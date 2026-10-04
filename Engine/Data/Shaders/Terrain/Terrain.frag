@@ -130,7 +130,7 @@ void main()
 	vec3 f3Directional = DirectionalLighting(pf4Lighting, f3Normal, mainLayout.fLightingDirectionalIntensity, mainLayout.fLightingDirectionalPower, mainLayout.fLightingDirectionalPowerMode);
 	vec3 f3Ambient = AmbientLightingPrecomputed(f3AmbientSum, mainLayout.fLightingAmbientIntensity, mainLayout.fLightingAmbientPower, mainLayout.fLightingAmbientPowerMode);
 	vec3 f3Lighting = globalLayout.fLightingTerrain * globalLayout.fLightingTimeOfDayMultiplier * (f3Directional + f3Ambient);
-	float fHeightRatio = clamp(f3InPosition.z * globalLayout.fBaseHeightInv, 0.0, 1.0);
+	float fHeightRatio = clamp(f3InPosition.z * globalLayout.fBaseHeightInverse, 0.0, 1.0);
 	f3Lighting *= mix(mainLayout.fLightingTerrainBelowBaseMultiplier, 1.0, pow(fHeightRatio, mainLayout.fLightingTerrainBelowBasePower));
 
 	// DT: TEMP — show only lighting texture contributions (with normals and base color)

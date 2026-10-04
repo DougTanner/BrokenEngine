@@ -7,7 +7,6 @@
 namespace engine
 {
 
-// Menu
 enum class MenuInputFlags : uint64_t
 {
 	kPauseMenu         = 0x00000001,
@@ -29,7 +28,7 @@ enum class MenuInputFlags : uint64_t
 	kToggleScreenshots = 0x00040000,
 	kMenuDebugTexture  = 0x00200000,
 	kDebugTextureNext  = 0x00400000,
-	kDebugTexturePrev  = 0x00800000,
+	kDebugTexturePrevious  = 0x00800000,
 	kToggleDebugRender = 0x01000000,
 };
 using MenuInputFlags_t = common::Flags<MenuInputFlags>;
@@ -44,32 +43,42 @@ struct MenuInput
 
 // Borrowed view of the current and previous raw snapshots, handed out by BeginPoll so engine policy and the
 // game callback detect edges against the same pair. It stores no state of its own and is only valid until
-// CompletePoll advances the previous snapshot, so it must never outlive GameBase::ProcessInput.
+// the previous snapshot advances, so it must never outlive GameBase::ProcessInput.
 class InputPoll
 {
 public:
 
-	bool KeyboardPressed(int64_t iKey) const { return mrCurrent.pKeyboardKeys[iKey] && !mrPrevious.pKeyboardKeys[iKey]; }
-	bool MousePressed(MouseButtons eButton) const { return (mrCurrent.mouseButtons & eButton) && !(mrPrevious.mouseButtons & eButton); }
-	bool GamepadPressed(GamepadButtons eButton) const { return (mrCurrent.gamepadButtons & eButton) && !(mrPrevious.gamepadButtons & eButton); }
+	const RawInput& mrCurrent;
+	const RawInput& mrPrevious;
+
+	bool KeyboardPressed(int64_t iKey) const
+	{
+		return mrCurrent.pbKeyboardKeys[iKey] && !mrPrevious.pbKeyboardKeys[iKey];
+	}
+	bool MousePressed(MouseButtons eButton) const
+	{
+		return (mrCurrent.mouseButtons & eButton) && !(mrPrevious.mouseButtons & eButton);
+	}
+	bool GamepadPressed(GamepadButtons eButton) const
+	{
+		return (mrCurrent.gamepadButtons & eButton) && !(mrPrevious.gamepadButtons & eButton);
+	}
 
 private:
 
 	friend class Input;
 
-	InputPoll(const RawInput& rCurrent, const RawInput& rPrevious) : mrCurrent(rCurrent), mrPrevious(rPrevious) {}
+	InputPoll(const RawInput& rCurrent, const RawInput& rPrevious) : mrCurrent(rCurrent), mrPrevious(rPrevious)
+	{
+	}
 
-	const RawInput& mrCurrent;
-	const RawInput& mrPrevious;
 };
 
-// Input manager class
 class Input
 {
 public:
 
 	InputPoll BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuInput);
-	void CompletePoll();
 
 private:
 
@@ -81,7 +90,9 @@ private:
 
 	// Previous display frame's published snapshot. Also carries the scroll-wheel baseline, since the raw
 	// snapshot exposes only a lifetime accumulator.
+public:
 	RawInput mPreviousRawInput {};
+private:
 
 	common::Flags<InputStateFlags> mStateFlags;
 };

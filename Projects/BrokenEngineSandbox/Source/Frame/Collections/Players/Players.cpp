@@ -76,9 +76,9 @@ void PlayersInterpolate::Register()
 		.uiCrc = data::kTexturesBlasterBC74pngCrc,
 		.puiColors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
 		.pf2TextureCoordinates = {{1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 1.0f}},
-		.fVisibleIntensity = gPlayerAreaLightVisibleIntensity.Get(),
-		.fLightingSize = gPlayerBlasterLightingArea.Get(),
-		.fLightingIntensity = gPlayerBlasterLightingIntensity.Get(),
+		.fVisibleIntensity = gPlayerAreaLightVisibleIntensity.mfCurrent,
+		.fLightingSize = gPlayerBlasterLightingArea.mfCurrent,
+		.fLightingIntensity = gPlayerBlasterLightingIntensity.mfCurrent,
 		.pVisibleIntensityWrapper = &gPlayerAreaLightVisibleIntensity,
 		.pLightingSizeWrapper = &gPlayerBlasterLightingArea,
 		.pLightingIntensityWrapper = &gPlayerBlasterLightingIntensity,
@@ -272,7 +272,7 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 			}
 
 			// The cell's local frame is centered on the origin, so the spawn offset is the local position.
-			XMVECTOR vecSpawnPosition = XMVectorSet(rSpawnData.fSpawnOffsetX, rSpawnData.fSpawnOffsetY, engine::gBaseHeight.Get(), 1.0f);
+			XMVECTOR vecSpawnPosition = XMVectorSet(rSpawnData.fSpawnOffsetX, rSpawnData.fSpawnOffsetY, engine::gBaseHeight.mfCurrent, 1.0f);
 
 			// These offsets arrive from outside the simulation (network or harness), so refuse one outside this
 			// cell here.
@@ -382,9 +382,9 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 			engine::WindTrailsInterpolate::Sync(rFrame.interpolate, rCurrentInterpolate.pWindTrails[i],
 			{
 				.vecPosition = rCurrentInterpolate.pVecPositions[i],
-				.fIntensity = game::gWindDepositPlayerIntensity.Get(),
-				.fWidth = game::gWindDepositPlayerWidth.Get(),
-				.fLengthMultiplier = game::gWindDepositPlayerLengthMultiplier.Get(),
+				.fIntensity = game::gWindDepositPlayerIntensity.mfCurrent,
+				.fWidth = game::gWindDepositPlayerWidth.mfCurrent,
+				.fLengthMultiplier = game::gWindDepositPlayerLengthMultiplier.mfCurrent,
 			});
 		}
 
@@ -496,7 +496,7 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 		{
 			vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime), rPreviousPostRender.pVecVelocities[i], vecPosition);
 		}
-		vecPosition = XMVectorSetZ(vecPosition, engine::gBaseHeight.Get());
+		vecPosition = XMVectorSetZ(vecPosition, engine::gBaseHeight.mfCurrent);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation (pos.W += dt * vel.W).
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
@@ -559,9 +559,9 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 			engine::WindTrailsInterpolate::Sync(rFrameInterpolate, rCurrent.pWindTrails[i],
 			{
 				.vecPosition = vecPosition,
-				.fIntensity = game::gWindDepositPlayerIntensity.Get(),
-				.fWidth = game::gWindDepositPlayerWidth.Get(),
-				.fLengthMultiplier = game::gWindDepositPlayerLengthMultiplier.Get(),
+				.fIntensity = game::gWindDepositPlayerIntensity.mfCurrent,
+				.fWidth = game::gWindDepositPlayerWidth.mfCurrent,
+				.fLengthMultiplier = game::gWindDepositPlayerLengthMultiplier.mfCurrent,
 			});
 		}
 
@@ -571,8 +571,8 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 		HexShieldIntensities hexShieldFragIntensities {};
 		for (int64_t j = 0; j < shaders::kiHexShieldDirections; ++j)
 		{
-			hexShieldVertIntensities.data[j] = std::max(rPrevious.pHexShieldVertIntensities[i].data[j] - gHexShieldIntensityDecay.Get() * fDeltaTime, 0.0f);
-			hexShieldFragIntensities.data[j] = std::max(rPrevious.pHexShieldFragIntensities[i].data[j] - gHexShieldIntensityDecay.Get() * fDeltaTime, 0.0f);
+			hexShieldVertIntensities.data[j] = std::max(rPrevious.pHexShieldVertIntensities[i].data[j] - gHexShieldIntensityDecay.mfCurrent * fDeltaTime, 0.0f);
+			hexShieldFragIntensities.data[j] = std::max(rPrevious.pHexShieldFragIntensities[i].data[j] - gHexShieldIntensityDecay.mfCurrent * fDeltaTime, 0.0f);
 		}
 		rCurrent.pHexShieldDirections[i] = hexShieldDirections;
 		rCurrent.pHexShieldVertIntensities[i] = hexShieldVertIntensities;
@@ -607,7 +607,7 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 				.pf4Directions = {},
 				.pfVertexIntensities = {},
 				.pfFragmentIntensities = {},
-				.fLightingIntensity = gHexShieldLightingIntensity.Get(),
+				.fLightingIntensity = gHexShieldLightingIntensity.mfCurrent,
 				.fSize = rCurrent.pfShieldShrinks[i] * kfHexShieldSizeScale,
 				.fColorMix = kfHexShieldColorMix,
 			};
@@ -723,7 +723,7 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 	// Frame center: every cell's local frame is centered on the origin.
 	// W=1.0 keeps this a proper position — every downstream (frameCenter - vecPosition) and cardinal offset add stays W-clean,
 	// so normalize fallbacks don't leak W into the AI direction and on into velocity.
-	XMVECTOR vecFrameCenter = XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.Get(), 1.0f);
+	XMVECTOR vecFrameCenter = XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.mfCurrent, 1.0f);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{

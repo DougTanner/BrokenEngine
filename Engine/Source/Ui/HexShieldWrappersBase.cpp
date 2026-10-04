@@ -5,7 +5,6 @@
 namespace engine
 {
 
-// Hex shield
 engine::Wrapper gHexShieldGrow(2.0f, 1.0f, 4.0f);
 engine::Wrapper gHexShieldEdgeDistance(18.8f, 18.0f, 19.1f);
 engine::Wrapper gHexShieldEdgePower(1.0f, 0.5f, 2.0f);

@@ -30,7 +30,7 @@ static_assert(BT_OFFSETOF(GameSettings, uiOpaqueUi) == 12, "GameSettings::uiOpaq
 static_assert(BT_OFFSETOF(GameSettings, eUiTheme) == 13, "GameSettings::eUiTheme offset changed — the theme byte follows the opaque-UI byte");
 static_assert(BT_OFFSETOF(GameSettings, uiPad) == 14, "GameSettings padding changed — GameSettings must remain 16 bytes");
 static_assert(sizeof(GameSettings) == 16, "GameSettings::kiVersion must be bumped with this layout");
-static constexpr char kpcGameSettingsPath[] = "GameSettings.bin";
+constexpr char kpcGameSettingsPath[] = "GameSettings.bin";
 
 void SaveGameSettings()
 {
@@ -40,8 +40,8 @@ void SaveGameSettings()
 	GameSettings gameSettings
 	{
 		.iLanguage = static_cast<int32_t>(geLanguage),
-		.fUiFontScale = gUiFontScale.Get(),
-		.fUiOpacity = gUiOpacity.Get(),
+		.fUiFontScale = gUiFontScale.mfCurrent,
+		.fUiOpacity = gUiOpacity.mfCurrent,
 		.uiOpaqueUi = static_cast<uint8_t>(gOpaqueUi.Get<bool>()),
 		.eUiTheme = GetUiTheme(),
 	};
@@ -49,10 +49,9 @@ void SaveGameSettings()
 	WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, kpcGameSettingsPath, gameSettings);
 }
 
-// Returns the first invalid field's name, or nullptr when every checked field is valid.
 static const char* FindInvalidGameSetting(const GameSettings& rGameSettings)
 {
-	if (rGameSettings.iLanguage < 0 || rGameSettings.iLanguage >= kLanguageCount)
+	if (rGameSettings.iLanguage < 0 || rGameSettings.iLanguage >= kiLanguageCount)
 	{
 		return "iLanguage";
 	}
@@ -74,31 +73,32 @@ void LoadGameSettings()
 {
 	GameSettings gameSettings {};
 
-	if (ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, kpcGameSettingsPath, gameSettings))
+	if (!ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, kpcGameSettingsPath, gameSettings))
 	{
-		const char* pcInvalidField = FindInvalidGameSetting(gameSettings);
-		if (pcInvalidField != nullptr)
-		{
-			LOG(kLoading, kWarning, "{} rejected: invalid {}", kpcGameSettingsPath, pcInvalidField);
-		}
-		else
-		{
-			geLanguage = static_cast<Language>(gameSettings.iLanguage);
-			gUiFontScale.Set(gameSettings.fUiFontScale);
-			gUiOpacity.Set(gameSettings.fUiOpacity);
-			gOpaqueUi.Set(gameSettings.uiOpaqueUi != 0);
-			gUiTheme.Set<UiTheme>(gameSettings.eUiTheme);
-		}
+		return;
 	}
+
+	const char* pcInvalidField = FindInvalidGameSetting(gameSettings);
+	if (pcInvalidField != nullptr)
+	{
+		LOG(kLoading, kWarning, "{} rejected: invalid {}", kpcGameSettingsPath, pcInvalidField);
+		return;
+	}
+
+	geLanguage = static_cast<Language>(gameSettings.iLanguage);
+	gUiFontScale.Set(gameSettings.fUiFontScale);
+	gUiOpacity.Set(gameSettings.fUiOpacity);
+	gOpaqueUi.Set(gameSettings.uiOpaqueUi != 0);
+	gUiTheme.Set<UiTheme>(gameSettings.eUiTheme);
 }
 
 void ResetGameSettings()
 {
 	geLanguage = Language::kEnglish;
-	gUiFontScale.ResetToDefault();
-	gOpaqueUi.ResetToDefault();
-	gUiOpacity.ResetToDefault();
-	gUiTheme.ResetToDefault();
+	gUiFontScale.mfCurrent = gUiFontScale.mfDefault;
+	gOpaqueUi.mfCurrent = gOpaqueUi.mfDefault;
+	gUiOpacity.mfCurrent = gUiOpacity.mfDefault;
+	gUiTheme.mfCurrent = gUiTheme.mfDefault;
 
 	SaveGameSettings();
 }

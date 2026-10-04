@@ -5,7 +5,7 @@
 namespace engine
 {
 
-// Helper to transfer data between objects using stream operators (for non-copyable types)
+// Streaming supports non-copyable types.
 template <typename T>
 inline void TransferViaStream(const T& rFrom, T& rTo)
 {
@@ -25,7 +25,6 @@ public:
 	{
 		mDifferences.reserve(1'024);
 
-		// Initialize starting state and frame
 		int64_t iStartTick = rSavedStart.interpolate.iTick;
 		TransferViaStream(rSavedStart, mSavedStart);
 		mInitialDifference = rInitialDifference;
@@ -53,7 +52,6 @@ public:
 
 	void Update(int64_t iTick, const DIFFERENCE_TYPE& rDifference, const SAVED_TYPE& rSavedCurrent)
 	{
-		// Record checksum for this frame
 		mChecksums.push_back(rSavedCurrent.Crc());
 		LOG(kReplay, kVerbose, "Checksum DifferenceStreamWriter Update {}: {}", rSavedCurrent.interpolate.iTick, *std::prev(mChecksums.end()));
 
@@ -62,22 +60,13 @@ public:
 			mFullFramesStream << rSavedCurrent;
 		}
 
-		// Skip if no state change occurred
 		if (rDifference.Crc() == mCurrentDifference.Crc())
 		{
 			return;
 		}
 
-		// Save the changed difference
 		mDifferences.emplace_back(iTick, rDifference);
 		mCurrentDifference = rDifference;
-	}
-
-	// Records an event that happens after iTick's dispatch. Appends are strictly increasing by construction,
-	// because the caller harvests at most one batch per tick.
-	void RecordPostDispatch(int64_t iTick, const DIFFERENCE_TYPE& rPostDispatch)
-	{
-		mPostDispatchRecords.emplace_back(iTick, rPostDispatch);
 	}
 
 	bool Save(FileFlags_t fileFlags, const std::filesystem::path& rFilename, const SAVED_TYPE& rSavedEnd)
@@ -85,10 +74,8 @@ public:
 		int64_t iDifferenceCount = mDifferences.size();
 		int64_t iPostDispatchCount = mPostDispatchRecords.size();
 
-		// Write header with version info, start/end states and metadata
 		bool bHeaderWritten = gpFileManager->WriteFileAtomically(fileFlags, rFilename, [&](std::fstream& rHeaderStream)
 		{
-			// Write version headers (matches WriteVersionedFile pattern)
 			WriteVersionHeader<SAVED_TYPE>(rHeaderStream);
 			WriteVersionHeader<DIFFERENCE_TYPE>(rHeaderStream);
 
@@ -104,35 +91,34 @@ public:
 			common::Write(rHeaderStream, iDifferenceCount);
 			rHeaderStream << rSavedEnd;
 			common::Write(rHeaderStream, iPostDispatchCount);
-			for (const auto& [iTick, postDispatch] : mPostDispatchRecords)
+			for (const auto& [riTick, rPostDispatch] : mPostDispatchRecords)
 			{
-				common::Write(rHeaderStream, iTick);
+				common::Write(rHeaderStream, riTick);
 				if constexpr (std::is_trivially_copyable_v<DIFFERENCE_TYPE>)
 				{
-					common::Write(rHeaderStream, postDispatch);
+					common::Write(rHeaderStream, rPostDispatch);
 				}
 				else
 				{
-					rHeaderStream << postDispatch;
+					rHeaderStream << rPostDispatch;
 				}
 			}
 		});
 		LOG(kReplay, kVerbose, "DifferenceStreamWriter save at frame {}: Count {} Checksum {}", rSavedEnd.interpolate.iTick, iDifferenceCount, rSavedEnd.Crc());
 
-		// Write difference records
 		std::filesystem::path framesFilename = std::filesystem::path(rFilename).concat(".frames");
 		bool bFramesWritten = gpFileManager->WriteFileAtomically(fileFlags, framesFilename, [&](std::fstream& rFramesStream)
 		{
-			for (const auto& [iTick, difference] : mDifferences)
+			for (const auto& [riTick, rDifference] : mDifferences)
 			{
-				common::Write(rFramesStream, iTick);
+				common::Write(rFramesStream, riTick);
 				if constexpr (std::is_trivially_copyable_v<DIFFERENCE_TYPE>)
 				{
-					common::Write(rFramesStream, difference);
+					common::Write(rFramesStream, rDifference);
 				}
 				else
 				{
-					rFramesStream << difference;
+					rFramesStream << rDifference;
 				}
 			}
 		});
@@ -166,7 +152,6 @@ public:
 
 		if constexpr (kbReplayFullFrames)
 		{
-			// Write complete frame snapshots for debugging
 			std::filesystem::path fullFramesFilename = std::filesystem::path(rFilename).concat(".fullframes");
 			bool bFullFramesWritten = gpFileManager->WriteFileAtomically(fileFlags, fullFramesFilename, [&](std::fstream& rFullFramesStream)
 			{
@@ -219,7 +204,11 @@ private:
 	std::vector<difference_t> mDifferences;
 	DIFFERENCE_TYPE mCurrentDifference {};
 
+public:
+	// Records an event that happens after iTick's dispatch. Appends are strictly increasing by construction,
+	// because the caller harvests at most one batch per tick.
 	std::vector<difference_t> mPostDispatchRecords;
+private:
 
 	std::vector<common::crc_t> mChecksums;
 	bool mbRecordsInitialChecksum = false;
@@ -241,14 +230,12 @@ public:
 		riMismatchFileVersion = 0;
 		riMismatchExpectedVersion = 0;
 
-		// Read header with version info, start/end states and metadata
 		std::fstream headerStream = gpFileManager->OpenFile(rFileFlags, rFilename);
 		if (!headerStream)
 		{
 			return;
 		}
 
-		// Read and validate version headers (matches ReadVersionedFile pattern)
 		int64_t iSavedVersion = 0;
 		int64_t iSavedSize = 0;
 		if (!ReadAndValidateVersionHeader<SAVED_TYPE>(headerStream, iSavedVersion, iSavedSize))
@@ -289,9 +276,9 @@ public:
 			headerStream >> rInitialDifference;
 		}
 		mCurrentDifference = rInitialDifference;
-		common::Read(headerStream, mDifferenceCount);
+		common::Read(headerStream, miDifferenceCount);
 		headerStream >> mSavedEnd;
-		if (!headerStream || mDifferenceCount < 0 || rSavedStart.interpolate.iTick < 0
+		if (!headerStream || miDifferenceCount < 0 || rSavedStart.interpolate.iTick < 0
 		 || mSavedEnd.interpolate.iTick < rSavedStart.interpolate.iTick
 		 || mSavedEnd.interpolate.iTick > std::numeric_limits<int64_t>::max() - 1)
 		{
@@ -380,11 +367,10 @@ public:
 		}
 		// Bound the replay .frames file's difference count against the stream before
 		// allocating; each record serializes at least an int64 tick plus one byte of difference.
-		common::ValidateDeserializedCount(mDifferenceCount, sizeof(int64_t) + 1, fileStream, "DifferenceStreamReader differences");
+		common::ValidateDeserializedCount(miDifferenceCount, sizeof(int64_t) + 1, fileStream, "DifferenceStreamReader differences");
 
-		// Load difference records
-		mDifferences.reserve(mDifferenceCount);
-		for (int64_t i = 0; i < mDifferenceCount; ++i)
+		mDifferences.reserve(miDifferenceCount);
+		for (int64_t i = 0; i < miDifferenceCount; ++i)
 		{
 			int64_t iTick = 0;
 			common::Read(fileStream, iTick);
@@ -469,7 +455,6 @@ public:
 
 		if constexpr (kbReplayFullFrames)
 		{
-			// Load complete frame snapshots for debugging
 			std::fstream fullFramesFile = gpFileManager->OpenFile(rFileFlags, std::filesystem::path(rFilename).concat(".fullframes"));
 			if (fullFramesFile)
 			{
@@ -496,21 +481,6 @@ public:
 		}
 
 		rbLoaded = true;
-	}
-
-	int64_t GetRecordedFrameCount()
-	{
-		return mDifferenceCount;
-	}
-
-	const SAVED_TYPE& GetSavedEnd() const
-	{
-		return mSavedEnd;
-	}
-
-	int64_t GetStartTick() const
-	{
-		return miStartTick;
 	}
 
 	bool IsTerminalTick(int64_t iTick) const
@@ -553,11 +523,10 @@ public:
 			}
 		}
 
-		common::crc_t currentChecksum = rSavedCurrent.Crc();
-		common::crc_t savedChecksum = mChecksums.at(iChecksumIndex);
+		common::crc_t uiCurrentChecksum = rSavedCurrent.Crc();
+		common::crc_t uiSavedChecksum = mChecksums.at(iChecksumIndex);
 
-		// On checksum mismatch, provide detailed diagnostics
-		if (currentChecksum != savedChecksum)
+		if (uiCurrentChecksum != uiSavedChecksum)
 		{
 			if constexpr (kbReplayFullFrames)
 			{
@@ -566,7 +535,7 @@ public:
 					savedFrame.LogDifferences(rSavedCurrent);
 				}
 			}
-			LOG(kNetwork, kError, "LogDifferences CRC Client: {} Server: {}", savedChecksum, currentChecksum);
+			LOG(kNetwork, kError, "LogDifferences CRC Client: {} Server: {}", uiSavedChecksum, uiCurrentChecksum);
 		}
 
 		mReaderFlags.Set(ReaderFlags::kTerminalChecksumValidated, IsTerminalTick(iTick));
@@ -598,7 +567,6 @@ public:
 			return false;
 		}
 
-		// Load difference if available for this frame, otherwise use current
 		if (mDifferencesIterator != mDifferences.end() && iTick == std::get<0>(*mDifferencesIterator))
 		{
 			rDifference = std::get<1>(*mDifferencesIterator);
@@ -672,8 +640,12 @@ private:
 		}
 	}
 
+public:
 	SAVED_TYPE mSavedEnd {};
-	int64_t mDifferenceCount = 0;
+
+	int64_t miDifferenceCount = 0;
+
+private:
 
 	std::vector<difference_t> mDifferences;
 	typename std::vector<difference_t>::iterator mDifferencesIterator = mDifferences.end();
@@ -683,7 +655,9 @@ private:
 	typename std::vector<difference_t>::iterator mPostDispatchRecordsIterator = mPostDispatchRecords.end();
 
 	std::vector<common::crc_t> mChecksums;
+public:
 	int64_t miStartTick = 0;
+private:
 	common::Flags<ReaderFlags> mReaderFlags;
 
 	std::stringstream mFullFramesStream;

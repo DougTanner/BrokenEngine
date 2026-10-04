@@ -19,7 +19,7 @@ struct AreaLightsType
 	float fLightingSize = 1.0f;
 	float fLightingIntensity = 1.0f;
 
-	// Render-time wrapper overrides: if non-null, wrapper.Get() replaces the baked value
+	// Render-time wrapper overrides: if non-null, wrapper.mfCurrent replaces the baked value
 	Wrapper* pVisibleIntensityWrapper = nullptr;
 	Wrapper* pLightingSizeWrapper = nullptr;
 	Wrapper* pLightingIntensityWrapper = nullptr;

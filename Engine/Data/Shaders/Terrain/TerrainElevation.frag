@@ -33,8 +33,8 @@ void main()
     // Undersea depth compression only applies below sea level; land pixels (fRaw >= 0) pass through and skip the pow
     if (fRaw < 0.0)
     {
-        float fT = clamp(fRaw * globalLayout.fSeaFloorElevationInv, 0.0, 1.0);
-        fOutElevation = pow(fT, globalLayout.fWaterUnderseaCompressionInv) * globalLayout.fSeaFloorElevation;
+        float fT = clamp(fRaw * globalLayout.fSeaFloorElevationInverse, 0.0, 1.0);
+        fOutElevation = pow(fT, globalLayout.fWaterUnderseaCompressionInverse) * globalLayout.fSeaFloorElevation;
     }
     else
     {

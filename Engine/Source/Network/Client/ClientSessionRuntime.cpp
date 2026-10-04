@@ -77,8 +77,8 @@ static bool ContainsCoordinate(std::span<const GridCoord> coordinates, GridCoord
 
 static ClientNetworkFixtures::CoordUpdateState QueryFixtureCoordinateUpdateState(GridCoord coordinate, int64_t iTick)
 {
-	auto it = game::gpGame->mCoordFrames.find(coordinate);
-	if (it == game::gpGame->mCoordFrames.end())
+	auto it = game::gpGame->mCoordinateFrames.find(coordinate);
+	if (it == game::gpGame->mCoordinateFrames.end())
 	{
 		return {};
 	}
@@ -99,7 +99,7 @@ void ClientSessionRuntime::InitializeLogTickScope(std::optional<common::LogTickS
 {
 	if (common::gpThreadLocal->miLogTickCounter < 0)
 	{
-		rOptionalTickScope.emplace(game::gpGame->TickCounter());
+		rOptionalTickScope.emplace(game::gpGame->miTickCounter);
 	}
 }
 
@@ -295,7 +295,7 @@ void ClientSessionRuntime::ApplyReceivedFullStates()
 		GridCoord coordinate = rFullState.coordinate;
 		int64_t iTick = rFullState.iTick;
 
-		CoordFrames& rCoordinateFrames = game::gpGame->mCoordFrames.try_emplace(coordinate).first->second;
+		CoordFrames& rCoordinateFrames = game::gpGame->mCoordinateFrames.try_emplace(coordinate).first->second;
 
 		const game::Frame* pRingTail = nullptr;
 		if (rCoordinateFrames.iSnapshotCount > 0)
@@ -322,15 +322,17 @@ void ClientSessionRuntime::ApplyReceivedFullStates()
 			// Only the first full state sets the game clock. Start behind the server by the jitter-safety floor,
 			// matching EvaluateClock, to avoid a ~150 ms ceiling stall and an initial target-behind error.
 			// Clamp the offset to iTick so a freshly loaded server cannot produce a negative simulation tick.
-			if (bInitialSetup && game::gpGame->TickCounter() < iTick)
+			if (bInitialSetup && game::gpGame->miTickCounter < iTick)
 			{
 				// iTickWallNanoseconds is one tick's wall duration at the current time scale, so dividing the
 				// wall-clock nanosecond numerator by it keeps the tick count correct as the time scale changes.
 				int64_t iTickWallNanoseconds = game::gpGame->mTimeStep.SimulationToWall(engine::kTickNanoseconds).count();
 				int64_t iInitialTargetBehind = (engine::kiJitterSafetyMicroseconds * 1'000 + iTickWallNanoseconds - 1) / iTickWallNanoseconds;
 				int64_t iAppliedBehind = std::min<int64_t>(iInitialTargetBehind, iTick);
-				game::gpGame->SetTickCounter(iTick - iAppliedBehind);
-				game::gpGame->SetCurrentTime(fFullStateTime - static_cast<float>(iAppliedBehind) * engine::kfDeltaTime);
+				int64_t iTickCounter = iTick - iAppliedBehind;
+				ASSERT(iTickCounter >= 0);
+				game::gpGame->miTickCounter = iTickCounter;
+				game::gpGame->mfCurrentTime = fFullStateTime - static_cast<float>(iAppliedBehind) * engine::kfDeltaTime;
 				game::gpGame->ResetRenderClock();
 			}
 		}
@@ -377,7 +379,7 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 		}
 
 		GridCoord coordinate = rSlot.coordinate;
-		CoordFrames& rCoordinateFrames = game::gpGame->mCoordFrames.at(coordinate);
+		CoordFrames& rCoordinateFrames = game::gpGame->mCoordinateFrames.at(coordinate);
 
 		for (ReceivedCoordUpdate& rUpdate : rSlotUpdates)
 		{
@@ -407,7 +409,7 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 
 			bool bInserted = rCoordinateFrames.serverUpdates.try_emplace(rUpdate.iTick, CoordFrames::CoordServerUpdate
 			{
-				.sharedCrc = rUpdate.uiSharedCrc,
+				.uiSharedCrc = rUpdate.uiSharedCrc,
 				.statusChanges = std::move(rUpdate.statusChanges),
 			}).second;
 			if (bInserted)
@@ -425,7 +427,7 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 int64_t ClientSessionRuntime::GetConfirmedTick() const
 {
 	int64_t iMinimumTick = -1;
-	for (const auto& [rCoordinate, rCoordinateFrames] : game::gpGame->mCoordFrames)
+	for (const auto& [rCoordinate, rCoordinateFrames] : game::gpGame->mCoordinateFrames)
 	{
 		if (rCoordinateFrames.iConfirmedTick >= 0 && (iMinimumTick < 0 || rCoordinateFrames.iConfirmedTick < iMinimumTick))
 		{
@@ -437,8 +439,8 @@ int64_t ClientSessionRuntime::GetConfirmedTick() const
 
 int64_t ClientSessionRuntime::GetClientConfirmedTick() const
 {
-	auto it = game::gpGame->mCoordFrames.find(game::gpGame->mClientGridCoord);
-	if (it == game::gpGame->mCoordFrames.end())
+	auto it = game::gpGame->mCoordinateFrames.find(game::gpGame->mClientGridCoordinate);
+	if (it == game::gpGame->mCoordinateFrames.end())
 	{
 		return -1;
 	}
@@ -452,7 +454,7 @@ int64_t ClientSessionRuntime::GetClientConfirmedTick() const
 int64_t ClientSessionRuntime::GetServerUpdateBufferSize() const
 {
 	int64_t iTotal = 0;
-	for (const auto& [rCoordinate, rCoordinateFrames] : game::gpGame->mCoordFrames)
+	for (const auto& [rCoordinate, rCoordinateFrames] : game::gpGame->mCoordinateFrames)
 	{
 		if (rCoordinateFrames.iConfirmedTick >= 0)
 		{
@@ -715,7 +717,9 @@ void ClientSessionRuntime::ApplyClockCorrection(int64_t iPreReconcileTick)
 		// doesn't drive the client tick negative.
 		int64_t iSnapTick = std::max<int64_t>(0, miLatestServerTick - miCurrentTargetBehind);
 		LOG(kNetwork, kWarning, "ClientSessionRuntime::ApplyClockCorrection Clock snap OldTick: {} NewTick: {} LatestServerTick: {} TargetBehind: {}", iPreReconcileTick, iSnapTick, miLatestServerTick, miCurrentTargetBehind);
-		game::gpGame->SetTickCounter(iSnapTick);
+		int64_t iTickCounter = iSnapTick;
+		ASSERT(iTickCounter >= 0);
+		game::gpGame->miTickCounter = iTickCounter;
 		game::gpGame->mTimeStep.mTickRemainderNanoseconds = 0ns;
 		game::gpGame->ResetRenderClock();
 		miClockError = 0;

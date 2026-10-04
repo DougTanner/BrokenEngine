@@ -38,19 +38,14 @@ public:
 	explicit PackChunks(const std::filesystem::path& rDataDirectory);
 	~PackChunks();
 
-	PackChunks(const PackChunks&) = delete; // Its by-value loader borrows `this`; deleting copy also suppresses the implicit move
+	PackChunks(const PackChunks&) = delete; // The by-value loader retains this object's address.
 	PackChunks& operator=(const PackChunks&) = delete;
 
 	const std::unordered_map<common::crc_t, EagerChunk>& GetEagerChunkMap() const;
-	const std::unordered_map<common::crc_t, LazyChunk>& GetLazyChunkMap() const;
-	common::crc_t GetPackIntegrityToken() const;
 
-	// Lazy loading APIs
 	bool IsChunkReady(common::crc_t crc) const;
-	void RequestChunkLoad(std::span<const common::crc_t> crcs, LoadPriority ePriority);
 	void WaitForChunks(std::span<const common::crc_t> crcs);
 
-	// Streaming API for reading data at specific offset within a chunk
 	bool ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer);
 
 #if defined(BT_CLIENT)
@@ -58,25 +53,28 @@ public:
 	void CancelChunkRead(ChunkReadRequest& rRequest);
 #endif // BT_CLIENT
 
-	// Notification for chunk completion (wakes WaitForChunks waiters)
-	void NotifyChunkCompletion();
-	LazyChunk& GetLazyChunk(common::crc_t crc);
-
-	void WaitForLoadersIdle();
-
+	// Reset texture eState and GPU handles: all texture chunks, or only targetCrcs. Chunk pool pointers and sizes are
+	// fixed at construction and are not touched. The caller owns exclusion for the chunks it resets — full recovery
+	// through WaitForLoadersIdle plus the upload-thread wait, island eviction through RenderGlobal's drained
+	// descriptor window, which excludes Vulkan descriptor/image use and is not a loader drain.
 	void ResetTextureChunkStates();
 	void ResetTextureChunkStates(std::span<const common::crc_t> targetCrcs);
 
+	// Reclaim a dead sub-range of a resident lazy chunk's decompressed pool memory. Decommits only the
+	// page-aligned interior of [uiOffset, uiOffset + uiLength); the boundary partial-pages (which may share
+	// bytes with the neighbouring payload) and every other chunk stay committed, and the chunk's pData pointer
+	// is unchanged. A consumer must recommit and reload the range before reading it again. Main-thread
+	// only (boot / device-loss recovery / transfer-complete texture adoption) — the range must have no concurrent reader.
 	void DecommitChunkRange(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
+	// Inverse of DecommitChunkRange: MEM_COMMITs the interior and re-reads [uiOffset, uiOffset + uiLength)
+	// straight from the pack file on disk into the pool (NOT via the decommitted resident copy). Uncompressed chunks only.
+	// Returns true on success; false on soft-fail (MEM_COMMIT failure / pack-open failure). On false the
+	// caller must NOT read the range — the interior may be decommitted or hold partial data.
 	[[nodiscard]] bool RecommitAndReloadChunkRange(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
-	void RequestChunkRangeReload(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, LoadPriority ePriority);
-	ChunkRangeReloadState GetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength) const;
-	void ResetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
 
-	// Memory profiling
-	MemoryStats GetEagerStats() const;
-	MemoryStats GetLazyStats() const;
-	MemoryStats GetMemoryStats(data::DataTypes eDataType) const;
+	MemoryStats GetEagerStatistics() const;
+	MemoryStats GetLazyStatistics() const;
+	MemoryStats GetMemoryStatistics(data::DataTypes eDataType) const;
 
 private:
 	friend class PackChunkLoader;
@@ -91,10 +89,10 @@ public:
 #endif
 	bool HasQueuedAudioRead() const;
 	bool HasOccupiedAudioRead() const;
-	static constexpr uint32_t kiAudioReadEntryCount = 6;
+	static constexpr int64_t kiAudioReadEntryCount = 6;
 
 private:
-	static constexpr uint32_t kiInvalidAudioReadEntry = std::numeric_limits<uint32_t>::max();
+	static constexpr uint32_t kuiInvalidAudioReadEntry = std::numeric_limits<uint32_t>::max();
 #if defined(BT_DEBUG)
 public:
 #endif
@@ -117,13 +115,12 @@ private:
 
 	// Per-data-type chunk-location tables (offset/size/path CRC/content CRC), read from each manifest in LoadPackFiles
 	std::vector<common::ChunkLocation> mChunkLocations[data::kDataTypeCount];
-	common::crc_t mPackIntegrityToken = common::kCrcSeed;
-
-	// Split chunk maps for eager and lazy loading
-	std::unordered_map<common::crc_t, EagerChunk> mEagerChunkMap;  // Scene, Model, Shader, Raw
-#if defined(BT_CLIENT) && defined(BT_DEBUG)
 public:
-#endif
+	common::crc_t mPackIntegrityToken = common::kCrcSeed;
+private:
+
+	std::unordered_map<common::crc_t, EagerChunk> mEagerChunkMap;  // Scene, Model, Shader, Raw
+public:
 	std::unordered_map<common::crc_t, LazyChunk> mLazyChunkMap;  // Audio, Islands, Texture
 private:
 
@@ -158,9 +155,7 @@ private:
 	// Sub-read size for chunked disk reads (256KB balances NVMe throughput vs L3 cache pressure)
 	static constexpr int64_t kiSubReadSize = 256 * 1'024;
 
-#if defined(BT_CLIENT) && defined(BT_DEBUG)
 public:
-#endif
 	PackChunkLoader mLoader;
 };
 

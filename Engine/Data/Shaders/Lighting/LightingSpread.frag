@@ -76,14 +76,14 @@ void main()
 
 	// Height fade: attenuate spread above base height
 	float fElevation = texture(elevationSampler, f2ElevTexcoord).x;
-	float fHeightT = clamp((fElevation - globalLayout.fBaseHeight) * globalLayout.fSpreadHeightEndHeightInv, 0.0f, 1.0f);
+	float fHeightT = clamp((fElevation - globalLayout.fBaseHeight) * globalLayout.fSpreadHeightEndHeightInverse, 0.0f, 1.0f);
 	float fHeightFade = pow(fHeightT, globalLayout.fSpreadHeightPower) * globalLayout.fSpreadHeightMultiplier;
 	fSpreadDistance *= 1.0f - fHeightFade;
 	fDecay *= 1.0f - fHeightFade;
 
 	// World-to-texcoord conversion: texcoord 0-1 covers the lighting area
-	float fAspectRatioX = globalLayout.f2LightingAreaExtentInv.x;
-	float fAspectRatioY = globalLayout.f2LightingAreaExtentInv.y;
+	float fAspectRatioX = globalLayout.f2LightingAreaExtentInverse.x;
+	float fAspectRatioY = globalLayout.f2LightingAreaExtentInverse.y;
 
 	f4OutRed = vec4(0.0f);
 	f4OutGreen = vec4(0.0f);

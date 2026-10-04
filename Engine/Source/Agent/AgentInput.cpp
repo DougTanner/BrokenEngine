@@ -475,7 +475,7 @@ void AgentInput::Overlay(RawInput& rRawInput)
 	{
 		if (mpbSyntheticKeys[i])
 		{
-			rRawInput.pKeyboardKeys[i] = true;
+			rRawInput.pbKeyboardKeys[i] = true;
 		}
 	}
 
@@ -503,8 +503,8 @@ void AgentInput::Overlay(RawInput& rRawInput)
 	// Overwrite mouse position with the synthetic pixel pos (normalized as the hardware path does).
 	if (mbSyntheticMousePosValid)
 	{
-		rRawInput.f2MousePosition.x = mf2SyntheticMousePixels[0] / static_cast<float>(gpGraphics->mFramebufferExtent2D.width);
-		rRawInput.f2MousePosition.y = mf2SyntheticMousePixels[1] / static_cast<float>(gpGraphics->mFramebufferExtent2D.height);
+		rRawInput.f2MousePosition.x = mf2SyntheticMousePixels[0] / static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
+		rRawInput.f2MousePosition.y = mf2SyntheticMousePixels[1] / static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	}
 
 	// NOTE: the synthetic scroll accumulator is deliberately NOT added here. iScrollWheelValue is a lifetime

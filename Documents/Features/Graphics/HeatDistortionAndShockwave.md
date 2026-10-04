@@ -178,20 +178,20 @@ Changes (12 files)
 
         void RenderTargetTextures::CreateDistortionTextures()
         {
-            VkExtent2D framebufferExtent = gpGraphics->mFramebufferExtent2D;
+            VkExtent2D framebufferExtent = gpGraphics->mFramebufferVkExtent2D;
             mDistortionSceneCopyTexture.Create(
             {
                 .textureFlags = {},
                 .name = "DistortionSceneCopy",
-                .flags = 0,
-                .format = VK_FORMAT_B8G8R8A8_UNORM,
-                .extent = VkExtent3D {framebufferExtent.width, framebufferExtent.height, 1},
-                .mipLevels = 1,
-                .arrayLayers = 1,
-                .samples = VK_SAMPLE_COUNT_1_BIT,
-                .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .vkImageCreateFlags = 0,
+                .vkFormat = VK_FORMAT_B8G8R8A8_UNORM,
+                .vkExtent3D = VkExtent3D {framebufferExtent.width, framebufferExtent.height, 1},
+                .uiMipLevels = 1,
+                .uiArrayLayers = 1,
+                .vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+                .vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                .vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+                .vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
                 .eTextureLayout = kShaderReadOnly,
             });
         }
@@ -203,12 +203,12 @@ Changes (12 files)
 
 5. Engine/Source/Graphics/Managers/BufferManager.h
    Add a distortion source storage buffer.
-   After mUiRectStorageBuffers (line 62), add:
+   After mUiRectangleStorageBuffers (line 62), add:
 
      std::vector<Buffer> mDistortionStorageBuffers;
 
    Initialize these in BufferManager::InitializePerCommandBufferBuffers
-   alongside mUiRectStorageBuffers (BufferManager.cpp:295/315), one per
+   alongside mUiRectangleStorageBuffers (BufferManager.cpp:295/315), one per
    framebuffer, with size for
    kiMaxDistortionSources * sizeof(DistortionSourceLayout).
 
@@ -230,7 +230,7 @@ Changes (12 files)
          .flags = {kNoWireframe},
          .ppShaders = {&mShaders.at(data::kShadersQuadsQuadsFullscreenvertCrc), &mShaders.at(data::kShadersDistortionDistortionfragCrc)},
          .pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-         .pDescriptorInfos =
+         .descriptorInfos =
          {
              {.flags = kMainLayoutUniformBuffers},
              {.flags = kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mDistortionStorageBuffers.data()},
@@ -240,7 +240,7 @@ Changes (12 files)
 
 8. Engine/Source/Graphics/Managers/CommandBufferManager.cpp
    After the image render pass ends (line 753,
-   Texture::RecordEndRenderPass) and before GpuStop for
+   vkCmdEndRenderPass) and before GpuStop for
    kGpuTimerImage (line 754), insert the distortion pass:
 
      // Copy the resolved scene to the distortion source texture
@@ -249,9 +249,9 @@ Changes (12 files)
      VkImageBlit blitRegion
      {
          .srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-         .srcOffsets = {{0, 0, 0}, {static_cast<int32_t>(gpGraphics->mFramebufferExtent2D.width), static_cast<int32_t>(gpGraphics->mFramebufferExtent2D.height), 1}},
+         .srcOffsets = {{0, 0, 0}, {static_cast<int32_t>(gpGraphics->mFramebufferVkExtent2D.width), static_cast<int32_t>(gpGraphics->mFramebufferVkExtent2D.height), 1}},
          .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-         .dstOffsets = {{0, 0, 0}, {static_cast<int32_t>(gpGraphics->mFramebufferExtent2D.width), static_cast<int32_t>(gpGraphics->mFramebufferExtent2D.height), 1}},
+         .dstOffsets = {{0, 0, 0}, {static_cast<int32_t>(gpGraphics->mFramebufferVkExtent2D.width), static_cast<int32_t>(gpGraphics->mFramebufferVkExtent2D.height), 1}},
      };
      Texture::RecordImageCopy(vkCommandBuffer, gpSwapchainManager->GetResolveImage(iFramebuffer), gpTextureManager->mRenderTargetTextures.mDistortionSceneCopyTexture, blitRegion);
      gpTextureManager->mRenderTargetTextures.mDistortionSceneCopyTexture.TransitionImageLayout(vkCommandBuffer, kTransferDst, kShaderReadOnly);
@@ -261,10 +261,10 @@ Changes (12 files)
      {
          RenderPassFlags_t distortionFlags {};
          distortionFlags.Set(RenderPassFlags::kClear);
-         Texture::RecordBeginRenderPass(vkCommandBuffer, gpSwapchainManager->mVkRenderPass, gpSwapchainManager->mFramebuffers.at(iFramebuffer).presentVkFramebuffer, gpGraphics->mFramebufferExtent2D, VkClearColorValue {}, distortionFlags, VK_SUBPASS_CONTENTS_INLINE);
+         Texture::RecordBeginRenderPass(vkCommandBuffer, gpSwapchainManager->mVkRenderPass, gpSwapchainManager->mFramebuffers.at(iFramebuffer).vkPresentFramebuffer, gpGraphics->mFramebufferVkExtent2D, VkClearColorValue {}, distortionFlags, VK_SUBPASS_CONTENTS_INLINE);
      }
      pPipelines[kPipelineDistortion].RecordDraw(iCommandBuffer, vkCommandBuffer, 1, 0);
-     Texture::RecordEndRenderPass(vkCommandBuffer);
+     vkCmdEndRenderPass(vkCommandBuffer);
      gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerDistortion);
 
    The swapchain image must have VK_IMAGE_USAGE_TRANSFER_SRC_BIT
@@ -340,13 +340,13 @@ Changes (12 files)
 
     Populate them in MainUniforms.cpp alongside the distortion
     source population:
-      rMainLayout.fDistortionHeatStrength = gDistortionHeatStrength.Get();
-      rMainLayout.fDistortionHeatSpeed = gDistortionHeatSpeed.Get();
-      rMainLayout.fDistortionHeatScale = gDistortionHeatScale.Get();
-      rMainLayout.fDistortionShockwaveStrength = gDistortionShockwaveStrength.Get();
-      rMainLayout.fDistortionShockwaveSpeed = gDistortionShockwaveSpeed.Get();
-      rMainLayout.fDistortionShockwaveWidth = gDistortionShockwaveWidth.Get();
-      rMainLayout.fDistortionShockwaveFalloff = gDistortionShockwaveFalloff.Get();
+      rMainLayout.fDistortionHeatStrength = gDistortionHeatStrength.mfCurrent;
+      rMainLayout.fDistortionHeatSpeed = gDistortionHeatSpeed.mfCurrent;
+      rMainLayout.fDistortionHeatScale = gDistortionHeatScale.mfCurrent;
+      rMainLayout.fDistortionShockwaveStrength = gDistortionShockwaveStrength.mfCurrent;
+      rMainLayout.fDistortionShockwaveSpeed = gDistortionShockwaveSpeed.mfCurrent;
+      rMainLayout.fDistortionShockwaveWidth = gDistortionShockwaveWidth.mfCurrent;
+      rMainLayout.fDistortionShockwaveFalloff = gDistortionShockwaveFalloff.mfCurrent;
 
 11. Engine/Source/Ui/Screens/TweaksScreen/TweaksSliderMap.cpp
     and Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenPbr.cpp

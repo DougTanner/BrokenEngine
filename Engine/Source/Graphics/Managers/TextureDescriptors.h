@@ -44,9 +44,9 @@ public:
 		int64_t iArrayIndex = -1;
 	};
 	void RegisterTextureBinding(const TextureBindingInfo& rInfo);
-	void RegisterBindlessArrayConsumer(Texture** ppTextures, Pipeline* pPipeline, int64_t iBinding, DescriptorFlags_t samplerFlags, int64_t iCount);
+	void RegisterBindlessArrayConsumer(std::span<Texture*> textures, Pipeline* pPipeline, int64_t iBinding, DescriptorFlags_t samplerFlags);
 	void RegisterStandaloneSamplerBinding(Pipeline* pPipeline, int64_t iBinding, DescriptorFlags_t samplerFlags);
-	void UnregisterPipeline(Pipeline* pPipeline);
+	void UnregisterPipeline(const Pipeline* pPipeline);
 	void UpdateDescriptorsForTexture(common::crc_t crc);
 	// Island slots own five coordinated array elements: template-owned elevation plus four lazy
 	// chunk-backed channels. The registry keeps their metadata and descriptor registrations together.
@@ -63,15 +63,13 @@ public:
 	int64_t CrcToIndex(common::crc_t crc);
 	float CrcToBlurredIndex(common::crc_t crc);
 
-	// Salt XOR'd into a texture CRC to key its pre-blurred bindless-array variant. Single-sourced here;
-	// referenced by both the blur-write site (TextureManager) and CrcToBlurredIndex (TextureDescriptors).
+	// XOR salt shared by TextureManager's blur writes and CrcToBlurredIndex for pre-blurred bindless-array entries.
 	static constexpr common::crc_t kBlurSalt = 0x424C5552; // "BLUR"
 
 	// Global descriptor Set 0 shared by all graphics pipelines
 	VkDescriptorSetLayout mGlobalVkDescriptorSetLayout = VK_NULL_HANDLE;
 	std::vector<VkDescriptorSet> mGlobalDescriptorSets;
 
-	// Texture binding tracking for deferred descriptor updates
 	struct TextureBinding
 	{
 		Pipeline* pPipeline = nullptr;
@@ -92,7 +90,6 @@ public:
 		int64_t iArrayIndex = -1;
 	};
 
-	// Standalone sampler binding tracking for sampler recreation
 	struct StandaloneSamplerBinding
 	{
 		Pipeline* pPipeline = nullptr;
@@ -102,20 +99,16 @@ public:
 
 	void WriteArrayBindingDescriptors(TextureBinding& rBinding, VkSampler vkSampler);
 	void SynchronizeFullArrayBindingGenerations(const TextureBinding& rBinding);
-	// Write the single (non-array) combined-image-sampler descriptor for a binding, resolving the view from
-	// rBinding.pTexture or, if null, the CRC's mTextureMap entry. Extracted from RewriteSamplerDescriptors.
+	// Resolve the single-texture view from rBinding.pTexture, falling back to the CRC's mTextureMap entry.
 	void WriteSingleTextureBinding(common::crc_t crc, TextureBinding& rBinding, VkSampler vkSampler);
-	void WriteFullArrayDescriptors(Pipeline& rPipeline, int64_t iBinding, Texture* const* ppArray, int64_t iCount, VkSampler vkSampler);
-	void WriteArrayElementFromLive(Texture** ppArray, int64_t iIndex);
+	void WriteFullArrayDescriptors(const Pipeline& rPipeline, int64_t iBinding, std::span<Texture* const> textures, VkSampler vkSampler);
+	void WriteArrayElementFromLive(Texture* const* ppArray, int64_t iIndex);
 	void RegisterIslandSlotBindings(common::crc_t bindingKey, Texture** ppTextures, int64_t iSlot);
 	void UnregisterBindingsForKey(common::crc_t bindingKey);
 	void AssertBindlessWriteEpoch() const;
 
-	// Consumer entry for a bindless texture array whose per-slot binding key is supplied lazily by
-	// the data subsystem (e.g., IslandTerrain). Populated by PipelineDescriptorWriter when it sees
-	// a DescriptorInfo flagged with kBindlessArrayConsumer. Map key is the array pointer
-	// (e.g., RenderTargetTextures::mElevationTextures.data()), so the per-entry array pointer is
-	// implicit in the map key and not duplicated here.
+	// PipelineDescriptorWriter registers kBindlessArrayConsumer descriptors for arrays with lazily assigned per-slot binding keys, such as IslandTerrain.
+	// The consumer map uses the live array pointer, such as RenderTargetTextures::mElevationTextures.data(), as its key.
 	struct BindlessArrayConsumer
 	{
 		Pipeline* pPipeline = nullptr;
@@ -132,7 +125,7 @@ public:
 	};
 
 	std::unordered_map<common::crc_t, std::vector<TextureBinding>> mTextureBindings;
-	std::unordered_map<Texture**, std::vector<BindlessArrayConsumer>> mBindlessArrayConsumers;
+	std::unordered_map<Texture* const*, std::vector<BindlessArrayConsumer>> mBindlessArrayConsumers;
 	std::unordered_map<int64_t, IslandSlot> mIslandSlots;
 	std::vector<StandaloneSamplerBinding> mStandaloneSamplerBindings;
 

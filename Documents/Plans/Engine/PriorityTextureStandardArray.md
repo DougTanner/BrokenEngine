@@ -9,11 +9,11 @@ The table contains 27 CRCs: two entries from `kpPriorityHead`, 17 from `kpWaterN
 
 ## Design
 
-Delete the nested `PriorityTextures` declaration. Declare the existing constant as `static inline constexpr std::array<common::crc_t, kiPriorityTextureCount> kpPriorityTextures = []() consteval` and retain its immediately invoked lambda initializer. Declare its local as `std::array<common::crc_t, kiPriorityTextureCount> priorityTextures {};`. Replace each `priorityTextures.pCrcs[i++] = crc` with `priorityTextures[i++] = crc`.
+Delete the nested `PriorityTextures` declaration. Declare the existing constant as `static inline constexpr std::array<common::crc_t, kiPriorityTextureCount> kPriorityTextures = []() consteval` and retain its immediately invoked lambda initializer. Declare its local as `std::array<common::crc_t, kiPriorityTextureCount> priorityTextures {};`. Replace each `priorityTextures.pCrcs[i++] = crc` with `priorityTextures[i++] = crc`.
 
-Keep the count expression, local `int64_t i = 0`, three range-for loops, CRC element type, head/water/tail order, and returned local unchanged. Keep all source table names and the `kpPriorityTextures` name. `<array>` is already supplied by `Common/ExternalHeaders.h`; add no include or alias.
+Keep the count expression, local `int64_t i = 0`, three range-for loops, CRC element type, head/water/tail order, and returned local unchanged. Keep all source table names and the `kPriorityTextures` name. `<array>` is already supplied by `Common/ExternalHeaders.h`; add no include or alias.
 
-Pass `kpPriorityTextures` directly to `gpFileManager->RequestChunkLoad` in `TextureManager::InitializeBootTextures`, preserving `LoadPriority::kRealtime`. Pass `TextureManager::kpPriorityTextures` directly to `gpTextureManager->WaitForTextures` in `MainThread`. The existing dynamic-extent, const-element span parameters accept the const standard array; no explicit span construction, pointer/count pair, overload, or API signature change is needed.
+Pass `kPriorityTextures` directly to `gpFileManager->mpPackChunks->mLoader.RequestChunkLoad` in `TextureManager::InitializeBootTextures`, preserving `LoadPriority::kRealtime`. Pass `TextureManager::kPriorityTextures` directly to `gpTextureManager->WaitForTextures` in `MainThread`. The existing dynamic-extent, const-element span parameters accept the const standard array; no explicit span construction, pointer/count pair, overload, or API signature change is needed.
 
 ## Critical files
 
@@ -24,7 +24,7 @@ Pass `kpPriorityTextures` directly to `gpFileManager->RequestChunkLoad` in `Text
 
 ## In scope
 
-- Remove `TextureManager::PriorityTextures` and replace only its `kpPriorityTextures` constant and consteval local with the explicit standard array type.
+- Remove `TextureManager::PriorityTextures` and replace only its `kPriorityTextures` constant and consteval local with the explicit standard array type.
 - Remove the five `.pCrcs` projections belonging to this table: three writes and two span arguments.
 - Verify unchanged compile-time contents, static lifetime, and span pointer/count behavior.
 
@@ -51,7 +51,7 @@ No documentation or style-policy edit is needed. Rule 21 already permits `std::a
 
 ## Verification
 
-1. Compare the changed table builder and source lists with the implementation session baseline. Confirm the source CRC lists and count expression are unchanged, the count is 2 + 17 + 8 = 27, and each loop still appends one CRC in order. Search the repository for `PriorityTextures`, `kpPriorityTextures`, and table-related `.pCrcs` uses; the wrapper and its projections must be gone with both intended consumers updated.
+1. Compare the changed table builder and source lists with the implementation session baseline. Confirm the source CRC lists and count expression are unchanged, the count is 2 + 17 + 8 = 27, and each loop still appends one CRC in order. Search the repository for `PriorityTextures`, `kPriorityTextures`, and table-related `.pCrcs` uses; the wrapper and its projections must be gone with both intended consumers updated.
 2. Through `/compile`, build BrokenEngineSandbox client Debug and Release. These builds must accept both implicit conversions to `std::span<const common::crc_t>` and the immediately invoked consteval array builder. The whole table remains inside `BT_CLIENT`; a server runtime run is unnecessary.
 3. Inspect the supported build's emitted table and the two call sites, comparing baseline artifacts where needed. Confirm the same 27 CRC values/216-byte payload, pointer and count 27 passed to both existing APIs, and no table-related dynamic initialization or allocation. Compare relevant payload and operations rather than whole executable bytes or relocated addresses. Record the inspected configuration and evidence locations.
 4. Perform normal changed-range correctness, affected-caller, style, comment, and documentation checks. No unit tests or harness scenario is needed: this change is settled by the preserved inputs/consteval algorithm, client compilation, and focused emitted-data/call-site evidence.

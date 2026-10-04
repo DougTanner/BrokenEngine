@@ -73,6 +73,7 @@ using namespace std::chrono_literals;
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <cwctype>
 #include <deque>
 #include <exception>
 #include <expected>

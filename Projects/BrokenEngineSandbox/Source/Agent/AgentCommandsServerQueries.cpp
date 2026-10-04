@@ -143,8 +143,8 @@ static nlohmann::json ExtractBlasters(const Frame& rFrame, int64_t iOffset, int6
 static const Frame& QueryFrame(const nlohmann::json& rParams)
 {
 	engine::GridCoord coord = CoordFromParam(rParams);
-	auto framesIt = gpGame->mCoordFrames.find(coord);
-	if (framesIt == gpGame->mCoordFrames.end())
+	auto framesIt = gpGame->mCoordinateFrames.find(coord);
+	if (framesIt == gpGame->mCoordinateFrames.end())
 	{
 		throw std::runtime_error("coord has no loaded frame");
 	}
@@ -154,7 +154,7 @@ static const Frame& QueryFrame(const nlohmann::json& rParams)
 	{
 		throw std::runtime_error("coord frame not ready");
 	}
-	return gpGame->CurrentFrame(coord);
+	return (*gpGame->mCoordinateFrames.at(coord).pCurrent);
 }
 
 void CommandQueryFrame(const nlohmann::json& rParams, nlohmann::json& rResult)

@@ -81,10 +81,10 @@ void ExplosionsInterpolate::Register()
 	{
 		.uiCrc = data::kTexturesBC7ExplosionpngCrc,
 		.uiColor = 0xFFFFFFFF,
-		.fVisibleArea = sTuning.pPrimaryVisibleAreaOne->Get(),
-		.fVisibleIntensity = sTuning.pPrimaryVisibleIntensityOne->Get(),
-		.fLightingArea = sTuning.pPrimaryLightingAreaOne->Get(),
-		.fLightingIntensity = sTuning.pPrimaryLightingIntensityOne->Get(),
+		.fVisibleArea = sTuning.pPrimaryVisibleAreaOne->mfCurrent,
+		.fVisibleIntensity = sTuning.pPrimaryVisibleIntensityOne->mfCurrent,
+		.fLightingArea = sTuning.pPrimaryLightingAreaOne->mfCurrent,
+		.fLightingIntensity = sTuning.pPrimaryLightingIntensityOne->mfCurrent,
 	});
 
 	// Keyframes are normalized; wrappers supply their magnitudes.

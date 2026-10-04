@@ -1,6 +1,7 @@
 #if defined(BT_CLIENT)
 
 #include "Data/Scene.h"
+#include "File/PackChunks.h"
 
 #include "Profile/ProfileManager.h"
 #include "Spaceships.h"
@@ -100,7 +101,7 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 	if (engine::gAnimationDataMap.contains(kSpaceshipModel))
 	{
 		pAnimationData = &engine::gAnimationDataMap.at(kSpaceshipModel);
-		uiMaterialCount = engine::gpFileManager->GetEagerChunkMap().at(kSpaceshipModel).pHeader->sceneHeader.uiMaterialCount;
+		uiMaterialCount = engine::gpFileManager->mpPackChunks->GetEagerChunkMap().at(kSpaceshipModel).pHeader->sceneHeader.uiMaterialCount;
 
 		iSkinnedMaterialCount = pAnimationData->SkinnedMaterialCount(uiMaterialCount);
 	}
@@ -119,7 +120,7 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 		// Positions are local to the rendered cell; the visible area is in the camera cell's frame.
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, engine::Rebase(rBasis, rCurrent.pVecPositions[i]));
-		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->f4RenderVisibleArea, f4Position))
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position))
 		{
 			continue;
 		}
@@ -192,7 +193,7 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 
 				int64_t iJointMatrixOffset = iJointBase + j * iJointsPerShip;
 
-				pAnimationData->EvaluateAnimation(0, rCurrent.pfAnimationTimes[i], uiMaterialCount, pMeshData, pJointMatricesBuffer, iJointMatrixOffset);
+				pAnimationData->EvaluateAnimation(0, rCurrent.pfAnimationTimes[i], std::span(pMeshData, static_cast<size_t>(uiMaterialCount)), pJointMatricesBuffer, iJointMatrixOffset);
 			}
 		}
 	};
@@ -205,7 +206,10 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 
 void SpaceshipsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	gpProfileManager->SetCount(game::kCpuCounterSpaceshipsRendered, siRendered);
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(game::kCpuCounterSpaceshipsRendered).iCount = siRendered;
+	}
 	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 }

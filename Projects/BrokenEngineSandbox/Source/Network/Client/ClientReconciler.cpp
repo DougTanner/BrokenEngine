@@ -1,5 +1,6 @@
 #include "Network/Client/ClientReconciler.h"
 
+#include "Audio/StaticVoices.h"
 #include "Network/Client/ReconcileReplay.h"
 
 #include "Frame/Collections/Players/Players.h"
@@ -13,8 +14,8 @@ namespace game
 
 static bool GetClientSnapshotPosition(XMVECTOR& rOut)
 {
-	auto coordIt = gpGame->mCoordFrames.find(gpGame->mClientGridCoord);
-	if (coordIt == gpGame->mCoordFrames.end() || coordIt->second.iSnapshotCount <= 0)
+	auto coordIt = gpGame->mCoordinateFrames.find(gpGame->mClientGridCoordinate);
+	if (coordIt == gpGame->mCoordinateFrames.end() || coordIt->second.iSnapshotCount <= 0)
 	{
 		return false;
 	}
@@ -39,12 +40,12 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 	ScopedSuppressAllocationTracking suppress;
 
 	// Re-sync client identity from main thread
-	mConfirmedClientState.clientGridCoord = gpGame->mClientGridCoord;
+	mConfirmedClientState.clientGridCoord = gpGame->mClientGridCoordinate;
 	mConfirmedClientState.clientGlobalPlayerId = gpGame->ClientPlayerId();
 	mConfirmedClientState.fPreviousClientArmor = gpGame->mfPreviousClientArmor;
 
 	engine::ReconcileInputs inputs;
-	inputs.iTargetTick = gpGame->TickCounter();
+	inputs.iTargetTick = gpGame->miTickCounter;
 	ASSERT(inputs.iTargetTick >= 0);
 	common::LogTickScope logTickScope(inputs.iTargetTick);
 
@@ -94,7 +95,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 			if (fTotal > Game::kfVisualErrorMaxDistance)
 			{
 				gpGame->mVecVisualErrorOffset = {};
-				LOG(kNetwork, kWarning, "Visual error offset reset (exceeded max) Coord: ({},{}) Delta: {} Max: {}", gpGame->mClientGridCoord.iX, gpGame->mClientGridCoord.iY, common::Wb(XMVectorGetX(XMVector3Length(vecError)), 3), common::Wb(Game::kfVisualErrorMaxDistance, 1));
+				LOG(kNetwork, kWarning, "Visual error offset reset (exceeded max) Coord: ({},{}) Delta: {} Max: {}", gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY, common::Wb(XMVectorGetX(XMVector3Length(vecError)), 3), common::Wb(Game::kfVisualErrorMaxDistance, 1));
 			}
 			else
 			{
@@ -105,10 +106,10 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 					float fChange = (mfLastLoggedVisualErrorDelta > 0.0f)
 						? std::abs(fDelta - mfLastLoggedVisualErrorDelta) / mfLastLoggedVisualErrorDelta
 						: 1.0f;
-					int64_t iCurrentTick = gpGame->TickCounter();
+					int64_t iCurrentTick = gpGame->miTickCounter;
 					if (fChange > 0.15f && (iCurrentTick - miLastVisualErrorLogTick > 32))
 					{
-						LOG(kNetwork, kDebug, "Visual error offset Coord: ({},{}) Delta: {} Accumulated: {}", gpGame->mClientGridCoord.iX, gpGame->mClientGridCoord.iY, common::Wb(fDelta, 3), common::Wb(fTotal, 3));
+						LOG(kNetwork, kDebug, "Visual error offset Coord: ({},{}) Delta: {} Accumulated: {}", gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY, common::Wb(fDelta, 3), common::Wb(fTotal, 3));
 						mfLastLoggedVisualErrorDelta = fDelta;
 						miLastVisualErrorLogTick = iCurrentTick;
 					}
@@ -120,7 +121,11 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 	mConfirmedClientState = newConfirmedClientState;
 	gpGame->mfPreviousClientArmor = newConfirmedClientState.fPreviousClientArmor;
 
-	gpProfileManager->SetReconcileCounters(dispatch.profiling.iCrcValidatedFrameTicks, dispatch.profiling.iAssumedFrameTicks, dispatch.profiling.iCrcFastPathEvents, dispatch.profiling.iStatusChangeReplayTicks, dispatch.profiling.iKnockOnReplayTicks);
+	gpProfileManager->mCrcValidatedTicksPerSecond.Set(dispatch.profiling.iCrcValidatedFrameTicks);
+	gpProfileManager->mAssumedTicksPerSecond.Set(dispatch.profiling.iAssumedFrameTicks);
+	gpProfileManager->mCrcFastPathEventsPerSecond.Set(dispatch.profiling.iCrcFastPathEvents);
+	gpProfileManager->mStatusChangeReplayTicksPerSecond.Set(dispatch.profiling.iStatusChangeReplayTicks);
+	gpProfileManager->mKnockOnReplayTicksPerSecond.Set(dispatch.profiling.iKnockOnReplayTicks);
 
 	// Large single-frame re-sim bursts are frame-time spike candidates
 	int64_t iReSimTicks = dispatch.profiling.iStatusChangeReplayTicks + dispatch.profiling.iKnockOnReplayTicks;
@@ -131,7 +136,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 
 	if (dispatch.bAnyFullReplay && engine::gpAudioManager != nullptr)
 	{
-		engine::gpAudioManager->SkipNextStaticVoiceInvalidation();
+		engine::gpAudioManager->mpStaticVoices->mbSkipNextInvalidation = true;
 	}
 
 	return {};

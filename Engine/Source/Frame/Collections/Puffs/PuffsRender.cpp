@@ -2,6 +2,8 @@
 
 #if defined(BT_CLIENT)
 
+#include "Data/Shader.h"
+#include "Graphics/Objects/PipelineDescriptorWriter.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 
 #include "Profile/ProfileManager.h"
@@ -12,7 +14,7 @@ namespace engine
 void PuffsInterpolate::GraphicsResources()
 {
 	gpBufferManager->CreateDynamicBuffer(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreatePipelineSmokeAxisAligned(kCrc, kpcName, sizeof(shaders::AxisAlignedQuadLayout));
+	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineSmokeAxisAligned, kCrc, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesSmokeBC44jpgCrc}, &gpBufferManager->mSmokeOccupancyVkBuffers[0], sizeof(shaders::AxisAlignedQuadLayout));
 }
 
 static int64_t siRendered = 0;
@@ -35,7 +37,7 @@ void PuffsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, cons
 
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmokeAxisAligned].at(kCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 1, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmokeAxisAligned].at(kCrc), iCommandBuffer, 1, pBuffer);
 	}
 }
 
@@ -82,8 +84,14 @@ void PuffsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __r
 
 void PuffsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	gpProfileManager->SetCount(kCpuCounterPuffs, siTotalCount);
-	gpProfileManager->SetCount(kCpuCounterPuffsRendered, siRendered);
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterPuffs).iCount = siTotalCount;
+	}
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterPuffsRendered).iCount = siRendered;
+	}
 	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmokeAxisAligned].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, gSmokeEnabled.Get<bool>() ? siRendered : 0);
 }
 

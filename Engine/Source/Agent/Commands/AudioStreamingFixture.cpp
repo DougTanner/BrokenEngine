@@ -129,7 +129,7 @@ void AudioStreamingFixture::Shutdown()
 	}
 	if (gpFileManager != nullptr)
 	{
-		gpFileManager->WaitForLoadersIdle();
+		gpFileManager->mpPackChunks->mLoader.WaitForLoadersIdle();
 	}
 	uint64_t uiGate = muiScenarioGate.load(std::memory_order_seq_cst);
 	if ((uiGate & 1) != 0)
@@ -670,7 +670,7 @@ AudioStreamingFixtureInvalidResult AudioStreamingFixture::RunInvalid()
 	const LazyChunk* pAudioChunk = nullptr;
 	for (const auto& [rCandidateCrc, rChunk] : pPackChunks->mLazyChunkMap)
 	{
-		if ((rChunk.header.flags & common::ChunkFlags::kChunkAudio) && rChunk.eState.load(std::memory_order_acquire) < ChunkState::kDiskLoaded)
+		if ((rChunk.header.flags & common::ChunkFlags::kChunkAudio) && rChunk.eState.value.load(std::memory_order_acquire) < ChunkState::kDiskLoaded)
 		{
 			crc = rCandidateCrc;
 			pAudioChunk = &rChunk;
@@ -723,8 +723,8 @@ AudioStreamingFixtureInvalidResult AudioStreamingFixture::RunInvalid()
 		}
 		return result;
 	}
-	uint32_t uiIndex = mInvalidRequest.uiEntryIndex;
-	uint64_t uiGeneration = mInvalidRequest.uiGeneration;
+	uint32_t uiIndex = mInvalidRequest.muiEntryIndex;
+	uint64_t uiGeneration = mInvalidRequest.muiGeneration;
 	uint64_t uiOwnership = pPackChunks->mAudioReadEntries[uiIndex].uiOwnership.load(std::memory_order_acquire);
 	if (AudioReadState(uiOwnership) != AudioChunkReadState::kLoading)
 	{

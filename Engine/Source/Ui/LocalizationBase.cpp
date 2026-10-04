@@ -3,9 +3,8 @@
 namespace engine
 {
 
-// Outer extent is deduced ([]) on purpose: a dropped/extra string row then changes std::size and trips the
-// static_assert below. Pinning it to [kCount + 1] would make that guard a tautology that catches nothing.
-static char32_t sppTranslatedStrings[][kLanguageCount][256]
+// The deduced outer extent lets the row-count assertion detect missing or extra string rows.
+static char32_t sppTranslatedStrings[][kiLanguageCount][256]
 {
 	// kStringComplete
 	{
@@ -190,7 +189,7 @@ static char32_t sppTranslatedStrings[][kLanguageCount][256]
 	},
 };
 // One outer row per StandardString enumerator plus the trailing all-empty sentinel row; static_assert catches a dropped
-// row, which would otherwise silently shift every later string's translations. (Inner [kLanguageCount][256] extents are
+// row, which would otherwise silently shift every later string's translations. (Inner [kiLanguageCount][256] extents are
 // fixed by the array type, so per-language drift within a row stays a positional authoring contract.)
 static_assert(std::size(sppTranslatedStrings) == static_cast<size_t>(StandardString::kCount) + 1);
 
@@ -209,12 +208,12 @@ void InitializeLocalization()
 	std::setlocale(LC_ALL, "en_US.utf8");
 	for (int64_t i = 0; i < static_cast<int64_t>(StandardString::kCount); ++i)
 	{
-		for (int64_t j = 0; j < kLanguageCount; ++j)
+		for (int64_t j = 0; j < kiLanguageCount; ++j)
 		{
 			int64_t k = 0;
 			while (sppTranslatedStrings[i][j][k] != 0)
 			{
-				sppTranslatedStrings[i][j][k] = towupper(static_cast<wint_t>(sppTranslatedStrings[i][j][k]));
+				sppTranslatedStrings[i][j][k] = std::towupper(static_cast<wint_t>(sppTranslatedStrings[i][j][k]));
 				++k;
 			}
 		}

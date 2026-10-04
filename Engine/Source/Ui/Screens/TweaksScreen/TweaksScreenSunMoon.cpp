@@ -16,28 +16,22 @@ const TweaksSliderMapRegistrar gSunMoonRegistrar
 	{"Noon End", &gSunMoonNoonEnd},
 	{"Evening Start", &gSunMoonEvening},
 	{"Night Start", &gSunMoonNightStart},
-	// Sun Intensity
 	{"Sun Terrain", &gSunMoonSunIntensityTerrain},
 	{"Sun Water", &gSunMoonSunIntensityWater},
 	{"Sun Objects", &gSunMoonSunIntensityObjects},
 	{"Sun Smoke", &gSunMoonSunIntensitySmoke},
-	// Moon Intensity + Blue Tint
 	{"Moon Terrain", &gSunMoonMoonIntensityTerrain},
 	{"Moon Water", &gSunMoonMoonIntensityWater},
 	{"Moon Objects", &gSunMoonMoonIntensityObjects},
 	{"Moon Smoke", &gSunMoonMoonIntensitySmoke},
 	{"Moon Blue Tint", &gSunMoonMoonBlueTint},
-	// Moon Timing
 	{"Moonrise Start", &gSunMoonMoonriseStart},
 	{"Moonrise End", &gSunMoonMoonriseEnd},
 	{"Moonset Start", &gSunMoonMoonsetStart},
 	{"Moonset End", &gSunMoonMoonsetEnd},
-	// Ambient
 	{"Minimum Ambient", &gSunMoonMinimumAmbient},
 	{"Ambient Multiplier", &gSunMoonAmbientMultiplier},
-	// Normal Tilt
 	{"Normal Tilt", &gSunMoonNormalTilt},
-	// Shadow Night-Gate
 	{"Shadow Night Multiplier", &gSunMoonShadowNightMultiplier},
 	{"Shadow Sunset Start", &gSunMoonShadowSunsetStart},
 	{"Shadow Sunset End", &gSunMoonShadowSunsetEnd},

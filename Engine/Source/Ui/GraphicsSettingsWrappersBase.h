@@ -20,10 +20,10 @@ extern Wrapper gPresentMode;
 extern Wrapper gMultisampling;
 extern Wrapper gSampleCount;
 extern Wrapper gAnisotropy;
-extern Wrapper gMaxAnisotropy;
+extern Wrapper gMaximumAnisotropy;
 extern Wrapper gSampleShading;
-extern Wrapper gMinSampleShading;
-extern Wrapper gMipLodBias;
+extern Wrapper gMinimumSampleShading;
+extern Wrapper gMipmapLevelOfDetailBias;
 extern Wrapper gWaterShapeDetail;
 extern Wrapper gSmokeSimulationPixels;
 extern Wrapper gSmokeSimulationArea;
@@ -36,7 +36,7 @@ extern Wrapper gWindEnabled;
 extern Wrapper gLightingEnabled;
 extern Wrapper gSunAngleOverride;
 
-// Clamps because the backing value crosses a trust boundary (persisted GraphicsSettings.bin) and Wrapper::Set<T> soft-falls without clamping
+// Clamps because the backing value crosses a trust boundary (persisted GameSettings.bin) and Wrapper::Set<T> soft-falls without clamping
 inline UiTheme GetUiTheme()
 {
 	return static_cast<UiTheme>(std::clamp(gUiTheme.Get<int64_t>(), 0ll, static_cast<int64_t>(UiTheme::kCount) - 1));

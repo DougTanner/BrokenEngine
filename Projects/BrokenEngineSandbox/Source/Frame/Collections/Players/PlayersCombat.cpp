@@ -181,7 +181,7 @@ static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[mayb
 	{
 		// Play shield hit sound with pitch based on remaining shield
 #if defined(BT_CLIENT)
-		engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioShieldArmor465540__steaq__scifishieldhitwavwavCrc, emitterCoord, vecDamagePosition, gShieldHitVolumeBase.Get() + gShieldHitVolumeScale.Get() * (1.0f - rPlayer.pfShields[i] / kfPlayerShield));
+		engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioShieldArmor465540__steaq__scifishieldhitwavwavCrc, emitterCoord, vecDamagePosition, gShieldHitVolumeBase.mfCurrent + gShieldHitVolumeScale.mfCurrent * (1.0f - rPlayer.pfShields[i] / kfPlayerShield));
 #endif
 
 		// Update hex shield direction intensity
@@ -215,7 +215,7 @@ static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[mayb
 			{
 				rPlayer.pfShieldDownSoundCooldowns[i] = kfShieldDownSoundCooldown;
 #if defined(BT_CLIENT)
-				engine::gpAudioManager->PlayOneShot(rFrame, data::kAudioShieldArmor570852__rafaelzimrp__magicshielddownwavCrc, false, gShieldDownVolume.Get());
+				engine::gpAudioManager->PlayOneShot(rFrame, data::kAudioShieldArmor570852__rafaelzimrp__magicshielddownwavCrc, false, gShieldDownVolume.mfCurrent);
 #endif
 			}
 		}
@@ -228,7 +228,7 @@ static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[mayb
 #if defined(BT_CLIENT)
 		if (fDamage > kfArmorHitSoundDamageThreshold)
 		{
-			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioShieldArmor330629__stormwaveaudio__scififorcefieldimpact15wavCrc, emitterCoord, vecDamagePosition, gArmorHitVolumeBase.Get() + gArmorHitVolumeScale.Get() * (1.0f - rPlayer.pfArmors[i] / kfPlayerArmor));
+			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioShieldArmor330629__stormwaveaudio__scififorcefieldimpact15wavCrc, emitterCoord, vecDamagePosition, gArmorHitVolumeBase.mfCurrent + gArmorHitVolumeScale.mfCurrent * (1.0f - rPlayer.pfArmors[i] / kfPlayerArmor));
 		}
 #endif
 
@@ -357,15 +357,15 @@ void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]]
 				.vecVelocity = vecBlasterVelocity,
 				.uiTypeIndex = PlayersInterpolate::suiBlasterTypeIndex,
 				.alignment = rCurrentPostRender.pAlignments[i],
-				.fWindTrailIntensity = game::gWindDepositPlayerBlastersIntensity.Get(),
-				.fWindTrailWidth = game::gWindDepositPlayerBlastersWidth.Get(),
-				.fWindTrailLengthMultiplier = game::gWindDepositPlayerBlastersLengthMultiplier.Get(),
+				.fWindTrailIntensity = game::gWindDepositPlayerBlastersIntensity.mfCurrent,
+				.fWindTrailWidth = game::gWindDepositPlayerBlastersWidth.mfCurrent,
+				.fWindTrailLengthMultiplier = game::gWindDepositPlayerBlastersLengthMultiplier.mfCurrent,
 			});
 
 #if defined(BT_CLIENT)
 			if (bSpawned)
 			{
-				engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, emitterCoord, vecFinalPosition, gPlayerBlasterVolume.Get(), gPlayerBlasterPitchMin.Get(), gPlayerBlasterPitchRandom.Get());
+				engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, emitterCoord, vecFinalPosition, gPlayerBlasterVolume.mfCurrent, gPlayerBlasterPitchMin.mfCurrent, gPlayerBlasterPitchRandom.mfCurrent);
 			}
 #endif
 
@@ -474,7 +474,7 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 		});
 
 #if defined(BT_CLIENT)
-		engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioMissile182794__qubodup__rocketlaunch_start_2wavCrc, emitterCoord, vecMissilePosition, gMissileLaunchVolume.Get(), gMissilePitchMin.Get(), gMissilePitchRandom.Get());
+		engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioMissile182794__qubodup__rocketlaunch_start_2wavCrc, emitterCoord, vecMissilePosition, gMissileLaunchVolume.mfCurrent, gMissilePitchMin.mfCurrent, gMissilePitchRandom.mfCurrent);
 #endif
 	}
 }

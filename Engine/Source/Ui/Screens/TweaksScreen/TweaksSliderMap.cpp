@@ -20,13 +20,9 @@ TweaksSliderMapRegistrar::TweaksSliderMapRegistrar(std::initializer_list<std::pa
 	// Heap: STL hash buckets allocate. Static-init runs before main-loop tracking begins; suppression mirrors TweaksSliderMap::Get() and stays explicit.
 	ScopedSuppressAllocationTracking suppress;
 
-	// Insert singly (not the void initializer_list overload, which silently drops keys already present) so a duplicate
-	// key fails loud with the offending key. A dropped key otherwise succeeds silently and never crashes on its own,
-	// and the first-open drift audit is structurally blind to it (key present + lookup succeeds), so this is the only
-	// backstop. Static-init-safe (pre-main): Log.cpp initializes in the library phase, so its mutex and file sink exist
-	// before this registrar runs, with LogWrite's alive-flag branch as the backstop; common::Assert's LOG takes the
-	// gpThreadLocal==nullptr fallback buffer. DEBUG_BREAK breaks at the collision under a debugger, and the post-break
-	// throw is the intended terminate() halt without one. Message is formatted (tracker not yet armed).
+	// Individual insertion detects duplicate keys; bulk insertion silently retains existing keys, and the first-open audit cannot detect the lost registration.
+	// Pre-main logging relies on Log.cpp's library-phase mutex/file-sink initialization, LogWrite's alive flag, and LOG's gpThreadLocal == nullptr fallback buffer.
+	// Assert reports the key, breaks under a debugger, and throws to terminate static initialization; formatting runs before allocation tracking is armed.
 	for (const std::pair<const std::string_view, Wrapper*>& rEntry : entries)
 	{
 		bool bInserted = TweaksSliderMap::Get().insert(rEntry).second;

@@ -15,10 +15,8 @@ struct PipelineDescriptorWriter
 	static bool BindingExistsInShaderLayout(const Pipeline& rPipeline, uint32_t uiBinding);
 
 	static void Write(Pipeline& rPipeline);
-	static void UpdateStorageBuffer(Pipeline& rPipeline, int64_t iFramebuffer, int64_t iBinding, Buffer* pBuffer);
-	static void UpdateCombinedImageSampler(Pipeline& rPipeline, int64_t iBinding, VkImageView vkImageView, VkSampler vkSampler);
-	static void UpdateSampler(Pipeline& rPipeline, int64_t iBinding, VkSampler vkSampler);
-	static void UpdateStorageImage(Pipeline& rPipeline, int64_t iBinding, VkImageView vkImageView);
+	static void UpdateImageDescriptor(const Pipeline& rPipeline, int64_t iBinding, VkSampler vkSampler, VkImageView vkImageView, VkImageLayout vkImageLayout, VkDescriptorType vkDescriptorType);
+	static void UpdateStorageBuffer(const Pipeline& rPipeline, int64_t iFramebuffer, int64_t iBinding, const Buffer* pBuffer);
 };
 
 } // namespace engine

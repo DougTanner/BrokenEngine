@@ -23,7 +23,7 @@ Changes (7 files)
      float fLifetime INIT;      // Total lifetime in seconds (0 = no gradient, use iColor only)
      float fParticlePad INIT;   // Padding to maintain 16-byte alignment
 
-   Add curl noise tunables to GlobalLayout (after fSmokeEdgeDecayDistanceInv, before uiSmokeTilesX -- fSmokeNoiseInfluence was deleted by the DeadUboFieldsSweep):
+   Add curl noise tunables to GlobalLayout (after fSmokeEdgeDecayDistanceInverse, before uiSmokeTilesX -- fSmokeNoiseInfluence was deleted by the DeadUboFieldsSweep):
      float fSmokeCurlNoiseScale INIT;     // World-space frequency of curl noise
      float fSmokeCurlNoiseStrength INIT;   // Displacement magnitude
      float fSmokeCurlNoiseSpeed INIT;      // Time animation speed
@@ -66,9 +66,9 @@ Changes (7 files)
 
 5. Engine/Source/Graphics/Render/SmokeUniforms.cpp
    After existing smoke tunable writes (around line 29), add curl noise uniforms:
-     rGlobalLayout.fSmokeCurlNoiseScale = gSmokeCurlNoiseScale.Get();
-     rGlobalLayout.fSmokeCurlNoiseStrength = gSmokeCurlNoiseStrength.Get();
-     rGlobalLayout.fSmokeCurlNoiseSpeed = gSmokeCurlNoiseSpeed.Get();
+     rGlobalLayout.fSmokeCurlNoiseScale = gSmokeCurlNoiseScale.mfCurrent;
+     rGlobalLayout.fSmokeCurlNoiseStrength = gSmokeCurlNoiseStrength.mfCurrent;
+     rGlobalLayout.fSmokeCurlNoiseSpeed = gSmokeCurlNoiseSpeed.mfCurrent;
 
 6. Engine/Source/Ui/WrapperBase.h and WrapperBase.cpp
    Declare and define three new Wrapper tunables for curl noise:

@@ -13,31 +13,29 @@ DeviceManager::DeviceManager()
 
 	ScopedBootTimer scopedBootTimer(kBootTimerDeviceManager);
 
-	// Query available device extensions
 	std::vector<VkExtensionProperties> availableExtensions;
-	VkResult eVkResult = VK_INCOMPLETE;
-	while (eVkResult == VK_INCOMPLETE)
+	VkResult vkResult = VK_INCOMPLETE;
+	while (vkResult == VK_INCOMPLETE)
 	{
 		uint32_t uiExtensionCount = 0;
-		eVkResult = vkEnumerateDeviceExtensionProperties(gpInstanceManager->mVkPhysicalDevice, nullptr, &uiExtensionCount, nullptr);
-		if (eVkResult != VK_SUCCESS && eVkResult != VK_INCOMPLETE)
+		vkResult = vkEnumerateDeviceExtensionProperties(gpInstanceManager->mVkPhysicalDevice, nullptr, &uiExtensionCount, nullptr);
+		if (vkResult != VK_SUCCESS && vkResult != VK_INCOMPLETE)
 		{
-			CHECK_VK(eVkResult);
+			CHECK_VK(vkResult);
 		}
 
 		availableExtensions.resize(uiExtensionCount);
-		eVkResult = vkEnumerateDeviceExtensionProperties(gpInstanceManager->mVkPhysicalDevice, nullptr, &uiExtensionCount, availableExtensions.data());
-		if (eVkResult != VK_SUCCESS && eVkResult != VK_INCOMPLETE)
+		vkResult = vkEnumerateDeviceExtensionProperties(gpInstanceManager->mVkPhysicalDevice, nullptr, &uiExtensionCount, availableExtensions.data());
+		if (vkResult != VK_SUCCESS && vkResult != VK_INCOMPLETE)
 		{
-			CHECK_VK(eVkResult);
+			CHECK_VK(vkResult);
 		}
-		if (eVkResult == VK_SUCCESS)
+		if (vkResult == VK_SUCCESS)
 		{
 			availableExtensions.resize(uiExtensionCount);
 		}
 	}
 
-	// Build device extension list
 	std::vector<const char*> deviceExtensions;
 	deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 	if constexpr (kbDebugPrintf)
@@ -50,21 +48,21 @@ DeviceManager::DeviceManager()
 	}
 	bool bMaintenance9Available = false;
 	bool bLineRasterizationAvailable = false;
-	for (const VkExtensionProperties& rExtension : availableExtensions)
+	for (const VkExtensionProperties& rVkExtensionProperties : availableExtensions)
 	{
-		if (std::strcmp(rExtension.extensionName, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME) == 0)
+		if (std::strcmp(rVkExtensionProperties.extensionName, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME) == 0)
 		{
 			deviceExtensions.push_back(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
 			mCapabilities.Set(DeviceCapabilityFlags::kMemoryBudgetAvailable);
 			LOG(kGraphics, kInfo, "VK_EXT_memory_budget extension available");
 		}
-		else if (std::strcmp(rExtension.extensionName, VK_KHR_MAINTENANCE_9_EXTENSION_NAME) == 0)
+		else if (std::strcmp(rVkExtensionProperties.extensionName, VK_KHR_MAINTENANCE_9_EXTENSION_NAME) == 0)
 		{
 			deviceExtensions.push_back(VK_KHR_MAINTENANCE_9_EXTENSION_NAME);
 			bMaintenance9Available = true;
 			LOG(kGraphics, kInfo, "VK_KHR_maintenance9 extension available");
 		}
-		else if (std::strcmp(rExtension.extensionName, VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME) == 0)
+		else if (std::strcmp(rVkExtensionProperties.extensionName, VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME) == 0)
 		{
 			bLineRasterizationAvailable = true;
 			LOG(kGraphics, kInfo, "VK_EXT_line_rasterization extension available");
@@ -120,7 +118,6 @@ DeviceManager::DeviceManager()
 		.shaderDeviceClock = VK_TRUE,
 	};
 
-	// Build feature pNext chain tail: maintenance9 (if available) -> shader clock (if enabled) -> line rasterization (if smooth lines enabled)
 	void* pFeatureChainTail = nullptr;
 	if constexpr (kbShaderRealtimeClock)
 	{
@@ -228,32 +225,30 @@ DeviceManager::DeviceManager()
 	vkDeviceCreateInfo.pEnabledFeatures = &vkPhysicalDeviceFeatures;
 	CHECK_VK(vkCreateDevice(gpInstanceManager->mVkPhysicalDevice, &vkDeviceCreateInfo, nullptr, &mVkDevice));
 
-	// Load device-specific Vulkan functions via Volk
 	volkLoadDevice(mVkDevice);
 
 	VkName(VK_OBJECT_TYPE_DEVICE, mVkDevice, "Logical");
 
 	// Shared command pool for OneShotCommandBuffer (single-threaded, graphics queue only)
-	VkCommandPoolCreateInfo oneShotCommandPoolCreateInfo
+	VkCommandPoolCreateInfo vkOneShotCommandPoolCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
 		.queueFamilyIndex = static_cast<uint32_t>(gpInstanceManager->miGraphicsQueueFamilyIndex),
 	};
-	CHECK_VK(vkCreateCommandPool(mVkDevice, &oneShotCommandPoolCreateInfo, nullptr, &mOneShotVkCommandPool));
+	CHECK_VK(vkCreateCommandPool(mVkDevice, &vkOneShotCommandPoolCreateInfo, nullptr, &mOneShotVkCommandPool));
 	VkName(VK_OBJECT_TYPE_COMMAND_POOL, mOneShotVkCommandPool, "OneShot");
 
-	VkFenceCreateInfo oneShotFenceCreateInfo
+	VkFenceCreateInfo vkOneShotFenceCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = VK_FENCE_CREATE_SIGNALED_BIT,
 	};
-	CHECK_VK(vkCreateFence(mVkDevice, &oneShotFenceCreateInfo, nullptr, &mOneShotVkFence));
+	CHECK_VK(vkCreateFence(mVkDevice, &vkOneShotFenceCreateInfo, nullptr, &mOneShotVkFence));
 	VkName(VK_OBJECT_TYPE_FENCE, mOneShotVkFence, "OneShot");
 
-	// Retrieve the queues now that the device has been created
 	vkGetDeviceQueue(mVkDevice, static_cast<uint32_t>(gpInstanceManager->miGraphicsQueueFamilyIndex), 0, &mGraphicsVkQueue);
 	VkName(VK_OBJECT_TYPE_QUEUE, mGraphicsVkQueue, "Graphics");
 	if (gpInstanceManager->miGraphicsQueueFamilyIndex == gpInstanceManager->miPresentQueueFamilyIndex)
@@ -277,10 +272,8 @@ DeviceManager::DeviceManager()
 		LOG(kGraphics, kInfo, "Transfer queue: dedicated (family {}), background GPU uploads enabled", gpInstanceManager->miTransferQueueFamilyIndex);
 	}
 
-	// Query whether QFOT is optional for transfer -> graphics
 	ProbeTransferQueueOwnershipTransfer(bMaintenance9Available);
 
-	// Descriptor pool
 	VkDescriptorPoolSize pVkDescriptorPoolSizes[]
 	{
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 256},
@@ -311,7 +304,6 @@ DeviceManager::DeviceManager()
 	CHECK_VK(vkCreateDescriptorPool(mVkDevice, &vkDescriptorPoolCreateInfo, nullptr, &mVkDescriptorPool));
 	VkName(VK_OBJECT_TYPE_DESCRIPTOR_POOL, mVkDescriptorPool, "Global");
 
-	// Initialize VMA
 	mVmaFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
 	mVmaFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
 
@@ -327,22 +319,20 @@ DeviceManager::DeviceManager()
 
 	CHECK_VK(vmaCreateAllocator(&allocatorCreateInfo, &mpAllocator));
 
-	// Pipeline cache
 	LoadPipelineCache();
 }
 
 DeviceManager::~DeviceManager()
 {
-	// Save pipeline cache to disk
 	if constexpr (kbVulkanPipelineCache)
 	{
 		size_t uiDataSize = 0;
-		VkResult eVkResult = vkGetPipelineCacheData(mVkDevice, mVkPipelineCache, &uiDataSize, nullptr);
-		if (eVkResult == VK_SUCCESS)
+		VkResult vkResult = vkGetPipelineCacheData(mVkDevice, mVkPipelineCache, &uiDataSize, nullptr);
+		if (vkResult == VK_SUCCESS)
 		{
 			std::vector<uint8_t> cacheData(uiDataSize);
-			eVkResult = vkGetPipelineCacheData(mVkDevice, mVkPipelineCache, &uiDataSize, cacheData.data());
-			if (eVkResult == VK_SUCCESS)
+			vkResult = vkGetPipelineCacheData(mVkDevice, mVkPipelineCache, &uiDataSize, cacheData.data());
+			if (vkResult == VK_SUCCESS)
 			{
 				common::crc_t uiCrc = common::Crc(std::span<const uint8_t>(cacheData.data(), uiDataSize));
 				if (gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, "pipeline.cache", [&](std::fstream& rStream)
@@ -356,12 +346,12 @@ DeviceManager::~DeviceManager()
 			}
 			else
 			{
-				LOG(kGraphics, kWarning, "Skipping pipeline cache save: vkGetPipelineCacheData returned {}", string_VkResult(eVkResult));
+				LOG(kGraphics, kWarning, "Skipping pipeline cache save: vkGetPipelineCacheData returned {}", string_VkResult(vkResult));
 			}
 		}
 		else
 		{
-			LOG(kGraphics, kWarning, "Skipping pipeline cache save: vkGetPipelineCacheData returned {}", string_VkResult(eVkResult));
+			LOG(kGraphics, kWarning, "Skipping pipeline cache save: vkGetPipelineCacheData returned {}", string_VkResult(vkResult));
 		}
 		vkDestroyPipelineCache(mVkDevice, mVkPipelineCache, nullptr);
 	}
@@ -401,7 +391,7 @@ void DeviceManager::LoadPipelineCache()
 		bool bFileExists = false;
 		try
 		{
-			bFileExists = gpFileManager->Exists({FileFlags::kAppDataDirectory}, "pipeline.cache");
+			bFileExists = std::filesystem::exists(gpFileManager->GetFilePath({FileFlags::kAppDataDirectory}, "pipeline.cache"));
 		}
 		catch (const std::filesystem::filesystem_error&)
 		{
@@ -454,13 +444,14 @@ void DeviceManager::LoadPipelineCache()
 							else
 							{
 								// Pre-validate header — NVIDIA logs a warning instead of silently discarding incompatible entries
-								VkPipelineCacheHeaderVersionOne header {};
-								std::memcpy(&header, cacheData.data() + sizeof(uiStoredCrc), sizeof(header));
-								const VkPhysicalDeviceProperties& rProps = gpInstanceManager->mVkPhysicalDeviceProperties;
-								bool bCompatible = header.headerSize == sizeof(VkPipelineCacheHeaderVersionOne)
-								                && header.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE
-								                && header.vendorID == rProps.vendorID && header.deviceID == rProps.deviceID
-								                && std::memcmp(header.pipelineCacheUUID, rProps.pipelineCacheUUID, VK_UUID_SIZE) == 0;
+								VkPipelineCacheHeaderVersionOne vkPipelineCacheHeader {};
+								std::memcpy(&vkPipelineCacheHeader, cacheData.data() + sizeof(uiStoredCrc), sizeof(vkPipelineCacheHeader));
+								const VkPhysicalDeviceProperties& rVkPhysicalDeviceProperties = gpInstanceManager->mVkPhysicalDeviceProperties;
+								bool bCompatible = vkPipelineCacheHeader.headerSize == sizeof(VkPipelineCacheHeaderVersionOne)
+								                && vkPipelineCacheHeader.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE
+								                && vkPipelineCacheHeader.vendorID == rVkPhysicalDeviceProperties.vendorID
+								                && vkPipelineCacheHeader.deviceID == rVkPhysicalDeviceProperties.deviceID
+								                && std::memcmp(vkPipelineCacheHeader.pipelineCacheUUID, rVkPhysicalDeviceProperties.pipelineCacheUUID, VK_UUID_SIZE) == 0;
 
 								if (bCompatible)
 								{
@@ -484,28 +475,33 @@ void DeviceManager::LoadPipelineCache()
 
 void DeviceManager::ProbeTransferQueueOwnershipTransfer(bool bMaintenance9Available)
 {
-	if (bMaintenance9Available && gpInstanceManager->miTransferQueueFamilyIndex != gpInstanceManager->miGraphicsQueueFamilyIndex)
+	if (!bMaintenance9Available)
 	{
-		uint32_t uiQueueFamilyCount = 0;
-		vkGetPhysicalDeviceQueueFamilyProperties2(gpInstanceManager->mVkPhysicalDevice, &uiQueueFamilyCount, nullptr);
-		std::vector<VkQueueFamilyOwnershipTransferPropertiesKHR> queueFamilyOwnershipTransferProperties(uiQueueFamilyCount, {.sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_OWNERSHIP_TRANSFER_PROPERTIES_KHR, .pNext = nullptr});
-		std::vector<VkQueueFamilyProperties2> queueFamilyProperties2(uiQueueFamilyCount, {.sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2, .pNext = nullptr});
-		for (uint32_t i = 0; i < uiQueueFamilyCount; ++i)
-		{
-			queueFamilyProperties2[i].pNext = &queueFamilyOwnershipTransferProperties[i];
-		}
-		vkGetPhysicalDeviceQueueFamilyProperties2(gpInstanceManager->mVkPhysicalDevice, &uiQueueFamilyCount, queueFamilyProperties2.data());
-
-		uint32_t uiTransferFamily = static_cast<uint32_t>(gpInstanceManager->miTransferQueueFamilyIndex);
-		uint32_t uiGraphicsFamily = static_cast<uint32_t>(gpInstanceManager->miGraphicsQueueFamilyIndex);
-		// Trust boundary: both indices must be valid queue families. InstanceManager falls the transfer index back to the
-		// graphics family when no family advertises VK_QUEUE_TRANSFER_BIT, so it can never be UINT32_MAX here (otherwise the
-		// != graphics guard above would be true and this would silently index [UINT32_MAX]).
-		ASSERT(uiTransferFamily < uiQueueFamilyCount && uiGraphicsFamily < uiQueueFamilyCount);
-		uint32_t uiOptimalMask = queueFamilyOwnershipTransferProperties[uiTransferFamily].optimalImageTransferToQueueFamilies;
-		mCapabilities.Set(DeviceCapabilityFlags::kTransferQueueFamilyOwnershipTransferOptional, (uiOptimalMask & (1u << uiGraphicsFamily)) != 0);
-		LOG(kGraphics, kDebug, "Transfer->Graphics QFOT optional: {} (transfer family {} optimal mask {}, graphics family {})", static_cast<bool>(mCapabilities & DeviceCapabilityFlags::kTransferQueueFamilyOwnershipTransferOptional), uiTransferFamily, uiOptimalMask, uiGraphicsFamily);
+		return;
 	}
+
+	if (gpInstanceManager->miTransferQueueFamilyIndex == gpInstanceManager->miGraphicsQueueFamilyIndex)
+	{
+		return;
+	}
+
+	uint32_t uiQueueFamilyCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties2(gpInstanceManager->mVkPhysicalDevice, &uiQueueFamilyCount, nullptr);
+	std::vector<VkQueueFamilyOwnershipTransferPropertiesKHR> queueFamilyOwnershipTransferProperties(uiQueueFamilyCount, {.sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_OWNERSHIP_TRANSFER_PROPERTIES_KHR, .pNext = nullptr});
+	std::vector<VkQueueFamilyProperties2> queueFamilyProperties2(uiQueueFamilyCount, {.sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2, .pNext = nullptr});
+	for (int64_t i = 0; i < std::ssize(queueFamilyProperties2); ++i)
+	{
+		queueFamilyProperties2.at(i).pNext = &queueFamilyOwnershipTransferProperties.at(i);
+	}
+	vkGetPhysicalDeviceQueueFamilyProperties2(gpInstanceManager->mVkPhysicalDevice, &uiQueueFamilyCount, queueFamilyProperties2.data());
+
+	int64_t iTransferFamily = static_cast<uint32_t>(gpInstanceManager->miTransferQueueFamilyIndex);
+	uint32_t uiGraphicsFamily = static_cast<uint32_t>(gpInstanceManager->miGraphicsQueueFamilyIndex);
+	// Both indices must identify valid queue families; InstanceManager falls back to the graphics family when no transfer family is available.
+	ASSERT(iTransferFamily < uiQueueFamilyCount && uiGraphicsFamily < uiQueueFamilyCount);
+	uint32_t uiOptimalMask = queueFamilyOwnershipTransferProperties.at(iTransferFamily).optimalImageTransferToQueueFamilies;
+	mCapabilities.Set(DeviceCapabilityFlags::kTransferQueueFamilyOwnershipTransferOptional, (uiOptimalMask & (1u << uiGraphicsFamily)) != 0);
+	LOG(kGraphics, kDebug, "Transfer->Graphics QFOT optional: {} (transfer family {} optimal mask {}, graphics family {})", static_cast<bool>(mCapabilities & DeviceCapabilityFlags::kTransferQueueFamilyOwnershipTransferOptional), iTransferFamily, uiOptimalMask, uiGraphicsFamily);
 }
 
 } // namespace engine

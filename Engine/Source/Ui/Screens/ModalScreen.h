@@ -11,9 +11,7 @@ public:
 
 	void Render();
 
-private:
-
-	float mfOkHoverAnim = 0.0f;
+	float mfOkHoverAnimation = 0.0f;
 };
 
 } // namespace engine

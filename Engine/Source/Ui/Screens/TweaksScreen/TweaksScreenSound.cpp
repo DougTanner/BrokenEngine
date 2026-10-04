@@ -13,26 +13,22 @@ const TweaksSliderMapRegistrar gSoundRegistrar
 	{"Master Volume", &gMasterVolume},
 	{"Music Volume", &gMusicVolume},
 	{"Sound Volume", &gSoundVolume},
-	// Listener Distance Start
-	{"Listener Distance Start Start Height", &gListenerDistanceStart.StartHeight},
-	{"Listener Distance Start End Height", &gListenerDistanceStart.EndHeight},
-	{"Listener Distance Start Low", &gListenerDistanceStart.Low},
-	{"Listener Distance Start High", &gListenerDistanceStart.High},
-	// Listener Distance End
-	{"Listener Distance End Start Height", &gListenerDistanceEnd.StartHeight},
-	{"Listener Distance End End Height", &gListenerDistanceEnd.EndHeight},
-	{"Listener Distance End Low", &gListenerDistanceEnd.Low},
-	{"Listener Distance End High", &gListenerDistanceEnd.High},
-	// Listener Curve
-	{"Listener Curve Start Height", &gListenerCurve.StartHeight},
-	{"Listener Curve End Height", &gListenerCurve.EndHeight},
-	{"Listener Curve Low", &gListenerCurve.Low},
-	{"Listener Curve High", &gListenerCurve.High},
-	// Listener Audible Floor
-	{"Listener Audible Floor Start Height", &gListenerAudibleFloor.StartHeight},
-	{"Listener Audible Floor End Height", &gListenerAudibleFloor.EndHeight},
-	{"Listener Audible Floor Low", &gListenerAudibleFloor.Low},
-	{"Listener Audible Floor High", &gListenerAudibleFloor.High},
+	{"Listener Distance Start Start Height", &gListenerDistanceStart.startHeight},
+	{"Listener Distance Start End Height", &gListenerDistanceStart.endHeight},
+	{"Listener Distance Start Low", &gListenerDistanceStart.low},
+	{"Listener Distance Start High", &gListenerDistanceStart.high},
+	{"Listener Distance End Start Height", &gListenerDistanceEnd.startHeight},
+	{"Listener Distance End End Height", &gListenerDistanceEnd.endHeight},
+	{"Listener Distance End Low", &gListenerDistanceEnd.low},
+	{"Listener Distance End High", &gListenerDistanceEnd.high},
+	{"Listener Curve Start Height", &gListenerCurve.startHeight},
+	{"Listener Curve End Height", &gListenerCurve.endHeight},
+	{"Listener Curve Low", &gListenerCurve.low},
+	{"Listener Curve High", &gListenerCurve.high},
+	{"Listener Audible Floor Start Height", &gListenerAudibleFloor.startHeight},
+	{"Listener Audible Floor End Height", &gListenerAudibleFloor.endHeight},
+	{"Listener Audible Floor Low", &gListenerAudibleFloor.low},
+	{"Listener Audible Floor High", &gListenerAudibleFloor.high},
 };
 
 void RenderSoundSection(TweaksScreenBase& rScreen)

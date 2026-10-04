@@ -550,12 +550,12 @@ void ServerFleetManager::DetectDisconnectedPlayerDeaths()
 					continue;
 				}
 
-				if (!gpGame->mCoordFrames.contains(rMember.coord))
+				if (!gpGame->mCoordinateFrames.contains(rMember.coord))
 				{
 					continue;
 				}
 
-				const PlayersPostRender& rPlayers = *gpGame->CurrentFrame(rMember.coord).postRender.pPlayers;
+				const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(rMember.coord).pCurrent).postRender.pPlayers;
 				bool bFound = false;
 				for (int64_t k = 0; k < rPlayers.iCount; ++k)
 				{

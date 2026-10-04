@@ -133,7 +133,7 @@ NEW FUNCTION (as a static helper in ReconcileReplay.cpp):
 FILE: Engine/Source/GameBase.cpp
 
 In GameBase::Render() (line 266), after computing fCurrentTime and
-before the per-frame interpolate loop (line 276 interpolateFrame lambda):
+before the per-frame interpolate loop (line 276 InterpolateFrame lambda):
 
 Add a new step that, for each non-client active coord, computes interpolated
 positions and overwrites the FrameInterpolate data in mRenderInterpolates.
@@ -141,15 +141,15 @@ positions and overwrites the FrameInterpolate data in mRenderInterpolates.
   float fRenderTime = fCurrentTime;  // already computed at line 249
   static constexpr float kfInterpolationDelay = 2.0f * game::kfDeltaTime; // 2 ticks
 
-After interpolateFrame() runs for each coord (after line 289), apply
+After InterpolateFrame() runs for each coord (after line 289), apply
 interpolation overrides for non-client coords:
 
   for (const GridCoord& rCoord : rActiveCoords)
   {
       if (rCoord == cameraCoord) continue;  // client coord uses prediction
 
-      auto subIt = mCoordFrames.find(rCoord);
-      if (subIt == mCoordFrames.end()) continue;
+      auto subIt = mCoordinateFrames.find(rCoord);
+      if (subIt == mCoordinateFrames.end()) continue;
 
       const CoordFrames& rSub = subIt->second;
       if (rSub.iInterpolationCount < 2) continue;  // need 2 snapshots minimum
@@ -296,7 +296,7 @@ FILES MODIFIED
    - Add ApplySnapshotInterpolation declaration to GameBase class
 
 2. Engine/Source/GameBase.cpp (Render function at line 266)
-   - After the interpolateFrame loop, add snapshot interpolation override
+   - After the InterpolateFrame loop, add snapshot interpolation override
      for non-client coords
    - Add ApplySnapshotInterpolation implementation
 

@@ -28,6 +28,7 @@ inline constexpr bool kbSingleInstance = false;
 #if defined(BT_DEBUG)
 // #define ENABLE_CRT_DEBUG_HEAP
 inline constexpr const char* kpcBuildConfigName = "Debug";
+inline constexpr bool kbMimallocDiagnostics = true;
 
 inline constexpr bool kbAutoConnect = true;
 inline constexpr bool kbDebugBreak = true;
@@ -45,6 +46,7 @@ inline constexpr bool kbRandomlyInvalidatePbrCubemapCache = true;
 inline constexpr bool kbShowProfileTextByDefault = false;
 #elif defined(BT_PROFILE)
 inline constexpr const char* kpcBuildConfigName = "Profile";
+inline constexpr bool kbMimallocDiagnostics = false;
 
 inline constexpr bool kbAutoConnect = true;
 inline constexpr bool kbDebugBreak = false;
@@ -62,6 +64,7 @@ inline constexpr bool kbRandomlyInvalidatePbrCubemapCache = false;
 inline constexpr bool kbShowProfileTextByDefault = true;
 #elif defined(BT_RELEASE)
 inline constexpr const char* kpcBuildConfigName = "Release";
+inline constexpr bool kbMimallocDiagnostics = false;
 
 inline constexpr bool kbAutoConnect = false;
 inline constexpr bool kbDebugBreak = false;

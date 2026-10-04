@@ -57,7 +57,7 @@ extern Wrapper gSpreadOutputThresholdEnd;
 extern Wrapper gSpreadOutputCompressEnd;
 
 // Write - Temporal
-extern Wrapper gLightingTexelRampMetersPerSec;
+extern Wrapper gLightingTexelRampMetersPerSecond;
 extern Wrapper gLightingTemporalBlend;
 extern Wrapper gLightingUpdateCadence;
 
@@ -94,8 +94,8 @@ extern Wrapper gLightingDayFinalMultiplier;
 extern Wrapper gLightingNightFinalMultiplier;
 
 // Read - Water Lighting
-extern Wrapper gLightingWaterEwnsPow;
-extern Wrapper gLightingWaterEwnsPowMode;
+extern Wrapper gLightingWaterEastWestNorthSouthPower;
+extern Wrapper gLightingWaterEastWestNorthSouthPowerMode;
 extern Wrapper gLightingWaterAmbientIntensity;
 extern Wrapper gLightingWaterAmbientPower;
 extern Wrapper gLightingWaterAmbientPowerMode;

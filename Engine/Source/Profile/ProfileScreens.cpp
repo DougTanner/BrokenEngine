@@ -1,5 +1,6 @@
 #include "Pch.h"
 
+#include "File/PackChunks.h"
 #include "Graphics/EngineCamera.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "ProfileManagerBase.h"
@@ -10,13 +11,13 @@
 namespace engine
 {
 
-// Helper: appends timer text into the caller's current workbuffer frame. Caller owns Push/Pop.
+// The caller owns the workbuffer frame's Push/Pop.
 void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
-	// Submit-worker threads write these timer fields under mCpuTimerMutex (CommandBufferManager); lock the identical reads here, matching LogTimers. Cold ~2 Hz path, no contention concern. No caller holds the mutex on the path in (SmoothCpuTimers releases before the formatters run).
+	// Submit-worker threads write timer fields under mCpuTimerMutex, so formatting takes the same lock. Callers must release the mutex before formatting; SmoothCpuTimers releases it before this call.
 	std::lock_guard lock(gpProfileManager->mCpuTimerMutex);
 
-	int64_t iCpuTimerCount = gpProfileManager->GetCpuTimerCount();
+	int64_t iCpuTimerCount = gpProfileManager->miCpuTimerCount;
 
 	rWorkbuffer.Append("\n\n");
 
@@ -24,10 +25,10 @@ void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 	{
 		CpuTimer& rCpuTimer = gpProfileManager->GetCpuTimer(i);
 
-		int64_t iValue = rCpuTimer.smoothedMicroseconds.mSmoothedValue;
+		std::chrono::microseconds elapsedMicroseconds(rCpuTimer.smoothedMicroseconds.mSmoothedValue);
 		if (bReevaluate)
 		{
-			rCpuTimer.flags.Set(ProfileRowFlags::kVisible, iValue != 0);
+			rCpuTimer.flags.Set(ProfileRowFlags::kVisible, elapsedMicroseconds != std::chrono::microseconds::zero());
 		}
 
 		if (!(rCpuTimer.flags & ProfileRowFlags::kVisible))
@@ -37,7 +38,7 @@ void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 
 		rWorkbuffer.Append(gpProfileManager->GetCpuTimerName(i));
 		rWorkbuffer.Append(": ");
-		rWorkbuffer.Append(iValue);
+		rWorkbuffer.Append(elapsedMicroseconds.count());
 		rWorkbuffer.Append(" us");
 		if (rCpuTimer.iThreads > 1)
 		{
@@ -60,10 +61,10 @@ void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 	}
 }
 
-// Helper: appends counter text into the caller's current workbuffer frame. Caller owns Push/Pop.
+// The caller owns the workbuffer frame's Push/Pop.
 void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
-	int64_t iCpuCounterCount = gpProfileManager->GetCpuCounterCount();
+	int64_t iCpuCounterCount = gpProfileManager->miCpuCounterCount;
 
 	for (int64_t i = 0; i < iCpuCounterCount; ++i)
 	{
@@ -86,19 +87,19 @@ void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 }
 
 #if defined(BT_CLIENT)
-static void AppendMemoryStats(common::Workbuffer& rWorkbuffer, bool bEager)
+static void AppendMemoryStatistics(common::Workbuffer& rWorkbuffer, bool bEager)
 {
 	for (int64_t i = 0; i < data::kDataTypeCount; ++i)
 	{
 		if (IsEagerChunk(static_cast<data::DataTypes>(i)) == bEager)
 		{
-			MemoryStats stats = gpFileManager->GetMemoryStats(static_cast<data::DataTypes>(i));
+			MemoryStats statistics = gpFileManager->mpPackChunks->GetMemoryStatistics(static_cast<data::DataTypes>(i));
 			rWorkbuffer.Append("  ");
 			rWorkbuffer.Append(data::kpcDataTypeNames[i]);
 			rWorkbuffer.Append(": ");
-			rWorkbuffer.AppendFloat(static_cast<float>(stats.iBytes) / (1'024.0f * 1'024.0f), 1);
+			rWorkbuffer.AppendFloat(static_cast<float>(statistics.iBytes) / (1'024.0f * 1'024.0f), 1);
 			rWorkbuffer.Append(" MB (");
-			rWorkbuffer.Append(stats.iCount);
+			rWorkbuffer.Append(statistics.iCount);
 			rWorkbuffer.Append(")\n");
 		}
 	}
@@ -108,9 +109,9 @@ static void FormatGpuGraphicsInfo(common::Workbuffer& rWorkbuffer)
 {
 	auto [iX, iY] = FullDetail();
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-	rWorkbuffer.Append(static_cast<int64_t>(gpGraphics->mFramebufferExtent2D.width));
+	rWorkbuffer.Append(static_cast<int64_t>(gpGraphics->mFramebufferVkExtent2D.width));
 	rWorkbuffer.Append(" x ");
-	rWorkbuffer.Append(static_cast<int64_t>(gpGraphics->mFramebufferExtent2D.height));
+	rWorkbuffer.Append(static_cast<int64_t>(gpGraphics->mFramebufferVkExtent2D.height));
 	rWorkbuffer.Append("\n");
 	rWorkbuffer.Append(iX);
 	rWorkbuffer.Append(" x ");
@@ -126,25 +127,25 @@ static void FormatGpuGraphicsInfo(common::Workbuffer& rWorkbuffer)
 
 static void FormatGpuTimerRows(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
-	GpuTimer* pGpuTimers = gpProfileManager->GetGpuTimers();
+	GpuTimer* pGpuTimers = gpProfileManager->mGpuTimers;
 
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	rWorkbuffer.Append("\n\n");
 
 	// Active visible-area LOD vertex grid (quads + 1), shared by the water displacement compute pre-pass
 	// (writes the top-left rectangle) and the water mesh draw. Mirrors the LOD pick in RenderFrameMain.
-	int iWaterLod = std::clamp(engine::gpCamera->miVisibleAreaLod, 0, static_cast<int>(BufferManager::kiVisibleAreaLodCount) - 1);
-	const BufferManager::VisibleAreaMeshLod& rWaterLod = gpBufferManager->mWaterMeshLods[iWaterLod];
-	int64_t iWaterGridX = rWaterLod.iQuadCountX + 1;
-	int64_t iWaterGridY = rWaterLod.iQuadCountY + 1;
+	int64_t iWaterLevelOfDetail = std::clamp<int64_t>(engine::gpCamera->miVisibleAreaLevelOfDetail, 0, BufferManager::kiVisibleAreaLodCount - 1);
+	const BufferManager::VisibleAreaMeshLod& rWaterLevelOfDetail = gpBufferManager->mWaterMeshLods[iWaterLevelOfDetail];
+	int64_t iWaterGridX = rWaterLevelOfDetail.iQuadCountX + 1;
+	int64_t iWaterGridY = rWaterLevelOfDetail.iQuadCountY + 1;
 
 	for (int64_t i = 0; i < kGpuTimerCount; ++i)
 	{
-		int64_t iValue = pGpuTimers[i].smoothedMicroseconds.mSmoothedValue;
-		int64_t iMax = pGpuTimers[i].smoothedMicroseconds.Maximum();
+		std::chrono::microseconds elapsedMicroseconds(pGpuTimers[i].smoothedMicroseconds.mSmoothedValue);
+		std::chrono::microseconds maximumMicroseconds(pGpuTimers[i].smoothedMicroseconds.Maximum());
 		if (bReevaluate)
 		{
-			pGpuTimers[i].flags.Set(ProfileRowFlags::kVisible, !(iValue < 10 || (iValue < 200 && !(iMax > 2 * iValue))));
+			pGpuTimers[i].flags.Set(ProfileRowFlags::kVisible, !(elapsedMicroseconds < std::chrono::microseconds(10) || (elapsedMicroseconds < std::chrono::microseconds(200) && !(maximumMicroseconds > 2 * elapsedMicroseconds))));
 		}
 
 		if (!(pGpuTimers[i].flags & ProfileRowFlags::kVisible))
@@ -154,24 +155,22 @@ static void FormatGpuTimerRows(common::Workbuffer& rWorkbuffer, bool bReevaluate
 
 		rWorkbuffer.Append(kGpuTimerNames[i]);
 		rWorkbuffer.Append(": ");
-		rWorkbuffer.Append(iValue);
+		rWorkbuffer.Append(elapsedMicroseconds.count());
 		rWorkbuffer.Append(" us");
-		if (iMax > 2 * iValue)
+		if (maximumMicroseconds > 2 * elapsedMicroseconds)
 		{
 			rWorkbuffer.Append(" (");
-			rWorkbuffer.Append(iMax);
+			rWorkbuffer.Append(maximumMicroseconds.count());
 			rWorkbuffer.Append(")");
 		}
 
-		// Resolution beside each dynamic-sized pass. Terrain Elevation shows its snap-grid render-target extent;
-		// Water Displacement / Water show the active visible-area LOD vertex grid (the top-left rectangle the
-		// displacement compute writes / the water mesh draws).
+		// Terrain Elevation's render target follows the snap grid.
 		if (i == kGpuTimerTerrainElevation)
 		{
 			rWorkbuffer.Append("  ");
-			rWorkbuffer.Append(static_cast<int64_t>(gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture.mInfo.extent.width));
+			rWorkbuffer.Append(static_cast<int64_t>(gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture.mInfo.vkExtent3D.width));
 			rWorkbuffer.Append("x");
-			rWorkbuffer.Append(static_cast<int64_t>(gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture.mInfo.extent.height));
+			rWorkbuffer.Append(static_cast<int64_t>(gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture.mInfo.vkExtent3D.height));
 		}
 		else if (i == kGpuTimerWaterDisplacement || i == kGpuTimerWater)
 		{
@@ -190,17 +189,17 @@ static void FormatGpuTimerRows(common::Workbuffer& rWorkbuffer, bool bReevaluate
 static void FormatCellReadout(common::Workbuffer& rWorkbuffer)
 {
 	rWorkbuffer.Append("Cell: [");
-	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mClientGridCoord.iX));
+	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mClientGridCoordinate.iX));
 	rWorkbuffer.Append(",");
-	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mClientGridCoord.iY));
+	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mClientGridCoordinate.iY));
 	rWorkbuffer.Append("]\nActive: ");
-	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mActiveCoords.size()));
+	rWorkbuffer.Append(std::ssize(game::gpGame->mActiveCoordinates));
 	rWorkbuffer.Append("\n");
 
-	auto profileCoordIt = game::gpGame->mCoordFrames.find(game::gpGame->mClientGridCoord);
-	if (profileCoordIt != game::gpGame->mCoordFrames.end() && profileCoordIt->second.iSnapshotCount > 0)
+	auto it = game::gpGame->mCoordinateFrames.find(game::gpGame->mClientGridCoordinate);
+	if (it != game::gpGame->mCoordinateFrames.end() && it->second.iSnapshotCount > 0)
 	{
-		const game::Frame& rRenderFrame = game::gpGame->RenderFrame(game::gpGame->mClientGridCoord);
+		const game::Frame& rRenderFrame = game::gpGame->RenderFrame(game::gpGame->mClientGridCoordinate);
 		rWorkbuffer.Append("Tick: ");
 		rWorkbuffer.Append(rRenderFrame.interpolate.iTick);
 		rWorkbuffer.Append("\nTime: ");
@@ -210,25 +209,25 @@ static void FormatCellReadout(common::Workbuffer& rWorkbuffer)
 	rWorkbuffer.Append("\n");
 }
 
-static void FormatGpuMemoryStats(common::Workbuffer& rWorkbuffer)
+static void FormatGpuMemoryStatistics(common::Workbuffer& rWorkbuffer)
 {
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	FormatCellReadout(rWorkbuffer);
 	rWorkbuffer.Append("GPU Memory\n");
 
-	VmaTotalStatistics stats {};
-	vmaCalculateStatistics(gpDeviceManager->mpAllocator, &stats);
+	VmaTotalStatistics statistics {};
+	vmaCalculateStatistics(gpDeviceManager->mpAllocator, &statistics);
 
 	rWorkbuffer.Append("Allocated: ");
-	rWorkbuffer.AppendFloat(static_cast<float>(stats.total.statistics.blockBytes) / (1'024.0f * 1'024.0f), 1);
+	rWorkbuffer.AppendFloat(static_cast<float>(statistics.total.statistics.blockBytes) / (1'024.0f * 1'024.0f), 1);
 	rWorkbuffer.Append(" MB\nUsed: ");
-	rWorkbuffer.AppendFloat(static_cast<float>(stats.total.statistics.allocationBytes) / (1'024.0f * 1'024.0f), 1);
+	rWorkbuffer.AppendFloat(static_cast<float>(statistics.total.statistics.allocationBytes) / (1'024.0f * 1'024.0f), 1);
 	rWorkbuffer.Append(" MB\nUnused: ");
-	rWorkbuffer.AppendFloat(static_cast<float>(stats.total.statistics.blockBytes - stats.total.statistics.allocationBytes) / (1'024.0f * 1'024.0f), 1);
+	rWorkbuffer.AppendFloat(static_cast<float>(statistics.total.statistics.blockBytes - statistics.total.statistics.allocationBytes) / (1'024.0f * 1'024.0f), 1);
 	rWorkbuffer.Append(" MB\nAllocations: ");
-	rWorkbuffer.Append(static_cast<int64_t>(stats.total.statistics.allocationCount));
+	rWorkbuffer.Append(static_cast<int64_t>(statistics.total.statistics.allocationCount));
 	rWorkbuffer.Append("  Blocks: ");
-	rWorkbuffer.Append(static_cast<int64_t>(stats.total.statistics.blockCount));
+	rWorkbuffer.Append(static_cast<int64_t>(statistics.total.statistics.blockCount));
 
 	if (gpDeviceManager->mCapabilities & DeviceCapabilityFlags::kMemoryBudgetAvailable)
 	{
@@ -238,8 +237,8 @@ static void FormatGpuMemoryStats(common::Workbuffer& rWorkbuffer)
 
 		for (uint32_t i = 0; i < uiHeapCount; ++i)
 		{
-			VkMemoryHeapFlags uiFlags = gpInstanceManager->mVkPhysicalDeviceMemoryProperties.memoryHeaps[i].flags;
-			bool bDeviceLocal = (uiFlags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) != 0;
+			VkMemoryHeapFlags vkMemoryHeapFlags = gpInstanceManager->mVkPhysicalDeviceMemoryProperties.memoryHeaps[i].flags;
+			bool bDeviceLocal = (vkMemoryHeapFlags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) != 0;
 
 			rWorkbuffer.Append("\nHeap ");
 			rWorkbuffer.Append(static_cast<int64_t>(i));
@@ -267,16 +266,16 @@ static void FormatGpuMemoryStats(common::Workbuffer& rWorkbuffer)
 
 #if defined(BT_CLIENT)
 
-void FormatFpsHeader(common::Workbuffer& rWorkbuffer, int64_t iTotalCpuTimeUs)
+void FormatFramesPerSecondHeader(common::Workbuffer& rWorkbuffer, std::chrono::microseconds elapsedCpuTime)
 {
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	rWorkbuffer.Append(static_cast<int64_t>(gpGraphics->mRendersInTheLastSecond.Get()));
 	rWorkbuffer.Append(" fps");
 
-	if (iTotalCpuTimeUs > 100)
+	if (elapsedCpuTime > std::chrono::microseconds(100))
 	{
 		rWorkbuffer.Append(" (Cpu: ");
-		rWorkbuffer.Append(1'000'000 / iTotalCpuTimeUs);
+		rWorkbuffer.Append(1'000'000 / elapsedCpuTime.count());
 		rWorkbuffer.Append(" fps, ");
 	}
 	else
@@ -284,12 +283,12 @@ void FormatFpsHeader(common::Workbuffer& rWorkbuffer, int64_t iTotalCpuTimeUs)
 		rWorkbuffer.Append(" (Cpu: >9000 fps, ");
 	}
 
-	GpuTimer* pGpuTimers = gpProfileManager->GetGpuTimers();
-	int64_t iTotalGpuTime = pGpuTimers[kGpuTimerGlobal].smoothedMicroseconds.mSmoothedValue + pGpuTimers[kGpuTimerMain].smoothedMicroseconds.mSmoothedValue + pGpuTimers[kGpuTimerImage].smoothedMicroseconds.mSmoothedValue;
-	if (iTotalGpuTime > 0)
+	GpuTimer* pGpuTimers = gpProfileManager->mGpuTimers;
+	std::chrono::microseconds elapsedGpuTime(pGpuTimers[kGpuTimerGlobal].smoothedMicroseconds.mSmoothedValue + pGpuTimers[kGpuTimerMain].smoothedMicroseconds.mSmoothedValue + pGpuTimers[kGpuTimerImage].smoothedMicroseconds.mSmoothedValue);
+	if (elapsedGpuTime > std::chrono::microseconds::zero())
 	{
 		rWorkbuffer.Append("Gpu: ");
-		rWorkbuffer.Append(1'000'000 / iTotalGpuTime);
+		rWorkbuffer.Append(1'000'000 / elapsedGpuTime.count());
 		rWorkbuffer.Append(" fps)");
 	}
 
@@ -306,48 +305,45 @@ void FormatFpsHeader(common::Workbuffer& rWorkbuffer, int64_t iTotalCpuTimeUs)
 
 void FormatCpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
-	// Cpu timers
 	{
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 		FormatCpuTimersText(rWorkbuffer, bReevaluate);
 		gpImGuiManager->UpdateTextArea(kTextProfileCpuTimers, rWorkbuffer.View());
 	}
 
-	// Counters text
 	{
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 		FormatCpuCountersText(rWorkbuffer, bReevaluate);
 		gpImGuiManager->UpdateTextArea(kTextProfileCpuCounters, rWorkbuffer.View());
 	}
 
-	// Memory profiling
-	MemoryStats eagerStats = gpFileManager->GetEagerStats();
-	MemoryStats lazyStats = gpFileManager->GetLazyStats();
-	int64_t iTotalBytes = eagerStats.iBytes + lazyStats.iBytes;
-	int64_t iTotalCount = eagerStats.iCount + lazyStats.iCount;
+	MemoryStats eagerStatistics = gpFileManager->mpPackChunks->GetEagerStatistics();
+	MemoryStats lazyStatistics = gpFileManager->mpPackChunks->GetLazyStatistics();
+	int64_t iTotalBytes = eagerStatistics.iBytes + lazyStatistics.iBytes;
+	int64_t iTotalCount = eagerStatistics.iCount + lazyStatistics.iCount;
 
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	FormatCellReadout(rWorkbuffer);
 	rWorkbuffer.Append("Data Memory\n");
 	rWorkbuffer.Append("Eager: ");
-	rWorkbuffer.AppendFloat(static_cast<float>(eagerStats.iBytes) / (1'024.0f * 1'024.0f), 1);
+	rWorkbuffer.AppendFloat(static_cast<float>(eagerStatistics.iBytes) / (1'024.0f * 1'024.0f), 1);
 	rWorkbuffer.Append(" MB (");
-	rWorkbuffer.Append(eagerStats.iCount);
+	rWorkbuffer.Append(eagerStatistics.iCount);
 	rWorkbuffer.Append(")\n");
-	AppendMemoryStats(rWorkbuffer, true);
+	AppendMemoryStatistics(rWorkbuffer, true);
 	rWorkbuffer.Append("Lazy: ");
-	rWorkbuffer.AppendFloat(static_cast<float>(lazyStats.iBytes) / (1'024.0f * 1'024.0f), 1);
+	rWorkbuffer.AppendFloat(static_cast<float>(lazyStatistics.iBytes) / (1'024.0f * 1'024.0f), 1);
 	rWorkbuffer.Append(" MB (");
-	rWorkbuffer.Append(lazyStats.iCount);
+	rWorkbuffer.Append(lazyStatistics.iCount);
 	rWorkbuffer.Append(")\n");
-	AppendMemoryStats(rWorkbuffer, false);
+	AppendMemoryStatistics(rWorkbuffer, false);
 	rWorkbuffer.Append("Total: ");
 	rWorkbuffer.AppendFloat(static_cast<float>(iTotalBytes) / (1'024.0f * 1'024.0f), 1);
 	rWorkbuffer.Append(" MB (");
 	rWorkbuffer.Append(iTotalCount);
 	rWorkbuffer.Append(")");
 	rWorkbuffer.Append("\nAllocations: ");
-	rWorkbuffer.Append(gpProfileManager->GetSmoothedAllocations().mSmoothedValue);
+	rWorkbuffer.Append(gpProfileManager->mSmoothedAllocations.mSmoothedValue);
 	gpImGuiManager->UpdateTextArea(kTextProfileMemory, rWorkbuffer.View());
 }
 
@@ -355,7 +351,7 @@ void FormatGpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
 	FormatGpuGraphicsInfo(rWorkbuffer);
 	FormatGpuTimerRows(rWorkbuffer, bReevaluate);
-	FormatGpuMemoryStats(rWorkbuffer);
+	FormatGpuMemoryStatistics(rWorkbuffer);
 }
 
 #endif // BT_CLIENT

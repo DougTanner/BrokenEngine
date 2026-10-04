@@ -2,37 +2,36 @@
 
 #if defined(BT_CLIENT)
 
+#include "Graphics/Objects/PipelineDescriptorWriter.h"
+
 namespace engine
 {
 
-static constexpr int64_t kiInitialDebugRender = 128 * 1'024;
+constexpr int64_t kiInitialDebugRender = 128 * 1'024;
 
 struct DebugRenderType
 {
 	common::crc_t crc = 0;
 	Pipelines ePipeline = kPipelineCount;
 	int64_t iCount = 0;
-	// Grows on demand; the reserved count lives here because an explicit initializer in sTypes below would
-	// override it and leave the entry with no reservation to grow into
-	common::StableVector<shaders::DebugRenderLayout> layouts {64 * kiInitialDebugRender};
+	// Each sTypes entry relies on this default member initializer for its reservation limit.
+	common::StableVector<shaders::DebugRenderLayout> layouts = common::StableVector<shaders::DebugRenderLayout>(64 * kiInitialDebugRender);
 };
 
 static DebugRenderType sTypes[]
 {
-	{common::CrcConsteval("DebugBox"),    kPipelineDebugBox,    0},
-	{common::CrcConsteval("DebugSphere"), kPipelineDebugSphere, 0},
-	{common::CrcConsteval("DebugCircle"), kPipelineDebugCircle, 0},
-	{common::CrcConsteval("DebugLine"),   kPipelineDebugLine,   0},
+	{.crc = common::CrcConsteval("DebugBox"), .ePipeline = kPipelineDebugBox, .iCount = 0},
+	{.crc = common::CrcConsteval("DebugSphere"), .ePipeline = kPipelineDebugSphere, .iCount = 0},
+	{.crc = common::CrcConsteval("DebugCircle"), .ePipeline = kPipelineDebugCircle, .iCount = 0},
+	{.crc = common::CrcConsteval("DebugLine"), .ePipeline = kPipelineDebugLine, .iCount = 0},
 };
 
-static constexpr int64_t kiBox = 0;
-static constexpr int64_t kiSphere = 1;
-static constexpr int64_t kiCircle = 2;
-static constexpr int64_t kiLine = 3;
+constexpr int64_t kiBox = 0;
+constexpr int64_t kiSphere = 1;
+constexpr int64_t kiCircle = 2;
+constexpr int64_t kiLine = 3;
 
-static bool sbEnabled = false;
-
-static void AddLayout(int64_t iType, const XMFLOAT4A& f4Row0, const XMFLOAT4A& f4Row1, const XMFLOAT4A& f4Row2, const XMFLOAT4A& f4Color)
+static void AddLayout(int64_t iType, const XMFLOAT4A& rf4Row0, const XMFLOAT4A& rf4Row1, const XMFLOAT4A& rf4Row2, const XMFLOAT4A& rf4Color)
 {
 	if constexpr (kbDebugRender)
 	{
@@ -49,82 +48,87 @@ static void AddLayout(int64_t iType, const XMFLOAT4A& f4Row0, const XMFLOAT4A& f
 		}
 
 		shaders::DebugRenderLayout& rLayout = rType.layouts[rType.iCount];
-		rLayout.f3x4Transform[0] = f4Row0;
-		rLayout.f3x4Transform[1] = f4Row1;
-		rLayout.f3x4Transform[2] = f4Row2;
-		rLayout.f4Color = f4Color;
+		rLayout.f3x4Transform[0] = rf4Row0;
+		rLayout.f3x4Transform[1] = rf4Row1;
+		rLayout.f3x4Transform[2] = rf4Row2;
+		rLayout.f4Color = rf4Color;
 		++rType.iCount;
 	}
 }
 
-void DebugRender::Box(const XMFLOAT3A& f3Position, const XMFLOAT3A& f3Scale, const XMFLOAT4A& f4Color)
+void DebugRender::Box(const XMFLOAT3A& rf3Position, const XMFLOAT3A& rf3Scale, const XMFLOAT4A& rf4Color)
 {
 	if constexpr (kbDebugRender)
 	{
-		if (!sbEnabled) { return; }
+		if (!msbEnabled)
+		{
+			return;
+		}
 		// Row-major 3x4: scale on diagonal, translation in w
-		AddLayout(kiBox, {f3Scale.x, 0.0f, 0.0f, f3Position.x}, {0.0f, f3Scale.y, 0.0f, f3Position.y}, {0.0f, 0.0f, f3Scale.z, f3Position.z}, f4Color);
+		AddLayout(kiBox, {rf3Scale.x, 0.0f, 0.0f, rf3Position.x}, {0.0f, rf3Scale.y, 0.0f, rf3Position.y}, {0.0f, 0.0f, rf3Scale.z, rf3Position.z}, rf4Color);
 	}
 }
 
-void DebugRender::Sphere(const XMFLOAT3A& f3Center, float fRadius, const XMFLOAT4A& f4Color)
+void DebugRender::Sphere(const XMFLOAT3A& rf3Center, float fRadius, const XMFLOAT4A& rf4Color)
 {
 	if constexpr (kbDebugRender)
 	{
-		if (!sbEnabled) { return; }
-		AddLayout(kiSphere, {fRadius, 0.0f, 0.0f, f3Center.x}, {0.0f, fRadius, 0.0f, f3Center.y}, {0.0f, 0.0f, fRadius, f3Center.z}, f4Color);
+		if (!msbEnabled)
+		{
+			return;
+		}
+		AddLayout(kiSphere, {fRadius, 0.0f, 0.0f, rf3Center.x}, {0.0f, fRadius, 0.0f, rf3Center.y}, {0.0f, 0.0f, fRadius, rf3Center.z}, rf4Color);
 	}
 }
 
-void DebugRender::Circle(const XMFLOAT3A& f3Center, float fRadius, const XMFLOAT4A& f4Color)
+void DebugRender::Circle(const XMFLOAT3A& rf3Center, float fRadius, const XMFLOAT4A& rf4Color)
 {
 	if constexpr (kbDebugRender)
 	{
-		if (!sbEnabled) { return; }
-		AddLayout(kiCircle, {fRadius, 0.0f, 0.0f, f3Center.x}, {0.0f, fRadius, 0.0f, f3Center.y}, {0.0f, 0.0f, fRadius, f3Center.z}, f4Color);
+		if (!msbEnabled)
+		{
+			return;
+		}
+		AddLayout(kiCircle, {fRadius, 0.0f, 0.0f, rf3Center.x}, {0.0f, fRadius, 0.0f, rf3Center.y}, {0.0f, 0.0f, fRadius, rf3Center.z}, rf4Color);
 	}
 }
 
-void DebugRender::Line(const XMFLOAT3A& f3Start, const XMFLOAT3A& f3End, const XMFLOAT4A& f4Color)
+void DebugRender::Line(const XMFLOAT3A& rf3Start, const XMFLOAT3A& rf3End, const XMFLOAT4A& rf4Color)
 {
 	if constexpr (kbDebugRender)
 	{
-		if (!sbEnabled) { return; }
+		if (!msbEnabled)
+		{
+			return;
+		}
 		// Line mesh is (0,0,0) to (1,0,0) along +X
 		// Transform: X axis = direction, translation = start
-		float fDx = f3End.x - f3Start.x;
-		float fDy = f3End.y - f3Start.y;
-		float fDz = f3End.z - f3Start.z;
+		float fDeltaX = rf3End.x - rf3Start.x;
+		float fDeltaY = rf3End.y - rf3Start.y;
+		float fDeltaZ = rf3End.z - rf3Start.z;
 
-		AddLayout(kiLine, {fDx, 0.0f, 0.0f, f3Start.x}, {fDy, 0.0f, 0.0f, f3Start.y}, {fDz, 0.0f, 0.0f, f3Start.z}, f4Color);
+		AddLayout(kiLine, {fDeltaX, 0.0f, 0.0f, rf3Start.x}, {fDeltaY, 0.0f, 0.0f, rf3Start.y}, {fDeltaZ, 0.0f, 0.0f, rf3Start.z}, rf4Color);
 	}
 }
 
-void DebugRender::Toggle()
-{
-	if constexpr (kbDebugRender)
-	{
-		sbEnabled = !sbEnabled;
-	}
-}
 
 void DebugRender::BeginRender(int64_t iCommandBuffer)
 {
 	if constexpr (kbDebugRender)
 	{
-		for (DebugRenderType& rType : sTypes)
+		for (const DebugRenderType& rType : sTypes)
 		{
 			if (rType.iCount == 0)
 			{
 				continue;
 			}
 
-			if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(rType.crc, kBufferMain, "DebugRender", sizeof(shaders::DebugRenderLayout), rType.iCount, iCommandBuffer))
+			if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(rType.crc, kBufferMain, "DebugRender", sizeof(shaders::DebugRenderLayout), rType.iCount, iCommandBuffer); pBuffer != nullptr)
 			{
-				gpPipelineManager->mpPipelines[rType.ePipeline].UpdateStorageBufferDescriptor(iCommandBuffer, 2, pBuffer);
+				PipelineDescriptorWriter::UpdateStorageBuffer(gpPipelineManager->mpPipelines[rType.ePipeline], iCommandBuffer, 2, pBuffer);
 			}
 
-			auto [pLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::DebugRenderLayout>(rType.crc, kBufferMain, iCommandBuffer);
+			[[maybe_unused]] auto [pLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::DebugRenderLayout>(rType.crc, kBufferMain, iCommandBuffer);
 			std::memcpy(pLayouts, rType.layouts.Data(), rType.iCount * sizeof(shaders::DebugRenderLayout));
 		}
 	}

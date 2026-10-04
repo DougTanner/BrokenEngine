@@ -1,5 +1,6 @@
 #include "IslandTerrain.h"
 
+#include "File/PackChunks.h"
 #include "Frame/FrameStaticData.h"
 #include "Frame/IslandChainPlacement.h"
 
@@ -22,7 +23,7 @@ IslandTerrain::IslandTerrain()
 
 	gpIslandTerrain = this;
 
-	const std::unordered_map<common::crc_t, LazyChunk>& rChunkMap = gpFileManager->GetLazyChunkMap();
+	const std::unordered_map<common::crc_t, LazyChunk>& rChunkMap = gpFileManager->mpPackChunks->mLazyChunkMap;
 	for (const auto& [rCrc, rLazyChunk] : rChunkMap)
 	{
 		if (!(rLazyChunk.header.flags & common::ChunkFlags::kIsland))
@@ -116,7 +117,7 @@ IslandTerrain::IslandTerrain()
 	ASSERT(!mIslandCrcsSorted.empty());
 
 
-	gpFileManager->RequestChunkLoad(mIslandCrcsSorted, LoadPriority::kRealtime);
+	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(mIslandCrcsSorted, LoadPriority::kRealtime);
 }
 
 IslandTerrain::~IslandTerrain()
@@ -133,9 +134,9 @@ void IslandTerrain::WaitForElevationMaps(float fNavigationThreshold, float fNavi
 void IslandTerrain::WaitForElevationMaps()
 #endif
 {
-	gpFileManager->WaitForChunks(mIslandCrcsSorted);
+	gpFileManager->mpPackChunks->WaitForChunks(mIslandCrcsSorted);
 
-	const std::unordered_map<common::crc_t, LazyChunk>& rChunkMap = gpFileManager->GetLazyChunkMap();
+	const std::unordered_map<common::crc_t, LazyChunk>& rChunkMap = gpFileManager->mpPackChunks->mLazyChunkMap;
 	for (auto& [rCrc, rTemplate] : mIslands)
 	{
 		const LazyChunk& rLazyChunk = rChunkMap.at(rCrc);
@@ -197,7 +198,7 @@ void IslandTerrain::WaitForElevationMaps()
 		// asynchronously restored only when this template gains a render slot.
 		rTemplate.pfMeshPositions = reinterpret_cast<const float*>(pAfterHeightmap);
 		rTemplate.puiMeshIndices = reinterpret_cast<const uint32_t*>(pAfterHeightmap + iMeshPositionBytes);
-		gpFileManager->DecommitChunkRange(rCrc, static_cast<uint64_t>(iHeightmapBytes), static_cast<uint64_t>(iMeshBytes));
+		gpFileManager->mpPackChunks->DecommitChunkRange(rCrc, static_cast<uint64_t>(iHeightmapBytes), static_cast<uint64_t>(iMeshBytes));
 		rTemplate.bMeshCpuDecommitted = true;
 #endif
 
@@ -205,7 +206,7 @@ void IslandTerrain::WaitForElevationMaps()
 		// The server never reads the mesh CPU slice (no GPU upload, no device loss), so reclaim it immediately after
 		// load: decommit the [positions][indices] sub-range of the kIsland chunk. Heightmap (before, offset 0) and hull
 		// (after) stay resident — the server reads the heightmap for NavContour below and the hull for placement/nav.
-		gpFileManager->DecommitChunkRange(rCrc, static_cast<uint64_t>(iHeightmapBytes), static_cast<uint64_t>(iMeshBytes));
+		gpFileManager->mpPackChunks->DecommitChunkRange(rCrc, static_cast<uint64_t>(iHeightmapBytes), static_cast<uint64_t>(iMeshBytes));
 #endif
 	}
 
@@ -374,7 +375,7 @@ static float CellElevation(const IslandTerrain& rTerrain, const FrameStaticData&
 
 float XM_CALLCONV IslandTerrain::GlobalElevation(GridCoord coord, FXMVECTOR vecLocalPosition) const
 {
-	// Frame Purity Constraint (IslandTerrain.h): GlobalElevation/GlobalNormal walk mCoordFrames with
+	// Frame Purity Constraint (IslandTerrain.h): GlobalElevation/GlobalNormal walk mCoordinateFrames with
 	// libm trig and must never run from frame-tick code — the sim hot path uses FrameElevationSampler::Sample/FrameNormal.
 	ASSERT(common::gpThreadLocal != nullptr && !common::gpThreadLocal->mbInFrameTick);
 
@@ -387,8 +388,8 @@ float XM_CALLCONV IslandTerrain::GlobalElevation(GridCoord coord, FXMVECTOR vecL
 	}
 
 	// Look up per-cell placements. Cells outside the simulated set fall through to sea floor.
-	auto it = game::gpGame->mCoordFrames.find(coord);
-	if (it == game::gpGame->mCoordFrames.end())
+	auto it = game::gpGame->mCoordinateFrames.find(coord);
+	if (it == game::gpGame->mCoordinateFrames.end())
 	{
 		return mfSeaFloorElevation;
 	}
@@ -558,8 +559,8 @@ XMVECTOR XM_CALLCONV IslandTerrain::GlobalNormal(GridCoord coord, FXMVECTOR vecL
 		}
 		if (!bHaveCachedCoord || tapCoord != cachedCoord)
 		{
-			auto it = game::gpGame->mCoordFrames.find(tapCoord);
-			pCachedStaticData = it == game::gpGame->mCoordFrames.end() ? nullptr : &it->second.staticData;
+			auto it = game::gpGame->mCoordinateFrames.find(tapCoord);
+			pCachedStaticData = it == game::gpGame->mCoordinateFrames.end() ? nullptr : &it->second.staticData;
 			cachedCoord = tapCoord;
 			bHaveCachedCoord = true;
 		}

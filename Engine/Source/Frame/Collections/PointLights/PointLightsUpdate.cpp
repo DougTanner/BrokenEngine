@@ -43,19 +43,19 @@ void PointLightsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 			{
 				if (rOriginalController.ppVisibleAreaScales[j] != nullptr)
 				{
-					rScaledController.keyframes[j].fVisibleArea *= rOriginalController.ppVisibleAreaScales[j]->Get();
+					rScaledController.keyframes[j].fVisibleArea *= rOriginalController.ppVisibleAreaScales[j]->mfCurrent;
 				}
 				if (rOriginalController.ppVisibleIntensityScales[j] != nullptr)
 				{
-					rScaledController.keyframes[j].fVisibleIntensity *= rOriginalController.ppVisibleIntensityScales[j]->Get();
+					rScaledController.keyframes[j].fVisibleIntensity *= rOriginalController.ppVisibleIntensityScales[j]->mfCurrent;
 				}
 				if (rOriginalController.ppLightingAreaScales[j] != nullptr)
 				{
-					rScaledController.keyframes[j].fLightingArea *= rOriginalController.ppLightingAreaScales[j]->Get();
+					rScaledController.keyframes[j].fLightingArea *= rOriginalController.ppLightingAreaScales[j]->mfCurrent;
 				}
 				if (rOriginalController.ppLightingIntensityScales[j] != nullptr)
 				{
-					rScaledController.keyframes[j].fLightingIntensity *= rOriginalController.ppLightingIntensityScales[j]->Get();
+					rScaledController.keyframes[j].fLightingIntensity *= rOriginalController.ppLightingIntensityScales[j]->mfCurrent;
 				}
 			});
 
@@ -130,10 +130,10 @@ void XM_CALLCONV PointLightsPostRender::AddControlled(game::Frame& __restrict rF
 	[&rInterpolate, &rController, fRotation](int64_t iSpawnIndex)
 	{
 		rInterpolate.puiTypeIndices[iSpawnIndex] = rController.uiBaseTypeIndex;
-		rInterpolate.pfVisibleAreas[iSpawnIndex] = rController.keyframes[0].fVisibleArea * (rController.ppVisibleAreaScales[0] != nullptr ? rController.ppVisibleAreaScales[0]->Get() : 1.0f);
-		rInterpolate.pfVisibleIntensities[iSpawnIndex] = rController.keyframes[0].fVisibleIntensity * (rController.ppVisibleIntensityScales[0] != nullptr ? rController.ppVisibleIntensityScales[0]->Get() : 1.0f);
-		rInterpolate.pfLightingAreas[iSpawnIndex] = rController.keyframes[0].fLightingArea * (rController.ppLightingAreaScales[0] != nullptr ? rController.ppLightingAreaScales[0]->Get() : 1.0f);
-		rInterpolate.pfLightingIntensities[iSpawnIndex] = rController.keyframes[0].fLightingIntensity * (rController.ppLightingIntensityScales[0] != nullptr ? rController.ppLightingIntensityScales[0]->Get() : 1.0f);
+		rInterpolate.pfVisibleAreas[iSpawnIndex] = rController.keyframes[0].fVisibleArea * (rController.ppVisibleAreaScales[0] != nullptr ? rController.ppVisibleAreaScales[0]->mfCurrent : 1.0f);
+		rInterpolate.pfVisibleIntensities[iSpawnIndex] = rController.keyframes[0].fVisibleIntensity * (rController.ppVisibleIntensityScales[0] != nullptr ? rController.ppVisibleIntensityScales[0]->mfCurrent : 1.0f);
+		rInterpolate.pfLightingAreas[iSpawnIndex] = rController.keyframes[0].fLightingArea * (rController.ppLightingAreaScales[0] != nullptr ? rController.ppLightingAreaScales[0]->mfCurrent : 1.0f);
+		rInterpolate.pfLightingIntensities[iSpawnIndex] = rController.keyframes[0].fLightingIntensity * (rController.ppLightingIntensityScales[0] != nullptr ? rController.ppLightingIntensityScales[0]->mfCurrent : 1.0f);
 		rInterpolate.pfRotations[iSpawnIndex] = fRotation + rController.keyframes[0].fRotation;
 		rInterpolate.pfBaseRotations[iSpawnIndex] = fRotation;
 	});

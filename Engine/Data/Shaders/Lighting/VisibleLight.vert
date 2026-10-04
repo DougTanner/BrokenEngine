@@ -35,7 +35,7 @@ void main()
 	int iIndex = 2 * int(f2InQuadVertex.y) + int(f2InQuadVertex.x);
 
 	f3OutPosition = pQuads[gl_InstanceIndex].pf4Vertices[iIndex].xyz;
-	f2OutTexcoord = pQuads[gl_InstanceIndex].pf4Texcoords[iIndex].xy;
+	f2OutTexcoord = pQuads[gl_InstanceIndex].pf4TextureCoordinates[iIndex].xy;
 	f4OutColor = unpackUnorm4x8(pQuads[gl_InstanceIndex].puiColors[iIndex]).abgr;
 
 	vec4 f4Position = pQuads[gl_InstanceIndex].pf4Vertices[iIndex];

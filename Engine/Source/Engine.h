@@ -1,19 +1,15 @@
 #pragma once
 
-// Profile
 #include "Profile/ProfileManagerBase.h"
 
-// Frame
 #include "Frame/AreaDamage.h"
 #include "Frame/Collision.h"
 #include "Frame/FrameRegistry.h"
 #include "Frame/TimeStep.h"
 
-// File
 #include "File/FileManager.h"
 #include "File/DifferenceStream.h"
 
-// Network (shared)
 #include "Network/NetworkManager.h"
 #include "Network/NetworkProtocol.h"
 #include "Network/NetworkMessages.h"
@@ -21,14 +17,12 @@
 #include "Network/NetworkSerialization.h"
 #include "Network/NetworkSimulation.h"
 
-// Launch options and agent command channel (shared)
 #include "LaunchOptions.h"
 #include "Agent/AgentCommandServer.h"
 #include "Agent/AgentCommandsShared.h"
 
 #if defined(BT_CLIENT)
 
-// Graphics objects
 #include "Graphics/Objects/Buffer.h"
 #include "Graphics/Objects/CommandBuffers.h"
 #include "Graphics/Objects/Pipeline.h"
@@ -36,7 +30,6 @@
 #include "Graphics/Objects/Shader.h"
 #include "Graphics/Objects/Texture.h"
 
-// Graphics managers
 #include "Graphics/Graphics.h"
 #include "Graphics/GraphicsUtils.h"
 #include "Graphics/Managers/BufferManager.h"
@@ -50,23 +43,19 @@
 #include "Graphics/Managers/TextureManager.h"
 #include "Graphics/Managers/TextureUploadManager.h"
 
-// Graphics misc
 #include "Graphics/AnimationData.h"
 #include "Graphics/EngineCamera.h"
 #include "Graphics/OneShotCommandBuffer.h"
 #include "Graphics/Screenshot.h"
 
-// Render
 #include "Graphics/Render/Render.h"
 
-// Graphics debug
 #include "Graphics/Debug/DebugRender.h"
 
 // Audio (StaticVoice/StreamingVoice headers deliberately not aggregated)
 #include "Audio/AudioUtility.h"
 #include "Audio/AudioManager.h"
 
-// Input
 #include "Input/Input.h"
 #include "Input/RawInputManager.h"
 
@@ -74,17 +63,14 @@
 #include "Agent/AgentUiRegistry.h"
 #include "Agent/AgentInput.h"
 
-// Network client
 #include "Network/NetworkDiscoveryScanner.h"
 #include "Network/Client/Client.h"
 #include "Network/Client/ClientSessionRuntime.h"
 
-// Graphics (Islands is client-only GPU rendering)
 #include "Graphics/Islands.h"
 
 #endif // BT_CLIENT
 
-// Terrain collision data (both client and server)
 #include "Frame/IslandTerrain.h"
 
 #if defined(BT_SERVER)
@@ -94,7 +80,6 @@
 #include "Network/Server/ServerSessionRuntime.h"
 #endif
 
-// Engine base
 #include "GameBase.h"
 
 #if defined(BT_CLIENT)
@@ -120,13 +105,13 @@ struct std::formatter<engine::Alignments> : std::formatter<std::string_view>
 	template<typename CONTEXT>
 	auto format(const engine::Alignments& rAlignments, CONTEXT& rContext) const
 	{
-		char pcBuffer[48];
+		char pcBuffer[48] {};
 		char* pWrite = pcBuffer;
-		for (char c : std::string_view("Alignments("))
+		for (char cCharacter : std::string_view("Alignments("))
 		{
-			*(pWrite++) = c;
+			*(pWrite++) = cCharacter;
 		}
-		pWrite = std::to_chars(pWrite, pcBuffer + sizeof(pcBuffer), rAlignments.alignmentPairs.size()).ptr;
+		pWrite = std::to_chars(pWrite, pcBuffer + sizeof(pcBuffer), std::ssize(rAlignments.alignmentPairs)).ptr;
 		*(pWrite++) = ')';
 		return std::formatter<std::string_view>::format(std::string_view(pcBuffer, pWrite - pcBuffer), rContext);
 	}
@@ -136,9 +121,9 @@ template<>
 struct std::formatter<engine::Uuid> : std::formatter<int64_t>
 {
 	template<typename CONTEXT>
-	auto format(const engine::Uuid id, CONTEXT& rContext) const
+	auto format(const engine::Uuid identifier, CONTEXT& rContext) const
 	{
-		return std::formatter<int64_t>::format(id.iValue, rContext);
+		return std::formatter<int64_t>::format(identifier.iValue, rContext);
 	}
 };
 
@@ -146,8 +131,8 @@ template<typename T>
 struct std::formatter<engine::Id<T>> : std::formatter<int64_t>
 {
 	template<typename CONTEXT>
-	auto format(const engine::Id<T> id, CONTEXT& rContext) const
+	auto format(const engine::Id<T> identifier, CONTEXT& rContext) const
 	{
-		return std::formatter<int64_t>::format(id.uuid.iValue, rContext);
+		return std::formatter<int64_t>::format(identifier.uuid.iValue, rContext);
 	}
 };

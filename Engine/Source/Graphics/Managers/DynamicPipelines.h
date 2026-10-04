@@ -47,16 +47,8 @@ public:
 	ModelPipeline* CreateModelPipeline(const ModelPipelineSpec& rModelPipelineSpec);
 	void CreateModelPipeline(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers);
 	void CreateModelPipelineShadow(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers);
-	void CreatePipelineLighting(common::crc_t crc, std::string_view name, int64_t iBufferSize);
 	void CreatePipelineVisibleLights(common::crc_t crc, std::string_view name, Buffer* pStorageBuffers);
-	void CreatePipelineAxisAlignedLighting(common::crc_t crc, std::string_view name, int64_t iBufferSize);
 	void CreatePipelineBillboards(common::crc_t crc, std::string_view name, int64_t iBufferSize);
-	void CreatePipelineSmokeAxisAligned(common::crc_t crc, std::string_view name, int64_t iBufferSize);
-	void CreatePipelineSmoke(common::crc_t crc, std::string_view name, int64_t iBufferSize);
-	void CreatePipelineWindDepositA(common::crc_t crc, std::string_view name, int64_t iBufferSize);
-	void CreatePipelineWindDepositB(common::crc_t crc, std::string_view name);
-	void CreatePipelineWindDepositAxisAlignedA(common::crc_t crc, std::string_view name, int64_t iBufferSize);
-	void CreatePipelineWindDepositAxisAlignedB(common::crc_t crc, std::string_view name);
 	void CreatePipelineHexShields(common::crc_t crc, std::string_view name, int64_t iBufferSize);
 	void CreatePipelineHexShieldsLighting(common::crc_t crc, std::string_view name);
 	void UpdateAllModelPipelineDescriptors(int64_t iCommandBuffer, int64_t iBinding, Buffer* pBuffer);
@@ -67,11 +59,12 @@ public:
 	std::unordered_map<common::crc_t, ModelPipeline*> mModelPipelineMaps[kDynamicModelPipelineCount];
 	std::unordered_map<common::crc_t, std::string> mShadowPipelineNames; // Owns shadow pipeline name strings
 
+	void CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, int64_t iBufferSize, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, DescriptorFlags eSamplerFlag);
+	void CreateDepositPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, const Texture& rTargetTexture, const DescriptorInfo& rTextureDescriptor, VkBuffer* pVkOccupancyBuffer, int64_t iBufferSize);
+
 private:
 
 	void AddPipeline(DynamicPipelineType eType, common::crc_t crc, const PipelineInfo& rPipelineInfo);
-	void CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, int64_t iBufferSize, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, DescriptorFlags eSamplerFlag);
-	void CreateDepositPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, Texture& rTargetTexture, const DescriptorInfo& rTextureDescriptor, VkBuffer* pOccupancyBuffer, int64_t iBufferSize);
 
 	std::unordered_map<common::crc_t, Shader>& mrShaders;
 };

@@ -68,7 +68,7 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::G
 
 	// Play explosion audio
 #if defined(BT_CLIENT)
-	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, emitterCoord, rCurrentInterpolate.pVecPositions[i], gSpaceshipDeathVolume.Get(), gSpaceshipDeathPitchMin.Get(), gSpaceshipDeathPitchRandom.Get());
+	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, emitterCoord, rCurrentInterpolate.pVecPositions[i], gSpaceshipDeathVolume.mfCurrent, gSpaceshipDeathPitchMin.mfCurrent, gSpaceshipDeathPitchRandom.mfCurrent);
 #endif
 
 	XMVECTOR vecDirection = XMVector3Normalize(rCurrentPostRender.pVecVelocities[i]);
@@ -173,7 +173,7 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 
 					// Play hit sound
 #if defined(BT_CLIENT)
-					engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster793907__cvltiv8r__snaresbycvltiv8r301wavCrc, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], gSpaceshipHitVolume.Get());
+					engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster793907__cvltiv8r__snaresbycvltiv8r301wavCrc, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], gSpaceshipHitVolume.mfCurrent);
 #endif
 
 					// Spawn hit flash effect at collision point

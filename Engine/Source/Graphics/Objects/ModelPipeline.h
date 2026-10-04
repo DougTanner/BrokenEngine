@@ -7,7 +7,12 @@
 namespace engine
 {
 
-enum class ModelDrawPass : uint8_t { kAll, kOpaque, kTransparent };
+enum class ModelDrawPass : uint8_t
+{
+	kAll,
+	kOpaque,
+	kTransparent,
+};
 
 enum class ModelPipelineFlags : uint64_t
 {
@@ -26,7 +31,7 @@ public:
 	void Create(common::crc_t sceneCrc, const PipelineInfo& rPipelineInfo, bool bIsShadow = false);
 	void RecordDrawIndirect(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants = {}, ModelDrawPass ePass = ModelDrawPass::kAll);
 	void WriteIndirectBuffer(int64_t iCommandBuffer, int64_t iCount);
-	void UpdateStorageBufferDescriptors(int64_t iFramebuffer, int64_t iBinding, Buffer* pBuffer);
+	void UpdateStorageBufferDescriptors(int64_t iFramebuffer, int64_t iBinding, const Buffer* pBuffer);
 
 	int64_t miMaterialCount = 0;
 	std::vector<Pipeline> mpPipelines;

@@ -81,7 +81,7 @@ Changes (11 files)
          vec3 color = texture(skyboxSampler, cubemapDir).rgb;
 
          // Apply exposure and gamma from PBR settings
-         vec3 mapped = ACESFilm(color * mainLayout.fPbrExposure);
+         vec3 mapped = ACESFilm(color * mainLayout.fPhysicallyBasedRenderingExposure);
          mapped = pow(mapped, vec3(1.0 / mainLayout.fPbrGamma));
 
          f4OutColor = vec4(mapped, 1.0);
@@ -146,7 +146,7 @@ Changes (11 files)
          .flags = {kCullBack, kUpdateAfterBind},
          .ppShaders = {&mShaders.at(data::kShadersQuadsQuadsFullscreenvertCrc), &mShaders.at(data::kShadersSkyboxSkyboxfragCrc)},
          .pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-         .pDescriptorInfos =
+         .descriptorInfos =
          {
              {.flags = kGlobalLayoutUniformBuffers},
              {.flags = kMainLayoutUniformBuffers},

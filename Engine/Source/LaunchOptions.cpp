@@ -19,18 +19,18 @@ bool ParseLaunchOptions()
 		return true;
 	}
 
-	bool bOk = true;
-	for (int i = 1; i < iArgumentCount; ++i)
+	bool bSuccess = true;
+	for (int64_t i = 1; i < iArgumentCount; ++i)
 	{
-		if (wcscmp(pArgumentValues[i], L"--loopback-only") == 0)
+		if (std::wcscmp(pArgumentValues[i], L"--loopback-only") == 0)
 		{
 			gLaunchOptions.flags.Set(LaunchOptionFlags::kLoopbackOnly);
 		}
-		else if (wcscmp(pArgumentValues[i], L"--renderdoc") == 0)
+		else if (std::wcscmp(pArgumentValues[i], L"--renderdoc") == 0)
 		{
 			gLaunchOptions.flags.Set(LaunchOptionFlags::kRenderDoc);
 		}
-		else if (wcscmp(pArgumentValues[i], L"--agent-port") == 0)
+		else if (std::wcscmp(pArgumentValues[i], L"--agent-port") == 0)
 		{
 			if (i + 1 < iArgumentCount)
 			{
@@ -41,7 +41,7 @@ bool ParseLaunchOptions()
 				{
 					LOG(kDefault, kError, "Launch option --agent-port out of range [1, 65535]: {}", iPort);
 					gLaunchOptions.iAgentPort = 0;
-					bOk = false;
+					bSuccess = false;
 				}
 				else
 				{
@@ -53,7 +53,7 @@ bool ParseLaunchOptions()
 				LOG(kDefault, kWarning, "Launch option --agent-port missing value");
 			}
 		}
-		else if (wcscmp(pArgumentValues[i], L"--log-file") == 0)
+		else if (std::wcscmp(pArgumentValues[i], L"--log-file") == 0)
 		{
 			if (i + 1 < iArgumentCount)
 			{
@@ -64,13 +64,13 @@ bool ParseLaunchOptions()
 				LOG(kDefault, kWarning, "Launch option --log-file missing value");
 			}
 		}
-		else if (wcscmp(pArgumentValues[i], L"--data-directory") == 0)
+		else if (std::wcscmp(pArgumentValues[i], L"--data-directory") == 0)
 		{
 			gLaunchOptions.dataDirectory.clear();
 			if (i + 1 >= iArgumentCount)
 			{
 				LOG(kDefault, kError, "Launch option --data-directory missing value");
-				bOk = false;
+				bSuccess = false;
 				continue;
 			}
 
@@ -78,7 +78,7 @@ bool ParseLaunchOptions()
 			if (!requestedDirectory.is_absolute())
 			{
 				LOG(kDefault, kError, "Launch option --data-directory must be absolute: \"{}\"", requestedDirectory);
-				bOk = false;
+				bSuccess = false;
 				continue;
 			}
 
@@ -87,7 +87,7 @@ bool ParseLaunchOptions()
 			if (canonicalError)
 			{
 				LOG(kDefault, kError, "Launch option --data-directory is missing or unusable: \"{}\" (error {})", requestedDirectory, canonicalError.value());
-				bOk = false;
+				bSuccess = false;
 				continue;
 			}
 
@@ -96,19 +96,19 @@ bool ParseLaunchOptions()
 			if (typeError || !bIsDirectory)
 			{
 				LOG(kDefault, kError, "Launch option --data-directory is not a usable directory: \"{}\" (error {})", canonicalDirectory, typeError.value());
-				bOk = false;
+				bSuccess = false;
 				continue;
 			}
 
 			gLaunchOptions.dataDirectory = std::move(canonicalDirectory);
 		}
-		else if (wcscmp(pArgumentValues[i], L"--app-data-directory") == 0)
+		else if (std::wcscmp(pArgumentValues[i], L"--app-data-directory") == 0)
 		{
 			gLaunchOptions.appDataDirectory.clear();
 			if (i + 1 >= iArgumentCount)
 			{
 				LOG(kDefault, kError, "Launch option --app-data-directory missing value");
-				bOk = false;
+				bSuccess = false;
 				continue;
 			}
 
@@ -116,7 +116,7 @@ bool ParseLaunchOptions()
 			if (!requestedDirectory.is_absolute())
 			{
 				LOG(kDefault, kError, "Launch option --app-data-directory must be absolute: \"{}\"", requestedDirectory);
-				bOk = false;
+				bSuccess = false;
 				continue;
 			}
 
@@ -125,7 +125,7 @@ bool ParseLaunchOptions()
 			if (canonicalError)
 			{
 				LOG(kDefault, kError, "Launch option --app-data-directory is missing or unusable: \"{}\" (error {})", requestedDirectory, canonicalError.value());
-				bOk = false;
+				bSuccess = false;
 				continue;
 			}
 
@@ -134,13 +134,13 @@ bool ParseLaunchOptions()
 			if (typeError || !bIsDirectory)
 			{
 				LOG(kDefault, kError, "Launch option --app-data-directory is not a usable directory: \"{}\" (error {})", canonicalDirectory, typeError.value());
-				bOk = false;
+				bSuccess = false;
 				continue;
 			}
 
 			gLaunchOptions.appDataDirectory = std::move(canonicalDirectory);
 		}
-		else if (wcscmp(pArgumentValues[i], L"--windowed") == 0)
+		else if (std::wcscmp(pArgumentValues[i], L"--windowed") == 0)
 		{
 			if (i + 1 < iArgumentCount)
 			{
@@ -159,12 +159,12 @@ bool ParseLaunchOptions()
 				if (iWidth < 1 || iWidth > kiMaxDimension || iHeight < 1 || iHeight > kiMaxDimension || pcEnd == nullptr || *pcEnd != L'\0')
 				{
 					LOG(kDefault, kError, "Launch option --windowed expects WxH with dimensions in [1, 16384]: {}", std::wstring(pcValue));
-					gLaunchOptions.windowedExtent = VkExtent2D {0, 0};
-					bOk = false;
+					gLaunchOptions.vkWindowedExtent = VkExtent2D {.width = 0, .height = 0};
+					bSuccess = false;
 				}
 				else
 				{
-					gLaunchOptions.windowedExtent = VkExtent2D {static_cast<uint32_t>(iWidth), static_cast<uint32_t>(iHeight)};
+					gLaunchOptions.vkWindowedExtent = VkExtent2D {.width = static_cast<uint32_t>(iWidth), .height = static_cast<uint32_t>(iHeight)};
 				}
 			}
 			else
@@ -179,7 +179,7 @@ bool ParseLaunchOptions()
 	}
 
 	LocalFree(pArgumentValues);
-	return bOk;
+	return bSuccess;
 }
 
 } // namespace engine

@@ -39,15 +39,15 @@ void CommandBufferRecordGlobal::Record(int64_t iFramebuffer)
 
 	RecordTerrainPasses(vkCommandBuffer, iCommandBuffer, pPipelines);
 
-	uint32_t uiWindWidth = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.extent.width;
-	uint32_t uiWindHeight = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.extent.height;
+	uint32_t uiWindWidth = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.vkExtent3D.width;
+	uint32_t uiWindHeight = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.vkExtent3D.height;
 	uint32_t uiWindTilesX = TileCount(uiWindWidth);
 	uint32_t uiWindTilesY = TileCount(uiWindHeight);
 
-	uint32_t uiSmokeMaxWidth = std::max(gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.extent.width, gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.extent.width);
-	uint32_t uiSmokeMaxHeight = std::max(gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.extent.height, gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.extent.height);
-	uint32_t uiSmokeTilesX = TileCount(uiSmokeMaxWidth);
-	uint32_t uiSmokeTilesY = TileCount(uiSmokeMaxHeight);
+	uint32_t uiSmokeMaximumWidth = std::max(gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.width, gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.vkExtent3D.width);
+	uint32_t uiSmokeMaximumHeight = std::max(gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.height, gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.vkExtent3D.height);
+	uint32_t uiSmokeTilesX = TileCount(uiSmokeMaximumWidth);
+	uint32_t uiSmokeTilesY = TileCount(uiSmokeMaximumHeight);
 
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerSpread);
 	RecordWindSpreadPipeline(vkCommandBuffer, iCommandBuffer, uiWindTilesX, uiWindTilesY, pPipelines);
@@ -75,13 +75,13 @@ void CommandBufferRecordGlobal::RecordShadowPasses(VkCommandBuffer vkCommandBuff
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerShadow);
 	// Record-time group counts cover the whole shadow texture: every extent change destroys and re-records
 	// these command buffers (Graphics recreation is at least the command-buffer destroy tier).
-	uint32_t uiShadowTilesX = TileCount(gpTextureManager->mRenderTargetTextures.mShadowTexture.mInfo.extent.width);
-	uint32_t uiShadowTilesY = TileCount(gpTextureManager->mRenderTargetTextures.mShadowTexture.mInfo.extent.height);
+	uint32_t uiShadowTilesX = TileCount(gpTextureManager->mRenderTargetTextures.mShadowTexture.mInfo.vkExtent3D.width);
+	uint32_t uiShadowTilesY = TileCount(gpTextureManager->mRenderTargetTextures.mShadowTexture.mInfo.vkExtent3D.height);
 	gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.RecordBeginRenderPass(vkCommandBuffer);
 	// Fixed-count prepass consumes the shared global placement arena populated by
 	// Islands::UpdateActiveIslands; cleared slots beyond the written total remain degenerate.
 	pPipelines[kPipelineShadowElevation].RecordDraw(iCommandBuffer, vkCommandBuffer, kiMaxActivePlacements, 0, {1.0f, 0.0f, 0.0f, 0.0f});
-	gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.RecordEndRenderPass(vkCommandBuffer);
+	vkCmdEndRenderPass(vkCommandBuffer);
 	pPipelines[kPipelineShadow].RecordCompute(iCommandBuffer, vkCommandBuffer, uiShadowTilesX, uiShadowTilesY);
 	gpTextureManager->mRenderTargetTextures.mShadowTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadOnly);
 	gpTextureManager->mRenderTargetTextures.mShadowBlurIntermediateTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
@@ -113,7 +113,7 @@ void CommandBufferRecordGlobal::RecordTerrainPasses(VkCommandBuffer vkCommandBuf
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerTerrainElevation);
 	gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture.RecordBeginRenderPass(vkCommandBuffer);
 	pPipelines[kPipelineTerrainElevation].RecordDraw(iCommandBuffer, vkCommandBuffer, kiMaxActivePlacements, 0);
-	gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture.RecordEndRenderPass(vkCommandBuffer);
+	vkCmdEndRenderPass(vkCommandBuffer);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerTerrainElevation);
 }
 
@@ -124,13 +124,12 @@ void CommandBufferRecordGlobal::RecordWindSpreadPipeline(VkCommandBuffer vkComma
 
 	uint32_t uiWindDilateGroups = (uiWindTilesX * uiWindTilesY + shaders::kiOccupancyDilateGroupSize - 1) / shaders::kiOccupancyDilateGroupSize;
 
-	// Reset both active tile buffers: {0, 1, 1}
-	uint32_t pWindResetCmd[3] {0, 1, 1};
-	vkCmdUpdateBuffer(vkCommandBuffer, gpBufferManager->mWindActiveTileVkBuffers[0], 0, sizeof(pWindResetCmd), pWindResetCmd);
-	vkCmdUpdateBuffer(vkCommandBuffer, gpBufferManager->mWindActiveTileVkBuffers[1], 0, sizeof(pWindResetCmd), pWindResetCmd);
+	uint32_t pWindResetCommand[3] {0, 1, 1};
+	vkCmdUpdateBuffer(vkCommandBuffer, gpBufferManager->mWindActiveTileVkBuffers[0], 0, sizeof(pWindResetCommand), pWindResetCommand);
+	vkCmdUpdateBuffer(vkCommandBuffer, gpBufferManager->mWindActiveTileVkBuffers[1], 0, sizeof(pWindResetCommand), pWindResetCommand);
 
 	// Barrier: transfer -> compute (both active tile buffers)
-	VkBufferMemoryBarrier pWindActiveTileResetBarriers[]
+	VkBufferMemoryBarrier pVkWindActiveTileResetBarriers[]
 	{
 		{
 			.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
@@ -155,14 +154,14 @@ void CommandBufferRecordGlobal::RecordWindSpreadPipeline(VkCommandBuffer vkComma
 			.size = VK_WHOLE_SIZE,
 		},
 	};
-	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pWindActiveTileResetBarriers)), pWindActiveTileResetBarriers, 0, nullptr);
+	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pVkWindActiveTileResetBarriers)), pVkWindActiveTileResetBarriers, 0, nullptr);
 
 	// Both dilates (read different occupancy buffers, write different active tile buffers)
 	pPipelines[kPipelineWindOccupancyDilateB].RecordCompute(iCommandBuffer, vkCommandBuffer, uiWindDilateGroups);
 	pPipelines[kPipelineWindOccupancyDilateA].RecordCompute(iCommandBuffer, vkCommandBuffer, uiWindDilateGroups);
 
 	// Barrier: compute read/write -> transfer write (occupancy), compute read/write -> indirect+compute (active tiles)
-	VkBufferMemoryBarrier pWindDilateBarriers[]
+	VkBufferMemoryBarrier pVkWindDilateBarriers[]
 	{
 		{
 			.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
@@ -209,14 +208,13 @@ void CommandBufferRecordGlobal::RecordWindSpreadPipeline(VkCommandBuffer vkComma
 			.size = VK_WHOLE_SIZE,
 		},
 	};
-	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pWindDilateBarriers)), pWindDilateBarriers, 0, nullptr);
+	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pVkWindDilateBarriers)), pVkWindDilateBarriers, 0, nullptr);
 
-	// Clear both occupancy buffers
-	vkCmdFillBuffer(vkCommandBuffer, gpBufferManager->mWindOccupancyVkBuffers[0], 0, gpBufferManager->mWindOccupancyBufferSize, 0);
-	vkCmdFillBuffer(vkCommandBuffer, gpBufferManager->mWindOccupancyVkBuffers[1], 0, gpBufferManager->mWindOccupancyBufferSize, 0);
+	vkCmdFillBuffer(vkCommandBuffer, gpBufferManager->mWindOccupancyVkBuffers[0], 0, gpBufferManager->mWindOccupancyBufferVkDeviceSize, 0);
+	vkCmdFillBuffer(vkCommandBuffer, gpBufferManager->mWindOccupancyVkBuffers[1], 0, gpBufferManager->mWindOccupancyBufferVkDeviceSize, 0);
 
 	// Barrier: transfer -> compute (both occupancy buffers)
-	VkBufferMemoryBarrier pWindOccupancyClearBarriers[]
+	VkBufferMemoryBarrier pVkWindOccupancyClearBarriers[]
 	{
 		{
 			.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
@@ -241,7 +239,7 @@ void CommandBufferRecordGlobal::RecordWindSpreadPipeline(VkCommandBuffer vkComma
 			.size = VK_WHOLE_SIZE,
 		},
 	};
-	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pWindOccupancyClearBarriers)), pWindOccupancyClearBarriers, 0, nullptr);
+	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pVkWindOccupancyClearBarriers)), pVkWindOccupancyClearBarriers, 0, nullptr);
 
 	// SpreadB: dispatch from ActiveTileB (reads TextureOne, writes TextureTwo)
 	gpTextureManager->mRenderTargetTextures.mWindTextureTwo.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
@@ -258,9 +256,8 @@ void CommandBufferRecordGlobal::RecordWindSpreadPipeline(VkCommandBuffer vkComma
 
 void CommandBufferRecordGlobal::RecordSmokeSpreadHalf(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer, uint32_t uiDilateGroups, Pipeline& rDilatePipeline, VkBuffer vkOutputOccupancyBuffer, Texture& rSmokeTexture, Pipeline& rSpreadPipeline)
 {
-	// Reset active tile buffer indirect command: {0, 1, 1}
-	uint32_t pResetCmd[3] {0, 1, 1};
-	vkCmdUpdateBuffer(vkCommandBuffer, gpBufferManager->mSmokeActiveTileVkBuffer, 0, sizeof(pResetCmd), pResetCmd);
+	uint32_t pResetCommand[3] {0, 1, 1};
+	vkCmdUpdateBuffer(vkCommandBuffer, gpBufferManager->mSmokeActiveTileVkBuffer, 0, sizeof(pResetCommand), pResetCommand);
 
 	// Barrier: transfer write → compute read for active tile buffer
 	VkBufferMemoryBarrier vkActiveTileResetBarrier
@@ -281,7 +278,7 @@ void CommandBufferRecordGlobal::RecordSmokeSpreadHalf(VkCommandBuffer vkCommandB
 	rDilatePipeline.RecordCompute(iCommandBuffer, vkCommandBuffer, uiDilateGroups);
 
 	// Barrier: dilate compute → indirect read + compute read (active tile), output occupancy read → transfer write
-	VkBufferMemoryBarrier pDilateBarriers[]
+	VkBufferMemoryBarrier pVkDilateBarriers[]
 	{
 		{
 			.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
@@ -306,10 +303,10 @@ void CommandBufferRecordGlobal::RecordSmokeSpreadHalf(VkCommandBuffer vkCommandB
 			.size = VK_WHOLE_SIZE,
 		},
 	};
-	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pDilateBarriers)), pDilateBarriers, 0, nullptr);
+	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pVkDilateBarriers)), pVkDilateBarriers, 0, nullptr);
 
 	// Clear output occupancy after the dilate has consumed its stale-tile union term, then let spread re-mark it.
-	vkCmdFillBuffer(vkCommandBuffer, vkOutputOccupancyBuffer, 0, gpBufferManager->mSmokeOccupancyBufferSize, 0);
+	vkCmdFillBuffer(vkCommandBuffer, vkOutputOccupancyBuffer, 0, gpBufferManager->mSmokeOccupancyBufferVkDeviceSize, 0);
 	VkBufferMemoryBarrier vkOccupancyClearBarrier
 	{
 		.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
@@ -324,7 +321,6 @@ void CommandBufferRecordGlobal::RecordSmokeSpreadHalf(VkCommandBuffer vkCommandB
 	};
 	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1, &vkOccupancyClearBarrier, 0, nullptr);
 
-	// Indirect dispatch from active tile buffer
 	rSmokeTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
 	rSpreadPipeline.RecordComputeIndirectFrom(iCommandBuffer, vkCommandBuffer, gpBufferManager->mSmokeActiveTileVkBuffer, 0);
 	rSmokeTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
@@ -342,7 +338,7 @@ void CommandBufferRecordGlobal::RecordSmokeSpreadPipeline(VkCommandBuffer vkComm
 	RecordSmokeSpreadHalf(vkCommandBuffer, iCommandBuffer, uiDilateGroups, pPipelines[kPipelineSmokeOccupancyDilate], gpBufferManager->mSmokeOccupancyVkBuffers[1], gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo, pPipelines[kPipelineSmokeSpreadComputeB]);
 
 	// Barrier between halves: SpreadB compute writes (occupancy) → SpreadA dilate reads; SpreadB indirect+compute reads (active tile) → transfer write
-	VkBufferMemoryBarrier pSpreadBBarriers[]
+	VkBufferMemoryBarrier pVkSpreadBBarriers[]
 	{
 		{
 			.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
@@ -367,7 +363,7 @@ void CommandBufferRecordGlobal::RecordSmokeSpreadPipeline(VkCommandBuffer vkComm
 			.size = VK_WHOLE_SIZE,
 		},
 	};
-	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pSpreadBBarriers)), pSpreadBBarriers, 0, nullptr);
+	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, static_cast<uint32_t>(std::size(pVkSpreadBBarriers)), pVkSpreadBBarriers, 0, nullptr);
 
 	// SpreadA: dilate with the scale-aware remap (current-area UV -> world -> previous-area UV, so zoomed smoke
 	// whose remapped sample-tile lies more than ~2 tiles from the output tile stays in the active list), then
@@ -381,31 +377,31 @@ void CommandBufferRecordGlobal::RecordParticleUpdatePasses(VkCommandBuffer vkCom
 {
 	BarrierInfo pBarriers[]
 	{
-		{BufferBarrier::kComputeReadWrite, BufferBarrier::kComputeRead, gpBufferManager->mLongParticlesStorageBuffer.mDeviceLocalVkBuffer},
-		{BufferBarrier::kComputeReadWrite, BufferBarrier::kShaderIndirectRead, pPipelines[kPipelineLongParticlesUpdate].mIndirectVkBuffer},
-		{BufferBarrier::kComputeReadWrite, BufferBarrier::kShaderIndirectRead, pPipelines[kPipelineLongParticlesRender].mIndirectVkBuffer},
-		{BufferBarrier::kComputeReadWrite, BufferBarrier::kComputeRead, gpBufferManager->mSquareParticlesStorageBuffer.mDeviceLocalVkBuffer},
-		{BufferBarrier::kComputeReadWrite, BufferBarrier::kShaderIndirectRead, pPipelines[kPipelineSquareParticlesUpdate].mIndirectVkBuffer},
-		{BufferBarrier::kComputeReadWrite, BufferBarrier::kShaderIndirectRead, pPipelines[kPipelineSquareParticlesRender].mIndirectVkBuffer},
+		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kComputeRead, .vkBarrierBuffer = gpBufferManager->mLongParticlesStorageBuffer.mDeviceLocalVkBuffer},
+		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kShaderIndirectRead, .vkBarrierBuffer = pPipelines[kPipelineLongParticlesUpdate].mIndirectVkBuffer},
+		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kShaderIndirectRead, .vkBarrierBuffer = pPipelines[kPipelineLongParticlesRender].mIndirectVkBuffer},
+		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kComputeRead, .vkBarrierBuffer = gpBufferManager->mSquareParticlesStorageBuffer.mDeviceLocalVkBuffer},
+		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kShaderIndirectRead, .vkBarrierBuffer = pPipelines[kPipelineSquareParticlesUpdate].mIndirectVkBuffer},
+		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kShaderIndirectRead, .vkBarrierBuffer = pPipelines[kPipelineSquareParticlesRender].mIndirectVkBuffer},
 	};
-	Buffer::RecordBarriers(vkCommandBuffer, pBarriers, std::size(pBarriers));
+	Buffer::RecordBarriers(vkCommandBuffer, pBarriers);
 
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerLongParticlesUpdate);
 	pPipelines[kPipelineLongParticlesUpdate].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 	BarrierInfo pLongParticleBarrier[]
 	{
-		{BufferBarrier::kComputeReadWrite, BufferBarrier::kStorageBufferRead, gpBufferManager->mLongParticlesStorageBuffer.mDeviceLocalVkBuffer},
+		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kStorageBufferRead, .vkBarrierBuffer = gpBufferManager->mLongParticlesStorageBuffer.mDeviceLocalVkBuffer},
 	};
-	Buffer::RecordBarriers(vkCommandBuffer, pLongParticleBarrier, std::size(pLongParticleBarrier));
+	Buffer::RecordBarriers(vkCommandBuffer, pLongParticleBarrier);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerLongParticlesUpdate);
 
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerSquareParticlesUpdate);
 	pPipelines[kPipelineSquareParticlesUpdate].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 	BarrierInfo pSquareParticleBarrier[]
 	{
-		{BufferBarrier::kComputeReadWrite, BufferBarrier::kStorageBufferRead, gpBufferManager->mSquareParticlesStorageBuffer.mDeviceLocalVkBuffer},
+		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kStorageBufferRead, .vkBarrierBuffer = gpBufferManager->mSquareParticlesStorageBuffer.mDeviceLocalVkBuffer},
 	};
-	Buffer::RecordBarriers(vkCommandBuffer, pSquareParticleBarrier, std::size(pSquareParticleBarrier));
+	Buffer::RecordBarriers(vkCommandBuffer, pSquareParticleBarrier);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerSquareParticlesUpdate);
 }
 

@@ -75,7 +75,7 @@ void FleetSelection::SelectPlayerInFleet(engine::GlobalId memberGlobalPlayerId)
 	mFocusedMemberGlobalId = memberGlobalPlayerId;
 	gpGame->mWeaponModeToggle.Reset();
 
-	// Update mClientGridCoord to match selected player's coord
+	// Update mClientGridCoordinate to match selected player's coord
 	const FleetMember& rMember = *memberIt;
 	if (!(rMember.flags & FleetMemberFlags::kIsDead))
 	{
@@ -225,7 +225,7 @@ void FleetSelection::SyncFleets(std::vector<Fleet>&& fleets)
 		mSpawnIntoFleetToggle.Reset();
 	}
 
-	// Update mClientGridCoord based on current selection
+	// Update mClientGridCoordinate based on current selection
 	engine::GlobalId focusedId = gpGame->ClientPlayerId();
 	bool bGridCoordResolved = false;
 	if ((focusedId.iValue != 0))

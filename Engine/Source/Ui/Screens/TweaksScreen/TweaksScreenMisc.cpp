@@ -8,14 +8,14 @@
 namespace engine
 {
 
-const TweaksSliderMapRegistrar gMiscRegistrar
+const TweaksSliderMapRegistrar gMiscellaneousRegistrar
 {
 	{"Debug Texture Range", &gMiscDebugTextureLinearRange},
 };
 
-void RenderMiscSection(TweaksScreenBase& rScreen)
+void RenderMiscellaneousSection(TweaksScreenBase& rScreen)
 {
-	int64_t iSection = giTweakSectionMisc;
+	int64_t iSection = giTweakSectionMiscellaneous;
 
 	rScreen.WrapperSeparatorText("Misc");
 	rScreen.WrapperSlider("Debug Texture Range", iSection);

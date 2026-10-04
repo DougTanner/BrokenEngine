@@ -37,7 +37,7 @@ struct CpuTimerThreadState
 struct CpuTimer
 {
 	int64_t iThreads = 0;
-	int64_t iTotalFrameTimeNs = 0;
+	int64_t iTotalFrameTimeNanoseconds = 0;
 
 	int64_t iAllocationsThisFrame = 0;
 
@@ -51,7 +51,7 @@ struct CpuTimer
 struct RawCpuTimerRecord
 {
 	uint64_t uiSampleSequence = 0;
-	int64_t iSampleUs = 0;
+	int64_t iSampleMicroseconds = 0;
 	int64_t iInvocationCount = 0;
 	int64_t iAuxiliaryCount = 0;
 };
@@ -74,7 +74,7 @@ struct RawCpuTimerEventRecord
 	uint64_t uiEventSequence = 0;
 	uint64_t uiSampleSequence = 0;
 	int64_t iSampleTick = 0;
-	int64_t iSampleUs = 0;
+	int64_t iSampleMicroseconds = 0;
 	int64_t iInvocationCount = 0;
 	int64_t iAuxiliaryCount = 0;
 	common::Flags<RawCpuTimerEventFlags> flags {};
@@ -319,8 +319,8 @@ static_assert(std::size(kBootTimerNames) == static_cast<size_t>(kBootTimerCount)
 
 struct BootTimer
 {
-	std::chrono::steady_clock::time_point startTimePoint {};
-	std::chrono::nanoseconds timeNs {};
+	std::chrono::steady_clock::time_point startTimePoint = std::chrono::steady_clock::time_point();
+	std::chrono::nanoseconds timeNanoseconds = 0ns;
 };
 
 enum class CpuStopFlags : uint32_t
@@ -336,7 +336,7 @@ public:
 
 	// The derived arrays are not constructed until after this base constructor returns. Store their addresses only;
 	// no base-constructor path may dereference them.
-	ProfileManagerBase(CpuCounter* pGameCpuCounters, CpuTimer* pGameCpuTimers, const std::string_view* pGameCpuCounterNames, const std::string_view* pGameCpuTimerNames, int64_t iCpuCounterCount, int64_t iCpuTimerCount);
+	ProfileManagerBase(std::span<CpuCounter> gameCpuCounters, std::span<CpuTimer> gameCpuTimers, std::span<const std::string_view> gameCpuCounterNames, std::span<const std::string_view> gameCpuTimerNames);
 	virtual ~ProfileManagerBase() = default;
 
 	void Create();
@@ -353,20 +353,14 @@ public:
 	void AddRawCpuTimerAuxiliaryCount(int64_t iCpuTimer, int64_t iCount);
 	void LatchRawCpuTimer(int64_t iCpuTimer, bool bAccept);
 	void LatchRawCpuTimers(bool bAccept, int64_t iSampleTick);
-	// The caller must hold mCpuTimerMutex.
-	RawCpuTimerRecord GetRawCpuTimer(int64_t iCpuTimer) const;
 	bool ArmRawCpuTimerEvent(int64_t iCpuTimer, int64_t iMinimumSampleTick);
 	// The caller must hold mCpuTimerMutex.
 	bool ArmRawCpuTimerEventLocked(int64_t iCpuTimer, int64_t iMinimumSampleTick);
 	// The caller must hold mCpuTimerMutex. Publication is performed by the derived latch hook.
 	bool PublishRawCpuTimerEvent(int64_t iCpuTimer, int64_t iSampleTick);
 	// The caller must hold mCpuTimerMutex.
-	RawCpuTimerEventRecord GetRawCpuTimerEvent(int64_t iCpuTimer) const;
-	// The caller must hold mCpuTimerMutex.
 	bool AcknowledgeRawCpuTimerEvent(int64_t iCpuTimer, uint64_t uiEventSequence);
 #endif // BT_SERVER
-
-	void SetCount(int64_t iCounter, int64_t iCount);
 
 #if defined(BT_CLIENT)
 	void ResetQueryPools(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, GpuTimers eStart, GpuTimers eEnd);
@@ -378,9 +372,6 @@ public:
 	void RenderImPlotGraphs();
 
 	void SetClockCorrection(int64_t iOffset, int64_t iTargetBehind, int64_t iError);
-	// Returns the same smoothed values FormatNetworkClock prints; iTargetBehind stays positive, as stored.
-	void GetClockCorrection(int64_t& riOffset, int64_t& riTargetBehind, int64_t& riError);
-	void SetReconcileCounters(int64_t iCrcValidated, int64_t iAssumed, int64_t iCrcFastPath, int64_t iStatusChangeReplay, int64_t iKnockOnReplay);
 #endif // BT_CLIENT
 
 	void BootStart(BootTimers eBootTimer);
@@ -398,16 +389,11 @@ public:
 	CpuTimer& GetCpuTimer(int64_t iIndex);
 	std::string_view GetCpuCounterName(int64_t iIndex);
 	std::string_view GetCpuTimerName(int64_t iIndex);
-	int64_t GetCpuCounterCount() const;
-	int64_t GetCpuTimerCount() const;
 
 #if defined(BT_CLIENT)
-	GpuTimer* GetGpuTimers() { return mGpuTimers; }
 	GpuShadowSample mGpuShadowSample {};
 #endif // BT_CLIENT
-	common::Smoothed<int64_t>& GetSmoothedAllocations() { return mSmoothedAllocations; }
-
-	// One global mutex serializing all CPU timers: guards the CPU-timer arrays / per-thread timer states against concurrent writes from dispatch, submit (CommandBufferManager), and network threads. Designed for coarse phase scopes, not per-entity timers — finer granularity would distort the measurements it takes. Public so the engine::FormatCpuTimersText free function can lock the identical reads, matching the already-locked LogTimers.
+	// Guards CPU-timer arrays and per-thread states shared by dispatch, submit, and network threads. Timer scopes must remain coarse to avoid distorting measurements. FormatCpuTimersText and LogTimers hold this mutex while reading.
 	std::mutex mCpuTimerMutex;
 
 	common::InTheLastSecond mFullUpdatesInTheLastSecond;
@@ -416,10 +402,10 @@ public:
 	ProfileScreen meProfileScreen = kbShowProfileTextByDefault ? ProfileScreen::kCpu : ProfileScreen::kOff;
 
 #if defined(BT_SERVER) && !defined(ENABLE_CRT_DEBUG_HEAP)
-	int64_t miMimallocCommittedMib = 0;
-	int64_t miMimallocPeakCommittedMib = 0;
-	int64_t miMimallocHeapUsedMib = 0;
-	int64_t miMimallocPeakHeapUsedMib = 0;
+	int64_t miMimallocCommittedMebibytes = 0;
+	int64_t miMimallocPeakCommittedMebibytes = 0;
+	int64_t miMimallocHeapUsedMebibytes = 0;
+	int64_t miMimallocPeakHeapUsedMebibytes = 0;
 #endif
 
 protected:
@@ -438,45 +424,57 @@ protected:
 	CpuTimer* mpGameCpuTimers = nullptr;
 	const std::string_view* mpGameCpuCounterNames = nullptr;
 	const std::string_view* mpGameCpuTimerNames = nullptr;
+public:
 	int64_t miCpuCounterCount = 0;
+
 	int64_t miCpuTimerCount = 0;
+protected:
 
 #if defined(BT_CLIENT)
+public:
 	GpuTimer mGpuTimers[kGpuTimerCount];
+protected:
 #endif // BT_CLIENT
 
 	BootTimer mBootTimers[kBootTimerCount];
 
-	std::chrono::steady_clock::time_point mLastVisibilityEvalTime {};
+	std::chrono::steady_clock::time_point mLastVisibilityEvaluationTime = std::chrono::steady_clock::time_point();
 
 	std::unordered_map<std::thread::id, std::vector<CpuTimerThreadState>> mPerThreadTimerStates;
 
+public:
 	common::Smoothed<int64_t> mSmoothedAllocations;
+protected:
 
 #if defined(BT_SERVER)
 	// Called while mCpuTimerMutex is held, after accepted raw records have been copied.
-	virtual void OnRawCpuTimersLatched(int64_t) {}
+	virtual void OnRawCpuTimersLatched(int64_t)
+	{
+	}
 
 	struct RawCpuTimerState
 	{
-		int64_t iTotalTimeNs = 0;
+		int64_t iTotalTimeNanoseconds = 0;
 		int64_t iInvocationCount = 0;
-		std::atomic<int64_t> iAuxiliaryCount {};
+		std::atomic<int64_t> iAuxiliaryCount = 0;
 		RawCpuTimerRecord record {};
 		common::Flags<RawCpuTimerStateFlags> flags {};
 		RawCpuTimerEventRecord eventRecord {};
 		int64_t iMinimumSampleTick = 0;
 	};
 
+public:
+	// The caller must hold mCpuTimerMutex and gate reads with kbProfiling; storage is absent when profiling is disabled.
 	std::unique_ptr<RawCpuTimerState[]> mpRawCpuTimers;
+protected:
 #endif // BT_SERVER
 
 #if defined(BT_CLIENT)
 	VkQueryPool mVkQueryPool = VK_NULL_HANDLE;
 
 	std::unique_ptr<common::DiagnosticLog> mpDumpLog;
-	std::chrono::steady_clock::time_point mDumpStartTime {};
-	std::chrono::steady_clock::time_point mLastDumpTime {};
+	std::chrono::steady_clock::time_point mDumpStartTime = std::chrono::steady_clock::time_point();
+	std::chrono::steady_clock::time_point mLastDumpTime = std::chrono::steady_clock::time_point();
 #endif // BT_CLIENT
 
 private:
@@ -486,25 +484,32 @@ private:
 	void FormatNetworkTransport(common::Workbuffer& rWorkbuffer);
 	void FormatNetworkPeerMetrics(common::Workbuffer& rWorkbuffer, const ENetPeer& rPeer);
 	void FormatNetworkTraffic(common::Workbuffer& rWorkbuffer);
-	void FormatNetworkSync(common::Workbuffer& rWorkbuffer);
+	void FormatNetworkSynchronization(common::Workbuffer& rWorkbuffer);
 	void FormatNetworkPrediction(common::Workbuffer& rWorkbuffer);
 	void FormatNetworkClock(common::Workbuffer& rWorkbuffer);
 	void FormatNetworkReconciliation(common::Workbuffer& rWorkbuffer);
 
-	common::Smoothed<int64_t> mSmoothedRtt;
+	common::Smoothed<int64_t> mSmoothedRoundTripTime;
 	common::Smoothed<int64_t> mSmoothedJitter;
+public:
 	common::Smoothed<int64_t> mSmoothedClockOffset;
+
 	common::Smoothed<int64_t> mSmoothedClockTarget;
 	common::Smoothed<int64_t> mSmoothedClockError;
+private:
 	common::Smoothed<int64_t> mSmoothedRollback;
 	common::Smoothed<int64_t> mSmoothedBuffer;
-	common::Smoothed<int64_t> mSmoothedRecv;
+	common::Smoothed<int64_t> mSmoothedReceived;
 
+public:
 	common::InTheLastSecond mCrcValidatedTicksPerSecond;
+
 	common::InTheLastSecond mAssumedTicksPerSecond;
 	common::InTheLastSecond mCrcFastPathEventsPerSecond;
+
 	common::InTheLastSecond mStatusChangeReplayTicksPerSecond;
 	common::InTheLastSecond mKnockOnReplayTicksPerSecond;
+private:
 #endif // BT_CLIENT
 };
 
@@ -519,7 +524,7 @@ public:
 
 private:
 
-	BootTimers meBootTimer;
+	BootTimers meBootTimer = kBootTimerTotal;
 };
 
 class ScopedCpuProfile
@@ -540,7 +545,7 @@ void FormatCpuTimersText(common::Workbuffer& rWorkbuffer, bool bReevaluate);
 void FormatCpuCountersText(common::Workbuffer& rWorkbuffer, bool bReevaluate);
 
 #if defined(BT_CLIENT)
-void FormatFpsHeader(common::Workbuffer& rWorkbuffer, int64_t iTotalCpuTimeUs);
+void FormatFramesPerSecondHeader(common::Workbuffer& rWorkbuffer, std::chrono::microseconds elapsedCpuTime);
 void FormatCpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate);
 void FormatGpuScreen(common::Workbuffer& rWorkbuffer, bool bReevaluate);
 #endif

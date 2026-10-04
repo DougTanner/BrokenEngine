@@ -17,7 +17,7 @@ struct Frame;
 struct FrameInput;
 struct StatusChange;
 
-}
+} // namespace game
 
 namespace engine
 {
@@ -76,7 +76,7 @@ struct CoordFrames
 	int64_t iSnapshotHead = 0;       // physical index of oldest entry
 	int64_t iSnapshotCount = 0;      // number of valid entries in ring
 
-	// Confirmed tick = logical offset from head (-1 = none)
+	// iConfirmedTick is the validated simulation tick; iConfirmedOffset is its logical offset from the ring head (-1 = none).
 	int64_t iConfirmedTick = -1;
 	int64_t iConfirmedOffset = -1;
 
@@ -85,16 +85,16 @@ struct CoordFrames
 	int64_t iHighWaterValidatedTick = -1;
 
 	// Monotonic guard for the rendered frame: the renderer must never regress to an older tick
-	// or an earlier interpolated time for the same coord. Trips DEBUG_BREAK in Render().
+	// or an earlier interpolated time for the same coord. Trips DEBUG_BREAK in UpdateRenderInterpolation().
 	int64_t iLastRenderedTick = -1;
 	float fLastRenderedTime = 0.0f;
 
 	struct CoordServerUpdate
 	{
-		common::crc_t sharedCrc = 0;
+		common::crc_t uiSharedCrc = 0;
 		std::vector<game::StatusChange> statusChanges;
 	};
-	std::map<int64_t, CoordServerUpdate> serverUpdates;
+	std::unordered_map<int64_t, CoordServerUpdate> serverUpdates;
 
 	struct PendingFullState
 	{
@@ -216,37 +216,12 @@ public:
 	void ProcessInput(bool bLostFocus);
 	void ClientUpdate();
 	void Render();
-	float AdvanceRenderClock(double dT, bool bPaused, bool bHaveInterpolationWindow, double dSimDeltaSeconds);
-	game::Frame& RenderFrame(GridCoord coord) const;
+	float AdvanceRenderClock(double fWindowStartTime, bool bPaused, bool bHaveInterpolationWindow, double fSimulationDeltaSeconds);
+	game::Frame& RenderFrame(GridCoord coordinate) const;
 	void ResetRenderClock();
 #endif // BT_CLIENT
 #if defined(BT_SERVER)
 	void ServerUpdate();
-#endif // BT_SERVER
-
-	uint16_t GenerateFrameId() { return muiNextFrameId++; }
-	int64_t TickCounter() const { return miTickCounter; }
-	float CurrentTime() const { return mfCurrentTime; }
-	void SetTickCounter(int64_t iTickCounter) { ASSERT(iTickCounter >= 0); miTickCounter = iTickCounter; }
-	void SetCurrentTime(float fCurrentTime) { mfCurrentTime = fCurrentTime; }
-	uint16_t NextFrameId() const { return muiNextFrameId; }
-	void SetNextFrameId(uint16_t uiNextFrameId) { muiNextFrameId = uiNextFrameId; }
-	int64_t GenerateGlobalId() { return miNextGlobalId++; }
-	int64_t NextGlobalId() const { return miNextGlobalId; }
-	void SetNextGlobalId(int64_t iNextGlobalId) { miNextGlobalId = iNextGlobalId; }
-
-	bool InMainMenu() const { return mGameFlags & GameFlags::kMainMenu; }
-
-#if defined(BT_SERVER)
-	game::Frame& CurrentFrame(GridCoord coord) const
-	{
-		return *mCoordFrames.at(coord).pCurrent;
-	}
-
-	game::Frame& NextFrame(GridCoord coord)
-	{
-		return *mCoordFrames.at(coord).pNext;
-	}
 #endif // BT_SERVER
 
 	GameFlags_t mGameFlags;
@@ -268,20 +243,20 @@ public:
 	// delta; camera blend / shake decay / mfTime and visual-error-offset decay use the same timing units.
 	double mfLastRenderFrameSeconds = 0.0;
 #endif // BT_CLIENT
-	std::unordered_map<GridCoord, CoordFrames> mCoordFrames;
+	std::unordered_map<GridCoord, CoordFrames> mCoordinateFrames;
 	// Awake cells for this update: the coords simulated, published, and rendered. Populated by game policy
 	// (Game::ComputeActiveSet on the client, ServerSessionRuntime::ComputeActiveSet on the server); the append
 	// order is observable and reaches dispatch, broadcast, transfer, and render. Membership does not imply a
 	// client is watching a cell, so liveness checks must not be derived from it.
-	std::vector<GridCoord> mActiveCoords;
+	std::vector<GridCoord> mActiveCoordinates;
 	// game::Game caches the visible-neighbor ring keyed off this coord, so every write goes through
 	// Game::SetClientGridCoord, which invalidates that cache.
-	GridCoord mClientGridCoord {};
+	GridCoord mClientGridCoordinate {};
 
 	std::unordered_map<GridCoord, game::FrameInput> mFrameInputs;
 
 	// Creates the cell's frame storage and static data on demand; the game supplies the frame's contents.
-	void CreateFrameAtCoord(GridCoord coord);
+	void CreateFrameAtCoordinate(GridCoord coordinate);
 
 #if defined(BT_SERVER)
 	// True while replay playback owns the simulation, i.e. a reader is live or staged for a later tick.
@@ -292,7 +267,7 @@ public:
 	std::unique_ptr<Replay> mpReplay;
 
 	// Reusable server-side dispatch references; capacity persists across ticks as the active-cell count changes.
-	std::vector<ActiveFrameReference> mActiveFrameRefs;
+	std::vector<ActiveFrameReference> mActiveFrameReferences;
 #endif // BT_SERVER
 
 #if defined(BT_CLIENT)
@@ -306,9 +281,9 @@ public:
 
 private:
 
-	bool IsCoordRenderable(GridCoord coord) const;
-	void SelectRenderCamera(const std::vector<GridCoord>& rActiveCoords, GridCoord& rCameraCoord, bool& rbHaveRenderableCamera) const;
-	void UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, bool bHaveRenderableCamera);
+	bool IsCoordinateRenderable(GridCoord coordinate) const;
+	void SelectRenderCamera(const std::vector<GridCoord>& rActiveCoordinates, GridCoord& rCameraCoordinate, bool& rbHaveRenderableCamera) const;
+	void UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, bool bHaveRenderableCamera);
 #endif // BT_CLIENT
 
 protected:
@@ -317,27 +292,23 @@ protected:
 #if defined(BT_SERVER)
 	void RefreshReplayActiveSet();
 	void SwapFrames();
-	void BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveCoords);
+	void BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveCoordinates);
 	void FinalizeFrameTick();
 #endif // BT_SERVER
 
+public:
 	int64_t miTickCounter = 0;
-	float mfCurrentTime = 0.0f;
 
+	float mfCurrentTime = 0.0f;
 	uint16_t muiNextFrameId = 0;
+
 	int64_t miNextGlobalId = 1;
+protected:
 
 	MenuFlags_t mMenuFlags {MenuFlags::kMouseVisible};
 
 #if defined(BT_CLIENT)
-	// Render-side sim clock. Advances at sim rate (wall × current time ratio), clamped to
-	// [T_prevTail, T_prevTail+kfDeltaTime] so fDeltaTime in [0, kfDeltaTime] maps to a true
-	// interpolation window (prevTail -> tail) — never extrapolation past tail velocity. Sim
-	// commits and render integration share the same time-ratio-scaled clock, so no separate
-	// servo is needed; mfRenderTime simply integrates sim seconds and the clamps absorb
-	// sub-tick jitter. Single-tick commits don't rebase: T advances +kfDt while mfRenderTime
-	// stays continuous, so fDt drops by kfDt and the Update(N, kfDt) ≡ Update(N+1, 0)
-	// invariant makes the handoff pixel-identical.
+	// Render clock advances in simulation seconds, with wall time scaled by the current time ratio, and is clamped to the one-tick window starting at RenderFrame's source time. A midpoint seed sets phase; rebasing occurs only outside [source - kfDeltaTime, source + 2 * kfDeltaTime]. Single-tick commits preserve continuity through the Update(N, kfDeltaTime) == Update(N+1, 0) interpolation invariant.
 	double mfRenderTime = 0.0;
 	bool mbRenderClockSeeded = false;
 	common::Timer mRenderTimer;

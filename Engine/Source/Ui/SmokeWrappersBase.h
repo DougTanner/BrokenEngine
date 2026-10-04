@@ -5,18 +5,15 @@
 namespace engine
 {
 
-// Decay
-extern Wrapper gSmokeMax;
+extern Wrapper gSmokeMaximum;
 extern Wrapper gSmokePower;
 extern Wrapper gSmokeDecay;
 extern Wrapper gSmokeEdgeDecayDistance;
 
-// Color
-extern Wrapper gSmokeColorMin;
+extern Wrapper gSmokeColorMinimum;
 extern Wrapper gSmokeColorMultiplier;
 extern Wrapper gSmokeLightingMultiplier;
 
-// Noise
 extern Wrapper gSmokeNoiseScaleOne;
 extern Wrapper gSmokeNoiseScaleTwo;
 extern Wrapper gSmokeWindNoiseScale;
@@ -30,7 +27,6 @@ extern Wrapper gWindDisplacementNoiseScale;
 extern Wrapper gWindSmokeRetention;
 extern Wrapper gWindSmokeAdvection;
 
-// Object
 extern Wrapper gSmokeObjectHeight;
 
 // Trails (also rendered in game-side TweaksScreenSmokeDeposits column 3)

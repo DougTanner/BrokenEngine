@@ -65,13 +65,13 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 	// height. Actual clamped extents preserve device-independent coverage. At settled height the grid stays fixed; snap the camera-centered
 	// f4LightingArea to integer deposit texels because deposit rasterizes lights. Spread/combine/temporal resample that world rectangle at
 	// their own resolutions.
-	float fLightingTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.extent.width);
-	float fLightingTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.extent.height);
-	float fCombineTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.extent.width);
-	float fCombineTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.extent.height);
-	const XMFLOAT4& rVisibleArea = engine::gpCamera->f4RenderVisibleArea;
+	float fLightingTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.vkExtent3D.width);
+	float fLightingTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.vkExtent3D.height);
+	float fCombineTextureWidth = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.vkExtent3D.width);
+	float fCombineTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.vkExtent3D.height);
+	const XMFLOAT4& rf4VisibleArea = engine::gpCamera->mf4RenderVisibleArea;
 
-	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::Camera::kfLightingHeadroomMultiplier, engine::gpCamera->mfLightingTexelEyeHeight, fLightingTextureWidth, fLightingTextureHeight, gpSwapchainManager->mfAspectRatio, gFov.Get(), engine::gpCamera->mVecPosition);
+	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::Camera::kfLightingHeadroomMultiplier, engine::gpCamera->mfLightingTexelEyeHeight, fLightingTextureWidth, fLightingTextureHeight, gpSwapchainManager->mfAspectRatio, gFieldOfView.mfCurrent, engine::gpCamera->mVecPosition);
 
 	// Temporal accumulation publishes the current and previous world areas from one refresh epoch; a skip retains both.
 	static LightingTemporalAreaLatch sTemporalAreaLatch {};
@@ -80,7 +80,7 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 	// Every rectangle retained across frames here is in the camera cell's frame; follow a camera cell change before
 	// the refresh test compares them with this frame's areas, and let a multi-cell jump take the existing reset.
 	static RetainedAreaBasis sRetainedAreaBasis {};
-	if (std::optional<XMFLOAT2> of2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoord))
+	if (std::optional<XMFLOAT2> of2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
 	{
 		ShiftArea(sTemporalAreaLatch.f4CurrentArea, *of2Shift);
 		ShiftArea(sTemporalAreaLatch.f4PreviousArea, *of2Shift);
@@ -93,12 +93,12 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 		++gPresentationContinuity.lighting.iHistoryResets;
 	}
 	sbLightingRefreshFrame = bScheduledRefresh || !sTemporalAreaLatch.bInitialized || !sbHeldVisibleArea
-	                      || (bLightingEnabled && !IsVisibleAreaInsideHeldCombineCrop(rVisibleArea, sf4HeldVisibleArea, sTemporalAreaLatch.f4CurrentArea, fCombineTextureWidth, fCombineTextureHeight));
+	                      || (bLightingEnabled && !IsVisibleAreaInsideHeldCombineCrop(rf4VisibleArea, sf4HeldVisibleArea, sTemporalAreaLatch.f4CurrentArea, fCombineTextureWidth, fCombineTextureHeight));
 	if (sbLightingRefreshFrame)
 	{
-		rGlobalLayout.fLightingTemporalBlend = sTemporalAreaLatch.Update(area.f4Area, gbLightingTemporalReset, gLightingTemporalBlend.Get(), rGlobalLayout.f4LightingAreaPrevious);
+		rGlobalLayout.fLightingTemporalBlend = sTemporalAreaLatch.Update(area.f4Area, gbLightingTemporalReset, gLightingTemporalBlend.mfCurrent, rGlobalLayout.f4LightingAreaPrevious);
 		rGlobalLayout.f4LightingArea = sTemporalAreaLatch.f4CurrentArea;
-		sf4HeldVisibleArea = rVisibleArea;
+		sf4HeldVisibleArea = rf4VisibleArea;
 		sbHeldVisibleArea = true;
 	}
 	else
@@ -111,19 +111,19 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 	gPresentationContinuity.lighting.f4PreviousArea = sTemporalAreaLatch.f4PreviousArea;
 
 	// Lighting-area extent reciprocal (LightingSpread.frag world->texcoord multiply).
-	const XMFLOAT4& rLightingArea = sTemporalAreaLatch.f4CurrentArea;
-	float fLightingAreaWidth = rLightingArea.z - rLightingArea.x;
-	float fLightingAreaHeight = rLightingArea.y - rLightingArea.w;
-	rGlobalLayout.f2LightingAreaExtentInv.x = 1.0f / fLightingAreaWidth;
-	rGlobalLayout.f2LightingAreaExtentInv.y = 1.0f / fLightingAreaHeight;
+	const XMFLOAT4& rf4LightingArea = sTemporalAreaLatch.f4CurrentArea;
+	float fLightingAreaWidth = rf4LightingArea.z - rf4LightingArea.x;
+	float fLightingAreaHeight = rf4LightingArea.y - rf4LightingArea.w;
+	rGlobalLayout.f2LightingAreaExtentInverse.x = 1.0f / fLightingAreaWidth;
+	rGlobalLayout.f2LightingAreaExtentInverse.y = 1.0f / fLightingAreaHeight;
 
 	// Edge-fade denominator reciprocal (LightingDepositEdgeFade), deliberately floored unlike smoke/wind's ceil-based
 	// full-coverage dispatch grids. The minimum of one keeps the tile count nonzero if a device clamp produces a
 	// sub-tile texture extent.
 	uint32_t uiLightTilesX = std::max(1u, static_cast<uint32_t>(fLightingTextureWidth) / shaders::kiComputeTileSize);
 	uint32_t uiLightTilesY = std::max(1u, static_cast<uint32_t>(fLightingTextureHeight) / shaders::kiComputeTileSize);
-	rGlobalLayout.f2LightingDepositSizeInv.x = 1.0f / static_cast<float>(uiLightTilesX * shaders::kiComputeTileSize);
-	rGlobalLayout.f2LightingDepositSizeInv.y = 1.0f / static_cast<float>(uiLightTilesY * shaders::kiComputeTileSize);
+	rGlobalLayout.f2LightingDepositSizeInverse.x = 1.0f / static_cast<float>(uiLightTilesX * shaders::kiComputeTileSize);
+	rGlobalLayout.f2LightingDepositSizeInverse.y = 1.0f / static_cast<float>(uiLightTilesY * shaders::kiComputeTileSize);
 }
 
 void RenderLightingGlobal(int64_t iCommandBuffer)
@@ -142,102 +142,98 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	bool bScheduledLightingRefresh = gbLightingTemporalReset || (bLightingEnabled && siLightingRefreshFrame % iLightingUpdateCadence == 0);
 
 	// Generate run-unique seed once and reuse every frame: stable noise pattern across the run, no temporal flicker.
-	static const uint32_t skuiRandomSeed = []
+	static const uint32_t suiRandomSeed = []
 	{
 		common::RandomEngine randomEngine;
 		randomEngine.TimeSeed();
 		return static_cast<uint32_t>(common::RandomNext(randomEngine) >> 32);
 	}();
-	rGlobalLayout.uiRandomSeed = skuiRandomSeed;
+	rGlobalLayout.uiRandomSeed = suiRandomSeed;
 
-	rGlobalLayout.fLightingObjectsAdd = gLightingObjectsAdd.Get();
-	rGlobalLayout.fLightingDepositThreshold = gLightingDepositThreshold.Get();
-	rGlobalLayout.fLightingDepositCompress = gLightingDepositCompress.Get();
+	rGlobalLayout.fLightingObjectsAdd = gLightingObjectsAdd.mfCurrent;
+	rGlobalLayout.fLightingDepositThreshold = gLightingDepositThreshold.mfCurrent;
+	rGlobalLayout.fLightingDepositCompress = gLightingDepositCompress.mfCurrent;
 
-	float fCombineMaxBrightness = gCombineMaxBrightness.Get();
-	float fCombineContrast = gCombineContrast.Get();
-	float fCombineLinearStart = gCombineLinearStart.Get();
-	float fCombineLinearLength = gCombineLinearLength.Get();
+	float fCombineMaxBrightness = gCombineMaxBrightness.mfCurrent;
+	float fCombineContrast = gCombineContrast.mfCurrent;
+	float fCombineLinearStart = gCombineLinearStart.mfCurrent;
+	float fCombineLinearLength = gCombineLinearLength.mfCurrent;
 	rGlobalLayout.fCombineMaxBrightness = fCombineMaxBrightness;
 	rGlobalLayout.fCombineContrast = fCombineContrast;
 	rGlobalLayout.fCombineLinearStart = fCombineLinearStart;
-	rGlobalLayout.fCombineToe = gCombineToe.Get();
-	rGlobalLayout.fCombineBlackTightness = gCombineBlackTightness.Get();
-	rGlobalLayout.fCombineHuePreserve = gCombineHuePreserve.Get();
+	rGlobalLayout.fCombineToe = gCombineToe.mfCurrent;
+	rGlobalLayout.fCombineBlackTightness = gCombineBlackTightness.mfCurrent;
+	rGlobalLayout.fCombineHuePreserve = gCombineHuePreserve.mfCurrent;
 
 	// Precompute Uchimura segment constants S0/S1/CP from six invocation-invariant uniforms for LightCombine.comp and DebugTexture.frag; both
 	// use the same P-S1 epsilon guard.
-	float fCombineL0 = ((fCombineMaxBrightness - fCombineLinearStart) * fCombineLinearLength) / fCombineContrast;
-	float fCombineS1 = fCombineLinearStart + fCombineContrast * fCombineL0;
-	float fCombineC2 = (fCombineContrast * fCombineMaxBrightness) / std::max(fCombineMaxBrightness - fCombineS1, shaders::kfEpsilon);
-	rGlobalLayout.fCombineS0 = fCombineLinearStart + fCombineL0;
-	rGlobalLayout.fCombineS1 = fCombineS1;
-	rGlobalLayout.fCombineCP = -fCombineC2 / fCombineMaxBrightness;
+	float fCombineLinearSegmentLength = ((fCombineMaxBrightness - fCombineLinearStart) * fCombineLinearLength) / fCombineContrast;
+	float fCombineShoulderStart = fCombineLinearStart + fCombineContrast * fCombineLinearSegmentLength;
+	float fCombineShoulderCoefficient = (fCombineContrast * fCombineMaxBrightness) / std::max(fCombineMaxBrightness - fCombineShoulderStart, shaders::kfEpsilon);
+	rGlobalLayout.fCombineShoulderInputStart = fCombineLinearStart + fCombineLinearSegmentLength;
+	rGlobalLayout.fCombineShoulderOutputStart = fCombineShoulderStart;
+	rGlobalLayout.fCombineShoulderExponentCoefficient = -fCombineShoulderCoefficient / fCombineMaxBrightness;
 
-	// Pass normalization / exposure scaling precomputed (fCombinePassNormalize, fCombineExposurePassScale, spread pass count).
-	float fPassCount = gSpreadPassCount.Get();
-	float fPassNorm = std::lerp(1.0f, 1.0f / fPassCount, gCombinePassNormalize.Get());
-	float fPassScale = std::pow(fPassCount, -gCombineExposurePassScale.Get());
-	float fCombinePassNormScale = fPassNorm * fPassScale;
-	rGlobalLayout.fCombinePassNormScale = fCombinePassNormScale;
-	rGlobalLayout.fCombinePassTotalScale = fCombinePassNormScale / fPassCount;
+	float fPassCount = gSpreadPassCount.mfCurrent;
+	float fPassNormalization = std::lerp(1.0f, 1.0f / fPassCount, gCombinePassNormalize.mfCurrent);
+	float fPassScale = std::pow(fPassCount, -gCombineExposurePassScale.mfCurrent);
+	float fCombinePassNormalizationScale = fPassNormalization * fPassScale;
+	rGlobalLayout.fCombinePassNormalizationScale = fCombinePassNormalizationScale;
+	rGlobalLayout.fCombinePassTotalScale = fCombinePassNormalizationScale / fPassCount;
 	for (int64_t i = 0; i < _countof(rGlobalLayout.pfCombineCurvePoints); ++i)
 	{
-		float fT = 0.5f;
+		float fPassFraction = 0.5f;
 		if constexpr (shaders::kiMaxSpreadPasses > 1)
 		{
-			fT = static_cast<float>(i) / static_cast<float>(shaders::kiMaxSpreadPasses - 1);
+			fPassFraction = static_cast<float>(i) / static_cast<float>(shaders::kiMaxSpreadPasses - 1);
 		}
-		rGlobalLayout.pfCombineCurvePoints[i] = (gbUseCombineCurveNew ? gCombineCurveNew : gCombineCurveOld).Evaluate(fT);
+		rGlobalLayout.pfCombineCurvePoints[i] = (gbUseCombineCurveNew ? gCombineCurveNew : gCombineCurveOld).Evaluate(fPassFraction);
 	}
-	rGlobalLayout.fLightingTerrain = gLightingTerrain.Get();
-	rGlobalLayout.fLightingObjects = gLightingObjects.Get();
-	rGlobalLayout.fLightingAddTerrain = gLightingAddTerrain.Get();
+	rGlobalLayout.fLightingTerrain = gLightingTerrain.mfCurrent;
+	rGlobalLayout.fLightingObjects = gLightingObjects.mfCurrent;
+	rGlobalLayout.fLightingAddTerrain = gLightingAddTerrain.mfCurrent;
 
-	// Spread Start
-	rGlobalLayout.fSpreadDirectionalityStart = gSpreadDirectionality.Get();
-	rGlobalLayout.fSpreadDirectionCountStart = gSpreadDirectionCount.Get();
-	rGlobalLayout.fSpreadDistanceStart = gSpreadDistance.Get();
-	rGlobalLayout.fSpreadRingCountStart = gSpreadRingCount.Get();
-	rGlobalLayout.fSpreadJitterStart = gSpreadJitter.Get();
-	rGlobalLayout.fSpreadSampleJitterRangeStart = gSpreadSampleJitterRangeStart.Get();
-	rGlobalLayout.fSpreadSampleJitterClusteringStart = gSpreadSampleJitterClusteringStart.Get();
-	rGlobalLayout.fSpreadDecayStart = gSpreadDecay.Get();
-	rGlobalLayout.fSpreadAccumulationDecayStart = gSpreadAccumulationDecay.Get();
-	rGlobalLayout.fSpreadDistanceFalloffStart = gSpreadDistanceFalloff.Get();
-	rGlobalLayout.fSpreadOutputThresholdStart = gSpreadOutputThreshold.Get();
-	rGlobalLayout.fSpreadOutputCompressStart = gSpreadOutputCompress.Get();
-	rGlobalLayout.fSpreadPassCount = gSpreadPassCount.Get();
+	rGlobalLayout.fSpreadDirectionalityStart = gSpreadDirectionality.mfCurrent;
+	rGlobalLayout.fSpreadDirectionCountStart = gSpreadDirectionCount.mfCurrent;
+	rGlobalLayout.fSpreadDistanceStart = gSpreadDistance.mfCurrent;
+	rGlobalLayout.fSpreadRingCountStart = gSpreadRingCount.mfCurrent;
+	rGlobalLayout.fSpreadJitterStart = gSpreadJitter.mfCurrent;
+	rGlobalLayout.fSpreadSampleJitterRangeStart = gSpreadSampleJitterRangeStart.mfCurrent;
+	rGlobalLayout.fSpreadSampleJitterClusteringStart = gSpreadSampleJitterClusteringStart.mfCurrent;
+	rGlobalLayout.fSpreadDecayStart = gSpreadDecay.mfCurrent;
+	rGlobalLayout.fSpreadAccumulationDecayStart = gSpreadAccumulationDecay.mfCurrent;
+	rGlobalLayout.fSpreadDistanceFalloffStart = gSpreadDistanceFalloff.mfCurrent;
+	rGlobalLayout.fSpreadOutputThresholdStart = gSpreadOutputThreshold.mfCurrent;
+	rGlobalLayout.fSpreadOutputCompressStart = gSpreadOutputCompress.mfCurrent;
+	rGlobalLayout.fSpreadPassCount = gSpreadPassCount.mfCurrent;
 
 	// Spread End (interpolation targets for last spread pass)
-	rGlobalLayout.fSpreadDirectionalityEnd = gSpreadDirectionalityEnd.Get();
-	rGlobalLayout.fSpreadDirectionCountEnd = gSpreadDirectionCountEnd.Get();
-	rGlobalLayout.fSpreadDistanceEnd = gSpreadDistanceEnd.Resolve(engine::gpCamera->mfCameraEyeHeight);
-	rGlobalLayout.fSpreadRingCountEnd = gSpreadRingCountEnd.Get();
-	rGlobalLayout.fSpreadJitterEnd = gSpreadJitterEnd.Get();
-	rGlobalLayout.fSpreadSampleJitterRangeEnd = gSpreadSampleJitterRangeEnd.Get();
-	rGlobalLayout.fSpreadSampleJitterClusteringEnd = gSpreadSampleJitterClusteringEnd.Get();
-	rGlobalLayout.fSpreadDecayEnd = gSpreadDecayEnd.Get();
-	rGlobalLayout.fSpreadAccumulationDecayEnd = gSpreadAccumulationDecayEnd.Get();
-	rGlobalLayout.fSpreadDistanceFalloffEnd = gSpreadDistanceFalloffEnd.Get();
-	rGlobalLayout.fSpreadOutputThresholdEnd = gSpreadOutputThresholdEnd.Get();
-	rGlobalLayout.fSpreadOutputCompressEnd = gSpreadOutputCompressEnd.Get();
+	rGlobalLayout.fSpreadDirectionalityEnd = gSpreadDirectionalityEnd.mfCurrent;
+	rGlobalLayout.fSpreadDirectionCountEnd = gSpreadDirectionCountEnd.mfCurrent;
+	rGlobalLayout.fSpreadDistanceEnd = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, gSpreadDistanceEnd.startHeight.mfCurrent, gSpreadDistanceEnd.endHeight.mfCurrent, gSpreadDistanceEnd.low.mfCurrent, gSpreadDistanceEnd.high.mfCurrent);
+	rGlobalLayout.fSpreadRingCountEnd = gSpreadRingCountEnd.mfCurrent;
+	rGlobalLayout.fSpreadJitterEnd = gSpreadJitterEnd.mfCurrent;
+	rGlobalLayout.fSpreadSampleJitterRangeEnd = gSpreadSampleJitterRangeEnd.mfCurrent;
+	rGlobalLayout.fSpreadSampleJitterClusteringEnd = gSpreadSampleJitterClusteringEnd.mfCurrent;
+	rGlobalLayout.fSpreadDecayEnd = gSpreadDecayEnd.mfCurrent;
+	rGlobalLayout.fSpreadAccumulationDecayEnd = gSpreadAccumulationDecayEnd.mfCurrent;
+	rGlobalLayout.fSpreadDistanceFalloffEnd = gSpreadDistanceFalloffEnd.mfCurrent;
+	rGlobalLayout.fSpreadOutputThresholdEnd = gSpreadOutputThresholdEnd.mfCurrent;
+	rGlobalLayout.fSpreadOutputCompressEnd = gSpreadOutputCompressEnd.mfCurrent;
 
-	// Spread Height Fade
-	rGlobalLayout.fSpreadHeightMultiplier = gSpreadHeightMultiplier.Get();
-	rGlobalLayout.fSpreadHeightEndHeightInv = 1.0f / std::max(gSpreadHeightEndHeight.Get(), 0.001f);
-	rGlobalLayout.fSpreadHeightPower = gSpreadHeightPower.Get();
+	rGlobalLayout.fSpreadHeightMultiplier = gSpreadHeightMultiplier.mfCurrent;
+	rGlobalLayout.fSpreadHeightEndHeightInverse = 1.0f / std::max(gSpreadHeightEndHeight.mfCurrent, 0.001f);
+	rGlobalLayout.fSpreadHeightPower = gSpreadHeightPower.mfCurrent;
 
 	// Per-ring rotation angles: jitter slider sets the seed; the shader scales by interpolated jitter
 	// Each ring uses its own seed for uncorrelated rotations
-	float fJitter = gSpreadJitter.Get();
+	float fJitter = gSpreadJitter.mfCurrent;
 	common::RandomEngine ringRandomEngine(1'000 * static_cast<uint32_t>(static_cast<float>(shaders::kiMaxSpreadPasses) * fJitter));
 	for (int64_t i = 0; i < _countof(rGlobalLayout.pfSpreadRingRotations); ++i)
 	{
 		rGlobalLayout.pfSpreadRingRotations[i] = common::Random<XM_2PI>(ringRandomEngine);
 	}
 
-	// Lighting world-area / temporal / tile / readout population — colocated here so the whole Lighting region lives in one file (region ownership).
 	PopulateLightingParameters(rGlobalLayout, bScheduledLightingRefresh, bLightingEnabled);
 }
 
@@ -245,18 +241,17 @@ void RenderLightingMain(int64_t iCommandBuffer)
 {
 	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(&gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 
-	rMainLayout.fLightingSampledNormalsOneSize = gLightingSampledNormalsOneSize.Get();
-	rMainLayout.fLightingSampledNormalsTwoSize = gLightingSampledNormalsTwoSize.Get();
-	rMainLayout.fLightingSampledNormalsThreeSize = gLightingSampledNormalsThreeSize.Get();
+	rMainLayout.fLightingSampledNormalsOneSize = gLightingSampledNormalsOneSize.mfCurrent;
+	rMainLayout.fLightingSampledNormalsTwoSize = gLightingSampledNormalsTwoSize.mfCurrent;
+	rMainLayout.fLightingSampledNormalsThreeSize = gLightingSampledNormalsThreeSize.mfCurrent;
 	rMainLayout.uiWaterNormalIndexOne = static_cast<uint32_t>(gWaterNormalIndexOne.Get<int64_t>());
 	rMainLayout.uiWaterNormalIndexTwo = static_cast<uint32_t>(gWaterNormalIndexTwo.Get<int64_t>());
 	rMainLayout.uiWaterNormalIndexThree = static_cast<uint32_t>(gWaterNormalIndexThree.Get<int64_t>());
-	// Resolve the 3 normal-weight samples CPU-side by camera eye height and upload one float each
-	// Hard-coded fade band (default..2x default eye height) with no author
-	// control over the band -> free LerpAtHeight, not a HeightLerpWrapperQuartet; fade endpoint single-sourced on engine::Camera.
-	float fWaterNormalWeightOne = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightOneMin.Get(), gLightingSampledNormalsWeightOneMax.Get());
-	float fWaterNormalWeightTwo = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightTwoMin.Get(), gLightingSampledNormalsWeightTwoMax.Get());
-	float fWaterNormalWeightThree = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightThreeMin.Get(), gLightingSampledNormalsWeightThreeMax.Get());
+	// Normal weights use a fixed fade band from the default eye height to twice that height, with no author controls.
+	// engine::Camera owns the fade endpoint; LerpAtHeight resolves the weights before upload.
+	float fWaterNormalWeightOne = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightOneMinimum.mfCurrent, gLightingSampledNormalsWeightOneMaximum.mfCurrent);
+	float fWaterNormalWeightTwo = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightTwoMinimum.mfCurrent, gLightingSampledNormalsWeightTwoMaximum.mfCurrent);
+	float fWaterNormalWeightThree = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightThreeMinimum.mfCurrent, gLightingSampledNormalsWeightThreeMaximum.mfCurrent);
 	rMainLayout.fWaterNormalWeightOne = fWaterNormalWeightOne;
 	rMainLayout.fWaterNormalWeightTwo = fWaterNormalWeightTwo;
 	rMainLayout.fWaterNormalWeightThree = fWaterNormalWeightThree;
@@ -265,137 +260,134 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	float fWaterNormalWeightTotal = fWaterNormalWeightOne + fWaterNormalWeightTwo + fWaterNormalWeightThree;
 	if (fWaterNormalWeightTotal > 0.0f)
 	{
-		float fInvTotal = 1.0f / fWaterNormalWeightTotal;
-		float fWRelOne = fWaterNormalWeightOne * fInvTotal;
-		float fWRelTwo = fWaterNormalWeightTwo * fInvTotal;
-		float fWRelThree = fWaterNormalWeightThree * fInvTotal;
-		rMainLayout.fWaterNormalWRelSqOne = fWRelOne * fWRelOne;
-		rMainLayout.fWaterNormalWRelSqTwo = fWRelTwo * fWRelTwo;
-		rMainLayout.fWaterNormalWRelSqThree = fWRelThree * fWRelThree;
+		float fInverseTotalWeight = 1.0f / fWaterNormalWeightTotal;
+		float fRelativeWeightOne = fWaterNormalWeightOne * fInverseTotalWeight;
+		float fRelativeWeightTwo = fWaterNormalWeightTwo * fInverseTotalWeight;
+		float fRelativeWeightThree = fWaterNormalWeightThree * fInverseTotalWeight;
+		rMainLayout.fWaterNormalRelativeWeightSquaredOne = fRelativeWeightOne * fRelativeWeightOne;
+		rMainLayout.fWaterNormalRelativeWeightSquaredTwo = fRelativeWeightTwo * fRelativeWeightTwo;
+		rMainLayout.fWaterNormalRelativeWeightSquaredThree = fRelativeWeightThree * fRelativeWeightThree;
 	}
 	else
 	{
-		rMainLayout.fWaterNormalWRelSqOne = 0.0f;
-		rMainLayout.fWaterNormalWRelSqTwo = 0.0f;
-		rMainLayout.fWaterNormalWRelSqThree = 0.0f;
+		rMainLayout.fWaterNormalRelativeWeightSquaredOne = 0.0f;
+		rMainLayout.fWaterNormalRelativeWeightSquaredTwo = 0.0f;
+		rMainLayout.fWaterNormalRelativeWeightSquaredThree = 0.0f;
 	}
-	rMainLayout.fWaterNormalWeightSumInv = 1.0f / std::max(3.0f * fWaterNormalWeightTotal, shaders::kfEpsilon);
+	rMainLayout.fWaterNormalWeightSumInverse = 1.0f / std::max(3.0f * fWaterNormalWeightTotal, shaders::kfEpsilon);
 	// Water.frag height darkening keeps the bottom and uploads only the range reciprocal; the two tunables are independent and their ranges overlap, so
 	// floor the range magnitude at kfEpsilon to keep the reciprocal finite, keeping the sign so a top below the bottom still reads as an inverted range.
-	float fWaterHeightDarkenTop = gWaterHeightDarkenTop.Get();
-	float fWaterHeightDarkenBottom = gWaterHeightDarkenBottom.Get();
+	float fWaterHeightDarkenTop = gWaterHeightDarkenTop.mfCurrent;
+	float fWaterHeightDarkenBottom = gWaterHeightDarkenBottom.mfCurrent;
 	rMainLayout.fWaterHeightDarkenBottom = fWaterHeightDarkenBottom;
 	float fWaterHeightDarkenRange = fWaterHeightDarkenTop - fWaterHeightDarkenBottom;
 	float fRangeMagnitude = std::max(std::abs(fWaterHeightDarkenRange), shaders::kfEpsilon);
 	fWaterHeightDarkenRange = fWaterHeightDarkenRange < 0.0f ? -fRangeMagnitude : fRangeMagnitude;
-	rMainLayout.fWaterHeightDarkenRangeInv = 1.0f / fWaterHeightDarkenRange;
-	rMainLayout.fWaterHeightDarkenTarget = gWaterHeightDarkenTarget.Get();
-	rMainLayout.fWaterHeightDarkenSource = gWaterHeightDarkenSource.Get();
-	rMainLayout.fWaterHeightDarkenLighting = gWaterHeightDarkenLighting.Get();
+	rMainLayout.fWaterHeightDarkenRangeInverse = 1.0f / fWaterHeightDarkenRange;
+	rMainLayout.fWaterHeightDarkenTarget = gWaterHeightDarkenTarget.mfCurrent;
+	rMainLayout.fWaterHeightDarkenSource = gWaterHeightDarkenSource.mfCurrent;
+	rMainLayout.fWaterHeightDarkenLighting = gWaterHeightDarkenLighting.mfCurrent;
 
 	// GlobalUniforms folds fLightingWaterSkyboxSunBias into globalLayout.f4WaterBiasedSunNormal.
-	rMainLayout.fLightingWaterSkyboxNormalBlendWave = gLightingWaterSkyboxNormalBlendWave.Get();
-	rMainLayout.fLightingWaterSkyboxIntensity = gLightingWaterSkyboxIntensity.Get();
-	rMainLayout.fLightingWaterSkyboxAdd = gLightingWaterSkyboxAdd.Get();
-	float fSkyboxPowerOne = gLightingWaterSkyboxOnePower.Get();
-	float fSkyboxPowerTwo = gLightingWaterSkyboxTwoPower.Get();
-	float fSkyboxPowerThree = gLightingWaterSkyboxThreePower.Get();
+	rMainLayout.fLightingWaterSkyboxNormalBlendWave = gLightingWaterSkyboxNormalBlendWave.mfCurrent;
+	rMainLayout.fLightingWaterSkyboxIntensity = gLightingWaterSkyboxIntensity.mfCurrent;
+	rMainLayout.fLightingWaterSkyboxAdd = gLightingWaterSkyboxAdd.mfCurrent;
+	float fSkyboxPowerOne = gLightingWaterSkyboxOnePower.mfCurrent;
+	float fSkyboxPowerTwo = gLightingWaterSkyboxTwoPower.mfCurrent;
+	float fSkyboxPowerThree = gLightingWaterSkyboxThreePower.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxOnePower = fSkyboxPowerOne;
-	rMainLayout.fLightingWaterSkyboxTwo = gLightingWaterSkyboxTwo.Get();
+	rMainLayout.fLightingWaterSkyboxTwo = gLightingWaterSkyboxTwo.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxTwoPower = fSkyboxPowerTwo;
-	rMainLayout.fLightingWaterSkyboxThree = gLightingWaterSkyboxThree.Get();
+	rMainLayout.fLightingWaterSkyboxThree = gLightingWaterSkyboxThree.mfCurrent;
 	rMainLayout.fLightingWaterSkyboxThreePower = fSkyboxPowerThree;
-	rMainLayout.fLightingWaterSkyboxOneBeachReduction = gLightingWaterSkyboxOneBeachReduction.Get();
-	rMainLayout.fLightingWaterSkyboxTwoBeachReduction = gLightingWaterSkyboxTwoBeachReduction.Get();
-	rMainLayout.fLightingWaterSkyboxThreeBeachReduction = gLightingWaterSkyboxThreeBeachReduction.Get();
+	rMainLayout.fLightingWaterSkyboxOneBeachReduction = gLightingWaterSkyboxOneBeachReduction.mfCurrent;
+	rMainLayout.fLightingWaterSkyboxTwoBeachReduction = gLightingWaterSkyboxTwoBeachReduction.mfCurrent;
+	rMainLayout.fLightingWaterSkyboxThreeBeachReduction = gLightingWaterSkyboxThreeBeachReduction.mfCurrent;
 	// Per-lobe FilteredPowerLobe constants (Water.frag WATER_SPEC_AA_MODE 2/3): 2/(power+2) and 1/(1+power), xyz = lobes One/Two/Three.
-	rMainLayout.f4WaterSkyboxLobeAlphaSq = {2.0f / (fSkyboxPowerOne + 2.0f), 2.0f / (fSkyboxPowerTwo + 2.0f), 2.0f / (fSkyboxPowerThree + 2.0f), 0.0f};
-	rMainLayout.f4WaterSkyboxLobeOnePlusPowerInv = {1.0f / (1.0f + fSkyboxPowerOne), 1.0f / (1.0f + fSkyboxPowerTwo), 1.0f / (1.0f + fSkyboxPowerThree), 0.0f};
-	rMainLayout.fLightingWaterSkyboxLod = gLightingWaterSkyboxLod.Get();
-	rMainLayout.fWaterSpecAAVariance = gWaterSpecAAVariance.Get();
-	rMainLayout.fWaterSpecAAThreshold = gWaterSpecAAThreshold.Get();
-	rMainLayout.fWaterSpecAAMipScale = gWaterSpecAAMipScale.Get();
-	rMainLayout.fWaterNormalMipBias = gWaterNormalMipBias.Get();
-	// WATER_SPEC_AA_MIP_HANDOFF: per-mip Toksvig variance tables for the three selected octave-group
-	// textures, copied from the header-baked TextureManager tables every frame (30 floats — cheap, and
-	// chevron re-selection then needs no separate invalidation path).
-	std::memcpy(&rMainLayout.pfWaterSpecAAMipVariance[0 * shaders::kiWaterSpecAAMipTableSize], gpTextureManager->mpfWaterNormalMipVariance[gWaterNormalIndexOne.Get<int64_t>()], shaders::kiWaterSpecAAMipTableSize * sizeof(float));
-	std::memcpy(&rMainLayout.pfWaterSpecAAMipVariance[1 * shaders::kiWaterSpecAAMipTableSize], gpTextureManager->mpfWaterNormalMipVariance[gWaterNormalIndexTwo.Get<int64_t>()], shaders::kiWaterSpecAAMipTableSize * sizeof(float));
-	std::memcpy(&rMainLayout.pfWaterSpecAAMipVariance[2 * shaders::kiWaterSpecAAMipTableSize], gpTextureManager->mpfWaterNormalMipVariance[gWaterNormalIndexThree.Get<int64_t>()], shaders::kiWaterSpecAAMipTableSize * sizeof(float));
+	rMainLayout.f4WaterSkyboxLobeAlphaSquared = {2.0f / (fSkyboxPowerOne + 2.0f), 2.0f / (fSkyboxPowerTwo + 2.0f), 2.0f / (fSkyboxPowerThree + 2.0f), 0.0f};
+	rMainLayout.f4WaterSkyboxLobeOnePlusPowerInverse = {1.0f / (1.0f + fSkyboxPowerOne), 1.0f / (1.0f + fSkyboxPowerTwo), 1.0f / (1.0f + fSkyboxPowerThree), 0.0f};
+	rMainLayout.fLightingWaterSkyboxLevelOfDetail = gLightingWaterSkyboxLevelOfDetail.mfCurrent;
+	rMainLayout.fWaterSpecularAntialiasingVariance = gWaterSpecularAntialiasingVariance.mfCurrent;
+	rMainLayout.fWaterSpecularAntialiasingThreshold = gWaterSpecularAntialiasingThreshold.mfCurrent;
+	rMainLayout.fWaterSpecularAntialiasingMipmapScale = gWaterSpecularAntialiasingMipmapScale.mfCurrent;
+	rMainLayout.fWaterNormalMipmapBias = gWaterNormalMipmapBias.mfCurrent;
+	// WATER_SPEC_AA_MIP_HANDOFF uses header-baked Toksvig variance tables for the three selected octave-group textures.
+	// Copying their 30 floats every frame keeps texture selections current without a separate invalidation path.
+	std::memcpy(&rMainLayout.pfWaterSpecularAntialiasingMipmapVariance[0 * shaders::kiWaterSpecularAntialiasingMipTableSize], gpTextureManager->mpfWaterNormalMipVariance[gWaterNormalIndexOne.Get<int64_t>()], shaders::kiWaterSpecularAntialiasingMipTableSize * sizeof(float));
+	std::memcpy(&rMainLayout.pfWaterSpecularAntialiasingMipmapVariance[1 * shaders::kiWaterSpecularAntialiasingMipTableSize], gpTextureManager->mpfWaterNormalMipVariance[gWaterNormalIndexTwo.Get<int64_t>()], shaders::kiWaterSpecularAntialiasingMipTableSize * sizeof(float));
+	std::memcpy(&rMainLayout.pfWaterSpecularAntialiasingMipmapVariance[2 * shaders::kiWaterSpecularAntialiasingMipTableSize], gpTextureManager->mpfWaterNormalMipVariance[gWaterNormalIndexThree.Get<int64_t>()], shaders::kiWaterSpecularAntialiasingMipTableSize * sizeof(float));
 	// Full-detail reference weights for WATER_SPEC_AA_FADE_HANDOFF: the same LerpAtHeight the live
 	// fWaterNormalWeight* uploads above use, evaluated at the near-camera endpoint height.
-	rMainLayout.fWaterNormalWeightFullOne = engine::LerpAtHeight(engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightOneMin.Get(), gLightingSampledNormalsWeightOneMax.Get());
-	rMainLayout.fWaterNormalWeightFullTwo = engine::LerpAtHeight(engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightTwoMin.Get(), gLightingSampledNormalsWeightTwoMax.Get());
-	rMainLayout.fWaterNormalWeightFullThree = engine::LerpAtHeight(engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightThreeMin.Get(), gLightingSampledNormalsWeightThreeMax.Get());
+	rMainLayout.fWaterNormalWeightFullOne = engine::LerpAtHeight(engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightOneMinimum.mfCurrent, gLightingSampledNormalsWeightOneMaximum.mfCurrent);
+	rMainLayout.fWaterNormalWeightFullTwo = engine::LerpAtHeight(engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightTwoMinimum.mfCurrent, gLightingSampledNormalsWeightTwoMaximum.mfCurrent);
+	rMainLayout.fWaterNormalWeightFullThree = engine::LerpAtHeight(engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightThreeMinimum.mfCurrent, gLightingSampledNormalsWeightThreeMaximum.mfCurrent);
 
-	rMainLayout.fLightingWaterReflectedAmount = gLightingWaterReflectedAmount.Get();
-	rMainLayout.fLightingWaterReflectedNormalBlendWave = gLightingWaterReflectedNormalBlendWave.Get();
-	rMainLayout.fLightingWaterReflectedDistortion = gLightingWaterReflectedDistortion.Get();
-	rMainLayout.fLightingWaterReflectedFalloffStart = gLightingWaterReflectedFalloffStart.Get();
-	rMainLayout.fLightingWaterReflectedFalloffPower = gLightingWaterReflectedFalloffPower.Get();
-	rMainLayout.fLightingWaterReflectedFresnel = gLightingWaterReflectedFresnel.Get();
-	rMainLayout.fLightingWaterReflectedIntensity = gLightingWaterReflectedIntensity.Get();
+	rMainLayout.fLightingWaterReflectedAmount = gLightingWaterReflectedAmount.mfCurrent;
+	rMainLayout.fLightingWaterReflectedNormalBlendWave = gLightingWaterReflectedNormalBlendWave.mfCurrent;
+	rMainLayout.fLightingWaterReflectedDistortion = gLightingWaterReflectedDistortion.mfCurrent;
+	rMainLayout.fLightingWaterReflectedFalloffStart = gLightingWaterReflectedFalloffStart.mfCurrent;
+	rMainLayout.fLightingWaterReflectedFalloffPower = gLightingWaterReflectedFalloffPower.mfCurrent;
+	rMainLayout.fLightingWaterReflectedFresnel = gLightingWaterReflectedFresnel.mfCurrent;
+	rMainLayout.fLightingWaterReflectedIntensity = gLightingWaterReflectedIntensity.mfCurrent;
 
-	rMainLayout.fLightingWaterNormalSoften = gLightingWaterNormalSoften.Get();
-	rMainLayout.fLightingWaterNormalBlendWave = gLightingWaterNormalBlendWave.Get();
-	rMainLayout.fLightingWaterIntensity = gLightingWaterIntensity.Get();
-	rMainLayout.fLightingWaterAdd = gLightingWaterAdd.Get();
-	rMainLayout.fLightingWaterOne = gLightingWaterOne.Get();
-	rMainLayout.fLightingWaterOnePower = gLightingWaterOnePower.Get();
-	rMainLayout.fLightingWaterTwo = gLightingWaterTwo.Get();
-	rMainLayout.fLightingWaterTwoPower = gLightingWaterTwoPower.Get();
-	rMainLayout.fLightingWaterThree = gLightingWaterThree.Get();
-	rMainLayout.fLightingWaterThreePower = gLightingWaterThreePower.Get();
-	rMainLayout.fLightingWaterPowerMode = gLightingWaterPowerMode.Get();
+	rMainLayout.fLightingWaterNormalSoften = gLightingWaterNormalSoften.mfCurrent;
+	rMainLayout.fLightingWaterNormalBlendWave = gLightingWaterNormalBlendWave.mfCurrent;
+	rMainLayout.fLightingWaterIntensity = gLightingWaterIntensity.mfCurrent;
+	rMainLayout.fLightingWaterAdd = gLightingWaterAdd.mfCurrent;
+	rMainLayout.fLightingWaterOne = gLightingWaterOne.mfCurrent;
+	rMainLayout.fLightingWaterOnePower = gLightingWaterOnePower.mfCurrent;
+	rMainLayout.fLightingWaterTwo = gLightingWaterTwo.mfCurrent;
+	rMainLayout.fLightingWaterTwoPower = gLightingWaterTwoPower.mfCurrent;
+	rMainLayout.fLightingWaterThree = gLightingWaterThree.mfCurrent;
+	rMainLayout.fLightingWaterThreePower = gLightingWaterThreePower.mfCurrent;
+	rMainLayout.fLightingWaterPowerMode = gLightingWaterPowerMode.mfCurrent;
 
-	rMainLayout.fLightingDirectionalIntensity = gLightingDirectionalIntensity.Get();
-	rMainLayout.fLightingDirectionalPower = gLightingDirectionalPower.Get();
-	rMainLayout.fLightingDirectionalPowerMode = gLightingDirectionalPowerMode.Get();
-	rMainLayout.fLightingAmbientIntensity = gLightingAmbientIntensity.Get();
-	rMainLayout.fLightingAmbientPower = gLightingAmbientPower.Get();
-	rMainLayout.fLightingAmbientPowerMode = gLightingAmbientPowerMode.Get();
-	rMainLayout.fLightingWaterEwnsPow = gLightingWaterEwnsPow.Get();
-	rMainLayout.fLightingWaterEwnsPowMode = gLightingWaterEwnsPowMode.Get();
-	rMainLayout.fLightingWaterAmbientIntensity = gLightingWaterAmbientIntensity.Get();
-	rMainLayout.fLightingWaterAmbientPower = gLightingWaterAmbientPower.Get();
-	rMainLayout.fLightingWaterAmbientPowerMode = gLightingWaterAmbientPowerMode.Get();
-	rMainLayout.fLightingTerrainBelowBaseMultiplier = gLightingTerrainBelowBaseMultiplier.Get();
-	rMainLayout.fLightingTerrainBelowBasePower = gLightingTerrainBelowBasePower.Get();
+	rMainLayout.fLightingDirectionalIntensity = gLightingDirectionalIntensity.mfCurrent;
+	rMainLayout.fLightingDirectionalPower = gLightingDirectionalPower.mfCurrent;
+	rMainLayout.fLightingDirectionalPowerMode = gLightingDirectionalPowerMode.mfCurrent;
+	rMainLayout.fLightingAmbientIntensity = gLightingAmbientIntensity.mfCurrent;
+	rMainLayout.fLightingAmbientPower = gLightingAmbientPower.mfCurrent;
+	rMainLayout.fLightingAmbientPowerMode = gLightingAmbientPowerMode.mfCurrent;
+	rMainLayout.fLightingWaterEastWestNorthSouthPower = gLightingWaterEastWestNorthSouthPower.mfCurrent;
+	rMainLayout.fLightingWaterEastWestNorthSouthPowerMode = gLightingWaterEastWestNorthSouthPowerMode.mfCurrent;
+	rMainLayout.fLightingWaterAmbientIntensity = gLightingWaterAmbientIntensity.mfCurrent;
+	rMainLayout.fLightingWaterAmbientPower = gLightingWaterAmbientPower.mfCurrent;
+	rMainLayout.fLightingWaterAmbientPowerMode = gLightingWaterAmbientPowerMode.mfCurrent;
+	rMainLayout.fLightingTerrainBelowBaseMultiplier = gLightingTerrainBelowBaseMultiplier.mfCurrent;
+	rMainLayout.fLightingTerrainBelowBasePower = gLightingTerrainBelowBasePower.mfCurrent;
 
-	// Pbr
-	rMainLayout.fPbrExposure = gPbrExposure.Get();
-	rMainLayout.fPbrGammaInv = 1.0f / gPbrGamma.Get();
-	rMainLayout.fColorGradingSaturation = gColorGradingSaturation.Get();
-	rMainLayout.fColorGradingContrast = gColorGradingContrast.Get();
-	rMainLayout.fColorGradingTemperature = gColorGradingTemperature.Get();
-	rMainLayout.fPbrDayBrightness = gPbrDayBrightness.Get();
-	rMainLayout.fPbrAmbient = gPbrIblAmbient.Get();
+	rMainLayout.fPhysicallyBasedRenderingExposure = gPhysicallyBasedRenderingExposure.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingGammaInverse = 1.0f / gPhysicallyBasedRenderingGamma.mfCurrent;
+	rMainLayout.fColorGradingSaturation = gColorGradingSaturation.mfCurrent;
+	rMainLayout.fColorGradingContrast = gColorGradingContrast.mfCurrent;
+	rMainLayout.fColorGradingTemperature = gColorGradingTemperature.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingDayBrightness = gPhysicallyBasedRenderingDayBrightness.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingAmbient = gPhysicallyBasedRenderingImageBasedLightingAmbient.mfCurrent;
 
-	rMainLayout.fPbrMipCount = static_cast<float>(gpTextureManager->mTextureCache.miPbrCubeMipCount);
-	rMainLayout.fPbrSmoke = gPbrSmoke.Get();
+	rMainLayout.fPhysicallyBasedRenderingMipmapCount = static_cast<float>(gpTextureManager->mTextureCache.miPhysicallyBasedRenderingCubeMipmapCount);
+	rMainLayout.fPhysicallyBasedRenderingSmoke = gPhysicallyBasedRenderingSmoke.mfCurrent;
 
-	rMainLayout.fPbrBrdfDiffuse = gPbrBrdfDiffuse.Get();
-	rMainLayout.fPbrBrdfDiffusePower = gPbrBrdfDiffusePower.Get();
-	rMainLayout.fPbrBrdfSpecular = gPbrBrdfSpecular.Get();
-	rMainLayout.fPbrBrdfSpecularPower = gPbrBrdfSpecularPower.Get();
-	rMainLayout.fPbrIblDiffuse = gPbrIblDiffuse.Get();
-	rMainLayout.fPbrIblDiffusePower = gPbrIblDiffusePower.Get();
-	rMainLayout.fPbrIblSpecular = gPbrIblSpecular.Get();
-	rMainLayout.fPbrIblSpecularPower = gPbrIblSpecularPower.Get();
-	rMainLayout.fPbrSun = gPbrSun.Get();
-	rMainLayout.fPbrLighting = gPbrLighting.Get();
-	rMainLayout.fPbrLightingPower = gPbrLightingPower.Get();
-	rMainLayout.fPbrLightingSpecular = gPbrLightingSpecular.Get();
-	rMainLayout.fPbrLightingSpecularPower = gPbrLightingSpecularPower.Get();
-	rMainLayout.fPbrEmissive = gPbrEmissive.Get();
-	rMainLayout.fPbrIblShadowBlend = gPbrIblShadowBlend.Get();
-	rMainLayout.fPbrIblAmbientColorBlend = gPbrIblAmbientColorBlend.Get();
-	rMainLayout.fPbrShadowFloor = gPbrShadowFloor.Get();
-	rMainLayout.fPbrCubemapLodPower = gPbrCubemapLodPower.Get();
-	rMainLayout.fPbrCubemapLodOffset = gPbrCubemapLodOffset.Get();
+	rMainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse = gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower = gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular = gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower = gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingDiffuse = gPhysicallyBasedRenderingImageBasedLightingDiffuse.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingDiffusePower = gPhysicallyBasedRenderingImageBasedLightingDiffusePower.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingSpecular = gPhysicallyBasedRenderingImageBasedLightingSpecular.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingSpecularPower = gPhysicallyBasedRenderingImageBasedLightingSpecularPower.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingSun = gPhysicallyBasedRenderingSun.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingLighting = gPhysicallyBasedRenderingLighting.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingLightingPower = gPhysicallyBasedRenderingLightingPower.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingLightingSpecular = gPhysicallyBasedRenderingLightingSpecular.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingLightingSpecularPower = gPhysicallyBasedRenderingLightingSpecularPower.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingEmissive = gPhysicallyBasedRenderingEmissive.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingShadowBlend = gPhysicallyBasedRenderingImageBasedLightingShadowBlend.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingImageBasedLightingAmbientColorBlend = gPhysicallyBasedRenderingImageBasedLightingAmbientColorBlend.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingShadowFloor = gPhysicallyBasedRenderingShadowFloor.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingCubemapLevelOfDetailPower = gPhysicallyBasedRenderingCubemapLevelOfDetailPower.mfCurrent;
+	rMainLayout.fPhysicallyBasedRenderingCubemapLevelOfDetailOffset = gPhysicallyBasedRenderingCubemapLevelOfDetailOffset.mfCurrent;
 
-	// Smoke shadow
-	rMainLayout.fSmokeShadowIntensity = gSmokeShadowIntensity.Get();
+	rMainLayout.fSmokeShadowIntensity = gSmokeShadowIntensity.mfCurrent;
 }
 
 void RenderLightingSpreadIndirect(int64_t iCommandBuffer)
@@ -404,22 +396,17 @@ void RenderLightingSpreadIndirect(int64_t iCommandBuffer)
 	// attachment clears already provide its zero inputs, so no spread draw is needed.
 	int64_t iInstanceCount = sbLightingRefreshFrame && gLightingEnabled.Get<bool>() ? 1 : 0;
 
-	// All kiMaxSpreadPasses pipelines, not just the gSpreadPassCount active ones. Which passes the Main CB
-	// actually draws is decided at record time, and the slots come back zeroed from every pipeline recreate
-	// (PipelineCreator::CreateHostVisibleIndirectBuffer), so any pass left unwritten here would draw zero
-	// instances and black out lighting. Writing the full array keeps this loop independent of the recorded
-	// pass count — 40 stores, no reason to make it conditional.
-	// Only the current framebuffer's slot (WriteIndirectBuffer indexes by iCommandBuffer), never all
-	// miIndirectSlotCount slots: the others belong to frames still in flight on the GPU, and that
-	// per-framebuffer slot indexing is what makes this host-visible write race-free.
-	for (int64_t iPass = 0; iPass < shaders::kiMaxSpreadPasses; ++iPass)
+	// Update all kiMaxSpreadPasses pipelines because the recorded Main command buffer selects the active passes.
+	// CreateHostVisibleIndirectBuffer zeroes slots during pipeline recreation, so recorded passes need their instance counts restored.
+	// Write only iCommandBuffer's framebuffer slot; the other slots may still be in use by the GPU.
+	for (int64_t i = 0; i < shaders::kiMaxSpreadPasses; ++i)
 	{
-		gpPipelineManager->mSpreadPipelines[iPass].WriteIndirectBuffer(iCommandBuffer, iInstanceCount);
+		gpPipelineManager->mSpreadPipelines[i].WriteIndirectBuffer(iCommandBuffer, iInstanceCount);
 	}
 
 	// The combine-sized chain covers the whole texture; the refresh predicate suppresses it by zeroing the Z group
 	// count, so a skip dispatches nothing without re-recording the Main CB.
-	VkExtent3D vkCombineExtent = gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.extent;
+	VkExtent3D vkCombineExtent = gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.vkExtent3D;
 	int64_t iCombineGroupsX = TileCount(vkCombineExtent.width);
 	int64_t iCombineGroupsY = TileCount(vkCombineExtent.height);
 	int64_t iCombineGroupsZ = sbLightingRefreshFrame ? 1 : 0;

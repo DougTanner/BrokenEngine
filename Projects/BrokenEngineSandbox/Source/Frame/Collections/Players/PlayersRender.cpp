@@ -1,6 +1,8 @@
 #if defined(BT_CLIENT)
 
 #include "Data/Scene.h"
+
+#include "File/PackChunks.h"
 #include "Graphics/Debug/DebugRender.h"
 #include "Ui/WrapperBase.h"
 
@@ -153,7 +155,7 @@ static void XM_CALLCONV RenderNavigation(const PlayersInterpolate& __restrict rP
 		XMFLOAT3A f3NavStart {};
 		XMFLOAT3A f3NavEnd {};
 		XMStoreFloat3A(&f3NavStart, engine::Rebase(rBasis, vecPosition));
-		XMStoreFloat3A(&f3NavEnd, engine::Rebase(rBasis, XMVectorSetZ(vecWaypoint, engine::gBaseHeight.Get())));
+		XMStoreFloat3A(&f3NavEnd, engine::Rebase(rBasis, XMVectorSetZ(vecWaypoint, engine::gBaseHeight.mfCurrent)));
 		engine::DebugRender::Line(f3NavStart, f3NavEnd, {0.0f, 1.0f, 0.0f, 1.0f});
 		engine::DebugRender::Circle(f3NavEnd, kfPlayerRadius * 0.5f, {0.0f, 1.0f, 0.0f, 1.0f});
 	}
@@ -165,14 +167,14 @@ static void XM_CALLCONV RenderNavigation(const PlayersInterpolate& __restrict rP
 		{
 			// Flagship follow: use the flagship's interpolated position
 			XMFLOAT3A f3Dest {};
-			XMStoreFloat3A(&f3Dest, engine::Rebase(rBasis, XMVectorSetZ(vecFlagshipPosition, engine::gBaseHeight.Get())));
+			XMStoreFloat3A(&f3Dest, engine::Rebase(rBasis, XMVectorSetZ(vecFlagshipPosition, engine::gBaseHeight.mfCurrent)));
 			engine::DebugRender::Circle(f3Dest, kfPlayerRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
 		}
 	}
 	else if (XMVectorGetW(rPostRender.pVecIslandDestinations[i]) > 0.0f)
 	{
 		XMFLOAT3A f3Dest {};
-		XMStoreFloat3A(&f3Dest, engine::Rebase(rBasis, XMVectorSetZ(rPostRender.pVecIslandDestinations[i], engine::gBaseHeight.Get())));
+		XMStoreFloat3A(&f3Dest, engine::Rebase(rBasis, XMVectorSetZ(rPostRender.pVecIslandDestinations[i], engine::gBaseHeight.mfCurrent)));
 		engine::DebugRender::Circle(f3Dest, kfPlayerRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
 	}
 }
@@ -201,7 +203,7 @@ void PlayersInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, co
 
 	VkDeviceSize requiredSize = iTotalCount * sizeof(shaders::ModelLayout);
 	engine::Buffer& rBuffer = engine::gpBufferManager->mDynamicStorageBuffers[engine::kBufferMain].at(kCrc).at(iCommandBuffer);
-	if (rBuffer.mInfo.dataVkDeviceSize < requiredSize)
+	if (rBuffer.mInfo.vkDataSize < requiredSize)
 	{
 		engine::gpBufferManager->ResizeDynamicBuffer(kCrc, engine::kBufferMain, kName, requiredSize, iCommandBuffer);
 		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, &rBuffer);
@@ -261,7 +263,7 @@ void PlayersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpo
 		if (engine::gAnimationDataMap.contains(kPlayerModel))
 		{
 			const engine::AnimationData& rAnimationData = engine::gAnimationDataMap.at(kPlayerModel);
-			const engine::EagerChunk& rChunk = engine::gpFileManager->GetEagerChunkMap().at(kPlayerModel);
+			const engine::EagerChunk& rChunk = engine::gpFileManager->mpPackChunks->GetEagerChunkMap().at(kPlayerModel);
 			uint32_t uiMaterialCount = rChunk.pHeader->sceneHeader.uiMaterialCount;
 
 			// Allocate mesh data region
@@ -281,7 +283,7 @@ void PlayersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpo
 			common::JointMatrix* pJointMatrices = reinterpret_cast<common::JointMatrix*>(engine::gpBufferManager->mJointMatrixStorageBuffers.at(iCommandBuffer).mpMappedMemory);
 
 			// Evaluate animation for all materials
-			rAnimationData.EvaluateAnimation(0, rCurrent.pfAnimationTimes[i], uiMaterialCount, pMeshData, pJointMatrices, iJointMatrixOffset);
+			rAnimationData.EvaluateAnimation(0, rCurrent.pfAnimationTimes[i], std::span(pMeshData, static_cast<size_t>(uiMaterialCount)), pJointMatrices, iJointMatrixOffset);
 		}
 
 		++siRendered;

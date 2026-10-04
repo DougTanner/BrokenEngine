@@ -65,12 +65,12 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 			{
 				continue;
 			}
-			if (!gpGame->mCoordFrames.contains(rFlagship.coord))
+			if (!gpGame->mCoordinateFrames.contains(rFlagship.coord))
 			{
 				continue;
 			}
 
-			const PlayersPostRender& rPlayers = *gpGame->CurrentFrame(rFlagship.coord).postRender.pPlayers;
+			const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(rFlagship.coord).pCurrent).postRender.pPlayers;
 			bool bFoundFlagship = false;
 			int8_t iFlagshipNavDirection = -1;
 			for (int64_t k = 0; k < rPlayers.iCount; ++k)
@@ -149,12 +149,12 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 			{
 				continue;
 			}
-			if (!gpGame->mCoordFrames.contains(memberCoord))
+			if (!gpGame->mCoordinateFrames.contains(memberCoord))
 			{
 				continue;
 			}
 
-			const PlayersPostRender& rPlayers = *gpGame->CurrentFrame(memberCoord).postRender.pPlayers;
+			const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(memberCoord).pCurrent).postRender.pPlayers;
 			for (int64_t k = 0; k < rPlayers.iCount; ++k)
 			{
 				if (rPlayers.pGlobalPlayerIds[k] == rMember.globalPlayerId)

@@ -5,10 +5,10 @@
 namespace engine
 {
 
-void ServerUpdateDisplayStats();
+void ServerUpdateDisplayStatistics();
 bool ServerDisplayContentChanged();
-void PaintServerDisplay(HWND hWnd);
-void HandleServerClick(HWND hWnd, int64_t iX, int64_t iY);
+void PaintServerDisplay(HWND hWindow);
+void HandleServerClick(HWND hWindow, int64_t iX, int64_t iY);
 
 } // namespace engine
 

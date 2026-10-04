@@ -14,11 +14,11 @@ enum class Language : int32_t
 	kGerman = 5,
 };
 
-inline constexpr int64_t kLanguageCount = 6;
+inline constexpr int64_t kiLanguageCount = 6;
 
 struct LanguageOption
 {
-	Language eLanguage;
+	Language eLanguage = Language::kEnglish;
 	const char* pcLabel = nullptr;
 };
 
@@ -32,7 +32,7 @@ inline constexpr LanguageOption kLanguageOptions[]
 	{.eLanguage = Language::kFrench, .pcLabel = "FRANCAIS"},
 	{.eLanguage = Language::kGerman, .pcLabel = "DEUTSCH"},
 };
-static_assert(std::size(kLanguageOptions) == static_cast<size_t>(kLanguageCount));
+static_assert(std::size(kLanguageOptions) == static_cast<size_t>(kiLanguageCount));
 
 inline Language geLanguage = Language::kEnglish;
 

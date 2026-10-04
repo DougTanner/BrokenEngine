@@ -55,8 +55,11 @@ public:
 
 		DWORD uiObjectLength = 0;
 		DWORD uiResultLength = 0;
-		if (::BCryptGetProperty(mpAlgorithm, BCRYPT_OBJECT_LENGTH, reinterpret_cast<PUCHAR>(&uiObjectLength), sizeof(uiObjectLength), &uiResultLength, 0) < 0
-		 || uiResultLength != sizeof(uiObjectLength))
+		if (::BCryptGetProperty(mpAlgorithm, BCRYPT_OBJECT_LENGTH, reinterpret_cast<PUCHAR>(&uiObjectLength), sizeof(uiObjectLength), &uiResultLength, 0) < 0)
+		{
+			return;
+		}
+		if (uiResultLength != sizeof(uiObjectLength))
 		{
 			return;
 		}
@@ -85,9 +88,9 @@ public:
 
 	bool Update(std::span<const std::byte> bytes)
 	{
-		return mbValid && bytes.size() <= std::numeric_limits<ULONG>::max() &&
+		return mbValid && bytes.size() <= std::numeric_limits<ULONG>::max()
 #pragma warning(suppress: 26492) // CNG pbInput is SAL input-only and documented not modified.
-			(bytes.empty() || ::BCryptHashData(mpHash, reinterpret_cast<PUCHAR>(const_cast<std::byte*>(bytes.data())), static_cast<ULONG>(bytes.size()), 0) >= 0);
+		    && (bytes.empty() || ::BCryptHashData(mpHash, reinterpret_cast<PUCHAR>(const_cast<std::byte*>(bytes.data())), static_cast<ULONG>(bytes.size()), 0) >= 0);
 	}
 
 	bool Finish(std::array<uint8_t, 32>& rDigest)
@@ -107,33 +110,25 @@ class FileHandle
 {
 public:
 
-	explicit FileHandle(HANDLE hFile)
-		: mhFile(hFile)
+	explicit FileHandle(HANDLE pFile)
+		: mpFile(pFile)
 	{
 	}
 	~FileHandle()
 	{
-		if (mhFile != INVALID_HANDLE_VALUE)
+		if (mpFile != INVALID_HANDLE_VALUE)
 		{
-			::CloseHandle(mhFile);
+			::CloseHandle(mpFile);
 		}
 	}
 
-	HANDLE Get() const
-	{
-		return mhFile;
-	}
-
-private:
-
-	HANDLE mhFile = INVALID_HANDLE_VALUE;
+	HANDLE mpFile = INVALID_HANDLE_VALUE;
 };
 
 FileManager::FileManager()
 {
 	ASSERT(gpFileManager == nullptr);
 
-	// Get Windows AppData directory and append game name
 	if (!gLaunchOptions.appDataDirectory.empty())
 	{
 		mAppDataDirectory = gLaunchOptions.appDataDirectory;
@@ -142,15 +137,15 @@ FileManager::FileManager()
 	else
 	{
 		PWSTR pWideChar = nullptr;
-		HRESULT hresult = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pWideChar);
-		if (SUCCEEDED(hresult) && pWideChar != nullptr)
+		HRESULT iHresult = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pWideChar);
+		if (SUCCEEDED(iHresult) && pWideChar != nullptr)
 		{
 			mAppDataDirectory = pWideChar;
 		}
 		else
 		{
 			// OS failure (trust boundary): leave mAppDataDirectory empty so the append below yields a working-directory-relative path instead of constructing a std::filesystem::path from null.
-			LOG(kLoading, kError, "SHGetKnownFolderPath(FOLDERID_RoamingAppData) failed (hresult {}); falling back to a working-directory-relative AppData path", static_cast<int32_t>(hresult));
+			LOG(kLoading, kError, "SHGetKnownFolderPath(FOLDERID_RoamingAppData) failed (hresult {}); falling back to a working-directory-relative AppData path", static_cast<int32_t>(iHresult));
 		}
 		CoTaskMemFree(pWideChar);
 	}
@@ -163,7 +158,6 @@ FileManager::FileManager()
 	}
 	LOG(kLoading, kDebug, "AppData directory: \"{}\"", mAppDataDirectory.string());
 
-	// Get Windows temp directory and append game name
 	wchar_t pcDirectory[MAX_PATH] {};
 	GetTempPathW(static_cast<DWORD>(std::size(pcDirectory) - 1), pcDirectory);
 	mTempDirectory = pcDirectory;
@@ -207,11 +201,6 @@ FileManager::~FileManager()
 	{
 		gpFileManager = nullptr;
 	}
-}
-
-bool FileManager::Exists(const FileFlags_t& rFlags, const std::filesystem::path& rFilename)
-{
-	return std::filesystem::exists(GetFilePath(rFlags, rFilename));
 }
 
 std::filesystem::path FileManager::GetFilePath(const FileFlags_t& rFlags, const std::filesystem::path& rFilename)
@@ -272,18 +261,18 @@ void FileManager::BackupExistingFile(const FileFlags_t& rFlags, const std::files
 
 	std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
 	std::time_t time = std::chrono::system_clock::to_time_t(now);
-	int64_t iEpochMs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+	int64_t iEpochMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
 	std::tm timeStruct = *std::localtime(&time);
 	std::ostringstream timeStringStream;
-	timeStringStream << "-" << std::put_time(&timeStruct, "%Y-%m-%d") << "-" << iEpochMs;
+	timeStringStream << "-" << std::put_time(&timeStruct, "%Y-%m-%d") << "-" << iEpochMilliseconds;
 	std::filesystem::path backupFile = file.parent_path() / (file.stem().string() + timeStringStream.str() + file.extension().string());
 
-	std::error_code copyEc;
-	std::filesystem::copy_file(file, backupFile, copyEc);
-	if (copyEc)
+	std::error_code copyErrorCode;
+	std::filesystem::copy_file(file, backupFile, copyErrorCode);
+	if (copyErrorCode)
 	{
 		// OS trust boundary (disk full, permissions, antivirus): the atomic write of the main file is unaffected, so continue without the backup
-		LOG(kLoading, kError, "Backup copy to \"{}\" failed: {}", backupFile, copyEc.value());
+		LOG(kLoading, kError, "Backup copy to \"{}\" failed: {}", backupFile, copyErrorCode.value());
 		DEBUG_BREAK();
 	}
 }
@@ -326,13 +315,17 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 	}
 
 	FileHandle file(::CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_SEQUENTIAL_SCAN, nullptr));
-	if (file.Get() == INVALID_HANDLE_VALUE)
+	if (file.mpFile == INVALID_HANDLE_VALUE)
 	{
 		return false;
 	}
 
 	BY_HANDLE_FILE_INFORMATION information {};
-	if (::GetFileInformationByHandle(file.Get(), &information) == FALSE || (information.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) != 0)
+	if (::GetFileInformationByHandle(file.mpFile, &information) == FALSE)
+	{
+		return false;
+	}
+	if ((information.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) != 0)
 	{
 		return false;
 	}
@@ -344,9 +337,19 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 	for (;;)
 	{
 		DWORD uiBytesRead = 0;
-		if (::ReadFile(file.Get(), buffer.data(), static_cast<DWORD>(buffer.size()), &uiBytesRead, nullptr) == FALSE
-		 || uiBytesRead > buffer.size() || iByteCount > std::numeric_limits<int64_t>::max() - static_cast<int64_t>(uiBytesRead)
-		 || !hasher.Update(std::span<const std::byte>(buffer.data(), uiBytesRead)))
+		if (::ReadFile(file.mpFile, buffer.data(), static_cast<DWORD>(buffer.size()), &uiBytesRead, nullptr) == FALSE)
+		{
+			return false;
+		}
+		if (uiBytesRead > buffer.size())
+		{
+			return false;
+		}
+		if (iByteCount > std::numeric_limits<int64_t>::max() - static_cast<int64_t>(uiBytesRead))
+		{
+			return false;
+		}
+		if (!hasher.Update(std::span<const std::byte>(buffer.data(), uiBytesRead)))
 		{
 			return false;
 		}
@@ -368,26 +371,26 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 
 bool FileManager::CommitAtomicWrite(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, bool bWriteSucceeded)
 {
-	std::filesystem::path tmpFilename = rFilename;
-	tmpFilename += ".tmp";
-	std::filesystem::path tmpPath = GetFilePath(rFlags, tmpFilename);
-	std::filesystem::path destPath = GetFilePath(rFlags, rFilename);
+	std::filesystem::path temporaryFilename = rFilename;
+	temporaryFilename += ".tmp";
+	std::filesystem::path temporaryPath = GetFilePath(rFlags, temporaryFilename);
+	std::filesystem::path destinationPath = GetFilePath(rFlags, rFilename);
 
 	if (!bWriteSucceeded)
 	{
 		LOG(kLoading, kError, "WriteFileAtomically stream bad after lambda for \"{}\"", rFilename.string());
-		std::error_code removeEc;
-		std::filesystem::remove(tmpPath, removeEc);
+		std::error_code removeErrorCode;
+		std::filesystem::remove(temporaryPath, removeErrorCode);
 		return false;
 	}
 
-	std::error_code renameEc;
-	std::filesystem::rename(tmpPath, destPath, renameEc);
-	if (renameEc)
+	std::error_code renameErrorCode;
+	std::filesystem::rename(temporaryPath, destinationPath, renameErrorCode);
+	if (renameErrorCode)
 	{
-		LOG(kLoading, kError, "WriteFileAtomically rename failed for \"{}\": {}", rFilename.string(), renameEc.message());
-		std::error_code removeEc;
-		std::filesystem::remove(tmpPath, removeEc);
+		LOG(kLoading, kError, "WriteFileAtomically rename failed for \"{}\": {}", rFilename.string(), renameErrorCode.message());
+		std::error_code removeErrorCode;
+		std::filesystem::remove(temporaryPath, removeErrorCode);
 		return false;
 	}
 
@@ -395,115 +398,5 @@ bool FileManager::CommitAtomicWrite(const FileFlags_t& rFlags, const std::filesy
 	return true;
 }
 
-// The packed-asset chunk API forwards to the owned PackChunks engine.
-const std::unordered_map<common::crc_t, EagerChunk>& FileManager::GetEagerChunkMap() const
-{
-	return mpPackChunks->GetEagerChunkMap();
-}
-
-const std::unordered_map<common::crc_t, LazyChunk>& FileManager::GetLazyChunkMap() const
-{
-	return mpPackChunks->GetLazyChunkMap();
-}
-
-common::crc_t FileManager::GetPackIntegrityToken() const
-{
-	return mpPackChunks->GetPackIntegrityToken();
-}
-
-bool FileManager::IsChunkReady(common::crc_t crc) const
-{
-	return mpPackChunks->IsChunkReady(crc);
-}
-
-void FileManager::RequestChunkLoad(std::span<const common::crc_t> crcs, LoadPriority ePriority)
-{
-	mpPackChunks->RequestChunkLoad(crcs, ePriority);
-}
-
-void FileManager::WaitForChunks(std::span<const common::crc_t> crcs)
-{
-	mpPackChunks->WaitForChunks(crcs);
-}
-
-bool FileManager::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer)
-{
-	return mpPackChunks->ReadChunkData(crc, uiOffset, buffer);
-}
-
-#if defined(BT_CLIENT)
-
-ChunkReadResult FileManager::TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer)
-{
-	return mpPackChunks->TryReadChunkData(rRequest, crc, uiOffset, buffer);
-}
-
-
-#endif // BT_CLIENT
-
-void FileManager::NotifyChunkCompletion()
-{
-	mpPackChunks->NotifyChunkCompletion();
-}
-
-LazyChunk& FileManager::GetLazyChunk(common::crc_t crc)
-{
-	return mpPackChunks->GetLazyChunk(crc);
-}
-
-void FileManager::WaitForLoadersIdle()
-{
-	mpPackChunks->WaitForLoadersIdle();
-}
-
-void FileManager::ResetTextureChunkStates()
-{
-	mpPackChunks->ResetTextureChunkStates();
-}
-
-void FileManager::ResetTextureChunkStates(std::span<const common::crc_t> targetCrcs)
-{
-	mpPackChunks->ResetTextureChunkStates(targetCrcs);
-}
-
-void FileManager::DecommitChunkRange(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength)
-{
-	mpPackChunks->DecommitChunkRange(crc, uiOffset, uiLength);
-}
-
-bool FileManager::RecommitAndReloadChunkRange(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength)
-{
-	return mpPackChunks->RecommitAndReloadChunkRange(crc, uiOffset, uiLength);
-}
-
-void FileManager::RequestChunkRangeReload(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, LoadPriority ePriority)
-{
-	mpPackChunks->RequestChunkRangeReload(crc, uiOffset, uiLength, ePriority);
-}
-
-ChunkRangeReloadState FileManager::GetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength) const
-{
-	return mpPackChunks->GetChunkRangeReloadState(crc, uiOffset, uiLength);
-}
-
-void FileManager::ResetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength)
-{
-	mpPackChunks->ResetChunkRangeReloadState(crc, uiOffset, uiLength);
-}
-
-MemoryStats FileManager::GetEagerStats() const
-{
-	return mpPackChunks->GetEagerStats();
-}
-
-MemoryStats FileManager::GetLazyStats() const
-{
-	return mpPackChunks->GetLazyStats();
-}
-
-MemoryStats FileManager::GetMemoryStats(data::DataTypes eDataType) const
-{
-	return mpPackChunks->GetMemoryStats(eDataType);
-}
 
 } // namespace engine

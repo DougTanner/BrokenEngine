@@ -23,7 +23,6 @@ WaterNormalSamplingResult SampleWaterNormals()
 {
 	WaterNormalSamplingResult result;
 
-	// Normal map sampling with precision-safe UV computation
 	result.fSizeOne = mainLayout.fLightingSampledNormalsOneSize;
 	result.fSizeTwo = mainLayout.fLightingSampledNormalsTwoSize;
 	result.fSizeThree = mainLayout.fLightingSampledNormalsThreeSize;
@@ -60,7 +59,6 @@ WaterNormalSamplingResult SampleWaterNormals()
 		f3Accum += DecodeNormal(textureGrad(sampler, fract(f2UV), f2Dx, f2Dy).rg); \
 	}
 
-	// Sample One (3 octaves) — atlas index selected at runtime via uiWaterNormalIndexOne.
 	vec3 f3SampledNormalOne = vec3(0.0f);
 	if (result.fWeightOne > 0.0f)
 	{
@@ -74,7 +72,6 @@ WaterNormalSamplingResult SampleWaterNormals()
 		f3SampledNormalOne.xy = m2NormalRotOne * f3SampledNormalOne.xy;
 	}
 
-	// Sample Two (3 octaves)
 	vec3 f3SampledNormalTwo = vec3(0.0f);
 	if (result.fWeightTwo > 0.0f)
 	{
@@ -88,7 +85,6 @@ WaterNormalSamplingResult SampleWaterNormals()
 		f3SampledNormalTwo.xy = m2NormalRotTwo * f3SampledNormalTwo.xy;
 	}
 
-	// Sample Three (3 octaves) — extends the One/Two octave pattern linearly.
 	vec3 f3SampledNormalThree = vec3(0.0f);
 	if (result.fWeightThree > 0.0f)
 	{

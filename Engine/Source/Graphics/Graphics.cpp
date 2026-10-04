@@ -2,6 +2,7 @@
 
 #include "Graphics.h"
 
+#include "File/PackChunks.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/PbrWrappersBase.h"
@@ -37,8 +38,8 @@ static constexpr int64_t SnapToDetailBlock(int64_t iExtent)
 
 std::tuple<int64_t, int64_t> FullDetail()
 {
-	int64_t iX = SnapToDetailBlock(gpGraphics->mFramebufferExtent2D.width);
-	int64_t iY = SnapToDetailBlock(gpGraphics->mFramebufferExtent2D.height);
+	int64_t iX = SnapToDetailBlock(gpGraphics->mFramebufferVkExtent2D.width);
+	int64_t iY = SnapToDetailBlock(gpGraphics->mFramebufferVkExtent2D.height);
 
 	static int64_t siX = 0;
 	static int64_t siY = 0;
@@ -66,15 +67,15 @@ std::tuple<int64_t, int64_t> WaterFullDetail()
 
 float SmokeSimulationPixels()
 {
-	float fPixels = static_cast<float>(gpGraphics->mFramebufferExtent2D.width);
-	return (fPixels / static_cast<float>(kiReferenceWidth)) * kfSmokeReferencePixels * gSmokeSimulationPixels.Get();
+	float fPixels = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
+	return (fPixels / static_cast<float>(kiReferenceWidth)) * kfSmokeReferencePixels * gSmokeSimulationPixels.mfCurrent;
 }
 
 float SmokeSimulationPixelsY()
 {
 	// Floor to a multiple of kiComputeTileSize so uiSmokeTilesY divides evenly
-	float fWidth = static_cast<float>(gpGraphics->mFramebufferExtent2D.width);
-	float fHeight = static_cast<float>(gpGraphics->mFramebufferExtent2D.height);
+	float fWidth = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
+	float fHeight = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	float fY = SmokeSimulationPixels() * (fHeight / fWidth);
 	return std::floor(fY / static_cast<float>(shaders::kiComputeTileSize)) * static_cast<float>(shaders::kiComputeTileSize);
 }
@@ -87,7 +88,7 @@ static void CheckVulkan12Support()
 	{
 		LOG(kGraphics, kError, "Vulkan 1.2 required; vkEnumerateInstanceVersion is unavailable (Vulkan 1.0 driver)");
 
-		if (!AgentLaunched())
+		if ((gLaunchOptions.iAgentPort == 0))
 		{
 			MessageBox(nullptr, "Vulkan 1.2 or higher is required.\n\nYour graphics driver only supports Vulkan 1.0.", game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 		}
@@ -111,7 +112,7 @@ static void CheckVulkan12Support()
 		errorMessage += std::to_string(uiMinor);
 		errorMessage += ".";
 
-		if (!AgentLaunched())
+		if ((gLaunchOptions.iAgentPort == 0))
 		{
 			MessageBox(nullptr, errorMessage.c_str(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 		}
@@ -120,10 +121,10 @@ static void CheckVulkan12Support()
 	}
 }
 
-Graphics::Graphics(HINSTANCE hinstance, HWND hwnd)
-: mHinstance(hinstance)
-, mHwnd(hwnd)
+Graphics::Graphics(HINSTANCE instanceHandle, HWND windowHandle)
 {
+	mInstanceHandle = instanceHandle;
+	mWindowHandle = windowHandle;
 	ASSERT(gpGraphics == nullptr);
 
 	gpGraphics = this;
@@ -143,11 +144,11 @@ Graphics::Graphics(HINSTANCE hinstance, HWND hwnd)
 	DISPLAY_DEVICE displayDevice {.cb = sizeof(DISPLAY_DEVICE)};
 	while (EnumDisplayDevices(nullptr, static_cast<DWORD>(iDevices++), &displayDevice, EDD_GET_DEVICE_INTERFACE_NAME) == TRUE)
 	{
-		DEVMODEA devmodea {};
-		if ((displayDevice.StateFlags & DISPLAY_DEVICE_ACTIVE) != 0 && EnumDisplaySettings(displayDevice.DeviceName, ENUM_CURRENT_SETTINGS, &devmodea) == TRUE)
+		DEVMODEA displayMode {};
+		if ((displayDevice.StateFlags & DISPLAY_DEVICE_ACTIVE) != 0 && EnumDisplaySettings(displayDevice.DeviceName, ENUM_CURRENT_SETTINGS, &displayMode) == TRUE)
 		{
-			LOG(kGraphics, kDebug, "Active display device \"{}\" has frequency of {} Hz", displayDevice.DeviceName, devmodea.dmDisplayFrequency);
-			miMonitorRefreshRate = devmodea.dmDisplayFrequency;
+			LOG(kGraphics, kDebug, "Active display device \"{}\" has frequency of {} Hz", displayDevice.DeviceName, displayMode.dmDisplayFrequency);
+			miMonitorRefreshRate = displayMode.dmDisplayFrequency;
 		}
 	}
 }
@@ -169,7 +170,7 @@ void Graphics::WaitAllFramebufferFencesIdle()
 	// is NOT vkDeviceWaitIdle — only graphics-queue work references the island slots being freed /
 	// re-patched, so the present and transfer queues need not stall. The kExecuted guard skips fences
 	// that were never submitted (early frames), which are not signalable.
-	for (CommandBuffers& rCommandBuffers : gpCommandBufferManager->mPerFramebufferCommandBuffers)
+	for (const CommandBuffers& rCommandBuffers : gpCommandBufferManager->mPerFramebufferCommandBuffers)
 	{
 		if (rCommandBuffers.mFlags & CommandBufferFlags::kExecuted)
 		{
@@ -178,7 +179,7 @@ void Graphics::WaitAllFramebufferFencesIdle()
 	}
 }
 
-void Graphics::RenderGlobal(float fCurrentTime)
+void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
 {
 	int64_t iCommandBuffer = gpSwapchainManager->miFramebufferIndex;
 
@@ -194,7 +195,7 @@ void Graphics::RenderGlobal(float fCurrentTime)
 		CHECK_VK(vkResult);
 	}
 
-	miRenderFrameDeltaNs = mRenderFrameTimer.GetDeltaNs(true).count();
+	mRenderFrameDeltaNanoseconds = mRenderFrameTimer.GetDeltaNs(true);
 
 	// UPDATE_AFTER_BIND permits descriptor writes but does not prevent races with in-flight samplers, so eviction, adoption, lighting
 	// reblur, and restoration run only after every framebuffer fence drains. AnyRestorationPending also covers template-owned elevation
@@ -203,7 +204,7 @@ void Graphics::RenderGlobal(float fCurrentTime)
 	// the PackChunks loader drain (Graphics::Destroy owns that), so unrelated disk loads keep running through this window.
 	gpTextureManager->mFlags.Set(TextureManagerFlags::kPendingAcquireBarriers, false);
 	bool bDescriptorChurnPending = gpIslandTerrain->AnyEvictionPending() || gpIslandTerrain->AnyRestorationPending()
-	                            || gpTextureManager->AnyAdoptionPending()
+	                            || (gpTextureUploadManager->miPendingAdoptions.load(std::memory_order_relaxed) != 0)
 	                            || (gpTextureManager->mFlags & TextureManagerFlags::kPendingLightingReblur);
 	if (bDescriptorChurnPending)
 	{
@@ -223,8 +224,7 @@ void Graphics::RenderGlobal(float fCurrentTime)
 		gpTextureManager->mTextureDescriptors.VerifyAllDescriptorGenerations();
 	}
 
-	// Update VMA frame index for memory budget tracking. muiFrameCounter must advance every frame
-	// (independent of the budget extension) because Phase 5 LRU grace uses it as a monotonic clock.
+	// muiFrameCounter advances every frame, independent of memory-budget support, as the LRU grace clock.
 	if (gpDeviceManager->mCapabilities & DeviceCapabilityFlags::kMemoryBudgetAvailable)
 	{
 		vmaSetCurrentFrameIndex(gpDeviceManager->mpAllocator, static_cast<uint32_t>(muiFrameCounter));
@@ -237,17 +237,17 @@ void Graphics::RenderGlobal(float fCurrentTime)
 	}
 
 	gpProfileManager->CpuStart(kCpuTimerRenderGlobal);
-	RenderFrameGlobal(iCommandBuffer, fCurrentTime);
+	RenderFrameGlobal(iCommandBuffer, currentTime);
 	gpParticleManager->RenderGlobal(iCommandBuffer);
 	gpProfileManager->CpuStop(kCpuTimerRenderGlobal);
 
 	gpCommandBufferManager->SubmitGlobalCommandBuffer(iCommandBuffer);
 }
 
-void Graphics::RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, float fCurrentTime)
+void Graphics::RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, std::chrono::duration<float> currentTime)
 {
 	gpProfileManager->CpuStart(kCpuTimerRenderMain);
-	RenderFrameMain(iCommandBuffer, rRenderInterpolates, rActiveCoords, cameraCoord, fCurrentTime);
+	RenderFrameMain(iCommandBuffer, rRenderInterpolates, rActiveCoords, cameraCoord, currentTime);
 	gpProfileManager->CpuStop(kCpuTimerRenderMain);
 
 	gpImGuiManager->Prepare(iCommandBuffer);
@@ -309,8 +309,8 @@ bool Graphics::ExtentSettled() const
 	// Settled = extents equal, no deferred recreate, no pending swapchain-tier teardown. The last term catches the state
 	// after a failed tail acquire/present (tier escalated, mbSwapchainRecreateDeferred still false) — a retired swapchain
 	// that has not yet been recreated, which extent equality alone would falsely report as settled.
-	return mFramebufferExtent2D.width == gWantedFramebufferExtent2D.width
-	    && mFramebufferExtent2D.height == gWantedFramebufferExtent2D.height && !mbSwapchainRecreateDeferred
+	return mFramebufferVkExtent2D.width == gVkWantedFramebufferExtent2D.width
+	    && mFramebufferVkExtent2D.height == gVkWantedFramebufferExtent2D.height && !mbSwapchainRecreateDeferred
 	    && meDestroyType < DestroyType::kSwapchain;
 }
 
@@ -361,15 +361,11 @@ void Graphics::Create()
 
 	Destroy();
 
-	// TOCTOU zero-area race: Destroy()'s multi-ms vkDeviceWaitIdle gives an externally-driven minimize a window to
-	// zero the surface extent between the pre-Destroy gate's caps query and CreateSwapchain's re-query. Re-query here;
-	// on a zero-area defined extent, re-arm the swapchain tier and defer rather than feed a degenerate extent to
-	// CreateSwapchain (spec-invalid — .imageExtent must be non-zero). The swapchain manager is now torn down, so the
-	// next frame's render skip (GameBase::HandleDeferredSwapchain) guards rendering; its Create() retry re-enters the
-	// pre-Destroy gate, which defers again (no double-Destroy) until the extent is valid, then proceeds. A second
-	// Destroy() on that restore frame is re-run-safe (every teardown null-guards its handles). CHECK_VK can escalate to
-	// kSurface here (VK_ERROR_SURFACE_LOST_KHR); the < kSurface guard then lets a surface-loss teardown proceed instead
-	// of deferring.
+	// Minimize can zero the surface extent during Destroy's device wait, before CreateSwapchain re-queries it.
+	// Re-query after Destroy and defer a defined zero-area extent; Vulkan requires a nonzero imageExtent.
+	// With the swapchain manager absent, GameBase::HandleDeferredSwapchain skips rendering and retries Create;
+	// its pre-Destroy gate defers until the extent is valid, and teardown tolerates the repeated Destroy on retry.
+	// CHECK_VK can escalate surface loss to kSurface, which bypasses this deferral.
 	if (bSwapchainTierRecreate)
 	{
 		VkSurfaceCapabilitiesKHR vkSurfaceCapabilitiesKHR {};
@@ -387,12 +383,12 @@ void Graphics::Create()
 
 	if (mpInstanceManager == nullptr)
 	{
-		mpInstanceManager = std::make_unique<InstanceManager>(mHinstance, mHwnd);
+		mpInstanceManager = std::make_unique<InstanceManager>(mInstanceHandle, mWindowHandle);
 	}
 	if (mpDeviceManager == nullptr)
 	{
 		mpDeviceManager = std::make_unique<DeviceManager>();
-		gpTextureUploadManager->InitTransferResources();
+		gpTextureUploadManager->InitializeTransferResources();
 	}
 	bool bSwapchainRecreated = (mpSwapchainManager == nullptr);
 	if (mpSwapchainManager == nullptr)
@@ -462,7 +458,7 @@ void Graphics::Create()
 	}
 	if (mpImGuiManager == nullptr)
 	{
-		mpImGuiManager = std::make_unique<ImGuiManager>(mHwnd);
+		mpImGuiManager = std::make_unique<ImGuiManager>(mWindowHandle);
 
 		if constexpr (kbDebugInput)
 		{
@@ -517,42 +513,42 @@ void Graphics::Refresh()
 
 	if (gpInstanceManager != nullptr)
 	{
-		VkSampleCountFlagBits eSampleCount = gpInstanceManager->SelectSupportedSampleCount(gSampleCount.Get<VkSampleCountFlagBits>());
-		if (eSampleCount != gSampleCount.Get<VkSampleCountFlagBits>())
+		VkSampleCountFlagBits vkSampleCount = gpInstanceManager->SelectSupportedSampleCount(gSampleCount.Get<VkSampleCountFlagBits>());
+		if (vkSampleCount != gSampleCount.Get<VkSampleCountFlagBits>())
 		{
-			gSampleCount.Set<VkSampleCountFlagBits>(eSampleCount);
+			gSampleCount.Set<VkSampleCountFlagBits>(vkSampleCount);
 		}
 	}
 
 	PollSetting<VkSampleCountFlagBits>(gSampleCount, "Sample count", DestroyType::kSwapchain);
 
-	auto [ePresentMode, ePreviousPresentMode, bPresentModeChanged] = gPresentMode.Changed<VkPresentModeKHR>();
+	auto [vkPresentMode, vkPreviousPresentMode, bPresentModeChanged] = gPresentMode.Changed<VkPresentModeKHR>();
 	if (bPresentModeChanged) [[unlikely]]
 	{
-		LOG(kGraphics, kDebug, "{} -> {}", string_VkPresentModeKHR(ePreviousPresentMode), string_VkPresentModeKHR(ePresentMode));
+		LOG(kGraphics, kDebug, "{} -> {}", string_VkPresentModeKHR(vkPreviousPresentMode), string_VkPresentModeKHR(vkPresentMode));
 		meDestroyType = std::max(DestroyType::kSwapchain, meDestroyType);
 	}
 
-	if (gWantedFramebufferExtent2D.width != mFramebufferExtent2D.width || gWantedFramebufferExtent2D.height != mFramebufferExtent2D.height) [[unlikely]]
+	if (gVkWantedFramebufferExtent2D.width != mFramebufferVkExtent2D.width || gVkWantedFramebufferExtent2D.height != mFramebufferVkExtent2D.height) [[unlikely]]
 	{
 		// Zero-dimension early-return before the LOG: while minimized Create() re-enters every deferred frame with a
 		// 0x0 wanted extent, so logging here would spam per frame (the defer gate's own once-per-transition log covers it).
-		if (gWantedFramebufferExtent2D.width == 0 || gWantedFramebufferExtent2D.height == 0)
+		if (gVkWantedFramebufferExtent2D.width == 0 || gVkWantedFramebufferExtent2D.height == 0)
 		{
 			return;
 		}
-		LOG(kGraphics, kDebug, "{} x {} -> {} x {}", mFramebufferExtent2D.width, mFramebufferExtent2D.height, gWantedFramebufferExtent2D.width, gWantedFramebufferExtent2D.height);
-		mFramebufferExtent2D = gWantedFramebufferExtent2D;
+		LOG(kGraphics, kDebug, "{} x {} -> {} x {}", mFramebufferVkExtent2D.width, mFramebufferVkExtent2D.height, gVkWantedFramebufferExtent2D.width, gVkWantedFramebufferExtent2D.height);
+		mFramebufferVkExtent2D = gVkWantedFramebufferExtent2D;
 		meDestroyType = std::max(DestroyType::kSwapchain, meDestroyType);
 	}
 
 	PollSetting<bool>(gAnisotropy, "Anisotropy", DestroyType::kSamplers);
-	PollSetting<float>(gMaxAnisotropy, "Max anisotropy", DestroyType::kSamplers);
+	PollSetting<float>(gMaximumAnisotropy, "Max anisotropy", DestroyType::kSamplers);
 	PollSetting<bool>(gSampleShading, "Sample shading", DestroyType::kPipelines);
-	PollSetting<float>(gMinSampleShading, "Min sample shading", DestroyType::kPipelines);
-	PollSetting<float>(gMipLodBias, "Mip lod bias", DestroyType::kSamplers);
-	PollSetting<float>(gPbrModelDataMipLodBias, "Model data mip bias", DestroyType::kSamplers);
-	PollSetting<float>(gWaterNormalMipBias, "Water normal mip bias", DestroyType::kSamplers);
+	PollSetting<float>(gMinimumSampleShading, "Min sample shading", DestroyType::kPipelines);
+	PollSetting<float>(gMipmapLevelOfDetailBias, "Mip lod bias", DestroyType::kSamplers);
+	PollSetting<float>(gPhysicallyBasedRenderingModelDataMipmapLevelOfDetailBias, "Model data mip bias", DestroyType::kSamplers);
+	PollSetting<float>(gWaterNormalMipmapBias, "Water normal mip bias", DestroyType::kSamplers);
 	PollSetting<bool>(gWireframe, "Wireframe", DestroyType::kPipelines);
 	PollSetting<bool>(gDebugTexture, nullptr, DestroyType::kCommandBuffers);
 
@@ -560,10 +556,10 @@ void Graphics::Refresh()
 
 	PollSetting<float>(gShadowRenderMultiplier, "Shadow render multiplier", DestroyType::kPipelines, DestroyFlags::kShadowTextures, gpTextureManager != nullptr);
 
-	auto [fLightingMultiplier, fLightingMultiplierPrevious, bLightingMultiplierChanged] = gLightingDepositTextureMultiplier.Changed<float>();
-	auto [fSpreadTextureMultiplierStart, fSpreadTextureMultiplierStartPrevious, bSpreadTextureMultiplierStartChanged] = gSpreadTextureMultiplierStart.Changed<float>();
-	auto [fSpreadTextureMultiplierEnd, fSpreadTextureMultiplierEndPrevious, bSpreadTextureMultiplierEndChanged] = gSpreadTextureMultiplierEnd.Changed<float>();
-	auto [fSpreadPassCount, fSpreadPassCountPrevious, bSpreadPassCountChanged] = gSpreadPassCount.Changed<float>();
+	[[maybe_unused]] auto [fLightingMultiplier, fLightingMultiplierPrevious, bLightingMultiplierChanged] = gLightingDepositTextureMultiplier.Changed<float>();
+	[[maybe_unused]] auto [fSpreadTextureMultiplierStart, fSpreadTextureMultiplierStartPrevious, bSpreadTextureMultiplierStartChanged] = gSpreadTextureMultiplierStart.Changed<float>();
+	[[maybe_unused]] auto [fSpreadTextureMultiplierEnd, fSpreadTextureMultiplierEndPrevious, bSpreadTextureMultiplierEndChanged] = gSpreadTextureMultiplierEnd.Changed<float>();
+	[[maybe_unused]] auto [fSpreadPassCount, fSpreadPassCountPrevious, bSpreadPassCountChanged] = gSpreadPassCount.Changed<float>();
 	if ((bLightingMultiplierChanged || bSpreadTextureMultiplierStartChanged || bSpreadTextureMultiplierEndChanged || bSpreadPassCountChanged) && gpTextureManager != nullptr) [[unlikely]]
 	{
 		mDestroyFlags.Set(DestroyFlags::kLightingTextures);
@@ -571,17 +567,17 @@ void Graphics::Refresh()
 		meDestroyType = std::max(DestroyType::kPipelines, meDestroyType);
 	}
 
-	auto [fLightingBlurSigma, fLightingBlurSigmaPrevious, bLightingBlurSigmaChanged] = gLightingBlurSigma.Changed<float>();
-	auto [fLightingBlurSampleCount, fLightingBlurSampleCountPrevious, bLightingBlurSampleCountChanged] = gLightingBlurSampleCount.Changed<float>();
-	auto [fLightingBlurEdgeFalloff, fLightingBlurEdgeFalloffPrevious, bLightingBlurEdgeFalloffChanged] = gLightingBlurEdgeFalloff.Changed<float>();
+	[[maybe_unused]] auto [fLightingBlurSigma, fLightingBlurSigmaPrevious, bLightingBlurSigmaChanged] = gLightingBlurSigma.Changed<float>();
+	[[maybe_unused]] auto [fLightingBlurSampleCount, fLightingBlurSampleCountPrevious, bLightingBlurSampleCountChanged] = gLightingBlurSampleCount.Changed<float>();
+	[[maybe_unused]] auto [fLightingBlurEdgeFalloff, fLightingBlurEdgeFalloffPrevious, bLightingBlurEdgeFalloffChanged] = gLightingBlurEdgeFalloff.Changed<float>();
 	if ((bLightingBlurSigmaChanged || bLightingBlurSampleCountChanged || bLightingBlurEdgeFalloffChanged) && gpTextureManager != nullptr) [[unlikely]]
 	{
 		// Earlier frames may still sample the blur results, so RenderGlobal reblurs after its all-fence drain
 		gpTextureManager->mFlags.Set(TextureManagerFlags::kPendingLightingReblur);
 	}
 
-	auto [fObjectShadowsRenderMultiplier, fObjectShadowsRenderMultiplierPrevious, bObjectShadowsRenderMultiplierChanged] = gObjectShadowsRenderMultiplier.Changed<float>();
-	auto [fObjectShadowsBlurMultiplier, fObjectShadowsBlurMultiplierPrevious, bObjectShadowsBlurMultiplierChanged] = gObjectShadowsBlurMultiplier.Changed<float>();
+	[[maybe_unused]] auto [fObjectShadowsRenderMultiplier, fObjectShadowsRenderMultiplierPrevious, bObjectShadowsRenderMultiplierChanged] = gObjectShadowsRenderMultiplier.Changed<float>();
+	[[maybe_unused]] auto [fObjectShadowsBlurMultiplier, fObjectShadowsBlurMultiplierPrevious, bObjectShadowsBlurMultiplierChanged] = gObjectShadowsBlurMultiplier.Changed<float>();
 	if ((bObjectShadowsRenderMultiplierChanged || bObjectShadowsBlurMultiplierChanged) && gpTextureManager != nullptr) [[unlikely]]
 	{
 		mDestroyFlags.Set(DestroyFlags::kObjectShadows);
@@ -593,13 +589,13 @@ void Graphics::Refresh()
 	{
 		PollSetting<float>(gTerrainElevationTextureMultiplier, "TerrainElevationTexture multiplier", DestroyType::kPipelines, DestroyFlags::kTerrainElevation);
 
-		auto [fSmokeTrailPower, fSmokeTrailPowerPrevious, bSmokeTrailPowerChanged] = gSmokeTrailPower.Changed<float>();
-		auto [fSmokeTrailAlpha, fSmokeTrailAlphaPrevious, bSmokeTrailAlphaChanged] = gSmokeTrailAlpha.Changed<float>();
+		[[maybe_unused]] auto [fSmokeTrailPower, fSmokeTrailPowerPrevious, bSmokeTrailPowerChanged] = gSmokeTrailPower.Changed<float>();
+		[[maybe_unused]] auto [fSmokeTrailAlpha, fSmokeTrailAlphaPrevious, bSmokeTrailAlphaChanged] = gSmokeTrailAlpha.Changed<float>();
 		auto [fSmokeSimulationPixels, fPreviousSmokeSimulationPixels, bSmokeSimulationPixelsChanged] = gSmokeSimulationPixels.Changed<float>();
 		auto [fSmokeSimulationArea, fPreviousSmokeSimulationArea, bSmokeSimulationAreaChanged] = gSmokeSimulationArea.Changed<float>();
 		if (bSmokeTrailPowerChanged || bSmokeTrailAlphaChanged || bSmokeSimulationPixelsChanged || bSmokeSimulationAreaChanged) [[unlikely]]
 		{
-			LOG(kGraphics, kDebug, "SmokeSimulationPixels: {} -> {} ({} -> {})", common::Wb(fPreviousSmokeSimulationPixels, 3), common::Wb(fSmokeSimulationPixels, 3), common::Wb(gSmokeSimulationPixels.Get(), 3), common::Wb(SmokeSimulationPixels(), 3));
+			LOG(kGraphics, kDebug, "SmokeSimulationPixels: {} -> {} ({} -> {})", common::Wb(fPreviousSmokeSimulationPixels, 3), common::Wb(fSmokeSimulationPixels, 3), common::Wb(gSmokeSimulationPixels.mfCurrent, 3), common::Wb(SmokeSimulationPixels(), 3));
 			LOG(kGraphics, kDebug, "SmokeSimulationArea: {} -> {}", common::Wb(fPreviousSmokeSimulationArea, 3), common::Wb(fSmokeSimulationArea, 3));
 
 			mDestroyFlags.Set(DestroyFlags::kSmokeTextures);
@@ -697,13 +693,13 @@ bool Graphics::Destroy()
 		// a loader that popped a whole-texture request before the reset would otherwise publish kUploading after
 		// it, leaving a chunk in a state RequestChunkLoad skips forever. Lighter destroy levels keep no such
 		// reset, so they keep their current cost.
-		gpFileManager->WaitForLoadersIdle();
+		gpFileManager->mpPackChunks->mLoader.WaitForLoadersIdle();
 	}
 	if (gpTextureUploadManager != nullptr)
 	{
 		// Must follow the loader drain: a whole-texture job finishing inside the drain stores kUploading and posts
 		// an upload, and the reset maps kUploading back to kDiskLoaded and re-arms the pending-adoption counter —
-		// so without this wait the reset could rewrite a chunk whose upload thread is still writing uploadVkImage and
+		// so without this wait the reset could rewrite a chunk whose upload thread is still writing vkUploadImage and
 		// vmaAllocation.
 		gpTextureUploadManager->WaitIdle();
 	}
@@ -714,7 +710,6 @@ bool Graphics::Destroy()
 		vkDeviceWaitIdle(gpDeviceManager->mVkDevice);
 	}
 
-	// Only recreate resources if we're doing partial recreation (not full shutdown)
 	RecreateResources();
 
 	if (meDestroyType >= DestroyType::kSamplers)
@@ -792,7 +787,7 @@ bool Graphics::Destroy()
 		mpIslands.reset();
 		gpTextureUploadManager->DestroyTransferResources();
 		// Reset lazy-loaded texture chunk states so they reload after device recreation
-		gpFileManager->ResetTextureChunkStates();
+		gpFileManager->mpPackChunks->ResetTextureChunkStates();
 		// IslandTerrain is game-frame-owned (outlives Graphics); mesh arena allocations belong to Islands,
 		// which was destroyed above before mpDeviceManager.reset(). Release only template-owned resources here.
 		if (gpIslandTerrain != nullptr)

@@ -43,7 +43,7 @@ struct PuffControllerType
 	std::chrono::duration<float> times[kiMaximumControllerKeyframes] {};
 	PuffKeyframe keyframes[kiMaximumControllerKeyframes] {};
 
-	// Per-keyframe wrapper scaling: keyframe values are multiplied by wrapper.Get() at interpolation time
+	// Per-keyframe wrapper scaling: keyframe values are multiplied by wrapper.mfCurrent at interpolation time
 	Wrapper* ppAreaScales[kiMaximumControllerKeyframes] {};
 	Wrapper* ppIntensityScales[kiMaximumControllerKeyframes] {};
 

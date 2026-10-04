@@ -81,9 +81,9 @@ static std::filesystem::path BareFilenameParam(const nlohmann::json& rValue)
 
 static void CommandStatus([[maybe_unused]] const nlohmann::json& rParams, nlohmann::json& rResult)
 {
-	rResult["tick"] = gpGame->TickCounter();
+	rResult["tick"] = gpGame->miTickCounter;
 	rResult["paused"] = gpGame->mGameFlags & engine::GameFlags::kPaused;
-	rResult["recording"] = engine::gpReplay->IsRecording();
+	rResult["recording"] = (!engine::gpReplay->mReplayWriters.empty());
 	rResult["replaying"] = gpGame->mbReplaying;
 
 	int64_t iClientCount = 0;
@@ -97,13 +97,13 @@ static void CommandStatus([[maybe_unused]] const nlohmann::json& rParams, nlohma
 	rResult["clientCount"] = iClientCount;
 
 	nlohmann::json activeCoords = nlohmann::json::array();
-	for (const engine::GridCoord& rCoord : gpGame->mActiveCoords)
+	for (const engine::GridCoord& rCoord : gpGame->mActiveCoordinates)
 	{
 		activeCoords.push_back({rCoord.iX, rCoord.iY});
 	}
 	rResult["activeCoords"] = std::move(activeCoords);
 
-	rResult["nextGlobalId"] = gpGame->NextGlobalId();
+	rResult["nextGlobalId"] = gpGame->miNextGlobalId;
 	rResult["pendingFlagshipUpdateCount"] = std::ssize(gpServerSession->mpFleetManager->mNavigation.mPendingFlagshipUpdates);
 	rResult["harvestedTransferTotal"] = gpServerSession->miHarvestedTransferTotal;
 	rResult["pendingTransferFixtureCount"] = CountReplayTransferFixtures(*gpServerSession);
@@ -218,7 +218,7 @@ static void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& r
 			}
 		}
 
-		for (int64_t i = 0; i < gpProfileManager->GetCpuTimerCount(); ++i)
+		for (int64_t i = 0; i < gpProfileManager->miCpuTimerCount; ++i)
 		{
 			engine::CpuTimer& rTimer = gpProfileManager->GetCpuTimer(i);
 			nlohmann::json timer;
@@ -233,13 +233,13 @@ static void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& r
 			{
 				if (i == game::kCpuTimerPostRenderUpdateNavQuery)
 				{
-					engine::RawCpuTimerRecord rawRecord = gpProfileManager->GetRawCpuTimer(i);
+					engine::RawCpuTimerRecord rawRecord = gpProfileManager->mpRawCpuTimers[static_cast<size_t>(i)].record;
 					timer["sampleSequence"] = rawRecord.uiSampleSequence;
-					timer["sampleUs"] = rawRecord.iSampleUs;
+					timer["sampleUs"] = rawRecord.iSampleMicroseconds;
 					timer["queryCount"] = rawRecord.iInvocationCount;
 					timer["aStarCount"] = rawRecord.iAuxiliaryCount;
 
-					engine::RawCpuTimerEventRecord eventRecord = gpProfileManager->GetRawCpuTimerEvent(i);
+					engine::RawCpuTimerEventRecord eventRecord = gpProfileManager->mpRawCpuTimers[static_cast<size_t>(i)].eventRecord;
 					bool bEventAvailable = eventRecord.flags & engine::RawCpuTimerEventFlags::kAvailable;
 					bool bEventOverrun = eventRecord.flags & engine::RawCpuTimerEventFlags::kOverrun;
 					timer["activationEvent"] = {
@@ -247,7 +247,7 @@ static void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& r
 						{"eventSequence", eventRecord.uiEventSequence},
 						{"sampleSequence", eventRecord.uiSampleSequence},
 						{"sampleTick", eventRecord.iSampleTick},
-						{"sampleUs", eventRecord.iSampleUs},
+						{"sampleUs", eventRecord.iSampleMicroseconds},
 						{"queryCount", eventRecord.iInvocationCount},
 						{"aStarCount", eventRecord.iAuxiliaryCount},
 						{"qualifying", bEventAvailable && eventRecord.iInvocationCount == 8 && eventRecord.iAuxiliaryCount == 8},
@@ -265,7 +265,7 @@ static void CommandQueryProfile(const nlohmann::json& rParams, nlohmann::json& r
 	rResult["timers"] = std::move(timers);
 
 	nlohmann::json counters = nlohmann::json::array();
-	for (int64_t i = 0; i < gpProfileManager->GetCpuCounterCount(); ++i)
+	for (int64_t i = 0; i < gpProfileManager->miCpuCounterCount; ++i)
 	{
 		engine::CpuCounter& rCounter = gpProfileManager->GetCpuCounter(i);
 		nlohmann::json counter;

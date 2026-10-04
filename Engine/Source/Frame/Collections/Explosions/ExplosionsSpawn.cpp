@@ -114,7 +114,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, std::chrono::du
 	if (rType.uiWindRadialControllerTypeIndex != kuiInvalidControllerType)
 	{
 		float fWindSizePercent = std::sqrt(rSpawnInformation.fSizePercent);
-		WindRadialsPostRender::AddControlled(rFrame, currentTime.count(), rType.uiWindRadialControllerTypeIndex, rSpawnInformation.vecPosition, ExplosionsInterpolate::sTuning.pWindIntensity->Get() * fWindSizePercent, ExplosionsInterpolate::sTuning.pWindWidth->Get() * fWindSizePercent);
+		WindRadialsPostRender::AddControlled(rFrame, currentTime.count(), rType.uiWindRadialControllerTypeIndex, rSpawnInformation.vecPosition, ExplosionsInterpolate::sTuning.pWindIntensity->mfCurrent * fWindSizePercent, ExplosionsInterpolate::sTuning.pWindWidth->mfCurrent * fWindSizePercent);
 	}
 #endif
 
@@ -140,9 +140,9 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, std::chrono::du
 #if defined(BT_CLIENT)
 		// j == 0 is the central trail along the explosion direction; j > 0 are angle-jittered side trails
 		bool bPrimary = (j == 0);
-		float fLengthMultiplier = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailLength->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailLength->Get();
-		float fDurationMultiplier = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailDuration->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailDuration->Get();
-		fTrailIntensity *= bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailIntensity->Get() : ExplosionsInterpolate::sTuning.pSecondaryTrailIntensity->Get();
+		float fLengthMultiplier = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailLength->mfCurrent : ExplosionsInterpolate::sTuning.pSecondaryTrailLength->mfCurrent;
+		float fDurationMultiplier = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailDuration->mfCurrent : ExplosionsInterpolate::sTuning.pSecondaryTrailDuration->mfCurrent;
+		fTrailIntensity *= bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailIntensity->mfCurrent : ExplosionsInterpolate::sTuning.pSecondaryTrailIntensity->mfCurrent;
 		// Scaling the head's travel distance by Duration keeps head speed constant when Update later scales
 		// pfTrailTimes by the same Duration multiplier — so increasing Duration extends both space and time
 		// in lockstep rather than slowing the head into the engine's smoke-decay window.
@@ -169,7 +169,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, std::chrono::du
 	// Per-type tweak multipliers (Particles tab). Null on server, optional on client.
 	auto Scale = [](const Wrapper* pWrapper)
 	{
-		return pWrapper != nullptr ? pWrapper->Get() : 1.0f;
+		return pWrapper != nullptr ? pWrapper->mfCurrent : 1.0f;
 	};
 	float fPositionJitterScale         = Scale(rType.pParticlePositionJitterScale);
 	float fVelocityBaseScale           = Scale(rType.pParticleVelocityBaseScale);

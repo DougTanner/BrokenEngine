@@ -3,11 +3,11 @@
 
 ## Context
 
-`Engine/Source/File/Replay.cpp`, `Replay::SaveLoadReplay`, constructs an expected inventory with `BuildExpectedReplayInventory(expectedManifest, false)`. After checking its size, the current indexed loop compares `eKind`, `uiCoordKey`, and `iActivationTick`, throwing the same identity error from three branches. The entries also contain `digest`, which deliberately does not participate: expected inventory construction skips hashing.
+`Engine/Source/File/Replay.cpp`, `Replay::SaveLoadReplay`, constructs an expected inventory with `BuildExpectedReplayInventory(expectedManifest, false)`. After checking its size, the current indexed loop compares `eKind`, `uiCoordinateKey`, and `iActivationTick`, throwing the same identity error from three branches. The entries also contain `digest`, which deliberately does not participate: expected inventory construction skips hashing.
 
 ## Design
 
-Recommendation: replace only that indexed loop with one `std::ranges::equal` call on `expectedManifest.inventory` and `manifest.inventory`, using a captureless predicate with parameters `const ReplayManifestInventoryEntry& rExpected` and `const ReplayManifestInventoryEntry& rActual`. Return the conjunction of equality for `eKind`, `uiCoordKey`, and `iActivationTick`, in that order. On false, throw `std::ios_base::failure("ReplayManifest inventory identity")` once.
+Recommendation: replace only that indexed loop with one `std::ranges::equal` call on `expectedManifest.inventory` and `manifest.inventory`, using a captureless predicate with parameters `const ReplayManifestInventoryEntry& rExpected` and `const ReplayManifestInventoryEntry& rActual`. Return the conjunction of equality for `eKind`, `uiCoordinateKey`, and `iActivationTick`, in that order. On false, throw `std::ios_base::failure("ReplayManifest inventory identity")` once.
 
 Retain the preceding build/size condition and its `ReplayManifest inventory shape` exception unchanged. Retain generation-digest and artifact-digest validation after identity validation and live reset/adoption after all validation. Use surrounding continuation indentation. This C++20 ranges spelling fits the C++23 codebase and the existing ranges sort in this file; it expresses paired sequence equality without repeating iterator endpoints or manual index access.
 

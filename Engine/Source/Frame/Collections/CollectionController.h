@@ -44,7 +44,7 @@ struct ControllerType
 	ControllerKeyframe keyframes[kiMaximumControllerKeyframes] {};   // Keyframe states (normalized when wrappers present)
 
 #if defined(BT_CLIENT)
-	// Per-keyframe wrapper scaling: keyframe values are multiplied by wrapper.Get() at interpolation time
+	// Per-keyframe wrapper scaling: keyframe values are multiplied by wrapper.mfCurrent at interpolation time
 	Wrapper* ppVisibleAreaScales[kiMaximumControllerKeyframes] {};
 	Wrapper* ppVisibleIntensityScales[kiMaximumControllerKeyframes] {};
 	Wrapper* ppLightingAreaScales[kiMaximumControllerKeyframes] {};

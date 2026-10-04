@@ -76,7 +76,7 @@ void main()
 
 		// Extra decay at edge of simulation area.
 		// f2Texcoord is in [0, 1] by construction (texel center / imageSize) so the inner min(...) is non-negative; outer min clamps to 1.
-		f4Result.x *= min(1.0f, globalLayout.fSmokeEdgeDecayDistanceInv * min(f2Texcoord.x, min(1.0f - f2Texcoord.x, min(f2Texcoord.y, 1.0f - f2Texcoord.y))));
+		f4Result.x *= min(1.0f, globalLayout.fSmokeEdgeDecayDistanceInverse * min(f2Texcoord.x, min(1.0f - f2Texcoord.x, min(f2Texcoord.y, 1.0f - f2Texcoord.y))));
 
 		const float kfSmokeHalfMinSubnormal = 5.9604644775390625e-8f;
 		const float kfSmokeHalfFixedPointDecay = 0.99951171875f;

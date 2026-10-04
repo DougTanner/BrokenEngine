@@ -2,4 +2,4 @@
 
 extern std::atomic<int64_t> giAllocationsThisFrame;
 
-void EnableAllocationTracking(bool bEnable);
+extern std::atomic<bool> gbAllocationTrackingReady;

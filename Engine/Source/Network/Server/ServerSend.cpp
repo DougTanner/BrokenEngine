@@ -178,7 +178,7 @@ void Server::SendUpdate(ClientConnection& rClient, int64_t iTick)
 			rSlot.bHoldUpdatesUntilFullStateAck = true;
 			if (rSlot.iPendingFullStateTick != iTick)
 			{
-				SendCoordinateFullState(rClient.iClientId, i, iTick, coordinate, &game::gpGame->CurrentFrame(coordinate));
+				SendCoordinateFullState(rClient.iClientId, i, iTick, coordinate, &(*game::gpGame->mCoordinateFrames.at(coordinate).pCurrent));
 			}
 		}
 		if (rSlot.bHoldUpdatesUntilFullStateAck)

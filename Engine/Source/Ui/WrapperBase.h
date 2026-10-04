@@ -3,14 +3,14 @@
 namespace engine
 {
 
-// Float-backed container for a UI-bound setting (float / bool / discrete-enum flavors).
-// Thread contract: no atomics. All writes (Set/Reset/ResetToDefault/Toggle/SetPercent/SetIndex) are main-thread
+// Float-backed container for a setting (float / bool / discrete-enum flavors).
+// Thread contract: no atomics. All writes (mfCurrent/Set/Reset/Toggle/SetPercent/SetIndex) are main-thread
 // operations. The writer sites span several subsystems — menu/Tweaks screens (ImGuiManager::Prepare), input
 // handling, render-target maintenance, swapchain creation, texture-capability clamps, and settings load, among
 // others — so this is not a single-writer contract. mfCurrent is unsynchronized, so the invariant that keeps reads
 // safe is not "single writer" but "no write overlaps an active gpMultithreading->Dispatch() window": the main thread
 // is blocked inside Dispatch for the tick, so a wrapper read from a worker thread there (e.g. gBaseHeight in
-// NavQuery.cpp:465/580/600) cannot race a concurrent writer.
+// NavQuery.cpp) cannot race a concurrent writer.
 class Wrapper
 {
 public:
@@ -106,30 +106,10 @@ public:
 		mfCurrent = mfCurrent == 0.0f ? 1.0f : 0.0f;
 	}
 
-	float Get() const
-	{
-		return mfCurrent;
-	}
-
-	float GetMin() const
-	{
-		return mfMin;
-	}
-
-	float GetMax() const
-	{
-		return mfMax;
-	}
-
 	// A NaN fails both comparisons and an infinity lies past the finite bounds, so this also rejects non-finite values.
 	bool IsInRange(float fValue) const
 	{
 		return fValue >= mfMin && fValue <= mfMax;
-	}
-
-	float GetDefault() const
-	{
-		return mfDefault;
 	}
 
 	template <typename T>
@@ -198,14 +178,9 @@ public:
 		GetIndex();
 	}
 
-	void ResetToDefault()
-	{
-		mfCurrent = mfDefault;
-	}
-
 	float Percent() const
 	{
-		return (Get() - mfMin) / (mfMax - mfMin);
+		return (mfCurrent - mfMin) / (mfMax - mfMin);
 	}
 
 	void SetPercent(float fPercent)
@@ -215,22 +190,21 @@ public:
 
 	int64_t GetIndex() const
 	{
-		int64_t iIndex = 0;
-		for (const float& rfValue : mAllowed)
+		for (int64_t i = 0; const float& rfValue : mAllowed)
 		{
-			if (Get() == rfValue)
+			if (mfCurrent == rfValue)
 			{
-				return iIndex;
+				return i;
 			}
 
-			++iIndex;
+			++i;
 		}
 
 		// Intentional soft-fall: an off-grid value is legitimately reachable — a corrupt/hand-edited persisted
 		// gPresentMode or gUiTheme (settings-file load) — so this never throws. Returns index 0; the sole
 		// return-consuming caller clamps it (TweaksScreenBase.cpp), the graphics path re-clamps present mode against
-		// device support, and GetUiTheme() clamps the theme. DEBUG_BREAK is a debug-only hint for genuine internal
-		// misuse (no-op in release).
+		// device support, and GetUiTheme() clamps the theme. DEBUG_BREAK logs a warning in every build and breaks
+		// only when kbDebugBreak is enabled and a debugger is attached.
 		DEBUG_BREAK();
 		return 0;
 	}
@@ -255,31 +229,33 @@ private:
 	// load that value; SwapchainManager compares supported Mailbox/Immediate choices, defaults to FIFO, and resets the
 	// wrapper before submitting the Vulkan swapchain request. The UI exposes only these three modes.
 	float mfStep = 0.0f;
+
+public:
+
 	float mfDefault = 0.0f;
 	float mfMin = 0.0f;
 	float mfMax = 1.0f;
 
 	float mfCurrent = 0.0f;
+
+private:
+
 	float mfPrevious = 0.0f;
 };
 
 // Internal-only wrappers (not bound to any UI: not Tweaks, not GraphicsMenuScreen, not SoundMenuScreen).
-extern Wrapper gFov;
+extern Wrapper gFieldOfView;
 extern Wrapper gWireframe;
 extern Wrapper gBaseHeight;
 
-// Islands & terrain
 extern Wrapper gVisibleAreaExtraTop;
 extern Wrapper gVisibleAreaExtraBottom;
 extern Wrapper gTerrainElevationTextureMultiplier;
 
-// Smoke
 extern Wrapper gSmokeTrailPower;
 extern Wrapper gSmokeTrailAlpha;
 
-// Particles
 
-// Debug
 extern Wrapper gDebugTexture;
 extern Wrapper gDebugTextureIndex;
 

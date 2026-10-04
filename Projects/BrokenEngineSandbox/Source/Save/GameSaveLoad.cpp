@@ -21,7 +21,7 @@ bool WriteReplayMeta(const engine::FileFlags_t& rFlags, const std::filesystem::p
 {
 	ReplayMeta meta
 	{
-		.clientGridCoord = game::gpGame->mClientGridCoord,
+		.clientGridCoord = game::gpGame->mClientGridCoordinate,
 		.iClientPlayerIdValue = game::gpGame->ClientPlayerId().iValue,
 		.fPreviousClientArmor = game::gpGame->mfPreviousClientArmor,
 	};
@@ -56,7 +56,7 @@ bool GameSaveLoad::ServerSave()
 bool GameSaveLoad::ServerSave(const std::filesystem::path& rFilename)
 {
 	ScopedSuppressAllocationTracking suppress;
-	return engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, rFilename, game::gpGame->mClientGridCoord);
+	return engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, rFilename, game::gpGame->mClientGridCoordinate);
 }
 
 bool GameSaveLoad::ServerLoad()
@@ -67,7 +67,7 @@ bool GameSaveLoad::ServerLoad()
 bool GameSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 {
 	ScopedSuppressAllocationTracking suppress;
-	gpProfileManager->LatchRawCpuTimers(false, game::gpGame->TickCounter());
+	gpProfileManager->LatchRawCpuTimers(false, game::gpGame->miTickCounter);
 
 	engine::GridCoord loadedClientGridCoord {};
 	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, rFilename, loadedClientGridCoord))
@@ -75,12 +75,14 @@ bool GameSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 		return false;
 	}
 
-	int64_t iLoadedTick = game::gpGame->TickCounter();
-	float fLoadedTime = game::gpGame->CurrentTime();
+	int64_t iLoadedTick = game::gpGame->miTickCounter;
+	float fLoadedTime = game::gpGame->mfCurrentTime;
 	game::gpGame->Reset();
 	// Reset clears the clock; restore the saved values before client resynchronization.
-	game::gpGame->SetTickCounter(iLoadedTick);
-	game::gpGame->SetCurrentTime(fLoadedTime);
+	int64_t iTickCounter = iLoadedTick;
+	ASSERT(iTickCounter >= 0);
+	game::gpGame->miTickCounter = iTickCounter;
+	game::gpGame->mfCurrentTime = fLoadedTime;
 	game::gpGame->SetClientGridCoord(loadedClientGridCoord);
 	game::OnStateReplaced();
 	game::gpServerSession->mpRuntime->ComputeActiveSet();
@@ -91,10 +93,10 @@ bool GameSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 void GameSaveLoad::ServerReset()
 {
 	ScopedSuppressAllocationTracking suppress;
-	gpProfileManager->LatchRawCpuTimers(false, game::gpGame->TickCounter());
+	gpProfileManager->LatchRawCpuTimers(false, game::gpGame->miTickCounter);
 
 	game::gpGame->CreateNewFrame(game::GameFlags::kGame);
-	game::gpGame->SetNextGlobalId(1);
+	game::gpGame->miNextGlobalId = 1;
 	game::gpGame->Reset();
 	// Fresh-game wipe of fleet manager state. Load path leaves mFleets populated by ReadFleetData;
 	// fresh-game has no save to restore from, so explicitly clear before ResetClientsForLoad runs.
@@ -106,12 +108,12 @@ void GameSaveLoad::ServerReset()
 bool GameSaveLoad::Autosave()
 {
 	ScopedSuppressAllocationTracking suppress;
-	return engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite, engine::FileFlags::kBackup}, std::filesystem::path("ServerAutosave.save"), game::gpGame->mClientGridCoord);
+	return engine::WriteGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite, engine::FileFlags::kBackup}, std::filesystem::path("ServerAutosave.save"), game::gpGame->mClientGridCoordinate);
 }
 
 void GameSaveLoad::TickAutosave()
 {
-	if (game::gpGame->mbReplaying || engine::gpReplay->IsRecording() || (game::gpGame->mGameFlags & engine::GameFlags::kLoadReplay))
+	if (game::gpGame->mbReplaying || (!engine::gpReplay->mReplayWriters.empty()) || (game::gpGame->mGameFlags & engine::GameFlags::kLoadReplay))
 	{
 		return;
 	}
@@ -135,7 +137,7 @@ bool GameSaveLoad::Autoload()
 {
 	ScopedSuppressAllocationTracking suppress;
 
-	if (!engine::gpFileManager->Exists({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("ServerAutosave.save")))
+	if (!std::filesystem::exists(engine::gpFileManager->GetFilePath({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("ServerAutosave.save"))))
 	{
 		return false;
 	}

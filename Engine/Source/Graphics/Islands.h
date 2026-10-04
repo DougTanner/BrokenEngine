@@ -16,7 +16,7 @@ struct GridCoord;
 // sizeof(AxisAlignedQuadLayout): with kiCoordSlots = 16 and kiMaximumIslandsPerCell = 107 this is 436,560 bytes
 // (426.33 KiB), independent of the number of island templates.
 inline constexpr int64_t kiMaxActivePlacements = (game::NetworkSessionContract::kiCoordSlots + 1) * kiMaximumIslandsPerCell;
-inline constexpr VkDeviceSize kiIslandMeshArenaBytes = 64ull * 1'024ull * 1'024ull;
+inline constexpr VkDeviceSize kVkIslandMeshArenaBytes = 64ull * 1'024ull * 1'024ull;
 
 // SSBO and indirect buffers have one instance per framebuffer index, sized by kiMaxFramebuffers. UpdateActiveIslands runs before
 // RenderGlobal and writes only the re-acquired instance: its prior frame has presented and completed its GPU read, while this frame has not
@@ -30,12 +30,12 @@ public:
 	Islands();
 	~Islands();
 
-	bool AllocateMeshRanges(VkDeviceSize vkIndexSize, VkDeviceSize vkVertexSize, VmaVirtualAllocation& rIndexAllocation, VkDeviceSize& rIndexOffset, VmaVirtualAllocation& rVertexAllocation, VkDeviceSize& rVertexOffset);
+	bool AllocateMeshRanges(VkDeviceSize vkIndexSize, VkDeviceSize vkVertexSize, VmaVirtualAllocation& rIndexAllocation, VkDeviceSize& rVkIndexOffset, VmaVirtualAllocation& rVertexAllocation, VkDeviceSize& rVkVertexOffset);
 	void FreeMeshRanges(VmaVirtualAllocation vmaIndexAllocation, VmaVirtualAllocation vmaVertexAllocation);
-	void UploadMesh(VkDeviceSize vkIndexOffset, const void* pIndexData, VkDeviceSize vkIndexSize, VkDeviceSize vkVertexOffset, const void* pVertexData, VkDeviceSize vkVertexSize);
+	void UploadMesh(VkDeviceSize vkIndexOffset, std::span<const std::byte> indexData, VkDeviceSize vkVertexOffset, std::span<const std::byte> vertexData);
 	void WriteMeshIndirect(int64_t iTemplate, VkDeviceSize vkIndexOffset, VkDeviceSize vkVertexOffset, uint32_t uiIndexCount);
 
-	void UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrames>& rFrames, std::span<const GridCoord> rActiveCoords);
+	void UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrames>& rFrames, std::span<const GridCoord> activeCoordinates);
 
 	Buffer mIslandMeshArena;
 	uint64_t muiMeshArenaCapacityGeneration = 0;
@@ -44,7 +44,7 @@ public:
 	// arena by UpdateActiveIslands; each run starts at that template's per-frame firstInstance, with its
 	// mesh-visible prefix before the offscreen remainder. Inactive slots stay zero-width so the vertex shader
 	// emits degenerate triangles (GPU-culled).
-	// Triple-buffered (see kiMaxFramebuffers) and bound via kPerCommandBufferStorageBuffers so an
+	// Bound via kPerCommandBufferStorageBuffers so an
 	// in-flight frame's GPU read never races the host rewrite of the instance the current frame consumes.
 	std::array<Buffer, kiMaxFramebuffers> mIslandsStorageBuffers;
 
@@ -55,7 +55,7 @@ public:
 	// mIndirectVkBuffer pattern in SetupIndirectBuffer (Engine/Source/Graphics/Objects/PipelineCreator.cpp).
 	std::array<VkBuffer, kiMaxFramebuffers> mIslandsIndirectVkBuffers {};
 	std::array<VmaAllocation, kiMaxFramebuffers> mIslandsIndirectVmaAllocations {};
-	std::array<VkDrawIndexedIndirectCommand*, kiMaxFramebuffers> mppIslandsIndirectMapped {};
+	std::array<VkDrawIndexedIndirectCommand*, kiMaxFramebuffers> mppIslandsIndirectMappedVkDrawIndexedIndirectCommands {};
 
 	int64_t miTemplateCount = 0;  // Cached gpIslandTerrain->mIslandCrcsSorted.size() (fixed at boot).
 

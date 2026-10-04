@@ -13,7 +13,7 @@ public:
 	static std::unordered_map<std::string_view, Wrapper*>& Get();
 };
 
-// RAII helper: each translation unit declares one of these at namespace scope to register its labels into TweaksSliderMap::Get() at static-init time, co-locating registration with use-site.
+// Each translation unit declares one of these at namespace scope to register its labels into TweaksSliderMap::Get() at static-init time, co-locating registration with use-site.
 struct TweaksSliderMapRegistrar
 {
 	TweaksSliderMapRegistrar(std::initializer_list<std::pair<const std::string_view, Wrapper*>> entries);

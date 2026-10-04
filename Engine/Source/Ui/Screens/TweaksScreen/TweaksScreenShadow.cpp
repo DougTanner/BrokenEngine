@@ -10,11 +10,9 @@ namespace engine
 
 const TweaksSliderMapRegistrar gShadowRegistrar
 {
-	// Quality / Perf
 	{"Resolution", &gShadowRenderMultiplier},
-	{"Shadow Texel Ramp Speed", &gShadowTexelRampMetersPerSec},
+	{"Shadow Texel Ramp Speed", &gShadowTexelRampMetersPerSecond},
 	{"Shadow Temporal Blend", &gShadowTemporalBlend},
-	// Feather
 	{"Feather Noon", &gShadowFeatherNoon},
 	{"Feather Noon Offset", &gShadowFeatherNoonOffset},
 	{"Feather Sunset", &gShadowFeatherSunset},
@@ -25,7 +23,6 @@ const TweaksSliderMapRegistrar gShadowRegistrar
 	{"Affect Ambient", &gShadowAffectAmbient},
 	{"Height Fade Top", &gShadowHeightFadeTop},
 	{"Height Fade Bottom", &gShadowHeightFadeBottom},
-	// Object Shadows
 	{"Render Multiplier", &gObjectShadowsRenderMultiplier},
 	{"Blur Multiplier", &gObjectShadowsBlurMultiplier},
 	{"Shadow Noon", &gObjectShadowsNoon},

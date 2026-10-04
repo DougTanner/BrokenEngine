@@ -30,25 +30,16 @@ public:
 		}
 	}
 
-	void SetPending()
-	{
-		mFlags.Set(NetworkUiControlFlags::kPending);
-	}
-
-	bool IsPending() const
-	{
-		return mFlags & NetworkUiControlFlags::kPending;
-	}
-
 	void Reset()
 	{
 		mFlags.meFlags = static_cast<decltype(mFlags.meFlags)>(0);
 		mStateWhenRequested = T {};
 	}
 
+	common::Flags<NetworkUiControlFlags> mFlags {};
+
 private:
 
-	common::Flags<NetworkUiControlFlags> mFlags {};
 	T mStateWhenRequested {};
 };
 

@@ -6,7 +6,7 @@ namespace game
 ProfileManager* gpProfileManager = nullptr;
 
 ProfileManager::ProfileManager()
-: ProfileManagerBase(mGameCpuCounters, mGameCpuTimers, kGameCpuCounterNames, kGameCpuTimerNames, kGameCpuCounterCount, kGameCpuTimerCount)
+: ProfileManagerBase(mGameCpuCounters, mGameCpuTimers, kGameCpuCounterNames, kGameCpuTimerNames)
 {
 	ASSERT(gpProfileManager == nullptr);
 
@@ -29,7 +29,7 @@ void ProfileManager::OnRawCpuTimersLatched(int64_t iSampleTick)
 {
 	if constexpr (kbProfiling)
 	{
-		engine::RawCpuTimerRecord rawRecord = GetRawCpuTimer(kCpuTimerPostRenderUpdateNavQuery);
+		engine::RawCpuTimerRecord rawRecord = mpRawCpuTimers[static_cast<size_t>(kCpuTimerPostRenderUpdateNavQuery)].record;
 		if (rawRecord.iInvocationCount == 8)
 		{
 			PublishRawCpuTimerEvent(kCpuTimerPostRenderUpdateNavQuery, iSampleTick);

@@ -110,7 +110,7 @@ struct RenderDocCaptureState
 template <typename QUEUE_CAPTURE>
 static void BeginCaptureAndDefer(QUEUE_CAPTURE QueueCapture)
 {
-	HWND windowHandle = engine::gpGraphics->mHwnd;
+	HWND windowHandle = engine::gpGraphics->mWindowHandle;
 	bool bRestoreMinimized = IsIconic(windowHandle) != FALSE;
 	if (!bRestoreMinimized && engine::gpGraphics->mbSwapchainRecreateDeferred)
 	{
@@ -270,7 +270,7 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 		}
 	}
 
-	HWND windowHandle = engine::gpGraphics->mHwnd;
+	HWND windowHandle = engine::gpGraphics->mWindowHandle;
 	bool bRestoreMinimized = IsIconic(windowHandle) != FALSE;
 	if (!bRestoreMinimized && engine::gpGraphics->mbSwapchainRecreateDeferred)
 	{
@@ -380,7 +380,7 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 }
 
 // resize: change the live client window/framebuffer size mid-session by driving the real HWND resize
-// (SetWindowPos -> synchronous WM_SIZE -> gWantedFramebufferExtent2D -> swapchain recreate). Client dims are
+// (SetWindowPos -> synchronous WM_SIZE -> gVkWantedFramebufferExtent2D -> swapchain recreate). Client dims are
 // validated to [320x180, 16384x16384] then rounded up to a multiple of 8 (mirrors SetupWindow).
 // The swapchain additionally clamps to surface caps, so the applied extent may differ from the requested one.
 // Completes synchronously if already at the requested extent, else via the deferred-response mechanism once the
@@ -404,14 +404,14 @@ static void CommandResize(const nlohmann::json& rParameters, nlohmann::json& rRe
 	LONG iClientHeight = common::RoundUp<LONG, 8>(static_cast<LONG>(iHeight));
 
 	// Reject while minimized: WM_SIZE never fires for a minimized window, so the deferred poll can't converge.
-	if (IsIconic(engine::gpGraphics->mHwnd))
+	if (IsIconic(engine::gpGraphics->mWindowHandle))
 	{
 		throw std::runtime_error("window is minimized");
 	}
 
 	// Style-aware client -> outer conversion: WS_OVERLAPPEDWINDOW grows the client rect by the frame via
 	// AdjustWindowRect; WS_POPUP (borderless windowed-fullscreen) has no frame, so client size is the outer size.
-	HWND windowHandle = engine::gpGraphics->mHwnd;
+	HWND windowHandle = engine::gpGraphics->mWindowHandle;
 	LONG_PTR iStyle = GetWindowLongPtr(windowHandle, GWL_STYLE);
 	RECT outerRect {.left = 0, .top = 0, .right = iClientWidth, .bottom = iClientHeight};
 	if ((iStyle & WS_OVERLAPPEDWINDOW) != 0)
@@ -461,22 +461,22 @@ static void CommandResize(const nlohmann::json& rParameters, nlohmann::json& rRe
 		}
 	}
 
-	// Drain() runs on the WndProc thread, so this SetWindowPos's WM_SIZE fires synchronously and writes
-	// gWantedFramebufferExtent2D exactly as a human drag does. No z-order / activation change.
+	// Drain() runs on the WindowProcedure thread, so this SetWindowPos's WM_SIZE fires synchronously and writes
+	// gVkWantedFramebufferExtent2D exactly as a human drag does. No z-order / activation change.
 	SetWindowPos(windowHandle, nullptr, iPositionX, iPositionY, iOuterWidth, iOuterHeight, SWP_NOZORDER | SWP_NOACTIVATE);
 
 	// Fast path: if the swapchain already sits at the requested (rounded) extent, answer synchronously.
-	if (engine::gpGraphics->mFramebufferExtent2D.width == static_cast<uint32_t>(iClientWidth) && engine::gpGraphics->mFramebufferExtent2D.height == static_cast<uint32_t>(iClientHeight))
+	if (engine::gpGraphics->mFramebufferVkExtent2D.width == static_cast<uint32_t>(iClientWidth) && engine::gpGraphics->mFramebufferVkExtent2D.height == static_cast<uint32_t>(iClientHeight))
 	{
-		rResult["width"] = engine::gpGraphics->mFramebufferExtent2D.width;
-		rResult["height"] = engine::gpGraphics->mFramebufferExtent2D.height;
+		rResult["width"] = engine::gpGraphics->mFramebufferVkExtent2D.width;
+		rResult["height"] = engine::gpGraphics->mFramebufferVkExtent2D.height;
 		return;
 	}
 
 	engine::gpAgentCommandServer->DeferResponse([]() -> std::optional<nlohmann::json>
 	{
-		// Graphics::Refresh copies gWantedFramebufferExtent2D into mFramebufferExtent2D when it triggers the recreate
-		// (Graphics.cpp), and CreateSwapchain's defined branch may then clamp gWantedFramebufferExtent2D down to the
+		// Graphics::Refresh copies gVkWantedFramebufferExtent2D into mFramebufferVkExtent2D when it triggers the recreate
+		// (Graphics.cpp), and CreateSwapchain's defined branch may then clamp gVkWantedFramebufferExtent2D down to the
 		// surface-cap currentExtent (SwapchainManager.cpp), so the two converge only once the applied extent settles.
 		// ExtentSettled() also requires no recreate be deferred — extent equality alone is satisfied the moment Refresh
 		// copies the wanted extent, before the defer gate returns, which would report a false success no live swapchain
@@ -486,8 +486,8 @@ static void CommandResize(const nlohmann::json& rParameters, nlohmann::json& rRe
 			return std::nullopt;
 		}
 		nlohmann::json result;
-		result["width"] = engine::gpGraphics->mFramebufferExtent2D.width;
-		result["height"] = engine::gpGraphics->mFramebufferExtent2D.height;
+		result["width"] = engine::gpGraphics->mFramebufferVkExtent2D.width;
+		result["height"] = engine::gpGraphics->mFramebufferVkExtent2D.height;
 		return result;
 	});
 }
@@ -508,42 +508,42 @@ static void CommandFullscreen(const nlohmann::json& rParameters, nlohmann::json&
 
 	// Reject while minimized: the style toggle drives a swapchain recreate that can't converge off-screen, so the
 	// deferred poll would never settle (mirrors resize).
-	if (IsIconic(engine::gpGraphics->mHwnd))
+	if (IsIconic(engine::gpGraphics->mWindowHandle))
 	{
 		throw std::runtime_error("window is minimized");
 	}
 
 	// Live style read: WS_POPUP set == borderless windowed-fullscreen; WS_OVERLAPPEDWINDOW == windowed.
-	HWND windowHandle = engine::gpGraphics->mHwnd;
+	HWND windowHandle = engine::gpGraphics->mWindowHandle;
 	bool bIsFullscreen = (GetWindowLongPtr(windowHandle, GWL_STYLE) & WS_POPUP) != 0;
 
 	// Fast path: already in the requested mode — report the current extent synchronously (idempotence).
 	if (bIsFullscreen == bOn)
 	{
 		rResult["fullscreen"] = bIsFullscreen;
-		rResult["width"] = engine::gpGraphics->mFramebufferExtent2D.width;
-		rResult["height"] = engine::gpGraphics->mFramebufferExtent2D.height;
+		rResult["width"] = engine::gpGraphics->mFramebufferVkExtent2D.width;
+		rResult["height"] = engine::gpGraphics->mFramebufferVkExtent2D.height;
 		return;
 	}
 
 	// Install the override; the per-frame main-loop reconciliation (in MainThread, just after ProcessMessages()) picks it
 	// up and performs the style swap + SetupWindow + swapchain recreate. The command completes via the deferred-response mechanism once it lands.
-	engine::SetAgentFullscreenOverride(bOn);
+	engine::gAgentFullscreenOverride = bOn;
 
 	engine::gpAgentCommandServer->DeferResponse([bOn]() -> std::optional<nlohmann::json>
 	{
 		// Poll until BOTH the live WS_POPUP bit matches the request AND the extent has settled. ExtentSettled() folds
 		// extent equality with !mbSwapchainRecreateDeferred, so it can't report a false success while a recreate is
 		// still deferred (the style flips a frame before the swapchain finishes). Then report the applied state.
-		bool bNowFullscreen = (GetWindowLongPtr(engine::gpGraphics->mHwnd, GWL_STYLE) & WS_POPUP) != 0;
+		bool bNowFullscreen = (GetWindowLongPtr(engine::gpGraphics->mWindowHandle, GWL_STYLE) & WS_POPUP) != 0;
 		if (bNowFullscreen != bOn || !engine::gpGraphics->ExtentSettled())
 		{
 			return std::nullopt;
 		}
 		nlohmann::json result;
 		result["fullscreen"] = bNowFullscreen;
-		result["width"] = engine::gpGraphics->mFramebufferExtent2D.width;
-		result["height"] = engine::gpGraphics->mFramebufferExtent2D.height;
+		result["width"] = engine::gpGraphics->mFramebufferVkExtent2D.width;
+		result["height"] = engine::gpGraphics->mFramebufferVkExtent2D.height;
 		return result;
 	});
 }
@@ -564,7 +564,7 @@ static void CommandWindowState(const nlohmann::json& rParameters, nlohmann::json
 
 	bool bMinimized = rParameters.at("minimized").get<bool>();
 
-	HWND windowHandle = engine::gpGraphics->mHwnd;
+	HWND windowHandle = engine::gpGraphics->mWindowHandle;
 
 	// Fast path: already in the requested state — report it synchronously (idempotence), including the current extent
 	// on restore (matches resize/fullscreen).
@@ -573,8 +573,8 @@ static void CommandWindowState(const nlohmann::json& rParameters, nlohmann::json
 		rResult["minimized"] = bMinimized;
 		if (!bMinimized)
 		{
-			rResult["width"] = engine::gpGraphics->mFramebufferExtent2D.width;
-			rResult["height"] = engine::gpGraphics->mFramebufferExtent2D.height;
+			rResult["width"] = engine::gpGraphics->mFramebufferVkExtent2D.width;
+			rResult["height"] = engine::gpGraphics->mFramebufferVkExtent2D.height;
 		}
 		return;
 	}
@@ -585,7 +585,7 @@ static void CommandWindowState(const nlohmann::json& rParameters, nlohmann::json
 		ShowWindow(windowHandle, SW_MINIMIZE);
 		engine::gpAgentCommandServer->DeferResponse([]() -> std::optional<nlohmann::json>
 		{
-			if (IsIconic(engine::gpGraphics->mHwnd) == FALSE)
+			if (IsIconic(engine::gpGraphics->mWindowHandle) == FALSE)
 			{
 				return std::nullopt;
 			}
@@ -602,14 +602,14 @@ static void CommandWindowState(const nlohmann::json& rParameters, nlohmann::json
 	ShowWindow(windowHandle, SW_SHOWNOACTIVATE);
 	engine::gpAgentCommandServer->DeferResponse([]() -> std::optional<nlohmann::json>
 	{
-		if (IsIconic(engine::gpGraphics->mHwnd) != FALSE || !engine::gpGraphics->ExtentSettled())
+		if (IsIconic(engine::gpGraphics->mWindowHandle) != FALSE || !engine::gpGraphics->ExtentSettled())
 		{
 			return std::nullopt;
 		}
 		nlohmann::json result;
 		result["minimized"] = false;
-		result["width"] = engine::gpGraphics->mFramebufferExtent2D.width;
-		result["height"] = engine::gpGraphics->mFramebufferExtent2D.height;
+		result["width"] = engine::gpGraphics->mFramebufferVkExtent2D.width;
+		result["height"] = engine::gpGraphics->mFramebufferVkExtent2D.height;
 		return result;
 	});
 }
@@ -676,7 +676,7 @@ static nlohmann::json BuildDescribeUi()
 	result["tweaksVisible"] = game::gpGame->mbShowImGui;
 	result["gameFlags"] = GameFlagNames(game::gpGame->mGameFlags);
 
-	result["framebuffer"] = {engine::gpGraphics->mFramebufferExtent2D.width, engine::gpGraphics->mFramebufferExtent2D.height};
+	result["framebuffer"] = {engine::gpGraphics->mFramebufferVkExtent2D.width, engine::gpGraphics->mFramebufferVkExtent2D.height};
 
 	ImVec2 mousePosition = (ImGui::GetCurrentContext() != nullptr) ? ImGui::GetIO().MousePos : ImVec2(0.0f, 0.0f);
 	result["mouse"] = {mousePosition.x, mousePosition.y};
@@ -953,11 +953,11 @@ static void CommandGetWrapper(const nlohmann::json& rParameters, nlohmann::json&
 	}
 
 	char pcText[32] {};
-	std::snprintf(pcText, sizeof(pcText), "%.6f", it->second->Get());
+	std::snprintf(pcText, sizeof(pcText), "%.6f", it->second->mfCurrent);
 	rResult["value"] = pcText;
-	std::snprintf(pcText, sizeof(pcText), "%.6f", it->second->GetMin());
+	std::snprintf(pcText, sizeof(pcText), "%.6f", it->second->mfMin);
 	rResult["min"] = pcText;
-	std::snprintf(pcText, sizeof(pcText), "%.6f", it->second->GetMax());
+	std::snprintf(pcText, sizeof(pcText), "%.6f", it->second->mfMax);
 	rResult["max"] = pcText;
 }
 
@@ -1096,7 +1096,7 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 		throw std::runtime_error("query_profile requires empty params");
 	}
 
-	engine::GpuTimer* pGpuTimers = gpProfileManager->GetGpuTimers();
+	engine::GpuTimer* pGpuTimers = gpProfileManager->mGpuTimers;
 	nlohmann::json gpuTimers = nlohmann::json::array();
 	for (int64_t i = 0; i < engine::kGpuTimerCount; ++i)
 	{
@@ -1116,10 +1116,9 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 		{"sequence", rShadowSample.uiSequence},
 		{"currentUs", rShadowSample.iCurrentMicroseconds},
 	};
-	int64_t iClockOffset = 0;
-	int64_t iClockTargetBehind = 0;
-	int64_t iClockError = 0;
-	gpProfileManager->GetClockCorrection(iClockOffset, iClockTargetBehind, iClockError);
+	int64_t iClockOffset = gpProfileManager->mSmoothedClockOffset.mSmoothedValue;
+	int64_t iClockTargetBehind = gpProfileManager->mSmoothedClockTarget.mSmoothedValue;
+	int64_t iClockError = gpProfileManager->mSmoothedClockError.mSmoothedValue;
 	rResult["clock"] =
 	{
 		{"offsetTicks", iClockOffset},
@@ -1128,7 +1127,7 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 	};
 
 	nlohmann::json counters = nlohmann::json::array();
-	for (int64_t i = 0; i < gpProfileManager->GetCpuCounterCount(); ++i)
+	for (int64_t i = 0; i < gpProfileManager->miCpuCounterCount; ++i)
 	{
 		engine::CpuCounter& rCounter = gpProfileManager->GetCpuCounter(i);
 		nlohmann::json counter;

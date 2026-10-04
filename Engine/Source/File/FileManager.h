@@ -55,22 +55,23 @@ enum class ChunkRangeReloadState : uint32_t
 // Movable atomic wrapper (std::atomic deletes copy/move, breaking aggregate types in containers)
 struct MovableAtomicChunkState
 {
-	std::atomic<ChunkState> value {ChunkState::kNotLoaded};
+	std::atomic<ChunkState> value = ChunkState::kNotLoaded;
 
 	MovableAtomicChunkState() = default;
-	MovableAtomicChunkState(const MovableAtomicChunkState& rOther) : value(rOther.value.load(std::memory_order_relaxed)) {}
-	MovableAtomicChunkState(MovableAtomicChunkState&& rOther) noexcept : value(rOther.value.load(std::memory_order_relaxed)) {}
+	MovableAtomicChunkState(const MovableAtomicChunkState& rOther) : value(rOther.value.load(std::memory_order_relaxed))
+	{
+	}
+	MovableAtomicChunkState(MovableAtomicChunkState&& rOther) noexcept : value(rOther.value.load(std::memory_order_relaxed))
+	{
+	}
 	MovableAtomicChunkState& operator=(const MovableAtomicChunkState&) = delete;
 	MovableAtomicChunkState& operator=(MovableAtomicChunkState&&) = delete;
 
-	void store(ChunkState eVal, std::memory_order order = std::memory_order_seq_cst) { value.store(eVal, order); }
-	ChunkState load(std::memory_order order = std::memory_order_seq_cst) const { return value.load(order); }
 };
 
-// Movable atomic wrapper for a lazy chunk's asynchronous range-reload completion state.
 struct MovableAtomicChunkRangeReloadState
 {
-	std::atomic<ChunkRangeReloadState> value {ChunkRangeReloadState::kIdle};
+	std::atomic<ChunkRangeReloadState> value = ChunkRangeReloadState::kIdle;
 
 	MovableAtomicChunkRangeReloadState() = default;
 	MovableAtomicChunkRangeReloadState(const MovableAtomicChunkRangeReloadState& rOther)
@@ -84,21 +85,13 @@ struct MovableAtomicChunkRangeReloadState
 	MovableAtomicChunkRangeReloadState& operator=(const MovableAtomicChunkRangeReloadState&) = delete;
 	MovableAtomicChunkRangeReloadState& operator=(MovableAtomicChunkRangeReloadState&&) = delete;
 
-	void store(ChunkRangeReloadState eVal, std::memory_order order = std::memory_order_seq_cst)
-	{
-		value.store(eVal, order);
-	}
-	ChunkRangeReloadState load(std::memory_order order = std::memory_order_seq_cst) const
-	{
-		return value.load(order);
-	}
 };
 
 struct LazyChunk
 {
 	common::ChunkLocation location;                   // Manifest entry for pack offset, size, path CRC, and content CRC
-	MovableAtomicChunkState eState {};                // Atomic state tracking load progress
-	common::ChunkHeader header {};                    // Chunk header
+	MovableAtomicChunkState eState;
+	common::ChunkHeader header {};
 
 	std::byte* pData = nullptr;                       // Points into the pre-allocated lazy pool (null until assigned)
 	int64_t iDataSize = 0;
@@ -107,14 +100,13 @@ struct LazyChunk
 	// and remain stable until the consumer resets a ready or failed terminal state.
 	uint64_t uiRangeReloadOffset = 0;
 	uint64_t uiRangeReloadLength = 0;
-	MovableAtomicChunkRangeReloadState eRangeReloadState {};
+	MovableAtomicChunkRangeReloadState eRangeReloadState;
 
 	// GPU upload results (written by upload thread, read by main thread)
-	VkImage uploadVkImage = VK_NULL_HANDLE;
+	VkImage vkUploadImage = VK_NULL_HANDLE;
 	VmaAllocation vmaAllocation = VK_NULL_HANDLE;
 };
 
-// Load request for background thread
 enum class LoadPriority : uint32_t
 {
 	kLow = 0,
@@ -131,13 +123,12 @@ enum class LoadRequestKind : uint32_t
 
 struct LoadRequest
 {
-	common::crc_t crc;
-	LoadPriority ePriority;
+	common::crc_t crc = 0;
+	LoadPriority ePriority = LoadPriority::kLow;
 	LoadRequestKind eKind = LoadRequestKind::kWholeChunk;
 	uint64_t uiOffset = 0;
 	uint64_t uiLength = 0;
 
-	// Priority queue needs comparison operator
 	bool operator<(const LoadRequest& rOther) const
 	{
 		return ePriority < rOther.ePriority;
@@ -182,12 +173,12 @@ private:
 public:
 #endif
 	PackChunks* mpPackChunks = nullptr;
-	uint32_t uiEntryIndex = std::numeric_limits<uint32_t>::max();
-	uint64_t uiGeneration = 0;
+	uint32_t muiEntryIndex = std::numeric_limits<uint32_t>::max();
+	uint64_t muiGeneration = 0;
 private:
-	common::crc_t crc = 0;
-	uint64_t uiOffset = 0;
-	uint64_t uiLength = 0;
+	common::crc_t muiCrc = 0;
+	uint64_t muiOffset = 0;
+	uint64_t muiLength = 0;
 };
 
 #endif // BT_CLIENT
@@ -197,8 +188,6 @@ constexpr bool IsEagerChunk(data::DataTypes eDataType);
 // Used to skip opening (and locking) pack files the server never reads — Audio, Texture, etc.
 constexpr bool IsServerChunk(data::DataTypes eDataType);
 
-// Owned by FileManager (std::unique_ptr, forward-declared for the compile firewall): the packed-asset chunk
-// engine (eager buffers, lazy maps, loading threads, VirtualAlloc pool).
 class FileManager
 {
 public:
@@ -206,105 +195,48 @@ public:
 	FileManager();
 	~FileManager();
 
-	FileManager(const FileManager&) = delete; // Holds a std::unique_ptr<PackChunks> (non-copyable); deleting copy also suppresses the implicit move
+	FileManager(const FileManager&) = delete;
 	FileManager& operator=(const FileManager&) = delete;
 
-	bool Exists(const FileFlags_t& rFlags, const std::filesystem::path& rFilename);
 	std::fstream OpenFile(const FileFlags_t& rFlags, const std::filesystem::path& rFilename);
 	void RemoveFile(const FileFlags_t& rFlags, const std::filesystem::path& rFilename);
 	[[nodiscard]] bool ComputeSha256(std::span<const std::byte> bytes, std::array<uint8_t, 32>& rOut);
 	[[nodiscard]] bool ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, FileContentDigest& rOut);
 
-	// Crash-safe write: opens "<rFilename>.tmp" for write, runs fnWrite(stream), closes, then atomically renames to rFilename.
-	// On stream failure or rename failure the previous good file remains intact and the .tmp is removed. Returns false on any failure.
+	// Writes through "<rFilename>.tmp"; a stream or rename failure leaves the destination intact and attempts temporary-file cleanup.
 	template <typename FN>
-	[[nodiscard]] bool WriteFileAtomically(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, FN&& fnWrite);
+	[[nodiscard]] bool WriteFileAtomically(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, FN&& rWrite);
 
-	const std::unordered_map<common::crc_t, EagerChunk>& GetEagerChunkMap() const;
-	const std::unordered_map<common::crc_t, LazyChunk>& GetLazyChunkMap() const;
-	common::crc_t GetPackIntegrityToken() const;
 	
-	// Lazy loading APIs
-	bool IsChunkReady(common::crc_t crc) const;
-	void RequestChunkLoad(std::span<const common::crc_t> crcs, LoadPriority ePriority = LoadPriority::kNormal);
-	void WaitForChunks(std::span<const common::crc_t> crcs);
 	
-	// Streaming API for reading data at specific offset within a chunk
-	bool ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer);
 
-#if defined(BT_CLIENT)
-	ChunkReadResult TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer);
-#endif // BT_CLIENT
-
-	// Notification for chunk completion (wakes WaitForChunks waiters)
-	void NotifyChunkCompletion();
-	LazyChunk& GetLazyChunk(common::crc_t crc);
-
-	// Blocks until no whole or range load is queued or running, with every accepted job's terminal state published.
-	// Full graphics recovery calls this before texture-upload teardown so no loader can publish into the reset that
-	// follows. Callers must not enqueue new work afterwards until recovery completes. No separate admission state
-	// enforces that, because the exclusion is temporal: the one off-main producer (one-shot audio requesting its chunk
-	// from tick workers) has joined by the end of ClientUpdate, which precedes Render and the Graphics::Destroy that
-	// calls this.
-	void WaitForLoadersIdle();
-
-	// Reset texture eState and GPU handles: all texture chunks, or only targetCrcs. Chunk pool pointers and sizes are
-	// fixed at construction and are not touched. The caller owns exclusion for the chunks it resets — full recovery
-	// through WaitForLoadersIdle plus the upload-thread wait, island eviction through RenderGlobal's drained
-	// descriptor window, which excludes Vulkan descriptor/image use and is not a loader drain.
-	void ResetTextureChunkStates();
-	void ResetTextureChunkStates(std::span<const common::crc_t> targetCrcs);
-
-	// Reclaim a dead sub-range of a resident lazy chunk's decompressed pool memory. Decommits only the
-	// page-aligned interior of [uiOffset, uiOffset + uiLength); the boundary partial-pages (which may share
-	// bytes with the neighbouring payload) and every other chunk stay committed, and the chunk's pData pointer
-	// is unchanged. A consumer must recommit and reload the range before reading it again. Main-thread
-	// only (boot / device-loss recovery / transfer-complete texture adoption) — the range must have no concurrent reader.
-	void DecommitChunkRange(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
-	// Inverse of DecommitChunkRange: MEM_COMMITs the interior and re-reads [uiOffset, uiOffset + uiLength)
-	// straight from the pack file on disk into the pool (NOT via the decommitted resident copy). Uncompressed chunks only.
-	// Returns true on success; false on soft-fail (MEM_COMMIT failure / pack-open failure). On false the
-	// caller must NOT read the range — the interior may be decommitted or hold partial data.
-	[[nodiscard]] bool RecommitAndReloadChunkRange(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
-	// Queues a single uncompressed lazy-chunk range for background recommit/reload. Same-range requests deduplicate
-	// while pending or ready; a failed request stays failed until its consumer resets it. State reads acquire the
-	// worker's ready/failed publication, and reset refuses a pending request so it cannot invalidate an in-flight reload.
-	void RequestChunkRangeReload(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, LoadPriority ePriority = LoadPriority::kNormal);
-	ChunkRangeReloadState GetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength) const;
-	void ResetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
-
-	// Memory profiling
-	MemoryStats GetEagerStats() const;
-	MemoryStats GetLazyStats() const;
-	MemoryStats GetMemoryStats(data::DataTypes eDataType) const;
-
-private:
-
+public:
 	std::filesystem::path GetFilePath(const FileFlags_t& rFlags, const std::filesystem::path& rFilename);
+private:
 	bool CommitAtomicWrite(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, bool bWriteSucceeded);
 	void BackupExistingFile(const FileFlags_t& rFlags, const std::filesystem::path& rFilename);
+
+public:
 
 	std::filesystem::path mAppDataDirectory;
 	std::filesystem::path mTempDirectory;
 
 	// Packed-asset chunk engine. Owns the eager buffers, lazy maps, loading threads, and VirtualAlloc pool; the
-	// public chunk methods above forward to it. unique_ptr keeps PackChunks.h out of this header's ~20 PCH
-	// consumers (out-of-line ~FileManager in the .cpp destroys it where PackChunks is complete).
-#if defined(BT_CLIENT) && defined(BT_DEBUG)
-public:
-#endif
+	// callers reach it through mpPackChunks. The out-of-line destructor destroys the unique_ptr where PackChunks
+	// is complete; consumers that access its members include PackChunks.h.
 	std::unique_ptr<PackChunks> mpPackChunks;
 };
 
 inline FileManager* gpFileManager = nullptr;
 
-// Type trait to detect if a type has both operator<< and operator>> for binary stream serialization
-// Excludes built-in arithmetic types, pointers, and std::string to avoid false positives from text formatters
+// Exclude arithmetic types, pointers, strings and string views to avoid treating text stream operators as binary serialization.
 template <typename T, typename = void>
-struct has_binary_stream_operators : std::false_type {};
+struct HasBinaryStreamOperators : std::false_type
+{
+};
 
 template <typename T>
-struct has_binary_stream_operators
+struct HasBinaryStreamOperators
 <T,
 	std::enable_if_t
 	<
@@ -318,36 +250,37 @@ struct has_binary_stream_operators
 			decltype(std::declval<std::istream&>() >> std::declval<T&>())
 		>
 	>
-> : std::true_type {};
+> : std::true_type
+{
+};
 
 template <typename T>
-inline constexpr bool has_binary_stream_operators_v = has_binary_stream_operators<T>::value;
+inline constexpr bool kbHasBinaryStreamOperators = HasBinaryStreamOperators<T>::value;
 
 template <typename FN>
-bool FileManager::WriteFileAtomically(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, FN&& fnWrite)
+bool FileManager::WriteFileAtomically(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, FN&& rWrite)
 {
 	if (rFlags & FileFlags::kBackup)
 	{
 		BackupExistingFile(rFlags, rFilename);
 	}
 
-	// OpenFile is called on the .tmp filename, which doesn't exist yet, so kBackup must be stripped to avoid a no-op second backup.
-	// kStreaming is added because WriteFileAtomically is the only legitimate kWrite-without-kStreaming caller.
+	// Strip kBackup because the destination was backed up above; enable kStreaming for the temporary-file write.
 	FileFlags_t openFlags = rFlags;
 	openFlags.Set(FileFlags::kBackup, false);
 	openFlags.Set(FileFlags::kStreaming);
 
-	std::filesystem::path tmpFilename = rFilename;
-	tmpFilename += ".tmp";
+	std::filesystem::path temporaryFilename = rFilename;
+	temporaryFilename += ".tmp";
 
-	std::fstream stream = OpenFile(openFlags, tmpFilename);
+	std::fstream stream = OpenFile(openFlags, temporaryFilename);
 	if (!stream.is_open())
 	{
 		LOG(kLoading, kError, "WriteFileAtomically failed to open \"{}.tmp\"", rFilename.string());
 		return false;
 	}
 
-	fnWrite(stream);
+	rWrite(stream);
 	stream.close();
 	bool bGood = !stream.fail();
 
@@ -364,8 +297,7 @@ void WriteVersionHeader(std::fstream& rFileStream)
 	common::Write(rFileStream, std::is_trivially_copyable_v<STRUCT_TYPE> ? static_cast<int64_t>(sizeof(STRUCT_TYPE)) : int64_t{0});
 }
 
-// Reads the version+size header into the out-params and applies the validity rule. Out-params are
-// load-bearing: callers print the read values on mismatch and re-test for the size-mismatch DEBUG_BREAK.
+// Callers need the decoded version and size to diagnose mismatches and detect missing layout-version bumps.
 template <typename STRUCT_TYPE>
 bool ReadAndValidateVersionHeader(std::fstream& rFileStream, int64_t& riVersion, int64_t& riSize)
 {
@@ -385,7 +317,7 @@ bool WriteVersionedFile(const FileFlags_t& rFlags, const std::filesystem::path& 
 		WriteVersionHeader<STRUCT_TYPE>(rFileStream);
 		LOG(kLoading, kDebug, "WriteVersionedFile {} iVersion: {} iSize: {}", rFilename, iVersion, iSize);
 
-		if constexpr (has_binary_stream_operators_v<STRUCT_TYPE>)
+		if constexpr (kbHasBinaryStreamOperators<STRUCT_TYPE>)
 		{
 			rFileStream << rStructure;
 		}
@@ -408,7 +340,7 @@ bool ReadVersionedFile(const FileFlags_t& rFlags, const std::filesystem::path& r
 	LOG(kLoading, kDebug, "    iVersion: {} == {} iSize: {} == {}", iVersion, STRUCT_TYPE::kiVersion, iSize, sizeof(STRUCT_TYPE));
 	if (bHeaderValid)
 	{
-		if constexpr (has_binary_stream_operators_v<STRUCT_TYPE>)
+		if constexpr (kbHasBinaryStreamOperators<STRUCT_TYPE>)
 		{
 			fileStream >> rStructure;
 			return fileStream.good();
@@ -428,7 +360,7 @@ bool ReadVersionedFile(const FileFlags_t& rFlags, const std::filesystem::path& r
 	{
 		if (iVersion == STRUCT_TYPE::kiVersion && iSize != sizeof(STRUCT_TYPE))
 		{
-			// If this is hit, Frame::kiVersion might be missing a sub-version
+			// A matching version with a different serialized size indicates a missing layout-version bump.
 			DEBUG_BREAK();
 		}
 	}

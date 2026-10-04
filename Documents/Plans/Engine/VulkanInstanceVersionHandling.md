@@ -14,7 +14,7 @@ The recommendation is to reuse the existing `CHECK_VK` policy because `GraphicsU
 1. Retain the null-entry-point guard. Recommend the log text `Vulkan 1.2 required; vkEnumerateInstanceVersion is unavailable` and dialog text `Vulkan 1.2 or higher is required.\n\nThe Vulkan instance-version query is unavailable.` These state the observed limitation without attributing a device version.
 2. Replace the local `VkResult` assignment with `CHECK_VK(vkEnumerateInstanceVersion(&uiApiVersion));`. Keep initialization of `uiApiVersion` and make the following condition solely `uiApiVersion < VK_API_VERSION_1_2`.
 3. Recommend the insufficient-version log `Vulkan 1.2 required; supported Vulkan instance version is {}.{}` and dialog prefix `Vulkan 1.2 or higher is required.\n\nThe supported Vulkan instance version is `. Keep the existing major/minor formatting and fatal exception in this branch.
-4. Preserve both `!AgentLaunched()` dialog guards and the fatal null-entry-point branch. Remove the two obvious narration comment blocks immediately before the guard and query; the code states these operations directly.
+4. Preserve both `!(gLaunchOptions.iAgentPort != 0)` dialog guards and the fatal null-entry-point branch. Remove the two obvious narration comment blocks immediately before the guard and query; the code states these operations directly.
 
 The deliberate behavior change is that a failed query takes the established result-bearing fatal path, including its debug break, instead of the bespoke insufficient-version modal. No change to global error handling is recommended.
 
@@ -43,7 +43,7 @@ Instance/device creation, selected-device validation, extension and feature nego
 | Failed query is not interpreted as an insufficient version | Query passes through `CHECK_VK`; inspect `CheckVkFailed` for each documented failure result and verify it throws before version inspection. |
 | Only successful versions below 1.2 reach the version diagnostic | Diff shows version-only condition; messages identify instance support and retain major/minor formatting. |
 | Supported startup policy is preserved | Successful 1.2+ proceeds to unchanged `Create`; `InstanceManager.cpp:287` still requests 1.2 and its physical-device gate at lines 450-458 remains intact. |
-| Agent launches retain modal suppression | Both preflight dialogs remain inside `!AgentLaunched()` guards; query failure uses existing fatal policy. |
+| Agent launches retain modal suppression | Both preflight dialogs remain inside `!(gLaunchOptions.iAgentPort != 0)` guards; query failure uses existing fatal policy. |
 | Simplification stays local | One query invocation remains; local result variable and combined predicate disappear; no frame-path edits or new helpers. |
 | C++ integration remains valid | Client build succeeds through `/compile`. |
 

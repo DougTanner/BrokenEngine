@@ -5,6 +5,7 @@
 #include "Data/Model.h"
 #include "Data/Shader.h"
 #include "Data/Texture.h"
+#include "File/PackChunks.h"
 
 namespace engine
 {
@@ -17,7 +18,7 @@ DynamicPipelines::DynamicPipelines(std::unordered_map<common::crc_t, Shader>& rS
 // Resolves a model scene CRC to its model buffer + animation-aware vertex shader CRC (shared by the model + model-shadow pipeline creators).
 static void ResolveModelChunkShaders(common::crc_t sceneCrc, Buffer*& rpModelBuffer, common::crc_t& rVertexShaderCrc)
 {
-	const std::unordered_map<common::crc_t, EagerChunk>& rChunkMap = gpFileManager->GetEagerChunkMap();
+	const std::unordered_map<common::crc_t, EagerChunk>& rChunkMap = gpFileManager->mpPackChunks->GetEagerChunkMap();
 	auto sceneIt = rChunkMap.find(sceneCrc);
 	if (sceneIt == rChunkMap.end())
 	{
@@ -40,7 +41,6 @@ static void ResolveModelChunkShaders(common::crc_t sceneCrc, Buffer*& rpModelBuf
 	rVertexShaderCrc = rSceneHeader.bHasAnimation ? data::kShadersModelModelSkinnedvertCrc : data::kShadersModelModelStaticvertCrc;
 }
 
-// Allocates a Pipeline, runs Create with the supplied info, and registers it under eType/crc — the boilerplate tail shared by every CreatePipeline* below.
 void DynamicPipelines::AddPipeline(DynamicPipelineType eType, common::crc_t crc, const PipelineInfo& rPipelineInfo)
 {
 	mPipelines.push_back(std::make_unique<Pipeline>());
@@ -62,7 +62,6 @@ ModelPipeline* DynamicPipelines::CreateModelPipeline(const ModelPipelineSpec& rM
 
 void DynamicPipelines::CreateModelPipeline(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers)
 {
-	// Skip if pipeline already exists
 	if (mModelPipelineMaps[kDynamicModelPipelineModel].contains(crc))
 	{
 		return;
@@ -70,11 +69,10 @@ void DynamicPipelines::CreateModelPipeline(common::crc_t crc, std::string_view n
 
 	// Trust boundary: ResolveModelChunkShaders validates the pack-derived scene kind and model reference before
 	// PipelineInfo consumes them; ModelPipeline::Create validates scene-header counts and material ranges. This
-	// boot-required model pipeline logs kError and propagates to MainThread's try/catch (HandleException — crash
+	// boot-required model pipeline logs kError and propagates to ProcessMain's try/catch (HandleException — crash
 	// report + exit), matching the boot hard-fail tier.
 	try
 	{
-		// Look up the model buffer and animation-aware vertex shader from the scene header
 		Buffer* pModelBuffer = nullptr;
 		common::crc_t vertexShaderCrc = 0;
 		ResolveModelChunkShaders(sceneCrc, pModelBuffer, vertexShaderCrc);
@@ -88,7 +86,7 @@ void DynamicPipelines::CreateModelPipeline(common::crc_t crc, std::string_view n
 				.flags = {PipelineFlags::kIndirectHostVisible, PipelineFlags::kPushConstants, PipelineFlags::kDepthTest, PipelineFlags::kDepthWrite, PipelineFlags::kCullBack, PipelineFlags::kSampleShading, PipelineFlags::kUpdateAfterBind, PipelineFlags::kMultiSet},
 				.ppShaders = {&mrShaders.at(vertexShaderCrc), &mrShaders.at(data::kShadersModelModelfragCrc)},
 				.pVertexBuffer = pModelBuffer,
-				.pDescriptorInfos =
+				.descriptorInfos =
 				{
 					{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 					{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
@@ -110,7 +108,6 @@ void DynamicPipelines::CreateModelPipeline(common::crc_t crc, std::string_view n
 
 void DynamicPipelines::CreateModelPipelineShadow(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers)
 {
-	// Skip if shadow pipeline already exists
 	if (mModelPipelineMaps[kDynamicModelPipelineModelShadow].contains(crc))
 	{
 		return;
@@ -118,12 +115,11 @@ void DynamicPipelines::CreateModelPipelineShadow(common::crc_t crc, std::string_
 
 	// Trust boundary: ResolveModelChunkShaders validates the pack-derived scene kind and model reference before
 	// PipelineInfo consumes them; ModelPipeline::Create validates scene-header counts and material ranges. This
-	// boot-required model pipeline logs kError and propagates to MainThread's try/catch (HandleException — crash
+	// boot-required model pipeline logs kError and propagates to ProcessMain's try/catch (HandleException — crash
 	// report + exit), matching the boot hard-fail tier.
 	std::string_view pipelineName = name;
 	try
 	{
-		// Look up the model buffer and animation-aware vertex shader from the scene header
 		Buffer* pModelBuffer = nullptr;
 		common::crc_t vertexShaderCrc = 0;
 		ResolveModelChunkShaders(sceneCrc, pModelBuffer, vertexShaderCrc);
@@ -132,7 +128,6 @@ void DynamicPipelines::CreateModelPipelineShadow(common::crc_t crc, std::string_
 		std::string& rShadowName = mShadowPipelineNames.insert_or_assign(crc, std::string(name) + "Shadow").first->second;
 		pipelineName = rShadowName;
 
-		// Create shadow pipeline with minimal descriptor sets
 		ModelPipeline* pPipelineShadow = CreateModelPipeline(
 		{
 			.sceneCrc = sceneCrc,
@@ -142,9 +137,9 @@ void DynamicPipelines::CreateModelPipelineShadow(common::crc_t crc, std::string_
 				.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kIndirectHostVisible, PipelineFlags::kPushConstants, PipelineFlags::kUpdateAfterBind},
 				.ppShaders = {&mrShaders.at(vertexShaderCrc), &mrShaders.at(data::kShadersModelModelShadowfragCrc)},
 				.pVertexBuffer = pModelBuffer,
-				.targetVkRenderPass = gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.mVkRenderPass,
-				.vkExtent3D = gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.mInfo.extent,
-				.pDescriptorInfos =
+				.vkTargetRenderPass = gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.mVkRenderPass,
+				.vkExtent3D = gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture.mInfo.vkExtent3D,
+				.descriptorInfos =
 				{
 					{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 					{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
@@ -179,9 +174,9 @@ void DynamicPipelines::CreateAreaLightingPipeline(DynamicPipelineType eType, com
 		.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kIndirectHostVisible, PipelineFlags::kMax, PipelineFlags::kUpdateAfterBind},
 		.ppShaders = {&mrShaders.at(vertexShaderCrc), &mrShaders.at(fragmentShaderCrc)},
 		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-		.targetVkRenderPass = gpTextureManager->mRenderTargetTextures.mLightingVkRenderPass,
-		.vkExtent3D = gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.extent,
-		.pDescriptorInfos =
+		.vkTargetRenderPass = gpTextureManager->mRenderTargetTextures.mLightingVkRenderPass,
+		.vkExtent3D = gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.vkExtent3D,
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mDynamicStorageBuffers[kBufferMain].at(crc).data()},
@@ -191,27 +186,20 @@ void DynamicPipelines::CreateAreaLightingPipeline(DynamicPipelineType eType, com
 	});
 }
 
-void DynamicPipelines::CreatePipelineLighting(common::crc_t crc, std::string_view name, int64_t iBufferSize)
-{
-	CreateAreaLightingPipeline(kDynamicPipelineLighting, crc, name, iBufferSize, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersLightingAreaLightfragCrc, DescriptorFlags::kSamplerRepeat);
-}
-
 void DynamicPipelines::CreatePipelineVisibleLights(common::crc_t crc, std::string_view name, Buffer* pStorageBuffers)
 {
-	// Skip if visible lights pipeline already exists
 	if (mPipelineMaps[kDynamicPipelineVisibleLights].contains(crc))
 	{
 		return;
 	}
 
-	// Allocate pipeline for visible lights rendering in main pass
 	AddPipeline(kDynamicPipelineVisibleLights, crc,
 	{
 		.name = name,
 		.flags = {PipelineFlags::kIndirectHostVisible, PipelineFlags::kAddAlpha, PipelineFlags::kSampleShading, PipelineFlags::kUpdateAfterBind},
 		.ppShaders = {&mrShaders.at(data::kShadersLightingVisibleLightvertCrc), &mrShaders.at(data::kShadersLightingVisibleLightfragCrc)},
 		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
@@ -223,30 +211,22 @@ void DynamicPipelines::CreatePipelineVisibleLights(common::crc_t crc, std::strin
 	});
 }
 
-void DynamicPipelines::CreatePipelineAxisAlignedLighting(common::crc_t crc, std::string_view name, int64_t iBufferSize)
-{
-	CreateAreaLightingPipeline(kDynamicPipelineAxisAlignedLighting, crc, name, iBufferSize, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersLightingPointLightfragCrc, DescriptorFlags::kSamplerClamp);
-}
-
 void DynamicPipelines::CreatePipelineBillboards(common::crc_t crc, std::string_view name, int64_t iBufferSize)
 {
-	// Skip if billboards pipeline already exists
 	if (mPipelineMaps[kDynamicPipelineBillboards].contains(crc))
 	{
 		return;
 	}
 
-	// Create storage buffer for this billboards pipeline
 	gpBufferManager->CreateDynamicBuffer(crc, kBufferMain, name, iBufferSize);
 
-	// Allocate pipeline and configure for billboard rendering
 	AddPipeline(kDynamicPipelineBillboards, crc,
 	{
 		.name = name,
 		.flags = {PipelineFlags::kIndirectHostVisible, PipelineFlags::kSampleShading, PipelineFlags::kAlphaBlend, PipelineFlags::kUpdateAfterBind},
 		.ppShaders = {&mrShaders.at(data::kShadersParticlesBillboardsvertCrc), &mrShaders.at(data::kShadersParticlesBillboardsfragCrc)},
 		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
@@ -257,7 +237,7 @@ void DynamicPipelines::CreatePipelineBillboards(common::crc_t crc, std::string_v
 	});
 }
 
-void DynamicPipelines::CreateDepositPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, Texture& rTargetTexture, const DescriptorInfo& rTextureDescriptor, VkBuffer* pOccupancyBuffer, int64_t iBufferSize)
+void DynamicPipelines::CreateDepositPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, const Texture& rTargetTexture, const DescriptorInfo& rTextureDescriptor, VkBuffer* pVkOccupancyBuffer, int64_t iBufferSize)
 {
 	if (mPipelineMaps[eType].contains(crc))
 	{
@@ -275,67 +255,34 @@ void DynamicPipelines::CreateDepositPipeline(DynamicPipelineType eType, common::
 		.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kIndirectHostVisible, PipelineFlags::kAdd, PipelineFlags::kUpdateAfterBind},
 		.ppShaders = {&mrShaders.at(vertexShaderCrc), &mrShaders.at(fragmentShaderCrc)},
 		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-		.targetVkRenderPass = rTargetTexture.mVkRenderPass,
-		.vkExtent3D = rTargetTexture.mInfo.extent,
-		.pDescriptorInfos =
+		.vkTargetRenderPass = rTargetTexture.mVkRenderPass,
+		.vkExtent3D = rTargetTexture.mInfo.vkExtent3D,
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mDynamicStorageBuffers[kBufferMain].at(crc).data()},
 			rTextureDescriptor,
-			{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = pOccupancyBuffer},
+			{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = pVkOccupancyBuffer},
 		},
 	});
 }
 
-void DynamicPipelines::CreatePipelineSmokeAxisAligned(common::crc_t crc, std::string_view name, int64_t iBufferSize)
-{
-	CreateDepositPipeline(kDynamicPipelineSmokeAxisAligned, crc, name, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesSmokeBC44jpgCrc}, &gpBufferManager->mSmokeOccupancyVkBuffers[0], iBufferSize);
-}
-
-void DynamicPipelines::CreatePipelineSmoke(common::crc_t crc, std::string_view name, int64_t iBufferSize)
-{
-	CreateDepositPipeline(kDynamicPipelineSmoke, crc, name, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeGradientTexture}, &gpBufferManager->mSmokeOccupancyVkBuffers[0], iBufferSize);
-}
-
-void DynamicPipelines::CreatePipelineWindDepositA(common::crc_t crc, std::string_view name, int64_t iBufferSize)
-{
-	CreateDepositPipeline(kDynamicPipelineWindDepositA, crc, name, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc}, &gpBufferManager->mWindOccupancyVkBuffers[0], iBufferSize);
-}
-
-void DynamicPipelines::CreatePipelineWindDepositB(common::crc_t crc, std::string_view name)
-{
-	CreateDepositPipeline(kDynamicPipelineWindDepositB, crc, name, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureTwo, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc}, &gpBufferManager->mWindOccupancyVkBuffers[1], 0);
-}
-
-void DynamicPipelines::CreatePipelineWindDepositAxisAlignedA(common::crc_t crc, std::string_view name, int64_t iBufferSize)
-{
-	CreateDepositPipeline(kDynamicPipelineWindDepositAxisAlignedA, crc, name, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesParticlesBC4Square24pngCrc}, &gpBufferManager->mWindOccupancyVkBuffers[0], iBufferSize);
-}
-
-void DynamicPipelines::CreatePipelineWindDepositAxisAlignedB(common::crc_t crc, std::string_view name)
-{
-	CreateDepositPipeline(kDynamicPipelineWindDepositAxisAlignedB, crc, name, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureTwo, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesParticlesBC4Square24pngCrc}, &gpBufferManager->mWindOccupancyVkBuffers[1], 0);
-}
-
 void DynamicPipelines::CreatePipelineHexShields(common::crc_t crc, std::string_view name, int64_t iBufferSize)
 {
-	// Skip if HexShields pipeline already exists
 	if (mPipelineMaps[kDynamicPipelineHexShields].contains(crc))
 	{
 		return;
 	}
 
-	// Create storage buffer for this HexShields pipeline
 	gpBufferManager->CreateDynamicBuffer(crc, kBufferMain, name, iBufferSize);
 
-	// Allocate pipeline and configure for HexShields rendering (uses DualGeodesicIcosahedron mesh)
 	AddPipeline(kDynamicPipelineHexShields, crc,
 	{
 		.name = name,
 		.flags = {PipelineFlags::kIndirectHostVisible, PipelineFlags::kPushConstants, PipelineFlags::kAlphaBlend, PipelineFlags::kDepthTest, PipelineFlags::kCullBack, PipelineFlags::kUpdateAfterBind},
 		.ppShaders = {&mrShaders.at(data::kShadersObjectsHexShieldvertCrc), &mrShaders.at(data::kShadersObjectsHexShieldfragCrc)},
 		.pVertexBuffer = &gpBufferManager->mModelMap.at(data::kModelsDualGeodesicIcosahedronDualGeodesicIcosahedrongltfMODELCrc),
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
@@ -347,22 +294,21 @@ void DynamicPipelines::CreatePipelineHexShields(common::crc_t crc, std::string_v
 
 void DynamicPipelines::CreatePipelineHexShieldsLighting(common::crc_t crc, std::string_view name)
 {
-	// Skip if HexShields lighting pipeline already exists
 	if (mPipelineMaps[kDynamicPipelineHexShieldsLighting].contains(crc))
 	{
 		return;
 	}
 
-	// Allocate pipeline and configure for HexShields lighting pass (shares buffer with main HexShields pipeline)
+	// Shares the main HexShields pipeline's storage buffer.
 	AddPipeline(kDynamicPipelineHexShieldsLighting, crc,
 	{
 		.name = name,
 		.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kMax, PipelineFlags::kIndirectHostVisible, PipelineFlags::kUpdateAfterBind},
 		.ppShaders = {&mrShaders.at(data::kShadersObjectsHexShieldvertCrc), &mrShaders.at(data::kShadersObjectsHexShieldLightingfragCrc)},
 		.pVertexBuffer = &gpBufferManager->mModelMap.at(data::kModelsDualGeodesicIcosahedronDualGeodesicIcosahedrongltfMODELCrc),
-		.targetVkRenderPass = gpTextureManager->mRenderTargetTextures.mLightingVkRenderPass,
-		.vkExtent3D = gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.extent,
-		.pDescriptorInfos =
+		.vkTargetRenderPass = gpTextureManager->mRenderTargetTextures.mLightingVkRenderPass,
+		.vkExtent3D = gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.vkExtent3D,
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
@@ -373,11 +319,11 @@ void DynamicPipelines::CreatePipelineHexShieldsLighting(common::crc_t crc, std::
 
 void DynamicPipelines::UpdateAllModelPipelineDescriptors(int64_t iCommandBuffer, int64_t iBinding, Buffer* pBuffer)
 {
-	for (auto& [rCrc, rpPipeline] : mModelPipelineMaps[kDynamicModelPipelineModel])
+	for (const auto& [rCrc, rpPipeline] : mModelPipelineMaps[kDynamicModelPipelineModel])
 	{
 		rpPipeline->UpdateStorageBufferDescriptors(iCommandBuffer, iBinding, pBuffer);
 	}
-	for (auto& [rCrc, rpPipeline] : mModelPipelineMaps[kDynamicModelPipelineModelShadow])
+	for (const auto& [rCrc, rpPipeline] : mModelPipelineMaps[kDynamicModelPipelineModelShadow])
 	{
 		rpPipeline->UpdateStorageBufferDescriptors(iCommandBuffer, iBinding, pBuffer);
 	}

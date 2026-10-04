@@ -1,7 +1,7 @@
 # Mimalloc peak committed exceeds the arena reserve at server shutdown
 
 Open question: why did a Debug server's mimalloc peak committed memory exceed
-`kiMimallocArenaReserveMb` (10240 MiB) when its peak heap usage was only
+`kiMimallocArenaReserveMebibytes` (10240 MiB) when its peak heap usage was only
 1692 MiB? Not yet a Plan because the root cause is unproven, and the fix
 depends on it (see `## What diagnosis must establish`).
 
@@ -16,7 +16,7 @@ depends on it (see `## What diagnosis must establish`).
   `Mimalloc peak heap usage: 1692 MiB, peak committed: 11306 MiB (arena reserve: 10240 MiB)`
   It then hit `DEBUG_BREAK` in `MemoryInitializer::~MemoryInitializer`
   (`Engine/Source/Memory/GlobalAllocator.cpp`, the
-  `iPeakCommittedMb > kiMimallocArenaReserveMb` check).
+  `iPeakCommittedMebibytes > kiMimallocArenaReserveMebibytes` check).
 - The session's own change, which removed a 16-entry reserve and capacity
   check on a list that reached 85 small entries, cannot account for gigabytes
   of committed memory, so it is not a suspect.
@@ -25,7 +25,7 @@ depends on it (see `## What diagnosis must establish`).
 
 - `MemoryInitializer::MemoryInitializer` sets `mi_option_arena_eager_commit`
   to 1 and sets `mi_option_reserve_os_memory` to
-  `kiMimallocArenaReserveMb * 1024` KiB.
+  `kiMimallocArenaReserveMebibytes * 1024` KiB.
 - `~MemoryInitializer` (Debug only, not under `ENABLE_CRT_DEBUG_HEAP`) logs
   `stats.page_committed.peak` as "peak heap usage", compares
   `stats.committed.peak` against the reserve, and breaks when the reserve is
@@ -53,5 +53,5 @@ Run `/external-diagnose-bug`. It must establish:
 Once those answers exist, the outcome decides the destination. A wrong check
 or metric makes this a `Documents/Plans/Engine/` debt Plan for the shutdown
 check. A real memory growth source makes it a Plan for that owner. An
-undersized reserve means changing `kiMimallocArenaReserveMb` (a user decision
+undersized reserve means changing `kiMimallocArenaReserveMebibytes` (a user decision
 about the address-space budget).

@@ -125,9 +125,9 @@ Files:
   Engine/Source/Ui/MenuUtils.h:7-31
     kfMainMenuCenterFractionX = 1/3, kfMainMenuCenterFractionY = 0.5
     kfMainMenuOpticalOffsetYPixels = 20
-    kfGraphicsMaxHeightFraction = 0.9f, kfModalAnchorFractionY = 0.4f
+    kfGraphicsMaximumHeightFraction = 0.9f, kfModalAnchorFractionY = 0.4f
     kfHeadingGapPixels = 22
-    kfPrimaryButtonMinWidthPixels = 760, kfModalButtonMinWidthPixels = 380
+    kfPrimaryButtonMinimumWidthPixels = 760, kfModalButtonMinimumWidthPixels = 380
     kfMainMenuHeadingScale = 1.3, kfLanguageMenuFontScale = 1.0
     kfLanguageMenuGeometryScale = 0.5
   Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:14-16
@@ -219,12 +219,12 @@ CalcTextSize over that screen's labels, measured under the live font so the
 width is localization-proof — floored, where a floor constant exists, to a
 per-screen minimum. That max-plus-padding measurement is the MenuButtonsWidth
 helper; the minimum floors are the k*ButtonMinWidthPixels constants
-(kfPrimaryButtonMinWidthPixels, kfModalButtonMinWidthPixels).
+(kfPrimaryButtonMinimumWidthPixels, kfModalButtonMinimumWidthPixels).
 
 Files:
   Engine/Source/Ui/MenuUtils.cpp:289  bool MenuButton(...)
   Engine/Source/Ui/MenuUtils.cpp:253  float MenuButtonsWidth(std::initializer_list<std::u32string_view>)
-  Engine/Source/Ui/MenuUtils.h:30-31  kfPrimaryButtonMinWidthPixels, kfModalButtonMinWidthPixels
+  Engine/Source/Ui/MenuUtils.h:30-31  kfPrimaryButtonMinimumWidthPixels, kfModalButtonMinimumWidthPixels
   Engine/Source/Ui/Screens/ModalScreen.cpp:54  MenuButton("OK", ...)  (themed button)
 
 

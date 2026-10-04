@@ -188,18 +188,18 @@ static bool ReconcileValidateCrcCoord(CoordWork& rWork, int64_t iTick, const eng
 	rCurrentFrame.interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, false);
 	common::crc_t uiClientCrc = rCurrentFrame.postRender.uiSharedCrc;
 
-	if (uiClientCrc != rUpdate.sharedCrc)
+	if (uiClientCrc != rUpdate.uiSharedCrc)
 	{
 		if (!(rScratch.flags & ReconcileScratchFlags::kSuppressRepeatLogs))
 		{
 			char acSharedCrc[20] {}, acClientCrc[20] {};
-			common::ToHex(std::span<char, 20>(acSharedCrc), rUpdate.sharedCrc);
+			common::ToHex(std::span<char, 20>(acSharedCrc), rUpdate.uiSharedCrc);
 			common::ToHex(std::span<char, 20>(acClientCrc), uiClientCrc);
 			LOG(kNetwork, kDebug, "ReconcileValidateCrcCoord Replay CRC mismatch; reconciliation outcome pending Coord: ({},{}) ForTick: {} ServerCrc: {} ClientCrc: {} ServerStatusChanges: {} ClientStatusChanges: {}", rWork.coord.iX, rWork.coord.iY, iTick, acSharedCrc, acClientCrc, std::ssize(rUpdate.statusChanges), std::ssize(rFrameInput.statusChanges));
 		}
 
 		rScratch.iDesyncTick = iTick;
-		rScratch.desyncExpectedCrc = rUpdate.sharedCrc;
+		rScratch.desyncExpectedCrc = rUpdate.uiSharedCrc;
 		rScratch.desyncActualCrc = uiClientCrc;
 		if constexpr (kbDesyncDebugFrames)
 		{

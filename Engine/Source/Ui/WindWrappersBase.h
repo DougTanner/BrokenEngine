@@ -5,7 +5,6 @@
 namespace engine
 {
 
-// Time & Global
 extern Wrapper gWindTimeScale;
 extern Wrapper gWindThresholdLow;
 extern Wrapper gWindThresholdHigh;

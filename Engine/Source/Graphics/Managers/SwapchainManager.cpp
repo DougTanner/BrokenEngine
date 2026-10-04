@@ -9,7 +9,7 @@
 namespace engine
 {
 
-SwapchainManager::SwapchainManager(VkSwapchainKHR oldSwapchain)
+SwapchainManager::SwapchainManager(VkSwapchainKHR vkOldSwapchain)
 : mPresent(common::kThreadPresent, common::kiMinWorkbufferSize)
 {
 	ASSERT(gpSwapchainManager == nullptr);
@@ -19,9 +19,9 @@ SwapchainManager::SwapchainManager(VkSwapchainKHR oldSwapchain)
 	ScopedBootTimer scopedBootTimer(kBootTimerSwapchainManager);
 
 	CreateRenderPass();
-	CreateSwapchain(oldSwapchain);
+	CreateSwapchain(vkOldSwapchain);
 	CreateFramebuffers();
-	CreateSyncObjects();
+	CreateSynchronizationObjects();
 }
 
 void SwapchainManager::CreateRenderPass()
@@ -30,15 +30,15 @@ void SwapchainManager::CreateRenderPass()
 	// highlights are not clamped by the UNORM swapchain. The fullscreen HDR-resolve pass (kPipelineHdrResolve)
 	// then tone-maps + color-grades the whole frame into the swapchain via the simplified mVkRenderPass below.
 
-	// HDR scene render pass: color, depth, and optional MSAA in F16; color ends in SHADER_READ_ONLY for the same-command-buffer resolve pass.
-	VkFormat hdrVkFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-	VkAttachmentDescription pHdrVkAttachmentDescriptions[]
+	// The HDR pass uses F16 color, a depth attachment, and optional multisampling; color ends in SHADER_READ_ONLY for the same-command-buffer resolve pass.
+	VkFormat vkHdrFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+	VkAttachmentDescription pVkHdrAttachmentDescriptions[]
 	{
 		// HDR color (resolve target when multisampling)
 		VkAttachmentDescription
 		{
 			.flags = 0,
-			.format = hdrVkFormat,
+			.format = vkHdrFormat,
 			.samples = VK_SAMPLE_COUNT_1_BIT,
 			.loadOp = kbFramebufferClearColor
 				? (gMultisampling.Get<bool>() ? VK_ATTACHMENT_LOAD_OP_DONT_CARE : VK_ATTACHMENT_LOAD_OP_CLEAR)
@@ -49,7 +49,6 @@ void SwapchainManager::CreateRenderPass()
 			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 			.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		},
-		// Depth
 		VkAttachmentDescription
 		{
 			.flags = 0,
@@ -62,11 +61,10 @@ void SwapchainManager::CreateRenderPass()
 			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 			.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		},
-		// Multisample HDR framebuffer
 		VkAttachmentDescription
 		{
 			.flags = 0,
-			.format = hdrVkFormat,
+			.format = vkHdrFormat,
 			.samples = gSampleCount.Get<VkSampleCountFlagBits>(),
 			.loadOp = kbFramebufferClearColor ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 			.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -74,34 +72,34 @@ void SwapchainManager::CreateRenderPass()
 			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 			.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		}
+		},
 	};
 
-	VkAttachmentReference hdrColorVkAttachmentReference
+	VkAttachmentReference vkHdrColorAttachmentReference
 	{
 		.attachment = 0,
 		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	};
-	VkAttachmentReference depthVkAttachmentReference
+	VkAttachmentReference vkDepthAttachmentReference
 	{
 		.attachment = 1,
 		.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 	};
-	VkAttachmentReference multisamplingVkAttachmentReference
+	VkAttachmentReference vkMultisamplingAttachmentReference
 	{
 		.attachment = 2,
 		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	};
-	VkSubpassDescription hdrVkSubpassDescription
+	VkSubpassDescription vkHdrSubpassDescription
 	{
 		.flags = 0,
 		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 		.inputAttachmentCount = 0,
 		.pInputAttachments = nullptr,
 		.colorAttachmentCount = 1,
-		.pColorAttachments = gMultisampling.Get<bool>() ? &multisamplingVkAttachmentReference : &hdrColorVkAttachmentReference,
-		.pResolveAttachments = gMultisampling.Get<bool>() ? &hdrColorVkAttachmentReference : nullptr,
-		.pDepthStencilAttachment = &depthVkAttachmentReference,
+		.pColorAttachments = gMultisampling.Get<bool>() ? &vkMultisamplingAttachmentReference : &vkHdrColorAttachmentReference,
+		.pResolveAttachments = gMultisampling.Get<bool>() ? &vkHdrColorAttachmentReference : nullptr,
+		.pDepthStencilAttachment = &vkDepthAttachmentReference,
 		.preserveAttachmentCount = 0,
 		.pPreserveAttachments = nullptr,
 	};
@@ -114,7 +112,7 @@ void SwapchainManager::CreateRenderPass()
 	// EARLY/LATE_FRAGMENT_TESTS stages) must be made available before this frame's automatic
 	// UNDEFINED -> DEPTH_STENCIL_ATTACHMENT_OPTIMAL transition/clear -- otherwise a latent write-after-write the
 	// sync-validation layer flags.
-	VkSubpassDependency pHdrVkSubpassDependencies[]
+	VkSubpassDependency pVkHdrSubpassDependencies[]
 	{
 		VkSubpassDependency
 		{
@@ -138,24 +136,24 @@ void SwapchainManager::CreateRenderPass()
 		},
 	};
 
-	VkRenderPassCreateInfo hdrVkRenderPassCreateInfo
+	VkRenderPassCreateInfo vkHdrRenderPassCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
 		.attachmentCount = gMultisampling.Get<bool>() ? 3u : 2u,
-		.pAttachments = pHdrVkAttachmentDescriptions,
+		.pAttachments = pVkHdrAttachmentDescriptions,
 		.subpassCount = 1,
-		.pSubpasses = &hdrVkSubpassDescription,
-		.dependencyCount = static_cast<uint32_t>(std::size(pHdrVkSubpassDependencies)),
-		.pDependencies = pHdrVkSubpassDependencies,
+		.pSubpasses = &vkHdrSubpassDescription,
+		.dependencyCount = static_cast<uint32_t>(std::size(pVkHdrSubpassDependencies)),
+		.pDependencies = pVkHdrSubpassDependencies,
 	};
-	CHECK_VK(vkCreateRenderPass(gpDeviceManager->mVkDevice, &hdrVkRenderPassCreateInfo, nullptr, &mHdrVkRenderPass));
+	CHECK_VK(vkCreateRenderPass(gpDeviceManager->mVkDevice, &vkHdrRenderPassCreateInfo, nullptr, &mHdrVkRenderPass));
 	VkName(VK_OBJECT_TYPE_RENDER_PASS, mHdrVkRenderPass, "SwapchainManagerHdr");
 
 	// Present render pass: one single-sample color attachment for the resolve quad; scene pipelines target the HDR pass, so no depth/MSAA. Full
 	// overwrite permits DONT_CARE load; final layout is PRESENT_SRC_KHR, with a color-only acquire-semaphore dependency.
-	VkAttachmentDescription presentVkAttachmentDescription
+	VkAttachmentDescription vkPresentAttachmentDescription
 	{
 		.flags = 0,
 		.format = gpInstanceManager->mFramebufferVkFormat,
@@ -167,26 +165,26 @@ void SwapchainManager::CreateRenderPass()
 		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 		.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 	};
-	VkAttachmentReference presentVkAttachmentReference
+	VkAttachmentReference vkPresentAttachmentReference
 	{
 		.attachment = 0,
 		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	};
-	VkSubpassDescription presentVkSubpassDescription
+	VkSubpassDescription vkPresentSubpassDescription
 	{
 		.flags = 0,
 		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 		.inputAttachmentCount = 0,
 		.pInputAttachments = nullptr,
 		.colorAttachmentCount = 1,
-		.pColorAttachments = &presentVkAttachmentReference,
+		.pColorAttachments = &vkPresentAttachmentReference,
 		.pResolveAttachments = nullptr,
 		.pDepthStencilAttachment = nullptr,
 		.preserveAttachmentCount = 0,
 		.pPreserveAttachments = nullptr,
 	};
 	// Wait to write colors until the acquired image is available (see the swapchain acquire semaphore chain).
-	VkSubpassDependency presentVkSubpassDependency
+	VkSubpassDependency vkPresentSubpassDependency
 	{
 		.srcSubpass = VK_SUBPASS_EXTERNAL,
 		.dstSubpass = 0,
@@ -202,30 +200,29 @@ void SwapchainManager::CreateRenderPass()
 		.pNext = nullptr,
 		.flags = 0,
 		.attachmentCount = 1,
-		.pAttachments = &presentVkAttachmentDescription,
+		.pAttachments = &vkPresentAttachmentDescription,
 		.subpassCount = 1,
-		.pSubpasses = &presentVkSubpassDescription,
+		.pSubpasses = &vkPresentSubpassDescription,
 		.dependencyCount = 1,
-		.pDependencies = &presentVkSubpassDependency,
+		.pDependencies = &vkPresentSubpassDependency,
 	};
 	CHECK_VK(vkCreateRenderPass(gpDeviceManager->mVkDevice, &vkRenderPassCreateInfo, nullptr, &mVkRenderPass));
 	VkName(VK_OBJECT_TYPE_RENDER_PASS, mVkRenderPass, "SwapchainManager");
 }
 
-void SwapchainManager::CreateSwapchain(VkSwapchainKHR oldSwapchain)
+void SwapchainManager::CreateSwapchain(VkSwapchainKHR vkOldSwapchain)
 {
 	VkSurfaceCapabilitiesKHR vkSurfaceCapabilitiesKHR {};
 	CHECK_VK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpInstanceManager->mVkPhysicalDevice, gpInstanceManager->mVkSurfaceKHR, &vkSurfaceCapabilitiesKHR));
 	ASSERT((vkSurfaceCapabilitiesKHR.supportedCompositeAlpha & (VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR | VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR)) != 0);
 
-	// Validate swapchain image usage flags against surface capabilities
 	ASSERT((vkSurfaceCapabilitiesKHR.supportedUsageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) != 0);
-	VkImageUsageFlags swapchainUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	VkImageUsageFlags vkSwapchainUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	if constexpr (kbScreenshots)
 	{
 		if ((vkSurfaceCapabilitiesKHR.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0)
 		{
-			swapchainUsageFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+			vkSwapchainUsageFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		}
 		else
 		{
@@ -239,47 +236,47 @@ void SwapchainManager::CreateSwapchain(VkSwapchainKHR oldSwapchain)
 	std::vector<VkPresentModeKHR> physicalDevicePresentModes(uiPresentModeCount);
 	CHECK_VK(vkGetPhysicalDeviceSurfacePresentModesKHR(gpInstanceManager->mVkPhysicalDevice, gpInstanceManager->mVkSurfaceKHR, &uiPresentModeCount, physicalDevicePresentModes.data()));
 
-	LOG(kGraphics, kInfo, "Present modes ({}):", physicalDevicePresentModes.size());
+	LOG(kGraphics, kInfo, "Present modes ({}):", std::ssize(physicalDevicePresentModes));
 	// FIFO is guaranteed to be available
-	VkPresentModeKHR eVkPresentModeKHR = VK_PRESENT_MODE_FIFO_KHR;
-	for (const VkPresentModeKHR& reVkPresentModeKHR : physicalDevicePresentModes)
+	VkPresentModeKHR vkPresentModeKHR = VK_PRESENT_MODE_FIFO_KHR;
+	for (const VkPresentModeKHR& rVkPresentModeKHR : physicalDevicePresentModes)
 	{
-		LOG(kGraphics, kInfo, "  {}", string_VkPresentModeKHR(reVkPresentModeKHR));
+		LOG(kGraphics, kInfo, "  {}", string_VkPresentModeKHR(rVkPresentModeKHR));
 
-		if (reVkPresentModeKHR == VK_PRESENT_MODE_MAILBOX_KHR && gPresentMode.Get<VkPresentModeKHR>() == VK_PRESENT_MODE_MAILBOX_KHR)
+		if (rVkPresentModeKHR == VK_PRESENT_MODE_MAILBOX_KHR && gPresentMode.Get<VkPresentModeKHR>() == VK_PRESENT_MODE_MAILBOX_KHR)
 		{
-			eVkPresentModeKHR = VK_PRESENT_MODE_MAILBOX_KHR;
+			vkPresentModeKHR = VK_PRESENT_MODE_MAILBOX_KHR;
 		}
-		else if (reVkPresentModeKHR == VK_PRESENT_MODE_IMMEDIATE_KHR && gPresentMode.Get<VkPresentModeKHR>() == VK_PRESENT_MODE_IMMEDIATE_KHR)
+		else if (rVkPresentModeKHR == VK_PRESENT_MODE_IMMEDIATE_KHR && gPresentMode.Get<VkPresentModeKHR>() == VK_PRESENT_MODE_IMMEDIATE_KHR)
 		{
-			eVkPresentModeKHR = VK_PRESENT_MODE_IMMEDIATE_KHR;
+			vkPresentModeKHR = VK_PRESENT_MODE_IMMEDIATE_KHR;
 		}
 	}
-	LOG(kGraphics, kInfo, "Present mode selected: {}", string_VkPresentModeKHR(eVkPresentModeKHR));
-	gPresentMode.Reset(eVkPresentModeKHR);
+	LOG(kGraphics, kInfo, "Present mode selected: {}", string_VkPresentModeKHR(vkPresentModeKHR));
+	gPresentMode.Reset(vkPresentModeKHR);
 
 	// The swap extent is the resolution of the swap chain images and it's almost always exactly equal to the resolution of the window that we're drawing to
 	RECT clientRect {};
-	GetClientRect(gpGraphics->mHwnd, &clientRect);
+	GetClientRect(gpGraphics->mWindowHandle, &clientRect);
 	LOG(kGraphics, kDebug, "Swapchain extent resolution: currentExtent {} x {}, minImageExtent {} x {}, maxImageExtent {} x {}, client rect {} x {}", vkSurfaceCapabilitiesKHR.currentExtent.width, vkSurfaceCapabilitiesKHR.currentExtent.height, vkSurfaceCapabilitiesKHR.minImageExtent.width, vkSurfaceCapabilitiesKHR.minImageExtent.height, vkSurfaceCapabilitiesKHR.maxImageExtent.width, vkSurfaceCapabilitiesKHR.maxImageExtent.height, clientRect.right - clientRect.left, clientRect.bottom - clientRect.top);
 
 	if (vkSurfaceCapabilitiesKHR.currentExtent.width == 0xFFFFFFFF)
 	{
 		// If the surface size is undefined, the size is set to the size of the images requested
-		gpGraphics->mFramebufferExtent2D.width = std::clamp(gWantedFramebufferExtent2D.width, vkSurfaceCapabilitiesKHR.minImageExtent.width, vkSurfaceCapabilitiesKHR.maxImageExtent.width);
-		gpGraphics->mFramebufferExtent2D.height = std::clamp(gWantedFramebufferExtent2D.height, vkSurfaceCapabilitiesKHR.minImageExtent.height, vkSurfaceCapabilitiesKHR.maxImageExtent.height);
+		gpGraphics->mFramebufferVkExtent2D.width = std::clamp(gVkWantedFramebufferExtent2D.width, vkSurfaceCapabilitiesKHR.minImageExtent.width, vkSurfaceCapabilitiesKHR.maxImageExtent.width);
+		gpGraphics->mFramebufferVkExtent2D.height = std::clamp(gVkWantedFramebufferExtent2D.height, vkSurfaceCapabilitiesKHR.minImageExtent.height, vkSurfaceCapabilitiesKHR.maxImageExtent.height);
 	}
 	else
 	{
 		// If the surface size is defined, the swapchain size must match. Clamp to [minImageExtent, maxImageExtent]
 		// symmetrically with the undefined branch — a degenerate currentExtent must never reach .imageExtent or any attachment.
-		gpGraphics->mFramebufferExtent2D.width = std::clamp(vkSurfaceCapabilitiesKHR.currentExtent.width, vkSurfaceCapabilitiesKHR.minImageExtent.width, vkSurfaceCapabilitiesKHR.maxImageExtent.width);
-		gpGraphics->mFramebufferExtent2D.height = std::clamp(vkSurfaceCapabilitiesKHR.currentExtent.height, vkSurfaceCapabilitiesKHR.minImageExtent.height, vkSurfaceCapabilitiesKHR.maxImageExtent.height);
+		gpGraphics->mFramebufferVkExtent2D.width = std::clamp(vkSurfaceCapabilitiesKHR.currentExtent.width, vkSurfaceCapabilitiesKHR.minImageExtent.width, vkSurfaceCapabilitiesKHR.maxImageExtent.width);
+		gpGraphics->mFramebufferVkExtent2D.height = std::clamp(vkSurfaceCapabilitiesKHR.currentExtent.height, vkSurfaceCapabilitiesKHR.minImageExtent.height, vkSurfaceCapabilitiesKHR.maxImageExtent.height);
 
-		gWantedFramebufferExtent2D = gpGraphics->mFramebufferExtent2D;
+		gVkWantedFramebufferExtent2D = gpGraphics->mFramebufferVkExtent2D;
 	}
 
-	mfAspectRatio = static_cast<float>(gpGraphics->mFramebufferExtent2D.width) / static_cast<float>(gpGraphics->mFramebufferExtent2D.height);
+	mfAspectRatio = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width) / static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 
 	// Prefer at least three swapchain images within surface limits so rendering below the vsync rate can use triple buffering.
 	uint32_t uiMinImageCount = std::max(3u, vkSurfaceCapabilitiesKHR.minImageCount);
@@ -307,10 +304,10 @@ void SwapchainManager::CreateSwapchain(VkSwapchainKHR oldSwapchain)
 		.surface = gpInstanceManager->mVkSurfaceKHR,
 		.minImageCount = uiMinImageCount,
 		.imageFormat = gpInstanceManager->mFramebufferVkFormat,
-		.imageColorSpace = gpInstanceManager->mFramebufferVkColorSpace,
-		.imageExtent = gpGraphics->mFramebufferExtent2D,
+		.imageColorSpace = gpInstanceManager->mFramebufferVkColorSpaceKHR,
+		.imageExtent = gpGraphics->mFramebufferVkExtent2D,
 		.imageArrayLayers = 1,
-		.imageUsage = swapchainUsageFlags,
+		.imageUsage = vkSwapchainUsageFlags,
 		.imageSharingMode = bDifferentQueueFamilies ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount = bDifferentQueueFamilies ? 2u : 0u,
 		.pQueueFamilyIndices = bDifferentQueueFamilies ? &pQueueFamilyIndices[0] : nullptr,
@@ -318,28 +315,26 @@ void SwapchainManager::CreateSwapchain(VkSwapchainKHR oldSwapchain)
 		.compositeAlpha = (vkSurfaceCapabilitiesKHR.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR) != 0 ? VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR : VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
 		.presentMode = gPresentMode.Get<VkPresentModeKHR>(),
 		.clipped = VK_TRUE,
-		.oldSwapchain = oldSwapchain,
+		.oldSwapchain = vkOldSwapchain,
 	};
 	CHECK_VK(vkCreateSwapchainKHR(gpDeviceManager->mVkDevice, &vkSwapchainCreateInfoKHR, nullptr, &mVkSwapchainKHR));
 
 	// Destroy old swapchain after successfully creating new one
-	if (oldSwapchain != VK_NULL_HANDLE)
+	if (vkOldSwapchain != VK_NULL_HANDLE)
 	{
-		vkDestroySwapchainKHR(gpDeviceManager->mVkDevice, oldSwapchain, nullptr);
+		vkDestroySwapchainKHR(gpDeviceManager->mVkDevice, vkOldSwapchain, nullptr);
 	}
 	VkName(VK_OBJECT_TYPE_SWAPCHAIN_KHR, mVkSwapchainKHR, "");
 }
 
 void SwapchainManager::CreateFramebuffers()
 {
-	// Get the swapchain images
 	uint32_t uiImageCount = 0;
 	CHECK_VK(vkGetSwapchainImagesKHR(gpDeviceManager->mVkDevice, mVkSwapchainKHR, &uiImageCount, nullptr));
 	ASSERT(uiImageCount != 0);
 	std::vector<VkImage> swapchainImages(uiImageCount);
 	CHECK_VK(vkGetSwapchainImagesKHR(gpDeviceManager->mVkDevice, mVkSwapchainKHR, &uiImageCount, swapchainImages.data()));
 
-	// Depth
 	VkImageAspectFlags vkImageAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
 	if (gpInstanceManager->mDepthVkFormat == VK_FORMAT_D16_UNORM_S8_UINT || gpInstanceManager->mDepthVkFormat == VK_FORMAT_D24_UNORM_S8_UINT || gpInstanceManager->mDepthVkFormat == VK_FORMAT_D32_SFLOAT_S8_UINT)
 	{
@@ -349,15 +344,15 @@ void SwapchainManager::CreateFramebuffers()
 	{
 		.textureFlags = {},
 		.name = "Depth",
-		.flags = 0,
-		.format = gpInstanceManager->mDepthVkFormat,
-		.extent = VkExtent3D {.width = gpGraphics->mFramebufferExtent2D.width, .height = gpGraphics->mFramebufferExtent2D.height, .depth = 1},
-		.mipLevels = 1,
-		.arrayLayers = 1,
-		.samples = gMultisampling.Get<bool>() ? gSampleCount.Get<VkSampleCountFlagBits>() : VK_SAMPLE_COUNT_1_BIT,
-		.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.aspectMask = vkImageAspectFlags,
+		.vkImageCreateFlags = 0,
+		.vkFormat = gpInstanceManager->mDepthVkFormat,
+		.vkExtent3D = VkExtent3D {.width = gpGraphics->mFramebufferVkExtent2D.width, .height = gpGraphics->mFramebufferVkExtent2D.height, .depth = 1},
+		.uiMipLevels = 1,
+		.uiArrayLayers = 1,
+		.vkSampleCountFlagBits = gMultisampling.Get<bool>() ? gSampleCount.Get<VkSampleCountFlagBits>() : VK_SAMPLE_COUNT_1_BIT,
+		.vkImageUsageFlags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+		.vkImageAspectFlags = vkImageAspectFlags,
 		.eTextureLayout = TextureLayout::kUndefined,
 	});
 
@@ -368,15 +363,15 @@ void SwapchainManager::CreateFramebuffers()
 		{
 			.textureFlags = {},
 			.name = "Multisampling",
-			.flags = 0,
-			.format = VK_FORMAT_R16G16B16A16_SFLOAT,
-			.extent = VkExtent3D {.width = gpGraphics->mFramebufferExtent2D.width, .height = gpGraphics->mFramebufferExtent2D.height, .depth = 1},
-			.mipLevels = 1,
-			.arrayLayers = 1,
-			.samples = gSampleCount.Get<VkSampleCountFlagBits>(),
-			.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-			.viewType = VK_IMAGE_VIEW_TYPE_2D,
-			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.vkImageCreateFlags = 0,
+			.vkFormat = VK_FORMAT_R16G16B16A16_SFLOAT,
+			.vkExtent3D = VkExtent3D {.width = gpGraphics->mFramebufferVkExtent2D.width, .height = gpGraphics->mFramebufferVkExtent2D.height, .depth = 1},
+			.uiMipLevels = 1,
+			.uiArrayLayers = 1,
+			.vkSampleCountFlagBits = gSampleCount.Get<VkSampleCountFlagBits>(),
+			.vkImageUsageFlags = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+			.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+			.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 			.eTextureLayout = TextureLayout::kUndefined,
 		});
 	}
@@ -386,48 +381,48 @@ void SwapchainManager::CreateFramebuffers()
 	{
 		.textureFlags = {},
 		.name = "Hdr",
-		.flags = 0,
-		.format = VK_FORMAT_R16G16B16A16_SFLOAT,
-		.extent = VkExtent3D {.width = gpGraphics->mFramebufferExtent2D.width, .height = gpGraphics->mFramebufferExtent2D.height, .depth = 1},
-		.mipLevels = 1,
-		.arrayLayers = 1,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+		.vkImageCreateFlags = 0,
+		.vkFormat = VK_FORMAT_R16G16B16A16_SFLOAT,
+		.vkExtent3D = VkExtent3D {.width = gpGraphics->mFramebufferVkExtent2D.width, .height = gpGraphics->mFramebufferVkExtent2D.height, .depth = 1},
+		.uiMipLevels = 1,
+		.uiArrayLayers = 1,
+		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+		.vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 
 	// Single HDR framebuffer: none of its attachments (HDR color / depth / MSAA) are per-swapchain-image.
 	// Attachment order matches mHdrVkRenderPass: HDR color (0), depth (1), MSAA (2).
-	VkImageView pHdrVkImageViews[] {mHdrTexture.mVkImageView, mDepthTexture.mVkImageView, mMultisamplingTexture.mVkImageView};
-	VkFramebufferCreateInfo hdrVkFramebufferCreateInfo
+	VkImageView pVkHdrImageViews[] {mHdrTexture.mVkImageView, mDepthTexture.mVkImageView, mMultisamplingTexture.mVkImageView};
+	VkFramebufferCreateInfo vkHdrFramebufferCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
 		.renderPass = mHdrVkRenderPass,
 		.attachmentCount = gMultisampling.Get<bool>() ? 3u : 2u,
-		.pAttachments = pHdrVkImageViews,
-		.width = gpGraphics->mFramebufferExtent2D.width,
-		.height = gpGraphics->mFramebufferExtent2D.height,
+		.pAttachments = pVkHdrImageViews,
+		.width = gpGraphics->mFramebufferVkExtent2D.width,
+		.height = gpGraphics->mFramebufferVkExtent2D.height,
 		.layers = 1,
 	};
-	CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &hdrVkFramebufferCreateInfo, nullptr, &mHdrVkFramebuffer));
+	CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &vkHdrFramebufferCreateInfo, nullptr, &mHdrVkFramebuffer));
 	VkName(VK_OBJECT_TYPE_FRAMEBUFFER, mHdrVkFramebuffer, "Hdr");
 
 	mFramebuffers.resize(uiImageCount);
 	miFramebufferIndex = 0;
 	for (int64_t i = 0; Framebuffer& rFrameBuffer : mFramebuffers)
 	{
-		rFrameBuffer.presentVkImage = swapchainImages.at(i++);
+		rFrameBuffer.vkPresentImage = swapchainImages.at(i++);
 
 		VkImageViewCreateInfo vkImageViewCreateInfo
 		{
 			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 			.pNext = nullptr,
 			.flags = 0,
-			.image = rFrameBuffer.presentVkImage,
+			.image = rFrameBuffer.vkPresentImage,
 			.viewType = VK_IMAGE_VIEW_TYPE_2D,
 			.format = gpInstanceManager->mFramebufferVkFormat,
 			.components = VkComponentMapping
@@ -444,15 +439,15 @@ void SwapchainManager::CreateFramebuffers()
 				.levelCount = 1,
 				.baseArrayLayer = 0,
 				.layerCount = 1,
-			}
+			},
 		};
-		CHECK_VK(vkCreateImageView(gpDeviceManager->mVkDevice, &vkImageViewCreateInfo, nullptr, &rFrameBuffer.presentVkImageView));
-		VkName(VK_OBJECT_TYPE_IMAGE, rFrameBuffer.presentVkImage, std::format("Present {}", i - 1).c_str());
-		VkName(VK_OBJECT_TYPE_IMAGE_VIEW, rFrameBuffer.presentVkImageView, std::format("Present {}", i - 1).c_str());
+		CHECK_VK(vkCreateImageView(gpDeviceManager->mVkDevice, &vkImageViewCreateInfo, nullptr, &rFrameBuffer.vkPresentImageView));
+		VkName(VK_OBJECT_TYPE_IMAGE, rFrameBuffer.vkPresentImage, std::format("Present {}", i - 1).c_str());
+		VkName(VK_OBJECT_TYPE_IMAGE_VIEW, rFrameBuffer.vkPresentImageView, std::format("Present {}", i - 1).c_str());
 
 		// The present pass uses one framebuffer per swapchain image because the acquired image is its color attachment; HDR color, depth, and MSAA
 		// remain on mHdrVkFramebuffer.
-		VkImageView pVkImageViews[] {rFrameBuffer.presentVkImageView};
+		VkImageView pVkImageViews[] {rFrameBuffer.vkPresentImageView};
 		VkFramebufferCreateInfo vkFramebufferCreateInfo
 		{
 			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -461,20 +456,20 @@ void SwapchainManager::CreateFramebuffers()
 			.renderPass = mVkRenderPass,
 			.attachmentCount = 1,
 			.pAttachments = pVkImageViews,
-			.width = gpGraphics->mFramebufferExtent2D.width,
-			.height = gpGraphics->mFramebufferExtent2D.height,
+			.width = gpGraphics->mFramebufferVkExtent2D.width,
+			.height = gpGraphics->mFramebufferVkExtent2D.height,
 			.layers = 1,
 		};
-		CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &vkFramebufferCreateInfo, nullptr, &rFrameBuffer.presentVkFramebuffer));
-		VkName(VK_OBJECT_TYPE_FRAMEBUFFER, rFrameBuffer.presentVkFramebuffer, std::format("Present {}", i - 1).c_str());
+		CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &vkFramebufferCreateInfo, nullptr, &rFrameBuffer.vkPresentFramebuffer));
+		VkName(VK_OBJECT_TYPE_FRAMEBUFFER, rFrameBuffer.vkPresentFramebuffer, std::format("Present {}", i - 1).c_str());
 	}
 }
 
-void SwapchainManager::CreateSyncObjects()
+void SwapchainManager::CreateSynchronizationObjects()
 {
 	mImageAvailableFences.resize(mFramebuffers.size());
 	miFenceAvailableIndex = 0;
-	for ([[maybe_unused]] int64_t i = 0; VkFence& rFence : mImageAvailableFences)
+	for ([[maybe_unused]] int64_t i = 0; VkFence& rVkFence : mImageAvailableFences)
 	{
 		VkFenceCreateInfo vkFenceCreateInfo
 		{
@@ -482,13 +477,13 @@ void SwapchainManager::CreateSyncObjects()
 			.pNext = nullptr,
 			.flags = VK_FENCE_CREATE_SIGNALED_BIT,
 		};
-		CHECK_VK(vkCreateFence(gpDeviceManager->mVkDevice, &vkFenceCreateInfo, nullptr, &rFence));
-		VkName(VK_OBJECT_TYPE_FENCE, rFence, std::format("ImageAvailable {}", i++).c_str());
+		CHECK_VK(vkCreateFence(gpDeviceManager->mVkDevice, &vkFenceCreateInfo, nullptr, &rVkFence));
+		VkName(VK_OBJECT_TYPE_FENCE, rVkFence, std::format("ImageAvailable {}", i++).c_str());
 	}
 
 	mImageAvailableSemaphores.resize(mFramebuffers.size() + 1);
 	miImageAvailableIndex = 0;
-	for ([[maybe_unused]] int64_t i = 0; VkSemaphore& rSemaphore : mImageAvailableSemaphores)
+	for ([[maybe_unused]] int64_t i = 0; VkSemaphore& rVkSemaphore : mImageAvailableSemaphores)
 	{
 		VkSemaphoreCreateInfo vkSemaphoreCreateInfo
 		{
@@ -496,8 +491,8 @@ void SwapchainManager::CreateSyncObjects()
 			.pNext = nullptr,
 			.flags = 0,
 		};
-		CHECK_VK(vkCreateSemaphore(gpDeviceManager->mVkDevice, &vkSemaphoreCreateInfo, nullptr, &rSemaphore));
-		VkName(VK_OBJECT_TYPE_SEMAPHORE, rSemaphore, std::format("ImageAvailable {}", i++).c_str());
+		CHECK_VK(vkCreateSemaphore(gpDeviceManager->mVkDevice, &vkSemaphoreCreateInfo, nullptr, &rVkSemaphore));
+		VkName(VK_OBJECT_TYPE_SEMAPHORE, rVkSemaphore, std::format("ImageAvailable {}", i++).c_str());
 	}
 }
 
@@ -515,9 +510,9 @@ SwapchainManager::~SwapchainManager()
 
 	for (const Framebuffer& rFramebuffer : mFramebuffers)
 	{
-		vkDestroyFramebuffer(gpDeviceManager->mVkDevice, rFramebuffer.presentVkFramebuffer, nullptr);
+		vkDestroyFramebuffer(gpDeviceManager->mVkDevice, rFramebuffer.vkPresentFramebuffer, nullptr);
 
-		vkDestroyImageView(gpDeviceManager->mVkDevice, rFramebuffer.presentVkImageView, nullptr);
+		vkDestroyImageView(gpDeviceManager->mVkDevice, rFramebuffer.vkPresentImageView, nullptr);
 	}
 
 	if (mVkSwapchainKHR != VK_NULL_HANDLE)
@@ -553,7 +548,6 @@ void SwapchainManager::AcquireNextImage()
 		mCurrentImageAvailableVkFence = VK_NULL_HANDLE;
 	}
 
-	// Find out the index of the next image
 	mCurrentImageAvailableVkFence = GetNextImageAvailableFence();
 	CHECK_VK(vkResetFences(gpDeviceManager->mVkDevice, 1, &mCurrentImageAvailableVkFence));
 	mImageAvailableVkSemaphore = GetNextImageAvailableSemaphore();
@@ -582,13 +576,13 @@ void SwapchainManager::PresentToQueue(int64_t iFramebufferIndex)
 	CommandBuffers& rCommandBuffers = gpCommandBufferManager->mPerFramebufferCommandBuffers.at(iFramebufferIndex);
 
 	uint32_t uiCurrentFramebufferIndex = static_cast<uint32_t>(iFramebufferIndex);
-	VkSemaphore waitSemaphore = rCommandBuffers.mImGuiFinishedVkSemaphore;
+	VkSemaphore vkWaitSemaphore = rCommandBuffers.mImGuiFinishedVkSemaphore;
 	VkPresentInfoKHR vkPresentInfoKHR
 	{
 		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 		.pNext = nullptr,
 		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &waitSemaphore,
+		.pWaitSemaphores = &vkWaitSemaphore,
 		.swapchainCount = 1,
 		.pSwapchains = &mVkSwapchainKHR,
 		.pImageIndices = &uiCurrentFramebufferIndex,
@@ -602,13 +596,8 @@ void SwapchainManager::PresentToQueue(int64_t iFramebufferIndex)
 	// Handle stale swapchain by requesting deferred recreation
 	if (vkResult == VK_ERROR_OUT_OF_DATE_KHR || vkResult == VK_SUBOPTIMAL_KHR)
 	{
-		// This present-worker write is ordered before the main thread's Refresh() read-modify-write only by
-		//   gpSwapchainManager->mPresent.Wait() in the kbRenderThread frame-tail block (Graphics::RenderMainPresentAcquire,
-		//   before the next Create()). That same Wait also keeps the next frame's Global submit from racing this
-		//   vkQueuePresentKHR on the shared queue. Preserve that Wait when refactoring the frame tail. Same "plain member
-		//   published across a PersistentWorker Wake/Wait edge" family as CommandBufferManager's mbParticleSemaphoreSignaled
-		//   and CommandBuffers.h (mFlags/mVkFence).
-		// std::max, not plain assign: a same-frame kSurface escalation must never downgrade to kSwapchain.
+		// The kbRenderThread frame-tail mPresent.Wait() in Graphics::RenderMainPresentAcquire publishes this write before Refresh() in the next Create() and prevents the next frame's Global submit from racing vkQueuePresentKHR on the shared queue.
+		// A same-frame kSurface escalation must never downgrade to kSwapchain.
 		gpGraphics->meDestroyType = std::max(DestroyType::kSwapchain, gpGraphics->meDestroyType);
 		return;
 	}

@@ -2,6 +2,8 @@
 
 #if defined(BT_CLIENT)
 
+#include "Data/Shader.h"
+#include "Graphics/Objects/PipelineDescriptorWriter.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
 
@@ -13,7 +15,7 @@ namespace engine
 void PointLightsInterpolate::GraphicsResources()
 {
 	gpBufferManager->CreateDynamicBuffer(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreatePipelineAxisAlignedLighting(kCrc, kpcName, sizeof(shaders::AxisAlignedQuadLayout));
+	gpPipelineManager->mDynamicPipelines.CreateAreaLightingPipeline(kDynamicPipelineAxisAlignedLighting, kCrc, kpcName, sizeof(shaders::AxisAlignedQuadLayout), data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersLightingPointLightfragCrc, DescriptorFlags::kSamplerClamp);
 	Buffer* pVisibleLightsBuffers = gpBufferManager->CreateDynamicBuffer(kCrc, kBufferVisibleLights, kpcName, sizeof(shaders::VisibleLightQuadLayout));
 	gpPipelineManager->mDynamicPipelines.CreatePipelineVisibleLights(kCrc, kpcName, pVisibleLightsBuffers);
 }
@@ -38,11 +40,11 @@ void PointLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineAxisAlignedLighting].at(kCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 1, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineAxisAlignedLighting].at(kCrc), iCommandBuffer, 1, pBuffer);
 	}
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, kBufferVisibleLights, kpcName, sizeof(shaders::VisibleLightQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineVisibleLights].at(kCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 2, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineVisibleLights].at(kCrc), iCommandBuffer, 2, pBuffer);
 	}
 }
 
@@ -123,10 +125,10 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 			rVisibleLayout.pf4Vertices[3] = {f4VisiblePosition.x + fVisibleArea, f4VisiblePosition.y - fVisibleArea, f4VisiblePosition.z, 1.0f};
 		}
 
-		rVisibleLayout.pf4Texcoords[0] = {0.0f, 0.0f, 0.0f, 0.0f};
-		rVisibleLayout.pf4Texcoords[1] = {1.0f, 0.0f, 0.0f, 0.0f};
-		rVisibleLayout.pf4Texcoords[2] = {0.0f, 1.0f, 0.0f, 0.0f};
-		rVisibleLayout.pf4Texcoords[3] = {1.0f, 1.0f, 0.0f, 0.0f};
+		rVisibleLayout.pf4TextureCoordinates[0] = {0.0f, 0.0f, 0.0f, 0.0f};
+		rVisibleLayout.pf4TextureCoordinates[1] = {1.0f, 0.0f, 0.0f, 0.0f};
+		rVisibleLayout.pf4TextureCoordinates[2] = {0.0f, 1.0f, 0.0f, 0.0f};
+		rVisibleLayout.pf4TextureCoordinates[3] = {1.0f, 1.0f, 0.0f, 0.0f};
 
 		rVisibleLayout.puiColors[0] = rType.uiColor;
 		rVisibleLayout.puiColors[1] = rType.uiColor;
@@ -143,8 +145,14 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 
 void PointLightsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	gpProfileManager->SetCount(kCpuCounterPointLights, siTotalCount);
-	gpProfileManager->SetCount(kCpuCounterPointLightsRendered, siRendered);
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterPointLights).iCount = siTotalCount;
+	}
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterPointLightsRendered).iCount = siRendered;
+	}
 	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineAxisAlignedLighting].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() ? siRendered : 0);
 	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineVisibleLights].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 }

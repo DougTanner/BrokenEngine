@@ -32,16 +32,16 @@ void main()
 	{
 		// Float16 EWNS: Same tone mapping as LightCombine.comp (Uchimura). Pass scaling and the Uchimura
 		// segment constants (S0/S1/CP) are precomputed on the CPU (globalLayout.fCombine*).
-		vec4 f4Scaled = f4Sample * globalLayout.fCombinePassNormScale;
+		vec4 f4Scaled = f4Sample * globalLayout.fCombinePassNormalizationScale;
 
 		float P = globalLayout.fCombineMaxBrightness;
 		float a = globalLayout.fCombineContrast;
 		float m = globalLayout.fCombineLinearStart;
 		float c = globalLayout.fCombineToe;
 		float b = globalLayout.fCombineBlackTightness;
-		float S0 = globalLayout.fCombineS0;
-		float S1 = globalLayout.fCombineS1;
-		float CP = globalLayout.fCombineCP;
+		float S0 = globalLayout.fCombineShoulderInputStart;
+		float S1 = globalLayout.fCombineShoulderOutputStart;
+		float CP = globalLayout.fCombineShoulderExponentCoefficient;
 		vec4 f4W0 = vec4(1.0f) - smoothstep(vec4(0.0f), vec4(m), f4Scaled);
 		vec4 f4W2 = step(vec4(S0), f4Scaled);
 		vec4 f4W1 = vec4(1.0f) - f4W0 - f4W2;

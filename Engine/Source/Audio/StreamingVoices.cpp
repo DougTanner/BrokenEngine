@@ -9,17 +9,13 @@
 #endif
 
 #include "File/FileManager.h"
+#include "File/PackChunks.h"
 
 namespace engine
 {
 
 StreamingVoices::StreamingVoices() = default;
 StreamingVoices::~StreamingVoices() = default;
-
-void StreamingVoices::Init(AudioEngine* pAudioEngine)
-{
-	mpAudioEngine = pAudioEngine;
-}
 
 void StreamingVoices::Play(common::crc_t uiAudioCrc)
 {
@@ -35,17 +31,17 @@ void StreamingVoices::Play(common::crc_t uiAudioCrc)
 		TransitionCurrentToPrevious();
 	}
 
-	if (mpAudioEngine == nullptr || !mpAudioEngine->IsAudioDevicePresent()) [[unlikely]]
+	if (mpAudioEngine == nullptr) [[unlikely]]
+	{
+		return;
+	}
+
+	if (!mpAudioEngine->IsAudioDevicePresent()) [[unlikely]]
 	{
 		return;
 	}
 
 	CreateStream(uiAudioCrc);
-}
-
-void StreamingVoices::SetNextTrackCallback(std::function<common::crc_t()> callback)
-{
-	mGetNextTrack = std::move(callback);
 }
 
 void StreamingVoices::CheckTrackTransition()
@@ -64,7 +60,7 @@ void StreamingVoices::CheckTrackTransition()
 	}
 }
 
-void StreamingVoices::Update(float fDeltaTime)
+void StreamingVoices::Update(std::chrono::duration<float> deltaTime)
 {
 	// Heap: Member vector collects faded-out streams for deferred destruction after iteration.
 	// Allocation reused across frames. Suppression covers potential growth and destructor calls.
@@ -88,7 +84,7 @@ void StreamingVoices::Update(float fDeltaTime)
 		mPreviousStreams.back()->UpdateRequests(true);
 #endif
 	}
-	for (size_t i = 0; i + 1 < mPreviousStreams.size(); ++i)
+	for (int64_t i = 0; i + 1 < std::ssize(mPreviousStreams); ++i)
 	{
 #if defined(BT_DEBUG)
 		mPreviousStreams.at(i)->UpdateRequests(AudioStreamingFixture::AllowOlderFadeRequests());
@@ -100,16 +96,16 @@ void StreamingVoices::Update(float fDeltaTime)
 	if (mpCurrentStream != nullptr)
 	{
 		mpCurrentStream->DrainConsumedAndSubmitReady();
-		mpCurrentStream->UpdateVolume(fDeltaTime);
+		mpCurrentStream->UpdateVolume(deltaTime);
 	}
-	for (const std::unique_ptr<StreamingVoice>& pStream : mPreviousStreams)
+	for (const std::unique_ptr<StreamingVoice>& rpStream : mPreviousStreams)
 	{
-		pStream->DrainConsumedAndSubmitReady();
+		rpStream->DrainConsumedAndSubmitReady();
 	}
 
 	for (auto it = mPreviousStreams.begin(); it != mPreviousStreams.end();)
 	{
-		if ((*it)->UpdateVolume(fDeltaTime))
+		if ((*it)->UpdateVolume(deltaTime))
 		{
 			(*it)->CancelPendingReads();
 			mStreamsToDestroy.push_back(std::move(*it));
@@ -129,40 +125,40 @@ void StreamingVoices::CancelPendingReads()
 	{
 		mpCurrentStream->CancelPendingReads();
 	}
-	for (const std::unique_ptr<StreamingVoice>& pStream : mPreviousStreams)
+	for (const std::unique_ptr<StreamingVoice>& rpStream : mPreviousStreams)
 	{
-		pStream->CancelPendingReads();
+		rpStream->CancelPendingReads();
 	}
 }
 
 void StreamingVoices::Clear(bool bNullVoicesBeforeDestroy)
 {
 	CancelPendingReads();
-	for (const std::unique_ptr<StreamingVoice>& pStream : mStreamsToDestroy)
+	for (const std::unique_ptr<StreamingVoice>& rpStream : mStreamsToDestroy)
 	{
-		pStream->CancelPendingReads();
+		rpStream->CancelPendingReads();
 	}
 
 	if (bNullVoicesBeforeDestroy)
 	{
 		if (mpCurrentStream != nullptr)
 		{
-			mpCurrentStream->DetachXAudio2Voice();
+			mpCurrentStream->mpVoice = nullptr;
 		}
 
-		for (std::unique_ptr<StreamingVoice>& pStream : mPreviousStreams)
+		for (const std::unique_ptr<StreamingVoice>& rpStream : mPreviousStreams)
 		{
-			if (pStream != nullptr)
+			if (rpStream != nullptr)
 			{
-				pStream->DetachXAudio2Voice();
+				rpStream->mpVoice = nullptr;
 			}
 		}
 
-		for (std::unique_ptr<StreamingVoice>& pStream : mStreamsToDestroy)
+		for (const std::unique_ptr<StreamingVoice>& rpStream : mStreamsToDestroy)
 		{
-			if (pStream != nullptr)
+			if (rpStream != nullptr)
 			{
-				pStream->DetachXAudio2Voice();
+				rpStream->mpVoice = nullptr;
 			}
 		}
 	}
@@ -177,12 +173,12 @@ void StreamingVoices::Clear(bool bNullVoicesBeforeDestroy)
 int64_t StreamingVoices::GetStreamCount() const
 {
 	ASSERT(common::gpMultithreading->IsMainThread());
-	return (mpCurrentStream != nullptr ? 1 : 0) + static_cast<int64_t>(mPreviousStreams.size()) + static_cast<int64_t>(mStreamsToDestroy.size());
+	return (mpCurrentStream != nullptr ? 1 : 0) + std::ssize(mPreviousStreams) + std::ssize(mStreamsToDestroy);
 }
 
 void StreamingVoices::CreateStream(common::crc_t uiAudioCrc)
 {
-	const LazyChunk& rLazyChunk = gpFileManager->GetLazyChunkMap().at(uiAudioCrc);
+	const LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(uiAudioCrc);
 	AssertValidPackedAudio(rLazyChunk.header.audioHeader.waveFormat, rLazyChunk.header.iSize, rLazyChunk.iDataSize);
 
 	IXAudio2SourceVoice* pVoice = nullptr;
@@ -204,9 +200,9 @@ void StreamingVoices::CreateStream(common::crc_t uiAudioCrc)
 
 void StreamingVoices::TransitionCurrentToPrevious()
 {
-	for (const std::unique_ptr<StreamingVoice>& pStream : mPreviousStreams)
+	for (const std::unique_ptr<StreamingVoice>& rpStream : mPreviousStreams)
 	{
-		pStream->CancelPendingReads();
+		rpStream->CancelPendingReads();
 	}
 	mpCurrentStream->BeginFadeOut();
 	mPreviousStreams.push_back(std::move(mpCurrentStream));

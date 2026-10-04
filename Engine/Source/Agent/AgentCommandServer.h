@@ -93,7 +93,6 @@ private:
 
 inline AgentCommandServer* gpAgentCommandServer = nullptr;
 
-// Requests a clean shutdown of the main loop (sets sbQuit). Defined in Main.cpp; called by the quit command.
-void RequestQuit();
+inline bool gbQuit = false;
 
 } // namespace engine

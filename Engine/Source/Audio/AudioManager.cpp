@@ -15,41 +15,36 @@
 namespace engine
 {
 
-constexpr AUDIO_ENGINE_FLAGS kAudioEngineFlags = AudioEngine_UseMasteringLimiter;
+constexpr AUDIO_ENGINE_FLAGS keAudioEngineFlags = AudioEngine_UseMasteringLimiter;
 
 // Silent-start recovery probe interval, in Update frames. A deviceless machine holds the silent engine
 // forever, so an unthrottled probe would warn + full-reset every frame; ~2 s at 60 fps latency to pick up
 // a newly attached device is imperceptible against that cost.
 constexpr int64_t kiSilentRecoveryRetryFrames = 120;
 
-std::wstring AudioManager::GetEndpointId(IMMDevice* pDevice)
+std::wstring AudioManager::GetEndpointIdentifier(IMMDevice* pDevice)
 {
-	LPWSTR pcDeviceId = nullptr;
-	HRESULT hresult = pDevice->GetId(&pcDeviceId);
-	if (FAILED(hresult))
+	LPWSTR pcDeviceIdentifier = nullptr;
+	HRESULT iResult = pDevice->GetId(&pcDeviceIdentifier);
+	if (FAILED(iResult))
 	{
-		LOG(kAudio, kWarning, "  GetId failed: {}", common::HresultToString(hresult).data());
+		LOG(kAudio, kWarning, "  GetId failed: {}", common::HresultToString(iResult).data());
 		return std::wstring();
 	}
-	common::ScopedLambda freeDeviceId([=]()
+	common::ScopedLambda freeDeviceIdentifier([=]()
 	{
-		CoTaskMemFree(pcDeviceId);
+		CoTaskMemFree(pcDeviceIdentifier);
 	});
-	return pcDeviceId != nullptr ? std::wstring(pcDeviceId) : std::wstring();
-}
-
-void AudioManager::CreateAudioEngineForEndpoint(const std::wstring& rEndpointId)
-{
-	mpAudioEngine = std::make_unique<AudioEngine>(kAudioEngineFlags, nullptr, rEndpointId.c_str(), AudioCategory_GameEffects);
+	return pcDeviceIdentifier != nullptr ? std::wstring(pcDeviceIdentifier) : std::wstring();
 }
 
 std::wstring AudioManager::InitializeAudioEndpoint()
 {
-	Microsoft::WRL::ComPtr<IMMDeviceEnumerator> pMMDeviceEnumerator;
-	HRESULT hresult = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(pMMDeviceEnumerator.GetAddressOf()));
-	if (FAILED(hresult))
+	Microsoft::WRL::ComPtr<IMMDeviceEnumerator> pMultimediaDeviceEnumerator;
+	HRESULT iResult = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(pMultimediaDeviceEnumerator.GetAddressOf()));
+	if (FAILED(iResult))
 	{
-		LOG(kAudio, kWarning, "  CoCreateInstance(MMDeviceEnumerator) failed: {}", common::HresultToString(hresult).data());
+		LOG(kAudio, kWarning, "  CoCreateInstance(MMDeviceEnumerator) failed: {}", common::HresultToString(iResult).data());
 	}
 	else
 	{
@@ -57,15 +52,15 @@ std::wstring AudioManager::InitializeAudioEndpoint()
 	}
 
 	Microsoft::WRL::ComPtr<IMMDevice> pDefaultAudioEndpoint;
-	std::wstring defaultAudioEndpointId;
-	if (pMMDeviceEnumerator != nullptr && pMMDeviceEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &pDefaultAudioEndpoint) == S_OK)
+	std::wstring defaultAudioEndpointIdentifier;
+	if (pMultimediaDeviceEnumerator != nullptr && pMultimediaDeviceEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &pDefaultAudioEndpoint) == S_OK)
 	{
 		LOG(kAudio, kInfo, "  Got DefaultAudioEndpoint");
-		defaultAudioEndpointId = GetEndpointId(pDefaultAudioEndpoint.Get());
-		if (!defaultAudioEndpointId.empty())
+		defaultAudioEndpointIdentifier = GetEndpointIdentifier(pDefaultAudioEndpoint.Get());
+		if (!defaultAudioEndpointIdentifier.empty())
 		{
-			LOG(kAudio, kInfo, "    pcDeviceId: \"{}\"", defaultAudioEndpointId);
-			CreateAudioEngineForEndpoint(defaultAudioEndpointId);
+			LOG(kAudio, kInfo, "    pcDeviceId: \"{}\"", defaultAudioEndpointIdentifier);
+			mpAudioEngine = std::make_unique<AudioEngine>(keAudioEngineFlags, nullptr, defaultAudioEndpointIdentifier.c_str(), AudioCategory_GameEffects);
 		}
 		else
 		{
@@ -84,9 +79,9 @@ std::wstring AudioManager::InitializeAudioEndpoint()
 	if (mpAudioEngine == nullptr)
 	{
 		LOG(kAudio, kWarning, "  No usable audio endpoint; constructing silent-capable engine against the OS default");
-		mpAudioEngine = std::make_unique<AudioEngine>(kAudioEngineFlags, nullptr, nullptr, AudioCategory_GameEffects);
+		mpAudioEngine = std::make_unique<AudioEngine>(keAudioEngineFlags, nullptr, nullptr, AudioCategory_GameEffects);
 	}
-	return defaultAudioEndpointId;
+	return defaultAudioEndpointIdentifier;
 }
 
 void AudioManager::CacheMasteringVoiceChannels()
@@ -115,7 +110,7 @@ WAVEFORMATEX AudioManager::MakePinnedOutputFormat(WORD uiChannels) const
 	return format;
 }
 
-void AudioManager::ConfigureLiveGraph(const std::wstring& rSelectedDeviceId)
+void AudioManager::ConfigureLiveGraph(const wchar_t* pcSelectedDeviceIdentifier)
 {
 	// A silent-mode engine has no live output graph (GetOutputChannels() == 0). Defer all pinned-format
 	// setup — mPinnedOutputFormat stays empty and kPinnedFormatValid false — so Update recovery discovers
@@ -139,7 +134,7 @@ void AudioManager::ConfigureLiveGraph(const std::wstring& rSelectedDeviceId)
 		bool bPinned = false;
 		try
 		{
-			bPinned = mpAudioEngine->Reset(&mPinnedOutputFormat, rSelectedDeviceId.empty() ? nullptr : rSelectedDeviceId.c_str());
+			bPinned = mpAudioEngine->Reset(&mPinnedOutputFormat, pcSelectedDeviceIdentifier);
 		}
 		catch (const std::exception&)
 		{
@@ -153,7 +148,7 @@ void AudioManager::ConfigureLiveGraph(const std::wstring& rSelectedDeviceId)
 			DEBUG_BREAK();
 			try
 			{
-				mpAudioEngine->Reset(nullptr, rSelectedDeviceId.empty() ? nullptr : rSelectedDeviceId.c_str());
+				mpAudioEngine->Reset(nullptr, pcSelectedDeviceIdentifier);
 			}
 			catch (const std::exception&)
 			{
@@ -202,17 +197,17 @@ void AudioManager::ConfigureLiveGraph(const std::wstring& rSelectedDeviceId)
 	mFlags.Set(AudioManagerFlags::kPinnedFormatValid, mpAudioEngine->GetOutputSampleRate() == kiMasteringSampleRate);
 }
 
-void AudioManager::InitializeAudioSubsystems(const std::wstring& rSelectedDeviceId)
+void AudioManager::InitializeAudioSubsystems(const wchar_t* pcSelectedDeviceIdentifier)
 {
 	// Live-graph configuration (skips itself in silent mode); runs before ownership attach so its pin Reset
 	// is not observed as a notification.
-	ConfigureLiveGraph(rSelectedDeviceId);
+	ConfigureLiveGraph(pcSelectedDeviceIdentifier);
 
 	// One-time ownership attach — exactly once against the stable engine, even when silent. RegisterNotify
 	// deliberately follows ConfigureLiveGraph so the initial pin attempt cannot deliver an OnReset here.
 	mpAudioEngine->RegisterNotify(this, false);
-	mpStaticVoices->Init(mpAudioEngine.get(), &miMasteringVoiceChannels);
-	mpStreamingVoices->Init(mpAudioEngine.get());
+	mpStaticVoices->Initialize(mpAudioEngine.get(), &miMasteringVoiceChannels);
+	mpStreamingVoices->mpAudioEngine = mpAudioEngine.get();
 }
 
 AudioManager::AudioManager()
@@ -227,12 +222,11 @@ AudioManager::AudioManager()
 
 	try
 	{
-		// Find the id of the default audio endpoint
-		std::wstring selectedDeviceId = InitializeAudioEndpoint();
+		std::wstring selectedDeviceIdentifier = InitializeAudioEndpoint();
 
 		if (mpAudioEngine != nullptr)
 		{
-			InitializeAudioSubsystems(selectedDeviceId);
+			InitializeAudioSubsystems(selectedDeviceIdentifier.empty() ? nullptr : selectedDeviceIdentifier.c_str());
 		}
 	}
 	catch ([[maybe_unused]] const std::exception& rException)
@@ -262,15 +256,7 @@ AudioManager::~AudioManager()
 	}
 }
 
-void AudioManager::SetNextMusicTrackCallback(std::function<common::crc_t()> callback)
-{
-	mpStreamingVoices->SetNextTrackCallback(std::move(callback));
-}
 
-void AudioManager::SkipNextStaticVoiceInvalidation()
-{
-	mpStaticVoices->SkipNextInvalidation();
-}
 
 void AudioManager::ClearVoices(bool bNullVoicesBeforeDestroy)
 {
@@ -291,7 +277,7 @@ void AudioManager::Suspend()
 	mpAudioEngine->Suspend();
 
 	// Processing thread is now stopped — DestroyVoice returns instantly
-	LOG(kAudio, kInfo, "Suspend: destroying {} static voices, {} streams", mpStaticVoices->GetVoiceCount(), mpStreamingVoices->GetStreamCount());
+	LOG(kAudio, kInfo, "Suspend: destroying {} static voices, {} streams", std::ssize(mpStaticVoices->mVoices), mpStreamingVoices->GetStreamCount());
 	ClearVoices(false);
 }
 
@@ -325,13 +311,13 @@ void AudioManager::PlayOneShot(const game::Frame& rFrame, common::crc_t uiAudioC
 	mpStaticVoices->PlayOneShot(rFrame, uiAudioCrc, b3d, fVolume, fPitch, fPitchRange);
 }
 
-void XM_CALLCONV AudioManager::PlayOneShot3d(const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoord, FXMVECTOR vecLocalPosition, float fVolume, float fPitch, float fPitchRange)
+void XM_CALLCONV AudioManager::PlayOneShot3d(const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoordinate, FXMVECTOR vecLocalPosition, float fVolume, float fPitch, float fPitchRange)
 {
 	if (mbSuspended.load(std::memory_order_acquire))
 	{
 		return;
 	}
-	mpStaticVoices->PlayOneShot3d(rFrame, uiAudioCrc, emitterCoord, vecLocalPosition, fVolume, fPitch, fPitchRange);
+	mpStaticVoices->PlayOneShotThreeDimensional(rFrame, uiAudioCrc, emitterCoordinate, vecLocalPosition, fVolume, fPitch, fPitchRange);
 }
 
 void AudioManager::FinishDeviceReset()
@@ -352,7 +338,7 @@ void AudioManager::AttemptSilentEngineRecovery()
 	// The engine is silent with no format known to be pinned: no device at construction, a startup pin that
 	// left it silent, or a device-loss pin failure whose stored channel count is now stale. In every case the
 	// current endpoint's channel count is unknown, so reset to the OS default to bring up a live graph and
-	// learn it, then derive + pin the 48 kHz format. Reset guards match the trust boundary elsewhere.
+	// learn it, then derive + pin the 48 kHz format.
 	if (!(mFlags & AudioManagerFlags::kSilentRecoveryLogged))
 	{
 		LOG(kAudio, kWarning, "Audio device absent; probing for a device to recover");
@@ -507,7 +493,7 @@ void AudioManager::Update(const game::Frame* pFrame)
 #else
 	mpStreamingVoices->CheckTrackTransition();
 #endif
-	mpStreamingVoices->Update(fDeltaTime);
+	mpStreamingVoices->Update(std::chrono::duration<float>(fDeltaTime));
 
 	if (pFrame != nullptr)
 	{
@@ -516,13 +502,19 @@ void AudioManager::Update(const game::Frame* pFrame)
 		mpStaticVoices->UpdateListenerPosition();
 		// pFrame is the client cell's render frame (Main.cpp), so every persistent-sound position it carries is
 		// local to that cell.
-		mpStaticVoices->UpdateLifecycle(*pFrame, game::gpGame->mClientGridCoord, fDeltaTime);
+		mpStaticVoices->UpdateLifecycle(*pFrame, game::gpGame->mClientGridCoordinate, fDeltaTime);
 	}
 
 	mpStaticVoices->UpdateVolumes();
 
-	gpProfileManager->SetCount(kCpuCounterSounds, mpStaticVoices->GetVoiceCount());
-	gpProfileManager->SetCount(kCpuCounterStreams, mpStreamingVoices->GetStreamCount());
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterSounds).iCount = std::ssize(mpStaticVoices->mVoices);
+	}
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterStreams).iCount = mpStreamingVoices->GetStreamCount();
+	}
 
 	mpAudioEngine->Update();
 }

@@ -32,12 +32,9 @@ public:
 	void SaveLoadReplay();
 	[[nodiscard]] ReplayTickDecision SyncReplayTick();
 
-	bool IsRecording() const { return !mReplayWriters.empty(); }
-	bool IsPlaybackActiveOrPending() const;
-	bool IsRecordingActiveOrPending() const;
 	void ResetStreams();
 	[[nodiscard]] bool CaptureAcceptedTransfers(GridCoord destination, std::span<const game::StatusChange> sortedTransfers, const game::Frame& rPreTransferFrame);
-	void RetireCoordinate(GridCoord coord, std::unique_ptr<game::Frame> pLastCompleteFrame);
+	void RetireCoordinate(GridCoord coordinate, std::unique_ptr<game::Frame> pLastCompleteFrame);
 
 private:
 
@@ -46,13 +43,10 @@ private:
 
 	void ClearReplayTransientState();
 	void ClearReplayAbortState();
-	// Republishes engine::GameBase::mbReplaying, the single owner of "replay playback is running".
-	// Call after every change to the live or pending reader sets.
-	void PublishReplayingState();
 
 	struct PendingReplayReader
 	{
-		GridCoord coord {};
+		GridCoord coordinate {};
 		std::unique_ptr<DifferenceStreamReader<game::Frame, game::FrameInput>> pReader;
 		std::unique_ptr<game::Frame> pSavedStart;
 		game::FrameInput initialInput;
@@ -64,8 +58,8 @@ private:
 	int64_t miReplayInitialTick = 0;
 
 	void InvalidateReplayRecording();
-	void UpdateTerminalReplayWriter(GridCoord coord, ReplayWriterState& rWriterState, const game::Frame& rEndFrame);
-	void ActivateReplayReader(GridCoord coord, PendingReplayReader&& rPendingReader);
+	void UpdateTerminalReplayWriter(GridCoord coordinate, const ReplayWriterState& rWriterState, const game::Frame& rEndFrame);
+	void ActivateReplayReader(GridCoord coordinate, PendingReplayReader&& rPendingReader);
 };
 
 inline Replay* gpReplay = nullptr;

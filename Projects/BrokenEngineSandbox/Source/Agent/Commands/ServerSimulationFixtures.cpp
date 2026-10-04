@@ -38,7 +38,7 @@ static void Bind(ServerSession& rSession)
 
 static bool IsCoordActive(engine::GridCoord coord)
 {
-	return std::find(gpGame->mActiveCoords.begin(), gpGame->mActiveCoords.end(), coord) != gpGame->mActiveCoords.end();
+	return std::find(gpGame->mActiveCoordinates.begin(), gpGame->mActiveCoordinates.end(), coord) != gpGame->mActiveCoordinates.end();
 }
 
 static bool AreAdjacent(engine::GridCoord source, engine::GridCoord destination)
@@ -66,17 +66,17 @@ static void CommandReplayRecord([[maybe_unused]] const nlohmann::json& rParams, 
 			throw std::runtime_error("replay_record requires bool 'start'");
 		}
 		bool bStart = rParams.at("start").get<bool>();
-		if (bStart && engine::gpReplay->IsPlaybackActiveOrPending())
+		if (bStart && (game::gpGame->mbReplaying || (game::gpGame->mGameFlags & engine::GameFlags::kLoadReplay)))
 		{
 			throw std::runtime_error("replay_record start rejected: playback is active or pending");
 		}
 		// kSaveReplay is a pure toggle in SyncReplayTick (empty writer set starts, non-empty stops). While paused the
 		// per-tick loop is skipped, so a set-but-unconsumed flag leaves the effective requested state the inverse of
-		// IsRecording() — compute it, not IsRecording() alone. bEffective is the state the sim will settle into once the
+		// the nonempty mReplayWriters state — compute it, not the nonempty mReplayWriters state alone. bEffective is the state the sim will settle into once the
 		// pending flag (if any) is consumed. If that already matches the request, no change is pending; otherwise flip the
 		// toggle: setting a clear flag schedules a transition, clearing a set flag cancels a not-yet-consumed one.
 		bool bFlagPending = gpGame->mGameFlags & engine::GameFlags::kSaveReplay;
-		bool bEffective = engine::gpReplay->IsRecording() != bFlagPending;
+		bool bEffective = (!engine::gpReplay->mReplayWriters.empty()) != bFlagPending;
 		if (bStart == bEffective)
 		{
 			rResult["pending"] = false;
@@ -84,7 +84,7 @@ static void CommandReplayRecord([[maybe_unused]] const nlohmann::json& rParams, 
 		else if (bFlagPending)
 		{
 			// Cancel a pending transition (e.g. a stop request voids a not-yet-started recording).
-			if (!engine::gpReplay->IsRecording())
+			if (engine::gpReplay->mReplayWriters.empty())
 			{
 				sFixture.replayTransferFixtures.clear();
 				engine::ReplayFixtures::Reset(*engine::gpReplay);
@@ -109,7 +109,7 @@ static void CommandReplayPlay([[maybe_unused]] const nlohmann::json& rParams, [[
 	else
 	{
 		// Same semantics as F8 / kClientReplayPlaybackRequest: starts playback, or cancels if already replaying.
-		if (engine::gpReplay->IsRecordingActiveOrPending())
+		if ((!engine::gpReplay->mReplayWriters.empty() || (game::gpGame->mGameFlags & engine::GameFlags::kSaveReplay)))
 		{
 			throw std::runtime_error("replay_play rejected: active or pending recording");
 		}
@@ -154,7 +154,7 @@ static void CommandReplayDropRetainedEndFrame([[maybe_unused]] const nlohmann::j
 	}
 	else
 	{
-		if (!engine::gpReplay->IsRecording())
+		if (engine::gpReplay->mReplayWriters.empty())
 		{
 			throw std::runtime_error("replay_drop_retained_end_frame requires active recording");
 		}
@@ -227,9 +227,9 @@ static void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohman
 		}
 
 		if ((eFailurePoint == engine::ReplayFixtures::PersistenceFailurePoint::kManifestInvalidation
-		  || eFailurePoint == engine::ReplayFixtures::PersistenceFailurePoint::kGrid) == engine::gpReplay->IsRecording())
+		  || eFailurePoint == engine::ReplayFixtures::PersistenceFailurePoint::kGrid) == (!engine::gpReplay->mReplayWriters.empty()))
 		{
-			throw std::runtime_error(engine::gpReplay->IsRecording() ? "selected stage requires recording to be inactive" : "selected stage requires active recording");
+			throw std::runtime_error((!engine::gpReplay->mReplayWriters.empty()) ? "selected stage requires recording to be inactive" : "selected stage requires active recording");
 		}
 
 		bool bRequiresCoord = eFailurePoint == engine::ReplayFixtures::PersistenceFailurePoint::kCoordinateWriter
@@ -270,8 +270,8 @@ static void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann
 			throw std::runtime_error("cannot queue replay transfer fixture during replay playback");
 		}
 		bool bPendingStart = (gpGame->mGameFlags & engine::GameFlags::kPaused) && (gpGame->mGameFlags & engine::GameFlags::kSaveReplay)
-		                  && !engine::gpReplay->IsRecording();
-		if (!engine::gpReplay->IsRecording() && !bPendingStart)
+		                  && engine::gpReplay->mReplayWriters.empty();
+		if (engine::gpReplay->mReplayWriters.empty() && !bPendingStart)
 		{
 			throw std::runtime_error("replay_transfer_fixture requires active recording or a paused pending recording start");
 		}
@@ -330,8 +330,8 @@ static void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann
 		{
 			throw std::runtime_error("'source' is not active");
 		}
-		auto sourceIt = gpGame->mCoordFrames.find(source);
-		if (sourceIt == gpGame->mCoordFrames.end())
+		auto sourceIt = gpGame->mCoordinateFrames.find(source);
+		if (sourceIt == gpGame->mCoordinateFrames.end())
 		{
 			throw std::runtime_error("'source' frame is not ready");
 		}
@@ -345,11 +345,11 @@ static void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann
 		}
 
 		// Transfer payloads are destination-local, so the default arrival point is the destination cell's center.
-		XMVECTOR vecPosition = XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.Get(), 1.0f);
+		XMVECTOR vecPosition = XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.mfCurrent, 1.0f);
 		if (eType == StatusChangeType::kTransferBlaster)
 		{
-			auto destinationIt = gpGame->mCoordFrames.find(destination);
-			if (destinationIt == gpGame->mCoordFrames.end())
+			auto destinationIt = gpGame->mCoordinateFrames.find(destination);
+			if (destinationIt == gpGame->mCoordinateFrames.end())
 			{
 				throw std::runtime_error("replay transfer fixture destination frame is not ready");
 			}
@@ -373,10 +373,10 @@ static void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann
 			{
 				for (int64_t iGridX = 0; iGridX < kiTerrainGridDim; ++iGridX)
 				{
-					XMVECTOR vecCandidate = XMVectorSet(f4Area.x + (static_cast<float>(iGridX) + 0.5f) * fPitchX, f4Area.w + (static_cast<float>(iGridY) + 0.5f) * fPitchY, engine::gBaseHeight.Get(), 1.0f);
-					XMVECTOR vecNextCandidate = XMVectorSet(XMVectorGetX(vecCandidate) + engine::kfDeltaTime, XMVectorGetY(vecCandidate), engine::gBaseHeight.Get(), 1.0f);
-					if (engine::gpIslandTerrain->MakeFrameElevationSampler(rDestinationStaticData).Sample(vecCandidate) < engine::gBaseHeight.Get()
-					 && engine::gpIslandTerrain->MakeFrameElevationSampler(rDestinationStaticData).Sample(vecNextCandidate) < engine::gBaseHeight.Get())
+					XMVECTOR vecCandidate = XMVectorSet(f4Area.x + (static_cast<float>(iGridX) + 0.5f) * fPitchX, f4Area.w + (static_cast<float>(iGridY) + 0.5f) * fPitchY, engine::gBaseHeight.mfCurrent, 1.0f);
+					XMVECTOR vecNextCandidate = XMVectorSet(XMVectorGetX(vecCandidate) + engine::kfDeltaTime, XMVectorGetY(vecCandidate), engine::gBaseHeight.mfCurrent, 1.0f);
+					if (engine::gpIslandTerrain->MakeFrameElevationSampler(rDestinationStaticData).Sample(vecCandidate) < engine::gBaseHeight.mfCurrent
+					 && engine::gpIslandTerrain->MakeFrameElevationSampler(rDestinationStaticData).Sample(vecNextCandidate) < engine::gBaseHeight.mfCurrent)
 					{
 						vecPosition = vecCandidate;
 						bFoundTerrainClearPosition = true;
@@ -400,7 +400,7 @@ static void CommandReplayTransferFixture(const nlohmann::json& rParams, nlohmann
 			.fShield = 1.0f,
 			.uiTypeIndex = PlayersInterpolate::suiBlasterTypeIndex,
 			.fDeltaRotationMax = eType == StatusChangeType::kTransferMissile ? 2.0f : 0.0f,
-			.globalPlayerId = engine::GlobalId {eType == StatusChangeType::kTransferPlayer ? gpGame->GenerateGlobalId() : 0},
+			.globalPlayerId = engine::GlobalId {eType == StatusChangeType::kTransferPlayer ? gpGame->miNextGlobalId++ : 0},
 			.fleetWantedCoord = destination,
 		};
 		StatusChange transfer {.eType = eType, .data = std::move(data)};
@@ -464,7 +464,7 @@ static std::pair<engine::GridCoord, StatusChange> BuildInjectedChange(const nloh
 	{
 		bool bIsFlagship = rChange.contains("isFlagship") && rChange.at("isFlagship").get<bool>();
 		engine::GridCoord fleetWantedCoord = rChange.contains("fleetWantedCoord") ? CoordFromParam(rChange, "fleetWantedCoord") : coord;
-		int64_t iGlobalId = gpGame->GenerateGlobalId();
+		int64_t iGlobalId = gpGame->miNextGlobalId++;
 		SpawnPlayerData spawn {.iGlobalId = iGlobalId, .bIsFlagship = bIsFlagship, .fleetWantedCoord = fleetWantedCoord, .uiPendingFleetWantedCoordTicks = 0};
 		if (rChange.contains("pos"))
 		{
@@ -601,7 +601,7 @@ static void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::
 		{
 			throw std::runtime_error("navQueryActivation requires timescale 1/1");
 		}
-		else if (engine::gpReplay->IsRecording())
+		else if ((!engine::gpReplay->mReplayWriters.empty()))
 		{
 			throw std::runtime_error("navQueryActivation requires recording and replay to be inactive");
 		}
@@ -645,7 +645,7 @@ static void CommandInjectStatusChanges(const nlohmann::json& rParams, nlohmann::
 			// Drain is the main-thread serialization point. Keep the event arm and queue commit in one critical section
 			// so another tick cannot move the floor or observe a partially committed transaction.
 			std::lock_guard lock(gpProfileManager->mCpuTimerMutex);
-			iQueuedAtTick = gpGame->TickCounter();
+			iQueuedAtTick = gpGame->miTickCounter;
 			static constexpr int64_t kiMinimumSampleTickOffset = engine::kiTickRate + 1;
 			if (iQueuedAtTick > std::numeric_limits<int64_t>::max() - kiMinimumSampleTickOffset)
 			{
@@ -708,7 +708,7 @@ static void CommandSpawnPlayers(const nlohmann::json& rParams, nlohmann::json& r
 	nlohmann::json globalIds = nlohmann::json::array();
 	for (int64_t i = 0; i < iCount; ++i)
 	{
-		int64_t iGlobalId = gpGame->GenerateGlobalId();
+		int64_t iGlobalId = gpGame->miNextGlobalId++;
 		StatusChange change {.eType = StatusChangeType::kSpawnPlayer, .data = SpawnPlayerData {.iGlobalId = iGlobalId, .bIsFlagship = bIsFlagship, .fleetWantedCoord = coord, .uiPendingFleetWantedCoordTicks = 0}};
 		QueueAgentStatusChange(*gpServerSession, coord, change);
 		globalIds.push_back(iGlobalId);
@@ -794,10 +794,10 @@ static void CommandInjectOutwardTransfer(const nlohmann::json& rParams, nlohmann
 		float fPositionY = (iDeltaY > 0) ? f4Area.y - kfCoastMargin : (iDeltaY < 0) ? f4Area.w + kfCoastMargin : (f4Area.y + f4Area.w) * 0.5f;
 		XMVECTOR vecVelocity = XMVectorSet(static_cast<float>(iDeltaX) * kfPlayerMaxSpeed, static_cast<float>(iDeltaY) * kfPlayerMaxSpeed, 0.0f, 0.0f);
 
-		int64_t iGlobalId = gpGame->GenerateGlobalId();
+		int64_t iGlobalId = gpGame->miNextGlobalId++;
 		TransferData data
 		{
-			.vecPosition = XMVectorSet(fPositionX, fPositionY, engine::gBaseHeight.Get(), 1.0f),
+			.vecPosition = XMVectorSet(fPositionX, fPositionY, engine::gBaseHeight.mfCurrent, 1.0f),
 			.vecDirection = XMVector3Normalize(vecVelocity),
 			.vecVelocity = vecVelocity,
 			.alignment = gpGame->mPlayerAlignment,
@@ -926,14 +926,14 @@ void DrainPendingAgentStatusChanges(ServerSession& rSession)
 	for (auto it = sFixture.pendingAgentStatusChanges.begin(); it != sFixture.pendingAgentStatusChanges.end();)
 	{
 		const engine::GridCoord& rCoord = it->first;
-		auto framesIt = gpGame->mCoordFrames.find(rCoord);
-		bool bActive = std::find(gpGame->mActiveCoords.begin(), gpGame->mActiveCoords.end(), rCoord) != gpGame->mActiveCoords.end();
+		auto framesIt = gpGame->mCoordinateFrames.find(rCoord);
+		bool bActive = std::find(gpGame->mActiveCoordinates.begin(), gpGame->mActiveCoordinates.end(), rCoord) != gpGame->mActiveCoordinates.end();
 		if (!bActive)
 		{
 			++it;
 			continue;
 		}
-		if (framesIt == gpGame->mCoordFrames.end())
+		if (framesIt == gpGame->mCoordinateFrames.end())
 		{
 			++it;
 			continue;
@@ -962,11 +962,11 @@ void DrainReplayTransferFixtures(ServerSession& rSession, engine::ServerTransfer
 
 	for (auto& [rCoord, rTransfers] : sFixture.replayTransferFixtures)
 	{
-		auto it = gpGame->mCoordFrames.find(rCoord);
-		if (it == gpGame->mCoordFrames.end() || it->second.pNext == nullptr)
+		auto it = gpGame->mCoordinateFrames.find(rCoord);
+		if (it == gpGame->mCoordinateFrames.end() || it->second.pNext == nullptr)
 		{
-			gpGame->CreateFrameAtCoord(rCoord);
-			engine::CoordFrames& rFrames = gpGame->mCoordFrames.at(rCoord);
+			gpGame->CreateFrameAtCoordinate(rCoord);
+			engine::CoordFrames& rFrames = gpGame->mCoordinateFrames.at(rCoord);
 			rFrames.pNext = std::make_unique<Frame>();
 			std::swap(rFrames.pCurrent, rFrames.pNext);
 		}

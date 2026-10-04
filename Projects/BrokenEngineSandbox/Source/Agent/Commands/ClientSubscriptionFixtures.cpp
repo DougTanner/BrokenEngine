@@ -111,8 +111,8 @@ void CommandClientStaleUpdateFixture(const nlohmann::json& rParams, [[maybe_unus
 		bool bHasActiveConfirmedCoord = false;
 		for (const engine::ClientCoordSlot& rSlot : rClient.mCoordinateSlots)
 		{
-			auto coordIt = gpGame->mCoordFrames.find(rSlot.coordinate);
-			if (rSlot.eState == engine::CoordSubscriptionState::kActive && coordIt != gpGame->mCoordFrames.end()
+			auto coordIt = gpGame->mCoordinateFrames.find(rSlot.coordinate);
+			if (rSlot.eState == engine::CoordSubscriptionState::kActive && coordIt != gpGame->mCoordinateFrames.end()
 			 && coordIt->second.iConfirmedTick >= 0)
 			{
 				bHasActiveConfirmedCoord = true;

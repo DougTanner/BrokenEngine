@@ -331,9 +331,9 @@ void SpaceshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict
 			engine::WindTrailsInterpolate::Sync(rCurrentFrameInterpolate, rCurrent.puiWindTrails[i],
 			{
 				.vecPosition = vecPosition,
-				.fIntensity = game::gWindDepositSpaceshipsIntensity.Get(),
-				.fWidth = game::gWindDepositSpaceshipsWidth.Get(),
-				.fLengthMultiplier = game::gWindDepositSpaceshipsLengthMultiplier.Get(),
+				.fIntensity = game::gWindDepositSpaceshipsIntensity.mfCurrent,
+				.fWidth = game::gWindDepositSpaceshipsWidth.mfCurrent,
+				.fLengthMultiplier = game::gWindDepositSpaceshipsLengthMultiplier.mfCurrent,
 			});
 		}
 #endif // BT_CLIENT
@@ -494,13 +494,13 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 				.uiTypeIndex = suiEnemyBlasterTypeIndex,
 				.flags = {},
 				.alignment = rCurrentPostRender.pAlignments[i],
-				.fWindTrailIntensity = game::gWindDepositSpaceshipsBlastersIntensity.Get(),
-				.fWindTrailWidth = game::gWindDepositSpaceshipsBlastersWidth.Get(),
-				.fWindTrailLengthMultiplier = game::gWindDepositSpaceshipsBlastersLengthMultiplier.Get(),
+				.fWindTrailIntensity = game::gWindDepositSpaceshipsBlastersIntensity.mfCurrent,
+				.fWindTrailWidth = game::gWindDepositSpaceshipsBlastersWidth.mfCurrent,
+				.fWindTrailLengthMultiplier = game::gWindDepositSpaceshipsBlastersLengthMultiplier.mfCurrent,
 			});
 
 #if defined(BT_CLIENT)
-			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, rStaticData.coordinate, vecPosition, gEnemyBlasterVolume.Get(), gEnemyBlasterPitchMin.Get(), gEnemyBlasterPitchRandom.Get());
+			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, rStaticData.coordinate, vecPosition, gEnemyBlasterVolume.mfCurrent, gEnemyBlasterPitchMin.mfCurrent, gEnemyBlasterPitchRandom.mfCurrent);
 #endif
 		}
 	}
@@ -519,9 +519,9 @@ void SpaceshipsInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 	engine::WindTrailsInterpolate::Sync(rFrame.interpolate, rSpaceships.puiWindTrails[iIndex],
 	{
 		.vecPosition = rSpaceships.pVecPositions[iIndex],
-		.fIntensity = game::gWindDepositSpaceshipsIntensity.Get(),
-		.fWidth = game::gWindDepositSpaceshipsWidth.Get(),
-		.fLengthMultiplier = game::gWindDepositSpaceshipsLengthMultiplier.Get(),
+		.fIntensity = game::gWindDepositSpaceshipsIntensity.mfCurrent,
+		.fWidth = game::gWindDepositSpaceshipsWidth.mfCurrent,
+		.fLengthMultiplier = game::gWindDepositSpaceshipsLengthMultiplier.mfCurrent,
 	});
 }
 
@@ -609,14 +609,14 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 	float fDeltaTime = rFrame.interpolate.fDeltaTime;
 
 	// Hoist tick-invariant per-cell island-center candidates out of the per-ship steering loop: the island set and
-	// base height are fixed per coord, so build the XMVectorSet(x, y, gBaseHeight.Get(), 1.0f) candidates once (into
+	// base height are fixed per coord, so build the XMVectorSet(x, y, gBaseHeight.mfCurrent, 1.0f) candidates once (into
 	// the per-thread workbuffer) instead of N ships x M islands times. Values feed ComputeSteering bit-identically.
 	int64_t iIslandCount = static_cast<int64_t>(rStaticData.islands.size());
 	auto pIslandCandidates = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMFLOAT4*>(iIslandCount * static_cast<int64_t>(sizeof(XMFLOAT4)));
 	for (int64_t iIsland = 0; iIsland < iIslandCount; ++iIsland)
 	{
 		const engine::IslandPlacement& rPlacement = rStaticData.islands[iIsland];
-		XMStoreFloat4(&pIslandCandidates.mpData[iIsland], XMVectorSet(rPlacement.f2WorldPosition.x, rPlacement.f2WorldPosition.y, engine::gBaseHeight.Get(), 1.0f));
+		XMStoreFloat4(&pIslandCandidates.mpData[iIsland], XMVectorSet(rPlacement.f2WorldPosition.x, rPlacement.f2WorldPosition.y, engine::gBaseHeight.mfCurrent, 1.0f));
 	}
 	std::span<const XMFLOAT4> islandCandidates(static_cast<XMFLOAT4*>(pIslandCandidates.mpData), static_cast<size_t>(iIslandCount));
 

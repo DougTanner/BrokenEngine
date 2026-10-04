@@ -84,7 +84,7 @@ static void AdoptUnreachablePendingFullState(CoordWork& rWork)
 	rFrames.iHighWaterValidatedTick = iAdoptedTick;
 	rFrames.iLastFullStateTick = iAdoptedTick;
 	rFrames.pendingFullState.reset();
-	rFrames.serverUpdates.erase(rFrames.serverUpdates.begin(), rFrames.serverUpdates.upper_bound(iAdoptedTick));
+	std::erase_if(rFrames.serverUpdates, [iAdoptedTick](const auto& rEntry) { return rEntry.first <= iAdoptedTick; });
 	rFrames.iLastReplayConfirmedTick = -1;
 	rFrames.iLastReplayServerUpdateCount = -1;
 
@@ -388,7 +388,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 
 	// Reusing work slots preserves replayStack capacity across Run() calls and avoids per-frame allocations.
 	size_t uiEligibleCount = 0;
-	for (const auto& [rCoord, rFrames] : game::gpGame->mCoordFrames)
+	for (const auto& [rCoord, rFrames] : game::gpGame->mCoordinateFrames)
 	{
 		if (rFrames.iConfirmedTick >= 0)
 		{
@@ -400,7 +400,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 		mWorks.resize(uiEligibleCount);
 	}
 	int64_t iSlot = 0;
-	for (auto& [rCoord, rFrames] : game::gpGame->mCoordFrames)
+	for (auto& [rCoord, rFrames] : game::gpGame->mCoordinateFrames)
 	{
 		if (rFrames.iConfirmedTick < 0)
 		{
@@ -454,7 +454,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 		using enum ReconcileScratchFlags;
 
 		// Audio voice invalidation skip is gated on the client coord experiencing a full replay.
-		if ((rScratch.flags & kReplayed) && rWork.coord == game::gpGame->mClientGridCoord)
+		if ((rScratch.flags & kReplayed) && rWork.coord == game::gpGame->mClientGridCoordinate)
 		{
 			result.bAnyFullReplay = true;
 		}

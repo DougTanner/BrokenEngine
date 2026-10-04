@@ -7,7 +7,7 @@ namespace game
 
 struct FrameInterpolate;
 
-}
+} // namespace game
 
 namespace engine
 {
@@ -16,7 +16,7 @@ struct WorldSizedTexelArea
 {
 	XMFLOAT4 f4Area {};
 	float fAspect = 0.0f;
-	float fTanHalfFov = 0.0f;
+	float fTangentHalfFieldOfView = 0.0f;
 	float fWorldTexelX = 0.0f;
 	float fWorldTexelY = 0.0f;
 	float fFullWidth = 0.0f;
@@ -24,15 +24,15 @@ struct WorldSizedTexelArea
 
 	XMFLOAT2 ComputeVisibleArea(float fEyeHeight) const
 	{
-		return {2.0f * fEyeHeight * fAspect * fTanHalfFov, 2.0f * fEyeHeight * fTanHalfFov};
+		return {2.0f * fEyeHeight * fAspect * fTangentHalfFieldOfView, 2.0f * fEyeHeight * fTangentHalfFieldOfView};
 	}
 };
 
-inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fHeadroomMultiplier, float fTexelEyeHeight, float fTextureWidth, float fTextureHeight, float fAspect, float fFov, FXMVECTOR vecCameraPosition)
+inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fHeadroomMultiplier, float fTexelEyeHeight, float fTextureWidth, float fTextureHeight, float fAspect, float fFieldOfView, FXMVECTOR vecCameraPosition)
 {
-	float fTanHalfFov = std::tan(0.5f * XMConvertToRadians(fFov / fAspect));
-	float fWorldTexelX = (2.0f * fHeadroomMultiplier * fAspect * fTanHalfFov / fTextureWidth) * fTexelEyeHeight;
-	float fWorldTexelY = (2.0f * fHeadroomMultiplier * fTanHalfFov / fTextureHeight) * fTexelEyeHeight;
+	float fTangentHalfFieldOfView = std::tan(0.5f * XMConvertToRadians(fFieldOfView / fAspect));
+	float fWorldTexelX = (2.0f * fHeadroomMultiplier * fAspect * fTangentHalfFieldOfView / fTextureWidth) * fTexelEyeHeight;
+	float fWorldTexelY = (2.0f * fHeadroomMultiplier * fTangentHalfFieldOfView / fTextureHeight) * fTexelEyeHeight;
 	float fFullWidth = fTextureWidth * fWorldTexelX;
 	float fFullHeight = fTextureHeight * fWorldTexelY;
 	XMFLOAT4A f4CameraPosition {};
@@ -41,10 +41,11 @@ inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fHeadroo
 	int64_t iTopTexel = static_cast<int64_t>(std::floor((f4CameraPosition.y + fFullHeight * 0.5f) / fWorldTexelY));
 	float fLeft = static_cast<float>(iLeftTexel) * fWorldTexelX;
 	float fTop = static_cast<float>(iTopTexel) * fWorldTexelY;
-	return WorldSizedTexelArea {
+	return WorldSizedTexelArea
+	{
 		.f4Area = {fLeft, fTop, fLeft + fFullWidth, fTop - fFullHeight},
 		.fAspect = fAspect,
-		.fTanHalfFov = fTanHalfFov,
+		.fTangentHalfFieldOfView = fTangentHalfFieldOfView,
 		.fWorldTexelX = fWorldTexelX,
 		.fWorldTexelY = fWorldTexelY,
 		.fFullWidth = fFullWidth,
@@ -57,14 +58,14 @@ inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fHeadroo
 // one-cell case the 3x3 subscription allows; a larger step leaves no overlap, so the owner resets instead.
 struct RetainedAreaBasis
 {
-	GridCoord coord {};
+	GridCoord coordinate {};
 
-	[[nodiscard]] std::optional<XMFLOAT2> Advance(GridCoord cameraCoord)
+	[[nodiscard]] std::optional<XMFLOAT2> Advance(GridCoord cameraCoordinate)
 	{
-		int64_t iStepX = static_cast<int64_t>(cameraCoord.iX) - static_cast<int64_t>(coord.iX);
-		int64_t iStepY = static_cast<int64_t>(cameraCoord.iY) - static_cast<int64_t>(coord.iY);
-		XMFLOAT2 f2Offset = MakeRenderBasis(coord, cameraCoord).f2Offset;
-		coord = cameraCoord;
+		int64_t iStepX = static_cast<int64_t>(cameraCoordinate.iX) - static_cast<int64_t>(coordinate.iX);
+		int64_t iStepY = static_cast<int64_t>(cameraCoordinate.iY) - static_cast<int64_t>(coordinate.iY);
+		XMFLOAT2 f2Offset = MakeRenderBasis(coordinate, cameraCoordinate).f2Offset;
+		coordinate = cameraCoordinate;
 		if (iStepX < -1 || iStepX > 1 || iStepY < -1 || iStepY > 1)
 		{
 			return std::nullopt;
@@ -125,7 +126,7 @@ struct RetainedAreaReport
 struct PresentationContinuitySnapshot
 {
 	int64_t iPublishedFrames = 0;
-	GridCoord cameraBasisCoord {};
+	GridCoord cameraBasisCoordinate {};
 	XMFLOAT2 f2WaterOrigin {};
 	XMFLOAT2 f2ReducedNoiseOrigin {};
 	float fNoiseFrequency = 0.0f;
@@ -136,31 +137,26 @@ struct PresentationContinuitySnapshot
 
 inline PresentationContinuitySnapshot gPresentationContinuity {};
 
-void RenderFrameGlobal(int64_t iCommandBuffer, float fCurrentTime);
-void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, float fCurrentTime);
+void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> currentTime);
+void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, std::chrono::duration<float> currentTime);
 
-// Shadow
 inline bool gbShadowTemporalReset = false; // Set by CreateShadowTextures; re-arms the PopulateShadowParameters first-frame guard so a recreate doesn't blend stale history for one frame
 
-// Lighting
 // Set by CreateLightingTextures; re-arms the PopulateLightingParameters first-frame guard so a recreate doesn't blend stale history for one frame.
 inline bool gbLightingTemporalReset = false;
 void RenderLightingGlobal(int64_t iCommandBuffer);
 void RenderLightingMain(int64_t iCommandBuffer);
 void RenderLightingSpreadIndirect(int64_t iCommandBuffer);
 
-// Smoke
 inline bool gbSmokeClear = true;
 
 void RenderSmokeGlobal(int64_t iCommandBuffer);
 
-// Wind
 inline int64_t giWindTextureIndex = 0; // 0 = write TextureOne, 1 = write TextureTwo
 
 void RenderWindGlobal(int64_t iCommandBuffer);
 
-// Water
-void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAngle, float fDayPercent, float fCurrentTime);
+void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAngle, float fDayPercent, std::chrono::duration<float> elapsedTime);
 
 } // namespace engine
 

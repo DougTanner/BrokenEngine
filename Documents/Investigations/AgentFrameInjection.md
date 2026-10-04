@@ -63,7 +63,7 @@ Two things the table makes visible:
   by `spawn_players` or `replay_transfer_fixture`.
 - Every command mints identity server-side. No caller supplies a global id, an
   alignment, or a client GUID; the fixture always takes
-  `gpGame->GenerateGlobalId()` and `gpGame->PlayerAlignment()` (`:385, 390,
+  `gpGame->miNextGlobalId++` and `gpGame->PlayerAlignment()` (`:385, 390,
   452, 712, 802, 808`). Any generic shape has to keep those fields out of the
   caller's hands.
 
@@ -165,7 +165,7 @@ each transfer kind actually carries.
   (`Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md` `## Contracts`).
   Widening what a caller can put in a payload widens what must be validated,
   because the drains and consumers do not.
-- Server-side identity: global ids come from `gpGame->GenerateGlobalId()`,
+- Server-side identity: global ids come from `gpGame->miNextGlobalId++`,
   alignment from the session, and the client GUID stays empty
   (`commands-server.md:40, 50`). A payload field the caller could set to a
   colliding global id or a foreign alignment is an ownership exposure.

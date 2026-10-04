@@ -11,7 +11,7 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 };
 
 layout (set = 1, binding = 1) uniform sampler2D shadowTextureSampler;
-layout (set = 1, binding = 2, r16) uniform writeonly image2D shadowBlurIntermediateTexture; // keShadowFormat
+layout (set = 1, binding = 2, r16) uniform writeonly image2D shadowBlurIntermediateTexture; // kVkFormatShadow
 
 void main()
 {
@@ -22,7 +22,7 @@ void main()
 	uint uiX = uint(i2Texel.x);
 	uint uiY = uint(i2Texel.y);
 
-	vec2 f2InvSize = globalLayout.f2ShadowTextureSizeInv;
+	vec2 f2InvSize = globalLayout.f2ShadowTextureSizeInverse;
 	float fTotal = 0.0f;
 	for (int i = -kiShadowBlurRadius; i <= kiShadowBlurRadius; ++i)
 	{
@@ -30,5 +30,5 @@ void main()
 		fTotal += globalLayout.pfShadowBlurWeights[abs(i)] * textureLod(shadowTextureSampler, vUv, 0.0f).x;
 	}
 
-	imageStore(shadowBlurIntermediateTexture, ivec2(uiX, uiY), vec4(fTotal * globalLayout.fShadowBlurWeightSumInv, 0.0f, 0.0f, 0.0f));
+	imageStore(shadowBlurIntermediateTexture, ivec2(uiX, uiY), vec4(fTotal * globalLayout.fShadowBlurWeightSumInverse, 0.0f, 0.0f, 0.0f));
 }

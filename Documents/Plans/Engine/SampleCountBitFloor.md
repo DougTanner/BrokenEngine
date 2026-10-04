@@ -12,7 +12,7 @@ The two helper calls are `InstanceManager::SelectSupportedSampleCount` at line 1
 The recommendation is to replace only the helper body with:
 
 ```cpp
-return static_cast<VkSampleCountFlagBits>(std::bit_floor(eVkSampleCountFlags | VK_SAMPLE_COUNT_1_BIT));
+return static_cast<VkSampleCountFlagBits>(std::bit_floor(vkSampleCountFlags | VK_SAMPLE_COUNT_1_BIT));
 ```
 
 Retain the helper signature and both callers unchanged. OR-ing in 1 is necessary: `std::bit_floor(0)` alone would change the fallback from 1 to 0. Preserve the supported-setting early return in `SelectSupportedSampleCount` and its existing 4 fallback, including an unsupported request of 2.
@@ -23,7 +23,7 @@ Invalid masks with bits above 64 would differ from the old helper, which ignores
 
 ## Critical files
 
-- `Engine/Source/Graphics/Managers/InstanceManager.cpp`: change only static `SelectSampleCount`; inspect `SelectSupportedSampleCount` and the device-initialization assignment to `meMaxMultisampleCount` as unchanged producers.
+- `Engine/Source/Graphics/Managers/InstanceManager.cpp`: change only static `SelectSampleCount`; inspect `SelectSupportedSampleCount` and the device-initialization assignment to `mMaxMultisampleCountVkSampleCountFlagBits` as unchanged producers.
 - `Engine/Source/Graphics/Graphics.cpp:520`, `Graphics::Refresh`: inspect the unchanged supported-setting fast path and correction writeback as performance evidence.
 - `Common/ExternalHeaders.h:62`: confirm the existing centralized `<bit>` include; no edit.
 

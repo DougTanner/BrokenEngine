@@ -12,7 +12,7 @@ namespace game
 {
 
 Camera::Camera()
-: engine::Camera(engine::CameraSetup {.vecInitialPosition = XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.Get(), 0.0f))})
+: engine::Camera(engine::CameraSetup {.vecInitialPosition = XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.mfCurrent, 0.0f))})
 {
 }
 
@@ -30,20 +30,20 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 	// the camera at whatever stale gameplay position last set mVecPosition.
 	if (rGameInterpolate.gameFlags & GameFlags::kMainMenu)
 	{
-		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.Get(), 0.0f)));
+		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.mfCurrent, 0.0f)));
 	}
 
 	if (!(gpGame->ClientPlayerId().iValue != 0))
 	{
-		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.Get(), 0.0f)));
+		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.mfCurrent, 0.0f)));
 	}
 
 	// The interpolate's own cell, not the client cell: its positions are local to that cell, and the camera works in
 	// that same frame, so a target taken from it needs no conversion. Reading the index from a different cell's
 	// players would pick a position a whole cell away.
 	engine::GridCoord coord = rGameInterpolate.renderBasis.coordinate;
-	auto coordIt = gpGame->mCoordFrames.find(coord);
-	bool bHasCoord = coordIt != gpGame->mCoordFrames.end() && coordIt->second.iSnapshotCount > 0;
+	auto coordIt = gpGame->mCoordinateFrames.find(coord);
+	bool bHasCoord = coordIt != gpGame->mCoordinateFrames.end() && coordIt->second.iSnapshotCount > 0;
 	std::optional<int64_t> oIdx = bHasCoord ? gpGame->ClientPlayerIndex(*gpGame->RenderFrame(coord).postRender.pPlayers) : std::nullopt;
 	if (oIdx)
 	{
@@ -99,7 +99,7 @@ float Camera::SunAngle() const
 	}
 	if (bUseOverride)
 	{
-		return engine::gSunAngleOverride.Get();
+		return engine::gSunAngleOverride.mfCurrent;
 	}
 	return mfSunAngle;
 }

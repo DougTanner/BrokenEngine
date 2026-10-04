@@ -25,11 +25,10 @@ PackChunkLoader::~PackChunkLoader()
 void PackChunkLoader::Start()
 {
 	// Start background loading threads (each services the shared priority queue with its own read/scratch buffers)
-	for (int64_t iThreadIndex = 0; iThreadIndex < kiLoadingThreadCount; ++iThreadIndex)
+	for (int64_t i = 0; i < kiLoadingThreadCount; ++i)
 	{
-		// All loading threads share the semantically-correct kThreadLazyLoad id: nothing keys shared state off the
-		// thread id (it only tags log lines and gates the DxDiag-thread check), so distinct ids are unnecessary.
-		mLoadingThreads[iThreadIndex] = std::thread(common::ThreadLocal::Entry(&PackChunkLoader::LoadingThread, common::kiMinWorkbufferSize, common::kThreadLazyLoad), this, iThreadIndex);
+		// kThreadLazyLoad tags log lines and participates in the DxDiag-thread check; shared state does not use it.
+		mLoadingThreads[i] = std::thread(common::ThreadLocal::Entry(&PackChunkLoader::LoadingThread, common::kiMinWorkbufferSize, common::kThreadLazyLoad), this, i);
 	}
 }
 
@@ -75,19 +74,19 @@ void PackChunkLoader::RequestChunkLoad(std::span<const common::crc_t> crcs, Load
 			}
 
 			LazyChunk& rLazyChunk = it->second;
-			if (rLazyChunk.eState.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
+			if (rLazyChunk.eState.value.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
 			{
 				continue;
 			}
 
-			if (rLazyChunk.eState.load(std::memory_order_acquire) < ChunkState::kLoadRequested)
+			if (rLazyChunk.eState.value.load(std::memory_order_acquire) < ChunkState::kLoadRequested)
 			{
 				// Heap: priority_queue insertion may allocate. Items must persist until the loading thread pops them,
 				//   so a workbuffer (frame-scoped) can't own them, and the queue grows/shrinks unpredictably
 				ScopedSuppressAllocationTracking suppress;
 
-				mRequestQueue.push({crc, ePriority, LoadRequestKind::kWholeChunk});
-				rLazyChunk.eState.store(ChunkState::kLoadRequested, std::memory_order_release);
+				mRequestQueue.push({.crc = crc, .ePriority = ePriority, .eKind = LoadRequestKind::kWholeChunk});
+				rLazyChunk.eState.value.store(ChunkState::kLoadRequested, std::memory_order_release);
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
 				if (common::gpMultithreading->IsMainThread())
 				{
@@ -112,7 +111,7 @@ void PackChunkLoader::RequestChunkRangeReload(common::crc_t crc, uint64_t uiOffs
 	{
 		std::unique_lock lock(mQueueMutex);
 		LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(crc);
-		ChunkRangeReloadState eState = rLazyChunk.eRangeReloadState.load(std::memory_order_acquire);
+		ChunkRangeReloadState eState = rLazyChunk.eRangeReloadState.value.load(std::memory_order_acquire);
 		if (eState != ChunkRangeReloadState::kIdle)
 		{
 			// One LazyChunk owns one active range request. Consumers must reset its terminal state before selecting
@@ -122,17 +121,17 @@ void PackChunkLoader::RequestChunkRangeReload(common::crc_t crc, uint64_t uiOffs
 		}
 
 		ASSERT(!common::IsCompressed(rLazyChunk.header.flags));
-		ASSERT(rLazyChunk.eState.load(std::memory_order_acquire) >= ChunkState::kReady);
+		ASSERT(rLazyChunk.eState.value.load(std::memory_order_acquire) >= ChunkState::kReady);
 		rLazyChunk.uiRangeReloadOffset = uiOffset;
 		rLazyChunk.uiRangeReloadLength = uiLength;
 		{
 			// Heap: priority_queue insertion may allocate. The request must remain alive until a loading thread pops it.
 			ScopedSuppressAllocationTracking suppress;
-			mRequestQueue.push({crc, ePriority, LoadRequestKind::kRangeReload, uiOffset, uiLength});
+			mRequestQueue.push({.crc = crc, .ePriority = ePriority, .eKind = LoadRequestKind::kRangeReload, .uiOffset = uiOffset, .uiLength = uiLength});
 		}
 		// The loading thread cannot pop until mQueueMutex unlocks. This release-store publishes the range metadata
 		// together with the queued request, so an acquire state read observes the exact request it polls.
-		rLazyChunk.eRangeReloadState.store(ChunkRangeReloadState::kPending, std::memory_order_release);
+		rLazyChunk.eRangeReloadState.value.store(ChunkRangeReloadState::kPending, std::memory_order_release);
 		bAdded = true;
 	}
 
@@ -146,7 +145,7 @@ ChunkRangeReloadState PackChunkLoader::GetChunkRangeReloadState(common::crc_t cr
 {
 	std::unique_lock lock(mQueueMutex);
 	const LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(crc);
-	ChunkRangeReloadState eState = rLazyChunk.eRangeReloadState.load(std::memory_order_acquire);
+	ChunkRangeReloadState eState = rLazyChunk.eRangeReloadState.value.load(std::memory_order_acquire);
 	if (eState != ChunkRangeReloadState::kIdle)
 	{
 		ASSERT(rLazyChunk.uiRangeReloadOffset == uiOffset && rLazyChunk.uiRangeReloadLength == uiLength);
@@ -158,7 +157,7 @@ void PackChunkLoader::ResetChunkRangeReloadState(common::crc_t crc, uint64_t uiO
 {
 	std::unique_lock lock(mQueueMutex);
 	LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(crc);
-	ChunkRangeReloadState eState = rLazyChunk.eRangeReloadState.load(std::memory_order_acquire);
+	ChunkRangeReloadState eState = rLazyChunk.eRangeReloadState.value.load(std::memory_order_acquire);
 	if (eState == ChunkRangeReloadState::kPending)
 	{
 		ASSERT(false); // A pending range can still be writing into the lazy pool.
@@ -176,7 +175,7 @@ void PackChunkLoader::ResetChunkRangeReloadState(common::crc_t crc, uint64_t uiO
 
 	rLazyChunk.uiRangeReloadOffset = 0;
 	rLazyChunk.uiRangeReloadLength = 0;
-	rLazyChunk.eRangeReloadState.store(ChunkRangeReloadState::kIdle, std::memory_order_release);
+	rLazyChunk.eRangeReloadState.value.store(ChunkRangeReloadState::kIdle, std::memory_order_release);
 }
 
 void PackChunkLoader::WaitForChunks(std::span<const common::crc_t> crcs)
@@ -188,7 +187,7 @@ void PackChunkLoader::WaitForChunks(std::span<const common::crc_t> crcs)
 	{
 		for (common::crc_t crc : crcs)
 		{
-			if (mrPackChunks.mLazyChunkMap.at(crc).eState.load(std::memory_order_acquire) < ChunkState::kReady)
+			if (mrPackChunks.mLazyChunkMap.at(crc).eState.value.load(std::memory_order_acquire) < ChunkState::kReady)
 			{
 				return false;
 			}
@@ -199,16 +198,11 @@ void PackChunkLoader::WaitForChunks(std::span<const common::crc_t> crcs)
 
 void PackChunkLoader::WaitForLoadersIdle()
 {
-	// Full-recovery boundary: returns once every accepted whole and range job has left the loading threads with its
-	// terminal state published, and nothing is left queued. The exclusion that lets it run without admission state is
-	// temporal, not ownership: one producer is off-main (PlayOneShot3d -> StaticVoice::LoadXAudio2SourceVoice requests
-	// its audio chunk from tick workers), but ClientUpdate joins every dispatch worker before Render, and every
-	// Graphics::Destroy call site runs on the main thread at or after Render, so nothing can enqueue while this waits;
-	// Documents/Plans/Engine/AudioStreamingBackgroundRangeReads.md owns reconciling this once audio adds a producer
-	// outside that window.
-	// Without the drain, a loader that popped a whole-texture request before the all-texture reset can store
-	// kUploading after that reset already ran. RequestChunkLoad skips any chunk at >= kDiskLoaded, so such a chunk
-	// is never requested again and its texture never recovers.
+	// Drain queued and active whole-chunk and range jobs after they publish terminal states.
+	// ClientUpdate joins tick workers before Render; Graphics::Destroy drains on the main thread at or after Render.
+	// This excludes concurrent enqueueing, including tick-worker audio requests from PlayOneShot3d through StaticVoice::LoadXAudio2SourceVoice.
+	// Drain before the all-texture reset: a late kUploading store would escape the reset, and RequestChunkLoad skips
+	// states >= kDiskLoaded, leaving that texture permanently unrequested.
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
 	AudioStreamingFixture::PrepareLoaderDrain();
 #endif
@@ -310,7 +304,7 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 		{
 			LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(loadRequest.crc);
 			bool bReloaded = mrPackChunks.RecommitAndReloadChunkRange(loadRequest.crc, loadRequest.uiOffset, loadRequest.uiLength);
-			rLazyChunk.eRangeReloadState.store(bReloaded ? ChunkRangeReloadState::kReady : ChunkRangeReloadState::kFailed, std::memory_order_release);
+			rLazyChunk.eRangeReloadState.value.store(bReloaded ? ChunkRangeReloadState::kReady : ChunkRangeReloadState::kFailed, std::memory_order_release);
 		}
 		else
 		{
@@ -373,13 +367,13 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 	// Compressed chunks read into this thread's scratch and decompress into pData; uncompressed chunks read directly into pData.
 	std::byte* pDecompressScratch = mrPackChunks.mpDecompressScratches[iThreadIndex];
 	std::byte* pReadBuffer = mrPackChunks.mpReadBuffers[iThreadIndex];
-	std::byte* pReadDst = bCompressed ? pDecompressScratch : rLazyChunk.pData;
+	std::byte* pReadDestination = bCompressed ? pDecompressScratch : rLazyChunk.pData;
 
 	data::DataTypes eDataType = DataTypeFromFlags(rLazyChunk.header.flags);
 
-	// Read in sub-chunks, yielding between each to reduce main-thread scheduling latency
+	// Bound each disk read to kiSubReadSize plus sector-alignment padding.
 	HANDLE hFile = mrPackChunks.mLazyPackFileHandles[eDataType];
-	int64_t iFilePos = iAlignedOffset;
+	int64_t iFilePosition = iAlignedOffset;
 	int64_t iDataCopied = 0;
 
 	while (iDataCopied < iOnDiskSize)
@@ -389,53 +383,53 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 		// mutates the handle's shared file position and would race between threads, tearing reads. A synchronous
 		// (non-FILE_FLAG_OVERLAPPED) handle still completes the read synchronously when given an OVERLAPPED; the
 		// explicit offset supersedes the shared file pointer, so concurrent positional reads don't interfere.
-		// iFilePos stays sector-aligned (required by FILE_FLAG_NO_BUFFERING): it starts aligned and advances by
+		// iFilePosition stays sector-aligned (required by FILE_FLAG_NO_BUFFERING): it starts aligned and advances by
 		// uiBytesRead, which equals the sector-multiple uiReadSize on every read except the final (loop-exiting) one.
-		int64_t iSrcOffset = (iDataCopied == 0) ? iPrefix : 0;
-		DWORD uiReadSize = static_cast<DWORD>(common::RoundUp(std::min(mrPackChunks.kiSubReadSize, iOnDiskSize - iDataCopied) + iSrcOffset, mrPackChunks.miSectorSize));
+		int64_t iSourceOffset = (iDataCopied == 0) ? iPrefix : 0;
+		DWORD uiReadSize = static_cast<DWORD>(common::RoundUp(std::min(mrPackChunks.kiSubReadSize, iOnDiskSize - iDataCopied) + iSourceOffset, mrPackChunks.miSectorSize));
 		OVERLAPPED overlapped {};
-		overlapped.Offset = static_cast<DWORD>(iFilePos & 0xFFFFFFFF);
-		overlapped.OffsetHigh = static_cast<DWORD>((iFilePos >> 32) & 0xFFFFFFFF);
+		overlapped.Offset = static_cast<DWORD>(iFilePosition & 0xFFFFFFFF);
+		overlapped.OffsetHigh = static_cast<DWORD>((iFilePosition >> 32) & 0xFFFFFFFF);
 		DWORD uiBytesRead = 0;
 		static_cast<void>(ReadFile(hFile, pReadBuffer, uiReadSize, &uiBytesRead, &overlapped));
 
-		int64_t iCopySize = std::min(static_cast<int64_t>(uiBytesRead) - iSrcOffset, iOnDiskSize - iDataCopied);
+		int64_t iCopySize = std::min(static_cast<int64_t>(uiBytesRead) - iSourceOffset, iOnDiskSize - iDataCopied);
 		// A truncated .pack returns a 0-byte read that never advances iDataCopied; halt rather than spin.
 		ASSERT(iCopySize > 0);
-		std::byte* pSrc = pReadBuffer + iSrcOffset;
-		std::byte* pDst = pReadDst + iDataCopied;
+		std::byte* pSource = pReadBuffer + iSourceOffset;
+		std::byte* pDestination = pReadDestination + iDataCopied;
 
 		if (bCompressed)
 		{
 			// Compressed reads land in scratch; the decompress pass below will pull them back through cache anyway,
 			// so use a regular memcpy (not _mm_stream_si128) so the bytes stay hot for the LZ4/zlib decompress.
-			std::memcpy(pDst, pSrc, iCopySize);
+			std::memcpy(pDestination, pSource, iCopySize);
 		}
 		else
 		{
-			// Non-temporal copy: bypass L3 cache for destination writes (consumed later by upload thread)
-			bool bAligned = (reinterpret_cast<uintptr_t>(pSrc) % 16 == 0) && (reinterpret_cast<uintptr_t>(pDst) % 16 == 0);
+			// Non-temporal destination writes avoid cache pollution.
+			bool bAligned = (reinterpret_cast<uintptr_t>(pSource) % 16 == 0) && (reinterpret_cast<uintptr_t>(pDestination) % 16 == 0);
 			if (bAligned)
 			{
 				int64_t iStreamBytes = iCopySize & ~15LL;
 				for (int64_t i = 0; i < iStreamBytes; i += 16)
 				{
-					_mm_stream_si128(reinterpret_cast<__m128i*>(pDst + i), _mm_loadu_si128(reinterpret_cast<const __m128i*>(pSrc + i)));
+					_mm_stream_si128(reinterpret_cast<__m128i*>(pDestination + i), _mm_loadu_si128(reinterpret_cast<const __m128i*>(pSource + i)));
 				}
 				if (iCopySize > iStreamBytes)
 				{
-					std::memcpy(pDst + iStreamBytes, pSrc + iStreamBytes, iCopySize - iStreamBytes);
+					std::memcpy(pDestination + iStreamBytes, pSource + iStreamBytes, iCopySize - iStreamBytes);
 				}
 			}
 			else
 			{
-				std::memcpy(pDst, pSrc, iCopySize);
+				std::memcpy(pDestination, pSource, iCopySize);
 			}
 			_mm_sfence();
 		}
 
 		iDataCopied += iCopySize;
-		iFilePos += uiBytesRead;
+		iFilePosition += uiBytesRead;
 	}
 
 	if (bCompressed)
@@ -472,14 +466,14 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 	if (rLazyChunk.header.flags & common::ChunkFlags::kTexture)
 	{
 		// Request GPU upload on the dedicated upload thread (texture only)
-		rLazyChunk.eState.store(ChunkState::kUploading, std::memory_order_release);
+		rLazyChunk.eState.value.store(ChunkState::kUploading, std::memory_order_release);
 		gpTextureUploadManager->RequestUpload(rRequest.crc, rRequest.ePriority);
 	}
 	else
 #endif // BT_CLIENT
 	{
 		// Non-texture chunks are ready immediately after disk load
-		rLazyChunk.eState.store(ChunkState::kReady, std::memory_order_release);
+		rLazyChunk.eState.value.store(ChunkState::kReady, std::memory_order_release);
 		NotifyChunkCompletion();
 	}
 }

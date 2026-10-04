@@ -9,7 +9,7 @@ class InstanceManager
 {
 public:
 
-	InstanceManager(HINSTANCE hinstance, HWND hwnd);
+	InstanceManager(HINSTANCE hInstance, HWND hWindow);
 	~InstanceManager();
 
 	InstanceManager() = delete;
@@ -48,15 +48,15 @@ public:
 	std::vector<VkQueueFamilyProperties> mVkQueueFamilyProperties;
 
 	// minImageTransferGranularity for the chosen transfer queue family. (1,1,1) for graphics-capable queues; dedicated DMA queues (e.g. NVIDIA) typically report (16,16,8). Consumers must satisfy VUID-vkCmdCopyBufferToImage-imageOffset-07738 against this.
-	VkExtent3D mTransferImageGranularity {1, 1, 1};
+	VkExtent3D mTransferImageGranularityVkExtent3D {.width = 1, .height = 1, .depth = 1};
 
 	VkSurfaceKHR mVkSurfaceKHR = VK_NULL_HANDLE;
-	VkSampleCountFlagBits meMaxMultisampleCount = VK_SAMPLE_COUNT_1_BIT;
+	VkSampleCountFlagBits mMaxMultisampleCountVkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT;
 	VkFormat mFramebufferVkFormat = VK_FORMAT_UNDEFINED;
-	VkColorSpaceKHR mFramebufferVkColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
+	VkColorSpaceKHR mFramebufferVkColorSpaceKHR = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
 	VkFormat mDepthVkFormat = VK_FORMAT_UNDEFINED;
 
-	VkSampleCountFlagBits SelectSupportedSampleCount(VkSampleCountFlagBits eRequested) const;
+	VkSampleCountFlagBits SelectSupportedSampleCount(VkSampleCountFlagBits vkRequested) const;
 
 	std::vector<const char*> mValidationLayers;
 	VkDebugUtilsMessengerEXT mVkDebugUtilsMessengerEXT = nullptr;

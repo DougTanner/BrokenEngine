@@ -282,7 +282,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 		{
 			return false;
 		}
-		if (engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData).Sample(vecPosition) > engine::gBaseHeight.Get() - kfTerrainClearance)
+		if (engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData).Sample(vecPosition) > engine::gBaseHeight.mfCurrent - kfTerrainClearance)
 		{
 			return false;
 		}
@@ -315,7 +315,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 	{
 		for (int64_t iGridX = 0; iGridX < kiGridDim; ++iGridX)
 		{
-			auto vecGridCell = XMVectorSet(fAreaMinX + (static_cast<float>(iGridX) + 0.5f) * fPitchX, fAreaMinY + (static_cast<float>(iGridY) + 0.5f) * fPitchY, engine::gBaseHeight.Get(), 1.0f);
+			auto vecGridCell = XMVectorSet(fAreaMinX + (static_cast<float>(iGridX) + 0.5f) * fPitchX, fAreaMinY + (static_cast<float>(iGridY) + 0.5f) * fPitchY, engine::gBaseHeight.mfCurrent, 1.0f);
 			aValidGrid[iGridY * kiGridDim + iGridX] = IsSpawnPositionValid(vecGridCell);
 		}
 	}
@@ -405,7 +405,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 		float fLocalSide = aLocalOffsets[i].y;
 		float fWorldX = fBestAnchorX + fBestFacingCos * fLocalForward - fBestFacingSin * fLocalSide;
 		float fWorldY = fBestAnchorY + fBestFacingSin * fLocalForward + fBestFacingCos * fLocalSide;
-		auto vecSpawnPosition = XMVectorSet(fWorldX, fWorldY, engine::gBaseHeight.Get(), 1.0f);
+		auto vecSpawnPosition = XMVectorSet(fWorldX, fWorldY, engine::gBaseHeight.mfCurrent, 1.0f);
 		if (!IsSpawnPositionValid(vecSpawnPosition))
 		{
 			continue;
@@ -627,11 +627,26 @@ void FrameInterpolate::BeginRender(int64_t iCommandBuffer, const std::unordered_
 			iTotalSpaceships += it->second.pSpaceships->iCount;
 		}
 	}
-	gpProfileManager->SetCount(kCpuCounterPlayers, iTotalPlayers);
-	gpProfileManager->SetCount(kCpuCounterBlasters, iTotalBlasters);
-	gpProfileManager->SetCount(kCpuCounterBlastersRendered, iTotalBlasters);
-	gpProfileManager->SetCount(kCpuCounterMissiles, iTotalMissiles);
-	gpProfileManager->SetCount(kCpuCounterSpaceships, iTotalSpaceships);
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterPlayers).iCount = iTotalPlayers;
+	}
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterBlasters).iCount = iTotalBlasters;
+	}
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterBlastersRendered).iCount = iTotalBlasters;
+	}
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterMissiles).iCount = iTotalMissiles;
+	}
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterSpaceships).iCount = iTotalSpaceships;
+	}
 }
 
 void FrameInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer)
@@ -652,7 +667,10 @@ void FrameInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpola
 void FrameInterpolate::EndRender(int64_t iCommandBuffer)
 {
 	// Parent
-	gpProfileManager->SetCount(engine::kCpuCounterExplosions, engine::ExplosionsInterpolate::siTotalCount);
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(engine::kCpuCounterExplosions).iCount = engine::ExplosionsInterpolate::siTotalCount;
+	}
 	engine::ForEachEndRender(engine::InterpolateTypes {}, iCommandBuffer);
 
 	// Player

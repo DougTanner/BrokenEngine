@@ -34,7 +34,7 @@ void SaveTweaksSettings()
 
 	TweaksSettings settings {};
 	settings.uiShowImGui = static_cast<uint8_t>(gpGame->mbShowImGui);
-	settings.fSunAngle = engine::gSunAngleOverride.Get();
+	settings.fSunAngle = engine::gSunAngleOverride.mfCurrent;
 	engine::gpImGuiManager->mpTweaksScreen->SaveState(settings.sectionState);
 
 	engine::WriteVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, kpcTweaksSettingsPath, settings);
@@ -49,8 +49,8 @@ void LoadTweaksSettings()
 
 	TweaksSettings settings {};
 	if (engine::ReadVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, kpcTweaksSettingsPath, settings)
-	 && settings.uiShowImGui <= 1 && settings.fSunAngle >= engine::gSunAngleOverride.GetMin()
-	 && settings.fSunAngle <= engine::gSunAngleOverride.GetMax())
+	 && settings.uiShowImGui <= 1 && settings.fSunAngle >= engine::gSunAngleOverride.mfMin
+	 && settings.fSunAngle <= engine::gSunAngleOverride.mfMax)
 	{
 		gpGame->mbShowImGui = settings.uiShowImGui != 0;
 		engine::gpImGuiManager->mpTweaksScreen->LoadState(settings.sectionState);
@@ -98,9 +98,9 @@ void LoadClientState()
 		return;
 	}
 
-	if (!std::isfinite(settings.fCameraEyeHeightTarget) || settings.fCameraEyeHeightTarget < engine::kfMinEyeHeight || settings.fCameraEyeHeightTarget > engine::Camera::kfEyeHeightMax)
+	if (!std::isfinite(settings.fCameraEyeHeightTarget) || settings.fCameraEyeHeightTarget < engine::kfMinimumEyeHeight || settings.fCameraEyeHeightTarget > engine::Camera::kfEyeHeightMaximum)
 	{
-		LOG(kDefault, kWarning, "LoadClientState rejected {}: camera eye-height target {} is outside [{}, {}]", kpcClientStatePath, settings.fCameraEyeHeightTarget, engine::kfMinEyeHeight, engine::Camera::kfEyeHeightMax);
+		LOG(kDefault, kWarning, "LoadClientState rejected {}: camera eye-height target {} is outside [{}, {}]", kpcClientStatePath, settings.fCameraEyeHeightTarget, engine::kfMinimumEyeHeight, engine::Camera::kfEyeHeightMaximum);
 		return;
 	}
 

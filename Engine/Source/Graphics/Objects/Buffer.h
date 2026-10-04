@@ -33,7 +33,7 @@ struct BarrierInfo
 {
 	BufferBarrier eSource = BufferBarrier::kNone;
 	BufferBarrier eDestination = BufferBarrier::kNone;
-	VkBuffer barrierVkBuffer = VK_NULL_HANDLE;
+	VkBuffer vkBarrierBuffer = VK_NULL_HANDLE;
 };
 
 struct BufferInfo
@@ -44,8 +44,8 @@ struct BufferInfo
 	int64_t iCount = 0;
 	VkIndexType vkIndexType = VK_INDEX_TYPE_NONE_KHR;
 	int64_t iVertexStride = 0;
-	VkDeviceSize dataVkDeviceSize = 0;
-	VkDeviceSize iElementSize = 0; // Size of each element for type-safe access
+	VkDeviceSize vkDataSize = 0;
+	VkDeviceSize vkElementSize = 0;
 };
 
 struct DeviceLocalBufferUpload
@@ -61,7 +61,7 @@ public:
 
 	static void CreateBuffer(std::string_view name, VkDeviceSize vkDeviceSize, VkBufferUsageFlags vkBufferUsageFlags, VkMemoryPropertyFlags vkMemoryPropertyFlags, VkBuffer& rVkBuffer, VmaAllocation& rVmaAllocation, VmaAllocationInfo* pVmaAllocationInfo = nullptr);
 	static void UploadToDeviceLocal(VkBuffer vkDeviceLocalBuffer, std::span<const DeviceLocalBufferUpload> uploads);
-	static void RecordBarriers(VkCommandBuffer vkCommandBuffer, const BarrierInfo* pBarriers, int64_t iBarrierCount);
+	static void RecordBarriers(VkCommandBuffer vkCommandBuffer, std::span<const BarrierInfo> barriers);
 
 	Buffer() = default;
 	Buffer(const Buffer&) = delete;
@@ -74,10 +74,10 @@ public:
 	void Create(const BufferInfo& rInfo, const std::function<void(void*)>& rDataFunction = nullptr);
 	void Destroy() noexcept;
 
-	VkBuffer GetBuffer();
+	VkBuffer GetBuffer() const;
 
 	void RecordBindVertexBuffer(VkCommandBuffer vkCommandBuffer);
-	void RecordCopy(VkCommandBuffer vkCommandBuffer, VkPipelineStageFlags stageFlags = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+	void RecordCopy(VkCommandBuffer vkCommandBuffer, VkPipelineStageFlags vkStageFlags = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
 	BufferInfo mInfo {};
 
@@ -96,7 +96,7 @@ struct StagingBuffer
 	StagingBuffer& operator=(const StagingBuffer&) = delete;
 	~StagingBuffer();
 
-	VkBuffer stagingVkBuffer = VK_NULL_HANDLE;
+	VkBuffer vkStagingBuffer = VK_NULL_HANDLE;
 	VmaAllocation vmaAllocation = VK_NULL_HANDLE;
 	VmaAllocationInfo vmaAllocationInfo {};
 };

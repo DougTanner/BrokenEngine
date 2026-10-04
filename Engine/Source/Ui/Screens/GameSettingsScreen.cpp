@@ -21,21 +21,21 @@ void GameSettingsScreen::Render()
 		return;
 	}
 
-	ImGuiIO& rIo = ImGui::GetIO();
+	ImGuiIO& rInputOutput = ImGui::GetIO();
 	ScopedMenuScale menuScale;
 
 	// Centered via the pivot convention (UserInterfaceDesign.txt section 5), matching Pause/Sound
-	ImGui::SetNextWindowPos(ImVec2(rIo.DisplaySize.x * 0.5f, rIo.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+	ImGui::SetNextWindowPos(ImVec2(rInputOutput.DisplaySize.x * 0.5f, rInputOutput.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 
 	ScopedMenuFont menuFont;
 	ImGui::Begin("GameSettingsMenu", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize);
 
-	gpImGuiManager->RegisterOpaqueRect(ImGui::GetWindowPos(), ImGui::GetWindowSize());
+	gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
 
-	// Border + accent strip only — the opaque themed WindowBg must stay intact for RegisterOpaqueRect occlusion
-	ImVec2 vPanelPos = ImGui::GetWindowPos();
+	// Border + accent strip only — the opaque themed WindowBg must stay intact for RegisterOpaqueRectangle occlusion
+	ImVec2 vPanelPosition = ImGui::GetWindowPos();
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
-	DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
+	DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPosition, ImVec2(vPanelPosition.x + vPanelSize.x, vPanelPosition.y + vPanelSize.y));
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 
@@ -51,27 +51,28 @@ void GameSettingsScreen::Render()
 		ScopedMenuFont languageFont(kfLanguageMenuFontScale);
 
 		// Uniform text-driven width = max CalcTextSize over the 6 labels under the shared Latin/CJK font,
-		// plus frame padding to match the button chrome. Buttons then sit one-per-row via SameLine (default spacing).
+		// plus frame padding to match the button chrome. Buttons share one row via SameLine (default spacing).
 		float fLanguageButtonWidth = 0.0f;
-		for (int64_t i = 0; i < kLanguageCount; ++i)
+		for (const LanguageOption& rLanguageOption : kLanguageOptions)
 		{
-			fLanguageButtonWidth = std::max(fLanguageButtonWidth, ImGui::CalcTextSize(kLanguageOptions[i].pcLabel).x);
+			fLanguageButtonWidth = std::max(fLanguageButtonWidth, ImGui::CalcTextSize(rLanguageOption.pcLabel).x);
 		}
 		fLanguageButtonWidth += ImGui::GetStyle().FramePadding.x * 4.0f;
 
-		for (int64_t i = 0; i < kLanguageCount; ++i)
+		for (int64_t i = 0; const LanguageOption& rLanguageOption : kLanguageOptions)
 		{
 			if (i > 0)
 			{
 				ImGui::SameLine();
 			}
 
-			bool bSelected = (geLanguage == kLanguageOptions[i].eLanguage);
+			bool bSelected = (geLanguage == rLanguageOption.eLanguage);
 
-			if (MenuButton(kLanguageOptions[i].pcLabel, ImVec2(fLanguageButtonWidth, 0.0f), mfLanguageHoverAnims[i], bSelected))
+			if (MenuButton(rLanguageOption.pcLabel, ImVec2(fLanguageButtonWidth, 0.0f), mfLanguageHoverAnimations[i], bSelected))
 			{
-				geLanguage = kLanguageOptions[i].eLanguage;
+				geLanguage = rLanguageOption.eLanguage;
 			}
+			++i;
 		}
 
 		ImGui::PopStyleVar(2);
@@ -85,24 +86,21 @@ void GameSettingsScreen::Render()
 	ImGui::SetNextItemWidth(kfUiOpacitySliderWidthPixels * UiScale());
 	WrapperSlider("UI Opacity", &gUiOpacity);
 
-	RadioRow("Theme", &gUiTheme, static_cast<float>(GetUiTheme()),
-		{{"Naval Steel", static_cast<float>(UiTheme::kNavalSteel)}, {"Dark Amber", static_cast<float>(UiTheme::kDarkAmber)}, {"Midnight Mauve", static_cast<float>(UiTheme::kMidnightMauve)}});
+	RadioRow("Theme", &gUiTheme, static_cast<float>(GetUiTheme()), {{"Naval Steel", static_cast<float>(UiTheme::kNavalSteel)}, {"Dark Amber", static_cast<float>(UiTheme::kDarkAmber)}, {"Midnight Mauve", static_cast<float>(UiTheme::kMidnightMauve)}});
 
 	ImGui::Separator();
 
 	// One themed width shared by both buttons (measured under the live menu font)
 	float fButtonWidth = MenuButtonsWidth({TranslatedString(StandardString::kStringDefaults), U"Back"});
 
-	// Defaults button
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringDefaults)).mpData, ImVec2(fButtonWidth, 0.0f), mfDefaultsHoverAnim))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringDefaults)).mpData, ImVec2(fButtonWidth, 0.0f), mfDefaultsHoverAnimation))
 	{
 		ResetGameSettings();
 	}
 
 	ImGui::SameLine();
 
-	// Back button
-	if (MenuButton("Back", ImVec2(fButtonWidth, 0.0f), mfBackHoverAnim))
+	if (MenuButton("Back", ImVec2(fButtonWidth, 0.0f), mfBackHoverAnimation))
 	{
 		SaveGameSettings();
 		game::gpGame->meUiState = UiState::kPause;

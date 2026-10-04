@@ -12,7 +12,7 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 };
 
 layout (set = 1, binding = 1) uniform sampler2D shadowHistorySampler;
-layout (set = 1, binding = 2, r16) uniform image2D shadowBlurTexture; // keShadowFormat
+layout (set = 1, binding = 2, r16) uniform image2D shadowBlurTexture; // kVkFormatShadow
 
 // Temporal accumulation: blend the freshly-blurred shadow (in place) with the previous frame's result,
 // reprojected into the current texel grid by world position. While the texel-ramp rescales the grid this
@@ -31,7 +31,7 @@ void main()
 
 	// This texel's world position -> previous-frame UV. Reprojection makes the blend correct under pan/zoom
 	// (the grid moves frame-to-frame). Disocclusion (reprojected UV outside [0,1] = newly revealed): keep current.
-	vec2 f2Uv = (vec2(float(uiX), float(uiY)) + 0.5f) * globalLayout.f2ShadowTextureSizeInv;
+	vec2 f2Uv = (vec2(float(uiX), float(uiY)) + 0.5f) * globalLayout.f2ShadowTextureSizeInverse;
 	vec2 f2World = VisibleAreaToWorld(f2Uv, globalLayout.f4ShadowArea);
 	vec2 f2PreviousUv = WorldToVisibleArea(vec3(f2World, 0.0f), globalLayout.f4ShadowAreaPrevious);
 

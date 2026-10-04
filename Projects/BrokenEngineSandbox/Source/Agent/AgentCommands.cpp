@@ -13,7 +13,7 @@ namespace game
 
 void ExecuteAgentCommand(std::string_view cmd, const nlohmann::json& rParams, nlohmann::json& rResult)
 {
-	if (engine::ExecuteSharedAgentCommand(cmd, rParams, rResult, gpGame != nullptr ? gpGame->TickCounter() : -1))
+	if (engine::ExecuteSharedAgentCommand(cmd, rParams, rResult, gpGame != nullptr ? gpGame->miTickCounter : -1))
 	{
 		return;
 	}

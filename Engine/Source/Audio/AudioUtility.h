@@ -8,7 +8,7 @@ namespace engine
 // Pinned mastering-voice sample rate. Must match DataPacker's audiorepair::kiAudioExportSampleRate
 // (packed audio is resampled to this) so source rate == mastering rate and XAudio2 bypasses per-voice
 // SRC. Windows shared-mode does any final device-rate conversion once at the mastering output.
-inline constexpr int kiMasteringSampleRate = 48'000;
+inline constexpr int64_t kiMasteringSampleRate = 48'000;
 
 inline constexpr float VolumeToPower(float fMasterVolume, float fSoundVolume, float fLocalVolume = 1.0f)
 {
@@ -45,22 +45,24 @@ inline void AssertValidPackedAudio(const WAVEFORMATEX& rWaveFormat, int64_t iAud
 
 inline void DestroyXAudio2SourceVoice(AudioEngine* pAudioEngine, IXAudio2SourceVoice*& rpVoice)
 {
-	if (rpVoice != nullptr)
+	if (rpVoice == nullptr)
 	{
-		rpVoice->Stop(0, XAUDIO2_COMMIT_NOW);
-		rpVoice->FlushSourceBuffers();
-		if (pAudioEngine != nullptr)
-		{
-			std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-			pAudioEngine->DestroyVoice(rpVoice);
-			std::chrono::steady_clock::duration elapsed = std::chrono::steady_clock::now() - start;
-			if (elapsed > std::chrono::milliseconds(100))
-			{
-				LOG(kAudio, kWarning, "DestroyXAudio2SourceVoice took {}ms", std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
-			}
-		}
-		rpVoice = nullptr;
+		return;
 	}
+
+	rpVoice->Stop(0, XAUDIO2_COMMIT_NOW);
+	rpVoice->FlushSourceBuffers();
+	if (pAudioEngine != nullptr)
+	{
+		std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+		pAudioEngine->DestroyVoice(rpVoice);
+		std::chrono::steady_clock::duration elapsed = std::chrono::steady_clock::now() - start;
+		if (elapsed > 100ms)
+		{
+			LOG(kAudio, kWarning, "DestroyXAudio2SourceVoice took {}ms", std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
+		}
+	}
+	rpVoice = nullptr;
 }
 
 } // namespace engine

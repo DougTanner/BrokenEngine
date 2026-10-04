@@ -3,11 +3,11 @@ float Fresnel(vec3 f3CameraPosition, vec3 f3Position, vec3 f3InNormal, float fRe
 	vec3 f3Normal = normalize(f3InNormal);
 
 	// Schlick's approximation fresnel
-	float fCosTheta = dot(f3Normal, normalize(f3CameraPosition - f3Position));
-	float fF0 = globalLayout.fWaterFresnel;
-	float fPow = 1.0f - fCosTheta;
-	fPow = fPow * fPow * fPow * fPow; // Note: ^4 instead of ^5
-	return clamp(fF0 + (fReduction - fF0) * fPow, 0.0f, 1.0f);
+	float fCosineTheta = dot(f3Normal, normalize(f3CameraPosition - f3Position));
+	float fWaterFresnel = globalLayout.fWaterFresnel;
+	float fPower = 1.0f - fCosineTheta;
+	fPower = fPower * fPower * fPower * fPower; // Note: ^4 instead of ^5
+	return clamp(fWaterFresnel + (fReduction - fWaterFresnel) * fPower, 0.0f, 1.0f);
 }
 
 vec2 ProjectWaterReflection(WaterNormalSamplingResult normalResult, vec2 f2WorldInitialPosition, vec2 f2PositionAtBaseHeight)
@@ -26,9 +26,9 @@ vec2 ProjectWaterReflection(WaterNormalSamplingResult normalResult, vec2 f2World
 		vec3 f3WaterWorld = vec3(f2WorldInitialPosition, 0.0f);
 		vec3 f3EyeToPoint = normalize(f3WaterWorld - mainLayout.f4EyePosition.xyz);
 		vec3 f3ReflectedRay = reflect(f3EyeToPoint, f3ReflectedNormal);
-		// Guard grazing-normal divide: clamp z away from zero so fReflectedMult can't overflow to +Inf
-		float fReflectedMult = (globalLayout.fBaseHeight - f3WaterWorld.z) / max(f3ReflectedRay.z, 1e-4f);
-		vec2 f2PositionAtBaseHeightReflected = (f3WaterWorld + max(fReflectedMult, 0.0f) * f3ReflectedRay).xy;
+		// Guard grazing-normal divide: clamp z away from zero so fReflectedMultiplier can't overflow to +Inf
+		float fReflectedMultiplier = (globalLayout.fBaseHeight - f3WaterWorld.z) / max(f3ReflectedRay.z, 1.0e-4f);
+		vec2 f2PositionAtBaseHeightReflected = (f3WaterWorld + max(fReflectedMultiplier, 0.0f) * f3ReflectedRay).xy;
 
 		// Power-curve compression on the XY offset above FalloffStart so heavily-bent
 		// normals don't sample hundreds of world units away. Power=1 is passthrough.

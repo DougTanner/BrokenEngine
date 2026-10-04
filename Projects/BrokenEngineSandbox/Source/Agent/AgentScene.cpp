@@ -167,21 +167,21 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 	}
 
 	// Camera / UI / game state — always present (graceful empty state: no subscribed coords still returns these).
-	XMFLOAT4 f4VisibleArea = engine::gpCamera->f4RenderVisibleArea;
+	XMFLOAT4 f4VisibleArea = engine::gpCamera->mf4RenderVisibleArea;
 	// basisCoord is the cell the camera's own values are local to, so eye and visibleArea read against it, and a
 	// unit row's local position only compares with them once it is rebased from its own cell onto this one.
 	rResult["camera"] =
 	{
-		{"basisCoord", engine::AgentCoordinateJson(engine::gpCamera->mBasisCoord)},
+		{"basisCoord", engine::AgentCoordinateJson(engine::gpCamera->mBasisCoordinate)},
 		{"eye", engine::AgentLocalPositionJson(engine::gpCamera->mVecEyePosition)},
 		{"visibleArea", nlohmann::json::array({f4VisibleArea.x, f4VisibleArea.y, f4VisibleArea.z, f4VisibleArea.w})},
-		{"lod", engine::gpCamera->miVisibleAreaLod},
+		{"lod", engine::gpCamera->miVisibleAreaLevelOfDetail},
 	};
 	rResult["uiState"] = engine::UiStateName(gpGame->meUiState);
 	rResult["tweaksVisible"] = gpGame->mbShowImGui;
 	rResult["gameFlags"] = engine::GameFlagNames(gpGame->mGameFlags);
-	rResult["tick"] = gpGame->TickCounter();
-	rResult["clientGridCoord"] = engine::AgentCoordinateJson(gpGame->mClientGridCoord);
+	rResult["tick"] = gpGame->miTickCounter;
+	rResult["clientGridCoord"] = engine::AgentCoordinateJson(gpGame->mClientGridCoordinate);
 	rResult["fleets"] = BuildFleets();
 
 	nlohmann::json subscribedCoords = nlohmann::json::array();
@@ -194,7 +194,7 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 	int64_t iUnitCount = 0;
 	bool bTruncated = false;
 
-	for (const auto& [rCoord, rFrames] : gpGame->mCoordFrames)
+	for (const auto& [rCoord, rFrames] : gpGame->mCoordinateFrames)
 	{
 		subscribedCoords.push_back(engine::AgentCoordinateJson(rCoord));
 
@@ -227,7 +227,7 @@ void CommandDescribeScene(const nlohmann::json& rParams, nlohmann::json& rResult
 		// Unit positions are local to this cell, while the visible area and the screen projection are in the
 		// camera cell's frame, so every row rebases once before the cull and the projection and reports the
 		// unrebased local value.
-		engine::RenderBasis basis = engine::MakeRenderBasis(rCoord, engine::gpCamera->mBasisCoord);
+		engine::RenderBasis basis = engine::MakeRenderBasis(rCoord, engine::gpCamera->mBasisCoordinate);
 
 		iPlayerTotal += rFrame.postRender.pPlayers->iCount;
 		iSpaceshipTotal += rFrame.postRender.pSpaceships->iCount;

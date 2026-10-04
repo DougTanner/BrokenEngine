@@ -31,31 +31,30 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 	// predicate can suppress the chain without re-recording the Main CB. The flag also defers the Pipeline::Create
 	// texture request to the first WriteIndirectBuffer with instances, which is a no-op here: these pipelines bind
 	// only render-target textures, never disk-loaded chunks.
-	for (int64_t iPass = 0; iPass < shaders::kiMaxSpreadPasses; ++iPass)
+	for (int64_t i = 0; i < shaders::kiMaxSpreadPasses; ++i)
 	{
-		mpSpreadPipelineNames[iPass] = std::format("LightingSpread{}", iPass);
-		mpSpreadPipelines[iPass].Create(
+		mpSpreadPipelineNames[i] = std::format("LightingSpread{}", i);
+		mpSpreadPipelines[i].Create(
 		{
-			.name = mpSpreadPipelineNames[iPass],
+			.name = mpSpreadPipelineNames[i],
 			.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kIndirectHostVisible},
 			.ppShaders = {&mrShaders.at(data::kShadersQuadsQuadsFullscreenvertCrc), &mrShaders.at(data::kShadersLightingLightingSpreadfragCrc)},
 			.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-			.targetVkRenderPass = rTextures.mSpreadVkRenderPass,
-			.vkExtent3D = rTextures.mpSpreadTextures[iPass][0].mInfo.extent,
+			.vkTargetRenderPass = rTextures.mSpreadVkRenderPass,
+			.vkExtent3D = rTextures.mpSpreadTextures[i][0].mInfo.vkExtent3D,
 			.iColorAttachmentCount = 6,
-			.pDescriptorInfos =
+			.descriptorInfos =
 			{
 				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = iPass == 0 ? &rTextures.mpLightingTextures[0] : &rTextures.mpSpreadTextures[iPass - 1][0]},
-				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = iPass == 0 ? &rTextures.mpLightingTextures[1] : &rTextures.mpSpreadTextures[iPass - 1][1]},
-				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = iPass == 0 ? &rTextures.mpLightingTextures[2] : &rTextures.mpSpreadTextures[iPass - 1][2]},
+				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = i == 0 ? &rTextures.mpLightingTextures[0] : &rTextures.mpSpreadTextures[i - 1][0]},
+				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = i == 0 ? &rTextures.mpLightingTextures[1] : &rTextures.mpSpreadTextures[i - 1][1]},
+				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = i == 0 ? &rTextures.mpLightingTextures[2] : &rTextures.mpSpreadTextures[i - 1][2]},
 				{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mTerrainElevationTexture},
 			},
 		});
 	}
 
 	// Combine pipeline (tone map spread float16 → UNORM, all 3 colors)
-	// Build texture pointer arrays for sampler descriptor arrays (one per color channel, kiMaxSpreadPasses entries each)
 	Texture* ppSpreadRed[shaders::kiMaxSpreadPasses] {};
 	Texture* ppSpreadGreen[shaders::kiMaxSpreadPasses] {};
 	Texture* ppSpreadBlue[shaders::kiMaxSpreadPasses] {};
@@ -70,7 +69,7 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 		.name = "LightCombine",
 		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersLightingLightCombinecompCrc)},
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxSpreadPasses, .ppTextures = ppSpreadRed},
@@ -90,7 +89,7 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 		.name = "LightingTemporal",
 		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersLightingLightingTemporalcompCrc)},
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &rTextures.mpLightingHistoryTextures[0]},
@@ -109,7 +108,7 @@ void WorldLightingShadowPipelines::CreateLightingPipelines()
 		.name = "LightingHistoryCopy",
 		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersLightingLightingHistoryCopycompCrc)},
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kStorageImages, .pTexture = &rTextures.mpCombineTextures[0]},
@@ -136,9 +135,9 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kMax, PipelineFlags::kUpdateAfterBind},
 		.ppShaders = {&mrShaders.at(data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc), &mrShaders.at(data::kShadersTerrainTerrainElevationfragCrc)},
 		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-		.targetVkRenderPass = gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.mVkRenderPass,
-		.vkExtent3D = gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.mInfo.extent,
-		.pDescriptorInfos =
+		.vkTargetRenderPass = gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.mVkRenderPass,
+		.vkExtent3D = gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.mInfo.vkExtent3D,
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpIslands->mIslandsStorageBuffers.data()},
@@ -152,7 +151,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		.name = "Shadow",
 		.flags = {PipelineFlags::kCompute},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowcompCrc)},
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowElevationTexture},
@@ -165,7 +164,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		.name = "ShadowBlurH",
 		.flags = {PipelineFlags::kCompute},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowBlurHcompCrc)},
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowTexture},
@@ -178,7 +177,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		.name = "ShadowBlurV",
 		.flags = {PipelineFlags::kCompute},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowBlurVcompCrc)},
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurIntermediateTexture},
@@ -191,7 +190,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		.name = "ObjectShadowsBlurH",
 		.flags = {PipelineFlags::kCompute},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowObjectShadowsBlurHcompCrc)},
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsTexture},
@@ -204,7 +203,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		.name = "ObjectShadowsBlurV",
 		.flags = {PipelineFlags::kCompute},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowObjectShadowsBlurVcompCrc)},
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurIntermediateTexture},
@@ -219,7 +218,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		.name = "ShadowTemporal",
 		.flags = {PipelineFlags::kCompute},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowTemporalcompCrc)},
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowHistoryTexture},
@@ -232,7 +231,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		.name = "ShadowHistoryCopy",
 		.flags = {PipelineFlags::kCompute},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowHistoryCopycompCrc)},
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture},
@@ -249,7 +248,7 @@ void WorldLightingShadowPipelines::CreateLightingBlurPipelines()
 		.name = "LightingBlurH",
 		.flags = {PipelineFlags::kCompute, PipelineFlags::kPushConstants},
 		.ppShaders = {&mrShaders.at(data::kShadersLightingLightingBlurHcompCrc)},
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mWhiteTexture},
 			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mpCombineTextures[0]},
@@ -261,7 +260,7 @@ void WorldLightingShadowPipelines::CreateLightingBlurPipelines()
 		.name = "LightingBlurV",
 		.flags = {PipelineFlags::kCompute, PipelineFlags::kPushConstants},
 		.ppShaders = {&mrShaders.at(data::kShadersLightingLightingBlurVcompCrc)},
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kCombinedSamplers, .pTexture = &gpTextureManager->mWhiteTexture},
 			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mpCombineTextures[0]},
@@ -277,7 +276,6 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 		mppWaterNormalTextures[i] = &gpTextureManager->mTextureMap.at(TextureManager::kpWaterNormalCrcs[i]);
 	}
 
-	// Terrain
 	mpPipelines[kPipelineTerrain].Create(
 	{
 		.name = "Terrain",
@@ -286,7 +284,7 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 		.ppShaders = {&mrShaders.at(data::kShadersTerrainTerrainvertCrc), &mrShaders.at(data::kShadersTerrainTerrainfragCrc)},
 		// pVertexBuffer is null: vertex buffer is per-island and bound at draw time. Vertex input
 		// stride and attribute layout come from shader reflection (Terrain.vert declares vec2 f2InPosition).
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
@@ -318,26 +316,24 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 			// Bindless per-island material masks use set=1 binding=20; packed RGBA stores Rock/Sand/Snow/Flow. The masks follow the SSBO so fragment
 			// bindings 9..18 and the Terrain.vert SSBO at 19 stay fixed.
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp, DescriptorFlags::kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mMasksTextures.data()}, // set=1 binding 20 (masks)
-			// Per-island heightmap array (R16_SFLOAT), set=1 binding 21 (appended after masks at 20 so bindings
-			// 0..20 stay put). Terrain.vert samples it at the island-local UV to sink THIS island's submerged
-			// verts (own elevation < zero-out) to the flat sea floor, so an overlapping neighbor's MAX-composite
-			// height never lifts this island's underwater mesh. Same array pointer the prepasses consume, so the
-			// existing per-slot RegisterTextureBinding / eviction machinery patches this binding automatically.
+			// The R16_SFLOAT per-island heightmaps occupy set=1 binding=21 after masks at 20, preserving bindings 0..20.
+			// Terrain.vert samples island-local UVs and sinks vertices below the island's own zero-out threshold to the sea floor,
+			// preventing an overlapping island's MAX-composite height from lifting submerged mesh. Sharing the prepasses' array
+			// lets per-slot RegisterTextureBinding and eviction update this binding.
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerElevation, DescriptorFlags::kBindlessArrayConsumer}, .iCount = shaders::kiMaxIslands, .ppTextures = gpTextureManager->mRenderTargetTextures.mElevationTextures.data()}, // set=1 binding 21 (Terrain.vert own-heightmap sink)
 		},
 	});
 
-	// Pre-computes Gerstner wave displacement + Jacobian normal once per frame into two RGBA16F
-	// textures sampled by Water.vert (kPipelineWater) — the vertex shader texelFetches one value per
-	// vertex instead of summing the wave bands itself. Dispatch dims are written per frame by MainUniforms (WriteIndirectComputeBuffer) to cover
-	// only the active LOD sub-region; the shader's iWaterActiveQuad* uniform still bounds-checks each thread
-	// as a defensive guard.
+	// Compute Gerstner displacement and Jacobian normal once per frame into two RGBA16F textures sampled by
+	// Water.vert (kPipelineWater) via texelFetch per vertex. MainUniforms writes the indirect dispatch dimensions
+	// each frame through WriteIndirectComputeBuffer to cover the active LOD region; the shader also bounds-checks
+	// each thread against iWaterActiveQuad*.
 	mpPipelines[kPipelineWaterDisplacement].Create(
 	{
 		.name = "WaterDisplacement",
 		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersWaterWaterDisplacementcompCrc)},
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
@@ -355,7 +351,7 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 		.flags = {PipelineFlags::kAlphaBlend, PipelineFlags::kCullBack, PipelineFlags::kDepthTest, PipelineFlags::kDepthWrite, PipelineFlags::kDepthBias, PipelineFlags::kUpdateAfterBind, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersWaterWatervertCrc), &mrShaders.at(data::kShadersWaterWaterfragCrc)},
 		.pVertexBuffer = &gpBufferManager->mWaterMeshBuffer,
-		.pDescriptorInfos =
+		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
@@ -371,7 +367,7 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorder}, .pTexture = &gpTextureManager->mRenderTargetTextures.mAmbientCombineTexture},
 			// Compute-pre-computed Gerstner displacement + normal sampled in Water.vert via texelFetch.
 			// Explicit bindings keep the shader-side numbers at 13/14 — binding 12 is intentionally
-			// unused; renumbering the displacement bindings isn't worth the churn.
+			// unused.
 			{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiWaterBindingDisplacement, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementTexture},
 			{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiWaterBindingDisplacementNormal, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementNormalTexture},
 		},

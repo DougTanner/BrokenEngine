@@ -34,7 +34,7 @@ layout (location = 7) out flat uint uiOutTextureSlot;
 void main()
 {
 	iOutInstanceIndex = gl_InstanceIndex;
-	f4OutParams = pQuads[gl_InstanceIndex].f4Params;
+	f4OutParams = pQuads[gl_InstanceIndex].f4Parameters;
 	uiOutTextureSlot = pQuads[gl_InstanceIndex].uiTextureSlot;
 
 	f2OutTexcoord = vec2((1.0f - f2InQuadVertex.x) * pQuads[gl_InstanceIndex].f4TextureRect.x + f2InQuadVertex.x * pQuads[gl_InstanceIndex].f4TextureRect.z,

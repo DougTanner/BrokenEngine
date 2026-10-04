@@ -30,7 +30,7 @@ enum class GamepadButtons : uint32_t
 
 struct RawInput
 {
-	bool pKeyboardKeys[kiKeyboardKeyCount] {};
+	bool pbKeyboardKeys[kiKeyboardKeyCount] {};
 
 	common::Flags<MouseButtons> mouseButtons {};
 	XMFLOAT2 f2MousePosition {};
@@ -39,7 +39,7 @@ struct RawInput
 	common::Flags<GamepadButtons> gamepadButtons {};
 	XMFLOAT2 f2LeftThumbstick {};
 	XMFLOAT2 f2RightThumbstick {};
-	XMFLOAT2 f2Dpad {};
+	XMFLOAT2 f2DirectionalPad {};
 };
 
 #if defined(BT_CLIENT)
@@ -50,8 +50,8 @@ public:
 	RawInputManager();
 	~RawInputManager();
 
-	void HandleRawInput(LPARAM lparam);
-	void UpdateFocus(bool bHasFocus, HWND hwnd);
+	void HandleRawInput(LPARAM iMessageParameter);
+	void UpdateFocus(bool bHasFocus, HWND hWindow);
 	bool SetVibration(int64_t iPlayer, float fLeftMotor, float fRightMotor, float fLeftTrigger = 0.0f, float fRightTrigger = 0.0f);
 
 	void Update(bool bLostFocus);
@@ -68,7 +68,7 @@ private:
 
 	void TrapCursor(bool bTrap);
 
-	HWND mHwnd = nullptr;
+	HWND mhWindow = nullptr;
 
 	bool mpbKeyboardKeysDown[kiKeyboardKeyCount] {};
 	Mouse mMouse;

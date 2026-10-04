@@ -92,7 +92,7 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 		XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, vecPosition);
-		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->f4RenderVisibleArea, f4Position))
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position))
 		{
 			continue;
 		}
@@ -125,7 +125,10 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 
 void MissilesInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	gpProfileManager->SetCount(game::kCpuCounterMissilesRendered, siRendered);
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(game::kCpuCounterMissilesRendered).iCount = siRendered;
+	}
 	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 }

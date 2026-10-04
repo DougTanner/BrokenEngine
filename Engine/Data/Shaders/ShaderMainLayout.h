@@ -1,4 +1,8 @@
-#ifndef SHADER_MAIN_LAYOUT_H
+#if defined(BT_ENGINE)
+#pragma once
+#endif
+
+#if !defined(SHADER_MAIN_LAYOUT_H)
 #define SHADER_MAIN_LAYOUT_H
 struct MainLayout
 {
@@ -9,8 +13,8 @@ struct MainLayout
 
 	vec4 f4EyePosition INIT;
 	vec4 f4ToEyeNormal INIT;
-	// Camera-facing billboard basis derived CPU-side from f4ToEyeNormal (DebugRenderBillboard.vert); forward
-	// stays f4ToEyeNormal. Mirrors the shader's worldUp-select (0.999 threshold, +X fallback). w unused.
+	// MainUniforms.cpp derives right/up from f4ToEyeNormal using +Z when |z| < 0.999 and +X otherwise.
+	// DebugRenderBillboard.vert uses f4ToEyeNormal as forward; basis w components are unused.
 	vec4 f4BillboardRight INIT;
 	vec4 f4BillboardUp INIT;
 
@@ -34,12 +38,12 @@ struct MainLayout
 	float fWaterNormalWeightOne INIT;
 	float fWaterNormalWeightTwo INIT;
 	float fWaterNormalWeightThree INIT;
-	float fWaterNormalWRelSqOne INIT;    // (fWaterNormalWeightOne / weightTotal)^2 (Water.frag MIP_HANDOFF variance share)
-	float fWaterNormalWRelSqTwo INIT;
-	float fWaterNormalWRelSqThree INIT;
-	float fWaterNormalWeightSumInv INIT; // 1 / max(3*(fWaterNormalWeightOne+Two+Three), kfEpsilon) (Water.frag mode-3 agreement)
+	float fWaterNormalRelativeWeightSquaredOne INIT;    // (fWaterNormalWeightOne / weightTotal)^2 (Water.frag MIP_HANDOFF variance share)
+	float fWaterNormalRelativeWeightSquaredTwo INIT;
+	float fWaterNormalRelativeWeightSquaredThree INIT;
+	float fWaterNormalWeightSumInverse INIT; // 1 / max(3*(fWaterNormalWeightOne+Two+Three), kfEpsilon) (Water.frag mode-3 agreement)
 	float fWaterHeightDarkenBottom INIT;
-	float fWaterHeightDarkenRangeInv INIT; // 1 / (gWaterHeightDarkenTop - fWaterHeightDarkenBottom) (Water.frag height darken); magnitude floored at kfEpsilon, sign kept
+	float fWaterHeightDarkenRangeInverse INIT; // 1 / (gWaterHeightDarkenTop - fWaterHeightDarkenBottom) (Water.frag height darken); magnitude floored at kfEpsilon, sign kept
 	float fWaterHeightDarkenTarget INIT;
 	float fWaterHeightDarkenSource INIT;
 	float fWaterHeightDarkenLighting INIT;
@@ -57,20 +61,20 @@ struct MainLayout
 	float fLightingWaterSkyboxThreeBeachReduction INIT;
 	// Per-lobe FilteredPowerLobe (Water.frag WATER_SPEC_AA_MODE 2/3) constants folded from the skybox lobe
 	// powers: xyz = lobes One/Two/Three. The varying (1+p') numerator math stays in-shader.
-	vec4 f4WaterSkyboxLobeAlphaSq INIT;        // 2/(power+2) per lobe (Beckmann-equivalent kernel base)
-	vec4 f4WaterSkyboxLobeOnePlusPowerInv INIT; // 1/(1+power) per lobe (amplitude normalization)
-	float fLightingWaterSkyboxLod INIT;
+	vec4 f4WaterSkyboxLobeAlphaSquared INIT;        // 2/(power+2) per lobe (Beckmann-equivalent kernel base)
+	vec4 f4WaterSkyboxLobeOnePlusPowerInverse INIT; // 1/(1+power) per lobe (amplitude normalization)
+	float fLightingWaterSkyboxLevelOfDetail INIT;
 	// Specular-AA tuning for Water.frag's WATER_SPEC_AA_MODE variants (variance: modes 1-3; threshold: modes 2-3)
-	float fWaterSpecAAVariance INIT;
-	float fWaterSpecAAThreshold INIT;
+	float fWaterSpecularAntialiasingVariance INIT;
+	float fWaterSpecularAntialiasingThreshold INIT;
 	// WATER_SPEC_AA_MIP_HANDOFF inputs: per-mip Toksvig variance tables for the three selected
 	// octave-group textures (DataPacker-baked into TextureHeader, padded past the real chain with
 	// the last value), the handoff scale slider, the water-normal sampler's mip LOD bias (added to
 	// the shader's analytic LOD so the table lookup tracks the hardware fetch), and the three
 	// near-camera full-detail weights (WATER_SPEC_AA_FADE_HANDOFF reference; ratio-clamped in-shader)
-	float pfWaterSpecAAMipVariance[3 * kiWaterSpecAAMipTableSize] INIT;
-	float fWaterSpecAAMipScale INIT;
-	float fWaterNormalMipBias INIT;
+	float pfWaterSpecularAntialiasingMipmapVariance[3 * kiWaterSpecularAntialiasingMipTableSize] INIT;
+	float fWaterSpecularAntialiasingMipmapScale INIT;
+	float fWaterNormalMipmapBias INIT;
 	float fWaterNormalWeightFullOne INIT;
 	float fWaterNormalWeightFullTwo INIT;
 	float fWaterNormalWeightFullThree INIT;
@@ -101,50 +105,47 @@ struct MainLayout
 	float fLightingAmbientIntensity INIT;
 	float fLightingAmbientPower INIT;
 	float fLightingAmbientPowerMode INIT;
-	float fLightingWaterEwnsPow INIT;
-	float fLightingWaterEwnsPowMode INIT;
+	float fLightingWaterEastWestNorthSouthPower INIT;
+	float fLightingWaterEastWestNorthSouthPowerMode INIT;
 	float fLightingWaterAmbientIntensity INIT;
 	float fLightingWaterAmbientPower INIT;
 	float fLightingWaterAmbientPowerMode INIT;
 	float fLightingTerrainBelowBaseMultiplier INIT;
 	float fLightingTerrainBelowBasePower INIT;
 
-	// Pbr
-	float fPbrExposure INIT;
-	float fPbrGammaInv INIT; // 1 / gamma, applied in HdrResolve.frag
+	float fPhysicallyBasedRenderingExposure INIT;
+	float fPhysicallyBasedRenderingGammaInverse INIT; // 1 / gamma, applied in HdrResolve.frag
 	float fColorGradingSaturation INIT;
 	float fColorGradingContrast INIT;
 	float fColorGradingTemperature INIT;
-	float fPbrDayBrightness INIT;
-	float fPbrAmbient INIT;
+	float fPhysicallyBasedRenderingDayBrightness INIT;
+	float fPhysicallyBasedRenderingAmbient INIT;
 
-	float fPbrMipCount INIT;
-	float fPbrSmoke INIT;
+	float fPhysicallyBasedRenderingMipmapCount INIT;
+	float fPhysicallyBasedRenderingSmoke INIT;
 
-	float fPbrBrdfDiffuse INIT;
-	float fPbrBrdfDiffusePower INIT;
-	float fPbrBrdfSpecular INIT;
-	float fPbrBrdfSpecularPower INIT;
-	float fPbrIblDiffuse INIT;
-	float fPbrIblDiffusePower INIT;
-	float fPbrIblSpecular INIT;
-	float fPbrIblSpecularPower INIT;
-	float fPbrSun INIT;
-	float fPbrLighting INIT;
-	float fPbrLightingPower INIT;
-	float fPbrLightingSpecular INIT;
-	float fPbrLightingSpecularPower INIT;
-	float fPbrEmissive INIT;
-	float fPbrIblShadowBlend INIT;
-	float fPbrIblAmbientColorBlend INIT;
-	float fPbrShadowFloor INIT;
-	float fPbrCubemapLodPower INIT;
-	float fPbrCubemapLodOffset INIT;
+	float fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse INIT;
+	float fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower INIT;
+	float fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular INIT;
+	float fPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower INIT;
+	float fPhysicallyBasedRenderingImageBasedLightingDiffuse INIT;
+	float fPhysicallyBasedRenderingImageBasedLightingDiffusePower INIT;
+	float fPhysicallyBasedRenderingImageBasedLightingSpecular INIT;
+	float fPhysicallyBasedRenderingImageBasedLightingSpecularPower INIT;
+	float fPhysicallyBasedRenderingSun INIT;
+	float fPhysicallyBasedRenderingLighting INIT;
+	float fPhysicallyBasedRenderingLightingPower INIT;
+	float fPhysicallyBasedRenderingLightingSpecular INIT;
+	float fPhysicallyBasedRenderingLightingSpecularPower INIT;
+	float fPhysicallyBasedRenderingEmissive INIT;
+	float fPhysicallyBasedRenderingImageBasedLightingShadowBlend INIT;
+	float fPhysicallyBasedRenderingImageBasedLightingAmbientColorBlend INIT;
+	float fPhysicallyBasedRenderingShadowFloor INIT;
+	float fPhysicallyBasedRenderingCubemapLevelOfDetailPower INIT;
+	float fPhysicallyBasedRenderingCubemapLevelOfDetailOffset INIT;
 
-	// Shadow
 	float fSmokeShadowIntensity INIT;
 
-	// Hex shield
 	float fHexShieldGrow INIT;
 	float fHexShieldEdgeDistance INIT;
 	float fHexShieldEdgePower INIT;

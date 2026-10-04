@@ -12,27 +12,27 @@
 namespace engine
 {
 
-static void DebugRenderFrameEdges(const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord)
+static void DebugRenderFrameEdges(const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate)
 {
 	if constexpr (!kbDebugRender)
 	{
 		return;
 	}
 
-	float fZ = gBaseHeight.Get();
+	float fZ = gBaseHeight.mfCurrent;
 	static constexpr XMFLOAT4A kf4EdgeColor = {0.0f, 1.0f, 1.0f, 1.0f};
 
-	for (const GridCoord& rCoord : rActiveCoords)
+	for (const GridCoord& rCoordinate : rActiveCoordinates)
 	{
-		auto it = game::gpGame->mCoordFrames.find(rCoord);
-		if (it == game::gpGame->mCoordFrames.end())
+		auto it = game::gpGame->mCoordinateFrames.find(rCoordinate);
+		if (it == game::gpGame->mCoordinateFrames.end())
 		{
 			continue;
 		}
 
 		// Every cell has the same local edges; the basis offset is what places this one on screen.
 		// vecArea packing: x=minX, y=maxY, z=maxX, w=minY
-		XMFLOAT2 f2Offset = MakeRenderBasis(rCoord, cameraCoord).f2Offset;
+		XMFLOAT2 f2Offset = MakeRenderBasis(rCoordinate, cameraCoordinate).f2Offset;
 		XMVECTOR vecArea = LocalFrameArea();
 		float fMinX = XMVectorGetX(vecArea) + f2Offset.x;
 		float fMaxY = XMVectorGetY(vecArea) + f2Offset.y;
@@ -51,54 +51,54 @@ static void DebugRenderFrameEdges(const std::vector<GridCoord>& rActiveCoords, G
 	}
 }
 
-static void DebugRenderIslandBoundaries(const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord)
+static void DebugRenderIslandBoundaries(const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate)
 {
 	if constexpr (!kbDebugRender)
 	{
 		return;
 	}
 
-	float fZ = gBaseHeight.Get();
+	float fZ = gBaseHeight.mfCurrent;
 	static constexpr XMFLOAT4A kf4BoundaryColor = {1.0f, 0.0f, 1.0f, 1.0f};
 
-	for (const GridCoord& rCoord : rActiveCoords)
+	for (const GridCoord& rCoordinate : rActiveCoordinates)
 	{
-		auto it = game::gpGame->mCoordFrames.find(rCoord);
-		if (it == game::gpGame->mCoordFrames.end())
+		auto it = game::gpGame->mCoordinateFrames.find(rCoordinate);
+		if (it == game::gpGame->mCoordinateFrames.end())
 		{
 			continue;
 		}
 
-		// Placement positions are local to this cell; the rotate helper is the one point that converts them.
-		XMFLOAT2 f2Offset = MakeRenderBasis(rCoord, cameraCoord).f2Offset;
+		// Placement positions are local to this cell; the Rotate helper is the one point that converts them.
+		XMFLOAT2 f2Offset = MakeRenderBasis(rCoordinate, cameraCoordinate).f2Offset;
 
 		for (const IslandPlacement& rPlacement : it->second.staticData.islands)
 		{
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
 			float fHalfX = 0.5f * rTemplate.fQuadFootprintX;
 			float fHalfY = 0.5f * rTemplate.fQuadFootprintY;
-			float fCos = std::cos(rPlacement.fRotation);
-			float fSin = std::sin(rPlacement.fRotation);
+			float fCosine = std::cos(rPlacement.fRotation);
+			float fSine = std::sin(rPlacement.fRotation);
 
-			auto rotate = [&](float fLocalX, float fLocalY)
+			auto Rotate = [&](float fLocalX, float fLocalY)
 			{
-				return XMFLOAT3A {rPlacement.f2WorldPosition.x + f2Offset.x + fLocalX * fCos - fLocalY * fSin, rPlacement.f2WorldPosition.y + f2Offset.y + fLocalX * fSin + fLocalY * fCos, fZ};
+				return XMFLOAT3A {rPlacement.f2WorldPosition.x + f2Offset.x + fLocalX * fCosine - fLocalY * fSine, rPlacement.f2WorldPosition.y + f2Offset.y + fLocalX * fSine + fLocalY * fCosine, fZ};
 			};
 
-			XMFLOAT3A f3C0 = rotate(-fHalfX, -fHalfY);
-			XMFLOAT3A f3C1 = rotate( fHalfX, -fHalfY);
-			XMFLOAT3A f3C2 = rotate( fHalfX,  fHalfY);
-			XMFLOAT3A f3C3 = rotate(-fHalfX,  fHalfY);
+			XMFLOAT3A f3Corner0 = Rotate(-fHalfX, -fHalfY);
+			XMFLOAT3A f3Corner1 = Rotate( fHalfX, -fHalfY);
+			XMFLOAT3A f3Corner2 = Rotate( fHalfX,  fHalfY);
+			XMFLOAT3A f3Corner3 = Rotate(-fHalfX,  fHalfY);
 
-			DebugRender::Line(f3C0, f3C1, kf4BoundaryColor);
-			DebugRender::Line(f3C1, f3C2, kf4BoundaryColor);
-			DebugRender::Line(f3C2, f3C3, kf4BoundaryColor);
-			DebugRender::Line(f3C3, f3C0, kf4BoundaryColor);
+			DebugRender::Line(f3Corner0, f3Corner1, kf4BoundaryColor);
+			DebugRender::Line(f3Corner1, f3Corner2, kf4BoundaryColor);
+			DebugRender::Line(f3Corner2, f3Corner3, kf4BoundaryColor);
+			DebugRender::Line(f3Corner3, f3Corner0, kf4BoundaryColor);
 		}
 	}
 }
 
-static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord)
+static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate)
 {
 	if constexpr (!kbDebugRender)
 	{
@@ -111,16 +111,16 @@ static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoor
 	float fZ = common::kfUnderwaterMaskThresholdMeters;
 	static constexpr XMFLOAT4A kf4ValidAreaColor = {0.0f, 1.0f, 0.0f, 1.0f};
 
-	for (const GridCoord& rCoord : rActiveCoords)
+	for (const GridCoord& rCoordinate : rActiveCoordinates)
 	{
-		auto it = game::gpGame->mCoordFrames.find(rCoord);
-		if (it == game::gpGame->mCoordFrames.end())
+		auto it = game::gpGame->mCoordinateFrames.find(rCoordinate);
+		if (it == game::gpGame->mCoordinateFrames.end())
 		{
 			continue;
 		}
 
-		// Placement positions are local to this cell; the rotate helper is the one point that converts them.
-		XMFLOAT2 f2Offset = MakeRenderBasis(rCoord, cameraCoord).f2Offset;
+		// Placement positions are local to this cell; the Rotate helper is the one point that converts them.
+		XMFLOAT2 f2Offset = MakeRenderBasis(rCoordinate, cameraCoordinate).f2Offset;
 
 		for (const IslandPlacement& rPlacement : it->second.staticData.islands)
 		{
@@ -130,73 +130,71 @@ static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoor
 				continue;
 			}
 
-			float fCos = std::cos(rPlacement.fRotation);
-			float fSin = std::sin(rPlacement.fRotation);
+			float fCosine = std::cos(rPlacement.fRotation);
+			float fSine = std::sin(rPlacement.fRotation);
 
-			auto rotate = [&](const XMFLOAT2& rVert)
+			auto Rotate = [&](const XMFLOAT2& rVertex)
 			{
-				return XMFLOAT3A {rPlacement.f2WorldPosition.x + f2Offset.x + rVert.x * fCos - rVert.y * fSin, rPlacement.f2WorldPosition.y + f2Offset.y + rVert.x * fSin + rVert.y * fCos, fZ};
+				return XMFLOAT3A {rPlacement.f2WorldPosition.x + f2Offset.x + rVertex.x * fCosine - rVertex.y * fSine, rPlacement.f2WorldPosition.y + f2Offset.y + rVertex.x * fSine + rVertex.y * fCosine, fZ};
 			};
 
-			int32_t iCount = rTemplate.iValidAreaVertexCount;
-			for (int32_t i = 0; i < iCount; ++i)
+			int64_t iCount = rTemplate.iValidAreaVertexCount;
+			for (int64_t i = 0; i < iCount; ++i)
 			{
-				const XMFLOAT2& rA = rTemplate.pf2ValidAreaVertices[i];
-				const XMFLOAT2& rB = rTemplate.pf2ValidAreaVertices[(i + 1) % iCount];
-				DebugRender::Line(rotate(rA), rotate(rB), kf4ValidAreaColor);
+				const XMFLOAT2& rStartVertex = rTemplate.pf2ValidAreaVertices[i];
+				const XMFLOAT2& rEndVertex = rTemplate.pf2ValidAreaVertices[(i + 1) % iCount];
+				DebugRender::Line(Rotate(rStartVertex), Rotate(rEndVertex), kf4ValidAreaColor);
 			}
 		}
 	}
 }
 
-static void DebugRenderNavData(const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord)
+static void DebugRenderNavigationData(const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate)
 {
 	if constexpr (!kbDebugRender)
 	{
 		return;
 	}
 
-	float fZ = gBaseHeight.Get();
+	float fZ = gBaseHeight.mfCurrent;
 	static constexpr XMFLOAT4A kf4PolygonColor = {1.0f, 1.0f, 0.0f, 1.0f};
 	static constexpr XMFLOAT4A kf4VertexColor = {1.0f, 0.5f, 0.0f, 1.0f};
 
-	for (const GridCoord& rCoord : rActiveCoords)
+	for (const GridCoord& rCoordinate : rActiveCoordinates)
 	{
-		auto it = game::gpGame->mCoordFrames.find(rCoord);
-		if (it == game::gpGame->mCoordFrames.end())
+		auto it = game::gpGame->mCoordinateFrames.find(rCoordinate);
+		if (it == game::gpGame->mCoordinateFrames.end())
 		{
 			continue;
 		}
 
-		const NavData& rNav = it->second.staticData.navigationData;
+		const NavData& rNavigationData = it->second.staticData.navigationData;
 		// Nav vertices are local to this cell; the two draw sites below are this helper's conversion point.
-		XMFLOAT2 f2Offset = MakeRenderBasis(rCoord, cameraCoord).f2Offset;
+		XMFLOAT2 f2Offset = MakeRenderBasis(rCoordinate, cameraCoordinate).f2Offset;
 
-		// Polygon edges
-		for (int64_t iPoly = 0; iPoly < static_cast<int64_t>(rNav.polygonOffsets.size()); ++iPoly)
+		for (int64_t i = 0; i < std::ssize(rNavigationData.polygonOffsets); ++i)
 		{
-			int64_t iStart = rNav.polygonOffsets[iPoly];
-			int64_t iEnd = (iPoly + 1 < static_cast<int64_t>(rNav.polygonOffsets.size())) ? rNav.polygonOffsets[iPoly + 1] : static_cast<int64_t>(rNav.vertices.size());
+			int64_t iStart = rNavigationData.polygonOffsets.at(i);
+			int64_t iEnd = (i + 1 < std::ssize(rNavigationData.polygonOffsets)) ? rNavigationData.polygonOffsets.at(i + 1) : std::ssize(rNavigationData.vertices);
 
-			for (int64_t iVert = iStart; iVert < iEnd; ++iVert)
+			for (int64_t j = iStart; j < iEnd; ++j)
 			{
-				int64_t iNext = (iVert + 1 < iEnd) ? iVert + 1 : iStart;
-				XMFLOAT3A f3A = {rNav.vertices[iVert].x + f2Offset.x, rNav.vertices[iVert].y + f2Offset.y, fZ};
-				XMFLOAT3A f3B = {rNav.vertices[iNext].x + f2Offset.x, rNav.vertices[iNext].y + f2Offset.y, fZ};
-				DebugRender::Line(f3A, f3B, kf4PolygonColor);
+				int64_t iNext = (j + 1 < iEnd) ? j + 1 : iStart;
+				XMFLOAT3A f3StartVertex = {rNavigationData.vertices.at(j).x + f2Offset.x, rNavigationData.vertices.at(j).y + f2Offset.y, fZ};
+				XMFLOAT3A f3EndVertex = {rNavigationData.vertices.at(iNext).x + f2Offset.x, rNavigationData.vertices.at(iNext).y + f2Offset.y, fZ};
+				DebugRender::Line(f3StartVertex, f3EndVertex, kf4PolygonColor);
 			}
 		}
 
-		// Vertex markers
-		for (const XMFLOAT2& rVert : rNav.vertices)
+		for (const XMFLOAT2& rVertex : rNavigationData.vertices)
 		{
-			DebugRender::Circle({rVert.x + f2Offset.x, rVert.y + f2Offset.y, fZ}, 0.75f, kf4VertexColor);
+			DebugRender::Circle({rVertex.x + f2Offset.x, rVertex.y + f2Offset.y, fZ}, 0.75f, kf4VertexColor);
 		}
 	}
 }
 
 // Gerstner wave phase-reduction modulus (shared by both bands).
-constexpr double kdWaveTwoPi = 2.0 * 3.14159265358979323846;
+constexpr double kfWaveTwoPi = 2.0 * 3.14159265358979323846;
 
 // CPU-side staging + frame-invariant cache for one Gerstner wave band (`vec4` == XMFLOAT4, 16-byte
 // stride — matches the mapped layout arrays exactly for a straight memcpy). All wave math reads and
@@ -210,7 +208,7 @@ struct GerstnerWaveBandStaging
 {
 	XMFLOAT4 pf4WavesOne[256];
 	XMFLOAT4 pf4WavesTwo[256];
-	float pfBaseAmplitude[256];
+	float pfBaseAmplitude[256] {};
 };
 
 // Consumed low/medium tunables snapshot; inequality vs last frame triggers an invariant rebuild.
@@ -251,12 +249,11 @@ static GerstnerWaveBandStaging sMediumWaveStaging {};
 static LowWaveTunables sLowWaveTunables {};
 static MediumWaveTunables sMediumWaveTunables {};
 
-// Rebuild frame-invariant low-band directions, omega, phi, and clamped base amplitude in the staging cache with fixed per-wave float
-// expression order and RandomEngine consumption; cache rebuilds remain bit-identical to per-frame recomputation.
+// Cached wave terms require fixed per-wave float expression order and RandomEngine consumption.
 static void RebuildLowWaveInvariants(int64_t iCount)
 {
 	// Wave 0: fixed primary direction, no RNG draw, no amplitude clamp.
-	auto vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(gWaterLowAngle.Get()));
+	auto vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(gWaterLowAngle.mfCurrent));
 	sLowWaveStaging.pf4WavesOne[0].x = XMVectorGetX(vecDirection);
 	sLowWaveStaging.pf4WavesOne[0].y = XMVectorGetY(vecDirection);
 
@@ -264,15 +261,15 @@ static void RebuildLowWaveInvariants(int64_t iCount)
 	sLowWaveStaging.pf4WavesOne[0].z = XMVectorGetX(vecDirection);
 	sLowWaveStaging.pf4WavesOne[0].w = XMVectorGetY(vecDirection);
 
-	sLowWaveStaging.pf4WavesTwo[0].x = (2.0f * XM_PI) / (gWaterLowWavelength.Get()); // Omega
-	sLowWaveStaging.pfBaseAmplitude[0] = gWaterLowAmplitude.Get();
-	sLowWaveStaging.pf4WavesTwo[0].z = gWaterLowSpeed.Get() * sLowWaveStaging.pf4WavesTwo[0].x; // Phi
+	sLowWaveStaging.pf4WavesTwo[0].x = (2.0f * XM_PI) / (gWaterLowWavelength.mfCurrent); // Omega
+	sLowWaveStaging.pfBaseAmplitude[0] = gWaterLowAmplitude.mfCurrent;
+	sLowWaveStaging.pf4WavesTwo[0].z = gWaterLowSpeed.mfCurrent * sLowWaveStaging.pf4WavesTwo[0].x; // Phi
 
 	common::RandomEngine randomEngine {};
 	for (int64_t i = 1; i < iCount; ++i)
 	{
-		float fAngleAdjust = ((i % 2) == 0 ? 1.0f : -1.0f) * gWaterLowAngleAdjust.Get() * common::Random(randomEngine);
-		vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(gWaterLowAngle.Get() + fAngleAdjust));
+		float fAngleAdjust = ((i % 2) == 0 ? 1.0f : -1.0f) * gWaterLowAngleAdjust.mfCurrent * common::Random(randomEngine);
+		vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(gWaterLowAngle.mfCurrent + fAngleAdjust));
 		sLowWaveStaging.pf4WavesOne[i].x = XMVectorGetX(vecDirection);
 		sLowWaveStaging.pf4WavesOne[i].y = XMVectorGetY(vecDirection);
 
@@ -281,13 +278,13 @@ static void RebuildLowWaveInvariants(int64_t iCount)
 		sLowWaveStaging.pf4WavesOne[i].w = XMVectorGetY(vecDirection);
 
 		float fAdjust = common::Random(randomEngine);
-		float fWavelengthAdjust = fAdjust * gWaterLowWavelengthAdjust.Get();
-		float fAmplitudeAdjust = (1.0f - fAdjust) * std::abs(gWaterLowAmplitudeAdjust.Get()) * common::Random(randomEngine);
-		float fSpeedAdjust = fAdjust * gWaterLowSpeedAdjust.Get();
-		sLowWaveStaging.pf4WavesTwo[i].x = std::abs((2.0f * XM_PI) / (gWaterLowWavelength.Get() + fWavelengthAdjust * gWaterLowWavelength.Get())); // Omega
-		float fBaseAmplitude = std::abs(gWaterLowAmplitude.Get() - fAmplitudeAdjust * gWaterLowAmplitude.Get());
+		float fWavelengthAdjust = fAdjust * gWaterLowWavelengthAdjust.mfCurrent;
+		float fAmplitudeAdjust = (1.0f - fAdjust) * std::abs(gWaterLowAmplitudeAdjust.mfCurrent) * common::Random(randomEngine);
+		float fSpeedAdjust = fAdjust * gWaterLowSpeedAdjust.mfCurrent;
+		sLowWaveStaging.pf4WavesTwo[i].x = std::abs((2.0f * XM_PI) / (gWaterLowWavelength.mfCurrent + fWavelengthAdjust * gWaterLowWavelength.mfCurrent)); // Omega
+		float fBaseAmplitude = std::abs(gWaterLowAmplitude.mfCurrent - fAmplitudeAdjust * gWaterLowAmplitude.mfCurrent);
 		fBaseAmplitude = std::min(fBaseAmplitude, 0.1f * (1.0f / sLowWaveStaging.pf4WavesTwo[i].x));
-		sLowWaveStaging.pf4WavesTwo[i].z = (gWaterLowSpeed.Get() + gWaterLowSpeed.Get() * fSpeedAdjust * common::Random(randomEngine)) * sLowWaveStaging.pf4WavesTwo[i].x; // Phi
+		sLowWaveStaging.pf4WavesTwo[i].z = (gWaterLowSpeed.mfCurrent + gWaterLowSpeed.mfCurrent * fSpeedAdjust * common::Random(randomEngine)) * sLowWaveStaging.pf4WavesTwo[i].x; // Phi
 
 		// Thin the low-frequency band: zero every kiWaveCullModulo-th wave's amplitude below kiWaveCullLimit (tuning to reduce low-wave repetition).
 		static constexpr int64_t kiWaveCullLimit = 64;
@@ -307,24 +304,23 @@ static void RebuildMediumWaveInvariants(int64_t iCount)
 	common::RandomEngine randomEngine {};
 	for (int64_t i = 0; i < iCount; ++i)
 	{
-		float fAngleAdjust = gWaterMediumAngleAdjust.Get() * common::Random(randomEngine);
+		float fAngleAdjust = gWaterMediumAngleAdjust.mfCurrent * common::Random(randomEngine);
 		auto vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(fAngleAdjust));
 		sMediumWaveStaging.pf4WavesOne[i].x = XMVectorGetX(vecDirection);
 		sMediumWaveStaging.pf4WavesOne[i].y = XMVectorGetY(vecDirection);
 
-		float fWavelengthAdjust = -gWaterMediumWavelengthAdjust.Get() + 2.0f * gWaterMediumWavelengthAdjust.Get() * common::Random(randomEngine);
-		float fAmplitudeAdjust = -gWaterMediumAmplitudeAdjust.Get() + 2.0f * gWaterMediumAmplitudeAdjust.Get() * common::Random(randomEngine);
-		float fSpeedAdjust = -gWaterMediumSpeedAdjust.Get() + 2.0f * gWaterMediumSpeedAdjust.Get() * common::Random(randomEngine);
-		sMediumWaveStaging.pf4WavesTwo[i].x = std::abs((2.0f * XM_PI) / (gWaterMediumWavelength.Get() + fWavelengthAdjust * gWaterMediumWavelength.Get())); // Omega
-		float fBaseAmplitude = std::abs(gWaterMediumAmplitude.Get() + fAmplitudeAdjust * gWaterMediumAmplitude.Get());
+		float fWavelengthAdjust = -gWaterMediumWavelengthAdjust.mfCurrent + 2.0f * gWaterMediumWavelengthAdjust.mfCurrent * common::Random(randomEngine);
+		float fAmplitudeAdjust = -gWaterMediumAmplitudeAdjust.mfCurrent + 2.0f * gWaterMediumAmplitudeAdjust.mfCurrent * common::Random(randomEngine);
+		float fSpeedAdjust = -gWaterMediumSpeedAdjust.mfCurrent + 2.0f * gWaterMediumSpeedAdjust.mfCurrent * common::Random(randomEngine);
+		sMediumWaveStaging.pf4WavesTwo[i].x = std::abs((2.0f * XM_PI) / (gWaterMediumWavelength.mfCurrent + fWavelengthAdjust * gWaterMediumWavelength.mfCurrent)); // Omega
+		float fBaseAmplitude = std::abs(gWaterMediumAmplitude.mfCurrent + fAmplitudeAdjust * gWaterMediumAmplitude.mfCurrent);
 		fBaseAmplitude = std::min(fBaseAmplitude, 0.1f * (1.0f / sMediumWaveStaging.pf4WavesTwo[i].x));
 		sMediumWaveStaging.pfBaseAmplitude[i] = fBaseAmplitude;
-		sMediumWaveStaging.pf4WavesTwo[i].z = (gWaterMediumSpeed.Get() + fSpeedAdjust * gWaterMediumSpeed.Get()) * sMediumWaveStaging.pf4WavesTwo[i].x; // Phi
+		sMediumWaveStaging.pf4WavesTwo[i].z = (gWaterMediumSpeed.mfCurrent + fSpeedAdjust * gWaterMediumSpeed.mfCurrent) * sMediumWaveStaging.pf4WavesTwo[i].x; // Phi
 	}
 }
 
-// Geometric "low" wave band: writes iWaterLowCount and the pf4LowWaves* Gerstner terms, or zeroes the count when faded out.
-static void PopulateGerstnerLowWaves(shaders::MainLayout& rMainLayout, double dWaveTime, double dWaveCameraX, double dWaveCameraY, float fLowAmplitudeScale)
+static void PopulateGerstnerLowWaves(shaders::MainLayout& rMainLayout, double fWaveTime, double fWaveCameraX, double fWaveCameraY, float fLowAmplitudeScale)
 {
 	if (fLowAmplitudeScale <= 0.0f)
 	{
@@ -332,33 +328,32 @@ static void PopulateGerstnerLowWaves(shaders::MainLayout& rMainLayout, double dW
 		return;
 	}
 
-	int64_t iCount = std::min(gWaterLowCount.Get<int64_t>(), static_cast<int64_t>(gWaterLowMax.Get()));
+	int64_t iCount = std::min(gWaterLowCount.Get<int64_t>(), static_cast<int64_t>(gWaterLowMaximum.mfCurrent));
 
 	LowWaveTunables tunables {};
 	tunables.iCount = iCount;
-	tunables.fAngle = gWaterLowAngle.Get();
-	tunables.fWavelength = gWaterLowWavelength.Get();
-	tunables.fAmplitude = gWaterLowAmplitude.Get();
-	tunables.fSpeed = gWaterLowSpeed.Get();
-	tunables.fAngleAdjust = gWaterLowAngleAdjust.Get();
-	tunables.fWavelengthAdjust = gWaterLowWavelengthAdjust.Get();
-	tunables.fAmplitudeAdjust = gWaterLowAmplitudeAdjust.Get();
-	tunables.fSpeedAdjust = gWaterLowSpeedAdjust.Get();
+	tunables.fAngle = gWaterLowAngle.mfCurrent;
+	tunables.fWavelength = gWaterLowWavelength.mfCurrent;
+	tunables.fAmplitude = gWaterLowAmplitude.mfCurrent;
+	tunables.fSpeed = gWaterLowSpeed.mfCurrent;
+	tunables.fAngleAdjust = gWaterLowAngleAdjust.mfCurrent;
+	tunables.fWavelengthAdjust = gWaterLowWavelengthAdjust.mfCurrent;
+	tunables.fAmplitudeAdjust = gWaterLowAmplitudeAdjust.mfCurrent;
+	tunables.fSpeedAdjust = gWaterLowSpeedAdjust.mfCurrent;
 	if (tunables != sLowWaveTunables)
 	{
 		sLowWaveTunables = tunables;
 		RebuildLowWaveInvariants(iCount);
 	}
 
-	// Per-frame: eye-height-scaled amplitude + camera/time phase. Wave 0 uses (dWaveTime + 0.0) == dWaveTime.
 	for (int64_t i = 0; i < iCount; ++i)
 	{
 		sLowWaveStaging.pf4WavesTwo[i].y = sLowWaveStaging.pfBaseAmplitude[i] * fLowAmplitudeScale;
-		double dDirX = static_cast<double>(sLowWaveStaging.pf4WavesOne[i].x);
-		double dDirY = static_cast<double>(sLowWaveStaging.pf4WavesOne[i].y);
-		double dOmega = static_cast<double>(sLowWaveStaging.pf4WavesTwo[i].x);
-		double dPhi = static_cast<double>(sLowWaveStaging.pf4WavesTwo[i].z);
-		sLowWaveStaging.pf4WavesTwo[i].w = static_cast<float>(std::fmod((dDirX * dWaveCameraX + dDirY * dWaveCameraY) * dOmega + dPhi * (dWaveTime + static_cast<double>(i)), kdWaveTwoPi));
+		double fDirectionX = static_cast<double>(sLowWaveStaging.pf4WavesOne[i].x);
+		double fDirectionY = static_cast<double>(sLowWaveStaging.pf4WavesOne[i].y);
+		double fOmega = static_cast<double>(sLowWaveStaging.pf4WavesTwo[i].x);
+		double fPhi = static_cast<double>(sLowWaveStaging.pf4WavesTwo[i].z);
+		sLowWaveStaging.pf4WavesTwo[i].w = static_cast<float>(std::fmod((fDirectionX * fWaveCameraX + fDirectionY * fWaveCameraY) * fOmega + fPhi * (fWaveTime + static_cast<double>(i)), kfWaveTwoPi));
 	}
 
 	std::memcpy(rMainLayout.pf4LowWavesOne, sLowWaveStaging.pf4WavesOne, static_cast<size_t>(iCount) * sizeof(rMainLayout.pf4LowWavesOne[0]));
@@ -366,8 +361,7 @@ static void PopulateGerstnerLowWaves(shaders::MainLayout& rMainLayout, double dW
 	rMainLayout.iWaterLowCount = static_cast<int32_t>(iCount);
 }
 
-// Geometric "medium" wave band: writes iWaterMediumCount and the pf4MediumWaves* Gerstner terms, or zeroes the count when faded out.
-static void PopulateGerstnerMediumWaves(shaders::MainLayout& rMainLayout, double dWaveTime, double dWaveCameraX, double dWaveCameraY, float fMediumAmplitudeScale)
+static void PopulateGerstnerMediumWaves(shaders::MainLayout& rMainLayout, double fWaveTime, double fWaveCameraX, double fWaveCameraY, float fMediumAmplitudeScale)
 {
 	if (fMediumAmplitudeScale <= 0.0f)
 	{
@@ -379,28 +373,27 @@ static void PopulateGerstnerMediumWaves(shaders::MainLayout& rMainLayout, double
 
 	MediumWaveTunables tunables {};
 	tunables.iCount = iCount;
-	tunables.fWavelength = gWaterMediumWavelength.Get();
-	tunables.fAmplitude = gWaterMediumAmplitude.Get();
-	tunables.fSpeed = gWaterMediumSpeed.Get();
-	tunables.fAngleAdjust = gWaterMediumAngleAdjust.Get();
-	tunables.fWavelengthAdjust = gWaterMediumWavelengthAdjust.Get();
-	tunables.fAmplitudeAdjust = gWaterMediumAmplitudeAdjust.Get();
-	tunables.fSpeedAdjust = gWaterMediumSpeedAdjust.Get();
+	tunables.fWavelength = gWaterMediumWavelength.mfCurrent;
+	tunables.fAmplitude = gWaterMediumAmplitude.mfCurrent;
+	tunables.fSpeed = gWaterMediumSpeed.mfCurrent;
+	tunables.fAngleAdjust = gWaterMediumAngleAdjust.mfCurrent;
+	tunables.fWavelengthAdjust = gWaterMediumWavelengthAdjust.mfCurrent;
+	tunables.fAmplitudeAdjust = gWaterMediumAmplitudeAdjust.mfCurrent;
+	tunables.fSpeedAdjust = gWaterMediumSpeedAdjust.mfCurrent;
 	if (tunables != sMediumWaveTunables)
 	{
 		sMediumWaveTunables = tunables;
 		RebuildMediumWaveInvariants(iCount);
 	}
 
-	// Per-frame: eye-height-scaled amplitude + camera/time phase.
 	for (int64_t i = 0; i < iCount; ++i)
 	{
 		sMediumWaveStaging.pf4WavesTwo[i].y = sMediumWaveStaging.pfBaseAmplitude[i] * fMediumAmplitudeScale;
-		double dDirX = static_cast<double>(sMediumWaveStaging.pf4WavesOne[i].x);
-		double dDirY = static_cast<double>(sMediumWaveStaging.pf4WavesOne[i].y);
-		double dOmega = static_cast<double>(sMediumWaveStaging.pf4WavesTwo[i].x);
-		double dPhi = static_cast<double>(sMediumWaveStaging.pf4WavesTwo[i].z);
-		sMediumWaveStaging.pf4WavesTwo[i].w = static_cast<float>(std::fmod((dDirX * dWaveCameraX + dDirY * dWaveCameraY) * dOmega + dPhi * dWaveTime, kdWaveTwoPi));
+		double fDirectionX = static_cast<double>(sMediumWaveStaging.pf4WavesOne[i].x);
+		double fDirectionY = static_cast<double>(sMediumWaveStaging.pf4WavesOne[i].y);
+		double fOmega = static_cast<double>(sMediumWaveStaging.pf4WavesTwo[i].x);
+		double fPhi = static_cast<double>(sMediumWaveStaging.pf4WavesTwo[i].z);
+		sMediumWaveStaging.pf4WavesTwo[i].w = static_cast<float>(std::fmod((fDirectionX * fWaveCameraX + fDirectionY * fWaveCameraY) * fOmega + fPhi * fWaveTime, kfWaveTwoPi));
 	}
 
 	std::memcpy(rMainLayout.pf4MediumWavesOne, sMediumWaveStaging.pf4WavesOne, static_cast<size_t>(iCount) * sizeof(rMainLayout.pf4MediumWavesOne[0]));
@@ -420,26 +413,26 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurre
 		return;
 	}
 
-	double dWaveTime = static_cast<double>(fCurrentTime);
-	XMFLOAT4A f4WaveCameraPos {};
-	XMStoreFloat4A(&f4WaveCameraPos, engine::gpCamera->mVecPosition);
+	double fWaveTime = static_cast<double>(fCurrentTime);
+	XMFLOAT4A f4WaveCameraPosition {};
+	XMStoreFloat4A(&f4WaveCameraPosition, engine::gpCamera->mVecPosition);
 	// WaterDisplacement.comp adds dot(direction, worldPosition - waterOrigin) to this term, so the term must carry the
 	// absolute camera position for the wave phase to be continuous: reconstruct it as a double from the camera cell
 	// and the camera's local position, exactly as the reduced water origins do. CPU only — the uploaded phase is
 	// already reduced modulo 2*pi.
-	double fWaveCameraX = static_cast<double>(engine::gpCamera->mBasisCoord.iX) * static_cast<double>(kfCellWidth) + static_cast<double>(f4WaveCameraPos.x);
-	double fWaveCameraY = static_cast<double>(engine::gpCamera->mBasisCoord.iY) * static_cast<double>(kfCellHeight) + static_cast<double>(f4WaveCameraPos.y);
+	double fWaveCameraX = static_cast<double>(engine::gpCamera->mBasisCoordinate.iX) * static_cast<double>(kfCellWidth) + static_cast<double>(f4WaveCameraPosition.x);
+	double fWaveCameraY = static_cast<double>(engine::gpCamera->mBasisCoordinate.iY) * static_cast<double>(kfCellHeight) + static_cast<double>(f4WaveCameraPosition.y);
 
 	// Fade geometric wave amplitudes by camera eye height — per-stack Start/End sliders (1.0 at ≤ Start, 0.0 at ≥ End, linear between).
 	float fCameraEyeHeight = engine::gpCamera->mfCameraEyeHeight;
-	float fLowFadeStart = gWaterLowAmplitudeFadeStart.Get();
-	float fLowFadeEnd = gWaterLowAmplitudeFadeEnd.Get();
-	float fLowAmplitudeScale = std::clamp((fLowFadeEnd - fCameraEyeHeight) / std::max(fLowFadeEnd - fLowFadeStart, 1e-3f), 0.0f, 1.0f);
-	float fMediumFadeStart = gWaterMediumAmplitudeFadeStart.Get();
-	float fMediumFadeEnd = gWaterMediumAmplitudeFadeEnd.Get();
-	float fMediumAmplitudeScale = std::clamp((fMediumFadeEnd - fCameraEyeHeight) / std::max(fMediumFadeEnd - fMediumFadeStart, 1e-3f), 0.0f, 1.0f);
+	float fLowFadeStart = gWaterLowAmplitudeFadeStart.mfCurrent;
+	float fLowFadeEnd = gWaterLowAmplitudeFadeEnd.mfCurrent;
+	float fLowAmplitudeScale = std::clamp((fLowFadeEnd - fCameraEyeHeight) / std::max(fLowFadeEnd - fLowFadeStart, 1.0e-3f), 0.0f, 1.0f);
+	float fMediumFadeStart = gWaterMediumAmplitudeFadeStart.mfCurrent;
+	float fMediumFadeEnd = gWaterMediumAmplitudeFadeEnd.mfCurrent;
+	float fMediumAmplitudeScale = std::clamp((fMediumFadeEnd - fCameraEyeHeight) / std::max(fMediumFadeEnd - fMediumFadeStart, 1.0e-3f), 0.0f, 1.0f);
 
-	PopulateGerstnerLowWaves(rMainLayout, dWaveTime, fWaveCameraX, fWaveCameraY, fLowAmplitudeScale);
+	PopulateGerstnerLowWaves(rMainLayout, fWaveTime, fWaveCameraX, fWaveCameraY, fLowAmplitudeScale);
 
 	if (eWaterLevel == GraphicsQualityLevel::kMedium)
 	{
@@ -447,39 +440,34 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurre
 		return;
 	}
 
-	PopulateGerstnerMediumWaves(rMainLayout, dWaveTime, fWaveCameraX, fWaveCameraY, fMediumAmplitudeScale);
+	PopulateGerstnerMediumWaves(rMainLayout, fWaveTime, fWaveCameraX, fWaveCameraY, fMediumAmplitudeScale);
 }
 
-// Hex shield
 static void PopulateHexShield(shaders::MainLayout& rMainLayout)
 {
-	rMainLayout.fHexShieldGrow = engine::gHexShieldGrow.Get();
-	rMainLayout.fHexShieldEdgeDistance = engine::gHexShieldEdgeDistance.Get();
-	rMainLayout.fHexShieldEdgePower = engine::gHexShieldEdgePower.Get();
-	rMainLayout.fHexShieldEdgeMultiplier = engine::gHexShieldEdgeMultiplier.Get();
+	rMainLayout.fHexShieldGrow = engine::gHexShieldGrow.mfCurrent;
+	rMainLayout.fHexShieldEdgeDistance = engine::gHexShieldEdgeDistance.mfCurrent;
+	rMainLayout.fHexShieldEdgePower = engine::gHexShieldEdgePower.mfCurrent;
+	rMainLayout.fHexShieldEdgeMultiplier = engine::gHexShieldEdgeMultiplier.mfCurrent;
 
-	rMainLayout.fHexShieldWaveMultiplier = engine::gHexShieldWaveMultiplier.Get();
-	rMainLayout.fHexShieldWaveDotMultiplier = engine::gHexShieldWaveDotMultiplier.Get();
-	rMainLayout.fHexShieldWaveIntensityMultiplier = engine::gHexShieldWaveIntensityMultiplier.Get();
-	rMainLayout.fHexShieldWaveIntensityPower = engine::gHexShieldWaveIntensityPower.Get();
-	rMainLayout.fHexShieldWaveFalloffPower = engine::gHexShieldWaveFalloffPower.Get();
+	rMainLayout.fHexShieldWaveMultiplier = engine::gHexShieldWaveMultiplier.mfCurrent;
+	rMainLayout.fHexShieldWaveDotMultiplier = engine::gHexShieldWaveDotMultiplier.mfCurrent;
+	rMainLayout.fHexShieldWaveIntensityMultiplier = engine::gHexShieldWaveIntensityMultiplier.mfCurrent;
+	rMainLayout.fHexShieldWaveIntensityPower = engine::gHexShieldWaveIntensityPower.mfCurrent;
+	rMainLayout.fHexShieldWaveFalloffPower = engine::gHexShieldWaveFalloffPower.mfCurrent;
 
-	rMainLayout.fHexShieldDirectionFalloffPower = engine::gHexShieldDirectionFalloffPower.Get();
-	rMainLayout.fHexShieldDirectionMultiplier = engine::gHexShieldDirectionMultiplier.Get();
+	rMainLayout.fHexShieldDirectionFalloffPower = engine::gHexShieldDirectionFalloffPower.mfCurrent;
+	rMainLayout.fHexShieldDirectionMultiplier = engine::gHexShieldDirectionMultiplier.mfCurrent;
 }
 
-void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, float fCurrentTime)
+void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, std::chrono::duration<float> currentTime)
 {
-	if (rActiveCoords.empty() || rRenderInterpolates.find(cameraCoord) == rRenderInterpolates.end())
+	if (rActiveCoordinates.empty() || rRenderInterpolates.find(cameraCoordinate) == rRenderInterpolates.end())
 	{
-		// Nothing renderable: an all-rings-empty frame (e.g. a failed reconnect to a dead local server; GameBase::Render
-		// leaves mRenderInterpolates renderable-only, so a missing cameraCoord entry means the whole map is empty), or
-		// an empty rActiveCoords, which is defensive only (Game::ComputeActiveSet and Game::Reset always add
-		// mClientGridCoord; boot prerender seeds {kOriginCoordinate}). Run the SAME Begin/EndRender as the normal path with
-		// no per-coord Render between them, so every indirect count and per-transaction profile counter is written as
-		// 0 and nothing ghost-draws, then bail before touching cameraCoord's absent interpolate. Every collection
-		// BeginRender walks rActiveCoords behind an rRenderInterpolates find-guard (or is a no-op), never .at().
-		game::FrameInterpolate::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoords);
+		// Active-set computation and reset include the client cell, and boot prerender seeds the origin; the empty-set check is defensive.
+		// A missing camera interpolate can coexist with other renderable cells. Begin/end publication without per-cell Render clears indirect counts and per-transaction profile counters; collection BeginRender skips missing interpolates.
+		// Return before accessing the absent camera interpolate.
+		game::FrameInterpolate::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
 		game::FrameInterpolate::EndRender(iCommandBuffer);
 		RenderLightingSpreadIndirect(iCommandBuffer);
 		if constexpr (kbDebugRender)
@@ -490,19 +478,19 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 		return;
 	}
 
-	const game::FrameInterpolate& rCameraInterpolate = rRenderInterpolates.at(cameraCoord);
+	const game::FrameInterpolate& rCameraInterpolate = rRenderInterpolates.at(cameraCoordinate);
 	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(&gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
-	GraphicsQualityLevel eWaterLevel = static_cast<GraphicsQualityLevel>(std::clamp(gWaterLevel.Get<int64_t>(), int64_t {0}, static_cast<int64_t>(GraphicsQualityLevel::kCount) - 1));
+	GraphicsQualityLevel eWaterLevel = static_cast<GraphicsQualityLevel>(std::clamp(gWaterLevel.Get<int64_t>(), static_cast<int64_t>(0), static_cast<int64_t>(GraphicsQualityLevel::kCount) - 1));
 
 	RenderLightingMain(iCommandBuffer);
 	gpBufferManager->ResetSkinningAllocations(iCommandBuffer);
 
 	// Per-frame visible-area LOD draw params for water. The water pipeline binds a single concat
 	// mesh buffer holding all LODs; per-frame we tell vkCmdDrawIndexedIndirect which LOD's index
-	// range and vertex base to draw. engine::Camera computes miVisibleAreaLod from eye distance with 4×
+	// range and vertex base to draw. engine::Camera computes miVisibleAreaLevelOfDetail from eye distance with 4×
 	// hysteresis bands; mesh density and snap-grid are in lockstep. Terrain draws via one
 	// vkCmdDrawIndexedIndirect per island template in CommandBufferRecordMain.cpp.
-	int64_t iLevelOfDetail = engine::gpCamera->miVisibleAreaLod;
+	int64_t iLevelOfDetail = engine::gpCamera->miVisibleAreaLevelOfDetail;
 	const BufferManager::VisibleAreaMeshLod& rWaterLevelOfDetail = gpBufferManager->mWaterMeshLods[iLevelOfDetail];
 	gpPipelineManager->mpPipelines[kPipelineWater].WriteIndirectBuffer(iCommandBuffer, 1, rWaterLevelOfDetail.iIndexCount, rWaterLevelOfDetail.iIndexOffset, rWaterLevelOfDetail.iVertexOffset);
 
@@ -525,35 +513,33 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 		gpPipelineManager->mpPipelines[kPipelineWaterDisplacement].WriteIndirectComputeBuffer(iCommandBuffer, (rWaterLevelOfDetail.iQuadCountX + 1 + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize, (rWaterLevelOfDetail.iQuadCountY + 1 + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize, 1);
 	}
 
-	// Phase 1: BeginRender — compute total capacities, resize GPU buffers, reset counters
-	game::FrameInterpolate::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoords);
+	game::FrameInterpolate::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
 
-	// Phase 2: Render per-frame (camera first for index 0 stability)
-	auto renderFrame = [&](const GridCoord& rCoord)
+	// Render the camera cell first to keep its index at zero.
+	auto RenderFrame = [&](const GridCoord& rCoordinate)
 	{
-		auto it = rRenderInterpolates.find(rCoord);
+		auto it = rRenderInterpolates.find(rCoordinate);
 		if (it == rRenderInterpolates.end())
 		{
 			return;
 		}
-		const game::FrameInterpolate& rInterp = it->second;
+		const game::FrameInterpolate& rFrameInterpolate = it->second;
 		// Automatically dispatched main collections
-		game::FrameInterpolate::Render(rInterp, iCommandBuffer);
+		game::FrameInterpolate::Render(rFrameInterpolate, iCommandBuffer);
 		// Manually rendered trail collections
-		SmokeTrailsInterpolate::Render(rInterp, iCommandBuffer);
-		WindTrailsInterpolate::Render(rInterp, iCommandBuffer);
+		SmokeTrailsInterpolate::Render(rFrameInterpolate, iCommandBuffer);
+		WindTrailsInterpolate::Render(rFrameInterpolate, iCommandBuffer);
 	};
-	renderFrame(cameraCoord);
-	for (const GridCoord& rCoord : rActiveCoords)
+	RenderFrame(cameraCoordinate);
+	for (const GridCoord& rCoordinate : rActiveCoordinates)
 	{
-		if (rCoord == cameraCoord)
+		if (rCoordinate == cameraCoordinate)
 		{
 			continue;
 		}
-		renderFrame(rCoord);
+		RenderFrame(rCoordinate);
 	}
 
-	// Phase 3: EndRender — write indirect draw buffer counts
 	game::FrameInterpolate::EndRender(iCommandBuffer);
 
 	// EndRender publishes deposit indirect counts before spread indirect parameters are published.
@@ -562,32 +548,30 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	// Phase 4: Game-specific debug rendering (per-coord, positions from fully-interpolated frame)
 	if constexpr (kbDebugRender)
 	{
-		for (const GridCoord& rCoord : rActiveCoords)
+		for (const GridCoord& rCoordinate : rActiveCoordinates)
 		{
-			auto it = rRenderInterpolates.find(rCoord);
+			auto it = rRenderInterpolates.find(rCoordinate);
 			if (it != rRenderInterpolates.end())
 			{
-				game::FrameInterpolate::DebugRender(it->second, rCoord);
+				game::FrameInterpolate::DebugRender(it->second, rCoordinate);
 			}
 		}
 	}
 
-	DebugRenderNavData(rActiveCoords, cameraCoord);
-	DebugRenderFrameEdges(rActiveCoords, cameraCoord);
-	DebugRenderIslandBoundaries(rActiveCoords, cameraCoord);
-	DebugRenderIslandValidArea(rActiveCoords, cameraCoord);
+	DebugRenderNavigationData(rActiveCoordinates, cameraCoordinate);
+	DebugRenderFrameEdges(rActiveCoordinates, cameraCoordinate);
+	DebugRenderIslandBoundaries(rActiveCoordinates, cameraCoordinate);
+	DebugRenderIslandValidArea(rActiveCoordinates, cameraCoordinate);
 
 	DebugRender::BeginRender(iCommandBuffer);
 	DebugRender::EndRender(iCommandBuffer);
 
-	// Post-render MainLayout setup (camera matrices, wave params, hex shields, camera shake)
 	const game::FrameInterpolate& rFrameInterpolate = rCameraInterpolate;
 
 	static int32_t siRenderCount = 0;
 	rMainLayout.iFrameNumber = static_cast<int>(engine::gpCamera->miFrame);
 	rMainLayout.iRenderNumber = ++siRenderCount;
 
-	// Camera shake
 	float fCameraShake = engine::gpCamera->mfShake;
 	static constexpr float kfMaxRoll = 0.005f;
 	static constexpr float kfMaxPitch = 0.005f;
@@ -603,15 +587,14 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	XMStoreFloat4(&rMainLayout.f4EyePosition, engine::gpCamera->mVecEyePosition);
 	XMVECTOR vecToEyeNormal = engine::gpCamera->mVecToEyeNormal;
 	XMStoreFloat4(&rMainLayout.f4ToEyeNormal, vecToEyeNormal);
-	// Camera-facing billboard basis (DebugRenderBillboard.vert): fold the shader's per-vertex worldUp select +
-	// cross chain CPU-side since f4ToEyeNormal is invocation-invariant. Mirror the shader exactly — 0.999 z
-	// threshold, +X fallback, right normalized, up = cross(forward, right) left unnormalized. Forward stays f4ToEyeNormal.
-	XMVECTOR vecBillboardWorldUp = std::abs(XMVectorGetZ(vecToEyeNormal)) < 0.999f ? XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f) : XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
-	XMVECTOR vecBillboardRight = XMVector3Normalize(XMVector3Cross(vecBillboardWorldUp, vecToEyeNormal));
-	XMStoreFloat4(&rMainLayout.f4BillboardRight, vecBillboardRight);
-	XMStoreFloat4(&rMainLayout.f4BillboardUp, XMVector3Cross(vecToEyeNormal, vecBillboardRight));
+	// DebugRenderBillboard.vert consumes this basis for every vertex; forward remains f4ToEyeNormal.
+	// The reference axis switches from +Z to +X at |forward.z| = 0.999; right is normalized and up = cross(forward, right) is not.
+	XMVECTOR vecBillboardWorldUpNormal = std::abs(XMVectorGetZ(vecToEyeNormal)) < 0.999f ? XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f) : XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+	XMVECTOR vecBillboardRightNormal = XMVector3Normalize(XMVector3Cross(vecBillboardWorldUpNormal, vecToEyeNormal));
+	XMStoreFloat4(&rMainLayout.f4BillboardRight, vecBillboardRightNormal);
+	XMStoreFloat4(&rMainLayout.f4BillboardUp, XMVector3Cross(vecToEyeNormal, vecBillboardRightNormal));
 
-	PopulateGerstnerWaves(rMainLayout, fCurrentTime, eWaterLevel);
+	PopulateGerstnerWaves(rMainLayout, currentTime.count(), eWaterLevel);
 
 	PopulateHexShield(rMainLayout);
 }

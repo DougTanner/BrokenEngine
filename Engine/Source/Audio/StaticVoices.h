@@ -8,14 +8,14 @@
 namespace DirectX
 {
 class AudioEngine;
-}
+} // namespace DirectX
 
 namespace game
 {
 
 struct Frame;
 
-}
+} // namespace game
 
 namespace engine
 {
@@ -39,45 +39,41 @@ class StaticVoices
 {
 public:
 
-	void Init(AudioEngine* pAudioEngine, const int64_t* piMasteringVoiceChannels);
+	void Initialize(AudioEngine* pAudioEngine, const int64_t* piMasteringVoiceChannels);
 
-	void PlayOneShot(const game::Frame& rFrame, common::crc_t uiAudioCrc, bool b3d, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
-	// vecLocalPosition is local to emitterCoord; the cull and mix convert it against mListenerCoord.
-	void XM_CALLCONV PlayOneShot3d(const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoord, FXMVECTOR vecLocalPosition, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
+	void PlayOneShot(const game::Frame& rFrame, common::crc_t uiAudioCrc, bool bThreeDimensional, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
+	// vecLocalPosition is local to emitterCoordinate; the cull and mix convert it against mListenerCoordinate.
+	void XM_CALLCONV PlayOneShotThreeDimensional(const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoordinate, FXMVECTOR vecLocalPosition, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
 
-	// rFrame is the cell emitterCoord names, so every persistent-sound position it carries is local to it.
-	void UpdateLifecycle(const game::Frame& rFrame, GridCoord emitterCoord, float fDeltaTime);
+	// rFrame is the cell emitterCoordinate names, so every persistent-sound position it carries is local to it.
+	void UpdateLifecycle(const game::Frame& rFrame, GridCoord emitterCoordinate, float fDeltaTime);
 	void UpdateListenerPosition();
 	void UpdateVolumes();
 
 	void Clear(bool bNullVoicesBeforeDestroy);
 
-	int64_t GetVoiceCount() const { return static_cast<int64_t>(mVoices.size()); }
-
-	void SkipNextInvalidation() { mbSkipNextInvalidation = true; }
-
 private:
 
 	// Unlocked one-shot body shared by both public paths; callers hold mOneShotMutex.
 	// rfPitch is in/out: the pitch-randomization result flows back so the 3D path can
-	// pass the randomized ratio on to Apply3dVolume.
-	IXAudio2SourceVoice* PlayOneShotLocked(common::crc_t uiAudioCrc, bool b3d, float fVolume, float& rfPitch, float fPitchRange);
+	// pass the randomized ratio on to ApplyThreeDimensionalVolume.
+	IXAudio2SourceVoice* PlayOneShotLocked(common::crc_t uiAudioCrc, bool bThreeDimensional, float fVolume, float& rfPitch, float fPitchRange);
 
-	void XM_CALLCONV Apply3dVolume(IXAudio2SourceVoice* pVoice, FXMVECTOR vecPosition, FXMVECTOR vecVelocity, float fVolume, float fPitch);
+	void XM_CALLCONV ApplyThreeDimensionalVolume(IXAudio2SourceVoice* pVoice, FXMVECTOR vecPosition, FXMVECTOR vecVelocity, float fVolume, float fPitch);
 
 	float ComputeAttenuatedVolume(float fDistance, float fSoundVolume) const;
 
 	// UpdateLifecycle passes, run in fixed order each frame.
 	void InvalidationPass(const SoundsInterpolate& rSoundsInterpolate);
-	void PriorityPass(const SoundsInterpolate& rSoundsInterpolate, const SoundsPostRender& rSoundsPostRender, GridCoord emitterCoord);
+	void PriorityPass(const SoundsInterpolate& rSoundsInterpolate, const SoundsPostRender& rSoundsPostRender, GridCoord emitterCoordinate);
 	void DeactivationPass();
 	void AdvanceFadeOut(float fDeltaTime);
 	void AdvanceFadeIn(float fDeltaTime);
 
 	struct PooledVoice
 	{
-		common::crc_t mAudioCrc;
-		IXAudio2SourceVoice* mpVoice = nullptr;
+		common::crc_t uiAudioCrc = 0;
+		IXAudio2SourceVoice* pVoice = nullptr;
 	};
 	struct AcquiredVoice
 	{
@@ -85,8 +81,8 @@ private:
 		bool bFromPool = false;
 	};
 
-	void ReturnVoiceToPool(common::crc_t audioCrc, IXAudio2SourceVoice* pVoice);
-	IXAudio2SourceVoice* AcquireVoiceFromPool(common::crc_t audioCrc);
+	void ReturnVoiceToPool(common::crc_t uiAudioCrc, IXAudio2SourceVoice* pVoice);
+	IXAudio2SourceVoice* AcquireVoiceFromPool(common::crc_t uiAudioCrc);
 	AcquiredVoice AcquireOrLoadVoice(common::crc_t uiAudioCrc);
 	void ClearPool();
 	void BeginFadeOut(StaticVoice& rVoice);
@@ -100,22 +96,20 @@ private:
 	std::mutex mOneShotMutex; // 3D path locks once and calls the unlocked PlayOneShotLocked helper (no re-entry)
 	common::RandomEngine mRandomEngine;
 
+public:
 	bool mbSkipNextInvalidation = false;
+
 	std::vector<StaticVoice> mVoices;
+private:
 	std::vector<PooledVoice> mPooledVoices;
 	int64_t miFadeOutCount = 0; // Maintained count of mVoices entries flagged kFadingOut; kept in sync at every Set/Clear so the budget checks stay O(1). Reset in Clear().
 
-	// Listener/fade state below (through mfEffectiveFadeEnd) is written only by main-thread
-	// UpdateListenerPosition (audio step) and read LOCK-FREE by the one-shot path
-	// (PlayOneShot3d → ComputeAttenuatedVolume / Apply3dVolume's X3DAudioCalculate), which game
-	// sim code reaches from worker threads inside Dispatch() regions. Race-free purely by
-	// temporal exclusion: the main loop strictly sequences ClientUpdate (all dispatch workers
-	// join) → Render → AudioManager::Update (Main.cpp), so no worker is alive when the audio
-	// step writes. The same sequencing is why UpdateLifecycle / UpdateVolumes / Clear may
-	// touch mVoices / mPooledVoices without taking mOneShotMutex.
-	// The cell mVecListenerPosition is local to. Every emitter position arrives local to its own cell, so the
-	// cull, priority, and mix paths offset it by the whole-cell step between that cell and this one.
-	GridCoord mListenerCoord {};
+	// UpdateListenerPosition writes listener/fade state through mfEffectiveFadeEnd on the main thread.
+	// Main.cpp sequences ClientUpdate (all Dispatch workers join), Render, then AudioManager::Update.
+	// Worker one-shots read this state through PlayOneShotThreeDimensional, ComputeAttenuatedVolume and ApplyThreeDimensionalVolume without locking; that ordering excludes concurrent writes.
+	// The same ordering permits UpdateLifecycle, UpdateVolumes and Clear to access mVoices/mPooledVoices without mOneShotMutex.
+	// mListenerCoordinate is the cell for mVecListenerPosition; cull, priority and mix rebase each emitter's local position into it.
+	GridCoord mListenerCoordinate {};
 	XMVECTOR mVecListenerPosition {};
 	X3DAUDIO_LISTENER mX3dAudioListener
 	{

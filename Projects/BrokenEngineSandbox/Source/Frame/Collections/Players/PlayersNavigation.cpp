@@ -360,7 +360,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 
 				float fX = fIslandMinX + common::Random(rTemplate.fQuadFootprintX, rFrame.postRender.randomEngine);
 				float fY = fIslandMinY + common::Random(rTemplate.fQuadFootprintY, rFrame.postRender.randomEngine);
-				rVecIslandDestination = XMVectorSet(fX, fY, engine::gBaseHeight.Get(), 1.0f);
+				rVecIslandDestination = XMVectorSet(fX, fY, engine::gBaseHeight.mfCurrent, 1.0f);
 
 				// Snap to navigable area if inside an obstacle
 				rVecIslandDestination = engine::NavQuerySnapToNavigable(rVecIslandDestination, rStaticData.navigationData);
@@ -472,7 +472,7 @@ void XM_CALLCONV PlayersPostRender::ApplyTerrainPush(const engine::FrameStaticDa
 {
 	// Terrain collision - add velocity away from terrain, gentle at first then ramping up
 	float fElevation = engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData).Sample(vecPosition);
-	float fPushHeight = engine::gBaseHeight.Get() - kfPlayerRadius - kfPushMargin;
+	float fPushHeight = engine::gBaseHeight.mfCurrent - kfPlayerRadius - kfPushMargin;
 	if (fElevation >= fPushHeight) [[unlikely]]
 	{
 		XMVECTOR vecTerrainNormal = XMVector3Normalize(XMVectorSetZ(engine::gpIslandTerrain->FrameNormal(rStaticData, vecPosition), 0.0f));

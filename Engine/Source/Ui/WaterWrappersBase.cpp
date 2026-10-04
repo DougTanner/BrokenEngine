@@ -5,42 +5,29 @@ namespace engine
 
 // Specular - Normals
 // Water normal map atlas: 3 weighted samples each indexed into TextureManager::kpWaterNormalCrcs.
-// 11 Sea Waves 0.25
-// 3 FoamB 0.25
-// 6 GeenSeaB 0.15
-// 12 SeaWavesB 0.25
 Wrapper gWaterNormalIndexOne(int64_t {12}, std::vector<int64_t> {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
 Wrapper gLightingSampledNormalsOneSize(0.2f, 0.05f, 1.0f);
-Wrapper gLightingSampledNormalsWeightOneMin(1.5f, 0.0f, 4.0f);
-Wrapper gLightingSampledNormalsWeightOneMax(2.0f, 0.0f, 4.0f);
+Wrapper gLightingSampledNormalsWeightOneMinimum(1.5f, 0.0f, 4.0f);
+Wrapper gLightingSampledNormalsWeightOneMaximum(2.0f, 0.0f, 4.0f);
 Wrapper gWaterNormalRotationOne(0.16f, -XM_PI, XM_PI);
-Wrapper gLightingSampledNormalsSpeedOneMin(0.035f, 0.0f, 0.1f);
-Wrapper gLightingSampledNormalsSpeedOneMax(0.15f, 0.0f, 1.0f);
+Wrapper gLightingSampledNormalsSpeedOneMinimum(0.035f, 0.0f, 0.1f);
+Wrapper gLightingSampledNormalsSpeedOneMaximum(0.15f, 0.0f, 1.0f);
 Wrapper gWaterNormalSpeedDirectionOne(-2.3f, -XM_PI, XM_PI);
-// 4 GreenCalm 0.05
-// 12 SeaWaves 0.02
-// 16 WaterFall 0.04
-// 2 Foam 0.03
-// 7 Lake 0.06
-// 15 Stone and Ripples 
 Wrapper gWaterNormalIndexTwo(int64_t {15}, std::vector<int64_t> {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
 Wrapper gLightingSampledNormalsTwoSize(0.05f, 0.025f, 0.1f);
-Wrapper gLightingSampledNormalsWeightTwoMin(0.25f, 0.0f, 4.0f);
-Wrapper gLightingSampledNormalsWeightTwoMax(0.75f, 0.0f, 4.0f);
+Wrapper gLightingSampledNormalsWeightTwoMinimum(0.25f, 0.0f, 4.0f);
+Wrapper gLightingSampledNormalsWeightTwoMaximum(0.75f, 0.0f, 4.0f);
 Wrapper gWaterNormalRotationTwo(0.75f, -XM_PI, XM_PI);
-Wrapper gLightingSampledNormalsSpeedTwoMin(0.0f, 0.0f, 0.2f);
-Wrapper gLightingSampledNormalsSpeedTwoMax(0.075f, 0.0f, 1.0f);
+Wrapper gLightingSampledNormalsSpeedTwoMinimum(0.0f, 0.0f, 0.2f);
+Wrapper gLightingSampledNormalsSpeedTwoMaximum(0.075f, 0.0f, 1.0f);
 Wrapper gWaterNormalSpeedDirectionTwo(-1.0f, -XM_PI, XM_PI);
-// 12 SeaWavesB 0.03
-// 2 Foam
-// 4 GreenCalm 0.05
 Wrapper gWaterNormalIndexThree(int64_t {4}, std::vector<int64_t> {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
 Wrapper gLightingSampledNormalsThreeSize(0.02f, 0.02f, 0.1f);
-Wrapper gLightingSampledNormalsWeightThreeMin(0.5f, 0.0f, 4.0f);
-Wrapper gLightingSampledNormalsWeightThreeMax(0.8f, 0.0f, 4.0f);
+Wrapper gLightingSampledNormalsWeightThreeMinimum(0.5f, 0.0f, 4.0f);
+Wrapper gLightingSampledNormalsWeightThreeMaximum(0.8f, 0.0f, 4.0f);
 Wrapper gWaterNormalRotationThree(0.17f, -XM_PI, XM_PI);
-Wrapper gLightingSampledNormalsSpeedThreeMin(0.1f, 0.0f, 0.2f);
-Wrapper gLightingSampledNormalsSpeedThreeMax(0.15f, 0.0f, 1.0f);
+Wrapper gLightingSampledNormalsSpeedThreeMinimum(0.1f, 0.0f, 0.2f);
+Wrapper gLightingSampledNormalsSpeedThreeMaximum(0.15f, 0.0f, 1.0f);
 Wrapper gWaterNormalSpeedDirectionThree(-1.7f, -XM_PI, XM_PI);
 Wrapper gWaterDepthReflectionFeather(0.05f, 0.001f, 0.1f);
 Wrapper gWaterWaveNormalBlend(0.8f, 0.0f, 1.0f);
@@ -58,16 +45,16 @@ Wrapper gLightingWaterSkyboxTwo(3'000.0f, 0.0f, 5'000.0f);
 Wrapper gLightingWaterSkyboxTwoPower(30.0f, 1.0f, 100.0f);
 Wrapper gLightingWaterSkyboxThree(360.0f, 1.0f, 800.0f);
 Wrapper gLightingWaterSkyboxThreePower(2.0f, 0.001f, 4.0f);
-Wrapper gLightingWaterSkyboxLod(6.5f, 0.0f, 10.0f);
-// Specular-AA tuning for Water.frag's WATER_SPEC_AA_MODE variants: variance scales the filter kernel
-// (mode 2 default 0.25; mode 1 maps 0.25 -> exact pixel footprint), threshold clamps the widening.
-Wrapper gWaterSpecAAVariance(0.0f, 0.0f, 2.0f);
-Wrapper gWaterSpecAAThreshold(0.0f, 0.0f, 1.0f);
+Wrapper gLightingWaterSkyboxLevelOfDetail(6.5f, 0.0f, 10.0f);
+// Water.frag variance scales the specular filter kernel; mode 1 maps 0.25 to the exact pixel footprint.
+// In modes 2 and 3, threshold clamps the widening.
+Wrapper gWaterSpecularAntialiasingVariance(0.0f, 0.0f, 2.0f);
+Wrapper gWaterSpecularAntialiasingThreshold(0.0f, 0.0f, 1.0f);
 // WATER_SPEC_AA_MIP_HANDOFF: mip scale multiplies the baked per-mip Toksvig variance term (1.0 = the
 // physically-derived kernel); mip bias is the water-normal sampler's LOD bias (negative = sharpen,
-// positive = blur; 0 = unbiased, unlike the global -gMipLodBias sharpen), sampler recreate on change.
-Wrapper gWaterSpecAAMipScale(0.0f, 0.0f, 4.0f);
-Wrapper gWaterNormalMipBias(0.3f, 0.0f, 1.0f);
+// positive = blur; 0 = unbiased, unlike the global -gMipmapLevelOfDetailBias sharpen), sampler recreate on change.
+Wrapper gWaterSpecularAntialiasingMipmapScale(0.0f, 0.0f, 4.0f);
+Wrapper gWaterNormalMipmapBias(0.3f, 0.0f, 1.0f);
 
 // Specular - Height Darken
 Wrapper gWaterHeightDarkenTop(0.05f, -0.1f, 0.05f);
@@ -78,7 +65,7 @@ Wrapper gWaterHeightDarkenLighting(0.1f, 0.0f, 1.0f);
 
 // Low frequency waves
 Wrapper gWaterLowCount(int64_t {31}, std::vector<int64_t> {15, 31, 63, 127, 255});
-Wrapper gWaterLowMax(255.0f, 0.0f, 255.0f, 1.0f);
+Wrapper gWaterLowMaximum(255.0f, 0.0f, 255.0f, 1.0f);
 Wrapper gWaterLowAngle(4.8f, 0.0f, XM_2PI);
 Wrapper gWaterLowWavelength(4.0f, 1.0f, 20.0f);
 Wrapper gWaterLowAmplitude(0.05f, 0.0f, 0.1f);
@@ -112,15 +99,15 @@ Wrapper gWaterTerrainFade(0.3f, 0.1f, 5.0f);
 Wrapper gWaterTerrainFadeClamp(0.0f, 0.0f, 0.5f);
 Wrapper gWaterHeight(0.0f, -0.1f, 0.03f);
 Wrapper gWaterEarlyOut(0.0f, -0.1f, 0.1f);
-Wrapper gWaterDepthLutFeather(0.1f, 0.01f, 0.2f);
-Wrapper gWaterDepthLutSunsetFadePower(10.0f, 0.1f, 10.0f);
-Wrapper gWaterDepthLutSunsetFadeIntensity(0.3f, 0.0f, 1.0f);
+Wrapper gWaterDepthLookupTableFeather(0.1f, 0.01f, 0.2f);
+Wrapper gWaterDepthLookupTableSunsetFadePower(10.0f, 0.1f, 10.0f);
+Wrapper gWaterDepthLookupTableSunsetFadeIntensity(0.3f, 0.0f, 1.0f);
 Wrapper gWaterDepthColorFeather(0.3f, 0.01f, 0.4f);
 Wrapper gWaterDepthColorFloor(0.2f, 0.0f, 1.0f);
 Wrapper gWaterUnderseaCompression(0.8f, 0.1f, 1.0f);
 Wrapper gWaterColorBottom(0.08f, -2.0f, 2.0f);
 Wrapper gWaterColorHeight(1.86f, 0.0f, 4.0f);
-Wrapper gWaterFresnel(0.07f, 0.0f, 0.2f); // DT: TEMP
+Wrapper gWaterFresnel(0.07f, 0.0f, 0.2f);
 Wrapper gWaterColorNoiseFrequency(0.0013f, 0.0f, 0.01f);
 Wrapper gWaterColorNoiseAmount(0.1f, 0.0f, 0.2f);
 Wrapper gWaterColorNoiseWeightOne(-1.5f, -2.0f, 2.0f);

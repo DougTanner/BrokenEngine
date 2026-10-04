@@ -10,7 +10,7 @@
 namespace engine
 {
 
-// The base GetCpuTimer/GetCpuCounter accessors dispatch on a contiguous index space where the first game enumerator must start at the engine count. Pin that contract here so an omitted game-enum initializer is a compile error, not a silent misroute of every game index into the engine arrays. The engine consumes game CPU timers by name (GetCpuTimer(game::kCpuTimerFrameUpdate) below; GameBase phase brackets), so the timer anchor is that first named timer; the counter block is anchored on the generic first index the game profile header supplies.
+// Game timer and counter indices follow the engine indices contiguously. The timer anchor is kCpuTimerFrameUpdate, which engine phase scopes use; the counter anchor is kGameCpuCounterFirst.
 static_assert(static_cast<int64_t>(game::kCpuTimerFrameUpdate) == static_cast<int64_t>(kEngineCpuTimerCount), "First game CPU timer must start at kEngineCpuTimerCount (contiguous engine->game index space).");
 static_assert(static_cast<int64_t>(game::kGameCpuCounterFirst) == static_cast<int64_t>(kEngineCpuCounterCount), "First game CPU counter must start at kEngineCpuCounterCount (contiguous engine->game index space).");
 
@@ -22,18 +22,18 @@ constexpr std::chrono::seconds kProfileVisibilityInterval = 2s;
 constexpr std::chrono::seconds kProfileDumpInterval = 1s;
 #endif // BT_CLIENT
 
-ProfileManagerBase::ProfileManagerBase(CpuCounter* pGameCpuCounters, CpuTimer* pGameCpuTimers, const std::string_view* pGameCpuCounterNames, const std::string_view* pGameCpuTimerNames, int64_t iCpuCounterCount, int64_t iCpuTimerCount)
-: mpGameCpuCounters(pGameCpuCounters)
-, mpGameCpuTimers(pGameCpuTimers)
-, mpGameCpuCounterNames(pGameCpuCounterNames)
-, mpGameCpuTimerNames(pGameCpuTimerNames)
-, miCpuCounterCount(iCpuCounterCount)
-, miCpuTimerCount(iCpuTimerCount)
+ProfileManagerBase::ProfileManagerBase(std::span<CpuCounter> gameCpuCounters, std::span<CpuTimer> gameCpuTimers, std::span<const std::string_view> gameCpuCounterNames, std::span<const std::string_view> gameCpuTimerNames)
 {
+	mpGameCpuCounters = gameCpuCounters.data();
+	mpGameCpuTimers = gameCpuTimers.data();
+	mpGameCpuCounterNames = gameCpuCounterNames.data();
+	mpGameCpuTimerNames = gameCpuTimerNames.data();
+	miCpuCounterCount = kEngineCpuCounterCount + std::ssize(gameCpuCounters);
+	miCpuTimerCount = kEngineCpuTimerCount + std::ssize(gameCpuTimers);
 #if defined(BT_SERVER)
 	if constexpr (kbProfiling)
 	{
-		mpRawCpuTimers = std::make_unique<RawCpuTimerState[]>(static_cast<size_t>(iCpuTimerCount));
+		mpRawCpuTimers = std::make_unique<RawCpuTimerState[]>(static_cast<size_t>(miCpuTimerCount));
 	}
 #endif // BT_SERVER
 }
@@ -43,12 +43,12 @@ void ProfileManagerBase::Create()
 	if constexpr (kbProfiling)
 	{
 #if defined(BT_CLIENT)
-		// Precondition: managers are created in strict order Instance -> Device -> Swapchain, then this runs (Graphics::Create calls it after swapchain creation), so gpInstanceManager/gpDeviceManager/gpSwapchainManager and OneShotCommandBuffer are all live below. Server body is empty (managers client-only).
+		// Graphics::Create calls this after Instance, Device, and Swapchain creation; those managers and OneShotCommandBuffer must be live.
 		if constexpr (kbProfilingDump)
 		{
 			if (mpDumpLog == nullptr)
 			{
-				// Runs once, on the boot-time Create() (allocation tracking not yet armed); later Create() calls skip via the null guard above. DiagnosticLog's ctor creates the parent directory; its Write is stack-buffered, flushed per line, and suppresses allocation tracking, so the per-second dump is main-loop safe.
+				// Initial log creation runs before allocation tracking is armed. DiagnosticLog creates the parent directory and writes through a stack buffer, suppressing allocation tracking and flushing each line.
 				wchar_t pcDirectory[MAX_PATH] {};
 				uint32_t uiTempPathLength = GetTempPathW(static_cast<DWORD>(std::size(pcDirectory) - 1), pcDirectory);
 				if (uiTempPathLength != 0 && uiTempPathLength < std::size(pcDirectory) - 1)
@@ -70,15 +70,14 @@ void ProfileManagerBase::Create()
 			return;
 		}
 
-		// Validate that graphics queue family supports timestamp queries
-		uint32_t uiTimestampValidBits = gpInstanceManager->mVkQueueFamilyProperties[gpInstanceManager->miGraphicsQueueFamilyIndex].timestampValidBits;
+		uint32_t uiTimestampValidBits = gpInstanceManager->mVkQueueFamilyProperties.at(gpInstanceManager->miGraphicsQueueFamilyIndex).timestampValidBits;
 		if (uiTimestampValidBits == 0)
 		{
 			LOG(kDefault, kWarning, "Warning: Graphics queue family does not support timestamp queries. GPU profiling disabled.");
 			return;
 		}
 
-		int64_t iQueryCount = gpSwapchainManager->mFramebuffers.size() * 2 * kGpuTimerCount;
+		int64_t iQueryCount = std::ssize(gpSwapchainManager->mFramebuffers) * 2 * kGpuTimerCount;
 
 		VkQueryPoolCreateInfo vkQueryPoolCreateInfo
 		{
@@ -122,10 +121,10 @@ void ProfileManagerBase::Destroy()
 bool ProfileManagerBase::TickVisibilityCadence()
 {
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-	bool bReevaluate = now - mLastVisibilityEvalTime >= kProfileVisibilityInterval;
+	bool bReevaluate = now - mLastVisibilityEvaluationTime >= kProfileVisibilityInterval;
 	if (bReevaluate)
 	{
-		mLastVisibilityEvalTime = now;
+		mLastVisibilityEvaluationTime = now;
 	}
 
 	return bReevaluate;
@@ -138,7 +137,7 @@ void ProfileManagerBase::ToggleProfileText()
 		meProfileScreen = static_cast<ProfileScreen>((static_cast<uint8_t>(meProfileScreen) + 1) % static_cast<uint8_t>(ProfileScreen::kCount));
 
 		// Re-evaluate visibility immediately on the switched-to screen instead of showing stale flags.
-		mLastVisibilityEvalTime = {};
+		mLastVisibilityEvaluationTime = {};
 
 #if defined(BT_CLIENT)
 		for (int64_t i = kTextGraphics; i < kTextAreasCount; ++i)
@@ -158,16 +157,16 @@ void ProfileManagerBase::CpuStart(int64_t iCpuTimer, int64_t iThreads)
 
 		std::lock_guard lock(mCpuTimerMutex);
 
-		// Heap: try_emplace into mPerThreadTimerStates + vector::resize to kCpuTimerCount
+		// Exclude timer-state insertion and resizing from allocation measurements.
 		ScopedSuppressAllocationTracking suppress;
 
 		std::vector<CpuTimerThreadState>& rThreadStates = mPerThreadTimerStates.try_emplace(std::this_thread::get_id()).first->second;
-		if (rThreadStates.size() < static_cast<size_t>(GetCpuTimerCount()))
+		if (std::ssize(rThreadStates) < miCpuTimerCount)
 		{
-			rThreadStates.resize(static_cast<size_t>(GetCpuTimerCount()));
+			rThreadStates.resize(static_cast<size_t>(miCpuTimerCount));
 		}
 
-		CpuTimerThreadState& rState = rThreadStates[static_cast<size_t>(iCpuTimer)];
+		CpuTimerThreadState& rState = rThreadStates.at(static_cast<size_t>(iCpuTimer));
 		ASSERT(rState.startTimePoint == std::chrono::steady_clock::time_point());
 		rState.startTimePoint = now;
 		rState.iStartAllocations = iAllocations;
@@ -189,27 +188,25 @@ void ProfileManagerBase::CpuStop(int64_t iCpuTimer, CpuStopFlags_t flags)
 
 		if (flags & CpuStopFlags::kCrossThread)
 		{
-			// Search all threads for the one that started this timer
 			for (auto& [rThreadId, rStates] : mPerThreadTimerStates)
 			{
-				if (rStates.size() > static_cast<size_t>(iCpuTimer) && rStates[static_cast<size_t>(iCpuTimer)].startTimePoint != std::chrono::steady_clock::time_point())
+				if (std::ssize(rStates) > iCpuTimer && rStates.at(static_cast<size_t>(iCpuTimer)).startTimePoint != std::chrono::steady_clock::time_point())
 				{
-					pState = &rStates[static_cast<size_t>(iCpuTimer)];
+					pState = &rStates.at(static_cast<size_t>(iCpuTimer));
 					break;
 				}
 			}
 		}
 		else
 		{
-			// Same-thread start/stop: use current thread's state directly
 			std::vector<CpuTimerThreadState>& rThreadStates = mPerThreadTimerStates.try_emplace(std::this_thread::get_id()).first->second;
-			if (rThreadStates.size() < static_cast<size_t>(GetCpuTimerCount()))
+			if (std::ssize(rThreadStates) < miCpuTimerCount)
 			{
-				// Heap: vector::resize to kCpuTimerCount
+				// Exclude timer-state resizing from allocation measurements.
 				ScopedSuppressAllocationTracking suppress;
-				rThreadStates.resize(static_cast<size_t>(GetCpuTimerCount()));
+				rThreadStates.resize(static_cast<size_t>(miCpuTimerCount));
 			}
-			pState = &rThreadStates[static_cast<size_t>(iCpuTimer)];
+			pState = &rThreadStates.at(static_cast<size_t>(iCpuTimer));
 			ASSERT(pState->startTimePoint != std::chrono::steady_clock::time_point());
 		}
 
@@ -218,7 +215,7 @@ void ProfileManagerBase::CpuStop(int64_t iCpuTimer, CpuStopFlags_t flags)
 		if (pState != nullptr) [[likely]]
 		{
 			int64_t iElapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(now - pState->startTimePoint).count();
-			rCpuTimer.iTotalFrameTimeNs += iElapsedNanoseconds;
+			rCpuTimer.iTotalFrameTimeNanoseconds += iElapsedNanoseconds;
 			pState->startTimePoint = std::chrono::steady_clock::time_point();
 			rCpuTimer.iAllocationsThisFrame += std::max(static_cast<int64_t>(0), iAllocations - pState->iStartAllocations);
 
@@ -228,7 +225,7 @@ void ProfileManagerBase::CpuStop(int64_t iCpuTimer, CpuStopFlags_t flags)
 				RawCpuTimerState& rRawTimer = mpRawCpuTimers[static_cast<size_t>(iCpuTimer)];
 				if (rRawTimer.flags & RawCpuTimerStateFlags::kRegistered)
 				{
-					rRawTimer.iTotalTimeNs += iElapsedNanoseconds;
+					rRawTimer.iTotalTimeNanoseconds += iElapsedNanoseconds;
 					++rRawTimer.iInvocationCount;
 				}
 			}
@@ -238,8 +235,8 @@ void ProfileManagerBase::CpuStop(int64_t iCpuTimer, CpuStopFlags_t flags)
 		if (flags & CpuStopFlags::kSmoothNow) [[unlikely]]
 		{
 			rCpuTimer.flags.Set(ProfileRowFlags::kSmoothAtStop);
-			rCpuTimer.smoothedMicroseconds = rCpuTimer.iTotalFrameTimeNs / 1'000;
-			rCpuTimer.iTotalFrameTimeNs = 0;
+			rCpuTimer.smoothedMicroseconds = rCpuTimer.iTotalFrameTimeNanoseconds / 1'000;
+			rCpuTimer.iTotalFrameTimeNanoseconds = 0;
 			rCpuTimer.smoothedAllocations = rCpuTimer.iAllocationsThisFrame;
 			rCpuTimer.iAllocationsThisFrame = 0;
 		}
@@ -283,11 +280,11 @@ void ProfileManagerBase::LatchRawCpuTimer(int64_t iCpuTimer, bool bAccept)
 		if (bAccept)
 		{
 			++rRawTimer.record.uiSampleSequence;
-			rRawTimer.record.iSampleUs = rRawTimer.iTotalTimeNs / 1'000;
+			rRawTimer.record.iSampleMicroseconds = rRawTimer.iTotalTimeNanoseconds / 1'000;
 			rRawTimer.record.iInvocationCount = rRawTimer.iInvocationCount;
 			rRawTimer.record.iAuxiliaryCount = iAuxiliaryCount;
 		}
-		rRawTimer.iTotalTimeNs = 0;
+		rRawTimer.iTotalTimeNanoseconds = 0;
 		rRawTimer.iInvocationCount = 0;
 		if (!bAccept)
 		{
@@ -314,11 +311,11 @@ void ProfileManagerBase::LatchRawCpuTimers(bool bAccept, int64_t iSampleTick)
 			if (bAccept)
 			{
 				++rRawTimer.record.uiSampleSequence;
-				rRawTimer.record.iSampleUs = rRawTimer.iTotalTimeNs / 1'000;
+				rRawTimer.record.iSampleMicroseconds = rRawTimer.iTotalTimeNanoseconds / 1'000;
 				rRawTimer.record.iInvocationCount = rRawTimer.iInvocationCount;
 				rRawTimer.record.iAuxiliaryCount = iAuxiliaryCount;
 			}
-			rRawTimer.iTotalTimeNs = 0;
+			rRawTimer.iTotalTimeNanoseconds = 0;
 			rRawTimer.iInvocationCount = 0;
 		}
 
@@ -336,18 +333,6 @@ void ProfileManagerBase::LatchRawCpuTimers(bool bAccept, int64_t iSampleTick)
 		{
 			OnRawCpuTimersLatched(iSampleTick);
 		}
-	}
-}
-
-RawCpuTimerRecord ProfileManagerBase::GetRawCpuTimer(int64_t iCpuTimer) const
-{
-	if constexpr (kbProfiling)
-	{
-		return mpRawCpuTimers[static_cast<size_t>(iCpuTimer)].record;
-	}
-	else
-	{
-		return {};
 	}
 }
 
@@ -414,7 +399,7 @@ bool ProfileManagerBase::PublishRawCpuTimerEvent(int64_t iCpuTimer, int64_t iSam
 		++rEvent.uiEventSequence;
 		rEvent.uiSampleSequence = rRawTimer.record.uiSampleSequence;
 		rEvent.iSampleTick = iSampleTick;
-		rEvent.iSampleUs = rRawTimer.record.iSampleUs;
+		rEvent.iSampleMicroseconds = rRawTimer.record.iSampleMicroseconds;
 		rEvent.iInvocationCount = rRawTimer.record.iInvocationCount;
 		rEvent.iAuxiliaryCount = rRawTimer.record.iAuxiliaryCount;
 		rEvent.flags.Set(RawCpuTimerEventFlags::kAvailable);
@@ -426,18 +411,6 @@ bool ProfileManagerBase::PublishRawCpuTimerEvent(int64_t iCpuTimer, int64_t iSam
 	else
 	{
 		return false;
-	}
-}
-
-RawCpuTimerEventRecord ProfileManagerBase::GetRawCpuTimerEvent(int64_t iCpuTimer) const
-{
-	if constexpr (kbProfiling)
-	{
-		return mpRawCpuTimers[static_cast<size_t>(iCpuTimer)].eventRecord;
-	}
-	else
-	{
-		return {};
 	}
 }
 
@@ -460,11 +433,6 @@ bool ProfileManagerBase::AcknowledgeRawCpuTimerEvent(int64_t iCpuTimer, uint64_t
 	}
 }
 #endif // BT_SERVER
-
-void ProfileManagerBase::SetCount(int64_t iCounter, int64_t iCount)
-{
-	if constexpr (kbProfiling) { GetCpuCounter(iCounter).iCount = iCount; }
-}
 
 #if defined(BT_CLIENT)
 void ProfileManagerBase::ResetQueryPools(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, GpuTimers eStart, GpuTimers eEnd)
@@ -552,7 +520,6 @@ void ProfileManagerBase::GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTi
 			}
 			CHECK_VK(vkResultGetQueryPoolResults);
 
-			// Convert timestamp units to microseconds using device-specific timestampPeriod
 			int64_t iCurrentMicroseconds = static_cast<int64_t>(static_cast<float>(puiResults[1] - puiResults[0]) * gpInstanceManager->mVkPhysicalDeviceProperties.limits.timestampPeriod / 1'000.0f);
 			mGpuTimers[eGpuTimer].smoothedMicroseconds = iCurrentMicroseconds;
 
@@ -579,7 +546,7 @@ void ProfileManagerBase::BootStop(BootTimers eBootTimer)
 	if constexpr (kbProfiling)
 	{
 		BootTimer& rBootTimer = mBootTimers[eBootTimer];
-		rBootTimer.timeNs += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - rBootTimer.startTimePoint);
+		rBootTimer.timeNanoseconds += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - rBootTimer.startTimePoint);
 	}
 }
 
@@ -591,7 +558,7 @@ void ProfileManagerBase::BootLog()
 
 		for (int64_t i = 0; i < kBootTimerCount; ++i)
 		{
-			std::chrono::milliseconds durationMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(mBootTimers[i].timeNs);
+			std::chrono::milliseconds durationMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(mBootTimers[i].timeNanoseconds);
 			if (durationMilliseconds.count() > 10)
 			{
 				LOG(kDefault, kDebug, "{}: {} ms", kBootTimerNames[i], durationMilliseconds.count());
@@ -610,7 +577,7 @@ void ProfileManagerBase::LogTimers()
 		{
 			std::lock_guard lock(mCpuTimerMutex);
 
-			int64_t iCpuTimerCount = GetCpuTimerCount();
+			int64_t iCpuTimerCount = miCpuTimerCount;
 			for (int64_t i = 0; i < iCpuTimerCount; ++i)
 			{
 				CpuTimer& rCpuTimer = GetCpuTimer(i);
@@ -621,7 +588,7 @@ void ProfileManagerBase::LogTimers()
 		LOG(kDefault, kDebug, "");
 
 #if defined(BT_CLIENT)
-		int64_t iCommandBufferCount = gpSwapchainManager->mFramebuffers.size();
+		int64_t iCommandBufferCount = std::ssize(gpSwapchainManager->mFramebuffers);
 		for (int64_t i = 0; i < iCommandBufferCount; ++i)
 		{
 			GpuRead(i, kGpuTimerGlobal, kGpuTimerCount, false);
@@ -655,45 +622,45 @@ void ProfileManagerBase::DumpTimers()
 		}
 		mLastDumpTime = now;
 
-		int64_t iMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - mDumpStartTime).count();
+		int64_t iMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now - mDumpStartTime).count();
 
-		mpDumpLog->Write("{},meta,0,Fps,{},,,", iMs, gpGraphics->mRendersInTheLastSecond.Get());
-		mpDumpLog->Write("{},meta,1,FullUpdates,{},,,", iMs, mFullUpdatesInTheLastSecond.Get());
-		mpDumpLog->Write("{},meta,2,InterpolateUpdates,{},,,", iMs, mInterpolateUpdatesInTheLastSecond.Get());
+		mpDumpLog->Write("{},meta,0,Fps,{},,,", iMilliseconds, gpGraphics->mRendersInTheLastSecond.Get());
+		mpDumpLog->Write("{},meta,1,FullUpdates,{},,,", iMilliseconds, mFullUpdatesInTheLastSecond.Get());
+		mpDumpLog->Write("{},meta,2,InterpolateUpdates,{},,,", iMilliseconds, mInterpolateUpdatesInTheLastSecond.Get());
 
 		for (int64_t i = 0; i < kGpuTimerCount; ++i)
 		{
 			common::Smoothed<int64_t>& rMicroseconds = mGpuTimers[i].smoothedMicroseconds;
-			mpDumpLog->Write("{},gpu,{},{},{},{},{},", iMs, i, kGpuTimerNames[i], rMicroseconds.Current(), rMicroseconds.Average(), rMicroseconds.Maximum());
+			mpDumpLog->Write("{},gpu,{},{},{},{},{},", iMilliseconds, i, kGpuTimerNames[i], rMicroseconds.Current(), rMicroseconds.Average(), rMicroseconds.Maximum());
 		}
 
 		// Snapshot under the lock, write after: DiagnosticLog flushes per line, and dozens of flushed lines under mCpuTimerMutex would block dispatch/submit/network CpuStart/CpuStop once per second, distorting the timers being measured.
 		struct CpuTimerSample
 		{
-			int64_t iCurrentUs;
-			int64_t iAverageUs;
-			int64_t iMaxUs;
-			int64_t iAllocations;
+			int64_t iCurrentMicroseconds = 0;
+			int64_t iAverageMicroseconds = 0;
+			int64_t iMaximumMicroseconds = 0;
+			int64_t iAllocations = 0;
 		};
-		int64_t iCpuTimerCount = GetCpuTimerCount();
-		auto pSamples = common::gpThreadLocal->mWorkbuffer.PushBuffer<CpuTimerSample*>(iCpuTimerCount * static_cast<int64_t>(sizeof(CpuTimerSample)));
+		int64_t iCpuTimerCount = miCpuTimerCount;
+		auto samples = common::gpThreadLocal->mWorkbuffer.PushBuffer<CpuTimerSample*>(iCpuTimerCount * static_cast<int64_t>(sizeof(CpuTimerSample)));
 		{
 			std::lock_guard lock(mCpuTimerMutex);
 			for (int64_t i = 0; i < iCpuTimerCount; ++i)
 			{
 				CpuTimer& rCpuTimer = GetCpuTimer(i);
-				pSamples.mpData[i] = CpuTimerSample {rCpuTimer.smoothedMicroseconds.Current(), rCpuTimer.smoothedMicroseconds.Average(), rCpuTimer.smoothedMicroseconds.Maximum(), rCpuTimer.smoothedAllocations.Current()};
+				samples.mpData[i] = CpuTimerSample {.iCurrentMicroseconds = rCpuTimer.smoothedMicroseconds.Current(), .iAverageMicroseconds = rCpuTimer.smoothedMicroseconds.Average(), .iMaximumMicroseconds = rCpuTimer.smoothedMicroseconds.Maximum(), .iAllocations = rCpuTimer.smoothedAllocations.Current()};
 			}
 		}
 		for (int64_t i = 0; i < iCpuTimerCount; ++i)
 		{
-			mpDumpLog->Write("{},cpu,{},{},{},{},{},{}", iMs, i, GetCpuTimerName(i), pSamples.mpData[i].iCurrentUs, pSamples.mpData[i].iAverageUs, pSamples.mpData[i].iMaxUs, pSamples.mpData[i].iAllocations);
+			mpDumpLog->Write("{},cpu,{},{},{},{},{},{}", iMilliseconds, i, GetCpuTimerName(i), samples.mpData[i].iCurrentMicroseconds, samples.mpData[i].iAverageMicroseconds, samples.mpData[i].iMaximumMicroseconds, samples.mpData[i].iAllocations);
 		}
 
-		int64_t iCpuCounterCount = GetCpuCounterCount();
+		int64_t iCpuCounterCount = miCpuCounterCount;
 		for (int64_t i = 0; i < iCpuCounterCount; ++i)
 		{
-			mpDumpLog->Write("{},counter,{},{},{},,,", iMs, i, GetCpuCounterName(i), GetCpuCounter(i).iCount);
+			mpDumpLog->Write("{},counter,{},{},{},,,", iMilliseconds, i, GetCpuCounterName(i), GetCpuCounter(i).iCount);
 		}
 	}
 }
@@ -704,14 +671,14 @@ void ProfileManagerBase::SmoothCpuTimers()
 	if constexpr (kbProfiling)
 	{
 		std::lock_guard lock(mCpuTimerMutex);
-		int64_t iCpuTimerCount = GetCpuTimerCount();
+		int64_t iCpuTimerCount = miCpuTimerCount;
 		for (int64_t i = 0; i < iCpuTimerCount; ++i)
 		{
 			CpuTimer& rCpuTimer = GetCpuTimer(i);
 			if (!(rCpuTimer.flags & ProfileRowFlags::kSmoothAtStop))
 			{
-				rCpuTimer.smoothedMicroseconds = rCpuTimer.iTotalFrameTimeNs / 1'000;
-				rCpuTimer.iTotalFrameTimeNs = 0;
+				rCpuTimer.smoothedMicroseconds = rCpuTimer.iTotalFrameTimeNanoseconds / 1'000;
+				rCpuTimer.iTotalFrameTimeNanoseconds = 0;
 				rCpuTimer.smoothedAllocations = rCpuTimer.iAllocationsThisFrame;
 				rCpuTimer.iAllocationsThisFrame = 0;
 			}
@@ -755,8 +722,8 @@ void ProfileManagerBase::UpdateProfileText()
 
 		if (meProfileScreen == ProfileScreen::kCpu || meProfileScreen == ProfileScreen::kGpu)
 		{
-			int64_t iTotalCpuTimeUs = GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.mSmoothedValue;
-			FormatFpsHeader(rWorkbuffer, iTotalCpuTimeUs);
+			std::chrono::microseconds elapsedCpuTime(GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.mSmoothedValue);
+			FormatFramesPerSecondHeader(rWorkbuffer, elapsedCpuTime);
 		}
 
 		if (meProfileScreen == ProfileScreen::kCpu)
@@ -797,36 +764,38 @@ std::string_view ProfileManagerBase::GetCpuTimerName(int64_t iIndex)
 	return iIndex < kEngineCpuTimerCount ? kEngineCpuTimerNames[iIndex] : mpGameCpuTimerNames[iIndex - kEngineCpuTimerCount];
 }
 
-int64_t ProfileManagerBase::GetCpuCounterCount() const
-{
-	return miCpuCounterCount;
-}
-
-int64_t ProfileManagerBase::GetCpuTimerCount() const
-{
-	return miCpuTimerCount;
-}
-
 ScopedBootTimer::ScopedBootTimer(BootTimers eBootTimer)
-: meBootTimer(eBootTimer)
 {
-	if constexpr (kbProfiling) { gpProfileManager->BootStart(meBootTimer); }
+	meBootTimer = eBootTimer;
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->BootStart(meBootTimer);
+	}
 }
 
 ScopedBootTimer::~ScopedBootTimer()
 {
-	if constexpr (kbProfiling) { gpProfileManager->BootStop(meBootTimer); }
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->BootStop(meBootTimer);
+	}
 }
 
 ScopedCpuProfile::ScopedCpuProfile(int64_t iCpuTimer, int64_t iThreads)
-: miCpuTimer(iCpuTimer)
 {
-	if constexpr (kbProfiling) { gpProfileManager->CpuStart(miCpuTimer, iThreads); }
+	miCpuTimer = iCpuTimer;
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->CpuStart(miCpuTimer, iThreads);
+	}
 }
 
 ScopedCpuProfile::~ScopedCpuProfile()
 {
-	if constexpr (kbProfiling) { gpProfileManager->CpuStop(miCpuTimer); }
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->CpuStop(miCpuTimer);
+	}
 }
 
 } // namespace engine

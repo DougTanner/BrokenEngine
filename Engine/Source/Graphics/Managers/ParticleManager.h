@@ -9,14 +9,12 @@ class ParticleManager
 {
 public:
 
-	static void Spawn(shaders::ParticlesSpawnLayout& rParticlesSpawnLayout, shaders::ParticleLayout layout, common::crc_t textureCrc);
+	static void Spawn(shaders::ParticlesSpawnLayout& rParticlesSpawnLayout, shaders::ParticleLayout layout, common::crc_t uiTextureCrc);
 
 	ParticleManager();
 	~ParticleManager();
 
 	void RenderGlobal(int64_t iCommandBuffer);
-
-	int32_t GetOrAssignTextureIndex(common::crc_t textureCrc);
 
 	std::mutex mSpawnMutex;
 

@@ -2,6 +2,8 @@
 
 #include "TextureManager.h"
 
+#include "File/PackChunks.h"
+#include "Graphics/Objects/PipelineDescriptorWriter.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/PbrWrappersBase.h"
@@ -13,7 +15,7 @@ namespace engine
 {
 
 // Extra texture-descriptor slots reserved for pre-blurred lighting texture copies (one per registered lighting texture CRC)
-static constexpr int64_t kiLightingBlurSlots = 16;
+constexpr int64_t kiLightingBlurSlots = 16;
 
 std::tuple<int64_t, int64_t> TextureManager::DetailTextureSize(float fMultiplier)
 {
@@ -68,21 +70,21 @@ float TextureManager::DetailTextureAspectRatio()
 	return static_cast<float>(iWorldDetailX) / static_cast<float>(iWorldDetailY);
 }
 
-void TextureManager::CreatePlaceholderTexture(Texture& rTexture, std::string_view name, VkImageCreateFlags vkImageCreateFlags, VkFormat vkFormat, uint32_t uiArrayLayers, VkImageViewType vkImageViewType, const std::function<void(void*, int64_t, int64_t)>& rPixelWriter)
+void TextureManager::CreatePlaceholderTexture(Texture& rTexture, std::string_view name, VkImageCreateFlags vkImageCreateFlags, VkFormat vkFormat, uint32_t uiArrayLayers, VkImageViewType vkImageViewType, const std::function<void(std::span<std::byte>, int64_t)>& rPixelWriter)
 {
 	rTexture.Create(
 	{
 		.textureFlags = {},
 		.name = name,
-		.flags = vkImageCreateFlags,
-		.format = vkFormat,
-		.extent = VkExtent3D {1, 1, 1},
-		.mipLevels = 1,
-		.arrayLayers = uiArrayLayers,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-		.viewType = vkImageViewType,
-		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+		.vkImageCreateFlags = vkImageCreateFlags,
+		.vkFormat = vkFormat,
+		.vkExtent3D = VkExtent3D {.width = 1, .height = 1, .depth = 1},
+		.uiMipLevels = 1,
+		.uiArrayLayers = uiArrayLayers,
+		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+		.vkImageViewType = vkImageViewType,
+		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	}, rPixelWriter);
 }
@@ -103,14 +105,14 @@ TextureManager::TextureManager()
 	gpProfileManager->BootStart(kBootTimerTextureUpload);
 
 	// Create 1x1 white placeholder textures for deferred texture loading
-	CreatePlaceholderTexture(mWhiteTexture, "WhitePlaceholder", 0, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	CreatePlaceholderTexture(mWhiteTexture, "WhitePlaceholder", 0, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](std::span<std::byte> data, [[maybe_unused]] int64_t iPosition)
 	{
-		*static_cast<uint32_t*>(pData) = 0xFFFFFFFF;
+		*reinterpret_cast<uint32_t*>(data.data()) = 0xFFFFFFFF;
 	});
 
-	CreatePlaceholderTexture(mWhiteCubeTexture, "WhiteCubePlaceholder", VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, VK_FORMAT_R8G8B8A8_UNORM, 6, VK_IMAGE_VIEW_TYPE_CUBE, [](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	CreatePlaceholderTexture(mWhiteCubeTexture, "WhiteCubePlaceholder", VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, VK_FORMAT_R8G8B8A8_UNORM, 6, VK_IMAGE_VIEW_TYPE_CUBE, [](std::span<std::byte> data, [[maybe_unused]] int64_t iPosition)
 	{
-		uint32_t* pPixels = static_cast<uint32_t*>(pData);
+		uint32_t* pPixels = reinterpret_cast<uint32_t*>(data.data());
 		for (int64_t i = 0; i < 6; ++i)
 		{
 			pPixels[i] = 0xFFFFFFFF;
@@ -120,41 +122,40 @@ TextureManager::TextureManager()
 	// Slot-0 island placeholders. Format-matched to the bindless arrays; values chosen so
 	// sampling slot 0 has no visible effect (ocean-bottom elevation submerged below the water,
 	// mid-gray color, up-vector normals, full-bright AO).
-	CreatePlaceholderTexture(mIslandPlaceholderElevation, "IslandPlaceholderElevation", 0, shaders::keElevationFormat, 1, VK_IMAGE_VIEW_TYPE_2D, [](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	CreatePlaceholderTexture(mIslandPlaceholderElevation, "IslandPlaceholderElevation", 0, shaders::kVkFormatElevation, 1, VK_IMAGE_VIEW_TYPE_2D, [](std::span<std::byte> data, [[maybe_unused]] int64_t iPosition)
 	{
 		// Ocean-bottom, matching the elevation RTT clear (RenderTargetTextures.cpp) and the
 		// open-ocean CPU floor (IslandTerrain::mfSeaFloorElevation). Island slots that are not yet
 		// GPU-resident (startup, mid-load before RestorationSweep, evicted-slot grace window) alias
 		// this placeholder; ocean-bottom keeps their footprint submerged under the water instead of
 		// rendering a sea-level plane that pokes through the surface.
-		*static_cast<uint16_t*>(pData) = DirectX::PackedVector::XMConvertFloatToHalf(gpIslandTerrain->mfSeaFloorElevation);
+		*reinterpret_cast<uint16_t*>(data.data()) = DirectX::PackedVector::XMConvertFloatToHalf(gpIslandTerrain->mfSeaFloorElevation);
 	});
 
-	CreatePlaceholderTexture(mIslandPlaceholderColor, "IslandPlaceholderColor", 0, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	CreatePlaceholderTexture(mIslandPlaceholderColor, "IslandPlaceholderColor", 0, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](std::span<std::byte> data, [[maybe_unused]] int64_t iPosition)
 	{
-		*static_cast<uint32_t*>(pData) = 0xFF808080u;
+		*reinterpret_cast<uint32_t*>(data.data()) = 0xFF808080u;
 	});
 
-	CreatePlaceholderTexture(mIslandPlaceholderNormals, "IslandPlaceholderNormals", 0, VK_FORMAT_R8G8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	CreatePlaceholderTexture(mIslandPlaceholderNormals, "IslandPlaceholderNormals", 0, VK_FORMAT_R8G8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](std::span<std::byte> data, [[maybe_unused]] int64_t iPosition)
 	{
-		*static_cast<uint16_t*>(pData) = 0x8080u;
+		*reinterpret_cast<uint16_t*>(data.data()) = 0x8080u;
 	});
 
-	CreatePlaceholderTexture(mIslandPlaceholderAmbientOcclusion, "IslandPlaceholderAmbientOcclusion", 0, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	CreatePlaceholderTexture(mIslandPlaceholderAmbientOcclusion, "IslandPlaceholderAmbientOcclusion", 0, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](std::span<std::byte> data, [[maybe_unused]] int64_t iPosition)
 	{
-		*static_cast<uint8_t*>(pData) = 0xFFu;
+		*reinterpret_cast<uint8_t*>(data.data()) = 0xFFu;
 	});
 
-	// All-zero RGBA: no rock/sand/snow/flow until the real BC7 mask chunk adopts. Bindless arrays
-	// don't require uniform format across slots, so R8G8B8A8 here while real masks are BC7 is OK
-	// (same precedent as mIslandPlaceholderColor above vs BC7 islands).
-	CreatePlaceholderTexture(mIslandPlaceholderMasks, "IslandPlaceholderMasks", 0, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	// All-zero RGBA disables rock, sand, snow, and flow until the real BC7 mask chunk adopts.
+	// Bindless slots permit different formats: this placeholder uses R8G8B8A8, while island masks use BC7.
+	CreatePlaceholderTexture(mIslandPlaceholderMasks, "IslandPlaceholderMasks", 0, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_VIEW_TYPE_2D, [](std::span<std::byte> data, [[maybe_unused]] int64_t iPosition)
 	{
-		*static_cast<uint32_t*>(pData) = 0x00000000u;
+		*reinterpret_cast<uint32_t*>(data.data()) = 0x00000000u;
 	});
 
 	// Create deferred textures from ChunkHeader metadata for all texture chunks (real GPU resources allocated when data arrives)
-	for (auto& [rCrc, rLazyChunk] : gpFileManager->GetLazyChunkMap())
+	for (const auto& [rCrc, rLazyChunk] : gpFileManager->mpPackChunks->mLazyChunkMap)
 	{
 		if (!(rLazyChunk.header.flags & common::ChunkFlags::kTexture))
 		{
@@ -170,23 +171,23 @@ TextureManager::TextureManager()
 		{
 			.textureFlags = {},
 			.name = rLazyChunk.header.pcPath,
-			.crc = rCrc,
-			.flags = bCubemap ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : static_cast<VkImageCreateFlags>(0),
-			.format = rLazyChunk.header.textureHeader.vkFormat,
-			.extent = VkExtent3D {static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureWidth), static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureHeight), 1},
-			.mipLevels = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iMipLevels),
-			.arrayLayers = bCubemap ? 6u : 1u,
-			.samples = VK_SAMPLE_COUNT_1_BIT,
-			.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-			.viewType = bCubemap ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D,
-			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.uiCrc = rCrc,
+			.vkImageCreateFlags = bCubemap ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : static_cast<VkImageCreateFlags>(0),
+			.vkFormat = rLazyChunk.header.textureHeader.vkFormat,
+			.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureWidth), .height = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureHeight), .depth = 1},
+			.uiMipLevels = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iMipLevels),
+			.uiArrayLayers = bCubemap ? 6u : 1u,
+			.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+			.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			.vkImageViewType = bCubemap ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D,
+			.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 			.eTextureLayout = TextureLayout::kShaderReadOnly,
 		}, bCubemap ? mWhiteCubeTexture.mVkImageView : mWhiteTexture.mVkImageView);
 
 		// Water normal maps: copy the DataPacker-baked per-mip Toksvig variance table (already
 		// padded past the real mip chain with the last value) for the WATER_SPEC_AA_MIP_HANDOFF
 		// uniform upload. Header-resident so no lazy chunk data is needed at startup.
-		static_assert(shaders::kiWaterSpecAAMipTableSize == common::TextureHeader::kiMipVarianceCount, "The shader-side mip-variance table length must match the pack format's");
+		static_assert(shaders::kiWaterSpecularAntialiasingMipTableSize == common::TextureHeader::kiMipVarianceCount, "The shader-side mip-variance table length must match the pack format's");
 		for (int64_t i = 0; i < kiWaterNormalCount; ++i)
 		{
 			if (kpWaterNormalCrcs[i] == rCrc)
@@ -199,7 +200,7 @@ TextureManager::TextureManager()
 
 	// Pre-fill texture arrays with white placeholders for lazy index assignment
 	// Extra slots reserved for pre-blurred lighting texture copies
-	mTextureDescriptors.mImageInfos.resize(mTextureMap.size() + kiLightingBlurSlots, {nullptr, mWhiteTexture.mVkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
+	mTextureDescriptors.mImageInfos.resize(mTextureMap.size() + kiLightingBlurSlots, {.sampler = nullptr, .imageView = mWhiteTexture.mVkImageView, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
 
 	mTextureDescriptors.Create();
 
@@ -237,23 +238,22 @@ void TextureManager::InitializeBootTextures()
 	// Load pre-baked cubemaps from pack data
 	common::crc_t pIblCrcs[] = {kIrradianceCrc, kPrefilteredCrc, kPrefilteredWaterCrc};
 	WaitForTextures(pIblCrcs);
-	mTextureCache.miPbrCubeMipCount = mTextureMap.at(kPrefilteredCrc).mInfo.mipLevels;
+	mTextureCache.miPhysicallyBasedRenderingCubeMipmapCount = mTextureMap.at(kPrefilteredCrc).mInfo.uiMipLevels;
 
 	gpProfileManager->BootStop(kModelTexturesGeneration);
 
-	// Request priority textures
-	gpFileManager->RequestChunkLoad(kpPriorityTextures.pCrcs, LoadPriority::kRealtime);
+	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(kPriorityTextures.pCrcs, LoadPriority::kRealtime);
 
 	// Replay every registered lighting-texture request: registration runs once at startup, after the first Graphics
 	// construction, so without this a full recreate would strand these textures on the white placeholder forever (the
 	// set is still empty on that first boot, making this a no-op). One batched call rather than a per-CRC
-	// RequestTextureChunkLoad loop: that helper requests at kNormal, and the batch locks and wakes the loader once.
+	// per-texture request loop: registration requests at kNormal, and the batch locks and wakes the loader once.
 	common::ScopedWorkbufferArena scopedWorkbufferArena = common::gpThreadLocal->mWorkbuffer.Push();
 	for (common::crc_t crc : gpTextureUploadManager->mLightingTextureCrcs)
 	{
 		common::gpThreadLocal->mWorkbuffer.PushBack<common::crc_t>(crc);
 	}
-	gpFileManager->RequestChunkLoad(common::gpThreadLocal->mWorkbuffer.Span<common::crc_t>(), LoadPriority::kRealtime);
+	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(common::gpThreadLocal->mWorkbuffer.Span<common::crc_t>(), LoadPriority::kRealtime);
 }
 
 TextureManager::~TextureManager()
@@ -317,7 +317,7 @@ void TextureManager::CreateAcquireCommandBuffers()
 
 void TextureManager::DestroySamplers()
 {
-	for (VkSampler& rVkSampler : mpSamplers)
+	for (VkSampler& rVkSampler : mpSamplersVkSampler)
 	{
 		vkDestroySampler(gpDeviceManager->mVkDevice, rVkSampler, nullptr);
 		rVkSampler = VK_NULL_HANDLE;
@@ -326,21 +326,21 @@ void TextureManager::DestroySamplers()
 
 void TextureManager::CreateSamplers()
 {
-	if (gMaxAnisotropy.Get() > gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerAnisotropy)
+	if (gMaximumAnisotropy.mfCurrent > gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerAnisotropy)
 	{
-		gMaxAnisotropy.Reset(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerAnisotropy);
+		gMaximumAnisotropy.Reset(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerAnisotropy);
 	}
 
-	if (-gMipLodBias.Get() > gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias)
+	if (-gMipmapLevelOfDetailBias.mfCurrent > gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias)
 	{
-		gMipLodBias.Reset(-gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
+		gMipmapLevelOfDetailBias.Reset(-gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
 	}
-	else if (gMipLodBias.Get() < -gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias)
+	else if (gMipmapLevelOfDetailBias.mfCurrent < -gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias)
 	{
-		gMipLodBias.Reset(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
+		gMipmapLevelOfDetailBias.Reset(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
 	}
 
-	VkSamplerCreateInfo smokeVkSamplerCreateInfo
+	VkSamplerCreateInfo vkSmokeSamplerCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 		.pNext = nullptr,
@@ -361,18 +361,18 @@ void TextureManager::CreateSamplers()
 		.borderColor = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK,
 		.unnormalizedCoordinates = VK_FALSE,
 	};
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &smokeVkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotSmoke]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotSmoke], "Smoke");
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSmokeSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotSmoke]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotSmoke], "Smoke");
 
 	// Wind sampler: linear filtering for smooth advection + clamp-to-edge preserves energy at boundaries
-	smokeVkSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-	smokeVkSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-	smokeVkSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-	smokeVkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	smokeVkSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	smokeVkSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &smokeVkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotWindClamp]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotWindClamp], "WindClamp");
+	vkSmokeSamplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+	vkSmokeSamplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+	vkSmokeSamplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+	vkSmokeSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	vkSmokeSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	vkSmokeSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSmokeSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotWindClamp]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotWindClamp], "WindClamp");
 
 	VkSamplerCreateInfo vkSamplerCreateInfo
 	{
@@ -385,7 +385,7 @@ void TextureManager::CreateSamplers()
 		.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-		.mipLodBias = -gMipLodBias.Get(),
+		.mipLodBias = -gMipmapLevelOfDetailBias.mfCurrent,
 		.anisotropyEnable = VK_FALSE,
 		.maxAnisotropy = 1.0f,
 		.compareEnable = VK_FALSE,
@@ -395,121 +395,125 @@ void TextureManager::CreateSamplers()
 		.borderColor = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK,
 		.unnormalizedCoordinates = VK_FALSE,
 	};
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotLinearClamp]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotLinearClamp], "LinearClamp");
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotLinearClamp]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotLinearClamp], "LinearClamp");
 
-	vkSamplerCreateInfo.mipLodBias = -gMipLodBias.Get();
+	vkSamplerCreateInfo.mipLodBias = -gMipmapLevelOfDetailBias.mfCurrent;
 	vkSamplerCreateInfo.anisotropyEnable = gAnisotropy.Get<bool>() ? VK_TRUE : VK_FALSE;
-	vkSamplerCreateInfo.maxAnisotropy = gMaxAnisotropy.Get();
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotClamp]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotClamp], "Clamp");
+	vkSamplerCreateInfo.maxAnisotropy = gMaximumAnisotropy.mfCurrent;
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotClamp]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotClamp], "Clamp");
 
 	// Dedicated sampler for the per-island R16_SFLOAT heightmap (IslandTerrain bindless elevation array).
-	// Mirrors mpSamplers[kSamplerSlotClamp]; R16_SFLOAT linear filtering is spec-mandated (16-bit-float family),
+	// Mirrors mpSamplersVkSampler[kSamplerSlotClamp]; R16_SFLOAT linear filtering is spec-mandated (16-bit-float family),
 	// so this stays LINEAR unconditionally.
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotElevation]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotElevation], "Elevation");
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotElevation]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotElevation], "Elevation");
 
 	vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 	vkSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 	vkSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotBorder]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotBorder], "Border");
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotBorder]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotBorder], "Border");
 	// White border (opaque 1.0): the shadow texture is inverse (1.0 = fully lit / no shadow), so any sample beyond the
 	// texture extent reads "no shadow" instead of smearing the edge.
 	vkSamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotBorderWhite]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotBorderWhite], "BorderWhite");
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotBorderWhite]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotBorderWhite], "BorderWhite");
 	vkSamplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
 	vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	vkSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	vkSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotRepeat]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotRepeat], "Repeat");
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotRepeat]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotRepeat], "Repeat");
 
 	// Model normal and metallic-roughness textures carry data rather than color. Apply their dedicated
 	// bias directly so negative sharpens, positive blurs, and zero is unbiased.
-	vkSamplerCreateInfo.mipLodBias = std::clamp(gPbrModelDataMipLodBias.Get(), -gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias, gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotRepeatModelData]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotRepeatModelData], "RepeatModelData");
+	vkSamplerCreateInfo.mipLodBias = std::clamp(gPhysicallyBasedRenderingModelDataMipmapLevelOfDetailBias.mfCurrent, -gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias, gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotRepeatModelData]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotRepeatModelData], "RepeatModelData");
 
-	vkSamplerCreateInfo.mipLodBias = -gMipLodBias.Get();
+	vkSamplerCreateInfo.mipLodBias = -gMipmapLevelOfDetailBias.mfCurrent;
 	vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
 	vkSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
 	vkSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotMirroredRepeat]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotMirroredRepeat], "MirroredRepeat");
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotMirroredRepeat]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotMirroredRepeat], "MirroredRepeat");
 
-	// Water-normal variant: its own slider-driven bias instead of the global -gMipLodBias sharpen —
+	// Water-normal variant: its own slider-driven bias instead of the global -gMipmapLevelOfDetailBias sharpen —
 	// a sharpen bias tuned for albedo pushes minified normal fetches toward noisier mips (specular
 	// shimmer), and Water.frag's WATER_SPEC_AA_MIP_HANDOFF analytic LOD must track the hardware LOD
-	// (the slider value is also uploaded as fWaterNormalMipBias). Applied directly, not negated:
+	// (the slider value is also uploaded as fWaterNormalMipmapBias). Applied directly, not negated:
 	// negative = sharpen, positive = blur.
-	vkSamplerCreateInfo.mipLodBias = std::clamp(gWaterNormalMipBias.Get(), -gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias, gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotMirroredRepeatWater]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotMirroredRepeatWater], "MirroredRepeatWater");
+	vkSamplerCreateInfo.mipLodBias = std::clamp(gWaterNormalMipmapBias.mfCurrent, -gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias, gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxSamplerLodBias);
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotMirroredRepeatWater]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotMirroredRepeatWater], "MirroredRepeatWater");
 
-	vkSamplerCreateInfo.mipLodBias = -gMipLodBias.Get();
+	vkSamplerCreateInfo.mipLodBias = -gMipmapLevelOfDetailBias.mfCurrent;
 	vkSamplerCreateInfo.anisotropyEnable = VK_FALSE;
 	vkSamplerCreateInfo.maxAnisotropy = 1.0f;
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotMirroredRepeatLinear]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotMirroredRepeatLinear], "MirroredRepeatLinear");
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotMirroredRepeatLinear]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotMirroredRepeatLinear], "MirroredRepeatLinear");
 
 	vkSamplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	vkSamplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	vkSamplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplers[kSamplerSlotRepeatLinear]));
-	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplers[kSamplerSlotRepeatLinear], "RepeatLinear");
+	CHECK_VK(vkCreateSampler(gpDeviceManager->mVkDevice, &vkSamplerCreateInfo, nullptr, &mpSamplersVkSampler[kSamplerSlotRepeatLinear]));
+	VkName(VK_OBJECT_TYPE_SAMPLER, mpSamplersVkSampler[kSamplerSlotRepeatLinear], "RepeatLinear");
 }
 
 VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
 {
-	// Map sampler flags to slots; flags are mutually exclusive, so order matters only when a caller violates the asserted contract.
-	static constexpr struct FlagToSlotEntry { DescriptorFlags flag; SamplerSlot slot; } kFlagToSlot[]
+	// Sampler flags are mutually exclusive.
+	struct FlagToSlotEntry
 	{
-		{DescriptorFlags::kSamplerElevation, kSamplerSlotElevation},
-		{DescriptorFlags::kSamplerClamp, kSamplerSlotClamp},
-		{DescriptorFlags::kSamplerBorder, kSamplerSlotBorder},
-		{DescriptorFlags::kSamplerBorderWhite, kSamplerSlotBorderWhite},
-		{DescriptorFlags::kSamplerRepeat, kSamplerSlotRepeat},
-		{DescriptorFlags::kSamplerMirroredRepeat, kSamplerSlotMirroredRepeat},
-		{DescriptorFlags::kSamplerMirroredRepeatWater, kSamplerSlotMirroredRepeatWater},
-		{DescriptorFlags::kSamplerClampLinear, kSamplerSlotLinearClamp},
-		{DescriptorFlags::kSamplerRepeatLinear, kSamplerSlotRepeatLinear},
-		{DescriptorFlags::kSamplerMirroredRepeatLinear, kSamplerSlotMirroredRepeatLinear},
-		{DescriptorFlags::kSamplerSmoke, kSamplerSlotSmoke},
-		{DescriptorFlags::kSamplerWindClamp, kSamplerSlotWindClamp},
+		DescriptorFlags eFlag;
+		SamplerSlot eSlot;
+	};
+	static constexpr FlagToSlotEntry kFlagToSlot[]
+	{
+		{.eFlag = DescriptorFlags::kSamplerElevation, .eSlot = kSamplerSlotElevation},
+		{.eFlag = DescriptorFlags::kSamplerClamp, .eSlot = kSamplerSlotClamp},
+		{.eFlag = DescriptorFlags::kSamplerBorder, .eSlot = kSamplerSlotBorder},
+		{.eFlag = DescriptorFlags::kSamplerBorderWhite, .eSlot = kSamplerSlotBorderWhite},
+		{.eFlag = DescriptorFlags::kSamplerRepeat, .eSlot = kSamplerSlotRepeat},
+		{.eFlag = DescriptorFlags::kSamplerMirroredRepeat, .eSlot = kSamplerSlotMirroredRepeat},
+		{.eFlag = DescriptorFlags::kSamplerMirroredRepeatWater, .eSlot = kSamplerSlotMirroredRepeatWater},
+		{.eFlag = DescriptorFlags::kSamplerClampLinear, .eSlot = kSamplerSlotLinearClamp},
+		{.eFlag = DescriptorFlags::kSamplerRepeatLinear, .eSlot = kSamplerSlotRepeatLinear},
+		{.eFlag = DescriptorFlags::kSamplerMirroredRepeatLinear, .eSlot = kSamplerSlotMirroredRepeatLinear},
+		{.eFlag = DescriptorFlags::kSamplerSmoke, .eSlot = kSamplerSlotSmoke},
+		{.eFlag = DescriptorFlags::kSamplerWindClamp, .eSlot = kSamplerSlotWindClamp},
 	};
 
-	// Sampler flags are mutually exclusive — if a caller accidentally sets two, the first table match silently picks one and masks the bug.
 	int64_t iSamplerFlagCount = 0;
 	for (const FlagToSlotEntry& rEntry : kFlagToSlot)
 	{
-		iSamplerFlagCount += (flags & rEntry.flag ? 1 : 0);
+		iSamplerFlagCount += (flags & rEntry.eFlag ? 1 : 0);
 	}
 	ASSERT(iSamplerFlagCount <= 1);
 
 	for (const FlagToSlotEntry& rEntry : kFlagToSlot)
 	{
-		if (flags & rEntry.flag)
+		if (flags & rEntry.eFlag)
 		{
-			return mpSamplers[rEntry.slot];
+			return mpSamplersVkSampler[rEntry.eSlot];
 		}
 	}
 
 	// Unflagged descriptors sample internal render targets. They need linear clamp filtering, but player-facing
 	// anisotropy applies only to the explicitly flagged image-render samplers.
-	return mpSamplers[kSamplerSlotLinearClamp];
+	return mpSamplersVkSampler[kSamplerSlotLinearClamp];
 }
 
 void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 {
 	mFlags.Set(TextureManagerFlags::kPendingAcquireBarriers, false);
 
-	// Idle-frame fast path: skip the full mTextureMap scan when nothing is in an adoptable state. The
-	// TextureUploadManager pending-adoption counter is armed when a chunk reaches kDiskLoaded/kGpuUploadComplete
-	// and disarmed below at adoption, so a zero count means no chunk can be adopted this frame.
-	if (!gpTextureUploadManager->HasPendingAdoptions())
+	// kGpuUploadComplete awaits transfer-queue adoption; kDiskLoaded uses the same-queue or re-armed Create fallback.
+	// Both states write per-slot, texture-array, and lighting-blur descriptors, requiring RenderGlobal's all-framebuffer-fence drain first.
+	// The pending-adoption counter excludes kUploading and provides an O(1) idle check.
+	if (gpTextureUploadManager->miPendingAdoptions.load(std::memory_order_relaxed) == 0)
 	{
 		return;
 	}
@@ -525,8 +529,8 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 
 	for (auto& [rCrc, rTexture] : mTextureMap)
 	{
-		LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(rCrc);
-		ChunkState eState = rLazyChunk.eState.load(std::memory_order_acquire);
+		LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(rCrc);
+		ChunkState eState = rLazyChunk.eState.value.load(std::memory_order_acquire);
 
 		if (eState >= ChunkState::kReady)
 		{
@@ -548,22 +552,22 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 			// Fallback: upload thread didn't GPU upload (same queue family)
 
 			TextureUploadManager::ValidateTextureDimensions(rLazyChunk);
-			int64_t iExpectedBytes = common::ComputeImageByteSize(rTexture.mInfo.format, rTexture.mInfo.extent.width, rTexture.mInfo.extent.height, rTexture.mInfo.mipLevels, rTexture.mInfo.arrayLayers, rTexture.mInfo.extent.depth);
+			int64_t iExpectedBytes = common::ComputeImageByteSize(rTexture.mInfo.vkFormat, rTexture.mInfo.vkExtent3D.width, rTexture.mInfo.vkExtent3D.height, rTexture.mInfo.uiMipLevels, rTexture.mInfo.uiArrayLayers, rTexture.mInfo.vkExtent3D.depth);
 			ASSERT(iExpectedBytes > 0 && iExpectedBytes <= rLazyChunk.iDataSize);
 
-			rTexture.Create(rTexture.mInfo, [&](void* pData, int64_t iPosition, int64_t iSize)
+			rTexture.Create(rTexture.mInfo, [&](std::span<std::byte> data, int64_t iPosition)
 			{
-				std::memcpy(pData, &rLazyChunk.pData[iPosition], iSize);
+				std::memcpy(data.data(), &rLazyChunk.pData[iPosition], static_cast<int64_t>(data.size_bytes()));
 			});
 
 			// The copy above is synchronous and no upload thread owns this chunk on the early-out path, so the
 			// pool pages are reclaimable here exactly as on the kGpuUploadComplete path in AdoptUploadedChunk.
-			gpFileManager->DecommitChunkRange(rCrc, 0, rLazyChunk.iDataSize);
+			gpFileManager->mpPackChunks->DecommitChunkRange(rCrc, 0, rLazyChunk.iDataSize);
 			mTextureDescriptors.UpdateDescriptorsForTexture(rCrc);
 			bAdoptedTextures = true;
 
-			rLazyChunk.eState.store(ChunkState::kReady, std::memory_order_release);
-			gpTextureUploadManager->NotifyChunkAdopted(); // adoptable -> kReady: disarm the pending-adoption counter
+			rLazyChunk.eState.value.store(ChunkState::kReady, std::memory_order_release);
+			gpTextureUploadManager->miPendingAdoptions.fetch_sub(1, std::memory_order_relaxed); // adoptable -> kReady: disarm the pending-adoption counter
 
 			if (gpTextureUploadManager->mLightingTextureCrcs.contains(rCrc))
 			{
@@ -575,17 +579,14 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 		}
 	}
 
-	// Flush deferred texture array descriptor writes
 	if (bAdoptedTextures)
 	{
 		mTextureDescriptors.UpdateTextureArrayDescriptors();
 	}
 
-	// Finalize acquire barrier command buffer for CommandBufferManager to prepend. mFlags (kPendingAcquireBarriers) and
-	// miAcquireFramebufferIndex (set earlier in this function) are plain non-atomic members written here on the main
-	// thread (ProcessPendingTextures runs from Graphics::RenderGlobal) and read on the mSubmitGlobal worker in
-	// CommandBufferManager::SubmitGlobalToQueue — the publish is ordered only by that worker's Wake/Wait edge. Same
-	// "plain member published across a PersistentWorker Wake/Wait edge" family as CommandBuffers.h (mFlags/mVkFence).
+	// CommandBufferManager prepends this acquire buffer. ProcessPendingTextures writes the non-atomic kPendingAcquireBarriers
+	// flag and miAcquireFramebufferIndex on Graphics::RenderGlobal's main thread; SubmitGlobalToQueue reads them on
+	// mSubmitGlobal. Publication depends on that worker's Wake/Wait edge.
 	if (bRecordedBarriers)
 	{
 		CHECK_VK(vkEndCommandBuffer(vkAcquireCommandBuffer));
@@ -593,19 +594,19 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 	}
 }
 
-void TextureManager::AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bool bNeedAcquireBarrier, VkCommandBuffer vkAcquireCommandBuffer, bool& brRecordedBarriers)
+void TextureManager::AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bool bNeedAcquireBarrier, VkCommandBuffer vkAcquireCommandBuffer, bool& rbRecordedBarriers)
 {
-	LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(crc);
+	LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(crc);
 
 	// Adopt the GPU-uploaded image (sets mVkImage and creates VkImageView)
-	rTexture.AdoptTransferredImage(rLazyChunk.uploadVkImage, rLazyChunk.vmaAllocation);
+	rTexture.AdoptTransferredImage(rLazyChunk.vkUploadImage, rLazyChunk.vmaAllocation);
 
 	bool bIsLightingTexture = gpTextureUploadManager->mLightingTextureCrcs.contains(crc);
 
 	// Lighting textures handle their own acquire barrier inside BlurLightingTexture's OneShotCommandBuffer
 	if (bNeedAcquireBarrier && !bIsLightingTexture)
 	{
-		EnsureAcquireCommandBufferBegun(vkAcquireCommandBuffer, brRecordedBarriers);
+		EnsureAcquireCommandBufferBegun(vkAcquireCommandBuffer, rbRecordedBarriers);
 		rTexture.RecordAcquireBarrier(vkAcquireCommandBuffer);
 	}
 
@@ -614,11 +615,11 @@ void TextureManager::AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bo
 	// here (on the main thread) cannot race that thread. pData and iDataSize keep their construction
 	// values and describe the reserved pool range, not resident bytes — a whole reload recommits that
 	// range before writing it, and eState stays the residency authority.
-	gpFileManager->DecommitChunkRange(crc, 0, rLazyChunk.iDataSize);
+	gpFileManager->mpPackChunks->DecommitChunkRange(crc, 0, rLazyChunk.iDataSize);
 	mTextureDescriptors.UpdateDescriptorsForTexture(crc);
 
-	rLazyChunk.eState.store(ChunkState::kReady, std::memory_order_release);
-	gpTextureUploadManager->NotifyChunkAdopted(); // adoptable -> kReady: disarm the pending-adoption counter
+	rLazyChunk.eState.value.store(ChunkState::kReady, std::memory_order_release);
+	gpTextureUploadManager->miPendingAdoptions.fetch_sub(1, std::memory_order_relaxed); // adoptable -> kReady: disarm the pending-adoption counter
 
 	if (bIsLightingTexture)
 	{
@@ -626,9 +627,9 @@ void TextureManager::AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bo
 	}
 }
 
-void TextureManager::EnsureAcquireCommandBufferBegun(VkCommandBuffer vkAcquireCommandBuffer, bool& brRecordedBarriers)
+void TextureManager::EnsureAcquireCommandBufferBegun(VkCommandBuffer vkAcquireCommandBuffer, bool& rbRecordedBarriers)
 {
-	if (brRecordedBarriers)
+	if (rbRecordedBarriers)
 	{
 		return;
 	}
@@ -641,34 +642,23 @@ void TextureManager::EnsureAcquireCommandBufferBegun(VkCommandBuffer vkAcquireCo
 		.pInheritanceInfo = nullptr,
 	};
 	CHECK_VK(vkBeginCommandBuffer(vkAcquireCommandBuffer, &vkCommandBufferBeginInfo));
-	brRecordedBarriers = true;
-}
-
-bool TextureManager::AnyAdoptionPending() const
-{
-	// True when any chunk sits in an adoptable state (kGpuUploadComplete: transfer-queue uploaded, awaiting adopt;
-	// or kDiskLoaded: same-queue-family / re-armed fallback, adopted via Create). On such a frame
-	// ProcessPendingTextures writes descriptor elements (UpdateDescriptorsForTexture per-slot, the
-	// UpdateTextureArrayDescriptors flush, and the lighting-blur array write), so RenderGlobal's all-framebuffer-fence
-	// drain must fire first. The TextureUploadManager pending-adoption counter tracks exactly those two states
-	// (kUploading, between them, is excluded), providing an O(1) read.
-	return gpTextureUploadManager->HasPendingAdoptions();
+	rbRecordedBarriers = true;
 }
 
 void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 {
-	gpFileManager->RequestChunkLoad(crcs, LoadPriority::kRealtime);
+	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(crcs, LoadPriority::kRealtime);
 
 	for (common::crc_t crc : crcs)
 	{
-		LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(crc);
-		if (rLazyChunk.eState.load(std::memory_order_acquire) >= ChunkState::kReady)
+		LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(crc);
+		if (rLazyChunk.eState.value.load(std::memory_order_acquire) >= ChunkState::kReady)
 		{
 			continue;
 		}
 
 		// Upload in progress — spin until upload thread finishes and ProcessPendingTextures adopts
-		while (rLazyChunk.eState.load(std::memory_order_acquire) < ChunkState::kReady)
+		while (rLazyChunk.eState.value.load(std::memory_order_acquire) < ChunkState::kReady)
 		{
 			gpTextureUploadManager->RethrowException();
 
@@ -706,7 +696,7 @@ void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 					.pSignalSemaphores = nullptr,
 				};
 				CHECK_VK(vkQueueSubmit(gpDeviceManager->mGraphicsVkQueue, 1, &vkSubmitInfo, vkFence));
-				CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &vkFence, VK_TRUE, UINT64_MAX));
+				CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &vkFence, VK_TRUE, std::numeric_limits<uint64_t>::max()));
 
 				vkDestroyFence(gpDeviceManager->mVkDevice, vkFence, nullptr);
 				mFlags.Set(TextureManagerFlags::kPendingAcquireBarriers, false);
@@ -720,7 +710,7 @@ void TextureManager::WaitForTextures(std::span<Texture* const> textures)
 	common::ScopedWorkbufferArena scopedWorkbufferArena = common::gpThreadLocal->mWorkbuffer.Push();
 	for (Texture* pTexture : textures)
 	{
-		common::gpThreadLocal->mWorkbuffer.PushBack<common::crc_t>(pTexture->mInfo.crc);
+		common::gpThreadLocal->mWorkbuffer.PushBack<common::crc_t>(pTexture->mInfo.uiCrc);
 	}
 
 	WaitForTextures(common::gpThreadLocal->mWorkbuffer.Span<common::crc_t>());
@@ -731,8 +721,7 @@ void RegisterLightingTextureCrc(common::crc_t crc)
 	// Heap: unordered_set insert during startup registration
 	ScopedSuppressAllocationTracking suppress;
 	gpTextureUploadManager->mLightingTextureCrcs.insert(crc);
-	// A 17th lighting texture would overflow the reserved blur slots (TextureDescriptors.cpp's generic index ASSERT fires
-	// later and elsewhere); fail at the cause, naming the constant
+	// Each registered lighting texture consumes one of the kiLightingBlurSlots reserved descriptor slots.
 	ASSERT(static_cast<int64_t>(gpTextureUploadManager->mLightingTextureCrcs.size()) <= kiLightingBlurSlots);
 }
 
@@ -742,62 +731,59 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBar
 	ScopedSuppressAllocationTracking suppress;
 
 	Texture& rSource = mTextureMap.at(crc);
-	uint32_t uiWidth = rSource.mInfo.extent.width * 2;
-	uint32_t uiHeight = rSource.mInfo.extent.height * 2;
+	uint32_t uiWidth = rSource.mInfo.vkExtent3D.width * 2;
+	uint32_t uiHeight = rSource.mInfo.vkExtent3D.height * 2;
 
-	// Create or recreate intermediate texture (Texture::Create self-destroys any prior image)
+	// Texture::Create destroys the existing image before recreation.
 	auto itIntermediate = mBlurIntermediateTextures.try_emplace(crc).first;
 	itIntermediate->second.Create(
 	{
 		.textureFlags = {},
 		.name = "LightingBlurIntermediate",
-		.flags = 0,
-		.format = shaders::keCombineFormat,
-		.extent = VkExtent3D {uiWidth, uiHeight, 1},
-		.mipLevels = 1,
-		.arrayLayers = 1,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+		.vkImageCreateFlags = 0,
+		.vkFormat = shaders::kVkFormatCombine,
+		.vkExtent3D = VkExtent3D {.width = uiWidth, .height = uiHeight, .depth = 1},
+		.uiMipLevels = 1,
+		.uiArrayLayers = 1,
+		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 		.eTextureLayout = TextureLayout::kComputeReadWrite,
 	});
 
-	// Create or recreate result texture (Texture::Create self-destroys any prior image)
 	auto itResult = mBlurredLightingTextures.try_emplace(crc).first;
 	itResult->second.Create(
 	{
 		.textureFlags = {},
 		.name = "LightingBlurResult",
-		.flags = 0,
-		.format = shaders::keCombineFormat,
-		.extent = VkExtent3D {uiWidth, uiHeight, 1},
-		.mipLevels = 1,
-		.arrayLayers = 1,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+		.vkImageCreateFlags = 0,
+		.vkFormat = shaders::kVkFormatCombine,
+		.vkExtent3D = VkExtent3D {.width = uiWidth, .height = uiHeight, .depth = 1},
+		.uiMipLevels = 1,
+		.uiArrayLayers = 1,
+		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 
 	Texture& rIntermediate = itIntermediate->second;
 	Texture& rResult = itResult->second;
 
-	// Update pipeline descriptors for this blur pass
-	Pipeline& rBlurH = gpPipelineManager->mpPipelines[kPipelineLightingBlurH];
-	Pipeline& rBlurV = gpPipelineManager->mpPipelines[kPipelineLightingBlurV];
+	Pipeline& rHorizontalBlur = gpPipelineManager->mpPipelines[kPipelineLightingBlurH];
+	Pipeline& rVerticalBlur = gpPipelineManager->mpPipelines[kPipelineLightingBlurV];
 
-	rBlurH.UpdateCombinedImageSamplerDescriptor(0, rSource.mVkImageView, mpSamplers[kSamplerSlotLinearClamp]);
-	rBlurH.UpdateStorageImageDescriptor(1, rIntermediate.mVkImageView);
-	rBlurV.UpdateCombinedImageSamplerDescriptor(0, rIntermediate.mVkImageView, mpSamplers[kSamplerSlotLinearClamp]);
-	rBlurV.UpdateStorageImageDescriptor(1, rResult.mVkImageView);
+	PipelineDescriptorWriter::UpdateImageDescriptor(rHorizontalBlur, 0, mpSamplersVkSampler[kSamplerSlotLinearClamp], rSource.mVkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	PipelineDescriptorWriter::UpdateImageDescriptor(rHorizontalBlur, 1, VK_NULL_HANDLE, rIntermediate.mVkImageView, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+	PipelineDescriptorWriter::UpdateImageDescriptor(rVerticalBlur, 0, mpSamplersVkSampler[kSamplerSlotLinearClamp], rIntermediate.mVkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	PipelineDescriptorWriter::UpdateImageDescriptor(rVerticalBlur, 1, VK_NULL_HANDLE, rResult.mVkImageView, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
-	// Execute blur via one-shot command buffer
 	int32_t iWidth = static_cast<int32_t>(uiWidth);
 	int32_t iHeight = static_cast<int32_t>(uiHeight);
-	float fSigma = gLightingBlurSigma.Get();
-	float fPackedW = static_cast<float>(static_cast<int32_t>(gLightingBlurSampleCount.Get())) + gLightingBlurEdgeFalloff.Get() / 100.0f;
+	float fSigma = gLightingBlurSigma.mfCurrent;
+	float fPackedW = static_cast<float>(static_cast<int32_t>(gLightingBlurSampleCount.mfCurrent)) + gLightingBlurEdgeFalloff.mfCurrent / 100.0f;
 
 	OneShotCommandBuffer oneShotCommandBuffer;
 	VkCommandBuffer vkCommandBuffer = oneShotCommandBuffer.mVkCommandBuffer;
@@ -810,14 +796,14 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBar
 
 	// Horizontal pass: source → intermediate
 	rIntermediate.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
-	rBlurH.RecordCompute(0, vkCommandBuffer, TileCount(uiWidth), TileCount(uiHeight), 1, {std::bit_cast<float>(iWidth), std::bit_cast<float>(iHeight), fSigma, fPackedW});
+	rHorizontalBlur.RecordCompute(0, vkCommandBuffer, TileCount(uiWidth), TileCount(uiHeight), 1, {std::bit_cast<float>(iWidth), std::bit_cast<float>(iHeight), fSigma, fPackedW});
 
 	// Transition intermediate: storage write → shader read for V pass sampler
 	rIntermediate.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 
 	// Vertical pass: intermediate → result
 	rResult.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
-	rBlurV.RecordCompute(0, vkCommandBuffer, TileCount(uiWidth), TileCount(uiHeight), 1, {std::bit_cast<float>(iWidth), std::bit_cast<float>(iHeight), fSigma, fPackedW});
+	rVerticalBlur.RecordCompute(0, vkCommandBuffer, TileCount(uiWidth), TileCount(uiHeight), 1, {std::bit_cast<float>(iWidth), std::bit_cast<float>(iHeight), fSigma, fPackedW});
 
 	// Transition result back to shader read for bindless sampling
 	rResult.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
@@ -839,7 +825,7 @@ void TextureManager::ReblurAllLightingTextures()
 	{
 		// A registered CRC can be a cross-pack reference with no chunk in this pack set; IsChunkReady reports it
 		//   not ready, so it stays unblurred like the request path leaves it
-		if (gpFileManager->IsChunkReady(crc))
+		if (gpFileManager->mpPackChunks->IsChunkReady(crc))
 		{
 			BlurLightingTexture(crc);
 		}

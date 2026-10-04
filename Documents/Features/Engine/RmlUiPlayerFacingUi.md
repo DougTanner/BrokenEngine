@@ -10,8 +10,8 @@ The player-facing UI (main menu, pause/graphics/sound menus, modal, HUD) is Dear
 - **`Rml::RenderInterface` implementation** (new engine class, e.g. `engine::RmlRenderInterface`, client-only): compiled-geometry buffers via VMA, texture load through `TextureManager`/DataPacker chunks, scissor + transform support. Render inside the existing ImGui render pass owner (`ImGuiManager`, or a sibling manager sharing its `VkRenderPass` that draws over the finished frame before the ImGui submit) so the Global → Main → UI → present submission chain is unchanged.
 - **`Rml::SystemInterface`**: engine clock, clipboard via Win32, logging to `LOG`.
 - **Resolution independence**: feed RmlUi's context dp-ratio (its density-independent-pixel scale) from `engine::UiScale()` (framebuffer height / 2160 reference, `ImGuiManager.h`), re-set on framebuffer resize, so RmlUi screens share the exact resolution-independence convention as the surviving ImGui UI (TweaksScreen/ImPlot) rather than authoring a second scaling scheme.
-- **Opaque occlusion**: opaque RmlUi panels register through the existing `ImGuiManager::RegisterOpaqueRect` depth pre-pass so the 3D scene is occluded exactly as ImGui panels are today.
-- **Input routing**: forward Win32 messages from the `Main.cpp` WndProc to the RmlUi context alongside `ImGui_ImplWin32_WndProcHandler`, with a capture arbitration rule (RmlUi documents get first refusal when a player-facing screen is active).
+- **Opaque occlusion**: opaque RmlUi panels register through the existing `ImGuiManager::RegisterOpaqueRectangle` depth pre-pass so the 3D scene is occluded exactly as ImGui panels are today.
+- **Input routing**: forward Win32 messages from the `Main.cpp` WindowProcedure to the RmlUi context alongside `ImGui_ImplWin32_WndProcHandler`, with a capture arbitration rule (RmlUi documents get first refusal when a player-facing screen is active).
 - **Documents + data binding**: one `.rml`/`.rcss` document per screen (`MainMenuScreen`, `PauseMenuScreen`, `GraphicsMenuScreen`, `SoundMenuScreen`, `GameSettingsScreen`, `ModalScreen`, `HudScreen`), packed as Raw assets via DataPacker. Settings controls bind to the existing `engine::Wrapper` globals through RmlUi data models (replacing `MenuUtils` `WrapperSlider`/`WrapperToggle`/`WrapperPlusMinus` for these screens); server-confirmation gating keeps using `engine::NetworkUiControl`.
 - **Localization**: feed the UTF-32 table in the game `Localization.h` through RmlUi's string interface; CJK via the Chinese font source already packed (`data::kRawNotoSansSCLightotfCrc`).
 - **Allocation tracking**: RmlUi allocates during document load and layout; wrap load/reload in `ScopedSuppressAllocationTracking` and audit steady-state per-frame allocations (install `Rml::Allocator` hooks if needed).
@@ -20,9 +20,9 @@ The player-facing UI (main menu, pause/graphics/sound menus, modal, HUD) is Dear
 ## Critical files
 
 - `ThirdParty/RmlUi/` (new vendored library), `ThirdParty/Prebuilts/` unity units and the three ThirdParty configs
-- `Engine/Source/Graphics/Managers/ImGuiManager.{h,cpp}` — render-pass sharing, `RegisterOpaqueRect`, submission ordering
+- `Engine/Source/Graphics/Managers/ImGuiManager.{h,cpp}` — render-pass sharing, `RegisterOpaqueRectangle`, submission ordering
 - New `engine::RmlRenderInterface` / `RmlSystemInterface` (location: `Engine/Source/Graphics/Managers/` or `Engine/Source/Ui/`)
-- `Engine/Source/Main.cpp` — WndProc input routing
+- `Engine/Source/Main.cpp` — WindowProcedure input routing
 - `Engine/Source/Ui/Screens/*.{h,cpp}` (the six standard menus) and `Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.{h,cpp}` — per-screen replacement (~125 ImGui call sites), `MenuUtils.{h,cpp}` chrome/binding helpers retired for these screens
 - `Projects/BrokenEngineSandbox/Source/Ui/Localization.h` — string bridge
 - New `.rml`/`.rcss` assets under `Engine/Data/Raw/` or a game data directory (DataPacker Raw pipeline)

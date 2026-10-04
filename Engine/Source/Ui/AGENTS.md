@@ -5,7 +5,7 @@ Shared runtime settings, standard localization, player-facing menu helpers, the 
 ## Wrapper Contracts
 
 - `Wrapper` stores float, bool, or discrete values with one-consumer change tracking. `Changed<T>()` advances the previous-value state, so exactly one consumer may poll a wrapper each frame.
-- Mutate through `Set` or `Reset`; assignment is disabled. `Set` leaves the prior value intact so the next poll observes a change. `Reset` updates both values and is for initialization or capability clamping that must not trigger rebuilds.
+- Mutate through `Set` or `Reset`, or restore defaults with `mfCurrent = mfDefault`; wrapper assignment is disabled. `Set` leaves the prior value intact so the next poll observes a change. `Reset` updates both values and is for initialization or capability clamping that must not trigger rebuilds.
 - A discrete wrapper stores a persisted value outside its allowed set as-is, and `GetIndex()` reports index 0 for it; consumers clamp it. Capability clamps write only allowed values. Float wrappers may snap to a configured grid.
 - One-argument construction is Boolean-only. Non-Boolean numeric and enum constructors are deleted so a scalar cannot silently convert to the Boolean overload; floats use the ranged constructor and discrete values supply an allowed-value set.
 - Wrapper bounds annotated with shader invariants are correctness constraints, not UI tuning.
@@ -13,7 +13,7 @@ Shared runtime settings, standard localization, player-facing menu helpers, the 
 
 ## Localization
 
-- `LocalizationBase.h` owns the localization vocabulary: `Language` (a scoped `int32_t` enum whose values 0..5 are persisted in the game settings file), `kLanguageCount`, the `LanguageOption` labels in enum order, the selected-language state `geLanguage`, and `StandardString` with the standard menu strings. Game UI re-exports these through its facade (`../../../Projects/BrokenEngineSandbox/Source/Ui/AGENTS.md`).
+- `LocalizationBase.h` owns the localization vocabulary: `Language` (a scoped `int32_t` enum whose values 0..5 are persisted in the game settings file), `kiLanguageCount`, the `LanguageOption` labels in enum order, the selected-language state `geLanguage`, and `StandardString` with the standard menu strings. Game UI re-exports these through its facade (`../../../Projects/BrokenEngineSandbox/Source/Ui/AGENTS.md`).
 - The UTF-32 standard table lives in `LocalizationBase.cpp` with internal linkage. Its outer extent stays deduced so the trailing all-empty sentinel row plus the `static_assert` catches a dropped or added row; an empty language cell falls back to English.
 - `InitializeLocalization` sets the locale and uppercases the table in place. It is startup work, called from the `Game` constructor on both builds, and never runs in the main loop.
 
@@ -37,7 +37,7 @@ Shared runtime settings, standard localization, player-facing menu helpers, the 
 
 ## Shared Types
 
-- `engine::UiState`, the unguarded `engine::GameBase` members `meUiState`, `mModalMessage`, and `mbShowImGui`, and the unguarded `GameBase::InMainMenu()` query form the shared engine/game UI-state contract. The engine owns their public vocabulary and storage for both client and server; the game HUD retains its own state transitions, gating, and rendering semantics.
+- `engine::UiState`, the unguarded `engine::GameBase` members `meUiState`, `mModalMessage`, and `mbShowImGui`, and the unguarded `GameBase::mGameFlags` main-menu flag form the shared engine/game UI-state contract. The engine owns their public vocabulary and storage for both client and server; the game HUD retains its own state transitions, gating, and rendering semantics.
 - The client-only `StandardMenuFeature`, `StandardMenuState`, `StandardMenuModel`, and `StandardMenuAction` types plus the `GetStandardMenuModel` and `ApplyStandardMenuAction` virtuals extend that contract for the engine-owned menus. They are the only surface through which a standard screen reaches game-owned networking and frame transitions; their usage rules live in Screens (`Screens/AGENTS.md`). No server declaration depends on them.
 - Height-dependent wrapper groups resolve camera-height-conditioned render values; Render (`../Graphics/Render/AGENTS.md`) owns how those resolved values reach the per-frame GPU buffers.
 - Client-only curves use bounded monotone cubic interpolation and an ImPlot editor. Endpoints remain X-locked and interior control points ordered.

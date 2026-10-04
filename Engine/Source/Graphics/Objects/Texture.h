@@ -44,35 +44,35 @@ struct TextureInfo
 {
 	TextureFlags_t textureFlags;
 	std::string_view name;
-	common::crc_t crc = 0;
+	common::crc_t uiCrc = 0;
 
 	// VkImageCreateInfo
-	VkImageCreateFlags flags = 0;
-	VkFormat format = VK_FORMAT_UNDEFINED;
-	VkExtent3D extent {};
-	uint32_t mipLevels = 1;
-	uint32_t arrayLayers = 1;
-	VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-	VkImageUsageFlags usage = 0;
+	VkImageCreateFlags vkImageCreateFlags = 0;
+	VkFormat vkFormat = VK_FORMAT_UNDEFINED;
+	VkExtent3D vkExtent3D {};
+	uint32_t uiMipLevels = 1;
+	uint32_t uiArrayLayers = 1;
+	VkSampleCountFlagBits vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT;
+	VkImageUsageFlags vkImageUsageFlags = 0;
 
 	// VkImageViewCreateInfo
-	VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D;
-	VkImageAspectFlags aspectMask = 0;
+	VkImageViewType vkImageViewType = VK_IMAGE_VIEW_TYPE_2D;
+	VkImageAspectFlags vkImageAspectFlags = 0;
 
 	// vkCreateRenderPass
-	VkAttachmentLoadOp renderPassVkAttachmentLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	VkImageLayout renderPassInitialVkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	VkImageLayout renderPassFinalVkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VkAttachmentLoadOp vkRenderPassAttachmentLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	VkImageLayout vkRenderPassInitialImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VkImageLayout vkRenderPassFinalImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	// vkCmdBeginRenderPass
-	VkClearColorValue renderPassVkClearColorValue {};
+	VkClearColorValue vkRenderPassClearColorValue {};
 
 	// TransitionImageLayout
 	TextureLayout eTextureLayout = TextureLayout::kShaderReadOnly;
 
 	// Subpass dependency masks (render targets only)
-	VkPipelineStageFlags renderPassDstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	VkAccessFlags renderPassDstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	VkPipelineStageFlags vkRenderPassDestinationStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	VkAccessFlags vkRenderPassDestinationAccessMask = VK_ACCESS_SHADER_READ_BIT;
 };
 
 class Texture
@@ -80,7 +80,6 @@ class Texture
 public:
 
 	static void RecordBeginRenderPass(VkCommandBuffer vkCommandBuffer, VkRenderPass vkRenderPass, VkFramebuffer vkFramebuffer, VkExtent2D vkExtent2D, VkClearColorValue vkClearColorValue, RenderPassFlags_t renderPassFlags, VkSubpassContents vkSubpassContents = VK_SUBPASS_CONTENTS_INLINE);
-	static void RecordEndRenderPass(VkCommandBuffer vkCommandBuffer);
 
 	Texture() = default;
 	Texture(const Texture&) = delete;
@@ -94,16 +93,15 @@ public:
 		, mVkRenderPass(std::exchange(rOther.mVkRenderPass, VK_NULL_HANDLE))
 		, mVkFramebuffer(std::exchange(rOther.mVkFramebuffer, VK_NULL_HANDLE))
 	{}
-	Texture(const TextureInfo& rInfo, const std::function<void(void*, int64_t, int64_t)>& rDataFunction = nullptr);
+	Texture(const TextureInfo& rInfo, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction = nullptr);
 	~Texture();
 
-	void Create(const TextureInfo& rInfo, const std::function<void(void*, int64_t, int64_t)>& rDataFunction = nullptr);
+	void Create(const TextureInfo& rInfo, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction = nullptr);
 	void InitDeferred(const TextureInfo& rInfo, VkImageView vkPlaceholderImageView);
 	void AdoptTransferredImage(VkImage& rVkImage, VmaAllocation& rVmaAllocation);
 	void RecordAcquireBarrier(VkCommandBuffer vkCommandBuffer);
-	void UpdateData(const std::function<void(void*, int64_t, int64_t)>& rDataFunction);
+	void UpdateData(const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction);
 	void Destroy() noexcept;
-	void FreeGpuResources() noexcept;
 
 	void TransitionImageLayout(VkCommandBuffer vkCommandBuffer, TextureLayout eOldLayout, TextureLayout eNewLayout);
 	void RecordCopyImageFrom(VkCommandBuffer vkCommandBuffer, const Texture& rSource); // Caller transitions source->kTransferSource, this->kTransferDestination first
@@ -113,22 +111,19 @@ public:
 
 private:
 
-	void UploadImageData(const std::function<void(void*, int64_t, int64_t)>& rDataFunction, TextureLayout eOldLayout, TextureLayout eFinalLayout);
+	void UploadImageData(const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction, TextureLayout eOldLayout, TextureLayout eFinalLayout);
 	void CreateRenderTarget();
 
 public:
 
-	// Image
 	VmaAllocation mVmaAllocation = VK_NULL_HANDLE;
 	VkImage mVkImage = VK_NULL_HANDLE;
 	VkImageView mVkImageView = VK_NULL_HANDLE;
 
-	// Bumped on every handle swap (Create, AdoptTransferredImage). Snapshotted at descriptor-write
-	// time; TextureDescriptors::VerifyAllDescriptorGenerations breaks if a cached snapshot diverges,
-	// catching the silent semantic-staleness bug class Vulkan validation misses.
+	// Create and AdoptTransferredImage increment this generation; descriptor writes snapshot it.
+	// TextureDescriptors::VerifyAllDescriptorGenerations detects stale resources Vulkan validation misses.
 	uint64_t muiGeneration = 0;
 
-	// Render target
 	VkRenderPass mVkRenderPass = VK_NULL_HANDLE;
 	VkFramebuffer mVkFramebuffer = VK_NULL_HANDLE;
 };

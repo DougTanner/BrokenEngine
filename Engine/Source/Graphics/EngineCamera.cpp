@@ -30,10 +30,10 @@ static void UpdateTexelEyeHeightReference(float fLiveEyeHeight, float fContracti
 	rfReferenceEyeHeight = std::max(rfReferenceEyeHeight - fMaxContraction, fLiveEyeHeight);
 }
 
-constexpr float Smoothstep(float t)
+static constexpr float Smoothstep(float fParameter)
 {
-	t = std::clamp(t, 0.0f, 1.0f);
-	return t * t * (3.0f - 2.0f * t);
+	fParameter = std::clamp(fParameter, 0.0f, 1.0f);
+	return fParameter * fParameter * (3.0f - 2.0f * fParameter);
 }
 
 CameraTarget::CameraTarget(Kind eKind, XMVECTOR vecPosition, XMVECTOR vecVisualOffset)
@@ -86,19 +86,19 @@ void Camera::DiscardTrackingCaches()
 	mbJumping = false;
 }
 
-void Camera::ShiftToRenderedCell(GridCoord cameraCoord)
+void Camera::ShiftToRenderedCell(GridCoord cameraCoordinate)
 {
-	if (cameraCoord == mBasisCoord)
+	if (cameraCoordinate == mBasisCoordinate)
 	{
 		return;
 	}
 
-	int64_t iStepX = static_cast<int64_t>(cameraCoord.iX) - static_cast<int64_t>(mBasisCoord.iX);
-	int64_t iStepY = static_cast<int64_t>(cameraCoord.iY) - static_cast<int64_t>(mBasisCoord.iY);
+	int64_t iStepX = static_cast<int64_t>(cameraCoordinate.iX) - static_cast<int64_t>(mBasisCoordinate.iX);
+	int64_t iStepY = static_cast<int64_t>(cameraCoordinate.iY) - static_cast<int64_t>(mBasisCoordinate.iY);
 	// Z and W stay zero: the step is planar, and the cached values it moves are homogeneous points.
-	RenderBasis previousBasis = MakeRenderBasis(mBasisCoord, cameraCoord);
+	RenderBasis previousBasis = MakeRenderBasis(mBasisCoordinate, cameraCoordinate);
 	XMVECTOR vecShift = XMVectorSet(previousBasis.f2Offset.x, previousBasis.f2Offset.y, 0.0f, 0.0f);
-	mBasisCoord = cameraCoord;
+	mBasisCoordinate = cameraCoordinate;
 
 	if (iStepX < -1 || iStepX > 1 || iStepY < -1 || iStepY > 1)
 	{
@@ -132,14 +132,12 @@ void Camera::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaT
 	// of rendered cell must move every cached position into the new frame first.
 	ShiftToRenderedCell(rFrameInterpolate.renderBasis.coordinate);
 
-	// Decay camera shake using sim-scaled render time
 	mfShake = std::max(mfShake - fDeltaTime * 2.0f, 0.0f);
 
 	miFrame = rFrameInterpolate.iTick;
 
 	bool bMainMenuFrame = IsMainMenuFrame(rFrameInterpolate);
 
-	// Update sun angle with varying speeds (only during gameplay)
 	if (!bMainMenuFrame)
 	{
 		static constexpr float kfNightSpeedStart = XM_PI;
@@ -159,7 +157,8 @@ void Camera::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaT
 		}
 	}
 
-	// Free camera: WASD in main menu (debug only). Bypasses target/blend; W=0 movement vector preserves position W=1.
+	// Main-menu WASD moves the camera when kbFreeCamera is enabled and uses its position as the target.
+	// Movement has W=0 so it preserves the position's W=1.
 	bool bFreeCameraActive = false;
 	if constexpr (kbFreeCamera)
 	{
@@ -183,8 +182,8 @@ void Camera::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaT
 	// Keep each world-texel reference at or above the live eye height: zero initialization and outward zoom snap
 	// immediately for full viewport coverage, while inward zoom contracts at the existing independent rates so the
 	// density change remains gradual. At a settled height both references converge to the live height.
-	UpdateTexelEyeHeightReference(mfCameraEyeHeight, gShadowTexelRampMetersPerSec.Get(), fDeltaTime, mfShadowTexelEyeHeight);
-	UpdateTexelEyeHeightReference(mfCameraEyeHeight, gLightingTexelRampMetersPerSec.Get(), fDeltaTime, mfLightingTexelEyeHeight);
+	UpdateTexelEyeHeightReference(mfCameraEyeHeight, gShadowTexelRampMetersPerSecond.mfCurrent, fDeltaTime, mfShadowTexelEyeHeight);
+	UpdateTexelEyeHeightReference(mfCameraEyeHeight, gLightingTexelRampMetersPerSecond.mfCurrent, fDeltaTime, mfLightingTexelEyeHeight);
 
 	// Eye sits directly above target along +Z (straight-down view).
 	// W=0 — eye-local offset, not a homogeneous point; added to mVecPosition (W=1) preserves position.
@@ -192,11 +191,9 @@ void Camera::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaT
 	mVecToEyeNormal = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 	mVecEyePosition = XMVectorAdd(mVecPosition, vecEyePositionRelative);
 
-	// Set controller vibration based on camera shake
 	float fVibration = std::pow(mfShake, 0.5f);
 	gpRawInputManager->SetVibration(0, fVibration, fVibration);
 
-	// Calculate matrices and visible area
 	CalculateMatricesAndVisibleArea();
 
 	OnUpdateComplete();
@@ -265,8 +262,8 @@ void Camera::UpdatePosition(FXMVECTOR vecTargetPosition, float fDeltaTime)
 			}
 			else
 			{
-				float fT = Smoothstep(fElapsed / kfJumpDuration);
-				mVecPosition = XMVectorLerp(mVecJumpStartPosition, vecTargetPosition, fT);
+				float fParameter = Smoothstep(fElapsed / kfJumpDuration);
+				mVecPosition = XMVectorLerp(mVecJumpStartPosition, vecTargetPosition, fParameter);
 			}
 		}
 	}
@@ -284,15 +281,15 @@ void Camera::UpdatePosition(FXMVECTOR vecTargetPosition, float fDeltaTime)
 
 void Camera::UpdateEyeHeight()
 {
-	int iScrollDelta = mCameraInput.iScrollDelta;
+	int64_t iScrollDelta = mCameraInput.iScrollDelta;
 	if (iScrollDelta != 0)
 	{
 		// Scale per-tick zoom delta with current eye height, bounded by sqrt so high altitudes don't get 4x ticks and over-build Hermite velocity that carries into low-altitude territory.
 		float fEyeHeightDelta = static_cast<float>(iScrollDelta) * kfEyeHeightPerWheelTick * std::sqrt(mfCameraEyeHeight / kfCameraEyeHeightDefault);
-		float fNewTarget = std::clamp(mfCameraEyeHeightTarget - fEyeHeightDelta, kfMinEyeHeight, kfEyeHeightMax);
+		float fNewTarget = std::clamp(mfCameraEyeHeightTarget - fEyeHeightDelta, kfMinimumEyeHeight, kfEyeHeightMaximum);
 		if (fNewTarget != mfCameraEyeHeightTarget)
 		{
-			// Re-anchor every tick that actually moves the target. Snapshot current position AND velocity so the new Hermite curve picks up continuously, eliminating mid-flight stepping that an endpoint-shifted smoothstep would produce.
+			// Capture current height and velocity whenever the zoom target changes so the Hermite curve remains continuous.
 			mfEyeStartHeight = mfCameraEyeHeight;
 			mfEyeStartVelocity = mfEyeVelocity;
 			mfEyeStartTime = mfTime;
@@ -313,24 +310,24 @@ void Camera::UpdateEyeHeight()
 		else
 		{
 			// Cubic Hermite from (mfEyeStartHeight, mfEyeStartVelocity) to (mfCameraEyeHeightTarget, 0) over kfEyeBlendDuration.
-			float fT = fEyeElapsed / kfEyeBlendDuration;
-			float fT2 = fT * fT;
-			float fT3 = fT2 * fT;
-			float fH00 = 2.0f * fT3 - 3.0f * fT2 + 1.0f;
-			float fH10 = fT3 - 2.0f * fT2 + fT;
-			float fH01 = -2.0f * fT3 + 3.0f * fT2;
-			mfCameraEyeHeight = fH00 * mfEyeStartHeight + fH10 * mfEyeStartVelocity * kfEyeBlendDuration + fH01 * mfCameraEyeHeightTarget;
-			float fDH00 = 6.0f * fT2 - 6.0f * fT;
-			float fDH10 = 3.0f * fT2 - 4.0f * fT + 1.0f;
-			float fDH01 = -6.0f * fT2 + 6.0f * fT;
-			mfEyeVelocity = (fDH00 * mfEyeStartHeight + fDH10 * mfEyeStartVelocity * kfEyeBlendDuration + fDH01 * mfCameraEyeHeightTarget) / kfEyeBlendDuration;
+			float fParameter = fEyeElapsed / kfEyeBlendDuration;
+			float fParameterSquared = fParameter * fParameter;
+			float fParameterCubed = fParameterSquared * fParameter;
+			float fStartHeightBasis = 2.0f * fParameterCubed - 3.0f * fParameterSquared + 1.0f;
+			float fStartVelocityBasis = fParameterCubed - 2.0f * fParameterSquared + fParameter;
+			float fTargetHeightBasis = -2.0f * fParameterCubed + 3.0f * fParameterSquared;
+			mfCameraEyeHeight = fStartHeightBasis * mfEyeStartHeight + fStartVelocityBasis * mfEyeStartVelocity * kfEyeBlendDuration + fTargetHeightBasis * mfCameraEyeHeightTarget;
+			float fStartHeightBasisDerivative = 6.0f * fParameterSquared - 6.0f * fParameter;
+			float fStartVelocityBasisDerivative = 3.0f * fParameterSquared - 4.0f * fParameter + 1.0f;
+			float fTargetHeightBasisDerivative = -6.0f * fParameterSquared + 6.0f * fParameter;
+			mfEyeVelocity = (fStartHeightBasisDerivative * mfEyeStartHeight + fStartVelocityBasisDerivative * mfEyeStartVelocity * kfEyeBlendDuration + fTargetHeightBasisDerivative * mfCameraEyeHeightTarget) / kfEyeBlendDuration;
 		}
 	}
 }
 
 void Camera::ResetForSession()
 {
-	ResetSunAngle();
+	mfSunAngle = kfDefaultSunAngle;
 	DiscardTrackingCaches();
 	// Reinitialize both references directly to the new session's live zoom on the next camera update; do not carry
 	// contraction across sessions.
@@ -344,62 +341,59 @@ void Camera::RestoreEyeHeight(float fEyeHeight)
 	mfCameraEyeHeightTarget = fEyeHeight;
 }
 
-XMVECTOR XM_CALLCONV Camera::ScreenToWorld(FXMVECTOR vecScreenPos, float fHeight)
+XMVECTOR XM_CALLCONV Camera::ScreenToWorld(FXMVECTOR vecScreenPosition, float fHeight)
 {
 	XMVECTOR vecPlane = XMPlaneFromPointNormal(XMVectorSet(0.0f, 0.0f, fHeight, 1.0f), XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f));
 
-	float fViewportWidth = static_cast<float>(gpGraphics->mFramebufferExtent2D.width);
-	float fViewportHeight = static_cast<float>(gpGraphics->mFramebufferExtent2D.height);
-	auto vecWorldPos = XMVectorMultiply(XMVectorSet(fViewportWidth, fViewportHeight, 1.0f, 1.0f), vecScreenPos);
+	float fViewportWidth = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
+	float fViewportHeight = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
+	auto vecWorldPosition = XMVectorMultiply(XMVectorSet(fViewportWidth, fViewportHeight, 1.0f, 1.0f), vecScreenPosition);
 
-	vecWorldPos = XMVectorSetZ(vecWorldPos, 0.0f);
-	auto vecRayStart = XMVector3Unproject(vecWorldPos, 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, XMMatrixIdentity());
-	vecWorldPos = XMVectorSetZ(vecWorldPos, 1.0f);
-	auto vecRayEnd = XMVector3Unproject(vecWorldPos, 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, XMMatrixIdentity());
+	vecWorldPosition = XMVectorSetZ(vecWorldPosition, 0.0f);
+	auto vecRayStart = XMVector3Unproject(vecWorldPosition, 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, XMMatrixIdentity());
+	vecWorldPosition = XMVectorSetZ(vecWorldPosition, 1.0f);
+	auto vecRayEnd = XMVector3Unproject(vecWorldPosition, 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, XMMatrixIdentity());
 
 	// The SDK returns all-lane QNaN when the line is parallel to the plane (a camera looking exactly along Z=fHeight).
-	XMVECTOR vecIntersect = XMPlaneIntersectLine(vecPlane, vecRayStart, vecRayEnd);
-	return XMVector3IsNaN(vecIntersect) ? XMVectorSet(0.0f, 0.0f, fHeight, 1.0f) : vecIntersect;
+	XMVECTOR vecIntersection = XMPlaneIntersectLine(vecPlane, vecRayStart, vecRayEnd);
+	return XMVector3IsNaN(vecIntersection) ? XMVectorSet(0.0f, 0.0f, fHeight, 1.0f) : vecIntersection;
 }
 
-XMVECTOR XM_CALLCONV Camera::WorldToScreen(FXMVECTOR vecWorldPos) const
+XMVECTOR XM_CALLCONV Camera::WorldToScreen(FXMVECTOR vecWorldPosition) const
 {
-	// Exact inverse of ScreenToWorld's unproject: identical viewport / matrix arguments so the Y-sign and
-	// viewport convention are resolved by construction. Returns screen pixels in X/Y, projected depth in Z.
-	float fViewportWidth = static_cast<float>(gpGraphics->mFramebufferExtent2D.width);
-	float fViewportHeight = static_cast<float>(gpGraphics->mFramebufferExtent2D.height);
+	// Projection shares ScreenToWorld's viewport and matrices. X/Y are screen pixels and Z is projected depth.
+	float fViewportWidth = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
+	float fViewportHeight = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	// The scalar XMVector3Project overload builds its viewport offset with W=0, so the returned screen position
 	// carries W=0; force the position W invariant.
-	return XMVectorSetW(XMVector3Project(vecWorldPos, 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, XMMatrixIdentity()), 1.0f);
+	return XMVectorSetW(XMVector3Project(vecWorldPosition, 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, XMMatrixIdentity()), 1.0f);
 }
 
 void Camera::CalculateMatricesAndVisibleArea()
 {
 	auto vecToEyeNormal = XMVector3Normalize(XMVectorSubtract(mVecEyePosition, mVecPosition));
-	auto vecUp = XMVector3Cross(vecToEyeNormal, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
-	mMatView = XMMatrixLookAtRH(mVecEyePosition, mVecPosition, vecUp);
+	auto vecUpNormal = XMVector3Cross(vecToEyeNormal, XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
+	mMatView = XMMatrixLookAtRH(mVecEyePosition, mVecPosition, vecUpNormal);
 
 	static constexpr float kfNearClip = 1.0f;
-	static constexpr float kfMinFarClip = 400.0f;
+	static constexpr float kfMinimumFarClip = 400.0f;
 	static constexpr float kfFarClipPerEyeDistance = 2.667f;
 	float fEyeDistance = XMVectorGetX(XMVector3Length(XMVectorSubtract(mVecEyePosition, mVecPosition)));
-	float fFarClip = std::max(kfMinFarClip, fEyeDistance * kfFarClipPerEyeDistance);
-	float fViewportWidth = static_cast<float>(gpGraphics->mFramebufferExtent2D.width);
-	float fViewportHeight = static_cast<float>(gpGraphics->mFramebufferExtent2D.height);
+	float fFarClip = std::max(kfMinimumFarClip, fEyeDistance * kfFarClipPerEyeDistance);
+	float fViewportWidth = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
+	float fViewportHeight = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	float fAspectRatio = gpSwapchainManager->mfAspectRatio;
-	mMatPerspective = XMMatrixPerspectiveFovRH(XMConvertToRadians(gFov.Get() / fAspectRatio), fAspectRatio, kfNearClip, fFarClip);
+	mMatPerspective = XMMatrixPerspectiveFovRH(XMConvertToRadians(gFieldOfView.mfCurrent / fAspectRatio), fAspectRatio, kfNearClip, fFarClip);
 
-	// Create plane at Z=0 for projecting screen corners to world space
 	XMVECTOR vecPlane = XMPlaneFromPointNormal(XMVectorZero(), XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f));
 
 	XMMATRIX matIdentity = XMMatrixIdentity();
 
 	XMVECTOR vecRayStart {};
 	XMVECTOR vecRayEnd {};
-	XMVECTOR vecIntersectPlane {};
+	XMVECTOR vecPlaneIntersection {};
 
-	// Calculate visible area corners by unprojecting screen corners to world space at Z=0
-	XMFLOAT3 f3ScreenPos { 0.0f, 0.0f, 0.0f };
+	XMFLOAT3 f3ScreenPosition { 0.0f, 0.0f, 0.0f };
 
 	struct VisibleCorner
 	{
@@ -409,88 +403,83 @@ void Camera::CalculateMatricesAndVisibleArea()
 	};
 	const VisibleCorner corners[] =
 	{
-		{ 0.0f, 0.0f, &f4VisibleTopLeft },
-		{ fViewportWidth, 0.0f, &f4VisibleTopRight },
-		{ 0.0f, fViewportHeight, &f4VisibleBottomLeft },
-		{ fViewportWidth, fViewportHeight, &f4VisibleBottomRight },
+		{ .fScreenX = 0.0f, .fScreenY = 0.0f, .pTarget = &mf4VisibleTopLeft },
+		{ .fScreenX = fViewportWidth, .fScreenY = 0.0f, .pTarget = &mf4VisibleTopRight },
+		{ .fScreenX = 0.0f, .fScreenY = fViewportHeight, .pTarget = &mf4VisibleBottomLeft },
+		{ .fScreenX = fViewportWidth, .fScreenY = fViewportHeight, .pTarget = &mf4VisibleBottomRight },
 	};
 
 	for (const VisibleCorner& rCorner : corners)
 	{
-		f3ScreenPos.x = rCorner.fScreenX;
-		f3ScreenPos.y = rCorner.fScreenY;
+		f3ScreenPosition.x = rCorner.fScreenX;
+		f3ScreenPosition.y = rCorner.fScreenY;
 
-		f3ScreenPos.z = 0.0f;
-		vecRayStart = XMVector3Unproject(XMLoadFloat3(&f3ScreenPos), 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, matIdentity);
-		f3ScreenPos.z = 1.0f;
-		vecRayEnd = XMVector3Unproject(XMLoadFloat3(&f3ScreenPos), 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, matIdentity);
+		f3ScreenPosition.z = 0.0f;
+		vecRayStart = XMVector3Unproject(XMLoadFloat3(&f3ScreenPosition), 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, matIdentity);
+		f3ScreenPosition.z = 1.0f;
+		vecRayEnd = XMVector3Unproject(XMLoadFloat3(&f3ScreenPosition), 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, matIdentity);
 
-		vecIntersectPlane = XMPlaneIntersectLine(vecPlane, vecRayStart, vecRayEnd);
+		vecPlaneIntersection = XMPlaneIntersectLine(vecPlane, vecRayStart, vecRayEnd);
 		// The SDK returns all-lane QNaN when the corner ray is parallel to the Z=0 plane; a NaN corner would
 		// poison the visible area and every grid-snapped extent derived from it.
-		if (XMVector3IsNaN(vecIntersectPlane)) [[unlikely]]
+		if (XMVector3IsNaN(vecPlaneIntersection)) [[unlikely]]
 		{
-			vecIntersectPlane = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+			vecPlaneIntersection = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 		}
 
-		XMStoreFloat4(rCorner.pTarget, vecIntersectPlane);
+		XMStoreFloat4(rCorner.pTarget, vecPlaneIntersection);
 	}
 
-	f4LargeVisibleArea = XMFLOAT4 {f4VisibleTopLeft.x, f4VisibleTopLeft.y, f4VisibleTopRight.x, f4VisibleBottomRight.y};
+	mf4LargeVisibleArea = XMFLOAT4 {mf4VisibleTopLeft.x, mf4VisibleTopLeft.y, mf4VisibleTopRight.x, mf4VisibleBottomRight.y};
 
-	if (gpGraphics->mFramebufferExtent2D.width > gpGraphics->mFramebufferExtent2D.height) [[likely]]
+	if (gpGraphics->mFramebufferVkExtent2D.width > gpGraphics->mFramebufferVkExtent2D.height) [[likely]]
 	{
-		f4RenderVisibleArea = f4LargeVisibleArea;
-		float fVisibleHeight = f4RenderVisibleArea.y - f4RenderVisibleArea.w;
-		f4RenderVisibleArea.x -= gVisibleAreaExtraTop.Get() * fVisibleHeight;
-		f4RenderVisibleArea.y += gVisibleAreaExtraTop.Get() * fVisibleHeight;
-		f4RenderVisibleArea.z += gVisibleAreaExtraTop.Get() * fVisibleHeight;
-		f4RenderVisibleArea.w -= gVisibleAreaExtraBottom.Get() * fVisibleHeight;
+		mf4RenderVisibleArea = mf4LargeVisibleArea;
+		float fVisibleHeight = mf4RenderVisibleArea.y - mf4RenderVisibleArea.w;
+		mf4RenderVisibleArea.x -= gVisibleAreaExtraTop.mfCurrent * fVisibleHeight;
+		mf4RenderVisibleArea.y += gVisibleAreaExtraTop.mfCurrent * fVisibleHeight;
+		mf4RenderVisibleArea.z += gVisibleAreaExtraTop.mfCurrent * fVisibleHeight;
+		mf4RenderVisibleArea.w -= gVisibleAreaExtraBottom.mfCurrent * fVisibleHeight;
 	}
 	else [[unlikely]]
 	{
-		f4RenderVisibleArea = f4LargeVisibleArea;
+		mf4RenderVisibleArea = mf4LargeVisibleArea;
 	}
 
-	// Adjust visible area in world space to align with terrain and water polygon grid.
-	// LOD bucket: floor(log4(eyeDist / kfMinEyeHeight)) selects mesh density and snap-grid
-	// coarseness in lockstep. Each LOD reduces per-dim mesh quads by 2 (total by 4); the snap
-	// quad size scales accordingly so the visible-area edges only move when the camera crosses
-	// a full coarse-LOD quad. Within a LOD, the integer-eye-distance bucket below latches the
-	// per-frame quadSize, so sub-pixel FP drift in mfCameraEyeHeight cannot oscillate the snap
-	// (see GitHub flicker investigation: floor(area/quadSize) amplifies any quadSize jitter by
-	// ~area/quadSize, so quadSize must be bit-stable across consecutive frames).
-	XMFLOAT4 f4RawAreaIn = f4RenderVisibleArea;
+	// Each level of detail halves mesh quads per dimension, coupling mesh density to the visible-area snap grid.
+	// The integer eye-distance bucket latches quad size within a level of detail to prevent sub-pixel height drift from jittering snapped edges.
+	// floor(area / quadSize) amplifies quad-size jitter by approximately area / quadSize, so quad size must stay stable while the latch key is unchanged.
+	[[maybe_unused]] XMFLOAT4 f4RawInputArea = mf4RenderVisibleArea;
 
-	int iLod = std::clamp(static_cast<int>(std::floor(std::log2(std::max(fEyeDistance, kfMinEyeHeight) / kfMinEyeHeight) * 0.5f)), 0, static_cast<int>(BufferManager::kiVisibleAreaLodCount) - 1);
+	int64_t iLevelOfDetail = std::clamp<int64_t>(static_cast<int64_t>(std::floor(std::log2(std::max(fEyeDistance, kfMinimumEyeHeight) / kfMinimumEyeHeight) * 0.5f)), 0, BufferManager::kiVisibleAreaLodCount - 1);
 	// LOD hysteresis: refuse to flip back across the shared boundary if eye distance is still
-	// near it. Boundaries are at kfMinEyeHeight * 4^L; 5% band absorbs FP rounding around
+	// near it. Boundaries are at kfMinimumEyeHeight * 4^L; 5% band absorbs FP rounding around
 	// asymptotic settling.
-	static constexpr float kfLodHysteresisFraction = 0.05f;
-	if (iLod == miVisibleAreaLod - 1)
+	static constexpr float kfLevelOfDetailHysteresisFraction = 0.05f;
+	if (iLevelOfDetail == miVisibleAreaLevelOfDetail - 1)
 	{
-		float fBoundary = kfMinEyeHeight * std::pow(4.0f, static_cast<float>(miVisibleAreaLod));
-		if (fEyeDistance > fBoundary * (1.0f - kfLodHysteresisFraction))
+		float fBoundary = kfMinimumEyeHeight * std::pow(4.0f, static_cast<float>(miVisibleAreaLevelOfDetail));
+		if (fEyeDistance > fBoundary * (1.0f - kfLevelOfDetailHysteresisFraction))
 		{
-			iLod = miVisibleAreaLod;
+			iLevelOfDetail = miVisibleAreaLevelOfDetail;
 		}
 	}
-	else if (iLod == miVisibleAreaLod + 1)
+	else if (iLevelOfDetail == miVisibleAreaLevelOfDetail + 1)
 	{
-		float fBoundary = kfMinEyeHeight * std::pow(4.0f, static_cast<float>(miVisibleAreaLod + 1));
-		if (fEyeDistance < fBoundary * (1.0f + kfLodHysteresisFraction))
+		float fBoundary = kfMinimumEyeHeight * std::pow(4.0f, static_cast<float>(miVisibleAreaLevelOfDetail + 1));
+		if (fEyeDistance < fBoundary * (1.0f + kfLevelOfDetailHysteresisFraction))
 		{
-			iLod = miVisibleAreaLod;
+			iLevelOfDetail = miVisibleAreaLevelOfDetail;
 		}
 	}
 
 	// Visible-area snapping uses the water LOD table's concatenated quad grid. The composite G-buffer render targets use that snapped area even
 	// though terrain uses per-island Gaea2 meshes.
-	const BufferManager::VisibleAreaMeshLod& rLodMesh = gpBufferManager->mWaterMeshLods[iLod];
-	float fQuadsX = static_cast<float>(rLodMesh.iQuadCountX);
-	float fQuadsY = static_cast<float>(rLodMesh.iQuadCountY);
+	const BufferManager::VisibleAreaMeshLod& rLevelOfDetailMesh = gpBufferManager->mWaterMeshLods[iLevelOfDetail];
+	float fQuadsX = static_cast<float>(rLevelOfDetailMesh.iQuadCountX);
+	float fQuadsY = static_cast<float>(rLevelOfDetailMesh.iQuadCountY);
 
-	int iZoomBucket = static_cast<int>(std::floor(fEyeDistance));
+	int64_t iZoomBucket = static_cast<int64_t>(std::floor(fEyeDistance));
 	static constexpr float kfZoomBucketHysteresis = 0.1f;
 	if (iZoomBucket == miVisibleAreaZoomBucket - 1 && fEyeDistance > static_cast<float>(miVisibleAreaZoomBucket) - kfZoomBucketHysteresis)
 	{
@@ -501,25 +490,25 @@ void Camera::CalculateMatricesAndVisibleArea()
 		iZoomBucket = miVisibleAreaZoomBucket;
 	}
 
-	uint32_t uiLatchKey = static_cast<uint32_t>(rLodMesh.iQuadCountX)
-	                    ^ (static_cast<uint32_t>(rLodMesh.iQuadCountY) << 16)
-	                    ^ gpGraphics->mFramebufferExtent2D.width
-	                    ^ (gpGraphics->mFramebufferExtent2D.height << 16);
+	uint32_t uiLatchKey = static_cast<uint32_t>(rLevelOfDetailMesh.iQuadCountX)
+	                    ^ (static_cast<uint32_t>(rLevelOfDetailMesh.iQuadCountY) << 16)
+	                    ^ gpGraphics->mFramebufferVkExtent2D.width
+	                    ^ (gpGraphics->mFramebufferVkExtent2D.height << 16);
 
-	if (iZoomBucket != miVisibleAreaZoomBucket || uiLatchKey != muiVisibleAreaLatchKey || iLod != miVisibleAreaLod)
+	if (iZoomBucket != miVisibleAreaZoomBucket || uiLatchKey != muiVisibleAreaLatchKey || iLevelOfDetail != miVisibleAreaLevelOfDetail)
 	{
 		miVisibleAreaZoomBucket = iZoomBucket;
 		muiVisibleAreaLatchKey = uiLatchKey;
-		miVisibleAreaLod = iLod;
-		mf2LatchedQuadSize.x = (f4RenderVisibleArea.z - f4RenderVisibleArea.x) / fQuadsX;
-		mf2LatchedQuadSize.y = (f4RenderVisibleArea.y - f4RenderVisibleArea.w) / fQuadsY;
+		miVisibleAreaLevelOfDetail = iLevelOfDetail;
+		mf2LatchedQuadSize.x = (mf4RenderVisibleArea.z - mf4RenderVisibleArea.x) / fQuadsX;
+		mf2LatchedQuadSize.y = (mf4RenderVisibleArea.y - mf4RenderVisibleArea.w) / fQuadsY;
 	}
 
-	f2VisibleAreaQuadSize = mf2LatchedQuadSize;
-	f4RenderVisibleArea.x = common::RoundDown(f4RenderVisibleArea.x, f2VisibleAreaQuadSize.x);
-	f4RenderVisibleArea.y = common::RoundDown(f4RenderVisibleArea.y + f2VisibleAreaQuadSize.y, f2VisibleAreaQuadSize.y);
-	f4RenderVisibleArea.z = f4RenderVisibleArea.x + fQuadsX * f2VisibleAreaQuadSize.x;
-	f4RenderVisibleArea.w = f4RenderVisibleArea.y - fQuadsY * f2VisibleAreaQuadSize.y;
+	mf2VisibleAreaQuadSize = mf2LatchedQuadSize;
+	mf4RenderVisibleArea.x = common::RoundDown(mf4RenderVisibleArea.x, mf2VisibleAreaQuadSize.x);
+	mf4RenderVisibleArea.y = common::RoundDown(mf4RenderVisibleArea.y + mf2VisibleAreaQuadSize.y, mf2VisibleAreaQuadSize.y);
+	mf4RenderVisibleArea.z = mf4RenderVisibleArea.x + fQuadsX * mf2VisibleAreaQuadSize.x;
+	mf4RenderVisibleArea.w = mf4RenderVisibleArea.y - fQuadsY * mf2VisibleAreaQuadSize.y;
 }
 
 } // namespace engine

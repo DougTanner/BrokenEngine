@@ -90,7 +90,7 @@ static void CommandSetClientGridCoord(const nlohmann::json& rParameters, nlohman
 	{
 		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned player");
 	}
-	if (gpGame->InMainMenu())
+	if ((gpGame->mGameFlags & engine::GameFlags::kMainMenu))
 	{
 		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned player");
 	}

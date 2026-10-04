@@ -24,15 +24,12 @@ enum class DescriptorFlags : uint64_t
 		kSamplerBorderWhite         = 0x0200, // CLAMP_TO_BORDER + opaque white (1.0) — shadow's "no shadow" beyond coverage
 		kSamplerWindClamp           = 0x10000,
 		kSamplerElevation           = 0x20000,
-		kSamplerMirroredRepeatWater  = 0x80000, // MirroredRepeat with the gWaterNormalMipBias slider instead of the global -gMipLodBias sharpen (water normal maps)
+		kSamplerMirroredRepeatWater  = 0x80000, // MirroredRepeat with the gWaterNormalMipmapBias slider instead of the global -gMipmapLevelOfDetailBias sharpen (water normal maps)
 		kSamplerClampLinear          = 0x400000,
 		kSamplerRepeatLinear         = 0x800000,
 		kSamplerMirroredRepeatLinear = 0x1000000,
-		// Any-bit mask of every sampler flag, for the standalone-sampler (bSampler) test in
-		// PipelineDescriptorWriter::Write. Value is the OR of all kSampler* bits above. Includes
-		// kSamplerBorderWhite (0x0200), which is behavior-neutral: that flag only ever appears alongside
-		// kCombinedSamplers, and the standalone-sampler branch excludes kCombinedSamplers, so its presence in
-		// the mask never reclassifies a descriptor as a standalone sampler.
+		// PipelineDescriptorWriter::Write uses this any-bit mask for standalone samplers and excludes kCombinedSamplers.
+		// kSamplerBorderWhite is used only with kCombinedSamplers.
 		kSamplerAny                 = 0x00010 | 0x00020 | 0x00040 | 0x00080 | 0x00100 | 0x00200 | 0x10000 | 0x20000 | 0x80000 | 0x400000 | 0x800000 | 0x1000000,
 	kStorageImages                  = 0x0400,
 
@@ -50,7 +47,7 @@ enum class DescriptorFlags : uint64_t
 	kModel                          = 0x8000,
 
 	// Marks a bindless texture-array descriptor whose per-slot binding key is supplied lazily by the
-	// data subsystem (e.g., IslandTerrain) rather than derivable from ppTextures[k]->mInfo.crc.
+	// data subsystem (e.g., IslandTerrain) rather than derivable from ppTextures[k]->mInfo.uiCrc.
 	// PipelineDescriptorWriter routes flagged entries into TextureDescriptors::mBindlessArrayConsumers;
 	// IslandTerrain::AcquireTextureSlot iterates that registry at first-mint and registers under the
 	// correct islandCrc / chunk-CRC key.
@@ -104,12 +101,12 @@ struct PipelineInfo
 	Shader* ppShaders[2] {};
 	Buffer* pVertexBuffer = nullptr;
 	// External Set 0 layout (global descriptor set from TextureManager, not owned)
-	VkDescriptorSetLayout externalVkDescriptorSetLayout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout vkExternalDescriptorSetLayout = VK_NULL_HANDLE;
 	// Multi-set: external Set 1 layout provided by first ModelPipeline material (not owned)
-	VkDescriptorSetLayout externalSet1VkDescriptorSetLayout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout vkExternalSet1DescriptorSetLayout = VK_NULL_HANDLE;
 
 	// Render target
-	VkRenderPass targetVkRenderPass = VK_NULL_HANDLE;
+	VkRenderPass vkTargetRenderPass = VK_NULL_HANDLE;
 	VkExtent3D vkExtent3D {};
 	int32_t iColorAttachmentCount = 1;
 
@@ -118,7 +115,7 @@ struct PipelineInfo
 	int64_t iPushConstantBytes = 0;
 
 	// Entry count is capped at common::ShaderHeader::kiMaxDescriptorSetLayoutBindings by Pipeline::Create.
-	std::vector<DescriptorInfo> pDescriptorInfos;
+	std::vector<DescriptorInfo> descriptorInfos;
 };
 
 class Pipeline
@@ -126,9 +123,9 @@ class Pipeline
 public:
 
 	// Fallback for out-of-bounds binding lookups when vertex/fragment shaders have different binding counts
-	static constexpr VkDescriptorSetLayoutBinding kEmptyBinding {};
+	static constexpr VkDescriptorSetLayoutBinding kEmptyVkDescriptorSetLayoutBinding {};
 
-	// Resolve which descriptor set a binding belongs to from shader reflection (pDescriptorSetIndices),
+	// Resolve which descriptor set a binding belongs to from shader reflection (puiDescriptorSetIndices),
 	// defaulting to set 0 when neither shader declares it. Single source for the four set-partition /
 	// set-routing sites in PipelineCreator / PipelineDescriptorWriter.
 	static uint32_t ResolveBindingSetIndex(const PipelineInfo& rPipelineInfo, uint32_t uiBinding);
@@ -141,25 +138,21 @@ public:
 	void Create(const PipelineInfo& rInfo);
 	void Destroy() noexcept;
 
-	void RecordDraw(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, int64_t iInstanceCount, int64_t iFirstInstance, const XMFLOAT4& f4PushConstants = {});
-	void RecordDrawIndirect(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& f4PushConstants = {});
+	void RecordDraw(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, int64_t iInstanceCount, int64_t iFirstInstance, const XMFLOAT4& rf4PushConstants = {});
+	void RecordDrawIndirect(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants = {});
 
 	// Bind pipeline + descriptor sets (no vertex buffer, no draw call). Used by per-instance draw
 	// loops (e.g., per-island terrain meshes) that bind their own vertex/index buffer and issue
 	// vkCmdDrawIndexed themselves.
-	void RecordBindPipelineAndDescriptors(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& f4PushConstants = {});
-	void RecordDrawIndirectSet2(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& f4PushConstants);
-	void RecordCompute(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, int64_t iGroupCountX, int64_t iGroupCountY = 1, int64_t iGroupCountZ = 1, const XMFLOAT4& f4PushConstants = {});
-	void RecordComputeIndirect(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& f4PushConstants = {});
+	void RecordBindPipelineAndDescriptors(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants = {});
+	void RecordDrawIndirectSet2(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants);
+	void RecordCompute(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, int64_t iGroupCountX, int64_t iGroupCountY = 1, int64_t iGroupCountZ = 1, const XMFLOAT4& rf4PushConstants = {});
+	void RecordComputeIndirect(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants = {});
 	void RecordComputeIndirectFrom(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, VkBuffer vkIndirectBuffer, VkDeviceSize vkIndirectOffset);
 
 	void WriteIndirectBuffer(int64_t iCommandBuffer, int64_t iInstanceCount, int64_t iIndexCount = -1, int64_t iFirstIndex = 0, int64_t iVertexOffset = 0);
 	void WriteIndirectComputeBuffer(int64_t iCommandBuffer, int64_t iGroupCountX, int64_t iGroupCountY, int64_t iGroupCountZ);
 
-	void UpdateStorageBufferDescriptor(int64_t iFramebuffer, int64_t iBinding, Buffer* pBuffer);
-	void UpdateCombinedImageSamplerDescriptor(int64_t iBinding, VkImageView vkImageView, VkSampler vkSampler);
-	void UpdateSamplerDescriptor(int64_t iBinding, VkSampler vkSampler);
-	void UpdateStorageImageDescriptor(int64_t iBinding, VkImageView vkImageView);
 
 	PipelineInfo mInfo;
 
@@ -178,11 +171,11 @@ public:
 	// Multi-set: external Set 1 layout provided by first ModelPipeline material (not owned)
 	VkDescriptorSetLayout mExternalSet1VkDescriptorSetLayout = VK_NULL_HANDLE;
 
-	// Host-visible indirect buffer (used by GPU for vkCmdDrawIndexedIndirect)
+	// Indirect draw/dispatch buffer; host-visible commands are CPU-written, device-local commands are GPU-written.
 	VkBuffer mIndirectVkBuffer = VK_NULL_HANDLE;
 	VmaAllocation mIndirectVmaAllocation = VK_NULL_HANDLE;
-	VkDrawIndexedIndirectCommand* mpIndirectMappedMemory = nullptr;
-	VkDispatchIndirectCommand* mpIndirectComputeMappedMemory = nullptr; // Host-visible dispatch map (kIndirectHostVisible | kCompute); mutually exclusive with the draw map above
+	VkDrawIndexedIndirectCommand* mpIndirectVkDrawIndexedIndirectCommand = nullptr;
+	VkDispatchIndirectCommand* mpIndirectComputeVkDispatchIndirectCommand = nullptr; // Host-visible dispatch map (kIndirectHostVisible | kCompute); mutually exclusive with the draw map above
 	int64_t miIndirectSlotCount = 0; // Indirect buffer slot capacity bounding the Record*Indirect command-buffer index. Set only for indirect pipelines: the host-visible / graphics-device-local branches stamp max(framebufferCount, 3), the kIndirectDeviceLocal compute branch stamps 1. Stays 0 on non-indirect pipelines, which never read it (every Record*Indirect ASSERT is gated behind an indirect-flag ASSERT)
 
 	Buffer mModelMaterialsStorageBuffer;
@@ -192,9 +185,7 @@ public:
 	bool mbTexturesRequested = false;
 };
 
-// Mirrors BindGraphicsDescriptorSets in Pipeline.cpp; the global Set 0 is indexed per-framebuffer
-// (iCommandBuffer), the per-pipeline Set 1 follows the pipeline's mbPerCommandBuffer rule
-// (iDescriptorSetIndex).
+// Global set 0 uses the framebuffer index iCommandBuffer; per-pipeline set 1 uses iDescriptorSetIndex according to mbPerCommandBuffer.
 void BindComputeDescriptorSets(VkCommandBuffer vkCommandBuffer, VkPipelineLayout vkPipelineLayout, VkDescriptorSetLayout vkExternalLayout, int64_t iCommandBuffer, int64_t iDescriptorSetIndex, const std::vector<VkDescriptorSet>& rDescriptorSets);
 
 } // namespace engine

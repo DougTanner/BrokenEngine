@@ -14,7 +14,7 @@ common::ScopedWorkbufferAllocation<char*> AppendUtf8(common::Workbuffer& rWorkbu
 	// shrink to the actual length. The returned move-only handle owns the frame, so the bytes stay valid through
 	// the caller's full-expression, including the consuming ImGui call's read through mpData.
 	common::ScopedWorkbufferAllocation<char*> scopedAllocation = rWorkbuffer.PushBuffer<char*>(static_cast<int64_t>(u32String.size()) * 4 + 1);
-	char* const pcBase = scopedAllocation.mpData;
+	char* pcBase = scopedAllocation.mpData;
 	char* pcWrite = pcBase;
 	for (char32_t cCodePoint : u32String)
 	{
@@ -59,9 +59,9 @@ bool WrapperToggle(std::string_view label, engine::Wrapper* pWrapper)
 
 bool WrapperSlider(std::string_view label, engine::Wrapper* pWrapper, std::string_view format)
 {
-	float fValue = pWrapper->Get();
+	float fValue = pWrapper->mfCurrent;
 	bool bChanged = false;
-	if (ImGui::SliderFloat(label.data(), &fValue, pWrapper->GetMin(), pWrapper->GetMax(), format.data()))
+	if (ImGui::SliderFloat(label.data(), &fValue, pWrapper->mfMin, pWrapper->mfMax, format.data()))
 	{
 		pWrapper->Set(fValue);
 		bChanged = true;
@@ -70,7 +70,7 @@ bool WrapperSlider(std::string_view label, engine::Wrapper* pWrapper, std::strin
 	if (gpAgentUiRegistry != nullptr)
 	{
 		char pcValue[64];
-		std::snprintf(pcValue, sizeof(pcValue), format.data(), pWrapper->Get());
+		std::snprintf(pcValue, sizeof(pcValue), format.data(), pWrapper->mfCurrent);
 		gpAgentUiRegistry->RecordItemValue(ImGui::GetID(label.data()), pcValue);
 	}
 #endif
@@ -114,7 +114,7 @@ bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, s
 #if defined(BT_CLIENT)
 	if (gpAgentUiRegistry != nullptr)
 	{
-		float fFinal = pWrapper->Get();
+		float fFinal = pWrapper->mfCurrent;
 		for (const std::pair<const char*, float>& rOption : aOptions)
 		{
 			gpAgentUiRegistry->RecordItemChecked(ImGui::GetID(rOption.first), fFinal == rOption.second);
@@ -137,22 +137,22 @@ bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper, float f
 #endif
 	if (ImGui::Button("-"))
 	{
-		pWrapper->Set(pWrapper->Get() - fStep);
+		pWrapper->Set(pWrapper->mfCurrent - fStep);
 		bChanged = true;
 	}
 	ImGui::SameLine();
-	ImGui::Text("%.0f%%", pWrapper->Get() * 100.0f);
+	ImGui::Text("%.0f%%", pWrapper->mfCurrent * 100.0f);
 	ImGui::SameLine();
 	if (ImGui::Button("+"))
 	{
-		pWrapper->Set(pWrapper->Get() + fStep);
+		pWrapper->Set(pWrapper->mfCurrent + fStep);
 		bChanged = true;
 	}
 #if defined(BT_CLIENT)
 	if (gpAgentUiRegistry != nullptr)
 	{
 		char pcValue[64];
-		std::snprintf(pcValue, sizeof(pcValue), "%.0f%%", pWrapper->Get() * 100.0f);
+		std::snprintf(pcValue, sizeof(pcValue), "%.0f%%", pWrapper->mfCurrent * 100.0f);
 		gpAgentUiRegistry->RecordItemValue(uiMinusId, pcValue);
 		gpAgentUiRegistry->RecordItemValue(uiPlusId, pcValue);
 	}
@@ -170,7 +170,7 @@ constexpr float kfButtonRounding = 6.0f;
 constexpr float kfPanelBorderThickness = 2.0f;
 constexpr float kfAccentStripThickness = 3.0f;
 constexpr float kfButtonAccentBarWidth = 6.0f;
-constexpr float kfHoverAnimRate = 12.0f;
+constexpr float kfHoverAnimationRate = 12.0f;
 
 // Custom menu chrome follows engine::UiTheme and ImGuiManager.cpp's ThemePalettes.
 struct MenuChrome
@@ -215,14 +215,9 @@ constexpr MenuChrome kMenuChromes[]
 };
 static_assert(std::size(kMenuChromes) == static_cast<size_t>(engine::UiTheme::kCount));
 
-static const MenuChrome& GetMenuChrome()
+static ImVec4 InterpolateColor(const ImVec4& rf4FirstColor, const ImVec4& rf4SecondColor, float fInterpolationFactor)
 {
-	return kMenuChromes[static_cast<size_t>(engine::GetUiTheme())];
-}
-
-static ImVec4 LerpColor(const ImVec4& rf4A, const ImVec4& rf4B, float fT)
-{
-	return ImVec4(std::lerp(rf4A.x, rf4B.x, fT), std::lerp(rf4A.y, rf4B.y, fT), std::lerp(rf4A.z, rf4B.z, fT), std::lerp(rf4A.w, rf4B.w, fT));
+	return ImVec4(std::lerp(rf4FirstColor.x, rf4SecondColor.x, fInterpolationFactor), std::lerp(rf4FirstColor.y, rf4SecondColor.y, fInterpolationFactor), std::lerp(rf4FirstColor.z, rf4SecondColor.z, fInterpolationFactor), std::lerp(rf4FirstColor.w, rf4SecondColor.w, fInterpolationFactor));
 }
 
 // GetColorU32 additionally multiplies by style.Alpha, so BeginDisabled dims custom chrome like stock widgets
@@ -233,22 +228,22 @@ static ImU32 ChromeColor(const ImVec4& rf4Color, float fAlphaScale = 1.0f)
 
 float ComputeMouseOpennessTarget(ImVec2 vFixedExtent, ImVec2 vAnchor, float fPivotX)
 {
-	float fRectMinX = vAnchor.x - fPivotX * vFixedExtent.x;
-	float fRectMaxX = fRectMinX + vFixedExtent.x;
-	float fRectMinY = vAnchor.y;
-	float fRectMaxY = vAnchor.y + vFixedExtent.y;
+	float fRectangleMinimumX = vAnchor.x - fPivotX * vFixedExtent.x;
+	float fRectangleMaximumX = fRectangleMinimumX + vFixedExtent.x;
+	float fRectangleMinimumY = vAnchor.y;
+	float fRectangleMaximumY = vAnchor.y + vFixedExtent.y;
 
 	ImVec2 vMouse = ImGui::GetIO().MousePos;
-	float fDx = std::max({fRectMinX - vMouse.x, 0.0f, vMouse.x - fRectMaxX});
-	float fDy = std::max({fRectMinY - vMouse.y, 0.0f, vMouse.y - fRectMaxY});
-	float fDistance = std::sqrt(fDx * fDx + fDy * fDy);
+	float fDistanceX = std::max({fRectangleMinimumX - vMouse.x, 0.0f, vMouse.x - fRectangleMaximumX});
+	float fDistanceY = std::max({fRectangleMinimumY - vMouse.y, 0.0f, vMouse.y - fRectangleMaximumY});
+	float fDistance = std::sqrt(fDistanceX * fDistanceX + fDistanceY * fDistanceY);
 
 	return 1.0f - std::clamp(fDistance / (kfActivationDistancePixels * engine::UiScale()), 0.0f, 1.0f);
 }
 
 float UpdateSlideAndGetEdgeX(SlidePanelState& rState, ImVec2 vAnchor, float fSidePivotSign, float fTarget)
 {
-	ImGuiIO& rIo = ImGui::GetIO();
+	const ImGuiIO& rIo = ImGui::GetIO();
 
 	// Caller must set SetNextWindowPos pivot so the returned x IS the panel's off-screen edge:
 	//   right panel (fSidePivotSign > 0): pivot (0.0, 0) — returned x is the left edge
@@ -282,8 +277,7 @@ ScopedMenuFont::~ScopedMenuFont()
 
 float MenuButtonsWidth(std::initializer_list<std::u32string_view> aLabels)
 {
-	// Measure each label under the live pushed font and take the max, then add FramePadding.x * 4. Each AppendUtf8
-	// handle owns its Workbuffer frame only through the CalcTextSize full-expression, which is all the measurement needs.
+	// Each AppendUtf8 handle must remain alive through its CalcTextSize call.
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	float fWidth = 0.0f;
 	for (std::u32string_view u32Label : aLabels)
@@ -304,19 +298,19 @@ void MenuHeading(const char* pcLabel, float fHeadingScale)
 
 void DrawFullScreenDim()
 {
-	ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0.0f, 0.0f), ImGui::GetIO().DisplaySize, ChromeColor(GetMenuChrome().f4BackdropDim));
+	ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0.0f, 0.0f), ImGui::GetIO().DisplaySize, ChromeColor(kMenuChromes[static_cast<size_t>(engine::GetUiTheme())].f4BackdropDim));
 }
 
-void DrawPanelAccents(ImDrawList* pDrawList, const ImVec2& vMin, const ImVec2& vMax)
+void DrawPanelAccents(ImDrawList* pDrawList, const ImVec2& rvMinimum, const ImVec2& rvMaximum)
 {
-	const MenuChrome& rChrome = GetMenuChrome();
+	const MenuChrome& rChrome = kMenuChromes[static_cast<size_t>(engine::GetUiTheme())];
 	float fUiScale = engine::UiScale();
 	float fPanelRounding = kfPanelRounding * fUiScale;
-	pDrawList->AddRect(vMin, vMax, ChromeColor(rChrome.f4PanelBorder), fPanelRounding, 0, kfPanelBorderThickness * fUiScale);
-	pDrawList->AddRectFilled(ImVec2(vMin.x + fPanelRounding, vMin.y), ImVec2(vMax.x - fPanelRounding, vMin.y + kfAccentStripThickness * fUiScale), ChromeColor(rChrome.f4Accent));
+	pDrawList->AddRect(rvMinimum, rvMaximum, ChromeColor(rChrome.f4PanelBorder), fPanelRounding, 0, kfPanelBorderThickness * fUiScale);
+	pDrawList->AddRectFilled(ImVec2(rvMinimum.x + fPanelRounding, rvMinimum.y), ImVec2(rvMaximum.x - fPanelRounding, rvMinimum.y + kfAccentStripThickness * fUiScale), ChromeColor(rChrome.f4Accent));
 }
 
-bool MenuButton(const char* pcLabel, const ImVec2& vSize, float& rfHoverAnim, bool bSelected)
+bool MenuButton(const char* pcLabel, const ImVec2& rvSize, float& rfHoverAnimation, bool bSelected)
 {
 	float fUiScale = engine::UiScale();
 	float fButtonRounding = kfButtonRounding * fUiScale;
@@ -324,38 +318,38 @@ bool MenuButton(const char* pcLabel, const ImVec2& vSize, float& rfHoverAnim, bo
 
 	ImVec2 vTextSize = ImGui::CalcTextSize(pcLabel);
 	const ImGuiStyle& rStyle = ImGui::GetStyle();
-	ImVec2 vButtonSize(vSize.x > 0.0f ? vSize.x : vTextSize.x + rStyle.FramePadding.x * 2.0f, vSize.y > 0.0f ? vSize.y : vTextSize.y + rStyle.FramePadding.y * 2.0f);
+	ImVec2 vButtonSize(rvSize.x > 0.0f ? rvSize.x : vTextSize.x + rStyle.FramePadding.x * 2.0f, rvSize.y > 0.0f ? rvSize.y : vTextSize.y + rStyle.FramePadding.y * 2.0f);
 
 	// EnableNav: InvisibleButton defaults to ImGuiItemFlags_NoNav, which would skip keyboard/gamepad navigation
 	bool bPressed = ImGui::InvisibleButton(pcLabel, vButtonSize, ImGuiButtonFlags_EnableNav);
 	bool bHovered = ImGui::IsItemHovered() || ImGui::IsItemFocused(); // Focus term keeps keyboard/gamepad nav visible
 	// io.DeltaTime is uncapped wall-clock time; a long UI hitch pushes the interpolant past 1 and overshoots.
-	rfHoverAnim += ((bHovered ? 1.0f : 0.0f) - rfHoverAnim) * std::min(common::ExponentialInterpolant(kfHoverAnimRate, ImGui::GetIO().DeltaTime), 1.0f);
+	rfHoverAnimation += ((bHovered ? 1.0f : 0.0f) - rfHoverAnimation) * std::min(common::ExponentialInterpolant(kfHoverAnimationRate, ImGui::GetIO().DeltaTime), 1.0f);
 
-	const MenuChrome& rChrome = GetMenuChrome();
-	ImVec2 vMin = ImGui::GetItemRectMin();
-	ImVec2 vMax = ImGui::GetItemRectMax();
+	const MenuChrome& rChrome = kMenuChromes[static_cast<size_t>(engine::GetUiTheme())];
+	ImVec2 vMinimum = ImGui::GetItemRectMin();
+	ImVec2 vMaximum = ImGui::GetItemRectMax();
 	ImDrawList* pDrawList = ImGui::GetWindowDrawList();
 
-	ImVec4 f4Fill = LerpColor(rChrome.f4ButtonFill, rChrome.f4ButtonHover, bSelected ? 1.0f : rfHoverAnim);
+	ImVec4 f4Fill = InterpolateColor(rChrome.f4ButtonFill, rChrome.f4ButtonHover, bSelected ? 1.0f : rfHoverAnimation);
 	if (ImGui::IsItemActive())
 	{
 		f4Fill = rChrome.f4ButtonActive;
 	}
-	pDrawList->AddRectFilled(vMin, vMax, ChromeColor(f4Fill), fButtonRounding);
-	pDrawList->AddRect(vMin, vMax, ChromeColor(LerpColor(rChrome.f4PanelBorder, rChrome.f4Accent, bSelected ? 1.0f : rfHoverAnim)), fButtonRounding);
+	pDrawList->AddRectFilled(vMinimum, vMaximum, ChromeColor(f4Fill), fButtonRounding);
+	pDrawList->AddRect(vMinimum, vMaximum, ChromeColor(InterpolateColor(rChrome.f4PanelBorder, rChrome.f4Accent, bSelected ? 1.0f : rfHoverAnimation)), fButtonRounding);
 
 	// Left accent bar grows from the vertical center with hover/selection
-	float fBarIntensity = bSelected ? 1.0f : rfHoverAnim;
+	float fBarIntensity = bSelected ? 1.0f : rfHoverAnimation;
 	if (fBarIntensity > 0.01f)
 	{
-		float fCenterY = (vMin.y + vMax.y) * 0.5f;
-		float fHalfHeight = ((vMax.y - vMin.y) * 0.5f - fButtonRounding * 0.5f) * fBarIntensity;
-		pDrawList->AddRectFilled(ImVec2(vMin.x, fCenterY - fHalfHeight), ImVec2(vMin.x + fButtonAccentBarWidth, fCenterY + fHalfHeight), ChromeColor(rChrome.f4Accent, fBarIntensity));
+		float fCenterY = (vMinimum.y + vMaximum.y) * 0.5f;
+		float fHalfHeight = ((vMaximum.y - vMinimum.y) * 0.5f - fButtonRounding * 0.5f) * fBarIntensity;
+		pDrawList->AddRectFilled(ImVec2(vMinimum.x, fCenterY - fHalfHeight), ImVec2(vMinimum.x + fButtonAccentBarWidth, fCenterY + fHalfHeight), ChromeColor(rChrome.f4Accent, fBarIntensity));
 	}
 
-	ImVec2 vTextPos((vMin.x + vMax.x - vTextSize.x) * 0.5f, (vMin.y + vMax.y - vTextSize.y) * 0.5f);
-	pDrawList->AddText(vTextPos, ImGui::GetColorU32(ImGuiCol_Text), pcLabel);
+	ImVec2 vTextPosition((vMinimum.x + vMaximum.x - vTextSize.x) * 0.5f, (vMinimum.y + vMaximum.y - vTextSize.y) * 0.5f);
+	pDrawList->AddText(vTextPosition, ImGui::GetColorU32(ImGuiCol_Text), pcLabel);
 
 	return bPressed;
 }

@@ -5,8 +5,9 @@
 namespace engine
 {
 
-struct RenderTargetTextures
+class RenderTargetTextures
 {
+public:
 	void Create();
 
 	void DestroyLightingTextures();
@@ -47,7 +48,7 @@ struct RenderTargetTextures
 	Texture* mppLightingFinalTextures[3] {};
 
 	// Direction-averaged 0.25*(E+W+N+S) of the tone-mapped per-direction values.
-	// Sampled by Terrain/Water in the ambient path to replace three EWNS samples with one.
+	// Terrain/Water read it with one texture sample in the ambient path.
 	Texture mAmbientCombineTexture;
 
 	// Persistent previous-frame combined lighting (3 directional + ambient), reprojected by LightingTemporal.comp to
@@ -61,7 +62,7 @@ struct RenderTargetTextures
 	Texture* mppDebugTextures[shaders::kiMaxDebugTextures] {};
 	Texture* mppDebugTexturesB[shaders::kiMaxDebugTextures] {};
 	Texture* mppDebugTexturesC[shaders::kiMaxDebugTextures] {};
-	int64_t mpDebugTextureFormats[shaders::kiMaxDebugTextures] {};
+	int64_t mpiDebugTextureFormats[shaders::kiMaxDebugTextures] {};
 
 	Texture mShadowElevationTexture;
 	Texture mShadowTexture;
@@ -73,10 +74,9 @@ struct RenderTargetTextures
 	Texture mObjectShadowsBlurTexture;
 	Texture mObjectShadowsBlurIntermediateTexture;
 
-	// Per-frame compute output: Gerstner-wave displacement + Jacobian normal sampled by Water.vert
-	// (kPipelineWater) instead of the vertex shader recomputing the wave sum. Sized to
-	// the LOD0 water-mesh vertex grid; active LOD writes only the top-left iWaterActiveQuadX+1 by
-	// iWaterActiveQuadY+1 texel rectangle each frame.
+	// Per-frame compute output: Gerstner-wave displacement and Jacobian normal sampled by Water.vert (kPipelineWater).
+	// Storage matches the LOD0 water-mesh vertex grid; the active LOD writes only the top-left
+	// (iWaterActiveQuadX + 1) by (iWaterActiveQuadY + 1) texel rectangle each frame.
 	Texture mWaterDisplacementTexture;
 	Texture mWaterDisplacementNormalTexture;
 

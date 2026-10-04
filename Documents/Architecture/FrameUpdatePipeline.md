@@ -28,7 +28,7 @@ flowchart LR
 
 The client main loop is [`Main.cpp`](../../Engine/Source/Main.cpp): input precedes [`GameBase::ClientUpdate()`](../../Engine/Source/GameBase.cpp), then [`GameBase::Render()`](../../Engine/Source/GameBase.cpp), then audio update. [`ClientSessionRuntime.cpp`](../../Engine/Source/Network/Client/ClientSessionRuntime.cpp) owns engine network-cycle boundaries; [`ClientSession.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp) and [`ClientReconciler.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Client/ClientReconciler.cpp) own game reconciliation policy, while the replay/catch-up machinery they drive is engine-owned in [`ReconcileReplayTick.cpp`](../../Engine/Source/Network/Client/ReconcileReplayTick.cpp).
 
-`GameBase::ProcessInput` has a fixed internal order. [`Input::BeginPoll`](../../Engine/Source/Input/Input.cpp) publishes the display-frame raw snapshot and produces menu and camera input; engine menu policy runs next (quit, then the modal gate, cursor, pause/back-out, engine toggles); `Game::ProcessGameMenuInput` runs last; and `Input::CompletePoll` advances the previous snapshot on every path, including the modal path that skips the game callback.
+`GameBase::ProcessInput` has a fixed internal order. [`Input::BeginPoll`](../../Engine/Source/Input/Input.cpp) publishes the display-frame raw snapshot and produces menu and camera input; engine menu policy runs next (quit, then the modal gate, cursor, pause/back-out, engine toggles); `Game::ProcessGameMenuInput` runs last; and `Input::previous-snapshot assignment` advances the previous snapshot on every path, including the modal path that skips the game callback.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -39,23 +39,23 @@ flowchart LR
 ```mermaid
 %%{init: {'theme': 'default'}}%%
 flowchart LR
-    beginPoll["Input::BeginPoll"] --> policy["Engine menu policy"] --> callback["Game::ProcessGameMenuInput"] --> completePoll["Input::CompletePoll"] --> clientUpdate["GameBase::ClientUpdate"]
+    beginPoll["Input::BeginPoll"] --> policy["Engine menu policy"] --> callback["Game::ProcessGameMenuInput"] --> completePoll["Input::previous-snapshot assignment"] --> clientUpdate["GameBase::ClientUpdate"]
 ```
 
 ## Server Main Loop
 
-The server main loop in [`Main.cpp`](../../Engine/Source/Main.cpp) calls [`GameBase::ServerUpdate()`](../../Engine/Source/GameBase.cpp), followed by `ServerUpdateDisplayStats()`. `ServerUpdate()` establishes the high-level boundaries for network intake, game tick preparation, shared frame simulation, and network completion. [`ServerSessionRuntime.cpp`](../../Engine/Source/Network/Server/ServerSessionRuntime.cpp) owns the engine network cycle; [`ServerSession.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp) owns game session preparation. After the fixed-tick wait, `ServerSessionRuntime::PollTickBoundary` polls a second time so commands that arrived during the wait enter the imminent tick.
+The server main loop in [`Main.cpp`](../../Engine/Source/Main.cpp) calls [`GameBase::ServerUpdate()`](../../Engine/Source/GameBase.cpp), followed by `ServerUpdateDisplayStatistics()`. `ServerUpdate()` establishes the high-level boundaries for network intake, game tick preparation, shared frame simulation, and network completion. [`ServerSessionRuntime.cpp`](../../Engine/Source/Network/Server/ServerSessionRuntime.cpp) owns the engine network cycle; [`ServerSession.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp) owns game session preparation. After the fixed-tick wait, `ServerSessionRuntime::PollTickBoundary` polls a second time so commands that arrived during the wait enter the imminent tick.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
 flowchart LR
     intake["Network intake"] --> boundary["Tick-boundary poll"] --> prepare["Game tick preparation"] --> simulation["Shared frame simulation"] --> completion["Network completion"]
-    completion --> display["ServerUpdateDisplayStats"]
+    completion --> display["ServerUpdateDisplayStatistics"]
 ```
 
 ## Replay Transfer Publication
 
-Replay transfers are recorded on the exact tick that harvested them, in the difference stream's post-dispatch channel rather than inside any `FrameInput`; the authoritative state and network publication stay on that same harvest tick. For an event at `E`, the recording path calls `RecordPostDispatch(E)` with the harvested transfers. The channel is named for when its transfers are applied, not for when its record is read: during playback, `SyncReplayTick` first checksum-validates and removes any prior generation whose terminal tick is `E`, then activates a later generation due at `E`, loads that generation's exact-tick post-dispatch record, and stages its transfer before the frame dispatch for `E`. The active set was fixed before that activation, so the returned coordinate is absent from this dispatch. `FinalizeFrameTick` applies the staged transfer after dispatch and publishes the destination for `E`; the next iteration refreshes the replay active set and gives the new generation its first simulation dispatch at `E + 1`. At most one reader owns a coordinate at a time.
+Replay transfers are recorded on the exact tick that harvested them, in the difference stream's post-dispatch channel rather than inside any `FrameInput`; the authoritative state and network publication stay on that same harvest tick. For an event at `E`, the recording path calls `mPostDispatchRecords.emplace_back(E)` with the harvested transfers. The channel is named for when its transfers are applied, not for when its record is read: during playback, `SyncReplayTick` first checksum-validates and removes any prior generation whose terminal tick is `E`, then activates a later generation due at `E`, loads that generation's exact-tick post-dispatch record, and stages its transfer before the frame dispatch for `E`. The active set was fixed before that activation, so the returned coordinate is absent from this dispatch. `FinalizeFrameTick` applies the staged transfer after dispatch and publishes the destination for `E`; the next iteration refreshes the replay active set and gives the new generation its first simulation dispatch at `E + 1`. At most one reader owns a coordinate at a time.
 
 `SyncReplayTick` returns a dispatch decision to the shared server loop. `kStopBeforeDispatch` always runs `SaveLoadReplay` and breaks the current fixed-tick iteration before frame dispatch. A corrupt replay abort has no load flag, so `SaveLoadReplay` does not reload and the server rolls its tick/time back and rebuilds normal active/next-frame state before the break. When the last reader retires, Replay arms `kLoadReplay` before returning the same stop decision; `SaveLoadReplay` reloads the initial replay state, and its first dispatch occurs in a later fixed-tick iteration.
 
@@ -65,7 +65,7 @@ Network publication observes the returned coordinate only after the transfer has
 %%{init: {'theme': 'default'}}%%
 flowchart TB
     subgraph recording["Recording"]
-        recordE["Dispatch E"] --> harvestE["Post-dispatch harvest E"] --> channelE["RecordPostDispatch E"]
+        recordE["Dispatch E"] --> harvestE["Post-dispatch harvest E"] --> channelE["mPostDispatchRecords.emplace_back E"]
     end
     subgraph playback["Playback"]
         retireE["Validate + remove prior terminal reader E"] --> activateE["Activate returned generation E"] --> loadE["LoadPostDispatch E + stage transfers"]

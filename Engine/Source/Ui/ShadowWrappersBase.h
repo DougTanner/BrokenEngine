@@ -5,12 +5,10 @@
 namespace engine
 {
 
-// Quality / Perf
 extern Wrapper gShadowRenderMultiplier;
-extern Wrapper gShadowTexelRampMetersPerSec;
+extern Wrapper gShadowTexelRampMetersPerSecond;
 extern Wrapper gShadowTemporalBlend;
 
-// Feather
 extern Wrapper gShadowFeatherNoon;
 extern Wrapper gShadowFeatherNoonOffset;
 extern Wrapper gShadowFeatherSunset;
@@ -22,7 +20,6 @@ extern Wrapper gShadowAffectAmbient;
 extern Wrapper gShadowHeightFadeTop;
 extern Wrapper gShadowHeightFadeBottom;
 
-// Object Shadows
 extern Wrapper gObjectShadowsRenderMultiplier;
 extern Wrapper gObjectShadowsBlurMultiplier;
 extern Wrapper gObjectShadowsNoon;

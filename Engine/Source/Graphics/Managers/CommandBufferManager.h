@@ -21,11 +21,10 @@ public:
 
 	std::vector<CommandBuffers> mPerFramebufferCommandBuffers;
 
-	common::PersistentWorker mSubmitGlobal;
-	common::PersistentWorker mSubmitMain;
+	common::PersistentWorker mSubmitGlobal = common::PersistentWorker(common::kThreadSubmitGlobal, common::kiMinWorkbufferSize);
+	common::PersistentWorker mSubmitMain = common::PersistentWorker(common::kThreadSubmitMain, common::kiMinWorkbufferSize);
 
-	// Semaphore waits operate at submission granularity. VkEvent allows non-particle compute to proceed, but finer synchronization offers
-	// minimal occupancy gains for this workload.
+	// Semaphore waits operate at submission granularity; finer synchronization offers minimal occupancy gains for this workload.
 	VkSemaphore mParticleSyncVkSemaphore = VK_NULL_HANDLE;
 	bool mbParticleSemaphoreSignaled = false;
 

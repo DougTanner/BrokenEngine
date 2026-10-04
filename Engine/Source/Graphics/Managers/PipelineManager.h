@@ -72,10 +72,6 @@ public:
 
 	std::unordered_map<common::crc_t, Shader> mShaders;
 
-	void CreateLightingPipelines();
-	void CreateLightingBlurPipelines();
-	void CreatePipelineShadows();
-	void CreateLightingShadowDependentPipelines();
 	void CreateTerrainDataPipelines();
 	void CreateSmokeWindPipelines();
 	void CreateParticlePipelines();
@@ -84,7 +80,7 @@ public:
 	Pipeline mpPipelines[kPipelineCount];
 
 	// Texture* array for the kPipelineWater normal map atlas binding (sized sampler array).
-	// Populated at the top of CreateLightingShadowDependentPipelines() before kPipelineWater is built.
+	// Populated by WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines() before kPipelineWater is built.
 	Texture* mppWaterNormalTextures[shaders::kiWaterNormalCount] {};
 
 	// Spread pipelines [pass]: radial directional spread, fragment shader with MRT
@@ -102,11 +98,9 @@ public:
 	// Publishes the temporal-blended combine outputs into the distinct persistent history images.
 	Pipeline mLightingHistoryCopyPipeline;
 
-	DynamicPipelines mDynamicPipelines;
+	DynamicPipelines mDynamicPipelines = DynamicPipelines(mShaders);
 
-private:
-
-	WorldLightingShadowPipelines mWorldLightingShadowPipelines;
+	WorldLightingShadowPipelines mWorldLightingShadowPipelines = WorldLightingShadowPipelines(mShaders, mpPipelines, mSpreadPipelines, mSpreadPipelineNames, mCombinePipeline, mLightingTemporalPipeline, mLightingHistoryCopyPipeline, mppWaterNormalTextures);
 };
 
 inline PipelineManager* gpPipelineManager = nullptr;

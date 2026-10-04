@@ -1,5 +1,6 @@
 #pragma once
 
+#include "File/PackChunks.h"
 #include "CollectionController.h"
 #include "CollectionId.h"
 #include "CollectionLifecycle.h"
@@ -105,9 +106,6 @@ enum class CollectionFlags : uint32_t
 using CollectionFlags_t = common::Flags<CollectionFlags>;
 
 #if defined(BT_CLIENT)
-// Request lazy-load of a texture chunk by CRC (implemented in the FileManager subsystem)
-void RequestTextureChunkLoad(common::crc_t uiCrc);
-
 // Register a CRC for pre-blur (implemented in TextureManager.cpp)
 void RegisterLightingTextureCrc(common::crc_t uiCrc);
 #endif
@@ -132,7 +130,7 @@ struct TypeRegistry
 			if (rType.uiCrc != 0)
 			{
 #if defined(BT_CLIENT)
-				RequestTextureChunkLoad(rType.uiCrc);
+				gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(std::span(&rType.uiCrc, 1), LoadPriority::kNormal);
 				RegisterLightingTextureCrc(rType.uiCrc);
 #endif
 			}
@@ -143,7 +141,7 @@ struct TypeRegistry
 			if (rType.particleCrc != 0)
 			{
 #if defined(BT_CLIENT)
-				RequestTextureChunkLoad(rType.particleCrc);
+				gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(std::span(&rType.particleCrc, 1), LoadPriority::kNormal);
 				RegisterLightingTextureCrc(rType.particleCrc);
 #endif
 			}

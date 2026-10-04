@@ -1,3 +1,4 @@
+#include "File/PackChunks.h"
 #include "Input/Input.h"
 #include "Memory/GlobalAllocator.h"
 #include "Server/ServerDisplay.h"
@@ -16,38 +17,28 @@
 namespace engine
 {
 
-static bool sbQuit = false;
-
-void RequestQuit()
-{
-	sbQuit = true;
-}
-
 #if defined(BT_CLIENT)
 static HCURSOR sHcursorArrow = nullptr;
 static HCURSOR sHcursorCrosshair = nullptr;
 #endif
 
-static HWND sHwnd = nullptr;
+static HWND sHWindow = nullptr;
 static HMONITOR sHmonitor = nullptr;
 static MONITORINFO sMonitorInfo {};
 
 static bool sbHasFocus = false;
 
 #if defined(BT_CLIENT)
-static LONG sWindowStyle = 0;
-static RECT sWindowRect {};
+static LONG siWindowStyle = 0;
+static RECT sWindowRectangle {};
 
-// Agent-only runtime fullscreen override (SetAgentFullscreenOverride). std::nullopt = no override (launch behavior);
-// set = the agent fullscreen command forces this mode, consulted ahead of --windowed. Never mutates gFullscreen.
-static std::optional<bool> sAgentFullscreenOverride;
 #endif
 
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+static LRESULT CALLBACK WindowProcedure(HWND hWindow, UINT uiMessage, WPARAM uiWordParameter, LPARAM iLongParameter);
 
 #if defined(BT_CLIENT)
-void FindMonitor(bool bUseCurrentRect);
-VkExtent2D SetupWindow(bool bFullscreen, LONG& riWindowStyle, RECT& rWindowRect);
+static void FindMonitor(bool bUseCurrentRectangle);
+static VkExtent2D SetupWindow(bool bFullscreen, LONG& riWindowStyle, RECT& rWindowRectangle);
 
 // Effective fullscreen precedence: the agent fullscreen override (runtime, in-memory) wins first; else false when
 // --windowed WxH is set (reproducible agent capture geometry); else the saved gFullscreen preference. Override only
@@ -55,29 +46,25 @@ VkExtent2D SetupWindow(bool bFullscreen, LONG& riWindowStyle, RECT& rWindowRect)
 // rewrite the user's saved fullscreen preference).
 static bool WantedFullscreen()
 {
-	if (sAgentFullscreenOverride.has_value())
+	if (gAgentFullscreenOverride.has_value())
 	{
-		return *sAgentFullscreenOverride;
+		return *gAgentFullscreenOverride;
 	}
-	if (gLaunchOptions.windowedExtent.width != 0 && gLaunchOptions.windowedExtent.height != 0)
+	if (gLaunchOptions.vkWindowedExtent.width != 0 && gLaunchOptions.vkWindowedExtent.height != 0)
 	{
 		return false;
 	}
 	return gFullscreen.Get<bool>();
 }
 
-void SetAgentFullscreenOverride(std::optional<bool> fullscreen)
-{
-	sAgentFullscreenOverride = fullscreen;
-}
 #endif
-bool ProcessMessages();
+static bool ProcessMessages();
 
 static int HandleEagerLoadCompletion()
 {
 	try
 	{
-		static_cast<void>(gpFileManager->GetEagerChunkMap());
+		static_cast<void>(gpFileManager->mpPackChunks->GetEagerChunkMap());
 	}
 	catch (const std::system_error&)
 	{
@@ -85,7 +72,7 @@ static int HandleEagerLoadCompletion()
 	}
 	catch (const std::runtime_error& rException)
 	{
-		if (!AgentLaunched())
+		if ((gLaunchOptions.iAgentPort == 0))
 		{
 			MessageBox(nullptr, rException.what(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 		}
@@ -95,7 +82,7 @@ static int HandleEagerLoadCompletion()
 	return 0;
 }
 
-int MainThread(HINSTANCE hinstance)
+static int MainThread(HINSTANCE hInstance)
 {
 	common::SetupExceptionHandling();
 
@@ -124,7 +111,6 @@ int MainThread(HINSTANCE hinstance)
 	}
 
 #if defined(BT_CLIENT)
-	// Cursor
 	sHcursorArrow = LoadCursor(nullptr, IDC_ARROW);
 	sHcursorCrosshair = LoadCursor(nullptr, IDC_CROSS);
 	common::ScopedLambda destroyCursor([]()
@@ -143,10 +129,8 @@ int MainThread(HINSTANCE hinstance)
 #endif
 	auto pMultithreading = std::make_unique<common::Multithreading>(iBackgroundThreadCount);
 
-	// Profile
 	auto pProfileManager = std::make_unique<game::ProfileManager>();
 
-	// Start DxDiag reading in the background
 	std::future<void> readDxDiag;
 	if constexpr (kbDxDiag)
 	{
@@ -157,14 +141,11 @@ int MainThread(HINSTANCE hinstance)
 	}
 
 #if defined(BT_CLIENT)
-	// Input
 	auto pRawInputManager = std::make_unique<RawInputManager>();
 
-	// Audio
 	auto pAudioManager = std::make_unique<AudioManager>();
 #endif
 
-	// Network
 	auto pNetworkManager = std::make_unique<NetworkManager>();
 
 	// Agent command channel (loopback JSON control, drained on the main thread). Constructed after NetworkManager
@@ -207,15 +188,14 @@ int MainThread(HINSTANCE hinstance)
 		}
 	}
 
-	// Register class
-	WNDCLASSEX wndClassEx
+	WNDCLASSEX windowClassExtended
 	{
-		.cbSize = sizeof(wndClassEx),
+		.cbSize = sizeof(windowClassExtended),
 		.style = CS_HREDRAW | CS_VREDRAW,
-		.lpfnWndProc = WndProc,
+		.lpfnWndProc = WindowProcedure,
 		.cbClsExtra = 0,
 		.cbWndExtra = 0,
-		.hInstance = hinstance,
+		.hInstance = hInstance,
 		.hIcon = LoadIcon(nullptr, IDI_APPLICATION),
 		.hCursor = nullptr,
 		.hbrBackground = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)),
@@ -223,67 +203,63 @@ int MainThread(HINSTANCE hinstance)
 		.lpszClassName = game::kGameName.data(),
 		.hIconSm = LoadIcon(nullptr, IDI_APPLICATION),
 	};
-	ATOM atom = RegisterClassEx(&wndClassEx);
-	if (atom == 0)
+	ATOM uiAtom = RegisterClassEx(&windowClassExtended);
+	if (uiAtom == 0)
 	{
 		throw std::runtime_error("RegisterClassEx failed");
 	}
-	common::ScopedLambda unregisterClass([&hinstance]()
+	common::ScopedLambda unregisterClass([&hInstance]()
 	{
 		LOG(kDefault, kDebug, "Unregister class");
-		UnregisterClass(game::kGameName.data(), hinstance);
+		UnregisterClass(game::kGameName.data(), hInstance);
 	});
 
-	// Setup window rect & matrices
 #if defined(BT_CLIENT)
 	LoadGraphicsSettings();
-	gWantedFramebufferExtent2D = SetupWindow(WantedFullscreen(), sWindowStyle, sWindowRect);
+	gVkWantedFramebufferExtent2D = SetupWindow(WantedFullscreen(), siWindowStyle, sWindowRectangle);
 #else
 	LONG iWindowStyle = WS_POPUP;
-	RECT windowRect {};
-	SystemParametersInfo(SPI_GETWORKAREA, 0, &windowRect, 0);
+	RECT windowRectangle {};
+	SystemParametersInfo(SPI_GETWORKAREA, 0, &windowRectangle, 0);
 #endif // BT_CLIENT
 
-	// Create window
 #if defined(BT_CLIENT)
-	sHwnd = CreateWindow(game::kGameName.data(), game::kGameName.data(), sWindowStyle, sWindowRect.left, sWindowRect.top, sWindowRect.right - sWindowRect.left, sWindowRect.bottom - sWindowRect.top, nullptr, nullptr, hinstance, nullptr);
+	sHWindow = CreateWindow(game::kGameName.data(), game::kGameName.data(), siWindowStyle, sWindowRectangle.left, sWindowRectangle.top, sWindowRectangle.right - sWindowRectangle.left, sWindowRectangle.bottom - sWindowRectangle.top, nullptr, nullptr, hInstance, nullptr);
 #else
-	sHwnd = CreateWindow(game::kGameName.data(), game::kGameName.data(), iWindowStyle, windowRect.left, windowRect.top, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top, nullptr, nullptr, hinstance, nullptr);
+	sHWindow = CreateWindow(game::kGameName.data(), game::kGameName.data(), iWindowStyle, windowRectangle.left, windowRectangle.top, windowRectangle.right - windowRectangle.left, windowRectangle.bottom - windowRectangle.top, nullptr, nullptr, hInstance, nullptr);
 #endif
-	if (sHwnd == nullptr)
+	if (sHWindow == nullptr)
 	{
 		throw std::runtime_error("CreateWindow failed");
 	}
 	common::ScopedLambda destroyWindow([]()
 	{
 #if defined(BT_SERVER)
-		// Shutdown has definitely begun by here on every path, including an exception unwinding out of the main
-		// loop, so the WM_LBUTTONDOWN guard below this drain holds even when nothing set the flag earlier.
-		sbQuit = true;
+		// Set the shutdown flag before the teardown message drain, including exception unwinding, so clicks cannot request a repaint.
+		gbQuit = true;
 
 		// Drop any paint region an external event (uncover, resize, DPI change) added after the main loop's final
 		// drain: the server display reads game state, and by here the game object is already gone. ValidateRect
 		// leaves nothing for this drain to dispatch WM_PAINT for, and nothing invalidates the window afterwards.
-		// The null check is required, not defensive — ValidateRect(nullptr) redraws every window in the system.
-		if (sHwnd != nullptr)
+		// ValidateRect(nullptr) redraws every window in the system.
+		if (sHWindow != nullptr)
 		{
-			ValidateRect(sHwnd, nullptr);
+			ValidateRect(sHWindow, nullptr);
 		}
 		ProcessMessages();
 #endif
-		// No client pump here: Game, Graphics/ImGui, and Input are already destroyed, and the client WndProc
+		// No client pump here: Game, Graphics/ImGui, and Input are already destroyed, and the client WindowProcedure
 		// dereferences game::gpGame on WM_SETFOCUS.
 
-		if (sHwnd != nullptr)
+		if (sHWindow != nullptr)
 		{
 			LOG(kDefault, kDebug, "Destroy window");
-			DestroyWindow(sHwnd);
-			sHwnd = nullptr;
+			DestroyWindow(sHWindow);
+			sHWindow = nullptr;
 		}
 	});
 
 #if defined(BT_CLIENT)
-	// Load settings
 	LoadSoundSettings();
 	LoadGameSettings();
 	if (gMuteInBackground.Get<bool>() || gLaunchOptions.iAgentPort != 0)
@@ -308,15 +284,12 @@ int MainThread(HINSTANCE hinstance)
 	RegisterEngineTweakSections();
 	game::RegisterGameTweakSections();
 
-	// Initialize graphics
 	gpProfileManager->BootStart(kBootTimerVulkan);
-	auto pGraphics = std::make_unique<Graphics>(hinstance, sHwnd);
+	auto pGraphics = std::make_unique<Graphics>(hInstance, sHWindow);
 
-	// Load game
 	auto pCamera = std::make_unique<game::Camera>();
 	auto pGame = std::make_unique<game::Game>();
 
-	// Input
 	auto pInput = std::make_unique<Input>();
 	gpInput = pInput.get();
 
@@ -328,16 +301,14 @@ int MainThread(HINSTANCE hinstance)
 
 	gpProfileManager->BootStop(kBootTimerVulkan);
 
-	// Ensure priority textures are ready
 	gpProfileManager->BootStart(kBootTimerWaitForPriorityTextures);
-	gpTextureManager->WaitForTextures(TextureManager::kpPriorityTextures.pCrcs);
+	gpTextureManager->WaitForTextures(TextureManager::kPriorityTextures.pCrcs);
 	gpProfileManager->BootStop(kBootTimerWaitForPriorityTextures);
 
-	// Populate boot-time render interpolate for the single origin frame
 	{
-		// Heap: operator[] may insert default element
+		// Heap: try_emplace may allocate the origin entry.
 		ScopedSuppressAllocationTracking suppress;
-		game::FrameInterpolate::AllocateAndCopy(pGame->mRenderInterpolates.try_emplace(kOriginCoordinate).first->second, pGame->RenderFrame(pGame->mClientGridCoord).interpolate);
+		game::FrameInterpolate::AllocateAndCopy(pGame->mRenderInterpolates.try_emplace(kOriginCoordinate).first->second, pGame->RenderFrame(pGame->mClientGridCoordinate).interpolate);
 	}
 	gpCamera->Update(pGame->mRenderInterpolates.at(kOriginCoordinate), static_cast<float>(pGame->mfLastRenderFrameSeconds));
 
@@ -345,51 +316,50 @@ int MainThread(HINSTANCE hinstance)
 	// swapchain is skipped, not retried; the count is captured first because a swapchain-tier Destroy() resets the
 	// command buffer manager.
 	gpProfileManager->BootStart(kBootTimerRenderPresent);
-	std::vector<GridCoord> bootActiveCoords = {kOriginCoordinate};
-	size_t uiBootFramebufferCount = gpCommandBufferManager->mPerFramebufferCommandBuffers.size();
-	for (size_t i = 0; i < uiBootFramebufferCount; ++i)
+	std::vector<GridCoord> bootActiveCoordinates = {kOriginCoordinate};
+	int64_t iBootFramebufferCount = std::ssize(gpCommandBufferManager->mPerFramebufferCommandBuffers);
+	for (int64_t i = 0; i < iBootFramebufferCount; ++i)
 	{
 		if (pGame->HandleDeferredSwapchain())
 		{
 			continue;
 		}
-		gpGraphics->RenderGlobal(pGame->RenderFrame(pGame->mClientGridCoord).interpolate.fCurrentTime);
-		gpGraphics->RenderMainPresentAcquire(gpSwapchainManager->miFramebufferIndex, pGame->mRenderInterpolates, bootActiveCoords, kOriginCoordinate, pGame->RenderFrame(pGame->mClientGridCoord).interpolate.fCurrentTime);
+		gpGraphics->RenderGlobal(std::chrono::duration<float>(pGame->RenderFrame(pGame->mClientGridCoordinate).interpolate.fCurrentTime));
+		gpGraphics->RenderMainPresentAcquire(gpSwapchainManager->miFramebufferIndex, pGame->mRenderInterpolates, bootActiveCoordinates, kOriginCoordinate, std::chrono::duration<float>(pGame->RenderFrame(pGame->mClientGridCoordinate).interpolate.fCurrentTime));
 	}
 	gpProfileManager->BootStop(kBootTimerRenderPresent);
 
 	// Agent-mode launch stays minimized and must not steal focus from the user's active app
-	ShowWindow(sHwnd, gLaunchOptions.iAgentPort != 0 ? SW_SHOWMINNOACTIVE : SW_SHOWDEFAULT);
+	ShowWindow(sHWindow, gLaunchOptions.iAgentPort != 0 ? SW_SHOWMINNOACTIVE : SW_SHOWDEFAULT);
 #else
-	// Server: create terrain collision data (no Graphics)
 	auto pIslandTerrain = std::make_unique<IslandTerrain>();
 	if (HandleEagerLoadCompletion() != 0)
 	{
 		return 1;
 	}
-	gpIslandTerrain->WaitForElevationMaps(game::NavThresholdElevation(gBaseHeight.Get()), game::NavClearanceMeters());
+	gpIslandTerrain->WaitForElevationMaps(game::NavThresholdElevation(gBaseHeight.mfCurrent), game::NavClearanceMeters());
 
 	auto pGame = std::make_unique<game::Game>();
 
-	ShowWindow(sHwnd, gLaunchOptions.iAgentPort != 0 ? SW_SHOWMINNOACTIVE : SW_SHOWNOACTIVATE);
+	ShowWindow(sHWindow, gLaunchOptions.iAgentPort != 0 ? SW_SHOWMINNOACTIVE : SW_SHOWNOACTIVATE);
 #endif // BT_CLIENT
 	common::ScopedLambda hideWindow([]()
 	{
 		LOG(kDefault, kDebug, "Hide window");
-		ShowWindow(sHwnd, SW_HIDE);
+		ShowWindow(sHWindow, SW_HIDE);
 	});
 #if defined(BT_CLIENT)
 	// Agent-mode launch must not steal focus from the user's active app
 	if (gLaunchOptions.iAgentPort == 0)
 	{
-		SetForegroundWindow(sHwnd);
-		BringWindowToTop(sHwnd);
-		SetFocus(sHwnd);
+		SetForegroundWindow(sHWindow);
+		BringWindowToTop(sHWindow);
+		SetFocus(sHWindow);
 	}
 #else
 	if (gLaunchOptions.iAgentPort == 0)
 	{
-		SetFocus(sHwnd);
+		SetFocus(sHWindow);
 	}
 #endif
 	ProcessMessages();
@@ -398,9 +368,9 @@ int MainThread(HINSTANCE hinstance)
 
 	common::ScopedLambda disableAllocationTracking([]()
 	{
-		EnableAllocationTracking(false);
+		gbAllocationTrackingReady.store(false, std::memory_order_relaxed);
 	});
-	EnableAllocationTracking(true);
+	gbAllocationTrackingReady.store(true, std::memory_order_relaxed);
 	pGame->mTimeStep.mRealTime.Reset();
 
 	LOG(kDefault, kInfo, "\nEnter main loop");
@@ -409,9 +379,8 @@ int MainThread(HINSTANCE hinstance)
 	{
 		gpProfileManager->CpuStart(kCpuTimerMessagesAndInput);
 
-		// Process Windows messages
 		[[maybe_unused]] bool bLostFocus = ProcessMessages();
-		if (sbQuit) [[unlikely]]
+		if (gbQuit) [[unlikely]]
 		{
 			break;
 		}
@@ -421,16 +390,16 @@ int MainThread(HINSTANCE hinstance)
 		// ProcessMessages() calls, so a mid-shutdown mismatch can't SetWindowPos a dying window. Read through
 		// WantedFullscreen() so the --windowed / agent overrides fold in and gFullscreen is never mutated.
 		bool bWantedFullscreen = WantedFullscreen();
-		bool bIsFullscreen = (sWindowStyle & WS_POPUP) != 0;
+		bool bIsFullscreen = (siWindowStyle & WS_POPUP) != 0;
 		if (bIsFullscreen != bWantedFullscreen)
 		{
-			SetupWindow(bWantedFullscreen, sWindowStyle, sWindowRect);
-			SetWindowLongPtr(sHwnd, GWL_STYLE, sWindowStyle);
+			SetupWindow(bWantedFullscreen, siWindowStyle, sWindowRectangle);
+			SetWindowLongPtr(sHWindow, GWL_STYLE, siWindowStyle);
 			// SWP_NOZORDER | SWP_NOACTIVATE: the agent fullscreen command reaches this path, and the harness must never steal foreground focus.
-			SetWindowPos(sHwnd, nullptr, sWindowRect.left, sWindowRect.top, sWindowRect.right - sWindowRect.left, sWindowRect.bottom - sWindowRect.top, SWP_NOZORDER | SWP_NOACTIVATE);
+			SetWindowPos(sHWindow, nullptr, sWindowRectangle.left, sWindowRectangle.top, sWindowRectangle.right - sWindowRectangle.left, sWindowRectangle.bottom - sWindowRectangle.top, SWP_NOZORDER | SWP_NOACTIVATE);
 		}
 
-		// Drain agent commands before input so injected input scripts (later harness plans) act on the same frame.
+		// Drain agent commands before input so injected input scripts act on the same frame.
 		// The server drains in GameBase::ServerUpdate instead, matching the debug-control packet ordering.
 		if (gpAgentCommandServer != nullptr) [[unlikely]]
 		{
@@ -445,7 +414,6 @@ int MainThread(HINSTANCE hinstance)
 		}
 #endif
 
-		// Input
 #if defined(BT_CLIENT)
 		pGame->ProcessInput(bLostFocus);
 		if (pGame->mGameFlags & engine::GameFlags::kQuit) [[unlikely]]
@@ -476,17 +444,16 @@ int MainThread(HINSTANCE hinstance)
 			}
 			LOG(kDefault, kDebug, "Caught Vulkan device loss: {}", rException.what());
 			pGraphics.reset();
-			pGraphics = std::make_unique<Graphics>(hinstance, sHwnd);
+			pGraphics = std::make_unique<Graphics>(hInstance, sHWindow);
 		}
 
-		// Audio update
-		auto audioCoordIt = pGame->mCoordFrames.find(game::gpGame->mClientGridCoord);
-		pAudioManager->Update(audioCoordIt != pGame->mCoordFrames.end() && audioCoordIt->second.iSnapshotCount > 0 ? &pGame->RenderFrame(game::gpGame->mClientGridCoord) : nullptr);
+		auto it = pGame->mCoordinateFrames.find(game::gpGame->mClientGridCoordinate);
+		pAudioManager->Update(it != pGame->mCoordinateFrames.end() && it->second.iSnapshotCount > 0 ? &pGame->RenderFrame(game::gpGame->mClientGridCoordinate) : nullptr);
 #else
 		{
 			// Heap: Win32 InvalidateRect may trigger internal GDI allocations
 			ScopedSuppressAllocationTracking suppress;
-			ServerUpdateDisplayStats();
+			ServerUpdateDisplayStatistics();
 
 			// Throttle full-window GDI repaint to a fraction of the tick rate — paint cost dwarfs stat aggregation, and the window shows only coarse stats/map. Clicks still repaint immediately via WM_LBUTTONDOWN.
 			static constexpr int64_t kiServerDisplayRepaintTicks = 8;
@@ -495,17 +462,17 @@ int MainThread(HINSTANCE hinstance)
 			{
 				siServerDisplayRepaintCounter = 0;
 
-				// Skip the repaint when it would blit nothing new: a minimized/hidden window paints offscreen for no benefit, and a visible window whose displayed stats/map are unchanged need not repaint an identical frame. Clicks still repaint immediately via WM_LBUTTONDOWN.
+				// Skip the repaint when it would blit nothing new: a minimized/hidden window paints offscreen for no benefit, and a visible window whose displayed stats/map are unchanged need not repaint an identical frame.
 				// Keep a slow heartbeat while visible-but-unchanged so the free-running tick/timer text (deliberately outside the content hash) stays visibly alive instead of reading as a hung server.
 				static constexpr int64_t kiServerDisplayHeartbeatWindows = 4; // 4 x 8-tick windows = 1 Hz at the 32 Hz tick rate
 				static int64_t siServerDisplayHeartbeatCounter = 0;
-				if (!IsIconic(sHwnd) && IsWindowVisible(sHwnd))
+				if (!IsIconic(sHWindow) && IsWindowVisible(sHWindow))
 				{
 					bool bHeartbeat = ++siServerDisplayHeartbeatCounter >= kiServerDisplayHeartbeatWindows;
 					if (ServerDisplayContentChanged() || bHeartbeat)
 					{
 						siServerDisplayHeartbeatCounter = 0;
-						InvalidateRect(sHwnd, nullptr, FALSE);
+						InvalidateRect(sHWindow, nullptr, FALSE);
 					}
 				}
 			}
@@ -515,7 +482,7 @@ int MainThread(HINSTANCE hinstance)
 	LogIndent(-1);
 	LOG(kDefault, kInfo, "Exit main loop\n\n");
 
-	EnableAllocationTracking(false);
+	gbAllocationTrackingReady.store(false, std::memory_order_relaxed);
 
 #if defined(BT_SERVER)
 	if (!pGame->mGameSaveLoad.Autosave())
@@ -525,7 +492,6 @@ int MainThread(HINSTANCE hinstance)
 #endif
 
 #if defined(BT_CLIENT)
-	// Save settings
 	game::SaveTweaksSettings();
 	SaveSoundSettings();
 	SaveGraphicsSettings();
@@ -540,37 +506,37 @@ int MainThread(HINSTANCE hinstance)
 
 #if defined(BT_CLIENT)
 static int64_t siMonitorCount = 0;
-static bool sbUseCurrentRect = false;
+static bool sbUseCurrentRectangle = false;
 
-void FindMonitor(bool bUseCurrentRect)
+static void FindMonitor(bool bUseCurrentRectangle)
 {
 	sHmonitor = nullptr;
-	sbUseCurrentRect = bUseCurrentRect;
+	sbUseCurrentRectangle = bUseCurrentRectangle;
 
-	if (sbUseCurrentRect)
+	if (sbUseCurrentRectangle)
 	{
-		GetWindowRect(sHwnd, &sWindowRect);
-		LOG(kDefault, kDebug, "Window left top: {}, {}", sWindowRect.left, sWindowRect.top);
+		GetWindowRect(sHWindow, &sWindowRectangle);
+		LOG(kDefault, kDebug, "Window left top: {}, {}", sWindowRectangle.left, sWindowRectangle.top);
 	}
 
 	LOG(kDefault, kDebug, "Monitors:");
 	siMonitorCount = 0;
-	EnumDisplayMonitors(nullptr, nullptr, [](HMONITOR hmonitor, [[maybe_unused]] HDC hdc, [[maybe_unused]] LPRECT lprect, [[maybe_unused]] LPARAM lparam) -> BOOL
+	EnumDisplayMonitors(nullptr, nullptr, [](HMONITOR hMonitor, [[maybe_unused]] HDC hDeviceContext, [[maybe_unused]] LPRECT pRectangle, [[maybe_unused]] LPARAM iLongParameter) -> BOOL
 	{
-		MONITORINFO monitorinfo;
-		monitorinfo.cbSize = sizeof(monitorinfo);
-		GetMonitorInfo(hmonitor, &monitorinfo);
-		bool bPrimary = (monitorinfo.dwFlags & MONITORINFOF_PRIMARY) != 0;
-		bool bRectIsInMonitor = sWindowRect.left >= monitorinfo.rcMonitor.left && sWindowRect.left <= monitorinfo.rcMonitor.right && sWindowRect.top >= monitorinfo.rcMonitor.top && sWindowRect.top <= monitorinfo.rcMonitor.bottom;
+		MONITORINFO monitorInfo;
+		monitorInfo.cbSize = sizeof(monitorInfo);
+		GetMonitorInfo(hMonitor, &monitorInfo);
+		bool bPrimary = (monitorInfo.dwFlags & MONITORINFOF_PRIMARY) != 0;
+		bool bRectangleIsInMonitor = sWindowRectangle.left >= monitorInfo.rcMonitor.left && sWindowRectangle.left <= monitorInfo.rcMonitor.right && sWindowRectangle.top >= monitorInfo.rcMonitor.top && sWindowRectangle.top <= monitorInfo.rcMonitor.bottom;
 
-		[[maybe_unused]] LONG iWidth = monitorinfo.rcMonitor.right - monitorinfo.rcMonitor.left;
-		[[maybe_unused]] LONG iHeight = monitorinfo.rcMonitor.bottom - monitorinfo.rcMonitor.top;
-		LOG(kDefault, kDebug, "  {}: {} x {}{}{}", siMonitorCount++, iWidth, iHeight, bPrimary ? " (Primary)" : "", bRectIsInMonitor ? " (Monitor)" : "");
+		[[maybe_unused]] LONG iWidth = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
+		[[maybe_unused]] LONG iHeight = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
+		LOG(kDefault, kDebug, "  {}: {} x {}{}{}", siMonitorCount++, iWidth, iHeight, bPrimary ? " (Primary)" : "", bRectangleIsInMonitor ? " (Monitor)" : "");
 
-		if (sHmonitor == nullptr || (sbUseCurrentRect && bRectIsInMonitor) || (!sbUseCurrentRect && bPrimary))
+		if (sHmonitor == nullptr || (sbUseCurrentRectangle && bRectangleIsInMonitor) || (!sbUseCurrentRectangle && bPrimary))
 		{
-			sHmonitor = hmonitor;
-			sMonitorInfo = monitorinfo;
+			sHmonitor = hMonitor;
+			sMonitorInfo = monitorInfo;
 		}
 
 		return TRUE;
@@ -578,23 +544,23 @@ void FindMonitor(bool bUseCurrentRect)
 	LOG(kDefault, kDebug, "");
 }
 
-VkExtent2D SetupWindow(bool bFullscreen, LONG& riWindowStyle, RECT& rWindowRect)
+static VkExtent2D SetupWindow(bool bFullscreen, LONG& riWindowStyle, RECT& rWindowRectangle)
 {
-	if (sHwnd == nullptr)
+	if (sHWindow == nullptr)
 	{
 		riWindowStyle = 0;
 	}
 	else
 	{
-		riWindowStyle = GetWindowLong(sHwnd, GWL_STYLE) & ~(WS_OVERLAPPEDWINDOW | WS_POPUP);
+		riWindowStyle = GetWindowLong(sHWindow, GWL_STYLE) & ~(WS_OVERLAPPEDWINDOW | WS_POPUP);
 	}
 
-	FindMonitor(sHwnd != nullptr);
+	FindMonitor(sHWindow != nullptr);
 
 	if (bFullscreen)
 	{
 		riWindowStyle |= WS_POPUP;
-		rWindowRect = sMonitorInfo.rcMonitor;
+		rWindowRectangle = sMonitorInfo.rcMonitor;
 	}
 	else
 	{
@@ -603,60 +569,60 @@ VkExtent2D SetupWindow(bool bFullscreen, LONG& riWindowStyle, RECT& rWindowRect)
 		LONG iX = common::RoundUp<LONG, 8>(static_cast<LONG>(0.05f * static_cast<float>(sMonitorInfo.rcMonitor.right)));
 		LONG iY = common::RoundUp<LONG, 8>(static_cast<LONG>(0.05f * static_cast<float>(sMonitorInfo.rcMonitor.bottom)));
 
-		if (gLaunchOptions.windowedExtent.width != 0 && gLaunchOptions.windowedExtent.height != 0)
+		if (gLaunchOptions.vkWindowedExtent.width != 0 && gLaunchOptions.vkWindowedExtent.height != 0)
 		{
 			// Reproducible agent capture geometry: use the requested client size (multiple-of-8 rounded, matching
 			// the default inset path), anchored at the monitor's top-left inset.
-			LONG iClientWidth = common::RoundUp<LONG, 8>(static_cast<LONG>(gLaunchOptions.windowedExtent.width));
-			LONG iClientHeight = common::RoundUp<LONG, 8>(static_cast<LONG>(gLaunchOptions.windowedExtent.height));
-			rWindowRect.left = sMonitorInfo.rcMonitor.left + iX;
-			rWindowRect.top = sMonitorInfo.rcMonitor.top + iY;
-			rWindowRect.right = rWindowRect.left + iClientWidth;
-			rWindowRect.bottom = rWindowRect.top + iClientHeight;
+			LONG iClientWidth = common::RoundUp<LONG, 8>(static_cast<LONG>(gLaunchOptions.vkWindowedExtent.width));
+			LONG iClientHeight = common::RoundUp<LONG, 8>(static_cast<LONG>(gLaunchOptions.vkWindowedExtent.height));
+			rWindowRectangle.left = sMonitorInfo.rcMonitor.left + iX;
+			rWindowRectangle.top = sMonitorInfo.rcMonitor.top + iY;
+			rWindowRectangle.right = rWindowRectangle.left + iClientWidth;
+			rWindowRectangle.bottom = rWindowRectangle.top + iClientHeight;
 		}
 		else
 		{
-			rWindowRect.left = sMonitorInfo.rcMonitor.left + iX;
-			rWindowRect.right = sMonitorInfo.rcMonitor.right - iX;
-			rWindowRect.top = sMonitorInfo.rcMonitor.top + iY;
-			rWindowRect.bottom = sMonitorInfo.rcMonitor.bottom - iY;
+			rWindowRectangle.left = sMonitorInfo.rcMonitor.left + iX;
+			rWindowRectangle.right = sMonitorInfo.rcMonitor.right - iX;
+			rWindowRectangle.top = sMonitorInfo.rcMonitor.top + iY;
+			rWindowRectangle.bottom = sMonitorInfo.rcMonitor.bottom - iY;
 		}
 	}
 
-	LONG iFramebufferWidth = rWindowRect.right - rWindowRect.left;
-	LONG iFramebufferHeight = rWindowRect.bottom - rWindowRect.top;
-	LOG(kDefault, kDebug, "Set {} window {} x {} at ({}, {})", (riWindowStyle & WS_OVERLAPPEDWINDOW) != 0 ? "WS_OVERLAPPEDWINDOW" : "WS_POPUP", iFramebufferWidth, iFramebufferHeight, rWindowRect.left, rWindowRect.top);
+	LONG iFramebufferWidth = rWindowRectangle.right - rWindowRectangle.left;
+	LONG iFramebufferHeight = rWindowRectangle.bottom - rWindowRectangle.top;
+	LOG(kDefault, kDebug, "Set {} window {} x {} at ({}, {})", (riWindowStyle & WS_OVERLAPPEDWINDOW) != 0 ? "WS_OVERLAPPEDWINDOW" : "WS_POPUP", iFramebufferWidth, iFramebufferHeight, rWindowRectangle.left, rWindowRectangle.top);
 
 	if ((riWindowStyle & WS_OVERLAPPEDWINDOW) != 0)
 	{
-		AdjustWindowRect(&rWindowRect, riWindowStyle, FALSE);
+		AdjustWindowRect(&rWindowRectangle, riWindowStyle, FALSE);
 	}
 
-	return {static_cast<uint32_t>(iFramebufferWidth), static_cast<uint32_t>(iFramebufferHeight)};
+	return {.width = static_cast<uint32_t>(iFramebufferWidth), .height = static_cast<uint32_t>(iFramebufferHeight)};
 }
 #endif // BT_CLIENT
 
-bool ProcessMessages()
+static bool ProcessMessages()
 {
 	// Process messages with PeekMessage() which doesn't block
-	MSG msg {};
-	bool bHasMessage = PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE) == TRUE;
+	MSG message {};
+	bool bHasMessage = PeekMessage(&message, nullptr, 0, 0, PM_REMOVE) == TRUE;
 	while (bHasMessage)
 	{
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
-		bHasMessage = PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE) == TRUE;
+		TranslateMessage(&message);
+		DispatchMessage(&message);
+		bHasMessage = PeekMessage(&message, nullptr, 0, 0, PM_REMOVE) == TRUE;
 	}
 
 	return !sbHasFocus;
 }
 
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+static LRESULT CALLBACK WindowProcedure(HWND hWindow, UINT uiMessage, WPARAM uiWordParameter, LPARAM iLongParameter)
 {
 #if defined(BT_CLIENT)
 	// Game handles cursor when ImGui doesn't want the mouse. Guard GetIO(): the ImGui context can be destroyed across a
 	// multi-frame deferred swapchain recreate (minimized client), and this fires on the restore frame over the client area.
-	if (message == WM_SETCURSOR && LOWORD(lParam) == HTCLIENT && ImGui::GetCurrentContext() != nullptr && !ImGui::GetIO().WantCaptureMouse)
+	if (uiMessage == WM_SETCURSOR && LOWORD(iLongParameter) == HTCLIENT && ImGui::GetCurrentContext() != nullptr && !ImGui::GetIO().WantCaptureMouse)
 	{
 		SetCursor(game::gpGame->ShouldUseCrosshair() ? sHcursorCrosshair : sHcursorArrow);
 		return TRUE;
@@ -668,21 +634,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	// of physical input messages (mouse/keyboard/char/wheel ranges) so real human activity never becomes ImGui IO.
 	// Non-client mouse messages (WM_NCMOUSEMOVE etc.) are deliberately NOT added to the bypass ranges: the backend may
 	// queue a physical pos from them, but ImGuiManager::Prepare's re-pin/sentinel is always the last mouse-pos event
-	// before NewFrame, so gating them is unnecessary and is not done.
-	bool bInputMessage = (message >= WM_MOUSEFIRST && message <= WM_MOUSELAST) || (message >= WM_KEYFIRST && message <= WM_KEYLAST);
+	// before NewFrame.
+	bool bInputMessage = (uiMessage >= WM_MOUSEFIRST && uiMessage <= WM_MOUSELAST) || (uiMessage >= WM_KEYFIRST && uiMessage <= WM_KEYLAST);
 	if (!(bInputSuppressed && bInputMessage))
 	{
-		if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam) != 0)
+		if (ImGui_ImplWin32_WndProcHandler(hWindow, uiMessage, uiWordParameter, iLongParameter) != 0)
 		{
 			return TRUE;
 		}
 	}
 
-	switch (message)
+	switch (uiMessage)
 	{
 		// WM_ACTIVATEAPP stays ungated even when suppressed — DirectXTK Mouse focus bookkeeping, not a physical input feed.
 		case WM_ACTIVATEAPP:
-			Mouse::ProcessMessage(message, wParam, lParam);
+			Mouse::ProcessMessage(uiMessage, uiWordParameter, iLongParameter);
 			break;
 
 		case WM_MOUSEMOVE:
@@ -698,7 +664,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case WM_MOUSEHOVER:
 			if (!bInputSuppressed)
 			{
-				Mouse::ProcessMessage(message, wParam, lParam);
+				Mouse::ProcessMessage(uiMessage, uiWordParameter, iLongParameter);
 			}
 			break;
 
@@ -707,7 +673,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 #endif // BT_CLIENT
 
-	switch (message)
+	switch (uiMessage)
 	{
 #if defined(BT_SERVER)
 		case WM_ERASEBKGND:
@@ -717,7 +683,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			// Heap: GDI painting creates/destroys kernel objects that may trigger CRT allocations
 			ScopedSuppressAllocationTracking suppress;
-			PaintServerDisplay(hWnd);
+			PaintServerDisplay(hWindow);
 			return 0;
 		}
 
@@ -725,9 +691,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			if constexpr (kbDebugInput)
 			{
-				if (wParam == VK_F4)
+				if (uiWordParameter == VK_F4)
 				{
-					sbQuit = true;
+					gbQuit = true;
 				}
 			}
 			return 0;
@@ -737,14 +703,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			// Once shutdown has begun, ignore the click instead of invalidating: the teardown drain after the game
 			// object is gone would dispatch the resulting WM_PAINT into the game-state-reading server display.
-			// Losing a repaint from a click during shutdown is fine.
-			if (sbQuit)
+			if (gbQuit)
 			{
 				return 0;
 			}
 
-			HandleServerClick(hWnd, LOWORD(lParam), HIWORD(lParam));
-			InvalidateRect(hWnd, nullptr, FALSE);
+			HandleServerClick(hWindow, LOWORD(iLongParameter), HIWORD(iLongParameter));
+			InvalidateRect(hWindow, nullptr, FALSE);
 			return 0;
 		}
 #endif // BT_SERVER
@@ -752,13 +717,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case WM_SYSCOMMAND:
 		{
 			// Suppress system commands that enter modal loops and block the main thread
-			WORD wSysCommand = wParam & 0xFFF0;
-			if (wSysCommand == SC_KEYMENU
+			WORD uiSystemCommand = uiWordParameter & 0xFFF0;
+			if (uiSystemCommand == SC_KEYMENU
 #if defined(BT_SERVER)
-				|| wSysCommand == SC_MOVE
-				|| wSysCommand == SC_SIZE
-				|| wSysCommand == SC_MAXIMIZE
-				|| wSysCommand == SC_RESTORE
+				|| uiSystemCommand == SC_MOVE
+				|| uiSystemCommand == SC_SIZE
+				|| uiSystemCommand == SC_MAXIMIZE
+				|| uiSystemCommand == SC_RESTORE
 #endif
 				)
 			{
@@ -780,7 +745,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 				gpAudioManager->Resume();
 
-				gpRawInputManager->UpdateFocus(true, sHwnd);
+				gpRawInputManager->UpdateFocus(true, sHWindow);
 #endif // BT_CLIENT
 			}
 
@@ -801,7 +766,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					gpAudioManager->Suspend();
 				}
 
-				gpRawInputManager->UpdateFocus(false, sHwnd);
+				gpRawInputManager->UpdateFocus(false, sHWindow);
 #endif // BT_CLIENT
 			}
 
@@ -811,7 +776,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case WM_INPUT:
 		{
 #if defined(BT_CLIENT)
-			gpRawInputManager->HandleRawInput(lParam);
+			gpRawInputManager->HandleRawInput(iLongParameter);
 #endif
 			break; // WM_INPUT must reach DefWindowProc so the system can free the RAWINPUT handle
 		}
@@ -819,8 +784,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case WM_SIZE:
 		{
 #if defined(BT_CLIENT)
-			gWantedFramebufferExtent2D = {static_cast<uint32_t>(lParam) & 0xFFFF, static_cast<uint32_t>(lParam) >> 16};
-			LOG(kDefault, kDebug, "WM_SIZE: {} x {}", gWantedFramebufferExtent2D.width, gWantedFramebufferExtent2D.height);
+			gVkWantedFramebufferExtent2D = {.width = static_cast<uint32_t>(iLongParameter) & 0xFFFF, .height = static_cast<uint32_t>(iLongParameter) >> 16};
+			LOG(kDefault, kDebug, "WM_SIZE: {} x {}", gVkWantedFramebufferExtent2D.width, gVkWantedFramebufferExtent2D.height);
 #endif
 			break;
 		}
@@ -828,15 +793,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case WM_CLOSE:
 		{
 			LOG(kDefault, kDebug, "WM_CLOSE");
-			sbQuit = true;
+			gbQuit = true;
 			return 0;
 		}
 
 		case WM_DESTROY:
 		{
 			LOG(kDefault, kDebug, "WM_DESTROY");
-			sbQuit = true;
-			sHwnd = nullptr;
+			gbQuit = true;
+			sHWindow = nullptr;
 			break;
 		}
 
@@ -846,7 +811,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 	}
 
-	return DefWindowProc(hWnd, message, wParam, lParam);
+	return DefWindowProc(hWindow, uiMessage, uiWordParameter, iLongParameter);
 }
 
 } // namespace engine
@@ -872,7 +837,6 @@ static int ProcessMain(HINSTANCE hInstance)
 	// as the launch options allow.
 	engine::ResolveCrashReportPaths();
 
-	// Prevent multiple instances from running simultaneously
 	std::unique_ptr<void, decltype(&CloseHandle)> pMutex(nullptr, &CloseHandle);
 	if constexpr (kbSingleInstance)
 	{
@@ -881,7 +845,7 @@ static int ProcessMain(HINSTANCE hInstance)
 		if (GetLastError() == ERROR_ALREADY_EXISTS)
 		{
 			// An agent-launched instance must never block on a modal dialog — fail fast so AgentHarness sees the exit.
-			if (engine::AgentLaunched())
+			if ((engine::gLaunchOptions.iAgentPort != 0))
 			{
 				LOG(kDefault, kError, "Another instance is already running; --agent-port launch aborting");
 				return 0;
@@ -896,14 +860,14 @@ static int ProcessMain(HINSTANCE hInstance)
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
 #if defined(BT_CLIENT)
-	// Windows::Foundation::Initialize is required for XAudio2 (and possibly gamepads as well)
-	HRESULT hresult = Windows::Foundation::Initialize(RO_INIT_MULTITHREADED);
-	if (hresult != S_OK) [[unlikely]]
+	// Windows::Foundation::Initialize is required for XAudio2
+	HRESULT iFoundationResult = Windows::Foundation::Initialize(RO_INIT_MULTITHREADED);
+	if (iFoundationResult != S_OK) [[unlikely]]
 	{
-		LOG(kDefault, kError, "Windows::Foundation::Initialize failed: {:#x}", static_cast<uint32_t>(hresult));
-		if (!engine::AgentLaunched())
+		LOG(kDefault, kError, "Windows::Foundation::Initialize failed: {:#x}", static_cast<uint32_t>(iFoundationResult));
+		if ((engine::gLaunchOptions.iAgentPort == 0))
 		{
-			MessageBox(nullptr, common::HresultToString(hresult).data(), "Windows::Foundation::Initialize", MB_OK | MB_SYSTEMMODAL);
+			MessageBox(nullptr, common::HresultToString(iFoundationResult).data(), "Windows::Foundation::Initialize", MB_OK | MB_SYSTEMMODAL);
 		}
 		return 0;
 	}
@@ -926,7 +890,7 @@ static int ProcessMain(HINSTANCE hInstance)
 		}
 		catch (const std::runtime_error& rException)
 		{
-			if (!engine::AgentLaunched())
+			if ((engine::gLaunchOptions.iAgentPort == 0))
 			{
 				MessageBox(nullptr, rException.what(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 			}
@@ -963,7 +927,7 @@ static int ProcessMain(HINSTANCE hInstance)
 	return iResult;
 }
 
-int WINAPI wWinMain(_In_ HINSTANCE hInstance, [[maybe_unused]] _In_opt_ HINSTANCE hPrevInstance, [[maybe_unused]] _In_ LPWSTR lpCmdLine, [[maybe_unused]] _In_ int nShowCmd)
+int WINAPI wWinMain(_In_ HINSTANCE hInstance, [[maybe_unused]] _In_opt_ HINSTANCE hPreviousInstance, [[maybe_unused]] _In_ LPWSTR pcCommandLine, [[maybe_unused]] _In_ int iShowCommand)
 {
 	// No exception handling here: MainThread installs it as its first statement.
 	return common::ThreadLocal::Entry(ProcessMain, 10 * 1'024 * 1'024, std::nullopt, false)(hInstance);

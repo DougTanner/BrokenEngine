@@ -145,7 +145,7 @@ public:
 
 	void SetClientGridCoord(engine::GridCoord coord)
 	{
-		mClientGridCoord = coord;
+		mClientGridCoordinate = coord;
 		miVisibleNeighborCount = 0;
 	}
 

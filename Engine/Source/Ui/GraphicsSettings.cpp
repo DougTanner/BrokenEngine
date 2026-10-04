@@ -26,12 +26,12 @@ struct GraphicsSettings
 	static constexpr int64_t kiVersion = 15;
 
 	common::Flags<GraphicsSettingsFlags> flags {};
-	uint8_t uiPad[3] {};
-	VkPresentModeKHR ePresentMode = VK_PRESENT_MODE_FIFO_KHR;
-	VkSampleCountFlagBits eSampleCount = VK_SAMPLE_COUNT_4_BIT;
-	float fMaxAnisotropy = 0.0f;
-	float fMinSampleShading = 0.0f;
-	float fMipLodBias = 0.0f;
+	uint8_t uiPadding[3] {};
+	VkPresentModeKHR vkPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+	VkSampleCountFlagBits vkSampleCount = VK_SAMPLE_COUNT_4_BIT;
+	float fMaximumAnisotropy = 0.0f;
+	float fMinimumSampleShading = 0.0f;
+	float fMipmapLevelOfDetailBias = 0.0f;
 	float fSmokeSimulationArea = 0.0f;
 	float fMinimumAmbient = 0.0f;
 	float fLightingUpdateCadence = 1.0f;
@@ -42,17 +42,17 @@ struct GraphicsSettings
 	uint8_t uiObjectShadowsLevel = 0;
 	uint8_t uiLightingLevel = 0;
 	uint8_t uiSmokeDetailLevel = 0;
-	uint8_t uiQualityPad[3] {};
+	uint8_t uiQualityPadding[3] {};
 };
 static_assert(std::is_trivially_copyable_v<GraphicsSettings>, "GraphicsSettings must stay trivially copyable — WriteVersionedFile stamps sizeof");
 static_assert(std::is_standard_layout_v<GraphicsSettings>, "GraphicsSettings must stay standard-layout — BT_OFFSETOF below is only well-defined for standard-layout types");
 static_assert(BT_OFFSETOF(GraphicsSettings, flags) == 0, "GraphicsSettings::flags offset changed — the flag byte leads the file");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiPad) == 1, "GraphicsSettings padding changed — common::Flags must stay one byte");
-static_assert(BT_OFFSETOF(GraphicsSettings, ePresentMode) == 4, "GraphicsSettings::ePresentMode offset changed — existing setting bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, eSampleCount) == 8, "GraphicsSettings::eSampleCount offset changed — VkPresentModeKHR must stay four bytes");
-static_assert(BT_OFFSETOF(GraphicsSettings, fMaxAnisotropy) == 12, "GraphicsSettings::fMaxAnisotropy offset changed — VkSampleCountFlagBits must stay four bytes");
-static_assert(BT_OFFSETOF(GraphicsSettings, fMinSampleShading) == 16, "GraphicsSettings::fMinSampleShading offset changed — existing setting bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, fMipLodBias) == 20, "GraphicsSettings::fMipLodBias offset changed — existing setting bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiPadding) == 1, "GraphicsSettings padding changed — common::Flags must stay one byte");
+static_assert(BT_OFFSETOF(GraphicsSettings, vkPresentMode) == 4, "GraphicsSettings::vkPresentMode offset changed — existing setting bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, vkSampleCount) == 8, "GraphicsSettings::vkSampleCount offset changed — VkPresentModeKHR must stay four bytes");
+static_assert(BT_OFFSETOF(GraphicsSettings, fMaximumAnisotropy) == 12, "GraphicsSettings::fMaximumAnisotropy offset changed — VkSampleCountFlagBits must stay four bytes");
+static_assert(BT_OFFSETOF(GraphicsSettings, fMinimumSampleShading) == 16, "GraphicsSettings::fMinimumSampleShading offset changed — existing setting bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, fMipmapLevelOfDetailBias) == 20, "GraphicsSettings::fMipmapLevelOfDetailBias offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, fSmokeSimulationArea) == 24, "GraphicsSettings::fSmokeSimulationArea offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, fMinimumAmbient) == 28, "GraphicsSettings::fMinimumAmbient offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, fLightingUpdateCadence) == 32, "GraphicsSettings::fLightingUpdateCadence offset changed — existing setting bytes move");
@@ -61,9 +61,9 @@ static_assert(BT_OFFSETOF(GraphicsSettings, uiTerrainShadowsLevel) == 37, "Graph
 static_assert(BT_OFFSETOF(GraphicsSettings, uiObjectShadowsLevel) == 38, "GraphicsSettings::uiObjectShadowsLevel offset changed — existing quality bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, uiLightingLevel) == 39, "GraphicsSettings::uiLightingLevel offset changed — existing quality bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, uiSmokeDetailLevel) == 40, "GraphicsSettings::uiSmokeDetailLevel offset changed — existing quality bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiQualityPad) == 41, "GraphicsSettings padding changed — GraphicsSettings must remain 44 bytes");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiQualityPadding) == 41, "GraphicsSettings padding changed — GraphicsSettings must remain 44 bytes");
 static_assert(sizeof(GraphicsSettings) == 44, "GraphicsSettings::kiVersion must be bumped with this layout");
-static constexpr char kpcGraphicsSettingsPath[] = "GraphicsSettings.bin";
+constexpr char kpcGraphicsSettingsPath[] = "GraphicsSettings.bin";
 
 void SaveGraphicsSettings()
 {
@@ -72,14 +72,14 @@ void SaveGraphicsSettings()
 
 	GraphicsSettings graphicsSettings
 	{
-		.ePresentMode = gPresentMode.Get<VkPresentModeKHR>(),
-		.eSampleCount = gSampleCount.Get<VkSampleCountFlagBits>(),
-		.fMaxAnisotropy = gMaxAnisotropy.Get(),
-		.fMinSampleShading = gMinSampleShading.Get(),
-		.fMipLodBias = gMipLodBias.Get(),
-		.fSmokeSimulationArea = gSmokeSimulationArea.Get(),
-		.fMinimumAmbient = gSunMoonMinimumAmbient.Get(),
-		.fLightingUpdateCadence = gLightingUpdateCadence.Get(),
+		.vkPresentMode = gPresentMode.Get<VkPresentModeKHR>(),
+		.vkSampleCount = gSampleCount.Get<VkSampleCountFlagBits>(),
+		.fMaximumAnisotropy = gMaximumAnisotropy.mfCurrent,
+		.fMinimumSampleShading = gMinimumSampleShading.mfCurrent,
+		.fMipmapLevelOfDetailBias = gMipmapLevelOfDetailBias.mfCurrent,
+		.fSmokeSimulationArea = gSmokeSimulationArea.mfCurrent,
+		.fMinimumAmbient = gSunMoonMinimumAmbient.mfCurrent,
+		.fLightingUpdateCadence = gLightingUpdateCadence.mfCurrent,
 		.uiWaterLevel = gWaterLevel.Get<uint8_t>(),
 		.uiTerrainShadowsLevel = gTerrainShadowsLevel.Get<uint8_t>(),
 		.uiObjectShadowsLevel = gObjectShadowsLevel.Get<uint8_t>(),
@@ -106,22 +106,22 @@ static bool IsValidGraphicsQualityLevel(uint8_t uiLevel)
 // Returns the first invalid field's name, or nullptr when every checked field is valid.
 static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsSettings)
 {
-	if (!std::ranges::contains(gSampleCount.mAllowed, static_cast<float>(rGraphicsSettings.eSampleCount)))
+	if (!std::ranges::contains(gSampleCount.mAllowed, static_cast<float>(rGraphicsSettings.vkSampleCount)))
 	{
 		return "eSampleCount";
 	}
 
-	if (!gMaxAnisotropy.IsInRange(rGraphicsSettings.fMaxAnisotropy))
+	if (!gMaximumAnisotropy.IsInRange(rGraphicsSettings.fMaximumAnisotropy))
 	{
 		return "fMaxAnisotropy";
 	}
 
-	if (!gMinSampleShading.IsInRange(rGraphicsSettings.fMinSampleShading))
+	if (!gMinimumSampleShading.IsInRange(rGraphicsSettings.fMinimumSampleShading))
 	{
 		return "fMinSampleShading";
 	}
 
-	if (!gMipLodBias.IsInRange(rGraphicsSettings.fMipLodBias))
+	if (!gMipmapLevelOfDetailBias.IsInRange(rGraphicsSettings.fMipmapLevelOfDetailBias))
 	{
 		return "fMipLodBias";
 	}
@@ -178,7 +178,7 @@ static void LoadGraphicsQualityLevel(Wrapper& rLevel, uint8_t uiLevel)
 bool LoadGraphicsSettings()
 {
 	GraphicsSettings graphicsSettings {};
-	gWaterShapeDetail.ResetToDefault();
+	gWaterShapeDetail.mfCurrent = gWaterShapeDetail.mfDefault;
 
 	bool bRead = ReadVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, kpcGraphicsSettingsPath, graphicsSettings);
 	if (bRead)
@@ -194,14 +194,14 @@ bool LoadGraphicsSettings()
 	if (bRead)
 	{
 		gFullscreen.Set(graphicsSettings.flags & GraphicsSettingsFlags::kFullscreen);
-		gPresentMode.Set<VkPresentModeKHR>(graphicsSettings.ePresentMode);
+		gPresentMode.Set<VkPresentModeKHR>(graphicsSettings.vkPresentMode);
 		gMultisampling.Set(graphicsSettings.flags & GraphicsSettingsFlags::kMultisampling);
-		gSampleCount.Set<VkSampleCountFlagBits>(graphicsSettings.eSampleCount);
+		gSampleCount.Set<VkSampleCountFlagBits>(graphicsSettings.vkSampleCount);
 		gAnisotropy.Set(graphicsSettings.flags & GraphicsSettingsFlags::kAnisotropy);
-		gMaxAnisotropy.Set(graphicsSettings.fMaxAnisotropy);
+		gMaximumAnisotropy.Set(graphicsSettings.fMaximumAnisotropy);
 		gSampleShading.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSampleShading);
-		gMinSampleShading.Set(graphicsSettings.fMinSampleShading);
-		gMipLodBias.Set(graphicsSettings.fMipLodBias);
+		gMinimumSampleShading.Set(graphicsSettings.fMinimumSampleShading);
+		gMipmapLevelOfDetailBias.Set(graphicsSettings.fMipmapLevelOfDetailBias);
 		gSmokeEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kSmoke);
 		gSmokeSimulationArea.Set(graphicsSettings.fSmokeSimulationArea);
 		gSunMoonMinimumAmbient.Set(graphicsSettings.fMinimumAmbient);
@@ -224,28 +224,28 @@ bool LoadGraphicsSettings()
 
 void ResetGraphicsSettings()
 {
-	gFullscreen.ResetToDefault();
-	gPresentMode.ResetToDefault();
-	gMultisampling.ResetToDefault();
-	gSampleCount.ResetToDefault();
-	gAnisotropy.ResetToDefault();
-	gMaxAnisotropy.ResetToDefault();
-	gSampleShading.ResetToDefault();
-	gMinSampleShading.ResetToDefault();
-	gMipLodBias.ResetToDefault();
-	gWaterShapeDetail.ResetToDefault();
-	gSmokeEnabled.ResetToDefault();
-	gSmokeSimulationArea.ResetToDefault();
-	gSunMoonMinimumAmbient.ResetToDefault();
-	gLightingUpdateCadence.ResetToDefault();
-	gWindEnabled.ResetToDefault();
-	gLightingEnabled.ResetToDefault();
+	gFullscreen.mfCurrent = gFullscreen.mfDefault;
+	gPresentMode.mfCurrent = gPresentMode.mfDefault;
+	gMultisampling.mfCurrent = gMultisampling.mfDefault;
+	gSampleCount.mfCurrent = gSampleCount.mfDefault;
+	gAnisotropy.mfCurrent = gAnisotropy.mfDefault;
+	gMaximumAnisotropy.mfCurrent = gMaximumAnisotropy.mfDefault;
+	gSampleShading.mfCurrent = gSampleShading.mfDefault;
+	gMinimumSampleShading.mfCurrent = gMinimumSampleShading.mfDefault;
+	gMipmapLevelOfDetailBias.mfCurrent = gMipmapLevelOfDetailBias.mfDefault;
+	gWaterShapeDetail.mfCurrent = gWaterShapeDetail.mfDefault;
+	gSmokeEnabled.mfCurrent = gSmokeEnabled.mfDefault;
+	gSmokeSimulationArea.mfCurrent = gSmokeSimulationArea.mfDefault;
+	gSunMoonMinimumAmbient.mfCurrent = gSunMoonMinimumAmbient.mfDefault;
+	gLightingUpdateCadence.mfCurrent = gLightingUpdateCadence.mfDefault;
+	gWindEnabled.mfCurrent = gWindEnabled.mfDefault;
+	gLightingEnabled.mfCurrent = gLightingEnabled.mfDefault;
 
-	gWaterLevel.ResetToDefault();
-	gTerrainShadowsLevel.ResetToDefault();
-	gObjectShadowsLevel.ResetToDefault();
-	gLightingLevel.ResetToDefault();
-	gSmokeDetailLevel.ResetToDefault();
+	gWaterLevel.mfCurrent = gWaterLevel.mfDefault;
+	gTerrainShadowsLevel.mfCurrent = gTerrainShadowsLevel.mfDefault;
+	gObjectShadowsLevel.mfCurrent = gObjectShadowsLevel.mfDefault;
+	gLightingLevel.mfCurrent = gLightingLevel.mfDefault;
+	gSmokeDetailLevel.mfCurrent = gSmokeDetailLevel.mfDefault;
 	ApplyAllGraphicsQualityLevels();
 
 	SaveGraphicsSettings();

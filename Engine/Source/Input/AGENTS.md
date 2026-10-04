@@ -6,7 +6,7 @@ Global: `gpInput` — constructed in `Main.cpp`, polled only from `engine::GameB
 
 ## Poll Lifetime
 
-- One `ProcessInput` call is one poll: `BeginPoll` publishes the snapshot and produces this frame's values; `CompletePoll` copies the current snapshot into the previous one and runs last — after every edge consumer including the game callback, and also on the modal path that skips the callback. Moving it earlier silently breaks edge detection.
+- One `ProcessInput` call is one poll: `BeginPoll` publishes the snapshot and produces this frame's values; `gpInput->mPreviousRawInput = gpRawInputManager->mRawInput` copies the current snapshot into the previous one and runs last — after every edge consumer including the game callback, and also on the modal path that skips the callback. Moving it earlier silently breaks edge detection.
 - `InputPoll` is a borrowed view of the current and previous snapshots, so engine policy and the game callback detect edges against the same pair. It owns no state, allocates nothing, and must never outlive its `ProcessInput` call.
 - `MenuInputFlags` is the generic menu vocabulary; game-specific actions poll their own keys through `InputPoll` instead. `kSingleStep` (from Tab), `kMouseIsDown`, `kMouseClick`, `kGamepadButton`, `MenuInput::f2Mouse`, and `MenuInput::f2Gamepad` are produced and intentionally unconsumed.
 
@@ -28,7 +28,7 @@ Global: `gpInput` — constructed in `Main.cpp`, polled only from `engine::GameB
 - The wheel belongs to the UI when an ImGui key owner claims `ImGuiKey_MouseWheelY`, while the cursor hovers an ImGui window that can actually consume it (not collapsed, nonzero `ScrollMax.y`, wheel not disabled by window flags), or while `ImGuiContext::WheelingWindow` still holds an earlier target. Everything else, including an open but non-scrolling menu or modal, gives the delta to the camera. The test mirrors ImGui's own `UpdateMouseWheel` routing, reads `ImGuiContext` from the client-only `imgui_internal.h` view, and inspects ImGui state only after confirming a live context.
 - Two accepted timing tolerances: hover is one frame stale (ImGui resolves it in `NewFrame`, after input polling), so a notch on the frame the cursor crosses a panel edge may be double-handled or lost; and ImPlot's `MouseWheelY` ownership stays visible for two input polls after leaving a plot, which may suppress an immediate background notch.
 - The hovered-window test assumes no child windows. If a `BeginChild`, popup, combo, list box, or scrolling table is ever added, the gate must grow ImGui's `ParentWindow` bubble logic from `FindBestWheelingWindow`.
-- `CompletePoll` always advances the wheel baseline, including when input is swallowed, so a suppressed notch cannot surface later as zoom applied after the fact.
+- The previous-snapshot assignment always advances the wheel baseline, including when input is swallowed, so a suppressed notch cannot surface later as zoom applied after the fact.
 
 ## Focus and Agent Input
 

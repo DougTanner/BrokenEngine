@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-02T18:04:58.740Z","dependsOn":["Documents/Plans/Engine/StyleGuideSweepEngine.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-02T18:04:58.740Z","dependsOn":[]} -->
 # Style guide sweep: Projects stage
 
 ## Context

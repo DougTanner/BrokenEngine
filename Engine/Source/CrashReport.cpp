@@ -6,11 +6,11 @@ namespace engine
 {
 
 static std::string sDxDiag;
-static std::atomic<bool> sbDxDiagComplete { false };
+static std::atomic<bool> sbDxDiagComplete(false);
 static wchar_t spcAppDataOverride[MAX_PATH + 1] {};
 static wchar_t spcDesktopReportPath[MAX_PATH + 1] {};
 static wchar_t spcUserReportPath[MAX_PATH + 1] {};
-static constexpr wchar_t kpcFallbackReportPath[] = L"Crash-Report.txt";
+constexpr wchar_t kpcFallbackReportPath[] = L"Crash-Report.txt";
 
 void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
 {
@@ -21,8 +21,8 @@ void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
 	wchar_t pcCrashReportFile[128] {};
 	swprintf_s(pcCrashReportFile, std::size(pcCrashReportFile), L"\\%s-Crash-Report.txt", pcGameName);
 
-	size_t uiDirectoryLength = wcsnlen_s(pcDirectory, std::size(spcAppDataOverride));
-	size_t uiSuffixLength = 1 + wcslen(pcGameName) + wcslen(pcCrashReportFile);
+	std::size_t uiDirectoryLength = wcsnlen_s(pcDirectory, std::size(spcAppDataOverride));
+	std::size_t uiSuffixLength = 1 + std::wcslen(pcGameName) + std::wcslen(pcCrashReportFile);
 	if (uiDirectoryLength >= std::size(spcAppDataOverride))
 	{
 		return;
@@ -44,8 +44,8 @@ void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
 // buffer is either the complete intended path or empty, never a partial one the crash handler would write to.
 static bool AppendReportPath(wchar_t (&rBuffer)[MAX_PATH + 1], const wchar_t* pcText)
 {
-	size_t uiUsedLength = wcsnlen_s(rBuffer, std::size(rBuffer));
-	size_t uiTextLength = wcsnlen_s(pcText, std::size(rBuffer));
+	std::size_t uiUsedLength = wcsnlen_s(rBuffer, std::size(rBuffer));
+	std::size_t uiTextLength = wcsnlen_s(pcText, std::size(rBuffer));
 	if (uiTextLength >= std::size(rBuffer) - uiUsedLength)
 	{
 		rBuffer[0] = L'\0';
@@ -80,18 +80,18 @@ void ResolveCrashReportPaths()
 	}
 	else
 	{
-		PWSTR pWideChar = nullptr;
-		HRESULT hresult = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pWideChar);
-		if (SUCCEEDED(hresult) && pWideChar != nullptr)
+		PWSTR pcWideCharacter = nullptr;
+		HRESULT iHresult = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pcWideCharacter);
+		if (SUCCEEDED(iHresult) && pcWideCharacter != nullptr)
 		{
-			AppendReportPath(spcUserReportPath, pWideChar);
+			AppendReportPath(spcUserReportPath, pcWideCharacter);
 		}
 		else if (bDesktopFound)
 		{
 			// OS failure on the roaming lookup: fall back to the Desktop so the report still lands somewhere writable.
 			AppendReportPath(spcUserReportPath, pcDesktopDirectory);
 		}
-		CoTaskMemFree(pWideChar);
+		CoTaskMemFree(pcWideCharacter);
 	}
 
 	if (spcUserReportPath[0] != L'\0' && AppendReportPath(spcUserReportPath, L"\\") && AppendReportPath(spcUserReportPath, pcGameName))
@@ -114,14 +114,14 @@ void HandleException(std::optional<const std::exception*> pException)
 	DEBUG_BREAK_NO_LOG();
 
 	// An agent-launched instance must never block on a modal dialog — take the unprompted branch so the report still saves.
-	int iResult = AgentLaunched() ? IDNO : MessageBox(nullptr, "Save crash report to desktop?", game::kGameName.data(), MB_YESNO | MB_SYSTEMMODAL);
+	int iResult = (gLaunchOptions.iAgentPort != 0) ? IDNO : MessageBox(nullptr, "Save crash report to desktop?", game::kGameName.data(), MB_YESNO | MB_SYSTEMMODAL);
 
 	// Select an already-resolved path: this runs from the SIGABRT handler during heap corruption, so no path lookup,
 	// directory creation, or string building may happen here — ResolveCrashReportPaths did all of it at startup.
 	const wchar_t* pcPath = iResult == IDYES ? spcDesktopReportPath : spcUserReportPath;
 	if (pcPath[0] == L'\0')
 	{
-		// Startup resolution failed for this candidate: write beside the working directory rather than nowhere.
+		// Startup resolution failed for this candidate; the fallback path is relative to the working directory.
 		pcPath = kpcFallbackReportPath;
 	}
 
@@ -152,8 +152,8 @@ void HandleException(std::optional<const std::exception*> pException)
 	writer.Write("<End callstack>\n");
 
 	writer.Write("\n\n\n<Begin DxDiag>\n");
-	// The DxDiag thread appends to sDxDiag without a lock. The real crash path always joins it first, but the agent crash-report
-	// fixture calls this mid-main-loop, so skip the still-growing string rather than race it; the markers are always written.
+	// The DxDiag thread writes sDxDiag without a lock. The agent fixture and SIGABRT handler can run before it completes,
+	// so read the string only after completion is published; the section markers remain unconditional.
 	if (sbDxDiagComplete.load(std::memory_order_acquire))
 	{
 		writer.Write(sDxDiag.c_str());
@@ -163,16 +163,16 @@ void HandleException(std::optional<const std::exception*> pException)
 	common::LogDumpBuffers(writer);
 }
 
-static bool DxDiagCallFailed(HRESULT hresult, std::string_view call)
+static bool DxDiagCallFailed(HRESULT iHresult, std::string_view call)
 {
-	if (SUCCEEDED(hresult))
+	if (SUCCEEDED(iHresult))
 	{
 		return false;
 	}
 
 	// Heap: HresultToString returns a std::string, and this thread participates in main-loop allocation tracking.
 	ScopedSuppressAllocationTracking suppress;
-	LOG(kDefault, kError, "Failed to read DxDiag: {} failed: {}", call, common::HresultToString(hresult).data());
+	LOG(kDefault, kError, "Failed to read DxDiag: {} failed: {}", call, common::HresultToString(iHresult).data());
 	return true;
 }
 

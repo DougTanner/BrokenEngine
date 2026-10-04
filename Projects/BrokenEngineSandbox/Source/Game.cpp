@@ -1,5 +1,6 @@
 #include "Game.h"
 
+#include "Audio/StreamingVoices.h"
 #include "File/Replay.h"
 #include "Input/Input.h"
 #include "Network/Server/ServerBroadcaster.h"
@@ -63,10 +64,10 @@ Game::Game()
 	// Start music
 #if defined(BT_CLIENT)
 	StartMenuMusic();
-	engine::gpAudioManager->SetNextMusicTrackCallback([this]()
+	engine::gpAudioManager->mpStreamingVoices->mGetNextTrack = [this]()
 	{
 		return GetNextMusicTrack();
-	});
+	};
 #endif // BT_CLIENT
 
 }
@@ -135,7 +136,7 @@ std::optional<int64_t> Game::ClientPlayerIndex(const PlayersPostRender& rPlayers
 #if defined(BT_CLIENT)
 XMVECTOR Game::GetClientPlayerPosition() const
 {
-	const engine::CoordFrames& rFrames = mCoordFrames.at(mClientGridCoord);
+	const engine::CoordFrames& rFrames = mCoordinateFrames.at(mClientGridCoordinate);
 	if (rFrames.iSnapshotCount > 0)
 	{
 		int64_t iTailPhysical = engine::SnapshotIndex(rFrames.iSnapshotHead, rFrames.iSnapshotCount - 1);
@@ -159,37 +160,37 @@ void Game::ComputeActiveSet()
 #if defined(BT_SERVER)
 	gpServerSession->mpRuntime->ComputeActiveSet();
 #else
-	// Heap: mActiveCoords vector clear/push_back may allocate. Persists as Game member across frame updates
+	// Heap: mActiveCoordinates vector clear/push_back may allocate. Persists as Game member across frame updates
 	ScopedSuppressAllocationTracking suppress;
 
-	if (!InMainMenu())
+	if (!(mGameFlags & engine::GameFlags::kMainMenu))
 	{
-		mActiveCoords.clear();
-		for (const auto& [rCoord, rFrames] : mCoordFrames)
+		mActiveCoordinates.clear();
+		for (const auto& [rCoord, rFrames] : mCoordinateFrames)
 		{
-			if (rFrames.iSnapshotCount > 0 && (rFrames.iConfirmedTick >= 0 || rCoord == mClientGridCoord))
+			if (rFrames.iSnapshotCount > 0 && (rFrames.iConfirmedTick >= 0 || rCoord == mClientGridCoordinate))
 			{
-				mActiveCoords.push_back(rCoord);
+				mActiveCoordinates.push_back(rCoord);
 			}
 		}
 
 		{
-			auto it = mCoordFrames.find(mClientGridCoord);
-			if (it == mCoordFrames.end() || it->second.iSnapshotCount == 0)
+			auto it = mCoordinateFrames.find(mClientGridCoordinate);
+			if (it == mCoordinateFrames.end() || it->second.iSnapshotCount == 0)
 			{
-				CreateFrameAtCoord(mClientGridCoord);
+				CreateFrameAtCoordinate(mClientGridCoordinate);
 			}
-			if (!std::ranges::contains(mActiveCoords, mClientGridCoord))
+			if (!std::ranges::contains(mActiveCoordinates, mClientGridCoordinate))
 			{
-				mActiveCoords.push_back(mClientGridCoord);
+				mActiveCoordinates.push_back(mClientGridCoordinate);
 			}
 		}
 
 		miVisibleNeighborCount = 0;
 		if ((ClientPlayerId().iValue != 0))
 		{
-			// Camera-zoom-dependent VisibleArea: f4LargeVisibleArea packs (minX, maxY, maxX, minY).
-			const XMFLOAT4& f4Visible = engine::gpCamera->f4LargeVisibleArea;
+			// Camera-zoom-dependent VisibleArea: mf4LargeVisibleArea packs (minX, maxY, maxX, minY).
+			const XMFLOAT4& f4Visible = engine::gpCamera->mf4LargeVisibleArea;
 			// The visible area is in the camera basis cell's frame, which is not always the client cell: it lags a
 			// client-cell change and can be another coord entirely while render-camera selection falls back. Each
 			// neighbour rectangle therefore offsets the one local area every cell has by that neighbour's own offset
@@ -202,14 +203,14 @@ void Game::ComputeActiveSet()
 
 			auto ensureNeighbor = [&](engine::GridCoord neighbor)
 			{
-				auto it = mCoordFrames.find(neighbor);
-				if (it == mCoordFrames.end() || it->second.iSnapshotCount == 0)
+				auto it = mCoordinateFrames.find(neighbor);
+				if (it == mCoordinateFrames.end() || it->second.iSnapshotCount == 0)
 				{
-					CreateFrameAtCoord(neighbor);
+					CreateFrameAtCoordinate(neighbor);
 				}
-				if (!std::ranges::contains(mActiveCoords, neighbor))
+				if (!std::ranges::contains(mActiveCoordinates, neighbor))
 				{
-					mActiveCoords.push_back(neighbor);
+					mActiveCoordinates.push_back(neighbor);
 				}
 			};
 
@@ -226,11 +227,11 @@ void Game::ComputeActiveSet()
 					// A cell at the numeric edge of the grid has no neighbour in that direction; skip it rather than
 					// wrap to the opposite end.
 					engine::GridCoord neighbor {};
-					if (!engine::TryAddGridCoordinate(mClientGridCoord, i, j, neighbor))
+					if (!engine::TryAddGridCoordinate(mClientGridCoordinate, i, j, neighbor))
 					{
 						continue;
 					}
-					XMFLOAT2 f2Offset = engine::MakeRenderBasis(neighbor, engine::gpCamera->mBasisCoord).f2Offset;
+					XMFLOAT2 f2Offset = engine::MakeRenderBasis(neighbor, engine::gpCamera->mBasisCoordinate).f2Offset;
 					float fNeighborMinX = fCellMinX + f2Offset.x;
 					float fNeighborMaxX = fCellMaxX + f2Offset.x;
 					float fNeighborMinY = fCellMinY + f2Offset.y;
@@ -248,17 +249,17 @@ void Game::ComputeActiveSet()
 	}
 	else
 	{
-		mActiveCoords.clear();
-		mActiveCoords.push_back(mClientGridCoord);
+		mActiveCoordinates.clear();
+		mActiveCoordinates.push_back(mClientGridCoordinate);
 	}
 
 	// Delete local-only frames outside the active set, preserve network-subscribed frames
-	std::erase_if(mCoordFrames, [this](const std::pair<const engine::GridCoord, engine::CoordFrames>& rPair)
+	std::erase_if(mCoordinateFrames, [this](const std::pair<const engine::GridCoord, engine::CoordFrames>& rPair)
 	{
-		return !std::ranges::contains(mActiveCoords, rPair.first) && rPair.second.iConfirmedTick < 0;
+		return !std::ranges::contains(mActiveCoordinates, rPair.first) && rPair.second.iConfirmedTick < 0;
 	});
 
-	ASSERT(std::ranges::count_if(mCoordFrames, [](const std::pair<const engine::GridCoord, engine::CoordFrames>& rPair)
+	ASSERT(std::ranges::count_if(mCoordinateFrames, [](const std::pair<const engine::GridCoord, engine::CoordFrames>& rPair)
 	{
 		return rPair.second.iConfirmedTick < 0;
 	}) <= 9);
@@ -273,15 +274,15 @@ void Game::UpdateActiveIslands()
 	// coord list in the workbuffer (per-frame, no heap) and pass it as a span; UpdateActiveIslands' own
 	// nested PushBuffer is LIFO and pops before this arena does.
 	common::ScopedWorkbufferArena subscribedArena = common::gpThreadLocal->mWorkbuffer.Push();
-	for (const engine::GridCoord& rCoord : mActiveCoords)
+	for (const engine::GridCoord& rCoord : mActiveCoordinates)
 	{
-		auto it = mCoordFrames.find(rCoord);
-		if (it != mCoordFrames.end() && (it->second.iConfirmedTick >= 0 || rCoord == mClientGridCoord))
+		auto it = mCoordinateFrames.find(rCoord);
+		if (it != mCoordinateFrames.end() && (it->second.iConfirmedTick >= 0 || rCoord == mClientGridCoordinate))
 		{
 			subscribedArena.mBuffer.PushBack<engine::GridCoord>(rCoord);
 		}
 	}
-	engine::gpIslands->UpdateActiveIslands(mCoordFrames, subscribedArena.mBuffer.Span<const engine::GridCoord>());
+	engine::gpIslands->UpdateActiveIslands(mCoordinateFrames, subscribedArena.mBuffer.Span<const engine::GridCoord>());
 }
 #endif // BT_CLIENT
 
@@ -291,11 +292,11 @@ void Game::EnsureNextFrames()
 	// Heap: unordered_map insertion + make_unique<Frame>. Frames persist in mNextFrames across game lifetime
 	ScopedSuppressAllocationTracking suppress;
 
-	for (const engine::GridCoord& rCoord : mActiveCoords)
+	for (const engine::GridCoord& rCoord : mActiveCoordinates)
 	{
-		if (mCoordFrames.try_emplace(rCoord).first->second.pNext == nullptr)
+		if (mCoordinateFrames.try_emplace(rCoord).first->second.pNext == nullptr)
 		{
-			mCoordFrames.at(rCoord).pNext = std::make_unique<Frame>();
+			mCoordinateFrames.at(rCoord).pNext = std::make_unique<Frame>();
 		}
 	}
 }
@@ -311,9 +312,9 @@ void Game::BuildFrameInputs()
 
 	mFrameInputs.clear();
 
-	for (const engine::GridCoord& rCoord : mActiveCoords)
+	for (const engine::GridCoord& rCoord : mActiveCoordinates)
 	{
-		if (!mCoordFrames.contains(rCoord))
+		if (!mCoordinateFrames.contains(rCoord))
 		{
 			continue;
 		}
@@ -322,9 +323,9 @@ void Game::BuildFrameInputs()
 	}
 
 	// Camera shake — read most recent ring frame (head + count - 1)
-	auto it = mCoordFrames.find(mClientGridCoord);
+	auto it = mCoordinateFrames.find(mClientGridCoordinate);
 	const Frame* pTailFrame = nullptr;
-	if (it != mCoordFrames.end() && it->second.iSnapshotCount > 0)
+	if (it != mCoordinateFrames.end() && it->second.iSnapshotCount > 0)
 	{
 		int64_t iTailPhysical = engine::SnapshotIndex(it->second.iSnapshotHead, it->second.iSnapshotCount - 1);
 		pTailFrame = it->second.snapshots[iTailPhysical].get();
@@ -369,7 +370,7 @@ Game::~Game()
 	}
 #if defined(BT_CLIENT)
 	mpClientSession.reset();
-	engine::gpAudioManager->SetNextMusicTrackCallback(nullptr);
+	engine::gpAudioManager->mpStreamingVoices->mGetNextTrack = nullptr;
 #endif // BT_CLIENT
 
 #if defined(BT_SERVER)
@@ -416,8 +417,8 @@ void Game::Reset()
 #endif
 	mfPreviousClientArmor = 0.0f;
 	SetClientGridCoord(engine::kOriginCoordinate);
-	mActiveCoords.clear();
-	mActiveCoords.push_back(mClientGridCoord);
+	mActiveCoordinates.clear();
+	mActiveCoordinates.push_back(mClientGridCoordinate);
 }
 
 void Game::CreateNewFrame(GameFlags_t gameFlags)
@@ -426,8 +427,8 @@ void Game::CreateNewFrame(GameFlags_t gameFlags)
 	// game state lifetime, so workbuffer (lost on Pop) can't hold it.
 	ScopedSuppressAllocationTracking suppress;
 
-	mCoordFrames.clear();
-	engine::CoordFrames& rFrames = mCoordFrames.try_emplace(engine::kOriginCoordinate).first->second;
+	mCoordinateFrames.clear();
+	engine::CoordFrames& rFrames = mCoordinateFrames.try_emplace(engine::kOriginCoordinate).first->second;
 #if defined(BT_CLIENT)
 	rFrames.iSnapshotHead = 0;
 	rFrames.iSnapshotCount = 1;
@@ -468,15 +469,15 @@ void Game::CreateNewFrame(GameFlags_t gameFlags)
 #if defined(BT_CLIENT)
 bool Game::ShouldTrapCursor()
 {
-	return !InMainMenu();
+	return !(mGameFlags & engine::GameFlags::kMainMenu);
 }
 #endif // BT_CLIENT
 
 #if defined(BT_CLIENT)
 bool Game::ShouldUseCrosshair()
 {
-	auto it = mCoordFrames.find(mClientGridCoord);
-	if (it == mCoordFrames.end() || it->second.iSnapshotCount == 0)
+	auto it = mCoordinateFrames.find(mClientGridCoordinate);
+	if (it == mCoordinateFrames.end() || it->second.iSnapshotCount == 0)
 	{
 		return false;
 	}
@@ -537,7 +538,7 @@ void Game::ChangeFrame(GameFlags_t gameFlags)
 	gpClientSession->mpRuntime->Disconnect();
 #endif
 
-	if ((gameFlags & GameFlags::kMainMenu && InMainMenu()) || (gameFlags & GameFlags::kGame && !InMainMenu()))
+	if ((gameFlags & GameFlags::kMainMenu && (mGameFlags & engine::GameFlags::kMainMenu)) || (gameFlags & GameFlags::kGame && !(mGameFlags & engine::GameFlags::kMainMenu)))
 	{
 		DEBUG_BREAK();
 		return;
@@ -626,7 +627,7 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 			}
 		}
 
-		if (bReturnPressed && InMainMenu() && gpClientSession->mpRuntime->mpClient == nullptr)
+		if (bReturnPressed && (mGameFlags & engine::GameFlags::kMainMenu) && gpClientSession->mpRuntime->mpClient == nullptr)
 		{
 			if (gpClientSession->mpRuntime->mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered)
 			{
@@ -638,10 +639,10 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 			}
 		}
 
-		if (bCycleMenuIslandPressed && InMainMenu())
+		if (bCycleMenuIslandPressed && (mGameFlags & engine::GameFlags::kMainMenu))
 		{
 			miMenuIslandIndex = (miMenuIslandIndex + 1) % std::ssize(engine::gpIslandTerrain->mIslandCrcsByArea);
-			auto it = mCoordFrames.find(engine::kOriginCoordinate);
+			auto it = mCoordinateFrames.find(engine::kOriginCoordinate);
 			BuildMenuIslandPlacement(miMenuIslandIndex, it->second.staticData.islands);
 			// Cycling rewrites the placement list on an existing cell — drop the derived elevation grid
 			// and the render-path query cache so RunFrameTick rebuilds both from the new placements
@@ -692,7 +693,7 @@ void Game::CaptureClientStateIfChanged()
 #if defined(BT_CLIENT)
 common::crc_t Game::GetNextMusicTrack()
 {
-	if (InMainMenu())
+	if ((mGameFlags & engine::GameFlags::kMainMenu))
 	{
 		miMenuMusicIndex = (miMenuMusicIndex + 1) % static_cast<int64_t>(std::size(mMenuMusicPlaylist));
 		return mMenuMusicPlaylist[miMenuMusicIndex];
@@ -707,7 +708,7 @@ common::crc_t Game::GetNextMusicTrack()
 
 void Game::InitFramePostRender(Frame& rFrame)
 {
-	rFrame.postRender.uiFrameIdentifier = GenerateFrameId();
+	rFrame.postRender.uiFrameIdentifier = muiNextFrameId++;
 	rFrame.postRender.randomEngine.TimeSeed();
 	rFrame.postRender.playerAlignment = mPlayerAlignment;
 	rFrame.postRender.enemyAlignment = mEnemyAlignment;

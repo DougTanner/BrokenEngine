@@ -8,9 +8,9 @@ namespace engine
 struct ShaderInfo
 {
 	common::ChunkHeader* pChunkHeader = nullptr;
-	const VkDescriptorSetLayoutBinding* pDescriptorBindings = nullptr;
-	const uint32_t* pDescriptorSetIndices = nullptr;
-	const VkVertexInputAttributeDescription* pVertexAttributes = nullptr;
+	const VkDescriptorSetLayoutBinding* pVkDescriptorBindings = nullptr;
+	const uint32_t* puiDescriptorSetIndices = nullptr;
+	const VkVertexInputAttributeDescription* pVkVertexAttributes = nullptr;
 	int64_t iSpirvSize = 0;
 };
 
@@ -21,13 +21,13 @@ public:
 	Shader() = default;
 	Shader(const Shader&) = delete;
 	Shader& operator=(const Shader&) = delete;
-	Shader(const ShaderInfo& rInfo, const std::byte* pData);
+	Shader(const ShaderInfo& rInformation, const std::byte* pData);
 	~Shader();
 
-	void Create(const ShaderInfo& rInfo, const std::byte* pData);
+	void Create(const ShaderInfo& rInformation, const std::byte* pData);
 	void Destroy() noexcept;
 
-	ShaderInfo mInfo;
+	ShaderInfo mInformation {};
 
 	VkShaderModule mVkShaderModule = VK_NULL_HANDLE;
 };

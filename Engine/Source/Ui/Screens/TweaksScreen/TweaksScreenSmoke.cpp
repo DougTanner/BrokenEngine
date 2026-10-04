@@ -10,28 +10,23 @@ namespace engine
 
 const TweaksSliderMapRegistrar gSmokeRegistrar
 {
-	// Decay
-	{"Smoke Max", &gSmokeMax},
+	{"Smoke Max", &gSmokeMaximum},
 	{"Smoke Power", &gSmokePower},
 	{"Smoke Decay", &gSmokeDecay},
 	{"Smoke Edge Decay Distance", &gSmokeEdgeDecayDistance},
-	// Color
-	{"Smoke Color Min", &gSmokeColorMin},
+	{"Smoke Color Min", &gSmokeColorMinimum},
 	{"Smoke Color Multiplier", &gSmokeColorMultiplier},
 	{"Smoke Lighting Multiplier", &gSmokeLightingMultiplier},
-	// Noise
 	{"Smoke Noise Scale One", &gSmokeNoiseScaleOne},
 	{"Smoke Noise Scale Two", &gSmokeNoiseScaleTwo},
 	{"Smoke Wind Noise Scale", &gSmokeWindNoiseScale},
 	{"Smoke Noise Quantity", &gSmokeNoiseQuantity},
 	{"Smoke Wind Noise Quantity", &gSmokeWindNoiseQuantity},
-	// Wind Displacement
 	{"Wind To Smoke Strength", &gWindToSmokeStrength},
 	{"Wind To Smoke Power", &gWindToSmokePower},
 	{"Wind Displacement Noise Scale", &gWindDisplacementNoiseScale},
 	{"Wind Smoke Retention", &gWindSmokeRetention},
 	{"Wind Smoke Advection", &gWindSmokeAdvection},
-	// Object
 	{"Smoke Object Height", &gSmokeObjectHeight},
 	// Trails (also rendered in game-side TweaksScreenSmokeDeposits column 3)
 	{"Smoke Trails Quantity", &gSmokeTrailsQuantity},
@@ -53,7 +48,6 @@ void RenderSmokeSection(TweaksScreenBase& rScreen)
 		{
 			if (ImGui::BeginTable("SmokeColumns", 2))
 			{
-				// Left column
 				ImGui::TableNextColumn();
 
 				rScreen.WrapperSeparatorText("Decay");
@@ -74,7 +68,6 @@ void RenderSmokeSection(TweaksScreenBase& rScreen)
 				rScreen.WrapperSlider("Smoke Noise Quantity", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Wind Noise Quantity", iSection, 1.0f);
 
-				// Right column
 				ImGui::TableNextColumn();
 
 				rScreen.WrapperSeparatorText("Wind Displacement");

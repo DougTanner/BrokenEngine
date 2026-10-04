@@ -108,13 +108,13 @@ void CommandDesyncProbe(const nlohmann::json& rParameters, nlohmann::json& rResu
 	{
 		throw std::runtime_error("desync_probe requires a connected live client/server session");
 	}
-	if (gpGame->InMainMenu())
+	if ((gpGame->mGameFlags & engine::GameFlags::kMainMenu))
 	{
 		throw std::runtime_error("desync_probe requires a connected live client/server session");
 	}
 
-	auto coordIt = gpGame->mCoordFrames.find(gpGame->mClientGridCoord);
-	if (coordIt == gpGame->mCoordFrames.end())
+	auto coordIt = gpGame->mCoordinateFrames.find(gpGame->mClientGridCoordinate);
+	if (coordIt == gpGame->mCoordinateFrames.end())
 	{
 		throw std::runtime_error("desync_probe requires a current client frame");
 	}
@@ -130,7 +130,7 @@ void CommandDesyncProbe(const nlohmann::json& rParameters, nlohmann::json& rResu
 	}
 
 	int64_t iTick = pCurrentFrame->interpolate.iTick;
-	engine::GridCoord coord = gpGame->mClientGridCoord;
+	engine::GridCoord coord = gpGame->mClientGridCoordinate;
 	common::crc_t uiExpectedCrc = pCurrentFrame->postRender.uiSharedCrc;
 	common::crc_t uiActualCrc = uiExpectedCrc ^ static_cast<common::crc_t>(1);
 

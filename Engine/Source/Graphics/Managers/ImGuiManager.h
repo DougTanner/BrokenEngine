@@ -6,7 +6,7 @@ namespace game
 {
 class HudScreen;
 class TweaksScreen;
-}
+} // namespace game
 
 namespace engine
 {
@@ -34,13 +34,13 @@ enum TextAreas
 
 struct TextArea
 {
-	static constexpr int64_t kiMaxChars = 4'096;
+	static constexpr int64_t kiMaxCharacters = 4'096;
 
 	float fX = 0.0f;
 	float fY = 0.0f;
 	float fSize = 0.1f;
 	int64_t iCharacterCount = 0;
-	char pcText[kiMaxChars] {};
+	char pcText[kiMaxCharacters] {};
 };
 
 class ImGuiManager
@@ -52,10 +52,10 @@ public:
 
 	void Prepare(int64_t iFramebuffer);
 	void Submit(int64_t iFramebuffer);
-	void RegisterOpaqueRect(const ImVec2& pos, const ImVec2& size);
+	void RegisterOpaqueRectangle(const ImVec2& rPosition, const ImVec2& rSize);
 	void UpdateTextArea(TextAreas eTextArea, std::string_view characters);
 
-	static constexpr int64_t kiMaxUiRects = 32;
+	static constexpr int64_t kiMaxUiRectangles = 32;
 
 	float mfUiScale = 1.0f;
 
@@ -68,7 +68,7 @@ private:
 	void CreateRenderPass();
 	void CreateFramebuffers();
 	void CreateUiPrepassIndirectBuffer();
-	void UpdateUiRectBuffers(int64_t iFramebuffer);
+	void UpdateUiRectangleBuffers(int64_t iFramebuffer);
 	void SetupThemeGeometry(float fUiScale);
 	void ApplyThemeColors(UiTheme eTheme);
 	void RenderTextAreas();
@@ -76,6 +76,9 @@ private:
 	VkRenderPass mImGuiVkRenderPass = VK_NULL_HANDLE;
 	std::vector<VkFramebuffer> mImGuiFramebuffers;
 	ImDrawData* mpDrawData = nullptr;
+
+public:
+
 	std::unique_ptr<MainMenuScreen> mpMainMenuScreen;
 	std::unique_ptr<ModalScreen> mpModalScreen;
 	std::unique_ptr<PauseMenuScreen> mpPauseMenuScreen;
@@ -84,11 +87,13 @@ private:
 	std::unique_ptr<GameSettingsScreen> mpGameSettingsScreen;
 	std::unique_ptr<game::HudScreen> mpHudScreen;
 
-	VmaAllocation mUiPrepassIndirectVmaAllocation = VK_NULL_HANDLE;
-	VkDrawIndirectCommand* mpUiPrepassIndirectMapped = nullptr;
+private:
 
-	int64_t miOpaqueRectCount = 0;
-	XMFLOAT4 mOpaqueRects[kiMaxUiRects] {};
+	VmaAllocation mUiPrepassIndirectVmaAllocation = VK_NULL_HANDLE;
+	VkDrawIndirectCommand* mpUiPrepassIndirectMappedVkDrawIndirectCommand = nullptr;
+
+	int64_t miOpaqueRectangleCount = 0;
+	XMFLOAT4 mf4OpaqueRectangles[kiMaxUiRectangles] {};
 
 	static constexpr float kfTextEdge = 0.025f;
 	TextArea mTextAreas[kTextAreasCount]

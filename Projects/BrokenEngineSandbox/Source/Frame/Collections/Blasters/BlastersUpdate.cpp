@@ -140,9 +140,9 @@ static void XM_CALLCONV SyncBlaster(FrameInterpolate& rFrameInterpolate, engine:
 		{
 			.vecPosition = vecPosition,
 			.fVisibleArea = fSize,
-			.fVisibleIntensity = rPointLightType.pVisibleIntensityWrapper != nullptr ? rPointLightType.pVisibleIntensityWrapper->Get() : rPointLightType.fVisibleIntensity,
-			.fLightingArea = rPointLightType.pLightingAreaWrapper != nullptr ? rPointLightType.pLightingAreaWrapper->Get() : rPointLightType.fLightingArea,
-			.fLightingIntensity = rPointLightType.pLightingIntensityWrapper != nullptr ? rPointLightType.pLightingIntensityWrapper->Get() : rPointLightType.fLightingIntensity,
+			.fVisibleIntensity = rPointLightType.pVisibleIntensityWrapper != nullptr ? rPointLightType.pVisibleIntensityWrapper->mfCurrent : rPointLightType.fVisibleIntensity,
+			.fLightingArea = rPointLightType.pLightingAreaWrapper != nullptr ? rPointLightType.pLightingAreaWrapper->mfCurrent : rPointLightType.fLightingArea,
+			.fLightingIntensity = rPointLightType.pLightingIntensityWrapper != nullptr ? rPointLightType.pLightingIntensityWrapper->mfCurrent : rPointLightType.fLightingIntensity,
 			.fRotation = 0.0f,
 		});
 	}
@@ -317,7 +317,7 @@ void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 
 			// Play terrain impact sound
 #if defined(BT_CLIENT)
-			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster16793__pushtobreak__earth1wavCrc, rStaticData.coordinate, vecCollisionPosition, gTerrainImpactVolume.Get());
+			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster16793__pushtobreak__earth1wavCrc, rStaticData.coordinate, vecCollisionPosition, gTerrainImpactVolume.mfCurrent);
 #endif
 		}
 		else if (rBoundaryHit.bHit) [[unlikely]]

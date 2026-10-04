@@ -15,7 +15,6 @@ enum class TweakSectionFlags : uint32_t
 {
 };
 
-// Section index (0..SectionCount()) -> its single TweakSectionFlags bit.
 inline TweakSectionFlags SectionFlag(int64_t iSection)
 {
 	return static_cast<TweakSectionFlags>(1u << iSection);
@@ -23,18 +22,18 @@ inline TweakSectionFlags SectionFlag(int64_t iSection)
 
 class TweaksScreenBase;
 
-struct TweakSectionDesc
+struct TweakSectionDescription
 {
 	// Toggle-bar label and ImGui window title/ID. Register with string literals only: consumed as a C string.
 	std::string_view displayName;
 	// Persisted identity, folded into the layout CRC. Kept distinct from displayName so relabeling a section
 	// does not discard saved layout.
 	std::string_view stableKey;
-	void (*pfnRender)(TweaksScreenBase& rScreen) = nullptr;
+	void (*pRender)(TweaksScreenBase& rScreen) = nullptr;
 };
 
 // Persisted section layout, engine-owned and embedded by value in the game settings struct so exactly one
-// array bound and one sizeof exist in the program. Padding is explicit (uiPad) because the whole object is
+// array bound and one sizeof exist in the program. Padding is explicit (uiPadding) because the whole object is
 // written verbatim and repeated saves of unchanged settings must be byte-identical.
 struct TweakSectionState
 {
@@ -43,9 +42,8 @@ struct TweakSectionState
 	float fWindowPositionX[kiMaxTweakSections] {};
 	float fWindowPositionY[kiMaxTweakSections] {};
 	int8_t iActiveSubtab[kiMaxTweakSections] {};
-	uint8_t uiPad[1] {};
-	// common::Crc over the registered stableKeys in registration order. The dense indices above identify the
-	// same sections only while this matches; on mismatch LoadState discards the file and defaults stand.
+	uint8_t uiPadding[1] {};
+	// CRC of stable keys in registration order; on mismatch LoadState ignores saved layout and keeps defaults.
 	common::crc_t crcLayout = 0;
 };
 static_assert(std::is_trivially_copyable_v<TweakSectionState>);
@@ -55,15 +53,15 @@ class TweaksScreenBase
 {
 public:
 
+	// Registry storage. Startup-only writes, immutable during rendering, and fixed-size so registration never allocates.
+	inline static TweakSectionDescription msSectionDescriptions[kiMaxTweakSections] {};
+	inline static int64_t msiSectionCount = 0;
+
 	TweaksScreenBase();
 	virtual ~TweaksScreenBase() = default;
 
-	// Startup-only and single-threaded, from RegisterEngineTweakSections() / game::RegisterGameTweakSections()
-	// before the first UI frame. Appends rDesc, assigns the next dense index, and writes it back through
-	// riSection. The table is immutable afterward, so render-time reads need no synchronization.
-	static void RegisterSection(int64_t& riSection, const TweakSectionDesc& rDesc);
-	static int64_t SectionCount();
-	static const TweakSectionDesc& GetSection(int64_t iSection);
+	// RegisterEngineTweakSections and game::RegisterGameTweakSections register sections on one thread before the first UI frame; the registry is immutable during rendering.
+	static void RegisterSection(int64_t& riSection, const TweakSectionDescription& rDescription);
 	static common::Flags<TweakSectionFlags> AllSectionFlags();
 
 	void SaveState(TweakSectionState& rState) const;
@@ -84,8 +82,8 @@ public:
 	bool BeginSubtab(const char* pcLabel, int64_t iSection, int8_t iTab);
 	void WrapperSlider(std::string_view label, int64_t iSection, float fWidthMultiplier = 2.0f, std::string_view mapKey = {});
 	void WrapperSeparatorText(std::string_view label);
-	// Chevron-style discrete index selector: << [name] >> with wrap-around. iCount must equal the wrapper's allowed-value count.
-	void ChevronIndexSelector(std::string_view label, Wrapper& rWrapper, const std::string_view* pNames, int64_t iCount);
+	// Chevron selection wraps; names must contain exactly the wrapper's allowed values.
+	void ChevronIndexSelector(std::string_view label, Wrapper& rWrapper, std::span<const std::string_view> names);
 
 	void RunSliderAuditFrame();
 
@@ -94,16 +92,16 @@ public:
 
 	common::Flags<TweakSectionFlags> mSectionVisible {};
 	ImVec2 mWindowPositions[kiMaxTweakSections] {};
-	int8_t mActiveSubtab[kiMaxTweakSections] {};
+	int8_t miActiveSubtab[kiMaxTweakSections] {};
 	common::Flags<TweakSectionFlags> mApplySubtab {};
 	common::Flags<TweakSectionFlags> mSectionCollapsed {};
 	float mfToggleBarBottom = 0.0f;
 
-	// Slider-map drift audit runs once per TweaksScreen lifetime and is re-armed by graphics reconstruction. Cycles mActiveSubtab[] across 6 frames: frames 0-4 queue tabs and frame 5 settles the final selection.
+	// Slider-map drift audit runs once per TweaksScreen lifetime and is re-armed by graphics reconstruction. Cycles miActiveSubtab[] across 6 frames: frames 0-4 queue tabs and frame 5 settles the final selection.
 	// miAuditFrame: 0..(kiAuditFrameCount-1) = audit running, -1 = audit complete.
 	std::unordered_set<std::string_view> mAuditTouched;
 	std::unordered_set<std::string_view> mAuditMissed;
-	int8_t mPreAuditSubtab[kiMaxTweakSections] {};
+	int8_t miPreAuditSubtab[kiMaxTweakSections] {};
 	int8_t miAuditFrame = 0;
 	bool mbAuditMode = false;
 };
@@ -115,18 +113,18 @@ inline int64_t giTweakSectionWater = kiInvalidTweakSection;
 inline int64_t giTweakSectionLighting = kiInvalidTweakSection;
 inline int64_t giTweakSectionShadow = kiInvalidTweakSection;
 inline int64_t giTweakSectionSunMoon = kiInvalidTweakSection;
-inline int64_t giTweakSectionMisc = kiInvalidTweakSection;
+inline int64_t giTweakSectionMiscellaneous = kiInvalidTweakSection;
 inline int64_t giTweakSectionSound = kiInvalidTweakSection;
 inline int64_t giTweakSectionSmoke = kiInvalidTweakSection;
 inline int64_t giTweakSectionWind = kiInvalidTweakSection;
 
-void RenderPbrSection(TweaksScreenBase& rScreen);
+void RenderPhysicallyBasedRenderingSection(TweaksScreenBase& rScreen);
 void RenderTerrainSection(TweaksScreenBase& rScreen);
 void RenderWaterSection(TweaksScreenBase& rScreen);
 void RenderLightingSection(TweaksScreenBase& rScreen);
 void RenderShadowSection(TweaksScreenBase& rScreen);
 void RenderSunMoonSection(TweaksScreenBase& rScreen);
-void RenderMiscSection(TweaksScreenBase& rScreen);
+void RenderMiscellaneousSection(TweaksScreenBase& rScreen);
 void RenderSoundSection(TweaksScreenBase& rScreen);
 void RenderSmokeSection(TweaksScreenBase& rScreen);
 void RenderWindSection(TweaksScreenBase& rScreen);

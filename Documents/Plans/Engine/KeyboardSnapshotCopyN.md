@@ -5,14 +5,14 @@
 
 `RawInputManager::Update` in `Engine/Source/Input/RawInputManager.cpp` currently copies the hardware keyboard scratch array into the published snapshot with an indexed loop. The operation is a complete fixed-count copy, and `std::copy_n` states that operation directly without incidental indexing. This is the narrowly accepted B56 application; the Plan contains its complete rationale and does not depend on a feature-adoption investigation.
 
-`Engine/Source/Input/RawInputManager.h` declares `kiKeyboardKeyCount` as positive constexpr `int64_t` value `0xFF` (255). `RawInputManager::mpbKeyboardKeysDown` and `RawInput::pKeyboardKeys` are distinct non-overlapping `bool[kiKeyboardKeyCount]` arrays. `Common/ExternalHeaders.h` already includes `<algorithm>`. There is no need for an include, helper, storage, or type change. A search of existing Plans for `RawInputManager`, `copy_n`, `copy_if`, `move_backward`, and keyboard-copy wording found no existing owner.
+`Engine/Source/Input/RawInputManager.h` declares `kiKeyboardKeyCount` as positive constexpr `int64_t` value `0xFF` (255). `RawInputManager::mpbKeyboardKeysDown` and `RawInput::pbKeyboardKeys` are distinct non-overlapping `bool[kiKeyboardKeyCount]` arrays. `Common/ExternalHeaders.h` already includes `<algorithm>`. There is no need for an include, helper, storage, or type change. A search of existing Plans for `RawInputManager`, `copy_n`, `copy_if`, `move_backward`, and keyboard-copy wording found no existing owner.
 
 ## Design
 
 Inside the existing `if (bHasFocus)` keyboard branch of `RawInputManager::Update(bool bLostFocus)`, replace only the indexed loop with:
 
 ```cpp
-std::copy_n(mpbKeyboardKeysDown, kiKeyboardKeyCount, mRawInput.pKeyboardKeys);
+std::copy_n(mpbKeyboardKeysDown, kiKeyboardKeyCount, mRawInput.pbKeyboardKeys);
 ```
 
 In the comment immediately above the final `if (bScriptActive)` overlay branch, change only the phrase `keyboard copy loop` to `keyboard copy`. The resulting second comment line is:

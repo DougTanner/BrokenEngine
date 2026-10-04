@@ -26,19 +26,18 @@ std::error_code VkErrorCode(VkResult vkResult) noexcept
 		}
 	};
 
-	static const VulkanErrorCategory category;
-	return {static_cast<int>(vkResult), category};
+	static const VulkanErrorCategory sCategory;
+	return std::error_code(static_cast<int>(vkResult), sCategory);
 }
 
-void CheckVkFailed(VkResult vkResult, std::string_view expression, std::source_location loc)
+void CheckVkFailed(VkResult vkResult, std::string_view expression, std::source_location location)
 {
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	const char* pcResult = string_VkResult(vkResult);
-	LOG(kDefault, kError, "CheckVk failed: {} - \"{}\" at {}:{} in {}", pcResult, expression, loc.file_name(), loc.line(), loc.function_name());
+	LOG(kDefault, kError, "CheckVk failed: {} - \"{}\" at {}:{} in {}", pcResult, expression, location.file_name(), location.line(), location.function_name());
 
-	// Format exception message with call site information
-	auto pcException = rWorkbuffer.PushBuffer<char*>(1'024);
-	std::snprintf(pcException.mpData, 1'023, "CheckVk failed: \"%.*s\" at %s:%u in %s\nVkResult: %s", static_cast<int>(expression.size()), expression.data(), loc.file_name(), loc.line(), loc.function_name(), pcResult);
+	auto exceptionAllocation = rWorkbuffer.PushBuffer<char*>(1'024);
+	std::snprintf(exceptionAllocation.mpData, 1'023, "CheckVk failed: \"%.*s\" at %s:%u in %s\nVkResult: %s", static_cast<int>(expression.size()), expression.data(), location.file_name(), location.line(), location.function_name(), pcResult);
 
 	if (vkResult == VK_ERROR_OUT_OF_DATE_KHR || vkResult == VK_SUBOPTIMAL_KHR)
 	{
@@ -55,14 +54,14 @@ void CheckVkFailed(VkResult vkResult, std::string_view expression, std::source_l
 
 	if (vkResult == VK_ERROR_DEVICE_LOST)
 	{
-		throw std::system_error(VkErrorCode(vkResult), pcException.mpData);
+		throw std::system_error(VkErrorCode(vkResult), exceptionAllocation.mpData);
 	}
 
 	DEBUG_BREAK();
-	throw std::runtime_error(pcException.mpData);
+	throw std::runtime_error(exceptionAllocation.mpData);
 }
 
-void SetVkObjectName([[maybe_unused]] VkObjectType type, [[maybe_unused]] uint64_t handle, [[maybe_unused]] std::string_view name)
+void SetVkObjectName([[maybe_unused]] VkObjectType vkObjectType, [[maybe_unused]] uint64_t uiHandle, [[maybe_unused]] std::string_view name)
 {
 	if constexpr (kbVulkanDebugLayers)
 	{
@@ -71,16 +70,15 @@ void SetVkObjectName([[maybe_unused]] VkObjectType type, [[maybe_unused]] uint64
 			common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 			// string_VkObjectType returns "Unhandled VkObjectType" for unrecognized types (no "VK_OBJECT_TYPE_"
 			// prefix); strip the prefix only when present, else the fixed skip mis-truncates the fallback into a garbage tail.
-			const char* pcTypeName = string_VkObjectType(type);
-			size_t iPrefixLength = std::char_traits<char>::length("VK_OBJECT_TYPE_");
-			const char* pcPrefix = std::char_traits<char>::compare(pcTypeName, "VK_OBJECT_TYPE_", iPrefixLength) == 0 ? pcTypeName + iPrefixLength : pcTypeName;
+			const char* pcTypeName = string_VkObjectType(vkObjectType);
+			size_t uiPrefixLength = std::char_traits<char>::length("VK_OBJECT_TYPE_");
+			const char* pcPrefix = std::char_traits<char>::compare(pcTypeName, "VK_OBJECT_TYPE_", uiPrefixLength) == 0 ? pcTypeName + uiPrefixLength : pcTypeName;
 			common::ScopedWorkbufferArena innerArena = rWorkbuffer.Push();
 			rWorkbuffer.Append(pcPrefix);
 			rWorkbuffer.Append(" ");
 			rWorkbuffer.Append(name);
 
-			// Heap: emplace copies workbuffer string into a std::string in mDebugNames (unordered_set). Vulkan retains
-			// the c_str() pointer, so the string must outlive the object. Can't use workbuffer (gone after Pop)
+			// Heap: caching debug names in mDebugNames can allocate string storage and unordered_set nodes.
 			ScopedSuppressAllocationTracking suppress;
 
 			auto [it, bInserted] = gpGraphics->mDebugNames.emplace(rWorkbuffer.View());
@@ -88,8 +86,8 @@ void SetVkObjectName([[maybe_unused]] VkObjectType type, [[maybe_unused]] uint64
 			{
 				.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
 				.pNext = nullptr,
-				.objectType = type,
-				.objectHandle = handle,
+				.objectType = vkObjectType,
+				.objectHandle = uiHandle,
 				.pObjectName = it->c_str(),
 			};
 			vkSetDebugUtilsObjectNameEXT(gpDeviceManager->mVkDevice, &vkDebugUtilsObjectNameInfoEXT);
@@ -97,10 +95,10 @@ void SetVkObjectName([[maybe_unused]] VkObjectType type, [[maybe_unused]] uint64
 	}
 }
 
-bool IsPointVisible(XMVECTOR vecPosition, XMFLOAT4A& rOutPosition)
+bool IsPointVisible(XMVECTOR vecPosition, XMFLOAT4A& rf4OutPosition)
 {
-	XMStoreFloat4A(&rOutPosition, vecPosition);
-	return rOutPosition.x >= engine::gpCamera->f4RenderVisibleArea.x && rOutPosition.x <= engine::gpCamera->f4RenderVisibleArea.z && rOutPosition.y <= engine::gpCamera->f4RenderVisibleArea.y && rOutPosition.y >= engine::gpCamera->f4RenderVisibleArea.w;
+	XMStoreFloat4A(&rf4OutPosition, vecPosition);
+	return rf4OutPosition.x >= engine::gpCamera->mf4RenderVisibleArea.x && rf4OutPosition.x <= engine::gpCamera->mf4RenderVisibleArea.z && rf4OutPosition.y <= engine::gpCamera->mf4RenderVisibleArea.y && rf4OutPosition.y >= engine::gpCamera->mf4RenderVisibleArea.w;
 }
 
 XMVECTOR ProjectToBaseHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasis)
@@ -108,14 +106,14 @@ XMVECTOR ProjectToBaseHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasi
 	// The elevation query is answered in the emitter's own cell, from the coordinate the basis carries; the
 	// projection toward the eye is the conversion point, so the rebase happens exactly once here.
 	float fElevation = gpIslandTerrain->GlobalElevation(rBasis.coordinate, vecLocalPosition);
-	return common::ToBaseHeight(Rebase(rBasis, vecLocalPosition), engine::gpCamera->mVecEyePosition, std::max(fElevation, gBaseHeight.Get()));
+	return common::ToBaseHeight(Rebase(rBasis, vecLocalPosition), engine::gpCamera->mVecEyePosition, std::max(fElevation, gBaseHeight.mfCurrent));
 }
 
-void BuildAxisAlignedQuad(shaders::AxisAlignedQuadLayout& rLayout, const XMFLOAT4A& f4Position, float fArea, const XMFLOAT4A& f4Params, uint32_t uiColor)
+void BuildAxisAlignedQuad(shaders::AxisAlignedQuadLayout& rLayout, const XMFLOAT4A& rf4Position, float fArea, const XMFLOAT4A& rf4Parameters, uint32_t uiColor)
 {
-	rLayout.f4VertexRect = {f4Position.x - fArea, f4Position.y + fArea, 2.0f * fArea, -2.0f * fArea};
+	rLayout.f4VertexRect = {rf4Position.x - fArea, rf4Position.y + fArea, 2.0f * fArea, -2.0f * fArea};
 	rLayout.f4TextureRect = {0.0f, 0.0f, 1.0f, 1.0f};
-	rLayout.f4Params = f4Params;
+	rLayout.f4Parameters = rf4Parameters;
 	rLayout.fRotation = 0.0f; // non-island consumers render axis-aligned
 	rLayout.uiTextureSlot = 0; // non-island consumers don't sample the island texture array
 	rLayout.uiColor = uiColor;
@@ -123,14 +121,12 @@ void BuildAxisAlignedQuad(shaders::AxisAlignedQuadLayout& rLayout, const XMFLOAT
 
 float MinLightingDepositSize()
 {
-	// Minimum lighting size: clamp to 8 texels to prevent flickering from sub-texel lights. The deposit
-	// texel world size is constant-density (visible width / base detail resolution) at any settled height,
-	// independent of the lighting-headroom pre-size (the headroom cancels in the f4LightingArea texel
-	// formula), so the un-bumped DetailTextureSize is the right basis here — NOT LightingDetailTextureSize,
-	// which would shrink the floor by the headroom factor. The ceil only inflates the floor sub-texel.
-	auto [iLightingTextureX, iLightingTextureY] = TextureManager::DetailTextureSize(gLightingDepositTextureMultiplier.Get());
-	float fTexelSizeX = std::ceil(engine::gpCamera->f4RenderVisibleArea.z - engine::gpCamera->f4RenderVisibleArea.x) / static_cast<float>(iLightingTextureX);
-	float fTexelSizeY = std::ceil(engine::gpCamera->f4RenderVisibleArea.y - engine::gpCamera->f4RenderVisibleArea.w) / static_cast<float>(iLightingTextureY);
+	// At settled camera heights, eight constant-density lighting texels prevent sub-texel light flicker.
+	// Lighting-area and texture headroom factors cancel, so texel world size uses the base DetailTextureSize.
+	// Ceil inflates the floor by a sub-texel amount.
+	auto [iLightingTextureX, iLightingTextureY] = TextureManager::DetailTextureSize(gLightingDepositTextureMultiplier.mfCurrent);
+	float fTexelSizeX = std::ceil(engine::gpCamera->mf4RenderVisibleArea.z - engine::gpCamera->mf4RenderVisibleArea.x) / static_cast<float>(iLightingTextureX);
+	float fTexelSizeY = std::ceil(engine::gpCamera->mf4RenderVisibleArea.y - engine::gpCamera->mf4RenderVisibleArea.w) / static_cast<float>(iLightingTextureY);
 	return std::max(fTexelSizeX, fTexelSizeY) * 8.0f;
 }
 

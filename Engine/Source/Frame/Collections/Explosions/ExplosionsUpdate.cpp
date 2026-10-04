@@ -76,7 +76,7 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 			}
 
 			// j == 0 is the central trail along the explosion direction; j > 0 are angle-jittered side trails
-			float fDurationMultiplier = (j == 0) ? sTuning.pPrimaryTrailDuration->Get() : sTuning.pSecondaryTrailDuration->Get();
+			float fDurationMultiplier = (j == 0) ? sTuning.pPrimaryTrailDuration->mfCurrent : sTuning.pSecondaryTrailDuration->mfCurrent;
 			std::chrono::duration<float> effectiveTrailTime(rCurrent.pfTrailTimes[j][i] * fDurationMultiplier);
 			std::chrono::duration<float> trailEndTime = std::chrono::duration<float>(fTimePercent * rType.fTrailDelayTime) + effectiveTrailTime;
 

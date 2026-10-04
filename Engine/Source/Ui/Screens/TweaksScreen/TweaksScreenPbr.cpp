@@ -8,53 +8,44 @@
 namespace engine
 {
 
-const TweaksSliderMapRegistrar gPbrRegistrar
+const TweaksSliderMapRegistrar gPhysicallyBasedRenderingRegistrar
 {
-	// Engine Variables
-	{"Sun", &gPbrSun},
-	{"Day Brightness", &gPbrDayBrightness},
-	{"Model Data Mip Bias", &gPbrModelDataMipLodBias},
-	// BRDF
-	{"BRDF Diffuse", &gPbrBrdfDiffuse},
-	{"BRDF Diffuse Power", &gPbrBrdfDiffusePower},
-	{"BRDF Specular", &gPbrBrdfSpecular},
-	{"BRDF Specular Power", &gPbrBrdfSpecularPower},
-	// Tone Mapping
-	{"Exposure", &gPbrExposure},
-	{"Gamma", &gPbrGamma},
-	// Color Grading
+	{"Sun", &gPhysicallyBasedRenderingSun},
+	{"Day Brightness", &gPhysicallyBasedRenderingDayBrightness},
+	{"Model Data Mip Bias", &gPhysicallyBasedRenderingModelDataMipmapLevelOfDetailBias},
+	{"BRDF Diffuse", &gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse},
+	{"BRDF Diffuse Power", &gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower},
+	{"BRDF Specular", &gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular},
+	{"BRDF Specular Power", &gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower},
+	{"Exposure", &gPhysicallyBasedRenderingExposure},
+	{"Gamma", &gPhysicallyBasedRenderingGamma},
 	{"Saturation", &gColorGradingSaturation},
 	{"Contrast", &gColorGradingContrast},
 	{"Temperature", &gColorGradingTemperature},
-	// Post Lighting
-	{"Lighting Specular", &gPbrLightingSpecular},
-	{"Lighting Specular Power", &gPbrLightingSpecularPower},
-	{"Lighting", &gPbrLighting},
-	{"Lighting Power", &gPbrLightingPower},
-	// IBL
-	{"IBL Ambient", &gPbrIblAmbient},
-	{"IBL Diffuse", &gPbrIblDiffuse},
-	{"IBL Diffuse Power", &gPbrIblDiffusePower},
-	{"IBL Specular", &gPbrIblSpecular},
-	{"IBL Specular Power", &gPbrIblSpecularPower},
-	{"IBL Shadow Blend", &gPbrIblShadowBlend},
-	{"IBL Ambient Color Blend", &gPbrIblAmbientColorBlend},
-	{"Cubemap Lod Power", &gPbrCubemapLodPower},
-	{"Cubemap Lod Offset", &gPbrCubemapLodOffset},
-	{"Shadow Floor", &gPbrShadowFloor},
-	// Smoke
-	{"Smoke", &gPbrSmoke},
-	// Emissive
-	{"Emissive", &gPbrEmissive},
+	{"Lighting Specular", &gPhysicallyBasedRenderingLightingSpecular},
+	{"Lighting Specular Power", &gPhysicallyBasedRenderingLightingSpecularPower},
+	{"Lighting", &gPhysicallyBasedRenderingLighting},
+	{"Lighting Power", &gPhysicallyBasedRenderingLightingPower},
+	{"IBL Ambient", &gPhysicallyBasedRenderingImageBasedLightingAmbient},
+	{"IBL Diffuse", &gPhysicallyBasedRenderingImageBasedLightingDiffuse},
+	{"IBL Diffuse Power", &gPhysicallyBasedRenderingImageBasedLightingDiffusePower},
+	{"IBL Specular", &gPhysicallyBasedRenderingImageBasedLightingSpecular},
+	{"IBL Specular Power", &gPhysicallyBasedRenderingImageBasedLightingSpecularPower},
+	{"IBL Shadow Blend", &gPhysicallyBasedRenderingImageBasedLightingShadowBlend},
+	{"IBL Ambient Color Blend", &gPhysicallyBasedRenderingImageBasedLightingAmbientColorBlend},
+	{"Cubemap Lod Power", &gPhysicallyBasedRenderingCubemapLevelOfDetailPower},
+	{"Cubemap Lod Offset", &gPhysicallyBasedRenderingCubemapLevelOfDetailOffset},
+	{"Shadow Floor", &gPhysicallyBasedRenderingShadowFloor},
+	{"Smoke", &gPhysicallyBasedRenderingSmoke},
+	{"Emissive", &gPhysicallyBasedRenderingEmissive},
 };
 
-void RenderPbrSection(TweaksScreenBase& rScreen)
+void RenderPhysicallyBasedRenderingSection(TweaksScreenBase& rScreen)
 {
 	int64_t iSection = giTweakSectionPbr;
 
 	if (ImGui::BeginTable("PbrColumns", 2))
 	{
-		// Left column
 		ImGui::TableNextColumn();
 
 		rScreen.WrapperSeparatorText("Engine Variables");
@@ -83,7 +74,6 @@ void RenderPbrSection(TweaksScreenBase& rScreen)
 		rScreen.WrapperSlider("Lighting", iSection, 1.0f);
 		rScreen.WrapperSlider("Lighting Power", iSection, 1.0f);
 
-		// Right column
 		ImGui::TableNextColumn();
 
 		rScreen.WrapperSeparatorText("IBL");

@@ -119,8 +119,8 @@ void ServerSessionRuntime::PreparePausedSubscriptions()
 {
 	for (const engine::PendingNewSubscription& rSubscription : mpServer->mPendingNewSubscriptions)
 	{
-		auto it = game::gpGame->mCoordFrames.find(rSubscription.coordinate);
-		if (it == game::gpGame->mCoordFrames.end())
+		auto it = game::gpGame->mCoordinateFrames.find(rSubscription.coordinate);
+		if (it == game::gpGame->mCoordinateFrames.end())
 		{
 			continue;
 		}
@@ -177,13 +177,13 @@ void ServerSessionRuntime::HandleResyncRequests()
 				continue;
 			}
 
-			auto it = game::gpGame->mCoordFrames.find(coord);
-			if (it == game::gpGame->mCoordFrames.end())
+			auto it = game::gpGame->mCoordinateFrames.find(coord);
+			if (it == game::gpGame->mCoordinateFrames.end())
 			{
 				continue;
 			}
 
-			mpServer->SendCoordinateFullState(iClientId, i, game::gpGame->TickCounter(), coord, it->second.pCurrent.get());
+			mpServer->SendCoordinateFullState(iClientId, i, game::gpGame->miTickCounter, coord, it->second.pCurrent.get());
 		}
 	}
 
@@ -211,8 +211,8 @@ void ServerSessionRuntime::SendNewSubscriptionFullStates()
 			return true;
 		}
 
-		auto it = game::gpGame->mCoordFrames.find(rSubscription.coordinate);
-		if (it == game::gpGame->mCoordFrames.end())
+		auto it = game::gpGame->mCoordinateFrames.find(rSubscription.coordinate);
+		if (it == game::gpGame->mCoordinateFrames.end())
 		{
 			return false;
 		}
@@ -223,7 +223,7 @@ void ServerSessionRuntime::SendNewSubscriptionFullStates()
 		}
 
 		mpServer->SendCoordinateStaticData(rSubscription.iClientId, rSubscription.iSlot, rSubscription.coordinate, it->second.staticData);
-		mpServer->SendCoordinateFullState(rSubscription.iClientId, rSubscription.iSlot, game::gpGame->TickCounter(), rSubscription.coordinate, it->second.pCurrent.get());
+		mpServer->SendCoordinateFullState(rSubscription.iClientId, rSubscription.iSlot, game::gpGame->miTickCounter, rSubscription.coordinate, it->second.pCurrent.get());
 		return true;
 	});
 }
@@ -293,9 +293,9 @@ void ServerSessionRuntime::AddSubscribedCoords()
 			if (rClient.slots.at(i).subscription.flags & engine::SubscriptionFlags::kActive)
 			{
 				engine::GridCoord coord = rClient.slots.at(i).subscription.coordinate;
-				if (!std::ranges::contains(game::gpGame->mActiveCoords, coord))
+				if (!std::ranges::contains(game::gpGame->mActiveCoordinates, coord))
 				{
-					game::gpGame->mActiveCoords.push_back(coord);
+					game::gpGame->mActiveCoordinates.push_back(coord);
 				}
 			}
 		}
@@ -304,40 +304,40 @@ void ServerSessionRuntime::AddSubscribedCoords()
 
 void ServerSessionRuntime::SyncActiveFrames()
 {
-	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoords)
+	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoordinates)
 	{
-		if (!game::gpGame->mCoordFrames.contains(rCoord))
+		if (!game::gpGame->mCoordinateFrames.contains(rCoord))
 		{
-			game::gpGame->CreateFrameAtCoord(rCoord);
+			game::gpGame->CreateFrameAtCoordinate(rCoord);
 		}
 	}
 
 	// Delete frames outside the active set, handing a recording writer its final complete current frame first.
-	for (auto it = game::gpGame->mCoordFrames.begin(); it != game::gpGame->mCoordFrames.end();)
+	for (auto it = game::gpGame->mCoordinateFrames.begin(); it != game::gpGame->mCoordinateFrames.end();)
 	{
-		if (std::ranges::contains(game::gpGame->mActiveCoords, it->first))
+		if (std::ranges::contains(game::gpGame->mActiveCoordinates, it->first))
 		{
 			++it;
 			continue;
 		}
 
 		mrSession.OnFrameRetiring(it->first, std::move(it->second.pCurrent));
-		it = game::gpGame->mCoordFrames.erase(it);
+		it = game::gpGame->mCoordinateFrames.erase(it);
 	}
 }
 
 void ServerSessionRuntime::ComputeActiveSet()
 {
-	// Heap: mActiveCoords vector clear/push_back may allocate. Persists as Game member across frame updates
+	// Heap: mActiveCoordinates vector clear/push_back may allocate. Persists as Game member across frame updates
 	ScopedSuppressAllocationTracking suppress;
 
-	game::gpGame->mActiveCoords.clear();
+	game::gpGame->mActiveCoordinates.clear();
 	AddSubscribedCoords();
 	mrSession.AddGameRequiredCoords();
 
-	if (!std::ranges::contains(game::gpGame->mActiveCoords, engine::kOriginCoordinate))
+	if (!std::ranges::contains(game::gpGame->mActiveCoordinates, engine::kOriginCoordinate))
 	{
-		game::gpGame->mActiveCoords.push_back(engine::kOriginCoordinate);
+		game::gpGame->mActiveCoordinates.push_back(engine::kOriginCoordinate);
 	}
 
 	SyncActiveFrames();

@@ -5,7 +5,7 @@
 namespace DirectX
 {
 class AudioEngine;
-}
+} // namespace DirectX
 
 namespace engine
 {
@@ -20,13 +20,11 @@ public:
 	StreamingVoices();
 	~StreamingVoices();
 
-	void Init(AudioEngine* pAudioEngine);
 
 	void Play(common::crc_t uiAudioCrc);
-	void SetNextTrackCallback(std::function<common::crc_t()> callback);
 
 	void CheckTrackTransition();
-	void Update(float fDeltaTime);
+	void Update(std::chrono::duration<float> deltaTime);
 	void CancelPendingReads();
 	void Clear(bool bNullVoicesBeforeDestroy);
 
@@ -37,7 +35,9 @@ private:
 	void CreateStream(common::crc_t uiAudioCrc);
 	void TransitionCurrentToPrevious();
 
+public:
 	AudioEngine* mpAudioEngine = nullptr;
+private:
 
 #if defined(BT_DEBUG)
 public:
@@ -46,7 +46,9 @@ public:
 	std::vector<std::unique_ptr<StreamingVoice>> mPreviousStreams;
 private:
 	std::vector<std::unique_ptr<StreamingVoice>> mStreamsToDestroy;
+public:
 	std::function<common::crc_t()> mGetNextTrack;
+private:
 	// Track whose CreateStream failed during a transition; retried before asking mGetNextTrack again. 0 = none.
 	common::crc_t muiRetryTrackCrc = 0;
 };

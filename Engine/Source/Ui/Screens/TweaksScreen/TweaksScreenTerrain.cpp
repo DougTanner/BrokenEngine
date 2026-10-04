@@ -10,14 +10,11 @@ namespace engine
 
 const TweaksSliderMapRegistrar gTerrainRegistrar
 {
-	// Ambient Occlusion
 	{"Ambient Occlusion", &gIslandAmbientOcclusion},
-	// Terrain Detail
-	{"Detail Normals Multiplier Start Height", &gTerrainDetailNormalsMultiplier.StartHeight},
-	{"Detail Normals Multiplier End Height", &gTerrainDetailNormalsMultiplier.EndHeight},
-	{"Detail Normals Multiplier Low", &gTerrainDetailNormalsMultiplier.Low},
-	{"Detail Normals Multiplier High", &gTerrainDetailNormalsMultiplier.High},
-	// Beach
+	{"Detail Normals Multiplier Start Height", &gTerrainDetailNormalsMultiplier.startHeight},
+	{"Detail Normals Multiplier End Height", &gTerrainDetailNormalsMultiplier.endHeight},
+	{"Detail Normals Multiplier Low", &gTerrainDetailNormalsMultiplier.low},
+	{"Detail Normals Multiplier High", &gTerrainDetailNormalsMultiplier.high},
 	{"Snow Blend", &gTerrainSnowBlend},
 	{"Snow AO Exclusion", &gTerrainSnowAmbientOcclusionExclusion},
 	{"Beach Sand Size", &gTerrainBeachSandSize},
@@ -26,7 +23,6 @@ const TweaksSliderMapRegistrar gTerrainRegistrar
 	{"Beach Normals Size 2", &gTerrainBeachNormalsSizeTwo},
 	{"Beach Normals Size 3", &gTerrainBeachNormalsSizeThree},
 	{"Beach Normals Blend", &gTerrainBeachNormalsBlend},
-	// Rock
 	{"Rock Size", &gTerrainRockSize},
 	{"Rock Blend", &gTerrainRockBlend},
 	{"Rock Normals Size 1", &gTerrainRockNormalsSizeOne},

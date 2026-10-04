@@ -1,6 +1,8 @@
 #if defined(BT_CLIENT)
 
 #include "Graphics/Managers/TextureManager.h"
+
+#include "File/PackChunks.h"
 #include "Graphics/Islands.h"
 #include "IslandTerrain.h"
 
@@ -27,9 +29,9 @@ static MeshRange GetMeshRange(const IslandTemplate& rTemplate)
 
 static void ReleaseMeshCpuRange(common::crc_t uiIslandCrc, IslandTemplate& rTemplate, const MeshRange& rRange)
 {
-	gpFileManager->DecommitChunkRange(uiIslandCrc, rRange.uiOffset, rRange.uiLength);
+	gpFileManager->mpPackChunks->DecommitChunkRange(uiIslandCrc, rRange.uiOffset, rRange.uiLength);
 	rTemplate.bMeshCpuDecommitted = true;
-	gpFileManager->ResetChunkRangeReloadState(uiIslandCrc, rRange.uiOffset, rRange.uiLength);
+	gpFileManager->mpPackChunks->mLoader.ResetChunkRangeReloadState(uiIslandCrc, rRange.uiOffset, rRange.uiLength);
 }
 
 static bool IsTextureRestorationPending(common::crc_t uiIslandCrc, const IslandTemplate& rTemplate)
@@ -38,7 +40,7 @@ static bool IsTextureRestorationPending(common::crc_t uiIslandCrc, const IslandT
 	{
 		return false;
 	}
-	const LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(uiIslandCrc);
+	const LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(uiIslandCrc);
 	common::crc_t residencyCrcs[4] =
 	{
 		rLazyChunk.header.islandHeader.colorsCrc,
@@ -48,7 +50,7 @@ static bool IsTextureRestorationPending(common::crc_t uiIslandCrc, const IslandT
 	};
 	for (common::crc_t uiTextureCrc : residencyCrcs)
 	{
-		if (!gpFileManager->IsChunkReady(uiTextureCrc))
+		if (!gpFileManager->mpPackChunks->IsChunkReady(uiTextureCrc))
 		{
 			return false;
 		}
@@ -70,18 +72,18 @@ static void CreateElevationTextureFromHeightmap(IslandTemplate& rTemplate, std::
 	rTemplate.elevationTexture.Create(TextureInfo
 	{
 		.name = name,
-		.format = shaders::keElevationFormat,
-		.extent = {static_cast<uint32_t>(rTemplate.iHeightmapWidth), static_cast<uint32_t>(rTemplate.iHeightmapHeight), 1u},
-		.mipLevels = 1u,
-		.arrayLayers = 1u,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+		.vkFormat = shaders::kVkFormatElevation,
+		.vkExtent3D = {static_cast<uint32_t>(rTemplate.iHeightmapWidth), static_cast<uint32_t>(rTemplate.iHeightmapHeight), 1u},
+		.uiMipLevels = 1u,
+		.uiArrayLayers = 1u,
+		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
-	}, [&rTemplate](void* pData, int64_t iPosition, int64_t iSize)
+	}, [&rTemplate](std::span<std::byte> data, int64_t iPosition)
 	{
-		std::memcpy(pData, reinterpret_cast<const std::byte*>(rTemplate.puiHeightmapHalf) + iPosition, static_cast<size_t>(iSize));
+		std::memcpy(data.data(), reinterpret_cast<const std::byte*>(rTemplate.puiHeightmapHalf) + iPosition, static_cast<size_t>(static_cast<int64_t>(data.size_bytes())));
 	});
 }
 
@@ -111,7 +113,7 @@ int64_t IslandTerrain::FirstMintTextureSlot(common::crc_t uiIslandCrc, IslandTem
 	gpTextureManager->mTextureDescriptors.MintIslandSlot(iSlot, uiIslandCrc, rTemplate.elevationTexture, rTextureCrcs);
 
 	rTemplate.bGpuResident = false;
-	gpFileManager->RequestChunkLoad(rTextureCrcs, LoadPriority::kRealtime);
+	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(rTextureCrcs, LoadPriority::kRealtime);
 	LOG(kGraphics, kVerbose, "First-mint slot={} islandCrc={}", iSlot, uiIslandCrc);
 
 	return iSlot;
@@ -121,11 +123,11 @@ int64_t IslandTerrain::AcquireTextureSlot(common::crc_t uiIslandCrc)
 {
 	IslandTemplate& rTemplate = mIslands.at(uiIslandCrc);
 
-	const LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(uiIslandCrc);
+	const LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(uiIslandCrc);
 	if (rTemplate.eMeshResidency == IslandMeshResidency::kNonresident)
 	{
 		MeshRange range = GetMeshRange(rTemplate);
-		gpFileManager->RequestChunkRangeReload(uiIslandCrc, range.uiOffset, range.uiLength, LoadPriority::kRealtime);
+		gpFileManager->mpPackChunks->mLoader.RequestChunkRangeReload(uiIslandCrc, range.uiOffset, range.uiLength, LoadPriority::kRealtime);
 		rTemplate.eMeshResidency = IslandMeshResidency::kAsyncPending;
 	}
 
@@ -154,7 +156,7 @@ int64_t IslandTerrain::AcquireTextureSlot(common::crc_t uiIslandCrc)
 	// A freshly minted slot stays in slot-0 fallback while chunks load, until RestorationSweep patches it.
 	// Eviction and device-loss ResetTextureSlots set iTextureSlot negative, so the next use re-enters
 	// first mint and recreates elevationTexture.
-	gpFileManager->RequestChunkLoad(textureCrcs, LoadPriority::kRealtime);
+	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(textureCrcs, LoadPriority::kRealtime);
 	LOG(kLoading, kVerbose, "Re-acquire islandCrc={} slot={}, requesting chunk loads", uiIslandCrc, rTemplate.iTextureSlot);
 	return rTemplate.iTextureSlot;
 }
@@ -208,7 +210,7 @@ bool IslandTerrain::IsRestorationPending(common::crc_t uiIslandCrc, const Island
 	switch (rTemplate.eMeshResidency)
 	{
 		case IslandMeshResidency::kAsyncPending:
-			return gpFileManager->GetChunkRangeReloadState(uiIslandCrc, range.uiOffset, range.uiLength) != ChunkRangeReloadState::kPending;
+			return gpFileManager->mpPackChunks->mLoader.GetChunkRangeReloadState(uiIslandCrc, range.uiOffset, range.uiLength) != ChunkRangeReloadState::kPending;
 		case IslandMeshResidency::kCpuReady:
 			return rTemplate.bGpuResident;
 		case IslandMeshResidency::kArenaBlocked:
@@ -241,7 +243,7 @@ bool IslandTerrain::EvictTemplate(common::crc_t uiIslandCrc, IslandTemplate& rTe
 		return false;
 	}
 
-	const LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(uiIslandCrc);
+	const LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(uiIslandCrc);
 	// The 4 chunk-backed channels (color/normals/AO/masks). Elevation is template-owned (no chunk
 	// CRC) and is evicted separately below, via the template's own image rather than the chunk pool.
 	common::crc_t evictCrcs[4] =
@@ -261,9 +263,9 @@ bool IslandTerrain::EvictTemplate(common::crc_t uiIslandCrc, IslandTemplate& rTe
 
 	for (common::crc_t uiTextureCrc : evictCrcs)
 	{
-		gpTextureManager->mTextureMap.at(uiTextureCrc).FreeGpuResources();
+		gpTextureManager->mTextureMap.at(uiTextureCrc).Destroy();
 	}
-	rTemplate.elevationTexture.FreeGpuResources();
+	rTemplate.elevationTexture.Destroy();
 
 	MeshRange range = GetMeshRange(rTemplate);
 	switch (rTemplate.eMeshResidency)
@@ -300,7 +302,7 @@ bool IslandTerrain::EvictTemplate(common::crc_t uiIslandCrc, IslandTemplate& rTe
 	}
 	rTemplate.iTextureSlot = -1;
 
-	gpFileManager->ResetTextureChunkStates(evictCrcs);
+	gpFileManager->mpPackChunks->ResetTextureChunkStates(evictCrcs);
 	rTemplate.bGpuResident = false;
 
 	LOG(kLoading, kVerbose, "Reset chunk states for evicted islandCrc={} evictCrcs=[{},{},{},{}]", uiIslandCrc, evictCrcs[0], evictCrcs[1], evictCrcs[2], evictCrcs[3]);
@@ -350,7 +352,7 @@ void IslandTerrain::RestorationSweep()
 		MeshRange range = GetMeshRange(rTemplate);
 		if (rTemplate.eMeshResidency == IslandMeshResidency::kAsyncPending)
 		{
-			ChunkRangeReloadState eRangeState = gpFileManager->GetChunkRangeReloadState(rCrc, range.uiOffset, range.uiLength);
+			ChunkRangeReloadState eRangeState = gpFileManager->mpPackChunks->mLoader.GetChunkRangeReloadState(rCrc, range.uiOffset, range.uiLength);
 			if (eRangeState == ChunkRangeReloadState::kPending)
 			{
 				continue;
@@ -443,7 +445,7 @@ void IslandTerrain::RestorationSweep()
 		{
 			// Heap: UploadMesh creates transient VMA staging allocations in the RenderGlobal residency sweep.
 			ScopedSuppressAllocationTracking suppress;
-			gpIslands->UploadMesh(rTemplate.vkMeshIndexOffset, rTemplate.puiMeshIndices, range.vkIndexSize, rTemplate.vkMeshVertexOffset, rTemplate.pfMeshPositions, range.vkVertexSize);
+			gpIslands->UploadMesh(rTemplate.vkMeshIndexOffset, std::span<const std::byte>(reinterpret_cast<const std::byte*>(rTemplate.puiMeshIndices), static_cast<size_t>(range.vkIndexSize)), rTemplate.vkMeshVertexOffset, std::span<const std::byte>(reinterpret_cast<const std::byte*>(rTemplate.pfMeshPositions), static_cast<size_t>(range.vkVertexSize)));
 		}
 		ReleaseMeshCpuRange(rCrc, rTemplate, range);
 		gpIslands->WriteMeshIndirect(rTemplate.iTemplateArrayIndex, rTemplate.vkMeshIndexOffset, rTemplate.vkMeshVertexOffset, static_cast<uint32_t>(rTemplate.iMeshIndexCount));
@@ -473,7 +475,7 @@ void IslandTerrain::ReleaseGpuResources()
 		// destroy doesn't touch it — release here. On device-loss recovery the
 		// TextureManager ctor's ResetTextureSlots forces iTextureSlot < 0 for every template, so the
 		// next AcquireTextureSlot re-Creates elevationTexture via the first-mint path.
-		rTemplate.elevationTexture.FreeGpuResources();
+		rTemplate.elevationTexture.Destroy();
 		rTemplate.bGpuResident = false;
 	}
 }
@@ -485,7 +487,7 @@ void IslandTerrain::ResetTextureSlots()
 		if (rTemplate.eMeshResidency == IslandMeshResidency::kAsyncPending)
 		{
 			MeshRange range = GetMeshRange(rTemplate);
-			if (gpFileManager->GetChunkRangeReloadState(rCrc, range.uiOffset, range.uiLength) == ChunkRangeReloadState::kFailed)
+			if (gpFileManager->mpPackChunks->mLoader.GetChunkRangeReloadState(rCrc, range.uiOffset, range.uiLength) == ChunkRangeReloadState::kFailed)
 			{
 				// Teardown can run after the File-owned async request failed but before RestorationSweep
 				// promoted this template state. Consume that destroyed-lifecycle failure so re-mint can retry.

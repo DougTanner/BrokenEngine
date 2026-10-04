@@ -2,6 +2,7 @@
 
 #include "Pipeline.h"
 
+#include "File/PackChunks.h"
 #include "PipelineCreator.h"
 #include "PipelineDescriptorWriter.h"
 
@@ -13,23 +14,23 @@ using enum PipelineFlags;
 
 // Always pushes the default 16-byte PushConstantsLayout range; callers guard that the pipeline uses the default range
 // (iPushConstantBytes == 0), since a sub-16-byte override would overflow the layout's reserved push-constant range.
-static void RecordPushConstants(VkCommandBuffer vkCommandBuffer, VkPipelineLayout vkPipelineLayout, VkShaderStageFlags stageFlags, const XMFLOAT4& f4PushConstants)
+static void RecordPushConstants(VkCommandBuffer vkCommandBuffer, VkPipelineLayout vkPipelineLayout, VkShaderStageFlags vkStageFlags, const XMFLOAT4& rf4PushConstants)
 {
 	shaders::PushConstantsLayout pushConstantsLayout {};
-	pushConstantsLayout.f4Pipeline = f4PushConstants;
-	vkCmdPushConstants(vkCommandBuffer, vkPipelineLayout, stageFlags, 0, sizeof(pushConstantsLayout), &pushConstantsLayout);
+	pushConstantsLayout.f4Pipeline = rf4PushConstants;
+	vkCmdPushConstants(vkCommandBuffer, vkPipelineLayout, vkStageFlags, 0, sizeof(pushConstantsLayout), &pushConstantsLayout);
 }
 
 static void BindGraphicsDescriptorSets(VkCommandBuffer vkCommandBuffer, VkPipelineLayout vkPipelineLayout, VkDescriptorSetLayout vkExternalLayout, int64_t iDescriptorSetIndex, const std::vector<VkDescriptorSet>& rDescriptorSets)
 {
 	if (vkExternalLayout != VK_NULL_HANDLE)
 	{
-		VkDescriptorSet sets[2] = {gpTextureManager->mTextureDescriptors.mGlobalDescriptorSets[iDescriptorSetIndex], rDescriptorSets[iDescriptorSetIndex]};
-		vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout, 0, 2, sets, 0, nullptr);
+		VkDescriptorSet pVkDescriptorSets[2] = {gpTextureManager->mTextureDescriptors.mGlobalDescriptorSets.at(iDescriptorSetIndex), rDescriptorSets.at(iDescriptorSetIndex)};
+		vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout, 0, 2, pVkDescriptorSets, 0, nullptr);
 	}
 	else
 	{
-		vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout, 0, 1, &rDescriptorSets[iDescriptorSetIndex], 0, nullptr);
+		vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout, 0, 1, &rDescriptorSets.at(iDescriptorSetIndex), 0, nullptr);
 	}
 }
 
@@ -38,31 +39,31 @@ void BindComputeDescriptorSets(VkCommandBuffer vkCommandBuffer, VkPipelineLayout
 	// Global Set 0 is indexed per-framebuffer (iCommandBuffer); per-pipeline Set 1 follows mbPerCommandBuffer (iDescriptorSetIndex).
 	if (vkExternalLayout != VK_NULL_HANDLE)
 	{
-		VkDescriptorSet sets[2] = {gpTextureManager->mTextureDescriptors.mGlobalDescriptorSets[iCommandBuffer], rDescriptorSets[iDescriptorSetIndex]};
-		vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vkPipelineLayout, 0, 2, sets, 0, nullptr);
+		VkDescriptorSet pVkDescriptorSets[2] = {gpTextureManager->mTextureDescriptors.mGlobalDescriptorSets.at(iCommandBuffer), rDescriptorSets.at(iDescriptorSetIndex)};
+		vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vkPipelineLayout, 0, 2, pVkDescriptorSets, 0, nullptr);
 	}
 	else
 	{
-		vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vkPipelineLayout, 0, 1, &rDescriptorSets[iDescriptorSetIndex], 0, nullptr);
+		vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vkPipelineLayout, 0, 1, &rDescriptorSets.at(iDescriptorSetIndex), 0, nullptr);
 	}
 }
 
 uint32_t Pipeline::ResolveBindingSetIndex(const PipelineInfo& rPipelineInfo, uint32_t uiBinding)
 {
-	int64_t iBind = static_cast<int64_t>(uiBinding);
+	int64_t iBinding = static_cast<int64_t>(uiBinding);
 	const Shader* pFirstShader = rPipelineInfo.ppShaders[0];
-	if (iBind < pFirstShader->mInfo.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings && pFirstShader->mInfo.pDescriptorBindings[uiBinding].descriptorCount > 0)
+	if (iBinding < pFirstShader->mInformation.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings && pFirstShader->mInformation.pVkDescriptorBindings[uiBinding].descriptorCount > 0)
 	{
-		return pFirstShader->mInfo.pDescriptorSetIndices[uiBinding];
+		return pFirstShader->mInformation.puiDescriptorSetIndices[uiBinding];
 	}
 	if (rPipelineInfo.flags & kCompute)
 	{
 		return 0;
 	}
 	const Shader* pSecondShader = rPipelineInfo.ppShaders[1];
-	if (iBind < pSecondShader->mInfo.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings && pSecondShader->mInfo.pDescriptorBindings[uiBinding].descriptorCount > 0)
+	if (iBinding < pSecondShader->mInformation.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings && pSecondShader->mInformation.pVkDescriptorBindings[uiBinding].descriptorCount > 0)
 	{
-		return pSecondShader->mInfo.pDescriptorSetIndices[uiBinding];
+		return pSecondShader->mInformation.puiDescriptorSetIndices[uiBinding];
 	}
 	return 0;
 }
@@ -86,19 +87,19 @@ void Pipeline::Create(const PipelineInfo& rInfo)
 
 	mInfo = rInfo;
 
-	mExternalVkDescriptorSetLayout = mInfo.externalVkDescriptorSetLayout != VK_NULL_HANDLE ? mInfo.externalVkDescriptorSetLayout : gpTextureManager->mTextureDescriptors.mGlobalVkDescriptorSetLayout;
-	mExternalSet1VkDescriptorSetLayout = mInfo.externalSet1VkDescriptorSetLayout;
+	mExternalVkDescriptorSetLayout = mInfo.vkExternalDescriptorSetLayout != VK_NULL_HANDLE ? mInfo.vkExternalDescriptorSetLayout : gpTextureManager->mTextureDescriptors.mGlobalVkDescriptorSetLayout;
+	mExternalSet1VkDescriptorSetLayout = mInfo.vkExternalSet1DescriptorSetLayout;
 
 	if (mInfo.flags & kRenderTarget)
 	{
-		ASSERT(mInfo.targetVkRenderPass != VK_NULL_HANDLE);
+		ASSERT(mInfo.vkTargetRenderPass != VK_NULL_HANDLE);
 		ASSERT(mInfo.vkExtent3D.width != 0 && mInfo.vkExtent3D.height != 0);
 	}
 
 	mbPerCommandBuffer = mInfo.flags & kIndirectHostVisible;
-	for (size_t i = 0; i < mInfo.pDescriptorInfos.size(); ++i)
+	for (const DescriptorInfo& rDescriptorInfo : mInfo.descriptorInfos)
 	{
-		if (mInfo.pDescriptorInfos[i].flags & kPerCommandBufferUniformBuffers || mInfo.pDescriptorInfos[i].flags & kPerCommandBufferStorageBuffers || mInfo.pDescriptorInfos[i].flags & kGlobalLayoutUniformBuffers || mInfo.pDescriptorInfos[i].flags & kMainLayoutUniformBuffers)
+		if (rDescriptorInfo.flags & kPerCommandBufferUniformBuffers || rDescriptorInfo.flags & kPerCommandBufferStorageBuffers || rDescriptorInfo.flags & kGlobalLayoutUniformBuffers || rDescriptorInfo.flags & kMainLayoutUniformBuffers)
 		{
 			mbPerCommandBuffer = true;
 		}
@@ -106,7 +107,7 @@ void Pipeline::Create(const PipelineInfo& rInfo)
 
 	// Bound descriptor entries by ShaderHeader::kiMaxDescriptorSetLayoutBindings; PipelineDescriptorWriter's scratch arrays use the same cap. A
 	// kModel entry expands into several writes, guarded by per-push cursor assertions.
-	ASSERT(static_cast<int64_t>(mInfo.pDescriptorInfos.size()) <= common::ShaderHeader::kiMaxDescriptorSetLayoutBindings);
+	ASSERT(std::ssize(mInfo.descriptorInfos) <= common::ShaderHeader::kiMaxDescriptorSetLayoutBindings);
 
 	if (mInfo.flags & kCompute)
 	{
@@ -124,7 +125,7 @@ void Pipeline::Create(const PipelineInfo& rInfo)
 	if (!(mInfo.flags & kIndirectHostVisible) && !(mInfo.flags & kIndirectDeviceLocal) && !mTextureCrcs.empty())
 	{
 		mbTexturesRequested = true;
-		gpFileManager->RequestChunkLoad(mTextureCrcs);
+		gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(mTextureCrcs, LoadPriority::kNormal);
 	}
 }
 
@@ -146,7 +147,6 @@ void Pipeline::Destroy() noexcept
 	}
 	mVkDescriptorSets.clear();
 
-	// Free Set 2 descriptor sets
 	if (!mVkDescriptorSetsSet2.empty())
 	{
 		vkFreeDescriptorSets(gpDeviceManager->mVkDevice, vkDescriptorPool, static_cast<uint32_t>(mVkDescriptorSetsSet2.size()), mVkDescriptorSetsSet2.data());
@@ -166,7 +166,6 @@ void Pipeline::Destroy() noexcept
 	}
 	mVkDescriptorSetLayout = VK_NULL_HANDLE;
 
-	// Destroy Set 2 layout
 	if (mSet2VkDescriptorSetLayout != VK_NULL_HANDLE)
 	{
 		vkDestroyDescriptorSetLayout(gpDeviceManager->mVkDevice, mSet2VkDescriptorSetLayout, nullptr);
@@ -177,8 +176,8 @@ void Pipeline::Destroy() noexcept
 	{
 		if (mInfo.flags & kIndirectHostVisible)
 		{
-			mpIndirectMappedMemory = nullptr;
-			mpIndirectComputeMappedMemory = nullptr;
+			mpIndirectVkDrawIndexedIndirectCommand = nullptr;
+			mpIndirectComputeVkDispatchIndirectCommand = nullptr;
 		}
 
 		vmaDestroyBuffer(gpDeviceManager->mpAllocator, mIndirectVkBuffer, mIndirectVmaAllocation);
@@ -191,14 +190,14 @@ void Pipeline::Destroy() noexcept
 	// destruction, and in-place recreation retains stale materials.
 }
 
-void Pipeline::RecordDraw(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, int64_t iInstanceCount, int64_t iFirstInstance, const XMFLOAT4& f4PushConstants)
+void Pipeline::RecordDraw(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, int64_t iInstanceCount, int64_t iFirstInstance, const XMFLOAT4& rf4PushConstants)
 {
 	ASSERT(!(mInfo.flags & kIndirectHostVisible) && !(mInfo.flags & kIndirectDeviceLocal) && !(mInfo.flags & kCompute));
 
 	if (mInfo.flags & kPushConstants)
 	{
 		ASSERT(mInfo.iPushConstantBytes == 0);
-		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, f4PushConstants);
+		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, rf4PushConstants);
 	}
 
 	int64_t iDescriptorSetIndex = mbPerCommandBuffer ? iCommandBuffer : 0;
@@ -209,12 +208,12 @@ void Pipeline::RecordDraw(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffe
 	vkCmdDrawIndexed(vkCommandBuffer, static_cast<uint32_t>(mInfo.pVertexBuffer->mInfo.iCount), static_cast<uint32_t>(iInstanceCount), 0, 0, static_cast<uint32_t>(iFirstInstance));
 }
 
-void Pipeline::RecordBindPipelineAndDescriptors(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& f4PushConstants)
+void Pipeline::RecordBindPipelineAndDescriptors(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants)
 {
 	if (mInfo.flags & kPushConstants)
 	{
 		ASSERT(mInfo.iPushConstantBytes == 0);
-		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, f4PushConstants);
+		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, rf4PushConstants);
 	}
 
 	int64_t iDescriptorSetIndex = mbPerCommandBuffer ? iCommandBuffer : 0;
@@ -222,14 +221,14 @@ void Pipeline::RecordBindPipelineAndDescriptors(int64_t iCommandBuffer, VkComman
 	BindGraphicsDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mExternalVkDescriptorSetLayout, iDescriptorSetIndex, mVkDescriptorSets);
 }
 
-void Pipeline::RecordDrawIndirect(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& f4PushConstants)
+void Pipeline::RecordDrawIndirect(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants)
 {
 	ASSERT((mInfo.flags & kIndirectHostVisible || mInfo.flags & kIndirectDeviceLocal) && !(mInfo.flags & kCompute));
 
 	if (mInfo.flags & kPushConstants)
 	{
 		ASSERT(mInfo.iPushConstantBytes == 0);
-		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, f4PushConstants);
+		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, rf4PushConstants);
 	}
 
 	vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVkPipeline);
@@ -239,13 +238,12 @@ void Pipeline::RecordDrawIndirect(int64_t iCommandBuffer, VkCommandBuffer vkComm
 	int64_t iIndirectSlot = mInfo.flags & kIndirectDeviceLocal ? 0 : iCommandBuffer;
 	VkDeviceSize vkIndirectOffset = iIndirectSlot * sizeof(VkDrawIndexedIndirectCommand);
 
-	// Verify the indexed slot is within the indirect buffer's slot capacity
 	ASSERT(iIndirectSlot < miIndirectSlotCount);
 
 	vkCmdDrawIndexedIndirect(vkCommandBuffer, mIndirectVkBuffer, vkIndirectOffset, 1, sizeof(VkDrawIndexedIndirectCommand));
 }
 
-void Pipeline::RecordDrawIndirectSet2(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& f4PushConstants)
+void Pipeline::RecordDrawIndirectSet2(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants)
 {
 	ASSERT(mInfo.flags & kMultiSet);
 	ASSERT((mInfo.flags & kIndirectHostVisible || mInfo.flags & kIndirectDeviceLocal) && !(mInfo.flags & kCompute));
@@ -253,30 +251,29 @@ void Pipeline::RecordDrawIndirectSet2(int64_t iCommandBuffer, VkCommandBuffer vk
 	if (mInfo.flags & kPushConstants)
 	{
 		ASSERT(mInfo.iPushConstantBytes == 0);
-		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, f4PushConstants);
+		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, rf4PushConstants);
 	}
 
 	// Bind pipeline and Set 2 only (Set 0, Set 1, and vertex buffer already bound by ModelPipeline)
 	vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVkPipeline);
-	vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVkPipelineLayout, 2, 1, &mVkDescriptorSetsSet2[iCommandBuffer], 0, nullptr);
+	vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVkPipelineLayout, 2, 1, &mVkDescriptorSetsSet2.at(iCommandBuffer), 0, nullptr);
 	// Device-local reads slot 0; host-visible indexes per-framebuffer
 	int64_t iIndirectSlot = mInfo.flags & kIndirectDeviceLocal ? 0 : iCommandBuffer;
 	VkDeviceSize vkIndirectOffset = iIndirectSlot * sizeof(VkDrawIndexedIndirectCommand);
 
-	// Verify the indexed slot is within the indirect buffer's slot capacity
 	ASSERT(iIndirectSlot < miIndirectSlotCount);
 
 	vkCmdDrawIndexedIndirect(vkCommandBuffer, mIndirectVkBuffer, vkIndirectOffset, 1, sizeof(VkDrawIndexedIndirectCommand));
 }
 
-void Pipeline::RecordCompute(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, int64_t iGroupCountX, int64_t iGroupCountY, int64_t iGroupCountZ, const XMFLOAT4& f4PushConstants)
+void Pipeline::RecordCompute(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, int64_t iGroupCountX, int64_t iGroupCountY, int64_t iGroupCountZ, const XMFLOAT4& rf4PushConstants)
 {
 	ASSERT(!(mInfo.flags & kIndirectHostVisible || mInfo.flags & kIndirectDeviceLocal) && mInfo.flags & kCompute);
 
 	if (mInfo.flags & kPushConstants)
 	{
 		ASSERT(mInfo.iPushConstantBytes == 0);
-		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, f4PushConstants);
+		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, rf4PushConstants);
 	}
 
 	int64_t iDescriptorSetIndex = mbPerCommandBuffer ? iCommandBuffer : 0;
@@ -285,21 +282,20 @@ void Pipeline::RecordCompute(int64_t iCommandBuffer, VkCommandBuffer vkCommandBu
 	vkCmdDispatch(vkCommandBuffer, static_cast<uint32_t>(iGroupCountX), static_cast<uint32_t>(iGroupCountY), static_cast<uint32_t>(iGroupCountZ));
 }
 
-void Pipeline::RecordComputeIndirect(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& f4PushConstants)
+void Pipeline::RecordComputeIndirect(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants)
 {
 	ASSERT((mInfo.flags & kIndirectHostVisible || mInfo.flags & kIndirectDeviceLocal) && mInfo.flags & kCompute);
 
 	if (mInfo.flags & kPushConstants)
 	{
 		ASSERT(mInfo.iPushConstantBytes == 0);
-		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, f4PushConstants);
+		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, rf4PushConstants);
 	}
 
 	// Host-visible indexes per-framebuffer; device-local reads slot 0
 	int64_t iIndirectSlot = mInfo.flags & kIndirectHostVisible ? iCommandBuffer : 0;
 	VkDeviceSize vkDispatchOffset = iIndirectSlot * sizeof(VkDispatchIndirectCommand);
 
-	// Verify the indexed slot is within the indirect buffer's slot capacity
 	ASSERT(iIndirectSlot < miIndirectSlotCount);
 
 	RecordComputeIndirectFrom(iCommandBuffer, vkCommandBuffer, mIndirectVkBuffer, vkDispatchOffset);
@@ -323,20 +319,20 @@ void Pipeline::WriteIndirectBuffer(int64_t iCommandBuffer, int64_t iInstanceCoun
 	if (iInstanceCount > 0 && !mbTexturesRequested)
 	{
 		mbTexturesRequested = true;
-		gpFileManager->RequestChunkLoad(mTextureCrcs);
+		gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(mTextureCrcs, LoadPriority::kNormal);
 	}
 
-	ASSERT(mpIndirectMappedMemory != nullptr);
+	ASSERT(mpIndirectVkDrawIndexedIndirectCommand != nullptr);
 
-	VkDrawIndexedIndirectCommand& rCommand = mpIndirectMappedMemory[iCommandBuffer];
+	VkDrawIndexedIndirectCommand& rVkCommand = mpIndirectVkDrawIndexedIndirectCommand[iCommandBuffer];
 
 	// A negative iIndexCount means "draw the whole vertex buffer"; an explicit 0 stays a real zero-index draw, which is
 	// how an empty material range is expressed. Never normalize one of the two into the other.
-	rCommand.indexCount = static_cast<uint32_t>(iIndexCount < 0 ? mInfo.pVertexBuffer->mInfo.iCount : iIndexCount);
-	rCommand.instanceCount = static_cast<uint32_t>(iInstanceCount);
-	rCommand.firstIndex = static_cast<uint32_t>(iFirstIndex);
-	rCommand.vertexOffset = static_cast<int32_t>(iVertexOffset);
-	rCommand.firstInstance = 0;
+	rVkCommand.indexCount = static_cast<uint32_t>(iIndexCount < 0 ? mInfo.pVertexBuffer->mInfo.iCount : iIndexCount);
+	rVkCommand.instanceCount = static_cast<uint32_t>(iInstanceCount);
+	rVkCommand.firstIndex = static_cast<uint32_t>(iFirstIndex);
+	rVkCommand.vertexOffset = static_cast<int32_t>(iVertexOffset);
+	rVkCommand.firstInstance = 0;
 }
 
 void Pipeline::WriteIndirectComputeBuffer(int64_t iCommandBuffer, int64_t iGroupCountX, int64_t iGroupCountY, int64_t iGroupCountZ)
@@ -345,32 +341,12 @@ void Pipeline::WriteIndirectComputeBuffer(int64_t iCommandBuffer, int64_t iGroup
 	// defers texture requests for indirect pipelines): a host-visible compute-indirect pipeline must bind
 	// render-target textures only, never lazily disk-loaded ones.
 	ASSERT((mInfo.flags & kIndirectHostVisible) && (mInfo.flags & kCompute));
-	ASSERT(mpIndirectComputeMappedMemory != nullptr);
+	ASSERT(mpIndirectComputeVkDispatchIndirectCommand != nullptr);
 
-	VkDispatchIndirectCommand& rCommand = mpIndirectComputeMappedMemory[iCommandBuffer];
-	rCommand.x = static_cast<uint32_t>(iGroupCountX);
-	rCommand.y = static_cast<uint32_t>(iGroupCountY);
-	rCommand.z = static_cast<uint32_t>(iGroupCountZ);
-}
-
-void Pipeline::UpdateStorageBufferDescriptor(int64_t iFramebuffer, int64_t iBinding, Buffer* pBuffer)
-{
-	PipelineDescriptorWriter::UpdateStorageBuffer(*this, iFramebuffer, iBinding, pBuffer);
-}
-
-void Pipeline::UpdateCombinedImageSamplerDescriptor(int64_t iBinding, VkImageView vkImageView, VkSampler vkSampler)
-{
-	PipelineDescriptorWriter::UpdateCombinedImageSampler(*this, iBinding, vkImageView, vkSampler);
-}
-
-void Pipeline::UpdateSamplerDescriptor(int64_t iBinding, VkSampler vkSampler)
-{
-	PipelineDescriptorWriter::UpdateSampler(*this, iBinding, vkSampler);
-}
-
-void Pipeline::UpdateStorageImageDescriptor(int64_t iBinding, VkImageView vkImageView)
-{
-	PipelineDescriptorWriter::UpdateStorageImage(*this, iBinding, vkImageView);
+	VkDispatchIndirectCommand& rVkCommand = mpIndirectComputeVkDispatchIndirectCommand[iCommandBuffer];
+	rVkCommand.x = static_cast<uint32_t>(iGroupCountX);
+	rVkCommand.y = static_cast<uint32_t>(iGroupCountY);
+	rVkCommand.z = static_cast<uint32_t>(iGroupCountZ);
 }
 
 } // namespace engine

@@ -23,7 +23,7 @@ void ServerBroadcaster::BuildFrameInputs()
 	game::gpGame->mFrameInputs.clear();
 	mBroadcastStatusChanges.clear();
 
-	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoords)
+	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoordinates)
 	{
 		game::gpGame->mFrameInputs.try_emplace(rCoord);
 	}
@@ -91,30 +91,30 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 	{
 		if (!bReplaying)
 		{
-			for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoords)
+			for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoordinates)
 			{
 				rCallback(rCoord);
 			}
 			return;
 		}
 
-		for (auto it = game::gpGame->mActiveCoords.begin(); it != game::gpGame->mActiveCoords.end(); ++it)
+		for (auto it = game::gpGame->mActiveCoordinates.begin(); it != game::gpGame->mActiveCoordinates.end(); ++it)
 		{
-			if (std::find(game::gpGame->mActiveCoords.begin(), it, *it) == it)
+			if (std::find(game::gpGame->mActiveCoordinates.begin(), it, *it) == it)
 			{
 				rCallback(*it);
 			}
 		}
 		for ([[maybe_unused]] const auto& [rCoord, rStatusChanges] : mBroadcastStatusChanges)
 		{
-			if (!std::ranges::contains(game::gpGame->mActiveCoords, rCoord))
+			if (!std::ranges::contains(game::gpGame->mActiveCoordinates, rCoord))
 			{
 				rCallback(rCoord);
 			}
 		}
 		for ([[maybe_unused]] const auto& [rCoord, rStatusChanges] : rTransfers)
 		{
-			if (!std::ranges::contains(game::gpGame->mActiveCoords, rCoord) && !mBroadcastStatusChanges.contains(rCoord))
+			if (!std::ranges::contains(game::gpGame->mActiveCoordinates, rCoord) && !mBroadcastStatusChanges.contains(rCoord))
 			{
 				rCallback(rCoord);
 			}
@@ -169,7 +169,7 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 	for (const engine::GridCoord& rCoord : publicationCoords)
 	{
 		engine::GridUpdateData updateData {};
-		updateData.uiSharedCrc = game::gpGame->CurrentFrame(rCoord).postRender.uiSharedCrc;
+		updateData.uiSharedCrc = (*game::gpGame->mCoordinateFrames.at(rCoord).pCurrent).postRender.uiSharedCrc;
 		int64_t iRunStart = iStatusChangeIndex;
 		if (auto it = mBroadcastStatusChanges.find(rCoord); it != mBroadcastStatusChanges.end())
 		{
@@ -200,7 +200,7 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 		int64_t iFullFrameCount = 0;
 		for (const engine::GridCoord& rCoord : publicationCoords)
 		{
-			pFullFrames[iFullFrameCount++] = {rCoord, &game::gpGame->CurrentFrame(rCoord)};
+			pFullFrames[iFullFrameCount++] = {rCoord, &(*game::gpGame->mCoordinateFrames.at(rCoord).pCurrent)};
 		}
 		rRuntime.PublishTick(iTick, {pGridUpdates, static_cast<size_t>(iGridUpdateIndex)}, {pFullFrames, static_cast<size_t>(iFullFrameCount)});
 	}
@@ -255,11 +255,11 @@ void ServerBroadcaster::ProcessUpdatePlayerRequests()
 			continue;
 		}
 
-		if (!game::gpGame->mCoordFrames.contains(updateCoord))
+		if (!game::gpGame->mCoordinateFrames.contains(updateCoord))
 		{
 			continue;
 		}
-		int64_t iPlayerUuid = engine::RegistryUuidByGlobalId(game::Frame::OwnershipLayer(game::gpGame->CurrentFrame(updateCoord)), rRequest.globalId).iValue;
+		int64_t iPlayerUuid = engine::RegistryUuidByGlobalId(game::Frame::OwnershipLayer((*game::gpGame->mCoordinateFrames.at(updateCoord).pCurrent)), rRequest.globalId).iValue;
 		if (iPlayerUuid == 0)
 		{
 			continue;

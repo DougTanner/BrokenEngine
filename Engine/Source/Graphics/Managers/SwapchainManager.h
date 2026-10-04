@@ -10,29 +10,26 @@ struct Framebuffer
 	Framebuffer() = default;
 	Framebuffer(const Framebuffer&) = delete;
 	Framebuffer& operator=(const Framebuffer&) = delete;
-	// Movable (not copyable): std::vector<Framebuffer>::resize instantiates the relocation path at compile
-	// time. Handles are freed by ~SwapchainManager's loop, not this struct, so a defaulted move (which only
-	// copies the handle values) is safe — the moved-from element's destruction frees nothing.
+	// std::vector<Framebuffer>::resize requires move construction. Defaulted moves copy the handles; SwapchainManager frees them, and Framebuffer destruction releases nothing.
 	Framebuffer(Framebuffer&&) = default;
 	Framebuffer& operator=(Framebuffer&&) = default;
 
-	VkImage presentVkImage = VK_NULL_HANDLE;
-	VkImageView presentVkImageView = VK_NULL_HANDLE;
-	VkFramebuffer presentVkFramebuffer = VK_NULL_HANDLE;
+	VkImage vkPresentImage = VK_NULL_HANDLE;
+	VkImageView vkPresentImageView = VK_NULL_HANDLE;
+	VkFramebuffer vkPresentFramebuffer = VK_NULL_HANDLE;
 };
 
 class SwapchainManager
 {
 public:
 
-	SwapchainManager(VkSwapchainKHR oldSwapchain = VK_NULL_HANDLE);
+	SwapchainManager(VkSwapchainKHR vkOldSwapchain = VK_NULL_HANDLE);
 	~SwapchainManager();
 
 	void AcquireNextImage();
 	void Present(int64_t iFramebufferIndex);
 
-	// Hands the live swapchain handle to the caller (returns it, nulls the member) so the old swapchain
-	// survives across recreation — single named home for the ownership transfer in Graphics::Destroy.
+	// The transferred handle remains live across swapchain recreation.
 	VkSwapchainKHR ReleaseHandleForRecreation();
 
 	float mfAspectRatio = 1.0f;
@@ -59,11 +56,10 @@ public:
 
 private:
 
-	// Construction phases (called once from the ctor, in order).
 	void CreateRenderPass();
-	void CreateSwapchain(VkSwapchainKHR oldSwapchain);
+	void CreateSwapchain(VkSwapchainKHR vkOldSwapchain);
 	void CreateFramebuffers();
-	void CreateSyncObjects();
+	void CreateSynchronizationObjects();
 
 	// Round-robin acquire sync objects, advanced by the GetNext* accessors below.
 	std::vector<VkSemaphore> mImageAvailableSemaphores;
@@ -76,7 +72,7 @@ private:
 		VkSemaphore vkSemaphore = mImageAvailableSemaphores.at(miImageAvailableIndex);
 
 		++miImageAvailableIndex;
-		if (miImageAvailableIndex == static_cast<int64_t>(mImageAvailableSemaphores.size()))
+		if (miImageAvailableIndex == std::ssize(mImageAvailableSemaphores))
 		{
 			miImageAvailableIndex = 0;
 		}
@@ -89,7 +85,7 @@ private:
 		VkFence vkFence = mImageAvailableFences.at(miFenceAvailableIndex);
 
 		++miFenceAvailableIndex;
-		if (miFenceAvailableIndex == static_cast<int64_t>(mImageAvailableFences.size()))
+		if (miFenceAvailableIndex == std::ssize(mImageAvailableFences))
 		{
 			miFenceAvailableIndex = 0;
 		}

@@ -15,7 +15,7 @@ S31-OnPatrol (exploration), S31-TheGearsofProgress (building/ambient), S31-HighA
 AudioManager already supports mid-track transitions via PlayMusic() with crossfade.
 The game layer can query frame state: spaceship counts, player health/armor/shields,
 blaster/missile counts, and player proximity to enemies -- all available from the
-RenderFrame at the client's grid coord (`mClientGridCoord`).
+RenderFrame at the client's grid coord (`mClientGridCoordinate`).
 
 Why
 ---
@@ -103,20 +103,20 @@ Changes (3 files)
    - Keep mMenuMusicPlaylist and miMenuMusicIndex unchanged (menu stays sequential)
 
    Game.cpp:
-   - In the SetNextMusicTrackCallback lambda (Game constructor), change the
+   - In the mpStreamingVoices->mGetNextTrack lambda (Game constructor), change the
      else branch of GetNextMusicTrack() to return mAdaptiveMusic.GetTrack()
      instead of sequential indexing
    - Add mAdaptiveMusic.Update() call. This must run from a location that
      executes every frame on the client with access to the render frame.
-     The best location is inside the existing SetNextMusicTrackCallback --
+     The best location is inside the existing mpStreamingVoices->mGetNextTrack --
      but that only fires on track end. Instead, add the Update call in
      Game::ChangeFrame() (which runs every client frame) after the frame
-     is complete, guarded by #ifdef BT_CLIENT and !InMainMenu():
+     is complete, guarded by #ifdef BT_CLIENT and !(mGameFlags & engine::GameFlags::kMainMenu):
 
        #if defined(BT_CLIENT)
-       if (!InMainMenu() && mCoordFrames.contains(mClientGridCoord))
+       if (!(mGameFlags & engine::GameFlags::kMainMenu) && mCoordinateFrames.contains(mClientGridCoordinate))
        {
-           const Frame& rFrame = RenderFrame(mClientGridCoord);
+           const Frame& rFrame = RenderFrame(mClientGridCoordinate);
            float fDeltaTime = /* real-time delta from AudioManager's timer or similar */;
            mAdaptiveMusic.Update(fDeltaTime, rFrame);
        }

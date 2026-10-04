@@ -2,17 +2,14 @@
 
 #include "CommandBufferManager.h"
 
+#include "Profile/ProfileManager.h"
 #include "CommandBufferRecordGlobal.h"
 #include "CommandBufferRecordMain.h"
-
-#include "Profile/ProfileManager.h"
 
 namespace engine
 {
 
 CommandBufferManager::CommandBufferManager()
-: mSubmitGlobal(common::kThreadSubmitGlobal, common::kiMinWorkbufferSize)
-, mSubmitMain(common::kThreadSubmitMain, common::kiMinWorkbufferSize)
 {
 	ASSERT(gpCommandBufferManager == nullptr);
 
@@ -22,7 +19,7 @@ CommandBufferManager::CommandBufferManager()
 
 	// Each drawing command binds a specific VkFramebuffer, so record one command buffer per swapchain image.
 	mPerFramebufferCommandBuffers.reserve(gpSwapchainManager->mFramebuffers.size());
-	for (int64_t i = 0; i < static_cast<int64_t>(gpSwapchainManager->mFramebuffers.size()); ++i)
+	for (int64_t i = 0; i < std::ssize(gpSwapchainManager->mFramebuffers); ++i)
 	{
 		mPerFramebufferCommandBuffers.emplace_back(i);
 	}
@@ -50,7 +47,7 @@ void CommandBufferManager::RecordCommandBuffers()
 {
 	ScopedBootTimer scopedBootTimer(kBootTimerRecordCommandBuffers);
 
-	for (int64_t i = 0; i < static_cast<int64_t>(mPerFramebufferCommandBuffers.size()); ++i)
+	for (int64_t i = 0; i < std::ssize(mPerFramebufferCommandBuffers); ++i)
 	{
 		RecordCommandBuffer(i);
 	}
@@ -82,21 +79,21 @@ void CommandBufferManager::SubmitGlobalToQueue(int64_t iFramebufferIndex)
 	// and miAcquireFramebufferIndex are written on the main thread in TextureManager::ProcessPendingTextures; under
 	// kbRenderThread this read runs on the mSubmitGlobal worker, safe only because SubmitGlobalCommandBuffer's
 	// mSubmitGlobal.Wake() edge published those writes first. Same family as CommandBuffers.h (mFlags/mVkFence).
-	VkCommandBuffer pCommandBuffers[2] {};
+	VkCommandBuffer pVkCommandBuffers[2] {};
 	uint32_t uiCommandBufferCount = 0;
 	if (gpTextureManager->mFlags & TextureManagerFlags::kPendingAcquireBarriers)
 	{
-		pCommandBuffers[uiCommandBufferCount++] = gpTextureManager->mAcquireVkCommandBuffers.at(gpTextureManager->miAcquireFramebufferIndex);
+		pVkCommandBuffers[uiCommandBufferCount++] = gpTextureManager->mAcquireVkCommandBuffers.at(gpTextureManager->miAcquireFramebufferIndex);
 	}
-	pCommandBuffers[uiCommandBufferCount++] = rCommandBuffers.mGlobalVkCommandBuffer;
+	pVkCommandBuffers[uiCommandBufferCount++] = rCommandBuffers.mGlobalVkCommandBuffer;
 
 	uint32_t uiWaitSemaphoreCount = 0;
-	VkSemaphore pWaitSemaphores[1] {};
-	VkPipelineStageFlags pWaitDstStageMask[1] {};
+	VkSemaphore pVkWaitSemaphores[1] {};
+	VkPipelineStageFlags pVkWaitDestinationStageMask[1] {};
 	if (mbParticleSemaphoreSignaled)
 	{
-		pWaitSemaphores[uiWaitSemaphoreCount] = mParticleSyncVkSemaphore;
-		pWaitDstStageMask[uiWaitSemaphoreCount] = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+		pVkWaitSemaphores[uiWaitSemaphoreCount] = mParticleSyncVkSemaphore;
+		pVkWaitDestinationStageMask[uiWaitSemaphoreCount] = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 		++uiWaitSemaphoreCount;
 	}
 
@@ -105,10 +102,10 @@ void CommandBufferManager::SubmitGlobalToQueue(int64_t iFramebufferIndex)
 		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.pNext = nullptr,
 		.waitSemaphoreCount = uiWaitSemaphoreCount,
-		.pWaitSemaphores = pWaitSemaphores,
-		.pWaitDstStageMask = pWaitDstStageMask,
+		.pWaitSemaphores = pVkWaitSemaphores,
+		.pWaitDstStageMask = pVkWaitDestinationStageMask,
 		.commandBufferCount = uiCommandBufferCount,
-		.pCommandBuffers = pCommandBuffers,
+		.pCommandBuffers = pVkCommandBuffers,
 		.signalSemaphoreCount = 1,
 		.pSignalSemaphores = &rCommandBuffers.mGlobalFinishedVkSemaphore,
 	};
@@ -171,10 +168,8 @@ void CommandBufferManager::SubmitMainToQueue(int64_t iFramebufferIndex)
 		.pSignalSemaphores = vkSignalSemaphores,
 	};
 	gpProfileManager->CpuStart(kCpuTimerSubmitImage);
-	// Fence reset/signal split: Main resets mVkFence but submits with VK_NULL_HANDLE.
-	// The fence is (re-)signaled by the inseparable following UI submit (ImGuiManager::Submit submits with
-	// mVkFence); SubmitMainCommandBuffer is always followed by SubmitUiCommandBuffer (Graphics.cpp). Keep
-	// that pairing intact — Main resets the fence here, the following UI submit signals it.
+	// SubmitMainCommandBuffer resets mVkFence without signaling it; Graphics.cpp must follow it with
+	// SubmitUiCommandBuffer so ImGuiManager::Submit signals the fence.
 	CHECK_VK(vkResetFences(gpDeviceManager->mVkDevice, 1, &rCommandBuffers.mVkFence));
 	CHECK_VK(vkQueueSubmit(gpDeviceManager->mGraphicsVkQueue, 1, &vkSubmitInfo, VK_NULL_HANDLE));
 	gpProfileManager->CpuStop(kCpuTimerSubmitImage);

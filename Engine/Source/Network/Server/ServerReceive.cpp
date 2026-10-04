@@ -3,6 +3,8 @@
 #if defined(BT_SERVER)
 
 #include "Network/Server/Server.h"
+
+#include "File/PackChunks.h"
 #include "Network/Server/ServerSessionRuntime.h"
 #include "Network/NetworkCursor.h"
 
@@ -271,7 +273,7 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, i
 	}
 
 	common::crc_t uiClientPackIntegrityToken = message.uiPackIntegrityToken;
-	common::crc_t uiServerPackIntegrityToken = gpFileManager->GetPackIntegrityToken();
+	common::crc_t uiServerPackIntegrityToken = gpFileManager->mpPackChunks->mPackIntegrityToken;
 	if (uiClientPackIntegrityToken != uiServerPackIntegrityToken)
 	{
 		char pcMessage[256] {};

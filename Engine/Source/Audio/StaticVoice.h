@@ -26,10 +26,10 @@ class StaticVoice
 {
 public:
 
-	static bool LoadXAudio2SourceVoice(AudioEngine* pAudioEngine, IXAudio2SourceVoice*& rpVoice, common::crc_t audioCrc, LoadVoiceFlags_t flags);
+	static bool LoadXAudio2SourceVoice(AudioEngine* pAudioEngine, IXAudio2SourceVoice*& rpVoice, common::crc_t uiAudioCrc, LoadVoiceFlags_t flags);
 
 	StaticVoice() = delete;
-	StaticVoice(IXAudio2SourceVoice* pVoice, sound_t id, float fVolume, float fPitch, float fFadeOutTime, FXMVECTOR vecPosition, FXMVECTOR vecVelocity, common::crc_t audioCrc);
+	StaticVoice(IXAudio2SourceVoice* pVoice, sound_t id, float fVolume, float fPitch, float fFadeOutTime, FXMVECTOR vecPosition, FXMVECTOR vecVelocity, common::crc_t uiAudioCrc);
 
 	~StaticVoice();
 
@@ -48,7 +48,7 @@ public:
 	XMVECTOR mVecPosition {};
 	XMVECTOR mVecVelocity {};
 	IXAudio2SourceVoice* mpVoice = nullptr;
-	common::crc_t mAudioCrc = 0;
+	common::crc_t muiAudioCrc = 0;
 };
 
 } // namespace engine

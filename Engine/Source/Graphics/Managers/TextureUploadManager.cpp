@@ -2,6 +2,8 @@
 
 #include "TextureUploadManager.h"
 
+#include "File/PackChunks.h"
+
 namespace engine
 {
 
@@ -20,7 +22,7 @@ TextureUploadManager::~TextureUploadManager()
 	}
 }
 
-void TextureUploadManager::InitTransferResources()
+void TextureUploadManager::InitializeTransferResources()
 {
 	RethrowException();
 
@@ -28,7 +30,7 @@ void TextureUploadManager::InitTransferResources()
 	// Reset the drain handshake with mbShutdown so a recreated upload thread starts clean.
 	mbDrainRequested = false;
 	mbDrained = false;
-	mbThreadExited.store(false, std::memory_order_release); // A recreated thread starts un-exited
+	mbThreadExited.store(false, std::memory_order_release);
 
 	VkCommandPoolCreateInfo vkCommandPoolCreateInfo
 	{
@@ -61,8 +63,8 @@ void TextureUploadManager::InitTransferResources()
 
 	VmaAllocationInfo stagingVmaAllocationInfo {};
 	Buffer::CreateBuffer("TransferStaging", kiByteBudgetPerFrame, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mStagingVkBuffer, mStagingVmaAllocation, &stagingVmaAllocationInfo);
-	mStagingSize = kiByteBudgetPerFrame;
-	mStagingMappedData = stagingVmaAllocationInfo.pMappedData;
+	mStagingVkDeviceSize = kiByteBudgetPerFrame;
+	mpStagingMappedData = stagingVmaAllocationInfo.pMappedData;
 }
 
 void TextureUploadManager::DestroyTransferResources()
@@ -83,10 +85,8 @@ void TextureUploadManager::DestroyTransferResources()
 		mUploadThread.join();
 	}
 
-	// Reset upload-in-progress state
 	ResetUploadProgress();
 
-	// Clear stale upload queue
 	{
 		std::unique_lock lock(mUploadMutex);
 		mUploadQueue = {};
@@ -98,23 +98,22 @@ void TextureUploadManager::DestroyTransferResources()
 		vkWaitForFences(gpDeviceManager->mVkDevice, 1, &mTransferVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count());
 	}
 
-	// Clean up persistent staging buffer
 	if (mStagingVkBuffer != VK_NULL_HANDLE)
 	{
 		vmaDestroyBuffer(gpDeviceManager->mpAllocator, mStagingVkBuffer, mStagingVmaAllocation);
 		mStagingVkBuffer = VK_NULL_HANDLE;
 		mStagingVmaAllocation = VK_NULL_HANDLE;
-		mStagingSize = 0;
+		mStagingVkDeviceSize = 0;
 	}
 
 	// Clean up any GPU-uploaded texture images that were not adopted by TextureManager
-	for (const auto& [rCrc, rLazyChunk] : gpFileManager->GetLazyChunkMap())
+	for (const auto& [rCrc, rLazyChunk] : gpFileManager->mpPackChunks->mLazyChunkMap)
 	{
-		if (rLazyChunk.uploadVkImage != VK_NULL_HANDLE)
+		if (rLazyChunk.vkUploadImage != VK_NULL_HANDLE)
 		{
-			LazyChunk& rMutableChunk = gpFileManager->GetLazyChunk(rCrc);
-			vmaDestroyImage(gpDeviceManager->mpAllocator, rMutableChunk.uploadVkImage, rMutableChunk.vmaAllocation);
-			rMutableChunk.uploadVkImage = VK_NULL_HANDLE;
+			LazyChunk& rMutableChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(rCrc);
+			vmaDestroyImage(gpDeviceManager->mpAllocator, rMutableChunk.vkUploadImage, rMutableChunk.vmaAllocation);
+			rMutableChunk.vkUploadImage = VK_NULL_HANDLE;
 			rMutableChunk.vmaAllocation = VK_NULL_HANDLE;
 		}
 	}
@@ -132,7 +131,7 @@ void TextureUploadManager::ResetUploadProgress()
 	muiCurrentLayer = 0;
 	muiCurrentMip = 0;
 	muiCurrentMipY = 0;
-	mCurrentDataOffset = 0;
+	miCurrentDataOffset = 0;
 }
 
 void TextureUploadManager::StartThread()
@@ -153,7 +152,7 @@ void TextureUploadManager::RequestUpload(common::crc_t crc, LoadPriority ePriori
 		//   so a workbuffer (frame-scoped) can't own them, and the queue grows/shrinks unpredictably
 		ScopedSuppressAllocationTracking suppress;
 
-		mUploadQueue.push({crc, ePriority});
+		mUploadQueue.push({.crc = crc, .ePriority = ePriority});
 	}
 }
 
@@ -166,14 +165,9 @@ void TextureUploadManager::WaitIdle()
 		return;
 	}
 
-	// Close the upload-thread TOCTOU window. UploadThread consumes mFrameSignal (one instruction) before it
-	//   takes mWorkMutex, so a bare lock here could return while the thread is between the acquire and its
-	//   vkQueueSubmit on the transfer queue -- racing teardown's vkDeviceWaitIdle (a Vulkan external-
-	//   synchronization violation). Post a drain probe and block until the thread acks it from a quiescent
-	//   point: any iteration in flight when we take the lock below has finished its submit (the thread holds
-	//   mWorkMutex across the whole iteration), and a signal it consumed-but-not-yet-processed is skipped at
-	//   the top of its loop (mbDrainRequested), so no further submit issues until the next frame re-signals.
-	//   Teardown only -- the steady-state wake stays the binary_semaphore.
+	// UploadThread consumes mFrameSignal before taking mWorkMutex, so locking alone cannot prevent a pending submit from racing teardown's vkDeviceWaitIdle.
+	// Each iteration holds mWorkMutex through submission. A drain probe waits for an active iteration and makes the next iteration acknowledge without submitting.
+	// Binary-semaphore frame signals resume uploads; the condition variable is used only for teardown.
 	{
 		std::unique_lock lock(mWorkMutex);
 		mbDrained = false;
@@ -192,9 +186,8 @@ void TextureUploadManager::WaitIdle()
 
 void TextureUploadManager::SignalFrame()
 {
-	// Drain then release so the binary_semaphore (max 1) can't over-release when the upload thread is a frame
-	//   behind (mid-iteration, e.g. SubmitChunkUpload's vkWaitForFences). The dropped wake re-posts next frame --
-	//   no work lost. Same drain-then-release idiom as WaitIdle / DestroyTransferResources / WaitForTextures.
+	// Drain before releasing so the binary semaphore cannot exceed its maximum count of 1 while the upload thread is mid-iteration.
+	// A dropped wake is posted again by the next frame signal.
 	std::ignore = mFrameSignal.try_acquire();
 	mFrameSignal.release();
 }
@@ -260,7 +253,7 @@ void TextureUploadManager::UploadThread()
 				continue;
 			}
 
-			LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(mCurrentCrc);
+			LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(mCurrentCrc);
 			ValidateTextureDimensions(rLazyChunk);
 
 			if (HandleUploadEarlyOut(rLazyChunk))
@@ -271,11 +264,11 @@ void TextureUploadManager::UploadThread()
 			// Wait for previous submission (fence starts signaled, so first wait is free)
 			CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &mTransferVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count()));
 
-			bool bFirstChunk = (mCurrentDataOffset == 0);
+			bool bFirstChunk = (miCurrentDataOffset == 0);
 			bool bCubemap = rLazyChunk.header.flags & common::ChunkFlags::kCubemap;
 			VkFormat vkFormat = rLazyChunk.header.textureHeader.vkFormat;
 			bool bCompressed = (vkFormat == VK_FORMAT_BC4_UNORM_BLOCK || vkFormat == VK_FORMAT_BC5_UNORM_BLOCK || vkFormat == VK_FORMAT_BC7_UNORM_BLOCK);
-			const ChunkDimensions dimensions
+			ChunkDimensions dimensions
 			{
 				.bCubemap = bCubemap,
 				.vkFormat = vkFormat,
@@ -286,13 +279,11 @@ void TextureUploadManager::UploadThread()
 				.uiBaseHeight = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureHeight),
 			};
 
-			// First chunk: create VkImage via VMA
 			if (bFirstChunk)
 			{
 				CreateTransferImage(rLazyChunk, dimensions);
 			}
 
-			// Begin command buffer
 			CHECK_VK(vkResetCommandBuffer(mTransferVkCommandBuffer, 0));
 			VkCommandBufferBeginInfo vkCommandBufferBeginInfo
 			{
@@ -303,7 +294,6 @@ void TextureUploadManager::UploadThread()
 			};
 			CHECK_VK(vkBeginCommandBuffer(mTransferVkCommandBuffer, &vkCommandBufferBeginInfo));
 
-			// First chunk: transition UNDEFINED -> TRANSFER_DST_OPTIMAL (entire image)
 			VkImageMemoryBarrier vkImageMemoryBarrier
 			{
 				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -314,7 +304,7 @@ void TextureUploadManager::UploadThread()
 				.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-				.image = rLazyChunk.uploadVkImage,
+				.image = rLazyChunk.vkUploadImage,
 				.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = dimensions.uiMipLevels, .baseArrayLayer = 0, .layerCount = dimensions.uiArrayLayers},
 			};
 			if (bFirstChunk)
@@ -322,7 +312,6 @@ void TextureUploadManager::UploadThread()
 				vkCmdPipelineBarrier(mTransferVkCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &vkImageMemoryBarrier);
 			}
 
-			// Fill staging buffer and record copies
 			RecordStagingCopies(rLazyChunk, dimensions);
 
 			bool bDone = (muiCurrentLayer >= dimensions.uiArrayLayers);
@@ -342,15 +331,13 @@ void TextureUploadManager::UploadThread()
 			// Device lost during upload -- DestroyTransferResources will clean up GPU resources.
 			if (mCurrentCrc != 0)
 			{
-				LazyChunk& rLazyChunk = gpFileManager->GetLazyChunk(mCurrentCrc);
-				rLazyChunk.eState.store(ChunkState::kDiskLoaded, std::memory_order_release);
-				NotifyChunkAdoptable(); // kUploading -> kDiskLoaded: arm the pending-adoption counter
+				LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(mCurrentCrc);
+				rLazyChunk.eState.value.store(ChunkState::kDiskLoaded, std::memory_order_release);
+				miPendingAdoptions.fetch_add(1, std::memory_order_relaxed); // kUploading -> kDiskLoaded: arm the pending-adoption counter
 				mCurrentCrc = 0;
 			}
-			// workLock is already held here (this catch lives inside its scope) and mWorkMutex is non-recursive,
-			//   so set the exit flag and notify directly -- re-locking would self-deadlock. Unblocks a WaitIdle
-			//   parked on the drain probe that this exiting thread would otherwise never ack -- the device-loss
-			//   teardown deadlock the mbThreadExited flag closes.
+			// workLock already holds the non-recursive mWorkMutex; locking it again would self-deadlock.
+			// Publish the exit and notify the drain waiter before leaving the thread, since it cannot acknowledge another probe.
 			mbThreadExited.store(true, std::memory_order_release);
 			mIdleConditionVariable.notify_all();
 			break;
@@ -369,7 +356,7 @@ void TextureUploadManager::UploadThread()
 
 bool TextureUploadManager::DequeueNextUpload()
 {
-	// If no active texture, dequeue one. Returns false when the queue is empty (caller re-parks).
+	// An empty queue leaves the upload thread parked until another frame signal.
 	if (mCurrentCrc == 0)
 	{
 		std::unique_lock lock(mUploadMutex);
@@ -387,13 +374,12 @@ bool TextureUploadManager::DequeueNextUpload()
 
 bool TextureUploadManager::HandleUploadEarlyOut(LazyChunk& rLazyChunk)
 {
-	// Early out: no transfer command pool
 	if (mTransferVkCommandPool == VK_NULL_HANDLE)
 	{
 		DEBUG_BREAK();
-		rLazyChunk.eState.store(ChunkState::kDiskLoaded, std::memory_order_release);
-		NotifyChunkAdoptable(); // kUploading -> kDiskLoaded: arm the pending-adoption counter
-		gpFileManager->NotifyChunkCompletion();
+		rLazyChunk.eState.value.store(ChunkState::kDiskLoaded, std::memory_order_release);
+		miPendingAdoptions.fetch_add(1, std::memory_order_relaxed); // kUploading -> kDiskLoaded: arm the pending-adoption counter
+		gpFileManager->mpPackChunks->mLoader.NotifyChunkCompletion();
 		mCurrentCrc = 0;
 		return true;
 	}
@@ -401,9 +387,9 @@ bool TextureUploadManager::HandleUploadEarlyOut(LazyChunk& rLazyChunk)
 	// Early out: same queue (concurrent vkQueueSubmit is not thread-safe)
 	if (gpDeviceManager->mTransferVkQueue == gpDeviceManager->mGraphicsVkQueue)
 	{
-		rLazyChunk.eState.store(ChunkState::kDiskLoaded, std::memory_order_release);
-		NotifyChunkAdoptable(); // kUploading -> kDiskLoaded: arm the pending-adoption counter
-		gpFileManager->NotifyChunkCompletion();
+		rLazyChunk.eState.value.store(ChunkState::kDiskLoaded, std::memory_order_release);
+		miPendingAdoptions.fetch_add(1, std::memory_order_relaxed); // kUploading -> kDiskLoaded: arm the pending-adoption counter
+		gpFileManager->mpPackChunks->mLoader.NotifyChunkCompletion();
 		mCurrentCrc = 0;
 		return true;
 	}
@@ -430,8 +416,8 @@ void TextureUploadManager::ValidateTextureDimensions(const LazyChunk& rLazyChunk
 	bool bCubemap = rLazyChunk.header.flags & common::ChunkFlags::kCubemap;
 	VkImageCreateFlags vkImageCreateFlags = bCubemap ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : static_cast<VkImageCreateFlags>(0);
 	VkImageFormatProperties vkImageFormatProperties {};
-	VkResult eVkResult = vkGetPhysicalDeviceImageFormatProperties(gpInstanceManager->mVkPhysicalDevice, rTextureHeader.vkFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, vkImageCreateFlags, &vkImageFormatProperties);
-	ASSERT(eVkResult == VK_SUCCESS);
+	VkResult vkResult = vkGetPhysicalDeviceImageFormatProperties(gpInstanceManager->mVkPhysicalDevice, rTextureHeader.vkFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, vkImageCreateFlags, &vkImageFormatProperties);
+	ASSERT(vkResult == VK_SUCCESS);
 	ASSERT(rTextureHeader.iTextureWidth <= static_cast<int64_t>(vkImageFormatProperties.maxExtent.width));
 	ASSERT(rTextureHeader.iTextureHeight <= static_cast<int64_t>(vkImageFormatProperties.maxExtent.height));
 	ASSERT(rTextureHeader.iMipLevels <= static_cast<int64_t>(vkImageFormatProperties.maxMipLevels));
@@ -455,7 +441,7 @@ void TextureUploadManager::CreateTransferImage(LazyChunk& rLazyChunk, const Chun
 		.flags = rDimensions.bCubemap ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : static_cast<VkImageCreateFlags>(0),
 		.imageType = VK_IMAGE_TYPE_2D,
 		.format = rDimensions.vkFormat,
-		.extent = VkExtent3D {rDimensions.uiBaseWidth, rDimensions.uiBaseHeight, 1},
+		.extent = VkExtent3D {.width = rDimensions.uiBaseWidth, .height = rDimensions.uiBaseHeight, .depth = 1},
 		.mipLevels = rDimensions.uiMipLevels,
 		.arrayLayers = rDimensions.uiArrayLayers,
 		.samples = VK_SAMPLE_COUNT_1_BIT,
@@ -468,26 +454,25 @@ void TextureUploadManager::CreateTransferImage(LazyChunk& rLazyChunk, const Chun
 	};
 	VmaAllocationCreateInfo vmaAllocationCreateInfo {};
 	vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
-	CHECK_VK(vmaCreateImage(gpDeviceManager->mpAllocator, &vkImageCreateInfo, &vmaAllocationCreateInfo, &rLazyChunk.uploadVkImage, &rLazyChunk.vmaAllocation, nullptr));
+	CHECK_VK(vmaCreateImage(gpDeviceManager->mpAllocator, &vkImageCreateInfo, &vmaAllocationCreateInfo, &rLazyChunk.vkUploadImage, &rLazyChunk.vmaAllocation, nullptr));
 }
 
-void TextureUploadManager::RecordStagingCopies(LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions)
+void TextureUploadManager::RecordStagingCopies(const LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions)
 {
 	const std::byte* pData = rLazyChunk.pData;
 	VkDeviceSize vkStagingUsed = 0;
 
-	while (vkStagingUsed < mStagingSize && muiCurrentLayer < rDimensions.uiArrayLayers)
+	while (vkStagingUsed < mStagingVkDeviceSize && muiCurrentLayer < rDimensions.uiArrayLayers)
 	{
 		uint32_t uiMipWidth = std::max(rDimensions.uiBaseWidth >> muiCurrentMip, 1u);
 		uint32_t uiMipHeight = std::max(rDimensions.uiBaseHeight >> muiCurrentMip, 1u);
 		uint32_t uiRemainingHeight = uiMipHeight - muiCurrentMipY;
 		int64_t iRemainingMipBytes = common::SizeInBytes(rDimensions.vkFormat, uiMipWidth, uiRemainingHeight);
-		VkDeviceSize vkRemainingStaging = mStagingSize - vkStagingUsed;
+		VkDeviceSize vkRemainingStaging = mStagingVkDeviceSize - vkStagingUsed;
 
 		if (iRemainingMipBytes <= static_cast<int64_t>(vkRemainingStaging))
 		{
-			// Whole remaining mip fits
-			std::memcpy(static_cast<std::byte*>(mStagingMappedData) + vkStagingUsed, pData + mCurrentDataOffset, iRemainingMipBytes);
+			std::memcpy(static_cast<std::byte*>(mpStagingMappedData) + vkStagingUsed, pData + miCurrentDataOffset, iRemainingMipBytes);
 
 			VkBufferImageCopy vkBufferImageCopy {};
 			vkBufferImageCopy.bufferOffset = vkStagingUsed;
@@ -495,12 +480,12 @@ void TextureUploadManager::RecordStagingCopies(LazyChunk& rLazyChunk, const Chun
 			vkBufferImageCopy.imageSubresource.mipLevel = muiCurrentMip;
 			vkBufferImageCopy.imageSubresource.baseArrayLayer = muiCurrentLayer;
 			vkBufferImageCopy.imageSubresource.layerCount = 1;
-			vkBufferImageCopy.imageOffset = {0, static_cast<int32_t>(muiCurrentMipY), 0};
-			vkBufferImageCopy.imageExtent = {uiMipWidth, uiRemainingHeight, 1};
-			vkCmdCopyBufferToImage(mTransferVkCommandBuffer, mStagingVkBuffer, rLazyChunk.uploadVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
+			vkBufferImageCopy.imageOffset = {.x = 0, .y = static_cast<int32_t>(muiCurrentMipY), .z = 0};
+			vkBufferImageCopy.imageExtent = {.width = uiMipWidth, .height = uiRemainingHeight, .depth = 1};
+			vkCmdCopyBufferToImage(mTransferVkCommandBuffer, mStagingVkBuffer, rLazyChunk.vkUploadImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
 
 			vkStagingUsed += iRemainingMipBytes;
-			mCurrentDataOffset += iRemainingMipBytes;
+			miCurrentDataOffset += iRemainingMipBytes;
 			muiCurrentMipY = 0;
 			++muiCurrentMip;
 			if (muiCurrentMip >= rDimensions.uiMipLevels)
@@ -518,7 +503,7 @@ void TextureUploadManager::RecordStagingCopies(LazyChunk& rLazyChunk, const Chun
 			// degenerates to `granularity.height` pixels per chunk; for BCn (blockHeight == 4)
 			// it scales up to `granularity.height * 4 = 64` pixels per chunk on hardware that
 			// reports granularity.height == 16.
-			uint32_t uiChunkHeight = std::max(1u, gpInstanceManager->mTransferImageGranularity.height) * rDimensions.uiBlockHeight;
+			uint32_t uiChunkHeight = std::max(1u, gpInstanceManager->mTransferImageGranularityVkExtent3D.height) * rDimensions.uiBlockHeight;
 			int64_t iBytesPerChunk = common::SizeInBytes(rDimensions.vkFormat, uiMipWidth, uiChunkHeight);
 			int64_t iChunksThatFit = static_cast<int64_t>(vkRemainingStaging) / iBytesPerChunk;
 			if (iChunksThatFit == 0)
@@ -529,7 +514,7 @@ void TextureUploadManager::RecordStagingCopies(LazyChunk& rLazyChunk, const Chun
 			uint32_t uiCopyHeight = static_cast<uint32_t>(iChunksThatFit * uiChunkHeight);
 			int64_t iCopyBytes = common::SizeInBytes(rDimensions.vkFormat, uiMipWidth, uiCopyHeight);
 
-			std::memcpy(static_cast<std::byte*>(mStagingMappedData) + vkStagingUsed, pData + mCurrentDataOffset, iCopyBytes);
+			std::memcpy(static_cast<std::byte*>(mpStagingMappedData) + vkStagingUsed, pData + miCurrentDataOffset, iCopyBytes);
 
 			VkBufferImageCopy vkBufferImageCopy {};
 			vkBufferImageCopy.bufferOffset = vkStagingUsed;
@@ -537,11 +522,11 @@ void TextureUploadManager::RecordStagingCopies(LazyChunk& rLazyChunk, const Chun
 			vkBufferImageCopy.imageSubresource.mipLevel = muiCurrentMip;
 			vkBufferImageCopy.imageSubresource.baseArrayLayer = muiCurrentLayer;
 			vkBufferImageCopy.imageSubresource.layerCount = 1;
-			vkBufferImageCopy.imageOffset = {0, static_cast<int32_t>(muiCurrentMipY), 0};
-			vkBufferImageCopy.imageExtent = {uiMipWidth, uiCopyHeight, 1};
-			vkCmdCopyBufferToImage(mTransferVkCommandBuffer, mStagingVkBuffer, rLazyChunk.uploadVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
+			vkBufferImageCopy.imageOffset = {.x = 0, .y = static_cast<int32_t>(muiCurrentMipY), .z = 0};
+			vkBufferImageCopy.imageExtent = {.width = uiMipWidth, .height = uiCopyHeight, .depth = 1};
+			vkCmdCopyBufferToImage(mTransferVkCommandBuffer, mStagingVkBuffer, rLazyChunk.vkUploadImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
 
-			mCurrentDataOffset += iCopyBytes;
+			miCurrentDataOffset += iCopyBytes;
 			muiCurrentMipY += uiCopyHeight;
 			break; // staging full
 		}
@@ -550,7 +535,6 @@ void TextureUploadManager::RecordStagingCopies(LazyChunk& rLazyChunk, const Chun
 
 void TextureUploadManager::SubmitChunkUpload(LazyChunk& rLazyChunk, VkImageMemoryBarrier& rVkImageMemoryBarrier, bool bDone)
 {
-	// Post-copy barrier on final chunk
 	if (bDone)
 	{
 		bool bSeparateTransferFamily = gpInstanceManager->miTransferQueueFamilyIndex != gpInstanceManager->miGraphicsQueueFamilyIndex;
@@ -580,7 +564,6 @@ void TextureUploadManager::SubmitChunkUpload(LazyChunk& rLazyChunk, VkImageMemor
 		}
 		else
 		{
-			// Same family: transition directly to SHADER_READ_ONLY
 			rVkImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 			rVkImageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 			rVkImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -593,7 +576,6 @@ void TextureUploadManager::SubmitChunkUpload(LazyChunk& rLazyChunk, VkImageMemor
 
 	CHECK_VK(vkEndCommandBuffer(mTransferVkCommandBuffer));
 
-	// Submit to transfer queue
 	VkSubmitInfo vkSubmitInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -614,9 +596,9 @@ void TextureUploadManager::SubmitChunkUpload(LazyChunk& rLazyChunk, VkImageMemor
 		// Wait for GPU to finish before signaling completion
 		CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &mTransferVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count()));
 
-		rLazyChunk.eState.store(ChunkState::kGpuUploadComplete, std::memory_order_release);
-		NotifyChunkAdoptable(); // kUploading -> kGpuUploadComplete: arm the pending-adoption counter
-		gpFileManager->NotifyChunkCompletion();
+		rLazyChunk.eState.value.store(ChunkState::kGpuUploadComplete, std::memory_order_release);
+		miPendingAdoptions.fetch_add(1, std::memory_order_relaxed); // kUploading -> kGpuUploadComplete: arm the pending-adoption counter
+		gpFileManager->mpPackChunks->mLoader.NotifyChunkCompletion();
 
 		ResetUploadProgress();
 	}

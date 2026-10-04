@@ -89,7 +89,7 @@ void XM_CALLCONV SyncMissileTrail(FrameInterpolate& rFrameInterpolate, engine::s
 	engine::SmokeTrailsInterpolate::Sync(rFrameInterpolate, uiSmokeTrail,
 	{
 		.vecPosition = vecPosition,
-		.fIntensity = gMissileTrailIntensity.Get(),
+		.fIntensity = gMissileTrailIntensity.mfCurrent,
 	});
 }
 
@@ -138,7 +138,7 @@ void XM_CALLCONV SyncMissile(FrameInterpolate& rFrameInterpolate, engine::area_l
 			.vecPosition = vecPosition,
 			.vecVelocity = vecVelocity,
 			.uiCrc = data::kAudioMissile182794__qubodup__rocketlaunch_loopwavCrc,
-			.fVolume = gMissileLoopVolume.Get(),
+			.fVolume = gMissileLoopVolume.mfCurrent,
 			.fPitch = fPitch,
 			.fFadeOutTime = kfMissileSoundFadeOutTime,
 		});
@@ -206,9 +206,9 @@ void MissilesInterpolate::Register()
 		.uiCrc = data::kTexturesMissilesBC73pngCrc,
 		.puiColors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
 		.pf2TextureCoordinates = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f}},
-		.fVisibleIntensity = gMissileExhaustVisibleIntensity.Get(),
-		.fLightingSize = gMissileExhaustLightingArea.Get(),
-		.fLightingIntensity = gMissileExhaustLightingIntensity.Get(),
+		.fVisibleIntensity = gMissileExhaustVisibleIntensity.mfCurrent,
+		.fLightingSize = gMissileExhaustLightingArea.mfCurrent,
+		.fLightingIntensity = gMissileExhaustLightingIntensity.mfCurrent,
 		.pVisibleIntensityWrapper = &gMissileExhaustVisibleIntensity,
 		.pLightingSizeWrapper = &gMissileExhaustLightingArea,
 		.pLightingIntensityWrapper = &gMissileExhaustLightingIntensity,
@@ -220,9 +220,9 @@ void MissilesInterpolate::Register()
 		.uiCrc = data::kTexturesMissilesBC71pngCrc,
 		.puiColors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
 		.pf2TextureCoordinates = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f}},
-		.fVisibleIntensity = gMissileExhaustVisibleIntensity.Get(),
-		.fLightingSize = gMissileExhaustLightingArea.Get(),
-		.fLightingIntensity = gMissileExhaustLightingIntensity.Get(),
+		.fVisibleIntensity = gMissileExhaustVisibleIntensity.mfCurrent,
+		.fLightingSize = gMissileExhaustLightingArea.mfCurrent,
+		.fLightingIntensity = gMissileExhaustLightingIntensity.mfCurrent,
 		.pVisibleIntensityWrapper = &gMissileExhaustVisibleIntensity,
 		.pLightingSizeWrapper = &gMissileExhaustLightingArea,
 		.pLightingIntensityWrapper = &gMissileExhaustLightingIntensity,
@@ -516,7 +516,7 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	rCurrentPostRender.puiRegistryTargets[i] = {};
 
 #if defined(BT_CLIENT)
-	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], gExplosionVolume.Get());
+	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], gExplosionVolume.mfCurrent);
 #endif
 
 	rCurrentPostRender.pFlags[i].Set(kExploding);

@@ -35,15 +35,15 @@ RawInputManager::~RawInputManager()
 	}
 }
 
-void RawInputManager::UpdateFocus(bool bHasFocus, HWND hwnd)
+void RawInputManager::UpdateFocus(bool bHasFocus, HWND hWindow)
 {
 	mStateFlags.Set(RawInputStateFlags::kHasFocus, bHasFocus);
-	mHwnd = hwnd;
+	mhWindow = hWindow;
 
 	// Keyboard HID (usage page 0x01, usage 0x06). Register and unregister share the same device struct and
 	// differ only in dwFlags: RIDEV_NOLEGACY adds the HID keyboard and ignores legacy keyboard messages;
 	// RIDEV_REMOVE unregisters it.
-	RAWINPUTDEVICE rawinputdevice
+	RAWINPUTDEVICE rawInputDevice
 	{
 		.usUsagePage = 0x01,
 		.usUsage = 0x06,
@@ -53,7 +53,7 @@ void RawInputManager::UpdateFocus(bool bHasFocus, HWND hwnd)
 	if (bHasFocus)
 	{
 		LOG(kInput, kInfo, "RegisterRawInputDevices");
-		if (RegisterRawInputDevices(&rawinputdevice, 1, sizeof(RAWINPUTDEVICE)) == FALSE)
+		if (RegisterRawInputDevices(&rawInputDevice, 1, sizeof(RAWINPUTDEVICE)) == FALSE)
 		{
 			// Heap: common::LastErrorString() returns a std::string by value (exceeds SSO), and this LOG sits in the allocation-tracked main loop
 			ScopedSuppressAllocationTracking suppress;
@@ -72,7 +72,7 @@ void RawInputManager::UpdateFocus(bool bHasFocus, HWND hwnd)
 		TrapCursor(false);
 
 		LOG(kInput, kInfo, "UnregisterRawInputDevices");
-		if (RegisterRawInputDevices(&rawinputdevice, 1, sizeof(RAWINPUTDEVICE)) == FALSE)
+		if (RegisterRawInputDevices(&rawInputDevice, 1, sizeof(RAWINPUTDEVICE)) == FALSE)
 		{
 			// Heap: common::LastErrorString() returns a std::string by value (exceeds SSO), and this LOG sits in the allocation-tracked main loop
 			ScopedSuppressAllocationTracking suppress;
@@ -100,21 +100,21 @@ void RawInputManager::TrapCursor(bool bTrap)
 {
 	if (bTrap)
 	{
-		RECT rect {};
-		GetClientRect(mHwnd, &rect);
+		RECT rectangle {};
+		GetClientRect(mhWindow, &rectangle);
 		POINT pointUpperLeft {};
-		pointUpperLeft.x = rect.left;
-		pointUpperLeft.y = rect.top;
+		pointUpperLeft.x = rectangle.left;
+		pointUpperLeft.y = rectangle.top;
 		POINT pointLowerRight {};
-		pointLowerRight.x = rect.right;
-		pointLowerRight.y = rect.bottom;
-		MapWindowPoints(mHwnd, nullptr, &pointUpperLeft, 1);
-		MapWindowPoints(mHwnd, nullptr, &pointLowerRight, 1);
-		rect.left = pointUpperLeft.x;
-		rect.top = pointUpperLeft.y;
-		rect.right = pointLowerRight.x;
-		rect.bottom = pointLowerRight.y;
-		ClipCursor(&rect);
+		pointLowerRight.x = rectangle.right;
+		pointLowerRight.y = rectangle.bottom;
+		MapWindowPoints(mhWindow, nullptr, &pointUpperLeft, 1);
+		MapWindowPoints(mhWindow, nullptr, &pointLowerRight, 1);
+		rectangle.left = pointUpperLeft.x;
+		rectangle.top = pointUpperLeft.y;
+		rectangle.right = pointLowerRight.x;
+		rectangle.bottom = pointLowerRight.y;
+		ClipCursor(&rectangle);
 	}
 	else
 	{
@@ -143,12 +143,11 @@ void RawInputManager::Update(bool bLostFocus)
 		return;
 	}
 
-	// Keyboard
 	if (bHasFocus)
 	{
 		for (int64_t i = 0; i < kiKeyboardKeyCount; ++i)
 		{
-			mRawInput.pKeyboardKeys[i] = mpbKeyboardKeysDown[i];
+			mRawInput.pbKeyboardKeys[i] = mpbKeyboardKeysDown[i];
 		}
 	}
 	else
@@ -156,13 +155,12 @@ void RawInputManager::Update(bool bLostFocus)
 		// Relaxed unfocused-publish path: the hardware keyboard is unregistered (RIDEV_REMOVE) while unfocused, so
 		// mpbKeyboardKeysDown is frozen at its last focused state — zero the published keyboard so the overlay ORs
 		// synthetic keys onto a clean snapshot instead of republishing stuck key bits for the whole script.
-		std::fill(std::begin(mRawInput.pKeyboardKeys), std::end(mRawInput.pKeyboardKeys), false);
+		std::fill(std::begin(mRawInput.pbKeyboardKeys), std::end(mRawInput.pbKeyboardKeys), false);
 	}
 
-	// Mouse
 	Mouse::State mouseState = mMouse.GetState();
-	mRawInput.f2MousePosition.x = static_cast<float>(mouseState.x) / static_cast<float>(gpGraphics->mFramebufferExtent2D.width);
-	mRawInput.f2MousePosition.y = static_cast<float>(mouseState.y) / static_cast<float>(gpGraphics->mFramebufferExtent2D.height);
+	mRawInput.f2MousePosition.x = static_cast<float>(mouseState.x) / static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
+	mRawInput.f2MousePosition.y = static_cast<float>(mouseState.y) / static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	mRawInput.mouseButtons.Set(MouseButtons::kMouseButtonLeft, mouseState.leftButton);
 	mRawInput.mouseButtons.Set(MouseButtons::kMouseButtonMiddle, mouseState.middleButton);
 	mRawInput.mouseButtons.Set(MouseButtons::kMouseButtonRight, mouseState.rightButton);
@@ -170,11 +168,8 @@ void RawInputManager::Update(bool bLostFocus)
 	mRawInput.mouseButtons.Set(MouseButtons::kMouseButtonExtraTwo, mouseState.xButton2);
 	mRawInput.iScrollWheelValue = mouseState.scrollWheelValue;
 
-	// iScrollWheelValue is a lifetime accumulator consumers diff (game Input.cpp camera zoom). The agent's persistent
-	// synthetic scroll offset must participate in EVERY publish — not only script-active frames — or the offset
-	// vanishing when a script ends (or on refocus) would look like an equal-and-opposite phantom zoom. Null-guarded:
-	// server build and the agent-disabled client path have no AgentInput. (Single owner of the addition; the Overlay
-	// sink deliberately does not re-add it.)
+	// Consumers difference iScrollWheelValue, so retain the synthetic scroll offset on every publish to avoid phantom zoom when scripts end or focus returns.
+	// AgentInput may be absent; this is the sole addition of its offset, and Overlay does not add it.
 	if (gpAgentInput != nullptr)
 	{
 		mRawInput.iScrollWheelValue += gpAgentInput->miSyntheticScrollAccumulator;
@@ -197,8 +192,8 @@ void RawInputManager::Update(bool bLostFocus)
 			mRawInput.f2RightThumbstick.x = gamepadState.thumbSticks.rightX;
 			mRawInput.f2RightThumbstick.y = gamepadState.thumbSticks.rightY;
 
-			mRawInput.f2Dpad.x = gamepadState.dpad.left ? -1.0f : (gamepadState.dpad.right ? 1.0f : 0.0f);
-			mRawInput.f2Dpad.y = gamepadState.dpad.up ? 1.0f : (gamepadState.dpad.down ? -1.0f : 0.0f);
+			mRawInput.f2DirectionalPad.x = gamepadState.dpad.left ? -1.0f : (gamepadState.dpad.right ? 1.0f : 0.0f);
+			mRawInput.f2DirectionalPad.y = gamepadState.dpad.up ? 1.0f : (gamepadState.dpad.down ? -1.0f : 0.0f);
 
 			mRawInput.gamepadButtons.Set(GamepadButtons::kGamepadButtonA, gamepadState.IsAPressed());
 			mRawInput.gamepadButtons.Set(GamepadButtons::kGamepadButtonB, gamepadState.IsBPressed());
@@ -222,29 +217,29 @@ void RawInputManager::Update(bool bLostFocus)
 			mRawInput.f2RightThumbstick.x = 0.0f;
 			mRawInput.f2RightThumbstick.y = 0.0f;
 
-			mRawInput.f2Dpad.x = 0.0f;
-			mRawInput.f2Dpad.y = 0.0f;
+			mRawInput.f2DirectionalPad.x = 0.0f;
+			mRawInput.f2DirectionalPad.y = 0.0f;
 
 			mRawInput.gamepadButtons = {};
 		}
 	}
 
-	// Agent synthetic-input overlay: OR script-driven keys / mouse buttons / mouse pos / scroll onto the just-
-	// published snapshot. Must run AFTER the keyboard copy loop so synthetic key bits are not overwritten by it.
+	// Overlay ORs synthetic keys and mouse buttons and overrides synthetic mouse position; it does not add scroll.
+	// Run it after the keyboard copy so that copy does not overwrite synthetic key bits.
 	if (bScriptActive)
 	{
 		gpAgentInput->Overlay(mRawInput);
 	}
 }
 
-void RawInputManager::HandleRawInput(LPARAM lparam)
+void RawInputManager::HandleRawInput(LPARAM iMessageParameter)
 {
-	HRAWINPUT hrawinput = reinterpret_cast<HRAWINPUT>(lparam);
+	HRAWINPUT hRawInput = reinterpret_cast<HRAWINPUT>(iMessageParameter);
 
 	// Only the fixed-size keyboard usage is registered (UpdateFocus), never variable-length RAWHID, so sizeof(RAWINPUT) bounds every packet
-	RAWINPUT rawinput {};
-	UINT uiRawInputBytes = sizeof(rawinput);
-	if (GetRawInputData(hrawinput, RID_INPUT, &rawinput, &uiRawInputBytes, sizeof(RAWINPUTHEADER)) == static_cast<UINT>(-1))
+	RAWINPUT rawInput {};
+	UINT uiRawInputBytes = sizeof(rawInput);
+	if (GetRawInputData(hRawInput, RID_INPUT, &rawInput, &uiRawInputBytes, sizeof(RAWINPUTHEADER)) == static_cast<UINT>(-1))
 	{
 		// Heap: common::LastErrorString() returns a std::string by value (exceeds SSO), and this LOG sits in the allocation-tracked main loop
 		ScopedSuppressAllocationTracking suppress;
@@ -253,12 +248,12 @@ void RawInputManager::HandleRawInput(LPARAM lparam)
 		return;
 	}
 
-	if (rawinput.header.dwType == RIM_TYPEKEYBOARD && !PhysicalInputSuppressed())
+	if (rawInput.header.dwType == RIM_TYPEKEYBOARD && !PhysicalInputSuppressed())
 	{
-		USHORT uiKey = rawinput.data.keyboard.VKey;
+		USHORT uiKey = rawInput.data.keyboard.VKey;
 		if (uiKey < kiKeyboardKeyCount)
 		{
-			mpbKeyboardKeysDown[uiKey] = (rawinput.data.keyboard.Flags & RI_KEY_BREAK) == 0;
+			mpbKeyboardKeysDown[uiKey] = (rawInput.data.keyboard.Flags & RI_KEY_BREAK) == 0;
 		}
 	}
 }

@@ -39,9 +39,9 @@ void main()
 
 	int iIndex = 2 * int(f2InQuadVertex.y) + int(f2InQuadVertex.x);
 
-	f4OutParams = pQuads[gl_InstanceIndex].pf4Params[iIndex];
+	f4OutParams = pQuads[gl_InstanceIndex].pf4Parameters[iIndex];
 
-	f2OutTexcoord = pQuads[gl_InstanceIndex].pf4VerticesTexcoords[iIndex].zw;
+	f2OutTexcoord = pQuads[gl_InstanceIndex].pf4VerticesTextureCoordinates[iIndex].zw;
 
 	vec4 f4VisibleArea;
 	if (int(pushConstantsLayout.f4Pipeline.x) == 0)
@@ -61,16 +61,16 @@ void main()
 		f4VisibleArea = globalLayout.f4LightingArea;
 	}
 
-	float fWorldX = pQuads[gl_InstanceIndex].pf4VerticesTexcoords[iIndex].x;
-	float fWorldY = pQuads[gl_InstanceIndex].pf4VerticesTexcoords[iIndex].y;
+	float fWorldX = pQuads[gl_InstanceIndex].pf4VerticesTextureCoordinates[iIndex].x;
+	float fWorldY = pQuads[gl_InstanceIndex].pf4VerticesTextureCoordinates[iIndex].y;
 	gl_Position = vec4(-1.0f + 2.0f * (fWorldX - f4VisibleArea.x) / (f4VisibleArea.z - f4VisibleArea.x),
 	                    1.0f - 2.0f * (fWorldY - f4VisibleArea.y) / (f4VisibleArea.w - f4VisibleArea.y),
 					   0.0f,
 					   1.0f);
 
 	f2OutWorldPosition = vec2(fWorldX, fWorldY);
-	f2OutWorldCenter = (pQuads[gl_InstanceIndex].pf4VerticesTexcoords[0].xy
-	                  + pQuads[gl_InstanceIndex].pf4VerticesTexcoords[1].xy
-	                  + pQuads[gl_InstanceIndex].pf4VerticesTexcoords[2].xy
-	                  + pQuads[gl_InstanceIndex].pf4VerticesTexcoords[3].xy) * 0.25f;
+	f2OutWorldCenter = (pQuads[gl_InstanceIndex].pf4VerticesTextureCoordinates[0].xy
+	                  + pQuads[gl_InstanceIndex].pf4VerticesTextureCoordinates[1].xy
+	                  + pQuads[gl_InstanceIndex].pf4VerticesTextureCoordinates[2].xy
+	                  + pQuads[gl_InstanceIndex].pf4VerticesTextureCoordinates[3].xy) * 0.25f;
 }

@@ -7,7 +7,7 @@
 
 Source inspection at baseline `d29fed456d3ede935c5e672f95f13d6733f0660c` establishes:
 
-- `Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenBase.h`: `kiMaxTweakSections` is 31; `mActiveSubtab` and `mPreAuditSubtab` are zero-initialized `int8_t` arrays. The separate serialized `TweakSectionState::iActiveSubtab` is a C array inside a trivially copyable 296-byte structure with an explicit size assertion.
+- `Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenBase.h`: `kiMaxTweakSections` is 31; `miActiveSubtab` and `miPreAuditSubtab` are zero-initialized `int8_t` arrays. The separate serialized `TweakSectionState::iActiveSubtab` is a C array inside a trivially copyable 296-byte structure with an explicit size assertion.
 - `TweaksScreenBase.cpp`: `RunSliderAuditFrame()` snapshots at frame zero and restores every frame, before normal UI rendering; `SaveState()` and `LoadState()` copy all 31 active subtab values across the persistence boundary. `LoadState()` first rejects a mismatched layout CRC.
 - Repository searches found all uses of the two runtime members in these two files and no existing Plan owning this conversion.
 - `Common/ExternalHeaders.h` already includes `<array>`. `Documents/C++StyleGuide.txt` rule 21 already permits `std::array` where value semantics help.
@@ -15,8 +15,8 @@ Source inspection at baseline `d29fed456d3ede935c5e672f95f13d6733f0660c` establi
 ## Design
 
 1. Declare both runtime members as `std::array<int8_t, kiMaxTweakSections>` and retain `{}` initialization and their existing names.
-2. Replace the frame-zero snapshot with `mPreAuditSubtab = mActiveSubtab;` and the per-frame restore with `mActiveSubtab = mPreAuditSubtab;` at their existing positions.
-3. Preserve the serialized C array. In `SaveState()`, use `std::memcpy(rState.iActiveSubtab, mActiveSubtab.data(), sizeof(rState.iActiveSubtab));`. In `LoadState()`, use `std::memcpy(mActiveSubtab.data(), rState.iActiveSubtab, sizeof(rState.iActiveSubtab));`. The byte count belongs to the serialized array, never to the `std::array` wrapper.
+2. Replace the frame-zero snapshot with `miPreAuditSubtab = miActiveSubtab;` and the per-frame restore with `miActiveSubtab = miPreAuditSubtab;` at their existing positions.
+3. Preserve the serialized C array. In `SaveState()`, use `std::memcpy(rState.iActiveSubtab, miActiveSubtab.data(), sizeof(rState.iActiveSubtab));`. In `LoadState()`, use `std::memcpy(miActiveSubtab.data(), rState.iActiveSubtab, sizeof(rState.iActiveSubtab));`. The byte count belongs to the serialized array, never to the `std::array` wrapper.
 4. Keep existing indexed reads and writes unchanged. Add no includes, helpers, aliases, conversions, or bounds checks.
 
 ## Critical files
@@ -26,7 +26,7 @@ Source inspection at baseline `d29fed456d3ede935c5e672f95f13d6733f0660c` establi
 
 ## In scope
 
-- Change only the declarations of `TweaksScreenBase::mActiveSubtab` and `TweaksScreenBase::mPreAuditSubtab` to the specified zero-initialized `std::array` type.
+- Change only the declarations of `TweaksScreenBase::miActiveSubtab` and `TweaksScreenBase::miPreAuditSubtab` to the specified zero-initialized `std::array` type.
 - Change the four copy statements in the three named functions exactly as specified above.
 - Verify every reference to these two members still compiles and preserves its existing meaning.
 

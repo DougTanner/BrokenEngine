@@ -7,6 +7,7 @@
 #include "Agent/Commands/AudioStreamingFixture.h"
 #endif
 #include "File/FileManager.h"
+#include "File/PackChunks.h"
 #include "Ui/SoundSettingsWrappersBase.h"
 
 namespace engine
@@ -33,44 +34,44 @@ StreamingVoice::~StreamingVoice()
 #endif
 }
 
-float StreamingVoice::GetRemainingTime() const
+std::chrono::duration<float> StreamingVoice::GetRemainingTime() const
 {
 	int64_t iRemainingBytes = mpLazyChunk->header.iSize - miNextReadOffset;
 	if (iRemainingBytes <= 0)
 	{
-		return 0.0f;
+		return std::chrono::duration<float>::zero();
 	}
 
-	return static_cast<float>(iRemainingBytes) / static_cast<float>(mpLazyChunk->header.audioHeader.waveFormat.nAvgBytesPerSec);
+	return std::chrono::duration<float>(static_cast<float>(iRemainingBytes) / static_cast<float>(mpLazyChunk->header.audioHeader.waveFormat.nAvgBytesPerSec));
 }
 
 bool StreamingVoice::ShouldTransition() const
 {
-	return GetRemainingTime() <= kfCrossfadeDuration || miNextReadOffset >= mpLazyChunk->header.iSize || (mFlags & kLastBufferSubmitted);
+	return GetRemainingTime() <= kCrossfadeDuration || miNextReadOffset >= mpLazyChunk->header.iSize || (mFlags & kLastBufferSubmitted);
 }
 
 void StreamingVoice::UpdateRequests(bool bAllowRequests)
 {
-	for (int64_t iSlot = 0; iSlot < kiBufferCount; ++iSlot)
+	for (int64_t i = 0; i < kiBufferCount; ++i)
 	{
-		if (mSlotStates[iSlot] != SlotState::kPending)
+		if (mSlotStates[i] != SlotState::kPending)
 		{
 			continue;
 		}
 
-		std::span<std::byte> destination(reinterpret_cast<std::byte*>(mBuffers[iSlot]), mSlotBytesRead[iSlot]);
-		ChunkReadResult eResult = gpFileManager->TryReadChunkData(mReadRequests[iSlot], mpLazyChunk->location.crc, static_cast<uint64_t>(mSlotOffsets[iSlot]), destination);
+		std::span<std::byte> destination(reinterpret_cast<std::byte*>(mBuffers[i]), mSlotBytesRead[i]);
+		ChunkReadResult eResult = gpFileManager->mpPackChunks->TryReadChunkData(mReadRequests[i], mpLazyChunk->location.crc, static_cast<uint64_t>(mSlotOffsets[i]), destination);
 		if (eResult == ChunkReadResult::kReady)
 		{
-			mSlotStates[iSlot] = SlotState::kReady;
+			mSlotStates[i] = SlotState::kReady;
 		}
 		else if (eResult == ChunkReadResult::kFailed)
 		{
-			mSlotBytesRead[iSlot] = 0;
-			mbSlotLastBuffer[iSlot] = true;
+			mSlotBytesRead[i] = 0;
+			mbSlotLastBuffer[i] = true;
 			mbReadDone = true;
-			mSlotStates[iSlot] = SlotState::kReady;
-			LOG(kAudio, kWarning, "Music streaming: Failed to read chunk data at position {}", mSlotOffsets[iSlot]);
+			mSlotStates[i] = SlotState::kReady;
+			LOG(kAudio, kWarning, "Music streaming: Failed to read chunk data at position {}", mSlotOffsets[i]);
 		}
 	}
 
@@ -106,7 +107,7 @@ void StreamingVoice::UpdateRequests(bool bAllowRequests)
 
 		int64_t iBytesToRead = std::min(iRemainingData, kiBufferSize);
 		std::span<std::byte> destination(reinterpret_cast<std::byte*>(mBuffers[iSlot]), iBytesToRead);
-		ChunkReadResult eResult = gpFileManager->TryReadChunkData(mReadRequests[iSlot], mpLazyChunk->location.crc, static_cast<uint64_t>(miNextReadOffset), destination);
+		ChunkReadResult eResult = gpFileManager->mpPackChunks->TryReadChunkData(mReadRequests[iSlot], mpLazyChunk->location.crc, static_cast<uint64_t>(miNextReadOffset), destination);
 		if (eResult == ChunkReadResult::kRetry)
 		{
 			return;
@@ -164,7 +165,7 @@ void StreamingVoice::DrainConsumedAndSubmitReady()
 
 		if (iBytesRead == 0)
 		{
-			// EOF or read failure has nothing to submit; mark done and recycle the slot.
+			// An empty slot represents end of stream or a read failure.
 			mFlags.Set(kLastBufferSubmitted);
 			mSlotStates[miNextSubmit] = SlotState::kEmpty;
 			miNextSubmit = (miNextSubmit + 1) % kiBufferCount;
@@ -211,12 +212,12 @@ void StreamingVoice::DrainConsumedAndSubmitReady()
 
 void StreamingVoice::CancelPendingReads()
 {
-	for (int64_t iSlot = 0; iSlot < kiBufferCount; ++iSlot)
+	for (int64_t i = 0; i < kiBufferCount; ++i)
 	{
-		mReadRequests[iSlot].Reset();
-		if (mSlotStates[iSlot] == SlotState::kPending)
+		mReadRequests[i].Reset();
+		if (mSlotStates[i] == SlotState::kPending)
 		{
-			mSlotStates[iSlot] = SlotState::kEmpty;
+			mSlotStates[i] = SlotState::kEmpty;
 		}
 	}
 }
@@ -227,16 +228,11 @@ void StreamingVoice::BeginFadeOut()
 	mFlags.Set(kFadingOut);
 }
 
-void StreamingVoice::DetachXAudio2Voice()
-{
-	mpVoice = nullptr;
-}
-
-bool StreamingVoice::UpdateVolume(float fDeltaTime)
+bool StreamingVoice::UpdateVolume(std::chrono::duration<float> deltaTime)
 {
 	if (mFlags & kFadingIn)
 	{
-		mfCurrentVolume += fDeltaTime / kfCrossfadeDuration;
+		mfCurrentVolume += deltaTime / kCrossfadeDuration;
 		if (mfCurrentVolume >= 1.0f)
 		{
 			mFlags.Set(kFadingIn, false);
@@ -244,7 +240,7 @@ bool StreamingVoice::UpdateVolume(float fDeltaTime)
 	}
 	else if (mFlags & kFadingOut)
 	{
-		mfCurrentVolume -= fDeltaTime / kfCrossfadeDuration;
+		mfCurrentVolume -= deltaTime / kCrossfadeDuration;
 		if (mfCurrentVolume <= 0.0f)
 		{
 			mFlags.Set(kFadingOut, false);
@@ -252,7 +248,7 @@ bool StreamingVoice::UpdateVolume(float fDeltaTime)
 	}
 	mfCurrentVolume = std::clamp(mfCurrentVolume, 0.0f, 1.0f);
 
-	CHECK_HRESULT(mpVoice->SetVolume(VolumeToPower(gMasterVolume.Get(), gMusicVolume.Get(), mfCurrentVolume)));
+	CHECK_HRESULT(mpVoice->SetVolume(VolumeToPower(gMasterVolume.mfCurrent, gMusicVolume.mfCurrent, mfCurrentVolume)));
 
 	return mfCurrentVolume <= 0.0f;
 }

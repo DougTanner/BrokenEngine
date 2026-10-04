@@ -16,7 +16,7 @@ constexpr const char* kppcValidationLayers[]
 	"VK_LAYER_KHRONOS_synchronization2",
 };
 
-const char* kppcInstanceExtensionNames[]
+constexpr const char* kppcInstanceExtensionNames[]
 {
 	VK_KHR_SURFACE_EXTENSION_NAME,
 	VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
@@ -24,31 +24,30 @@ const char* kppcInstanceExtensionNames[]
 	VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 	VK_EXT_LAYER_SETTINGS_EXTENSION_NAME,
 };
-constexpr uint32_t kiBaseExtensionCount = 3;
-constexpr uint32_t kiDebugExtensionCount = 5;
+constexpr uint32_t kuiBaseExtensionCount = 3;
+constexpr uint32_t kuiDebugExtensionCount = 5;
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback([[maybe_unused]] VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT messageType, [[maybe_unused]] const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, [[maybe_unused]] void* pUserData)
+static VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback([[maybe_unused]] VkDebugUtilsMessageSeverityFlagBitsEXT vkMessageSeverity, [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT vkMessageType, [[maybe_unused]] const VkDebugUtilsMessengerCallbackDataEXT* pVkCallbackData, [[maybe_unused]] void* pUserData)
 {
 	if constexpr (kbVulkanDebugLayers)
 	{
-		if (pCallbackData->pMessageIdName != nullptr && strstr(pCallbackData->pMessageIdName, "TransitionUndefinedToReadOnly") != nullptr)
+		if (pVkCallbackData->pMessageIdName != nullptr && std::strstr(pVkCallbackData->pMessageIdName, "TransitionUndefinedToReadOnly") != nullptr)
 		{
-			// Lazy texture loading: We intentionally transition empty textures from UNDEFINED to SHADER_READ_ONLY. Reading undefined contents is fine, textures will be updated later.
+			// Lazy-loaded textures transition from UNDEFINED to SHADER_READ_ONLY before their contents are uploaded.
 			return VK_FALSE;
 		}
 
-		// Suppress false positive: with VK_KHR_maintenance9, QFOT is optional for sampled/transfer images so VK_QUEUE_FAMILY_IGNORED barriers are spec-correct,
-		// but the validation layer's ConcurrentUsageOfExclusiveImage check is not maintenance9-aware and reports cross-queue usage at command buffer recording time.
-		// Only fires during startup (GeneratePbrLutBrdf draws referencing transfer-queue-uploaded textures) and potentially after window resize re-recording.
-		// During regular rendering, command buffers are pre-recorded before textures are adopted so the check never runs against transfer-queue-uploaded images.
-		if (pCallbackData->pMessageIdName != nullptr && strstr(pCallbackData->pMessageIdName, "ConcurrentUsageOfExclusiveImage") != nullptr)
+		// VK_KHR_maintenance9 permits sampled/transfer images to omit queue-family ownership transfers;
+		// ConcurrentUsageOfExclusiveImage does not account for that extension. Startup's GeneratePhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTable draws
+		// reference transfer-uploaded textures; regular-render commands are recorded before texture adoption.
+		if (pVkCallbackData->pMessageIdName != nullptr && std::strstr(pVkCallbackData->pMessageIdName, "ConcurrentUsageOfExclusiveImage") != nullptr)
 		{
 			return VK_FALSE;
 		}
 
-		if (pCallbackData->pMessageIdName != nullptr && strstr(pCallbackData->pMessageIdName, "VkDescriptorSetAllocateInfo-descriptorCount") != nullptr)
+		if (pVkCallbackData->pMessageIdName != nullptr && std::strstr(pVkCallbackData->pMessageIdName, "VkDescriptorSetAllocateInfo-descriptorCount") != nullptr)
 		{
-			LOG(kDefault, kError, "Double the number of descriptor sets in DeviceManager::DeviceManager() {}", pCallbackData->pMessage);
+			LOG(kDefault, kError, "Double the number of descriptor sets in DeviceManager::DeviceManager() {}", pVkCallbackData->pMessage);
 			// DEBUG_BREAK, not ASSERT: the Vulkan C callback frame is not a supported unwind path, so a throw here
 			// terminates the process over a validation-layer message instead of returning to the driver
 			DEBUG_BREAK();
@@ -56,63 +55,63 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback([[maybe_unused]] VkDebu
 		}
 
 		// VK_SUBOPTIMAL_KHR from present is expected while a window resize / fullscreen transition races the surface: presentation still succeeds and the next frame's swapchain recreate resolves it. Suppress the best-practices warning; the recreate path already handles the result code.
-		if (pCallbackData->pMessageIdName != nullptr && strstr(pCallbackData->pMessageIdName, "SuboptimalSwapchain") != nullptr)
+		if (pVkCallbackData->pMessageIdName != nullptr && std::strstr(pVkCallbackData->pMessageIdName, "SuboptimalSwapchain") != nullptr)
 		{
 			return VK_FALSE;
 		}
 
-		// GPU-AV defaults its ray-hit-object / mesh-shading sub-checks on; on hardware lacking rayTracingInvocationReorder / meshShader the layer auto-disables them at vkCreateDevice and logs this. We already opt those out in the layer settings above; this guards against any other benign setting auto-adjustment too.
-		if (pCallbackData->pMessageIdName != nullptr && strstr(pCallbackData->pMessageIdName, "WARNING-Setting-Limit-Adjusted") != nullptr)
+		// GPU-AV adjusts settings for unsupported rayTracingInvocationReorder/meshShader features at vkCreateDevice; BuildValidationLayerSettings disables those checks.
+		if (pVkCallbackData->pMessageIdName != nullptr && std::strstr(pVkCallbackData->pMessageIdName, "WARNING-Setting-Limit-Adjusted") != nullptr)
 		{
 			return VK_FALSE;
 		}
 
-		if (pCallbackData->pMessageIdName != nullptr && strstr(pCallbackData->pMessageIdName, "DEBUG-PRINTF") != nullptr)
+		if (pVkCallbackData->pMessageIdName != nullptr && std::strstr(pVkCallbackData->pMessageIdName, "DEBUG-PRINTF") != nullptr)
 		{
 			// Zero-alloc: log the last line of the message (the printf output) without splitting into heap strings — this
 			// callback is reachable at per-draw frequency in kbDebugPrintf builds with allocation tracking live.
 			// find_last_of returns npos when there is no newline; npos + 1 == 0 yields the whole message via substr.
-			std::string_view message(pCallbackData->pMessage);
+			std::string_view message(pVkCallbackData->pMessage);
 			std::string_view lastLine = message.substr(message.find_last_of('\n') + 1);
 			LOG(kGraphics, kInfo, "[debugPrintfEXT] {}", lastLine);
 			return VK_FALSE;
 		}
 
-		if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) != 0 || (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) != 0)
+		if ((vkMessageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) != 0 || (vkMessageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) != 0)
 		{
 			return VK_FALSE;
 		}
 
-		LOG(kDefault, kError, "DebugUtilsCallback {} {} \"{}\" \"{}\"", static_cast<uint64_t>(messageSeverity), static_cast<uint64_t>(messageType), pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		LOG(kDefault, kError, "DebugUtilsCallback {} {} \"{}\" \"{}\"", static_cast<uint64_t>(vkMessageSeverity), static_cast<uint64_t>(vkMessageType), pVkCallbackData->pMessageIdName, pVkCallbackData->pMessage);
 		DEBUG_BREAK();
 	}
 
 	return VK_FALSE;
 }
 
-static VkSampleCountFlagBits SelectSampleCount(VkSampleCountFlags eVkSampleCountFlags)
+static VkSampleCountFlagBits SelectSampleCount(VkSampleCountFlags vkSampleCountFlags)
 {
-	if ((eVkSampleCountFlags & VK_SAMPLE_COUNT_64_BIT) != 0)
+	if ((vkSampleCountFlags & VK_SAMPLE_COUNT_64_BIT) != 0)
 	{
 		return VK_SAMPLE_COUNT_64_BIT;
 	}
-	if ((eVkSampleCountFlags & VK_SAMPLE_COUNT_32_BIT) != 0)
+	if ((vkSampleCountFlags & VK_SAMPLE_COUNT_32_BIT) != 0)
 	{
 		return VK_SAMPLE_COUNT_32_BIT;
 	}
-	if ((eVkSampleCountFlags & VK_SAMPLE_COUNT_16_BIT) != 0)
+	if ((vkSampleCountFlags & VK_SAMPLE_COUNT_16_BIT) != 0)
 	{
 		return VK_SAMPLE_COUNT_16_BIT;
 	}
-	if ((eVkSampleCountFlags & VK_SAMPLE_COUNT_8_BIT) != 0)
+	if ((vkSampleCountFlags & VK_SAMPLE_COUNT_8_BIT) != 0)
 	{
 		return VK_SAMPLE_COUNT_8_BIT;
 	}
-	if ((eVkSampleCountFlags & VK_SAMPLE_COUNT_4_BIT) != 0)
+	if ((vkSampleCountFlags & VK_SAMPLE_COUNT_4_BIT) != 0)
 	{
 		return VK_SAMPLE_COUNT_4_BIT;
 	}
-	if ((eVkSampleCountFlags & VK_SAMPLE_COUNT_2_BIT) != 0)
+	if ((vkSampleCountFlags & VK_SAMPLE_COUNT_2_BIT) != 0)
 	{
 		return VK_SAMPLE_COUNT_2_BIT;
 	}
@@ -120,94 +119,100 @@ static VkSampleCountFlagBits SelectSampleCount(VkSampleCountFlags eVkSampleCount
 	return VK_SAMPLE_COUNT_1_BIT;
 }
 
-VkSampleCountFlagBits InstanceManager::SelectSupportedSampleCount(VkSampleCountFlagBits eRequested) const
+VkSampleCountFlagBits InstanceManager::SelectSupportedSampleCount(VkSampleCountFlagBits vkRequested) const
 {
-	VkSampleCountFlags eSupported = mVkPhysicalDeviceProperties.limits.framebufferColorSampleCounts & mVkPhysicalDeviceProperties.limits.framebufferDepthSampleCounts;
-	if ((eSupported & eRequested) != 0)
+	VkSampleCountFlags vkSupported = mVkPhysicalDeviceProperties.limits.framebufferColorSampleCounts & mVkPhysicalDeviceProperties.limits.framebufferDepthSampleCounts;
+	if ((vkSupported & vkRequested) != 0)
 	{
-		return eRequested;
+		return vkRequested;
 	}
 
 	// Highest supported count above one that does not exceed the request; when there is none (only an unsupported
 	// request of 2), 4 is returned because the Vulkan required limits guarantee it.
-	return SelectSampleCount((eSupported & (eRequested | (eRequested - 1))) | VK_SAMPLE_COUNT_4_BIT);
+	return SelectSampleCount((vkSupported & (vkRequested | (vkRequested - 1))) | VK_SAMPLE_COUNT_4_BIT);
 }
 
 // Stable storage for the VkLayerSettingEXT pValues pointers — Vulkan reads them at vkCreateInstance, after BuildValidationLayerSettings has returned, so they must outlive the helper's stack frame.
-[[maybe_unused]] static constexpr VkBool32 kbLayerSettingTrue = VK_TRUE;
-[[maybe_unused]] static constexpr VkBool32 kbLayerSettingFalse = VK_FALSE;
+[[maybe_unused]] constexpr VkBool32 kVkLayerSettingTrue = VK_TRUE;
+[[maybe_unused]] constexpr VkBool32 kVkLayerSettingFalse = VK_FALSE;
 
-// Fills the caller-owned settings array (which must outlive vkCreateInstance) and returns the populated count.
-static uint32_t BuildValidationLayerSettings(VkLayerSettingEXT (&rLayerSettings)[7])
+// The caller-owned settings array must remain alive until vkCreateInstance returns.
+static uint32_t BuildValidationLayerSettings(VkLayerSettingEXT (&rVkLayerSettings)[7])
 {
-	rLayerSettings[0] =
+	rVkLayerSettings[0] =
 	{
 		.pLayerName = kpcKhronosValidation,
 		.pSettingName = "validate_best_practices",
 		.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
 		.valueCount = 1,
-		.pValues = &kbLayerSettingTrue,
+		.pValues = &kVkLayerSettingTrue,
 	};
-	rLayerSettings[1] =
+	rVkLayerSettings[1] =
 	{
 		.pLayerName = kpcKhronosValidation,
 		.pSettingName = "validate_sync",
 		.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
 		.valueCount = 1,
-		.pValues = &kbLayerSettingTrue,
+		.pValues = &kVkLayerSettingTrue,
 	};
 	uint32_t uiLayerSettingCount = 2;
 	if constexpr (kbGpuAssistedValidation)
 	{
-		rLayerSettings[uiLayerSettingCount++] = {
+		rVkLayerSettings[uiLayerSettingCount++] =
+		{
 			.pLayerName = kpcKhronosValidation,
 			.pSettingName = "gpuav_enable",
 			.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
 			.valueCount = 1,
-			.pValues = &kbLayerSettingTrue,
+			.pValues = &kVkLayerSettingTrue,
 		};
-		rLayerSettings[uiLayerSettingCount++] = {
+		rVkLayerSettings[uiLayerSettingCount++] =
+		{
 			.pLayerName = kpcKhronosValidation,
 			.pSettingName = "gpuav_shader_instrumentation",
 			.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
 			.valueCount = 1,
-			.pValues = &kbLayerSettingTrue,
+			.pValues = &kVkLayerSettingTrue,
 		};
-		rLayerSettings[uiLayerSettingCount++] = {
+		rVkLayerSettings[uiLayerSettingCount++] =
+		{
 			.pLayerName = kpcKhronosValidation,
 			.pSettingName = "gpuav_validate_ray_query",
 			.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
 			.valueCount = 1,
-			.pValues = &kbLayerSettingFalse,
+			.pValues = &kVkLayerSettingFalse,
 		};
 		// Disable GPU-AV sub-checks whose device features this hardware lacks (rayTracingInvocationReorder / meshShader). Otherwise GPU-AV defaults them on and the layer logs a WARNING-Setting-Limit-Adjusted at vkCreateDevice while auto-disabling them. gpuav_validate_ray_hit_object is a valid internal key (the layer prints it) but is absent from the JSON manifest.
-		rLayerSettings[uiLayerSettingCount++] = {
+		rVkLayerSettings[uiLayerSettingCount++] =
+		{
 			.pLayerName = kpcKhronosValidation,
 			.pSettingName = "gpuav_validate_ray_hit_object",
 			.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
 			.valueCount = 1,
-			.pValues = &kbLayerSettingFalse,
+			.pValues = &kVkLayerSettingFalse,
 		};
-		rLayerSettings[uiLayerSettingCount++] = {
+		rVkLayerSettings[uiLayerSettingCount++] =
+		{
 			.pLayerName = kpcKhronosValidation,
 			.pSettingName = "gpuav_mesh_shading",
 			.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
 			.valueCount = 1,
-			.pValues = &kbLayerSettingFalse,
+			.pValues = &kVkLayerSettingFalse,
 		};
 	}
 	else if constexpr (kbDebugPrintf)
 	{
-		rLayerSettings[uiLayerSettingCount++] = {
+		rVkLayerSettings[uiLayerSettingCount++] =
+		{
 			.pLayerName = kpcKhronosValidation,
 			.pSettingName = "printf_enable",
 			.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
 			.valueCount = 1,
-			.pValues = &kbLayerSettingTrue,
+			.pValues = &kVkLayerSettingTrue,
 		};
 	}
 
-	ASSERT(uiLayerSettingCount <= std::size(rLayerSettings));
+	ASSERT(uiLayerSettingCount <= std::size(rVkLayerSettings));
 	return uiLayerSettingCount;
 }
 
@@ -227,21 +232,21 @@ static void TryLoadRenderDocDll()
 			HKEY hKey = nullptr;
 			if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Khronos\\Vulkan\\ImplicitLayers", 0, KEY_READ, &hKey) == ERROR_SUCCESS)
 			{
-				char valueName[MAX_PATH] {};
+				char pcValueName[MAX_PATH] {};
 				for (DWORD i = 0; ; ++i)
 				{
-					DWORD cchValueName = MAX_PATH;
-					if (RegEnumValue(hKey, i, valueName, &cchValueName, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS)
+					DWORD uiValueNameCharacterCount = MAX_PATH;
+					if (RegEnumValue(hKey, i, pcValueName, &uiValueNameCharacterCount, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS)
 					{
 						break;
 					}
-					if (strstr(valueName, "renderdoc.json") != nullptr)
+					if (std::strstr(pcValueName, "renderdoc.json") != nullptr)
 					{
-						char* lastSep = strrchr(valueName, '\\');
-						if (lastSep != nullptr)
+						char* pcLastSeparator = std::strrchr(pcValueName, '\\');
+						if (pcLastSeparator != nullptr)
 						{
-							strcpy_s(lastSep + 1, MAX_PATH - (lastSep + 1 - valueName), "renderdoc.dll");
-							LoadLibrary(valueName);
+							strcpy_s(pcLastSeparator + 1, MAX_PATH - (pcLastSeparator + 1 - pcValueName), "renderdoc.dll");
+							LoadLibrary(pcValueName);
 						}
 						break;
 					}
@@ -263,7 +268,7 @@ static void TryLoadRenderDocDll()
 	}
 }
 
-InstanceManager::InstanceManager(HINSTANCE hinstance, HWND hwnd)
+InstanceManager::InstanceManager(HINSTANCE hInstance, HWND hWindow)
 {
 	ASSERT(gpInstanceManager == nullptr);
 
@@ -286,16 +291,15 @@ InstanceManager::InstanceManager(HINSTANCE hinstance, HWND hwnd)
 		.engineVersion = 0,
 		.apiVersion = VK_API_VERSION_1_2, // Also update "--target-env vulkan1.2" in DataPacker
 	};
-	// Configure validation layer settings using VK_EXT_layer_settings
-	VkLayerSettingEXT layerSettings[7] {};
-	uint32_t uiLayerSettingCount = BuildValidationLayerSettings(layerSettings);
+	VkLayerSettingEXT pVkLayerSettings[7] {};
+	uint32_t uiLayerSettingCount = BuildValidationLayerSettings(pVkLayerSettings);
 
 	VkLayerSettingsCreateInfoEXT vkLayerSettingsCreateInfoEXT =
 	{
 		.sType = VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT,
 		.pNext = nullptr,
 		.settingCount = uiLayerSettingCount,
-		.pSettings = layerSettings,
+		.pSettings = pVkLayerSettings,
 	};
 	VkInstanceCreateInfo vkInstanceCreateInfo
 	{
@@ -305,16 +309,16 @@ InstanceManager::InstanceManager(HINSTANCE hinstance, HWND hwnd)
 		.pApplicationInfo = &vkApplicationInfo,
 		.enabledLayerCount = kbVulkanDebugLayers ? static_cast<uint32_t>(mValidationLayers.size()) : 0,
 		.ppEnabledLayerNames = kbVulkanDebugLayers ? mValidationLayers.data() : nullptr,
-		.enabledExtensionCount = kbVulkanDebugLayers ? kiDebugExtensionCount : kiBaseExtensionCount,
+		.enabledExtensionCount = kbVulkanDebugLayers ? kuiDebugExtensionCount : kuiBaseExtensionCount,
 		.ppEnabledExtensionNames = kppcInstanceExtensionNames,
 	};
 
 	TryLoadRenderDocDll();
 
-	HMODULE renderDocHmodule = GetModuleHandle("renderdoc.dll");
-	if (renderDocHmodule != nullptr)
+	HMODULE hRenderDocModule = GetModuleHandle("renderdoc.dll");
+	if (hRenderDocModule != nullptr)
 	{
-		LOG(kGraphics, kInfo, "renderDocHmodule: {}", reinterpret_cast<uint64_t>(renderDocHmodule));
+		LOG(kGraphics, kInfo, "renderDocHmodule: {}", reinterpret_cast<uint64_t>(hRenderDocModule));
 
 		// RenderDoc doesn't ship VK_LAYER_KHRONOS_validation, so VK_EXT_layer_settings is unavailable. Keep first 4 entries of kppcInstanceExtensionNames (surface, win32 surface, portability enumeration, debug utils). pNext must be cleared because VkLayerSettingsCreateInfoEXT requires the layer settings extension we just dropped. VUID-VkInstanceCreateInfo-flags-06559 holds because VK_KHR_portability_enumeration is retained.
 		vkInstanceCreateInfo.pNext = nullptr;
@@ -324,10 +328,10 @@ InstanceManager::InstanceManager(HINSTANCE hinstance, HWND hwnd)
 
 		if constexpr (kbRenderDoc)
 		{
-			auto pfnGetApi = reinterpret_cast<pRENDERDOC_GetAPI>(GetProcAddress(renderDocHmodule, "RENDERDOC_GetAPI"));
-			if (pfnGetApi != nullptr)
+			auto pGetRenderDocApi = reinterpret_cast<pRENDERDOC_GetAPI>(GetProcAddress(hRenderDocModule, "RENDERDOC_GetAPI"));
+			if (pGetRenderDocApi != nullptr)
 			{
-				pfnGetApi(eRENDERDOC_API_Version_1_6_0, reinterpret_cast<void**>(&mpRenderDocApi));
+				pGetRenderDocApi(eRENDERDOC_API_Version_1_6_0, reinterpret_cast<void**>(&mpRenderDocApi));
 				LOG(kGraphics, kInfo, "RenderDoc API initialized: {}", reinterpret_cast<uint64_t>(mpRenderDocApi));
 			}
 
@@ -363,7 +367,7 @@ InstanceManager::InstanceManager(HINSTANCE hinstance, HWND hwnd)
 		std::string errorMessage = "Failed to create Vulkan instance.\n\nVulkan 1.2 or higher is required.\n\nError: ";
 		errorMessage += pcResult;
 
-		if (!AgentLaunched())
+		if ((gLaunchOptions.iAgentPort == 0))
 		{
 			MessageBox(nullptr, errorMessage.c_str(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 		}
@@ -371,12 +375,10 @@ InstanceManager::InstanceManager(HINSTANCE hinstance, HWND hwnd)
 		throw std::runtime_error("Vulkan 1.2 not available");
 	}
 
-	// Load instance-specific Vulkan functions via Volk
 	volkLoadInstance(mVkInstance);
 
 	if constexpr (kbVulkanDebugLayers)
 	{
-		// Set up a callback to receive messages from the debug utils validation layer
 		VkDebugUtilsMessengerCreateInfoEXT vkDebugUtilsMessengerCreateInfoEXT
 		{
 			.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -393,14 +395,13 @@ InstanceManager::InstanceManager(HINSTANCE hinstance, HWND hwnd)
 		}
 	}
 
-	// Based on https://github.com/Overv/VulkanTutorial
 	VkWin32SurfaceCreateInfoKHR vkWin32SurfaceCreateInfoKHR
 	{
 		.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
 		.pNext = nullptr,
 		.flags = 0,
-		.hinstance = hinstance,
-		.hwnd = hwnd,
+		.hinstance = hInstance,
+		.hwnd = hWindow,
 	};
 	CHECK_VK(vkCreateWin32SurfaceKHR(mVkInstance, &vkWin32SurfaceCreateInfoKHR, nullptr, &mVkSurfaceKHR));
 
@@ -410,12 +411,10 @@ InstanceManager::InstanceManager(HINSTANCE hinstance, HWND hwnd)
 	SelectSurfaceFormat();
 	SelectDepthFormat();
 
-	// Fail loud if the device cannot blend the special-format color RTTs the elevation/lighting/smoke/wind
-	// prepasses MAX/ADD-blend into (kMax/kAdd pipeline flags set blendEnable=VK_TRUE). Blending a color
-	// attachment requires VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT for the format; absent it is silent UB
-	// at pipeline creation. Near-universal on desktop GPUs, but the dependency is real and otherwise unguarded.
-	const VkFormat pBlendedRenderTargetVkFormats[] {shaders::keElevationFormat, shaders::keLightingFormat, shaders::keSmokeFormat, shaders::keWindFormat};
-	for (const VkFormat& rVkFormat : pBlendedRenderTargetVkFormats)
+	// Elevation, lighting, smoke, and wind prepasses enable MAX/ADD blending with kMax/kAdd.
+	// Their attachment formats require VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT; absence makes pipeline creation undefined behavior.
+	const VkFormat pVkBlendedRenderTargetFormats[] {shaders::kVkFormatElevation, shaders::kVkFormatLighting, shaders::kVkFormatSmoke, shaders::kVkFormatWind};
+	for (const VkFormat& rVkFormat : pVkBlendedRenderTargetFormats)
 	{
 		if (!SupportsColorAttachmentBlend(rVkFormat))
 		{
@@ -449,7 +448,6 @@ void InstanceManager::SelectBestPhysicalDevice()
 		vkGetPhysicalDeviceProperties(rVkPhysicalDevice, &vkPhysicalDeviceProperties);
 		LOG(kGraphics, kInfo, "    \"{}\"{}", vkPhysicalDeviceProperties.deviceName, vkPhysicalDeviceProperties.deviceType == VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? " (Discrete) " : "");
 
-		// Validate device supports required Vulkan API version
 		uint32_t uiDeviceApiVersion = vkPhysicalDeviceProperties.apiVersion;
 		if (uiDeviceApiVersion < VK_API_VERSION_1_2)
 		{
@@ -462,9 +460,9 @@ void InstanceManager::SelectBestPhysicalDevice()
 		vkGetPhysicalDeviceQueueFamilyProperties(rVkPhysicalDevice, &uiPhysicalDeviceQueueFamilyCount, nullptr);
 		for (int64_t i = 0; i < uiPhysicalDeviceQueueFamilyCount; ++i)
 		{
-			VkBool32 supportsPresentVkBool32 = VK_FALSE;
-			CHECK_VK(vkGetPhysicalDeviceSurfaceSupportKHR(rVkPhysicalDevice, static_cast<uint32_t>(i), mVkSurfaceKHR, &supportsPresentVkBool32));
-			bSupportsPresent |= supportsPresentVkBool32 == VK_TRUE;
+			VkBool32 vkSupportsPresent = VK_FALSE;
+			CHECK_VK(vkGetPhysicalDeviceSurfaceSupportKHR(rVkPhysicalDevice, static_cast<uint32_t>(i), mVkSurfaceKHR, &vkSupportsPresent));
+			bSupportsPresent |= vkSupportsPresent == VK_TRUE;
 		}
 
 		if (!bSupportsPresent)
@@ -492,32 +490,31 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 	LOG(kGraphics, kInfo, "  maxImageDimension2D: {}", mVkPhysicalDeviceProperties.limits.maxImageDimension2D);
 	LOG(kGraphics, kInfo, "  maxImageDimensionCube: {}", mVkPhysicalDeviceProperties.limits.maxImageDimensionCube);
 	LOG(kGraphics, kInfo, "  maxPerStageResources: {}", mVkPhysicalDeviceProperties.limits.maxPerStageResources);
-	// Validated on the finally-selected device, not on provisional candidates (a weak iGPU enumerated before the winning dGPU would trip it spuriously)
+	// Check capabilities only after device selection; weaker devices rejected during enumeration must not fail initialization.
 	ASSERT(mVkPhysicalDeviceProperties.limits.maxPerStageResources > 200);
 	ASSERT(mVkPhysicalDeviceProperties.limits.maxUniformBufferRange >= 65'536);
 	vkGetPhysicalDeviceMemoryProperties(mVkPhysicalDevice, &mVkPhysicalDeviceMemoryProperties);
 
 	vkGetPhysicalDeviceFeatures2(mVkPhysicalDevice, &mVkPhysicalDeviceFeatures2);
 
-	// Check required Vulkan features
 	struct RequiredFeature
 	{
-		const VkBool32* pFeature = nullptr;
+		const VkBool32* pVkFeature = nullptr;
 		const char* pcName = nullptr;
 		const char* pcReason = nullptr;
 	};
 	const RequiredFeature pRequiredFeatures[]
 	{
-		{.pFeature = &mVkPhysicalDeviceFeatures2.features.shaderStorageImageExtendedFormats, .pcName = "shaderStorageImageExtendedFormats", .pcReason = "R16_SFLOAT smoke storage images"},
-		{.pFeature = &mVkPhysicalDeviceVulkan12Features.descriptorBindingStorageBufferUpdateAfterBind, .pcName = "descriptorBindingStorageBufferUpdateAfterBind", .pcReason = "VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT"},
-		{.pFeature = &mVkPhysicalDeviceVulkan12Features.shaderSampledImageArrayNonUniformIndexing, .pcName = "shaderSampledImageArrayNonUniformIndexing", .pcReason = "non-uniform descriptor indexing"},
-		{.pFeature = &mVkPhysicalDeviceVulkan12Features.descriptorBindingSampledImageUpdateAfterBind, .pcName = "descriptorBindingSampledImageUpdateAfterBind", .pcReason = "texture streaming"},
-		{.pFeature = &mVkPhysicalDeviceVulkan12Features.descriptorBindingPartiallyBound, .pcName = "descriptorBindingPartiallyBound", .pcReason = "bindless texture arrays"},
-		{.pFeature = &mVkPhysicalDeviceVulkan12Features.runtimeDescriptorArray, .pcName = "runtimeDescriptorArray", .pcReason = "bindless texture arrays"},
+		{.pVkFeature = &mVkPhysicalDeviceFeatures2.features.shaderStorageImageExtendedFormats, .pcName = "shaderStorageImageExtendedFormats", .pcReason = "R16_SFLOAT smoke storage images"},
+		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.descriptorBindingStorageBufferUpdateAfterBind, .pcName = "descriptorBindingStorageBufferUpdateAfterBind", .pcReason = "VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT"},
+		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.shaderSampledImageArrayNonUniformIndexing, .pcName = "shaderSampledImageArrayNonUniformIndexing", .pcReason = "non-uniform descriptor indexing"},
+		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.descriptorBindingSampledImageUpdateAfterBind, .pcName = "descriptorBindingSampledImageUpdateAfterBind", .pcReason = "texture streaming"},
+		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.descriptorBindingPartiallyBound, .pcName = "descriptorBindingPartiallyBound", .pcReason = "bindless texture arrays"},
+		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.runtimeDescriptorArray, .pcName = "runtimeDescriptorArray", .pcReason = "bindless texture arrays"},
 	};
 	for (const RequiredFeature& rRequiredFeature : pRequiredFeatures)
 	{
-		if (*rRequiredFeature.pFeature != VK_TRUE)
+		if (*rRequiredFeature.pVkFeature != VK_TRUE)
 		{
 			std::string errorMessage = "Required Vulkan feature not supported.\n\n";
 			errorMessage += rRequiredFeature.pcName;
@@ -527,7 +524,7 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 
 			LOG(kGraphics, kError, "Required Vulkan feature {} not supported ({})", rRequiredFeature.pcName, rRequiredFeature.pcReason);
 
-			if (!AgentLaunched())
+			if ((gLaunchOptions.iAgentPort == 0))
 			{
 				MessageBox(nullptr, errorMessage.c_str(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 			}
@@ -538,9 +535,9 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 		}
 	}
 
-	if (!SupportsStorageImage(shaders::keSmokeFormat))
+	if (!SupportsStorageImage(shaders::kVkFormatSmoke))
 	{
-		LOG(kGraphics, kError, "Device does not advertise VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT for smoke format {}", string_VkFormat(shaders::keSmokeFormat));
+		LOG(kGraphics, kError, "Device does not advertise VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT for smoke format {}", string_VkFormat(shaders::kVkFormatSmoke));
 		throw std::runtime_error("Smoke texture format does not support storage images");
 	}
 
@@ -558,13 +555,13 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 	ASSERT(mVkPhysicalDevice16BitStorageFeatures.uniformAndStorageBuffer16BitAccess == VK_TRUE);
 	ASSERT(mVkPhysicalDeviceFeatures2.features.shaderInt16 == VK_TRUE);
 #endif
-	meMaxMultisampleCount = SelectSampleCount(mVkPhysicalDeviceProperties.limits.framebufferColorSampleCounts & mVkPhysicalDeviceProperties.limits.framebufferDepthSampleCounts);
-	LOG(kGraphics, kInfo, "  Max multisample count: {}\n", static_cast<int64_t>(meMaxMultisampleCount));
-	ASSERT(meMaxMultisampleCount > VK_SAMPLE_COUNT_1_BIT);
-	VkSampleCountFlagBits eSampleCount = SelectSupportedSampleCount(gSampleCount.Get<VkSampleCountFlagBits>());
-	if (eSampleCount != gSampleCount.Get<VkSampleCountFlagBits>())
+	mMaxMultisampleCountVkSampleCountFlagBits = SelectSampleCount(mVkPhysicalDeviceProperties.limits.framebufferColorSampleCounts & mVkPhysicalDeviceProperties.limits.framebufferDepthSampleCounts);
+	LOG(kGraphics, kInfo, "  Max multisample count: {}\n", static_cast<int64_t>(mMaxMultisampleCountVkSampleCountFlagBits));
+	ASSERT(mMaxMultisampleCountVkSampleCountFlagBits > VK_SAMPLE_COUNT_1_BIT);
+	VkSampleCountFlagBits vkSampleCount = SelectSupportedSampleCount(gSampleCount.Get<VkSampleCountFlagBits>());
+	if (vkSampleCount != gSampleCount.Get<VkSampleCountFlagBits>())
 	{
-		gSampleCount.Reset<VkSampleCountFlagBits>(eSampleCount);
+		gSampleCount.Reset<VkSampleCountFlagBits>(vkSampleCount);
 	}
 }
 
@@ -580,9 +577,9 @@ void InstanceManager::SelectQueueFamilies()
 	LOG(kGraphics, kInfo, "Physical device queues ({}):", uiPhysicalDeviceQueueFamilyCount);
 	for (int64_t i = 0; i < uiPhysicalDeviceQueueFamilyCount; ++i)
 	{
-		VkBool32 supportsPresentVkBool32 = VK_FALSE;
-		CHECK_VK(vkGetPhysicalDeviceSurfaceSupportKHR(mVkPhysicalDevice, static_cast<uint32_t>(i), mVkSurfaceKHR, &supportsPresentVkBool32));
-		LOG(kGraphics, kInfo, "  {} | {} | {} | {}", (mVkQueueFamilyProperties.at(i).queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0 ? "VK_QUEUE_GRAPHICS_BIT" : "                     ", supportsPresentVkBool32 == VK_TRUE ? "Supports present" : "                ", (mVkQueueFamilyProperties.at(i).queueFlags & VK_QUEUE_COMPUTE_BIT) != 0 ? "VK_QUEUE_COMPUTE_BIT" : "                    ", (mVkQueueFamilyProperties.at(i).queueFlags & VK_QUEUE_TRANSFER_BIT) != 0 ? "VK_QUEUE_TRANSFER_BIT" : "                     ");
+		VkBool32 vkSupportsPresent = VK_FALSE;
+		CHECK_VK(vkGetPhysicalDeviceSurfaceSupportKHR(mVkPhysicalDevice, static_cast<uint32_t>(i), mVkSurfaceKHR, &vkSupportsPresent));
+		LOG(kGraphics, kInfo, "  {} | {} | {} | {}", (mVkQueueFamilyProperties.at(i).queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0 ? "VK_QUEUE_GRAPHICS_BIT" : "                     ", vkSupportsPresent == VK_TRUE ? "Supports present" : "                ", (mVkQueueFamilyProperties.at(i).queueFlags & VK_QUEUE_COMPUTE_BIT) != 0 ? "VK_QUEUE_COMPUTE_BIT" : "                    ", (mVkQueueFamilyProperties.at(i).queueFlags & VK_QUEUE_TRANSFER_BIT) != 0 ? "VK_QUEUE_TRANSFER_BIT" : "                     ");
 	}
 	LOG(kGraphics, kInfo, "");
 
@@ -594,9 +591,9 @@ void InstanceManager::SelectQueueFamilies()
 		if ((mVkQueueFamilyProperties.at(i).queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0)
 		{
 			// Search for a graphics queue in the array of queue families, prefer one that supports both
-			VkBool32 supportsPresentVkBool32 = VK_FALSE;
-			CHECK_VK(vkGetPhysicalDeviceSurfaceSupportKHR(mVkPhysicalDevice, static_cast<uint32_t>(i), mVkSurfaceKHR, &supportsPresentVkBool32));
-			if (supportsPresentVkBool32 == VK_TRUE)
+			VkBool32 vkSupportsPresent = VK_FALSE;
+			CHECK_VK(vkGetPhysicalDeviceSurfaceSupportKHR(mVkPhysicalDevice, static_cast<uint32_t>(i), mVkSurfaceKHR, &vkSupportsPresent));
+			if (vkSupportsPresent == VK_TRUE)
 			{
 				miGraphicsQueueFamilyIndex = i;
 				miPresentQueueFamilyIndex = i;
@@ -623,14 +620,13 @@ void InstanceManager::SelectQueueFamilies()
 		}
 	}
 
-	// If didn't find a queue that supports both graphics and present, then find a separate present queue
 	if (miPresentQueueFamilyIndex == UINT32_MAX)
 	{
 		for (int64_t i = 0; i < uiPhysicalDeviceQueueFamilyCount; ++i)
 		{
-			VkBool32 supportsPresentVkBool32 = VK_FALSE;
-			CHECK_VK(vkGetPhysicalDeviceSurfaceSupportKHR(mVkPhysicalDevice, static_cast<uint32_t>(i), mVkSurfaceKHR, &supportsPresentVkBool32));
-			if (supportsPresentVkBool32 == VK_TRUE)
+			VkBool32 vkSupportsPresent = VK_FALSE;
+			CHECK_VK(vkGetPhysicalDeviceSurfaceSupportKHR(mVkPhysicalDevice, static_cast<uint32_t>(i), mVkSurfaceKHR, &vkSupportsPresent));
+			if (vkSupportsPresent == VK_TRUE)
 			{
 				miPresentQueueFamilyIndex = i;
 				break;
@@ -654,8 +650,8 @@ void InstanceManager::SelectQueueFamilies()
 	ASSERT(miGraphicsQueueFamilyIndex != UINT32_MAX && miPresentQueueFamilyIndex != UINT32_MAX && miTransferQueueFamilyIndex != UINT32_MAX);
 	LOG(kGraphics, kInfo, "Selected queue families: graphics {}, present {}, transfer {}", miGraphicsQueueFamilyIndex, miPresentQueueFamilyIndex, miTransferQueueFamilyIndex);
 
-	mTransferImageGranularity = mVkQueueFamilyProperties.at(miTransferQueueFamilyIndex).minImageTransferGranularity;
-	LOG(kGraphics, kDebug, "Transfer queue minImageTransferGranularity: ({}, {}, {})", mTransferImageGranularity.width, mTransferImageGranularity.height, mTransferImageGranularity.depth);
+	mTransferImageGranularityVkExtent3D = mVkQueueFamilyProperties.at(miTransferQueueFamilyIndex).minImageTransferGranularity;
+	LOG(kGraphics, kDebug, "Transfer queue minImageTransferGranularity: ({}, {}, {})", mTransferImageGranularityVkExtent3D.width, mTransferImageGranularityVkExtent3D.height, mTransferImageGranularityVkExtent3D.depth);
 }
 
 void InstanceManager::SelectSurfaceFormat()
@@ -666,7 +662,7 @@ void InstanceManager::SelectSurfaceFormat()
 	std::vector<VkSurfaceFormatKHR> physicalDeviceSurfaceFormats(uiFormatCount);
 	CHECK_VK(vkGetPhysicalDeviceSurfaceFormatsKHR(mVkPhysicalDevice, mVkSurfaceKHR, &uiFormatCount, physicalDeviceSurfaceFormats.data()));
 
-	LOG(kGraphics, kInfo, "Surface formats ({}):", physicalDeviceSurfaceFormats.size());
+	LOG(kGraphics, kInfo, "Surface formats ({}):", std::ssize(physicalDeviceSurfaceFormats));
 	for ([[maybe_unused]] const VkSurfaceFormatKHR& rVkSurfaceFormatKHR : physicalDeviceSurfaceFormats)
 	{
 		LOG(kGraphics, kInfo, "  {} ({})", string_VkFormat(rVkSurfaceFormatKHR.format), string_VkColorSpaceKHR(rVkSurfaceFormatKHR.colorSpace));
@@ -677,7 +673,7 @@ void InstanceManager::SelectSurfaceFormat()
 	if (uiFormatCount == 1 && physicalDeviceSurfaceFormats.at(0).format == VK_FORMAT_UNDEFINED)
 	{
 		mFramebufferVkFormat = VK_FORMAT_B8G8R8A8_UNORM;
-		LOG(kGraphics, kInfo, "Selected framebuffer format: {} with color space: {} (no preferred format)\n", string_VkFormat(mFramebufferVkFormat), string_VkColorSpaceKHR(mFramebufferVkColorSpace));
+		LOG(kGraphics, kInfo, "Selected framebuffer format: {} with color space: {} (no preferred format)\n", string_VkFormat(mFramebufferVkFormat), string_VkColorSpaceKHR(mFramebufferVkColorSpaceKHR));
 	}
 	else
 	{
@@ -687,19 +683,18 @@ void InstanceManager::SelectSurfaceFormat()
 			if (rVkSurfaceFormatKHR.format == VK_FORMAT_B8G8R8A8_UNORM || rVkSurfaceFormatKHR.format == VK_FORMAT_R8G8B8A8_UNORM)
 			{
 				mFramebufferVkFormat = rVkSurfaceFormatKHR.format;
-				mFramebufferVkColorSpace = rVkSurfaceFormatKHR.colorSpace;
+				mFramebufferVkColorSpaceKHR = rVkSurfaceFormatKHR.colorSpace;
 				bFoundPreferredFormat = true;
-				LOG(kGraphics, kInfo, "Selected framebuffer format: {} with color space: {}\n", string_VkFormat(mFramebufferVkFormat), string_VkColorSpaceKHR(mFramebufferVkColorSpace));
+				LOG(kGraphics, kInfo, "Selected framebuffer format: {} with color space: {}\n", string_VkFormat(mFramebufferVkFormat), string_VkColorSpaceKHR(mFramebufferVkColorSpaceKHR));
 				break;
 			}
 		}
 
-		// Fallback to first available format if preferred formats not found
 		if (!bFoundPreferredFormat)
 		{
 			mFramebufferVkFormat = physicalDeviceSurfaceFormats.at(0).format;
-			mFramebufferVkColorSpace = physicalDeviceSurfaceFormats.at(0).colorSpace;
-			LOG(kGraphics, kInfo, "Using fallback surface format: {} with color space: {} (preferred formats not available)\n", string_VkFormat(mFramebufferVkFormat), string_VkColorSpaceKHR(mFramebufferVkColorSpace));
+			mFramebufferVkColorSpaceKHR = physicalDeviceSurfaceFormats.at(0).colorSpace;
+			LOG(kGraphics, kInfo, "Using fallback surface format: {} with color space: {} (preferred formats not available)\n", string_VkFormat(mFramebufferVkFormat), string_VkColorSpaceKHR(mFramebufferVkColorSpaceKHR));
 		}
 	}
 }
@@ -709,32 +704,30 @@ void InstanceManager::SelectDepthFormat()
 	// Prefer high precision depth formats
 	VkFormat pVkFormats[] {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D16_UNORM, VK_FORMAT_D16_UNORM_S8_UINT};
 
-	// Search first for optimal formats
-	for (VkFormat& rFormat : pVkFormats)
+	for (const VkFormat& rVkFormat : pVkFormats)
 	{
 		VkFormatProperties vkFormatProperties {};
-		vkGetPhysicalDeviceFormatProperties(mVkPhysicalDevice, rFormat, &vkFormatProperties);
+		vkGetPhysicalDeviceFormatProperties(mVkPhysicalDevice, rVkFormat, &vkFormatProperties);
 
 		if ((vkFormatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
 		{
-			LOG(kGraphics, kInfo, "Depth format selected: {} (optimal)\n", string_VkFormat(rFormat));
-			mDepthVkFormat = rFormat;
+			LOG(kGraphics, kInfo, "Depth format selected: {} (optimal)\n", string_VkFormat(rVkFormat));
+			mDepthVkFormat = rVkFormat;
 			break;
 		}
 	}
 
 	if (mDepthVkFormat == VK_FORMAT_UNDEFINED)
 	{
-		// Search linear if we can't find an optimal format
-		for (VkFormat& rFormat : pVkFormats)
+		for (const VkFormat& rVkFormat : pVkFormats)
 		{
 			VkFormatProperties vkFormatProperties {};
-			vkGetPhysicalDeviceFormatProperties(mVkPhysicalDevice, rFormat, &vkFormatProperties);
+			vkGetPhysicalDeviceFormatProperties(mVkPhysicalDevice, rVkFormat, &vkFormatProperties);
 
 			if ((vkFormatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
 			{
-				LOG(kGraphics, kInfo, "Depth format selected: {} (linear)\n", string_VkFormat(rFormat));
-				mDepthVkFormat = rFormat;
+				LOG(kGraphics, kInfo, "Depth format selected: {} (linear)\n", string_VkFormat(rVkFormat));
+				mDepthVkFormat = rVkFormat;
 				break;
 			}
 		}
@@ -785,11 +778,11 @@ void InstanceManager::ReadLayerProperties()
 	{
 		LOG(kGraphics, kInfo, "  {} {}.{}", rVkLayerProperties.layerName, VK_VERSION_PATCH(rVkLayerProperties.specVersion), rVkLayerProperties.implementationVersion);
 
-		for (size_t i = 0; i < std::size(kppcValidationLayers); ++i)
+		for (const char* pcValidationLayer : kppcValidationLayers)
 		{
-			if (std::strcmp(rVkLayerProperties.layerName, kppcValidationLayers[i]) == 0)
+			if (std::strcmp(rVkLayerProperties.layerName, pcValidationLayer) == 0)
 			{
-				mValidationLayers.push_back(kppcValidationLayers[i]);
+				mValidationLayers.push_back(pcValidationLayer);
 			}
 		}
 

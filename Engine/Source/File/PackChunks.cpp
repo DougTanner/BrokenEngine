@@ -69,7 +69,6 @@ PackChunks::~PackChunks()
 
 	mLoader.Stop();
 
-	// Close persistent pack file handles and free per-thread read + decompress buffers
 	for (HANDLE& rHandle : mLazyPackFileHandles)
 	{
 		if (rHandle != nullptr && rHandle != INVALID_HANDLE_VALUE)
@@ -92,7 +91,6 @@ PackChunks::~PackChunks()
 	}
 }
 
-// Build full path to a data file (pack or manifest) for the given data type
 std::filesystem::path PackChunks::GetDataFilePath(data::DataTypes eDataType, std::string_view extension) const
 {
 	return mDataDirectory / (std::string(data::kpcDataTypeNames[eDataType]) + std::string(extension));
@@ -109,7 +107,6 @@ constexpr bool IsServerChunk(data::DataTypes eDataType)
 	return eDataType == data::kDataTypeIslands;
 }
 
-// Derive data type from chunk flags for pack file handle lookup
 data::DataTypes DataTypeFromFlags(const common::ChunkFlags_t& rFlags)
 {
 	if (rFlags & common::ChunkFlags::kScene)
@@ -268,9 +265,7 @@ void PackChunks::LoadPackFiles()
 		}
 #endif
 
-		// Cache pack file path for reuse across loading stages
 		mPackFilePaths[i] = GetDataFilePath(static_cast<data::DataTypes>(i), ".pack");
-		// Read chunk locations from manifest
 		std::filesystem::path manifestPath = GetDataFilePath(static_cast<data::DataTypes>(i), ".manifest");
 		std::fstream manifestStream(manifestPath, std::ios::in | std::ios::binary);
 		common::DataHeader dataHeader {};
@@ -284,16 +279,16 @@ void PackChunks::LoadPackFiles()
 
 		// Trust boundary: iChunkCount comes from the manifest header; a garbage count would drive an unbounded resize
 		// (bad_alloc terminate) or a torn read. Bound it by what the file can actually hold before allocating.
-		static constexpr int64_t iChunkTableOffset = common::RoundUp<int64_t, common::kiAlignmentBytes>(static_cast<int64_t>(sizeof(common::DataHeader)));
+		static constexpr int64_t kiChunkTableOffset = common::RoundUp<int64_t, common::kiAlignmentBytes>(static_cast<int64_t>(sizeof(common::DataHeader)));
 		manifestStream.seekg(0, std::ios::end);
 		int64_t iManifestSize = static_cast<int64_t>(manifestStream.tellg());
-		int64_t iMaxChunks = (iManifestSize - iChunkTableOffset) / static_cast<int64_t>(sizeof(common::ChunkLocation));
-		if (!manifestStream || dataHeader.iChunkCount < 0 || dataHeader.iChunkCount > iMaxChunks)
+		int64_t iMaximumChunkCount = (iManifestSize - kiChunkTableOffset) / static_cast<int64_t>(sizeof(common::ChunkLocation));
+		if (!manifestStream || dataHeader.iChunkCount < 0 || dataHeader.iChunkCount > iMaximumChunkCount)
 		{
 			FailMissingRequiredAsset(manifestPath, "manifest chunk-count out of range");
 		}
 
-		manifestStream.seekg(iChunkTableOffset);
+		manifestStream.seekg(kiChunkTableOffset);
 		mChunkLocations[i].resize(dataHeader.iChunkCount);
 		manifestStream.read(reinterpret_cast<char*>(mChunkLocations[i].data()), dataHeader.iChunkCount * sizeof(common::ChunkLocation));
 		if (!manifestStream)
@@ -338,7 +333,6 @@ void PackChunks::LoadPackFiles()
 			{
 				FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
 			}
-			// Read the header
 			common::ChunkHeader chunkHeader {};
 			packStream.seekg(rChunkLocation.uiOffset);
 			packStream.read(reinterpret_cast<char*>(&chunkHeader), sizeof(chunkHeader));
@@ -355,7 +349,6 @@ void PackChunks::LoadPackFiles()
 			int64_t iDataSize = bCompressed ? chunkHeader.iUncompressedSize : iOnDiskSize;
 			mLazyChunkMap.try_emplace(rChunkLocation.crc, LazyChunk {.location = rChunkLocation, .header = chunkHeader, .iDataSize = iDataSize});
 
-			// Track largest compressed-chunk on-disk size for the loading-thread scratch buffer.
 			if (bCompressed && iOnDiskSize > miDecompressScratchSize)
 			{
 				miDecompressScratchSize = iOnDiskSize;
@@ -371,7 +364,7 @@ void PackChunks::LoadPackFiles()
 
 	// Pre-allocate memory pool for all lazy chunk data (eliminates heap lock contention during background loading)
 	int64_t iPoolOffset = 0;
-	for (auto& [crc, rLazyChunk] : mLazyChunkMap)
+	for (const auto& [crc, rLazyChunk] : mLazyChunkMap)
 	{
 		if (rLazyChunk.iDataSize > std::numeric_limits<int64_t>::max() - (common::kiAlignmentBytes - 1))
 		{
@@ -393,7 +386,6 @@ void PackChunks::LoadPackFiles()
 			FailMissingRequiredAsset(mDataDirectory, "lazy chunk pool allocation failed");
 		}
 
-		// Assign each lazy chunk its pre-allocated region in the pool
 		iPoolOffset = 0;
 		for (auto& [crc, rLazyChunk] : mLazyChunkMap)
 		{
@@ -406,10 +398,10 @@ void PackChunks::LoadPackFiles()
 	// compressed). One per loading thread so concurrent decompresses never share a scratch buffer.
 	if (miDecompressScratchSize > 0)
 	{
-		for (std::byte*& rDecompressScratch : mpDecompressScratches)
+		for (std::byte*& rpDecompressScratch : mpDecompressScratches)
 		{
-			rDecompressScratch = static_cast<std::byte*>(VirtualAlloc(nullptr, miDecompressScratchSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
-			if (rDecompressScratch == nullptr)
+			rpDecompressScratch = static_cast<std::byte*>(VirtualAlloc(nullptr, miDecompressScratchSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+			if (rpDecompressScratch == nullptr)
 			{
 				FailMissingRequiredAsset(mDataDirectory, "decompression scratch allocation failed");
 			}
@@ -421,12 +413,10 @@ void PackChunks::LoadPackFiles()
 	GetDiskFreeSpaceW(mDataDirectory.root_path().c_str(), &uiSectorsPerCluster, &uiBytesPerSector, &uiNumberOfFreeClusters, &uiTotalNumberOfClusters);
 	miSectorSize = uiBytesPerSector;
 
-	// Query the VM page granularity for lazy-chunk sub-range decommit/recommit (DecommitChunkRange).
 	SYSTEM_INFO systemInfo {};
 	GetSystemInfo(&systemInfo);
 	miPageSize = systemInfo.dwPageSize;
 
-	// Open persistent unbuffered handles for lazy pack files
 	for (int64_t i = 0; i < data::kDataTypeCount; ++i)
 	{
 		if (IsEagerChunk(static_cast<data::DataTypes>(i)))
@@ -452,10 +442,10 @@ void PackChunks::LoadPackFiles()
 	// Allocate per-thread sector-aligned read buffers (one sub-read + sector padding each) so concurrent
 	// loading threads never share a read buffer.
 	miReadBufferSize = common::RoundUp(kiSubReadSize + miSectorSize, miSectorSize);
-	for (std::byte*& rReadBuffer : mpReadBuffers)
+	for (std::byte*& rpReadBuffer : mpReadBuffers)
 	{
-		rReadBuffer = static_cast<std::byte*>(_aligned_malloc(miReadBufferSize, static_cast<size_t>(miSectorSize)));
-		if (rReadBuffer == nullptr)
+		rpReadBuffer = static_cast<std::byte*>(_aligned_malloc(miReadBufferSize, static_cast<size_t>(miSectorSize)));
+		if (rpReadBuffer == nullptr)
 		{
 			FailMissingRequiredAsset(mDataDirectory, "aligned read-buffer allocation failed");
 		}
@@ -464,7 +454,7 @@ void PackChunks::LoadPackFiles()
 	mLoadingFuture = std::async(std::launch::async, common::ThreadLocal::Entry([this]()
 	{
 #if defined(BT_CLIENT)
-		for (uint32_t i = 0; i < data::kDataTypeCount; ++i)
+		for (int64_t i = 0; i < data::kDataTypeCount; ++i)
 		{
 			if (!IsEagerChunk(static_cast<data::DataTypes>(i)))
 			{
@@ -473,7 +463,6 @@ void PackChunks::LoadPackFiles()
 
 			std::vector<std::byte>& rPackBytes = mPackFileData[i];
 
-			// If eager loading, read the entire .pack file into memory
 			std::error_code packFileSizeError;
 			uintmax_t uiPackFileSize = std::filesystem::file_size(mPackFilePaths[i], packFileSizeError);
 			if (packFileSizeError)
@@ -493,11 +482,9 @@ void PackChunks::LoadPackFiles()
 			}
 			packStream.close();
 
-			// Process chunks from pack file
 			uiPackFileSize = rPackBytes.size();
 			for (const common::ChunkLocation& rChunkLocation : mChunkLocations[i])
 			{
-				// Add to eager chunk map
 				if (const char* pcReason = ValidateChunkLocation(uiPackFileSize, rChunkLocation); pcReason != nullptr)
 				{
 					FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
@@ -536,16 +523,6 @@ const std::unordered_map<common::crc_t, EagerChunk>& PackChunks::GetEagerChunkMa
 	return mEagerChunkMap;
 }
 
-const std::unordered_map<common::crc_t, LazyChunk>& PackChunks::GetLazyChunkMap() const
-{
-	return mLazyChunkMap;
-}
-
-common::crc_t PackChunks::GetPackIntegrityToken() const
-{
-	return mPackIntegrityToken;
-}
-
 bool PackChunks::IsChunkReady(common::crc_t crc) const
 {
 	// Eager map is async-populated; only assert the not-an-eager-chunk invariant once it is published.
@@ -554,27 +531,7 @@ bool PackChunks::IsChunkReady(common::crc_t crc) const
 		ASSERT(mEagerChunkMap.find(crc) == mEagerChunkMap.end());
 	}
 	auto it = mLazyChunkMap.find(crc);
-	return it != mLazyChunkMap.end() ? it->second.eState.load(std::memory_order_acquire) >= ChunkState::kReady : false;
-}
-
-void PackChunks::RequestChunkLoad(std::span<const common::crc_t> crcs, LoadPriority ePriority)
-{
-	mLoader.RequestChunkLoad(crcs, ePriority);
-}
-
-void PackChunks::RequestChunkRangeReload(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, LoadPriority ePriority)
-{
-	mLoader.RequestChunkRangeReload(crc, uiOffset, uiLength, ePriority);
-}
-
-ChunkRangeReloadState PackChunks::GetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength) const
-{
-	return mLoader.GetChunkRangeReloadState(crc, uiOffset, uiLength);
-}
-
-void PackChunks::ResetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength)
-{
-	mLoader.ResetChunkRangeReloadState(crc, uiOffset, uiLength);
+	return it != mLazyChunkMap.end() ? it->second.eState.value.load(std::memory_order_acquire) >= ChunkState::kReady : false;
 }
 
 void PackChunks::WaitForChunks(std::span<const common::crc_t> crcs)
@@ -583,24 +540,8 @@ void PackChunks::WaitForChunks(std::span<const common::crc_t> crcs)
 	mLoader.WaitForChunks(crcs);
 }
 
-void PackChunks::WaitForLoadersIdle()
-{
-	mLoader.WaitForLoadersIdle();
-}
-
-void PackChunks::NotifyChunkCompletion()
-{
-	mLoader.NotifyChunkCompletion();
-}
-
-LazyChunk& PackChunks::GetLazyChunk(common::crc_t crc)
-{
-	return mLazyChunkMap.at(crc);
-}
-
 void PackChunks::ResetTextureChunkStates()
 {
-	// Wholesale reset for device-loss recovery: resets state and GPU handles for every texture chunk.
 	LOG(kLoading, kInfo, "All-texture chunk state reset");
 	ResetTextureChunkStates({});
 }
@@ -609,7 +550,7 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 {
 	// pData/iDataSize are fixed at construction and never rewritten, so this reset touches only the selected
 	// textures' eState and GPU handles. Callers own exclusion against the loading threads: full recovery drains
-	// them through WaitForLoadersIdle and then waits the upload thread, while LRU eviction runs in RenderGlobal's
+	// them through mLoader.WaitForLoadersIdle and then waits the upload thread, while LRU eviction runs in RenderGlobal's
 	// drained descriptor window (a Vulkan descriptor/image drain, not a loader drain) and targets resident,
 	// non-uploading textures, for which no whole-chunk loader can be in flight.
 	bool bResetAll = targetCrcs.empty();
@@ -625,20 +566,20 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 			continue;
 		}
 
-		ChunkState eState = rLazyChunk.eState.load(std::memory_order_acquire);
+		ChunkState eState = rLazyChunk.eState.value.load(std::memory_order_acquire);
 
-		rLazyChunk.uploadVkImage = VK_NULL_HANDLE;
+		rLazyChunk.vkUploadImage = VK_NULL_HANDLE;
 		rLazyChunk.vmaAllocation = VK_NULL_HANDLE;
 
 		if (eState == ChunkState::kReady)
 		{
 			// Adoption decommitted the pool pages, so the CPU bytes are gone: need a full reload from disk
-			rLazyChunk.eState.store(ChunkState::kNotLoaded, std::memory_order_release);
+			rLazyChunk.eState.value.store(ChunkState::kNotLoaded, std::memory_order_release);
 		}
 		else if (eState == ChunkState::kGpuUploadComplete || eState == ChunkState::kUploading)
 		{
 			// CPU data still valid, just needs re-upload
-			rLazyChunk.eState.store(ChunkState::kDiskLoaded, std::memory_order_release);
+			rLazyChunk.eState.value.store(ChunkState::kDiskLoaded, std::memory_order_release);
 #if defined(BT_CLIENT)
 			// Maintain the pending-adoption counter: kUploading (uncounted) -> kDiskLoaded (counted) arms it;
 			// kGpuUploadComplete -> kDiskLoaded stays adoptable (already counted), so leave it unchanged. Both reset
@@ -648,7 +589,7 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 			// and gpTextureUploadManager outlives the device-loss Graphics recreate, so it is always valid here.
 			if (eState == ChunkState::kUploading)
 			{
-				gpTextureUploadManager->NotifyChunkAdoptable();
+				gpTextureUploadManager->miPendingAdoptions.fetch_add(1, std::memory_order_relaxed);
 			}
 #endif // BT_CLIENT
 		}
@@ -661,47 +602,42 @@ bool PackChunks::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<s
 	// mbEagerLoadComplete — skip the lookup until then so a boot-window read can't race the populating task.
 	if (mbEagerLoadComplete.load(std::memory_order_acquire))
 	{
-		auto eagerIt = mEagerChunkMap.find(crc);
-		if (eagerIt != mEagerChunkMap.end())
+		auto it = mEagerChunkMap.find(crc);
+		if (it != mEagerChunkMap.end())
 		{
-			const EagerChunk& rEagerChunk = eagerIt->second;
+			const EagerChunk& rEagerChunk = it->second;
 			// Use the chunk-table data extent, not pHeader->iSize: a scene chunk's iSize excludes its appended animation section
 			int64_t iDataSize = rEagerChunk.iDataSize;
 
-			// Validate read bounds
 			if (uiOffset + buffer.size() > static_cast<uint64_t>(iDataSize))
 			{
 				return false;
 			}
 
-			// Copy data from eager chunk
 			std::memcpy(buffer.data(), rEagerChunk.pData + uiOffset, buffer.size());
 			return true;
 		}
 	}
 
-	// Check lazy chunks
-	auto lazyIt = mLazyChunkMap.find(crc);
-	if (lazyIt != mLazyChunkMap.end())
+	auto it = mLazyChunkMap.find(crc);
+	if (it != mLazyChunkMap.end())
 	{
-		LazyChunk& rLazyChunk = lazyIt->second;
+		LazyChunk& rLazyChunk = it->second;
 
 		// If chunk is loaded, read from memory. No lock: pData visibility comes from the eState release
 		// (LoadChunk) / acquire (here) pair, not PackChunkLoader::mQueueMutex — the lockless writers never take it.
 		// pData/iDataSize are fixed at construction, so no reset can move them out from under this read.
-		if (rLazyChunk.eState.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
+		if (rLazyChunk.eState.value.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
 		{
 			// An adopted texture keeps its pData/iDataSize while its pool pages are decommitted, so a texture CRC
 			// reaching this path would copy from decommitted memory. eState is the authority for non-texture reads.
 			ASSERT(!(rLazyChunk.header.flags & common::ChunkFlags::kTexture));
 
-			// Validate read bounds
 			if (uiOffset + buffer.size() > static_cast<uint64_t>(rLazyChunk.iDataSize))
 			{
 				return false;
 			}
 
-			// Copy data from lazy chunk
 			std::memcpy(buffer.data(), rLazyChunk.pData + uiOffset, buffer.size());
 			return true;
 		}
@@ -717,18 +653,15 @@ bool PackChunks::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<s
 			return false;
 		}
 
-		// Calculate actual data offset in pack file
 		int64_t iDataOffset = rLazyChunk.location.uiOffset + common::kiChunkDataOffset;
 		int64_t iDataSize = rLazyChunk.location.uiSize - common::kiChunkDataOffset;
 
-		// Validate read bounds
 		if (uiOffset + buffer.size() > static_cast<uint64_t>(iDataSize))
 		{
 			packStream.close();
 			return false;
 		}
 
-		// Seek and read requested data
 		packStream.seekg(iDataOffset + uiOffset);
 		packStream.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
 		// Past the bounds check above, a short read means the pack file itself is truncated.
@@ -738,7 +671,6 @@ bool PackChunks::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<s
 		return true;
 	}
 
-	// Chunk not found
 	return false;
 }
 
@@ -746,14 +678,14 @@ bool PackChunks::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<s
 
 ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer)
 {
-	auto clearRequest = [&rRequest]
+	auto ClearRequest = [&rRequest]
 	{
 		rRequest.mpPackChunks = nullptr;
-		rRequest.uiEntryIndex = kiInvalidAudioReadEntry;
-		rRequest.uiGeneration = 0;
-		rRequest.crc = 0;
-		rRequest.uiOffset = 0;
-		rRequest.uiLength = 0;
+		rRequest.muiEntryIndex = kuiInvalidAudioReadEntry;
+		rRequest.muiGeneration = 0;
+		rRequest.muiCrc = 0;
+		rRequest.muiOffset = 0;
+		rRequest.muiLength = 0;
 	};
 
 	if (rRequest.mpPackChunks != nullptr)
@@ -763,32 +695,32 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 			rRequest.Reset();
 			return ChunkReadResult::kFailed;
 		}
-		if (rRequest.uiEntryIndex >= mAudioReadEntries.size())
+		if (rRequest.muiEntryIndex >= mAudioReadEntries.size())
 		{
 			rRequest.Reset();
 			return ChunkReadResult::kFailed;
 		}
-		if (rRequest.crc != crc)
+		if (rRequest.muiCrc != crc)
 		{
 			rRequest.Reset();
 			return ChunkReadResult::kFailed;
 		}
-		if (rRequest.uiOffset != uiOffset)
+		if (rRequest.muiOffset != uiOffset)
 		{
 			rRequest.Reset();
 			return ChunkReadResult::kFailed;
 		}
-		if (rRequest.uiLength != buffer.size())
+		if (rRequest.muiLength != buffer.size())
 		{
 			rRequest.Reset();
 			return ChunkReadResult::kFailed;
 		}
 
-		AudioChunkReadEntry& rEntry = mAudioReadEntries[rRequest.uiEntryIndex];
+		AudioChunkReadEntry& rEntry = mAudioReadEntries[rRequest.muiEntryIndex];
 		uint64_t uiOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
-		if (AudioReadGeneration(uiOwnership) != rRequest.uiGeneration)
+		if (AudioReadGeneration(uiOwnership) != rRequest.muiGeneration)
 		{
-			clearRequest();
+			ClearRequest();
 			return ChunkReadResult::kFailed;
 		}
 
@@ -818,15 +750,15 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 
 		std::memcpy(buffer.data(), rEntry.data.data(), rEntry.uiLength);
 #if defined(BT_DEBUG)
-		AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillReady, rRequest.uiEntryIndex, crc, uiOffset, rEntry.uiLength, AudioStreamingFixtureQueueState::kReady, rRequest.uiGeneration, false);
+		AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillReady, rRequest.muiEntryIndex, crc, uiOffset, rEntry.uiLength, AudioStreamingFixtureQueueState::kReady, rRequest.muiGeneration, false);
 #endif
-		uint64_t uiFreeOwnership = PackAudioReadOwnership(AudioChunkReadState::kFree, rRequest.uiGeneration);
+		uint64_t uiFreeOwnership = PackAudioReadOwnership(AudioChunkReadState::kFree, rRequest.muiGeneration);
 		if (!rEntry.uiOwnership.compare_exchange_strong(uiOwnership, uiFreeOwnership, std::memory_order_acq_rel))
 		{
-			clearRequest();
+			ClearRequest();
 			return ChunkReadResult::kFailed;
 		}
-		clearRequest();
+		ClearRequest();
 		return ChunkReadResult::kReady;
 	}
 
@@ -839,12 +771,12 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 		return ChunkReadResult::kFailed;
 	}
 
-	auto lazyIt = mLazyChunkMap.find(crc);
-	if (lazyIt == mLazyChunkMap.end())
+	auto it = mLazyChunkMap.find(crc);
+	if (it == mLazyChunkMap.end())
 	{
 		return ChunkReadResult::kFailed;
 	}
-	LazyChunk& rLazyChunk = lazyIt->second;
+	LazyChunk& rLazyChunk = it->second;
 	if (!(rLazyChunk.header.flags & common::ChunkFlags::kChunkAudio))
 	{
 		return ChunkReadResult::kFailed;
@@ -872,15 +804,15 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 		return ChunkReadResult::kFailed;
 	}
 
-	if (rLazyChunk.eState.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
+	if (rLazyChunk.eState.value.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
 	{
 		std::memcpy(buffer.data(), rLazyChunk.pData + uiOffset, buffer.size());
 		return ChunkReadResult::kReady;
 	}
 
-	for (uint32_t uiIndex = 0; uiIndex < mAudioReadEntries.size(); ++uiIndex)
+	for (uint32_t i = 0; i < mAudioReadEntries.size(); ++i)
 	{
-		AudioChunkReadEntry& rEntry = mAudioReadEntries[uiIndex];
+		AudioChunkReadEntry& rEntry = mAudioReadEntries[i];
 		uint64_t uiFreeOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
 		if (AudioReadState(uiFreeOwnership) != AudioChunkReadState::kFree)
 		{
@@ -892,19 +824,19 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 		rEntry.uiOffset = uiOffset;
 		rEntry.uiLength = buffer.size();
 		rRequest.mpPackChunks = this;
-		rRequest.uiEntryIndex = uiIndex;
-		rRequest.uiGeneration = uiGeneration;
-		rRequest.crc = crc;
-		rRequest.uiOffset = uiOffset;
-		rRequest.uiLength = buffer.size();
+		rRequest.muiEntryIndex = i;
+		rRequest.muiGeneration = uiGeneration;
+		rRequest.muiCrc = crc;
+		rRequest.muiOffset = uiOffset;
+		rRequest.muiLength = buffer.size();
 		uint64_t uiQueuedOwnership = PackAudioReadOwnership(AudioChunkReadState::kQueued, uiGeneration);
 		if (!rEntry.uiOwnership.compare_exchange_strong(uiFreeOwnership, uiQueuedOwnership, std::memory_order_release, std::memory_order_acquire))
 		{
-			clearRequest();
+			ClearRequest();
 			continue;
 		}
 #if defined(BT_DEBUG)
-		AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillQueued, uiIndex, crc, uiOffset, buffer.size(), AudioStreamingFixtureQueueState::kQueued, uiGeneration, false);
+		AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillQueued, i, crc, uiOffset, buffer.size(), AudioStreamingFixtureQueueState::kQueued, uiGeneration, false);
 #endif
 		mLoader.PublishWake();
 		return ChunkReadResult::kPending;
@@ -922,13 +854,13 @@ void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 	{
 		return;
 	}
-	if (rRequest.uiEntryIndex >= mAudioReadEntries.size())
+	if (rRequest.muiEntryIndex >= mAudioReadEntries.size())
 	{
 		return;
 	}
 
-	AudioChunkReadEntry& rEntry = mAudioReadEntries[rRequest.uiEntryIndex];
-	uint64_t uiRequestGeneration = rRequest.uiGeneration;
+	AudioChunkReadEntry& rEntry = mAudioReadEntries[rRequest.muiEntryIndex];
+	uint64_t uiRequestGeneration = rRequest.muiGeneration;
 	uint64_t uiOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
 	while (AudioReadGeneration(uiOwnership) == uiRequestGeneration)
 	{
@@ -945,18 +877,18 @@ void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 		if (rEntry.uiOwnership.compare_exchange_weak(uiOwnership, uiCancelledOwnership, std::memory_order_acq_rel))
 		{
 #if defined(BT_DEBUG)
-			AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillCancelled, rRequest.uiEntryIndex, rRequest.crc, rRequest.uiOffset, rRequest.uiLength, static_cast<AudioStreamingFixtureQueueState>(eState), uiRequestGeneration, eState != AudioChunkReadState::kLoading);
+			AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillCancelled, rRequest.muiEntryIndex, rRequest.muiCrc, rRequest.muiOffset, rRequest.muiLength, static_cast<AudioStreamingFixtureQueueState>(eState), uiRequestGeneration, eState != AudioChunkReadState::kLoading);
 #endif
 			break;
 		}
 	}
 
 	rRequest.mpPackChunks = nullptr;
-	rRequest.uiEntryIndex = kiInvalidAudioReadEntry;
-	rRequest.uiGeneration = 0;
-	rRequest.crc = 0;
-	rRequest.uiOffset = 0;
-	rRequest.uiLength = 0;
+	rRequest.muiEntryIndex = kuiInvalidAudioReadEntry;
+	rRequest.muiGeneration = 0;
+	rRequest.muiCrc = 0;
+	rRequest.muiOffset = 0;
+	rRequest.muiLength = 0;
 }
 
 bool PackChunks::HasQueuedAudioRead() const
@@ -986,9 +918,9 @@ bool PackChunks::HasOccupiedAudioRead() const
 
 bool PackChunks::TryClaimAudioRead(uint32_t& ruiIndex, uint64_t& ruiGeneration)
 {
-	for (uint32_t uiIndex = 0; uiIndex < mAudioReadEntries.size(); ++uiIndex)
+	for (uint32_t i = 0; i < mAudioReadEntries.size(); ++i)
 	{
-		AudioChunkReadEntry& rEntry = mAudioReadEntries[uiIndex];
+		AudioChunkReadEntry& rEntry = mAudioReadEntries[i];
 		uint64_t uiQueuedOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
 		if (AudioReadState(uiQueuedOwnership) != AudioChunkReadState::kQueued)
 		{
@@ -998,7 +930,7 @@ bool PackChunks::TryClaimAudioRead(uint32_t& ruiIndex, uint64_t& ruiGeneration)
 		uint64_t uiLoadingOwnership = PackAudioReadOwnership(AudioChunkReadState::kLoading, uiGeneration);
 		if (rEntry.uiOwnership.compare_exchange_strong(uiQueuedOwnership, uiLoadingOwnership, std::memory_order_acq_rel))
 		{
-			ruiIndex = uiIndex;
+			ruiIndex = i;
 			ruiGeneration = uiGeneration;
 			return true;
 		}
@@ -1152,7 +1084,6 @@ bool PackChunks::RecommitAndReloadChunkRange(common::crc_t crc, uint64_t uiOffse
 	// Inverse of DecommitChunkRange for device-loss recovery: re-commit the same page-aligned interior, then re-read
 	// the whole [uiOffset, uiOffset + uiLength) range straight from the pack file on disk. ReadChunkData cannot serve
 	// this — for a loaded chunk it copies from the (now-decommitted) resident pool and would fault — so read directly.
-	// Uncompressed chunks only (on-disk payload == pool layout); islands satisfy this (iUncompressedSize == 0).
 	LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
 	// Compressed chunks store decompressed bytes in the pool, so a raw disk reload corrupts that representation without
 	// necessarily crashing. This path requires uncompressed chunks; island chunks satisfy that contract.
@@ -1162,7 +1093,6 @@ bool PackChunks::RecommitAndReloadChunkRange(common::crc_t crc, uint64_t uiOffse
 		return false;
 	}
 
-	// Direct disk re-read of the full range (rewrites the committed boundary bytes with identical data — harmless).
 	// Device-loss recovery can run inside the allocation-tracked main loop, so suppress tracking for the transient stream.
 	data::DataTypes eDataType = DataTypeFromFlags(rLazyChunk.header.flags);
 	int64_t iDataOffset = rLazyChunk.location.uiOffset + common::kiChunkDataOffset;
@@ -1201,35 +1131,35 @@ bool PackChunks::RecommitChunkRange(common::crc_t crc, const LazyChunk& rLazyChu
 	return true;
 }
 
-MemoryStats PackChunks::GetEagerStats() const
+MemoryStats PackChunks::GetEagerStatistics() const
 {
-	MemoryStats stats;
+	MemoryStats statistics;
 	// mPackFileData / mEagerChunkMap are async-populated; report nothing until the eager load publishes.
 	if (!mbEagerLoadComplete.load(std::memory_order_acquire))
 	{
-		return stats;
+		return statistics;
 	}
-	for (uint32_t i = 0; i < data::kDataTypeCount; ++i)
+	for (int64_t i = 0; i < data::kDataTypeCount; ++i)
 	{
 		if (IsEagerChunk(static_cast<data::DataTypes>(i)))
 		{
-			stats.iBytes += static_cast<int64_t>(mPackFileData[i].size());
+			statistics.iBytes += std::ssize(mPackFileData[i]);
 		}
 	}
-	stats.iCount = static_cast<int64_t>(mEagerChunkMap.size());
-	return stats;
+	statistics.iCount = static_cast<int64_t>(mEagerChunkMap.size());
+	return statistics;
 }
 
-MemoryStats PackChunks::GetLazyStats() const
+MemoryStats PackChunks::GetLazyStatistics() const
 {
-	MemoryStats stats;
+	MemoryStats statistics;
 	// No lock: mLazyChunkMap structure is frozen after boot, eState is atomic (acquire), and iDataSize is fixed
 	// at construction. PackChunkLoader::mQueueMutex never guarded these value reads — the lockless writers never take it.
 	// An adopted texture (kReady) has had its pool pages decommitted, so its retained pData/iDataSize describe
 	// the reserved allocation rather than resident bytes; skip it or the readout overstates what is held.
 	for (const auto& [crc, rLazyChunk] : mLazyChunkMap)
 	{
-		ChunkState eState = rLazyChunk.eState.load(std::memory_order_acquire);
+		ChunkState eState = rLazyChunk.eState.value.load(std::memory_order_acquire);
 		if (eState >= ChunkState::kReady && (rLazyChunk.header.flags & common::ChunkFlags::kTexture))
 		{
 			continue;
@@ -1237,30 +1167,30 @@ MemoryStats PackChunks::GetLazyStats() const
 
 		if (eState >= ChunkState::kDiskLoaded)
 		{
-			stats.iBytes += rLazyChunk.iDataSize;
-			++stats.iCount;
+			statistics.iBytes += rLazyChunk.iDataSize;
+			++statistics.iCount;
 		}
 	}
-	return stats;
+	return statistics;
 }
 
-MemoryStats PackChunks::GetMemoryStats(data::DataTypes eDataType) const
+MemoryStats PackChunks::GetMemoryStatistics(data::DataTypes eDataType) const
 {
-	MemoryStats stats;
+	MemoryStats statistics;
 
 	if (IsEagerChunk(eDataType))
 	{
 		// mPackFileData is async-populated; report 0 resident bytes until published. mChunkLocations is set
 		// synchronously in LoadPackFiles, so the chunk count is always safe to read.
-		stats.iBytes = mbEagerLoadComplete.load(std::memory_order_acquire) ? static_cast<int64_t>(mPackFileData[eDataType].size()) : 0;
-		stats.iCount = static_cast<int64_t>(mChunkLocations[eDataType].size());
+		statistics.iBytes = mbEagerLoadComplete.load(std::memory_order_acquire) ? std::ssize(mPackFileData[eDataType]) : 0;
+		statistics.iCount = std::ssize(mChunkLocations[eDataType]);
 	}
 	else
 	{
-		// No lock, and adopted textures skipped: see GetLazyStats.
+		// No lock, and adopted textures skipped: see GetLazyStatistics.
 		for (const auto& [crc, rLazyChunk] : mLazyChunkMap)
 		{
-			ChunkState eState = rLazyChunk.eState.load(std::memory_order_acquire);
+			ChunkState eState = rLazyChunk.eState.value.load(std::memory_order_acquire);
 			if (eState >= ChunkState::kReady && (rLazyChunk.header.flags & common::ChunkFlags::kTexture))
 			{
 				continue;
@@ -1268,19 +1198,13 @@ MemoryStats PackChunks::GetMemoryStats(data::DataTypes eDataType) const
 
 			if (DataTypeFromFlags(rLazyChunk.header.flags) == eDataType && eState >= ChunkState::kDiskLoaded)
 			{
-				stats.iBytes += rLazyChunk.iDataSize;
-				++stats.iCount;
+				statistics.iBytes += rLazyChunk.iDataSize;
+				++statistics.iCount;
 			}
 		}
 	}
-	return stats;
+	return statistics;
 }
 
-#if defined(BT_CLIENT)
-void RequestTextureChunkLoad(common::crc_t crc)
-{
-	gpFileManager->RequestChunkLoad(std::span(&crc, 1));
-}
-#endif
 
 } // namespace engine

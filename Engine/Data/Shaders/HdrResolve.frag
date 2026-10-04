@@ -39,7 +39,7 @@ void main()
 	// Exposure -> ACES tone map the accumulated HDR scene
 	vec3 hdr = texture(hdrSampler, f2InTexcoord).rgb;
 	hdr = min(hdr, vec3(65000.0f)); // Kill F16 Inf
-	hdr *= mainLayout.fPbrExposure;
+	hdr *= mainLayout.fPhysicallyBasedRenderingExposure;
 	vec3 mapped = ACESFilm(hdr);
 
 	// Saturation: mix toward Rec.709 luminance
@@ -57,5 +57,5 @@ void main()
 	mapped = clamp(mapped, 0.0f, 1.0f);
 
 	// Gamma
-	f4OutColor = vec4(pow(mapped, vec3(mainLayout.fPbrGammaInv)), 1.0f);
+	f4OutColor = vec4(pow(mapped, vec3(mainLayout.fPhysicallyBasedRenderingGammaInverse)), 1.0f);
 }

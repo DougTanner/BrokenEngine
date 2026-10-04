@@ -27,10 +27,10 @@ struct CrcValidateResult
 {
 	// True when no unresolved mismatches remain past iHighestMatch.
 	bool bMatch = true;
-	// Highest tick whose ring-frame sharedCrc matched its server update. -1 if no match.
+	// Highest tick whose ring-frame uiSharedCrc matched its server update. -1 if no match.
 	int64_t iHighestMatch = -1;
 	int64_t iHighestMatchIndex = -1;
-	// Lowest tick > iConfirmedTick whose ring-frame sharedCrc did NOT match. -1 if none.
+	// Lowest tick > iConfirmedTick whose ring-frame uiSharedCrc did NOT match. -1 if none.
 	// Mismatches at ticks < iHighestMatch are bypassed (they'll be dropped anyway).
 	int64_t iLowestUnresolvedMismatch = -1;
 };
@@ -49,11 +49,19 @@ static CrcValidateResult CrcValidateLoop(const CoordWork& rWork, int64_t iTarget
 	// Walk in tick-ascending order. iHighestMatch grows monotonically, so whenever it advances
 	// any prior-tracked mismatch becomes bypassed (older than the new confirmed tick) and we
 	// can reset the unresolved tracker.
-	for (auto it = rFrames.serverUpdates.lower_bound(rFrames.iConfirmedTick + 1);
-		it != rFrames.serverUpdates.end() && it->first <= iTargetTick;
-		++it)
+	common::ScopedWorkbufferArena sortedTicks = common::gpThreadLocal->mWorkbuffer.Push();
+	for (const auto& [iTick, rUpdate] : rFrames.serverUpdates)
 	{
-		int64_t iTick = it->first;
+		if (iTick >= rFrames.iConfirmedTick + 1 && iTick <= iTargetTick)
+		{
+			sortedTicks.mBuffer.PushBack(iTick);
+		}
+	}
+	std::span<int64_t> ticks = sortedTicks.mBuffer.Span<int64_t>();
+	std::ranges::sort(ticks);
+	for (int64_t iTick : ticks)
+	{
+		auto it = rFrames.serverUpdates.find(iTick);
 		int64_t iIndex = FindSnapshotIndex(rFrames.snapshots, rFrames.iSnapshotHead, rFrames.iSnapshotCount, iTick);
 		if (iIndex < 0)
 		{
@@ -62,7 +70,7 @@ static CrcValidateResult CrcValidateLoop(const CoordWork& rWork, int64_t iTarget
 		int64_t iPhysical = SnapshotIndex(rFrames.iSnapshotHead, iIndex);
 		const game::Frame& rClientFrame = *rFrames.snapshots[iPhysical];
 
-		if (rClientFrame.postRender.uiSharedCrc == it->second.sharedCrc)
+		if (rClientFrame.postRender.uiSharedCrc == it->second.uiSharedCrc)
 		{
 			result.iHighestMatch = iTick;
 			result.iHighestMatchIndex = iIndex;
@@ -77,7 +85,7 @@ static CrcValidateResult CrcValidateLoop(const CoordWork& rWork, int64_t iTarget
 			if (!bSuppressRepeatLogs && iMismatchCount == 0)
 			{
 				char acSharedCrc[20] {}, acClientCrc[20] {};
-				common::ToHex(std::span<char, 20>(acSharedCrc), it->second.sharedCrc);
+				common::ToHex(std::span<char, 20>(acSharedCrc), it->second.uiSharedCrc);
 				common::ToHex(std::span<char, 20>(acClientCrc), rClientFrame.postRender.uiSharedCrc);
 
 				common::ScopedWorkbufferArena builder = common::gpThreadLocal->mWorkbuffer.Push();
@@ -160,7 +168,7 @@ static void CrcApplyMatchResult(CoordWork& rWork, int64_t iHighestMatch, int64_t
 
 	// Drop validated entries — fast-path advances iConfirmedTick in place, so anything
 	// at or below it is now consumed and would otherwise accumulate in serverUpdates.
-	rFrames.serverUpdates.erase(rFrames.serverUpdates.begin(), rFrames.serverUpdates.upper_bound(iHighestMatch));
+	std::erase_if(rFrames.serverUpdates, [iHighestMatch](const auto& rEntry) { return rEntry.first <= iHighestMatch; });
 }
 
 CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTargetTick)
@@ -194,7 +202,14 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 	bool bSameState = (rFrames.iConfirmedTick == rFrames.iLastLoggedConfirmedTick);
 	if (bSameState && !rFrames.serverUpdates.empty())
 	{
-		auto it = rFrames.serverUpdates.upper_bound(rFrames.iConfirmedTick);
+		auto it = rFrames.serverUpdates.end();
+		for (auto candidateIt = rFrames.serverUpdates.begin(); candidateIt != rFrames.serverUpdates.end(); ++candidateIt)
+		{
+			if (candidateIt->first > rFrames.iConfirmedTick && (it == rFrames.serverUpdates.end() || candidateIt->first < it->first))
+			{
+				it = candidateIt;
+			}
+		}
 		bSameState = (it != rFrames.serverUpdates.end() && it->first == rFrames.iLastLoggedFirstMismatch);
 	}
 
@@ -231,7 +246,7 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 
 	// Gap at confirmed+1 with no matches/mismatches: first server update is non-consecutive
 	// and nothing was validatable. Nothing for the fast path or full replay to do this cycle.
-	if (validateResult.iHighestMatch == -1 && validateResult.bMatch && !rFrames.serverUpdates.empty() && rFrames.serverUpdates.begin()->first != rFrames.iConfirmedTick + 1)
+	if (validateResult.iHighestMatch == -1 && validateResult.bMatch && !rFrames.serverUpdates.empty() && std::ranges::min_element(rFrames.serverUpdates, {}, [](const auto& rEntry) { return rEntry.first; })->first != rFrames.iConfirmedTick + 1)
 	{
 		return result;
 	}

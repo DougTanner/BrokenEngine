@@ -10,10 +10,10 @@ namespace engine
 
 // Reciprocal of the previous smoke area's signed extents (Smoke/Wind OccupancyDilate remap divisor). Preserves
 // the shader's component order exactly: X = 1/(z-x) (width), Y = 1/(w-y) (negative — max-Y is .y, min-Y is .w).
-static void PopulatePreviousSmokeAreaSizeInv(shaders::GlobalLayout& rGlobalLayout, const XMFLOAT4& rArea)
+static void PopulatePreviousSmokeAreaSizeInverse(shaders::GlobalLayout& rGlobalLayout, const XMFLOAT4& rf4Area)
 {
-	rGlobalLayout.f2PreviousSmokeAreaSizeInv.x = 1.0f / (rArea.z - rArea.x);
-	rGlobalLayout.f2PreviousSmokeAreaSizeInv.y = 1.0f / (rArea.w - rArea.y);
+	rGlobalLayout.f2PreviousSmokeAreaSizeInverse.x = 1.0f / (rf4Area.z - rf4Area.x);
+	rGlobalLayout.f2PreviousSmokeAreaSizeInverse.y = 1.0f / (rf4Area.w - rf4Area.y);
 }
 
 // Smoke has three publishing exits, each with its own area pair; report whichever pair this frame actually published.
@@ -27,38 +27,38 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 {
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 
-	rGlobalLayout.fSmokeMax = gSmokeMax.Get();
-	rGlobalLayout.fSmokePower = gSmokePower.Get();
-	rGlobalLayout.fSmokeDecay = gSmokeDecay.Get();
+	rGlobalLayout.fSmokeMax = gSmokeMaximum.mfCurrent;
+	rGlobalLayout.fSmokePower = gSmokePower.mfCurrent;
+	rGlobalLayout.fSmokeDecay = gSmokeDecay.mfCurrent;
 
-	rGlobalLayout.fSmokeColorMin = gSmokeColorMin.Get();
-	rGlobalLayout.fSmokeColorMultiplier = gSmokeColorMultiplier.Get();
-	rGlobalLayout.fSmokeLightingMultiplier = gSmokeLightingMultiplier.Get();
-	rGlobalLayout.fSmokeIntensityFalloff = gSmokeIntensityFalloff.Get();
-	rGlobalLayout.fSmokeWindNoiseScale = gSmokeWindNoiseScale.Get();
-	rGlobalLayout.fSmokeWindNoiseQuantity = gSmokeWindNoiseQuantity.Get();
-	rGlobalLayout.fSmokeNoiseQuantity = gSmokeNoiseQuantity.Get();
+	rGlobalLayout.fSmokeColorMin = gSmokeColorMinimum.mfCurrent;
+	rGlobalLayout.fSmokeColorMultiplier = gSmokeColorMultiplier.mfCurrent;
+	rGlobalLayout.fSmokeLightingMultiplier = gSmokeLightingMultiplier.mfCurrent;
+	rGlobalLayout.fSmokeIntensityFalloff = gSmokeIntensityFalloff.mfCurrent;
+	rGlobalLayout.fSmokeWindNoiseScale = gSmokeWindNoiseScale.mfCurrent;
+	rGlobalLayout.fSmokeWindNoiseQuantity = gSmokeWindNoiseQuantity.mfCurrent;
+	rGlobalLayout.fSmokeNoiseQuantity = gSmokeNoiseQuantity.mfCurrent;
 
-	rGlobalLayout.fSmokeNoiseScaleOne = gSmokeNoiseScaleOne.Get();
-	rGlobalLayout.fSmokeNoiseScaleTwo = gSmokeNoiseScaleTwo.Get();
-	rGlobalLayout.fSmokeObjectHeightInv = 1.0f / gSmokeObjectHeight.Get();
-	rGlobalLayout.fSmokeEdgeDecayDistanceInv = 1.0f / gSmokeEdgeDecayDistance.Get();
+	rGlobalLayout.fSmokeNoiseScaleOne = gSmokeNoiseScaleOne.mfCurrent;
+	rGlobalLayout.fSmokeNoiseScaleTwo = gSmokeNoiseScaleTwo.mfCurrent;
+	rGlobalLayout.fSmokeObjectHeightInv = 1.0f / gSmokeObjectHeight.mfCurrent;
+	rGlobalLayout.fSmokeEdgeDecayDistanceInverse = 1.0f / gSmokeEdgeDecayDistance.mfCurrent;
 
-	uint32_t uiTextureOneWidth = gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.extent.width;
-	uint32_t uiTextureOneHeight = gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.extent.height;
-	uint32_t uiMaxWidth = std::max(uiTextureOneWidth, gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.extent.width);
-	uint32_t uiMaxHeight = std::max(uiTextureOneHeight, gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.extent.height);
+	uint32_t uiTextureOneWidth = gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.width;
+	uint32_t uiTextureOneHeight = gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.height;
+	uint32_t uiMaxWidth = std::max(uiTextureOneWidth, gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.vkExtent3D.width);
+	uint32_t uiMaxHeight = std::max(uiTextureOneHeight, gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.vkExtent3D.height);
 	rGlobalLayout.uiSmokeTilesX = TileCount(uiMaxWidth);
 	rGlobalLayout.uiSmokeTilesY = TileCount(uiMaxHeight);
 	rGlobalLayout.fSmokeDepositTileScale = static_cast<float>(uiMaxWidth) / static_cast<float>(uiTextureOneWidth);
 
 	// World-area follows the visible area each frame: aspect inherits from the framebuffer,
 	// size grows with camera zoom-out. gSmokeSimulationArea acts as a margin multiplier.
-	const XMFLOAT4& rVisible = engine::gpCamera->f4RenderVisibleArea;
-	float fCenterX = 0.5f * (rVisible.x + rVisible.z);
-	float fCenterY = 0.5f * (rVisible.y + rVisible.w);
-	float fHalfWidth = 0.5f * (rVisible.z - rVisible.x) * gSmokeSimulationArea.Get();
-	float fHalfHeight = 0.5f * (rVisible.y - rVisible.w) * gSmokeSimulationArea.Get();
+	const XMFLOAT4& rf4Visible = engine::gpCamera->mf4RenderVisibleArea;
+	float fCenterX = 0.5f * (rf4Visible.x + rf4Visible.z);
+	float fCenterY = 0.5f * (rf4Visible.y + rf4Visible.w);
+	float fHalfWidth = 0.5f * (rf4Visible.z - rf4Visible.x) * gSmokeSimulationArea.mfCurrent;
+	float fHalfHeight = 0.5f * (rf4Visible.y - rf4Visible.w) * gSmokeSimulationArea.mfCurrent;
 	XMFLOAT4 f4CurrentSmokeArea {fCenterX - fHalfWidth, fCenterY + fHalfHeight, fCenterX + fHalfWidth, fCenterY - fHalfHeight};
 
 	static bool sbSmoke = false;
@@ -82,7 +82,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	// follow a camera cell change before it is published beside this frame's area. A one-cell step keeps the smoke
 	// and wind textures usable; a larger step leaves no overlap, so it takes the existing clear below.
 	static RetainedAreaBasis sRetainedAreaBasis {};
-	if (std::optional<XMFLOAT2> of2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoord))
+	if (std::optional<XMFLOAT2> of2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
 	{
 		ShiftArea(sf4PreviousSmokeArea, *of2Shift);
 	}
@@ -98,7 +98,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 
 		rGlobalLayout.f4SmokeArea = f4CurrentSmokeArea;
 		rGlobalLayout.f4PreviousSmokeArea = f4CurrentSmokeArea;
-		PopulatePreviousSmokeAreaSizeInv(rGlobalLayout, f4CurrentSmokeArea);
+		PopulatePreviousSmokeAreaSizeInverse(rGlobalLayout, f4CurrentSmokeArea);
 		sf4PreviousSmokeArea = f4CurrentSmokeArea;
 		PublishSmokeContinuity(f4CurrentSmokeArea, f4CurrentSmokeArea);
 
@@ -112,7 +112,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	{
 		rGlobalLayout.f4SmokeArea = sf4PreviousSmokeArea;
 		rGlobalLayout.f4PreviousSmokeArea = sf4PreviousSmokeArea;
-		PopulatePreviousSmokeAreaSizeInv(rGlobalLayout, sf4PreviousSmokeArea);
+		PopulatePreviousSmokeAreaSizeInverse(rGlobalLayout, sf4PreviousSmokeArea);
 		PublishSmokeContinuity(sf4PreviousSmokeArea, sf4PreviousSmokeArea);
 
 		gpPipelineManager->mpPipelines[kPipelineSmokeClearA].WriteIndirectBuffer(iCommandBuffer, 0);
@@ -123,7 +123,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 
 	rGlobalLayout.f4SmokeArea = f4CurrentSmokeArea;
 	rGlobalLayout.f4PreviousSmokeArea = sf4PreviousSmokeArea;
-	PopulatePreviousSmokeAreaSizeInv(rGlobalLayout, sf4PreviousSmokeArea);
+	PopulatePreviousSmokeAreaSizeInverse(rGlobalLayout, sf4PreviousSmokeArea);
 	PublishSmokeContinuity(f4CurrentSmokeArea, sf4PreviousSmokeArea);
 	sf4PreviousSmokeArea = f4CurrentSmokeArea;
 

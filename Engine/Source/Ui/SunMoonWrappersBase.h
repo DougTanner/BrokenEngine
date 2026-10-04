@@ -35,10 +35,10 @@ extern Wrapper gSunMoonMoonsetEnd;
 extern Wrapper gSunMoonMinimumAmbient;
 extern Wrapper gSunMoonAmbientMultiplier;
 
-// Normal Tilt (radians, applied to f4SunMoonNormal only — does not affect shadows)
+// Tilt in radians affects f4SunMoonNormal, derived terrain/water lighting, and shadow-stretch translation.
 extern Wrapper gSunMoonNormalTilt;
 
-// Shadow Night-Gate (radians)
+// Shadow night multiplier is dimensionless; timing boundaries are in radians.
 extern Wrapper gSunMoonShadowNightMultiplier;
 extern Wrapper gSunMoonShadowSunsetStart;
 extern Wrapper gSunMoonShadowSunsetEnd;

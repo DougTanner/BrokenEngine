@@ -9,32 +9,32 @@ namespace engine
 
 struct FrameInterpolateBase;
 
-// The presentation basis for a cell whose positions are shown against cameraCoord's cell. The offset is a whole
+// The presentation basis for a cell whose positions are shown against cameraCoordinate's cell. The offset is a whole
 // number of cell widths, so it is exact in float, and it is the only value a grid coordinate contributes to
 // presentation. Collection render bodies read the one stamped on their interpolate copy; every other conversion
 // point builds its own here. Nothing publishes one render-wide for a renderer to find.
-constexpr RenderBasis MakeRenderBasis(GridCoord coord, GridCoord cameraCoord)
+constexpr RenderBasis MakeRenderBasis(GridCoord coordinate, GridCoord cameraCoordinate)
 {
 	return RenderBasis
 	{
-		.coordinate = coord,
+		.coordinate = coordinate,
 		.f2Offset =
 		{
-			static_cast<float>(static_cast<int64_t>(coord.iX) - static_cast<int64_t>(cameraCoord.iX)) * kfCellWidth,
-			static_cast<float>(static_cast<int64_t>(coord.iY) - static_cast<int64_t>(cameraCoord.iY)) * kfCellHeight,
+			static_cast<float>(static_cast<int64_t>(coordinate.iX) - static_cast<int64_t>(cameraCoordinate.iX)) * kfCellWidth,
+			static_cast<float>(static_cast<int64_t>(coordinate.iY) - static_cast<int64_t>(cameraCoordinate.iY)) * kfCellHeight,
 		},
 	};
 }
 
 // Minimum eye height (LOD pivot floor). Single source for both the engine LOD-bucket math in
 // Camera::CalculateMatricesAndVisibleArea and the zoom-clamp floor in Camera::UpdateEyeHeight.
-inline constexpr float kfMinEyeHeight = 150.0f;
+inline constexpr float kfMinimumEyeHeight = 150.0f;
 
 // Camera (display-rate, client-only, continuous)
 struct CameraInput
 {
 	XMFLOAT2 f2Move {};
-	int iScrollDelta = 0;
+	int64_t iScrollDelta = 0;
 };
 
 // Initial menu pose the derived camera hands to the generic base at construction.
@@ -81,14 +81,14 @@ public:
 	// Camera-height zoom-factor fade endpoint (2x default eye height = fully zoomed out). Single-sources the water
 	// (WaterUniforms) and lighting (LightingUniforms) LerpAtHeight calls -- both reference this constant.
 	static constexpr float kfWaveFadeEndHeight = 2.0f * kfCameraEyeHeightDefault;
-	// Release zoom-out ceiling (dev builds zoom further; see kfEyeHeightMax). NOT a texel reference: the shadow/lighting
+	// Release zoom-out ceiling (dev builds zoom further; see kfEyeHeightMaximum). NOT a texel reference: the shadow/lighting
 	// texel grids hold a constant on-screen pixel size at any height (the texels coarsen with zoom instead of cropping
 	// coverage), so this is purely the gameplay limit on how far the camera can pull back.
-	static constexpr float kfEyeHeightMaxRelease = 600.0f;
+	static constexpr float kfEyeHeightMaximumRelease = 600.0f;
 #if defined(BT_RELEASE)
-	static constexpr float kfEyeHeightMax = kfEyeHeightMaxRelease; // Shipping: gameplay zoom-out ceiling
+	static constexpr float kfEyeHeightMaximum = kfEyeHeightMaximumRelease; // Shipping: gameplay zoom-out ceiling
 #else
-	static constexpr float kfEyeHeightMax = 2'000.0f; // Dev: full zoom range (texels just coarsen further, coverage preserved)
+	static constexpr float kfEyeHeightMaximum = 2'000.0f; // Dev: full zoom range (texels just coarsen further, coverage preserved)
 #endif
 	// Headroom multipliers: the shadow and lighting (deposit/spread/combine) textures are allocated this much larger
 	// than the wanted on-screen pixel size. Because their texel-height references never fall below live eye height,
@@ -103,14 +103,14 @@ public:
 	XMMATRIX mMatView {};
 	XMMATRIX mMatPerspective {};
 
-	XMFLOAT2 f2VisibleAreaQuadSize {};
-	XMFLOAT4 f4RenderVisibleArea {};
-	XMFLOAT4 f4LargeVisibleArea {};
+	XMFLOAT2 mf2VisibleAreaQuadSize {};
+	XMFLOAT4 mf4RenderVisibleArea {};
+	XMFLOAT4 mf4LargeVisibleArea {};
 
-	XMFLOAT4 f4VisibleTopLeft {};
-	XMFLOAT4 f4VisibleTopRight {};
-	XMFLOAT4 f4VisibleBottomLeft {};
-	XMFLOAT4 f4VisibleBottomRight {};
+	XMFLOAT4 mf4VisibleTopLeft {};
+	XMFLOAT4 mf4VisibleTopRight {};
+	XMFLOAT4 mf4VisibleBottomLeft {};
+	XMFLOAT4 mf4VisibleBottomRight {};
 
 	XMVECTOR mVecPosition {};
 	XMVECTOR mVecEyePosition {};
@@ -119,15 +119,15 @@ public:
 	// The cell every cached camera position, and every basis built for this render, is local to. Update follows the
 	// rendered camera coord: on a one-cell step it shifts the cached positions so the flight stays continuous, on a
 	// larger step it restarts tracking.
-	GridCoord mBasisCoord {};
+	GridCoord mBasisCoordinate {};
 
 	float mfShake = 0.0f;
 	int64_t miFrame = 0;
 
 	// Visible-area LOD (read by renderer to pick which mesh-LOD region to draw). Equation:
-	// floor(log4(eyeDistance / kfMinEyeHeight)) clamped to BufferManager::kiVisibleAreaLodCount-1.
+	// floor(log4(eyeDistance / kfMinimumEyeHeight)) clamped to BufferManager::kiVisibleAreaLodCount-1.
 	// Higher LOD = fewer mesh quads (each dim halved per LOD; total quads /4 per LOD).
-	int miVisibleAreaLod = 0;
+	int64_t miVisibleAreaLevelOfDetail = 0;
 
 	CameraInput mCameraInput {};
 
@@ -166,12 +166,12 @@ public:
 	void ResetForSession();
 	void RestoreEyeHeight(float fEyeHeight);
 
-	virtual float SunAngle() const { return mfSunAngle; }
-	float RawSunAngle() const { return mfSunAngle; }
-	void ResetSunAngle() { mfSunAngle = kfDefaultSunAngle; }
+	float mfSunAngle = 1.4f;
 
-	XMVECTOR XM_CALLCONV ScreenToWorld(FXMVECTOR vecScreenPos, float fHeight);
-	XMVECTOR XM_CALLCONV WorldToScreen(FXMVECTOR vecWorldPos) const;
+	virtual float SunAngle() const = 0;
+
+	XMVECTOR XM_CALLCONV ScreenToWorld(FXMVECTOR vecScreenPosition, float fHeight);
+	XMVECTOR XM_CALLCONV WorldToScreen(FXMVECTOR vecWorldPosition) const;
 
 	inline bool XM_CALLCONV InVisibleArea(XMFLOAT4 f4VisibleArea, XMFLOAT4 f4Position, float fAdjustLeft = 0.0f, float fAdjustRight = 0.0f, float fAdjustTop = 0.0f, float fAdjustBottom = 0.0f)
 	{
@@ -187,8 +187,6 @@ public:
 
 protected:
 
-	float mfSunAngle = 1.4f;
-
 	// Derived-camera policy. The concrete camera knows the real interpolate frame type and casts back to it.
 	virtual bool IsMainMenuFrame(const FrameInterpolateBase& rFrameInterpolate) const = 0;
 	virtual CameraTarget PullTarget(const FrameInterpolateBase& rFrameInterpolate) = 0;
@@ -199,16 +197,14 @@ protected:
 private:
 
 	void DiscardTrackingCaches();
-	void ShiftToRenderedCell(GridCoord cameraCoord);
+	void ShiftToRenderedCell(GridCoord cameraCoordinate);
 	XMVECTOR ResolveTarget(const CameraTarget& rCameraTarget);
 	void UpdatePosition(FXMVECTOR vecTargetPosition, float fDeltaTime);
 	void UpdateEyeHeight();
 
 	XMFLOAT2 mf2LatchedQuadSize {};
-	// 0 is unreachable as a real bucket (eye distance always >= kfMinEyeHeight = 150), so the
-	// first-frame change-detect always fires. Using INT_MIN here would cause signed-integer
-	// overflow when the hysteresis check evaluates `miVisibleAreaZoomBucket - 1`.
-	int miVisibleAreaZoomBucket = 0;
+	// Zero is below every real eye-distance bucket, forcing the first update while keeping adjacent-bucket hysteresis arithmetic in range.
+	int64_t miVisibleAreaZoomBucket = 0;
 	uint32_t muiVisibleAreaLatchKey = 0;
 };
 

@@ -8,27 +8,27 @@ namespace engine
 // Specular - Normals (per-sample row layout: chevron | size | weight-min | weight-max | rotation | speed-min | speed-max | speed-direction)
 extern Wrapper gWaterNormalIndexOne;
 extern Wrapper gLightingSampledNormalsOneSize;
-extern Wrapper gLightingSampledNormalsWeightOneMin;
-extern Wrapper gLightingSampledNormalsWeightOneMax;
+extern Wrapper gLightingSampledNormalsWeightOneMinimum;
+extern Wrapper gLightingSampledNormalsWeightOneMaximum;
 extern Wrapper gWaterNormalRotationOne;
-extern Wrapper gLightingSampledNormalsSpeedOneMin;
-extern Wrapper gLightingSampledNormalsSpeedOneMax;
+extern Wrapper gLightingSampledNormalsSpeedOneMinimum;
+extern Wrapper gLightingSampledNormalsSpeedOneMaximum;
 extern Wrapper gWaterNormalSpeedDirectionOne;
 extern Wrapper gWaterNormalIndexTwo;
 extern Wrapper gLightingSampledNormalsTwoSize;
-extern Wrapper gLightingSampledNormalsWeightTwoMin;
-extern Wrapper gLightingSampledNormalsWeightTwoMax;
+extern Wrapper gLightingSampledNormalsWeightTwoMinimum;
+extern Wrapper gLightingSampledNormalsWeightTwoMaximum;
 extern Wrapper gWaterNormalRotationTwo;
-extern Wrapper gLightingSampledNormalsSpeedTwoMin;
-extern Wrapper gLightingSampledNormalsSpeedTwoMax;
+extern Wrapper gLightingSampledNormalsSpeedTwoMinimum;
+extern Wrapper gLightingSampledNormalsSpeedTwoMaximum;
 extern Wrapper gWaterNormalSpeedDirectionTwo;
 extern Wrapper gWaterNormalIndexThree;
 extern Wrapper gLightingSampledNormalsThreeSize;
-extern Wrapper gLightingSampledNormalsWeightThreeMin;
-extern Wrapper gLightingSampledNormalsWeightThreeMax;
+extern Wrapper gLightingSampledNormalsWeightThreeMinimum;
+extern Wrapper gLightingSampledNormalsWeightThreeMaximum;
 extern Wrapper gWaterNormalRotationThree;
-extern Wrapper gLightingSampledNormalsSpeedThreeMin;
-extern Wrapper gLightingSampledNormalsSpeedThreeMax;
+extern Wrapper gLightingSampledNormalsSpeedThreeMinimum;
+extern Wrapper gLightingSampledNormalsSpeedThreeMaximum;
 extern Wrapper gWaterNormalSpeedDirectionThree;
 extern Wrapper gWaterDepthReflectionFeather;
 extern Wrapper gWaterWaveNormalBlend;
@@ -46,11 +46,11 @@ extern Wrapper gLightingWaterSkyboxTwo;
 extern Wrapper gLightingWaterSkyboxTwoPower;
 extern Wrapper gLightingWaterSkyboxThree;
 extern Wrapper gLightingWaterSkyboxThreePower;
-extern Wrapper gLightingWaterSkyboxLod;
-extern Wrapper gWaterSpecAAVariance;
-extern Wrapper gWaterSpecAAThreshold;
-extern Wrapper gWaterSpecAAMipScale;
-extern Wrapper gWaterNormalMipBias;
+extern Wrapper gLightingWaterSkyboxLevelOfDetail;
+extern Wrapper gWaterSpecularAntialiasingVariance;
+extern Wrapper gWaterSpecularAntialiasingThreshold;
+extern Wrapper gWaterSpecularAntialiasingMipmapScale;
+extern Wrapper gWaterNormalMipmapBias;
 
 // Specular - Height Darken
 extern Wrapper gWaterHeightDarkenTop;
@@ -61,7 +61,7 @@ extern Wrapper gWaterHeightDarkenLighting;
 
 // Low frequency waves
 extern Wrapper gWaterLowCount; // wave-count radio selector, not slider-mapped
-extern Wrapper gWaterLowMax;
+extern Wrapper gWaterLowMaximum;
 extern Wrapper gWaterLowAngle;
 extern Wrapper gWaterLowWavelength;
 extern Wrapper gWaterLowAmplitude;
@@ -93,9 +93,9 @@ extern Wrapper gWaterTerrainFade;
 extern Wrapper gWaterTerrainFadeClamp;
 extern Wrapper gWaterHeight;
 extern Wrapper gWaterEarlyOut;
-extern Wrapper gWaterDepthLutFeather;
-extern Wrapper gWaterDepthLutSunsetFadePower;
-extern Wrapper gWaterDepthLutSunsetFadeIntensity;
+extern Wrapper gWaterDepthLookupTableFeather;
+extern Wrapper gWaterDepthLookupTableSunsetFadePower;
+extern Wrapper gWaterDepthLookupTableSunsetFadeIntensity;
 extern Wrapper gWaterDepthColorFeather;
 extern Wrapper gWaterDepthColorFloor;
 extern Wrapper gWaterUnderseaCompression;

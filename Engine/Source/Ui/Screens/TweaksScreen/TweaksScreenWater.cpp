@@ -13,25 +13,25 @@ const TweaksSliderMapRegistrar gWaterRegistrar
 {
 	// Specular - Normals (per-sample row layout: chevron | size | weight-min | weight-max | rotation | speed-min | speed-max | speed-direction)
 	{"Size 1", &gLightingSampledNormalsOneSize},
-	{"Weight Min 1", &gLightingSampledNormalsWeightOneMin},
-	{"Weight Max 1", &gLightingSampledNormalsWeightOneMax},
+	{"Weight Min 1", &gLightingSampledNormalsWeightOneMinimum},
+	{"Weight Max 1", &gLightingSampledNormalsWeightOneMaximum},
 	{"Rotation 1", &gWaterNormalRotationOne},
-	{"Speed Min 1", &gLightingSampledNormalsSpeedOneMin},
-	{"Speed Max 1", &gLightingSampledNormalsSpeedOneMax},
+	{"Speed Min 1", &gLightingSampledNormalsSpeedOneMinimum},
+	{"Speed Max 1", &gLightingSampledNormalsSpeedOneMaximum},
 	{"Speed Direction 1", &gWaterNormalSpeedDirectionOne},
 	{"Size 2", &gLightingSampledNormalsTwoSize},
-	{"Weight Min 2", &gLightingSampledNormalsWeightTwoMin},
-	{"Weight Max 2", &gLightingSampledNormalsWeightTwoMax},
+	{"Weight Min 2", &gLightingSampledNormalsWeightTwoMinimum},
+	{"Weight Max 2", &gLightingSampledNormalsWeightTwoMaximum},
 	{"Rotation 2", &gWaterNormalRotationTwo},
-	{"Speed Min 2", &gLightingSampledNormalsSpeedTwoMin},
-	{"Speed Max 2", &gLightingSampledNormalsSpeedTwoMax},
+	{"Speed Min 2", &gLightingSampledNormalsSpeedTwoMinimum},
+	{"Speed Max 2", &gLightingSampledNormalsSpeedTwoMaximum},
 	{"Speed Direction 2", &gWaterNormalSpeedDirectionTwo},
 	{"Size 3", &gLightingSampledNormalsThreeSize},
-	{"Weight Min 3", &gLightingSampledNormalsWeightThreeMin},
-	{"Weight Max 3", &gLightingSampledNormalsWeightThreeMax},
+	{"Weight Min 3", &gLightingSampledNormalsWeightThreeMinimum},
+	{"Weight Max 3", &gLightingSampledNormalsWeightThreeMaximum},
 	{"Rotation 3", &gWaterNormalRotationThree},
-	{"Speed Min 3", &gLightingSampledNormalsSpeedThreeMin},
-	{"Speed Max 3", &gLightingSampledNormalsSpeedThreeMax},
+	{"Speed Min 3", &gLightingSampledNormalsSpeedThreeMinimum},
+	{"Speed Max 3", &gLightingSampledNormalsSpeedThreeMaximum},
 	{"Speed Direction 3", &gWaterNormalSpeedDirectionThree},
 	{"Depth Reflection Feather", &gWaterDepthReflectionFeather},
 	{"Wave Normal Blend (Global)", &gWaterWaveNormalBlend},
@@ -48,11 +48,11 @@ const TweaksSliderMapRegistrar gWaterRegistrar
 	{"Skybox 2 Power", &gLightingWaterSkyboxTwoPower},
 	{"Skybox 3", &gLightingWaterSkyboxThree},
 	{"Skybox 3 Power", &gLightingWaterSkyboxThreePower},
-	{"Skybox Lod", &gLightingWaterSkyboxLod},
-	{"Spec AA Variance", &gWaterSpecAAVariance},
-	{"Spec AA Threshold", &gWaterSpecAAThreshold},
-	{"Spec AA Mip Scale", &gWaterSpecAAMipScale},
-	{"Normal Mip Bias", &gWaterNormalMipBias},
+	{"Skybox Lod", &gLightingWaterSkyboxLevelOfDetail},
+	{"Spec AA Variance", &gWaterSpecularAntialiasingVariance},
+	{"Spec AA Threshold", &gWaterSpecularAntialiasingThreshold},
+	{"Spec AA Mip Scale", &gWaterSpecularAntialiasingMipmapScale},
+	{"Normal Mip Bias", &gWaterNormalMipmapBias},
 	// Specular - Height Darken
 	{"Height Darken Top", &gWaterHeightDarkenTop},
 	{"Height Darken Bottom", &gWaterHeightDarkenBottom},
@@ -60,7 +60,7 @@ const TweaksSliderMapRegistrar gWaterRegistrar
 	{"Height Darken Source", &gWaterHeightDarkenSource},
 	{"Height Darken Lighting", &gWaterHeightDarkenLighting},
 	// Low - Wave
-	{"Low Max", &gWaterLowMax},
+	{"Low Max", &gWaterLowMaximum},
 	{"Angle", &gWaterLowAngle},
 	{"Wavelength", &gWaterLowWavelength},
 	{"Amplitude", &gWaterLowAmplitude},
@@ -93,9 +93,9 @@ const TweaksSliderMapRegistrar gWaterRegistrar
 	{"Water Terrain Fade Clamp", &gWaterTerrainFadeClamp},
 	{"Water Height", &gWaterHeight},
 	{"Water Early Out", &gWaterEarlyOut},
-	{"Water Depth Lut Feather", &gWaterDepthLutFeather},
-	{"Water Depth Lut Sunset Fade Power", &gWaterDepthLutSunsetFadePower},
-	{"Water Depth Lut Sunset Fade Intensity", &gWaterDepthLutSunsetFadeIntensity},
+	{"Water Depth Lut Feather", &gWaterDepthLookupTableFeather},
+	{"Water Depth Lut Sunset Fade Power", &gWaterDepthLookupTableSunsetFadePower},
+	{"Water Depth Lut Sunset Fade Intensity", &gWaterDepthLookupTableSunsetFadeIntensity},
 	{"Water Depth Color Feather", &gWaterDepthColorFeather},
 	{"Water Depth Color Floor", &gWaterDepthColorFloor},
 	{"Undersea Compression", &gWaterUnderseaCompression},
@@ -131,7 +131,7 @@ void RenderWaterSection(TweaksScreenBase& rScreen)
 				ImGui::TableNextColumn();
 
 				rScreen.WrapperSeparatorText("Normals");
-				rScreen.ChevronIndexSelector("Sample 1", gWaterNormalIndexOne, TextureManager::kpWaterNormalNames, TextureManager::kiWaterNormalCount);
+				rScreen.ChevronIndexSelector("Sample 1", gWaterNormalIndexOne, TextureManager::kpWaterNormalNames);
 				rScreen.WrapperSlider("Size 1", iSection, 1.0f);
 				rScreen.WrapperSlider("Weight Min 1", iSection, 1.0f);
 				rScreen.WrapperSlider("Weight Max 1", iSection, 1.0f);
@@ -140,7 +140,7 @@ void RenderWaterSection(TweaksScreenBase& rScreen)
 				rScreen.WrapperSlider("Speed Max 1", iSection, 1.0f);
 				rScreen.WrapperSlider("Speed Direction 1", iSection, 1.0f);
 
-				rScreen.ChevronIndexSelector("Sample 2", gWaterNormalIndexTwo, TextureManager::kpWaterNormalNames, TextureManager::kiWaterNormalCount);
+				rScreen.ChevronIndexSelector("Sample 2", gWaterNormalIndexTwo, TextureManager::kpWaterNormalNames);
 				rScreen.WrapperSlider("Size 2", iSection, 1.0f);
 				rScreen.WrapperSlider("Weight Min 2", iSection, 1.0f);
 				rScreen.WrapperSlider("Weight Max 2", iSection, 1.0f);
@@ -149,7 +149,7 @@ void RenderWaterSection(TweaksScreenBase& rScreen)
 				rScreen.WrapperSlider("Speed Max 2", iSection, 1.0f);
 				rScreen.WrapperSlider("Speed Direction 2", iSection, 1.0f);
 
-				rScreen.ChevronIndexSelector("Sample 3", gWaterNormalIndexThree, TextureManager::kpWaterNormalNames, TextureManager::kiWaterNormalCount);
+				rScreen.ChevronIndexSelector("Sample 3", gWaterNormalIndexThree, TextureManager::kpWaterNormalNames);
 				rScreen.WrapperSlider("Size 3", iSection, 1.0f);
 				rScreen.WrapperSlider("Weight Min 3", iSection, 1.0f);
 				rScreen.WrapperSlider("Weight Max 3", iSection, 1.0f);

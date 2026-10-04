@@ -82,7 +82,7 @@ vec3 SunLighting(vec3 f3MaterialColor, GlobalLayout globalLayout, vec4 f4Positio
 	float fNdotL = max(0.0f, dot(f3Normal, globalLayout.f4SunMoonNormal.xyz));
 	vec3 f3SunLight  = fShadowSun  * fNdotL * f3Sun;
 	vec3 f3MoonLight = fShadowMoon * fNdotL * f3Moon;
-	float fAmbientShadow = (globalLayout.fSunMagTerrain * fShadowSun + globalLayout.fMoonMagTerrain * fShadowMoon) * globalLayout.fSunMoonMagSumInvTerrain;
+	float fAmbientShadow = (globalLayout.fSunMagnitudeTerrain * fShadowSun + globalLayout.fMoonMagnitudeTerrain * fShadowMoon) * globalLayout.fSunMoonMagnitudeSumInverseTerrain;
 	return f3MaterialColor * fAmbientOcclusion * (max(f3SunLight, f3MoonLight) + globalLayout.f4AmbientUnshadowed.xyz + fAmbientShadow * globalLayout.f4AmbientShadowed.xyz);
 }
 
@@ -154,8 +154,7 @@ vec3 DirectionalLighting(vec4 pf4Lighting[3], vec3 f3Normal, float fIntensity, f
 
 vec3 WaterLighting(vec4 pf4Lighting[3], vec3 f3Normal, float fSoften, float fOne, float fOnePower, float fTwo, float fTwoPower, float fThree, float fThreePower, float fPowerMode)
 {
-	// Guard exact (0,0,1) normals (flat-top geometry): normalize() of a zero-length xy NaNs. Zero weights = no
-	// directional contribution, the intended degenerate behavior.
+	// Zero-length xy normals use a zero direction to avoid undefined normalization; fSoften blends the resulting zero weights toward 0.25f.
 	float fLen = length(f3Normal.xy);
 	vec2 f2Normal = fLen > kfEpsilon ? f3Normal.xy / fLen : vec2(0.0f);
 	float fWeightE = mix(max(0.0f, f2Normal.x), 0.25f, fSoften);

@@ -9,7 +9,7 @@ namespace game
 
 struct Frame;
 
-}
+} // namespace game
 
 namespace engine
 {
@@ -50,35 +50,36 @@ public:
 	void Update(const game::Frame* pFrame);
 
 	void PlayOneShot(const game::Frame& rFrame, common::crc_t uiAudioCrc, bool b3d, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
-	// vecLocalPosition is local to emitterCoord; the mix converts it against the listener's own cell.
-	void XM_CALLCONV PlayOneShot3d(const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoord, FXMVECTOR vecLocalPosition, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
+	// vecLocalPosition is local to emitterCoordinate; the mix converts it against the listener's own cell.
+	void XM_CALLCONV PlayOneShot3d(const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoordinate, FXMVECTOR vecLocalPosition, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
 
 	void PlayMusic(common::crc_t uiAudioCrc);
-	void SetNextMusicTrackCallback(std::function<common::crc_t()> callback);
-
-	void SkipNextStaticVoiceInvalidation();
 
 	void Suspend();
 	void Resume();
 
-	// IVoiceNotify
-	void OnBufferEnd() override {}
+	void OnBufferEnd() override
+	{
+	}
 	void OnCriticalError() override;
 	void OnReset() override;
-	void OnUpdate() override {}
+	void OnUpdate() override
+	{
+	}
 	void OnDestroyEngine() noexcept override;
 	void OnTrim() override;
-	void GatherStatistics([[maybe_unused]] AudioStatistics& rStats) const override {}
+	void GatherStatistics([[maybe_unused]] AudioStatistics& rStatistics) const override
+	{
+	}
 	void OnDestroyParent() noexcept override;
 
 private:
 
-	std::wstring GetEndpointId(IMMDevice* pDevice);
-	void CreateAudioEngineForEndpoint(const std::wstring& rEndpointId);
+	std::wstring GetEndpointIdentifier(IMMDevice* pDevice);
 	std::wstring InitializeAudioEndpoint();
-	void InitializeAudioSubsystems(const std::wstring& rSelectedDeviceId);
+	void InitializeAudioSubsystems(const wchar_t* pcSelectedDeviceIdentifier);
 	WAVEFORMATEX MakePinnedOutputFormat(WORD uiChannels) const;
-	void ConfigureLiveGraph(const std::wstring& rSelectedDeviceId);
+	void ConfigureLiveGraph(const wchar_t* pcSelectedDeviceIdentifier);
 	void FinishDeviceReset();
 	void AttemptSilentEngineRecovery();
 	void CacheMasteringVoiceChannels();
@@ -86,13 +87,14 @@ private:
 
 	common::Timer mRealTime;
 	std::unique_ptr<AudioEngine> mpAudioEngine;
+public:
 	// Declared after mpAudioEngine so both are destroyed first: they retain its raw pointer.
 	std::unique_ptr<StaticVoices> mpStaticVoices;
+	std::unique_ptr<StreamingVoices> mpStreamingVoices;
+private:
 #if defined(BT_DEBUG)
 public:
 #endif
-	std::unique_ptr<StreamingVoices> mpStreamingVoices;
-
 	std::atomic<bool> mbSuspended = false;
 private:
 	std::atomic<bool> mbClearVoicesRequested = false;
@@ -103,8 +105,6 @@ private:
 	// the rate pin survives Reset — DirectXTK does not cache the ctor wfx.
 	WAVEFORMATEX mPinnedOutputFormat {};
 
-	// State bits (pinned-format validity, silent-recovery log-once, expected-reset suppression); see the
-	// AudioManagerFlags enumerators for each bit's contract.
 	AudioManagerFlags_t mFlags;
 
 	// Silent-start recovery throttle counter: gates probe frequency (kiSilentRecoveryRetryFrames) so a

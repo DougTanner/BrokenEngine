@@ -3,13 +3,14 @@
 #if defined(BT_CLIENT)
 
 #include "File/FileManager.h"
+#include "File/PackChunks.h"
 
 namespace engine
 {
 
 using enum StaticVoiceFlags;
 
-bool StaticVoice::LoadXAudio2SourceVoice(AudioEngine* pAudioEngine, IXAudio2SourceVoice*& rpVoice, common::crc_t audioCrc, LoadVoiceFlags_t flags)
+bool StaticVoice::LoadXAudio2SourceVoice(AudioEngine* pAudioEngine, IXAudio2SourceVoice*& rpVoice, common::crc_t uiAudioCrc, LoadVoiceFlags_t flags)
 {
 	bool bOneShot = flags & LoadVoiceFlags::kOneShot;
 	bool b3d = flags & LoadVoiceFlags::k3d;
@@ -20,13 +21,13 @@ bool StaticVoice::LoadXAudio2SourceVoice(AudioEngine* pAudioEngine, IXAudio2Sour
 		return false;
 	}
 
-	if (!gpFileManager->IsChunkReady(audioCrc))
+	if (!gpFileManager->mpPackChunks->IsChunkReady(uiAudioCrc))
 	{
-		gpFileManager->RequestChunkLoad(std::to_array<common::crc_t>({audioCrc}), LoadPriority::kHigh);
+		gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(std::to_array<common::crc_t>({uiAudioCrc}), LoadPriority::kHigh);
 		return false;
 	}
 
-	const LazyChunk& rLazyChunk = gpFileManager->GetLazyChunkMap().at(audioCrc);
+	const LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(uiAudioCrc);
 	AssertValidPackedAudio(rLazyChunk.header.audioHeader.waveFormat, rLazyChunk.header.iSize, rLazyChunk.iDataSize);
 
 	// 3d sounds should have only one channel, re-export the sound as mono
@@ -36,7 +37,7 @@ bool StaticVoice::LoadXAudio2SourceVoice(AudioEngine* pAudioEngine, IXAudio2Sour
 	if (rpVoice == nullptr)
 	{
 		char pcHex[20] {};
-		LOG(kAudio, kWarning, "StaticVoice::LoadXAudio2SourceVoice AllocateVoice failed for CRC {}", common::ToHex(std::span(pcHex), audioCrc));
+		LOG(kAudio, kWarning, "StaticVoice::LoadXAudio2SourceVoice AllocateVoice failed for CRC {}", common::ToHex(std::span(pcHex), uiAudioCrc));
 		return false;
 	}
 
@@ -59,20 +60,19 @@ bool StaticVoice::LoadXAudio2SourceVoice(AudioEngine* pAudioEngine, IXAudio2Sour
 	return true;
 }
 
-StaticVoice::StaticVoice(IXAudio2SourceVoice* pVoice, sound_t id, float fVolume, float fPitch, float fFadeOutTime, FXMVECTOR vecPosition, FXMVECTOR vecVelocity, common::crc_t audioCrc)
+StaticVoice::StaticVoice(IXAudio2SourceVoice* pVoice, sound_t id, float fVolume, float fPitch, float fFadeOutTime, FXMVECTOR vecPosition, FXMVECTOR vecVelocity, common::crc_t uiAudioCrc)
 : mpVoice(pVoice)
 , mId(id)
 , mfVolume(fVolume)
 , mfPitch(fPitch)
-, mfFadeVolume(1.0f)
 , mfFadeOutTime(fFadeOutTime)
 , mVecPosition(vecPosition)
 , mVecVelocity(vecVelocity)
-, mAudioCrc(audioCrc)
+, muiAudioCrc(uiAudioCrc)
 {
 	ASSERT(mfFadeOutTime > 0.0f);
 
-	// Start silent and let the same-frame Apply3dVolume (at the creation site / UpdateVolumes)
+	// Start silent and let the same-frame ApplyThreeDimensionalVolume (at the creation site / UpdateVolumes)
 	// establish the attenuated 3D mix — matches the reactivation path's SetVolume(0) before Start,
 	// so the voice's first rendered quantum is never audible at the un-attenuated 2D volume.
 	CHECK_HRESULT(mpVoice->SetVolume(0.0f));
@@ -101,7 +101,7 @@ StaticVoice& StaticVoice::operator=(StaticVoice&& rToMove) noexcept
 		mfFadeOutTime = rToMove.mfFadeOutTime;
 		mVecPosition = rToMove.mVecPosition;
 		mVecVelocity = rToMove.mVecVelocity;
-		mAudioCrc = rToMove.mAudioCrc;
+		muiAudioCrc = rToMove.muiAudioCrc;
 
 		ASSERT(mpVoice == nullptr);
 		mpVoice = rToMove.mpVoice;

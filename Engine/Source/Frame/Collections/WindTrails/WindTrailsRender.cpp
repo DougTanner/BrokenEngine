@@ -2,6 +2,8 @@
 
 #if defined(BT_CLIENT)
 
+#include "Data/Shader.h"
+#include "Graphics/Objects/PipelineDescriptorWriter.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
@@ -13,8 +15,8 @@ static int64_t siRendered = 0;
 void WindTrailsInterpolate::GraphicsResources()
 {
 	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::QuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreatePipelineWindDepositA(kuiCrc, kpcName, sizeof(shaders::QuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreatePipelineWindDepositB(kuiCrc, kpcName);
+	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositA, kuiCrc, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc}, &gpBufferManager->mWindOccupancyVkBuffers[0], sizeof(shaders::QuadLayout));
+	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositB, kuiCrc, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureTwo, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc}, &gpBufferManager->mWindOccupancyVkBuffers[1], 0);
 }
 
 void WindTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
@@ -43,8 +45,8 @@ void WindTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::QuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositA].at(kuiCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 1, pBuffer);
-		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositB].at(kuiCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 1, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositA].at(kuiCrc), iCommandBuffer, 1, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositB].at(kuiCrc), iCommandBuffer, 1, pBuffer);
 	}
 }
 
@@ -122,21 +124,21 @@ void WindTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 			XMFLOAT4A f4Vertex {};
 
 			XMStoreFloat4A(&f4Vertex, vecFrontLeft);
-			pQuadLayouts[siRendered].pf4VerticesTexcoords[0] = {f4Vertex.x, f4Vertex.y, 0.0f, 1.0f};
+			pQuadLayouts[siRendered].pf4VerticesTextureCoordinates[0] = {f4Vertex.x, f4Vertex.y, 0.0f, 1.0f};
 			XMStoreFloat4A(&f4Vertex, vecFrontRight);
-			pQuadLayouts[siRendered].pf4VerticesTexcoords[1] = {f4Vertex.x, f4Vertex.y, 1.0f, 1.0f};
+			pQuadLayouts[siRendered].pf4VerticesTextureCoordinates[1] = {f4Vertex.x, f4Vertex.y, 1.0f, 1.0f};
 			XMStoreFloat4A(&f4Vertex, vecBackLeft);
-			pQuadLayouts[siRendered].pf4VerticesTexcoords[2] = {f4Vertex.x, f4Vertex.y, 0.0f, 0.0f};
+			pQuadLayouts[siRendered].pf4VerticesTextureCoordinates[2] = {f4Vertex.x, f4Vertex.y, 0.0f, 0.0f};
 			XMStoreFloat4A(&f4Vertex, vecBackRight);
-			pQuadLayouts[siRendered].pf4VerticesTexcoords[3] = {f4Vertex.x, f4Vertex.y, 1.0f, 0.0f};
+			pQuadLayouts[siRendered].pf4VerticesTextureCoordinates[3] = {f4Vertex.x, f4Vertex.y, 1.0f, 0.0f};
 
 			XMFLOAT4A f4Parameters = {fIntensity, fWindDirectionX, fWindDirectionY, 0.0f};
-			pQuadLayouts[siRendered].pf4Params[0] = f4Parameters;
-			pQuadLayouts[siRendered].pf4Params[1] = f4Parameters;
-			pQuadLayouts[siRendered].pf4Params[2] = f4Parameters;
-			pQuadLayouts[siRendered].pf4Params[3] = f4Parameters;
+			pQuadLayouts[siRendered].pf4Parameters[0] = f4Parameters;
+			pQuadLayouts[siRendered].pf4Parameters[1] = f4Parameters;
+			pQuadLayouts[siRendered].pf4Parameters[2] = f4Parameters;
+			pQuadLayouts[siRendered].pf4Parameters[3] = f4Parameters;
 
-			pQuadLayouts[siRendered].f4Params = {};
+			pQuadLayouts[siRendered].f4Parameters = {};
 			pQuadLayouts[siRendered].uiColor = 0xFFFFFFFF;
 
 			++siRendered;

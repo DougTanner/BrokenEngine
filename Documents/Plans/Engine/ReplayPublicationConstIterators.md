@@ -3,17 +3,17 @@
 
 ## Context
 
-`ServerBroadcaster::BuildTickPublication` in `Engine/Source/Network/Server/ServerBroadcaster.cpp:87` defines `ForEachPublicationCoord`. Its replay branch visits `game::gpGame->mActiveCoords` with mutable vector iterators, although it only reads coordinates. A prefix `std::find` emits each coordinate at its first occurrence. The loop's current iterator is needed as the prefix endpoint, so retaining the iterator loop expresses the algorithm directly.
+`ServerBroadcaster::BuildTickPublication` in `Engine/Source/Network/Server/ServerBroadcaster.cpp:87` defines `ForEachPublicationCoord`. Its replay branch visits `game::gpGame->mActiveCoordinates` with mutable vector iterators, although it only reads coordinates. A prefix `std::find` emits each coordinate at its first occurrence. The loop's current iterator is needed as the prefix endpoint, so retaining the iterator loop expresses the algorithm directly.
 
-`Engine/Source/GameBase.h:276` declares `mActiveCoords` as `std::vector<GridCoord>`. `Engine/Source/Frame/GridCoord.h:11` provides const defaulted equality. Both callback instantiations accept `const engine::GridCoord&`: the first counts coordinates/status changes, and the second copies coordinates into publication storage. Neither mutates the source vector. Const iterators therefore express the existing read-only contract with no new machinery or runtime work.
+`Engine/Source/GameBase.h:276` declares `mActiveCoordinates` as `std::vector<GridCoord>`. `Engine/Source/Frame/GridCoord.h:11` provides const defaulted equality. Both callback instantiations accept `const engine::GridCoord&`: the first counts coordinates/status changes, and the second copies coordinates into publication storage. Neither mutates the source vector. Const iterators therefore express the existing read-only contract with no new machinery or runtime work.
 
 ## Design
 
 In the replay-only iterator loop inside `ForEachPublicationCoord`, make exactly these three accessor substitutions together:
 
-1. Initialize `it` from `game::gpGame->mActiveCoords.cbegin()` instead of `begin()`.
-2. Compare `it` against `game::gpGame->mActiveCoords.cend()` instead of `end()`.
-3. Pass `game::gpGame->mActiveCoords.cbegin()` as the first argument to `std::find` instead of `begin()`.
+1. Initialize `it` from `game::gpGame->mActiveCoordinates.cbegin()` instead of `begin()`.
+2. Compare `it` against `game::gpGame->mActiveCoordinates.cend()` instead of `end()`.
+3. Pass `game::gpGame->mActiveCoordinates.cbegin()` as the first argument to `std::find` instead of `begin()`.
 
 Keep `auto`, `++it`, the prefix endpoint `it`, the searched value `*it`, the equality against `it`, and `rCallback(*it)` unchanged. Updating both `begin()` calls keeps the two `std::find` iterator arguments the same type.
 

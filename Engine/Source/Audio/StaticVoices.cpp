@@ -10,7 +10,7 @@
 namespace engine
 {
 
-void StaticVoices::Init(AudioEngine* pAudioEngine, const int64_t* piMasteringVoiceChannels)
+void StaticVoices::Initialize(AudioEngine* pAudioEngine, const int64_t* piMasteringVoiceChannels)
 {
 	mpAudioEngine = pAudioEngine;
 	mpiMasteringVoiceChannels = piMasteringVoiceChannels;
@@ -18,7 +18,7 @@ void StaticVoices::Init(AudioEngine* pAudioEngine, const int64_t* piMasteringVoi
 	mVoices.reserve(kiMaxStaticVoices + kiMaxFadeOutPool);
 }
 
-void StaticVoices::PlayOneShot([[maybe_unused]] const game::Frame& rFrame, common::crc_t uiAudioCrc, bool b3d, float fVolume, float fPitch, float fPitchRange)
+void StaticVoices::PlayOneShot([[maybe_unused]] const game::Frame& rFrame, common::crc_t uiAudioCrc, bool bThreeDimensional, float fVolume, float fPitch, float fPitchRange)
 {
 	ASSERT(rFrame.interpolate.frameFlags & FrameFlags::kPostRender);
 
@@ -35,23 +35,28 @@ void StaticVoices::PlayOneShot([[maybe_unused]] const game::Frame& rFrame, commo
 	}
 
 	std::lock_guard<std::mutex> lock(mOneShotMutex);
-	PlayOneShotLocked(uiAudioCrc, b3d, fVolume, fPitch, fPitchRange);
+	PlayOneShotLocked(uiAudioCrc, bThreeDimensional, fVolume, fPitch, fPitchRange);
 }
 
-IXAudio2SourceVoice* StaticVoices::PlayOneShotLocked(common::crc_t uiAudioCrc, bool b3d, float fVolume, float& rfPitch, float fPitchRange)
+IXAudio2SourceVoice* StaticVoices::PlayOneShotLocked(common::crc_t uiAudioCrc, bool bThreeDimensional, float fVolume, float& rfPitch, float fPitchRange)
 {
 	// Heap: AllocateVoice creates an XAudio2 source voice that persists until playback ends.
 	// XAudio2 owns the allocation internally, so workbuffer and pre-allocation are not possible.
 	ScopedSuppressAllocationTracking suppress;
 
-	if (mpAudioEngine == nullptr || !mpAudioEngine->IsAudioDevicePresent()) [[unlikely]]
+	if (mpAudioEngine == nullptr) [[unlikely]]
+	{
+		return nullptr;
+	}
+
+	if (!mpAudioEngine->IsAudioDevicePresent()) [[unlikely]]
 	{
 		return nullptr;
 	}
 
 	IXAudio2SourceVoice* pIXAudio2SourceVoice = nullptr;
 	LoadVoiceFlags_t loadFlags(LoadVoiceFlags::kOneShot);
-	loadFlags.Set(LoadVoiceFlags::k3d, b3d);
+	loadFlags.Set(LoadVoiceFlags::k3d, bThreeDimensional);
 	if (!StaticVoice::LoadXAudio2SourceVoice(mpAudioEngine, pIXAudio2SourceVoice, uiAudioCrc, loadFlags))
 	{
 		return nullptr;
@@ -62,9 +67,9 @@ IXAudio2SourceVoice* StaticVoices::PlayOneShotLocked(common::crc_t uiAudioCrc, b
 		rfPitch += common::Random(fPitchRange, mRandomEngine);
 	}
 
-	if (!b3d)
+	if (!bThreeDimensional)
 	{
-		CHECK_HRESULT(pIXAudio2SourceVoice->SetVolume(VolumeToPower(gMasterVolume.Get(), gSoundVolume.Get(), fVolume)));
+		CHECK_HRESULT(pIXAudio2SourceVoice->SetVolume(VolumeToPower(gMasterVolume.mfCurrent, gSoundVolume.mfCurrent, fVolume)));
 	}
 	CHECK_HRESULT(pIXAudio2SourceVoice->SetFrequencyRatio(SnapFrequencyRatio(rfPitch)));
 	CHECK_HRESULT(pIXAudio2SourceVoice->Start(0, XAUDIO2_COMMIT_NOW));
@@ -72,18 +77,22 @@ IXAudio2SourceVoice* StaticVoices::PlayOneShotLocked(common::crc_t uiAudioCrc, b
 	return pIXAudio2SourceVoice;
 }
 
-void XM_CALLCONV StaticVoices::PlayOneShot3d([[maybe_unused]] const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoord, FXMVECTOR vecLocalPosition, float fVolume, float fPitch, float fPitchRange)
+void XM_CALLCONV StaticVoices::PlayOneShotThreeDimensional([[maybe_unused]] const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoordinate, FXMVECTOR vecLocalPosition, float fVolume, float fPitch, float fPitchRange)
 {
 	ASSERT(rFrame.interpolate.frameFlags & FrameFlags::kPostRender);
 
-	// Hoisted above the RNG advance and the lock so replay ticks never mutate audio state
-	// (the documented replay invariant) and a suspended client does no extra work.
+	// Replay ticks return before pitch randomization or locking so they do not mutate audio state.
 	if (rFrame.interpolate.frameFlags & FrameFlags::kRecalculated)
 	{
 		return;
 	}
 
-	if (mpAudioEngine == nullptr || !mpAudioEngine->IsAudioDevicePresent()) [[unlikely]]
+	if (mpAudioEngine == nullptr) [[unlikely]]
+	{
+		return;
+	}
+
+	if (!mpAudioEngine->IsAudioDevicePresent()) [[unlikely]]
 	{
 		return;
 	}
@@ -97,7 +106,7 @@ void XM_CALLCONV StaticVoices::PlayOneShot3d([[maybe_unused]] const game::Frame&
 
 	// The emitter position arrives local to its own cell: this is the one point that moves it into the listener's
 	// cell, and the mix below reuses that converted value.
-	XMVECTOR vecPosition = Rebase(MakeRenderBasis(emitterCoord, mListenerCoord), vecLocalPosition);
+	XMVECTOR vecPosition = Rebase(MakeRenderBasis(emitterCoordinate, mListenerCoordinate), vecLocalPosition);
 
 	// Hard-cull inaudible one-shots before grabbing a voice slot. Uses the same curve
 	// as the persistent priority pass so behaviour is consistent across both paths.
@@ -109,31 +118,31 @@ void XM_CALLCONV StaticVoices::PlayOneShot3d([[maybe_unused]] const game::Frame&
 
 	std::lock_guard<std::mutex> lock(mOneShotMutex);
 
-	// PlayOneShotLocked randomizes fPitch in place so Apply3dVolume's SetFrequencyRatio
+	// PlayOneShotLocked randomizes fPitch in place so ApplyThreeDimensionalVolume's SetFrequencyRatio
 	// uses the same randomized ratio rather than overwriting it with the base pitch.
 	IXAudio2SourceVoice* pIXAudio2SourceVoice = PlayOneShotLocked(uiAudioCrc, true, fVolume, fPitch, fPitchRange);
 	if (pIXAudio2SourceVoice != nullptr)
 	{
-		Apply3dVolume(pIXAudio2SourceVoice, vecPosition, XMVectorZero(), fVolume, fPitch);
+		ApplyThreeDimensionalVolume(pIXAudio2SourceVoice, vecPosition, XMVectorZero(), fVolume, fPitch);
 	}
 }
 
-void StaticVoices::ReturnVoiceToPool(common::crc_t audioCrc, IXAudio2SourceVoice* pVoice)
+void StaticVoices::ReturnVoiceToPool(common::crc_t uiAudioCrc, IXAudio2SourceVoice* pVoice)
 {
 	pVoice->Stop(0, XAUDIO2_COMMIT_NOW);
-	mPooledVoices.push_back({audioCrc, pVoice});
+	mPooledVoices.push_back({.uiAudioCrc = uiAudioCrc, .pVoice = pVoice});
 }
 
-IXAudio2SourceVoice* StaticVoices::AcquireVoiceFromPool(common::crc_t audioCrc)
+IXAudio2SourceVoice* StaticVoices::AcquireVoiceFromPool(common::crc_t uiAudioCrc)
 {
-	for (size_t i = 0; i < mPooledVoices.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(mPooledVoices); ++i)
 	{
-		if (mPooledVoices[i].mAudioCrc == audioCrc)
+		if (mPooledVoices.at(i).uiAudioCrc == uiAudioCrc)
 		{
-			IXAudio2SourceVoice* pVoice = mPooledVoices[i].mpVoice;
-			if (i < mPooledVoices.size() - 1)
+			IXAudio2SourceVoice* pVoice = mPooledVoices.at(i).pVoice;
+			if (i < std::ssize(mPooledVoices) - 1)
 			{
-				mPooledVoices[i] = mPooledVoices.back();
+				mPooledVoices.at(i) = mPooledVoices.back();
 			}
 			mPooledVoices.pop_back();
 			return pVoice;
@@ -173,7 +182,7 @@ void StaticVoices::ActivateVoice(StaticVoice& rVoice, IXAudio2SourceVoice* pVoic
 
 void StaticVoices::RetireVoice(StaticVoice& rVoice)
 {
-	ReturnVoiceToPool(rVoice.mAudioCrc, rVoice.mpVoice);
+	ReturnVoiceToPool(rVoice.muiAudioCrc, rVoice.mpVoice);
 	rVoice.mpVoice = nullptr;
 	rVoice.mFlags.Set(StaticVoiceFlags::kInactive);
 }
@@ -182,21 +191,17 @@ void StaticVoices::ClearPool()
 {
 	for (PooledVoice& rPooled : mPooledVoices)
 	{
-		DestroyXAudio2SourceVoice(mpAudioEngine, rPooled.mpVoice);
+		DestroyXAudio2SourceVoice(mpAudioEngine, rPooled.pVoice);
 	}
 	mPooledVoices.clear();
 }
 
-void StaticVoices::UpdateLifecycle(const game::Frame& rFrame, GridCoord emitterCoord, float fDeltaTime)
+void StaticVoices::UpdateLifecycle(const game::Frame& rFrame, GridCoord emitterCoordinate, float fDeltaTime)
 {
 	ASSERT(rFrame.interpolate.frameFlags & FrameFlags::kPostRender);
 
-	// Skipping replay ticks (kRecalculated) also skips the consumption of mbSkipNextInvalidation
-	// below; that is intentional. The flag is raised by game::ClientReconciler::Run after a
-	// bAnyFullReplay — a full network reconciliation replay can rewrite post-render sound IDs
-	// mid-tick, which would otherwise cause the invalidation pass to fade-out voices whose IDs
-	// no longer match the replayed state. By suppressing one tick of invalidation, UpdateVolumes
-	// can re-establish the replayed IDs before the next invalidation pass runs.
+	// Recalculated ticks leave mbSkipNextInvalidation pending. Full reconciliation can rewrite sound IDs mid-tick;
+	// skipping invalidation on the next ordinary lifecycle pass prevents premature fade-out while PriorityPass processes the replayed state.
 	if (rFrame.interpolate.frameFlags & FrameFlags::kRecalculated)
 	{
 		return;
@@ -212,7 +217,7 @@ void StaticVoices::UpdateLifecycle(const game::Frame& rFrame, GridCoord emitterC
 	{
 		InvalidationPass(rSoundsInterpolate);
 	}
-	PriorityPass(rSoundsInterpolate, rSoundsPostRender, emitterCoord);
+	PriorityPass(rSoundsInterpolate, rSoundsPostRender, emitterCoordinate);
 	DeactivationPass();
 	AdvanceFadeOut(fDeltaTime);
 	AdvanceFadeIn(fDeltaTime);
@@ -224,7 +229,7 @@ void StaticVoices::InvalidationPass(const SoundsInterpolate& rSoundsInterpolate)
 	// (or erases outright if it's already silent / inactive). Fade advance and the
 	// kFadingOut → kInactive transition live in AdvanceFadeOut so all three sources of fade
 	// (invalidation, range-deactivation, budget-eviction) share one ramp-and-cleanup path.
-	for (int64_t i = 0; i < static_cast<int64_t>(mVoices.size());)
+	for (int64_t i = 0; i < std::ssize(mVoices);)
 	{
 		StaticVoice& rVoice = mVoices.at(i);
 
@@ -250,7 +255,7 @@ void StaticVoices::InvalidationPass(const SoundsInterpolate& rSoundsInterpolate)
 			// Already silent; skip the fade and erase directly.
 			if (rVoice.mpVoice != nullptr)
 			{
-				ReturnVoiceToPool(rVoice.mAudioCrc, rVoice.mpVoice);
+				ReturnVoiceToPool(rVoice.muiAudioCrc, rVoice.mpVoice);
 				rVoice.mpVoice = nullptr;
 			}
 			bDestroy = true;
@@ -269,7 +274,7 @@ void StaticVoices::InvalidationPass(const SoundsInterpolate& rSoundsInterpolate)
 
 		if (bDestroy)
 		{
-			if (i < static_cast<int64_t>(mVoices.size()) - 1)
+			if (i < std::ssize(mVoices) - 1)
 			{
 				mVoices.at(i) = std::move(mVoices.back());
 			}
@@ -282,12 +287,12 @@ void StaticVoices::InvalidationPass(const SoundsInterpolate& rSoundsInterpolate)
 	}
 }
 
-void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, const SoundsPostRender& rSoundsPostRender, GridCoord emitterCoord)
+void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, const SoundsPostRender& rSoundsPostRender, GridCoord emitterCoordinate)
 {
-	// Every position in rSoundsInterpolate is local to emitterCoord. This pass is where a persistent sound's position
+	// Every position in rSoundsInterpolate is local to emitterCoordinate. This pass is where a persistent sound's position
 	// enters the mix, so it converts once here and stores the listener-frame value on the voice; UpdateListenerPosition
 	// keeps those stored values current when the listener itself changes cell.
-	RenderBasis emitterBasis = MakeRenderBasis(emitterCoord, mListenerCoord);
+	RenderBasis emitterBasis = MakeRenderBasis(emitterCoordinate, mListenerCoordinate);
 
 	// Rank candidates by attenuated volume so the closest / loudest sounds win the
 	// kiMaxStaticVoices slots. Out-of-range candidates (below the hysteresis floor) are
@@ -300,11 +305,15 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 
 	static constexpr float kfDeactivateFloor = 0.8f * kfCullVolume;
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-	struct PriorityEntry { float fAttenuated; int64_t iSoundIndex; };
+	struct PriorityEntry
+	{
+		float fAttenuated;
+		int64_t iSoundIndex;
+	};
 	// RAII handle keeps the workbuffer frame alive; raw pointer below avoids
 	// std::sort deducing _RanIt from the ScopedWorkbufferAllocation type.
-	auto pPriorityScratch = rWorkbuffer.PushBuffer<PriorityEntry*>(iSoundCount * static_cast<int64_t>(sizeof(PriorityEntry)));
-	PriorityEntry* pPriority = pPriorityScratch.mpData;
+	auto priorityScratch = rWorkbuffer.PushBuffer<PriorityEntry*>(iSoundCount * static_cast<int64_t>(sizeof(PriorityEntry)));
+	PriorityEntry* pPriority = priorityScratch.mpData;
 
 	// Hysteresis floor: candidates below 0.8 * cull never enter the priority list,
 	// so a sound oscillating around the boundary doesn't toggle slots each frame.
@@ -320,7 +329,7 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 		{
 			continue;
 		}
-		pPriority[iCandidateCount++] = {fAttenuated, i};
+		pPriority[iCandidateCount++] = {.fAttenuated = fAttenuated, .iSoundIndex = i};
 	}
 
 	std::sort(pPriority, pPriority + iCandidateCount, [](const PriorityEntry& rEntryA, const PriorityEntry& rEntryB)
@@ -330,11 +339,11 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 
 	// Walk in priority order; allocate or sync up to kiMaxStaticVoices slots.
 	int64_t iSlotCap = std::min(iCandidateCount, kiMaxStaticVoices);
-	for (int64_t iSlot = 0; iSlot < iSlotCap; ++iSlot)
+	for (int64_t i = 0; i < iSlotCap; ++i)
 	{
-		float fAttenuated = pPriority[iSlot].fAttenuated;
-		int64_t i = pPriority[iSlot].iSoundIndex;
-		sound_t id = rSoundsPostRender.pIds[i];
+		float fAttenuated = pPriority[i].fAttenuated;
+		int64_t iSoundIndex = pPriority[i].iSoundIndex;
+		sound_t id = rSoundsPostRender.pIds[iSoundIndex];
 		int64_t iIndex = rSoundsInterpolate.idToIndexMap.at(id);
 		float fSoundVolume = rSoundsInterpolate.pfVolumes[iIndex];
 		float fPitch = rSoundsInterpolate.pfPitches[iIndex];
@@ -365,7 +374,7 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 			{
 				// Reactivate: re-acquire from the per-crc pool, restart the source voice,
 				// and ramp volume in via mfFadeVolume to mask the click.
-				AcquiredVoice acquiredVoice = AcquireOrLoadVoice(pExistingVoice->mAudioCrc);
+				AcquiredVoice acquiredVoice = AcquireOrLoadVoice(pExistingVoice->muiAudioCrc);
 				IXAudio2SourceVoice* pVoice = acquiredVoice.pVoice;
 				if (pVoice == nullptr)
 				{
@@ -374,8 +383,8 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 				ActivateVoice(*pExistingVoice, pVoice);
 				pExistingVoice->mfFadeVolume = 0.0f;
 				// SetVolume(0) before Start() prevents an audible click — pooled voices
-				// retain whatever volume Apply3dVolume last set on them, which may be
-				// loud. Apply3dVolume in the next UpdateVolumes will re-establish the
+				// retain whatever volume ApplyThreeDimensionalVolume last set on them, which may be
+				// loud. ApplyThreeDimensionalVolume in the next UpdateVolumes will re-establish the
 				// ramped volume.
 				CHECK_HRESULT(pVoice->SetVolume(0.0f));
 				CHECK_HRESULT(pVoice->Start(0, XAUDIO2_COMMIT_NOW));
@@ -409,7 +418,7 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 		}
 		// Active + kInactive entries count toward kiMaxStaticVoices; kFadingOut entries
 		// live in the FadeOutPool overflow capacity above the primary cap.
-		if (static_cast<int64_t>(mVoices.size()) - miFadeOutCount >= kiMaxStaticVoices)
+		if (std::ssize(mVoices) - miFadeOutCount >= kiMaxStaticVoices)
 		{
 			// Reclaim the first inactive entry rather than deferring forever: an inactive entry holds
 			// no XAudio2 voice (RetireVoice already returned it to the pool) and no fade state, so
@@ -417,11 +426,11 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 			// kInactive and kFadingOut never coexist on an entry across passes, so miFadeOutCount
 			// needs no adjustment here.
 			int64_t iInactive = -1;
-			for (int64_t iVoice = 0; iVoice < static_cast<int64_t>(mVoices.size()); ++iVoice)
+			for (int64_t j = 0; j < std::ssize(mVoices); ++j)
 			{
-				if (mVoices.at(iVoice).mFlags & StaticVoiceFlags::kInactive)
+				if (mVoices.at(j).mFlags & StaticVoiceFlags::kInactive)
 				{
-					iInactive = iVoice;
+					iInactive = j;
 					break;
 				}
 			}
@@ -430,7 +439,7 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 				LOG(kAudio, kDebug, "Max static voices reached ({}), deferring add", kiMaxStaticVoices);
 				continue;
 			}
-			if (iInactive < static_cast<int64_t>(mVoices.size()) - 1)
+			if (iInactive < std::ssize(mVoices) - 1)
 			{
 				mVoices.at(iInactive) = std::move(mVoices.back());
 			}
@@ -457,7 +466,7 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 		// (SetVolume(0)), so without this the first quantum of a fresh voice would be inaudible
 		// until the next UpdateVolumes. Scaled by mfFadeVolume so a pooled voice stays silent
 		// for its first quantum and enters the fade-in ramp instead.
-		Apply3dVolume(pVoice, vecPosition, vecVelocity, rNewVoice.mfFadeVolume * fSoundVolume, fPitch);
+		ApplyThreeDimensionalVolume(pVoice, vecPosition, vecVelocity, rNewVoice.mfFadeVolume * fSoundVolume, fPitch);
 		rNewVoice.mFlags.Set(StaticVoiceFlags::kActivatedThisFrame);
 	}
 }
@@ -471,9 +480,7 @@ void StaticVoices::DeactivationPass()
 	// drains stale active voices.
 	for (StaticVoice& rVoice : mVoices)
 	{
-		// kActivatedThisFrame is transient — clear it unconditionally before the state
-		// guards so it never persists to the next frame even if PriorityPass's marking
-		// conditions change.
+		// Clear the transient kActivatedThisFrame flag before every state guard so it cannot persist into the next frame.
 		bool bActivated = (rVoice.mFlags & StaticVoiceFlags::kActivatedThisFrame);
 		rVoice.mFlags.Set(StaticVoiceFlags::kActivatedThisFrame, false);
 
@@ -553,15 +560,15 @@ void StaticVoices::UpdateListenerPosition()
 	// The listener is the camera, so its cell is the camera cell and every stored voice position is expressed in it.
 	// When that cell changes, move the stored positions with it: a voice that is not re-synced this frame (out of
 	// range, fading out) would otherwise mix a whole cell away from where it sounds.
-	if (engine::gpCamera->mBasisCoord != mListenerCoord)
+	if (engine::gpCamera->mBasisCoordinate != mListenerCoordinate)
 	{
-		RenderBasis previousBasis = MakeRenderBasis(mListenerCoord, engine::gpCamera->mBasisCoord);
+		RenderBasis previousBasis = MakeRenderBasis(mListenerCoordinate, engine::gpCamera->mBasisCoordinate);
 		XMVECTOR vecShift = XMVectorSet(previousBasis.f2Offset.x, previousBasis.f2Offset.y, 0.0f, 0.0f);
 		for (StaticVoice& rVoice : mVoices)
 		{
 			rVoice.mVecPosition = XMVectorAdd(rVoice.mVecPosition, vecShift);
 		}
-		mListenerCoord = engine::gpCamera->mBasisCoord;
+		mListenerCoordinate = engine::gpCamera->mBasisCoordinate;
 	}
 
 	// mVecListenerPosition is the camera eye in full XYZ, so altitude contributes to manual fade distance.
@@ -569,7 +576,7 @@ void StaticVoices::UpdateListenerPosition()
 	// ground emitters keeps screen-left audible on the left rather than collapsed toward center by altitude. Listener
 	// velocity is zero because RTS camera-motion Doppler is negligible and snap/jump easing must not add artifacts.
 	mVecListenerPosition = engine::gpCamera->mVecEyePosition;
-	XMVECTOR vecPanListener = XMVectorSetZ(engine::gpCamera->mVecPosition, gBaseHeight.Get());
+	XMVECTOR vecPanListener = XMVectorSetZ(engine::gpCamera->mVecPosition, gBaseHeight.mfCurrent);
 	XMFLOAT3A f3PanPosition {};
 	XMStoreFloat3A(&f3PanPosition, vecPanListener);
 	mX3dAudioListener.OrientFront = {0.0f, 0.0f, -1.0f};
@@ -579,15 +586,15 @@ void StaticVoices::UpdateListenerPosition()
 
 	// Fade band + X3DAudio curve are camera-height-lerped per the canonical "Camera-Height-
 	// Conditional Uniforms" pattern. Each
-	// quantity owns four wrappers (StartHeight, EndHeight, Low, High) in SoundSettingsWrappersBase
+	// quantity owns four wrappers (startHeight, endHeight, low, high) in SoundSettingsWrappersBase
 	// and is exposed in the Sound > Tweaks sub-tab. Distances on the consumer side
-	// (Apply3dVolume / ComputeAttenuatedVolume) are 3D against mVecListenerPosition (camera
+	// (ApplyThreeDimensionalVolume / ComputeAttenuatedVolume) are 3D against mVecListenerPosition (camera
 	// eye), so altitude naturally pushes ground emitters into the fade band as the camera climbs.
 	float fEyeHeight = engine::gpCamera->mfCameraEyeHeight;
-	mfEffectiveFadeStart = gListenerDistanceStart.Resolve(fEyeHeight);
-	mfEffectiveFadeEnd = gListenerDistanceEnd.Resolve(fEyeHeight);
-	mfCurveDistanceScaler = gListenerCurve.Resolve(fEyeHeight);
-	mfManualFadeVolume = gListenerAudibleFloor.Resolve(fEyeHeight);
+	mfEffectiveFadeStart = engine::LerpAtHeight(fEyeHeight, gListenerDistanceStart.startHeight.mfCurrent, gListenerDistanceStart.endHeight.mfCurrent, gListenerDistanceStart.low.mfCurrent, gListenerDistanceStart.high.mfCurrent);
+	mfEffectiveFadeEnd = engine::LerpAtHeight(fEyeHeight, gListenerDistanceEnd.startHeight.mfCurrent, gListenerDistanceEnd.endHeight.mfCurrent, gListenerDistanceEnd.low.mfCurrent, gListenerDistanceEnd.high.mfCurrent);
+	mfCurveDistanceScaler = engine::LerpAtHeight(fEyeHeight, gListenerCurve.startHeight.mfCurrent, gListenerCurve.endHeight.mfCurrent, gListenerCurve.low.mfCurrent, gListenerCurve.high.mfCurrent);
+	mfManualFadeVolume = engine::LerpAtHeight(fEyeHeight, gListenerAudibleFloor.startHeight.mfCurrent, gListenerAudibleFloor.endHeight.mfCurrent, gListenerAudibleFloor.low.mfCurrent, gListenerAudibleFloor.high.mfCurrent);
 }
 
 void StaticVoices::UpdateVolumes()
@@ -598,7 +605,7 @@ void StaticVoices::UpdateVolumes()
 		{
 			continue; // No XAudio2 voice attached — skip mix.
 		}
-		Apply3dVolume(rVoice.mpVoice, rVoice.mVecPosition, rVoice.mVecVelocity, rVoice.mfFadeVolume * rVoice.mfVolume, rVoice.mfPitch);
+		ApplyThreeDimensionalVolume(rVoice.mpVoice, rVoice.mVecPosition, rVoice.mVecVelocity, rVoice.mfFadeVolume * rVoice.mfVolume, rVoice.mfPitch);
 	}
 }
 
@@ -626,7 +633,7 @@ void StaticVoices::Clear(bool bNullVoicesBeforeDestroy)
 	{
 		for (PooledVoice& rPooled : mPooledVoices)
 		{
-			rPooled.mpVoice = nullptr;
+			rPooled.pVoice = nullptr;
 		}
 		mPooledVoices.clear();
 	}
@@ -639,7 +646,7 @@ void StaticVoices::Clear(bool bNullVoicesBeforeDestroy)
 float StaticVoices::ComputeAttenuatedVolume(float fDistance, float fSoundVolume) const
 {
 	// Natural distance curve from fSoundVolume at fadeStart to 0 at fadeEnd (no audible
-	// floor — that's a separate Apply3dVolume concern). Used by the priority/cull pass
+	// floor — that's a separate ApplyThreeDimensionalVolume concern). Used by the priority/cull pass
 	// so out-of-range sounds compute as effectively-silent and get culled.
 	float fDistanceVolume = fSoundVolume;
 	if (fDistance >= mfEffectiveFadeEnd)
@@ -655,7 +662,7 @@ float StaticVoices::ComputeAttenuatedVolume(float fDistance, float fSoundVolume)
 	return fDistanceVolume;
 }
 
-void XM_CALLCONV StaticVoices::Apply3dVolume(IXAudio2SourceVoice* pVoice, FXMVECTOR vecPosition, FXMVECTOR vecVelocity, float fVolume, float fPitch)
+void XM_CALLCONV StaticVoices::ApplyThreeDimensionalVolume(IXAudio2SourceVoice* pVoice, FXMVECTOR vecPosition, FXMVECTOR vecVelocity, float fVolume, float fPitch)
 {
 	XMFLOAT3A f3Position {};
 	XMStoreFloat3A(&f3Position, vecPosition);
@@ -697,7 +704,7 @@ void XM_CALLCONV StaticVoices::Apply3dVolume(IXAudio2SourceVoice* pVoice, FXMVEC
 	float fAudibleFloor = mfManualFadeVolume * fVolume;
 	float fDistanceVolume = std::max(fAttenuated, fAudibleFloor);
 
-	float fFinalPower = VolumeToPower(gMasterVolume.Get(), gSoundVolume.Get(), fDistanceVolume);
+	float fFinalPower = VolumeToPower(gMasterVolume.mfCurrent, gSoundVolume.mfCurrent, fDistanceVolume);
 	CHECK_HRESULT(pVoice->SetVolume(fFinalPower));
 	CHECK_HRESULT(pVoice->SetFrequencyRatio(SnapFrequencyRatio(x3dAudioDspSettings.DopplerFactor * fPitch)));
 }

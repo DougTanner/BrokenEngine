@@ -11,30 +11,30 @@ using enum TextureLayout;
 struct LayoutMapping
 {
 	VkImageLayout vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	VkAccessFlags accessFlags = 0;
-	VkPipelineStageFlags stageFlags = 0;
+	VkAccessFlags vkAccessFlags = 0;
+	VkPipelineStageFlags vkPipelineStageFlags = 0;
 };
 
 constexpr LayoutMapping kLayoutMappings[]
 {
 	// kUndefined
-	{VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_NONE_KHR, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT},
+	{.vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED, .vkAccessFlags = VK_ACCESS_NONE_KHR, .vkPipelineStageFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT},
 	// kColorAttachment
-	{VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
+	{.vkImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, .vkAccessFlags = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, .vkPipelineStageFlags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
 	// kComputeReadOnly
-	{VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
+	{.vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, .vkAccessFlags = VK_ACCESS_SHADER_READ_BIT, .vkPipelineStageFlags = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
 	// kComputeReadWrite
-	{VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
+	{.vkImageLayout = VK_IMAGE_LAYOUT_GENERAL, .vkAccessFlags = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, .vkPipelineStageFlags = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
 	// kFragmentShaderReadOnly
-	{VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT},
+	{.vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, .vkAccessFlags = VK_ACCESS_SHADER_READ_BIT, .vkPipelineStageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT},
 	// kGeneral
-	{VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_MEMORY_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT},
+	{.vkImageLayout = VK_IMAGE_LAYOUT_GENERAL, .vkAccessFlags = VK_ACCESS_MEMORY_READ_BIT, .vkPipelineStageFlags = VK_PIPELINE_STAGE_TRANSFER_BIT},
 	// kShaderReadOnly
-	{VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
+	{.vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, .vkAccessFlags = VK_ACCESS_SHADER_READ_BIT, .vkPipelineStageFlags = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
 	// kTransferDestination
-	{VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT},
+	{.vkImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, .vkAccessFlags = VK_ACCESS_TRANSFER_WRITE_BIT, .vkPipelineStageFlags = VK_PIPELINE_STAGE_TRANSFER_BIT},
 	// kTransferSource
-	{VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT},
+	{.vkImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, .vkAccessFlags = VK_ACCESS_TRANSFER_READ_BIT, .vkPipelineStageFlags = VK_PIPELINE_STAGE_TRANSFER_BIT},
 };
 static_assert(std::size(kLayoutMappings) == static_cast<size_t>(TextureLayout::kTransferSource) + 1);
 
@@ -46,7 +46,7 @@ VkImageLayout ToVkImageLayout(TextureLayout eLayout)
 static void CreateImageView(VkImage vkImage, const TextureInfo& rInfo, bool bCheckRenderPass, VkImageView& rVkImageView)
 {
 	VkComponentMapping vkComponentMapping {.r = VK_COMPONENT_SWIZZLE_R, .g = VK_COMPONENT_SWIZZLE_G, .b = VK_COMPONENT_SWIZZLE_B, .a = VK_COMPONENT_SWIZZLE_A};
-	if ((!bCheckRenderPass || !(rInfo.textureFlags & kRenderPass)) && rInfo.format == VK_FORMAT_BC4_UNORM_BLOCK)
+	if ((!bCheckRenderPass || !(rInfo.textureFlags & kRenderPass)) && rInfo.vkFormat == VK_FORMAT_BC4_UNORM_BLOCK)
 	{
 		vkComponentMapping = {.r = VK_COMPONENT_SWIZZLE_R, .g = VK_COMPONENT_SWIZZLE_R, .b = VK_COMPONENT_SWIZZLE_R, .a = VK_COMPONENT_SWIZZLE_R};
 	}
@@ -56,10 +56,10 @@ static void CreateImageView(VkImage vkImage, const TextureInfo& rInfo, bool bChe
 		.pNext = nullptr,
 		.flags = 0,
 		.image = vkImage,
-		.viewType = rInfo.viewType,
-		.format = rInfo.format,
+		.viewType = rInfo.vkImageViewType,
+		.format = rInfo.vkFormat,
 		.components = vkComponentMapping,
-		.subresourceRange = {.aspectMask = rInfo.aspectMask, .baseMipLevel = 0, .levelCount = rInfo.mipLevels, .baseArrayLayer = 0, .layerCount = rInfo.arrayLayers},
+		.subresourceRange = {.aspectMask = rInfo.vkImageAspectFlags, .baseMipLevel = 0, .levelCount = rInfo.uiMipLevels, .baseArrayLayer = 0, .layerCount = rInfo.uiArrayLayers},
 	};
 	CHECK_VK(vkCreateImageView(gpDeviceManager->mVkDevice, &vkImageViewCreateInfo, nullptr, &rVkImageView));
 	VkName(VK_OBJECT_TYPE_IMAGE_VIEW, rVkImageView, rInfo.name.data());
@@ -71,7 +71,7 @@ void Texture::RecordBeginRenderPass(VkCommandBuffer vkCommandBuffer, VkRenderPas
 	{
 		{.color = vkClearColorValue},
 		{.depthStencil = {.depth = kfMaxDepth, .stencil = 0}},
-		{.color = {0.0f, 0.0f, 0.0f, 0.0f}},
+		{.color = {.float32 = {0.0f, 0.0f, 0.0f, 0.0f}}},
 	};
 
 	int64_t iAttachmentCount = 1;
@@ -93,7 +93,7 @@ void Texture::RecordBeginRenderPass(VkCommandBuffer vkCommandBuffer, VkRenderPas
 		.framebuffer = vkFramebuffer,
 		.renderArea =
 		{
-			.offset = {0, 0},
+			.offset = {.x = 0, .y = 0},
 			.extent = vkExtent2D,
 		},
 		.clearValueCount = bClear ? static_cast<uint32_t>(iAttachmentCount) : 0,
@@ -102,12 +102,7 @@ void Texture::RecordBeginRenderPass(VkCommandBuffer vkCommandBuffer, VkRenderPas
 	vkCmdBeginRenderPass(vkCommandBuffer, &vkRenderPassBeginInfo, vkSubpassContents);
 }
 
-void Texture::RecordEndRenderPass(VkCommandBuffer vkCommandBuffer)
-{
-	vkCmdEndRenderPass(vkCommandBuffer);
-}
-
-Texture::Texture(const TextureInfo& rInfo, const std::function<void(void*, int64_t, int64_t)>& rDataFunction)
+Texture::Texture(const TextureInfo& rInfo, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction)
 {
 	Create(rInfo, rDataFunction);
 }
@@ -151,12 +146,12 @@ void Texture::RecordAcquireBarrier(VkCommandBuffer vkCommandBuffer)
 		.srcQueueFamilyIndex = bQueueFamilyOwnershipTransferOptional ? VK_QUEUE_FAMILY_IGNORED : static_cast<uint32_t>(gpInstanceManager->miTransferQueueFamilyIndex),
 		.dstQueueFamilyIndex = bQueueFamilyOwnershipTransferOptional ? VK_QUEUE_FAMILY_IGNORED : static_cast<uint32_t>(gpInstanceManager->miGraphicsQueueFamilyIndex),
 		.image = mVkImage,
-		.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = mInfo.mipLevels, .baseArrayLayer = 0, .layerCount = mInfo.arrayLayers},
+		.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = mInfo.uiMipLevels, .baseArrayLayer = 0, .layerCount = mInfo.uiArrayLayers},
 	};
 	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &vkImageMemoryBarrier);
 }
 
-void Texture::Create(const TextureInfo& rInfo, const std::function<void(void*, int64_t, int64_t)>& rDataFunction)
+void Texture::Create(const TextureInfo& rInfo, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction)
 {
 	Destroy();
 
@@ -166,29 +161,28 @@ void Texture::Create(const TextureInfo& rInfo, const std::function<void(void*, i
 	{
 		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 		.pNext = nullptr,
-		.flags = mInfo.flags,
+		.flags = mInfo.vkImageCreateFlags,
 		.imageType = VK_IMAGE_TYPE_2D,
-		.format = mInfo.format,
-		.extent = mInfo.extent,
-		.mipLevels = mInfo.mipLevels,
-		.arrayLayers = mInfo.arrayLayers,
-		.samples = mInfo.samples,
+		.format = mInfo.vkFormat,
+		.extent = mInfo.vkExtent3D,
+		.mipLevels = mInfo.uiMipLevels,
+		.arrayLayers = mInfo.uiArrayLayers,
+		.samples = mInfo.vkSampleCountFlagBits,
 		.tiling = VK_IMAGE_TILING_OPTIMAL,
-		.usage = mInfo.usage,
+		.usage = mInfo.vkImageUsageFlags,
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount = 0,
 		.pQueueFamilyIndices = nullptr,
 		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 	};
-	// Configure VMA allocation
 	VmaAllocationCreateInfo vmaAllocationCreateInfo {};
 	vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
 
 	if (mInfo.textureFlags & kRenderPass)
 	{
-		// Use dedicated allocations only for large render targets (VMA recommends for resources >32MB or frequently resized)
-		static constexpr VkDeviceSize kLargeSizeThreshold = 32 * 1'024 * 1'024;
-		if (common::SizeInBytes(mInfo.format, mInfo.extent.width, mInfo.extent.height) * mInfo.arrayLayers >= kLargeSizeThreshold)
+		// Force dedicated allocations for render targets with at least 32 MiB of base-level array data; VMA chooses allocations otherwise.
+		static constexpr VkDeviceSize kVkLargeSizeThreshold = 32 * 1'024 * 1'024;
+		if (common::SizeInBytes(mInfo.vkFormat, mInfo.vkExtent3D.width, mInfo.vkExtent3D.height) * mInfo.uiArrayLayers >= kVkLargeSizeThreshold)
 		{
 			vmaAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 		}
@@ -219,40 +213,34 @@ void Texture::Create(const TextureInfo& rInfo, const std::function<void(void*, i
 	}
 }
 
-void Texture::UpdateData(const std::function<void(void*, int64_t, int64_t)>& rDataFunction)
+void Texture::UpdateData(const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction)
 {
 	ASSERT(mVkImage != VK_NULL_HANDLE);
 	UploadImageData(rDataFunction, kShaderReadOnly, kShaderReadOnly);
 }
 
-void Texture::UploadImageData(const std::function<void(void*, int64_t, int64_t)>& rDataFunction, TextureLayout eOldLayout, TextureLayout eFinalLayout)
+void Texture::UploadImageData(const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction, TextureLayout eOldLayout, TextureLayout eFinalLayout)
 {
-	// Calculate total buffer size for all mip levels
-	VkDeviceSize vkDeviceSize = common::ComputeImageByteSize(mInfo.format, mInfo.extent.width, mInfo.extent.height, mInfo.mipLevels, mInfo.arrayLayers, mInfo.extent.depth);
+	VkDeviceSize vkDeviceSize = common::ComputeImageByteSize(mInfo.vkFormat, mInfo.vkExtent3D.width, mInfo.vkExtent3D.height, mInfo.uiMipLevels, mInfo.uiArrayLayers, mInfo.vkExtent3D.depth);
 
-	// Create staging buffer and fill with data
 	StagingBuffer stagingBuffer(mInfo.name, vkDeviceSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
-	// Use VMA's pre-mapped pointer
-	rDataFunction(stagingBuffer.vmaAllocationInfo.pMappedData, 0, vkDeviceSize);
+	rDataFunction(std::span<std::byte>(static_cast<std::byte*>(stagingBuffer.vmaAllocationInfo.pMappedData), static_cast<size_t>(vkDeviceSize)), 0);
 
-	// Record all operations into a single command buffer
 	OneShotCommandBuffer oneShotCommandBuffer;
 
-	// Transition layout to transfer destination
 	TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, eOldLayout, kTransferDestination);
 
-	// Record all buffer-to-image copies
 	size_t uiOffset = 0;
-	for (uint32_t i = 0; i < mInfo.arrayLayers; ++i)
+	for (uint32_t i = 0; i < mInfo.uiArrayLayers; ++i)
 	{
-		uint32_t uiWidth = mInfo.extent.width;
-		uint32_t uiHeight = mInfo.extent.height;
-		for (uint32_t uiLevel = 0; uiLevel < mInfo.mipLevels; ++uiLevel)
+		uint32_t uiWidth = mInfo.vkExtent3D.width;
+		uint32_t uiHeight = mInfo.vkExtent3D.height;
+		for (uint32_t j = 0; j < mInfo.uiMipLevels; ++j)
 		{
 			VkBufferImageCopy vkBufferImageCopy {};
 			vkBufferImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			vkBufferImageCopy.imageSubresource.mipLevel = uiLevel;
+			vkBufferImageCopy.imageSubresource.mipLevel = j;
 			vkBufferImageCopy.imageSubresource.baseArrayLayer = i;
 			vkBufferImageCopy.imageSubresource.layerCount = 1;
 			vkBufferImageCopy.imageExtent.width = uiWidth;
@@ -260,15 +248,14 @@ void Texture::UploadImageData(const std::function<void(void*, int64_t, int64_t)>
 			vkBufferImageCopy.imageExtent.depth = 1;
 			vkBufferImageCopy.bufferOffset = uiOffset;
 
-			uiOffset += common::SizeInBytes(mInfo.format, uiWidth, uiHeight);
+			uiOffset += common::SizeInBytes(mInfo.vkFormat, uiWidth, uiHeight);
 			uiWidth = std::max(1u, uiWidth / 2);
 			uiHeight = std::max(1u, uiHeight / 2);
 
-			vkCmdCopyBufferToImage(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.stagingVkBuffer, mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
+			vkCmdCopyBufferToImage(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.vkStagingBuffer, mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
 		}
 	}
 
-	// Transition to final layout if needed
 	if (eFinalLayout != kUndefined)
 	{
 		TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, kTransferDestination, eFinalLayout);
@@ -284,14 +271,14 @@ void Texture::CreateRenderTarget()
 		VkAttachmentDescription
 		{
 			.flags = 0,
-			.format = mInfo.format,
+			.format = mInfo.vkFormat,
 			.samples = VK_SAMPLE_COUNT_1_BIT,
-			.loadOp = mInfo.renderPassVkAttachmentLoadOp,
+			.loadOp = mInfo.vkRenderPassAttachmentLoadOp,
 			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-			.initialLayout = mInfo.renderPassInitialVkImageLayout,
-			.finalLayout = mInfo.renderPassFinalVkImageLayout,
+			.initialLayout = mInfo.vkRenderPassInitialImageLayout,
+			.finalLayout = mInfo.vkRenderPassFinalImageLayout,
 		},
 	};
 	VkAttachmentReference vkAttachmentReference
@@ -312,15 +299,15 @@ void Texture::CreateRenderTarget()
 		.preserveAttachmentCount = 0,
 		.pPreserveAttachments = nullptr,
 	};
-	// This VK_SUBPASS_EXTERNAL subpass dependency, combined with mInfo.renderPassFinalVkImageLayout, will insert an implicit pipeline barrier at the end of the render pass
+	// This VK_SUBPASS_EXTERNAL subpass dependency, combined with mInfo.vkRenderPassFinalImageLayout, will insert an implicit pipeline barrier at the end of the render pass
 	VkSubpassDependency vkSubpassDependency
 	{
 		.srcSubpass = 0,
 		.dstSubpass = VK_SUBPASS_EXTERNAL,
 		.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-		.dstStageMask = mInfo.renderPassDstStageMask,
+		.dstStageMask = mInfo.vkRenderPassDestinationStageMask,
 		.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-		.dstAccessMask = mInfo.renderPassDstAccessMask,
+		.dstAccessMask = mInfo.vkRenderPassDestinationAccessMask,
 		.dependencyFlags = 0,
 	};
 	VkRenderPassCreateInfo vkRenderPassCreateInfo
@@ -346,8 +333,8 @@ void Texture::CreateRenderTarget()
 		.renderPass = mVkRenderPass,
 		.attachmentCount = 1,
 		.pAttachments = pVkImageViews,
-		.width = mInfo.extent.width,
-		.height = mInfo.extent.height,
+		.width = mInfo.vkExtent3D.width,
+		.height = mInfo.vkExtent3D.height,
 		.layers = 1,
 	};
 	CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &vkFramebufferCreateInfo, nullptr, &mVkFramebuffer));
@@ -377,27 +364,19 @@ void Texture::Destroy() noexcept
 	}
 }
 
-void Texture::FreeGpuResources() noexcept
-{
-	// Tears down image + view but preserves mInfo so AdoptTransferredImage can re-attach fresh
-	// GPU resources later. Terrain textures have no render-pass / framebuffer, so Destroy() is
-	// equivalent here; the named alias documents intent at the call site (LRU eviction).
-	Destroy();
-}
-
 void Texture::TransitionImageLayout(VkCommandBuffer vkCommandBuffer, TextureLayout eOldLayout, TextureLayout eNewLayout)
 {
-	const LayoutMapping& rSrc = kLayoutMappings[static_cast<int>(eOldLayout)];
-	const LayoutMapping& rDst = kLayoutMappings[static_cast<int>(eNewLayout)];
+	const LayoutMapping& rSource = kLayoutMappings[static_cast<int>(eOldLayout)];
+	const LayoutMapping& rDestination = kLayoutMappings[static_cast<int>(eNewLayout)];
 
 	VkImageMemoryBarrier vkImageMemoryBarrier
 	{
 		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 		.pNext = nullptr,
-		.srcAccessMask = rSrc.accessFlags,
-		.dstAccessMask = rDst.accessFlags,
-		.oldLayout = rSrc.vkImageLayout,
-		.newLayout = rDst.vkImageLayout,
+		.srcAccessMask = rSource.vkAccessFlags,
+		.dstAccessMask = rDestination.vkAccessFlags,
+		.oldLayout = rSource.vkImageLayout,
+		.newLayout = rDestination.vkImageLayout,
 		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 		.image = mVkImage,
@@ -405,13 +384,13 @@ void Texture::TransitionImageLayout(VkCommandBuffer vkCommandBuffer, TextureLayo
 		{
 			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
 			.baseMipLevel = 0,
-			.levelCount = mInfo.mipLevels,
+			.levelCount = mInfo.uiMipLevels,
 			.baseArrayLayer = 0,
-			.layerCount = mInfo.arrayLayers,
+			.layerCount = mInfo.uiArrayLayers,
 		},
 	};
 
-	vkCmdPipelineBarrier(vkCommandBuffer, rSrc.stageFlags, rDst.stageFlags, 0, 0, nullptr, 0, nullptr, 1, &vkImageMemoryBarrier);
+	vkCmdPipelineBarrier(vkCommandBuffer, rSource.vkPipelineStageFlags, rDestination.vkPipelineStageFlags, 0, 0, nullptr, 0, nullptr, 1, &vkImageMemoryBarrier);
 }
 
 void Texture::RecordCopyImageFrom(VkCommandBuffer vkCommandBuffer, const Texture& rSource)
@@ -419,10 +398,10 @@ void Texture::RecordCopyImageFrom(VkCommandBuffer vkCommandBuffer, const Texture
 	VkImageCopy vkImageCopy
 	{
 		.srcSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1},
-		.srcOffset = {0, 0, 0},
+		.srcOffset = {.x = 0, .y = 0, .z = 0},
 		.dstSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1},
-		.dstOffset = {0, 0, 0},
-		.extent = mInfo.extent,
+		.dstOffset = {.x = 0, .y = 0, .z = 0},
+		.extent = mInfo.vkExtent3D,
 	};
 	vkCmdCopyImage(vkCommandBuffer, rSource.mVkImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkImageCopy);
 }
@@ -430,11 +409,11 @@ void Texture::RecordCopyImageFrom(VkCommandBuffer vkCommandBuffer, const Texture
 void Texture::RecordBeginRenderPass(VkCommandBuffer vkCommandBuffer)
 {
 	RenderPassFlags_t renderPassFlags;
-	if (mInfo.renderPassVkAttachmentLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR)
+	if (mInfo.vkRenderPassAttachmentLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR)
 	{
 		renderPassFlags.Set(RenderPassFlags::kClear);
 	}
-	RecordBeginRenderPass(vkCommandBuffer, mVkRenderPass, mVkFramebuffer, {mInfo.extent.width, mInfo.extent.height}, mInfo.renderPassVkClearColorValue, renderPassFlags);
+	RecordBeginRenderPass(vkCommandBuffer, mVkRenderPass, mVkFramebuffer, {.width = mInfo.vkExtent3D.width, .height = mInfo.vkExtent3D.height}, mInfo.vkRenderPassClearColorValue, renderPassFlags);
 }
 
 } // namespace engine

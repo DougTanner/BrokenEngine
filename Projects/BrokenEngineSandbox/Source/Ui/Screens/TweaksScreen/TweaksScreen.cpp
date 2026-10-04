@@ -26,12 +26,12 @@ void RegisterGameTweakSections()
 	engine::TweaksScreenBase::RegisterSection(giTweakSectionHexShield,
 	{
 		.displayName = "Hex Shield", .stableKey = "HexShield",
-		.pfnRender = [](engine::TweaksScreenBase& rScreen) { static_cast<TweaksScreen&>(rScreen).RenderHexShieldSection(); }
+		.pRender = [](engine::TweaksScreenBase& rScreen) { static_cast<TweaksScreen&>(rScreen).RenderHexShieldSection(); }
 	});
 	engine::TweaksScreenBase::RegisterSection(giTweakSectionParticles,
 	{
 		.displayName = "Particles", .stableKey = "Particles",
-		.pfnRender = [](engine::TweaksScreenBase& rScreen) { static_cast<TweaksScreen&>(rScreen).RenderParticlesSection(); }
+		.pRender = [](engine::TweaksScreenBase& rScreen) { static_cast<TweaksScreen&>(rScreen).RenderParticlesSection(); }
 	});
 }
 

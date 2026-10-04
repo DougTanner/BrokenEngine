@@ -22,21 +22,21 @@ void SoundMenuScreen::Render()
 		return;
 	}
 
-	ImGuiIO& rIo = ImGui::GetIO();
+	ImGuiIO& rInputOutput = ImGui::GetIO();
 	ScopedMenuScale menuScale;
 
 	// Centered via the pivot convention (UserInterfaceDesign.txt section 5), matching Pause/Graphics
-	ImGui::SetNextWindowPos(ImVec2(rIo.DisplaySize.x * 0.5f, rIo.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+	ImGui::SetNextWindowPos(ImVec2(rInputOutput.DisplaySize.x * 0.5f, rInputOutput.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 
 	ScopedMenuFont menuFont;
 	ImGui::Begin("SoundMenu", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize);
 
-	gpImGuiManager->RegisterOpaqueRect(ImGui::GetWindowPos(), ImGui::GetWindowSize());
+	gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
 
-	// Border + accent strip only — the opaque themed WindowBg must stay intact for RegisterOpaqueRect occlusion
-	ImVec2 vPanelPos = ImGui::GetWindowPos();
+	// Border + accent strip only — the opaque themed WindowBg must stay intact for RegisterOpaqueRectangle occlusion
+	ImVec2 vPanelPosition = ImGui::GetWindowPos();
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
-	DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
+	DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPosition, ImVec2(vPanelPosition.x + vPanelSize.x, vPanelPosition.y + vPanelSize.y));
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 
@@ -58,16 +58,14 @@ void SoundMenuScreen::Render()
 	// One themed width shared by both buttons (measured under the live menu font)
 	float fButtonWidth = MenuButtonsWidth({TranslatedString(StandardString::kStringDefaults), U"Back"});
 
-	// Defaults button
-	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringDefaults)).mpData, ImVec2(fButtonWidth, 0.0f), mfDefaultsHoverAnim))
+	if (MenuButton(AppendUtf8(rWorkbuffer, TranslatedString(StandardString::kStringDefaults)).mpData, ImVec2(fButtonWidth, 0.0f), mfDefaultsHoverAnimation))
 	{
 		ResetSoundSettings();
 	}
 
 	ImGui::SameLine();
 
-	// Back button
-	if (MenuButton("Back", ImVec2(fButtonWidth, 0.0f), mfBackHoverAnim))
+	if (MenuButton("Back", ImVec2(fButtonWidth, 0.0f), mfBackHoverAnimation))
 	{
 		game::gpGame->meUiState = UiState::kPause;
 	}

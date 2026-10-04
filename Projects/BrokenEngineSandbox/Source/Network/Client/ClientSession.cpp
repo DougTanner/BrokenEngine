@@ -91,9 +91,9 @@ void ClientSession::ProcessReceivedGamePackets()
 		std::vector<Fleet> receivedFleets;
 		if (ParseFleetSync(mpRuntime->mpClient->mReceivedGamePackets, receivedFleets))
 		{
-			engine::GridCoord preFleetCoord = gpGame->mClientGridCoord;
+			engine::GridCoord preFleetCoord = gpGame->mClientGridCoordinate;
 			gpGame->mFleetSelection.SyncFleets(std::move(receivedFleets));
-			if (gpGame->mClientGridCoord != preFleetCoord)
+			if (gpGame->mClientGridCoordinate != preFleetCoord)
 			{
 				UpdateDesiredCoords(SubscriptionChangeReason::kFleetSync);
 			}
@@ -118,7 +118,7 @@ void ClientSession::ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent)
 		case PlayerEventType::kAssigned:
 			if (!gpGame->IsClientPlayer(rEvent.globalPlayerId))
 			{
-				LOG(kNetwork, kVerbose, "PlayerEvent kAssigned NewGlobalPlayerId: {} NewCoord: ({},{}) FocusedGlobalPlayerId: {} FocusedCoord: ({},{})", rEvent.globalPlayerId, rEvent.coord.iX, rEvent.coord.iY, gpGame->ClientPlayerId(), gpGame->mClientGridCoord.iX, gpGame->mClientGridCoord.iY);
+				LOG(kNetwork, kVerbose, "PlayerEvent kAssigned NewGlobalPlayerId: {} NewCoord: ({},{}) FocusedGlobalPlayerId: {} FocusedCoord: ({},{})", rEvent.globalPlayerId, rEvent.coord.iX, rEvent.coord.iY, gpGame->ClientPlayerId(), gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY);
 				gpGame->AddClientPlayer(rEvent.globalPlayerId, rEvent.coord);
 			}
 			UpdateDesiredCoords(SubscriptionChangeReason::kAssigned);
@@ -174,7 +174,7 @@ void ClientSession::Reconcile()
 	{
 		// Heap: reconciliation deserialization and map operations
 		ScopedSuppressAllocationTracking suppress;
-		int64_t iCurrentTick = gpGame->TickCounter();
+		int64_t iCurrentTick = gpGame->miTickCounter;
 		if (engine::gpClient != nullptr)
 		{
 			engine::ReconcileDesyncInfo desyncInfo = mpReconciler->Run();
@@ -208,7 +208,7 @@ void ClientSession::OnConnectionFailed()
 
 void ClientSession::OnConnectionAccepted()
 {
-	if (gpGame->InMainMenu())
+	if ((gpGame->mGameFlags & engine::GameFlags::kMainMenu))
 	{
 		gpGame->StartGameMusic();
 		gpGame->CreateNewFrame(GameFlags::kGame);
@@ -239,7 +239,9 @@ void ClientSession::OnServerLoad()
 	LOG(kDefault, kDebug, "ClientSession::OnServerLoad");
 
 	// Reset tick counter and time step — server tick resets to the saved value
-	gpGame->SetTickCounter(0);
+	int64_t iTickCounter = 0;
+	ASSERT(iTickCounter >= 0);
+	gpGame->miTickCounter = iTickCounter;
 	gpGame->mTimeStep.mTickRemainderNanoseconds = 0ns;
 	gpGame->mTimeStep.mRealTime.Reset();
 	gpGame->ResetRenderClock();
@@ -257,11 +259,11 @@ void ClientSession::OnServerLoad()
 
 	// Clear local coord frames (stale pre-load data). Reset render-progress fields first
 	// so that any entry re-emplaced by a racing packet in the same frame starts clean.
-	for (auto& [rCoord, rCoordFrames] : gpGame->mCoordFrames)
+	for (auto& [rCoord, rCoordFrames] : gpGame->mCoordinateFrames)
 	{
 		rCoordFrames.ResetClientState();
 	}
-	gpGame->mCoordFrames.clear();
+	gpGame->mCoordinateFrames.clear();
 
 	// Reset game-owned reconciliation and desync state.
 	ResetClientPacketFaultFixture(*this);
@@ -273,7 +275,7 @@ void ClientSession::OnRuntimeDisconnected()
 {
 	ResetClientPacketFaultFixture(*this);
 	mpReconciler->Reset();
-	for (auto& [rCoord, rFrames] : gpGame->mCoordFrames)
+	for (auto& [rCoord, rFrames] : gpGame->mCoordinateFrames)
 	{
 		rFrames.ResetClientState();
 	}
@@ -282,7 +284,7 @@ void ClientSession::OnRuntimeDisconnected()
 
 void ClientSession::OnCoordReleased(engine::GridCoord coord)
 {
-	gpGame->mCoordFrames.erase(coord);
+	gpGame->mCoordinateFrames.erase(coord);
 }
 void ClientSession::SendUpdatePlayerRequest(int64_t iGlobalPlayerId, bool bUseMissiles, float fNavigationDelay)
 {
@@ -340,7 +342,7 @@ void ClientSession::ApplyReceivedStaticData()
 	std::vector<engine::ReceivedStaticData>& rStaticDataList = mpRuntime->mpClient->mReceivedStaticData;
 	for (engine::ReceivedStaticData& rReceived : rStaticDataList)
 	{
-		engine::CoordFrames& rFrames = gpGame->mCoordFrames.try_emplace(rReceived.coordinate).first->second;
+		engine::CoordFrames& rFrames = gpGame->mCoordinateFrames.try_emplace(rReceived.coordinate).first->second;
 		rFrames.staticData = std::move(rReceived.staticData);
 		rFrames.staticData.coordinate = rReceived.coordinate;
 
@@ -377,7 +379,7 @@ void ClientSession::HydrateReceivedFullState(Frame& rReceived, const Frame* pRin
 
 void ClientSession::ResetCoordStatesForResync()
 {
-	for (auto& [rCoord, rSub] : gpGame->mCoordFrames)
+	for (auto& [rCoord, rSub] : gpGame->mCoordinateFrames)
 	{
 		rSub.ResetClientState();
 	}
@@ -396,7 +398,7 @@ void ClientSession::UpdateDesiredCoords(SubscriptionChangeReason eReason)
 	std::optional<common::LogTickScope> optionalTickScope;
 	if (common::gpThreadLocal->miLogTickCounter < 0)
 	{
-		optionalTickScope.emplace(gpGame->TickCounter());
+		optionalTickScope.emplace(gpGame->miTickCounter);
 	}
 
 	static constexpr int64_t kiMaxDesiredCoords = 9;
@@ -410,7 +412,7 @@ void ClientSession::UpdateDesiredCoords(SubscriptionChangeReason eReason)
 
 	if ((gpGame->ClientPlayerId().iValue != 0))
 	{
-		pushCoord(gpGame->mClientGridCoord);
+		pushCoord(gpGame->mClientGridCoordinate);
 		for (int64_t i = 0; i < gpGame->miVisibleNeighborCount; ++i)
 		{
 			pushCoord(gpGame->mVisibleNeighbors[i]);
@@ -421,7 +423,7 @@ void ClientSession::UpdateDesiredCoords(SubscriptionChangeReason eReason)
 		pushCoord(engine::kOriginCoordinate);
 	}
 
-	mpRuntime->SetDesiredCoordinates(std::span<const engine::GridCoord>(desiredCoords, static_cast<size_t>(iDesiredCount)), ToString(eReason), gpGame->TickCounter());
+	mpRuntime->SetDesiredCoordinates(std::span<const engine::GridCoord>(desiredCoords, static_cast<size_t>(iDesiredCount)), ToString(eReason), gpGame->miTickCounter);
 }
 
 void ClientSession::UpdateSubscriptions()

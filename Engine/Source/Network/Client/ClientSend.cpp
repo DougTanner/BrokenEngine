@@ -4,6 +4,8 @@
 
 #if defined(BT_CLIENT)
 
+#include "File/PackChunks.h"
+
 namespace engine
 {
 
@@ -183,7 +185,7 @@ void Client::SendHello()
 	{
 		.uiProtocolVersion = kuiProtocolVersion,
 		.iFrameVersion = game::NetworkSessionContract::GetFrameVersion(),
-		.uiPackIntegrityToken = gpFileManager->GetPackIntegrityToken(),
+		.uiPackIntegrityToken = gpFileManager->mpPackChunks->mPackIntegrityToken,
 		.buildConfiguration = kpcBuildConfigName,
 		.guid = mClientGuid,
 		.bHasGuid = true,

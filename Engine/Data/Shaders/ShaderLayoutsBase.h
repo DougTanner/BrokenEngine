@@ -1,8 +1,4 @@
-// DT: TEMP
-// #define DT_LIGHTING_ONLY
 
-// #define ENABLE_SHADER_REALTIME_CLOCK_EXT
-// #define ENABLE_DEBUG_PRINTF_EXT
 #if defined(ENABLE_DEBUG_PRINTF_EXT)
 	#define ENABLE_VULKAN_DEBUG_LAYERS
 #endif
@@ -16,7 +12,6 @@
 #define INIT {}
 #define STD std::
 
-// Constexpr bool equivalents of shader defines for C++ code
 #if defined(ENABLE_DEBUG_PRINTF_EXT)
 inline constexpr bool kbDebugPrintf = true;
 #else
@@ -32,15 +27,15 @@ inline constexpr bool kbShaderRealtimeClock = false;
 namespace shaders
 {
 
-inline constexpr VkFormat keElevationFormat = VK_FORMAT_R16_SFLOAT;
+inline constexpr VkFormat kVkFormatElevation = VK_FORMAT_R16_SFLOAT;
 
-inline constexpr VkFormat keLightingFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+inline constexpr VkFormat kVkFormatLighting = VK_FORMAT_R16G16B16A16_SFLOAT;
 
-inline constexpr VkFormat keSmokeFormat = VK_FORMAT_R16_SFLOAT;
-inline constexpr VkFormat keWindFormat = VK_FORMAT_R16G16_SFLOAT;
-inline constexpr VkFormat keShadowFormat = VK_FORMAT_R16_UNORM;
-inline constexpr VkFormat keCombineFormat = VK_FORMAT_R8G8B8A8_UNORM;
-inline constexpr VkFormat keWaterDisplacementFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+inline constexpr VkFormat kVkFormatSmoke = VK_FORMAT_R16_SFLOAT;
+inline constexpr VkFormat kVkFormatWind = VK_FORMAT_R16G16_SFLOAT;
+inline constexpr VkFormat kVkFormatShadow = VK_FORMAT_R16_UNORM;
+inline constexpr VkFormat kVkFormatCombine = VK_FORMAT_R8G8B8A8_UNORM;
+inline constexpr VkFormat kVkFormatWaterDisplacement = VK_FORMAT_R16G16B16A16_SFLOAT;
 
 struct vec2 : public XMFLOAT2
 {
@@ -119,7 +114,7 @@ struct VkDispatchIndirectCommand
 #endif // BT_ENGINE
 
 CONSTEXPR float kfPi = 3.141592654f;
-CONSTEXPR float kfEpsilon = 1e-6f;
+CONSTEXPR float kfEpsilon = 1.0e-6f;
 
 // Global Set-0 descriptor binding numbers are shared by C++ descriptor writes and shader layout qualifiers; keep
 // both sides in lockstep.
@@ -147,7 +142,7 @@ CONSTEXPR int kiWaterNormalCount = 17;
 // Length of each per-octave-group mip-variance table uploaded for Water.frag's
 // WATER_SPEC_AA_MIP_HANDOFF kernel. Must equal common::TextureHeader::kiMipVarianceCount
 // (static_assert in TextureManager.cpp) — the tables are copied verbatim from texture chunk headers.
-CONSTEXPR int kiWaterSpecAAMipTableSize = 10;
+CONSTEXPR int kiWaterSpecularAntialiasingMipTableSize = 10;
 
 // Island bindless-slot ceiling: shared by C++ and the terrain shaders, it sizes the bindless
 // sampler arrays (Terrain.frag / TerrainElevation.frag), their descriptor counts (PipelineManager),
@@ -192,7 +187,7 @@ struct AxisAlignedQuadLayout
 {
 	vec4 f4VertexRect INIT;
 	vec4 f4TextureRect INIT;
-	vec4 f4Params INIT;
+	vec4 f4Parameters INIT;
 	float fRotation INIT; // radians; 0 = identity (no rotation). Vertex shader rotates corners around quad center.
 	uint32_t uiTextureSlot INIT; // per-instance bindless texture-array index; 0 for non-island quads (templates assign at AcquireTextureSlot).
 	uint32_t uiColor INIT;
@@ -215,16 +210,16 @@ struct DebugRenderLayout
 
 struct QuadLayout
 {
-	vec4 pf4VerticesTexcoords[4] INIT;
-	vec4 pf4Params[4] INIT;
-	vec4 f4Params INIT;
+	vec4 pf4VerticesTextureCoordinates[4] INIT;
+	vec4 pf4Parameters[4] INIT;
+	vec4 f4Parameters INIT;
 	uint32_t uiColor INIT;
 };
 
 struct VisibleLightQuadLayout
 {
 	vec4 pf4Vertices[4] INIT;
-	vec4 pf4Texcoords[4] INIT;
+	vec4 pf4TextureCoordinates[4] INIT;
 	uint32_t puiColors[4] INIT;
 
 	float fIntensity INIT;
@@ -235,7 +230,7 @@ struct VisibleLightQuadLayout
 
 struct PbrMaterialLayout
 {
-	// First 9 fields must exactly match MaterialShaderData (from f4BaseColorFactor onward)
+	// First 11 fields must exactly match MaterialShaderData (from f4BaseColorFactor onward)
 	// PBR material properties per glTF 2.0 metallic-roughness specification
 	vec4 f4BaseColorFactor INIT;
 	vec4 f4EmissiveFactor INIT;
@@ -293,7 +288,6 @@ struct HexShieldLayout
 	float fMinimumIntensity INIT;
 };
 
-// Particles
 CONSTEXPR int kiMaxParticlesSpawn = 8 * 1024;
 CONSTEXPR int kiMaxParticles = 16 * 1024;
 

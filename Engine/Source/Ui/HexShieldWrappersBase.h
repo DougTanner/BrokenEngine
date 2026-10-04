@@ -7,7 +7,6 @@
 namespace engine
 {
 
-// Hex shield
 extern engine::Wrapper gHexShieldGrow;
 extern engine::Wrapper gHexShieldEdgeDistance;
 extern engine::Wrapper gHexShieldEdgePower;

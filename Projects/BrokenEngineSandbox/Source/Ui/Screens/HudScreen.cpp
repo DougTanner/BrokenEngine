@@ -23,7 +23,7 @@ void HudScreen::Render()
 	std::optional<common::LogTickScope> optionalTickScope;
 	if (common::gpThreadLocal->miLogTickCounter < 0)
 	{
-		optionalTickScope.emplace(gpGame->TickCounter());
+		optionalTickScope.emplace(gpGame->miTickCounter);
 	}
 
 	if (gpGame->meUiState != engine::UiState::kNone)
@@ -32,8 +32,8 @@ void HudScreen::Render()
 	}
 
 	// Force-open the fleet panel when the focused fleet has no presence in any subscribed frame.
-	// Iterating all subscribed frames (not just mClientGridCoord) tolerates cell-boundary crossings,
-	// where the player's snapshot has migrated to a neighbor before mClientGridCoord catches up.
+	// Iterating all subscribed frames (not just mClientGridCoordinate) tolerates cell-boundary crossings,
+	// where the player's snapshot has migrated to a neighbor before mClientGridCoordinate catches up.
 	bool bWantsForceOpen = false;
 	const char* pcWantReason = "fleet member present";
 	int64_t iSubscribedFrameCount = 0;
@@ -51,7 +51,7 @@ void HudScreen::Render()
 	else
 	{
 		bool bFoundAny = false;
-		for (const auto& [coord, frames] : gpGame->mCoordFrames)
+		for (const auto& [coord, frames] : gpGame->mCoordinateFrames)
 		{
 			if (frames.iSnapshotCount == 0)
 			{
@@ -102,17 +102,17 @@ void HudScreen::Render()
 	// kWarning clears both the compile floor (keLogLevelDefault, kDebug) and the runtime default threshold (kInfo).
 	if (bForceOpen && !mbPreviousForceOpen)
 	{
-		LOG(kDefault, kWarning, "HUD auto-unhide reason: {} coord: ({},{}) frames: {}", pcWantReason, gpGame->mClientGridCoord.iX, gpGame->mClientGridCoord.iY, iSubscribedFrameCount);
+		LOG(kDefault, kWarning, "HUD auto-unhide reason: {} coord: ({},{}) frames: {}", pcWantReason, gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY, iSubscribedFrameCount);
 	}
 	mbPreviousForceOpen = bForceOpen;
 
 	// Right panel content gate: it has nothing useful to show without a focused player in current snapshot.
 	std::optional<int64_t> oPlayerIndex;
 	{
-		auto it = gpGame->mCoordFrames.find(gpGame->mClientGridCoord);
-		if (it != gpGame->mCoordFrames.end() && it->second.iSnapshotCount > 0)
+		auto it = gpGame->mCoordinateFrames.find(gpGame->mClientGridCoordinate);
+		if (it != gpGame->mCoordinateFrames.end() && it->second.iSnapshotCount > 0)
 		{
-			oPlayerIndex = gpGame->ClientPlayerIndex(*gpGame->RenderFrame(gpGame->mClientGridCoord).postRender.pPlayers);
+			oPlayerIndex = gpGame->ClientPlayerIndex(*gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pPlayers);
 		}
 	}
 	bool bRightHasContent = oPlayerIndex.has_value();
@@ -183,9 +183,9 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	ImGui::SetNextWindowPos(ImVec2(fEdgeX, vAnchor.y), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
 	ImGui::Begin("FleetPanel", nullptr, eFlags);
 	mFleetSlide.vLastSize = ImGui::GetWindowSize();
-	engine::gpImGuiManager->RegisterOpaqueRect(ImGui::GetWindowPos(), ImGui::GetWindowSize());
+	engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
 
-	// Border + accent strip only — the opaque themed WindowBg must stay intact for RegisterOpaqueRect occlusion
+	// Border + accent strip only — the opaque themed WindowBg must stay intact for RegisterOpaqueRectangle occlusion
 	ImVec2 vPanelPos = ImGui::GetWindowPos();
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
 	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
@@ -226,12 +226,12 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	ImGui::EndDisabled();
 
 	ImGui::SameLine();
-	ImGui::BeginDisabled(gpGame->mFleetSelection.mCreateFleetToggle.IsPending() || iFleetCount >= kiMaxFleetsPerClient);
+	ImGui::BeginDisabled((gpGame->mFleetSelection.mCreateFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || iFleetCount >= kiMaxFleetsPerClient);
 	if (ImGui::Button("[+]##Fleet"))
 	{
 		if (gpClientSession != nullptr)
 		{
-			gpGame->mFleetSelection.mCreateFleetToggle.SetPending();
+			gpGame->mFleetSelection.mCreateFleetToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
 			gpClientSession->SendCreateFleetRequest();
 			LOG(kDefault, kVerbose, "HUD CreateFleetRequest FleetCount: {}", iFleetCount);
 		}
@@ -244,12 +244,12 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	gpGame->mFleetSelection.mDeleteFleetToggle.Update(iFleetCount);
 	bool bCanDelete = pFleet != nullptr && pFleet->members.empty();
 	ImGui::SameLine();
-	ImGui::BeginDisabled(!bCanDelete || gpGame->mFleetSelection.mDeleteFleetToggle.IsPending());
+	ImGui::BeginDisabled(!bCanDelete || (gpGame->mFleetSelection.mDeleteFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending));
 	if (ImGui::Button("[-]##Fleet"))
 	{
 		if (pFleet != nullptr && gpClientSession != nullptr)
 		{
-			gpGame->mFleetSelection.mDeleteFleetToggle.SetPending();
+			gpGame->mFleetSelection.mDeleteFleetToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
 			gpClientSession->SendDeleteFleetRequest(pFleet->guid);
 			LOG(kDefault, kVerbose, "HUD DeleteFleetRequest Fleet: ({},{}) FleetCount: {}", pFleet->guid.uiHigh, pFleet->guid.uiLow, iFleetCount);
 		}
@@ -310,12 +310,12 @@ void HudScreen::RenderFleetPanel(float fTarget)
 		}
 
 		// Add player button at bottom of list
-		ImGui::BeginDisabled(gpGame->mFleetSelection.mSpawnIntoFleetToggle.IsPending() || pFleet->members.size() >= kuiMaxFleetMembers);
+		ImGui::BeginDisabled((gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || pFleet->members.size() >= kuiMaxFleetMembers);
 		if (ImGui::Button("[+]##Player"))
 		{
 			if (gpClientSession != nullptr)
 			{
-				gpGame->mFleetSelection.mSpawnIntoFleetToggle.SetPending();
+				gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
 				gpClientSession->SendSpawnIntoFleetRequest(pFleet->guid);
 				LOG(kDefault, kVerbose, "HUD SpawnIntoFleet Fleet: ({},{})", pFleet->guid.uiHigh, pFleet->guid.uiLow);
 			}
@@ -325,7 +325,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 		// Fleet navigation delay slider
 		ImGui::Separator();
 		gpGame->mFleetSelection.mNavigationDelayControl.Update(NavigationDelayKey {.fleetGuid = pFleet->guid, .fNavigationDelay = pFleet->fNavigationDelay});
-		ImGui::BeginDisabled(gpGame->mFleetSelection.mNavigationDelayControl.IsPending());
+		ImGui::BeginDisabled((gpGame->mFleetSelection.mNavigationDelayControl.mFlags & engine::NetworkUiControlFlags::kPending));
 		static float sfNavigationDelayEditValue = 0.0f;
 		static bool sbNavigationDelaySliderWasActive = false;
 		// Reload only while the slider is inactive, so it owns the value for the whole interaction and a release
@@ -350,7 +350,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 			// An unchanged release would get back an equal FleetSync, which never clears pending
 			if (gpClientSession != nullptr && sfNavigationDelayEditValue != pFleet->fNavigationDelay)
 			{
-				gpGame->mFleetSelection.mNavigationDelayControl.SetPending();
+				gpGame->mFleetSelection.mNavigationDelayControl.mFlags.Set(engine::NetworkUiControlFlags::kPending);
 				gpClientSession->SendFleetNavigationDelayRequest(pFleet->guid, sfNavigationDelayEditValue);
 			}
 		}
@@ -367,10 +367,10 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 
 	std::optional<int64_t> oPlayerIndex = std::nullopt;
 	{
-		auto it = gpGame->mCoordFrames.find(gpGame->mClientGridCoord);
-		if (it != gpGame->mCoordFrames.end() && it->second.iSnapshotCount > 0)
+		auto it = gpGame->mCoordinateFrames.find(gpGame->mClientGridCoordinate);
+		if (it != gpGame->mCoordinateFrames.end() && it->second.iSnapshotCount > 0)
 		{
-			oPlayerIndex = gpGame->ClientPlayerIndex(*gpGame->RenderFrame(gpGame->mClientGridCoord).postRender.pPlayers);
+			oPlayerIndex = gpGame->ClientPlayerIndex(*gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pPlayers);
 		}
 	}
 
@@ -385,16 +385,16 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 	ImGui::SetNextWindowPos(ImVec2(fEdgeX, vAnchor.y), ImGuiCond_Always, ImVec2(0.0f, 0.0f));
 	ImGui::Begin("FocusedPlayerPanel", nullptr, eFlags);
 	mFocusedPlayerSlide.vLastSize = ImGui::GetWindowSize();
-	engine::gpImGuiManager->RegisterOpaqueRect(ImGui::GetWindowPos(), ImGui::GetWindowSize());
+	engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
 
-	// Border + accent strip only — the opaque themed WindowBg must stay intact for RegisterOpaqueRect occlusion
+	// Border + accent strip only — the opaque themed WindowBg must stay intact for RegisterOpaqueRectangle occlusion
 	ImVec2 vPanelPos = ImGui::GetWindowPos();
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
 	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPos, ImVec2(vPanelPos.x + vPanelSize.x, vPanelPos.y + vPanelSize.y));
 
 	if (oPlayerIndex.has_value())
 	{
-		PlayersPostRender& rPlayers = *gpGame->RenderFrame(gpGame->mClientGridCoord).postRender.pPlayers;
+		PlayersPostRender& rPlayers = *gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pPlayers;
 		bool bUseMissiles = static_cast<bool>(rPlayers.pFlags[*oPlayerIndex] & PlayerFlags::kUseMissiles);
 		gpGame->mWeaponModeToggle.Update(WeaponModeKey {.playerId = gpGame->ClientPlayerId(), .bUseMissiles = bUseMissiles});
 
@@ -406,12 +406,12 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 		ImVec2 vCursor = ImGui::GetCursorPos();
 		ImGui::SetCursorPos(ImVec2(vCursor.x + std::max(0.0f, 0.5f * (vAvailable.x - vButtonSize.x)), vCursor.y + std::max(0.0f, 0.5f * (vAvailable.y - vButtonSize.y))));
 
-		ImGui::BeginDisabled(gpGame->mWeaponModeToggle.IsPending());
+		ImGui::BeginDisabled((gpGame->mWeaponModeToggle.mFlags & engine::NetworkUiControlFlags::kPending));
 		if (ImGui::Button(pLabel, vButtonSize))
 		{
 			if (gpClientSession != nullptr && (gpGame->ClientPlayerId().iValue != 0))
 			{
-				gpGame->mWeaponModeToggle.SetPending();
+				gpGame->mWeaponModeToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
 				float fNavigationDelay = rPlayers.pfNavigationDelays[*oPlayerIndex];
 				gpClientSession->SendUpdatePlayerRequest(gpGame->ClientPlayerId().iValue, !bUseMissiles, fNavigationDelay);
 			}

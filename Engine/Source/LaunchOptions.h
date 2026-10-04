@@ -9,16 +9,16 @@ enum class LaunchOptionFlags : uint8_t
 	kRenderDoc    = 1 << 1, // force-load renderdoc.dll before instance creation and expose the in-app capture API (client; requires game kbRenderDoc)
 };
 
-// Command-line launch options, parsed once in ProcessMain before any subsystem starts. Later harness plans append
-// fields here as new launch args are added. std::filesystem::path / int64_t come from ExternalHeaders (PCH).
+// Parsed once in ProcessMain before any subsystem starts.
 struct LaunchOptions
 {
+	// An agent-launched process has no one to answer a modal dialog, so startup failures log and exit instead.
 	int64_t iAgentPort = 0; // 0 = agent command channel disabled
-	common::Flags<LaunchOptionFlags> flags; // parsed boolean launch options (see LaunchOptionFlags)
+	common::Flags<LaunchOptionFlags> flags;
 	std::filesystem::path logFile; // empty = no log-file sink
 	std::filesystem::path dataDirectory; // empty = executable-sibling Data; --data-directory supplies an existing absolute directory
 	std::filesystem::path appDataDirectory; // empty = roaming AppData; --app-data-directory supplies an existing absolute directory
-	VkExtent2D windowedExtent {0, 0}; // {0,0} = not requested; --windowed WxH forces a windowed client size (overrides fullscreen at the read sites, never mutates gFullscreen)
+	VkExtent2D vkWindowedExtent {.width = 0, .height = 0}; // {0,0} = not requested; --windowed WxH forces a windowed client size (overrides fullscreen at the read sites, never mutates gFullscreen)
 };
 
 inline LaunchOptions gLaunchOptions {};
@@ -30,23 +30,15 @@ bool ParseLaunchOptions();
 // True for an agent-harness client: a kbAgent build launched with --agent-port. Every physical (human) input
 // chokepoint is suppressed for the process lifetime, leaving the harness's synthetic input as the sole source.
 // Constant from the ProcessMain parse (equals agent-channel existence) — never flips mid-run. Reading game kbAgent is the
-// sanctioned engine->game direction. Harness overview: .claude/skills/agent-harness/SKILL.md.
+// sanctioned engine->game direction.
 inline bool PhysicalInputSuppressed()
 {
 	return kbAgent && gLaunchOptions.iAgentPort != 0;
 }
 
-// An agent-launched process has no one to answer a modal dialog, so startup failures log and exit instead.
-inline bool AgentLaunched()
-{
-	return gLaunchOptions.iAgentPort != 0;
-}
-
 #if defined(BT_CLIENT)
-// Agent-only runtime fullscreen override. std::nullopt clears it (restores launch behavior); a set value forces
-// windowed/fullscreen mid-run, consulted ahead of --windowed in WantedFullscreen(). Never mutates the persisted
-// gFullscreen setting. Defined in Main.cpp beside the override static. Harness overview: .claude/skills/agent-harness/SKILL.md.
-void SetAgentFullscreenOverride(std::optional<bool> fullscreen);
+// std::nullopt keeps launch behavior; a set value overrides --windowed and the saved fullscreen preference without changing it.
+inline std::optional<bool> gAgentFullscreenOverride = std::nullopt;
 #endif
 
 } // namespace engine

@@ -20,8 +20,6 @@ public:
 	void CreateLightingBlurPipelines();
 	void CreateLightingShadowDependentPipelines();
 
-private:
-
 	std::unordered_map<common::crc_t, Shader>& mrShaders;
 	Pipeline* mpPipelines = nullptr;
 	Pipeline* mpSpreadPipelines = nullptr;

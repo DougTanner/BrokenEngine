@@ -9,17 +9,17 @@ class CurveData
 {
 public:
 
-	static constexpr int kiMaxControlPoints = 16;
+	static constexpr int64_t kiMaximumControlPoints = 16;
 
 	CurveData() = delete;
 
-	CurveData(std::initializer_list<ImVec2> initial, float fYMin, float fYMax)
-	: mfYMin(fYMin)
-	, mfYMax(fYMax)
+	CurveData(std::initializer_list<ImVec2> initial, float fYMinimum, float fYMaximum)
+	: mfYMinimum(fYMinimum)
+	, mfYMaximum(fYMaximum)
 	{
-		ASSERT(mfYMin < mfYMax);
+		ASSERT(mfYMinimum < mfYMaximum);
 		ASSERT(initial.size() >= 2);
-		mPoints.reserve(kiMaxControlPoints);
+		mPoints.reserve(kiMaximumControlPoints);
 		for (const ImVec2& rPoint : initial)
 		{
 			mPoints.push_back(rPoint);
@@ -28,24 +28,23 @@ public:
 
 	~CurveData() = default;
 
-	float GetYMin() const { return mfYMin; }
-	float GetYMax() const { return mfYMax; }
-	int GetPointCount() const { return static_cast<int>(mPoints.size()); }
-	const ImVec2& GetPoint(int iIndex) const { return mPoints[iIndex]; }
-	bool IsEndpoint(int iIndex) const { return iIndex == 0 || iIndex == static_cast<int>(mPoints.size()) - 1; }
+	bool IsEndpoint(int64_t iIndex) const
+	{
+		return iIndex == 0 || iIndex == std::ssize(mPoints) - 1;
+	}
 
 	// Add a new control point. Clamps X to (0, 1) (endpoints stay reserved at exactly 0 and 1).
 	// Returns index of the new point, or -1 if at cap.
-	int AddPoint(ImVec2 point)
+	int64_t AddPoint(ImVec2 point)
 	{
-		if (static_cast<int>(mPoints.size()) >= kiMaxControlPoints)
+		if (std::ssize(mPoints) >= kiMaximumControlPoints)
 		{
 			return -1;
 		}
 		point.x = std::clamp(point.x, std::nextafter(0.0f, 1.0f), std::nextafter(1.0f, 0.0f));
-		point.y = std::clamp(point.y, mfYMin, mfYMax);
-		int iInsert = 1;
-		while (iInsert < static_cast<int>(mPoints.size()) && mPoints[iInsert].x < point.x)
+		point.y = std::clamp(point.y, mfYMinimum, mfYMaximum);
+		int64_t iInsert = 1;
+		while (iInsert < std::ssize(mPoints) && mPoints.at(iInsert).x < point.x)
 		{
 			++iInsert;
 		}
@@ -54,13 +53,13 @@ public:
 	}
 
 	// Remove a non-endpoint point. Silently ignored for endpoints or when at the floor of 2 points.
-	void RemovePoint(int iIndex)
+	void RemovePoint(int64_t iIndex)
 	{
-		if (iIndex <= 0 || iIndex >= static_cast<int>(mPoints.size()) - 1)
+		if (iIndex <= 0 || iIndex >= std::ssize(mPoints) - 1)
 		{
 			return;
 		}
-		if (mPoints.size() <= 2)
+		if (std::ssize(mPoints) <= 2)
 		{
 			return;
 		}
@@ -69,97 +68,97 @@ public:
 
 	// Move a point. Endpoints lock X to 0 or 1; interior points clamp X between neighbors
 	// (with a small epsilon) so the sort order is preserved.
-	void MovePoint(int iIndex, ImVec2 point)
+	void MovePoint(int64_t iIndex, ImVec2 point)
 	{
-		if (iIndex < 0 || iIndex >= static_cast<int>(mPoints.size()))
+		if (iIndex < 0 || iIndex >= std::ssize(mPoints))
 		{
 			return;
 		}
-		point.y = std::clamp(point.y, mfYMin, mfYMax);
+		point.y = std::clamp(point.y, mfYMinimum, mfYMaximum);
 		if (iIndex == 0)
 		{
-			mPoints[0] = ImVec2(0.0f, point.y);
+			mPoints.at(0) = ImVec2(0.0f, point.y);
 			return;
 		}
-		if (iIndex == static_cast<int>(mPoints.size()) - 1)
+		if (iIndex == std::ssize(mPoints) - 1)
 		{
-			mPoints[iIndex] = ImVec2(1.0f, point.y);
+			mPoints.at(iIndex) = ImVec2(1.0f, point.y);
 			return;
 		}
-		static constexpr float kfSeparation = 1e-4f;
-		float fMinX = mPoints[iIndex - 1].x + kfSeparation;
-		float fMaxX = mPoints[iIndex + 1].x - kfSeparation;
-		point.x = std::clamp(point.x, fMinX, fMaxX);
-		mPoints[iIndex] = point;
+		static constexpr float kfSeparation = 1.0e-4f;
+		float fMinimumX = mPoints.at(iIndex - 1).x + kfSeparation;
+		float fMaximumX = mPoints.at(iIndex + 1).x - kfSeparation;
+		point.x = std::clamp(point.x, fMinimumX, fMaximumX);
+		mPoints.at(iIndex) = point;
 	}
 
-	// Sample the curve at fT in [0, 1] using monotone cubic Hermite (Fritsch-Carlson).
-	float Evaluate(float fT) const
+	// Sample the curve at fCurveX in [0, 1] using monotone cubic Hermite (Fritsch-Carlson).
+	float Evaluate(float fCurveX) const
 	{
-		fT = std::clamp(fT, 0.0f, 1.0f);
-		int iCount = static_cast<int>(mPoints.size());
-		if (fT <= mPoints[0].x)
+		fCurveX = std::clamp(fCurveX, 0.0f, 1.0f);
+		int64_t iCount = std::ssize(mPoints);
+		if (fCurveX <= mPoints.at(0).x)
 		{
-			return mPoints[0].y;
+			return mPoints.at(0).y;
 		}
-		if (fT >= mPoints[iCount - 1].x)
+		if (fCurveX >= mPoints.at(iCount - 1).x)
 		{
-			return mPoints[iCount - 1].y;
+			return mPoints.at(iCount - 1).y;
 		}
-		int i = 0;
-		while (i < iCount - 1 && mPoints[i + 1].x < fT)
+		int64_t i = 0;
+		while (i < iCount - 1 && mPoints.at(i + 1).x < fCurveX)
 		{
 			++i;
 		}
-		float fMOut;
-		float fMIn;
-		ComputeTangents(i, fMOut, fMIn);
-		float fX0 = mPoints[i].x;
-		float fX1 = mPoints[i + 1].x;
-		float fY0 = mPoints[i].y;
-		float fY1 = mPoints[i + 1].y;
-		float fH = fX1 - fX0;
-		float fU = (fT - fX0) / fH;
-		float fU2 = fU * fU;
-		float fU3 = fU2 * fU;
-		float fH00 = 2.0f * fU3 - 3.0f * fU2 + 1.0f;
-		float fH10 = fU3 - 2.0f * fU2 + fU;
-		float fH01 = -2.0f * fU3 + 3.0f * fU2;
-		float fH11 = fU3 - fU2;
-		float fY = fH00 * fY0 + fH10 * fH * fMOut + fH01 * fY1 + fH11 * fH * fMIn;
-		return std::clamp(fY, mfYMin, mfYMax);
+		float fOutgoingTangent;
+		float fIncomingTangent;
+		ComputeTangents(i, fOutgoingTangent, fIncomingTangent);
+		float fX0 = mPoints.at(i).x;
+		float fX1 = mPoints.at(i + 1).x;
+		float fY0 = mPoints.at(i).y;
+		float fY1 = mPoints.at(i + 1).y;
+		float fSegmentWidth = fX1 - fX0;
+		float fSegmentFraction = (fCurveX - fX0) / fSegmentWidth;
+		float fSegmentFractionSquared = fSegmentFraction * fSegmentFraction;
+		float fSegmentFractionCubed = fSegmentFractionSquared * fSegmentFraction;
+		float fLeftValueBasis = 2.0f * fSegmentFractionCubed - 3.0f * fSegmentFractionSquared + 1.0f;
+		float fLeftTangentBasis = fSegmentFractionCubed - 2.0f * fSegmentFractionSquared + fSegmentFraction;
+		float fRightValueBasis = -2.0f * fSegmentFractionCubed + 3.0f * fSegmentFractionSquared;
+		float fRightTangentBasis = fSegmentFractionCubed - fSegmentFractionSquared;
+		float fY = fLeftValueBasis * fY0 + fLeftTangentBasis * fSegmentWidth * fOutgoingTangent + fRightValueBasis * fY1 + fRightTangentBasis * fSegmentWidth * fIncomingTangent;
+		return std::clamp(fY, mfYMinimum, mfYMaximum);
 	}
 
 private:
 
 	// Fritsch-Carlson tangents at segment endpoints i (left) and i+1 (right).
-	void ComputeTangents(int iSegment, float& rfMLeft, float& rfMRight) const
+	void ComputeTangents(int64_t iSegment, float& rfLeftTangent, float& rfRightTangent) const
 	{
-		rfMLeft = SecantTangent(iSegment);
-		rfMRight = SecantTangent(iSegment + 1);
+		rfLeftTangent = SecantTangent(iSegment);
+		rfRightTangent = SecantTangent(iSegment + 1);
 		// Preserve monotonicity on the current segment.
 		float fDelta = Secant(iSegment);
 		if (fDelta == 0.0f)
 		{
-			rfMLeft = 0.0f;
-			rfMRight = 0.0f;
+			rfLeftTangent = 0.0f;
+			rfRightTangent = 0.0f;
 			return;
 		}
-		float fAlpha = rfMLeft / fDelta;
-		float fBeta = rfMRight / fDelta;
-		float fMag = fAlpha * fAlpha + fBeta * fBeta;
-		if (fMag > 9.0f)
+		float fAlpha = rfLeftTangent / fDelta;
+		float fBeta = rfRightTangent / fDelta;
+		float fSquaredMagnitude = fAlpha * fAlpha + fBeta * fBeta;
+		if (fSquaredMagnitude > 9.0f)
 		{
-			float fScale = 3.0f / std::sqrt(fMag);
-			rfMLeft = fScale * fAlpha * fDelta;
-			rfMRight = fScale * fBeta * fDelta;
+			float fScale = 3.0f / std::sqrt(fSquaredMagnitude);
+			rfLeftTangent = fScale * fAlpha * fDelta;
+			rfRightTangent = fScale * fBeta * fDelta;
 		}
 	}
 
 	// Average of adjacent secant slopes (or the single adjacent secant at boundaries).
-	float SecantTangent(int iIndex) const
+	float SecantTangent(int64_t iIndex) const
 	{
-		int iCount = static_cast<int>(mPoints.size());
+		int64_t iCount = std::ssize(mPoints);
 		if (iIndex == 0)
 		{
 			return Secant(0);
@@ -177,15 +176,17 @@ private:
 		return 0.5f * (fLeft + fRight);
 	}
 
-	float Secant(int iSegment) const
+	float Secant(int64_t iSegment) const
 	{
-		float fDx = mPoints[iSegment + 1].x - mPoints[iSegment].x;
-		return (mPoints[iSegment + 1].y - mPoints[iSegment].y) / fDx;
+		float fDeltaX = mPoints.at(iSegment + 1).x - mPoints.at(iSegment).x;
+		return (mPoints.at(iSegment + 1).y - mPoints.at(iSegment).y) / fDeltaX;
 	}
 
+public:
+
 	std::vector<ImVec2> mPoints;
-	float mfYMin = 0.0f;
-	float mfYMax = 0.0f;
+	float mfYMinimum = 0.0f;
+	float mfYMaximum = 0.0f;
 };
 
 } // namespace engine

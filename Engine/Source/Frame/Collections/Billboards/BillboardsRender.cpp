@@ -2,6 +2,8 @@
 
 #if defined(BT_CLIENT)
 
+#include "Graphics/Objects/PipelineDescriptorWriter.h"
+
 #include "Profile/ProfileManager.h"
 
 namespace engine
@@ -35,7 +37,7 @@ void BillboardsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::BillboardLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineBillboards].at(kuiCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 2, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineBillboards].at(kuiCrc), iCommandBuffer, 2, pBuffer);
 	}
 }
 
@@ -105,8 +107,14 @@ void BillboardsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 
 void BillboardsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	gpProfileManager->SetCount(kCpuCounterBillboards, siTotalCount);
-	gpProfileManager->SetCount(kCpuCounterBillboardsRendered, siRendered);
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterBillboards).iCount = siTotalCount;
+	}
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterBillboardsRendered).iCount = siRendered;
+	}
 
 	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineBillboards].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 }

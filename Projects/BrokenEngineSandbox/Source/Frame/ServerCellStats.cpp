@@ -40,19 +40,31 @@ void PublishServerEntityCounts()
 	int64_t iTotalBlasters = 0;
 	int64_t iTotalMissiles = 0;
 
-	for (const engine::GridCoord& rCoord : gpGame->mActiveCoords)
+	for (const engine::GridCoord& rCoord : gpGame->mActiveCoordinates)
 	{
-		ServerCellStats cellStats = GetServerCellStats(gpGame->CurrentFrame(rCoord));
+		ServerCellStats cellStats = GetServerCellStats((*gpGame->mCoordinateFrames.at(rCoord).pCurrent));
 		iTotalPlayers += cellStats.iPlayers;
 		iTotalSpaceships += cellStats.iSpaceships;
 		iTotalBlasters += cellStats.iBlasters;
 		iTotalMissiles += cellStats.iMissiles;
 	}
 
-	gpProfileManager->SetCount(kCpuCounterPlayers, iTotalPlayers);
-	gpProfileManager->SetCount(kCpuCounterSpaceships, iTotalSpaceships);
-	gpProfileManager->SetCount(kCpuCounterBlasters, iTotalBlasters);
-	gpProfileManager->SetCount(kCpuCounterMissiles, iTotalMissiles);
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterPlayers).iCount = iTotalPlayers;
+	}
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterSpaceships).iCount = iTotalSpaceships;
+	}
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterBlasters).iCount = iTotalBlasters;
+	}
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterMissiles).iCount = iTotalMissiles;
+	}
 }
 
 } // namespace game

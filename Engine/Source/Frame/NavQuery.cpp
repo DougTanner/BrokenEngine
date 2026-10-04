@@ -571,7 +571,7 @@ bool XM_CALLCONV NavQueryPointBlocked(FXMVECTOR vecPosition, const NavData& rNav
 
 XMVECTOR XM_CALLCONV NavQuerySnapToNavigable(FXMVECTOR vecPosition, const NavData& rNavData)
 {
-	float fBaseHeight = gBaseHeight.Get();
+	float fBaseHeight = gBaseHeight.mfCurrent;
 	ASSERT(XMVectorGetZ(vecPosition) == fBaseHeight);
 
 	const XMFLOAT2* pVertices = rNavData.vertices.data();
@@ -605,7 +605,7 @@ XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDesti
 	}
 #endif // BT_SERVER
 
-	float fBaseHeight = gBaseHeight.Get();
+	float fBaseHeight = gBaseHeight.mfCurrent;
 	ASSERT(XMVectorGetZ(vecPosition) == fBaseHeight);
 	ASSERT(XMVectorGetZ(vecDestination) == fBaseHeight);
 

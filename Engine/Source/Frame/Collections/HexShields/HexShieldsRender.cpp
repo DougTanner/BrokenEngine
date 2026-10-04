@@ -2,6 +2,7 @@
 
 #if defined(BT_CLIENT)
 
+#include "Graphics/Objects/PipelineDescriptorWriter.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 
 #include "Profile/ProfileManager.h"
@@ -38,8 +39,8 @@ void HexShieldsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::HexShieldLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineHexShields].at(kuiCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 2, pBuffer);
-		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineHexShieldsLighting].at(kuiCrc)->UpdateStorageBufferDescriptor(iCommandBuffer, 2, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineHexShields].at(kuiCrc), iCommandBuffer, 2, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineHexShieldsLighting].at(kuiCrc), iCommandBuffer, 2, pBuffer);
 	}
 }
 
@@ -65,7 +66,7 @@ void HexShieldsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, Rebase(rBasis, vecLocalPosition));
-		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->f4RenderVisibleArea, f4Position, kfAdjust, kfAdjust, kfAdjust, kfAdjust))
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position, kfAdjust, kfAdjust, kfAdjust, kfAdjust))
 		{
 			continue;
 		}
@@ -110,8 +111,14 @@ void HexShieldsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 
 void HexShieldsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	gpProfileManager->SetCount(kCpuCounterHexShields, siTotalCount);
-	gpProfileManager->SetCount(kCpuCounterHexShieldsRendered, siRendered);
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterHexShields).iCount = siTotalCount;
+	}
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterHexShieldsRendered).iCount = siRendered;
+	}
 	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineHexShields].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineHexShieldsLighting].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() ? siRendered : 0);
 }

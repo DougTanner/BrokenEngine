@@ -7,101 +7,95 @@
 namespace engine
 {
 
-void TextureCache::CopyImageToHostMemory(VkImage srcImage, VkExtent3D extent, VkFormat format, uint32_t mipLevels, uint32_t arrayLayers, bool bFromSwapchain, VkImageLayout vkCurrentLayout, std::vector<std::byte>& rOutData)
+void TextureCache::CopyImageToHostMemory(VkImage vkSourceImage, VkExtent3D vkExtent, VkFormat vkFormat, uint32_t uiMipmapLevels, uint32_t uiArrayLayers, bool bFromSwapchain, VkImageLayout vkCurrentLayout, std::vector<std::byte>& rOutputData)
 {
-	// Heap: rOutData.resize + staging-buffer creation. Main-loop-reachable per frame via the kbScreenshots trigger
-	// (Graphics::RenderMainPresentAcquire -> Screenshot::SaveScreenshot -> here) with tracking live; rOutData
+	// Heap: rOutputData.resize + staging-buffer creation. Main-loop-reachable per frame via the kbScreenshots trigger
+	// (Graphics::RenderMainPresentAcquire -> Screenshot::SaveScreenshot -> here) with tracking live; rOutputData
 	// is std::move'd into the async save lambda so it cannot use the workbuffer.
 	ScopedSuppressAllocationTracking suppress;
 
-	VkPipelineStageFlags srcStage = bFromSwapchain ? VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	VkPipelineStageFlags dstStage = bFromSwapchain ? VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	VkAccessFlags srcAccess = bFromSwapchain ? 0 : VK_ACCESS_SHADER_READ_BIT;
-	VkAccessFlags dstAccess = bFromSwapchain ? 0 : VK_ACCESS_SHADER_READ_BIT;
+	VkPipelineStageFlags vkSourceStage = bFromSwapchain ? VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	VkPipelineStageFlags vkDestinationStage = bFromSwapchain ? VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	VkAccessFlags vkSourceAccess = bFromSwapchain ? 0 : VK_ACCESS_SHADER_READ_BIT;
+	VkAccessFlags vkDestinationAccess = bFromSwapchain ? 0 : VK_ACCESS_SHADER_READ_BIT;
 
-	// Calculate total data size
-	int64_t iTotalSize = common::ComputeImageByteSize(format, extent.width, extent.height, mipLevels, arrayLayers, 1);
+	int64_t iTotalSize = common::ComputeImageByteSize(vkFormat, vkExtent.width, vkExtent.height, uiMipmapLevels, uiArrayLayers, 1);
 
-	// Allocate output data
-	rOutData.resize(iTotalSize);
+	rOutputData.resize(iTotalSize);
 
-	// Create staging buffer
 	StagingBuffer stagingBuffer("ImageCopyStaging", iTotalSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
 	OneShotCommandBuffer oneShotCommandBuffer;
 
-	// Transition image to transfer source layout
 	VkImageMemoryBarrier vkImageMemoryBarrier
 	{
 		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcAccessMask = srcAccess,
+		.srcAccessMask = vkSourceAccess,
 		.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
 		.oldLayout = vkCurrentLayout,
 		.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		.image = srcImage,
+		.image = vkSourceImage,
 		.subresourceRange =
 		{
 			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
 			.baseMipLevel = 0,
-			.levelCount = mipLevels,
+			.levelCount = uiMipmapLevels,
 			.baseArrayLayer = 0,
-			.layerCount = arrayLayers,
+			.layerCount = uiArrayLayers,
 		},
 	};
-	vkCmdPipelineBarrier(oneShotCommandBuffer.mVkCommandBuffer, srcStage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &vkImageMemoryBarrier);
+	vkCmdPipelineBarrier(oneShotCommandBuffer.mVkCommandBuffer, vkSourceStage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &vkImageMemoryBarrier);
 
-	// Copy each mip level and array layer to staging buffer
-	size_t uiOffset = 0;
+	VkDeviceSize vkOffset = 0;
 
-	for (uint32_t iLayer = 0; iLayer < arrayLayers; ++iLayer)
+	for (uint32_t i = 0; i < uiArrayLayers; ++i)
 	{
-		int64_t iMipWidth = extent.width;
-		int64_t iMipHeight = extent.height;
-		for (uint32_t iMip = 0; iMip < mipLevels; ++iMip)
+		int64_t iMipmapWidth = vkExtent.width;
+		int64_t iMipmapHeight = vkExtent.height;
+		for (uint32_t j = 0; j < uiMipmapLevels; ++j)
 		{
 			VkBufferImageCopy vkBufferImageCopy
 			{
-				.bufferOffset = uiOffset,
+				.bufferOffset = vkOffset,
 				.imageSubresource =
 				{
 					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-					.mipLevel = iMip,
-					.baseArrayLayer = iLayer,
+					.mipLevel = j,
+					.baseArrayLayer = i,
 					.layerCount = 1,
 				},
 				.imageExtent =
 				{
-					.width = static_cast<uint32_t>(iMipWidth),
-					.height = static_cast<uint32_t>(iMipHeight),
+					.width = static_cast<uint32_t>(iMipmapWidth),
+					.height = static_cast<uint32_t>(iMipmapHeight),
 					.depth = 1,
 				},
 			};
 
-			vkCmdCopyImageToBuffer(oneShotCommandBuffer.mVkCommandBuffer, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer.stagingVkBuffer, 1, &vkBufferImageCopy);
+			vkCmdCopyImageToBuffer(oneShotCommandBuffer.mVkCommandBuffer, vkSourceImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer.vkStagingBuffer, 1, &vkBufferImageCopy);
 
-			uiOffset += common::SizeInBytes(format, iMipWidth, iMipHeight);
-			iMipWidth = std::max(iMipWidth / 2, 1ll);
-			iMipHeight = std::max(iMipHeight / 2, 1ll);
+			vkOffset += common::SizeInBytes(vkFormat, iMipmapWidth, iMipmapHeight);
+			iMipmapWidth = std::max(iMipmapWidth / 2, 1ll);
+			iMipmapHeight = std::max(iMipmapHeight / 2, 1ll);
 		}
 	}
 
-	// Transition image back to original layout
 	vkImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 	vkImageMemoryBarrier.newLayout = vkCurrentLayout;
 	vkImageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-	vkImageMemoryBarrier.dstAccessMask = dstAccess;
-	vkCmdPipelineBarrier(oneShotCommandBuffer.mVkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, dstStage, 0, 0, nullptr, 0, nullptr, 1, &vkImageMemoryBarrier);
+	vkImageMemoryBarrier.dstAccessMask = vkDestinationAccess;
+	vkCmdPipelineBarrier(oneShotCommandBuffer.mVkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, vkDestinationStage, 0, 0, nullptr, 0, nullptr, 1, &vkImageMemoryBarrier);
 
 	oneShotCommandBuffer.Execute();
 
-	// Use VMA's pre-mapped pointer to copy data to output (VMA guarantees pMappedData valid for mapped allocations)
+	// VMA keeps pMappedData valid for the mapped staging allocation's lifetime.
 #pragma warning(suppress: 6387)
-	std::memcpy(rOutData.data(), stagingBuffer.vmaAllocationInfo.pMappedData, iTotalSize);
+	std::memcpy(rOutputData.data(), stagingBuffer.vmaAllocationInfo.pMappedData, iTotalSize);
 }
 
-void TextureCache::GeneratePbrLutBrdf()
+void TextureCache::GeneratePhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTable()
 {
 	if constexpr (kbRandomlyInvalidatePbrCubemapCache)
 	{
@@ -113,53 +107,50 @@ void TextureCache::GeneratePbrLutBrdf()
 		}
 	}
 
-	// Try to load BRDF LUT from cache
 	VkFormat vkFormat = VK_FORMAT_R16G16_SFLOAT;
 	int64_t iSize = 512;
 
-	if (gpFileManager->Exists({FileFlags::kAppDataDirectory}, "BrdfLut.cache"))
+	if (std::filesystem::exists(gpFileManager->GetFilePath({FileFlags::kAppDataDirectory}, "BrdfLut.cache")))
 	{
-		// Create texture optimized for loading from cache
 		TextureInfo textureInfo
 		{
 			.textureFlags = {},
 			.name = "PbrLutBrdf",
-			.flags = {},
-			.format = vkFormat,
-			.extent = VkExtent3D {static_cast<uint32_t>(iSize), static_cast<uint32_t>(iSize), 1},
-			.mipLevels = 1,
-			.arrayLayers = 1,
-			.samples = VK_SAMPLE_COUNT_1_BIT,
-			.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-			.viewType = VK_IMAGE_VIEW_TYPE_2D,
-			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.vkImageCreateFlags = {},
+			.vkFormat = vkFormat,
+			.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iSize), .height = static_cast<uint32_t>(iSize), .depth = 1},
+			.uiMipLevels = 1,
+			.uiArrayLayers = 1,
+			.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+			.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+			.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 			.eTextureLayout = TextureLayout::kShaderReadOnly,
 		};
-		mPbrLutBrdfTexture.Create(textureInfo);
+		mPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTableTexture.Create(textureInfo);
 
-		if (TryLoadCachedTexture("BrdfLut.cache", mPbrLutBrdfTexture))
+		if (TryLoadCachedTexture("BrdfLut.cache", mPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTableTexture))
 		{
 			return;
 		}
 	}
 
-	// Create texture with render pass support for generation
-	mPbrLutBrdfTexture.Create(
+	mPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTableTexture.Create(
 	{
 		.textureFlags = {TextureFlags::kRenderPass},
 		.name = "LutBrdf",
-		.flags = 0,
-		.format = vkFormat,
-		.extent = VkExtent3D {512, 512, 1},
-		.mipLevels = 1,
-		.arrayLayers = 1,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.renderPassVkAttachmentLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-		.renderPassInitialVkImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		.renderPassFinalVkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		.vkImageCreateFlags = 0,
+		.vkFormat = vkFormat,
+		.vkExtent3D = VkExtent3D {.width = 512, .height = 512, .depth = 1},
+		.uiMipLevels = 1,
+		.uiArrayLayers = 1,
+		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+		.vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
+		.vkRenderPassAttachmentLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.vkRenderPassInitialImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		.vkRenderPassFinalImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		.eTextureLayout = TextureLayout::kColorAttachment,
 	});
 
@@ -169,9 +160,9 @@ void TextureCache::GeneratePbrLutBrdf()
 		.flags = {PipelineFlags::kRenderTarget},
 		.ppShaders = {&gpPipelineManager->mShaders.at(data::kShadersModelModelGenBrdfLutvertCrc), &gpPipelineManager->mShaders.at(data::kShadersModelModelGenBrdfLutfragCrc)},
 		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-		.targetVkRenderPass = mPbrLutBrdfTexture.mVkRenderPass,
-		.vkExtent3D = mPbrLutBrdfTexture.mInfo.extent,
-		.pDescriptorInfos =
+		.vkTargetRenderPass = mPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTableTexture.mVkRenderPass,
+		.vkExtent3D = mPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTableTexture.mInfo.vkExtent3D,
+		.descriptorInfos =
 		{
 		},
 	});
@@ -181,23 +172,22 @@ void TextureCache::GeneratePbrLutBrdf()
 	{
 		OneShotCommandBuffer oneShotCommandBuffer;
 
-		mPbrLutBrdfTexture.RecordBeginRenderPass(oneShotCommandBuffer.mVkCommandBuffer);
+		mPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTableTexture.RecordBeginRenderPass(oneShotCommandBuffer.mVkCommandBuffer);
 		pipeline.RecordDraw(0, oneShotCommandBuffer.mVkCommandBuffer, 1, 0);
-		mPbrLutBrdfTexture.RecordEndRenderPass(oneShotCommandBuffer.mVkCommandBuffer);
+		vkCmdEndRenderPass(oneShotCommandBuffer.mVkCommandBuffer);
 
 		oneShotCommandBuffer.Execute();
 	}
 
-	// Save generated texture to cache
-	SaveTextureToCache("BrdfLut.cache", mPbrLutBrdfTexture);
+	SaveTextureToCache("BrdfLut.cache", mPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTableTexture);
 }
 
 bool TextureCache::TryLoadCachedTexture(const std::filesystem::path& rCachePath, Texture& rTexture, common::crc_t sourceCrc)
 {
-	// Heap: the cached-payload vector below runs from GeneratePbrLutBrdf in the PipelineManager ctor, which also fires on pipeline-tier recreate (settings change / device loss) with the main-loop tracker armed. Mirrors SaveTextureToCache's CopyImageToHostMemory suppression.
+	// Heap: the cached-payload vector below runs from GeneratePhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTable in the PipelineManager ctor, which also fires on pipeline-tier recreate (settings change / device loss) with the main-loop tracker armed. Mirrors SaveTextureToCache's CopyImageToHostMemory suppression.
 	ScopedSuppressAllocationTracking suppress;
 
-	if (!gpFileManager->Exists({FileFlags::kAppDataDirectory}, rCachePath))
+	if (!std::filesystem::exists(gpFileManager->GetFilePath({FileFlags::kAppDataDirectory}, rCachePath)))
 	{
 		return false;
 	}
@@ -211,8 +201,7 @@ bool TextureCache::TryLoadCachedTexture(const std::filesystem::path& rCachePath,
 	TextureFileCacheHeader header {};
 	fileStream.read(reinterpret_cast<char*>(&header), sizeof(TextureFileCacheHeader));
 
-	// Validate header (including source CRC if provided)
-	if (!fileStream || header.iMagic != TextureFileCacheHeader::kiMagic || header.iVersion != TextureFileCacheHeader::kiVersion || header.vkFormat != rTexture.mInfo.format || header.iWidth != rTexture.mInfo.extent.width || header.iHeight != rTexture.mInfo.extent.height || header.iMipLevels != rTexture.mInfo.mipLevels || header.iArrayLayers != rTexture.mInfo.arrayLayers || (sourceCrc != 0 && header.sourceCrc != sourceCrc))
+	if (!fileStream || header.iMagic != TextureFileCacheHeader::kiMagic || header.iVersion != TextureFileCacheHeader::kiVersion || header.vkFormat != rTexture.mInfo.vkFormat || header.iWidth != rTexture.mInfo.vkExtent3D.width || header.iHeight != rTexture.mInfo.vkExtent3D.height || header.iMipmapLevels != rTexture.mInfo.uiMipLevels || header.iArrayLayers != rTexture.mInfo.uiArrayLayers || (sourceCrc != 0 && header.sourceCrc != sourceCrc))
 	{
 		fileStream.close();
 		LOG(kGraphics, kWarning, "Invalid cache file {} (header validation failed), regenerating", rCachePath.string());
@@ -220,7 +209,7 @@ bool TextureCache::TryLoadCachedTexture(const std::filesystem::path& rCachePath,
 	}
 
 	// The on-disk iDataSize is opaque (cache file is a trust boundary); validate it against the size computed from the already-validated dims/format before trusting it. A too-small value would overread in the upload memcpy below; a negative value would blow up the std::vector ctor.
-	int64_t iExpectedDataSize = common::ComputeImageByteSize(rTexture.mInfo.format, rTexture.mInfo.extent.width, rTexture.mInfo.extent.height, rTexture.mInfo.mipLevels, rTexture.mInfo.arrayLayers, 1);
+	int64_t iExpectedDataSize = common::ComputeImageByteSize(rTexture.mInfo.vkFormat, rTexture.mInfo.vkExtent3D.width, rTexture.mInfo.vkExtent3D.height, rTexture.mInfo.uiMipLevels, rTexture.mInfo.uiArrayLayers, 1);
 	if (header.iDataSize != iExpectedDataSize)
 	{
 		fileStream.close();
@@ -228,7 +217,6 @@ bool TextureCache::TryLoadCachedTexture(const std::filesystem::path& rCachePath,
 		return false;
 	}
 
-	// Read texture data
 	std::vector<std::byte> data(header.iDataSize);
 	fileStream.read(reinterpret_cast<char*>(data.data()), header.iDataSize);
 	if (!fileStream)
@@ -239,10 +227,10 @@ bool TextureCache::TryLoadCachedTexture(const std::filesystem::path& rCachePath,
 	}
 	fileStream.close();
 
-	// Update texture with cached data. Copy data.size() (== the validated iDataSize) rather than the staging size iSize so the read can never exceed the buffer we own (the two are equal for the depth-1 textures the cache holds).
-	rTexture.UpdateData([&data](void* pData, [[maybe_unused]] int64_t iPosition, [[maybe_unused]] int64_t iSize)
+	// Update texture with cached data. Copy data.size() (== the validated iDataSize) rather than the staging span size so the read can never exceed the buffer we own (the two are equal for the depth-1 textures the cache holds).
+	rTexture.UpdateData([&data](std::span<std::byte> destinationData, [[maybe_unused]] int64_t iPosition)
 	{
-		std::memcpy(pData, data.data(), data.size());
+		std::memcpy(destinationData.data(), data.data(), data.size());
 	});
 
 	LOG(kLoading, kDebug, "Loaded cached texture from {}", rCachePath.string());
@@ -251,24 +239,21 @@ bool TextureCache::TryLoadCachedTexture(const std::filesystem::path& rCachePath,
 
 void TextureCache::SaveTextureToCache(const std::filesystem::path& rCachePath, const Texture& rTexture, common::crc_t sourceCrc)
 {
-	// Prepare header
 	TextureFileCacheHeader header {};
 	header.iMagic = TextureFileCacheHeader::kiMagic;
 	header.iVersion = TextureFileCacheHeader::kiVersion;
-	header.vkFormat = rTexture.mInfo.format;
-	header.iWidth = rTexture.mInfo.extent.width;
-	header.iHeight = rTexture.mInfo.extent.height;
-	header.iMipLevels = rTexture.mInfo.mipLevels;
-	header.iArrayLayers = rTexture.mInfo.arrayLayers;
+	header.vkFormat = rTexture.mInfo.vkFormat;
+	header.iWidth = rTexture.mInfo.vkExtent3D.width;
+	header.iHeight = rTexture.mInfo.vkExtent3D.height;
+	header.iMipmapLevels = rTexture.mInfo.uiMipLevels;
+	header.iArrayLayers = rTexture.mInfo.uiArrayLayers;
 	header.sourceCrc = sourceCrc;
 
-	// Read texture data from GPU
 	std::vector<std::byte> data;
-	CopyImageToHostMemory(rTexture.mVkImage, rTexture.mInfo.extent, rTexture.mInfo.format, rTexture.mInfo.mipLevels, rTexture.mInfo.arrayLayers, false, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, data);
+	CopyImageToHostMemory(rTexture.mVkImage, rTexture.mInfo.vkExtent3D, rTexture.mInfo.vkFormat, rTexture.mInfo.uiMipLevels, rTexture.mInfo.uiArrayLayers, false, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, data);
 
 	header.iDataSize = static_cast<int64_t>(data.size());
 
-	// Write cache file
 	if (gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, rCachePath, [&](std::fstream& rStream)
 	{
 		common::Write(rStream, header);

@@ -38,7 +38,6 @@ public:
 
 	VkSampler GetSampler(DescriptorFlags_t flags);
 
-	// Process newly loaded textures from lazy loading system
 	void ProcessPendingTextures(int64_t iFramebufferIndex);
 
 	// Allocate the per-framebuffer acquire-barrier command pool + buffers (mAcquireVkCommandPool /
@@ -47,19 +46,11 @@ public:
 
 	// Create a 1x1 programmatic placeholder Texture. Shared by the seven ctor placeholders (white / white
 	// cube / the five island bindless-array anchors); only name/flags/format/layers/view-type/pixel differ.
-	void CreatePlaceholderTexture(Texture& rTexture, std::string_view name, VkImageCreateFlags vkImageCreateFlags, VkFormat vkFormat, uint32_t uiArrayLayers, VkImageViewType vkImageViewType, const std::function<void(void*, int64_t, int64_t)>& rPixelWriter);
+	void CreatePlaceholderTexture(Texture& rTexture, std::string_view name, VkImageCreateFlags vkImageCreateFlags, VkFormat vkFormat, uint32_t uiArrayLayers, VkImageViewType vkImageViewType, const std::function<void(std::span<std::byte>, int64_t)>& rPixelWriter);
 
-	// ProcessPendingTextures seam helpers: adopt one transfer-queue-uploaded chunk (descriptor write +
-	// optional acquire barrier + lighting blur), and lazily begin the acquire command buffer on first use.
-	void AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bool bNeedAcquireBarrier, VkCommandBuffer vkAcquireCommandBuffer, bool& brRecordedBarriers);
-	void EnsureAcquireCommandBufferBegun(VkCommandBuffer vkAcquireCommandBuffer, bool& brRecordedBarriers);
+	void AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bool bNeedAcquireBarrier, VkCommandBuffer vkAcquireCommandBuffer, bool& rbRecordedBarriers);
+	void EnsureAcquireCommandBufferBegun(VkCommandBuffer vkAcquireCommandBuffer, bool& rbRecordedBarriers);
 
-	// True when ProcessPendingTextures will adopt a chunk this frame (and thus write descriptor
-	// elements). Drives the RenderGlobal all-framebuffer-fence drain so those writes don't race an
-	// in-flight frame still sampling the slot.
-	bool AnyAdoptionPending() const;
-
-	// Wait for textures to be loaded and update their data
 	void WaitForTextures(std::span<const common::crc_t> crcs);
 	void WaitForTextures(std::span<Texture* const> textures);
 
@@ -67,23 +58,23 @@ public:
 	static inline constexpr int64_t kiWaterNormalCount = shaders::kiWaterNormalCount;
 	static inline constexpr common::crc_t kpWaterNormalCrcs[kiWaterNormalCount]
 	{
-		data::kTexturesWaterBC50pngCrc,                  // 0
-		data::kTexturesWaterBC53jpgCrc,                  // 3
-		data::kTexturesWaterBC5FoamjpgCrc,               // Foam
-		data::kTexturesWaterBC5FoamBjpgCrc,              // FoamB
-		data::kTexturesWaterBC5GreenCalmjpgCrc,          // GreenCalm
-		data::kTexturesWaterBC5GreenSeajpgCrc,           // GreenSea
-		data::kTexturesWaterBC5GreenSeaBjpgCrc,          // GreenSeaB
-		data::kTexturesWaterBC5LakejpgCrc,               // Lake
-		data::kTexturesWaterBC5PondSedimentjpgCrc,       // PondSediment
-		data::kTexturesWaterBC5PooljpgCrc,               // Pool
-		data::kTexturesWaterBC5SeaDistantjpgCrc,         // SeaDistant
-		data::kTexturesWaterBC5SeaWavesjpgCrc,           // SeaWaves
-		data::kTexturesWaterBC5SeaWavesBjpgCrc,          // SeaWavesB
-		data::kTexturesWaterBC5SlimyWaterjpgCrc,         // SlimyWater
-		data::kTexturesWaterBC5SlimyWaterBjpgCrc,        // SlimyWaterB
-		data::kTexturesWaterBC5StonesAndRipplesjpgCrc,   // StonesAndRipples
-		data::kTexturesWaterBC5WaterFalljpgCrc,          // WaterFall
+		data::kTexturesWaterBC50pngCrc,
+		data::kTexturesWaterBC53jpgCrc,
+		data::kTexturesWaterBC5FoamjpgCrc,
+		data::kTexturesWaterBC5FoamBjpgCrc,
+		data::kTexturesWaterBC5GreenCalmjpgCrc,
+		data::kTexturesWaterBC5GreenSeajpgCrc,
+		data::kTexturesWaterBC5GreenSeaBjpgCrc,
+		data::kTexturesWaterBC5LakejpgCrc,
+		data::kTexturesWaterBC5PondSedimentjpgCrc,
+		data::kTexturesWaterBC5PooljpgCrc,
+		data::kTexturesWaterBC5SeaDistantjpgCrc,
+		data::kTexturesWaterBC5SeaWavesjpgCrc,
+		data::kTexturesWaterBC5SeaWavesBjpgCrc,
+		data::kTexturesWaterBC5SlimyWaterjpgCrc,
+		data::kTexturesWaterBC5SlimyWaterBjpgCrc,
+		data::kTexturesWaterBC5StonesAndRipplesjpgCrc,
+		data::kTexturesWaterBC5WaterFalljpgCrc,
 	};
 	static inline constexpr std::string_view kpWaterNormalNames[kiWaterNormalCount]
 	{
@@ -122,7 +113,7 @@ public:
 	{
 		common::crc_t pCrcs[kiPriorityTextureCount] {};
 	};
-	static inline constexpr PriorityTextures kpPriorityTextures = []() consteval
+	static inline constexpr PriorityTextures kPriorityTextures = []() consteval
 	{
 		PriorityTextures priorityTextures {};
 		int64_t i = 0;
@@ -164,7 +155,7 @@ public:
 		kSamplerSlotMirroredRepeatLinear,
 		kSamplerSlotCount,
 	};
-	VkSampler mpSamplers[kSamplerSlotCount] {};
+	VkSampler mpSamplersVkSampler[kSamplerSlotCount] {};
 
 	// Per-mip Toksvig variance tables for the water normal maps, copied from TextureHeader::pfMipVariance
 	// during the ctor chunk walk (headers are resident at startup; the lazy pixel data is not). Indexed by

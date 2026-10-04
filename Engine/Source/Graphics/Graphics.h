@@ -7,7 +7,7 @@ namespace game
 
 struct FrameInterpolate;
 
-}
+} // namespace game
 
 namespace engine
 {
@@ -45,7 +45,7 @@ enum class DestroyFlags : uint16_t
 };
 using DestroyFlags_t = common::Flags<DestroyFlags>;
 
-inline VkExtent2D gWantedFramebufferExtent2D {};
+inline VkExtent2D gVkWantedFramebufferExtent2D {};
 
 std::tuple<int64_t, int64_t> FullDetail();
 std::tuple<int64_t, int64_t> WaterFullDetail();
@@ -91,30 +91,29 @@ class Graphics
 {
 public:
 
-	Graphics(HINSTANCE hinstance, HWND hwnd);
+	Graphics(HINSTANCE instanceHandle, HWND windowHandle);
 	~Graphics();
 
 	Graphics() = delete;
 
-	void RenderGlobal(float fCurrentTime);
+	void RenderGlobal(std::chrono::duration<float> currentTime);
 	// Wait on all in-flight per-framebuffer fences (not just the current one). Used to quiesce the
 	// graphics queue before island eviction/restoration frees images / rewrites descriptors.
 	void WaitAllFramebufferFencesIdle();
-	void RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, float fCurrentTime);
+	void RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, std::chrono::duration<float> currentTime);
 	void Create();
 	void Refresh();
 	bool Destroy();
 	void RecreateResources();
-	// True once the live framebuffer extent matches the wanted extent AND no swapchain recreate is deferred — i.e.
-	// a live swapchain actually backs the wanted extent. Extent equality alone is a false positive while deferred
-	// (Refresh copies the wanted extent at trigger time before the defer gate returns early).
+	// Matching extents require both no deferred recreation and no pending swapchain-tier teardown to be settled.
+	// Refresh copies the wanted extent before recreation can defer, and a failed acquire/present can leave a teardown pending.
 	bool ExtentSettled() const;
 
-	HINSTANCE mHinstance = nullptr;
-	HWND mHwnd = nullptr;
+	HINSTANCE mInstanceHandle = nullptr;
+	HWND mWindowHandle = nullptr;
 	int64_t miMonitorRefreshRate = 60;
 	uint64_t muiFrameCounter = 0;
-	VkExtent2D mFramebufferExtent2D = gWantedFramebufferExtent2D;
+	VkExtent2D mFramebufferVkExtent2D = gVkWantedFramebufferExtent2D;
 
 	DestroyType meDestroyType = DestroyType::kNone;
 	DestroyFlags_t mDestroyFlags;
@@ -135,7 +134,7 @@ public:
 	std::unique_ptr<ImGuiManager> mpImGuiManager;
 
 	common::Timer mRenderFrameTimer;
-	int64_t miRenderFrameDeltaNs = 0;
+	std::chrono::nanoseconds mRenderFrameDeltaNanoseconds = 0ns;
 
 	common::InTheLastSecond mRendersInTheLastSecond;
 

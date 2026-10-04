@@ -68,7 +68,10 @@ void PushersInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& _
 
 void PushersInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	gpProfileManager->SetCount(kCpuCounterPushers, siTotalCount);
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterPushers).iCount = siTotalCount;
+	}
 }
 
 #endif // BT_CLIENT

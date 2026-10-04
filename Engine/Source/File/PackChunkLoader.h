@@ -26,17 +26,26 @@ private:
 
 	void Start();
 	void Stop();
-#if defined(BT_CLIENT) && defined(BT_DEBUG)
 public:
-#endif
 	void RequestChunkLoad(std::span<const common::crc_t> crcs, LoadPriority ePriority);
-private:
+public:
+	// Queues a single uncompressed lazy-chunk range for background recommit/reload. Same-range requests deduplicate
+	// while pending or ready; a failed request stays failed until its consumer resets it. State reads acquire the
+	// worker's ready/failed publication, and reset refuses a pending request so it cannot invalidate an in-flight reload.
 	void RequestChunkRangeReload(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, LoadPriority ePriority);
 	ChunkRangeReloadState GetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength) const;
 	void ResetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
 	void WaitForChunks(std::span<const common::crc_t> crcs);
+	// Blocks until no whole or range load is queued or running, with every accepted job's terminal state published.
+	// Full graphics recovery calls this before texture-upload teardown so no loader can publish into the reset that
+	// follows. Callers must not enqueue new work afterwards until recovery completes. No separate admission state
+	// enforces that, because the exclusion is temporal: the one off-main producer (one-shot audio requesting its chunk
+	// from tick workers) has joined by the end of ClientUpdate, which precedes Render and the Graphics::Destroy that
+	// calls this.
 	void WaitForLoadersIdle();
+	// Notification for chunk completion (wakes WaitForChunks waiters)
 	void NotifyChunkCompletion();
+private:
 	void LoadingThread(int64_t iThreadIndex);
 	void LoadChunk(const LoadRequest& rRequest, int64_t iThreadIndex);
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
@@ -54,7 +63,7 @@ private:
 	static constexpr int64_t kiLoadingThreadCount = 2;
 	PackChunks& mrPackChunks;
 	std::thread mLoadingThreads[kiLoadingThreadCount];
-	std::atomic<uint64_t> mWakeSequence {0};
+	std::atomic<uint64_t> mWakeSequence = 0;
 	std::condition_variable mCompletionCondition;
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
 public:
@@ -62,7 +71,7 @@ public:
 	mutable std::mutex mQueueMutex;
 private:
 	std::priority_queue<LoadRequest> mRequestQueue;
-	std::atomic<bool> mShutdown {false};
+	std::atomic<bool> mShutdown = false;
 
 	// Jobs popped from mRequestQueue but not yet finished, guarded by mQueueMutex. Queue-empty alone cannot say the
 	// loaders are idle, because a popped job runs outside the lock; WaitForLoadersIdle needs both.

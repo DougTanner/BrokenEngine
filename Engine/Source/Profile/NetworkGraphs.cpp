@@ -10,7 +10,7 @@ namespace engine
 
 static ImPlotPoint SmoothedGetter(int iIndex, void* pData)
 {
-	common::Smoothed<int64_t>* pSmoothed = static_cast<common::Smoothed<int64_t>*>(pData);
+	const common::Smoothed<int64_t>* pSmoothed = static_cast<const common::Smoothed<int64_t>*>(pData);
 	int64_t iStart = pSmoothed->miNext - pSmoothed->miCount;
 	if (iStart < 0)
 	{
@@ -20,12 +20,12 @@ static ImPlotPoint SmoothedGetter(int iIndex, void* pData)
 	return ImPlotPoint(static_cast<double>(iIndex), static_cast<double>(pSmoothed->mpValues[iActual]));
 }
 
-static void PlotSmoothed(const char* pLabel, common::Smoothed<int64_t>& rSmoothed)
+static void PlotSmoothed(const char* pcLabel, const common::Smoothed<int64_t>& rSmoothed)
 {
-	if (ImPlot::BeginPlot(pLabel, ImVec2(-1.0f, 120.0f * engine::UiScale())))
+	if (ImPlot::BeginPlot(pcLabel, ImVec2(-1.0f, 120.0f * engine::UiScale())))
 	{
 		ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoTickLabels, ImPlotAxisFlags_AutoFit);
-		ImPlot::PlotLineG(pLabel, SmoothedGetter, &rSmoothed, static_cast<int>(rSmoothed.miCount));
+		ImPlot::PlotLineG(pcLabel, SmoothedGetter, const_cast<common::Smoothed<int64_t>*>(&rSmoothed), static_cast<int>(rSmoothed.miCount));
 		ImPlot::EndPlot();
 	}
 }
@@ -48,7 +48,7 @@ void ProfileManagerBase::RenderImPlotGraphs()
 
 	if (ImGui::Begin("Network Graphs", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse))
 	{
-		PlotSmoothed("RTT (ms)", mSmoothedRtt);
+		PlotSmoothed("RTT (ms)", mSmoothedRoundTripTime);
 		PlotSmoothed("Jitter (ms)", mSmoothedJitter);
 		PlotSmoothed("Rollback (ticks)", mSmoothedRollback);
 		PlotSmoothed("Server Buffer", mSmoothedBuffer);

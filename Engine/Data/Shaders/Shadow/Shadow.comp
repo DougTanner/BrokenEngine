@@ -11,7 +11,7 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 };
 
 layout (set = 1, binding = 1) uniform sampler2D elevationTextureSampler;
-layout (set = 1, binding = 2, r16) uniform writeonly image2D shadowTexture; // keShadowFormat
+layout (set = 1, binding = 2, r16) uniform writeonly image2D shadowTexture; // kVkFormatShadow
 
 void main()
 {
@@ -23,7 +23,7 @@ void main()
 	uint x = uint(i2Texel.x);
 	uint y = uint(i2Texel.y);
 
-	vec2 f2InvElevationSize = globalLayout.f2ShadowElevationTextureSizeInv;
+	vec2 f2InvElevationSize = globalLayout.f2ShadowElevationTextureSizeInverse;
 
 	float fElevation = max(textureLod(elevationTextureSampler, vec2(float(x) + float(globalLayout.iShadowStartOffset), float(y)) * f2InvElevationSize, 0.0f).x, 0.0f);
 
@@ -31,7 +31,7 @@ void main()
 	vec3 f3ToBaseNormal = vec3(globalLayout.fShadowDirectionMultiplier, 0.0f, 0.0f);
 
 	float fDistance = globalLayout.fShadowDistanceFalloff;
-	float fInvDistance = globalLayout.fShadowDistanceFalloffInv;
+	float fInvDistance = globalLayout.fShadowDistanceFalloffInverse;
 
 	float fShadow = 0.0f;
 	float fOtherX = globalLayout.fShadowWidthScale;
@@ -61,7 +61,7 @@ void main()
 		float fTerrainAngle = acos(clamp(dot(f3ToBaseNormal, f3ToOtherNormal), -1.0f, 1.0f));
 
 		float fFeather = globalLayout.fShadowFeather;
-		float fHeightMultiplier = clamp((fOtherElevation - globalLayout.fShadowHeightFadeBottom) * globalLayout.fShadowHeightFadeRangeInv, 0.0f, 1.0f);
+		float fHeightMultiplier = clamp((fOtherElevation - globalLayout.fShadowHeightFadeBottom) * globalLayout.fShadowHeightFadeRangeInverse, 0.0f, 1.0f);
 		fShadow = max(fHeightMultiplier * fDistanceFactor * mix(1.0f, 0.0f, (globalLayout.fShadowAngleOffsetSum - fTerrainAngle) * fFeather), fShadow);
 		if (fShadow >= 1.0f)
 		{

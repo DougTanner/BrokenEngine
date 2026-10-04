@@ -36,9 +36,9 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 				.uiTypeIndex = rData.uiTypeIndex,
 				.alignment = rData.alignment,
 				// Wind-trail tuning is client-only visual debug state; reset to canonical defaults on server-authored transfer.
-				.fWindTrailIntensity = rData.alignment == playerAlignment ? gWindDepositPlayerBlastersIntensity.GetDefault() : gWindDepositSpaceshipsBlastersIntensity.GetDefault(),
-				.fWindTrailWidth = rData.alignment == playerAlignment ? gWindDepositPlayerBlastersWidth.GetDefault() : gWindDepositSpaceshipsBlastersWidth.GetDefault(),
-				.fWindTrailLengthMultiplier = rData.alignment == playerAlignment ? gWindDepositPlayerBlastersLengthMultiplier.GetDefault() : gWindDepositSpaceshipsBlastersLengthMultiplier.GetDefault(),
+				.fWindTrailIntensity = rData.alignment == playerAlignment ? gWindDepositPlayerBlastersIntensity.mfDefault : gWindDepositSpaceshipsBlastersIntensity.mfDefault,
+				.fWindTrailWidth = rData.alignment == playerAlignment ? gWindDepositPlayerBlastersWidth.mfDefault : gWindDepositSpaceshipsBlastersWidth.mfDefault,
+				.fWindTrailLengthMultiplier = rData.alignment == playerAlignment ? gWindDepositPlayerBlastersLengthMultiplier.mfDefault : gWindDepositSpaceshipsBlastersLengthMultiplier.mfDefault,
 			});
 			break;
 

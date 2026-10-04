@@ -92,7 +92,7 @@ void ServerClientManager::LogConnectingClientDiagnostic(const engine::ClientConn
 	{
 		LOG(kNetwork, kInfo, "    Guid: ({},{}) FleetCount: {} Match: {}", rExistingGuid.uiHigh, rExistingGuid.uiLow, rExistingFleets.size(), rExistingGuid == rClient.clientGuid);
 	}
-	for (const auto& [rCoord, rFrames] : gpGame->mCoordFrames)
+	for (const auto& [rCoord, rFrames] : gpGame->mCoordinateFrames)
 	{
 		const PlayersPostRender& rPlayers = *rFrames.pCurrent->postRender.pPlayers;
 		if (rPlayers.iCount == 0)
@@ -117,7 +117,7 @@ void ServerClientManager::SpawnWaitingClients()
 		// A respawned fleet member keeps its global ID; only a new ship mints one.
 		engine::GlobalId globalPlayerId = (rClientSpawnInformation.memberGlobalPlayerId.iValue != 0)
 			? rClientSpawnInformation.memberGlobalPlayerId
-			: engine::GlobalId {gpGame->GenerateGlobalId()};
+			: engine::GlobalId {gpGame->miNextGlobalId++};
 
 		bool bIsFlagship = false;
 		engine::GridCoord spawnFleetWantedCoord {};
@@ -209,13 +209,13 @@ void ServerClientManager::DetectPlayerDeaths()
 			engine::GlobalId globalId = rOwnedPlayer.globalId;
 			engine::GridCoord coord = rOwnedPlayer.coord;
 
-			if (!gpGame->mCoordFrames.contains(coord))
+			if (!gpGame->mCoordinateFrames.contains(coord))
 			{
 				continue;
 			}
 
 			// Scan pGlobalPlayerIds to see if the player still exists
-			const PlayersPostRender& rPlayers = *gpGame->CurrentFrame(coord).postRender.pPlayers;
+			const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(coord).pCurrent).postRender.pPlayers;
 			bool bFound = false;
 			for (int64_t j = 0; j < rPlayers.iCount; ++j)
 			{

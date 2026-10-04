@@ -3,7 +3,7 @@
 
 ## Context
 
-`Replay::SaveLoadReplay` in `Engine/Source/File/Replay.cpp:465` bounds the activation-record count before reserving storage with `common::ValidateDeserializedCount(iCoordCount, 16, manifestStream, "ReplayManifest records")`. The literal conceals the fieldwise serialized contract.
+`Replay::SaveLoadReplay` in `Engine/Source/File/Replay.cpp:465` bounds the activation-record count before reserving storage with `common::ValidateDeserializedCount(iCoordinateCount, 16, manifestStream, "ReplayManifest records")`. The literal conceals the fieldwise serialized contract.
 
 The same file declares `ReplayManifestRecord::iActivationTick` as `int64_t` (line 58). `Engine/Source/Frame/GridCoord.h:8–9` declares `iX` and `iY` as `int32_t`. The manifest payload writer appends these three fields individually and in that order (`Replay.cpp:144–149`); the reader consumes the same fields (`Replay.cpp:474`). The integral encoding loops consume exactly `sizeof(TYPE)` bytes per field (`Replay.cpp:28–51` and the payload writer). Thus the record occupies 8 + 4 + 4 = 16 bytes, irrespective of struct padding.
 

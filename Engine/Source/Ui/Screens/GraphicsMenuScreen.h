@@ -11,10 +11,8 @@ public:
 
 	void Render();
 
-private:
-
-	float mfDefaultsHoverAnim = 0.0f;
-	float mfBackHoverAnim = 0.0f;
+	float mfDefaultsHoverAnimation = 0.0f;
+	float mfBackHoverAnimation = 0.0f;
 };
 
 } // namespace engine

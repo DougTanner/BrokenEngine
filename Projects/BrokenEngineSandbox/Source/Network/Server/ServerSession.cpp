@@ -42,7 +42,7 @@ ServerSession::~ServerSession()
 
 void ServerSession::PrepareTick()
 {
-	// During replay, PrepareActiveSet already configured mActiveCoords from the reader map
+	// During replay, PrepareActiveSet already configured mActiveCoordinates from the reader map
 	if (gpGame->mbReplaying) [[unlikely]]
 	{
 		return;
@@ -50,14 +50,14 @@ void ServerSession::PrepareTick()
 
 	// Recompute active set each tick so new client subscriptions
 	// (requested by the client after the previous frame's assignment) are picked up immediately
-	// Heap: ComputeActiveSet/EnsureNextFrames may grow mActiveCoords and CoordFrames maps
+	// Heap: ComputeActiveSet/EnsureNextFrames may grow mActiveCoordinates and CoordFrames maps
 	ScopedSuppressAllocationTracking suppress;
 
 	mpRuntime->ComputeActiveSet();
 	gpGame->EnsureNextFrames();
 
 	// Add empty frame inputs for any newly active coords
-	for (const engine::GridCoord& rCoord : gpGame->mActiveCoords)
+	for (const engine::GridCoord& rCoord : gpGame->mActiveCoordinates)
 	{
 		if (!gpGame->mFrameInputs.contains(rCoord))
 		{
@@ -201,7 +201,7 @@ void ServerSession::ParseReceivedGamePackets()
 				case GamePacketType::kClientReplayRecordRequest:
 				{
 					LOG(kDefault, kDebug, "ServerSession::kClientReplayRecordRequest Client: {}", rPacket.iClientId);
-					if (engine::gpReplay->IsPlaybackActiveOrPending())
+					if ((game::gpGame->mbReplaying || (game::gpGame->mGameFlags & engine::GameFlags::kLoadReplay)))
 					{
 						LOG(kDefault, kWarning, "ServerSession::kClientReplayRecordRequest rejected: playback is active or pending Client: {}", rPacket.iClientId);
 						break;
@@ -212,7 +212,7 @@ void ServerSession::ParseReceivedGamePackets()
 				case GamePacketType::kClientReplayPlaybackRequest:
 				{
 					LOG(kDefault, kDebug, "ServerSession::kClientReplayPlaybackRequest Client: {}", rPacket.iClientId);
-					if (engine::gpReplay->IsRecordingActiveOrPending())
+					if ((!engine::gpReplay->mReplayWriters.empty() || (game::gpGame->mGameFlags & engine::GameFlags::kSaveReplay)))
 					{
 						LOG(kDefault, kWarning, "ServerSession::kClientReplayPlaybackRequest rejected: active or pending recording Client: {}", rPacket.iClientId);
 						break;
@@ -289,13 +289,13 @@ void ServerSession::FinalizeTickClients()
 
 void ServerSession::AddGameRequiredCoords()
 {
-	for (const auto& [rCoord, rFrames] : gpGame->mCoordFrames)
+	for (const auto& [rCoord, rFrames] : gpGame->mCoordinateFrames)
 	{
 		if (rFrames.pCurrent->postRender.pPlayers->iCount > 0)
 		{
-			if (!std::ranges::contains(gpGame->mActiveCoords, rCoord))
+			if (!std::ranges::contains(gpGame->mActiveCoordinates, rCoord))
 			{
-				gpGame->mActiveCoords.push_back(rCoord);
+				gpGame->mActiveCoordinates.push_back(rCoord);
 			}
 		}
 	}
@@ -432,8 +432,8 @@ int64_t ServerSession::RelinkFromFrames(int64_t iClientId, const engine::ClientG
 	}
 
 	std::vector<engine::OwnedEntity> relinkEntries;
-	relinkEntries.reserve(gpGame->mCoordFrames.size());
-	for (const auto& [rCoord, rFrames] : gpGame->mCoordFrames)
+	relinkEntries.reserve(gpGame->mCoordinateFrames.size());
+	for (const auto& [rCoord, rFrames] : gpGame->mCoordinateFrames)
 	{
 		const PlayersPostRender& rPlayers = *rFrames.pCurrent->postRender.pPlayers;
 		for (int64_t i = 0; i < rPlayers.iCount; ++i)

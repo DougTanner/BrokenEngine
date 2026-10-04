@@ -1,7 +1,8 @@
 #if defined(BT_CLIENT)
 
-#include "Ui/LightingWrappersBase.h"
 #include "RenderTargetTextures.h"
+
+#include "Ui/LightingWrappersBase.h"
 #include "TextureManager.h"
 
 namespace engine
@@ -19,18 +20,18 @@ void RenderTargetTextures::DestroyLightingTextures()
 	mAmbientCombineTexture.Destroy();
 	mAmbientHistoryTexture.Destroy();
 
-	for (int64_t iPass = 0; iPass < shaders::kiMaxSpreadPasses; ++iPass)
+	for (int64_t i = 0; i < shaders::kiMaxSpreadPasses; ++i)
 	{
-		for (int64_t iColor = 0; iColor < 3; ++iColor)
+		for (int64_t j = 0; j < 3; ++j)
 		{
-			mpSpreadTextures[iPass][iColor].Destroy();
-			mpSpreadOnlyTextures[iPass][iColor].Destroy();
+			mpSpreadTextures[i][j].Destroy();
+			mpSpreadOnlyTextures[i][j].Destroy();
 		}
 
-		if (mpSpreadVkFramebuffers[iPass] != VK_NULL_HANDLE)
+		if (mpSpreadVkFramebuffers[i] != VK_NULL_HANDLE)
 		{
-			vkDestroyFramebuffer(gpDeviceManager->mVkDevice, mpSpreadVkFramebuffers[iPass], nullptr);
-			mpSpreadVkFramebuffers[iPass] = VK_NULL_HANDLE;
+			vkDestroyFramebuffer(gpDeviceManager->mVkDevice, mpSpreadVkFramebuffers[i], nullptr);
+			mpSpreadVkFramebuffers[i] = VK_NULL_HANDLE;
 		}
 	}
 
@@ -57,21 +58,21 @@ void RenderTargetTextures::CreateLightingTextures()
 	// guard so PopulateLightingParameters blends pure-current and re-seeds history next frame (mirror of CreateShadowTextures).
 	gbLightingTemporalReset = true;
 
-	auto [iLightingTextureX, iLightingTextureY] = TextureManager::LightingDetailTextureSize(gLightingDepositTextureMultiplier.Get());
+	auto [iLightingTextureX, iLightingTextureY] = TextureManager::LightingDetailTextureSize(gLightingDepositTextureMultiplier.mfCurrent);
 	// Create 3 lighting textures without individual render passes
 	TextureInfo lightingTextureInfo
 	{
 		.textureFlags = {},
 		.name = "RedLighting",
-		.flags = 0,
-		.format = shaders::keLightingFormat,
-		.extent = VkExtent3D {static_cast<uint32_t>(iLightingTextureX), static_cast<uint32_t>(iLightingTextureY), 1},
-		.mipLevels = 1,
-		.arrayLayers = 1,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback (shared by all 3 lighting textures)
-		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+		.vkImageCreateFlags = 0,
+		.vkFormat = shaders::kVkFormatLighting,
+		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iLightingTextureX), .height = static_cast<uint32_t>(iLightingTextureY), .depth = 1},
+		.uiMipLevels = 1,
+		.uiArrayLayers = 1,
+		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+		.vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback (shared by all 3 lighting textures)
+		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	};
 	mpLightingTextures[0].Create(lightingTextureInfo);
@@ -80,14 +81,13 @@ void RenderTargetTextures::CreateLightingTextures()
 	lightingTextureInfo.name = "BlueLighting";
 	mpLightingTextures[2].Create(lightingTextureInfo);
 
-	// Create MRT render pass with 3 color attachments
 	VkAttachmentDescription pVkAttachmentDescriptions[3] {};
-	for (int64_t i = 0; i < 3; ++i)
+	for (VkAttachmentDescription& rVkAttachmentDescription : pVkAttachmentDescriptions)
 	{
-		pVkAttachmentDescriptions[i] = VkAttachmentDescription
+		rVkAttachmentDescription = VkAttachmentDescription
 		{
 			.flags = 0,
-			.format = shaders::keLightingFormat,
+			.format = shaders::kVkFormatLighting,
 			.samples = VK_SAMPLE_COUNT_1_BIT,
 			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -154,7 +154,6 @@ void RenderTargetTextures::CreateLightingTextures()
 	CHECK_VK(vkCreateRenderPass(gpDeviceManager->mVkDevice, &vkRenderPassCreateInfo, nullptr, &mLightingVkRenderPass));
 	VkName(VK_OBJECT_TYPE_RENDER_PASS, mLightingVkRenderPass, "LightingMRT");
 
-	// Create framebuffer binding all 3 lighting textures
 	VkImageView pVkImageViews[3] {mpLightingTextures[0].mVkImageView, mpLightingTextures[1].mVkImageView, mpLightingTextures[2].mVkImageView};
 	VkFramebufferCreateInfo vkFramebufferCreateInfo
 	{
@@ -171,63 +170,61 @@ void RenderTargetTextures::CreateLightingTextures()
 	CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &vkFramebufferCreateInfo, nullptr, &mLightingVkFramebuffer));
 	VkName(VK_OBJECT_TYPE_FRAMEBUFFER, mLightingVkFramebuffer, "LightingMRT");
 
-	// Create spread textures (MRT color attachments, one set per pass, interpolated size)
-	float fSpreadMultStart = gSpreadTextureMultiplierStart.Get();
-	float fSpreadMultEnd = gSpreadTextureMultiplierEnd.Get();
-	int64_t iPassCount = static_cast<int64_t>(gSpreadPassCount.Get());
-	static constexpr std::string_view pColorNames[3] {"Red", "Green", "Blue"};
-	for (int64_t iPass = 0; iPass < shaders::kiMaxSpreadPasses; ++iPass)
+	float fSpreadMultiplierStart = gSpreadTextureMultiplierStart.mfCurrent;
+	float fSpreadMultiplierEnd = gSpreadTextureMultiplierEnd.mfCurrent;
+	int64_t iPassCount = static_cast<int64_t>(gSpreadPassCount.mfCurrent);
+	static constexpr std::string_view kColorNames[3] {"Red", "Green", "Blue"};
+	for (int64_t i = 0; i < shaders::kiMaxSpreadPasses; ++i)
 	{
-		float fT = (iPassCount > 1) ? static_cast<float>(iPass) / static_cast<float>(iPassCount - 1) : 0.0f;
-		float fMult = fSpreadMultStart + fT * (fSpreadMultEnd - fSpreadMultStart);
-		auto [iPassX, iPassY] = TextureManager::LightingDetailTextureSize(fMult);
-		for (int64_t iColor = 0; iColor < 3; ++iColor)
+		float fInterpolationFraction = (iPassCount > 1) ? static_cast<float>(i) / static_cast<float>(iPassCount - 1) : 0.0f;
+		float fMultiplier = fSpreadMultiplierStart + fInterpolationFraction * (fSpreadMultiplierEnd - fSpreadMultiplierStart);
+		auto [iPassX, iPassY] = TextureManager::LightingDetailTextureSize(fMultiplier);
+		for (int64_t j = 0; j < 3; ++j)
 		{
-			std::string strSpreadName = std::format("Spread{}_{}", pColorNames[iColor], iPass);
-			mpSpreadTextures[iPass][iColor].Create(TextureInfo
+			std::string spreadName = std::format("Spread{}_{}", kColorNames[j], i);
+			mpSpreadTextures[i][j].Create(TextureInfo
 			{
 				.textureFlags = {},
-				.name = strSpreadName,
-				.flags = 0,
-				.format = shaders::keLightingFormat,
-				.extent = VkExtent3D {static_cast<uint32_t>(iPassX), static_cast<uint32_t>(iPassY), 1},
-				.mipLevels = 1,
-				.arrayLayers = 1,
-				.samples = VK_SAMPLE_COUNT_1_BIT,
-				.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
-				.viewType = VK_IMAGE_VIEW_TYPE_2D,
-				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.name = spreadName,
+				.vkImageCreateFlags = 0,
+				.vkFormat = shaders::kVkFormatLighting,
+				.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iPassX), .height = static_cast<uint32_t>(iPassY), .depth = 1},
+				.uiMipLevels = 1,
+				.uiArrayLayers = 1,
+				.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+				.vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
+				.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+				.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 				.eTextureLayout = TextureLayout::kShaderReadOnly,
 			});
-			std::string strSpreadOnlyName = std::format("SpreadOnly{}_{}", pColorNames[iColor], iPass);
-			mpSpreadOnlyTextures[iPass][iColor].Create(TextureInfo
+			std::string spreadOnlyName = std::format("SpreadOnly{}_{}", kColorNames[j], i);
+			mpSpreadOnlyTextures[i][j].Create(TextureInfo
 			{
 				.textureFlags = {},
-				.name = strSpreadOnlyName,
-				.flags = 0,
-				.format = shaders::keLightingFormat,
-				.extent = VkExtent3D {static_cast<uint32_t>(iPassX), static_cast<uint32_t>(iPassY), 1},
-				.mipLevels = 1,
-				.arrayLayers = 1,
-				.samples = VK_SAMPLE_COUNT_1_BIT,
-				.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
-				.viewType = VK_IMAGE_VIEW_TYPE_2D,
-				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.name = spreadOnlyName,
+				.vkImageCreateFlags = 0,
+				.vkFormat = shaders::kVkFormatLighting,
+				.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iPassX), .height = static_cast<uint32_t>(iPassY), .depth = 1},
+				.uiMipLevels = 1,
+				.uiArrayLayers = 1,
+				.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+				.vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
+				.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+				.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 				.eTextureLayout = TextureLayout::kShaderReadOnly,
 			});
 		}
 	}
 
-	// Create spread MRT render pass (6 color attachments: 3 accumulated + 3 spread-only)
 	// Locations 0–2: accumulated (fed to next spread pass). Locations 3–5: spread-only (read by combine).
-	VkAttachmentDescription pSpreadAttachmentDescriptions[6] {};
-	VkAttachmentReference pSpreadAttachmentReferences[6] {};
+	VkAttachmentDescription pVkSpreadAttachmentDescriptions[6] {};
+	VkAttachmentReference pVkSpreadAttachmentReferences[6] {};
 	for (int64_t i = 0; i < 6; ++i)
 	{
-		pSpreadAttachmentDescriptions[i] = VkAttachmentDescription
+		pVkSpreadAttachmentDescriptions[i] = VkAttachmentDescription
 		{
 			.flags = 0,
-			.format = shaders::keLightingFormat,
+			.format = shaders::kVkFormatLighting,
 			.samples = VK_SAMPLE_COUNT_1_BIT,
 			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -236,7 +233,7 @@ void RenderTargetTextures::CreateLightingTextures()
 			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 			.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		};
-		pSpreadAttachmentReferences[i] = {.attachment = static_cast<uint32_t>(i), .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+		pVkSpreadAttachmentReferences[i] = {.attachment = static_cast<uint32_t>(i), .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
 	}
 	VkSubpassDescription vkSpreadSubpassDescription
 	{
@@ -245,7 +242,7 @@ void RenderTargetTextures::CreateLightingTextures()
 		.inputAttachmentCount = 0,
 		.pInputAttachments = nullptr,
 		.colorAttachmentCount = 6,
-		.pColorAttachments = pSpreadAttachmentReferences,
+		.pColorAttachments = pVkSpreadAttachmentReferences,
 		.pResolveAttachments = nullptr,
 		.pDepthStencilAttachment = nullptr,
 		.preserveAttachmentCount = 0,
@@ -279,8 +276,8 @@ void RenderTargetTextures::CreateLightingTextures()
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.attachmentCount = static_cast<uint32_t>(std::size(pSpreadAttachmentDescriptions)),
-		.pAttachments = pSpreadAttachmentDescriptions,
+		.attachmentCount = static_cast<uint32_t>(std::size(pVkSpreadAttachmentDescriptions)),
+		.pAttachments = pVkSpreadAttachmentDescriptions,
 		.subpassCount = 1,
 		.pSubpasses = &vkSpreadSubpassDescription,
 		.dependencyCount = static_cast<uint32_t>(std::size(pVkSpreadSubpassDependencies)),
@@ -289,17 +286,16 @@ void RenderTargetTextures::CreateLightingTextures()
 	CHECK_VK(vkCreateRenderPass(gpDeviceManager->mVkDevice, &vkSpreadRenderPassCreateInfo, nullptr, &mSpreadVkRenderPass));
 	VkName(VK_OBJECT_TYPE_RENDER_PASS, mSpreadVkRenderPass, "SpreadMRT");
 
-	// Create spread framebuffers (one per spread pass, each binding 3 accumulated + 3 spread-only textures)
-	for (int64_t iPass = 0; iPass < shaders::kiMaxSpreadPasses; ++iPass)
+	for (int64_t i = 0; i < shaders::kiMaxSpreadPasses; ++i)
 	{
-		VkImageView pSpreadImageViews[6]
+		VkImageView pVkSpreadImageViews[6]
 		{
-			mpSpreadTextures[iPass][0].mVkImageView,
-			mpSpreadTextures[iPass][1].mVkImageView,
-			mpSpreadTextures[iPass][2].mVkImageView,
-			mpSpreadOnlyTextures[iPass][0].mVkImageView,
-			mpSpreadOnlyTextures[iPass][1].mVkImageView,
-			mpSpreadOnlyTextures[iPass][2].mVkImageView,
+			mpSpreadTextures[i][0].mVkImageView,
+			mpSpreadTextures[i][1].mVkImageView,
+			mpSpreadTextures[i][2].mVkImageView,
+			mpSpreadOnlyTextures[i][0].mVkImageView,
+			mpSpreadOnlyTextures[i][1].mVkImageView,
+			mpSpreadOnlyTextures[i][2].mVkImageView,
 		};
 		VkFramebufferCreateInfo vkSpreadFramebufferCreateInfo
 		{
@@ -307,35 +303,35 @@ void RenderTargetTextures::CreateLightingTextures()
 			.pNext = nullptr,
 			.flags = 0,
 			.renderPass = mSpreadVkRenderPass,
-			.attachmentCount = static_cast<uint32_t>(std::size(pSpreadImageViews)),
-			.pAttachments = pSpreadImageViews,
-			.width = mpSpreadTextures[iPass][0].mInfo.extent.width,
-			.height = mpSpreadTextures[iPass][0].mInfo.extent.height,
+			.attachmentCount = static_cast<uint32_t>(std::size(pVkSpreadImageViews)),
+			.pAttachments = pVkSpreadImageViews,
+			.width = mpSpreadTextures[i][0].mInfo.vkExtent3D.width,
+			.height = mpSpreadTextures[i][0].mInfo.vkExtent3D.height,
 			.layers = 1,
 		};
-		CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &vkSpreadFramebufferCreateInfo, nullptr, &mpSpreadVkFramebuffers[iPass]));
-		VkName(VK_OBJECT_TYPE_FRAMEBUFFER, mpSpreadVkFramebuffers[iPass], std::format("SpreadMRT_{}", iPass));
+		CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &vkSpreadFramebufferCreateInfo, nullptr, &mpSpreadVkFramebuffers[i]));
+		VkName(VK_OBJECT_TYPE_FRAMEBUFFER, mpSpreadVkFramebuffers[i], std::format("SpreadMRT_{}", i));
 	}
 
 	// Create combine textures (UNORM tone-mapped output, sized to max of start/end). LightingTemporal.comp blends the
 	// previous-frame history into these in place; LightingHistoryCopy.comp publishes the result to history.
-	auto [iCombineX, iCombineY] = TextureManager::LightingDetailTextureSize(std::max(fSpreadMultStart, fSpreadMultEnd));
-	static constexpr std::string_view pCombineNames[3] {"CombineRed", "CombineGreen", "CombineBlue"};
+	auto [iCombineX, iCombineY] = TextureManager::LightingDetailTextureSize(std::max(fSpreadMultiplierStart, fSpreadMultiplierEnd));
+	static constexpr std::string_view kCombineNames[3] {"CombineRed", "CombineGreen", "CombineBlue"};
 	for (int64_t i = 0; i < 3; ++i)
 	{
 		mpCombineTextures[i].Create(TextureInfo
 		{
 			.textureFlags = {},
-			.name = pCombineNames[i],
-			.flags = 0,
-			.format = shaders::keCombineFormat,
-			.extent = VkExtent3D {static_cast<uint32_t>(iCombineX), static_cast<uint32_t>(iCombineY), 1},
-			.mipLevels = 1,
-			.arrayLayers = 1,
-			.samples = VK_SAMPLE_COUNT_1_BIT,
-			.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-			.viewType = VK_IMAGE_VIEW_TYPE_2D,
-			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.name = kCombineNames[i],
+			.vkImageCreateFlags = 0,
+			.vkFormat = shaders::kVkFormatCombine,
+			.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iCombineX), .height = static_cast<uint32_t>(iCombineY), .depth = 1},
+			.uiMipLevels = 1,
+			.uiArrayLayers = 1,
+			.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+			.vkImageUsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+			.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+			.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 			.eTextureLayout = TextureLayout::kShaderReadOnly,
 		});
 	}
@@ -343,37 +339,37 @@ void RenderTargetTextures::CreateLightingTextures()
 	{
 		.textureFlags = {},
 		.name = "CombineAmbient",
-		.flags = 0,
-		.format = shaders::keCombineFormat,
-		.extent = VkExtent3D {static_cast<uint32_t>(iCombineX), static_cast<uint32_t>(iCombineY), 1},
-		.mipLevels = 1,
-		.arrayLayers = 1,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+		.vkImageCreateFlags = 0,
+		.vkFormat = shaders::kVkFormatCombine,
+		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iCombineX), .height = static_cast<uint32_t>(iCombineY), .depth = 1},
+		.uiMipLevels = 1,
+		.uiArrayLayers = 1,
+		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+		.vkImageUsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 
 	// History textures: previous-frame combine outputs reprojected + EMA-blended by LightingTemporal.comp.
 	// Clones of the combine textures (same bumped extent, RGBA8 UNORM); SAMPLED (read as history), STORAGE
 	// (descriptor-set compatibility with combine bindings) so LightingHistoryCopy.comp can refresh them in-place.
-	static constexpr std::string_view pHistoryNames[3] {"LightingHistoryRed", "LightingHistoryGreen", "LightingHistoryBlue"};
+	static constexpr std::string_view kHistoryNames[3] {"LightingHistoryRed", "LightingHistoryGreen", "LightingHistoryBlue"};
 	for (int64_t i = 0; i < 3; ++i)
 	{
 		mpLightingHistoryTextures[i].Create(TextureInfo
 		{
 			.textureFlags = {},
-			.name = pHistoryNames[i],
-			.flags = 0,
-			.format = shaders::keCombineFormat,
-			.extent = VkExtent3D {static_cast<uint32_t>(iCombineX), static_cast<uint32_t>(iCombineY), 1},
-			.mipLevels = 1,
-			.arrayLayers = 1,
-			.samples = VK_SAMPLE_COUNT_1_BIT,
-			.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
-			.viewType = VK_IMAGE_VIEW_TYPE_2D,
-			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.name = kHistoryNames[i],
+			.vkImageCreateFlags = 0,
+			.vkFormat = shaders::kVkFormatCombine,
+			.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iCombineX), .height = static_cast<uint32_t>(iCombineY), .depth = 1},
+			.uiMipLevels = 1,
+			.uiArrayLayers = 1,
+			.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+			.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
+			.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+			.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 			.eTextureLayout = TextureLayout::kShaderReadOnly,
 		});
 	}
@@ -381,15 +377,15 @@ void RenderTargetTextures::CreateLightingTextures()
 	{
 		.textureFlags = {},
 		.name = "LightingHistoryAmbient",
-		.flags = 0,
-		.format = shaders::keCombineFormat,
-		.extent = VkExtent3D {static_cast<uint32_t>(iCombineX), static_cast<uint32_t>(iCombineY), 1},
-		.mipLevels = 1,
-		.arrayLayers = 1,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
-		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+		.vkImageCreateFlags = 0,
+		.vkFormat = shaders::kVkFormatCombine,
+		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iCombineX), .height = static_cast<uint32_t>(iCombineY), .depth = 1},
+		.uiMipLevels = 1,
+		.uiArrayLayers = 1,
+		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
+		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 
@@ -405,25 +401,24 @@ void RenderTargetTextures::CreateLightingTextures()
 
 void RenderTargetTextures::RegisterDebugTextures(int64_t iPassCount)
 {
-	// Debug textures: terrain elevation, deposit RGB (visible area), deposit combined direction, spread pass 0..N combined direction, and
-	// combine red. Terrain.frag samples color/normal/AO directly from bindless per-island textures.
+	// Terrain.frag samples color/normal/AO directly from bindless per-island textures.
 	static constexpr int64_t kiTerrainDebugSlotCount = 1;
 	mppDebugTextures[0] = &mTerrainElevationTexture;
-	mpDebugTextureFormats[0] = shaders::kiDebugTextureFormatTerrainElevation;
+	mpiDebugTextureFormats[0] = shaders::kiDebugTextureFormatTerrainElevation;
 
 	mppDebugTextures[kiTerrainDebugSlotCount + 0] = &mpLightingTextures[0];
-	mpDebugTextureFormats[kiTerrainDebugSlotCount + 0] = shaders::kiDebugTextureFormatFloat16LinearVisibleArea;
+	mpiDebugTextureFormats[kiTerrainDebugSlotCount + 0] = shaders::kiDebugTextureFormatFloat16LinearVisibleArea;
 	mppDebugTextures[kiTerrainDebugSlotCount + 1] = &mpLightingTextures[0];
-	mpDebugTextureFormats[kiTerrainDebugSlotCount + 1] = shaders::kiDebugTextureFormatFloat16DepositDirectionCombined;
+	mpiDebugTextureFormats[kiTerrainDebugSlotCount + 1] = shaders::kiDebugTextureFormatFloat16DepositDirectionCombined;
 	for (int64_t i = 0; i < iPassCount; ++i)
 	{
 		mppDebugTextures[kiTerrainDebugSlotCount + 2 + i] = &mpSpreadTextures[i][0];
 		mppDebugTexturesB[kiTerrainDebugSlotCount + 2 + i] = &mpSpreadTextures[i][1];
 		mppDebugTexturesC[kiTerrainDebugSlotCount + 2 + i] = &mpSpreadTextures[i][2];
-		mpDebugTextureFormats[kiTerrainDebugSlotCount + 2 + i] = shaders::kiDebugTextureFormatFloat16SpreadDirectionCombined;
+		mpiDebugTextureFormats[kiTerrainDebugSlotCount + 2 + i] = shaders::kiDebugTextureFormatFloat16SpreadDirectionCombined;
 	}
 	mppDebugTextures[kiTerrainDebugSlotCount + 2 + iPassCount] = &mpCombineTextures[0];
-	mpDebugTextureFormats[kiTerrainDebugSlotCount + 2 + iPassCount] = shaders::kiDebugTextureFormatUnormLightingDirectional;
+	mpiDebugTextureFormats[kiTerrainDebugSlotCount + 2 + iPassCount] = shaders::kiDebugTextureFormatUnormLightingDirectional;
 	miDebugTextureCount = kiTerrainDebugSlotCount + 3 + iPassCount;
 
 	// Fill unused B/C slots with primary texture so descriptor writes remain valid
@@ -443,7 +438,7 @@ void RenderTargetTextures::RegisterDebugTextures(int64_t iPassCount)
 		}
 	}
 
-	if (gDebugTextureIndex.Get() >= static_cast<float>(miDebugTextureCount))
+	if (gDebugTextureIndex.mfCurrent >= static_cast<float>(miDebugTextureCount))
 	{
 		gDebugTextureIndex.Set(static_cast<float>(miDebugTextureCount - 1));
 	}

@@ -11,19 +11,15 @@ namespace engine
 
 const TweaksSliderMapRegistrar gLightingRegistrar
 {
-	// Write - Pre-Blur
 	{"Lighting Blur Sigma", &gLightingBlurSigma},
 	{"Lighting Blur Sample Count", &gLightingBlurSampleCount},
 	{"Lighting Blur Edge Falloff", &gLightingBlurEdgeFalloff},
-	// Write - Deposit
 	{"Deposit Texture Multiplier", &gLightingDepositTextureMultiplier},
 	{"Deposit Threshold", &gLightingDepositThreshold},
 	{"Deposit Compress", &gLightingDepositCompress},
-	// Write - Spread
 	{"Spread Pass Count", &gSpreadPassCount},
 	{"Spread Decay", &gSpreadDecay},
 	{"Spread Accumulation Decay", &gSpreadAccumulationDecay},
-	// Write - Spread Start
 	{"Spread Texture Multiplier Start", &gSpreadTextureMultiplierStart},
 	{"Spread Directionality", &gSpreadDirectionality},
 	{"Spread Direction Count", &gSpreadDirectionCount},
@@ -38,14 +34,13 @@ const TweaksSliderMapRegistrar gLightingRegistrar
 	{"Spread Height Power", &gSpreadHeightPower},
 	{"Spread Output Threshold", &gSpreadOutputThreshold},
 	{"Spread Output Compress", &gSpreadOutputCompress},
-	// Write - Spread End
 	{"Spread Texture Multiplier End", &gSpreadTextureMultiplierEnd},
 	{"Spread Directionality End", &gSpreadDirectionalityEnd},
 	{"Spread Direction Count End", &gSpreadDirectionCountEnd},
-	{"Spread Distance End Start Height", &gSpreadDistanceEnd.StartHeight},
-	{"Spread Distance End End Height", &gSpreadDistanceEnd.EndHeight},
-	{"Spread Distance End Low", &gSpreadDistanceEnd.Low},
-	{"Spread Distance End High", &gSpreadDistanceEnd.High},
+	{"Spread Distance End Start Height", &gSpreadDistanceEnd.startHeight},
+	{"Spread Distance End End Height", &gSpreadDistanceEnd.endHeight},
+	{"Spread Distance End Low", &gSpreadDistanceEnd.low},
+	{"Spread Distance End High", &gSpreadDistanceEnd.high},
 	{"Spread Ring Count End", &gSpreadRingCountEnd},
 	{"Spread Jitter End", &gSpreadJitterEnd},
 	{"Spread Sample Jitter Range End", &gSpreadSampleJitterRangeEnd},
@@ -55,11 +50,9 @@ const TweaksSliderMapRegistrar gLightingRegistrar
 	{"Spread Distance Falloff End", &gSpreadDistanceFalloffEnd},
 	{"Spread Output Threshold End", &gSpreadOutputThresholdEnd},
 	{"Spread Output Compress End", &gSpreadOutputCompressEnd},
-	// Write - Temporal
-	{"Texel Ramp Speed", &gLightingTexelRampMetersPerSec},
+	{"Texel Ramp Speed", &gLightingTexelRampMetersPerSecond},
 	{"Temporal Blend", &gLightingTemporalBlend},
 	{"Lighting Update Cadence", &gLightingUpdateCadence},
-	// Combine
 	{"Combine Max Brightness", &gCombineMaxBrightness},
 	{"Combine Contrast", &gCombineContrast},
 	{"Combine Linear Start", &gCombineLinearStart},
@@ -69,7 +62,6 @@ const TweaksSliderMapRegistrar gLightingRegistrar
 	{"Combine Pass Normalize", &gCombinePassNormalize},
 	{"Combine Exposure Pass Scale", &gCombineExposurePassScale},
 	{"Combine Hue Preserve", &gCombineHuePreserve},
-	// Read - Terrain Lighting
 	{"Directional Intensity", &gLightingDirectionalIntensity},
 	{"Directional Power", &gLightingDirectionalPower},
 	{"Directional Power Mode", &gLightingDirectionalPowerMode},
@@ -84,9 +76,8 @@ const TweaksSliderMapRegistrar gLightingRegistrar
 	{"Objects Add", &gLightingObjectsAdd},
 	{"Day Final Multiplier", &gLightingDayFinalMultiplier},
 	{"Night Final Multiplier", &gLightingNightFinalMultiplier},
-	// Read - Water Lighting
-	{"Water EWNS Pow", &gLightingWaterEwnsPow},
-	{"Water EWNS Pow Mode", &gLightingWaterEwnsPowMode},
+	{"Water EWNS Pow", &gLightingWaterEastWestNorthSouthPower},
+	{"Water EWNS Pow Mode", &gLightingWaterEastWestNorthSouthPowerMode},
 	{"Water Ambient Intensity", &gLightingWaterAmbientIntensity},
 	{"Water Ambient Power", &gLightingWaterAmbientPower},
 	{"Water Ambient Power Mode", &gLightingWaterAmbientPowerMode},
@@ -101,7 +92,6 @@ const TweaksSliderMapRegistrar gLightingRegistrar
 	{"Water Three", &gLightingWaterThree},
 	{"Water Three Power", &gLightingWaterThreePower},
 	{"Water Power Mode", &gLightingWaterPowerMode},
-	// Read - Water Reflected
 	{"Water Reflected Amount", &gLightingWaterReflectedAmount},
 	{"Water Reflected Normal Blend Wave", &gLightingWaterReflectedNormalBlendWave},
 	{"Water Reflected Distortion", &gLightingWaterReflectedDistortion},
@@ -220,17 +210,17 @@ void RenderLightingSection(TweaksScreenBase& rScreen)
 
 				if (ImGui::Button("Copy Curve To Clipboard"))
 				{
-					char pBuffer[2'048] {};
-					const char* pName = gbUseCombineCurveNew ? "gCombineCurveNew" : "gCombineCurveOld";
-					int iOffset = std::snprintf(pBuffer, sizeof(pBuffer), "CurveData %s({", pName);
-					for (int i = 0; i < rActiveCurve.GetPointCount(); ++i)
+					char pcBuffer[2'048] {};
+					const char* pcName = gbUseCombineCurveNew ? "gCombineCurveNew" : "gCombineCurveOld";
+					int iOffset = std::snprintf(pcBuffer, sizeof(pcBuffer), "CurveData %s({", pcName);
+					for (int64_t i = 0; i < std::ssize(rActiveCurve.mPoints); ++i)
 					{
-						const ImVec2& rPoint = rActiveCurve.GetPoint(i);
-						iOffset += std::snprintf(pBuffer + iOffset, sizeof(pBuffer) - iOffset, "%sImVec2(%.4ff, %.4ff)", i == 0 ? "" : ", ", rPoint.x, rPoint.y);
+						const ImVec2& rPoint = rActiveCurve.mPoints.at(i);
+						iOffset += std::snprintf(pcBuffer + iOffset, sizeof(pcBuffer) - iOffset, "%sImVec2(%.4ff, %.4ff)", i == 0 ? "" : ", ", rPoint.x, rPoint.y);
 					}
-					std::snprintf(pBuffer + iOffset, sizeof(pBuffer) - iOffset, "}, %.4ff, %.4ff);", rActiveCurve.GetYMin(), rActiveCurve.GetYMax());
-					ImGui::SetClipboardText(pBuffer);
-					LOG(kGraphics, kInfo, "{}", pBuffer);
+					std::snprintf(pcBuffer + iOffset, sizeof(pcBuffer) - iOffset, "}, %.4ff, %.4ff);", rActiveCurve.mfYMinimum, rActiveCurve.mfYMaximum);
+					ImGui::SetClipboardText(pcBuffer);
+					LOG(kGraphics, kInfo, "{}", pcBuffer);
 				}
 
 				ImGui::EndTable();

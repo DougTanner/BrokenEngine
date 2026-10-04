@@ -139,7 +139,7 @@ public:
 	// Sim path (Frame-tick callers). Cell-local O(1) nearest-texel lookup into the cell's
 	// precomputed FrameStaticData::elevationGrid, taking the position in that cell's own centered local
 	// meters. Out-of-cell positions return mfSeaFloorElevation. Honors the Frame Purity Constraint: the
-	// caller hands its own static data in, so this never touches gpGame->mCoordFrames and never reads a
+	// caller hands its own static data in, so this never touches gpGame->mCoordinateFrames and never reads a
 	// neighbor cell. Builds happen at the top of RunFrameTick (see FrameBase.cpp), before any sim phase
 	// that would query.
 	[[nodiscard]] XMVECTOR XM_CALLCONV FrameNormal(const FrameStaticData& rStaticData, FXMVECTOR vecLocalPosition) const;
@@ -150,7 +150,7 @@ public:
 	void XM_CALLCONV BuildElevationGrid(const std::vector<IslandPlacement>& rPlacements, std::vector<float>& rOutGrid) const;
 
 	// Render path (engine client — ProjectToBaseHeight). Takes the cell the position is local to plus that
-	// local position, and iterates mCoordFrames' immutable islands list; a position (or a GlobalNormal tap)
+	// local position, and iterates mCoordinateFrames' immutable islands list; a position (or a GlobalNormal tap)
 	// past the cell edge resolves onto the neighbouring cell. Never touches the per-cell grid, so it never
 	// races the tick-time build. MUST NOT be called from Frame-tick code; use FrameElevationSampler::Sample/FrameNormal
 	// from a Frame-tick context.

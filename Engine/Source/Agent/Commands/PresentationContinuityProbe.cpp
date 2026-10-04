@@ -40,7 +40,7 @@ void CommandPresentationContinuityProbe(const nlohmann::json& rParameters, nlohm
 
 	const PresentationContinuitySnapshot& rSnapshot = gPresentationContinuity;
 	rResult["publishedFrames"] = rSnapshot.iPublishedFrames;
-	rResult["basisCoord"] = AgentCoordinateJson(rSnapshot.cameraBasisCoord);
+	rResult["basisCoord"] = AgentCoordinateJson(rSnapshot.cameraBasisCoordinate);
 	rResult["water"] =
 	{
 		{"origin", OriginJson(rSnapshot.f2WaterOrigin)},

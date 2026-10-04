@@ -7,7 +7,7 @@
 namespace DirectX
 {
 class AudioEngine;
-}
+} // namespace DirectX
 
 namespace engine
 {
@@ -19,7 +19,7 @@ struct AudioStreamingVoiceControl;
 
 inline constexpr int64_t kiBufferCount = 3;
 inline constexpr int64_t kiBufferSize = 16 * 1'024;
-inline constexpr float kfCrossfadeDuration = 1.0f;
+inline constexpr std::chrono::duration<float> kCrossfadeDuration = 1s;
 
 enum class StreamingVoiceFlags : uint8_t
 {
@@ -52,24 +52,36 @@ public:
 	StreamingVoice(StreamingVoice&&) = delete;
 	StreamingVoice& operator=(StreamingVoice&&) = delete;
 
-	float GetRemainingTime() const;
+	std::chrono::duration<float> GetRemainingTime() const;
 	bool ShouldTransition() const;
 	void UpdateRequests(bool bAllowRequests);
 	void DrainConsumedAndSubmitReady();
 	void CancelPendingReads();
 	void BeginFadeOut();
-	void DetachXAudio2Voice();
-	bool UpdateVolume(float fDeltaTime);
+	bool UpdateVolume(std::chrono::duration<float> deltaTime);
 
-	// IVoiceNotify
 	void OnBufferEnd() override;
-	void OnCriticalError() override {}
-	void OnReset() override {}
-	void OnUpdate() override {}
-	void OnDestroyEngine() noexcept override {}
-	void OnTrim() override {}
-	void GatherStatistics([[maybe_unused]] AudioStatistics& rStats) const override {}
-	void OnDestroyParent() noexcept override {}
+	void OnCriticalError() override
+	{
+	}
+	void OnReset() override
+	{
+	}
+	void OnUpdate() override
+	{
+	}
+	void OnDestroyEngine() noexcept override
+	{
+	}
+	void OnTrim() override
+	{
+	}
+	void GatherStatistics([[maybe_unused]] AudioStatistics& rStatistics) const override
+	{
+	}
+	void OnDestroyParent() noexcept override
+	{
+	}
 private:
 #if defined(BT_DEBUG)
 public:
@@ -104,9 +116,7 @@ private:
 	int64_t mSlotBytesRead[kiBufferCount] {};
 	bool mbSlotLastBuffer[kiBufferCount] {};
 	uint8_t mBuffers[kiBufferCount][kiBufferSize] {};
-#if defined(BT_DEBUG)
 public:
-#endif
 	IXAudio2SourceVoice* mpVoice = nullptr;
 private:
 	AudioEngine* mpAudioEngine = nullptr;

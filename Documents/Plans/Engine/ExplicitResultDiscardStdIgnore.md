@@ -13,7 +13,7 @@ The author recommends replacing only the four existing `static_cast<void>(call()
 
 | Existing site | Concrete use and preserved behavior |
 |---|---|
-| `Engine/Source/Main.cpp:80`, `HandleEagerLoadCompletion` | Discard `gpFileManager->GetEagerChunkMap()`'s map reference while retaining eager-load completion and its surrounding exception handling. |
+| `Engine/Source/Main.cpp:80`, `HandleEagerLoadCompletion` | Discard `gpFileManager->mpPackChunks->GetEagerChunkMap()`'s map reference while retaining eager-load completion and its surrounding exception handling. |
 | `Engine/Source/File/PackChunks.cpp:587`, `PackChunks::WaitForChunks` | Discard `GetEagerChunkMap()`'s map reference before the unchanged loader wait; retain eager-load failure propagation. |
 | `Engine/Source/Agent/Commands/AudioStreamingFixture.cpp:735`, `AudioStreamingFixture::RunInvalid` | Discard only the initial valid `TryReadChunkData` status between the missing-CRC and wrong-CRC checks. Preserve request submission, buffers, subsequent comparisons and reset. This code is client Debug only. |
 | `Engine/Source/File/PackChunkLoader.cpp:400`, `PackChunkLoader::LoadChunk` | Discard `ReadFile`'s existing Boolean result while preserving its arguments, output byte count, copy-size calculation and following assertion. |

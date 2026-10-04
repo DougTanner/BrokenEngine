@@ -10,11 +10,9 @@ namespace engine
 
 const TweaksSliderMapRegistrar gWindRegistrar
 {
-	// Time & Global
 	{"Wind Time Scale", &gWindTimeScale},
 	{"Wind Threshold Low", &gWindThresholdLow},
 	{"Wind Threshold High", &gWindThresholdHigh},
-	// Propagation
 	{"Wind Advection Scale High", &gWindAdvectionScaleHigh},
 	{"Wind Advection Scale Low", &gWindAdvectionScaleLow},
 	{"Wind Swirl Scale High", &gWindSwirlScaleHigh},

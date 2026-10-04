@@ -3,7 +3,6 @@
 namespace engine
 {
 
-// Time & Global
 Wrapper gWindTimeScale(0.35f, 0.005f, 0.5f);
 Wrapper gWindThresholdLow(0.02f, 0.0f, 0.05f);
 Wrapper gWindThresholdHigh(0.05f, 0.05f, 0.1f);
