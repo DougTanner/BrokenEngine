@@ -155,7 +155,7 @@ public:
 			std::filesystem::path fullFramesFilename = std::filesystem::path(rFilename).concat(".fullframes");
 			bool bFullFramesWritten = gpFileManager->WriteFileAtomically(fileFlags, fullFramesFilename, [&](std::fstream& rFullFramesStream)
 			{
-				rFullFramesStream << mFullFramesStream.str();
+				rFullFramesStream << mFullFramesStream.view();
 			});
 			if (!bFullFramesWritten && failedFilename.empty())
 			{
