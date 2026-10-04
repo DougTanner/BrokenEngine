@@ -388,7 +388,7 @@ void TweaksScreenBase::SaveState(TweakSectionState& rState) const
 		rState.fWindowPositionX[i] = mWindowPositions[i].x;
 		rState.fWindowPositionY[i] = mWindowPositions[i].y;
 	}
-	std::memcpy(rState.iActiveSubtab, miActiveSubtab, sizeof(miActiveSubtab));
+	std::copy(std::begin(miActiveSubtab), std::end(miActiveSubtab), std::begin(rState.iActiveSubtab));
 	rState.crcLayout = ComputeLayoutCrc();
 }
 
@@ -408,7 +408,7 @@ void TweaksScreenBase::LoadState(const TweakSectionState& rState)
 	{
 		mWindowPositions[i] = ImVec2(rState.fWindowPositionX[i], rState.fWindowPositionY[i]);
 	}
-	std::memcpy(miActiveSubtab, rState.iActiveSubtab, sizeof(miActiveSubtab));
+	std::copy(std::begin(rState.iActiveSubtab), std::end(rState.iActiveSubtab), std::begin(miActiveSubtab));
 	mApplySubtab = AllSectionFlags();
 }
 
@@ -458,7 +458,7 @@ void TweaksScreenBase::RunSliderAuditFrame()
 
 		if (miAuditFrame == 0)
 		{
-			std::memcpy(miPreAuditSubtab, miActiveSubtab, sizeof(miActiveSubtab));
+			std::copy(std::begin(miActiveSubtab), std::end(miActiveSubtab), std::begin(miPreAuditSubtab));
 			ScopedSuppressAllocationTracking suppress;
 			size_t uiSliderCount = TweaksSliderMap::Get().size();
 			mAuditTouched.reserve(uiSliderCount);
@@ -489,7 +489,7 @@ void TweaksScreenBase::RunSliderAuditFrame()
 		mbAuditMode = false;
 
 		// Restore EVERY frame (not just on completion): the actual UI render later in the same Render() call must draw the user's saved tab, not the audit-cycled one.
-		std::memcpy(miActiveSubtab, miPreAuditSubtab, sizeof(miActiveSubtab));
+		std::copy(std::begin(miPreAuditSubtab), std::end(miPreAuditSubtab), std::begin(miActiveSubtab));
 		mApplySubtab = AllSectionFlags();
 
 		++miAuditFrame;
