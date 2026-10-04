@@ -107,6 +107,17 @@ The `argument-hint` value selects the Plan:
    record it carries, including a `citations.items` entry with `pathExists` or
    `lineExists` false, is an advisory lead, never a defect to clear and rerun.
 
+   The brief also has the preparation `implementer` check the planned change
+   against
+   [`../compile/references/runtime-data-mode.md`](../compile/references/runtime-data-mode.md)
+   `## Mode selection` and, when it hits a Local trigger, list the Local
+   generation authorization request `/compile` `## Inputs` requires at plan
+   approval under the snapshot's `## Unresolved decisions`, with the
+   consequence of declining — no BrokenEngineSandbox build can generate the
+   Local data the change needs — and a recommendation to grant. The
+   authorization rests only on that item as presented under
+   `### Implementation approval`, never on an approval that did not carry it.
+
    After that preparation handoff, and before the Plan review reviewers, main
    runs `/plan-alternatives` when its trigger fires; a candidate worth
    presenting is carried into the step 7 approval presentation's
