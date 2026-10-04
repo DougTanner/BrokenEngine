@@ -168,4 +168,28 @@ function Get-AgentMarkdownSearchText
 	return [string]::new($characters)
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Test-AgentBlockOpener, Get-AgentMarkdownSearchText
+# Null when the slug is not gpt-<version>-<family>, such as gpt-5.5 or codex-auto-review.
+function Get-AgentModelFamily([string] $Slug) {
+	if ($Slug -cmatch '^gpt-(\d+(?:\.\d+)*)-([a-z][a-z0-9-]*)$') {
+		return [pscustomobject] @{ Version = $Matches[1]; Family = $Matches[2] }
+	}
+
+	return $null
+}
+
+# Part by part with a missing part read as 0, so 6 equals 6.0, 6 < 6.1, and 5.10 > 5.9.
+function Compare-AgentModelVersion([string] $Left, [string] $Right) {
+	$leftParts = @($Left.Split('.') | ForEach-Object { [long] $_ })
+	$rightParts = @($Right.Split('.') | ForEach-Object { [long] $_ })
+	for ($index = 0; $index -lt [Math]::Max($leftParts.Count, $rightParts.Count); $index++) {
+		$leftPart = if ($index -lt $leftParts.Count) { $leftParts[$index] } else { 0 }
+		$rightPart = if ($index -lt $rightParts.Count) { $rightParts[$index] } else { 0 }
+		if ($leftPart -ne $rightPart) {
+			return [Math]::Sign($leftPart - $rightPart)
+		}
+	}
+
+	return 0
+}
+
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Test-AgentBlockOpener, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion

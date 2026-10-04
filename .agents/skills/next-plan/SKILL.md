@@ -292,6 +292,12 @@ deferral, unknown claim state, or work still to land — never prints that line.
   8's acceptance checks pass on the empty change, step 10's completion
   applies. Refusing either is the approval-refused
   `### Post-checkpoint outcomes` row.
+- When the claimed Plan carries a `## Sweep` section, main runs `/sweep` on it
+  in place of steps 4-8 — preparation, `/plan-alternatives`, Plan review, the
+  final claim refresh, the approval presentation, and implementation under the
+  Change Workflow; the `/next-plan` request is the approval. Steps 1-3 and 9-11
+  run as written, with `/sweep`'s stage close standing in for step 8's
+  acceptance checks.
 - A Plan, card, scope, invariant, or acceptance change after approval, other
   than the redraft `### Implementation approval` allows, requires a new
   presentation of the difference.

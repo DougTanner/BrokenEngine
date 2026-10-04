@@ -124,7 +124,7 @@ Routed-to paths (Plans since landed):
   `Documents/Plans/Engine/StyleGuideScannerRuleSweepEngine.md`,
   `Documents/Plans/Game/StyleGuideScannerRuleSweepProjects.md`,
   `Documents/Plans/Engine/StyleGuideScannerRuleSweepCommonDataPackerTools.md`;
-  hand read — [one-pass whole-file sweep](StyleGuideWholeFileSweep.md);
+  hand read — [`/sweep` `style-guide` type](../../../.agents/skills/sweep/references/types/style-guide.md);
   repo review (landed) — `Documents/Plans/Engine/StyleGuideRepoReviewRuleSweep.md`.
   The Build warnings Plan needs no sweep: it already fixes the existing sites
   its promoted warnings report.

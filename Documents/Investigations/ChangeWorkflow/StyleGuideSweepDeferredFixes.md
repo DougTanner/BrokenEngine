@@ -1,9 +1,10 @@
 # Style guide sweep: deferred fixes
 
-Findings the style guide whole-file sweep left unfixed because their fix lies
-outside `StyleGuideWholeFileSweep.md` `## Fix bound`, or could not be applied
-inside the sweep. Each needs a user decision before any change. Stages covered:
-`Engine/` batches `Engine_Source_Agent`, `Engine_Source_Network` and
+Findings the `/sweep` `style-guide` type left unfixed because their fix lies
+outside that type's `## Fix bound`, or could not be applied inside the sweep.
+Each needs a user decision before any change. The sweep coordinator writes one
+`##` section per sweep Plan under the Plan's file stem; `## Engine/` holds the
+Engine batches `Engine_Source_Agent`, `Engine_Source_Network` and
 `Engine_Source_Frame`.
 
 ## Engine/

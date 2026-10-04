@@ -54,6 +54,8 @@ OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no ef
 
 This workflow governs every tracked artifact — C++, shaders, PowerShell and other scripts, skills, plans, and documentation. An artifact type a step does not name is a case this workflow does not assign to anyone: resolve it with the user, never by treating the step as inapplicable.
 
+A sweep run, defined by `/sweep`, does not follow this workflow; `/sweep` owns what it keeps.
+
 For Tier 1 and Tier 2, the user's request is the approval. Classify the work, make the smallest complete change, run the checks that fit its size, and report changed files, the checks that settled it, and residuals. No approval round-trip or report file unless a landing gate applies.
 
 Definitions:

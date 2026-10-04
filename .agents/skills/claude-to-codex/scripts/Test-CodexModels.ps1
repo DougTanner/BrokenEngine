@@ -22,30 +22,6 @@ $result = [ordered]@{
 	message = $null
 }
 
-# Null when the slug is not gpt-<version>-<family>, such as gpt-5.5 or codex-auto-review.
-function Get-ModelFamily([string] $Slug) {
-	if ($Slug -cmatch '^gpt-(\d+(?:\.\d+)*)-([a-z][a-z0-9-]*)$') {
-		return [pscustomobject] @{ Version = $Matches[1]; Family = $Matches[2] }
-	}
-
-	return $null
-}
-
-# Part by part with a missing part read as 0, so 6 equals 6.0, 6 < 6.1, and 5.10 > 5.9.
-function Compare-ModelVersion([string] $Left, [string] $Right) {
-	$leftParts = @($Left.Split('.') | ForEach-Object { [long] $_ })
-	$rightParts = @($Right.Split('.') | ForEach-Object { [long] $_ })
-	for ($index = 0; $index -lt [Math]::Max($leftParts.Count, $rightParts.Count); $index++) {
-		$leftPart = if ($index -lt $leftParts.Count) { $leftParts[$index] } else { 0 }
-		$rightPart = if ($index -lt $rightParts.Count) { $rightParts[$index] } else { 0 }
-		if ($leftPart -ne $rightPart) {
-			return [Math]::Sign($leftPart - $rightPart)
-		}
-	}
-
-	return 0
-}
-
 $exitCode = 1
 try {
 	$repositoryRoot = Get-AgentCanonicalPath (Join-Path $sharedScripts '..\..')
@@ -82,12 +58,12 @@ try {
 		}
 
 		$newest = $slug
-		$pinned = Get-ModelFamily $slug
+		$pinned = Get-AgentModelFamily $slug
 		if ($null -ne $pinned) {
 			$newestVersion = $pinned.Version
 			foreach ($entry in @($catalog | Where-Object { $_.visibility -ceq 'list' })) {
-				$candidate = Get-ModelFamily $entry.slug
-				if (($null -ne $candidate) -and ($candidate.Family -ceq $pinned.Family) -and ((Compare-ModelVersion $candidate.Version $newestVersion) -gt 0)) {
+				$candidate = Get-AgentModelFamily $entry.slug
+				if (($null -ne $candidate) -and ($candidate.Family -ceq $pinned.Family) -and ((Compare-AgentModelVersion $candidate.Version $newestVersion) -gt 0)) {
 					$newest = $entry.slug
 					$newestVersion = $candidate.Version
 				}
