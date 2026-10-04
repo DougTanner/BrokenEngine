@@ -67,11 +67,12 @@ try {
  if($status.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session worktree. $($status.Stderr.Trim())")}
  $dirty=@(Get-DirtyPath $status.Stdout)
  if($dirty.Count -ne 0){
-  # Validation and Plan completion read Documents/Plans from this tree, so uncommitted scheduler input is never safe to
-  # claim against; no rerun flag can lift this, so the message names a route that works instead of a flag that does not.
+  # Uncommitted scheduler input must never reach selection or healing. A held claim is exempt when every dirty path is
+  # a Plan: plan claim-next returns the held claim before selection, and healing reads only primary-tip Plans.
   $schedulerPaths=@($dirty|Where-Object{$_.StartsWith('Documents/Plans/',[StringComparison]::Ordinal)})
-  if($schedulerPaths.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "A plan claim cannot run while scheduler input is uncommitted; $($schedulerPaths.Count) path(s) under Documents/Plans/ are modified or untracked: $(Format-DirtyPath $schedulerPaths). No Plan was claimed and the worktree was not touched. Set those paths aside with: git stash push -u -m '<tag>' -- <those paths>, then rerun this command and restore them with: git stash apply --index <that stash entry>, which keeps a staged version; or land that work first." 'stop-report-to-user'}
-  if(-not $ResumeRetained){$route=if($targeted){' To resume uncommitted work retained by an earlier deferral of this Plan, rerun this command with -ResumeRetained.'}else{''};Complete-Claim 2 'blocked' 'claim.worktree-dirty' "Session worktree must be clean before a plan claim; $($dirty.Count) path(s) are modified or untracked: $(Format-DirtyPath $dirty). No Plan was claimed and the worktree was not touched.$route" $(if($targeted){'resume-with-flag'}else{'stop-report-to-user'})}
+  $heldPlansOnly=$null -ne $heldClaim -and $schedulerPaths.Count -eq $dirty.Count
+  if($schedulerPaths.Count -ne 0 -and -not $heldPlansOnly){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "A plan claim cannot run while scheduler input is uncommitted; $($schedulerPaths.Count) path(s) under Documents/Plans/ are modified or untracked: $(Format-DirtyPath $schedulerPaths). No Plan was claimed and the worktree was not touched. Report this to the user, who decides whether to set those paths aside (git stash push -u -m '<tag>' -- <those paths>, rerun this command, then git stash apply --index <that stash entry>, which keeps a staged version) or to land that work first." 'stop-report-to-user'}
+  if(-not $ResumeRetained -and -not $heldPlansOnly){$route=if($targeted){' To resume uncommitted work retained by an earlier deferral of this Plan, rerun this command with -ResumeRetained.'}else{''};Complete-Claim 2 'blocked' 'claim.worktree-dirty' "Session worktree must be clean before a plan claim; $($dirty.Count) path(s) are modified or untracked: $(Format-DirtyPath $dirty). No Plan was claimed and the worktree was not touched.$route" $(if($targeted){'resume-with-flag'}else{'stop-report-to-user'})}
   if($context.SessionHead -cne $context.PrimaryTip){
    # The claim below fast-forwards the session, which would overwrite a retained path the primary movement also changed.
    # NUL-delimited output keeps both sides of the comparison in the same raw path form.
@@ -79,7 +80,7 @@ try {
    if($incoming.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git diff --name-only could not compare the session head with the primary tip. $($incoming.Stderr.Trim())")}
    $incomingPaths=@(($incoming.Stdout -split "`0")|Where-Object{-not [string]::IsNullOrEmpty($_)})
    $overlap=@($dirty|Where-Object{$incomingPaths -ccontains $_})
-   if($overlap.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "-ResumeRetained cannot claim because fast-forwarding the session from $($context.SessionHead) to the primary tip $($context.PrimaryTip) would touch $($overlap.Count) retained path(s): $(Format-DirtyPath $overlap). No Plan was claimed and the worktree was not touched; commit or land that work first." 'stop-report-to-user'}
+   if($overlap.Count -ne 0){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "The claim cannot proceed because fast-forwarding the session from $($context.SessionHead) to the primary tip $($context.PrimaryTip) would touch $($overlap.Count) retained path(s): $(Format-DirtyPath $overlap). No Plan was claimed and the worktree was not touched. Report this to the user, who decides how to resolve it, for example by landing that work first." 'stop-report-to-user'}
   }
   $result.retained=[ordered]@{count=$dirty.Count;truncated=($dirty.Count -gt 10);paths=@($dirty|Select-Object -First 10)}
  }

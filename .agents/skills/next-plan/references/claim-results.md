@@ -33,8 +33,11 @@ unreadable, the run falls through into the ordinary flow below, so a later
 
 Any other claim run, bare or targeted, is refused with `stop-report-to-user`,
 never `resume-with-flag`, when the session worktree holds an uncommitted
-`Documents/Plans` path; that result's `message` names those paths and the route
-that works.
+`Documents/Plans` path; that result's `message` names those paths and the
+user's options. The one exception is that off-tip run when the early lookup
+reports the held claim: if its only uncommitted paths are under
+`Documents/Plans`, it proceeds, reports them as `retained`, and is refused at
+the dirty-worktree gate only when the fast-forward would touch one of them.
 
 Otherwise, before it validates and claims, the claim script brings the session
 branch up to the primary tip by fast-forward only when the session is behind,
@@ -47,8 +50,9 @@ absent from a stale worktree; a Plan that lands on primary afterwards is picked
 up by the next invocation. A `claim.session-diverged` result carries no
 `divergence` object: its `message` lists every commit the session holds and
 primary lacks, names the repair-script recovery route for a session whose
-primary branch was rewritten under it, and under `-ResumeRetained` it may also
-carry the `retained` projection.
+primary branch was rewritten under it, and it may also carry the `retained`
+projection under `-ResumeRetained` or for that held-claim run whose only
+uncommitted paths are under `Documents/Plans`.
 
 ## Reading the queue listing
 
