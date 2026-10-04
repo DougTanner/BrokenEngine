@@ -91,32 +91,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback([[maybe_unused]] VkDebu
 
 static VkSampleCountFlagBits SelectSampleCount(VkSampleCountFlags vkSampleCountFlags)
 {
-	if ((vkSampleCountFlags & VK_SAMPLE_COUNT_64_BIT) != 0)
-	{
-		return VK_SAMPLE_COUNT_64_BIT;
-	}
-	if ((vkSampleCountFlags & VK_SAMPLE_COUNT_32_BIT) != 0)
-	{
-		return VK_SAMPLE_COUNT_32_BIT;
-	}
-	if ((vkSampleCountFlags & VK_SAMPLE_COUNT_16_BIT) != 0)
-	{
-		return VK_SAMPLE_COUNT_16_BIT;
-	}
-	if ((vkSampleCountFlags & VK_SAMPLE_COUNT_8_BIT) != 0)
-	{
-		return VK_SAMPLE_COUNT_8_BIT;
-	}
-	if ((vkSampleCountFlags & VK_SAMPLE_COUNT_4_BIT) != 0)
-	{
-		return VK_SAMPLE_COUNT_4_BIT;
-	}
-	if ((vkSampleCountFlags & VK_SAMPLE_COUNT_2_BIT) != 0)
-	{
-		return VK_SAMPLE_COUNT_2_BIT;
-	}
-
-	return VK_SAMPLE_COUNT_1_BIT;
+	return static_cast<VkSampleCountFlagBits>(std::bit_floor(vkSampleCountFlags | VK_SAMPLE_COUNT_1_BIT));
 }
 
 VkSampleCountFlagBits InstanceManager::SelectSupportedSampleCount(VkSampleCountFlagBits vkRequested) const
