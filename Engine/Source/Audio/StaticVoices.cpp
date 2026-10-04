@@ -454,8 +454,7 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 			continue;
 		}
 		float fFadeOutTime = rSoundsInterpolate.pfFadeOutTimes[iIndex];
-		mVoices.push_back(StaticVoice(pVoice, id, fSoundVolume, fPitch, fFadeOutTime, vecPosition, vecVelocity, uiCrc));
-		StaticVoice& rNewVoice = mVoices.back();
+		StaticVoice& rNewVoice = mVoices.emplace_back(pVoice, id, fSoundVolume, fPitch, fFadeOutTime, vecPosition, vecVelocity, uiCrc);
 		if (acquiredVoice.bFromPool)
 		{
 			// Pooled voices are never flushed, so Start() resumes mid-buffer at a random loop phase —
