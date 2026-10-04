@@ -126,9 +126,7 @@ struct BeachSubdivider
 	uint32_t AddVertex(float fX, float fY, float fZ)
 	{
 		uint32_t uiNewIndex = static_cast<uint32_t>(rMeshPositions.size() / 3);
-		rMeshPositions.push_back(fX);
-		rMeshPositions.push_back(fY);
-		rMeshPositions.push_back(fZ);
+		rMeshPositions.insert(rMeshPositions.end(), {fX, fY, fZ});
 		return uiNewIndex;
 	}
 
@@ -157,9 +155,7 @@ struct BeachSubdivider
 	uint32_t AppendTriangle(uint32_t uiA, uint32_t uiB, uint32_t uiC, uint8_t uiDepth)
 	{
 		uint32_t uiNewTriangle = static_cast<uint32_t>(rMeshIndices.size() / 3);
-		rMeshIndices.push_back(uiA);
-		rMeshIndices.push_back(uiB);
-		rMeshIndices.push_back(uiC);
+		rMeshIndices.insert(rMeshIndices.end(), {uiA, uiB, uiC});
 		triangleAlive.push_back(1);
 		triangleDepth.push_back(uiDepth);
 		EdgeAdd(EdgeKey(uiA, uiB), static_cast<int32_t>(uiNewTriangle));
