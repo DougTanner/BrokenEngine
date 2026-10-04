@@ -131,7 +131,7 @@ namespace toolcli::landing
 				{
 					return false;
 				}
-				worktrees.push_back(currentWorktree);
+				worktrees.push_back(std::move(currentWorktree));
 				currentWorktree.clear();
 				bInvalidEntry = false;
 			}
@@ -151,7 +151,7 @@ namespace toolcli::landing
 			{
 				return false;
 			}
-			worktrees.push_back(currentWorktree);
+			worktrees.push_back(std::move(currentWorktree));
 		}
 		if (worktrees.empty())
 		{
