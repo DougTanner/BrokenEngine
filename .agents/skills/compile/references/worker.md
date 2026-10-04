@@ -191,7 +191,10 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
         (MSBuild's exit code once launched; `1` for tool failures including a
         retained-log failure after a successful build).
       - `target`/`worktreeRoot` normalized identities, `arguments`,
-        `selectedFiles`, `invalidatedObjects`.
+        `selectedFiles`, and `invalidatedObjects` — the object paths
+        invalidated for a `-Files` selection before MSBuild ran, empty without
+        `-Files`; it never reports what MSBuild compiled, which only the
+        retained log records.
       - `lock` outcome (`acquired`/`timeout`/`failed`) with the lock path and
         waited seconds.
       - `msbuild` discovery/launch state and MSBuild's own exit code.
