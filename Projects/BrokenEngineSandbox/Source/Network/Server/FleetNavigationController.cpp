@@ -23,7 +23,7 @@ static engine::GridCoord NavigationDirectionOffset(int64_t iNavigationDirection)
 	}
 }
 
-void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::ClientGuid, std::vector<Fleet>, engine::ClientGuidHash>& rFleets, common::RandomEngine& rRandom)
+void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, common::RandomEngine& rRandom)
 {
 	for (auto& [rGuid, rFleetVector] : rFleets)
 	{
@@ -110,7 +110,7 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 	}
 }
 
-void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<engine::ClientGuid, std::vector<Fleet>, engine::ClientGuidHash>& rFleets)
+void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets)
 {
 	for (const PendingFlagshipUpdate& rUpdate : mPendingFlagshipUpdates)
 	{

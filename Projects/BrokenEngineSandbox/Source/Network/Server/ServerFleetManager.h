@@ -92,10 +92,10 @@ public:
 	int64_t FindClientIdForGuid(const engine::ClientGuid& rGuid) const;
 
 	// All fleets keyed by persistent ClientGuid (survives disconnect/reconnect)
-	std::unordered_map<engine::ClientGuid, std::vector<Fleet>, engine::ClientGuidHash> mFleets;
+	std::unordered_map<engine::ClientGuid, std::vector<Fleet>> mFleets;
 
 	// Connected client mapping: ClientGuid -> iClientId (0 = disconnected)
-	std::unordered_map<engine::ClientGuid, int64_t, engine::ClientGuidHash> mGuidToClientId;
+	std::unordered_map<engine::ClientGuid, int64_t> mGuidToClientId;
 
 	FleetNavigationController mNavigation;
 

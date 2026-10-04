@@ -128,7 +128,7 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	}
 }
 
-void WriteFleetData(std::fstream& rFileStream, const std::unordered_map<engine::ClientGuid, std::vector<Fleet>, engine::ClientGuidHash>& rFleets, const common::RandomEngine& rRandom)
+void WriteFleetData(std::fstream& rFileStream, const std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, const common::RandomEngine& rRandom)
 {
 	// Heap: sorted fleet-owner scratch vector for deterministic save output
 	ScopedSuppressAllocationTracking suppress;
@@ -162,7 +162,7 @@ void WriteFleetData(std::fstream& rFileStream, const std::unordered_map<engine::
 	common::Write(rFileStream, rRandom.State());
 }
 
-void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientGuid, std::vector<Fleet>, engine::ClientGuidHash>& rFleets, std::unordered_map<engine::ClientGuid, int64_t, engine::ClientGuidHash>& rGuidToClientId, common::RandomEngine& rRandom)
+void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, std::unordered_map<engine::ClientGuid, int64_t>& rGuidToClientId, common::RandomEngine& rRandom)
 {
 	rFleets.clear();
 	rGuidToClientId.clear();

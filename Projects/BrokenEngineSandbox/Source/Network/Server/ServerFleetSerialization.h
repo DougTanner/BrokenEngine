@@ -10,8 +10,8 @@ namespace game
 // Game-owned half of a staged grid save. The engine grid reader carries it without inspecting it.
 struct SaveStagedState
 {
-	std::unordered_map<engine::ClientGuid, std::vector<Fleet>, engine::ClientGuidHash> fleets;
-	std::unordered_map<engine::ClientGuid, int64_t, engine::ClientGuidHash> guidToClientId;
+	std::unordered_map<engine::ClientGuid, std::vector<Fleet>> fleets;
+	std::unordered_map<engine::ClientGuid, int64_t> guidToClientId;
 	common::RandomEngine randomEngine;
 };
 
@@ -22,9 +22,9 @@ void ResetSaveState();
 
 void SendFleetSync(int64_t iClientId, const std::vector<Fleet>& rFleets);
 
-void WriteFleetData(std::fstream& rFileStream, const std::unordered_map<engine::ClientGuid, std::vector<Fleet>, engine::ClientGuidHash>& rFleets, const common::RandomEngine& rRandom);
+void WriteFleetData(std::fstream& rFileStream, const std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, const common::RandomEngine& rRandom);
 
-void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientGuid, std::vector<Fleet>, engine::ClientGuidHash>& rFleets, std::unordered_map<engine::ClientGuid, int64_t, engine::ClientGuidHash>& rGuidToClientId, common::RandomEngine& rRandom);
+void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, std::unordered_map<engine::ClientGuid, int64_t>& rGuidToClientId, common::RandomEngine& rRandom);
 
 } // namespace game
 

@@ -6,7 +6,6 @@ namespace game
 // Server-minted random 128-bit fleet identifier; survives disconnect/reconnect, save/load, and full client restart.
 struct FleetGuidTag;
 using FleetGuid = engine::Guid128<FleetGuidTag>;
-using FleetGuidHash = engine::Guid128Hash<FleetGuidTag>;
 
 static_assert(!std::is_same_v<FleetGuid, engine::ClientGuid>, "FleetGuid and ClientGuid must stay tag-distinct — a shared tag silently permits passing a client identifier where a fleet identifier belongs");
 static_assert(sizeof(FleetGuid) == 16, "FleetGuid size changed — ClientState.bin and the fleet save records are 16 raw bytes");

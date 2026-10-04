@@ -19,8 +19,8 @@ class FleetNavigationController
 {
 public:
 
-	void TickFleetTimers(std::unordered_map<engine::ClientGuid, std::vector<Fleet>, engine::ClientGuidHash>& rFleets, common::RandomEngine& rRandom);
-	void ProcessFlagshipUpdates(const std::unordered_map<engine::ClientGuid, std::vector<Fleet>, engine::ClientGuidHash>& rFleets);
+	void TickFleetTimers(std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, common::RandomEngine& rRandom);
+	void ProcessFlagshipUpdates(const std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets);
 
 
 	void ShiftFlagshipAfterDeath(const engine::ClientGuid& rGuid, Fleet& rFleet);

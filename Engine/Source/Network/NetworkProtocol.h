@@ -91,19 +91,9 @@ struct Guid128
 	bool operator==(const Guid128&) const = default;
 };
 
-template <typename TAG>
-struct Guid128Hash
-{
-	size_t operator()(const Guid128<TAG>& rIdentifier) const
-	{
-		return std::hash<uint64_t>{}(rIdentifier.uiHigh) ^ (std::hash<uint64_t>{}(rIdentifier.uiLow) << 1);
-	}
-};
-
 // 128-bit client GUID for persistent identity across save/load
 struct ClientGuidTag;
 using ClientGuid = Guid128<ClientGuidTag>;
-using ClientGuidHash = Guid128Hash<ClientGuidTag>;
 
 static_assert(sizeof(ClientGuid) == 16, "ClientGuid size changed — ClientGuid.bin and the fleet save owner records are 16 raw bytes");
 static_assert(alignof(ClientGuid) == alignof(uint64_t), "ClientGuid alignment changed — PlayersPostRender::pClientGuids column stride shifts");
@@ -113,6 +103,20 @@ static_assert(std::is_trivially_copyable_v<ClientGuid>, "ClientGuid must stay tr
 static_assert(std::is_standard_layout_v<ClientGuid>, "ClientGuid must stay standard-layout — BT_OFFSETOF above is only well-defined for standard-layout types");
 
 } // namespace engine
+
+namespace std
+{
+
+template <typename TAG>
+struct hash<engine::Guid128<TAG>>
+{
+	size_t operator()(const engine::Guid128<TAG>& rGuid) const
+	{
+		return std::hash<uint64_t> {}(rGuid.uiHigh) ^ (std::hash<uint64_t> {}(rGuid.uiLow) << 1);
+	}
+};
+
+} // namespace std
 
 #include "Network/NetworkMessages.h"
 
