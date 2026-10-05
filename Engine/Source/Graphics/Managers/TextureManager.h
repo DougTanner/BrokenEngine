@@ -109,26 +109,10 @@ public:
 	// Priority textures preloaded at boot so chevron switches and the first terrain frame never show a
 	// placeholder. The water-normal block is single-sourced from kpWaterNormalCrcs — do not re-list it here.
 	static inline constexpr int64_t kiPriorityTextureCount = std::size(kpPriorityHead) + kiWaterNormalCount + std::size(kpPriorityTail);
-	struct PriorityTextures
+	static inline constexpr std::array<common::crc_t, kiPriorityTextureCount> kPriorityTextures = []() consteval
 	{
-		common::crc_t pCrcs[kiPriorityTextureCount] {};
-	};
-	static inline constexpr PriorityTextures kPriorityTextures = []() consteval
-	{
-		PriorityTextures priorityTextures {};
-		int64_t i = 0;
-		for (common::crc_t crc : kpPriorityHead)
-		{
-			priorityTextures.pCrcs[i++] = crc;
-		}
-		for (common::crc_t crc : kpWaterNormalCrcs)
-		{
-			priorityTextures.pCrcs[i++] = crc;
-		}
-		for (common::crc_t crc : kpPriorityTail)
-		{
-			priorityTextures.pCrcs[i++] = crc;
-		}
+		std::array<common::crc_t, kiPriorityTextureCount> priorityTextures {};
+		std::ranges::copy(kpPriorityTail, std::ranges::copy(kpWaterNormalCrcs, std::ranges::copy(kpPriorityHead, priorityTextures.begin()).out).out);
 		return priorityTextures;
 	}();
 

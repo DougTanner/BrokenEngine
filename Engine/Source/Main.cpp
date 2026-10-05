@@ -303,7 +303,7 @@ static int MainThread(HINSTANCE hInstance)
 	gpProfileManager->BootStop(kBootTimerVulkan);
 
 	gpProfileManager->BootStart(kBootTimerWaitForPriorityTextures);
-	gpTextureManager->WaitForTextures(TextureManager::kPriorityTextures.pCrcs);
+	gpTextureManager->WaitForTextures(TextureManager::kPriorityTextures);
 	gpProfileManager->BootStop(kBootTimerWaitForPriorityTextures);
 
 	{

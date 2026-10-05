@@ -242,7 +242,7 @@ void TextureManager::InitializeBootTextures()
 
 	gpProfileManager->BootStop(kModelTexturesGeneration);
 
-	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(kPriorityTextures.pCrcs, LoadPriority::kRealtime);
+	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(kPriorityTextures, LoadPriority::kRealtime);
 
 	// Replay every registered lighting-texture request: registration runs once at startup, after the first Graphics
 	// construction, so without this a full recreate would strand these textures on the white placeholder forever (the
