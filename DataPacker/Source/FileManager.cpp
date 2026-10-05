@@ -277,7 +277,7 @@ static MaterializationInventory BuildMaterializationInventory(const std::filesys
 		}
 	}
 	inventory.order.resize(inventory.files.size());
-	std::iota(inventory.order.begin(), inventory.order.end(), 0);
+	std::ranges::iota(inventory.order, 0);
 	std::sort(inventory.order.begin(), inventory.order.end(), [&inventory, &rSource](int64_t iLeftIndex, int64_t iRightIndex)
 	{
 		return PathLess(std::filesystem::relative(inventory.files.at(iLeftIndex), rSource), std::filesystem::relative(inventory.files.at(iRightIndex), rSource));
