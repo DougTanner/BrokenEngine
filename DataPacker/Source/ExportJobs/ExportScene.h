@@ -31,7 +31,7 @@ public:
 	{
 	}
 
-	virtual ~ExportScene() = default;
+	~ExportScene() override = default;
 
 	virtual bool CheckDirty(const std::filesystem::path& rPackFile) override;
 

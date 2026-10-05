@@ -14,7 +14,7 @@ public:
 
 	ExportShader(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile);
 
-	virtual ~ExportShader() = default;
+	~ExportShader() override = default;
 
 	bool CheckDirty(const std::filesystem::path& rPackFile) override;
 

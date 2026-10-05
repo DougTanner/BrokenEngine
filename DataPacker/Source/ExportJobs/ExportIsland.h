@@ -30,7 +30,7 @@ public:
 	{
 	}
 
-	virtual ~ExportIsland() = default;
+	~ExportIsland() override = default;
 
 	// Governs the four BC encodes (AmbientOcclusion / Color / Normals / Masks) only. Deliberately a
 	// plain int64_t rather than Version(...): folding in sizeof(common::ChunkHeader) would retie the

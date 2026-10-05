@@ -17,7 +17,7 @@ public:
 	{
 	}
 
-	virtual ~ExportRaw() = default;
+	~ExportRaw() override = default;
 
 protected:
 

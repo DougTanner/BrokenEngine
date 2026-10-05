@@ -19,7 +19,7 @@ public:
 	{
 	}
 
-	virtual ~ExportTexture() = default;
+	~ExportTexture() override = default;
 
 protected:
 
