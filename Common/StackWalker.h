@@ -88,10 +88,7 @@ protected:
 class LogStackWalker : public FilteredStackWalker
 {
 public:
-	LogStackWalker(ExceptType eExceptType)
-	: FilteredStackWalker(eExceptType)
-	{
-	}
+	using FilteredStackWalker::FilteredStackWalker;
 
 protected:
 
