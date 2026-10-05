@@ -43,8 +43,7 @@ static void ResolveModelChunkShaders(common::crc_t sceneCrc, Buffer*& rpModelBuf
 
 void DynamicPipelines::AddPipeline(DynamicPipelineType eType, common::crc_t crc, const PipelineInfo& rPipelineInfo)
 {
-	mPipelines.push_back(std::make_unique<Pipeline>());
-	Pipeline* pPipeline = mPipelines.back().get();
+	Pipeline* pPipeline = mPipelines.emplace_back(std::make_unique<Pipeline>()).get();
 	pPipeline->Create(rPipelineInfo);
 	mPipelineMaps[eType].insert_or_assign(crc, pPipeline);
 }
