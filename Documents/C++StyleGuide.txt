@@ -177,7 +177,7 @@ IMPORTANT do not use auto in range-based for loops, except for the structured bi
 41. Explicitly use std:: namespace, do not `using namespace std;`: std::vector, std::string, std::unordered_map
 NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 
-42. Use designated initializers for struct initializers: LazyChunk { .location = loc, .header = chunkHeader, }
+42. Use designated initializers for struct initializers: LazyChunk { .location = loc, .header = chunkHeader, } Exception: A derived aggregate with a single public nonvirtual base and no direct instance members may initialize that base from an existing value of the base type: Derived message {fields};. Keep designated initialization for the prepared base value.
 
 43. Run-Time Type Info (RTTI) is disabled, do not use it
 

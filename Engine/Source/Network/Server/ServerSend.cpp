@@ -139,14 +139,12 @@ void Server::WriteBufferedFramePacket(common::Workbuffer& rWorkbuffer, PacketTyp
 	};
 	if (eType == PacketType::kServerCoordinateUpdate)
 	{
-		NetworkMessages::ServerCoordUpdateMessage message {};
-		static_cast<NetworkMessages::CoordUpdateFields&>(message) = fields;
+		NetworkMessages::ServerCoordUpdateMessage message {fields};
 		NetworkMessages::Write(rWorkbuffer, message);
 	}
 	else if (eType == PacketType::kServerCoordinateResend)
 	{
-		NetworkMessages::ServerCoordResendMessage message {};
-		static_cast<NetworkMessages::CoordUpdateFields&>(message) = fields;
+		NetworkMessages::ServerCoordResendMessage message {fields};
 		NetworkMessages::Write(rWorkbuffer, message);
 	}
 }

@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-02T23:09:46.189Z","dependsOn":["Documents/Plans/Engine/CoordinatePacketAggregateInitialization.md","Documents/Plans/Engine/SimplifyBufferFrameStructuredBinding.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-02T23:09:46.189Z","dependsOn":["Documents/Plans/Engine/SimplifyBufferFrameStructuredBinding.md"]} -->
 # Split engine Server into Server and ServerBufferedFrames
 
 ## Context
