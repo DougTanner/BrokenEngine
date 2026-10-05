@@ -86,6 +86,7 @@ private:
 	bool mbDrained = false; // UploadThread sets this to confirm it reached a quiescent point (guarded by mWorkMutex)
 	std::exception_ptr mException; // Unexpected upload-thread failure, published before mbThreadExited while mWorkMutex is held
 	std::atomic<bool> mbThreadExited = false; // Shutdown-wake and exception exits publish this flag under mWorkMutex before notifying mIdleConditionVariable.
+	static_assert(decltype(mbThreadExited)::is_always_lock_free);
 	std::mutex mUploadMutex;
 	std::priority_queue<LoadRequest> mUploadQueue;
 	std::atomic<bool> mbShutdown = false;
