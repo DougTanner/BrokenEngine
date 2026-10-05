@@ -94,14 +94,14 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
 
 	const engine::AnimationData* pAnimationData = nullptr;
-	uint32_t uiMaterialCount = 0;
+	int64_t iMaterialCount = 0;
 	int64_t iSkinnedMaterialCount = 0;
 	if (engine::gAnimationDataMap.contains(kuiSpaceshipModel))
 	{
 		pAnimationData = &engine::gAnimationDataMap.at(kuiSpaceshipModel);
-		uiMaterialCount = engine::gpFileManager->mpPackChunks->GetEagerChunkMap().at(kuiSpaceshipModel).pHeader->sceneHeader.uiMaterialCount;
+		iMaterialCount = engine::gpFileManager->mpPackChunks->GetEagerChunkMap().at(kuiSpaceshipModel).pHeader->sceneHeader.uiMaterialCount;
 
-		iSkinnedMaterialCount = pAnimationData->SkinnedMaterialCount(uiMaterialCount);
+		iSkinnedMaterialCount = pAnimationData->SkinnedMaterialCount(iMaterialCount);
 	}
 
 	// Visibility culling runs on the main thread before worker dispatch.
@@ -135,7 +135,7 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 
 	if (pAnimationData != nullptr && iVisibleCount > 0)
 	{
-		iMeshDataBase = engine::gpBufferManager->AllocateMeshData(iCommandBuffer, iVisibleCount * uiMaterialCount);
+		iMeshDataBase = engine::gpBufferManager->AllocateMeshData(iCommandBuffer, iVisibleCount * iMaterialCount);
 		pMeshDataBuffer = reinterpret_cast<common::MeshData*>(engine::gpBufferManager->mMeshDataStorageBuffers.at(iCommandBuffer).mpMappedMemory);
 
 		iJointsPerShip = iSkinnedMaterialCount * pAnimationData->mHeader.skeleton.uiSkinJointCount;
@@ -182,14 +182,14 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 
 			if (pAnimationData != nullptr)
 			{
-				int64_t iShipMeshDataBase = iMeshDataBase + j * uiMaterialCount;
+				int64_t iShipMeshDataBase = iMeshDataBase + j * iMaterialCount;
 				rModelLayout.uiMeshDataBase = static_cast<uint32_t>(iShipMeshDataBase);
 
 				common::MeshData* pMeshData = pMeshDataBuffer + iShipMeshDataBase;
 
 				int64_t iJointMatrixOffset = iJointBase + j * iJointsPerShip;
 
-				pAnimationData->EvaluateAnimation(0, rCurrent.pfAnimationTimes[i], std::span(pMeshData, static_cast<size_t>(uiMaterialCount)), pJointMatricesBuffer, iJointMatrixOffset);
+				pAnimationData->EvaluateAnimation(0, rCurrent.pfAnimationTimes[i], std::span(pMeshData, static_cast<size_t>(iMaterialCount)), pJointMatricesBuffer, iJointMatrixOffset);
 			}
 		}
 	};

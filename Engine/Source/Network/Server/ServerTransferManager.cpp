@@ -177,7 +177,7 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 
 			char acPlayerIds[192] {};
 			int64_t iPlayerIdCount = 0;
-			size_t uiPosition = 0;
+			int64_t iPosition = 0;
 			for (const game::StatusChange& rTransfer : rTransfers)
 			{
 				if (rTransfer.eType != game::StatusChangeType::kTransferPlayer)
@@ -190,23 +190,23 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 					continue;
 				}
 
-				static constexpr size_t kuiReserve = 24; // ", " + max 20-digit int64
-				if (uiPosition + kuiReserve > sizeof(acPlayerIds))
+				static constexpr int64_t kiReserve = 24; // ", " + max 20-digit int64
+				if (iPosition + kiReserve > std::ssize(acPlayerIds))
 				{
 					break;
 				}
 
 				if (iPlayerIdCount > 0)
 				{
-					acPlayerIds[uiPosition++] = ',';
-					acPlayerIds[uiPosition++] = ' ';
+					acPlayerIds[iPosition++] = ',';
+					acPlayerIds[iPosition++] = ' ';
 				}
-				int iWritten = std::snprintf(acPlayerIds + uiPosition, sizeof(acPlayerIds) - uiPosition, "%lld", std::get<game::TransferData>(rTransfer.data).globalPlayerId.iValue);
+				int64_t iWritten = std::snprintf(acPlayerIds + iPosition, static_cast<size_t>(std::ssize(acPlayerIds) - iPosition), "%lld", std::get<game::TransferData>(rTransfer.data).globalPlayerId.iValue);
 				if (iWritten <= 0)
 				{
 					break;
 				}
-				uiPosition += static_cast<size_t>(iWritten);
+				iPosition += iWritten;
 				++iPlayerIdCount;
 			}
 

@@ -67,7 +67,7 @@ Deliberately left open for the implementing session to decide with the user:
   `kiMaxStatusChangeBytesPerItem` (`NetworkSerialization.h`) if the payload grows past it.
 - `FrameInput::kiVersion` bump — required for any `StatusChange` payload change
   (`Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md`, `FrameInput` serialization rule).
-- `engine::kuiProtocolVersion` bump — required for any incompatible `StatusChange` layout
+- `engine::kiProtocolVersion` bump — required for any incompatible `StatusChange` layout
   change (`Projects/BrokenEngineSandbox/Source/Network/AGENTS.md`).
 
 ### Out-of-cell targets
@@ -85,7 +85,7 @@ transfer path.
 - `Projects/BrokenEngineSandbox/Source/Frame/Collections/Players/Players.cpp`
   (`ProcessSpawnStatusChanges` and its Phase 5 caller)
 - `Engine/Source/Network/NetworkSerialization.cpp`
-- `Engine/Source/Network/NetworkProtocol.h` (`kuiProtocolVersion`)
+- `Engine/Source/Network/NetworkProtocol.h` (`kiProtocolVersion`)
 - `Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsServer.cpp` (harness command, if the
   harness entry point is included)
 
@@ -96,7 +96,7 @@ transfer path.
 - Applying the relocation in the Phase 5 Spawn handler in `Players.cpp`, after Collision and
   before the shared CRC stamp.
 - Refusing an out-of-cell target.
-- The `FrameInput::kiVersion` and `engine::kuiProtocolVersion` bumps the payload change forces.
+- The `FrameInput::kiVersion` and `engine::kiProtocolVersion` bumps the payload change forces.
 - Optionally, an AgentHarness command that issues the status change.
 
 ## Out of scope

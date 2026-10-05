@@ -131,7 +131,16 @@ Branches, the session label, and the receipt path are re-resolved by the
 landing worker or fixed; the path set and the `Attribution trailer` stay
 ordinary brief fields; the owner token never crosses the dispatch boundary —
 the landing worker claims the lock itself. A decline or non-answer leaves
-primary unchanged. Two standing exceptions skip only the question, never the
+primary unchanged. A reply that asks for changes instead also leaves primary
+unchanged and redirects the current change rather than declining it: main
+returns to preparation and implementation for the difference — under
+`/next-plan`, by its `### Post-checkpoint outcomes` row for that reply — and
+then dispatches a fresh preparation whose path set is the session's full
+landing set, now including every path the difference changed. The unlanded
+candidate commit on the session branch is session-owned work: implementation
+continues on top of it, the fresh preparation rewrites it through
+`references/worker.md` step 2, and main asks the user nothing about it. Two
+standing exceptions skip only the question, never the
 SmartGit launch or the summary: `/save-plan`, when the change contains exactly
 the saved Plan file; and an explicit user-authorized Plan rejection, when the
 change contains exactly the paths `Complete-NextPlan.ps1 -Reject` reported and

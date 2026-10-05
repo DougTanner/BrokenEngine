@@ -40,20 +40,20 @@ constexpr float kfSpaceshipExplosionSizeEnd = kfSpaceshipRadius * 0.25f;
 constexpr float kfSpaceshipExplosionSmoke = 0.5f;
 constexpr float kfSpaceshipExplosionPositionJitter = kfSpaceshipRadius * 0.375f;
 constexpr float kfSpaceshipExplosionDirectionJitter = 0.5f;
-constexpr uint32_t kuiSpaceshipExplosionTrailCount = 5;
+constexpr int64_t kiSpaceshipExplosionTrailCount = 5;
 
 static void RegisterEnemyBlasterType();
 
 // Shared type indices (accessible from SpaceshipsCombat.cpp via extern)
-uint8_t guiSpaceshipExplosionTypeIndex = 0xFF;
+int64_t giSpaceshipExplosionTypeIndex = 0xFF;
 #if defined(BT_CLIENT)
-static uint8_t suiSpaceshipHitFlashTypeIndex = 0xFF;
-uint8_t guiSpaceshipHitFlashControllerTypeIndex = 0xFF;
+static int64_t siSpaceshipHitFlashTypeIndex = 0xFF;
+int64_t giSpaceshipHitFlashControllerTypeIndex = 0xFF;
 
 static void RegisterSpaceshipHitFlashEffect();
 #endif
 
-constexpr uint32_t kuiSpaceshipExplosionBaseParticleCount = 16;
+constexpr int64_t kiSpaceshipExplosionBaseParticleCount = 16;
 constexpr uint32_t kuiSpaceshipExplosionParticleColor = 0xFF0000FF;
 constexpr float kfSpaceshipExplosionParticleVelocityMinimum = 1.0f;
 constexpr float kfSpaceshipExplosionParticleVelocityRandom = 9.0f;
@@ -61,7 +61,7 @@ constexpr float kfSpaceshipExplosionParticleVerticalVelocityMinimum = -5.0f;
 constexpr float kfSpaceshipExplosionParticleVerticalVelocityRandom = 10.0f;
 constexpr float kfSpaceshipExplosionParticleIntensityDecay = 2.4f;
 constexpr float kfSpaceshipExplosionTrailLengthRandom = kfSpaceshipRadius * 1.25f;
-constexpr uint32_t kuiSpaceshipExplosionSecondaryCount = 1;
+constexpr int64_t kiSpaceshipExplosionSecondaryCount = 1;
 
 constexpr float kfSpawnBlasterPlayerAngle = 0.1f;
 constexpr float kfBlastersSpeed = 50.0f;
@@ -106,17 +106,17 @@ constexpr std::chrono::duration<float> kHitFlashDuration(0.3f);
 
 void SpaceshipsInterpolate::Register()
 {
-	engine::ExplosionsInterpolate::RegisterType(guiSpaceshipExplosionTypeIndex,
+	engine::ExplosionsInterpolate::RegisterType(giSpaceshipExplosionTypeIndex,
 	{
 #if defined(BT_CLIENT)
-		.uiPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryLightControllerTypeIndex,
-		.uiSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryLightControllerTypeIndex,
-		.uiPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryPuffControllerTypeIndex,
-		.uiSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryPuffControllerTypeIndex,
-		.uiTrailTypeIndex = engine::ExplosionsInterpolate::suiExplosionTrailTypeIndex,
-		.uiWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::suiWindRadialControllerTypeIndex,
+		.iPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryLightControllerTypeIndex,
+		.iSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryLightControllerTypeIndex,
+		.iPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryPuffControllerTypeIndex,
+		.iSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryPuffControllerTypeIndex,
+		.iTrailTypeIndex = engine::ExplosionsInterpolate::siExplosionTrailTypeIndex,
+		.iWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::suiWindRadialControllerTypeIndex,
 #endif // BT_CLIENT
-		.uiBaseParticleCount = kuiSpaceshipExplosionBaseParticleCount,
+		.uiBaseParticleCount = static_cast<uint32_t>(kiSpaceshipExplosionBaseParticleCount),
 		.uiParticleColor = kuiSpaceshipExplosionParticleColor,
 		.fParticleVelocityMinimum = kfSpaceshipExplosionParticleVelocityMinimum,
 		.fParticleVelocityRandom = kfSpaceshipExplosionParticleVelocityRandom,
@@ -124,7 +124,7 @@ void SpaceshipsInterpolate::Register()
 		.fParticleVerticalVelocityRandom = kfSpaceshipExplosionParticleVerticalVelocityRandom,
 		.fParticleIntensityDecay = kfSpaceshipExplosionParticleIntensityDecay,
 		.fTrailLengthRandom = kfSpaceshipExplosionTrailLengthRandom,
-		.uiSecondaryExplosionCount = kuiSpaceshipExplosionSecondaryCount,
+		.iSecondaryExplosionCount = kiSpaceshipExplosionSecondaryCount,
 		.pParticleWidthScale = &gSpaceshipExplosionParticleWidth,
 		.pParticleLengthScale = &gSpaceshipExplosionParticleLength,
 		.pParticleLengthSpreadScale = &gSpaceshipExplosionParticleLengthSpread,
@@ -147,18 +147,18 @@ void SpaceshipsInterpolate::Register()
 #endif
 }
 
-static uint8_t suiEnemyBlasterPointLightTypeIndex = 0xFF;
-static uint8_t suiEnemyBlasterTypeIndex = 0xFF;
+static int64_t siEnemyBlasterPointLightTypeIndex = 0xFF;
+static int64_t siEnemyBlasterTypeIndex = 0xFF;
 
 static void RegisterEnemyBlasterType()
 {
-	if (suiEnemyBlasterTypeIndex != 0xFF)
+	if (siEnemyBlasterTypeIndex != 0xFF)
 	{
 		return;
 	}
 
 #if defined(BT_CLIENT)
-	engine::PointLightsInterpolate::RegisterType(suiEnemyBlasterPointLightTypeIndex,
+	engine::PointLightsInterpolate::RegisterType(siEnemyBlasterPointLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesBlasterBC72pngCrc,
 		.uiColor = 0xFFFFFFFF,
@@ -170,10 +170,10 @@ static void RegisterEnemyBlasterType()
 	});
 #endif // BT_CLIENT
 
-	BlastersInterpolate::RegisterType(suiEnemyBlasterTypeIndex,
+	BlastersInterpolate::RegisterType(siEnemyBlasterTypeIndex,
 	{
 		.f2Size = {kfEnemyBlasterSize, kfEnemyBlasterSize},
-		.uiPointLightTypeIndex = suiEnemyBlasterPointLightTypeIndex,
+		.iPointLightTypeIndex = siEnemyBlasterPointLightTypeIndex,
 	});
 }
 
@@ -193,18 +193,18 @@ void XM_CALLCONV SyncSpaceship(FrameInterpolate& rFrameInterpolate, engine::push
 #if defined(BT_CLIENT)
 static void RegisterSpaceshipHitFlashEffect()
 {
-	if (suiSpaceshipHitFlashTypeIndex == 0xFF)
+	if (siSpaceshipHitFlashTypeIndex == 0xFF)
 	{
-		engine::PointLightsInterpolate::RegisterType(suiSpaceshipHitFlashTypeIndex,
+		engine::PointLightsInterpolate::RegisterType(siSpaceshipHitFlashTypeIndex,
 		{
 			.uiCrc = data::kTexturesBlasterBC74pngCrc,
 			.uiColor = 0xFFFFFFFF,
 		});
 
-		engine::PointLightsInterpolate::RegisterControllerType(guiSpaceshipHitFlashControllerTypeIndex,
+		engine::PointLightsInterpolate::RegisterControllerType(giSpaceshipHitFlashControllerTypeIndex,
 		{
-			.uiBaseTypeIndex = suiSpaceshipHitFlashTypeIndex,
-			.uiKeyframeCount = 2,
+			.iBaseTypeIndex = siSpaceshipHitFlashTypeIndex,
+			.iKeyframeCount = 2,
 			.bDestroysSelf = true,
 			.times = {std::chrono::duration<float>(0.0f), kHitFlashDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 			.keyframes =
@@ -230,11 +230,11 @@ void SpawnSpaceshipExplosion(Frame& __restrict rFrame, XMVECTOR vecPosition, XMV
 
 	engine::ExplosionsPostRender::Spawn(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime),
 	{
-		.uiTypeIndex = guiSpaceshipExplosionTypeIndex,
+		.iTypeIndex = giSpaceshipExplosionTypeIndex,
 		.vecPosition = vecJitteredPosition,
 		.vecDirection = vecJitteredDirection,
 		.flags = {engine::ExplosionFlags::kDestroysSelf, engine::ExplosionFlags::kRed},
-		.uiTrailCount = kuiSpaceshipExplosionTrailCount,
+		.iTrailCount = kiSpaceshipExplosionTrailCount,
 		.fTrailAngle = fPercent * XM_PI,
 		.uiParticleCount = static_cast<uint32_t>(fPercent * kfSpaceshipExplosionParticleCount),
 		.fParticleAngle = fPercent * XM_PIDIV2,
@@ -383,7 +383,7 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 		};
 		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
 		{
-			LOG(kDefault, kError, "Spaceship Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) Health: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), common::Wb(rCurrentPostRender.pfHealths[i], 1), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, rFrame.postRender.transferRequests.size(), rFrame.postRender.transferRequests.capacity());
+			LOG(kDefault, kError, "Spaceship Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) Health: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), common::Wb(rCurrentPostRender.pfHealths[i], 1), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
 		PushTransferRequest(rFrame.postRender, request);
@@ -469,7 +469,7 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 			{
 				.vecPosition = vecPosition,
 				.vecVelocity = vecBlasterVelocity,
-				.uiTypeIndex = suiEnemyBlasterTypeIndex,
+				.iTypeIndex = siEnemyBlasterTypeIndex,
 				.flags = {},
 				.alignment = rCurrentPostRender.pAlignments[i],
 				.fWindTrailIntensity = game::gWindDepositSpaceshipsBlastersIntensity.mfCurrent,

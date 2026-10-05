@@ -14,7 +14,7 @@ namespace game
 
 #if defined(BT_DEBUG)
 
-constexpr uint64_t kuiAudioStreamingFixtureReadLength = 16 * 1'024;
+constexpr int64_t kiAudioStreamingFixtureReadLength = 16 * 1'024;
 
 static const char* AudioStreamingFixturePartitionName(engine::AudioStreamingFixturePartition ePartition)
 {
@@ -126,7 +126,7 @@ struct AudioStreamingFixtureCoexistenceState
 	}
 
 	AudioStreamingFixtureCoexistenceFlags_t flags;
-	uint64_t uiStartSequence = 0;
+	int64_t iStartSequence = 0;
 };
 
 struct AudioStreamingFixtureStartState
@@ -203,20 +203,20 @@ static nlohmann::json BuildAudioStreamingFixtureSnapshot()
 		engine::AudioStreamingFixtureSnapshot before = engine::gpAgentCommandServer->mpAudioStreamingFixture->InspectFile();
 		audioSnapshot = engine::gpAgentCommandServer->mpAudioStreamingFixture->InspectAudio();
 		snapshot = engine::gpAgentCommandServer->mpAudioStreamingFixture->InspectFile();
-		bCombinedCoherent = before.uiScenarioGate == snapshot.uiScenarioGate && before.uiActiveWriters == snapshot.uiActiveWriters
+		bCombinedCoherent = before.uiScenarioGate == snapshot.uiScenarioGate && before.iActiveWriters == snapshot.iActiveWriters
 		                 && before.uiReservationBoundary == snapshot.uiReservationBoundary && before.uiRetryCount == snapshot.uiRetryCount
 		                 && before.eHoldOwner == snapshot.eHoldOwner && before.eHoldState == snapshot.eHoldState
 		                 && (before.flags & engine::AudioStreamingFixtureSnapshotFlags::kLoaderStaged) == (snapshot.flags & engine::AudioStreamingFixtureSnapshotFlags::kLoaderStaged)
-		                 && before.uiHeldIndex == snapshot.uiHeldIndex && before.uiHeldGeneration == snapshot.uiHeldGeneration
-		                 && before.uiMainHead == snapshot.uiMainHead && before.uiLoader0Head == snapshot.uiLoader0Head
-		                 && before.uiLoader1Head == snapshot.uiLoader1Head;
-		for (size_t i = 0; bCombinedCoherent && i < snapshot.poolEntries.size(); ++i)
+		                 && before.iHeldIndex == snapshot.iHeldIndex && before.iHeldGeneration == snapshot.iHeldGeneration
+		                 && before.iMainHead == snapshot.iMainHead && before.iLoader0Head == snapshot.iLoader0Head
+		                 && before.iLoader1Head == snapshot.iLoader1Head;
+		for (int64_t i = 0; bCombinedCoherent && i < std::ssize(snapshot.poolEntries); ++i)
 		{
-			const engine::AudioStreamingFixturePoolEntry& rBefore = before.poolEntries[i];
-			const engine::AudioStreamingFixturePoolEntry& rAfter = snapshot.poolEntries[i];
-			bCombinedCoherent = rBefore.uiIndex == rAfter.uiIndex && rBefore.eState == rAfter.eState
-			                 && rBefore.uiGeneration == rAfter.uiGeneration && rBefore.crc == rAfter.crc
-			                 && rBefore.uiOffset == rAfter.uiOffset && rBefore.uiLength == rAfter.uiLength;
+			const engine::AudioStreamingFixturePoolEntry& rBefore = before.poolEntries[static_cast<size_t>(i)];
+			const engine::AudioStreamingFixturePoolEntry& rAfter = snapshot.poolEntries[static_cast<size_t>(i)];
+			bCombinedCoherent = rBefore.iIndex == rAfter.iIndex && rBefore.eState == rAfter.eState
+			                 && rBefore.iGeneration == rAfter.iGeneration && rBefore.crc == rAfter.crc
+			                 && rBefore.iOffset == rAfter.iOffset && rBefore.iLength == rAfter.iLength;
 		}
 		if (bCombinedCoherent)
 		{
@@ -226,17 +226,17 @@ static nlohmann::json BuildAudioStreamingFixtureSnapshot()
 	snapshot.flags.Set(engine::AudioStreamingFixtureSnapshotFlags::kCoherent, (snapshot.flags & engine::AudioStreamingFixtureSnapshotFlags::kCoherent) && bCombinedCoherent);
 	nlohmann::json result;
 	result["scenarioGate"] = snapshot.uiScenarioGate;
-	result["scenarioGeneration"] = snapshot.uiScenarioGeneration;
-	result["activeWriters"] = snapshot.uiActiveWriters;
+	result["scenarioGeneration"] = snapshot.iScenarioGeneration;
+	result["activeWriters"] = snapshot.iActiveWriters;
 	result["reservationStart"] = snapshot.uiReservationStart;
 	result["reservationBoundary"] = snapshot.uiReservationBoundary;
 	result["retryCount"] = snapshot.uiRetryCount;
 	result["holdOwner"] = AudioStreamingFixtureHoldOwnerName(snapshot.eHoldOwner);
 	result["holdState"] = AudioStreamingFixtureHoldStateName(snapshot.eHoldState);
-	result["heldPoolIndex"] = snapshot.uiHeldIndex == std::numeric_limits<uint32_t>::max()
+	result["heldPoolIndex"] = snapshot.iHeldIndex == 4'294'967'295i64
 			? nlohmann::json(nullptr)
-			: nlohmann::json(snapshot.uiHeldIndex);
-	result["heldGeneration"] = snapshot.uiHeldGeneration;
+			: nlohmann::json(snapshot.iHeldIndex);
+	result["heldGeneration"] = snapshot.iHeldGeneration;
 	result["heldState"] = AudioStreamingFixtureQueueStateName(snapshot.eHeldState);
 	result["coherent"] = snapshot.flags & engine::AudioStreamingFixtureSnapshotFlags::kCoherent;
 	result["gapFree"] = snapshot.flags & engine::AudioStreamingFixtureSnapshotFlags::kGapFree;
@@ -246,19 +246,19 @@ static nlohmann::json BuildAudioStreamingFixtureSnapshot()
 		{"loaderStaged", snapshot.flags & engine::AudioStreamingFixtureSnapshotFlags::kLoaderStaged},
 		{"controlledPublication", audioSnapshot.flags & engine::AudioStreamingFixtureAudioSnapshotFlags::kControlledPublication},
 		{"saturationActive", audioSnapshot.flags & engine::AudioStreamingFixtureAudioSnapshotFlags::kSaturationActive},
-		{"publicationAllowance", audioSnapshot.uiPublicationAllowance},
+		{"publicationAllowance", audioSnapshot.iPublicationAllowance},
 	};
 	result["poolEntries"] = nlohmann::json::array();
 	for (const engine::AudioStreamingFixturePoolEntry& rEntry : snapshot.poolEntries)
 	{
 		result["poolEntries"].push_back(
 		{
-			{"index", rEntry.uiIndex},
+			{"index", rEntry.iIndex},
 			{"state", AudioStreamingFixtureQueueStateName(rEntry.eState)},
-			{"generation", rEntry.uiGeneration},
+			{"generation", rEntry.iGeneration},
 			{"crc", rEntry.crc},
-			{"offset", rEntry.uiOffset},
-			{"length", rEntry.uiLength},
+			{"offset", rEntry.iOffset},
+			{"length", rEntry.iLength},
 		});
 	}
 	result["current"] = BuildAudioStreamingFixtureVoiceSummary(audioSnapshot.current);
@@ -271,11 +271,11 @@ static nlohmann::json BuildAudioStreamingFixtureSnapshot()
 	};
 	result["partitions"] = nlohmann::json::array(
 	{
-		{{"name", "main"}, {"head", snapshot.uiMainHead}, {"dropped", snapshot.uiMainDropped}},
-		{{"name", "loader0"}, {"head", snapshot.uiLoader0Head}, {"dropped", snapshot.uiLoader0Dropped}},
-		{{"name", "loader1"}, {"head", snapshot.uiLoader1Head}, {"dropped", snapshot.uiLoader1Dropped}},
+		{{"name", "main"}, {"head", snapshot.iMainHead}, {"dropped", snapshot.iMainDropped}},
+		{{"name", "loader0"}, {"head", snapshot.iLoader0Head}, {"dropped", snapshot.iLoader0Dropped}},
+		{{"name", "loader1"}, {"head", snapshot.iLoader1Head}, {"dropped", snapshot.iLoader1Dropped}},
 	});
-	bool bOverflow = snapshot.uiMainDropped != 0 || snapshot.uiLoader0Dropped != 0 || snapshot.uiLoader1Dropped != 0;
+	bool bOverflow = snapshot.iMainDropped != 0 || snapshot.iLoader0Dropped != 0 || snapshot.iLoader1Dropped != 0;
 	result["overflow"] = bOverflow;
 	result["evidenceValid"] = (snapshot.flags & engine::AudioStreamingFixtureSnapshotFlags::kCoherent)
 	                       && (snapshot.flags & engine::AudioStreamingFixtureSnapshotFlags::kGapFree) && !bOverflow;
@@ -285,19 +285,19 @@ static nlohmann::json BuildAudioStreamingFixtureSnapshot()
 		const engine::AudioStreamingFixtureRecord& rRecord = snapshot.records.at(i);
 		nlohmann::json record;
 		record["sequence"] = rRecord.uiSequence;
-		record["scenarioGeneration"] = rRecord.uiScenarioGeneration;
+		record["scenarioGeneration"] = rRecord.iScenarioGeneration;
 		record["partition"] = AudioStreamingFixturePartitionName(rRecord.ePartition);
 		record["phase"] = AudioStreamingFixturePhaseName(rRecord.ePhase);
-		record["threadId"] = rRecord.uiThreadId;
+		record["threadId"] = rRecord.iThreadId;
 		record["threadPriority"] = rRecord.iThreadPriority;
-		record["poolIndex"] = rRecord.uiPoolIndex == std::numeric_limits<uint32_t>::max()
+		record["poolIndex"] = rRecord.iPoolIndex == 4'294'967'295i64
 		                    ? nlohmann::json(nullptr)
-		                    : nlohmann::json(rRecord.uiPoolIndex);
+		                    : nlohmann::json(rRecord.iPoolIndex);
 		record["crc"] = rRecord.crc;
-		record["offset"] = rRecord.uiOffset;
-		record["length"] = rRecord.uiLength;
+		record["offset"] = rRecord.iOffset;
+		record["length"] = rRecord.iLength;
 		record["state"] = AudioStreamingFixtureQueueStateName(rRecord.eState);
-		record["generation"] = rRecord.uiGeneration;
+		record["generation"] = rRecord.iGeneration;
 		record["cancelAcknowledged"] = rRecord.bCancelAcknowledged;
 		result["records"].push_back(std::move(record));
 	}
@@ -325,17 +325,17 @@ static nlohmann::json BuildAudioStreamingFixtureInvalidResult(const engine::Audi
 static bool AudioStreamingFixtureEvidenceValid(const engine::AudioStreamingFixtureSnapshot& rSnapshot)
 {
 	return (rSnapshot.flags & engine::AudioStreamingFixtureSnapshotFlags::kCoherent)
-	    && (rSnapshot.flags & engine::AudioStreamingFixtureSnapshotFlags::kGapFree) && rSnapshot.uiMainDropped == 0
-	    && rSnapshot.uiLoader0Dropped == 0 && rSnapshot.uiLoader1Dropped == 0;
+	    && (rSnapshot.flags & engine::AudioStreamingFixtureSnapshotFlags::kGapFree) && rSnapshot.iMainDropped == 0
+	    && rSnapshot.iLoader0Dropped == 0 && rSnapshot.iLoader1Dropped == 0;
 }
 
-static int64_t CountAudioStreamingFixtureRecords(const engine::AudioStreamingFixtureSnapshot& rSnapshot, engine::AudioStreamingFixturePhase ePhase, common::crc_t crc, uint64_t uiAfterSequence = 0)
+static int64_t CountAudioStreamingFixtureRecords(const engine::AudioStreamingFixtureSnapshot& rSnapshot, engine::AudioStreamingFixturePhase ePhase, common::crc_t crc, int64_t iAfterSequence = 0)
 {
 	int64_t iCount = 0;
 	for (int64_t i = 0; i < rSnapshot.iRecordCount; ++i)
 	{
 		const engine::AudioStreamingFixtureRecord& rRecord = rSnapshot.records.at(i);
-		iCount += rRecord.uiSequence > uiAfterSequence && rRecord.ePhase == ePhase && rRecord.crc == crc ? 1 : 0;
+		iCount += rRecord.uiSequence > static_cast<uint64_t>(iAfterSequence) && rRecord.ePhase == ePhase && rRecord.crc == crc ? 1 : 0;
 	}
 	return iCount;
 }
@@ -468,7 +468,7 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParame
 		if (action == "start")
 		{
 			std::shared_ptr<AudioStreamingFixtureStartState> pState = std::make_shared<AudioStreamingFixtureStartState>();
-			if (engine::gpAgentCommandServer->mpAudioStreamingFixture->Begin(data::kAudioMusicdoodlewavCrc, 0, kuiAudioStreamingFixtureReadLength))
+			if (engine::gpAgentCommandServer->mpAudioStreamingFixture->Begin(data::kAudioMusicdoodlewavCrc, 0, kiAudioStreamingFixtureReadLength))
 			{
 				if (!engine::gpAgentCommandServer->mpAudioStreamingFixture->Play(data::kAudioMusicdoodlewavCrc))
 				{
@@ -488,7 +488,7 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParame
 				{
 					throw std::runtime_error("audio_streaming_fixture managers were destroyed while start awaited quiescence");
 				}
-				if (!engine::gpAgentCommandServer->mpAudioStreamingFixture->Begin(data::kAudioMusicdoodlewavCrc, 0, kuiAudioStreamingFixtureReadLength))
+				if (!engine::gpAgentCommandServer->mpAudioStreamingFixture->Begin(data::kAudioMusicdoodlewavCrc, 0, kiAudioStreamingFixtureReadLength))
 				{
 					return std::nullopt;
 				}
@@ -554,7 +554,7 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParame
 				{
 					return std::nullopt;
 				}
-				if (snapshot.uiHeldIndex != std::numeric_limits<uint32_t>::max())
+				if (snapshot.iHeldIndex != 4'294'967'295i64)
 				{
 					return std::nullopt;
 				}
@@ -569,7 +569,7 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParame
 		{
 			std::shared_ptr<AudioStreamingFixtureCoexistenceState> pState = std::make_shared<AudioStreamingFixtureCoexistenceState>();
 			engine::AudioStreamingFixtureSnapshot before = engine::gpAgentCommandServer->mpAudioStreamingFixture->InspectFile();
-			pState->uiStartSequence = before.uiReservationBoundary;
+			pState->iStartSequence = static_cast<int64_t>(before.uiReservationBoundary);
 			pState->flags.Set(AudioStreamingFixtureCoexistenceFlags::kControlled, engine::gpAgentCommandServer->mpAudioStreamingFixture->InspectAudio().flags & engine::AudioStreamingFixtureAudioSnapshotFlags::kControlledPublication);
 			pState->flags.Set(AudioStreamingFixtureCoexistenceFlags::kStaging);
 			engine::gpAgentCommandServer->mpAudioStreamingFixture->StartCoexistence(data::kAudioBlaster16793__pushtobreak__earth1wavCrc, data::kAudioBlaster793907__cvltiv8r__snaresbycvltiv8r301wavCrc);
@@ -604,7 +604,7 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParame
 					{
 						return std::nullopt;
 					}
-					if (CountAudioStreamingFixtureRecords(snapshot, engine::AudioStreamingFixturePhase::kRefillReady, data::kAudioMusicdoodlewavCrc, pState->uiStartSequence) < 3)
+					if (CountAudioStreamingFixtureRecords(snapshot, engine::AudioStreamingFixturePhase::kRefillReady, data::kAudioMusicdoodlewavCrc, pState->iStartSequence) < 3)
 					{
 						return std::nullopt;
 					}
@@ -646,7 +646,7 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParame
 				{
 					return std::nullopt;
 				}
-				if (snapshot.uiHeldIndex != std::numeric_limits<uint32_t>::max())
+				if (snapshot.iHeldIndex != 4'294'967'295i64)
 				{
 					return std::nullopt;
 				}
@@ -682,7 +682,7 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParame
 			switch (pState->ePhase)
 			{
 				case AudioStreamingFixtureSaturationPhase::kSetup:
-					if (!engine::gpAgentCommandServer->mpAudioStreamingFixture->Begin(data::kAudioMusicdoodlewavCrc, 0, kuiAudioStreamingFixtureReadLength))
+					if (!engine::gpAgentCommandServer->mpAudioStreamingFixture->Begin(data::kAudioMusicdoodlewavCrc, 0, kiAudioStreamingFixtureReadLength))
 					{
 						return std::nullopt;
 					}
@@ -697,7 +697,7 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParame
 					bool bPrimaryStreamHeld = false;
 					for (const engine::AudioStreamingFixturePoolEntry& rEntry : fileSnapshot.poolEntries)
 					{
-						bPrimaryStreamHeld = bPrimaryStreamHeld || (rEntry.crc == data::kAudioMusicdoodlewavCrc && rEntry.uiOffset == 0 && rEntry.uiLength == kuiAudioStreamingFixtureReadLength && rEntry.eState == engine::AudioStreamingFixtureQueueState::kLoading);
+						bPrimaryStreamHeld = bPrimaryStreamHeld || (rEntry.crc == data::kAudioMusicdoodlewavCrc && rEntry.iOffset == 0 && rEntry.iLength == kiAudioStreamingFixtureReadLength && rEntry.eState == engine::AudioStreamingFixtureQueueState::kLoading);
 					}
 					bool bReadyOne = false;
 					bool bReadyTwo = false;
@@ -708,8 +708,8 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParame
 						 && rRecord.ePartition == engine::AudioStreamingFixturePartition::kMain
 						 && rRecord.ePhase == engine::AudioStreamingFixturePhase::kRefillReady)
 						{
-							bReadyOne = bReadyOne || rRecord.uiOffset == kuiAudioStreamingFixtureReadLength;
-							bReadyTwo = bReadyTwo || rRecord.uiOffset == 2 * kuiAudioStreamingFixtureReadLength;
+							bReadyOne = bReadyOne || rRecord.iOffset == kiAudioStreamingFixtureReadLength;
+							bReadyTwo = bReadyTwo || rRecord.iOffset == 2 * kiAudioStreamingFixtureReadLength;
 						}
 					}
 					if (!bPrimaryStreamHeld)
@@ -822,7 +822,7 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParame
 					{
 						return std::nullopt;
 					}
-					if (fileSnapshot.uiHeldIndex != std::numeric_limits<uint32_t>::max())
+					if (fileSnapshot.iHeldIndex != 4'294'967'295i64)
 					{
 						return std::nullopt;
 					}

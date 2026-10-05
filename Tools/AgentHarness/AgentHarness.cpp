@@ -21,8 +21,8 @@
 
 namespace toolcli
 {
-	constexpr uint32_t kuiMaxRequestBytes = 1ui32 * 1'024ui32 * 1'024ui32;
-	constexpr uint32_t kuiMaxResponseBytes = 16ui32 * 1'024ui32 * 1'024ui32;
+	constexpr int64_t kiMaxRequestBytes = 1i64 * 1'024i64 * 1'024i64;
+	constexpr int64_t kiMaxResponseBytes = 16i64 * 1'024i64 * 1'024i64;
 	constexpr int64_t kiConnectAttemptTimeoutMilliseconds = 500; // per connect try; retried until the --timeout-ms deadline
 	constexpr int64_t kiConnectRetrySleepMilliseconds = 150; // brief pause between connect tries
 	constexpr int64_t kiDefaultResponseTimeoutMilliseconds = 15'000;
@@ -114,15 +114,15 @@ namespace toolcli
 	static bool ReadAllStandardInput(std::string& rInput)
 	{
 		char pBuffer[4'096] {};
-		size_t uiRead = 0;
-		while ((uiRead = std::fread(pBuffer, 1, sizeof(pBuffer), stdin)) > 0)
+		int64_t iRead = 0;
+		while ((iRead = static_cast<int64_t>(std::fread(pBuffer, 1, sizeof(pBuffer), stdin))) > 0)
 		{
-			if (rInput.size() > kuiMaxRequestBytes || uiRead > kuiMaxRequestBytes - rInput.size())
+			if (std::ssize(rInput) > kiMaxRequestBytes || iRead > kiMaxRequestBytes - std::ssize(rInput))
 			{
 				Fail("request exceeds 1 MiB");
 				return false;
 			}
-			rInput.append(pBuffer, uiRead);
+			rInput.append(pBuffer, static_cast<size_t>(iRead));
 		}
 		if (std::ferror(stdin))
 		{
@@ -211,7 +211,7 @@ namespace toolcli
 			timeval timeout {};
 			timeout.tv_sec = static_cast<long>(waitDuration.count() / 1'000);
 			timeout.tv_usec = static_cast<long>((waitDuration.count() % 1'000) * 1'000);
-			int iReady = ::select(0, bWrite ? nullptr : &readSet, bWrite ? &writeSet : nullptr, nullptr, &timeout);
+			int64_t iReady = ::select(0, bWrite ? nullptr : &readSet, bWrite ? &writeSet : nullptr, nullptr, &timeout);
 			if (iReady == SOCKET_ERROR)
 			{
 				return SocketOperationResult::kReadinessFailure;
@@ -246,8 +246,8 @@ namespace toolcli
 			{
 				return eWaitResult;
 			}
-			int iChunk = ::send(socket, data.data(), static_cast<int>(data.size()), 0);
-			int iSocketError = iChunk == SOCKET_ERROR ? ::WSAGetLastError() : 0;
+			int64_t iChunk = ::send(socket, data.data(), static_cast<int>(data.size()), 0);
+			int64_t iSocketError = iChunk == SOCKET_ERROR ? ::WSAGetLastError() : 0;
 			if (iChunk > 0)
 			{
 				data = data.subspan(static_cast<size_t>(iChunk));
@@ -282,8 +282,8 @@ namespace toolcli
 			{
 				return eWaitResult;
 			}
-			int iChunk = ::recv(socket, data.data(), static_cast<int>(data.size()), 0);
-			int iSocketError = iChunk == SOCKET_ERROR ? ::WSAGetLastError() : 0;
+			int64_t iChunk = ::recv(socket, data.data(), static_cast<int>(data.size()), 0);
+			int64_t iSocketError = iChunk == SOCKET_ERROR ? ::WSAGetLastError() : 0;
 			if (iChunk > 0)
 			{
 				data = data.subspan(static_cast<size_t>(iChunk));
@@ -332,7 +332,7 @@ namespace toolcli
 			return false;
 		}
 
-		int iResult = ::connect(socket, reinterpret_cast<const sockaddr*>(&rAddress), sizeof(rAddress));
+		int64_t iResult = ::connect(socket, reinterpret_cast<const sockaddr*>(&rAddress), sizeof(rAddress));
 		if (iResult != 0)
 		{
 			if (::WSAGetLastError() != WSAEWOULDBLOCK)
@@ -348,7 +348,7 @@ namespace toolcli
 			timeval timeout {};
 			timeout.tv_sec = static_cast<long>(iTimeoutMilliseconds / 1'000);
 			timeout.tv_usec = static_cast<long>((iTimeoutMilliseconds % 1'000) * 1'000);
-			int iReady = ::select(0, nullptr, &writeSet, &errorSet, &timeout);
+			int64_t iReady = ::select(0, nullptr, &writeSet, &errorSet, &timeout);
 			if (iReady <= 0 || FD_ISSET(socket, &errorSet))
 			{
 				return false;
@@ -365,7 +365,7 @@ namespace toolcli
 		return ::ioctlsocket(socket, FIONBIO, &uiBlocking) == 0;
 	}
 
-	static bool ParseSocketCommandArguments(int iArgumentCount, wchar_t* const pArgumentValues[], SocketCommandArguments& rArguments)
+	static bool ParseSocketCommandArguments(int64_t iArgumentCount, wchar_t* const pArgumentValues[], SocketCommandArguments& rArguments)
 	{
 		bool bHaveRequestSource = false;
 
@@ -590,7 +590,7 @@ namespace toolcli
 			(static_cast<uint32_t>(pResponseLengthPrefix[1]) << 8) |
 			(static_cast<uint32_t>(pResponseLengthPrefix[2]) << 16) |
 			(static_cast<uint32_t>(pResponseLengthPrefix[3]) << 24);
-		if (uiResponseLength == 0 || uiResponseLength > kuiMaxResponseBytes)
+		if (uiResponseLength == 0 || uiResponseLength > kiMaxResponseBytes)
 		{
 			Fail("response length out of range");
 			return std::nullopt;
@@ -606,7 +606,7 @@ namespace toolcli
 		return response;
 	}
 
-	static int PrintResponseAndInterpretExitCode(std::string_view response)
+	static int64_t PrintResponseAndInterpretExitCode(std::string_view response)
 	{
 		std::cout << response << '\n';
 		try
@@ -625,7 +625,7 @@ namespace toolcli
 		return kiExitFailure;
 	}
 
-	static int RunSocketCommand(int iArgumentCount, wchar_t* const pArgumentValues[])
+	static int64_t RunSocketCommand(int64_t iArgumentCount, wchar_t* const pArgumentValues[])
 	{
 		try
 		{
@@ -645,7 +645,7 @@ namespace toolcli
 				PrintUsage(std::cerr);
 				return kiExitFailure;
 			}
-			if (request.size() > kuiMaxRequestBytes)
+			if (request.size() > kiMaxRequestBytes)
 			{
 				Fail("request exceeds 1 MiB");
 				return kiExitFailure;
@@ -707,8 +707,8 @@ int wmain(int iArgumentCount, wchar_t* pArgumentValues[])
 		}
 		if (mode == L"lock")
 		{
-			return toolcli::RunHarnessLockCommand(std::span<const wchar_t* const>(pArgumentValues, static_cast<size_t>(iArgumentCount)));
+			return static_cast<int>(toolcli::RunHarnessLockCommand(std::span<const wchar_t* const>(pArgumentValues, static_cast<size_t>(iArgumentCount))));
 		}
 	}
-	return toolcli::RunSocketCommand(iArgumentCount, pArgumentValues);
+	return static_cast<int>(toolcli::RunSocketCommand(iArgumentCount, pArgumentValues));
 }

@@ -29,11 +29,11 @@ static void Bind(Client& rClient)
 	}
 }
 
-SubscribeAcceptResult ReceiveSubscribeAccept(Client& rClient, uint8_t uiSlotIndex, uint16_t uiEpoch, GridCoord coord)
+SubscribeAcceptResult ReceiveSubscribeAccept(Client& rClient, int64_t iSlotIndex, int64_t iEpoch, GridCoord coord)
 {
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-	NetworkMessages::ServerSubscribeAcceptMessage message {.uiLoadGeneration = rClient.muiCommittedLoadGeneration, .uiSlotIndex = uiSlotIndex, .uiEpoch = uiEpoch, .coord = coord};
+	NetworkMessages::ServerSubscribeAcceptMessage message {.uiLoadGeneration = static_cast<uint8_t>(rClient.miCommittedLoadGeneration), .uiSlotIndex = static_cast<uint8_t>(iSlotIndex), .uiEpoch = static_cast<uint16_t>(iEpoch), .coord = coord};
 	NetworkMessages::Write(rWorkbuffer, message);
 
 	Bind(rClient);
@@ -67,7 +67,7 @@ void ArmCancelledSubscription(Client& rClient, const std::shared_ptr<CancelledSu
 	sBinding.pCancelledSubscription = pState;
 }
 
-void CaptureStaleUpdate(const Client& rClient, std::span<const uint8_t> packetData, uint8_t uiSlotIndex, uint16_t uiEpoch, int64_t iTick)
+void CaptureStaleUpdate(const Client& rClient, std::span<const uint8_t> packetData, int64_t iSlotIndex, int64_t iEpoch, int64_t iTick)
 {
 	if (sBinding.pClient != &rClient)
 	{
@@ -80,10 +80,10 @@ void CaptureStaleUpdate(const Client& rClient, std::span<const uint8_t> packetDa
 		pState->packet.assign(packetData.begin(), packetData.end());
 		pState->iCapturedBytes = std::ssize(packetData);
 		pState->iCapturedAtPoll = pState->iCapturePolls;
-		pState->uiSlotIndex = uiSlotIndex;
-		pState->uiEpoch = uiEpoch;
+		pState->iSlotIndex = iSlotIndex;
+		pState->iEpoch = iEpoch;
 		pState->iTick = iTick;
-		pState->coord = rClient.mSubscriptions.mCoordinateSlots.at(uiSlotIndex).coordinate;
+		pState->coord = rClient.mSubscriptions.mCoordinateSlots.at(static_cast<size_t>(iSlotIndex)).coordinate;
 		pState->flags.Set(StaleUpdateFlags::kCaptured);
 	}
 }
@@ -114,12 +114,12 @@ std::shared_ptr<StaleUpdateState> PollBeforeDrain(Client& rClient, QueryCoordUpd
 	{
 		return nullptr;
 	}
-	if (pState->uiSlotIndex >= std::ssize(rClient.mSubscriptions.mCoordinateSlots))
+	if (pState->iSlotIndex >= std::ssize(rClient.mSubscriptions.mCoordinateSlots))
 	{
 		return nullptr;
 	}
 
-	ClientCoordSlot& rSlot = rClient.mSubscriptions.mCoordinateSlots.at(pState->uiSlotIndex);
+	ClientCoordSlot& rSlot = rClient.mSubscriptions.mCoordinateSlots.at(static_cast<size_t>(pState->iSlotIndex));
 	CoordUpdateState coordState = pfnQueryCoordUpdateState(pState->coord, pState->iTick);
 	if (rSlot.eState != CoordSubscriptionState::kActive)
 	{
@@ -129,7 +129,7 @@ std::shared_ptr<StaleUpdateState> PollBeforeDrain(Client& rClient, QueryCoordUpd
 	{
 		return nullptr;
 	}
-	if (rSlot.acknowledgementState.uiEpoch != pState->uiEpoch)
+	if (rSlot.acknowledgementState.uiEpoch != pState->iEpoch)
 	{
 		return nullptr;
 	}
@@ -175,7 +175,7 @@ void PollAfterDrain(const Client& rClient, const std::shared_ptr<StaleUpdateStat
 	pState->flags.Set(StaleUpdateFlags::kComplete);
 }
 
-bool ObserveSubscribeAcceptCleanup(const Client& rClient, uint8_t uiSerializedSlot, int64_t iSerializedBytes)
+bool ObserveSubscribeAcceptCleanup(const Client& rClient, int64_t iSerializedSlot, int64_t iSerializedBytes)
 {
 	if (sBinding.pClient != &rClient)
 	{
@@ -185,19 +185,19 @@ bool ObserveSubscribeAcceptCleanup(const Client& rClient, uint8_t uiSerializedSl
 	{
 		return false;
 	}
-	sBinding.pSubscribeAcceptResult->uiSerializedSlot = uiSerializedSlot;
+	sBinding.pSubscribeAcceptResult->iSerializedSlot = iSerializedSlot;
 	sBinding.pSubscribeAcceptResult->iSerializedBytes = iSerializedBytes;
 	sBinding.pSubscribeAcceptResult->bSendSuppressed = true;
 	return true;
 }
 
-void ObserveUnsubscribeAck(const Client& rClient, uint8_t uiSlotIndex)
+void ObserveUnsubscribeAck(const Client& rClient, int64_t iSlotIndex)
 {
 	if (sBinding.pClient != &rClient)
 	{
 		return;
 	}
-	if (std::shared_ptr<CancelledSubscriptionState> pState = sBinding.pCancelledSubscription.lock(); pState != nullptr && pState->iSlot == uiSlotIndex)
+	if (std::shared_ptr<CancelledSubscriptionState> pState = sBinding.pCancelledSubscription.lock(); pState != nullptr && pState->iSlot == iSlotIndex)
 	{
 		pState->eOutcome = CancelledSubscriptionOutcome::kAcked;
 	}

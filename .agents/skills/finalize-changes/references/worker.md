@@ -47,9 +47,7 @@ continuation capsule carries that blocked disposition as its unresolved-issue
 item and, for a `primary.path-overlap` blocker that in-worker recovery
 returned, `Temp/finalize-primary-movement-result.json` as path plus selector.
 Every preparation dispatch recovers `primary.path-overlap` itself under
-`## Recovery`; the user-authorized recovery dispatch that `## Recovery` routes
-separately is the one whose capsule carries a `primary.path-overlap` conflict
-blocker as that blocked disposition.
+`## Recovery`.
 
 1. Run final preparation first when a claimed Plan finished.
    - Run `plan complete`, or `plan reject --user-authorized-rejection` after
@@ -277,18 +275,19 @@ blocker as that blocked disposition.
     question. A changed-region review finding or a failed build on that path
     is main's, handled through its ordinary review-and-fix round before that
     fresh preparation dispatch.
-  - Any other exit (conflict) in the user-authorized recovery dispatch the
-    `## Steps` intro identifies: resolve under the preconfirmation
-    reconciliation conflict rule above, then continue with every Exit 0 step
-    from the approval-preparation re-invocation on. The resolved hunks count as
-    a meaning change, so that dispatch returns the meaning-change handoff.
-  - Any other exit (conflict) in every other preparation dispatch: unlike the
-    preconfirmation reconciliation conflict rule above, run
-    `git rebase --abort`, prove the session tip is again the candidate commit
-    with no rebase in progress, and return the original `primary.path-overlap`
-    result as a blocker for the user, carrying the rebase's stderr verbatim so
-    a rebase that refused to start is not read as a conflict. If that proof
-    fails, keep the blocker and stop.
+  - Any other exit that leaves a rebase in progress (conflict): resolve under
+    the preconfirmation reconciliation conflict rule above, then continue with
+    every Exit 0 step from the approval-preparation re-invocation on. The
+    resolved hunks count as a meaning change, so this dispatch returns the
+    meaning-change handoff.
+  - Abort instead when the approved decisions, including any user answer the
+    continuation capsule carries, do not determine a valid resolution, such as
+    when the two sides' intents contradict: run `git rebase --abort`. After
+    that abort, or after any other exit that leaves no rebase in progress (the
+    rebase refused to start), prove the session tip is again the candidate
+    commit with no rebase in progress, and return the original
+    `primary.path-overlap` result as a blocker for the user, carrying the
+    rebase's stderr verbatim. If that proof fails, keep the blocker and stop.
 
   This is not the rewritten-history case below, which the fork-point repair
   script handles

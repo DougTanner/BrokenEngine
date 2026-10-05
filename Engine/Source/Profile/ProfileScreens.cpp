@@ -231,11 +231,11 @@ static void FormatGpuMemoryStatistics(common::Workbuffer& rWorkbuffer)
 
 	if (gpDeviceManager->mCapabilities & DeviceCapabilityFlags::kMemoryBudgetAvailable)
 	{
-		uint32_t uiHeapCount = gpInstanceManager->mVkPhysicalDeviceMemoryProperties.memoryHeapCount;
+		int64_t iHeapCount = gpInstanceManager->mVkPhysicalDeviceMemoryProperties.memoryHeapCount;
 		VmaBudget budgets[VK_MAX_MEMORY_HEAPS] {};
 		vmaGetHeapBudgets(gpDeviceManager->mpAllocator, budgets);
 
-		for (uint32_t i = 0; i < uiHeapCount; ++i)
+		for (int64_t i = 0; i < iHeapCount; ++i)
 		{
 			VkMemoryHeapFlags vkMemoryHeapFlags = gpInstanceManager->mVkPhysicalDeviceMemoryProperties.memoryHeaps[i].flags;
 			bool bDeviceLocal = (vkMemoryHeapFlags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) != 0;

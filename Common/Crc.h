@@ -5,14 +5,14 @@ namespace common
 
 using crc_t = uint64_t;
 
-template<size_t N>
+template<int64_t N>
 struct FixedString
 {
 	char data[N] {};
 
 	constexpr FixedString(const char (&str)[N])
 	{
-		for (size_t i = 0; i < N; ++i)
+		for (int64_t i = 0; i < N; ++i)
 		{
 			data[i] = str[i];
 		}

@@ -15,7 +15,7 @@
 namespace engine
 {
 
-ServerSessionRuntime::ServerSessionRuntime(game::ServerSession& rSession, uint16_t uiPort)
+ServerSessionRuntime::ServerSessionRuntime(game::ServerSession& rSession, int64_t iPort)
 :	mrSession(rSession)
 {
 	mpDiscoveryResponder = std::make_unique<NetworkDiscoveryResponder>();
@@ -23,7 +23,7 @@ ServerSessionRuntime::ServerSessionRuntime(game::ServerSession& rSession, uint16
 	mTimerHandle = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
 	try
 	{
-		mpServer = std::make_unique<Server>(uiPort);
+		mpServer = std::make_unique<Server>(iPort);
 	}
 	catch (...)
 	{
@@ -184,7 +184,7 @@ void ServerSessionRuntime::HandleResyncRequests()
 				continue;
 			}
 
-			mpServer->SendCoordinateFullState(iClientId, i, game::gpGame->miTickCounter, coord, it->second.pCurrent.get());
+			mpServer->mBufferedFrames.SendCoordinateFullState(iClientId, i, game::gpGame->miTickCounter, coord, it->second.pCurrent.get());
 		}
 	}
 
@@ -223,8 +223,8 @@ void ServerSessionRuntime::SendNewSubscriptionFullStates()
 			return false;
 		}
 
-		mpServer->SendCoordinateStaticData(rSubscription.iClientId, rSubscription.iSlot, rSubscription.coordinate, it->second.staticData);
-		mpServer->SendCoordinateFullState(rSubscription.iClientId, rSubscription.iSlot, game::gpGame->miTickCounter, rSubscription.coordinate, it->second.pCurrent.get());
+		mpServer->mBufferedFrames.SendCoordinateStaticData(rSubscription.iClientId, rSubscription.iSlot, rSubscription.coordinate, it->second.staticData);
+		mpServer->mBufferedFrames.SendCoordinateFullState(rSubscription.iClientId, rSubscription.iSlot, game::gpGame->miTickCounter, rSubscription.coordinate, it->second.pCurrent.get());
 		return true;
 	});
 }
@@ -253,7 +253,7 @@ void ServerSessionRuntime::CompleteUpdate(int64_t iFullTicks, int64_t iTick)
 	{
 		for (ClientConnection& rClient : mpServer->mClients)
 		{
-			mpServer->SendResends(rClient, iTick);
+			mpServer->mBufferedFrames.SendResends(rClient, iTick);
 		}
 		return;
 	}
@@ -265,7 +265,7 @@ void ServerSessionRuntime::CompleteUpdate(int64_t iFullTicks, int64_t iTick)
 
 void ServerSessionRuntime::ResetTransportForLoad()
 {
-	mpServer->ClearBufferedFrames();
+	mpServer->mBufferedFrames.ClearBufferedFrames();
 	mpServer->mPendingNewSubscriptions.clear();
 	mpServer->mPendingResynchronizationClientIds.clear();
 	mpServer->Flush();
@@ -273,14 +273,14 @@ void ServerSessionRuntime::ResetTransportForLoad()
 
 void ServerSessionRuntime::PublishTick(int64_t iTick, std::span<const std::pair<GridCoord, GridUpdateData>> gridUpdates, std::span<const std::pair<GridCoord, const game::Frame*>> fullFrames)
 {
-	mpServer->BufferFrame(iTick, gridUpdates);
+	mpServer->mBufferedFrames.BufferFrame(iTick, gridUpdates);
 	if (!fullFrames.empty())
 	{
-		mpServer->BufferFullFrame(iTick, fullFrames);
+		mpServer->mBufferedFrames.BufferFullFrame(iTick, fullFrames);
 	}
 	for (ClientConnection& rClient : mpServer->mClients)
 	{
-		mpServer->SendUpdate(rClient, iTick);
+		mpServer->mBufferedFrames.SendUpdate(rClient, iTick);
 	}
 }
 

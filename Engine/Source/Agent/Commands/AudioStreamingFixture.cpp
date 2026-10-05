@@ -80,7 +80,7 @@ static AudioStreamingFixtureVoiceSummary InspectVoice(const StreamingVoice& rVoi
 	{
 		rVoice.mpVoice->GetState(&voiceState, XAUDIO2_VOICE_NOSAMPLESPLAYED);
 	}
-	summary.iBuffersQueued = static_cast<int32_t>(voiceState.BuffersQueued);
+	summary.iBuffersQueued = static_cast<int64_t>(voiceState.BuffersQueued);
 	summary.flags.Set(AudioStreamingFixtureVoiceFlags::kUnderrunning, !(rVoice.mFlags & StreamingVoiceFlags::kLastBufferSubmitted) && voiceState.BuffersQueued == 0 && rVoice.mSlotStates[rVoice.miNextSubmit] != SlotState::kReady);
 	return summary;
 }
@@ -136,7 +136,7 @@ void AudioStreamingFixture::Shutdown()
 	{
 		muiScenarioGate.store(uiGate + 1, std::memory_order_seq_cst);
 	}
-	while (muiActiveWriters.load(std::memory_order_seq_cst) != 0)
+	while (miActiveWriters.load(std::memory_order_seq_cst) != 0)
 	{
 		SwitchToThread();
 	}
@@ -165,7 +165,7 @@ bool AudioStreamingFixture::RequestHold()
 	return true;
 }
 
-bool AudioStreamingFixture::Begin(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength)
+bool AudioStreamingFixture::Begin(common::crc_t crc, int64_t iOffset, int64_t iLength)
 {
 	if (gpAudioManager == nullptr)
 	{
@@ -186,7 +186,7 @@ bool AudioStreamingFixture::Begin(common::crc_t crc, uint64_t uiOffset, uint64_t
 	}
 	if (mFlags & Flags::kHoldPending)
 	{
-		if (!ArmHold(AudioStreamingFixtureHoldOwner::kControlled, crc, uiOffset, uiLength))
+		if (!ArmHold(AudioStreamingFixtureHoldOwner::kControlled, crc, iOffset, iLength))
 		{
 			return false;
 		}
@@ -247,7 +247,7 @@ AudioStreamingFixtureAudioSnapshot AudioStreamingFixture::InspectAudio() const
 		snapshot.current = InspectVoice(*rVoices.mpCurrentStream);
 		if (rVoices.mpCurrentStream->mpAudioStreamingControl != nullptr)
 		{
-			snapshot.uiPublicationAllowance = rVoices.mpCurrentStream->mpAudioStreamingControl->uiPublicationAllowance;
+			snapshot.iPublicationAllowance = rVoices.mpCurrentStream->mpAudioStreamingControl->uiPublicationAllowance;
 		}
 	}
 	if (!rVoices.mPreviousStreams.empty())
@@ -265,7 +265,7 @@ AudioStreamingFixtureAudioSnapshot AudioStreamingFixture::InspectAudio() const
 	snapshot.flags.Set(AudioStreamingFixtureAudioSnapshotFlags::kSaturationActive, mCommandFlags & AudioStreamingFixtureCommandFlags::kSaturationActive);
 	if (!(snapshot.flags & AudioStreamingFixtureAudioSnapshotFlags::kControlledPublication))
 	{
-		snapshot.uiPublicationAllowance = 0;
+		snapshot.iPublicationAllowance = 0;
 	}
 	return snapshot;
 }
@@ -278,7 +278,7 @@ void AudioStreamingFixture::ResetHistory()
 		rHistory.uiDropped.store(0, std::memory_order_relaxed);
 		for (HistoryEntry& rEntry : rHistory.entries)
 		{
-			rEntry.uiPublishedSequence.store(0, std::memory_order_relaxed);
+			rEntry.iPublishedSequence.store(0, std::memory_order_relaxed);
 			rEntry.record = {};
 		}
 	};
@@ -311,7 +311,7 @@ bool AudioStreamingFixture::BeginHistory()
 		ReleaseSaturation();
 		mbResetPending = true;
 	}
-	if (muiActiveWriters.load(std::memory_order_seq_cst) != 0)
+	if (miActiveWriters.load(std::memory_order_seq_cst) != 0)
 	{
 		return false;
 	}
@@ -328,9 +328,9 @@ bool AudioStreamingFixture::BeginHistory()
 	return true;
 }
 
-bool AudioStreamingFixture::ArmHold(AudioStreamingFixtureHoldOwner eOwner, common::crc_t crc, uint64_t uiOffset, uint64_t uiLength)
+bool AudioStreamingFixture::ArmHold(AudioStreamingFixtureHoldOwner eOwner, common::crc_t crc, int64_t iOffset, int64_t iLength)
 {
-	if (muiHeldIndex.load(std::memory_order_seq_cst) != std::numeric_limits<uint32_t>::max())
+	if (miHeldIndex.load(std::memory_order_seq_cst) != 4'294'967'295i64)
 	{
 		return false;
 	}
@@ -341,8 +341,8 @@ bool AudioStreamingFixture::ArmHold(AudioStreamingFixtureHoldOwner eOwner, commo
 	}
 	uint64_t uiGeneration = NextHoldGeneration(HoldGeneration(uiToken));
 	mHoldCrc.store(crc, std::memory_order_seq_cst);
-	muiHoldOffset.store(uiOffset, std::memory_order_seq_cst);
-	muiHoldLength.store(uiLength, std::memory_order_seq_cst);
+	miHoldOffset.store(iOffset, std::memory_order_seq_cst);
+	miHoldLength.store(iLength, std::memory_order_seq_cst);
 	uint64_t uiArmedToken = PackHoldToken(eOwner, AudioStreamingFixtureHoldState::kArmed, uiGeneration);
 	return muiHoldToken.compare_exchange_strong(uiToken, uiArmedToken, std::memory_order_seq_cst);
 }
@@ -453,54 +453,54 @@ void AudioStreamingFixture::ReleaseSaturation()
 	}
 }
 
-void AudioStreamingFixture::Record(AudioStreamingFixturePartition ePartition, AudioStreamingFixturePhase ePhase, uint32_t uiPoolIndex, common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, AudioStreamingFixtureQueueState eState, uint64_t uiGeneration, bool bCancelAcknowledged)
+void AudioStreamingFixture::Record(AudioStreamingFixturePartition ePartition, AudioStreamingFixturePhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioStreamingFixtureQueueState eState, int64_t iGeneration, bool bCancelAcknowledged)
 {
 	if (AudioStreamingFixture* pFixture = gpAttachedAudioStreamingFixture.load(std::memory_order_acquire); pFixture != nullptr)
 	{
-		pFixture->RecordEntry(ePartition, ePhase, uiPoolIndex, crc, uiOffset, uiLength, eState, uiGeneration, bCancelAcknowledged);
+		pFixture->RecordEntry(ePartition, ePhase, iPoolIndex, crc, iOffset, iLength, eState, iGeneration, bCancelAcknowledged);
 	}
 }
 
-void AudioStreamingFixture::RecordEntry(AudioStreamingFixturePartition ePartition, AudioStreamingFixturePhase ePhase, uint32_t uiPoolIndex, common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, AudioStreamingFixtureQueueState eState, uint64_t uiGeneration, bool bCancelAcknowledged)
+void AudioStreamingFixture::RecordEntry(AudioStreamingFixturePartition ePartition, AudioStreamingFixturePhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioStreamingFixtureQueueState eState, int64_t iGeneration, bool bCancelAcknowledged)
 {
 	uint64_t uiGate = muiScenarioGate.load(std::memory_order_seq_cst);
 	if ((uiGate & 1) == 0)
 	{
 		return;
 	}
-	muiActiveWriters.fetch_add(1, std::memory_order_seq_cst);
+	miActiveWriters.fetch_add(1, std::memory_order_seq_cst);
 	if (muiScenarioGate.load(std::memory_order_seq_cst) != uiGate)
 	{
-		muiActiveWriters.fetch_sub(1, std::memory_order_seq_cst);
+		miActiveWriters.fetch_sub(1, std::memory_order_seq_cst);
 		return;
 	}
 	auto Write = [&](auto& rHistory)
 	{
-		uint32_t uiIndex = rHistory.uiHead.fetch_add(1, std::memory_order_seq_cst);
-		if (uiIndex >= rHistory.entries.size())
+		int64_t iIndex = rHistory.uiHead.fetch_add(1, std::memory_order_seq_cst);
+		if (iIndex >= std::ssize(rHistory.entries))
 		{
 			rHistory.uiDropped.fetch_add(1, std::memory_order_seq_cst);
 			return;
 		}
 		uint64_t uiSequence = muiNextSequence.fetch_add(1, std::memory_order_seq_cst) + 1;
-		HistoryEntry& rEntry = rHistory.entries[uiIndex];
+		HistoryEntry& rEntry = rHistory.entries[iIndex];
 		rEntry.record =
 		{
 			.uiSequence = uiSequence,
-			.uiScenarioGeneration = uiGate >> 1,
-			.uiGeneration = uiGeneration,
-			.uiThreadId = GetCurrentThreadId(),
+			.iScenarioGeneration = static_cast<int64_t>(uiGate >> 1),
+			.iGeneration = iGeneration,
+			.iThreadId = static_cast<int64_t>(GetCurrentThreadId()),
 			.iThreadPriority = GetThreadPriority(GetCurrentThread()),
-			.uiPoolIndex = uiPoolIndex,
+			.iPoolIndex = iPoolIndex,
 			.crc = crc,
-			.uiOffset = uiOffset,
-			.uiLength = uiLength,
+			.iOffset = iOffset,
+			.iLength = iLength,
 			.ePartition = ePartition,
 			.ePhase = ePhase,
 			.eState = eState,
 			.bCancelAcknowledged = bCancelAcknowledged,
 		};
-		rEntry.uiPublishedSequence.store(uiSequence, std::memory_order_release);
+		rEntry.iPublishedSequence.store(static_cast<int64_t>(uiSequence), std::memory_order_release);
 	};
 	switch (ePartition)
 	{
@@ -508,7 +508,7 @@ void AudioStreamingFixture::RecordEntry(AudioStreamingFixturePartition ePartitio
 		case AudioStreamingFixturePartition::kLoader0: Write(mLoader0History); break;
 		case AudioStreamingFixturePartition::kLoader1: Write(mLoader1History); break;
 	}
-	muiActiveWriters.fetch_sub(1, std::memory_order_seq_cst);
+	miActiveWriters.fetch_sub(1, std::memory_order_seq_cst);
 }
 
 AudioStreamingFixtureSnapshot AudioStreamingFixture::InspectFile() const
@@ -525,8 +525,8 @@ AudioStreamingFixtureSnapshot AudioStreamingFixture::InspectFile() const
 		std::array<uint64_t, PackChunks::kiAudioReadEntryCount> poolOwnerships {};
 		bool bPoolCopyChanged = false;
 		snapshot.uiScenarioGate = muiScenarioGate.load(std::memory_order_acquire);
-		snapshot.uiScenarioGeneration = snapshot.uiScenarioGate >> 1;
-		snapshot.uiActiveWriters = muiActiveWriters.load(std::memory_order_seq_cst);
+		snapshot.iScenarioGeneration = static_cast<int64_t>(snapshot.uiScenarioGate >> 1);
+		snapshot.iActiveWriters = miActiveWriters.load(std::memory_order_seq_cst);
 		snapshot.uiReservationStart = muiReservationStart;
 		snapshot.uiReservationBoundary = muiNextSequence.load(std::memory_order_acquire);
 		snapshot.uiRetryCount = muiRetryCount.load(std::memory_order_seq_cst);
@@ -534,22 +534,22 @@ AudioStreamingFixtureSnapshot AudioStreamingFixture::InspectFile() const
 		snapshot.eHoldOwner = HoldOwner(uiHoldToken);
 		snapshot.eHoldState = HoldState(uiHoldToken);
 		snapshot.flags.Set(AudioStreamingFixtureSnapshotFlags::kLoaderStaged, meStagingOwner.load(std::memory_order_seq_cst) != StagingOwner::kNone);
-		snapshot.uiHeldIndex = muiHeldIndex.load(std::memory_order_seq_cst);
-		snapshot.uiHeldGeneration = muiHeldGeneration.load(std::memory_order_seq_cst);
-		for (uint32_t i = 0; i < pPackChunks->mAudioReadEntries.size(); ++i)
+		snapshot.iHeldIndex = miHeldIndex.load(std::memory_order_seq_cst);
+		snapshot.iHeldGeneration = miHeldGeneration.load(std::memory_order_seq_cst);
+		for (int64_t i = 0; i < std::ssize(pPackChunks->mAudioReadEntries); ++i)
 		{
 			const AudioChunkReadEntry& rEntry = pPackChunks->mAudioReadEntries[i];
 			uint64_t uiOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
 			poolOwnerships[i] = uiOwnership;
 			AudioStreamingFixturePoolEntry& rPoolEntry = snapshot.poolEntries[i];
-			rPoolEntry.uiIndex = i;
+			rPoolEntry.iIndex = i;
 			rPoolEntry.eState = ToFixtureState(AudioReadState(uiOwnership));
-			rPoolEntry.uiGeneration = AudioReadGeneration(uiOwnership);
+			rPoolEntry.iGeneration = static_cast<int64_t>(AudioReadGeneration(uiOwnership));
 			if (rPoolEntry.eState != AudioStreamingFixtureQueueState::kFree)
 			{
 				rPoolEntry.crc = rEntry.crc;
-				rPoolEntry.uiOffset = rEntry.uiOffset;
-				rPoolEntry.uiLength = rEntry.uiLength;
+				rPoolEntry.iOffset = rEntry.iOffset;
+				rPoolEntry.iLength = rEntry.iLength;
 				if (rEntry.uiOwnership.load(std::memory_order_acquire) != uiOwnership)
 				{
 					bPoolCopyChanged = true;
@@ -561,32 +561,32 @@ AudioStreamingFixtureSnapshot AudioStreamingFixture::InspectFile() const
 		{
 			continue;
 		}
-		if (snapshot.uiHeldIndex < snapshot.poolEntries.size())
+		if (snapshot.iHeldIndex < std::ssize(snapshot.poolEntries))
 		{
-			snapshot.eHeldState = snapshot.poolEntries[snapshot.uiHeldIndex].eState;
+			snapshot.eHeldState = snapshot.poolEntries[snapshot.iHeldIndex].eState;
 		}
-		auto Copy = [&](const auto& rHistory, uint32_t& ruiHead, uint32_t& ruiDropped)
+		auto Copy = [&](const auto& rHistory, int64_t& riHead, int64_t& riDropped)
 		{
-			ruiHead = rHistory.uiHead.load(std::memory_order_acquire);
-			ruiDropped = rHistory.uiDropped.load(std::memory_order_acquire);
-			uint32_t uiCount = std::min<uint32_t>(ruiHead, static_cast<uint32_t>(rHistory.entries.size()));
-			for (uint32_t i = 0; i < uiCount; ++i)
+			riHead = rHistory.uiHead.load(std::memory_order_acquire);
+			riDropped = rHistory.uiDropped.load(std::memory_order_acquire);
+			int64_t iCount = std::min<int64_t>(riHead, std::ssize(rHistory.entries));
+			for (int64_t i = 0; i < iCount; ++i)
 			{
-				uint64_t uiPublished = rHistory.entries[i].uiPublishedSequence.load(std::memory_order_acquire);
-				if (uiPublished != 0 && snapshot.iRecordCount < static_cast<int64_t>(snapshot.records.size()))
+				int64_t iPublished = rHistory.entries[i].iPublishedSequence.load(std::memory_order_acquire);
+				if (iPublished != 0 && snapshot.iRecordCount < static_cast<int64_t>(snapshot.records.size()))
 				{
 					snapshot.records[snapshot.iRecordCount++] = rHistory.entries[i].record;
 				}
 			}
 		};
-		Copy(mMainHistory, snapshot.uiMainHead, snapshot.uiMainDropped);
-		Copy(mLoader0History, snapshot.uiLoader0Head, snapshot.uiLoader0Dropped);
-		Copy(mLoader1History, snapshot.uiLoader1Head, snapshot.uiLoader1Dropped);
-		if (snapshot.uiActiveWriters != 0)
+		Copy(mMainHistory, snapshot.iMainHead, snapshot.iMainDropped);
+		Copy(mLoader0History, snapshot.iLoader0Head, snapshot.iLoader0Dropped);
+		Copy(mLoader1History, snapshot.iLoader1Head, snapshot.iLoader1Dropped);
+		if (snapshot.iActiveWriters != 0)
 		{
 			continue;
 		}
-		if (muiActiveWriters.load(std::memory_order_seq_cst) != 0)
+		if (miActiveWriters.load(std::memory_order_seq_cst) != 0)
 		{
 			continue;
 		}
@@ -606,11 +606,11 @@ AudioStreamingFixtureSnapshot AudioStreamingFixture::InspectFile() const
 		{
 			continue;
 		}
-		if (snapshot.uiHeldIndex != muiHeldIndex.load(std::memory_order_seq_cst))
+		if (snapshot.iHeldIndex != miHeldIndex.load(std::memory_order_seq_cst))
 		{
 			continue;
 		}
-		if (snapshot.uiHeldGeneration != muiHeldGeneration.load(std::memory_order_seq_cst))
+		if (snapshot.iHeldGeneration != miHeldGeneration.load(std::memory_order_seq_cst))
 		{
 			continue;
 		}
@@ -619,7 +619,7 @@ AudioStreamingFixtureSnapshot AudioStreamingFixture::InspectFile() const
 			continue;
 		}
 		bool bPoolChanged = false;
-		for (uint32_t i = 0; i < pPackChunks->mAudioReadEntries.size(); ++i)
+		for (int64_t i = 0; i < std::ssize(pPackChunks->mAudioReadEntries); ++i)
 		{
 			bPoolChanged |= pPackChunks->mAudioReadEntries[i].uiOwnership.load(std::memory_order_acquire) != poolOwnerships[i];
 		}
@@ -627,15 +627,15 @@ AudioStreamingFixtureSnapshot AudioStreamingFixture::InspectFile() const
 		{
 			continue;
 		}
-		if (snapshot.uiMainHead != mMainHistory.uiHead.load(std::memory_order_acquire))
+		if (snapshot.iMainHead != mMainHistory.uiHead.load(std::memory_order_acquire))
 		{
 			continue;
 		}
-		if (snapshot.uiLoader0Head != mLoader0History.uiHead.load(std::memory_order_acquire))
+		if (snapshot.iLoader0Head != mLoader0History.uiHead.load(std::memory_order_acquire))
 		{
 			continue;
 		}
-		if (snapshot.uiLoader1Head != mLoader1History.uiHead.load(std::memory_order_acquire))
+		if (snapshot.iLoader1Head != mLoader1History.uiHead.load(std::memory_order_acquire))
 		{
 			continue;
 		}
@@ -648,11 +648,11 @@ AudioStreamingFixtureSnapshot AudioStreamingFixture::InspectFile() const
 		{
 			snapshot.flags.Set(AudioStreamingFixtureSnapshotFlags::kGapFree, snapshot.records[i].uiSequence == snapshot.uiReservationStart + static_cast<uint64_t>(i) + 1);
 		}
-		if (!(snapshot.flags & AudioStreamingFixtureSnapshotFlags::kGapFree) && snapshot.uiMainDropped == 0 && snapshot.uiLoader0Dropped == 0 && snapshot.uiLoader1Dropped == 0)
+		if (!(snapshot.flags & AudioStreamingFixtureSnapshotFlags::kGapFree) && snapshot.iMainDropped == 0 && snapshot.iLoader0Dropped == 0 && snapshot.iLoader1Dropped == 0)
 		{
 			continue;
 		}
-		snapshot.flags.Set(AudioStreamingFixtureSnapshotFlags::kCoherent, snapshot.uiMainDropped == 0 && snapshot.uiLoader0Dropped == 0 && snapshot.uiLoader1Dropped == 0 && (snapshot.flags & AudioStreamingFixtureSnapshotFlags::kGapFree));
+		snapshot.flags.Set(AudioStreamingFixtureSnapshotFlags::kCoherent, snapshot.iMainDropped == 0 && snapshot.iLoader0Dropped == 0 && snapshot.iLoader1Dropped == 0 && (snapshot.flags & AudioStreamingFixtureSnapshotFlags::kGapFree));
 		return snapshot;
 	}
 	return snapshot;
@@ -698,8 +698,8 @@ AudioStreamingFixtureInvalidResult AudioStreamingFixture::RunInvalid()
 	std::ignore = pPackChunks->TryReadChunkData(request, crc, 0, std::span(bytes).first(1));
 	result.bWrongCrcFailed = pPackChunks->TryReadChunkData(request, wrongCrc, 0, std::span(bytes).first(1)) == ChunkReadResult::kFailed;
 	request.Reset();
-	result.bOverflowFailed = pPackChunks->TryReadChunkData(request, crc, std::numeric_limits<uint64_t>::max(), std::span(bytes).first(1)) == ChunkReadResult::kFailed;
-	result.bOutOfRangeFailed = pPackChunks->TryReadChunkData(request, crc, static_cast<uint64_t>(pAudioChunk->iDataSize), std::span(bytes).first(1)) == ChunkReadResult::kFailed;
+	result.bOverflowFailed = pPackChunks->TryReadChunkData(request, crc, static_cast<int64_t>(std::numeric_limits<uint64_t>::max()), std::span(bytes).first(1)) == ChunkReadResult::kFailed;
+	result.bOutOfRangeFailed = pPackChunks->TryReadChunkData(request, crc, pAudioChunk->iDataSize, std::span(bytes).first(1)) == ChunkReadResult::kFailed;
 	result.bZeroLengthFailed = pPackChunks->TryReadChunkData(request, crc, 0, std::span<std::byte>()) == ChunkReadResult::kFailed;
 	result.bOversizeFailed = pPackChunks->TryReadChunkData(request, crc, 0, std::span(bytes)) == ChunkReadResult::kFailed;
 	ChunkReadResult eShort = pPackChunks->TryReadChunkData(request, crc, 0, std::span(bytes).first(1));
@@ -708,14 +708,14 @@ AudioStreamingFixtureInvalidResult AudioStreamingFixture::RunInvalid()
 	if (mInvalidRequest.mpPackChunks == nullptr)
 	{
 		mInvalidCrc = crc;
-		muiInvalidOffset = 0;
-		muiInvalidLength = std::min<uint64_t>(static_cast<uint64_t>(pAudioChunk->iDataSize), mInvalidBuffer.size());
-		if (!ArmHold(AudioStreamingFixtureHoldOwner::kInvalid, crc, muiInvalidOffset, muiInvalidLength))
+		miInvalidOffset = 0;
+		miInvalidLength = std::min<int64_t>(pAudioChunk->iDataSize, std::ssize(mInvalidBuffer));
+		if (!ArmHold(AudioStreamingFixtureHoldOwner::kInvalid, crc, miInvalidOffset, miInvalidLength))
 		{
 			result.bPending = true;
 			return result;
 		}
-		ChunkReadResult eResult = pPackChunks->TryReadChunkData(mInvalidRequest, crc, muiInvalidOffset, std::span(mInvalidBuffer).first(muiInvalidLength));
+		ChunkReadResult eResult = pPackChunks->TryReadChunkData(mInvalidRequest, crc, miInvalidOffset, std::span(mInvalidBuffer).first(static_cast<size_t>(miInvalidLength)));
 		result.bPending = eResult == ChunkReadResult::kPending;
 		if (!result.bPending)
 		{
@@ -723,23 +723,23 @@ AudioStreamingFixtureInvalidResult AudioStreamingFixture::RunInvalid()
 		}
 		return result;
 	}
-	uint32_t uiIndex = mInvalidRequest.muiEntryIndex;
-	uint64_t uiGeneration = mInvalidRequest.muiGeneration;
-	uint64_t uiOwnership = pPackChunks->mAudioReadEntries[uiIndex].uiOwnership.load(std::memory_order_acquire);
+	int64_t iIndex = mInvalidRequest.miEntryIndex;
+	int64_t iGeneration = static_cast<int64_t>(mInvalidRequest.muiGeneration);
+	uint64_t uiOwnership = pPackChunks->mAudioReadEntries[iIndex].uiOwnership.load(std::memory_order_acquire);
 	if (AudioReadState(uiOwnership) != AudioChunkReadState::kLoading)
 	{
 		result.bPending = true;
 		return result;
 	}
 	std::fill(mInvalidBuffer.begin(), mInvalidBuffer.end(), std::byte {0x5a});
-	ChunkReadResult ePoll = pPackChunks->TryReadChunkData(mInvalidRequest, mInvalidCrc, muiInvalidOffset, std::span(mInvalidBuffer).first(muiInvalidLength - 1));
+	ChunkReadResult ePoll = pPackChunks->TryReadChunkData(mInvalidRequest, mInvalidCrc, miInvalidOffset, std::span(mInvalidBuffer).first(static_cast<size_t>(miInvalidLength - 1)));
 	result.bTooSmallPollFailed = ePoll == ChunkReadResult::kFailed;
 	result.bTooSmallPollNoWrite = std::ranges::all_of(mInvalidBuffer, [](std::byte uiValue)
 	{
 		return uiValue == std::byte {0x5a};
 	});
-	uiOwnership = pPackChunks->mAudioReadEntries[uiIndex].uiOwnership.load(std::memory_order_acquire);
-	result.bLoadingCancelled = AudioReadGeneration(uiOwnership) != uiGeneration;
+	uiOwnership = pPackChunks->mAudioReadEntries[iIndex].uiOwnership.load(std::memory_order_acquire);
+	result.bLoadingCancelled = static_cast<int64_t>(AudioReadGeneration(uiOwnership)) != iGeneration;
 	result.bLoadingEntryNotReused = AudioReadState(uiOwnership) == AudioChunkReadState::kLoading;
 	ReleaseInvalid();
 	return result;
@@ -751,7 +751,7 @@ void AudioStreamingFixture::ReleaseInvalid()
 	ReleaseHold(AudioStreamingFixtureHoldOwner::kInvalid);
 }
 
-bool AudioStreamingFixture::HoldAudioRead(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, uint32_t uiIndex, uint64_t uiGeneration)
+bool AudioStreamingFixture::HoldAudioRead(common::crc_t crc, int64_t iOffset, int64_t iLength, int64_t iIndex, int64_t iGeneration)
 {
 	AudioStreamingFixture* pFixture = gpAttachedAudioStreamingFixture.load(std::memory_order_acquire);
 	if (pFixture == nullptr)
@@ -767,11 +767,11 @@ bool AudioStreamingFixture::HoldAudioRead(common::crc_t crc, uint64_t uiOffset, 
 	{
 		return false;
 	}
-	if (pFixture->muiHoldOffset.load(std::memory_order_seq_cst) != uiOffset)
+	if (pFixture->miHoldOffset.load(std::memory_order_seq_cst) != iOffset)
 	{
 		return false;
 	}
-	if (pFixture->muiHoldLength.load(std::memory_order_seq_cst) != uiLength)
+	if (pFixture->miHoldLength.load(std::memory_order_seq_cst) != iLength)
 	{
 		return false;
 	}
@@ -779,13 +779,13 @@ bool AudioStreamingFixture::HoldAudioRead(common::crc_t crc, uint64_t uiOffset, 
 	{
 		return false;
 	}
-	pFixture->muiHeldGeneration.store(uiGeneration, std::memory_order_seq_cst);
-	pFixture->muiHeldIndex.store(uiIndex, std::memory_order_seq_cst);
+	pFixture->miHeldGeneration.store(iGeneration, std::memory_order_seq_cst);
+	pFixture->miHeldIndex.store(iIndex, std::memory_order_seq_cst);
 	uint64_t uiConsumedToken = PackHoldToken(HoldOwner(uiHoldToken), AudioStreamingFixtureHoldState::kConsumed, HoldGeneration(uiHoldToken));
 	if (!pFixture->muiHoldToken.compare_exchange_strong(uiHoldToken, uiConsumedToken, std::memory_order_seq_cst))
 	{
-		pFixture->muiHeldGeneration.store(0, std::memory_order_seq_cst);
-		pFixture->muiHeldIndex.store(std::numeric_limits<uint32_t>::max(), std::memory_order_seq_cst);
+		pFixture->miHeldGeneration.store(0, std::memory_order_seq_cst);
+		pFixture->miHeldIndex.store(4'294'967'295i64, std::memory_order_seq_cst);
 		return false;
 	}
 	uiHoldToken = uiConsumedToken;
@@ -804,8 +804,8 @@ void AudioStreamingFixture::CompleteAudioRead(bool bHeld)
 	}
 	if (AudioStreamingFixture* pFixture = gpAttachedAudioStreamingFixture.load(std::memory_order_acquire); pFixture != nullptr)
 	{
-		pFixture->muiHeldGeneration.store(0, std::memory_order_seq_cst);
-		pFixture->muiHeldIndex.store(std::numeric_limits<uint32_t>::max(), std::memory_order_seq_cst);
+		pFixture->miHeldGeneration.store(0, std::memory_order_seq_cst);
+		pFixture->miHeldIndex.store(4'294'967'295i64, std::memory_order_seq_cst);
 	}
 }
 

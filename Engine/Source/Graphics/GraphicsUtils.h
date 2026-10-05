@@ -29,9 +29,9 @@ inline void CheckVk(VkResult vkResult, std::string_view expression, std::source_
 	}
 }
 
-inline constexpr uint32_t TileCount(uint32_t uiCount)
+inline constexpr int64_t TileCount(int64_t iCount)
 {
-	return (uiCount + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize;
+	return (iCount + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize;
 }
 
 // Shared rendering helpers for collections. Each renderer rebases its cell-local positions once, at its single

@@ -36,12 +36,12 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, std::chrono::du
 	common::ValidateVector<true >(rSpawnInformation.vecPosition);
 	common::ValidateVector<false>(rSpawnInformation.vecDirection);
 
-	const ExplosionType& rType = ExplosionsInterpolate::sTypes.at(rSpawnInformation.uiTypeIndex);
+	const ExplosionType& rType = ExplosionsInterpolate::sTypes.at(static_cast<size_t>(rSpawnInformation.iTypeIndex));
 
 	GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
 	int64_t iSpawnIndex = AddElement(rInterpolate, rPostRender);
 
-	rInterpolate.puiTypeIndices[iSpawnIndex] = rSpawnInformation.uiTypeIndex;
+	rInterpolate.puiTypeIndices[iSpawnIndex] = static_cast<uint8_t>(rSpawnInformation.iTypeIndex);
 	rInterpolate.pFlags[iSpawnIndex] = rSpawnInformation.flags;
 	rInterpolate.pfStartTimes[iSpawnIndex] = currentTime.count();
 	rInterpolate.pVecPositions[iSpawnIndex] = rSpawnInformation.vecPosition;
@@ -49,7 +49,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, std::chrono::du
 
 	rInterpolate.pfTimePercents[iSpawnIndex] = rSpawnInformation.fTimePercent;
 
-	rInterpolate.piTrailCounts[iSpawnIndex] = static_cast<int32_t>(std::min(rSpawnInformation.uiTrailCount, static_cast<uint32_t>(kiMaxExplosionTrails)));
+	rInterpolate.piTrailCounts[iSpawnIndex] = static_cast<int32_t>(std::min(rSpawnInformation.iTrailCount, kiMaxExplosionTrails));
 
 	// Initialize trail arrays to invalid
 	for (int64_t j = 0; j < kiMaxExplosionTrails; ++j)
@@ -68,22 +68,22 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, std::chrono::du
 
 	// Fire-and-forget effects: Primary light
 #if defined(BT_CLIENT)
-	if (rType.uiPrimaryLightControllerTypeIndex != kuiInvalidControllerType)
+	if (rType.iPrimaryLightControllerTypeIndex != kiInvalidControllerType)
 	{
-		PointLightsPostRender::AddControlled(rFrame, currentTime, rType.uiPrimaryLightControllerTypeIndex, rSpawnInformation.vecPosition, fPrimaryRotation);
+		PointLightsPostRender::AddControlled(rFrame, currentTime, rType.iPrimaryLightControllerTypeIndex, rSpawnInformation.vecPosition, fPrimaryRotation);
 	}
 #endif
 
 	// Fire-and-forget effects: Primary puff
 #if defined(BT_CLIENT)
-	if (rType.uiPrimaryPuffControllerTypeIndex != kuiInvalidControllerType)
+	if (rType.iPrimaryPuffControllerTypeIndex != kiInvalidControllerType)
 	{
-		PuffsPostRender::AddControlled(rFrame, currentTime, rType.uiPrimaryPuffControllerTypeIndex, rSpawnInformation.vecPosition);
+		PuffsPostRender::AddControlled(rFrame, currentTime, rType.iPrimaryPuffControllerTypeIndex, rSpawnInformation.vecPosition);
 	}
 #endif
 
 	// Fire-and-forget effects: Secondary explosions (staggered)
-	int64_t iSecondaryExplosions = static_cast<int64_t>(rType.uiSecondaryExplosionCount);
+	int64_t iSecondaryExplosions = rType.iSecondaryExplosionCount;
 	std::chrono::duration<float> durationDelayDelta(iSecondaryExplosions > 0 ? (0.75f * rSpawnInformation.fTimePercent * rType.fPrimaryTime) / static_cast<float>(iSecondaryExplosions) : 0.0f);
 	std::chrono::duration<float> durationDelay = durationDelayDelta;
 
@@ -96,26 +96,26 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, std::chrono::du
 		[[maybe_unused]] float fSecondaryRotation = common::Random<XM_2PI>(rFrame.postRender.randomEngine);
 
 #if defined(BT_CLIENT)
-		if (rType.uiSecondaryLightControllerTypeIndex != kuiInvalidControllerType)
+		if (rType.iSecondaryLightControllerTypeIndex != kiInvalidControllerType)
 		{
-			PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(currentTime.count() + durationDelay.count()), rType.uiSecondaryLightControllerTypeIndex, vecSecondaryPosition, fSecondaryRotation);
+			PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(currentTime.count() + durationDelay.count()), rType.iSecondaryLightControllerTypeIndex, vecSecondaryPosition, fSecondaryRotation);
 		}
 #endif
 
 #if defined(BT_CLIENT)
-		if (rType.uiSecondaryPuffControllerTypeIndex != kuiInvalidControllerType)
+		if (rType.iSecondaryPuffControllerTypeIndex != kiInvalidControllerType)
 		{
-			PuffsPostRender::AddControlled(rFrame, std::chrono::duration<float>(currentTime.count() + durationDelay.count()), rType.uiSecondaryPuffControllerTypeIndex, vecSecondaryPosition);
+			PuffsPostRender::AddControlled(rFrame, std::chrono::duration<float>(currentTime.count() + durationDelay.count()), rType.iSecondaryPuffControllerTypeIndex, vecSecondaryPosition);
 		}
 #endif
 	}
 
 	// Fire-and-forget wind deposit (radial, auto-expires)
 #if defined(BT_CLIENT)
-	if (rType.uiWindRadialControllerTypeIndex != kuiInvalidControllerType)
+	if (rType.iWindRadialControllerTypeIndex != kiInvalidControllerType)
 	{
 		float fWindSizePercent = std::sqrt(rSpawnInformation.fSizePercent);
-		WindRadialsPostRender::AddControlled(rFrame, currentTime.count(), rType.uiWindRadialControllerTypeIndex, rSpawnInformation.vecPosition, ExplosionsInterpolate::sTuning.pWindIntensity->mfCurrent * fWindSizePercent, ExplosionsInterpolate::sTuning.pWindWidth->mfCurrent * fWindSizePercent);
+		WindRadialsPostRender::AddControlled(rFrame, currentTime.count(), rType.iWindRadialControllerTypeIndex, rSpawnInformation.vecPosition, ExplosionsInterpolate::sTuning.pWindIntensity->mfCurrent * fWindSizePercent, ExplosionsInterpolate::sTuning.pWindWidth->mfCurrent * fWindSizePercent);
 	}
 #endif
 
@@ -153,7 +153,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, std::chrono::du
 
 		// Update fades the trail from its configured starting intensity.
 		smoke_trails_t trailId;
-		SmokeTrailsPostRender::Add(rFrame, trailId, ExplosionsInterpolate::suiExplosionTrailTypeIndex);
+		SmokeTrailsPostRender::Add(rFrame, trailId, ExplosionsInterpolate::siExplosionTrailTypeIndex);
 
 		rInterpolate.pTrails[j][iSpawnIndex] = trailId;
 		rInterpolate.pfTrailIntensities[j][iSpawnIndex] = fTrailIntensity;
@@ -203,11 +203,11 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, std::chrono::du
 		[[maybe_unused]] uint32_t uiParticleColor = rType.uiParticleColor;
 		if (rSpawnInformation.flags & kYellow)
 		{
-			uiParticleColor |= ((100 + common::Random(25ui32, rFrame.postRender.randomEngine)) << 16) | ((common::Random(25ui32, rFrame.postRender.randomEngine)) << 8);
+			uiParticleColor |= ((100 + common::Random(25i64, rFrame.postRender.randomEngine)) << 16) | ((common::Random(25i64, rFrame.postRender.randomEngine)) << 8);
 		}
 		else if (rSpawnInformation.flags & kRed)
 		{
-			uiParticleColor |= ((50 + common::Random(25ui32, rFrame.postRender.randomEngine)) << 16) | ((common::Random(25ui32, rFrame.postRender.randomEngine)) << 8);
+			uiParticleColor |= ((50 + common::Random(25i64, rFrame.postRender.randomEngine)) << 16) | ((common::Random(25i64, rFrame.postRender.randomEngine)) << 8);
 		}
 
 		[[maybe_unused]] float fParticleIntensity = (rType.fParticleIntensityMinimum + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fParticleIntensityRandom * fIntensitySpreadScale) * fVisibleIntensityScale;

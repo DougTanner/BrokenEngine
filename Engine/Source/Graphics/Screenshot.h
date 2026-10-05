@@ -27,9 +27,9 @@ void ValidateDumpRenderTargetRequest(const DumpRenderTargetRequest& rRequest);
 // request/result slot, but abandoned screenshot and dump encoders may overlap because their independent futures
 // outlive timeout/disconnect. ResetCaptureResult records a fresh active token; SetCaptureResult rejects stale-token
 // publications, and TakeCaptureResult consumes only the active request's result.
-uint64_t ResetCaptureResult();
-void SetCaptureResult(uint64_t uiCaptureToken, nlohmann::json result);
-std::optional<nlohmann::json> TakeCaptureResult(uint64_t uiCaptureToken);
+int64_t ResetCaptureResult();
+void SetCaptureResult(int64_t iCaptureToken, nlohmann::json result);
+std::optional<nlohmann::json> TakeCaptureResult(int64_t iCaptureToken);
 
 } // namespace engine
 

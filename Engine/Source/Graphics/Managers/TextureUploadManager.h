@@ -55,9 +55,9 @@ private:
 	{
 		bool bCubemap = false;
 		VkFormat vkFormat = VK_FORMAT_UNDEFINED;
-		uint32_t uiBlockHeight = 0;
-		uint32_t uiArrayLayers = 0;
-		uint32_t uiMipLevels = 0;
+		int64_t iBlockHeight = 0;
+		int64_t iArrayLayers = 0;
+		int64_t iMipLevels = 0;
 		uint32_t uiBaseWidth = 0;
 		uint32_t uiBaseHeight = 0;
 	};
@@ -74,9 +74,9 @@ private:
 
 	// In-progress upload state (persists across frames for one texture at a time)
 	common::crc_t mCurrentCrc = 0;
-	uint32_t muiCurrentLayer = 0;
+	int64_t miCurrentLayer = 0;
 	uint32_t muiCurrentMip = 0;
-	uint32_t muiCurrentMipY = 0;      // Y texel offset within current mip (for sub-mip partial copies)
+	int64_t miCurrentMipY = 0;      // Y texel offset within current mip (for sub-mip partial copies)
 	int64_t miCurrentDataOffset = 0;     // Byte offset into LazyChunk.pData
 
 	std::thread mUploadThread;
@@ -97,7 +97,7 @@ private:
 
 	VkBuffer mStagingVkBuffer = VK_NULL_HANDLE;
 	VmaAllocation mStagingVmaAllocation = VK_NULL_HANDLE;
-	VkDeviceSize mStagingVkDeviceSize = 0;
+	int64_t miStagingSize = 0;
 	void* mpStagingMappedData = nullptr;
 };
 

@@ -5,7 +5,7 @@
 namespace engine
 {
 
-constexpr int kiCurveSamples = 256;
+constexpr int64_t kiCurveSamples = 256;
 constexpr float kfPointRadius = 8.0f;    // control-point dot radius and DragPoint grab half-size in pixels
 constexpr float kfGrabTolerance = 24.0f; // pixel radius within which a left-click targets an existing point instead of adding a new one
 constexpr ImVec4 kGoldColor(0.95f, 0.75f, 0.2f, 1.0f);
@@ -60,8 +60,8 @@ bool CurveWidget(std::string_view label, CurveData& rCurve)
 		}
 
 		// Curve polyline (257 samples through the monotone-cubic evaluator).
-		float pfX[kiCurveSamples + 1] {};
-		float pfY[kiCurveSamples + 1] {};
+		float pfX[kiCurveSamples + 1i64] {};
+		float pfY[kiCurveSamples + 1i64] {};
 		for (int64_t i = 0; i <= kiCurveSamples; ++i)
 		{
 			float fSamplePosition = static_cast<float>(i) / static_cast<float>(kiCurveSamples);
@@ -71,7 +71,7 @@ bool CurveWidget(std::string_view label, CurveData& rCurve)
 		ImPlotSpec curveSpecification;
 		curveSpecification.LineColor = kGoldColor;
 		curveSpecification.LineWeight = 2.0f;
-		ImPlot::PlotLine("##Curve", pfX, pfY, kiCurveSamples + 1, curveSpecification);
+		ImPlot::PlotLine("##Curve", pfX, pfY, static_cast<int>(kiCurveSamples + 1i64), curveSpecification);
 
 		// Nearest existing control point within the grab tolerance (pixel space) — drives add-suppression and
 		// right-click deletion, preventing a click aimed at an existing point from adding a stray one.

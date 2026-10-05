@@ -5,8 +5,8 @@
 namespace engine
 {
 
-inline constexpr int32_t kiCollisionZonesX = 8;
-inline constexpr int32_t kiCollisionZonesY = 8;
+inline constexpr int64_t kiCollisionZonesX = 8;
+inline constexpr int64_t kiCollisionZonesY = 8;
 inline constexpr int64_t kiCollisionZonePreallocate = 2'048;
 inline constexpr int64_t kiCollisionLayerPreallocate = 16;
 inline constexpr int64_t kiCollisionLayerPairPreallocate = 16;

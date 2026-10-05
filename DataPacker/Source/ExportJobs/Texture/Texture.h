@@ -166,7 +166,7 @@ public:
 	// `kAutoNormalize` rescales the R channel from its actual [min, max] range to byte [0, 255]
 	// — required for elevation (raw internal = meters × 255 would saturate at 1 m). Color/normals/AO
 	// already live in [0, 255], so leave it off for those.
-	void SaveJpegSidecar(const std::filesystem::path& rPath, int iQuality, TextureOptions_t options);
+	void SaveJpegSidecar(const std::filesystem::path& rPath, int64_t iQuality, TextureOptions_t options);
 
 	int64_t miWidth = 0;
 	int64_t miHeight = 0;

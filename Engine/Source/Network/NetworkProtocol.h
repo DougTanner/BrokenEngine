@@ -58,9 +58,9 @@ inline constexpr const char* PacketTypeName(PacketType eType)
 	return "Unknown";
 }
 
-inline constexpr uint32_t kuiProtocolVersion = 20;
-inline constexpr uint8_t kuiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
-inline constexpr uint16_t kuiDefaultPort = 27'015;
+inline constexpr int64_t kiProtocolVersion = 21;
+inline constexpr int64_t kiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
+inline constexpr int64_t kiDefaultPort = 27'015;
 inline constexpr int64_t kiMaximumResendFrames = 8;
 inline constexpr int64_t kiFloorStallLogThreshold = 15;
 inline constexpr int64_t kiMaximumBufferedFrames = 256;
@@ -178,8 +178,8 @@ inline constexpr ClientPacketContract GetClientPacketContract(PacketType eType)
 	}
 }
 
-inline constexpr uint16_t kuiDiscoveryPort = kuiDefaultPort + 1;
-inline constexpr uint32_t kuiDiscoveryMagic = 0x42524B4E; // "BRKN"
+inline constexpr int64_t kiDiscoveryPort = kiDefaultPort + 1;
+inline constexpr int64_t kiDiscoveryMagic = 0x42524B4E; // "BRKN"
 inline constexpr std::chrono::milliseconds kDiscoveryScanDuration = 1'500ms;
 
 // Network buffer size for ACK bitfield and snapshot ring buffers (decoupled from physics tick rate)

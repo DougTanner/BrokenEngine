@@ -32,8 +32,8 @@ void RenderTargetTextures::CreateWaterDisplacementTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatWaterDisplacement,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iWaterX), .height = static_cast<uint32_t>(iWaterY), .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -47,8 +47,8 @@ void RenderTargetTextures::CreateWaterDisplacementTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatWaterDisplacement,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iWaterX), .height = static_cast<uint32_t>(iWaterY), .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -83,8 +83,8 @@ void RenderTargetTextures::CreateShadowTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatElevation,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iShadowTextureX + iShadowTextureX / 2), .height = static_cast<uint32_t>(iShadowTextureY), .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -102,8 +102,8 @@ void RenderTargetTextures::CreateShadowTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatShadow,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iShadowTextureX), .height = static_cast<uint32_t>(iShadowTextureY), .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -117,8 +117,8 @@ void RenderTargetTextures::CreateShadowTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatShadow,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iShadowTextureX), .height = static_cast<uint32_t>(iShadowTextureY), .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -132,8 +132,8 @@ void RenderTargetTextures::CreateShadowTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatShadow,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iShadowTextureX), .height = static_cast<uint32_t>(iShadowTextureY), .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -147,8 +147,8 @@ void RenderTargetTextures::CreateShadowTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatShadow,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iShadowTextureX), .height = static_cast<uint32_t>(iShadowTextureY), .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -169,8 +169,8 @@ void RenderTargetTextures::CreateSmokeTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = VK_FORMAT_R16_UNORM,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iGradientSize), .height = static_cast<uint32_t>(iGradientSize), .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -193,8 +193,8 @@ void RenderTargetTextures::CreateSmokeTextures()
 				float fDistance = std::pow(std::sqrt(fX * fX + fY * fY) / fCenter, fPower);
 				float fIntensity = 1.0f - std::pow(fDistance, fAlpha) / (std::pow(fDistance, fAlpha) + std::pow((1.0f - fDistance), fAlpha));
 
-				uint16_t uiRed = static_cast<uint16_t>(static_cast<float>(std::numeric_limits<uint16_t>::max()) * fIntensity);
-				puiColor[j * iGradientSize + i] = uiRed;
+				int64_t iRed = static_cast<int64_t>(static_cast<float>(std::numeric_limits<uint16_t>::max()) * fIntensity);
+				puiColor[j * iGradientSize + i] = static_cast<uint16_t>(iRed);
 			}
 		}
 	});
@@ -206,8 +206,8 @@ void RenderTargetTextures::CreateSmokeTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatSmoke,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(SmokeSimulationPixels()), .height = static_cast<uint32_t>(SmokeSimulationPixelsY()), .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback (shared by SmokeOne/SmokeTwo)
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -244,8 +244,8 @@ void RenderTargetTextures::CreateWindTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatWind,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(SmokeSimulationPixels()), .height = static_cast<uint32_t>(SmokeSimulationPixelsY()), .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -264,8 +264,8 @@ void RenderTargetTextures::CreateWindTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatWind,
 		.vkExtent3D = windTextureInfo.vkExtent3D,
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -294,7 +294,7 @@ void RenderTargetTextures::CreateWindTextures()
 	VkBufferMemoryBarrier pVkWindOccupancyInitializationBarriers[2] {};
 	for (int64_t i = 0; i < 2; ++i)
 	{
-		vkCmdFillBuffer(oneShotCommandBuffer.mVkCommandBuffer, gpBufferManager->mWindOccupancyVkBuffers[i], 0, gpBufferManager->mWindOccupancyBufferVkDeviceSize, 0);
+		vkCmdFillBuffer(oneShotCommandBuffer.mVkCommandBuffer, gpBufferManager->mWindOccupancyVkBuffers[i], 0, static_cast<VkDeviceSize>(gpBufferManager->miWindOccupancyBufferSize), 0);
 		pVkWindOccupancyInitializationBarriers[i] =
 		{
 			.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
@@ -322,8 +322,8 @@ void RenderTargetTextures::CreateObjectShadowsTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatShadow,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iObjectShadowsRenderTextureX), .height = static_cast<uint32_t>(iObjectShadowsRenderTextureY), .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -343,8 +343,8 @@ void RenderTargetTextures::CreateObjectShadowsTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatShadow,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iObjectShadowsBlurTextureX), .height = static_cast<uint32_t>(iObjectShadowsBlurTextureY), .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -358,8 +358,8 @@ void RenderTargetTextures::CreateObjectShadowsTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatShadow,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iObjectShadowsBlurTextureX), .height = static_cast<uint32_t>(iObjectShadowsBlurTextureY), .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -379,8 +379,8 @@ void RenderTargetTextures::CreateTerrainTextures()
 			.vkImageCreateFlags = 0,
 			.vkFormat = VK_FORMAT_R8G8B8A8_UNORM,
 			.vkExtent3D = VkExtent3D {.width = 32, .height = 32, .depth = 1},
-			.uiMipLevels = 1,
-			.uiArrayLayers = 1,
+			.iMipLevels = 1,
+			.iArrayLayers = 1,
 			.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 			.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 			.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -400,8 +400,8 @@ void RenderTargetTextures::CreateTerrainTextures()
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatElevation,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iTerrainElevationTextureX), .height = static_cast<uint32_t>(iTerrainElevationTextureY), .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // TRANSFER_SRC: agent dump_render_target readback
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,

@@ -79,11 +79,11 @@ public:
 		// Owned copy of texture pointers for full-array bindings (e.g. water normals). Per-island
 		// bindings retain only pTexture, the descriptor element they own.
 		std::vector<Texture*> textures;
-		// pTexture->muiGeneration / textures[i]->muiGeneration snapshotted at descriptor-write time.
+		// pTexture->miGeneration / textures[i]->miGeneration snapshotted at descriptor-write time.
 		// VerifyAllDescriptorGenerations breaks if the live texture's generation
 		// has drifted (texture destroyed/recreated since this descriptor was written).
-		uint64_t uiTextureGeneration = 0;
-		std::vector<uint64_t> uiTextureGenerations;
+		int64_t iTextureGeneration = 0;
+		std::vector<int64_t> iTextureGenerations;
 		// True when this descriptor element deliberately resolves to the placeholder because its
 		// owned Texture has no view. Verification accepts that state until a real view appears.
 		bool bTextureUsesPlaceholder = false;

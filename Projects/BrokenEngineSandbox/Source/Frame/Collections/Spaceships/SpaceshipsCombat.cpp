@@ -42,9 +42,9 @@ static SpaceshipCollisionIntervalScratch& GetSpaceshipCollisionIntervalScratch()
 }
 
 // Shared type indices (defined in Spaceships.cpp, set during Register())
-extern uint8_t guiSpaceshipExplosionTypeIndex;
+extern int64_t giSpaceshipExplosionTypeIndex;
 #if defined(BT_CLIENT)
-extern uint8_t guiSpaceshipHitFlashControllerTypeIndex;
+extern int64_t giSpaceshipHitFlashControllerTypeIndex;
 #endif
 
 // Defined in Spaceships.cpp.
@@ -96,13 +96,13 @@ void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFram
 		return;
 	}
 
-	size_t uiCount = static_cast<size_t>(rCurrentInterpolate.iCount);
-	sCollisionFlags.resize(uiCount);
-	sCollisionRadii.resize(uiCount);
-	sCollisionDamages.resize(uiCount);
-	rCollisionScratch.startTimes.resize(uiCount);
-	rCollisionScratch.endTimes.resize(uiCount);
-	rCollisionScratch.maximumTimes.resize(uiCount);
+	int64_t iCount = rCurrentInterpolate.iCount;
+	sCollisionFlags.resize(static_cast<size_t>(iCount));
+	sCollisionRadii.resize(static_cast<size_t>(iCount));
+	sCollisionDamages.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.startTimes.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.endTimes.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.maximumTimes.resize(static_cast<size_t>(iCount));
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		sCollisionFlags.at(static_cast<size_t>(i)) = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
@@ -167,7 +167,7 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 #endif
 
 #if defined(BT_CLIENT)
-					engine::PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), guiSpaceshipHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
+					engine::PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), giSpaceshipHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
 #endif
 
 					if (rCurrentPostRender.pfHealths[i] <= 0.0f)

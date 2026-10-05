@@ -6,7 +6,7 @@ struct SubdivisionConfig
 	float fBandMinimumMeters = 0.0f;  // Triangles whose Z-range overlaps [fBandMinimumMeters, fBandMaximumMeters] are candidates
 	float fBandMaximumMeters = 0.0f;
 	float fMaximumEdgeMeters = 0.0f;  // In-band triangles subdivide until longest XY edge <= this
-	int32_t iMaximumDepth = 0;        // Safety cap on recursive subdivision depth
+	int64_t iMaximumDepth = 0;        // Safety cap on recursive subdivision depth
 };
 
 // After Gaea Mesher load, recursively midpoint-split triangles overlapping the beach-Z band until the

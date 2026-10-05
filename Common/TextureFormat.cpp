@@ -39,7 +39,7 @@ int64_t SizeInBytes(VkFormat vkFormat, int64_t iWidth, int64_t iHeight)
 
 		default:
 			ASSERT(false);
-			return 4 * iPixels;
+			std::unreachable();
 	}
 }
 

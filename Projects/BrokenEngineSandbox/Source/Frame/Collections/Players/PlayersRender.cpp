@@ -132,7 +132,7 @@ static std::pair<bool, XMVECTOR> FindFlagshipPosition(const PlayersInterpolate& 
 
 static void XM_CALLCONV RenderNavigation(const PlayersInterpolate& __restrict rPlayers, const PlayersPostRender& __restrict rPostRender, int64_t i, int64_t iCount, FXMVECTOR vecPosition, const engine::RenderBasis& rBasis)
 {
-	int8_t iNavigationDirection = GetNavigationDirection(rPostRender.pFlags[i]);
+	int64_t iNavigationDirection = GetNavigationDirection(rPostRender.pFlags[i]);
 	bool bFlagshipFound = false;
 	XMVECTOR vecFlagshipPosition = XMVectorZero();
 	if (iNavigationDirection == 5)
@@ -193,11 +193,11 @@ void PlayersInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, co
 		return;
 	}
 
-	VkDeviceSize vkRequiredSize = iTotalCount * sizeof(shaders::ModelLayout);
+	int64_t iRequiredSize = iTotalCount * static_cast<int64_t>(sizeof(shaders::ModelLayout));
 	engine::Buffer& rBuffer = engine::gpBufferManager->mDynamicStorageBuffers[engine::kBufferMain].at(kCrc).at(iCommandBuffer);
-	if (rBuffer.mInfo.vkDataSize < vkRequiredSize)
+	if (rBuffer.mInfo.iDataSize < iRequiredSize)
 	{
-		engine::gpBufferManager->ResizeDynamicBuffer(kCrc, engine::kBufferMain, kName, vkRequiredSize, iCommandBuffer);
+		engine::gpBufferManager->ResizeDynamicBuffer(kCrc, engine::kBufferMain, kName, iRequiredSize, iCommandBuffer);
 		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, &rBuffer);
 		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, &rBuffer);
 	}
@@ -255,20 +255,20 @@ void PlayersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpo
 		{
 			const engine::AnimationData& rAnimationData = engine::gAnimationDataMap.at(kPlayerModel);
 			const engine::EagerChunk& rChunk = engine::gpFileManager->mpPackChunks->GetEagerChunkMap().at(kPlayerModel);
-			uint32_t uiMaterialCount = rChunk.pHeader->sceneHeader.uiMaterialCount;
+			int64_t iMaterialCount = rChunk.pHeader->sceneHeader.uiMaterialCount;
 
-			int64_t iMeshDataBase = engine::gpBufferManager->AllocateMeshData(iCommandBuffer, uiMaterialCount);
+			int64_t iMeshDataBase = engine::gpBufferManager->AllocateMeshData(iCommandBuffer, iMaterialCount);
 			rPlayerLayout.uiMeshDataBase = static_cast<uint32_t>(iMeshDataBase);
 
 			common::MeshData* pMeshData = reinterpret_cast<common::MeshData*>(engine::gpBufferManager->mMeshDataStorageBuffers.at(iCommandBuffer).mpMappedMemory) + iMeshDataBase;
 
-			int64_t iSkinnedMaterialCount = rAnimationData.SkinnedMaterialCount(uiMaterialCount);
+			int64_t iSkinnedMaterialCount = rAnimationData.SkinnedMaterialCount(iMaterialCount);
 
 			int64_t iJointMatrixOffset = engine::gpBufferManager->AllocateJointMatrices(iCommandBuffer, iSkinnedMaterialCount * rAnimationData.mHeader.skeleton.uiSkinJointCount);
 
 			common::JointMatrix* pJointMatrices = reinterpret_cast<common::JointMatrix*>(engine::gpBufferManager->mJointMatrixStorageBuffers.at(iCommandBuffer).mpMappedMemory);
 
-			rAnimationData.EvaluateAnimation(0, rCurrent.pfAnimationTimes[i], std::span(pMeshData, static_cast<size_t>(uiMaterialCount)), pJointMatrices, iJointMatrixOffset);
+			rAnimationData.EvaluateAnimation(0, rCurrent.pfAnimationTimes[i], std::span(pMeshData, static_cast<size_t>(iMaterialCount)), pJointMatrices, iJointMatrixOffset);
 		}
 
 		++siRendered;

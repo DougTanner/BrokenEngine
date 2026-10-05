@@ -19,7 +19,7 @@ public:
 
 	int64_t WorkerCount() const
 	{
-		return static_cast<int64_t>(mWorkers.size());
+		return std::ssize(mWorkers);
 	}
 
 	bool IsMainThread() const
@@ -43,7 +43,7 @@ public:
 			mbDispatchActive.store(false, std::memory_order_release);
 		});
 
-		int64_t iThreadCount = static_cast<int64_t>(mWorkers.size()) + 1;
+		int64_t iThreadCount = std::ssize(mWorkers) + 1;
 		int64_t iPerThread = iCount / iThreadCount;
 		int64_t iRemainder = iCount % iThreadCount;
 
@@ -51,9 +51,9 @@ public:
 		int64_t iLogIndent = gpThreadLocal->miLogIndent;
 
 		int64_t iPos = 0;
-		for (size_t i = 0; i < mWorkers.size(); ++i)
+		for (int64_t i = 0; i < std::ssize(mWorkers); ++i)
 		{
-			int64_t iThreadItems = iPerThread + (static_cast<int64_t>(i) < iRemainder ? 1 : 0);
+			int64_t iThreadItems = iPerThread + (i < iRemainder ? 1 : 0);
 			if (iThreadItems == 0)
 			{
 				break;
@@ -61,7 +61,7 @@ public:
 
 			int64_t iStart = iPos;
 			int64_t iEnd = iPos + iThreadItems;
-			mWorkers.at(i)->Wake([&rProcessRange, iStart, iEnd, iLogTickCounter, iLogIndent]()
+			mWorkers.at(static_cast<size_t>(i))->Wake([&rProcessRange, iStart, iEnd, iLogTickCounter, iLogIndent]()
 			{
 				// Propagate the caller's tick/indent so worker logs tag under the dispatching scope
 				LogTickScope logTickScope(iLogTickCounter);
@@ -124,7 +124,7 @@ public:
 
 private:
 
-	std::thread::id mMainThreadId;
+	std::thread::id mMainThreadId = std::this_thread::get_id();
 	std::vector<std::unique_ptr<PersistentWorker>> mWorkers;
 	std::atomic<bool> mbDispatchActive = false;
 };

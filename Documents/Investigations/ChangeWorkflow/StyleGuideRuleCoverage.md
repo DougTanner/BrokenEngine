@@ -14,10 +14,6 @@ Workflow path for session-changed C++ and can fail or produce a finding:
 - a compiler error or poison under a default `/compile` build.
 
 These are listed as `recorded:` and never count as enforcement:
-- Jev style-rule judgment, which is advisory: the review ignores its rule 3
-  and rule 56 entries (`.agents/skills/code-style-review/references/worker.md:58-61`)
-  and takes its rule 49 entries only as extra candidates
-  (`.agents/skills/code-style-review/references/worker.md:96-97`, `:127-128`);
 - a `.clang-tidy` check, because `/compile` force-disables Clang-Tidy
   (`Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md:26`);
 - an `.editorconfig` setting, which only an editor's formatter applies;
@@ -44,7 +40,7 @@ Routed-to paths (Plans since landed):
 |---|---|---|---|---|---|
 | 1 | Tab indentation | recorded: `.editorconfig:9` | unowned | Scanner kind: a leading-space indent shows on one line | Scanner kinds |
 | 2 | Brace placement | `.agents/scripts/Find-SessionCandidates.ps1:45`; `.agents/skills/code-style-review/references/worker.md:67-68` (forms the scanner does not emit); recorded: `.editorconfig:34-38` | enforced | none | none |
-| 3 | Hungarian notation | `.agents/skills/code-style-review/references/worker.md:69`; recorded: `.agents/scripts/Test-StyleRuleJudgment.ps1:50`, `.clang-tidy:26` (deferred) | enforced | none | none |
+| 3 | Hungarian notation | `.agents/skills/code-style-review/references/worker.md:69`; recorded: `.clang-tidy:26` (deferred) | enforced | none | none |
 | 4 | `#pragma once` | none | unowned | Hand read: a missing line in a new header is not a line pattern | Hand read |
 | 5 | RAII | recorded: `.agents/skills/repo-code-review/references/checks.md:25-26` (traces cleanup correctness, does not require RAII) | unowned | Scanner kind for raw allocation calls, which show on one line; hand read for manual lock and unlock, which needs the lock object's type | Scanner kinds; Hand read |
 | 6 | Feature toggles, no config macros | none | unowned | Scanner kind: configuration macro names and a preprocessor test of a `kb` toggle show on one line | Scanner kinds |
@@ -89,14 +85,14 @@ Routed-to paths (Plans since landed):
 | 46 | No `Est` DirectXMath functions | none | unowned | Scanner kind: an `Est` suffix shows on one line | Scanner kinds |
 | 47 | Include order | `.agents/skills/repo-code-review/references/checks.md:179-181` (external headers go in `Common/ExternalHeaders.h`); recorded: `.editorconfig:86-88` | partial: grouping and order within the file | Hand read: order needs the whole include block | Hand read |
 | 48 | Close `std::fstream`, no extra braces | none | unowned | Hand read: the purpose of a scope is a judgment | Hand read |
-| 49 | Public state; no trivial accessors | `.agents/skills/code-style-review/references/worker.md:70`; `.agents/skills/repo-code-review/references/checks.md:165-172`; recorded: `.agents/scripts/Test-StyleRuleJudgment.ps1:55` | enforced | none | none |
+| 49 | Public state; no trivial accessors | `.agents/skills/code-style-review/references/worker.md:70`; `.agents/skills/repo-code-review/references/checks.md:165-172` | enforced | none | none |
 | 50 | Pointer tests compare with `nullptr` | `.agents/scripts/Find-SessionCandidates.ps1:54`; recorded: `.clang-tidy:45` | enforced | none | none |
 | 51 | One-line parameters and arguments; Boolean wrapping | `.agents/skills/code-style-review/references/worker.md:70` | enforced | none | none |
 | 52 | Space before `{}` | `.agents/scripts/Find-SessionCandidates.ps1:55`; recorded: `.editorconfig:56` | enforced | none | none |
 | 53 | `reserve` before repeated appends | none | unowned | `/repo-code-review` check: the loop count and container type need tracing | Repo review |
 | 54 | `Vk<Type>` member suffix | none | unowned | Scanner kind: the declared type and name show on one line | Scanner kinds |
 | 55 | `enum class` | none | unowned | Scanner kind: an `enum` without `class` shows on one line; step 10 exempts index-and-count enums | Scanner kinds |
-| 56 | Complete words | `.agents/skills/code-style-review/references/worker.md:70`; recorded: `.agents/scripts/Test-StyleRuleJudgment.ps1:62`, `:295` | enforced | none | none |
+| 56 | Complete words | `.agents/skills/code-style-review/references/worker.md:70` | enforced | none | none |
 | 57 | No `Impl`/`Internal` suffixes | `.agents/scripts/Find-SessionCandidates.ps1:56` | enforced | none | none |
 | 58 | `#if defined()` | `.agents/scripts/Find-SessionCandidates.ps1:57`; recorded: `.clang-tidy:36` | enforced | none | none |
 | 59 | Indented `case` | recorded: `.editorconfig:25-26` | unowned | Scanner lookback check: an added `case` line against the nearest enclosing `switch` line | Scanner kinds |

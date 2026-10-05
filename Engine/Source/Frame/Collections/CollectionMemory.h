@@ -5,8 +5,7 @@ namespace engine
 
 // ForEachMemberPointer visits array pointer elements in index order and scalar pointers once; order
 // determines CRC and layout. Callbacks receive pointer references for assign/reset/swap, preserving
-// constness. Derive ElementType with remove_pointer_t<remove_reference_t<decltype(rElementPointer)>>:
-// reversing the removals leaves a pointer type and gives pointer-sized storage.
+// constness.
 
 template <typename MEMBER, typename FN>
 constexpr void ForEachMemberPointer(MEMBER& rMember, FN&& rFunction)
@@ -32,9 +31,9 @@ constexpr int64_t CalculateBufferSize(int64_t iCapacity, const T& rMember)
 	ASSERT(iCapacity >= 0);
 
 	int64_t iBufferSize = 0;
-	ForEachMemberPointer(rMember, [&](auto& rElementPointer)
+	ForEachMemberPointer(rMember, [&]<typename ELEMENT_PTR>([[maybe_unused]] ELEMENT_PTR& rElementPointer)
 	{
-		using ElementType = std::remove_pointer_t<std::remove_reference_t<decltype(rElementPointer)>>;
+		using ElementType = std::remove_pointer_t<ELEMENT_PTR>;
 		iBufferSize += common::RoundUp<int64_t, 64>(iCapacity * sizeof(ElementType));
 	});
 	return iBufferSize;
@@ -58,12 +57,11 @@ int64_t MemberTupleBufferSize(int64_t iCapacity, const TUPLE& rMembers)
 template <typename T>
 void AssignAligned(T& rMember, int64_t iCapacity, std::byte*& rpCurrent)
 {
-	ForEachMemberPointer(rMember, [&](auto& rElementPointer)
+	ForEachMemberPointer(rMember, [&]<typename ELEMENT_PTR>(ELEMENT_PTR& rElementPointer)
 	{
-		using ElementPtrType = std::remove_reference_t<decltype(rElementPointer)>;
-		using ElementType = std::remove_pointer_t<ElementPtrType>;
+		using ElementType = std::remove_pointer_t<ELEMENT_PTR>;
 		rpCurrent = reinterpret_cast<std::byte*>(common::RoundUp<uintptr_t, 64>(reinterpret_cast<uintptr_t>(rpCurrent)));
-		rElementPointer = reinterpret_cast<ElementPtrType>(rpCurrent);
+		rElementPointer = reinterpret_cast<ELEMENT_PTR>(rpCurrent);
 		rpCurrent += iCapacity * sizeof(ElementType);
 	});
 }
@@ -71,10 +69,9 @@ void AssignAligned(T& rMember, int64_t iCapacity, std::byte*& rpCurrent)
 template <typename T>
 void AssignAndCopyAligned(T& rMember, int64_t iCapacity, int64_t iCount, std::byte*& rpCurrent)
 {
-	ForEachMemberPointer(rMember, [&](auto& rElementPointer)
+	ForEachMemberPointer(rMember, [&]<typename ELEMENT_PTR>(ELEMENT_PTR& rElementPointer)
 	{
-		using ElementPtrType = std::remove_reference_t<decltype(rElementPointer)>;
-		using ElementType = std::remove_pointer_t<ElementPtrType>;
+		using ElementType = std::remove_pointer_t<ELEMENT_PTR>;
 		rpCurrent = reinterpret_cast<std::byte*>(common::RoundUp<uintptr_t, 64>(reinterpret_cast<uintptr_t>(rpCurrent)));
 
 		if (rElementPointer != nullptr)
@@ -82,7 +79,7 @@ void AssignAndCopyAligned(T& rMember, int64_t iCapacity, int64_t iCount, std::by
 			std::memcpy(rpCurrent, rElementPointer, iCount * sizeof(ElementType));
 		}
 
-		rElementPointer = reinterpret_cast<ElementPtrType>(rpCurrent);
+		rElementPointer = reinterpret_cast<ELEMENT_PTR>(rpCurrent);
 		rpCurrent += iCapacity * sizeof(ElementType);
 	});
 }
@@ -246,10 +243,10 @@ void CopyMemberEntryRows(int64_t iCount, CURRENT_MEMBER& rCurrentMember, const P
 
 	if constexpr (kbCurrentIsArray && kbPreviousIsArray)
 	{
-		static constexpr size_t kuiCurrentExtent = std::extent_v<CURRENT_MEMBER>;
-		static constexpr size_t kuiPreviousExtent = std::extent_v<PREVIOUS_MEMBER>;
-		static_assert(kuiCurrentExtent == kuiPreviousExtent, "Corresponding collection member array extents must match");
-		for (size_t i = 0; i < kuiCurrentExtent; ++i)
+		static constexpr int64_t kiCurrentExtent = std::extent_v<CURRENT_MEMBER>;
+		static constexpr int64_t kiPreviousExtent = std::extent_v<PREVIOUS_MEMBER>;
+		static_assert(kiCurrentExtent == kiPreviousExtent, "Corresponding collection member array extents must match");
+		for (int64_t i = 0; i < kiCurrentExtent; ++i)
 		{
 			CopyMemberPointerRows(iCount, rCurrentMember[i], rPreviousMember[i]);
 		}
@@ -260,10 +257,10 @@ void CopyMemberEntryRows(int64_t iCount, CURRENT_MEMBER& rCurrentMember, const P
 	}
 }
 
-template <typename CURRENT_TUPLE, typename PREVIOUS_TUPLE, size_t... INDICES>
-void CopyMemberRows(int64_t iCount, CURRENT_TUPLE&& rCurrentMembers, PREVIOUS_TUPLE&& rPreviousMembers, std::index_sequence<INDICES...>)
+template <typename CURRENT_TUPLE, typename PREVIOUS_TUPLE, int64_t... INDICES>
+void CopyMemberRows(int64_t iCount, CURRENT_TUPLE&& rCurrentMembers, PREVIOUS_TUPLE&& rPreviousMembers, std::integer_sequence<int64_t, INDICES...>)
 {
-	(CopyMemberEntryRows(iCount, std::get<INDICES>(rCurrentMembers), std::get<INDICES>(rPreviousMembers)), ...);
+	(CopyMemberEntryRows(iCount, std::get<static_cast<size_t>(INDICES)>(rCurrentMembers), std::get<static_cast<size_t>(INDICES)>(rPreviousMembers)), ...);
 }
 
 // Copies corresponding member arrays in stable tuple order, and array entries in stable index order.
@@ -272,15 +269,15 @@ void CopyMemberRows(int64_t iCount, CURRENT_TUPLE&& rCurrentMembers, PREVIOUS_TU
 {
 	using CurrentTuple = std::remove_reference_t<CURRENT_TUPLE>;
 	using PreviousTuple = std::remove_reference_t<PREVIOUS_TUPLE>;
-	static constexpr size_t kuiCurrentSize = std::tuple_size_v<CurrentTuple>;
-	static constexpr size_t kuiPreviousSize = std::tuple_size_v<PreviousTuple>;
-	static_assert(kuiCurrentSize == kuiPreviousSize, "Corresponding collection member tuples must have matching arity");
+	static constexpr int64_t kiCurrentSize = std::tuple_size_v<CurrentTuple>;
+	static constexpr int64_t kiPreviousSize = std::tuple_size_v<PreviousTuple>;
+	static_assert(kiCurrentSize == kiPreviousSize, "Corresponding collection member tuples must have matching arity");
 
-	if constexpr (kuiCurrentSize == kuiPreviousSize)
+	if constexpr (kiCurrentSize == kiPreviousSize)
 	{
 		if (iCount > 0)
 		{
-			CopyMemberRows(iCount, std::forward<CURRENT_TUPLE>(rCurrentMembers), std::forward<PREVIOUS_TUPLE>(rPreviousMembers), std::make_index_sequence<kuiCurrentSize> {});
+			CopyMemberRows(iCount, std::forward<CURRENT_TUPLE>(rCurrentMembers), std::forward<PREVIOUS_TUPLE>(rPreviousMembers), std::make_integer_sequence<int64_t, kiCurrentSize> {});
 		}
 	}
 }

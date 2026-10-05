@@ -44,13 +44,13 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	rGlobalLayout.fSmokeObjectHeightInv = 1.0f / gSmokeObjectHeight.mfCurrent;
 	rGlobalLayout.fSmokeEdgeDecayDistanceInverse = 1.0f / gSmokeEdgeDecayDistance.mfCurrent;
 
-	uint32_t uiTextureOneWidth = gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.width;
-	uint32_t uiTextureOneHeight = gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.height;
-	uint32_t uiMaxWidth = std::max(uiTextureOneWidth, gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.vkExtent3D.width);
-	uint32_t uiMaxHeight = std::max(uiTextureOneHeight, gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.vkExtent3D.height);
-	rGlobalLayout.uiSmokeTilesX = TileCount(uiMaxWidth);
-	rGlobalLayout.uiSmokeTilesY = TileCount(uiMaxHeight);
-	rGlobalLayout.fSmokeDepositTileScale = static_cast<float>(uiMaxWidth) / static_cast<float>(uiTextureOneWidth);
+	int64_t iTextureOneWidth = gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.width;
+	int64_t iTextureOneHeight = gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.height;
+	int64_t iMaxWidth = std::max(iTextureOneWidth, static_cast<int64_t>(gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.vkExtent3D.width));
+	int64_t iMaxHeight = std::max(iTextureOneHeight, static_cast<int64_t>(gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.vkExtent3D.height));
+	rGlobalLayout.uiSmokeTilesX = static_cast<uint32_t>(TileCount(iMaxWidth));
+	rGlobalLayout.uiSmokeTilesY = static_cast<uint32_t>(TileCount(iMaxHeight));
+	rGlobalLayout.fSmokeDepositTileScale = static_cast<float>(iMaxWidth) / static_cast<float>(iTextureOneWidth);
 
 	// World-area follows the visible area each frame: aspect inherits from the framebuffer,
 	// size grows with camera zoom-out. gSmokeSimulationArea acts as a margin multiplier.

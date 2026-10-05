@@ -28,7 +28,7 @@ BufferManager::BufferManager()
 		.iCount = 6,
 		.vkIndexType = VK_INDEX_TYPE_UINT16,
 		.iVertexStride = sizeof(float) * 2,
-		.vkDataSize = sizeof(puiQuads) + sizeof(pfQuads),
+		.iDataSize = sizeof(puiQuads) + sizeof(pfQuads),
 	},
 	[&](void* pData)
 	{
@@ -82,7 +82,7 @@ BufferManager::BufferManager()
 			.iCount = rModelHeader.iIndexCount,
 			.vkIndexType = common::ModelHeader::UsesU16Indices(rModelHeader.iVertexCount) ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32,
 			.iVertexStride = rModelHeader.iStride,
-			.vkDataSize = static_cast<VkDeviceSize>(rChunk.pHeader->iSize),
+			.iDataSize = rChunk.pHeader->iSize,
 		},
 		[&](void* pData)
 		{
@@ -100,7 +100,7 @@ BufferManager::BufferManager()
 	{
 		.name = "LongParticles",
 		.flags = {BufferFlags::kStorage, BufferFlags::kDeviceLocal},
-		.vkDataSize = sizeof(shaders::ParticlesLayout),
+		.iDataSize = sizeof(shaders::ParticlesLayout),
 	},
 	[&](void* pData)
 	{
@@ -111,7 +111,7 @@ BufferManager::BufferManager()
 	{
 		.name = "SquareParticles",
 		.flags = {BufferFlags::kStorage, BufferFlags::kDeviceLocal},
-		.vkDataSize = sizeof(shaders::ParticlesLayout),
+		.iDataSize = sizeof(shaders::ParticlesLayout),
 	},
 	[&](void* pData)
 	{
@@ -144,7 +144,7 @@ void BufferManager::CreateDebugMeshBuffers()
 				.iCount = std::size(puiIndices),
 				.vkIndexType = VK_INDEX_TYPE_UINT16,
 				.iVertexStride = sizeof(float) * 3,
-				.vkDataSize = sizeof(puiIndices) + sizeof(pfVertices),
+				.iDataSize = sizeof(puiIndices) + sizeof(pfVertices),
 			},
 			[&](void* pData)
 			{
@@ -187,7 +187,7 @@ void BufferManager::CreateDebugMeshBuffers()
 				.iCount = std::size(puiIndices),
 				.vkIndexType = VK_INDEX_TYPE_UINT16,
 				.iVertexStride = sizeof(float) * 3,
-				.vkDataSize = sizeof(puiIndices) + sizeof(pfVertices),
+				.iDataSize = sizeof(puiIndices) + sizeof(pfVertices),
 			},
 			[&](void* pData)
 			{
@@ -220,7 +220,7 @@ void BufferManager::CreateDebugMeshBuffers()
 				.iCount = std::size(puiIndices),
 				.vkIndexType = VK_INDEX_TYPE_UINT16,
 				.iVertexStride = sizeof(float) * 3,
-				.vkDataSize = sizeof(puiIndices) + sizeof(pfVertices),
+				.iDataSize = sizeof(puiIndices) + sizeof(pfVertices),
 			},
 			[&](void* pData)
 			{
@@ -240,7 +240,7 @@ void BufferManager::CreateDebugMeshBuffers()
 				.iCount = std::size(puiIndices),
 				.vkIndexType = VK_INDEX_TYPE_UINT16,
 				.iVertexStride = sizeof(float) * 3,
-				.vkDataSize = sizeof(puiIndices) + sizeof(pfVertices),
+				.iDataSize = sizeof(puiIndices) + sizeof(pfVertices),
 			},
 			[&](void* pData)
 			{
@@ -321,35 +321,35 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 		{
 			.name = "GlobalLayout",
 			.flags = {BufferFlags::kUniform, BufferFlags::kCopyToDeviceLocalEveryFrame},
-			.vkDataSize = sizeof(shaders::GlobalLayout),
+			.iDataSize = sizeof(shaders::GlobalLayout),
 		});
 
 		mMainLayoutUniformBuffers.at(i).Create(
 		{
 			.name = "MainLayout",
 			.flags = {BufferFlags::kUniform, BufferFlags::kCopyToDeviceLocalEveryFrame},
-			.vkDataSize = sizeof(shaders::MainLayout),
+			.iDataSize = sizeof(shaders::MainLayout),
 		});
 
 		mUiRectangleStorageBuffers.at(i).Create(
 		{
 			.name = "UiRects",
 			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
-			.vkDataSize = ImGuiManager::kiMaxUiRectangles * sizeof(XMFLOAT4),
+			.iDataSize = ImGuiManager::kiMaxUiRectangles * static_cast<int64_t>(sizeof(XMFLOAT4)),
 		});
 
 		mLongParticlesSpawnStorageBuffers.at(i).Create(
 		{
 			.name = "LongParticlesSpawn",
 			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
-			.vkDataSize = sizeof(shaders::ParticlesSpawnLayout),
+			.iDataSize = sizeof(shaders::ParticlesSpawnLayout),
 		});
 
 		mSquareParticlesSpawnStorageBuffers.at(i).Create(
 		{
 			.name = "SquareParticlesSpawn",
 			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
-			.vkDataSize = sizeof(shaders::ParticlesSpawnLayout),
+			.iDataSize = sizeof(shaders::ParticlesSpawnLayout),
 		});
 	}
 
@@ -362,7 +362,7 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 		{
 			.name = "MeshData",
 			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
-			.vkDataSize = common::MeshData::kiMaxMeshes * sizeof(common::MeshData),
+			.iDataSize = common::MeshData::kiMaxMeshes * static_cast<int64_t>(sizeof(common::MeshData)),
 		},
 		[&](void* pData)
 		{
@@ -392,7 +392,7 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 		{
 			.name = "JointMatrices",
 			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
-			.vkDataSize = common::kiInitialJointMatrixCapacity * sizeof(common::JointMatrix),
+			.iDataSize = common::kiInitialJointMatrixCapacity * static_cast<int64_t>(sizeof(common::JointMatrix)),
 		},
 		[&](void* pData)
 		{
@@ -422,7 +422,7 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 	}
 }
 
-Buffer* BufferManager::CreateDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, VkDeviceSize vkElementSize)
+Buffer* BufferManager::CreateDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, int64_t iElementSize)
 {
 	std::unordered_map<common::crc_t, std::vector<Buffer>>& rMap = mDynamicStorageBuffers[eType];
 	auto [it, bInserted] = rMap.try_emplace(crc);
@@ -440,15 +440,15 @@ Buffer* BufferManager::CreateDynamicBuffer(common::crc_t crc, DynamicBufferType 
 		{
 			.name = name,
 			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
-			.vkDataSize = vkElementSize,
-			.vkElementSize = vkElementSize,
+			.iDataSize = iElementSize,
+			.iElementSize = iElementSize,
 		});
 	}
 
 	return rBuffers.data();
 }
 
-void BufferManager::ResizeDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, VkDeviceSize vkNewSize, int64_t iFramebuffer)
+void BufferManager::ResizeDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, int64_t iNewSize, int64_t iFramebuffer)
 {
 	// Each dynamic buffer is referenced only by its framebuffer's command buffer. Resize follows that framebuffer's RenderGlobal fence wait,
 	// and callers immediately repoint its descriptors before submission; recorded commands reference buffers only through those descriptors. A
@@ -458,7 +458,7 @@ void BufferManager::ResizeDynamicBuffer(common::crc_t crc, DynamicBufferType eTy
 
 	std::unordered_map<common::crc_t, std::vector<Buffer>>& rMap = mDynamicStorageBuffers[eType];
 	Buffer& rOldBuffer = rMap.at(crc).at(iFramebuffer);
-	VkDeviceSize vkElementSize = rOldBuffer.mInfo.vkElementSize;
+	int64_t iElementSize = rOldBuffer.mInfo.iElementSize;
 	mPreviousBuffer = std::move(rOldBuffer);
 
 	Buffer& rBuffer = rMap.at(crc).at(iFramebuffer);
@@ -466,20 +466,20 @@ void BufferManager::ResizeDynamicBuffer(common::crc_t crc, DynamicBufferType eTy
 	{
 		.name = name,
 		.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
-		.vkDataSize = vkNewSize,
-		.vkElementSize = vkElementSize,
+		.iDataSize = iNewSize,
+		.iElementSize = iElementSize,
 	});
 }
 
-Buffer* BufferManager::ResizeDynamicBufferIfNeeded(common::crc_t crc, DynamicBufferType eType, std::string_view name, VkDeviceSize vkLayoutSize, int64_t iCapacity, int64_t iCommandBuffer)
+Buffer* BufferManager::ResizeDynamicBufferIfNeeded(common::crc_t crc, DynamicBufferType eType, std::string_view name, int64_t iLayoutSize, int64_t iCapacity, int64_t iCommandBuffer)
 {
-	VkDeviceSize vkRequiredSize = vkLayoutSize * iCapacity;
+	int64_t iRequiredSize = iLayoutSize * iCapacity;
 	Buffer& rBuffer = mDynamicStorageBuffers[eType].at(crc).at(iCommandBuffer);
-	if (rBuffer.mInfo.vkDataSize >= vkRequiredSize)
+	if (rBuffer.mInfo.iDataSize >= iRequiredSize)
 	{
 		return nullptr;
 	}
-	ResizeDynamicBuffer(crc, eType, name, vkRequiredSize, iCommandBuffer);
+	ResizeDynamicBuffer(crc, eType, name, iRequiredSize, iCommandBuffer);
 	return &rBuffer;
 }
 
@@ -532,7 +532,7 @@ void BufferManager::GrowMeshDataBuffer(int64_t iCommandBuffer, int64_t iValidCou
 	{
 		.name = "MeshData",
 		.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
-		.vkDataSize = miMeshDataCapacity[iCommandBuffer] * sizeof(common::MeshData),
+		.iDataSize = miMeshDataCapacity[iCommandBuffer] * static_cast<int64_t>(sizeof(common::MeshData)),
 	});
 
 	// Copy only the iValidCount elements written before this allocation; the old buffer holds nothing past them
@@ -559,7 +559,7 @@ void BufferManager::GrowJointMatrixBuffer(int64_t iCommandBuffer, int64_t iValid
 	{
 		.name = "JointMatrices",
 		.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
-		.vkDataSize = miJointMatrixCapacity[iCommandBuffer] * sizeof(common::JointMatrix),
+		.iDataSize = miJointMatrixCapacity[iCommandBuffer] * static_cast<int64_t>(sizeof(common::JointMatrix)),
 	});
 
 	// Copy only the iValidCount elements written before this allocation; the old buffer holds nothing past them
@@ -573,18 +573,18 @@ void BufferManager::CreateSmokeHierarchicalBuffers()
 {
 	DestroySmokeHierarchicalBuffers();
 
-	uint32_t uiMaxWidth = std::max(gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.width, gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.vkExtent3D.width);
-	uint32_t uiMaxHeight = std::max(gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.height, gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.vkExtent3D.height);
-	uint32_t uiTilesX = TileCount(uiMaxWidth);
-	uint32_t uiTilesY = TileCount(uiMaxHeight);
-	uint32_t uiTotalTiles = uiTilesX * uiTilesY;
+	int64_t iMaxWidth = std::max(gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.width, gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.vkExtent3D.width);
+	int64_t iMaxHeight = std::max(gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.height, gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.vkExtent3D.height);
+	int64_t iTilesX = TileCount(iMaxWidth);
+	int64_t iTilesY = TileCount(iMaxHeight);
+	int64_t iTotalTiles = iTilesX * iTilesY;
 
 	// Bit-packed occupancy: 1 bit per tile, packed into uint32s
-	uint32_t uiOccupancyWordCount = (uiTotalTiles + 31) / 32;
-	mSmokeOccupancyBufferVkDeviceSize = static_cast<VkDeviceSize>(uiOccupancyWordCount) * sizeof(uint32_t);
+	int64_t iOccupancyWordCount = (iTotalTiles + 31) / 32;
+	miSmokeOccupancyBufferSize = iOccupancyWordCount * static_cast<int64_t>(sizeof(uint32_t));
 	for (int64_t i = 0; i < 2; ++i)
 	{
-		Buffer::CreateBuffer(i == 0 ? "SmokeOccupancyA" : "SmokeOccupancyB", mSmokeOccupancyBufferVkDeviceSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mSmokeOccupancyVkBuffers[i], mSmokeOccupancyVmaAllocations[i]);
+		Buffer::CreateBuffer(i == 0 ? "SmokeOccupancyA" : "SmokeOccupancyB", miSmokeOccupancyBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mSmokeOccupancyVkBuffers[i], mSmokeOccupancyVmaAllocations[i]);
 	}
 
 	// Occupancy describes persistent texture contents, so both buffers must start empty alongside the
@@ -592,7 +592,7 @@ void BufferManager::CreateSmokeHierarchicalBuffers()
 	OneShotCommandBuffer oneShotCommandBuffer;
 	for (VkBuffer vkSmokeOccupancyBuffer : mSmokeOccupancyVkBuffers)
 	{
-		vkCmdFillBuffer(oneShotCommandBuffer.mVkCommandBuffer, vkSmokeOccupancyBuffer, 0, mSmokeOccupancyBufferVkDeviceSize, 0);
+		vkCmdFillBuffer(oneShotCommandBuffer.mVkCommandBuffer, vkSmokeOccupancyBuffer, 0, static_cast<VkDeviceSize>(miSmokeOccupancyBufferSize), 0);
 	}
 	VkBufferMemoryBarrier pVkSmokeOccupancyInitializationBarriers[2] {};
 	for (int64_t i = 0; i < 2; ++i)
@@ -614,8 +614,8 @@ void BufferManager::CreateSmokeHierarchicalBuffers()
 	oneShotCommandBuffer.Execute();
 
 	// Active tile list: VkDispatchIndirectCommand (12 bytes) + packed tile indices (4 bytes each)
-	mSmokeActiveTileBufferVkDeviceSize = sizeof(VkDispatchIndirectCommand) + static_cast<VkDeviceSize>(uiTotalTiles) * sizeof(uint32_t);
-	Buffer::CreateBuffer("SmokeActiveTile", mSmokeActiveTileBufferVkDeviceSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mSmokeActiveTileVkBuffer, mSmokeActiveTileVmaAllocation);
+	miSmokeActiveTileBufferSize = static_cast<int64_t>(sizeof(VkDispatchIndirectCommand)) + iTotalTiles * static_cast<int64_t>(sizeof(uint32_t));
+	Buffer::CreateBuffer("SmokeActiveTile", miSmokeActiveTileBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mSmokeActiveTileVkBuffer, mSmokeActiveTileVmaAllocation);
 	gbSmokeClear = true;
 }
 
@@ -630,13 +630,13 @@ void BufferManager::DestroySmokeHierarchicalBuffers()
 			mSmokeOccupancyVmaAllocations[i] = VK_NULL_HANDLE;
 		}
 	}
-	mSmokeOccupancyBufferVkDeviceSize = 0;
+	miSmokeOccupancyBufferSize = 0;
 	if (mSmokeActiveTileVkBuffer != VK_NULL_HANDLE)
 	{
 		vmaDestroyBuffer(gpDeviceManager->mpAllocator, mSmokeActiveTileVkBuffer, mSmokeActiveTileVmaAllocation);
 		mSmokeActiveTileVkBuffer = VK_NULL_HANDLE;
 		mSmokeActiveTileVmaAllocation = VK_NULL_HANDLE;
-		mSmokeActiveTileBufferVkDeviceSize = 0;
+		miSmokeActiveTileBufferSize = 0;
 	}
 }
 
@@ -644,24 +644,24 @@ void BufferManager::CreateWindHierarchicalBuffers()
 {
 	DestroyWindHierarchicalBuffers();
 
-	uint32_t uiWidth = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.vkExtent3D.width;
-	uint32_t uiHeight = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.vkExtent3D.height;
-	uint32_t uiTilesX = TileCount(uiWidth);
-	uint32_t uiTilesY = TileCount(uiHeight);
-	uint32_t uiTotalTiles = uiTilesX * uiTilesY;
+	int64_t iWidth = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.vkExtent3D.width;
+	int64_t iHeight = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.vkExtent3D.height;
+	int64_t iTilesX = TileCount(iWidth);
+	int64_t iTilesY = TileCount(iHeight);
+	int64_t iTotalTiles = iTilesX * iTilesY;
 
 	// Bit-packed occupancy: 1 bit per tile, packed into uint32s
-	uint32_t uiOccupancyWordCount = (uiTotalTiles + 31) / 32;
-	mWindOccupancyBufferVkDeviceSize = static_cast<VkDeviceSize>(uiOccupancyWordCount) * sizeof(uint32_t);
+	int64_t iOccupancyWordCount = (iTotalTiles + 31) / 32;
+	miWindOccupancyBufferSize = iOccupancyWordCount * static_cast<int64_t>(sizeof(uint32_t));
 
 	// Active tile list: VkDispatchIndirectCommand (12 bytes) + packed tile indices (4 bytes each)
-	mWindActiveTileBufferVkDeviceSize = sizeof(VkDispatchIndirectCommand) + static_cast<VkDeviceSize>(uiTotalTiles) * sizeof(uint32_t);
+	miWindActiveTileBufferSize = static_cast<int64_t>(sizeof(VkDispatchIndirectCommand)) + iTotalTiles * static_cast<int64_t>(sizeof(uint32_t));
 
 	for (int64_t i = 0; i < 2; ++i)
 	{
-		Buffer::CreateBuffer(i == 0 ? "WindOccupancyA" : "WindOccupancyB", mWindOccupancyBufferVkDeviceSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mWindOccupancyVkBuffers[i], mWindOccupancyVmaAllocations[i]);
+		Buffer::CreateBuffer(i == 0 ? "WindOccupancyA" : "WindOccupancyB", miWindOccupancyBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mWindOccupancyVkBuffers[i], mWindOccupancyVmaAllocations[i]);
 
-		Buffer::CreateBuffer(i == 0 ? "WindActiveTileA" : "WindActiveTileB", mWindActiveTileBufferVkDeviceSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mWindActiveTileVkBuffers[i], mWindActiveTileVmaAllocations[i]);
+		Buffer::CreateBuffer(i == 0 ? "WindActiveTileA" : "WindActiveTileB", miWindActiveTileBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mWindActiveTileVkBuffers[i], mWindActiveTileVmaAllocations[i]);
 	}
 }
 
@@ -682,8 +682,8 @@ void BufferManager::DestroyWindHierarchicalBuffers()
 			mWindActiveTileVmaAllocations[i] = VK_NULL_HANDLE;
 		}
 	}
-	mWindOccupancyBufferVkDeviceSize = 0;
-	mWindActiveTileBufferVkDeviceSize = 0;
+	miWindOccupancyBufferSize = 0;
+	miWindActiveTileBufferSize = 0;
 }
 
 static void CreateVisibleAreaMesh(int64_t iMeshX, int64_t iMeshY, uint32_t* puiIndices, std::byte* pVertices)
@@ -778,12 +778,12 @@ void BufferManager::CreateWaterMesh()
 		.iCount = std::ssize(indices),
 		.vkIndexType = VK_INDEX_TYPE_UINT32,
 		.iVertexStride = sizeof(float) * 2,
-		.vkDataSize = sizeof(uint32_t) * indices.size() + vertices.size(),
+		.iDataSize = static_cast<int64_t>(sizeof(uint32_t)) * std::ssize(indices) + std::ssize(vertices),
 	},
 	[&](void* pData)
 	{
-		std::memcpy(pData, indices.data(), sizeof(uint32_t) * indices.size());
-		std::memcpy(static_cast<char*>(pData) + sizeof(uint32_t) * indices.size(), vertices.data(), vertices.size());
+		std::memcpy(pData, indices.data(), static_cast<size_t>(static_cast<int64_t>(sizeof(uint32_t)) * std::ssize(indices)));
+		std::memcpy(static_cast<char*>(pData) + static_cast<int64_t>(sizeof(uint32_t)) * std::ssize(indices), vertices.data(), static_cast<size_t>(std::ssize(vertices)));
 	});
 }
 

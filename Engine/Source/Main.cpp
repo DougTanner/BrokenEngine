@@ -29,7 +29,7 @@ static MONITORINFO sMonitorInfo {};
 static bool sbHasFocus = false;
 
 #if defined(BT_CLIENT)
-static LONG siWindowStyle = 0;
+static int64_t siWindowStyle = 0;
 static RECT sWindowRectangle {};
 
 #endif
@@ -38,7 +38,7 @@ static LRESULT CALLBACK WindowProcedure(HWND hWindow, UINT uiMessage, WPARAM uiW
 
 #if defined(BT_CLIENT)
 static void FindMonitor(bool bUseCurrentRectangle);
-static VkExtent2D SetupWindow(bool bFullscreen, LONG& riWindowStyle, RECT& rWindowRectangle);
+static VkExtent2D SetupWindow(bool bFullscreen, int64_t& riWindowStyle, RECT& rWindowRectangle);
 
 // Effective fullscreen precedence: the agent fullscreen override (runtime, in-memory) wins first; else false when
 // --windowed WxH is set (reproducible agent capture geometry); else the saved gFullscreen preference. Override only
@@ -60,7 +60,7 @@ static bool WantedFullscreen()
 #endif
 static bool ProcessMessages();
 
-static int HandleEagerLoadCompletion()
+static int64_t HandleEagerLoadCompletion()
 {
 	try
 	{
@@ -82,7 +82,7 @@ static int HandleEagerLoadCompletion()
 	return 0;
 }
 
-static int MainThread(HINSTANCE hInstance)
+static int64_t MainThread(HINSTANCE hInstance)
 {
 	common::SetupExceptionHandling();
 
@@ -203,8 +203,8 @@ static int MainThread(HINSTANCE hInstance)
 		.lpszClassName = game::kGameName.data(),
 		.hIconSm = LoadIcon(nullptr, IDI_APPLICATION),
 	};
-	ATOM uiAtom = RegisterClassEx(&windowClassExtended);
-	if (uiAtom == 0)
+	int64_t iAtom = RegisterClassEx(&windowClassExtended);
+	if (iAtom == 0)
 	{
 		throw std::runtime_error("RegisterClassEx failed");
 	}
@@ -218,15 +218,15 @@ static int MainThread(HINSTANCE hInstance)
 	LoadGraphicsSettings();
 	gVkWantedFramebufferExtent2D = SetupWindow(WantedFullscreen(), siWindowStyle, sWindowRectangle);
 #else
-	LONG iWindowStyle = WS_POPUP;
+	int64_t iWindowStyle = WS_POPUP;
 	RECT windowRectangle {};
 	SystemParametersInfo(SPI_GETWORKAREA, 0, &windowRectangle, 0);
 #endif // BT_CLIENT
 
 #if defined(BT_CLIENT)
-	sHWindow = CreateWindow(game::kGameName.data(), game::kGameName.data(), siWindowStyle, sWindowRectangle.left, sWindowRectangle.top, sWindowRectangle.right - sWindowRectangle.left, sWindowRectangle.bottom - sWindowRectangle.top, nullptr, nullptr, hInstance, nullptr);
+	sHWindow = CreateWindow(game::kGameName.data(), game::kGameName.data(), static_cast<DWORD>(siWindowStyle), sWindowRectangle.left, sWindowRectangle.top, sWindowRectangle.right - sWindowRectangle.left, sWindowRectangle.bottom - sWindowRectangle.top, nullptr, nullptr, hInstance, nullptr);
 #else
-	sHWindow = CreateWindow(game::kGameName.data(), game::kGameName.data(), iWindowStyle, windowRectangle.left, windowRectangle.top, windowRectangle.right - windowRectangle.left, windowRectangle.bottom - windowRectangle.top, nullptr, nullptr, hInstance, nullptr);
+	sHWindow = CreateWindow(game::kGameName.data(), game::kGameName.data(), static_cast<DWORD>(iWindowStyle), windowRectangle.left, windowRectangle.top, windowRectangle.right - windowRectangle.left, windowRectangle.bottom - windowRectangle.top, nullptr, nullptr, hInstance, nullptr);
 #endif
 	if (sHWindow == nullptr)
 	{
@@ -395,7 +395,7 @@ static int MainThread(HINSTANCE hInstance)
 		if (bIsFullscreen != bWantedFullscreen)
 		{
 			SetupWindow(bWantedFullscreen, siWindowStyle, sWindowRectangle);
-			SetWindowLongPtr(sHWindow, GWL_STYLE, siWindowStyle);
+			SetWindowLongPtr(sHWindow, GWL_STYLE, static_cast<LONG_PTR>(static_cast<LONG>(siWindowStyle)));
 			// SWP_NOZORDER | SWP_NOACTIVATE: the agent fullscreen command reaches this path, and the harness must never steal foreground focus.
 			SetWindowPos(sHWindow, nullptr, sWindowRectangle.left, sWindowRectangle.top, sWindowRectangle.right - sWindowRectangle.left, sWindowRectangle.bottom - sWindowRectangle.top, SWP_NOZORDER | SWP_NOACTIVATE);
 		}
@@ -530,8 +530,8 @@ static void FindMonitor(bool bUseCurrentRectangle)
 		bool bPrimary = (monitorInfo.dwFlags & MONITORINFOF_PRIMARY) != 0;
 		bool bRectangleIsInMonitor = sWindowRectangle.left >= monitorInfo.rcMonitor.left && sWindowRectangle.left <= monitorInfo.rcMonitor.right && sWindowRectangle.top >= monitorInfo.rcMonitor.top && sWindowRectangle.top <= monitorInfo.rcMonitor.bottom;
 
-		[[maybe_unused]] LONG iWidth = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
-		[[maybe_unused]] LONG iHeight = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
+		[[maybe_unused]] int64_t iWidth = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
+		[[maybe_unused]] int64_t iHeight = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
 		LOG(kDefault, kDebug, "  {}: {} x {}{}{}", siMonitorCount++, iWidth, iHeight, bPrimary ? " (Primary)" : "", bRectangleIsInMonitor ? " (Monitor)" : "");
 
 		if (sHmonitor == nullptr || (sbUseCurrentRectangle && bRectangleIsInMonitor) || (!sbUseCurrentRectangle && bPrimary))
@@ -545,7 +545,7 @@ static void FindMonitor(bool bUseCurrentRectangle)
 	LOG(kDefault, kDebug, "");
 }
 
-static VkExtent2D SetupWindow(bool bFullscreen, LONG& riWindowStyle, RECT& rWindowRectangle)
+static VkExtent2D SetupWindow(bool bFullscreen, int64_t& riWindowStyle, RECT& rWindowRectangle)
 {
 	if (sHWindow == nullptr)
 	{
@@ -567,36 +567,36 @@ static VkExtent2D SetupWindow(bool bFullscreen, LONG& riWindowStyle, RECT& rWind
 	{
 		riWindowStyle |= WS_OVERLAPPEDWINDOW;
 
-		LONG iX = common::RoundUp<LONG, 8>(static_cast<LONG>(0.05f * static_cast<float>(sMonitorInfo.rcMonitor.right)));
-		LONG iY = common::RoundUp<LONG, 8>(static_cast<LONG>(0.05f * static_cast<float>(sMonitorInfo.rcMonitor.bottom)));
+		int64_t iX = common::RoundUp<int64_t, 8>(static_cast<int64_t>(0.05f * static_cast<float>(sMonitorInfo.rcMonitor.right)));
+		int64_t iY = common::RoundUp<int64_t, 8>(static_cast<int64_t>(0.05f * static_cast<float>(sMonitorInfo.rcMonitor.bottom)));
 
 		if (gLaunchOptions.vkWindowedExtent.width != 0 && gLaunchOptions.vkWindowedExtent.height != 0)
 		{
 			// Reproducible agent capture geometry: use the requested client size (multiple-of-8 rounded, matching
 			// the default inset path), anchored at the monitor's top-left inset.
-			LONG iClientWidth = common::RoundUp<LONG, 8>(static_cast<LONG>(gLaunchOptions.vkWindowedExtent.width));
-			LONG iClientHeight = common::RoundUp<LONG, 8>(static_cast<LONG>(gLaunchOptions.vkWindowedExtent.height));
-			rWindowRectangle.left = sMonitorInfo.rcMonitor.left + iX;
-			rWindowRectangle.top = sMonitorInfo.rcMonitor.top + iY;
-			rWindowRectangle.right = rWindowRectangle.left + iClientWidth;
-			rWindowRectangle.bottom = rWindowRectangle.top + iClientHeight;
+			int64_t iClientWidth = common::RoundUp<int64_t, 8>(static_cast<int64_t>(gLaunchOptions.vkWindowedExtent.width));
+			int64_t iClientHeight = common::RoundUp<int64_t, 8>(static_cast<int64_t>(gLaunchOptions.vkWindowedExtent.height));
+			rWindowRectangle.left = static_cast<LONG>(sMonitorInfo.rcMonitor.left + iX);
+			rWindowRectangle.top = static_cast<LONG>(sMonitorInfo.rcMonitor.top + iY);
+			rWindowRectangle.right = static_cast<LONG>(rWindowRectangle.left + iClientWidth);
+			rWindowRectangle.bottom = static_cast<LONG>(rWindowRectangle.top + iClientHeight);
 		}
 		else
 		{
-			rWindowRectangle.left = sMonitorInfo.rcMonitor.left + iX;
-			rWindowRectangle.right = sMonitorInfo.rcMonitor.right - iX;
-			rWindowRectangle.top = sMonitorInfo.rcMonitor.top + iY;
-			rWindowRectangle.bottom = sMonitorInfo.rcMonitor.bottom - iY;
+			rWindowRectangle.left = static_cast<LONG>(sMonitorInfo.rcMonitor.left + iX);
+			rWindowRectangle.right = static_cast<LONG>(sMonitorInfo.rcMonitor.right - iX);
+			rWindowRectangle.top = static_cast<LONG>(sMonitorInfo.rcMonitor.top + iY);
+			rWindowRectangle.bottom = static_cast<LONG>(sMonitorInfo.rcMonitor.bottom - iY);
 		}
 	}
 
-	LONG iFramebufferWidth = rWindowRectangle.right - rWindowRectangle.left;
-	LONG iFramebufferHeight = rWindowRectangle.bottom - rWindowRectangle.top;
+	int64_t iFramebufferWidth = rWindowRectangle.right - rWindowRectangle.left;
+	int64_t iFramebufferHeight = rWindowRectangle.bottom - rWindowRectangle.top;
 	LOG(kDefault, kDebug, "Set {} window {} x {} at ({}, {})", (riWindowStyle & WS_OVERLAPPEDWINDOW) != 0 ? "WS_OVERLAPPEDWINDOW" : "WS_POPUP", iFramebufferWidth, iFramebufferHeight, rWindowRectangle.left, rWindowRectangle.top);
 
 	if ((riWindowStyle & WS_OVERLAPPEDWINDOW) != 0)
 	{
-		AdjustWindowRect(&rWindowRectangle, riWindowStyle, FALSE);
+		AdjustWindowRect(&rWindowRectangle, static_cast<DWORD>(riWindowStyle), FALSE);
 	}
 
 	return {.width = static_cast<uint32_t>(iFramebufferWidth), .height = static_cast<uint32_t>(iFramebufferHeight)};
@@ -817,7 +817,7 @@ static LRESULT CALLBACK WindowProcedure(HWND hWindow, UINT uiMessage, WPARAM uiW
 
 } // namespace engine
 
-static int ProcessMain(HINSTANCE hInstance)
+static int64_t ProcessMain(HINSTANCE hInstance)
 {
 	if (!engine::ParseLaunchOptions())
 	{
@@ -862,13 +862,13 @@ static int ProcessMain(HINSTANCE hInstance)
 
 #if defined(BT_CLIENT)
 	// Windows::Foundation::Initialize is required for XAudio2
-	HRESULT iFoundationResult = Windows::Foundation::Initialize(RO_INIT_MULTITHREADED);
+	int64_t iFoundationResult = Windows::Foundation::Initialize(RO_INIT_MULTITHREADED);
 	if (iFoundationResult != S_OK) [[unlikely]]
 	{
 		LOG(kDefault, kError, "Windows::Foundation::Initialize failed: {:#x}", static_cast<uint32_t>(iFoundationResult));
 		if ((engine::gLaunchOptions.iAgentPort == 0))
 		{
-			MessageBox(nullptr, common::HresultToString(iFoundationResult).data(), "Windows::Foundation::Initialize", MB_OK | MB_SYSTEMMODAL);
+			MessageBox(nullptr, common::HresultToString(static_cast<HRESULT>(iFoundationResult)).data(), "Windows::Foundation::Initialize", MB_OK | MB_SYSTEMMODAL);
 		}
 		return 0;
 	}
@@ -878,7 +878,7 @@ static int ProcessMain(HINSTANCE hInstance)
 	auto pTextureUploadManager = std::make_unique<engine::TextureUploadManager>();
 #endif
 	std::unique_ptr<engine::FileManager> pFileManager;
-	int iResult = 0;
+	int64_t iResult = 0;
 	try
 	{
 		try
@@ -931,5 +931,5 @@ static int ProcessMain(HINSTANCE hInstance)
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, [[maybe_unused]] _In_opt_ HINSTANCE hPreviousInstance, [[maybe_unused]] _In_ LPWSTR pcCommandLine, [[maybe_unused]] _In_ int iShowCommand)
 {
 	// No exception handling here: MainThread installs it as its first statement.
-	return common::ThreadLocal::Entry(ProcessMain, 10 * 1'024 * 1'024, std::nullopt, false)(hInstance);
+	return static_cast<int>(common::ThreadLocal::Entry(ProcessMain, 10 * 1'024 * 1'024, std::nullopt, false)(hInstance));
 }

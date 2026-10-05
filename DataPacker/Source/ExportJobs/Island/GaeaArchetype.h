@@ -24,4 +24,4 @@ float ReadArchetypeSeaLevel(const std::filesystem::path& rTerrainFile);
 // the post-bake elevation math so the Gaea editor preview and the in-game terrain agree on the water
 // surface position. Each route works on its own cached PatchedArchetype.terrain copy, so the
 // on-disk source archetype is never mutated.
-void PatchArchetype(const std::filesystem::path& rTerrainFile, const WorldDimensions& rDimensions, int32_t iSeed, std::optional<int64_t> oiMeshResolution, int32_t iGaeaRouteChoice);
+void PatchArchetype(const std::filesystem::path& rTerrainFile, const WorldDimensions& rDimensions, int64_t iSeed, std::optional<int64_t> oiMeshResolution, int64_t iGaeaRouteChoice);

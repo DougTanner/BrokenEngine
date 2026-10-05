@@ -116,7 +116,7 @@ struct FleetSyncMessage
 	// reader validity nor the flagship relation; the server's fleet invariant provides that relation.
 	static void ReadPayload(const std::vector<uint8_t>& rPayload, std::vector<Fleet>& rOutFleets)
 	{
-		engine::NetworkMessages::MessageReader reader(std::span<const uint8_t>(rPayload.data(), rPayload.size()));
+		engine::NetworkMessages::MessageReader reader(std::span<const uint8_t>(rPayload.data(), static_cast<size_t>(std::ssize(rPayload))));
 		int64_t iFleetCount = 0;
 		reader.BoundedCount(iFleetCount, kiFleetHeaderSize, 0);
 

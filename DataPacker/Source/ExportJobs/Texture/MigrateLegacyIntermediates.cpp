@@ -42,7 +42,7 @@ static std::vector<uint8_t> DecodeBcnMip0ToRgba8(const std::byte* puiEncoded, in
 		for (int64_t iBlockX = 0; iBlockX < iBlocksX; ++iBlockX)
 		{
 			const std::byte* puiBlock = puiEncoded + (iBlockY * iBlocksX + iBlockX) * iBlockSizeBytes;
-			uint8_t uiBlockRgba[16 * 4] = {};
+			int64_t iBlockRgba[16 * 4] = {};
 
 			switch (vkFormat)
 			{
@@ -52,8 +52,8 @@ static std::vector<uint8_t> DecodeBcnMip0ToRgba8(const std::byte* puiEncoded, in
 					rgbcx::unpack_bc4(puiBlock, uiBc4Pixels, 1);
 					for (int64_t i = 0; i < 16; ++i)
 					{
-						uiBlockRgba[i * 4 + 0] = uiBc4Pixels[i];
-						uiBlockRgba[i * 4 + 3] = 255;
+						iBlockRgba[i * 4 + 0] = uiBc4Pixels[i];
+						iBlockRgba[i * 4 + 3] = 255;
 					}
 					break;
 				}
@@ -63,9 +63,9 @@ static std::vector<uint8_t> DecodeBcnMip0ToRgba8(const std::byte* puiEncoded, in
 					rgbcx::unpack_bc5(puiBlock, uiBc5Pixels, 0, 1, 2);
 					for (int64_t i = 0; i < 16; ++i)
 					{
-						uiBlockRgba[i * 4 + 0] = uiBc5Pixels[i * 2 + 0];
-						uiBlockRgba[i * 4 + 1] = uiBc5Pixels[i * 2 + 1];
-						uiBlockRgba[i * 4 + 3] = 255;
+						iBlockRgba[i * 4 + 0] = uiBc5Pixels[i * 2 + 0];
+						iBlockRgba[i * 4 + 1] = uiBc5Pixels[i * 2 + 1];
+						iBlockRgba[i * 4 + 3] = 255;
 					}
 					break;
 				}
@@ -75,10 +75,10 @@ static std::vector<uint8_t> DecodeBcnMip0ToRgba8(const std::byte* puiEncoded, in
 					bc7decomp::unpack_bc7(puiBlock, bc7Pixels);
 					for (int64_t i = 0; i < 16; ++i)
 					{
-						uiBlockRgba[i * 4 + 0] = bc7Pixels[i].r;
-						uiBlockRgba[i * 4 + 1] = bc7Pixels[i].g;
-						uiBlockRgba[i * 4 + 2] = bc7Pixels[i].b;
-						uiBlockRgba[i * 4 + 3] = bc7Pixels[i].a;
+						iBlockRgba[i * 4 + 0] = bc7Pixels[i].r;
+						iBlockRgba[i * 4 + 1] = bc7Pixels[i].g;
+						iBlockRgba[i * 4 + 2] = bc7Pixels[i].b;
+						iBlockRgba[i * 4 + 3] = bc7Pixels[i].a;
 					}
 					break;
 				}
@@ -99,10 +99,10 @@ static std::vector<uint8_t> DecodeBcnMip0ToRgba8(const std::byte* puiEncoded, in
 					}
 					int64_t iDestIndex = (iY * iWidth + iX) * 4;
 					int64_t iBlockIndex = (i * 4 + j) * 4;
-					rgba8.at(iDestIndex + 0) = uiBlockRgba[iBlockIndex + 0];
-					rgba8.at(iDestIndex + 1) = uiBlockRgba[iBlockIndex + 1];
-					rgba8.at(iDestIndex + 2) = uiBlockRgba[iBlockIndex + 2];
-					rgba8.at(iDestIndex + 3) = uiBlockRgba[iBlockIndex + 3];
+					rgba8.at(iDestIndex + 0) = static_cast<uint8_t>(iBlockRgba[iBlockIndex + 0]);
+					rgba8.at(iDestIndex + 1) = static_cast<uint8_t>(iBlockRgba[iBlockIndex + 1]);
+					rgba8.at(iDestIndex + 2) = static_cast<uint8_t>(iBlockRgba[iBlockIndex + 2]);
+					rgba8.at(iDestIndex + 3) = static_cast<uint8_t>(iBlockRgba[iBlockIndex + 3]);
 				}
 			}
 		}
@@ -179,10 +179,8 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 	{
 		return;
 	}
-	uintmax_t uiExpectedRawSize = static_cast<uintmax_t>(iExpectedRawSize);
-	uintmax_t uiCompressedPayloadBound = static_cast<uintmax_t>(compressBound(static_cast<uLong>(iExpectedRawSize)));
-	uintmax_t uiPayloadSize = static_cast<uintmax_t>(iPayloadSize);
-	if (uiPayloadSize != uiExpectedRawSize && uiPayloadSize > uiCompressedPayloadBound)
+	int64_t iCompressedPayloadBound = static_cast<int64_t>(compressBound(static_cast<uLong>(iExpectedRawSize)));
+	if (iPayloadSize != iExpectedRawSize && iPayloadSize > iCompressedPayloadBound)
 	{
 		return;
 	}
@@ -211,7 +209,7 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 	{
 		rawBytes.resize(iExpectedRawSize);
 		uLongf uiUncompressedSize = static_cast<uLongf>(iExpectedRawSize);
-		int iZlibResult = uncompress(reinterpret_cast<Bytef*>(rawBytes.data()), &uiUncompressedSize, reinterpret_cast<const Bytef*>(payload.data()), static_cast<uLong>(iPayloadSize));
+		int64_t iZlibResult = uncompress(reinterpret_cast<Bytef*>(rawBytes.data()), &uiUncompressedSize, reinterpret_cast<const Bytef*>(payload.data()), static_cast<uLong>(iPayloadSize));
 		if (iZlibResult != Z_OK || static_cast<int64_t>(uiUncompressedSize) != iExpectedRawSize)
 		{
 			return;
@@ -230,7 +228,7 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 		fileStreamOut.write(reinterpret_cast<const char*>(&iWidth), sizeof(iWidth));
 		fileStreamOut.write(reinterpret_cast<const char*>(&iHeight), sizeof(iHeight));
 		fileStreamOut.write(reinterpret_cast<const char*>(&iMipMaps), sizeof(iMipMaps));
-		fileStreamOut.write(reinterpret_cast<const char*>(compressed.data()), compressed.size());
+		fileStreamOut.write(reinterpret_cast<const char*>(compressed.data()), static_cast<std::streamsize>(std::ssize(compressed)));
 		fileStreamOut.flush();
 		fileStreamOut.close();
 		VERIFY_SUCCESS(fileStreamOut.good());

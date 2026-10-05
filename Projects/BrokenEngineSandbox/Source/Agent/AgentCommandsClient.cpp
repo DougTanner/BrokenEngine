@@ -18,7 +18,7 @@
 namespace game
 {
 
-int32_t ClientGridCoordinateValue(const nlohmann::json& rValue, std::string_view command)
+int64_t ClientGridCoordinateValue(const nlohmann::json& rValue, std::string_view command)
 {
 	if (!rValue.is_number_integer())
 	{
@@ -35,7 +35,7 @@ int32_t ClientGridCoordinateValue(const nlohmann::json& rValue, std::string_view
 		{
 			throw std::runtime_error(std::format("{} 'coord' values must fit in a signed 32-bit integer", command));
 		}
-		return static_cast<int32_t>(uiValue);
+		return static_cast<int64_t>(uiValue);
 	}
 
 	int64_t iValue = rValue.get<int64_t>();
@@ -43,11 +43,12 @@ int32_t ClientGridCoordinateValue(const nlohmann::json& rValue, std::string_view
 	{
 		throw std::runtime_error(std::format("{} 'coord' values must fit in a signed 32-bit integer", command));
 	}
-	return static_cast<int32_t>(iValue);
+	return iValue;
 }
 
-// set_client_grid_coord: move the client's grid cell so automation can drive the cross-cell subscribe and
-// full-state adoption path. Schema: {"coord":[x,y]}.
+// set_client_grid_coord: move the client's grid cell and pin it against every game writer until
+// release_client_grid_coord or Game::Reset, so automation can drive the cross-cell subscribe and full-state
+// adoption path. Schema: {"coord":[x,y]}.
 static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	// Heap: validation errors and JSON result
@@ -68,7 +69,7 @@ static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nl
 		throw std::runtime_error("set_client_grid_coord 'coord' must be an array of 2 integers");
 	}
 
-	engine::GridCoord coordinate {.iX = ClientGridCoordinateValue(rCoordinate.at(0), "set_client_grid_coord"), .iY = ClientGridCoordinateValue(rCoordinate.at(1), "set_client_grid_coord")};
+	engine::GridCoord coordinate {.iX = static_cast<int32_t>(ClientGridCoordinateValue(rCoordinate.at(0), "set_client_grid_coord")), .iY = static_cast<int32_t>(ClientGridCoordinateValue(rCoordinate.at(1), "set_client_grid_coord"))};
 
 	// Before player assignment the subscription policy falls back to origin, so the requested cell would be dropped.
 	if (gpGame == nullptr)
@@ -101,10 +102,35 @@ static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nl
 	}
 
 	// Order is an invariant: the setter clears the visible-neighbour cache keyed by the old cell.
-	gpGame->SetClientGridCoordinate(coordinate);
+	gpGame->PinClientGridCoordinate(coordinate);
 	gpClientSession->UpdateDesiredCoordinates(SubscriptionChangeReason::kPollTick);
 
 	rResult["clientGridCoord"] = {coordinate.iX, coordinate.iY};
+}
+
+// release_client_grid_coord: clear the set_client_grid_coord pin; the cell stays put until the next game writer
+// moves it. Schema: {}.
+static void CommandReleaseClientGridCoordinate(const nlohmann::json& rParameters, nlohmann::json& rResult)
+{
+	// Heap: validation errors and JSON result
+	ScopedSuppressAllocationTracking suppress;
+
+	if (!rParameters.is_object())
+	{
+		throw std::runtime_error("release_client_grid_coord accepts no params");
+	}
+	if (!rParameters.empty())
+	{
+		throw std::runtime_error("release_client_grid_coord accepts no params");
+	}
+	if (gpGame == nullptr)
+	{
+		throw std::runtime_error("release_client_grid_coord requires a live client game");
+	}
+
+	gpGame->mbClientGridCoordinatePinned = false;
+
+	rResult["clientGridCoord"] = {gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY};
 }
 
 bool ExecuteAgentCommandClient(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)
@@ -152,6 +178,11 @@ bool ExecuteAgentCommandClient(std::string_view command, const nlohmann::json& r
 	if (command == "set_client_grid_coord")
 	{
 		CommandSetClientGridCoordinate(rParameters, rResult);
+		return true;
+	}
+	if (command == "release_client_grid_coord")
+	{
+		CommandReleaseClientGridCoordinate(rParameters, rResult);
 		return true;
 	}
 	return false;

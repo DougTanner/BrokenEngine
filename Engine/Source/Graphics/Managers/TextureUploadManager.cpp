@@ -63,7 +63,7 @@ void TextureUploadManager::InitializeTransferResources()
 
 	VmaAllocationInfo stagingVmaAllocationInfo {};
 	Buffer::CreateBuffer("TransferStaging", kiByteBudgetPerFrame, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mStagingVkBuffer, mStagingVmaAllocation, &stagingVmaAllocationInfo);
-	mStagingVkDeviceSize = kiByteBudgetPerFrame;
+	miStagingSize = kiByteBudgetPerFrame;
 	mpStagingMappedData = stagingVmaAllocationInfo.pMappedData;
 }
 
@@ -103,7 +103,7 @@ void TextureUploadManager::DestroyTransferResources()
 		vmaDestroyBuffer(gpDeviceManager->mpAllocator, mStagingVkBuffer, mStagingVmaAllocation);
 		mStagingVkBuffer = VK_NULL_HANDLE;
 		mStagingVmaAllocation = VK_NULL_HANDLE;
-		mStagingVkDeviceSize = 0;
+		miStagingSize = 0;
 	}
 
 	// Clean up any GPU-uploaded texture images that were not adopted by TextureManager
@@ -128,9 +128,9 @@ void TextureUploadManager::DestroyTransferResources()
 void TextureUploadManager::ResetUploadProgress()
 {
 	mCurrentCrc = 0;
-	muiCurrentLayer = 0;
+	miCurrentLayer = 0;
 	muiCurrentMip = 0;
-	muiCurrentMipY = 0;
+	miCurrentMipY = 0;
 	miCurrentDataOffset = 0;
 }
 
@@ -272,9 +272,9 @@ void TextureUploadManager::UploadThread()
 			{
 				.bCubemap = bCubemap,
 				.vkFormat = vkFormat,
-				.uiBlockHeight = bCompressed ? 4ui32 : 1ui32,
-				.uiArrayLayers = bCubemap ? 6ui32 : 1ui32,
-				.uiMipLevels = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iMipLevels),
+				.iBlockHeight = bCompressed ? 4i64 : 1i64,
+				.iArrayLayers = bCubemap ? 6i64 : 1i64,
+				.iMipLevels = rLazyChunk.header.textureHeader.iMipLevels,
 				.uiBaseWidth = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureWidth),
 				.uiBaseHeight = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureHeight),
 			};
@@ -305,7 +305,7 @@ void TextureUploadManager::UploadThread()
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.image = rLazyChunk.vkUploadImage,
-				.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = dimensions.uiMipLevels, .baseArrayLayer = 0, .layerCount = dimensions.uiArrayLayers},
+				.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = static_cast<uint32_t>(dimensions.iMipLevels), .baseArrayLayer = 0, .layerCount = static_cast<uint32_t>(dimensions.iArrayLayers)},
 			};
 			if (bFirstChunk)
 			{
@@ -314,7 +314,7 @@ void TextureUploadManager::UploadThread()
 
 			RecordStagingCopies(rLazyChunk, dimensions);
 
-			bool bDone = (muiCurrentLayer >= dimensions.uiArrayLayers);
+			bool bDone = (miCurrentLayer >= dimensions.iArrayLayers);
 
 			SubmitChunkUpload(rLazyChunk, vkImageMemoryBarrier, bDone);
 		}
@@ -442,8 +442,8 @@ void TextureUploadManager::CreateTransferImage(LazyChunk& rLazyChunk, const Chun
 		.imageType = VK_IMAGE_TYPE_2D,
 		.format = rDimensions.vkFormat,
 		.extent = VkExtent3D {.width = rDimensions.uiBaseWidth, .height = rDimensions.uiBaseHeight, .depth = 1},
-		.mipLevels = rDimensions.uiMipLevels,
-		.arrayLayers = rDimensions.uiArrayLayers,
+		.mipLevels = static_cast<uint32_t>(rDimensions.iMipLevels),
+		.arrayLayers = static_cast<uint32_t>(rDimensions.iArrayLayers),
 		.samples = VK_SAMPLE_COUNT_1_BIT,
 		.tiling = VK_IMAGE_TILING_OPTIMAL,
 		.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -460,38 +460,38 @@ void TextureUploadManager::CreateTransferImage(LazyChunk& rLazyChunk, const Chun
 void TextureUploadManager::RecordStagingCopies(const LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions)
 {
 	const std::byte* pData = rLazyChunk.pData;
-	VkDeviceSize vkStagingUsed = 0;
+	int64_t iStagingUsed = 0;
 
-	while (vkStagingUsed < mStagingVkDeviceSize && muiCurrentLayer < rDimensions.uiArrayLayers)
+	while (iStagingUsed < miStagingSize && miCurrentLayer < rDimensions.iArrayLayers)
 	{
-		uint32_t uiMipWidth = std::max(rDimensions.uiBaseWidth >> muiCurrentMip, 1ui32);
-		uint32_t uiMipHeight = std::max(rDimensions.uiBaseHeight >> muiCurrentMip, 1ui32);
-		uint32_t uiRemainingHeight = uiMipHeight - muiCurrentMipY;
-		int64_t iRemainingMipBytes = common::SizeInBytes(rDimensions.vkFormat, uiMipWidth, uiRemainingHeight);
-		VkDeviceSize vkRemainingStaging = mStagingVkDeviceSize - vkStagingUsed;
+		int64_t iMipWidth = std::max(rDimensions.uiBaseWidth >> muiCurrentMip, 1ui32);
+		int64_t iMipHeight = std::max(rDimensions.uiBaseHeight >> muiCurrentMip, 1ui32);
+		int64_t iRemainingHeight = iMipHeight - miCurrentMipY;
+		int64_t iRemainingMipBytes = common::SizeInBytes(rDimensions.vkFormat, iMipWidth, iRemainingHeight);
+		int64_t iRemainingStaging = miStagingSize - iStagingUsed;
 
-		if (iRemainingMipBytes <= static_cast<int64_t>(vkRemainingStaging))
+		if (iRemainingMipBytes <= iRemainingStaging)
 		{
-			std::memcpy(static_cast<std::byte*>(mpStagingMappedData) + vkStagingUsed, pData + miCurrentDataOffset, iRemainingMipBytes);
+			std::memcpy(static_cast<std::byte*>(mpStagingMappedData) + iStagingUsed, pData + miCurrentDataOffset, iRemainingMipBytes);
 
 			VkBufferImageCopy vkBufferImageCopy {};
-			vkBufferImageCopy.bufferOffset = vkStagingUsed;
+			vkBufferImageCopy.bufferOffset = static_cast<VkDeviceSize>(iStagingUsed);
 			vkBufferImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			vkBufferImageCopy.imageSubresource.mipLevel = muiCurrentMip;
-			vkBufferImageCopy.imageSubresource.baseArrayLayer = muiCurrentLayer;
+			vkBufferImageCopy.imageSubresource.baseArrayLayer = static_cast<uint32_t>(miCurrentLayer);
 			vkBufferImageCopy.imageSubresource.layerCount = 1;
-			vkBufferImageCopy.imageOffset = {.x = 0, .y = static_cast<int32_t>(muiCurrentMipY), .z = 0};
-			vkBufferImageCopy.imageExtent = {.width = uiMipWidth, .height = uiRemainingHeight, .depth = 1};
+			vkBufferImageCopy.imageOffset = {.x = 0, .y = static_cast<int32_t>(miCurrentMipY), .z = 0};
+			vkBufferImageCopy.imageExtent = {.width = static_cast<uint32_t>(iMipWidth), .height = static_cast<uint32_t>(iRemainingHeight), .depth = 1};
 			vkCmdCopyBufferToImage(mTransferVkCommandBuffer, mStagingVkBuffer, rLazyChunk.vkUploadImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
 
-			vkStagingUsed += iRemainingMipBytes;
+			iStagingUsed += iRemainingMipBytes;
 			miCurrentDataOffset += iRemainingMipBytes;
-			muiCurrentMipY = 0;
+			miCurrentMipY = 0;
 			++muiCurrentMip;
-			if (muiCurrentMip >= rDimensions.uiMipLevels)
+			if (muiCurrentMip >= rDimensions.iMipLevels)
 			{
 				muiCurrentMip = 0;
-				++muiCurrentLayer;
+				++miCurrentLayer;
 			}
 		}
 		else
@@ -503,31 +503,31 @@ void TextureUploadManager::RecordStagingCopies(const LazyChunk& rLazyChunk, cons
 			// degenerates to `granularity.height` pixels per chunk; for BCn (blockHeight == 4)
 			// it scales up to `granularity.height * 4 = 64` pixels per chunk on hardware that
 			// reports granularity.height == 16.
-			uint32_t uiChunkHeight = std::max(1ui32, gpInstanceManager->mTransferImageGranularityVkExtent3D.height) * rDimensions.uiBlockHeight;
-			int64_t iBytesPerChunk = common::SizeInBytes(rDimensions.vkFormat, uiMipWidth, uiChunkHeight);
-			int64_t iChunksThatFit = static_cast<int64_t>(vkRemainingStaging) / iBytesPerChunk;
+			int64_t iChunkHeight = std::max(1i64, static_cast<int64_t>(gpInstanceManager->mTransferImageGranularityVkExtent3D.height)) * rDimensions.iBlockHeight;
+			int64_t iBytesPerChunk = common::SizeInBytes(rDimensions.vkFormat, iMipWidth, iChunkHeight);
+			int64_t iChunksThatFit = iRemainingStaging / iBytesPerChunk;
 			if (iChunksThatFit == 0)
 			{
 				break;
 			}
 
-			uint32_t uiCopyHeight = static_cast<uint32_t>(iChunksThatFit * uiChunkHeight);
-			int64_t iCopyBytes = common::SizeInBytes(rDimensions.vkFormat, uiMipWidth, uiCopyHeight);
+			int64_t iCopyHeight = iChunksThatFit * iChunkHeight;
+			int64_t iCopyBytes = common::SizeInBytes(rDimensions.vkFormat, iMipWidth, iCopyHeight);
 
-			std::memcpy(static_cast<std::byte*>(mpStagingMappedData) + vkStagingUsed, pData + miCurrentDataOffset, iCopyBytes);
+			std::memcpy(static_cast<std::byte*>(mpStagingMappedData) + iStagingUsed, pData + miCurrentDataOffset, iCopyBytes);
 
 			VkBufferImageCopy vkBufferImageCopy {};
-			vkBufferImageCopy.bufferOffset = vkStagingUsed;
+			vkBufferImageCopy.bufferOffset = static_cast<VkDeviceSize>(iStagingUsed);
 			vkBufferImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			vkBufferImageCopy.imageSubresource.mipLevel = muiCurrentMip;
-			vkBufferImageCopy.imageSubresource.baseArrayLayer = muiCurrentLayer;
+			vkBufferImageCopy.imageSubresource.baseArrayLayer = static_cast<uint32_t>(miCurrentLayer);
 			vkBufferImageCopy.imageSubresource.layerCount = 1;
-			vkBufferImageCopy.imageOffset = {.x = 0, .y = static_cast<int32_t>(muiCurrentMipY), .z = 0};
-			vkBufferImageCopy.imageExtent = {.width = uiMipWidth, .height = uiCopyHeight, .depth = 1};
+			vkBufferImageCopy.imageOffset = {.x = 0, .y = static_cast<int32_t>(miCurrentMipY), .z = 0};
+			vkBufferImageCopy.imageExtent = {.width = static_cast<uint32_t>(iMipWidth), .height = static_cast<uint32_t>(iCopyHeight), .depth = 1};
 			vkCmdCopyBufferToImage(mTransferVkCommandBuffer, mStagingVkBuffer, rLazyChunk.vkUploadImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
 
 			miCurrentDataOffset += iCopyBytes;
-			muiCurrentMipY += uiCopyHeight;
+			miCurrentMipY += iCopyHeight;
 			break; // staging full
 		}
 	}

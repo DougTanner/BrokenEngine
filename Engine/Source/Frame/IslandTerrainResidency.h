@@ -10,7 +10,7 @@ namespace engine
 // Phase 5 LRU grace: a template's GPU resources stay resident this many render frames after its
 // last placement reference drops. ~5s @60Hz, ~2.5s @120Hz. Chosen to cover transient absences
 // in moving-camera traversal without holding GPU memory indefinitely.
-inline constexpr uint64_t kuiGraceRenderFrames = 300;
+inline constexpr int64_t kiGraceRenderFrames = 300;
 
 class IslandTerrainResidency
 {

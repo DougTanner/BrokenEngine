@@ -23,7 +23,7 @@ namespace toolcli
 	};
 
 	bool Utf8PathLess(std::wstring_view left, std::wstring_view right);
-	bool ParseCanonicalUtcTimestamp(std::string_view value, uint64_t& rTicks);
+	bool ParseCanonicalUtcTimestamp(std::string_view value, int64_t& rTicks);
 	bool ReadBytes(const std::filesystem::path& rPath, std::string& rBytes);
 	bool NormalizePlanPath(std::wstring_view value, std::wstring& rPath);
 	bool BuildPlans(const std::filesystem::path& rWorktree, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics);

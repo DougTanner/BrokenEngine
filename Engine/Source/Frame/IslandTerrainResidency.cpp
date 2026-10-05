@@ -11,27 +11,27 @@ namespace engine
 
 struct MeshRange
 {
-	uint64_t uiOffset = 0;
-	uint64_t uiLength = 0;
-	VkDeviceSize vkIndexSize = 0;
-	VkDeviceSize vkVertexSize = 0;
+	int64_t iOffset = 0;
+	int64_t iLength = 0;
+	int64_t iIndexSize = 0;
+	int64_t iVertexSize = 0;
 };
 
 static MeshRange GetMeshRange(const IslandTemplate& rTemplate)
 {
 	MeshRange range {};
-	range.uiOffset = static_cast<uint64_t>(rTemplate.iHeightmapWidth) * static_cast<uint64_t>(rTemplate.iHeightmapHeight) * sizeof(uint16_t);
-	range.vkVertexSize = static_cast<VkDeviceSize>(rTemplate.iMeshVertexCount) * 2 * sizeof(float);
-	range.vkIndexSize = static_cast<VkDeviceSize>(rTemplate.iMeshIndexCount) * sizeof(uint32_t);
-	range.uiLength = static_cast<uint64_t>(range.vkVertexSize + range.vkIndexSize);
+	range.iOffset = static_cast<int64_t>(rTemplate.iHeightmapWidth) * static_cast<int64_t>(rTemplate.iHeightmapHeight) * static_cast<int64_t>(sizeof(uint16_t));
+	range.iVertexSize = static_cast<int64_t>(rTemplate.iMeshVertexCount) * 2 * static_cast<int64_t>(sizeof(float));
+	range.iIndexSize = static_cast<int64_t>(rTemplate.iMeshIndexCount) * static_cast<int64_t>(sizeof(uint32_t));
+	range.iLength = range.iVertexSize + range.iIndexSize;
 	return range;
 }
 
 static void ReleaseMeshCpuRange(common::crc_t uiIslandCrc, IslandTemplate& rTemplate, const MeshRange& rRange)
 {
-	gpFileManager->mpPackChunks->DecommitChunkRange(uiIslandCrc, rRange.uiOffset, rRange.uiLength);
+	gpFileManager->mpPackChunks->DecommitChunkRange(uiIslandCrc, rRange.iOffset, rRange.iLength);
 	rTemplate.bMeshCpuDecommitted = true;
-	gpFileManager->mpPackChunks->mLoader.ResetChunkRangeReloadState(uiIslandCrc, rRange.uiOffset, rRange.uiLength);
+	gpFileManager->mpPackChunks->mLoader.ResetChunkRangeReloadState(uiIslandCrc, rRange.iOffset, rRange.iLength);
 }
 
 static bool IsTextureRestorationPending(common::crc_t uiIslandCrc, const IslandTemplate& rTemplate)
@@ -74,8 +74,8 @@ static void CreateElevationTextureFromHeightmap(IslandTemplate& rTemplate, std::
 		.name = name,
 		.vkFormat = shaders::kVkFormatElevation,
 		.vkExtent3D = {static_cast<uint32_t>(rTemplate.iHeightmapWidth), static_cast<uint32_t>(rTemplate.iHeightmapHeight), 1ui32},
-		.uiMipLevels = 1ui32,
-		.uiArrayLayers = 1ui32,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -142,7 +142,7 @@ int64_t IslandTerrainResidency::AcquireTextureSlot(common::crc_t uiIslandCrc)
 	if (rTemplate.eMeshResidency == IslandMeshResidency::kNonresident)
 	{
 		MeshRange range = GetMeshRange(rTemplate);
-		gpFileManager->mpPackChunks->mLoader.RequestChunkRangeReload(uiIslandCrc, range.uiOffset, range.uiLength, LoadPriority::kRealtime);
+		gpFileManager->mpPackChunks->mLoader.RequestChunkRangeReload(uiIslandCrc, range.iOffset, range.iLength, LoadPriority::kRealtime);
 		rTemplate.eMeshResidency = IslandMeshResidency::kAsyncPending;
 	}
 
@@ -211,7 +211,7 @@ bool IslandTerrainResidency::AnyRestorationPending() const
 bool IslandTerrainResidency::IsEvictionPending(const IslandTemplate& rTemplate) const
 {
 	return rTemplate.iTextureSlot != 0 && rTemplate.bGpuResident && rTemplate.iReferenceCount == 0
-	    && (gpGraphics->muiFrameCounter - rTemplate.uiLastUsedRenderFrame) > kuiGraceRenderFrames;
+	    && (gpGraphics->miFrameCounter - rTemplate.iLastUsedRenderFrame) > kiGraceRenderFrames;
 }
 
 bool IslandTerrainResidency::IsRestorationPending(common::crc_t uiIslandCrc, const IslandTemplate& rTemplate) const
@@ -225,11 +225,11 @@ bool IslandTerrainResidency::IsRestorationPending(common::crc_t uiIslandCrc, con
 	switch (rTemplate.eMeshResidency)
 	{
 		case IslandMeshResidency::kAsyncPending:
-			return gpFileManager->mpPackChunks->mLoader.GetChunkRangeReloadState(uiIslandCrc, range.uiOffset, range.uiLength) != ChunkRangeReloadState::kPending;
+			return gpFileManager->mpPackChunks->mLoader.GetChunkRangeReloadState(uiIslandCrc, range.iOffset, range.iLength) != ChunkRangeReloadState::kPending;
 		case IslandMeshResidency::kCpuReady:
 			return rTemplate.bGpuResident;
 		case IslandMeshResidency::kArenaBlocked:
-			return rTemplate.bGpuResident && (gpIslands->muiMeshArenaCapacityGeneration != rTemplate.uiMeshArenaBlockedGeneration || HasArenaEvictionCandidate(uiIslandCrc));
+			return rTemplate.bGpuResident && (gpIslands->miMeshArenaCapacityGeneration != rTemplate.iMeshArenaBlockedGeneration || HasArenaEvictionCandidate(uiIslandCrc));
 		case IslandMeshResidency::kNonresident:
 		case IslandMeshResidency::kFailed:
 		case IslandMeshResidency::kResident:
@@ -269,7 +269,7 @@ bool IslandTerrainResidency::EvictTemplate(common::crc_t uiIslandCrc, IslandTemp
 		rLazyChunk.header.islandHeader.masksCrc,
 	};
 
-	LOG(kGraphics, kVerbose, "Evicting islandCrc={} slot={} (refCount=0, framesSinceUse={})", uiIslandCrc, rTemplate.iTextureSlot, gpGraphics->muiFrameCounter - rTemplate.uiLastUsedRenderFrame);
+	LOG(kGraphics, kVerbose, "Evicting islandCrc={} slot={} (refCount=0, framesSinceUse={})", uiIslandCrc, rTemplate.iTextureSlot, gpGraphics->miFrameCounter - rTemplate.iLastUsedRenderFrame);
 
 	int64_t iSlot = rTemplate.iTextureSlot;
 	// Redirect every live descriptor to placeholders and retire its five generation records before
@@ -291,9 +291,9 @@ bool IslandTerrainResidency::EvictTemplate(common::crc_t uiIslandCrc, IslandTemp
 			gpIslands->FreeMeshRanges(rTemplate.meshIndexAllocation, rTemplate.meshVertexAllocation);
 			rTemplate.meshIndexAllocation = VK_NULL_HANDLE;
 			rTemplate.meshVertexAllocation = VK_NULL_HANDLE;
-			rTemplate.vkMeshIndexOffset = 0;
-			rTemplate.vkMeshVertexOffset = 0;
-			rTemplate.uiMeshArenaBlockedGeneration = 0;
+			rTemplate.iMeshIndexOffset = 0;
+			rTemplate.iMeshVertexOffset = 0;
+			rTemplate.iMeshArenaBlockedGeneration = 0;
 			rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
 			break;
 		case IslandMeshResidency::kCpuReady:
@@ -369,7 +369,7 @@ void IslandTerrainResidency::RestorationSweep()
 		MeshRange range = GetMeshRange(rTemplate);
 		if (rTemplate.eMeshResidency == IslandMeshResidency::kAsyncPending)
 		{
-			ChunkRangeReloadState eRangeState = gpFileManager->mpPackChunks->mLoader.GetChunkRangeReloadState(rCrc, range.uiOffset, range.uiLength);
+			ChunkRangeReloadState eRangeState = gpFileManager->mpPackChunks->mLoader.GetChunkRangeReloadState(rCrc, range.iOffset, range.iLength);
 			if (eRangeState == ChunkRangeReloadState::kPending)
 			{
 				continue;
@@ -406,7 +406,7 @@ void IslandTerrainResidency::RestorationSweep()
 			{
 				continue;
 			}
-			if (gpIslands->muiMeshArenaCapacityGeneration == rTemplate.uiMeshArenaBlockedGeneration && !HasArenaEvictionCandidate(rCrc))
+			if (gpIslands->miMeshArenaCapacityGeneration == rTemplate.iMeshArenaBlockedGeneration && !HasArenaEvictionCandidate(rCrc))
 			{
 				continue;
 			}
@@ -426,7 +426,7 @@ void IslandTerrainResidency::RestorationSweep()
 			continue;
 		}
 
-		while (!gpIslands->AllocateMeshRanges(range.vkIndexSize, range.vkVertexSize, rTemplate.meshIndexAllocation, rTemplate.vkMeshIndexOffset, rTemplate.meshVertexAllocation, rTemplate.vkMeshVertexOffset))
+		while (!gpIslands->AllocateMeshRanges(range.iIndexSize, range.iVertexSize, rTemplate.meshIndexAllocation, rTemplate.iMeshIndexOffset, rTemplate.meshVertexAllocation, rTemplate.iMeshVertexOffset))
 		{
 			common::crc_t uiEvictCrc = 0;
 			IslandTemplate* pEvictTemplate = nullptr;
@@ -434,7 +434,7 @@ void IslandTerrainResidency::RestorationSweep()
 			{
 				if (rCandidateCrc != rCrc && rCandidate.eMeshResidency == IslandMeshResidency::kResident && rCandidate.bGpuResident
 				 && rCandidate.iReferenceCount == 0
-				 && (pEvictTemplate == nullptr || rCandidate.uiLastUsedRenderFrame < pEvictTemplate->uiLastUsedRenderFrame))
+				 && (pEvictTemplate == nullptr || static_cast<uint64_t>(rCandidate.iLastUsedRenderFrame) < static_cast<uint64_t>(pEvictTemplate->iLastUsedRenderFrame)))
 				{
 					uiEvictCrc = rCandidateCrc;
 					pEvictTemplate = &rCandidate;
@@ -442,7 +442,7 @@ void IslandTerrainResidency::RestorationSweep()
 			}
 			if (pEvictTemplate == nullptr)
 			{
-				rTemplate.uiMeshArenaBlockedGeneration = gpIslands->muiMeshArenaCapacityGeneration;
+				rTemplate.iMeshArenaBlockedGeneration = gpIslands->miMeshArenaCapacityGeneration;
 				rTemplate.eMeshResidency = IslandMeshResidency::kArenaBlocked;
 				gpIslands->WriteMeshIndirect(rTemplate.iTemplateArrayIndex, 0, 0, 0);
 				LOG(kGraphics, kWarning, "Island mesh arena exhausted: crc={}", rCrc);
@@ -462,11 +462,11 @@ void IslandTerrainResidency::RestorationSweep()
 		{
 			// Heap: UploadMesh creates transient VMA staging allocations in the RenderGlobal residency sweep.
 			ScopedSuppressAllocationTracking suppress;
-			gpIslands->UploadMesh(rTemplate.vkMeshIndexOffset, std::span<const std::byte>(reinterpret_cast<const std::byte*>(rTemplate.puiMeshIndices), static_cast<size_t>(range.vkIndexSize)), rTemplate.vkMeshVertexOffset, std::span<const std::byte>(reinterpret_cast<const std::byte*>(rTemplate.pfMeshPositions), static_cast<size_t>(range.vkVertexSize)));
+			gpIslands->UploadMesh(rTemplate.iMeshIndexOffset, std::span<const std::byte>(reinterpret_cast<const std::byte*>(rTemplate.puiMeshIndices), static_cast<size_t>(range.iIndexSize)), rTemplate.iMeshVertexOffset, std::span<const std::byte>(reinterpret_cast<const std::byte*>(rTemplate.pfMeshPositions), static_cast<size_t>(range.iVertexSize)));
 		}
 		ReleaseMeshCpuRange(rCrc, rTemplate, range);
-		gpIslands->WriteMeshIndirect(rTemplate.iTemplateArrayIndex, rTemplate.vkMeshIndexOffset, rTemplate.vkMeshVertexOffset, static_cast<uint32_t>(rTemplate.iMeshIndexCount));
-		rTemplate.uiMeshArenaBlockedGeneration = 0;
+		gpIslands->WriteMeshIndirect(rTemplate.iTemplateArrayIndex, rTemplate.iMeshIndexOffset, rTemplate.iMeshVertexOffset, rTemplate.iMeshIndexCount);
+		rTemplate.iMeshArenaBlockedGeneration = 0;
 		rTemplate.eMeshResidency = IslandMeshResidency::kResident;
 		LOG(kGraphics, kDebug, "Restored island mesh: crc={} vertices={} indices={}", rCrc, rTemplate.iMeshVertexCount, rTemplate.iMeshIndexCount);
 	}
@@ -478,8 +478,8 @@ void IslandTerrainResidency::ReleaseGpuResources()
 	{
 		rTemplate.meshIndexAllocation = VK_NULL_HANDLE;
 		rTemplate.meshVertexAllocation = VK_NULL_HANDLE;
-		rTemplate.vkMeshIndexOffset = 0;
-		rTemplate.vkMeshVertexOffset = 0;
+		rTemplate.iMeshIndexOffset = 0;
+		rTemplate.iMeshVertexOffset = 0;
 		if (rTemplate.eMeshResidency == IslandMeshResidency::kResident)
 		{
 			rTemplate.eMeshResidency = IslandMeshResidency::kNonresident;
@@ -504,7 +504,7 @@ void IslandTerrainResidency::ResetTextureSlots()
 		if (rTemplate.eMeshResidency == IslandMeshResidency::kAsyncPending)
 		{
 			MeshRange range = GetMeshRange(rTemplate);
-			if (gpFileManager->mpPackChunks->mLoader.GetChunkRangeReloadState(rCrc, range.uiOffset, range.uiLength) == ChunkRangeReloadState::kFailed)
+			if (gpFileManager->mpPackChunks->mLoader.GetChunkRangeReloadState(rCrc, range.iOffset, range.iLength) == ChunkRangeReloadState::kFailed)
 			{
 				// Teardown can run after the File-owned async request failed but before RestorationSweep
 				// promoted this template state. Consume that destroyed-lifecycle failure so re-mint can retry.
@@ -519,7 +519,7 @@ void IslandTerrainResidency::ResetTextureSlots()
 		rTemplate.iTextureSlot = -1;
 		rTemplate.bGpuResident = false;
 		rTemplate.iReferenceCount = 0;
-		rTemplate.uiLastUsedRenderFrame = 0;
+		rTemplate.iLastUsedRenderFrame = 0;
 	}
 	miNextTextureSlot = 1;
 	// Device-loss resets the high-water mark to 1; stale recycled indices would collide with the

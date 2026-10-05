@@ -117,9 +117,8 @@ Codex callers never invoke it.
 - Never launch a task that needs a resource the `-Sandbox` input says no mode
   reaches — `.agents/` writes, Git index or refs writes, lock storage, or the
   network; run it in a Claude role instead. Such tasks include skill-file edits
-  (any change under `.agents/`), `/compile`, `/finalize-changes`, Plan
-  creation through `New-PlanFile.ps1`, and `/code-style-review` networked
-  style-rule judgment.
+  (any change under `.agents/`), `/compile`, `/finalize-changes`, and Plan
+  creation through `New-PlanFile.ps1`.
 - Attempt a `workspace-write` run exactly once, never re-dispatching it: report
   any failed or judged-malformed outcome to the user together with the
   worktree's `git status`.

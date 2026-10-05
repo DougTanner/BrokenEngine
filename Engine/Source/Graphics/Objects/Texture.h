@@ -50,8 +50,8 @@ struct TextureInfo
 	VkImageCreateFlags vkImageCreateFlags = 0;
 	VkFormat vkFormat = VK_FORMAT_UNDEFINED;
 	VkExtent3D vkExtent3D {};
-	uint32_t uiMipLevels = 1;
-	uint32_t uiArrayLayers = 1;
+	int64_t iMipLevels = 1;
+	int64_t iArrayLayers = 1;
 	VkSampleCountFlagBits vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT;
 	VkImageUsageFlags vkImageUsageFlags = 0;
 
@@ -89,7 +89,7 @@ public:
 		, mVmaAllocation(std::exchange(rOther.mVmaAllocation, VK_NULL_HANDLE))
 		, mVkImage(std::exchange(rOther.mVkImage, VK_NULL_HANDLE))
 		, mVkImageView(std::exchange(rOther.mVkImageView, VK_NULL_HANDLE))
-		, muiGeneration(rOther.muiGeneration)
+		, miGeneration(rOther.miGeneration)
 		, mVkRenderPass(std::exchange(rOther.mVkRenderPass, VK_NULL_HANDLE))
 		, mVkFramebuffer(std::exchange(rOther.mVkFramebuffer, VK_NULL_HANDLE))
 	{}
@@ -122,7 +122,7 @@ public:
 
 	// Create and AdoptTransferredImage increment this generation; descriptor writes snapshot it.
 	// TextureDescriptors::VerifyAllDescriptorGenerations detects stale resources Vulkan validation misses.
-	uint64_t muiGeneration = 0;
+	int64_t miGeneration = 0;
 
 	VkRenderPass mVkRenderPass = VK_NULL_HANDLE;
 	VkFramebuffer mVkFramebuffer = VK_NULL_HANDLE;

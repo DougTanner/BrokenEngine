@@ -86,21 +86,21 @@ void CommandGamePacketFaultFixture(const nlohmann::json& rParameters, nlohmann::
 	}
 	if (caseName == "server_only")
 	{
-		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientIdentifier, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(0, 0)});
+		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientIdentifier, .iPacketType = static_cast<int64_t>(eType), .payload = std::vector<uint8_t>(0, 0)});
 	}
 	else if (caseName == "undersized")
 	{
-		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientIdentifier, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(12, 0)});
+		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientIdentifier, .iPacketType = static_cast<int64_t>(eType), .payload = std::vector<uint8_t>(12, 0)});
 	}
 	else if (caseName == "oversized")
 	{
-		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientIdentifier, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(14, 0)});
+		engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientIdentifier, .iPacketType = static_cast<int64_t>(eType), .payload = std::vector<uint8_t>(14, 0)});
 	}
 	else
 	{
 		for (int64_t i = 0; i < 9; ++i)
 		{
-			engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientIdentifier, .uiPacketType = static_cast<uint8_t>(eType), .payload = std::vector<uint8_t>(13, 0)});
+			engine::gpServer->mReceivedGamePackets.push_back({.iClientId = iClientIdentifier, .iPacketType = static_cast<int64_t>(eType), .payload = std::vector<uint8_t>(13, 0)});
 		}
 	}
 
@@ -238,14 +238,14 @@ void CommandServerPreHandshakeAcknowledgmentFixture([[maybe_unused]] const nlohm
 		int64_t iRateViolations = pClient->iRateViolations;
 		int64_t iPacketCount = pClient->iTickPacketCount;
 		int64_t iByteCount = pClient->iTickByteCount;
-		static constexpr uint8_t kuiPacketType = static_cast<uint8_t>(engine::PacketType::kClientAcknowledgmentStream);
-		uint16_t uiTypeCount = pClient->uiTickTypeCounts[kuiPacketType];
+		static constexpr int64_t kiPacketType = static_cast<int64_t>(engine::PacketType::kClientAcknowledgmentStream);
+		int64_t iTypeCount = pClient->uiTickTypeCounts[kiPacketType];
 		int64_t iClientTimestampNanoseconds = pClient->iClientTimestampNanoseconds;
 		int64_t iConsecutiveZeroAdvanceAcknowledgments = pClient->iConsecutiveZeroAdvanceAcks;
 		bool bFloorStalled = pClient->bFloorStalled;
 		int64_t iPeakConsecutiveStallAcknowledgments = pClient->iPeakConsecutiveStallAcks;
 		std::vector<engine::AckState> acknowledgmentStates;
-		acknowledgmentStates.reserve(pClient->slots.size());
+		acknowledgmentStates.reserve(static_cast<size_t>(std::ssize(pClient->slots)));
 		for (const engine::ClientConnection::SlotState& rSlot : pClient->slots)
 		{
 			acknowledgmentStates.push_back(rSlot.ack);
@@ -284,7 +284,7 @@ void CommandServerPreHandshakeAcknowledgmentFixture([[maybe_unused]] const nlohm
 			throw std::runtime_error("server_pre_handshake_ack_fixture client identity changed during receive");
 		}
 
-		bool bAcknowledgmentSlotsUnchanged = pClient->slots.size() == acknowledgmentStates.size();
+		bool bAcknowledgmentSlotsUnchanged = std::ssize(pClient->slots) == std::ssize(acknowledgmentStates);
 		for (int64_t i = 0; bAcknowledgmentSlotsUnchanged && i < std::ssize(pClient->slots); ++i)
 		{
 			const engine::AckState& rBefore = acknowledgmentStates.at(i);
@@ -295,7 +295,7 @@ void CommandServerPreHandshakeAcknowledgmentFixture([[maybe_unused]] const nlohm
 		bool bAdmissionAdvanced = pClient->iTickPacketCount == iPacketCount + 1
 		                       && pClient->iTickByteCount == iByteCount + engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize;
 		bool bHandshakeRestored = bHandshakeComplete && pClient->bHandshakeComplete;
-		bool bTypeCountUnchanged = pClient->uiTickTypeCounts[kuiPacketType] == uiTypeCount;
+		bool bTypeCountUnchanged = pClient->uiTickTypeCounts[kiPacketType] == iTypeCount;
 		bool bAcknowledgmentStallUnchanged = pClient->iConsecutiveZeroAdvanceAcks == iConsecutiveZeroAdvanceAcknowledgments
 		                                  && pClient->bFloorStalled == bFloorStalled
 		                                  && pClient->iPeakConsecutiveStallAcks == iPeakConsecutiveStallAcknowledgments;
@@ -331,7 +331,7 @@ void CommandServerPreHandshakeAcknowledgmentFixture([[maybe_unused]] const nlohm
 		}
 
 		rResult["clientId"] = iClientIdentifier;
-		rResult["type"] = kuiPacketType;
+		rResult["type"] = kiPacketType;
 		rResult["size"] = iPacketSize;
 		rResult["packetCountBefore"] = iPacketCount;
 		rResult["packetCountAfter"] = pClient->iTickPacketCount;

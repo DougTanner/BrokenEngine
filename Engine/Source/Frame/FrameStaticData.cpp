@@ -7,7 +7,7 @@ namespace engine
 
 void FrameStaticData::Write(std::ostream& rStream, bool bIncludeNavigationData) const
 {
-	common::Write(rStream, static_cast<int32_t>(islands.size()));
+	common::Write(rStream, static_cast<int32_t>(std::ssize(islands)));
 	for (const IslandPlacement& rPlacement : islands)
 	{
 		common::Write(rStream, rPlacement.islandCrc);
@@ -56,7 +56,7 @@ void FrameStaticData::Read(std::istream& rStream, bool bIncludeNavigationData)
 
 void FrameStaticData::BuildRenderPlacementCache(const IslandTerrain& rIslandTerrain) const
 {
-	islandRenderQueries.resize(islands.size());
+	islandRenderQueries.resize(static_cast<size_t>(std::ssize(islands)));
 	for (int64_t i = 0; i < std::ssize(islands); ++i)
 	{
 		const IslandPlacement& rPlacement = islands.at(i);

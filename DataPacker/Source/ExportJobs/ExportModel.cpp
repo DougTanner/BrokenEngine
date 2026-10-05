@@ -23,54 +23,54 @@ void ExportModel::Export()
 	size_t uiIndexCount = 0;
 	size_t uiVertexCount = 0;
 
-	uintmax_t uiFileSize = SourceFileSize(mInputPath, kpcContext);
+	int64_t iFileSize = SourceFileSize(mInputPath, kpcContext);
 	std::fstream fileStream(mInputPath, std::ios::in | std::ios::binary);
 	if (!fileStream)
 	{
 		throw std::runtime_error("ExportModel::Export failed to open source file");
 	}
-	RequireSourceExtent(uiFileSize, 0, sizeof(uiMaterialCount), kpcContext);
+	RequireSourceExtent(static_cast<uintmax_t>(iFileSize), 0, sizeof(uiMaterialCount), kpcContext);
 	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(&uiMaterialCount), sizeof(uiMaterialCount)), kpcContext);
 
-	uintmax_t uiMaterialCountValue = static_cast<uintmax_t>(uiMaterialCount);
 	if (uiMaterialCount > static_cast<size_t>(std::numeric_limits<int64_t>::max()))
 	{
 		throw std::runtime_error("ExportModel::Export material count is not representable");
 	}
-	uintmax_t uiMaterialIndexBytes = MultiplySourceBytes(uiMaterialCountValue, sizeof(uint32_t), kpcContext);
-	uintmax_t uiMaterialInfoBytes = MultiplySourceBytes(uiMaterialCountValue, sizeof(common::MaterialInfo), kpcContext);
-	uintmax_t uiFileOffset = sizeof(uiMaterialCount);
-	RequireSourceExtent(uiFileSize, uiFileOffset, uiMaterialIndexBytes, kpcContext);
-	uiFileOffset = AddSourceBytes(uiFileOffset, uiMaterialIndexBytes, kpcContext);
-	RequireSourceExtent(uiFileSize, uiFileOffset, uiMaterialInfoBytes, kpcContext);
+	int64_t iMaterialCountValue = static_cast<int64_t>(uiMaterialCount);
+	uintmax_t uiMaterialIndexBytes = MultiplySourceBytes(static_cast<uintmax_t>(iMaterialCountValue), sizeof(uint32_t), kpcContext);
+	uintmax_t uiMaterialInfoBytes = MultiplySourceBytes(static_cast<uintmax_t>(iMaterialCountValue), sizeof(common::MaterialInfo), kpcContext);
+	int64_t iFileOffset = sizeof(uiMaterialCount);
+	RequireSourceExtent(static_cast<uintmax_t>(iFileSize), static_cast<uintmax_t>(iFileOffset), uiMaterialIndexBytes, kpcContext);
+	iFileOffset = static_cast<int64_t>(AddSourceBytes(static_cast<uintmax_t>(iFileOffset), uiMaterialIndexBytes, kpcContext));
+	RequireSourceExtent(static_cast<uintmax_t>(iFileSize), static_cast<uintmax_t>(iFileOffset), uiMaterialInfoBytes, kpcContext);
 	materialIndexPositions.resize(uiMaterialCount);
 	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(materialIndexPositions.data()), static_cast<size_t>(uiMaterialIndexBytes)), kpcContext);
 	// Skip past material info data (not needed for model export)
 	SkipSourceBytes(fileStream, uiMaterialInfoBytes, kpcContext);
-	uiFileOffset = AddSourceBytes(uiFileOffset, uiMaterialInfoBytes, kpcContext);
-	uintmax_t uiCountsBytes = AddSourceBytes(sizeof(uiIndexCount), sizeof(uiVertexCount), kpcContext);
-	RequireSourceExtent(uiFileSize, uiFileOffset, uiCountsBytes, kpcContext);
+	iFileOffset = static_cast<int64_t>(AddSourceBytes(static_cast<uintmax_t>(iFileOffset), uiMaterialInfoBytes, kpcContext));
+	int64_t iCountsBytes = static_cast<int64_t>(AddSourceBytes(sizeof(uiIndexCount), sizeof(uiVertexCount), kpcContext));
+	RequireSourceExtent(static_cast<uintmax_t>(iFileSize), static_cast<uintmax_t>(iFileOffset), static_cast<uintmax_t>(iCountsBytes), kpcContext);
 	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(&uiIndexCount), sizeof(uiIndexCount)), kpcContext);
 	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(&uiVertexCount), sizeof(uiVertexCount)), kpcContext);
-	uiFileOffset = AddSourceBytes(uiFileOffset, uiCountsBytes, kpcContext);
+	iFileOffset = static_cast<int64_t>(AddSourceBytes(static_cast<uintmax_t>(iFileOffset), static_cast<uintmax_t>(iCountsBytes), kpcContext));
 
 	if (uiVertexCount > static_cast<size_t>(std::numeric_limits<int64_t>::max()))
 	{
 		throw std::runtime_error("ExportModel::Export vertex count is not representable");
 	}
 	bool bUsesU16Indices = common::ModelHeader::UsesU16Indices(static_cast<int64_t>(uiVertexCount));
-	size_t uiIndexElementSize = bUsesU16Indices ? sizeof(uint16_t) : sizeof(uint32_t);
+	int64_t iIndexElementSize = bUsesU16Indices ? sizeof(uint16_t) : sizeof(uint32_t);
 	if (uiIndexCount > static_cast<size_t>(std::numeric_limits<int64_t>::max()))
 	{
 		throw std::runtime_error("ExportModel::Export index count is not representable");
 	}
-	uintmax_t uiIndexBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiIndexCount), uiIndexElementSize, kpcContext);
-	RequireSourceExtent(uiFileSize, uiFileOffset, uiIndexBytes, kpcContext);
-	uintmax_t uiVertexOffset = AddSourceBytes(uiFileOffset, uiIndexBytes, kpcContext);
+	uintmax_t uiIndexBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiIndexCount), static_cast<size_t>(iIndexElementSize), kpcContext);
+	RequireSourceExtent(static_cast<uintmax_t>(iFileSize), static_cast<uintmax_t>(iFileOffset), uiIndexBytes, kpcContext);
+	int64_t iVertexOffset = static_cast<int64_t>(AddSourceBytes(static_cast<uintmax_t>(iFileOffset), uiIndexBytes, kpcContext));
 	uintmax_t uiVertexBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiVertexCount), sizeof(common::ModelVertex), kpcContext);
-	RequireSourceExtent(uiFileSize, uiVertexOffset, uiVertexBytes, kpcContext);
-	uintmax_t uiExpectedFileSize = AddSourceBytes(uiVertexOffset, uiVertexBytes, kpcContext);
-	if (uiExpectedFileSize != uiFileSize)
+	RequireSourceExtent(static_cast<uintmax_t>(iFileSize), static_cast<uintmax_t>(iVertexOffset), uiVertexBytes, kpcContext);
+	int64_t iExpectedFileSize = static_cast<int64_t>(AddSourceBytes(static_cast<uintmax_t>(iVertexOffset), uiVertexBytes, kpcContext));
+	if (iExpectedFileSize != iFileSize)
 	{
 		throw std::runtime_error("ExportModel::Export source file has trailing data");
 	}
@@ -86,10 +86,10 @@ void ExportModel::Export()
 	}
 	// Trust boundary: a decoded index at or past the vertex count would read outside the packed vertex
 	// buffer at draw time, and the runtime validates only counts and byte extents.
-	for (size_t i = 0; i < uiIndexCount; ++i)
+	for (int64_t i = 0; i < static_cast<int64_t>(uiIndexCount); ++i)
 	{
-		size_t uiIndex = bUsesU16Indices ? static_cast<size_t>(indices16.at(i)) : static_cast<size_t>(indices32.at(i));
-		if (uiIndex >= uiVertexCount)
+		int64_t iIndex = static_cast<int64_t>(bUsesU16Indices ? indices16.at(static_cast<size_t>(i)) : indices32.at(static_cast<size_t>(i)));
+		if (iIndex >= static_cast<int64_t>(uiVertexCount))
 		{
 			throw std::runtime_error("ExportModel::Export index is out of range");
 		}
@@ -103,7 +103,7 @@ void ExportModel::Export()
 		throw std::runtime_error("ExportModel::Export index data size overflow");
 	}
 	int64_t iIndexCount = static_cast<int64_t>(uiIndexCount);
-	int64_t iIndicesSize = indices16.size() > 0
+	int64_t iIndicesSize = std::ssize(indices16) > 0
 		? common::ModelHeader::VerticesOffset(iIndexCount, sizeof(uint16_t))
 		: common::ModelHeader::VerticesOffset(iIndexCount, sizeof(uint32_t));
 	if (iIndicesSize < 0 || uiVertexBytes > static_cast<uintmax_t>(std::numeric_limits<int64_t>::max() - iIndicesSize))
@@ -111,10 +111,8 @@ void ExportModel::Export()
 		throw std::runtime_error("ExportModel::Export model data size overflow");
 	}
 	int64_t iDataSize = iIndicesSize + static_cast<int64_t>(uiVertexBytes);
-	uintmax_t uiMaximumDataSize = static_cast<uintmax_t>(std::numeric_limits<int64_t>::max())
-		- static_cast<uintmax_t>(common::kiChunkDataOffset)
-		- static_cast<uintmax_t>(common::kiAlignmentBytes - 1);
-	if (static_cast<uintmax_t>(iDataSize) > uiMaximumDataSize)
+	int64_t iMaximumDataSize = std::numeric_limits<int64_t>::max() - common::kiChunkDataOffset - (common::kiAlignmentBytes - 1);
+	if (iDataSize > iMaximumDataSize)
 	{
 		throw std::runtime_error("ExportModel::Export chunk data size overflow");
 	}
@@ -122,7 +120,7 @@ void ExportModel::Export()
 	pHeader->modelHeader.iIndexCount = iIndexCount;
 	pHeader->modelHeader.iVertexCount = static_cast<int64_t>(uiVertexCount);
 	pHeader->modelHeader.iStride = iStride;
-	if (indices16.size() > 0)
+	if (std::ssize(indices16) > 0)
 	{
 		std::memcpy(dataSpan.data(), indices16.data(), common::VectorByteSize(indices16));
 	}

@@ -76,7 +76,7 @@ struct CaptureCommandState
 	HWND windowHandle = nullptr;
 	CaptureCommandPhase ePhase = CaptureCommandPhase::kAwaitResult;
 	bool bRestoreMinimized = false;
-	uint64_t uiCaptureToken = 0;
+	int64_t iCaptureToken = 0;
 	std::optional<nlohmann::json> result;
 };
 
@@ -118,7 +118,7 @@ static void BeginCaptureAndDefer(QUEUE_CAPTURE QueueCapture)
 		throw std::runtime_error("window is minimized or swapchain recreate is deferred");
 	}
 
-	std::shared_ptr<CaptureCommandState> pState = std::make_shared<CaptureCommandState>();
+	std::unique_ptr<CaptureCommandState> pState = std::make_unique<CaptureCommandState>();
 	pState->windowHandle = windowHandle;
 	pState->bRestoreMinimized = bRestoreMinimized;
 	if (bRestoreMinimized)
@@ -128,25 +128,25 @@ static void BeginCaptureAndDefer(QUEUE_CAPTURE QueueCapture)
 	}
 	else
 	{
-		pState->uiCaptureToken = engine::ResetCaptureResult();
-		QueueCapture(pState->uiCaptureToken);
+		pState->iCaptureToken = engine::ResetCaptureResult();
+		QueueCapture(pState->iCaptureToken);
 	}
 
-	engine::gpAgentCommandServer->DeferResponse([pState, QueueCapture = std::move(QueueCapture)]() mutable -> std::optional<nlohmann::json>
+	engine::gpAgentCommandServer->DeferResponse([pState = std::move(pState), QueueCapture = std::move(QueueCapture)]() mutable -> std::optional<nlohmann::json>
 	{
 		if (pState->ePhase == CaptureCommandPhase::kAwaitRestore)
 		{
 			if (IsIconic(pState->windowHandle) == FALSE && engine::gpGraphics->ExtentSettled())
 			{
-				pState->uiCaptureToken = engine::ResetCaptureResult();
-				QueueCapture(pState->uiCaptureToken);
+				pState->iCaptureToken = engine::ResetCaptureResult();
+				QueueCapture(pState->iCaptureToken);
 				pState->ePhase = CaptureCommandPhase::kAwaitResult;
 			}
 		}
 
 		if (pState->ePhase == CaptureCommandPhase::kAwaitResult)
 		{
-			pState->result = engine::TakeCaptureResult(pState->uiCaptureToken);
+			pState->result = engine::TakeCaptureResult(pState->iCaptureToken);
 			if (pState->result.has_value())
 			{
 				if (!pState->bRestoreMinimized)
@@ -236,9 +236,9 @@ static void CommandScreenshot(const nlohmann::json& rParameters, [[maybe_unused]
 		request.iQuality = iQuality;
 	}
 
-	BeginCaptureAndDefer([request = std::move(request)](uint64_t uiCaptureToken) mutable
+	BeginCaptureAndDefer([request = std::move(request)](int64_t iCaptureToken) mutable
 	{
-		request.uiCaptureToken = uiCaptureToken;
+		request.iCaptureToken = iCaptureToken;
 		engine::gpGraphics->mScreenshotRequest = std::move(request);
 	});
 }
@@ -279,7 +279,7 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 		throw std::runtime_error("window is minimized or swapchain recreate is deferred");
 	}
 
-	std::shared_ptr<RenderDocCaptureState> pState = std::make_shared<RenderDocCaptureState>();
+	std::unique_ptr<RenderDocCaptureState> pState = std::make_unique<RenderDocCaptureState>();
 	pState->windowHandle = windowHandle;
 	pState->bRestoreMinimized = bRestoreMinimized;
 	pState->iFrames = iFrames;
@@ -301,7 +301,7 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 		}
 	}
 
-	engine::gpAgentCommandServer->DeferResponse([pState, pRenderDocApi]() -> std::optional<nlohmann::json>
+	engine::gpAgentCommandServer->DeferResponse([pState = std::move(pState), pRenderDocApi]() -> std::optional<nlohmann::json>
 	{
 		if (pState->ePhase == RenderDocCapturePhase::kAwaitRestore)
 		{
@@ -354,16 +354,16 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 		}
 
 		nlohmann::json paths = nlohmann::json::array();
-		for (uint32_t i = pState->uiBaselineCaptures; i < pState->uiBaselineCaptures + static_cast<uint32_t>(pState->iFrames); ++i)
+		for (int64_t i = pState->uiBaselineCaptures; i < pState->uiBaselineCaptures + static_cast<uint32_t>(pState->iFrames); ++i)
 		{
 			// Two-call GetCapture: first with a null buffer to size the path (length includes the NUL), then read it.
 			uint32_t uiPathLength = 0;
-			if (pRenderDocApi->GetCapture(i, nullptr, &uiPathLength, nullptr) == 0)
+			if (pRenderDocApi->GetCapture(static_cast<uint32_t>(i), nullptr, &uiPathLength, nullptr) == 0)
 			{
 				throw std::runtime_error("renderdoc_capture: capture index unavailable");
 			}
 			std::string capturePath(uiPathLength, '\0');
-			pRenderDocApi->GetCapture(i, capturePath.data(), &uiPathLength, nullptr);
+			pRenderDocApi->GetCapture(static_cast<uint32_t>(i), capturePath.data(), &uiPathLength, nullptr);
 			capturePath.resize(uiPathLength > 0 ? uiPathLength - 1 : 0);
 
 			if (!std::filesystem::exists(std::filesystem::path(reinterpret_cast<const char8_t*>(capturePath.c_str()))))
@@ -400,8 +400,8 @@ static void CommandResize(const nlohmann::json& rParameters, nlohmann::json& rRe
 	}
 
 	// Multiple-of-8 rounding for reproducible geometry (matches SetupWindow's client-size rounding).
-	LONG iClientWidth = common::RoundUp<LONG, 8>(static_cast<LONG>(iWidth));
-	LONG iClientHeight = common::RoundUp<LONG, 8>(static_cast<LONG>(iHeight));
+	int64_t iClientWidth = common::RoundUp<int64_t, 8>(iWidth);
+	int64_t iClientHeight = common::RoundUp<int64_t, 8>(iHeight);
 
 	// Reject while minimized: WM_SIZE never fires for a minimized window, so the deferred poll can't converge.
 	if (IsIconic(engine::gpGraphics->mWindowHandle))
@@ -412,21 +412,21 @@ static void CommandResize(const nlohmann::json& rParameters, nlohmann::json& rRe
 	// Style-aware client -> outer conversion: WS_OVERLAPPEDWINDOW grows the client rect by the frame via
 	// AdjustWindowRect; WS_POPUP (borderless windowed-fullscreen) has no frame, so client size is the outer size.
 	HWND windowHandle = engine::gpGraphics->mWindowHandle;
-	LONG_PTR iStyle = GetWindowLongPtr(windowHandle, GWL_STYLE);
-	RECT outerRect {.left = 0, .top = 0, .right = iClientWidth, .bottom = iClientHeight};
+	int64_t iStyle = GetWindowLongPtr(windowHandle, GWL_STYLE);
+	RECT outerRect {.left = 0, .top = 0, .right = static_cast<LONG>(iClientWidth), .bottom = static_cast<LONG>(iClientHeight)};
 	if ((iStyle & WS_OVERLAPPEDWINDOW) != 0)
 	{
 		AdjustWindowRect(&outerRect, static_cast<DWORD>(iStyle), FALSE);
 	}
-	LONG iOuterWidth = outerRect.right - outerRect.left;
-	LONG iOuterHeight = outerRect.bottom - outerRect.top;
+	int64_t iOuterWidth = outerRect.right - outerRect.left;
+	int64_t iOuterHeight = outerRect.bottom - outerRect.top;
 
 	// On-screen clamping: a fixed top-left with a growing size can push the bottom/right edges off screen. Query
 	// the window's current monitor (mirrors SetupWindow) and keep the outer rect fully within rcMonitor.
 	RECT currentRect {};
 	GetWindowRect(windowHandle, &currentRect);
-	LONG iPositionX = currentRect.left;
-	LONG iPositionY = currentRect.top;
+	int64_t iPositionX = currentRect.left;
+	int64_t iPositionY = currentRect.top;
 
 	MONITORINFO monitorInfo = {};
 	monitorInfo.cbSize = sizeof(monitorInfo);
@@ -463,7 +463,7 @@ static void CommandResize(const nlohmann::json& rParameters, nlohmann::json& rRe
 
 	// Drain() runs on the WindowProcedure thread, so this SetWindowPos's WM_SIZE fires synchronously and writes
 	// gVkWantedFramebufferExtent2D exactly as a human drag does. No z-order / activation change.
-	SetWindowPos(windowHandle, nullptr, iPositionX, iPositionY, iOuterWidth, iOuterHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+	SetWindowPos(windowHandle, nullptr, static_cast<int>(iPositionX), static_cast<int>(iPositionY), static_cast<int>(iOuterWidth), static_cast<int>(iOuterHeight), SWP_NOZORDER | SWP_NOACTIVATE);
 
 	// Fast path: if the swapchain already sits at the requested (rounded) extent, answer synchronously.
 	if (engine::gpGraphics->mFramebufferVkExtent2D.width == static_cast<uint32_t>(iClientWidth) && engine::gpGraphics->mFramebufferVkExtent2D.height == static_cast<uint32_t>(iClientHeight))
@@ -661,9 +661,9 @@ static void CommandDumpRenderTarget(const nlohmann::json& rParameters, [[maybe_u
 	// Validate now (unknown name / bad index / non-encodable format) so errors report synchronously.
 	engine::ValidateDumpRenderTargetRequest(request);
 
-	BeginCaptureAndDefer([request = std::move(request)](uint64_t uiCaptureToken) mutable
+	BeginCaptureAndDefer([request = std::move(request)](int64_t iCaptureToken) mutable
 	{
-		request.uiCaptureToken = uiCaptureToken;
+		request.iCaptureToken = iCaptureToken;
 		engine::gpGraphics->mDumpRenderTargetRequest = std::move(request);
 	});
 }
@@ -754,7 +754,7 @@ static std::string CandidateLabels(const char* pcWindow)
 }
 
 // Win32 VK code for a named key (letters/digits directly; a small symbolic table for the game bindings).
-static int32_t ParseVirtualKey(std::string_view name)
+static int64_t ParseVirtualKey(std::string_view name)
 {
 	if (name.size() == 1)
 	{
@@ -765,7 +765,7 @@ static int32_t ParseVirtualKey(std::string_view name)
 		}
 		if ((cChar >= 'A' && cChar <= 'Z') || (cChar >= '0' && cChar <= '9'))
 		{
-			return static_cast<int32_t>(static_cast<unsigned char>(cChar));
+			return static_cast<int64_t>(static_cast<unsigned char>(cChar));
 		}
 	}
 	if (name == "ESC" || name == "ESCAPE")
@@ -802,7 +802,7 @@ static int32_t ParseVirtualKey(std::string_view name)
 	}
 	if (name.size() >= 2 && (name[0] == 'F' || name[0] == 'f'))
 	{
-		int32_t iNumber = std::atoi(std::string(name.substr(1)).c_str());
+		int64_t iNumber = std::atoi(std::string(name.substr(1)).c_str());
 		if (iNumber >= 1 && iNumber <= 24)
 		{
 			return VK_F1 + (iNumber - 1);
@@ -1032,7 +1032,7 @@ static void CommandMouse(const nlohmann::json& rParameters, [[maybe_unused]] nlo
 		{
 			throw std::runtime_error("mouse 'notches' wheel delta or lifetime wheel total would exceed int32");
 		}
-		script.iWheelNotches = static_cast<int32_t>(iNotches);
+		script.iWheelNotches = iNotches;
 
 		// Optional target coords: both present routes the ImGui wheel to the window under (x,y); neither supplies a new
 		// ImGui target or preserves a pin from an earlier script. Camera zoom is suppressed when the hovered window can
@@ -1113,7 +1113,7 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 	const engine::GpuShadowSample& rShadowSample = gpProfileManager->mGpuShadowSample;
 	rResult["shadowSample"] =
 	{
-		{"sequence", rShadowSample.uiSequence},
+		{"sequence", rShadowSample.iSequence},
 		{"currentUs", rShadowSample.iCurrentMicroseconds},
 	};
 	int64_t iClockOffset = gpProfileManager->mSmoothedClockOffset.mSmoothedValue;

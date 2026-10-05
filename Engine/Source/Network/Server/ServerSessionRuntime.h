@@ -21,7 +21,7 @@ class ServerSessionRuntime
 {
 public:
 
-	explicit ServerSessionRuntime(game::ServerSession& rSession, uint16_t uiPort);
+	explicit ServerSessionRuntime(game::ServerSession& rSession, int64_t iPort);
 	~ServerSessionRuntime();
 
 	void Poll(const NetworkTimeState& rTimeState);

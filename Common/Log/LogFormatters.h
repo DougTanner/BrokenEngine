@@ -214,22 +214,22 @@ struct std::formatter<std::chrono::seconds> : std::formatter<std::string_view>
 };
 
 template<>
-struct std::formatter<int8_t> : std::formatter<int>
+struct std::formatter<int8_t> : std::formatter<int64_t>
 {
 	template<typename CONTEXT>
-	auto format(const int8_t iValue, CONTEXT& rContext) const
+	auto format(const int64_t iValue, CONTEXT& rContext) const
 	{
-		return std::formatter<int>::format(static_cast<int>(iValue), rContext);
+		return std::formatter<int64_t>::format(iValue, rContext);
 	}
 };
 
 template<>
-struct std::formatter<uint8_t> : std::formatter<uint32_t>
+struct std::formatter<uint8_t> : std::formatter<int64_t>
 {
 	template<typename CONTEXT>
-	auto format(const uint8_t uiValue, CONTEXT& rContext) const
+	auto format(const int64_t iValue, CONTEXT& rContext) const
 	{
-		return std::formatter<uint32_t>::format(static_cast<uint32_t>(uiValue), rContext);
+		return std::formatter<int64_t>::format(iValue, rContext);
 	}
 };
 

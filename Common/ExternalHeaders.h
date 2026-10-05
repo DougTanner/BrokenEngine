@@ -103,6 +103,7 @@ using namespace std::chrono_literals;
 #include <semaphore>
 #include <source_location>
 #include <span>
+#include <spanstream>
 #include <variant>
 #include <sstream>
 #include <stdexcept>

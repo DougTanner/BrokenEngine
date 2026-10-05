@@ -43,15 +43,15 @@ void ProfileManagerBase::Create()
 	if constexpr (kbProfiling)
 	{
 #if defined(BT_CLIENT)
-		// Graphics::Create calls this after Instance, Device, and Swapchain creation; those managers and OneShotCommandBuffer must be live.
+		// Graphics::Create calls this after Instance, Device, and Swapchain creation; those managers must be live.
 		if constexpr (kbProfilingDump)
 		{
 			if (mpDumpLog == nullptr)
 			{
 				// Initial log creation runs before allocation tracking is armed. DiagnosticLog creates the parent directory and writes through a stack buffer, suppressing allocation tracking and flushing each line.
 				wchar_t pcDirectory[MAX_PATH] {};
-				uint32_t uiTempPathLength = GetTempPathW(static_cast<DWORD>(std::size(pcDirectory) - 1), pcDirectory);
-				if (uiTempPathLength != 0 && uiTempPathLength < std::size(pcDirectory) - 1)
+				int64_t iTempPathLength = GetTempPathW(static_cast<DWORD>(std::size(pcDirectory) - 1), pcDirectory);
+				if (iTempPathLength != 0 && iTempPathLength < std::ssize(pcDirectory) - 1)
 				{
 					std::filesystem::path filename(pcDirectory);
 					filename /= game::kGameName;
@@ -70,8 +70,8 @@ void ProfileManagerBase::Create()
 			return;
 		}
 
-		uint32_t uiTimestampValidBits = gpInstanceManager->mVkQueueFamilyProperties.at(gpInstanceManager->miGraphicsQueueFamilyIndex).timestampValidBits;
-		if (uiTimestampValidBits == 0)
+		int64_t iTimestampValidBits = gpInstanceManager->mVkQueueFamilyProperties.at(gpInstanceManager->miGraphicsQueueFamilyIndex).timestampValidBits;
+		if (iTimestampValidBits == 0)
 		{
 			LOG(kDefault, kWarning, "Warning: Graphics queue family does not support timestamp queries. GPU profiling disabled.");
 			return;
@@ -92,10 +92,8 @@ void ProfileManagerBase::Create()
 		CHECK_VK(vkCreateQueryPool(gpDeviceManager->mVkDevice, &vkQueryPoolCreateInfo, nullptr, &mVkQueryPool));
 		VkName(VK_OBJECT_TYPE_QUERY_POOL, mVkQueryPool, "Timestamp");
 
-		// Initial reset of all queries before command buffer recording
-		OneShotCommandBuffer oneShotCommandBuffer;
-		vkCmdResetQueryPool(oneShotCommandBuffer.mVkCommandBuffer, mVkQueryPool, 0, static_cast<uint32_t>(iQueryCount));
-		oneShotCommandBuffer.Execute();
+		// Queries must be reset before first use; no submitted work references this fresh pool yet.
+		vkResetQueryPool(gpDeviceManager->mVkDevice, mVkQueryPool, 0, static_cast<uint32_t>(iQueryCount));
 #endif // BT_CLIENT
 	}
 }
@@ -279,7 +277,7 @@ void ProfileManagerBase::LatchRawCpuTimer(int64_t iCpuTimer, bool bAccept)
 		int64_t iAuxiliaryCount = rRawTimer.iAuxiliaryCount.exchange(0, std::memory_order_relaxed);
 		if (bAccept)
 		{
-			++rRawTimer.record.uiSampleSequence;
+			++rRawTimer.record.iSampleSequence;
 			rRawTimer.record.iSampleMicroseconds = rRawTimer.iTotalTimeNanoseconds / 1'000;
 			rRawTimer.record.iInvocationCount = rRawTimer.iInvocationCount;
 			rRawTimer.record.iAuxiliaryCount = iAuxiliaryCount;
@@ -310,7 +308,7 @@ void ProfileManagerBase::LatchRawCpuTimers(bool bAccept, int64_t iSampleTick)
 			int64_t iAuxiliaryCount = rRawTimer.iAuxiliaryCount.exchange(0, std::memory_order_relaxed);
 			if (bAccept)
 			{
-				++rRawTimer.record.uiSampleSequence;
+				++rRawTimer.record.iSampleSequence;
 				rRawTimer.record.iSampleMicroseconds = rRawTimer.iTotalTimeNanoseconds / 1'000;
 				rRawTimer.record.iInvocationCount = rRawTimer.iInvocationCount;
 				rRawTimer.record.iAuxiliaryCount = iAuxiliaryCount;
@@ -396,8 +394,8 @@ bool ProfileManagerBase::PublishRawCpuTimerEvent(int64_t iCpuTimer, int64_t iSam
 			return false;
 		}
 
-		++rEvent.uiEventSequence;
-		rEvent.uiSampleSequence = rRawTimer.record.uiSampleSequence;
+		++rEvent.iEventSequence;
+		rEvent.iSampleSequence = rRawTimer.record.iSampleSequence;
 		rEvent.iSampleTick = iSampleTick;
 		rEvent.iSampleMicroseconds = rRawTimer.record.iSampleMicroseconds;
 		rEvent.iInvocationCount = rRawTimer.record.iInvocationCount;
@@ -414,12 +412,12 @@ bool ProfileManagerBase::PublishRawCpuTimerEvent(int64_t iCpuTimer, int64_t iSam
 	}
 }
 
-bool ProfileManagerBase::AcknowledgeRawCpuTimerEvent(int64_t iCpuTimer, uint64_t uiEventSequence)
+bool ProfileManagerBase::AcknowledgeRawCpuTimerEvent(int64_t iCpuTimer, int64_t iEventSequence)
 {
 	if constexpr (kbProfiling)
 	{
 		RawCpuTimerEventRecord& rEvent = mpRawCpuTimers[static_cast<size_t>(iCpuTimer)].eventRecord;
-		if (!(rEvent.flags & RawCpuTimerEventFlags::kAvailable) || uiEventSequence == 0 || uiEventSequence != rEvent.uiEventSequence)
+		if (!(rEvent.flags & RawCpuTimerEventFlags::kAvailable) || iEventSequence == 0 || iEventSequence != rEvent.iEventSequence)
 		{
 			return false;
 		}
@@ -444,9 +442,9 @@ void ProfileManagerBase::ResetQueryPools(int64_t iCommandBuffer, VkCommandBuffer
 			return;
 		}
 
-		uint32_t uiIndex = static_cast<uint32_t>(2 * (kGpuTimerCount * iCommandBuffer + eStart));
-		uint32_t uiCount = static_cast<uint32_t>(2 * (eEnd - eStart));
-		vkCmdResetQueryPool(vkCommandBuffer, mVkQueryPool, uiIndex, uiCount);
+		int64_t iIndex = 2 * (kGpuTimerCount * iCommandBuffer + eStart);
+		int64_t iCount = 2 * (eEnd - eStart);
+		vkCmdResetQueryPool(vkCommandBuffer, mVkQueryPool, static_cast<uint32_t>(iIndex), static_cast<uint32_t>(iCount));
 	}
 }
 #endif // BT_CLIENT
@@ -461,8 +459,8 @@ void ProfileManagerBase::GpuStart(int64_t iCommandBuffer, VkCommandBuffer vkComm
 			return;
 		}
 
-		uint32_t uiCounterIndex = static_cast<uint32_t>(2 * kGpuTimerCount * iCommandBuffer + 2 * eGpuTimer);
-		vkCmdWriteTimestamp(vkCommandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, mVkQueryPool, uiCounterIndex);
+		int64_t iCounterIndex = 2 * kGpuTimerCount * iCommandBuffer + 2 * eGpuTimer;
+		vkCmdWriteTimestamp(vkCommandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, mVkQueryPool, static_cast<uint32_t>(iCounterIndex));
 
 		bool bRoot = eGpuTimer == kGpuTimerGlobal || eGpuTimer == kGpuTimerMain || eGpuTimer == kGpuTimerImage;
 		if (vkCmdBeginDebugUtilsLabelEXT != nullptr)
@@ -488,8 +486,8 @@ void ProfileManagerBase::GpuStop(int64_t iCommandBuffer, VkCommandBuffer vkComma
 			return;
 		}
 
-		uint32_t uiCounterIndex = static_cast<uint32_t>(2 * kGpuTimerCount * iCommandBuffer + 2 * eGpuTimer + 1);
-		vkCmdWriteTimestamp(vkCommandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, mVkQueryPool, uiCounterIndex);
+		int64_t iCounterIndex = 2 * kGpuTimerCount * iCommandBuffer + 2 * eGpuTimer + 1;
+		vkCmdWriteTimestamp(vkCommandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, mVkQueryPool, static_cast<uint32_t>(iCounterIndex));
 
 		if (vkCmdEndDebugUtilsLabelEXT != nullptr)
 		{
@@ -512,8 +510,8 @@ void ProfileManagerBase::GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTi
 		{
 			GpuTimers eGpuTimer = static_cast<GpuTimers>(i);
 			uint64_t puiResults[2] {};
-			uint32_t uiCounterIndex = static_cast<uint32_t>(2 * kGpuTimerCount * iCommandBuffer + 2 * eGpuTimer);
-			VkResult vkResultGetQueryPoolResults = vkGetQueryPoolResults(gpDeviceManager->mVkDevice, mVkQueryPool, uiCounterIndex, 2, sizeof(puiResults), puiResults, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
+			int64_t iCounterIndex = 2 * kGpuTimerCount * iCommandBuffer + 2 * eGpuTimer;
+			VkResult vkResultGetQueryPoolResults = vkGetQueryPoolResults(gpDeviceManager->mVkDevice, mVkQueryPool, static_cast<uint32_t>(iCounterIndex), 2, sizeof(puiResults), puiResults, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
 			if (vkResultGetQueryPoolResults == VK_NOT_READY)
 			{
 				continue;
@@ -525,7 +523,7 @@ void ProfileManagerBase::GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTi
 
 			if (bLatchShadowSample && eGpuTimer == kGpuTimerShadow)
 			{
-				++mGpuShadowSample.uiSequence;
+				++mGpuShadowSample.iSequence;
 				mGpuShadowSample.iCurrentMicroseconds = iCurrentMicroseconds;
 			}
 		}

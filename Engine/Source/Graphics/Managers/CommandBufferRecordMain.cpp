@@ -132,8 +132,8 @@ void CommandBufferRecordMain::RecordLightingSpreadPipeline(VkCommandBuffer vkCom
 
 		for (int64_t i = 0; i < iSpreadPassCount; ++i)
 		{
-			uint32_t uiPassWidth = rRenderTargetTextures.mpSpreadTextures[i][0].mInfo.vkExtent3D.width;
-			uint32_t uiPassHeight = rRenderTargetTextures.mpSpreadTextures[i][0].mInfo.vkExtent3D.height;
+			int64_t iPassWidth = rRenderTargetTextures.mpSpreadTextures[i][0].mInfo.vkExtent3D.width;
+			int64_t iPassHeight = rRenderTargetTextures.mpSpreadTextures[i][0].mInfo.vkExtent3D.height;
 			VkClearValue pVkSpreadClearValues[6] {};
 			VkRenderPassBeginInfo vkSpreadRenderPassBeginInfo
 			{
@@ -141,7 +141,7 @@ void CommandBufferRecordMain::RecordLightingSpreadPipeline(VkCommandBuffer vkCom
 				.pNext = nullptr,
 				.renderPass = rRenderTargetTextures.mSpreadVkRenderPass,
 				.framebuffer = rRenderTargetTextures.mpSpreadVkFramebuffers[i],
-				.renderArea = {.offset = {.x = 0, .y = 0}, .extent = {.width = uiPassWidth, .height = uiPassHeight}},
+				.renderArea = {.offset = {.x = 0, .y = 0}, .extent = {.width = static_cast<uint32_t>(iPassWidth), .height = static_cast<uint32_t>(iPassHeight)}},
 				.clearValueCount = static_cast<uint32_t>(std::size(pVkSpreadClearValues)),
 				.pClearValues = pVkSpreadClearValues,
 			};
@@ -284,13 +284,13 @@ void CommandBufferRecordMain::RecordObjectShadows(VkCommandBuffer vkCommandBuffe
 void CommandBufferRecordMain::RecordObjectShadowsBlur(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer)
 {
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerObjectShadowsBlur);
-	uint32_t uiObjectShadowsBlurWidth = gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture.mInfo.vkExtent3D.width;
-	uint32_t uiObjectShadowsBlurHeight = gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture.mInfo.vkExtent3D.height;
+	int64_t iObjectShadowsBlurWidth = gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture.mInfo.vkExtent3D.width;
+	int64_t iObjectShadowsBlurHeight = gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture.mInfo.vkExtent3D.height;
 	gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurIntermediateTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
-	gpPipelineManager->mpPipelines[kPipelineObjectShadowsBlurH].RecordCompute(iCommandBuffer, vkCommandBuffer, TileCount(uiObjectShadowsBlurWidth), TileCount(uiObjectShadowsBlurHeight));
+	gpPipelineManager->mpPipelines[kPipelineObjectShadowsBlurH].RecordCompute(iCommandBuffer, vkCommandBuffer, TileCount(iObjectShadowsBlurWidth), TileCount(iObjectShadowsBlurHeight));
 	gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurIntermediateTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadOnly);
 	gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
-	gpPipelineManager->mpPipelines[kPipelineObjectShadowsBlurV].RecordCompute(iCommandBuffer, vkCommandBuffer, TileCount(uiObjectShadowsBlurWidth), TileCount(uiObjectShadowsBlurHeight));
+	gpPipelineManager->mpPipelines[kPipelineObjectShadowsBlurV].RecordCompute(iCommandBuffer, vkCommandBuffer, TileCount(iObjectShadowsBlurWidth), TileCount(iObjectShadowsBlurHeight));
 	gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 	gpTextureManager->mRenderTargetTextures.mObjectShadowsBlurIntermediateTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadOnly, TextureLayout::kShaderReadOnly);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerObjectShadowsBlur);

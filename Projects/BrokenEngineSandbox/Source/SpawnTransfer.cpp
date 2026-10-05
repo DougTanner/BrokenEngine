@@ -33,7 +33,7 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 			{
 				.vecPosition = rData.vecPosition,
 				.vecVelocity = rData.vecVelocity,
-				.uiTypeIndex = rData.uiTypeIndex,
+				.iTypeIndex = rData.uiTypeIndex,
 				.alignment = rData.alignment,
 				// Wind-trail tuning is client-only visual debug state; reset to canonical defaults on server-authored transfer.
 				.fWindTrailIntensity = rData.alignment == playerAlignment ? gWindDepositPlayerBlastersIntensity.mfDefault : gWindDepositSpaceshipsBlastersIntensity.mfDefault,
@@ -95,8 +95,8 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 				.fNavigationDelay = rData.navigationDelaySeconds.count(),
 				.globalPlayerId = rData.globalPlayerId,
 				.fleetWantedCoordinate = rData.fleetWantedCoordinate,
-				.uiPendingFleetWantedCoordinateTicks = rData.uiPendingFleetWantedCoordinateTicks,
-				.uiPendingWeaponModeTicks = rData.uiPendingWeaponModeTicks,
+				.iPendingFleetWantedCoordinateTicks = rData.uiPendingFleetWantedCoordinateTicks,
+				.iPendingWeaponModeTicks = rData.uiPendingWeaponModeTicks,
 				.bTransfer = true,
 			});
 			break;

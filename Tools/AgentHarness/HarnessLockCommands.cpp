@@ -38,12 +38,12 @@ namespace toolcli
 		return locator;
 	}
 
-	static std::optional<Locator> ParseLocator(std::span<const wchar_t* const> argumentValues, int iStartIndex, std::wstring& rOwner, std::wstring& rExpectedOwner, std::wstring& rSession, std::wstring& rWorktree)
+	static std::optional<Locator> ParseLocator(std::span<const wchar_t* const> argumentValues, int64_t iStartIndex, std::wstring& rOwner, std::wstring& rExpectedOwner, std::wstring& rSession, std::wstring& rWorktree)
 	{
 		std::wstring key;
-		for (int i = iStartIndex; i < std::ssize(argumentValues); ++i)
+		for (int64_t i = iStartIndex; i < std::ssize(argumentValues); ++i)
 		{
-			std::wstring_view argument = argumentValues[i];
+			std::wstring_view argument = argumentValues[static_cast<size_t>(i)];
 			std::wstring* pDestination = nullptr;
 			if (argument == L"--key")
 			{
@@ -75,7 +75,7 @@ namespace toolcli
 				Fail("lock option requires a value");
 				return std::nullopt;
 			}
-			*pDestination = argumentValues[i];
+			*pDestination = argumentValues[static_cast<size_t>(i)];
 		}
 		if (key.empty())
 		{
@@ -104,7 +104,7 @@ namespace toolcli
 	}
 
 
-	int RunHarnessLockCommand(std::span<const wchar_t* const> argumentValues)
+	int64_t RunHarnessLockCommand(std::span<const wchar_t* const> argumentValues)
 	{
 		if (std::ssize(argumentValues) < 3)
 		{

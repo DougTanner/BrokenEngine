@@ -7,28 +7,28 @@ namespace common
 // length that includes it; trimming keeps single-line log output clean. Also NUL-terminates at the trim point.
 static std::string_view TrimSystemMessage(std::span<char> buffer)
 {
-	size_t uiLength = buffer.size() - 1;
-	while (uiLength > 0 && (buffer[uiLength - 1] == '\r' || buffer[uiLength - 1] == '\n' || buffer[uiLength - 1] == '.' || buffer[uiLength - 1] == ' '))
+	int64_t iLength = std::ssize(buffer) - 1;
+	while (iLength > 0 && (buffer[static_cast<size_t>(iLength - 1)] == '\r' || buffer[static_cast<size_t>(iLength - 1)] == '\n' || buffer[static_cast<size_t>(iLength - 1)] == '.' || buffer[static_cast<size_t>(iLength - 1)] == ' '))
 	{
-		--uiLength;
+		--iLength;
 	}
 
-	buffer[uiLength] = 0;
-	return std::string_view(buffer.data(), uiLength);
+	buffer[static_cast<size_t>(iLength)] = 0;
+	return std::string_view(buffer.data(), static_cast<size_t>(iLength));
 }
 
 std::string LastErrorString()
 {
 	char acReturn[MAX_PATH] {};
-	DWORD uiLength = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), acReturn, static_cast<DWORD>(std::size(acReturn)) - 1, nullptr);
-	return std::string(TrimSystemMessage(std::span<char>(acReturn, uiLength + 1)));
+	int64_t iLength = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), acReturn, static_cast<DWORD>(std::size(acReturn)) - 1, nullptr);
+	return std::string(TrimSystemMessage(std::span<char>(acReturn, static_cast<size_t>(iLength + 1))));
 }
 
 std::string HresultToString(HRESULT hresult)
 {
 	char acReturn[MAX_PATH] {};
-	DWORD uiLength = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, static_cast<DWORD>(hresult), 0, acReturn, static_cast<DWORD>(std::size(acReturn) - 1), nullptr);
-	return std::string(TrimSystemMessage(std::span<char>(acReturn, uiLength + 1)));
+	int64_t iLength = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, static_cast<DWORD>(hresult), 0, acReturn, static_cast<DWORD>(std::size(acReturn) - 1), nullptr);
+	return std::string(TrimSystemMessage(std::span<char>(acReturn, static_cast<size_t>(iLength + 1))));
 }
 
 int64_t LogicalCoreCount()
@@ -61,7 +61,7 @@ int64_t HardwareCoreCount()
 	}
 
 	std::vector<SYSTEM_LOGICAL_PROCESSOR_INFORMATION> buffer(1);
-	DWORD uiReturnLength = static_cast<DWORD>(buffer.size() * sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION));
+	DWORD uiReturnLength = static_cast<DWORD>(std::ssize(buffer) * static_cast<int64_t>(sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION)));
 
 	BOOL bDone = FALSE;
 	while (bDone == FALSE)
@@ -72,7 +72,8 @@ int64_t HardwareCoreCount()
 		{
 			if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
 			{
-				buffer.resize(uiReturnLength / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION));
+				int64_t iReturnLength = uiReturnLength;
+				buffer.resize(static_cast<size_t>(iReturnLength / static_cast<int64_t>(sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION))));
 			}
 			else
 			{
@@ -86,18 +87,18 @@ int64_t HardwareCoreCount()
 		}
 	}
 
-	DWORD uiProcessorCoreCount = 0;
+	int64_t iProcessorCoreCount = 0;
 	for (const SYSTEM_LOGICAL_PROCESSOR_INFORMATION& rSystemLogicalProcessorInformation : buffer)
 	{
 		if (rSystemLogicalProcessorInformation.Relationship == RelationProcessorCore)
 		{
-			++uiProcessorCoreCount;
+			++iProcessorCoreCount;
 		}
 	}
 
-	if (uiProcessorCoreCount >= 1)
+	if (iProcessorCoreCount >= 1)
 	{
-		return uiProcessorCoreCount;
+		return iProcessorCoreCount;
 	}
 	else
 	{
@@ -124,7 +125,7 @@ std::tuple<std::string, std::string> FileTimeString(const std::filesystem::file_
 
 	// Format failures leave the display strings empty.
 	char pcDate[MAX_PATH] {};
-	int iWritten = GetDateFormat(LOCALE_USER_DEFAULT, 0, &localSystemTime, "yyyy-MM-dd", pcDate, static_cast<DWORD>(std::size(pcDate) - 1));
+	int64_t iWritten = GetDateFormat(LOCALE_USER_DEFAULT, 0, &localSystemTime, "yyyy-MM-dd", pcDate, static_cast<DWORD>(std::size(pcDate) - 1));
 	if (iWritten == 0)
 	{
 		LOG(kDefault, kWarning, "GetDateFormat failed: {}", GetLastError());
@@ -144,7 +145,10 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 {
 	// RAII so each launch-failure early return below releases the handles / attribute list already acquired. Pipe and
 	// process handles use a nullptr sentinel, so unique_ptr<void> (which skips the deleter on nullptr) fits.
-	using ScopedHandle = std::unique_ptr<void, decltype(&CloseHandle)>;
+	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE hHandle) noexcept
+	{
+		CloseHandle(hHandle);
+	})>;
 
 	SECURITY_ATTRIBUTES securityAttributes
 	{
@@ -159,8 +163,8 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 	{
 		return std::nullopt;
 	}
-	ScopedHandle pStandardInputPipeRead(hStandardInputPipeRead, &CloseHandle);
-	ScopedHandle pStandardInputPipeWrite(hStandardInputPipeWrite, &CloseHandle);
+	ScopedHandle pStandardInputPipeRead(hStandardInputPipeRead);
+	ScopedHandle pStandardInputPipeWrite(hStandardInputPipeWrite);
 
 	HANDLE hStandardOutputPipeRead = nullptr;
 	HANDLE hStandardOutputPipeWrite = nullptr;
@@ -168,8 +172,8 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 	{
 		return std::nullopt;
 	}
-	ScopedHandle pStandardOutputPipeRead(hStandardOutputPipeRead, &CloseHandle);
-	ScopedHandle pStandardOutputPipeWrite(hStandardOutputPipeWrite, &CloseHandle);
+	ScopedHandle pStandardOutputPipeRead(hStandardOutputPipeRead);
+	ScopedHandle pStandardOutputPipeWrite(hStandardOutputPipeWrite);
 
 	// Strip inheritance from parent-side pipe ends; the attribute list below only applies to the child-side two.
 	if (!SetHandleInformation(hStandardInputPipeWrite, HANDLE_FLAG_INHERIT, 0))
@@ -219,8 +223,8 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 	{
 		return std::nullopt;
 	}
-	ScopedHandle pProcess(processInformation.hProcess, &CloseHandle);
-	ScopedHandle pThread(processInformation.hThread, &CloseHandle);
+	ScopedHandle pProcess(processInformation.hProcess);
+	ScopedHandle pThread(processInformation.hThread);
 
 	// Close the parent's child-side pipe ends now (before the read loop, not at scope exit) so ReadFile sees
 	// EOF once the child exits; the child holds its own inherited duplicates.
@@ -232,8 +236,9 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 	DWORD uiBytesRead = 0;
 	while (ReadFile(hStandardOutputPipeRead, pcPipeOutput, static_cast<DWORD>(sizeof(pcPipeOutput) - 1), &uiBytesRead, nullptr) == TRUE)
 	{
-		pcPipeOutput[uiBytesRead] = 0;
-		output.append(pcPipeOutput, &pcPipeOutput[uiBytesRead]);
+		int64_t iBytesRead = uiBytesRead;
+		pcPipeOutput[iBytesRead] = 0;
+		output.append(pcPipeOutput, &pcPipeOutput[iBytesRead]);
 	}
 
 	WaitForSingleObject(processInformation.hProcess, INFINITE);

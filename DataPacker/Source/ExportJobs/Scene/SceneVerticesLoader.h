@@ -5,13 +5,13 @@ namespace tinygltf { class Model; class Node; struct Material; }
 // Hash function for the (originalMaterial, nodeIndex, hasSkinning) effective-material key
 struct MaterialNodeKeyHash
 {
-	size_t operator()(const std::tuple<int, int, bool>& rKey) const
+	size_t operator()(const std::tuple<int64_t, int64_t, bool>& rKey) const
 	{
-		return std::hash<int>()(std::get<0>(rKey)) ^ (std::hash<int>()(std::get<1>(rKey)) << 1) ^ (std::get<2>(rKey) ? 0x9e3779b9ui32 : 0ui32);
+		return std::hash<int64_t>()(std::get<0>(rKey)) ^ (std::hash<int64_t>()(std::get<1>(rKey)) << 1) ^ (std::get<2>(rKey) ? 0x9e3779b9ui32 : 0ui32);
 	}
 };
 
-using MaterialNodeMap = std::unordered_map<std::tuple<int, int, bool>, int, MaterialNodeKeyHash>;
+using MaterialNodeMap = std::unordered_map<std::tuple<int64_t, int64_t, bool>, int64_t, MaterialNodeKeyHash>;
 
 struct Material
 {
@@ -22,19 +22,19 @@ struct Parent
 {
 	const Parent* pParent = nullptr;
 	XMMATRIX matNode {};
-	int iNodeIndex = -1;
+	int64_t iNodeIndex = -1;
 };
 
 // Tracks per-material skinning metadata during export
 struct MaterialNodeInfo
 {
 	bool bHasSkinning = false;  // Deformation mode of every primitive routed to this material
-	int iNodeIndex = -1;        // Node index of the mesh contributing to this material
+	int64_t iNodeIndex = -1;        // Node index of the mesh contributing to this material
 	XMMATRIX matMeshWorld = XMMatrixIdentity();  // World transform of mesh at bind pose (accumulated matLocal)
-	int iOriginalMaterialIndex = -1;  // Original glTF material index (for split materials)
+	int64_t iOriginalMaterialIndex = -1;  // Original glTF material index (for split materials)
 };
 
-XMMATRIX ComputeNodeWorldTransform(int iNodeIndex, const tinygltf::Model& rModel, const std::unordered_map<int, int>& rNodeParentMap);
+XMMATRIX ComputeNodeWorldTransform(int64_t iNodeIndex, const tinygltf::Model& rModel, const std::unordered_map<int64_t, int64_t>& rNodeParentMap);
 
 // Per-scene state threaded through every recursive LoadVertices call.
 // rMaterialNodeMap keys entries by glTF material, mesh node, and skinning mode,
@@ -48,7 +48,7 @@ struct LoadVerticesContext
 	bool bHasSkeleton = false;
 };
 
-void LoadVertices(const Parent* pParent, int iCurrentNodeIndex, const tinygltf::Node& rNode, const tinygltf::Model& rModel, LoadVerticesContext& rContext);
+void LoadVertices(const Parent* pParent, int64_t iCurrentNodeIndex, const tinygltf::Node& rNode, const tinygltf::Model& rModel, LoadVerticesContext& rContext);
 
 bool IsNonOcclusionUse(int64_t iIndex, const tinygltf::Material& rMaterial);
 bool IsOcclusion(int64_t iIndex, const tinygltf::Material& rMaterial);

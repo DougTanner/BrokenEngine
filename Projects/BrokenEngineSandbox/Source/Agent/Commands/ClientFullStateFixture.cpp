@@ -138,7 +138,7 @@ static nlohmann::json BuildState()
 	result["timeDivide"] = gpGame->mTimeStep.miTimeDivide;
 	if (gpClientSession->mpRuntime->mpClient != nullptr)
 	{
-		result["loadGeneration"] = gpClientSession->mpRuntime->mpClient->muiCommittedLoadGeneration;
+		result["loadGeneration"] = gpClientSession->mpRuntime->mpClient->miCommittedLoadGeneration;
 	}
 	else
 	{

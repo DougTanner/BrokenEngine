@@ -7,7 +7,7 @@
 namespace engine
 {
 
-void TextureCache::CopyImageToHostMemory(VkImage vkSourceImage, VkExtent3D vkExtent, VkFormat vkFormat, uint32_t uiMipmapLevels, uint32_t uiArrayLayers, bool bFromSwapchain, VkImageLayout vkCurrentLayout, std::vector<std::byte>& rOutputData)
+void TextureCache::CopyImageToHostMemory(VkImage vkSourceImage, VkExtent3D vkExtent, VkFormat vkFormat, int64_t iMipmapLevels, int64_t iArrayLayers, bool bFromSwapchain, VkImageLayout vkCurrentLayout, std::vector<std::byte>& rOutputData)
 {
 	// Heap: rOutputData.resize + staging-buffer creation. Main-loop-reachable per frame via the kbScreenshots trigger
 	// (Graphics::RenderMainPresentAcquire -> Screenshot::SaveScreenshot -> here) with tracking live; rOutputData
@@ -19,7 +19,7 @@ void TextureCache::CopyImageToHostMemory(VkImage vkSourceImage, VkExtent3D vkExt
 	VkAccessFlags vkSourceAccess = bFromSwapchain ? 0 : VK_ACCESS_SHADER_READ_BIT;
 	VkAccessFlags vkDestinationAccess = bFromSwapchain ? 0 : VK_ACCESS_SHADER_READ_BIT;
 
-	int64_t iTotalSize = common::ComputeImageByteSize(vkFormat, vkExtent.width, vkExtent.height, uiMipmapLevels, uiArrayLayers, 1);
+	int64_t iTotalSize = common::ComputeImageByteSize(vkFormat, vkExtent.width, vkExtent.height, iMipmapLevels, iArrayLayers, 1);
 
 	rOutputData.resize(iTotalSize);
 
@@ -41,29 +41,29 @@ void TextureCache::CopyImageToHostMemory(VkImage vkSourceImage, VkExtent3D vkExt
 		{
 			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
 			.baseMipLevel = 0,
-			.levelCount = uiMipmapLevels,
+			.levelCount = static_cast<uint32_t>(iMipmapLevels),
 			.baseArrayLayer = 0,
-			.layerCount = uiArrayLayers,
+			.layerCount = static_cast<uint32_t>(iArrayLayers),
 		},
 	};
 	vkCmdPipelineBarrier(oneShotCommandBuffer.mVkCommandBuffer, vkSourceStage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &vkImageMemoryBarrier);
 
-	VkDeviceSize vkOffset = 0;
+	int64_t iOffset = 0;
 
-	for (uint32_t i = 0; i < uiArrayLayers; ++i)
+	for (int64_t i = 0; i < iArrayLayers; ++i)
 	{
 		int64_t iMipmapWidth = vkExtent.width;
 		int64_t iMipmapHeight = vkExtent.height;
-		for (uint32_t j = 0; j < uiMipmapLevels; ++j)
+		for (int64_t j = 0; j < iMipmapLevels; ++j)
 		{
 			VkBufferImageCopy vkBufferImageCopy
 			{
-				.bufferOffset = vkOffset,
+				.bufferOffset = static_cast<VkDeviceSize>(iOffset),
 				.imageSubresource =
 				{
 					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-					.mipLevel = j,
-					.baseArrayLayer = i,
+					.mipLevel = static_cast<uint32_t>(j),
+					.baseArrayLayer = static_cast<uint32_t>(i),
 					.layerCount = 1,
 				},
 				.imageExtent =
@@ -76,7 +76,7 @@ void TextureCache::CopyImageToHostMemory(VkImage vkSourceImage, VkExtent3D vkExt
 
 			vkCmdCopyImageToBuffer(oneShotCommandBuffer.mVkCommandBuffer, vkSourceImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer.vkStagingBuffer, 1, &vkBufferImageCopy);
 
-			vkOffset += common::SizeInBytes(vkFormat, iMipmapWidth, iMipmapHeight);
+			iOffset += common::SizeInBytes(vkFormat, iMipmapWidth, iMipmapHeight);
 			iMipmapWidth = std::max(iMipmapWidth / 2, 1i64);
 			iMipmapHeight = std::max(iMipmapHeight / 2, 1i64);
 		}
@@ -100,7 +100,7 @@ void TextureCache::GeneratePhysicallyBasedRenderingBidirectionalReflectanceDistr
 	if constexpr (kbRandomlyInvalidatePhysicallyBasedRenderingCubemapCache)
 	{
 		common::RandomEngine randomEngine(static_cast<uint32_t>(std::chrono::steady_clock::now().time_since_epoch().count()));
-		if (common::Random(10ui32, randomEngine) == 0)
+		if (common::Random(10i64, randomEngine) == 0)
 		{
 			LOG(kGraphics, kDebug, "Randomly invalidating GLTF BRDF LUT cache");
 			gpFileManager->RemoveFile({FileFlags::kAppDataDirectory}, "BrdfLut.cache");
@@ -119,8 +119,8 @@ void TextureCache::GeneratePhysicallyBasedRenderingBidirectionalReflectanceDistr
 			.vkImageCreateFlags = {},
 			.vkFormat = vkFormat,
 			.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iSize), .height = static_cast<uint32_t>(iSize), .depth = 1},
-			.uiMipLevels = 1,
-			.uiArrayLayers = 1,
+			.iMipLevels = 1,
+			.iArrayLayers = 1,
 			.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 			.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -142,8 +142,8 @@ void TextureCache::GeneratePhysicallyBasedRenderingBidirectionalReflectanceDistr
 		.vkImageCreateFlags = 0,
 		.vkFormat = vkFormat,
 		.vkExtent3D = VkExtent3D {.width = 512, .height = 512, .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -201,7 +201,7 @@ bool TextureCache::TryLoadCachedTexture(const std::filesystem::path& rCachePath,
 	TextureFileCacheHeader header {};
 	fileStream.read(reinterpret_cast<char*>(&header), sizeof(TextureFileCacheHeader));
 
-	if (!fileStream || header.iMagic != TextureFileCacheHeader::kiMagic || header.iVersion != TextureFileCacheHeader::kiVersion || header.vkFormat != rTexture.mInfo.vkFormat || header.iWidth != rTexture.mInfo.vkExtent3D.width || header.iHeight != rTexture.mInfo.vkExtent3D.height || header.iMipmapLevels != rTexture.mInfo.uiMipLevels || header.iArrayLayers != rTexture.mInfo.uiArrayLayers || (sourceCrc != 0 && header.sourceCrc != sourceCrc))
+	if (!fileStream || header.iMagic != TextureFileCacheHeader::kiMagic || header.iVersion != TextureFileCacheHeader::kiVersion || header.vkFormat != rTexture.mInfo.vkFormat || header.iWidth != rTexture.mInfo.vkExtent3D.width || header.iHeight != rTexture.mInfo.vkExtent3D.height || header.iMipmapLevels != rTexture.mInfo.iMipLevels || header.iArrayLayers != rTexture.mInfo.iArrayLayers || (sourceCrc != 0 && header.sourceCrc != sourceCrc))
 	{
 		fileStream.close();
 		LOG(kGraphics, kWarning, "Invalid cache file {} (header validation failed), regenerating", rCachePath.string());
@@ -209,7 +209,7 @@ bool TextureCache::TryLoadCachedTexture(const std::filesystem::path& rCachePath,
 	}
 
 	// The on-disk iDataSize is opaque (cache file is a trust boundary); validate it against the size computed from the already-validated dims/format before trusting it. A too-small value would overread in the upload memcpy below; a negative value would blow up the std::vector ctor.
-	int64_t iExpectedDataSize = common::ComputeImageByteSize(rTexture.mInfo.vkFormat, rTexture.mInfo.vkExtent3D.width, rTexture.mInfo.vkExtent3D.height, rTexture.mInfo.uiMipLevels, rTexture.mInfo.uiArrayLayers, 1);
+	int64_t iExpectedDataSize = common::ComputeImageByteSize(rTexture.mInfo.vkFormat, rTexture.mInfo.vkExtent3D.width, rTexture.mInfo.vkExtent3D.height, rTexture.mInfo.iMipLevels, rTexture.mInfo.iArrayLayers, 1);
 	if (header.iDataSize != iExpectedDataSize)
 	{
 		fileStream.close();
@@ -230,7 +230,7 @@ bool TextureCache::TryLoadCachedTexture(const std::filesystem::path& rCachePath,
 	// Update texture with cached data. Copy data.size() (== the validated iDataSize) rather than the staging span size so the read can never exceed the buffer we own (the two are equal for the depth-1 textures the cache holds).
 	rTexture.UpdateData([&data](std::span<std::byte> destinationData, [[maybe_unused]] int64_t iPosition)
 	{
-		std::memcpy(destinationData.data(), data.data(), data.size());
+		std::memcpy(destinationData.data(), data.data(), static_cast<size_t>(std::ssize(data)));
 	});
 
 	LOG(kLoading, kDebug, "Loaded cached texture from {}", rCachePath.string());
@@ -245,14 +245,14 @@ void TextureCache::SaveTextureToCache(const std::filesystem::path& rCachePath, c
 	header.vkFormat = rTexture.mInfo.vkFormat;
 	header.iWidth = rTexture.mInfo.vkExtent3D.width;
 	header.iHeight = rTexture.mInfo.vkExtent3D.height;
-	header.iMipmapLevels = rTexture.mInfo.uiMipLevels;
-	header.iArrayLayers = rTexture.mInfo.uiArrayLayers;
+	header.iMipmapLevels = rTexture.mInfo.iMipLevels;
+	header.iArrayLayers = rTexture.mInfo.iArrayLayers;
 	header.sourceCrc = sourceCrc;
 
 	std::vector<std::byte> data;
-	CopyImageToHostMemory(rTexture.mVkImage, rTexture.mInfo.vkExtent3D, rTexture.mInfo.vkFormat, rTexture.mInfo.uiMipLevels, rTexture.mInfo.uiArrayLayers, false, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, data);
+	CopyImageToHostMemory(rTexture.mVkImage, rTexture.mInfo.vkExtent3D, rTexture.mInfo.vkFormat, rTexture.mInfo.iMipLevels, rTexture.mInfo.iArrayLayers, false, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, data);
 
-	header.iDataSize = static_cast<int64_t>(data.size());
+	header.iDataSize = std::ssize(data);
 
 	if (gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, rCachePath, [&](std::fstream& rStream)
 	{

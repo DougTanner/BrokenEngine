@@ -24,8 +24,8 @@ constexpr const char* kppcInstanceExtensionNames[]
 	VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 	VK_EXT_LAYER_SETTINGS_EXTENSION_NAME,
 };
-constexpr uint32_t kuiBaseExtensionCount = 3;
-constexpr uint32_t kuiDebugExtensionCount = 5;
+constexpr int64_t kiBaseExtensionCount = 3;
+constexpr int64_t kiDebugExtensionCount = 5;
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback([[maybe_unused]] VkDebugUtilsMessageSeverityFlagBitsEXT vkMessageSeverity, [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT vkMessageType, [[maybe_unused]] const VkDebugUtilsMessengerCallbackDataEXT* pVkCallbackData, [[maybe_unused]] void* pUserData)
 {
@@ -112,7 +112,7 @@ VkSampleCountFlagBits InstanceManager::SelectSupportedSampleCount(VkSampleCountF
 [[maybe_unused]] constexpr VkBool32 kVkLayerSettingFalse = VK_FALSE;
 
 // The caller-owned settings array must remain alive until vkCreateInstance returns.
-static uint32_t BuildValidationLayerSettings(VkLayerSettingEXT (&rVkLayerSettings)[7])
+static int64_t BuildValidationLayerSettings(VkLayerSettingEXT (&rVkLayerSettings)[7])
 {
 	rVkLayerSettings[0] =
 	{
@@ -130,10 +130,10 @@ static uint32_t BuildValidationLayerSettings(VkLayerSettingEXT (&rVkLayerSetting
 		.valueCount = 1,
 		.pValues = &kVkLayerSettingTrue,
 	};
-	uint32_t uiLayerSettingCount = 2;
+	int64_t iLayerSettingCount = 2;
 	if constexpr (kbGraphicsProcessingUnitAssistedValidation)
 	{
-		rVkLayerSettings[uiLayerSettingCount++] =
+		rVkLayerSettings[iLayerSettingCount++] =
 		{
 			.pLayerName = kpcKhronosValidation,
 			.pSettingName = "gpuav_enable",
@@ -141,7 +141,7 @@ static uint32_t BuildValidationLayerSettings(VkLayerSettingEXT (&rVkLayerSetting
 			.valueCount = 1,
 			.pValues = &kVkLayerSettingTrue,
 		};
-		rVkLayerSettings[uiLayerSettingCount++] =
+		rVkLayerSettings[iLayerSettingCount++] =
 		{
 			.pLayerName = kpcKhronosValidation,
 			.pSettingName = "gpuav_shader_instrumentation",
@@ -149,7 +149,7 @@ static uint32_t BuildValidationLayerSettings(VkLayerSettingEXT (&rVkLayerSetting
 			.valueCount = 1,
 			.pValues = &kVkLayerSettingTrue,
 		};
-		rVkLayerSettings[uiLayerSettingCount++] =
+		rVkLayerSettings[iLayerSettingCount++] =
 		{
 			.pLayerName = kpcKhronosValidation,
 			.pSettingName = "gpuav_validate_ray_query",
@@ -158,7 +158,7 @@ static uint32_t BuildValidationLayerSettings(VkLayerSettingEXT (&rVkLayerSetting
 			.pValues = &kVkLayerSettingFalse,
 		};
 		// Disable GPU-AV sub-checks whose device features this hardware lacks (rayTracingInvocationReorder / meshShader). Otherwise GPU-AV defaults them on and the layer logs a WARNING-Setting-Limit-Adjusted at vkCreateDevice while auto-disabling them. gpuav_validate_ray_hit_object is a valid internal key (the layer prints it) but is absent from the JSON manifest.
-		rVkLayerSettings[uiLayerSettingCount++] =
+		rVkLayerSettings[iLayerSettingCount++] =
 		{
 			.pLayerName = kpcKhronosValidation,
 			.pSettingName = "gpuav_validate_ray_hit_object",
@@ -166,7 +166,7 @@ static uint32_t BuildValidationLayerSettings(VkLayerSettingEXT (&rVkLayerSetting
 			.valueCount = 1,
 			.pValues = &kVkLayerSettingFalse,
 		};
-		rVkLayerSettings[uiLayerSettingCount++] =
+		rVkLayerSettings[iLayerSettingCount++] =
 		{
 			.pLayerName = kpcKhronosValidation,
 			.pSettingName = "gpuav_mesh_shading",
@@ -177,7 +177,7 @@ static uint32_t BuildValidationLayerSettings(VkLayerSettingEXT (&rVkLayerSetting
 	}
 	else if constexpr (kbDebugPrintf)
 	{
-		rVkLayerSettings[uiLayerSettingCount++] =
+		rVkLayerSettings[iLayerSettingCount++] =
 		{
 			.pLayerName = kpcKhronosValidation,
 			.pSettingName = "printf_enable",
@@ -187,8 +187,8 @@ static uint32_t BuildValidationLayerSettings(VkLayerSettingEXT (&rVkLayerSetting
 		};
 	}
 
-	ASSERT(uiLayerSettingCount <= std::size(rVkLayerSettings));
-	return uiLayerSettingCount;
+	ASSERT(iLayerSettingCount <= std::ssize(rVkLayerSettings));
+	return iLayerSettingCount;
 }
 
 // Opt-in force-load: lets RenderDoc's "Attach to running instance" find us without launching through RenderDoc. Triggers the layer-disable branch in the ctor, so the runtime --renderdoc launch option gates it (atop compile-time kbRenderDoc) to avoid sacrificing validation in normal debug runs.
@@ -208,10 +208,10 @@ static void TryLoadRenderDocDll()
 			if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Khronos\\Vulkan\\ImplicitLayers", 0, KEY_READ, &hKey) == ERROR_SUCCESS)
 			{
 				char pcValueName[MAX_PATH] {};
-				for (DWORD i = 0; ; ++i)
+				for (int64_t i = 0; ; ++i)
 				{
 					DWORD uiValueNameCharacterCount = MAX_PATH;
-					if (RegEnumValue(hKey, i, pcValueName, &uiValueNameCharacterCount, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS)
+					if (RegEnumValue(hKey, static_cast<DWORD>(i), pcValueName, &uiValueNameCharacterCount, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS)
 					{
 						break;
 					}
@@ -267,13 +267,13 @@ InstanceManager::InstanceManager(HINSTANCE hInstance, HWND hWindow)
 		.apiVersion = VK_API_VERSION_1_2, // Also update "--target-env vulkan1.2" in DataPacker
 	};
 	VkLayerSettingEXT pVkLayerSettings[7] {};
-	uint32_t uiLayerSettingCount = BuildValidationLayerSettings(pVkLayerSettings);
+	int64_t iLayerSettingCount = BuildValidationLayerSettings(pVkLayerSettings);
 
 	VkLayerSettingsCreateInfoEXT vkLayerSettingsCreateInfoEXT =
 	{
 		.sType = VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT,
 		.pNext = nullptr,
-		.settingCount = uiLayerSettingCount,
+		.settingCount = static_cast<uint32_t>(iLayerSettingCount),
 		.pSettings = pVkLayerSettings,
 	};
 	VkInstanceCreateInfo vkInstanceCreateInfo
@@ -282,9 +282,9 @@ InstanceManager::InstanceManager(HINSTANCE hInstance, HWND hWindow)
 		.pNext = kbVulkanDebugLayers ? &vkLayerSettingsCreateInfoEXT : nullptr,
 		.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR,
 		.pApplicationInfo = &vkApplicationInfo,
-		.enabledLayerCount = kbVulkanDebugLayers ? static_cast<uint32_t>(mValidationLayers.size()) : 0,
+		.enabledLayerCount = kbVulkanDebugLayers ? static_cast<uint32_t>(std::ssize(mValidationLayers)) : 0,
 		.ppEnabledLayerNames = kbVulkanDebugLayers ? mValidationLayers.data() : nullptr,
-		.enabledExtensionCount = kbVulkanDebugLayers ? kuiDebugExtensionCount : kuiBaseExtensionCount,
+		.enabledExtensionCount = static_cast<uint32_t>(kbVulkanDebugLayers ? kiDebugExtensionCount : kiBaseExtensionCount),
 		.ppEnabledExtensionNames = kppcInstanceExtensionNames,
 	};
 

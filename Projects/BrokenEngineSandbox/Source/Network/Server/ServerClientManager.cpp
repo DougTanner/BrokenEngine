@@ -120,17 +120,17 @@ void ServerClientManager::SpawnWaitingClients()
 
 		bool bIsFlagship = false;
 		engine::GridCoord spawnFleetWantedCoordinate {};
-		uint8_t uiSpawnPendingFleetTicks = 0;
+		int64_t iSpawnPendingFleetTicks = 0;
 		if ((rClientSpawnInformation.fleetGuid.uiHigh != 0 || rClientSpawnInformation.fleetGuid.uiLow != 0))
 		{
 			ServerFleetManager::FleetLookupResult result = gpServerSession->mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.memberGlobalPlayerId);
 			bIsFlagship = result.flags & ServerFleetManager::FleetLookupFlags::kIsFlagship;
 			spawnFleetWantedCoordinate = result.fleetWantedCoord;
-			uiSpawnPendingFleetTicks = result.uiPendingFleetWantedCoordTicks;
+			iSpawnPendingFleetTicks = result.iPendingFleetWantedCoordTicks;
 		}
 
 		// The requesting client's GUID rides the status change, so the row this tick creates is born owned.
-		StatusChange spawnChange {.eType = StatusChangeType::kSpawnPlayer, .data = SpawnPlayerData {.iGlobalId = globalPlayerId.iValue, .bIsFlagship = bIsFlagship, .fleetWantedCoordinate = spawnFleetWantedCoordinate, .uiPendingFleetWantedCoordinateTicks = uiSpawnPendingFleetTicks, .clientGuid = rClientSpawnInformation.clientGuid}};
+		StatusChange spawnChange {.eType = StatusChangeType::kSpawnPlayer, .data = SpawnPlayerData {.iGlobalId = globalPlayerId.iValue, .bIsFlagship = bIsFlagship, .fleetWantedCoordinate = spawnFleetWantedCoordinate, .uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(iSpawnPendingFleetTicks), .clientGuid = rClientSpawnInformation.clientGuid}};
 		gpGame->mFrameInputs.try_emplace(engine::kOriginCoordinate).first->second.statusChanges.push_back(spawnChange);
 		LOG(kNetwork, kVerbose, "ServerClientManager::SpawnWaitingClients::kSpawnPlayer Client: {} GlobalId: {} Coord: ({},{}) Flagship: {}", rClientSpawnInformation.iClientId, globalPlayerId.iValue, engine::kOriginCoordinate.iX, engine::kOriginCoordinate.iY, bIsFlagship);
 

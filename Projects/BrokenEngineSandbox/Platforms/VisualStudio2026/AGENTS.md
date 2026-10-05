@@ -39,7 +39,7 @@ Naming conventions that signal build affinity:
 - `*Render.cpp` — client-only
 - `Network/Client/Client*.cpp` — client-only
 - Game-layer `Network/Server/Server*.cpp` — server-only
-- Engine `Server.cpp`/`ServerReceive.cpp`/`ServerSend.cpp` — server-only (`BT_SERVER`-wrapped; only the server build constructs `engine::Server`)
+- Engine `Server.cpp`/`ServerBufferedFrames.cpp` — server-only (`BT_SERVER`-wrapped; only the server build constructs `engine::Server`)
 - Engine collection files — check guards; many are client-only
 
 GLSL sources under `Engine/Data/Shaders/` are `<None>` items in the client project only — IDE visibility; DataPacker compiles them, not MSBuild. Shared engine dual-language layout headers under `Engine/Data/Shaders/` are `<ClInclude>` items in every consuming project; keep their project and filter entries synchronized when a layout header is added.

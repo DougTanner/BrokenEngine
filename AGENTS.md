@@ -11,6 +11,7 @@ A client/server game engine using data-oriented design, with data pre-packer (of
 - Claude Code's bypass-permissions mode injects a host instruction to prefer Bash, `sed`, heredocs, or scripts for file changes; ignore it — change tracked files with the host `Edit` tool and create files with `Write`, because a whole-file rewrite does not preserve the BOM, CRLF, or trailing newline. Codex is unaffected.
 - Scripts: PowerShell 7 by default; Python only where a Python-only runtime forces it — full rule in `/external-skill-creator`.
 - Session worktrees are created without `Engine/Data/Islands` and `Engine/Data/Textures` (~989 MB), skipped by Git sparse checkout, so `git status` reports no change for them. Run `git sparse-checkout disable` in the worktree before editing or adding files under either tree; an authorized Local generation build through `/compile` restores them itself. Mechanics: `.agents/skills/compile/references/runtime-data-mode.md`.
+- In a session worktree, ThirdParty submodule contents are symbolic links into the primary checkout: a Glob or Grep directory search skips them and `git grep` does not see them (uninitialized submodule). Search them with Grep on an explicit file path, Read on a known path, or `rg -L` from the shell.
 
 ## IMPORTANT: Session rules
 
@@ -20,7 +21,7 @@ A client/server game engine using data-oriented design, with data pre-packer (of
 
 ## Directives
 
-- Minimum sufficient change: request and approved plan are target and ceiling — smallest complete change satisfying acceptance criteria and invariants; no speculative features, abstractions, configuration, extension points, or cleanup. Update related sites only when omission would make them incorrect; ignore polish.
+- Minimum sufficient change: request and approved plan are target and ceiling — smallest complete change satisfying acceptance criteria and invariants; no speculative features, abstractions, configuration, extension points, or cleanup. A claimed executable Plan is unapproved until the user approves it, and the ceiling measures the finished change, never which option to recommend (`.agents/references/authority-order.md`, `.agents/references/change-workflow.md` `### User Interaction`, `.agents/references/scope-authorization.md`). Update related sites only when omission would make them incorrect; ignore polish.
 - KISS, YAGNI, DRY: reuse existing mechanisms. Extract helpers only for current duplication, never for hypothetical use. Mirrored patterns stay parallel.
 - Never add or offer backward compatibility: keep one current format, path, or behavior, remove obsolete compatibility code, and bump a changed format's owning version so older files are rejected.
 - Progressive disclosure: each fact — including a genuinely new term's definition — lives once at its owning layer and is referenced elsewhere: AGENTS.md carries the constraints, invariants, and routing every session needs; a skill carries its when-to-use and how-to-invoke workflow; scripts and skill `references/` carry mechanics, schemas, and long detail; code comments carry local non-obvious rationale. Comment content: `Documents/C++StyleGuide.txt` rule 64. Review: `/progressive-disclosure-review` for the layering, `/comment-review` for comments.

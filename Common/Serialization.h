@@ -65,7 +65,7 @@ inline void ValidateDeserializedCountCapacity(int64_t iCount, int64_t iCapacity,
 template<typename T>
 int64_t VectorByteSize(const std::vector<T>& rVector)
 {
-	return rVector.size() * sizeof(T);
+	return std::ssize(rVector) * sizeof(T);
 }
 
 // XMVECTOR requires its dedicated overload with no generic raw-byte fallback. Reads native x64 object

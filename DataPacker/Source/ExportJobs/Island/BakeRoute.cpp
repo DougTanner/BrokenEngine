@@ -34,15 +34,15 @@ constexpr const char* kpcIntermediateFiles[] =
 // Gaea. SplitVersion.meta tracks fast post-Gaea splitting; bump kiSplitVersion for ProcessBakedRegion
 // crop/edge-taper or route column/row changes. AreLeavesDirty reruns only the split from existing raw
 // output.
-constexpr int32_t kiBakeVersion = 28;
-constexpr int32_t kiSplitVersion = 8;
+constexpr int64_t kiBakeVersion = 28;
+constexpr int64_t kiSplitVersion = 8;
 
 // The band straddles beach Z=0 independently of elevationMeters; its lower and upper bounds
 // separately control underwater and above-water coverage.
 constexpr float kfBeachSubdivisionMinMeters = -0.25f;
 constexpr float kfBeachSubdivisionMaxMeters = 0.5f;
 constexpr float kfBeachSubdivisionMaxEdgeMeters = 1.0f;
-constexpr int32_t kiBeachSubdivisionMaxDepth = 12;
+constexpr int64_t kiBeachSubdivisionMaxDepth = 12;
 
 constexpr const char* kpcBakeVersionFile = "BakeVersion.meta";
 constexpr const char* kpcSplitVersionFile = "SplitVersion.meta";
@@ -465,18 +465,18 @@ static void LoadMesherMesh(const std::filesystem::path& rIntermediatesDirectory,
 	const tinygltf::Accessor& rIndexAccessor = gltfModel.accessors.at(static_cast<size_t>(rPrimitive.indices));
 	const tinygltf::BufferView& rIndexView = gltfModel.bufferViews.at(static_cast<size_t>(rIndexAccessor.bufferView));
 	const tinygltf::Buffer& rIndexBuffer = gltfModel.buffers.at(static_cast<size_t>(rIndexView.buffer));
-	size_t uiIndexComponentBytes = 0;
+	int64_t iIndexComponentBytes = 0;
 	if (rIndexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
 	{
-		uiIndexComponentBytes = sizeof(uint32_t);
+		iIndexComponentBytes = sizeof(uint32_t);
 	}
 	else if (rIndexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
 	{
-		uiIndexComponentBytes = sizeof(uint16_t);
+		iIndexComponentBytes = sizeof(uint16_t);
 	}
 	else if (rIndexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
 	{
-		uiIndexComponentBytes = sizeof(uint8_t);
+		iIndexComponentBytes = sizeof(uint8_t);
 	}
 	else
 	{
@@ -486,17 +486,17 @@ static void LoadMesherMesh(const std::filesystem::path& rIntermediatesDirectory,
 	{
 		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices buffer view (byteOffset {}, byteLength {}) does not fit its {}-byte buffer.", meshGltfFile.string(), rIndexView.byteOffset, rIndexView.byteLength, rIndexBuffer.data.size()));
 	}
-	if (rIndexAccessor.byteOffset > rIndexView.byteLength || rIndexAccessor.count > (rIndexView.byteLength - rIndexAccessor.byteOffset) / uiIndexComponentBytes)
+	if (rIndexAccessor.byteOffset > rIndexView.byteLength || rIndexAccessor.count > (rIndexView.byteLength - rIndexAccessor.byteOffset) / iIndexComponentBytes)
 	{
-		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices accessor (byteOffset {}, count {}, {} byte(s) per index) runs past its buffer view (byteLength {}).", meshGltfFile.string(), rIndexAccessor.byteOffset, rIndexAccessor.count, uiIndexComponentBytes, rIndexView.byteLength));
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices accessor (byteOffset {}, count {}, {} byte(s) per index) runs past its buffer view (byteLength {}).", meshGltfFile.string(), rIndexAccessor.byteOffset, rIndexAccessor.count, iIndexComponentBytes, rIndexView.byteLength));
 	}
 	if (rIndexAccessor.count % 3 != 0)
 	{
 		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices accessor count {} is not a multiple of three.", meshGltfFile.string(), rIndexAccessor.count));
 	}
-	if ((rIndexView.byteOffset + rIndexAccessor.byteOffset) % uiIndexComponentBytes != 0)
+	if ((rIndexView.byteOffset + rIndexAccessor.byteOffset) % iIndexComponentBytes != 0)
 	{
-		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices start at byte {}, which is not aligned to the {}-byte index component.", meshGltfFile.string(), rIndexView.byteOffset + rIndexAccessor.byteOffset, uiIndexComponentBytes));
+		throw std::runtime_error(std::format("Gaea Mesher output \"{}\" indices start at byte {}, which is not aligned to the {}-byte index component.", meshGltfFile.string(), rIndexView.byteOffset + rIndexAccessor.byteOffset, iIndexComponentBytes));
 	}
 
 	int64_t iIndexCount = static_cast<int64_t>(rIndexAccessor.count);
@@ -529,11 +529,11 @@ static void LoadMesherMesh(const std::filesystem::path& rIntermediatesDirectory,
 		}
 	}
 
-	for (int64_t i = 0; uint32_t uiIndex : rMeshIndices)
+	for (int64_t i = 0; int64_t iIndex : rMeshIndices)
 	{
-		if (uiIndex >= static_cast<uint32_t>(iVertexCount))
+		if (iIndex >= static_cast<uint32_t>(iVertexCount))
 		{
-			throw std::runtime_error(std::format("Gaea Mesher output \"{}\" index {} references vertex {}, past the {} vertices in the mesh.", meshGltfFile.string(), i, uiIndex, iVertexCount));
+			throw std::runtime_error(std::format("Gaea Mesher output \"{}\" index {} references vertex {}, past the {} vertices in the mesh.", meshGltfFile.string(), i, iIndex, iVertexCount));
 		}
 		++i;
 	}
@@ -555,8 +555,8 @@ static void LoadMesherMesh(const std::filesystem::path& rIntermediatesDirectory,
 	};
 	int64_t iDepthCapHits = 0;
 	SubdivideBeachBand(rMeshPositions, rMeshIndices, subdivisionConfig, iDepthCapHits);
-	iVertexCount = static_cast<int64_t>(rMeshPositions.size() / 3);
-	iIndexCount = static_cast<int64_t>(rMeshIndices.size());
+	iVertexCount = std::ssize(rMeshPositions) / 3;
+	iIndexCount = std::ssize(rMeshIndices);
 
 	if (iDepthCapHits > 0)
 	{

@@ -30,14 +30,14 @@ void PointLightsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 		float fLightingIntensity = rPrevious.pfLightingIntensities[i];
 
 		// AllocateAndCopy preserves controller type, start time, and base rotation.
-		uint8_t uiControllerTypeIndex = rCurrent.puiControllerTypeIndices[i];
+		int64_t iControllerTypeIndex = rCurrent.puiControllerTypeIndices[i];
 		std::chrono::duration<float> startTime(rCurrent.pfStartTimes[i]);
 		float fBaseRotation = rCurrent.pfBaseRotations[i];
 
-		if (uiControllerTypeIndex != kuiInvalidControllerType)
+		if (iControllerTypeIndex != kiInvalidControllerType)
 		{
 			std::chrono::duration<float> elapsedTime = currentTime - startTime;
-			const ControllerType& rController = sControllerTypes.at(uiControllerTypeIndex);
+			const ControllerType& rController = sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
 
 			ControllerKeyframe interpolated = InterpolateScaledKeyframes(rController, elapsedTime.count(), [](ControllerType& rScaledController, const ControllerType& rOriginalController, int64_t j)
 			{
@@ -92,7 +92,7 @@ void PointLightsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFra
 {
 }
 
-void PointLightsPostRender::Add(game::Frame& __restrict rFrame, point_lights_t& rId, uint8_t uiTypeIndex)
+void PointLightsPostRender::Add(game::Frame& __restrict rFrame, point_lights_t& rId, int64_t iTypeIndex)
 {
 	ASSERT(!(rId.uuid.iValue != 0));
 
@@ -106,18 +106,18 @@ void PointLightsPostRender::Add(game::Frame& __restrict rFrame, point_lights_t& 
 
 	ZeroMemberRow(iSpawnIndex, rInterpolate.Members());
 	rInterpolate.pVecPositions[iSpawnIndex] = XMVectorSetW(XMVectorZero(), 1.0f);
-	rInterpolate.puiTypeIndices[iSpawnIndex] = uiTypeIndex;
-	rInterpolate.puiControllerTypeIndices[iSpawnIndex] = kuiInvalidControllerType;
+	rInterpolate.puiTypeIndices[iSpawnIndex] = static_cast<uint8_t>(iTypeIndex);
+	rInterpolate.puiControllerTypeIndices[iSpawnIndex] = static_cast<uint8_t>(kiInvalidControllerType);
 }
 
-void XM_CALLCONV PointLightsPostRender::AddControlled(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition, float fRotation)
+void XM_CALLCONV PointLightsPostRender::AddControlled(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fRotation)
 {
 	PointLightsInterpolate& rInterpolate = rFrame.interpolate.pointLights;
 	PointLightsPostRender& rPostRender = rFrame.postRender.pointLights;
 
-	const ControllerType& rController = PointLightsInterpolate::sControllerTypes.at(uiControllerTypeIndex);
+	const ControllerType& rController = PointLightsInterpolate::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
 
-	AddControlledElement(rInterpolate, rPostRender, currentTime.count(), uiControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
+	AddControlledElement(rInterpolate, rPostRender, currentTime.count(), iControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
 	{
 		GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
 	},
@@ -129,7 +129,7 @@ void XM_CALLCONV PointLightsPostRender::AddControlled(game::Frame& __restrict rF
 	},
 	[&rInterpolate, &rController, fRotation](int64_t iSpawnIndex)
 	{
-		rInterpolate.puiTypeIndices[iSpawnIndex] = rController.uiBaseTypeIndex;
+		rInterpolate.puiTypeIndices[iSpawnIndex] = static_cast<uint8_t>(rController.iBaseTypeIndex);
 		rInterpolate.pfVisibleAreas[iSpawnIndex] = rController.keyframes[0].fVisibleArea * (rController.ppVisibleAreaScales[0] != nullptr ? rController.ppVisibleAreaScales[0]->mfCurrent : 1.0f);
 		rInterpolate.pfVisibleIntensities[iSpawnIndex] = rController.keyframes[0].fVisibleIntensity * (rController.ppVisibleIntensityScales[0] != nullptr ? rController.ppVisibleIntensityScales[0]->mfCurrent : 1.0f);
 		rInterpolate.pfLightingAreas[iSpawnIndex] = rController.keyframes[0].fLightingArea * (rController.ppLightingAreaScales[0] != nullptr ? rController.ppLightingAreaScales[0]->mfCurrent : 1.0f);

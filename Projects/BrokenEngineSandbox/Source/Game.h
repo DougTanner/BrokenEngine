@@ -135,11 +135,32 @@ public:
 	engine::GridCoord mVisibleNeighbors[8] {};
 	int64_t miVisibleNeighborCount = 0;
 
+#if defined(BT_CLIENT)
+	// Harness-only viewer pin: set by set_client_grid_coord, cleared by release_client_grid_coord or Reset.
+	// Survives server load and replay restart so a recipe can hold one cell subscribed across playback loops.
+	bool mbClientGridCoordinatePinned = false;
+#endif
+
 	void SetClientGridCoordinate(engine::GridCoord coordinate)
 	{
+#if defined(BT_CLIENT)
+		if (mbClientGridCoordinatePinned)
+		{
+			return;
+		}
+#endif
 		mClientGridCoordinate = coordinate;
 		miVisibleNeighborCount = 0;
 	}
+
+#if defined(BT_CLIENT)
+	void PinClientGridCoordinate(engine::GridCoord coordinate)
+	{
+		mbClientGridCoordinatePinned = false;
+		SetClientGridCoordinate(coordinate);
+		mbClientGridCoordinatePinned = true;
+	}
+#endif
 
 private:
 

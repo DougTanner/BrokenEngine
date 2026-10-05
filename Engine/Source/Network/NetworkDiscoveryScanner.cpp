@@ -48,11 +48,11 @@ NetworkDiscoveryScanner::~NetworkDiscoveryScanner()
 
 void NetworkDiscoveryScanner::StartScan()
 {
-	uint32_t uiMagic = kuiDiscoveryMagic;
+	uint32_t uiMagic = static_cast<uint32_t>(kiDiscoveryMagic);
 
 	sockaddr_in localAddress {};
 	localAddress.sin_family = AF_INET;
-	localAddress.sin_port = htons(kuiDiscoveryPort);
+	localAddress.sin_port = htons(static_cast<uint16_t>(kiDiscoveryPort));
 	localAddress.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 	sendto(muiSocket, reinterpret_cast<const char*>(&uiMagic), sizeof(uiMagic), 0, reinterpret_cast<sockaddr*>(&localAddress), sizeof(localAddress));
 
@@ -60,7 +60,7 @@ void NetworkDiscoveryScanner::StartScan()
 	{
 		sockaddr_in broadcastAddress {};
 		broadcastAddress.sin_family = AF_INET;
-		broadcastAddress.sin_port = htons(kuiDiscoveryPort);
+		broadcastAddress.sin_port = htons(static_cast<uint16_t>(kiDiscoveryPort));
 		broadcastAddress.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 		sendto(muiSocket, reinterpret_cast<const char*>(&uiMagic), sizeof(uiMagic), 0, reinterpret_cast<sockaddr*>(&broadcastAddress), sizeof(broadcastAddress));
 	}
@@ -77,8 +77,8 @@ void NetworkDiscoveryScanner::Poll()
 	int iSenderLength = sizeof(senderAddress);
 	uint32_t uiMagic = 0;
 
-	int iReceived = recvfrom(muiSocket, reinterpret_cast<char*>(&uiMagic), sizeof(uiMagic), 0, reinterpret_cast<sockaddr*>(&senderAddress), &iSenderLength);
-	if (iReceived == sizeof(uiMagic) && uiMagic == kuiDiscoveryMagic)
+	int64_t iReceived = recvfrom(muiSocket, reinterpret_cast<char*>(&uiMagic), sizeof(uiMagic), 0, reinterpret_cast<sockaddr*>(&senderAddress), &iSenderLength);
+	if (iReceived == sizeof(uiMagic) && uiMagic == kiDiscoveryMagic)
 	{
 		uint8_t* pBytes = reinterpret_cast<uint8_t*>(&senderAddress.sin_addr);
 		std::snprintf(mpcFoundAddress, sizeof(mpcFoundAddress), "%u.%u.%u.%u", pBytes[0], pBytes[1], pBytes[2], pBytes[3]);

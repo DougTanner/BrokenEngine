@@ -78,7 +78,7 @@ private:
 	std::wstring GetEndpointIdentifier(IMMDevice* pDevice);
 	std::wstring InitializeAudioEndpoint();
 	void InitializeAudioSubsystems(const wchar_t* pcSelectedDeviceIdentifier);
-	WAVEFORMATEX MakePinnedOutputFormat(WORD uiChannels) const;
+	WAVEFORMATEX MakePinnedOutputFormat(int64_t iChannels) const;
 	void ConfigureLiveGraph(const wchar_t* pcSelectedDeviceIdentifier);
 	void FinishDeviceReset();
 	void AttemptSilentEngineRecovery();

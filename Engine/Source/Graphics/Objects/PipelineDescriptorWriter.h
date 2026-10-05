@@ -10,9 +10,9 @@ class Buffer;
 
 struct PipelineDescriptorWriter
 {
-	// Returns true if uiBinding has a non-zero descriptorCount in either shader's reflected layout.
+	// Returns true if iBinding has a non-zero descriptorCount in either shader's reflected layout.
 	// Exposed so deferred-update callers (TextureDescriptors::Register*) can validate at register time.
-	static bool BindingExistsInShaderLayout(const Pipeline& rPipeline, uint32_t uiBinding);
+	static bool BindingExistsInShaderLayout(const Pipeline& rPipeline, int64_t iBinding);
 
 	static void Write(Pipeline& rPipeline);
 	static void UpdateImageDescriptor(const Pipeline& rPipeline, int64_t iBinding, VkSampler vkSampler, VkImageView vkImageView, VkImageLayout vkImageLayout, VkDescriptorType vkDescriptorType);

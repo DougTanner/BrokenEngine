@@ -18,16 +18,16 @@ static std::wstring Utf8ToWide(std::string_view value)
 	{
 		return {};
 	}
-	int iCharacters = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0);
+	int64_t iCharacters = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0);
 	if (iCharacters == 0)
 	{
 		iCharacters = MultiByteToWideChar(CP_ACP, 0, value.data(), static_cast<int>(value.size()), nullptr, 0);
-		std::wstring wideValue(iCharacters, L'\0');
-		MultiByteToWideChar(CP_ACP, 0, value.data(), static_cast<int>(value.size()), wideValue.data(), iCharacters);
+		std::wstring wideValue(static_cast<size_t>(iCharacters), L'\0');
+		MultiByteToWideChar(CP_ACP, 0, value.data(), static_cast<int>(value.size()), wideValue.data(), static_cast<int>(iCharacters));
 		return wideValue;
 	}
-	std::wstring wideValue(iCharacters, L'\0');
-	MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), wideValue.data(), iCharacters);
+	std::wstring wideValue(static_cast<size_t>(iCharacters), L'\0');
+	MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), wideValue.data(), static_cast<int>(iCharacters));
 	return wideValue;
 }
 
@@ -38,9 +38,9 @@ static std::string NormalizeUtf8(std::string_view value)
 	{
 		return {};
 	}
-	int iBytes = WideCharToMultiByte(CP_UTF8, 0, wideValue.data(), static_cast<int>(wideValue.size()), nullptr, 0, nullptr, nullptr);
-	std::string utf8Value(iBytes, '\0');
-	WideCharToMultiByte(CP_UTF8, 0, wideValue.data(), static_cast<int>(wideValue.size()), utf8Value.data(), iBytes, nullptr, nullptr);
+	int64_t iBytes = WideCharToMultiByte(CP_UTF8, 0, wideValue.data(), static_cast<int>(wideValue.size()), nullptr, 0, nullptr, nullptr);
+	std::string utf8Value(static_cast<size_t>(iBytes), '\0');
+	WideCharToMultiByte(CP_UTF8, 0, wideValue.data(), static_cast<int>(wideValue.size()), utf8Value.data(), static_cast<int>(iBytes), nullptr, nullptr);
 	return utf8Value;
 }
 
@@ -52,13 +52,13 @@ static std::string BuildModalText(const Record& rRecord)
 	}
 
 	std::string text;
-	for (size_t i = 0; i < rRecord.exportFailures.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(rRecord.exportFailures); ++i)
 	{
 		if (i > 0)
 		{
 			text.append("\n\n");
 		}
-		const ExportFailure& rFailure = rRecord.exportFailures.at(i);
+		const ExportFailure& rFailure = rRecord.exportFailures.at(static_cast<size_t>(i));
 		if (rFailure.assetPath)
 		{
 			text.append("Asset: ");
@@ -91,8 +91,8 @@ ButtonResult Report(const Record& rRecord)
 	static const bool sbNoninteractiveEnvironment = []()
 	{
 		wchar_t pcNoninteractive[2] {};
-		DWORD uiNoninteractiveLength = GetEnvironmentVariableW(L"BT_DATAPACKER_NONINTERACTIVE", pcNoninteractive, static_cast<DWORD>(std::size(pcNoninteractive)));
-		return uiNoninteractiveLength == 1 && pcNoninteractive[0] == L'1';
+		int64_t iNoninteractiveLength = GetEnvironmentVariableW(L"BT_DATAPACKER_NONINTERACTIVE", pcNoninteractive, static_cast<DWORD>(std::size(pcNoninteractive)));
+		return iNoninteractiveLength == 1 && pcNoninteractive[0] == L'1';
 	}();
 	if (sbNoninteractiveEnvironment)
 	{
@@ -120,7 +120,7 @@ ButtonResult Report(const Record& rRecord)
 	}
 	std::wstring title = Utf8ToWide(NormalizeUtf8(rRecord.title));
 	std::wstring message = Utf8ToWide(text);
-	int iResult = MessageBoxW(nullptr, message.c_str(), title.c_str(), uiFlags);
+	int64_t iResult = MessageBoxW(nullptr, message.c_str(), title.c_str(), uiFlags);
 	return rRecord.eButtons == ButtonContract::kOk || iResult == IDOK ? ButtonResult::kAcknowledged : ButtonResult::kCancelled;
 }
 

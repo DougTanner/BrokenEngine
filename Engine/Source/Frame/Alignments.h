@@ -9,7 +9,7 @@ struct AlignmentIdentifier
 	uint32_t uiValue = 0;
 
 	constexpr AlignmentIdentifier() = default;
-	constexpr explicit AlignmentIdentifier(uint32_t uiValue) : uiValue(uiValue)
+	constexpr explicit AlignmentIdentifier(int64_t iValue) : uiValue(static_cast<uint32_t>(iValue))
 	{
 	}
 

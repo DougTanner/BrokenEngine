@@ -50,9 +50,14 @@ backticks:
 - `Targets` — Git pathspecs passed to `git ls-files`, exclude magic allowed.
   The coordinator rejects a target under `.agents/`.
 - `Batches` — optional directory prefixes that are batches of their own; every
-  other target file batches by its top-level directory. List here every
-  directory holding more than 20 C++ files, and order the stage Plans so an
-  area is swept before the areas that consume its renames.
+  other target file batches by its top-level directory. The listed order is the
+  run order: the listed batches run first, in that order, then the remaining
+  top-level directories by name, so list every area whose run order matters
+  relative to another. Each file goes to the first listed prefix it falls under,
+  so list a deeper prefix before its parent; listed after it, the deeper prefix
+  gets no files. List here every directory holding more than 20 C++ files, and
+  order the stage Plans so an area is swept before the areas that consume its
+  renames.
 
 A type whose `## Find rules` defers to the Plan (`cpp-adoption`, `document`)
 also needs a `## Sweep rules` section: what FIND looks for, the target form,
@@ -63,8 +68,8 @@ every other file is its own unit.
 
 The stage baseline is the SHA in `Temp/Sweep/Baseline.txt`, which the first
 `-Batch` run writes. The `BATCH-DONE` and `CLOSE-DONE` lines end in the fields
-`cpp=yes|no`, `builds=<targets>`, `profile=yes|no`, and `replay=yes|no`,
-which the coordinator derives from the C++ files changed since the baseline.
+`cpp=yes|no`, `builds=<targets>`, and `profile=yes|no`, which the coordinator
+derives from the C++ files changed since the baseline.
 DataPacker, WorktreeCli, and AgentHarness build in Release only (`/compile`
 `## Inputs`).
 
@@ -75,11 +80,12 @@ DataPacker, WorktreeCli, and AgentHarness build in Release only (`/compile`
    `(recommended)` first. Done when the user has chosen; that slug is `-Model`
    for every `-Batch` and `-Close` launch.
 2. Run `pwsh -NoProfile -File .agents/skills/sweep/scripts/Invoke-Sweep.ps1 -Plan <Plan> -List`.
-   Done when it prints each batch name with its unit count.
+   Done when it prints each batch name with its unit count, in run order.
 
 ### Per batch
 
-Run the batches one after another, with no commit before landing.
+Run the batches one after another in the order step 2 printed them, with no
+commit before landing.
 
 3. Delete `Temp/Sweep/Status.txt` if present, then launch the coordinator
    detached, because a batch outlives the 2-hour background-task limit:
@@ -88,6 +94,9 @@ Run the batches one after another, with no commit before landing.
    Start-Process pwsh -WindowStyle Hidden -WorkingDirectory '<worktree root>' -ArgumentList '-NoProfile','-File','.agents/skills/sweep/scripts/Invoke-Sweep.ps1','-Plan','<Plan>','-Model','<slug>','-Batch','<batch>'
    ```
 
+   When the user asks for more or less parallelism, append `'-Throttle','<n>'`
+   to a `-Batch` launch to set how many of the batch's units run at once
+   (default 8).
    Done when the process has started.
 4. Wait with a Monitor until-loop until `Temp/Sweep/Status.txt` exists and no
    longer reads `RUNNING`; the delete in step 3 keeps the previous run's final
@@ -123,10 +132,7 @@ Run the batches one after another, with no commit before landing.
     `/compile` for its `builds=` targets: Client and Server in Debug and
     Release, plus Profile when the line reads `profile=yes`; the others in
     Release. Done when every build passes or the line reads `cpp=no`.
-11. When the `CLOSE-DONE` line reads `replay=yes`, run the `/agent-harness`
-    replay determinism check. Done when it passes or the line reads
-    `replay=no`.
-12. Report the stage per `## Handoff`, then land through `/next-plan` steps
+11. Report the stage per `## Handoff`, then land through `/next-plan` steps
     9-11. Done when `/next-plan` step 11 is done.
 
 ## Handoff
@@ -144,7 +150,10 @@ fixes applied, deferred entries, and the deferred-fixes record path the type's
   `/repo-code-review`, `/comment-review` dispatch, `/coherence-review`,
   `/update-claude-docs`, or `/verify-acceptance`. A sweep keeps the per-batch
   and stage builds, the static checks, ordering fixes through
-  `/resolve-findings`, the replay check, and the landing gate.
+  `/resolve-findings`, and the landing gate. Any further review or runtime
+  verification of the stage's change is main's decision: main follows the
+  review the Plan states, or, when the Plan states none, asks the user before
+  step 11.
 - The `/finalize-changes` brief supplies the sweep outputs for the landing
   acceptance-table rows
   ([`landing-acceptance-table.md`](../finalize-changes/references/landing-acceptance-table.md)

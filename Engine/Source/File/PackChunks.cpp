@@ -163,7 +163,7 @@ data::DataTypes DataTypeFromFlags(const common::ChunkFlags_t& rFlags)
 // location or a chunk header, so one corrupt value would address memory outside the real pack file. Both helpers
 // run before a chunk is published, so corrupt data is never consumed. Each returns nullptr when the data is
 // valid, or the reason to report through FailMissingRequiredAsset.
-static const char* ValidateChunkLocation(uint64_t uiPackFileSize, const common::ChunkLocation& rChunkLocation)
+static const char* ValidateChunkLocation(int64_t iPackFileSize, const common::ChunkLocation& rChunkLocation)
 {
 	if (rChunkLocation.uiOffset % static_cast<uint64_t>(common::kiAlignmentBytes) != 0)
 	{
@@ -173,11 +173,11 @@ static const char* ValidateChunkLocation(uint64_t uiPackFileSize, const common::
 	{
 		return "chunk smaller than its header";
 	}
-	if (rChunkLocation.uiOffset > uiPackFileSize)
+	if (rChunkLocation.uiOffset > static_cast<uint64_t>(iPackFileSize))
 	{
 		return "chunk range outside pack file";
 	}
-	if (rChunkLocation.uiSize > uiPackFileSize - rChunkLocation.uiOffset)
+	if (rChunkLocation.uiSize > static_cast<uint64_t>(iPackFileSize) - rChunkLocation.uiOffset)
 	{
 		return "chunk range outside pack file";
 	}
@@ -322,14 +322,14 @@ void PackChunks::LoadPackFiles()
 			FailMissingRequiredAsset(mPackFilePaths[i], "pack file missing or unreadable");
 		}
 		packStream.seekg(0, std::ios::end);
-		uint64_t uiPackFileSize = static_cast<uint64_t>(packStream.tellg());
+		int64_t iPackFileSize = static_cast<int64_t>(packStream.tellg());
 		if (!packStream.good())
 		{
 			FailMissingRequiredAsset(mPackFilePaths[i], "pack file size unreadable");
 		}
 		for (const common::ChunkLocation& rChunkLocation : mChunkLocations[i])
 		{
-			if (const char* pcReason = ValidateChunkLocation(uiPackFileSize, rChunkLocation); pcReason != nullptr)
+			if (const char* pcReason = ValidateChunkLocation(iPackFileSize, rChunkLocation); pcReason != nullptr)
 			{
 				FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
 			}
@@ -464,28 +464,28 @@ void PackChunks::LoadPackFiles()
 			std::vector<std::byte>& rPackBytes = mPackFileData[i];
 
 			std::error_code packFileSizeError;
-			uintmax_t uiPackFileSize = std::filesystem::file_size(mPackFilePaths[i], packFileSizeError);
+			int64_t iPackFileSize = static_cast<int64_t>(std::filesystem::file_size(mPackFilePaths[i], packFileSizeError));
 			if (packFileSizeError)
 			{
 				FailMissingRequiredAsset(mPackFilePaths[i], "pack file size unreadable");
 			}
-			rPackBytes.resize(uiPackFileSize);
+			rPackBytes.resize(static_cast<size_t>(iPackFileSize));
 			std::fstream packStream(mPackFilePaths[i], std::ios::in | std::ios::binary);
 			if (!packStream)
 			{
 				FailMissingRequiredAsset(mPackFilePaths[i], "pack file could not be opened for eager loading");
 			}
-			packStream.read(reinterpret_cast<char*>(rPackBytes.data()), rPackBytes.size());
-			if (!packStream || packStream.gcount() != static_cast<std::streamsize>(rPackBytes.size()))
+			packStream.read(reinterpret_cast<char*>(rPackBytes.data()), static_cast<std::streamsize>(std::ssize(rPackBytes)));
+			if (!packStream || packStream.gcount() != static_cast<std::streamsize>(std::ssize(rPackBytes)))
 			{
 				FailMissingRequiredAsset(mPackFilePaths[i], "pack file truncated during eager loading");
 			}
 			packStream.close();
 
-			uiPackFileSize = rPackBytes.size();
+			iPackFileSize = std::ssize(rPackBytes);
 			for (const common::ChunkLocation& rChunkLocation : mChunkLocations[i])
 			{
-				if (const char* pcReason = ValidateChunkLocation(uiPackFileSize, rChunkLocation); pcReason != nullptr)
+				if (const char* pcReason = ValidateChunkLocation(iPackFileSize, rChunkLocation); pcReason != nullptr)
 				{
 					FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
 				}
@@ -494,9 +494,9 @@ void PackChunks::LoadPackFiles()
 				{
 					FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
 				}
-				uint64_t uiDataOffset = rChunkLocation.uiOffset + common::kiChunkDataOffset;
+				int64_t iDataOffset = static_cast<int64_t>(rChunkLocation.uiOffset + common::kiChunkDataOffset);
 
-				mEagerChunkMap.try_emplace(rChunkLocation.crc, EagerChunk { .pHeader = pChunkHeader, .pData = rPackBytes.data() + uiDataOffset, .iDataSize = static_cast<int64_t>(rChunkLocation.uiSize - common::kiChunkDataOffset), });
+				mEagerChunkMap.try_emplace(rChunkLocation.crc, EagerChunk { .pHeader = pChunkHeader, .pData = rPackBytes.data() + iDataOffset, .iDataSize = static_cast<int64_t>(rChunkLocation.uiSize - common::kiChunkDataOffset), });
 
 				LOG(kLoading, kDebug, "Eager chunk {} \"{}\" size {}", rChunkLocation.crc, std::string_view(pChunkHeader->pcPath), rChunkLocation.uiSize);
 			}
@@ -596,7 +596,7 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 	}
 }
 
-bool PackChunks::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer)
+bool PackChunks::ReadChunkData(common::crc_t crc, int64_t iOffset, std::span<std::byte> buffer)
 {
 	// Check eager chunks first. No locking needed: they are read-only once the async eager load publishes
 	// mbEagerLoadComplete — skip the lookup until then so a boot-window read can't race the populating task.
@@ -609,12 +609,12 @@ bool PackChunks::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<s
 			// Use the chunk-table data extent, not pHeader->iSize: a scene chunk's iSize excludes its appended animation section
 			int64_t iDataSize = rEagerChunk.iDataSize;
 
-			if (uiOffset + buffer.size() > static_cast<uint64_t>(iDataSize))
+			if (iOffset + buffer.size() > static_cast<uint64_t>(iDataSize))
 			{
 				return false;
 			}
 
-			std::memcpy(buffer.data(), rEagerChunk.pData + uiOffset, buffer.size());
+			std::memcpy(buffer.data(), rEagerChunk.pData + iOffset, buffer.size());
 			return true;
 		}
 	}
@@ -633,12 +633,12 @@ bool PackChunks::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<s
 			// reaching this path would copy from decommitted memory. eState is the authority for non-texture reads.
 			ASSERT(!(rLazyChunk.header.flags & common::ChunkFlags::kTexture));
 
-			if (uiOffset + buffer.size() > static_cast<uint64_t>(rLazyChunk.iDataSize))
+			if (iOffset + buffer.size() > static_cast<uint64_t>(rLazyChunk.iDataSize))
 			{
 				return false;
 			}
 
-			std::memcpy(buffer.data(), rLazyChunk.pData + uiOffset, buffer.size());
+			std::memcpy(buffer.data(), rLazyChunk.pData + iOffset, buffer.size());
 			return true;
 		}
 
@@ -656,13 +656,13 @@ bool PackChunks::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<s
 		int64_t iDataOffset = rLazyChunk.location.uiOffset + common::kiChunkDataOffset;
 		int64_t iDataSize = rLazyChunk.location.uiSize - common::kiChunkDataOffset;
 
-		if (uiOffset + buffer.size() > static_cast<uint64_t>(iDataSize))
+		if (iOffset + buffer.size() > static_cast<uint64_t>(iDataSize))
 		{
 			packStream.close();
 			return false;
 		}
 
-		packStream.seekg(iDataOffset + uiOffset);
+		packStream.seekg(iDataOffset + iOffset);
 		packStream.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
 		// Past the bounds check above, a short read means the pack file itself is truncated.
 		ASSERT(packStream.good());
@@ -676,16 +676,16 @@ bool PackChunks::ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<s
 
 #if defined(BT_CLIENT)
 
-ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer)
+ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, int64_t iOffset, std::span<std::byte> buffer)
 {
 	auto ClearRequest = [&rRequest]
 	{
 		rRequest.mpPackChunks = nullptr;
-		rRequest.muiEntryIndex = kuiInvalidAudioReadEntry;
+		rRequest.miEntryIndex = kiInvalidAudioReadEntry;
 		rRequest.muiGeneration = 0;
 		rRequest.muiCrc = 0;
-		rRequest.muiOffset = 0;
-		rRequest.muiLength = 0;
+		rRequest.miOffset = 0;
+		rRequest.miLength = 0;
 	};
 
 	if (rRequest.mpPackChunks != nullptr)
@@ -695,7 +695,7 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 			rRequest.Reset();
 			return ChunkReadResult::kFailed;
 		}
-		if (rRequest.muiEntryIndex >= mAudioReadEntries.size())
+		if (rRequest.miEntryIndex >= std::ssize(mAudioReadEntries))
 		{
 			rRequest.Reset();
 			return ChunkReadResult::kFailed;
@@ -705,18 +705,18 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 			rRequest.Reset();
 			return ChunkReadResult::kFailed;
 		}
-		if (rRequest.muiOffset != uiOffset)
+		if (rRequest.miOffset != iOffset)
 		{
 			rRequest.Reset();
 			return ChunkReadResult::kFailed;
 		}
-		if (rRequest.muiLength != buffer.size())
+		if (rRequest.miLength != std::ssize(buffer))
 		{
 			rRequest.Reset();
 			return ChunkReadResult::kFailed;
 		}
 
-		AudioChunkReadEntry& rEntry = mAudioReadEntries[rRequest.muiEntryIndex];
+		AudioChunkReadEntry& rEntry = mAudioReadEntries[static_cast<size_t>(rRequest.miEntryIndex)];
 		uint64_t uiOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
 		if (AudioReadGeneration(uiOwnership) != rRequest.muiGeneration)
 		{
@@ -737,20 +737,20 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 			CancelChunkRead(rRequest);
 			return ChunkReadResult::kFailed;
 		}
-		if (rEntry.uiOffset != uiOffset)
+		if (rEntry.iOffset != iOffset)
 		{
 			CancelChunkRead(rRequest);
 			return ChunkReadResult::kFailed;
 		}
-		if (rEntry.uiLength != buffer.size())
+		if (rEntry.iLength != std::ssize(buffer))
 		{
 			CancelChunkRead(rRequest);
 			return ChunkReadResult::kFailed;
 		}
 
-		std::memcpy(buffer.data(), rEntry.data.data(), rEntry.uiLength);
+		std::memcpy(buffer.data(), rEntry.data.data(), static_cast<size_t>(rEntry.iLength));
 #if defined(BT_DEBUG)
-		AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillReady, rRequest.muiEntryIndex, crc, uiOffset, rEntry.uiLength, AudioStreamingFixtureQueueState::kReady, rRequest.muiGeneration, false);
+		AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillReady, rRequest.miEntryIndex, crc, iOffset, rEntry.iLength, AudioStreamingFixtureQueueState::kReady, rRequest.muiGeneration, false);
 #endif
 		uint64_t uiFreeOwnership = PackAudioReadOwnership(AudioChunkReadState::kFree, rRequest.muiGeneration);
 		if (!rEntry.uiOwnership.compare_exchange_strong(uiOwnership, uiFreeOwnership, std::memory_order_acq_rel))
@@ -781,11 +781,11 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 	{
 		return ChunkReadResult::kFailed;
 	}
-	if (uiOffset > static_cast<uint64_t>(rLazyChunk.iDataSize))
+	if (static_cast<uint64_t>(iOffset) > static_cast<uint64_t>(rLazyChunk.iDataSize))
 	{
 		return ChunkReadResult::kFailed;
 	}
-	if (buffer.size() > static_cast<uint64_t>(rLazyChunk.iDataSize) - uiOffset)
+	if (buffer.size() > static_cast<uint64_t>(rLazyChunk.iDataSize) - static_cast<uint64_t>(iOffset))
 	{
 		return ChunkReadResult::kFailed;
 	}
@@ -794,23 +794,23 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 	{
 		return ChunkReadResult::kFailed;
 	}
-	uint64_t uiPackDataSize = rLazyChunk.location.uiSize - common::kiChunkDataOffset;
-	if (uiOffset > uiPackDataSize)
+	int64_t iPackDataSize = static_cast<int64_t>(rLazyChunk.location.uiSize - common::kiChunkDataOffset);
+	if (iOffset > iPackDataSize)
 	{
 		return ChunkReadResult::kFailed;
 	}
-	if (buffer.size() > uiPackDataSize - uiOffset)
+	if (std::ssize(buffer) > iPackDataSize - iOffset)
 	{
 		return ChunkReadResult::kFailed;
 	}
 
 	if (rLazyChunk.eState.value.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
 	{
-		std::memcpy(buffer.data(), rLazyChunk.pData + uiOffset, buffer.size());
+		std::memcpy(buffer.data(), rLazyChunk.pData + iOffset, buffer.size());
 		return ChunkReadResult::kReady;
 	}
 
-	for (uint32_t i = 0; i < mAudioReadEntries.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(mAudioReadEntries); ++i)
 	{
 		AudioChunkReadEntry& rEntry = mAudioReadEntries[i];
 		uint64_t uiFreeOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
@@ -821,14 +821,14 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 
 		uint64_t uiGeneration = NextAudioReadGeneration(AudioReadGeneration(uiFreeOwnership));
 		rEntry.crc = crc;
-		rEntry.uiOffset = uiOffset;
-		rEntry.uiLength = buffer.size();
+		rEntry.iOffset = iOffset;
+		rEntry.iLength = std::ssize(buffer);
 		rRequest.mpPackChunks = this;
-		rRequest.muiEntryIndex = i;
+		rRequest.miEntryIndex = i;
 		rRequest.muiGeneration = uiGeneration;
 		rRequest.muiCrc = crc;
-		rRequest.muiOffset = uiOffset;
-		rRequest.muiLength = buffer.size();
+		rRequest.miOffset = iOffset;
+		rRequest.miLength = std::ssize(buffer);
 		uint64_t uiQueuedOwnership = PackAudioReadOwnership(AudioChunkReadState::kQueued, uiGeneration);
 		if (!rEntry.uiOwnership.compare_exchange_strong(uiFreeOwnership, uiQueuedOwnership, std::memory_order_release, std::memory_order_acquire))
 		{
@@ -836,7 +836,7 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 			continue;
 		}
 #if defined(BT_DEBUG)
-		AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillQueued, i, crc, uiOffset, buffer.size(), AudioStreamingFixtureQueueState::kQueued, uiGeneration, false);
+		AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillQueued, i, crc, iOffset, buffer.size(), AudioStreamingFixtureQueueState::kQueued, uiGeneration, false);
 #endif
 		mLoader.PublishWake();
 		return ChunkReadResult::kPending;
@@ -854,12 +854,12 @@ void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 	{
 		return;
 	}
-	if (rRequest.muiEntryIndex >= mAudioReadEntries.size())
+	if (rRequest.miEntryIndex >= std::ssize(mAudioReadEntries))
 	{
 		return;
 	}
 
-	AudioChunkReadEntry& rEntry = mAudioReadEntries[rRequest.muiEntryIndex];
+	AudioChunkReadEntry& rEntry = mAudioReadEntries[static_cast<size_t>(rRequest.miEntryIndex)];
 	uint64_t uiRequestGeneration = rRequest.muiGeneration;
 	uint64_t uiOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
 	while (AudioReadGeneration(uiOwnership) == uiRequestGeneration)
@@ -877,18 +877,18 @@ void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 		if (rEntry.uiOwnership.compare_exchange_weak(uiOwnership, uiCancelledOwnership, std::memory_order_acq_rel))
 		{
 #if defined(BT_DEBUG)
-			AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillCancelled, rRequest.muiEntryIndex, rRequest.muiCrc, rRequest.muiOffset, rRequest.muiLength, static_cast<AudioStreamingFixtureQueueState>(eState), uiRequestGeneration, eState != AudioChunkReadState::kLoading);
+			AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillCancelled, rRequest.miEntryIndex, rRequest.muiCrc, rRequest.miOffset, rRequest.miLength, static_cast<AudioStreamingFixtureQueueState>(eState), uiRequestGeneration, eState != AudioChunkReadState::kLoading);
 #endif
 			break;
 		}
 	}
 
 	rRequest.mpPackChunks = nullptr;
-	rRequest.muiEntryIndex = kuiInvalidAudioReadEntry;
+	rRequest.miEntryIndex = kiInvalidAudioReadEntry;
 	rRequest.muiGeneration = 0;
 	rRequest.muiCrc = 0;
-	rRequest.muiOffset = 0;
-	rRequest.muiLength = 0;
+	rRequest.miOffset = 0;
+	rRequest.miLength = 0;
 }
 
 bool PackChunks::HasQueuedAudioRead() const
@@ -916,9 +916,9 @@ bool PackChunks::HasOccupiedAudioRead() const
 	});
 }
 
-bool PackChunks::TryClaimAudioRead(uint32_t& ruiIndex, uint64_t& ruiGeneration)
+bool PackChunks::TryClaimAudioRead(int64_t& riIndex, uint64_t& ruiGeneration)
 {
-	for (uint32_t i = 0; i < mAudioReadEntries.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(mAudioReadEntries); ++i)
 	{
 		AudioChunkReadEntry& rEntry = mAudioReadEntries[i];
 		uint64_t uiQueuedOwnership = rEntry.uiOwnership.load(std::memory_order_acquire);
@@ -930,7 +930,7 @@ bool PackChunks::TryClaimAudioRead(uint32_t& ruiIndex, uint64_t& ruiGeneration)
 		uint64_t uiLoadingOwnership = PackAudioReadOwnership(AudioChunkReadState::kLoading, uiGeneration);
 		if (rEntry.uiOwnership.compare_exchange_strong(uiQueuedOwnership, uiLoadingOwnership, std::memory_order_acq_rel))
 		{
-			ruiIndex = i;
+			riIndex = i;
 			ruiGeneration = uiGeneration;
 			return true;
 		}
@@ -954,18 +954,18 @@ void PackChunks::AcknowledgeQueuedAudioReads()
 	}
 }
 
-void PackChunks::LoadAudioRead(uint32_t uiIndex, uint64_t uiGeneration, int64_t iThreadIndex)
+void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iThreadIndex)
 {
-	AudioChunkReadEntry& rEntry = mAudioReadEntries[uiIndex];
+	AudioChunkReadEntry& rEntry = mAudioReadEntries[static_cast<size_t>(iIndex)];
 	common::crc_t crc = rEntry.crc;
-	uint64_t uiOffset = rEntry.uiOffset;
-	uint64_t uiLength = rEntry.uiLength;
+	int64_t iOffset = rEntry.iOffset;
+	int64_t iLength = rEntry.iLength;
 #if defined(BT_DEBUG)
 	AudioStreamingFixturePartition ePartition = iThreadIndex == 0
 		? AudioStreamingFixturePartition::kLoader0
 		: AudioStreamingFixturePartition::kLoader1;
-	AudioStreamingFixture::Record(ePartition, AudioStreamingFixturePhase::kRefillLoading, uiIndex, crc, uiOffset, uiLength, AudioStreamingFixtureQueueState::kLoading, uiGeneration, false);
-	bool bHeld = AudioStreamingFixture::HoldAudioRead(crc, uiOffset, uiLength, uiIndex, uiGeneration);
+	AudioStreamingFixture::Record(ePartition, AudioStreamingFixturePhase::kRefillLoading, iIndex, crc, iOffset, iLength, AudioStreamingFixtureQueueState::kLoading, uiGeneration, false);
+	bool bHeld = AudioStreamingFixture::HoldAudioRead(crc, iOffset, iLength, iIndex, uiGeneration);
 #endif
 
 	const LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
@@ -980,6 +980,9 @@ void PackChunks::LoadAudioRead(uint32_t uiIndex, uint64_t uiGeneration, int64_t 
 		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range pack handle is unavailable");
 	}
 
+	// Pack file offsets are unsigned on disk, so the overflow guards below run in uint64_t.
+	uint64_t uiOffset = static_cast<uint64_t>(iOffset);
+	uint64_t uiLength = static_cast<uint64_t>(iLength);
 	uint64_t uiDataFileOffset = rLazyChunk.location.uiOffset + common::kiChunkDataOffset;
 	if (uiDataFileOffset < rLazyChunk.location.uiOffset)
 	{
@@ -1050,7 +1053,7 @@ void PackChunks::LoadAudioRead(uint32_t uiIndex, uint64_t uiGeneration, int64_t 
 		VERIFY_SUCCESS(rEntry.uiOwnership.compare_exchange_strong(uiExpectedOwnership, uiFreeOwnership, std::memory_order_acq_rel));
 	}
 #if defined(BT_DEBUG)
-	AudioStreamingFixture::Record(ePartition, bCurrent ? AudioStreamingFixturePhase::kRefillReady : AudioStreamingFixturePhase::kRefillCancelled, uiIndex, crc, uiOffset, uiLength, bCurrent ? AudioStreamingFixtureQueueState::kReady : AudioStreamingFixtureQueueState::kFree, uiGeneration, !bCurrent);
+	AudioStreamingFixture::Record(ePartition, bCurrent ? AudioStreamingFixturePhase::kRefillReady : AudioStreamingFixturePhase::kRefillCancelled, iIndex, crc, iOffset, iLength, bCurrent ? AudioStreamingFixtureQueueState::kReady : AudioStreamingFixtureQueueState::kFree, uiGeneration, !bCurrent);
 	AudioStreamingFixture::CompleteAudioRead(bHeld);
 #endif
 	mLoader.NotifyChunkCompletion();
@@ -1059,7 +1062,7 @@ void PackChunks::LoadAudioRead(uint32_t uiIndex, uint64_t uiGeneration, int64_t 
 
 #endif // BT_CLIENT
 
-void PackChunks::DecommitChunkRange(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength)
+void PackChunks::DecommitChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength)
 {
 	// Reclaim a dead sub-range of a resident lazy chunk. Only the page-aligned interior is decommitted, so the
 	// boundary partial-pages — which may share bytes with the neighbouring heightmap/hull payload — stay committed;
@@ -1067,28 +1070,28 @@ void PackChunks::DecommitChunkRange(common::crc_t crc, uint64_t uiOffset, uint64
 	// reservation, so they are untouched. Main-thread only, with no concurrent reader of the range.
 	// A failed MEM_DECOMMIT is benign (the pages simply stay committed) so its result is not checked.
 	LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
-	uintptr_t uiRangeStart = reinterpret_cast<uintptr_t>(rLazyChunk.pData) + uiOffset;
-	uintptr_t uiRangeEnd = uiRangeStart + uiLength;
-	uintptr_t uiAlignedStart = common::RoundUp(uiRangeStart, static_cast<uintptr_t>(miPageSize));
-	uintptr_t uiAlignedEnd = common::RoundDown(uiRangeEnd, static_cast<uintptr_t>(miPageSize));
-	if (uiAlignedEnd > uiAlignedStart)
+	int64_t iRangeStart = reinterpret_cast<int64_t>(rLazyChunk.pData) + iOffset;
+	int64_t iRangeEnd = iRangeStart + iLength;
+	int64_t iAlignedStart = common::RoundUp(iRangeStart, miPageSize);
+	int64_t iAlignedEnd = common::RoundDown(iRangeEnd, miPageSize);
+	if (iAlignedEnd > iAlignedStart)
 	{
 		// MEM_RELEASE would discard the pool reservation that RecommitAndReloadChunkRange recommits at this address.
 #pragma warning(suppress: 6250) // Intentional MEM_DECOMMIT; retaining the lazy-pool reservation is required.
-		VirtualFree(reinterpret_cast<void*>(uiAlignedStart), static_cast<SIZE_T>(uiAlignedEnd - uiAlignedStart), MEM_DECOMMIT);
+		VirtualFree(reinterpret_cast<void*>(iAlignedStart), static_cast<SIZE_T>(iAlignedEnd - iAlignedStart), MEM_DECOMMIT);
 	}
 }
 
-bool PackChunks::RecommitAndReloadChunkRange(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength)
+bool PackChunks::RecommitAndReloadChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength)
 {
 	// Inverse of DecommitChunkRange for device-loss recovery: re-commit the same page-aligned interior, then re-read
-	// the whole [uiOffset, uiOffset + uiLength) range straight from the pack file on disk. ReadChunkData cannot serve
+	// the whole [iOffset, iOffset + iLength) range straight from the pack file on disk. ReadChunkData cannot serve
 	// this — for a loaded chunk it copies from the (now-decommitted) resident pool and would fault — so read directly.
 	LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
 	// Compressed chunks store decompressed bytes in the pool, so a raw disk reload corrupts that representation without
 	// necessarily crashing. This path requires uncompressed chunks; island chunks satisfy that contract.
 	ASSERT(!common::IsCompressed(rLazyChunk.header.flags));
-	if (!RecommitChunkRange(crc, rLazyChunk, uiOffset, uiLength))
+	if (!RecommitChunkRange(crc, rLazyChunk, iOffset, iLength))
 	{
 		return false;
 	}
@@ -1104,24 +1107,24 @@ bool PackChunks::RecommitAndReloadChunkRange(common::crc_t crc, uint64_t uiOffse
 		DEBUG_BREAK();
 		return false;
 	}
-	packStream.seekg(iDataOffset + static_cast<int64_t>(uiOffset));
-	packStream.read(reinterpret_cast<char*>(rLazyChunk.pData + uiOffset), static_cast<std::streamsize>(uiLength));
+	packStream.seekg(iDataOffset + iOffset);
+	packStream.read(reinterpret_cast<char*>(rLazyChunk.pData + iOffset), static_cast<std::streamsize>(iLength));
 	ASSERT(packStream.good());
 
 	return true;
 }
 
-bool PackChunks::RecommitChunkRange(common::crc_t crc, const LazyChunk& rLazyChunk, uint64_t uiOffset, uint64_t uiLength)
+bool PackChunks::RecommitChunkRange(common::crc_t crc, const LazyChunk& rLazyChunk, int64_t iOffset, int64_t iLength)
 {
-	uintptr_t uiRangeStart = reinterpret_cast<uintptr_t>(rLazyChunk.pData) + uiOffset;
-	uintptr_t uiRangeEnd = uiRangeStart + uiLength;
-	uintptr_t uiAlignedStart = common::RoundUp(uiRangeStart, static_cast<uintptr_t>(miPageSize));
-	uintptr_t uiAlignedEnd = common::RoundDown(uiRangeEnd, static_cast<uintptr_t>(miPageSize));
-	if (uiAlignedEnd > uiAlignedStart)
+	int64_t iRangeStart = reinterpret_cast<int64_t>(rLazyChunk.pData) + iOffset;
+	int64_t iRangeEnd = iRangeStart + iLength;
+	int64_t iAlignedStart = common::RoundUp(iRangeStart, miPageSize);
+	int64_t iAlignedEnd = common::RoundDown(iRangeEnd, miPageSize);
+	if (iAlignedEnd > iAlignedStart)
 	{
 		// VirtualAlloc result is an OS trust boundary: on failure the interior stays decommitted and the read below
 		// would fault, so fail the recommit soft (leave the range as-is) rather than crash the recovery path.
-		if (VirtualAlloc(reinterpret_cast<void*>(uiAlignedStart), static_cast<SIZE_T>(uiAlignedEnd - uiAlignedStart), MEM_COMMIT, PAGE_READWRITE) == nullptr)
+		if (VirtualAlloc(reinterpret_cast<void*>(iAlignedStart), static_cast<SIZE_T>(iAlignedEnd - iAlignedStart), MEM_COMMIT, PAGE_READWRITE) == nullptr)
 		{
 			LOG(kLoading, kError, "Recommit MEM_COMMIT failed for chunk {}", crc);
 			DEBUG_BREAK();

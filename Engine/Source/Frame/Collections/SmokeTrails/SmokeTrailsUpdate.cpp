@@ -38,7 +38,7 @@ void SmokeTrailsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFra
 {
 }
 
-void SmokeTrailsPostRender::Add(game::Frame& __restrict rFrame, smoke_trails_t& rId, uint8_t uiTypeIndex)
+void SmokeTrailsPostRender::Add(game::Frame& __restrict rFrame, smoke_trails_t& rId, int64_t iTypeIndex)
 {
 	ASSERT(!(rId.uuid.iValue != 0));
 
@@ -52,7 +52,7 @@ void SmokeTrailsPostRender::Add(game::Frame& __restrict rFrame, smoke_trails_t& 
 	rId = id;
 	rPostRender.pIds[iSpawnIndex] = id;
 	ZeroMemberRow(iSpawnIndex, rInterpolate.Members());
-	rInterpolate.puiTypeIndices[iSpawnIndex] = uiTypeIndex;
+	rInterpolate.puiTypeIndices[iSpawnIndex] = static_cast<uint8_t>(iTypeIndex);
 	rInterpolate.pfStartTimes[iSpawnIndex] = rFrame.interpolate.fCurrentTime;
 }
 

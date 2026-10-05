@@ -192,7 +192,7 @@ nlohmann::json AgentLocalPositionJson(FXMVECTOR vecLocalPosition)
 	return nlohmann::json::array({XMVectorGetX(vecLocalPosition), XMVectorGetY(vecLocalPosition), XMVectorGetZ(vecLocalPosition)});
 }
 
-int32_t AgentGridCoordinateValue(const nlohmann::json& rValue, std::string_view name)
+int64_t AgentGridCoordinateValue(const nlohmann::json& rValue, std::string_view name)
 {
 	if (!rValue.is_number_integer())
 	{
@@ -201,12 +201,12 @@ int32_t AgentGridCoordinateValue(const nlohmann::json& rValue, std::string_view 
 
 	if (rValue.is_number_unsigned())
 	{
-		uint64_t uiValue = rValue.get<uint64_t>();
-		if (uiValue > static_cast<uint64_t>(std::numeric_limits<int32_t>::max()))
+		if (rValue > static_cast<uint64_t>(std::numeric_limits<int32_t>::max()))
 		{
 			throw std::runtime_error(std::format("{} values must fit in a signed 32-bit integer", name));
 		}
-		return static_cast<int32_t>(uiValue);
+		int64_t iValue = rValue.get<int64_t>();
+		return iValue;
 	}
 
 	int64_t iValue = rValue.get<int64_t>();
@@ -214,7 +214,7 @@ int32_t AgentGridCoordinateValue(const nlohmann::json& rValue, std::string_view 
 	{
 		throw std::runtime_error(std::format("{} values must fit in a signed 32-bit integer", name));
 	}
-	return static_cast<int32_t>(iValue);
+	return iValue;
 }
 
 bool ExecuteSharedAgentCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult, int64_t iGameTick)

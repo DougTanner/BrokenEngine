@@ -30,7 +30,7 @@ static void WriteFileBytes(const std::filesystem::path& rFile, std::string_view 
 // with iSeed. Gaea's `--seed` CLI flag only mixes a global seed into per-node randomness; it
 // doesn't override the per-node "Seed" fields baked into the .terrain JSON. Patching them
 // directly is the only way to make Island.json's seed value fully determine the bake.
-static void PatchArchetypeSeeds(nlohmann::json& rJson, int32_t iSeed)
+static void PatchArchetypeSeeds(nlohmann::json& rJson, int64_t iSeed)
 {
 	if (rJson.is_object())
 	{
@@ -87,7 +87,7 @@ static void PatchArchetypeMesherResolution(nlohmann::json& rJson, int64_t iVerti
 // archetype authors Choice at whatever the editor was last saved at; DataPacker always patches it
 // per route so the bake is deterministic. riRouteNodeCount accumulates matches so the caller can
 // assert exactly one Route node exists.
-static void PatchArchetypeRoute(nlohmann::json& rJson, int32_t iChoice, int64_t& riRouteNodeCount)
+static void PatchArchetypeRoute(nlohmann::json& rJson, int64_t iChoice, int64_t& riRouteNodeCount)
 {
 	if (rJson.is_object())
 	{
@@ -158,7 +158,7 @@ float ReadArchetypeSeaLevel(const std::filesystem::path& rTerrainFile)
 	throw std::runtime_error("Archetype has no Sea node — DataPacker reads its Level to derive the per-island beach offset. Add a Sea node to the graph or extend BakeIslandIntermediates to handle sea-less archetypes.");
 }
 
-void PatchArchetype(const std::filesystem::path& rTerrainFile, const WorldDimensions& rDimensions, int32_t iSeed, std::optional<int64_t> oiMeshResolution, int32_t iGaeaRouteChoice)
+void PatchArchetype(const std::filesystem::path& rTerrainFile, const WorldDimensions& rDimensions, int64_t iSeed, std::optional<int64_t> oiMeshResolution, int64_t iGaeaRouteChoice)
 {
 	std::ifstream readStream(rTerrainFile);
 	nlohmann::json terrainJson = nlohmann::json::parse(readStream);

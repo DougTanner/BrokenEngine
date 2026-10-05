@@ -100,19 +100,19 @@ void ExportTexture::ProcessKtxCubemap()
 	std::vector<std::byte> compressed = Lz4Compress(std::span<const std::byte>(static_cast<const std::byte*>(textureCube.data()), static_cast<size_t>(iUncompressedSize)));
 	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
-	auto [pHeader, dataSpan] = AllocateHeaderAndData(static_cast<int64_t>(compressed.size()));
+	auto [pHeader, dataSpan] = AllocateHeaderAndData(std::ssize(compressed));
 	pHeader->iUncompressedSize = iUncompressedSize;
 	pHeader->textureHeader.iTextureWidth = textureCube[0].extent().x;
 	pHeader->textureHeader.iTextureHeight = textureCube[0].extent().y;
 	pHeader->textureHeader.iMipLevels = textureCube.levels();
 	pHeader->textureHeader.vkFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-	std::memcpy(dataSpan.data(), compressed.data(), compressed.size());
+	std::memcpy(dataSpan.data(), compressed.data(), static_cast<size_t>(std::ssize(compressed)));
 }
 
 void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 {
 	std::vector<std::byte> fileBytes = common::ReadEntireFile(mInputPath);
-	int64_t iFileSize = static_cast<int64_t>(fileBytes.size());
+	int64_t iFileSize = std::ssize(fileBytes);
 	TextureIntermediateHeader header = ReadTextureIntermediateHeader(fileBytes);
 	int64_t iWidth = header.iWidth;
 	int64_t iHeight = header.iHeight;
@@ -146,7 +146,7 @@ void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 	//     payload size (already 6 faces) instead of the 2D-only ComputeUncompressedTextureSize math.
 	bool bRawHalfFloat = vkFormat == VK_FORMAT_R16G16B16A16_SFLOAT;
 	int64_t iUncompressedSize = bRawHalfFloat
-		? static_cast<int64_t>(data.size())
+		? std::ssize(data)
 		: ComputeUncompressedTextureSize(vkFormat, iWidth, iHeight, iMipMaps);
 
 	// Lz4Compress narrows the source size to int, so bound the derived size here: the inflate buffer
@@ -174,7 +174,7 @@ void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 		// fill (DataPacker has no soft-fail path — a mismatch is a producer bug, not corrupt shipped data).
 		inflated.resize(static_cast<size_t>(iUncompressedSize));
 		uLongf uiInflatedSize = static_cast<uLongf>(iUncompressedSize);
-		int iZlibResult = uncompress(reinterpret_cast<Bytef*>(inflated.data()), &uiInflatedSize, reinterpret_cast<const Bytef*>(data.data()), static_cast<uLong>(data.size()));
+		int64_t iZlibResult = uncompress(reinterpret_cast<Bytef*>(inflated.data()), &uiInflatedSize, reinterpret_cast<const Bytef*>(data.data()), static_cast<uLong>(std::ssize(data)));
 		ASSERT(iZlibResult == Z_OK && static_cast<int64_t>(uiInflatedSize) == iUncompressedSize);
 	}
 	const std::vector<std::byte>& rRawBytes = bRawHalfFloat ? data : inflated;
@@ -182,14 +182,14 @@ void ExportTexture::ProcessRawTexture(VkFormat vkFormat)
 	std::vector<std::byte> compressed = Lz4Compress(rRawBytes);
 	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
-	auto [pHeader, dataSpan] = AllocateHeaderAndData(static_cast<int64_t>(compressed.size()));
+	auto [pHeader, dataSpan] = AllocateHeaderAndData(std::ssize(compressed));
 	pHeader->iUncompressedSize = iUncompressedSize;
 	pHeader->textureHeader.iTextureWidth = iWidth;
 	pHeader->textureHeader.iTextureHeight = iHeight;
 	pHeader->textureHeader.iMipLevels = iMipMaps;
 	pHeader->textureHeader.vkFormat = vkFormat;
 
-	std::memcpy(dataSpan.data(), compressed.data(), compressed.size());
+	std::memcpy(dataSpan.data(), compressed.data(), static_cast<size_t>(std::ssize(compressed)));
 }
 
 void ExportTexture::ProcessLiveCubemap(VkFormat vkFormat)
@@ -223,17 +223,17 @@ void ExportTexture::ProcessLiveCubemap(VkFormat vkFormat)
 		}
 	}
 
-	int64_t iUncompressedSize = static_cast<int64_t>(data.size());
+	int64_t iUncompressedSize = std::ssize(data);
 	std::vector<std::byte> compressed = Lz4Compress(std::span<const std::byte>(data.data(), static_cast<size_t>(iUncompressedSize)));
 	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
-	auto [pHeader, dataSpan] = AllocateHeaderAndData(static_cast<int64_t>(compressed.size()));
+	auto [pHeader, dataSpan] = AllocateHeaderAndData(std::ssize(compressed));
 	pHeader->iUncompressedSize = iUncompressedSize;
 	pHeader->textureHeader.iTextureWidth = iWidth;
 	pHeader->textureHeader.iTextureHeight = iHeight;
 	pHeader->textureHeader.iMipLevels = 1;
 	pHeader->textureHeader.vkFormat = vkFormat;
-	std::memcpy(dataSpan.data(), compressed.data(), compressed.size());
+	std::memcpy(dataSpan.data(), compressed.data(), static_cast<size_t>(std::ssize(compressed)));
 }
 
 // Per-mip Toksvig slope variance for a BC5 normal map: decode mip 0 to 3D normals, box-average a
@@ -320,16 +320,16 @@ void ExportTexture::ProcessRegularTexture(VkFormat vkFormat)
 
 	std::vector<std::byte> data = texture.Export(vkFormat, {});
 
-	int64_t iUncompressedSize = static_cast<int64_t>(data.size());
+	int64_t iUncompressedSize = std::ssize(data);
 	std::vector<std::byte> compressed = Lz4Compress(std::span<const std::byte>(data.data(), static_cast<size_t>(iUncompressedSize)));
 	mChunkFlags.Set(common::ChunkFlags::kLz4Compressed);
 
-	auto [pHeader, dataSpan] = AllocateHeaderAndData(static_cast<int64_t>(compressed.size()));
+	auto [pHeader, dataSpan] = AllocateHeaderAndData(std::ssize(compressed));
 	pHeader->iUncompressedSize = iUncompressedSize;
 	pHeader->textureHeader.iTextureWidth = texture.miWidth;
 	pHeader->textureHeader.iTextureHeight = texture.miHeight;
-	pHeader->textureHeader.iMipLevels = texture.mData.size();
+	pHeader->textureHeader.iMipLevels = std::ssize(texture.mData);
 	pHeader->textureHeader.vkFormat = vkFormat;
 	std::memcpy(pHeader->textureHeader.pfMipVariance, pfMipVariance, sizeof(pfMipVariance));
-	std::memcpy(dataSpan.data(), compressed.data(), compressed.size());
+	std::memcpy(dataSpan.data(), compressed.data(), static_cast<size_t>(std::ssize(compressed)));
 }

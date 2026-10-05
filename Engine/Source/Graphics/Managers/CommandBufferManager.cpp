@@ -19,7 +19,7 @@ CommandBufferManager::CommandBufferManager()
 	ScopedBootTimer scopedBootTimer(kBootTimerCommandBufferManager);
 
 	// Each drawing command binds a specific VkFramebuffer, so record one command buffer per swapchain image.
-	mPerFramebufferCommandBuffers.reserve(gpSwapchainManager->mFramebuffers.size());
+	mPerFramebufferCommandBuffers.reserve(static_cast<size_t>(std::ssize(gpSwapchainManager->mFramebuffers)));
 	for (int64_t i = 0; i < std::ssize(gpSwapchainManager->mFramebuffers); ++i)
 	{
 		mPerFramebufferCommandBuffers.emplace_back(i);
@@ -81,31 +81,31 @@ void CommandBufferManager::SubmitGlobalToQueue(int64_t iFramebufferIndex)
 	// kbRenderThread this read runs on the mSubmitGlobal worker, safe only because SubmitGlobalCommandBuffer's
 	// mSubmitGlobal.Wake() edge published those writes first. Same family as CommandBuffers.h (mFlags/mVkFence).
 	VkCommandBuffer pVkCommandBuffers[2] {};
-	uint32_t uiCommandBufferCount = 0;
+	int64_t iCommandBufferCount = 0;
 	if (gpTextureManager->mFlags & TextureManagerFlags::kPendingAcquireBarriers)
 	{
-		pVkCommandBuffers[uiCommandBufferCount++] = gpTextureManager->mAcquireVkCommandBuffers.at(gpTextureManager->miAcquireFramebufferIndex);
+		pVkCommandBuffers[iCommandBufferCount++] = gpTextureManager->mAcquireVkCommandBuffers.at(gpTextureManager->miAcquireFramebufferIndex);
 	}
-	pVkCommandBuffers[uiCommandBufferCount++] = rCommandBuffers.mGlobalVkCommandBuffer;
+	pVkCommandBuffers[iCommandBufferCount++] = rCommandBuffers.mGlobalVkCommandBuffer;
 
-	uint32_t uiWaitSemaphoreCount = 0;
+	int64_t iWaitSemaphoreCount = 0;
 	VkSemaphore pVkWaitSemaphores[1] {};
 	VkPipelineStageFlags pVkWaitDestinationStageMask[1] {};
 	if (mbParticleSemaphoreSignaled)
 	{
-		pVkWaitSemaphores[uiWaitSemaphoreCount] = mParticleSyncVkSemaphore;
-		pVkWaitDestinationStageMask[uiWaitSemaphoreCount] = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-		++uiWaitSemaphoreCount;
+		pVkWaitSemaphores[iWaitSemaphoreCount] = mParticleSyncVkSemaphore;
+		pVkWaitDestinationStageMask[iWaitSemaphoreCount] = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+		++iWaitSemaphoreCount;
 	}
 
 	VkSubmitInfo vkSubmitInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.pNext = nullptr,
-		.waitSemaphoreCount = uiWaitSemaphoreCount,
+		.waitSemaphoreCount = static_cast<uint32_t>(iWaitSemaphoreCount),
 		.pWaitSemaphores = pVkWaitSemaphores,
 		.pWaitDstStageMask = pVkWaitDestinationStageMask,
-		.commandBufferCount = uiCommandBufferCount,
+		.commandBufferCount = static_cast<uint32_t>(iCommandBufferCount),
 		.pCommandBuffers = pVkCommandBuffers,
 		.signalSemaphoreCount = 1,
 		.pSignalSemaphores = &rCommandBuffers.mGlobalFinishedVkSemaphore,

@@ -34,7 +34,7 @@ struct RawInput
 
 	common::Flags<MouseButtons> mouseButtons {};
 	XMFLOAT2 f2MousePosition {};
-	int iScrollWheelValue = 0;
+	int64_t iScrollWheelValue = 0;
 
 	common::Flags<GamepadButtons> gamepadButtons {};
 	XMFLOAT2 f2LeftThumbstick {};

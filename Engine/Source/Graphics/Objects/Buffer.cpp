@@ -7,16 +7,16 @@ namespace engine
 
 using enum BufferFlags;
 
-void Buffer::CreateBuffer([[maybe_unused]] std::string_view name, VkDeviceSize vkDeviceSize, VkBufferUsageFlags vkBufferUsageFlags, VkMemoryPropertyFlags vkMemoryPropertyFlags, VkBuffer& rVkBuffer, VmaAllocation& rVmaAllocation, VmaAllocationInfo* pVmaAllocationInfo)
+void Buffer::CreateBuffer([[maybe_unused]] std::string_view name, int64_t iDeviceSize, VkBufferUsageFlags vkBufferUsageFlags, VkMemoryPropertyFlags vkMemoryPropertyFlags, VkBuffer& rVkBuffer, VmaAllocation& rVmaAllocation, VmaAllocationInfo* pVmaAllocationInfo)
 {
-	VkDeviceSize vkRoundedDeviceSize = common::RoundUp(vkDeviceSize, gpInstanceManager->mVkPhysicalDeviceProperties.limits.nonCoherentAtomSize);
+	int64_t iRoundedDeviceSize = common::RoundUp(iDeviceSize, static_cast<int64_t>(gpInstanceManager->mVkPhysicalDeviceProperties.limits.nonCoherentAtomSize));
 
 	VkBufferCreateInfo vkBufferCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.size = vkRoundedDeviceSize,
+		.size = static_cast<VkDeviceSize>(iRoundedDeviceSize),
 		.usage = vkBufferUsageFlags,
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount = 0,
@@ -58,29 +58,29 @@ void Buffer::UploadToDeviceLocal(VkBuffer vkDeviceLocalBuffer, std::span<const D
 	ASSERT(vkDeviceLocalBuffer != VK_NULL_HANDLE);
 	ASSERT(!uploads.empty());
 
-	VkDeviceSize vkStagingSize = 0;
+	int64_t iStagingSize = 0;
 	for (const DeviceLocalBufferUpload& rUpload : uploads)
 	{
 		ASSERT(rUpload.pData != nullptr);
-		ASSERT(rUpload.vkSize > 0);
-		vkStagingSize += rUpload.vkSize;
+		ASSERT(rUpload.iSize > 0);
+		iStagingSize += rUpload.iSize;
 	}
 
-	StagingBuffer stagingBuffer("BufferUpload", vkStagingSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+	StagingBuffer stagingBuffer("BufferUpload", iStagingSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 	common::ScopedWorkbufferArena scopedWorkbufferArena = common::gpThreadLocal->mWorkbuffer.Push();
 	auto copiesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<VkBufferCopy*>(uploads.size() * sizeof(VkBufferCopy));
-	VkDeviceSize vkStagingOffset = 0;
-	for (size_t i = 0; i < uploads.size(); ++i)
+	int64_t iStagingOffset = 0;
+	for (int64_t i = 0; i < std::ssize(uploads); ++i)
 	{
-		const DeviceLocalBufferUpload& rUpload = uploads[i];
-		std::memcpy(static_cast<std::byte*>(stagingBuffer.vmaAllocationInfo.pMappedData) + vkStagingOffset, rUpload.pData, static_cast<size_t>(rUpload.vkSize));
+		const DeviceLocalBufferUpload& rUpload = uploads[static_cast<size_t>(i)];
+		std::memcpy(static_cast<std::byte*>(stagingBuffer.vmaAllocationInfo.pMappedData) + iStagingOffset, rUpload.pData, static_cast<size_t>(rUpload.iSize));
 		copiesAllocation.mpData[i] =
 		{
-			.srcOffset = vkStagingOffset,
-			.dstOffset = rUpload.vkDestinationOffset,
-			.size = rUpload.vkSize,
+			.srcOffset = static_cast<VkDeviceSize>(iStagingOffset),
+			.dstOffset = static_cast<VkDeviceSize>(rUpload.iDestinationOffset),
+			.size = static_cast<VkDeviceSize>(rUpload.iSize),
 		};
-		vkStagingOffset += rUpload.vkSize;
+		iStagingOffset += rUpload.iSize;
 	}
 
 	OneShotCommandBuffer oneShotCommandBuffer;
@@ -88,9 +88,9 @@ void Buffer::UploadToDeviceLocal(VkBuffer vkDeviceLocalBuffer, std::span<const D
 	oneShotCommandBuffer.Execute();
 }
 
-StagingBuffer::StagingBuffer(std::string_view name, VkDeviceSize vkDeviceSize, VkBufferUsageFlags vkBufferUsageFlags)
+StagingBuffer::StagingBuffer(std::string_view name, int64_t iDeviceSize, VkBufferUsageFlags vkBufferUsageFlags)
 {
-	Buffer::CreateBuffer(name, vkDeviceSize, vkBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vkStagingBuffer, vmaAllocation, &vmaAllocationInfo);
+	Buffer::CreateBuffer(name, iDeviceSize, vkBufferUsageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vkStagingBuffer, vmaAllocation, &vmaAllocationInfo);
 }
 
 StagingBuffer::~StagingBuffer()
@@ -226,11 +226,11 @@ void Buffer::Create(const BufferInfo& rInfo, const std::function<void(void*)>& r
 			VmaAllocationInfo vmaAllocationInfo {};
 			if (mInfo.flags & kHostVisible)
 			{
-				Buffer::CreateBuffer(mInfo.name, mInfo.vkDataSize, vkBufferUsageFlagBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mHostVisibleVkBuffer, mHostVisibleVmaAllocation, &vmaAllocationInfo);
+				Buffer::CreateBuffer(mInfo.name, mInfo.iDataSize, vkBufferUsageFlagBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mHostVisibleVkBuffer, mHostVisibleVmaAllocation, &vmaAllocationInfo);
 			}
 			else
 			{
-				Buffer::CreateBuffer(mInfo.name, mInfo.vkDataSize, vkBufferUsageFlagBits | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mHostVisibleVkBuffer, mHostVisibleVmaAllocation, &vmaAllocationInfo);
+				Buffer::CreateBuffer(mInfo.name, mInfo.iDataSize, vkBufferUsageFlagBits | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mHostVisibleVkBuffer, mHostVisibleVmaAllocation, &vmaAllocationInfo);
 			}
 
 			// Use VMA's pre-mapped pointer (VMA_ALLOCATION_CREATE_MAPPED_BIT auto-maps the memory)
@@ -244,18 +244,18 @@ void Buffer::Create(const BufferInfo& rInfo, const std::function<void(void*)>& r
 
 		if (mInfo.flags & kDeviceLocal || mInfo.flags & kCopyToDeviceLocalEveryFrame)
 		{
-			Buffer::CreateBuffer(mInfo.name, mInfo.vkDataSize, vkBufferUsageFlagBits | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mDeviceLocalVkBuffer, mDeviceLocalVmaAllocation);
+			Buffer::CreateBuffer(mInfo.name, mInfo.iDataSize, vkBufferUsageFlagBits | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mDeviceLocalVkBuffer, mDeviceLocalVmaAllocation);
 		}
 	}
 	else
 	{
 		ASSERT(mInfo.flags & kIndexVertex);
-		Buffer::CreateBuffer(mInfo.name, mInfo.vkDataSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mDeviceLocalVkBuffer, mDeviceLocalVmaAllocation);
+		Buffer::CreateBuffer(mInfo.name, mInfo.iDataSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mDeviceLocalVkBuffer, mDeviceLocalVmaAllocation);
 	}
 
 	if (mInfo.flags & kDeviceLocal && rDataFunction != nullptr)
 	{
-		StagingBuffer stagingBuffer(mInfo.name, mInfo.vkDataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+		StagingBuffer stagingBuffer(mInfo.name, mInfo.iDataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
 		rDataFunction(stagingBuffer.vmaAllocationInfo.pMappedData);
 
@@ -264,7 +264,7 @@ void Buffer::Create(const BufferInfo& rInfo, const std::function<void(void*)>& r
 		{
 			.srcOffset = 0,
 			.dstOffset = 0,
-			.size = mInfo.vkDataSize,
+			.size = static_cast<VkDeviceSize>(mInfo.iDataSize),
 		};
 		vkCmdCopyBuffer(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.vkStagingBuffer, mDeviceLocalVkBuffer, 1, &vkBufferCopy);
 		oneShotCommandBuffer.Execute();
@@ -300,7 +300,8 @@ void Buffer::RecordBindVertexBuffer(VkCommandBuffer vkCommandBuffer)
 
 	vkCmdBindIndexBuffer(vkCommandBuffer, mDeviceLocalVkBuffer, 0, mInfo.vkIndexType);
 	int64_t iIndexSize = mInfo.vkIndexType == VK_INDEX_TYPE_UINT16 ? sizeof(uint16_t) : sizeof(uint32_t);
-	VkDeviceSize vkVerticesOffset = common::ModelHeader::VerticesOffset(mInfo.iCount, iIndexSize);
+	int64_t iVerticesOffset = common::ModelHeader::VerticesOffset(mInfo.iCount, iIndexSize);
+	VkDeviceSize vkVerticesOffset = static_cast<VkDeviceSize>(iVerticesOffset);
 	vkCmdBindVertexBuffers(vkCommandBuffer, 0, 1, &mDeviceLocalVkBuffer, &vkVerticesOffset);
 }
 
@@ -319,7 +320,7 @@ void Buffer::RecordCopy(VkCommandBuffer vkCommandBuffer, VkPipelineStageFlags vk
 		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 		.buffer = mDeviceLocalVkBuffer,
 		.offset = 0,
-		.size = mInfo.vkDataSize,
+		.size = static_cast<VkDeviceSize>(mInfo.iDataSize),
 	};
 	vkCmdPipelineBarrier(vkCommandBuffer, vkStageFlags, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 1, &vkBufferMemoryBarrier, 0, nullptr);
 
@@ -327,7 +328,7 @@ void Buffer::RecordCopy(VkCommandBuffer vkCommandBuffer, VkPipelineStageFlags vk
 	{
 		.srcOffset = 0,
 		.dstOffset = 0,
-		.size = mInfo.vkDataSize,
+		.size = static_cast<VkDeviceSize>(mInfo.iDataSize),
 	};
 	vkCmdCopyBuffer(vkCommandBuffer, mHostVisibleVkBuffer, mDeviceLocalVkBuffer, 1, &vkBufferCopy);
 
@@ -342,7 +343,7 @@ void Buffer::RecordCopy(VkCommandBuffer vkCommandBuffer, VkPipelineStageFlags vk
 		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 		.buffer = mDeviceLocalVkBuffer,
 		.offset = 0,
-		.size = mInfo.vkDataSize,
+		.size = static_cast<VkDeviceSize>(mInfo.iDataSize),
 	};
 	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, vkStageFlags, 0, 0, nullptr, 1, &vkBufferMemoryBarrier, 0, nullptr);
 }

@@ -172,7 +172,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 
 	ImVec2 vAnchor(rInputOutput.DisplaySize.x * kfHudEdgeMarginFraction, rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
 	float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFleetSlide, vAnchor, -1.0f, fTarget);
-	ImGuiWindowFlags iWindowFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize;
+	int64_t iWindowFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize;
 	engine::ScopedMenuFont menuFont;
 	// Content-driven height: auto-resize to the fleet list, capped at kfHudPanelMaximumHeightFraction (long lists scroll). Width
 	// pinned to PanelWidth() via the matching min/max constraint x.
@@ -181,7 +181,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	ImGui::SetNextWindowSize(ImVec2(fPanelWidth, 0.0f), ImGuiCond_Always);
 	ImGui::SetNextWindowSizeConstraints(ImVec2(fPanelWidth, 0.0f), ImVec2(fPanelWidth, fMaximumHeight));
 	ImGui::SetNextWindowPos(ImVec2(fEdgeX, vAnchor.y), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
-	ImGui::Begin("FleetPanel", nullptr, iWindowFlags);
+	ImGui::Begin("FleetPanel", nullptr, static_cast<ImGuiWindowFlags>(iWindowFlags));
 	mFleetSlide.vLastSize = ImGui::GetWindowSize();
 	engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
 
@@ -368,14 +368,14 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 
 	ImVec2 vAnchor(rInputOutput.DisplaySize.x * (1.0f - kfHudEdgeMarginFraction), rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
 	float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFocusedPlayerSlide, vAnchor, 1.0f, fTarget);
-	ImGuiWindowFlags iWindowFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+	int64_t iWindowFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 	engine::ScopedMenuFont menuFont;
 	// Match the left FleetPanel's size exactly (symmetry): same PanelWidth(), height forced to the left panel's live height
 	// captured earlier this frame (RenderFleetPanel runs first). First frame (vLastSize.y still zero): fall back to the cap.
 	float fLeftHeight = (mFleetSlide.vLastSize.y > 0.0f) ? mFleetSlide.vLastSize.y : (rInputOutput.DisplaySize.y * kfHudPanelMaximumHeightFraction);
 	ImGui::SetNextWindowSize(ImVec2(PanelWidth(), fLeftHeight), ImGuiCond_Always);
 	ImGui::SetNextWindowPos(ImVec2(fEdgeX, vAnchor.y), ImGuiCond_Always, ImVec2(0.0f, 0.0f));
-	ImGui::Begin("FocusedPlayerPanel", nullptr, iWindowFlags);
+	ImGui::Begin("FocusedPlayerPanel", nullptr, static_cast<ImGuiWindowFlags>(iWindowFlags));
 	mFocusedPlayerSlide.vLastSize = ImGui::GetWindowSize();
 	engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
 

@@ -108,7 +108,7 @@ struct PipelineInfo
 	// Render target
 	VkRenderPass vkTargetRenderPass = VK_NULL_HANDLE;
 	VkExtent3D vkExtent3D {};
-	int32_t iColorAttachmentCount = 1;
+	int64_t iColorAttachmentCount = 1;
 
 	// Push-constant range size in bytes; 0 => default sizeof(shaders::PushConstantsLayout). Override only
 	// for pipelines whose shader declares a smaller push-constant block (e.g. LightCombine).
@@ -128,7 +128,7 @@ public:
 	// Resolve which descriptor set a binding belongs to from shader reflection (puiDescriptorSetIndices),
 	// defaulting to set 0 when neither shader declares it. Single source for the four set-partition /
 	// set-routing sites in PipelineCreator / PipelineDescriptorWriter.
-	static uint32_t ResolveBindingSetIndex(const PipelineInfo& rPipelineInfo, uint32_t uiBinding);
+	static int64_t ResolveBindingSetIndex(const PipelineInfo& rPipelineInfo, int64_t iBinding);
 
 	Pipeline() = default;
 	Pipeline(const Pipeline&) = delete;
@@ -148,7 +148,7 @@ public:
 	void RecordDrawIndirectSet2(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants);
 	void RecordCompute(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, int64_t iGroupCountX, int64_t iGroupCountY = 1, int64_t iGroupCountZ = 1, const XMFLOAT4& rf4PushConstants = {});
 	void RecordComputeIndirect(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants = {});
-	void RecordComputeIndirectFrom(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, VkBuffer vkIndirectBuffer, VkDeviceSize vkIndirectOffset);
+	void RecordComputeIndirectFrom(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, VkBuffer vkIndirectBuffer, int64_t iIndirectOffset);
 
 	void WriteIndirectBuffer(int64_t iCommandBuffer, int64_t iInstanceCount, int64_t iIndexCount = -1, int64_t iFirstIndex = 0, int64_t iVertexOffset = 0);
 	void WriteIndirectComputeBuffer(int64_t iCommandBuffer, int64_t iGroupCountX, int64_t iGroupCountY, int64_t iGroupCountZ);

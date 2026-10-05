@@ -14,8 +14,8 @@ namespace engine
 // publications so they cannot replace the newer request's result.
 static std::mutex sCaptureResultMutex;
 static std::optional<nlohmann::json> sCaptureResult;
-static uint64_t suiCaptureTokenNext = 0; // monotonic mint (guarded by sCaptureResultMutex)
-static uint64_t suiCaptureTokenActive = 0; // current request token (guarded by sCaptureResultMutex)
+static int64_t siCaptureTokenNext = 0; // monotonic mint (guarded by sCaptureResultMutex)
+static int64_t siCaptureTokenActive = 0; // current request token (guarded by sCaptureResultMutex)
 
 static std::string PathToString(const std::filesystem::path& rPath)
 {
@@ -23,41 +23,41 @@ static std::string PathToString(const std::filesystem::path& rPath)
 	return std::string(reinterpret_cast<const char*>(pathString.c_str()), pathString.size());
 }
 
-static void ReportCaptureFailure(std::string_view error, bool bPublishResult, uint64_t uiCaptureToken)
+static void ReportCaptureFailure(std::string_view error, bool bPublishResult, int64_t iCaptureToken)
 {
 	LOG(kGraphics, kWarning, "{}", error);
 	if (bPublishResult)
 	{
 		nlohmann::json result;
 		result["error"] = error;
-		SetCaptureResult(uiCaptureToken, std::move(result));
+		SetCaptureResult(iCaptureToken, std::move(result));
 	}
 }
 
 static constexpr bool IsBlueGreenRedAlpha(VkFormat vkFormat);
 
-uint64_t ResetCaptureResult()
+int64_t ResetCaptureResult()
 {
 	std::unique_lock lock(sCaptureResultMutex);
 	sCaptureResult.reset();
-	suiCaptureTokenActive = ++suiCaptureTokenNext;
-	return suiCaptureTokenActive;
+	siCaptureTokenActive = ++siCaptureTokenNext;
+	return siCaptureTokenActive;
 }
 
-void SetCaptureResult(uint64_t uiCaptureToken, nlohmann::json result)
+void SetCaptureResult(int64_t iCaptureToken, nlohmann::json result)
 {
 	std::unique_lock lock(sCaptureResultMutex);
-	if (uiCaptureToken != suiCaptureTokenActive)
+	if (iCaptureToken != siCaptureTokenActive)
 	{
 		return;
 	}
 	sCaptureResult = std::move(result);
 }
 
-std::optional<nlohmann::json> TakeCaptureResult(uint64_t uiCaptureToken)
+std::optional<nlohmann::json> TakeCaptureResult(int64_t iCaptureToken)
 {
 	std::unique_lock lock(sCaptureResultMutex);
-	if (uiCaptureToken != suiCaptureTokenActive || !sCaptureResult.has_value())
+	if (iCaptureToken != siCaptureTokenActive || !sCaptureResult.has_value())
 	{
 		return std::nullopt;
 	}
@@ -109,12 +109,12 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 			const uint32_t* puiAlphaRedGreenBlue = reinterpret_cast<const uint32_t*>(data.data());
 			std::vector<uint32_t> redGreenBlueAlphaPixels(vkExtent3D.width * vkExtent3D.height);
 			uint32_t* puiAlphaBlueGreenRed = redGreenBlueAlphaPixels.data();
-			for (uint32_t i = 0; i < vkExtent3D.height; ++i)
+			for (int64_t i = 0; i < vkExtent3D.height; ++i)
 			{
-				for (uint32_t j = 0; j < vkExtent3D.width; ++j)
+				for (int64_t iColumn = 0; iColumn < vkExtent3D.width; ++iColumn)
 				{
-					uint32_t uiAlphaRedGreenBlue = puiAlphaRedGreenBlue[i * vkExtent3D.width + j];
-					puiAlphaBlueGreenRed[i * vkExtent3D.width + j] = bSwapRedBlue
+					uint32_t uiAlphaRedGreenBlue = puiAlphaRedGreenBlue[i * vkExtent3D.width + iColumn];
+					puiAlphaBlueGreenRed[i * vkExtent3D.width + iColumn] = bSwapRedBlue
 						? ((uiAlphaRedGreenBlue & 0x00FF0000) >> 16) | ((uiAlphaRedGreenBlue & 0x0000FF00) >> 0) | ((uiAlphaRedGreenBlue & 0x000000FF) << 16) | 0xFF000000
 						: (uiAlphaRedGreenBlue & 0x00FFFFFF) | 0xFF000000;
 				}
@@ -145,10 +145,10 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 			else
 			{
 				wchar_t pcDirectory[MAX_PATH] {};
-				uint32_t uiTemporaryPathLength = GetTempPathW(static_cast<DWORD>(std::size(pcDirectory)), pcDirectory);
-				if (uiTemporaryPathLength == 0 || uiTemporaryPathLength >= std::size(pcDirectory))
+				int64_t iTemporaryPathLength = static_cast<int64_t>(GetTempPathW(static_cast<DWORD>(std::size(pcDirectory)), pcDirectory));
+				if (iTemporaryPathLength == 0 || iTemporaryPathLength >= std::ssize(pcDirectory))
 				{
-					ReportCaptureFailure("SaveScreenshot GetTempPathW failed or returned insufficient capacity", rRequest.bPublishResult, rRequest.uiCaptureToken);
+					ReportCaptureFailure("SaveScreenshot GetTempPathW failed or returned insufficient capacity", rRequest.bPublishResult, rRequest.iCaptureToken);
 					return;
 				}
 				filename = pcDirectory;
@@ -162,7 +162,7 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 			{
 				if (stbi_write_png(reinterpret_cast<const char*>(filename.u8string().c_str()), static_cast<int>(iWidth), static_cast<int>(iHeight), 4, pPixels, static_cast<int>(iWidth * 4)) == 0)
 				{
-					ReportCaptureFailure("SaveScreenshot stbi_write_png failed", rRequest.bPublishResult, rRequest.uiCaptureToken);
+					ReportCaptureFailure("SaveScreenshot stbi_write_png failed", rRequest.bPublishResult, rRequest.iCaptureToken);
 					return;
 				}
 			}
@@ -170,7 +170,7 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 			{
 				if (stbi_write_jpg(reinterpret_cast<const char*>(filename.u8string().c_str()), static_cast<int>(iWidth), static_cast<int>(iHeight), 4, pPixels, static_cast<int>(rRequest.iQuality)) == 0)
 				{
-					ReportCaptureFailure("SaveScreenshot stbi_write_jpg failed", rRequest.bPublishResult, rRequest.uiCaptureToken);
+					ReportCaptureFailure("SaveScreenshot stbi_write_jpg failed", rRequest.bPublishResult, rRequest.iCaptureToken);
 					return;
 				}
 			}
@@ -183,7 +183,7 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 				result["path"] = PathToString(filename);
 				result["width"] = iWidth;
 				result["height"] = iHeight;
-				SetCaptureResult(rRequest.uiCaptureToken, std::move(result));
+				SetCaptureResult(rRequest.iCaptureToken, std::move(result));
 			}
 		}
 		catch (const std::exception& rException)
@@ -193,7 +193,7 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 			{
 				nlohmann::json result;
 				result["error"] = rException.what();
-				SetCaptureResult(rRequest.uiCaptureToken, std::move(result));
+				SetCaptureResult(rRequest.iCaptureToken, std::move(result));
 			}
 		}
 	}, common::kiMinWorkbufferSize, common::kThreadScreenshot));
@@ -361,13 +361,13 @@ static float SingleChannelToFloat(const std::byte* pData, int64_t iTexel, VkForm
 {
 	if (vkFormat == VK_FORMAT_R16_UNORM)
 	{
-		uint16_t uiValue = reinterpret_cast<const uint16_t*>(pData)[iTexel];
-		return static_cast<float>(uiValue) / static_cast<float>(std::numeric_limits<uint16_t>::max());
+		int64_t iValue = static_cast<int64_t>(reinterpret_cast<const uint16_t*>(pData)[iTexel]);
+		return static_cast<float>(iValue) / static_cast<float>(std::numeric_limits<uint16_t>::max());
 	}
 	if (vkFormat == VK_FORMAT_R16_SFLOAT)
 	{
-		uint16_t uiValue = reinterpret_cast<const uint16_t*>(pData)[iTexel];
-		return DirectX::PackedVector::XMConvertHalfToFloat(static_cast<DirectX::PackedVector::HALF>(uiValue));
+		int64_t iValue = static_cast<int64_t>(reinterpret_cast<const uint16_t*>(pData)[iTexel]);
+		return DirectX::PackedVector::XMConvertHalfToFloat(static_cast<DirectX::PackedVector::HALF>(iValue));
 	}
 	// VK_FORMAT_R32_SFLOAT
 	return reinterpret_cast<const float*>(pData)[iTexel];
@@ -396,10 +396,10 @@ static void EncodeAndWriteDump(const std::vector<std::byte>& rData, VkExtent3D v
 			static std::atomic<int64_t> siDump(1);
 			int64_t iDump = siDump.fetch_add(1);
 			wchar_t pcDirectory[MAX_PATH] {};
-			uint32_t uiTemporaryPathLength = GetTempPathW(static_cast<DWORD>(std::size(pcDirectory)), pcDirectory);
-			if (uiTemporaryPathLength == 0 || uiTemporaryPathLength >= std::size(pcDirectory))
+			int64_t iTemporaryPathLength = static_cast<int64_t>(GetTempPathW(static_cast<DWORD>(std::size(pcDirectory)), pcDirectory));
+			if (iTemporaryPathLength == 0 || iTemporaryPathLength >= std::ssize(pcDirectory))
 			{
-				ReportCaptureFailure("DumpRenderTarget GetTempPathW failed or returned insufficient capacity", rRequest.bPublishResult, rRequest.uiCaptureToken);
+				ReportCaptureFailure("DumpRenderTarget GetTempPathW failed or returned insufficient capacity", rRequest.bPublishResult, rRequest.iCaptureToken);
 				return;
 			}
 			basePath = pcDirectory;
@@ -418,8 +418,14 @@ static void EncodeAndWriteDump(const std::vector<std::byte>& rData, VkExtent3D v
 			std::filesystem::path binPath = basePath;
 			binPath += ".bin";
 			std::ofstream binStream(binPath, std::ios::binary);
-			binStream.write(reinterpret_cast<const char*>(rData.data()), static_cast<std::streamsize>(rData.size()));
+			binStream.write(reinterpret_cast<const char*>(rData.data()), static_cast<std::streamsize>(std::ssize(rData)));
 			binStream.close();
+			// !binStream tests failbit and badbit after close, covering a failed open, a short write, and a failed close.
+			if (!binStream)
+			{
+				ReportCaptureFailure("DumpRenderTarget raw .bin write failed", rRequest.bPublishResult, rRequest.iCaptureToken);
+				return;
+			}
 			result["raw"] = PathToString(binPath);
 		}
 
@@ -444,7 +450,7 @@ static void EncodeAndWriteDump(const std::vector<std::byte>& rData, VkExtent3D v
 			}
 			if (stbi_write_png(reinterpret_cast<const char*>(pngPath.u8string().c_str()), static_cast<int>(iWidth), static_cast<int>(iHeight), 4, redGreenBlueAlphaPixels.data(), static_cast<int>(iWidth * 4)) == 0)
 			{
-				ReportCaptureFailure("DumpRenderTarget color stbi_write_png failed", rRequest.bPublishResult, rRequest.uiCaptureToken);
+				ReportCaptureFailure("DumpRenderTarget color stbi_write_png failed", rRequest.bPublishResult, rRequest.iCaptureToken);
 				return;
 			}
 			result["path"] = PathToString(pngPath);
@@ -474,7 +480,7 @@ static void EncodeAndWriteDump(const std::vector<std::byte>& rData, VkExtent3D v
 			}
 			if (stbi_write_png(reinterpret_cast<const char*>(pngPath.u8string().c_str()), static_cast<int>(iWidth), static_cast<int>(iHeight), 1, gray.data(), static_cast<int>(iWidth)) == 0)
 			{
-				ReportCaptureFailure("DumpRenderTarget grayscale stbi_write_png failed", rRequest.bPublishResult, rRequest.uiCaptureToken);
+				ReportCaptureFailure("DumpRenderTarget grayscale stbi_write_png failed", rRequest.bPublishResult, rRequest.iCaptureToken);
 				return;
 			}
 			result["path"] = PathToString(pngPath);
@@ -486,7 +492,7 @@ static void EncodeAndWriteDump(const std::vector<std::byte>& rData, VkExtent3D v
 		LOG(kGraphics, kDebug, "DumpRenderTarget {} -> {}", rRequest.name, basePath);
 		if (rRequest.bPublishResult)
 		{
-			SetCaptureResult(rRequest.uiCaptureToken, std::move(result));
+			SetCaptureResult(rRequest.iCaptureToken, std::move(result));
 		}
 	}
 	catch (const std::exception& rException)
@@ -496,7 +502,7 @@ static void EncodeAndWriteDump(const std::vector<std::byte>& rData, VkExtent3D v
 		{
 			nlohmann::json result;
 			result["error"] = rException.what();
-			SetCaptureResult(rRequest.uiCaptureToken, std::move(result));
+			SetCaptureResult(rRequest.iCaptureToken, std::move(result));
 		}
 	}
 }

@@ -35,7 +35,7 @@ void TextureDescriptors::Create()
 		{.binding = shaders::kiGlobalBindingMainUniform, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT},
 		{.binding = shaders::kiGlobalBindingSamplerRepeatModelData, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT},
 		{.binding = shaders::kiGlobalBindingSamplerRepeat, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT},
-		{.binding = shaders::kiGlobalBindingBindlessTextures, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = static_cast<uint32_t>(mImageInfos.size()), .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT},
+		{.binding = shaders::kiGlobalBindingBindlessTextures, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = static_cast<uint32_t>(std::ssize(mImageInfos)), .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT},
 		{.binding = shaders::kiGlobalBindingSamplerClamp, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT},
 	};
 
@@ -92,7 +92,7 @@ void TextureDescriptors::Destroy()
 {
 	if (mGlobalVkDescriptorSetLayout != VK_NULL_HANDLE)
 	{
-		vkFreeDescriptorSets(gpDeviceManager->mVkDevice, gpDeviceManager->mVkDescriptorPool, static_cast<uint32_t>(mGlobalDescriptorSets.size()), mGlobalDescriptorSets.data());
+		vkFreeDescriptorSets(gpDeviceManager->mVkDevice, gpDeviceManager->mVkDescriptorPool, static_cast<uint32_t>(std::ssize(mGlobalDescriptorSets)), mGlobalDescriptorSets.data());
 		vkDestroyDescriptorSetLayout(gpDeviceManager->mVkDevice, mGlobalVkDescriptorSetLayout, nullptr);
 		mGlobalVkDescriptorSetLayout = VK_NULL_HANDLE;
 		mGlobalDescriptorSets.clear();
@@ -115,7 +115,7 @@ void TextureDescriptors::WriteGlobalDescriptorSets()
 			{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = mGlobalDescriptorSets.at(i), .dstBinding = shaders::kiGlobalBindingMainUniform, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .pBufferInfo = &vkMainBufferInfo},
 			{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = mGlobalDescriptorSets.at(i), .dstBinding = shaders::kiGlobalBindingSamplerRepeatModelData, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .pImageInfo = &vkSamplerRepeatModelDataInfo},
 			{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = mGlobalDescriptorSets.at(i), .dstBinding = shaders::kiGlobalBindingSamplerRepeat, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .pImageInfo = &vkSamplerRepeatInfo},
-			{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = mGlobalDescriptorSets.at(i), .dstBinding = shaders::kiGlobalBindingBindlessTextures, .descriptorCount = static_cast<uint32_t>(mImageInfos.size()), .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .pImageInfo = mImageInfos.data()},
+			{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = mGlobalDescriptorSets.at(i), .dstBinding = shaders::kiGlobalBindingBindlessTextures, .descriptorCount = static_cast<uint32_t>(std::ssize(mImageInfos)), .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .pImageInfo = mImageInfos.data()},
 			{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = mGlobalDescriptorSets.at(i), .dstBinding = shaders::kiGlobalBindingSamplerClamp, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .pImageInfo = &vkSamplerClampInfo},
 		};
 
@@ -134,7 +134,7 @@ void TextureDescriptors::UpdateTextureArrayDescriptors()
 			.dstSet = rVkDescriptorSet,
 			.dstBinding = shaders::kiGlobalBindingBindlessTextures,
 			.dstArrayElement = 0,
-			.descriptorCount = static_cast<uint32_t>(mImageInfos.size()),
+			.descriptorCount = static_cast<uint32_t>(std::ssize(mImageInfos)),
 			.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
 			.pImageInfo = mImageInfos.data(),
 			.pBufferInfo = nullptr,
@@ -189,7 +189,7 @@ void TextureDescriptors::WriteArrayBindingDescriptors(TextureBinding& rBinding, 
 			};
 			vkUpdateDescriptorSets(gpDeviceManager->mVkDevice, 1, &vkWriteDescriptorSet, 0, nullptr);
 		}
-		rBinding.uiTextureGeneration = pTexture != nullptr ? pTexture->muiGeneration : 0;
+		rBinding.iTextureGeneration = pTexture != nullptr ? pTexture->miGeneration : 0;
 		rBinding.bTextureUsesPlaceholder = pTexture == nullptr || pTexture->mVkImageView == VK_NULL_HANDLE;
 		return;
 	}
@@ -197,10 +197,10 @@ void TextureDescriptors::WriteArrayBindingDescriptors(TextureBinding& rBinding, 
 	int64_t iTextureCount = std::ssize(rBinding.textures);
 	WriteFullArrayDescriptors(*rBinding.pPipeline, rBinding.iBinding, rBinding.textures, vkSampler);
 
-	rBinding.uiTextureGenerations.resize(iTextureCount);
+	rBinding.iTextureGenerations.resize(iTextureCount);
 	for (int64_t i = 0; i < iTextureCount; ++i)
 	{
-		rBinding.uiTextureGenerations.at(i) = rBinding.textures.at(i) != nullptr ? rBinding.textures.at(i)->muiGeneration : 0;
+		rBinding.iTextureGenerations.at(i) = rBinding.textures.at(i) != nullptr ? rBinding.textures.at(i)->miGeneration : 0;
 	}
 	SynchronizeFullArrayBindingGenerations(rBinding);
 }
@@ -221,8 +221,8 @@ void TextureDescriptors::SynchronizeFullArrayBindingGenerations(const TextureBin
 			{
 				continue;
 			}
-			ASSERT(std::ssize(rOtherBinding.uiTextureGenerations) == std::ssize(rBinding.uiTextureGenerations));
-			std::copy(rBinding.uiTextureGenerations.begin(), rBinding.uiTextureGenerations.end(), rOtherBinding.uiTextureGenerations.begin());
+			ASSERT(std::ssize(rOtherBinding.iTextureGenerations) == std::ssize(rBinding.iTextureGenerations));
+			std::copy(rBinding.iTextureGenerations.begin(), rBinding.iTextureGenerations.end(), rOtherBinding.iTextureGenerations.begin());
 		}
 	}
 }
@@ -303,7 +303,7 @@ void TextureDescriptors::AssertBindlessWriteEpoch() const
 
 void TextureDescriptors::RegisterBindlessArrayConsumer(std::span<Texture*> textures, Pipeline* pPipeline, int64_t iBinding, DescriptorFlags_t samplerFlags)
 {
-	ASSERT(PipelineDescriptorWriter::BindingExistsInShaderLayout(*pPipeline, static_cast<uint32_t>(iBinding)));
+	ASSERT(PipelineDescriptorWriter::BindingExistsInShaderLayout(*pPipeline, iBinding));
 	mBindlessArrayConsumers.try_emplace(textures.data()).first->second.push_back({.pPipeline = pPipeline, .iBinding = iBinding, .samplerFlags = samplerFlags, .iCount = std::ssize(textures)});
 
 	// PipelineManager rebuilds preserve live island slots but clear pipeline registrations. Re-register owned elements so in-flight lazy adoption reaches the rebuilt Set 1 descriptors.
@@ -455,10 +455,10 @@ void TextureDescriptors::RestoreIslandSlot(common::crc_t islandCrc)
 void TextureDescriptors::RegisterTextureBinding(const TextureBindingInfo& rInfo)
 {
 	// Validate binding existence at pipeline creation to prevent VUID-00316 during sampler recreation.
-	ASSERT(PipelineDescriptorWriter::BindingExistsInShaderLayout(*rInfo.pPipeline, static_cast<uint32_t>(rInfo.iBinding)));
+	ASSERT(PipelineDescriptorWriter::BindingExistsInShaderLayout(*rInfo.pPipeline, rInfo.iBinding));
 
 	std::vector<Texture*> textures;
-	std::vector<uint64_t> uiTextureGenerations;
+	std::vector<int64_t> iTextureGenerations;
 	Texture* pTexture = rInfo.pTexture;
 	if (rInfo.iArrayIndex >= 0)
 	{
@@ -468,20 +468,20 @@ void TextureDescriptors::RegisterTextureBinding(const TextureBindingInfo& rInfo)
 	else if (rInfo.ppTextures != nullptr)
 	{
 		textures.assign(rInfo.ppTextures, rInfo.ppTextures + rInfo.iCount);
-		uiTextureGenerations.resize(rInfo.iCount);
+		iTextureGenerations.resize(rInfo.iCount);
 		for (int64_t i = 0; i < rInfo.iCount; ++i)
 		{
-			uiTextureGenerations.at(i) = rInfo.ppTextures[i] != nullptr ? rInfo.ppTextures[i]->muiGeneration : 0;
+			iTextureGenerations.at(i) = rInfo.ppTextures[i] != nullptr ? rInfo.ppTextures[i]->miGeneration : 0;
 		}
 	}
-	uint64_t uiTextureGeneration = pTexture != nullptr ? pTexture->muiGeneration : 0;
+	int64_t iTextureGeneration = pTexture != nullptr ? pTexture->miGeneration : 0;
 	bool bTextureUsesPlaceholder = rInfo.iArrayIndex >= 0 && (pTexture == nullptr || pTexture->mVkImageView == VK_NULL_HANDLE);
-	mTextureBindings.try_emplace(rInfo.crc).first->second.push_back({.pPipeline = rInfo.pPipeline, .iBinding = rInfo.iBinding, .samplerFlags = rInfo.samplerFlags, .pTexture = pTexture, .textures = std::move(textures), .uiTextureGeneration = uiTextureGeneration, .uiTextureGenerations = std::move(uiTextureGenerations), .bTextureUsesPlaceholder = bTextureUsesPlaceholder, .iArrayIndex = rInfo.iArrayIndex});
+	mTextureBindings.try_emplace(rInfo.crc).first->second.push_back({.pPipeline = rInfo.pPipeline, .iBinding = rInfo.iBinding, .samplerFlags = rInfo.samplerFlags, .pTexture = pTexture, .textures = std::move(textures), .iTextureGeneration = iTextureGeneration, .iTextureGenerations = std::move(iTextureGenerations), .bTextureUsesPlaceholder = bTextureUsesPlaceholder, .iArrayIndex = rInfo.iArrayIndex});
 }
 
 void TextureDescriptors::RegisterStandaloneSamplerBinding(Pipeline* pPipeline, int64_t iBinding, DescriptorFlags_t samplerFlags)
 {
-	ASSERT(PipelineDescriptorWriter::BindingExistsInShaderLayout(*pPipeline, static_cast<uint32_t>(iBinding)));
+	ASSERT(PipelineDescriptorWriter::BindingExistsInShaderLayout(*pPipeline, iBinding));
 
 	mStandaloneSamplerBindings.push_back({.pPipeline = pPipeline, .iBinding = iBinding, .samplerFlags = samplerFlags});
 }
@@ -549,7 +549,7 @@ void TextureDescriptors::UpdateDescriptorsForTexture(common::crc_t crc)
 			else
 			{
 				PipelineDescriptorWriter::UpdateImageDescriptor(*rBinding.pPipeline, rBinding.iBinding, vkSampler, vkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-				rBinding.uiTextureGeneration = rTexture.muiGeneration;
+				rBinding.iTextureGeneration = rTexture.miGeneration;
 			}
 		}
 	}
@@ -570,11 +570,11 @@ void TextureDescriptors::UnregisterBindingsForKey(common::crc_t bindingKey)
 void TextureDescriptors::WriteSingleTextureBinding(common::crc_t crc, TextureBinding& rBinding, VkSampler vkSampler)
 {
 	VkImageView vkImageView = VK_NULL_HANDLE;
-	uint64_t uiGeneration = 0;
+	int64_t iGeneration = 0;
 	if (rBinding.pTexture != nullptr)
 	{
 		vkImageView = rBinding.pTexture->mVkImageView;
-		uiGeneration = rBinding.pTexture->muiGeneration;
+		iGeneration = rBinding.pTexture->miGeneration;
 	}
 	else
 	{
@@ -582,13 +582,13 @@ void TextureDescriptors::WriteSingleTextureBinding(common::crc_t crc, TextureBin
 		if (it != mrTextureManager.mTextureMap.end())
 		{
 			vkImageView = it->second.mVkImageView;
-			uiGeneration = it->second.muiGeneration;
+			iGeneration = it->second.miGeneration;
 		}
 	}
 	if (vkImageView != VK_NULL_HANDLE)
 	{
 		PipelineDescriptorWriter::UpdateImageDescriptor(*rBinding.pPipeline, rBinding.iBinding, vkSampler, vkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-		rBinding.uiTextureGeneration = uiGeneration;
+		rBinding.iTextureGeneration = iGeneration;
 	}
 }
 
@@ -639,21 +639,21 @@ void TextureDescriptors::VerifyAllDescriptorGenerations() const
 	{
 		for (const TextureBinding& rBinding : rBindings)
 		{
-			if (rBinding.pTexture != nullptr && rBinding.pTexture->muiGeneration != 0
-			 && ((rBinding.bTextureUsesPlaceholder && rBinding.pTexture->mVkImageView != VK_NULL_HANDLE) || (!rBinding.bTextureUsesPlaceholder && (rBinding.pTexture->muiGeneration != rBinding.uiTextureGeneration || rBinding.pTexture->mVkImage == VK_NULL_HANDLE))))
+			if (rBinding.pTexture != nullptr && rBinding.pTexture->miGeneration != 0
+			 && ((rBinding.bTextureUsesPlaceholder && rBinding.pTexture->mVkImageView != VK_NULL_HANDLE) || (!rBinding.bTextureUsesPlaceholder && (rBinding.pTexture->miGeneration != rBinding.iTextureGeneration || rBinding.pTexture->mVkImage == VK_NULL_HANDLE))))
 			{
-				LOG(kGraphics, kError, "Descriptor staleness: pipeline={} binding={} crc={} texture={} snapshotGen={} currentGen={} vkImage={}", rBinding.pPipeline->mInfo.name, rBinding.iBinding, rCrc, reinterpret_cast<uintptr_t>(rBinding.pTexture), rBinding.uiTextureGeneration, rBinding.pTexture->muiGeneration, reinterpret_cast<uintptr_t>(rBinding.pTexture->mVkImage));
+				LOG(kGraphics, kError, "Descriptor staleness: pipeline={} binding={} crc={} texture={} snapshotGen={} currentGen={} vkImage={}", rBinding.pPipeline->mInfo.name, rBinding.iBinding, rCrc, reinterpret_cast<uintptr_t>(rBinding.pTexture), rBinding.iTextureGeneration, rBinding.pTexture->miGeneration, reinterpret_cast<uintptr_t>(rBinding.pTexture->mVkImage));
 				DEBUG_BREAK();
 			}
 
-			ASSERT(std::ssize(rBinding.uiTextureGenerations) == std::ssize(rBinding.textures));
+			ASSERT(std::ssize(rBinding.iTextureGenerations) == std::ssize(rBinding.textures));
 			for (int64_t i = 0; i < std::ssize(rBinding.textures); ++i)
 			{
 				Texture* pTexture = rBinding.textures.at(i);
-				if (pTexture != nullptr && pTexture->muiGeneration != 0
-				 && (pTexture->muiGeneration != rBinding.uiTextureGenerations.at(i) || pTexture->mVkImage == VK_NULL_HANDLE))
+				if (pTexture != nullptr && pTexture->miGeneration != 0
+				 && (pTexture->miGeneration != rBinding.iTextureGenerations.at(i) || pTexture->mVkImage == VK_NULL_HANDLE))
 				{
-					LOG(kGraphics, kError, "Descriptor staleness (array): pipeline={} binding={} crc={} slot={} texture={} snapshotGen={} currentGen={} vkImage={}", rBinding.pPipeline->mInfo.name, rBinding.iBinding, rCrc, i, reinterpret_cast<uintptr_t>(pTexture), rBinding.uiTextureGenerations.at(i), pTexture->muiGeneration, reinterpret_cast<uintptr_t>(pTexture->mVkImage));
+					LOG(kGraphics, kError, "Descriptor staleness (array): pipeline={} binding={} crc={} slot={} texture={} snapshotGen={} currentGen={} vkImage={}", rBinding.pPipeline->mInfo.name, rBinding.iBinding, rCrc, i, reinterpret_cast<uintptr_t>(pTexture), rBinding.iTextureGenerations.at(i), pTexture->miGeneration, reinterpret_cast<uintptr_t>(pTexture->mVkImage));
 					DEBUG_BREAK();
 				}
 			}

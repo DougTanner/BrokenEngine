@@ -74,15 +74,6 @@ std::tuple<int64_t, typename INTERPOLATE::id_t> AddVisualIndexableElement(INTERP
 }
 #endif // BT_CLIENT
 
-template <typename INTERPOLATE, typename POST_RENDER>
-std::tuple<int64_t, typename INTERPOLATE::id_t> AddIndexableElementWithId(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, typename INTERPOLATE::id_t existingId)
-{
-	return AddGeneratedIndexableElement(rInterpolate, rPostRender, [existingId]()
-	{
-		return existingId;
-	});
-}
-
 // POST_RENDER must provide pIds containing the element IDs.
 template <typename INTERPOLATE, typename POST_RENDER, typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE>
 void RemoveIndexableElement(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, typename INTERPOLATE::id_t id, INTERPOLATE_TUPLE&& rInterpolateTuple, POST_RENDER_TUPLE&& rPostRenderTuple)

@@ -13,7 +13,7 @@ struct SkeletonData
 	std::vector<XMFLOAT4X4> inverseBindMatrices;
 };
 
-std::unordered_map<int, int> BuildNodeParentMap(const tinygltf::Model& rModel);
+std::unordered_map<int64_t, int64_t> BuildNodeParentMap(const tinygltf::Model& rModel);
 
 // The pack format carries one flattened skeleton and every downstream loader reads skin 0, so the skin the nodes
 // actually reference is moved into slot 0 here; a scene referencing more than one skin cannot be represented and is rejected.

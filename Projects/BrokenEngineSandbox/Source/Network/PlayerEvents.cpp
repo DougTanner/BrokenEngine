@@ -9,11 +9,11 @@
 namespace game
 {
 
-void ParsePlayerEvents(const std::vector<std::pair<uint8_t, std::vector<uint8_t>>>& rRawPackets, common::ScopedWorkbufferArena& rOutputEventsArena)
+void ParsePlayerEvents(const std::vector<std::pair<int64_t, std::vector<uint8_t>>>& rRawPackets, common::ScopedWorkbufferArena& rOutputEventsArena)
 {
-	for (const auto& [uiPacketType, rPayload] : rRawPackets)
+	for (const auto& [iPacketType, rPayload] : rRawPackets)
 	{
-		GamePacketType eType = static_cast<GamePacketType>(uiPacketType);
+		GamePacketType eType = static_cast<GamePacketType>(iPacketType);
 
 		if (eType == GamePacketType::kServerAssignPlayer)
 		{
@@ -31,7 +31,7 @@ void ParsePlayerEvents(const std::vector<std::pair<uint8_t, std::vector<uint8_t>
 	}
 }
 
-bool ParseFleetSynchronization(std::vector<std::pair<uint8_t, std::vector<uint8_t>>>& rRawPackets, std::vector<Fleet>& rOutputFleets)
+bool ParseFleetSynchronization(std::vector<std::pair<int64_t, std::vector<uint8_t>>>& rRawPackets, std::vector<Fleet>& rOutputFleets)
 {
 	// A sync, including a zero-fleet sync, commits into rOutputFleets but leaves it empty when
 	// fleetCount == 0, so emptiness cannot tell the caller "applied" from "nothing arrived" — report it explicitly

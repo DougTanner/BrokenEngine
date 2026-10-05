@@ -22,11 +22,11 @@ Islands::Islands()
 		.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
 		.vkIndexType = VK_INDEX_TYPE_UINT32,
 		.iVertexStride = static_cast<int64_t>(2 * sizeof(float)),
-		.vkDataSize = kVkIslandMeshArenaBytes,
+		.iDataSize = kiIslandMeshArenaBytes,
 	});
 	VmaVirtualBlockCreateInfo vmaVirtualBlockCreateInfo
 	{
-		.size = kVkIslandMeshArenaBytes,
+		.size = static_cast<VkDeviceSize>(kiIslandMeshArenaBytes),
 	};
 	CHECK_VK(vmaCreateVirtualBlock(&vmaVirtualBlockCreateInfo, &mIslandMeshVirtualBlock));
 
@@ -42,7 +42,7 @@ Islands::Islands()
 	// All kiMaxFramebuffers instances are allocated regardless of the live framebuffer count so any index
 	// stays valid across a swapchain recreation that changes the count (mpIslands is not rebuilt then).
 	int64_t iStorageBufferEntryCount = kiMaxActivePlacements;
-	VkDeviceSize vkIndirectSize = static_cast<VkDeviceSize>(miTemplateCount) * sizeof(VkDrawIndexedIndirectCommand);
+	int64_t iIndirectSize = miTemplateCount * static_cast<int64_t>(sizeof(VkDrawIndexedIndirectCommand));
 
 	for (int64_t i = 0; i < kiMaxFramebuffers; ++i)
 	{
@@ -55,7 +55,7 @@ Islands::Islands()
 			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
 			.iCount = iStorageBufferEntryCount,
 			.iVertexStride = sizeof(shaders::AxisAlignedQuadLayout),
-			.vkDataSize = static_cast<VkDeviceSize>(iStorageBufferEntryCount) * sizeof(shaders::AxisAlignedQuadLayout),
+			.iDataSize = iStorageBufferEntryCount * static_cast<int64_t>(sizeof(shaders::AxisAlignedQuadLayout)),
 		});
 		std::memset(mIslandsStorageBuffers.at(i).mpMappedMemory, 0, static_cast<size_t>(iStorageBufferEntryCount) * sizeof(shaders::AxisAlignedQuadLayout));
 
@@ -63,7 +63,7 @@ Islands::Islands()
 		// vertexOffset in the drained churn window; firstInstance and instanceCount are rewritten per frame by
 		// UpdateActiveIslands.
 		VmaAllocationInfo vmaAllocationInfo {};
-		Buffer::CreateBuffer("IslandsIndirect", vkIndirectSize, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mIslandsIndirectVkBuffers.at(i), mIslandsIndirectVmaAllocations.at(i), &vmaAllocationInfo);
+		Buffer::CreateBuffer("IslandsIndirect", iIndirectSize, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mIslandsIndirectVkBuffers.at(i), mIslandsIndirectVmaAllocations.at(i), &vmaAllocationInfo);
 		mppIslandsIndirectMappedVkDrawIndexedIndirectCommands.at(i) = static_cast<VkDrawIndexedIndirectCommand*>(vmaAllocationInfo.pMappedData);
 
 		for (int64_t j = 0; j < miTemplateCount; ++j)
@@ -84,7 +84,7 @@ Islands::~Islands()
 	if (mIslandMeshVirtualBlock != VK_NULL_HANDLE)
 	{
 		vmaClearVirtualBlock(mIslandMeshVirtualBlock);
-		++muiMeshArenaCapacityGeneration;
+		++miMeshArenaCapacityGeneration;
 		vmaDestroyVirtualBlock(mIslandMeshVirtualBlock);
 		mIslandMeshVirtualBlock = VK_NULL_HANDLE;
 	}
@@ -107,7 +107,7 @@ Islands::~Islands()
 	}
 }
 
-bool Islands::AllocateMeshRanges(VkDeviceSize vkIndexSize, VkDeviceSize vkVertexSize, VmaVirtualAllocation& rIndexAllocation, VkDeviceSize& rVkIndexOffset, VmaVirtualAllocation& rVertexAllocation, VkDeviceSize& rVkVertexOffset)
+bool Islands::AllocateMeshRanges(int64_t iIndexSize, int64_t iVertexSize, VmaVirtualAllocation& rIndexAllocation, int64_t& riIndexOffset, VmaVirtualAllocation& rVertexAllocation, int64_t& riVertexOffset)
 {
 	ASSERT(mIslandMeshVirtualBlock != VK_NULL_HANDLE);
 
@@ -115,7 +115,7 @@ bool Islands::AllocateMeshRanges(VkDeviceSize vkIndexSize, VkDeviceSize vkVertex
 	VkDeviceSize vkIndexOffset = 0;
 	VmaVirtualAllocationCreateInfo indexAllocationCreateInfo
 	{
-		.size = vkIndexSize,
+		.size = static_cast<VkDeviceSize>(iIndexSize),
 		.alignment = sizeof(uint32_t),
 	};
 	if (vmaVirtualAllocate(mIslandMeshVirtualBlock, &indexAllocationCreateInfo, &vmaIndexAllocation, &vkIndexOffset) != VK_SUCCESS)
@@ -127,7 +127,7 @@ bool Islands::AllocateMeshRanges(VkDeviceSize vkIndexSize, VkDeviceSize vkVertex
 	VkDeviceSize vkVertexOffset = 0;
 	VmaVirtualAllocationCreateInfo vertexAllocationCreateInfo
 	{
-		.size = vkVertexSize,
+		.size = static_cast<VkDeviceSize>(iVertexSize),
 		.alignment = 2 * sizeof(float),
 	};
 	if (vmaVirtualAllocate(mIslandMeshVirtualBlock, &vertexAllocationCreateInfo, &vmaVertexAllocation, &vkVertexOffset) != VK_SUCCESS)
@@ -137,9 +137,9 @@ bool Islands::AllocateMeshRanges(VkDeviceSize vkIndexSize, VkDeviceSize vkVertex
 	}
 
 	rIndexAllocation = vmaIndexAllocation;
-	rVkIndexOffset = vkIndexOffset;
+	riIndexOffset = static_cast<int64_t>(vkIndexOffset);
 	rVertexAllocation = vmaVertexAllocation;
-	rVkVertexOffset = vkVertexOffset;
+	riVertexOffset = static_cast<int64_t>(vkVertexOffset);
 	return true;
 }
 
@@ -150,32 +150,32 @@ void Islands::FreeMeshRanges(VmaVirtualAllocation vmaIndexAllocation, VmaVirtual
 	ASSERT(vmaVertexAllocation != VK_NULL_HANDLE);
 	vmaVirtualFree(mIslandMeshVirtualBlock, vmaIndexAllocation);
 	vmaVirtualFree(mIslandMeshVirtualBlock, vmaVertexAllocation);
-	++muiMeshArenaCapacityGeneration;
+	++miMeshArenaCapacityGeneration;
 }
 
-void Islands::UploadMesh(VkDeviceSize vkIndexOffset, std::span<const std::byte> indexData, VkDeviceSize vkVertexOffset, std::span<const std::byte> vertexData)
+void Islands::UploadMesh(int64_t iIndexOffset, std::span<const std::byte> indexData, int64_t iVertexOffset, std::span<const std::byte> vertexData)
 {
-	ASSERT(vkIndexOffset <= kVkIslandMeshArenaBytes && indexData.size() <= kVkIslandMeshArenaBytes - vkIndexOffset);
-	ASSERT(vkVertexOffset <= kVkIslandMeshArenaBytes && vertexData.size() <= kVkIslandMeshArenaBytes - vkVertexOffset);
+	ASSERT(iIndexOffset >= 0 && iIndexOffset <= kiIslandMeshArenaBytes && std::ssize(indexData) <= kiIslandMeshArenaBytes - iIndexOffset);
+	ASSERT(iVertexOffset >= 0 && iVertexOffset <= kiIslandMeshArenaBytes && std::ssize(vertexData) <= kiIslandMeshArenaBytes - iVertexOffset);
 	DeviceLocalBufferUpload uploads[]
 	{
-		{.pData = indexData.data(), .vkDestinationOffset = vkIndexOffset, .vkSize = static_cast<VkDeviceSize>(indexData.size())},
-		{.pData = vertexData.data(), .vkDestinationOffset = vkVertexOffset, .vkSize = static_cast<VkDeviceSize>(vertexData.size())},
+		{.pData = indexData.data(), .iDestinationOffset = iIndexOffset, .iSize = std::ssize(indexData)},
+		{.pData = vertexData.data(), .iDestinationOffset = iVertexOffset, .iSize = std::ssize(vertexData)},
 	};
 	Buffer::UploadToDeviceLocal(mIslandMeshArena.mDeviceLocalVkBuffer, uploads);
 }
 
-void Islands::WriteMeshIndirect(int64_t iTemplate, VkDeviceSize vkIndexOffset, VkDeviceSize vkVertexOffset, uint32_t uiIndexCount)
+void Islands::WriteMeshIndirect(int64_t iTemplate, int64_t iIndexOffset, int64_t iVertexOffset, int64_t iIndexCount)
 {
 	ASSERT(iTemplate >= 0 && iTemplate < miTemplateCount);
-	ASSERT(vkIndexOffset % sizeof(uint32_t) == 0);
-	ASSERT(vkVertexOffset % (2 * sizeof(float)) == 0);
+	ASSERT(iIndexOffset % static_cast<int64_t>(sizeof(uint32_t)) == 0);
+	ASSERT(iVertexOffset % static_cast<int64_t>(2 * sizeof(float)) == 0);
 	for (int64_t i = 0; i < kiMaxFramebuffers; ++i)
 	{
 		VkDrawIndexedIndirectCommand& rVkIndirect = mppIslandsIndirectMappedVkDrawIndexedIndirectCommands.at(i)[iTemplate];
-		rVkIndirect.indexCount = uiIndexCount;
-		rVkIndirect.firstIndex = static_cast<uint32_t>(vkIndexOffset / sizeof(uint32_t));
-		rVkIndirect.vertexOffset = static_cast<int32_t>(vkVertexOffset / (2 * sizeof(float)));
+		rVkIndirect.indexCount = static_cast<uint32_t>(iIndexCount);
+		rVkIndirect.firstIndex = static_cast<uint32_t>(iIndexOffset / static_cast<int64_t>(sizeof(uint32_t)));
+		rVkIndirect.vertexOffset = static_cast<int32_t>(iVertexOffset / static_cast<int64_t>(2 * sizeof(float)));
 	}
 }
 
@@ -191,14 +191,14 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 	VkDrawIndexedIndirectCommand* pVkIndirect = mppIslandsIndirectMappedVkDrawIndexedIndirectCommands.at(iFramebuffer);
 
 	// Per-template reference counts reset each frame. Templates with reference count zero for
-	// kuiGraceRenderFrames become eviction candidates in RenderGlobal's next post-fence EvictionSweep.
+	// kiGraceRenderFrames become eviction candidates in RenderGlobal's next post-fence EvictionSweep.
 	for (auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
 	{
 		rTemplate.iReferenceCount = 0;
 	}
 
 	auto pStorageBufferQuads = reinterpret_cast<shaders::AxisAlignedQuadLayout*>(rStorageBuffer.mpMappedMemory);
-	uint32_t uiPreviousWrittenTotal = mLastWrittenCounts.at(iFramebuffer);
+	int64_t iPreviousWrittenTotal = mLastWrittenCounts.at(iFramebuffer);
 
 	// Counting, prefix, and emission cursors are per-frame scratch in one contiguous thread-workbuffer
 	// reservation. Keeping them in one reservation ensures a possible workbuffer grow happens before any
@@ -254,7 +254,7 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 			int64_t iTemplate = rTemplate.iTemplateArrayIndex;
 			ASSERT(iTemplate >= 0 && iTemplate < miTemplateCount);
 			++rTemplate.iReferenceCount;
-			rTemplate.uiLastUsedRenderFrame = gpGraphics->muiFrameCounter;
+			rTemplate.iLastUsedRenderFrame = gpGraphics->miFrameCounter;
 			std::ignore = gpIslandTerrainResidency->AcquireTextureSlot(rPlacement.islandCrc);
 			++puiPerTemplateTotalCount[iTemplate];
 			if (IsMeshVisible(rPlacement, rTemplate, f2Offset))
@@ -276,21 +276,21 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 	// Exclusive prefix sum of per-template totals establishes each contiguous run in the shared arena.
 	// firstInstance and the mesh-visible instanceCount are refreshed for every template, including zero-count
 	// templates, in the acquired framebuffer's indirect buffer only.
-	uint32_t uiCurrentWrittenOffset = 0;
+	int64_t iCurrentWrittenOffset = 0;
 	for (int64_t i = 0; i < miTemplateCount; ++i)
 	{
-		puiPerTemplateBase[i] = uiCurrentWrittenOffset;
+		puiPerTemplateBase[i] = static_cast<uint32_t>(iCurrentWrittenOffset);
 		pVkIndirect[i].firstInstance = puiPerTemplateBase[i];
 		pVkIndirect[i].instanceCount = puiPerTemplateMeshVisibleCount[i];
-		uiCurrentWrittenOffset += puiPerTemplateTotalCount[i];
+		iCurrentWrittenOffset += puiPerTemplateTotalCount[i];
 	}
 
-	auto EmitPlacement = [&](const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, uint32_t uiTextureSlot, XMFLOAT2 f2Offset)
+	auto EmitPlacement = [&](const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, int64_t iTextureSlot, XMFLOAT2 f2Offset)
 	{
 		int64_t iTemplate = rTemplate.iTemplateArrayIndex;
 		ASSERT(iTemplate >= 0 && iTemplate < miTemplateCount);
-		uint32_t uiSlotInTemplate = puiPerTemplateEmitCount[iTemplate];
-		int64_t iStorageBufferIndex = static_cast<int64_t>(puiPerTemplateBase[iTemplate]) + uiSlotInTemplate;
+		int64_t iSlotInTemplate = puiPerTemplateEmitCount[iTemplate];
+		int64_t iStorageBufferIndex = static_cast<int64_t>(puiPerTemplateBase[iTemplate]) + iSlotInTemplate;
 		if (iStorageBufferIndex >= kiMaxActivePlacements)
 		{
 			// Placement indices must stay below kiMaxActivePlacements to keep writes within the shared arena.
@@ -312,7 +312,7 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 
 		rQuad.f4Parameters.x = 0.0f;
 		rQuad.fRotation = rPlacement.fRotation;
-		rQuad.uiTextureSlot = uiTextureSlot;
+		rQuad.uiTextureSlot = static_cast<uint32_t>(iTextureSlot);
 
 		++puiPerTemplateEmitCount[iTemplate];
 	};
@@ -334,7 +334,7 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
 			if (IsMeshVisible(rPlacement, rTemplate, f2Offset))
 			{
-				EmitPlacement(rPlacement, rTemplate, static_cast<uint32_t>(rTemplate.iTextureSlot), f2Offset);
+				EmitPlacement(rPlacement, rTemplate, rTemplate.iTextureSlot, f2Offset);
 			}
 		}
 	}
@@ -358,7 +358,7 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
 			if (!IsMeshVisible(rPlacement, rTemplate, f2Offset))
 			{
-				EmitPlacement(rPlacement, rTemplate, static_cast<uint32_t>(rTemplate.iTextureSlot), f2Offset);
+				EmitPlacement(rPlacement, rTemplate, rTemplate.iTextureSlot, f2Offset);
 			}
 		}
 	}
@@ -368,14 +368,14 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 		ASSERT(puiPerTemplateEmitCount[i] == puiPerTemplateTotalCount[i]);
 	}
 
-	if (iCurrentWrittenTotal < uiPreviousWrittenTotal)
+	if (iCurrentWrittenTotal < iPreviousWrittenTotal)
 	{
 		// The current run overwrote [0, iCurrentWrittenTotal). Clear only the stale tail from this frame's
 		// total through the previous total; the prepasses draw the entire fixed arena and would otherwise see
 		// placements left by the prior population of this framebuffer instance.
-		std::memset(&pStorageBufferQuads[static_cast<size_t>(iCurrentWrittenTotal)], 0, static_cast<size_t>(uiPreviousWrittenTotal - iCurrentWrittenTotal) * sizeof(shaders::AxisAlignedQuadLayout));
+		std::memset(&pStorageBufferQuads[static_cast<size_t>(iCurrentWrittenTotal)], 0, static_cast<size_t>(iPreviousWrittenTotal - iCurrentWrittenTotal) * sizeof(shaders::AxisAlignedQuadLayout));
 	}
-	mLastWrittenCounts.at(iFramebuffer) = static_cast<uint32_t>(iCurrentWrittenTotal);
+	mLastWrittenCounts.at(iFramebuffer) = iCurrentWrittenTotal;
 }
 
 } // namespace engine

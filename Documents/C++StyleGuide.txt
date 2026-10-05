@@ -59,7 +59,7 @@ Use the following rules for C++ code
 7. Camel case, except for template parameters. Classes and functions start with an uppercase letter, variables start with a lowercase letter. A variable holding a lambda or a std::function is named like a function, starting with an uppercase letter, or continuing uppercase after a rule 3 prefix (mGetNextTrack, rWriteBody): auto Sample = [&](int64_t iFrame) -> float { ... }; called as Sample(i).
 
 	class RenderThread
-	constexpr uint32_t kuiThreadCount
+	constexpr int64_t kiThreadCount
 	template <typename T> or template <typename... TUV>
 
 8. Use i/j/k variable names in for loops, but prefer range-based for loop when possible. When a counter is the zero-based ordinal of every visited element, std::views::enumerate with a structured binding is recommended over a counter initializer statement, which remains allowed; the element's reference and constness come from the underlying range, so enumerate a const range for read-only access. If any other counter variable is required with a range-based for loop, use the C++20 syntax to include an initializer statement. Use "it" for iterators.
@@ -82,9 +82,9 @@ Use the following rules for C++ code
 13. Default to int64_t: int64_t iCount = 0;
     -Use int8_t, int16_t when packing into structs and arrays (if higher range of larger types is not required)
 	-Use unsigned integers when doing bitwise operations
-	-Use the corresponding type when dealing with directly with parameters and return values from other APIs (ex: Vulkan uses uint32_t)
+	-Our own variables, parameters, members, and return values use our types (int64_t by default) even when the value comes from another API; convert to the API's type only where the value is passed to that API: vkCmdDraw(cmd, static_cast<uint32_t>(iVertexCount), 1, 0, 0);
 
-14. Use "Count" not "Num", ex: uint32_t kuiThreadCount = 3; not kuiNumThreads
+14. Use "Count" not "Num", ex: int64_t kiThreadCount = 3; not kiNumThreads
 
 15. YOU MUST not use auto keyword unless:
 	a) It's an XMVECTOR or XMMATRIX: auto vecResult = XMVector3Normalize(vecInput);
@@ -94,6 +94,7 @@ Use the following rules for C++ code
 	e) It is a lambda expression assigned directly to the variable: auto Callback = []() {};
 	f) It is a generic lambda parameter: [](const auto& rSource) {};
 	g) It is an explicit object (this auto&&) or abbreviated-template (auto&&) parameter, and the deduced return type, of a function returning a std::tie member list: auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.a, rSelf.b); }
+	h) It is a decltype(auto) return type on a generic callable wrapper that directly returns the wrapped invocation and preserves its result type and reference category.
 
 IMPORTANT do not use auto in range-based for loops, except for the structured binding of rule 8 enumeration or rule 38 associative-container iteration
 
@@ -106,7 +107,7 @@ IMPORTANT do not use auto in range-based for loops, except for the structured bi
 
 	Access std::vectors with .at(): mIslands.at(0).quad
 
-17. Use int64_t (rule 13) for std::vector sizes and indices, obtaining the size with std::ssize(), unless the value's consumer requires another integer type (an API parameter or serialized field type): for (int64_t i = 0; i < std::ssize(vec); ++i)
+17. Use int64_t (rule 13) for std::vector sizes and indices, obtaining the size with std::ssize(), casting only where the value is passed to another API: for (int64_t i = 0; i < std::ssize(vec); ++i)
 
 18. Use "const" for read-only reference and pointee contracts:
 	a) A pointer or reference is passed into a function and not modified: const game::MenuInput& rMenuInput
@@ -116,7 +117,7 @@ IMPORTANT do not use auto in range-based for loops, except for the structured bi
 19. Use "typename" not "class" for template declarations, template parameters should be in all upper case ex: template <typename T, typename... TUV>
 
 20. Use uniform initialization only for structures, arrays, and initializer list constructed classes
-	int i = 0;
+	int64_t i = 0;
 	Class class(0, i);
 	Struct struct {a = 0, b = i};
 
@@ -124,7 +125,7 @@ IMPORTANT do not use auto in range-based for loops, except for the structured bi
 
 22. Have a comma at the end of every line in initializer lists
 
-	int pInts[] =
+	int64_t pInts[] =
 	{
 		1,
 		2,
@@ -155,7 +156,7 @@ IMPORTANT do not use auto in range-based for loops, except for the structured bi
 
 33. Do not use any constants from limits.h, instead use std::numeric_limits: std::numeric_limits<float>::max()
 
-34. Use digit separators for large numbers: uint32_t uiOneMillion = 1'000'000;
+34. Use digit separators for large numbers: int64_t iOneMillion = 1'000'000;
 
 35. Use the file system library std::filesystem
 
@@ -172,7 +173,7 @@ IMPORTANT do not use auto in range-based for loops, except for the structured bi
 
 39. Use [[maybe_unused]] when a variable is unused: void Func([[maybe_unused]] int64_t iUnused)
 
-40. Use std::string_view or std::wstring_view instead of "const char*" or std::string& or std::wstring& parameters into functions; a "const char*" or "const wchar_t*" parameter stays when a caller can pass null or when its value reaches an API that needs a null-terminated string: void UpdateTextArea(TextAreas eTextArea, std::string_view pcCharacters); bool BeginSubtab(const char* pcLabel, int64_t iSection, int8_t iTab);
+40. Use std::string_view or std::wstring_view instead of "const char*" or std::string& or std::wstring& parameters into functions; a "const char*" or "const wchar_t*" parameter stays when a caller can pass null or when its value reaches an API that needs a null-terminated string: void UpdateTextArea(TextAreas eTextArea, std::string_view pcCharacters); bool BeginSubtab(const char* pcLabel, int64_t iSection, int64_t iTab);
 
 41. Explicitly use std:: namespace, do not `using namespace std;`: std::vector, std::string, std::unordered_map
 NOTE: The following global namespaces are allowed: `using namespace DirectX;`
@@ -227,7 +228,7 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 	Ordinary Boolean expressions follow a length threshold instead: a Boolean assignment or initializer, an if()/while() condition, or a returned Boolean expression that joins onto one line of 140 columns or fewer stays on one line — never split it at && or ||. Past 140 columns you may split it, but you are not required to. When you do split, use as few lines as possible: fill each line with operands up to 140 columns and break only at a top-level && or ||, which then starts the next line. The parentheses of "if (", "else if (" and "while (", and a pair that encloses the whole right-hand side of an assignment or return, are the opener, so the && or || directly inside them are the top-level break points and the operand aligns after the "if (", "else if (", "while (", "= (" or "return ("; never break inside any other parentheses. Count the closing ) and any terminating ; toward the line's columns, and let a single operand that cannot fit stand alone on its line even when it passes 140. Indent each continuation line with tabs up to the statement's own indent level and then pad with spaces so its operand starts in the same column as the first operand on the opening line, with "&& " or "|| " immediately to the left of that column — tabs for indentation, spaces for alignment, tabs counting as 4 columns. The exception is the same one stated above for arguments.
 
 	Declaration (good):
-	void CreateBuffer(std::string_view name, VkDeviceSize vkDeviceSize, VkBufferUsageFlags vkBufferUsageFlags, VkMemoryPropertyFlags vkMemoryPropertyFlags, VkBuffer& rVkBuffer, VkDeviceMemory& rVkDeviceMemory);
+	void CreateBuffer(std::string_view name, int64_t iSize, VkBufferUsageFlags vkBufferUsageFlags, VkMemoryPropertyFlags vkMemoryPropertyFlags, VkBuffer& rVkBuffer, VkDeviceMemory& rVkDeviceMemory);
 
 	Call (bad — arguments wrapped):
 	engine::gpAudioManager->PlayOneShot3d(rFrame,

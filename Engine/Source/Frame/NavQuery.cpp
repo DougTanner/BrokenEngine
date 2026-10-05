@@ -82,10 +82,10 @@ bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVerti
 	float fCellSizeX = (fMaxX - fMinX) / static_cast<float>(kiNavZonesX);
 	float fCellSizeY = (fMaxY - fMinY) / static_cast<float>(kiNavZonesY);
 
-	int32_t iX = NavGridCell(fP0x, fMinX, fMaxX, kiNavZonesX);
-	int32_t iY = NavGridCell(fP0y, fMinY, fMaxY, kiNavZonesY);
-	int32_t iEndX = NavGridCell(fP1x, fMinX, fMaxX, kiNavZonesX);
-	int32_t iEndY = NavGridCell(fP1y, fMinY, fMaxY, kiNavZonesY);
+	int64_t iX = NavGridCell(fP0x, fMinX, fMaxX, kiNavZonesX);
+	int64_t iY = NavGridCell(fP0y, fMinY, fMaxY, kiNavZonesY);
+	int64_t iEndX = NavGridCell(fP1x, fMinX, fMaxX, kiNavZonesX);
+	int64_t iEndY = NavGridCell(fP1y, fMinY, fMaxY, kiNavZonesY);
 
 	float fSegmentDeltaX = fP1x - fP0x;
 	float fSegmentDeltaY = fP1y - fP0y;
@@ -116,11 +116,11 @@ bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVerti
 	for (int64_t i = 0; i <= iMaxSteps; ++i)
 	{
 		int64_t iCell = iY * kiNavZonesX + iX;
-		int32_t iBegin = rNavData.gridEdgeOffsets.at(static_cast<size_t>(iCell));
-		int32_t iStop = rNavData.gridEdgeOffsets.at(static_cast<size_t>(iCell) + 1);
+		int64_t iBegin = rNavData.gridEdgeOffsets.at(static_cast<size_t>(iCell));
+		int64_t iStop = rNavData.gridEdgeOffsets.at(static_cast<size_t>(iCell) + 1);
 		for (int64_t k = iBegin; k < iStop; ++k)
 		{
-			int32_t iEdge = rNavData.gridEdges.at(static_cast<size_t>(k));
+			int64_t iEdge = rNavData.gridEdges.at(static_cast<size_t>(k));
 			if (SegmentsIntersect(f2A, f2B, pVertices[rNavData.edgeA.at(static_cast<size_t>(iEdge))], pVertices[rNavData.edgeB.at(static_cast<size_t>(iEdge))]))
 			{
 				return true;
@@ -134,12 +134,12 @@ bool SegmentBlockedByObstacle(XMFLOAT2 f2A, XMFLOAT2 f2B, const XMFLOAT2* pVerti
 
 		if (fTMaxX < fTMaxY)
 		{
-			iX += static_cast<int32_t>(iStepX);
+			iX += iStepX;
 			fTMaxX += fTDeltaX;
 		}
 		else
 		{
-			iY += static_cast<int32_t>(iStepY);
+			iY += iStepY;
 			fTMaxY += fTDeltaY;
 		}
 
@@ -165,8 +165,8 @@ bool PointInAnyPolygon(XMFLOAT2 f2Point, const XMFLOAT2* pVertices, const NavDat
 			continue;
 		}
 
-		auto [iStart, iEnd] = PolygonRange(rNavData.polygonOffsets, i, static_cast<int32_t>(rNavData.vertices.size()));
-		int32_t iCount = iEnd - iStart;
+		auto [iStart, iEnd] = std::pair<int64_t, int64_t>(PolygonRange(rNavData.polygonOffsets, i, std::ssize(rNavData.vertices)));
+		int64_t iCount = iEnd - iStart;
 
 		if (iCount > 0 && PointInPolygon(f2Point, std::span<const XMFLOAT2>(&pVertices[iStart], static_cast<size_t>(iCount))))
 		{
@@ -201,7 +201,7 @@ static XMFLOAT2 NearestPolygonEdgePoint(XMFLOAT2 f2Position, const XMFLOAT2* pVe
 			continue;
 		}
 
-		auto [iStart, iEnd] = PolygonRange(rNavData.polygonOffsets, j, static_cast<int32_t>(rNavData.vertices.size()));
+		auto [iStart, iEnd] = std::pair<int64_t, int64_t>(PolygonRange(rNavData.polygonOffsets, j, std::ssize(rNavData.vertices)));
 		int64_t iCount = iEnd - iStart;
 
 		for (int64_t i = 0; i < iCount; ++i)
@@ -275,7 +275,7 @@ struct AStarMemoryLayout
 	int64_t iByteCount = 0;
 };
 
-static constexpr AStarMemoryLayout ComputeAStarMemoryLayout(int32_t iTotalNodes, int32_t iVertexCount)
+static constexpr AStarMemoryLayout ComputeAStarMemoryLayout(int64_t iTotalNodes, int64_t iVertexCount)
 {
 	// Layout: all 4-byte types first (float, int32_t), then bool arrays last to avoid alignment issues
 	AStarMemoryLayout layout {};
@@ -312,9 +312,9 @@ struct AStarHeap
 	int32_t* pOpenSet = nullptr;
 	int32_t* pHeapPosition = nullptr;
 	const float* pFCost = nullptr;
-	int32_t iHeapCount = 0;
+	int64_t iHeapCount = 0;
 
-	bool Less(int32_t iNodeA, int32_t iNodeB) const
+	bool Less(int64_t iNodeA, int64_t iNodeB) const
 	{
 		float fA = pFCost[iNodeA];
 		float fB = pFCost[iNodeB];
@@ -325,21 +325,21 @@ struct AStarHeap
 		return iNodeA < iNodeB;
 	}
 
-	void Swap(int32_t iIndexA, int32_t iIndexB)
+	void Swap(int64_t iIndexA, int64_t iIndexB)
 	{
-		int32_t iNodeA = pOpenSet[iIndexA];
-		int32_t iNodeB = pOpenSet[iIndexB];
-		pOpenSet[iIndexA] = iNodeB;
-		pOpenSet[iIndexB] = iNodeA;
-		pHeapPosition[iNodeA] = iIndexB;
-		pHeapPosition[iNodeB] = iIndexA;
+		int64_t iNodeA = pOpenSet[iIndexA];
+		int64_t iNodeB = pOpenSet[iIndexB];
+		pOpenSet[iIndexA] = static_cast<int32_t>(iNodeB);
+		pOpenSet[iIndexB] = static_cast<int32_t>(iNodeA);
+		pHeapPosition[iNodeA] = static_cast<int32_t>(iIndexB);
+		pHeapPosition[iNodeB] = static_cast<int32_t>(iIndexA);
 	}
 
-	void SiftUp(int32_t iIndex)
+	void SiftUp(int64_t iIndex)
 	{
 		while (iIndex > 0)
 		{
-			int32_t iParent = (iIndex - 1) / 2;
+			int64_t iParent = (iIndex - 1) / 2;
 			if (!Less(pOpenSet[iIndex], pOpenSet[iParent]))
 			{
 				break;
@@ -349,13 +349,13 @@ struct AStarHeap
 		}
 	}
 
-	void SiftDown(int32_t iIndex)
+	void SiftDown(int64_t iIndex)
 	{
 		while (true)
 		{
-			int32_t iSmallest = iIndex;
-			int32_t iLeft = 2 * iIndex + 1;
-			int32_t iRight = 2 * iIndex + 2;
+			int64_t iSmallest = iIndex;
+			int64_t iLeft = 2 * iIndex + 1;
+			int64_t iRight = 2 * iIndex + 2;
 			if (iLeft < iHeapCount && Less(pOpenSet[iLeft], pOpenSet[iSmallest]))
 			{
 				iSmallest = iLeft;
@@ -373,17 +373,17 @@ struct AStarHeap
 		}
 	}
 
-	void Push(int32_t iNode)
+	void Push(int64_t iNode)
 	{
-		pOpenSet[iHeapCount] = iNode;
-		pHeapPosition[iNode] = iHeapCount;
+		pOpenSet[iHeapCount] = static_cast<int32_t>(iNode);
+		pHeapPosition[iNode] = static_cast<int32_t>(iHeapCount);
 		++iHeapCount;
 		SiftUp(iHeapCount - 1);
 	}
 
-	int32_t Pop()
+	int64_t Pop()
 	{
-		int32_t iTop = pOpenSet[0];
+		int64_t iTop = pOpenSet[0];
 		pHeapPosition[iTop] = -1;
 		--iHeapCount;
 		if (iHeapCount > 0)
@@ -400,10 +400,10 @@ struct AStarHeap
 // Returns the direction toward the first waypoint, or zero vector if no path found
 static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVertices, const NavData& rNavData, const AStarMemory& rMemory, float fBaseHeight, XMVECTOR* pOutNextWaypoint)
 {
-	int32_t iVertexCount = static_cast<int32_t>(rNavData.vertices.size());
-	int32_t iStartNode = iVertexCount;
-	int32_t iEndNode = iVertexCount + 1;
-	int32_t iTotalNodes = iVertexCount + 2;
+	int64_t iVertexCount = std::ssize(rNavData.vertices);
+	int64_t iStartNode = iVertexCount;
+	int64_t iEndNode = iVertexCount + 1;
+	int64_t iTotalNodes = iVertexCount + 2;
 
 	for (int64_t i = 0; i < iTotalNodes; ++i)
 	{
@@ -422,7 +422,7 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 		rMemory.pStartVisible[i] = !SegmentBlockedByObstacle(f2Start, pVertices[i], pVertices, rNavData);
 	}
 
-	auto GetPosition = [&](int32_t iNode) -> XMFLOAT2
+	auto GetPosition = [&](int64_t iNode) -> XMFLOAT2
 	{
 		if (iNode == iStartNode)
 		{
@@ -443,11 +443,11 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 
 	while (heap.iHeapCount > 0)
 	{
-		int32_t iCurrent = heap.Pop();
+		int64_t iCurrent = heap.Pop();
 
 		if (iCurrent == iEndNode)
 		{
-			int32_t iNode = iEndNode;
+			int64_t iNode = iEndNode;
 			while (rMemory.pParent[iNode] != iStartNode && rMemory.pParent[iNode] != -1)
 			{
 				iNode = rMemory.pParent[iNode];
@@ -464,7 +464,7 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 
 		rMemory.pClosed[iCurrent] = true;
 
-		auto TryNeighbor = [&](int32_t iNeighbor)
+		auto TryNeighbor = [&](int64_t iNeighbor)
 		{
 			if (rMemory.pClosed[iNeighbor])
 			{
@@ -479,7 +479,7 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 			{
 				rMemory.pGCost[iNeighbor] = fTentativeG;
 				rMemory.pFCost[iNeighbor] = fTentativeG + Distance(f2Neighbor, f2End);
-				rMemory.pParent[iNeighbor] = iCurrent;
+				rMemory.pParent[iNeighbor] = static_cast<int32_t>(iCurrent);
 
 				if (rMemory.pHeapPosition[iNeighbor] >= 0)
 				{
@@ -495,7 +495,7 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 		if (iCurrent == iStartNode)
 		{
 			// The sole caller enters A* only after this post-snap start-to-end segment tested blocked.
-			for (int32_t i = 0; i < iVertexCount; ++i)
+			for (int64_t i = 0; i < iVertexCount; ++i)
 			{
 				if (rMemory.pStartVisible[i])
 				{
@@ -506,8 +506,8 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 		else if (iCurrent < iVertexCount)
 		{
 			// Visibility-graph + polygon-perimeter neighbors, precomputed into one adjacency span.
-			int32_t iBegin = rNavData.adjacencyOffsets.at(static_cast<size_t>(iCurrent));
-			int32_t iStop = rNavData.adjacencyOffsets.at(static_cast<size_t>(iCurrent) + 1);
+			int64_t iBegin = rNavData.adjacencyOffsets.at(static_cast<size_t>(iCurrent));
+			int64_t iStop = rNavData.adjacencyOffsets.at(static_cast<size_t>(iCurrent) + 1);
 			for (int64_t k = iBegin; k < iStop; ++k)
 			{
 				TryNeighbor(rNavData.adjacencyNeighbors.at(static_cast<size_t>(k)));
@@ -626,8 +626,8 @@ XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDesti
 		return XMVector3Normalize(vecDelta);
 	}
 
-	int32_t iVertexCount = static_cast<int32_t>(rNavData.vertices.size());
-	int32_t iTotalNodes = iVertexCount + 2;
+	int64_t iVertexCount = std::ssize(rNavData.vertices);
+	int64_t iTotalNodes = iVertexCount + 2;
 
 	// Workbuffer allocation for A* scratch memory only (vertices already in NavData's cell-local frame)
 	AStarMemoryLayout aStarMemoryLayout = ComputeAStarMemoryLayout(iTotalNodes, iVertexCount);

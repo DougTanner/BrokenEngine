@@ -94,7 +94,7 @@ Azure blocks all inbound traffic except RDP (TCP 3389) by default. The Broken En
 
 | Rule | Port | Protocol | Source | Why |
 | --- | --- | --- | --- | --- |
-| Game traffic | **27015** | **UDP** | Any (or tester IPs) | ENet game port, hard-coded `kuiDefaultPort` |
+| Game traffic | **27015** | **UDP** | Any (or tester IPs) | ENet game port, hard-coded `kiDefaultPort` |
 | RDP lockdown | 3389 | TCP | **Your home IP only** | Never leave RDP open to `0.0.0.0/0` |
 
 Do **not** open:
@@ -124,7 +124,7 @@ BrokenEngineSandboxServer.exe --data-directory C:\GameServer\Data --log-file C:\
 ```
 
 - **Omit `--loopback-only`** — without it the server binds all interfaces (required for remote clients). The harness's loopback flag is for local development only.
-- The game port is **not configurable**: 27015 always (`kuiDefaultPort`, `Engine/Source/Network/NetworkProtocol.h`).
+- The game port is **not configurable**: 27015 always (`kiDefaultPort`, `Engine/Source/Network/NetworkProtocol.h`).
 - `--agent-port <n>` is optional and loopback-only — useful if you RDP in and want harness-style control of the live server.
 - The server shows a small "Headless Monitoring Window" (GDI); it is not a console app.
 - On quit the server autosaves; on next start it loads that autosave — sim state carries across VM sessions as long as the binary/Data stay compatible.

@@ -9,8 +9,8 @@ class Wrapper;
 
 
 inline constexpr int64_t kiMaximumControllerKeyframes = 4;
-inline constexpr uint8_t kuiInvalidTypeIndex = 0xFF;
-inline constexpr uint8_t kuiInvalidControllerType = kuiInvalidTypeIndex;
+inline constexpr int64_t kiInvalidTypeIndex = 0xFF;
+inline constexpr int64_t kiInvalidControllerType = kiInvalidTypeIndex;
 
 struct ControllerKeyframe
 {
@@ -37,8 +37,8 @@ struct ControllerKeyframe
 
 struct ControllerType
 {
-	uint8_t uiBaseTypeIndex = 0;                                // Base Type for color/texture
-	uint8_t uiKeyframeCount = 2;                                // Actual keyframes used (2-4)
+	int64_t iBaseTypeIndex = 0;                                // Base Type for color/texture
+	int64_t iKeyframeCount = 2;                                // Actual keyframes used (2-4)
 	bool bDestroysSelf = true;                                  // Auto-remove when animation ends
 	std::chrono::duration<float> times[kiMaximumControllerKeyframes] {};                  // Keyframe times (relative to start)
 	ControllerKeyframe keyframes[kiMaximumControllerKeyframes] {};   // Keyframe states (normalized when wrappers present)
@@ -58,13 +58,13 @@ template <typename CONTROLLER_TYPE>
 inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateKeyframes(const CONTROLLER_TYPE& rController, float fElapsedTime)
 {
 	using KeyframeType = std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)>;
-	int64_t iKeyframeCount = rController.uiKeyframeCount;
+	int64_t iKeyframeCount = rController.iKeyframeCount;
 
 	if (fElapsedTime <= rController.times[0].count())
 	{
 		return rController.keyframes[0];
 	}
-	// NOLINTNEXTLINE(clang-analyzer-security.ArrayBound) — registered controllers always have uiKeyframeCount >= 2; the analyzer's count==0 path cannot occur
+	// NOLINTNEXTLINE(clang-analyzer-security.ArrayBound) — registered controllers always have iKeyframeCount >= 2; the analyzer's count==0 path cannot occur
 	if (fElapsedTime >= rController.times[iKeyframeCount - 1].count())
 	{
 		return rController.keyframes[iKeyframeCount - 1];
@@ -87,7 +87,7 @@ template <typename CONTROLLER_TYPE, typename SCALE_FUNCTION>
 inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateScaledKeyframes(const CONTROLLER_TYPE& rController, float fElapsedTime, SCALE_FUNCTION ScaleFunction)
 {
 	CONTROLLER_TYPE scaledController = rController;
-	for (int64_t j = 0; j < rController.uiKeyframeCount; ++j)
+	for (int64_t j = 0; j < rController.iKeyframeCount; ++j)
 	{
 		ScaleFunction(scaledController, rController, j);
 	}
@@ -96,14 +96,14 @@ inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateSca
 
 // Spawns a paired controlled element while leaving collection-specific seeding to the caller.
 template <typename INTERPOLATE, typename POST_RENDER, typename GROW_FUNCTION, typename ADD_FUNCTION, typename SEED_FUNCTION>
-void XM_CALLCONV AddControlledElement(INTERPOLATE& rInterpolate, [[maybe_unused]] const POST_RENDER& rPostRender, float fCurrentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition, GROW_FUNCTION GrowFunction, ADD_FUNCTION AddFunction, SEED_FUNCTION SeedFunction)
+void XM_CALLCONV AddControlledElement(INTERPOLATE& rInterpolate, [[maybe_unused]] const POST_RENDER& rPostRender, float fCurrentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, GROW_FUNCTION GrowFunction, ADD_FUNCTION AddFunction, SEED_FUNCTION SeedFunction)
 {
 	GrowFunction();
 	int64_t iSpawnIndex = AddFunction();
 
 	rInterpolate.pVecPositions[iSpawnIndex] = XMVectorSetW(vecPosition, 1.0f);
 	SeedFunction(iSpawnIndex);
-	rInterpolate.puiControllerTypeIndices[iSpawnIndex] = uiControllerTypeIndex;
+	rInterpolate.puiControllerTypeIndices[iSpawnIndex] = static_cast<uint8_t>(iControllerTypeIndex);
 	rInterpolate.pfStartTimes[iSpawnIndex] = fCurrentTime;
 }
 
@@ -114,17 +114,17 @@ struct ControllerTypeRegistry
 {
 	static inline std::vector<CONTROLLER_TYPE> sControllerTypes;
 
-	static void RegisterControllerType(uint8_t& ruiIndex, const CONTROLLER_TYPE& rType)
+	static void RegisterControllerType(int64_t& riIndex, const CONTROLLER_TYPE& rType)
 	{
-		ASSERT(ruiIndex == kuiInvalidTypeIndex);
-		ASSERT(std::ssize(sControllerTypes) < kuiInvalidTypeIndex);
-		ASSERT(rType.uiKeyframeCount >= 2);
-		ASSERT(rType.uiKeyframeCount <= kiMaximumControllerKeyframes);
-		for (int64_t i = 1; i < rType.uiKeyframeCount; ++i)
+		ASSERT(riIndex == kiInvalidTypeIndex);
+		ASSERT(std::ssize(sControllerTypes) < kiInvalidTypeIndex);
+		ASSERT(rType.iKeyframeCount >= 2);
+		ASSERT(rType.iKeyframeCount <= kiMaximumControllerKeyframes);
+		for (int64_t i = 1; i < rType.iKeyframeCount; ++i)
 		{
 			ASSERT(rType.times[i] >= rType.times[i - 1]);
 		}
-		ruiIndex = static_cast<uint8_t>(std::ssize(sControllerTypes));
+		riIndex = std::ssize(sControllerTypes);
 		sControllerTypes.push_back(rType);
 	}
 
@@ -136,20 +136,20 @@ void DestroyExpiredControlled(INTERPOLATE& rInterpolate, POST_RENDER& rPostRende
 {
 	for (int64_t i = 0; i < rInterpolate.iCount; ++i)
 	{
-		uint8_t uiControllerTypeIndex = rInterpolate.puiControllerTypeIndices[i];
-		if (uiControllerTypeIndex == kuiInvalidControllerType)
+		int64_t iControllerTypeIndex = rInterpolate.puiControllerTypeIndices[i];
+		if (iControllerTypeIndex == kiInvalidControllerType)
 		{
 			continue;
 		}
 
-		const typename decltype(INTERPOLATE::sControllerTypes)::value_type& rController = INTERPOLATE::sControllerTypes.at(uiControllerTypeIndex);
+		const typename decltype(INTERPOLATE::sControllerTypes)::value_type& rController = INTERPOLATE::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
 		if (!rController.bDestroysSelf)
 		{
 			continue;
 		}
 
 		float fElapsedTime = fCurrentTime - rInterpolate.pfStartTimes[i];
-		if (fElapsedTime > rController.times[rController.uiKeyframeCount - 1].count()) [[unlikely]]
+		if (fElapsedTime > rController.times[rController.iKeyframeCount - 1].count()) [[unlikely]]
 		{
 			RemoveFunction(rInterpolate, rPostRender, i);
 		}

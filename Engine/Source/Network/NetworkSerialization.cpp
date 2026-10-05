@@ -349,7 +349,7 @@ int64_t CompressStatusChangeBatch(std::span<const game::StatusChange> changes, s
 	int32_t iUncompressedSize = static_cast<int32_t>(iSerializedSize);
 	std::memcpy(pOutput, &iUncompressedSize, sizeof(int32_t));
 
-	int iCompressedSize = LZ4_compress_default(reinterpret_cast<const char*>(pSerialized), reinterpret_cast<char*>(pOutput + sizeof(int32_t)), static_cast<int>(iSerializedSize), static_cast<int>(iDestinationCapacity - sizeof(int32_t)));
+	int64_t iCompressedSize = LZ4_compress_default(reinterpret_cast<const char*>(pSerialized), reinterpret_cast<char*>(pOutput + sizeof(int32_t)), static_cast<int>(iSerializedSize), static_cast<int>(iDestinationCapacity - sizeof(int32_t)));
 	if (iCompressedSize <= 0)
 	{
 		// Belt (the caller sizes destination to fit any valid capped batch): a 0 return means the batch did not fit. Drop it
@@ -373,7 +373,7 @@ int64_t DecompressStatusChangeBatch(std::span<const uint8_t> source, game::Statu
 	common::ScopedWorkbufferAllocation<uint8_t*> decompressedAllocation = rWorkbuffer.PushBuffer<uint8_t*>(iUncompressedSize);
 	uint8_t* pDecompressed = decompressedAllocation.mpData;
 
-	int iResult = LZ4_decompress_safe(reinterpret_cast<const char*>(pInput + sizeof(int32_t)), reinterpret_cast<char*>(pDecompressed), static_cast<int>(iSourceSize - sizeof(int32_t)), iUncompressedSize);
+	int64_t iResult = LZ4_decompress_safe(reinterpret_cast<const char*>(pInput + sizeof(int32_t)), reinterpret_cast<char*>(pDecompressed), static_cast<int>(iSourceSize - sizeof(int32_t)), iUncompressedSize);
 
 	int64_t iCount = DeserializeStatusChangeBatch(std::span<const uint8_t>(pDecompressed, static_cast<size_t>(iResult)), pDestination);
 

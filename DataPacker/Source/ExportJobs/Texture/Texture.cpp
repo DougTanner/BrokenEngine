@@ -2,13 +2,13 @@
 
 #include "FileManager.h"
 
-inline constexpr uint32_t kuiBc45SearchRadius = 5;
-inline constexpr uint32_t kuiBc7MaxPartitions = 64;
-inline constexpr uint32_t kuiBc7UberLevel = 4;
+inline constexpr int64_t kiBc45SearchRadius = 5;
+inline constexpr int64_t kiBc7MaxPartitions = 64;
+inline constexpr int64_t kiBc7UberLevel = 4;
 
 // Tracks how many threads are inside EncodeBlocks at once. The caller-held sEncodeMutex must
 // keep this at 0 or 1 — anything higher means a call site forgot to take the lock.
-static std::atomic<int> siActiveEncodeCount(0);
+static std::atomic<int64_t> siActiveEncodeCount(0);
 
 void Texture::StaticInitialize()
 {
@@ -53,7 +53,7 @@ void Texture::LoadImage(const std::filesystem::path& rPath)
 	miHeight = iStbiHeight;
 
 	stbi_uc* puiSource = puiPixels;
-	std::vector<float>& rPixels = mData.emplace_back(4 * iStbiWidth * iStbiHeight);
+	std::vector<float>& rPixels = mData.emplace_back(static_cast<size_t>(4 * miWidth * miHeight));
 	float* pfDestination = rPixels.data();
 	for (int64_t j = 0; j < miHeight; ++j)
 	{
@@ -106,17 +106,17 @@ void Texture::LoadUint16Raw(const std::filesystem::path& rPath)
 
 	uintmax_t uiWidth = static_cast<uintmax_t>(miWidth);
 	uintmax_t uiHeight = static_cast<uintmax_t>(miHeight);
-	static constexpr uintmax_t kuiBytesPerPixel = sizeof(uint16_t);
+	static constexpr int64_t kiBytesPerPixel = sizeof(uint16_t);
 	if (uiWidth > std::numeric_limits<uintmax_t>::max() / uiHeight)
 	{
 		throw std::runtime_error("Uint16 raw texture dimensions overflow");
 	}
 	uintmax_t uiPixelCount = uiWidth * uiHeight;
-	if (uiPixelCount > std::numeric_limits<uintmax_t>::max() / kuiBytesPerPixel)
+	if (uiPixelCount > std::numeric_limits<uintmax_t>::max() / kiBytesPerPixel)
 	{
 		throw std::runtime_error("Uint16 raw texture byte count overflow");
 	}
-	uintmax_t uiExpectedBytes = uiPixelCount * kuiBytesPerPixel;
+	uintmax_t uiExpectedBytes = uiPixelCount * kiBytesPerPixel;
 
 	// Headerless: the file length is the only shape check available. Checked before the read because
 	// ReadEntireFile sizes its allocation from the on-disk length.
@@ -151,11 +151,11 @@ void Texture::LoadUint16Raw(const std::filesystem::path& rPath)
 
 // OpenEXR reports every failure through a result code, so a discarded result publishes an
 // incompletely decoded image that looks valid downstream.
-static void CheckExrResult(exr_result_t iExrResult, const std::filesystem::path& rPath, std::string_view call)
+static void CheckExrResult(int64_t iExrResult, const std::filesystem::path& rPath, std::string_view call)
 {
 	if (iExrResult != EXR_ERR_SUCCESS)
 	{
-		throw std::runtime_error(std::format("{} failed for EXR \"{}\": {}", call, rPath.string(), exr_get_default_error_message(iExrResult)));
+		throw std::runtime_error(std::format("{} failed for EXR \"{}\": {}", call, rPath.string(), exr_get_default_error_message(static_cast<exr_result_t>(iExrResult))));
 	}
 }
 
@@ -163,7 +163,7 @@ void Texture::LoadExr(const std::filesystem::path& rPath)
 {
 	exr_context_initializer_t exrContextInitializer = EXR_DEFAULT_CONTEXT_INITIALIZER;
 	exr_context_t pExrContext {};
-	exr_result_t iExrResult = exr_start_read(&pExrContext, reinterpret_cast<const char*>(rPath.u8string().c_str()), &exrContextInitializer);
+	int64_t iExrResult = exr_start_read(&pExrContext, reinterpret_cast<const char*>(rPath.u8string().c_str()), &exrContextInitializer);
 	CheckExrResult(iExrResult, rPath, "exr_start_read");
 	common::ScopedLambda releaseExrContext([=]()
 	{
@@ -175,7 +175,8 @@ void Texture::LoadExr(const std::filesystem::path& rPath)
 	CheckExrResult(exr_get_data_window(pExrContext, 0, &dataWindow), rPath, "exr_get_data_window");
 	int32_t iScansPerChunk = 0;
 	CheckExrResult(exr_get_scanlines_per_chunk(pExrContext, 0, &iScansPerChunk), rPath, "exr_get_scanlines_per_chunk");
-	ASSERT(iScansPerChunk == 1);
+	int64_t iScanlinesPerChunk = iScansPerChunk;
+	ASSERT(iScanlinesPerChunk == 1);
 
 	miWidth = dataWindow.max.x + 1;
 	miHeight = dataWindow.max.y + 1;
@@ -183,10 +184,10 @@ void Texture::LoadExr(const std::filesystem::path& rPath)
 	std::vector<float> pixelsG(miWidth * miHeight);
 	std::vector<float> pixelsB(miWidth * miHeight);
 
-	for (int i = dataWindow.min.y; i <= dataWindow.max.y; i += iScansPerChunk)
+	for (int64_t i = dataWindow.min.y; i <= dataWindow.max.y; i += iScanlinesPerChunk)
 	{
 		exr_chunk_info_t exrChunkInfo {};
-		CheckExrResult(exr_read_scanline_chunk_info(pExrContext, 0, i, &exrChunkInfo), rPath, "exr_read_scanline_chunk_info");
+		CheckExrResult(exr_read_scanline_chunk_info(pExrContext, 0, static_cast<int>(i), &exrChunkInfo), rPath, "exr_read_scanline_chunk_info");
 
 		exr_decode_pipeline_t decoder {};
 		CheckExrResult(exr_decoding_initialize(pExrContext, 0, &exrChunkInfo, &decoder), rPath, "exr_decoding_initialize");
@@ -259,10 +260,10 @@ Texture::Texture(const std::byte* puiPixels, int64_t iWidth, int64_t iHeight, in
 	{
 		for (int64_t i = 0; i < miWidth; ++i)
 		{
-			pfDestination[0] = static_cast<float>(std::to_integer<uint8_t>(puiPixels[0]));
-			pfDestination[1] = static_cast<float>(std::to_integer<uint8_t>(puiPixels[1]));
-			pfDestination[2] = static_cast<float>(std::to_integer<uint8_t>(puiPixels[2]));
-			pfDestination[3] = static_cast<float>(std::to_integer<uint8_t>(iStride == 4 ? puiPixels[3] : std::byte {255}));
+			pfDestination[0] = static_cast<float>(std::to_integer<int64_t>(puiPixels[0]));
+			pfDestination[1] = static_cast<float>(std::to_integer<int64_t>(puiPixels[1]));
+			pfDestination[2] = static_cast<float>(std::to_integer<int64_t>(puiPixels[2]));
+			pfDestination[3] = static_cast<float>(std::to_integer<int64_t>(iStride == 4 ? puiPixels[3] : std::byte {255}));
 
 			puiPixels += iStride;
 			pfDestination += 4;
@@ -311,12 +312,12 @@ void Texture::Crop(int64_t iX, int64_t iY, int64_t iWidth, int64_t iHeight)
 	ASSERT(iX + iWidth <= miWidth && iY + iHeight <= miHeight);
 
 	const std::vector<float>& rSource = mData.at(0);
-	std::vector<float> cropped(4 * static_cast<size_t>(iWidth) * static_cast<size_t>(iHeight));
+	std::vector<float> cropped(static_cast<size_t>(4 * iWidth * iHeight));
 	for (int64_t iRow = 0; iRow < iHeight; ++iRow)
 	{
-		const float* pfSource = &rSource.at(4 * (static_cast<size_t>(iY + iRow) * static_cast<size_t>(miWidth) + static_cast<size_t>(iX)));
-		float* pfDestination = &cropped.at(4 * static_cast<size_t>(iRow) * static_cast<size_t>(iWidth));
-		std::memcpy(pfDestination, pfSource, 4 * static_cast<size_t>(iWidth) * sizeof(float));
+		const float* pfSource = &rSource.at(static_cast<size_t>(4 * ((iY + iRow) * miWidth + iX)));
+		float* pfDestination = &cropped.at(static_cast<size_t>(4 * iRow * iWidth));
+		std::memcpy(pfDestination, pfSource, static_cast<size_t>(4 * iWidth * sizeof(float)));
 	}
 	mData.at(0) = std::move(cropped);
 	miWidth = iWidth;
@@ -334,8 +335,8 @@ void Texture::MaskByHeightmap(const std::vector<float>& rHeightmap, int64_t iHei
 	std::vector<float>& rPixels = mData.at(0);
 	for (int64_t iY = 0; iY < miHeight; ++iY)
 	{
-		const float* pfHeightmapRow = &rHeightmap.at(static_cast<size_t>(iY / iHeightmapDivisor) * static_cast<size_t>(iHeightmapWidth));
-		float* pfPixel = &rPixels.at(4 * static_cast<size_t>(iY) * static_cast<size_t>(miWidth));
+		const float* pfHeightmapRow = &rHeightmap.at(static_cast<size_t>((iY / iHeightmapDivisor) * iHeightmapWidth));
+		float* pfPixel = &rPixels.at(static_cast<size_t>(4 * iY * miWidth));
 		for (int64_t iX = 0; iX < miWidth; ++iX)
 		{
 			if (pfHeightmapRow[iX / iHeightmapDivisor] < fThresholdMeters)
@@ -382,7 +383,7 @@ void Texture::EncodeBlocks(std::byte* puiOutput, const std::vector<float>& rInpu
 	}
 
 	// Callers must hold Texture::sEncodeMutex — this function trusts the caller's lock.
-	int iActiveEncodes = siActiveEncodeCount.fetch_add(1, std::memory_order_relaxed) + 1;
+	int64_t iActiveEncodes = siActiveEncodeCount.fetch_add(1, std::memory_order_relaxed) + 1;
 	common::ScopedLambda decrementActive([]()
 	{
 		siActiveEncodeCount.fetch_sub(1, std::memory_order_relaxed);
@@ -393,8 +394,8 @@ void Texture::EncodeBlocks(std::byte* puiOutput, const std::vector<float>& rInpu
 	bc7enc_compress_block_params bc7Parameters {};
 	bc7enc_compress_block_params_init(&bc7Parameters);
 	bc7enc_compress_block_params_init_linear_weights(&bc7Parameters);
-	bc7Parameters.m_max_partitions = kuiBc7MaxPartitions;
-	bc7Parameters.m_uber_level = kuiBc7UberLevel;
+	bc7Parameters.m_max_partitions = static_cast<uint32_t>(kiBc7MaxPartitions);
+	bc7Parameters.m_uber_level = static_cast<uint32_t>(kiBc7UberLevel);
 
 	int64_t iBlockColumns = (iWidth + 3) / 4;
 	int64_t iBlockRows = (iHeight + 3) / 4;
@@ -426,10 +427,10 @@ void Texture::EncodeBlocks(std::byte* puiOutput, const std::vector<float>& rInpu
 				switch (vkFormat)
 				{
 					case VK_FORMAT_BC4_UNORM_BLOCK:
-						rgbcx::encode_bc4_hq(puiBlock, pixels.data(), 4, kuiBc45SearchRadius, rgbcx::BC4_USE_ALL_MODES);
+						rgbcx::encode_bc4_hq(puiBlock, pixels.data(), 4, static_cast<uint32_t>(kiBc45SearchRadius), rgbcx::BC4_USE_ALL_MODES);
 						break;
 					case VK_FORMAT_BC5_UNORM_BLOCK:
-						rgbcx::encode_bc5_hq(puiBlock, pixels.data(), 0, 1, 4, kuiBc45SearchRadius, rgbcx::BC4_USE_ALL_MODES);
+						rgbcx::encode_bc5_hq(puiBlock, pixels.data(), 0, 1, 4, static_cast<uint32_t>(kiBc45SearchRadius), rgbcx::BC4_USE_ALL_MODES);
 						break;
 					case VK_FORMAT_BC7_UNORM_BLOCK:
 						if (bc7enc_compress_block(puiBlock, pixels.data(), &bc7Parameters))
@@ -523,7 +524,7 @@ void Texture::ToR32Sfloat(std::byte* puiOutput, const std::vector<float>& rInput
 
 void Texture::Export(std::vector<std::byte>& rData, VkFormat vkFormat, TextureOptions_t options)
 {
-	int64_t iSize = common::ComputeImageByteSize(vkFormat, miWidth, miHeight, static_cast<int64_t>(mData.size()), 1, 1);
+	int64_t iSize = common::ComputeImageByteSize(vkFormat, miWidth, miHeight, std::ssize(mData), 1, 1);
 	std::vector<std::byte> data(iSize);
 
 	int64_t iMipWidth = miWidth;
@@ -570,7 +571,7 @@ void Texture::Export(std::vector<std::byte>& rData, VkFormat vkFormat, TextureOp
 	rData.insert(rData.end(), data.begin(), data.end());
 }
 
-void Texture::SaveJpegSidecar(const std::filesystem::path& rPath, int iQuality, TextureOptions_t options)
+void Texture::SaveJpegSidecar(const std::filesystem::path& rPath, int64_t iQuality, TextureOptions_t options)
 {
 	bool bGrayscale = options & TextureOptions::kGrayscale;
 	bool bAutoNormalize = options & TextureOptions::kAutoNormalize;
@@ -599,42 +600,43 @@ void Texture::SaveJpegSidecar(const std::filesystem::path& rPath, int iQuality, 
 	uint8_t* puiDestination = bytes.data();
 	for (int64_t i = 0; i < iPixelCount; ++i)
 	{
-		uint8_t uiR = static_cast<uint8_t>(std::clamp((pfSource[0] - fMin) * fScale, 0.0f, 255.0f));
+		int64_t iR = static_cast<int64_t>(std::clamp((pfSource[0] - fMin) * fScale, 0.0f, 255.0f));
 		if (bGrayscale)
 		{
-			puiDestination[0] = uiR;
-			puiDestination[1] = uiR;
-			puiDestination[2] = uiR;
+			puiDestination[0] = static_cast<uint8_t>(iR);
+			puiDestination[1] = static_cast<uint8_t>(iR);
+			puiDestination[2] = static_cast<uint8_t>(iR);
 		}
 		else
 		{
-			puiDestination[0] = uiR;
+			puiDestination[0] = static_cast<uint8_t>(iR);
 			puiDestination[1] = static_cast<uint8_t>(std::clamp(pfSource[1], 0.0f, 255.0f));
 			puiDestination[2] = static_cast<uint8_t>(std::clamp(pfSource[2], 0.0f, 255.0f));
 		}
 		pfSource += 4;
 		puiDestination += 3;
 	}
-	int iResult = stbi_write_jpg(reinterpret_cast<const char*>(rPath.u8string().c_str()), static_cast<int>(miWidth), static_cast<int>(miHeight), 3, bytes.data(), iQuality);
+	int64_t iResult = stbi_write_jpg(reinterpret_cast<const char*>(rPath.u8string().c_str()), static_cast<int>(miWidth), static_cast<int>(miHeight), 3, bytes.data(), static_cast<int>(iQuality));
 	ASSERT(iResult != 0);
 }
 
 std::vector<std::byte> ZlibCompress(std::span<const std::byte> source)
 {
-	uLongf uiBound = compressBound(static_cast<uLong>(source.size()));
-	std::vector<std::byte> compressed(uiBound);
-	uLongf uiCompressedSize = uiBound;
-	int iZlibResult = compress2(reinterpret_cast<Bytef*>(compressed.data()), &uiCompressedSize, reinterpret_cast<const Bytef*>(source.data()), static_cast<uLong>(source.size()), Z_BEST_COMPRESSION);
+	int64_t iBound = compressBound(static_cast<uLong>(source.size()));
+	std::vector<std::byte> compressed(static_cast<size_t>(iBound));
+	uLongf uiCompressedSize = static_cast<uLongf>(iBound);
+	int64_t iZlibResult = compress2(reinterpret_cast<Bytef*>(compressed.data()), &uiCompressedSize, reinterpret_cast<const Bytef*>(source.data()), static_cast<uLong>(source.size()), Z_BEST_COMPRESSION);
 	ASSERT(iZlibResult == Z_OK);
-	compressed.resize(uiCompressedSize);
+	int64_t iCompressedSize = uiCompressedSize;
+	compressed.resize(static_cast<size_t>(iCompressedSize));
 	return compressed;
 }
 
 std::vector<std::byte> Lz4Compress(std::span<const std::byte> source)
 {
-	int iBound = LZ4_compressBound(static_cast<int>(source.size()));
+	int64_t iBound = LZ4_compressBound(static_cast<int>(source.size()));
 	std::vector<std::byte> compressed(static_cast<size_t>(iBound));
-	int iCompressedSize = LZ4_compress_HC(reinterpret_cast<const char*>(source.data()), reinterpret_cast<char*>(compressed.data()), static_cast<int>(source.size()), iBound, LZ4HC_CLEVEL_MAX);
+	int64_t iCompressedSize = LZ4_compress_HC(reinterpret_cast<const char*>(source.data()), reinterpret_cast<char*>(compressed.data()), static_cast<int>(source.size()), static_cast<int>(iBound), LZ4HC_CLEVEL_MAX);
 	ASSERT(iCompressedSize > 0);
 	compressed.resize(static_cast<size_t>(iCompressedSize));
 	return compressed;
@@ -643,7 +645,7 @@ std::vector<std::byte> Lz4Compress(std::span<const std::byte> source)
 gli::texture LoadGliFromPath(const std::filesystem::path& rPath)
 {
 	std::vector<std::byte> data = common::ReadEntireFile(rPath);
-	return gli::load(reinterpret_cast<const char*>(data.data()), data.size());
+	return gli::load(reinterpret_cast<const char*>(data.data()), static_cast<size_t>(std::ssize(data)));
 }
 
 TextureIntermediateHeader ReadTextureIntermediateHeader(std::span<const std::byte> data)
@@ -724,8 +726,8 @@ void Texture::Save(const std::filesystem::path& rPath, VkFormat vkFormat, Textur
 		rStream.write(reinterpret_cast<const char*>(&iMagic), sizeof(iMagic));
 		rStream.write(reinterpret_cast<const char*>(&miWidth), sizeof(miWidth));
 		rStream.write(reinterpret_cast<const char*>(&miHeight), sizeof(miHeight));
-		int64_t iMipMaps = static_cast<int64_t>(mData.size());
+		int64_t iMipMaps = std::ssize(mData);
 		rStream.write(reinterpret_cast<const char*>(&iMipMaps), sizeof(iMipMaps));
-		rStream.write(reinterpret_cast<const char*>(compressed.data()), static_cast<std::streamsize>(compressed.size()));
+		rStream.write(reinterpret_cast<const char*>(compressed.data()), static_cast<std::streamsize>(std::ssize(compressed)));
 	});
 }

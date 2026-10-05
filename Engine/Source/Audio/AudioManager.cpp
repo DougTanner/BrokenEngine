@@ -25,10 +25,10 @@ constexpr int64_t kiSilentRecoveryRetryFrames = 120;
 std::wstring AudioManager::GetEndpointIdentifier(IMMDevice* pDevice)
 {
 	LPWSTR pcDeviceIdentifier = nullptr;
-	HRESULT iResult = pDevice->GetId(&pcDeviceIdentifier);
-	if (FAILED(iResult))
+	int64_t iResult = pDevice->GetId(&pcDeviceIdentifier);
+	if (FAILED(static_cast<HRESULT>(iResult)))
 	{
-		LOG(kAudio, kWarning, "  GetId failed: {}", common::HresultToString(iResult).data());
+		LOG(kAudio, kWarning, "  GetId failed: {}", common::HresultToString(static_cast<HRESULT>(iResult)).data());
 		return std::wstring();
 	}
 	common::ScopedLambda freeDeviceIdentifier([=]()
@@ -41,10 +41,10 @@ std::wstring AudioManager::GetEndpointIdentifier(IMMDevice* pDevice)
 std::wstring AudioManager::InitializeAudioEndpoint()
 {
 	Microsoft::WRL::ComPtr<IMMDeviceEnumerator> pMultimediaDeviceEnumerator;
-	HRESULT iResult = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(pMultimediaDeviceEnumerator.GetAddressOf()));
-	if (FAILED(iResult))
+	int64_t iResult = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(pMultimediaDeviceEnumerator.GetAddressOf()));
+	if (FAILED(static_cast<HRESULT>(iResult)))
 	{
-		LOG(kAudio, kWarning, "  CoCreateInstance(MMDeviceEnumerator) failed: {}", common::HresultToString(iResult).data());
+		LOG(kAudio, kWarning, "  CoCreateInstance(MMDeviceEnumerator) failed: {}", common::HresultToString(static_cast<HRESULT>(iResult)).data());
 	}
 	else
 	{
@@ -97,11 +97,11 @@ void AudioManager::CacheMasteringVoiceChannels()
 	miMasteringVoiceChannels = std::min(static_cast<int64_t>(voiceDetails.InputChannels), static_cast<int64_t>(waveFormat.Format.nChannels));
 }
 
-WAVEFORMATEX AudioManager::MakePinnedOutputFormat(WORD uiChannels) const
+WAVEFORMATEX AudioManager::MakePinnedOutputFormat(int64_t iChannels) const
 {
 	WAVEFORMATEX format {};
 	format.wFormatTag = WAVE_FORMAT_PCM;
-	format.nChannels = uiChannels;
+	format.nChannels = static_cast<WORD>(iChannels);
 	format.nSamplesPerSec = static_cast<DWORD>(kiMasteringSampleRate);
 	format.wBitsPerSample = 16;
 	format.nBlockAlign = static_cast<WORD>(format.nChannels * (format.wBitsPerSample / 8));
@@ -121,7 +121,7 @@ void AudioManager::ConfigureLiveGraph(const wchar_t* pcSelectedDeviceIdentifier)
 		return;
 	}
 
-	mPinnedOutputFormat = MakePinnedOutputFormat(static_cast<WORD>(mpAudioEngine->GetOutputChannels()));
+	mPinnedOutputFormat = MakePinnedOutputFormat(mpAudioEngine->GetOutputChannels());
 	if (mpAudioEngine->GetOutputSampleRate() != kiMasteringSampleRate)
 	{
 		LOG(kAudio, kInfo, "  Pinning mastering voice to {} Hz (device native {} Hz)", kiMasteringSampleRate, mpAudioEngine->GetOutputSampleRate());
@@ -365,7 +365,7 @@ void AudioManager::AttemptSilentEngineRecovery()
 	// 48 kHz — unless the device is already native 48 kHz (mirror startup's skip to avoid a needless graph
 	// teardown/rebuild). A failed pin goes silent, so restore the device-default graph on false/throw; that
 	// restored graph is audible but unpinned and is not recorded as pinned below.
-	mPinnedOutputFormat = MakePinnedOutputFormat(static_cast<WORD>(mpAudioEngine->GetOutputChannels()));
+	mPinnedOutputFormat = MakePinnedOutputFormat(mpAudioEngine->GetOutputChannels());
 	if (mpAudioEngine->GetOutputSampleRate() != kiMasteringSampleRate)
 	{
 		// The default Reset above brought the graph live, so these pin/fallback Resets run against a live

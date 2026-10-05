@@ -24,7 +24,7 @@ common::crc_t FrameInput::Crc() const
 
 std::ostream& operator<<(std::ostream& rStream, const FrameInput& rInput)
 {
-	int64_t iStatusCount = static_cast<int64_t>(rInput.statusChanges.size());
+	int64_t iStatusCount = std::ssize(rInput.statusChanges);
 	common::Write(rStream, iStatusCount);
 	for (const StatusChange& rChange : rInput.statusChanges)
 	{

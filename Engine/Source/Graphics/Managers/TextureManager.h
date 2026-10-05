@@ -46,7 +46,7 @@ public:
 
 	// Create a 1x1 programmatic placeholder Texture. Shared by the seven ctor placeholders (white / white
 	// cube / the five island bindless-array anchors); only name/flags/format/layers/view-type/pixel differ.
-	void CreatePlaceholderTexture(Texture& rTexture, std::string_view name, VkImageCreateFlags vkImageCreateFlags, VkFormat vkFormat, uint32_t uiArrayLayers, VkImageViewType vkImageViewType, const std::function<void(std::span<std::byte>, int64_t)>& rPixelWriter);
+	void CreatePlaceholderTexture(Texture& rTexture, std::string_view name, VkImageCreateFlags vkImageCreateFlags, VkFormat vkFormat, int64_t iArrayLayers, VkImageViewType vkImageViewType, const std::function<void(std::span<std::byte>, int64_t)>& rPixelWriter);
 
 	void AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bool bNeedAcquireBarrier, VkCommandBuffer vkAcquireCommandBuffer, bool& rbRecordedBarriers);
 	void EnsureAcquireCommandBufferBegun(VkCommandBuffer vkAcquireCommandBuffer, bool& rbRecordedBarriers);

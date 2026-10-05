@@ -17,7 +17,7 @@ void BillboardsInterpolate::Sync(game::FrameInterpolate& rFrameInterpolate, id_t
 	int64_t iIndex = rBillboards.idToIndexMap.at(id);
 
 	rBillboards.pVecPositions[iIndex] = XMVectorSetW(rData.vecPosition, 1.0f);
-	rBillboards.puiTypeIndices[iIndex] = rData.uiTypeIndex;
+	rBillboards.puiTypeIndices[iIndex] = static_cast<uint8_t>(rData.iTypeIndex);
 	rBillboards.pFlags[iIndex] = rData.flags;
 	rBillboards.pfRotations[iIndex] = rData.fRotation;
 	rBillboards.pfExtra[iIndex] = rData.fExtra;
@@ -27,7 +27,7 @@ void BillboardsPostRender::Update([[maybe_unused]] const game::Frame& __restrict
 {
 }
 
-void BillboardsPostRender::Add(game::Frame& __restrict rFrame, billboard_t& rId, uint8_t uiTypeIndex)
+void BillboardsPostRender::Add(game::Frame& __restrict rFrame, billboard_t& rId, int64_t iTypeIndex)
 {
 	ASSERT(!(rId.uuid.iValue != 0));
 
@@ -39,7 +39,7 @@ void BillboardsPostRender::Add(game::Frame& __restrict rFrame, billboard_t& rId,
 	rId = newId;
 	rPostRender.pIds[iSpawnIndex] = newId;
 	ZeroMemberRow(iSpawnIndex, rInterpolate.Members());
-	rInterpolate.puiTypeIndices[iSpawnIndex] = uiTypeIndex;
+	rInterpolate.puiTypeIndices[iSpawnIndex] = static_cast<uint8_t>(iTypeIndex);
 }
 
 } // namespace engine

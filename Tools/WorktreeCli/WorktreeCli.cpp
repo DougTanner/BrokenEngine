@@ -47,17 +47,17 @@ int wmain(int iArgumentCount, wchar_t* pArgumentValues[])
 	{
 		if (iArgumentCount == 3 && toolcli::ToLowerInvariant(pArgumentValues[2]) == L"token")
 		{
-			return toolcli::PrintOwnerToken();
+			return static_cast<int>(toolcli::PrintOwnerToken());
 		}
-		return toolcli::RunLandingLockCommand(std::span<const wchar_t* const>(pArgumentValues, static_cast<size_t>(iArgumentCount)));
+		return static_cast<int>(toolcli::RunLandingLockCommand(std::span<const wchar_t* const>(pArgumentValues, static_cast<size_t>(iArgumentCount))));
 	}
 	if (mode == L"plan")
 	{
-		return toolcli::RunPlanSchedulerCommand(std::span<wchar_t* const>(pArgumentValues, static_cast<size_t>(iArgumentCount)));
+		return static_cast<int>(toolcli::RunPlanSchedulerCommand(std::span<wchar_t* const>(pArgumentValues, static_cast<size_t>(iArgumentCount))));
 	}
 	if (mode == L"build")
 	{
-		return toolcli::RunBuildCommand(iArgumentCount, pArgumentValues);
+		return static_cast<int>(toolcli::RunBuildCommand(iArgumentCount, pArgumentValues));
 	}
 	toolcli::Fail("unknown command");
 	return toolcli::kiExitFailure;

@@ -84,6 +84,7 @@ void ServerBroadcaster::BuildFrameInputs()
 void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessionRuntime& rRuntime, [[maybe_unused]] const common::ScopedWorkbufferArena& rPublicationArena)
 {
 	const std::unordered_map<engine::GridCoord, std::vector<game::StatusChange>>& rTransfers = game::gpServerSession->mpTransferManager->mTransfers;
+	const std::vector<engine::GridCoord>& rActiveCoordinates = game::gpGame->mActiveCoordinates;
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	bool bReplaying = game::gpGame->mbReplaying;
@@ -98,9 +99,9 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 			return;
 		}
 
-		for (auto it = game::gpGame->mActiveCoordinates.begin(); it != game::gpGame->mActiveCoordinates.end(); ++it)
+		for (auto it = rActiveCoordinates.begin(); it != rActiveCoordinates.end(); ++it)
 		{
-			if (std::find(game::gpGame->mActiveCoordinates.begin(), it, *it) == it)
+			if (std::find(rActiveCoordinates.begin(), it, *it) == it)
 			{
 				rCallback(*it);
 			}
@@ -265,8 +266,8 @@ void ServerBroadcaster::ProcessUpdatePlayerRequests()
 			continue;
 		}
 
-		uint8_t uiPendingWeaponModeTicks = static_cast<uint8_t>(engine::kiTickRate);
-		game::StatusChange updateChange {.eType = game::StatusChangeType::kUpdatePlayer, .data = game::UpdatePlayerData{.iPlayerUuid = iPlayerUuid, .bUseMissiles = rRequest.bUseMissiles, .navigationDelaySeconds = rRequest.navigationDelaySeconds, .uiPendingWeaponModeTicks = uiPendingWeaponModeTicks}};
+		int64_t iPendingWeaponModeTicks = engine::kiTickRate;
+		game::StatusChange updateChange {.eType = game::StatusChangeType::kUpdatePlayer, .data = game::UpdatePlayerData{.iPlayerUuid = iPlayerUuid, .bUseMissiles = rRequest.bUseMissiles, .navigationDelaySeconds = rRequest.navigationDelaySeconds, .uiPendingWeaponModeTicks = static_cast<uint8_t>(iPendingWeaponModeTicks)}};
 		it->second.statusChanges.push_back(updateChange);
 
 		LOG(kNetwork, kDebug, "ServerBroadcaster::ProcessUpdatePlayerRequests Client: {} GlobalPlayer: {} PlayerUuid: {} Coord: ({},{}) Missiles: {} NavDelay: {}", rRequest.iClientId, rRequest.globalId, iPlayerUuid, updateCoord.iX, updateCoord.iY, rRequest.bUseMissiles, common::Wb(rRequest.navigationDelaySeconds.count(), 3));

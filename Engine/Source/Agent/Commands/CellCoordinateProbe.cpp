@@ -57,7 +57,7 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 	{
 		throw std::runtime_error("cell_coordinate_probe 'coord' must be an array of 2 integers");
 	}
-	GridCoord coordinate {.iX = AgentGridCoordinateValue(rCoordinate.at(0), "cell_coordinate_probe 'coord'"), .iY = AgentGridCoordinateValue(rCoordinate.at(1), "cell_coordinate_probe 'coord'")};
+	GridCoord coordinate {.iX = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(0), "cell_coordinate_probe 'coord'")), .iY = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(1), "cell_coordinate_probe 'coord'"))};
 
 	if (gpIslandTerrain == nullptr)
 	{
@@ -90,7 +90,7 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 	rResult["area"] = {{"width", bounds.fMaxX - bounds.fMinX}, {"height", bounds.fMaxY - bounds.fMinY}};
 	rResult["terrain"] = {{"axisSamplePositions", DistinctAxisSamplePositions()}, {"samplesFinite", bSamplesFinite}};
 	rResult["placements"] = {{"count", std::ssize(placements)}, {"crc", PlacementsCrc(placements)}};
-	rResult["elevation"] = {{"crc", common::Crc(std::span<const float>(elevationGrid.data(), elevationGrid.size()))}};
+	rResult["elevation"] = {{"crc", common::Crc(std::span<const float>(elevationGrid.data(), static_cast<size_t>(std::ssize(elevationGrid))))}};
 }
 
 } // namespace engine

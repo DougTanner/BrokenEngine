@@ -28,7 +28,7 @@ void SendFleetSync(int64_t iClientId, const std::vector<Fleet>& rFleets)
 	rWorkbuffer.PushBack<uint8_t>(static_cast<uint8_t>(GamePacketType::kServerFleetSync));
 	GameMessages::FleetSyncMessage::WritePayload(rWorkbuffer, rFleets);
 
-	engine::NetworkManager::SendPacket(pClient->pPeer, engine::NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	engine::NetworkManager::SendPacket(pClient->pPeer, engine::NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
 static void WriteFleet(std::fstream& rFileStream, const Fleet& rFleet)

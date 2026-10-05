@@ -14,7 +14,7 @@
 namespace engine
 {
 
-Client::Client(const char* pcServerAddress, uint16_t uiPort, int64_t iCoordinateSlotCount, const ClientGuid& rGuid, GuidAssignedCallback pGuidAssignedCallback)
+Client::Client(const char* pcServerAddress, int64_t iPort, int64_t iCoordinateSlotCount, const ClientGuid& rGuid, GuidAssignedCallback pGuidAssignedCallback)
 {
 	ASSERT(gpClient == nullptr);
 
@@ -31,7 +31,7 @@ Client::Client(const char* pcServerAddress, uint16_t uiPort, int64_t iCoordinate
 	ENetAddress localAddress {};
 	localAddress.host = htonl(INADDR_LOOPBACK);
 	// Heap: ENet allocates host data internally
-	mpHost = enet_host_create((gLaunchOptions.flags & LaunchOptionFlags::kLoopbackOnly) ? &localAddress : nullptr, 1, NetworkManager::kuiChannelCount, 0, 0);
+	mpHost = enet_host_create((gLaunchOptions.flags & LaunchOptionFlags::kLoopbackOnly) ? &localAddress : nullptr, 1, static_cast<size_t>(NetworkManager::kiChannelCount), 0, 0);
 	if (mpHost == nullptr)
 	{
 		LOG(kNetwork, kWarning, "Client::Client enet_host_create failed");
@@ -44,10 +44,10 @@ Client::Client(const char* pcServerAddress, uint16_t uiPort, int64_t iCoordinate
 
 	ENetAddress address {};
 	enet_address_set_host(&address, pcServerAddress);
-	address.port = uiPort;
+	address.port = static_cast<uint16_t>(iPort);
 
 	// Heap: ENet allocates peer data internally
-	mpServerPeer = enet_host_connect(mpHost, &address, NetworkManager::kuiChannelCount, 0);
+	mpServerPeer = enet_host_connect(mpHost, &address, static_cast<size_t>(NetworkManager::kiChannelCount), 0);
 }
 
 Client::~Client()
@@ -340,10 +340,10 @@ void Client::Disconnect()
 	}
 }
 
-static std::unique_ptr<game::Frame> DecompressAndReadFrame(int32_t iUncompressedSize, const NetworkMessages::PacketPayload& rCompressedPayload)
+static std::unique_ptr<game::Frame> DecompressAndReadFrame(int64_t iUncompressedSize, const NetworkMessages::PacketPayload& rCompressedPayload)
 {
-	std::string decompressed(iUncompressedSize, '\0');
-	LZ4_decompress_safe(reinterpret_cast<const char*>(rCompressedPayload.puiData), decompressed.data(), rCompressedPayload.iSize, iUncompressedSize);
+	std::string decompressed(static_cast<size_t>(iUncompressedSize), '\0');
+	LZ4_decompress_safe(reinterpret_cast<const char*>(rCompressedPayload.puiData), decompressed.data(), rCompressedPayload.iSize, static_cast<int>(iUncompressedSize));
 
 	std::istringstream frameStream(std::move(decompressed), std::ios::binary);
 	std::unique_ptr<game::Frame> pFrame = std::make_unique<game::Frame>();
@@ -351,54 +351,54 @@ static std::unique_ptr<game::Frame> DecompressAndReadFrame(int32_t iUncompressed
 	return pFrame;
 }
 
-std::optional<uint8_t> Client::DrainLoadNotification()
+std::optional<int64_t> Client::DrainLoadNotification()
 {
 	if (!(mStateFlags & ClientStateFlags::kLoadNotificationReceived))
 	{
 		return std::nullopt;
 	}
 	mStateFlags.Set(ClientStateFlags::kLoadNotificationReceived, false);
-	std::optional<uint8_t> uiLoadGeneration = muiPendingLoadGeneration;
-	muiPendingLoadGeneration.reset();
-	return uiLoadGeneration;
+	std::optional<int64_t> iLoadGeneration = miPendingLoadGeneration;
+	miPendingLoadGeneration.reset();
+	return iLoadGeneration;
 }
 
 void Client::ServerCoordinateFullState(std::span<const uint8_t> packetData)
 {
 	NetworkMessages::ServerCoordFullStateMessage message {};
 	NetworkMessages::Read(packetData, message);
-	if (message.uiLoadGeneration != muiCommittedLoadGeneration)
+	if (message.uiLoadGeneration != miCommittedLoadGeneration)
 	{
-		LOG(kNetwork, kWarning, "Client::ServerCoordFullState Dropped mismatched load generation Packet: {} Current: {}", message.uiLoadGeneration, muiCommittedLoadGeneration);
+		LOG(kNetwork, kWarning, "Client::ServerCoordFullState Dropped mismatched load generation Packet: {} Current: {}", message.uiLoadGeneration, miCommittedLoadGeneration);
 		return;
 	}
 
-	uint8_t uiSlotIndex = message.uiSlotIndex;
-	uint16_t uiEpoch = message.uiEpoch;
+	int64_t iSlotIndex = message.uiSlotIndex;
+	int64_t iEpoch = message.uiEpoch;
 	int64_t iTick = message.iTick;
 	GridCoord coord = message.coord;
 
-	LOG(kNetwork, kVerbose, "Client::ServerCoordFullState Frame: {} Slot: {} Coord: ({},{})", iTick, uiSlotIndex, coord.iX, coord.iY);
+	LOG(kNetwork, kVerbose, "Client::ServerCoordFullState Frame: {} Slot: {} Coord: ({},{})", iTick, iSlotIndex, coord.iX, coord.iY);
 	ScopedLogIndent scopedLogIndent;
 
 	ScopedSuppressAllocationTracking suppress;
 
-	ClientCoordSlot& rSlot = mSubscriptions.mCoordinateSlots.at(uiSlotIndex);
-	ClientSubscriptions::FullStateFlags_t actions = mSubscriptions.ClassifyFullState(uiSlotIndex, uiEpoch, coord);
+	ClientCoordSlot& rSlot = mSubscriptions.mCoordinateSlots.at(static_cast<size_t>(iSlotIndex));
+	ClientSubscriptions::FullStateFlags_t actions = mSubscriptions.ClassifyFullState(iSlotIndex, iEpoch, coord);
 
 	if (actions & ClientSubscriptions::FullStateFlags::kRejectAsGhost)
 	{
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = uiSlotIndex, .uiEpoch = uiEpoch};
+		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = static_cast<uint8_t>(iSlotIndex), .uiEpoch = static_cast<uint16_t>(iEpoch)};
 		NetworkMessages::Write(rWorkbuffer, unsubscribe);
-		NetworkManager::SendPacket(mpServerPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
-		LOG(kNetwork, kVerbose, "Client::ServerCoordFullState coord mismatch, sent unsubscribe for ghost Slot: {} Coord: ({},{}) SlotCoord: ({},{})", uiSlotIndex, coord.iX, coord.iY, rSlot.coordinate.iX, rSlot.coordinate.iY);
+		NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+		LOG(kNetwork, kVerbose, "Client::ServerCoordFullState coord mismatch, sent unsubscribe for ghost Slot: {} Coord: ({},{}) SlotCoord: ({},{})", iSlotIndex, coord.iX, coord.iY, rSlot.coordinate.iX, rSlot.coordinate.iY);
 		// Retire the ghost's epoch on a slot with no server-assigned epoch so its late accept is dropped
 		bool bHasNoAssignedEpoch = rSlot.eState == CoordSubscriptionState::kUnsubscribed;
-		if (bHasNoAssignedEpoch && static_cast<int16_t>(uiEpoch - rSlot.acknowledgementState.uiEpoch) > 0)
+		if (bHasNoAssignedEpoch && static_cast<int16_t>(iEpoch - rSlot.acknowledgementState.uiEpoch) > 0)
 		{
-			rSlot.acknowledgementState.uiEpoch = uiEpoch;
+			rSlot.acknowledgementState.uiEpoch = static_cast<uint16_t>(iEpoch);
 		}
 		return;
 	}
@@ -426,7 +426,7 @@ void Client::ServerCoordinateFullState(std::span<const uint8_t> packetData)
 	rSlot.acknowledgementState.iAcknowledgmentFloor = iTick;
 	rSlot.acknowledgementState.uiReceivedBitfieldLow = 0;
 	rSlot.acknowledgementState.uiReceivedBitfieldHigh = 0;
-	rSlot.acknowledgementState.uiEpoch = uiEpoch;
+	rSlot.acknowledgementState.uiEpoch = static_cast<uint16_t>(iEpoch);
 	rSlot.eState = CoordSubscriptionState::kActive;
 	rSlot.transitionStartTime = {};
 }
@@ -435,17 +435,17 @@ void Client::ServerCoordinateStaticData(std::span<const uint8_t> packetData)
 {
 	NetworkMessages::ServerCoordStaticDataMessage message {};
 	NetworkMessages::Read(packetData, message);
-	if (message.uiLoadGeneration != muiCommittedLoadGeneration)
+	if (message.uiLoadGeneration != miCommittedLoadGeneration)
 	{
-		LOG(kNetwork, kWarning, "Client::ServerCoordStaticData Dropped mismatched load generation Packet: {} Current: {}", message.uiLoadGeneration, muiCommittedLoadGeneration);
+		LOG(kNetwork, kWarning, "Client::ServerCoordStaticData Dropped mismatched load generation Packet: {} Current: {}", message.uiLoadGeneration, miCommittedLoadGeneration);
 		return;
 	}
 
-	uint8_t uiSlotIndex = message.uiSlotIndex;
-	uint16_t uiEpoch = message.uiEpoch;
+	int64_t iSlotIndex = message.uiSlotIndex;
+	int64_t iEpoch = message.uiEpoch;
 	GridCoord coord = message.coord;
 
-	const ClientCoordSlot& rSlot = mSubscriptions.mCoordinateSlots.at(uiSlotIndex);
+	const ClientCoordSlot& rSlot = mSubscriptions.mCoordinateSlots.at(static_cast<size_t>(iSlotIndex));
 	// Before the accept (this lane can overtake it and the unsubscribe ACK), a kUnsubscribed or reallocated kUnsubscribing
 	// slot admits only a coord with a live subscribe request
 	bool bAwaitingAccept = (rSlot.eState == CoordSubscriptionState::kUnsubscribed || rSlot.eState == CoordSubscriptionState::kUnsubscribing) && mSubscriptions.mSubscribeRequests.IsLive(coord);
@@ -460,12 +460,12 @@ void Client::ServerCoordinateStaticData(std::span<const uint8_t> packetData)
 		return;
 	}
 	// Epoch guard: SubscribeAccept set the epoch
-	if (rSlot.eState == CoordSubscriptionState::kWaitingFullState && uiEpoch != rSlot.acknowledgementState.uiEpoch)
+	if (rSlot.eState == CoordSubscriptionState::kWaitingFullState && iEpoch != rSlot.acknowledgementState.uiEpoch)
 	{
 		return;
 	}
 	// The other admitted states hold no epoch for this subscription, so they are guarded by the retained epoch instead
-	if (rSlot.eState != CoordSubscriptionState::kWaitingFullState && mSubscriptions.IsStaleRetainedEpoch(uiSlotIndex, uiEpoch, coord))
+	if (rSlot.eState != CoordSubscriptionState::kWaitingFullState && mSubscriptions.IsStaleRetainedEpoch(iSlotIndex, iEpoch, coord))
 	{
 		return;
 	}
@@ -487,9 +487,9 @@ void Client::ServerCoordinateUpdateOrResend(std::span<const uint8_t> packetData,
 {
 	auto Receive = [this, bProcessRoundTripTime, packetData](const NetworkMessages::CoordUpdateFields& rMessage)
 	{
-		if (rMessage.uiLoadGeneration != muiCommittedLoadGeneration)
+		if (rMessage.uiLoadGeneration != miCommittedLoadGeneration)
 		{
-			LOG(kNetwork, kWarning, "Client::ServerCoordUpdateOrResend Dropped mismatched load generation Packet: {} Current: {}", rMessage.uiLoadGeneration, muiCommittedLoadGeneration);
+			LOG(kNetwork, kWarning, "Client::ServerCoordUpdateOrResend Dropped mismatched load generation Packet: {} Current: {}", rMessage.uiLoadGeneration, miCommittedLoadGeneration);
 			return;
 		}
 		// Pipeline RTT: read echoed client timestamp (monotonic guard prevents duplicate processing during multi-frame ticks)
@@ -605,7 +605,7 @@ void Client::ServerConnectionResponse(std::span<const uint8_t> packetData)
 		{
 			return;
 		}
-		muiCommittedLoadGeneration = message.uiLoadGeneration;
+		miCommittedLoadGeneration = message.uiLoadGeneration;
 		mStateFlags.Set(ClientStateFlags::kConnectionAccepted);
 		if (message.uiDebugInput == 1)
 		{
@@ -635,8 +635,8 @@ void Client::ServerConnectionResponse(std::span<const uint8_t> packetData)
 	}
 	else
 	{
-		size_t iCopyLength = std::min(message.rejectionMessage.size(), sizeof(mpcRejectionReason) - 1);
-		std::memcpy(mpcRejectionReason, message.rejectionMessage.data(), iCopyLength);
+		int64_t iCopyLength = std::min(std::ssize(message.rejectionMessage), std::ssize(mpcRejectionReason) - 1);
+		std::memcpy(mpcRejectionReason, message.rejectionMessage.data(), static_cast<size_t>(iCopyLength));
 		mpcRejectionReason[iCopyLength] = '\0';
 		LOG(kNetwork, kWarning, "Client::ServerConnectionResponse Rejected: {}", mpcRejectionReason);
 	}
@@ -646,17 +646,17 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 {
 	NetworkMessages::ServerSubscribeAcceptMessage message {};
 	NetworkMessages::Read(packetData, message);
-	if (message.uiLoadGeneration != muiCommittedLoadGeneration)
+	if (message.uiLoadGeneration != miCommittedLoadGeneration)
 	{
-		LOG(kNetwork, kWarning, "Client::ServerSubscribeAccept Dropped mismatched load generation Packet: {} Current: {}", message.uiLoadGeneration, muiCommittedLoadGeneration);
+		LOG(kNetwork, kWarning, "Client::ServerSubscribeAccept Dropped mismatched load generation Packet: {} Current: {}", message.uiLoadGeneration, miCommittedLoadGeneration);
 		return;
 	}
 
-	uint8_t uiSlotIndex = message.uiSlotIndex;
-	uint16_t uiEpoch = message.uiEpoch;
+	int64_t iSlotIndex = message.uiSlotIndex;
+	int64_t iEpoch = message.uiEpoch;
 	GridCoord coord = message.coord;
 
-	if (uiSlotIndex == kuiSubscribeRejectSlot)
+	if (iSlotIndex == kiSubscribeRejectSlot)
 	{
 		// Server rejected subscription (not adjacent / no free slot)
 		mSubscriptions.mSubscribeRequests.TakeAnswer(coord);
@@ -666,48 +666,48 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 
 	// Defensive (trust boundary: network input): a non-sentinel slot the client cannot host would
 	// throw at mCoordinateSlots.at() below. Unsubscribe so a server-side slot cannot leak, then drop.
-	if (uiSlotIndex >= std::ssize(mSubscriptions.mCoordinateSlots))
+	if (iSlotIndex >= std::ssize(mSubscriptions.mCoordinateSlots))
 	{
-		LOG(kNetwork, kWarning, "Client::ServerSubscribeAccept Out-of-range, unsubscribing Slot: {} Coord: ({},{})", uiSlotIndex, coord.iX, coord.iY);
+		LOG(kNetwork, kWarning, "Client::ServerSubscribeAccept Out-of-range, unsubscribing Slot: {} Coord: ({},{})", iSlotIndex, coord.iX, coord.iY);
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = uiSlotIndex, .uiEpoch = uiEpoch};
+		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = static_cast<uint8_t>(iSlotIndex), .uiEpoch = static_cast<uint16_t>(iEpoch)};
 		NetworkMessages::Write(rWorkbuffer, unsubscribe);
 		if (!ClientNetworkFixtures::ObserveSubscribeAcceptCleanup(*this, unsubscribe.uiSlotIndex, std::ssize(rWorkbuffer.View())))
 		{
-			NetworkManager::SendPacket(mpServerPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+			NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 		}
 		return;
 	}
 
 	// This accept answers the coord's oldest request; a cancelled or missing one makes a heal or commit unsubscribe
 	bool bLive = mSubscriptions.mSubscribeRequests.TakeAnswer(coord);
-	ClientCoordSlot& rSlot = mSubscriptions.mCoordinateSlots.at(uiSlotIndex);
-	ClientSubscriptions::SubscribeAcceptFlags_t actions = mSubscriptions.ClassifySubscribeAccept(uiSlotIndex, uiEpoch, coord);
+	ClientCoordSlot& rSlot = mSubscriptions.mCoordinateSlots.at(static_cast<size_t>(iSlotIndex));
+	ClientSubscriptions::SubscribeAcceptFlags_t actions = mSubscriptions.ClassifySubscribeAccept(iSlotIndex, iEpoch, coord);
 
 	if (actions & ClientSubscriptions::SubscribeAcceptFlags::kRejectGhost)
 	{
-		LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept Ignoring Slot: {} Coord: ({},{}) SlotCoord: ({},{}) State: {}", uiSlotIndex, coord.iX, coord.iY, rSlot.coordinate.iX, rSlot.coordinate.iY, static_cast<int>(rSlot.eState));
+		LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept Ignoring Slot: {} Coord: ({},{}) SlotCoord: ({},{}) State: {}", iSlotIndex, coord.iX, coord.iY, rSlot.coordinate.iX, rSlot.coordinate.iY, static_cast<int>(rSlot.eState));
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = uiSlotIndex, .uiEpoch = uiEpoch};
+		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = static_cast<uint8_t>(iSlotIndex), .uiEpoch = static_cast<uint16_t>(iEpoch)};
 		NetworkMessages::Write(rWorkbuffer, unsubscribe);
-		NetworkManager::SendPacket(mpServerPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
-		LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept sent unsubscribe for ghost Slot: {} Coord: ({},{})", uiSlotIndex, coord.iX, coord.iY);
+		NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+		LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept sent unsubscribe for ghost Slot: {} Coord: ({},{})", iSlotIndex, coord.iX, coord.iY);
 		return;
 	}
 
 	if (actions & ClientSubscriptions::SubscribeAcceptFlags::kHealEpoch)
 	{
-		rSlot.acknowledgementState.uiEpoch = uiEpoch;
+		rSlot.acknowledgementState.uiEpoch = static_cast<uint16_t>(iEpoch);
 		if (!bLive)
 		{
-			LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept Healed then cancelled Slot: {} Coord: ({},{})", uiSlotIndex, coord.iX, coord.iY);
-			SendUnsubscribe(uiSlotIndex);
+			LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept Healed then cancelled Slot: {} Coord: ({},{})", iSlotIndex, coord.iX, coord.iY);
+			SendUnsubscribe(iSlotIndex);
 		}
 		else
 		{
-			LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept Healed active slot Slot: {} Coord: ({},{}) Epoch: {}", uiSlotIndex, coord.iX, coord.iY, uiEpoch);
+			LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept Healed active slot Slot: {} Coord: ({},{}) Epoch: {}", iSlotIndex, coord.iX, coord.iY, iEpoch);
 		}
 		return;
 	}
@@ -720,12 +720,12 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 		rSlot.acknowledgementState.iAcknowledgmentFloor = -1;
 		rSlot.acknowledgementState.uiReceivedBitfieldLow = 0;
 		rSlot.acknowledgementState.uiReceivedBitfieldHigh = 0;
-		rSlot.acknowledgementState.uiEpoch = uiEpoch;
+		rSlot.acknowledgementState.uiEpoch = static_cast<uint16_t>(iEpoch);
 
 		if (!bLive)
 		{
-			LOG(kNetwork, kDebug, "Client::ServerSubscribeAccept Cancelled Slot: {} Coord: ({},{})", uiSlotIndex, coord.iX, coord.iY);
-			SendUnsubscribe(uiSlotIndex);
+			LOG(kNetwork, kDebug, "Client::ServerSubscribeAccept Cancelled Slot: {} Coord: ({},{})", iSlotIndex, coord.iX, coord.iY);
+			SendUnsubscribe(iSlotIndex);
 		}
 	}
 }
@@ -735,30 +735,30 @@ void Client::ServerUnsubscribeAcknowledgement(std::span<const uint8_t> packetDat
 	NetworkMessages::ServerUnsubscribeAckMessage message {};
 	NetworkMessages::Read(packetData, message);
 
-	uint8_t uiSlotIndex = message.uiSlotIndex;
+	int64_t iSlotIndex = message.uiSlotIndex;
 
-	ClientCoordSlot& rSlot = mSubscriptions.mCoordinateSlots.at(uiSlotIndex);
+	ClientCoordSlot& rSlot = mSubscriptions.mCoordinateSlots.at(static_cast<size_t>(iSlotIndex));
 	if (rSlot.eState != CoordSubscriptionState::kUnsubscribing)
 	{
 		return;
 	}
 
-	mSubscriptions.FreeSlot(uiSlotIndex);
-	ClientNetworkFixtures::ObserveUnsubscribeAck(*this, uiSlotIndex);
+	mSubscriptions.FreeSlot(iSlotIndex);
+	ClientNetworkFixtures::ObserveUnsubscribeAck(*this, iSlotIndex);
 }
 
 void Client::ServerLoadNotification(std::span<const uint8_t> packetData)
 {
 	NetworkMessages::ServerLoadNotificationMessage message {};
 	NetworkMessages::Read(packetData, message);
-	if (message.uiLoadGeneration <= muiCommittedLoadGeneration)
+	if (message.uiLoadGeneration <= miCommittedLoadGeneration)
 	{
 		return;
 	}
 
-	if (!muiPendingLoadGeneration.has_value() || message.uiLoadGeneration > *muiPendingLoadGeneration)
+	if (!miPendingLoadGeneration.has_value() || message.uiLoadGeneration > *miPendingLoadGeneration)
 	{
-		muiPendingLoadGeneration = message.uiLoadGeneration;
+		miPendingLoadGeneration = message.uiLoadGeneration;
 	}
 
 	mReceivedGamePackets.clear();
@@ -803,12 +803,12 @@ bool Client::SendAcknowledgement()
 
 	// Per-slot ACK state for proactive re-sends
 	NetworkMessages::AckStreamEntry pEntries[NetworkManager::kiMaximumEnetCoordinateSlots] {};
-	uint8_t uiAckSlotCount = 0;
+	int64_t iAckSlotCount = 0;
 	for (int64_t i = 0; i < std::ssize(mSubscriptions.mCoordinateSlots); ++i)
 	{
 		if (mSubscriptions.mCoordinateSlots.at(i).eState == CoordSubscriptionState::kActive)
 		{
-			pEntries[uiAckSlotCount] =
+			pEntries[iAckSlotCount] =
 			{
 				.uiSlotIndex = static_cast<uint8_t>(i),
 				.uiEpoch = mSubscriptions.mCoordinateSlots.at(i).acknowledgementState.uiEpoch,
@@ -816,7 +816,7 @@ bool Client::SendAcknowledgement()
 				.uiReceivedBitfieldLow = mSubscriptions.mCoordinateSlots.at(i).acknowledgementState.uiReceivedBitfieldLow,
 				.uiReceivedBitfieldHigh = mSubscriptions.mCoordinateSlots.at(i).acknowledgementState.uiReceivedBitfieldHigh,
 			};
-			++uiAckSlotCount;
+			++iAckSlotCount;
 		}
 	}
 
@@ -824,14 +824,14 @@ bool Client::SendAcknowledgement()
 	int64_t iTimestampNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 	NetworkMessages::ClientAckStreamMessage message
 	{
-		.uiSlotCount = uiAckSlotCount,
+		.uiSlotCount = static_cast<uint8_t>(iAckSlotCount),
 		.pEntries = pEntries,
 		.iEntryCapacity = NetworkManager::kiMaximumEnetCoordinateSlots,
 		.iTimestampNanoseconds = iTimestampNanoseconds,
 	};
 	NetworkMessages::Write(rWorkbuffer, message);
 
-	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kuiChannelUnreliable, rWorkbuffer, 0);
+	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelUnreliable, rWorkbuffer, 0);
 	return true;
 }
 
@@ -856,7 +856,7 @@ void Client::SendDesynchronizationReport(int64_t iTick, GridCoord coordinate, co
 		.uiActualCrc = static_cast<uint64_t>(uiActualCrc),
 	};
 	NetworkMessages::Write(rWorkbuffer, message);
-	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
 void Client::SendDebugFrameRequest(int64_t iTick, GridCoord coordinate)
@@ -872,7 +872,7 @@ void Client::SendDebugFrameRequest(int64_t iTick, GridCoord coordinate)
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	NetworkMessages::ClientDebugFrameRequestMessage message {.iTick = iTick, .coord = coordinate};
 	NetworkMessages::Write(rWorkbuffer, message);
-	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
 bool Client::SendSubscribe(GridCoord coordinate)
@@ -904,9 +904,9 @@ bool Client::SendSubscribe(GridCoord coordinate)
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-	NetworkMessages::ClientSubscribeMessage message {.uiLoadGeneration = muiCommittedLoadGeneration, .coord = coordinate};
+	NetworkMessages::ClientSubscribeMessage message {.uiLoadGeneration = static_cast<uint8_t>(miCommittedLoadGeneration), .coord = coordinate};
 	NetworkMessages::Write(rWorkbuffer, message);
-	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 
 	return true;
 }
@@ -929,7 +929,7 @@ void Client::SendUnsubscribe(int64_t iSlot)
 		.uiEpoch = rSlot.acknowledgementState.uiEpoch,
 	};
 	NetworkMessages::Write(rWorkbuffer, message);
-	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
 void Client::SendResynchronizationRequest()
@@ -945,7 +945,7 @@ void Client::SendResynchronizationRequest()
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	NetworkMessages::ClientResyncRequestMessage message {};
 	NetworkMessages::Write(rWorkbuffer, message);
-	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
 void Client::SendHello()
@@ -955,7 +955,7 @@ void Client::SendHello()
 
 	NetworkMessages::ClientHelloMessage message
 	{
-		.uiProtocolVersion = kuiProtocolVersion,
+		.uiProtocolVersion = static_cast<uint32_t>(kiProtocolVersion),
 		.iFrameVersion = game::NetworkSessionContract::Frame::kiVersion,
 		.uiPackIntegrityToken = gpFileManager->mpPackChunks->mPackIntegrityToken,
 		.buildConfiguration = kpcBuildConfigurationName,
@@ -966,7 +966,7 @@ void Client::SendHello()
 
 	miHelloSendTimeNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 
-	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
 } // namespace engine

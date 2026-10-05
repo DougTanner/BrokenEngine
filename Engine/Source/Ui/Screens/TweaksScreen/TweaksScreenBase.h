@@ -82,7 +82,7 @@ public:
 	void RenderSectionWindow(int64_t iSection);
 
 	void RenderWaveCountRadioButtons(Wrapper& rCountWrapper);
-	bool BeginSubtab(const char* pcLabel, int64_t iSection, int8_t iTab);
+	bool BeginSubtab(const char* pcLabel, int64_t iSection, int64_t iTab);
 	void WrapperSlider(std::string_view label, int64_t iSection, float fWidthMultiplier = 2.0f, std::string_view mapKey = {});
 	void WrapperSeparatorText(std::string_view label);
 	// Chevron selection wraps; names must contain exactly the wrapper's allowed values.
@@ -105,7 +105,7 @@ public:
 	std::unordered_set<std::string_view> mAuditTouched;
 	std::unordered_set<std::string_view> mAuditMissed;
 	int8_t miPreAuditSubtab[kiMaxTweakSections] {};
-	int8_t miAuditFrame = 0;
+	int64_t miAuditFrame = 0;
 	bool mbAuditMode = false;
 };
 
@@ -132,7 +132,7 @@ void RenderSoundSection(TweaksScreenBase& rScreen);
 void RenderSmokeSection(TweaksScreenBase& rScreen);
 void RenderWindSection(TweaksScreenBase& rScreen);
 
-void RenderTweakExtensionSubtabs(TweaksScreenBase& rScreen, int64_t iSection, int8_t iFirstSubtab);
+void RenderTweakExtensionSubtabs(TweaksScreenBase& rScreen, int64_t iSection, int64_t iFirstSubtab);
 void RenderTweakExtensionInline(TweaksScreenBase& rScreen, int64_t iSection);
 
 // Registers the engine's sections. Called from Main.cpp immediately before the Graphics ctor (which builds

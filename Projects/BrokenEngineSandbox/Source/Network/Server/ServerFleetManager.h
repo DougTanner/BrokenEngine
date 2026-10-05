@@ -76,7 +76,7 @@ public:
 	{
 		FleetLookupFlags_t flags {};
 		engine::GridCoord fleetWantedCoord {};
-		uint8_t uiPendingFleetWantedCoordTicks = 0;
+		int64_t iPendingFleetWantedCoordTicks = 0;
 	};
 	FleetLookupResult LookupFleetWantedCoord(const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalPlayerId);
 

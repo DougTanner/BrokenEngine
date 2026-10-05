@@ -59,7 +59,8 @@ public:
 		{
 			return;
 		}
-		if (uiResultLength != sizeof(uiObjectLength))
+		int64_t iResultLength = static_cast<int64_t>(uiResultLength);
+		if (iResultLength != static_cast<int64_t>(sizeof(uiObjectLength)))
 		{
 			return;
 		}
@@ -137,15 +138,15 @@ FileManager::FileManager()
 	else
 	{
 		PWSTR pWideChar = nullptr;
-		HRESULT iHresult = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pWideChar);
-		if (SUCCEEDED(iHresult) && pWideChar != nullptr)
+		int64_t iHresult = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pWideChar);
+		if (SUCCEEDED(static_cast<HRESULT>(iHresult)) && pWideChar != nullptr)
 		{
 			mAppDataDirectory = pWideChar;
 		}
 		else
 		{
 			// OS failure (trust boundary): leave mAppDataDirectory empty so the append below yields a working-directory-relative path instead of constructing a std::filesystem::path from null.
-			LOG(kLoading, kError, "SHGetKnownFolderPath(FOLDERID_RoamingAppData) failed (hresult {}); falling back to a working-directory-relative AppData path", static_cast<int32_t>(iHresult));
+			LOG(kLoading, kError, "SHGetKnownFolderPath(FOLDERID_RoamingAppData) failed (hresult {}); falling back to a working-directory-relative AppData path", iHresult);
 		}
 		CoTaskMemFree(pWideChar);
 	}
@@ -260,9 +261,9 @@ void FileManager::BackupExistingFile(const FileFlags_t& rFlags, const std::files
 	}
 
 	std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-	std::time_t time = std::chrono::system_clock::to_time_t(now);
+	int64_t iTime = std::chrono::system_clock::to_time_t(now);
 	int64_t iEpochMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-	std::tm timeStruct = *std::localtime(&time);
+	std::tm timeStruct = *std::localtime(&iTime);
 	std::ostringstream timeStringStream;
 	timeStringStream << "-" << std::put_time(&timeStruct, "%Y-%m-%d") << "-" << iEpochMilliseconds;
 	std::filesystem::path backupFile = file.parent_path() / (file.stem().string() + timeStringStream.str() + file.extension().string());
@@ -290,12 +291,12 @@ bool FileManager::ComputeSha256(std::span<const std::byte> bytes, std::array<uin
 	std::array<uint8_t, 32> digest {};
 	while (!bytes.empty())
 	{
-		size_t uiChunkSize = std::min(bytes.size(), static_cast<size_t>(std::numeric_limits<ULONG>::max()));
-		if (!hasher.Update(bytes.first(uiChunkSize)))
+		int64_t iChunkSize = bytes.size() > std::numeric_limits<ULONG>::max() ? static_cast<int64_t>(std::numeric_limits<ULONG>::max()) : static_cast<int64_t>(bytes.size());
+		if (!hasher.Update(bytes.first(static_cast<size_t>(iChunkSize))))
 		{
 			return false;
 		}
-		bytes = bytes.subspan(uiChunkSize);
+		bytes = bytes.subspan(static_cast<size_t>(iChunkSize));
 	}
 	if (!hasher.Finish(digest))
 	{
@@ -341,20 +342,21 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 		{
 			return false;
 		}
-		if (uiBytesRead > buffer.size())
+		int64_t iBytesRead = static_cast<int64_t>(uiBytesRead);
+		if (iBytesRead > static_cast<int64_t>(buffer.size()))
 		{
 			return false;
 		}
-		if (iByteCount > std::numeric_limits<int64_t>::max() - static_cast<int64_t>(uiBytesRead))
+		if (iByteCount > std::numeric_limits<int64_t>::max() - iBytesRead)
 		{
 			return false;
 		}
-		if (!hasher.Update(std::span<const std::byte>(buffer.data(), uiBytesRead)))
+		if (!hasher.Update(std::span<const std::byte>(buffer.data(), static_cast<size_t>(iBytesRead))))
 		{
 			return false;
 		}
-		iByteCount += uiBytesRead;
-		if (uiBytesRead == 0)
+		iByteCount += iBytesRead;
+		if (iBytesRead == 0)
 		{
 			break;
 		}

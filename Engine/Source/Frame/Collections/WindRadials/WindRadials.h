@@ -29,7 +29,7 @@ struct WindRadialKeyframe
 
 struct WindRadialControllerType
 {
-	uint8_t uiKeyframeCount = 2;
+	int64_t iKeyframeCount = 2;
 	bool bDestroysSelf = true;
 	std::chrono::duration<float> times[kiMaximumControllerKeyframes] {};
 	WindRadialKeyframe keyframes[kiMaximumControllerKeyframes] {};
@@ -76,7 +76,7 @@ struct WindRadialsPostRender : public Collection<WindRadialsPostRender>
 	static void Destroy(game::Frame& __restrict rFrame, const FrameStaticData& rStaticData);
 
 	// Add controlled wind radial (fire-and-forget, auto-destroys when animation ends)
-	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, float fCurrentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition, float fBaseIntensity, float fBaseSize);
+	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, float fCurrentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fBaseIntensity, float fBaseSize);
 
 	auto Members([[maybe_unused]] this auto&& rSelf)
 	{

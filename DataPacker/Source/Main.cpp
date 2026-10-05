@@ -40,7 +40,7 @@ static constexpr DataTypeEntry kDataTypes[] =
 	{.enumSuffix = "Texture", .displayName = "Texture", .headerFile = "Texture.h"},
 	{.enumSuffix = "Raw",     .displayName = "Raw",     .headerFile = "Raw.h"},
 };
-static constexpr size_t kuiDataTypeCount = std::size(kDataTypes);
+static constexpr int64_t kiDataTypeCount = std::ssize(kDataTypes);
 
 static bool WriteIfChanged(std::string_view content, const std::filesystem::path& rPath, std::string_view logName)
 {
@@ -66,8 +66,11 @@ static bool WriteIfChanged(std::string_view content, const std::filesystem::path
 // its header.
 static std::unordered_map<std::string, std::string> sGeneratedCrcNames;
 
+template <typename T>
+using ExportJobList = std::vector<std::unique_ptr<T>>;
+
 template <IsExportJob T>
-static void RegisterGeneratedCrcNames(const std::vector<std::unique_ptr<T>>& rJobs)
+static void RegisterGeneratedCrcNames(const ExportJobList<T>& rJobs)
 {
 	for (const std::unique_ptr<T>& rpJob : rJobs)
 	{
@@ -82,7 +85,7 @@ static void RegisterGeneratedCrcNames(const std::vector<std::unique_ptr<T>>& rJo
 }
 
 template <IsExportJob T>
-static void WriteCrcHeader(const std::filesystem::path& rOutPath, const std::vector<std::unique_ptr<T>>& rJobs)
+static void WriteCrcHeader(const std::filesystem::path& rOutPath, const ExportJobList<T>& rJobs)
 {
 	std::fstream stream(rOutPath, std::ios::out | std::ios::binary);
 	stream << "#pragma once" << std::endl;
@@ -105,15 +108,15 @@ static void WriteCrcHeader(const std::filesystem::path& rOutPath, const std::vec
 	VERIFY_SUCCESS(stream.good());
 }
 
-static bool IsFileLockedError(DWORD uiError)
+static bool IsFileLockedError(int64_t iError)
 {
-	return uiError == ERROR_SHARING_VIOLATION || uiError == ERROR_LOCK_VIOLATION;
+	return iError == ERROR_SHARING_VIOLATION || iError == ERROR_LOCK_VIOLATION;
 }
 
 static bool IsFileLockedError(const std::error_code& rError)
 {
 	// std::filesystem reports Win32 codes through std::system_category on Windows
-	return rError.category() == std::system_category() && IsFileLockedError(static_cast<DWORD>(rError.value()));
+	return rError.category() == std::system_category() && IsFileLockedError(rError.value());
 }
 
 // Publishes the manifest and pack over the previous output. A running BrokenEngineSandbox client or server keeps its
@@ -196,7 +199,7 @@ static bool PublishManifestAndPack(const std::filesystem::path& rTemporaryManife
 	}
 }
 
-static std::optional<uint64_t> GetReadableFileSize(const std::filesystem::path& rPath)
+static std::optional<int64_t> GetReadableFileSize(const std::filesystem::path& rPath)
 {
 	std::error_code fileSizeError;
 	uintmax_t uiFileSizeValue = std::filesystem::file_size(rPath, fileSizeError);
@@ -212,32 +215,32 @@ static std::optional<uint64_t> GetReadableFileSize(const std::filesystem::path& 
 	{
 		return std::nullopt;
 	}
-	return static_cast<uint64_t>(uiFileSizeValue);
+	return static_cast<int64_t>(uiFileSizeValue);
 }
 
 static bool LoadPublishedManifestChunkTable(const std::filesystem::path& rManifestFile, std::fstream& rManifestFileStream, int64_t iManifestChunkCount, std::vector<common::ChunkLocation>& rManifestChunkLocations)
 {
-	static constexpr uint64_t kuiChunkTableOffset = static_cast<uint64_t>(common::RoundUp<int64_t, common::kiAlignmentBytes>(static_cast<int64_t>(sizeof(common::DataHeader))));
+	static constexpr int64_t kiChunkTableOffset = common::RoundUp<int64_t, common::kiAlignmentBytes>(static_cast<int64_t>(sizeof(common::DataHeader)));
 
-	std::optional<uint64_t> optionalManifestFileSize = GetReadableFileSize(rManifestFile);
+	std::optional<int64_t> optionalManifestFileSize = GetReadableFileSize(rManifestFile);
 	if (!optionalManifestFileSize.has_value())
 	{
 		return false;
 	}
 
-	uint64_t uiManifestFileSize = optionalManifestFileSize.value();
-	if (uiManifestFileSize < kuiChunkTableOffset)
+	int64_t iManifestFileSize = optionalManifestFileSize.value();
+	if (iManifestFileSize < kiChunkTableOffset)
 	{
 		return false;
 	}
 
-	uint64_t uiManifestTableBytes = uiManifestFileSize - kuiChunkTableOffset;
-	uint64_t uiMaxChunks = uiManifestTableBytes / static_cast<uint64_t>(sizeof(common::ChunkLocation));
+	int64_t iManifestTableBytes = iManifestFileSize - kiChunkTableOffset;
+	int64_t iMaxChunks = iManifestTableBytes / static_cast<int64_t>(sizeof(common::ChunkLocation));
 	if (iManifestChunkCount < 0)
 	{
 		return false;
 	}
-	if (static_cast<uint64_t>(iManifestChunkCount) > uiMaxChunks)
+	if (iManifestChunkCount > iMaxChunks)
 	{
 		return false;
 	}
@@ -250,7 +253,7 @@ static bool LoadPublishedManifestChunkTable(const std::filesystem::path& rManife
 		return false;
 	}
 
-	uint64_t uiChunkTableBytes = static_cast<uint64_t>(iManifestChunkCount) * sizeof(common::ChunkLocation);
+	int64_t iChunkTableBytes = iManifestChunkCount * static_cast<int64_t>(sizeof(common::ChunkLocation));
 
 	try
 	{
@@ -261,18 +264,18 @@ static bool LoadPublishedManifestChunkTable(const std::filesystem::path& rManife
 		return false;
 	}
 
-	rManifestFileStream.seekg(static_cast<std::streamoff>(kuiChunkTableOffset), std::ios::beg);
+	rManifestFileStream.seekg(static_cast<std::streamoff>(kiChunkTableOffset), std::ios::beg);
 	if (!rManifestFileStream)
 	{
 		return false;
 	}
-	if (uiChunkTableBytes == 0)
+	if (iChunkTableBytes == 0)
 	{
 		return true;
 	}
 
-	rManifestFileStream.read(reinterpret_cast<char*>(rManifestChunkLocations.data()), static_cast<std::streamsize>(uiChunkTableBytes));
-	return rManifestFileStream && rManifestFileStream.gcount() == static_cast<std::streamsize>(uiChunkTableBytes);
+	rManifestFileStream.read(reinterpret_cast<char*>(rManifestChunkLocations.data()), static_cast<std::streamsize>(iChunkTableBytes));
+	return rManifestFileStream && rManifestFileStream.gcount() == static_cast<std::streamsize>(iChunkTableBytes);
 }
 
 static bool LoadPublishedManifest(const std::filesystem::path& rManifestFile, int64_t& riManifestChunkCount, std::vector<common::ChunkLocation>& rManifestChunkLocations)
@@ -288,11 +291,12 @@ static bool LoadPublishedManifest(const std::filesystem::path& rManifestFile, in
 
 static bool ValidatePublishedPackLayout(const std::filesystem::path& rPackFile, const std::vector<common::ChunkLocation>& rManifestChunkLocations)
 {
-	std::optional<uint64_t> optionalPackFileSize = GetReadableFileSize(rPackFile);
+	std::optional<int64_t> optionalPackFileSize = GetReadableFileSize(rPackFile);
 	if (!optionalPackFileSize.has_value())
 	{
 		return false;
 	}
+	uint64_t uiPackFileSize = static_cast<uint64_t>(optionalPackFileSize.value());
 
 	std::fstream packFileStream(rPackFile, std::ios::in | std::ios::binary);
 	if (!packFileStream)
@@ -305,9 +309,9 @@ static bool ValidatePublishedPackLayout(const std::filesystem::path& rPackFile, 
 	for (const common::ChunkLocation& rChunkLocation : rManifestChunkLocations)
 	{
 		if (rChunkLocation.uiOffset != uiExpectedOffset || rChunkLocation.uiOffset % kuiAlignmentBytes != 0
-		 || rChunkLocation.uiOffset > optionalPackFileSize.value()
+		 || rChunkLocation.uiOffset > uiPackFileSize
 		 || rChunkLocation.uiSize < static_cast<uint64_t>(common::kiChunkDataOffset)
-		 || rChunkLocation.uiSize > optionalPackFileSize.value() - rChunkLocation.uiOffset)
+		 || rChunkLocation.uiSize > uiPackFileSize - rChunkLocation.uiOffset)
 		{
 			return false;
 		}
@@ -334,13 +338,13 @@ static bool ValidatePublishedPackLayout(const std::filesystem::path& rPackFile, 
 		uiExpectedOffset = uiChunkEnd + uiPadding;
 	}
 
-	return uiExpectedOffset == optionalPackFileSize.value();
+	return uiExpectedOffset == uiPackFileSize;
 }
 
 template <IsExportJob T>
-static std::vector<std::unique_ptr<T>> DiscoverExportJobsAndAggregateDirty(const std::filesystem::path& rPackFile, const std::vector<common::ChunkLocation>& rManifestChunkLocations, bool& rbDirty)
+static ExportJobList<T> DiscoverExportJobsAndAggregateDirty(const std::filesystem::path& rPackFile, const std::vector<common::ChunkLocation>& rManifestChunkLocations, bool& rbDirty)
 {
-	std::vector<std::unique_ptr<T>> exportJobs;
+	ExportJobList<T> exportJobs;
 	for (const std::filesystem::path& rBaseDirectory : gpFileManager->mpInputDirectories)
 	{
 		for (const std::filesystem::directory_entry& rDirectoryEntry : std::filesystem::recursive_directory_iterator(rBaseDirectory))
@@ -365,14 +369,14 @@ static std::vector<std::unique_ptr<T>> DiscoverExportJobsAndAggregateDirty(const
 	if (!rbDirty)
 	{
 		std::vector<common::crc_t> manifestPathCrcs;
-		manifestPathCrcs.reserve(rManifestChunkLocations.size());
+		manifestPathCrcs.reserve(static_cast<size_t>(std::ssize(rManifestChunkLocations)));
 		for (const common::ChunkLocation& rChunkLocation : rManifestChunkLocations)
 		{
 			manifestPathCrcs.push_back(rChunkLocation.crc);
 		}
 
 		std::vector<common::crc_t> jobPathCrcs;
-		jobPathCrcs.reserve(exportJobs.size());
+		jobPathCrcs.reserve(static_cast<size_t>(std::ssize(exportJobs)));
 		for (const std::unique_ptr<T>& rpExportJob : exportJobs)
 		{
 			jobPathCrcs.push_back(rpExportJob->mCrc);
@@ -413,7 +417,7 @@ static std::vector<std::unique_ptr<T>> DiscoverExportJobsAndAggregateDirty(const
 }
 
 template <IsExportJob T>
-static void SortAndCheckDuplicateExportJobs(std::vector<std::unique_ptr<T>>& rExportJobs)
+static void SortAndCheckDuplicateExportJobs(ExportJobList<T>& rExportJobs)
 {
 	// Sort by relative path to ensure chunks are in same order inside the file (for more efficient Steam patching)
 	std::sort(rExportJobs.begin(), rExportJobs.end(), [](const std::unique_ptr<T>& rpLeft, const std::unique_ptr<T>& rpRight)
@@ -437,7 +441,7 @@ static void SortAndCheckDuplicateExportJobs(std::vector<std::unique_ptr<T>>& rEx
 }
 
 template <IsExportJob T>
-static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const std::filesystem::path& rTemporaryManifestFile, const std::filesystem::path& rTemporaryPackFile, std::vector<std::unique_ptr<T>>& rExportJobs, DataPackerRunSummary& rRunSummary)
+static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const std::filesystem::path& rTemporaryManifestFile, const std::filesystem::path& rTemporaryPackFile, ExportJobList<T>& rExportJobs, DataPackerRunSummary& rRunSummary)
 {
 	std::fstream temporaryManifestFileStream(rTemporaryManifestFile, std::ios::out | std::ios::binary);
 
@@ -451,7 +455,7 @@ static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const st
 	std::fstream temporaryPackFileStream(rTemporaryPackFile, std::ios::out | std::ios::binary);
 
 	std::vector<diagnostic::ExportFailure> failures;
-	failures.reserve(rExportJobs.size() + 1);
+	failures.reserve(static_cast<size_t>(std::ssize(rExportJobs) + 1));
 	for (const std::unique_ptr<T>& rpExportJob : rExportJobs)
 	{
 		try
@@ -462,8 +466,8 @@ static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const st
 			{
 				.crc = rpExportJob->mCrc,
 				.uiOffset = static_cast<uint64_t>(temporaryPackFileStream.tellp()),
-				.uiSize = rData.size(),
-				.contentCrc = rData.empty() ? common::kCrcSeed : common::Crc(std::span<const std::byte>(rData.data(), rData.size())),
+				.uiSize = static_cast<uint64_t>(std::ssize(rData)),
+				.contentCrc = rData.empty() ? common::kCrcSeed : common::Crc(std::span<const std::byte>(rData.data(), static_cast<size_t>(std::ssize(rData)))),
 			};
 			temporaryManifestFileStream.write(reinterpret_cast<char*>(&chunkLocation), sizeof(chunkLocation));
 
@@ -496,7 +500,7 @@ static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const st
 }
 
 template <IsExportJob T>
-static std::expected<bool, FileManager::EnsureLocalResult> RunDirtyExport(const std::filesystem::path& rManifestFile, const std::filesystem::path& rPackFile, const std::filesystem::path& rHeaderFile, std::vector<std::unique_ptr<T>>& rExportJobs, DataPackerRunSummary& rRunSummary)
+static std::expected<bool, FileManager::EnsureLocalResult> RunDirtyExport(const std::filesystem::path& rManifestFile, const std::filesystem::path& rPackFile, const std::filesystem::path& rHeaderFile, ExportJobList<T>& rExportJobs, DataPackerRunSummary& rRunSummary)
 {
 	FileManager::EnsureLocalResult eResult = gpFileManager->EnsureLocal(FileManager::OutputRoot::kData);
 	if (eResult == FileManager::EnsureLocalResult::kCancelled || eResult == FileManager::EnsureLocalResult::kFailed)
@@ -607,7 +611,7 @@ std::expected<bool, FileManager::EnsureLocalResult> RunExportJobs(DataPackerRunS
 	headerFile += ".h";
 	bDirty |= !std::filesystem::exists(headerFile);
 
-	std::vector<std::unique_ptr<T>> exportJobs = DiscoverExportJobsAndAggregateDirty<T>(packFile, manifestChunkLocations, bDirty);
+	ExportJobList<T> exportJobs = DiscoverExportJobsAndAggregateDirty<T>(packFile, manifestChunkLocations, bDirty);
 	RegisterGeneratedCrcNames(exportJobs);
 
 	if (!bDirty && !ValidatePublishedPackLayout(packFile, manifestChunkLocations))
@@ -667,10 +671,10 @@ static bool GenerateDataTypesHeader(const std::filesystem::path& rOutPath)
 	content << std::endl;
 	content << "inline constexpr const char* kpcDataTypeNames[kDataTypeCount] =" << std::endl;
 	content << "{" << std::endl;
-	for (size_t i = 0; i < kuiDataTypeCount; ++i)
+	for (int64_t i = 0; i < kiDataTypeCount; ++i)
 	{
 		content << "\t\"" << kDataTypes[i].displayName << "\"";
-		if (i + 1 < kuiDataTypeCount)
+		if (i + 1 < kiDataTypeCount)
 		{
 			content << ",";
 		}
@@ -700,7 +704,7 @@ static bool GenerateDataHeader(const std::filesystem::path& rOutPath)
 	return WriteIfChanged(content.str(), rOutPath, "Data.h");
 }
 
-bool MainThread(int iArgumentCount, char* ppcArguments[], DataPackerRunSummary& rRunSummary)
+bool MainThread(int64_t iArgumentCount, char* ppcArguments[], DataPackerRunSummary& rRunSummary)
 {
 	common::Multithreading multithreading(std::max<int64_t>(0, common::HardwareCoreCount() - 3));
 
@@ -712,7 +716,7 @@ bool MainThread(int iArgumentCount, char* ppcArguments[], DataPackerRunSummary& 
 	Texture::StaticInitialize();
 
 	FileManager::EnsureLocalResult eInitializationResult = FileManager::EnsureLocalResult::kAlreadyLocal;
-	auto pFileManager = std::make_unique<FileManager>(std::span(ppcArguments, iArgumentCount), eInitializationResult);
+	auto pFileManager = std::make_unique<FileManager>(std::span(ppcArguments, static_cast<size_t>(iArgumentCount)), eInitializationResult);
 	if (eInitializationResult == FileManager::EnsureLocalResult::kCancelled || eInitializationResult == FileManager::EnsureLocalResult::kFailed)
 	{
 		pFileManager.reset();
@@ -780,7 +784,7 @@ bool MaterializeData(char* ppcArguments[])
 	return eResult != FileManager::EnsureLocalResult::kCancelled && eResult != FileManager::EnsureLocalResult::kFailed;
 }
 
-static bool RunCommand(int iArgumentCount, char* ppcArguments[])
+static bool RunCommand(int64_t iArgumentCount, char* ppcArguments[])
 {
 	if (iArgumentCount >= 2 && std::string_view(ppcArguments[1]) == "--materialize-data")
 	{
@@ -826,7 +830,7 @@ static bool RunCommand(int iArgumentCount, char* ppcArguments[])
 	}
 }
 
-static bool RunCommandWithExceptionHandling(int iArgumentCount, char* ppcArguments[])
+static bool RunCommandWithExceptionHandling(int64_t iArgumentCount, char* ppcArguments[])
 {
 	bool bSuccess = false;
 	try
@@ -861,17 +865,17 @@ static bool RunCommandWithExceptionHandling(int iArgumentCount, char* ppcArgumen
 	return bSuccess;
 }
 
-static int ProcessMain(int iArgumentCount, char* ppcArguments[])
+static int64_t ProcessMain(int64_t iArgumentCount, char* ppcArguments[])
 {
 	HANDLE hMutex = CreateMutex(nullptr, TRUE, "BrokenEngineDataPacker");
 	if (hMutex == nullptr)
 	{
-		DWORD uiError = GetLastError();
+		int64_t iError = GetLastError();
 		diagnostic::Record record
 		{
 			.eSeverity = diagnostic::Severity::kError,
 			.title = "Data Packer - std::exception",
-			.message = std::format("CreateMutex failed (Win32 {})", uiError),
+			.message = std::format("CreateMutex failed (Win32 {})", iError),
 			.eButtons = diagnostic::ButtonContract::kOk,
 			.eIcon = diagnostic::ModalIcon::kNone,
 		};
@@ -895,28 +899,28 @@ static int ProcessMain(int iArgumentCount, char* ppcArguments[])
 		bOwnsMutex = false;
 		std::printf("DataPacker is already running, waiting...\n");
 		// Windows mutex waits by the owning thread acquire recursively; every acquisition requires a matching release.
-		DWORD uiWaitResult = WaitForSingleObject(hMutex, INFINITE);
-		if (uiWaitResult == WAIT_FAILED)
+		int64_t iWaitResult = WaitForSingleObject(hMutex, INFINITE);
+		if (iWaitResult == WAIT_FAILED)
 		{
-			DWORD uiError = GetLastError();
+			int64_t iError = GetLastError();
 			diagnostic::Record record
 			{
 				.eSeverity = diagnostic::Severity::kError,
 				.title = "Data Packer - std::exception",
-				.message = std::format("WaitForSingleObject failed (Win32 {})", uiError),
+				.message = std::format("WaitForSingleObject failed (Win32 {})", iError),
 				.eButtons = diagnostic::ButtonContract::kOk,
 				.eIcon = diagnostic::ModalIcon::kNone,
 			};
 			diagnostic::Report(record);
 			return 1;
 		}
-		if (uiWaitResult != WAIT_OBJECT_0 && uiWaitResult != WAIT_ABANDONED)
+		if (iWaitResult != WAIT_OBJECT_0 && iWaitResult != WAIT_ABANDONED)
 		{
 			diagnostic::Record record
 			{
 				.eSeverity = diagnostic::Severity::kError,
 				.title = "Data Packer - std::exception",
-				.message = std::format("WaitForSingleObject returned unexpected result {}", uiWaitResult),
+				.message = std::format("WaitForSingleObject returned unexpected result {}", iWaitResult),
 				.eButtons = diagnostic::ButtonContract::kOk,
 				.eIcon = diagnostic::ModalIcon::kNone,
 			};
@@ -943,7 +947,7 @@ static int ProcessMain(int iArgumentCount, char* ppcArguments[])
 
 int main(int iArgumentCount, char* ppcArguments[])
 {
-	return common::ThreadLocal::Entry(ProcessMain, common::kiMinWorkbufferSize, std::nullopt, false)(iArgumentCount, ppcArguments);
+	return static_cast<int>(common::ThreadLocal::Entry(ProcessMain, common::kiMinWorkbufferSize, std::nullopt, false)(iArgumentCount, ppcArguments));
 }
 
 #if defined(_CRTDBG_MAP_ALLOC)

@@ -33,7 +33,7 @@ struct AreaLightsInterpolate : public Collection<AreaLightsInterpolate, Collecti
 
 	struct SyncData
 	{
-		uint8_t uiTypeIndex = 0;
+		int64_t iTypeIndex = 0;
 		XMVECTOR vecVisiblePositions[4] {};
 		float fIntensityMultiplier = 1.0f;
 	};
@@ -63,7 +63,7 @@ struct AreaLightsPostRender : public Collection<AreaLightsPostRender>
 {
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
 
-	static void Add(game::Frame& __restrict rFrame, area_lights_t& rId, uint8_t uiTypeIndex);
+	static void Add(game::Frame& __restrict rFrame, area_lights_t& rId, int64_t iTypeIndex);
 
 	area_lights_t* __restrict pIds = nullptr;
 	auto Members(this auto&& rSelf)

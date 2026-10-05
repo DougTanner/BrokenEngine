@@ -258,6 +258,9 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerTypes.h">
       <Filter>Engine\Network\Server</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerBufferedFrames.h">
+      <Filter>Engine\Network\Server</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManagerBase.h">
       <Filter>Engine\Profile</Filter>
     </ClInclude>
@@ -656,10 +659,7 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\OwnedEntityRegistry.cpp">
       <Filter>Engine\Network\Server</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerReceive.cpp">
-      <Filter>Engine\Network\Server</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerSend.cpp">
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerBufferedFrames.cpp">
       <Filter>Engine\Network\Server</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\CrashReport.cpp">

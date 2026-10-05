@@ -60,7 +60,7 @@ void StreamingVoice::UpdateRequests(bool bAllowRequests)
 		}
 
 		std::span<std::byte> destination(reinterpret_cast<std::byte*>(mBuffers[i]), mSlotBytesRead[i]);
-		ChunkReadResult eResult = gpFileManager->mpPackChunks->TryReadChunkData(mReadRequests[i], mpLazyChunk->location.crc, static_cast<uint64_t>(mSlotOffsets[i]), destination);
+		ChunkReadResult eResult = gpFileManager->mpPackChunks->TryReadChunkData(mReadRequests[i], mpLazyChunk->location.crc, mSlotOffsets[i], destination);
 		if (eResult == ChunkReadResult::kReady)
 		{
 			mSlotStates[i] = SlotState::kReady;
@@ -107,7 +107,7 @@ void StreamingVoice::UpdateRequests(bool bAllowRequests)
 
 		int64_t iBytesToRead = std::min(iRemainingData, kiBufferSize);
 		std::span<std::byte> destination(reinterpret_cast<std::byte*>(mBuffers[iSlot]), iBytesToRead);
-		ChunkReadResult eResult = gpFileManager->mpPackChunks->TryReadChunkData(mReadRequests[iSlot], mpLazyChunk->location.crc, static_cast<uint64_t>(miNextReadOffset), destination);
+		ChunkReadResult eResult = gpFileManager->mpPackChunks->TryReadChunkData(mReadRequests[iSlot], mpLazyChunk->location.crc, miNextReadOffset, destination);
 		if (eResult == ChunkReadResult::kRetry)
 		{
 			return;
@@ -184,11 +184,11 @@ void StreamingVoice::DrainConsumedAndSubmitReady()
 			.LoopCount = 0,
 			.pContext = this,
 		};
-		HRESULT hResult = mpVoice->SubmitSourceBuffer(&xaudio2Buffer);
-		if (FAILED(hResult))
+		int64_t iResult = mpVoice->SubmitSourceBuffer(&xaudio2Buffer);
+		if (FAILED(static_cast<HRESULT>(iResult)))
 		{
 			char pcHex[20] {};
-			LOG(kAudio, kWarning, "SubmitSourceBuffer failed, HRESULT: {}", common::ToHex(std::span(pcHex), static_cast<uint32_t>(hResult)));
+			LOG(kAudio, kWarning, "SubmitSourceBuffer failed, HRESULT: {}", common::ToHex(std::span(pcHex), static_cast<uint32_t>(iResult)));
 			mFlags.Set(kLastBufferSubmitted);
 			break;
 		}

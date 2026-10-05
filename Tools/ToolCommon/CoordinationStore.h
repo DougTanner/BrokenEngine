@@ -40,7 +40,7 @@ namespace toolcli::coordination
 	};
 
 	std::string CurrentUtcTimestamp();
-	bool ParseUtcTimestamp(const std::string& rValue, uint64_t& rTicks);
+	bool ParseUtcTimestamp(const std::string& rValue, int64_t& rTicks);
 	uint64_t CurrentUtcTicks();
 	std::string FormatUtcTimestamp(uint64_t uiTicks);
 	std::optional<std::string> HashSha256(std::string_view value);

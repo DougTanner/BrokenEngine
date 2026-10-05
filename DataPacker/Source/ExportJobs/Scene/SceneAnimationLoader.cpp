@@ -15,7 +15,7 @@ static size_t CheckedAnimationSize(size_t uiCount, size_t uiElementSize, std::st
 	return uiCount * uiElementSize;
 }
 
-static const float* AccessorFloats(const tinygltf::Model& rModel, int iAccessor, size_t uiRequiredBytes, std::string_view context)
+static const float* AccessorFloats(const tinygltf::Model& rModel, int64_t iAccessor, size_t uiRequiredBytes, std::string_view context)
 {
 	if (!IsValidIndex(iAccessor, std::ssize(rModel.accessors)))
 	{
@@ -50,8 +50,8 @@ static const float* AccessorFloats(const tinygltf::Model& rModel, int iAccessor,
 		throw std::runtime_error(std::format("{} accessor {} buffer view {} has unsupported animation byte stride {}.", context, iAccessor, rAccessor.bufferView, rBufferView.byteStride));
 	}
 
-	int32_t iComponentSize = tinygltf::GetComponentSizeInBytes(static_cast<uint32_t>(rAccessor.componentType));
-	int32_t iComponentCount = tinygltf::GetNumComponentsInType(static_cast<uint32_t>(rAccessor.type));
+	int64_t iComponentSize = tinygltf::GetComponentSizeInBytes(static_cast<uint32_t>(rAccessor.componentType));
+	int64_t iComponentCount = tinygltf::GetNumComponentsInType(static_cast<uint32_t>(rAccessor.type));
 	if (iComponentSize <= 0)
 	{
 		throw std::runtime_error(std::format("{} accessor {} has an invalid component or element type.", context, iAccessor));
@@ -112,15 +112,15 @@ static bool MapAnimationChannel(const tinygltf::AnimationChannel& rGltfChannel, 
 
 	if (rGltfChannel.target_path == "translation")
 	{
-		rChannel.uiTargetPath = common::AnimationChannel::kTargetPathTranslation;
+		rChannel.uiTargetPath = static_cast<uint8_t>(common::AnimationChannel::kiTargetPathTranslation);
 	}
 	else if (rGltfChannel.target_path == "rotation")
 	{
-		rChannel.uiTargetPath = common::AnimationChannel::kTargetPathRotation;
+		rChannel.uiTargetPath = static_cast<uint8_t>(common::AnimationChannel::kiTargetPathRotation);
 	}
 	else if (rGltfChannel.target_path == "scale")
 	{
-		rChannel.uiTargetPath = common::AnimationChannel::kTargetPathScale;
+		rChannel.uiTargetPath = static_cast<uint8_t>(common::AnimationChannel::kiTargetPathScale);
 	}
 	else
 	{
@@ -129,22 +129,22 @@ static bool MapAnimationChannel(const tinygltf::AnimationChannel& rGltfChannel, 
 
 	if (rSampler.interpolation == "STEP")
 	{
-		rChannel.uiInterpolation = common::AnimationChannel::kInterpolationStep;
+		rChannel.uiInterpolation = static_cast<uint8_t>(common::AnimationChannel::kiInterpolationStep);
 	}
 	else if (rSampler.interpolation == "CUBICSPLINE")
 	{
-		rChannel.uiInterpolation = common::AnimationChannel::kInterpolationCubicSpline;
+		rChannel.uiInterpolation = static_cast<uint8_t>(common::AnimationChannel::kiInterpolationCubicSpline);
 	}
 	else
 	{
-		rChannel.uiInterpolation = common::AnimationChannel::kInterpolationLinear;
+		rChannel.uiInterpolation = static_cast<uint8_t>(common::AnimationChannel::kiInterpolationLinear);
 	}
 	return true;
 }
 
 static void EmitCubicKeyframes(std::span<const float> times, std::span<const float> values, int64_t iValueStride, common::AnimationChannel& rChannel, float& rfDuration, std::vector<common::AnimationKeyframeCubic>& rCubicKeyframes)
 {
-	rChannel.uiKeyframeStart = static_cast<uint32_t>(rCubicKeyframes.size());
+	rChannel.uiKeyframeStart = static_cast<uint32_t>(std::ssize(rCubicKeyframes));
 
 	for (int64_t j = 0; j < std::ssize(times); ++j)
 	{
@@ -154,7 +154,7 @@ static void EmitCubicKeyframes(std::span<const float> times, std::span<const flo
 		// CUBICSPLINE has 3 values per keyframe: in-tangent, value, out-tangent
 		int64_t iBaseIndex = j * 3 * iValueStride;
 
-		if (rChannel.uiTargetPath == common::AnimationChannel::kTargetPathRotation) // Rotation (vec4)
+		if (rChannel.uiTargetPath == common::AnimationChannel::kiTargetPathRotation) // Rotation (vec4)
 		{
 			keyframe.f4InTangent = XMFLOAT4(values[iBaseIndex + 0], values[iBaseIndex + 1], values[iBaseIndex + 2], values[iBaseIndex + 3]);
 			keyframe.f4Value = XMFLOAT4(values[iBaseIndex + iValueStride + 0], values[iBaseIndex + iValueStride + 1], values[iBaseIndex + iValueStride + 2], values[iBaseIndex + iValueStride + 3]);
@@ -174,18 +174,18 @@ static void EmitCubicKeyframes(std::span<const float> times, std::span<const flo
 
 static void EmitKeyframes(std::span<const float> times, std::span<const float> values, int64_t iValueStride, common::AnimationChannel& rChannel, float& rfDuration, std::vector<common::AnimationKeyframe>& rKeyframes)
 {
-	rChannel.uiKeyframeStart = static_cast<uint32_t>(rKeyframes.size());
+	rChannel.uiKeyframeStart = static_cast<uint32_t>(std::ssize(rKeyframes));
 
 	for (int64_t j = 0; j < std::ssize(times); ++j)
 	{
 		common::AnimationKeyframe keyframe {};
 		keyframe.fTime = times[j];
 
-		if (rChannel.uiTargetPath == common::AnimationChannel::kTargetPathRotation)
+		if (rChannel.uiTargetPath == common::AnimationChannel::kiTargetPathRotation)
 		{
 			keyframe.f4Value = XMFLOAT4(values[j * iValueStride + 0], values[j * iValueStride + 1], values[j * iValueStride + 2], values[j * iValueStride + 3]);
 		}
-		else if (rChannel.uiTargetPath == common::AnimationChannel::kTargetPathTranslation)
+		else if (rChannel.uiTargetPath == common::AnimationChannel::kiTargetPathTranslation)
 		{
 			keyframe.f4Value = XMFLOAT4(values[j * iValueStride + 0], values[j * iValueStride + 1], values[j * iValueStride + 2], 0.0f);
 		}
@@ -208,7 +208,7 @@ bool DetermineAnimationPath(const tinygltf::Model& rGltfModel)
 	}
 
 	const tinygltf::Skin& rSkin = rGltfModel.skins.at(0);
-	std::unordered_set<int> skinJoints(rSkin.joints.begin(), rSkin.joints.end());
+	std::unordered_set<int64_t> skinJoints(rSkin.joints.begin(), rSkin.joints.end());
 
 	for (const tinygltf::Animation& rAnimation : rGltfModel.animations)
 	{
@@ -236,11 +236,11 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOutput)
 	{
 		common::AnimationClip animation {};
 
-		size_t iNameLength = std::min(rAnimation.name.size(), static_cast<size_t>(common::AnimationClip::kiMaxNameLength - 1));
-		std::memcpy(animation.pcName, rAnimation.name.c_str(), iNameLength);
+		int64_t iNameLength = std::min(std::ssize(rAnimation.name), common::AnimationClip::kiMaxNameLength - 1);
+		std::memcpy(animation.pcName, rAnimation.name.c_str(), static_cast<size_t>(iNameLength));
 		animation.pcName[iNameLength] = '\0';
 
-		animation.uiChannelStart = static_cast<uint32_t>(rChannels.size());
+		animation.uiChannelStart = static_cast<uint32_t>(std::ssize(rChannels));
 		animation.uiChannelCount = 0;
 		animation.fDuration = 0.0f;
 
@@ -288,13 +288,13 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOutput)
 				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) input accessor {} is not SCALAR.", rAnimation.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rSampler.input));
 			}
 
-			int iRequiredOutputType = channel.uiTargetPath == common::AnimationChannel::kTargetPathRotation ? TINYGLTF_TYPE_VEC4 : TINYGLTF_TYPE_VEC3;
+			int64_t iRequiredOutputType = channel.uiTargetPath == common::AnimationChannel::kiTargetPathRotation ? TINYGLTF_TYPE_VEC4 : TINYGLTF_TYPE_VEC3;
 			if (rOutputAccessor.type != iRequiredOutputType)
 			{
 				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) output accessor {} has an incompatible element type.", rAnimation.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rSampler.output));
 			}
 
-			if (channel.uiInterpolation == common::AnimationChannel::kInterpolationCubicSpline)
+			if (channel.uiInterpolation == common::AnimationChannel::kiInterpolationCubicSpline)
 			{
 				if (rOutputAccessor.count % 3 != 0 || rOutputAccessor.count / 3 != rInputAccessor.count)
 				{
@@ -306,10 +306,10 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOutput)
 				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) output count {} does not match its input count {}.", rAnimation.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rOutputAccessor.count, rInputAccessor.count));
 			}
 
-			int64_t iValueStride = (channel.uiTargetPath == common::AnimationChannel::kTargetPathRotation) ? 4 : 3; // Rotation is vec4, others vec3
+			int64_t iValueStride = (channel.uiTargetPath == common::AnimationChannel::kiTargetPathRotation) ? 4 : 3; // Rotation is vec4, others vec3
 			size_t uiInputBytes = CheckedAnimationSize(rInputAccessor.count, sizeof(float), context);
 			size_t uiOutputElementCount = rInputAccessor.count;
-			if (channel.uiInterpolation == common::AnimationChannel::kInterpolationCubicSpline)
+			if (channel.uiInterpolation == common::AnimationChannel::kiInterpolationCubicSpline)
 			{
 				uiOutputElementCount = CheckedAnimationSize(uiOutputElementCount, 3, context);
 			}
@@ -328,7 +328,7 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOutput)
 
 			channel.uiKeyframeCount = static_cast<uint32_t>(rInputAccessor.count);
 
-			if (channel.uiInterpolation == common::AnimationChannel::kInterpolationCubicSpline)
+			if (channel.uiInterpolation == common::AnimationChannel::kiInterpolationCubicSpline)
 			{
 				EmitCubicKeyframes(std::span<const float>(pfTimes, rInputAccessor.count), std::span<const float>(pfValues, uiOutputFloatCount), iValueStride, channel, animation.fDuration, rCubicKeyframes);
 			}

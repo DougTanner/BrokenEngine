@@ -26,7 +26,7 @@ static float AdmitSpawnTimer(float fSpawnTimer)
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 132 + engine::kiNavDataVersion + BlastersInterpolate::kiVersion + BlastersPostRender::kiVersion + MissilesInterpolate::kiVersion + MissilesPostRender::kiVersion + PlayersInterpolate::kiVersion + PlayersPostRender::kiVersion + SpaceshipsInterpolate::kiVersion + SpaceshipsPostRender::kiVersion + engine::ExplosionsInterpolate::kiVersion + engine::PushersInterpolate::kiVersion + engine::PushersPostRender::kiVersion + engine::ExplosionsPostRender::kiVersion;
+const int64_t Frame::kiVersion = 133 + engine::kiNavDataVersion + BlastersInterpolate::kiVersion + BlastersPostRender::kiVersion + MissilesInterpolate::kiVersion + MissilesPostRender::kiVersion + PlayersInterpolate::kiVersion + PlayersPostRender::kiVersion + SpaceshipsInterpolate::kiVersion + SpaceshipsPostRender::kiVersion + engine::ExplosionsInterpolate::kiVersion + engine::PushersInterpolate::kiVersion + engine::PushersPostRender::kiVersion + engine::ExplosionsPostRender::kiVersion;
 
 FrameInterpolate::FrameInterpolate()
 : pPlayers(std::make_unique<PlayersInterpolate>())
@@ -46,7 +46,7 @@ FramePostRender::FramePostRender()
 , pMissiles(std::make_unique<MissilesPostRender>())
 , pSpaceships(std::make_unique<SpaceshipsPostRender>())
 {
-	transferRequests.reserve(engine::kuiInitialTransferCapacity);
+	transferRequests.reserve(static_cast<size_t>(engine::kiInitialTransferCapacity));
 }
 
 FramePostRender::~FramePostRender() = default;
@@ -134,7 +134,7 @@ void FrameInterpolate::AllocateAndCopy(FrameInterpolate& __restrict rCurrent, co
 
 	engine::AllocateAndCopyMembers(*rCurrent.pPlayers, *rPrevious.pPlayers);
 
-	engine::AllocateAndCopyCollections(GameInterpolateCollections(rCurrent), GameInterpolateCollections(rPrevious), std::make_index_sequence<std::tuple_size_v<decltype(GameInterpolateCollections(rCurrent))>> {});
+	engine::AllocateAndCopyCollections(GameInterpolateCollections(rCurrent), GameInterpolateCollections(rPrevious), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(GameInterpolateCollections(rCurrent))>)> {});
 }
 
 void FrameInterpolate::Update(FrameInterpolate& __restrict rCurrent, const Frame& __restrict rPreviousFrame, float fDeltaTime)
@@ -171,7 +171,7 @@ void FramePostRender::AllocateAndCopy(FramePostRender& __restrict rCurrent, cons
 
 	engine::AllocateAndCopyMembers(*rCurrent.pPlayers, *rPrevious.pPlayers);
 
-	engine::AllocateAndCopyCollections(GamePostRenderCollections(rCurrent), GamePostRenderCollections(rPrevious), std::make_index_sequence<std::tuple_size_v<decltype(GamePostRenderCollections(rCurrent))>> {});
+	engine::AllocateAndCopyCollections(GamePostRenderCollections(rCurrent), GamePostRenderCollections(rPrevious), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(GamePostRenderCollections(rCurrent))>)> {});
 }
 
 void FramePostRender::Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const FrameInput& __restrict rFrameInput, const engine::FrameStaticData& rStaticData)
@@ -640,7 +640,7 @@ bool FrameInterpolate::LogDifferences(const FrameInterpolate& rOther) const
 	bEqual &= common::LogDifference<"fSpawnTimer">(fSpawnTimer, rOther.fSpawnTimer);
 	bEqual &= common::LogDifference<"gameFlags">(gameFlags, rOther.gameFlags);
 	bEqual &= pPlayers->LogDifferences(*rOther.pPlayers);
-	bEqual &= engine::LogDifferencesCollections(GameInterpolateCollections(*this), GameInterpolateCollections(rOther), std::make_index_sequence<std::tuple_size_v<decltype(GameInterpolateCollections(*this))>> {});
+	bEqual &= engine::LogDifferencesCollections(GameInterpolateCollections(*this), GameInterpolateCollections(rOther), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(GameInterpolateCollections(*this))>)> {});
 	return bEqual;
 }
 
@@ -705,7 +705,7 @@ bool FramePostRender::LogDifferences(const FramePostRender& rOther) const
 	bEqual &= common::LogDifference<"enemyAlignment">(enemyAlignment, rOther.enemyAlignment);
 	bEqual &= common::LogDifference<"playerAlignment">(playerAlignment, rOther.playerAlignment);
 	bEqual &= pPlayers->LogDifferences(*rOther.pPlayers);
-	bEqual &= engine::LogDifferencesCollections(GamePostRenderCollections(*this), GamePostRenderCollections(rOther), std::make_index_sequence<std::tuple_size_v<decltype(GamePostRenderCollections(*this))>> {});
+	bEqual &= engine::LogDifferencesCollections(GamePostRenderCollections(*this), GamePostRenderCollections(rOther), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(GamePostRenderCollections(*this))>)> {});
 	return bEqual;
 }
 
@@ -747,7 +747,11 @@ void FramePostRender::ServerRead(std::istream& rStream)
 
 bool PrepareTransferRequest(const FramePostRender& rPostRender, const engine::FrameBounds& rBounds, TransferRequest& rRequest)
 {
-	engine::ComputeTransferDelta(rBounds, rRequest.data.vecPosition, rRequest.iDeltaX, rRequest.iDeltaY);
+	int64_t iDeltaX = 0;
+	int64_t iDeltaY = 0;
+	engine::ComputeTransferDelta(rBounds, rRequest.data.vecPosition, iDeltaX, iDeltaY);
+	rRequest.iDeltaX = static_cast<int8_t>(iDeltaX);
+	rRequest.iDeltaY = static_cast<int8_t>(iDeltaY);
 
 	// The payload leaves here already expressed in the destination cell's local frame: one cell width per
 	// transferred axis. Every downstream consumer — network transfer, SpawnTransfer, replay reconcile —
@@ -790,6 +794,12 @@ void Frame::ServerRead(std::istream& rStream)
 {
 	interpolate.ServerRead(rStream);
 	postRender.ServerRead(rStream);
+
+	engine::FrameInterpolateBase& rInterpolateBase = interpolate;
+	engine::FramePostRenderBase& rPostRenderBase = postRender;
+	engine::ValidateCollectionPairs(rInterpolateBase.ServerCollections(), rPostRenderBase.ServerCollections());
+	engine::ValidateCollectionPair(*interpolate.pPlayers, *postRender.pPlayers);
+	engine::ValidateCollectionPairs(GameInterpolateCollections(interpolate), GamePostRenderCollections(postRender));
 }
 
 std::ostream& operator<<(std::ostream& rStream, const Frame& rCurrent)

@@ -15,9 +15,9 @@ constexpr int64_t kiMaxColorAttachments = 6;
 
 // Push-constant range size for a pipeline's layout: the per-pipeline override when set, else the default
 // 16-byte PushConstantsLayout. It must match the shader's declared push-constant block.
-static uint32_t ResolvePushConstantBytes(const Pipeline& rPipeline)
+static int64_t ResolvePushConstantBytes(const Pipeline& rPipeline)
 {
-	return rPipeline.mInfo.iPushConstantBytes > 0 ? static_cast<uint32_t>(rPipeline.mInfo.iPushConstantBytes) : static_cast<uint32_t>(sizeof(shaders::PushConstantsLayout));
+	return rPipeline.mInfo.iPushConstantBytes > 0 ? rPipeline.mInfo.iPushConstantBytes : static_cast<int64_t>(sizeof(shaders::PushConstantsLayout));
 }
 
 // Configures update-after-bind for storage buffer bindings in dynamic pipelines
@@ -75,7 +75,7 @@ static void CreateSingleSetPipelineLayout(VkDescriptorSetLayoutCreateInfo& rVkLa
 	VkPushConstantRange vkPushConstantRange {};
 	vkPushConstantRange.stageFlags = vkPushConstantStageFlags;
 	vkPushConstantRange.offset = 0;
-	vkPushConstantRange.size = ResolvePushConstantBytes(rPipeline);
+	vkPushConstantRange.size = static_cast<uint32_t>(ResolvePushConstantBytes(rPipeline));
 	rVkPipelineLayoutCreateInfo.pPushConstantRanges = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? &vkPushConstantRange : nullptr;
 	CHECK_VK(vkCreatePipelineLayout(gpDeviceManager->mVkDevice, &rVkPipelineLayoutCreateInfo, nullptr, &rPipeline.mVkPipelineLayout));
 	VkName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, rPipeline.mVkPipelineLayout, rPipeline.mInfo.name.data());
@@ -110,7 +110,7 @@ static void SetupIndirectBuffer(Pipeline& rPipeline, int64_t iCommandBufferCount
 	else if (rPipeline.mInfo.flags & PipelineFlags::kIndirectDeviceLocal)
 	{
 		rPipeline.miIndirectSlotCount = iCommandBufferCount;
-		Buffer::CreateBuffer(rPipeline.mInfo.name, iCommandBufferCount * sizeof(VkDrawIndexedIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, rPipeline.mIndirectVkBuffer, rPipeline.mIndirectVmaAllocation);
+		Buffer::CreateBuffer(rPipeline.mInfo.name, iCommandBufferCount * static_cast<int64_t>(sizeof(VkDrawIndexedIndirectCommand)), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, rPipeline.mIndirectVkBuffer, rPipeline.mIndirectVmaAllocation);
 	}
 }
 
@@ -136,13 +136,13 @@ static int64_t MergeReflectedBindings(const Shader& rVertexShader, const Shader&
 			ASSERT(rVkVertexBinding.descriptorType == rVkFragmentBinding.descriptorType);
 		}
 		pVkDescriptorSetLayoutBindings[iDescriptorCount].descriptorType = rVkVertexBinding.descriptorCount > 0 ? rVkVertexBinding.descriptorType : rVkFragmentBinding.descriptorType;
-		uint32_t uiDescriptorCount = std::max(rVkVertexBinding.descriptorCount, rVkFragmentBinding.descriptorCount);
+		int64_t iBindingDescriptorCount = std::max(rVkVertexBinding.descriptorCount, rVkFragmentBinding.descriptorCount);
 		// Runtime-sized arrays exported with UINT32_MAX sentinel; replace with actual texture array size
-		if (uiDescriptorCount == UINT32_MAX)
+		if (iBindingDescriptorCount == UINT32_MAX)
 		{
-			uiDescriptorCount = static_cast<uint32_t>(gpTextureManager->mTextureDescriptors.mImageInfos.size());
+			iBindingDescriptorCount = std::ssize(gpTextureManager->mTextureDescriptors.mImageInfos);
 		}
-		pVkDescriptorSetLayoutBindings[iDescriptorCount].descriptorCount = uiDescriptorCount;
+		pVkDescriptorSetLayoutBindings[iDescriptorCount].descriptorCount = static_cast<uint32_t>(iBindingDescriptorCount);
 		pVkDescriptorSetLayoutBindings[iDescriptorCount].stageFlags = rVkVertexBinding.stageFlags | rVkFragmentBinding.stageFlags;
 		pVkDescriptorSetLayoutBindings[iDescriptorCount].pImmutableSamplers = rVkVertexBinding.pImmutableSamplers != nullptr ? rVkVertexBinding.pImmutableSamplers : rVkFragmentBinding.pImmutableSamplers;
 		++iDescriptorCount;
@@ -158,14 +158,14 @@ static void SplitBindingsBySet(const Pipeline& rPipeline, std::span<const VkDesc
 	riSet2Count = 0;
 	for (int64_t i = 0; i < std::ssize(descriptorSetLayoutBindings); ++i)
 	{
-		uint32_t uiBinding = descriptorSetLayoutBindings[i].binding;
-		uint32_t uiSet = Pipeline::ResolveBindingSetIndex(rPipeline.mInfo, uiBinding);
+		int64_t iBinding = descriptorSetLayoutBindings[i].binding;
+		int64_t iSet = Pipeline::ResolveBindingSetIndex(rPipeline.mInfo, iBinding);
 
-		if (uiSet == 1)
+		if (iSet == 1)
 		{
 			pVkSet1Bindings[riSet1Count++] = descriptorSetLayoutBindings[i];
 		}
-		else if (uiSet == 2)
+		else if (iSet == 2)
 		{
 			pVkSet2Bindings[riSet2Count++] = descriptorSetLayoutBindings[i];
 		}
@@ -206,8 +206,8 @@ static void CreateMultiSetPipelineLayout(Pipeline& rPipeline, VkDescriptorSetLay
 		rPipeline.mExternalSet1VkDescriptorSetLayout != VK_NULL_HANDLE ? rPipeline.mExternalSet1VkDescriptorSetLayout : rPipeline.mVkDescriptorSetLayout,
 		rPipeline.mSet2VkDescriptorSetLayout,
 	};
-	uint32_t uiSetCount = (rPipeline.mInfo.flags & PipelineFlags::kMultiSet) ? 3 : 2;
-	rVkPipelineLayoutCreateInfo.setLayoutCount = uiSetCount;
+	int64_t iSetCount = (rPipeline.mInfo.flags & PipelineFlags::kMultiSet) ? 3 : 2;
+	rVkPipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(iSetCount);
 	rVkPipelineLayoutCreateInfo.pSetLayouts = pVkSetLayouts;
 	rVkPipelineLayoutCreateInfo.pushConstantRangeCount = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? 1 : 0;
 	rVkPipelineLayoutCreateInfo.pPushConstantRanges = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? &rVkPushConstantRange : nullptr;
@@ -223,7 +223,7 @@ static void CreateDescriptorSetLayouts(Pipeline& rPipeline, VkDescriptorSetLayou
 	VkPushConstantRange vkPushConstantRange {};
 	vkPushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 	vkPushConstantRange.offset = 0;
-	vkPushConstantRange.size = ResolvePushConstantBytes(rPipeline);
+	vkPushConstantRange.size = static_cast<uint32_t>(ResolvePushConstantBytes(rPipeline));
 
 	if (rPipeline.mExternalVkDescriptorSetLayout != VK_NULL_HANDLE)
 	{
@@ -470,7 +470,7 @@ static void ConfigureBlendState(GraphicsPipelineState& rState, const Pipeline& r
 		rState.vkPipelineColorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 	}
 
-	int32_t iColorAttachmentCount = rPipeline.mInfo.iColorAttachmentCount;
+	int64_t iColorAttachmentCount = rPipeline.mInfo.iColorAttachmentCount;
 	if (iColorAttachmentCount == 1 && rPipeline.mInfo.vkTargetRenderPass == gpTextureManager->mRenderTargetTextures.mLightingVkRenderPass)
 	{
 		iColorAttachmentCount = 3;
@@ -482,7 +482,7 @@ static void ConfigureBlendState(GraphicsPipelineState& rState, const Pipeline& r
 		{
 			rState.pVkMultipleRenderTargetBlendStates[i] = rState.vkPipelineColorBlendAttachmentState;
 		}
-		rState.vkPipelineColorBlendStateCreateInfo.attachmentCount = iColorAttachmentCount;
+		rState.vkPipelineColorBlendStateCreateInfo.attachmentCount = static_cast<uint32_t>(iColorAttachmentCount);
 		rState.vkPipelineColorBlendStateCreateInfo.pAttachments = rState.pVkMultipleRenderTargetBlendStates;
 	}
 	else
@@ -662,9 +662,9 @@ void PipelineCreator::CreateComputePipeline(Pipeline& rPipeline)
 	int64_t iSet1Count = 0;
 	for (int64_t i = 0; i < iDescriptorCount; ++i)
 	{
-		uint32_t uiBinding = pVkDescriptorSetLayoutBindings[i].binding;
-		uint32_t uiSet = Pipeline::ResolveBindingSetIndex(rPipeline.mInfo, uiBinding);
-		if (uiSet == 1)
+		int64_t iBinding = pVkDescriptorSetLayoutBindings[i].binding;
+		int64_t iSet = Pipeline::ResolveBindingSetIndex(rPipeline.mInfo, iBinding);
+		if (iSet == 1)
 		{
 			pVkSet1Bindings[iSet1Count++] = pVkDescriptorSetLayoutBindings[i];
 		}
@@ -688,7 +688,7 @@ void PipelineCreator::CreateComputePipeline(Pipeline& rPipeline)
 		VkPushConstantRange vkPushConstantRange {};
 		vkPushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 		vkPushConstantRange.offset = 0;
-		vkPushConstantRange.size = ResolvePushConstantBytes(rPipeline);
+		vkPushConstantRange.size = static_cast<uint32_t>(ResolvePushConstantBytes(rPipeline));
 		vkPipelineLayoutCreateInfo.setLayoutCount = 2;
 		vkPipelineLayoutCreateInfo.pSetLayouts = pVkSetLayouts;
 		vkPipelineLayoutCreateInfo.pushConstantRangeCount = rPipeline.mInfo.flags & PipelineFlags::kPushConstants ? 1 : 0;

@@ -63,7 +63,7 @@ inline float RandomUnitFloat(RandomEngine& rRandomEngine)
 	return static_cast<float>(RandomNext(rRandomEngine) >> 40) * kfDivisor;
 }
 
-uint32_t Random(uint32_t uiMax, RandomEngine& rRandomEngine);
+uint32_t Random(int64_t iMax, RandomEngine& rRandomEngine);
 
 template<float MAX = 1.0f>
 inline float Random(RandomEngine& rRandomEngine)

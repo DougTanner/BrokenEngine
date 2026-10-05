@@ -394,7 +394,7 @@ static void CommandReplayTransferFixture(const nlohmann::json& rParameters, nloh
 			.alignment = gpGame->mPlayerAlignment,
 			.fHealth = 1.0f,
 			.fShield = 1.0f,
-			.uiTypeIndex = PlayersInterpolate::suiBlasterTypeIndex,
+			.uiTypeIndex = static_cast<uint8_t>(PlayersInterpolate::siBlasterTypeIndex),
 			.fDeltaRotationMaximum = eType == StatusChangeType::kTransferMissile ? 2.0f : 0.0f,
 			.globalPlayerId = engine::GlobalId {.iValue = eType == StatusChangeType::kTransferPlayer ? gpGame->miNextGlobalId++ : 0},
 			.fleetWantedCoordinate = destination,

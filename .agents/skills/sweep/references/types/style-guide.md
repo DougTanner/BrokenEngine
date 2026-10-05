@@ -8,7 +8,7 @@ below are the only additions.
 
 Rule set: the `/code-style-review` mandate — the scanner's `style-rule-<n>`
 kinds plus the hand-read list and permitted forms in
-`.agents/skills/code-style-review/references/worker.md` steps 7 and 10 — and
+`.agents/skills/code-style-review/references/worker.md` steps 6 and 9 — and
 rule 64 as `.agents/skills/comment-review` applies it.
 
 Procedure:
@@ -46,7 +46,7 @@ User rulings (never report these as findings):
 ## Fix bound
 
 Wider than `/code-style-review`'s meaning-preserving bound (its worker steps
-11-12): a fix may change a type, container, signature, overload choice,
+10-11): a fix may change a type, container, signature, overload choice,
 error-handling path, or `kb*` toggle, provided observable behavior is
 unchanged. Accepted examples: removal of trivial accessors and forwarders
 (rule 49), pointer-and-count parameters replaced by `std::span`, and long-form
@@ -64,8 +64,8 @@ included, even where an example names a renamed or removed identifier.
 
 Regressions found in earlier sweeps:
 
-- An integer changed to `size_t` instead of `int64_t` with `std::ssize()` (a
-  `std::span` extent or other API consumer keeps `size_t`).
+- An integer changed to `size_t` instead of `int64_t` with `std::ssize()` (cast
+  only where the value is passed to an API that takes `size_t`).
 - A `d`-prefixed double.
 - A lowercase lambda or `std::function` variable (an immediately invoked
   initializer lambda's variable holds its result and is exempt).

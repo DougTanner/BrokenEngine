@@ -57,13 +57,13 @@ void BillboardsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		uint8_t uiTypeIndex = rCurrent.puiTypeIndices[i];
+		int64_t iTypeIndex = rCurrent.puiTypeIndices[i];
 		BillboardFlags_t flags = rCurrent.pFlags[i];
 		float fRotation = rCurrent.pfRotations[i];
 		float fExtra = rCurrent.pfExtra[i];
 		XMVECTOR vecLocalPosition = rCurrent.pVecPositions[i];
 
-		const BillboardsInterpolate::Type& rType = BillboardsInterpolate::sTypes.at(uiTypeIndex);
+		const BillboardsInterpolate::Type& rType = BillboardsInterpolate::sTypes.at(static_cast<size_t>(iTypeIndex));
 
 		// Convert into the camera cell's frame, then project to clip space — the view matrix is built in that frame.
 		XMVECTOR vecProjection = XMVector4Transform(Rebase(rBasis, vecLocalPosition), XMMatrixMultiply(engine::gpCamera->mMatView, engine::gpCamera->mMatPerspective));

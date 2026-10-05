@@ -80,11 +80,11 @@ void SaveGraphicsSettings()
 		.fSmokeSimulationArea = gSmokeSimulationArea.mfCurrent,
 		.fMinimumAmbient = gSunMoonMinimumAmbient.mfCurrent,
 		.fLightingUpdateCadence = gLightingUpdateCadence.mfCurrent,
-		.uiWaterLevel = gWaterLevel.Get<uint8_t>(),
-		.uiTerrainShadowsLevel = gTerrainShadowsLevel.Get<uint8_t>(),
-		.uiObjectShadowsLevel = gObjectShadowsLevel.Get<uint8_t>(),
-		.uiLightingLevel = gLightingLevel.Get<uint8_t>(),
-		.uiSmokeDetailLevel = gSmokeDetailLevel.Get<uint8_t>(),
+		.uiWaterLevel = static_cast<uint8_t>(gWaterLevel.Get<int64_t>()),
+		.uiTerrainShadowsLevel = static_cast<uint8_t>(gTerrainShadowsLevel.Get<int64_t>()),
+		.uiObjectShadowsLevel = static_cast<uint8_t>(gObjectShadowsLevel.Get<int64_t>()),
+		.uiLightingLevel = static_cast<uint8_t>(gLightingLevel.Get<int64_t>()),
+		.uiSmokeDetailLevel = static_cast<uint8_t>(gSmokeDetailLevel.Get<int64_t>()),
 	};
 
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kFullscreen, gFullscreen.Get<bool>());
@@ -98,9 +98,9 @@ void SaveGraphicsSettings()
 	WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, kpcGraphicsSettingsPath, graphicsSettings);
 }
 
-static bool IsValidGraphicsQualityLevel(uint8_t uiLevel)
+static bool IsValidGraphicsQualityLevel(int64_t iLevel)
 {
-	return uiLevel < static_cast<uint8_t>(GraphicsQualityLevel::kCount);
+	return iLevel < static_cast<int64_t>(GraphicsQualityLevel::kCount);
 }
 
 // Returns the first invalid field's name, or nullptr when every checked field is valid.
@@ -169,10 +169,10 @@ static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsS
 	return nullptr;
 }
 
-static void LoadGraphicsQualityLevel(Wrapper& rLevel, uint8_t uiLevel)
+static void LoadGraphicsQualityLevel(Wrapper& rLevel, int64_t iLevel)
 {
 	// Reset, not Set: loading is initialization, so no consumer should see this as a pending change.
-	rLevel.Reset<int64_t>(uiLevel);
+	rLevel.Reset<int64_t>(iLevel);
 }
 
 bool LoadGraphicsSettings()

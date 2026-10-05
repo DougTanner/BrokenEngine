@@ -44,22 +44,22 @@ struct BufferInfo
 	int64_t iCount = 0;
 	VkIndexType vkIndexType = VK_INDEX_TYPE_NONE_KHR;
 	int64_t iVertexStride = 0;
-	VkDeviceSize vkDataSize = 0;
-	VkDeviceSize vkElementSize = 0;
+	int64_t iDataSize = 0;
+	int64_t iElementSize = 0;
 };
 
 struct DeviceLocalBufferUpload
 {
 	const void* pData = nullptr;
-	VkDeviceSize vkDestinationOffset = 0;
-	VkDeviceSize vkSize = 0;
+	int64_t iDestinationOffset = 0;
+	int64_t iSize = 0;
 };
 
 class Buffer
 {
 public:
 
-	static void CreateBuffer(std::string_view name, VkDeviceSize vkDeviceSize, VkBufferUsageFlags vkBufferUsageFlags, VkMemoryPropertyFlags vkMemoryPropertyFlags, VkBuffer& rVkBuffer, VmaAllocation& rVmaAllocation, VmaAllocationInfo* pVmaAllocationInfo = nullptr);
+	static void CreateBuffer(std::string_view name, int64_t iDeviceSize, VkBufferUsageFlags vkBufferUsageFlags, VkMemoryPropertyFlags vkMemoryPropertyFlags, VkBuffer& rVkBuffer, VmaAllocation& rVmaAllocation, VmaAllocationInfo* pVmaAllocationInfo = nullptr);
 	static void UploadToDeviceLocal(VkBuffer vkDeviceLocalBuffer, std::span<const DeviceLocalBufferUpload> uploads);
 	static void RecordBarriers(VkCommandBuffer vkCommandBuffer, std::span<const BarrierInfo> barriers);
 
@@ -91,7 +91,7 @@ public:
 
 struct StagingBuffer
 {
-	StagingBuffer(std::string_view name, VkDeviceSize vkDeviceSize, VkBufferUsageFlags vkBufferUsageFlags);
+	StagingBuffer(std::string_view name, int64_t iDeviceSize, VkBufferUsageFlags vkBufferUsageFlags);
 	StagingBuffer(const StagingBuffer&) = delete;
 	StagingBuffer& operator=(const StagingBuffer&) = delete;
 	~StagingBuffer();

@@ -5,7 +5,7 @@
 // Returns {nullptr, 0} when the attribute is absent. Stride falls back to the accessor's component
 // count when the buffer view is tightly packed.
 template <typename T>
-static std::pair<const T*, int> FindAttribute(const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, const char* pcAttributeName)
+static std::pair<const T*, int64_t> FindAttribute(const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, const char* pcAttributeName)
 {
 	auto it = rPrimitive.attributes.find(pcAttributeName);
 	if (it == rPrimitive.attributes.end())
@@ -29,14 +29,14 @@ static std::pair<const T*, int> FindAttribute(const tinygltf::Primitive& rPrimit
 // row 3, which is correct for DirectXMath). Identity when the node carries neither.
 static XMMATRIX NodeLocalMatrix(const tinygltf::Node& rNode)
 {
-	bool bHasTRS = rNode.translation.size() == 3 || rNode.rotation.size() == 4 || rNode.scale.size() == 3;
-	bool bHasMatrix = rNode.matrix.size() == 16;
+	bool bHasTRS = std::ssize(rNode.translation) == 3 || std::ssize(rNode.rotation) == 4 || std::ssize(rNode.scale) == 3;
+	bool bHasMatrix = std::ssize(rNode.matrix) == 16;
 
 	if (bHasTRS)
 	{
-		XMVECTOR vecTranslation = rNode.translation.size() == 3 ? XMVectorSet(static_cast<float>(rNode.translation.at(0)), static_cast<float>(rNode.translation.at(1)), static_cast<float>(rNode.translation.at(2)), 0.0f) : XMVectorZero();
-		XMVECTOR vecRotation = rNode.rotation.size() == 4 ? XMVectorSet(static_cast<float>(rNode.rotation.at(0)), static_cast<float>(rNode.rotation.at(1)), static_cast<float>(rNode.rotation.at(2)), static_cast<float>(rNode.rotation.at(3))) : XMQuaternionIdentity();
-		XMVECTOR vecScale = rNode.scale.size() == 3 ? XMVectorSet(static_cast<float>(rNode.scale.at(0)), static_cast<float>(rNode.scale.at(1)), static_cast<float>(rNode.scale.at(2)), 1.0f) : XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f);
+		XMVECTOR vecTranslation = std::ssize(rNode.translation) == 3 ? XMVectorSet(static_cast<float>(rNode.translation.at(0)), static_cast<float>(rNode.translation.at(1)), static_cast<float>(rNode.translation.at(2)), 0.0f) : XMVectorZero();
+		XMVECTOR vecRotation = std::ssize(rNode.rotation) == 4 ? XMVectorSet(static_cast<float>(rNode.rotation.at(0)), static_cast<float>(rNode.rotation.at(1)), static_cast<float>(rNode.rotation.at(2)), static_cast<float>(rNode.rotation.at(3))) : XMQuaternionIdentity();
+		XMVECTOR vecScale = std::ssize(rNode.scale) == 3 ? XMVectorSet(static_cast<float>(rNode.scale.at(0)), static_cast<float>(rNode.scale.at(1)), static_cast<float>(rNode.scale.at(2)), 1.0f) : XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f);
 
 		return XMMatrixScalingFromVector(vecScale) * XMMatrixRotationQuaternion(vecRotation) * XMMatrixTranslationFromVector(vecTranslation);
 	}
@@ -53,13 +53,13 @@ static XMMATRIX NodeLocalMatrix(const tinygltf::Node& rNode)
 
 // Primitives sharing a glTF material need separate entries when their mesh nodes or skinning modes differ,
 // so each draw uses one mesh transform and one deformation path.
-static int ResolveEffectiveMaterial(LoadVerticesContext& rContext, int iOriginalMaterial, int iCurrentNodeIndex, bool bHasSkinning, const XMMATRIX& rMatMeshWorld)
+static int64_t ResolveEffectiveMaterial(LoadVerticesContext& rContext, int64_t iOriginalMaterial, int64_t iCurrentNodeIndex, bool bHasSkinning, const XMMATRIX& rMatMeshWorld)
 {
 	std::vector<Material>& rMaterials = rContext.rMaterials;
 	std::vector<MaterialNodeInfo>& rMaterialNodeInfos = rContext.rMaterialNodeInfos;
 	MaterialNodeMap& rMaterialNodeMap = rContext.rMaterialNodeMap;
 
-	std::tuple<int, int, bool> key = std::make_tuple(iOriginalMaterial, iCurrentNodeIndex, bHasSkinning);
+	std::tuple<int64_t, int64_t, bool> key = std::make_tuple(iOriginalMaterial, iCurrentNodeIndex, bHasSkinning);
 	auto it = rMaterialNodeMap.find(key);
 
 	if (it != rMaterialNodeMap.end())
@@ -67,14 +67,14 @@ static int ResolveEffectiveMaterial(LoadVerticesContext& rContext, int iOriginal
 		return it->second;
 	}
 
-	if (rMaterialNodeInfos.at(iOriginalMaterial).iNodeIndex < 0)
+	if (rMaterialNodeInfos.at(static_cast<size_t>(iOriginalMaterial)).iNodeIndex < 0)
 	{
 		// Original material not yet used - use it directly
 		rMaterialNodeMap.insert_or_assign(key, iOriginalMaterial);
-		rMaterialNodeInfos.at(iOriginalMaterial).bHasSkinning = bHasSkinning;
-		rMaterialNodeInfos.at(iOriginalMaterial).iNodeIndex = iCurrentNodeIndex;
-		rMaterialNodeInfos.at(iOriginalMaterial).matMeshWorld = rMatMeshWorld;
-		rMaterialNodeInfos.at(iOriginalMaterial).iOriginalMaterialIndex = iOriginalMaterial;
+		rMaterialNodeInfos.at(static_cast<size_t>(iOriginalMaterial)).bHasSkinning = bHasSkinning;
+		rMaterialNodeInfos.at(static_cast<size_t>(iOriginalMaterial)).iNodeIndex = iCurrentNodeIndex;
+		rMaterialNodeInfos.at(static_cast<size_t>(iOriginalMaterial)).matMeshWorld = rMatMeshWorld;
+		rMaterialNodeInfos.at(static_cast<size_t>(iOriginalMaterial)).iOriginalMaterialIndex = iOriginalMaterial;
 		return iOriginalMaterial;
 	}
 
@@ -92,7 +92,7 @@ static int ResolveEffectiveMaterial(LoadVerticesContext& rContext, int iOriginal
 	return iEffectiveMaterial;
 }
 
-static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vector<uint32_t>& rIndexRemap, const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, bool bHasSkeleton, const XMMATRIX& rMatMeshWorld, int64_t iPrimitive, int iSkinJointCount)
+static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vector<int64_t>& rIndexRemap, const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, bool bHasSkeleton, const XMMATRIX& rMatMeshWorld, int64_t iPrimitive, int64_t iSkinJointCount)
 {
 	// Position (required) - accessor also supplies the vertex count that drives the loop below
 	const tinygltf::Accessor& rPositionAccessor = rModel.accessors.at(rPrimitive.attributes.find("POSITION")->second);
@@ -179,9 +179,9 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 	// sequence), append the unique vertices to the shared scene-wide buffer at uiVertexStart, then
 	// translate each original-vertex slot to its final scene index for AppendIndices.
 	std::vector<uint32_t> remap(rPositionAccessor.count);
-	size_t uiUniqueCount = meshopt_generateVertexRemap(remap.data(), nullptr, rPositionAccessor.count, rawVertices.data(), rPositionAccessor.count, sizeof(common::ModelVertex));
+	int64_t iUniqueCount = static_cast<int64_t>(meshopt_generateVertexRemap(remap.data(), nullptr, rPositionAccessor.count, rawVertices.data(), rPositionAccessor.count, sizeof(common::ModelVertex)));
 
-	rVertices.resize(uiVertexStart + uiUniqueCount);
+	rVertices.resize(static_cast<size_t>(uiVertexStart + iUniqueCount));
 	meshopt_remapVertexBuffer(rVertices.data() + uiVertexStart, rawVertices.data(), rPositionAccessor.count, sizeof(common::ModelVertex), remap.data());
 
 	rIndexRemap.resize(rPositionAccessor.count);
@@ -190,10 +190,10 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 		rIndexRemap.at(j) = uiVertexStart + remap.at(j);
 	}
 
-	LOG(kDefault, kVerbose, "  Vertices: {} -> {} (deduplicated {})", rPositionAccessor.count, uiUniqueCount, rPositionAccessor.count - uiUniqueCount);
+	LOG(kDefault, kVerbose, "  Vertices: {} -> {} (deduplicated {})", rPositionAccessor.count, iUniqueCount, static_cast<int64_t>(rPositionAccessor.count) - iUniqueCount);
 }
 
-static void AppendIndices(std::vector<uint32_t>& rIndexBuffer, const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, const std::vector<uint32_t>& rIndexRemap)
+static void AppendIndices(std::vector<uint32_t>& rIndexBuffer, const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, const std::vector<int64_t>& rIndexRemap)
 {
 	if (rPrimitive.indices <= -1)
 	{
@@ -213,7 +213,7 @@ static void AppendIndices(std::vector<uint32_t>& rIndexBuffer, const tinygltf::P
 			const uint32_t* puiIndices = static_cast<const uint32_t*>(pIndices);
 			for (int64_t j = 0; j < static_cast<int64_t>(rIndicesAccessor.count); ++j)
 			{
-				rIndexBuffer.push_back(rIndexRemap.at(puiIndices[j]));
+				rIndexBuffer.push_back(static_cast<uint32_t>(rIndexRemap.at(puiIndices[j])));
 			}
 			break;
 		}
@@ -223,7 +223,7 @@ static void AppendIndices(std::vector<uint32_t>& rIndexBuffer, const tinygltf::P
 			const uint16_t* puiIndices = static_cast<const uint16_t*>(pIndices);
 			for (int64_t j = 0; j < static_cast<int64_t>(rIndicesAccessor.count); ++j)
 			{
-				rIndexBuffer.push_back(rIndexRemap.at(puiIndices[j]));
+				rIndexBuffer.push_back(static_cast<uint32_t>(rIndexRemap.at(puiIndices[j])));
 			}
 			break;
 		}
@@ -233,7 +233,7 @@ static void AppendIndices(std::vector<uint32_t>& rIndexBuffer, const tinygltf::P
 			const uint8_t* puiIndices = static_cast<const uint8_t*>(pIndices);
 			for (int64_t j = 0; j < static_cast<int64_t>(rIndicesAccessor.count); ++j)
 			{
-				rIndexBuffer.push_back(rIndexRemap.at(puiIndices[j]));
+				rIndexBuffer.push_back(static_cast<uint32_t>(rIndexRemap.at(puiIndices[j])));
 			}
 			break;
 		}
@@ -244,15 +244,15 @@ static void AppendIndices(std::vector<uint32_t>& rIndexBuffer, const tinygltf::P
 }
 
 
-XMMATRIX ComputeNodeWorldTransform(int iNodeIndex, const tinygltf::Model& rModel, const std::unordered_map<int, int>& rNodeParentMap)
+XMMATRIX ComputeNodeWorldTransform(int64_t iNodeIndex, const tinygltf::Model& rModel, const std::unordered_map<int64_t, int64_t>& rNodeParentMap)
 {
 	XMMATRIX matWorld = XMMatrixIdentity();
-	int iCurrent = iNodeIndex;
+	int64_t iCurrent = iNodeIndex;
 
 	std::vector<XMMATRIX> chain;
 	while (iCurrent >= 0)
 	{
-		const tinygltf::Node& rNode = rModel.nodes.at(iCurrent);
+		const tinygltf::Node& rNode = rModel.nodes.at(static_cast<size_t>(iCurrent));
 		XMMATRIX matLocal = NodeLocalMatrix(rNode);
 
 		chain.push_back(matLocal);
@@ -270,17 +270,17 @@ XMMATRIX ComputeNodeWorldTransform(int iNodeIndex, const tinygltf::Model& rModel
 	return matWorld;
 }
 
-void LoadVertices(const Parent* pParent, int iCurrentNodeIndex, const tinygltf::Node& rNode, const tinygltf::Model& rModel, LoadVerticesContext& rContext)
+void LoadVertices(const Parent* pParent, int64_t iCurrentNodeIndex, const tinygltf::Node& rNode, const tinygltf::Model& rModel, LoadVerticesContext& rContext)
 {
 	std::vector<common::ModelVertex>& rVertices = rContext.rVertices;
 	std::vector<Material>& rMaterials = rContext.rMaterials;
 
 	XMMATRIX matNode = NodeLocalMatrix(rNode);
 
-	for (int64_t i = 0; i < std::ssize(rNode.children); ++i)
+	for (int64_t iChild : rNode.children)
 	{
 		Parent parent { .pParent = pParent, .matNode = matNode, .iNodeIndex = iCurrentNodeIndex };
-		LoadVertices(&parent, rNode.children.at(i), rModel.nodes.at(rNode.children.at(i)), rModel, rContext);
+		LoadVertices(&parent, iChild, rModel.nodes.at(static_cast<size_t>(iChild)), rModel, rContext);
 	}
 
 	if (rNode.mesh < 0)
@@ -328,19 +328,19 @@ void LoadVertices(const Parent* pParent, int iCurrentNodeIndex, const tinygltf::
 		}
 
 		ASSERT(rPrimitive.material >= 0);
-		int iOriginalMaterial = rPrimitive.material;
+		int64_t iOriginalMaterial = rPrimitive.material;
 		// Joint indices only mean anything when the owning node actually references a skin; without one there is no
 		// joint/inverse-bind mapping to apply, so the primitive ships as a mesh-matrix draw and the shader ignores its joint attributes
 		bool bHasSkinning = rNode.skin >= 0 && rPrimitive.attributes.find("JOINTS_0") != rPrimitive.attributes.end();
 
-		int iEffectiveMaterial = ResolveEffectiveMaterial(rContext, iOriginalMaterial, iCurrentNodeIndex, bHasSkinning, matMeshWorld);
-		Material& rMaterial = rMaterials.at(iEffectiveMaterial);
+		int64_t iEffectiveMaterial = ResolveEffectiveMaterial(rContext, iOriginalMaterial, iCurrentNodeIndex, bHasSkinning, matMeshWorld);
+		Material& rMaterial = rMaterials.at(static_cast<size_t>(iEffectiveMaterial));
 
 		// CanonicalizeSceneSkin range-checked rNode.skin before export, and this full count is the per-material joint-matrix
 		// stride the runtime advances by
-		int iSkinJointCount = bHasSkinning ? static_cast<int>(rModel.skins[rNode.skin].joints.size()) : 0;
+		int64_t iSkinJointCount = bHasSkinning ? std::ssize(rModel.skins[rNode.skin].joints) : 0;
 
-		std::vector<uint32_t> indexRemap;
+		std::vector<int64_t> indexRemap;
 		BuildVertices(rVertices, indexRemap, rPrimitive, rModel, rContext.bHasSkeleton, matMeshWorld, i, iSkinJointCount);
 
 		AppendIndices(rMaterial.indexBuffer, rPrimitive, rModel, indexRemap);
@@ -350,7 +350,7 @@ void LoadVertices(const Parent* pParent, int iCurrentNodeIndex, const tinygltf::
 
 static bool UsesTexture(const tinygltf::ParameterMap& rParameters, std::string_view textureName, int64_t iIndex)
 {
-	tinygltf::ParameterMap::const_iterator it = rParameters.find(std::string{textureName});
+	auto it = rParameters.find(std::string{textureName});
 	return it != rParameters.end() && it->second.TextureIndex() == iIndex;
 }
 

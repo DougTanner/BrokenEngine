@@ -127,14 +127,14 @@ void ClientSessionRuntime::ResetForConnect()
 	mStateFlags.Set(ClientSessionStateFlags::kNoFreeSlotLogged, false);
 }
 
-void ClientSessionRuntime::Connect(std::string_view serverAddress, uint16_t uiPort, int64_t iCoordinateSlots)
+void ClientSessionRuntime::Connect(std::string_view serverAddress, int64_t iPort, int64_t iCoordinateSlots)
 {
 	// Heap: address copy, GUID file I/O, and Client/ENet construction
 	ScopedSuppressAllocationTracking suppress;
 	ResetForConnect();
 	std::string serverAddressString(serverAddress);
 	ClientGuid clientGuid = LoadClientGuidFromDisk();
-	mpClient = std::make_unique<Client>(serverAddressString.c_str(), uiPort, iCoordinateSlots, clientGuid, &PersistClientGuidToDisk);
+	mpClient = std::make_unique<Client>(serverAddressString.c_str(), iPort, iCoordinateSlots, clientGuid, &PersistClientGuidToDisk);
 	if (mpClient->mpHost == nullptr)
 	{
 		mrSession.OnConnectionFailed();
@@ -142,10 +142,10 @@ void ClientSessionRuntime::Connect(std::string_view serverAddress, uint16_t uiPo
 	}
 }
 
-void ClientSessionRuntime::ConnectToDiscoveredServer(uint16_t uiPort, int64_t iCoordinateSlots)
+void ClientSessionRuntime::ConnectToDiscoveredServer(int64_t iPort, int64_t iCoordinateSlots)
 {
 	mStateFlags.Set(ClientSessionStateFlags::kServerDiscovered, false);
-	Connect(mcDiscoveredAddress, uiPort, iCoordinateSlots);
+	Connect(mcDiscoveredAddress, iPort, iCoordinateSlots);
 }
 
 void ClientSessionRuntime::Disconnect()
@@ -262,9 +262,9 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 		}
 		return;
 	}
-	if (std::optional<uint8_t> uiLoadGeneration = mpClient->DrainLoadNotification(); uiLoadGeneration.has_value())
+	if (std::optional<int64_t> iLoadGeneration = mpClient->DrainLoadNotification(); iLoadGeneration.has_value())
 	{
-		mpClient->muiCommittedLoadGeneration = *uiLoadGeneration;
+		mpClient->miCommittedLoadGeneration = *iLoadGeneration;
 		ResetForServerLoad();
 		mrSession.OnServerLoad();
 	}

@@ -104,7 +104,7 @@ void PackChunkLoader::RequestChunkLoad(std::span<const common::crc_t> crcs, Load
 	}
 }
 
-void PackChunkLoader::RequestChunkRangeReload(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, LoadPriority ePriority)
+void PackChunkLoader::RequestChunkRangeReload(common::crc_t crc, int64_t iOffset, int64_t iLength, LoadPriority ePriority)
 {
 	bool bAdded = false;
 
@@ -116,18 +116,18 @@ void PackChunkLoader::RequestChunkRangeReload(common::crc_t crc, uint64_t uiOffs
 		{
 			// One LazyChunk owns one active range request. Consumers must reset its terminal state before selecting
 			// another range, which prevents a late consumer from observing or resetting a different reload.
-			ASSERT(rLazyChunk.uiRangeReloadOffset == uiOffset && rLazyChunk.uiRangeReloadLength == uiLength);
+			ASSERT(rLazyChunk.iRangeReloadOffset == iOffset && rLazyChunk.iRangeReloadLength == iLength);
 			return;
 		}
 
 		ASSERT(!common::IsCompressed(rLazyChunk.header.flags));
 		ASSERT(rLazyChunk.eState.value.load(std::memory_order_acquire) >= ChunkState::kReady);
-		rLazyChunk.uiRangeReloadOffset = uiOffset;
-		rLazyChunk.uiRangeReloadLength = uiLength;
+		rLazyChunk.iRangeReloadOffset = iOffset;
+		rLazyChunk.iRangeReloadLength = iLength;
 		{
 			// Heap: priority_queue insertion may allocate. The request must remain alive until a loading thread pops it.
 			ScopedSuppressAllocationTracking suppress;
-			mRequestQueue.push({.crc = crc, .ePriority = ePriority, .eKind = LoadRequestKind::kRangeReload, .uiOffset = uiOffset, .uiLength = uiLength});
+			mRequestQueue.push({.crc = crc, .ePriority = ePriority, .eKind = LoadRequestKind::kRangeReload, .iOffset = iOffset, .iLength = iLength});
 		}
 		// The loading thread cannot pop until mQueueMutex unlocks. This release-store publishes the range metadata
 		// together with the queued request, so an acquire state read observes the exact request it polls.
@@ -141,19 +141,19 @@ void PackChunkLoader::RequestChunkRangeReload(common::crc_t crc, uint64_t uiOffs
 	}
 }
 
-ChunkRangeReloadState PackChunkLoader::GetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength) const
+ChunkRangeReloadState PackChunkLoader::GetChunkRangeReloadState(common::crc_t crc, int64_t iOffset, int64_t iLength) const
 {
 	std::unique_lock lock(mQueueMutex);
 	const LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(crc);
 	ChunkRangeReloadState eState = rLazyChunk.eRangeReloadState.value.load(std::memory_order_acquire);
 	if (eState != ChunkRangeReloadState::kIdle)
 	{
-		ASSERT(rLazyChunk.uiRangeReloadOffset == uiOffset && rLazyChunk.uiRangeReloadLength == uiLength);
+		ASSERT(rLazyChunk.iRangeReloadOffset == iOffset && rLazyChunk.iRangeReloadLength == iLength);
 	}
 	return eState;
 }
 
-void PackChunkLoader::ResetChunkRangeReloadState(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength)
+void PackChunkLoader::ResetChunkRangeReloadState(common::crc_t crc, int64_t iOffset, int64_t iLength)
 {
 	std::unique_lock lock(mQueueMutex);
 	LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(crc);
@@ -167,14 +167,14 @@ void PackChunkLoader::ResetChunkRangeReloadState(common::crc_t crc, uint64_t uiO
 	{
 		return;
 	}
-	if (rLazyChunk.uiRangeReloadOffset != uiOffset || rLazyChunk.uiRangeReloadLength != uiLength)
+	if (rLazyChunk.iRangeReloadOffset != iOffset || rLazyChunk.iRangeReloadLength != iLength)
 	{
 		ASSERT(false); // A consumer may only reset its own completed request.
 		return;
 	}
 
-	rLazyChunk.uiRangeReloadOffset = 0;
-	rLazyChunk.uiRangeReloadLength = 0;
+	rLazyChunk.iRangeReloadOffset = 0;
+	rLazyChunk.iRangeReloadLength = 0;
 	rLazyChunk.eRangeReloadState.value.store(ChunkRangeReloadState::kIdle, std::memory_order_release);
 }
 
@@ -229,10 +229,10 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 
 	while (true)
 	{
-		uint64_t uiSavedWakeSequence = mWakeSequence.load(std::memory_order_acquire);
+		int64_t iSavedWakeSequence = static_cast<int64_t>(mWakeSequence.load(std::memory_order_acquire));
 		LoadRequest loadRequest {};
 #if defined(BT_CLIENT)
-		uint32_t uiAudioIndex = 0;
+		int64_t iAudioIndex = 0;
 		uint64_t uiAudioGeneration = 0;
 		bool bAudioRead = false;
 #endif // BT_CLIENT
@@ -271,7 +271,7 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 				}
 			}
 #if defined(BT_CLIENT)
-			else if (bAudioWork && mrPackChunks.TryClaimAudioRead(uiAudioIndex, uiAudioGeneration))
+			else if (bAudioWork && mrPackChunks.TryClaimAudioRead(iAudioIndex, uiAudioGeneration))
 			{
 				bAudioRead = true;
 				bHaveWork = true;
@@ -289,21 +289,21 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 
 		if (!bHaveWork)
 		{
-			mWakeSequence.wait(uiSavedWakeSequence, std::memory_order_acquire);
+			mWakeSequence.wait(static_cast<uint64_t>(iSavedWakeSequence), std::memory_order_acquire);
 			continue;
 		}
 
 #if defined(BT_CLIENT)
 		if (bAudioRead)
 		{
-			mrPackChunks.LoadAudioRead(uiAudioIndex, uiAudioGeneration, iThreadIndex);
+			mrPackChunks.LoadAudioRead(iAudioIndex, uiAudioGeneration, iThreadIndex);
 		}
 		else
 #endif // BT_CLIENT
 		if (loadRequest.eKind == LoadRequestKind::kRangeReload)
 		{
 			LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(loadRequest.crc);
-			bool bReloaded = mrPackChunks.RecommitAndReloadChunkRange(loadRequest.crc, loadRequest.uiOffset, loadRequest.uiLength);
+			bool bReloaded = mrPackChunks.RecommitAndReloadChunkRange(loadRequest.crc, loadRequest.iOffset, loadRequest.iLength);
 			rLazyChunk.eRangeReloadState.value.store(bReloaded ? ChunkRangeReloadState::kReady : ChunkRangeReloadState::kFailed, std::memory_order_release);
 		}
 		else
@@ -315,7 +315,7 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 		if (!bAudioRead)
 		{
 			const LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(loadRequest.crc);
-			AudioStreamingFixture::Record(iThreadIndex == 0 ? AudioStreamingFixturePartition::kLoader0 : AudioStreamingFixturePartition::kLoader1, AudioStreamingFixturePhase::kExistingComplete, std::numeric_limits<uint32_t>::max(), loadRequest.crc, loadRequest.uiOffset, loadRequest.eKind == LoadRequestKind::kWholeChunk ? static_cast<uint64_t>(rLazyChunk.iDataSize) : loadRequest.uiLength, AudioStreamingFixtureQueueState::kReady, 0, false);
+			AudioStreamingFixture::Record(iThreadIndex == 0 ? AudioStreamingFixturePartition::kLoader0 : AudioStreamingFixturePartition::kLoader1, AudioStreamingFixturePhase::kExistingComplete, std::numeric_limits<uint32_t>::max(), loadRequest.crc, loadRequest.iOffset, loadRequest.eKind == LoadRequestKind::kWholeChunk ? rLazyChunk.iDataSize : loadRequest.iLength, AudioStreamingFixtureQueueState::kReady, 0, false);
 		}
 #endif
 
@@ -384,14 +384,14 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 		// (non-FILE_FLAG_OVERLAPPED) handle still completes the read synchronously when given an OVERLAPPED; the
 		// explicit offset supersedes the shared file pointer, so concurrent positional reads don't interfere.
 		// iFilePosition stays sector-aligned (required by FILE_FLAG_NO_BUFFERING): it starts aligned and advances by
-		// uiBytesRead, which equals the sector-multiple uiReadSize on every read except the final (loop-exiting) one.
+		// uiBytesRead, which equals the sector-multiple iReadSize on every read except the final (loop-exiting) one.
 		int64_t iSourceOffset = (iDataCopied == 0) ? iPrefix : 0;
-		DWORD uiReadSize = static_cast<DWORD>(common::RoundUp(std::min(mrPackChunks.kiSubReadSize, iOnDiskSize - iDataCopied) + iSourceOffset, mrPackChunks.miSectorSize));
+		int64_t iReadSize = common::RoundUp(std::min(mrPackChunks.kiSubReadSize, iOnDiskSize - iDataCopied) + iSourceOffset, mrPackChunks.miSectorSize);
 		OVERLAPPED overlapped {};
 		overlapped.Offset = static_cast<DWORD>(iFilePosition & 0xFFFFFFFF);
 		overlapped.OffsetHigh = static_cast<DWORD>((iFilePosition >> 32) & 0xFFFFFFFF);
 		DWORD uiBytesRead = 0;
-		std::ignore = ReadFile(hFile, pReadBuffer, uiReadSize, &uiBytesRead, &overlapped);
+		std::ignore = ReadFile(hFile, pReadBuffer, static_cast<DWORD>(iReadSize), &uiBytesRead, &overlapped);
 
 		int64_t iCopySize = std::min(static_cast<int64_t>(uiBytesRead) - iSourceOffset, iOnDiskSize - iDataCopied);
 		// A truncated .pack returns a 0-byte read that never advances iDataCopied; halt rather than spin.
@@ -445,14 +445,14 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 			// decode requires the EXACT compressed length or it errors on the final-literals parse check. Pass
 			// header.iSize (the exact compressed payload byte count), not iOnDiskSize, which is rounded up to
 			// kiAlignmentBytes and so carries up to 15 trailing pad bytes.
-			int iLz4Result = LZ4_decompress_safe(reinterpret_cast<const char*>(pDecompressScratch), reinterpret_cast<char*>(rLazyChunk.pData), static_cast<int>(rLazyChunk.header.iSize), static_cast<int>(rLazyChunk.iDataSize));
+			int64_t iLz4Result = LZ4_decompress_safe(reinterpret_cast<const char*>(pDecompressScratch), reinterpret_cast<char*>(rLazyChunk.pData), static_cast<int>(rLazyChunk.header.iSize), static_cast<int>(rLazyChunk.iDataSize));
 			// A short or negative decode leaves the pool slot partly filled, and the upload would publish it.
-			ASSERT(static_cast<int64_t>(iLz4Result) == rLazyChunk.iDataSize);
+			ASSERT(iLz4Result == rLazyChunk.iDataSize);
 		}
 		else
 		{
 			uLongf uiUncompressedSize = static_cast<uLongf>(rLazyChunk.iDataSize);
-			int iZlibResult = uncompress(reinterpret_cast<Bytef*>(rLazyChunk.pData), &uiUncompressedSize, reinterpret_cast<const Bytef*>(pDecompressScratch), static_cast<uLong>(iOnDiskSize));
+			int64_t iZlibResult = uncompress(reinterpret_cast<Bytef*>(rLazyChunk.pData), &uiUncompressedSize, reinterpret_cast<const Bytef*>(pDecompressScratch), static_cast<uLong>(iOnDiskSize));
 			ASSERT(iZlibResult == Z_OK && static_cast<int64_t>(uiUncompressedSize) == rLazyChunk.iDataSize);
 		}
 	}

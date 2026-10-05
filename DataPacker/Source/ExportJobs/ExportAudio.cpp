@@ -15,36 +15,37 @@ void ExportAudio::Export()
 	uint32_t uiAudioBytes = 0;
 
 	CHECK_HRESULT(DirectX::LoadWAVAudioFromFile(mInputPath.c_str(), waveData, &pWaveformatex, &pAudioData, &uiAudioBytes));
+	int64_t iAudioBytes = uiAudioBytes;
 	ASSERT(pWaveformatex->nChannels == 1 || pWaveformatex->nChannels == 2);
 	// File data — DirectXTK doesn't validate nBlockAlign for PCM/float; zero or inconsistent breaks the trim math below
 	ASSERT(pWaveformatex->nBlockAlign != 0 && pWaveformatex->nBlockAlign == pWaveformatex->nChannels * pWaveformatex->wBitsPerSample / 8);
 
 	// Truncated source data: trim the partial frame so conversion below sees whole frames only
-	uint32_t uiTrimmedBytes = uiAudioBytes % pWaveformatex->nBlockAlign;
-	if (uiTrimmedBytes != 0)
+	int64_t iTrimmedBytes = iAudioBytes % pWaveformatex->nBlockAlign;
+	if (iTrimmedBytes != 0)
 	{
-		uiAudioBytes -= uiTrimmedBytes;
-		LOG(kDefault, kWarning, "{}: trimmed {} partial-frame bytes", mRelativeFile, uiTrimmedBytes);
+		iAudioBytes -= iTrimmedBytes;
+		LOG(kDefault, kWarning, "{}: trimmed {} partial-frame bytes", mRelativeFile, iTrimmedBytes);
 	}
 
 	// Decode to one interleaved float working buffer; all analysis/repair runs in float
 	std::vector<float> fSamples;
 	if (pWaveformatex->wFormatTag == WAVE_FORMAT_PCM && pWaveformatex->wBitsPerSample == 16)
 	{
-		size_t uiSampleCount = uiAudioBytes / sizeof(int16_t);
-		fSamples.resize(uiSampleCount);
+		int64_t iSampleCount = iAudioBytes / static_cast<int64_t>(sizeof(int16_t));
+		fSamples.resize(static_cast<size_t>(iSampleCount));
 		const int16_t* piSamples = reinterpret_cast<const int16_t*>(pAudioData);
-		for (size_t i = 0; i < uiSampleCount; ++i)
+		for (int64_t i = 0; i < iSampleCount; ++i)
 		{
 			// Divisor matches the output multiplier so a defect-free 16-bit file round-trips bit-exactly
-			fSamples[i] = static_cast<float>(piSamples[i]) / 32'767.0f;
+			fSamples[static_cast<size_t>(i)] = static_cast<float>(piSamples[i]) / 32'767.0f;
 		}
 	}
 	else if (pWaveformatex->wFormatTag == WAVE_FORMAT_IEEE_FLOAT && pWaveformatex->wBitsPerSample == 32)
 	{
-		size_t uiSampleCount = uiAudioBytes / sizeof(float);
-		fSamples.resize(uiSampleCount);
-		std::memcpy(fSamples.data(), pAudioData, uiAudioBytes);
+		int64_t iSampleCount = iAudioBytes / static_cast<int64_t>(sizeof(float));
+		fSamples.resize(static_cast<size_t>(iSampleCount));
+		std::memcpy(fSamples.data(), pAudioData, static_cast<size_t>(iAudioBytes));
 	}
 	else
 	{
@@ -74,14 +75,14 @@ void ExportAudio::Export()
 	// Convert once to int16; clamp here to the int16 range. lround (not truncation) is
 	// required for the bit-exact 16-bit round-trip; clamp floor -32768 so a full-scale negative
 	// source sample survives
-	std::vector<int16_t> pcmSamples(fSamples.size());
-	for (size_t i = 0; i < fSamples.size(); ++i)
+	std::vector<int16_t> pcmSamples(static_cast<size_t>(std::ssize(fSamples)));
+	for (int64_t i = 0; i < std::ssize(fSamples); ++i)
 	{
-		pcmSamples[i] = static_cast<int16_t>(std::clamp(std::lround(fSamples[i] * 32'767.0f), -32'768L, 32'767L));
+		pcmSamples[static_cast<size_t>(i)] = static_cast<int16_t>(std::clamp(std::lround(fSamples[static_cast<size_t>(i)] * 32'767.0f), -32'768L, 32'767L));
 	}
 
 	// Allocate header and data for chunk (only store audio data, not WAV headers)
-	int64_t iPcmDataSize = pcmSamples.size() * sizeof(int16_t);
+	int64_t iPcmDataSize = std::ssize(pcmSamples) * static_cast<int64_t>(sizeof(int16_t));
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(iPcmDataSize);
 
 	pHeader->audioHeader.waveFormat.wFormatTag = WAVE_FORMAT_PCM;
@@ -92,5 +93,5 @@ void ExportAudio::Export()
 	pHeader->audioHeader.waveFormat.wBitsPerSample = 16;
 	pHeader->audioHeader.waveFormat.cbSize = 0;
 
-	std::memcpy(dataSpan.data(), pcmSamples.data(), iPcmDataSize);
+	std::memcpy(dataSpan.data(), pcmSamples.data(), static_cast<size_t>(iPcmDataSize));
 }

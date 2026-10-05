@@ -121,7 +121,7 @@ void AnimationData::Load(std::span<const std::byte> animationData, common::crc_t
 	for (int64_t i = 0; i < mHeader.uiChannelCount; ++i)
 	{
 		const common::AnimationChannel& rChannel = mpChannels[i];
-		int64_t iKeyframeTotal = rChannel.uiInterpolation == common::AnimationChannel::kInterpolationCubicSpline ? mHeader.uiCubicKeyframeCount : mHeader.uiKeyframeCount;
+		int64_t iKeyframeTotal = rChannel.uiInterpolation == common::AnimationChannel::kiInterpolationCubicSpline ? mHeader.uiCubicKeyframeCount : mHeader.uiKeyframeCount;
 		if (rChannel.uiNodeIndex >= mHeader.skeleton.uiNodeCount || rChannel.uiKeyframeCount == 0
 		 || rChannel.uiKeyframeStart > iKeyframeTotal || rChannel.uiKeyframeCount > iKeyframeTotal - rChannel.uiKeyframeStart)
 		{
@@ -229,7 +229,7 @@ XMVECTOR AnimationData::InterpolateKeyframes(const common::AnimationChannel& rCh
 	int64_t iKeyframeCount = rChannel.uiKeyframeCount;
 
 	// CUBICSPLINE path: uses AnimationKeyframeCubic with tangent fields
-	if (rChannel.uiInterpolation == common::AnimationChannel::kInterpolationCubicSpline)
+	if (rChannel.uiInterpolation == common::AnimationChannel::kiInterpolationCubicSpline)
 	{
 		const common::AnimationKeyframeCubic* pKeyframes = &mpCubicKeyframes[rChannel.uiKeyframeStart];
 
@@ -264,7 +264,7 @@ XMVECTOR AnimationData::InterpolateKeyframes(const common::AnimationChannel& rCh
 
 		XMVECTOR vecResult = XMVectorAdd(XMVectorAdd(XMVectorScale(vecStartValue, fStartValueWeight), XMVectorScale(vecStartTangent, fStartTangentWeight)), XMVectorAdd(XMVectorScale(vecEndValue, fEndValueWeight), XMVectorScale(vecEndTangent, fEndTangentWeight)));
 
-		if (rChannel.uiTargetPath == common::AnimationChannel::kTargetPathRotation)
+		if (rChannel.uiTargetPath == common::AnimationChannel::kiTargetPathRotation)
 		{
 			vecResult = XMQuaternionNormalize(vecResult);
 		}
@@ -283,7 +283,7 @@ XMVECTOR AnimationData::InterpolateKeyframes(const common::AnimationChannel& rCh
 	const common::AnimationKeyframe& rKey0 = pKeyframes[iKeyframe0];
 	const common::AnimationKeyframe& rKey1 = pKeyframes[iKeyframe1];
 
-	if (rChannel.uiInterpolation == common::AnimationChannel::kInterpolationStep)
+	if (rChannel.uiInterpolation == common::AnimationChannel::kiInterpolationStep)
 	{
 		return XMLoadFloat4(&rKey0.f4Value);
 	}
@@ -298,7 +298,7 @@ XMVECTOR AnimationData::InterpolateKeyframes(const common::AnimationChannel& rCh
 	XMVECTOR vecStartValue = XMLoadFloat4(&rKey0.f4Value);
 	XMVECTOR vecEndValue = XMLoadFloat4(&rKey1.f4Value);
 
-	if (rChannel.uiTargetPath == common::AnimationChannel::kTargetPathRotation)
+	if (rChannel.uiTargetPath == common::AnimationChannel::kiTargetPathRotation)
 	{
 		return XMQuaternionSlerp(vecStartValue, vecEndValue, fInterpolationFraction);
 	}
@@ -323,10 +323,10 @@ void AnimationData::EvaluateWorldMatrices(int64_t iAnimationIndex, float fTime, 
 	XMVECTOR* pvecScales       = reinterpret_cast<XMVECTOR*>(pBuffer + 2 * iVectorSize);
 
 	// Initialize node transforms from bind pose (only for animated nodes)
-	const uint8_t* puiAnimatedNodes = mAnimatedNodes.data() + iAnimationIndex * mHeader.skeleton.uiNodeCount;
+	const int64_t* piAnimatedNodes = mAnimatedNodes.data() + iAnimationIndex * mHeader.skeleton.uiNodeCount;
 	for (int64_t i = 0; i < mHeader.skeleton.uiNodeCount; ++i)
 	{
-		if (puiAnimatedNodes[i])
+		if (piAnimatedNodes[i])
 		{
 			const common::ModelNode& rNode = mpNodes[i];
 			pvecTranslations[i] = XMLoadFloat4(&rNode.f4BindTranslation);
@@ -342,13 +342,13 @@ void AnimationData::EvaluateWorldMatrices(int64_t iAnimationIndex, float fTime, 
 
 		switch (rChannel.uiTargetPath)
 		{
-			case common::AnimationChannel::kTargetPathTranslation:
+			case common::AnimationChannel::kiTargetPathTranslation:
 				pvecTranslations[rChannel.uiNodeIndex] = vecValue;
 				break;
-			case common::AnimationChannel::kTargetPathRotation:
+			case common::AnimationChannel::kiTargetPathRotation:
 				pvecRotations[rChannel.uiNodeIndex] = vecValue;
 				break;
-			case common::AnimationChannel::kTargetPathScale:
+			case common::AnimationChannel::kiTargetPathScale:
 				pvecScales[rChannel.uiNodeIndex] = vecValue;
 				break;
 			default:
@@ -361,7 +361,7 @@ void AnimationData::EvaluateWorldMatrices(int64_t iAnimationIndex, float fTime, 
 	for (int64_t i = 0; i < mHeader.skeleton.uiNodeCount; ++i)
 	{
 		XMMATRIX matLocal {};
-		if (puiAnimatedNodes[i])
+		if (piAnimatedNodes[i])
 		{
 			const common::ModelNode& rNode = mpNodes[i];
 			XMMATRIX matBindMatrix = XMLoadFloat4x4(&rNode.f4x4BindMatrix);

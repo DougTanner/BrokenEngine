@@ -70,7 +70,7 @@ float TextureManager::DetailTextureAspectRatio()
 	return static_cast<float>(iWorldDetailX) / static_cast<float>(iWorldDetailY);
 }
 
-void TextureManager::CreatePlaceholderTexture(Texture& rTexture, std::string_view name, VkImageCreateFlags vkImageCreateFlags, VkFormat vkFormat, uint32_t uiArrayLayers, VkImageViewType vkImageViewType, const std::function<void(std::span<std::byte>, int64_t)>& rPixelWriter)
+void TextureManager::CreatePlaceholderTexture(Texture& rTexture, std::string_view name, VkImageCreateFlags vkImageCreateFlags, VkFormat vkFormat, int64_t iArrayLayers, VkImageViewType vkImageViewType, const std::function<void(std::span<std::byte>, int64_t)>& rPixelWriter)
 {
 	rTexture.Create(
 	{
@@ -79,8 +79,8 @@ void TextureManager::CreatePlaceholderTexture(Texture& rTexture, std::string_vie
 		.vkImageCreateFlags = vkImageCreateFlags,
 		.vkFormat = vkFormat,
 		.vkExtent3D = VkExtent3D {.width = 1, .height = 1, .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = uiArrayLayers,
+		.iMipLevels = 1,
+		.iArrayLayers = iArrayLayers,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		.vkImageViewType = vkImageViewType,
@@ -175,8 +175,8 @@ TextureManager::TextureManager()
 			.vkImageCreateFlags = bCubemap ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : static_cast<VkImageCreateFlags>(0),
 			.vkFormat = rLazyChunk.header.textureHeader.vkFormat,
 			.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureWidth), .height = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureHeight), .depth = 1},
-			.uiMipLevels = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iMipLevels),
-			.uiArrayLayers = bCubemap ? 6ui32 : 1ui32,
+			.iMipLevels = rLazyChunk.header.textureHeader.iMipLevels,
+			.iArrayLayers = bCubemap ? 6 : 1,
 			.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 			.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			.vkImageViewType = bCubemap ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D,
@@ -200,7 +200,7 @@ TextureManager::TextureManager()
 
 	// Pre-fill texture arrays with white placeholders for lazy index assignment
 	// Extra slots reserved for pre-blurred lighting texture copies
-	mTextureDescriptors.mImageInfos.resize(mTextureMap.size() + kiLightingBlurSlots, {.sampler = nullptr, .imageView = mWhiteTexture.mVkImageView, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
+	mTextureDescriptors.mImageInfos.resize(static_cast<size_t>(std::ssize(mTextureMap) + kiLightingBlurSlots), {.sampler = nullptr, .imageView = mWhiteTexture.mVkImageView, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
 
 	mTextureDescriptors.Create();
 
@@ -238,7 +238,7 @@ void TextureManager::InitializeBootTextures()
 	// Load pre-baked cubemaps from pack data
 	common::crc_t pIblCrcs[] = {kIrradianceCrc, kPrefilteredCrc, kPrefilteredWaterCrc};
 	WaitForTextures(pIblCrcs);
-	mTextureCache.miPhysicallyBasedRenderingCubeMipmapCount = mTextureMap.at(kPrefilteredCrc).mInfo.uiMipLevels;
+	mTextureCache.miPhysicallyBasedRenderingCubeMipmapCount = mTextureMap.at(kPrefilteredCrc).mInfo.iMipLevels;
 
 	gpProfileManager->BootStop(kModelTexturesGeneration);
 
@@ -302,15 +302,15 @@ void TextureManager::CreateAcquireCommandBuffers()
 	};
 	CHECK_VK(vkCreateCommandPool(gpDeviceManager->mVkDevice, &vkCommandPoolCreateInfo, nullptr, &mAcquireVkCommandPool));
 
-	uint32_t uiFramebufferCount = static_cast<uint32_t>(gpSwapchainManager->mFramebuffers.size());
-	mAcquireVkCommandBuffers.resize(uiFramebufferCount);
+	int64_t iFramebufferCount = std::ssize(gpSwapchainManager->mFramebuffers);
+	mAcquireVkCommandBuffers.resize(static_cast<size_t>(iFramebufferCount));
 	VkCommandBufferAllocateInfo vkCommandBufferAllocateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 		.pNext = nullptr,
 		.commandPool = mAcquireVkCommandPool,
 		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = uiFramebufferCount,
+		.commandBufferCount = static_cast<uint32_t>(iFramebufferCount),
 	};
 	CHECK_VK(vkAllocateCommandBuffers(gpDeviceManager->mVkDevice, &vkCommandBufferAllocateInfo, mAcquireVkCommandBuffers.data()));
 }
@@ -552,7 +552,7 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 			// Fallback: upload thread didn't GPU upload (same queue family)
 
 			TextureUploadManager::ValidateTextureDimensions(rLazyChunk);
-			int64_t iExpectedBytes = common::ComputeImageByteSize(rTexture.mInfo.vkFormat, rTexture.mInfo.vkExtent3D.width, rTexture.mInfo.vkExtent3D.height, rTexture.mInfo.uiMipLevels, rTexture.mInfo.uiArrayLayers, rTexture.mInfo.vkExtent3D.depth);
+			int64_t iExpectedBytes = common::ComputeImageByteSize(rTexture.mInfo.vkFormat, rTexture.mInfo.vkExtent3D.width, rTexture.mInfo.vkExtent3D.height, rTexture.mInfo.iMipLevels, rTexture.mInfo.iArrayLayers, rTexture.mInfo.vkExtent3D.depth);
 			ASSERT(iExpectedBytes > 0 && iExpectedBytes <= rLazyChunk.iDataSize);
 
 			rTexture.Create(rTexture.mInfo, [&](std::span<std::byte> data, int64_t iPosition)
@@ -731,8 +731,8 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBar
 	ScopedSuppressAllocationTracking suppress;
 
 	Texture& rSource = mTextureMap.at(crc);
-	uint32_t uiWidth = rSource.mInfo.vkExtent3D.width * 2;
-	uint32_t uiHeight = rSource.mInfo.vkExtent3D.height * 2;
+	int64_t iBlurWidth = static_cast<int64_t>(rSource.mInfo.vkExtent3D.width) * 2i64;
+	int64_t iBlurHeight = static_cast<int64_t>(rSource.mInfo.vkExtent3D.height) * 2i64;
 
 	// Texture::Create destroys the existing image before recreation.
 	auto itIntermediate = mBlurIntermediateTextures.try_emplace(crc).first;
@@ -742,9 +742,9 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBar
 		.name = "LightingBlurIntermediate",
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatCombine,
-		.vkExtent3D = VkExtent3D {.width = uiWidth, .height = uiHeight, .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iBlurWidth), .height = static_cast<uint32_t>(iBlurHeight), .depth = 1},
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -759,9 +759,9 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBar
 		.name = "LightingBlurResult",
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatCombine,
-		.vkExtent3D = VkExtent3D {.width = uiWidth, .height = uiHeight, .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iBlurWidth), .height = static_cast<uint32_t>(iBlurHeight), .depth = 1},
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -780,8 +780,8 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBar
 	PipelineDescriptorWriter::UpdateImageDescriptor(rVerticalBlur, 0, mpSamplersVkSampler[kSamplerSlotLinearClamp], rIntermediate.mVkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 	PipelineDescriptorWriter::UpdateImageDescriptor(rVerticalBlur, 1, VK_NULL_HANDLE, rResult.mVkImageView, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
-	int32_t iWidth = static_cast<int32_t>(uiWidth);
-	int32_t iHeight = static_cast<int32_t>(uiHeight);
+	int32_t iWidth = static_cast<int32_t>(iBlurWidth);
+	int32_t iHeight = static_cast<int32_t>(iBlurHeight);
 	float fSigma = gLightingBlurSigma.mfCurrent;
 	float fPackedW = static_cast<float>(static_cast<int32_t>(gLightingBlurSampleCount.mfCurrent)) + gLightingBlurEdgeFalloff.mfCurrent / 100.0f;
 
@@ -796,14 +796,14 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBar
 
 	// Horizontal pass: source → intermediate
 	rIntermediate.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
-	rHorizontalBlur.RecordCompute(0, vkCommandBuffer, TileCount(uiWidth), TileCount(uiHeight), 1, {std::bit_cast<float>(iWidth), std::bit_cast<float>(iHeight), fSigma, fPackedW});
+	rHorizontalBlur.RecordCompute(0, vkCommandBuffer, TileCount(iBlurWidth), TileCount(iBlurHeight), 1, {std::bit_cast<float>(iWidth), std::bit_cast<float>(iHeight), fSigma, fPackedW});
 
 	// Transition intermediate: storage write → shader read for V pass sampler
 	rIntermediate.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 
 	// Vertical pass: intermediate → result
 	rResult.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
-	rVerticalBlur.RecordCompute(0, vkCommandBuffer, TileCount(uiWidth), TileCount(uiHeight), 1, {std::bit_cast<float>(iWidth), std::bit_cast<float>(iHeight), fSigma, fPackedW});
+	rVerticalBlur.RecordCompute(0, vkCommandBuffer, TileCount(iBlurWidth), TileCount(iBlurHeight), 1, {std::bit_cast<float>(iWidth), std::bit_cast<float>(iHeight), fSigma, fPackedW});
 
 	// Transition result back to shader read for bindless sampling
 	rResult.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);

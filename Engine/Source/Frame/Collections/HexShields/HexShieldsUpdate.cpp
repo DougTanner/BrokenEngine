@@ -54,7 +54,7 @@ void HexShieldsPostRender::Update([[maybe_unused]] const game::Frame& __restrict
 {
 }
 
-void HexShieldsPostRender::Add(game::Frame& __restrict rFrame, hex_shields_t& rId, uint8_t uiTypeIndex)
+void HexShieldsPostRender::Add(game::Frame& __restrict rFrame, hex_shields_t& rId, int64_t iTypeIndex)
 {
 	ASSERT(!(rId.uuid.iValue != 0));
 
@@ -68,7 +68,7 @@ void HexShieldsPostRender::Add(game::Frame& __restrict rFrame, hex_shields_t& rI
 
 	ZeroMemberRow(iSpawnIndex, rInterpolate.Members());
 	rInterpolate.pVecPositions[iSpawnIndex] = XMVectorSetW(XMVectorZero(), 1.0f);
-	rInterpolate.puiTypeIndices[iSpawnIndex] = uiTypeIndex;
+	rInterpolate.puiTypeIndices[iSpawnIndex] = static_cast<uint8_t>(iTypeIndex);
 }
 
 void HexShieldsPostRender::Remove(game::Frame& __restrict rFrame, hex_shields_t& rId)

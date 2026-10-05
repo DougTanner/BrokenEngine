@@ -57,7 +57,7 @@ bool ExportScene::CheckDirty(const std::filesystem::path& rPackFile)
 
 constexpr const char* kpcContext = "ExportScene";
 
-static VkFilter ToVkFilter(int iFilterMode)
+static VkFilter ToVkFilter(int64_t iFilterMode)
 {
 	switch (iFilterMode)
 	{
@@ -81,7 +81,7 @@ static VkFilter ToVkFilter(int iFilterMode)
 	}
 }
 
-static VkSamplerAddressMode ToVkSamplerAddressMode(int iWrapMode)
+static VkSamplerAddressMode ToVkSamplerAddressMode(int64_t iWrapMode)
 {
 	switch (iWrapMode)
 	{
@@ -102,8 +102,8 @@ static VkSamplerAddressMode ToVkSamplerAddressMode(int iWrapMode)
 static std::vector<VkFormat> ComputeTextureFormats(const tinygltf::Model& rModel)
 {
 	std::vector<VkFormat> textureFormats;
-	textureFormats.reserve(rModel.textures.size());
-	for (size_t i = 0; i < rModel.textures.size(); ++i)
+	textureFormats.reserve(static_cast<size_t>(std::ssize(rModel.textures)));
+	for (int64_t i = 0; i < std::ssize(rModel.textures); ++i)
 	{
 		// Textures sharing a source image share one generated intermediate, so a normal use through any of them
 		// forces the two-channel format: the shader samples .rg and reconstructs Z from them. The single-channel
@@ -111,18 +111,18 @@ static std::vector<VkFormat> ComputeTextureFormats(const tinygltf::Model& rModel
 		bool bNormal = false;
 		bool bOcclusion = false;
 		bool bNonOcclusionUse = false;
-		for (size_t j = 0; j < rModel.textures.size(); ++j)
+		for (int64_t j = 0; j < std::ssize(rModel.textures); ++j)
 		{
-			if (rModel.textures.at(j).source != rModel.textures.at(i).source)
+			if (rModel.textures.at(static_cast<size_t>(j)).source != rModel.textures.at(static_cast<size_t>(i)).source)
 			{
 				continue;
 			}
 
 			for (const tinygltf::Material& rMaterial : rModel.materials)
 			{
-				bNormal |= IsNormal(static_cast<int64_t>(j), rMaterial);
-				bOcclusion |= IsOcclusion(static_cast<int64_t>(j), rMaterial);
-				bNonOcclusionUse |= IsNonOcclusionUse(static_cast<int64_t>(j), rMaterial);
+				bNormal |= IsNormal(j, rMaterial);
+				bOcclusion |= IsOcclusion(j, rMaterial);
+				bNonOcclusionUse |= IsNonOcclusionUse(j, rMaterial);
 			}
 		}
 
@@ -147,13 +147,13 @@ static std::vector<VkFormat> ComputeTextureFormats(const tinygltf::Model& rModel
 static void LogFilteredChannelDiagnostics(const tinygltf::Model& rGltfModel)
 {
 	LOG(kDefault, kWarning, "WARNING: All animation channels were filtered out!");
-	LOG(kDefault, kWarning, "  Node count: {}", rGltfModel.nodes.size());
+	LOG(kDefault, kWarning, "  Node count: {}", std::ssize(rGltfModel.nodes));
 	int64_t iCount = 0;
 	for (const tinygltf::Animation& rAnimation : rGltfModel.animations)
 	{
 		for (const tinygltf::AnimationChannel& rChannel : rAnimation.channels)
 		{
-			LOG(kDefault, kWarning, "    Animation channel targets node {} (\"{}\")", rChannel.target_node, rChannel.target_node >= 0 && static_cast<size_t>(rChannel.target_node) < rGltfModel.nodes.size() ? rGltfModel.nodes.at(rChannel.target_node).name : "invalid");
+			LOG(kDefault, kWarning, "    Animation channel targets node {} (\"{}\")", rChannel.target_node, rChannel.target_node >= 0 && rChannel.target_node < std::ssize(rGltfModel.nodes) ? rGltfModel.nodes.at(rChannel.target_node).name : "invalid");
 			if (++iCount >= 10)
 			{
 				break;
@@ -241,16 +241,16 @@ static bool IsSceneTextureIntermediate(std::string_view name, std::string_view i
 
 	std::string_view indexAndSuffix(name);
 	indexAndSuffix.remove_prefix(intermediatePrefix.size());
-	size_t uiSuffixStart = indexAndSuffix.find('.');
-	if (uiSuffixStart == std::string_view::npos)
+	int64_t iSuffixStart = static_cast<int64_t>(indexAndSuffix.find('.'));
+	if (iSuffixStart == -1)
 	{
 		return false;
 	}
-	if (uiSuffixStart == 0)
+	if (iSuffixStart == 0)
 	{
 		return false;
 	}
-	for (char cCharacter : indexAndSuffix.substr(0, uiSuffixStart))
+	for (char cCharacter : indexAndSuffix.substr(0, static_cast<size_t>(iSuffixStart)))
 	{
 		if (cCharacter < '0' || cCharacter > '9')
 		{
@@ -258,7 +258,7 @@ static bool IsSceneTextureIntermediate(std::string_view name, std::string_view i
 		}
 	}
 
-	std::string_view suffix = indexAndSuffix.substr(uiSuffixStart);
+	std::string_view suffix = indexAndSuffix.substr(static_cast<size_t>(iSuffixStart));
 	return suffix == TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK) || suffix == TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK) || suffix == TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK);
 }
 
@@ -365,11 +365,11 @@ std::filesystem::path ExportScene::GetTextureIntermediatePath(int64_t iTextureIn
 	return path;
 }
 
-std::filesystem::path ExportScene::GetTextureIntermediateStagePath(size_t uiStageIndex) const
+std::filesystem::path ExportScene::GetTextureIntermediateStagePath(int64_t iStageIndex) const
 {
 	std::filesystem::path path = mInputPath.parent_path();
 	// Keep outer stages out of tag-first texture routing until they are published under the final name.
-	path /= L".TextureStage." + std::to_wstring(::GetCurrentProcessId()) + L"." + std::to_wstring(miId) + L"." + std::to_wstring(uiStageIndex) + L".tmp";
+	path /= L".TextureStage." + std::to_wstring(::GetCurrentProcessId()) + L"." + std::to_wstring(miId) + L"." + std::to_wstring(iStageIndex) + L".tmp";
 	return path;
 }
 
@@ -417,9 +417,9 @@ void ExportScene::PreExport(const tinygltf::Model& rGltfModel)
 
 	ProcessTextures(rGltfModel);
 
-	LOG(kDefault, kDebug, "Loading {} materials", rGltfModel.materials.size());
-	std::vector<Material> materials(rGltfModel.materials.size());
-	std::vector<MaterialNodeInfo> materialNodeInfos(rGltfModel.materials.size());
+	LOG(kDefault, kDebug, "Loading {} materials", std::ssize(rGltfModel.materials));
+	std::vector<Material> materials(static_cast<size_t>(std::ssize(rGltfModel.materials)));
+	std::vector<MaterialNodeInfo> materialNodeInfos(static_cast<size_t>(std::ssize(rGltfModel.materials)));
 	bool bHasSkeleton = SetupSkeletonAndMaterials(rGltfModel);
 
 	// A skin alone makes bHasSkeleton true, but MainExport emits the skeleton only inside WriteAnimationSection,
@@ -433,12 +433,12 @@ void ExportScene::PreExport(const tinygltf::Model& rGltfModel)
 	std::vector<common::ModelVertex> vertices;
 	LoadVerticesAndOptimizeMeshes(rGltfModel, bHasSkeleton, materials, materialNodeInfos, vertices);
 
-	std::vector<common::MaterialInfo> materialInfos(materials.size());
+	std::vector<common::MaterialInfo> materialInfos(static_cast<size_t>(std::ssize(materials)));
 	BuildMaterialInfos(rGltfModel, bHasSkeleton, materials, materialNodeInfos, materialInfos);
 
 	WriteModelFile(materials, materialInfos, vertices);
 
-	LOG(kDefault, kDebug, "Samplers: {}", rGltfModel.samplers.size());
+	LOG(kDefault, kDebug, "Samplers: {}", std::ssize(rGltfModel.samplers));
 	for (const tinygltf::Sampler& rSampler : rGltfModel.samplers)
 	{
 		LOG(kDefault, kVerbose, "  {} {} {} {}", ToVkFilter(rSampler.minFilter), ToVkFilter(rSampler.magFilter), ToVkSamplerAddressMode(rSampler.wrapS), ToVkSamplerAddressMode(rSampler.wrapT));
@@ -448,8 +448,8 @@ void ExportScene::PreExport(const tinygltf::Model& rGltfModel)
 
 void ExportScene::ProcessTextures(const tinygltf::Model& rGltfModel)
 {
-	ASSERT(rGltfModel.textures.size() <= common::SceneHeader::kiMaxTextures);
-	LOG(kDefault, kDebug, "Pre-processing {} textures", rGltfModel.textures.size());
+	ASSERT(std::ssize(rGltfModel.textures) <= common::SceneHeader::kiMaxTextures);
+	LOG(kDefault, kDebug, "Pre-processing {} textures", std::ssize(rGltfModel.textures));
 
 	std::vector<VkFormat> textureFormats = ComputeTextureFormats(rGltfModel);
 	struct TextureAttempt
@@ -461,22 +461,22 @@ void ExportScene::ProcessTextures(const tinygltf::Model& rGltfModel)
 	};
 
 	std::vector<TextureAttempt> textureAttempts;
-	textureAttempts.reserve(rGltfModel.textures.size());
-	mTextureAttemptFiles.reserve(mTextureAttemptFiles.size() + rGltfModel.textures.size());
-	for (size_t i = 0; i < rGltfModel.textures.size(); ++i)
+	textureAttempts.reserve(static_cast<size_t>(std::ssize(rGltfModel.textures)));
+	mTextureAttemptFiles.reserve(static_cast<size_t>(std::ssize(mTextureAttemptFiles) + std::ssize(rGltfModel.textures)));
+	for (int64_t i = 0; i < std::ssize(rGltfModel.textures); ++i)
 	{
-		int64_t iSource = rGltfModel.textures.at(i).source;
-		VkFormat vkFormat = textureFormats.at(i);
-		size_t iAttempt = 0;
-		for (; iAttempt < textureAttempts.size(); ++iAttempt)
+		int64_t iSource = rGltfModel.textures.at(static_cast<size_t>(i)).source;
+		VkFormat vkFormat = textureFormats.at(static_cast<size_t>(i));
+		int64_t iAttempt = 0;
+		for (; iAttempt < std::ssize(textureAttempts); ++iAttempt)
 		{
-			const TextureAttempt& rAttempt = textureAttempts.at(iAttempt);
+			const TextureAttempt& rAttempt = textureAttempts.at(static_cast<size_t>(iAttempt));
 			if (rAttempt.iSource == iSource && rAttempt.vkFormat == vkFormat)
 			{
 				break;
 			}
 		}
-		if (iAttempt == textureAttempts.size())
+		if (iAttempt == std::ssize(textureAttempts))
 		{
 			textureAttempts.push_back(
 			{
@@ -511,7 +511,7 @@ void ExportScene::ProcessTextures(const tinygltf::Model& rGltfModel)
 	// Publish every completed outer stage only after all unique workers succeeded. Record each final as soon as it
 	// is published, so a mid-loop failure's CleanupOnFailure removes the replaced prefix instead of leaving a mixed
 	// generation for the texture pass to pack.
-	mPublishedTextureFiles.reserve(textureAttempts.size());
+	mPublishedTextureFiles.reserve(static_cast<size_t>(std::ssize(textureAttempts)));
 	try
 	{
 		for (const TextureAttempt& rAttempt : textureAttempts)
@@ -530,10 +530,10 @@ void ExportScene::ProcessTextures(const tinygltf::Model& rGltfModel)
 	// Log each source slot, including slots sharing one unique worker, and retain the existing
 	// per-slot format/CRC ordering used by MainExport.
 	int64_t iTextureIndex = 0;
-	for (size_t i = 0; i < rGltfModel.textures.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(rGltfModel.textures); ++i)
 	{
-		const tinygltf::Image& rImage = rGltfModel.images.at(rGltfModel.textures.at(i).source);
-		std::filesystem::path finalPath = GetTextureIntermediatePath(rGltfModel.textures.at(i).source, textureFormats.at(i));
+		const tinygltf::Image& rImage = rGltfModel.images.at(rGltfModel.textures.at(static_cast<size_t>(i)).source);
+		std::filesystem::path finalPath = GetTextureIntermediatePath(rGltfModel.textures.at(static_cast<size_t>(i)).source, textureFormats.at(static_cast<size_t>(i)));
 		LOG(kDefault, kVerbose, "  {}: Texture {} -> {}", iTextureIndex++, rImage.uri, finalPath.filename().native());
 	}
 
@@ -583,7 +583,7 @@ bool ExportScene::SetupSkeletonAndMaterials(const tinygltf::Model& rGltfModel)
 		SkeletonData skeletonData = LoadSkeletonData(rGltfModel);
 		if (DetermineAnimationPath(rGltfModel))
 		{
-			LOG(kDefault, kDebug, "  Skeletal animation detected: {} skin joints, {} total nodes", rGltfModel.skins.at(0).joints.size(), rGltfModel.nodes.size());
+			LOG(kDefault, kDebug, "  Skeletal animation detected: {} skin joints, {} total nodes", std::ssize(rGltfModel.skins.at(0).joints), std::ssize(rGltfModel.nodes));
 		}
 		else
 		{
@@ -598,16 +598,16 @@ void ExportScene::LoadVerticesAndOptimizeMeshes(const tinygltf::Model& rGltfMode
 	const tinygltf::Scene& rScene = rGltfModel.scenes.at(rGltfModel.defaultScene > -1 ? rGltfModel.defaultScene : 0);
 	MaterialNodeMap materialNodeMap;
 	LoadVerticesContext loadContext {.rVertices = rVertices, .rMaterials = rMaterials, .rMaterialNodeInfos = rMaterialNodeInfos, .rMaterialNodeMap = materialNodeMap, .bHasSkeleton = bHasSkeleton};
-	for (size_t i = 0; i < rScene.nodes.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(rScene.nodes); ++i)
 	{
-		int iNodeIndex = rScene.nodes.at(i);
-		const tinygltf::Node& rNode = rGltfModel.nodes.at(iNodeIndex);
+		int64_t iNodeIndex = rScene.nodes.at(static_cast<size_t>(i));
+		const tinygltf::Node& rNode = rGltfModel.nodes.at(static_cast<size_t>(iNodeIndex));
 		Parent parent {.pParent = nullptr, .matNode = XMMatrixIdentity(), .iNodeIndex = -1};
 		LoadVertices(&parent, iNodeIndex, rNode, rGltfModel, loadContext);
 	}
-	if (rMaterials.size() > rGltfModel.materials.size())
+	if (std::ssize(rMaterials) > std::ssize(rGltfModel.materials))
 	{
-		LOG(kDefault, kDebug, "  Split {} materials into {} to handle primitives from different mesh nodes or deformation modes", rGltfModel.materials.size(), rMaterials.size());
+		LOG(kDefault, kDebug, "  Split {} materials into {} to handle primitives from different mesh nodes or deformation modes", std::ssize(rGltfModel.materials), std::ssize(rMaterials));
 	}
 
 	for (int64_t i = 0; i < std::ssize(rMaterials); ++i)
@@ -617,16 +617,16 @@ void ExportScene::LoadVerticesAndOptimizeMeshes(const tinygltf::Model& rGltfMode
 		{
 			continue;
 		}
-		meshopt_optimizeVertexCache(rIndexBuffer.data(), rIndexBuffer.data(), rIndexBuffer.size(), rVertices.size());
-		meshopt_optimizeOverdraw(rIndexBuffer.data(), rIndexBuffer.data(), rIndexBuffer.size(), &rVertices.at(0).f3Pos.x, rVertices.size(), sizeof(common::ModelVertex), 1.05f);
-		LOG(kDefault, kVerbose, "  Material {}: optimized {} triangles", i, rIndexBuffer.size() / 3);
+		meshopt_optimizeVertexCache(rIndexBuffer.data(), rIndexBuffer.data(), static_cast<size_t>(std::ssize(rIndexBuffer)), static_cast<size_t>(std::ssize(rVertices)));
+		meshopt_optimizeOverdraw(rIndexBuffer.data(), rIndexBuffer.data(), static_cast<size_t>(std::ssize(rIndexBuffer)), &rVertices.at(0).f3Pos.x, static_cast<size_t>(std::ssize(rVertices)), sizeof(common::ModelVertex), 1.05f);
+		LOG(kDefault, kVerbose, "  Material {}: optimized {} triangles", i, std::ssize(rIndexBuffer) / 3);
 	}
 }
 
 void ExportScene::BuildMaterialInfos(const tinygltf::Model& rGltfModel, bool bHasSkeleton, const std::vector<Material>& rMaterials, const std::vector<MaterialNodeInfo>& rMaterialNodeInfos, std::vector<common::MaterialInfo>& rMaterialInfos)
 {
 	// Build parent map for node hierarchy traversal (used for both skeletal and node-based)
-	std::unordered_map<int, int> nodeParentMap = BuildNodeParentMap(rGltfModel);
+	std::unordered_map<int64_t, int64_t> nodeParentMap = BuildNodeParentMap(rGltfModel);
 
 	for (int64_t i = 0; i < std::ssize(rMaterialNodeInfos); ++i)
 	{
@@ -654,11 +654,11 @@ void ExportScene::BuildMaterialInfos(const tinygltf::Model& rGltfModel, bool bHa
 			XMStoreFloat4x4(&rMaterialInfos.at(i).f4x4RelativeTransform, XMMatrixIdentity());
 			LOG(kDefault, kVerbose, "  Material {}: skinned, mesh node {}", i, rMaterialInfos.at(i).iParentNodeIndex);
 		}
-		else if (rInfo.iNodeIndex >= 0 && bHasSkeleton && rInfo.iNodeIndex < static_cast<int>(rGltfModel.nodes.size()))
+		else if (rInfo.iNodeIndex >= 0 && bHasSkeleton && rInfo.iNodeIndex < std::ssize(rGltfModel.nodes))
 		{
 			// Every node is its own joint (the skeleton used an identity node->joint mapping), so the
 			// nearest skeleton ancestor of a non-skinned material is its own mesh node.
-			int iAncestorNodeIndex = rInfo.iNodeIndex;
+			int64_t iAncestorNodeIndex = rInfo.iNodeIndex;
 			XMMATRIX matAncestorWorld = ComputeNodeWorldTransform(iAncestorNodeIndex, rGltfModel, nodeParentMap);
 
 			rMaterialInfos.at(i).iParentNodeIndex = static_cast<int16_t>(iAncestorNodeIndex);
@@ -671,9 +671,9 @@ void ExportScene::BuildMaterialInfos(const tinygltf::Model& rGltfModel, bool bHa
 
 	for (int64_t i = 0; i < std::ssize(rMaterials); ++i)
 	{
-		int iOriginalMaterialIndex = rMaterialNodeInfos.at(i).iOriginalMaterialIndex >= 0 ? rMaterialNodeInfos.at(i).iOriginalMaterialIndex : static_cast<int>(i);
-		const tinygltf::Material& rTinygltfMaterial = rGltfModel.materials.at(iOriginalMaterialIndex);
-		LOG(kDefault, kVerbose, "  {}: \"{}\"{}; {} {} {} {} {} textures, {} indices{}", i, rTinygltfMaterial.name, (iOriginalMaterialIndex != i ? std::format(" (split from {})", iOriginalMaterialIndex) : ""), rTinygltfMaterial.pbrMetallicRoughness.baseColorTexture.index, rTinygltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index, rTinygltfMaterial.normalTexture.index, rTinygltfMaterial.occlusionTexture.index, rTinygltfMaterial.emissiveTexture.index, rMaterials.at(i).indexBuffer.size(), (rMaterialInfos.at(i).flags & common::MaterialFlags::kSkinned) ? " (skinned)" : "");
+		int64_t iOriginalMaterialIndex = rMaterialNodeInfos.at(i).iOriginalMaterialIndex >= 0 ? rMaterialNodeInfos.at(i).iOriginalMaterialIndex : i;
+		const tinygltf::Material& rTinygltfMaterial = rGltfModel.materials.at(static_cast<size_t>(iOriginalMaterialIndex));
+		LOG(kDefault, kVerbose, "  {}: \"{}\"{}; {} {} {} {} {} textures, {} indices{}", i, rTinygltfMaterial.name, (iOriginalMaterialIndex != i ? std::format(" (split from {})", iOriginalMaterialIndex) : ""), rTinygltfMaterial.pbrMetallicRoughness.baseColorTexture.index, rTinygltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index, rTinygltfMaterial.normalTexture.index, rTinygltfMaterial.occlusionTexture.index, rTinygltfMaterial.emissiveTexture.index, std::ssize(rMaterials.at(i).indexBuffer), (rMaterialInfos.at(i).flags & common::MaterialFlags::kSkinned) ? " (skinned)" : "");
 	}
 }
 
@@ -682,7 +682,7 @@ void ExportScene::WriteModelFile(const std::vector<Material>& rMaterials, const 
 	std::filesystem::path path(mInputPath);
 	path += ".MODEL";
 
-	LOG(kDefault, kDebug, "Total vertices: {}", rVertices.size());
+	LOG(kDefault, kDebug, "Total vertices: {}", std::ssize(rVertices));
 
 	std::unordered_map<float, int64_t> jointsMap;
 	XMFLOAT3 f3Min = rVertices.at(0).f3Pos;
@@ -707,25 +707,25 @@ void ExportScene::WriteModelFile(const std::vector<Material>& rMaterials, const 
 	}
 
 	std::vector<uint32_t> indices32;
-	std::vector<uint32_t> materialIndexPositions(rMaterials.size());
+	std::vector<uint32_t> materialIndexPositions(static_cast<size_t>(std::ssize(rMaterials)));
 	for (int64_t i = 0; i < std::ssize(rMaterials); ++i)
 	{
-		materialIndexPositions.at(i) = static_cast<uint32_t>(indices32.size());
+		materialIndexPositions.at(i) = static_cast<uint32_t>(std::ssize(indices32));
 		indices32.insert(indices32.end(), rMaterials.at(i).indexBuffer.begin(), rMaterials.at(i).indexBuffer.end());
 	}
 
-	std::vector<common::ModelVertex> optimizedVertices(rVertices.size());
-	meshopt_optimizeVertexFetch(optimizedVertices.data(), indices32.data(), indices32.size(), rVertices.data(), rVertices.size(), sizeof(common::ModelVertex));
+	std::vector<common::ModelVertex> optimizedVertices(static_cast<size_t>(std::ssize(rVertices)));
+	meshopt_optimizeVertexFetch(optimizedVertices.data(), indices32.data(), static_cast<size_t>(std::ssize(indices32)), rVertices.data(), static_cast<size_t>(std::ssize(rVertices)), sizeof(common::ModelVertex));
 	rVertices = std::move(optimizedVertices);
-	LOG(kDefault, kDebug, "Mesh optimized: {} vertices, {} indices ({} materials)", rVertices.size(), indices32.size(), rMaterials.size());
+	LOG(kDefault, kDebug, "Mesh optimized: {} vertices, {} indices ({} materials)", std::ssize(rVertices), std::ssize(indices32), std::ssize(rMaterials));
 
 	std::vector<uint16_t> indices16;
-	if (common::ModelHeader::UsesU16Indices(static_cast<int64_t>(rVertices.size())))
+	if (common::ModelHeader::UsesU16Indices(std::ssize(rVertices)))
 	{
-		indices16.reserve(indices32.size());
-		for (uint32_t uiIndex : indices32)
+		indices16.reserve(static_cast<size_t>(std::ssize(indices32)));
+		for (int64_t iIndex : indices32)
 		{
-			indices16.push_back(static_cast<uint16_t>(uiIndex));
+			indices16.push_back(static_cast<uint16_t>(iIndex));
 		}
 	}
 
@@ -739,7 +739,7 @@ void ExportScene::WriteModelFile(const std::vector<Material>& rMaterials, const 
 	fileStreamOut.write(reinterpret_cast<const char*>(rMaterialInfos.data()), common::VectorByteSize(rMaterialInfos));
 	fileStreamOut.write(reinterpret_cast<const char*>(&uiIndexCount), sizeof(uiIndexCount));
 	fileStreamOut.write(reinterpret_cast<const char*>(&uiVertexCount), sizeof(uiVertexCount));
-	if (indices16.size() > 0)
+	if (std::ssize(indices16) > 0)
 	{
 		fileStreamOut.write(reinterpret_cast<const char*>(indices16.data()), common::VectorByteSize(indices16));
 	}
@@ -760,33 +760,31 @@ void ExportScene::MainExport(const tinygltf::Model& rGltfModel)
 	std::filesystem::path modelPath(mInputPath);
 	modelPath += ".MODEL";
 	size_t uiMaterialCount = 0;
-	uintmax_t uiModelFileSize = SourceFileSize(modelPath, kpcContext);
+	int64_t iModelFileSize = SourceFileSize(modelPath, kpcContext);
 	std::fstream materialCountFileStream(modelPath, std::ios::in | std::ios::binary);
 	if (!materialCountFileStream)
 	{
 		throw std::runtime_error("ExportScene failed to open model file");
 	}
-	RequireSourceExtent(uiModelFileSize, 0, sizeof(uiMaterialCount), kpcContext);
+	RequireSourceExtent(static_cast<uintmax_t>(iModelFileSize), 0, sizeof(uiMaterialCount), kpcContext);
 	ReadSourceBytes(materialCountFileStream, std::span<char>(reinterpret_cast<char*>(&uiMaterialCount), sizeof(uiMaterialCount)), kpcContext);
 	materialCountFileStream.close();
 	if (uiMaterialCount > static_cast<size_t>(common::SceneHeader::kiMaxMaterials))
 	{
 		throw std::runtime_error("ExportScene model material count is invalid");
 	}
-	uintmax_t uiMaterialIndexBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(uint32_t), kpcContext);
-	uintmax_t uiMaterialInfoBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(common::MaterialInfo), kpcContext);
-	uintmax_t uiMaterialBytes = AddSourceBytes(uiMaterialIndexBytes, uiMaterialInfoBytes, kpcContext);
-	RequireSourceExtent(uiModelFileSize, sizeof(uiMaterialCount), uiMaterialBytes, kpcContext);
+	int64_t iMaterialIndexBytes = static_cast<int64_t>(MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(uint32_t), kpcContext));
+	int64_t iMaterialInfoBytes = static_cast<int64_t>(MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(common::MaterialInfo), kpcContext));
+	int64_t iMaterialBytes = static_cast<int64_t>(AddSourceBytes(static_cast<uintmax_t>(iMaterialIndexBytes), static_cast<uintmax_t>(iMaterialInfoBytes), kpcContext));
+	RequireSourceExtent(static_cast<uintmax_t>(iModelFileSize), sizeof(uiMaterialCount), static_cast<uintmax_t>(iMaterialBytes), kpcContext);
 
-	int64_t iTextureCount = static_cast<int64_t>(rGltfModel.textures.size());
+	int64_t iTextureCount = std::ssize(rGltfModel.textures);
 	int64_t iMaterialCount = static_cast<int64_t>(uiMaterialCount);
 	int64_t iSceneArraysSize = common::SceneHeader::MaterialDataOffset(iTextureCount, iMaterialCount);
-	uintmax_t uiMaterialShaderDataBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(common::MaterialShaderData), kpcContext);
-	int64_t iDataSize = iSceneArraysSize + static_cast<int64_t>(uiMaterialShaderDataBytes);
-	uintmax_t uiMaximumDataSize = static_cast<uintmax_t>(std::numeric_limits<int64_t>::max())
-		- static_cast<uintmax_t>(common::kiChunkDataOffset)
-		- static_cast<uintmax_t>(common::kiAlignmentBytes - 1);
-	if (static_cast<uintmax_t>(iDataSize) > uiMaximumDataSize)
+	int64_t iMaterialShaderDataBytes = static_cast<int64_t>(MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(common::MaterialShaderData), kpcContext));
+	int64_t iDataSize = iSceneArraysSize + iMaterialShaderDataBytes;
+	int64_t iMaximumDataSize = std::numeric_limits<int64_t>::max() - common::kiChunkDataOffset - (common::kiAlignmentBytes - 1);
+	if (iDataSize < 0 || iDataSize > iMaximumDataSize)
 	{
 		throw std::runtime_error("ExportScene chunk data size overflow");
 	}
@@ -795,21 +793,21 @@ void ExportScene::MainExport(const tinygltf::Model& rGltfModel)
 	uint32_t* puiIndexStarts = reinterpret_cast<uint32_t*>(dataSpan.data() + common::SceneHeader::IndexStartsOffset(iTextureCount));
 	common::MaterialShaderData* pMaterialShaderDatas = reinterpret_cast<common::MaterialShaderData*>(dataSpan.data() + iSceneArraysSize);
 
-	LOG(kDefault, kDebug, "Textures: {}", rGltfModel.textures.size());
+	LOG(kDefault, kDebug, "Textures: {}", std::ssize(rGltfModel.textures));
 	std::vector<VkFormat> textureFormats = ComputeTextureFormats(rGltfModel);
 	pHeader->sceneHeader.uiTextureCount = 0;
-	for (size_t i = 0; i < rGltfModel.textures.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(rGltfModel.textures); ++i)
 	{
-		const tinygltf::Texture& rTexture = rGltfModel.textures.at(i);
+		const tinygltf::Texture& rTexture = rGltfModel.textures.at(static_cast<size_t>(i));
 		std::filesystem::path relativeFile = mRelativeDirectory;
 		relativeFile /= mInputPath.filename();
 		relativeFile += ".Texture";
 		relativeFile += std::to_string(rTexture.source);
-		relativeFile += TextureIntermediateSuffix(textureFormats.at(i));
+		relativeFile += TextureIntermediateSuffix(textureFormats.at(static_cast<size_t>(i)));
 		pTextureCrcs[pHeader->sceneHeader.uiTextureCount++] = common::Crc(relativeFile.string());
 	}
 
-	LOG(kDefault, kDebug, "Materials: {} (original), {} (after splitting)", rGltfModel.materials.size(), uiMaterialCount);
+	LOG(kDefault, kDebug, "Materials: {} (original), {} (after splitting)", std::ssize(rGltfModel.materials), uiMaterialCount);
 
 	pHeader->sceneHeader.modelCrc = common::Crc(mRelativeFile + ".MODEL");
 
@@ -820,7 +818,7 @@ void ExportScene::MainExport(const tinygltf::Model& rGltfModel)
 
 	FillMaterialShaderDatas(rGltfModel, materialInfos, std::span<common::MaterialShaderData>(pMaterialShaderDatas, uiMaterialCount));
 
-	if (rGltfModel.animations.size() > 0)
+	if (std::ssize(rGltfModel.animations) > 0)
 	{
 		WriteAnimationSection(rGltfModel, materialInfos, pHeader);
 	}
@@ -828,40 +826,40 @@ void ExportScene::MainExport(const tinygltf::Model& rGltfModel)
 
 void ExportScene::ReadMaterialInfosFromModel(const std::filesystem::path& rModelPath, std::span<uint32_t> indexStarts, std::vector<common::MaterialInfo>& rMaterialInfos)
 {
-	size_t uiMaterialCount = indexStarts.size();
-	uintmax_t uiFileSize = SourceFileSize(rModelPath, kpcContext);
+	int64_t iMaterialCount = std::ssize(indexStarts);
+	int64_t iFileSize = SourceFileSize(rModelPath, kpcContext);
 	std::fstream fileStream(rModelPath, std::ios::in | std::ios::binary);
 	if (!fileStream)
 	{
 		throw std::runtime_error("ExportScene failed to open model file");
 	}
-	RequireSourceExtent(uiFileSize, 0, sizeof(uiMaterialCount), kpcContext);
+	RequireSourceExtent(static_cast<uintmax_t>(iFileSize), 0, sizeof(size_t), kpcContext);
 	size_t uiMaterialCountVerify = 0;
 	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(&uiMaterialCountVerify), sizeof(uiMaterialCountVerify)), kpcContext);
-	if (uiMaterialCountVerify != uiMaterialCount)
+	if (uiMaterialCountVerify != static_cast<size_t>(iMaterialCount))
 	{
 		throw std::runtime_error("ExportScene model material count changed while reading");
 	}
-	uintmax_t uiMaterialIndexBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(uint32_t), kpcContext);
-	uintmax_t uiMaterialInfoBytes = MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(common::MaterialInfo), kpcContext);
-	uintmax_t uiFileOffset = sizeof(uiMaterialCount);
-	RequireSourceExtent(uiFileSize, uiFileOffset, uiMaterialIndexBytes, kpcContext);
-	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(indexStarts.data()), static_cast<size_t>(uiMaterialIndexBytes)), kpcContext);
-	uiFileOffset = AddSourceBytes(uiFileOffset, uiMaterialIndexBytes, kpcContext);
+	int64_t iMaterialIndexBytes = static_cast<int64_t>(MultiplySourceBytes(static_cast<uintmax_t>(iMaterialCount), sizeof(uint32_t), kpcContext));
+	int64_t iMaterialInfoBytes = static_cast<int64_t>(MultiplySourceBytes(static_cast<uintmax_t>(iMaterialCount), sizeof(common::MaterialInfo), kpcContext));
+	int64_t iFileOffset = sizeof(size_t);
+	RequireSourceExtent(static_cast<uintmax_t>(iFileSize), static_cast<uintmax_t>(iFileOffset), static_cast<uintmax_t>(iMaterialIndexBytes), kpcContext);
+	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(indexStarts.data()), static_cast<size_t>(iMaterialIndexBytes)), kpcContext);
+	iFileOffset = static_cast<int64_t>(AddSourceBytes(static_cast<uintmax_t>(iFileOffset), static_cast<uintmax_t>(iMaterialIndexBytes), kpcContext));
 
-	RequireSourceExtent(uiFileSize, uiFileOffset, uiMaterialInfoBytes, kpcContext);
-	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(rMaterialInfos.data()), static_cast<size_t>(uiMaterialInfoBytes)), kpcContext);
+	RequireSourceExtent(static_cast<uintmax_t>(iFileSize), static_cast<uintmax_t>(iFileOffset), static_cast<uintmax_t>(iMaterialInfoBytes), kpcContext);
+	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(rMaterialInfos.data()), static_cast<size_t>(iMaterialInfoBytes)), kpcContext);
 
 	fileStream.close();
 }
 
 void ExportScene::FillMaterialShaderDatas(const tinygltf::Model& rGltfModel, const std::vector<common::MaterialInfo>& rMaterialInfos, std::span<common::MaterialShaderData> materialShaderDatas)
 {
-	for (size_t i = 0; i < rMaterialInfos.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(rMaterialInfos); ++i)
 	{
-		int iOriginalMaterialIndex = rMaterialInfos.at(i).iOriginalMaterialIndex >= 0 ? rMaterialInfos.at(i).iOriginalMaterialIndex : static_cast<int>(i);
-		const tinygltf::Material& rMaterial = rGltfModel.materials.at(iOriginalMaterialIndex);
-		LOG(kDefault, kVerbose, "  {}: {}{}", i, rMaterial.name, (iOriginalMaterialIndex != static_cast<int>(i) ? std::format(" (split from {})", iOriginalMaterialIndex) : ""));
+		int64_t iOriginalMaterialIndex = rMaterialInfos.at(static_cast<size_t>(i)).iOriginalMaterialIndex >= 0 ? rMaterialInfos.at(static_cast<size_t>(i)).iOriginalMaterialIndex : i;
+		const tinygltf::Material& rMaterial = rGltfModel.materials.at(static_cast<size_t>(iOriginalMaterialIndex));
+		LOG(kDefault, kVerbose, "  {}: {}{}", i, rMaterial.name, (iOriginalMaterialIndex != i ? std::format(" (split from {})", iOriginalMaterialIndex) : ""));
 		if (rMaterial.doubleSided == true)
 		{
 			LOG(kDefault, kWarning, "  Warning! Material is double sided");
@@ -936,21 +934,21 @@ void ExportScene::FillMaterialShaderDatas(const tinygltf::Model& rGltfModel, con
 		}
 		materialShaderData.fAlphaMaskCutoff = static_cast<float>(rMaterial.alphaCutoff);
 
-		materialShaderDatas[i] = materialShaderData;
+		materialShaderDatas[static_cast<size_t>(i)] = materialShaderData;
 	}
 }
 
 void ExportScene::WriteAnimationSection(const tinygltf::Model& rGltfModel, const std::vector<common::MaterialInfo>& rMaterialInfos, common::ChunkHeader* pHeader)
 {
-	LOG(kDefault, kDebug, "Animation export: {} skins, {} animations", rGltfModel.skins.size(), rGltfModel.animations.size());
-	if (rGltfModel.skins.size() > 0)
+	LOG(kDefault, kDebug, "Animation export: {} skins, {} animations", std::ssize(rGltfModel.skins), std::ssize(rGltfModel.animations));
+	if (std::ssize(rGltfModel.skins) > 0)
 	{
-		LOG(kDefault, kDebug, "  Skin 0 has {} joints", rGltfModel.skins.at(0).joints.size());
+		LOG(kDefault, kDebug, "  Skin 0 has {} joints", std::ssize(rGltfModel.skins.at(0).joints));
 	}
 	int64_t iTotalChannels = 0;
 	for (const tinygltf::Animation& rAnimation : rGltfModel.animations)
 	{
-		iTotalChannels += static_cast<int64_t>(rAnimation.channels.size());
+		iTotalChannels += std::ssize(rAnimation.channels);
 	}
 	LOG(kDefault, kDebug, "  Total animation channels in glTF: {}", iTotalChannels);
 
@@ -968,7 +966,7 @@ void ExportScene::WriteAnimationSection(const tinygltf::Model& rGltfModel, const
 	std::vector<common::AnimationKeyframeCubic> cubicKeyframes;
 	AnimationOutput animationOutput {.rAnimations = animations, .rChannels = channels, .rKeyframes = keyframes, .rCubicKeyframes = cubicKeyframes};
 	LoadAnimations(rGltfModel, animationOutput);
-	LOG(kDefault, kDebug, "  {} animations, {} channels, {} keyframes, {} cubic keyframes", animations.size(), channels.size(), keyframes.size(), cubicKeyframes.size());
+	LOG(kDefault, kDebug, "  {} animations, {} channels, {} keyframes, {} cubic keyframes", std::ssize(animations), std::ssize(channels), std::ssize(keyframes), std::ssize(cubicKeyframes));
 
 	// Every animation channel was filtered out: export as a static scene rather than an empty clip section
 	if (animations.empty())
@@ -987,13 +985,13 @@ void ExportScene::WriteAnimationSection(const tinygltf::Model& rGltfModel, const
 	}
 
 	common::AnimationHeader animationHeader {};
-	animationHeader.uiAnimationCount = static_cast<uint32_t>(animations.size());
-	animationHeader.uiChannelCount = static_cast<uint32_t>(channels.size());
-	animationHeader.uiKeyframeCount = static_cast<uint32_t>(keyframes.size());
-	animationHeader.uiCubicKeyframeCount = static_cast<uint32_t>(cubicKeyframes.size());
-	animationHeader.uiMaterialCount = static_cast<uint32_t>(rMaterialInfos.size());
+	animationHeader.uiAnimationCount = static_cast<uint32_t>(std::ssize(animations));
+	animationHeader.uiChannelCount = static_cast<uint32_t>(std::ssize(channels));
+	animationHeader.uiKeyframeCount = static_cast<uint32_t>(std::ssize(keyframes));
+	animationHeader.uiCubicKeyframeCount = static_cast<uint32_t>(std::ssize(cubicKeyframes));
+	animationHeader.uiMaterialCount = static_cast<uint32_t>(std::ssize(rMaterialInfos));
 	animationHeader.skeleton = skeletonData.skeleton;
-	ASSERT(animations.size() <= common::AnimationHeader::kiMaxAnimations);
+	ASSERT(std::ssize(animations) <= common::AnimationHeader::kiMaxAnimations);
 
 	for (int64_t i = 0; i < std::ssize(rMaterialInfos); ++i)
 	{
@@ -1003,21 +1001,21 @@ void ExportScene::WriteAnimationSection(const tinygltf::Model& rGltfModel, const
 		}
 	}
 
-	int64_t iSkinJointToNodeSize = common::RoundUp<int64_t, common::kiAnimationSectionAlignment>(static_cast<int64_t>(skeletonData.skinJointToNode.size()) * static_cast<int64_t>(sizeof(uint16_t)));
+	int64_t iSkinJointToNodeSize = common::RoundUp<int64_t, common::kiAnimationSectionAlignment>(std::ssize(skeletonData.skinJointToNode) * static_cast<int64_t>(sizeof(uint16_t)));
 	int64_t iAnimationDataSize = sizeof(common::AnimationHeader)
-		+ skeletonData.nodes.size() * sizeof(common::ModelNode)
+		+ std::ssize(skeletonData.nodes) * sizeof(common::ModelNode)
 		+ iSkinJointToNodeSize
-		+ skeletonData.inverseBindMatrices.size() * sizeof(XMFLOAT4X4)
-		+ animations.size() * sizeof(common::AnimationClip)
-		+ rMaterialInfos.size() * sizeof(common::MaterialInfo)
-		+ channels.size() * sizeof(common::AnimationChannel)
-		+ keyframes.size() * sizeof(common::AnimationKeyframe)
-		+ cubicKeyframes.size() * sizeof(common::AnimationKeyframeCubic);
+		+ std::ssize(skeletonData.inverseBindMatrices) * sizeof(XMFLOAT4X4)
+		+ std::ssize(animations) * sizeof(common::AnimationClip)
+		+ std::ssize(rMaterialInfos) * sizeof(common::MaterialInfo)
+		+ std::ssize(channels) * sizeof(common::AnimationChannel)
+		+ std::ssize(keyframes) * sizeof(common::AnimationKeyframe)
+		+ std::ssize(cubicKeyframes) * sizeof(common::AnimationKeyframeCubic);
 
-	int64_t iCurrentSize = static_cast<int64_t>(mHeaderAndData.size());
+	int64_t iCurrentSize = std::ssize(mHeaderAndData);
 	// Mirrors the reader's math (LoadAnimationDataFromEagerChunks, AnimationData.cpp): the MaterialShaderData block is 16-byte rounded by AllocateHeaderAndData
-	int64_t iExpectedOffset = common::kiChunkDataOffset + common::SceneHeader::AnimationSectionOffset(static_cast<int64_t>(rGltfModel.textures.size()), static_cast<int64_t>(rMaterialInfos.size()));
-	LOG(kDefault, kVerbose, "  Animation data: writing at offset {} (buffer size {}), expected runtime offset {} (diff {})", iCurrentSize, mHeaderAndData.size(), iExpectedOffset, iCurrentSize - iExpectedOffset);
+	int64_t iExpectedOffset = common::kiChunkDataOffset + common::SceneHeader::AnimationSectionOffset(std::ssize(rGltfModel.textures), std::ssize(rMaterialInfos));
+	LOG(kDefault, kVerbose, "  Animation data: writing at offset {} (buffer size {}), expected runtime offset {} (diff {})", iCurrentSize, std::ssize(mHeaderAndData), iExpectedOffset, iCurrentSize - iExpectedOffset);
 	ASSERT(iCurrentSize == iExpectedOffset);
 	mHeaderAndData.resize(iCurrentSize + iAnimationDataSize);
 	std::byte* pAnimationData = mHeaderAndData.data() + iCurrentSize;
@@ -1025,34 +1023,34 @@ void ExportScene::WriteAnimationSection(const tinygltf::Model& rGltfModel, const
 	std::memcpy(pAnimationData, &animationHeader, sizeof(animationHeader));
 	pAnimationData += sizeof(animationHeader);
 
-	std::memcpy(pAnimationData, skeletonData.nodes.data(), skeletonData.nodes.size() * sizeof(common::ModelNode));
-	pAnimationData += skeletonData.nodes.size() * sizeof(common::ModelNode);
+	std::memcpy(pAnimationData, skeletonData.nodes.data(), static_cast<size_t>(std::ssize(skeletonData.nodes)) * sizeof(common::ModelNode));
+	pAnimationData += std::ssize(skeletonData.nodes) * sizeof(common::ModelNode);
 
 	if (!skeletonData.skinJointToNode.empty())
 	{
-		std::memcpy(pAnimationData, skeletonData.skinJointToNode.data(), skeletonData.skinJointToNode.size() * sizeof(uint16_t));
+		std::memcpy(pAnimationData, skeletonData.skinJointToNode.data(), static_cast<size_t>(std::ssize(skeletonData.skinJointToNode)) * sizeof(uint16_t));
 	}
 	pAnimationData += iSkinJointToNodeSize;
 
 	if (!skeletonData.inverseBindMatrices.empty())
 	{
-		std::memcpy(pAnimationData, skeletonData.inverseBindMatrices.data(), skeletonData.inverseBindMatrices.size() * sizeof(XMFLOAT4X4));
+		std::memcpy(pAnimationData, skeletonData.inverseBindMatrices.data(), static_cast<size_t>(std::ssize(skeletonData.inverseBindMatrices)) * sizeof(XMFLOAT4X4));
 	}
-	pAnimationData += skeletonData.inverseBindMatrices.size() * sizeof(XMFLOAT4X4);
+	pAnimationData += std::ssize(skeletonData.inverseBindMatrices) * sizeof(XMFLOAT4X4);
 
-	std::memcpy(pAnimationData, animations.data(), animations.size() * sizeof(common::AnimationClip));
-	pAnimationData += animations.size() * sizeof(common::AnimationClip);
+	std::memcpy(pAnimationData, animations.data(), static_cast<size_t>(std::ssize(animations)) * sizeof(common::AnimationClip));
+	pAnimationData += std::ssize(animations) * sizeof(common::AnimationClip);
 
-	std::memcpy(pAnimationData, rMaterialInfos.data(), rMaterialInfos.size() * sizeof(common::MaterialInfo));
-	pAnimationData += rMaterialInfos.size() * sizeof(common::MaterialInfo);
+	std::memcpy(pAnimationData, rMaterialInfos.data(), static_cast<size_t>(std::ssize(rMaterialInfos)) * sizeof(common::MaterialInfo));
+	pAnimationData += std::ssize(rMaterialInfos) * sizeof(common::MaterialInfo);
 
-	std::memcpy(pAnimationData, channels.data(), channels.size() * sizeof(common::AnimationChannel));
-	pAnimationData += channels.size() * sizeof(common::AnimationChannel);
+	std::memcpy(pAnimationData, channels.data(), static_cast<size_t>(std::ssize(channels)) * sizeof(common::AnimationChannel));
+	pAnimationData += std::ssize(channels) * sizeof(common::AnimationChannel);
 
-	std::memcpy(pAnimationData, keyframes.data(), keyframes.size() * sizeof(common::AnimationKeyframe));
-	pAnimationData += keyframes.size() * sizeof(common::AnimationKeyframe);
+	std::memcpy(pAnimationData, keyframes.data(), static_cast<size_t>(std::ssize(keyframes)) * sizeof(common::AnimationKeyframe));
+	pAnimationData += std::ssize(keyframes) * sizeof(common::AnimationKeyframe);
 
-	std::memcpy(pAnimationData, cubicKeyframes.data(), cubicKeyframes.size() * sizeof(common::AnimationKeyframeCubic));
+	std::memcpy(pAnimationData, cubicKeyframes.data(), static_cast<size_t>(std::ssize(cubicKeyframes)) * sizeof(common::AnimationKeyframeCubic));
 }
 
 void ExportScene::CleanupTextureAttemptFiles()

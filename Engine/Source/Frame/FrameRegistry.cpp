@@ -155,9 +155,9 @@ void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch&
 
 	float fRadiusSquared = fRadius * fRadius;
 
-	for (size_t i = 0; i < rBatch.rows.size(); ++i)
+	for (int64_t i = 0; i < std::ssize(rBatch.rows); ++i)
 	{
-		int64_t iConsumerRow = rBatch.rows[i];
+		int64_t iConsumerRow = rBatch.rows[static_cast<size_t>(i)];
 		XMVECTOR vecOrigin = rBatch.pVecOrigins[iConsumerRow];
 		XMVECTOR vecDirection = rBatch.pVecDirections[iConsumerRow];
 		AlignmentIdentifier consumerAlignment = rBatch.pAlignments != nullptr ? rBatch.pAlignments[iConsumerRow] : AlignmentIdentifier {};
@@ -165,7 +165,7 @@ void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch&
 		const RegistrySourceLayer* pBestLayer = nullptr;
 		int64_t iBestRow = 0;
 		int64_t iBestEligibleIndex = 0;
-		uint16_t uiBestSubscribers = std::numeric_limits<uint16_t>::max();
+		int64_t iBestSubscribers = std::numeric_limits<uint16_t>::max();
 		float fBestAngle = std::numeric_limits<float>::max();
 
 		int64_t iEligibleIndex = 0;
@@ -188,12 +188,12 @@ void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch&
 				}
 
 				float fAngle = std::abs(XMVectorGetX(XMVector3AngleBetweenNormals(vecDirection, XMVector3Normalize(vecToSource))));
-				uint16_t uiSubscribers = rContext.subscriberCounts[iCandidateIndex];
+				int64_t iSubscribers = rContext.subscriberCounts[iCandidateIndex];
 
 				// Strictly better wins, so an exact tie leaves the earlier layer and row in place.
-				if (uiSubscribers < uiBestSubscribers || (uiSubscribers == uiBestSubscribers && fAngle < fBestAngle))
+				if (iSubscribers < iBestSubscribers || (iSubscribers == iBestSubscribers && fAngle < fBestAngle))
 				{
-					uiBestSubscribers = uiSubscribers;
+					iBestSubscribers = iSubscribers;
 					fBestAngle = fAngle;
 					pBestLayer = &rLayer;
 					iBestRow = iRow;
@@ -202,7 +202,7 @@ void AcquireRegistryTargets(RegistryQueryContext& rContext, const RegistryBatch&
 			}
 		}
 
-		RegistryResult& rResult = rBatch.results[i];
+		RegistryResult& rResult = rBatch.results[static_cast<size_t>(i)];
 		rResult = pBestLayer != nullptr ? MakeResult(*pBestLayer, iBestRow) : RegistryResult {};
 		if (pBestLayer != nullptr)
 		{

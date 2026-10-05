@@ -35,9 +35,9 @@ common::crc_t MultiCrc(int64_t iCount, const TUPLE& rMembers)
 	{
 		std::apply([&](const auto&... rMemberPointers)
 		{
-			(ForEachMemberPointer(rMemberPointers, [&](const auto& rpElementPointer)
+			(ForEachMemberPointer(rMemberPointers, [&]<typename ELEMENT_PTR>(const ELEMENT_PTR& rpElementPointer)
 			{
-				uiChecksum = (uiChecksum ^ common::Crc(std::span<const std::remove_pointer_t<std::remove_reference_t<decltype(rpElementPointer)>>>(rpElementPointer, static_cast<size_t>(iCount)))) * common::kCrcMultiplier;
+				uiChecksum = (uiChecksum ^ common::Crc(std::span<const std::remove_pointer_t<ELEMENT_PTR>>(rpElementPointer, static_cast<size_t>(iCount)))) * common::kCrcMultiplier;
 			}), ...);
 		}, rMembers);
 	}
@@ -50,9 +50,9 @@ void MultiWrite(std::ostream& rStream, int64_t iCount, const TUPLE& rMembers)
 {
 	std::apply([&](const auto&... rMemberPointers)
 	{
-		(ForEachMemberPointer(rMemberPointers, [&](const auto& rpElementPointer)
+		(ForEachMemberPointer(rMemberPointers, [&]<typename ELEMENT_PTR>(const ELEMENT_PTR& rpElementPointer)
 		{
-			common::Write(rStream, std::span<const std::remove_pointer_t<std::remove_reference_t<decltype(rpElementPointer)>>>(rpElementPointer, static_cast<size_t>(iCount)));
+			common::Write(rStream, std::span<const std::remove_pointer_t<ELEMENT_PTR>>(rpElementPointer, static_cast<size_t>(iCount)));
 		}), ...);
 	}, rMembers);
 }
@@ -73,10 +73,22 @@ void MultiRead(std::istream& rStream, int64_t iCount, const TUPLE& rMembers)
 template <typename STRUCT>
 void ValidateAfterRead(std::istream& rStream, STRUCT& rStruct)
 {
-	if constexpr (requires { STRUCT::PostRead(rStruct); })
+	// A failed MultiRead leaves member storage partial; only validate a complete read.
+	if (rStream.good())
 	{
-		// A failed MultiRead leaves member storage partial; only validate a complete read.
-		if (rStream.good())
+		// Trust boundary: a type index this build never registered is a corrupt stream; reject it before any consumer looks it up.
+		if constexpr (requires { STRUCT::sTypes; rStruct.puiTypeIndices; })
+		{
+			for (int64_t i = 0; i < rStruct.iCount; ++i)
+			{
+				if (rStruct.puiTypeIndices[i] >= std::ssize(STRUCT::sTypes))
+				{
+					throw std::ios_base::failure("ValidateAfterRead puiTypeIndices");
+				}
+			}
+		}
+
+		if constexpr (requires { STRUCT::PostRead(rStruct); })
 		{
 			STRUCT::PostRead(rStruct);
 		}
@@ -118,11 +130,11 @@ struct TypeRegistry
 	using Type = TYPE;
 	static inline std::vector<TYPE> sTypes;
 
-	static void RegisterType(uint8_t& ruiIndex, const TYPE& rType)
+	static void RegisterType(int64_t& riIndex, const TYPE& rType)
 	{
-		ASSERT(ruiIndex == kuiInvalidTypeIndex);
-		ASSERT(std::ssize(sTypes) < kuiInvalidTypeIndex);
-		ruiIndex = static_cast<uint8_t>(sTypes.size());
+		ASSERT(riIndex == kiInvalidTypeIndex);
+		ASSERT(std::ssize(sTypes) < kiInvalidTypeIndex);
+		riIndex = std::ssize(sTypes);
 		sTypes.push_back(rType);
 
 		if constexpr (requires { rType.uiCrc; })
@@ -163,66 +175,24 @@ struct OptionalIdToIndex<T, FLAGS>
 
 	std::unordered_map<id_t, int64_t> idToIndexMap;
 
-	inline void Write(std::ostream& rStream) const
-	{
-		// Infrequent save/replay writes allocate a temporary key vector for deterministic ordering.
-		ScopedSuppressAllocationTracking suppress;
-		int64_t iSize = idToIndexMap.size();
-		common::Write(rStream, iSize);
-
-		std::vector<id_t> vecKeys = GetSortedKeys();
-		for (const id_t& rKey : vecKeys)
-		{
-			rKey.Write(rStream);
-			common::Write(rStream, idToIndexMap.at(rKey));
-		}
-	}
-
-	// iCount is the collection's already-validated live-row count. The rebuilt map must be a bijection from stream
-	// keys onto [0, iCount): equal cardinality, distinct keys, in-range values, and distinct values together prove it,
-	// so a hostile stream cannot leave a live row unindexed or alias two rows to one index.
-	inline void Read(std::istream& rStream, int64_t iCount)
+	// Rejecting zero and duplicate IDs makes the rebuilt map a bijection onto [0, ids.size()), so no live row is
+	// left unindexed and no two rows alias one ID.
+	inline void RebuildFromIds(std::span<const id_t> ids)
 	{
 		// Rebuilding the map allocates buckets and nodes that persist across frames for stable ID lookups.
 		ScopedSuppressAllocationTracking suppress;
-		int64_t iSize = 0;
-		common::Read(rStream, iSize);
-		// Trust boundary: a hostile map size would make reserve() an unbounded allocation. Each entry
-		// serializes at least an int64 value, so bound the count against the stream's remaining length.
-		common::ValidateDeserializedCount(iSize, sizeof(int64_t), rStream, "OptionalIdToIndex::Read");
-		if (iSize != iCount)
-		{
-			throw std::ios_base::failure("OptionalIdToIndex::Read");
-		}
 		idToIndexMap.clear();
-		idToIndexMap.reserve(iSize);
-
-		// Index-distinctness bitmap over [0, iCount): proves the values are a permutation, not merely in range.
-		int64_t iWordCount = (iCount + 63) / 64;
-		auto seenAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<uint64_t*>(iWordCount * sizeof(uint64_t));
-		uint64_t* pSeen = static_cast<uint64_t*>(seenAllocation.mpData);
-		std::memset(pSeen, 0, iWordCount * sizeof(uint64_t));
-
-		for (int64_t i = 0; i < iSize; ++i)
+		idToIndexMap.reserve(ids.size());
+		for (auto [i, rId] : std::views::enumerate(ids))
 		{
-			id_t key {};
-			int64_t iValue = 0;
-			key.Read(rStream);
-			common::Read(rStream, iValue);
-			if (iValue < 0 || iValue >= iCount)
+			if (rId.uuid.iValue == 0)
 			{
-				throw std::ios_base::failure("OptionalIdToIndex::Read");
+				throw std::ios_base::failure("OptionalIdToIndex::RebuildFromIds");
 			}
-			uint64_t uiBit = 1ui64 << (iValue & 63);
-			if ((pSeen[iValue >> 6] & uiBit) != 0)
+
+			if (!idToIndexMap.try_emplace(rId, i).second)
 			{
-				throw std::ios_base::failure("OptionalIdToIndex::Read");
-			}
-			pSeen[iValue >> 6] |= uiBit;
-			// A duplicate stream key must not silently overwrite: it would leave a live row unindexed.
-			if (!idToIndexMap.try_emplace(key, iValue).second)
-			{
-				throw std::ios_base::failure("OptionalIdToIndex::Read");
+				throw std::ios_base::failure("OptionalIdToIndex::RebuildFromIds");
 			}
 		}
 	}
@@ -250,24 +220,6 @@ struct OptionalIdToIndex<T, FLAGS>
 
 		return uiChecksum;
 	}
-
-private:
-	// Returns sorted keys for deterministic serialization ordering.
-	std::vector<id_t> GetSortedKeys() const
-	{
-		std::vector<id_t> vecKeys;
-		vecKeys.reserve(idToIndexMap.size());
-		for (const auto& [rKey, riValue] : idToIndexMap)
-		{
-			vecKeys.push_back(rKey);
-		}
-		// id_t/Uuid ordering compares only iValue; this comparator preserves serialized key order.
-		std::sort(vecKeys.begin(), vecKeys.end(), [](const id_t& rLeft, const id_t& rRight)
-		{
-			return rLeft.uuid.iValue < rRight.uuid.iValue;
-		});
-		return vecKeys;
-	}
 };
 
 template <typename T, common::Flags<CollectionFlags> FLAGS = {}>
@@ -289,10 +241,6 @@ struct Collection : public OptionalIdToIndex<T, FLAGS>
 	{
 		common::Write(rStream, iCount);
 		common::Write(rStream, iCapacity);
-		if constexpr (FLAGS & CollectionFlags::kIdToIndex)
-		{
-			static_cast<const OptionalIdToIndex<T, FLAGS>&>(*this).Write(rStream);
-		}
 	}
 
 	inline void Read(std::istream& rStream)
@@ -303,11 +251,6 @@ struct Collection : public OptionalIdToIndex<T, FLAGS>
 		// to bound writes and allocation. With member stride unknown, validation uses a minimum stride of 1;
 		// AllocateAndAssign enforces the 256 MiB ceiling using the actual member stride.
 		common::ValidateDeserializedCountCapacity(iCount, iCapacity, 1, rStream, "Collection::Read");
-		if constexpr (FLAGS & CollectionFlags::kIdToIndex)
-		{
-			// Validates the map is a bijection onto [0, iCount), so exactly one map entry backs each live row.
-			static_cast<OptionalIdToIndex<T, FLAGS>&>(*this).Read(rStream, iCount);
-		}
 	}
 
 	inline common::crc_t Crc() const

@@ -37,33 +37,7 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    other status means the ranges are unavailable — report that instead of
    proceeding. Done when the status is `pass` or the unavailability is
    reported.
-6. For a session-changed scope when the `Jev` input is absent, run the
-   style-rule judgment once: `pwsh -NoProfile -File
-   .agents/scripts/Test-StyleRuleJudgment.ps1 -RepositoryRoot '<absolute
-   repository toplevel>' -Baseline <full 40-character SHA> -OutputPath
-   Temp/code-style-review-judgment.json`, with the same optional
-   `-Head <commit>` and `-IncludeUntracked` switch as step 8 and the caller's
-   `Paths` as `-PathPrefix` when supplied; the run sends each changed block's
-   text and identifier list to the TypeSafe service through `Invoke-Jev.ps1`.
-   - Read `status` and every `flagged` entry from the file; steps 7 and 10
-     take its flagged entries, and the script is never run a second time.
-   - The result is advisory and usable only when `status` is `ok`, including
-     `judgment.no-blocks` (zero rows, `Judgment: none`) and `blocks.partial`
-     (summarize available entries as step 10 directs and add
-     `Judgment: partial — <message>`; failed blocks: `error`, no `flagged`).
-   - Any other status, or no summary line, is recorded as
-     `Judgment: not run — <code>: <message>`
-     ([`../SKILL.md`](../SKILL.md) `## Handoff`), with the exception text as
-     the message when there is no summary line, and the review continues.
-   - Jev asks about rule 49. The script also emits `rule3` and
-     `rule56` entries; ignore them — no adjudication record, no candidate — until
-     the next test in `Documents/Investigations/JevStyleRuleJudgment.md` is
-     run.
-   - When the scope is caller-supplied (no baseline) or the `Jev` input is
-     `skip`, the script is not run.
-   - Done when an `ok` result is in hand, or a `Judgment` row records why
-     there is none.
-7. Read `Documents/C++StyleGuide.txt`; it is the authority every step-10
+6. Read `Documents/C++StyleGuide.txt`; it is the authority every step-9
    adjudication is decided against. Hand-read the selected ranges for every
    Rule 2 form the narrow scanner does not emit, and in every review for
    rules 3, 4, 7, 8, 12, 13, 14, 16 (including its vector `.at()` clause), 21,
@@ -90,23 +64,22 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      using the run. Each rewritten file is one `Fixes Applied` row (Rule 47,
      include block reordered) and adds its owning build targets to
      `Build required`; that build is the rewrite's meaning-preservation proof
-     step 11 requires. Each violation the run still reports is
+     step 10 requires. Each violation the run still reports is
      reported as a residual.
 
-   Step 6's `flagged` entries for rule 49 are extra step-10 candidates; check
-   them first. The hand-read rules, rule 47 through the script run, and the
-   rules the scanner's `style-rule-<n>` kinds cover are this review's whole
-   style mandate; a rule is on both lists when each covers a different form.
+   The hand-read rules, rule 47 through the script run, and the rules the
+   scanner's `style-rule-<n>` kinds cover are this review's whole style
+   mandate; a rule is on both lists when each covers a different form.
    Every other guide rule has another owner: `/repo-code-review` owns rules 9,
    53, 60 and 67 and rule 47's external-header half
    ([`../../repo-code-review/references/checks.md`](../../repo-code-review/references/checks.md)),
    `/comment-review` owns rule 64, and the compiler owns rules 43 (RTTI off,
    warnings as errors) and 63 (the rotate poison in `Common/ExternalHeaders.h`).
-   Done when the guide is in hand, step 6's flagged entries are listed for
-   step 10, and the hand read covers every selected range, and either the rule
-   47 script's run has `status` `pass` or `fail` with every remaining violation
-   reported as a residual, or its unavailability is reported.
-8. Run the session-added candidate scanner once: `pwsh -NoProfile -File
+   Done when the guide is in hand, the hand read covers every selected range,
+   and either the rule 47 script's run has `status` `pass` or `fail` with every
+   remaining violation reported as a residual, or its unavailability is
+   reported.
+7. Run the session-added candidate scanner once: `pwsh -NoProfile -File
    .agents/scripts/Find-SessionCandidates.ps1 -RepositoryRoot '<absolute
    repository toplevel>' -Baseline <full 40-character SHA> -OutputPath
    Temp/code-style-review-candidates.json`,
@@ -119,85 +92,68 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    - Done when one `broken-engine-session-candidates/v1` object with `hits`
      rows of `path`, `line`, `kind`, and `text`, plus `counts`, is read from
      that file, or the run printed no summary line.
-9. Confirm the scan is usable. Only `status` `pass` (exit 0) is usable;
-   `blocked` (exit 2), `error` (exit 1), or no summary line from the step-8
+8. Confirm the scan is usable. Only `status` `pass` (exit 0) is usable;
+   `blocked` (exit 2), `error` (exit 1), or no summary line from the step-7
    run means both the style candidates and the added-versus-pre-existing
    distinction are unavailable — report that and never reconstruct either scan
    inline. Done when the scan is usable or its unavailability is reported.
-10. Adjudicate every `style-rule-<n>` row and every step-6 flagged entry for
-    rule 49 against rule n of the guide, reading the surrounding
-    code; the rows and entries are a starting list, not the finding set. For
-    Rule 2, surrounding code must reject declaration-shaped text inside a
-    block comment or raw string opened on an earlier line. Rule 29 needs the
-    base class, which is off the line, so look it up.
-    - These kinds' permitted forms are off the line, so reject a row that is
-      one: rule 5, ownership handed straight to a RAII owner; rule 6, a
-      preprocessor guard `if constexpr` cannot replace — around an `#include`,
-      a namespace-scope declaration, or code naming a symbol declared only in
-      that configuration — or a `kb*` definition block in `Pch.h`; rule 11, a
-      macro argument or a function type; rule 17, a container that is not a
-      `std::vector`, or an integer type the value's consumer requires, such as
-      a serialized field type or an API parameter type; rule 22, an enum body
-      or a function body, which is not an initializer list; rule 25, a
-      namespace-scope `constexpr` variable in a `.cpp` file, since rule 25
-      governs only function scope and header global scope; rule 26, an enum
-      declared in the file's own header — the file itself when it is a header,
-      or for a `.cpp` the header declaring the functions or class it defines;
-      rule 27, a literal with both digits and no suffix whose destination or
-      other operand is double; rule 36, a class type with a constructor, an
-      out-parameter filled on the next line, or a static member whose
-      initializer names types the header only forward-declares; rule 39, a
-      `(void)name;` discard of a lambda capture held only for lifetime;
-      rule 40, a local, member, cast, or template argument rather than a
-      parameter, a parameter type an external callback signature fixes, or a
-      `const char*` or `const wchar_t*` parameter that a caller can pass as
-      null, or whose value reaches an API that needs null termination; rule 44,
-      storage that is not an aligned type; rule 51, one of the established
-      multi-line forms the guide keeps; rule 54, a local or a struct
-      member rather than a class member; rule 55, an index-and-count enum.
-    - The rows carry their own rule number, so this step covers whatever kinds
-      the run emits; step 7's hand read supplies the other hand-read rules'
-      findings.
-    - Record each step-6 flagged entry for rule 49 in
-      `Temp/code-style-review-adjudication.md` under `## Judgment`: `path:line`,
-      the rule, its probability, `confirmed` or `false flag`, and the concise
-      guide/code reason for that decision. Mark it `confirmed` only when
-      adjudication against rule n of the guide finds the flagged construct is
-      a real violation of that rule and the violation involves a
-      session-changed line; otherwise `false flag`, including a construct
-      the rule does not cover and a real violation in unchanged code. A
-      confirmed entry is a finding for steps 11-17 exactly as a scanner row is.
-      A violation the hand read finds without a flagged entry is an ordinary
-      finding with no adjudication record; these records cover only the
-      script's flagged rule 49 entries. Return the counts and evidence under
-      [`../SKILL.md`](../SKILL.md) `## Handoff`; keep the script-owned JSON
-      unchanged and report confirmed findings through their existing routes.
-    - Done when every style row and flagged entry is accepted as a finding or
-      rejected.
-11. Auto-fix only when the resulting C++ meaning is demonstrably unchanged.
+9. Adjudicate every `style-rule-<n>` row against rule n of the guide, reading
+   the surrounding code; the rows are a starting list, not the finding set. For
+   Rule 2, surrounding code must reject declaration-shaped text inside a
+   block comment or raw string opened on an earlier line. Rule 29 needs the
+   base class, which is off the line, so look it up.
+   - These kinds' permitted forms are off the line, so reject a row that is
+     one: rule 5, ownership handed straight to a RAII owner; rule 6, a
+     preprocessor guard `if constexpr` cannot replace — around an `#include`,
+     a namespace-scope declaration, or code naming a symbol declared only in
+     that configuration — or a `kb*` definition block in `Pch.h`; rule 11, a
+     macro argument or a function type; rule 17, a container that is not a
+     `std::vector`; rule 22, an enum body
+     or a function body, which is not an initializer list; rule 25, a
+     namespace-scope `constexpr` variable in a `.cpp` file, since rule 25
+     governs only function scope and header global scope; rule 26, an enum
+     declared in the file's own header — the file itself when it is a header,
+     or for a `.cpp` the header declaring the functions or class it defines;
+     rule 27, a literal with both digits and no suffix whose destination or
+     other operand is double; rule 36, a class type with a constructor, an
+     out-parameter filled on the next line, or a static member whose
+     initializer names types the header only forward-declares; rule 39, a
+     `(void)name;` discard of a lambda capture held only for lifetime;
+     rule 40, a local, member, cast, or template argument rather than a
+     parameter, a parameter type an external callback signature fixes, or a
+     `const char*` or `const wchar_t*` parameter that a caller can pass as
+     null, or whose value reaches an API that needs null termination; rule 44,
+     storage that is not an aligned type; rule 51, one of the established
+     multi-line forms the guide keeps; rule 54, a local or a struct
+     member rather than a class member; rule 55, an index-and-count enum.
+   - The rows carry their own rule number, so this step covers whatever kinds
+     the run emits; step 6's hand read supplies the other hand-read rules'
+     findings.
+   - Done when every style row is accepted as a finding or rejected.
+10. Auto-fix only when the resulting C++ meaning is demonstrably unchanged.
     Examples include whitespace, argument layout, an exact deduced type
     replacing disallowed `auto`, and `NULL` replaced where it is a null pointer
     constant. Done when every applied fix is meaning-preserving.
-12. Do not auto-fix a proposed finding that requires changing container type or
+11. Do not auto-fix a proposed finding that requires changing container type or
     access semantics, public API, class/struct access or layout, control flow,
     overload resolution, or numeric behavior.
     - Report it for caller classification and the applicable domain review.
     - Done when each such finding is listed under `Routed Findings`.
-13. Rename an identifier only when it is a meaning-preserving style correction
+12. Rename an identifier only when it is a meaning-preserving style correction
     and all code references can be propagated, searching the old identifier
     across the repository before editing. Done when that search covers every
     reference.
-14. Propagate every reference the rename breaks in C++ and shader sources,
+13. Propagate every reference the rename breaks in C++ and shader sources,
     including references outside the selected ranges. Applying the shader-side
     reference updates is part of the rename. Done when no broken reference to
     the old identifier remains.
-15. Route stale `AGENTS.md` references to `/update-claude-docs`, and list
+14. Route stale `AGENTS.md` references to `/update-claude-docs`, and list
     ordinary documentation and plan references as caller residuals. Done when
     each stale reference is routed or listed.
-16. Return the exact affected build targets for every rename; a rename is not
+15. Return the exact affected build targets for every rename; a rename is not
     verified without those builds. Done when `Build required` names those
     targets.
-17. Remove confirmed temporary debug instrumentation added during the session,
+16. Remove confirmed temporary debug instrumentation added during the session,
     including temporary `LOG`, `printf`, `DEBUG_BREAK()`, `assert(false)`,
     `// FIXME`, and `// HACK` lines, taking the added-versus-pre-existing
     distinction from the scanner.
@@ -209,28 +165,25 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
 - Run inside one delegated `mechanic`; never delegate. Review C++ only. Style
   review is not a landing gate (a Change Workflow definition).
 - Shader style is out of scope; do not review or route it. The only shader
-  edits are the reference updates that propagate a C++ rename (steps 13-16).
+  edits are the reference updates that propagate a C++ rename (steps 12-15).
 - Rule 49 forwarding findings are routed, not auto-fixed — see
   `/repo-code-review` (`../../repo-code-review/SKILL.md`).
 - The untracked rule differs per script: the step-3 inventory covers an
   untracked file only when `-IncludeUntracked <comma-separated paths>` lists it,
   and its `counts.unlistedUntracked` reports how many it did not list; the
-  step-8 scanner takes `-IncludeUntracked` as a switch and enumerates the
+  step-7 scanner takes `-IncludeUntracked` as a switch and enumerates the
   untracked files itself.
-- Each `-OutputPath` run in steps 3, 6, and 8 writes its result document to
+- Each `-OutputPath` run in steps 3 and 7 writes its result document to
   that file and prints one summary line naming its status, code, and message
   (the headers of `.agents/scripts/Get-SessionChangeInventory.ps1` and
   `.agents/scripts/Find-SessionCandidates.ps1`). Read the file only after that
   run printed the line; no summary line means no result document, so that
   step's result is unavailable.
 - Comment content — what a comment says and whether it should exist — is
-  `/comment-review` work; this review touches a comment only as the step-17
+  `/comment-review` work; this review touches a comment only as the step-16
   residue removal directs.
-- Every judgment in steps 10 and 17 stays here, because the scanner's
+- Every judgment in steps 9 and 16 stays here, because the scanner's
   contract (`.agents/scripts/Find-SessionCandidates.ps1`) never edits a source
   file and reports candidates only.
-- The judgment script's rule 3 threshold and rule 56 name threshold were
-  measured against the corpus at
-  [`style-rule-judgment/cases.json`](style-rule-judgment/cases.json).
 - Never add a debug tag merely to defer cleanup, and do not alter pre-existing
   intentional debug logs. Never touch strings or non-comment code.

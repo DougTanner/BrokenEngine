@@ -7,7 +7,7 @@ constexpr int64_t kiPusherZones = 50;
 constexpr int64_t kiMaxPushersPerZone = 512;
 
 // Zone acceleration structure: thread_local so each Dispatch worker and reconcile thread gets its own copy
-alignas(64) static thread_local uint16_t sppuiPushersPerZone[kiPusherZones][kiPusherZones] {};
+alignas(64) static thread_local int64_t sppiPushersPerZone[kiPusherZones][kiPusherZones] {};
 alignas(64) static thread_local int16_t spppiPusherZones[kiPusherZones][kiPusherZones][kiMaxPushersPerZone] {};
 
 // Cell bounds the zone grid spans, refreshed by SetupZones from the cell's own area
@@ -44,7 +44,7 @@ void XM_CALLCONV PushersInterpolate::SetupZones([[maybe_unused]] const game::Fra
 {
 	const PushersInterpolate& rCurrent = rFrame.interpolate.pushers;
 
-	ZeroMemory(sppuiPushersPerZone, sizeof(sppuiPushersPerZone));
+	ZeroMemory(sppiPushersPerZone, sizeof(sppiPushersPerZone));
 
 	// Span the whole cell with the fixed zone grid
 	FrameBounds bounds = ComputeFrameBounds(vecArea);
@@ -79,7 +79,7 @@ void XM_CALLCONV PushersInterpolate::SetupZones([[maybe_unused]] const game::Fra
 		{
 			for (int64_t k = iZoneStartX; k <= iZoneEndX; ++k)
 			{
-				int64_t iPushersPerZone = sppuiPushersPerZone[k][j];
+				int64_t iPushersPerZone = sppiPushersPerZone[k][j];
 				if (iPushersPerZone >= kiMaxPushersPerZone) [[unlikely]]
 				{
 					++iDroppedRegistrations;
@@ -87,7 +87,7 @@ void XM_CALLCONV PushersInterpolate::SetupZones([[maybe_unused]] const game::Fra
 				}
 
 				spppiPusherZones[k][j][iPushersPerZone] = static_cast<int16_t>(i);
-				++sppuiPushersPerZone[k][j];
+				++sppiPushersPerZone[k][j];
 			}
 		}
 	}
@@ -109,7 +109,7 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 	int64_t iZoneX = std::clamp(static_cast<int64_t>((f2Position.x - sfPusherAreaMinX) / sfPusherZoneWidth), 0i64, kiPusherZones - 1);
 	int64_t iZoneY = std::clamp(static_cast<int64_t>((f2Position.y - sfPusherAreaMinY) / sfPusherZoneHeight), 0i64, kiPusherZones - 1);
 	int16_t* piZone = spppiPusherZones[iZoneX][iZoneY];
-	int64_t iPushersInZone = sppuiPushersPerZone[iZoneX][iZoneY];
+	int64_t iPushersInZone = sppiPushersPerZone[iZoneX][iZoneY];
 
 	int64_t iIgnoreIndex = -1;
 	if ((ignorePusher.uuid.iValue != 0))

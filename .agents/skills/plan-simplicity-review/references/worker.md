@@ -68,10 +68,13 @@ steps change product, user interface, tooling, or public interface behavior.
    compensates for a defect or misbehavior, establish whether the change removes
    the cause or only suppresses the symptom — re-tuning a value, adding a
    compensating offset, catching and ignoring a failure, or special-casing one
-   call site of a shared bug. Evaluate a choice the plan itself declares decided
-   against the root-cause alternative it rejected. Every bandaid finding names
-   the suspected root cause with repository evidence (`path:line`) and sketches
-   the base-level durable fix as its alternative.
+   call site of a shared bug, which includes adding another copy of a check or
+   fix that a sibling site already carries. Before passing this question, search
+   the repository for such sibling copies by the same symbol, column, or check
+   shape. Evaluate a choice the plan itself declares decided against the
+   root-cause alternative it rejected. Every bandaid finding names the suspected
+   root cause with repository evidence (`path:line`) and sketches the base-level
+   durable fix as its alternative.
 7. Actual consumer and observable benefit. Name who consumes the result and the
    benefit they can observe once this plan lands. Judge only what the plan
    already proposes: never ask for an extra feature or a wider boundary to

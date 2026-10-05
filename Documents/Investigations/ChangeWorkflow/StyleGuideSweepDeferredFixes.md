@@ -34,11 +34,6 @@ Engine batches `Engine_Source_Agent`, `Engine_Source_Network`,
 - `Engine/Data/Shaders/ShaderGlobalLayout.h:73`, `:229` (rule 56) — the rename
   needs matching edits in `.agents/skills/glsl-review/references/shader-footguns.md`,
   which the Codex sandbox could not write.
-- `.agents/skills/code-style-review/references/style-rule-judgment/cases.json:150`,
-  `:373` — fixture code still calls the removed accessor
-  `gMissileLaunchVolume.Get()` (now `.mfCurrent`) and the old `PlayOneShot3d`
-  argument list; updating it may change which rule the fixture expects, and
-  the Codex sandbox could not write `.agents/`.
 - `Engine/Source/Graphics/Managers/DynamicPipelines.cpp:21` (rule 8) — the
   proposed nested `it` shadows the outer iterator, which MSVC C4456 rejects
   under `/W4 /WX`.

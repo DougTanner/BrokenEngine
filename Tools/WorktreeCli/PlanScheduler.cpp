@@ -11,7 +11,7 @@
 
 namespace toolcli
 {
-	constexpr uint64_t kuiClaimLifetimeTicks = 48ui64 * 60ui64 * 60ui64 * 10'000'000ui64;
+	constexpr int64_t kiClaimLifetimeTicks = 48i64 * 60i64 * 60i64 * 10'000'000i64;
 	// Scheduler changes queue behind peer sessions, so the guard waits far longer than the
 	// Guard default; deliberately separate from the build lock's wait.
 	constexpr int64_t kiSchedulerGuardWaitSeconds = 500;
@@ -66,7 +66,7 @@ namespace toolcli
 		std::cout << value.dump() << '\n';
 	}
 
-	static int Failure(std::string_view code, int iExitCode = kiExitFailure)
+	static int64_t Failure(std::string_view code, int64_t iExitCode = kiExitFailure)
 	{
 		PrintResult({ { "status", "error" }, { "code", code } }, 2);
 		return iExitCode;
@@ -181,8 +181,8 @@ namespace toolcli
 				continue;
 			}
 			std::wstring_view suffix(filename.data() + prefix.size(), filename.size() - prefix.size());
-			size_t uiSeparator = suffix.find(L'.');
-			if (uiSeparator == std::wstring_view::npos || suffix.find(L'.', uiSeparator + 1) != std::wstring_view::npos || !IsCanonicalPositiveDecimal(suffix.substr(0, uiSeparator)) || !IsCanonicalPositiveDecimal(suffix.substr(uiSeparator + 1)))
+			int64_t iSeparator = static_cast<int64_t>(suffix.find(L'.'));
+			if (iSeparator == -1 || suffix.find(L'.', static_cast<size_t>(iSeparator + 1)) != std::wstring_view::npos || !IsCanonicalPositiveDecimal(suffix.substr(0, static_cast<size_t>(iSeparator))) || !IsCanonicalPositiveDecimal(suffix.substr(static_cast<size_t>(iSeparator + 1))))
 			{
 				continue;
 			}
@@ -272,9 +272,9 @@ namespace toolcli
 			{
 				return false;
 			}
-			uint64_t uiClaimedAt = 0;
-			uint64_t uiExpiresAt = 0;
-			return ParseCanonicalUtcTimestamp(fields.at("claimedAt"), uiClaimedAt) && ParseCanonicalUtcTimestamp(fields.at("expiresAt"), uiExpiresAt) && uiExpiresAt > uiClaimedAt && uiExpiresAt - uiClaimedAt == kuiClaimLifetimeTicks;
+			int64_t iClaimedAt = 0;
+			int64_t iExpiresAt = 0;
+			return ParseCanonicalUtcTimestamp(fields.at("claimedAt"), iClaimedAt) && ParseCanonicalUtcTimestamp(fields.at("expiresAt"), iExpiresAt) && iExpiresAt > iClaimedAt && iExpiresAt - iClaimedAt == kiClaimLifetimeTicks;
 		}
 		catch (const nlohmann::json::exception&)
 		{
@@ -303,8 +303,8 @@ namespace toolcli
 
 	static bool ClaimIsLive(const Claim& rClaim)
 	{
-		uint64_t uiExpiry = 0;
-		return coordination::ParseUtcTimestamp(rClaim.json["expiresAt"].get<std::string>(), uiExpiry) && uiExpiry > coordination::CurrentUtcTicks();
+		int64_t iExpiry = 0;
+		return coordination::ParseUtcTimestamp(rClaim.json["expiresAt"].get<std::string>(), iExpiry) && iExpiry > static_cast<int64_t>(coordination::CurrentUtcTicks());
 	}
 
 	static bool HealClaims(const std::filesystem::path& rRoot, std::wstring_view repository, const std::unordered_map<std::wstring, Plan>& rPrimaryPlans, nlohmann::json& rHealed)
@@ -522,7 +522,7 @@ namespace toolcli
 		PrintResult({ { "status", "ok" }, { "code", code }, { "plan", WideToUtf8(planPath) }, { "owner", rClaim["owner"] }, { "session", rClaim["session"] }, { "worktree", rClaim["worktree"] }, { "branch", rClaim["branch"] }, { "claimedAt", rClaim["claimedAt"] }, { "expiresAt", rClaim["expiresAt"] } }, 2);
 	}
 
-	static int RunValidate(const Arguments& rArguments)
+	static int64_t RunValidate(const Arguments& rArguments)
 	{
 		std::wstring repository; std::filesystem::path worktree;
 		if (!ResolveContext(rArguments, repository, worktree))
@@ -628,7 +628,7 @@ namespace toolcli
 
 	// A read-only preview of the scheduler row states from the session tree.  It heals nothing, takes no scheduler
 	// guard, and creates no scheduler storage, so a claim record it cannot use is ignored here rather than deleted.
-	static int RunList(const Arguments& rArguments)
+	static int64_t RunList(const Arguments& rArguments)
 	{
 		std::wstring repository; std::filesystem::path worktree;
 		if (!ResolveContext(rArguments, repository, worktree))
@@ -738,7 +738,7 @@ namespace toolcli
 		return kiExitOk;
 	}
 
-	static int RunClaimNext(const Arguments& rArguments)
+	static int64_t RunClaimNext(const Arguments& rArguments)
 	{
 		std::wstring repository; std::filesystem::path worktree;
 		if (!ResolveContext(rArguments, repository, worktree) || rArguments.owner.empty() || rArguments.session.empty() || rArguments.branch.empty() || rArguments.primaryWorktree.empty())
@@ -870,8 +870,8 @@ namespace toolcli
 			{
 				continue; // claimed by another session, or an unhealable record
 			}
-			uint64_t uiClaimedAt = coordination::CurrentUtcTicks();
-			nlohmann::json claim = { { "schemaVersion", 2 }, { "repository", WideToUtf8(repository) }, { "plan", WideToUtf8(pPlan->path) }, { "owner", WideToUtf8(rArguments.owner) }, { "session", WideToUtf8(rArguments.session) }, { "worktree", WideToUtf8(worktree.wstring()) }, { "branch", WideToUtf8(rArguments.branch) }, { "claimedAt", coordination::FormatUtcTimestamp(uiClaimedAt) }, { "expiresAt", coordination::FormatUtcTimestamp(uiClaimedAt + kuiClaimLifetimeTicks) } };
+			int64_t iClaimedAt = static_cast<int64_t>(coordination::CurrentUtcTicks());
+			nlohmann::json claim = { { "schemaVersion", 2 }, { "repository", WideToUtf8(repository) }, { "plan", WideToUtf8(pPlan->path) }, { "owner", WideToUtf8(rArguments.owner) }, { "session", WideToUtf8(rArguments.session) }, { "worktree", WideToUtf8(worktree.wstring()) }, { "branch", WideToUtf8(rArguments.branch) }, { "claimedAt", coordination::FormatUtcTimestamp(static_cast<uint64_t>(iClaimedAt)) }, { "expiresAt", coordination::FormatUtcTimestamp(static_cast<uint64_t>(iClaimedAt + kiClaimLifetimeTicks)) } };
 			if (!coordination::EnsureParentDirectory(*claimPath))
 			{
 				return Failure("claim-write-failed");
@@ -887,7 +887,7 @@ namespace toolcli
 		return kiExitOk;
 	}
 
-	static int RunClaimStatus(const Arguments& rArguments)
+	static int64_t RunClaimStatus(const Arguments& rArguments)
 	{
 		std::wstring repository; std::filesystem::path worktree;
 		if (!ResolveWorktreeContext(rArguments, repository, worktree) || rArguments.owner.empty() || rArguments.session.empty())
@@ -937,7 +937,7 @@ namespace toolcli
 		return kiExitOk;
 	}
 
-	static int RunUnclaim(const Arguments& rArguments)
+	static int64_t RunUnclaim(const Arguments& rArguments)
 	{
 		std::wstring repository; std::filesystem::path worktree;
 		if (!ResolveWorktreeContext(rArguments, repository, worktree) || rArguments.owner.empty() || rArguments.session.empty())
@@ -990,19 +990,19 @@ namespace toolcli
 			return false;
 		}
 		dependencies.erase(found);
-		size_t uiLineEnd = rPlan.bytes.find('\n');
-		size_t uiSuffixStart = uiLineEnd == std::string::npos ? rPlan.bytes.size() : (uiLineEnd > 0 && rPlan.bytes[uiLineEnd - 1] == '\r' ? uiLineEnd - 1 : uiLineEnd);
+		int64_t iLineEnd = static_cast<int64_t>(rPlan.bytes.find('\n'));
+		int64_t iSuffixStart = iLineEnd == -1 ? std::ssize(rPlan.bytes) : (iLineEnd > 0 && rPlan.bytes[static_cast<size_t>(iLineEnd - 1)] == '\r' ? iLineEnd - 1 : iLineEnd);
 		nlohmann::json metadata = { { "createdUtc", rPlan.createdUtc }, { "dependsOn", nlohmann::json::array() } };
 		for (const std::wstring& rDependency : dependencies)
 		{
 			metadata["dependsOn"].push_back(WideToUtf8(rDependency));
 		}
-		rBytes = std::string(kMarkerPrefix) + metadata.dump() + std::string(kMarkerSuffix) + rPlan.bytes.substr(uiSuffixStart);
+		rBytes = std::string(kMarkerPrefix) + metadata.dump() + std::string(kMarkerSuffix) + rPlan.bytes.substr(static_cast<size_t>(iSuffixStart));
 		return true;
 	}
 
 	// Terminal preparation removes the target from every direct dependency child's byte-zero marker and deletes the target Plan file. Both edits are idempotent: a child whose marker no longer lists the target is not selected, and an absent target is skipped.
-	static int RunTerminal(std::wstring_view operation, const Arguments& rArguments)
+	static int64_t RunTerminal(std::wstring_view operation, const Arguments& rArguments)
 	{
 		bool bReject = operation == L"reject";
 		if (bReject && !rArguments.bUserAuthorizedRejection)
@@ -1116,7 +1116,7 @@ namespace toolcli
 				return Failure("orphan-cleanup-failed");
 			}
 		}
-		std::vector<std::filesystem::path> stagedPaths(rewrites.size());
+		std::vector<std::filesystem::path> stagedPaths(static_cast<size_t>(std::ssize(rewrites)));
 		auto DiscardStaged = [&stagedPaths](int64_t iFirst, int64_t iLast)
 		{
 			for (int64_t i = iFirst; i < iLast; ++i)
@@ -1168,7 +1168,7 @@ namespace toolcli
 		return kiExitOk;
 	}
 
-	int RunPlanSchedulerCommand(std::span<wchar_t* const> argumentValues)
+	int64_t RunPlanSchedulerCommand(std::span<wchar_t* const> argumentValues)
 	{
 		if (std::ssize(argumentValues) < 3)
 		{

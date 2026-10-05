@@ -247,10 +247,10 @@ void RawInputManager::HandleRawInput(LPARAM iMessageParameter)
 
 	if (rawInput.header.dwType == RIM_TYPEKEYBOARD && !PhysicalInputSuppressed())
 	{
-		USHORT uiKey = rawInput.data.keyboard.VKey;
-		if (uiKey < kiKeyboardKeyCount)
+		int64_t iKey = rawInput.data.keyboard.VKey;
+		if (iKey < kiKeyboardKeyCount)
 		{
-			mpbKeyboardKeysDown[uiKey] = (rawInput.data.keyboard.Flags & RI_KEY_BREAK) == 0;
+			mpbKeyboardKeysDown[iKey] = (rawInput.data.keyboard.Flags & RI_KEY_BREAK) == 0;
 		}
 	}
 }

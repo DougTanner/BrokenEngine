@@ -98,8 +98,8 @@ struct LazyChunk
 
 	// One asynchronous recommit/reload range. Its offset and length are written before the pending release-store
 	// and remain stable until the consumer resets a ready or failed terminal state.
-	uint64_t uiRangeReloadOffset = 0;
-	uint64_t uiRangeReloadLength = 0;
+	int64_t iRangeReloadOffset = 0;
+	int64_t iRangeReloadLength = 0;
 	MovableAtomicChunkRangeReloadState eRangeReloadState;
 
 	// GPU upload results (written by upload thread, read by main thread)
@@ -126,8 +126,8 @@ struct LoadRequest
 	common::crc_t crc = 0;
 	LoadPriority ePriority = LoadPriority::kLow;
 	LoadRequestKind eKind = LoadRequestKind::kWholeChunk;
-	uint64_t uiOffset = 0;
-	uint64_t uiLength = 0;
+	int64_t iOffset = 0;
+	int64_t iLength = 0;
 
 	bool operator<(const LoadRequest& rOther) const
 	{
@@ -173,12 +173,12 @@ private:
 public:
 #endif
 	PackChunks* mpPackChunks = nullptr;
-	uint32_t muiEntryIndex = std::numeric_limits<uint32_t>::max();
+	int64_t miEntryIndex = static_cast<int64_t>(std::numeric_limits<uint32_t>::max());
 	uint64_t muiGeneration = 0;
 private:
 	common::crc_t muiCrc = 0;
-	uint64_t muiOffset = 0;
-	uint64_t muiLength = 0;
+	int64_t miOffset = 0;
+	int64_t miLength = 0;
 };
 
 #endif // BT_CLIENT
@@ -229,33 +229,13 @@ public:
 
 inline FileManager* gpFileManager = nullptr;
 
-// Exclude arithmetic types, pointers, strings and string views to avoid treating text stream operators as binary serialization.
-template <typename T, typename = void>
-struct HasBinaryStreamOperators : std::false_type
-{
-};
-
 template <typename T>
-struct HasBinaryStreamOperators
-<T,
-	std::enable_if_t
-	<
-		!std::is_arithmetic_v<T> &&
-		!std::is_pointer_v<T> &&
-		!std::is_same_v<std::decay_t<T>, std::string> &&
-		!std::is_same_v<std::decay_t<T>, std::string_view>,
-		std::void_t
-		<
-			decltype(std::declval<std::ostream&>() << std::declval<const T&>()),
-			decltype(std::declval<std::istream&>() >> std::declval<T&>())
-		>
-	>
-> : std::true_type
-{
-};
-
-template <typename T>
-inline constexpr bool kbHasBinaryStreamOperators = HasBinaryStreamOperators<T>::value;
+concept HasBinaryStreamOperators =
+	requires
+	{
+		std::declval<std::ostream&>() << std::declval<const T&>();
+		std::declval<std::istream&>() >> std::declval<T&>();
+	};
 
 template <typename FN>
 bool FileManager::WriteFileAtomically(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, FN&& rWrite)
@@ -317,7 +297,7 @@ bool WriteVersionedFile(const FileFlags_t& rFlags, const std::filesystem::path& 
 		WriteVersionHeader<STRUCT_TYPE>(rFileStream);
 		LOG(kLoading, kDebug, "WriteVersionedFile {} iVersion: {} iSize: {}", rFilename, iVersion, iSize);
 
-		if constexpr (kbHasBinaryStreamOperators<STRUCT_TYPE>)
+		if constexpr (HasBinaryStreamOperators<STRUCT_TYPE>)
 		{
 			rFileStream << rStructure;
 		}
@@ -340,7 +320,7 @@ bool ReadVersionedFile(const FileFlags_t& rFlags, const std::filesystem::path& r
 	LOG(kLoading, kDebug, "    iVersion: {} == {} iSize: {} == {}", iVersion, STRUCT_TYPE::kiVersion, iSize, sizeof(STRUCT_TYPE));
 	if (bHeaderValid)
 	{
-		if constexpr (kbHasBinaryStreamOperators<STRUCT_TYPE>)
+		if constexpr (HasBinaryStreamOperators<STRUCT_TYPE>)
 		{
 			fileStream >> rStructure;
 			return fileStream.good();

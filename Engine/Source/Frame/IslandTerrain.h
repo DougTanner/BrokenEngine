@@ -40,8 +40,8 @@ struct IslandTemplate
 	// R16 half-floats at kIsland payload offset zero; readers use
 	// DirectX::PackedVector::XMConvertHalfToFloat.
 	const uint16_t* puiHeightmapHalf = nullptr;
-	int32_t iHeightmapWidth = 0;
-	int32_t iHeightmapHeight = 0;
+	int64_t iHeightmapWidth = 0;
+	int64_t iHeightmapHeight = 0;
 
 	float fWorldFootprintXMeters = 0.0f;
 	float fWorldFootprintYMeters = 0.0f;
@@ -64,8 +64,8 @@ struct IslandTemplate
 
 	// Mesh vertex/index counts and CPU mesh data pointers (pfMeshPositions / puiMeshIndices) are
 	// populated by WaitForElevationMaps after it validates the resident kIsland chunk payload.
-	int32_t iMeshVertexCount = 0;
-	int32_t iMeshIndexCount = 0;
+	int64_t iMeshVertexCount = 0;
+	int64_t iMeshIndexCount = 0;
 
 	// Per-island valid-area convex hull (CCW) in island-local meters, centered. Slices the kIsland
 	// chunk payload after the mesh indices (set by WaitForElevationMaps). Shared: the server packs
@@ -73,7 +73,7 @@ struct IslandTemplate
 	// renders it (MainUniforms DebugRenderIslandValidArea). A count < 3 (or null pointer) means no
 	// usable polygon.
 	const XMFLOAT2* pf2ValidAreaVertices = nullptr;
-	int32_t iValidAreaVertexCount = 0;
+	int64_t iValidAreaVertexCount = 0;
 
 #if defined(BT_CLIENT)
 	// Phase 5 LRU eviction state. bGpuResident means "slot points at this template's real
@@ -82,7 +82,7 @@ struct IslandTemplate
 	// post-eviction-pre-restore. iReferenceCount is recomputed from scratch each frame in
 	// Islands::UpdateActiveIslands.
 	int64_t iReferenceCount = 0;
-	uint64_t uiLastUsedRenderFrame = 0;
+	int64_t iLastUsedRenderFrame = 0;
 	bool bGpuResident = false;
 
 	// Gaea Mesher-baked terrain mesh in island-local meters (XY centered). CPU pointers slice into
@@ -93,10 +93,10 @@ struct IslandTemplate
 	const uint32_t* puiMeshIndices = nullptr;
 	VmaVirtualAllocation meshIndexAllocation = VK_NULL_HANDLE;
 	VmaVirtualAllocation meshVertexAllocation = VK_NULL_HANDLE;
-	VkDeviceSize vkMeshIndexOffset = 0;
-	VkDeviceSize vkMeshVertexOffset = 0;
+	int64_t iMeshIndexOffset = 0;
+	int64_t iMeshVertexOffset = 0;
 	IslandMeshResidency eMeshResidency = IslandMeshResidency::kNonresident;
-	uint64_t uiMeshArenaBlockedGeneration = 0;
+	int64_t iMeshArenaBlockedGeneration = 0;
 	// True once the [positions][indices] CPU slice has been decommitted from the lazy pool.
 	bool bMeshCpuDecommitted = false;
 

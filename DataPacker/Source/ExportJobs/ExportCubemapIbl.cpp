@@ -10,7 +10,7 @@ constexpr int64_t kiCubemapIblFingerprintVersion = 1;
 struct KtxCubemapData
 {
 	std::vector<float> floatData;
-	uint32_t uiFaceSize = 0;
+	int64_t iFaceSize = 0;
 };
 
 static std::filesystem::path GetFingerprintMetadataPath(const std::filesystem::path& rOutputPath, int64_t iInputRoot)
@@ -250,8 +250,8 @@ static KtxCubemapData LoadKtxCubemapAsFloat(const std::filesystem::path& rPath)
 	ASSERT(!texture.empty() && texture.target() == gli::TARGET_CUBE);
 	gli::texture_cube textureCube(texture);
 	ASSERT(textureCube.format() == gli::FORMAT_RGBA16_SFLOAT_PACK16);
-	result.uiFaceSize = textureCube[0].extent().x;
-	int64_t iPixelsPerFace = static_cast<int64_t>(result.uiFaceSize) * result.uiFaceSize;
+	result.iFaceSize = textureCube[0].extent().x;
+	int64_t iPixelsPerFace = result.iFaceSize * result.iFaceSize;
 	result.floatData.resize(iPixelsPerFace * 6 * 4);
 	for (int64_t i = 0; i < 6; ++i)
 	{
@@ -306,13 +306,13 @@ bool GenerateIrradianceCubemaps()
 					LOG(kDefault, kDebug, "Generating irradiance cubemap for \"{}\"", rDirectoryEntry.path().filename().string());
 
 					KtxCubemapData cubemapData = LoadKtxCubemapAsFloat(rDirectoryEntry.path());
-					uint32_t uiFaceSize = cubemapData.uiFaceSize;
-					int64_t iPixelsPerFace = static_cast<int64_t>(uiFaceSize) * uiFaceSize;
+					int64_t iFaceSize = cubemapData.iFaceSize;
+					int64_t iPixelsPerFace = iFaceSize * iFaceSize;
 					int64_t iTotalPixels = iPixelsPerFace * 6;
 
 					cmft::Image sourceImage;
 					cmft::Image destinationImage;
-					cmft::imageCreate(sourceImage, uiFaceSize, uiFaceSize, 0x000000ff, 1, 6, cmft::TextureFormat::RGBA32F);
+					cmft::imageCreate(sourceImage, static_cast<uint32_t>(iFaceSize), static_cast<uint32_t>(iFaceSize), 0x000000ff, 1, 6, cmft::TextureFormat::RGBA32F);
 					common::ScopedLambda imageCleanup([&]()
 					{
 						cmft::imageUnload(sourceImage);
@@ -323,10 +323,10 @@ bool GenerateIrradianceCubemaps()
 					// Generate 128x128 irradiance through serial CPU double-precision spherical harmonics, without
 					// OpenCL or a thread-count input. DataPacker is not /fp:strict, so FMA contraction and the FP
 					// environment can affect output across hosts.
-					static constexpr uint32_t kuiIrradianceFaceSize = 128;
-					cmft::imageIrradianceFilterSh(destinationImage, kuiIrradianceFaceSize, sourceImage);
+					static constexpr int64_t kiIrradianceFaceSize = 128;
+					cmft::imageIrradianceFilterSh(destinationImage, static_cast<uint32_t>(kiIrradianceFaceSize), sourceImage);
 
-					int64_t iIrradiancePixelsPerFace = kuiIrradianceFaceSize * kuiIrradianceFaceSize;
+					int64_t iIrradiancePixelsPerFace = kiIrradianceFaceSize * kiIrradianceFaceSize;
 					int64_t iIrradianceTotalPixels = iIrradiancePixelsPerFace * 6;
 					std::vector<uint16_t> halfData(iIrradianceTotalPixels * 4);
 
@@ -334,8 +334,8 @@ bool GenerateIrradianceCubemaps()
 					DirectX::PackedVector::XMConvertFloatToHalfStream(halfData.data(), sizeof(uint16_t), pSourceFloat, sizeof(float), iIrradianceTotalPixels * 4);
 
 					// Write intermediate file: [width][height][mipcount][pixel data for 6 faces]
-					int64_t iWidth = kuiIrradianceFaceSize;
-					int64_t iHeight = kuiIrradianceFaceSize;
+					int64_t iWidth = kiIrradianceFaceSize;
+					int64_t iHeight = kiIrradianceFaceSize;
 					int64_t iMipCount = 1;
 
 					WriteStagedIntermediate(outputPath, [&](std::ostream& rStream)
@@ -343,7 +343,7 @@ bool GenerateIrradianceCubemaps()
 						rStream.write(reinterpret_cast<const char*>(&iWidth), sizeof(iWidth));
 						rStream.write(reinterpret_cast<const char*>(&iHeight), sizeof(iHeight));
 						rStream.write(reinterpret_cast<const char*>(&iMipCount), sizeof(iMipCount));
-						rStream.write(reinterpret_cast<const char*>(halfData.data()), halfData.size() * sizeof(uint16_t));
+						rStream.write(reinterpret_cast<const char*>(halfData.data()), static_cast<std::streamsize>(std::ssize(halfData) * static_cast<int64_t>(sizeof(uint16_t))));
 					});
 					CompleteOutputUpdate(metadataPath, fingerprint);
 				}
@@ -377,8 +377,8 @@ bool GenerateIrradianceCubemaps()
 	return ReportIblFailures("irradiance", failures);
 }
 
-static constexpr uint32_t kuiPreFilteredFaceSize = 1'024;
-static constexpr uint8_t kuiPreFilteredMipCount = 11; // log2(1024) + 1
+static constexpr int64_t kiPreFilteredFaceSize = 1'024;
+static constexpr int64_t kiPreFilteredMipCount = 11; // log2(1024) + 1
 
 // Packs a CMFT radiance-filtered cubemap into face-major / mip-minor half-floats (matching the engine's
 // TextureUploadManager iteration order) and writes the [width][height][mipcount][pixels] intermediate.
@@ -388,8 +388,8 @@ static void WriteFilteredCubemap(cmft::Image& rDestinationImage, const std::file
 	cmft::imageGetMipOffsets(offsets, rDestinationImage);
 
 	int64_t iTotalHalfFloats = 0;
-	int64_t iMipSize = kuiPreFilteredFaceSize;
-	for (int64_t i = 0; i < kuiPreFilteredMipCount; ++i, iMipSize /= 2)
+	int64_t iMipSize = kiPreFilteredFaceSize;
+	for (int64_t i = 0; i < kiPreFilteredMipCount; ++i, iMipSize /= 2)
 	{
 		iTotalHalfFloats += iMipSize * iMipSize * 4;
 	}
@@ -400,8 +400,8 @@ static void WriteFilteredCubemap(cmft::Image& rDestinationImage, const std::file
 
 	for (int64_t i = 0; i < 6; ++i)
 	{
-		iMipSize = kuiPreFilteredFaceSize;
-		for (int64_t j = 0; j < kuiPreFilteredMipCount; ++j, iMipSize /= 2)
+		iMipSize = kiPreFilteredFaceSize;
+		for (int64_t j = 0; j < kiPreFilteredMipCount; ++j, iMipSize /= 2)
 		{
 			int64_t iMipPixels = iMipSize * iMipSize;
 			const float* pSourceFloat = reinterpret_cast<const float*>(static_cast<uint8_t*>(rDestinationImage.m_data) + offsets[i][j]);
@@ -411,23 +411,23 @@ static void WriteFilteredCubemap(cmft::Image& rDestinationImage, const std::file
 	}
 
 	// Write intermediate file: [width][height][mipcount][pixel data]
-	int64_t iWidth = kuiPreFilteredFaceSize;
-	int64_t iHeight = kuiPreFilteredFaceSize;
-	int64_t iMipCount = kuiPreFilteredMipCount;
+	int64_t iWidth = kiPreFilteredFaceSize;
+	int64_t iHeight = kiPreFilteredFaceSize;
+	int64_t iMipCount = kiPreFilteredMipCount;
 
 	WriteStagedIntermediate(rOutputPath, [&](std::ostream& rStream)
 	{
 		rStream.write(reinterpret_cast<const char*>(&iWidth), sizeof(iWidth));
 		rStream.write(reinterpret_cast<const char*>(&iHeight), sizeof(iHeight));
 		rStream.write(reinterpret_cast<const char*>(&iMipCount), sizeof(iMipCount));
-		rStream.write(reinterpret_cast<const char*>(halfData.data()), halfData.size() * sizeof(uint16_t));
+		rStream.write(reinterpret_cast<const char*>(halfData.data()), static_cast<std::streamsize>(std::ssize(halfData) * static_cast<int64_t>(sizeof(uint16_t))));
 	});
 }
 
 // Radiance-filters every [C]-tagged .ktx cubemap that is out of date and writes the pre-filtered
 // intermediate beside the source. Returns false when input discovery itself failed, leaving the shared
 // expected-output set incomplete.
-static bool ProcessKtxCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClContext, ExpectedIblOutputs& rExpectedOutputs, std::vector<diagnostic::ExportFailure>& rFailures)
+static bool ProcessKtxCubemaps(int64_t iCpuThreads, cmft::ClContext* pClContext, ExpectedIblOutputs& rExpectedOutputs, std::vector<diagnostic::ExportFailure>& rFailures)
 {
 	try
 	{
@@ -465,12 +465,12 @@ static bool ProcessKtxCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClContext
 					LOG(kDefault, kDebug, "Generating pre-filtered cubemap for \"{}\"", rDirectoryEntry.path().filename().string());
 
 					KtxCubemapData cubemapData = LoadKtxCubemapAsFloat(rDirectoryEntry.path());
-					uint32_t uiFaceSize = cubemapData.uiFaceSize;
-					int64_t iPixelsPerFace = static_cast<int64_t>(uiFaceSize) * uiFaceSize;
+					int64_t iFaceSize = cubemapData.iFaceSize;
+					int64_t iPixelsPerFace = iFaceSize * iFaceSize;
 					int64_t iTotalPixels = iPixelsPerFace * 6;
 
 					cmft::Image sourceImage;
-					cmft::imageCreate(sourceImage, uiFaceSize, uiFaceSize, 0x000000ff, 1, 6, cmft::TextureFormat::RGBA32F);
+					cmft::imageCreate(sourceImage, static_cast<uint32_t>(iFaceSize), static_cast<uint32_t>(iFaceSize), 0x000000ff, 1, 6, cmft::TextureFormat::RGBA32F);
 					cmft::Image destinationImage;
 					common::ScopedLambda imageCleanup([&]()
 					{
@@ -479,7 +479,7 @@ static bool ProcessKtxCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClContext
 					});
 					std::memcpy(sourceImage.m_data, cubemapData.floatData.data(), iTotalPixels * 4 * sizeof(float));
 
-					cmft::imageRadianceFilter(destinationImage, kuiPreFilteredFaceSize, cmft::LightingModel::BlinnBrdf, false, kuiPreFilteredMipCount, 14, 4, sourceImage, cmft::EdgeFixup::None, uiCpuThreads, pClContext);
+					cmft::imageRadianceFilter(destinationImage, static_cast<uint32_t>(kiPreFilteredFaceSize), cmft::LightingModel::BlinnBrdf, false, static_cast<uint8_t>(kiPreFilteredMipCount), 14, 4, sourceImage, cmft::EdgeFixup::None, static_cast<uint8_t>(iCpuThreads), pClContext);
 
 					WriteFilteredCubemap(destinationImage, outputPath);
 					CompleteOutputUpdate(metadataPath, fingerprint);
@@ -503,7 +503,7 @@ static bool ProcessKtxCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClContext
 // Radiance-filters every [C]-tagged directory of six cube-face images (posx/negx/... .jpg or px/nx/... .png)
 // that is out of date and writes the pre-filtered intermediate beside the directory. Returns false when
 // input discovery itself failed, leaving the shared expected-output set incomplete.
-static bool ProcessFaceImageCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClContext, ExpectedIblOutputs& rExpectedOutputs, std::vector<diagnostic::ExportFailure>& rFailures)
+static bool ProcessFaceImageCubemaps(int64_t iCpuThreads, cmft::ClContext* pClContext, ExpectedIblOutputs& rExpectedOutputs, std::vector<diagnostic::ExportFailure>& rFailures)
 {
 	try
 	{
@@ -591,7 +591,7 @@ static bool ProcessFaceImageCubemaps(uint8_t uiCpuThreads, cmft::ClContext* pClC
 
 					cmft::imageCubemapFromFaceList(sourceImage, faceImages);
 
-					cmft::imageRadianceFilter(destinationImage, kuiPreFilteredFaceSize, cmft::LightingModel::BlinnBrdf, false, kuiPreFilteredMipCount, 14, 4, sourceImage, cmft::EdgeFixup::None, uiCpuThreads, pClContext);
+					cmft::imageRadianceFilter(destinationImage, static_cast<uint32_t>(kiPreFilteredFaceSize), cmft::LightingModel::BlinnBrdf, false, static_cast<uint8_t>(kiPreFilteredMipCount), 14, 4, sourceImage, cmft::EdgeFixup::None, static_cast<uint8_t>(iCpuThreads), pClContext);
 
 					WriteFilteredCubemap(destinationImage, outputPath);
 					CompleteOutputUpdate(metadataPath, fingerprint);

@@ -72,7 +72,7 @@ struct ExplosionTuning
 #endif
 
 inline constexpr int64_t kiMaxExplosionTrails = 8;
-inline constexpr uint8_t kuiInvalidTrailType = 255;
+inline constexpr int64_t kiInvalidTrailType = 255;
 
 enum class ExplosionFlags : uint8_t
 {
@@ -85,12 +85,12 @@ using ExplosionFlags_t = common::Flags<ExplosionFlags>;
 struct ExplosionType
 {
 	// Controller type indices for fire-and-forget effects
-	uint8_t uiPrimaryLightControllerTypeIndex = kuiInvalidControllerType;
-	uint8_t uiSecondaryLightControllerTypeIndex = kuiInvalidControllerType;
-	uint8_t uiPrimaryPuffControllerTypeIndex = kuiInvalidControllerType;
-	uint8_t uiSecondaryPuffControllerTypeIndex = kuiInvalidControllerType;
-	uint8_t uiTrailTypeIndex = kuiInvalidTrailType;
-	uint8_t uiWindRadialControllerTypeIndex = kuiInvalidControllerType;
+	int64_t iPrimaryLightControllerTypeIndex = kiInvalidControllerType;
+	int64_t iSecondaryLightControllerTypeIndex = kiInvalidControllerType;
+	int64_t iPrimaryPuffControllerTypeIndex = kiInvalidControllerType;
+	int64_t iSecondaryPuffControllerTypeIndex = kiInvalidControllerType;
+	int64_t iTrailTypeIndex = kiInvalidTrailType;
+	int64_t iWindRadialControllerTypeIndex = kiInvalidControllerType;
 
 	uint32_t uiBaseParticleCount = 0;
 	common::crc_t particleCrc = common::CrcConsteval("Textures\\Particles\\[BC4]Long\\5.png");
@@ -123,7 +123,7 @@ struct ExplosionType
 	float fTrailGravity = 2.0f;
 
 	// Secondary explosion count (lights and puffs)
-	uint32_t uiSecondaryExplosionCount = 4;
+	int64_t iSecondaryExplosionCount = 4;
 
 	float fSecondaryPositionMinimum = 0.25f;
 	float fSecondaryPositionJitter = 1.0f;
@@ -173,12 +173,12 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 	static inline ExplosionTuning sTuning;
 	static inline int64_t siTotalCount = 0;
 
-	static inline uint8_t suiPrimaryLightControllerTypeIndex = kuiInvalidControllerType;
-	static inline uint8_t suiSecondaryLightControllerTypeIndex = kuiInvalidControllerType;
-	static inline uint8_t suiPrimaryPuffControllerTypeIndex = kuiInvalidControllerType;
-	static inline uint8_t suiSecondaryPuffControllerTypeIndex = kuiInvalidControllerType;
-	static inline uint8_t suiExplosionTrailTypeIndex = kuiInvalidTrailType;
-	static inline uint8_t suiWindRadialControllerTypeIndex = kuiInvalidControllerType;
+	static inline uint8_t suiPrimaryLightControllerTypeIndex = static_cast<uint8_t>(kiInvalidControllerType);
+	static inline uint8_t suiSecondaryLightControllerTypeIndex = static_cast<uint8_t>(kiInvalidControllerType);
+	static inline uint8_t suiPrimaryPuffControllerTypeIndex = static_cast<uint8_t>(kiInvalidControllerType);
+	static inline uint8_t suiSecondaryPuffControllerTypeIndex = static_cast<uint8_t>(kiInvalidControllerType);
+	static inline int64_t siExplosionTrailTypeIndex = kiInvalidTrailType;
+	static inline uint8_t suiWindRadialControllerTypeIndex = static_cast<uint8_t>(kiInvalidControllerType);
 #endif // BT_CLIENT
 
 	static void Update(game::FrameInterpolate& __restrict rCurrentFrameInterpolate, const game::Frame& __restrict rPreviousFrame);
@@ -253,11 +253,11 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 
 	struct SpawnInfo
 	{
-		uint8_t uiTypeIndex = 0;
+		int64_t iTypeIndex = 0;
 		XMVECTOR vecPosition = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 		XMVECTOR vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 		ExplosionFlags_t flags {};
-		uint32_t uiTrailCount = 0;
+		int64_t iTrailCount = 0;
 		float fTrailAngle = XM_2PI;
 		uint32_t uiParticleCount = 0;
 		float fParticleAngle = XM_2PI;

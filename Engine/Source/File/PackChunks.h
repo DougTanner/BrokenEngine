@@ -20,8 +20,8 @@ struct AudioChunkReadEntry
 {
 	std::atomic<uint64_t> uiOwnership {0};
 	common::crc_t crc = 0;
-	uint64_t uiOffset = 0;
-	uint64_t uiLength = 0;
+	int64_t iOffset = 0;
+	int64_t iLength = 0;
 	std::array<std::byte, 16 * 1'024> data {};
 };
 
@@ -46,10 +46,10 @@ public:
 	bool IsChunkReady(common::crc_t crc) const;
 	void WaitForChunks(std::span<const common::crc_t> crcs);
 
-	bool ReadChunkData(common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer);
+	bool ReadChunkData(common::crc_t crc, int64_t iOffset, std::span<std::byte> buffer);
 
 #if defined(BT_CLIENT)
-	ChunkReadResult TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, uint64_t uiOffset, std::span<std::byte> buffer);
+	ChunkReadResult TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, int64_t iOffset, std::span<std::byte> buffer);
 	void CancelChunkRead(ChunkReadRequest& rRequest);
 #endif // BT_CLIENT
 
@@ -61,16 +61,16 @@ public:
 	void ResetTextureChunkStates(std::span<const common::crc_t> targetCrcs);
 
 	// Reclaim a dead sub-range of a resident lazy chunk's decompressed pool memory. Decommits only the
-	// page-aligned interior of [uiOffset, uiOffset + uiLength); the boundary partial-pages (which may share
+	// page-aligned interior of [iOffset, iOffset + iLength); the boundary partial-pages (which may share
 	// bytes with the neighbouring payload) and every other chunk stay committed, and the chunk's pData pointer
 	// is unchanged. A consumer must recommit and reload the range before reading it again. Main-thread
 	// only (boot / device-loss recovery / transfer-complete texture adoption) — the range must have no concurrent reader.
-	void DecommitChunkRange(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
-	// Inverse of DecommitChunkRange: MEM_COMMITs the interior and re-reads [uiOffset, uiOffset + uiLength)
+	void DecommitChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength);
+	// Inverse of DecommitChunkRange: MEM_COMMITs the interior and re-reads [iOffset, iOffset + iLength)
 	// straight from the pack file on disk into the pool (NOT via the decommitted resident copy). Uncompressed chunks only.
 	// Returns true on success; false on soft-fail (MEM_COMMIT failure / pack-open failure). On false the
 	// caller must NOT read the range — the interior may be decommitted or hold partial data.
-	[[nodiscard]] bool RecommitAndReloadChunkRange(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
+	[[nodiscard]] bool RecommitAndReloadChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength);
 
 	MemoryStats GetEagerStatistics() const;
 	MemoryStats GetLazyStatistics() const;
@@ -80,7 +80,7 @@ private:
 	friend class PackChunkLoader;
 
 	void LoadPackFiles();
-	[[nodiscard]] bool RecommitChunkRange(common::crc_t crc, const LazyChunk& rLazyChunk, uint64_t uiOffset, uint64_t uiLength);
+	[[nodiscard]] bool RecommitChunkRange(common::crc_t crc, const LazyChunk& rLazyChunk, int64_t iOffset, int64_t iLength);
 	std::filesystem::path GetDataFilePath(data::DataTypes eDataType, std::string_view extension) const;
 
 #if defined(BT_CLIENT)
@@ -92,7 +92,7 @@ public:
 	static constexpr int64_t kiAudioReadEntryCount = 6;
 
 private:
-	static constexpr uint32_t kuiInvalidAudioReadEntry = std::numeric_limits<uint32_t>::max();
+	static constexpr int64_t kiInvalidAudioReadEntry = 4'294'967'295i64;
 #if defined(BT_DEBUG)
 public:
 #endif
@@ -100,8 +100,8 @@ public:
 
 private:
 	bool HasActiveAudioRead() const;
-	bool TryClaimAudioRead(uint32_t& ruiIndex, uint64_t& ruiGeneration);
-	void LoadAudioRead(uint32_t uiIndex, uint64_t uiGeneration, int64_t iThreadIndex);
+	bool TryClaimAudioRead(int64_t& riIndex, uint64_t& ruiGeneration);
+	void LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iThreadIndex);
 	void AcknowledgeQueuedAudioReads();
 #endif // BT_CLIENT
 

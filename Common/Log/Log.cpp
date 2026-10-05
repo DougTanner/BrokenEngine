@@ -12,7 +12,7 @@
 namespace common
 {
 
-std::atomic<int64_t> giMyOutputDebugString = 0;
+constinit std::atomic<int64_t> giMyOutputDebugString = 0;
 std::mutex gLogMutex;
 
 LogRingBuffer gLogRingBuffers[kiLogCategoryCount];
@@ -33,7 +33,7 @@ std::atomic<LogLevel> gLogRuntimeLevels[kiLogCategoryCount]
 static_assert(std::size(gLogRuntimeLevels) == kiLogCategoryCount, "gLogRuntimeLevels out of sync with LogCategory");
 
 // Constant-initialized, so it reads false before this TU's dynamic initialization and after its destruction.
-static std::atomic<bool> sbLogAlive = false;
+static constinit std::atomic<bool> sbLogAlive = false;
 
 // Whole-stream file sink (Log.h EnableLogFile); teed by LogWrite under gLogMutex.
 static std::ofstream sLogFileStream;

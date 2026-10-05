@@ -30,7 +30,7 @@ void Shader::Create(const ShaderInfo& rInformation, const std::byte* pData)
 		.pCode = reinterpret_cast<const uint32_t*>(pData),
 	};
 
-	ASSERT(*reinterpret_cast<const uint32_t*>(pData) == common::ShaderHeader::kuiSpirvMagic);
+	ASSERT(*reinterpret_cast<const uint32_t*>(pData) == common::ShaderHeader::kiSpirvMagic);
 
 	CHECK_VK(vkCreateShaderModule(gpDeviceManager->mVkDevice, &vkShaderModuleCreateInfo, nullptr, &mVkShaderModule));
 	VkName(VK_OBJECT_TYPE_SHADER_MODULE, mVkShaderModule, mInformation.pChunkHeader->pcPath);

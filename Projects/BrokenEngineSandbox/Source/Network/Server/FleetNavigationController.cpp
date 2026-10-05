@@ -68,7 +68,7 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 
 			const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(rFlagship.coordinate).pCurrent).postRender.pPlayers;
 			bool bFoundFlagship = false;
-			int8_t iFlagshipNavigationDirection = -1;
+			int64_t iFlagshipNavigationDirection = -1;
 			for (int64_t k = 0; k < rPlayers.iCount; ++k)
 			{
 				if (rPlayers.pGlobalPlayerIds[k] == rFlagship.globalPlayerId)
@@ -88,7 +88,7 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 				continue;
 			}
 
-			int64_t iDirection = common::Random(3ui32, rRandom);
+			int64_t iDirection = common::Random(3i64, rRandom);
 			engine::GridCoord offset = NavigationDirectionOffset(iDirection);
 			engine::GridCoord destination {};
 			if (!engine::TryAddGridCoordinate(rFlagship.coordinate, offset.iX, offset.iY, destination)) [[unlikely]]
@@ -100,11 +100,11 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 				rFleet.frameChangeTimerSeconds = rFleet.navigationDelaySeconds;
 				continue;
 			}
-			uint8_t uiPendingTicks = static_cast<uint8_t>(engine::kiTickRate);
+			int64_t iPendingTicks = engine::kiTickRate;
 			rFleet.wantedCoordinate = destination;
-			rFleet.uiPendingFleetWantedCoordinateTicks = uiPendingTicks;
+			rFleet.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(iPendingTicks);
 			rFleet.frameChangeTimerSeconds = rFleet.navigationDelaySeconds;
-			mPendingFlagshipUpdates.push_back({.clientGuid = rGuid, .fleetGuid = rFleet.guid, .newWantedCoordinate = destination, .uiPendingFleetWantedCoordinateTicks = uiPendingTicks});
+			mPendingFlagshipUpdates.push_back({.clientGuid = rGuid, .fleetGuid = rFleet.guid, .newWantedCoordinate = destination, .iPendingFleetWantedCoordinateTicks = iPendingTicks});
 			LOG(kNetwork, kVerbose, "FleetNavigationController::TickFleetTimers Guid: ({},{}) FleetGuid: ({},{}) Direction: {} WantedCoord: ({},{})", rGuid.uiHigh, rGuid.uiLow, rFleet.guid.uiHigh, rFleet.guid.uiLow, iDirection, destination.iX, destination.iY);
 		}
 	}
@@ -167,7 +167,7 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 							.iPlayerUuid = iPlayerUuid,
 							.bIsFlagship = bMemberIsFlagship,
 							.fleetWantedCoordinate = rUpdate.newWantedCoordinate,
-							.uiPendingFleetWantedCoordinateTicks = rUpdate.uiPendingFleetWantedCoordinateTicks,
+							.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(rUpdate.iPendingFleetWantedCoordinateTicks),
 						},
 					});
 					++iMembersUpdated;

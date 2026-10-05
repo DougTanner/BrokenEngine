@@ -31,8 +31,8 @@ public:
 	explicit ClientSessionRuntime(game::ClientSession& rSession);
 	~ClientSessionRuntime();
 
-	void Connect(std::string_view serverAddress, uint16_t uiPort, int64_t iCoordinateSlots);
-	void ConnectToDiscoveredServer(uint16_t uiPort, int64_t iCoordinateSlots);
+	void Connect(std::string_view serverAddress, int64_t iPort, int64_t iCoordinateSlots);
+	void ConnectToDiscoveredServer(int64_t iPort, int64_t iCoordinateSlots);
 	void Disconnect();
 	void StartDiscovery();
 	void PollDiscovery();
@@ -54,7 +54,7 @@ public:
 		InitializeLogTickScope(optionalTickScope);
 
 		rLogFunction();
-		mpClient->SendSimplePacket(ePacketType, NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, rArguments...);
+		mpClient->SendSimplePacket(ePacketType, NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE, rArguments...);
 
 		{
 			// Send the user command now instead of waiting for the tick-cadence ack flush.

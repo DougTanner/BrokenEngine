@@ -10,9 +10,9 @@ std::string ToString(std::wstring_view wideChars)
 		return {};
 	}
 
-	int iSize = WideCharToMultiByte(CP_UTF8, 0, wideChars.data(), static_cast<int>(wideChars.size()), nullptr, 0, nullptr, nullptr);
-	std::string result(iSize, '\0');
-	WideCharToMultiByte(CP_UTF8, 0, wideChars.data(), static_cast<int>(wideChars.size()), result.data(), iSize, nullptr, nullptr);
+	int64_t iSize = WideCharToMultiByte(CP_UTF8, 0, wideChars.data(), static_cast<int>(wideChars.size()), nullptr, 0, nullptr, nullptr);
+	std::string result(static_cast<std::string::size_type>(iSize), '\0');
+	WideCharToMultiByte(CP_UTF8, 0, wideChars.data(), static_cast<int>(wideChars.size()), result.data(), static_cast<int>(iSize), nullptr, nullptr);
 	return result;
 }
 

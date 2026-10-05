@@ -14,7 +14,7 @@ struct AgentUiItem
 	char pcValue[64] {};
 	char pcWindow[32] {};
 	XMFLOAT4 f4Rectangle {}; // pixels: {minX, minY, maxX, maxY}
-	int32_t iStatusFlags = 0; // ImGuiItemStatusFlags_ bits supplied by ItemAdd, ItemInfo, and menu helpers
+	int64_t iStatusFlags = 0; // ImGuiItemStatusFlags_ bits supplied by ItemAdd, ItemInfo, and menu helpers
 	bool bDisabled = false;
 };
 
@@ -49,7 +49,7 @@ public:
 
 	// Write-table fill (called from the imgui hooks during ImGui::NewFrame..Render).
 	void HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Rectangle, const char* pcWindow, bool bDisabled, bool bVisible);
-	void HookItemInfo(ImGuiID uiIdentifier, const char* pcLabel, int32_t iStatusFlags);
+	void HookItemInfo(ImGuiID uiIdentifier, const char* pcLabel, int64_t iStatusFlags);
 
 	// Attach menu-control metadata to an item already submitted in the current write table.
 	void RecordItemValue(ImGuiID uiIdentifier, const char* pcValue);

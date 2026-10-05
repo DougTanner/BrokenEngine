@@ -28,7 +28,7 @@ inline constexpr float kfUnderwaterMaskThresholdMeters = -2.5f;
 inline void AlignOutputStream(std::fstream& rFileStream)
 {
 	static constexpr char kpcPadding[kiAlignmentBytes] {};
-	std::streamoff iPos = rFileStream.tellp();
+	int64_t iPos = static_cast<int64_t>(rFileStream.tellp());
 	ASSERT(iPos >= 0);
 	// The padding count is in [0, kiAlignmentBytes) and is zero when the position is aligned.
 	int64_t iBytesToAlign = (kiAlignmentBytes - (static_cast<int64_t>(iPos) % kiAlignmentBytes)) % kiAlignmentBytes;
@@ -142,16 +142,16 @@ static_assert(sizeof(AnimationKeyframeCubic) == 52, "AnimationKeyframeCubic layo
 struct AnimationChannel
 {
 	// The runtime reader (AnimationData) and DataPacker writer (SceneAnimationLoader) share these glTF channel enums.
-	static constexpr uint8_t kTargetPathTranslation = 0;
-	static constexpr uint8_t kTargetPathRotation    = 1;
-	static constexpr uint8_t kTargetPathScale       = 2;
-	static constexpr uint8_t kInterpolationStep        = 0;
-	static constexpr uint8_t kInterpolationLinear      = 1;
-	static constexpr uint8_t kInterpolationCubicSpline = 2;
+	static constexpr int64_t kiTargetPathTranslation = 0;
+	static constexpr int64_t kiTargetPathRotation    = 1;
+	static constexpr int64_t kiTargetPathScale       = 2;
+	static constexpr int64_t kiInterpolationStep        = 0;
+	static constexpr int64_t kiInterpolationLinear      = 1;
+	static constexpr int64_t kiInterpolationCubicSpline = 2;
 
 	uint16_t uiNodeIndex = 0;     // Node index in skeleton.nodes[]
-	uint8_t uiTargetPath = 0;     // kTargetPath* (translation/rotation/scale)
-	uint8_t uiInterpolation = 0;  // kInterpolation* (STEP/LINEAR/CUBICSPLINE)
+	uint8_t uiTargetPath = 0;     // kiTargetPath* (translation/rotation/scale)
+	uint8_t uiInterpolation = 0;  // kiInterpolation* (STEP/LINEAR/CUBICSPLINE)
 	uint32_t uiKeyframeStart = 0; // Index into keyframe array
 	uint32_t uiKeyframeCount = 0;
 };
@@ -328,7 +328,7 @@ struct ShaderHeader
 	static constexpr int64_t kiMaxDescriptorSetLayoutBindings = 32;
 	static constexpr int64_t kiMaxVertexInputAttributeDescriptions = 12;
 	// First word of every SPIR-V module; asserted by the DataPacker writer and the engine reader
-	static constexpr uint32_t kuiSpirvMagic = 0x07230203;
+	static constexpr int64_t kiSpirvMagic = 0x07230203;
 
 	int64_t iDescriptorSetLayoutBindings = 0;
 	int64_t iVertexInputAttributeDescriptions = 0;

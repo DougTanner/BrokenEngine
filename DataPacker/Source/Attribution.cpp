@@ -15,7 +15,7 @@ struct PendingCopy
 
 static bool PathLess(const std::filesystem::path& rLeft, const std::filesystem::path& rRight)
 {
-	int iResult = CompareStringOrdinal(rLeft.native().c_str(), -1, rRight.native().c_str(), -1, TRUE);
+	int64_t iResult = CompareStringOrdinal(rLeft.native().c_str(), -1, rRight.native().c_str(), -1, TRUE);
 	return iResult == CSTR_LESS_THAN || (iResult == CSTR_EQUAL && CompareStringOrdinal(rLeft.native().c_str(), -1, rRight.native().c_str(), -1, FALSE) == CSTR_LESS_THAN);
 }
 
@@ -34,12 +34,12 @@ static void ValidateAttributionDestination(const std::filesystem::path& rAttribu
 		DWORD uiAttributes = GetFileAttributesW(currentPath.native().c_str());
 		if (uiAttributes == INVALID_FILE_ATTRIBUTES)
 		{
-			DWORD uiError = GetLastError();
-			if (uiError == ERROR_FILE_NOT_FOUND || uiError == ERROR_PATH_NOT_FOUND)
+			int64_t iError = GetLastError();
+			if (iError == ERROR_FILE_NOT_FOUND || iError == ERROR_PATH_NOT_FOUND)
 			{
 				return;
 			}
-			throw std::runtime_error(std::format("Cannot validate attribution destination: {} (Win32 {})", currentPath.string(), uiError));
+			throw std::runtime_error(std::format("Cannot validate attribution destination: {} (Win32 {})", currentPath.string(), iError));
 		}
 		if ((uiAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
 		{
@@ -131,7 +131,7 @@ static std::vector<std::filesystem::path> SelectLicenseFiles(const std::vector<s
 	for (const std::filesystem::directory_entry& rFileEntry : rFiles)
 	{
 		std::string filenameLower = common::ToLower(rFileEntry.path().filename().string());
-		if (filenameLower.find("copying") != std::string::npos || filenameLower == "manual.md" || filenameLower.find("readme") != std::string::npos)
+		if (filenameLower.contains("copying") || filenameLower == "manual.md" || filenameLower.contains("readme"))
 		{
 			bFoundLicense = true;
 			licenseFiles.push_back(rFileEntry.path());

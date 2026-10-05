@@ -3,13 +3,13 @@
 #if defined(BT_SERVER)
 
 #include "Frame/GridCoord.h"
+#include "Network/Server/ServerBufferedFrames.h"
 #include "Network/Server/ServerTypes.h"
 #include "Network/NetworkCursor.h"
 
 namespace engine
 {
 
-struct FrameStaticData;
 class ServerSessionRuntime;
 
 } // namespace engine
@@ -17,7 +17,6 @@ class ServerSessionRuntime;
 namespace game
 {
 
-struct Frame;
 struct StatusChange;
 
 } // namespace game
@@ -28,7 +27,7 @@ namespace engine
 struct ReceivedGamePacket
 {
 	int64_t iClientId = 0;
-	uint8_t uiPacketType = 0;
+	int64_t iPacketType = 0;
 	// Heap: raw game packet payload (type byte stripped)
 	std::vector<uint8_t> payload;
 };
@@ -42,7 +41,7 @@ struct ClientConnection
 		int64_t iPreviousResendCount = 0;
 		int64_t iResendLogCooldown = 0;
 		// Tick of the last full state sent on this slot, until the client's re-baselined ACK floor arrives or
-		// Server::ClientAcknowledgementStream's bounded window closes on it.
+		// ServerBufferedFrames::ApplyAckStream's bounded window closes on it.
 		// Server-local: the client derives the same tick from the full state itself, so this stays off the wire.
 		int64_t iPendingFullStateTick = -1;
 		bool bHoldUpdatesUntilFullStateAck = false;
@@ -106,53 +105,11 @@ struct ClientConnection
 	{
 		SlotState& rSlot = slots.at(iSlot);
 		// Reset ACK state but preserve epoch (incremented on next allocation)
-		uint16_t uiEpoch = rSlot.ack.uiEpoch;
+		int64_t iEpoch = rSlot.ack.uiEpoch;
 		rSlot = {};
-		rSlot.ack.uiEpoch = uiEpoch;
+		rSlot.ack.uiEpoch = static_cast<uint16_t>(iEpoch);
 	}
 
-};
-
-// Per-coord ring buffer entry for re-send support
-struct PerCoordBufferedFrame
-{
-	int64_t iTick = 0;
-	common::crc_t uiSharedCrc = 0;
-	// Heap: variable-size compressed status change data per frame
-	std::vector<uint8_t> compressedData;
-};
-
-struct BufferedFullFrame
-{
-	int64_t iTick = 0;
-	// Heap: serialized frame data per grid coordinate for debug frame requests
-	std::unordered_map<GridCoord, std::string> serializedFrames;
-};
-
-// Server main thread only. Set mpTarget to the destination before writing; appending retains its
-// capacity across serializations.
-class StringAppendStreamBuf : public std::streambuf
-{
-public:
-
-	std::string* mpTarget = nullptr;
-
-protected:
-
-	int_type overflow(int_type iChar) override
-	{
-		if (iChar != traits_type::eof())
-		{
-			mpTarget->push_back(static_cast<char>(iChar));
-		}
-		return traits_type::not_eof(iChar);
-	}
-
-	std::streamsize xsputn(const char_type* pData, std::streamsize iCount) override
-	{
-		mpTarget->append(pData, static_cast<size_t>(iCount));
-		return iCount;
-	}
 };
 
 // Which of an update's two Server::Poll calls is running. The tick-boundary poll continues the admission
@@ -174,13 +131,11 @@ class Server
 {
 public:
 
-	explicit Server(uint16_t uiPort);
+	explicit Server(int64_t iPort);
 	~Server();
 
 	ClientConnection* FindClient(int64_t iClientId);
 	const ClientConnection* FindClient(int64_t iClientId) const;
-	void SendCoordinateFullState(int64_t iClientId, int64_t iSlot, int64_t iTick, GridCoord coordinate, const game::Frame* pFrame);
-	void SendCoordinateStaticData(int64_t iClientId, int64_t iSlot, GridCoord coordinate, const FrameStaticData& rStaticData);
 	void AdvanceLoadGeneration();
 	void BroadcastLoadNotification();
 	// Consume-once: sends only when TimeStep recorded an applied time-scale change since the last call.
@@ -197,21 +152,17 @@ public:
 	// Records a client->server contract violation against eKind's count; escalates to disconnect at
 	// kiCorruptViolationDisconnectCount corrupt or kiRateViolationDisconnectCount outstanding rate violations.
 	// Callers MUST NOT touch their ClientConnection* afterward -- the client may have been removed.
-	void RecordContractViolation(int64_t iClientId, ContractViolationKind eKind, std::string_view reason, uint8_t uiPacketType, int64_t iSize);
+	void RecordContractViolation(int64_t iClientId, ContractViolationKind eKind, std::string_view reason, int64_t iPacketType, int64_t iSize);
 
 	// Wire dispatch entry point for one received packet. Public so a harness fixture can inject a
 	// deliberately malformed packet through the real admission, dispatch, and violation path.
 	void Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer);
 
 private:
+	friend class ServerBufferedFrames;
 	friend class ServerSessionRuntime;
 	void Poll(const NetworkTimeState& rTimeState, ServerPollMode ePollMode);
-	void BufferFrame(int64_t iTick, std::span<const std::pair<GridCoord, GridUpdateData>> gridUpdates);
-	void BufferFullFrame(int64_t iTick, std::span<const std::pair<GridCoord, const game::Frame*>> frames);
-	void SendUpdate(ClientConnection& rClient, int64_t iTick);
-	void SendResends(ClientConnection& rClient, int64_t iTick);
 	void Flush();
-	void ClearBufferedFrames();
 
 	void Connect(const ENetEvent& rEvent);
 	void Disconnect(const ENetEvent& rEvent);
@@ -231,12 +182,7 @@ private:
 	void SendSubscribeAccept(const ClientConnection& rClient, int64_t iSlot, GridCoord coordinate);
 	void SendTimespeedUpdate(ENetPeer* pPeer, int64_t iMultiply, int64_t iDivide);
 
-	void WriteBufferedFramePacket(common::Workbuffer& rWorkbuffer, PacketType eType, int64_t iSlot, uint16_t uiEpoch, const PerCoordBufferedFrame& rBuffered, int64_t iTimestampNanoseconds);
-	const PerCoordBufferedFrame* FindBufferedFrame(GridCoord coordinate, int64_t iTick) const;
-	int CompressToBuffer(std::span<const char> data);
 	void RemoveClient(int64_t iClientId);
-
-	void UpdateResendLogState(ClientConnection& rClient, int64_t iSlot, int64_t iSlotResendCount, GridCoord coordinate);
 
 	ENetHost* mpHost = nullptr;
 	int64_t miNextClientId = 1;
@@ -244,25 +190,9 @@ private:
 	// Budget stall grace (see Server::Poll): gate 2 records no violation before mBudgetGraceDeadline.
 	std::chrono::steady_clock::time_point mPreviousPollEnd {};
 	std::chrono::steady_clock::time_point mBudgetGraceDeadline {};
-	uint8_t muiLoadGeneration = 0;
+	int64_t miLoadGeneration = 0;
 
-	// Per-coord ring buffers for re-sends
-	std::unordered_map<GridCoord, std::deque<PerCoordBufferedFrame>> mPerCoordinateBufferedFrames;
-	int64_t miLatestBufferedTick = -1;
-
-	// Ring buffer for debug frame requests
-	std::deque<BufferedFullFrame> mBufferedFullFrames;
-
-	// Compression scratch buffer (reused across BufferFrame calls)
-	std::vector<uint8_t> mCompressionBuffer;
-
-	// Server main thread only. mFrameStream writes to mFrameStreamBuffer.mpTarget: recycled full-frame pool
-	// entries or mSendScratch for transient coordinate sends.
-	StringAppendStreamBuf mFrameStreamBuffer;
-	std::ostream mFrameStream = std::ostream(&mFrameStreamBuffer);
-	std::string mSendScratch;
-	// Heap: recycled per-coord buffers for the full-frame ring, reused across BufferFullFrame calls
-	std::vector<std::string> mFullFramePool;
+	ServerBufferedFrames mBufferedFrames = ServerBufferedFrames(*this);
 
 	// Network simulation delay queue
 	std::deque<DelayedPacket> mDelayedPackets;

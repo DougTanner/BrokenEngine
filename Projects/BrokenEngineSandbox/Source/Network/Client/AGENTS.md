@@ -19,7 +19,7 @@ Client-only game networking. `ClientSession` is the game-policy wrapper over `en
 ## Reconciliation Invariants
 
 - A server-validated tick is frozen and never simulated again; preserve render-behind history when advancing confirmed state. Replay and catch-up stay within the coordinate ring budget: the retained authoritative base holds one ring slot, so combined replay and catch-up writes are one less than the ring size and never wrap onto the base.
-- Server-load notification clears coord, clock, identity, fleet, subscription, and reconciler state before the client accepts post-load data.
+- Server-load notification clears coord (kept while the harness viewer pin is set), clock, identity, fleet, subscription, and reconciler state before the client accepts post-load data.
 - Player-event and fleet-sync handlers have independent exception boundaries, each splitting corrupt data from an ordinary local failure under the hub's corrupt-input policy (`../../../../../Engine/Source/Network/AGENTS.md`). Static-data application and per-frame gameplay hydration remain outside those catches.
 - Desired subscriptions stay sticky to reduce visible churn. During a real debug-frame wait or the synthetic full-state fixture stall, transport polling and receive-buffer drains continue while subscription updates, simulation, and reconciliation remain stalled.
 

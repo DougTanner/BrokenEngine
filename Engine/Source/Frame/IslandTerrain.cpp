@@ -43,7 +43,7 @@ IslandTerrain::IslandTerrain()
 	}
 
 	// Stable, deterministic iteration order for slot assignment (Phase 3).
-	mIslandCrcsSorted.reserve(mIslands.size());
+	mIslandCrcsSorted.reserve(static_cast<size_t>(std::ssize(mIslands)));
 	for (const auto& [rCrc, rTemplate] : mIslands)
 	{
 		mIslandCrcsSorted.push_back(rCrc);
@@ -99,7 +99,7 @@ IslandTerrain::IslandTerrain()
 	// leaves another template sampling freed storage after its generation-verifier record is removed.
 	{
 		std::vector<common::crc_t> channelCrcs;
-		channelCrcs.reserve(mIslandCrcsSorted.size() * 4);
+		channelCrcs.reserve(static_cast<size_t>(std::ssize(mIslandCrcsSorted) * 4));
 		for (common::crc_t islandCrc : mIslandCrcsSorted)
 		{
 			const common::IslandHeader& rIslandHeader = rChunkMap.at(islandCrc).header.islandHeader;
@@ -198,7 +198,7 @@ void IslandTerrain::WaitForElevationMaps()
 		// asynchronously restored only when this template gains a render slot.
 		rTemplate.pfMeshPositions = reinterpret_cast<const float*>(pAfterHeightmap);
 		rTemplate.puiMeshIndices = reinterpret_cast<const uint32_t*>(pAfterHeightmap + iMeshPositionBytes);
-		gpFileManager->mpPackChunks->DecommitChunkRange(rCrc, static_cast<uint64_t>(iHeightmapBytes), static_cast<uint64_t>(iMeshBytes));
+		gpFileManager->mpPackChunks->DecommitChunkRange(rCrc, iHeightmapBytes, iMeshBytes);
 		rTemplate.bMeshCpuDecommitted = true;
 #endif
 
@@ -206,7 +206,7 @@ void IslandTerrain::WaitForElevationMaps()
 		// The server never reads the mesh CPU slice (no GPU upload, no device loss), so reclaim it immediately after
 		// load: decommit the [positions][indices] sub-range of the kIsland chunk. Heightmap (before, offset 0) and hull
 		// (after) stay resident — the server reads the heightmap for NavContour below and the hull for placement/nav.
-		gpFileManager->mpPackChunks->DecommitChunkRange(rCrc, static_cast<uint64_t>(iHeightmapBytes), static_cast<uint64_t>(iMeshBytes));
+		gpFileManager->mpPackChunks->DecommitChunkRange(rCrc, iHeightmapBytes, iMeshBytes);
 #endif
 	}
 
@@ -236,8 +236,8 @@ void IslandTerrain::WaitForElevationMaps()
 static bool ResolveLocalPosition(GridCoord& rCoord, XMFLOAT4A& rf4Local)
 {
 
-	int32_t iStepX = static_cast<int32_t>(std::floor((rf4Local.x - kfBaseAreaMinimumX) / kfCellWidth));
-	int32_t iStepY = static_cast<int32_t>(std::floor((rf4Local.y - kfBaseAreaMinimumY) / kfCellHeight));
+	int64_t iStepX = static_cast<int64_t>(std::floor((rf4Local.x - kfBaseAreaMinimumX) / kfCellWidth));
+	int64_t iStepY = static_cast<int64_t>(std::floor((rf4Local.y - kfBaseAreaMinimumY) / kfCellHeight));
 	if (iStepX == 0 && iStepY == 0)
 	{
 		return true;
@@ -330,7 +330,7 @@ static float CellElevation(const IslandTerrain& rTerrain, const FrameStaticData&
 {
 	const std::vector<IslandPlacement>& rIslands = rStaticData.islands;
 	const std::vector<IslandRenderQuery>& rQueries = rStaticData.islandRenderQueries;
-	bool bHaveQueryCache = rQueries.size() == rIslands.size();
+	bool bHaveQueryCache = std::ssize(rQueries) == std::ssize(rIslands);
 
 	// Reused across the fallback path's iterations (every field overwritten before use each time), so the
 	// common cache-hit path constructs nothing per island.

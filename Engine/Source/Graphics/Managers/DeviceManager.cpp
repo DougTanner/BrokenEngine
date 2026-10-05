@@ -144,6 +144,7 @@ DeviceManager::DeviceManager()
 		.descriptorBindingPartiallyBound = VK_TRUE,
 		.runtimeDescriptorArray = VK_TRUE,
 		.scalarBlockLayout = VK_TRUE,
+		.hostQueryReset = VK_TRUE,
 	};
 	if constexpr (kbGraphicsProcessingUnitAssistedValidation || kbDebugPrintf)
 	{
@@ -162,27 +163,27 @@ DeviceManager::DeviceManager()
 	float pfQueuePriorities[] {1.0f};
 
 	// Deduplicate queue family indices (Vulkan forbids duplicate family indices in VkDeviceCreateInfo)
-	uint32_t pUniqueFamilyIndices[] {static_cast<uint32_t>(gpInstanceManager->miGraphicsQueueFamilyIndex), static_cast<uint32_t>(gpInstanceManager->miPresentQueueFamilyIndex), static_cast<uint32_t>(gpInstanceManager->miTransferQueueFamilyIndex)};
+	int64_t pUniqueFamilyIndices[] {gpInstanceManager->miGraphicsQueueFamilyIndex, gpInstanceManager->miPresentQueueFamilyIndex, gpInstanceManager->miTransferQueueFamilyIndex};
 	std::sort(std::begin(pUniqueFamilyIndices), std::end(pUniqueFamilyIndices));
-	uint32_t uiUniqueFamilyCount = static_cast<uint32_t>(std::unique(std::begin(pUniqueFamilyIndices), std::end(pUniqueFamilyIndices)) - std::begin(pUniqueFamilyIndices));
+	int64_t iUniqueFamilyCount = std::unique(std::begin(pUniqueFamilyIndices), std::end(pUniqueFamilyIndices)) - std::begin(pUniqueFamilyIndices);
 
 	VkDeviceQueueCreateInfo pVkDeviceQueueCreateInfo[3] {};
-	for (uint32_t i = 0; i < uiUniqueFamilyCount; ++i)
+	for (int64_t i = 0; i < iUniqueFamilyCount; ++i)
 	{
 		pVkDeviceQueueCreateInfo[i] =
 		{
 			.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
 			.pNext = nullptr,
-			.queueFamilyIndex = pUniqueFamilyIndices[i],
+			.queueFamilyIndex = static_cast<uint32_t>(pUniqueFamilyIndices[i]),
 			.queueCount = 1,
 			.pQueuePriorities = pfQueuePriorities,
 		};
 	}
-	vkDeviceCreateInfo.queueCreateInfoCount = uiUniqueFamilyCount;
+	vkDeviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(iUniqueFamilyCount);
 	vkDeviceCreateInfo.pQueueCreateInfos = pVkDeviceQueueCreateInfo;
-	vkDeviceCreateInfo.enabledLayerCount = kbVulkanDebugLayers ? static_cast<uint32_t>(gpInstanceManager->mValidationLayers.size()) : 0;
+	vkDeviceCreateInfo.enabledLayerCount = kbVulkanDebugLayers ? static_cast<uint32_t>(std::ssize(gpInstanceManager->mValidationLayers)) : 0;
 	vkDeviceCreateInfo.ppEnabledLayerNames = kbVulkanDebugLayers ? gpInstanceManager->mValidationLayers.data() : nullptr;
-	vkDeviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+	vkDeviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(std::ssize(deviceExtensions));
 	vkDeviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
 	VkPhysicalDeviceFeatures vkPhysicalDeviceFeatures
 	{
@@ -443,7 +444,7 @@ void DeviceManager::LoadPipelineCache()
 
 								if (bCompatible)
 								{
-									vkPipelineCacheCreateInfo.initialDataSize = static_cast<VkDeviceSize>(cacheData.size() - sizeof(uiStoredCrc));
+									vkPipelineCacheCreateInfo.initialDataSize = static_cast<size_t>(std::ssize(cacheData) - static_cast<int64_t>(sizeof(uiStoredCrc)));
 									vkPipelineCacheCreateInfo.pInitialData = cacheData.data() + sizeof(uiStoredCrc);
 									LOG(kGraphics, kDebug, "Loaded pipeline cache ({} bytes)", iSize);
 								}
@@ -483,7 +484,7 @@ void DeviceManager::ProbeTransferQueueOwnershipTransfer(bool bMaintenance9Availa
 	}
 	vkGetPhysicalDeviceQueueFamilyProperties2(gpInstanceManager->mVkPhysicalDevice, &uiQueueFamilyCount, queueFamilyProperties2.data());
 
-	int64_t iTransferFamily = static_cast<uint32_t>(gpInstanceManager->miTransferQueueFamilyIndex);
+	int64_t iTransferFamily = gpInstanceManager->miTransferQueueFamilyIndex;
 	uint32_t uiGraphicsFamily = static_cast<uint32_t>(gpInstanceManager->miGraphicsQueueFamilyIndex);
 	// Both indices must identify valid queue families; InstanceManager falls back to the graphics family when no transfer family is available.
 	ASSERT(iTransferFamily < uiQueueFamilyCount && uiGraphicsFamily < uiQueueFamilyCount);

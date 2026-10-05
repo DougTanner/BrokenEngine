@@ -219,20 +219,20 @@ static void CropAndRepackMesh(std::vector<float>& rMeshPositions, std::vector<ui
 	};
 
 	std::vector<uint32_t> survivingIndices;
-	survivingIndices.reserve(rMeshIndices.size());
+	survivingIndices.reserve(static_cast<size_t>(std::ssize(rMeshIndices)));
 	for (int64_t i = 0; i + 2 < std::ssize(rMeshIndices); i += 3)
 	{
-		uint32_t iA = rMeshIndices[i + 0];
-		uint32_t iB = rMeshIndices[i + 1];
-		uint32_t iC = rMeshIndices[i + 2];
+		int64_t iA = rMeshIndices[i + 0];
+		int64_t iB = rMeshIndices[i + 1];
+		int64_t iC = rMeshIndices[i + 2];
 		if (VertexOutside(iA) && VertexOutside(iB) && VertexOutside(iC))
 		{
 			++iDiscardedTriangles;
 			continue;
 		}
-		survivingIndices.push_back(iA);
-		survivingIndices.push_back(iB);
-		survivingIndices.push_back(iC);
+		survivingIndices.push_back(static_cast<uint32_t>(iA));
+		survivingIndices.push_back(static_cast<uint32_t>(iB));
+		survivingIndices.push_back(static_cast<uint32_t>(iC));
 	}
 	rMeshIndices = std::move(survivingIndices);
 
@@ -245,10 +245,10 @@ static void CropAndRepackMesh(std::vector<float>& rMeshPositions, std::vector<ui
 	// Compact + cache-optimize the vertex buffer: meshopt_optimizeVertexFetch reorders surviving
 	// vertices into index-access order (GPU fetch efficiency) and drops orphans left by the crop,
 	// rewriting rMeshIndices in place. Positions are bare float XYZ triples (12-byte stride).
-	size_t uiOldVertexCount = rMeshPositions.size() / 3;
-	std::vector<float> packedPositions(rMeshPositions.size());
-	size_t uiNewVertexCount = meshopt_optimizeVertexFetch(packedPositions.data(), rMeshIndices.data(), rMeshIndices.size(), rMeshPositions.data(), uiOldVertexCount, sizeof(float) * 3);
-	packedPositions.resize(uiNewVertexCount * 3);
+	int64_t iOldVertexCount = std::ssize(rMeshPositions) / 3;
+	std::vector<float> packedPositions(static_cast<size_t>(std::ssize(rMeshPositions)));
+	int64_t iNewVertexCount = static_cast<int64_t>(meshopt_optimizeVertexFetch(packedPositions.data(), rMeshIndices.data(), static_cast<size_t>(std::ssize(rMeshIndices)), rMeshPositions.data(), static_cast<size_t>(iOldVertexCount), sizeof(float) * 3));
+	packedPositions.resize(static_cast<size_t>(iNewVertexCount * 3));
 	rMeshPositions = std::move(packedPositions);
 
 	// Re-center XY of every surviving vertex on the post-crop center. Z is unchanged
@@ -258,14 +258,14 @@ static void CropAndRepackMesh(std::vector<float>& rMeshPositions, std::vector<ui
 		rMeshPositions[i * 3 + 0] -= fCropCenterXMeters;
 		rMeshPositions[i * 3 + 1] -= fCropCenterYMeters;
 	}
-	LOG(kDefault, kDebug, "Mesh chunk \"{}\": cropped {} triangles outside bbox, re-centered XY by ({:.2f}, {:.2f})m, {} -> {} vertices", rLeafDirectory.string(), iDiscardedTriangles, fCropCenterXMeters, fCropCenterYMeters, uiOldVertexCount, std::ssize(rMeshPositions) / 3);
+	LOG(kDefault, kDebug, "Mesh chunk \"{}\": cropped {} triangles outside bbox, re-centered XY by ({:.2f}, {:.2f})m, {} -> {} vertices", rLeafDirectory.string(), iDiscardedTriangles, fCropCenterXMeters, fCropCenterYMeters, iOldVertexCount, std::ssize(rMeshPositions) / 3);
 }
 
 static void WriteMeshProcessed(const std::filesystem::path& rLeafIntermediatesDirectory, const std::vector<float>& rMeshPositions, const std::vector<uint32_t>& rMeshIndices)
 {
 	std::ofstream meshOutput(rLeafIntermediatesDirectory / "MeshProcessed.bin", std::ios::binary | std::ios::trunc);
-	int32_t iVertexCount32 = static_cast<int32_t>(rMeshPositions.size() / 3);
-	int32_t iIndexCount32 = static_cast<int32_t>(rMeshIndices.size());
+	int32_t iVertexCount32 = static_cast<int32_t>(std::ssize(rMeshPositions) / 3);
+	int32_t iIndexCount32 = static_cast<int32_t>(std::ssize(rMeshIndices));
 	meshOutput.write(reinterpret_cast<const char*>(&iVertexCount32), sizeof(int32_t));
 	meshOutput.write(reinterpret_cast<const char*>(&iIndexCount32), sizeof(int32_t));
 	meshOutput.write(reinterpret_cast<const char*>(rMeshPositions.data()), static_cast<std::streamsize>(std::ssize(rMeshPositions) * static_cast<int64_t>(sizeof(float))));

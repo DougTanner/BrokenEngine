@@ -52,9 +52,9 @@ void RegisterEngineTweakSections()
 	TweaksScreenBase::RegisterSection(giTweakSectionWind, {.displayName = "Wind", .stableKey = "Wind", .pRender = RenderWindSection});
 }
 
-void RenderTweakExtensionSubtabs(TweaksScreenBase& rScreen, int64_t iSection, int8_t iFirstSubtab)
+void RenderTweakExtensionSubtabs(TweaksScreenBase& rScreen, int64_t iSection, int64_t iFirstSubtab)
 {
-	for (int8_t i = iFirstSubtab; const TweakExtensionHook& rHook : game::kTweakExtensionHooks)
+	for (int64_t i = iFirstSubtab; const TweakExtensionHook& rHook : game::kTweakExtensionHooks)
 	{
 		if (*rHook.piSection != iSection)
 		{
@@ -159,7 +159,7 @@ void TweaksScreenBase::ChevronIndexSelector(std::string_view label, Wrapper& rWr
 	}
 }
 
-bool TweaksScreenBase::BeginSubtab(const char* pcLabel, int64_t iSection, int8_t iTab)
+bool TweaksScreenBase::BeginSubtab(const char* pcLabel, int64_t iSection, int64_t iTab)
 {
 	bool bApplySavedSubtab = (mApplySubtab & SectionFlag(iSection)) && miActiveSubtab[iSection] == iTab;
 	if (!ImGui::BeginTabItem(pcLabel, nullptr, bApplySavedSubtab ? ImGuiTabItemFlags_SetSelected : 0))
@@ -173,7 +173,7 @@ bool TweaksScreenBase::BeginSubtab(const char* pcLabel, int64_t iSection, int8_t
 	}
 	if (!(mApplySubtab & SectionFlag(iSection)))
 	{
-		miActiveSubtab[iSection] = iTab;
+		miActiveSubtab[iSection] = static_cast<int8_t>(iTab);
 	}
 	return true;
 }
@@ -460,14 +460,14 @@ void TweaksScreenBase::RunSliderAuditFrame()
 		{
 			std::copy(std::begin(miActiveSubtab), std::end(miActiveSubtab), std::begin(miPreAuditSubtab));
 			ScopedSuppressAllocationTracking suppress;
-			size_t uiSliderCount = TweaksSliderMap::Get().size();
-			mAuditTouched.reserve(uiSliderCount);
+			int64_t iSliderCount = std::ssize(TweaksSliderMap::Get());
+			mAuditTouched.reserve(static_cast<size_t>(iSliderCount));
 			mAuditMissed.reserve(8); // typical drift is small; reserve nominal to avoid 1-element bucket churn
 		}
 
 		for (int64_t i = 0; i < msiSectionCount; ++i)
 		{
-			miActiveSubtab[i] = miAuditFrame;
+			miActiveSubtab[i] = static_cast<int8_t>(miAuditFrame);
 			mApplySubtab.Set(SectionFlag(i));
 		}
 

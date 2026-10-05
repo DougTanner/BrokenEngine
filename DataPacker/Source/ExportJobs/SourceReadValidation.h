@@ -4,7 +4,7 @@
 // Every throw is prefixed with the caller-supplied context so an aggregate diagnostic still names the
 // job that failed.
 
-inline uintmax_t SourceFileSize(const std::filesystem::path& rPath, std::string_view context)
+inline int64_t SourceFileSize(const std::filesystem::path& rPath, std::string_view context)
 {
 	std::error_code fileSizeError;
 	uintmax_t uiFileSize = std::filesystem::file_size(rPath, fileSizeError);
@@ -12,7 +12,7 @@ inline uintmax_t SourceFileSize(const std::filesystem::path& rPath, std::string_
 	{
 		throw std::runtime_error(std::format("{} invalid source file size", context));
 	}
-	return uiFileSize;
+	return static_cast<int64_t>(uiFileSize);
 }
 
 inline uintmax_t MultiplySourceBytes(uintmax_t uiCount, size_t uiElementSize, std::string_view context)
@@ -53,8 +53,8 @@ inline void ReadSourceBytes(std::istream& rStream, std::span<char> data, std::st
 		return;
 	}
 
-	std::streamsize iByteCount = static_cast<std::streamsize>(data.size());
-	rStream.read(data.data(), iByteCount);
+	int64_t iByteCount = static_cast<int64_t>(data.size());
+	rStream.read(data.data(), static_cast<std::streamsize>(iByteCount));
 	if (!rStream || rStream.gcount() != iByteCount)
 	{
 		throw std::runtime_error(std::format("{} failed to read complete source file", context));

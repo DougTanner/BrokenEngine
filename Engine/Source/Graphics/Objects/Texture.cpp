@@ -59,7 +59,7 @@ static void CreateImageView(VkImage vkImage, const TextureInfo& rInfo, bool bChe
 		.viewType = rInfo.vkImageViewType,
 		.format = rInfo.vkFormat,
 		.components = vkComponentMapping,
-		.subresourceRange = {.aspectMask = rInfo.vkImageAspectFlags, .baseMipLevel = 0, .levelCount = rInfo.uiMipLevels, .baseArrayLayer = 0, .layerCount = rInfo.uiArrayLayers},
+		.subresourceRange = {.aspectMask = rInfo.vkImageAspectFlags, .baseMipLevel = 0, .levelCount = static_cast<uint32_t>(rInfo.iMipLevels), .baseArrayLayer = 0, .layerCount = static_cast<uint32_t>(rInfo.iArrayLayers)},
 	};
 	CHECK_VK(vkCreateImageView(gpDeviceManager->mVkDevice, &vkImageViewCreateInfo, nullptr, &rVkImageView));
 	VkName(VK_OBJECT_TYPE_IMAGE_VIEW, rVkImageView, rInfo.name.data());
@@ -128,7 +128,7 @@ void Texture::AdoptTransferredImage(VkImage& rVkImage, VmaAllocation& rVmaAlloca
 	mVmaAllocation = std::exchange(rVmaAllocation, VK_NULL_HANDLE);
 
 	CreateImageView(mVkImage, mInfo, false, mVkImageView);
-	++muiGeneration;
+	++miGeneration;
 }
 
 void Texture::RecordAcquireBarrier(VkCommandBuffer vkCommandBuffer)
@@ -146,7 +146,7 @@ void Texture::RecordAcquireBarrier(VkCommandBuffer vkCommandBuffer)
 		.srcQueueFamilyIndex = bQueueFamilyOwnershipTransferOptional ? VK_QUEUE_FAMILY_IGNORED : static_cast<uint32_t>(gpInstanceManager->miTransferQueueFamilyIndex),
 		.dstQueueFamilyIndex = bQueueFamilyOwnershipTransferOptional ? VK_QUEUE_FAMILY_IGNORED : static_cast<uint32_t>(gpInstanceManager->miGraphicsQueueFamilyIndex),
 		.image = mVkImage,
-		.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = mInfo.uiMipLevels, .baseArrayLayer = 0, .layerCount = mInfo.uiArrayLayers},
+		.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = static_cast<uint32_t>(mInfo.iMipLevels), .baseArrayLayer = 0, .layerCount = static_cast<uint32_t>(mInfo.iArrayLayers)},
 	};
 	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &vkImageMemoryBarrier);
 }
@@ -165,8 +165,8 @@ void Texture::Create(const TextureInfo& rInfo, const std::function<void(std::spa
 		.imageType = VK_IMAGE_TYPE_2D,
 		.format = mInfo.vkFormat,
 		.extent = mInfo.vkExtent3D,
-		.mipLevels = mInfo.uiMipLevels,
-		.arrayLayers = mInfo.uiArrayLayers,
+		.mipLevels = static_cast<uint32_t>(mInfo.iMipLevels),
+		.arrayLayers = static_cast<uint32_t>(mInfo.iArrayLayers),
 		.samples = mInfo.vkSampleCountFlagBits,
 		.tiling = VK_IMAGE_TILING_OPTIMAL,
 		.usage = mInfo.vkImageUsageFlags,
@@ -181,8 +181,8 @@ void Texture::Create(const TextureInfo& rInfo, const std::function<void(std::spa
 	if (mInfo.textureFlags & kRenderPass)
 	{
 		// Force dedicated allocations for render targets with at least 32 MiB of base-level array data; VMA chooses allocations otherwise.
-		static constexpr VkDeviceSize kVkLargeSizeThreshold = 32 * 1'024 * 1'024;
-		if (common::SizeInBytes(mInfo.vkFormat, mInfo.vkExtent3D.width, mInfo.vkExtent3D.height) * mInfo.uiArrayLayers >= kVkLargeSizeThreshold)
+		static constexpr int64_t kiLargeSizeThreshold = 32 * 1'024 * 1'024;
+		if (common::SizeInBytes(mInfo.vkFormat, mInfo.vkExtent3D.width, mInfo.vkExtent3D.height) * mInfo.iArrayLayers >= kiLargeSizeThreshold)
 		{
 			vmaAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 		}
@@ -192,7 +192,7 @@ void Texture::Create(const TextureInfo& rInfo, const std::function<void(std::spa
 	VkName(VK_OBJECT_TYPE_IMAGE, mVkImage, mInfo.name.data());
 
 	CreateImageView(mVkImage, mInfo, true, mVkImageView);
-	++muiGeneration;
+	++miGeneration;
 
 	if (rDataFunction != nullptr)
 	{
@@ -221,36 +221,36 @@ void Texture::UpdateData(const std::function<void(std::span<std::byte>, int64_t)
 
 void Texture::UploadImageData(const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction, TextureLayout eOldLayout, TextureLayout eFinalLayout)
 {
-	VkDeviceSize vkDeviceSize = common::ComputeImageByteSize(mInfo.vkFormat, mInfo.vkExtent3D.width, mInfo.vkExtent3D.height, mInfo.uiMipLevels, mInfo.uiArrayLayers, mInfo.vkExtent3D.depth);
+	int64_t iSize = common::ComputeImageByteSize(mInfo.vkFormat, mInfo.vkExtent3D.width, mInfo.vkExtent3D.height, mInfo.iMipLevels, mInfo.iArrayLayers, mInfo.vkExtent3D.depth);
 
-	StagingBuffer stagingBuffer(mInfo.name, vkDeviceSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+	StagingBuffer stagingBuffer(mInfo.name, iSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
-	rDataFunction(std::span<std::byte>(static_cast<std::byte*>(stagingBuffer.vmaAllocationInfo.pMappedData), static_cast<size_t>(vkDeviceSize)), 0);
+	rDataFunction(std::span<std::byte>(static_cast<std::byte*>(stagingBuffer.vmaAllocationInfo.pMappedData), static_cast<size_t>(iSize)), 0);
 
 	OneShotCommandBuffer oneShotCommandBuffer;
 
 	TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, eOldLayout, kTransferDestination);
 
-	size_t uiOffset = 0;
-	for (uint32_t i = 0; i < mInfo.uiArrayLayers; ++i)
+	int64_t iOffset = 0;
+	for (int64_t i = 0; i < mInfo.iArrayLayers; ++i)
 	{
-		uint32_t uiWidth = mInfo.vkExtent3D.width;
-		uint32_t uiHeight = mInfo.vkExtent3D.height;
-		for (uint32_t j = 0; j < mInfo.uiMipLevels; ++j)
+		int64_t iWidth = mInfo.vkExtent3D.width;
+		int64_t iHeight = mInfo.vkExtent3D.height;
+		for (int64_t j = 0; j < mInfo.iMipLevels; ++j)
 		{
 			VkBufferImageCopy vkBufferImageCopy {};
 			vkBufferImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			vkBufferImageCopy.imageSubresource.mipLevel = j;
-			vkBufferImageCopy.imageSubresource.baseArrayLayer = i;
+			vkBufferImageCopy.imageSubresource.mipLevel = static_cast<uint32_t>(j);
+			vkBufferImageCopy.imageSubresource.baseArrayLayer = static_cast<uint32_t>(i);
 			vkBufferImageCopy.imageSubresource.layerCount = 1;
-			vkBufferImageCopy.imageExtent.width = uiWidth;
-			vkBufferImageCopy.imageExtent.height = uiHeight;
+			vkBufferImageCopy.imageExtent.width = static_cast<uint32_t>(iWidth);
+			vkBufferImageCopy.imageExtent.height = static_cast<uint32_t>(iHeight);
 			vkBufferImageCopy.imageExtent.depth = 1;
-			vkBufferImageCopy.bufferOffset = uiOffset;
+			vkBufferImageCopy.bufferOffset = static_cast<VkDeviceSize>(iOffset);
 
-			uiOffset += common::SizeInBytes(mInfo.vkFormat, uiWidth, uiHeight);
-			uiWidth = std::max(1ui32, uiWidth / 2);
-			uiHeight = std::max(1ui32, uiHeight / 2);
+			iOffset += common::SizeInBytes(mInfo.vkFormat, iWidth, iHeight);
+			iWidth = std::max(1i64, iWidth / 2);
+			iHeight = std::max(1i64, iHeight / 2);
 
 			vkCmdCopyBufferToImage(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.vkStagingBuffer, mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
 		}
@@ -384,9 +384,9 @@ void Texture::TransitionImageLayout(VkCommandBuffer vkCommandBuffer, TextureLayo
 		{
 			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
 			.baseMipLevel = 0,
-			.levelCount = mInfo.uiMipLevels,
+			.levelCount = static_cast<uint32_t>(mInfo.iMipLevels),
 			.baseArrayLayer = 0,
-			.layerCount = mInfo.uiArrayLayers,
+			.layerCount = static_cast<uint32_t>(mInfo.iArrayLayers),
 		},
 	};
 

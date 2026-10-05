@@ -47,7 +47,7 @@ private:
 	std::filesystem::path GetPreExportMarkerPath() const;
 	std::optional<std::string> GetPreExportFingerprint() const;
 	std::filesystem::path GetTextureIntermediatePath(int64_t iTextureIndex, VkFormat vkFormat) const;
-	std::filesystem::path GetTextureIntermediateStagePath(size_t uiStageIndex) const;
+	std::filesystem::path GetTextureIntermediateStagePath(int64_t iStageIndex) const;
 
 	void PreExport(const tinygltf::Model& rGltfModel);
 	void MainExport(const tinygltf::Model& rGltfModel);

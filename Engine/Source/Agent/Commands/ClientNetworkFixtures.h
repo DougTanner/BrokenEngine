@@ -14,7 +14,7 @@ namespace ClientNetworkFixtures
 
 struct SubscribeAcceptResult
 {
-	uint8_t uiSerializedSlot = 0;
+	int64_t iSerializedSlot = 0;
 	int64_t iSerializedBytes = 0;
 	bool bSendSuppressed = false;
 };
@@ -33,8 +33,8 @@ struct StaleUpdateState
 {
 	std::vector<uint8_t> packet;
 	GridCoord coord {};
-	uint8_t uiSlotIndex = 0;
-	uint16_t uiEpoch = 0;
+	int64_t iSlotIndex = 0;
+	int64_t iEpoch = 0;
 	int64_t iTick = -1;
 	int64_t iCapturedBytes = 0;
 	int64_t iAckFloorBefore = -1;
@@ -73,14 +73,14 @@ struct CoordUpdateState
 
 using QueryCoordUpdateState = CoordUpdateState (*)(GridCoord coord, int64_t iTick);
 
-SubscribeAcceptResult ReceiveSubscribeAccept(Client& rClient, uint8_t uiSlotIndex, uint16_t uiEpoch, GridCoord coord);
+SubscribeAcceptResult ReceiveSubscribeAccept(Client& rClient, int64_t iSlotIndex, int64_t iEpoch, GridCoord coord);
 void ArmStaleUpdate(Client& rClient, const std::shared_ptr<StaleUpdateState>& pState);
 void ArmCancelledSubscription(Client& rClient, const std::shared_ptr<CancelledSubscriptionState>& pState);
-void CaptureStaleUpdate(const Client& rClient, std::span<const uint8_t> packetData, uint8_t uiSlotIndex, uint16_t uiEpoch, int64_t iTick);
+void CaptureStaleUpdate(const Client& rClient, std::span<const uint8_t> packetData, int64_t iSlotIndex, int64_t iEpoch, int64_t iTick);
 std::shared_ptr<StaleUpdateState> PollBeforeDrain(Client& rClient, QueryCoordUpdateState pfnQueryCoordUpdateState);
 void PollAfterDrain(const Client& rClient, const std::shared_ptr<StaleUpdateState>& pState, QueryCoordUpdateState pfnQueryCoordUpdateState);
-bool ObserveSubscribeAcceptCleanup(const Client& rClient, uint8_t uiSerializedSlot, int64_t iSerializedBytes);
-void ObserveUnsubscribeAck(const Client& rClient, uint8_t uiSlotIndex);
+bool ObserveSubscribeAcceptCleanup(const Client& rClient, int64_t iSerializedSlot, int64_t iSerializedBytes);
+void ObserveUnsubscribeAck(const Client& rClient, int64_t iSlotIndex);
 void Reset(const Client& rClient);
 void Detach();
 

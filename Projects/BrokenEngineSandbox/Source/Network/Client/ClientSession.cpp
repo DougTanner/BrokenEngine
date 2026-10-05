@@ -189,7 +189,7 @@ void ClientSession::Reconcile()
 void ClientSession::ConnectToServer(std::string_view serverAddress)
 {
 	gpGame->mModalMessage[0] = '\0';
-	mpRuntime->Connect(serverAddress, engine::kuiDefaultPort, NetworkSessionContract::kiCoordinateSlots);
+	mpRuntime->Connect(serverAddress, engine::kiDefaultPort, NetworkSessionContract::kiCoordinateSlots);
 }
 
 void ClientSession::OnConnectionRejected(std::string_view reason)

@@ -21,7 +21,7 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		uint8_t uiTypeIndex = rPrevious.puiTypeIndices[i];
+		int64_t iTypeIndex = rPrevious.puiTypeIndices[i];
 		ExplosionFlags_t flags = rPrevious.pFlags[i];
 		std::chrono::duration<float> startTime(rPrevious.pfStartTimes[i]);
 		XMVECTOR vecPosition = rPrevious.pVecPositions[i];
@@ -29,9 +29,9 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 
 		float fTimePercent = rPrevious.pfTimePercents[i];
 
-		int32_t iTrailCount = rPrevious.piTrailCounts[i];
+		int64_t iTrailCount = rPrevious.piTrailCounts[i];
 
-		rCurrent.puiTypeIndices[i] = uiTypeIndex;
+		rCurrent.puiTypeIndices[i] = static_cast<uint8_t>(iTypeIndex);
 		rCurrent.pFlags[i] = flags;
 		rCurrent.pfStartTimes[i] = startTime.count();
 		rCurrent.pVecPositions[i] = vecPosition;
@@ -39,7 +39,7 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 
 		rCurrent.pfTimePercents[i] = fTimePercent;
 
-		rCurrent.piTrailCounts[i] = iTrailCount;
+		rCurrent.piTrailCounts[i] = static_cast<int32_t>(iTrailCount);
 
 		// Copy trail data (not IDs - those are copied in AllocateAndCopy)
 		for (int64_t j = 0; j < kiMaxExplosionTrails; ++j)
@@ -65,7 +65,7 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 		}
 
 #if defined(BT_CLIENT)
-		const ExplosionType& rType = sTypes.at(uiTypeIndex);
+		const ExplosionType& rType = sTypes.at(static_cast<size_t>(iTypeIndex));
 		std::chrono::duration<float> explosionTime = currentTime - startTime;
 
 		for (int64_t j = 0; j < iTrailCount; ++j)

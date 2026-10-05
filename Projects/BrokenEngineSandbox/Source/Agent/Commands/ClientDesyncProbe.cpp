@@ -25,12 +25,12 @@ static int64_t DesynchronizationProbeCountParameter(const nlohmann::json& rParam
 
 	if (rParameters.at(parameterNameString).is_number_unsigned())
 	{
-		uint64_t uiCount = rParameters.at(parameterNameString).get<uint64_t>();
-		if (uiCount > 8)
+		if (rParameters.at(parameterNameString) > 8ui64)
 		{
 			throw std::runtime_error("desync_probe '" + parameterNameString + "' must be an integer in [0,8]");
 		}
-		return static_cast<int64_t>(uiCount);
+		int64_t iCount = rParameters.at(parameterNameString).get<int64_t>();
+		return iCount;
 	}
 
 	int64_t iCount = rParameters.at(parameterNameString).get<int64_t>();
@@ -55,8 +55,8 @@ void CommandDesynchronizationProbe(const nlohmann::json& rParameters, nlohmann::
 		throw std::runtime_error("desync_probe params must be an object");
 	}
 
-	size_t uiKnownParameterCount = static_cast<size_t>(rParameters.contains("desyncReports")) + static_cast<size_t>(rParameters.contains("debugFrameRequests")) + static_cast<size_t>(rParameters.contains("triggerRecovery"));
-	if (rParameters.size() != uiKnownParameterCount)
+	int64_t iKnownParameterCount = static_cast<int64_t>(rParameters.contains("desyncReports")) + static_cast<int64_t>(rParameters.contains("debugFrameRequests")) + static_cast<int64_t>(rParameters.contains("triggerRecovery"));
+	if (std::ssize(rParameters) != iKnownParameterCount)
 	{
 		throw std::runtime_error("desync_probe accepts only 'desyncReports', 'debugFrameRequests', and 'triggerRecovery'");
 	}

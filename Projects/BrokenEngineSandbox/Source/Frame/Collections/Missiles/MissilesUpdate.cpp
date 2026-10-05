@@ -143,10 +143,10 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			{
 				fNextJitter = common::Random<kfJitterIntervalRandom>(rFrame.postRender.randomEngine);
 
-				uint32_t uiRandom = common::Random(2ui32, rFrame.postRender.randomEngine);
+				int64_t iRandom = common::Random(2i64, rFrame.postRender.randomEngine);
 				float fDeltaAnglePercentExtra = 1.0f + 3.0f * fDeltaAnglePercent;
 				float fDeltaAngleJitter = !(uiTarget.uuid.iValue != 0) ? kfDeltaAngleJitterRandom : kfDeltaAngleJitterRandomWithTarget;
-				if (uiRandom == 0)
+				if (iRandom == 0)
 				{
 					vecVelocity = XMVector3RotateSafe(vecVelocity, XMQuaternionRotationRollPitchYaw(0.0f, 0.0f, fDeltaAnglePercentExtra * (-kfDirectionJitterRandom + common::Random(2.0f * kfDirectionJitterRandom, rFrame.postRender.randomEngine))));
 					if constexpr (kbDebugBreak)
@@ -154,7 +154,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 						common::ValidateVector<false>(vecVelocity);
 					}
 				}
-				if (uiRandom == 1)
+				if (iRandom == 1)
 				{
 					fDeltaRotation += fDeltaAnglePercentExtra * (-fDeltaAngleJitter + fDeltaAngleJitter * common::Random<2.0f>(rFrame.postRender.randomEngine));
 				}
@@ -313,36 +313,36 @@ void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		return;
 	}
 
-	size_t uiCount = static_cast<size_t>(rCurrentInterpolate.iCount);
-	sCollisionFlags.resize(uiCount);
-	sCollisionRadii.resize(uiCount);
-	sCollisionDamages.resize(uiCount);
-	rCollisionScratch.startTimes.resize(uiCount);
-	rCollisionScratch.endTimes.resize(uiCount);
-	rCollisionScratch.maximumTimes.resize(uiCount);
-	rCollisionScratch.terrainHits.resize(uiCount);
-	rCollisionScratch.boundaryHits.resize(uiCount);
+	int64_t iCount = rCurrentInterpolate.iCount;
+	sCollisionFlags.resize(static_cast<size_t>(iCount));
+	sCollisionRadii.resize(static_cast<size_t>(iCount));
+	sCollisionDamages.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.startTimes.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.endTimes.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.maximumTimes.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.terrainHits.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.boundaryHits.resize(static_cast<size_t>(iCount));
 	const MissilesInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pMissiles;
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		size_t uiIndex = static_cast<size_t>(i);
-		sCollisionFlags.at(uiIndex) = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {engine::CollisionFlags::kDestroyOnCollide};
-		sCollisionRadii.at(uiIndex) = kfMissileCollisionRadius;
-		sCollisionDamages.at(uiIndex) = 0.0f;  // Damage via area damage system
-		rCollisionScratch.startTimes.at(uiIndex) = 0.0f;
-		rCollisionScratch.endTimes.at(uiIndex) = 1.0f;
-		rCollisionScratch.terrainHits.at(uiIndex) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
-		rCollisionScratch.boundaryHits.at(uiIndex) = engine::TracePointToFrameExit(engine::LocalFrameArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		int64_t iIndex = i;
+		sCollisionFlags.at(static_cast<size_t>(iIndex)) = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {engine::CollisionFlags::kDestroyOnCollide};
+		sCollisionRadii.at(static_cast<size_t>(iIndex)) = kfMissileCollisionRadius;
+		sCollisionDamages.at(static_cast<size_t>(iIndex)) = 0.0f;  // Damage via area damage system
+		rCollisionScratch.startTimes.at(static_cast<size_t>(iIndex)) = 0.0f;
+		rCollisionScratch.endTimes.at(static_cast<size_t>(iIndex)) = 1.0f;
+		rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)) = engine::TracePointToFrameExit(engine::LocalFrameArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		float fMaximumTime = std::numeric_limits<float>::max();
-		if (rCollisionScratch.terrainHits.at(uiIndex).bHit)
+		if (rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)).bHit)
 		{
-			fMaximumTime = rCollisionScratch.terrainHits.at(uiIndex).fTime;
+			fMaximumTime = rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)).fTime;
 		}
-		if (rCollisionScratch.boundaryHits.at(uiIndex).bHit)
+		if (rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)).bHit)
 		{
-			fMaximumTime = std::min(fMaximumTime, rCollisionScratch.boundaryHits.at(uiIndex).fTime);
+			fMaximumTime = std::min(fMaximumTime, rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)).fTime);
 		}
-		rCollisionScratch.maximumTimes.at(uiIndex) = fMaximumTime;
+		rCollisionScratch.maximumTimes.at(static_cast<size_t>(iIndex)) = fMaximumTime;
 	}
 
 	siCollisionLayerIndex = engine::Collision::AddLayer(
@@ -387,7 +387,7 @@ void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 			continue;
 		}
 
-		size_t uiIndex = static_cast<size_t>(i);
+		int64_t iIndex = i;
 		// Entity results are pre-filtered against terrain and frame-exit cutoffs.
 		if ((engine::Collision::sResultSpans[engine::Collision::sLayerBaseOffsets[siCollisionLayerIndex] + i].iCount > 0))
 		{
@@ -400,8 +400,8 @@ void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 			continue;
 		}
 
-		const engine::SegmentHit& rTerrainHit = rCollisionScratch.terrainHits.at(uiIndex);
-		const engine::SegmentHit& rBoundaryHit = rCollisionScratch.boundaryHits.at(uiIndex);
+		const engine::SegmentHit& rTerrainHit = rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex));
+		const engine::SegmentHit& rBoundaryHit = rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex));
 		if (rTerrainHit.bHit && (!rBoundaryHit.bHit || rTerrainHit.fTime <= rBoundaryHit.fTime))
 		{
 			rCurrentInterpolate.pVecPositions[i] = rTerrainHit.vecPosition;

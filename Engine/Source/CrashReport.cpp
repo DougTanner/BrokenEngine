@@ -21,14 +21,14 @@ void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
 	wchar_t pcCrashReportFile[128] {};
 	swprintf_s(pcCrashReportFile, std::size(pcCrashReportFile), L"\\%s-Crash-Report.txt", pcGameName);
 
-	std::size_t uiDirectoryLength = wcsnlen_s(pcDirectory, std::size(spcAppDataOverride));
-	std::size_t uiSuffixLength = 1 + std::wcslen(pcGameName) + std::wcslen(pcCrashReportFile);
-	if (uiDirectoryLength >= std::size(spcAppDataOverride))
+	int64_t iDirectoryLength = wcsnlen_s(pcDirectory, std::size(spcAppDataOverride));
+	int64_t iSuffixLength = 1 + static_cast<int64_t>(std::wcslen(pcGameName)) + static_cast<int64_t>(std::wcslen(pcCrashReportFile));
+	if (iDirectoryLength >= std::ssize(spcAppDataOverride))
 	{
 		return;
 	}
 
-	if (uiSuffixLength >= std::size(spcAppDataOverride) - uiDirectoryLength)
+	if (iSuffixLength >= std::ssize(spcAppDataOverride) - iDirectoryLength)
 	{
 		return;
 	}
@@ -44,9 +44,9 @@ void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
 // buffer is either the complete intended path or empty, never a partial one the crash handler would write to.
 static bool AppendReportPath(wchar_t (&rBuffer)[MAX_PATH + 1], const wchar_t* pcText)
 {
-	std::size_t uiUsedLength = wcsnlen_s(rBuffer, std::size(rBuffer));
-	std::size_t uiTextLength = wcsnlen_s(pcText, std::size(rBuffer));
-	if (uiTextLength >= std::size(rBuffer) - uiUsedLength)
+	int64_t iUsedLength = wcsnlen_s(rBuffer, std::size(rBuffer));
+	int64_t iTextLength = wcsnlen_s(pcText, std::size(rBuffer));
+	if (iTextLength >= std::ssize(rBuffer) - iUsedLength)
 	{
 		rBuffer[0] = L'\0';
 		return false;
@@ -81,8 +81,8 @@ void ResolveCrashReportPaths()
 	else
 	{
 		PWSTR pcWideCharacter = nullptr;
-		HRESULT iHresult = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pcWideCharacter);
-		if (SUCCEEDED(iHresult) && pcWideCharacter != nullptr)
+		int64_t iHresult = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_CREATE, nullptr, &pcWideCharacter);
+		if (SUCCEEDED(static_cast<HRESULT>(iHresult)) && pcWideCharacter != nullptr)
 		{
 			AppendReportPath(spcUserReportPath, pcWideCharacter);
 		}
@@ -114,7 +114,7 @@ void HandleException(std::optional<const std::exception*> pException)
 	DEBUG_BREAK_NO_LOG();
 
 	// An agent-launched instance must never block on a modal dialog — take the unprompted branch so the report still saves.
-	int iResult = (gLaunchOptions.iAgentPort != 0) ? IDNO : MessageBox(nullptr, "Save crash report to desktop?", game::kGameName.data(), MB_YESNO | MB_SYSTEMMODAL);
+	int64_t iResult = (gLaunchOptions.iAgentPort != 0) ? IDNO : MessageBox(nullptr, "Save crash report to desktop?", game::kGameName.data(), MB_YESNO | MB_SYSTEMMODAL);
 
 	// Select an already-resolved path: this runs from the SIGABRT handler during heap corruption, so no path lookup,
 	// directory creation, or string building may happen here — ResolveCrashReportPaths did all of it at startup.
@@ -163,16 +163,16 @@ void HandleException(std::optional<const std::exception*> pException)
 	common::LogDumpBuffers(writer);
 }
 
-static bool DxDiagCallFailed(HRESULT iHresult, std::string_view call)
+static bool DxDiagCallFailed(int64_t iHresult, std::string_view call)
 {
-	if (SUCCEEDED(iHresult))
+	if (SUCCEEDED(static_cast<HRESULT>(iHresult)))
 	{
 		return false;
 	}
 
 	// Heap: HresultToString returns a std::string, and this thread participates in main-loop allocation tracking.
 	ScopedSuppressAllocationTracking suppress;
-	LOG(kDefault, kError, "Failed to read DxDiag: {} failed: {}", call, common::HresultToString(iHresult).data());
+	LOG(kDefault, kError, "Failed to read DxDiag: {} failed: {}", call, common::HresultToString(static_cast<HRESULT>(iHresult)).data());
 	return true;
 }
 
@@ -228,11 +228,12 @@ void ReadDxDiag()
 		{
 			return;
 		}
-		LOG(kDefault, kDebug, "DxDiag found {} children", uiChildCount);
-		for (DWORD i = 0; i < uiChildCount; ++i)
+		int64_t iChildCount = uiChildCount;
+		LOG(kDefault, kDebug, "DxDiag found {} children", iChildCount);
+		for (int64_t i = 0; i < iChildCount; ++i)
 		{
 			WCHAR pcChildName[256] {};
-			if (DxDiagCallFailed(pDisplayDevices->EnumChildContainerNames(i, pcChildName, 256), "EnumChildContainerNames"))
+			if (DxDiagCallFailed(pDisplayDevices->EnumChildContainerNames(static_cast<DWORD>(i), pcChildName, 256), "EnumChildContainerNames"))
 			{
 				return;
 			}
@@ -247,11 +248,12 @@ void ReadDxDiag()
 			// appended to the report.
 			DWORD uiPropCount = 0;
 			pChild->GetNumberOfProps(&uiPropCount);
-			LOG(kDefault, kDebug, "    {} props", uiPropCount);
-			for (DWORD j = 0; j < uiPropCount; ++j)
+			int64_t iPropCount = uiPropCount;
+			LOG(kDefault, kDebug, "    {} props", iPropCount);
+			for (int64_t j = 0; j < iPropCount; ++j)
 			{
 				WCHAR pcPropName[256] {};
-				pChild->EnumPropNames(j, pcPropName, static_cast<DWORD>(std::size(pcPropName) - 1));
+				pChild->EnumPropNames(static_cast<DWORD>(j), pcPropName, static_cast<DWORD>(std::size(pcPropName) - 1));
 
 				VARIANT variant {};
 				pChild->GetProp(pcPropName, &variant);

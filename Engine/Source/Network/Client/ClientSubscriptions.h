@@ -60,7 +60,7 @@ public:
 	void FreeSlot(int64_t iSlot);
 	void Reset();
 	void RecoverTimedOutSubscriptions();
-	bool IsStaleRetainedEpoch(int64_t iSlot, uint16_t uiEpoch, GridCoord coordinate) const;
+	bool IsStaleRetainedEpoch(int64_t iSlot, int64_t iEpoch, GridCoord coordinate) const;
 
 	enum class FullStateFlags : uint8_t
 	{
@@ -69,7 +69,7 @@ public:
 		kCommit        = 1 << 2, // Caller proceeds to push fullState + activate slot
 	};
 	using FullStateFlags_t = common::Flags<FullStateFlags>;
-	FullStateFlags_t ClassifyFullState(uint8_t uiSlotIndex, uint16_t uiEpoch, GridCoord coordinate);
+	FullStateFlags_t ClassifyFullState(int64_t iSlotIndex, int64_t iEpoch, GridCoord coordinate);
 
 	enum class CoordUpdateFlags : uint8_t
 	{
@@ -77,7 +77,7 @@ public:
 		kTrackTick = 1 << 1, // Call TrackReceivedTick (set only on kActive; skipped on kWaitingFullState)
 	};
 	using CoordUpdateFlags_t = common::Flags<CoordUpdateFlags>;
-	CoordUpdateFlags_t ClassifyCoordinateUpdate(uint8_t uiSlotIndex, uint16_t uiEpoch);
+	CoordUpdateFlags_t ClassifyCoordinateUpdate(int64_t iSlotIndex, int64_t iEpoch);
 
 	enum class SubscribeAcceptFlags : uint8_t
 	{
@@ -86,7 +86,7 @@ public:
 		kRejectGhost = 1 << 2, // State mismatch: send unsubscribe + logs
 	};
 	using SubscribeAcceptFlags_t = common::Flags<SubscribeAcceptFlags>;
-	SubscribeAcceptFlags_t ClassifySubscribeAccept(uint8_t uiSlotIndex, uint16_t uiEpoch, GridCoord coordinate);
+	SubscribeAcceptFlags_t ClassifySubscribeAccept(int64_t iSlotIndex, int64_t iEpoch, GridCoord coordinate);
 
 	std::vector<ClientCoordSlot> mCoordinateSlots;
 	SubscribeRequests mSubscribeRequests;

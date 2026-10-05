@@ -19,32 +19,32 @@ struct ExportedIsland
 	std::vector<float> cpuMeshPositions;   // float2 XY pairs in island-local meters (origin at center). Z is discarded — Terrain.vert re-derives it from the elevation sampler.
 	std::vector<uint32_t> cpuMeshIndices;
 	std::vector<float> cpuValidAreaVertices;   // float2 XY pairs in island-local meters (origin at center) — CCW convex hull of pixels at or above the underwater mask threshold.
-	int32_t iHeightmapWidth = 0;
-	int32_t iHeightmapHeight = 0;
-	int32_t iMeshVertexCount = 0;
-	int32_t iMeshIndexCount = 0;
-	int32_t iValidAreaVertexCount = 0;
+	int64_t iHeightmapWidth = 0;
+	int64_t iHeightmapHeight = 0;
+	int64_t iMeshVertexCount = 0;
+	int64_t iMeshIndexCount = 0;
+	int64_t iValidAreaVertexCount = 0;
 	float fWorldFootprintXMeters = 0.0f;
 	float fWorldFootprintYMeters = 0.0f;
 	float fWorldElevationMeters = 0.0f;
 };
 
-static size_t CheckedProduct(size_t uiLeft, size_t uiRight, std::string_view what)
+static int64_t CheckedProduct(int64_t iLeft, int64_t iRight, std::string_view what)
 {
-	if (uiRight != 0 && uiLeft > std::numeric_limits<size_t>::max() / uiRight)
+	if (iRight != 0 && iLeft > std::numeric_limits<int64_t>::max() / iRight)
 	{
-		throw std::runtime_error(std::format("{} size overflows size_t.", what));
+		throw std::runtime_error(std::format("{} size overflows int64_t.", what));
 	}
-	return uiLeft * uiRight;
+	return iLeft * iRight;
 }
 
-static size_t CheckedSum(size_t uiLeft, size_t uiRight, std::string_view what)
+static int64_t CheckedSum(int64_t iLeft, int64_t iRight, std::string_view what)
 {
-	if (uiLeft > std::numeric_limits<size_t>::max() - uiRight)
+	if (iLeft > std::numeric_limits<int64_t>::max() - iRight)
 	{
-		throw std::runtime_error(std::format("{} size overflows size_t.", what));
+		throw std::runtime_error(std::format("{} size overflows int64_t.", what));
 	}
-	return uiLeft + uiRight;
+	return iLeft + iRight;
 }
 
 
@@ -58,12 +58,12 @@ static size_t CheckedSum(size_t uiLeft, size_t uiRight, std::string_view what)
 // yields an empty hull.
 static void BuildValidAreaHull(ExportedIsland& rOut)
 {
-	int32_t iWidth = rOut.iHeightmapWidth;
-	int32_t iHeight = rOut.iHeightmapHeight;
+	int64_t iWidth = rOut.iHeightmapWidth;
+	int64_t iHeight = rOut.iHeightmapHeight;
 	float fFootprintX = rOut.fWorldFootprintXMeters;
 	float fFootprintY = rOut.fWorldFootprintYMeters;
 
-	auto PixelToLocal = [&](int32_t iX, int32_t iY)
+	auto PixelToLocal = [&](int64_t iX, int64_t iY)
 	{
 		float fLocalX = (static_cast<float>(iX) / static_cast<float>(iWidth - 1) - 0.5f) * fFootprintX;
 		float fLocalY = (0.5f - static_cast<float>(iY) / static_cast<float>(iHeight - 1)) * fFootprintY;
@@ -72,11 +72,11 @@ static void BuildValidAreaHull(ExportedIsland& rOut)
 
 	std::vector<XMFLOAT2> candidates;
 	candidates.reserve(static_cast<size_t>(iHeight) * 2);
-	for (int32_t i = 0; i < iHeight; ++i)
+	for (int64_t i = 0; i < iHeight; ++i)
 	{
-		int32_t iLeft = -1;
-		int32_t iRight = -1;
-		for (int32_t j = 0; j < iWidth; ++j)
+		int64_t iLeft = -1;
+		int64_t iRight = -1;
+		for (int64_t j = 0; j < iWidth; ++j)
 		{
 			if (rOut.cpuHeightmapData.at(static_cast<size_t>(i) * static_cast<size_t>(iWidth) + static_cast<size_t>(j)) >= common::kfUnderwaterMaskThresholdMeters)
 			{
@@ -98,7 +98,7 @@ static void BuildValidAreaHull(ExportedIsland& rOut)
 		}
 	}
 
-	if (candidates.size() < 3)
+	if (std::ssize(candidates) < 3)
 	{
 		return;
 	}
@@ -137,13 +137,13 @@ static void BuildValidAreaHull(ExportedIsland& rOut)
 	// Last point repeats the first; drop it.
 	hull.resize(static_cast<size_t>(iHullVertexCount) - 1);
 
-	if (hull.size() < 3)
+	if (std::ssize(hull) < 3)
 	{
 		return;
 	}
 
-	rOut.iValidAreaVertexCount = static_cast<int32_t>(hull.size());
-	rOut.cpuValidAreaVertices.reserve(hull.size() * 2);
+	rOut.iValidAreaVertexCount = std::ssize(hull);
+	rOut.cpuValidAreaVertices.reserve(static_cast<size_t>(std::ssize(hull) * 2));
 	for (const XMFLOAT2& rVert : hull)
 	{
 		rOut.cpuValidAreaVertices.push_back(rVert.x);
@@ -180,7 +180,7 @@ static void VerifyHullCcwConvex(const ExportedIsland& rOut)
 // Shared encode tail: mask invisible underwater texels flat, build the BC mip chain, write the
 // committed intermediate, then the debug JPEG sidecar. Each caller still constructs / crops / packs
 // its own Texture and holds Texture::sEncodeMutex; only this trailing sequence is shared.
-static void MaskMipSaveTexture(Texture& rTexture, const std::vector<float>& rHeightmapData, int64_t iElevationWidth, int64_t iElevationHeight, int64_t iMaskDivisor, const float (&rFlatValues)[4], VkFormat vkFormat, const std::filesystem::path& rSavePath, TextureOptions_t saveOptions, const std::filesystem::path& rJpegPath, int iJpegQuality, TextureOptions_t jpegOptions)
+static void MaskMipSaveTexture(Texture& rTexture, const std::vector<float>& rHeightmapData, int64_t iElevationWidth, int64_t iElevationHeight, int64_t iMaskDivisor, const float (&rFlatValues)[4], VkFormat vkFormat, const std::filesystem::path& rSavePath, TextureOptions_t saveOptions, const std::filesystem::path& rJpegPath, int64_t iJpegQuality, TextureOptions_t jpegOptions)
 {
 	rTexture.MaskByHeightmap(rHeightmapData, iElevationWidth, iElevationHeight, iMaskDivisor, common::kfUnderwaterMaskThresholdMeters, rFlatValues);
 	rTexture.MakeMipmaps(vkFormat);
@@ -191,14 +191,14 @@ static void MaskMipSaveTexture(Texture& rTexture, const std::vector<float>& rHei
 // Loads the four grayscale material-mask PNGs (Rock/Sand/Snow/Flow), packs them into one BC7 RGBA texture
 // cropped + 4x downsampled to match the heightmap footprint, and saves it. Serialized behind
 // Texture::sEncodeMutex like the other island textures.
-static void EncodeMaterialMasks(const std::filesystem::path& rInputPath, const std::filesystem::path& rTextureSourceDirectory, const std::filesystem::path& rDiagnosticsDirectory, const BakedDimensions& rBaked, const std::vector<float>& rHeightmapData, int64_t iElevationWidth, int64_t iElevationHeight, int iJpegSidecarQuality)
+static void EncodeMaterialMasks(const std::filesystem::path& rInputPath, const std::filesystem::path& rTextureSourceDirectory, const std::filesystem::path& rDiagnosticsDirectory, const BakedDimensions& rBaked, const std::vector<float>& rHeightmapData, int64_t iElevationWidth, int64_t iElevationHeight, int64_t iJpegSidecarQuality)
 {
 	std::lock_guard<std::mutex> lock(Texture::sEncodeMutex);
 
 	const char* pcMaskNames[4] = {"Rock.png", "Sand.png", "Snow.png", "Flow.png"};
 	stbi_uc* ppMaskPixels[4] = {};
-	int iMaskWidth = 0;
-	int iMaskHeight = 0;
+	int64_t iMaskWidth = 0;
+	int64_t iMaskHeight = 0;
 	common::ScopedLambda freeMaskPixels([&]()
 	{
 		for (stbi_uc* pPixels : ppMaskPixels)
@@ -261,11 +261,11 @@ static void ReadProcessedMesh(const std::filesystem::path& rIntermediatesDir, Ex
 		throw std::runtime_error(std::format("Failed to open processed mesh file \"{}\".", meshFile.string()));
 	}
 
-	static constexpr size_t kuiMeshHeaderBytes = sizeof(int32_t) * 2;
+	static constexpr int64_t kiMeshHeaderBytes = static_cast<int64_t>(sizeof(int32_t)) * 2;
 	uintmax_t uiMeshFileBytes = std::filesystem::file_size(meshFile);
-	if (uiMeshFileBytes < kuiMeshHeaderBytes)
+	if (uiMeshFileBytes < kiMeshHeaderBytes)
 	{
-		throw std::runtime_error(std::format("Processed mesh file \"{}\" is {} bytes; expected at least {} bytes for its header.", meshFile.string(), uiMeshFileBytes, kuiMeshHeaderBytes));
+		throw std::runtime_error(std::format("Processed mesh file \"{}\" is {} bytes; expected at least {} bytes for its header.", meshFile.string(), uiMeshFileBytes, kiMeshHeaderBytes));
 	}
 
 	int32_t iMeshVertexCount = 0;
@@ -294,31 +294,31 @@ static void ReadProcessedMesh(const std::filesystem::path& rIntermediatesDir, Ex
 		throw std::runtime_error(std::format("Processed mesh file \"{}\" declares {} indices, which does not form complete triangles.", meshFile.string(), iMeshIndexCount));
 	}
 
-	size_t uiMeshVertexCount = static_cast<size_t>(iMeshVertexCount);
-	size_t uiMeshIndexCount = static_cast<size_t>(iMeshIndexCount);
-	size_t uiPositionElementCount = CheckedProduct(uiMeshVertexCount, 3, "processed mesh position element");
-	size_t uiPositionBytes = CheckedProduct(uiPositionElementCount, sizeof(float), "processed mesh position");
-	size_t uiMeshPositionElementCount = CheckedProduct(uiMeshVertexCount, 2, "processed mesh XY position element");
-	size_t uiIndexBytes = CheckedProduct(uiMeshIndexCount, sizeof(uint32_t), "processed mesh index");
-	size_t uiPayloadBytes = CheckedSum(uiPositionBytes, uiIndexBytes, "processed mesh payload");
-	size_t uiExpectedFileBytes = CheckedSum(kuiMeshHeaderBytes, uiPayloadBytes, "processed mesh file");
-	if (uiMeshFileBytes != static_cast<uintmax_t>(uiExpectedFileBytes))
+	int64_t iVertexCount = iMeshVertexCount;
+	int64_t iIndexCount = iMeshIndexCount;
+	int64_t iPositionElementCount = CheckedProduct(iVertexCount, 3, "processed mesh position element");
+	int64_t iPositionBytes = CheckedProduct(iPositionElementCount, sizeof(float), "processed mesh position");
+	int64_t iMeshPositionElementCount = CheckedProduct(iVertexCount, 2, "processed mesh XY position element");
+	int64_t iIndexBytes = CheckedProduct(iIndexCount, sizeof(uint32_t), "processed mesh index");
+	int64_t iPayloadBytes = CheckedSum(iPositionBytes, iIndexBytes, "processed mesh payload");
+	int64_t iExpectedFileBytes = CheckedSum(kiMeshHeaderBytes, iPayloadBytes, "processed mesh file");
+	if (uiMeshFileBytes != static_cast<uintmax_t>(iExpectedFileBytes))
 	{
-		throw std::runtime_error(std::format("Processed mesh file \"{}\" is {} bytes; expected {} bytes for {} vertices and {} indices.", meshFile.string(), uiMeshFileBytes, uiExpectedFileBytes, iMeshVertexCount, iMeshIndexCount));
+		throw std::runtime_error(std::format("Processed mesh file \"{}\" is {} bytes; expected {} bytes for {} vertices and {} indices.", meshFile.string(), uiMeshFileBytes, iExpectedFileBytes, iMeshVertexCount, iMeshIndexCount));
 	}
 
-	std::vector<float> meshPositionsXYZ(uiPositionElementCount);
-	std::vector<float> meshPositions(uiMeshPositionElementCount);
-	std::vector<uint32_t> meshIndices(uiMeshIndexCount);
-	if (uiPositionBytes > 0 && (!meshStream.read(reinterpret_cast<char*>(meshPositionsXYZ.data()), static_cast<std::streamsize>(uiPositionBytes)) || meshStream.gcount() != static_cast<std::streamsize>(uiPositionBytes)))
+	std::vector<float> meshPositionsXYZ(static_cast<size_t>(iPositionElementCount));
+	std::vector<float> meshPositions(static_cast<size_t>(iMeshPositionElementCount));
+	std::vector<uint32_t> meshIndices(static_cast<size_t>(iIndexCount));
+	if (iPositionBytes > 0 && (!meshStream.read(reinterpret_cast<char*>(meshPositionsXYZ.data()), static_cast<std::streamsize>(iPositionBytes)) || meshStream.gcount() != static_cast<std::streamsize>(iPositionBytes)))
 	{
 		throw std::runtime_error(std::format("Failed to read processed mesh positions from \"{}\".", meshFile.string()));
 	}
-	if (uiIndexBytes > 0 && (!meshStream.read(reinterpret_cast<char*>(meshIndices.data()), static_cast<std::streamsize>(uiIndexBytes)) || meshStream.gcount() != static_cast<std::streamsize>(uiIndexBytes)))
+	if (iIndexBytes > 0 && (!meshStream.read(reinterpret_cast<char*>(meshIndices.data()), static_cast<std::streamsize>(iIndexBytes)) || meshStream.gcount() != static_cast<std::streamsize>(iIndexBytes)))
 	{
 		throw std::runtime_error(std::format("Failed to read processed mesh indices from \"{}\".", meshFile.string()));
 	}
-	for (size_t i = 0; i < uiMeshVertexCount; ++i)
+	for (int64_t i = 0; i < iVertexCount; ++i)
 	{
 		const float* pfPosition = meshPositionsXYZ.data() + i * 3;
 		if (!std::isfinite(pfPosition[0]))
@@ -334,11 +334,11 @@ static void ReadProcessedMesh(const std::filesystem::path& rIntermediatesDir, Ex
 			throw std::runtime_error(std::format("Processed mesh file \"{}\" vertex {} has a non-finite position ({}, {}, {}).", meshFile.string(), i, pfPosition[0], pfPosition[1], pfPosition[2]));
 		}
 	}
-	for (size_t i = 0; i < uiMeshIndexCount; ++i)
+	for (int64_t i = 0; i < iIndexCount; ++i)
 	{
-		if (meshIndices.at(i) >= uiMeshVertexCount)
+		if (meshIndices.at(static_cast<size_t>(i)) >= iVertexCount)
 		{
-			throw std::runtime_error(std::format("Processed mesh file \"{}\" index {} references vertex {}, but the vertex count is {}.", meshFile.string(), i, meshIndices.at(i), uiMeshVertexCount));
+			throw std::runtime_error(std::format("Processed mesh file \"{}\" index {} references vertex {}, but the vertex count is {}.", meshFile.string(), i, meshIndices.at(static_cast<size_t>(i)), iVertexCount));
 		}
 	}
 
@@ -380,8 +380,8 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 		throw std::runtime_error(std::format("Island leaf \"{}\" has invalid world dimensions: {}x{} m footprint, {} m elevation.", rInputPath.string(), baked.fWidthMeters, baked.fHeightMeters, baked.fElevationMeters));
 	}
 
-	size_t uiCropPixelCount = CheckedProduct(static_cast<size_t>(baked.iCropWidth), static_cast<size_t>(baked.iCropHeight), "island crop pixel");
-	if (uiCropPixelCount > static_cast<uintmax_t>(std::numeric_limits<int64_t>::max()) / 4)
+	int64_t iCropPixelCount = CheckedProduct(baked.iCropWidth, baked.iCropHeight, "island crop pixel");
+	if (iCropPixelCount > std::numeric_limits<int64_t>::max() / 4)
 	{
 		throw std::runtime_error(std::format("Island leaf \"{}\" crop dimensions are too large for texture pixels.", rInputPath.string()));
 	}
@@ -397,8 +397,8 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	{
 		throw std::runtime_error(std::format("Island leaf \"{}\" has invalid elevation dimensions: {}x{}.", rInputPath.string(), iElevationWidth, iElevationHeight));
 	}
-	size_t uiElevationPixelCount = CheckedProduct(static_cast<size_t>(iElevationWidth), static_cast<size_t>(iElevationHeight), "island elevation pixel");
-	size_t uiElevationBytes = CheckedProduct(uiElevationPixelCount, sizeof(float), "island elevation");
+	int64_t iElevationPixelCount = CheckedProduct(iElevationWidth, iElevationHeight, "island elevation pixel");
+	int64_t iElevationBytes = CheckedProduct(iElevationPixelCount, sizeof(float), "island elevation");
 
 	// Read the downsampled engine-meter elevation up front so it can drive both the per-texture
 	// underwater mask (below) and the chunk payload heightmap (further down). Same buffer, single
@@ -410,17 +410,17 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 		throw std::runtime_error(std::format("Failed to open island elevation file \"{}\".", elevationFile.string()));
 	}
 	uintmax_t uiActualElevationBytes = std::filesystem::file_size(elevationFile);
-	if (uiActualElevationBytes != static_cast<uintmax_t>(uiElevationBytes))
+	if (uiActualElevationBytes != static_cast<uintmax_t>(iElevationBytes))
 	{
-		throw std::runtime_error(std::format("Island leaf \"{}\" elevation file is {} bytes; expected {} bytes for {}x{} float32.", elevationFile.string(), uiActualElevationBytes, uiElevationBytes, iElevationWidth, iElevationHeight));
+		throw std::runtime_error(std::format("Island leaf \"{}\" elevation file is {} bytes; expected {} bytes for {}x{} float32.", elevationFile.string(), uiActualElevationBytes, iElevationBytes, iElevationWidth, iElevationHeight));
 	}
-	rOut.cpuHeightmapData.resize(uiElevationPixelCount);
-	if (!rawStream.read(reinterpret_cast<char*>(rOut.cpuHeightmapData.data()), static_cast<std::streamsize>(uiElevationBytes)) || rawStream.gcount() != static_cast<std::streamsize>(uiElevationBytes))
+	rOut.cpuHeightmapData.resize(static_cast<size_t>(iElevationPixelCount));
+	if (!rawStream.read(reinterpret_cast<char*>(rOut.cpuHeightmapData.data()), static_cast<std::streamsize>(iElevationBytes)) || rawStream.gcount() != static_cast<std::streamsize>(iElevationBytes))
 	{
 		throw std::runtime_error(std::format("Failed to read complete island elevation file \"{}\".", elevationFile.string()));
 	}
-	rOut.iHeightmapWidth = static_cast<int32_t>(iElevationWidth);
-	rOut.iHeightmapHeight = static_cast<int32_t>(iElevationHeight);
+	rOut.iHeightmapWidth = iElevationWidth;
+	rOut.iHeightmapHeight = iElevationHeight;
 
 	// Convex hull of the valid (above-threshold) region — same heightmap + threshold as the texture
 	// masking. Packed into the chunk payload after the mesh (see Export()); debug render draws it.
@@ -446,7 +446,7 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	// mip, and zlib catches the across-block repetition for free.
 	if (bEncodeTextures)
 	{
-		static constexpr int kiJpegSidecarQuality = 90;
+		static constexpr int64_t kiJpegSidecarQuality = 90;
 		{
 			std::lock_guard<std::mutex> lock(Texture::sEncodeMutex);
 			Texture texture(intermediatesDirectory / "AmbientOcclusion.r16", FileType::kUint16Raw, baked.iCropWidth, baked.iCropHeight);
@@ -656,12 +656,12 @@ void ExportIsland::Export()
 	// so precision is sub-mm near the waterline (nav/gameplay) and ~0.25 m worst-case at the highest peaks —
 	// negligible for a km-scale camera. Halves the dominant resident CPU bucket (the runtime dequantizes via
 	// XMConvertHalfToFloat at each read site). The hull/masks above stay full-precision (computed pre-quant).
-	std::vector<uint16_t> heightmapHalf(exported.cpuHeightmapData.size());
-	DirectX::PackedVector::XMConvertFloatToHalfStream(heightmapHalf.data(), sizeof(uint16_t), exported.cpuHeightmapData.data(), sizeof(float), exported.cpuHeightmapData.size());
-	int64_t iHeightmapDataSize = static_cast<int64_t>(heightmapHalf.size() * sizeof(uint16_t));
-	int64_t iMeshPositionBytes = static_cast<int64_t>(exported.cpuMeshPositions.size() * sizeof(float));
-	int64_t iMeshIndexBytes = static_cast<int64_t>(exported.cpuMeshIndices.size() * sizeof(uint32_t));
-	int64_t iValidAreaBytes = static_cast<int64_t>(exported.cpuValidAreaVertices.size() * sizeof(float));
+	std::vector<uint16_t> heightmapHalf(static_cast<size_t>(std::ssize(exported.cpuHeightmapData)));
+	DirectX::PackedVector::XMConvertFloatToHalfStream(heightmapHalf.data(), sizeof(uint16_t), exported.cpuHeightmapData.data(), sizeof(float), static_cast<size_t>(std::ssize(exported.cpuHeightmapData)));
+	int64_t iHeightmapDataSize = std::ssize(heightmapHalf) * static_cast<int64_t>(sizeof(uint16_t));
+	int64_t iMeshPositionBytes = std::ssize(exported.cpuMeshPositions) * static_cast<int64_t>(sizeof(float));
+	int64_t iMeshIndexBytes = std::ssize(exported.cpuMeshIndices) * static_cast<int64_t>(sizeof(uint32_t));
+	int64_t iValidAreaBytes = std::ssize(exported.cpuValidAreaVertices) * static_cast<int64_t>(sizeof(float));
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(iHeightmapDataSize + iMeshPositionBytes + iMeshIndexBytes + iValidAreaBytes);
 
 	std::filesystem::path ambientOcclusionFile(relativeFile);
@@ -680,14 +680,14 @@ void ExportIsland::Export()
 	masksFile /= kpcIslandMasks;
 	pHeader->islandHeader.masksCrc = common::Crc(masksFile.string());
 
-	pHeader->islandHeader.iHeightmapWidth = exported.iHeightmapWidth;
-	pHeader->islandHeader.iHeightmapHeight = exported.iHeightmapHeight;
+	pHeader->islandHeader.iHeightmapWidth = static_cast<int32_t>(exported.iHeightmapWidth);
+	pHeader->islandHeader.iHeightmapHeight = static_cast<int32_t>(exported.iHeightmapHeight);
 	pHeader->islandHeader.fWorldFootprintXMeters = exported.fWorldFootprintXMeters;
 	pHeader->islandHeader.fWorldFootprintYMeters = exported.fWorldFootprintYMeters;
 	pHeader->islandHeader.fWorldElevationMeters = exported.fWorldElevationMeters;
-	pHeader->islandHeader.iMeshVertexCount = exported.iMeshVertexCount;
-	pHeader->islandHeader.iMeshIndexCount = exported.iMeshIndexCount;
-	pHeader->islandHeader.iValidAreaVertexCount = exported.iValidAreaVertexCount;
+	pHeader->islandHeader.iMeshVertexCount = static_cast<int32_t>(exported.iMeshVertexCount);
+	pHeader->islandHeader.iMeshIndexCount = static_cast<int32_t>(exported.iMeshIndexCount);
+	pHeader->islandHeader.iValidAreaVertexCount = static_cast<int32_t>(exported.iValidAreaVertexCount);
 
 	// Chunk payload: [heightmap R16 halfs][mesh positions][mesh indices][valid-area hull verts]. Runtime
 	// IslandTerrain slices these contiguously using IslandHeader's count fields.

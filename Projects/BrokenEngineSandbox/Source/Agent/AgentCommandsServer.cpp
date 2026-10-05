@@ -183,7 +183,7 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 	}
 
 	bool bAcknowledgementRequested = false;
-	uint64_t uiAcknowledgementSequence = 0;
+	int64_t iAcknowledgementSequence = 0;
 	for (const auto& [rKey, rValue] : rParameters.items())
 	{
 		if (rKey != "ackActivationEventSequence")
@@ -195,7 +195,7 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 			throw std::runtime_error("'ackActivationEventSequence' must be a nonzero unsigned integer");
 		}
 		bAcknowledgementRequested = true;
-		uiAcknowledgementSequence = rValue.get<uint64_t>();
+		iAcknowledgementSequence = static_cast<int64_t>(rValue.get<uint64_t>());
 	}
 	if constexpr (!kbProfiling)
 	{
@@ -213,7 +213,7 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 		{
 			if (bAcknowledgementRequested)
 			{
-				bActivationEventAcknowledged = gpProfileManager->AcknowledgeRawCpuTimerEvent(game::kCpuTimerPostRenderUpdateNavigationQuery, uiAcknowledgementSequence);
+				bActivationEventAcknowledged = gpProfileManager->AcknowledgeRawCpuTimerEvent(game::kCpuTimerPostRenderUpdateNavigationQuery, iAcknowledgementSequence);
 			}
 		}
 
@@ -233,7 +233,7 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 				if (i == game::kCpuTimerPostRenderUpdateNavigationQuery)
 				{
 					engine::RawCpuTimerRecord rawRecord = gpProfileManager->mpRawCpuTimers[static_cast<size_t>(i)].record;
-					timer["sampleSequence"] = rawRecord.uiSampleSequence;
+					timer["sampleSequence"] = rawRecord.iSampleSequence;
 					timer["sampleUs"] = rawRecord.iSampleMicroseconds;
 					timer["queryCount"] = rawRecord.iInvocationCount;
 					timer["aStarCount"] = rawRecord.iAuxiliaryCount;
@@ -243,8 +243,8 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 					bool bEventOverrun = eventRecord.flags & engine::RawCpuTimerEventFlags::kOverrun;
 					timer["activationEvent"] = {
 						{"available", bEventAvailable},
-						{"eventSequence", eventRecord.uiEventSequence},
-						{"sampleSequence", eventRecord.uiSampleSequence},
+						{"eventSequence", eventRecord.iEventSequence},
+						{"sampleSequence", eventRecord.iSampleSequence},
 						{"sampleTick", eventRecord.iSampleTick},
 						{"sampleUs", eventRecord.iSampleMicroseconds},
 						{"queryCount", eventRecord.iInvocationCount},
@@ -288,7 +288,7 @@ engine::GridCoord CoordinateFromParameter(const nlohmann::json& rParameters, std
 	}
 	const nlohmann::json& rCoordinate = rParameters.at(std::string(key));
 	std::string name = std::format("'{}'", key);
-	return engine::GridCoord {.iX = engine::AgentGridCoordinateValue(rCoordinate.at(0), name), .iY = engine::AgentGridCoordinateValue(rCoordinate.at(1), name)};
+	return engine::GridCoord {.iX = static_cast<int32_t>(engine::AgentGridCoordinateValue(rCoordinate.at(0), name)), .iY = static_cast<int32_t>(engine::AgentGridCoordinateValue(rCoordinate.at(1), name))};
 }
 
 bool ExecuteAgentCommandServer(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)

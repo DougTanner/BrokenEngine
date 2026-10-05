@@ -126,7 +126,7 @@ inline XMVECTOR XM_CALLCONV LocalFrameArea()
 // Neighbour and transfer-destination coordinate arithmetic. Returns false and leaves rOutputCoordinate untouched when
 // the sum leaves the signed-int32 identity range, so a cell at a numeric edge omits that neighbour instead of
 // wrapping to the opposite end of the grid.
-[[nodiscard]] inline bool TryAddGridCoordinate(GridCoord coordinate, int32_t iDeltaX, int32_t iDeltaY, GridCoord& rOutputCoordinate)
+[[nodiscard]] inline bool TryAddGridCoordinate(GridCoord coordinate, int64_t iDeltaX, int64_t iDeltaY, GridCoord& rOutputCoordinate)
 {
 	int64_t iSumX = static_cast<int64_t>(coordinate.iX) + static_cast<int64_t>(iDeltaX);
 	int64_t iSumY = static_cast<int64_t>(coordinate.iY) + static_cast<int64_t>(iDeltaY);
@@ -143,7 +143,7 @@ inline XMVECTOR XM_CALLCONV LocalFrameArea()
 	return true;
 }
 
-inline constexpr size_t kuiInitialTransferCapacity = 32;
+inline constexpr int64_t kiInitialTransferCapacity = 32;
 
 inline bool XM_CALLCONV IsOutOfBounds(const FrameBounds& rBounds, FXMVECTOR vecPosition)
 {
@@ -153,12 +153,12 @@ inline bool XM_CALLCONV IsOutOfBounds(const FrameBounds& rBounds, FXMVECTOR vecP
 	return !(fPositionX > rBounds.fMinX && fPositionX < rBounds.fMaxX && fPositionY > rBounds.fMinY && fPositionY < rBounds.fMaxY);
 }
 
-inline void XM_CALLCONV ComputeTransferDelta(const FrameBounds& rBounds, FXMVECTOR vecPosition, int8_t& riDeltaX, int8_t& riDeltaY)
+inline void XM_CALLCONV ComputeTransferDelta(const FrameBounds& rBounds, FXMVECTOR vecPosition, int64_t& riDeltaX, int64_t& riDeltaY)
 {
 	float fPositionX = XMVectorGetX(vecPosition);
 	float fPositionY = XMVectorGetY(vecPosition);
-	riDeltaX = static_cast<int8_t>((fPositionX >= rBounds.fMaxX) ? 1 : (fPositionX <= rBounds.fMinX) ? -1 : 0);
-	riDeltaY = static_cast<int8_t>((fPositionY >= rBounds.fMaxY) ? 1 : (fPositionY <= rBounds.fMinY) ? -1 : 0);
+	riDeltaX = (fPositionX >= rBounds.fMaxX) ? 1 : (fPositionX <= rBounds.fMinX) ? -1 : 0;
+	riDeltaY = (fPositionY >= rBounds.fMaxY) ? 1 : (fPositionY <= rBounds.fMinY) ? -1 : 0;
 }
 
 template<typename... TS>
@@ -328,8 +328,8 @@ void ForEachPostRenderSpawn(TypeList<TS...>, game::Frame& __restrict rFrame, con
 	}(), ...);
 }
 
-template<typename TUPLE_CURRENT, typename TUPLE_PREVIOUS, size_t... INDICES>
-void AllocateAndCopyCollections(TUPLE_CURRENT&& rCurrent, const TUPLE_PREVIOUS& rPrevious, std::index_sequence<INDICES...>)
+template<typename TUPLE_CURRENT, typename TUPLE_PREVIOUS, int64_t... INDICES>
+void AllocateAndCopyCollections(TUPLE_CURRENT&& rCurrent, const TUPLE_PREVIOUS& rPrevious, std::integer_sequence<int64_t, INDICES...>)
 {
 	([](auto& rCurrentCollection, const auto& rPreviousCollection)
 	{
@@ -342,15 +342,15 @@ void AllocateAndCopyCollections(TUPLE_CURRENT&& rCurrent, const TUPLE_PREVIOUS& 
 		{
 			engine::AllocateAndCopyMembers(rCurrentCollection, rPreviousCollection);
 		}
-	}(std::get<INDICES>(rCurrent), std::get<INDICES>(rPrevious)), ...);
+	}(std::get<static_cast<size_t>(INDICES)>(rCurrent), std::get<static_cast<size_t>(INDICES)>(rPrevious)), ...);
 }
 
 // Every collection logs in tuple order; the fold never short-circuits.
-template<typename TUPLE_CURRENT, typename TUPLE_OTHER, size_t... INDICES>
-bool LogDifferencesCollections(const TUPLE_CURRENT& rCurrent, const TUPLE_OTHER& rOther, std::index_sequence<INDICES...>)
+template<typename TUPLE_CURRENT, typename TUPLE_OTHER, int64_t... INDICES>
+bool LogDifferencesCollections(const TUPLE_CURRENT& rCurrent, const TUPLE_OTHER& rOther, std::integer_sequence<int64_t, INDICES...>)
 {
 	bool bEqual = true;
-	((bEqual &= std::get<INDICES>(rCurrent).LogDifferences(std::get<INDICES>(rOther))), ...);
+	((bEqual &= std::get<static_cast<size_t>(INDICES)>(rCurrent).LogDifferences(std::get<static_cast<size_t>(INDICES)>(rOther))), ...);
 	return bEqual;
 }
 
@@ -372,25 +372,30 @@ void DestroySweep(const INTERPOLATE& rInterpolate, [[maybe_unused]] const POST_R
 }
 
 template <typename INTERPOLATE, typename POST_RENDER>
-void ValidateCollectionPair(const INTERPOLATE& rInterpolate, const POST_RENDER& rPostRender)
+void ValidateCollectionPair(INTERPOLATE& rInterpolate, const POST_RENDER& rPostRender)
 {
 	if (rInterpolate.iCount != rPostRender.iCount || rInterpolate.iCapacity != rPostRender.iCapacity)
 	{
 		throw std::ios_base::failure("Frame collection pair count/capacity mismatch");
 	}
+	if constexpr (HasIdToIndex<INTERPOLATE>)
+	{
+		// The ID map is not serialized; it is rebuilt from the paired PostRender IDs, which exist only once both halves are read.
+		rInterpolate.RebuildFromIds(std::span(rPostRender.pIds, static_cast<size_t>(rInterpolate.iCount)));
+	}
 }
 
-template <typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE, size_t... INDICES>
-void ValidateCollectionPairs(const INTERPOLATE_TUPLE& rInterpolateCollections, const POST_RENDER_TUPLE& rPostRenderCollections, std::index_sequence<INDICES...>)
+template <typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE, int64_t... INDICES>
+void ValidateCollectionPairs(const INTERPOLATE_TUPLE& rInterpolateCollections, const POST_RENDER_TUPLE& rPostRenderCollections, std::integer_sequence<int64_t, INDICES...>)
 {
-	(ValidateCollectionPair(std::get<INDICES>(rInterpolateCollections), std::get<INDICES>(rPostRenderCollections)), ...);
+	(ValidateCollectionPair(std::get<static_cast<size_t>(INDICES)>(rInterpolateCollections), std::get<static_cast<size_t>(INDICES)>(rPostRenderCollections)), ...);
 }
 
 template <typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE>
 void ValidateCollectionPairs(const INTERPOLATE_TUPLE& rInterpolateCollections, const POST_RENDER_TUPLE& rPostRenderCollections)
 {
 	static_assert(std::tuple_size_v<INTERPOLATE_TUPLE> == std::tuple_size_v<POST_RENDER_TUPLE>);
-	ValidateCollectionPairs(rInterpolateCollections, rPostRenderCollections, std::make_index_sequence<std::tuple_size_v<INTERPOLATE_TUPLE>> {});
+	ValidateCollectionPairs(rInterpolateCollections, rPostRenderCollections, std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<INTERPOLATE_TUPLE>)> {});
 }
 
 // Collection tuple folds: left-to-right over the tuple, so CRC mixing and byte order follow tuple order

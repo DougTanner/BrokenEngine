@@ -167,7 +167,7 @@ std::tuple<common::ChunkHeader*, std::span<std::byte>> ExportJob::AllocateHeader
 
 	mHeaderAndData.resize(iTotalSizeAligned);
 	reinterpret_cast<common::ChunkHeader*>(mHeaderAndData.data())->iSize = iDataSize;
-	return std::make_tuple(reinterpret_cast<common::ChunkHeader*>(mHeaderAndData.data()), std::span(&mHeaderAndData.at(iDataOffset), mHeaderAndData.size() - iDataOffset));
+	return std::make_tuple(reinterpret_cast<common::ChunkHeader*>(mHeaderAndData.data()), std::span(&mHeaderAndData.at(iDataOffset), static_cast<size_t>(std::ssize(mHeaderAndData) - iDataOffset)));
 }
 
 bool ExportJob::CheckDirty([[maybe_unused]] const std::filesystem::path& rPackFile)
@@ -233,14 +233,14 @@ std::vector<std::byte>& ExportJob::RunExport()
 
 		std::fstream fileStream(mChunkFile, std::ios::in | std::ios::binary);
 		fileStream.seekg(sizeof(kiMagic) + sizeof(int64_t)); // Skip magic and version
-		fileStream.read(reinterpret_cast<char*>(mHeaderAndData.data()), mHeaderAndData.size());
+		fileStream.read(reinterpret_cast<char*>(mHeaderAndData.data()), static_cast<std::streamsize>(std::ssize(mHeaderAndData)));
 
 		// CheckDirty only validated the 16-byte header, and resize() zero-inits the buffer, so a short read
 		// (truncated/interrupted chunk) would silently pack a zero tail. Verify the full body was read; if not,
 		// discard the cache and fall through to a full dirty re-export rather than shipping the zeroed bytes.
-		if (!fileStream.good() || fileStream.gcount() != static_cast<std::streamsize>(mHeaderAndData.size()))
+		if (!fileStream.good() || fileStream.gcount() != std::ssize(mHeaderAndData))
 		{
-			LOG(kDefault, kWarning, "Cached chunk file \"{}\" is truncated ({} of {} bytes read); re-exporting", mChunkFile.string(), fileStream.gcount(), mHeaderAndData.size());
+			LOG(kDefault, kWarning, "Cached chunk file \"{}\" is truncated ({} of {} bytes read); re-exporting", mChunkFile.string(), fileStream.gcount(), std::ssize(mHeaderAndData));
 			mbDirty = true;
 		}
 		else if (const char* pcReason = ValidateCachedChunkBody(mHeaderAndData, mCrc, mRelativeFile, mChunkFlags & common::ChunkFlags::kScene); pcReason != nullptr)
@@ -288,7 +288,7 @@ std::vector<std::byte>& ExportJob::RunExport()
 	std::fstream fileStream(mChunkFile, std::ios::out | std::ios::binary);
 	int64_t piMagicAndVersion[2] = { kiMagic, miVersion };
 	fileStream.write(reinterpret_cast<char*>(piMagicAndVersion), sizeof(piMagicAndVersion));
-	fileStream.write(reinterpret_cast<char*>(mHeaderAndData.data()), mHeaderAndData.size());
+	fileStream.write(reinterpret_cast<char*>(mHeaderAndData.data()), static_cast<std::streamsize>(std::ssize(mHeaderAndData)));
 	fileStream.close();
 	VERIFY_SUCCESS(fileStream.good());
 

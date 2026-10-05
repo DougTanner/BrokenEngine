@@ -86,7 +86,7 @@ Evidence from this session (scratch artifacts under `Temp/`, not tracked):
   channel.
 - Replay format: `FrameInput` is the versioned per-tick unit; a change to the
   `StatusChange` payload bytes a server writes bumps `FrameInput::kiVersion`,
-  and a wire-visible change also bumps `engine::kuiProtocolVersion`
+  and a wire-visible change also bumps `engine::kiProtocolVersion`
   (`Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md` `## Invariants`; `Engine/Source/Network/AGENTS.md`
   `## Transport Contracts`). The type enum is append-only
   (`Projects/BrokenEngineSandbox/Source/Frame/StatusChange.h:6-20`). Replay
@@ -133,7 +133,7 @@ sharply in cost.
   (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Players/PlayersCombat.cpp:420-425`), so this proves "a missile spawned at the
   edge", not "fired at" something.
 - Invariant surfaces: payload bytes change, so `FrameInput::kiVersion` and
-  `kuiProtocolVersion` both bump and the client must read the new field;
+  `kiProtocolVersion` both bump and the client must read the new field;
   stale replays and saves are invalidated by design. Trust boundary is the
   ordinary parameter validation. `kUseMissiles` and the cooldown still gate
   the shot, so the harness still sends `UpdatePlayer` and waits one second.
@@ -330,7 +330,7 @@ over logs and pixels).
 |---|---|---|---|---|---|
 | Solves the motivating criterion | shot only, no target | yes | no (needs 1b) | no (needs 1b and a recording) | yes, one scenario |
 | New `StatusChange` or payload bytes | yes | no | no | no | no |
-| `FrameInput::kiVersion` / `kuiProtocolVersion` bump | both | none | none | none | none |
+| `FrameInput::kiVersion` / `kiProtocolVersion` bump | both | none | none | none | none |
 | Replay format change | no | no | no | no (splice only) | no |
 | Determinism evidence preserved | yes | yes | yes | no for the spliced span | yes |
 | Client build change | yes | no | no | no | no |
@@ -389,7 +389,7 @@ observation register, not the scenario control, and neither blocks the other.
    `Projects/BrokenEngineSandbox/Source/Frame/Collections/AGENTS.md` and is out of proportion for a harness wait.
 5. Whether a targetless forced shot (1a) is ever a criterion. If yes, decide
    the payload field versus a new appended type, and schedule the
-   `FrameInput::kiVersion` and `kuiProtocolVersion` bumps.
+   `FrameInput::kiVersion` and `kiProtocolVersion` bumps.
 6. The runtime evidence rule for "fired": polling `query_collection missiles`
    for a row with nonzero `registryTargetId` versus a durable `kDebug` line in
    `SpawnMissiles`; and an explicit statement that `kTemp` lines never land in

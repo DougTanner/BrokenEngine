@@ -10,10 +10,11 @@ namespace engine
 
 struct NavData;
 
-inline std::pair<int32_t, int32_t> PolygonRange(const std::vector<int32_t>& rPolygonOffsets, int64_t iPolygonIndex, int32_t iVertexTotal)
+template<typename T>
+inline std::pair<int64_t, int64_t> PolygonRange(const std::vector<T>& rPolygonOffsets, int64_t iPolygonIndex, int64_t iVertexTotal)
 {
-	int32_t iStart = rPolygonOffsets.at(static_cast<size_t>(iPolygonIndex));
-	int32_t iEnd = (iPolygonIndex + 1 < std::ssize(rPolygonOffsets)) ? rPolygonOffsets.at(static_cast<size_t>(iPolygonIndex + 1)) : iVertexTotal;
+	int64_t iStart = rPolygonOffsets.at(static_cast<size_t>(iPolygonIndex));
+	int64_t iEnd = (iPolygonIndex + 1 < std::ssize(rPolygonOffsets)) ? rPolygonOffsets.at(static_cast<size_t>(iPolygonIndex + 1)) : iVertexTotal;
 	return {iStart, iEnd};
 }
 

@@ -17,13 +17,13 @@ inline std::pair<bool, std::string> GetFileOrStringContent(const T& rSource)
 			return {false, {}};
 		}
 
-		size_t uiFileSize = std::filesystem::file_size(rSource);
+		int64_t iFileSize = static_cast<int64_t>(std::filesystem::file_size(rSource));
 		std::string fileContents;
-		fileContents.resize(uiFileSize);
+		fileContents.resize(static_cast<std::string::size_type>(iFileSize));
 
 		std::fstream fileStream(rSource, std::ios::in | std::ios::binary);
-		fileStream.read(fileContents.data(), uiFileSize);
-		bool bReadOk = static_cast<bool>(fileStream) && static_cast<size_t>(fileStream.gcount()) == uiFileSize;
+		fileStream.read(fileContents.data(), static_cast<std::streamsize>(iFileSize));
+		bool bReadOk = static_cast<bool>(fileStream) && fileStream.gcount() == iFileSize;
 		fileStream.close();
 
 		if (!bReadOk)
@@ -63,8 +63,8 @@ inline std::vector<std::byte> ReadEntireFile(const std::filesystem::path& rPath)
 	{
 		throw std::runtime_error("ReadEntireFile failed to open file");
 	}
-	fileStream.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(data.size()));
-	if (static_cast<size_t>(fileStream.gcount()) != data.size())
+	fileStream.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(std::ssize(data)));
+	if (fileStream.gcount() != std::ssize(data))
 	{
 		throw std::runtime_error("ReadEntireFile failed to read complete file");
 	}

@@ -31,8 +31,8 @@ constexpr float kfSecondaryPuffTimes = 0.4f * (kfPrimaryPuffEndTime - kfPrimaryP
 
 constexpr float kfExplosionTrailWidth = 1.0f;
 
-static uint8_t suiExplosionPointLightTypeIndex = kuiInvalidControllerType;
-static uint8_t suiExplosionPuffTypeIndex = kuiInvalidControllerType;
+static int64_t siExplosionPointLightTypeIndex = kiInvalidControllerType;
+static int64_t siExplosionPuffTypeIndex = kiInvalidControllerType;
 
 void XM_CALLCONV SyncExplosionTrail(game::FrameInterpolate& rFrameInterpolate, smoke_trails_t trailId, FXMVECTOR vecPosition, float fIntensity)
 {
@@ -63,21 +63,21 @@ void ExplosionsPostRender::AllocateAndCopy(ExplosionsPostRender& rCurrent, const
 void ExplosionsInterpolate::Register()
 {
 #if defined(BT_CLIENT)
-	if (suiExplosionPointLightTypeIndex != kuiInvalidControllerType)
+	if (siExplosionPointLightTypeIndex != kiInvalidControllerType)
 	{
 		return;
 	}
 
 	// Most of these pointers end up in controller-scale arrays that treat nullptr as "multiplier 1.0", so an
 	// unfilled field would silently disable that slider instead of failing. Catch it here while it is still cheap.
-	static constexpr size_t kuiTuningFieldCount = sizeof(ExplosionTuning) / sizeof(Wrapper*);
-	static_assert(kuiTuningFieldCount == 40);
-	for (const Wrapper* pTuningField : std::bit_cast<std::array<Wrapper*, kuiTuningFieldCount>>(sTuning))
+	static constexpr int64_t kiTuningFieldCount = static_cast<int64_t>(sizeof(ExplosionTuning) / sizeof(Wrapper*));
+	static_assert(kiTuningFieldCount == 40);
+	for (const Wrapper* pTuningField : std::bit_cast<std::array<Wrapper*, static_cast<size_t>(kiTuningFieldCount)>>(sTuning))
 	{
 		ASSERT(pTuningField != nullptr);
 	}
 
-	PointLightsInterpolate::RegisterType(suiExplosionPointLightTypeIndex,
+	PointLightsInterpolate::RegisterType(siExplosionPointLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesBC7ExplosionpngCrc,
 		.uiColor = 0xFFFFFFFF,
@@ -88,10 +88,11 @@ void ExplosionsInterpolate::Register()
 	});
 
 	// Keyframes are normalized; wrappers supply their magnitudes.
-	PointLightsInterpolate::RegisterControllerType(suiPrimaryLightControllerTypeIndex,
+	int64_t iPrimaryLightControllerTypeIndex = suiPrimaryLightControllerTypeIndex;
+	PointLightsInterpolate::RegisterControllerType(iPrimaryLightControllerTypeIndex,
 	{
-		.uiBaseTypeIndex = suiExplosionPointLightTypeIndex,
-		.uiKeyframeCount = 3,
+		.iBaseTypeIndex = siExplosionPointLightTypeIndex,
+		.iKeyframeCount = 3,
 		.bDestroysSelf = true,
 		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.4f * kfPrimaryTime), std::chrono::duration<float>(3.0f * kfPrimaryTime), std::chrono::duration<float>(0.0f)},
 		.keyframes =
@@ -106,11 +107,13 @@ void ExplosionsInterpolate::Register()
 		.ppLightingAreaScales = {sTuning.pPrimaryLightingAreaOne, sTuning.pPrimaryLightingAreaTwo, sTuning.pPrimaryLightingAreaThree, nullptr},
 		.ppLightingIntensityScales = {sTuning.pPrimaryLightingIntensityOne, sTuning.pPrimaryLightingIntensityTwo, sTuning.pPrimaryLightingIntensityThree, nullptr},
 	});
+	suiPrimaryLightControllerTypeIndex = static_cast<uint8_t>(iPrimaryLightControllerTypeIndex);
 
-	PointLightsInterpolate::RegisterControllerType(suiSecondaryLightControllerTypeIndex,
+	int64_t iSecondaryLightControllerTypeIndex = suiSecondaryLightControllerTypeIndex;
+	PointLightsInterpolate::RegisterControllerType(iSecondaryLightControllerTypeIndex,
 	{
-		.uiBaseTypeIndex = suiExplosionPointLightTypeIndex,
-		.uiKeyframeCount = 3,
+		.iBaseTypeIndex = siExplosionPointLightTypeIndex,
+		.iKeyframeCount = 3,
 		.bDestroysSelf = true,
 		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(1.0f * kfPrimaryTime), std::chrono::duration<float>(3.0f * kfPrimaryTime), std::chrono::duration<float>(0.0f)},
 		.keyframes =
@@ -125,17 +128,19 @@ void ExplosionsInterpolate::Register()
 		.ppLightingAreaScales = {sTuning.pSecondaryLightingAreaOne, sTuning.pSecondaryLightingAreaTwo, sTuning.pSecondaryLightingAreaThree, nullptr},
 		.ppLightingIntensityScales = {sTuning.pSecondaryLightingIntensityOne, sTuning.pSecondaryLightingIntensityTwo, sTuning.pSecondaryLightingIntensityThree, nullptr},
 	});
+	suiSecondaryLightControllerTypeIndex = static_cast<uint8_t>(iSecondaryLightControllerTypeIndex);
 
-	PuffsInterpolate::RegisterType(suiExplosionPuffTypeIndex,
+	PuffsInterpolate::RegisterType(siExplosionPuffTypeIndex,
 	{
 		.uiCrc = 0,
 		.uiColor = 0xFFFFFFFF,
 	});
 
-	PuffsInterpolate::RegisterControllerType(suiPrimaryPuffControllerTypeIndex,
+	int64_t iPrimaryPuffControllerTypeIndex = suiPrimaryPuffControllerTypeIndex;
+	PuffsInterpolate::RegisterControllerType(iPrimaryPuffControllerTypeIndex,
 	{
-		.uiBaseTypeIndex = suiExplosionPuffTypeIndex,
-		.uiKeyframeCount = 2,
+		.iBaseTypeIndex = siExplosionPuffTypeIndex,
+		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
 		.times = {std::chrono::duration<float>(kfPrimaryPuffStartTime), std::chrono::duration<float>(kfPrimaryPuffEndTime), std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.keyframes =
@@ -148,11 +153,13 @@ void ExplosionsInterpolate::Register()
 		.ppAreaScales = {sTuning.pPrimaryPuffAreaOne, sTuning.pPrimaryPuffAreaTwo, nullptr, nullptr},
 		.ppIntensityScales = {sTuning.pPrimaryPuffIntensityOne, sTuning.pPrimaryPuffIntensityTwo, nullptr, nullptr},
 	});
+	suiPrimaryPuffControllerTypeIndex = static_cast<uint8_t>(iPrimaryPuffControllerTypeIndex);
 
-	PuffsInterpolate::RegisterControllerType(suiSecondaryPuffControllerTypeIndex,
+	int64_t iSecondaryPuffControllerTypeIndex = suiSecondaryPuffControllerTypeIndex;
+	PuffsInterpolate::RegisterControllerType(iSecondaryPuffControllerTypeIndex,
 	{
-		.uiBaseTypeIndex = suiExplosionPuffTypeIndex,
-		.uiKeyframeCount = 2,
+		.iBaseTypeIndex = siExplosionPuffTypeIndex,
+		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
 		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(kfSecondaryPuffTimes), std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.keyframes =
@@ -165,21 +172,24 @@ void ExplosionsInterpolate::Register()
 		.ppAreaScales = {sTuning.pSecondaryPuffAreaOne, sTuning.pSecondaryPuffAreaTwo, nullptr, nullptr},
 		.ppIntensityScales = {sTuning.pSecondaryPuffIntensityOne, sTuning.pSecondaryPuffIntensityTwo, nullptr, nullptr},
 	});
+	suiSecondaryPuffControllerTypeIndex = static_cast<uint8_t>(iSecondaryPuffControllerTypeIndex);
 
-	SmokeTrailsInterpolate::RegisterType(suiExplosionTrailTypeIndex,
+	SmokeTrailsInterpolate::RegisterType(siExplosionTrailTypeIndex,
 	{
 		.uiCrc = 0,
-		.uiColor = 0xFFFFFFFF,
+		.iColor = 0xFFFFFFFF,
 		.fWidth = kfExplosionTrailWidth,
 	});
 
-	WindRadialsInterpolate::RegisterControllerType(suiWindRadialControllerTypeIndex,
+	int64_t iWindRadialControllerTypeIndex = suiWindRadialControllerTypeIndex;
+	WindRadialsInterpolate::RegisterControllerType(iWindRadialControllerTypeIndex,
 	{
-		.uiKeyframeCount = 2,
+		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
 		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(kfWindDepositDuration), std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.keyframes = {{.fIntensity = 1.0f, .fSize = 1.0f}, {.fIntensity = 0.0f, .fSize = 1.0f}, {}, {}},
 	});
+	suiWindRadialControllerTypeIndex = static_cast<uint8_t>(iWindRadialControllerTypeIndex);
 #endif // BT_CLIENT
 }
 
@@ -196,8 +206,8 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 
 	for (int64_t i = 0; i < rInterpolate.iCount; ++i)
 	{
-		uint8_t uiTypeIndex = rInterpolate.puiTypeIndices[i];
-		const ExplosionType& rType = ExplosionsInterpolate::sTypes.at(uiTypeIndex);
+		int64_t iTypeIndex = rInterpolate.puiTypeIndices[i];
+		const ExplosionType& rType = ExplosionsInterpolate::sTypes.at(static_cast<size_t>(iTypeIndex));
 
 		float fStartTime = rInterpolate.pfStartTimes[i];
 		float fExplosionTime = fCurrentTime - fStartTime;

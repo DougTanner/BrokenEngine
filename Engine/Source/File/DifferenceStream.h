@@ -71,8 +71,8 @@ public:
 
 	bool Save(FileFlags_t fileFlags, const std::filesystem::path& rFilename, const SAVED_TYPE& rSavedEnd)
 	{
-		int64_t iDifferenceCount = mDifferences.size();
-		int64_t iPostDispatchCount = mPostDispatchRecords.size();
+		int64_t iDifferenceCount = std::ssize(mDifferences);
+		int64_t iPostDispatchCount = std::ssize(mPostDispatchRecords);
 
 		bool bHeaderWritten = gpFileManager->WriteFileAtomically(fileFlags, rFilename, [&](std::fstream& rHeaderStream)
 		{
@@ -501,7 +501,7 @@ public:
 		}
 
 		int64_t iChecksumIndex = iTick - miStartTick - 1;
-		if (iChecksumIndex < 0 || iChecksumIndex >= static_cast<int64_t>(mChecksums.size()))
+		if (iChecksumIndex < 0 || iChecksumIndex >= std::ssize(mChecksums))
 		{
 			return;
 		}

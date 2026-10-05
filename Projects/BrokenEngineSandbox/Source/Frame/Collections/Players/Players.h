@@ -62,12 +62,12 @@ struct PlayersInterpolate : public engine::Collection<PlayersInterpolate, engine
 
 	static void GraphicsResources();
 
-	static inline uint8_t suiAreaLightTypeIndex = 0xFF;
-	static inline uint8_t suiBlasterTypeIndex = 0xFF;
-	static inline uint8_t suiExplosionTypeIndex = 0xFF;
+	static inline int64_t siAreaLightTypeIndex = 0xFF;
+	static inline int64_t siBlasterTypeIndex = 0xFF;
+	static inline int64_t siExplosionTypeIndex = 0xFF;
 	static inline uint8_t suiImpactPuffControllerTypeIndex = 0xFF;
 	static inline uint8_t suiImpactPointLightControllerTypeIndex = 0xFF;
-	static inline uint8_t suiHexShieldTypeIndex = 0xFF;
+	static inline int64_t siHexShieldTypeIndex = 0xFF;
 
 
 	static void Update(FrameInterpolate& __restrict rFrameInterpolate, const Frame& __restrict rPreviousFrame);
@@ -160,24 +160,24 @@ enum class PlayerFlags : uint16_t
 };
 using PlayerFlags_t = common::Flags<PlayerFlags>;
 
-inline constexpr int8_t GetNavigationDirection(PlayerFlags_t flags)
+inline constexpr int64_t GetNavigationDirection(PlayerFlags_t flags)
 {
-	return static_cast<int8_t>(((std::to_underlying(flags.meFlags) >> 8) & 0x7) - 1);
+	return static_cast<int64_t>(((std::to_underlying(flags.meFlags) >> 8) & 0x7) - 1);
 }
 
-inline void SetNavigationDirection(PlayerFlags_t& rFlags, int8_t iDirection)
+inline void SetNavigationDirection(PlayerFlags_t& rFlags, int64_t iDirection)
 {
 	uint16_t uiRaw = std::to_underlying(rFlags.meFlags);
 	uiRaw = static_cast<uint16_t>((uiRaw & ~0x0700) | (static_cast<uint16_t>(iDirection + 1) << 8));
 	rFlags.meFlags = static_cast<PlayerFlags>(uiRaw);
 }
 
-inline constexpr int8_t GetNavigationWaypointIndex(PlayerFlags_t flags)
+inline constexpr int64_t GetNavigationWaypointIndex(PlayerFlags_t flags)
 {
-	return static_cast<int8_t>((std::to_underlying(flags.meFlags) >> 12) & 0x3);
+	return static_cast<int64_t>((std::to_underlying(flags.meFlags) >> 12) & 0x3);
 }
 
-inline void SetNavigationWaypointIndex(PlayerFlags_t& rFlags, int8_t iIndex)
+inline void SetNavigationWaypointIndex(PlayerFlags_t& rFlags, int64_t iIndex)
 {
 	uint16_t uiRaw = std::to_underlying(rFlags.meFlags);
 	uiRaw = static_cast<uint16_t>((uiRaw & ~0x3000) | (static_cast<uint16_t>(iIndex) << 12));
@@ -239,8 +239,8 @@ struct PlayersPostRender : public engine::Collection<PlayersPostRender>
 private:
 	// Per-player Update helpers (called from PlayersPostRender::Update orchestrator)
 	// Defined in PlayersNavigation.cpp:
-	static void XM_CALLCONV ComputeNavigation(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecFrameCenter, engine::GridCoord fleetWantedCoordinate, uint8_t uiPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, float fDeltaTime, int8_t& riNavigationDirection, int8_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, float& rfFrameChangeTimer);
-	static void XM_CALLCONV ApplyMovement(int8_t iNavigationDirection, FXMVECTOR vecArtificialIntelligenceDirection, float fDeltaTime, float fAccelerationMultiplier, float fDecayMultiplier, XMVECTOR& rVecVelocity);
+	static void XM_CALLCONV ComputeNavigation(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecFrameCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, float fDeltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, float& rfFrameChangeTimer);
+	static void XM_CALLCONV ApplyMovement(int64_t iNavigationDirection, FXMVECTOR vecArtificialIntelligenceDirection, float fDeltaTime, float fAccelerationMultiplier, float fDecayMultiplier, XMVECTOR& rVecVelocity);
 	static void XM_CALLCONV ApplyTerrainPush(const engine::FrameStaticData& rStaticData, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity);
 	static void XM_CALLCONV ApplyPusherPush(const Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, int64_t i, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity);
 
@@ -337,8 +337,8 @@ public:
 		engine::GlobalId globalPlayerId {};
 		engine::ClientGuid clientGuid {};
 		engine::GridCoord fleetWantedCoordinate {};
-		uint8_t uiPendingFleetWantedCoordinateTicks = 0;
-		uint8_t uiPendingWeaponModeTicks = 0;
+		int64_t iPendingFleetWantedCoordinateTicks = 0;
+		int64_t iPendingWeaponModeTicks = 0;
 		// Transfers preserve supplied combat fields and animation time; navigation resets at spawn, and shield rotation and shrink use defaults.
 		bool bTransfer = false;
 	};

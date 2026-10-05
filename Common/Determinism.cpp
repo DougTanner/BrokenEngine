@@ -94,8 +94,8 @@ void SetupExceptionHandling()
 				return EXCEPTION_CONTINUE_SEARCH;
 			}
 
-			DWORD uiExceptionCode = pExceptionPointers->ExceptionRecord->ExceptionCode;
-			switch (uiExceptionCode)
+			int64_t iExceptionCode = pExceptionPointers->ExceptionRecord->ExceptionCode;
+			switch (iExceptionCode)
 			{
 				case DBG_PRINTEXCEPTION_WIDE_C:
 					LOG(kDefault, kVerbose, "DBG_PRINTEXCEPTION_WIDE_C");
@@ -131,13 +131,13 @@ void SetupExceptionHandling()
 				case 0xE06D7363: // Microsoft C++ SEH Exception
 				{
 					// Expected-throw region: a designed error path (e.g. agent command validation) throws to reach its catch — skip crash diagnostics for the C++ throw only.
-					if (uiExceptionCode == 0xE06D7363 && giExpectedThrowDepth > 0)
+					if (iExceptionCode == 0xE06D7363 && giExpectedThrowDepth > 0)
 					{
 						return EXCEPTION_CONTINUE_SEARCH;
 					}
 
 					char pcHex[20] {};
-					LOG(kDefault, kError, "Vectored exception: {}", ToHex(std::span(pcHex), uiExceptionCode));
+					LOG(kDefault, kError, "Vectored exception: {}", ToHex(std::span(pcHex), static_cast<DWORD>(iExceptionCode)));
 
 					bool bDxDiagThread = gpThreadLocal != nullptr && gpThreadLocal->miThreadId.has_value() && gpThreadLocal->miThreadId.value() == kThreadDxDiag;
 					if (bDxDiagThread)
@@ -146,7 +146,7 @@ void SetupExceptionHandling()
 					}
 					else
 					{
-						const char* pcType = uiExceptionCode == 0xC0000374 ? "Heap corruption" : (uiExceptionCode == 0xC0000005 ? "Access Violation" : (uiExceptionCode == 0xE06D7363 ? "Microsoft C++ SEH Exception" : "Unknown type"));
+						const char* pcType = iExceptionCode == 0xC0000374 ? "Heap corruption" : (iExceptionCode == 0xC0000005 ? "Access Violation" : (iExceptionCode == 0xE06D7363 ? "Microsoft C++ SEH Exception" : "Unknown type"));
 						LOG(kDefault, kError, "<{}>", pcType);
 						LogStackWalker logStackWalker(StackWalker::NonExcept);
 						logStackWalker.ShowCallstack();
@@ -159,7 +159,7 @@ void SetupExceptionHandling()
 				}
 
 				default:
-					LOG(kDefault, kError, "Unhandled vectored exception: {}", uiExceptionCode);
+					LOG(kDefault, kError, "Unhandled vectored exception: {}", iExceptionCode);
 					DEBUG_BREAK();
 					break;
 			}

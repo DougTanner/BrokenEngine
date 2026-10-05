@@ -32,7 +32,7 @@ bool FrameInterpolateBase::LogDifferences(const FrameInterpolateBase& rOther) co
 	bEqual &= common::LogDifference<"iTick">(iTick, rOther.iTick);
 	bEqual &= common::LogDifference<"fCurrentTime">(fCurrentTime, rOther.fCurrentTime);
 	bEqual &= common::LogDifference<"fDeltaTime">(fDeltaTime, rOther.fDeltaTime);
-	bEqual &= LogDifferencesCollections(ServerCollections(), rOther.ServerCollections(), std::make_index_sequence<std::tuple_size_v<decltype(ServerCollections())>> {});
+	bEqual &= LogDifferencesCollections(ServerCollections(), rOther.ServerCollections(), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(ServerCollections())>)> {});
 	return bEqual;
 }
 
@@ -102,7 +102,7 @@ bool FramePostRenderBase::LogDifferences(const FramePostRenderBase& rOther) cons
 		bEqual = false;
 		LOG(kNetwork, kError, "LogDifferences {} alignments differ", common::gpLogDifferenceContext);
 	}
-	bEqual &= LogDifferencesCollections(ServerCollections(), rOther.ServerCollections(), std::make_index_sequence<std::tuple_size_v<decltype(ServerCollections())>> {});
+	bEqual &= LogDifferencesCollections(ServerCollections(), rOther.ServerCollections(), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(ServerCollections())>)> {});
 	return bEqual;
 }
 
@@ -165,7 +165,7 @@ void FrameInterpolateBase::AllocateAndCopy([[maybe_unused]] game::FrameInterpola
 {
 	FrameInterpolateBase& rCurrentBase = rCurrent;
 	const FrameInterpolateBase& rPreviousBase = rPrevious;
-	AllocateAndCopyCollections(rCurrentBase.Collections(), rPreviousBase.Collections(), std::make_index_sequence<std::tuple_size_v<decltype(rCurrentBase.Collections())>> {});
+	AllocateAndCopyCollections(rCurrentBase.Collections(), rPreviousBase.Collections(), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(rCurrentBase.Collections())>)> {});
 }
 
 void FrameInterpolateBase::Update([[maybe_unused]] game::FrameInterpolate& __restrict rCurrent, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] float fDeltaTime)
@@ -186,7 +186,7 @@ void FramePostRenderBase::AllocateAndCopy([[maybe_unused]] game::FramePostRender
 {
 	FramePostRenderBase& rCurrentBase = rCurrent;
 	const FramePostRenderBase& rPreviousBase = rPrevious;
-	AllocateAndCopyCollections(rCurrentBase.Collections(), rPreviousBase.Collections(), std::make_index_sequence<std::tuple_size_v<decltype(rCurrentBase.Collections())>> {});
+	AllocateAndCopyCollections(rCurrentBase.Collections(), rPreviousBase.Collections(), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(rCurrentBase.Collections())>)> {});
 }
 
 void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const game::FrameInput& __restrict rFrameInput, [[maybe_unused]] const FrameStaticData& rStaticData)

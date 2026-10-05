@@ -15,9 +15,9 @@
 
 namespace toolcli::coordination
 {
-	static std::string FailureReasonFor(DWORD uiError)
+	static std::string FailureReasonFor(int64_t iError)
 	{
-		return uiError == ERROR_SHARING_VIOLATION || uiError == ERROR_LOCK_VIOLATION ? "timed out" : "Windows error " + std::to_string(uiError);
+		return iError == ERROR_SHARING_VIOLATION || iError == ERROR_LOCK_VIOLATION ? "timed out" : "Windows error " + std::to_string(iError);
 	}
 
 	Guard::Guard(const std::filesystem::path& rPath, bool& rbContentionObserved, std::string& rFailureReason, int64_t iMaximumWaitMilliseconds, int64_t iMaximumDeniedAccessMilliseconds) :
@@ -40,17 +40,17 @@ namespace toolcli::coordination
 				mbValid = true;
 				return;
 			}
-			DWORD uiLastError = ::GetLastError();
-			rFailureReason = FailureReasonFor(uiLastError);
+			int64_t iLastError = ::GetLastError();
+			rFailureReason = FailureReasonFor(iLastError);
 			// ERROR_ACCESS_DENIED covers the delete-pending window while a releasing holder unlinks the guard file.
-			if (uiLastError != ERROR_SHARING_VIOLATION && uiLastError != ERROR_LOCK_VIOLATION && uiLastError != ERROR_ACCESS_DENIED)
+			if (iLastError != ERROR_SHARING_VIOLATION && iLastError != ERROR_LOCK_VIOLATION && iLastError != ERROR_ACCESS_DENIED)
 			{
 				return;
 			}
-			rbContentionObserved = rbContentionObserved || uiLastError == ERROR_SHARING_VIOLATION || uiLastError == ERROR_LOCK_VIOLATION;
+			rbContentionObserved = rbContentionObserved || iLastError == ERROR_SHARING_VIOLATION || iLastError == ERROR_LOCK_VIOLATION;
 			std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 			// The denied-access budget covers the current consecutive run only: a sharing or lock violation proves a live holder rather than a stuck delete-pending window, so the next denied observation starts a fresh budget.
-			if (uiLastError == ERROR_ACCESS_DENIED)
+			if (iLastError == ERROR_ACCESS_DENIED)
 			{
 				if (!deniedRunStart)
 				{
@@ -94,11 +94,11 @@ namespace toolcli::coordination
 		return pBuffer;
 	}
 
-	bool ParseUtcTimestamp(const std::string& rValue, uint64_t& rTicks)
+	bool ParseUtcTimestamp(const std::string& rValue, int64_t& rTicks)
 	{
 		SYSTEMTIME time {};
 		char cSuffix = 0;
-		int iRead = std::sscanf(rValue.c_str(), "%hu-%hu-%huT%hu:%hu:%hu.%hu%c", &time.wYear, &time.wMonth, &time.wDay, &time.wHour, &time.wMinute, &time.wSecond, &time.wMilliseconds, &cSuffix);
+		int64_t iRead = std::sscanf(rValue.c_str(), "%hu-%hu-%huT%hu:%hu:%hu.%hu%c", &time.wYear, &time.wMonth, &time.wDay, &time.wHour, &time.wMinute, &time.wSecond, &time.wMilliseconds, &cSuffix);
 		FILETIME fileTime {};
 		if (iRead != 8)
 		{
@@ -116,7 +116,7 @@ namespace toolcli::coordination
 		{
 			return false;
 		}
-		rTicks = (static_cast<uint64_t>(fileTime.dwHighDateTime) << 32) | fileTime.dwLowDateTime;
+		rTicks = static_cast<int64_t>((static_cast<uint64_t>(fileTime.dwHighDateTime) << 32) | fileTime.dwLowDateTime);
 		return true;
 	}
 
@@ -155,9 +155,10 @@ namespace toolcli::coordination
 			::BCryptCloseAlgorithmProvider(hAlgorithm, 0);
 			return std::nullopt;
 		}
-		std::vector<UCHAR> hashObject(uiObjectLength);
+		int64_t iObjectLength = uiObjectLength;
+		std::vector<UCHAR> hashObject(static_cast<size_t>(iObjectLength));
 		BCRYPT_HASH_HANDLE hHash = nullptr;
-		if (::BCryptCreateHash(hAlgorithm, &hHash, hashObject.data(), uiObjectLength, nullptr, 0, 0) < 0
+		if (::BCryptCreateHash(hAlgorithm, &hHash, hashObject.data(), static_cast<ULONG>(iObjectLength), nullptr, 0, 0) < 0
 		 || ::BCryptHashData(hHash, reinterpret_cast<PUCHAR>(const_cast<char*>(value.data())), static_cast<ULONG>(value.size()), 0) < 0)
 		{
 			if (hHash != nullptr)
@@ -206,21 +207,21 @@ namespace toolcli::coordination
 			return std::nullopt;
 		}
 		std::wstring finalPath(32'768, L'\0');
-		DWORD uiWritten = ::GetFinalPathNameByHandleW(hDirectory.Get(), finalPath.data(), static_cast<DWORD>(finalPath.size()), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
-		if (uiWritten == 0 || uiWritten >= finalPath.size())
+		int64_t iWritten = ::GetFinalPathNameByHandleW(hDirectory.Get(), finalPath.data(), static_cast<DWORD>(finalPath.size()), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+		if (iWritten == 0 || std::cmp_greater_equal(iWritten, finalPath.size()))
 		{
 			return std::nullopt;
 		}
-		finalPath.resize(uiWritten);
+		finalPath.resize(static_cast<size_t>(iWritten));
 		// A network share normalizes to \\?\UNC\server\share\..., which the prefix strip below would turn into a
 		// mangled relative key that is then persisted, hashed, and handed to Git.  No logical key form covers a UNC
 		// checkout, so canonicalization fails here where the reason is still visible.
-		if (finalPath.starts_with(L"\\\\?\\UNC\\"))
+		if (finalPath.starts_with(LR"(\\?\UNC\)"))
 		{
 			Fail("network-share (UNC) checkouts are unsupported by the coordination tooling: " + WideToUtf8(finalPath));
 			return std::nullopt;
 		}
-		if (finalPath.starts_with(L"\\\\?\\"))
+		if (finalPath.starts_with(LR"(\\?\)"))
 		{
 			finalPath.erase(0, 4);
 		}
@@ -338,7 +339,9 @@ namespace toolcli::coordination
 			return false;
 		}
 		DWORD uiWritten = 0;
-		bool bSucceeded = ::WriteFile(hFile.Get(), contents.data(), static_cast<DWORD>(contents.size()), &uiWritten, nullptr) != FALSE && uiWritten == contents.size() && ::FlushFileBuffers(hFile.Get()) != FALSE;
+		bool bSucceeded = ::WriteFile(hFile.Get(), contents.data(), static_cast<DWORD>(contents.size()), &uiWritten, nullptr) != FALSE;
+		int64_t iWritten = uiWritten;
+		bSucceeded = bSucceeded && std::cmp_equal(iWritten, contents.size()) && ::FlushFileBuffers(hFile.Get()) != FALSE;
 		hFile.Reset();
 		if (!bSucceeded)
 		{
@@ -403,16 +406,17 @@ namespace toolcli::coordination
 				return false;
 			}
 		}
-		uint64_t uiClaimedTicks = 0;
-		uint64_t uiHeartbeatTicks = 0;
+		int64_t iClaimedTicks = 0;
+		int64_t iHeartbeatTicks = 0;
 		std::optional<int64_t> claimantPid = rMetadata.contains("claimantPid") ? JsonInt64(rMetadata["claimantPid"]) : std::nullopt;
-		return rMetadata.contains("schemaVersion") && JsonIntegerEquals(rMetadata["schemaVersion"], iExpectedSchemaVersion)
+		bool bValidMetadata = rMetadata.contains("schemaVersion") && JsonIntegerEquals(rMetadata["schemaVersion"], iExpectedSchemaVersion)
 		    && rMetadata.contains("domain") && rMetadata["domain"].is_string()
 		    && rMetadata["domain"].get<std::string>() == WideToUtf8(rLocator.domain) && rMetadata.contains("logicalKey")
 		    && rMetadata["logicalKey"].is_string() && rMetadata["logicalKey"].get<std::string>() == WideToUtf8(rLocator.logicalKey)
 		    && claimantPid && std::in_range<uint32_t>(*claimantPid)
-		    && ParseUtcTimestamp(rMetadata["claimedAt"].get<std::string>(), uiClaimedTicks)
-		    && ParseUtcTimestamp(rMetadata["heartbeatAt"].get<std::string>(), uiHeartbeatTicks) && uiClaimedTicks <= uiHeartbeatTicks;
+		    && ParseUtcTimestamp(rMetadata["claimedAt"].get<std::string>(), iClaimedTicks)
+		    && ParseUtcTimestamp(rMetadata["heartbeatAt"].get<std::string>(), iHeartbeatTicks);
+		return bValidMetadata && iClaimedTicks <= iHeartbeatTicks;
 	}
 
 	nlohmann::json NewMetadata(const Locator& rLocator, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree)

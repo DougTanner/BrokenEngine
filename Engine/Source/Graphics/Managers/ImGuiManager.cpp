@@ -128,8 +128,8 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 		.QueueFamily = static_cast<uint32_t>(gpInstanceManager->miGraphicsQueueFamilyIndex),
 		.Queue = gpDeviceManager->mGraphicsVkQueue,
 		.DescriptorPool = gpDeviceManager->mVkDescriptorPool,
-		.MinImageCount = static_cast<uint32_t>(gpSwapchainManager->mFramebuffers.size()),
-		.ImageCount = static_cast<uint32_t>(gpSwapchainManager->mFramebuffers.size()),
+		.MinImageCount = static_cast<uint32_t>(std::ssize(gpSwapchainManager->mFramebuffers)),
+		.ImageCount = static_cast<uint32_t>(std::ssize(gpSwapchainManager->mFramebuffers)),
 		.PipelineInfoMain
 		{
 			.RenderPass = mImGuiVkRenderPass,
@@ -391,7 +391,7 @@ void ImGuiManager::CreateRenderPass()
 
 void ImGuiManager::CreateFramebuffers()
 {
-	mImGuiFramebuffers.resize(gpSwapchainManager->mFramebuffers.size());
+	mImGuiFramebuffers.resize(static_cast<size_t>(std::ssize(gpSwapchainManager->mFramebuffers)));
 	for (int64_t i = 0; i < std::ssize(mImGuiFramebuffers); ++i)
 	{
 		VkImageView vkImageView = gpSwapchainManager->mFramebuffers.at(i).vkPresentImageView;

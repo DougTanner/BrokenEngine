@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <fstream>
 #include <functional>
+#include <iterator>
 #include <unordered_map>
 
 namespace toolcli
@@ -14,9 +15,9 @@ namespace toolcli
 		return WideToUtf8(left) < WideToUtf8(right);
 	}
 
-	bool ParseCanonicalUtcTimestamp(std::string_view value, uint64_t& rTicks)
+	bool ParseCanonicalUtcTimestamp(std::string_view value, int64_t& rTicks)
 	{
-		return coordination::ParseUtcTimestamp(std::string(value), rTicks) && coordination::FormatUtcTimestamp(rTicks) == value;
+		return coordination::ParseUtcTimestamp(std::string(value), rTicks) && coordination::FormatUtcTimestamp(static_cast<uint64_t>(rTicks)) == value;
 	}
 
 	bool ReadBytes(const std::filesystem::path& rPath, std::string& rBytes)
@@ -27,14 +28,14 @@ namespace toolcli
 			return false;
 		}
 		input.seekg(0, std::ios::end);
-		std::streamoff iSize = input.tellg();
+		int64_t iSize = static_cast<int64_t>(input.tellg());
 		if (iSize < 0 || iSize > 4 * 1'024 * 1'024)
 		{
 			return false;
 		}
 		input.seekg(0, std::ios::beg);
 		rBytes.assign(static_cast<size_t>(iSize), '\0');
-		input.read(rBytes.data(), iSize);
+		input.read(rBytes.data(), static_cast<std::streamsize>(iSize));
 		return input.good() || input.eof();
 	}
 
@@ -99,13 +100,13 @@ namespace toolcli
 			rPlan.diagnostic = "manual";
 			return true;
 		}
-		size_t uiLineEnd = rPlan.bytes.find('\n');
-		size_t uiMarkerEnd = uiLineEnd == std::string::npos ? rPlan.bytes.size() : uiLineEnd;
-		if (uiMarkerEnd > 0 && rPlan.bytes[uiMarkerEnd - 1] == '\r')
+		int64_t iLineEnd = static_cast<int64_t>(rPlan.bytes.find('\n'));
+		int64_t iMarkerEnd = iLineEnd == -1 ? std::ssize(rPlan.bytes) : iLineEnd;
+		if (iMarkerEnd > 0 && rPlan.bytes[static_cast<size_t>(iMarkerEnd - 1)] == '\r')
 		{
-			--uiMarkerEnd;
+			--iMarkerEnd;
 		}
-		std::string_view marker(rPlan.bytes.data(), uiMarkerEnd);
+		std::string_view marker(rPlan.bytes.data(), static_cast<size_t>(iMarkerEnd));
 		if (!marker.ends_with(kMarkerSuffix))
 		{
 			rPlan.diagnostic = "malformed plan metadata marker";
@@ -113,9 +114,9 @@ namespace toolcli
 		}
 		try
 		{
-			size_t uiJsonBegin = kMarkerPrefix.size();
-			size_t uiJsonLength = marker.size() - uiJsonBegin - kMarkerSuffix.size();
-			nlohmann::json metadata = nlohmann::json::parse(std::string(marker.substr(uiJsonBegin, uiJsonLength)));
+			int64_t iJsonBegin = std::ssize(kMarkerPrefix);
+			int64_t iJsonLength = std::ssize(marker) - iJsonBegin - std::ssize(kMarkerSuffix);
+			nlohmann::json metadata = nlohmann::json::parse(std::string(marker.substr(static_cast<size_t>(iJsonBegin), static_cast<size_t>(iJsonLength))));
 			if (metadata.contains("dependsOn") && metadata["dependsOn"].is_array())
 			{
 				std::vector<std::wstring> dependencies;
@@ -141,8 +142,8 @@ namespace toolcli
 				rPlan.diagnostic = "metadata requires exactly createdUtc and dependsOn";
 				return false;
 			}
-			uint64_t uiTicks = 0;
-			if (!ParseCanonicalUtcTimestamp(metadata["createdUtc"].get<std::string>(), uiTicks))
+			int64_t iTicks = 0;
+			if (!ParseCanonicalUtcTimestamp(metadata["createdUtc"].get<std::string>(), iTicks))
 			{
 				rPlan.diagnostic = "createdUtc is invalid";
 				return false;
@@ -224,21 +225,21 @@ namespace toolcli
 		{
 			return false;
 		}
-		size_t uiOffset = 0;
-		while (uiOffset < listing->size())
+		int64_t iOffset = 0;
+		while (iOffset < std::ssize(*listing))
 		{
-			size_t uiEnd = listing->find('\0', uiOffset);
-			if (uiEnd == std::string::npos)
+			int64_t iEnd = static_cast<int64_t>(listing->find('\0', static_cast<size_t>(iOffset)));
+			if (iEnd == -1)
 			{
 				return false;
 			}
 			std::wstring path;
-			if (!NormalizePlanPath(Utf8ToWide(std::string_view(listing->data() + uiOffset, uiEnd - uiOffset)), path))
+			if (!NormalizePlanPath(Utf8ToWide(std::string_view(listing->data() + iOffset, static_cast<size_t>(iEnd - iOffset))), path))
 			{
-				uiOffset = uiEnd + 1;
+				iOffset = iEnd + 1;
 				continue;
 			}
-			uiOffset = uiEnd + 1;
+			iOffset = iEnd + 1;
 			Plan plan {};
 			plan.path = path;
 			plan.diskPath = rWorktree / path;
@@ -261,18 +262,18 @@ namespace toolcli
 		{
 			return false;
 		}
-		size_t uiOffset = 0;
-		while (uiOffset < listing->size())
+		int64_t iOffset = 0;
+		while (iOffset < std::ssize(*listing))
 		{
-			size_t uiEnd = listing->find('\0', uiOffset);
-			if (uiEnd == std::string::npos)
+			int64_t iEnd = static_cast<int64_t>(listing->find('\0', static_cast<size_t>(iOffset)));
+			if (iEnd == -1)
 			{
 				return false;
 			}
-			std::string_view entry(listing->data() + uiOffset, uiEnd - uiOffset);
-			uiOffset = uiEnd + 1;
-			size_t uiTab = entry.find('\t');
-			if (uiTab == std::string::npos)
+			std::string_view entry(listing->data() + iOffset, static_cast<size_t>(iEnd - iOffset));
+			iOffset = iEnd + 1;
+			int64_t iTab = static_cast<int64_t>(entry.find('\t'));
+			if (iTab == -1)
 			{
 				continue;
 			}
@@ -283,7 +284,7 @@ namespace toolcli
 				continue;
 			}
 			std::wstring path;
-			if (!NormalizePlanPath(Utf8ToWide(entry.substr(uiTab + 1)), path))
+			if (!NormalizePlanPath(Utf8ToWide(entry.substr(static_cast<size_t>(iTab + 1))), path))
 			{
 				continue;
 			}

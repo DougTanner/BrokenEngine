@@ -46,7 +46,7 @@ constexpr float kfExplosionSizeStart = kfPlayerRadius * 1.3333f;
 constexpr float kfExplosionSizeEnd = kfPlayerRadius * 0.3333f;
 constexpr float kfExplosionSmoke = 0.25f;
 constexpr float kfDeathRadialPower = 0.3f;
-constexpr uint32_t kuiDeathTrailCount = 2;
+constexpr int64_t kiDeathTrailCount = 2;
 
 // Firing, look targets, and missile aim require a living, visible spaceship past arrival grace.
 static bool XM_CALLCONV IsAcquireCandidate(const SpaceshipsInterpolate& __restrict rSpaceshipsInterpolate, const SpaceshipsPostRender& __restrict rSpaceshipsPostRender, FXMVECTOR vecPlayerPosition, int64_t j)
@@ -319,7 +319,7 @@ void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]]
 			{
 				.vecPosition = vecFinalPosition,
 				.vecVelocity = vecBlasterVelocity,
-				.uiTypeIndex = PlayersInterpolate::suiBlasterTypeIndex,
+				.iTypeIndex = PlayersInterpolate::siBlasterTypeIndex,
 				.alignment = rCurrentPostRender.pAlignments[i],
 				.fWindTrailIntensity = game::gWindDepositPlayerBlastersIntensity.mfCurrent,
 				.fWindTrailWidth = game::gWindDepositPlayerBlastersWidth.mfCurrent,
@@ -466,11 +466,11 @@ void PlayersPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict 
 
 		engine::ExplosionsPostRender::Spawn(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime),
 		{
-			.uiTypeIndex = PlayersInterpolate::suiExplosionTypeIndex,
+			.iTypeIndex = PlayersInterpolate::siExplosionTypeIndex,
 			.vecPosition = vecJitteredPosition,
 			.vecDirection = vecJitteredDirection,
 			.flags = {engine::ExplosionFlags::kDestroysSelf, engine::ExplosionFlags::kYellow},
-			.uiTrailCount = kuiDeathTrailCount,
+			.iTrailCount = kiDeathTrailCount,
 			.fTrailAngle = fPercent * XM_PIDIV2,
 			.uiParticleCount = static_cast<uint32_t>(fPercent * kfExplosionParticleCount),
 			.fParticleAngle = fPercent * XM_PIDIV2,

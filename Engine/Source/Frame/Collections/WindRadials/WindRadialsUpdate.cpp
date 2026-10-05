@@ -31,10 +31,10 @@ void WindRadialsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 		float fBaseIntensity = rCurrent.pfBaseIntensities[i];
 		float fBaseSize = rCurrent.pfBaseSizes[i];
 
-		uint8_t uiControllerTypeIndex = rCurrent.puiControllerTypeIndices[i];
+		int64_t iControllerTypeIndex = rCurrent.puiControllerTypeIndices[i];
 		float fStartTime = rCurrent.pfStartTimes[i];
 		float fElapsedTime = fCurrentTime - fStartTime;
-		const WindRadialControllerType& rController = WindRadialsInterpolate::sControllerTypes.at(uiControllerTypeIndex);
+		const WindRadialControllerType& rController = WindRadialsInterpolate::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
 		WindRadialKeyframe interpolated = InterpolateKeyframes(rController, fElapsedTime);
 
 		rCurrent.pVecPositions[i] = vecPosition;
@@ -47,14 +47,14 @@ void WindRadialsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFra
 {
 }
 
-void XM_CALLCONV WindRadialsPostRender::AddControlled(game::Frame& __restrict rFrame, float fCurrentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition, float fBaseIntensity, float fBaseSize)
+void XM_CALLCONV WindRadialsPostRender::AddControlled(game::Frame& __restrict rFrame, float fCurrentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fBaseIntensity, float fBaseSize)
 {
 	WindRadialsInterpolate& rInterpolate = rFrame.interpolate.windRadials;
 	WindRadialsPostRender& rPostRender = rFrame.postRender.windRadials;
 
-	const WindRadialControllerType& rController = WindRadialsInterpolate::sControllerTypes.at(uiControllerTypeIndex);
+	const WindRadialControllerType& rController = WindRadialsInterpolate::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
 
-	AddControlledElement(rInterpolate, rPostRender, fCurrentTime, uiControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
+	AddControlledElement(rInterpolate, rPostRender, fCurrentTime, iControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
 	{
 		GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
 	}, [&rInterpolate, &rPostRender]()

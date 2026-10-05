@@ -39,7 +39,7 @@ static bool ReadReplayManifestValue(std::istream& rStream, TYPE& rValue)
 	UnsignedType uiValue = 0;
 	for (int64_t i = 0; i < static_cast<int64_t>(sizeof(TYPE)); ++i)
 	{
-		int iByte = rStream.get();
+		int64_t iByte = rStream.get();
 		if (iByte == std::char_traits<char>::eof())
 		{
 			return false;
@@ -137,7 +137,7 @@ static bool AppendReplayManifestPayload(const ReplayManifest& rManifest, std::ve
 
 	AppendValue(kiReplayManifestVersion);
 	AppendValue(rManifest.iInitialTick);
-	AppendValue(static_cast<int64_t>(rManifest.records.size()));
+	AppendValue(static_cast<int64_t>(std::ssize(rManifest.records)));
 	for (const ReplayManifestRecord& rRecord : rManifest.records)
 	{
 		AppendValue(rRecord.iActivationTick);
@@ -145,7 +145,7 @@ static bool AppendReplayManifestPayload(const ReplayManifest& rManifest, std::ve
 		AppendValue(rRecord.coordinate.iY);
 	}
 	AppendValue(static_cast<uint8_t>(rManifest.bHasFullFrames ? 1 : 0));
-	AppendValue(static_cast<int64_t>(rManifest.inventory.size()));
+	AppendValue(static_cast<int64_t>(std::ssize(rManifest.inventory)));
 	for (const ReplayManifestInventoryEntry& rEntry : rManifest.inventory)
 	{
 		AppendValue(static_cast<uint8_t>(rEntry.eKind));
@@ -246,7 +246,7 @@ static bool PublishReplayManifest(const ReplayManifest& rManifest, const std::ar
 	}
 	return engine::gpFileManager->WriteFileAtomically({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, std::filesystem::path("F7.replay.manifest"), [&](std::fstream& rManifestStream)
 	{
-		rManifestStream.write(reinterpret_cast<const char*>(payload.data()), static_cast<std::streamsize>(payload.size()));
+		rManifestStream.write(reinterpret_cast<const char*>(payload.data()), static_cast<std::streamsize>(std::ssize(payload)));
 		rManifestStream.write(reinterpret_cast<const char*>(rGenerationDigest.data()), static_cast<std::streamsize>(rGenerationDigest.size()));
 	});
 }
@@ -441,7 +441,7 @@ void Replay::SaveLoadReplay()
 				{
 					throw std::ios_base::failure("ReplayManifest initial tick");
 				}
-				common::ValidateDeserializedCount(iCoordinateCount, 16, manifestStream, "ReplayManifest records");
+				common::ValidateDeserializedCount(iCoordinateCount, sizeof(ReplayManifestRecord::iActivationTick) + sizeof(GridCoord::iX) + sizeof(GridCoord::iY), manifestStream, "ReplayManifest records");
 				if (iCoordinateCount <= 0)
 				{
 					throw std::ios_base::failure("ReplayManifest empty records");
@@ -538,24 +538,16 @@ void Replay::SaveLoadReplay()
 				}
 
 				ReplayManifest expectedManifest = manifest;
-				if (!BuildExpectedReplayInventory(expectedManifest, false) || expectedManifest.inventory.size() != manifest.inventory.size())
+				if (!BuildExpectedReplayInventory(expectedManifest, false) || std::ssize(expectedManifest.inventory) != std::ssize(manifest.inventory))
 				{
 					throw std::ios_base::failure("ReplayManifest inventory shape");
 				}
-				for (int64_t i = 0; i < std::ssize(manifest.inventory); ++i)
+				if (!std::ranges::equal(expectedManifest.inventory, manifest.inventory, [](const ReplayManifestInventoryEntry& rExpected, const ReplayManifestInventoryEntry& rActual)
 				{
-					if (expectedManifest.inventory.at(i).eKind != manifest.inventory.at(i).eKind)
-					{
-						throw std::ios_base::failure("ReplayManifest inventory identity");
-					}
-					if (expectedManifest.inventory.at(i).uiCoordinateKey != manifest.inventory.at(i).uiCoordinateKey)
-					{
-						throw std::ios_base::failure("ReplayManifest inventory identity");
-					}
-					if (expectedManifest.inventory.at(i).iActivationTick != manifest.inventory.at(i).iActivationTick)
-					{
-						throw std::ios_base::failure("ReplayManifest inventory identity");
-					}
+					return rExpected.eKind == rActual.eKind && rExpected.uiCoordinateKey == rActual.uiCoordinateKey && rExpected.iActivationTick == rActual.iActivationTick;
+				}))
+				{
+					throw std::ios_base::failure("ReplayManifest inventory identity");
 				}
 				std::array<uint8_t, 32> expectedGenerationDigest {};
 				if (!ComputeReplayGenerationDigest(manifest, expectedGenerationDigest) || expectedGenerationDigest != generationDigest)
@@ -588,7 +580,7 @@ void Replay::SaveLoadReplay()
 					PendingReplayReader pendingReader;
 				};
 				std::vector<StagedReplayReader> stagedReaders;
-				stagedReaders.reserve(rRecordedRecords.size());
+				stagedReaders.reserve(static_cast<size_t>(std::ssize(rRecordedRecords)));
 				for (const ReplayManifestRecord& rRecord : rRecordedRecords)
 				{
 					StagedReplayReader staged {.record = rRecord};
@@ -627,7 +619,7 @@ void Replay::SaveLoadReplay()
 					stagedReaders.push_back(std::move(staged));
 				}
 				std::unordered_map<GridCoord, int64_t> previousSavedEndTicks;
-				previousSavedEndTicks.reserve(stagedReaders.size());
+				previousSavedEndTicks.reserve(static_cast<size_t>(std::ssize(stagedReaders)));
 				for (const StagedReplayReader& rStagedReader : stagedReaders)
 				{
 					int64_t iSavedEndTick = rStagedReader.pendingReader.pReader->mSavedEnd.interpolate.iTick;
@@ -658,7 +650,7 @@ void Replay::SaveLoadReplay()
 				}
 
 				std::unordered_set<GridCoord> initialCoordinates;
-				initialCoordinates.reserve(stagedReaders.size());
+				initialCoordinates.reserve(static_cast<size_t>(std::ssize(stagedReaders)));
 				if (stagedGrid.iTick != iInitialTick)
 				{
 					throw std::ios_base::failure("ReplayManifest grid initial tick mismatch");
@@ -883,7 +875,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 						std::filesystem::path fullFramesPath = std::filesystem::path(coordinateReplayPath).concat(".fullframes");
 						std::fstream fullFramesStream = engine::gpFileManager->OpenFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, fullFramesPath);
 						fullFramesStream.seekg(0, std::ios::end);
-						std::streamoff iBeforeBytes = fullFramesStream.tellg();
+						int64_t iBeforeBytes = fullFramesStream.tellg();
 						bool bFullFramesTruncated = fullFramesStream.is_open() && iBeforeBytes > 0
 						                         && iBeforeBytes <= std::numeric_limits<std::streamsize>::max();
 						std::vector<std::byte> prefix;
@@ -893,8 +885,8 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 							fullFramesStream.seekg(0, std::ios::beg);
 							if (!prefix.empty())
 							{
-								fullFramesStream.read(reinterpret_cast<char*>(prefix.data()), static_cast<std::streamsize>(prefix.size()));
-								bFullFramesTruncated = fullFramesStream.gcount() == static_cast<std::streamsize>(prefix.size());
+								fullFramesStream.read(reinterpret_cast<char*>(prefix.data()), static_cast<std::streamsize>(std::ssize(prefix)));
+								bFullFramesTruncated = fullFramesStream.gcount() == std::ssize(prefix);
 							}
 						}
 						fullFramesStream.close();
@@ -904,13 +896,13 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 							{
 								if (!prefix.empty())
 								{
-									rFullFramesStream.write(reinterpret_cast<const char*>(prefix.data()), static_cast<std::streamsize>(prefix.size()));
+									rFullFramesStream.write(reinterpret_cast<const char*>(prefix.data()), static_cast<std::streamsize>(std::ssize(prefix)));
 								}
 							});
 						}
 						if (bFullFramesTruncated)
 						{
-							LOG(kDefault, kDebug, "Injected malformed replay fullframes for coord ({},{}); bytes {} -> {}", rCoordinate.iX, rCoordinate.iY, iBeforeBytes, prefix.size());
+							LOG(kDefault, kDebug, "Injected malformed replay fullframes for coord ({},{}); bytes {} -> {}", rCoordinate.iX, rCoordinate.iY, iBeforeBytes, std::ssize(prefix));
 						}
 						else
 						{

@@ -19,8 +19,8 @@ namespace game
 struct BlastersType
 {
 	XMFLOAT2 f2Size {0.11f, 1.5f};
-	uint8_t uiAreaLightTypeIndex = 0;
-	uint8_t uiPointLightTypeIndex = 0xFF; // 0xFF = use area light
+	int64_t iAreaLightTypeIndex = 0;
+	int64_t iPointLightTypeIndex = 0xFF; // 0xFF = use area light
 };
 
 struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>, public engine::TypeRegistry<BlastersType>
@@ -32,18 +32,6 @@ struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>, pub
 	static void Register();
 
 	static void AllocateAndCopy(BlastersInterpolate& rCurrent, const BlastersInterpolate& rPrevious);
-
-	// Trust boundary: a type index this build never registered is a corrupt stream; reject it before client hydration looks it up.
-	static void PostRead(const BlastersInterpolate& rCurrent)
-	{
-		for (int64_t i = 0; i < rCurrent.iCount; ++i)
-		{
-			if (rCurrent.puiTypeIndices[i] >= std::ssize(sTypes))
-			{
-				throw std::ios_base::failure("BlastersInterpolate puiTypeIndices");
-			}
-		}
-	}
 
 	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame);
 
@@ -118,7 +106,7 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 	{
 		XMVECTOR vecPosition = DirectX::XMVectorZero();
 		XMVECTOR vecVelocity = DirectX::XMVectorZero();
-		uint8_t uiTypeIndex = 0;
+		int64_t iTypeIndex = 0;
 		BlasterFlags_t flags {};
 		engine::AlignmentIdentifier alignment {};
 		float fWindTrailIntensity = 0.0f;

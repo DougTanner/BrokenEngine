@@ -50,7 +50,7 @@ struct CpuTimer
 #if defined(BT_SERVER)
 struct RawCpuTimerRecord
 {
-	uint64_t uiSampleSequence = 0;
+	int64_t iSampleSequence = 0;
 	int64_t iSampleMicroseconds = 0;
 	int64_t iInvocationCount = 0;
 	int64_t iAuxiliaryCount = 0;
@@ -71,8 +71,8 @@ enum class RawCpuTimerStateFlags : uint8_t
 
 struct RawCpuTimerEventRecord
 {
-	uint64_t uiEventSequence = 0;
-	uint64_t uiSampleSequence = 0;
+	int64_t iEventSequence = 0;
+	int64_t iSampleSequence = 0;
 	int64_t iSampleTick = 0;
 	int64_t iSampleMicroseconds = 0;
 	int64_t iInvocationCount = 0;
@@ -262,7 +262,7 @@ struct GpuTimer
 
 struct GpuShadowSample
 {
-	uint64_t uiSequence = 0;
+	int64_t iSequence = 0;
 	int64_t iCurrentMicroseconds = 0;
 };
 #endif // BT_CLIENT
@@ -359,7 +359,7 @@ public:
 	// The caller must hold mCpuTimerMutex. Publication is performed by the derived latch hook.
 	bool PublishRawCpuTimerEvent(int64_t iCpuTimer, int64_t iSampleTick);
 	// The caller must hold mCpuTimerMutex.
-	bool AcknowledgeRawCpuTimerEvent(int64_t iCpuTimer, uint64_t uiEventSequence);
+	bool AcknowledgeRawCpuTimerEvent(int64_t iCpuTimer, int64_t iEventSequence);
 #endif // BT_SERVER
 
 #if defined(BT_CLIENT)

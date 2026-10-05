@@ -3,6 +3,7 @@
 #include "ToolCliCommon.h"
 
 #include <filesystem>
+#include <iterator>
 #include <limits>
 #include <vector>
 
@@ -28,14 +29,14 @@ namespace toolcli::landing
 		nlohmann::json metadata = NewMetadata(rLocator, owner, session, worktree);
 		metadata["schemaVersion"] = kiLandingLeaseSchemaVersion;
 		metadata["leaseDurationSeconds"] = leaseDuration.count();
-		uint64_t uiHeartbeatTicks = 0;
-		ParseUtcTimestamp(metadata["heartbeatAt"].get<std::string>(), uiHeartbeatTicks);
-		uint64_t uiExpiresTicks = uiHeartbeatTicks + static_cast<uint64_t>(leaseDuration.count()) * 10'000'000ui64;
-		metadata["expiresAt"] = FormatUtcTimestamp(uiExpiresTicks);
+		int64_t iHeartbeatTicks = 0;
+		ParseUtcTimestamp(metadata["heartbeatAt"].get<std::string>(), iHeartbeatTicks);
+		int64_t iExpiresTicks = iHeartbeatTicks + leaseDuration.count() * 10'000'000i64;
+		metadata["expiresAt"] = FormatUtcTimestamp(static_cast<uint64_t>(iExpiresTicks));
 		return metadata;
 	}
 
-	std::optional<LandingLease> ValidateLandingLease(const nlohmann::json& rMetadata, const Locator& rLocator, uint64_t uiCurrentTicks)
+	std::optional<LandingLease> ValidateLandingLease(const nlohmann::json& rMetadata, const Locator& rLocator, int64_t iCurrentTicks)
 	{
 		if (!coordination::ValidateMetadataEnvelope(rMetadata, rLocator, kiLandingLeaseSchemaVersion))
 		{
@@ -61,16 +62,16 @@ namespace toolcli::landing
 		lease.expiresAt = rMetadata["expiresAt"].get<std::string>();
 		lease.duration = std::chrono::seconds(*durationSeconds);
 		// The envelope already proved claimedAt and heartbeatAt parse and are ordered; these calls exist to fill the lease ticks.
-		if (!ParseUtcTimestamp(lease.claimedAt, lease.uiClaimedTicks) || !ParseUtcTimestamp(lease.heartbeatAt, lease.uiHeartbeatTicks) || !ParseUtcTimestamp(lease.expiresAt, lease.uiExpiresTicks))
+		if (!ParseUtcTimestamp(lease.claimedAt, lease.iClaimedTicks) || !ParseUtcTimestamp(lease.heartbeatAt, lease.iHeartbeatTicks) || !ParseUtcTimestamp(lease.expiresAt, lease.iExpiresTicks))
 		{
 			return std::nullopt;
 		}
-		if (lease.uiHeartbeatTicks > (std::numeric_limits<uint64_t>::max)() - static_cast<uint64_t>(lease.duration.count()) * 10'000'000ui64
-		 || lease.uiExpiresTicks != lease.uiHeartbeatTicks + static_cast<uint64_t>(lease.duration.count()) * 10'000'000ui64)
+		if (lease.iHeartbeatTicks > (std::numeric_limits<int64_t>::max)() - lease.duration.count() * 10'000'000i64
+		 || lease.iExpiresTicks != lease.iHeartbeatTicks + lease.duration.count() * 10'000'000i64)
 		{
 			return std::nullopt;
 		}
-		if (lease.uiHeartbeatTicks > uiCurrentTicks)
+		if (lease.iHeartbeatTicks > iCurrentTicks)
 		{
 			return std::nullopt;
 		}
@@ -94,11 +95,11 @@ namespace toolcli::landing
 				status[pField] = rMetadata[pField];
 			}
 		}
-		uint64_t uiCurrentTicks = CurrentUtcTicks();
-		std::optional<LandingLease> lease = ValidateLandingLease(rMetadata, rLocator, uiCurrentTicks);
+		int64_t iCurrentTicks = static_cast<int64_t>(CurrentUtcTicks());
+		std::optional<LandingLease> lease = ValidateLandingLease(rMetadata, rLocator, iCurrentTicks);
 		if (lease)
 		{
-			status["leaseState"] = uiCurrentTicks < lease->uiExpiresTicks ? "live" : "expired";
+			status["leaseState"] = iCurrentTicks < lease->iExpiresTicks ? "live" : "expired";
 		}
 		return status;
 	}
@@ -113,14 +114,14 @@ namespace toolcli::landing
 		std::vector<std::wstring> worktrees;
 		std::wstring currentWorktree;
 		bool bInvalidEntry = false;
-		for (size_t i = 0; i < listing->size();)
+		for (int64_t i = 0; i < std::ssize(*listing);)
 		{
-			size_t uiEnd = listing->find('\0', i);
-			if (uiEnd == std::string::npos)
+			int64_t iEnd = static_cast<int64_t>(listing->find('\0', static_cast<std::string::size_type>(i)));
+			if (iEnd == static_cast<int64_t>(std::string::npos))
 			{
-				uiEnd = listing->size();
+				iEnd = std::ssize(*listing);
 			}
-			std::string_view field(listing->data() + i, uiEnd - i);
+			std::string_view field(listing->data() + i, static_cast<std::string_view::size_type>(iEnd - i));
 			if (field.empty())
 			{
 				if (currentWorktree.empty())
@@ -143,7 +144,7 @@ namespace toolcli::landing
 			{
 				bInvalidEntry = true;
 			}
-			i = uiEnd + 1;
+			i = iEnd + 1;
 		}
 		if (!currentWorktree.empty())
 		{

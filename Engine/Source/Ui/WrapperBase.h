@@ -62,7 +62,7 @@ public:
 	: mAllowed([&rAllowedValues]
 	{
 		std::vector<float> allowed;
-		allowed.reserve(rAllowedValues.size());
+		allowed.reserve(static_cast<size_t>(std::ssize(rAllowedValues)));
 		for (const T& rValue : rAllowedValues)
 		{
 			allowed.push_back(static_cast<float>(rValue));

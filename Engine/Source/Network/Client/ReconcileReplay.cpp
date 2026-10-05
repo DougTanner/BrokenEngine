@@ -387,17 +387,17 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 	ScopedSuppressAllocationTracking suppress;
 
 	// Reusing work slots preserves replayStack capacity across Run() calls and avoids per-frame allocations.
-	size_t uiEligibleCount = 0;
+	int64_t iEligibleCount = 0;
 	for (const auto& [rCoord, rFrames] : game::gpGame->mCoordinateFrames)
 	{
 		if (rFrames.iConfirmedTick >= 0)
 		{
-			++uiEligibleCount;
+			++iEligibleCount;
 		}
 	}
-	if (mWorks.size() < uiEligibleCount)
+	if (std::ssize(mWorks) < iEligibleCount)
 	{
-		mWorks.resize(uiEligibleCount);
+		mWorks.resize(static_cast<size_t>(iEligibleCount));
 	}
 	int64_t iSlot = 0;
 	for (auto& [rCoord, rFrames] : game::gpGame->mCoordinateFrames)
@@ -411,20 +411,20 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 		rWork.pFrames = &rFrames;
 		rWork.scratch.Reset();
 	}
-	size_t uiActiveCount = static_cast<size_t>(iSlot);
-	miActiveCount = static_cast<int64_t>(uiActiveCount);
+	int64_t iActiveCount = iSlot;
+	miActiveCount = iActiveCount;
 
 	ReconcileDispatchResult result;
 	result.iActiveCount = miActiveCount;
 
-	if (uiActiveCount == 0)
+	if (iActiveCount == 0)
 	{
 		return result;
 	}
 
 	// Each worker touches only its own CoordFrames entry.
-	std::span<CoordWork> activeWorks(mWorks.data(), uiActiveCount);
-	int64_t iCount = static_cast<int64_t>(uiActiveCount);
+	std::span<CoordWork> activeWorks(mWorks.data(), static_cast<size_t>(iActiveCount));
+	int64_t iCount = iActiveCount;
 	auto ProcessRange = [&](int64_t iBegin, int64_t iEnd)
 	{
 		// Heap: ReconcileCoord may grow per-coord scratch (frames, replay buffers) on dispatch

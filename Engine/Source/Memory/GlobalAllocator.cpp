@@ -246,11 +246,21 @@ struct MemoryInitializer
 		// Eagerly commit arenas when mimalloc reserves them.
 		mi_option_set(mi_option_arena_eager_commit, 1);
 
-		// mimalloc's startup arena reservation option is measured in KiB.
-		mi_option_set(mi_option_reserve_os_memory, kiMimallocArenaReserveMebibytes * 1'024);
+		// mimalloc reads mi_option_reserve_os_memory during its TLS-callback process init, before C++ statics, so reserve directly.
+		int64_t iReserveResult = mi_reserve_os_memory(static_cast<std::size_t>(kiMimallocArenaReserveMebibytes) * 1'024 * 1'024, true /*commit*/, true /*allow large*/);
+		if (iReserveResult != 0)
+		{
+			LOG(kDefault, kWarning, "mi_reserve_os_memory of {} MiB failed with {}; continuing on on-demand arenas", kiMimallocArenaReserveMebibytes, iReserveResult);
+		}
 
 		if constexpr (kbMimallocDiagnostics)
 		{
+			mi_stats_t statistics = {};
+			statistics.size = sizeof(mi_stats_t);
+			statistics.version = MI_STAT_VERSION;
+			mi_stats_get(&statistics);
+			iArenaCountAfterReserve = statistics.arena_count.total;
+
 			mi_register_output([](const char* pcMessage, [[maybe_unused]] void* pArgument)
 			{
 				OutputDebugStringA(pcMessage);
@@ -274,15 +284,18 @@ struct MemoryInitializer
 			int64_t iPeakCommittedMebibytes = statistics.committed.peak / (1'024 * 1'024);
 
 			// May log during static destruction: Log.cpp initializes via init_seg(lib), so it is destroyed after this default-phase object.
-			LOG(kDefault, kInfo, "Mimalloc peak heap usage: {} MiB, peak committed: {} MiB (arena reserve: {} MiB)", statistics.page_committed.peak / (1'024 * 1'024), iPeakCommittedMebibytes, kiMimallocArenaReserveMebibytes);
+			LOG(kDefault, kInfo, "Mimalloc peak heap usage: {} MiB, peak committed: {} MiB, arenas: {} (after reserve: {}), arena reserve: {} MiB", statistics.page_committed.peak / (1'024 * 1'024), iPeakCommittedMebibytes, statistics.arena_count.total, iArenaCountAfterReserve, kiMimallocArenaReserveMebibytes);
 
-			if (iPeakCommittedMebibytes > kiMimallocArenaReserveMebibytes)
+			// More arenas than after the reserve means the reserve failed or was undersized.
+			if (statistics.arena_count.total > iArenaCountAfterReserve)
 			{
 				DEBUG_BREAK();
 			}
 		}
 #endif
 	}
+
+	int64_t iArenaCountAfterReserve = 0;
 };
 
 static MemoryInitializer sMemoryInitializer;

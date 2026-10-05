@@ -37,8 +37,8 @@ struct PuffKeyframe
 
 struct PuffControllerType
 {
-	uint8_t uiBaseTypeIndex = 0;
-	uint8_t uiKeyframeCount = 2;
+	int64_t iBaseTypeIndex = 0;
+	int64_t iKeyframeCount = 2;
 	bool bDestroysSelf = true;
 	std::chrono::duration<float> times[kiMaximumControllerKeyframes] {};
 	PuffKeyframe keyframes[kiMaximumControllerKeyframes] {};
@@ -68,7 +68,7 @@ struct PuffsInterpolate : public Collection<PuffsInterpolate>,
 	float* __restrict pfAreas = nullptr;
 	float* __restrict pfRotations = nullptr;
 
-	// Controller fields (kuiInvalidControllerType = not controlled)
+	// Controller fields (kiInvalidControllerType = not controlled)
 	uint8_t* __restrict puiControllerTypeIndices = nullptr;
 	float* __restrict pfStartTimes = nullptr;
 
@@ -95,7 +95,7 @@ struct PuffsPostRender : public Collection<PuffsPostRender>
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
 
 	// Destroy removes expired puffs whose controller has bDestroysSelf set.
-	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition);
+	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition);
 
 	static void Destroy(game::Frame& __restrict rFrame, const FrameStaticData& rStaticData);
 

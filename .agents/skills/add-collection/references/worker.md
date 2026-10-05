@@ -166,8 +166,8 @@ runner applies. The purpose and the triggers live in
   are the live engine example. The collection-layout auditor (step 17) checks
   declarations and sum terms against each other in both directions.
 - Use `CollectionFlags::kIdToIndex` only when external owners need a stable
-  handle. Prefer `AddIndexableElement`, `AddIndexableElementWithId`, and
-  `RemoveIndexableElement`; they maintain the map during add and swap-and-pop.
+  handle. Prefer `AddIndexableElement` and `RemoveIndexableElement`; they
+  maintain the map during add and swap-and-pop.
   Manual identity wiring is conditional on a real alternate ID source or
   lifecycle, such as Sounds' client-only UUID stream, not on the flag itself.
 - Optional hooks merged into the surrounding phase need no no-op boilerplate:

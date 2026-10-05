@@ -58,7 +58,7 @@ struct PointLightsInterpolate : public Collection<PointLightsInterpolate, Collec
 	float* __restrict pfLightingAreas = nullptr;
 	float* __restrict pfLightingIntensities = nullptr;
 
-	// Controller fields (kuiInvalidControllerType = not controlled)
+	// Controller fields (kiInvalidControllerType = not controlled)
 	uint8_t* __restrict puiControllerTypeIndices = nullptr;
 	float* __restrict pfStartTimes = nullptr;
 	float* __restrict pfBaseRotations = nullptr;
@@ -85,10 +85,10 @@ struct PointLightsPostRender : public Collection<PointLightsPostRender>
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
 
 	// Add non-controlled point light
-	static void Add(game::Frame& __restrict rFrame, point_lights_t& rId, uint8_t uiTypeIndex);
+	static void Add(game::Frame& __restrict rFrame, point_lights_t& rId, int64_t iTypeIndex);
 
 	// Fire-and-forget keyframe animation; the controller's bDestroysSelf enables removal after the final keyframe.
-	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, uint8_t uiControllerTypeIndex, FXMVECTOR vecPosition, float fRotation);
+	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fRotation);
 
 
 	// Destroy handles auto-removal of expired controlled lights

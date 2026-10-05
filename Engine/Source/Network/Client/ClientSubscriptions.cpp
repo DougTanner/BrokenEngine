@@ -76,9 +76,9 @@ void ClientSubscriptions::FreeSlot(int64_t iSlot)
 	ClientCoordSlot& rSlot = mCoordinateSlots.at(iSlot);
 	// Reset slot state but retain the epoch of the subscription being cleared, so a packet still in
 	// flight from that subscription can be recognized as stale before the slot is admitted again
-	uint16_t uiEpoch = rSlot.acknowledgementState.uiEpoch;
+	int64_t iEpoch = rSlot.acknowledgementState.uiEpoch;
 	rSlot = {};
-	rSlot.acknowledgementState.uiEpoch = uiEpoch;
+	rSlot.acknowledgementState.uiEpoch = static_cast<uint16_t>(iEpoch);
 }
 
 void ClientSubscriptions::Reset()
@@ -106,31 +106,31 @@ void ClientSubscriptions::RecoverTimedOutSubscriptions()
 	}
 }
 
-bool ClientSubscriptions::IsStaleRetainedEpoch(int64_t iSlot, uint16_t uiEpoch, GridCoord coordinate) const
+bool ClientSubscriptions::IsStaleRetainedEpoch(int64_t iSlot, int64_t iEpoch, GridCoord coordinate) const
 {
 	// Cleared slots retain their last epoch, so a packet from a retired subscription (load reset,
 	// unsubscribe, cancel) is recognized before it can be admitted onto the reused slot. Wrap-aware:
 	// the server only ever increments the epoch, so genuine traffic is strictly newer.
-	uint16_t uiRetainedEpoch = mCoordinateSlots.at(iSlot).acknowledgementState.uiEpoch;
-	if (static_cast<int16_t>(uiEpoch - uiRetainedEpoch) > 0)
+	int64_t iRetainedEpoch = mCoordinateSlots.at(iSlot).acknowledgementState.uiEpoch;
+	if (static_cast<int16_t>(iEpoch - iRetainedEpoch) > 0)
 	{
 		return false;
 	}
 
-	LOG(kNetwork, kDebug, "Client::IsStaleRetainedEpoch dropped stale packet Slot: {} Coord: ({},{}) Epoch: {} RetainedEpoch: {}", iSlot, coordinate.iX, coordinate.iY, uiEpoch, uiRetainedEpoch);
+	LOG(kNetwork, kDebug, "Client::IsStaleRetainedEpoch dropped stale packet Slot: {} Coord: ({},{}) Epoch: {} RetainedEpoch: {}", iSlot, coordinate.iX, coordinate.iY, iEpoch, iRetainedEpoch);
 	return true;
 }
 
-ClientSubscriptions::FullStateFlags_t ClientSubscriptions::ClassifyFullState(uint8_t uiSlotIndex, uint16_t uiEpoch, GridCoord coordinate)
+ClientSubscriptions::FullStateFlags_t ClientSubscriptions::ClassifyFullState(int64_t iSlotIndex, int64_t iEpoch, GridCoord coordinate)
 {
-	const ClientCoordSlot& rSlot = mCoordinateSlots.at(uiSlotIndex);
+	const ClientCoordSlot& rSlot = mCoordinateSlots.at(static_cast<size_t>(iSlotIndex));
 
 	// Full state arrived before SubscribeAccept (different ENet channels)
 	if (rSlot.eState == CoordSubscriptionState::kUnsubscribed)
 	{
 		if (mSubscribeRequests.IsLive(coordinate))
 		{
-			if (IsStaleRetainedEpoch(uiSlotIndex, uiEpoch, coordinate))
+			if (IsStaleRetainedEpoch(iSlotIndex, iEpoch, coordinate))
 			{
 				return {};
 			}
@@ -147,7 +147,7 @@ ClientSubscriptions::FullStateFlags_t ClientSubscriptions::ClassifyFullState(uin
 			return FullStateFlags::kRejectAsGhost;
 		}
 		// Epoch guard: SubscribeAccept set the epoch; stale full-state on the same coordinate/slot is dropped
-		if (uiEpoch != rSlot.acknowledgementState.uiEpoch)
+		if (iEpoch != rSlot.acknowledgementState.uiEpoch)
 		{
 			return {};
 		}
@@ -155,7 +155,7 @@ ClientSubscriptions::FullStateFlags_t ClientSubscriptions::ClassifyFullState(uin
 	}
 
 	// The server may reallocate a slot before its unsubscribe ACK arrives, and this per-slot lane can overtake that ACK
-	if (rSlot.eState == CoordSubscriptionState::kUnsubscribing && mSubscribeRequests.IsLive(coordinate) && !IsStaleRetainedEpoch(uiSlotIndex, uiEpoch, coordinate))
+	if (rSlot.eState == CoordSubscriptionState::kUnsubscribing && mSubscribeRequests.IsLive(coordinate) && !IsStaleRetainedEpoch(iSlotIndex, iEpoch, coordinate))
 	{
 		return { FullStateFlags::kAdoptCoordinate, FullStateFlags::kCommit };
 	}
@@ -164,7 +164,7 @@ ClientSubscriptions::FullStateFlags_t ClientSubscriptions::ClassifyFullState(uin
 	// A genuine resend re-activates the slot at the resend tick via ServerCoordinateFullState's
 	// commit block; a stale/ghost full state (wrong coordinate or superseded epoch) still falls
 	// through to the reject below.
-	if (rSlot.eState == CoordSubscriptionState::kActive && rSlot.coordinate == coordinate && uiEpoch == rSlot.acknowledgementState.uiEpoch)
+	if (rSlot.eState == CoordSubscriptionState::kActive && rSlot.coordinate == coordinate && iEpoch == rSlot.acknowledgementState.uiEpoch)
 	{
 		return FullStateFlags::kCommit;
 	}
@@ -173,25 +173,25 @@ ClientSubscriptions::FullStateFlags_t ClientSubscriptions::ClassifyFullState(uin
 	return {};
 }
 
-ClientSubscriptions::CoordUpdateFlags_t ClientSubscriptions::ClassifyCoordinateUpdate(uint8_t uiSlotIndex, uint16_t uiEpoch)
+ClientSubscriptions::CoordUpdateFlags_t ClientSubscriptions::ClassifyCoordinateUpdate(int64_t iSlotIndex, int64_t iEpoch)
 {
-	const ClientCoordSlot& rSlot = mCoordinateSlots.at(uiSlotIndex);
+	const ClientCoordSlot& rSlot = mCoordinateSlots.at(static_cast<size_t>(iSlotIndex));
 
-	if (rSlot.eState == CoordSubscriptionState::kWaitingFullState && uiEpoch == rSlot.acknowledgementState.uiEpoch)
+	if (rSlot.eState == CoordSubscriptionState::kWaitingFullState && iEpoch == rSlot.acknowledgementState.uiEpoch)
 	{
 		// Pre-full-state buffering: accept but do not advance the per-slot tick counter
 		return CoordUpdateFlags::kCommit;
 	}
-	if (rSlot.eState == CoordSubscriptionState::kActive && uiEpoch == rSlot.acknowledgementState.uiEpoch)
+	if (rSlot.eState == CoordSubscriptionState::kActive && iEpoch == rSlot.acknowledgementState.uiEpoch)
 	{
 		return { CoordUpdateFlags::kCommit, CoordUpdateFlags::kTrackTick };
 	}
 	return {};
 }
 
-ClientSubscriptions::SubscribeAcceptFlags_t ClientSubscriptions::ClassifySubscribeAccept(uint8_t uiSlotIndex, uint16_t uiEpoch, GridCoord coordinate)
+ClientSubscriptions::SubscribeAcceptFlags_t ClientSubscriptions::ClassifySubscribeAccept(int64_t iSlotIndex, int64_t iEpoch, GridCoord coordinate)
 {
-	const ClientCoordSlot& rSlot = mCoordinateSlots.at(uiSlotIndex);
+	const ClientCoordSlot& rSlot = mCoordinateSlots.at(static_cast<size_t>(iSlotIndex));
 
 	// Re-subscription whose stale predecessor data already activated the slot — heal in place
 	if (rSlot.eState == CoordSubscriptionState::kActive && rSlot.coordinate == coordinate)
@@ -207,7 +207,7 @@ ClientSubscriptions::SubscribeAcceptFlags_t ClientSubscriptions::ClassifySubscri
 
 	// The accept of a subscription already retired on this slot (by a ghost full state or a cancelled
 	// commit) is dropped: that path already sent its unsubscribe, which frees the server slot.
-	if (IsStaleRetainedEpoch(uiSlotIndex, uiEpoch, coordinate))
+	if (IsStaleRetainedEpoch(iSlotIndex, iEpoch, coordinate))
 	{
 		return {};
 	}

@@ -44,7 +44,7 @@ public:
 	void Append(std::string_view text);
 	void Append(std::wstring_view text);
 	void Append(int64_t iValue);
-	void AppendFloat(float fValue, int iPrecision);
+	void AppendFloat(float fValue, int64_t iPrecision);
 	std::string_view View() const;
 	template <typename T>
 	const T* Data() const
@@ -68,6 +68,7 @@ public:
 	template<typename T>
 	void PushBack(const T& rValue)
 	{
+		static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable");
 		ASSERT(miDepth > 0);
 		int64_t iNeeded = miSize + static_cast<int64_t>(sizeof(T));
 		if (iNeeded > mBuffer.Size()) [[unlikely]]
@@ -280,49 +281,49 @@ ScopedWorkbufferAllocation<T> Workbuffer::PushBuffer(int64_t iSizeInBytes)
 // so multiple Wb/WbV2 wrappers in one LOG call are safe.
 struct Wb
 {
-	Wb(float fValue, int iPrecision)
+	Wb(float fValue, int64_t iPrecision)
 	: fValue(fValue), iPrecision(iPrecision)
 	{
 	}
 
 	float fValue = 0.0f;
-	int   iPrecision = 0;
+	int64_t   iPrecision = 0;
 };
 
 // 2D XMVECTOR formatted as "(x,y)" with shared precision.
 struct WbV2
 {
-	WbV2(DirectX::XMVECTOR vecValue, int iPrecision)
+	WbV2(DirectX::XMVECTOR vecValue, int64_t iPrecision)
 	: vecValue(vecValue), iPrecision(iPrecision)
 	{
 	}
 
 	DirectX::XMVECTOR vecValue;
-	int               iPrecision = 0;
+	int64_t               iPrecision = 0;
 };
 
 // 3D XMVECTOR formatted as "(x,y,z)" with shared precision.
 struct WbV3
 {
-	WbV3(DirectX::XMVECTOR vecValue, int iPrecision)
+	WbV3(DirectX::XMVECTOR vecValue, int64_t iPrecision)
 	: vecValue(vecValue), iPrecision(iPrecision)
 	{
 	}
 
 	DirectX::XMVECTOR vecValue;
-	int               iPrecision = 0;
+	int64_t               iPrecision = 0;
 };
 
 // 4D XMVECTOR formatted as "(x,y,z,w)" with shared precision.
 struct WbV4
 {
-	WbV4(DirectX::XMVECTOR vecValue, int iPrecision)
+	WbV4(DirectX::XMVECTOR vecValue, int64_t iPrecision)
 	: vecValue(vecValue), iPrecision(iPrecision)
 	{
 	}
 
 	DirectX::XMVECTOR vecValue;
-	int               iPrecision = 0;
+	int64_t               iPrecision = 0;
 };
 
 } // namespace common

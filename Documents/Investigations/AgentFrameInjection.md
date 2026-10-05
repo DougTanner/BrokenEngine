@@ -159,7 +159,7 @@ each transfer kind actually carries.
   hostile-parameter trust boundary — as stated in
   `AgentHarnessFineGrainedControl.md` `## Constraints every option must
   respect`. None of the shapes below adds a `StatusChangeType` or changes a
-  payload byte, so no `FrameInput::kiVersion` or `kuiProtocolVersion` bump is
+  payload byte, so no `FrameInput::kiVersion` or `kiProtocolVersion` bump is
   in play; they change only how a payload is built at the command boundary.
 - Every handler validates and throws
   (`Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md` `## Contracts`).

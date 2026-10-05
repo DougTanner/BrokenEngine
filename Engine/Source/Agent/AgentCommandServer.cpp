@@ -46,7 +46,7 @@ AgentCommandServer::AgentCommandServer(int64_t iPort)
 			break;
 		}
 
-		int iBindError = WSAGetLastError();
+		int64_t iBindError = WSAGetLastError();
 		closesocket(muiListenSocket); // a failed bind leaves the socket unusable; recreate (and re-arm SO_REUSEADDR) next attempt
 		muiListenSocket = INVALID_SOCKET;
 
@@ -120,7 +120,7 @@ void AgentCommandServer::ClearDeferredResponse()
 	mDeferredPoll = nullptr;
 	mDeferredIdentifier = nullptr;
 	mbResponseDeferred = false;
-	muiDeferredGeneration = 0;
+	miDeferredGeneration = 0;
 	miDeferredDrainCount = 0;
 }
 
@@ -147,7 +147,7 @@ void AgentCommandServer::ListenerLoop(std::stop_token stopToken)
 			uiClientSocket = accept(muiListenSocket, nullptr, nullptr);
 			if (uiClientSocket == INVALID_SOCKET)
 			{
-				int iAcceptError = WSAGetLastError();
+				int64_t iAcceptError = WSAGetLastError();
 				if (iAcceptError == WSAEWOULDBLOCK)
 				{
 					mResponseReady.wait_for(lock, kListenerRetryInterval, [&stopToken]()
@@ -193,7 +193,7 @@ void AgentCommandServer::ListenerLoop(std::stop_token stopToken)
 		// connection's first request. mDeferredPoll itself is main-thread-only — never bare-written here.
 		{
 			std::unique_lock lock(mMutex);
-			++muiConnectionGeneration;
+			++miConnectionGeneration;
 			mPendingResponse.reset();
 			if (muiActiveSocket != INVALID_SOCKET)
 			{
@@ -215,7 +215,7 @@ void AgentCommandServer::ServeConnection(SOCKET uiClientSocket, const std::stop_
 			return; // peer closed or socket error
 		}
 
-		if (uiLength > kuiMaximumRequestBytes)
+		if (uiLength > kiMaximumRequestBytes)
 		{
 			LOG(kNetwork, kWarning, "AgentCommandServer request frame too large ({} bytes), closing connection", uiLength);
 			return;
@@ -245,7 +245,7 @@ void AgentCommandServer::ServeConnection(SOCKET uiClientSocket, const std::stop_
 			{
 				return; // stop can race the completed read; do not publish a request after shutdown begins
 			}
-			request.uiGeneration = muiConnectionGeneration;
+			request.iGeneration = miConnectionGeneration;
 			mPendingRequest = std::move(request);
 		}
 
@@ -262,7 +262,7 @@ void AgentCommandServer::ServeConnection(SOCKET uiClientSocket, const std::stop_
 			{
 				lock.unlock();
 				char cPeekByte = 0;
-				int iPeeked = recv(uiClientSocket, &cPeekByte, 1, MSG_PEEK);
+				int64_t iPeeked = recv(uiClientSocket, &cPeekByte, 1, MSG_PEEK);
 				if (iPeeked == 0 || (iPeeked == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK))
 				{
 					return; // peer closed or reset; teardown bumps the generation so its response is dropped
@@ -302,7 +302,7 @@ void AgentCommandServer::Drain()
 		bool bStaleConnection = false;
 		{
 			std::unique_lock lock(mMutex);
-			bStaleConnection = muiDeferredGeneration != muiConnectionGeneration;
+			bStaleConnection = miDeferredGeneration != miConnectionGeneration;
 		}
 		if (bStaleConnection)
 		{
@@ -357,7 +357,7 @@ void AgentCommandServer::Drain()
 		mPendingRequest.reset();
 	}
 	// Every response to this request, synchronous or deferred, publishes only while its handoff generation is live.
-	muiDeferredGeneration = request.uiGeneration;
+	miDeferredGeneration = request.iGeneration;
 
 	// Build the response envelope. Malformed JSON or a missing/invalid cmd answers with id:null; a handler
 	// exception echoes the request id. The lock is never held across game-state work.
@@ -424,7 +424,7 @@ void AgentCommandServer::Drain()
 	PublishResponse(std::move(response));
 }
 
-void AgentCommandServer::DeferResponse(std::function<std::optional<nlohmann::json>()> Poll)
+void AgentCommandServer::DeferResponse(std::move_only_function<std::optional<nlohmann::json>()> Poll)
 {
 	mDeferredPoll = std::move(Poll);
 	mbResponseDeferred = true;
@@ -446,7 +446,7 @@ void AgentCommandServer::PublishResponse(nlohmann::json response)
 
 	{
 		std::unique_lock lock(mMutex);
-		if (muiDeferredGeneration != muiConnectionGeneration)
+		if (miDeferredGeneration != miConnectionGeneration)
 		{
 			return; // the request's connection was torn down; a later connection must never receive this response
 		}
@@ -471,7 +471,7 @@ bool AgentCommandServer::ReadExact(SOCKET uiClientSocket, std::span<uint8_t> buf
 		timeval timeout {};
 		timeout.tv_sec = static_cast<long>(kListenerRetryInterval.count() / 1'000);
 		timeout.tv_usec = static_cast<long>((kListenerRetryInterval.count() % 1'000) * 1'000);
-		int iReady = select(0, &readSet, nullptr, nullptr, &timeout);
+		int64_t iReady = select(0, &readSet, nullptr, nullptr, &timeout);
 		if (iReady == SOCKET_ERROR)
 		{
 			return false;
@@ -485,7 +485,7 @@ bool AgentCommandServer::ReadExact(SOCKET uiClientSocket, std::span<uint8_t> buf
 			return false;
 		}
 
-		int iReceived = recv(uiClientSocket, reinterpret_cast<char*>(buffer.data() + iTotal), static_cast<int>(std::ssize(buffer) - iTotal), 0);
+		int64_t iReceived = recv(uiClientSocket, reinterpret_cast<char*>(buffer.data() + iTotal), static_cast<int>(std::ssize(buffer) - iTotal), 0);
 		if (iReceived > 0)
 		{
 			iTotal += iReceived;
@@ -527,7 +527,7 @@ bool AgentCommandServer::SendExact(SOCKET uiClientSocket, std::span<const uint8_
 		timeval timeout {};
 		timeout.tv_sec = static_cast<long>(waitDuration.count() / 1'000'000);
 		timeout.tv_usec = static_cast<long>(waitDuration.count() % 1'000'000);
-		int iReady = select(0, nullptr, &writeSet, nullptr, &timeout);
+		int64_t iReady = select(0, nullptr, &writeSet, nullptr, &timeout);
 		if (iReady == SOCKET_ERROR)
 		{
 			return false;
@@ -537,7 +537,7 @@ bool AgentCommandServer::SendExact(SOCKET uiClientSocket, std::span<const uint8_
 			continue;
 		}
 
-		int iSent = send(uiClientSocket, reinterpret_cast<const char*>(buffer.data() + iTotal), static_cast<int>(std::ssize(buffer) - iTotal), 0);
+		int64_t iSent = send(uiClientSocket, reinterpret_cast<const char*>(buffer.data() + iTotal), static_cast<int>(std::ssize(buffer) - iTotal), 0);
 		if (iSent > 0)
 		{
 			iTotal += iSent;

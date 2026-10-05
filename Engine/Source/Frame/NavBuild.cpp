@@ -20,7 +20,7 @@ struct ContourEdge
 // row ∈ [0, iHeight-1] / col ∈ [0, iWidth]. The 32+16+16 packing leaves comfortable headroom for
 // the heightmap sizes the engine builds (kiElevationDivisor = 4 caps heightmap dims at a few
 // thousand pixels).
-static constexpr uint64_t EncodeEdgeKey(uint32_t uiOrientation, int32_t iRow, int32_t iColumn)
+static constexpr uint64_t EncodeEdgeKey(uint32_t uiOrientation, int64_t iRow, int64_t iColumn)
 {
 	return (static_cast<uint64_t>(uiOrientation) << 32) | (static_cast<uint64_t>(static_cast<uint32_t>(iRow)) << 16) | static_cast<uint64_t>(static_cast<uint32_t>(iColumn));
 }
@@ -29,19 +29,19 @@ static constexpr uint64_t EncodeEdgeKey(uint32_t uiOrientation, int32_t iRow, in
 // Heightmap pixels are engine-meters relative to beach (0 == sea level) — sampled directly.
 // Heightmap is anisotropic (DataPacker auto-crop produces non-square dims); UV scale is per-axis
 // so the contour lives in [0, 1]² regardless of aspect ratio. Row stride is iWidth.
-static void ExtractContourEdges(std::vector<ContourEdge>& rEdges, std::span<const float> heightmapData, int32_t iWidth, int32_t iHeight, float fWorldThreshold)
+static void ExtractContourEdges(std::vector<ContourEdge>& rEdges, std::span<const float> heightmapData, int64_t iWidth, int64_t iHeight, float fWorldThreshold)
 {
 	float fScaleU = 1.0f / static_cast<float>(iWidth - 1);
 	float fScaleV = 1.0f / static_cast<float>(iHeight - 1);
 
-	for (int32_t i = 0; i < iHeight - 1; ++i)
+	for (int64_t i = 0; i < iHeight - 1; ++i)
 	{
-		for (int32_t j = 0; j < iWidth - 1; ++j)
+		for (int64_t j = 0; j < iWidth - 1; ++j)
 		{
-			float fTopLeft = heightmapData[i * iWidth + j];
-			float fTopRight = heightmapData[i * iWidth + j + 1];
-			float fBottomRight = heightmapData[(i + 1) * iWidth + j + 1];
-			float fBottomLeft = heightmapData[(i + 1) * iWidth + j];
+			float fTopLeft = heightmapData[static_cast<size_t>(i * iWidth + j)];
+			float fTopRight = heightmapData[static_cast<size_t>(i * iWidth + j + 1)];
+			float fBottomRight = heightmapData[static_cast<size_t>((i + 1) * iWidth + j + 1)];
+			float fBottomLeft = heightmapData[static_cast<size_t>((i + 1) * iWidth + j)];
 
 			// Classification: 1 = above threshold (obstacle), 0 = below (navigable)
 			uint32_t uiCase = 0;
@@ -185,7 +185,7 @@ static void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons
 		bool bIsEndpointB = false; // false = matched on f2A / uiKeyA, true = matched on f2B / uiKeyB
 	};
 	std::unordered_multimap<uint64_t, EdgeReference> vertexToEdge;
-	vertexToEdge.reserve(rEdges.size() * 2);
+	vertexToEdge.reserve(static_cast<size_t>(std::ssize(rEdges) * 2));
 	for (int64_t i = 0; i < std::ssize(rEdges); ++i)
 	{
 		vertexToEdge.insert({rEdges.at(i).uiKeyA, {.iEdgeIndex = i, .bIsEndpointB = false}});
@@ -198,7 +198,7 @@ static void ChainEdgesIntoPolygons(std::vector<std::vector<XMFLOAT2>>& rPolygons
 		ASSERT(vertexToEdge.count(rEdges.at(i).uiKeyB) <= 2);
 	}
 
-	std::vector<bool> used(rEdges.size(), false);
+	std::vector<bool> used(static_cast<size_t>(std::ssize(rEdges)), false);
 
 	for (int64_t i = 0; i < std::ssize(rEdges); ++i)
 	{
@@ -314,7 +314,7 @@ bool PointInPolygon(XMFLOAT2 f2Point, std::span<const XMFLOAT2> vertices)
 	return iWinding != 0;
 }
 
-void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData, int32_t iHeightmapWidth, int32_t iHeightmapHeight, float fWorldThreshold, float fClearanceMeters, float fFootprintXMeters, float fFootprintYMeters)
+void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData, int64_t iHeightmapWidth, int64_t iHeightmapHeight, float fWorldThreshold, float fClearanceMeters, float fFootprintXMeters, float fFootprintYMeters)
 {
 	LOG(kNavData, kDebug, "NavBuild: heightmap {}x{} worldThreshold={}", iHeightmapWidth, iHeightmapHeight, common::Wb(fWorldThreshold, 4));
 
@@ -341,10 +341,10 @@ void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData,
 	static constexpr double kfSimplifyEpsilonMeters = 1.00;
 	// Clipper2 PathsD quantizes doubles to int64 at 10^precision per unit. Keep precision 6 for both
 	// the UV union and metric offset so marching-squares detail and meter-scale clearance remain stable.
-	static constexpr int kiClipperPrecision = 6;
+	static constexpr int64_t kiClipperPrecision = 6;
 
 	Clipper2Lib::PathsD obstacles;
-	obstacles.reserve(polygons.size());
+	obstacles.reserve(static_cast<size_t>(std::ssize(polygons)));
 	for (const std::vector<XMFLOAT2>& rPolygon : polygons)
 	{
 		if (std::ssize(rPolygon) < 3)
@@ -352,7 +352,7 @@ void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData,
 			continue;
 		}
 		Clipper2Lib::PathD path;
-		path.reserve(rPolygon.size());
+		path.reserve(static_cast<size_t>(std::ssize(rPolygon)));
 		for (const XMFLOAT2& rVertex : rPolygon)
 		{
 			path.emplace_back(rVertex.x, rVertex.y);
@@ -361,7 +361,7 @@ void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData,
 	}
 
 	// Union resolves overlaps; positive winding = outer obstacle, negative = enclosed hole.
-	Clipper2Lib::PathsD unioned = Clipper2Lib::Union(obstacles, Clipper2Lib::FillRule::NonZero, kiClipperPrecision);
+	Clipper2Lib::PathsD unioned = Clipper2Lib::Union(obstacles, Clipper2Lib::FillRule::NonZero, static_cast<int>(kiClipperPrecision));
 	for (Clipper2Lib::PathD& rPath : unioned)
 	{
 		for (Clipper2Lib::PointD& rPoint : rPath)
@@ -372,7 +372,7 @@ void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData,
 	}
 
 	// Clearance is added to the terrain-push contour; distances and tolerances are in meters.
-	Clipper2Lib::PathsD inflated = Clipper2Lib::InflatePaths(unioned, static_cast<double>(fClearanceMeters), Clipper2Lib::JoinType::Miter, Clipper2Lib::EndType::Polygon, kfMiterLimit, kiClipperPrecision);
+	Clipper2Lib::PathsD inflated = Clipper2Lib::InflatePaths(unioned, static_cast<double>(fClearanceMeters), Clipper2Lib::JoinType::Miter, Clipper2Lib::EndType::Polygon, kfMiterLimit, static_cast<int>(kiClipperPrecision));
 	// Topology-preserving simplification (does not introduce crossings).
 	Clipper2Lib::PathsD simplified = Clipper2Lib::SimplifyPaths(inflated, kfSimplifyEpsilonMeters);
 
@@ -389,7 +389,7 @@ void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData,
 			++iDroppedHoles;
 			continue;
 		}
-		rContour.polygonOffsets.push_back(static_cast<int32_t>(rContour.vertices.size()));
+		rContour.polygonOffsets.push_back(std::ssize(rContour.vertices));
 		for (const Clipper2Lib::PointD& rPoint : rPath)
 		{
 			float fU = static_cast<float>(rPoint.x / static_cast<double>(fFootprintXMeters) + 0.5);
@@ -420,16 +420,16 @@ void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData,
 	// agnostic. The invariant is UV-space only: BuildCellNavigationData mirrors Y when it places a template, so
 	// the merged world-space polygons are wound clockwise.
 	int64_t iPolygonCount = std::ssize(rContour.polygonOffsets);
-	int32_t iVertexTotal = static_cast<int32_t>(rContour.vertices.size());
+	int64_t iVertexTotal = std::ssize(rContour.vertices);
 	for (int64_t i = 0; i < iPolygonCount; ++i)
 	{
-		auto [iStart, iEnd] = PolygonRange(rContour.polygonOffsets, i, iVertexTotal);
-		int32_t iCount = iEnd - iStart;
+		auto [iStart, iEnd] = std::pair<int64_t, int64_t>(PolygonRange(rContour.polygonOffsets, i, iVertexTotal));
+		int64_t iCount = iEnd - iStart;
 		if (iCount < 3)
 		{
 			continue;
 		}
-		ASSERT(common::IsPolygonCcw(std::span<const XMFLOAT2>(&rContour.vertices.at(iStart), static_cast<size_t>(iCount))));
+		ASSERT(common::IsPolygonCcw(std::span<const XMFLOAT2>(&rContour.vertices.at(static_cast<size_t>(iStart)), static_cast<size_t>(iCount))));
 	}
 }
 

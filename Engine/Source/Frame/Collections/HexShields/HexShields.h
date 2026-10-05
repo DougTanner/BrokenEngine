@@ -74,7 +74,7 @@ struct HexShieldsPostRender : public Collection<HexShieldsPostRender>
 {
 	static void Update(const game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
 
-	static void Add(game::Frame& __restrict rFrame, hex_shields_t& rId, uint8_t uiTypeIndex);
+	static void Add(game::Frame& __restrict rFrame, hex_shields_t& rId, int64_t iTypeIndex);
 	static void Remove(game::Frame& __restrict rFrame, hex_shields_t& rId);
 
 	hex_shields_t* __restrict pIds = nullptr;

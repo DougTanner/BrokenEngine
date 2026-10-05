@@ -42,13 +42,13 @@ void BlastersInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 	rBlasters.pAreaLights[iIndex] = {};
 	rBlasters.pPointLights[iIndex] = {};
 
-	if (rType.uiPointLightTypeIndex != 0xFF)
+	if (rType.iPointLightTypeIndex != 0xFF)
 	{
-		engine::PointLightsPostRender::Add(rFrame, rBlasters.pPointLights[iIndex], rType.uiPointLightTypeIndex);
+		engine::PointLightsPostRender::Add(rFrame, rBlasters.pPointLights[iIndex], rType.iPointLightTypeIndex);
 	}
 	else
 	{
-		rFrame.postRender.areaLights.Add(rFrame, rBlasters.pAreaLights[iIndex], rType.uiAreaLightTypeIndex);
+		rFrame.postRender.areaLights.Add(rFrame, rBlasters.pAreaLights[iIndex], rType.iAreaLightTypeIndex);
 	}
 
 	rBlasters.pWindTrails[iIndex] = {};
@@ -71,7 +71,7 @@ void BlastersInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 	if ((rBlasters.pPointLights[iIndex].uuid.iValue != 0))
 	{
 		float fSize = rType.f2Size.x;
-		const engine::PointLightsType& rPointLightType = engine::PointLightsInterpolate::sTypes.at(rType.uiPointLightTypeIndex);
+		const engine::PointLightsType& rPointLightType = engine::PointLightsInterpolate::sTypes.at(static_cast<size_t>(rType.iPointLightTypeIndex));
 		engine::PointLightsInterpolate::Sync(rFrame.interpolate, rBlasters.pPointLights[iIndex],
 		{
 			.vecPosition = rBlasters.pVecPositions[iIndex],
@@ -92,7 +92,7 @@ void BlastersInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 
 		engine::AreaLightsInterpolate::Sync(rFrame.interpolate, rBlasters.pAreaLights[iIndex],
 		{
-			.uiTypeIndex = rType.uiAreaLightTypeIndex,
+			.iTypeIndex = rType.iAreaLightTypeIndex,
 			.vecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
 		});
 	}
@@ -125,7 +125,7 @@ bool BlastersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rSpawn
 
 	rCurrentInterpolate.pVecPositions[iIndex] = rSpawnInformation.vecPosition;
 	rCurrentInterpolate.pVecDirections[iIndex] = XMVector3Normalize(rSpawnInformation.vecVelocity);
-	rCurrentInterpolate.puiTypeIndices[iIndex] = rSpawnInformation.uiTypeIndex;
+	rCurrentInterpolate.puiTypeIndices[iIndex] = static_cast<uint8_t>(rSpawnInformation.iTypeIndex);
 #if defined(BT_CLIENT)
 	rCurrentInterpolate.pfWindTrailIntensities[iIndex] = rSpawnInformation.fWindTrailIntensity;
 	rCurrentInterpolate.pfWindTrailWidths[iIndex] = rSpawnInformation.fWindTrailWidth;

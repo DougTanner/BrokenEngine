@@ -33,7 +33,7 @@ constexpr float kfBlasterSizeX = kfPlayerRadius * 0.3333f;
 constexpr float kfBlasterSizeY = kfPlayerRadius * 1.0f;
 
 
-constexpr uint32_t kuiExplosionBaseParticleCount = 16;
+constexpr int64_t kiExplosionBaseParticleCount = 16;
 constexpr float kfExplosionParticleVelocityMinimum = 5.0f;
 constexpr float kfExplosionParticleVelocityRandom = 15.0f;
 constexpr float kfExplosionParticleVerticalVelocityMinimum = 0.0f;
@@ -65,7 +65,7 @@ constexpr float kfRotationTiltMaximum = 0.4f;
 void PlayersInterpolate::Register()
 {
 #if defined(BT_CLIENT)
-	engine::AreaLightsInterpolate::RegisterType(suiAreaLightTypeIndex,
+	engine::AreaLightsInterpolate::RegisterType(siAreaLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesBlasterBC74pngCrc,
 		.puiColors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
@@ -79,23 +79,23 @@ void PlayersInterpolate::Register()
 	});
 #endif // BT_CLIENT
 
-	BlastersInterpolate::RegisterType(suiBlasterTypeIndex,
+	BlastersInterpolate::RegisterType(siBlasterTypeIndex,
 	{
 		.f2Size = {kfBlasterSizeX, kfBlasterSizeY},
-		.uiAreaLightTypeIndex = suiAreaLightTypeIndex,
+		.iAreaLightTypeIndex = siAreaLightTypeIndex,
 	});
 
-	engine::ExplosionsInterpolate::RegisterType(suiExplosionTypeIndex,
+	engine::ExplosionsInterpolate::RegisterType(siExplosionTypeIndex,
 	{
 #if defined(BT_CLIENT)
-		.uiPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryLightControllerTypeIndex,
-		.uiSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryLightControllerTypeIndex,
-		.uiPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryPuffControllerTypeIndex,
-		.uiSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryPuffControllerTypeIndex,
-		.uiTrailTypeIndex = engine::ExplosionsInterpolate::suiExplosionTrailTypeIndex,
-		.uiWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::suiWindRadialControllerTypeIndex,
+		.iPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryLightControllerTypeIndex,
+		.iSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryLightControllerTypeIndex,
+		.iPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryPuffControllerTypeIndex,
+		.iSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryPuffControllerTypeIndex,
+		.iTrailTypeIndex = engine::ExplosionsInterpolate::siExplosionTrailTypeIndex,
+		.iWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::suiWindRadialControllerTypeIndex,
 #endif // BT_CLIENT
-		.uiBaseParticleCount = kuiExplosionBaseParticleCount,
+		.uiBaseParticleCount = static_cast<uint32_t>(kiExplosionBaseParticleCount),
 		.uiParticleColor = 0xFF0000FF,
 		.fParticleVelocityMinimum = kfExplosionParticleVelocityMinimum,
 		.fParticleVelocityRandom = kfExplosionParticleVelocityRandom,
@@ -120,16 +120,17 @@ void PlayersInterpolate::Register()
 
 #if defined(BT_CLIENT)
 	// Hits trigger the impact light controller.
-	uint8_t uiImpactPointLightTypeIndex = 0xFF;
-	engine::PointLightsInterpolate::RegisterType(uiImpactPointLightTypeIndex,
+	int64_t iImpactPointLightTypeIndex = 0xFF;
+	engine::PointLightsInterpolate::RegisterType(iImpactPointLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesBC7ExplosionpngCrc,
 		.uiColor = 0xFFFFFFFF,
 	});
-	engine::PointLightsInterpolate::RegisterControllerType(suiImpactPointLightControllerTypeIndex,
+	int64_t iImpactPointLightControllerTypeIndex = suiImpactPointLightControllerTypeIndex;
+	engine::PointLightsInterpolate::RegisterControllerType(iImpactPointLightControllerTypeIndex,
 	{
-		.uiBaseTypeIndex = uiImpactPointLightTypeIndex,
-		.uiKeyframeCount = 2,
+		.iBaseTypeIndex = iImpactPointLightTypeIndex,
+		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
 		.times = {std::chrono::duration<float>::zero(), kImpactPointLightDuration, std::chrono::duration<float>::zero(), std::chrono::duration<float>::zero()},
 		.keyframes =
@@ -144,18 +145,20 @@ void PlayersInterpolate::Register()
 		.ppLightingAreaScales = {&gPlayerImpactLightingAreaOne, &gPlayerImpactLightingAreaTwo, nullptr, nullptr},
 		.ppLightingIntensityScales = {&gPlayerImpactLightingIntensityOne, &gPlayerImpactLightingIntensityTwo, nullptr, nullptr},
 	});
+	suiImpactPointLightControllerTypeIndex = static_cast<uint8_t>(iImpactPointLightControllerTypeIndex);
 
 	// Hits trigger the impact puff controller.
-	uint8_t uiImpactPuffTypeIndex = 0xFF;
-	engine::PuffsInterpolate::RegisterType(uiImpactPuffTypeIndex,
+	int64_t iImpactPuffTypeIndex = 0xFF;
+	engine::PuffsInterpolate::RegisterType(iImpactPuffTypeIndex,
 	{
 		.uiCrc = data::kTexturesSmokeBC44jpgCrc,
 		.uiColor = 0xFFFFFFFF,
 	});
-	engine::PuffsInterpolate::RegisterControllerType(suiImpactPuffControllerTypeIndex,
+	int64_t iImpactPuffControllerTypeIndex = suiImpactPuffControllerTypeIndex;
+	engine::PuffsInterpolate::RegisterControllerType(iImpactPuffControllerTypeIndex,
 	{
-		.uiBaseTypeIndex = uiImpactPuffTypeIndex,
-		.uiKeyframeCount = 2,
+		.iBaseTypeIndex = iImpactPuffTypeIndex,
+		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
 		.times = {std::chrono::duration<float>::zero(), kImpactPuffDuration, std::chrono::duration<float>::zero(), std::chrono::duration<float>::zero()},
 		.keyframes =
@@ -168,8 +171,9 @@ void PlayersInterpolate::Register()
 		.ppAreaScales = {&gPlayerImpactPuffAreaOne, &gPlayerImpactPuffAreaTwo, nullptr, nullptr},
 		.ppIntensityScales = {&gPlayerImpactPuffIntensityOne, &gPlayerImpactPuffIntensityTwo, nullptr, nullptr},
 	});
+	suiImpactPuffControllerTypeIndex = static_cast<uint8_t>(iImpactPuffControllerTypeIndex);
 
-	engine::HexShieldsInterpolate::RegisterType(suiHexShieldTypeIndex,
+	engine::HexShieldsInterpolate::RegisterType(siHexShieldTypeIndex,
 	{
 		.uiColor = 0x40FFFF00,        // Cyan with 25% alpha (ABGR)
 		.uiLightingColor = 0x40FFFF00, // Cyan (ABGR)
@@ -275,7 +279,7 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 				// Empty unless the spawn request carries an owning client: agent-injected rows are born unowned.
 				.clientGuid = rSpawnData.clientGuid,
 				.fleetWantedCoordinate = rSpawnData.fleetWantedCoordinate,
-				.uiPendingFleetWantedCoordinateTicks = rSpawnData.uiPendingFleetWantedCoordinateTicks,
+				.iPendingFleetWantedCoordinateTicks = rSpawnData.uiPendingFleetWantedCoordinateTicks,
 			});
 		}
 	}
@@ -371,7 +375,7 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 
 		if (!(rCurrentInterpolate.pHexShields[i].uuid.iValue != 0) && !(rCurrentPostRender.pFlags[i] & kExploding))
 		{
-			engine::HexShieldsPostRender::Add(rFrame, rCurrentInterpolate.pHexShields[i], PlayersInterpolate::suiHexShieldTypeIndex);
+			engine::HexShieldsPostRender::Add(rFrame, rCurrentInterpolate.pHexShields[i], PlayersInterpolate::siHexShieldTypeIndex);
 		}
 	}
 #endif // BT_CLIENT
@@ -435,7 +439,7 @@ bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	// hull direction, and the cached steering, island destination, navigation mode, and waypoint index reset here.
 	// Flagship navigates to island destination on enter; non-flagship starts roaming and follows flagship via proximity
 	PlayerFlags_t spawnFlags = rInfo.flags;
-	SetNavigationDirection(spawnFlags, (rInfo.flags & kIsFlagship) ? static_cast<int8_t>(4) : static_cast<int8_t>(-1));
+	SetNavigationDirection(spawnFlags, (rInfo.flags & kIsFlagship) ? 4i64 : -1i64);
 	SetNavigationWaypointIndex(spawnFlags, 0);
 	rCurrentPostRender.pFlags[iIndex] = spawnFlags;
 	rCurrentPostRender.pfNavigationDelays[iIndex] = rInfo.fNavigationDelay;
@@ -443,8 +447,8 @@ bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.pClientGuids[iIndex] = rInfo.clientGuid;
 	rCurrentPostRender.pGlobalPlayerIds[iIndex] = rInfo.globalPlayerId;
 	rCurrentPostRender.pFleetWantedCoordinates[iIndex] = rInfo.fleetWantedCoordinate;
-	rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = rInfo.uiPendingFleetWantedCoordinateTicks;
-	rCurrentPostRender.puiPendingWeaponModeTicks[iIndex] = rInfo.uiPendingWeaponModeTicks;
+	rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = static_cast<uint8_t>(rInfo.iPendingFleetWantedCoordinateTicks);
+	rCurrentPostRender.puiPendingWeaponModeTicks[iIndex] = static_cast<uint8_t>(rInfo.iPendingWeaponModeTicks);
 #if defined(BT_CLIENT)
 	rCurrentPostRender.pVecDebugNavigationWaypoints[iIndex] = XMVectorZero();
 #endif // BT_CLIENT
@@ -625,13 +629,13 @@ void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, 
 		return;
 	}
 
-	size_t uiCount = static_cast<size_t>(rCurrentInterpolate.iCount);
-	sCollisionRadii.resize(uiCount);
-	sCollisionDamages.resize(uiCount);
-	sCollisionFlags.resize(uiCount);
-	rCollisionScratch.startTimes.resize(uiCount);
-	rCollisionScratch.endTimes.resize(uiCount);
-	rCollisionScratch.maximumTimes.resize(uiCount);
+	int64_t iCount = rCurrentInterpolate.iCount;
+	sCollisionRadii.resize(static_cast<size_t>(iCount));
+	sCollisionDamages.resize(static_cast<size_t>(iCount));
+	sCollisionFlags.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.startTimes.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.endTimes.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.maximumTimes.resize(static_cast<size_t>(iCount));
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		sCollisionRadii.at(static_cast<size_t>(i)) = kfPlayerRadius;
@@ -698,10 +702,10 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		float fFrameChangeTimer = rPrevious.pfFrameChangeTimers[i];
 		float fNavigationDelay = rPrevious.pfNavigationDelays[i];
 		engine::GridCoord fleetWantedCoordinate = rPrevious.pFleetWantedCoordinates[i];
-		uint8_t uiPendingFleetWantedCoordinateTicks = rPrevious.puiPendingFleetWantedCoordinateTicks[i];
-		uint8_t uiPendingWeaponModeTicks = rPrevious.puiPendingWeaponModeTicks[i];
-		int8_t iNavigationDirection = GetNavigationDirection(flags);
-		int8_t iNavigationWaypointIndex = GetNavigationWaypointIndex(flags);
+		int64_t iPendingFleetWantedCoordinateTicks = rPrevious.puiPendingFleetWantedCoordinateTicks[i];
+		int64_t iPendingWeaponModeTicks = rPrevious.puiPendingWeaponModeTicks[i];
+		int64_t iNavigationDirection = GetNavigationDirection(flags);
+		int64_t iNavigationWaypointIndex = GetNavigationWaypointIndex(flags);
 		XMVECTOR vecIslandDestination = rPrevious.pVecIslandDestinations[i];
 		XMVECTOR vecPosition = rPreviousInterpolate.pVecPositions[i];
 
@@ -716,14 +720,14 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		}
 #endif // BT_CLIENT
 
-		if (uiPendingFleetWantedCoordinateTicks > 0)
+		if (iPendingFleetWantedCoordinateTicks > 0)
 		{
-			uiPendingFleetWantedCoordinateTicks--;
+			iPendingFleetWantedCoordinateTicks--;
 		}
-		if (uiPendingWeaponModeTicks > 0)
+		if (iPendingWeaponModeTicks > 0)
 		{
-			uiPendingWeaponModeTicks--;
-			if (uiPendingWeaponModeTicks == 0)
+			iPendingWeaponModeTicks--;
+			if (iPendingWeaponModeTicks == 0)
 			{
 				if (flags & kPendingUseMissiles)
 				{
@@ -743,7 +747,7 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		}
 		else
 		{
-			ComputeNavigation(rFrame, rPreviousFrame, rStaticData, i, vecPosition, vecFrameCenter, fleetWantedCoordinate, uiPendingFleetWantedCoordinateTicks, flags, fDeltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, fFrameChangeTimer);
+			ComputeNavigation(rFrame, rPreviousFrame, rStaticData, i, vecPosition, vecFrameCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, flags, fDeltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, fFrameChangeTimer);
 
 			bool bLookTargetFound = false;
 			XMVECTOR vecLookPosition = XMVectorZero();
@@ -783,8 +787,8 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		rCurrent.pfNavigationDelays[i] = fNavigationDelay;
 		rCurrent.pVecIslandDestinations[i] = vecIslandDestination;
 		rCurrent.pFleetWantedCoordinates[i] = fleetWantedCoordinate;
-		rCurrent.puiPendingFleetWantedCoordinateTicks[i] = uiPendingFleetWantedCoordinateTicks;
-		rCurrent.puiPendingWeaponModeTicks[i] = uiPendingWeaponModeTicks;
+		rCurrent.puiPendingFleetWantedCoordinateTicks[i] = static_cast<uint8_t>(iPendingFleetWantedCoordinateTicks);
+		rCurrent.puiPendingWeaponModeTicks[i] = static_cast<uint8_t>(iPendingWeaponModeTicks);
 	}
 }
 

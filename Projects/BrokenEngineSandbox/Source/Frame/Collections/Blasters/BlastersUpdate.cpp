@@ -49,10 +49,10 @@ constexpr float kfBlasterCollisionRadius = 0.5f;
 constexpr float kfTerrainImpactJitter = 0.25f;
 
 #if defined(BT_CLIENT)
-static uint8_t suiTerrainCraterTypeIndex = 0xFF;
-static uint8_t suiTerrainCraterControllerIndex = 0xFF;
-static uint8_t suiTerrainPuffTypeIndex = 0xFF;
-static uint8_t suiTerrainPuffControllerIndex = 0xFF;
+static int64_t siTerrainCraterTypeIndex = 0xFF;
+static int64_t siTerrainCraterControllerIndex = 0xFF;
+static int64_t siTerrainPuffTypeIndex = 0xFF;
+static int64_t siTerrainPuffControllerIndex = 0xFF;
 
 constexpr std::chrono::duration<float> kTerrainCraterTimeOne = 0.1s;
 constexpr std::chrono::duration<float> kTerrainCraterTimeTwo = 3s;
@@ -63,21 +63,21 @@ constexpr float kfTerrainPuffRotationEnd = 10.0f;
 
 void BlastersInterpolate::Register()
 {
-	if (suiTerrainCraterTypeIndex != 0xFF)
+	if (siTerrainCraterTypeIndex != 0xFF)
 	{
 		return;
 	}
 
-	engine::PointLightsInterpolate::RegisterType(suiTerrainCraterTypeIndex,
+	engine::PointLightsInterpolate::RegisterType(siTerrainCraterTypeIndex,
 	{
 		.uiCrc = data::kTexturesBlasterBC7TerrainImpactpngCrc,
 		.uiColor = 0xFFFFFFFF,
 	});
 
-	engine::PointLightsInterpolate::RegisterControllerType(suiTerrainCraterControllerIndex,
+	engine::PointLightsInterpolate::RegisterControllerType(siTerrainCraterControllerIndex,
 	{
-		.uiBaseTypeIndex = suiTerrainCraterTypeIndex,
-		.uiKeyframeCount = 4,
+		.iBaseTypeIndex = siTerrainCraterTypeIndex,
+		.iKeyframeCount = 4,
 		.bDestroysSelf = true,
 		.times = {0s, kTerrainCraterTimeOne, kTerrainCraterTimeTwo, kTerrainCraterTimeThree},
 		.keyframes =
@@ -93,16 +93,16 @@ void BlastersInterpolate::Register()
 		.ppLightingIntensityScales = {&gCraterLightingIntensityOne, &gCraterLightingIntensityTwo, &gCraterLightingIntensityThree, &gCraterLightingIntensityFour},
 	});
 
-	engine::PuffsInterpolate::RegisterType(suiTerrainPuffTypeIndex,
+	engine::PuffsInterpolate::RegisterType(siTerrainPuffTypeIndex,
 	{
 		.uiCrc = data::kTexturesSmokeBC44jpgCrc,
 		.uiColor = 0xFFFFFFFF,
 	});
 
-	engine::PuffsInterpolate::RegisterControllerType(suiTerrainPuffControllerIndex,
+	engine::PuffsInterpolate::RegisterControllerType(siTerrainPuffControllerIndex,
 	{
-		.uiBaseTypeIndex = suiTerrainPuffTypeIndex,
-		.uiKeyframeCount = 2,
+		.iBaseTypeIndex = siTerrainPuffTypeIndex,
+		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
 		.times = {0s, kTerrainPuffTime, 0s, 0s},
 		.keyframes =
@@ -117,14 +117,14 @@ void BlastersInterpolate::Register()
 	});
 }
 
-static void XM_CALLCONV SynchronizeBlaster(FrameInterpolate& rFrameInterpolate, engine::area_lights_t areaLight, engine::point_lights_t pointLight, FXMVECTOR vecPosition, FXMVECTOR vecVelocity, uint8_t uiTypeIndex)
+static void XM_CALLCONV SynchronizeBlaster(FrameInterpolate& rFrameInterpolate, engine::area_lights_t areaLight, engine::point_lights_t pointLight, FXMVECTOR vecPosition, FXMVECTOR vecVelocity, int64_t iTypeIndex)
 {
-	const BlastersType& rType = BlastersInterpolate::sTypes.at(uiTypeIndex);
+	const BlastersType& rType = BlastersInterpolate::sTypes.at(static_cast<size_t>(iTypeIndex));
 
 	if ((pointLight.uuid.iValue != 0))
 	{
 		float fSize = rType.f2Size.x;
-		const engine::PointLightsType& rPointLightType = engine::PointLightsInterpolate::sTypes.at(rType.uiPointLightTypeIndex);
+		const engine::PointLightsType& rPointLightType = engine::PointLightsInterpolate::sTypes.at(static_cast<size_t>(rType.iPointLightTypeIndex));
 		engine::PointLightsInterpolate::Sync(rFrameInterpolate, pointLight,
 		{
 			.vecPosition = vecPosition,
@@ -145,7 +145,7 @@ static void XM_CALLCONV SynchronizeBlaster(FrameInterpolate& rFrameInterpolate, 
 
 		engine::AreaLightsInterpolate::Sync(rFrameInterpolate, areaLight,
 		{
-			.uiTypeIndex = rType.uiAreaLightTypeIndex,
+			.iTypeIndex = rType.iAreaLightTypeIndex,
 			.vecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
 		});
 	}
@@ -162,7 +162,7 @@ void BlastersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		// Load (type index copied in AllocateAndCopy)
-		[[maybe_unused]] uint8_t uiTypeIndex = rCurrent.puiTypeIndices[i];
+		[[maybe_unused]] int64_t iTypeIndex = rCurrent.puiTypeIndices[i];
 		XMVECTOR vecVelocity = rPreviousPostRender.pVecVelocities[i];
 
 		XMVECTOR vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), vecVelocity, rPrevious.pVecPositions[i]);
@@ -175,7 +175,7 @@ void BlastersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 		rCurrent.pVecDirections[i] = vecDirection;
 
 #if defined(BT_CLIENT)
-		SynchronizeBlaster(rCurrentFrameInterpolate, rCurrent.pAreaLights[i], rCurrent.pPointLights[i], vecPosition, vecVelocity, uiTypeIndex);
+		SynchronizeBlaster(rCurrentFrameInterpolate, rCurrent.pAreaLights[i], rCurrent.pPointLights[i], vecPosition, vecVelocity, iTypeIndex);
 
 		if ((rCurrent.pWindTrails[i].uuid.iValue != 0))
 		{
@@ -210,36 +210,36 @@ void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		return;
 	}
 
-	size_t uiCount = static_cast<size_t>(rCurrentInterpolate.iCount);
-	sCollisionFlags.resize(uiCount);
-	sCollisionRadii.resize(uiCount);
-	sCollisionDamages.resize(uiCount);
-	rCollisionScratch.startTimes.resize(uiCount);
-	rCollisionScratch.endTimes.resize(uiCount);
-	rCollisionScratch.maxTimes.resize(uiCount);
-	rCollisionScratch.terrainHits.resize(uiCount);
-	rCollisionScratch.boundaryHits.resize(uiCount);
+	int64_t iCount = rCurrentInterpolate.iCount;
+	sCollisionFlags.resize(static_cast<size_t>(iCount));
+	sCollisionRadii.resize(static_cast<size_t>(iCount));
+	sCollisionDamages.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.startTimes.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.endTimes.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.maxTimes.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.terrainHits.resize(static_cast<size_t>(iCount));
+	rCollisionScratch.boundaryHits.resize(static_cast<size_t>(iCount));
 	const BlastersInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pBlasters;
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		size_t uiIndex = static_cast<size_t>(i);
-		sCollisionFlags.at(uiIndex) = engine::CollisionFlags::kDestroyOnCollide;
-		sCollisionRadii.at(uiIndex) = kfBlasterCollisionRadius;
-		sCollisionDamages.at(uiIndex) = kfBlasterDamage;
-		rCollisionScratch.startTimes.at(uiIndex) = 0.0f;
-		rCollisionScratch.endTimes.at(uiIndex) = 1.0f;
-		rCollisionScratch.terrainHits.at(uiIndex) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
-		rCollisionScratch.boundaryHits.at(uiIndex) = engine::TracePointToFrameExit(engine::LocalFrameArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		int64_t iIndex = i;
+		sCollisionFlags.at(static_cast<size_t>(iIndex)) = engine::CollisionFlags::kDestroyOnCollide;
+		sCollisionRadii.at(static_cast<size_t>(iIndex)) = kfBlasterCollisionRadius;
+		sCollisionDamages.at(static_cast<size_t>(iIndex)) = kfBlasterDamage;
+		rCollisionScratch.startTimes.at(static_cast<size_t>(iIndex)) = 0.0f;
+		rCollisionScratch.endTimes.at(static_cast<size_t>(iIndex)) = 1.0f;
+		rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)) = engine::TracePointToFrameExit(engine::LocalFrameArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		float fMaxTime = std::numeric_limits<float>::max();
-		if (rCollisionScratch.terrainHits.at(uiIndex).bHit)
+		if (rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)).bHit)
 		{
-			fMaxTime = rCollisionScratch.terrainHits.at(uiIndex).fTime;
+			fMaxTime = rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)).fTime;
 		}
-		if (rCollisionScratch.boundaryHits.at(uiIndex).bHit)
+		if (rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)).bHit)
 		{
-			fMaxTime = std::min(fMaxTime, rCollisionScratch.boundaryHits.at(uiIndex).fTime);
+			fMaxTime = std::min(fMaxTime, rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)).fTime);
 		}
-		rCollisionScratch.maxTimes.at(uiIndex) = fMaxTime;
+		rCollisionScratch.maxTimes.at(static_cast<size_t>(iIndex)) = fMaxTime;
 	}
 
 	siCollisionLayerIndex = engine::Collision::AddLayer(
@@ -274,7 +274,7 @@ void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		size_t uiIndex = static_cast<size_t>(i);
+		int64_t iIndex = i;
 		// Entity results are pre-filtered against terrain and frame-exit cutoffs.
 		if ((engine::Collision::sResultSpans[engine::Collision::sLayerBaseOffsets[siCollisionLayerIndex] + i].iCount > 0))
 		{
@@ -282,8 +282,8 @@ void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 			continue;
 		}
 
-		const engine::SegmentHit& rTerrainHit = rCollisionScratch.terrainHits.at(uiIndex);
-		const engine::SegmentHit& rBoundaryHit = rCollisionScratch.boundaryHits.at(uiIndex);
+		const engine::SegmentHit& rTerrainHit = rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex));
+		const engine::SegmentHit& rBoundaryHit = rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex));
 		if (rTerrainHit.bHit && (!rBoundaryHit.bHit || rTerrainHit.fTime <= rBoundaryHit.fTime)) [[unlikely]]
 		{
 			rCurrentPostRender.pFlags[i].Set(kDestroy);
@@ -294,8 +294,8 @@ void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 
 			[[maybe_unused]] float fRotation = common::Random<XM_2PI>(rFrame.postRender.randomEngine);
 #if defined(BT_CLIENT)
-			engine::PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), suiTerrainCraterControllerIndex, vecCollisionPosition, fRotation);
-			engine::PuffsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), suiTerrainPuffControllerIndex, vecCollisionPosition);
+			engine::PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), siTerrainCraterControllerIndex, vecCollisionPosition, fRotation);
+			engine::PuffsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), siTerrainPuffControllerIndex, vecCollisionPosition);
 #endif
 
 #if defined(BT_CLIENT)

@@ -47,8 +47,8 @@ static int64_t siTotalMissiles = 0;
 // reclaims GDI objects.
 static HDC shDeviceContextBuffer = nullptr;
 static HBITMAP shBitmapBuffer = nullptr;
-static int siBufferWidth = 0;
-static int siBufferHeight = 0;
+static int64_t siBufferWidth = 0;
+static int64_t siBufferHeight = 0;
 static HFONT shFont = nullptr;
 
 static HBRUSH shBrushBackground = nullptr;  // RGB(30, 30, 30) — window / content background
@@ -197,7 +197,7 @@ bool ServerDisplayContentChanged()
 	return true;
 }
 
-static void PaintGridMap(HDC hDeviceContextBuffer, std::span<char> buffer, int iMapLeft, int iMapTop, int iMapWidth, int iMapHeight, const std::vector<ClientConnection>& rClients)
+static void PaintGridMap(HDC hDeviceContextBuffer, std::span<char> buffer, int64_t iMapLeft, int64_t iMapTop, int64_t iMapWidth, int64_t iMapHeight, const std::vector<ClientConnection>& rClients)
 {
 	if (game::gpGame->mActiveCoordinates.empty())
 	{
@@ -223,32 +223,32 @@ static void PaintGridMap(HDC hDeviceContextBuffer, std::span<char> buffer, int i
 	iMinimumY -= 1;
 	iMaximumY += 1;
 
-	int32_t iGridWidth = iMaximumX - iMinimumX + 1;
-	int32_t iGridHeight = iMaximumY - iMinimumY + 1;
+	int64_t iGridWidth = iMaximumX - iMinimumX + 1;
+	int64_t iGridHeight = iMaximumY - iMinimumY + 1;
 
-	int iCellWidth = std::min(60, iMapWidth / iGridWidth);
-	int iCellHeight = std::min(60, iMapHeight / iGridHeight);
-	int iCellSize = std::min(iCellWidth, iCellHeight);
+	int64_t iCellWidth = std::min(60i64, iMapWidth / iGridWidth);
+	int64_t iCellHeight = std::min(60i64, iMapHeight / iGridHeight);
+	int64_t iCellSize = std::min(iCellWidth, iCellHeight);
 
-	int iGridPixelWidth = iGridWidth * iCellSize;
-	int iGridPixelHeight = iGridHeight * iCellSize;
-	int iOffsetX = (iMapWidth - iGridPixelWidth) / 2;
-	int iOffsetY = (iMapHeight - iGridPixelHeight) / 2;
+	int64_t iGridPixelWidth = iGridWidth * iCellSize;
+	int64_t iGridPixelHeight = iGridHeight * iCellSize;
+	int64_t iOffsetX = (iMapWidth - iGridPixelWidth) / 2;
+	int64_t iOffsetY = (iMapHeight - iGridPixelHeight) / 2;
 
 	if (iCellSize < 4)
 	{
 		return;
 	}
 
-	for (int32_t i = iMinimumY; i <= iMaximumY; ++i)
+	for (int64_t i = iMinimumY; i <= iMaximumY; ++i)
 	{
-		for (int32_t j = iMinimumX; j <= iMaximumX; ++j)
+		for (int64_t j = iMinimumX; j <= iMaximumX; ++j)
 		{
-			int iCellLeft = iMapLeft + iOffsetX + (j - iMinimumX) * iCellSize;
-			int iCellTop = iMapTop + iOffsetY + (iMaximumY - i) * iCellSize;
-			RECT cellRectangle {.left = iCellLeft, .top = iCellTop, .right = iCellLeft + iCellSize, .bottom = iCellTop + iCellSize};
+			int64_t iCellLeft = iMapLeft + iOffsetX + (j - iMinimumX) * iCellSize;
+			int64_t iCellTop = iMapTop + iOffsetY + (iMaximumY - i) * iCellSize;
+			RECT cellRectangle {.left = static_cast<LONG>(iCellLeft), .top = static_cast<LONG>(iCellTop), .right = static_cast<LONG>(iCellLeft + iCellSize), .bottom = static_cast<LONG>(iCellTop + iCellSize)};
 
-			GridCoord coordinate {.iX = j, .iY = i};
+			GridCoord coordinate {.iX = static_cast<int32_t>(j), .iY = static_cast<int32_t>(i)};
 			bool bIsActive = false;
 			bool bIsSubscribed = false;
 			int64_t iClientsInCell = 0;
@@ -291,20 +291,20 @@ static void PaintGridMap(HDC hDeviceContextBuffer, std::span<char> buffer, int i
 
 			HPEN hPen = (iClientsInCell > 0) ? shPenCellBorderClient : shPenGray;
 			HPEN hOldPen = static_cast<HPEN>(SelectObject(hDeviceContextBuffer, hPen));
-			MoveToEx(hDeviceContextBuffer, iCellLeft, iCellTop, nullptr);
-			LineTo(hDeviceContextBuffer, iCellLeft + iCellSize, iCellTop);
-			LineTo(hDeviceContextBuffer, iCellLeft + iCellSize, iCellTop + iCellSize);
-			LineTo(hDeviceContextBuffer, iCellLeft, iCellTop + iCellSize);
-			LineTo(hDeviceContextBuffer, iCellLeft, iCellTop);
+			MoveToEx(hDeviceContextBuffer, static_cast<int>(iCellLeft), static_cast<int>(iCellTop), nullptr);
+			LineTo(hDeviceContextBuffer, static_cast<int>(iCellLeft + iCellSize), static_cast<int>(iCellTop));
+			LineTo(hDeviceContextBuffer, static_cast<int>(iCellLeft + iCellSize), static_cast<int>(iCellTop + iCellSize));
+			LineTo(hDeviceContextBuffer, static_cast<int>(iCellLeft), static_cast<int>(iCellTop + iCellSize));
+			LineTo(hDeviceContextBuffer, static_cast<int>(iCellLeft), static_cast<int>(iCellTop));
 			SelectObject(hDeviceContextBuffer, hOldPen);
 
 			// Red interior border for subscribed cells
 			if (bIsSubscribed && iCellSize >= 20)
 			{
-				static constexpr int kiInset = 2;
+				static constexpr int64_t kiInset = 2;
 				HPEN hOldPen2 = static_cast<HPEN>(SelectObject(hDeviceContextBuffer, shPenRed));
 				HBRUSH hOldBrush = static_cast<HBRUSH>(SelectObject(hDeviceContextBuffer, GetStockObject(NULL_BRUSH)));
-				Rectangle(hDeviceContextBuffer, iCellLeft + kiInset, iCellTop + kiInset, iCellLeft + iCellSize - kiInset + 1, iCellTop + iCellSize - kiInset + 1);
+				Rectangle(hDeviceContextBuffer, static_cast<int>(iCellLeft + kiInset), static_cast<int>(iCellTop + kiInset), static_cast<int>(iCellLeft + iCellSize - kiInset + 1), static_cast<int>(iCellTop + iCellSize - kiInset + 1));
 				SelectObject(hDeviceContextBuffer, hOldBrush);
 				SelectObject(hDeviceContextBuffer, hOldPen2);
 			}
@@ -317,17 +317,17 @@ static void PaintGridMap(HDC hDeviceContextBuffer, std::span<char> buffer, int i
 
 				SetTextColor(hDeviceContextBuffer, RGB(220, 220, 220));
 
-				int iLineLength = std::min(std::snprintf(buffer.data(), buffer.size(), "(%d,%d)", j, i), static_cast<int>(buffer.size()) - 1);
-				TextOutA(hDeviceContextBuffer, iCellLeft + 2, iCellTop + 2, buffer.data(), iLineLength);
+				int64_t iLineLength = std::min<int64_t>(std::snprintf(buffer.data(), buffer.size(), "(%d,%d)", static_cast<int>(j), static_cast<int>(i)), static_cast<int64_t>(buffer.size()) - 1);
+				TextOutA(hDeviceContextBuffer, static_cast<int>(iCellLeft + 2), static_cast<int>(iCellTop + 2), buffer.data(), static_cast<int>(iLineLength));
 
-				iLineLength = std::min(std::snprintf(buffer.data(), buffer.size(), "%lld", iEntityCount), static_cast<int>(buffer.size()) - 1);
-				TextOutA(hDeviceContextBuffer, iCellLeft + 2, iCellTop + 28, buffer.data(), iLineLength);
+				iLineLength = std::min<int64_t>(std::snprintf(buffer.data(), buffer.size(), "%lld", iEntityCount), static_cast<int64_t>(buffer.size()) - 1);
+				TextOutA(hDeviceContextBuffer, static_cast<int>(iCellLeft + 2), static_cast<int>(iCellTop + 28), buffer.data(), static_cast<int>(iLineLength));
 
 				if (iClientsInCell > 0)
 				{
 					SetTextColor(hDeviceContextBuffer, RGB(150, 200, 255));
-					iLineLength = std::min(std::snprintf(buffer.data(), buffer.size(), "%lld", iClientsInCell), static_cast<int>(buffer.size()) - 1);
-					TextOutA(hDeviceContextBuffer, iCellLeft + iCellSize - 20, iCellTop + 2, buffer.data(), iLineLength);
+					iLineLength = std::min<int64_t>(std::snprintf(buffer.data(), buffer.size(), "%lld", iClientsInCell), static_cast<int64_t>(buffer.size()) - 1);
+					TextOutA(hDeviceContextBuffer, static_cast<int>(iCellLeft + iCellSize - 20), static_cast<int>(iCellTop + 2), buffer.data(), static_cast<int>(iLineLength));
 				}
 			}
 		}
@@ -336,22 +336,22 @@ static void PaintGridMap(HDC hDeviceContextBuffer, std::span<char> buffer, int i
 
 static void PaintWorkbufferText(HDC hDeviceContextBuffer, std::string_view text, int64_t iX, int64_t& riY, int64_t iLineHeight)
 {
-	size_t uiStart = 0;
-	while (uiStart < text.size())
+	int64_t iStart = 0;
+	while (iStart < static_cast<int64_t>(text.size()))
 	{
-		size_t uiEnd = text.find('\n', uiStart);
-		if (uiEnd == std::string_view::npos)
+		int64_t iEnd = static_cast<int64_t>(text.find('\n', static_cast<size_t>(iStart)));
+		if (iEnd == -1)
 		{
-			uiEnd = text.size();
+			iEnd = static_cast<int64_t>(text.size());
 		}
 
-		std::string_view line = text.substr(uiStart, uiEnd - uiStart);
+		std::string_view line = text.substr(static_cast<size_t>(iStart), static_cast<size_t>(iEnd - iStart));
 		if (!line.empty())
 		{
 			TextOutA(hDeviceContextBuffer, static_cast<int>(iX), static_cast<int>(riY), line.data(), static_cast<int>(line.size()));
 		}
 		riY += iLineHeight;
-		uiStart = uiEnd + 1;
+		iStart = iEnd + 1;
 	}
 }
 
@@ -413,7 +413,7 @@ void HandleServerClick(HWND hWindow, int64_t iX, int64_t iY)
 	}
 }
 
-static void PaintProfilePanel(HDC hDeviceContextBuffer, int iLeft, int iTop, [[maybe_unused]] int iWidth, int iHeight)
+static void PaintProfilePanel(HDC hDeviceContextBuffer, int64_t iLeft, int64_t iTop, [[maybe_unused]] int64_t iWidth, int64_t iHeight)
 {
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	int64_t iTextX = iLeft + 10;
@@ -425,9 +425,9 @@ static void PaintProfilePanel(HDC hDeviceContextBuffer, int iLeft, int iTop, [[m
 	sProfileText.clear();
 
 	char pcLine[256] {};
-	int iLineLength = std::min(std::snprintf(pcLine, sizeof(pcLine), "FPS: %lld  Potential: %lld", gpProfileManager->mFullUpdatesInTheLastSecond.Get(), gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average() > 0 ? 1'000'000 / gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average() : 0i64), static_cast<int>(sizeof(pcLine)) - 1);
+	int64_t iLineLength = std::min<int64_t>(std::snprintf(pcLine, sizeof(pcLine), "FPS: %lld  Potential: %lld", gpProfileManager->mFullUpdatesInTheLastSecond.Get(), gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average() > 0 ? 1'000'000 / gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average() : 0i64), static_cast<int64_t>(sizeof(pcLine)) - 1);
 	SetTextColor(hDeviceContextBuffer, RGB(100, 180, 255));
-	TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, iLineLength);
+	TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iLineLength));
 	sProfileText += pcLine;
 	sProfileText += "\n";
 	iTextY += iLineHeight + 4;
@@ -461,8 +461,8 @@ static void PaintProfilePanel(HDC hDeviceContextBuffer, int iLeft, int iTop, [[m
 
 	auto MemoryLine = [&](const char* pcFormat, int64_t iValue)
 	{
-		int iMemoryLineLength = std::min(std::snprintf(pcLine, sizeof(pcLine), pcFormat, iValue), static_cast<int>(sizeof(pcLine)) - 1);
-		TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, iMemoryLineLength);
+		int64_t iMemoryLineLength = std::min<int64_t>(std::snprintf(pcLine, sizeof(pcLine), pcFormat, iValue), static_cast<int64_t>(sizeof(pcLine)) - 1);
+		TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iMemoryLineLength));
 		sProfileText += pcLine;
 		sProfileText += "\n";
 		iTextY += iLineHeight;
@@ -492,12 +492,12 @@ static void PaintProfilePanel(HDC hDeviceContextBuffer, int iLeft, int iTop, [[m
 	TextOutA(hDeviceContextBuffer, sCopyButtonRectangle.left + 14, sCopyButtonRectangle.top + 2, "Copy", 4);
 }
 
-static void PaintTabBar(HDC hDeviceContextBuffer, int iWidth)
+static void PaintTabBar(HDC hDeviceContextBuffer, int64_t iWidth)
 {
 	for (int64_t i = 0; std::string_view tabName : kTabNames)
 	{
-		int iTabLeft = static_cast<int>(kiTabBarLeft + i * kiTabWidth);
-		RECT tabRectangle {.left = iTabLeft, .top = 0, .right = static_cast<int>(iTabLeft + kiTabWidth), .bottom = static_cast<int>(kiTabHeight)};
+		int64_t iTabLeft = kiTabBarLeft + i * kiTabWidth;
+		RECT tabRectangle {.left = static_cast<LONG>(iTabLeft), .top = 0, .right = static_cast<int>(iTabLeft + kiTabWidth), .bottom = static_cast<int>(kiTabHeight)};
 
 		bool bActive = (i == static_cast<int64_t>(seActiveTab));
 		HBRUSH hBrush = bActive ? shBrushTabActive : shBrushTabInactive;
@@ -505,26 +505,26 @@ static void PaintTabBar(HDC hDeviceContextBuffer, int iWidth)
 
 		HPEN hPen = bActive ? shPenBlue : shPenGray;
 		HPEN hOldPen = static_cast<HPEN>(SelectObject(hDeviceContextBuffer, hPen));
-		MoveToEx(hDeviceContextBuffer, iTabLeft, static_cast<int>(kiTabHeight), nullptr);
-		LineTo(hDeviceContextBuffer, iTabLeft, 0);
+		MoveToEx(hDeviceContextBuffer, static_cast<int>(iTabLeft), static_cast<int>(kiTabHeight), nullptr);
+		LineTo(hDeviceContextBuffer, static_cast<int>(iTabLeft), 0);
 		LineTo(hDeviceContextBuffer, static_cast<int>(iTabLeft + kiTabWidth), 0);
 		LineTo(hDeviceContextBuffer, static_cast<int>(iTabLeft + kiTabWidth), static_cast<int>(kiTabHeight));
 		if (!bActive)
 		{
-			LineTo(hDeviceContextBuffer, iTabLeft, static_cast<int>(kiTabHeight));
+			LineTo(hDeviceContextBuffer, static_cast<int>(iTabLeft), static_cast<int>(kiTabHeight));
 		}
 		SelectObject(hDeviceContextBuffer, hOldPen);
 
 		SetTextColor(hDeviceContextBuffer, bActive ? RGB(255, 255, 255) : RGB(160, 160, 160));
-		TextOutA(hDeviceContextBuffer, iTabLeft + 12, 4, tabName.data(), static_cast<int>(tabName.size()));
+		TextOutA(hDeviceContextBuffer, static_cast<int>(iTabLeft + 12), 4, tabName.data(), static_cast<int>(tabName.size()));
 		++i;
 	}
 
 	// Bottom line across non-tab area
 	HPEN hOldPen = static_cast<HPEN>(SelectObject(hDeviceContextBuffer, shPenGray));
-	int iTabsEnd = static_cast<int>(kiTabBarLeft + kiTabCount * kiTabWidth);
-	MoveToEx(hDeviceContextBuffer, iTabsEnd, kiTabHeight, nullptr);
-	LineTo(hDeviceContextBuffer, iWidth, kiTabHeight);
+	int64_t iTabsEnd = kiTabBarLeft + kiTabCount * kiTabWidth;
+	MoveToEx(hDeviceContextBuffer, static_cast<int>(iTabsEnd), kiTabHeight, nullptr);
+	LineTo(hDeviceContextBuffer, static_cast<int>(iWidth), kiTabHeight);
 	SelectObject(hDeviceContextBuffer, hOldPen);
 }
 
@@ -535,8 +535,8 @@ void PaintServerDisplay(HWND hWindow)
 
 	RECT clientRectangle {};
 	GetClientRect(hWindow, &clientRectangle);
-	int iWidth = clientRectangle.right - clientRectangle.left;
-	int iHeight = clientRectangle.bottom - clientRectangle.top;
+	int64_t iWidth = static_cast<int64_t>(clientRectangle.right) - clientRectangle.left;
+	int64_t iHeight = static_cast<int64_t>(clientRectangle.bottom) - clientRectangle.top;
 
 	EnsureCachedGraphicsDeviceInterfaceObjects();
 
@@ -546,7 +546,7 @@ void PaintServerDisplay(HWND hWindow)
 	}
 	if (shBitmapBuffer == nullptr || iWidth != siBufferWidth || iHeight != siBufferHeight)
 	{
-		HBITMAP hBitmapNew = CreateCompatibleBitmap(hDeviceContext, iWidth, iHeight);
+		HBITMAP hBitmapNew = CreateCompatibleBitmap(hDeviceContext, static_cast<int>(iWidth), static_cast<int>(iHeight));
 		SelectObject(shDeviceContextBuffer, hBitmapNew); // deselects the previous bitmap (or the DC's default stock bitmap on first paint)
 		if (shBitmapBuffer != nullptr)
 		{
@@ -573,15 +573,15 @@ void PaintServerDisplay(HWND hWindow)
 	int64_t iActiveCells = std::ssize(game::gpGame->mActiveCoordinates);
 
 	// Left half: text stats
-	int iTextX = 10;
-	int iTextY = 10;
-	int iLineHeight = 36;
+	int64_t iTextX = 10;
+	int64_t iTextY = 10;
+	int64_t iLineHeight = 36;
 	char pcLine[256] {};
 
 	auto TextLine = [&](const char* pcFormat, auto... arguments)
 	{
-		int iTextLength = std::min(std::snprintf(pcLine, sizeof(pcLine), pcFormat, arguments...), static_cast<int>(sizeof(pcLine)) - 1);
-		TextOutA(hDeviceContextBuffer, iTextX, iTextY, pcLine, iTextLength);
+		int64_t iTextLength = std::min<int64_t>(std::snprintf(pcLine, sizeof(pcLine), pcFormat, arguments...), static_cast<int64_t>(sizeof(pcLine)) - 1);
+		TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iTextLength));
 		iTextY += iLineHeight;
 	};
 
@@ -597,8 +597,8 @@ void PaintServerDisplay(HWND hWindow)
 	TextLine("Tick: %lld", iTick);
 	TextLine("Time: %.2f s", static_cast<double>(fCurrentTime));
 	TextLine("Active cells: %lld", iActiveCells);
-	int iTextLength = std::min(std::snprintf(pcLine, sizeof(pcLine), "Clients: %lld", iClientCount), static_cast<int>(sizeof(pcLine)) - 1);
-	TextOutA(hDeviceContextBuffer, iTextX, iTextY, pcLine, iTextLength);
+	int64_t iTextLength = std::min<int64_t>(std::snprintf(pcLine, sizeof(pcLine), "Clients: %lld", iClientCount), static_cast<int64_t>(sizeof(pcLine)) - 1);
+	TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iTextLength));
 	iTextY += iLineHeight;
 
 	SetTextColor(hDeviceContextBuffer, RGB(150, 220, 150));
@@ -607,8 +607,8 @@ void PaintServerDisplay(HWND hWindow)
 	TextLine("Spaceships: %lld", siTotalSpaceships);
 	TextLine("Blasters: %lld", siTotalBlasters);
 	TextLine("Missiles: %lld", siTotalMissiles);
-	iTextLength = std::min(std::snprintf(pcLine, sizeof(pcLine), "Explosions: %lld", gpProfileManager->GetCpuCounter(kCpuCounterExplosions).iCount), static_cast<int>(sizeof(pcLine)) - 1);
-	TextOutA(hDeviceContextBuffer, iTextX, iTextY, pcLine, iTextLength);
+	iTextLength = std::min<int64_t>(std::snprintf(pcLine, sizeof(pcLine), "Explosions: %lld", gpProfileManager->GetCpuCounter(kCpuCounterExplosions).iCount), static_cast<int64_t>(sizeof(pcLine)) - 1);
+	TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iTextLength));
 
 #if !defined(ENABLE_CRT_DEBUG_HEAP)
 	iTextY += iLineHeight * 2;
@@ -617,17 +617,17 @@ void PaintServerDisplay(HWND hWindow)
 	TextLine("Committed: %lld MiB", gpProfileManager->miMimallocCommittedMebibytes);
 	TextLine("Peak cmtd: %lld MiB", gpProfileManager->miMimallocPeakCommittedMebibytes);
 	TextLine("Heap used: %lld MiB", gpProfileManager->miMimallocHeapUsedMebibytes);
-	iTextLength = std::min(std::snprintf(pcLine, sizeof(pcLine), "Peak heap: %lld MiB", gpProfileManager->miMimallocPeakHeapUsedMebibytes), static_cast<int>(sizeof(pcLine)) - 1);
-	TextOutA(hDeviceContextBuffer, iTextX, iTextY, pcLine, iTextLength);
+	iTextLength = std::min<int64_t>(std::snprintf(pcLine, sizeof(pcLine), "Peak heap: %lld MiB", gpProfileManager->miMimallocPeakHeapUsedMebibytes), static_cast<int64_t>(sizeof(pcLine)) - 1);
+	TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iTextLength));
 #endif
 
 	PaintTabBar(hDeviceContextBuffer, iWidth);
 
 	// Right side content area (below tab bar)
-	int iContentLeft = static_cast<int>(kiTabBarLeft);
-	int iContentTop = static_cast<int>(kiTabHeight) + 5;
-	int iContentWidth = iWidth - iContentLeft - 10;
-	int iContentHeight = iHeight - iContentTop - 10;
+	int64_t iContentLeft = kiTabBarLeft;
+	int64_t iContentTop = kiTabHeight + 5;
+	int64_t iContentWidth = iWidth - iContentLeft - 10;
+	int64_t iContentHeight = iHeight - iContentTop - 10;
 
 	if (seActiveTab == ServerTab::kMap)
 	{
@@ -638,7 +638,7 @@ void PaintServerDisplay(HWND hWindow)
 		PaintProfilePanel(hDeviceContextBuffer, iContentLeft, iContentTop, iContentWidth, iContentHeight);
 	}
 
-	BitBlt(hDeviceContext, 0, 0, iWidth, iHeight, hDeviceContextBuffer, 0, 0, SRCCOPY);
+	BitBlt(hDeviceContext, 0, 0, static_cast<int>(iWidth), static_cast<int>(iHeight), hDeviceContextBuffer, 0, 0, SRCCOPY);
 
 	EndPaint(hWindow, &paintStructure);
 }

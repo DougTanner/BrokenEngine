@@ -25,12 +25,12 @@ namespace toolcli
 	using namespace std::chrono_literals;
 
 	constexpr int64_t kiBuildLockWaitSeconds = 500;
-	constexpr size_t kuiMaxDiagnostics = 500;
+	constexpr int64_t kiMaxDiagnostics = 500;
 	constexpr int64_t kiMaxUnmatchedMessages = 50;
 	// Backtracking in the diagnostic regexes is superlinear; pathological MSVC template
 	// diagnostics can span tens of KB on one line, so oversized lines skip parsing (the
 	// retained log still holds them verbatim).
-	constexpr size_t kuiMaxDiagnosticLineLength = 4'096;
+	constexpr int64_t kiMaxDiagnosticLineLength = 4'096;
 
 	// The build command's public contract is exactly one of these objects on stdout.
 	constexpr std::string_view kBuildResultSchema = "broken-engine-build-result/v1";
@@ -39,18 +39,18 @@ namespace toolcli
 
 	static std::optional<std::wstring> GetEnvironmentValue(const wchar_t* pName)
 	{
-		DWORD uiRequired = ::GetEnvironmentVariableW(pName, nullptr, 0);
-		if (uiRequired == 0)
+		int64_t iRequired = ::GetEnvironmentVariableW(pName, nullptr, 0);
+		if (iRequired == 0)
 		{
 			return std::nullopt;
 		}
-		std::wstring value(uiRequired, L'\0');
-		DWORD uiWritten = ::GetEnvironmentVariableW(pName, value.data(), uiRequired);
-		if (uiWritten == 0 || uiWritten >= uiRequired)
+		std::wstring value(static_cast<size_t>(iRequired), L'\0');
+		int64_t iWritten = ::GetEnvironmentVariableW(pName, value.data(), static_cast<DWORD>(iRequired));
+		if (iWritten == 0 || iWritten >= iRequired)
 		{
 			return std::nullopt;
 		}
-		value.resize(uiWritten);
+		value.resize(static_cast<size_t>(iWritten));
 		return value;
 	}
 
@@ -116,10 +116,10 @@ namespace toolcli
 				HANDLE hRawFile = ::CreateFileW(extendedCandidate.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
 				if (hRawFile == INVALID_HANDLE_VALUE)
 				{
-					DWORD uiError = ::GetLastError();
-					if (uiError != ERROR_FILE_EXISTS)
+					int64_t iError = ::GetLastError();
+					if (iError != ERROR_FILE_EXISTS)
 					{
-						FailBuild("create retained build log failed (Windows error " + std::to_string(uiError) + ")");
+						FailBuild("create retained build log failed (Windows error " + std::to_string(iError) + ")");
 						return false;
 					}
 					continue;
@@ -141,16 +141,17 @@ namespace toolcli
 			}
 			while (!data.empty())
 			{
-				DWORD uiChunk = static_cast<DWORD>(std::min<size_t>(data.size(), 1ui32 << 20));
+				int64_t iChunk = std::min<int64_t>(std::ssize(data), 1i64 << 20);
 				DWORD uiWritten = 0;
-				if (::WriteFile(mhFile.Get(), data.data(), uiChunk, &uiWritten, nullptr) == FALSE || uiWritten == 0)
+				if (::WriteFile(mhFile.Get(), data.data(), static_cast<DWORD>(iChunk), &uiWritten, nullptr) == FALSE || uiWritten == 0)
 				{
 					mbFailed = true;
 					FailBuildWindows("write retained build log");
 					return;
 				}
-				data = data.subspan(uiWritten);
-				miBytes += uiWritten;
+				int64_t iWritten = uiWritten;
+				data = data.subspan(static_cast<size_t>(iWritten));
+				miBytes += iWritten;
 			}
 		}
 
@@ -175,8 +176,8 @@ namespace toolcli
 		void Consume(std::span<const char> data)
 		{
 			mCarry.append(data.data(), data.size());
-			size_t uiStart = 0;
-			for (size_t uiIndex = mCarry.find('\n', 0); uiIndex != std::string::npos; uiIndex = mCarry.find('\n', uiStart))
+			int64_t iStart = 0;
+			for (int64_t iIndex = static_cast<int64_t>(mCarry.find('\n', 0)); iIndex != -1; iIndex = static_cast<int64_t>(mCarry.find('\n', static_cast<size_t>(iStart))))
 			{
 				// A set skip flag means this segment is the tail of a dropped oversized line.
 				if (mbSkipLine)
@@ -185,14 +186,14 @@ namespace toolcli
 				}
 				else
 				{
-					ParseLine(std::string_view(mCarry).substr(uiStart, uiIndex - uiStart));
+					ParseLine(std::string_view(mCarry).substr(static_cast<size_t>(iStart), static_cast<size_t>(iIndex - iStart)));
 				}
-				uiStart = uiIndex + 1;
+				iStart = iIndex + 1;
 			}
-			mCarry.erase(0, uiStart);
+			mCarry.erase(0, static_cast<size_t>(iStart));
 			// ParseLine already skips lines over the cap, so dropping an oversized unterminated
 			// carry loses no line that would have been parsed.
-			if (mCarry.size() > kuiMaxDiagnosticLineLength)
+			if (std::ssize(mCarry) > kiMaxDiagnosticLineLength)
 			{
 				mbSkipLine = true;
 				mCarry.clear();
@@ -231,8 +232,7 @@ namespace toolcli
 			{
 				line.remove_suffix(1);
 			}
-			if (line.empty() || line.size() > kuiMaxDiagnosticLineLength
-			 || (line.find("error") == std::string_view::npos && line.find("warning") == std::string_view::npos))
+			if (line.empty() || std::ssize(line) > kiMaxDiagnosticLineLength || (!line.contains("error") && !line.contains("warning")))
 			{
 				return;
 			}
@@ -255,7 +255,7 @@ namespace toolcli
 			{
 				// Backtracking limit hit; fall through to the unmatched-line handling.
 			}
-			if (line.find("error") != std::string_view::npos && std::ssize(sBuildMessages) < kiMaxUnmatchedMessages)
+			if (line.contains("error") && std::ssize(sBuildMessages) < kiMaxUnmatchedMessages)
 			{
 				sBuildMessages.emplace_back(line);
 			}
@@ -269,7 +269,7 @@ namespace toolcli
 			{
 				return;
 			}
-			if (mDiagnostics.size() >= kuiMaxDiagnostics)
+			if (std::ssize(mDiagnostics) >= kiMaxDiagnostics)
 			{
 				mbTruncated = true;
 				return;
@@ -301,7 +301,7 @@ namespace toolcli
 
 	// Launches MSBuild with stdout and stderr bound to one pipe so the retained log
 	// preserves the observed read order of the combined stream.
-	static std::optional<DWORD> RunMsBuildToLog(const std::filesystem::path& rExecutable, const std::vector<std::wstring>& rArguments, RetainedLog& rLog, DiagnosticParser& rParser)
+	static std::optional<int64_t> RunMsBuildToLog(const std::filesystem::path& rExecutable, const std::vector<std::wstring>& rArguments, RetainedLog& rLog, DiagnosticParser& rParser)
 	{
 		RunProcessOptions options;
 		options.bCaptureOutput = true;
@@ -319,7 +319,7 @@ namespace toolcli
 		{
 			return std::nullopt;
 		}
-		return result->uiExitCode;
+		return static_cast<int64_t>(result->uiExitCode);
 	}
 
 	static std::optional<std::filesystem::path> FindMsBuild()
@@ -342,18 +342,18 @@ namespace toolcli
 			return defaultPath;
 		}
 
-		DWORD uiRequired = ::GetEnvironmentVariableW(L"ProgramFiles(x86)", nullptr, 0);
-		if (uiRequired == 0)
+		int64_t iRequired = ::GetEnvironmentVariableW(L"ProgramFiles(x86)", nullptr, 0);
+		if (iRequired == 0)
 		{
 			return std::nullopt;
 		}
-		std::wstring programFiles(uiRequired, L'\0');
-		DWORD uiWritten = ::GetEnvironmentVariableW(L"ProgramFiles(x86)", programFiles.data(), uiRequired);
-		if (uiWritten == 0 || uiWritten >= uiRequired)
+		std::wstring programFiles(static_cast<size_t>(iRequired), L'\0');
+		int64_t iWritten = ::GetEnvironmentVariableW(L"ProgramFiles(x86)", programFiles.data(), static_cast<DWORD>(iRequired));
+		if (iWritten == 0 || iWritten >= iRequired)
 		{
 			return std::nullopt;
 		}
-		programFiles.resize(uiWritten);
+		programFiles.resize(static_cast<size_t>(iWritten));
 		std::filesystem::path vswherePath = std::filesystem::path(programFiles) / L"Microsoft Visual Studio" / L"Installer" / L"vswhere.exe";
 		if (!std::filesystem::is_regular_file(vswherePath))
 		{
@@ -421,7 +421,7 @@ namespace toolcli
 		while (true)
 		{
 			HANDLE hRawLock = ::CreateFileW(extendedLockPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_HIDDEN, nullptr);
-			DWORD uiError = hRawLock == INVALID_HANDLE_VALUE ? ::GetLastError() : ERROR_SUCCESS;
+			int64_t iError = hRawLock == INVALID_HANDLE_VALUE ? ::GetLastError() : ERROR_SUCCESS;
 			Handle hLock(hRawLock);
 			riWaitedSeconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - waitStart).count();
 			if (hLock.IsValid())
@@ -434,9 +434,9 @@ namespace toolcli
 				rpDisposition = "acquired";
 				return hLock;
 			}
-			if (uiError != ERROR_SHARING_VIOLATION && uiError != ERROR_LOCK_VIOLATION)
+			if (iError != ERROR_SHARING_VIOLATION && iError != ERROR_LOCK_VIOLATION)
 			{
-				FailBuild("acquire build lock failed (Windows error " + std::to_string(uiError) + ")");
+				FailBuild("acquire build lock failed (Windows error " + std::to_string(iError) + ")");
 				return std::nullopt;
 			}
 			std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
@@ -503,7 +503,7 @@ namespace toolcli
 	static std::optional<EvaluatedCompileItems> EvaluateProjectCompileItems(const std::filesystem::path& rMsBuild, const std::filesystem::path& rProject, const std::vector<std::wstring>& rBuildArguments, RetainedLog& rLog)
 	{
 		std::vector<std::wstring> queryArguments = { rMsBuild.native(), rProject.native() };
-		queryArguments.reserve(queryArguments.size() + rBuildArguments.size() + 3);
+		queryArguments.reserve(static_cast<size_t>(std::ssize(queryArguments) + std::ssize(rBuildArguments) + 3));
 		queryArguments.insert(queryArguments.end(), rBuildArguments.begin(), rBuildArguments.end());
 		queryArguments.emplace_back(L"/getProperty:IntDir");
 		queryArguments.emplace_back(L"/getItem:ClCompile");
@@ -626,10 +626,10 @@ namespace toolcli
 			std::filesystem::path extendedObjectPath = ExtendedLengthPath(it->second.object);
 			if (::DeleteFileW(extendedObjectPath.c_str()) == FALSE)
 			{
-				DWORD uiError = ::GetLastError();
-				if (uiError != ERROR_FILE_NOT_FOUND && uiError != ERROR_PATH_NOT_FOUND)
+				int64_t iError = ::GetLastError();
+				if (iError != ERROR_FILE_NOT_FOUND && iError != ERROR_PATH_NOT_FOUND)
 				{
-					FailBuild("delete selected object failed (Windows error " + std::to_string(uiError) + ")");
+					FailBuild("delete selected object failed (Windows error " + std::to_string(iError) + ")");
 					return false;
 				}
 			}
@@ -659,7 +659,7 @@ namespace toolcli
 		return result;
 	}
 
-	static int EmitBuildResult(nlohmann::json& rResult, int iExitCode, int64_t iElapsedMilliseconds)
+	static int64_t EmitBuildResult(nlohmann::json& rResult, int64_t iExitCode, int64_t iElapsedMilliseconds)
 	{
 		rResult["exitCode"] = iExitCode;
 		rResult["elapsedMilliseconds"] = iElapsedMilliseconds;
@@ -688,7 +688,7 @@ namespace toolcli
 		}
 	};
 
-	static int RunBuildExecution(BuildExecutionState& rState)
+	static int64_t RunBuildExecution(BuildExecutionState& rState)
 	{
 		if (!rState.retainedLog.Open(rState.rWorktreeRoot / L"Temp" / L"AgentBuildLogs", rState.rTarget.stem().native()))
 		{
@@ -733,7 +733,7 @@ namespace toolcli
 			arguments.emplace_back(L"/nodeReuse:false");
 		}
 		std::wcerr << L"WorktreeCli: building " << rState.rTarget.native() << L'\n' << std::flush;
-		std::optional<DWORD> msbuildExitCode = RunMsBuildToLog(rState.rMsBuild, arguments, rState.retainedLog, rState.parser);
+		std::optional<int64_t> msbuildExitCode = RunMsBuildToLog(rState.rMsBuild, arguments, rState.retainedLog, rState.parser);
 		rState.FinalizeStreams();
 		if (!msbuildExitCode)
 		{
@@ -757,7 +757,7 @@ namespace toolcli
 		return kiExitOk;
 	}
 
-	static int RunBuildCommandUnguarded(int iArgumentCount, wchar_t* pArgumentValues[])
+	static int64_t RunBuildCommandUnguarded(int64_t iArgumentCount, wchar_t* pArgumentValues[])
 	{
 		std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 		sBuildMessages.clear();
@@ -840,12 +840,12 @@ namespace toolcli
 			.rWorktreeRoot = *worktreeRoot,
 			.rMsBuild = *msbuildPath,
 		};
-		int iExecutionExitCode = RunBuildExecution(state);
+		int64_t iExecutionExitCode = RunBuildExecution(state);
 		return EmitBuildResult(result, iExecutionExitCode, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 	}
 
 	// The fallback result uses the build command's schema.
-	static int EmitFallbackBuildResult(std::string_view message)
+	static int64_t EmitFallbackBuildResult(std::string_view message)
 	{
 		Fail(message);
 		nlohmann::json result = NewBuildResult();
@@ -853,7 +853,7 @@ namespace toolcli
 		return EmitBuildResult(result, kiExitFailure, 0);
 	}
 
-	int RunBuildCommand(int iArgumentCount, wchar_t* pArgumentValues[])
+	int64_t RunBuildCommand(int64_t iArgumentCount, wchar_t* pArgumentValues[])
 	{
 		try
 		{

@@ -69,7 +69,7 @@ Changes (11 files)
    New client-only collection following the Puffs pattern.
    - FlipbookType: uiCrc (texture atlas CRC), uiColumns, uiRows,
      uiFrameCount, fFrameRate, fSize
-   - FlipbookControllerType: uiBaseTypeIndex, uiKeyframeCount,
+   - FlipbookControllerType: iBaseTypeIndex, iKeyframeCount,
      times[], FlipbookKeyframe keyframes[] (fSize, fAlpha, fRotation).
      bDestroysSelf = true
    - FlipbooksInterpolate: Collection<FlipbooksInterpolate> with

@@ -30,7 +30,7 @@ public:
 
 	// Pre-computed at load time, runtime-sized to the header counts (see Load)
 	common::AlignedUniquePtr<XMMATRIX> mpBindPoseLocalMatrices;       // uiNodeCount entries
-	std::vector<uint8_t> mAnimatedNodes;                             // uiAnimationCount * uiNodeCount, row stride uiNodeCount
+	std::vector<int64_t> mAnimatedNodes;                             // uiAnimationCount * uiNodeCount, row stride uiNodeCount
 	common::AlignedUniquePtr<XMMATRIX> mpAlignedInverseBindMatrices;  // uiSkinJointCount entries
 	common::AlignedUniquePtr<XMMATRIX> mpAlignedRelativeTransforms;   // uiMaterialCount entries
 

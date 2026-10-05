@@ -120,10 +120,10 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 	// Edge-fade denominator reciprocal (LightingDepositEdgeFade), deliberately floored unlike smoke/wind's ceil-based
 	// full-coverage dispatch grids. The minimum of one keeps the tile count nonzero if a device clamp produces a
 	// sub-tile texture extent.
-	uint32_t uiLightTilesX = std::max(1ui32, static_cast<uint32_t>(fLightingTextureWidth) / shaders::kiComputeTileSize);
-	uint32_t uiLightTilesY = std::max(1ui32, static_cast<uint32_t>(fLightingTextureHeight) / shaders::kiComputeTileSize);
-	rGlobalLayout.f2LightingDepositSizeInverse.x = 1.0f / static_cast<float>(uiLightTilesX * shaders::kiComputeTileSize);
-	rGlobalLayout.f2LightingDepositSizeInverse.y = 1.0f / static_cast<float>(uiLightTilesY * shaders::kiComputeTileSize);
+	int64_t iLightTilesX = std::max(1i64, static_cast<int64_t>(fLightingTextureWidth) / shaders::kiComputeTileSize);
+	int64_t iLightTilesY = std::max(1i64, static_cast<int64_t>(fLightingTextureHeight) / shaders::kiComputeTileSize);
+	rGlobalLayout.f2LightingDepositSizeInverse.x = 1.0f / static_cast<float>(iLightTilesX * shaders::kiComputeTileSize);
+	rGlobalLayout.f2LightingDepositSizeInverse.y = 1.0f / static_cast<float>(iLightTilesY * shaders::kiComputeTileSize);
 }
 
 void RenderLightingGlobal(int64_t iCommandBuffer)

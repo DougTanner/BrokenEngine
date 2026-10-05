@@ -26,8 +26,8 @@ static void CopyTruncate(std::span<char> destination, const char* pcSource)
 // Length of the display portion of an ImGui label — everything before the "##" id separator (or the whole string).
 static int64_t DisplayLength(std::string_view label)
 {
-	size_t uiSeparator = label.find("##");
-	return static_cast<int64_t>(uiSeparator == std::string_view::npos ? label.size() : uiSeparator);
+	int64_t iSeparator = static_cast<int64_t>(label.find("##"));
+	return iSeparator == static_cast<int64_t>(std::string_view::npos) ? static_cast<int64_t>(label.size()) : iSeparator;
 }
 
 static constexpr char LowerAscii(char cChar)
@@ -110,7 +110,7 @@ void AgentUiRegistry::HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Recta
 	AgentUiItem& rItem = mItems[miWrite][riCount];
 	rItem.uiIdentifier = uiIdentifier;
 	rItem.f4Rectangle = rf4Rectangle;
-	rItem.iStatusFlags = bVisible ? static_cast<int32_t>(ImGuiItemStatusFlags_Visible) : 0;
+	rItem.iStatusFlags = bVisible ? static_cast<int64_t>(ImGuiItemStatusFlags_Visible) : 0;
 	rItem.bDisabled = bDisabled;
 	rItem.pcLabel[0] = '\0';
 	rItem.pcValue[0] = '\0';
@@ -123,7 +123,7 @@ void AgentUiRegistry::HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Recta
 	++riCount;
 }
 
-void AgentUiRegistry::HookItemInfo(ImGuiID uiIdentifier, const char* pcLabel, int32_t iStatusFlags)
+void AgentUiRegistry::HookItemInfo(ImGuiID uiIdentifier, const char* pcLabel, int64_t iStatusFlags)
 {
 	// Search newest records first; tabs can emit ItemInfo before their ItemAdd.
 	int64_t iCount = miItemCount[miWrite];
@@ -182,14 +182,14 @@ void AgentUiRegistry::RecordItemChecked(ImGuiID uiIdentifier, bool bChecked)
 		AgentUiItem& rItem = mItems[miWrite][i];
 		if (rItem.uiIdentifier == uiIdentifier)
 		{
-			rItem.iStatusFlags |= static_cast<int32_t>(ImGuiItemStatusFlags_Checkable);
+			rItem.iStatusFlags |= static_cast<int64_t>(ImGuiItemStatusFlags_Checkable);
 			if (bChecked)
 			{
-				rItem.iStatusFlags |= static_cast<int32_t>(ImGuiItemStatusFlags_Checked);
+				rItem.iStatusFlags |= static_cast<int64_t>(ImGuiItemStatusFlags_Checked);
 			}
 			else
 			{
-				rItem.iStatusFlags &= ~static_cast<int32_t>(ImGuiItemStatusFlags_Checked);
+				rItem.iStatusFlags &= ~static_cast<int64_t>(ImGuiItemStatusFlags_Checked);
 			}
 			return;
 		}
@@ -322,7 +322,7 @@ void ImGuiTestEngineHook_ItemInfo(ImGuiContext* pContext, ImGuiID uiIdentifier, 
 	{
 		return;
 	}
-	engine::gpAgentUiRegistry->HookItemInfo(uiIdentifier, pcLabel, static_cast<int32_t>(iStatusFlags));
+	engine::gpAgentUiRegistry->HookItemInfo(uiIdentifier, pcLabel, static_cast<int64_t>(iStatusFlags));
 }
 
 void ImGuiTestEngineHook_Log([[maybe_unused]] ImGuiContext* pContext, [[maybe_unused]] const char* pcFormat, ...)

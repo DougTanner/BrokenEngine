@@ -29,15 +29,15 @@ $script:MaximumOutputBytes = 131072
 $script:InventoryScript = Join-Path $PSScriptRoot 'Get-SessionChangeInventory.ps1'
 $script:CppClasses = @('cpp', 'dual-language-header')
 # One entry per candidate kind: the residue kinds .agents/skills/code-style-review/references/worker.md
-# step 17 removes, and one style-rule-<n> kind per rule of Documents/C++StyleGuide.txt that its step 10
+# step 16 removes, and one style-rule-<n> kind per rule of Documents/C++StyleGuide.txt that its step 9
 # adjudicates. The order is the order a line is attributed: a line reports the first kind that matches
 # it. An entry's Except clears a match that is one of the rule's permitted forms. The style-rule-61,
 # style-rule-22, style-rule-59, style-rule-62 and style-rule-51 kinds are not in this table: each needs another
 # head-side line too, so Test-Rule61Line, Test-Rule22Line and Test-Rule59Line decide theirs, in that order,
 # before the table, and Test-Rule62Line then Test-Rule51Line decide theirs after the table, so they hide no
-# table kind; style-rule-14 is the table's last entry for the same reason. That worker's step 7 hand-read
+# table kind; style-rule-14 is the table's last entry for the same reason. That worker's step 6 hand-read
 # list and these style-rule-<n> kinds together make the review's style mandate, and a rule is on both when
-# each covers a different form, so update step 7 when a kind changes.
+# each covers a different form, so update step 6 when a kind changes.
 $script:ScalarType = '(?:(?:unsigned|signed)\s+)?(?:bool|char|wchar_t|short|int|long(?:\s+long)?|float|double)|unsigned|u?int(?:8|16|32|64)_t|size_t|u?intptr_t|ptrdiff_t'
 $script:IntegerType = '(?:(?:unsigned|signed)\s+)?(?:short|int|long(?:\s+long)?)|unsigned|u?int(?:8|16|32|64)_t|size_t|ptrdiff_t'
 # The prose-prone kinds share style-rule-2's comment-and-string alternative, so a line holding a comment

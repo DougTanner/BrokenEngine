@@ -24,14 +24,14 @@ void Workbuffer::Append(std::wstring_view text)
 		return;
 	}
 
-	int iSize = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
+	int64_t iSize = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
 	int64_t iNeeded = miSize + iSize;
 	if (iNeeded > mBuffer.Size()) [[unlikely]]
 	{
 		Grow(iNeeded);
 	}
 
-	WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), reinterpret_cast<char*>(mBuffer.Data()) + miSize, iSize, nullptr, nullptr);
+	WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), reinterpret_cast<char*>(mBuffer.Data()) + miSize, static_cast<int>(iSize), nullptr, nullptr);
 	miSize += iSize;
 }
 
@@ -52,18 +52,18 @@ void Workbuffer::Append(int64_t iValue)
 	miSize = result.ptr - reinterpret_cast<char*>(mBuffer.Data());
 }
 
-void Workbuffer::AppendFloat(float fValue, int iPrecision)
+void Workbuffer::AppendFloat(float fValue, int64_t iPrecision)
 {
 	ASSERT(miDepth > 0);
 	char* pStart = reinterpret_cast<char*>(mBuffer.Data()) + miSize;
 	char* pEnd = reinterpret_cast<char*>(mBuffer.Data()) + mBuffer.Size();
-	std::to_chars_result result = std::to_chars(pStart, pEnd, fValue, std::chars_format::fixed, iPrecision);
+	std::to_chars_result result = std::to_chars(pStart, pEnd, fValue, std::chars_format::fixed, static_cast<int>(iPrecision));
 	if (result.ec == std::errc::value_too_large) [[unlikely]]
 	{
 		Grow(miSize + 64);
 		pStart = reinterpret_cast<char*>(mBuffer.Data()) + miSize;
 		pEnd = reinterpret_cast<char*>(mBuffer.Data()) + mBuffer.Size();
-		result = std::to_chars(pStart, pEnd, fValue, std::chars_format::fixed, iPrecision);
+		result = std::to_chars(pStart, pEnd, fValue, std::chars_format::fixed, static_cast<int>(iPrecision));
 	}
 
 	miSize = result.ptr - reinterpret_cast<char*>(mBuffer.Data());

@@ -498,7 +498,7 @@ ServerFleetManager::FleetLookupResult ServerFleetManager::LookupFleetWantedCoord
 
 	FleetLookupFlags_t flags {FleetLookupFlags::kFound};
 	flags.Set(FleetLookupFlags::kIsFlagship, bIsFlagship);
-	return {.flags = flags, .fleetWantedCoord = rFleet.wantedCoordinate, .uiPendingFleetWantedCoordTicks = rFleet.uiPendingFleetWantedCoordinateTicks};
+	return {.flags = flags, .fleetWantedCoord = rFleet.wantedCoordinate, .iPendingFleetWantedCoordTicks = rFleet.uiPendingFleetWantedCoordinateTicks};
 }
 
 void ServerFleetManager::DetectDisconnectedPlayerDeaths()

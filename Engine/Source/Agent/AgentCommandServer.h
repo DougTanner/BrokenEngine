@@ -34,7 +34,7 @@ public:
 	// response and instead polls `Poll` at the top of every later Drain(); the first non-empty result is published
 	// as {"id",ok:true,"result"} echoing the deferred request's id, and a poll exception as the failure envelope.
 	// Only one request is ever in flight, so there is a single deferred slot. Main-thread only.
-	void DeferResponse(std::function<std::optional<nlohmann::json>()> Poll);
+	void DeferResponse(std::move_only_function<std::optional<nlohmann::json>()> Poll);
 
 	// Deferred-poll liveness bound (~30 s at 60 fps): a capture lost to a device-loss Graphics recreation (mailboxes
 	// wiped) never resolves, so cap the wait and publish a failure rather than deadlock the channel forever.
@@ -54,7 +54,7 @@ private:
 	struct PendingRequest
 	{
 		nlohmann::json request;
-		uint64_t uiGeneration = 0;
+		int64_t iGeneration = 0;
 		bool bParsed = false;
 	};
 
@@ -69,7 +69,7 @@ private:
 	static bool SendExact(SOCKET uiClientSocket, std::span<const uint8_t> buffer, const std::chrono::steady_clock::time_point& rDeadline);
 	static bool SendFrame(SOCKET uiClientSocket, std::string_view payload);
 
-	static constexpr uint32_t kuiMaximumRequestBytes = 1ui32 * 1'024ui32 * 1'024ui32; // 1 MiB — larger request frames are rejected
+	static constexpr int64_t kiMaximumRequestBytes = 1i64 * 1'024i64 * 1'024i64; // 1 MiB — larger request frames are rejected
 	static constexpr int64_t kiMaximumResponseBytes = 16i64 * 1'024i64 * 1'024i64; // 16 MiB response cap
 
 	SOCKET muiListenSocket = INVALID_SOCKET;
@@ -79,13 +79,13 @@ private:
 	std::condition_variable mResponseReady;
 	std::optional<PendingRequest> mPendingRequest; // listener -> main
 	std::optional<std::string> mPendingResponse; // main -> listener
-	uint64_t muiConnectionGeneration = 0; // mMutex-guarded; bumped on each connection teardown
+	int64_t miConnectionGeneration = 0; // mMutex-guarded; bumped on each connection teardown
 
 	// Deferred-response state — touched only on the main thread (Drain and the handlers it calls), so no lock.
-	std::function<std::optional<nlohmann::json>()> mDeferredPoll; // set = a response is deferred, polled each Drain
+	std::move_only_function<std::optional<nlohmann::json>()> mDeferredPoll; // set = a response is deferred, polled each Drain
 	nlohmann::json mDeferredIdentifier; // id echoed when the deferred poll completes
 	bool mbResponseDeferred = false; // set by DeferResponse within the current Drain dispatch
-	uint64_t muiDeferredGeneration = 0; // handoff generation of the request Drain last took; its response publishes only while it is live
+	int64_t miDeferredGeneration = 0; // handoff generation of the request Drain last took; its response publishes only while it is live
 	int64_t miDeferredDrainCount = 0; // Drains elapsed since the deferral (liveness timeout)
 
 	std::jthread mListenerThread; // last member: its body reads every other member via `this`

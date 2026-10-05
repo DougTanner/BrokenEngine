@@ -50,7 +50,7 @@ void Alignments::CopyFrom(const Alignments& rOther)
 {
 	if (std::ssize(alignmentPairs) == std::ssize(rOther.alignmentPairs))
 	{
-		std::memcpy(alignmentPairs.data(), rOther.alignmentPairs.data(), alignmentPairs.size() * sizeof(AlignmentPair));
+		std::memcpy(alignmentPairs.data(), rOther.alignmentPairs.data(), static_cast<size_t>(std::ssize(alignmentPairs)) * sizeof(AlignmentPair));
 	}
 	else
 	{

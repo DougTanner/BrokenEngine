@@ -10,8 +10,8 @@ static const std::filesystem::path& GetVulkanSdkBinariesDirectory()
 	static const std::filesystem::path sPath = []()
 	{
 		wchar_t pcDirectory[MAX_PATH] {};
-		DWORD uiResult = GetEnvironmentVariableW(L"VK_SDK_PATH", pcDirectory, static_cast<DWORD>(std::size(pcDirectory) - 1));
-		if (uiResult == 0)
+		int64_t iResult = GetEnvironmentVariableW(L"VK_SDK_PATH", pcDirectory, static_cast<DWORD>(std::size(pcDirectory) - 1));
+		if (iResult == 0)
 		{
 			throw std::runtime_error("VK_SDK_PATH environment variable not found");
 		}
@@ -41,7 +41,7 @@ struct BindingTable
 	common::ChunkFlags_t chunkFlags;
 };
 
-static void WriteBinding(BindingTable& rTable, int64_t iBinding, uint32_t uiSet, VkDescriptorType vkDescriptorType, int64_t iDescriptorCount)
+static void WriteBinding(BindingTable& rTable, int64_t iBinding, int64_t iSet, VkDescriptorType vkDescriptorType, int64_t iDescriptorCount)
 {
 	ASSERT(iBinding < common::ShaderHeader::kiMaxDescriptorSetLayoutBindings);
 	// Table is indexed by binding number alone — a second write means two sets reuse one binding number, which would silently overwrite the first entry
@@ -52,7 +52,7 @@ static void WriteBinding(BindingTable& rTable, int64_t iBinding, uint32_t uiSet,
 	rVkDescriptorSetLayoutBinding.descriptorCount = static_cast<uint32_t>(iDescriptorCount);
 	rVkDescriptorSetLayoutBinding.stageFlags = rTable.chunkFlags & common::ChunkFlags::kCompute ? VK_SHADER_STAGE_COMPUTE_BIT : (rTable.chunkFlags & common::ChunkFlags::kFragment ? VK_SHADER_STAGE_FRAGMENT_BIT : VK_SHADER_STAGE_VERTEX_BIT);
 	rVkDescriptorSetLayoutBinding.pImmutableSamplers = nullptr;
-	rTable.puiSetIndices[iBinding] = uiSet;
+	rTable.puiSetIndices[iBinding] = static_cast<uint32_t>(iSet);
 }
 
 // Enumerates one SPIRV-Cross resource category, writing a descriptor binding per resource.
@@ -69,8 +69,8 @@ static void CollectBindings(const spirv_cross::SmallVector<spirv_cross::Resource
 	for (const spirv_cross::Resource& rResource : rResources)
 	{
 		int64_t iBinding = rCompiler.get_decoration(rResource.id, spv::DecorationBinding);
-		uint32_t uiSet = rCompiler.get_decoration(rResource.id, spv::DecorationDescriptorSet);
-		LOG(kDefault, kVerbose,"   {} {} {} set {} bound at {}", static_cast<uint32_t>(rResource.type_id), static_cast<uint32_t>(rResource.base_type_id), rResource.name, uiSet, iBinding);
+		int64_t iSet = rCompiler.get_decoration(rResource.id, spv::DecorationDescriptorSet);
+		LOG(kDefault, kVerbose,"   {} {} {} set {} bound at {}", static_cast<uint32_t>(rResource.type_id), static_cast<uint32_t>(rResource.base_type_id), rResource.name, iSet, iBinding);
 
 		const spirv_cross::SPIRType& rSpirvType = rCompiler.get_type(rResource.type_id);
 		if (!rSpirvType.array.empty())
@@ -78,7 +78,7 @@ static void CollectBindings(const spirv_cross::SmallVector<spirv_cross::Resource
 			LOG(kDefault, kVerbose,"   Array size: {}", rSpirvType.array[0]);
 		}
 
-		WriteBinding(rTable, iBinding, uiSet, vkDescriptorType, countFn(rSpirvType));
+		WriteBinding(rTable, iBinding, iSet, vkDescriptorType, countFn(rSpirvType));
 		rTable.riBindingCount = std::max(iBinding + 1, rTable.riBindingCount);
 	}
 }
@@ -242,7 +242,7 @@ std::filesystem::path ExportShader::OptimizeShader(const std::filesystem::path& 
 void ExportShader::ReflectAndWriteShader(const std::filesystem::path& rSpirvFile)
 {
 	std::vector<std::byte> spirvData = common::ReadEntireFile(rSpirvFile);
-	int64_t iSpirvFileBytes = static_cast<int64_t>(spirvData.size());
+	int64_t iSpirvFileBytes = std::ssize(spirvData);
 
 	VkDescriptorSetLayoutBinding pVkDescriptorSetLayoutBindings[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
 	uint32_t puiSetIndices[common::ShaderHeader::kiMaxDescriptorSetLayoutBindings] {};
@@ -285,7 +285,7 @@ void ExportShader::ReflectAndWriteShader(const std::filesystem::path& rSpirvFile
 	}
 	LOG(kDefault, kVerbose, "   Descriptions: {} Input stride: {}", iAttributeCount, iVertexInputStride);
 
-	if (shaderResources.stage_outputs.size() > 0)
+	if (std::ssize(shaderResources.stage_outputs) > 0)
 	{
 		LOG(kDefault, kVerbose,"Stage outputs:");
 		for (const spirv_cross::Resource& rResource : shaderResources.stage_outputs)
@@ -322,7 +322,7 @@ void ExportShader::ReflectAndWriteShader(const std::filesystem::path& rSpirvFile
 
 	std::memcpy(dataSpan.data() + common::ShaderHeader::SpirvOffset(iBindingCount, iAttributeCount), spirvData.data(), iSpirvFileBytes);
 
-	ASSERT(*reinterpret_cast<uint32_t*>(dataSpan.data() + common::ShaderHeader::SpirvOffset(iBindingCount, iAttributeCount)) == common::ShaderHeader::kuiSpirvMagic);
+	ASSERT(*reinterpret_cast<uint32_t*>(dataSpan.data() + common::ShaderHeader::SpirvOffset(iBindingCount, iAttributeCount)) == common::ShaderHeader::kiSpirvMagic);
 }
 
 void ExportShader::CleanupOnFailure()
@@ -336,7 +336,7 @@ void ExportShader::CleanupOnFailure()
 
 constexpr int64_t kiDependencyMetadataMagic = 0x53484445504D5431;
 constexpr int64_t kiDependencyMetadataVersion = 2;
-constexpr size_t kuiFingerprintCharacters = 64;
+constexpr int64_t kiFingerprintCharacters = 64;
 
 struct CachedDependencyFingerprint
 {
@@ -411,7 +411,7 @@ static std::optional<std::vector<CachedDependencyFingerprint>> ReadDependencyMet
 			return std::nullopt;
 		}
 		std::string relativePath(static_cast<size_t>(iPathCharacters), '\0');
-		std::string fingerprint(kuiFingerprintCharacters, '\0');
+		std::string fingerprint(static_cast<size_t>(kiFingerprintCharacters), '\0');
 		stream.read(relativePath.data(), relativePath.size());
 		stream.read(fingerprint.data(), fingerprint.size());
 		if (!stream)
@@ -453,12 +453,12 @@ static std::string ReadAndValidateDependencyFile(const std::filesystem::path& rD
 
 	// shaderc emits the target separator literally as ": ". A Windows drive colon is followed by a
 	// slash, so searching for the full separator avoids cutting the target at "C:".
-	size_t uiTargetSeparator = content.find(": ");
-	if (uiTargetSeparator == std::string::npos)
+	int64_t iTargetSeparator = static_cast<int64_t>(content.find(": "));
+	if (iTargetSeparator == static_cast<int64_t>(std::string::npos))
 	{
 		throw std::runtime_error(std::format("Shader dependency file \"{}\" has no ': ' target separator", rDependencyFilePath.string()));
 	}
-	content.erase(0, uiTargetSeparator + 2);
+	content.erase(0, static_cast<size_t>(iTargetSeparator + 2));
 	while (!content.empty() && (content.back() == '\r' || content.back() == '\n'))
 	{
 		content.pop_back();
@@ -498,13 +498,13 @@ static std::vector<std::string> BuildDependencyRootPrefixes()
 	return rootPrefixes;
 }
 
-static const std::string* FindMatchingDependencyRoot(const std::vector<std::string>& rRootPrefixes, std::string_view lowerContent, size_t uiOffset)
+static const std::string* FindMatchingDependencyRoot(const std::vector<std::string>& rRootPrefixes, std::string_view lowerContent, int64_t iOffset)
 {
 	for (const std::string& rRootPrefix : rRootPrefixes)
 	{
 		std::string lowerPrefix = common::ToLower(rRootPrefix);
-		if (uiOffset + lowerPrefix.size() <= lowerContent.size() && lowerContent.compare(uiOffset, lowerPrefix.size(), lowerPrefix) == 0
-		 && (uiOffset + lowerPrefix.size() == lowerContent.size() || lowerContent[uiOffset + lowerPrefix.size()] == '\\' || lowerContent[uiOffset + lowerPrefix.size()] == '/'))
+		if (iOffset + std::ssize(lowerPrefix) <= std::ssize(lowerContent) && lowerContent.compare(static_cast<size_t>(iOffset), lowerPrefix.size(), lowerPrefix) == 0
+		 && (iOffset + std::ssize(lowerPrefix) == std::ssize(lowerContent) || lowerContent[static_cast<size_t>(iOffset + std::ssize(lowerPrefix))] == '\\' || lowerContent[static_cast<size_t>(iOffset + std::ssize(lowerPrefix))] == '/'))
 		{
 			return &rRootPrefix;
 		}
@@ -515,31 +515,31 @@ static const std::string* FindMatchingDependencyRoot(const std::vector<std::stri
 static std::vector<std::filesystem::path> ParseRootDelimitedDependencies(const std::filesystem::path& rDependencyFilePath, std::string_view content, const std::vector<std::string>& rRootPrefixes, std::string_view lowerContent)
 {
 	std::vector<std::filesystem::path> dependencies;
-	size_t uiDependencyStart = 0;
-	while (uiDependencyStart < content.size())
+	int64_t iDependencyStart = 0;
+	while (iDependencyStart < std::ssize(content))
 	{
-		if (FindMatchingDependencyRoot(rRootPrefixes, lowerContent, uiDependencyStart) == nullptr)
+		if (FindMatchingDependencyRoot(rRootPrefixes, lowerContent, iDependencyStart) == nullptr)
 		{
-			throw std::runtime_error(std::format("Shader dependency file \"{}\" contains an ambiguous or outside-root entry near \"{}\"", rDependencyFilePath.string(), content.substr(uiDependencyStart)));
+			throw std::runtime_error(std::format("Shader dependency file \"{}\" contains an ambiguous or outside-root entry near \"{}\"", rDependencyFilePath.string(), content.substr(static_cast<size_t>(iDependencyStart))));
 		}
 
-		size_t uiDependencyEnd = content.size();
-		for (size_t uiSpace = content.find(' ', uiDependencyStart); uiSpace != std::string_view::npos; uiSpace = content.find(' ', uiSpace + 1))
+		int64_t iDependencyEnd = std::ssize(content);
+		for (int64_t iSpace = static_cast<int64_t>(content.find(' ', static_cast<size_t>(iDependencyStart))); iSpace != static_cast<int64_t>(std::string_view::npos); iSpace = static_cast<int64_t>(content.find(' ', static_cast<size_t>(iSpace + 1))))
 		{
-			if (FindMatchingDependencyRoot(rRootPrefixes, lowerContent, uiSpace + 1) != nullptr)
+			if (FindMatchingDependencyRoot(rRootPrefixes, lowerContent, iSpace + 1) != nullptr)
 			{
-				uiDependencyEnd = uiSpace;
+				iDependencyEnd = iSpace;
 				break;
 			}
 		}
 
-		std::filesystem::path dependency(content.substr(uiDependencyStart, uiDependencyEnd - uiDependencyStart));
+		std::filesystem::path dependency(content.substr(static_cast<size_t>(iDependencyStart), static_cast<size_t>(iDependencyEnd - iDependencyStart)));
 		if (!IsDependencyInInputRoot(dependency))
 		{
 			throw std::runtime_error(std::format("Shader dependency \"{}\" is ambiguous, missing, or outside DataPacker input roots", dependency.string()));
 		}
 		dependencies.push_back(std::move(dependency));
-		uiDependencyStart = uiDependencyEnd == content.size() ? content.size() : uiDependencyEnd + 1;
+		iDependencyStart = iDependencyEnd == std::ssize(content) ? std::ssize(content) : iDependencyEnd + 1;
 	}
 	return dependencies;
 }
@@ -548,7 +548,7 @@ static std::vector<std::filesystem::path> ParseWhitespaceDependencies(const std:
 {
 	// Each whitespace token must independently resolve to an existing dependency under an input root; invalid tokens throw.
 	std::vector<std::filesystem::path> dependencies;
-	std::istringstream stream((std::string(content)));
+	std::ispanstream stream(content);
 	std::string token;
 	while (stream >> token)
 	{
@@ -659,7 +659,7 @@ void ExportShader::UpdateCacheMetadata()
 	std::filesystem::path temporaryPath = mDependencyMetadataFile;
 	temporaryPath += ".tmp";
 	std::fstream stream(temporaryPath, std::ios::out | std::ios::binary);
-	int64_t iCount = static_cast<int64_t>(mDependencyFingerprints.size());
+	int64_t iCount = std::ssize(mDependencyFingerprints);
 	stream.write(reinterpret_cast<const char*>(&kiDependencyMetadataMagic), sizeof(kiDependencyMetadataMagic));
 	stream.write(reinterpret_cast<const char*>(&kiDependencyMetadataVersion), sizeof(kiDependencyMetadataVersion));
 	stream.write(reinterpret_cast<const char*>(&iCount), sizeof(iCount));

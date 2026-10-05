@@ -11,7 +11,7 @@ void ExecuteAgentCommand(std::string_view command, const nlohmann::json& rParame
 #if defined(BT_CLIENT)
 // One agent-supplied grid coordinate value, named by command in the failure message. Accepts the full
 // signed-int32 identity domain and throws for an integer outside it or a non-integer.
-int32_t ClientGridCoordinateValue(const nlohmann::json& rValue, std::string_view command);
+int64_t ClientGridCoordinateValue(const nlohmann::json& rValue, std::string_view command);
 
 // Defined in AgentCommandsClient.cpp, which is compiled only into the client; returns true when handled.
 // Handler exceptions propagate to engine::AgentCommandServer::Drain().

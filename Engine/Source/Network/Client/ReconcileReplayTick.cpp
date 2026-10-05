@@ -52,25 +52,25 @@ static void LogTransferSummary(const CoordWork& rWork, int64_t iTick, int64_t iT
 	if (iTransferPlayerCount > 0)
 	{
 		char acPlayerIds[192] {};
-		size_t uiPosition = 0;
+		int64_t iPosition = 0;
 		for (int64_t i = 0; i < std::ssize(transferPlayerIds); ++i)
 		{
-			static constexpr size_t kuiReserve = 24;
-			if (uiPosition + kuiReserve > sizeof(acPlayerIds))
+			static constexpr int64_t kiReserve = 24;
+			if (iPosition + kiReserve > std::ssize(acPlayerIds))
 			{
 				break;
 			}
 			if (i > 0)
 			{
-				acPlayerIds[uiPosition++] = ',';
-				acPlayerIds[uiPosition++] = ' ';
+				acPlayerIds[iPosition++] = ',';
+				acPlayerIds[iPosition++] = ' ';
 			}
-			int iWritten = std::snprintf(acPlayerIds + uiPosition, sizeof(acPlayerIds) - uiPosition, "%lld", transferPlayerIds[i].iValue);
+			int64_t iWritten = std::snprintf(acPlayerIds + iPosition, static_cast<size_t>(std::ssize(acPlayerIds) - iPosition), "%lld", transferPlayerIds[i].iValue);
 			if (iWritten <= 0)
 			{
 				break;
 			}
-			uiPosition += static_cast<size_t>(iWritten);
+			iPosition += iWritten;
 		}
 		LOG(kNetwork, kVerbose, "ReconcileRunTickCoord SpawnTransfers Coord: ({},{}) ForTick: {} TransferCount: {} PlayerCount: {} BlasterCount: {} SpaceshipCount: {} MissileCount: {} PlayerIds: [{}]", rWork.coord.iX, rWork.coord.iY, iTick, iTransferTotal, iTransferPlayerCount, iTransferBlasterCount, iTransferSpaceshipCount, iTransferMissileCount, acPlayerIds);
 	}

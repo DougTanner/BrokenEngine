@@ -1,13 +1,13 @@
 #include "SceneSkeletonLoader.h"
 
-std::unordered_map<int, int> BuildNodeParentMap(const tinygltf::Model& rModel)
+std::unordered_map<int64_t, int64_t> BuildNodeParentMap(const tinygltf::Model& rModel)
 {
-	std::unordered_map<int, int> parentMap;
+	std::unordered_map<int64_t, int64_t> parentMap;
 	for (int64_t i = 0; i < std::ssize(rModel.nodes); ++i)
 	{
-		for (int iChildIndex : rModel.nodes.at(i).children)
+		for (int64_t iChildIndex : rModel.nodes.at(i).children)
 		{
-			parentMap.insert_or_assign(iChildIndex, static_cast<int>(i));
+			parentMap.insert_or_assign(iChildIndex, i);
 		}
 	}
 	return parentMap;
@@ -15,7 +15,7 @@ std::unordered_map<int, int> BuildNodeParentMap(const tinygltf::Model& rModel)
 
 void CanonicalizeSceneSkin(tinygltf::Model& rModel)
 {
-	std::unordered_set<int> referencedSkins;
+	std::unordered_set<int64_t> referencedSkins;
 	for (const tinygltf::Node& rNode : rModel.nodes)
 	{
 		if (rNode.skin < 0)
@@ -42,13 +42,13 @@ void CanonicalizeSceneSkin(tinygltf::Model& rModel)
 		return;
 	}
 
-	int iReferencedSkin = *referencedSkins.begin();
+	int64_t iReferencedSkin = *referencedSkins.begin();
 	if (iReferencedSkin == 0)
 	{
 		return;
 	}
 
-	std::swap(rModel.skins.at(0), rModel.skins.at(iReferencedSkin));
+	std::swap(rModel.skins.at(0), rModel.skins.at(static_cast<size_t>(iReferencedSkin)));
 	for (tinygltf::Node& rNode : rModel.nodes)
 	{
 		// No other node references a skin, so nothing maps onto the displaced slot
@@ -63,20 +63,20 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 {
 	LOG(kDefault, kDebug, "LoadSkeletonData: Loading all nodes...");
 
-	std::unordered_map<int, int> parentMap = BuildNodeParentMap(rModel);
+	std::unordered_map<int64_t, int64_t> parentMap = BuildNodeParentMap(rModel);
 
 	SkeletonData skeletonData;
-	skeletonData.skeleton.uiNodeCount = static_cast<uint16_t>(rModel.nodes.size());
+	skeletonData.skeleton.uiNodeCount = static_cast<uint16_t>(std::ssize(rModel.nodes));
 	ASSERT(std::ssize(rModel.nodes) <= std::numeric_limits<int16_t>::max());
 
 	// CanonicalizeSceneSkin runs before export so any node-referenced skin occupies slot 0.
 	if (!rModel.skins.empty())
 	{
 		const tinygltf::Skin& rSkin = rModel.skins.at(0);
-		skeletonData.skeleton.uiSkinJointCount = static_cast<uint16_t>(rSkin.joints.size());
+		skeletonData.skeleton.uiSkinJointCount = static_cast<uint16_t>(std::ssize(rSkin.joints));
 		ASSERT(std::ssize(rSkin.joints) <= skeletonData.skeleton.uiNodeCount);
 
-		skeletonData.skinJointToNode.resize(rSkin.joints.size());
+		skeletonData.skinJointToNode.resize(static_cast<size_t>(std::ssize(rSkin.joints)));
 		for (int64_t i = 0; i < std::ssize(rSkin.joints); ++i)
 		{
 			skeletonData.skinJointToNode.at(i) = static_cast<uint16_t>(rSkin.joints.at(i));
@@ -182,7 +182,7 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 			}
 		}
 
-		skeletonData.inverseBindMatrices.resize(rSkin.joints.size());
+		skeletonData.inverseBindMatrices.resize(static_cast<size_t>(std::ssize(rSkin.joints)));
 		for (int64_t i = 0; i < std::ssize(rSkin.joints); ++i)
 		{
 			if (pfInverseBindMatrices != nullptr)
@@ -206,19 +206,19 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 
 	LOG(kDefault, kDebug, "  Total nodes: {}", skeletonData.skeleton.uiNodeCount);
 
-	skeletonData.nodes.resize(rModel.nodes.size());
+	skeletonData.nodes.resize(static_cast<size_t>(std::ssize(rModel.nodes)));
 	for (int64_t i = 0; i < std::ssize(rModel.nodes); ++i)
 	{
 		common::ModelNode& rNode = skeletonData.nodes.at(i);
 		const tinygltf::Node& rGltfNode = rModel.nodes.at(i);
 
 		rNode.iParentIndex = -1;
-		auto parentIt = parentMap.find(static_cast<int>(i));
+		auto parentIt = parentMap.find(i);
 		if (parentIt != parentMap.end())
 		{
 			// Nodes ship in source order and the runtime builds world matrices in one forward pass, so a parent
 			// that follows its child would only be caught at load (AnimationData::Load, std::ios_base::failure).
-			if (parentIt->second >= static_cast<int>(i))
+			if (parentIt->second >= i)
 			{
 				throw std::runtime_error(std::format("ExportScene node {} has parent node {}, which does not precede it; glTF nodes must be ordered parent-before-child", i, parentIt->second));
 			}

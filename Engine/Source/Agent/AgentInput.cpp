@@ -10,7 +10,7 @@
 namespace engine
 {
 
-constexpr int32_t kiWheelDelta = 120; // Win32 WHEEL_DELTA — one notch of the DirectXTK lifetime scroll accumulator
+constexpr int64_t kiWheelDelta = 120; // Win32 WHEEL_DELTA — one notch of the DirectXTK lifetime scroll accumulator
 constexpr int64_t kiMaximumWheelNotches = INT32_MAX / kiWheelDelta;
 
 // Rect stability threshold: max per-corner pixel delta below which two consecutive frames count as settled.
@@ -74,7 +74,7 @@ bool AgentInput::WheelNotchesFit(int64_t iNotches) const
 	{
 		return false;
 	}
-	int64_t iSum = static_cast<int64_t>(miSyntheticScrollAccumulator) + iNotches * kiWheelDelta;
+	int64_t iSum = miSyntheticScrollAccumulator + iNotches * kiWheelDelta;
 	return iSum >= std::numeric_limits<int>::min() && iSum <= std::numeric_limits<int>::max();
 }
 
@@ -210,7 +210,7 @@ void AgentInput::AdvanceFrame()
 			{
 				if (pInputOutput != nullptr)
 				{
-					pInputOutput->AddMouseButtonEvent(mScript.iImGuiMouseButton, true);
+					pInputOutput->AddMouseButtonEvent(static_cast<int>(mScript.iImGuiMouseButton), true);
 				}
 				miPhase = 2;
 				return;
@@ -219,7 +219,7 @@ void AgentInput::AdvanceFrame()
 			{
 				if (pInputOutput != nullptr)
 				{
-					pInputOutput->AddMouseButtonEvent(mScript.iImGuiMouseButton, false);
+					pInputOutput->AddMouseButtonEvent(static_cast<int>(mScript.iImGuiMouseButton), false);
 				}
 				miPhase = 3;
 				miPhaseFrame = 0;
@@ -405,7 +405,7 @@ void AgentInput::AdvanceFrame()
 						muiSyntheticMouseButtons |= mScript.uiOverlayMouseButtonBit;
 						if (pInputOutput != nullptr)
 						{
-							pInputOutput->AddMouseButtonEvent(mScript.iImGuiMouseButton, true);
+							pInputOutput->AddMouseButtonEvent(static_cast<int>(mScript.iImGuiMouseButton), true);
 						}
 						miPhase = 1;
 					}
@@ -422,7 +422,7 @@ void AgentInput::AdvanceFrame()
 						muiSyntheticMouseButtons &= ~mScript.uiOverlayMouseButtonBit;
 						if (pInputOutput != nullptr)
 						{
-							pInputOutput->AddMouseButtonEvent(mScript.iImGuiMouseButton, false);
+							pInputOutput->AddMouseButtonEvent(static_cast<int>(mScript.iImGuiMouseButton), false);
 						}
 						miPhase = 1;
 					}
@@ -439,7 +439,7 @@ void AgentInput::AdvanceFrame()
 						muiSyntheticMouseButtons |= mScript.uiOverlayMouseButtonBit;
 						if (pInputOutput != nullptr)
 						{
-							pInputOutput->AddMouseButtonEvent(mScript.iImGuiMouseButton, true);
+							pInputOutput->AddMouseButtonEvent(static_cast<int>(mScript.iImGuiMouseButton), true);
 						}
 						miPhase = 1;
 						miPhaseFrame = 0;
@@ -450,7 +450,7 @@ void AgentInput::AdvanceFrame()
 						muiSyntheticMouseButtons &= ~mScript.uiOverlayMouseButtonBit;
 						if (pInputOutput != nullptr)
 						{
-							pInputOutput->AddMouseButtonEvent(mScript.iImGuiMouseButton, false);
+							pInputOutput->AddMouseButtonEvent(static_cast<int>(mScript.iImGuiMouseButton), false);
 						}
 						miPhase = 2;
 						miPhaseFrame = 0;

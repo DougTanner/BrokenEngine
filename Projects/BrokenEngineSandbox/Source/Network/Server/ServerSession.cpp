@@ -30,7 +30,7 @@ ServerSession::ServerSession()
 	mpTransferManager = std::make_unique<engine::ServerTransferManager>();
 	mpBroadcaster = std::make_unique<engine::ServerBroadcaster>();
 	mpClientManager = std::make_unique<ServerClientManager>();
-	mpRuntime = std::make_unique<engine::ServerSessionRuntime>(*this, engine::kuiDefaultPort);
+	mpRuntime = std::make_unique<engine::ServerSessionRuntime>(*this, engine::kiDefaultPort);
 }
 
 ServerSession::~ServerSession()
@@ -78,19 +78,19 @@ static float AdmitNavigationDelay(float fDelay)
 
 static bool ReadBooleanByte(const uint8_t*& pCursor)
 {
-	uint8_t uiValue = engine::ReadUint8(pCursor);
-	if (uiValue > 1)
+	int64_t iValue = engine::ReadUint8(pCursor);
+	if (iValue > 1)
 	{
 		engine::NetworkMessages::ThrowCorruptStream("ServerSession Boolean byte");
 	}
-	return uiValue != 0;
+	return iValue != 0;
 }
 
 void ServerSession::ParseReceivedGamePackets()
 {
 	for (const engine::ReceivedGamePacket& rPacket : mpRuntime->mpServer->mReceivedGamePackets)
 	{
-		GamePacketType eType = static_cast<GamePacketType>(rPacket.uiPacketType);
+		GamePacketType eType = static_cast<GamePacketType>(rPacket.iPacketType);
 
 		// Contract gate (trust boundary): validate every game-range packet once before dispatch (drop -> count -> escalate).
 		// Every client-sendable game contract row has min == max (GamePacketType.h), so this gate settles each admitted
@@ -245,7 +245,7 @@ void ServerSession::ParseReceivedGamePackets()
 			// engine Server::Receive — so an uncaught throw would tear down ServerUpdate. Drop the single
 			// packet and continue, parity with Server::Receive/Client::Receive.
 			LOG(kNetwork, kDebug, "ServerSession::ParseReceivedGamePackets dropped corrupt packet (type {}) Client: {}: {}", static_cast<uint8_t>(eType), rPacket.iClientId, rException.what());
-			engine::gpServer->RecordContractViolation(rPacket.iClientId, engine::ContractViolationKind::kCorrupt, "game packet handler threw", rPacket.uiPacketType, std::ssize(rPacket.payload) + 1);
+			engine::gpServer->RecordContractViolation(rPacket.iClientId, engine::ContractViolationKind::kCorrupt, "game packet handler threw", rPacket.iPacketType, std::ssize(rPacket.payload) + 1);
 		}
 	}
 }
@@ -313,7 +313,7 @@ void ServerSession::SendAssignPlayer(int64_t iClientId, engine::GlobalId globalI
 	GameMessages::AssignPlayerMessage message {.iGlobalPlayerIdentifier = globalId.iValue, .coordinate = coordinate};
 	engine::NetworkMessages::Write(rWorkbuffer, message);
 	ASSERT(rWorkbuffer.Count<uint8_t>() == sizeof(uint8_t) + GameMessages::AssignPlayerMessage::kiSize);
-	engine::NetworkManager::SendPacket(pClient->pPeer, engine::NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	engine::NetworkManager::SendPacket(pClient->pPeer, engine::NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
 void ServerSession::SendPlayerState(int64_t iClientId, PlayerStateWireType eWireType, int64_t iGlobalPlayerId, engine::GridCoord coordinate)
@@ -333,7 +333,7 @@ void ServerSession::SendPlayerState(int64_t iClientId, PlayerStateWireType eWire
 	GameMessages::PlayerStateMessage message {.uiWireType = static_cast<uint8_t>(eWireType), .iGlobalPlayerIdentifier = iGlobalPlayerId, .coordinate = coordinate};
 	engine::NetworkMessages::Write(rWorkbuffer, message);
 	ASSERT(rWorkbuffer.Count<uint8_t>() == sizeof(uint8_t) + GameMessages::PlayerStateMessage::kiSize);
-	engine::NetworkManager::SendPacket(pClient->pPeer, engine::NetworkManager::kuiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	engine::NetworkManager::SendPacket(pClient->pPeer, engine::NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
 void ServerSession::StepTimescale(bool bFaster)

@@ -134,7 +134,7 @@ namespace toolcli
 		kSteal,
 	};
 
-	static int EmitLandingConflict(const Locator& rLocator, const nlohmann::json& rMetadata, LandingRecordState eRecordState)
+	static int64_t EmitLandingConflict(const Locator& rLocator, const nlohmann::json& rMetadata, LandingRecordState eRecordState)
 	{
 		if (eRecordState == LandingRecordState::kReadable)
 		{
@@ -151,7 +151,7 @@ namespace toolcli
 		return kiExitStateConflict;
 	}
 
-	static int HandleClaim(const Locator& rLocator, nlohmann::json& rMetadata, bool bExists, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree, int64_t iLeaseSeconds)
+	static int64_t HandleClaim(const Locator& rLocator, nlohmann::json& rMetadata, bool bExists, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree, int64_t iLeaseSeconds)
 	{
 		if (bExists)
 		{
@@ -167,10 +167,10 @@ namespace toolcli
 		return kiExitOk;
 	}
 
-	static int HandleRefresh(const Locator& rLocator, nlohmann::json& rMetadata, bool bExists, std::wstring_view owner)
+	static int64_t HandleRefresh(const Locator& rLocator, nlohmann::json& rMetadata, bool bExists, std::wstring_view owner)
 	{
-		uint64_t uiCurrentTicks = CurrentUtcTicks();
-		std::optional<landing::LandingLease> lease = bExists ? landing::ValidateLandingLease(rMetadata, rLocator, uiCurrentTicks) : std::nullopt;
+		int64_t iCurrentTicks = static_cast<int64_t>(CurrentUtcTicks());
+		std::optional<landing::LandingLease> lease = bExists ? landing::ValidateLandingLease(rMetadata, rLocator, iCurrentTicks) : std::nullopt;
 		if (!lease)
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
@@ -179,19 +179,19 @@ namespace toolcli
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 		}
-		if (uiCurrentTicks >= lease->uiExpiresTicks)
+		if (iCurrentTicks >= lease->iExpiresTicks)
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 		}
 		std::string timestamp = CurrentUtcTimestamp();
-		uint64_t uiHeartbeatTicks = 0;
-		ParseUtcTimestamp(timestamp, uiHeartbeatTicks);
-		if (uiHeartbeatTicks < lease->uiHeartbeatTicks)
+		int64_t iHeartbeatTicks = 0;
+		ParseUtcTimestamp(timestamp, iHeartbeatTicks);
+		if (iHeartbeatTicks < lease->iHeartbeatTicks)
 		{
 			return EmitLandingConflict(rLocator, rMetadata, LandingRecordState::kReadable);
 		}
 		rMetadata["heartbeatAt"] = timestamp;
-		rMetadata["expiresAt"] = FormatUtcTimestamp(uiHeartbeatTicks + static_cast<uint64_t>(lease->duration.count()) * 10'000'000ui64);
+		rMetadata["expiresAt"] = FormatUtcTimestamp(static_cast<uint64_t>(iHeartbeatTicks + lease->duration.count() * 10'000'000i64));
 		if (!WriteMetadataAtomic(rLocator.path, rMetadata))
 		{
 			FailWindows("refresh lock metadata");
@@ -201,10 +201,10 @@ namespace toolcli
 		return kiExitOk;
 	}
 
-	static int HandleRecover(const Locator& rLocator, nlohmann::json& rMetadata, bool bExists, std::wstring_view owner, std::wstring_view expectedOwner, std::wstring_view session, std::wstring_view worktree, int64_t iLeaseSeconds)
+	static int64_t HandleRecover(const Locator& rLocator, nlohmann::json& rMetadata, bool bExists, std::wstring_view owner, std::wstring_view expectedOwner, std::wstring_view session, std::wstring_view worktree, int64_t iLeaseSeconds)
 	{
-		uint64_t uiNow = CurrentUtcTicks();
-		std::optional<landing::LandingLease> lease = bExists ? landing::ValidateLandingLease(rMetadata, rLocator, uiNow) : std::nullopt;
+		int64_t iNow = static_cast<int64_t>(CurrentUtcTicks());
+		std::optional<landing::LandingLease> lease = bExists ? landing::ValidateLandingLease(rMetadata, rLocator, iNow) : std::nullopt;
 		if (!lease)
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
@@ -213,7 +213,7 @@ namespace toolcli
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 		}
-		if (uiNow < lease->uiExpiresTicks)
+		if (iNow < lease->iExpiresTicks)
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 		}
@@ -242,7 +242,7 @@ namespace toolcli
 		return kiExitOk;
 	}
 
-	static int HandleReleaseOrSteal(const Locator& rLocator, const nlohmann::json& rMetadata, bool bExists, LandingReleaseOperation eOperation, std::wstring_view owner, std::wstring_view expectedOwner)
+	static int64_t HandleReleaseOrSteal(const Locator& rLocator, const nlohmann::json& rMetadata, bool bExists, LandingReleaseOperation eOperation, std::wstring_view owner, std::wstring_view expectedOwner)
 	{
 		if (!bExists)
 		{
@@ -274,7 +274,7 @@ namespace toolcli
 	// Bounded blocking claim. Every attempt reads, classifies, and writes under its own guard scope; the guard is
 	// released before each sleep so a holder releasing its lease can always make progress. Only the final outcome
 	// prints, so the invocation still emits exactly one JSON object.
-	static int WaitForLandingClaim(const Locator& rLocator, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree, int64_t iLeaseSeconds, int64_t iWaitSeconds, int64_t iPollMilliseconds)
+	static int64_t WaitForLandingClaim(const Locator& rLocator, std::wstring_view owner, std::wstring_view session, std::wstring_view worktree, int64_t iLeaseSeconds, int64_t iWaitSeconds, int64_t iPollMilliseconds)
 	{
 		std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::now() + std::chrono::seconds(iWaitSeconds);
 		for (;;)
@@ -322,14 +322,14 @@ namespace toolcli
 					return EmitLandingConflict(rLocator, metadata, LandingRecordState::kUnverifiable);
 				}
 
-				uint64_t uiNow = CurrentUtcTicks();
-				std::optional<landing::LandingLease> lease = landing::ValidateLandingLease(metadata, rLocator, uiNow);
+				int64_t iNow = static_cast<int64_t>(CurrentUtcTicks());
+				std::optional<landing::LandingLease> lease = landing::ValidateLandingLease(metadata, rLocator, iNow);
 				if (!lease)
 				{
 					// Unverifiable metadata is never repaired by a waiter; taking it over needs user authority.
 					return EmitLandingConflict(rLocator, metadata, LandingRecordState::kReadable);
 				}
-				if (uiNow >= lease->uiExpiresTicks)
+				if (iNow >= lease->iExpiresTicks)
 				{
 					// A refused recovery (a registered worktree is mid Git operation) is not final: keep waiting.
 					if (landing::AllRegisteredWorktreesClear(rLocator))
@@ -358,7 +358,7 @@ namespace toolcli
 				else
 				{
 					// Wake just after the foreign lease expires when that comes first.
-					iSleepMilliseconds = std::min<int64_t>(iSleepMilliseconds, static_cast<int64_t>((lease->uiExpiresTicks - uiNow) / 10'000ui64) + 1);
+					iSleepMilliseconds = std::min<int64_t>(iSleepMilliseconds, (lease->iExpiresTicks - iNow) / 10'000i64 + 1);
 				}
 			}
 
@@ -374,7 +374,7 @@ namespace toolcli
 		}
 	}
 
-	int RunLandingLockCommand(std::span<const wchar_t* const> argumentValues)
+	int64_t RunLandingLockCommand(std::span<const wchar_t* const> argumentValues)
 	{
 		if (std::ssize(argumentValues) < 3)
 		{

@@ -26,18 +26,18 @@ static std::filesystem::path PathFromUtf8(std::string_view utf8Value)
 
 static std::optional<std::filesystem::path> FindExecutableOnPath(const wchar_t* pcExecutable)
 {
-	DWORD uiCharacters = SearchPathW(nullptr, pcExecutable, nullptr, 0, nullptr, nullptr);
-	if (uiCharacters == 0)
+	int64_t iCharacters = SearchPathW(nullptr, pcExecutable, nullptr, 0, nullptr, nullptr);
+	if (iCharacters == 0)
 	{
 		return std::nullopt;
 	}
-	std::wstring path(uiCharacters, L'\0');
-	DWORD uiWritten = SearchPathW(nullptr, pcExecutable, nullptr, static_cast<DWORD>(path.size()), path.data(), nullptr);
-	if (uiWritten == 0 || static_cast<int64_t>(uiWritten) >= std::ssize(path))
+	std::wstring path(static_cast<size_t>(iCharacters), L'\0');
+	int64_t iWritten = SearchPathW(nullptr, pcExecutable, nullptr, static_cast<DWORD>(path.size()), path.data(), nullptr);
+	if (iWritten == 0 || iWritten >= std::ssize(path))
 	{
 		return std::nullopt;
 	}
-	path.resize(uiWritten);
+	path.resize(static_cast<size_t>(iWritten));
 	return std::filesystem::path(std::move(path));
 }
 
@@ -78,7 +78,7 @@ static bool PathEqual(const std::filesystem::path& rLeft, const std::filesystem:
 
 static bool PathLess(const std::filesystem::path& rLeft, const std::filesystem::path& rRight)
 {
-	int iResult = CompareStringOrdinal(rLeft.native().c_str(), -1, rRight.native().c_str(), -1, TRUE);
+	int64_t iResult = CompareStringOrdinal(rLeft.native().c_str(), -1, rRight.native().c_str(), -1, TRUE);
 	return iResult == CSTR_LESS_THAN || (iResult == CSTR_EQUAL && CompareStringOrdinal(rLeft.native().c_str(), -1, rRight.native().c_str(), -1, FALSE) == CSTR_LESS_THAN);
 }
 
@@ -97,13 +97,13 @@ static bool IsReparsePoint(const std::filesystem::path& rPath)
 static std::filesystem::path GetRepositoryRootFromExecutable()
 {
 	std::wstring executableBuffer(32'768, L'\0');
-	DWORD uiLength = GetModuleFileNameW(nullptr, executableBuffer.data(), static_cast<DWORD>(executableBuffer.size()));
-	if (uiLength == 0 || uiLength >= executableBuffer.size())
+	int64_t iLength = GetModuleFileNameW(nullptr, executableBuffer.data(), static_cast<DWORD>(executableBuffer.size()));
+	if (iLength == 0 || iLength >= std::ssize(executableBuffer))
 	{
-		throw std::runtime_error(std::format("Unable to resolve DataPacker executable path (GetModuleFileNameW returned {}, Win32 {})", uiLength, GetLastError()));
+		throw std::runtime_error(std::format("Unable to resolve DataPacker executable path (GetModuleFileNameW returned {}, Win32 {})", iLength, GetLastError()));
 	}
 
-	std::filesystem::path executablePath(std::wstring(executableBuffer.data(), uiLength));
+	std::filesystem::path executablePath(std::wstring(executableBuffer.data(), static_cast<size_t>(iLength)));
 	std::wstring executableName = executablePath.filename().native();
 	if (CompareStringOrdinal(executableName.c_str(), -1, L"DataPacker.exe", -1, TRUE) != CSTR_EQUAL
 	 && CompareStringOrdinal(executableName.c_str(), -1, L"DataPacker.Debug.exe", -1, TRUE) != CSTR_EQUAL)
@@ -149,7 +149,7 @@ static bool IsRecognizedLinkRaw(const std::filesystem::path& rLink, const std::f
 	}
 	std::vector<uint8_t> bytes(MAXIMUM_REPARSE_DATA_BUFFER_SIZE);
 	DWORD uiReturned = 0;
-	if (!DeviceIoControl(link.get(), FSCTL_GET_REPARSE_POINT, nullptr, 0, bytes.data(), static_cast<DWORD>(bytes.size()), &uiReturned, nullptr))
+	if (!DeviceIoControl(link.get(), FSCTL_GET_REPARSE_POINT, nullptr, 0, bytes.data(), static_cast<DWORD>(std::ssize(bytes)), &uiReturned, nullptr))
 	{
 		return false;
 	}
@@ -220,8 +220,8 @@ static std::optional<LinkedWorktreeIdentity> DiscoverLinkedWorktreeIdentity(cons
 		LOG(kDefault, kWarning, "Malformed Git worktree metadata; output linking disabled");
 		return std::nullopt;
 	}
-	size_t uiEnd = result->output.find('\0');
-	std::filesystem::path primaryRoot = PathFromUtf8(result->output.substr(9, uiEnd - 9));
+	int64_t iEnd = static_cast<int64_t>(result->output.find('\0'));
+	std::filesystem::path primaryRoot = PathFromUtf8(result->output.substr(9, static_cast<size_t>(iEnd - 9)));
 	std::optional<std::filesystem::path> primaryCommon = RunGit(*git, primaryRoot, L"rev-parse --path-format=absolute --git-common-dir");
 	if (!primaryCommon || !PathEqual(*primaryCommon, *commonDirectory))
 	{
@@ -276,7 +276,7 @@ static MaterializationInventory BuildMaterializationInventory(const std::filesys
 			throw std::runtime_error(std::format("Unsupported output entry: {}", rEntry.path().string()));
 		}
 	}
-	inventory.order.resize(inventory.files.size());
+	inventory.order.resize(static_cast<size_t>(std::ssize(inventory.files)));
 	std::ranges::iota(inventory.order, 0);
 	std::sort(inventory.order.begin(), inventory.order.end(), [&inventory, &rSource](int64_t iLeftIndex, int64_t iRightIndex)
 	{
@@ -346,11 +346,11 @@ FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitial
 	reInitializationResult = EnsureLocalResult::kAlreadyLocal;
 	gpFileManager = this;
 	wchar_t pcForbidExpensiveExport[2] {};
-	DWORD uiForbidExpensiveExportLength = GetEnvironmentVariableW(L"BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT", pcForbidExpensiveExport, static_cast<DWORD>(std::size(pcForbidExpensiveExport)));
-	mbForbidExpensiveExport = uiForbidExpensiveExportLength == 1 && pcForbidExpensiveExport[0] == L'1';
+	int64_t iForbidExpensiveExportLength = GetEnvironmentVariableW(L"BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT", pcForbidExpensiveExport, static_cast<DWORD>(std::size(pcForbidExpensiveExport)));
+	mbForbidExpensiveExport = iForbidExpensiveExportLength == 1 && pcForbidExpensiveExport[0] == L'1';
 	wchar_t pcForbidGaeaExport[2] {};
-	DWORD uiForbidGaeaExportLength = GetEnvironmentVariableW(L"BT_DATAPACKER_FORBID_GAEA_EXPORT", pcForbidGaeaExport, static_cast<DWORD>(std::size(pcForbidGaeaExport)));
-	mbForbidGaeaExport = uiForbidGaeaExportLength == 1 && pcForbidGaeaExport[0] == L'1';
+	int64_t iForbidGaeaExportLength = GetEnvironmentVariableW(L"BT_DATAPACKER_FORBID_GAEA_EXPORT", pcForbidGaeaExport, static_cast<DWORD>(std::size(pcForbidGaeaExport)));
+	mbForbidGaeaExport = iForbidGaeaExportLength == 1 && pcForbidGaeaExport[0] == L'1';
 
 	if (argvSpan.size() == 1)
 	{
@@ -401,14 +401,14 @@ FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitial
 	// %LOCALAPPDATA%\Temp files by last-access age, which would delete long-lived Gaea bake payloads even
 	// while their always-read .meta sidecars stay fresh, producing a cache that looks warm but is empty.
 	PWSTR pWideChar = nullptr;
-	HRESULT iHresult = SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, nullptr, &pWideChar);
-	std::filesystem::path localAppData = SUCCEEDED(iHresult) && pWideChar != nullptr ? std::filesystem::path(pWideChar) : std::filesystem::path {};
+	int64_t iHresult = SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, nullptr, &pWideChar);
+	std::filesystem::path localAppData = SUCCEEDED(static_cast<HRESULT>(iHresult)) && pWideChar != nullptr ? std::filesystem::path(pWideChar) : std::filesystem::path {};
 	CoTaskMemFree(pWideChar);
 	if (localAppData.empty())
 	{
 		// No fallback: a relocated cache root is indistinguishable from a cold one and costs a 3+ hour
 		// Gaea re-bake, so fail the run rather than silently exporting everything somewhere else.
-		throw std::runtime_error(std::format("SHGetKnownFolderPath(FOLDERID_LocalAppData) failed (hresult {})", static_cast<int32_t>(iHresult)));
+		throw std::runtime_error(std::format("SHGetKnownFolderPath(FOLDERID_LocalAppData) failed (hresult {})", iHresult));
 	}
 	mCacheDirectory = localAppData / "BrokenEngine" / "DataPackerCache" / mProjectName;
 	std::filesystem::create_directories(mCacheDirectory);
@@ -510,10 +510,10 @@ FileManager::EnsureLocalResult FileManager::ReconcileWorktreeOutput(OutputRootIn
 		}
 		else
 		{
-			DWORD uiError = GetLastError();
-			if (uiError != ERROR_PRIVILEGE_NOT_HELD && uiError != ERROR_INVALID_PARAMETER && uiError != ERROR_NOT_SUPPORTED)
+			int64_t iError = GetLastError();
+			if (iError != ERROR_PRIVILEGE_NOT_HELD && iError != ERROR_INVALID_PARAMETER && iError != ERROR_NOT_SUPPORTED)
 			{
-				throw std::runtime_error(std::format("CreateSymbolicLinkW failed for destination {} from source {} (Win32 {})", rRoot.destination.string(), rRoot.source.string(), uiError));
+				throw std::runtime_error(std::format("CreateSymbolicLinkW failed for destination {} from source {} (Win32 {})", rRoot.destination.string(), rRoot.source.string(), iError));
 			}
 			return MaterializeOutput(rRoot);
 		}
@@ -552,12 +552,12 @@ FileManager::EnsureLocalResult FileManager::MaterializeOutput(OutputRootInfo& rR
 	ULARGE_INTEGER available {};
 	if (!GetDiskFreeSpaceExW(rRoot.destination.root_path().native().c_str(), &available, nullptr, nullptr))
 	{
-		DWORD uiError = GetLastError();
+		int64_t iError = GetLastError();
 		diagnostic::Record record
 		{
 			.eSeverity = diagnostic::Severity::kError,
 			.title = "Data Packer - std::exception",
-			.message = std::format("GetDiskFreeSpaceExW failed for \"{}\" (Win32 {})", rRoot.destination.string(), uiError),
+			.message = std::format("GetDiskFreeSpaceExW failed for \"{}\" (Win32 {})", rRoot.destination.string(), iError),
 			.eButtons = diagnostic::ButtonContract::kOk,
 			.eIcon = diagnostic::ModalIcon::kNone,
 		};

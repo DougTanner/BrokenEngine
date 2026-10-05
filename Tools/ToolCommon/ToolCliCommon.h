@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <exception>
 #include <filesystem>
 #include <functional>
@@ -20,9 +21,9 @@
 
 namespace toolcli
 {
-	inline constexpr int kiExitOk = 0;
-	inline constexpr int kiExitStateConflict = 2;
-	inline constexpr int kiExitFailure = 1;
+	inline constexpr int64_t kiExitOk = 0;
+	inline constexpr int64_t kiExitStateConflict = 2;
+	inline constexpr int64_t kiExitFailure = 1;
 
 	class Handle
 	{
@@ -68,7 +69,7 @@ namespace toolcli
 	std::optional<std::string> RunGit(const std::vector<std::wstring>& rArguments);
 
 	void SetToolName(std::string_view name);
-	int PrintOwnerToken();
+	int64_t PrintOwnerToken();
 	void Fail(std::string_view message);
 	void FailWindows(std::string_view operation);
 	std::string WideToUtf8(std::wstring_view value);

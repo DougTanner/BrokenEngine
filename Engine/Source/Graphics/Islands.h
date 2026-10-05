@@ -16,7 +16,7 @@ struct GridCoord;
 // sizeof(AxisAlignedQuadLayout): with kiCoordinateSlots = 16 and kiMaximumIslandsPerCell = 107 this is 436,560 bytes
 // (426.33 KiB), independent of the number of island templates.
 inline constexpr int64_t kiMaxActivePlacements = (game::NetworkSessionContract::kiCoordinateSlots + 1) * kiMaximumIslandsPerCell;
-inline constexpr VkDeviceSize kVkIslandMeshArenaBytes = 64ui64 * 1'024ui64 * 1'024ui64;
+inline constexpr int64_t kiIslandMeshArenaBytes = 64i64 * 1'024i64 * 1'024i64;
 
 // SSBO and indirect buffers have one instance per framebuffer index, sized by kiMaxFramebuffers. UpdateActiveIslands runs before
 // RenderGlobal and writes only the re-acquired instance: its prior frame has presented and completed its GPU read, while this frame has not
@@ -30,15 +30,15 @@ public:
 	Islands();
 	~Islands();
 
-	bool AllocateMeshRanges(VkDeviceSize vkIndexSize, VkDeviceSize vkVertexSize, VmaVirtualAllocation& rIndexAllocation, VkDeviceSize& rVkIndexOffset, VmaVirtualAllocation& rVertexAllocation, VkDeviceSize& rVkVertexOffset);
+	bool AllocateMeshRanges(int64_t iIndexSize, int64_t iVertexSize, VmaVirtualAllocation& rIndexAllocation, int64_t& riIndexOffset, VmaVirtualAllocation& rVertexAllocation, int64_t& riVertexOffset);
 	void FreeMeshRanges(VmaVirtualAllocation vmaIndexAllocation, VmaVirtualAllocation vmaVertexAllocation);
-	void UploadMesh(VkDeviceSize vkIndexOffset, std::span<const std::byte> indexData, VkDeviceSize vkVertexOffset, std::span<const std::byte> vertexData);
-	void WriteMeshIndirect(int64_t iTemplate, VkDeviceSize vkIndexOffset, VkDeviceSize vkVertexOffset, uint32_t uiIndexCount);
+	void UploadMesh(int64_t iIndexOffset, std::span<const std::byte> indexData, int64_t iVertexOffset, std::span<const std::byte> vertexData);
+	void WriteMeshIndirect(int64_t iTemplate, int64_t iIndexOffset, int64_t iVertexOffset, int64_t iIndexCount);
 
 	void UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrames>& rFrames, std::span<const GridCoord> activeCoordinates);
 
 	Buffer mIslandMeshArena;
-	uint64_t muiMeshArenaCapacityGeneration = 0;
+	int64_t miMeshArenaCapacityGeneration = 0;
 
 	// One SSBO per framebuffer index. Placements occupy contiguous per-template runs packed into the shared
 	// arena by UpdateActiveIslands; each run starts at that template's per-frame firstInstance, with its
@@ -63,7 +63,7 @@ public:
 	// current run always starts at arena slot 0, so UpdateActiveIslands clears only the tail from the current
 	// total through this previous total after rewriting, instead of clearing the whole reserved arena every
 	// frame. Values are zero-initialized to match the ctor's baseline full memset.
-	std::array<uint32_t, kiMaxFramebuffers> mLastWrittenCounts {};
+	std::array<int64_t, kiMaxFramebuffers> mLastWrittenCounts {};
 
 private:
 

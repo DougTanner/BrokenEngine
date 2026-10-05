@@ -37,9 +37,9 @@ Game::Game()
 
 	InitializeLocalization();
 
-	uint32_t uiNextAlignment = 1;
-	mPlayerAlignment = engine::AlignmentIdentifier {uiNextAlignment++};
-	mEnemyAlignment = engine::AlignmentIdentifier {uiNextAlignment++};
+	int64_t iNextAlignment = 1;
+	mPlayerAlignment = engine::AlignmentIdentifier {iNextAlignment++};
+	mEnemyAlignment = engine::AlignmentIdentifier {iNextAlignment++};
 	mAlignments.AddAlignment(mPlayerAlignment, mEnemyAlignment, engine::AlignmentFlags::kuiEnemies);
 
 #if defined(BT_SERVER)
@@ -207,9 +207,9 @@ void Game::ComputeActiveSet()
 
 			// Adjacent-only clamp: at wide zoom the VisibleArea may extend past the 3x3 ring;
 			// only the immediate ring is ever subscribed regardless.
-			for (int32_t i = -1; i <= 1; ++i)
+			for (int64_t i = -1; i <= 1; ++i)
 			{
-				for (int32_t j = -1; j <= 1; ++j)
+				for (int64_t j = -1; j <= 1; ++j)
 				{
 					if (i == 0 && j == 0)
 					{
@@ -403,6 +403,7 @@ void Game::Reset()
 	mClientPlayerCoordinates.clear();
 #if defined(BT_CLIENT)
 	mFleetSelection.Clear();
+	mbClientGridCoordinatePinned = false;
 #endif
 	mfPreviousClientArmor = 0.0f;
 	SetClientGridCoordinate(engine::kOriginCoordinate);
@@ -504,7 +505,7 @@ void Game::ApplyStandardMenuAction(engine::StandardMenuAction eAction)
 			gpClientSession->mpRuntime->StartDiscovery();
 			break;
 		case engine::StandardMenuAction::kConnectToDiscoveredServer:
-			gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kuiDefaultPort, NetworkSessionContract::kiCoordinateSlots);
+			gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kiDefaultPort, NetworkSessionContract::kiCoordinateSlots);
 			break;
 		case engine::StandardMenuAction::kChangeFrameToMainMenu:
 			ChangeFrame(GameFlags::kMainMenu);
@@ -563,23 +564,23 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 		{
 			if (rMenuInput.flags & engine::MenuInputFlags::kQuicksave)
 			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientSaveRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientSaveRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
 			}
 			if (rMenuInput.flags & engine::MenuInputFlags::kQuickload)
 			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientLoadRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientLoadRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
 			}
 			if (rMenuInput.flags & engine::MenuInputFlags::kSaveReplay)
 			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientReplayRecordRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientReplayRecordRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
 			}
 			if (rMenuInput.flags & engine::MenuInputFlags::kLoadReplay)
 			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientReplayPlaybackRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientReplayPlaybackRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
 			}
 			if (bReturnPressed)
 			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientResetRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientResetRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
 			}
 		}
 
@@ -587,14 +588,14 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 		{
 			if (bServerTakesDebugControl)
 			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, 0ui8);
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE, 0ui8);
 			}
 		}
 		else if (rMenuInput.flags & engine::MenuInputFlags::kSpeedUpTime)
 		{
 			if (bServerTakesDebugControl)
 			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, 1ui8);
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE, 1ui8);
 			}
 		}
 
@@ -603,7 +604,7 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 		{
 			if (bServerTakesDebugControl)
 			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientPauseRequest, engine::NetworkManager::kuiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>((mGameFlags & engine::GameFlags::kPaused) ? 1 : 0));
+				engine::gpClient->SendSimplePacket(GamePacketType::kClientPauseRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>((mGameFlags & engine::GameFlags::kPaused) ? 1 : 0));
 			}
 		}
 
@@ -611,7 +612,7 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 		{
 			if (gpClientSession->mpRuntime->mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered)
 			{
-				gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kuiDefaultPort, NetworkSessionContract::kiCoordinateSlots);
+				gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kiDefaultPort, NetworkSessionContract::kiCoordinateSlots);
 			}
 			else
 			{

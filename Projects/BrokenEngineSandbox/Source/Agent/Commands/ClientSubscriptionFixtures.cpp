@@ -72,16 +72,16 @@ void CommandClientSubscribeAcceptFixture(const nlohmann::json& rParams, nlohmann
 		{
 			throw std::runtime_error("client_subscribe_accept_fixture 'slot' must be outside the client pool and below the rejection sentinel");
 		}
-		if (iSlot >= engine::kuiSubscribeRejectSlot)
+		if (iSlot >= engine::kiSubscribeRejectSlot)
 		{
 			throw std::runtime_error("client_subscribe_accept_fixture 'slot' must be outside the client pool and below the rejection sentinel");
 		}
 
-		engine::ClientNetworkFixtures::SubscribeAcceptResult result = engine::ClientNetworkFixtures::ReceiveSubscribeAccept(rClient, static_cast<uint8_t>(iSlot), 0, {});
+		engine::ClientNetworkFixtures::SubscribeAcceptResult result = engine::ClientNetworkFixtures::ReceiveSubscribeAccept(rClient, iSlot, 0, {});
 		rResult["slot"] = iSlot;
 		rResult["outOfRange"] = true;
 		rResult["cleanupSerialized"] = result.iSerializedBytes == engine::NetworkMessages::ClientUnsubscribeMessage::kiFixedSize;
-		rResult["cleanupSlot"] = result.uiSerializedSlot;
+		rResult["cleanupSlot"] = result.iSerializedSlot;
 		rResult["cleanupSize"] = result.iSerializedBytes;
 		rResult["networkSendSuppressed"] = result.bSendSuppressed;
 	}
@@ -149,8 +149,8 @@ void CommandClientStaleUpdateFixture(const nlohmann::json& rParams, [[maybe_unus
 
 			nlohmann::json result;
 			result["coord"] = {pState->coord.iX, pState->coord.iY};
-			result["slot"] = pState->uiSlotIndex;
-			result["epoch"] = pState->uiEpoch;
+			result["slot"] = pState->iSlotIndex;
+			result["epoch"] = pState->iEpoch;
 			result["tick"] = pState->iTick;
 			result["capturedBytes"] = pState->iCapturedBytes;
 			result["ackFloorBefore"] = pState->iAckFloorBefore;
@@ -196,8 +196,8 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 		}
 		engine::GridCoord coordinate
 		{
-			.iX = ClientGridCoordinateValue(rCoordinate.at(0), "client_cancelled_subscription_fixture"),
-			.iY = ClientGridCoordinateValue(rCoordinate.at(1), "client_cancelled_subscription_fixture"),
+			.iX = static_cast<int32_t>(ClientGridCoordinateValue(rCoordinate.at(0), "client_cancelled_subscription_fixture")),
+			.iY = static_cast<int32_t>(ClientGridCoordinateValue(rCoordinate.at(1), "client_cancelled_subscription_fixture")),
 		};
 		engine::Client& rClient = RequireFixtureClient("client_cancelled_subscription_fixture");
 		if (!(gpGame->ClientPlayerIdentifier().iValue != 0))
@@ -252,8 +252,8 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 		std::vector<engine::GridCoord> queueBefore = rRuntime.mSubscriptionQueue;
 		engine::ClientCoordSlot& rSlot = rClient.mSubscriptions.mCoordinateSlots.at(iSlot);
 		rClient.mSubscriptions.mSubscribeRequests.Add(coordinate);
-		uint16_t uiRetainedEpoch = rSlot.acknowledgementState.uiEpoch;
-		uint16_t uiEpoch = static_cast<uint16_t>(uiRetainedEpoch + 1);
+		int64_t iRetainedEpoch = rSlot.acknowledgementState.uiEpoch;
+		uint16_t uiEpoch = static_cast<uint16_t>(iRetainedEpoch + 1);
 		if (uiEpoch == 0)
 		{
 			uiEpoch = 1;
@@ -265,7 +265,7 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 		engine::NetworkMessages::ServerSubscribeAcceptMessage accept
 		{
-			.uiLoadGeneration = rClient.muiCommittedLoadGeneration,
+			.uiLoadGeneration = static_cast<uint8_t>(rClient.miCommittedLoadGeneration),
 			.uiSlotIndex = static_cast<uint8_t>(iSlot),
 			.uiEpoch = uiEpoch,
 			.coord = coordinate,
@@ -277,7 +277,7 @@ void CommandClientCancelledSubscriptionFixture([[maybe_unused]] const nlohmann::
 		{
 			// The server never issued the invented epoch; retaining it would make the stale-epoch check drop
 			// the server's genuine accept when it next allocates this slot with that same epoch
-			rSlot.acknowledgementState.uiEpoch = uiRetainedEpoch;
+			rSlot.acknowledgementState.uiEpoch = static_cast<uint16_t>(iRetainedEpoch);
 		}
 		bool bPolicyUnchanged = desiredBefore == rRuntime.mDesiredCoordinates && stickyBefore == rRuntime.mUnwantedTimestamps
 		                     && queueBefore == rRuntime.mSubscriptionQueue;

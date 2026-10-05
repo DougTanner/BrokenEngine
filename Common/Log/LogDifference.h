@@ -24,7 +24,7 @@ struct ScopedLogDifferenceContext
 	ScopedLogDifferenceContext& operator=(const ScopedLogDifferenceContext&) = delete;
 };
 
-inline constexpr int kiLogDifferencePrecision = 3;
+inline constexpr int64_t kiLogDifferencePrecision = 3;
 
 template <typename T>
 using LogDifferenceValue = std::conditional_t<std::is_same_v<T, float> || std::is_same_v<T, double>, Wb,

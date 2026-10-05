@@ -11,14 +11,15 @@ bool ParseLaunchOptions()
 {
 	// Runs in ProcessMain before allocation tracking, so any allocation is untracked. CommandLineToArgvW allocates via
 	// LocalAlloc; LocalFree it.
-	int iArgumentCount = 0;
-	LPWSTR* pArgumentValues = CommandLineToArgvW(GetCommandLineW(), &iArgumentCount);
+	int iApiArgumentCount = 0;
+	LPWSTR* pArgumentValues = CommandLineToArgvW(GetCommandLineW(), &iApiArgumentCount);
 	if (pArgumentValues == nullptr)
 	{
 		LOG(kDefault, kWarning, "ParseLaunchOptions CommandLineToArgvW failed: {}", GetLastError());
 		return true;
 	}
 
+	int64_t iArgumentCount = static_cast<int64_t>(iApiArgumentCount);
 	bool bSuccess = true;
 	for (int64_t i = 1; i < iArgumentCount; ++i)
 	{

@@ -66,7 +66,7 @@ struct ScreenshotRequest
 	bool bPublishResult = false;
 	// Capture token minted and made active by ResetCaptureResult(); the async save publishes only while it remains
 	// active, so an overlapping abandoned encoder cannot replace a newer request's result. 0 for dev saves.
-	uint64_t uiCaptureToken = 0;
+	int64_t iCaptureToken = 0;
 };
 
 // Agent render-target dump request queued into Graphics::mDumpRenderTargetRequest; consumed at the same capture
@@ -82,9 +82,9 @@ struct DumpRenderTargetRequest
 	// As ScreenshotRequest::bPublishResult — set only by the agent dump handler so the encode result reaches the
 	// deferred-response poll and no non-agent save is consumed as the response to a concurrent agent capture.
 	bool bPublishResult = false;
-	// As ScreenshotRequest::uiCaptureToken — publication succeeds only while this request remains active, so an
+	// As ScreenshotRequest::iCaptureToken — publication succeeds only while this request remains active, so an
 	// overlapping abandoned encoder cannot replace a newer request's result. 0 for non-agent dumps.
-	uint64_t uiCaptureToken = 0;
+	int64_t iCaptureToken = 0;
 };
 
 class Graphics
@@ -112,7 +112,7 @@ public:
 	HINSTANCE mInstanceHandle = nullptr;
 	HWND mWindowHandle = nullptr;
 	int64_t miMonitorRefreshRate = 60;
-	uint64_t muiFrameCounter = 0;
+	int64_t miFrameCounter = 0;
 	VkExtent2D mFramebufferVkExtent2D = gVkWantedFramebufferExtent2D;
 
 	DestroyType meDestroyType = DestroyType::kNone;

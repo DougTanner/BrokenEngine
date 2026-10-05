@@ -12,7 +12,7 @@ struct PendingFlagshipUpdate
 	engine::ClientGuid clientGuid {};
 	FleetGuid fleetGuid {};
 	engine::GridCoord newWantedCoordinate {};
-	uint8_t uiPendingFleetWantedCoordinateTicks = 0;
+	int64_t iPendingFleetWantedCoordinateTicks = 0;
 };
 
 class FleetNavigationController

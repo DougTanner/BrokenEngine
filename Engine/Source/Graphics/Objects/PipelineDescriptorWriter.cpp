@@ -9,7 +9,7 @@ namespace engine
 {
 
 // Check if a binding belongs to global Set 0 (must not register for per-pipeline descriptor updates)
-static bool BindingIsInSet0(const Pipeline& rPipeline, uint32_t uiBinding)
+static bool BindingIsInSet0(const Pipeline& rPipeline, int64_t iBinding)
 {
 	if (rPipeline.mExternalVkDescriptorSetLayout == VK_NULL_HANDLE)
 	{
@@ -17,7 +17,7 @@ static bool BindingIsInSet0(const Pipeline& rPipeline, uint32_t uiBinding)
 	}
 	// Callers gate every BindingIsInSet0 with BindingExistsInShaderLayout (short-circuit), so the binding
 	// is always declared by some shader here — ResolveBindingSetIndex's default-0 fallback never decides.
-	return Pipeline::ResolveBindingSetIndex(rPipeline.mInfo, uiBinding) == 0;
+	return Pipeline::ResolveBindingSetIndex(rPipeline.mInfo, iBinding) == 0;
 }
 
 // WriteModelDescriptor pushes this many single-texture image-infos (sampler, irradiance, prefiltered,
@@ -41,9 +41,9 @@ struct DescriptorWriteCursor
 // The framebuffer-0-only "this binding takes a deferred per-pipeline registration" gate, repeated at
 // every register site. The extra kCombinedSamplers conjunct at the combined-sampler site stays at that
 // call site (specific to that branch, not part of the general gate).
-static bool ShouldRegisterBinding(const Pipeline& rPipeline, int64_t iFramebuffer, uint32_t uiBinding)
+static bool ShouldRegisterBinding(const Pipeline& rPipeline, int64_t iFramebuffer, int64_t iBinding)
 {
-	return iFramebuffer == 0 && PipelineDescriptorWriter::BindingExistsInShaderLayout(rPipeline, uiBinding) && !BindingIsInSet0(rPipeline, uiBinding);
+	return iFramebuffer == 0 && PipelineDescriptorWriter::BindingExistsInShaderLayout(rPipeline, iBinding) && !BindingIsInSet0(rPipeline, iBinding);
 }
 
 // Emits one IBL combined-image-sampler write (irradiance / prefiltered / lutBRDF) — the three differ only
@@ -66,7 +66,7 @@ static void PushCombinedImageSamplerWrite(Pipeline& rPipeline, int64_t iFramebuf
 	rCursor.pVkWriteDescriptorSets[rCursor.iDescriptorCount++] = rVkWriteDescriptorSet;
 	ASSERT(rCursor.iDescriptorCount < common::ShaderHeader::kiMaxDescriptorSetLayoutBindings);
 
-	if (ShouldRegisterBinding(rPipeline, iFramebuffer, static_cast<uint32_t>(rCursor.iDescriptorCount - 1)))
+	if (ShouldRegisterBinding(rPipeline, iFramebuffer, rCursor.iDescriptorCount - 1))
 	{
 		gpTextureManager->mTextureDescriptors.RegisterTextureBinding({.crc = registerCrc, .pPipeline = &rPipeline, .iBinding = rCursor.iDescriptorCount - 1, .samplerFlags = DescriptorFlags::kSamplerRepeat, .pTexture = &rTexture});
 	}
@@ -93,7 +93,7 @@ static void WriteModelDescriptor(Pipeline& rPipeline, const DescriptorInfo& rDes
 		rCursor.pVkWriteDescriptorSets[rCursor.iDescriptorCount++] = rVkWriteDescriptorSet;
 		ASSERT(rCursor.iDescriptorCount < common::ShaderHeader::kiMaxDescriptorSetLayoutBindings);
 
-		if (ShouldRegisterBinding(rPipeline, iFramebuffer, static_cast<uint32_t>(rCursor.iDescriptorCount - 1)))
+		if (ShouldRegisterBinding(rPipeline, iFramebuffer, rCursor.iDescriptorCount - 1))
 		{
 			gpTextureManager->mTextureDescriptors.RegisterStandaloneSamplerBinding(&rPipeline, rCursor.iDescriptorCount - 1, DescriptorFlags::kSamplerRepeat);
 		}
@@ -102,7 +102,7 @@ static void WriteModelDescriptor(Pipeline& rPipeline, const DescriptorInfo& rDes
 	// Bindless texture array
 	{
 		rVkWriteDescriptorSet.dstBinding = static_cast<uint32_t>(rCursor.iDescriptorCount);
-		rVkWriteDescriptorSet.descriptorCount = static_cast<uint32_t>(gpTextureManager->mTextureDescriptors.mImageInfos.size());
+		rVkWriteDescriptorSet.descriptorCount = static_cast<uint32_t>(std::ssize(gpTextureManager->mTextureDescriptors.mImageInfos));
 		rVkWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 		rVkWriteDescriptorSet.pImageInfo = gpTextureManager->mTextureDescriptors.mImageInfos.data();
 		rVkWriteDescriptorSet.pBufferInfo = nullptr;
@@ -121,7 +121,7 @@ static void WriteModelDescriptor(Pipeline& rPipeline, const DescriptorInfo& rDes
 		{
 			.name = "Materials",
 			.flags = {BufferFlags::kStorage, BufferFlags::kDeviceLocal},
-			.vkDataSize = rChunk.pHeader->sceneHeader.uiMaterialCount * sizeof(shaders::PbrMaterialLayout),
+			.iDataSize = static_cast<int64_t>(rChunk.pHeader->sceneHeader.uiMaterialCount) * static_cast<int64_t>(sizeof(shaders::PbrMaterialLayout)),
 		}, [&](void* pData)
 		{
 			const common::SceneHeader& rSceneHeader = rChunk.pHeader->sceneHeader;
@@ -130,17 +130,17 @@ static void WriteModelDescriptor(Pipeline& rPipeline, const DescriptorInfo& rDes
 			const common::MaterialShaderData* pMaterialShaderData = reinterpret_cast<const common::MaterialShaderData*>(rChunk.pData + iArraysSize);
 			shaders::PbrMaterialLayout* pCurrent = static_cast<shaders::PbrMaterialLayout*>(pData);
 			static constexpr int64_t kiOldMaterialSize = offsetof(shaders::PbrMaterialLayout, fColorTextureIndex);
-			auto ResolveTextureIndex = [&](int32_t iTextureSet, uint8_t uiTextureIndex)
+			auto ResolveTextureIndex = [&](int64_t iTextureSet, int64_t iTextureIndex)
 			{
 				if (iTextureSet < 0)
 				{
 					return 0.0f;
 				}
-				if (uiTextureIndex >= rSceneHeader.uiTextureCount)
+				if (iTextureIndex >= rSceneHeader.uiTextureCount)
 				{
 					throw std::ios_base::failure("PipelineDescriptorWriter material");
 				}
-				return static_cast<float>(gpTextureManager->mTextureDescriptors.CrcToIndex(pTextureCrcs[uiTextureIndex]));
+				return static_cast<float>(gpTextureManager->mTextureDescriptors.CrcToIndex(pTextureCrcs[iTextureIndex]));
 			};
 			for (int64_t j = 0; j < rSceneHeader.uiMaterialCount; ++j)
 			{
@@ -208,7 +208,7 @@ static void WriteBufferDescriptor(const DescriptorInfo& rDescriptorInfo, int64_t
 	ASSERT(rCursor.iDescriptorCount < common::ShaderHeader::kiMaxDescriptorSetLayoutBindings);
 }
 
-static void WriteStandaloneSampler(Pipeline& rPipeline, const DescriptorInfo& rDescriptorInfo, int64_t iFramebuffer, uint32_t uiBinding, int64_t iRegisterBinding, VkWriteDescriptorSet& rVkWriteDescriptorSet, DescriptorWriteCursor& rCursor)
+static void WriteStandaloneSampler(Pipeline& rPipeline, const DescriptorInfo& rDescriptorInfo, int64_t iFramebuffer, int64_t iBinding, int64_t iRegisterBinding, VkWriteDescriptorSet& rVkWriteDescriptorSet, DescriptorWriteCursor& rCursor)
 {
 	VkDescriptorImageInfo& rVkDescriptorImageInfo = rCursor.pVkImageInfos[rCursor.iImageInfoCount++];
 	ASSERT(rCursor.iImageInfoCount <= rCursor.iMaxImageInfos);
@@ -221,7 +221,7 @@ static void WriteStandaloneSampler(Pipeline& rPipeline, const DescriptorInfo& rD
 	rVkWriteDescriptorSet.pImageInfo = &rVkDescriptorImageInfo;
 	rVkWriteDescriptorSet.pBufferInfo = nullptr;
 
-	if (ShouldRegisterBinding(rPipeline, iFramebuffer, uiBinding))
+	if (ShouldRegisterBinding(rPipeline, iFramebuffer, iBinding))
 	{
 		gpTextureManager->mTextureDescriptors.RegisterStandaloneSamplerBinding(&rPipeline, iRegisterBinding, rDescriptorInfo.flags);
 	}
@@ -327,12 +327,11 @@ static int64_t FilterWritesByShaderLayout(const Pipeline& rPipeline, std::span<V
 	int64_t iValidCount = 0;
 	for (int64_t j = 0; j < std::ssize(writeDescriptorSets); ++j)
 	{
-		uint32_t uiBinding = writeDescriptorSets[j].dstBinding;
-		if (uiBinding < common::ShaderHeader::kiMaxDescriptorSetLayoutBindings)
+		int64_t iBinding = static_cast<int64_t>(writeDescriptorSets[j].dstBinding);
+		if (iBinding < common::ShaderHeader::kiMaxDescriptorSetLayoutBindings)
 		{
-			int64_t iBinding = static_cast<int64_t>(uiBinding);
-			const VkDescriptorSetLayoutBinding& rVkFirstBinding = iBinding < pFirstShader->mInformation.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings ? pFirstShader->mInformation.pVkDescriptorBindings[uiBinding] : Pipeline::kEmptyVkDescriptorSetLayoutBinding;
-			const VkDescriptorSetLayoutBinding& rVkSecondBinding = pSecondShader != nullptr && iBinding < pSecondShader->mInformation.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings ? pSecondShader->mInformation.pVkDescriptorBindings[uiBinding] : Pipeline::kEmptyVkDescriptorSetLayoutBinding;
+			const VkDescriptorSetLayoutBinding& rVkFirstBinding = iBinding < pFirstShader->mInformation.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings ? pFirstShader->mInformation.pVkDescriptorBindings[iBinding] : Pipeline::kEmptyVkDescriptorSetLayoutBinding;
+			const VkDescriptorSetLayoutBinding& rVkSecondBinding = pSecondShader != nullptr && iBinding < pSecondShader->mInformation.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings ? pSecondShader->mInformation.pVkDescriptorBindings[iBinding] : Pipeline::kEmptyVkDescriptorSetLayoutBinding;
 			if (rVkFirstBinding.descriptorCount > 0 || rVkSecondBinding.descriptorCount > 0)
 			{
 				writeDescriptorSets[iValidCount++] = writeDescriptorSets[j];
@@ -347,15 +346,15 @@ static int64_t RouteWritesBySet(const PipelineInfo& rPipelineInfo, std::span<VkW
 	int64_t iValidCount = 0;
 	for (int64_t j = 0; j < std::ssize(writeDescriptorSets); ++j)
 	{
-		uint32_t uiBinding = writeDescriptorSets[j].dstBinding;
-		uint32_t uiSet = Pipeline::ResolveBindingSetIndex(rPipelineInfo, uiBinding);
+		int64_t iBinding = static_cast<int64_t>(writeDescriptorSets[j].dstBinding);
+		int64_t iSet = Pipeline::ResolveBindingSetIndex(rPipelineInfo, iBinding);
 
-		if (uiSet == 2)
+		if (iSet == 2)
 		{
 			writeDescriptorSets[j].dstSet = vkDestinationSet2;
 			writeDescriptorSets[iValidCount++] = writeDescriptorSets[j];
 		}
-		else if (uiSet == 1 && !bHasExternalSet1)
+		else if (iSet == 1 && !bHasExternalSet1)
 		{
 			writeDescriptorSets[iValidCount++] = writeDescriptorSets[j];
 		}
@@ -364,19 +363,18 @@ static int64_t RouteWritesBySet(const PipelineInfo& rPipelineInfo, std::span<VkW
 	return iValidCount;
 }
 
-bool PipelineDescriptorWriter::BindingExistsInShaderLayout(const Pipeline& rPipeline, uint32_t uiBinding)
+bool PipelineDescriptorWriter::BindingExistsInShaderLayout(const Pipeline& rPipeline, int64_t iBinding)
 {
-	if (uiBinding >= common::ShaderHeader::kiMaxDescriptorSetLayoutBindings)
+	if (iBinding < 0 || iBinding >= common::ShaderHeader::kiMaxDescriptorSetLayoutBindings)
 	{
 		return false;
 	}
-	int64_t iBinding = static_cast<int64_t>(uiBinding);
-	const VkDescriptorSetLayoutBinding& rVkFirstBinding = iBinding < rPipeline.mInfo.ppShaders[0]->mInformation.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings ? rPipeline.mInfo.ppShaders[0]->mInformation.pVkDescriptorBindings[uiBinding] : Pipeline::kEmptyVkDescriptorSetLayoutBinding;
+	const VkDescriptorSetLayoutBinding& rVkFirstBinding = iBinding < rPipeline.mInfo.ppShaders[0]->mInformation.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings ? rPipeline.mInfo.ppShaders[0]->mInformation.pVkDescriptorBindings[iBinding] : Pipeline::kEmptyVkDescriptorSetLayoutBinding;
 	if (rPipeline.mInfo.flags & PipelineFlags::kCompute)
 	{
 		return rVkFirstBinding.descriptorCount > 0;
 	}
-	const VkDescriptorSetLayoutBinding& rVkSecondBinding = iBinding < rPipeline.mInfo.ppShaders[1]->mInformation.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings ? rPipeline.mInfo.ppShaders[1]->mInformation.pVkDescriptorBindings[uiBinding] : Pipeline::kEmptyVkDescriptorSetLayoutBinding;
+	const VkDescriptorSetLayoutBinding& rVkSecondBinding = iBinding < rPipeline.mInfo.ppShaders[1]->mInformation.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings ? rPipeline.mInfo.ppShaders[1]->mInformation.pVkDescriptorBindings[iBinding] : Pipeline::kEmptyVkDescriptorSetLayoutBinding;
 	return rVkFirstBinding.descriptorCount > 0 || rVkSecondBinding.descriptorCount > 0;
 }
 
@@ -476,15 +474,15 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 			ASSERT(!(rDescriptorInfo.flags & DescriptorFlags::kBindlessArrayConsumer) || (rDescriptorInfo.flags & DescriptorFlags::kCombinedSamplers));
 
 			// Deferred registrations require the shader binding number, not the descriptor-write index (VUID-00316).
-			uint32_t uiBinding = rDescriptorInfo.iExplicitBinding >= 0 ? static_cast<uint32_t>(rDescriptorInfo.iExplicitBinding) : static_cast<uint32_t>(cursor.iDescriptorCount);
-			int64_t iRegisterBinding = static_cast<int64_t>(uiBinding);
+			int64_t iBinding = rDescriptorInfo.iExplicitBinding >= 0 ? rDescriptorInfo.iExplicitBinding : cursor.iDescriptorCount;
+			int64_t iRegisterBinding = iBinding;
 
 			VkWriteDescriptorSet vkWriteDescriptorSet
 			{
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 				.pNext = nullptr,
 				.dstSet = vkDescriptorSet,
-				.dstBinding = uiBinding,
+				.dstBinding = static_cast<uint32_t>(iBinding),
 				.dstArrayElement = 0,
 				.pTexelBufferView = nullptr,
 			};
@@ -500,11 +498,11 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 			}
 			else if (bSampler && !(rDescriptorInfo.flags & DescriptorFlags::kCombinedSamplers))
 			{
-				WriteStandaloneSampler(rPipeline, rDescriptorInfo, j, uiBinding, iRegisterBinding, vkWriteDescriptorSet, cursor);
+				WriteStandaloneSampler(rPipeline, rDescriptorInfo, j, iBinding, iRegisterBinding, vkWriteDescriptorSet, cursor);
 			}
 			else if (rDescriptorInfo.flags & DescriptorFlags::kTextures)
 			{
-				vkWriteDescriptorSet.descriptorCount = static_cast<uint32_t>(gpTextureManager->mTextureDescriptors.mImageInfos.size());
+				vkWriteDescriptorSet.descriptorCount = static_cast<uint32_t>(std::ssize(gpTextureManager->mTextureDescriptors.mImageInfos));
 				vkWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 				vkWriteDescriptorSet.pImageInfo = gpTextureManager->mTextureDescriptors.mImageInfos.data();
 				vkWriteDescriptorSet.pBufferInfo = nullptr;
@@ -516,7 +514,7 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 			{
 				WriteCombinedSamplers(rDescriptorInfo, vkWriteDescriptorSet, cursor);
 
-				if (rDescriptorInfo.flags & DescriptorFlags::kCombinedSamplers && ShouldRegisterBinding(rPipeline, j, uiBinding))
+				if (rDescriptorInfo.flags & DescriptorFlags::kCombinedSamplers && ShouldRegisterBinding(rPipeline, j, iBinding))
 				{
 					RegisterCombinedSamplerBindings(rPipeline, rDescriptorInfo, iRegisterBinding);
 				}
@@ -546,7 +544,7 @@ void PipelineDescriptorWriter::UpdateStorageBuffer(const Pipeline& rPipeline, in
 	// Guards against deferred-update callers (TextureDescriptors::Rewrite*) passing a binding
 	// that the per-pipeline layout doesn't declare (e.g. confusing sequential descriptor index
 	// with the explicit binding number). Pops the debugger before Vulkan validation fires.
-	ASSERT(BindingExistsInShaderLayout(rPipeline, static_cast<uint32_t>(iBinding)));
+	ASSERT(BindingExistsInShaderLayout(rPipeline, iBinding));
 
 	VkDescriptorBufferInfo vkDescriptorBufferInfo
 	{
@@ -574,7 +572,7 @@ void PipelineDescriptorWriter::UpdateStorageBuffer(const Pipeline& rPipeline, in
 
 void PipelineDescriptorWriter::UpdateImageDescriptor(const Pipeline& rPipeline, int64_t iBinding, VkSampler vkSampler, VkImageView vkImageView, VkImageLayout vkImageLayout, VkDescriptorType vkDescriptorType)
 {
-	ASSERT(PipelineDescriptorWriter::BindingExistsInShaderLayout(rPipeline, static_cast<uint32_t>(iBinding)));
+	ASSERT(PipelineDescriptorWriter::BindingExistsInShaderLayout(rPipeline, iBinding));
 
 	for (const VkDescriptorSet& rVkDescriptorSet : rPipeline.mVkDescriptorSets)
 	{

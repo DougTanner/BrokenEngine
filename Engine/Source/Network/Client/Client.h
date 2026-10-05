@@ -56,11 +56,11 @@ public:
 
 	using GuidAssignedCallback = void (*)(const ClientGuid&);
 
-	Client(const char* pcServerAddress, uint16_t uiPort, int64_t iCoordinateSlotCount, const ClientGuid& rGuid, GuidAssignedCallback pGuidAssignedCallback);
+	Client(const char* pcServerAddress, int64_t iPort, int64_t iCoordinateSlotCount, const ClientGuid& rGuid, GuidAssignedCallback pGuidAssignedCallback);
 	~Client();
 
 	template <typename TTYPE, typename... TARGS>
-	void SendSimplePacket(TTYPE eType, uint8_t uiChannel, uint32_t uiPacketFlags, const TARGS&... rArguments)
+	void SendSimplePacket(TTYPE eType, int64_t iChannel, uint32_t uiPacketFlags, const TARGS&... rArguments)
 	{
 		static_assert(std::is_enum_v<TTYPE>, "SendSimplePacket type tag must be an enum (engine::PacketType or game::GamePacketType)");
 
@@ -69,7 +69,7 @@ public:
 			return;
 		}
 
-		NetworkManager::SendSimplePacket(mpServerPeer, eType, uiChannel, uiPacketFlags, rArguments...);
+		NetworkManager::SendSimplePacket(mpServerPeer, eType, iChannel, uiPacketFlags, rArguments...);
 	}
 
 	void SendDesynchronizationReport(int64_t iTick, GridCoord coordinate, common::crc_t uiExpectedCrc, common::crc_t uiActualCrc);
@@ -98,7 +98,7 @@ public:
 	char mpcRejectionReason[256] = {};
 
 	// Heap: raw game packet buffer grows on assign/player-state packets
-	std::vector<std::pair<uint8_t, std::vector<uint8_t>>> mReceivedGamePackets;
+	std::vector<std::pair<int64_t, std::vector<uint8_t>>> mReceivedGamePackets;
 	std::vector<std::vector<ReceivedCoordUpdate>> mReceivedCoordinateUpdates;
 	std::vector<ReceivedCoordFullState> mReceivedFullStates;
 	std::vector<ReceivedStaticData> mReceivedStaticData;
@@ -119,7 +119,7 @@ private:
 	bool SendSubscribe(GridCoord coordinate);
 	void SendUnsubscribe(int64_t iSlot);
 	void Flush();
-	std::optional<uint8_t> DrainLoadNotification();
+	std::optional<int64_t> DrainLoadNotification();
 	void ResetAllSlots();
 	void DispatchIncoming(ENetEvent& rEvent, bool bFastForward);
 	void Receive(ENetEvent& rEvent);
@@ -137,7 +137,7 @@ private:
 
 	ENetHost* mpHost = nullptr;
 
-	// Reused status-change decode scratch (same reused-buffer + exact-size-assign pattern as Server::mCompressionBuffer):
+	// Reused status-change decode scratch (same reused-buffer + exact-size-assign pattern as ServerBufferedFrames::mCompressionBuffer):
 	// decompress into this 1024-cap buffer, then assign() the exact count into each ReceivedCoordUpdate so buffered updates carry no slack
 	std::vector<game::StatusChange> mStatusChangeScratch;
 
@@ -161,10 +161,10 @@ private:
 	std::deque<DelayedPacket> mDelayedPackets;
 	NetworkSimulationState mNetworkSimulationState;
 public:
-	uint8_t muiCommittedLoadGeneration = 0;
+	int64_t miCommittedLoadGeneration = 0;
 
 private:
-	std::optional<uint8_t> muiPendingLoadGeneration;
+	std::optional<int64_t> miPendingLoadGeneration;
 };
 
 inline Client* gpClient = nullptr;

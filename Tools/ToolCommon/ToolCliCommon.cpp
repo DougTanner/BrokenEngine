@@ -11,10 +11,10 @@ namespace toolcli
 
 	static void ReportProcessFailure(const RunProcessOptions& rOptions, std::string_view operation)
 	{
-		DWORD uiError = ::GetLastError();
+		int64_t iError = ::GetLastError();
 		if (rOptions.FailureSink)
 		{
-			rOptions.FailureSink(std::string(operation) + " failed (Windows error " + std::to_string(uiError) + ")");
+			rOptions.FailureSink(std::string(operation) + " failed (Windows error " + std::to_string(iError) + ")");
 		}
 	}
 
@@ -156,21 +156,22 @@ namespace toolcli
 			// A zero-byte write by the child completes ReadFile with TRUE/0; only a broken pipe is EOF.
 			while (::ReadFile(hPipeRead.Get(), pBuffer, sizeof(pBuffer), &uiRead, nullptr) != FALSE)
 			{
-				if (uiRead == 0)
+				int64_t iRead = uiRead;
+				if (iRead == 0)
 				{
 					continue;
 				}
 				if (rOptions.OutputSink)
 				{
-					rOptions.OutputSink(std::span<const char>(pBuffer, uiRead));
+					rOptions.OutputSink(std::span<const char>(pBuffer, static_cast<size_t>(iRead)));
 				}
 				else
 				{
-					result.output.append(pBuffer, uiRead);
+					result.output.append(pBuffer, static_cast<size_t>(iRead));
 				}
 			}
-			DWORD uiReadError = ::GetLastError();
-			if (uiReadError != ERROR_BROKEN_PIPE)
+			int64_t iReadError = ::GetLastError();
+			if (iReadError != ERROR_BROKEN_PIPE)
 			{
 				ReportProcessFailure(rOptions, "read process output");
 				hPipeRead.Reset();
@@ -194,12 +195,17 @@ namespace toolcli
 	std::optional<std::string> RunGit(const std::vector<std::wstring>& rArguments)
 	{
 		std::vector<std::wstring> arguments { L"git.exe" };
-		arguments.insert(arguments.end(), rArguments.begin(), rArguments.end());
+		arguments.append_range(rArguments);
 		RunProcessOptions options;
 		options.bMergeStdError = true;
 		options.bNoWindow = true;
 		std::optional<ProcessResult> result = RunProcess(nullptr, arguments, options);
-		if (!result || result->uiExitCode != 0)
+		if (!result)
+		{
+			return std::nullopt;
+		}
+		int64_t iExitCode = result->uiExitCode;
+		if (iExitCode != 0)
 		{
 			return std::nullopt;
 		}
@@ -211,7 +217,7 @@ namespace toolcli
 		sToolName = name;
 	}
 
-	int PrintOwnerToken()
+	int64_t PrintOwnerToken()
 	{
 		unsigned char pBytes[16] {};
 		if (::BCryptGenRandom(nullptr, pBytes, static_cast<ULONG>(sizeof(pBytes)), BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0)
@@ -244,14 +250,14 @@ namespace toolcli
 			return {};
 		}
 
-		int iLength = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
+		int64_t iLength = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
 		if (iLength <= 0)
 		{
 			return {};
 		}
 
 		std::string result(static_cast<size_t>(iLength), '\0');
-		if (::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), result.data(), iLength, nullptr, nullptr) != iLength)
+		if (::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), result.data(), static_cast<int>(iLength), nullptr, nullptr) != iLength)
 		{
 			return {};
 		}
@@ -265,14 +271,14 @@ namespace toolcli
 			return {};
 		}
 
-		int iLength = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0);
+		int64_t iLength = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0);
 		if (iLength <= 0)
 		{
 			return {};
 		}
 
 		std::wstring result(static_cast<size_t>(iLength), L'\0');
-		if (::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), result.data(), iLength) != iLength)
+		if (::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), result.data(), static_cast<int>(iLength)) != iLength)
 		{
 			return {};
 		}
@@ -291,28 +297,28 @@ namespace toolcli
 		}
 
 		std::wstring result = L"\"";
-		size_t uiBackslashes = 0;
+		int64_t iBackslashes = 0;
 		for (wchar_t cCharacter : argument)
 		{
 			if (cCharacter == L'\\')
 			{
-				++uiBackslashes;
+				++iBackslashes;
 				continue;
 			}
 
 			if (cCharacter == L'\"')
 			{
-				result.append(uiBackslashes * 2 + 1, L'\\');
+				result.append(static_cast<size_t>(iBackslashes * 2 + 1), L'\\');
 				result.push_back(cCharacter);
-				uiBackslashes = 0;
+				iBackslashes = 0;
 				continue;
 			}
 
-			result.append(uiBackslashes, L'\\');
-			uiBackslashes = 0;
+			result.append(static_cast<size_t>(iBackslashes), L'\\');
+			iBackslashes = 0;
 			result.push_back(cCharacter);
 		}
-		result.append(uiBackslashes * 2, L'\\');
+		result.append(static_cast<size_t>(iBackslashes * 2), L'\\');
 		result.push_back(L'\"');
 		return result;
 	}
@@ -333,19 +339,19 @@ namespace toolcli
 
 	std::filesystem::path GetLocalApplicationDataPath()
 	{
-		DWORD uiRequired = ::GetEnvironmentVariableW(L"LOCALAPPDATA", nullptr, 0);
-		if (uiRequired == 0)
+		int64_t iRequired = ::GetEnvironmentVariableW(L"LOCALAPPDATA", nullptr, 0);
+		if (iRequired == 0)
 		{
 			return {};
 		}
 
-		std::wstring value(uiRequired, L'\0');
-		DWORD uiWritten = ::GetEnvironmentVariableW(L"LOCALAPPDATA", value.data(), uiRequired);
-		if (uiWritten == 0 || uiWritten >= uiRequired)
+		std::wstring value(static_cast<size_t>(iRequired), L'\0');
+		int64_t iWritten = ::GetEnvironmentVariableW(L"LOCALAPPDATA", value.data(), static_cast<DWORD>(iRequired));
+		if (iWritten == 0 || iWritten >= iRequired)
 		{
 			return {};
 		}
-		value.resize(uiWritten);
+		value.resize(static_cast<size_t>(iWritten));
 		return std::filesystem::path(value);
 	}
 
@@ -362,14 +368,14 @@ namespace toolcli
 		{
 			return path;
 		}
-		return std::filesystem::path(L"\\\\?\\" + path.lexically_normal().native());
+		return std::filesystem::path(LR"(\\?\)" + path.lexically_normal().native());
 	}
 
 	std::wstring ToLowerInvariant(std::wstring value)
 	{
 		if (!value.empty())
 		{
-			int iResult = ::LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_LOWERCASE, value.data(), static_cast<int>(value.size()), value.data(), static_cast<int>(value.size()), nullptr, nullptr, 0);
+			int64_t iResult = ::LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_LOWERCASE, value.data(), static_cast<int>(value.size()), value.data(), static_cast<int>(value.size()), nullptr, nullptr, 0);
 			if (iResult == 0)
 			{
 				return {};

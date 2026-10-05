@@ -53,10 +53,10 @@ crc_t RandomEngine::Crc() const
 	return common::Crc(uiState);
 }
 
-uint32_t Random(uint32_t uiMax, RandomEngine& rRandomEngine)
+uint32_t Random(int64_t iMax, RandomEngine& rRandomEngine)
 {
 	// Lemire multiply-shift — division-free, uses the strong high 32 bits; 64-bit range cannot wrap at UINT32_MAX
-	uint64_t uiRange = static_cast<uint64_t>(uiMax) + 1;
+	uint64_t uiRange = static_cast<uint64_t>(iMax) + 1;
 	return static_cast<uint32_t>(((RandomNext(rRandomEngine) >> 32) * uiRange) >> 32);
 }
 

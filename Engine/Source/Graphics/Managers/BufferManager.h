@@ -30,9 +30,9 @@ public:
 
 	void CreateWaterMesh();
 
-	Buffer* CreateDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, VkDeviceSize vkElementSize);
-	void ResizeDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, VkDeviceSize vkNewSize, int64_t iFramebuffer);
-	Buffer* ResizeDynamicBufferIfNeeded(common::crc_t crc, DynamicBufferType eType, std::string_view name, VkDeviceSize vkLayoutSize, int64_t iCapacity, int64_t iCommandBuffer);
+	Buffer* CreateDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, int64_t iElementSize);
+	void ResizeDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, int64_t iNewSize, int64_t iFramebuffer);
+	Buffer* ResizeDynamicBufferIfNeeded(common::crc_t crc, DynamicBufferType eType, std::string_view name, int64_t iLayoutSize, int64_t iCapacity, int64_t iCommandBuffer);
 
 	template<typename T>
 	struct DynamicStorageBufferResult
@@ -45,12 +45,12 @@ public:
 	DynamicStorageBufferResult<T> GetDynamicStorageBuffer(common::crc_t crc, DynamicBufferType eType, int64_t iCommandBuffer)
 	{
 		Buffer& rBuffer = mDynamicStorageBuffers[eType].at(crc).at(iCommandBuffer);
-		// CreateDynamicBuffer() stores its size argument as vkElementSize; pass sizeof(T) so ResizeDynamicBuffer preserves the element size.
-		ASSERT(sizeof(T) == rBuffer.mInfo.vkElementSize);
+		// CreateDynamicBuffer() stores its size argument as iElementSize; pass sizeof(T) so ResizeDynamicBuffer preserves the element size.
+		ASSERT(static_cast<int64_t>(sizeof(T)) == rBuffer.mInfo.iElementSize);
 		return
 		{
 			.pData = reinterpret_cast<T*>(rBuffer.mpMappedMemory),
-			.iCapacity = static_cast<int64_t>(rBuffer.mInfo.vkDataSize / rBuffer.mInfo.vkElementSize),
+			.iCapacity = rBuffer.mInfo.iDataSize / rBuffer.mInfo.iElementSize,
 		};
 	}
 
@@ -64,20 +64,20 @@ public:
 	// Smoke hierarchical dispatch buffers (per-texture occupancy, shared active tile list)
 	VkBuffer mSmokeOccupancyVkBuffers[2] {};
 	VmaAllocation mSmokeOccupancyVmaAllocations[2] {};
-	VkDeviceSize mSmokeOccupancyBufferVkDeviceSize = 0;
+	int64_t miSmokeOccupancyBufferSize = 0;
 	VkBuffer mSmokeActiveTileVkBuffer = VK_NULL_HANDLE;
 	VmaAllocation mSmokeActiveTileVmaAllocation = VK_NULL_HANDLE;
-	VkDeviceSize mSmokeActiveTileBufferVkDeviceSize = 0;
+	int64_t miSmokeActiveTileBufferSize = 0;
 	void CreateSmokeHierarchicalBuffers();
 	void DestroySmokeHierarchicalBuffers();
 
 	// Wind hierarchical dispatch buffers (two pairs: A for TextureOne, B for TextureTwo)
 	VkBuffer mWindOccupancyVkBuffers[2] = {};
 	VmaAllocation mWindOccupancyVmaAllocations[2] = {};
-	VkDeviceSize mWindOccupancyBufferVkDeviceSize = 0;
+	int64_t miWindOccupancyBufferSize = 0;
 	VkBuffer mWindActiveTileVkBuffers[2] = {};
 	VmaAllocation mWindActiveTileVmaAllocations[2] = {};
-	VkDeviceSize mWindActiveTileBufferVkDeviceSize = 0;
+	int64_t miWindActiveTileBufferSize = 0;
 	void CreateWindHierarchicalBuffers();
 	void DestroyWindHierarchicalBuffers();
 

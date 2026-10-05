@@ -47,7 +47,7 @@ inline constexpr const char* kpcRequiredIslandJsonKeys[] = {"archetype", "seed",
 struct RouteSubdivision
 {
 	const char* pcLabel = nullptr;
-	int32_t iGaeaChoice = 0;
+	int64_t iGaeaChoice = 0;
 	int64_t iColumns = 0;
 	int64_t iRows = 0;
 };
@@ -63,7 +63,7 @@ struct IslandBakeContext
 	const std::filesystem::path& rIslandJsonFile;
 	const nlohmann::json& rIslandJson;
 	const WorldDimensions& rDimensions;
-	int32_t iSeed = 0;
+	int64_t iSeed = 0;
 	int64_t iTexturePixels = 0;
 	std::optional<int64_t> oiMeshResolution;
 };

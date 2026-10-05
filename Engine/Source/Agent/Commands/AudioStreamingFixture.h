@@ -86,14 +86,14 @@ using AudioStreamingFixtureCommandFlags_t = common::Flags<AudioStreamingFixtureC
 struct AudioStreamingFixtureRecord
 {
 	uint64_t uiSequence = 0;
-	uint64_t uiScenarioGeneration = 0;
-	uint64_t uiGeneration = 0;
-	uint32_t uiThreadId = 0;
-	int32_t iThreadPriority = 0;
-	uint32_t uiPoolIndex = std::numeric_limits<uint32_t>::max();
+	int64_t iScenarioGeneration = 0;
+	int64_t iGeneration = 0;
+	int64_t iThreadId = 0;
+	int64_t iThreadPriority = 0;
+	int64_t iPoolIndex = 4'294'967'295i64;
 	common::crc_t crc = 0;
-	uint64_t uiOffset = 0;
-	uint64_t uiLength = 0;
+	int64_t iOffset = 0;
+	int64_t iLength = 0;
 	AudioStreamingFixturePartition ePartition = AudioStreamingFixturePartition::kMain;
 	AudioStreamingFixturePhase ePhase = AudioStreamingFixturePhase::kStartup;
 	AudioStreamingFixtureQueueState eState = AudioStreamingFixtureQueueState::kFree;
@@ -102,34 +102,34 @@ struct AudioStreamingFixtureRecord
 
 struct AudioStreamingFixturePoolEntry
 {
-	uint32_t uiIndex = 0;
+	int64_t iIndex = 0;
 	AudioStreamingFixtureQueueState eState = AudioStreamingFixtureQueueState::kFree;
-	uint64_t uiGeneration = 0;
+	int64_t iGeneration = 0;
 	common::crc_t crc = 0;
-	uint64_t uiOffset = 0;
-	uint64_t uiLength = 0;
+	int64_t iOffset = 0;
+	int64_t iLength = 0;
 };
 
 struct AudioStreamingFixtureSnapshot
 {
 	uint64_t uiScenarioGate = 0;
-	uint64_t uiScenarioGeneration = 0;
-	uint64_t uiActiveWriters = 0;
+	int64_t iScenarioGeneration = 0;
+	int64_t iActiveWriters = 0;
 	uint64_t uiReservationStart = 0;
 	uint64_t uiReservationBoundary = 0;
 	uint64_t uiRetryCount = 0;
 	AudioStreamingFixtureHoldOwner eHoldOwner = AudioStreamingFixtureHoldOwner::kNone;
 	AudioStreamingFixtureHoldState eHoldState = AudioStreamingFixtureHoldState::kIdle;
 	AudioStreamingFixtureSnapshotFlags_t flags;
-	uint32_t uiHeldIndex = std::numeric_limits<uint32_t>::max();
-	uint64_t uiHeldGeneration = 0;
+	int64_t iHeldIndex = 4'294'967'295i64;
+	int64_t iHeldGeneration = 0;
 	AudioStreamingFixtureQueueState eHeldState = AudioStreamingFixtureQueueState::kFree;
-	uint32_t uiMainHead = 0;
-	uint32_t uiLoader0Head = 0;
-	uint32_t uiLoader1Head = 0;
-	uint32_t uiMainDropped = 0;
-	uint32_t uiLoader0Dropped = 0;
-	uint32_t uiLoader1Dropped = 0;
+	int64_t iMainHead = 0;
+	int64_t iLoader0Head = 0;
+	int64_t iLoader1Head = 0;
+	int64_t iMainDropped = 0;
+	int64_t iLoader0Dropped = 0;
+	int64_t iLoader1Dropped = 0;
 	int64_t iRecordCount = 0;
 	std::array<AudioStreamingFixturePoolEntry, 6> poolEntries {};
 	std::array<AudioStreamingFixtureRecord, 80> records {};
@@ -155,16 +155,16 @@ struct AudioStreamingFixtureVoiceSummary
 {
 	common::crc_t crc = 0;
 	float fVolume = 0.0f;
-	int32_t iPendingSlots = 0;
-	int32_t iBuffersQueued = 0;
+	int64_t iPendingSlots = 0;
+	int64_t iBuffersQueued = 0;
 	AudioStreamingFixtureVoiceFlags_t flags;
 };
 
 struct AudioStreamingFixtureOlderFades
 {
-	int32_t iCount = 0;
-	int32_t iPendingSlots = 0;
-	int32_t iUnderrunningCount = 0;
+	int64_t iCount = 0;
+	int64_t iPendingSlots = 0;
+	int64_t iUnderrunningCount = 0;
 };
 
 struct AudioStreamingFixtureAudioSnapshot
@@ -172,7 +172,7 @@ struct AudioStreamingFixtureAudioSnapshot
 	AudioStreamingFixtureVoiceSummary current;
 	AudioStreamingFixtureVoiceSummary newestFade;
 	AudioStreamingFixtureOlderFades olderFades;
-	uint32_t uiPublicationAllowance = 0;
+	int64_t iPublicationAllowance = 0;
 	AudioStreamingFixtureAudioSnapshotFlags_t flags;
 };
 
@@ -195,7 +195,7 @@ public:
 	void Shutdown();
 
 	bool RequestHold();
-	bool Begin(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
+	bool Begin(common::crc_t crc, int64_t iOffset, int64_t iLength);
 	bool Play(common::crc_t crc);
 	void Clear();
 	void ReleaseControls();
@@ -203,7 +203,7 @@ public:
 
 	bool BeginHistory();
 	AudioStreamingFixtureSnapshot InspectFile() const;
-	bool ArmHold(AudioStreamingFixtureHoldOwner eOwner, common::crc_t crc, uint64_t uiOffset, uint64_t uiLength);
+	bool ArmHold(AudioStreamingFixtureHoldOwner eOwner, common::crc_t crc, int64_t iOffset, int64_t iLength);
 	void ReleaseHold(AudioStreamingFixtureHoldOwner eOwner);
 	void StartCoexistence(common::crc_t realtimeCrc, common::crc_t normalCrc);
 	bool FinishCoexistence();
@@ -215,8 +215,8 @@ public:
 
 	AudioStreamingFixtureCommandFlags_t mCommandFlags;
 
-	static void Record(AudioStreamingFixturePartition ePartition, AudioStreamingFixturePhase ePhase, uint32_t uiPoolIndex, common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, AudioStreamingFixtureQueueState eState, uint64_t uiGeneration, bool bCancelAcknowledged);
-	static bool HoldAudioRead(common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, uint32_t uiIndex, uint64_t uiGeneration);
+	static void Record(AudioStreamingFixturePartition ePartition, AudioStreamingFixturePhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioStreamingFixtureQueueState eState, int64_t iGeneration, bool bCancelAcknowledged);
+	static bool HoldAudioRead(common::crc_t crc, int64_t iOffset, int64_t iLength, int64_t iIndex, int64_t iGeneration);
 	static void CompleteAudioRead(bool bHeld);
 	static void CountRetry();
 	static void PrepareLoaderDrain();
@@ -248,23 +248,23 @@ private:
 	struct HistoryEntry
 	{
 		AudioStreamingFixtureRecord record {};
-		std::atomic<uint64_t> uiPublishedSequence {0};
+		std::atomic<int64_t> iPublishedSequence {0};
 	};
 
-	template <size_t SIZE>
+	template <int64_t SIZE>
 	struct History
 	{
-		std::array<HistoryEntry, SIZE> entries {};
+		std::array<HistoryEntry, static_cast<size_t>(SIZE)> entries {};
 		std::atomic<uint32_t> uiHead {0};
 		std::atomic<uint32_t> uiDropped {0};
 	};
 
 	void ResetHistory();
-	void RecordEntry(AudioStreamingFixturePartition ePartition, AudioStreamingFixturePhase ePhase, uint32_t uiPoolIndex, common::crc_t crc, uint64_t uiOffset, uint64_t uiLength, AudioStreamingFixtureQueueState eState, uint64_t uiGeneration, bool bCancelAcknowledged);
+	void RecordEntry(AudioStreamingFixturePartition ePartition, AudioStreamingFixturePhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioStreamingFixtureQueueState eState, int64_t iGeneration, bool bCancelAcknowledged);
 
 	std::vector<std::unique_ptr<AudioStreamingVoiceControl>> mVoiceControls;
 	std::atomic<uint64_t> muiScenarioGate {0};
-	std::atomic<uint64_t> muiActiveWriters {0};
+	std::atomic<int64_t> miActiveWriters {0};
 	std::atomic<uint64_t> muiNextSequence {0};
 	std::atomic<uint64_t> muiRetryCount {0};
 	uint64_t muiReservationStart = 0;
@@ -275,15 +275,15 @@ private:
 	History<24> mLoader1History;
 	std::atomic<uint64_t> muiHoldToken {0};
 	std::atomic<common::crc_t> mHoldCrc {0};
-	std::atomic<uint64_t> muiHoldOffset {0};
-	std::atomic<uint64_t> muiHoldLength {0};
-	std::atomic<uint32_t> muiHeldIndex {std::numeric_limits<uint32_t>::max()};
-	std::atomic<uint64_t> muiHeldGeneration {0};
+	std::atomic<int64_t> miHoldOffset {0};
+	std::atomic<int64_t> miHoldLength {0};
+	std::atomic<int64_t> miHeldIndex {4'294'967'295i64};
+	std::atomic<int64_t> miHeldGeneration {0};
 	ChunkReadRequest mInvalidRequest;
 	std::array<std::byte, 16 * 1'024> mInvalidBuffer {};
 	common::crc_t mInvalidCrc = 0;
-	uint64_t muiInvalidOffset = 0;
-	uint64_t muiInvalidLength = 0;
+	int64_t miInvalidOffset = 0;
+	int64_t miInvalidLength = 0;
 	bool mbShutdown = false;
 };
 

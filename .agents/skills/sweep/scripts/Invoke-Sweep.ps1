@@ -1,8 +1,10 @@
 # Coordinator for /sweep (.agents/skills/sweep/SKILL.md). Every Codex run uses the one -Model at reasoning
 # effort high; agents hand off through files under Temp/Sweep/, and Status.txt carries the run's state.
 # -ListModels prints the list-visible Codex model slugs, marking the highest gpt-<version>-sol (recommended).
-# -Plan <path> -List prints the sweep Plan's batches and unit counts.
+# -Plan <path> -List prints the sweep Plan's batches and unit counts in run order: the ## Sweep Batches entries
+# first in their listed order, then the remaining top-level batches by name.
 # -Plan <path> -Model <slug> -Batch <name> runs one batch (resumable); -Unit <stem> runs one unit only.
+# -Throttle <n> sets how many units of a -Batch run execute in parallel (default 8).
 # -Plan <path> -Model <slug> -Close runs the stage close: Cleanup, Ordering, and the deferred-fixes ledger.
 param(
 	[string] $Plan,
@@ -79,7 +81,8 @@ $units = $files | Group-Object { $_ -replace '\.(h|cpp)$', '' } | ForEach-Object
 
 if ($List)
 {
-	$units | Group-Object Batch | ForEach-Object { '{0} {1}' -f $_.Name, $_.Count }
+	$order = @($ownBatchDirs -replace '/', '_')
+	$units | Group-Object Batch | Sort-Object { $i = [array]::IndexOf($order, $_.Name); if ($i -lt 0) { $order.Count } else { $i } }, Name | ForEach-Object { '{0} {1}' -f $_.Name, $_.Count }
 	return
 }
 
@@ -110,20 +113,18 @@ function Get-Section([string] $Path, [string] $Heading)
 
 # The build fields main branches on, from the C++ files changed since the stage baseline: Client and Server for any
 # change, DataPacker when one is under DataPacker/ or Common/ (DataPacker's Pch.h includes Common.h), WorktreeCli and
-# AgentHarness when one is under Tools/, the Profile build when one now mentions BT_PROFILE, and the replay check
-# unless every one is under Tools/.
+# AgentHarness when one is under Tools/, and the Profile build when one now mentions BT_PROFILE.
 function Get-BuildFields([string] $Baseline)
 {
 	$cpp = @(git -C $root diff --name-only $Baseline -- '*.h' '*.cpp')
-	if ($cpp.Count -eq 0) { return 'cpp=no builds=none profile=no replay=no' }
+	if ($cpp.Count -eq 0) { return 'cpp=no builds=none profile=no' }
 	$builds = @('Client', 'Server')
 	if ($cpp | Where-Object { $_ -match '^(DataPacker|Common)/' }) { $builds += 'DataPacker' }
 	if ($cpp | Where-Object { $_.StartsWith('Tools/') }) { $builds += 'WorktreeCli', 'AgentHarness' }
 	# Greps every C++ file rather than passing the changed paths, which can exceed the command-line length limit.
 	$profiled = @(git -C $root grep -l 'BT_PROFILE' -- '*.h' '*.cpp')
 	$profileBuild = if ($cpp | Where-Object { $profiled -contains $_ }) { 'yes' } else { 'no' }
-	$replay = if ($cpp | Where-Object { -not $_.StartsWith('Tools/') }) { 'yes' } else { 'no' }
-	return "cpp=yes builds=$($builds -join ',') profile=$profileBuild replay=$replay"
+	return "cpp=yes builds=$($builds -join ',') profile=$profileBuild"
 }
 
 if ($Close)

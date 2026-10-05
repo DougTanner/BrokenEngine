@@ -4,6 +4,10 @@
 
 #include "Network/Server/Server.h"
 
+#include "File/PackChunks.h"
+#include "Network/Server/ServerSessionRuntime.h"
+#include "Network/NetworkCursor.h"
+
 #include "Game.h"
 
 namespace engine
@@ -19,7 +23,9 @@ static_assert(kiMaximumAcknowledgmentStreamPacketSize == NetworkMessages::Client
 // exceeds it, and ordinary running never reaches it.
 constexpr std::chrono::seconds kBudgetStallGrace = 1s;
 
-Server::Server(uint16_t uiPort)
+constexpr std::chrono::seconds kDesynchronizationDiagnosticCooldown = 2s;
+
+Server::Server(int64_t iPort)
 {
 	ASSERT(gpServer == nullptr);
 
@@ -27,14 +33,11 @@ Server::Server(uint16_t uiPort)
 
 	ENetAddress address {};
 	address.host = (gLaunchOptions.flags & LaunchOptionFlags::kLoopbackOnly) ? htonl(INADDR_LOOPBACK) : ENET_HOST_ANY;
-	address.port = uiPort;
+	address.port = static_cast<uint16_t>(iPort);
 
 	ScopedSuppressAllocationTracking suppress;
-	// Heap: one-time compression scratch buffer, sized so any valid capped StatusChange batch always fits
-	// (CompressToBuffer grows it further on demand for full debug frames)
-	mCompressionBuffer.resize(kiMaxCompressedStatusChangeBatchBytes);
 	// Heap: ENet allocates host data internally
-	mpHost = enet_host_create(&address, 64, NetworkManager::kuiChannelCount, 0, 0);
+	mpHost = enet_host_create(&address, 64, static_cast<size_t>(NetworkManager::kiChannelCount), 0, 0);
 	if (mpHost == nullptr)
 	{
 		LOG(kNetwork, kWarning, "Server::Server enet_host_create failed");
@@ -63,8 +66,8 @@ Server::~Server()
 
 void Server::AdvanceLoadGeneration()
 {
-	ASSERT(muiLoadGeneration < UINT8_MAX);
-	++muiLoadGeneration;
+	ASSERT(miLoadGeneration < UINT8_MAX);
+	++miLoadGeneration;
 }
 
 void Server::Flush()
@@ -332,7 +335,7 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 					}
 					ScopedSuppressAllocationTracking suppress;
 					// Heap: raw game packet buffer grows on game-specific packets
-					mReceivedGamePackets.push_back({.iClientId = iClientId, .uiPacketType = packetData[0], .payload = std::vector<uint8_t>(packetData.begin() + 1, packetData.end())});
+					mReceivedGamePackets.push_back({.iClientId = iClientId, .iPacketType = packetData[0], .payload = std::vector<uint8_t>(packetData.begin() + 1, packetData.end())});
 				}
 				break;
 		}
@@ -345,145 +348,6 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 		LOG(kNetwork, kDebug, "Server::Receive dropped corrupt packet (type {}) Client: {}: {}", static_cast<uint8_t>(eType), iClientId, rException.what());
 		RecordContractViolation(iClientId, ContractViolationKind::kCorrupt, "corrupt payload", packetData[0], static_cast<int64_t>(packetData.size()));
 	}
-}
-
-void Server::BufferFrame(int64_t iTick, std::span<const std::pair<GridCoord, GridUpdateData>> gridUpdates)
-{
-	miLatestBufferedTick = iTick;
-	ScopedSuppressAllocationTracking suppress;
-
-	std::unordered_set<GridCoord> activeCoordinates;
-	activeCoordinates.reserve(gridUpdates.size());
-
-	for (const std::pair<GridCoord, GridUpdateData>& rGridUpdate : gridUpdates)
-	{
-		const GridCoord& rCoordinate = rGridUpdate.first;
-		const GridUpdateData& rUpdateData = rGridUpdate.second;
-		activeCoordinates.insert(rCoordinate);
-
-		// Heap: per-coord ring buffer grows until steady state
-		PerCoordBufferedFrame buffered {};
-		buffered.iTick = iTick;
-		buffered.uiSharedCrc = rUpdateData.uiSharedCrc;
-
-		if (!rUpdateData.statusChanges.empty())
-		{
-			int64_t iStatusChangeCount = static_cast<int64_t>(rUpdateData.statusChanges.size());
-			if (iStatusChangeCount > kiMaximumStatusChangesPerCell)
-			{
-				// Should never happen: the sim must not exceed the protocol's per-cell cap (also the client decode
-				// scratch size and the compression-scratch sizing basis). Alert in debug, then drop the payload rather
-				// than overflow the scratch. The frame is still buffered (ring contiguity) with its uiSharedCrc, so the
-				// client CRC-mismatches and resyncs instead of applying a truncated batch.
-				DEBUG_BREAK();
-				LOG(kNetwork, kError, "Server::BufferFrame status change count {} exceeds cap {}, dropping payload Coord: ({},{}) Frame: {}", iStatusChangeCount, kiMaximumStatusChangesPerCell, rCoordinate.iX, rCoordinate.iY, iTick);
-			}
-			else
-			{
-				int64_t iCompressedSize = game::NetworkSessionContract::CompressStatusChanges(std::span<const game::StatusChange>(rUpdateData.statusChanges.data(), static_cast<size_t>(iStatusChangeCount)), std::span<uint8_t>(mCompressionBuffer));
-				if (iCompressedSize > 0)
-				{
-					buffered.compressedData.assign(mCompressionBuffer.begin(), mCompressionBuffer.begin() + iCompressedSize);
-				}
-				else
-				{
-					// Compression failed despite the sized scratch — drop the payload (logged kError by the codec)
-					// rather than buffer an empty prefix, which the client's status-change decoder rejects as a corrupt
-					// payload — a fatal response to the server's own encoding failure.
-					LOG(kNetwork, kError, "Server::BufferFrame compression failed, dropping payload Coord: ({},{}) Frame: {} Count: {}", rCoordinate.iX, rCoordinate.iY, iTick, iStatusChangeCount);
-				}
-			}
-		}
-
-		std::deque<PerCoordBufferedFrame>& rCoordinateBuffer = mPerCoordinateBufferedFrames.try_emplace(rCoordinate).first->second;
-		rCoordinateBuffer.push_back(std::move(buffered));
-		while (static_cast<int64_t>(rCoordinateBuffer.size()) > kiMaximumBufferedFrames)
-		{
-			rCoordinateBuffer.pop_front();
-		}
-	}
-
-	// Prune ring buffers for coords no longer in the active set
-	std::erase_if(mPerCoordinateBufferedFrames, [&activeCoordinates](const std::pair<const GridCoord, std::deque<PerCoordBufferedFrame>>& rEntry)
-	{
-		return !activeCoordinates.contains(rEntry.first);
-	});
-}
-
-void Server::BufferFullFrame(int64_t iTick, std::span<const std::pair<GridCoord, const game::Frame*>> frames)
-{
-	ScopedSuppressAllocationTracking suppress;
-
-	// Evict oldest entries first, recycling their per-coord string storage into the pool so the build
-	// loop below serializes into reused capacity (no large allocation once at steady state).
-	// Heap: ring/pool grow until steady state
-	while (static_cast<int64_t>(mBufferedFullFrames.size()) >= kiMaximumBufferedFrames)
-	{
-		for (auto& [rCoordinate, rSerialized] : mBufferedFullFrames.front().serializedFrames)
-		{
-			mFullFramePool.push_back(std::move(rSerialized));
-		}
-		mBufferedFullFrames.pop_front();
-	}
-
-	BufferedFullFrame buffered {};
-	buffered.iTick = iTick;
-
-	for (const std::pair<GridCoord, const game::Frame*>& rFrame : frames)
-	{
-		std::string serialized;
-		if (!mFullFramePool.empty())
-		{
-			serialized = std::move(mFullFramePool.back());
-			mFullFramePool.pop_back();
-		}
-		serialized.clear();
-
-		mFrameStreamBuffer.mpTarget = &serialized;
-		game::NetworkSessionContract::WriteFrame(mFrameStream, *rFrame.second);
-
-		buffered.serializedFrames.insert_or_assign(rFrame.first, std::move(serialized));
-	}
-
-	mBufferedFullFrames.push_back(std::move(buffered));
-}
-
-void Server::ClearBufferedFrames()
-{
-	mPerCoordinateBufferedFrames.clear();
-	mBufferedFullFrames.clear();
-	miLatestBufferedTick = -1;
-}
-
-const PerCoordBufferedFrame* Server::FindBufferedFrame(GridCoord coordinate, int64_t iTick) const
-{
-	auto it = mPerCoordinateBufferedFrames.find(coordinate);
-	if (it == mPerCoordinateBufferedFrames.end())
-	{
-		return nullptr;
-	}
-	const std::deque<PerCoordBufferedFrame>& rCoordinateBuffer = it->second;
-	if (rCoordinateBuffer.empty())
-	{
-		return nullptr;
-	}
-	int64_t iIndex = iTick - rCoordinateBuffer.front().iTick;
-	if (iIndex < 0 || iIndex >= static_cast<int64_t>(rCoordinateBuffer.size()))
-	{
-		return nullptr;
-	}
-	return &rCoordinateBuffer.at(static_cast<size_t>(iIndex));
-}
-
-int Server::CompressToBuffer(std::span<const char> data)
-{
-	int iSize = static_cast<int>(data.size());
-	int iMaxCompressed = LZ4_compressBound(iSize);
-	if (static_cast<int>(mCompressionBuffer.size()) < iMaxCompressed)
-	{
-		mCompressionBuffer.resize(iMaxCompressed);
-	}
-	return LZ4_compress_default(data.data(), reinterpret_cast<char*>(mCompressionBuffer.data()), iSize, iMaxCompressed);
 }
 
 void Server::RemoveClient(int64_t iClientId)
@@ -532,7 +396,7 @@ ClientConnection* Server::FindHandshakenClient(int64_t iClientId)
 	return (pClient != nullptr && pClient->bHandshakeComplete) ? pClient : nullptr;
 }
 
-void Server::RecordContractViolation(int64_t iClientId, ContractViolationKind eKind, std::string_view reason, uint8_t uiPacketType, int64_t iSize)
+void Server::RecordContractViolation(int64_t iClientId, ContractViolationKind eKind, std::string_view reason, int64_t iPacketType, int64_t iSize)
 {
 	ClientConnection* pClient = FindClient(iClientId);
 	if (pClient == nullptr)
@@ -568,12 +432,12 @@ void Server::RecordContractViolation(int64_t iClientId, ContractViolationKind eK
 	// back to zero) plus one Disconnecting line per hostile client, no per-packet spam, no cooldown state.
 	if (riViolations == 1)
 	{
-		LOG(kNetwork, kWarning, "Server::RecordContractViolation First Client: {} Kind: {} Reason: {} Type: {} Size: {}", iClientId, pcKind, reason, uiPacketType, iSize);
+		LOG(kNetwork, kWarning, "Server::RecordContractViolation First Client: {} Kind: {} Reason: {} Type: {} Size: {}", iClientId, pcKind, reason, iPacketType, iSize);
 	}
 
 	if (riViolations >= iDisconnectCount)
 	{
-		LOG(kNetwork, kWarning, "Server::RecordContractViolation Disconnecting Client: {} Kind: {} Violations: {} Reason: {} Type: {} Size: {}", iClientId, pcKind, riViolations, reason, uiPacketType, iSize);
+		LOG(kNetwork, kWarning, "Server::RecordContractViolation Disconnecting Client: {} Kind: {} Violations: {} Reason: {} Type: {} Size: {}", iClientId, pcKind, riViolations, reason, iPacketType, iSize);
 
 		// Capture peer/GUID before the client record is removed below.
 		ENetPeer* pPeer = pClient->pPeer;
@@ -605,27 +469,453 @@ bool Server::AdmitGamePacket(const ReceivedGamePacket& rPacket, const ClientPack
 	{
 		// Sentinel: not client-sendable (server->client, unknown, or debug-control on a non-debug server).
 		// RecordContractViolation may remove the client — do not touch pClient afterward.
-		RecordContractViolation(rPacket.iClientId, ContractViolationKind::kCorrupt, "game type not client-sendable", rPacket.uiPacketType, iFullSize);
+		RecordContractViolation(rPacket.iClientId, ContractViolationKind::kCorrupt, "game type not client-sendable", rPacket.iPacketType, iFullSize);
 		return false;
 	}
 	if (iFullSize < rContract.iMinimumSize || iFullSize > rContract.iMaximumSize)
 	{
-		RecordContractViolation(rPacket.iClientId, ContractViolationKind::kCorrupt, "game packet size out of range", rPacket.uiPacketType, iFullSize);
+		RecordContractViolation(rPacket.iClientId, ContractViolationKind::kCorrupt, "game packet size out of range", rPacket.iPacketType, iFullSize);
 		return false;
 	}
 	// Per-type per-tick cap. uiTickTypeCounts is reset once per update by the engine (both of the update's polls
 	// share the window); engine and game types occupy disjoint type-byte ranges, so sharing one array across
 	// both dispatch points is coherent within that window.
-	if (++pClient->uiTickTypeCounts[rPacket.uiPacketType] > rContract.iMaximumPerTick)
+	if (++pClient->uiTickTypeCounts[rPacket.iPacketType] > rContract.iMaximumPerTick)
 	{
 		if (rContract.bOverCapCountsViolation)
 		{
-			RecordContractViolation(rPacket.iClientId, ContractViolationKind::kRate, "game packet per-tick cap exceeded", rPacket.uiPacketType, iFullSize);
+			RecordContractViolation(rPacket.iClientId, ContractViolationKind::kRate, "game packet per-tick cap exceeded", rPacket.iPacketType, iFullSize);
 		}
 		return false; // drop
 	}
 
 	return true;
+}
+
+void Server::ClientAcknowledgementStream(std::span<const uint8_t> packetData, int64_t iClientId)
+{
+	ClientConnection* pClient = FindHandshakenClient(iClientId);
+	if (pClient == nullptr)
+	{
+		return;
+	}
+
+	NetworkMessages::AckStreamEntry entries[NetworkManager::kiMaximumEnetCoordinateSlots] {};
+	NetworkMessages::ClientAckStreamMessage message
+	{
+		.pEntries = entries,
+		.iEntryCapacity = NetworkManager::kiMaximumEnetCoordinateSlots,
+	};
+	NetworkMessages::Read(packetData, message);
+
+	// A layout failure already threw above and is recorded by the dispatch catch; this cross-check only
+	// catches a readable packet whose declared slot count disagrees with its byte length, so no packet is
+	// counted twice.
+	if (static_cast<int64_t>(packetData.size()) != NetworkMessages::ClientAckStreamMessage::GetSize(message.uiSlotCount))
+	{
+		RecordContractViolation(iClientId, ContractViolationKind::kCorrupt, "ackstream size", packetData[0], static_cast<int64_t>(packetData.size()));
+		return;
+	}
+
+	mBufferedFrames.ApplyAckStream(*pClient, message, iClientId);
+}
+
+void Server::ClientDesynchronizationReport(std::span<const uint8_t> packetData, int64_t iClientId)
+{
+	ClientConnection* pClient = FindHandshakenClient(iClientId);
+	if (pClient == nullptr)
+	{
+		return;
+	}
+
+	NetworkMessages::ClientDesyncReportMessage message {};
+	NetworkMessages::Read(packetData, message);
+	// Before the cooldown, so a corrupt report does not consume it.
+	if (message.iTick < 0)
+	{
+		NetworkMessages::ThrowCorruptStream("Server::ClientDesyncReport");
+	}
+
+	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+	if (now < pClient->desynchronizationReportDeadline)
+	{
+		return;
+	}
+	pClient->desynchronizationReportDeadline = now + kDesynchronizationDiagnosticCooldown;
+
+	int64_t iTick = message.iTick;
+	GridCoord coordinate = message.coord;
+	uint64_t uiExpectedCrc = message.uiExpectedCrc;
+	uint64_t uiActualCrc = message.uiActualCrc;
+
+	char pcExpected[20] {};
+	char pcActual[20] {};
+	LOG(kNetwork, kError, "Server::ClientDesyncReport Frame: {} Grid: ({},{}) Expected: {} Actual: {}", iTick, coordinate.iX, coordinate.iY, common::ToHex(std::span(pcExpected), uiExpectedCrc), common::ToHex(std::span(pcActual), uiActualCrc));
+}
+
+void Server::ClientDebugFrameRequest(std::span<const uint8_t> packetData, ENetPeer* pPeer, int64_t iClientId)
+{
+	ClientConnection* pClient = FindHandshakenClient(iClientId);
+	if (pClient == nullptr)
+	{
+		return;
+	}
+
+	NetworkMessages::ClientDebugFrameRequestMessage message {};
+	NetworkMessages::Read(packetData, message);
+	// Before the cooldown, so a corrupt request does not consume it.
+	if (message.iTick < 0)
+	{
+		NetworkMessages::ThrowCorruptStream("Server::ClientDebugFrameRequest");
+	}
+
+	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+	if (now < pClient->debugFrameRequestDeadline)
+	{
+		return;
+	}
+	pClient->debugFrameRequestDeadline = now + kDesynchronizationDiagnosticCooldown;
+
+	mBufferedFrames.SendDebugFrame(pPeer, message.iTick, message.coord);
+}
+
+void Server::ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, int64_t iClientId)
+{
+	NetworkMessages::ClientHelloMessage message {};
+	NetworkMessages::Read(packetData, message);
+
+	int64_t iClientProtocolVersion = message.uiProtocolVersion;
+	if (iClientProtocolVersion != kiProtocolVersion)
+	{
+		char pcMessage[256] {};
+		std::snprintf(pcMessage, sizeof(pcMessage), "Protocol version mismatch: server is %u, client is %u", static_cast<unsigned int>(kiProtocolVersion), static_cast<uint32_t>(iClientProtocolVersion));
+		LOG(kNetwork, kWarning, "Server::ClientHello Rejecting Client: {} Reason: {}", iClientId, pcMessage);
+
+		RejectHello(pPeer, iClientId, pcMessage);
+		return;
+	}
+
+	int64_t iClientFrameVersion = message.iFrameVersion;
+	if (iClientFrameVersion != game::NetworkSessionContract::Frame::kiVersion)
+	{
+		char pcMessage[256] {};
+		std::snprintf(pcMessage, sizeof(pcMessage), "Frame version mismatch: server is %lld, client is %lld", game::NetworkSessionContract::Frame::kiVersion, iClientFrameVersion);
+		LOG(kNetwork, kWarning, "Server::ClientHello Rejecting Client: {} Reason: {}", iClientId, pcMessage);
+
+		RejectHello(pPeer, iClientId, pcMessage);
+		return;
+	}
+
+	common::crc_t uiClientPackIntegrityToken = message.uiPackIntegrityToken;
+	common::crc_t uiServerPackIntegrityToken = gpFileManager->mpPackChunks->mPackIntegrityToken;
+	if (uiClientPackIntegrityToken != uiServerPackIntegrityToken)
+	{
+		char pcMessage[256] {};
+		std::snprintf(pcMessage, sizeof(pcMessage), "Pack integrity mismatch: server token is %llu, client token is %llu. Regenerate generated game data and retry.", static_cast<unsigned long long>(uiServerPackIntegrityToken), static_cast<unsigned long long>(uiClientPackIntegrityToken));
+		LOG(kNetwork, kWarning, "Server::ClientHello Rejecting Client: {} Reason: {}", iClientId, pcMessage);
+
+		RejectHello(pPeer, iClientId, pcMessage);
+		return;
+	}
+
+	char pcClientConfiguration[64] = {};
+	int64_t iCopyLength = std::min(std::ssize(message.buildConfiguration), std::ssize(pcClientConfiguration) - 1);
+	std::memcpy(pcClientConfiguration, message.buildConfiguration.data(), static_cast<size_t>(iCopyLength));
+
+	if (std::strcmp(pcClientConfiguration, kpcBuildConfigurationName) != 0)
+	{
+		LOG(kNetwork, kWarning, "Server::ClientHello Client {} build config mismatch: server is {}, client is {}", iClientId, kpcBuildConfigurationName, pcClientConfiguration);
+	}
+
+	ClientGuid clientGuid = message.bHasGuid ? message.guid : ClientGuid {};
+
+	ClientConnection* pClient = FindClient(iClientId);
+	if (pClient == nullptr)
+	{
+		LOG(kNetwork, kWarning, "Server::ClientHello Rejecting Client: {} Reason: no connection state", iClientId);
+		return;
+	}
+
+	// Idempotent replay: an already-handshaken client re-sends the accept using its STORED GUID.
+	// Do not overwrite established identity (fleet ownership is GUID-keyed) or mint a fresh GUID.
+	if (pClient->bHandshakeComplete)
+	{
+		LOG(kNetwork, kInfo, "Server::ClientHello Replay Client: {} GUID: {} {}", iClientId, pClient->clientGuid.uiHigh, pClient->clientGuid.uiLow);
+		SendConnectionResponse(pPeer, true, nullptr, &pClient->clientGuid);
+		SendTimespeedUpdate(pPeer, game::gpGame->mTimeStep.miTimeMultiply, game::gpGame->mTimeStep.miTimeDivide);
+		return;
+	}
+
+	// One live handshaken peer per GUID: fleet ownership is GUID-keyed, so a second peer must not take over the first's identity.
+	// This peer's own record is not yet handshaken (the replay branch returned otherwise), so it cannot match itself.
+	if ((clientGuid.uiHigh != 0 || clientGuid.uiLow != 0))
+	{
+		auto it = std::ranges::find_if(mClients, [&clientGuid](const ClientConnection& rOther)
+		{
+			return rOther.bHandshakeComplete && rOther.clientGuid == clientGuid;
+		});
+		if (it != mClients.end())
+		{
+			const char* pcMessage = "Duplicate client GUID: another connected client already uses this identity";
+			LOG(kNetwork, kWarning, "Server::ClientHello Rejecting Client: {} Reason: {} Existing Client: {}", iClientId, pcMessage, it->iClientId);
+
+			SendConnectionResponse(pPeer, false, pcMessage, nullptr);
+			RemoveClient(iClientId);
+			enet_peer_disconnect_later(pPeer, 0);
+			return;
+		}
+	}
+
+	if ((clientGuid.uiHigh == 0 && clientGuid.uiLow == 0))
+	{
+		::UUID uuid;
+		[[maybe_unused]] int64_t iRpcStatus = UuidCreate(&uuid); // RPC_S_UUID_LOCAL_ONLY still yields a usable UUID
+		std::memcpy(&clientGuid.uiHigh, &uuid, 8);
+		std::memcpy(&clientGuid.uiLow, reinterpret_cast<const uint8_t*>(&uuid) + 8, 8);
+	}
+
+	pClient->bHandshakeComplete = true;
+	pClient->clientGuid = clientGuid;
+
+	LOG(kNetwork, kInfo, "Server::ClientHello Accepted Client: {} Config: {} GUID: {} {}", iClientId, pcClientConfiguration, clientGuid.uiHigh, clientGuid.uiLow);
+	SendConnectionResponse(pPeer, true, nullptr, &clientGuid);
+
+	SendTimespeedUpdate(pPeer, game::gpGame->mTimeStep.miTimeMultiply, game::gpGame->mTimeStep.miTimeDivide);
+}
+
+void Server::RejectHello(ENetPeer* pPeer, int64_t iClientId, const char* pcMessage)
+{
+	SendConnectionResponse(pPeer, false, pcMessage, nullptr);
+
+	// An accepted client's removal must reach the game layer: the later DISCONNECT event finds no record and publishes nothing.
+	if (const ClientConnection* pClient = FindHandshakenClient(iClientId); pClient != nullptr)
+	{
+		ScopedSuppressAllocationTracking suppress;
+		mPendingDisconnects.push_back({.iClientId = iClientId, .clientGuid = pClient->clientGuid});
+	}
+
+	RemoveClient(iClientId);
+	enet_peer_disconnect_later(pPeer, 0);
+}
+
+void Server::ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClientId)
+{
+	NetworkMessages::ClientSubscribeMessage message {};
+	NetworkMessages::Read(packetData, message);
+
+	GridCoord coordinate = message.coord;
+
+	ClientConnection* pClient = FindHandshakenClient(iClientId);
+	if (pClient == nullptr)
+	{
+		return;
+	}
+	if (message.uiLoadGeneration != miLoadGeneration)
+	{
+		LOG(kNetwork, kWarning, "Server::ClientSubscribe LoadGenerationMismatch Client: {} Received: {} Current: {}", iClientId, message.uiLoadGeneration, miLoadGeneration);
+		return;
+	}
+
+	// Answer every subscribe exactly once: the client matches each answer to its oldest outstanding request for the coord.
+	int64_t iExistingSlot = pClient->FindSlotForCoordinate(coordinate);
+	if (iExistingSlot >= 0)
+	{
+		LOG(kNetwork, kVerbose, "Server::ClientSubscribe AlreadySubscribed Client: {} Coord: ({},{})", iClientId, coordinate.iX, coordinate.iY);
+		SendSubscribeAccept(*pClient, iExistingSlot, coordinate);
+		return;
+	}
+
+	// The origin is always simulated and permits the initial fleet spawn.
+	bool bAdjacent = (coordinate == kOriginCoordinate);
+	for (const GridCoord& rOwnedCoordinate : pClient->authorizedCoordinates)
+	{
+		// 64-bit: the client-supplied coord is hostile input, so the difference can overflow int32 and std::abs(INT32_MIN) is undefined.
+		int64_t iDeltaX = std::abs(static_cast<int64_t>(coordinate.iX) - static_cast<int64_t>(rOwnedCoordinate.iX));
+		int64_t iDeltaY = std::abs(static_cast<int64_t>(coordinate.iY) - static_cast<int64_t>(rOwnedCoordinate.iY));
+		if (iDeltaX <= 1 && iDeltaY <= 1)
+		{
+			bAdjacent = true;
+			break;
+		}
+	}
+	if (!bAdjacent)
+	{
+		LOG(kNetwork, kWarning, "Server::ClientSubscribe Rejected (not adjacent) Client: {} Coord: ({},{})", iClientId, coordinate.iX, coordinate.iY);
+		SendSubscribeAccept(*pClient, kiSubscribeRejectSlot, coordinate);
+		return;
+	}
+
+	int64_t iSlot = pClient->AllocateSlot(game::NetworkSessionContract::kiCoordinateSlots);
+	if (iSlot < 0)
+	{
+		LOG(kNetwork, kWarning, "Server::ClientSubscribe No free slot Client: {} Coord: ({},{})", iClientId, coordinate.iX, coordinate.iY);
+		SendSubscribeAccept(*pClient, kiSubscribeRejectSlot, coordinate);
+		return;
+	}
+
+	pClient->slots.at(iSlot).subscription.coordinate = coordinate;
+	pClient->slots.at(iSlot).subscription.flags.Set(SubscriptionFlags::kActive);
+	++pClient->slots.at(iSlot).ack.uiEpoch;
+
+	LOG(kNetwork, kDebug, "Server::ClientSubscribe Client: {} Coord: ({},{}) Slot: {}", iClientId, coordinate.iX, coordinate.iY, iSlot);
+
+	SendSubscribeAccept(*pClient, iSlot, coordinate);
+
+	ScopedSuppressAllocationTracking suppress;
+	// Replace an existing pending entry for this client+slot (a subscribe->unsubscribe->subscribe
+	// cycle reuses the slot with a new coord) rather than appending a duplicate.
+	auto it = std::ranges::find_if(mPendingNewSubscriptions, [iClientId, iSlot](const PendingNewSubscription& rPending)
+	{
+		return rPending.iClientId == iClientId && rPending.iSlot == iSlot;
+	});
+	if (it != mPendingNewSubscriptions.end())
+	{
+		it->coordinate = coordinate;
+	}
+	else
+	{
+		// Heap: pending subscription entry
+		mPendingNewSubscriptions.push_back({.iClientId = iClientId, .iSlot = iSlot, .coordinate = coordinate});
+	}
+}
+
+void Server::ClientUnsubscribe(std::span<const uint8_t> packetData, int64_t iClientId)
+{
+	NetworkMessages::ClientUnsubscribeMessage message {};
+	NetworkMessages::Read(packetData, message);
+
+	int64_t iSlotIndex = message.uiSlotIndex;
+	int64_t iEpoch = message.uiEpoch;
+
+	ClientConnection* pClient = FindClient(iClientId);
+	if (pClient == nullptr)
+	{
+		return;
+	}
+
+	if (iSlotIndex < std::ssize(pClient->slots) && (pClient->slots.at(static_cast<size_t>(iSlotIndex)).subscription.flags & SubscriptionFlags::kActive)
+	 && pClient->slots.at(static_cast<size_t>(iSlotIndex)).ack.uiEpoch == iEpoch)
+	{
+		GridCoord coordinate = pClient->slots.at(static_cast<size_t>(iSlotIndex)).subscription.coordinate;
+		pClient->FreeSlot(iSlotIndex);
+
+		LOG(kNetwork, kDebug, "Server::ClientUnsubscribe Client: {} Slot: {} Coord: ({},{})", iClientId, iSlotIndex, coordinate.iX, coordinate.iY);
+	}
+
+	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+	NetworkMessages::ServerUnsubscribeAckMessage response {.uiSlotIndex = static_cast<uint8_t>(iSlotIndex)};
+	NetworkMessages::Write(rWorkbuffer, response);
+	NetworkManager::SendPacket(pClient->pPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+}
+
+void Server::ClientResynchronizationRequest(std::span<const uint8_t> packetData, int64_t iClientId)
+{
+	NetworkMessages::ClientResyncRequestMessage message {};
+	NetworkMessages::Read(packetData, message);
+
+	ClientConnection* pClient = FindHandshakenClient(iClientId);
+	if (pClient == nullptr)
+	{
+		return;
+	}
+
+	LOG(kNetwork, kWarning, "Server::ClientResyncRequest Client: {}", iClientId);
+
+	if (std::ranges::contains(mPendingResynchronizationClientIds, iClientId))
+	{
+		return;
+	}
+
+	// Heap: pending resync client-id vector grows on request
+	ScopedSuppressAllocationTracking suppress;
+	mPendingResynchronizationClientIds.push_back(iClientId);
+}
+
+void Server::SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char* pcMessage, const ClientGuid* pGloballyUniqueIdentifier)
+{
+	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+
+	NetworkMessages::ServerConnectionResponseMessage message
+	{
+		.uiLoadGeneration = static_cast<uint8_t>(miLoadGeneration),
+		.uiAccepted = bAccepted ? 1ui32 : 0ui32,
+		.uiDebugInput = kbDebugInput ? 1ui32 : 0ui32,
+		.guid = (pGloballyUniqueIdentifier != nullptr) ? *pGloballyUniqueIdentifier : ClientGuid {},
+		.bHasGuid = bAccepted && pGloballyUniqueIdentifier != nullptr,
+		.rejectionMessage = (!bAccepted && pcMessage != nullptr) ? pcMessage : "",
+	};
+	NetworkMessages::Write(rWorkbuffer, message);
+
+	NetworkManager::SendPacket(pPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+}
+
+void Server::SendSubscribeAccept(const ClientConnection& rClient, int64_t iSlot, GridCoord coordinate)
+{
+	int64_t iEpoch = (iSlot < std::ssize(rClient.slots)) ? rClient.slots.at(iSlot).ack.uiEpoch : 0;
+	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+	NetworkMessages::ServerSubscribeAcceptMessage message
+	{
+		.uiLoadGeneration = static_cast<uint8_t>(miLoadGeneration),
+		.uiSlotIndex = static_cast<uint8_t>(iSlot),
+		.uiEpoch = static_cast<uint16_t>(iEpoch),
+		.coord = coordinate,
+	};
+	NetworkMessages::Write(rWorkbuffer, message);
+	NetworkManager::SendPacket(rClient.pPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+}
+
+void Server::BroadcastLoadNotification()
+{
+	LOG(kDefault, kDebug, "Server::BroadcastLoadNotification");
+
+	for (const ClientConnection& rClient : mClients)
+	{
+		if (!rClient.bHandshakeComplete)
+		{
+			continue;
+		}
+
+		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+		NetworkMessages::ServerLoadNotificationMessage message {.uiLoadGeneration = static_cast<uint8_t>(miLoadGeneration)};
+		NetworkMessages::Write(rWorkbuffer, message);
+		NetworkManager::SendPacket(rClient.pPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	}
+}
+
+void Server::SendTimespeedUpdate(ENetPeer* pPeer, int64_t iMultiply, int64_t iDivide)
+{
+	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+	NetworkMessages::ServerTimespeedUpdateMessage message {.iMultiply = iMultiply, .iDivide = iDivide};
+	NetworkMessages::Write(rWorkbuffer, message);
+	NetworkManager::SendPacket(pPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+}
+
+void Server::BroadcastTimespeedIfChanged()
+{
+	if (!game::gpGame->mTimeStep.mbTimeScaleChanged) [[likely]]
+	{
+		return;
+	}
+	game::gpGame->mTimeStep.mbTimeScaleChanged = false;
+
+	int64_t iMultiply = game::gpGame->mTimeStep.miTimeMultiply;
+	int64_t iDivide = game::gpGame->mTimeStep.miTimeDivide;
+	LOG(kNetwork, kDebug, "Server::BroadcastTimespeedIfChanged Multiply: {} Divide: {}", iMultiply, iDivide);
+
+	for (const ClientConnection& rClient : mClients)
+	{
+		if (!rClient.bHandshakeComplete)
+		{
+			continue;
+		}
+
+		SendTimespeedUpdate(rClient.pPeer, iMultiply, iDivide);
+	}
 }
 
 } // namespace engine

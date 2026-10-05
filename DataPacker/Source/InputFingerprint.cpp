@@ -62,9 +62,9 @@ public:
 		}
 		std::string result;
 		result.reserve(64);
-		for (uint8_t uiByte : pDigest)
+		for (int64_t iByte : pDigest)
 		{
-			result += std::format("{:02x}", uiByte);
+			result += std::format("{:02x}", iByte);
 		}
 		return result;
 	}
@@ -82,12 +82,12 @@ static std::string HashFileContents(const std::filesystem::path& rPath, InputFin
 	std::vector<std::byte> normalizedBuffer;
 	if (eMode == InputFingerprintMode::kTextCrLf)
 	{
-		normalizedBuffer.resize(buffer.size() * 2 + 2);
+		normalizedBuffer.resize(static_cast<size_t>(std::ssize(buffer) * 2 + 2));
 	}
 	bool bPendingCarriageReturn = false;
 	while (stream)
 	{
-		stream.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
+		stream.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(std::ssize(buffer)));
 		int64_t iByteCount = stream.gcount();
 		if (eMode == InputFingerprintMode::kRaw)
 		{
@@ -138,11 +138,11 @@ static std::string HashFileContents(const std::filesystem::path& rPath, InputFin
 
 constexpr const char* kpcPersistentFingerprintMagic = "DataPackerInputFingerprint";
 constexpr int64_t kiPersistentFingerprintVersion = 2;
-constexpr uintmax_t kuiMaximumPersistentFingerprintBytes = 4 * 1'024;
+constexpr int64_t kiMaximumPersistentFingerprintBytes = 4 * 1'024;
 
 constexpr const char* kpcFingerprintCacheMagic = "DataPackerFingerprintCache";
 constexpr int64_t kiFingerprintCacheVersion = 1;
-constexpr uintmax_t kuiMaximumFingerprintCacheBytes = 64 * 1'024 * 1'024;
+constexpr int64_t kiMaximumFingerprintCacheBytes = 64 * 1'024 * 1'024;
 
 static bool IsSha256(std::string_view fingerprint)
 {
@@ -181,7 +181,7 @@ void InputFingerprintCache::Load()
 		{
 			return;
 		}
-		if (uiCacheSize > kuiMaximumFingerprintCacheBytes)
+		if (uiCacheSize > kiMaximumFingerprintCacheBytes)
 		{
 			return;
 		}
@@ -230,7 +230,7 @@ void InputFingerprintCache::Save()
 	}
 	// Sorted output keeps a rewrite of unchanged content byte-identical in the cross-worktree shared cache.
 	std::vector<const std::pair<const std::string, CachedFingerprint>*> sortedEntries;
-	sortedEntries.reserve(mCachedFingerprints.size());
+	sortedEntries.reserve(static_cast<size_t>(std::ssize(mCachedFingerprints)));
 	for (const std::pair<const std::string, CachedFingerprint>& rEntry : mCachedFingerprints)
 	{
 		sortedEntries.push_back(&rEntry);
@@ -273,9 +273,9 @@ void InputFingerprintCache::Save()
 	}
 	if (!MoveFileExW(temporaryPath.native().c_str(), mCacheFile.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
 	{
-		DWORD uiError = GetLastError();
+		int64_t iError = GetLastError();
 		std::filesystem::remove(temporaryPath);
-		throw std::system_error(static_cast<int>(uiError), std::system_category(), std::format("Failed to publish fingerprint cache \"{}\"", mCacheFile.string()));
+		throw std::system_error(static_cast<int>(iError), std::system_category(), std::format("Failed to publish fingerprint cache \"{}\"", mCacheFile.string()));
 	}
 	mbDirty = false;
 }
@@ -337,7 +337,7 @@ std::string InputFingerprintCache::GetPersistentFile(const std::filesystem::path
 		{
 			throw std::runtime_error("Invalid fingerprint metadata size");
 		}
-		if (uiMetadataSize > kuiMaximumPersistentFingerprintBytes)
+		if (uiMetadataSize > kiMaximumPersistentFingerprintBytes)
 		{
 			throw std::runtime_error("Invalid fingerprint metadata size");
 		}
@@ -392,9 +392,9 @@ std::string InputFingerprintCache::GetPersistentFile(const std::filesystem::path
 	}
 	if (!MoveFileExW(temporaryPath.native().c_str(), metadataPath.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
 	{
-		DWORD uiError = GetLastError();
+		int64_t iError = GetLastError();
 		std::filesystem::remove(temporaryPath);
-		throw std::system_error(static_cast<int>(uiError), std::system_category(), std::format("Failed to publish fingerprint metadata \"{}\"", metadataPath.string()));
+		throw std::system_error(static_cast<int>(iError), std::system_category(), std::format("Failed to publish fingerprint metadata \"{}\"", metadataPath.string()));
 	}
 	mCachedFingerprints.insert_or_assign(key, CachedFingerprint {.snapshot = snapshot, .fingerprint = fingerprint});
 	mbDirty = true;

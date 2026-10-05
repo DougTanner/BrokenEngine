@@ -33,8 +33,6 @@ plus the session's residue removed and semantic candidates routed to the caller.
 - `Paths` — repository-relative path prefixes restricting a session-changed
   scope, each matching that path or anything below it; absent to review the
   whole session.
-- `Jev` — `skip`, supplied only after the user says "skip jev"; the worker then
-  never runs the judgment script. Absent otherwise.
 
 The scanner also has a whole-file mode that lists the `style-rule-<n>`
 candidates on every line of named tracked `*.h`/`*.cpp` files, each a path
@@ -54,28 +52,12 @@ Return the shared handoff form in
 - `Renames and Required Builds` — one row per rename: old → new, propagated
   C++ references; or none.
 - `Routed Findings` — routed candidates with file:line, proposed finding,
-  classification or domain-review route; or none. Give one row per candidate,
-  including confirmed rule 49 entries, without repeating them in `Judgment`.
+  classification or domain-review route; or none. Give one row per candidate.
   Full rows may move to evidence under the shared Handoffs overflow rules;
   retain the routed-candidate count inline when they move.
 - `Documentation Residuals` — one row each: identifier, file:line, and
   `/update-claude-docs` or the caller; or none.
 - `Functions/regions touched` — one row per function or region, or none.
-- `Judgment` — `confirmed: <count>; false flags: <count>` for adjudicated
-  flagged rule 49 entries; `none` when the script returned zero flagged rule 49
-  entries; `skipped (user)` on `Jev: skip`; `not applicable (cleanup scope)`
-  for a caller-supplied scope; `not run — <code>: <message>` when the script
-  returned no usable result; plus one `partial — <message>` row on a
-  `blocks.partial` result. Counts cover only entries available for adjudication.
-
-The shared `Evidence` field cites
-`Temp/code-style-review-judgment.json` with the `status`, `code`,
-and `blocks` selectors when that result document exists, and
-`blocks[*].flagged` only where present. For
-adjudicated flagged rule 49 entries, it also cites
-`Temp/code-style-review-adjudication.md ## Judgment` for the complete per-entry
-decisions. Per-entry adjudication rows are evidence, not required
-inline text.
 
 The shared `Build required` field names the exact affected targets, or `none`.
 Each shared `Residuals` row names an unresolved item; use `none` when absent.

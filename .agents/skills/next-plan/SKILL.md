@@ -135,21 +135,29 @@ The `argument-hint` value selects the Plan:
    [tier3-workflow.md](references/tier3-workflow.md). Done when every required review has
    completed and accepted findings are resolved, or a missing mandatory
    reviewer is reported as a blocker.
-6. Invoke step 3's claim script idempotently immediately before the final
-   preparation handoff. When that result carries a `sync` object, the tree
-   moved under the preparation evidence: main lists, as names only with no
-   diff content, the paths `sync.from..sync.to` changed and keeps those the
-   preparation handoff cited. When that list is non-empty, main never reads
-   that diff itself: it dispatches one `researcher` with `sync.from..sync.to`,
-   the intersecting paths, and the preparation snapshot's path and `##`
-   selectors, and that worker returns under `Decisive checks`, without quoting
-   the diff, one row per path stating whether its change touches a statement
-   the preparation handoff or execution card relies on.
+6. Unless step 10 already ran (the changes-requested row in
+   `### Post-checkpoint outcomes`), invoke step 3's claim script idempotently
+   immediately before the final preparation handoff. When that result carries
+   a `sync` object, the tree moved under the preparation evidence, and main
+   never lists or reads that
+   range itself: it dispatches one `researcher` with `sync.from..sync.to`, the
+   preparation snapshot's path and `##` selectors, and the preparation
+   handoff's one-line rows that cite repository paths outside that snapshot.
+   That worker lists the changed names with
+   `git diff --name-only --no-renames <sync.from> <sync.to>`, keeps those the
+   snapshot or those rows cite, including skill-relative (resolving against
+   the directory of the skill whose `SKILL.md` or name the surrounding text
+   cites), directory, and skill-name (`/<skill>`, resolving to that skill's
+   `.agents/skills/<name>/` files) citations, and returns under
+   `Decisive checks`, without quoting the diff or the uncited names, one row
+   with the count of changed cited paths and one row per changed cited path
+   stating whether its change touches a statement the preparation handoff or
+   execution card relies on.
    When any row reports a touch, return to step 4, rerun the affected Plan
    review checks in step 5, and repeat this final refresh before approval;
-   reuse review evidence whose inputs did not change. Done when it reports the
-   held claim and either no cited path intersects or every returned row
-   reports no touch.
+   reuse review evidence whose inputs did not change. Done when the claim
+   result reports the held claim and either the claim result carries no `sync`
+   object, the count row reports zero, or every per-path row reports no touch.
 7. Present for approval per this file's `### Implementation approval`. Done
    when the user's decision arrives.
 8. Implement the approved change. Done when its own acceptance checks pass.
@@ -190,6 +198,7 @@ The `argument-hint` value selects the Plan:
 | Run outcome | Claim disposition | Next action |
 | --- | --- | --- |
 | implementation accepted and verified | held | run `Complete-NextPlan.ps1`, then the landing gate |
+| changes requested at the `/finalize-changes` landing confirmation | held | prepare only the difference at step 4, whose brief cites the existing preparation snapshot, with its `## In scope` and `## Out of scope`, in place of the deleted claimed Plan; run step 5, then step 8 on top of the unlanded candidate commit, because the request is a choice that came with approval under `### Implementation approval`, so step 7 presents only the difference when step 5 adds a user decision, widens scope, or raises the tier; skip steps 6, 9, and 10, which already ran, and skip the checkpoint for every later outcome of the run; then dispatch a fresh `/finalize-changes` preparation whose brief records that the claim exit already ran |
 | user explicitly authorizes rejection | held | run `Complete-NextPlan.ps1 -Reject`, then the landing gate |
 | claim wrapper returns `claim.plan-mismatch` | held, identified only by `conflict.heldPlan` | run the checkpoint once, retain the held claim and all work, report requested and held Plans, and stop; never complete, reject, or defer implicitly |
 | approval refused, or a blocker whose authoritative result explicitly reports a held claim, with no separate defer instruction | held | run the checkpoint once, retain the claim and all work, report and stop; never complete, reject, or defer implicitly, and any checkpoint work created stays with the retained session |

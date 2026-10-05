@@ -232,8 +232,9 @@ void SwapchainManager::CreateSwapchain(VkSwapchainKHR vkOldSwapchain)
 
 	uint32_t uiPresentModeCount = 0;
 	CHECK_VK(vkGetPhysicalDeviceSurfacePresentModesKHR(gpInstanceManager->mVkPhysicalDevice, gpInstanceManager->mVkSurfaceKHR, &uiPresentModeCount, nullptr));
-	ASSERT(uiPresentModeCount != 0);
-	std::vector<VkPresentModeKHR> physicalDevicePresentModes(uiPresentModeCount);
+	int64_t iPresentModeCount = static_cast<int64_t>(uiPresentModeCount);
+	ASSERT(iPresentModeCount != 0);
+	std::vector<VkPresentModeKHR> physicalDevicePresentModes(static_cast<size_t>(iPresentModeCount));
 	CHECK_VK(vkGetPhysicalDeviceSurfacePresentModesKHR(gpInstanceManager->mVkPhysicalDevice, gpInstanceManager->mVkSurfaceKHR, &uiPresentModeCount, physicalDevicePresentModes.data()));
 
 	LOG(kGraphics, kInfo, "Present modes ({}):", std::ssize(physicalDevicePresentModes));
@@ -279,12 +280,12 @@ void SwapchainManager::CreateSwapchain(VkSwapchainKHR vkOldSwapchain)
 	mfAspectRatio = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width) / static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 
 	// Prefer at least three swapchain images within surface limits so rendering below the vsync rate can use triple buffering.
-	uint32_t uiMinImageCount = std::max(3ui32, vkSurfaceCapabilitiesKHR.minImageCount);
+	int64_t iMinImageCount = std::max(3i64, static_cast<int64_t>(vkSurfaceCapabilitiesKHR.minImageCount));
 	if (vkSurfaceCapabilitiesKHR.maxImageCount > 0)
 	{
-		uiMinImageCount = std::min(uiMinImageCount, vkSurfaceCapabilitiesKHR.maxImageCount);
+		iMinImageCount = std::min(iMinImageCount, static_cast<int64_t>(vkSurfaceCapabilitiesKHR.maxImageCount));
 	}
-	LOG(kGraphics, kDebug, "uiMinImageCount: {}", uiMinImageCount);
+	LOG(kGraphics, kDebug, "uiMinImageCount: {}", iMinImageCount);
 
 	uint32_t pQueueFamilyIndices[]
 	{
@@ -302,7 +303,7 @@ void SwapchainManager::CreateSwapchain(VkSwapchainKHR vkOldSwapchain)
 		.pNext = nullptr,
 		.flags = 0,
 		.surface = gpInstanceManager->mVkSurfaceKHR,
-		.minImageCount = uiMinImageCount,
+		.minImageCount = static_cast<uint32_t>(iMinImageCount),
 		.imageFormat = gpInstanceManager->mFramebufferVkFormat,
 		.imageColorSpace = gpInstanceManager->mFramebufferVkColorSpaceKHR,
 		.imageExtent = gpGraphics->mFramebufferVkExtent2D,
@@ -331,9 +332,11 @@ void SwapchainManager::CreateFramebuffers()
 {
 	uint32_t uiImageCount = 0;
 	CHECK_VK(vkGetSwapchainImagesKHR(gpDeviceManager->mVkDevice, mVkSwapchainKHR, &uiImageCount, nullptr));
-	ASSERT(uiImageCount != 0);
-	std::vector<VkImage> swapchainImages(uiImageCount);
+	int64_t iImageCount = static_cast<int64_t>(uiImageCount);
+	ASSERT(iImageCount != 0);
+	std::vector<VkImage> swapchainImages(static_cast<size_t>(iImageCount));
 	CHECK_VK(vkGetSwapchainImagesKHR(gpDeviceManager->mVkDevice, mVkSwapchainKHR, &uiImageCount, swapchainImages.data()));
+	iImageCount = static_cast<int64_t>(uiImageCount);
 
 	VkImageAspectFlags vkImageAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
 	if (gpInstanceManager->mDepthVkFormat == VK_FORMAT_D16_UNORM_S8_UINT || gpInstanceManager->mDepthVkFormat == VK_FORMAT_D24_UNORM_S8_UINT || gpInstanceManager->mDepthVkFormat == VK_FORMAT_D32_SFLOAT_S8_UINT)
@@ -347,8 +350,8 @@ void SwapchainManager::CreateFramebuffers()
 		.vkImageCreateFlags = 0,
 		.vkFormat = gpInstanceManager->mDepthVkFormat,
 		.vkExtent3D = VkExtent3D {.width = gpGraphics->mFramebufferVkExtent2D.width, .height = gpGraphics->mFramebufferVkExtent2D.height, .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = gMultisampling.Get<bool>() ? gSampleCount.Get<VkSampleCountFlagBits>() : VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -366,8 +369,8 @@ void SwapchainManager::CreateFramebuffers()
 			.vkImageCreateFlags = 0,
 			.vkFormat = VK_FORMAT_R16G16B16A16_SFLOAT,
 			.vkExtent3D = VkExtent3D {.width = gpGraphics->mFramebufferVkExtent2D.width, .height = gpGraphics->mFramebufferVkExtent2D.height, .depth = 1},
-			.uiMipLevels = 1,
-			.uiArrayLayers = 1,
+			.iMipLevels = 1,
+			.iArrayLayers = 1,
 			.vkSampleCountFlagBits = gSampleCount.Get<VkSampleCountFlagBits>(),
 			.vkImageUsageFlags = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 			.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -384,8 +387,8 @@ void SwapchainManager::CreateFramebuffers()
 		.vkImageCreateFlags = 0,
 		.vkFormat = VK_FORMAT_R16G16B16A16_SFLOAT,
 		.vkExtent3D = VkExtent3D {.width = gpGraphics->mFramebufferVkExtent2D.width, .height = gpGraphics->mFramebufferVkExtent2D.height, .depth = 1},
-		.uiMipLevels = 1,
-		.uiArrayLayers = 1,
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
 		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
 		.vkImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -411,7 +414,7 @@ void SwapchainManager::CreateFramebuffers()
 	CHECK_VK(vkCreateFramebuffer(gpDeviceManager->mVkDevice, &vkHdrFramebufferCreateInfo, nullptr, &mHdrVkFramebuffer));
 	VkName(VK_OBJECT_TYPE_FRAMEBUFFER, mHdrVkFramebuffer, "Hdr");
 
-	mFramebuffers.resize(uiImageCount);
+	mFramebuffers.resize(static_cast<size_t>(iImageCount));
 	miFramebufferIndex = 0;
 	for (int64_t i = 0; Framebuffer& rFrameBuffer : mFramebuffers)
 	{
@@ -467,7 +470,7 @@ void SwapchainManager::CreateFramebuffers()
 
 void SwapchainManager::CreateSynchronizationObjects()
 {
-	mImageAvailableFences.resize(mFramebuffers.size());
+	mImageAvailableFences.resize(static_cast<size_t>(std::ssize(mFramebuffers)));
 	miFenceAvailableIndex = 0;
 	for ([[maybe_unused]] int64_t i = 0; VkFence& rVkFence : mImageAvailableFences)
 	{
@@ -481,7 +484,7 @@ void SwapchainManager::CreateSynchronizationObjects()
 		VkName(VK_OBJECT_TYPE_FENCE, rVkFence, std::format("ImageAvailable {}", i++).c_str());
 	}
 
-	mImageAvailableSemaphores.resize(mFramebuffers.size() + 1);
+	mImageAvailableSemaphores.resize(static_cast<size_t>(std::ssize(mFramebuffers) + 1));
 	miImageAvailableIndex = 0;
 	for ([[maybe_unused]] int64_t i = 0; VkSemaphore& rVkSemaphore : mImageAvailableSemaphores)
 	{

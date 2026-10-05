@@ -71,8 +71,8 @@ void SetVkObjectName([[maybe_unused]] VkObjectType vkObjectType, [[maybe_unused]
 			// string_VkObjectType returns "Unhandled VkObjectType" for unrecognized types (no "VK_OBJECT_TYPE_"
 			// prefix); strip the prefix only when present, else the fixed skip mis-truncates the fallback into a garbage tail.
 			const char* pcTypeName = string_VkObjectType(vkObjectType);
-			size_t uiPrefixLength = std::char_traits<char>::length("VK_OBJECT_TYPE_");
-			const char* pcPrefix = std::char_traits<char>::compare(pcTypeName, "VK_OBJECT_TYPE_", uiPrefixLength) == 0 ? pcTypeName + uiPrefixLength : pcTypeName;
+			int64_t iPrefixLength = static_cast<int64_t>(std::char_traits<char>::length("VK_OBJECT_TYPE_"));
+			const char* pcPrefix = std::char_traits<char>::compare(pcTypeName, "VK_OBJECT_TYPE_", static_cast<size_t>(iPrefixLength)) == 0 ? pcTypeName + iPrefixLength : pcTypeName;
 			common::ScopedWorkbufferArena innerArena = rWorkbuffer.Push();
 			rWorkbuffer.Append(pcPrefix);
 			rWorkbuffer.Append(" ");

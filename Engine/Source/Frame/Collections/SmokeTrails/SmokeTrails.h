@@ -13,7 +13,7 @@ struct FrameStaticData;
 struct SmokeTrailsType
 {
 	common::crc_t uiCrc = 0;
-	uint32_t uiColor = 0xFFFFFFFF;
+	int64_t iColor = 0xFFFFFFFF;
 	float fWidth = 1.0f;
 };
 
@@ -63,7 +63,7 @@ struct SmokeTrailsPostRender : public Collection<SmokeTrailsPostRender>
 
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
 
-	static void Add(game::Frame& __restrict rFrame, smoke_trails_t& rId, uint8_t uiTypeIndex);
+	static void Add(game::Frame& __restrict rFrame, smoke_trails_t& rId, int64_t iTypeIndex);
 
 
 	smoke_trails_t* __restrict pIds = nullptr;

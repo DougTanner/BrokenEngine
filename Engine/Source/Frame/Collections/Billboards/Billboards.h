@@ -22,7 +22,7 @@ struct BillboardsType
 	common::crc_t uiCrc = 0;
 	float fSize = 1.0f;
 	float fAlpha = 1.0f;
-	uint8_t uiGameType = 0;
+	int64_t iGameType = 0;
 };
 
 struct BillboardsInterpolate : public Collection<BillboardsInterpolate, CollectionFlags::kIdToIndex>,
@@ -35,7 +35,7 @@ struct BillboardsInterpolate : public Collection<BillboardsInterpolate, Collecti
 	struct SyncData
 	{
 		XMVECTOR vecPosition {};
-		uint8_t uiTypeIndex = 0;
+		int64_t iTypeIndex = 0;
 		BillboardFlags_t flags;
 		float fRotation = 0.0f;
 		float fExtra = 0.0f;
@@ -67,8 +67,8 @@ using billboard_t = BillboardsInterpolate::id_t;
 struct BillboardsPostRender : public Collection<BillboardsPostRender>
 {
 	static void Update(const game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
-	static void Add(game::Frame& __restrict rFrame, billboard_t&& rId, uint8_t) = delete;
-	static void Add(game::Frame& __restrict rFrame, billboard_t& rId, uint8_t uiTypeIndex);
+	static void Add(game::Frame& __restrict rFrame, billboard_t&& rId, int64_t) = delete;
+	static void Add(game::Frame& __restrict rFrame, billboard_t& rId, int64_t iTypeIndex);
 
 	billboard_t* __restrict pIds = nullptr;
 	auto Members(this auto&& rSelf)

@@ -46,14 +46,14 @@ void RenderWindGlobal(int64_t iCommandBuffer)
 	rGlobalLayout.fWindDisplacementNoiseScale = gWindDisplacementNoiseScale.mfCurrent;
 	rGlobalLayout.fWindSmokeAdvection = gWindSmokeAdvection.mfCurrent;
 
-	uint32_t uiWindWidth = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.vkExtent3D.width;
-	uint32_t uiWindHeight = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.vkExtent3D.height;
-	uint32_t uiWindTilesX = TileCount(uiWindWidth);
-	uint32_t uiWindTilesY = TileCount(uiWindHeight);
-	rGlobalLayout.uiWindTilesX = uiWindTilesX;
-	rGlobalLayout.uiWindTilesY = uiWindTilesY;
-	rGlobalLayout.f2WindTilesInverse.x = 1.0f / static_cast<float>(uiWindTilesX);
-	rGlobalLayout.f2WindTilesInverse.y = 1.0f / static_cast<float>(uiWindTilesY);
+	int64_t iWindWidth = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.vkExtent3D.width;
+	int64_t iWindHeight = gpTextureManager->mRenderTargetTextures.mWindTextureOne.mInfo.vkExtent3D.height;
+	int64_t iWindTilesX = TileCount(iWindWidth);
+	int64_t iWindTilesY = TileCount(iWindHeight);
+	rGlobalLayout.uiWindTilesX = static_cast<uint32_t>(iWindTilesX);
+	rGlobalLayout.uiWindTilesY = static_cast<uint32_t>(iWindTilesY);
+	rGlobalLayout.f2WindTilesInverse.x = 1.0f / static_cast<float>(iWindTilesX);
+	rGlobalLayout.f2WindTilesInverse.y = 1.0f / static_cast<float>(iWindTilesY);
 
 	giWindTextureIndex = 1 - giWindTextureIndex;
 

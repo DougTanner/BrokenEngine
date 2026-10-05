@@ -42,7 +42,7 @@ constexpr float kfTrailOffset = -0.9f;
 constexpr float kfTrailWidth = 0.15f;
 #endif
 
-constexpr uint32_t kuiMissileExplosionBaseParticleCount = 15;
+constexpr int64_t kiMissileExplosionBaseParticleCount = 15;
 constexpr uint32_t kuiMissileExplosionParticleColor = 0xFF0000FF;
 constexpr float kfMissileExplosionParticleVelocityMinimum = 1.0f;
 constexpr float kfMissileExplosionParticleVelocityRandom = 4.0f;
@@ -61,13 +61,13 @@ constexpr float kfDeltaRotationLimitMinimum = 2.0f;
 constexpr float kfDeltaRotationLimitRandom = 2.0f;
 
 #if defined(BT_CLIENT)
-static uint8_t suiPlayerExhaustAreaLightTypeIndex = 0xFF;
-static uint8_t suiEnemyExhaustAreaLightTypeIndex = 0xFF;
+static int64_t siPlayerExhaustAreaLightTypeIndex = 0xFF;
+static int64_t siEnemyExhaustAreaLightTypeIndex = 0xFF;
 
-static uint8_t suiSmokeTrailTypeIndex = 0xFF;
+static int64_t siSmokeTrailTypeIndex = 0xFF;
 #endif // BT_CLIENT
 
-static uint8_t suiMissileExplosionTypeIndex = 0xFF;
+static int64_t siMissileExplosionTypeIndex = 0xFF;
 
 #if defined(BT_CLIENT)
 void XM_CALLCONV SynchronizeMissileTrail(FrameInterpolate& rFrameInterpolate, engine::smoke_trails_t uiSmokeTrail, FXMVECTOR vecPosition)
@@ -104,7 +104,7 @@ void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine:
 
 		engine::AreaLightsInterpolate::Sync(rFrameInterpolate, uiAreaLight,
 		{
-			.uiTypeIndex = (flags & kTargetPlayer) ? suiEnemyExhaustAreaLightTypeIndex : suiPlayerExhaustAreaLightTypeIndex,
+			.iTypeIndex = (flags & kTargetPlayer) ? siEnemyExhaustAreaLightTypeIndex : siPlayerExhaustAreaLightTypeIndex,
 			.vecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
 			.fIntensityMultiplier = fIntensityMultiplier,
 		});
@@ -152,11 +152,11 @@ void MissilesInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 		return;
 	}
 
-	uint8_t uiAreaLightType = (rPostRender.pFlags[iIndex] & kTargetEnemy)
-		? suiPlayerExhaustAreaLightTypeIndex : suiEnemyExhaustAreaLightTypeIndex;
-	rFrame.postRender.areaLights.Add(rFrame, rMissiles.puiAreaLights[iIndex], uiAreaLightType);
+	int64_t iAreaLightType = (rPostRender.pFlags[iIndex] & kTargetEnemy)
+		? siPlayerExhaustAreaLightTypeIndex : siEnemyExhaustAreaLightTypeIndex;
+	rFrame.postRender.areaLights.Add(rFrame, rMissiles.puiAreaLights[iIndex], iAreaLightType);
 
-	engine::SmokeTrailsPostRender::Add(rFrame, rMissiles.puiSmokeTrails[iIndex], suiSmokeTrailTypeIndex);
+	engine::SmokeTrailsPostRender::Add(rFrame, rMissiles.puiSmokeTrails[iIndex], siSmokeTrailTypeIndex);
 
 	engine::SoundsPostRender::Add(rFrame, rPostRender.puiSounds[iIndex]);
 
@@ -180,7 +180,7 @@ void MissilesInterpolate::ClientInitAll(Frame& rFrame)
 void MissilesInterpolate::Register()
 {
 #if defined(BT_CLIENT)
-	engine::AreaLightsInterpolate::RegisterType(suiPlayerExhaustAreaLightTypeIndex,
+	engine::AreaLightsInterpolate::RegisterType(siPlayerExhaustAreaLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesMissilesBC73pngCrc,
 		.puiColors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
@@ -193,7 +193,7 @@ void MissilesInterpolate::Register()
 		.pLightingIntensityWrapper = &gMissileExhaustLightingIntensity,
 	});
 
-	engine::AreaLightsInterpolate::RegisterType(suiEnemyExhaustAreaLightTypeIndex,
+	engine::AreaLightsInterpolate::RegisterType(siEnemyExhaustAreaLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesMissilesBC71pngCrc,
 		.puiColors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
@@ -206,25 +206,25 @@ void MissilesInterpolate::Register()
 		.pLightingIntensityWrapper = &gMissileExhaustLightingIntensity,
 	});
 
-	engine::SmokeTrailsInterpolate::RegisterType(suiSmokeTrailTypeIndex,
+	engine::SmokeTrailsInterpolate::RegisterType(siSmokeTrailTypeIndex,
 	{
 		.uiCrc = 0,
-		.uiColor = 0xFFFFFFFF,
+		.iColor = 0xFFFFFFFF,
 		.fWidth = kfTrailWidth,
 	});
 #endif // BT_CLIENT
 
-	engine::ExplosionsInterpolate::RegisterType(suiMissileExplosionTypeIndex,
+	engine::ExplosionsInterpolate::RegisterType(siMissileExplosionTypeIndex,
 	{
 #if defined(BT_CLIENT)
-		.uiPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryLightControllerTypeIndex,
-		.uiSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryLightControllerTypeIndex,
-		.uiPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryPuffControllerTypeIndex,
-		.uiSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryPuffControllerTypeIndex,
-		.uiTrailTypeIndex = engine::ExplosionsInterpolate::suiExplosionTrailTypeIndex,
-		.uiWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::suiWindRadialControllerTypeIndex,
+		.iPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryLightControllerTypeIndex,
+		.iSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryLightControllerTypeIndex,
+		.iPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryPuffControllerTypeIndex,
+		.iSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryPuffControllerTypeIndex,
+		.iTrailTypeIndex = engine::ExplosionsInterpolate::siExplosionTrailTypeIndex,
+		.iWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::suiWindRadialControllerTypeIndex,
 #endif // BT_CLIENT
-		.uiBaseParticleCount = kuiMissileExplosionBaseParticleCount,
+		.uiBaseParticleCount = static_cast<uint32_t>(kiMissileExplosionBaseParticleCount),
 		.uiParticleColor = kuiMissileExplosionParticleColor,
 		.fParticleVelocityMinimum = kfMissileExplosionParticleVelocityMinimum,
 		.fParticleVelocityRandom = kfMissileExplosionParticleVelocityRandom,
@@ -263,11 +263,11 @@ static void SpawnMissileExplosion(Frame& __restrict rFrame, float fPercent, XMVE
 
 		engine::ExplosionsPostRender::Spawn(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime),
 			{
-				.uiTypeIndex = suiMissileExplosionTypeIndex,
+				.iTypeIndex = siMissileExplosionTypeIndex,
 				.vecPosition = vecExplosionPosition,
 				.vecDirection = vecDirection,
 				.flags = {engine::ExplosionFlags::kDestroysSelf, engine::ExplosionFlags::kYellow},
-				.uiTrailCount = static_cast<uint32_t>(2.0f * fScaledPercent * (flags & kDirectional ? 0.6f : 1.0f) * kfExplosionTrailCountMinimum + kfExplosionTrailCountRandom * common::Random(rFrame.postRender.randomEngine)),
+				.iTrailCount = static_cast<int64_t>(2.0f * fScaledPercent * (flags & kDirectional ? 0.6f : 1.0f) * kfExplosionTrailCountMinimum + kfExplosionTrailCountRandom * common::Random(rFrame.postRender.randomEngine)),
 				.fTrailAngle = flags & kDirectional ? XM_PI : XM_2PI,
 				.uiParticleCount = static_cast<uint32_t>(2.0f * fScaledPercent * kfExplosionParticleCount),
 				.fParticleAngle = flags & kDirectional ? XM_PI : XM_2PI,

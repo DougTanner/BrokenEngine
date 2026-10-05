@@ -120,7 +120,7 @@ void SmokeTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 		pTrailLayouts[siRendered].pf4Parameters[3] = {fQuantity, 0.0f, 0.0f, 0.0f};
 
 		pTrailLayouts[siRendered].f4Parameters = {};
-		pTrailLayouts[siRendered].uiColor = rType.uiColor;
+		pTrailLayouts[siRendered].uiColor = static_cast<uint32_t>(rType.iColor);
 
 		++siRendered;
 	}

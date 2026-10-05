@@ -10,6 +10,9 @@ struct [[nodiscard]] ScopedSuppressAllocationTracking
 		++giAllocationTrackingSuppressed;
 	}
 
+	ScopedSuppressAllocationTracking(const ScopedSuppressAllocationTracking&) = delete;
+	ScopedSuppressAllocationTracking& operator=(const ScopedSuppressAllocationTracking&) = delete;
+
 	~ScopedSuppressAllocationTracking()
 	{
 		--giAllocationTrackingSuppressed;
@@ -26,6 +29,9 @@ struct [[nodiscard]] ScopedResumeAllocationTracking
 	{
 		--giAllocationTrackingSuppressed;
 	}
+
+	ScopedResumeAllocationTracking(const ScopedResumeAllocationTracking&) = delete;
+	ScopedResumeAllocationTracking& operator=(const ScopedResumeAllocationTracking&) = delete;
 
 	~ScopedResumeAllocationTracking()
 	{

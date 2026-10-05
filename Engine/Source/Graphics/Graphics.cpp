@@ -181,12 +181,12 @@ void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
 		gpTextureManager->mTextureDescriptors.VerifyAllDescriptorGenerations();
 	}
 
-	// muiFrameCounter advances every frame, independent of memory-budget support, as the LRU grace clock.
+	// miFrameCounter advances every frame, independent of memory-budget support, as the LRU grace clock.
 	if (gpDeviceManager->mCapabilities & DeviceCapabilityFlags::kMemoryBudgetAvailable)
 	{
-		vmaSetCurrentFrameIndex(gpDeviceManager->mpAllocator, static_cast<uint32_t>(muiFrameCounter));
+		vmaSetCurrentFrameIndex(gpDeviceManager->mpAllocator, static_cast<uint32_t>(miFrameCounter));
 	}
-	++muiFrameCounter;
+	++miFrameCounter;
 
 	if (rCommandBuffers.mFlags & CommandBufferFlags::kExecuted)
 	{

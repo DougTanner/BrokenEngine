@@ -56,10 +56,10 @@ static CollisionEventScratch& GetCollisionEventScratch()
 
 struct ZoneRange
 {
-	int32_t iStartX = 0;
-	int32_t iEndX = 0;
-	int32_t iStartY = 0;
-	int32_t iEndY = 0;
+	int64_t iStartX = 0;
+	int64_t iEndX = 0;
+	int64_t iStartY = 0;
+	int64_t iEndY = 0;
 };
 
 struct ZonePair
@@ -121,10 +121,10 @@ ZoneRange Collision::CalculateZoneRange(float fMinimumX, float fMaximumX, float 
 {
 	return
 	{
-		.iStartX = std::clamp(static_cast<int32_t>((fMinimumX - fRadius - sfAreaMinimumX) / sfZoneWidth), 0, kiCollisionZonesX - 1),
-		.iEndX = std::clamp(static_cast<int32_t>((fMaximumX + fRadius - sfAreaMinimumX) / sfZoneWidth), 0, kiCollisionZonesX - 1),
-		.iStartY = std::clamp(static_cast<int32_t>((fMinimumY - fRadius - sfAreaMinimumY) / sfZoneHeight), 0, kiCollisionZonesY - 1),
-		.iEndY = std::clamp(static_cast<int32_t>((fMaximumY + fRadius - sfAreaMinimumY) / sfZoneHeight), 0, kiCollisionZonesY - 1),
+		.iStartX = std::clamp(static_cast<int64_t>((fMinimumX - fRadius - sfAreaMinimumX) / sfZoneWidth), 0i64, kiCollisionZonesX - 1),
+		.iEndX = std::clamp(static_cast<int64_t>((fMaximumX + fRadius - sfAreaMinimumX) / sfZoneWidth), 0i64, kiCollisionZonesX - 1),
+		.iStartY = std::clamp(static_cast<int64_t>((fMinimumY - fRadius - sfAreaMinimumY) / sfZoneHeight), 0i64, kiCollisionZonesY - 1),
+		.iEndY = std::clamp(static_cast<int64_t>((fMaximumY + fRadius - sfAreaMinimumY) / sfZoneHeight), 0i64, kiCollisionZonesY - 1),
 	};
 }
 

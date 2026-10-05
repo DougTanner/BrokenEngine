@@ -141,7 +141,7 @@ Add new methods at end of file (before the closing namespace brace, line 301):
         // Heap: ENet allocates packet data internally
         ScopedSuppressAllocationTracking suppress;
         ENetPacket* pPacket = enet_packet_create(packetSpan.data(), packetSpan.size(), 0);
-        enet_peer_send(rClient.pPeer, NetworkManager::CoordinateSlotUnreliable(iSlot), pPacket);
+        enet_peer_send(rClient.pPeer, static_cast<enet_uint8>(NetworkManager::CoordinateSlotUnreliable(iSlot)), pPacket);
 
         rWorkbuffer.Pop();
     }

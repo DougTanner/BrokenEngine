@@ -53,12 +53,12 @@ struct AgentScript
 	int64_t iTimeoutFrames = 120; // stabilization timeout (click / hover / set_slider)
 	int64_t iHoldFrames = 2;      // hover / key hold duration
 
-	int32_t iVirtualKey = 0; // key command: Win32 VK code driven through the RawInput overlay
+	int64_t iVirtualKey = 0; // key command: Win32 VK code driven through the RawInput overlay
 
 	AgentMouseAction eMouseAction = AgentMouseAction::kMove;
-	int32_t iImGuiMouseButton = 0; // 0 left / 1 right / 2 middle (ImGui IO button index)
+	int64_t iImGuiMouseButton = 0; // 0 left / 1 right / 2 middle (ImGui IO button index)
 	uint32_t uiOverlayMouseButtonBit = 0; // engine::MouseButtons bit for the RawInput overlay
-	int32_t iWheelNotches = 0;
+	int64_t iWheelNotches = 0;
 	float f2CoordinatePixels[2] {}; // mouse command raw pixel coords
 	bool bHasCoordinate = false;
 };
@@ -104,7 +104,7 @@ public:
 
 	// Persistent synthetic scroll offset added into the published lifetime iScrollWheelValue on EVERY publish (script
 	// active or not) — consumers diff iScrollWheelValue, so the offset must never drop out of the published value.
-	int miSyntheticScrollAccumulator = 0;
+	int64_t miSyntheticScrollAccumulator = 0;
 
 	// True when the notch count's wheel product fits int32_t and adding it to the lifetime accumulator stays representable.
 	bool WheelNotchesFit(int64_t iNotches) const;
@@ -130,7 +130,7 @@ private:
 	XMFLOAT4 mf4LastRectangle {};
 	bool mbHaveLastRectangle = false;
 
-	int32_t miResolvedStatusFlags = 0; // resolved target's ImGuiItemStatusFlags (set_slider Inputable pre-validation)
+	int64_t miResolvedStatusFlags = 0; // resolved target's ImGuiItemStatusFlags (set_slider Inputable pre-validation)
 	float mf2TargetCenter[2] {}; // resolved rect center, re-pinned into ImGui each frame
 
 	// Persistent synthetic state read by Overlay() (game-binding sink).

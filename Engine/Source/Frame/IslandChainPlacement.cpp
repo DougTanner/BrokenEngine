@@ -141,7 +141,7 @@ static const std::vector<common::crc_t>& PickBucket(Role eRole)
 static common::crc_t PickCrc(Role eRole, common::RandomEngine& rCrcRandom)
 {
 	const std::vector<common::crc_t>& rBucket = PickBucket(eRole);
-	return rBucket.at(common::Random(static_cast<uint32_t>(rBucket.size() - 1ui32), rCrcRandom));
+	return rBucket.at(common::Random(std::ssize(rBucket) - 1, rCrcRandom));
 }
 
 // Long islands follow the attachment direction with jitter; squarer islands rotate freely.
@@ -163,10 +163,10 @@ static float OrientForTangent(common::crc_t crc, float fAttachWorld, common::Ran
 }
 
 // Degenerate valid-area hulls use a four-corner footprint rectangle in rRectangleStorage.
-static const XMFLOAT2* LocalHull(const IslandTemplate& rTemplate, XMFLOAT2 (&rRectangleStorage)[4], int32_t& rCount)
+static const XMFLOAT2* LocalHull(const IslandTemplate& rTemplate, XMFLOAT2 (&rRectangleStorage)[4], int64_t& rCount)
 {
 	const XMFLOAT2* pLocalHull = rTemplate.pf2ValidAreaVertices;
-	int32_t iCount = rTemplate.iValidAreaVertexCount;
+	int64_t iCount = rTemplate.iValidAreaVertexCount;
 	if (pLocalHull == nullptr || iCount < 3)
 	{
 		float fHalfWidth = 0.5f * rTemplate.fQuadFootprintX;
@@ -187,7 +187,7 @@ static int64_t CommitPlacement(CellContext& rContext, common::crc_t crc, XMFLOAT
 	// placedHullViews hold raw vertex pointers into placedHullStorage, reserved to kiMaximumIslandsPerCell.
 	// Placement must not exceed that reserve; the stable-view contract protects SAT overlap tests,
 	// deterministic packing, and CRC agreement.
-	ASSERT(rContext.placedHullStorage.size() < rContext.placedHullStorage.capacity());
+	ASSERT(std::ssize(rContext.placedHullStorage) < static_cast<int64_t>(rContext.placedHullStorage.capacity()));
 	rContext.placedHullStorage.emplace_back(rContext.scratch.begin(), rContext.scratch.end());
 	common::ConvexHull2D view = rCandidate;
 	view.pVertices = rContext.placedHullStorage.back().data();
@@ -203,7 +203,7 @@ static bool PlaceAnchor(CellContext& rContext, common::crc_t crc, float fTargetL
 {
 	const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(crc);
 	XMFLOAT2 rectangleHull[4] {};
-	int32_t iLocalCount = 0;
+	int64_t iLocalCount = 0;
 	const XMFLOAT2* pLocalHull = LocalHull(rTemplate, rectangleHull, iLocalCount);
 
 	common::SinCos rotation = common::DeterministicSinCos(fRotation);
@@ -237,7 +237,7 @@ static bool TryTouchPlace(CellContext& rContext, common::crc_t crc, int64_t iHos
 {
 	const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(crc);
 	XMFLOAT2 rectangleHull[4] {};
-	int32_t iLocalCount = 0;
+	int64_t iLocalCount = 0;
 	const XMFLOAT2* pLocalHull = LocalHull(rTemplate, rectangleHull, iLocalCount);
 
 	common::SinCos direction = common::DeterministicSinCos(fDirection);
