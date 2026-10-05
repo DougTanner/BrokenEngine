@@ -585,12 +585,10 @@ void Texture::SaveJpegSidecar(const std::filesystem::path& rPath, int iQuality, 
 	{
 		fMin = std::numeric_limits<float>::infinity();
 		float fMax = -std::numeric_limits<float>::infinity();
-		const float* pfScan = rPixels.data();
-		for (int64_t i = 0; i < iPixelCount; ++i)
+		for (float fRed : rPixels | std::views::stride(4))
 		{
-			fMin = std::min(fMin, pfScan[0]);
-			fMax = std::max(fMax, pfScan[0]);
-			pfScan += 4;
+			fMin = std::min(fMin, fRed);
+			fMax = std::max(fMax, fRed);
 		}
 		fRange = (fMax > fMin) ? (fMax - fMin) : 1.0f;
 	}
