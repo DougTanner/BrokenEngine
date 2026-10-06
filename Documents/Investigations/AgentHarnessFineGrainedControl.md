@@ -6,15 +6,19 @@ cell edge" — so that runtime acceptance criteria phrased that way become
 drivable instead of `BLOCKED`. This document records the gap, what the code
 offers today, four candidate mechanisms compared on the same criteria, a
 recommendation, and the decisions a Plan needs before any of it is executable.
-Nothing here is implemented.
+The server agent command `inject_payload` now provides Option 1b's placement
+(transfer entries at a caller-chosen `vecPosition`, without recording) and
+Option 2's exact-tick scheduling (an optional per-entry `tick`)
+(`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:47`);
+nothing else here is implemented.
 
 ## The gap
 
 What the harness can do today, all on the server:
 
-- Place players: `spawn_players` and `inject_status_changes` with
-  `SpawnPlayer`, which accepts a `pos` offset in meters from the cell center
-  (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:48-49`).
+- Place players: `inject_payload` with `SpawnPlayer`, which accepts
+  `fSpawnOffsetX`/`fSpawnOffsetY` offsets in meters from the cell center
+  (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:47`).
 - Change a player's weapon mode and navigation delay through `UpdatePlayer`,
   and its fleet target through `UpdateFleet` (same lines). Every injected
   change is a `StatusChange` that the broadcaster drains into the per-cell
@@ -23,13 +27,13 @@ What the harness can do today, all on the server:
   (`Engine/Source/Network/Server/ServerBroadcaster.cpp:82-99`;
   `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:808-855`).
 - Pause, step time, save, load, reset, and record or play a replay
-  (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:33-43`).
-- Fabricate one cross-cell transfer of a player, spaceship, blaster, or
-  missile into an adjacent cell — but only while recording or with a pending
-  recording start, and only at a fixed reference position in the destination
-  cell (`Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:255-264, 334`).
+  (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:33-42`).
+- Queue cross-cell transfer arrivals of a player, spaceship, blaster, or
+  missile at a caller-chosen `vecPosition`, without recording, and schedule
+  any entry at an exact tick
+  (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:47`).
 - Read counts and rows back with `query_frame`, `query_players`, and
-  `query_collection` (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:44-46`).
+  `query_collection` (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:43-45`).
 
 What the missile path needs, from the current code:
 
@@ -48,10 +52,10 @@ What the missile path needs, from the current code:
   Nothing lets a command choose where an enemy appears, and nothing forces a
   shot.
 
-So the only primitive genuinely missing for the motivating criterion is "put
-an enemy spaceship at a chosen position in a chosen cell, outside recording".
-Player placement, weapon mode, pause-for-exact-tick, and the read-back
-queries already exist.
+So the only primitive the motivating criterion lacked was "put an enemy
+spaceship at a chosen position in a chosen cell, outside recording", which an
+`inject_payload` `TransferSpaceship` entry now provides. Player placement,
+weapon mode, exact-tick scheduling, and the read-back queries already exist.
 
 Evidence from this session (scratch artifacts under `Temp/`, not tracked):
 
@@ -59,7 +63,7 @@ Evidence from this session (scratch artifacts under `Temp/`, not tracked):
   eight AI players injected at cell edges, then 55 seconds of simulation at
   raised timescale produced enemy spaceships and blasters in the hundreds but
   zero missiles in any cell. Caveat for anyone re-citing this run: its
-  `useMissiles` selector holds a failed `inject_status_changes` request (a
+  `useMissiles` selector holds a failed status-change injection request (a
   JSON type error), so `kUseMissiles` may never have been set in that run.
   The range gate above is established from the code, not from that artifact
   alone; a clean rerun with an accepted `UpdatePlayer` batch is needed before
@@ -127,7 +131,7 @@ sharply in cost.
 - Critical files: `Projects/BrokenEngineSandbox/Source/Frame/StatusChange.h:72-79` (payload), `Projects/BrokenEngineSandbox/Source/Frame/FrameInput.h:11`
   (version), the game Network codec that writes `UpdatePlayerData` on the
   wire, `Projects/BrokenEngineSandbox/Source/Frame/Collections/Players/Players.cpp:361-381`, `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:487-492`,
-  `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:48`.
+  `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:47`.
 - What it adds: a shot on demand. Without a target inside 160 m the missile
   leaves along the hull direction with no homing target
   (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Players/PlayersCombat.cpp:420-425`), so this proves "a missile spawned at the
@@ -145,26 +149,26 @@ sharply in cost.
 
 - Mechanism: the transfer path already materializes a spaceship at a given
   position in a destination cell with a full `TransferData` — that is exactly
-  what `replay_transfer_fixture` builds and queues
-  (`Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:379-395`), and the queue drains through the
+  what an `inject_payload` `TransferSpaceship` entry builds and queues
+  (`BuildInjectedEntry`, `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:404-571`, with its
+  `TransferSpaceship` field list at `:466-473`), and the queue drains through the
   transfer manager into the ordinary harvest, sort, capture, and apply path
-  (`Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:857-879`). The recording requirement lives
-  only in that command's validation (`Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:259-264`),
-  not in the mechanism; `QueueReplayTransferFixture` itself gates on
-  `kbDebugInput` and a live destination (`Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:783-806`).
-  The narrow change is a placement command (or a relaxed fixture) that takes
-  a `pos` in the same meters-from-cell-center form `SpawnPlayer` uses and does
-  not require recording. The blaster branch already shows the terrain-clear
-  search a placed entity needs (`Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:335-377`).
+  (`DrainReplayTransferFixtures`, `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:947-981`). That entry requires
+  `kbDebugInput` and a live destination but no recording, and takes its
+  `vecPosition` in the same meters-from-cell-center form as the `SpawnPlayer`
+  `fSpawnOffsetX`/`fSpawnOffsetY` offsets
+  (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:47`).
 - Critical files: `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:247-407, 783-806`;
-  `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:40`; `Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md`
+  `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:47`; `Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md`
   `## Contracts` (fixture sentences).
-- What it adds: the one missing primitive. With a player at an edge
-  (`SpawnPlayer pos`), `UpdatePlayer useMissiles`, a one-second wait for the
+- What it adds: the one primitive that was missing, now provided by that
+  entry. With a player at an edge
+  (`SpawnPlayer` `fSpawnOffsetX`/`fSpawnOffsetY`), `UpdatePlayer`
+  `bUseMissiles`, a one-second wait for the
   weapon countdown, and a spaceship placed within 160 m, the ordinary
   `AcquireTarget` fires without any forced flag, and `query_collection
   missiles` shows the row with a nonzero `registryTargetId`
-  (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:46`).
+  (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:45`).
 - Invariant surfaces: none of the serialized formats change — the transfer
   rides the existing post-dispatch channel and existing `TransferData`. The
   entity gets arrival grace, so the harness waits one second after placement.
@@ -177,7 +181,7 @@ sharply in cost.
 
 ### Option 2 — General scripted-input command
 
-- Mechanism: extend `inject_status_changes` into a script: each entry carries
+- Mechanism: extend status-change injection into a script: each entry carries
   an `atTick`, the pending map in `ServerSimulationFixtureState`
   (`Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:24-31`) holds entries until that tick, and
   `DrainPendingAgentStatusChanges` releases them into the tick input the
@@ -185,15 +189,16 @@ sharply in cost.
   the per-cell `pFrameInput` reference; `Engine/Source/GameBase.cpp:507-527` clears inputs
   after the tick).
 - Critical files: `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:24-31, 513-674, 808-855`;
-  `Engine/Source/Network/Server/ServerBroadcaster.cpp:82-90`; `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:48, 51`.
-- What it adds: exact-tick scheduling of many steps in one request. It does
-  not add vocabulary: the sandbox has no human-steered player, `FrameInput`
+  `Engine/Source/Network/Server/ServerBroadcaster.cpp:82-90`; `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:47, 74`.
+- What it adds: exact-tick scheduling of many steps in one request, now
+  provided by the `inject_payload` per-entry `tick`. It does not add
+  vocabulary: the sandbox has no human-steered player, `FrameInput`
   instances are never built from hardware (`Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md` `## Invariants`),
   and the only "player input" is the `StatusChange` set. Every new verb —
   fire, place enemy — still needs Option 1's changes.
 - Invariant surfaces: scheduling alone touches no format. Deferred entries
   already survive pauses and apply on the next unpaused tick
-  (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:51`), so "pause, inject, unpause" already gives
+  (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:74`), so "pause, inject, unpause" already gives
   exact-tick placement without a scheduler.
 - When it pays off: only for long multi-step scripts where per-step round
   trips at high timescale would miss their tick. For a handful of steps the
@@ -303,10 +308,11 @@ over logs and pixels).
 
 - Mechanism: a named scenario command in `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp` (for
   example `scenario_fixture {"name":"missile_at_cell_edge"}`) that sequences
-  the existing primitives in C++: queue `SpawnPlayer` with an edge `pos`,
-  queue `UpdatePlayer useMissiles`, queue a spaceship transfer at a position
-  inside 160 m through the fixture queue, and optionally arm the same
-  writer-input pause `replay_transfer_fixture` uses
+  the existing primitives in C++: queue `SpawnPlayer` with edge
+  `fSpawnOffsetX`/`fSpawnOffsetY`, queue `UpdatePlayer` `bUseMissiles`, queue
+  a spaceship transfer at a position inside 160 m through the fixture queue,
+  and optionally arm the same writer-input pause `inject_payload`
+  `pauseAfterWriterInput` uses
   (`Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:397-400`; `Engine/Source/Agent/Commands/ReplayFixtures.cpp:240-267`)
   so the harness observes the exact tick.
 - Critical files: `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:247-407, 724-774, 776-806`;
@@ -320,7 +326,8 @@ over logs and pixels).
   `kbDebugInput` gate.
 - When it pays off: when a criterion depends on ordering that separate
   commands cannot pin (two events in one tick, or an event on the exact tick
-  recording starts), which is the case `replay_transfer_fixture` exists for.
+  recording starts), which is the case `inject_payload`
+  `pauseAfterWriterInput` exists for.
   For the missile case the ordering is loose (one-second waits dominate), so
   a fixture would hard-code what three ordinary commands express.
 
@@ -341,8 +348,9 @@ over logs and pixels).
 
 Take Option 1b first, and only 1b:
 
-- It is the single missing primitive. Player placement (`SpawnPlayer pos`),
-  weapon mode (`UpdatePlayer useMissiles`), exact-tick placement
+- It was the single missing primitive. Player placement (`SpawnPlayer`
+  `fSpawnOffsetX`/`fSpawnOffsetY`), weapon mode (`UpdatePlayer`
+  `bUseMissiles`), exact-tick placement
   (pause, inject, unpause), and read-back (`query_collection missiles` with
   `registryTargetId`) already exist, so once an enemy can be placed within
   160 m of an edge player the ordinary acquire path fires a targeted missile
@@ -350,8 +358,9 @@ Take Option 1b first, and only 1b:
 - It changes no serialized format and no client code, because the transfer
   path already carries a complete spaceship and already recomputes the
   destination CRC.
-- It reuses the fixture code that exists for the same job, with the
-  recording gate and the fixed position being the only things in the way.
+- It reuses the fixture code that exists for the same job; `inject_payload`
+  transfer entries have since removed the recording gate and the fixed
+  position that were in the way.
 
 Defer 1a until a criterion demands a targetless or exact-tick shot; it costs
 two version bumps for a verb the motivating criterion does not need. Skip
@@ -361,24 +370,23 @@ frames and per-tick CRCs only the simulation can produce, and a spliced
 replay plays but forfeits the checksum evidence that makes a replay worth
 using. The record-then-splice form is already documented for the one case
 that needs it. Reserve Option 4 for same-tick ordering, where
-`replay_transfer_fixture` is the precedent.
+`inject_payload` `pauseAfterWriterInput` is the precedent.
 
 Land `Documents/Plans/Engine/ReplayTransferCaptureFixtureEventPin.md` independently; it fixes the
 observation register, not the scenario control, and neither blocks the other.
 
 ## Decisions a Plan needs
 
-1. Command shape: a new placement command, or `replay_transfer_fixture` with
-   its recording gate removed and a `pos` parameter added, keeping
+1. Command shape: a new placement command, or the `inject_payload` transfer
+   entries, which already take a `vecPosition` without recording and keep
    `pauseAfterWriterInput` meaningful only while recording. Naming follows
    from this: the repository term for the mechanism is transfer, and the
    command should say what it does.
 2. Position semantics: meters from the destination cell center, matching
-   `SpawnPlayer pos` (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:48`), and the refusal rule for an
+   `SpawnPlayer` `fSpawnOffsetX`/`fSpawnOffsetY` (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:47`), and the refusal rule for an
    out-of-cell, non-finite, or terrain-blocked position — reject at the
-   command, or log and skip at the consumer as `SpawnPlayer` does. The
-   blaster terrain search (`Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:335-377`) is the
-   existing precedent for a placed entity.
+   command, as `inject_payload` does for an out-of-cell or non-finite
+   position, or log and skip at the consumer.
 3. Type coverage: spaceship only, or all four transfer types the fixture
    already builds. The `TransferData` defaults at
    `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:379-391` are fixture values (health 1,
@@ -396,7 +404,7 @@ observation register, not the scenario control, and neither blocks the other.
    tracked code for a scenario.
 7. Build gate: keep the placement `kbDebugInput`-only like the fixture it
    reuses (`Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationFixtures.cpp:785-788`), or make it always
-   available like `inject_status_changes`.
+   available like the `inject_payload` status-change entries.
 8. Documentation owners: the new `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md` entry, the fixture
    sentences in `Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md`
    `## Contracts`, and whether the harness `Projects/BrokenEngineSandbox/Documents/AgentHarness/replay.md` scenarios that say

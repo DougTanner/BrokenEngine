@@ -59,24 +59,28 @@ void ServerBroadcaster::BuildFrameInputs()
 		game::gpServerSession->mpFleetManager->ProcessFlagshipUpdates();
 
 		// After ProcessFlagshipUpdates so the flagship update this queues is consumed on the following update and its
-		// fleet-RNG draw keeps its position, and before the drain so the drain's sort restores type-ascending order.
+		// fleet-RNG draw keeps its position, and before the first tick's PrepareTickStatusChanges drain so a drain that
+		// releases agent entries for the origin coordinate sorts this spawn in with them.
 		game::gpServerSession->mpClientManager->SpawnWaitingClients();
+	}
+}
 
-		// Drain agent-injected StatusChanges into mFrameInputs so they ride the same broadcast / CRC / replay channel
-		// as real spawns. Entries not consumable this update stay in the map (deferred) and apply on the first update
-		// that can take them, matching the paused deferral. Whole-map defers: the update won't tick (mfLastDeltaTime == 0:
-		// paused / zero-accumulated ticks — the per-tick consumer loop won't run and the next BuildFrameInputs wipes
-		// mFrameInputs); or replay playback (LoadDifference overwrites mFrameInputs from the recorded stream).
-		// Per-coord defers below: a coord the tick loop won't simulate (inactive, or no committed pCurrent frame yet).
-		game::DrainPendingAgentStatusChanges(*game::gpServerSession);
+void ServerBroadcaster::PrepareTickStatusChanges()
+{
+	// Heap: unordered_map insert, vector growth for statusChanges
+	ScopedSuppressAllocationTracking suppress;
 
-		// Save StatusChanges for broadcasting (transfers handled separately in HarvestTransfers)
-		for (const auto& [rCoord, rFrameInput] : game::gpGame->mFrameInputs)
+	// Runs once per normal-play tick, so an agent-injected StatusChange can enter any tick of a multi-tick update and
+	// rides the same broadcast / CRC / replay channel as real spawns. An entry stays queued until its scheduled tick
+	// and until its coord is one the tick will simulate (active, with a committed pCurrent frame).
+	game::DrainPendingAgentStatusChanges(*game::gpServerSession);
+
+	// Save this tick's StatusChanges for broadcasting (transfers handled separately in HarvestTransfers)
+	for (const auto& [rCoord, rFrameInput] : game::gpGame->mFrameInputs)
+	{
+		if (!rFrameInput.statusChanges.empty())
 		{
-			if (!rFrameInput.statusChanges.empty())
-			{
-				mBroadcastStatusChanges.insert_or_assign(rCoord, rFrameInput.statusChanges);
-			}
+			mBroadcastStatusChanges.insert_or_assign(rCoord, rFrameInput.statusChanges);
 		}
 	}
 }

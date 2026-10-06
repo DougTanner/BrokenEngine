@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-05T23:35:09.141Z","dependsOn":["Documents/Plans/Game/InjectPayloadCommand.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-05T23:35:09.141Z","dependsOn":[]} -->
 # `edit_frame`: direct agent-harness writes to Frame collection columns and frame scalars
 
 Line numbers cite baseline `63669fbb61d2f1dbc0b16ae616c7ea661eb57a87`. Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other.

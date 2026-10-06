@@ -63,6 +63,8 @@ void ServerSession::PrepareTick()
 			gpGame->mFrameInputs.try_emplace(rCoordinate);
 		}
 	}
+
+	mpBroadcaster->PrepareTickStatusChanges();
 }
 
 // Reject a wire-supplied navigation delay outside [0, 60] before it enters server-authoritative sim state:

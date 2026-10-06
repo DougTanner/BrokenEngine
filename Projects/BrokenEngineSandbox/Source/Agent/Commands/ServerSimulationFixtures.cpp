@@ -9,20 +9,29 @@
 #include "Network/Server/ServerTransferManager.h"
 #include "Ui/WrapperBase.h"
 
+#include "Agent/Commands/AgentFieldNames.h"
 #include "Agent/AgentCommandsServerQueries.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Network/Server/ServerSession.h"
 #include "Profile/ProfileManager.h"
 #include "Game.h"
+#include "SpawnTransfer.h"
 
 namespace game
 {
 
+// iTick is the tick the change is released on, or the first later tick its coordinate can take it.
+struct ScheduledStatusChange
+{
+	int64_t iTick = 0;
+	StatusChange change;
+};
+
 struct ServerSimulationFixtureState
 {
 	const ServerSession* pSession = nullptr;
-	std::unordered_map<engine::GridCoord, std::vector<StatusChange>> pendingAgentStatusChanges;
-	std::unordered_map<engine::GridCoord, std::vector<StatusChange>> replayTransferFixtures;
+	std::unordered_map<engine::GridCoord, std::vector<ScheduledStatusChange>> pendingAgentStatusChanges;
+	std::unordered_map<engine::GridCoord, std::vector<ScheduledStatusChange>> replayTransferFixtures;
 };
 
 static ServerSimulationFixtureState sFixture;
@@ -39,13 +48,6 @@ static void Bind(const ServerSession& rSession)
 static bool IsCoordinateActive(engine::GridCoord coordinate)
 {
 	return std::find(gpGame->mActiveCoordinates.begin(), gpGame->mActiveCoordinates.end(), coordinate) != gpGame->mActiveCoordinates.end();
-}
-
-static bool AreAdjacent(engine::GridCoord source, engine::GridCoord destination)
-{
-	int64_t iDeltaX = static_cast<int64_t>(destination.iX) - source.iX;
-	int64_t iDeltaY = static_cast<int64_t>(destination.iY) - source.iY;
-	return (iDeltaX != 0 || iDeltaY != 0) && std::abs(iDeltaX) <= 1 && std::abs(iDeltaY) <= 1;
 }
 
 static void CommandReplayRecord([[maybe_unused]] const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
@@ -253,286 +255,360 @@ static void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohman
 		rResult["armed"] = true;
 	}
 }
-static void CommandReplayTransferFixture(const nlohmann::json& rParameters, nlohmann::json& rResult)
+
+template <auto MEMBER, bool REQUIRED = false>
+struct InjectedField
 {
-	if constexpr (!kbDebugInput)
+	static constexpr auto kpMember = MEMBER;
+	static constexpr bool kbIsRequired = REQUIRED;
+	static constexpr std::string_view kName = kStatusChangeFieldName<MEMBER>;
+	static_assert(!kName.empty(), "Listed payload member has no generated name; regenerate AgentFieldNames.h");
+};
+
+static float FiniteFloatFromValue(const nlohmann::json& rValue, std::string_view name)
+{
+	if (!rValue.is_number())
 	{
-		throw std::runtime_error("replay_transfer_fixture requires kbDebugInput build");
+		throw std::runtime_error(std::format("'{}' must be a finite number", name));
+	}
+	float fValue = rValue.get<float>();
+	if (!std::isfinite(fValue))
+	{
+		throw std::runtime_error(std::format("'{}' must be a finite number", name));
+	}
+	return fValue;
+}
+
+template <auto MEMBER, bool REQUIRED, typename DATA_TYPE>
+static void ParseInjectedField(const nlohmann::json& rEntry, DATA_TYPE& rData)
+{
+	static constexpr std::string_view kName = kStatusChangeFieldName<MEMBER>;
+	bool bPresent = rEntry.contains(kName);
+	if (!bPresent && REQUIRED)
+	{
+		throw std::runtime_error(std::format("'{}' required", kName));
+	}
+	if (!bPresent)
+	{
+		return;
+	}
+
+	using Member = std::remove_cvref_t<decltype(rData.*MEMBER)>;
+	Member& rMember = rData.*MEMBER;
+	const nlohmann::json& rValue = rEntry.at(std::string(kName));
+	if constexpr (std::is_same_v<Member, bool>)
+	{
+		if (!rValue.is_boolean())
+		{
+			throw std::runtime_error(std::format("'{}' must be a boolean", kName));
+		}
+		rMember = rValue.get<bool>();
+	}
+	else if constexpr (std::is_same_v<Member, int64_t>)
+	{
+		if (!rValue.is_number_integer())
+		{
+			throw std::runtime_error(std::format("'{}' must be an integer", kName));
+		}
+		rMember = rValue.get<int64_t>();
+	}
+	else if constexpr (std::is_same_v<Member, uint8_t>)
+	{
+		if (!rValue.is_number_integer())
+		{
+			throw std::runtime_error(std::format("'{}' must be an integer in [0,255]", kName));
+		}
+		int64_t iValue = rValue.get<int64_t>();
+		if (iValue < 0 || iValue > std::numeric_limits<uint8_t>::max())
+		{
+			throw std::runtime_error(std::format("'{}' must be an integer in [0,255]", kName));
+		}
+		rMember = static_cast<uint8_t>(iValue);
+	}
+	else if constexpr (std::is_same_v<Member, float>)
+	{
+		rMember = FiniteFloatFromValue(rValue, kName);
+	}
+	else if constexpr (std::is_same_v<Member, std::chrono::duration<float>>)
+	{
+		rMember = std::chrono::duration<float>(FiniteFloatFromValue(rValue, kName));
+	}
+	else if constexpr (std::is_same_v<Member, engine::GridCoord>)
+	{
+		rMember = CoordinateFromParameter(rEntry, kName);
+	}
+	else if constexpr (std::is_same_v<Member, XMVECTOR>)
+	{
+		if (!rValue.is_array())
+		{
+			throw std::runtime_error(std::format("'{}' must be an [x,y] array of finite numbers", kName));
+		}
+		if (rValue.size() != 2)
+		{
+			throw std::runtime_error(std::format("'{}' must be an [x,y] array of finite numbers", kName));
+		}
+		// The caller supplies local XY only; the W lane follows the position/direction invariant.
+		static constexpr bool kbIsPosition = MEMBER == &TransferData::vecPosition;
+		rMember = XMVectorSet(FiniteFloatFromValue(rValue.at(0), kName), FiniteFloatFromValue(rValue.at(1), kName), kbIsPosition ? engine::gBaseHeight.mfCurrent : 0.0f, kbIsPosition ? 1.0f : 0.0f);
 	}
 	else
 	{
-		if (gpGame->mbReplaying)
+		static_assert(false, "inject_payload has no JSON parse for this payload member type");
+	}
+}
+
+// FIELDS lists the payload members a kind accepts; every other entry key except coord, type, and tick is rejected.
+template <typename... FIELDS, typename DATA_TYPE>
+static void ParseInjectedFields(const nlohmann::json& rEntry, DATA_TYPE& rData)
+{
+	for (const auto& [rKey, rValue] : rEntry.items())
+	{
+		if (rKey != "coord" && rKey != "type" && rKey != "tick" && ((rKey != FIELDS::kName) && ...))
 		{
-			throw std::runtime_error("cannot queue replay transfer fixture during replay playback");
+			throw std::runtime_error(std::format("inject_payload entry has unknown field '{}' for its type", rKey));
 		}
-		bool bPendingStart = (gpGame->mGameFlags & engine::GameFlags::kPaused) && (gpGame->mGameFlags & engine::GameFlags::kSaveReplay)
-		                  && engine::gpReplay->mReplayWriters.empty();
-		if (engine::gpReplay->mReplayWriters.empty() && !bPendingStart)
+	}
+	(ParseInjectedField<FIELDS::kpMember, FIELDS::kbIsRequired>(rEntry, rData), ...);
+}
+
+static StatusChangeType StatusChangeTypeFromEntry(const nlohmann::json& rEntry)
+{
+	if (!rEntry.contains("type"))
+	{
+		throw std::runtime_error("each entry requires string 'type'");
+	}
+	if (!rEntry.at("type").is_string())
+	{
+		throw std::runtime_error("each entry requires string 'type'");
+	}
+	std::string type = rEntry.at("type").get<std::string>();
+	for (int64_t i = 0; i < static_cast<int64_t>(StatusChangeType::kCount); ++i)
+	{
+		if (type == StatusChangeTypeName(static_cast<StatusChangeType>(i)))
 		{
-			throw std::runtime_error("replay_transfer_fixture requires active recording or a paused pending recording start");
+			return static_cast<StatusChangeType>(i);
 		}
-		if (!rParameters.contains("type"))
+	}
+	throw std::runtime_error("'type' must be SpawnPlayer|TransferPlayer|TransferSpaceship|TransferBlaster|TransferMissile|DestroyPlayer|UpdatePlayer|UpdateFleet");
+}
+
+static void ValidateInjectedPosition(FXMVECTOR vecPosition)
+{
+	if (!common::InsideArea(vecPosition, engine::LocalFrameArea()))
+	{
+		throw std::runtime_error("inject_payload position must lie inside the cell");
+	}
+}
+
+// Validates one entry without touching any queue.
+static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(const nlohmann::json& rEntry)
+{
+	if (!rEntry.is_object())
+	{
+		throw std::runtime_error("each inject_payload entry must be an object");
+	}
+	engine::GridCoord coordinate = CoordinateFromParameter(rEntry);
+	StatusChangeType eType = StatusChangeTypeFromEntry(rEntry);
+
+	ScheduledStatusChange scheduled {.iTick = gpGame->miTickCounter + 1, .change = {.eType = eType, .data = DefaultDataForType(eType)}};
+	if (rEntry.contains("tick"))
+	{
+		if (!rEntry.at("tick").is_number_integer())
 		{
-			throw std::runtime_error("replay_transfer_fixture requires string 'type'");
+			throw std::runtime_error("'tick' must be an integer");
 		}
-		if (!rParameters.at("type").is_string())
+		scheduled.iTick = rEntry.at("tick").get<int64_t>();
+		if (scheduled.iTick <= gpGame->miTickCounter)
 		{
-			throw std::runtime_error("replay_transfer_fixture requires string 'type'");
+			throw std::runtime_error("'tick' must be greater than the current status.tick");
 		}
-		bool bPauseAfterWriterInput = false;
-		if (rParameters.contains("pauseAfterWriterInput"))
+	}
+
+	if (IsTransferType(eType))
+	{
+		if constexpr (!kbDebugInput)
 		{
-			if (!rParameters.at("pauseAfterWriterInput").is_boolean())
+			throw std::runtime_error("transfer entries require kbDebugInput build");
+		}
+		if (eType != StatusChangeType::kTransferPlayer && !gpServerSession->mpTransferManager->IsDestinationLive(coordinate))
+		{
+			throw std::runtime_error("transfer entry 'coord' is not live for this type");
+		}
+
+		TransferData& rData = std::get<TransferData>(scheduled.change.data);
+		// Transfer payloads are destination-local, so the default arrival point is the cell centre.
+		rData.vecPosition = XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.mfCurrent, 1.0f);
+		rData.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+		rData.vecVelocity = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+		rData.alignment = gpGame->mPlayerAlignment;
+		rData.fHealth = 1.0f;
+		rData.fShield = 1.0f;
+		rData.uiTypeIndex = static_cast<uint8_t>(PlayersInterpolate::siBlasterTypeIndex);
+		rData.fDeltaRotationMaximum = eType == StatusChangeType::kTransferMissile ? 2.0f : 0.0f;
+		rData.fleetWantedCoordinate = coordinate;
+		switch (eType)
+		{
+			case StatusChangeType::kTransferPlayer:
+				ParseInjectedFields<
+					InjectedField<&TransferData::vecPosition>,
+					InjectedField<&TransferData::vecDirection>,
+					InjectedField<&TransferData::vecVelocity>,
+					InjectedField<&TransferData::fHealth>,
+					InjectedField<&TransferData::fShield>,
+					InjectedField<&TransferData::nextBlasterFireTimeSeconds>,
+					InjectedField<&TransferData::nextSecondarySpawnTimeSeconds>,
+					InjectedField<&TransferData::shieldCooldownSeconds>,
+					InjectedField<&TransferData::shieldDownSoundCooldownSeconds>,
+					InjectedField<&TransferData::animationTimeSeconds>,
+					InjectedField<&TransferData::navigationDelaySeconds>,
+					InjectedField<&TransferData::fleetWantedCoordinate>>(rEntry, rData);
+				break;
+			case StatusChangeType::kTransferSpaceship:
+				ParseInjectedFields<
+					InjectedField<&TransferData::vecPosition>,
+					InjectedField<&TransferData::vecDirection>,
+					InjectedField<&TransferData::vecVelocity>,
+					InjectedField<&TransferData::fHealth>,
+					InjectedField<&TransferData::nextBlasterSpawnTimeSeconds>,
+					InjectedField<&TransferData::fDeltaRotation>>(rEntry, rData);
+				break;
+			case StatusChangeType::kTransferBlaster:
+				ParseInjectedFields<
+					InjectedField<&TransferData::vecPosition>,
+					InjectedField<&TransferData::vecVelocity>,
+					InjectedField<&TransferData::uiTypeIndex>>(rEntry, rData);
+				break;
+			default:
+				ParseInjectedFields<
+					InjectedField<&TransferData::vecPosition>,
+					InjectedField<&TransferData::vecDirection>,
+					InjectedField<&TransferData::vecVelocity>,
+					InjectedField<&TransferData::fAcceleration>,
+					InjectedField<&TransferData::deltaRotationDelaySeconds>,
+					InjectedField<&TransferData::timeSeconds>,
+					InjectedField<&TransferData::nextJitterSeconds>,
+					InjectedField<&TransferData::fDeltaRotation>,
+					InjectedField<&TransferData::fDeltaRotationMaximum>,
+					InjectedField<&TransferData::fPitch>>(rEntry, rData);
+				break;
+		}
+
+		// An out-of-cell arrival asserts at PlayersPostRender::Spawn and is silently dropped by the other transfer types'
+		// Spawn, so reject it here.
+		ValidateInjectedPosition(rData.vecPosition);
+		// An arriving player coasts under its transfer lock. A velocity that crosses a whole cell in one tick outruns the
+		// one-cell transfer delta and asserts at Spawn, so cap it at the speed navigation never exceeds.
+		if (eType == StatusChangeType::kTransferPlayer && !(XMVectorGetX(XMVector2LengthSq(rData.vecVelocity)) <= kfPlayerMaximumSpeed * kfPlayerMaximumSpeed))
+		{
+			throw std::runtime_error(std::format("TransferPlayer '{}' must not exceed the maximum player speed", kStatusChangeFieldName<&TransferData::vecVelocity>));
+		}
+		if (!PlayersPostRender::IsBlasterFireTimeInRange(rData.nextBlasterFireTimeSeconds.count()))
+		{
+			throw std::runtime_error(std::format("'{}' is out of range", kStatusChangeFieldName<&TransferData::nextBlasterFireTimeSeconds>));
+		}
+		if (!PlayersPostRender::IsNavigationDelayInRange(rData.navigationDelaySeconds.count()))
+		{
+			throw std::runtime_error(std::format("'{}' must be within [0,60]", kStatusChangeFieldName<&TransferData::navigationDelaySeconds>));
+		}
+		if (!IsAdoptableStatusChange(scheduled.change))
+		{
+			throw std::runtime_error(std::format("'{}' is not a registered Blaster type", kStatusChangeFieldName<&TransferData::uiTypeIndex>));
+		}
+	}
+	else
+	{
+		if (!IsCoordinateActive(coordinate))
+		{
+			throw std::runtime_error("status-change entry 'coord' is not active");
+		}
+
+		switch (eType)
+		{
+			case StatusChangeType::kSpawnPlayer:
 			{
-				throw std::runtime_error("'pauseAfterWriterInput' must be bool");
+				SpawnPlayerData& rData = std::get<SpawnPlayerData>(scheduled.change.data);
+				rData.fleetWantedCoordinate = coordinate;
+				ParseInjectedFields<
+					InjectedField<&SpawnPlayerData::fSpawnOffsetX>,
+					InjectedField<&SpawnPlayerData::fSpawnOffsetY>,
+					InjectedField<&SpawnPlayerData::bIsFlagship>,
+					InjectedField<&SpawnPlayerData::fleetWantedCoordinate>>(rEntry, rData);
+				// Spawn silently skips an out-of-cell offset, so reject it here.
+				ValidateInjectedPosition(XMVectorSet(rData.fSpawnOffsetX, rData.fSpawnOffsetY, engine::gBaseHeight.mfCurrent, 1.0f));
+				break;
 			}
-			bPauseAfterWriterInput = rParameters.at("pauseAfterWriterInput").get<bool>();
-		}
-		if (bPauseAfterWriterInput && engine::ReplayFixtures::IsWriterPauseArmed(*engine::gpReplay))
-		{
-			throw std::runtime_error("replay_transfer_fixture pauseAfterWriterInput is already armed");
-		}
-
-		std::string type = rParameters.at("type").get<std::string>();
-		StatusChangeType eType {};
-		if (type == "player")
-		{
-			eType = StatusChangeType::kTransferPlayer;
-		}
-		else if (type == "spaceship")
-		{
-			eType = StatusChangeType::kTransferSpaceship;
-		}
-		else if (type == "blaster")
-		{
-			eType = StatusChangeType::kTransferBlaster;
-		}
-		else if (type == "missile")
-		{
-			eType = StatusChangeType::kTransferMissile;
-		}
-		else
-		{
-			throw std::runtime_error("'type' must be player|spaceship|blaster|missile");
-		}
-
-		engine::GridCoord source = CoordinateFromParameter(rParameters, "source");
-		engine::GridCoord destination = CoordinateFromParameter(rParameters, "destination");
-		if (!AreAdjacent(source, destination))
-		{
-			throw std::runtime_error("'source' and 'destination' must be distinct adjacent coords");
-		}
-		if (!IsCoordinateActive(source))
-		{
-			throw std::runtime_error("'source' is not active");
-		}
-		auto sourceIt = gpGame->mCoordinateFrames.find(source);
-		if (sourceIt == gpGame->mCoordinateFrames.end())
-		{
-			throw std::runtime_error("'source' frame is not ready");
-		}
-		if (sourceIt->second.pCurrent == nullptr)
-		{
-			throw std::runtime_error("'source' frame is not ready");
-		}
-		if (sourceIt->second.pNext == nullptr)
-		{
-			throw std::runtime_error("'source' frame is not ready");
-		}
-
-		// Transfer payloads are destination-local, so the default arrival point is the destination cell's center.
-		XMVECTOR vecPosition = XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.mfCurrent, 1.0f);
-		if (eType == StatusChangeType::kTransferBlaster)
-		{
-			auto destinationIt = gpGame->mCoordinateFrames.find(destination);
-			if (destinationIt == gpGame->mCoordinateFrames.end())
+			case StatusChangeType::kDestroyPlayer:
+				ParseInjectedFields<InjectedField<&DestroyPlayerData::iPlayerUuid, true>>(rEntry, std::get<DestroyPlayerData>(scheduled.change.data));
+				break;
+			case StatusChangeType::kUpdatePlayer:
 			{
-				throw std::runtime_error("replay transfer fixture destination frame is not ready");
-			}
-
-			engine::FrameStaticData& rDestinationStaticData = destinationIt->second.staticData;
-			if (rDestinationStaticData.elevationGrid.empty() && !rDestinationStaticData.islands.empty())
-			{
-				// Heap: Build the one-time derived terrain grid before this command samples it.
-				ScopedSuppressAllocationTracking suppress;
-				engine::gpIslandTerrain->BuildElevationGrid(rDestinationStaticData.islands, rDestinationStaticData.elevationGrid);
-			}
-			XMFLOAT4A f4Area {};
-			XMStoreFloat4A(&f4Area, engine::LocalFrameArea());
-			// Blasters are destroyed by point-terrain contact, so place this debug fixture in a terrain-clear
-			// cell and verify the first fixed-tick movement remains clear too.
-			static constexpr int64_t kiTerrainGridDimension = 20;
-			float fPitchX = (f4Area.z - f4Area.x) / static_cast<float>(kiTerrainGridDimension);
-			float fPitchY = (f4Area.y - f4Area.w) / static_cast<float>(kiTerrainGridDimension);
-			bool bFoundTerrainClearPosition = false;
-			for (int64_t i = 0; i < kiTerrainGridDimension && !bFoundTerrainClearPosition; ++i)
-			{
-				for (int64_t j = 0; j < kiTerrainGridDimension; ++j)
+				UpdatePlayerData& rData = std::get<UpdatePlayerData>(scheduled.change.data);
+				rData.uiPendingWeaponModeTicks = static_cast<uint8_t>(engine::kiTickRate);
+				ParseInjectedFields<
+					InjectedField<&UpdatePlayerData::iPlayerUuid, true>,
+					InjectedField<&UpdatePlayerData::bUseMissiles>,
+					InjectedField<&UpdatePlayerData::navigationDelaySeconds>>(rEntry, rData);
+				// Rejects a delay the wire would reject, so an injected player never holds an out-of-range delay.
+				if (!PlayersPostRender::IsNavigationDelayInRange(rData.navigationDelaySeconds.count()))
 				{
-					XMVECTOR vecCandidate = XMVectorSet(f4Area.x + (static_cast<float>(j) + 0.5f) * fPitchX, f4Area.w + (static_cast<float>(i) + 0.5f) * fPitchY, engine::gBaseHeight.mfCurrent, 1.0f);
-					XMVECTOR vecNextCandidate = XMVectorSet(XMVectorGetX(vecCandidate) + engine::kfDeltaTime, XMVectorGetY(vecCandidate), engine::gBaseHeight.mfCurrent, 1.0f);
-					if (engine::gpIslandTerrain->MakeFrameElevationSampler(rDestinationStaticData).Sample(vecCandidate) < engine::gBaseHeight.mfCurrent
-					 && engine::gpIslandTerrain->MakeFrameElevationSampler(rDestinationStaticData).Sample(vecNextCandidate) < engine::gBaseHeight.mfCurrent)
-					{
-						vecPosition = vecCandidate;
-						bFoundTerrainClearPosition = true;
-						break;
-					}
+					throw std::runtime_error(std::format("'{}' must be within [0,60]", kStatusChangeFieldName<&UpdatePlayerData::navigationDelaySeconds>));
 				}
+				break;
 			}
-			if (!bFoundTerrainClearPosition)
+			default:
 			{
-				throw std::runtime_error("replay transfer fixture destination has no terrain-clear Blaster position");
+				UpdateFleetData& rData = std::get<UpdateFleetData>(scheduled.change.data);
+				rData.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(engine::kiTickRate);
+				ParseInjectedFields<
+					InjectedField<&UpdateFleetData::iPlayerUuid, true>,
+					InjectedField<&UpdateFleetData::fleetWantedCoordinate, true>,
+					InjectedField<&UpdateFleetData::bIsFlagship>>(rEntry, rData);
+				break;
 			}
 		}
-
-		TransferData data
-		{
-			.vecPosition = vecPosition,
-			.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f),
-			.vecVelocity = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f),
-			.alignment = gpGame->mPlayerAlignment,
-			.fHealth = 1.0f,
-			.fShield = 1.0f,
-			.uiTypeIndex = static_cast<uint8_t>(PlayersInterpolate::siBlasterTypeIndex),
-			.fDeltaRotationMaximum = eType == StatusChangeType::kTransferMissile ? 2.0f : 0.0f,
-			.globalPlayerId = engine::GlobalId {.iValue = eType == StatusChangeType::kTransferPlayer ? gpGame->miNextGlobalId++ : 0},
-			.fleetWantedCoordinate = destination,
-		};
-		StatusChange transfer {.eType = eType, .data = std::move(data)};
-		if (!QueueReplayTransferFixture(*gpServerSession, destination, std::move(transfer)))
-		{
-			throw std::runtime_error("replay transfer fixture destination is not live for this type");
-		}
-		if (bPauseAfterWriterInput)
-		{
-			engine::ReplayFixtures::ArmPauseAfterNextWriterInput(*engine::gpReplay, bPendingStart);
-		}
-
-		rResult["type"] = type;
-		rResult["source"] = {source.iX, source.iY};
-		rResult["destination"] = {destination.iX, destination.iY};
-		rResult["pauseAfterWriterInput"] = bPauseAfterWriterInput;
 	}
+	return {coordinate, std::move(scheduled)};
 }
 
-static int64_t PlayerUuidFromParameter(const nlohmann::json& rChange)
-{
-	if (!rChange.contains("playerUuid"))
-	{
-		throw std::runtime_error("'playerUuid' required");
-	}
-	return rChange.at("playerUuid").get<int64_t>();
-}
-
-// Rejects a delay the wire would reject, so an injected player never holds an out-of-range delay.
-static std::chrono::duration<float> NavigationDelayFromParameter(const nlohmann::json& rChange)
-{
-	std::chrono::duration<float> navigationDelaySeconds(rChange.contains("navigationDelay") ? rChange.at("navigationDelay").get<float>() : 60.0f);
-	if (!PlayersPostRender::IsNavigationDelayInRange(navigationDelaySeconds.count()))
-	{
-		throw std::runtime_error("'navigationDelay' must be finite and within [0,60]");
-	}
-	return navigationDelaySeconds;
-}
-
-// Only SpawnPlayer, DestroyPlayer, UpdatePlayer and UpdateFleet are injectable.
-// SpawnPlayer global ids are minted at injection time and appended to rGlobalIds.
-static std::pair<engine::GridCoord, StatusChange> BuildInjectedChange(const nlohmann::json& rChange, nlohmann::json& rGlobalIds)
-{
-	engine::GridCoord coordinate = CoordinateFromParameter(rChange);
-	if (!IsCoordinateActive(coordinate))
-	{
-		throw std::runtime_error("change 'coord' is not active");
-	}
-	if (!rChange.contains("type"))
-	{
-		throw std::runtime_error("each change requires string 'type'");
-	}
-	if (!rChange.at("type").is_string())
-	{
-		throw std::runtime_error("each change requires string 'type'");
-	}
-	std::string type = rChange.at("type").get<std::string>();
-
-	StatusChange change;
-	if (type == "SpawnPlayer")
-	{
-		bool bIsFlagship = rChange.contains("isFlagship") && rChange.at("isFlagship").get<bool>();
-		engine::GridCoord fleetWantedCoordinate = rChange.contains("fleetWantedCoord") ? CoordinateFromParameter(rChange, "fleetWantedCoord") : coordinate;
-		int64_t iGlobalId = gpGame->miNextGlobalId++;
-		SpawnPlayerData spawn {.iGlobalId = iGlobalId, .bIsFlagship = bIsFlagship, .fleetWantedCoordinate = fleetWantedCoordinate, .uiPendingFleetWantedCoordinateTicks = 0};
-		if (rChange.contains("pos"))
-		{
-			// The consumer rejects out-of-cell spawns.
-			const nlohmann::json& rPosition = rChange.at("pos");
-			if (!rPosition.is_array())
-			{
-				throw std::runtime_error("'pos' must be an [x,y] array of numbers");
-			}
-			if (rPosition.size() != 2)
-			{
-				throw std::runtime_error("'pos' must be an [x,y] array of numbers");
-			}
-			if (!rPosition.at(0).is_number())
-			{
-				throw std::runtime_error("'pos' must be an [x,y] array of numbers");
-			}
-			if (!rPosition.at(1).is_number())
-			{
-				throw std::runtime_error("'pos' must be an [x,y] array of numbers");
-			}
-			spawn.fSpawnOffsetX = rPosition.at(0).get<float>();
-			spawn.fSpawnOffsetY = rPosition.at(1).get<float>();
-		}
-		change.eType = StatusChangeType::kSpawnPlayer;
-		change.data = spawn;
-		rGlobalIds.push_back(iGlobalId);
-	}
-	else if (type == "DestroyPlayer")
-	{
-		change.eType = StatusChangeType::kDestroyPlayer;
-		change.data = DestroyPlayerData {.iPlayerUuid = PlayerUuidFromParameter(rChange)};
-	}
-	else if (type == "UpdatePlayer")
-	{
-		bool bUseMissiles = rChange.contains("useMissiles") && rChange.at("useMissiles").get<bool>();
-		change.eType = StatusChangeType::kUpdatePlayer;
-		change.data = UpdatePlayerData {.iPlayerUuid = PlayerUuidFromParameter(rChange), .bUseMissiles = bUseMissiles, .navigationDelaySeconds = NavigationDelayFromParameter(rChange), .uiPendingWeaponModeTicks = static_cast<uint8_t>(engine::kiTickRate)};
-	}
-	else if (type == "UpdateFleet")
-	{
-		bool bIsFlagship = rChange.contains("isFlagship") && rChange.at("isFlagship").get<bool>();
-		change.eType = StatusChangeType::kUpdateFleet;
-		change.data = UpdateFleetData {.iPlayerUuid = PlayerUuidFromParameter(rChange), .bIsFlagship = bIsFlagship, .fleetWantedCoordinate = CoordinateFromParameter(rChange, "fleetWantedCoord"), .uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(engine::kiTickRate)};
-	}
-	else
-	{
-		throw std::runtime_error("'type' must be SpawnPlayer|DestroyPlayer|UpdatePlayer|UpdateFleet");
-	}
-	return {coordinate, change};
-}
-
-static void CommandInjectStatusChanges(const nlohmann::json& rParameters, nlohmann::json& rResult)
+static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	if (!rParameters.is_object())
 	{
-		throw std::runtime_error("inject_status_changes params must be an object");
+		throw std::runtime_error("inject_payload params must be an object");
 	}
 	for (const auto& [rKey, rValue] : rParameters.items())
 	{
-		if (rKey != "changes" && rKey != "navQueryActivation")
+		if (rKey != "entries" && rKey != "navQueryActivation" && rKey != "pauseAfterWriterInput")
 		{
-			throw std::runtime_error("inject_status_changes unknown parameter '" + rKey + "'");
+			throw std::runtime_error("inject_payload unknown parameter '" + rKey + "'");
 		}
 	}
-	if (!rParameters.contains("changes"))
+	if (!rParameters.contains("entries"))
 	{
-		throw std::runtime_error("inject_status_changes requires array 'changes'");
+		throw std::runtime_error("inject_payload requires non-empty array 'entries'");
 	}
-	if (!rParameters.at("changes").is_array())
+	if (!rParameters.at("entries").is_array())
 	{
-		throw std::runtime_error("inject_status_changes requires array 'changes'");
+		throw std::runtime_error("inject_payload requires non-empty array 'entries'");
+	}
+	if (rParameters.at("entries").empty())
+	{
+		throw std::runtime_error("inject_payload requires non-empty array 'entries'");
+	}
+
+	bool bPauseAfterWriterInputPresent = rParameters.contains("pauseAfterWriterInput");
+	bool bPauseAfterWriterInput = false;
+	if (bPauseAfterWriterInputPresent)
+	{
+		if (!rParameters.at("pauseAfterWriterInput").is_boolean())
+		{
+			throw std::runtime_error("'pauseAfterWriterInput' must be bool");
+		}
+		if constexpr (!kbDebugInput)
+		{
+			throw std::runtime_error("'pauseAfterWriterInput' requires kbDebugInput build");
+		}
+		bPauseAfterWriterInput = rParameters.at("pauseAfterWriterInput").get<bool>();
 	}
 
 	bool bArmNavigationQuery = false;
@@ -605,15 +681,73 @@ static void CommandInjectStatusChanges(const nlohmann::json& rParameters, nlohma
 			throw std::runtime_error("navQueryActivation requires recording and replay to be inactive");
 		}
 	}
-	const nlohmann::json& rChanges = rParameters.at("changes");
+	const nlohmann::json& rEntries = rParameters.at("entries");
 
-	// Queue the batch only after every entry validates; failed builds can leave gaps in the monotonic global ids.
-	nlohmann::json globalIds = nlohmann::json::array();
-	std::vector<std::pair<engine::GridCoord, StatusChange>> built;
-	built.reserve(rChanges.size());
-	for (const nlohmann::json& rChange : rChanges)
+	// Validate the whole batch before any queue mutation or global id is minted.
+	std::vector<std::pair<engine::GridCoord, ScheduledStatusChange>> built;
+	built.reserve(rEntries.size());
+	bool bHasTransfer = false;
+	bool bHasTick = false;
+	for (const nlohmann::json& rEntry : rEntries)
 	{
-		built.push_back(BuildInjectedChange(rChange, globalIds));
+		built.push_back(BuildInjectedEntry(rEntry));
+		bHasTransfer = bHasTransfer || IsTransferType(built.back().second.change.eType);
+		bHasTick = bHasTick || rEntry.contains("tick");
+	}
+	// The arm's prepared queue swap covers only the status queue.
+	if (bArmNavigationQuery && bHasTransfer)
+	{
+		throw std::runtime_error("navQueryActivation cannot be combined with transfer entries");
+	}
+	// The arm's sample floor and the writer-input pause both assume the batch enters the next tick.
+	if (bArmNavigationQuery && bHasTick)
+	{
+		throw std::runtime_error("navQueryActivation cannot be combined with entry 'tick'");
+	}
+	bool bPendingStart = (gpGame->mGameFlags & engine::GameFlags::kPaused) && (gpGame->mGameFlags & engine::GameFlags::kSaveReplay)
+	                  && engine::gpReplay->mReplayWriters.empty();
+	if (bPauseAfterWriterInput)
+	{
+		if (!bHasTransfer)
+		{
+			throw std::runtime_error("pauseAfterWriterInput requires a transfer entry");
+		}
+		if (engine::gpReplay->mReplayWriters.empty() && !bPendingStart)
+		{
+			throw std::runtime_error("pauseAfterWriterInput requires active recording or a paused pending recording start");
+		}
+		if (engine::ReplayFixtures::IsWriterPauseArmed(*engine::gpReplay))
+		{
+			throw std::runtime_error("pauseAfterWriterInput is already armed");
+		}
+		if (bHasTick)
+		{
+			throw std::runtime_error("pauseAfterWriterInput cannot be combined with entry 'tick'");
+		}
+	}
+
+	// Ids are reserved here and committed to miNextGlobalId only with the queue, so a rejected arm consumes none.
+	int64_t iNextGlobalId = gpGame->miNextGlobalId;
+	nlohmann::json globalIds = nlohmann::json::array();
+	for (std::pair<engine::GridCoord, ScheduledStatusChange>& rBuiltEntry : built)
+	{
+		ScheduledStatusChange& rScheduled = rBuiltEntry.second;
+		if (rScheduled.change.eType == StatusChangeType::kSpawnPlayer)
+		{
+			int64_t iGlobalId = iNextGlobalId++;
+			std::get<SpawnPlayerData>(rScheduled.change.data).iGlobalId = iGlobalId;
+			globalIds.push_back(iGlobalId);
+		}
+		else if (rScheduled.change.eType == StatusChangeType::kTransferPlayer)
+		{
+			int64_t iGlobalId = iNextGlobalId++;
+			std::get<TransferData>(rScheduled.change.data).globalPlayerId = engine::GlobalId {.iValue = iGlobalId};
+			globalIds.push_back(iGlobalId);
+		}
+	}
+	if (bPauseAfterWriterInputPresent)
+	{
+		rResult["pauseAfterWriterInput"] = bPauseAfterWriterInput;
 	}
 
 	int64_t iQueuedAtTick = 0;
@@ -624,10 +758,10 @@ static void CommandInjectStatusChanges(const nlohmann::json& rParameters, nlohma
 		{
 			// Prepare a complete queue copy before touching the profiler state. A failed allocation leaves both the
 			// existing queue and the event arm unchanged.
-			std::unordered_map<engine::GridCoord, std::vector<StatusChange>> preparedPendingAgentStatusChanges = sFixture.pendingAgentStatusChanges;
-			for (const auto& [rCoordinate, rChange] : built)
+			decltype(sFixture.pendingAgentStatusChanges) preparedPendingAgentStatusChanges = sFixture.pendingAgentStatusChanges;
+			for (const std::pair<engine::GridCoord, ScheduledStatusChange>& rBuiltEntry : built)
 			{
-				preparedPendingAgentStatusChanges.try_emplace(rCoordinate).first->second.push_back(rChange);
+				preparedPendingAgentStatusChanges.try_emplace(rBuiltEntry.first).first->second.push_back(rBuiltEntry.second);
 			}
 
 			// Prepare every response field that could allocate before arming. The command failure path must not report an
@@ -656,15 +790,30 @@ static void CommandInjectStatusChanges(const nlohmann::json& rParameters, nlohma
 			{
 				throw std::runtime_error("navQueryActivation event is occupied or overrun");
 			}
+			gpGame->miNextGlobalId = iNextGlobalId;
 			static_assert(noexcept(preparedPendingAgentStatusChanges.swap(sFixture.pendingAgentStatusChanges)));
 			preparedPendingAgentStatusChanges.swap(sFixture.pendingAgentStatusChanges);
 		}
 	}
 	else
 	{
-		for (const auto& [rCoordinate, rChange] : built)
+		gpGame->miNextGlobalId = iNextGlobalId;
+		for (const std::pair<engine::GridCoord, ScheduledStatusChange>& rBuiltEntry : built)
 		{
-			QueueAgentStatusChange(*gpServerSession, rCoordinate, rChange);
+			const engine::GridCoord& rCoordinate = rBuiltEntry.first;
+			const ScheduledStatusChange& rScheduled = rBuiltEntry.second;
+			if (IsTransferType(rScheduled.change.eType))
+			{
+				VERIFY_SUCCESS(QueueReplayTransferFixture(*gpServerSession, rCoordinate, rScheduled.iTick, rScheduled.change));
+			}
+			else
+			{
+				QueueAgentStatusChange(*gpServerSession, rCoordinate, rScheduled.iTick, rScheduled.change);
+			}
+		}
+		if (bPauseAfterWriterInput)
+		{
+			engine::ReplayFixtures::ArmPauseAfterNextWriterInput(*engine::gpReplay, bPendingStart);
 		}
 		rResult["injected"] = std::ssize(built);
 		rResult["globalIds"] = std::move(globalIds);
@@ -672,151 +821,9 @@ static void CommandInjectStatusChanges(const nlohmann::json& rParameters, nlohma
 	}
 }
 
-static void CommandSpawnPlayers(const nlohmann::json& rParameters, nlohmann::json& rResult)
-{
-	if (gpGame->mbReplaying)
-	{
-		throw std::runtime_error("cannot inject during replay playback");
-	}
-	engine::GridCoord coordinate = CoordinateFromParameter(rParameters);
-	if (!IsCoordinateActive(coordinate))
-	{
-		throw std::runtime_error("'coord' is not active");
-	}
-	if (!rParameters.contains("count"))
-	{
-		throw std::runtime_error("spawn_players requires 'count'");
-	}
-	int64_t iCount = rParameters.at("count").get<int64_t>();
-	// Spawn changes are allocated up front, before any tick runs.
-	static constexpr int64_t kiMaximumSpawnCount = 256; // matches the query window default limit
-	if (iCount < 0)
-	{
-		throw std::runtime_error("'count' must be in [0, 256]");
-	}
-	if (iCount > kiMaximumSpawnCount)
-	{
-		throw std::runtime_error("'count' must be in [0, 256]");
-	}
-	bool bIsFlagship = rParameters.contains("isFlagship") && rParameters.at("isFlagship").get<bool>();
-
-	nlohmann::json globalIds = nlohmann::json::array();
-	for (int64_t i = 0; i < iCount; ++i)
-	{
-		int64_t iGlobalId = gpGame->miNextGlobalId++;
-		StatusChange change {.eType = StatusChangeType::kSpawnPlayer, .data = SpawnPlayerData {.iGlobalId = iGlobalId, .bIsFlagship = bIsFlagship, .fleetWantedCoordinate = coordinate, .uiPendingFleetWantedCoordinateTicks = 0}};
-		QueueAgentStatusChange(*gpServerSession, coordinate, change);
-		globalIds.push_back(iGlobalId);
-	}
-
-	rResult["injected"] = iCount;
-	rResult["globalIds"] = std::move(globalIds);
-	rResult["deferred"] = static_cast<bool>(gpGame->mGameFlags & engine::GameFlags::kPaused);
-}
-
-// Seeds one synthetic Player arrival near the requested edge and lets the unchanged transfer pipeline carry it
-// back out: SpawnTransfer's post-arrival lock skips navigation and acceleration, so the arrival coasts at the
-// velocity chosen here until PostCollision sees it leave the cell.
-static void CommandInjectOutwardTransfer(const nlohmann::json& rParameters, nlohmann::json& rResult)
-{
-	if constexpr (!kbDebugInput)
-	{
-		throw std::runtime_error("inject_outward_transfer requires kbDebugInput build");
-	}
-	else
-	{
-		if (gpGame->mbReplaying)
-		{
-			throw std::runtime_error("cannot inject during replay playback");
-		}
-		if (!rParameters.is_object())
-		{
-			throw std::runtime_error("inject_outward_transfer requires exactly {\"coord\":[x,y],\"delta\":[dx,dy]}");
-		}
-		if (rParameters.size() != 2)
-		{
-			throw std::runtime_error("inject_outward_transfer requires exactly {\"coord\":[x,y],\"delta\":[dx,dy]}");
-		}
-
-		engine::GridCoord coordinate = CoordinateFromParameter(rParameters);
-		if (!rParameters.contains("delta"))
-		{
-			throw std::runtime_error("inject_outward_transfer requires exactly {\"coord\":[x,y],\"delta\":[dx,dy]}");
-		}
-		const nlohmann::json& rDelta = rParameters.at("delta");
-		if (!rDelta.is_array())
-		{
-			throw std::runtime_error("'delta' must be a [dx,dy] array");
-		}
-		if (rDelta.size() != 2)
-		{
-			throw std::runtime_error("'delta' must be a [dx,dy] array");
-		}
-		if (!rDelta.at(0).is_number_integer())
-		{
-			throw std::runtime_error("'delta' components must be integers in [-1,1] and not both zero");
-		}
-		if (!rDelta.at(1).is_number_integer())
-		{
-			throw std::runtime_error("'delta' components must be integers in [-1,1] and not both zero");
-		}
-		int64_t iDeltaX = rDelta.at(0).get<int64_t>();
-		int64_t iDeltaY = rDelta.at(1).get<int64_t>();
-		if (std::abs(iDeltaX) > 1)
-		{
-			throw std::runtime_error("'delta' components must be integers in [-1,1] and not both zero");
-		}
-		if (std::abs(iDeltaY) > 1)
-		{
-			throw std::runtime_error("'delta' components must be integers in [-1,1] and not both zero");
-		}
-		if (iDeltaX == 0 && iDeltaY == 0)
-		{
-			throw std::runtime_error("'delta' components must be integers in [-1,1] and not both zero");
-		}
-
-		XMFLOAT4A f4Area {};
-		XMStoreFloat4A(&f4Area, engine::LocalFrameArea());
-		// 16 ticks of coast: half of SpawnTransfer's one-second transfer lock, long enough for the harness to
-		// observe the seeded cell while it is active and still finished inside the lock. The extra half step
-		// keeps the crossing off an exact multiple of the step, so the departing position overshoots the edge
-		// instead of landing on it, and the cell-width subtraction PrepareTransferRequest applies leaves the
-		// destination-local position strictly inside the destination cell.
-		static constexpr float kfCoastMargin = (16.0f - 0.5f) * kfPlayerMaximumSpeed * engine::kfDeltaTime;
-		// Midpoint of the requested edge: the half-extent pulled inward on each non-zero axis, the cell centre
-		// on a zero-delta one.
-		float fPositionX = (iDeltaX > 0) ? f4Area.z - kfCoastMargin : (iDeltaX < 0) ? f4Area.x + kfCoastMargin : (f4Area.x + f4Area.z) * 0.5f;
-		float fPositionY = (iDeltaY > 0) ? f4Area.y - kfCoastMargin : (iDeltaY < 0) ? f4Area.w + kfCoastMargin : (f4Area.y + f4Area.w) * 0.5f;
-		XMVECTOR vecVelocity = XMVectorSet(static_cast<float>(iDeltaX) * kfPlayerMaximumSpeed, static_cast<float>(iDeltaY) * kfPlayerMaximumSpeed, 0.0f, 0.0f);
-
-		int64_t iGlobalId = gpGame->miNextGlobalId++;
-		TransferData data
-		{
-			.vecPosition = XMVectorSet(fPositionX, fPositionY, engine::gBaseHeight.mfCurrent, 1.0f),
-			.vecDirection = XMVector3Normalize(vecVelocity),
-			.vecVelocity = vecVelocity,
-			.alignment = gpGame->mPlayerAlignment,
-			// A zero-armor arrival is flagged exploding on its first tick instead of transferring.
-			.fHealth = 1.0f,
-			.fShield = 1.0f,
-			.globalPlayerId = engine::GlobalId {.iValue = iGlobalId},
-			// Seeded cell: no fleet override fights the coast once the transfer lock expires.
-			.fleetWantedCoordinate = coordinate,
-		};
-		StatusChange transfer {.eType = StatusChangeType::kTransferPlayer, .data = std::move(data)};
-		if (!QueueReplayTransferFixture(*gpServerSession, coordinate, std::move(transfer)))
-		{
-			throw std::runtime_error("inject_outward_transfer could not queue the arrival");
-		}
-
-		rResult["globalId"] = iGlobalId;
-		rResult["deferred"] = static_cast<bool>(gpGame->mGameFlags & engine::GameFlags::kPaused);
-	}
-}
-
 bool ExecuteServerSimulationFixtureCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (command != "replay_record" && command != "replay_play" && command != "replay_transfer_capture" && command != "replay_drop_retained_end_frame" && command != "replay_inject_persistence_failure" && command != "replay_transfer_fixture" && command != "inject_status_changes" && command != "spawn_players" && command != "inject_outward_transfer")
+	if (command != "replay_record" && command != "replay_play" && command != "replay_transfer_capture" && command != "replay_drop_retained_end_frame" && command != "replay_inject_persistence_failure" && command != "inject_payload")
 	{
 		return false;
 	}
@@ -846,37 +853,22 @@ bool ExecuteServerSimulationFixtureCommand(std::string_view command, const nlohm
 		CommandReplayInjectPersistenceFailure(rParameters, rResult);
 		return true;
 	}
-	if (command == "replay_transfer_fixture")
+	if (command == "inject_payload")
 	{
-		CommandReplayTransferFixture(rParameters, rResult);
-		return true;
-	}
-	if (command == "inject_status_changes")
-	{
-		CommandInjectStatusChanges(rParameters, rResult);
-		return true;
-	}
-	if (command == "spawn_players")
-	{
-		CommandSpawnPlayers(rParameters, rResult);
-		return true;
-	}
-	if (command == "inject_outward_transfer")
-	{
-		CommandInjectOutwardTransfer(rParameters, rResult);
+		CommandInjectPayload(rParameters, rResult);
 		return true;
 	}
 	return false;
 }
 
-void QueueAgentStatusChange(const ServerSession& rSession, engine::GridCoord coordinate, const StatusChange& rChange)
+void QueueAgentStatusChange(const ServerSession& rSession, engine::GridCoord coordinate, int64_t iTick, const StatusChange& rChange)
 {
 	// Runs at the agent command drain point under AgentCommandServer::Drain's allocation suppression.
 	Bind(rSession);
-	sFixture.pendingAgentStatusChanges.try_emplace(coordinate).first->second.push_back(rChange);
+	sFixture.pendingAgentStatusChanges.try_emplace(coordinate).first->second.push_back({.iTick = iTick, .change = rChange});
 }
 
-bool QueueReplayTransferFixture(const ServerSession& rSession, engine::GridCoord destination, StatusChange transfer)
+bool QueueReplayTransferFixture(const ServerSession& rSession, engine::GridCoord destination, int64_t iTick, StatusChange transfer)
 {
 	if constexpr (!kbDebugInput)
 	{
@@ -891,13 +883,9 @@ bool QueueReplayTransferFixture(const ServerSession& rSession, engine::GridCoord
 	{
 		return false;
 	}
-	if (transfer.eType != StatusChangeType::kTransferPlayer && !rSession.mpTransferManager->IsDestinationLive(destination))
-	{
-		return false;
-	}
 
 	Bind(rSession);
-	sFixture.replayTransferFixtures.try_emplace(destination).first->second.push_back(std::move(transfer));
+	sFixture.replayTransferFixtures.try_emplace(destination).first->second.push_back({.iTick = iTick, .change = std::move(transfer)});
 	return true;
 }
 
@@ -907,15 +895,12 @@ void DrainPendingAgentStatusChanges(const ServerSession& rSession)
 	{
 		return;
 	}
-	if (gpGame->mfLastDeltaTime <= 0.0f)
-	{
-		return;
-	}
-	if (gpGame->mbReplaying)
-	{
-		return;
-	}
 
+	int64_t iTick = gpGame->miTickCounter;
+	auto IsReleased = [iTick](const ScheduledStatusChange& rScheduled)
+	{
+		return rScheduled.iTick <= iTick;
+	};
 	for (auto it = sFixture.pendingAgentStatusChanges.begin(); it != sFixture.pendingAgentStatusChanges.end();)
 	{
 		const engine::GridCoord& rCoordinate = it->first;
@@ -936,13 +921,26 @@ void DrainPendingAgentStatusChanges(const ServerSession& rSession)
 			++it;
 			continue;
 		}
+		std::vector<ScheduledStatusChange>& rScheduledChanges = it->second;
+		if (std::ranges::none_of(rScheduledChanges, IsReleased))
+		{
+			++it;
+			continue;
+		}
 		std::vector<StatusChange>& rStatusChanges = gpGame->mFrameInputs.try_emplace(rCoordinate).first->second.statusChanges;
-		rStatusChanges.insert(rStatusChanges.end(), it->second.begin(), it->second.end());
+		for (const ScheduledStatusChange& rScheduled : rScheduledChanges)
+		{
+			if (IsReleased(rScheduled))
+			{
+				rStatusChanges.push_back(rScheduled.change);
+			}
+		}
 		std::stable_sort(rStatusChanges.begin(), rStatusChanges.end(), [](const StatusChange& rLeft, const StatusChange& rRight)
 		{
 			return rLeft.eType < rRight.eType;
 		});
-		it = sFixture.pendingAgentStatusChanges.erase(it);
+		std::erase_if(rScheduledChanges, IsReleased);
+		it = rScheduledChanges.empty() ? sFixture.pendingAgentStatusChanges.erase(it) : std::next(it);
 	}
 }
 
@@ -953,11 +951,33 @@ void DrainReplayTransferFixtures(const ServerSession& rSession, engine::ServerTr
 		return;
 	}
 
-	for (const auto& [rCoordinate, rTransfers] : sFixture.replayTransferFixtures)
+	int64_t iTick = gpGame->miTickCounter;
+	auto IsReleased = [iTick](const ScheduledStatusChange& rScheduled)
 	{
-		rTransferManager.PrepareReplayTransfers(rCoordinate, rTransfers);
+		return rScheduled.iTick <= iTick;
+	};
+	for (auto it = sFixture.replayTransferFixtures.begin(); it != sFixture.replayTransferFixtures.end();)
+	{
+		const engine::GridCoord& rCoordinate = it->first;
+		std::vector<ScheduledStatusChange>& rScheduledTransfers = it->second;
+		for (const ScheduledStatusChange& rScheduled : rScheduledTransfers)
+		{
+			if (!IsReleased(rScheduled))
+			{
+				continue;
+			}
+			// Mirrors CollectTransfers' organic drop: ApplyPreparedTransfers breaks on a non-player transfer to a non-live destination.
+			if (rScheduled.change.eType != StatusChangeType::kTransferPlayer && !rTransferManager.IsDestinationLive(rCoordinate))
+			{
+				LOG(kNetwork, kWarning, "Dropping injected transfer to non-live Frame Tick: {} Dest: ({},{}) Type: {}", iTick, rCoordinate.iX, rCoordinate.iY, StatusChangeTypeName(rScheduled.change.eType));
+				continue;
+			}
+			// One call per entry: PrepareReplayTransfers appends, and a call with no entry would still create the destination.
+			rTransferManager.PrepareReplayTransfers(rCoordinate, std::span(&rScheduled.change, 1));
+		}
+		std::erase_if(rScheduledTransfers, IsReleased);
+		it = rScheduledTransfers.empty() ? sFixture.replayTransferFixtures.erase(it) : std::next(it);
 	}
-	sFixture.replayTransferFixtures.clear();
 }
 
 void ResetPendingAgentStatusChanges(const ServerSession& rSession)

@@ -159,7 +159,17 @@ The `argument-hint` value selects the Plan:
    object, the count row reports zero, or every per-path row reports no touch.
 7. Present for approval per this file's `### Implementation approval`. Done
    when the user's decision arrives.
-8. Implement the approved change. Done when its own acceptance checks pass.
+8. Implement the approved change. Main dispatches one `/implement-plan`
+   `implementer` per `Slices` row of the latest handoff that returned that
+   field, each brief citing as the approved plan the step-4 preparation
+   snapshot (the `Temp/` path whose `## In scope` and `## Out of scope` the
+   preparation handoff cites, or the difference preparation's snapshot on the
+   changes-requested route) and copying that row as the assigned items and
+   allowed file scope; main never reads the snapshot's `## In scope` itself.
+   Main assigns each change the user approved after the plan to exactly one
+   row, adding one slice when none fits, and passes `none` for those changes
+   to every other row. `Slices: none`
+   dispatches no implementer. Done when its own acceptance checks pass.
 9. Run the checkpoint exactly once, however the run ends: after step 8's
    acceptance checks, before step 10 when that step applies, and before
    `/finalize-changes` prepares the
@@ -221,6 +231,16 @@ per-statement enumeration of unaffected results.
   final row `Unaffected statements: <count>`; a quantitative feasibility
   estimate is not repeated here, and step 4 governs one returned as a `Findings`
   row.
+- `Slices` — the only source of the slice partition; the card's `Roles`
+  carries role assignments, not the split. One row per disjoint implementation
+  slice: the snapshot items it owns, named by section and label or bullet,
+  never by their text, and its allowed file scope; one row when the work has
+  no disjoint split, and `none` for an empty realized change. Refinements
+  accepted from Plan review or grill rounds are written into the preparation
+  snapshot;
+  every dispatch that changes the snapshot's scope, such as that write-in or a
+  redraft, names `Slices` in its `Return:`, in addition to its assigned skill's
+  handoff, and returns the field again.
 
 ### Execution card presentation/template
 

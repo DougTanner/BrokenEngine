@@ -12,5 +12,5 @@ Replace the one-slot arm with a small bounded queue of pending arms, each carryi
 
 ## Acceptance
 
-- Two `inject_status_changes` requests with `navQueryActivation:{arm:true}` in a row both succeed; the first publishes its event, and after the harness acknowledges it the second publishes its own event with its own floor.
+- Two `inject_payload` requests with `navQueryActivation:{arm:true}` in a row both succeed; the first publishes its event, and after the harness acknowledges it the second publishes its own event with its own floor.
 - A full queue rejects the arm before the status-change queue is swapped.

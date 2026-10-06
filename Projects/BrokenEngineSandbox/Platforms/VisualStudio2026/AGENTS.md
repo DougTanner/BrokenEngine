@@ -33,7 +33,7 @@ Each `.cpp` belongs in the client vcxproj, server vcxproj, or both, matching its
 
 Entirely one-sided source files also carry a whole-file `#if defined(BT_CLIENT)` / `BT_SERVER` wrap; headers keep `#pragma once` outside that guard. `Engine.h` guard spans group includes but do not establish affinity. A file force-included by both builds but consumed on only one side stays unwrapped and documents that deliberate exception in its leaf `AGENTS.md`.
 
-Headers follow the same affinity (Solution Explorer cleanliness; `ClInclude` has no build effect). Generated headers are property-based `$(GameDataDirectory)\*.h` items so Shared and Local show the selected source; the server omits the client-only generated `Shader.h`.
+Headers follow the same affinity (Solution Explorer cleanliness; `ClInclude` has no build effect). DataPacker-generated headers are property-based `$(GameDataDirectory)\*.h` items so Shared and Local show the selected source; the server omits the client-only generated `Shader.h`. A script-generated header checked in under `Source/` is listed by its Source path with its consumer's affinity, like any other header.
 
 Naming conventions that signal build affinity:
 - `*Render.cpp` — client-only

@@ -380,6 +380,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\CellCoordinateProbe.h" />
     <ClInclude Include="..\..\Source\Agent\AgentCommands.h" />
     <ClInclude Include="..\..\Source\Agent\AgentCommandsServerQueries.h" />
+    <ClInclude Include="..\..\Source\Agent\Commands\AgentFieldNames.h" />
     <ClInclude Include="..\..\Source\Agent\Commands\ServerFaultFixtures.h" />
     <ClInclude Include="..\..\Source\Agent\Commands\ServerSimulationFixtures.h" />
     <ClInclude Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityFixture.h" />
