@@ -119,9 +119,8 @@ The `argument-hint` value selects the Plan:
    `### Implementation approval`, never on an approval that did not carry it.
 
    After that preparation handoff, and before the Plan review reviewers, main
-   runs `/plan-alternatives` when its trigger fires; a candidate worth
-   presenting is carried into the step 7 approval presentation's
-   `### Plan alternatives` section.
+   runs `/plan-alternatives` when its trigger fires and presents per that
+   skill's `### User presentation`.
 
    Done when the execution card carries every field of the card template in
    this file's `### Execution card presentation/template`, the preparation
@@ -259,13 +258,13 @@ classified tier before the Plan review step.
 Preparation and claim do not require approval. Before implementation, present
 only the execution card's `### What does this plan do?` and
 `### Why this is good for the codebase` sections, plus a `### Plan alternatives`
-section when `/plan-alternatives` returned a candidate worth presenting,
-carrying that skill's comparison and question so it is clear that choosing one
-replaces the drafted plan, plus a `### User decisions needed` section when any
-decision is unresolved, listing each one with its options, trade-offs, and a
-recommendation; the rest of the resolved Plan and card stays in the snapshot
-for the reviews and is not presented. Deliver that presentation per the
-`### User Interaction` rules in
+section when `/plan-alternatives` presents candidates (that skill's
+`### User presentation`), carrying that skill's comparison and question so it
+is clear that choosing one replaces the drafted plan, plus a
+`### User decisions needed` section when any decision is unresolved, listing
+each one with its options, trade-offs, and a recommendation; the rest of the
+resolved Plan and card stays in the snapshot for the reviews and is not
+presented. Deliver that presentation per the `### User Interaction` rules in
 [`.agents/references/change-workflow.md`](../../references/change-workflow.md) —
 on Codex as exactly one complete `<proposed_plan>` block, then ending the turn
 without an approval question; on Claude Code, OpenCode, and every other host as

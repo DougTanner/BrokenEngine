@@ -312,8 +312,10 @@ void Graphics::Create()
 	// transition latch: the next genuine defer must re-log and re-arm.
 	mbSwapchainRecreateDeferred = false;
 
-	// Capture the deferrable-tier flag before Destroy() zeroes meDestroyType — the post-Destroy zero-area re-check
-	// below only applies to a swapchain-tier recreate (kSurface/device-loss are deliberately unguarded; see the gate).
+	// Capture the tier before Destroy() zeroes meDestroyType: the surviving texture manager's rebuild below selects its
+	// work by it, and the post-Destroy zero-area re-check only applies to a swapchain-tier recreate (kSurface/device-loss
+	// are deliberately unguarded; see the gate).
+	DestroyType eDestroyType = meDestroyType;
 	bool bSwapchainTierRecreate = gpInstanceManager != nullptr && meDestroyType >= DestroyType::kSwapchain && meDestroyType < DestroyType::kSurface;
 
 	Destroy();
@@ -380,10 +382,37 @@ void Graphics::Create()
 	{
 		mpTextureManager = std::make_unique<TextureManager>();
 		bInitializeBootTextures = true;
+		// The fresh texture and buffer managers' constructors build every flagged resource
+		mDestroyFlags = DestroyFlags_t {};
 	}
-	else if (bSwapchainRecreated)
+	else
 	{
-		gpTextureManager->CreateScreenDependentResources();
+		// Rebuild only after Destroy() ran this call, so its vkDeviceWaitIdle has drained every user of the old resources
+		if (eDestroyType != DestroyType::kNone)
+		{
+			RecreateResources();
+		}
+
+		if (eDestroyType >= DestroyType::kSamplers)
+		{
+			gpTextureManager->DestroySamplers();
+			gpTextureManager->CreateSamplers();
+
+			// Global Set 0 survives pipeline recreation, always update it with new sampler handles
+			gpTextureManager->mTextureDescriptors.WriteGlobalDescriptorSets();
+
+			// Rewrite per-pipeline sampler descriptors unless all pipelines are being fully rebuilt
+			if (eDestroyType < DestroyType::kPipelines)
+			{
+				gpTextureManager->mTextureDescriptors.RewriteSamplerDescriptors();
+			}
+		}
+
+		// After the sampler rebuild: the new global sets are written with the current sampler handles
+		if (bSwapchainRecreated)
+		{
+			gpTextureManager->CreateScreenDependentResources();
+		}
 	}
 	if (mpPipelineManager == nullptr)
 	{
@@ -667,26 +696,6 @@ bool Graphics::Destroy()
 		vkDeviceWaitIdle(gpDeviceManager->mVkDevice);
 	}
 
-	RecreateResources();
-
-	if (meDestroyType >= DestroyType::kSamplers)
-	{
-		if (gpTextureManager != nullptr)
-		{
-			gpTextureManager->DestroySamplers();
-			gpTextureManager->CreateSamplers();
-
-			// Global Set 0 survives pipeline recreation, always update it with new sampler handles
-			gpTextureManager->mTextureDescriptors.WriteGlobalDescriptorSets();
-
-			// Rewrite per-pipeline sampler descriptors unless all pipelines are being fully rebuilt
-			if (meDestroyType < DestroyType::kPipelines)
-			{
-				gpTextureManager->mTextureDescriptors.RewriteSamplerDescriptors();
-			}
-		}
-	}
-
 	if (meDestroyType >= DestroyType::kCommandBuffers)
 	{
 		mpCommandBufferManager.reset();
@@ -755,7 +764,6 @@ bool Graphics::Destroy()
 		mpInstanceManager.reset();
 	}
 
-	mDestroyFlags = DestroyFlags_t {};
 	meDestroyType = DestroyType::kNone;
 
 	return true;

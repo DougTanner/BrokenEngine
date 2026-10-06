@@ -3,8 +3,8 @@ name: plan-alternatives
 description: >-
   Explore materially different ways to make a change before its plan reviews:
   dispatch blind, one-shot `researcher` workers on fixed axes, compare their
-  candidates against the drafted approach, and ask the user when a candidate
-  is worth presenting. Use when the change adds new code or modifies
+  candidates against the drafted approach, and present every returned
+  candidate to the user. Use when the change adds new code or modifies
   non-documentation behavior (/plan-simplicity-review `## When to use`
   defines both), both at the Change Workflow Prepare and explore alternatives
   step and from a /next-plan claim once the Plan is verified. A new
@@ -20,8 +20,8 @@ allowed-tools: [Read, Grep, Glob, Agent, AskUserQuestion]
 Answer one question before the Plan review step: is there a materially
 different way to do this? Main dispatches one to three blind `researcher` workers
 on fixed axes, compares their candidates against the drafted approach, and
-reports that the original stands or puts the candidates worth presenting to the
-user, who picks at most one.
+reports that the original stands or puts every returned candidate to the user,
+who picks at most one.
 
 ## When to use
 
@@ -86,32 +86,28 @@ and never merges candidates into a hybrid; the user picks at most one:
   rebuilding it;
 - `Self-serving machinery`: adds none.
 
-The scores inform a judgement; they are not a tally. A candidate is
-`worth presenting` when it fully meets the objective and, weighing the
-criteria above, a user could reasonably prefer it — most often because it wins
-on cause removal or shape. A loss on net new code or invariant surfaces is a
-cost to state beside it, never a reason to withhold it; a loss on cause
-removal or shape is weighed like any other. A candidate that fails the
-objective, rebuilds an existing guarantee, or adds self-serving machinery is
-not worth presenting. An empty axis says nothing about whether candidate zero
-is the simplest approach; whether the drafted plan itself is over-built is the
-`/plan-simplicity-review` question.
+The scores inform main's recommendation and the costs stated beside each
+candidate — an objective not fully met, a rebuilt existing guarantee, or
+self-serving machinery among them; they are not a tally, and they never decide
+which candidates the user sees. An empty axis says nothing about whether
+candidate zero is the simplest approach; whether the drafted plan itself is
+over-built is the `/plan-simplicity-review` question.
 
 ### User presentation
 
-When no candidate is worth presenting, the original stands and the turn's report
-carries one line:
+When no researcher returned a candidate, the original stands and the turn's
+report carries one line:
 
 ```text
-Alternatives: original stands (<n> candidates, <axes>)
+Alternatives: original stands (<axes>)
 ```
 
 Otherwise, before the Plan review step — or, in a `/next-plan` run, as the
 `### Plan alternatives` section of that skill's `### Implementation approval`
-presentation — main presents every candidate worth presenting beside the
-drafted approach in plain language per `### User Interaction` — the same
-criteria, what it adds and deletes, which invariant surfaces it touches, and
-when it pays off — with a recommendation, then asks verbatim:
+presentation — main presents every returned candidate beside the drafted
+approach in plain language per `### User Interaction` — the same criteria,
+what it adds and deletes, which invariant surfaces it touches, and when it pays
+off — with a recommendation, then asks verbatim:
 
 > Which approach should this change use: the drafted plan as written, or one of
 > the alternatives above?
