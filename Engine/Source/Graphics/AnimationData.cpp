@@ -359,7 +359,7 @@ void AnimationData::EvaluateWorldMatrices(int64_t iAnimationIndex, float fTime, 
 				break;
 			default:
 				ASSERT(false);
-				break;
+				std::unreachable();
 		}
 	}
 

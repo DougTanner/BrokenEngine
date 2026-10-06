@@ -352,7 +352,7 @@ namespace toolcli
 			return {};
 		}
 		value.resize(static_cast<size_t>(iWritten));
-		return std::filesystem::path(value);
+		return std::filesystem::path(std::move(value));
 	}
 
 	std::filesystem::path ExtendedLengthPath(std::filesystem::path path)

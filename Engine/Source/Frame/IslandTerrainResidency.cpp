@@ -48,14 +48,10 @@ static bool IsTextureRestorationPending(common::crc_t uiIslandCrc, const IslandT
 		rLazyChunk.header.islandHeader.ambientOcclusionCrc,
 		rLazyChunk.header.islandHeader.masksCrc,
 	};
-	for (common::crc_t uiTextureCrc : residencyCrcs)
+	return std::ranges::all_of(residencyCrcs, [](const common::crc_t& rTextureCrc)
 	{
-		if (!gpFileManager->mpPackChunks->IsChunkReady(uiTextureCrc))
-		{
-			return false;
-		}
-	}
-	return true;
+		return gpFileManager->mpPackChunks->IsChunkReady(rTextureCrc);
+	});
 }
 
 // Upload an island's heightmap into its template-owned elevationTexture as an R16_SFLOAT image (raw
@@ -182,14 +178,10 @@ bool IslandTerrainResidency::AnyEvictionPending() const
 	{
 		return false;
 	}
-	for (const auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
+	return std::ranges::any_of(gpIslandTerrain->mIslands, [this](const std::pair<const common::crc_t, IslandTemplate>& rIsland)
 	{
-		if (IsEvictionPending(rTemplate))
-		{
-			return true;
-		}
-	}
-	return false;
+		return IsEvictionPending(rIsland.second);
+	});
 }
 
 bool IslandTerrainResidency::AnyRestorationPending() const
@@ -198,14 +190,10 @@ bool IslandTerrainResidency::AnyRestorationPending() const
 	{
 		return false;
 	}
-	for (const auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
+	return std::ranges::any_of(gpIslandTerrain->mIslands, [this](const std::pair<const common::crc_t, IslandTemplate>& rIsland)
 	{
-		if (IsRestorationPending(rCrc, rTemplate))
-		{
-			return true;
-		}
-	}
-	return false;
+		return IsRestorationPending(rIsland.first, rIsland.second);
+	});
 }
 
 bool IslandTerrainResidency::IsEvictionPending(const IslandTemplate& rTemplate) const

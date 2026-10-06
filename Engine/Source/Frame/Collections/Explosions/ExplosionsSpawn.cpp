@@ -23,7 +23,7 @@ void XM_CALLCONV SyncExplosionTrail(game::FrameInterpolate& rFrameInterpolate, s
 
 #endif // BT_CLIENT
 
-bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, const SpawnInfo& rSpawnInformation)
+bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]] GridCoord coordinate, std::chrono::duration<float> currentTime, const SpawnInfo& rSpawnInformation)
 {
 	if (!common::InsideArea(rSpawnInformation.vecPosition, engine::LocalFrameArea()))
 	{
@@ -187,11 +187,13 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, std::chrono::du
 	[[maybe_unused]] float fIntensityDecayScale = Scale(rType.pParticleIntensityDecayScale);
 	[[maybe_unused]] float fIntensityPowerScale = Scale(rType.pParticleIntensityPowerScale);
 
+#if defined(BT_CLIENT)
+	RenderBasis basis = MakeRenderBasis(coordinate, gpCamera->mBasisCoordinate);
+#endif // BT_CLIENT
+
 	for (int64_t i = 0; i < iTotalParticles; ++i)
 	{
-		XMFLOAT4A f4Position {};
-		XMVECTOR vecParticlePosition = common::RandomPositionJitter(rSpawnInformation.vecPosition, rType.fParticlePositionJitter * fPositionJitterScale, rFrame.postRender.randomEngine);
-		XMStoreFloat4A(&f4Position, vecParticlePosition);
+		[[maybe_unused]] XMVECTOR vecParticlePosition = common::RandomPositionJitter(rSpawnInformation.vecPosition, rType.fParticlePositionJitter * fPositionJitterScale, rFrame.postRender.randomEngine);
 
 		float fVelocityMagnitude = rType.fParticleVelocityMinimum * fVelocityBaseScale + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fParticleVelocityRandom * fVelocitySpreadScale;
 		XMVECTOR vecVelocity = XMVectorMultiply(XMVectorReplicate(fVelocityMagnitude), vecDirection2dNormal);
@@ -218,6 +220,9 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, std::chrono::du
 #if defined(BT_CLIENT)
 		if (!(rFrame.interpolate.frameFlags & FrameFlags::kRecalculated))
 		{
+			// ParticleManager::Spawn culls against the camera cell's visible area, so convert before the call.
+			XMFLOAT4A f4Position {};
+			XMStoreFloat4A(&f4Position, Rebase(basis, vecParticlePosition));
 			ParticleManager::Spawn(gpParticleManager->mLongParticlesSpawnLayout,
 			{
 				.iColor = static_cast<int32_t>(uiParticleColor),

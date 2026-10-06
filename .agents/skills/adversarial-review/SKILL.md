@@ -40,7 +40,7 @@ Whenever a session baseline exists, the complete changed-artifact list is the
 `triggers`. The run is usable only when `status` is `pass` and `truncated` is
 false; otherwise the complete changed-artifact list is unavailable, so return
 `BLOCKED`. An untracked file appears only when the caller supplies it
-with `-IncludeUntracked <comma-separated paths>`, and `counts.unlistedUntracked`
+with `-IncludeUntracked '<comma-separated paths>'`, and `counts.unlistedUntracked`
 reports how many untracked files the run did not list. Never enumerate the
 changed artifacts inline.
 

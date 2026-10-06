@@ -5,6 +5,7 @@
 #include "File/Replay.h"
 
 #include "Agent/Commands/ServerFaultFixtures.h"
+#include "Agent/Commands/ServerFrameEdit.h"
 #include "Agent/Commands/ServerSimulationFixtures.h"
 #include "Agent/AgentCommandsServerQueries.h"
 #include "Network/Server/ServerFleetManager.h"
@@ -63,11 +64,11 @@ static std::filesystem::path BareFilenameParameter(const nlohmann::json& rValue)
 	{
 		throw std::runtime_error("'file' must be a non-empty bare filename");
 	}
-	if (utf8.find('\0') != std::string::npos)
+	if (utf8.contains('\0'))
 	{
 		throw std::runtime_error("'file' must not contain an embedded NUL");
 	}
-	if (utf8.find('/') != std::string::npos || utf8.find('\\') != std::string::npos || utf8.find(':') != std::string::npos || utf8.find("..") != std::string::npos)
+	if (utf8.contains('/') || utf8.contains('\\') || utf8.contains(':') || utf8.contains(".."))
 	{
 		throw std::runtime_error("'file' must be a bare filename (no path separators, drive/stream ':', or '..')");
 	}
@@ -75,7 +76,8 @@ static std::filesystem::path BareFilenameParameter(const nlohmann::json& rValue)
 	{
 		throw std::runtime_error("'file' must not use a reserved Windows device name");
 	}
-	return std::filesystem::path(reinterpret_cast<const char8_t*>(utf8.c_str()));
+	std::u8string u8String(utf8.begin(), utf8.end());
+	return std::filesystem::path(u8String);
 }
 
 static void CommandStatus([[maybe_unused]] const nlohmann::json& rParameters, nlohmann::json& rResult)
@@ -336,6 +338,11 @@ bool ExecuteAgentCommandServer(std::string_view command, const nlohmann::json& r
 	if (command == "reset")
 	{
 		CommandReset(rParameters, rResult);
+		return true;
+	}
+	if (command == "edit_frame")
+	{
+		CommandEditFrame(rParameters, rResult);
 		return true;
 	}
 	if (ExecuteServerSimulationFixtureCommand(command, rParameters, rResult))

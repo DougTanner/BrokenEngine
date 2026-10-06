@@ -217,7 +217,7 @@ static const char* ValidateChunkHeader(data::DataTypes eExpectedDataType, const 
 		{
 			return "chunk header size outside chunk";
 		}
-		if (rChunkHeader.iSize > std::numeric_limits<int>::max())
+		if (!std::in_range<int>(rChunkHeader.iSize))
 		{
 			return "chunk header size outside chunk";
 		}
@@ -243,7 +243,7 @@ static const char* ValidateChunkHeader(data::DataTypes eExpectedDataType, const 
 		{
 			return "chunk uncompressed size invalid";
 		}
-		if (rChunkHeader.iUncompressedSize > std::numeric_limits<int>::max())
+		if (!std::in_range<int>(rChunkHeader.iUncompressedSize))
 		{
 			return "chunk uncompressed size invalid";
 		}
@@ -561,7 +561,7 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 			continue;
 		}
 
-		if (!bResetAll && std::find(targetCrcs.begin(), targetCrcs.end(), crc) == targetCrcs.end())
+		if (!bResetAll && !std::ranges::contains(targetCrcs, crc))
 		{
 			continue;
 		}
@@ -582,11 +582,9 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 			rLazyChunk.eState.value.store(ChunkState::kDiskLoaded, std::memory_order_release);
 #if defined(BT_CLIENT)
 			// Maintain the pending-adoption counter: kUploading (uncounted) -> kDiskLoaded (counted) arms it;
-			// kGpuUploadComplete -> kDiskLoaded stays adoptable (already counted), so leave it unchanged. Both reset
-			// callers run with the upload thread idle (whole-pool: Graphics::Destroy drains the loaders, waits the
-			// upload worker through WaitIdle, then destroys the transfer resources before this reset; per-island:
-			// in the drained descriptor window),
-			// and gpTextureUploadManager outlives the device-loss Graphics recreate, so it is always valid here.
+			// kGpuUploadComplete -> kDiskLoaded stays adoptable (already counted), so leave it unchanged. Only the
+			// whole-pool reset reaches this branch, because per-island eviction requires bGpuResident, so its targets
+			// are kReady. gpTextureUploadManager outlives the device-loss Graphics recreate, so it is always valid here.
 			if (eState == ChunkState::kUploading)
 			{
 				gpTextureUploadManager->miPendingAdoptions.fetch_add(1, std::memory_order_relaxed);
@@ -1023,7 +1021,7 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 	{
 		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range exceeds the pack file");
 	}
-	if (uiLogicalEnd > static_cast<uint64_t>(fileSize.QuadPart))
+	if (std::cmp_greater(uiLogicalEnd, fileSize.QuadPart))
 	{
 		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range exceeds the pack file");
 	}

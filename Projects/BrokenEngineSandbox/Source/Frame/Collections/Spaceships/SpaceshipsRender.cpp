@@ -35,12 +35,15 @@ static int64_t siRendered = 0;
 static std::atomic<bool> sbRenderActive = false;
 
 // sbRenderActive must clear during exception unwinding so subsequent Render calls do not fail the concurrency ASSERT.
-struct SpaceshipsRenderActiveGuard
+struct [[nodiscard]] SpaceshipsRenderActiveGuard
 {
 	SpaceshipsRenderActiveGuard()
 	{
 		ASSERT(!sbRenderActive.exchange(true));
 	}
+
+	SpaceshipsRenderActiveGuard(const SpaceshipsRenderActiveGuard&) = delete;
+	SpaceshipsRenderActiveGuard& operator=(const SpaceshipsRenderActiveGuard&) = delete;
 
 	~SpaceshipsRenderActiveGuard()
 	{

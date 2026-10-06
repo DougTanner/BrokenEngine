@@ -185,14 +185,10 @@ void PackChunkLoader::WaitForChunks(std::span<const common::crc_t> crcs)
 	std::unique_lock lock(mQueueMutex);
 	mCompletionCondition.wait(lock, [&]
 	{
-		for (common::crc_t crc : crcs)
+		return std::ranges::none_of(crcs, [this](const common::crc_t& crc)
 		{
-			if (mrPackChunks.mLazyChunkMap.at(crc).eState.value.load(std::memory_order_acquire) < ChunkState::kReady)
-			{
-				return false;
-			}
-		}
-		return true;
+			return mrPackChunks.mLazyChunkMap.at(crc).eState.value.load(std::memory_order_acquire) < ChunkState::kReady;
+		});
 	});
 }
 

@@ -103,10 +103,7 @@ IslandTerrain::IslandTerrain()
 		for (common::crc_t islandCrc : mIslandCrcsSorted)
 		{
 			const common::IslandHeader& rIslandHeader = rChunkMap.at(islandCrc).header.islandHeader;
-			channelCrcs.push_back(rIslandHeader.colorsCrc);
-			channelCrcs.push_back(rIslandHeader.normalsCrc);
-			channelCrcs.push_back(rIslandHeader.ambientOcclusionCrc);
-			channelCrcs.push_back(rIslandHeader.masksCrc);
+			channelCrcs.insert(channelCrcs.end(), {rIslandHeader.colorsCrc, rIslandHeader.normalsCrc, rIslandHeader.ambientOcclusionCrc, rIslandHeader.masksCrc});
 		}
 		std::sort(channelCrcs.begin(), channelCrcs.end());
 		ASSERT(std::adjacent_find(channelCrcs.begin(), channelCrcs.end()) == channelCrcs.end());

@@ -12,7 +12,7 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1
      -RepositoryRoot '<absolute repository toplevel>' -Baseline <full
      40-character SHA> -Regions -OutputPath Temp/comment-review-inventory.json`,
-     adding `-IncludeUntracked <comma-separated paths>` when the caller
+     adding `-IncludeUntracked '<comma-separated paths>'` when the caller
      supplied untracked paths. The run prints one summary line naming its
      status, code, and message; read the object from that file only after this
      run printed that line, keeping the `entries` rows whose `class` is `cpp`,
@@ -52,7 +52,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      not evident from the comment and the surrounding code.
    - Done when every accepted finding carries a replacement or a route.
 5. Return the handoff `../SKILL.md` `## Handoff` defines. `Status` is `BLOCKED`
-   when the inventory or the scanner is unavailable, naming that input;
+   when the inventory or the scanner is unavailable, or a focused re-review
+   arrives without `First-round findings`, naming the missing input;
    `NEEDS_ACTION` when any block became a finding; `PASS` when none did. Done
    when that handoff is the final answer.
 

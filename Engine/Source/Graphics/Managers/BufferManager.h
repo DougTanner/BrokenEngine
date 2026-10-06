@@ -44,6 +44,7 @@ public:
 	template<typename T>
 	DynamicStorageBufferResult<T> GetDynamicStorageBuffer(common::crc_t crc, DynamicBufferType eType, int64_t iCommandBuffer)
 	{
+		static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable");
 		Buffer& rBuffer = mDynamicStorageBuffers[eType].at(crc).at(iCommandBuffer);
 		// CreateDynamicBuffer() stores its size argument as iElementSize; pass sizeof(T) so ResizeDynamicBuffer preserves the element size.
 		ASSERT(static_cast<int64_t>(sizeof(T)) == rBuffer.mInfo.iElementSize);

@@ -111,12 +111,12 @@ function Get-Section([string] $Path, [string] $Heading)
 	if ($body -and $body -notmatch '^(-\s*)?none$') { return $body }
 }
 
-# The build fields main branches on, from the C++ files changed since the stage baseline: Client and Server for any
+# The build fields main branches on, from the C++ files changed since the given commit: Client and Server for any
 # change, DataPacker when one is under DataPacker/ or Common/ (DataPacker's Pch.h includes Common.h), WorktreeCli and
 # AgentHarness when one is under Tools/, and the Profile build when one now mentions BT_PROFILE.
-function Get-BuildFields([string] $Baseline)
+function Get-BuildFields([string] $Since)
 {
-	$cpp = @(git -C $root diff --name-only $Baseline -- '*.h' '*.cpp')
+	$cpp = @(git -C $root diff --name-only $Since -- '*.h' '*.cpp')
 	if ($cpp.Count -eq 0) { return 'cpp=no builds=none profile=no' }
 	$builds = @('Client', 'Server')
 	if ($cpp | Where-Object { $_ -match '^(DataPacker|Common)/' }) { $builds += 'DataPacker' }
@@ -201,6 +201,10 @@ $batchUnits = @($units | Where-Object { $_.Batch -ceq $Batch -and (-not $Unit -o
 if ($batchUnits.Count -eq 0) { throw "no units for batch '$Batch' unit '$Unit'" }
 New-Item -ItemType Directory -Force -Path (Join-Path $sweep 'units') | Out-Null
 if (-not (Test-Path -LiteralPath $baselineFile)) { (git -C $root rev-parse HEAD).Trim() | Set-Content $baselineFile }
+# The batch-start snapshot: a commit of the tracked working tree before any unit runs, or HEAD when that tree is
+# clean. git stash create stores nothing in refs/stash.
+$startFile = Join-Path $sweep "$Batch.start.txt"
+if (-not (Test-Path -LiteralPath $startFile)) { $start = git -C $root stash create; if (-not $start) { $start = git -C $root rev-parse HEAD }; $start.Trim() | Set-Content $startFile }
 "RUNNING $Batch $(Get-Date -Format s) units=$($batchUnits.Count)" | Set-Content $status
 
 $invokeSweepCodex = ${function:Invoke-SweepCodex}.ToString()
@@ -275,4 +279,4 @@ foreach ($u in $batchUnits)
 }
 $summary = "units=$($batchUnits.Count) applied=$($totals.applied) declined=$($totals.declined) crossfile=$($totals.crossfile) oob=$($totals.oob)"
 Add-Content (Join-Path $sweep 'Progress.md') "batch $Batch phase1+propagate $summary"
-"BATCH-DONE $Batch $(Get-Date -Format s) $summary $(Get-BuildFields (Get-Content -LiteralPath $baselineFile -TotalCount 1).Trim())" | Set-Content $status
+"BATCH-DONE $Batch $(Get-Date -Format s) $summary $(Get-BuildFields (Get-Content -LiteralPath $startFile -TotalCount 1).Trim())" | Set-Content $status

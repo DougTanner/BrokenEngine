@@ -1,9 +1,8 @@
 # The static checks for the Run targeted pre-review checks
 # step, selected from the session change inventory and run in one pass: `validate-skill`
-# for each changed skill package, `markdown-links` for every changed markdown file, and
-# `agent-field-names` when StatusChange.h, the generated AgentFieldNames.h, or its generator changes. The
-# first and third compose existing scripts (the bundled skill validator and `Write-AgentFieldNames.ps1
-# -Check`); only the markdown link and anchor check is new here. The
+# for each changed skill package and `markdown-links` for every changed markdown file. The
+# first composes an existing script (the bundled skill validator); only the markdown link and anchor
+# check is new here. The
 # run reports results only — it never decides whether a failing check blocks a slice, never edits a
 # file, and writes nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is
 # safe under a read-only sandbox. Stdout carries only the result document.
@@ -14,8 +13,7 @@
 # an unexpected error exits 1 with status `error`. `-Head <commit>` selects the changed
 # files from a committed head instead of the working tree, and `-IncludeUntracked` adds the untracked
 # files when checking the working tree. Only `markdown-links` reads content from that commit;
-# `validate-skill` validates the working tree's copy of each selected package, and `agent-field-names`
-# checks the working tree's generated header.
+# `validate-skill` validates the working tree's copy of each selected package.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -32,7 +30,6 @@ $script:MaximumMessageLength = 256
 
 $script:InventoryScript = Join-Path $PSScriptRoot 'Get-SessionChangeInventory.ps1'
 $script:ValidateSkillScript = Join-Path $PSScriptRoot '../skills/external-skill-creator/scripts/Validate-Skill.ps1'
-$script:AgentFieldNamesScript = Join-Path $PSScriptRoot 'Write-AgentFieldNames.ps1'
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
 $script:Root = $null
 $script:HeadSha = ''
@@ -325,32 +322,12 @@ function Invoke-MarkdownLinkCheck([object] $Inventory, [bool] $Truncated) {
 	return New-CheckRow 'markdown-links' $true $status ([ordered]@{ linkCount = $linkCount; failures = [object[]] $failures.ToArray() })
 }
 
-function Invoke-AgentFieldNamesCheck([object] $Inventory, [bool] $Truncated) {
-	# Both sides of every entry are scanned, deletions included, because a deleted generated header must
-	# fail; Get-ChangedPath drops deletions.
-	$triggerPaths = @('Projects/BrokenEngineSandbox/Source/Frame/StatusChange.h', 'Projects/BrokenEngineSandbox/Source/Agent/Commands/AgentFieldNames.h', '.agents/scripts/Write-AgentFieldNames.ps1')
-	$triggered = $false
-	foreach ($entry in $Inventory.entries) {
-		if ($triggerPaths -ccontains $entry.path -or $triggerPaths -ccontains $entry.oldPath) { $triggered = $true; break }
-	}
-	if (-not $triggered) {
-		if (-not $Truncated) { return New-CheckRow 'agent-field-names' $false 'skipped' $null }
-		return New-CheckRow 'agent-field-names' $true 'blocked' ([ordered]@{ reason = 'The inventory truncated its entry table, so a change to the generated field names could not be ruled out.' })
-	}
-	$run = Invoke-StaticCheckProcess (Get-StaticCheckShell) @('-NoProfile', '-File', $script:AgentFieldNamesScript, '-Check') $script:Root
-	# Exit 1 is a missing or stale header; any other nonzero exit is a parse or setup failure.
-	$status = switch ($run.ExitCode) { 0 { 'pass' } 1 { 'fail' } default { 'blocked' } }
-	if ($status -ceq 'pass') { return New-CheckRow 'agent-field-names' $true $status ([ordered]@{ exitCode = $run.ExitCode }) }
-	$lines = @(($run.Stdout -split "`r`n|`n|`r") | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-	return New-CheckRow 'agent-field-names' $true $status ([ordered]@{ exitCode = $run.ExitCode; lines = [object[]] $lines })
-}
-
 try {
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
 	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
 		Complete-StaticChecks 2 'blocked' 'static-checks.repository-root-invalid' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
 	}
-	foreach ($composed in @($script:InventoryScript, $script:ValidateSkillScript, $script:AgentFieldNamesScript)) {
+	foreach ($composed in @($script:InventoryScript, $script:ValidateSkillScript)) {
 		if (-not (Test-Path -LiteralPath $composed -PathType Leaf)) {
 			Complete-StaticChecks 2 'blocked' 'static-checks.script-missing' "A composed script is missing: '$composed'."
 		}
@@ -360,11 +337,10 @@ try {
 	$truncated = [bool] $inventory.truncated
 	$result.truncated = $truncated
 
-	# All three rows are always present, triggered or not.
+	# Both rows are always present, triggered or not.
 	$checks = @(
 		(Invoke-ValidateSkillCheck $inventory)
 		(Invoke-MarkdownLinkCheck $inventory $truncated)
-		(Invoke-AgentFieldNamesCheck $inventory $truncated)
 	)
 	$result.checks = [object[]] $checks
 	$triggeredStatuses = @($checks | Where-Object { $_.triggered } | ForEach-Object { $_.status })

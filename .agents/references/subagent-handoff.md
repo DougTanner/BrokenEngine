@@ -36,7 +36,8 @@ selector into a Markdown file is a `##` heading in it. Text a skill's
 handoff itself still carries the decision-relevant summary of each moved field,
 such as the count in `Changed files`, so main decides without opening the file;
 the file is for the workers main dispatches next, cited to them as path plus
-selector, and for main when a decision needs the detail.
+selector, and for main when a decision needs the detail. The report-file
+exemption for that file is in root `AGENTS.md` `## Environment`.
 
 A skill extends this form only by adding rows inside an existing field or by
 declaring extra fields in its own `## Handoff` section, each one line or one row

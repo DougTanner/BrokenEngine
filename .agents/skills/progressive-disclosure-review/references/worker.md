@@ -9,8 +9,8 @@ Steps and rules for the dispatched reviewer. The public
    re-deriving hunks: `pwsh -NoProfile -File
    .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
    repository toplevel>' -Baseline <full 40-character SHA> -Regions` (add `-Head
-   <commit>` for a committed head and `-IncludeUntracked <comma-separated
-   paths>` for untracked files), filtered to instruction-doc paths.
+   <commit>` for a committed head and `-IncludeUntracked '<comma-separated
+   paths>'` for untracked files), filtered to instruction-doc paths.
 
    Only `status` `pass` is usable; any other status means the diff input is
    unavailable — report that instead of enumerating hunks inline. Read

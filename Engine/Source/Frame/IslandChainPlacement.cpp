@@ -188,9 +188,9 @@ static int64_t CommitPlacement(CellContext& rContext, common::crc_t crc, XMFLOAT
 	// Placement must not exceed that reserve; the stable-view contract protects SAT overlap tests,
 	// deterministic packing, and CRC agreement.
 	ASSERT(std::ssize(rContext.placedHullStorage) < static_cast<int64_t>(rContext.placedHullStorage.capacity()));
-	rContext.placedHullStorage.emplace_back(rContext.scratch.begin(), rContext.scratch.end());
+	std::vector<XMFLOAT2>& rPlacedHull = rContext.placedHullStorage.emplace_back(rContext.scratch.begin(), rContext.scratch.end());
 	common::ConvexHull2D view = rCandidate;
-	view.pVertices = rContext.placedHullStorage.back().data();
+	view.pVertices = rPlacedHull.data();
 	rContext.placedHullViews.push_back(view);
 	rContext.pOut->push_back({.islandCrc = crc, .f2WorldPosition = f2Local, .fRotation = fRotation});
 	return std::ssize(rContext.placedHullViews) - 1;
@@ -281,12 +281,12 @@ static bool TryTouchPlace(CellContext& rContext, common::crc_t crc, int64_t iHos
 		return false;
 	}
 
-	for (const common::ConvexHull2D& rPlaced : rContext.placedHullViews)
+	if (std::ranges::any_of(rContext.placedHullViews, [&candidate](const common::ConvexHull2D& rPlaced)
 	{
-		if (common::ConvexHullsOverlap(candidate, rPlaced))
-		{
-			return false;
-		}
+		return common::ConvexHullsOverlap(candidate, rPlaced);
+	}))
+	{
+		return false;
 	}
 
 	rPlacedIndexOut = CommitPlacement(rContext, crc, f2Local, fRotation, candidate);

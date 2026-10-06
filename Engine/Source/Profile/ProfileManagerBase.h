@@ -370,6 +370,9 @@ public:
 	void GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTimers eEnd, bool bLatchShadowSample);
 
 	void SetClockCorrection(int64_t iOffset, int64_t iTargetBehind, int64_t iError);
+
+	// Called when rendering resumes after skipped frames, so the first rendered frame reports only its own samples.
+	void DiscardSkippedFrameSamples();
 #endif // BT_CLIENT
 
 	void BootStart(BootTimers eBootTimer);
@@ -497,7 +500,7 @@ public:
 #endif // BT_CLIENT
 };
 
-class ScopedBootTimer
+class [[nodiscard]] ScopedBootTimer
 {
 public:
 
@@ -511,7 +514,7 @@ private:
 	BootTimers meBootTimer = kBootTimerTotal;
 };
 
-class ScopedCpuProfile
+class [[nodiscard]] ScopedCpuProfile
 {
 public:
 

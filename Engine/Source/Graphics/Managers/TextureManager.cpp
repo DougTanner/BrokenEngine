@@ -192,7 +192,7 @@ TextureManager::TextureManager()
 		{
 			if (kpWaterNormalCrcs[i] == rCrc)
 			{
-				std::memcpy(mpfWaterNormalMipVariance[i], rLazyChunk.header.textureHeader.pfMipVariance, sizeof(mpfWaterNormalMipVariance[i]));
+				std::copy(std::begin(rLazyChunk.header.textureHeader.pfMipVariance), std::end(rLazyChunk.header.textureHeader.pfMipVariance), std::begin(mpfWaterNormalMipVariance[i]));
 				break;
 			}
 		}

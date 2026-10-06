@@ -170,12 +170,12 @@ bool ServerDisplayContentChanged()
 			Mix(rOwnedCoordinate.iY);
 		}
 
-		for (int64_t i = 0; i < std::ssize(rClient.slots); ++i)
+		for (const ClientConnection::SlotState& rSlot : rClient.slots)
 		{
-			if (rClient.slots.at(i).subscription.flags & SubscriptionFlags::kActive)
+			if (rSlot.subscription.flags & SubscriptionFlags::kActive)
 			{
-				Mix(rClient.slots.at(i).subscription.coordinate.iX);
-				Mix(rClient.slots.at(i).subscription.coordinate.iY);
+				Mix(rSlot.subscription.coordinate.iX);
+				Mix(rSlot.subscription.coordinate.iY);
 			}
 		}
 	}
@@ -249,18 +249,12 @@ static void PaintGridMap(HDC hDeviceContextBuffer, std::span<char> buffer, int64
 			RECT cellRectangle {.left = static_cast<LONG>(iCellLeft), .top = static_cast<LONG>(iCellTop), .right = static_cast<LONG>(iCellLeft + iCellSize), .bottom = static_cast<LONG>(iCellTop + iCellSize)};
 
 			GridCoord coordinate {.iX = static_cast<int32_t>(j), .iY = static_cast<int32_t>(i)};
-			bool bIsActive = false;
+			bool bIsActive = std::ranges::any_of(game::gpGame->mActiveCoordinates, [&coordinate](const GridCoord& rActiveCoordinate)
+			{
+				return rActiveCoordinate == coordinate;
+			});
 			bool bIsSubscribed = false;
 			int64_t iClientsInCell = 0;
-
-			for (const GridCoord& rActiveCoordinate : game::gpGame->mActiveCoordinates)
-			{
-				if (rActiveCoordinate == coordinate)
-				{
-					bIsActive = true;
-					break;
-				}
-			}
 
 			for (const ClientConnection& rClient : rClients)
 			{
@@ -494,7 +488,7 @@ static void PaintProfilePanel(HDC hDeviceContextBuffer, int64_t iLeft, int64_t i
 
 static void PaintTabBar(HDC hDeviceContextBuffer, int64_t iWidth)
 {
-	for (int64_t i = 0; std::string_view tabName : kTabNames)
+	for (auto [i, tabName] : std::views::enumerate(kTabNames))
 	{
 		int64_t iTabLeft = kiTabBarLeft + i * kiTabWidth;
 		RECT tabRectangle {.left = static_cast<LONG>(iTabLeft), .top = 0, .right = static_cast<int>(iTabLeft + kiTabWidth), .bottom = static_cast<int>(kiTabHeight)};
@@ -517,7 +511,6 @@ static void PaintTabBar(HDC hDeviceContextBuffer, int64_t iWidth)
 
 		SetTextColor(hDeviceContextBuffer, bActive ? RGB(255, 255, 255) : RGB(160, 160, 160));
 		TextOutA(hDeviceContextBuffer, static_cast<int>(iTabLeft + 12), 4, tabName.data(), static_cast<int>(tabName.size()));
-		++i;
 	}
 
 	// Bottom line across non-tab area

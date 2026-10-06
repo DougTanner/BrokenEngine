@@ -381,10 +381,7 @@ void TextureDescriptors::MintIslandSlot(int64_t iSlot, common::crc_t islandCrc, 
 	IslandSlot islandSlot;
 	islandSlot.islandCrc = islandCrc;
 	islandSlot.pElevationTexture = &rElevationTexture;
-	for (int64_t i = 0; i < static_cast<int64_t>(std::size(textureCrcs)); ++i)
-	{
-		islandSlot.textureCrcs[i] = textureCrcs[i];
-	}
+	std::copy(std::begin(textureCrcs), std::end(textureCrcs), std::begin(islandSlot.textureCrcs));
 	mIslandSlots.emplace(iSlot, islandSlot);
 	RegisterIslandSlotBindings(islandCrc, rTargets.mElevationTextures.data(), iSlot);
 	RegisterIslandSlotBindings(textureCrcs[0], rTargets.mColorTextures.data(), iSlot);

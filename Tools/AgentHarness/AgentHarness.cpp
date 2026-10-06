@@ -46,7 +46,7 @@ namespace toolcli
 		bool bReadStandardInput = false;
 	};
 
-	class ScopedWindowsSockets
+	class [[nodiscard]] ScopedWindowsSockets
 	{
 	public:
 		ScopedWindowsSockets() = default;
@@ -72,7 +72,7 @@ namespace toolcli
 		bool mbInitialized = false;
 	};
 
-	class ScopedSocket
+	class [[nodiscard]] ScopedSocket
 	{
 	public:
 		ScopedSocket() = default;
@@ -634,7 +634,7 @@ namespace toolcli
 			{
 				return kiExitFailure;
 			}
-			std::string request = arguments.inlineRequest;
+			std::string request = std::move(arguments.inlineRequest);
 			if (arguments.bReadStandardInput && !ReadAllStandardInput(request))
 			{
 				return kiExitFailure;

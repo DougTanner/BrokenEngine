@@ -77,7 +77,7 @@ static VkFilter ToVkFilter(int64_t iFilterMode)
 			return VK_FILTER_LINEAR;
 		default:
 			ASSERT(false);
-			return VK_FILTER_LINEAR;
+			std::unreachable();
 	}
 }
 
@@ -95,7 +95,7 @@ static VkSamplerAddressMode ToVkSamplerAddressMode(int64_t iWrapMode)
 			return VK_SAMPLER_ADDRESS_MODE_REPEAT;
 		default:
 			ASSERT(false);
-			return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			std::unreachable();
 	}
 }
 
@@ -103,7 +103,7 @@ static std::vector<VkFormat> ComputeTextureFormats(const tinygltf::Model& rModel
 {
 	std::vector<VkFormat> textureFormats;
 	textureFormats.reserve(static_cast<size_t>(std::ssize(rModel.textures)));
-	for (int64_t i = 0; i < std::ssize(rModel.textures); ++i)
+	for (const tinygltf::Texture& rTexture : rModel.textures)
 	{
 		// Textures sharing a source image share one generated intermediate, so a normal use through any of them
 		// forces the two-channel format: the shader samples .rg and reconstructs Z from them. The single-channel
@@ -113,7 +113,7 @@ static std::vector<VkFormat> ComputeTextureFormats(const tinygltf::Model& rModel
 		bool bNonOcclusionUse = false;
 		for (int64_t j = 0; j < std::ssize(rModel.textures); ++j)
 		{
-			if (rModel.textures.at(static_cast<size_t>(j)).source != rModel.textures.at(static_cast<size_t>(i)).source)
+			if (rModel.textures.at(static_cast<size_t>(j)).source != rTexture.source)
 			{
 				continue;
 			}
@@ -250,12 +250,12 @@ static bool IsSceneTextureIntermediate(std::string_view name, std::string_view i
 	{
 		return false;
 	}
-	for (char cCharacter : indexAndSuffix.substr(0, static_cast<size_t>(iSuffixStart)))
+	if (std::ranges::any_of(indexAndSuffix.substr(0, static_cast<size_t>(iSuffixStart)), [](const char& rcCharacter)
 	{
-		if (cCharacter < '0' || cCharacter > '9')
-		{
-			return false;
-		}
+		return rcCharacter < '0' || rcCharacter > '9';
+	}))
+	{
+		return false;
 	}
 
 	std::string_view suffix = indexAndSuffix.substr(static_cast<size_t>(iSuffixStart));
@@ -598,9 +598,8 @@ void ExportScene::LoadVerticesAndOptimizeMeshes(const tinygltf::Model& rGltfMode
 	const tinygltf::Scene& rScene = rGltfModel.scenes.at(rGltfModel.defaultScene > -1 ? rGltfModel.defaultScene : 0);
 	MaterialNodeMap materialNodeMap;
 	LoadVerticesContext loadContext {.rVertices = rVertices, .rMaterials = rMaterials, .rMaterialNodeInfos = rMaterialNodeInfos, .rMaterialNodeMap = materialNodeMap, .bHasSkeleton = bHasSkeleton};
-	for (int64_t i = 0; i < std::ssize(rScene.nodes); ++i)
+	for (int64_t iNodeIndex : rScene.nodes)
 	{
-		int64_t iNodeIndex = rScene.nodes.at(static_cast<size_t>(i));
 		const tinygltf::Node& rNode = rGltfModel.nodes.at(static_cast<size_t>(iNodeIndex));
 		Parent parent {.pParent = nullptr, .matNode = XMMatrixIdentity(), .iNodeIndex = -1};
 		LoadVertices(&parent, iNodeIndex, rNode, rGltfModel, loadContext);
@@ -711,7 +710,7 @@ void ExportScene::WriteModelFile(const std::vector<Material>& rMaterials, const 
 	for (int64_t i = 0; i < std::ssize(rMaterials); ++i)
 	{
 		materialIndexPositions.at(i) = static_cast<uint32_t>(std::ssize(indices32));
-		indices32.insert(indices32.end(), rMaterials.at(i).indexBuffer.begin(), rMaterials.at(i).indexBuffer.end());
+		indices32.append_range(rMaterials.at(i).indexBuffer);
 	}
 
 	std::vector<common::ModelVertex> optimizedVertices(static_cast<size_t>(std::ssize(rVertices)));

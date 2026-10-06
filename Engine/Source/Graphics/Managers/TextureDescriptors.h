@@ -20,10 +20,12 @@ public:
 	void UpdateTextureArrayDescriptors();
 	void InitializeIslandSlots();
 
-	class ScopedBindlessWriteEpoch
+	class [[nodiscard]] ScopedBindlessWriteEpoch
 	{
 	public:
 		explicit ScopedBindlessWriteEpoch(TextureDescriptors& rTextureDescriptors);
+		ScopedBindlessWriteEpoch(const ScopedBindlessWriteEpoch&) = delete;
+		ScopedBindlessWriteEpoch& operator=(const ScopedBindlessWriteEpoch&) = delete;
 		~ScopedBindlessWriteEpoch();
 
 	private:

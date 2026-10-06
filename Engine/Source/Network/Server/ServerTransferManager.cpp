@@ -38,9 +38,9 @@ bool ServerTransferManager::IsDestinationLive(engine::GridCoord destination) con
 	}
 	for (const engine::ClientConnection& rClient : engine::gpServer->mClients)
 	{
-		for (int64_t i = 0; i < std::ssize(rClient.slots); ++i)
+		for (const engine::ClientConnection::SlotState& rSlot : rClient.slots)
 		{
-			if ((rClient.slots.at(i).subscription.flags & engine::SubscriptionFlags::kActive) && rClient.slots.at(i).subscription.coordinate == destination)
+			if ((rSlot.subscription.flags & engine::SubscriptionFlags::kActive) && rSlot.subscription.coordinate == destination)
 			{
 				return true;
 			}
@@ -216,15 +216,10 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 			}
 			else
 			{
-				bool bAnySubscribed = false;
-				for (const engine::ClientConnection& rClient : engine::gpServer->mClients)
+				bool bAnySubscribed = std::ranges::any_of(engine::gpServer->mClients, [&rCoord](const engine::ClientConnection& rClient)
 				{
-					if (rClient.FindSlotForCoordinate(rCoord) >= 0)
-					{
-						bAnySubscribed = true;
-						break;
-					}
-				}
+					return rClient.FindSlotForCoordinate(rCoord) >= 0;
+				});
 				if (bAnySubscribed)
 				{
 					LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} PlayerCount: {} BlasterCount: {} SpaceshipCount: {} MissileCount: {} CrcPre: {} CrcPost: {}", rCoord.iX, rCoord.iY, std::ssize(rTransfers), (game::Frame::OwnershipLayer(rDestinationFrame)).iCount, rDestinationFrame.postRender.pBlasters->iCount, rDestinationFrame.postRender.pSpaceships->iCount, rDestinationFrame.postRender.pMissiles->iCount, acCrcPre, acCrcPost);
@@ -320,7 +315,7 @@ void ServerTransferManager::HarvestTransfers()
 void ServerTransferManager::PrepareReplayTransfers(engine::GridCoord coord, std::span<const game::StatusChange> recordedTransfers)
 {
 	std::vector<game::StatusChange>& rTransfers = mTransfers.try_emplace(coord).first->second;
-	rTransfers.insert(rTransfers.end(), recordedTransfers.begin(), recordedTransfers.end());
+	rTransfers.append_range(recordedTransfers);
 
 	auto it = game::gpGame->mCoordinateFrames.find(coord);
 	if (it == game::gpGame->mCoordinateFrames.end() || it->second.pNext == nullptr)

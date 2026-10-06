@@ -38,6 +38,57 @@ enum class FrameFlags : uint64_t
 };
 using FrameFlags_t = common::Flags<FrameFlags>;
 
+// A client-only value is absent from the cross-build stream that ServerRead consumes.
+template <auto MEMBER>
+inline constexpr bool kbClientOnlyValue = false;
+
+template <typename OWNER, typename... COLUMNS>
+void FrameValuesWrite(std::ostream& rStream, const OWNER& rOwner, FrameColumnList<COLUMNS...>)
+{
+	auto WriteValue = [&]<typename COLUMN>(COLUMN)
+	{
+		using Value = std::remove_cvref_t<decltype(rOwner.*COLUMN::kpMember)>;
+		const Value& rValue = rOwner.*COLUMN::kpMember;
+		if constexpr (requires { rValue.Write(rStream); })
+		{
+			rValue.Write(rStream);
+		}
+		else
+		{
+			common::Write(rStream, rValue);
+		}
+	};
+	(WriteValue(COLUMNS {}), ...);
+}
+
+template <bool SHARED, typename OWNER, typename... COLUMNS>
+void FrameValuesRead(std::istream& rStream, OWNER& rOwner, FrameColumnList<COLUMNS...>)
+{
+	auto ReadValue = [&]<typename COLUMN>(COLUMN)
+	{
+		if constexpr (!SHARED || !kbClientOnlyValue<COLUMN::kpMember>)
+		{
+			using Value = std::remove_cvref_t<decltype(rOwner.*COLUMN::kpMember)>;
+			Value& rValue = rOwner.*COLUMN::kpMember;
+			if constexpr (std::is_same_v<Value, common::RandomEngine>)
+			{
+				uint64_t uiRandomState = 0;
+				common::Read(rStream, uiRandomState);
+				rValue.SetSerializedState(uiRandomState);
+			}
+			else if constexpr (requires { rValue.Read(rStream); })
+			{
+				rValue.Read(rStream);
+			}
+			else
+			{
+				common::Read(rStream, rValue);
+			}
+		}
+	};
+	(ReadValue(COLUMNS {}), ...);
+}
+
 struct FrameInterpolateBase
 {
 	FrameInterpolateBase() = default;
@@ -97,9 +148,9 @@ struct FrameInterpolateBase
 	}
 
 #if defined(BT_CLIENT)
-	static constexpr size_t kCollectionCount = 11;
+	static constexpr int64_t kiCollectionCount = 11;
 #else
-	static constexpr size_t kCollectionCount = 2;
+	static constexpr int64_t kiCollectionCount = 2;
 #endif
 
 	auto ServerCollections(this auto&& rSelf)
@@ -118,6 +169,12 @@ struct FrameInterpolateBase
 		return fDeltaX <= kfVisibleEastWest && fDeltaY <= kfVisibleNorthSouth;
 	}
 
+	// The frame-wide values Write, Read, and ServerRead serialize, in stream order.
+	static auto Values()
+	{
+		return FrameColumnList<FRAME_COLUMN(FrameInterpolateBase, iTick), FRAME_COLUMN(FrameInterpolateBase, fCurrentTime), FRAME_COLUMN(FrameInterpolateBase, fDeltaTime)> {};
+	}
+
 	common::crc_t Crcs() const;
 	bool LogDifferences(const FrameInterpolateBase& rOther) const;
 	void Write(std::ostream& rStream) const;
@@ -125,7 +182,7 @@ struct FrameInterpolateBase
 	void ServerRead(std::istream& rStream);
 };
 
-static_assert(std::tuple_size_v<decltype(std::declval<FrameInterpolateBase>().Collections())> == FrameInterpolateBase::kCollectionCount, "FrameInterpolateBase: Collections() tuple size does not match kCollectionCount. Did you add a new collection member without updating Collections()?");
+static_assert(static_cast<int64_t>(std::tuple_size_v<decltype(std::declval<FrameInterpolateBase>().Collections())>) == FrameInterpolateBase::kiCollectionCount, "FrameInterpolateBase: Collections() tuple size does not match kiCollectionCount. Did you add a new collection member without updating Collections()?");
 
 #if defined(BT_SERVER)
 static_assert(std::is_same_v<decltype(std::declval<FrameInterpolateBase>().Collections()), decltype(std::declval<FrameInterpolateBase>().ServerCollections())>, "Server build: FrameInterpolateBase::Collections() and ServerCollections() must be the same tuple — Write() walks Collections() while ServerRead()/Crcs() walk ServerCollections(); a divergence shears the wire format.");
@@ -187,14 +244,28 @@ struct FramePostRenderBase
 	}
 
 #if defined(BT_CLIENT)
-	static constexpr size_t kCollectionCount = 11;
+	static constexpr int64_t kiCollectionCount = 11;
 #else
-	static constexpr size_t kCollectionCount = 2;
+	static constexpr int64_t kiCollectionCount = 2;
 #endif
 
 	auto ServerCollections(this auto&& rSelf)
 	{
 		return std::tie(rSelf.explosions, rSelf.pushers);
+	}
+
+	// The frame-wide values Write and Read serialize, in stream order; ServerRead skips the kbClientOnlyValue ones.
+	static auto Values()
+	{
+		return FrameColumnList<
+			FRAME_COLUMN(FramePostRenderBase, randomEngine),
+			FRAME_COLUMN(FramePostRenderBase, uiNextUuid),
+#if defined(BT_CLIENT)
+			FRAME_COLUMN(FramePostRenderBase, uiNextSoundUuid),
+			FRAME_COLUMN(FramePostRenderBase, uiNextVisualUuid),
+#endif
+			FRAME_COLUMN(FramePostRenderBase, uiFrameIdentifier),
+			FRAME_COLUMN(FramePostRenderBase, alignments)> {};
 	}
 
 	common::crc_t Crcs() const;
@@ -204,7 +275,14 @@ struct FramePostRenderBase
 	void ServerRead(std::istream& rStream);
 };
 
-static_assert(std::tuple_size_v<decltype(std::declval<FramePostRenderBase>().Collections())> == FramePostRenderBase::kCollectionCount, "FramePostRenderBase: Collections() tuple size does not match kCollectionCount. Did you add a new collection member without updating Collections()?");
+#if defined(BT_CLIENT)
+template <>
+inline constexpr bool kbClientOnlyValue<&FramePostRenderBase::uiNextSoundUuid> = true;
+template <>
+inline constexpr bool kbClientOnlyValue<&FramePostRenderBase::uiNextVisualUuid> = true;
+#endif
+
+static_assert(static_cast<int64_t>(std::tuple_size_v<decltype(std::declval<FramePostRenderBase>().Collections())>) == FramePostRenderBase::kiCollectionCount, "FramePostRenderBase: Collections() tuple size does not match kiCollectionCount. Did you add a new collection member without updating Collections()?");
 
 static_assert(std::tuple_size_v<decltype(std::declval<FrameInterpolateBase>().Collections())> == std::tuple_size_v<decltype(std::declval<FramePostRenderBase>().Collections())>, "FrameInterpolateBase and FramePostRenderBase must have the same number of collections");
 

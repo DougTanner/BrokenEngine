@@ -382,7 +382,7 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 
 	SpawnBlasters(rFrame, rStaticData.coordinate);
 	SpawnMissiles(rFrame, rStaticData.coordinate);
-	SpawnDeathExplosions(rFrame);
+	SpawnDeathExplosions(rFrame, rStaticData.coordinate);
 }
 
 bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)

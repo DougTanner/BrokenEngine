@@ -112,7 +112,7 @@ static bool ReplayInventoryEntryLess(const ReplayManifestInventoryEntry& rLeft, 
 
 static bool AppendReplayManifestPayload(const ReplayManifest& rManifest, std::vector<std::byte>& rPayload)
 {
-	if (rManifest.records.size() > static_cast<size_t>(std::numeric_limits<int64_t>::max()) || rManifest.inventory.size() > static_cast<size_t>(std::numeric_limits<int64_t>::max()))
+	if (!std::in_range<int64_t>(rManifest.records.size()) || !std::in_range<int64_t>(rManifest.inventory.size()))
 	{
 		return false;
 	}
@@ -176,7 +176,7 @@ static bool ComputeReplayGenerationDigest(const ReplayManifest& rManifest, std::
 		rootPreimage.push_back(static_cast<std::byte>((static_cast<uint32_t>(kReplayManifestGenerationDomain.size()) >> (i * 8)) & 0xFFui32));
 	}
 	rootPreimage.insert(rootPreimage.end(), reinterpret_cast<const std::byte*>(kReplayManifestGenerationDomain.data()), reinterpret_cast<const std::byte*>(kReplayManifestGenerationDomain.data() + kReplayManifestGenerationDomain.size()));
-	rootPreimage.insert(rootPreimage.end(), payload.begin(), payload.end());
+	rootPreimage.append_range(payload);
 	return engine::gpFileManager->ComputeSha256(rootPreimage, rDigest);
 }
 
@@ -340,7 +340,7 @@ bool Replay::CaptureAcceptedTransfers(GridCoord destination, std::span<const gam
 	ReplayWriterState& rWriterState = rWriterGenerations.back();
 	game::FrameInput postDispatchInput {};
 	postDispatchInput.statusChanges.assign(sortedTransfers.begin(), sortedTransfers.end());
-	rWriterState.pWriter->mPostDispatchRecords.emplace_back(rPreTransferFrame.interpolate.iTick, postDispatchInput);
+	rWriterState.pWriter->mPostDispatchRecords.emplace_back(rPreTransferFrame.interpolate.iTick, std::move(postDispatchInput));
 	ReplayFixtures::ObserveAcceptedTransfers(*this, rPreTransferFrame.interpolate.iTick, sortedTransfers);
 	return false;
 }
@@ -877,7 +877,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 						fullFramesStream.seekg(0, std::ios::end);
 						int64_t iBeforeBytes = fullFramesStream.tellg();
 						bool bFullFramesTruncated = fullFramesStream.is_open() && iBeforeBytes > 0
-						                         && iBeforeBytes <= std::numeric_limits<std::streamsize>::max();
+						                         && std::in_range<std::streamsize>(iBeforeBytes);
 						std::vector<std::byte> prefix;
 						if (bFullFramesTruncated)
 						{
@@ -927,7 +927,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 				ReplayManifest manifest
 				{
 					.iInitialTick = recordedRecords.empty() ? 0 : recordedRecords.front().iActivationTick,
-					.records = recordedRecords,
+					.records = std::move(recordedRecords),
 					.bHasFullFrames = kbReplayFullFrames,
 				};
 				std::array<uint8_t, 32> generationDigest {};

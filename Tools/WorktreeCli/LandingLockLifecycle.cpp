@@ -176,7 +176,7 @@ namespace toolcli::landing
 				gitDirectoryText->pop_back();
 			}
 			std::filesystem::path gitDirectory = Utf8ToWide(*gitDirectoryText);
-			std::filesystem::path extendedGitDirectory = ExtendedLengthPath(gitDirectory);
+			std::filesystem::path extendedGitDirectory = ExtendedLengthPath(std::move(gitDirectory));
 			if (!std::filesystem::is_directory(extendedGitDirectory, error) || error)
 			{
 				return false;

@@ -46,7 +46,7 @@ namespace toolcli
 		{
 			return false;
 		}
-		if (value.find(L'\\') != std::wstring::npos)
+		if (value.contains(L'\\'))
 		{
 			return false;
 		}
@@ -70,12 +70,12 @@ namespace toolcli
 		{
 			return false;
 		}
-		for (const std::filesystem::path& rPart : path)
+		if (std::ranges::any_of(path, [](const std::filesystem::path& rPart)
 		{
-			if (rPart == L"." || rPart == L"..")
-			{
-				return false;
-			}
+			return rPart == L"." || rPart == L"..";
+		}))
+		{
+			return false;
 		}
 		if (path.generic_wstring() != value)
 		{
@@ -215,7 +215,7 @@ namespace toolcli
 			return;
 		}
 		std::string message = rPlan.diagnostic == "manual" ? "plan document requires byte-zero broken-engine-plan/v1 metadata" : rPlan.diagnostic;
-		rDiagnostics.push_back({ { "plan", WideToUtf8(rPlan.path) }, { "code", "invalid-metadata" }, { "message", message } });
+		rDiagnostics.push_back({ { "plan", WideToUtf8(rPlan.path) }, { "code", "invalid-metadata" }, { "message", std::move(message) } });
 	}
 
 	bool BuildPlans(const std::filesystem::path& rWorktree, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
@@ -249,7 +249,7 @@ namespace toolcli
 			{
 				ReportInvalidMetadata(plan, rDiagnostics);
 			}
-			rPlans.emplace(path, std::move(plan));
+			rPlans.emplace(std::move(path), std::move(plan));
 		}
 		return true;
 	}
@@ -295,14 +295,14 @@ namespace toolcli
 			}
 			Plan plan {};
 			plan.path = path;
-			plan.bytes = *bytes;
+			plan.bytes = std::move(*bytes);
 			ParsePlanBytes(plan);
 			ClassifyDirectoryGuidance(plan);
 			if (!plan.bValid)
 			{
 				ReportInvalidMetadata(plan, rDiagnostics);
 			}
-			rPlans.emplace(path, std::move(plan));
+			rPlans.emplace(std::move(path), std::move(plan));
 		}
 		return true;
 	}

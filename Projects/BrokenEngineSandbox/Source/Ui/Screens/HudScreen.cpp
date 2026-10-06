@@ -62,14 +62,10 @@ void HudScreen::Render()
 			for (int64_t i = 0; i < rPlayers.iCount && !bFoundAny; ++i)
 			{
 				engine::GlobalId globalPlayerId = rPlayers.pGlobalPlayerIds[i];
-				for (const FleetMember& rMember : pFleet->members)
+				bFoundAny = std::ranges::any_of(pFleet->members, [globalPlayerId](const FleetMember& rMember)
 				{
-					if (rMember.globalPlayerId == globalPlayerId)
-					{
-						bFoundAny = true;
-						break;
-					}
-				}
+					return rMember.globalPlayerId == globalPlayerId;
+				});
 			}
 			if (bFoundAny)
 			{

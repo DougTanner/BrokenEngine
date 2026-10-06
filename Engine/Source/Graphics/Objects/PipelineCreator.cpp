@@ -156,18 +156,18 @@ static void SplitBindingsBySet(const Pipeline& rPipeline, std::span<const VkDesc
 {
 	riSet1Count = 0;
 	riSet2Count = 0;
-	for (int64_t i = 0; i < std::ssize(descriptorSetLayoutBindings); ++i)
+	for (const VkDescriptorSetLayoutBinding& rVkBinding : descriptorSetLayoutBindings)
 	{
-		int64_t iBinding = descriptorSetLayoutBindings[i].binding;
+		int64_t iBinding = rVkBinding.binding;
 		int64_t iSet = Pipeline::ResolveBindingSetIndex(rPipeline.mInfo, iBinding);
 
 		if (iSet == 1)
 		{
-			pVkSet1Bindings[riSet1Count++] = descriptorSetLayoutBindings[i];
+			pVkSet1Bindings[riSet1Count++] = rVkBinding;
 		}
 		else if (iSet == 2)
 		{
-			pVkSet2Bindings[riSet2Count++] = descriptorSetLayoutBindings[i];
+			pVkSet2Bindings[riSet2Count++] = rVkBinding;
 		}
 	}
 }

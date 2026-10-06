@@ -64,6 +64,12 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 	std::unique_ptr<MissilesInterpolate> pMissiles;
 	std::unique_ptr<SpaceshipsInterpolate> pSpaceships;
 
+	// The game frame-wide values Write, Read, and ServerRead serialize after the base values, in stream order.
+	static auto Values()
+	{
+		return engine::FrameColumnList<FRAME_COLUMN(FrameInterpolate, fSpawnTimer), FRAME_COLUMN(FrameInterpolate, gameFlags)> {};
+	}
+
 	static common::crc_t Crcs(const FrameInterpolate& rCurrent);
 	bool LogDifferences(const FrameInterpolate& rOther) const;
 	void Write(std::ostream& rStream) const;
@@ -106,6 +112,12 @@ struct FramePostRender : public engine::FramePostRenderBase
 
 	// Transient transfer output buffer (not serialized, not in CRC/equality)
 	std::vector<TransferRequest> transferRequests;
+
+	// The game frame-wide values Write, Read, and ServerRead serialize after the base values, in stream order.
+	static auto Values()
+	{
+		return engine::FrameColumnList<FRAME_COLUMN(FramePostRender, enemyAlignment), FRAME_COLUMN(FramePostRender, playerAlignment)> {};
+	}
 
 	static common::crc_t Crcs(const FramePostRender& rCurrent);
 	bool LogDifferences(const FramePostRender& rOther) const;

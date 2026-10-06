@@ -210,17 +210,18 @@ void RenderLightingSection(TweaksScreenBase& rScreen)
 
 				if (ImGui::Button("Copy Curve To Clipboard"))
 				{
-					char pcBuffer[2'048] {};
+					// Heap: the clipboard text is a std::string built on one button click.
+					ScopedSuppressAllocationTracking suppress;
 					const char* pcName = gbUseCombineCurveNew ? "gCombineCurveNew" : "gCombineCurveOld";
-					int iOffset = std::snprintf(pcBuffer, sizeof(pcBuffer), "CurveData %s({", pcName);
+					std::string curveText = std::format("CurveData {}({{", pcName);
 					for (int64_t i = 0; i < std::ssize(rActiveCurve.mPoints); ++i)
 					{
 						const ImVec2& rPoint = rActiveCurve.mPoints.at(i);
-						iOffset += std::snprintf(pcBuffer + iOffset, sizeof(pcBuffer) - iOffset, "%sImVec2(%.4ff, %.4ff)", i == 0 ? "" : ", ", rPoint.x, rPoint.y);
+						curveText += std::format("{}ImVec2({:.4f}f, {:.4f}f)", i == 0 ? "" : ", ", rPoint.x, rPoint.y);
 					}
-					std::snprintf(pcBuffer + iOffset, sizeof(pcBuffer) - iOffset, "}, %.4ff, %.4ff);", rActiveCurve.mfYMinimum, rActiveCurve.mfYMaximum);
-					ImGui::SetClipboardText(pcBuffer);
-					LOG(kGraphics, kInfo, "{}", pcBuffer);
+					curveText += std::format("}}, {:.4f}f, {:.4f}f);", rActiveCurve.mfYMinimum, rActiveCurve.mfYMaximum);
+					ImGui::SetClipboardText(curveText.c_str());
+					LOG(kGraphics, kInfo, "{}", curveText.c_str());
 				}
 
 				ImGui::EndTable();

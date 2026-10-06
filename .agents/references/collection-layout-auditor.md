@@ -10,12 +10,10 @@ header text. Never reconstruct these operations inline.
   tuple, in both directions;
 - `SharedMembers()`/`ClientMembers()` partition that tuple;
 - `SharedCrcMembers()` and `PersistentMembers()` stay subsets;
-- no `BT_CLIENT`-guarded column sits in `SharedMembers()`;
+- no `BT_CLIENT`-guarded column sits in `SharedMembers()`; and
 - no build's accessor tuple drops a column that build declares while the other
   build's tuple lists it, checked per build only where that build's tuple
-  membership resolves to declared columns; and
-- every collection `kiVersion` declaration and `Frame::kiVersion` term resolve
-  to each other, in both directions.
+  membership resolves to declared columns.
 
 ## Invocation
 
@@ -37,8 +35,8 @@ It prints one `broken-engine-collection-layout/v1` JSON object with
 
 `status` `pass` (exit 0) means no violations; `failed` (exit 1) reports
 violations with path, line, collection, member, and rule; `blocked` (exit 2)
-means an accessor shape, tuple entry, guard form, or `Frame::kiVersion` sum the
-parser could not resolve, which is never a pass; `error` (exit 1) means the run
+means an accessor shape, tuple entry, or guard form the parser could not
+resolve, which is never a pass; `error` (exit 1) means the run
 itself failed, such as a missing or empty `-Path`.
 
 The report is capped at 32 items and 8192 bytes, so `truncated` and

@@ -59,6 +59,8 @@ void AssignAligned(T& rMember, int64_t iCapacity, std::byte*& rpCurrent)
 {
 	ForEachMemberPointer(rMember, [&]<typename ELEMENT_PTR>(ELEMENT_PTR& rElementPointer)
 	{
+		static_assert(std::is_trivially_copyable_v<std::remove_pointer_t<ELEMENT_PTR>>, "Collection member element types must be trivially copyable");
+		static_assert(alignof(std::remove_pointer_t<ELEMENT_PTR>) <= 64, "Collection member element alignment must not exceed 64 bytes");
 		using ElementType = std::remove_pointer_t<ELEMENT_PTR>;
 		rpCurrent = reinterpret_cast<std::byte*>(common::RoundUp<uintptr_t, 64>(reinterpret_cast<uintptr_t>(rpCurrent)));
 		rElementPointer = reinterpret_cast<ELEMENT_PTR>(rpCurrent);
@@ -71,6 +73,8 @@ void AssignAndCopyAligned(T& rMember, int64_t iCapacity, int64_t iCount, std::by
 {
 	ForEachMemberPointer(rMember, [&]<typename ELEMENT_PTR>(ELEMENT_PTR& rElementPointer)
 	{
+		static_assert(std::is_trivially_copyable_v<std::remove_pointer_t<ELEMENT_PTR>>, "Collection member element types must be trivially copyable");
+		static_assert(alignof(std::remove_pointer_t<ELEMENT_PTR>) <= 64, "Collection member element alignment must not exceed 64 bytes");
 		using ElementType = std::remove_pointer_t<ELEMENT_PTR>;
 		rpCurrent = reinterpret_cast<std::byte*>(common::RoundUp<uintptr_t, 64>(reinterpret_cast<uintptr_t>(rpCurrent)));
 
@@ -222,6 +226,7 @@ void Allocate(STRUCT& rCurrent, const STRUCT& rPrevious, TUPLE&& rMembers)
 template <typename CURRENT_POINTER, typename PREVIOUS_POINTER>
 void CopyMemberPointerRows(int64_t iCount, CURRENT_POINTER& rCurrentPointer, const PREVIOUS_POINTER& rPreviousPointer)
 {
+	static_assert(std::is_trivially_copyable_v<std::remove_pointer_t<std::remove_reference_t<decltype(rCurrentPointer)>>>, "Collection member element types must be trivially copyable");
 	using CurrentPointer = std::remove_reference_t<decltype(rCurrentPointer)>;
 	using PreviousPointer = std::remove_reference_t<decltype(rPreviousPointer)>;
 	static_assert(std::is_pointer_v<CurrentPointer> && std::is_pointer_v<PreviousPointer>, "Collection members must be pointers");

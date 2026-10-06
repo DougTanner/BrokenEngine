@@ -289,11 +289,11 @@ void ServerSessionRuntime::AddSubscribedCoords()
 	const std::vector<engine::ClientConnection>& rClients = mpServer->mClients;
 	for (const engine::ClientConnection& rClient : rClients)
 	{
-		for (int64_t i = 0; i < std::ssize(rClient.slots); ++i)
+		for (const engine::ClientConnection::SlotState& rSlot : rClient.slots)
 		{
-			if (rClient.slots.at(i).subscription.flags & engine::SubscriptionFlags::kActive)
+			if (rSlot.subscription.flags & engine::SubscriptionFlags::kActive)
 			{
-				engine::GridCoord coord = rClient.slots.at(i).subscription.coordinate;
+				engine::GridCoord coord = rSlot.subscription.coordinate;
 				if (!std::ranges::contains(game::gpGame->mActiveCoordinates, coord))
 				{
 					game::gpGame->mActiveCoordinates.push_back(coord);

@@ -43,7 +43,7 @@ namespace toolcli
 
 	static bool IsLowerHex(std::string_view text, int64_t iLength)
 	{
-		return iLength >= 0 && text.size() == static_cast<size_t>(iLength) && std::all_of(text.begin(), text.end(), [](char cValue)
+		return std::cmp_equal(text.size(), iLength) && std::all_of(text.begin(), text.end(), [](char cValue)
 		{
 			return (cValue >= '0' && cValue <= '9') || (cValue >= 'a' && cValue <= 'f');
 		});
@@ -456,7 +456,7 @@ namespace toolcli
 		{
 			return false;
 		}
-		rRepository = *repository; rWorktree = *worktree;
+		rRepository = std::move(*repository); rWorktree = std::move(*worktree);
 		return true;
 	}
 
@@ -481,8 +481,8 @@ namespace toolcli
 		{
 			return false;
 		}
-		rRepository = *repository;
-		rWorktree = *worktree;
+		rRepository = std::move(*repository);
+		rWorktree = std::move(*worktree);
 		return true;
 	}
 
@@ -509,7 +509,7 @@ namespace toolcli
 			{
 				continue;
 			}
-			rPlanPath = path;
+			rPlanPath = std::move(path);
 			rClaim = std::move(claim);
 			rbFound = true;
 			return true;
@@ -581,7 +581,7 @@ namespace toolcli
 				}
 			}
 		}
-		nlohmann::json output = { { "operation", "validate" }, { "status", diagnostics.empty() ? "valid" : "invalid" }, { "code", diagnostics.empty() ? "ok" : "invalid-plans" }, { "message", diagnostics.empty() ? "plan metadata is valid" : "some plans are excluded from selection" }, { "diagnostics", diagnostics }, { "notices", nlohmann::json::array() }, { "healedClaims", healed }, { "plans", nlohmann::json::array() } };
+		nlohmann::json output = { { "operation", "validate" }, { "status", diagnostics.empty() ? "valid" : "invalid" }, { "code", diagnostics.empty() ? "ok" : "invalid-plans" }, { "message", diagnostics.empty() ? "plan metadata is valid" : "some plans are excluded from selection" }, { "diagnostics", std::move(diagnostics) }, { "notices", nlohmann::json::array() }, { "healedClaims", std::move(healed) }, { "plans", nlohmann::json::array() } };
 		for (const std::wstring& rPath : GetSortedPlanPaths(plans))
 		{
 			const Plan& rPlan = plans.at(rPath);
@@ -620,7 +620,7 @@ namespace toolcli
 			{
 				dependencies.push_back(WideToUtf8(rDependency));
 			}
-			output["plans"].push_back({ { "path", WideToUtf8(pPlan->path) }, { "createdUtc", pPlan->createdUtc }, { "dependsOn", dependencies } });
+			output["plans"].push_back({ { "path", WideToUtf8(pPlan->path) }, { "createdUtc", pPlan->createdUtc }, { "dependsOn", std::move(dependencies) } });
 		}
 		PrintResult(std::move(output), 1);
 		return kiExitOk;
@@ -675,7 +675,7 @@ namespace toolcli
 			return Failure("local-app-data-unavailable");
 		}
 		const std::filesystem::path& root = *schedulerRoot;
-		nlohmann::json output = { { "operation", "list" }, { "status", "ok" }, { "code", "ok" }, { "diagnostics", diagnostics }, { "plans", nlohmann::json::array() } };
+		nlohmann::json output = { { "operation", "list" }, { "status", "ok" }, { "code", "ok" }, { "diagnostics", std::move(diagnostics) }, { "plans", nlohmann::json::array() } };
 		for (const Plan* pPlan : rows)
 		{
 			nlohmann::json dependencies = nlohmann::json::array();
@@ -683,7 +683,7 @@ namespace toolcli
 			{
 				dependencies.push_back(WideToUtf8(rDependency));
 			}
-			nlohmann::json row = { { "path", WideToUtf8(pPlan->path) }, { "createdUtc", pPlan->createdUtc }, { "dependsOn", dependencies } };
+			nlohmann::json row = { { "path", WideToUtf8(pPlan->path) }, { "createdUtc", pPlan->createdUtc }, { "dependsOn", std::move(dependencies) } };
 			Claim claim;
 			std::optional<std::filesystem::path> claimPath = ClaimPath(root, pPlan->path);
 			if (!claimPath)
@@ -715,7 +715,7 @@ namespace toolcli
 				}
 				for (const std::wstring& rDependency : primary->second.dependencies)
 				{
-					if (primaryPlans.find(rDependency) != primaryPlans.end() && std::find(blocking.begin(), blocking.end(), rDependency) == blocking.end())
+					if (primaryPlans.find(rDependency) != primaryPlans.end() && !std::ranges::contains(blocking, rDependency))
 					{
 						blocking.push_back(rDependency);
 					}
@@ -1077,7 +1077,7 @@ namespace toolcli
 			{
 				return Failure("child-invalid", kiExitStateConflict);
 			}
-			if (std::find(rPlan.dependencies.begin(), rPlan.dependencies.end(), target) == rPlan.dependencies.end())
+			if (!std::ranges::contains(rPlan.dependencies, target))
 			{
 				continue;
 			}
@@ -1164,7 +1164,7 @@ namespace toolcli
 		{
 			changed.push_back(WideToUtf8(rRewrite.path));
 		}
-		PrintResult({ { "status", "ok" }, { "code", bReject ? "rejected" : "completed" }, { "plan", WideToUtf8(target) }, { "changedPaths", changed } }, 2);
+		PrintResult({ { "status", "ok" }, { "code", bReject ? "rejected" : "completed" }, { "plan", WideToUtf8(target) }, { "changedPaths", std::move(changed) } }, 2);
 		return kiExitOk;
 	}
 

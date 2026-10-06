@@ -99,10 +99,10 @@ void Alignments::Read(std::istream& rStream)
 	common::ValidateDeserializedCount(iCount, sizeof(AlignmentPair::uiKey) + sizeof(AlignmentPair::uiFlags), rStream, "Alignments::Read");
 
 	alignmentPairs.resize(iCount);
-	for (int64_t i = 0; i < iCount; ++i)
+	for (AlignmentPair& rPair : alignmentPairs)
 	{
-		common::Read(rStream, alignmentPairs.at(i).uiKey);
-		common::Read(rStream, alignmentPairs.at(i).uiFlags);
+		common::Read(rStream, rPair.uiKey);
+		common::Read(rStream, rPair.uiFlags);
 	}
 }
 

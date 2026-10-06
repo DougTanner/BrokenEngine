@@ -25,7 +25,7 @@ enum Threads
 
 class ThreadLocal;
 template <typename FUNCTION> struct ThreadLocalEntry;
-inline thread_local ThreadLocal* gpThreadLocal = nullptr;
+inline constinit thread_local ThreadLocal* gpThreadLocal = nullptr;
 
 // Note: "4096 - sizeof(DWORD)" is max length for OutputDebugString()
 //       But some Vulkan validation messages can overflow that
@@ -78,7 +78,7 @@ private:
 	ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> iThreadId = std::nullopt, bool bSetupExceptionHandling = true, int64_t iWorkbufferReserveSize = 0);
 
 	// Must precede mpLogBuffer/mWorkbuffer below: those alias this storage (ctor member-init order depends on it).
-	std::vector<char> mLogBufferMemory;
+	std::vector<char> mLogBufferMemory = std::vector<char>(kiLogBufferSize);
 	StableVector<std::byte> mWorkbufferMemory;
 
 public:
@@ -103,7 +103,7 @@ struct ThreadLocalEntry
 	}
 };
 
-class LogTickScope
+class [[nodiscard]] LogTickScope
 {
 public:
 
@@ -132,7 +132,7 @@ private:
 // IslandTerrain::GlobalElevation reads the flag to fail fast if the render-only terrain query is ever
 // called from frame-tick code (the Frame Purity Constraint). Saves/restores the prior value for nesting
 // safety, mirroring LogTickScope.
-class FrameTickScope
+class [[nodiscard]] FrameTickScope
 {
 public:
 
@@ -157,7 +157,7 @@ private:
 };
 
 // Sets miLogIndent to an absolute value and restores the prior on exit (cross-thread indent propagation); for relative +1/-1 indentation use ScopedLogIndent (Log.h)
-class LogIndentScope
+class [[nodiscard]] LogIndentScope
 {
 public:
 

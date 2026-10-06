@@ -12,7 +12,7 @@ std::optional<common::ChunkFlags_t> ExportTexture::Handles(const std::filesystem
 
 	static constexpr std::string_view kExtensions[] = {".png", ".tga", ".jpg", ".ktx", TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK), TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK), TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK), TextureIntermediateSuffix(VK_FORMAT_R16_UNORM), TextureIntermediateSuffix(VK_FORMAT_R16G16B16A16_SFLOAT)};
 	std::string extension = rDirectoryEntry.path().extension().string();
-	return std::find(std::begin(kExtensions), std::end(kExtensions), extension) != std::end(kExtensions) ? std::optional<common::ChunkFlags_t>(common::ChunkFlags::kTexture) : std::nullopt;
+	return std::ranges::contains(kExtensions, extension) ? std::optional<common::ChunkFlags_t>(common::ChunkFlags::kTexture) : std::nullopt;
 }
 
 static int64_t ComputeUncompressedTextureSize(VkFormat vkFormat, int64_t iWidth, int64_t iHeight, int64_t iMipLevels)
@@ -50,11 +50,11 @@ void ExportTexture::Export()
 	{
 		vkFormat = VK_FORMAT_R16_UNORM;
 	}
-	else if (narrowExtension == TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK) || filename.find(L"[BC4]") != std::wstring::npos)
+	else if (narrowExtension == TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK) || filename.contains(L"[BC4]"))
 	{
 		vkFormat = VK_FORMAT_BC4_UNORM_BLOCK;
 	}
-	else if (narrowExtension == TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK) || filename.find(L"[BC5]") != std::wstring::npos)
+	else if (narrowExtension == TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK) || filename.contains(L"[BC5]"))
 	{
 		vkFormat = VK_FORMAT_BC5_UNORM_BLOCK;
 	}
@@ -62,7 +62,7 @@ void ExportTexture::Export()
 	{
 		vkFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 	}
-	else if (mChunkFlags & common::ChunkFlags::kCubemap || narrowExtension == TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK) || filename.find(L"[BC7]") != std::wstring::npos)
+	else if (mChunkFlags & common::ChunkFlags::kCubemap || narrowExtension == TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK) || filename.contains(L"[BC7]"))
 	{
 		vkFormat = VK_FORMAT_BC7_UNORM_BLOCK;
 	}
@@ -330,6 +330,6 @@ void ExportTexture::ProcessRegularTexture(VkFormat vkFormat)
 	pHeader->textureHeader.iTextureHeight = texture.miHeight;
 	pHeader->textureHeader.iMipLevels = std::ssize(texture.mData);
 	pHeader->textureHeader.vkFormat = vkFormat;
-	std::memcpy(pHeader->textureHeader.pfMipVariance, pfMipVariance, sizeof(pfMipVariance));
+	std::copy(std::begin(pfMipVariance), std::end(pfMipVariance), std::begin(pHeader->textureHeader.pfMipVariance));
 	std::memcpy(dataSpan.data(), compressed.data(), static_cast<size_t>(std::ssize(compressed)));
 }

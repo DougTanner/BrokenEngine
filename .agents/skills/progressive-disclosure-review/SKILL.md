@@ -39,12 +39,17 @@ findings and fixes land, only the affected files receive a focused re-review.
 - `Baseline` — the full 40-character session baseline SHA and the absolute
   repository toplevel, plus the committed head when the review runs against one.
 - `Scope` — any untracked paths the review must cover.
+- `First-round findings` — focused re-review only: each accepted first-round
+  `Findings` row being re-checked, verbatim as the first round returned it,
+  carried in the dispatch's `Continuation capsule:` field
+  (`.agents/references/subagent-handoff.md` `## Continuation capsule`).
 
-The reviewer derives the changed instruction-doc list itself from those inputs
-and never takes a caller-supplied list or diff in its place.
+The reviewer derives the changed instruction-doc list itself from `Baseline`
+and `Scope` and never takes a caller-supplied list or diff in its place.
 
-If the baseline is unavailable, or the change inventory cannot produce the
-changed regions, return `BLOCKED` naming the missing input.
+If the baseline is unavailable, the change inventory cannot produce the changed
+regions, or a focused re-review arrives without `First-round findings`, return
+`BLOCKED` naming the missing input.
 
 ## Handoff
 

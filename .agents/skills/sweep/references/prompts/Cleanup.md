@@ -3,11 +3,11 @@ Repository root (session worktree): {{ROOT}}
 Sweep Plan: {{PLAN}}
 Stage baseline: {{BASELINE}}
 
-Read `{{TYPE}}` sections `## Find rules`, `## Fix bound`, and `## Cleanup checklist` when present, and `{{PLAN}}` section `## Sweep rules` when `## Find rules` defers to it. Per-unit FIX agents and per-batch PROPAGATE agents already made every edit in `git diff {{BASELINE}}`; no one spot-checked them, and this step takes that place.
+Read `{{TYPE}}` sections `## Find rules`, `## Fix bound`, and `## Cleanup checklist` when present, and `{{PLAN}}` section `## Sweep rules` when `## Find rules` defers to it. Per-unit FIX agents and per-batch PROPAGATE agents made the sweep's edits in `git diff {{BASELINE}}`; no one spot-checked them, and this step takes that place. The diff can also hold accepted main-session build fixes, which are not FIX or PROPAGATE output. The working tree passed every per-batch build before this step, and this step's corrections are not built, so when unsure whether a correction would still build, leave the hunk alone and list it as step 2 states.
 
 Steps:
 1. List the changed files with `git diff --name-only {{BASELINE}}`, then read `git diff {{BASELINE}} -- <file>` one file at a time.
-2. For each changed hunk, check it against `## Find rules` (an edit that breaks a rule or ruling there), `## Fix bound` (an edit outside it), and every `## Cleanup checklist` item. Correct each violating edit in place, restoring the baseline text when no compliant fix exists.
+2. For each changed hunk, check it against `## Find rules` (an edit that breaks a rule or ruling there), `## Fix bound` (an edit outside it), and every `## Cleanup checklist` item. Correct each violating edit in place, restoring the baseline text when no compliant fix exists. Never make a correction, or restore baseline text, that would fail the build, including a warning that warnings-as-errors or code analysis makes an error, such as a redundant check over a typedef'd type; list that hunk as an item whose correction reads `none - left in place: <reason>` instead.
 3. Preserve each file's encoding, BOM, line endings, tabs, and trailing newline exactly; change only the bytes a correction needs. Never edit `ThirdParty/`. Never run a Git command that changes state and do not build.
 
 Your final message is written verbatim to a file the coordinator reads. Format:

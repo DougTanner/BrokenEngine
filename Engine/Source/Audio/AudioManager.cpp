@@ -211,8 +211,6 @@ void AudioManager::InitializeAudioSubsystems(const wchar_t* pcSelectedDeviceIden
 }
 
 AudioManager::AudioManager()
-: mpStaticVoices(std::make_unique<StaticVoices>())
-, mpStreamingVoices(std::make_unique<StreamingVoices>())
 {
 	ASSERT(gpAudioManager == nullptr);
 

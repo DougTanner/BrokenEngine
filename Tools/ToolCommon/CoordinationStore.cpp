@@ -399,12 +399,13 @@ namespace toolcli::coordination
 
 	bool ValidateMetadataEnvelope(const nlohmann::json& rMetadata, const Locator& rLocator, int64_t iExpectedSchemaVersion)
 	{
-		for (const char* pField : { "owner", "session", "worktree", "claimedAt", "heartbeatAt" })
+		const char* const pFields[] = { "owner", "session", "worktree", "claimedAt", "heartbeatAt" };
+		if (!std::ranges::all_of(pFields, [&rMetadata](const char* const& rpField)
 		{
-			if (!rMetadata.contains(pField) || !rMetadata[pField].is_string() || rMetadata[pField].get<std::string>().empty())
-			{
-				return false;
-			}
+			return rMetadata.contains(rpField) && rMetadata[rpField].is_string() && !rMetadata[rpField].get<std::string>().empty();
+		}))
+		{
+			return false;
 		}
 		int64_t iClaimedTicks = 0;
 		int64_t iHeartbeatTicks = 0;
@@ -432,7 +433,7 @@ namespace toolcli::coordination
 			{ "worktree", WideToUtf8(worktree) },
 			{ "claimantPid", ::GetCurrentProcessId() },
 			{ "claimedAt", timestamp },
-			{ "heartbeatAt", timestamp },
+			{ "heartbeatAt", std::move(timestamp) },
 		};
 	}
 } // namespace toolcli::coordination

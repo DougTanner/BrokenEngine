@@ -132,9 +132,9 @@ static void SerializeGroup(uint8_t*& rpCursor, game::StatusChangeType eType, con
 	WriteUint8(rpCursor, static_cast<uint8_t>(eType));
 	WriteUint16(rpCursor, static_cast<uint16_t>(iGroupCount));
 
-	for (int64_t i = 0; i < iGroupCount; ++i)
+	for (int64_t i : indices)
 	{
-		const game::StatusChangeData& rData = pChanges[indices[i]].data;
+		const game::StatusChangeData& rData = pChanges[i].data;
 		const uint8_t* pItemStart = rpCursor;
 
 		switch (eType)
@@ -195,9 +195,9 @@ static void GroupIndicesByType(std::span<const game::StatusChange> changes, int6
 {
 	int64_t iCount = static_cast<int64_t>(changes.size());
 
-	for (int64_t i = 0; i < iCount; ++i)
+	for (const game::StatusChange& rChange : changes)
 	{
-		++piCounts[static_cast<int64_t>(changes[i].eType)];
+		++piCounts[static_cast<int64_t>(rChange.eType)];
 	}
 
 	for (int64_t i = 1; i < kiTypeCount; ++i)

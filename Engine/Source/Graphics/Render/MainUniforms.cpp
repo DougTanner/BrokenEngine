@@ -569,9 +569,8 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 
 	const game::FrameInterpolate& rFrameInterpolate = rCameraInterpolate;
 
-	static int32_t siRenderCount = 0;
 	rMainLayout.iFrameNumber = static_cast<int>(engine::gpCamera->miFrame);
-	rMainLayout.iRenderNumber = ++siRenderCount;
+	rMainLayout.iRenderNumber = static_cast<int32_t>(gpGraphics->miFrameCounter);
 
 	float fCameraShake = engine::gpCamera->mfShake;
 	static constexpr float kfMaxRoll = 0.005f;

@@ -248,6 +248,7 @@ struct GlobalLayout
 	float fParticlesStretchVelocityStart INIT;
 	float fParticlesStretchVelocityMultiplier INIT;
 	float fParticlesStretchRangeInverse INIT; // 1 / max(stretchVelocityEnd - stretchVelocityStart, kfEpsilon) (LongParticlesRender.vert length ramp)
+	vec2 f2ParticlesBasisShift INIT; // Whole-cell offset of a one-cell camera cell change, else 0 (ParticlesUpdate.comp moves live particles into the new cell's frame).
 
 	vec2 f2ShadowTextureSizeInverse INIT; // 1 / shadow texture extent (ShadowBlurH/V, ShadowTemporal).
 	vec2 f2ShadowElevationTextureSizeInverse INIT; // 1 / elevation texture extent (Shadow.comp).

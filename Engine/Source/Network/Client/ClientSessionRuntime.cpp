@@ -65,14 +65,10 @@ static bool IsSlotActive(const ClientCoordSlot& rSlot)
 
 static bool ContainsCoordinate(std::span<const GridCoord> coordinates, GridCoord coordinate)
 {
-	for (const GridCoord& rCoordinate : coordinates)
+	return std::ranges::any_of(coordinates, [coordinate](const GridCoord& rCoordinate)
 	{
-		if (rCoordinate == coordinate)
-		{
-			return true;
-		}
-	}
-	return false;
+		return rCoordinate == coordinate;
+	});
 }
 
 static ClientNetworkFixtures::CoordUpdateState QueryFixtureCoordinateUpdateState(GridCoord coordinate, int64_t iTick)
@@ -476,9 +472,9 @@ void ClientSessionRuntime::SendAckAndFlush()
 void ClientSessionRuntime::SetDesiredCoordinates(std::span<const GridCoord> desiredCoordinates, std::string_view reason, int64_t iTick)
 {
 	bool bChanged = std::ssize(desiredCoordinates) != std::ssize(mDesiredCoordinates);
-	for (int64_t i = 0; !bChanged && i < std::ssize(desiredCoordinates); ++i)
+	if (!bChanged)
 	{
-		bChanged = desiredCoordinates[i] != mDesiredCoordinates.at(i);
+		bChanged = !std::ranges::equal(desiredCoordinates, mDesiredCoordinates);
 	}
 	if (!bChanged)
 	{
@@ -495,9 +491,9 @@ void ClientSessionRuntime::SetDesiredCoordinates(std::span<const GridCoord> desi
 			mUnwantedTimestamps.try_emplace(rCoordinate, now);
 		}
 	}
-	for (int64_t i = 0; i < std::ssize(desiredCoordinates); ++i)
+	for (const GridCoord& rCoordinate : desiredCoordinates)
 	{
-		mUnwantedTimestamps.erase(desiredCoordinates[i]);
+		mUnwantedTimestamps.erase(rCoordinate);
 	}
 	mDesiredCoordinates.clear();
 	if (!desiredCoordinates.empty())

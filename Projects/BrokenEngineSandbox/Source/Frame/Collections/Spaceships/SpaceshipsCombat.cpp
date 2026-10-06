@@ -48,7 +48,7 @@ extern int64_t giSpaceshipHitFlashControllerTypeIndex;
 #endif
 
 // Defined in Spaceships.cpp.
-void SpawnSpaceshipExplosion(Frame& __restrict rFrame, XMVECTOR vecPosition, XMVECTOR vecDirection, float fPercent);
+void SpawnSpaceshipExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate, XMVECTOR vecPosition, XMVECTOR vecDirection, float fPercent);
 
 static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecDamageDirection)
 {
@@ -70,7 +70,7 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::G
 #endif
 
 	XMVECTOR vecDirection = XMVector3Normalize(rCurrentPostRender.pVecVelocities[i]);
-	SpawnSpaceshipExplosion(rFrame, rCurrentInterpolate.pVecPositions[i], vecDirection, 1.0f);
+	SpawnSpaceshipExplosion(rFrame, emitterCoordinate, rCurrentInterpolate.pVecPositions[i], vecDirection, 1.0f);
 }
 
 void XM_CALLCONV SpaceshipsPostRender::RegenerateHealth(FXMVECTOR vecPosition, bool bPlayerAlive, FXMVECTOR vecNearestPlayer, SpaceshipFlags_t flags, std::chrono::duration<float> deltaTime, float& rfHealth)

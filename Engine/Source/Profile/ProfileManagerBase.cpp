@@ -672,6 +672,38 @@ void ProfileManagerBase::DumpTimers()
 		}
 	}
 }
+
+void ProfileManagerBase::DiscardSkippedFrameSamples()
+{
+	if constexpr (kbProfiling)
+	{
+		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+
+		std::lock_guard lock(mCpuTimerMutex);
+
+		int64_t iCpuTimerCount = miCpuTimerCount;
+		for (int64_t i = 0; i < iCpuTimerCount; ++i)
+		{
+			CpuTimer& rCpuTimer = GetCpuTimer(i);
+			rCpuTimer.iTotalFrameTimeNanoseconds = 0;
+			rCpuTimer.iAllocationsThisFrame = 0;
+		}
+
+		giAllocationsThisFrame.store(0, std::memory_order_relaxed);
+
+		// AcquireToGlobal stays running across the skipped frames; restart it now. The boot render loop can resume before it ever started, so a missing state is valid.
+		for (auto& [rThreadId, rStates] : mPerThreadTimerStates)
+		{
+			if (std::ssize(rStates) > kCpuTimerAcquireToGlobal && rStates.at(static_cast<size_t>(kCpuTimerAcquireToGlobal)).startTimePoint != std::chrono::steady_clock::time_point())
+			{
+				CpuTimerThreadState& rState = rStates.at(static_cast<size_t>(kCpuTimerAcquireToGlobal));
+				rState.startTimePoint = now;
+				rState.iStartAllocations = 0;
+				break;
+			}
+		}
+	}
+}
 #endif // BT_CLIENT
 
 void ProfileManagerBase::SmoothCpuTimers()

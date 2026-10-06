@@ -325,16 +325,16 @@ static int64_t FilterWritesByShaderLayout(const Pipeline& rPipeline, std::span<V
 	Shader* pSecondShader = bCompute ? nullptr : rPipeline.mInfo.ppShaders[1];
 
 	int64_t iValidCount = 0;
-	for (int64_t j = 0; j < std::ssize(writeDescriptorSets); ++j)
+	for (const VkWriteDescriptorSet& rVkWriteDescriptorSet : writeDescriptorSets)
 	{
-		int64_t iBinding = static_cast<int64_t>(writeDescriptorSets[j].dstBinding);
+		int64_t iBinding = static_cast<int64_t>(rVkWriteDescriptorSet.dstBinding);
 		if (iBinding < common::ShaderHeader::kiMaxDescriptorSetLayoutBindings)
 		{
 			const VkDescriptorSetLayoutBinding& rVkFirstBinding = iBinding < pFirstShader->mInformation.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings ? pFirstShader->mInformation.pVkDescriptorBindings[iBinding] : Pipeline::kEmptyVkDescriptorSetLayoutBinding;
 			const VkDescriptorSetLayoutBinding& rVkSecondBinding = pSecondShader != nullptr && iBinding < pSecondShader->mInformation.pChunkHeader->shaderHeader.iDescriptorSetLayoutBindings ? pSecondShader->mInformation.pVkDescriptorBindings[iBinding] : Pipeline::kEmptyVkDescriptorSetLayoutBinding;
 			if (rVkFirstBinding.descriptorCount > 0 || rVkSecondBinding.descriptorCount > 0)
 			{
-				writeDescriptorSets[iValidCount++] = writeDescriptorSets[j];
+				writeDescriptorSets[iValidCount++] = rVkWriteDescriptorSet;
 			}
 		}
 	}
@@ -344,19 +344,19 @@ static int64_t FilterWritesByShaderLayout(const Pipeline& rPipeline, std::span<V
 static int64_t RouteWritesBySet(const PipelineInfo& rPipelineInfo, std::span<VkWriteDescriptorSet> writeDescriptorSets, VkDescriptorSet vkDestinationSet2, bool bHasExternalSet1)
 {
 	int64_t iValidCount = 0;
-	for (int64_t j = 0; j < std::ssize(writeDescriptorSets); ++j)
+	for (VkWriteDescriptorSet& rVkWriteDescriptorSet : writeDescriptorSets)
 	{
-		int64_t iBinding = static_cast<int64_t>(writeDescriptorSets[j].dstBinding);
+		int64_t iBinding = static_cast<int64_t>(rVkWriteDescriptorSet.dstBinding);
 		int64_t iSet = Pipeline::ResolveBindingSetIndex(rPipelineInfo, iBinding);
 
 		if (iSet == 2)
 		{
-			writeDescriptorSets[j].dstSet = vkDestinationSet2;
-			writeDescriptorSets[iValidCount++] = writeDescriptorSets[j];
+			rVkWriteDescriptorSet.dstSet = vkDestinationSet2;
+			writeDescriptorSets[iValidCount++] = rVkWriteDescriptorSet;
 		}
 		else if (iSet == 1 && !bHasExternalSet1)
 		{
-			writeDescriptorSets[iValidCount++] = writeDescriptorSets[j];
+			writeDescriptorSets[iValidCount++] = rVkWriteDescriptorSet;
 		}
 		// Set 0 writes are dropped (handled by global descriptor set)
 	}

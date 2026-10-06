@@ -70,9 +70,30 @@ void ParticleManager::RenderGlobal(int64_t iCommandBuffer)
 	std::memcpy(&rSquareParticlesSpawnLayout.pParticles[0], &mSquareParticlesSpawnLayout.pParticles[0], rSquareParticlesSpawnLayout.iCount * sizeof(shaders::ParticleLayout));
 	mSquareParticlesSpawnLayout.iCount = 0;
 
+	// Live particles and this iteration's staged spawns are in the previous camera cell's frame. A one-cell step shifts
+	// them in the update pass; a larger step leaves nothing worth keeping, so it clears the pool. Written every call
+	// because each command buffer has its own global uniform.
+	static RetainedAreaBasis sRetainedAreaBasis {};
+	if (std::optional<XMFLOAT2> of2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
+	{
+		rGlobalLayout.f2ParticlesBasisShift.x = of2Shift->x;
+		rGlobalLayout.f2ParticlesBasisShift.y = of2Shift->y;
+	}
+	else
+	{
+		rGlobalLayout.f2ParticlesBasisShift = {};
+		mbReset = true;
+	}
+
 	rLongParticlesSpawnLayout.iReset = mbReset ? 1 : 0;
 	rSquareParticlesSpawnLayout.iReset = mbReset ? 1 : 0;
 	mbReset = false;
+}
+
+void ParticleManager::DiscardStagedSpawns()
+{
+	mLongParticlesSpawnLayout.iCount = 0;
+	mSquareParticlesSpawnLayout.iCount = 0;
 }
 
 } // namespace engine

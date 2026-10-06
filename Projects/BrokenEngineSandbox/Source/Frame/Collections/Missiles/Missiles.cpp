@@ -249,7 +249,7 @@ void MissilesInterpolate::Register()
 	});
 }
 
-static void SpawnMissileExplosion(Frame& __restrict rFrame, float fPercent, XMVECTOR vecPosition, XMVECTOR vecDirection, MissileFlags_t flags)
+static void SpawnMissileExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate, float fPercent, XMVECTOR vecPosition, XMVECTOR vecDirection, MissileFlags_t flags)
 {
 	static constexpr float kfSizeMultipliers[] = {1.0f, 0.5f, 0.25f,};
 	for (int64_t j = 0; float fSizeMultiplier : kfSizeMultipliers)
@@ -261,7 +261,7 @@ static void SpawnMissileExplosion(Frame& __restrict rFrame, float fPercent, XMVE
 			vecExplosionPosition = common::RandomPositionJitter<0.2f>(vecPosition, rFrame.postRender.randomEngine);
 		}
 
-		engine::ExplosionsPostRender::Spawn(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime),
+		engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime),
 			{
 				.iTypeIndex = siMissileExplosionTypeIndex,
 				.vecPosition = vecExplosionPosition,
@@ -509,7 +509,7 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	}
 #endif
 
-	SpawnMissileExplosion(rFrame, 1.0f, rCurrentInterpolate.pVecPositions[i], rCurrentPostRender.pVecExplosionDirections[i], rCurrentPostRender.pFlags[i]);
+	SpawnMissileExplosion(rFrame, rStaticData.coordinate, 1.0f, rCurrentInterpolate.pVecPositions[i], rCurrentPostRender.pVecExplosionDirections[i], rCurrentPostRender.pFlags[i]);
 
 	// Register area damage for the AreaDamage phase
 	engine::AreaDamage::Add(

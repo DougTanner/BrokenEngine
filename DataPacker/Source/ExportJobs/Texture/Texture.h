@@ -45,7 +45,7 @@ constexpr const char* TextureIntermediateSuffix(VkFormat vkFormat)
 			return ".R16G16B16A16_SFLOAT";
 		default:
 			ASSERT(false);
-			return "";
+			std::unreachable();
 	}
 }
 
@@ -99,7 +99,7 @@ TextureIntermediateHeader ReadTextureIntermediateHeader(std::span<const std::byt
 // (ExportCubemapIbl) so the tag test stays scoped to filename() at every site.
 inline bool HasCubemapTag(const std::filesystem::path& rPath)
 {
-	return rPath.filename().native().find(L"[C]") != std::wstring::npos;
+	return rPath.filename().native().contains(L"[C]");
 }
 
 class Texture

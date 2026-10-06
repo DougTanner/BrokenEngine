@@ -329,10 +329,10 @@ void BuildCellNavigationData(NavData& rNavigationData, const std::vector<IslandP
 		float fFootprintY = rTemplate.fQuadFootprintY;
 
 		// Local axes: +U = +world.x, +V = -world.y (V is world-Y inverted).
-		for (int64_t i = 0; i < iVertexCount; ++i)
+		for (const XMFLOAT2& rVertex : rContour.vertices)
 		{
-			float fU = rContour.vertices.at(i).x;
-			float fV = rContour.vertices.at(i).y;
+			float fU = rVertex.x;
+			float fV = rVertex.y;
 
 			float fLocalX = (fU - 0.5f) * fFootprintX;
 			float fLocalY = (0.5f - fV) * fFootprintY;

@@ -137,7 +137,7 @@ static nlohmann::json ExtractBlasters(const Frame& rFrame, int64_t iOffset, int6
 	return items;
 }
 
-static const Frame& QueryFrame(const nlohmann::json& rParameters)
+Frame& QueryFrame(const nlohmann::json& rParameters)
 {
 	engine::GridCoord coordinate = CoordinateFromParameter(rParameters);
 	auto it = gpGame->mCoordinateFrames.find(coordinate);

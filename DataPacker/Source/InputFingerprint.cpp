@@ -312,7 +312,7 @@ std::string InputFingerprintCache::GetFile(const std::filesystem::path& rPath, I
 	}
 
 	std::string fingerprint = HashFileContents(rPath, eMode);
-	mCachedFingerprints.insert_or_assign(key, CachedFingerprint {.snapshot = snapshot, .fingerprint = fingerprint});
+	mCachedFingerprints.insert_or_assign(std::move(key), CachedFingerprint {.snapshot = snapshot, .fingerprint = fingerprint});
 	mbDirty = true;
 	return fingerprint;
 }
@@ -396,7 +396,7 @@ std::string InputFingerprintCache::GetPersistentFile(const std::filesystem::path
 		std::filesystem::remove(temporaryPath);
 		throw std::system_error(static_cast<int>(iError), std::system_category(), std::format("Failed to publish fingerprint metadata \"{}\"", metadataPath.string()));
 	}
-	mCachedFingerprints.insert_or_assign(key, CachedFingerprint {.snapshot = snapshot, .fingerprint = fingerprint});
+	mCachedFingerprints.insert_or_assign(std::move(key), CachedFingerprint {.snapshot = snapshot, .fingerprint = fingerprint});
 	mbDirty = true;
 	return fingerprint;
 }
@@ -435,7 +435,11 @@ InputFingerprintCache::FileSnapshot InputFingerprintCache::Snapshot(const std::f
 	{
 		throw std::system_error(static_cast<int>(GetLastError()), std::system_category(), std::format("Failed to open \"{}\" for fingerprinting", rPath.string()));
 	}
-	std::unique_ptr<void, decltype(&CloseHandle)> fileHandle(hFile, &CloseHandle);
+	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE hHandle) noexcept
+	{
+		CloseHandle(hHandle);
+	})>;
+	ScopedHandle fileHandle(hFile);
 	FILE_BASIC_INFO basicInfo {};
 	BY_HANDLE_FILE_INFORMATION fileInfo {};
 	if (!GetFileInformationByHandleEx(fileHandle.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo))

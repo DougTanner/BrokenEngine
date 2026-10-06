@@ -22,6 +22,7 @@ struct LogBuffer
 	static constexpr int64_t kiLineCount = LINE_COUNT;
 
 	std::atomic<int64_t> iWritePosition {0};
+	static_assert(decltype(iWritePosition)::is_always_lock_free);
 	char pcLines[kiLineCount][kiLogBufferSize] {}; // last byte always 0
 
 	char* AcquireLine()
@@ -171,7 +172,7 @@ void Log(LogCategory eCategory, std::format_string<const TUV&...> format, const 
 	LogWrite(pLogBuffer);
 }
 
-class ScopedLogIndent
+class [[nodiscard]] ScopedLogIndent
 {
 public:
 

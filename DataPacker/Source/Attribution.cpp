@@ -124,7 +124,7 @@ static std::vector<std::filesystem::path> SelectLicenseFiles(const std::vector<s
 
 	if (bFoundLicense)
 	{
-		return { primaryLicenseFile };
+		return { std::move(primaryLicenseFile) };
 	}
 
 	std::vector<std::filesystem::path> licenseFiles;

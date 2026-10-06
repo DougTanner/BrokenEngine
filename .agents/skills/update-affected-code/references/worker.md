@@ -61,7 +61,7 @@
    .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
    repository toplevel>' -Baseline <full 40-character SHA>` (add
    `-Head <commit>` for a committed head, and
-   `-IncludeUntracked <comma-separated paths>` listing the untracked paths in
+   `-IncludeUntracked '<comma-separated paths>'` listing the untracked paths in
    the owned change set, because the run covers an untracked file only when
    that parameter names it). Emit an `/update-vcxproj` handoff carrying its
    rows whose paths fall in the owned change set, each with its path and

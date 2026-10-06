@@ -54,7 +54,7 @@ extern std::recursive_mutex gDbgHelpMutex;
 extern thread_local int64_t giExpectedThrowDepth;
 
 // Scope-bound expected-throw guard for this thread; deleted copy/move operations keep each depth increment paired with one decrement.
-struct ScopedExpectedThrows
+struct [[nodiscard]] ScopedExpectedThrows
 {
 	ScopedExpectedThrows()
 	{

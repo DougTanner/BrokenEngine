@@ -18,7 +18,6 @@ class Timer
 public:
 
 	inline Timer()
-	: mLastTimePoint(std::chrono::steady_clock::now())
 	{
 	}
 
@@ -42,7 +41,7 @@ public:
 
 private:
 
-	std::chrono::steady_clock::time_point mLastTimePoint;
+	std::chrono::steady_clock::time_point mLastTimePoint = std::chrono::steady_clock::now();
 };
 
 } // namespace common

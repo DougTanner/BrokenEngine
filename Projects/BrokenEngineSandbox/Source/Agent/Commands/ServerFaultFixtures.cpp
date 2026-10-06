@@ -109,7 +109,7 @@ void CommandGamePacketFaultFixture(const nlohmann::json& rParameters, nlohmann::
 	gpServerSession->mpClientManager->Disconnects();
 
 	rResult["clientId"] = iClientIdentifier;
-	rResult["case"] = caseName;
+	rResult["case"] = std::move(caseName);
 	rResult["type"] = static_cast<uint8_t>(eType);
 	rResult["payloadSize"] = iPayloadSize;
 	rResult["fullSize"] = iFullSize;
@@ -178,7 +178,7 @@ void CommandEnginePacketFaultFixture(const nlohmann::json& rParameters, nlohmann
 	engine::gpServer->Receive(packet, pPeer);
 
 	rResult["clientId"] = iClientIdentifier;
-	rResult["case"] = caseName;
+	rResult["case"] = std::move(caseName);
 	rResult["type"] = packet.at(0);
 	rResult["size"] = iSize;
 }
@@ -284,13 +284,10 @@ void CommandServerPreHandshakeAcknowledgmentFixture([[maybe_unused]] const nlohm
 			throw std::runtime_error("server_pre_handshake_ack_fixture client identity changed during receive");
 		}
 
-		bool bAcknowledgmentSlotsUnchanged = std::ssize(pClient->slots) == std::ssize(acknowledgmentStates);
-		for (int64_t i = 0; bAcknowledgmentSlotsUnchanged && i < std::ssize(pClient->slots); ++i)
+		bool bAcknowledgmentSlotsUnchanged = std::ssize(pClient->slots) == std::ssize(acknowledgmentStates) && std::ranges::equal(pClient->slots, acknowledgmentStates, [](const engine::ClientConnection::SlotState& rSlot, const engine::AckState& rBefore)
 		{
-			const engine::AckState& rBefore = acknowledgmentStates.at(i);
-			const engine::AckState& rAfter = pClient->slots.at(i).ack;
-			bAcknowledgmentSlotsUnchanged = rAfter.iAcknowledgmentFloor == rBefore.iAcknowledgmentFloor && rAfter.uiReceivedBitfieldLow == rBefore.uiReceivedBitfieldLow && rAfter.uiReceivedBitfieldHigh == rBefore.uiReceivedBitfieldHigh && rAfter.uiEpoch == rBefore.uiEpoch;
-		}
+			return rSlot.ack.iAcknowledgmentFloor == rBefore.iAcknowledgmentFloor && rSlot.ack.uiReceivedBitfieldLow == rBefore.uiReceivedBitfieldLow && rSlot.ack.uiReceivedBitfieldHigh == rBefore.uiReceivedBitfieldHigh && rSlot.ack.uiEpoch == rBefore.uiEpoch;
+		});
 
 		bool bAdmissionAdvanced = pClient->iTickPacketCount == iPacketCount + 1
 		                       && pClient->iTickByteCount == iByteCount + engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize;

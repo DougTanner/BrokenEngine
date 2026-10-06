@@ -90,12 +90,12 @@ static bool IsOutputCurrent(const std::filesystem::path& rOutputPath, const std:
 	}
 
 	std::filesystem::file_time_type outputTime = std::filesystem::last_write_time(rOutputPath);
-	for (const std::filesystem::path& rLegacyInput : legacyInputs)
+	if (std::ranges::any_of(legacyInputs, [outputTime](const std::filesystem::path& rLegacyInput)
 	{
-		if (std::filesystem::last_write_time(rLegacyInput) > outputTime)
-		{
-			return false;
-		}
+		return std::filesystem::last_write_time(rLegacyInput) > outputTime;
+	}))
+	{
+		return false;
 	}
 	WriteFingerprintMetadata(rMetadataPath, fingerprint);
 	return true;
@@ -208,7 +208,7 @@ static void ReconcileIblOutputs(const ExpectedIblOutputs& rExpectedOutputs, std:
 			std::filesystem::path outputPath = gpFileManager->mpInputDirectories[i] / relativePath;
 			if (!rExpectedOutputs.contains(GetExpectedOutputKey(outputPath)))
 			{
-				orphans.emplace_back(outputPath, rSidecar.path());
+				orphans.emplace_back(std::move(outputPath), rSidecar.path());
 			}
 		}
 
@@ -614,10 +614,11 @@ static bool ProcessFaceImageCubemaps(int64_t iCpuThreads, cmft::ClContext* pClCo
 
 bool GeneratePreFilteredCubemaps()
 {
-	static const uint8_t suiCpuThreads = static_cast<uint8_t>(std::max(1ui32, std::thread::hardware_concurrency()));
+	// cmft takes the CPU thread count as uint8_t
+	static const int64_t siCpuThreads = std::min(common::LogicalCoreCount(), static_cast<int64_t>(std::numeric_limits<uint8_t>::max()));
 
 	// OpenCL radiance convolution produces GPU/driver-dependent half-float output; the CPU fallback
-	// depends on suiCpuThreads. R16G16B16A16_SFLOAT intermediates rely on a single canonical bake host
+	// depends on siCpuThreads. R16G16B16A16_SFLOAT intermediates rely on a single canonical bake host
 	// for reproducibility.
 	ExpectedIblOutputs expectedOutputs;
 	std::vector<diagnostic::ExportFailure> failures;
@@ -641,8 +642,8 @@ bool GeneratePreFilteredCubemaps()
 
 		// Both sub-passes fill one expected-output set, so both run and either one's incomplete walk blocks
 		// the single sweep below.
-		bDiscoveryComplete &= ProcessKtxCubemaps(suiCpuThreads, pClContext, expectedOutputs, failures);
-		bDiscoveryComplete &= ProcessFaceImageCubemaps(suiCpuThreads, pClContext, expectedOutputs, failures);
+		bDiscoveryComplete &= ProcessKtxCubemaps(siCpuThreads, pClContext, expectedOutputs, failures);
+		bDiscoveryComplete &= ProcessFaceImageCubemaps(siCpuThreads, pClContext, expectedOutputs, failures);
 	}
 
 	if (bDiscoveryComplete)

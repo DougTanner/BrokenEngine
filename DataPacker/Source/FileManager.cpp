@@ -3,8 +3,6 @@
 #include "DiagnosticReporter.h"
 
 
-using ScopedHandle = std::unique_ptr<void, decltype(&CloseHandle)>;
-
 struct SymbolicLinkReparseDataBuffer
 {
 	ULONG uiReparseTag;
@@ -108,7 +106,7 @@ static std::filesystem::path GetRepositoryRootFromExecutable()
 	if (CompareStringOrdinal(executableName.c_str(), -1, L"DataPacker.exe", -1, TRUE) != CSTR_EQUAL
 	 && CompareStringOrdinal(executableName.c_str(), -1, L"DataPacker.Debug.exe", -1, TRUE) != CSTR_EQUAL)
 	{
-		throw std::runtime_error(std::format("DataPacker executable path has unexpected layout: {} (expected suffix DataPacker\\Platforms\\VisualStudio2026\\Output\\DataPacker.exe or DataPacker.Debug.exe)", executablePath.string()));
+		throw std::runtime_error(std::format(R"(DataPacker executable path has unexpected layout: {} (expected suffix DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe or DataPacker.Debug.exe))", executablePath.string()));
 	}
 
 	static constexpr const wchar_t* kpwcExpectedDirectories[] =
@@ -123,7 +121,7 @@ static std::filesystem::path GetRepositoryRootFromExecutable()
 	{
 		if (repositoryRoot.empty() || CompareStringOrdinal(repositoryRoot.filename().native().c_str(), -1, pwcExpected, -1, TRUE) != CSTR_EQUAL)
 		{
-			throw std::runtime_error(std::format("DataPacker executable path has unexpected layout: {} (expected suffix DataPacker\\Platforms\\VisualStudio2026\\Output\\DataPacker.exe or DataPacker.Debug.exe)", executablePath.string()));
+			throw std::runtime_error(std::format(R"(DataPacker executable path has unexpected layout: {} (expected suffix DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe or DataPacker.Debug.exe))", executablePath.string()));
 		}
 		repositoryRoot = repositoryRoot.parent_path();
 	}
@@ -142,7 +140,11 @@ static void EstablishOutputDestinationParent(const std::filesystem::path& rDesti
 
 static bool IsRecognizedLinkRaw(const std::filesystem::path& rLink, const std::filesystem::path& rExpected)
 {
-	ScopedHandle link(CreateFileW(rLink.native().c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr), CloseHandle);
+	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE hHandle) noexcept
+	{
+		CloseHandle(hHandle);
+	})>;
+	ScopedHandle link(CreateFileW(rLink.native().c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr));
 	if (link.get() == nullptr || link.get() == INVALID_HANDLE_VALUE)
 	{
 		return false;
@@ -159,11 +161,11 @@ static bool IsRecognizedLinkRaw(const std::filesystem::path& rLink, const std::f
 		return false;
 	}
 	std::wstring target(pData->cPathBuffer + pData->uiSubstituteNameOffset / sizeof(wchar_t), pData->uiSubstituteNameLength / sizeof(wchar_t));
-	if (target.rfind(L"\\??\\", 0) == 0)
+	if (target.rfind(LR"(\??\)", 0) == 0)
 	{
 		target.erase(0, 4);
 	}
-	std::filesystem::path targetPath(target);
+	std::filesystem::path targetPath(std::move(target));
 	if (targetPath.is_relative())
 	{
 		targetPath = rLink.parent_path() / targetPath;

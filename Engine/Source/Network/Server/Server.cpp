@@ -727,17 +727,13 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClien
 
 	// The origin is always simulated and permits the initial fleet spawn.
 	bool bAdjacent = (coordinate == kOriginCoordinate);
-	for (const GridCoord& rOwnedCoordinate : pClient->authorizedCoordinates)
+	bAdjacent |= std::ranges::any_of(pClient->authorizedCoordinates, [&coordinate](const GridCoord& rOwnedCoordinate)
 	{
 		// 64-bit: the client-supplied coord is hostile input, so the difference can overflow int32 and std::abs(INT32_MIN) is undefined.
 		int64_t iDeltaX = std::abs(static_cast<int64_t>(coordinate.iX) - static_cast<int64_t>(rOwnedCoordinate.iX));
 		int64_t iDeltaY = std::abs(static_cast<int64_t>(coordinate.iY) - static_cast<int64_t>(rOwnedCoordinate.iY));
-		if (iDeltaX <= 1 && iDeltaY <= 1)
-		{
-			bAdjacent = true;
-			break;
-		}
-	}
+		return iDeltaX <= 1 && iDeltaY <= 1;
+	});
 	if (!bAdjacent)
 	{
 		LOG(kNetwork, kWarning, "Server::ClientSubscribe Rejected (not adjacent) Client: {} Coord: ({},{})", iClientId, coordinate.iX, coordinate.iY);

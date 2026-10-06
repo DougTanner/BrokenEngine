@@ -39,7 +39,7 @@ std::vector<T> Split(const T& rString, const T& rDelimiter)
 	{
 		token = rString.substr(iStart, iEnd - iStart);
 		iStart = iEnd + iDelimiterLength;
-		splits.push_back(token);
+		splits.push_back(std::move(token));
 	}
 	splits.push_back(rString.substr(iStart));
 	return splits;

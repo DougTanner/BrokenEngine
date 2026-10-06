@@ -75,15 +75,10 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 	std::vector<float> elevationGrid;
 	gpIslandTerrain->BuildElevationGrid(placements, elevationGrid);
 
-	bool bSamplesFinite = true;
-	for (float fSample : elevationGrid)
+	bool bSamplesFinite = std::ranges::all_of(elevationGrid, [](const float& fSample)
 	{
-		if (!std::isfinite(fSample))
-		{
-			bSamplesFinite = false;
-			break;
-		}
-	}
+		return std::isfinite(fSample);
+	});
 
 	FrameBounds bounds = ComputeFrameBounds(LocalFrameArea());
 	rResult["coord"] = AgentCoordinateJson(coordinate);

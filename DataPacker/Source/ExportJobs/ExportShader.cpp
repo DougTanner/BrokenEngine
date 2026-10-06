@@ -641,7 +641,7 @@ void ExportShader::CaptureDependencies()
 			mDependencyFingerprints.emplace_back(DependencyFingerprint
 			{
 				.iInputRoot = iRoot,
-				.relativePath = relativePath,
+				.relativePath = std::move(relativePath),
 				.fingerprint = gpFileManager->mpInputFingerprintCache->Get(dependency),
 			});
 			bFoundRoot = true;

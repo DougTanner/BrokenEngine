@@ -13,6 +13,7 @@ namespace common
 {
 
 constinit std::atomic<int64_t> giMyOutputDebugString = 0;
+static_assert(decltype(giMyOutputDebugString)::is_always_lock_free);
 std::mutex gLogMutex;
 
 LogRingBuffer gLogRingBuffers[kiLogCategoryCount];
@@ -24,7 +25,7 @@ constexpr LogLevel keLogRuntimeDefault = kVerbose; // Offline tool: no agent / s
 #else
 constexpr LogLevel keLogRuntimeDefault = kInfo; // Documented out-of-box threshold; the agent lowers it live via set_log_level
 #endif
-std::atomic<LogLevel> gLogRuntimeLevels[kiLogCategoryCount]
+constinit std::atomic<LogLevel> gLogRuntimeLevels[kiLogCategoryCount]
 {
 	keLogRuntimeDefault, kVerbose, // [1] kTemp: transient agent/dev diagnostics — always emit (compile floor keLogLevelTemporary = kVerbose)
 	keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault,
@@ -41,12 +42,15 @@ static std::ofstream sLogFileStream;
 // Declaration order relative to sLogFileStream is load-bearing: dynamic init runs in declaration order within a TU and
 // destruction in reverse, so declaring the guard after the stream opens the flag once the stream exists and closes it
 // again before the stream is destroyed.
-struct LogAliveGuard
+struct [[nodiscard]] LogAliveGuard
 {
 	LogAliveGuard()
 	{
 		sbLogAlive.store(true, std::memory_order_relaxed);
 	}
+
+	LogAliveGuard(const LogAliveGuard&) = delete;
+	LogAliveGuard& operator=(const LogAliveGuard&) = delete;
 
 	~LogAliveGuard()
 	{

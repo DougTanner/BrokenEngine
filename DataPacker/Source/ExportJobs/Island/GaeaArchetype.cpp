@@ -1,7 +1,7 @@
 #include "GaeaArchetype.h"
 
 
-constexpr const wchar_t* kpwcGaeaDefaultPath = L"C:\\Program Files\\QuadSpinner\\Gaea 2\\Gaea.Swarm.exe";
+constexpr const wchar_t* kpwcGaeaDefaultPath = LR"(C:\Program Files\QuadSpinner\Gaea 2\Gaea.Swarm.exe)";
 constexpr const char* kpcGaeaEnvVar = "GAEA2_PATH";
 
 // Fallback assumption for the Gaea Sea node's normalized `Level` field. Gaea omits the key
@@ -63,7 +63,7 @@ static void PatchArchetypeMesherResolution(nlohmann::json& rJson, int64_t iVerti
 	if (rJson.is_object())
 	{
 		auto it = rJson.find("$type");
-		if (it != rJson.end() && it->is_string() && it->get<std::string>().find("Mesher") != std::string::npos)
+		if (it != rJson.end() && it->is_string() && it->get<std::string>().contains("Mesher"))
 		{
 			rJson["VerticesPerSide"] = iVerticesPerSide;
 		}
@@ -117,7 +117,11 @@ std::filesystem::path ResolveGaeaExecutable()
 	char* pcEnvValue = nullptr;
 	size_t uiEnvSize = 0;
 	_dupenv_s(&pcEnvValue, &uiEnvSize, kpcGaeaEnvVar);
-	std::unique_ptr<char, decltype(&std::free)> pcEnvValueOwner(pcEnvValue, &std::free);
+	using ScopedEnvValue = std::unique_ptr<char, decltype([](char* pcValue) noexcept
+	{
+		std::free(pcValue);
+	})>;
+	ScopedEnvValue pcEnvValueOwner(pcEnvValue);
 	if (pcEnvValueOwner != nullptr)
 	{
 		std::filesystem::path envPath(pcEnvValueOwner.get());

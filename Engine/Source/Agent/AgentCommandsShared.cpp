@@ -201,7 +201,7 @@ int64_t AgentGridCoordinateValue(const nlohmann::json& rValue, std::string_view 
 
 	if (rValue.is_number_unsigned())
 	{
-		if (rValue > static_cast<uint64_t>(std::numeric_limits<int32_t>::max()))
+		if (!std::in_range<int32_t>(rValue.get<uint64_t>()))
 		{
 			throw std::runtime_error(std::format("{} values must fit in a signed 32-bit integer", name));
 		}
@@ -210,7 +210,7 @@ int64_t AgentGridCoordinateValue(const nlohmann::json& rValue, std::string_view 
 	}
 
 	int64_t iValue = rValue.get<int64_t>();
-	if (iValue < static_cast<int64_t>(std::numeric_limits<int32_t>::min()) || iValue > static_cast<int64_t>(std::numeric_limits<int32_t>::max()))
+	if (!std::in_range<int32_t>(iValue))
 	{
 		throw std::runtime_error(std::format("{} values must fit in a signed 32-bit integer", name));
 	}

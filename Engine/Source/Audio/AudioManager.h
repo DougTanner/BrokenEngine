@@ -3,6 +3,8 @@
 #if defined(BT_CLIENT)
 
 #include "Frame/GridCoord.h"
+#include "StaticVoices.h"
+#include "StreamingVoices.h"
 
 namespace game
 {
@@ -36,9 +38,6 @@ enum class AudioManagerFlags : uint8_t
 	kExpectedResetInProgress = 0x04,
 };
 using AudioManagerFlags_t = common::Flags<AudioManagerFlags>;
-
-class StaticVoices;
-class StreamingVoices;
 
 class AudioManager : public IVoiceNotify
 {
@@ -89,8 +88,8 @@ private:
 	std::unique_ptr<AudioEngine> mpAudioEngine;
 public:
 	// Declared after mpAudioEngine so both are destroyed first: they retain its raw pointer.
-	std::unique_ptr<StaticVoices> mpStaticVoices;
-	std::unique_ptr<StreamingVoices> mpStreamingVoices;
+	std::unique_ptr<StaticVoices> mpStaticVoices = std::make_unique<StaticVoices>();
+	std::unique_ptr<StreamingVoices> mpStreamingVoices = std::make_unique<StreamingVoices>();
 private:
 #if defined(BT_DEBUG)
 public:

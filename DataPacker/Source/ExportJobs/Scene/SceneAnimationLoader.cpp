@@ -212,12 +212,12 @@ bool DetermineAnimationPath(const tinygltf::Model& rGltfModel)
 
 	for (const tinygltf::Animation& rAnimation : rGltfModel.animations)
 	{
-		for (const tinygltf::AnimationChannel& rChannel : rAnimation.channels)
+		if (std::ranges::any_of(rAnimation.channels, [&skinJoints](const tinygltf::AnimationChannel& rChannel)
 		{
-			if (rChannel.target_node >= 0 && skinJoints.count(rChannel.target_node) == 0)
-			{
-				return false;
-			}
+			return rChannel.target_node >= 0 && skinJoints.count(rChannel.target_node) == 0;
+		}))
+		{
+			return false;
 		}
 	}
 	return true;
@@ -279,7 +279,7 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOutput)
 			{
 				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) has no input keyframes.", rAnimation.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler));
 			}
-			if (rInputAccessor.count > std::numeric_limits<uint32_t>::max())
+			if (!std::in_range<uint32_t>(rInputAccessor.count))
 			{
 				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) input keyframe count {} exceeds the supported limit {}.", rAnimation.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rInputAccessor.count, std::numeric_limits<uint32_t>::max()));
 			}

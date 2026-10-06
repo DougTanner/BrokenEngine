@@ -205,7 +205,7 @@ static void TryLoadRenderDocDll()
 		{
 			// Default RenderDoc installer doesn't add itself to PATH, so plain LoadLibrary("renderdoc.dll") fails. Read the install dir from the Vulkan loader's implicit-layer JSON registration — renderdoc.dll lives in the same folder.
 			HKEY hKey = nullptr;
-			if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Khronos\\Vulkan\\ImplicitLayers", 0, KEY_READ, &hKey) == ERROR_SUCCESS)
+			if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, R"(SOFTWARE\Khronos\Vulkan\ImplicitLayers)", 0, KEY_READ, &hKey) == ERROR_SUCCESS)
 			{
 				char pcValueName[MAX_PATH] {};
 				for (int64_t i = 0; ; ++i)
@@ -237,7 +237,7 @@ static void TryLoadRenderDocDll()
 
 			if (GetModuleHandle("renderdoc.dll") == nullptr)
 			{
-				LOG(kGraphics, kWarning, "--renderdoc requested but renderdoc.dll could not be loaded. Confirm RenderDoc is installed and registered in HKLM\\SOFTWARE\\Khronos\\Vulkan\\ImplicitLayers.");
+				LOG(kGraphics, kWarning, R"(--renderdoc requested but renderdoc.dll could not be loaded. Confirm RenderDoc is installed and registered in HKLM\SOFTWARE\Khronos\Vulkan\ImplicitLayers.)");
 			}
 		}
 	}

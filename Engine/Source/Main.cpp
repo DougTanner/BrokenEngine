@@ -838,7 +838,11 @@ static int64_t ProcessMain(HINSTANCE hInstance)
 	// as the launch options allow.
 	engine::ResolveCrashReportPaths();
 
-	std::unique_ptr<void, decltype(&CloseHandle)> pMutex(nullptr, &CloseHandle);
+	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE hHandle) noexcept
+	{
+		CloseHandle(hHandle);
+	})>;
+	ScopedHandle pMutex(nullptr);
 	if constexpr (kbSingleInstance)
 	{
 		HANDLE hMutex = CreateMutex(nullptr, TRUE, "BrokenEngineSandboxServer");

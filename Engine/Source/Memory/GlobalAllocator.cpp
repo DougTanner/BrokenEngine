@@ -2,9 +2,9 @@
 
 #include "CrashReport.h"
 
-std::atomic<int64_t> giAllocationsThisFrame = 0;
+constinit std::atomic<int64_t> giAllocationsThisFrame = 0;
 
-std::atomic<bool> gbAllocationTrackingReady = false;
+constinit std::atomic<bool> gbAllocationTrackingReady = false;
 
 static void TrackAllocation()
 {
@@ -243,6 +243,9 @@ struct MemoryInitializer
 #if defined(ENABLE_CRT_DEBUG_HEAP)
 		_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #else
+		// Purge off so freed pages are never decommitted and recommitted during gameplay; set here because upstream has no compile-time default for it.
+		mi_option_set(mi_option_purge_delay, -1);
+
 		// mimalloc's process init reserves the arena from the Mimalloc.cpp wrapper default; this only verifies it became arena 0 (id 1).
 		std::size_t uiArenaBytes = 0;
 		void* pArena = mi_arena_area(1, &uiArenaBytes);

@@ -63,8 +63,8 @@ struct AgentScript
 	bool bHasCoordinate = false;
 };
 
-// Frame-stepped synthetic-input engine. Advanced one step per rendered frame at the client drain point
-// (before ImGui NewFrame), so injected events land in the same frame. Two sinks: ImGui IO events (UI driving) and
+// Frame-stepped synthetic-input engine. Advanced one step per client main-loop iteration at the drain point
+// (before ImGui NewFrame), so on a rendered frame injected events land in that frame. Two sinks: ImGui IO events (UI driving) and
 // a RawInput snapshot overlay (engine key bindings). Zero steady-state heap — all state is fixed members.
 class AgentInput
 {
@@ -89,7 +89,9 @@ public:
 
 	// At the client main-thread drain point before GameBase::Render and ImGui::NewFrame, advance the active script and
 	// queue this frame's ImGui IO. The call is unconditional, so minimized frames still advance while Render takes the
-	// swapchain-deferred skip and bypasses ImGuiManager::Prepare.
+	// swapchain-deferred skip and bypasses ImGuiManager::Prepare. While the client is not rendering (minimized or
+	// swapchain recreate deferred), only the RawInput overlay takes effect; mouse ImGui events sent then never reach
+	// ImGui, and key scripts send none.
 	void AdvanceFrame();
 
 	// End of RawInputManager::Update: OR the synthetic key / mouse-button / mouse-pos state onto the just-published

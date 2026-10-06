@@ -229,9 +229,9 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 	// Each ring uses its own seed for uncorrelated rotations
 	float fJitter = gSpreadJitter.mfCurrent;
 	common::RandomEngine ringRandomEngine(1'000 * static_cast<uint32_t>(static_cast<float>(shaders::kiMaxSpreadPasses) * fJitter));
-	for (int64_t i = 0; i < _countof(rGlobalLayout.pfSpreadRingRotations); ++i)
+	for (float& rfSpreadRingRotation : rGlobalLayout.pfSpreadRingRotations)
 	{
-		rGlobalLayout.pfSpreadRingRotations[i] = common::Random<XM_2PI>(ringRandomEngine);
+		rfSpreadRingRotation = common::Random<XM_2PI>(ringRandomEngine);
 	}
 
 	PopulateLightingParameters(rGlobalLayout, bScheduledLightingRefresh, bLightingEnabled);
@@ -399,9 +399,9 @@ void RenderLightingSpreadIndirect(int64_t iCommandBuffer)
 	// Update all kiMaxSpreadPasses pipelines because the recorded Main command buffer selects the active passes.
 	// CreateHostVisibleIndirectBuffer zeroes slots during pipeline recreation, so recorded passes need their instance counts restored.
 	// Write only iCommandBuffer's framebuffer slot; the other slots may still be in use by the GPU.
-	for (int64_t i = 0; i < shaders::kiMaxSpreadPasses; ++i)
+	for (Pipeline& rPipeline : gpPipelineManager->mSpreadPipelines)
 	{
-		gpPipelineManager->mSpreadPipelines[i].WriteIndirectBuffer(iCommandBuffer, iInstanceCount);
+		rPipeline.WriteIndirectBuffer(iCommandBuffer, iInstanceCount);
 	}
 
 	// The combine-sized chain covers the whole texture; the refresh predicate suppresses it by zeroing the Z group

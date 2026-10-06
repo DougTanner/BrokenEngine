@@ -471,13 +471,13 @@
     <ClInclude Include="..\..\Source\Agent\AgentCommandsServerQueries.h">
       <Filter>Game\Agent</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Agent\Commands\AgentFieldNames.h">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\Agent\Commands\ServerFaultFixtures.h">
       <Filter>Game\Agent\Commands</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Agent\Commands\ServerSimulationFixtures.h">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Agent\Commands\ServerFrameEdit.h">
       <Filter>Game\Agent\Commands</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityFixture.h">
@@ -801,6 +801,9 @@
       <Filter>Game\Agent\Commands</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Agent\Commands\ServerSimulationFixtures.cpp">
+      <Filter>Game\Agent\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Agent\Commands\ServerFrameEdit.cpp">
       <Filter>Game\Agent\Commands</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityFixture.cpp">

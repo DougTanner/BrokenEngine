@@ -12,10 +12,7 @@ struct FixedString
 
 	constexpr FixedString(const char (&str)[N])
 	{
-		for (int64_t i = 0; i < N; ++i)
-		{
-			data[i] = str[i];
-		}
+		std::copy(std::begin(str), std::end(str), std::begin(data));
 	}
 
 	constexpr operator const char*() const

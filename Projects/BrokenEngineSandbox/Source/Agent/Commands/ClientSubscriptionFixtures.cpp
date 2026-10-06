@@ -105,17 +105,11 @@ void CommandClientStaleUpdateFixture(const nlohmann::json& rParams, [[maybe_unus
 			throw std::runtime_error("client_stale_update_fixture requires exactly {}");
 		}
 		engine::Client& rClient = RequireFixtureClient("client_stale_update_fixture");
-		bool bHasActiveConfirmedCoordinate = false;
-		for (const engine::ClientCoordSlot& rSlot : rClient.mSubscriptions.mCoordinateSlots)
+		bool bHasActiveConfirmedCoordinate = std::ranges::any_of(rClient.mSubscriptions.mCoordinateSlots, [](const engine::ClientCoordSlot& rSlot)
 		{
 			auto it = gpGame->mCoordinateFrames.find(rSlot.coordinate);
-			if (rSlot.eState == engine::CoordSubscriptionState::kActive && it != gpGame->mCoordinateFrames.end()
-			 && it->second.iConfirmedTick >= 0)
-			{
-				bHasActiveConfirmedCoordinate = true;
-				break;
-			}
-		}
+			return rSlot.eState == engine::CoordSubscriptionState::kActive && it != gpGame->mCoordinateFrames.end() && it->second.iConfirmedTick >= 0;
+		});
 		if (!bHasActiveConfirmedCoordinate)
 		{
 			throw std::runtime_error("client_stale_update_fixture requires an active confirmed coord");

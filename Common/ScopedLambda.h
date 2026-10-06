@@ -3,7 +3,7 @@
 namespace common
 {
 
-class ScopedLambda
+class [[nodiscard]] ScopedLambda
 {
 public:
 
@@ -11,6 +11,9 @@ public:
 	: mReleaseFunction(std::move(releaseFunction))
 	{
 	}
+
+	ScopedLambda(const ScopedLambda&) = delete;
+	ScopedLambda& operator=(const ScopedLambda&) = delete;
 
 	~ScopedLambda()
 	{

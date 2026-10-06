@@ -69,7 +69,9 @@ every other file is its own unit.
 The stage baseline is the SHA in `Temp/Sweep/Baseline.txt`, which the first
 `-Batch` run writes. The `BATCH-DONE` and `CLOSE-DONE` lines end in the fields
 `cpp=yes|no`, `builds=<targets>`, and `profile=yes|no`, which the coordinator
-derives from the C++ files changed since the baseline.
+derives from the changed C++ files: for `BATCH-DONE`, those changed since the
+tracked working tree as it stood before the batch's first unit ran; for
+`CLOSE-DONE`, those changed since the stage baseline.
 DataPacker, WorktreeCli, and AgentHarness build in Release only (`/compile`
 `## Inputs`).
 

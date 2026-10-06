@@ -190,7 +190,7 @@ namespace toolcli
 		{
 			return EmitLandingConflict(rLocator, rMetadata, LandingRecordState::kReadable);
 		}
-		rMetadata["heartbeatAt"] = timestamp;
+		rMetadata["heartbeatAt"] = std::move(timestamp);
 		rMetadata["expiresAt"] = FormatUtcTimestamp(static_cast<uint64_t>(iHeartbeatTicks + lease->duration.count() * 10'000'000i64));
 		if (!WriteMetadataAtomic(rLocator.path, rMetadata))
 		{

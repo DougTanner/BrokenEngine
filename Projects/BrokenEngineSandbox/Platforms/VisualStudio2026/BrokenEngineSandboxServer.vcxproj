@@ -380,9 +380,9 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\CellCoordinateProbe.h" />
     <ClInclude Include="..\..\Source\Agent\AgentCommands.h" />
     <ClInclude Include="..\..\Source\Agent\AgentCommandsServerQueries.h" />
-    <ClInclude Include="..\..\Source\Agent\Commands\AgentFieldNames.h" />
     <ClInclude Include="..\..\Source\Agent\Commands\ServerFaultFixtures.h" />
     <ClInclude Include="..\..\Source\Agent\Commands\ServerSimulationFixtures.h" />
+    <ClInclude Include="..\..\Source\Agent\Commands\ServerFrameEdit.h" />
     <ClInclude Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityFixture.h" />
     <ClInclude Include="..\..\Source\Agent\Commands\RegistryFixture.h" />
     <ClInclude Include="..\..\Source\Save\GameSaveLoad.h" />
@@ -505,6 +505,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Agent\AgentCommandsServerQueries.cpp" />
     <ClCompile Include="..\..\Source\Agent\Commands\ServerFaultFixtures.cpp" />
     <ClCompile Include="..\..\Source\Agent\Commands\ServerSimulationFixtures.cpp" />
+    <ClCompile Include="..\..\Source\Agent\Commands\ServerFrameEdit.cpp" />
     <ClCompile Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityFixture.cpp" />
     <ClCompile Include="..\..\Source\Agent\Commands\RegistryFixture.cpp" />
     <ClCompile Include="..\..\Source\Save\GameSaveLoad.cpp" />

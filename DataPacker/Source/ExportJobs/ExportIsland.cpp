@@ -117,13 +117,13 @@ static void BuildValidAreaHull(ExportedIsland& rOut)
 	int64_t iCount = std::ssize(candidates);
 	std::vector<XMFLOAT2> hull(static_cast<size_t>(iCount) * 2);
 	int64_t iHullVertexCount = 0;
-	for (int64_t i = 0; i < iCount; ++i)
+	for (const XMFLOAT2& rCandidate : candidates)
 	{
-		while (iHullVertexCount >= 2 && Cross(hull.at(iHullVertexCount - 2), hull.at(iHullVertexCount - 1), candidates.at(i)) <= 0.0f)
+		while (iHullVertexCount >= 2 && Cross(hull.at(iHullVertexCount - 2), hull.at(iHullVertexCount - 1), rCandidate) <= 0.0f)
 		{
 			--iHullVertexCount;
 		}
-		hull.at(iHullVertexCount++) = candidates.at(i);
+		hull.at(iHullVertexCount++) = rCandidate;
 	}
 	int64_t iLower = iHullVertexCount + 1;
 	for (int64_t i = iCount - 2; i >= 0; --i)
@@ -146,8 +146,7 @@ static void BuildValidAreaHull(ExportedIsland& rOut)
 	rOut.cpuValidAreaVertices.reserve(static_cast<size_t>(std::ssize(hull) * 2));
 	for (const XMFLOAT2& rVert : hull)
 	{
-		rOut.cpuValidAreaVertices.push_back(rVert.x);
-		rOut.cpuValidAreaVertices.push_back(rVert.y);
+		rOut.cpuValidAreaVertices.insert(rOut.cpuValidAreaVertices.end(), {rVert.x, rVert.y});
 	}
 }
 
@@ -365,9 +364,9 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	// drives every downstream size; it is written last per leaf, so its presence is guaranteed if the
 	// bake succeeded. The committed BC outputs are saved to the leaf root (not Intermediates).
 	BakedDimensions baked = ReadBakedDimensions(rInputPath);
-	if (baked.iFullTexturePixels <= 0 || baked.iFullTexturePixels > std::numeric_limits<int32_t>::max() || baked.iCropX < 0
-	 || baked.iCropY < 0 || baked.iCropWidth <= 0 || baked.iCropHeight <= 0 || baked.iCropWidth > std::numeric_limits<int32_t>::max()
-	 || baked.iCropHeight > std::numeric_limits<int32_t>::max() || baked.iCropWidth % kiElevationDivisor != 0
+	if (baked.iFullTexturePixels <= 0 || !std::in_range<int32_t>(baked.iFullTexturePixels) || baked.iCropX < 0
+	 || baked.iCropY < 0 || baked.iCropWidth <= 0 || baked.iCropHeight <= 0 || !std::in_range<int32_t>(baked.iCropWidth)
+	 || !std::in_range<int32_t>(baked.iCropHeight) || baked.iCropWidth % kiElevationDivisor != 0
 	 || baked.iCropHeight % kiElevationDivisor != 0 || baked.iCropX > std::numeric_limits<int64_t>::max() - baked.iCropWidth
 	 || baked.iCropY > std::numeric_limits<int64_t>::max() - baked.iCropHeight || baked.iCropX + baked.iCropWidth > baked.iFullTexturePixels
 	 || baked.iCropY + baked.iCropHeight > baked.iFullTexturePixels)
@@ -393,7 +392,7 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	rOut.fWorldElevationMeters = baked.fElevationMeters;
 	int64_t iElevationWidth = baked.iCropWidth / kiElevationDivisor;
 	int64_t iElevationHeight = baked.iCropHeight / kiElevationDivisor;
-	if (iElevationWidth <= 0 || iElevationHeight <= 0 || iElevationWidth > std::numeric_limits<int32_t>::max() || iElevationHeight > std::numeric_limits<int32_t>::max())
+	if (iElevationWidth <= 0 || iElevationHeight <= 0 || !std::in_range<int32_t>(iElevationWidth) || !std::in_range<int32_t>(iElevationHeight))
 	{
 		throw std::runtime_error(std::format("Island leaf \"{}\" has invalid elevation dimensions: {}x{}.", rInputPath.string(), iElevationWidth, iElevationHeight));
 	}
@@ -495,15 +494,10 @@ std::optional<common::ChunkFlags_t> ExportIsland::Handles(const std::filesystem:
 	}
 
 	// Ancestors only (parent_path) — a leaf directory itself named "Islands" must not match.
-	bool bUnderIslands = false;
-	for (const std::filesystem::path& rPart : rDirectoryEntry.path().parent_path())
+	bool bUnderIslands = std::ranges::any_of(rDirectoryEntry.path().parent_path(), [](const std::filesystem::path& rPart)
 	{
-		if (rPart == "Islands")
-		{
-			bUnderIslands = true;
-			break;
-		}
-	}
+		return rPart == "Islands";
+	});
 	if (!bUnderIslands)
 	{
 		return std::nullopt;
@@ -570,14 +564,10 @@ std::string ExportIsland::GetTextureFingerprint() const
 bool ExportIsland::AreTextureOutputsPresent() const
 {
 	static constexpr const char* kpcOutputs[] = {kpcIslandAmbientOcclusion, kpcIslandColor, kpcIslandMasks, kpcIslandNormals};
-	for (const char* pcOutput : kpcOutputs)
+	return std::ranges::all_of(kpcOutputs, [this](const char* const& pcOutput)
 	{
-		if (!std::filesystem::exists(mInputPath / pcOutput))
-		{
-			return false;
-		}
-	}
-	return true;
+		return std::filesystem::exists(mInputPath / pcOutput);
+	});
 }
 
 bool ExportIsland::AreTexturesFresh() const

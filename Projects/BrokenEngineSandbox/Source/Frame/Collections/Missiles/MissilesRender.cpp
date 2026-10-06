@@ -20,12 +20,15 @@ static int64_t siRendered = 0;
 static std::atomic<bool> sbRenderActive = false;
 
 // sbRenderActive must clear during exception unwinding so subsequent Render calls do not fail the concurrency ASSERT.
-struct MissilesRenderActiveGuard
+struct [[nodiscard]] MissilesRenderActiveGuard
 {
 	MissilesRenderActiveGuard()
 	{
 		ASSERT(!sbRenderActive.exchange(true));
 	}
+
+	MissilesRenderActiveGuard(const MissilesRenderActiveGuard&) = delete;
+	MissilesRenderActiveGuard& operator=(const MissilesRenderActiveGuard&) = delete;
 
 	~MissilesRenderActiveGuard()
 	{

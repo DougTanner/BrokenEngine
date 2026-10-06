@@ -72,7 +72,7 @@ Water's variance-table consumption is documented in Water shaders (`../../../Dat
 
 ### TextureUploadManager
 
-A dedicated upload thread with a fixed staging budget, persisting large-texture progress across frames. The budget caps size, not rate: the render loop signals the thread once per frame and the thread waits for a signal before each chunk, so uploads spread across frames instead of bursting. Block-compressed partial copies support BC4, BC5, and BC7. Queue selection prefers transfer-only work but resolves to foreground adoption when transfer aliases graphics or the distinct present family, so concurrent submissions do not share that queue.
+A dedicated upload thread with a fixed staging budget, persisting large-texture progress across frames. The budget caps size, not rate: the render loop signals the thread once per iteration, including iterations `GameBase::Render` skips for a deferred swapchain, and the thread waits for a signal before each chunk, so uploads spread across frames instead of bursting. Block-compressed partial copies support BC4, BC5, and BC7. Queue selection prefers transfer-only work but resolves to foreground adoption when transfer aliases graphics or the distinct present family, so concurrent submissions do not share that queue.
 
 - Distinct transfer queues release image ownership for the matching graphics acquire; maintenance9-capable devices may use the simplified path. Device loss preserves CPU data for re-upload.
 - `WaitIdle` is a teardown drain handshake: the upload thread acknowledges only from a no-submit-in-flight point, and every exit path publishes exit state so a waiter cannot deadlock. Frame permits remain binary and must be drained before release. Fatal upload failures are published for the main thread and survive transfer-resource recreation; device loss remains a separate recovery path.
@@ -90,7 +90,7 @@ Loads SPIR-V from pack chunks and owns fixed engine pipelines plus CRC-keyed dyn
 
 ### ParticleManager
 
-Stages CPU particle spawns for fixed-capacity GPU compute allocation and simulation. Worker spawns first cull by visible area and intensity, then append under the spawn mutex during joined frame-tick work. `RenderGlobal` runs after the worker join, copies staged spawns into the current framebuffer's mapped storage, and clears CPU staging. Bindless texture-index assignment mutates descriptor bookkeeping while spawning; its safety relies on this tick/render phase exclusion. Keep that exclusion if spawn or descriptor work moves between phases.
+Stages CPU particle spawns for fixed-capacity GPU compute allocation and simulation. Worker spawns first cull by the camera cell's visible area and intensity, so callers pass camera-cell positions, then append under the spawn mutex during joined frame-tick work. `RenderGlobal` runs after the worker join, copies staged spawns into the current framebuffer's mapped storage, and clears CPU staging; when `GameBase::Render` skips `RenderGlobal` for a deferred swapchain it clears staging with `DiscardStagedSpawns` instead, so ticks keep spawning without accumulating past the staging limit. Bindless texture-index assignment mutates descriptor bookkeeping while spawning; its safety relies on this tick/render phase exclusion. Keep that exclusion if spawn or descriptor work moves between phases. The pool follows the camera's cell through `RetainedAreaBasis`: a one-cell step shifts every allocated particle by the whole-cell offset in the update pass, and a larger step resets the pool.
 
 ### ImGuiManager
 

@@ -560,7 +560,7 @@ void Texture::Export(std::vector<std::byte>& rData, VkFormat vkFormat, TextureOp
 
 			default:
 				ASSERT(false);
-				break;
+				std::unreachable();
 		}
 
 		puiCurrentPosition += common::SizeInBytes(vkFormat, iMipWidth, iMipHeight);
@@ -568,7 +568,7 @@ void Texture::Export(std::vector<std::byte>& rData, VkFormat vkFormat, TextureOp
 		iMipHeight = std::max(iMipHeight / 2, 1i64);
 	}
 
-	rData.insert(rData.end(), data.begin(), data.end());
+	rData.append_range(data);
 }
 
 void Texture::SaveJpegSidecar(const std::filesystem::path& rPath, int64_t iQuality, TextureOptions_t options)

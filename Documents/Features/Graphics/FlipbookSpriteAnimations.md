@@ -153,7 +153,7 @@ Changes (11 files)
       (same position)
     - Add rSelf.flipbooks to both Collections() tuples (both Interpolate
       and PostRender)
-    - Increment kCollectionCount by 1 (client: 11 -> 12, server stays 2)
+    - Increment kiCollectionCount by 1 (client: 11 -> 12, server stays 2)
     - Add FlipbooksInterpolate to the InterpolateRenderTypes TypeList
 
 Additional updates (not counted as separate changes):

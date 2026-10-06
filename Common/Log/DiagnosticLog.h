@@ -43,7 +43,7 @@ private:
 
 inline constexpr int64_t kDiagnosticLogCount = 4;
 
-inline DiagnosticLog* gpDiagnosticLogs[kDiagnosticLogCount] = {};
+inline constinit DiagnosticLog* gpDiagnosticLogs[kDiagnosticLogCount] = {};
 
 } // namespace common
 

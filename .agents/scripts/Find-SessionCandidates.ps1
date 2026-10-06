@@ -30,14 +30,13 @@ $script:InventoryScript = Join-Path $PSScriptRoot 'Get-SessionChangeInventory.ps
 $script:CppClasses = @('cpp', 'dual-language-header')
 # One entry per candidate kind: the residue kinds .agents/skills/code-style-review/references/worker.md
 # step 16 removes, and one style-rule-<n> kind per rule of Documents/C++StyleGuide.txt that its step 9
-# adjudicates. The order is the order a line is attributed: a line reports the first kind that matches
-# it. An entry's Except clears a match that is one of the rule's permitted forms. The style-rule-61,
-# style-rule-22, style-rule-59, style-rule-62 and style-rule-51 kinds are not in this table: each needs another
-# head-side line too, so Test-Rule61Line, Test-Rule22Line and Test-Rule59Line decide theirs, in that order,
-# before the table, and Test-Rule62Line then Test-Rule51Line decide theirs after the table, so they hide no
-# table kind; style-rule-14 is the table's last entry for the same reason. That worker's step 6 hand-read
-# list and these style-rule-<n> kinds together make the review's style mandate, and a rule is on both when
-# each covers a different form, so update step 6 when a kind changes.
+# adjudicates. A line reports every kind that matches it, each as its own row. An entry's Except clears a
+# match that is one of the rule's permitted forms or a form another kind reports. The style-rule-61,
+# style-rule-22, style-rule-59, style-rule-62 and style-rule-51 kinds are not in this table: each needs
+# another head-side line too, so Test-Rule61Line, Test-Rule22Line, Test-Rule59Line, Test-Rule62Line and
+# Test-Rule51Line decide theirs. That worker's step 6 hand-read list, its step 16 rule 70 check, and these
+# style-rule-<n> kinds together make the review's style mandate, and a rule is on two lists when each covers
+# a different form, so update step 6 when a kind changes.
 $script:ScalarType = '(?:(?:unsigned|signed)\s+)?(?:bool|char|wchar_t|short|int|long(?:\s+long)?|float|double)|unsigned|u?int(?:8|16|32|64)_t|size_t|u?intptr_t|ptrdiff_t'
 $script:IntegerType = '(?:(?:unsigned|signed)\s+)?(?:short|int|long(?:\s+long)?)|unsigned|u?int(?:8|16|32|64)_t|size_t|ptrdiff_t'
 # The prose-prone kinds share style-rule-2's comment-and-string alternative, so a line holding a comment
@@ -56,44 +55,44 @@ $script:CandidatePatterns = @(
 	@{ Kind = 'fixme'; Pattern = '(?://|/\*|^\s*\*).*\bFIXME\b' }
 	@{ Kind = 'hack'; Pattern = '(?://|/\*|^\s*\*).*\bHACK\b' }
 	@{ Kind = 'style-rule-2'; Pattern = '^\s*(?:[A-Za-z_]\w*(?:::[A-Za-z_]\w*)?(?:<[^{};]*>)?\s+)+(?:[*&]\s*)?[A-Za-z_]\w*(?:\s*\[[^\]]*\])?\s*\{\s*$'; Except = '(?://|/\*|\*/|["''])|^\s*(?:class|struct|union|enum|namespace|return|if|else|for|while|switch|try|catch|do)\b' }
-	@{ Kind = 'style-rule-15'; Pattern = $script:CodePrefix + '\bauto\b'; Except = 'auto\s*&?&?\s*\[|\bauto\s+(?:vec|mat)|\bauto\s*&?\s+(?:it|\w+It)\b|=\s*\[|<[^<>]*>\s*[({]|\bdecltype\s*\(\s*auto\s*\)' }
-	@{ Kind = 'style-rule-18'; Pattern = '^\s*const\s+(?:[A-Za-z_][\w:]*(?:<[^;]*>)?\s+)+[A-Za-z_]\w*\s*[={(]'; Except = '^\s*const\s+[^=({;<]*(?:<[^;]*>)?[^=({;<]*[&*]' }
-	@{ Kind = 'style-rule-19'; Pattern = '\btemplate\s*<[^>]*(?:\bclass\b|\btypename(?:\.\.\.)?\s+[A-Z]*[a-z])' }
+	@{ Kind = 'style-rule-15'; Pattern = $script:CodePrefix + '\bauto\b'; Except = 'auto\s*&?&?\s*\[|\bauto\s+(?:vec|mat)[A-Z]|\bauto\s*&?\s+(?:it|\w+It)\b|=\s*\[|=\s*[&*]?(?:[\w:.]|->)*<[^<>]*>\s*[({]|\bdecltype\s*\(\s*auto\s*\)' }
+	@{ Kind = 'style-rule-18'; Pattern = '^\s*(?:static\s+)?const\s+(?![^=({;<]*(?:<[^;]*>)?[^=({;<]*[&*])(?:[A-Za-z_][\w:]*(?:<[^;]*>)?\s+)+[A-Za-z_]\w*\s*[={(]|^\s*(?:static\s+)?const\s+auto\s*\[|^\s*(?:[A-Za-z_][\w:]*(?:<[^;]*>)?\s*\*?\s+)+const\s+[A-Za-z_]\w*\s*[={(]|\bfor\s*\(\s*const\s+(?:[A-Za-z_][\w:]*(?:<[^;]*>)?\s+)+[A-Za-z_]\w*\s*:' }
+	@{ Kind = 'style-rule-19'; Pattern = '\btemplate\s*<[^>]*(?:\bclass\b|[\w.]\s+[A-Z0-9_]*[a-z]\w*\s*(?:[,=>]|$))' }
 	@{ Kind = 'style-rule-27'; Pattern = $script:CodePrefix + '(?:\b\d+\.(?:\d+(?:[eE][-+]?\d+)?)?(?:[^\w.]|$)|\b\d+\.f\b|(?<![\w.])\.\d+(?:f|\b))' }
-	@{ Kind = 'style-rule-68'; Pattern = $script:CodePrefix + '(?:\bstatic_cast\s*<\s*(?:std::)?(?:u?int(?:16|32|64)_t|uint8_t)\s*>\s*\(\s*-?(?:0[xX][0-9a-fA-F'']+|\d[\d'']*)\s*\)|(?<![\w:])(?:std::)?(?:u?int(?:16|32|64)_t|uint8_t)\s*\{\s*-?(?:0[xX][0-9a-fA-F'']+|\d[\d'']*)\s*\}|(?<![\w.''])(?:0[xX][0-9a-fA-F'']+|\d[\d'']*)(?:[uU]?(?:ll|LL)|(?:ll|LL)[uU]|[uU])\b)' }
+	@{ Kind = 'style-rule-68'; Pattern = $script:CodePrefix + '(?:\bstatic_cast\s*<\s*(?:std::)?(?:u?int(?:16|32|64)_t|uint8_t)\s*>\s*\(\s*-?(?:0[xX][0-9a-fA-F'']+|\d[\d'']*)\s*\)|(?<![\w:])(?:std::)?(?:u?int(?:16|32|64)_t|uint8_t)\s*\{\s*-?(?:0[xX][0-9a-fA-F'']+|\d[\d'']*)\s*\}|(?<![\w.''])(?:0[xX][0-9a-fA-F'']+|\d[\d'']*)(?:[uU]?(?:ll|LL)|(?:ll|LL)[uU]|[uU][lL]?|[lL][uU])\b)' }
 	@{ Kind = 'style-rule-28'; Pattern = $script:CodePrefix + '\bNULL\b' }
-	@{ Kind = 'style-rule-29'; Pattern = '\bvirtual\b.*\)\s*(?:const\s*)?(?:noexcept\s*)?;'; Except = '\boverride\b|\bfinal\b' }
+	@{ Kind = 'style-rule-29'; Pattern = '\bvirtual\b.*\)\s*(?:const\s*)?(?:noexcept(?:\s*\([^)]*\))?\s*)?(?:;|\{|$)'; Except = '\boverride\b|\bfinal\b' }
 	@{ Kind = 'style-rule-32'; Pattern = '\bstd::map\s*<' }
-	@{ Kind = 'style-rule-41'; Pattern = '\busing\s+namespace\s+[\w:]+\s*;'; Except = 'using\s+namespace\s+DirectX\s*;' }
-	@{ Kind = 'style-rule-50'; Pattern = '\b(?:if|while)\s*\((?:.*(?:&&|\|\||\())?\s*!?\s*(?<!\bsizeof\s*\(\s*)(?:[\w.>-]*(?:->|\.))?[gms]?p[A-Z]\w*\s*(?:\)|&&|\|\|)' }
-	@{ Kind = 'style-rule-52'; Pattern = $script:CodePrefix + '\w\{\}' }
+	@{ Kind = 'style-rule-41'; Pattern = '\busing\s+namespace\s+[\w:]+\s*;'; Except = 'using\s+namespace\s+(?:DirectX|std::chrono_literals)\s*;' }
+	@{ Kind = 'style-rule-50'; Pattern = '\b(?:if|while)\s*\((?:.*(?:&&|\|\||\(|;))?\s*!?\s*(?<!\bsizeof\s*\(\s*)(?:[\w.>-]*(?:->|\.))?[gms]?p[A-Z]\w*\s*(?:\)|&&|\|\|)|\b(?:if|while)\s*\((?:.*(?:&&|\|\||(?<![\w\])]\s*)\(|;))?\s*!?\s*(?:[\w.>-]*(?:->|\.))?[gms]?p(?:p|c|ui|i|b|e|f[234]?|vec|mat)[A-Z]\w*\s*(?:\)|&&|\|\|)|\b(?:if|while)\s*\(\s*(?:const\s+)?[A-Za-z_][\w:]*(?:<[^;]*>)?\s*\*+\s*(?:const\s+)?[A-Za-z_]\w*\s*=[^;]*\)\s*(?:[{/].*)?$' }
+	@{ Kind = 'style-rule-52'; Pattern = $script:CodePrefix + '[\w>]\{' }
 	@{ Kind = 'style-rule-57'; Pattern = '\b\w+(?:Impl|Internal)\s*\(' }
-	@{ Kind = 'style-rule-58'; Pattern = '^\s*#\s*ifn?def\b' }
-	@{ Kind = 'style-rule-1'; Pattern = '^ +\S'; Except = '^ +\*' }
-	@{ Kind = 'style-rule-5'; Pattern = '\bnew\s+[A-Za-z_]|\bdelete\b|\b(?:malloc|calloc|realloc|free)\s*\('; Except = $script:CommentOrQuote + '|=\s*delete\b|\boperator\s+(?:new|delete)\b' }
+	@{ Kind = 'style-rule-58'; Pattern = '^\s*#\s*(?:el)?ifn?def\b' }
+	@{ Kind = 'style-rule-1'; Pattern = '^ +[^ ]'; Except = '^ +\*(?:\s|/|$)' }
+	@{ Kind = 'style-rule-5'; Pattern = $script:CodePrefix + '(?:\bnew\s+[A-Za-z_]|\bdelete\b|\b(?:malloc|calloc|realloc|free|_aligned_(?:malloc|realloc|free))\s*\()'; Except = '^\s*\*(?:\s|/|$)|=\s*delete\b|\boperator\s+(?:new|delete)\b' }
 	@{ Kind = 'style-rule-6'; Pattern = '\bBT_(?:DEBUG|RELEASE|PROFILE)\b|^\s*#\s*(?:el)?if\b.*\bkb[A-Z]'; Except = $script:CommentOrQuote }
 	@{ Kind = 'style-rule-10'; Pattern = '^\s*#\s*include\s*["<][^">]*\\' }
-	# A `(void)name;` discard is also a parenthesized builtin type followed by an operand, so rule 39
-	# precedes rule 11.
-	@{ Kind = 'style-rule-39'; Pattern = '\(\s*void\s*\)\s*[A-Za-z_]\w*\s*;' }
-	@{ Kind = 'style-rule-11'; Pattern = '(?<!\b(?:alignas|alignof|sizeof|decltype)\s*)\((?:const\s+)?(?:void|' + $script:ScalarType + '|[A-Za-z_][\w:]*(?=\s*(?:const\s*)?\*))(?:\s*const)?(?:\s*\*)*\s*\)\s*(?!(?:const|override|noexcept|final|volatile|mutable)\b)[\w(]'; Except = '^\s*//' }
+	@{ Kind = 'style-rule-39'; Pattern = '\(\s*void\s*\)\s*[A-Za-z_]\w*\s*;|\bstatic_cast\s*<\s*void\s*>\s*\(\s*[A-Za-z_]\w*\s*\)\s*;|\bUNREFERENCED_PARAMETER\s*\(|\bstd::ignore\s*=\s*[A-Za-z_]\w*\s*;' }
+	# A `(void)name;` or `static_cast<void>(name);` discard is style-rule-39's row, not a rule 11 cast.
+	@{ Kind = 'style-rule-11'; Pattern = '(?<!\b(?:alignas|alignof|sizeof|decltype)\s*)\((?:const\s+)?(?:void|' + $script:ScalarType + '|[A-Za-z_][\w:]*(?=\s*(?:const\s*)?\*))(?:\s*const)?(?:\s*\*)*\s*\)\s*(?!(?:const|override|noexcept|final|volatile|mutable)\b)[\w(]|\bstatic_cast\s*<\s*void\s*>\s*\('; Except = '^\s*//|\(\s*void\s*\)\s*[A-Za-z_]\w*\s*;|\bstatic_cast\s*<\s*void\s*>\s*\(\s*[A-Za-z_]\w*\s*\)\s*;' }
 	@{ Kind = 'style-rule-17'; Pattern = '\b(?:' + $script:IntegerType + ')\s+[A-Za-z_]\w*\s*[={][^;]*\.size\s*\(\s*\)|\bfor\s*\(\s*(?:' + $script:IntegerType + ')\s+[A-Za-z_]\w*[^;]*;[^;]*\.size\s*\(\s*\)|\b(?!int64_t\b)(?:' + $script:IntegerType + ')\s+[A-Za-z_]\w*\s*[={][^;]*\bstd::ssize\s*\(|\bfor\s*\(\s*(?!int64_t\b)(?:' + $script:IntegerType + ')\s+[A-Za-z_]\w*[^;]*;[^;]*\bstd::ssize\s*\(' }
-	@{ Kind = 'style-rule-20'; Pattern = '^\s*(?:(?:static|inline|constexpr|const|thread_local|mutable)\s+)*(?:' + $script:ScalarType + ')\s+[A-Za-z_]\w*\s*\{' }
-	@{ Kind = 'style-rule-23'; Pattern = '\btypedef\b'; Except = $script:CommentOrQuote }
-	@{ Kind = 'style-rule-25'; Pattern = $script:CodePrefix + '\bconstexpr\b'; Except = '\b(?:static|inline)\b|\bif\s+constexpr\b|\bconstexpr\s+[^=;{]*[\w)*&>]\s*\(' }
+	@{ Kind = 'style-rule-20'; Pattern = '^\s*(?:(?:static|inline|constexpr|const|thread_local|mutable)\s+)*(?:' + $script:ScalarType + ')\s+[A-Za-z_]\w*\s*(?:=\s*)?\{|^\s*(?:(?:static|inline|constexpr|const|thread_local|mutable)\s+)*[A-Za-z_][\w:]*(?:<[^;]*>)?\s*\*+\s*(?:const\s+)?[A-Za-z_]\w*\s*(?:=\s*)?\{|(?<![\w:]|(?:->|:)\s*)(?:std::)?(?:' + $script:ScalarType + ')\s*\{' }
+	@{ Kind = 'style-rule-23'; Pattern = $script:CodePrefix + '\btypedef\b'; Except = '^\s*\*(?:\s|/|$)' }
+	@{ Kind = 'style-rule-25'; Pattern = $script:CodePrefix + '\bconstexpr\b'; Except = '\b(?:static|inline)\s+(?:(?:static|inline|const|thread_local)\s+)*constexpr\b|\bconstexpr\s+(?:static|inline)\b|\bif\s+constexpr\b|\bconstexpr\s+[^=;{]*[\w)*&>]\s*\(' }
 	@{ Kind = 'style-rule-26'; Pattern = '\busing\s+enum\b' }
 	@{ Kind = 'style-rule-30'; Pattern = '>\s+>' }
-	@{ Kind = 'style-rule-33'; Pattern = '\b(?:CHAR_BIT|MB_LEN_MAX|S?CHAR_MIN|S?CHAR_MAX|UCHAR_MAX|SHRT_MIN|SHRT_MAX|USHRT_MAX|INT_MIN|INT_MAX|UINT_MAX|LONG_MIN|LONG_MAX|ULONG_MAX|LLONG_MIN|LLONG_MAX|ULLONG_MAX)\b' }
+	@{ Kind = 'style-rule-33'; Pattern = '\b(?:CHAR_BIT|MB_LEN_MAX|S?CHAR_MIN|S?CHAR_MAX|UCHAR_MAX|SHRT_MIN|SHRT_MAX|USHRT_MAX|INT_MIN|INT_MAX|UINT_MAX|LONG_MIN|LONG_MAX|ULONG_MAX|LLONG_MIN|LLONG_MAX|ULLONG_MAX|_I(?:8|16|32|64)_(?:MIN|MAX)|_UI(?:8|16|32|64)_MAX)\b' }
 	@{ Kind = 'style-rule-34'; Pattern = $script:CodePrefix + '(?<![\w.''])\d{4,}(?![\d''])'; Except = '^\s*#\s*(?:pragma|line)\b|^\s*\*(?:\s|/|$)' }
-	@{ Kind = 'style-rule-35'; Pattern = '\b(?:(?:CreateDirectory|RemoveDirectory|DeleteFile|GetFileAttributes(?:Ex)?|SetFileAttributes|PathFileExists|FindFirstFile(?:Ex)?|FindNextFile)[AW]?|FindClose|_w?mkdir|_w?rmdir|_w?unlink|_w?access(?:_s)?|_w?stat(?:32|64|i64)?|_w?findfirst(?:32|64)?|_w?findnext(?:32|64)?|mkdir|rmdir|unlink|opendir|readdir)\s*\('; Except = $script:CommentOrQuote }
-	@{ Kind = 'style-rule-36'; Pattern = '^\s*(?:(?:static|inline|thread_local|volatile|mutable)\s+)*(?:const\s+)?(?:(?:' + $script:ScalarType + ')(?:\s*\*+\s*|\s+)|(?!(?:return|delete|co_return|throw|goto|case|else|do)\b)[A-Za-z_][\w:]*(?:<[^;]*>)?\s*\*+\s*)(?:const\s+)?[A-Za-z_]\w*\s*;' }
-	@{ Kind = 'style-rule-37'; Pattern = '\bstd::get\s*<\s*\d+\s*>\s*\(|\bstd::tie\s*\(' }
-	@{ Kind = 'style-rule-40'; Pattern = '[(,]\s*const\s+(?:(?:char|wchar_t)\s*\*|std::w?string\s*&)'; Except = '\bfor\s*\(\s*const\s+(?:(?:char|wchar_t)\s*\*|std::w?string\s*&)' }
-	@{ Kind = 'style-rule-44'; Pattern = '\bXM(?:Load|Store)Float(?:2|3|4|3x4|4x3|4x4)\s*\(' }
+	@{ Kind = 'style-rule-35'; Pattern = $script:CodePrefix + '\b(?:(?:CreateDirectory|RemoveDirectory|DeleteFile|GetFileAttributes(?:Ex)?|SetFileAttributes|PathFileExists|FindFirstFile(?:Ex)?|FindNextFile)[AW]?|FindClose|_w?mkdir|_w?rmdir|_w?unlink|_w?access(?:_s)?|_w?stat(?:32|64|i64)?|_w?findfirst(?:32|64)?|_w?findnext(?:32|64)?|_w?rename|_wremove|mkdir|rmdir|unlink|opendir|readdir)\s*\('; Except = '^\s*\*(?:\s|/|$)' }
+	@{ Kind = 'style-rule-36'; Pattern = '^\s*(?:(?:static|inline|thread_local|volatile|mutable)\s+)*(?:const\s+)?(?:(?:' + $script:ScalarType + ')(?:\s*\*+\s*|\s+)|(?!(?:return|delete|co_return|throw|goto|case|else|do)\b)[A-Za-z_][\w:]*(?:<[^;]*>)?\s*\*+\s*)(?:const\s+)?[A-Za-z_]\w*\s*;|^\s*extern\s+(?!"|template\b)[^;(]*;' }
+	@{ Kind = 'style-rule-37'; Pattern = '\bstd::get\s*<\s*\d+\s*>\s*\(|\bstd::tie\s*\(|&\s*[A-Za-z_]\w*\s*=\s*[^;]*\.(?:first|second)\s*;' }
+	@{ Kind = 'style-rule-40'; Pattern = '[(,]\s*(?:\[\[[^\]]*\]\]\s*)?(?:const\s+(?:(?:char|wchar_t)\s*\*|std::w?string\s*&)|(?:char|wchar_t)\s+const\s*\*|std::w?string\s+const\s*&)'; Except = '\bfor\s*\(\s*(?:const\s+(?:(?:char|wchar_t)\s*\*|std::w?string\s*&)|(?:char|wchar_t)\s+const\s*\*|std::w?string\s+const\s*&)' }
+	@{ Kind = 'style-rule-44'; Pattern = '\bXM(?:Load|Store)(?:Float(?:2|3|4|3x4|4x3|4x4)|Int(?:2|3|4))\s*\(' }
 	@{ Kind = 'style-rule-46'; Pattern = '\bXM\w*Est\s*\(' }
-	@{ Kind = 'style-rule-54'; Pattern = '^\s*(?:(?:static|inline|const|mutable)\s+)*Vk[A-Z]\w*\s+[A-Za-z_]\w*\s*(?:[=;{]|$)'; Except = '^\s*(?:(?:static|inline|const|mutable)\s+)*Vk([A-Z]\w*)\s+[A-Za-z_]\w*Vk\1\s*(?:[=;{]|$)' }
-	@{ Kind = 'style-rule-55'; Pattern = '^\s*enum\b(?!\s+(?:class|struct)\b)'; Except = $script:CommentOrQuote }
+	@{ Kind = 'style-rule-54'; Pattern = '^\s*(?:(?:static|inline|const|mutable)\s+)*Vk[A-Z]\w*\s+[A-Za-z_]\w*\s*(?:\[[^\]]*\]\s*)*(?:[=;{]|$)'; Except = '^\s*(?:(?:static|inline|const|mutable)\s+)*Vk([A-Z]\w*)\s+[A-Za-z_]\w*Vk\1s?\s*(?:\[[^\]]*\]\s*)*(?:[=;{]|$)' }
+	@{ Kind = 'style-rule-55'; Pattern = '^\s*enum\b(?!\s+(?:class|struct)\b)' }
 	@{ Kind = 'style-rule-66'; Pattern = '^\s*namespace\s*(?:\{.*)?$' }
+	@{ Kind = 'style-rule-43'; Pattern = $script:CodePrefix + '(?:\btypeid\s*\(|\bdynamic_cast\s*<)'; Except = '^\s*\*(?:\s|/|$)' }
 	# `Num` as its own word in an identifier, so Number and Enumerate stay clear; a name reached through ::, ->
 	# or . belongs to another API.
 	@{ Kind = 'style-rule-14'; Pattern = '(?<!(?:::|->|\.)\s*)\b(?:\w*[a-z0-9_])?Num(?![a-z])'; Except = $script:CommentOrQuote }
@@ -351,15 +350,18 @@ function Test-Rule51Line([string] $Path, [int] $Line, [string] $Text) {
 }
 
 function Test-CandidatePattern([string] $Path, [string] $Text) {
+	$kinds = [Collections.Generic.List[string]]::new()
 	foreach ($pattern in $script:ScannedPatterns) {
 		if ($Text -cnotmatch $pattern.Pattern) { continue }
 		if ($pattern.ContainsKey('Except') -and $Text -cmatch $pattern.Except) { continue }
 		# Rule 25 governs function scope and header global scope, so a column-0 constexpr in a .cpp file is a
 		# permitted namespace-scope form.
 		if ($pattern.Kind -ceq 'style-rule-25' -and $Path -cmatch '\.cpp$' -and $Text -cmatch '^constexpr\b') { continue }
-		return $pattern.Kind
+		# A .cpp extern variable needs its defining file and sharing files to judge, so the hand-read covers it.
+		if ($pattern.Kind -ceq 'style-rule-36' -and $Path -cnotmatch '\.h$' -and $Text -cmatch '^\s*extern\b') { continue }
+		$kinds.Add($pattern.Kind)
 	}
-	return $null
+	return , $kinds
 }
 
 try {
@@ -368,7 +370,7 @@ try {
 		Complete-SessionCandidates 2 'blocked' 'candidates.repository-root-invalid' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
 	}
 	if ($PSCmdlet.ParameterSetName -ceq 'WholeFile') {
-		# A residue kind such as log would otherwise hide a style kind on an existing line.
+		# Whole-file mode reports style kinds only.
 		$script:ScannedPatterns = @($script:CandidatePatterns | Where-Object { $_.Kind.StartsWith('style-rule-') })
 		$scannedLines = Get-FileLine $Path
 		$scope = "$(@($Path).Count) named C++ file(s)"
@@ -385,23 +387,25 @@ try {
 
 	$hits = [Collections.Generic.List[object]]::new()
 	foreach ($line in $scannedLines) {
-		$kind = if (Test-Rule61Line $line.Path $line.Line $line.Text) { 'style-rule-61' }
-		elseif (Test-Rule22Line $line.Path $line.Line $line.Text) { 'style-rule-22' }
-		elseif (Test-Rule59Line $line.Path $line.Line $line.Text) { 'style-rule-59' }
-		else { Test-CandidatePattern $line.Path $line.Text }
-		if ($null -eq $kind -and (Test-Rule62Line $line.Path $line.Line $line.Text)) { $kind = 'style-rule-62' }
-		if ($null -eq $kind -and (Test-Rule51Line $line.Path $line.Line $line.Text)) { $kind = 'style-rule-51' }
-		if ($null -eq $kind) { continue }
+		$kinds = [Collections.Generic.List[string]]::new()
+		if (Test-Rule61Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-61') }
+		if (Test-Rule22Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-22') }
+		if (Test-Rule59Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-59') }
+		$kinds.AddRange((Test-CandidatePattern $line.Path $line.Text))
+		if (Test-Rule62Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-62') }
+		if (Test-Rule51Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-51') }
+		if ($kinds.Count -eq 0) { continue }
 		$text = $line.Text.Trim()
 		if ($text.Length -gt $script:MaximumTextLength) { $text = $text.Substring(0, $script:MaximumTextLength) }
-		$hits.Add([ordered]@{ path = $line.Path; line = $line.Line; kind = $kind; text = $text })
+		foreach ($kind in $kinds) { $hits.Add([ordered]@{ path = $line.Path; line = $line.Line; kind = $kind; text = $text }) }
 	}
 	$sorted = [Collections.Generic.List[object]]::new($hits)
 	$sorted.Sort([Comparison[object]] {
 		param($left, $right)
 		$compare = [string]::CompareOrdinal($left.path, $right.path)
 		if ($compare -ne 0) { return $compare }
-		return $left.line - $right.line
+		if ($left.line -ne $right.line) { return $left.line - $right.line }
+		return [string]::CompareOrdinal($left.kind, $right.kind)
 	})
 
 	# Counts always describe the complete scan, never the truncated emission.

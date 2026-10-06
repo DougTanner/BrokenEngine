@@ -3,14 +3,13 @@
 namespace common
 {
 
-inline thread_local const char* gpLogDifferenceContext = "";
+inline constinit thread_local const char* gpLogDifferenceContext = "";
 
-struct ScopedLogDifferenceContext
+struct [[nodiscard]] ScopedLogDifferenceContext
 {
-	const char* pcPrevious = nullptr;
+	const char* pcPrevious = gpLogDifferenceContext;
 
 	ScopedLogDifferenceContext(const char* pcContext)
-	: pcPrevious(gpLogDifferenceContext)
 	{
 		gpLogDifferenceContext = pcContext;
 	}

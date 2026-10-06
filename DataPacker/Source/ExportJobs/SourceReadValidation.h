@@ -8,7 +8,7 @@ inline int64_t SourceFileSize(const std::filesystem::path& rPath, std::string_vi
 {
 	std::error_code fileSizeError;
 	uintmax_t uiFileSize = std::filesystem::file_size(rPath, fileSizeError);
-	if (fileSizeError || uiFileSize > static_cast<uintmax_t>(std::numeric_limits<std::streamoff>::max()))
+	if (fileSizeError || !std::in_range<std::streamoff>(uiFileSize))
 	{
 		throw std::runtime_error(std::format("{} invalid source file size", context));
 	}
@@ -44,7 +44,7 @@ inline void RequireSourceExtent(uintmax_t uiFileSize, uintmax_t uiOffset, uintma
 
 inline void ReadSourceBytes(std::istream& rStream, std::span<char> data, std::string_view context)
 {
-	if (data.size() > static_cast<uintmax_t>(std::numeric_limits<std::streamsize>::max()))
+	if (!std::in_range<std::streamsize>(data.size()))
 	{
 		throw std::runtime_error(std::format("{} source read size overflow", context));
 	}
@@ -63,7 +63,7 @@ inline void ReadSourceBytes(std::istream& rStream, std::span<char> data, std::st
 
 inline void SkipSourceBytes(std::istream& rStream, uintmax_t uiByteCount, std::string_view context)
 {
-	if (uiByteCount > static_cast<uintmax_t>(std::numeric_limits<std::streamoff>::max()))
+	if (!std::in_range<std::streamoff>(uiByteCount))
 	{
 		throw std::runtime_error(std::format("{} source seek size overflow", context));
 	}

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Frame/Collections/Collection.h"
+#include "Frame/GridCoord.h"
 
 namespace game
 {
@@ -93,7 +94,7 @@ struct ExplosionType
 	int64_t iWindRadialControllerTypeIndex = kiInvalidControllerType;
 
 	uint32_t uiBaseParticleCount = 0;
-	common::crc_t particleCrc = common::CrcConsteval("Textures\\Particles\\[BC4]Long\\5.png");
+	common::crc_t particleCrc = common::CrcConsteval(R"(Textures\Particles\[BC4]Long\5.png)");
 	uint32_t uiParticleColor = 0xFF0000FF;
 
 	float fParticlePositionJitter = 0.5f;
@@ -266,7 +267,8 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 		float fTimePercent = 1.0f;
 	};
 
-	static bool Spawn(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, const SpawnInfo& rSpawnInformation);
+	// coordinate is the cell rSpawnInformation.vecPosition is local to.
+	static bool Spawn(game::Frame& __restrict rFrame, GridCoord coordinate, std::chrono::duration<float> currentTime, const SpawnInfo& rSpawnInformation);
 };
 
 extern template struct Collection<ExplosionsInterpolate>;

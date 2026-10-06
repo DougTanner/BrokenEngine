@@ -129,11 +129,15 @@ static bool PublishManifestAndPack(const std::filesystem::path& rTemporaryManife
 	bool bManifestPublished = false;
 	// Empty means no prompt is pending; otherwise it is the sentence describing why publishing failed
 	std::string pendingFailure;
+	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE hHandle) noexcept
+	{
+		CloseHandle(hHandle);
+	})>;
 	while (true)
 	{
 		// Requesting DELETE access fails against a client or server already holding the pack share-read-only, so an
 		// already-running one is detected before the manifest publishes and the common case prompts with nothing torn yet.
-		std::unique_ptr<void, decltype(&CloseHandle)> pProbe(nullptr, &CloseHandle);
+		ScopedHandle pProbe(nullptr);
 		if (pendingFailure.empty() && std::filesystem::exists(rPackFile))
 		{
 			HANDLE hProbe = CreateFileW(rPackFile.native().c_str(), DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr);
@@ -207,11 +211,11 @@ static std::optional<int64_t> GetReadableFileSize(const std::filesystem::path& r
 	{
 		return std::nullopt;
 	}
-	if (uiFileSizeValue > std::numeric_limits<uint64_t>::max())
+	if (!std::in_range<uint64_t>(uiFileSizeValue))
 	{
 		return std::nullopt;
 	}
-	if (uiFileSizeValue > static_cast<uintmax_t>(std::numeric_limits<std::streamoff>::max()))
+	if (!std::in_range<std::streamoff>(uiFileSizeValue))
 	{
 		return std::nullopt;
 	}
@@ -244,7 +248,7 @@ static bool LoadPublishedManifestChunkTable(const std::filesystem::path& rManife
 	{
 		return false;
 	}
-	if (static_cast<uint64_t>(iManifestChunkCount) > static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
+	if (!std::in_range<size_t>(iManifestChunkCount))
 	{
 		return false;
 	}
@@ -684,7 +688,7 @@ static bool GenerateDataTypesHeader(const std::filesystem::path& rOutPath)
 	content << std::endl;
 	content << "} // namespace data" << std::endl;
 
-	return WriteIfChanged(content.str(), rOutPath, "DataTypes.h");
+	return WriteIfChanged(content.view(), rOutPath, "DataTypes.h");
 }
 
 static bool GenerateDataHeader(const std::filesystem::path& rOutPath)
@@ -701,7 +705,7 @@ static bool GenerateDataHeader(const std::filesystem::path& rOutPath)
 		content << "#include \"" << rEntry.headerFile << "\"" << std::endl;
 	}
 
-	return WriteIfChanged(content.str(), rOutPath, "Data.h");
+	return WriteIfChanged(content.view(), rOutPath, "Data.h");
 }
 
 bool MainThread(int64_t iArgumentCount, char* ppcArguments[], DataPackerRunSummary& rRunSummary)
@@ -844,7 +848,7 @@ static bool RunCommandWithExceptionHandling(int64_t iArgumentCount, char* ppcArg
 		{
 			.eSeverity = diagnostic::Severity::kError,
 			.title = "Data Packer - std::exception",
-			.message = message,
+			.message = std::move(message),
 			.eButtons = diagnostic::ButtonContract::kOk,
 			.eIcon = diagnostic::ModalIcon::kNone,
 		};

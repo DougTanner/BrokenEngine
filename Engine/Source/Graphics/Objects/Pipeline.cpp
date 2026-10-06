@@ -96,13 +96,10 @@ void Pipeline::Create(const PipelineInfo& rInfo)
 	}
 
 	mbPerCommandBuffer = mInfo.flags & kIndirectHostVisible;
-	for (const DescriptorInfo& rDescriptorInfo : mInfo.descriptorInfos)
+	mbPerCommandBuffer = std::ranges::any_of(mInfo.descriptorInfos, [](const DescriptorInfo& rDescriptorInfo)
 	{
-		if (rDescriptorInfo.flags & kPerCommandBufferUniformBuffers || rDescriptorInfo.flags & kPerCommandBufferStorageBuffers || rDescriptorInfo.flags & kGlobalLayoutUniformBuffers || rDescriptorInfo.flags & kMainLayoutUniformBuffers)
-		{
-			mbPerCommandBuffer = true;
-		}
-	}
+		return rDescriptorInfo.flags & kPerCommandBufferUniformBuffers || rDescriptorInfo.flags & kPerCommandBufferStorageBuffers || rDescriptorInfo.flags & kGlobalLayoutUniformBuffers || rDescriptorInfo.flags & kMainLayoutUniformBuffers;
+	}) || mbPerCommandBuffer;
 
 	// Bound descriptor entries by ShaderHeader::kiMaxDescriptorSetLayoutBindings; PipelineDescriptorWriter's scratch arrays use the same cap. A
 	// kModel entry expands into several writes, guarded by per-push cursor assertions.

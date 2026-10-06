@@ -78,14 +78,10 @@
 - F8 | `Engine/Source/Frame/Collision.h:115` | Rule 13 | Leave unchanged. rule edge case: Collision.cpp:621–625 relies on unsigned increment wrapping to zero after UINT32_MAX and clearing stored generations. Conversion to `int64_t` removes that wrap, while assignments to the unchanged uint32_t buffer at line 645 truncate and equality checks at line 641 compare against the untruncated counter, breaking pair deduplication.
 
 #### Engine/Source/Frame/FrameBase (out-of-bound)
-- F1 | `Engine/Source/Frame/FrameBase.h:100` | Rule 13 | Leave unchanged: conversion to `int64_t` requires renaming `kCollectionCount` -> `kiCollectionCount`, including declarations at lines 100/102 and both references at line 128; propagation requires editing excluded `.agents/skills/add-collection/references/worker.md:83`.
-- F2 | `Engine/Source/Frame/FrameBase.h:102` | Rule 13 | Leave unchanged: same required rename and excluded instruction reference as F1.
 - F3 | `Engine/Source/Frame/FrameBase.h:145` | Rule 13 | Leave unchanged: deterministic frame counter is serialized at FrameBase.cpp:115/134/153 and CRC-covered at FrameBase.cpp:80; its type and unsigned increment behavior are excluded.
 - F4 | `Engine/Source/Frame/FrameBase.h:147` | Rule 13 | Leave unchanged: frame-state counter is serialized at FrameBase.cpp:117/136; frame layout and serialized state are excluded.
 - F5 | `Engine/Source/Frame/FrameBase.h:148` | Rule 13 | Leave unchanged: frame-state counter is serialized at FrameBase.cpp:118/137; frame layout and serialized state are excluded.
 - F6 | `Engine/Source/Frame/FrameBase.h:156` | Rule 13 | Leave unchanged: reference binds directly to the excluded frame counters at FrameBase.h:222/228 and Collections/Sounds/SoundsUpdate.cpp:39; changing it to `int64_t&` requires changing those counters and changes unsigned increment behavior at line 158.
-- F7 | `Engine/Source/Frame/FrameBase.h:190` | Rule 13 | Leave unchanged: conversion to `int64_t` requires renaming `kCollectionCount` -> `kiCollectionCount`, including declarations at lines 190/192 and both references at line 207; propagation requires editing excluded `.agents/skills/add-collection/references/worker.md:83`.
-- F8 | `Engine/Source/Frame/FrameBase.h:192` | Rule 13 | Leave unchanged: same required rename and excluded instruction reference as F7.
 
 #### Engine/Source/Frame/FrameRegistry (out-of-bound)
 - F4 | `Engine/Source/Frame/FrameRegistry.h:55` | Rule 13 | `std::span<uint16_t> subscriberCounts {};` belongs to byte-backed scratch storage; widening changes the excluded layout.
@@ -146,9 +142,6 @@
 #### Engine/Source/Graphics/Managers/TextureManager (out-of-bound)
 - F6 | `Engine/Source/Graphics/Managers/TextureManager.cpp:783` | Rule 13 | `iWidth` crosses the GPU push-constant layout boundary through `std::bit_cast<float>`; widening breaks its four-byte representation. Type unchanged; initializer identifier updated under F4.
 - F7 | `Engine/Source/Graphics/Managers/TextureManager.cpp:784` | Rule 13 | `iHeight` crosses the GPU push-constant layout boundary through `std::bit_cast<float>`; widening breaks its four-byte representation. Type unchanged; initializer identifier updated under F5.
-
-#### Engine/Source/Graphics/Render/MainUniforms (out-of-bound)
-- F1 | `Engine/Source/Graphics/Render/MainUniforms.cpp:572` | Rule 13 | rule edge case: persistent `++siRenderCount` has no bound or reset; widening to `int64_t` then casting into GPU field `int32_t iRenderNumber` cannot satisfy the required always-fits narrowing check after INT32_MAX renders.
 
 #### Engine/Source/Graphics/Screenshot (out-of-bound)
 - F11 | `Engine/Source/Graphics/Screenshot.cpp:365` | Rule 13 | rule edge case: changing `std::numeric_limits<uint16_t>::max()` to `int64_t` changes the UNORM16 normalization divisor and encoded pixel values.
@@ -327,9 +320,6 @@
 #### Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenBase (out-of-bound)
 - F5 | `Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenBase.h:54` | Rule 13 | Leave unchanged: this is explicit padding in the verbatim-persisted `TweakSectionState`, whose size is asserted at h:59. Widening it would change serialized layout and bytes.
 
-#### Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenLighting (out-of-bound)
-- `Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenLighting.cpp:215` | Rule 13 | Reverted to `int iOffset`. rule edge case: `RenderLightingSection`'s `std::snprintf` offset accumulator, widened to `int64_t` and passed as `sizeof(pcBuffer) - static_cast<size_t>(iOffset)` at :219 and :221, makes Client Release code analysis report C6386 (2049 bytes into the 2,048-byte buffer) at :221, which fails the build as an error. Runtime behavior does not change, because `CurveData::kiMaximumControlPoints` (16) keeps the formatted text under the buffer size.
-
 #### Engine/Source/Ui/GameSettings (out-of-bound)
 - F1 | `Engine/Source/Ui/GameSettings.cpp:16` | Rule 13 | `iLanguage` is serialized with asserted offset and size; conversion to `int64_t` would change serialized bytes.
 - F2 | `Engine/Source/Ui/GameSettings.cpp:20` | Rule 13 | `uiOpaqueUi` is serialized with asserted offset and size; conversion to `int64_t` would change serialized bytes.
@@ -452,7 +442,6 @@
 #### DataPacker/Source/ExportJobs/ExportCubemapIbl (out-of-bound)
 - F4 | `DataPacker/Source/ExportJobs/ExportCubemapIbl.cpp:331` | Rule 13 | Half-float elements cross the raw-byte serialization boundary; changing their type changes intermediate-file layout.
 - F8 | `DataPacker/Source/ExportJobs/ExportCubemapIbl.cpp:398` | Rule 13 | Half-float elements cross the raw-byte serialization boundary; changing their type changes intermediate-file layout.
-- F13 | `DataPacker/Source/ExportJobs/ExportCubemapIbl.cpp:617` | Rule 13 | rule edge case: `hardware_concurrency()` is not bounded to 255; existing conversion truncates modulo 256. Widening requires retaining early narrowing, while clamping changes threading.
 
 #### DataPacker/Source/ExportJobs/ExportIsland (out-of-bound)
 - F1 | `DataPacker/Source/ExportJobs/ExportIsland.cpp:20` | Rule 13 | Its elements are copied directly into the `.pack` payload at line 697; changing their width changes serialized bytes.
@@ -497,9 +486,6 @@
 #### DataPacker/Source/ExportJobs/ExportShader (out-of-bound)
 - F5 | `DataPacker/Source/ExportJobs/ExportShader.cpp:248` | Rule 13 | Leave unchanged: line 320 copies these elements directly into `.pack` payload bytes. Changing their width changes serialized layout; `Common/DataFile.h` computes offsets using `sizeof(uint32_t)`, and `PipelineManager.cpp` reads them as `const uint32_t*`.
 
-#### DataPacker/Source/ExportJobs/Island/BakeIslandIntermediates (out-of-bound)
-- F1 | `DataPacker/Source/ExportJobs/Island/BakeIslandIntermediates.cpp:173` | Rule 13 | rule edge case: `get<int64_t>()` followed by `static_cast<int32_t>(iSeed)` at line 270 narrows an unrestricted JSON seed; no range check proves the value always fits, as the sweep requires.
-
 #### DataPacker/Source/ExportJobs/Island/BakeIslandIntermediatesInternal (out-of-bound)
 - F3 | `DataPacker/Source/ExportJobs/Island/BakeIslandIntermediatesInternal.h:93` | Rule 13 | Leave unchanged: the elements cross a binary layout boundary. `BakeRoute.cpp:369` reads raw `AmbientOcclusion.r16` bytes into this buffer; `ProcessBakedRegion.cpp:187–190` copies and writes those elements as 16-bit pixels.
 - F4 | `DataPacker/Source/ExportJobs/Island/BakeIslandIntermediatesInternal.h:100` | Rule 13 | Leave unchanged: the elements cross a binary layout boundary. `ProcessBakedRegion.cpp:349` passes this buffer to `WriteMeshProcessed`, which writes its raw 32-bit elements into `MeshProcessed.bin` at line 272.
@@ -541,12 +527,10 @@
 - `DataPacker/Source/ExportJobs/Scene/SceneSkeletonLoader.cpp:137` | Rule 13 | Reverted to `size_t`. rule edge case: `LoadSkeletonData`'s inverse-bind span guards (`count > SIZE_MAX / kuiMatrixSize` at :138, `byteOffset > SIZE_MAX - bufferView.byteOffset` at :161) bound products and sums of tinygltf `size_t` fields. In `int64_t`, `count * kuiMatrixSize` and the offset sum overflow as signed values for counts or offsets that the unsigned checks handle.
 
 #### DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader (out-of-bound)
-- F2 | `DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.cpp:23` | Rule 13 | Reclassified local: rule edge case: `ByteStride()` can return `-1`; unsigned division by `sizeof(T)` followed by the existing `int` cast yields `-1` for the instantiated types, whereas the proposed `int64_t` cast yields a huge positive stride.
 - F10 | `DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.cpp:82` | Rule 17 | Reclassified local: rule edge case: replacing `static_cast<int>(rMaterials.size())` removes existing narrowing above `INT_MAX`, changing material-map values and subsequent index lookup behavior; no count bound establishes equivalence.
 - F13 | `DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.cpp:113` | Rule 17 | Reclassified local: rule edge case: widening `uiVertexStart` removes existing 32-bit truncation and unsigned wrap in `uiVertexStart + remap.at(j)`, changing vertex placement or serialized indices beyond the 32-bit range.
 - F14 | `DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.cpp:181` | Rule 13 | `std::vector<uint32_t> remap` crosses meshoptimizer’s fixed `unsigned int*` and `const unsigned int*` layout boundaries.
 - F16 | `DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.cpp:196` | Rule 13 | `std::vector<uint32_t>& rIndexBuffer` refers to fixed-width meshoptimizer buffers and the serialized model index stream.
-- F18 | `DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.cpp:208` | Rule 17 | Reclassified local: rule edge case: the accessor count is unvalidated here; signed addition of a nonempty buffer size and a count near `INT64_MAX` can overflow, replacing defined unsigned arithmetic and reserve failure with undefined behavior.
 - F30 | `DataPacker/Source/ExportJobs/Scene/SceneVerticesLoader.h:18` | Rule 13 | `std::vector<uint32_t> indexBuffer` crosses meshoptimizer’s fixed-width buffer boundary and feeds the serialized model index stream.
 
 #### DataPacker/Source/ExportJobs/SourceReadValidation (out-of-bound)

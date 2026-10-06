@@ -822,8 +822,10 @@ bool GameBase::HandleDeferredSwapchain()
 	// Successful recreation clears mbSwapchainRecreateDeferred and resets meDestroyType through Destroy. Every deferred path sets the flag, including after Destroy has torn down the swapchain, so acquire must wait until the flag clears.
 	if (!gpGraphics->mbSwapchainRecreateDeferred)
 	{
+		gpProfileManager->DiscardSkippedFrameSamples();
 		gpSwapchainManager->AcquireNextImage();
 		mMinimizedThrottleLast.reset(); // Recreate resumed: drop the throttle timestamp so a fresh minimize starts clean.
+		gpGraphics->mRenderFrameTimer.Reset(); // The next frame delta steps wind, so it must not span the skipped interval.
 	}
 	else
 	{
@@ -880,6 +882,10 @@ void GameBase::Render()
 
 	if (HandleDeferredSwapchain())
 	{
+		// RenderGlobal is skipped, so drop this frame's staged spawns rather than letting them pile up past the staging limit.
+		gpParticleManager->DiscardStagedSpawns();
+		// RenderMainPresentAcquire is skipped too, so signal the upload thread here to keep transfer uploads moving while the swapchain is deferred.
+		gpTextureUploadManager->SignalFrame();
 		return;
 	}
 

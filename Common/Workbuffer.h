@@ -16,8 +16,6 @@ public:
 	// The two frame-bookkeeping reservations are 64x their pre-sized depth: growth past that is a runaway, not an under-size.
 	explicit Workbuffer(StableVector<std::byte>& rBuffer)
 	: mBuffer(rBuffer)
-	, mSavedBase(64 * 64)
-	, mSavedSize(64 * 64)
 	{
 		mSavedBase.Resize(64); // Pre-sized for the deepest arena nesting source structure ever reaches (see RawPush).
 		mSavedSize.Resize(64); // Parallel to mSavedBase: saves each parent frame's exact pre-push miSize for Pop to restore.
@@ -49,12 +47,14 @@ public:
 	template <typename T>
 	const T* Data() const
 	{
+		static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable");
 		ASSERT(miDepth > 0);
 		return reinterpret_cast<const T*>(mBuffer.Data() + miBase);
 	}
 	template <typename T>
 	T* Data()
 	{
+		static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable");
 		ASSERT(miDepth > 0);
 		return reinterpret_cast<T*>(mBuffer.Data() + miBase);
 	}
@@ -93,6 +93,7 @@ public:
 	template<typename T>
 	std::span<const T> Span() const
 	{
+		static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable");
 		ASSERT(miDepth > 0);
 		return {reinterpret_cast<const T*>(mBuffer.Data() + miBase), static_cast<size_t>(miSize - miBase) / sizeof(T)};
 	}
@@ -100,6 +101,7 @@ public:
 	template<typename T>
 	std::span<T> Span()
 	{
+		static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable");
 		ASSERT(miDepth > 0);
 		return {reinterpret_cast<T*>(mBuffer.Data() + miBase), static_cast<size_t>(miSize - miBase) / sizeof(T)};
 	}
@@ -129,6 +131,7 @@ private:
 	template<typename T>
 	T RawPushBuffer(int64_t iSizeInBytes)
 	{
+		static_assert(alignof(std::remove_pointer_t<T>) <= 16, "Workbuffer allocations require alignment no greater than 16 bytes");
 		if (miDepth == mSavedBase.Size()) [[unlikely]]
 		{
 			// See RawPush: pre-sized for max nesting; DEBUG_BREAK flags under-sizing, growth commits more of the reservation in place.
@@ -174,8 +177,8 @@ private:
 	int64_t miDepth = 0;
 	int64_t miLastPushBufferSize = 0;
 	int64_t miLastPushBufferDepth = -1;
-	StableVector<int64_t> mSavedBase;
-	StableVector<int64_t> mSavedSize;
+	StableVector<int64_t> mSavedBase {64 * 64};
+	StableVector<int64_t> mSavedSize {64 * 64};
 
 	friend class ScopedWorkbufferArena;
 	template<typename> friend class ScopedWorkbufferAllocation;

@@ -23,10 +23,19 @@ static float AdmitSpawnTimer(float fSpawnTimer)
 	return fSpawnTimer;
 }
 
+template <typename... TS>
+static consteval int64_t SumVersions(engine::TypeList<TS...>)
+{
+	return (0i64 + ... + TS::kiVersion);
+}
+
+using EngineInterpolateTypes = engine::TupleToTypeList_t<decltype(std::declval<engine::FrameInterpolateBase&>().ServerCollections())>;
+using EnginePostRenderTypes = engine::TupleToTypeList_t<decltype(std::declval<engine::FramePostRenderBase&>().ServerCollections())>;
+
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 133 + engine::kiNavDataVersion + BlastersInterpolate::kiVersion + BlastersPostRender::kiVersion + MissilesInterpolate::kiVersion + MissilesPostRender::kiVersion + PlayersInterpolate::kiVersion + PlayersPostRender::kiVersion + SpaceshipsInterpolate::kiVersion + SpaceshipsPostRender::kiVersion + engine::ExplosionsInterpolate::kiVersion + engine::PushersInterpolate::kiVersion + engine::PushersPostRender::kiVersion + engine::ExplosionsPostRender::kiVersion;
+const int64_t Frame::kiVersion = 133 + engine::kiNavDataVersion + PlayersInterpolate::kiVersion + PlayersPostRender::kiVersion + SumVersions(GameInterpolateTypes {}) + SumVersions(GamePostRenderTypes {}) + SumVersions(EngineInterpolateTypes {}) + SumVersions(EnginePostRenderTypes {});
 
 FrameInterpolate::FrameInterpolate()
 : pPlayers(std::make_unique<PlayersInterpolate>())
@@ -648,8 +657,7 @@ void FrameInterpolate::Write(std::ostream& rStream) const
 {
 	static_cast<const engine::FrameInterpolateBase&>(*this).Write(rStream);
 
-	common::Write(rStream, fSpawnTimer);
-	common::Write(rStream, gameFlags);
+	engine::FrameValuesWrite(rStream, *this, Values());
 
 	engine::CollectionWrite(rStream, *pPlayers, pPlayers->Members());
 
@@ -660,9 +668,8 @@ void FrameInterpolate::Read(std::istream& rStream)
 {
 	static_cast<engine::FrameInterpolateBase&>(*this).Read(rStream);
 
-	common::Read(rStream, fSpawnTimer);
+	engine::FrameValuesRead<false>(rStream, *this, Values());
 	fSpawnTimer = AdmitSpawnTimer(fSpawnTimer);
-	common::Read(rStream, gameFlags);
 
 	engine::CollectionRead(rStream, *pPlayers, pPlayers->Members());
 
@@ -673,8 +680,7 @@ void FrameInterpolate::ServerRead(std::istream& rStream)
 {
 	static_cast<engine::FrameInterpolateBase&>(*this).ServerRead(rStream);
 
-	common::Read(rStream, fSpawnTimer);
-	common::Read(rStream, gameFlags);
+	engine::FrameValuesRead<true>(rStream, *this, Values());
 
 	engine::SharedCollectionRead(rStream, *pPlayers);
 
@@ -713,8 +719,7 @@ void FramePostRender::Write(std::ostream& rStream) const
 {
 	static_cast<const engine::FramePostRenderBase&>(*this).Write(rStream);
 
-	enemyAlignment.Write(rStream);
-	playerAlignment.Write(rStream);
+	engine::FrameValuesWrite(rStream, *this, Values());
 
 	engine::CollectionWrite(rStream, *pPlayers, pPlayers->Members());
 
@@ -725,8 +730,7 @@ void FramePostRender::Read(std::istream& rStream)
 {
 	static_cast<engine::FramePostRenderBase&>(*this).Read(rStream);
 
-	enemyAlignment.Read(rStream);
-	playerAlignment.Read(rStream);
+	engine::FrameValuesRead<false>(rStream, *this, Values());
 
 	engine::CollectionRead(rStream, *pPlayers, pPlayers->Members());
 
@@ -737,8 +741,7 @@ void FramePostRender::ServerRead(std::istream& rStream)
 {
 	static_cast<engine::FramePostRenderBase&>(*this).ServerRead(rStream);
 
-	enemyAlignment.Read(rStream);
-	playerAlignment.Read(rStream);
+	engine::FrameValuesRead<true>(rStream, *this, Values());
 
 	engine::SharedCollectionRead(rStream, *pPlayers);
 

@@ -31,6 +31,7 @@ Update Frame Update Pipeline (`../../../Documents/Architecture/FrameUpdatePipeli
 
 - `Collections()` order is a dependency order, not just a type list. A producer must precede an owned consumer; Explosions before SmokeTrails is the live example. Tuple-size and client/server type checks do not verify this ordering.
 - `Write()`/`Read()` walk full `Collections()` and are build-local. Cross-build server snapshots use `ServerRead()` with `ServerCollections()` and shared members. Preserve tuple order, type parity, and member wire order together.
+- A frame-wide value missing from its frame struct's `Values()` is never persisted. `Crcs()` and `LogDifferences()` list the values other than the `kbClientOnlyValue` ones by hand and change together with the list.
 - Collection-level SOA, initialization, ID-map, count, and CRC rules are authoritative in Collections (`Collections/AGENTS.md`).
 
 ## Terrain and Navigation

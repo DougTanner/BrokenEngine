@@ -49,6 +49,24 @@ Use the following rules for C++ code
 
 5. Use RAII for allocations and locking: std::unique_ptr<game::Frame> mpCurrentFrame;
 
+	A scope-guard type is [[nodiscard]] and noncopyable:
+
+	struct [[nodiscard]] ScopedSuppressAllocationTracking
+	{
+		ScopedSuppressAllocationTracking();
+		ScopedSuppressAllocationTracking(const ScopedSuppressAllocationTracking&) = delete;
+		ScopedSuppressAllocationTracking& operator=(const ScopedSuppressAllocationTracking&) = delete;
+		~ScopedSuppressAllocationTracking();
+	};
+
+	A std::unique_ptr custom deleter is a captureless lambda type, constructed from the handle alone. Keep it to .cpp files and function scope, because each translation unit gets a distinct closure type:
+
+	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE hHandle) noexcept
+	{
+		CloseHandle(hHandle);
+	})>;
+	ScopedHandle pProcess(processInformation.hProcess);
+
 6. Features are toggled via `inline constexpr bool kb*` variables in Pch.h (e.g., kbLogging, kbRecording). Use `if constexpr` for conditional compilation. Avoid using configuration differences directly (BT_DEBUG vs. BT_RELEASE):
 
 	if constexpr (kbLogging)
@@ -64,8 +82,9 @@ Use the following rules for C++ code
 
 8. Use i/j/k variable names in for loops, but prefer range-based for loop when possible. When a counter is the zero-based ordinal of every visited element, std::views::enumerate with a structured binding is recommended over a counter initializer statement, which remains allowed; the element's reference and constness come from the underlying range, so enumerate a const range for read-only access. If any other counter variable is required with a range-based for loop, use the C++20 syntax to include an initializer statement. Use "it" for iterators.
 
-	for (int64_t i = 0; i < std::ssize(mIslands); ++i)
+	for (const Island& rIsland : mIslands)
 	for (auto [i, rMember] : std::views::enumerate(pFleet->members))
+	for (int64_t i = 0; i < std::ssize(mIslands); ++i)  // only when i also indexes another container, runs in reverse or over part of the range, or the body resizes mIslands
 
 9. Exceptions are for fatal errors only (things that would cause the program to crash), not control flow. Use standard-library exception types by default. Define a custom exception only when it adds useful functionality, such as concrete data or behavior; do not add an empty derived type merely to rename or categorize a failure.
 
@@ -104,6 +123,7 @@ IMPORTANT do not use auto in range-based for loops, except for the structured bi
 	Write/assign: map.insert_or_assign(key, value)
 	Create-then-use: map.try_emplace(key).first->second
 	Ensure existence: map.try_emplace(key);
+	Test membership: map.contains(key)
 
 	Access std::vectors with .at(): mIslands.at(0).quad
 
@@ -152,17 +172,23 @@ IMPORTANT do not use auto in range-based for loops, except for the structured bi
 
 31. Use static_assert instead of runtime assert whenever possible: static_assert(std::chrono::high_resolution_clock::is_steady);
 
+	static_assert(std::is_trivially_copyable_v<T>);  // a template that copies a T as raw bytes
+	static_assert(decltype(mbFlag)::is_always_lock_free);  // an atomic that must be lock-free
+
 32. Use std::unordered_map instead of std::map: std::unordered_map<common::crc_t, Texture> mTextureMap;
 
 33. Do not use any constants from limits.h, instead use std::numeric_limits: std::numeric_limits<float>::max()
+	For a mixed-sign integer comparison or a "fits in T" check, use std::cmp_equal, std::cmp_less, etc. and std::in_range<T>(v) instead of a sign guard plus cast: return std::cmp_equal(uiValue, iExpected); if (std::in_range<uint32_t>(iProcessId))
 
 34. Use digit separators for large numbers: int64_t iOneMillion = 1'000'000;
 
 35. Use the file system library std::filesystem
 
 36. Always initialize variables (unless it is a class with a constructor). Use inline variables with initializers in header (both globals and class members). Do not initalize class member variables in the .cpp file.: bool mbQuit = false;
+	A mutable global that must be initialized before dynamic initialization runs (logging, allocation tracking, crash and exception handlers) is constinit: static constinit std::atomic<bool> sbLogAlive = false;
 
 37. Use structured bindings for multiple return from functions with std::tuple<>: auto [bMultisampling, bPrevious, bChanged] = gMultisampling.Changed<bool>();
+	Also use one instead of separate .first and .second reference aliases of the same pair: const auto& [rCoordinate, rUpdateData] = rGridUpdate;
 
 38. Use structured bindings in range-based for loops over associative containers (std::map, std::unordered_map)
 
@@ -176,7 +202,7 @@ IMPORTANT do not use auto in range-based for loops, except for the structured bi
 40. Use std::string_view or std::wstring_view instead of "const char*" or std::string& or std::wstring& parameters into functions; a "const char*" or "const wchar_t*" parameter stays when a caller can pass null or when its value reaches an API that needs a null-terminated string: void UpdateTextArea(TextAreas eTextArea, std::string_view pcCharacters); bool BeginSubtab(const char* pcLabel, int64_t iSection, int64_t iTab);
 
 41. Explicitly use std:: namespace, do not `using namespace std;`: std::vector, std::string, std::unordered_map
-NOTE: The following global namespaces are allowed: `using namespace DirectX;`
+NOTE: The following global namespaces are allowed: `using namespace DirectX;`. `using namespace std::chrono_literals;` is allowed at any scope, because rule 12's duration suffixes need it.
 
 42. Use designated initializers for struct initializers: LazyChunk { .location = loc, .header = chunkHeader, } Exception: A derived aggregate with a single public nonvirtual base and no direct instance members may initialize that base from an existing value of the base type: Derived message {fields};. Keep designated initialization for the prepared base value.
 
@@ -272,7 +298,11 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 
 52. Put a space before "{}" universal initializers, ex: Uuid uuid {}; XMFLOAT2 f2MousePosition {};
 
-53. Multiple .emplace_back() or .push_back() calls on a std::vector should be preceeded by .reserve() to avoid multiple reallocations and destructor calls
+53. Multiple .emplace_back() or .push_back() calls on a std::vector should be preceeded by .reserve() to avoid multiple reallocations and destructor calls. Append a whole range with .append_range(), and a few fixed values with one initializer-list insert. When the new element is used right away, take the reference emplace_back returns instead of calling .back():
+
+	arguments.append_range(rArguments);
+	rMeshPositions.insert(rMeshPositions.end(), {fX, fY, fZ});
+	StaticVoice& rNewVoice = mVoices.emplace_back(pVoice, id, fSoundVolume, fPitch, fFadeOutTime, vecPosition, vecVelocity, uiCrc);
 
 54. Vulkan type (any Vk* type) class member variables end with Vk{TypeName} suffix: VkCommandBuffer mGlobalVkCommandBuffer = VK_NULL_HANDLE;
 
@@ -297,11 +327,6 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 
 59. Indent "case" statements one level from their "switch":
 
-60. Gate std::memcpy size on the destination, not the source. If sizes differ, use std::min(sizeof(source), sizeof(dest)):
-
-	std::memcpy(&dest, &source, std::min(sizeof(source), sizeof(dest)));
-
-
 	switch (eState)
 	{
 		case State::kIdle:
@@ -309,6 +334,14 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`
 		case State::kRunning:
 			break;
 	}
+
+60. Gate std::memcpy size on the destination, not the source. If sizes differ, use std::min(sizeof(source), sizeof(dest)):
+
+	std::memcpy(&dest, &source, std::min(sizeof(source), sizeof(dest)));
+
+	A same-type array copy uses std::copy; memcpy remains for byte copies:
+
+	std::copy(std::begin(miActiveSubtab), std::end(miActiveSubtab), std::begin(rState.iActiveSubtab));
 
 61. "if" and "else" bodies always use curly braces, even for a single statement (braces per rule 2):
 
@@ -405,3 +438,25 @@ What a comment should say, in the fewest sentences that carry it: an invariant, 
 	iX = std::clamp(iX, 0i64, iMaximum);
 	uint64_t uiBit = 1ui64 << iIndex;
 	kMouseButtonLeft = 1ui32 << 0,
+
+69. Express intent with a named check instead of a comparison or a hand-written loop whose only job is that search:
+
+	if (filenameLower.contains("readme"))  // not filenameLower.find("readme") != std::string::npos
+	if (std::ranges::contains(rRuntime.mDesiredCoordinates, coordinate))  // not std::ranges::find(...) != rRuntime.mDesiredCoordinates.end()
+	return std::ranges::any_of(rPlan.dependencies, [&rPlans](const std::wstring& rDependency)
+	{
+		return rPlans.contains(rDependency);
+	});
+
+	The same goes for std::ranges::all_of, none_of, equal, and find_last_if.
+
+	Not when the receiver has no contains member, the find has a start position, or the found position or iterator is used afterwards, as in if (auto it = m.find(k); it != m.end()).
+
+70. Use std::unreachable() instead of a dead fallback return after ASSERT(false):
+
+	default:
+		ASSERT(false);
+		std::unreachable();
+
+71. Use a raw string literal for a string with several backslashes: if (finalPath.starts_with(LR"(\\?\UNC\)"))
+	Not when the text needs an escape a raw literal cannot spell (\0, \x..), or a \n or \t whose raw form would need a literal line break or tab.

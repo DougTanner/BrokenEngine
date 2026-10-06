@@ -170,9 +170,9 @@ void Islands::WriteMeshIndirect(int64_t iTemplate, int64_t iIndexOffset, int64_t
 	ASSERT(iTemplate >= 0 && iTemplate < miTemplateCount);
 	ASSERT(iIndexOffset % static_cast<int64_t>(sizeof(uint32_t)) == 0);
 	ASSERT(iVertexOffset % static_cast<int64_t>(2 * sizeof(float)) == 0);
-	for (int64_t i = 0; i < kiMaxFramebuffers; ++i)
+	for (VkDrawIndexedIndirectCommand* pVkIndirect : mppIslandsIndirectMappedVkDrawIndexedIndirectCommands)
 	{
-		VkDrawIndexedIndirectCommand& rVkIndirect = mppIslandsIndirectMappedVkDrawIndexedIndirectCommands.at(i)[iTemplate];
+		VkDrawIndexedIndirectCommand& rVkIndirect = pVkIndirect[iTemplate];
 		rVkIndirect.indexCount = static_cast<uint32_t>(iIndexCount);
 		rVkIndirect.firstIndex = static_cast<uint32_t>(iIndexOffset / static_cast<int64_t>(sizeof(uint32_t)));
 		rVkIndirect.vertexOffset = static_cast<int32_t>(iVertexOffset / static_cast<int64_t>(2 * sizeof(float)));
@@ -295,7 +295,7 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 		{
 			// Placement indices must stay below kiMaxActivePlacements to keep writes within the shared arena.
 			ASSERT(false);
-			return;
+			std::unreachable();
 		}
 
 		shaders::AxisAlignedQuadLayout& rQuad = pStorageBufferQuads[iStorageBufferIndex];

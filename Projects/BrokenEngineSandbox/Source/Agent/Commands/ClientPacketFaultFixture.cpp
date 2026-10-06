@@ -70,7 +70,7 @@ void CommandClientPacketFaultFixture([[maybe_unused]] const nlohmann::json& rPar
 
 		std::vector<uint8_t> packet = {static_cast<uint8_t>(engine::PacketType::kServerCoordinateFullState), 0, 0};
 
-		rResult["case"] = caseName;
+		rResult["case"] = std::move(caseName);
 		rResult["type"] = packet.front();
 		rResult["size"] = std::ssize(packet);
 		rResult["armed"] = true;

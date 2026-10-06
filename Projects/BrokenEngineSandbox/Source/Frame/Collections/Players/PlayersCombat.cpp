@@ -440,7 +440,7 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 	}
 }
 
-void PlayersPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict rFrame)
+void PlayersPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict rFrame, engine::GridCoord emitterCoordinate)
 {
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
@@ -464,7 +464,7 @@ void PlayersPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict 
 		float fAdjustedPercent = (std::pow((1.0f - fPercent) + 1.0f, kfDeathRadialPower) - 1.0f) * kfExplosionsRadius;
 		vecJitteredPosition = XMVectorMultiplyAdd(vecJitteredDirection, XMVectorReplicate(fAdjustedPercent), vecJitteredPosition);
 
-		engine::ExplosionsPostRender::Spawn(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime),
+		engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime),
 		{
 			.iTypeIndex = PlayersInterpolate::siExplosionTypeIndex,
 			.vecPosition = vecJitteredPosition,

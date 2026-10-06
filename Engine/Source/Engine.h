@@ -52,7 +52,7 @@
 
 #include "Graphics/Debug/DebugRender.h"
 
-// Audio (StaticVoice/StreamingVoice headers deliberately not aggregated)
+// Audio
 #include "Audio/AudioUtility.h"
 #include "Audio/AudioManager.h"
 

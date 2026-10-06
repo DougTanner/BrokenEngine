@@ -366,7 +366,8 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 			pRenderDocApi->GetCapture(static_cast<uint32_t>(i), capturePath.data(), &uiPathLength, nullptr);
 			capturePath.resize(uiPathLength > 0 ? uiPathLength - 1 : 0);
 
-			if (!std::filesystem::exists(std::filesystem::path(reinterpret_cast<const char8_t*>(capturePath.c_str()))))
+			std::u8string capturePathUtf8(capturePath.begin(), capturePath.end());
+			if (!std::filesystem::exists(std::filesystem::path(capturePathUtf8)))
 			{
 				throw std::runtime_error("renderdoc_capture: capture file missing");
 			}
@@ -846,7 +847,7 @@ static void BeginScriptAndDefer(const engine::AgentScript& rScript, bool bDescri
 		throw std::runtime_error("busy");
 	}
 
-	engine::gpAgentCommandServer->DeferResponse([bDescribeUiAfter, bLabelBased, bHasWindow, errorWindow]() -> std::optional<nlohmann::json>
+	engine::gpAgentCommandServer->DeferResponse([bDescribeUiAfter, bLabelBased, bHasWindow, errorWindow = std::move(errorWindow)]() -> std::optional<nlohmann::json>
 	{
 		engine::AgentScriptStatus eStatus = engine::gpAgentInput->meStatus;
 		if (eStatus == engine::AgentScriptStatus::kPending)
@@ -892,6 +893,16 @@ static void BeginScriptAndDefer(const engine::AgentScript& rScript, bool bDescri
 	});
 }
 
+// Label-based scripts act only through ImGui and the published registry, which a non-rendering client never updates,
+// so they would settle on a frozen snapshot and report success for input ImGui never received.
+static void ThrowIfClientNotRendering()
+{
+	if (IsIconic(engine::gpGraphics->mWindowHandle) != FALSE || engine::gpGraphics->mbSwapchainRecreateDeferred)
+	{
+		throw std::runtime_error("client is not rendering (minimized or swapchain recreate deferred); restore with window_state {\"minimized\":false}");
+	}
+}
+
 static void CommandDescribeUi([[maybe_unused]] const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	rResult = BuildDescribeUi();
@@ -907,6 +918,7 @@ static void CommandClick(const nlohmann::json& rParameters, [[maybe_unused]] nlo
 	// Latest stabilization lands on advance timeoutFrames - 1; press, release, and settle add 4 more advances.
 	script.iTimeoutFrames = FrameCountParameter(rParameters, "click", "timeoutFrames", script.iTimeoutFrames, engine::AgentCommandServer::kiDeferredTimeoutDrains - 3);
 	bool bDescribeUiAfter = !rParameters.contains("describeUiAfter") || rParameters.at("describeUiAfter").get<bool>();
+	ThrowIfClientNotRendering();
 	BeginScriptAndDefer(script, bDescribeUiAfter, true, script.bHasWindow, script.pcWindow);
 }
 
@@ -918,6 +930,7 @@ static void CommandHover(const nlohmann::json& rParameters, [[maybe_unused]] nlo
 	FillLabelTarget(rParameters, script);
 	// Latest stabilization lands on advance iTimeoutFrames - 1, and the hold then finishes at least holdFrames advances later.
 	script.iHoldFrames = FrameCountParameter(rParameters, "hover", "holdFrames", script.iHoldFrames, engine::AgentCommandServer::kiDeferredTimeoutDrains - script.iTimeoutFrames + 1);
+	ThrowIfClientNotRendering();
 	BeginScriptAndDefer(script, true, true, script.bHasWindow, script.pcWindow);
 }
 
@@ -933,6 +946,7 @@ static void CommandSetSlider(const nlohmann::json& rParameters, [[maybe_unused]]
 	FillLabelTarget(rParameters, script);
 	double fValue = rParameters.at("value").get<double>();
 	std::snprintf(script.pcValueText, sizeof(script.pcValueText), "%g", fValue);
+	ThrowIfClientNotRendering();
 	BeginScriptAndDefer(script, false, true, script.bHasWindow, script.pcWindow);
 }
 
@@ -1019,7 +1033,7 @@ static void CommandMouse(const nlohmann::json& rParameters, [[maybe_unused]] nlo
 			bool bValid = rNotches.is_number_integer();
 			if (bValid && rNotches.is_number_unsigned())
 			{
-				bValid = rNotches.get<uint64_t>() <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
+				bValid = std::in_range<int64_t>(rNotches.get<uint64_t>());
 			}
 			if (!bValid)
 			{

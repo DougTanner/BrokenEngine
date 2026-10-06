@@ -29,7 +29,7 @@ inline constexpr float kfMainMenuOpticalOffsetYPixels = 20.0f; // Screenshot-der
 inline constexpr float kfPrimaryButtonMinimumWidthPixels = 760.0f; // Menu primary-button minimum width
 inline constexpr float kfModalButtonMinimumWidthPixels = 380.0f;   // Modal button minimum width
 
-class ScopedMenuScale
+class [[nodiscard]] ScopedMenuScale
 {
 public:
 	ScopedMenuScale()
@@ -39,6 +39,9 @@ public:
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(rStyle.ItemSpacing.x * kfMenuUiScale, rStyle.ItemSpacing.y * kfMenuUiScale));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(rStyle.WindowPadding.x * kfMenuUiScale, rStyle.WindowPadding.y * kfMenuUiScale));
 	}
+
+	ScopedMenuScale(const ScopedMenuScale&) = delete;
+	ScopedMenuScale& operator=(const ScopedMenuScale&) = delete;
 
 	~ScopedMenuScale()
 	{
@@ -74,10 +77,12 @@ float UpdateSlideAndGetEdgeX(SlidePanelState& rState, ImVec2 vAnchor, float fSid
 // fScale multiplies the default Latin/CJK font's base size; gUiFontScale applies once on top.
 // Construct before Begin() and destroy after End(), or construct and destroy inside the window.
 // Leaving a font pushed inside Begin() on the stack at End() triggers a recovery pop and a second pop in the destructor.
-class ScopedMenuFont
+class [[nodiscard]] ScopedMenuFont
 {
 public:
 	explicit ScopedMenuFont(float fScale = kfMenuUiScale);
+	ScopedMenuFont(const ScopedMenuFont&) = delete;
+	ScopedMenuFont& operator=(const ScopedMenuFont&) = delete;
 	~ScopedMenuFont();
 };
 

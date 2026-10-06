@@ -66,7 +66,7 @@ prints one
 the rule below. The implementer reports `truncated` with the brief so a
 shortfall is never presented as a complete inventory. An untracked
 file appears only when the caller supplies it with `-IncludeUntracked
-<comma-separated paths>`, and `counts.unlistedUntracked` reports how many
+'<comma-separated paths>'`, and `counts.unlistedUntracked` reports how many
 untracked files the run did not list.
 
 Main dispatches one preparation `implementer` to assemble that brief from

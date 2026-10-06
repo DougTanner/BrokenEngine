@@ -166,7 +166,7 @@ Changes (15 files)
     - Add DecalsPostRender decals {} member to FramePostRenderBase
       (in the BT_CLIENT block, alphabetically after billboards)
     - Add rSelf.decals to both Collections() tuples (after billboards)
-    - Increment kCollectionCount from 11 to 12 in both structs
+    - Increment kiCollectionCount from 11 to 12 in both structs
     - Add DecalsInterpolate to InterpolateRenderTypes type list
 
 12. Engine/Source/Profile/ProfileManagerBase.h

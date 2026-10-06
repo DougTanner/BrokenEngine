@@ -31,7 +31,7 @@ int64_t ClientGridCoordinateValue(const nlohmann::json& rValue, std::string_view
 	if (rValue.is_number_unsigned())
 	{
 		uint64_t uiValue = rValue.get<uint64_t>();
-		if (uiValue > static_cast<uint64_t>(std::numeric_limits<int32_t>::max()))
+		if (!std::in_range<int32_t>(uiValue))
 		{
 			throw std::runtime_error(std::format("{} 'coord' values must fit in a signed 32-bit integer", command));
 		}
@@ -39,7 +39,7 @@ int64_t ClientGridCoordinateValue(const nlohmann::json& rValue, std::string_view
 	}
 
 	int64_t iValue = rValue.get<int64_t>();
-	if (iValue < static_cast<int64_t>(std::numeric_limits<int32_t>::min()) || iValue > static_cast<int64_t>(std::numeric_limits<int32_t>::max()))
+	if (!std::in_range<int32_t>(iValue))
 	{
 		throw std::runtime_error(std::format("{} 'coord' values must fit in a signed 32-bit integer", command));
 	}

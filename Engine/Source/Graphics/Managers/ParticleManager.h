@@ -15,6 +15,7 @@ public:
 	~ParticleManager();
 
 	void RenderGlobal(int64_t iCommandBuffer);
+	void DiscardStagedSpawns();
 
 	std::mutex mSpawnMutex;
 

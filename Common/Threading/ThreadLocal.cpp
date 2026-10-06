@@ -5,7 +5,6 @@ namespace common
 
 ThreadLocal::ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> iThreadId, bool bSetupExceptionHandling, int64_t iWorkbufferReserveSize)
 : miThreadId(iThreadId)
-, mLogBufferMemory(kiLogBufferSize)
 , mWorkbufferMemory(iWorkbufferReserveSize > 0 ? iWorkbufferReserveSize : 64 * std::max(iWorkbufferSize, 64i64 * 1'024i64))
 , mpLogBuffer(mLogBufferMemory.data())
 , mWorkbuffer(mWorkbufferMemory)

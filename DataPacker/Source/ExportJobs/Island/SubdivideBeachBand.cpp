@@ -269,9 +269,7 @@ void BeachSubdivider::Run()
 		{
 			continue;
 		}
-		compactedIndices.push_back(rMeshIndices.at(i + 0));
-		compactedIndices.push_back(rMeshIndices.at(i + 1));
-		compactedIndices.push_back(rMeshIndices.at(i + 2));
+		compactedIndices.insert(compactedIndices.end(), {rMeshIndices.at(i + 0), rMeshIndices.at(i + 1), rMeshIndices.at(i + 2)});
 	}
 	rMeshIndices = std::move(compactedIndices);
 }

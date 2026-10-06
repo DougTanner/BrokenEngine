@@ -23,7 +23,7 @@ runner applies. The purpose and the triggers live in
    |---|---|---|
    | Shared-only game collection struct | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.h`: `SpaceshipsPostRender`; sibling `.cpp` files | `SharedMembers()` plus `Members()` returning it, so a later client-only field cannot silently join the CRC; no special frame dispatch |
    | Shared game state plus client-owned state | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.h`: both structs; `Missiles.cpp`: `ClientInit`, `ClientInitAll`, `Transfer`; `MissilesUpdate.cpp` | guarded `ClientMembers()`, client `tuple_cat`, hydration, owned-object teardown, transfer payload |
-   | Server-visible engine collection | `Engine/Source/Frame/Collections/Pushers/Pushers.h`: both structs; sibling `.cpp` files; `Engine/Source/Frame/FrameBase.h`; `game::Frame::kiVersion` in `Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp` | direct FrameBase storage, server tuple registration, index helpers, per-struct version terms |
+   | Server-visible engine collection | `Engine/Source/Frame/Collections/Pushers/Pushers.h`: both structs; sibling `.cpp` files; `Engine/Source/Frame/FrameBase.h` | direct FrameBase storage, server tuple registration, index helpers, per-struct `kiVersion` declarations folded through server tuple registration |
    | Owner-synchronized whole-file client-only collection | `Engine/Source/Frame/Collections/Sounds/Sounds.h`: both structs; sibling `.cpp` files; `FrameBase.h` | outer `BT_CLIENT` guard, `Members()` only, owner `Sync`/Add/Remove, custom client-only identity only when required |
    | Controller-driven fire-and-forget client-only collection | `Engine/Source/Frame/Collections/Puffs/Puffs.h`: both structs; `Puffs.cpp`, `PuffsUpdate.cpp`, `PuffsRender.cpp`; `FrameBase.h` | `Members()` only, controller metadata copy, paired Add/Destroy, no owner handle or persisted version |
 
@@ -80,7 +80,7 @@ runner applies. The purpose and the triggers live in
     - Include the header in `Engine/Source/Frame/FrameBase.h`.
     - Add direct members to both FrameBase structs, entries at matching
       positions in both `Collections()` tuples, and update both
-      `kCollectionCount` values.
+      `kiCollectionCount` values.
     - For server-visible state, also add both structs to the corresponding
       `ServerCollections()` tuples. For pure client-only state, guard include,
       members, tuple entries, and client counts with `BT_CLIENT` and omit it
@@ -91,16 +91,23 @@ runner applies. The purpose and the triggers live in
 13. Define `static constexpr int64_t kiVersion` on both structs for every game
     collection pair and every server-visible engine pair.
 
-    - Add both terms to `game::Frame::kiVersion` in
-      `Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp`.
+    - `game::Frame::kiVersion` folds the versions of every collection in the
+      game `GameInterpolateTypes`/`GamePostRenderTypes` lists and the engine
+      `ServerCollections()` lists, so the registration in step 11 or 12 adds
+      both terms; add none by hand.
+    - An explicitly dispatched pair kept outside those lists, as Players
+      is, adds its own `kiVersion` terms to the `game::Frame::kiVersion`
+      definition in `Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp`, as
+      Players does.
 
-    Done when both declarations and both sum terms exist.
+    Done when both declarations exist, plus those explicit terms for such a
+    pair.
 
 ### Settle and verify
 
 14. Settle transfer and hydration, the first of the two decisions the
     collection-layout auditor cannot make. It checks tuple membership, subset
-    and guard relations, and the version sum (step 17); it cannot reach these
+    and guard relations (step 17); it cannot reach these
     two decisions, so settle them before finishing:
 
     - [ ] Transferable state has matching send and receive wiring; source-owned
@@ -109,7 +116,7 @@ runner applies. The purpose and the triggers live in
       after server state arrives (`ClientInit`/`ClientInitAll` pattern).
 
     Done when that box holds.
-15. Settle the harness query decision, the second decision that auditor cannot
+15. Settle the harness exposure decision, the second decision that auditor cannot
     reach:
 
     - [ ] Inspect
@@ -119,8 +126,12 @@ runner applies. The purpose and the triggers live in
         `query_collection` arm, and allowed-name error text.
       - If not, record the deliberate exclusion. Pure client-only collections
         have no server query.
+    - [ ] For a server-visible collection, add the `FrameCollection` specialization
+      and column list the server build demands, per the `edit_frame` rule in
+      [`Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md`](../../../../Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md)
+      `## Contracts`.
 
-    Done when that box holds.
+    Done when both boxes hold.
 16. Resolve every cited path and symbol against the final tree. Done when each
     resolves.
 17. Run the collection-layout auditor from the repository root and clear every
@@ -162,9 +173,8 @@ runner applies. The purpose and the triggers live in
   `engine::PushersInterpolate` proves that an indexable collection can use the
   normal tuples.
 - Pure client-only engine collections do not alter persisted shared layout and
-  do not contribute version terms. `PushersInterpolate` and `PushersPostRender`
-  are the live engine example. The collection-layout auditor (step 17) checks
-  declarations and sum terms against each other in both directions.
+  do not contribute version terms. Sounds and Puffs are the live engine
+  examples.
 - Use `CollectionFlags::kIdToIndex` only when external owners need a stable
   handle. Prefer `AddIndexableElement` and `RemoveIndexableElement`; they
   maintain the map during add and swap-and-pop.

@@ -67,7 +67,7 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 
 	SkeletonData skeletonData;
 	skeletonData.skeleton.uiNodeCount = static_cast<uint16_t>(std::ssize(rModel.nodes));
-	ASSERT(std::ssize(rModel.nodes) <= std::numeric_limits<int16_t>::max());
+	ASSERT(std::in_range<int16_t>(std::ssize(rModel.nodes)));
 
 	// CanonicalizeSceneSkin runs before export so any node-referenced skin occupies slot 0.
 	if (!rModel.skins.empty())

@@ -117,7 +117,7 @@ void Buffer::RecordBarriers(VkCommandBuffer vkCommandBuffer, std::span<const Bar
 
 			default:
 				ASSERT(false);
-				break;
+				std::unreachable();
 		}
 
 		VkAccessFlags vkDestinationAccessMask = VK_ACCESS_NONE_KHR;
@@ -146,7 +146,7 @@ void Buffer::RecordBarriers(VkCommandBuffer vkCommandBuffer, std::span<const Bar
 
 			default:
 				ASSERT(false);
-				break;
+				std::unreachable();
 		}
 
 		vkCombinedSourceStage |= vkSourceStageMask;

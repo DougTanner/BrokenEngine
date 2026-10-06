@@ -14,6 +14,8 @@ namespace common
 template <typename T>
 class StableVector
 {
+	static_assert(alignof(T) <= 64 * 1'024, "StableVector requires a type with alignment no greater than 64 KiB");
+
 public:
 
 	// iReservedCount is the element ceiling; the reservation covers that many elements' bytes rounded up to the

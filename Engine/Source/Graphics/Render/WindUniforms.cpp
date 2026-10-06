@@ -9,10 +9,9 @@ namespace engine
 
 void RenderWindGlobal(int64_t iCommandBuffer)
 {
-	// Accumulate wind time (always tick to avoid delta spikes after toggle)
-	static common::Timer sWindTimer;
+	// Step from the Graphics frame delta, which the skipped-render resume resets so a minimize does not land as one step.
 	static float sfWindTime = 0.0f;
-	float fDeltaTime = common::NanosecondsToFloatSeconds<float>(sWindTimer.GetDeltaNs(true));
+	float fDeltaTime = common::NanosecondsToFloatSeconds<float>(gpGraphics->mRenderFrameDeltaNanoseconds);
 	sfWindTime += fDeltaTime * gWindTimeScale.mfCurrent;
 
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);

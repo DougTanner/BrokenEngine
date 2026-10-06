@@ -56,7 +56,7 @@ BufferManager::BufferManager()
 		}
 
 		const common::ModelHeader& rModelHeader = rChunk.pHeader->modelHeader;
-		if (rModelHeader.iIndexCount < 0 || rModelHeader.iIndexCount > std::numeric_limits<uint32_t>::max() || rModelHeader.iVertexCount < 0 || rModelHeader.iStride <= 0)
+		if (!std::in_range<uint32_t>(rModelHeader.iIndexCount) || rModelHeader.iVertexCount < 0 || rModelHeader.iStride <= 0)
 		{
 			throw std::ios_base::failure("BufferManager model");
 		}
@@ -356,9 +356,9 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 	// MeshData buffer for glTF skeletal animation
 	// Per-framebuffer with host-visible for CPU updates during Render()
 	mMeshDataStorageBuffers.resize(iCommandBufferCount);
-	for (int64_t i = 0; i < iCommandBufferCount; ++i)
+	for (Buffer& rBuffer : mMeshDataStorageBuffers)
 	{
-		mMeshDataStorageBuffers.at(i).Create(
+		rBuffer.Create(
 		{
 			.name = "MeshData",
 			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
@@ -386,9 +386,9 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 	// Joint matrix buffer for glTF skeletal animation (separate from MeshData)
 	// Separate dynamically-sized buffer keeps MeshData small and fixed-size with no embedded joint cap
 	mJointMatrixStorageBuffers.resize(iCommandBufferCount);
-	for (int64_t i = 0; i < iCommandBufferCount; ++i)
+	for (Buffer& rBuffer : mJointMatrixStorageBuffers)
 	{
-		mJointMatrixStorageBuffers.at(i).Create(
+		rBuffer.Create(
 		{
 			.name = "JointMatrices",
 			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
@@ -434,9 +434,9 @@ Buffer* BufferManager::CreateDynamicBuffer(common::crc_t crc, DynamicBufferType 
 
 	int64_t iCommandBufferCount = std::ssize(gpSwapchainManager->mFramebuffers);
 	rBuffers.resize(iCommandBufferCount);
-	for (int64_t i = 0; i < iCommandBufferCount; ++i)
+	for (Buffer& rBuffer : rBuffers)
 	{
-		rBuffers.at(i).Create(
+		rBuffer.Create(
 		{
 			.name = name,
 			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},

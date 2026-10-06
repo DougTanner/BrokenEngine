@@ -55,15 +55,10 @@ void ExportAudio::Export()
 	// _loop assets loop the whole buffer at runtime (XAUDIO2_LOOP_INFINITE): never edge-fade,
 	// validate the seam instead. Music/ assets are loudness-mastered: safe fixes only (see AudioRepair.h)
 	bool bLoop = common::ToLower(mInputPath.stem().string()).ends_with("_loop");
-	bool bMusic = false;
-	for (const std::filesystem::path& rComponent : mRelativeDirectory)
+	bool bMusic = std::ranges::any_of(mRelativeDirectory, [](const std::filesystem::path& rComponent)
 	{
-		if (common::ToLower(rComponent.string()) == "music")
-		{
-			bMusic = true;
-			break;
-		}
-	}
+		return common::ToLower(rComponent.string()) == "music";
+	});
 	bool bAllowDeclip = audiorepair::kbDeclipEnabled && (!bMusic || audiorepair::kbDeclipMusic);
 	audiorepair::RepairAudio(fSamples, pWaveformatex->nChannels, pWaveformatex->nSamplesPerSec, mRelativeFile, bLoop, bAllowDeclip, !bMusic);
 

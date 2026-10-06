@@ -17,7 +17,7 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
    |---|---|---|
    | Shared-only game collection struct | `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.h`: `SpaceshipsPostRender`, `SpaceshipsPostRender::Spawn`, `Spaceships.cpp` `SpaceshipsPostRender::AllocateAndCopy` | `SharedMembers()` with `Members()` forwarding to it; per-struct versions, `PersistentMembers()` carry-forward, spawn initialization |
    | Shared/client-split game pair | `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.h`, `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.cpp`, `MissilesInterpolate::Update` | `SharedMembers()` plus guarded `ClientMembers()`, `Members()` composition, spawn, copy, `ClientInit`, transfer send |
-   | Server-visible engine pair | `/Engine/Source/Frame/Collections/Pushers/Pushers.h`, `PushersInterpolate::Sync`, `PushersPostRender::Add`, `/Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp` `Frame::kiVersion` | Existing `Members()`-only shape, per-struct versions, owner sync, zero-init, difference logging, ID map |
+   | Server-visible engine pair | `/Engine/Source/Frame/Collections/Pushers/Pushers.h`, `PushersInterpolate::Sync`, `PushersPostRender::Add` | Existing `Members()`-only shape, per-struct versions, owner sync, zero-init, difference logging, ID map |
    | Owner-synchronized client-only pair | `/Engine/Source/Frame/Collections/Sounds/Sounds.h`, `SoundsInterpolate::Sync`, `SoundsPostRender::Add` | Whole-file `BT_CLIENT`, `Members()` only, full carry-forward copy, `SyncData`/`Sync`, Add defaults, no shared version or differences |
    | Controller-driven, fire-and-forget client-only pair | `/Engine/Source/Frame/Collections/Puffs/Puffs.h`, `PuffsInterpolate::Update`, `PuffsPostRender::AddControlled` | Whole-file `BT_CLIENT`, `Members()` only, selective controller copy, unconditional animated stores, complete Add initialization |
 
@@ -141,15 +141,21 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
 
     Done when identity semantics are decided and any required map edit is made.
 15. Decide whether a server-visible game field belongs in the deliberately
-    minimum-and-cheap agent result.
+    minimum-and-cheap agent result; the `edit_frame` bullet also applies to
+    engine fields.
 
     - Current exposure lives in
       `/Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsServerQueries.cpp`
       through `ExtractPlayers`, `ExtractSpaceships`, `ExtractMissiles`, and
       `ExtractBlasters`.
     - Record an intentional exclusion when no scenario needs it.
+    - A server-visible column joins its collection's `edit_frame` column list
+      per the `edit_frame` rule in
+      [`Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md`](../../../../Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md)
+      `## Contracts`; the server build's `static_assert` enforces it.
 
-    Done when the field is exposed there or the exclusion is recorded.
+    Done when the field is exposed there or the exclusion is recorded, and any
+    server-visible column's `edit_frame` list entry is made.
 
 ### Verify
 

@@ -84,7 +84,7 @@ static std::vector<uint8_t> DecodeBcnMip0ToRgba8(const std::byte* puiEncoded, in
 				}
 				default:
 					ASSERT(false);
-					break;
+					std::unreachable();
 			}
 
 			for (int64_t i = 0; i < 4; ++i)
@@ -121,7 +121,7 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 	}
 
 	uintmax_t uiFileSize = std::filesystem::file_size(rPath);
-	if (uiFileSize > static_cast<uintmax_t>(std::numeric_limits<int64_t>::max()))
+	if (!std::in_range<int64_t>(uiFileSize))
 	{
 		return;
 	}
@@ -163,8 +163,7 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 	}
 
 	int64_t iExpectedRawSize = common::ComputeImageByteSize(vkFormat, iWidth, iHeight, iMipMaps, 1, 1);
-	if (iExpectedRawSize <= 0 || static_cast<uintmax_t>(iExpectedRawSize) > static_cast<uintmax_t>(std::numeric_limits<uLongf>::max())
-	 || static_cast<uintmax_t>(iExpectedRawSize) > static_cast<uintmax_t>(std::numeric_limits<uLong>::max()))
+	if (iExpectedRawSize <= 0 || !std::in_range<uLong>(iExpectedRawSize))
 	{
 		return;
 	}
@@ -175,7 +174,7 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 	}
 	// The minimum-file-size check above proves iPayloadOffset < iFileSize, so the payload is nonempty.
 	int64_t iPayloadSize = iFileSize - header.iPayloadOffset;
-	if (static_cast<uintmax_t>(iPayloadSize) > static_cast<uintmax_t>(std::numeric_limits<uLong>::max()))
+	if (!std::in_range<uLong>(iPayloadSize))
 	{
 		return;
 	}

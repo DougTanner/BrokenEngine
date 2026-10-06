@@ -21,7 +21,7 @@ namespace toolcli::coordination
 		std::filesystem::path path;
 	};
 
-	class Guard
+	class [[nodiscard]] Guard
 	{
 	public:
 		// rbContentionObserved: a live holder was proven at any point during acquisition; the final error can be a delete-pending flicker instead.

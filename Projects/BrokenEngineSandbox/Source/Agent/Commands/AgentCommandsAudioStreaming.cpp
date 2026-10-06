@@ -210,14 +210,10 @@ static nlohmann::json BuildAudioStreamingFixtureSnapshot()
 		                 && before.iHeldIndex == snapshot.iHeldIndex && before.iHeldGeneration == snapshot.iHeldGeneration
 		                 && before.iMainHead == snapshot.iMainHead && before.iLoader0Head == snapshot.iLoader0Head
 		                 && before.iLoader1Head == snapshot.iLoader1Head;
-		for (int64_t i = 0; bCombinedCoherent && i < std::ssize(snapshot.poolEntries); ++i)
+		bCombinedCoherent = bCombinedCoherent && std::ranges::equal(before.poolEntries, snapshot.poolEntries, [](const engine::AudioStreamingFixturePoolEntry& rBefore, const engine::AudioStreamingFixturePoolEntry& rAfter)
 		{
-			const engine::AudioStreamingFixturePoolEntry& rBefore = before.poolEntries[static_cast<size_t>(i)];
-			const engine::AudioStreamingFixturePoolEntry& rAfter = snapshot.poolEntries[static_cast<size_t>(i)];
-			bCombinedCoherent = rBefore.iIndex == rAfter.iIndex && rBefore.eState == rAfter.eState
-			                 && rBefore.iGeneration == rAfter.iGeneration && rBefore.crc == rAfter.crc
-			                 && rBefore.iOffset == rAfter.iOffset && rBefore.iLength == rAfter.iLength;
-		}
+			return rBefore.iIndex == rAfter.iIndex && rBefore.eState == rAfter.eState && rBefore.iGeneration == rAfter.iGeneration && rBefore.crc == rAfter.crc && rBefore.iOffset == rAfter.iOffset && rBefore.iLength == rAfter.iLength;
+		});
 		if (bCombinedCoherent)
 		{
 			break;
@@ -694,11 +690,10 @@ void CommandAudioStreamingFixture([[maybe_unused]] const nlohmann::json& rParame
 					return std::nullopt;
 				case AudioStreamingFixtureSaturationPhase::kWaitForPrimaryStream:
 				{
-					bool bPrimaryStreamHeld = false;
-					for (const engine::AudioStreamingFixturePoolEntry& rEntry : fileSnapshot.poolEntries)
+					bool bPrimaryStreamHeld = std::ranges::any_of(fileSnapshot.poolEntries, [](const engine::AudioStreamingFixturePoolEntry& rEntry)
 					{
-						bPrimaryStreamHeld = bPrimaryStreamHeld || (rEntry.crc == data::kAudioMusicdoodlewavCrc && rEntry.iOffset == 0 && rEntry.iLength == kiAudioStreamingFixtureReadLength && rEntry.eState == engine::AudioStreamingFixtureQueueState::kLoading);
-					}
+						return rEntry.crc == data::kAudioMusicdoodlewavCrc && rEntry.iOffset == 0 && rEntry.iLength == kiAudioStreamingFixtureReadLength && rEntry.eState == engine::AudioStreamingFixtureQueueState::kLoading;
+					});
 					bool bReadyOne = false;
 					bool bReadyTwo = false;
 					for (int64_t i = 0; i < fileSnapshot.iRecordCount; ++i)

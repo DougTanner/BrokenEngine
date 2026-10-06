@@ -252,7 +252,7 @@ private:
 	// Weapon and death-explosion spawn helpers (called from PlayersPostRender::Spawn). Defined in PlayersCombat.cpp.
 	static void SpawnBlasters(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate);
 	static void SpawnMissiles(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate);
-	static void SpawnDeathExplosions(Frame& __restrict rFrame);
+	static void SpawnDeathExplosions(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate);
 
 public:
 

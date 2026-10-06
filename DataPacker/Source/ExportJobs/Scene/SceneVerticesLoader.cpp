@@ -1,12 +1,15 @@
 #include "SceneVerticesLoader.h"
 
+#include "ExportJobs/SourceReadValidation.h"
+
 
 // Fetches a primitive vertex attribute as a typed pointer + element stride (in units of T).
-// Returns {nullptr, 0} when the attribute is absent. Stride falls back to the accessor's component
-// count when the buffer view is tightly packed.
+// Returns {nullptr, 0} when the attribute is absent. Throws when reading iComponentCount values of T
+// for each of uiVertexCount vertices would leave the accessor's buffer view or buffer.
 template <typename T>
-static std::pair<const T*, int64_t> FindAttribute(const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, const char* pcAttributeName)
+static std::pair<const T*, int64_t> FindAttribute(const tinygltf::Primitive& rPrimitive, const tinygltf::Model& rModel, const char* pcAttributeName, size_t uiVertexCount, int64_t iComponentCount)
 {
+	static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable");
 	auto it = rPrimitive.attributes.find(pcAttributeName);
 	if (it == rPrimitive.attributes.end())
 	{
@@ -18,10 +21,27 @@ static std::pair<const T*, int64_t> FindAttribute(const tinygltf::Primitive& rPr
 	{
 		ASSERT(rAccessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
 	}
+	else if constexpr (std::is_same_v<T, uint16_t>)
+	{
+		ASSERT(rAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT);
+	}
 	const tinygltf::BufferView& rBufferView = rModel.bufferViews.at(rAccessor.bufferView);
+
+	int64_t iByteStride = rAccessor.ByteStride(rBufferView);
+	if (iByteStride == -1)
+	{
+		throw std::runtime_error(std::format("{} accessor has an invalid byte stride", pcAttributeName));
+	}
+	RequireSourceExtent(rModel.buffers.at(rBufferView.buffer).data.size(), rBufferView.byteOffset, rBufferView.byteLength, pcAttributeName);
+	uintmax_t uiAccessorBytes = 0;
+	if (uiVertexCount != 0)
+	{
+		uiAccessorBytes = AddSourceBytes(MultiplySourceBytes(uiVertexCount - 1, static_cast<size_t>(iByteStride), pcAttributeName), static_cast<uintmax_t>(iComponentCount * static_cast<int64_t>(sizeof(T))), pcAttributeName);
+	}
+	RequireSourceExtent(rBufferView.byteLength, rAccessor.byteOffset, uiAccessorBytes, pcAttributeName);
+
 	const T* pData = reinterpret_cast<const T*>(&(rModel.buffers.at(rBufferView.buffer).data.at(rAccessor.byteOffset + rBufferView.byteOffset)));
-	int iStride = rAccessor.ByteStride(rBufferView) != 0 ? static_cast<int>(rAccessor.ByteStride(rBufferView) / sizeof(T)) : tinygltf::GetNumComponentsInType(rAccessor.type);
-	return {pData, iStride};
+	return {pData, iByteStride / static_cast<int64_t>(sizeof(T))};
 }
 
 // Composes a glTF node's local transform: either the TRS triple (scale * rotation * translation) or
@@ -96,19 +116,18 @@ static void BuildVertices(std::vector<common::ModelVertex>& rVertices, std::vect
 {
 	// Position (required) - accessor also supplies the vertex count that drives the loop below
 	const tinygltf::Accessor& rPositionAccessor = rModel.accessors.at(rPrimitive.attributes.find("POSITION")->second);
-	auto [pfPositions, iPositionStride] = FindAttribute<float>(rPrimitive, rModel, "POSITION");
+	auto [pfPositions, iPositionStride] = FindAttribute<float>(rPrimitive, rModel, "POSITION", rPositionAccessor.count, 3);
 
-	auto [pfNormals, iNormalStride] = FindAttribute<float>(rPrimitive, rModel, "NORMAL");
-	auto [pfTexcoords0, iTexcoordStride0] = FindAttribute<float>(rPrimitive, rModel, "TEXCOORD_0");
-	auto [pfTexcoords1, iTexcoordStride1] = FindAttribute<float>(rPrimitive, rModel, "TEXCOORD_1");
-	auto [pfTexcoords2, iTexcoordStride2] = FindAttribute<float>(rPrimitive, rModel, "TEXCOORD_2");
-	auto [pfTexcoords3, iTexcoordStride3] = FindAttribute<float>(rPrimitive, rModel, "TEXCOORD_3");
-	auto [pfTexcoords4, iTexcoordStride4] = FindAttribute<float>(rPrimitive, rModel, "TEXCOORD_4");
-	auto [pfWeights, iWeightsStride] = FindAttribute<float>(rPrimitive, rModel, "WEIGHTS_0");
+	auto [pfNormals, iNormalStride] = FindAttribute<float>(rPrimitive, rModel, "NORMAL", rPositionAccessor.count, 3);
+	auto [pfTexcoords0, iTexcoordStride0] = FindAttribute<float>(rPrimitive, rModel, "TEXCOORD_0", rPositionAccessor.count, 2);
+	auto [pfTexcoords1, iTexcoordStride1] = FindAttribute<float>(rPrimitive, rModel, "TEXCOORD_1", rPositionAccessor.count, 2);
+	auto [pfTexcoords2, iTexcoordStride2] = FindAttribute<float>(rPrimitive, rModel, "TEXCOORD_2", rPositionAccessor.count, 2);
+	auto [pfTexcoords3, iTexcoordStride3] = FindAttribute<float>(rPrimitive, rModel, "TEXCOORD_3", rPositionAccessor.count, 2);
+	auto [pfTexcoords4, iTexcoordStride4] = FindAttribute<float>(rPrimitive, rModel, "TEXCOORD_4", rPositionAccessor.count, 2);
+	auto [pfWeights, iWeightsStride] = FindAttribute<float>(rPrimitive, rModel, "WEIGHTS_0", rPositionAccessor.count, 4);
 
 	// Joints are read as uint16_t; the runtime skinning path requires that component type
-	auto [puiJoints, iJointsStride] = FindAttribute<uint16_t>(rPrimitive, rModel, "JOINTS_0");
-	ASSERT(puiJoints == nullptr || rModel.accessors[rPrimitive.attributes.at("JOINTS_0")].componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT);
+	auto [puiJoints, iJointsStride] = FindAttribute<uint16_t>(rPrimitive, rModel, "JOINTS_0", rPositionAccessor.count, 4);
 
 	uint32_t uiVertexStart = static_cast<uint32_t>(rVertices.size());
 
@@ -201,16 +220,17 @@ static void AppendIndices(std::vector<uint32_t>& rIndexBuffer, const tinygltf::P
 	}
 
 	const tinygltf::Accessor& rIndicesAccessor = rModel.accessors.at(rPrimitive.indices);
-	const tinygltf::BufferView& rIndiciesBufferView = rModel.bufferViews[rIndicesAccessor.bufferView];
+	const tinygltf::BufferView& rIndiciesBufferView = rModel.bufferViews.at(rIndicesAccessor.bufferView);
 	const tinygltf::Buffer& rIndiciesBuffer = rModel.buffers.at(rIndiciesBufferView.buffer);
-	const void* pIndices = &(rIndiciesBuffer.data.at(rIndicesAccessor.byteOffset + rIndiciesBufferView.byteOffset));
 
-	rIndexBuffer.reserve(rIndexBuffer.size() + rIndicesAccessor.count);
 	switch (rIndicesAccessor.componentType)
 	{
 		case TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT:
 		{
-			const uint32_t* puiIndices = static_cast<const uint32_t*>(pIndices);
+			RequireSourceExtent(rIndiciesBuffer.data.size(), rIndiciesBufferView.byteOffset, rIndiciesBufferView.byteLength, "indices");
+			RequireSourceExtent(rIndiciesBufferView.byteLength, rIndicesAccessor.byteOffset, MultiplySourceBytes(rIndicesAccessor.count, sizeof(uint32_t), "indices"), "indices");
+			const uint32_t* puiIndices = reinterpret_cast<const uint32_t*>(&(rIndiciesBuffer.data.at(rIndicesAccessor.byteOffset + rIndiciesBufferView.byteOffset)));
+			rIndexBuffer.reserve(static_cast<size_t>(std::ssize(rIndexBuffer) + static_cast<int64_t>(rIndicesAccessor.count)));
 			for (int64_t j = 0; j < static_cast<int64_t>(rIndicesAccessor.count); ++j)
 			{
 				rIndexBuffer.push_back(static_cast<uint32_t>(rIndexRemap.at(puiIndices[j])));
@@ -220,7 +240,10 @@ static void AppendIndices(std::vector<uint32_t>& rIndexBuffer, const tinygltf::P
 
 		case TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT:
 		{
-			const uint16_t* puiIndices = static_cast<const uint16_t*>(pIndices);
+			RequireSourceExtent(rIndiciesBuffer.data.size(), rIndiciesBufferView.byteOffset, rIndiciesBufferView.byteLength, "indices");
+			RequireSourceExtent(rIndiciesBufferView.byteLength, rIndicesAccessor.byteOffset, MultiplySourceBytes(rIndicesAccessor.count, sizeof(uint16_t), "indices"), "indices");
+			const uint16_t* puiIndices = reinterpret_cast<const uint16_t*>(&(rIndiciesBuffer.data.at(rIndicesAccessor.byteOffset + rIndiciesBufferView.byteOffset)));
+			rIndexBuffer.reserve(static_cast<size_t>(std::ssize(rIndexBuffer) + static_cast<int64_t>(rIndicesAccessor.count)));
 			for (int64_t j = 0; j < static_cast<int64_t>(rIndicesAccessor.count); ++j)
 			{
 				rIndexBuffer.push_back(static_cast<uint32_t>(rIndexRemap.at(puiIndices[j])));
@@ -230,7 +253,10 @@ static void AppendIndices(std::vector<uint32_t>& rIndexBuffer, const tinygltf::P
 
 		case TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE:
 		{
-			const uint8_t* puiIndices = static_cast<const uint8_t*>(pIndices);
+			RequireSourceExtent(rIndiciesBuffer.data.size(), rIndiciesBufferView.byteOffset, rIndiciesBufferView.byteLength, "indices");
+			RequireSourceExtent(rIndiciesBufferView.byteLength, rIndicesAccessor.byteOffset, MultiplySourceBytes(rIndicesAccessor.count, sizeof(uint8_t), "indices"), "indices");
+			const uint8_t* puiIndices = reinterpret_cast<const uint8_t*>(&(rIndiciesBuffer.data.at(rIndicesAccessor.byteOffset + rIndiciesBufferView.byteOffset)));
+			rIndexBuffer.reserve(static_cast<size_t>(std::ssize(rIndexBuffer) + static_cast<int64_t>(rIndicesAccessor.count)));
 			for (int64_t j = 0; j < static_cast<int64_t>(rIndicesAccessor.count); ++j)
 			{
 				rIndexBuffer.push_back(static_cast<uint32_t>(rIndexRemap.at(puiIndices[j])));

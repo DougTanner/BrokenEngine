@@ -6,10 +6,11 @@ namespace engine
 {
 
 static std::string sDxDiag;
-static std::atomic<bool> sbDxDiagComplete(false);
+static constinit std::atomic<bool> sbDxDiagComplete(false);
+static_assert(decltype(sbDxDiagComplete)::is_always_lock_free);
 static wchar_t spcAppDataOverride[MAX_PATH + 1] {};
-static wchar_t spcDesktopReportPath[MAX_PATH + 1] {};
-static wchar_t spcUserReportPath[MAX_PATH + 1] {};
+static constinit wchar_t spcDesktopReportPath[MAX_PATH + 1] {};
+static constinit wchar_t spcUserReportPath[MAX_PATH + 1] {};
 constexpr wchar_t kpcFallbackReportPath[] = L"Crash-Report.txt";
 
 void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)

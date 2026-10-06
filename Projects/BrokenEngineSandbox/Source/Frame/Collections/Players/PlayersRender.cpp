@@ -56,12 +56,15 @@ static int64_t siRendered = 0;
 static std::atomic<bool> sbRenderActive = false;
 
 // The guard clears sbRenderActive on scope exit, including exception unwinding after a failed capacity ASSERT.
-struct PlayersRenderActiveGuard
+struct [[nodiscard]] PlayersRenderActiveGuard
 {
 	PlayersRenderActiveGuard()
 	{
 		ASSERT(!sbRenderActive.exchange(true));
 	}
+
+	PlayersRenderActiveGuard(const PlayersRenderActiveGuard&) = delete;
+	PlayersRenderActiveGuard& operator=(const PlayersRenderActiveGuard&) = delete;
 
 	~PlayersRenderActiveGuard()
 	{

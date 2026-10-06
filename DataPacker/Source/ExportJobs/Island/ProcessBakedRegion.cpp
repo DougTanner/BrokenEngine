@@ -230,9 +230,7 @@ static void CropAndRepackMesh(std::vector<float>& rMeshPositions, std::vector<ui
 			++iDiscardedTriangles;
 			continue;
 		}
-		survivingIndices.push_back(static_cast<uint32_t>(iA));
-		survivingIndices.push_back(static_cast<uint32_t>(iB));
-		survivingIndices.push_back(static_cast<uint32_t>(iC));
+		survivingIndices.insert(survivingIndices.end(), {static_cast<uint32_t>(iA), static_cast<uint32_t>(iB), static_cast<uint32_t>(iC)});
 	}
 	rMeshIndices = std::move(survivingIndices);
 

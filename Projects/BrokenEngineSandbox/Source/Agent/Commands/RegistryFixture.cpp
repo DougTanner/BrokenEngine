@@ -365,13 +365,10 @@ void CommandRegistryFixture([[maybe_unused]] const nlohmann::json& rParameters, 
 		bool bOwnershipCountCorrect = (ownerLayer).iCount == kiOwnerCount;
 
 		static constexpr engine::GlobalId kMissingGlobalId {.iValue = 999};
-		bool bForeignLookupMatches = true;
-		for (int64_t i = 0; i < kiOwnerCount; ++i)
+		bool bForeignLookupMatches = std::ranges::equal(pOwnerGlobalIds, pOwnerIds, [&foreignLayer, &ownerLayer](const engine::GlobalId& rGlobalId, const engine::registry_id_t& rId)
 		{
-			bForeignLookupMatches = bForeignLookupMatches
-			                     && engine::RegistryUuidByGlobalId(foreignLayer, pOwnerGlobalIds[i]) == pOwnerIds[i].uuid
-			                     && engine::RegistryUuidByGlobalId(foreignLayer, pOwnerGlobalIds[i]) == engine::RegistryUuidByGlobalId(ownerLayer, pOwnerGlobalIds[i]);
-		}
+			return engine::RegistryUuidByGlobalId(foreignLayer, rGlobalId) == rId.uuid && engine::RegistryUuidByGlobalId(foreignLayer, rGlobalId) == engine::RegistryUuidByGlobalId(ownerLayer, rGlobalId);
+		});
 		bool bUuidLookupHit = engine::RegistryUuidByGlobalId(ownerLayer, pOwnerGlobalIds[2]) == pOwnerIds[2].uuid;
 		bool bUuidLookupMiss = engine::RegistryUuidByGlobalId(ownerLayer, kMissingGlobalId) == engine::Uuid {};
 		bool bUuidLookupWithoutGlobalIds = engine::RegistryUuidByGlobalId(anonymousLayer, pOwnerGlobalIds[2]) == engine::Uuid {};

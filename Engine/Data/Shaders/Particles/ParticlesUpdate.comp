@@ -46,6 +46,8 @@ void main()
 	const float fRotationDeltaDecay = particles.pParticles[i].fRotationDeltaDecay;
 
 	vec4 f4OriginalPosition = particles.pParticles[i].f4Position;
+	// Follow a one-cell camera cell change.
+	f4OriginalPosition.xy += globalLayout.f2ParticlesBasisShift;
 	vec4 f4Velocity = particles.pParticles[i].f4Velocity;
 	float fVisibleIntensity = particles.pParticles[i].fVisibleIntensity;
 	float fSize = particles.pParticles[i].fSize;

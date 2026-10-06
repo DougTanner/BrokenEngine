@@ -121,15 +121,10 @@ static void RemoveNonRouteSubFolders(const std::filesystem::path& rIslandFolder,
 			continue;
 		}
 		std::string name = rEntry.path().filename().string();
-		bool bIsRouteLabel = false;
-		for (const RouteSubdivision* pRoute : rRoutes)
+		bool bIsRouteLabel = std::ranges::any_of(rRoutes, [&name](const RouteSubdivision* const& pRoute)
 		{
-			if (name == pRoute->pcLabel)
-			{
-				bIsRouteLabel = true;
-				break;
-			}
-		}
+			return name == pRoute->pcLabel;
+		});
 		if (!bIsRouteLabel)
 		{
 			staleSubFolders.push_back(rEntry.path());
@@ -170,7 +165,23 @@ static void BakeOne(const std::filesystem::path& rIslandFolder)
 		throw std::runtime_error(std::format("\"{}\" has legacy \"mips\" key. Islands no longer use mip chains: remove \"mips\" and use \"texturePixels\" instead (single resolution; elevation auto-downsamples to texturePixels / {}).", islandJsonFile.string(), kiElevationDivisor));
 	}
 
-	int32_t iSeed = islandJson.at("seed").get<int32_t>();
+	const nlohmann::json& rSeedJson = islandJson.at("seed");
+	if (!rSeedJson.is_number_integer())
+	{
+		throw std::runtime_error(std::format("\"{}\" seed must be an integer", islandJsonFile.string()));
+	}
+	if (rSeedJson.is_number_unsigned())
+	{
+		if (!std::in_range<int32_t>(rSeedJson.get<uint64_t>()))
+		{
+			throw std::runtime_error(std::format("\"{}\" seed must fit in a signed 32-bit integer", islandJsonFile.string()));
+		}
+	}
+	else if (!std::in_range<int32_t>(rSeedJson.get<int64_t>()))
+	{
+		throw std::runtime_error(std::format("\"{}\" seed must fit in a signed 32-bit integer", islandJsonFile.string()));
+	}
+	int64_t iSeed = rSeedJson.get<int64_t>();
 	int64_t iTexturePixels = islandJson.at("texturePixels").get<int64_t>();
 	WorldDimensions dimensions
 	{

@@ -38,9 +38,7 @@ bool FrameInterpolateBase::LogDifferences(const FrameInterpolateBase& rOther) co
 
 void FrameInterpolateBase::Write(std::ostream& rStream) const
 {
-	common::Write(rStream, iTick);
-	common::Write(rStream, fCurrentTime);
-	common::Write(rStream, fDeltaTime);
+	FrameValuesWrite(rStream, *this, Values());
 
 	std::apply([&](const auto&... rCollections)
 	{
@@ -50,9 +48,7 @@ void FrameInterpolateBase::Write(std::ostream& rStream) const
 
 void FrameInterpolateBase::Read(std::istream& rStream)
 {
-	common::Read(rStream, iTick);
-	common::Read(rStream, fCurrentTime);
-	common::Read(rStream, fDeltaTime);
+	FrameValuesRead<false>(rStream, *this, Values());
 
 	std::apply([&](auto&... rCollections)
 	{
@@ -62,9 +58,7 @@ void FrameInterpolateBase::Read(std::istream& rStream)
 
 void FrameInterpolateBase::ServerRead(std::istream& rStream)
 {
-	common::Read(rStream, iTick);
-	common::Read(rStream, fCurrentTime);
-	common::Read(rStream, fDeltaTime);
+	FrameValuesRead<true>(rStream, *this, Values());
 
 	std::apply([&](auto&... rCollections)
 	{
@@ -111,14 +105,7 @@ bool FramePostRenderBase::LogDifferences(const FramePostRenderBase& rOther) cons
 // Cross-build network snapshots use ServerRead, which omits those counters.
 void FramePostRenderBase::Write(std::ostream& rStream) const
 {
-	common::Write(rStream, randomEngine);
-	common::Write(rStream, uiNextUuid);
-#if defined(BT_CLIENT)
-	common::Write(rStream, uiNextSoundUuid);
-	common::Write(rStream, uiNextVisualUuid);
-#endif
-	common::Write(rStream, uiFrameIdentifier);
-	alignments.Write(rStream);
+	FrameValuesWrite(rStream, *this, Values());
 
 	std::apply([&](const auto&... rCollections)
 	{
@@ -128,16 +115,7 @@ void FramePostRenderBase::Write(std::ostream& rStream) const
 
 void FramePostRenderBase::Read(std::istream& rStream)
 {
-	uint64_t uiRandomState = 0;
-	common::Read(rStream, uiRandomState);
-	randomEngine.SetSerializedState(uiRandomState);
-	common::Read(rStream, uiNextUuid);
-#if defined(BT_CLIENT)
-	common::Read(rStream, uiNextSoundUuid);
-	common::Read(rStream, uiNextVisualUuid);
-#endif
-	common::Read(rStream, uiFrameIdentifier);
-	alignments.Read(rStream);
+	FrameValuesRead<false>(rStream, *this, Values());
 
 	std::apply([&](auto&... rCollections)
 	{
@@ -147,13 +125,7 @@ void FramePostRenderBase::Read(std::istream& rStream)
 
 void FramePostRenderBase::ServerRead(std::istream& rStream)
 {
-	uint64_t uiRandomState = 0;
-	common::Read(rStream, uiRandomState);
-	randomEngine.SetSerializedState(uiRandomState);
-	common::Read(rStream, uiNextUuid);
-	// Server does not write uiNextSoundUuid or uiNextVisualUuid
-	common::Read(rStream, uiFrameIdentifier);
-	alignments.Read(rStream);
+	FrameValuesRead<true>(rStream, *this, Values());
 
 	std::apply([&](auto&... rCollections)
 	{

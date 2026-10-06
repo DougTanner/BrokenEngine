@@ -3,10 +3,10 @@
 # Reports regularity violations as structured data. It is an auditor only: it never writes,
 # generates, or repairs a header, and it never proposes tuple text. Tuple position and wire
 # order are judgment calls this script cannot see; it checks membership, partitioning,
-# subsets, guard parity, and Frame::kiVersion sum completeness.
+# subsets, and guard parity.
 #
 # Exit codes: 0 pass, 1 violations or input/internal error, 2 blocked (an accessor shape, tuple
-# entry, guard form, or version sum the parser cannot resolve confidently). `status` distinguishes
+# entry, or guard form the parser cannot resolve confidently). `status` distinguishes
 # `pass` / `failed` / `error` / `blocked`.
 #
 # Recognized declaration form: `TYPE* __restrict pName` or the C-array-of-pointer column
@@ -26,8 +26,6 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$script:DefaultPaths = @('Engine/Source/Frame/Collections', 'Projects/BrokenEngineSandbox/Source/Frame/Collections')
-$script:DefaultFrameSource = 'Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp'
 $script:MaximumViolations = 32
 $script:MaximumTextLength = 96
 $script:MaximumMessageLength = 256
@@ -77,6 +75,23 @@ function Resolve-InputPath
 
 	$full = if ([IO.Path]::IsPathFullyQualified($InputPath)) { $InputPath } else { Join-Path $script:RepoRoot $InputPath }
 	return Get-AgentCanonicalPath $full
+}
+
+# The default sweep: the engine collections plus every game project's standard collection folder,
+# which marks the project, so no project is named here.
+function Get-DefaultLayoutPaths
+{
+	$paths = [Collections.Generic.List[string]]::new()
+	$null = $paths.Add('Engine/Source/Frame/Collections')
+	[string[]] $names = @([IO.Directory]::GetDirectories((Join-Path $script:RepoRoot 'Projects')) | ForEach-Object { [IO.Path]::GetFileName($_) })
+	[Array]::Sort($names, [StringComparer]::Ordinal)
+	foreach ($name in $names)
+	{
+		$candidate = "Projects/$name/Source/Frame/Collections"
+		if ([IO.Directory]::Exists((Join-Path $script:RepoRoot $candidate))) { $null = $paths.Add($candidate) }
+	}
+
+	return $paths
 }
 
 # The client configuration is the superset: a guard is effective when BT_CLIENT is defined
@@ -187,7 +202,7 @@ function Get-NetBraceDelta
 }
 
 # Parses one header into collection-struct records: declared SOA columns with their guards,
-# accessor bodies with their entries, and kiVersion presence.
+# and accessor bodies with their entries.
 function Read-CollectionHeader
 {
 	param([string] $FullPath)
@@ -276,7 +291,6 @@ function Read-CollectionHeader
 					Name = $Matches[1]
 					Path = $displayPath
 					Line = $lineNumber
-					HasVersion = $false
 					Declarations = [Collections.Generic.List[object]]::new()
 					Accessors = [Collections.Generic.List[object]]::new()
 				}
@@ -291,11 +305,7 @@ function Read-CollectionHeader
 
 		if ($structOpened -and $depthBefore -eq ($structDepth + 1))
 		{
-			if ($trimmed -cmatch '^static\s+constexpr\s+int64_t\s+kiVersion\b')
-			{
-				$current.HasVersion = $true
-			}
-			elseif ($trimmed -cmatch '^[A-Za-z_][\w:]*\s*\*\s*__restrict\s+(\w+)\s*[=;]' -or $trimmed -cmatch '^[A-Za-z_][\w:]*\s*\*\s+(\w+)\s*\[[^\]]+\]\s*[=;]')
+			if ($trimmed -cmatch '^[A-Za-z_][\w:]*\s*\*\s*__restrict\s+(\w+)\s*[=;]' -or $trimmed -cmatch '^[A-Za-z_][\w:]*\s*\*\s+(\w+)\s*\[[^\]]+\]\s*[=;]')
 			{
 				$null = $current.Declarations.Add([pscustomobject]@{
 					Member = $Matches[1]
@@ -610,53 +620,6 @@ function Test-GuardParity
 	}
 }
 
-# Both directions of the Frame::kiVersion sum. The literal base term and engine::kiNavDataVersion
-# carry no `::kiVersion` suffix, so they are exempt by construction.
-function Test-VersionSum
-{
-	param([string] $FrameSourcePath, [object[]] $VersionStructs)
-
-	$displayPath = Get-RepositoryRelativePath $FrameSourcePath
-	$lines = [IO.File]::ReadAllLines($FrameSourcePath)
-	$sumLine = 0
-	$sumText = ''
-	for ($index = 0; $index -lt $lines.Count; $index++)
-	{
-		if ($lines[$index] -cmatch 'Frame::kiVersion\s*=\s*(.*?);')
-		{
-			$sumLine = $index + 1
-			$sumText = $Matches[1]
-			break
-		}
-	}
-
-	if ($sumLine -eq 0)
-	{
-		Add-BlockedViolation $displayPath 0 '' '' 'version.sum-unparsed' (Get-ExcerptText "No Frame::kiVersion assignment found in $displayPath")
-		return
-	}
-
-	$termNames = @([regex]::Matches($sumText, '([A-Za-z_]\w*)::kiVersion') | ForEach-Object { $_.Groups[1].Value })
-	$declaringNames = @($VersionStructs | Where-Object { $_.HasVersion } | ForEach-Object { $_.Name })
-
-	foreach ($struct in $VersionStructs)
-	{
-		if (-not $struct.HasVersion) { continue }
-		if ($termNames -cnotcontains $struct.Name)
-		{
-			Add-LayoutViolation $struct.Path $struct.Line $struct.Name 'kiVersion' 'version.term-missing' (Get-ExcerptText "$($struct.Name)::kiVersion is absent from the Frame::kiVersion sum")
-		}
-	}
-
-	foreach ($termName in $termNames)
-	{
-		if ($declaringNames -cnotcontains $termName)
-		{
-			Add-LayoutViolation $displayPath $sumLine $termName 'kiVersion' 'version.term-unresolved' (Get-ExcerptText "$($termName)::kiVersion has no live declaration")
-		}
-	}
-}
-
 function New-TerminalResult
 {
 	param([string] $Status, [string] $Code, [string] $Message)
@@ -723,7 +686,7 @@ try
 	$script:RepoRoot = Get-AgentCanonicalPath (Join-Path $PSScriptRoot '..\..')
 
 	# `pwsh -File` cannot pass an array, so a single ';'-separated value carries several paths.
-	$layoutInputs = @($(if ($null -eq $Path -or $Path.Count -eq 0) { $script:DefaultPaths } else { @($Path | ForEach-Object { $_.Split(';', [StringSplitOptions]::RemoveEmptyEntries) }) }))
+	$layoutInputs = @($(if ($null -eq $Path -or $Path.Count -eq 0) { Get-DefaultLayoutPaths } else { @($Path | ForEach-Object { $_.Split(';', [StringSplitOptions]::RemoveEmptyEntries) }) }))
 	$layoutFiles = [Collections.Generic.List[string]]::new()
 	# A -Path that flattens to nothing would otherwise audit nothing and still report a pass.
 	$inputError = $(if ($layoutInputs.Count -eq 0) { 'No collection header or directory path was supplied.' } else { '' })
@@ -747,51 +710,21 @@ try
 
 	if ([string]::IsNullOrEmpty($inputError))
 	{
-		# The version check always sweeps the full default collection directories, so a narrowed
-		# -Path cannot fabricate a stale-term violation.
-		$frameSourcePath = Resolve-InputPath $script:DefaultFrameSource
-		if (-not [IO.File]::Exists($frameSourcePath))
+		foreach ($file in $layoutFiles)
 		{
-			$inputError = "Frame source does not exist: $frameSourcePath"
-		}
-		else
-		{
-			$versionFiles = [Collections.Generic.List[string]]::new()
-			foreach ($defaultPath in $script:DefaultPaths)
+			foreach ($struct in (Read-CollectionHeader $file))
 			{
-				foreach ($file in [IO.Directory]::GetFiles((Resolve-InputPath $defaultPath), '*.h', [IO.SearchOption]::AllDirectories)) { $null = $versionFiles.Add($file) }
-			}
+				Resolve-AccessorShapes $struct
+				$effective = Get-EffectiveMembers $struct
+				if ($null -eq $effective) { continue }
 
-			$parsed = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::OrdinalIgnoreCase)
-			foreach ($file in (@($layoutFiles) + @($versionFiles)))
-			{
-				if ($parsed.ContainsKey($file)) { continue }
-				$parsed.Add($file, (Read-CollectionHeader $file))
+				Test-MembersExactlyOnce $struct $effective
+				Test-AccessorPartition $struct $effective
+				Test-SharedCrcSubset $struct $effective
+				Test-PersistentSubset $struct $effective
+				Test-SharedClientGuard $struct
+				Test-GuardParity $struct
 			}
-
-			foreach ($file in $layoutFiles)
-			{
-				foreach ($struct in $parsed[$file])
-				{
-					Resolve-AccessorShapes $struct
-					$effective = Get-EffectiveMembers $struct
-					if ($null -eq $effective) { continue }
-
-					Test-MembersExactlyOnce $struct $effective
-					Test-AccessorPartition $struct $effective
-					Test-SharedCrcSubset $struct $effective
-					Test-PersistentSubset $struct $effective
-					Test-SharedClientGuard $struct
-					Test-GuardParity $struct
-				}
-			}
-
-			$versionStructs = [Collections.Generic.List[object]]::new()
-			foreach ($file in $versionFiles)
-			{
-				foreach ($struct in $parsed[$file]) { $null = $versionStructs.Add($struct) }
-			}
-			Test-VersionSum $frameSourcePath $versionStructs
 		}
 	}
 

@@ -107,12 +107,12 @@ static std::string SplitFingerprint(const RouteSubdivision& rRoute)
 // by AreLeavesDirty so a split-only change never trips this.
 static bool IsGaeaRawDirty(const std::filesystem::path& rIntermediatesDirectory, std::string_view expectedFingerprint)
 {
-	for (const char* pcFile : kpcIntermediateFiles)
+	if (std::ranges::any_of(kpcIntermediateFiles, [&rIntermediatesDirectory](const char* const& pcFile)
 	{
-		if (!std::filesystem::exists(rIntermediatesDirectory / pcFile))
-		{
-			return true;
-		}
+		return !std::filesystem::exists(rIntermediatesDirectory / pcFile);
+	}))
+	{
+		return true;
 	}
 	if (!std::filesystem::exists(rIntermediatesDirectory / kpcPatchedArchetypeFile))
 	{
@@ -309,7 +309,7 @@ static std::vector<float> LoadElevationMeters(const std::filesystem::path& rInte
 		throw std::runtime_error(std::format("Gaea output \"{}\" has an elevation extent that overflows size_t ({}x{} float32).", elevationFile.string(), iTexturePixels, iTexturePixels));
 	}
 	size_t uiExpectedBytes = uiPixelCount * sizeof(float);
-	if (uiExpectedBytes > static_cast<uintmax_t>(std::numeric_limits<std::streamsize>::max()))
+	if (!std::in_range<std::streamsize>(uiExpectedBytes))
 	{
 		throw std::runtime_error(std::format("Gaea output \"{}\" has an elevation extent too large for stream reads ({}x{} float32).", elevationFile.string(), iTexturePixels, iTexturePixels));
 	}
@@ -328,14 +328,13 @@ static std::vector<float> LoadElevationMeters(const std::filesystem::path& rInte
 	{
 		throw std::runtime_error(std::format("Failed to read complete Gaea elevation output \"{}\".", elevationFile.string()));
 	}
-	for (int64_t i = 0; float& fRaw : fullElevationMeters)
+	for (auto [i, fRaw] : std::views::enumerate(fullElevationMeters))
 	{
 		if (!std::isfinite(fRaw) || fRaw < 0.0f || fRaw > 1.0f)
 		{
 			throw std::runtime_error(std::format("Gaea produced \"{}\" with elevation pixel {} at {}, outside the normalized [0, 1] range. Verify the archetype's Elevation Export node uses FloatRaw32 format and that the graph feeding it is clamped to [0, 1].", elevationFile.string(), i, fRaw));
 		}
 		fRaw = (fRaw - fSeaLevelNormalized) * fElevationMeters;
-		++i;
 	}
 	return fullElevationMeters;
 }
@@ -351,7 +350,7 @@ static std::vector<uint16_t> LoadAmbientOcclusion(const std::filesystem::path& r
 		throw std::runtime_error(std::format("Gaea output \"{}\" has an ambient-occlusion extent that overflows size_t ({}x{} uint16).", ambientOcclusionFile.string(), iTexturePixels, iTexturePixels));
 	}
 	size_t uiExpectedAmbientOcclusionBytes = uiPixelCount * sizeof(uint16_t);
-	if (uiExpectedAmbientOcclusionBytes > static_cast<uintmax_t>(std::numeric_limits<std::streamsize>::max()))
+	if (!std::in_range<std::streamsize>(uiExpectedAmbientOcclusionBytes))
 	{
 		throw std::runtime_error(std::format("Gaea output \"{}\" has an ambient-occlusion extent too large for stream reads ({}x{} uint16).", ambientOcclusionFile.string(), iTexturePixels, iTexturePixels));
 	}
@@ -529,13 +528,12 @@ static void LoadMesherMesh(const std::filesystem::path& rIntermediatesDirectory,
 		}
 	}
 
-	for (int64_t i = 0; int64_t iIndex : rMeshIndices)
+	for (auto [i, iIndex] : std::views::enumerate(std::as_const(rMeshIndices)))
 	{
 		if (iIndex >= static_cast<uint32_t>(iVertexCount))
 		{
 			throw std::runtime_error(std::format("Gaea Mesher output \"{}\" index {} references vertex {}, past the {} vertices in the mesh.", meshGltfFile.string(), i, iIndex, iVertexCount));
 		}
-		++i;
 	}
 
 	int64_t iInitialVertexCount = iVertexCount;

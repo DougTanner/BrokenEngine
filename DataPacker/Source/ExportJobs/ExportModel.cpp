@@ -32,7 +32,7 @@ void ExportModel::Export()
 	RequireSourceExtent(static_cast<uintmax_t>(iFileSize), 0, sizeof(uiMaterialCount), kpcContext);
 	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(&uiMaterialCount), sizeof(uiMaterialCount)), kpcContext);
 
-	if (uiMaterialCount > static_cast<size_t>(std::numeric_limits<int64_t>::max()))
+	if (!std::in_range<int64_t>(uiMaterialCount))
 	{
 		throw std::runtime_error("ExportModel::Export material count is not representable");
 	}
@@ -54,13 +54,13 @@ void ExportModel::Export()
 	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(&uiVertexCount), sizeof(uiVertexCount)), kpcContext);
 	iFileOffset = static_cast<int64_t>(AddSourceBytes(static_cast<uintmax_t>(iFileOffset), static_cast<uintmax_t>(iCountsBytes), kpcContext));
 
-	if (uiVertexCount > static_cast<size_t>(std::numeric_limits<int64_t>::max()))
+	if (!std::in_range<int64_t>(uiVertexCount))
 	{
 		throw std::runtime_error("ExportModel::Export vertex count is not representable");
 	}
 	bool bUsesU16Indices = common::ModelHeader::UsesU16Indices(static_cast<int64_t>(uiVertexCount));
 	int64_t iIndexElementSize = bUsesU16Indices ? sizeof(uint16_t) : sizeof(uint32_t);
-	if (uiIndexCount > static_cast<size_t>(std::numeric_limits<int64_t>::max()))
+	if (!std::in_range<int64_t>(uiIndexCount))
 	{
 		throw std::runtime_error("ExportModel::Export index count is not representable");
 	}

@@ -52,7 +52,7 @@ public:
 	VkFramebuffer mHdrVkFramebuffer = VK_NULL_HANDLE;
 	VkSwapchainKHR mVkSwapchainKHR = VK_NULL_HANDLE;
 
-	common::PersistentWorker mPresent;
+	common::PersistentWorker mPresent = common::PersistentWorker(common::kThreadPresent, common::kiMinWorkbufferSize);
 
 private:
 

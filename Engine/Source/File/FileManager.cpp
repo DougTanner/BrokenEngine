@@ -89,7 +89,7 @@ public:
 
 	bool Update(std::span<const std::byte> bytes)
 	{
-		return mbValid && bytes.size() <= std::numeric_limits<ULONG>::max()
+		return mbValid && std::in_range<ULONG>(bytes.size())
 #pragma warning(suppress: 26492) // CNG pbInput is SAL input-only and documented not modified.
 		    && (bytes.empty() || ::BCryptHashData(mpHash, reinterpret_cast<PUCHAR>(const_cast<std::byte*>(bytes.data())), static_cast<ULONG>(bytes.size()), 0) >= 0);
 	}
@@ -218,7 +218,7 @@ std::filesystem::path FileManager::GetFilePath(const FileFlags_t& rFlags, const 
 	else
 	{
 		ASSERT(false);
-		return "";
+		std::unreachable();
 	}
 
 	filePath /= rFilename;
@@ -291,7 +291,7 @@ bool FileManager::ComputeSha256(std::span<const std::byte> bytes, std::array<uin
 	std::array<uint8_t, 32> digest {};
 	while (!bytes.empty())
 	{
-		int64_t iChunkSize = bytes.size() > std::numeric_limits<ULONG>::max() ? static_cast<int64_t>(std::numeric_limits<ULONG>::max()) : static_cast<int64_t>(bytes.size());
+		int64_t iChunkSize = !std::in_range<ULONG>(bytes.size()) ? static_cast<int64_t>(std::numeric_limits<ULONG>::max()) : static_cast<int64_t>(bytes.size());
 		if (!hasher.Update(bytes.first(static_cast<size_t>(iChunkSize))))
 		{
 			return false;

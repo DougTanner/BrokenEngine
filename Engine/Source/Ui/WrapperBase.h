@@ -50,8 +50,6 @@ public:
 
 	explicit Wrapper(bool bValue)
 	: mfDefault(bValue ? 1.0f : 0.0f)
-	, mfMin(0.0f)
-	, mfMax(1.0f)
 	, mfCurrent(mfDefault)
 	, mfPrevious(mfCurrent)
 	{
@@ -71,8 +69,6 @@ public:
 		return allowed;
 	}())
 	, mfDefault(static_cast<float>(value))
-	, mfMin(0.0f)
-	, mfMax(1.0f)
 	, mfCurrent(mfDefault)
 	, mfPrevious(mfCurrent)
 	{

@@ -16,6 +16,19 @@ namespace engine
 
 struct FrameStaticData;
 
+template <auto MEMBER, common::FixedString NAME>
+struct FrameColumn
+{
+	static constexpr auto kpMember = MEMBER;
+	static constexpr std::string_view kName = NAME.data;
+};
+
+// The edit_frame key is the column's own member token.
+#define FRAME_COLUMN(OWNER, MEMBER) engine::FrameColumn<&OWNER::MEMBER, #MEMBER>
+
+template <typename... COLUMNS>
+struct FrameColumnList {};
+
 // Decoupled movement: drag decays velocity, acceleration scales down near max speed
 // kbBlendVelocityToDirection: when true, blends velocity direction toward vecDirection (airplane-like constraint)
 template<bool kbBlendVelocityToDirection = false>
@@ -130,11 +143,11 @@ inline XMVECTOR XM_CALLCONV LocalFrameArea()
 {
 	int64_t iSumX = static_cast<int64_t>(coordinate.iX) + static_cast<int64_t>(iDeltaX);
 	int64_t iSumY = static_cast<int64_t>(coordinate.iY) + static_cast<int64_t>(iDeltaY);
-	if (iSumX < std::numeric_limits<int32_t>::min() || iSumX > std::numeric_limits<int32_t>::max())
+	if (!std::in_range<int32_t>(iSumX))
 	{
 		return false;
 	}
-	if (iSumY < std::numeric_limits<int32_t>::min() || iSumY > std::numeric_limits<int32_t>::max())
+	if (!std::in_range<int32_t>(iSumY))
 	{
 		return false;
 	}

@@ -58,7 +58,7 @@ rule permits as using that call's own output:
 `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1
 -RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character SHA>
 -EmitTargets | Set-Content -LiteralPath Temp/code-review-targets.json
--NoNewline`, adding `-IncludeUntracked <comma-separated paths>` for authorized
+-NoNewline`, adding `-IncludeUntracked '<comma-separated paths>'` for authorized
 untracked additions and `-Head <commit>` for a committed head. That gitignored
 `Temp/` path is the save-path convention, and the manager supplies the path, not
 the targets bytes, to the review worker. The run reports its own `status` rather

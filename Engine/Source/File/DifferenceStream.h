@@ -143,11 +143,11 @@ public:
 		}
 		else if (!bFramesWritten)
 		{
-			failedFilename = framesFilename;
+			failedFilename = std::move(framesFilename);
 		}
 		else if (!bChecksumsWritten)
 		{
-			failedFilename = checksumsFilename;
+			failedFilename = std::move(checksumsFilename);
 		}
 
 		if constexpr (kbReplayFullFrames)
@@ -159,7 +159,7 @@ public:
 			});
 			if (!bFullFramesWritten && failedFilename.empty())
 			{
-				failedFilename = fullFramesFilename;
+				failedFilename = std::move(fullFramesFilename);
 			}
 		}
 

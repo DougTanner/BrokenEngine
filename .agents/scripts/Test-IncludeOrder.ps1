@@ -35,16 +35,15 @@ Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 
 $script:MaximumRows = 400
 $script:SourceRoots = @('Common', 'DataPacker', 'Engine', 'Projects', 'Tools')
-# Aggregation and precompiled headers whose include order is load-bearing.
+# Aggregation and precompiled headers whose include order is load-bearing; each game project's Pch.h
+# joins them once the projects are discovered.
 $script:ExcludedFiles = @(
-	'Projects/BrokenEngineSandbox/Source/Pch.h'
 	'DataPacker/Source/Pch.h'
 	'Common/ExternalHeaders.h'
 	'Common/Common.h'
 	'Engine/Source/Engine.h'
 )
 $script:ProjectFiles = @(
-	@{ Prefix = '^(?:Engine|Common|Projects/BrokenEngineSandbox)/'; Project = 'Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/BrokenEngineSandbox.vcxproj' }
 	@{ Prefix = '^DataPacker/'; Project = 'DataPacker/Platforms/VisualStudio2026/DataPacker.vcxproj' }
 	@{ Prefix = '^Tools/(?:AgentHarness|ToolCommon)/'; Project = 'Tools/AgentHarness/Platforms/VisualStudio2026/AgentHarness.vcxproj' }
 	@{ Prefix = '^Tools/WorktreeCli/'; Project = 'Tools/WorktreeCli/Platforms/VisualStudio2026/WorktreeCli.vcxproj' }
@@ -277,6 +276,20 @@ try {
 	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
 		Complete-IncludeOrder 2 'error' "-RepositoryRoot must be an existing directory: '$RepositoryRoot'."
 	}
+	# A game project is a Projects/<Name> directory holding Platforms/VisualStudio2026/<Name>.vcxproj, its
+	# client project. Engine/ and Common/ resolve through the first one's include list, which differs from
+	# its server project's only by the RenderDoc directory.
+	$gameProjects = [Collections.Generic.List[hashtable]]::new()
+	[string[]] $names = @([IO.Directory]::GetDirectories((Join-Path $script:Root 'Projects')) | ForEach-Object { [IO.Path]::GetFileName($_) })
+	[Array]::Sort($names, [StringComparer]::Ordinal)
+	foreach ($name in $names) {
+		$project = "Projects/$name/Platforms/VisualStudio2026/$name.vcxproj"
+		if (-not [IO.File]::Exists((Join-Path $script:Root $project))) { continue }
+		$script:ExcludedFiles += "Projects/$name/Source/Pch.h"
+		$gameProjects.Add(@{ Prefix = "^Projects/$([regex]::Escape($name))/"; Project = $project })
+	}
+	if ($gameProjects.Count -gt 0) { $gameProjects.Insert(0, @{ Prefix = '^(?:Engine|Common)/'; Project = $gameProjects[0].Project }) }
+	$script:ProjectFiles = @($gameProjects) + $script:ProjectFiles
 	if ($PSBoundParameters.ContainsKey('Path') -eq [bool] $All) {
 		Complete-IncludeOrder 2 'error' 'Pass exactly one of -Path or -All.'
 	}

@@ -40,6 +40,13 @@ files receive a focused re-review.
 - `Baseline` — the full 40-character session baseline SHA and the absolute
   repository toplevel, required for a session-changed scope, plus any untracked
   paths the review must cover.
+- `First-round findings` — focused re-review only: each accepted first-round
+  `Findings` row being re-checked, verbatim as the first round returned it,
+  carried in the dispatch's `Continuation capsule:` field
+  (`.agents/references/subagent-handoff.md` `## Continuation capsule`).
+
+`Scope` and `Baseline` alone fix the review scope; the `First-round findings`
+rows never stand in for a caller-supplied `Scope`.
 
 ## Handoff
 

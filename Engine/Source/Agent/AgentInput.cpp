@@ -75,7 +75,7 @@ bool AgentInput::WheelNotchesFit(int64_t iNotches) const
 		return false;
 	}
 	int64_t iSum = miSyntheticScrollAccumulator + iNotches * kiWheelDelta;
-	return iSum >= std::numeric_limits<int>::min() && iSum <= std::numeric_limits<int>::max();
+	return std::in_range<int>(iSum);
 }
 
 void AgentInput::Finish(AgentScriptStatus eStatus)

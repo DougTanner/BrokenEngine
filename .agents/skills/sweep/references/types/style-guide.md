@@ -24,7 +24,6 @@ Procedure:
 
 User rulings (never report these as findings):
 
-- `using namespace std::chrono_literals;` stays as is.
 - The DirectXMath-style `XM_PIDIV*` constants in `Common/ExternalHeaders.h`
   keep their `XM_` names.
 - A struct member of a Vulkan `Vk*` type uses the plain `vk` prefix

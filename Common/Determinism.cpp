@@ -9,7 +9,7 @@ static std::mutex sMutex;
 
 std::recursive_mutex gDbgHelpMutex;
 
-thread_local int64_t giExpectedThrowDepth = 0;
+constinit thread_local int64_t giExpectedThrowDepth = 0;
 
 void ConfigureThreadFloatingPoint()
 {

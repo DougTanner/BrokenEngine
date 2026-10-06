@@ -167,12 +167,6 @@ namespace toolcli
 	class DiagnosticParser
 	{
 	public:
-		DiagnosticParser() :
-			mOriginDiagnostic(R"(^\s*(.+?)(?:\((\d+)(?:,(\d+))?\))?\s*:\s*(?:[A-Za-z][A-Za-z ]*\s+)?(error|warning)\s+([A-Za-z]+\d+)\s*:\s*(.*?)\s*(?:\[([^\][]*)\])?\s*$)"),
-			mBareDiagnostic(R"(^\s*(?:[A-Za-z][A-Za-z ]*\s+)?(error|warning)\s+([A-Za-z]+\d+)\s*:\s*(.*)$)")
-		{
-		}
-
 		void Consume(std::span<const char> data)
 		{
 			mCarry.append(data.data(), data.size());
@@ -223,7 +217,7 @@ namespace toolcli
 				return 0;
 			}
 			int64_t iValue = std::strtoll(rMatch.first, nullptr, 10);
-			return iValue > 0 && iValue <= (std::numeric_limits<int>::max)() ? iValue : 0;
+			return iValue > 0 && std::in_range<int>(iValue) ? iValue : 0;
 		}
 
 		void ParseLine(std::string_view line)
@@ -286,8 +280,8 @@ namespace toolcli
 			mDiagnostics.push_back(std::move(diagnostic));
 		}
 
-		std::regex mOriginDiagnostic;
-		std::regex mBareDiagnostic;
+		std::regex mOriginDiagnostic { R"(^\s*(.+?)(?:\((\d+)(?:,(\d+))?\))?\s*:\s*(?:[A-Za-z][A-Za-z ]*\s+)?(error|warning)\s+([A-Za-z]+\d+)\s*:\s*(.*?)\s*(?:\[([^\][]*)\])?\s*$)" };
+		std::regex mBareDiagnostic { R"(^\s*(?:[A-Za-z][A-Za-z ]*\s+)?(error|warning)\s+([A-Za-z]+\d+)\s*:\s*(.*)$)" };
 		std::string mCarry;
 		std::unordered_set<std::string> mSeenDiagnostics;
 
@@ -336,7 +330,7 @@ namespace toolcli
 			return std::nullopt;
 		}
 
-		std::filesystem::path defaultPath = L"C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe";
+		std::filesystem::path defaultPath = LR"(C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe)";
 		if (std::filesystem::is_regular_file(defaultPath))
 		{
 			return defaultPath;
@@ -360,7 +354,7 @@ namespace toolcli
 			return std::nullopt;
 		}
 
-		std::vector<std::wstring> arguments = { vswherePath.native(), L"-latest", L"-products", L"*", L"-requires", L"Microsoft.Component.MSBuild", L"-find", L"MSBuild\\**\\Bin\\MSBuild.exe" };
+		std::vector<std::wstring> arguments = { vswherePath.native(), L"-latest", L"-products", L"*", L"-requires", L"Microsoft.Component.MSBuild", L"-find", LR"(MSBuild\**\Bin\MSBuild.exe)" };
 		std::optional<ProcessResult> result = RunBuildProcess(vswherePath, arguments);
 		if (!result || result->uiExitCode != 0)
 		{
@@ -463,15 +457,11 @@ namespace toolcli
 		std::wstring shortDashPrefix = ToLowerInvariant(L"-p:" + std::wstring(propertyName) + L"=");
 		std::wstring longSlashPrefix = ToLowerInvariant(L"/property:" + std::wstring(propertyName) + L"=");
 		std::wstring longDashPrefix = ToLowerInvariant(L"-property:" + std::wstring(propertyName) + L"=");
-		for (const std::wstring& rArgument : rArguments)
+		return std::ranges::any_of(rArguments, [&shortSlashPrefix, &shortDashPrefix, &longSlashPrefix, &longDashPrefix](const std::wstring& rArgument)
 		{
 			std::wstring lower = ToLowerInvariant(rArgument);
-			if (lower.starts_with(shortSlashPrefix) || lower.starts_with(shortDashPrefix) || lower.starts_with(longSlashPrefix) || lower.starts_with(longDashPrefix))
-			{
-				return true;
-			}
-		}
-		return false;
+			return lower.starts_with(shortSlashPrefix) || lower.starts_with(shortDashPrefix) || lower.starts_with(longSlashPrefix) || lower.starts_with(longDashPrefix);
+		});
 	}
 
 	static std::wstring ComparablePath(const std::filesystem::path& rPath)
@@ -504,7 +494,7 @@ namespace toolcli
 	{
 		std::vector<std::wstring> queryArguments = { rMsBuild.native(), rProject.native() };
 		queryArguments.reserve(static_cast<size_t>(std::ssize(queryArguments) + std::ssize(rBuildArguments) + 3));
-		queryArguments.insert(queryArguments.end(), rBuildArguments.begin(), rBuildArguments.end());
+		queryArguments.append_range(rBuildArguments);
 		queryArguments.emplace_back(L"/getProperty:IntDir");
 		queryArguments.emplace_back(L"/getItem:ClCompile");
 		queryArguments.emplace_back(L"/nologo");
@@ -577,7 +567,7 @@ namespace toolcli
 				result.items.emplace(ComparablePath(source), BuildItem
 				{
 					.source = source,
-					.object = object,
+					.object = std::move(object),
 				});
 			}
 			return result;
@@ -715,19 +705,14 @@ namespace toolcli
 		}
 
 		std::vector<std::wstring> arguments = { rState.rMsBuild.native(), rState.rTarget.native() };
-		arguments.insert(arguments.end(), rState.rBuildArguments.begin(), rState.rBuildArguments.end());
+		arguments.append_range(rState.rBuildArguments);
 		// Persistent MSBuild worker nodes inherit the pipe write handle and would stall the
 		// drain long after the build completes; honor an explicit caller choice when present.
-		bool bHasNodeReuse = false;
-		for (const std::wstring& rArgument : rState.rBuildArguments)
+		bool bHasNodeReuse = std::ranges::any_of(rState.rBuildArguments, [](const std::wstring& rArgument)
 		{
 			std::wstring lower = ToLowerInvariant(rArgument);
-			if (lower.starts_with(L"/nodereuse:") || lower.starts_with(L"-nodereuse:") || lower.starts_with(L"/nr:") || lower.starts_with(L"-nr:"))
-			{
-				bHasNodeReuse = true;
-				break;
-			}
-		}
+			return lower.starts_with(L"/nodereuse:") || lower.starts_with(L"-nodereuse:") || lower.starts_with(L"/nr:") || lower.starts_with(L"-nr:");
+		});
 		if (!bHasNodeReuse)
 		{
 			arguments.emplace_back(L"/nodeReuse:false");
