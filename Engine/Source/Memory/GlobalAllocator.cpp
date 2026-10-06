@@ -243,14 +243,13 @@ struct MemoryInitializer
 #if defined(ENABLE_CRT_DEBUG_HEAP)
 		_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #else
-		// Eagerly commit arenas when mimalloc reserves them.
-		mi_option_set(mi_option_arena_eager_commit, 1);
-
-		// mimalloc reads mi_option_reserve_os_memory during its TLS-callback process init, before C++ statics, so reserve directly.
-		int64_t iReserveResult = mi_reserve_os_memory(static_cast<std::size_t>(kiMimallocArenaReserveMebibytes) * 1'024 * 1'024, true /*commit*/, true /*allow large*/);
-		if (iReserveResult != 0)
+		// mimalloc's process init reserves the arena from the Mimalloc.cpp wrapper default; this only verifies it became arena 0 (id 1).
+		std::size_t uiArenaBytes = 0;
+		void* pArena = mi_arena_area(1, &uiArenaBytes);
+		int64_t iArenaMebibytes = static_cast<int64_t>(uiArenaBytes / (1'024 * 1'024));
+		if (pArena == nullptr || iArenaMebibytes < kiMimallocArenaReserveMebibytes)
 		{
-			LOG(kDefault, kWarning, "mi_reserve_os_memory of {} MiB failed with {}; continuing on on-demand arenas", kiMimallocArenaReserveMebibytes, iReserveResult);
+			LOG(kDefault, kWarning, "mimalloc arena reserve of {} MiB not found (arena 0: {} MiB); continuing on on-demand arenas", kiMimallocArenaReserveMebibytes, iArenaMebibytes);
 		}
 
 		if constexpr (kbMimallocDiagnostics)

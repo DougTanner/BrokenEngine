@@ -51,9 +51,9 @@ $script:AcceptanceSkeletonChecks = [ordered]@{
 $script:ClassNames = @('dual-language-header', 'glsl', 'cpp', 'skill', 'plan', 'script', 'vcxproj', 'doc', 'binary', 'other')
 $script:ManifestModes = @('100644', '100755')
 $script:ManifestRoots = @('Common', 'DataPacker', 'Engine', 'Projects', 'Tools')
-# EXCLUDED in .agents/skills/code-quality-metrics/scripts/Analyze-CodeQualityMetrics.py is the source of
-# truth for the analyzer corpus: a target path the analyzer finds in neither corpus fails there with exit
-# 2, so a path under one of these first path components is never emitted.
+# -EmitTargets is the C++ review target list its consumers read, so it omits paths under these first path
+# components (upstream libraries, agent tooling, scratch) except the repository's own wrappers under
+# ThirdParty/Prebuilts/Source, which are reviewed like any other changed C++ (Test-ManifestCorpusPath).
 $script:ManifestExcludedRoots = @('ThirdParty', '.agents', '.claude', 'Temp')
 $script:ZeroOid = '0000000000000000000000000000000000000000'
 
@@ -678,14 +678,15 @@ function Write-SessionManifest([string] $CommitSha, [string] $TreeSha, [object[]
 }
 
 function Test-ManifestCorpusPath([string] $Path) {
-	return $script:ManifestExcludedRoots -cnotcontains $Path.Split('/')[0]
+	return ($script:ManifestExcludedRoots -cnotcontains $Path.Split('/')[0]) -or (Test-InventoryPathInScope $Path @('ThirdParty/Prebuilts/Source'))
 }
 
 function Write-SessionTargets([object[]] $Entries) {
-	# Each side qualifies on its own class, mode, and corpus membership, so a rename that crosses a class
-	# or corpus boundary and a type change between an ordinary file and a gitlink contribute only the
-	# eligible side's path. A side whose mode is not an ordinary file is never analyzable C++, so it is
-	# skipped rather than blocked; the analyzer derives pairing and renames from the emitted paths.
+	# Emits the session's changed ordinary-file C++ paths that Test-ManifestCorpusPath admits. Each side
+	# qualifies on its own class, mode, and path, so a rename that crosses a class or root boundary and a
+	# type change between an ordinary file and a gitlink contribute only the eligible side's path. A
+	# gitlink side holds no reviewable C++ text, so it is skipped rather than blocked; consumers derive
+	# pairing and renames from the emitted paths.
 	$paths = [Collections.Generic.HashSet[string]]::new([string[]] @(), [StringComparer]::Ordinal)
 	foreach ($entry in $Entries) {
 		$baselinePath = if ($null -ne $entry.OldPath) { $entry.OldPath } else { $entry.Path }

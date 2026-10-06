@@ -7,10 +7,12 @@ cost data that would inform it does not exist yet.
 
 ## Current behavior
 
-- `MemoryInitializer` (`Engine/Source/Memory/GlobalAllocator.cpp`) reserves and
-  commits a 10 GiB arena up front. `Engine/Source/Memory/AGENTS.md`
-  `## Architecture Notes` already notes that mimalloc's default purge may
-  still decommit freed arena ranges during gameplay.
+- mimalloc's own process init reserves and commits a 10 GiB arena up front (a
+  `ThirdParty/Prebuilts/Source/Engine/Mimalloc.cpp` wrapper default), and
+  `MemoryInitializer` (`Engine/Source/Memory/GlobalAllocator.cpp`) verifies
+  it. `Engine/Source/Memory/AGENTS.md` `## Architecture Notes` already notes
+  that mimalloc's default purge may still decommit freed arena ranges during
+  gameplay.
 - mimalloc 2.2.7 defaults: `purge_delay` 10 ms (`ThirdParty/mimalloc/src/options.c:144`)
   times `arena_purge_mult` 10 (`options.c:153`) gives an arena purge delay of
   about 100 ms (`src/arena.c:467-469`). `purge_decommits` defaults to 1
@@ -37,8 +39,8 @@ fault on first touch.
 
 Debug harness runs in the session that fixed the up-front arena measured: idle
 server peak heap 149 MiB, workload server peak heap 1548 MiB, peak committed
-about 10.3-10.5 GiB, and 2 arenas. The extra arena #0 is covered by
-`Documents/Plans/Engine/MimallocArenaReserveInProcessInit.md`.
+about 10.3-10.5 GiB, and 2 arenas. Reserving the arena inside mimalloc's
+process init removes the extra arena #0.
 
 ## Evidence that would inform the decision
 
