@@ -9,7 +9,7 @@ class AnimationData
 {
 public:
 
-	void Load(std::span<const std::byte> animationData, common::crc_t crc);
+	void Load(std::span<const std::byte> animationData, int64_t iMaterialCount, common::crc_t crc);
 	void EvaluateWorldMatrices(int64_t iAnimationIndex, float fTime, XMMATRIX* pmatWorldMatrices) const;
 	void EvaluateMaterial(int64_t iMaterialIndex, const XMMATRIX* pmatWorldMatrices, common::MeshData* pMeshData, common::JointMatrix* pJointMatrices, int64_t iJointMatrixOffset) const;
 	void EvaluateAnimation(int64_t iAnimationIndex, float fTime, std::span<common::MeshData> meshData, common::JointMatrix* pJointMatrices, int64_t iJointMatrixOffset) const;
@@ -32,7 +32,7 @@ public:
 	common::AlignedUniquePtr<XMMATRIX> mpBindPoseLocalMatrices;       // uiNodeCount entries
 	std::vector<int64_t> mAnimatedNodes;                             // uiAnimationCount * uiNodeCount, row stride uiNodeCount
 	common::AlignedUniquePtr<XMMATRIX> mpAlignedInverseBindMatrices;  // uiSkinJointCount entries
-	common::AlignedUniquePtr<XMMATRIX> mpAlignedRelativeTransforms;   // uiMaterialCount entries
+	common::AlignedUniquePtr<XMMATRIX> mpAlignedRelativeTransforms;   // SceneHeader::uiMaterialCount entries
 
 private:
 

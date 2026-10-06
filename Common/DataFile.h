@@ -236,12 +236,11 @@ struct AnimationHeader
 	uint32_t uiChannelCount = 0;
 	uint32_t uiKeyframeCount = 0;          // Compact keyframes (STEP/LINEAR)
 	uint32_t uiCubicKeyframeCount = 0;
-	uint32_t uiMaterialCount = 0;          // Per-material skinning info count
 	Skeleton skeleton {};
 	// Animations, materialInfos, and trailing data are stored in the data stream.
 };
-static_assert(sizeof(AnimationHeader) == 24, "AnimationHeader layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportScene::kiVersion's raw version (sizeof fold catches size changes only)");
-static_assert(BT_OFFSETOF(AnimationHeader, skeleton) == 20, "AnimationHeader padding changed — embedded Skeleton no longer at offset 20");
+static_assert(sizeof(AnimationHeader) == 20, "AnimationHeader layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportScene::kiVersion's raw version (sizeof fold catches size changes only)");
+static_assert(BT_OFFSETOF(AnimationHeader, skeleton) == 16, "AnimationHeader padding changed — embedded Skeleton no longer at offset 16");
 
 struct MaterialShaderData
 {
@@ -427,7 +426,7 @@ struct DataHeader
 	// identify guarded layouts. A version mismatch forces full re-export, and the engine rejects stale
 	// manifests. Per-job caches are separate: payload-size changes invalidate them through each job's
 	// sizeof folds, while same-size reorders also require the owning job's raw-version bump.
-	static constexpr int64_t kiVersion = 53 + sizeof(ChunkHeader);
+	static constexpr int64_t kiVersion = 54 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 
 	int64_t iChunkCount = 0;

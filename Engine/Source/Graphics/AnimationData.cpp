@@ -34,7 +34,7 @@ static void FindKeyframePair(std::span<const KEYFRAME> keyframes, float fTime, i
 	riKeyframe1 = iUpperIndex < iKeyframeCount ? iUpperIndex : iKeyframeCount - 1;
 }
 
-void AnimationData::Load(std::span<const std::byte> animationData, common::crc_t crc)
+void AnimationData::Load(std::span<const std::byte> animationData, int64_t iMaterialCount, common::crc_t crc)
 {
 	const std::byte* pAnimationData = animationData.data();
 	int64_t iAnimationBytes = std::ssize(animationData);
@@ -49,13 +49,13 @@ void AnimationData::Load(std::span<const std::byte> animationData, common::crc_t
 	std::memcpy(&mHeader, pAnimationData, sizeof(mHeader));
 	pAnimationData += sizeof(mHeader);
 
-	// Animation and material counts have structural maxima. Node count is bounded by its uint16_t field, the byte extent, and the exporter's int16_t parent-index ASSERT; skin-joint count cannot exceed it.
+	// Animation and material counts have structural maxima; the material count is the scene header's, which the renderers also use. Node count is bounded by its uint16_t field, the byte extent, and the exporter's int16_t parent-index ASSERT; skin-joint count cannot exceed it.
 	// Channels and keyframes have no producer structural maximum, so the deserialization ceiling bounds their arithmetic.
 	// Counts size allocations and advance aliases; invalid counts can over-allocate or leave the eager buffer.
 	// Animated chunks require at least one clip because evaluation indexes the clip array.
 	if (mHeader.skeleton.uiSkinJointCount > mHeader.skeleton.uiNodeCount
 	 || mHeader.uiAnimationCount > common::AnimationHeader::kiMaxAnimations || mHeader.uiAnimationCount == 0
-	 || mHeader.uiMaterialCount > common::SceneHeader::kiMaxMaterials || mHeader.uiChannelCount > common::kiMaxDeserializedCapacity
+	 || iMaterialCount > common::SceneHeader::kiMaxMaterials || mHeader.uiChannelCount > common::kiMaxDeserializedCapacity
 	 || mHeader.uiKeyframeCount > common::kiMaxDeserializedCapacity || mHeader.uiCubicKeyframeCount > common::kiMaxDeserializedCapacity)
 	{
 		throw std::ios_base::failure("AnimationData::Load");
@@ -89,7 +89,7 @@ void AnimationData::Load(std::span<const std::byte> animationData, common::crc_t
 	BoundAdvance(mHeader.uiAnimationCount * static_cast<int64_t>(sizeof(common::AnimationClip)));
 
 	mpMaterialInfos = reinterpret_cast<const common::MaterialInfo*>(pAnimationData);
-	BoundAdvance(mHeader.uiMaterialCount * static_cast<int64_t>(sizeof(common::MaterialInfo)));
+	BoundAdvance(iMaterialCount * static_cast<int64_t>(sizeof(common::MaterialInfo)));
 
 	mpChannels = reinterpret_cast<const common::AnimationChannel*>(pAnimationData);
 	BoundAdvance(mHeader.uiChannelCount * static_cast<int64_t>(sizeof(common::AnimationChannel)));
@@ -100,6 +100,12 @@ void AnimationData::Load(std::span<const std::byte> animationData, common::crc_t
 	mpCubicKeyframes = reinterpret_cast<const common::AnimationKeyframeCubic*>(pAnimationData);
 	BoundAdvance(mHeader.uiCubicKeyframeCount * static_cast<int64_t>(sizeof(common::AnimationKeyframeCubic)));
 
+	// The exporter writes exactly the summed sections, so leftover bytes mean a count disagrees with the data, such as a scene material count that does not match the material infos written.
+	if (iOffset != iAnimationBytes)
+	{
+		throw std::ios_base::failure("AnimationData::Load");
+	}
+
 	// Secondary indices require validation independently of counts: channels write the animated-node mask and skin joints read world matrices.
 	// Validate material parents, channel and clip ranges, skin-joint mappings, and topologically ordered node parents once at load time so per-frame evaluation stays unchecked.
 	for (int64_t i = 0; i < mHeader.skeleton.uiSkinJointCount; ++i)
@@ -109,7 +115,7 @@ void AnimationData::Load(std::span<const std::byte> animationData, common::crc_t
 			throw std::ios_base::failure("AnimationData::Load");
 		}
 	}
-	for (int64_t i = 0; i < mHeader.uiMaterialCount; ++i)
+	for (int64_t i = 0; i < iMaterialCount; ++i)
 	{
 		if (static_cast<int32_t>(mpMaterialInfos[i].iParentNodeIndex) >= static_cast<int32_t>(mHeader.skeleton.uiNodeCount))
 		{
@@ -175,8 +181,8 @@ void AnimationData::Load(std::span<const std::byte> animationData, common::crc_t
 		mpAlignedInverseBindMatrices[i] = XMLoadFloat4x4(&pInverseBindMatrices[i]);
 	}
 
-	mpAlignedRelativeTransforms = common::MakeAligned<XMMATRIX>(mHeader.uiMaterialCount);
-	for (int64_t i = 0; i < mHeader.uiMaterialCount; ++i)
+	mpAlignedRelativeTransforms = common::MakeAligned<XMMATRIX>(iMaterialCount);
+	for (int64_t i = 0; i < iMaterialCount; ++i)
 	{
 		mpAlignedRelativeTransforms[i] = XMLoadFloat4x4(&mpMaterialInfos[i].f4x4RelativeTransform);
 	}
@@ -453,7 +459,7 @@ void LoadAnimationDataFromEagerChunks()
 				{
 					throw std::ios_base::failure("AnimationData::Load");
 				}
-				rAnimationData.Load(std::span(rChunk.pData + iAnimationSectionOffset, static_cast<size_t>(iAnimationBytes)), rCrc);
+				rAnimationData.Load(std::span(rChunk.pData + iAnimationSectionOffset, static_cast<size_t>(iAnimationBytes)), rChunk.pHeader->sceneHeader.uiMaterialCount, rCrc);
 			}
 			catch (const std::ios_base::failure& rException)
 			{

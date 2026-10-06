@@ -989,7 +989,6 @@ void ExportScene::WriteAnimationSection(const tinygltf::Model& rGltfModel, const
 	animationHeader.uiChannelCount = static_cast<uint32_t>(std::ssize(channels));
 	animationHeader.uiKeyframeCount = static_cast<uint32_t>(std::ssize(keyframes));
 	animationHeader.uiCubicKeyframeCount = static_cast<uint32_t>(std::ssize(cubicKeyframes));
-	animationHeader.uiMaterialCount = static_cast<uint32_t>(std::ssize(rMaterialInfos));
 	animationHeader.skeleton = skeletonData.skeleton;
 	ASSERT(std::ssize(animations) <= common::AnimationHeader::kiMaxAnimations);
 

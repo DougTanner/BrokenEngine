@@ -1413,3 +1413,4 @@
 {"index":1411,"date":"2026-10-05","captureMode":"carry-forward","verbosity":0.036094622132,"structuralErosion":0.575380232643,"supported":554,"parsed":552}
 {"index":1412,"date":"2026-10-05","captureMode":"carry-forward","verbosity":0.036094622132,"structuralErosion":0.575380232643,"supported":554,"parsed":552}
 {"index":1413,"date":"2026-10-05","captureMode":"carry-forward","verbosity":0.036094622132,"structuralErosion":0.575380232643,"supported":554,"parsed":552}
+{"index":1414,"date":"2026-10-06","captureMode":"cpp-change","verbosity":0.036094622132,"structuralErosion":0.575460833378,"supported":554,"parsed":552}
