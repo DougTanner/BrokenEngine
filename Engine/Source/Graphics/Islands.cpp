@@ -2,7 +2,7 @@
 
 #include "Islands.h"
 
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 #include "Frame/IslandChainPlacement.h"
 
 namespace engine
@@ -179,7 +179,7 @@ void Islands::WriteMeshIndirect(int64_t iTemplate, int64_t iIndexOffset, int64_t
 	}
 }
 
-void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrames>& rFrames, std::span<const GridCoord> activeCoordinates)
+void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, Cell>& rCells, std::span<const GridCoord> activeCoordinates)
 {
 	// Write only the framebuffer instance the current frame will consume. miFramebufferIndex was set by the
 	// trailing AcquireNextImage of the prior render (Graphics.cpp); it is the index RenderGlobal reads
@@ -240,13 +240,13 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 	// Acquire residency and texture slots once per placement; write placements after all per-template bases are known.
 	for (const GridCoord& rCoordinate : activeCoordinates)
 	{
-		auto it = rFrames.find(rCoordinate);
-		if (it == rFrames.end() || it->second.iSnapshotCount == 0)
+		auto it = rCells.find(rCoordinate);
+		if (it == rCells.end() || it->second.iSnapshotCount == 0)
 		{
 			continue;
 		}
 
-		const FrameStaticData& rStaticData = it->second.staticData;
+		const CellStaticData& rStaticData = it->second.staticData;
 		XMFLOAT2 f2Offset = MakeRenderBasis(rCoordinate, engine::gpCamera->mBasisCoordinate).f2Offset;
 		for (const IslandPlacement& rPlacement : rStaticData.islands)
 		{
@@ -321,13 +321,13 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 	// beginning of each template's run so the indirect terrain draw consumes exactly this prefix.
 	for (const GridCoord& rCoordinate : activeCoordinates)
 	{
-		auto it = rFrames.find(rCoordinate);
-		if (it == rFrames.end() || it->second.iSnapshotCount == 0)
+		auto it = rCells.find(rCoordinate);
+		if (it == rCells.end() || it->second.iSnapshotCount == 0)
 		{
 			continue;
 		}
 
-		const FrameStaticData& rStaticData = it->second.staticData;
+		const CellStaticData& rStaticData = it->second.staticData;
 		XMFLOAT2 f2Offset = MakeRenderBasis(rCoordinate, engine::gpCamera->mBasisCoordinate).f2Offset;
 		for (const IslandPlacement& rPlacement : rStaticData.islands)
 		{
@@ -345,13 +345,13 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrame
 	// ShadowElevation.
 	for (const GridCoord& rCoordinate : activeCoordinates)
 	{
-		auto it = rFrames.find(rCoordinate);
-		if (it == rFrames.end() || it->second.iSnapshotCount == 0)
+		auto it = rCells.find(rCoordinate);
+		if (it == rCells.end() || it->second.iSnapshotCount == 0)
 		{
 			continue;
 		}
 
-		const FrameStaticData& rStaticData = it->second.staticData;
+		const CellStaticData& rStaticData = it->second.staticData;
 		XMFLOAT2 f2Offset = MakeRenderBasis(rCoordinate, engine::gpCamera->mBasisCoordinate).f2Offset;
 		for (const IslandPlacement& rPlacement : rStaticData.islands)
 		{

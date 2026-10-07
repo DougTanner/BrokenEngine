@@ -41,17 +41,17 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 				continue;
 			}
 
-			// Drain frameChangeTimerSeconds only while the flagship is at wantedCoordinate, so the cycle is transit plus
+			// Drain cellChangeTimerSeconds only while the flagship is at wantedCoordinate, so the cycle is transit plus
 			// navigationDelaySeconds of idle time. Drain there even in cardinal mode; an expired timer fires when that mode
 			// ends instead of freezing. GameBase::ServerUpdate supplies mfLastDeltaTime = iFullTicks * kfDeltaTime
 			// after pause/time-scale resolution. BuildFrameInputs runs this only for advancing updates, including
 			// mTimeStep fast-forward/slow-motion scaling, keeping it in tick lockstep.
 			if (rFlagship.coordinate == rFleet.wantedCoordinate)
 			{
-				rFleet.frameChangeTimerSeconds -= std::chrono::duration<float>(gpGame->mfLastDeltaTime);
+				rFleet.cellChangeTimerSeconds -= std::chrono::duration<float>(gpGame->mfLastDeltaTime);
 			}
 
-			if (rFleet.frameChangeTimerSeconds.count() > 0.0f)
+			if (rFleet.cellChangeTimerSeconds.count() > 0.0f)
 			{
 				continue;
 			}
@@ -61,12 +61,12 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 			{
 				continue;
 			}
-			if (!gpGame->mCoordinateFrames.contains(rFlagship.coordinate))
+			if (!gpGame->mCells.contains(rFlagship.coordinate))
 			{
 				continue;
 			}
 
-			const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(rFlagship.coordinate).pCurrent).postRender.pPlayers;
+			const PlayersPostRender& rPlayers = *(*gpGame->mCells.at(rFlagship.coordinate).pCurrent).postRender.pPlayers;
 			bool bFoundFlagship = false;
 			int64_t iFlagshipNavigationDirection = -1;
 			for (int64_t k = 0; k < rPlayers.iCount; ++k)
@@ -97,13 +97,13 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 				// rather than wrapping to the far side of the grid. wantedCoordinate already equals the flagship coord,
 				// so resetting the timer alone spends a full navigationDelaySeconds before the next draw instead of
 				// redrawing a direction every tick.
-				rFleet.frameChangeTimerSeconds = rFleet.navigationDelaySeconds;
+				rFleet.cellChangeTimerSeconds = rFleet.navigationDelaySeconds;
 				continue;
 			}
 			int64_t iPendingTicks = engine::kiTickRate;
 			rFleet.wantedCoordinate = destination;
 			rFleet.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(iPendingTicks);
-			rFleet.frameChangeTimerSeconds = rFleet.navigationDelaySeconds;
+			rFleet.cellChangeTimerSeconds = rFleet.navigationDelaySeconds;
 			mPendingFlagshipUpdates.push_back({.clientGuid = rGuid, .fleetGuid = rFleet.guid, .newWantedCoordinate = destination, .iPendingFleetWantedCoordinateTicks = iPendingTicks});
 			LOG(kNetwork, kVerbose, "FleetNavigationController::TickFleetTimers Guid: ({},{}) FleetGuid: ({},{}) Direction: {} WantedCoord: ({},{})", rGuid.uiHigh, rGuid.uiLow, rFleet.guid.uiHigh, rFleet.guid.uiLow, iDirection, destination.iX, destination.iY);
 		}
@@ -148,12 +148,12 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 			{
 				continue;
 			}
-			if (!gpGame->mCoordinateFrames.contains(memberCoordinate))
+			if (!gpGame->mCells.contains(memberCoordinate))
 			{
 				continue;
 			}
 
-			const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(memberCoordinate).pCurrent).postRender.pPlayers;
+			const PlayersPostRender& rPlayers = *(*gpGame->mCells.at(memberCoordinate).pCurrent).postRender.pPlayers;
 			for (int64_t k = 0; k < rPlayers.iCount; ++k)
 			{
 				if (rPlayers.pGlobalPlayerIds[k] == rMember.globalPlayerId)
@@ -202,7 +202,7 @@ void FleetNavigationController::ShiftFlagshipAfterDeath(const engine::ClientGuid
 	const FleetMember& rNewFlagship = rFleet.members.at(static_cast<size_t>(iNewFlagship));
 	rFleet.flagshipGlobalPlayerId = rNewFlagship.globalPlayerId;
 	rFleet.wantedCoordinate = rNewFlagship.coordinate;
-	rFleet.frameChangeTimerSeconds = rFleet.navigationDelaySeconds;
+	rFleet.cellChangeTimerSeconds = rFleet.navigationDelaySeconds;
 	mPendingFlagshipUpdates.push_back({.clientGuid = rGuid, .fleetGuid = rFleet.guid, .newWantedCoordinate = rFleet.wantedCoordinate});
 }
 

@@ -11,7 +11,7 @@
 namespace engine
 {
 
-struct FrameStaticData;
+struct CellStaticData;
 
 #if defined(BT_CLIENT)
 enum class IslandMeshResidency : uint8_t
@@ -110,7 +110,7 @@ struct IslandTemplate
 
 // Batch samples reuse one cell's elevation grid and sea-floor value through the /fp:strict simulation path.
 // A null pGrid returns fSeaFloor.
-struct FrameElevationSampler
+struct CellElevationSampler
 {
 	const std::vector<float>* pGrid = nullptr;
 	float fSeaFloor = 0.0f;
@@ -131,23 +131,23 @@ public:
 	void WaitForElevationMaps();
 #endif
 
-	// Sim path (Frame-tick callers). Cell-local O(1) nearest-texel lookup into the cell's
-	// precomputed FrameStaticData::elevationGrid, taking the position in that cell's own centered local
-	// meters. Out-of-cell positions return mfSeaFloorElevation. Honors the Frame Purity Constraint: the
-	// caller hands its own static data in, so this never touches gpGame->mCoordinateFrames and never reads a
+	// Sim path (Frame-tick callers). Cell-local surface normal from four nearest-texel samples of the cell's
+	// precomputed CellStaticData::elevationGrid, taking the position in that cell's own centered local
+	// meters. A tap outside the cell samples mfSeaFloorElevation. Honors the Frame Purity Constraint: the
+	// caller hands its own static data in, so this never touches gpGame->mCells and never reads a
 	// neighbor cell. Builds happen at the top of RunFrameTick (see FrameBase.cpp), before any sim phase
 	// that would query.
-	[[nodiscard]] XMVECTOR XM_CALLCONV FrameNormal(const FrameStaticData& rStaticData, FXMVECTOR vecLocalPosition) const;
+	[[nodiscard]] XMVECTOR XM_CALLCONV CellNormal(const CellStaticData& rStaticData, FXMVECTOR vecLocalPosition) const;
 
-	[[nodiscard]] FrameElevationSampler XM_CALLCONV MakeFrameElevationSampler(const FrameStaticData& rStaticData) const;
+	[[nodiscard]] CellElevationSampler XM_CALLCONV MakeCellElevationSampler(const CellStaticData& rStaticData) const;
 
 	// Centered cell-local grids cover [-450,+450] meters; overlapping island footprints max-blend, matching GlobalElevation.
 	void XM_CALLCONV BuildElevationGrid(const std::vector<IslandPlacement>& rPlacements, std::vector<float>& rOutGrid) const;
 
 	// Render path (engine client — ProjectToBaseHeight). Takes the cell the position is local to plus that
-	// local position, and iterates mCoordinateFrames' immutable islands list; a position (or a GlobalNormal tap)
+	// local position, and iterates mCells' immutable islands list; a position (or a GlobalNormal tap)
 	// past the cell edge resolves onto the neighbouring cell. Never touches the per-cell grid, so it never
-	// races the tick-time build. MUST NOT be called from Frame-tick code; use FrameElevationSampler::Sample/FrameNormal
+	// races the tick-time build. MUST NOT be called from Frame-tick code; use CellElevationSampler::Sample/CellNormal
 	// from a Frame-tick context.
 	[[nodiscard]] float XM_CALLCONV GlobalElevation(GridCoord coord, FXMVECTOR vecLocalPosition) const;
 	[[nodiscard]] XMVECTOR XM_CALLCONV GlobalNormal(GridCoord coord, FXMVECTOR vecLocalPosition) const;
@@ -176,6 +176,6 @@ public:
 
 inline IslandTerrain* gpIslandTerrain = nullptr;
 
-SegmentHit XM_CALLCONV TracePointAgainstTerrain(const FrameStaticData& rStaticData, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition, float fStartTime, float fEndTime);
+SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticData, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition, float fStartTime, float fEndTime);
 
 } // namespace engine

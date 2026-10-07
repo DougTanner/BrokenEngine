@@ -7,7 +7,7 @@
 namespace engine
 {
 
-struct CoordFrames;
+struct Cell;
 struct GridCoord;
 
 // Global SSBO arena capacity: every subscribed coordinate slot plus the local unconfirmed cell can contribute
@@ -35,7 +35,7 @@ public:
 	void UploadMesh(int64_t iIndexOffset, std::span<const std::byte> indexData, int64_t iVertexOffset, std::span<const std::byte> vertexData);
 	void WriteMeshIndirect(int64_t iTemplate, int64_t iIndexOffset, int64_t iVertexOffset, int64_t iIndexCount);
 
-	void UpdateActiveIslands(const std::unordered_map<GridCoord, CoordFrames>& rFrames, std::span<const GridCoord> activeCoordinates);
+	void UpdateActiveIslands(const std::unordered_map<GridCoord, Cell>& rCells, std::span<const GridCoord> activeCoordinates);
 
 	Buffer mIslandMeshArena;
 	int64_t miMeshArenaCapacityGeneration = 0;

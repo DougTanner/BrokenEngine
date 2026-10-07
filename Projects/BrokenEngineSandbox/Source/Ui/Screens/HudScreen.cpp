@@ -31,12 +31,12 @@ void HudScreen::Render()
 		return;
 	}
 
-	// Force-open the fleet panel when the focused fleet has no presence in any subscribed frame.
-	// Iterating all subscribed frames (not just mClientGridCoordinate) tolerates cell-boundary crossings,
+	// Force-open the fleet panel when the focused fleet has no presence in any subscribed cell.
+	// Iterating all subscribed cells (not just mClientGridCoordinate) tolerates cell-boundary crossings,
 	// where the player's snapshot has migrated to a neighbor before mClientGridCoordinate catches up.
 	bool bWantsForceOpen = false;
 	const char* pcWantReason = "fleet member present";
-	int64_t iSubscribedFrameCount = 0;
+	int64_t iSubscribedCellCount = 0;
 
 	if (!(gpGame->ClientPlayerIdentifier().iValue != 0))
 	{
@@ -51,13 +51,13 @@ void HudScreen::Render()
 	else
 	{
 		bool bFoundAny = false;
-		for (const auto& [rCoordinate, rFrames] : gpGame->mCoordinateFrames)
+		for (const auto& [rCoordinate, rCell] : gpGame->mCells)
 		{
-			if (rFrames.iSnapshotCount == 0)
+			if (rCell.iSnapshotCount == 0)
 			{
 				continue;
 			}
-			++iSubscribedFrameCount;
+			++iSubscribedCellCount;
 			const PlayersPostRender& rPlayers = *gpGame->RenderFrame(rCoordinate).postRender.pPlayers;
 			for (int64_t i = 0; i < rPlayers.iCount && !bFoundAny; ++i)
 			{
@@ -75,14 +75,14 @@ void HudScreen::Render()
 		if (!bFoundAny)
 		{
 			bWantsForceOpen = true;
-			pcWantReason = (iSubscribedFrameCount == 0)
+			pcWantReason = (iSubscribedCellCount == 0)
 				? "no subscribed snapshots"
-				: "no fleet members in any subscribed frame";
+				: "no fleet members in any subscribed cell";
 		}
 	}
 
 	// Grace period: only force-open once the want-state has been sustained. Absorbs the brief gap during cell-boundary
-	// hand-offs when the player snapshot is momentarily absent from every subscribed frame, plus ClientPlayerIdentifier blips.
+	// hand-offs when the player snapshot is momentarily absent from every subscribed cell, plus ClientPlayerIdentifier blips.
 	ImGuiIO& rInputOutput = ImGui::GetIO();
 	if (bWantsForceOpen)
 	{
@@ -98,15 +98,15 @@ void HudScreen::Render()
 	// kWarning clears both the compile floor (keLogLevelDefault, kDebug) and the runtime default threshold (kInfo).
 	if (bForceOpen && !mbPreviousForceOpen)
 	{
-		LOG(kDefault, kWarning, "HUD auto-unhide reason: {} coord: ({},{}) frames: {}", pcWantReason, gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY, iSubscribedFrameCount);
+		LOG(kDefault, kWarning, "HUD auto-unhide reason: {} coord: ({},{}) cells: {}", pcWantReason, gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY, iSubscribedCellCount);
 	}
 	mbPreviousForceOpen = bForceOpen;
 
 	// Right panel content gate: it has nothing useful to show without a focused player in current snapshot.
 	std::optional<int64_t> oPlayerIndex;
 	{
-		auto it = gpGame->mCoordinateFrames.find(gpGame->mClientGridCoordinate);
-		if (it != gpGame->mCoordinateFrames.end() && it->second.iSnapshotCount > 0)
+		auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
+		if (it != gpGame->mCells.end() && it->second.iSnapshotCount > 0)
 		{
 			oPlayerIndex = gpGame->ClientPlayerIndex(*gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pPlayers);
 		}
@@ -355,8 +355,8 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 
 	std::optional<int64_t> oPlayerIndex = std::nullopt;
 	{
-		auto it = gpGame->mCoordinateFrames.find(gpGame->mClientGridCoordinate);
-		if (it != gpGame->mCoordinateFrames.end() && it->second.iSnapshotCount > 0)
+		auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
+		if (it != gpGame->mCells.end() && it->second.iSnapshotCount > 0)
 		{
 			oPlayerIndex = gpGame->ClientPlayerIndex(*gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pPlayers);
 		}

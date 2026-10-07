@@ -467,18 +467,18 @@ void GameBase::BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveC
 		mActiveFrameReferences.reserve(static_cast<size_t>(iActiveCount));
 		for (const GridCoord& rCoordinate : rActiveCoordinates)
 		{
-			CoordFrames& rFrames = mCoordinateFrames.at(rCoordinate);
-			if (rFrames.pCurrent == nullptr || rFrames.pNext == nullptr)
+			Cell& rCell = mCells.at(rCoordinate);
+			if (rCell.pCurrent == nullptr || rCell.pNext == nullptr)
 			{
-				LOG(kDefault, kWarning, "BuildDispatch NullFrame Coord: ({},{}) pCurrent: {} pNext: {}", rCoordinate.iX, rCoordinate.iY, rFrames.pCurrent != nullptr, rFrames.pNext != nullptr);
+				LOG(kDefault, kWarning, "BuildDispatch NullFrame Coord: ({},{}) pCurrent: {} pNext: {}", rCoordinate.iX, rCoordinate.iY, rCell.pCurrent != nullptr, rCell.pNext != nullptr);
 				continue;
 			}
 			mActiveFrameReferences.push_back(
 			{
-				.pNext = rFrames.pNext.get(),
-				.pCurrent = rFrames.pCurrent.get(),
+				.pNext = rCell.pNext.get(),
+				.pCurrent = rCell.pCurrent.get(),
 				.pFrameInput = &mFrameInputs.at(rCoordinate),
-				.pStaticData = &rFrames.staticData,
+				.pStaticData = &rCell.staticData,
 			});
 		}
 	}
@@ -510,7 +510,7 @@ void GameBase::BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveC
 
 void GameBase::FinalizeFrameTick()
 {
-	// Transfer entities that crossed frame boundaries into destination frames
+	// Transfer entities that crossed cell boundaries into destination cells
 	if (!mbReplaying)
 	{
 		game::gpGame->HarvestTransfers();
@@ -540,13 +540,13 @@ game::Frame& GameBase::RenderFrame(GridCoord coordinate) const
 	// populated that many slots yet (cold start or a replay/rollback that didn't apply retention),
 	// fall back to the oldest available; callers force fDeltaTime = 0 for that coord so no
 	// extrapolation occurs.
-	const CoordFrames& rFrames = mCoordinateFrames.at(coordinate);
-	ASSERT(rFrames.iSnapshotCount > 0);
-	int64_t iDesiredLogical = rFrames.iSnapshotCount - 1 - kiRenderBehindTicks;
+	const Cell& rCell = mCells.at(coordinate);
+	ASSERT(rCell.iSnapshotCount > 0);
+	int64_t iDesiredLogical = rCell.iSnapshotCount - 1 - kiRenderBehindTicks;
 	int64_t iLogical = std::max<int64_t>(0, iDesiredLogical);
-	int64_t iPhysical = SnapshotIndex(rFrames.iSnapshotHead, iLogical);
-	ASSERT(rFrames.snapshots[iPhysical] != nullptr);
-	return *rFrames.snapshots[iPhysical];
+	int64_t iPhysical = SnapshotIndex(rCell.iSnapshotHead, iLogical);
+	ASSERT(rCell.snapshots[iPhysical] != nullptr);
+	return *rCell.snapshots[iPhysical];
 }
 
 void GameBase::ResetRenderClock()
@@ -648,8 +648,8 @@ float GameBase::AdvanceRenderClock(double fWindowStartTime, bool bPaused, bool b
 bool GameBase::IsCoordinateRenderable(GridCoord coordinate) const
 {
 	// A coordinate is renderable only when it has frame storage and a populated snapshot ring.
-	auto it = mCoordinateFrames.find(coordinate);
-	return it != mCoordinateFrames.end() && it->second.iSnapshotCount > 0;
+	auto it = mCells.find(coordinate);
+	return it != mCells.end() && it->second.iSnapshotCount > 0;
 }
 
 void GameBase::SelectRenderCamera(const std::vector<GridCoord>& rActiveCoordinates, GridCoord& rCameraCoordinate, bool& rbHaveRenderableCamera) const
@@ -701,13 +701,13 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 	mfLastRenderFrameSeconds = fSimulationDeltaSeconds;
 	// Only advance the render clock and sample the source frame when a renderable camera coord exists.
 	// On the failed-reconnect all-empty-rings frame (bHaveRenderableCamera == false) fDeltaTime stays 0
-	// and none of mCoordinateFrames.at(cameraCoordinate) / RenderFrame(cameraCoordinate) / the clock math runs; the
+	// and none of mCells.at(cameraCoordinate) / RenderFrame(cameraCoordinate) / the clock math runs; the
 	// prune and per-coord interpolate below still run so mRenderInterpolates ends renderable-only.
 	float fDeltaTime = 0.0f;
 	if (bHaveRenderableCamera)
 	{
-		const CoordFrames& rCameraFrames = mCoordinateFrames.at(cameraCoordinate);
-		bool bHaveInterpolationWindow = (rCameraFrames.iSnapshotCount >= kiRenderBehindTicks + 1);
+		const Cell& rCameraCell = mCells.at(cameraCoordinate);
+		bool bHaveInterpolationWindow = (rCameraCell.iSnapshotCount >= kiRenderBehindTicks + 1);
 		// RenderFrame returns the frame kiRenderBehindTicks behind tail once populated, else the oldest
 		// available. Either way, its fCurrentTime is the START of the current render window. Promoted to double so mfRenderTime - fWindowStartTime keeps
 		// nanosecond precision even after hours of accumulated game time (float ULP at ~16384s is 2ms,
@@ -740,16 +740,16 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 		auto InterpolateFrame = [&](const GridCoord& rCoordinate)
 		{
 			const game::Frame& rFrame = RenderFrame(rCoordinate);
-			CoordFrames& rFrames = mCoordinateFrames.at(rCoordinate);
-			if (rFrame.interpolate.iTick < rFrames.iLastRenderedTick
-			 || (rFrame.interpolate.iTick == rFrames.iLastRenderedTick && rFrame.interpolate.fCurrentTime < rFrames.fLastRenderedTime))
+			Cell& rCell = mCells.at(rCoordinate);
+			if (rFrame.interpolate.iTick < rCell.iLastRenderedTick
+			 || (rFrame.interpolate.iTick == rCell.iLastRenderedTick && rFrame.interpolate.fCurrentTime < rCell.fLastRenderedTime))
 			{
-				LOG(kNetwork, kError, "Render regressed to older frame Coord: ({},{}) Tick: {} LastTick: {} Time: {} LastTime: {}", rCoordinate.iX, rCoordinate.iY, rFrame.interpolate.iTick, rFrames.iLastRenderedTick, common::Wb(rFrame.interpolate.fCurrentTime, 4), common::Wb(rFrames.fLastRenderedTime, 4));
+				LOG(kNetwork, kError, "Render regressed to older frame Coord: ({},{}) Tick: {} LastTick: {} Time: {} LastTime: {}", rCoordinate.iX, rCoordinate.iY, rFrame.interpolate.iTick, rCell.iLastRenderedTick, common::Wb(rFrame.interpolate.fCurrentTime, 4), common::Wb(rCell.fLastRenderedTime, 4));
 				DEBUG_BREAK();
 			}
-			rFrames.iLastRenderedTick = rFrame.interpolate.iTick;
-			rFrames.fLastRenderedTime = rFrame.interpolate.fCurrentTime;
-			float fCoordinateDeltaTime = (rFrames.iSnapshotCount >= kiRenderBehindTicks + 1) ? fDeltaTime : 0.0f;
+			rCell.iLastRenderedTick = rFrame.interpolate.iTick;
+			rCell.fLastRenderedTime = rFrame.interpolate.fCurrentTime;
+			float fCoordinateDeltaTime = (rCell.iSnapshotCount >= kiRenderBehindTicks + 1) ? fDeltaTime : 0.0f;
 			game::FrameInterpolate::AllocateAndCopy(mRenderInterpolates.try_emplace(rCoordinate).first->second, rFrame.interpolate);
 			game::FrameInterpolate::Update(mRenderInterpolates.at(rCoordinate), rFrame, fCoordinateDeltaTime);
 			// Label the copy with the cell its positions are local to and that cell's offset from the camera cell
@@ -911,37 +911,37 @@ void GameBase::RefreshReplayActiveSet()
 	for (const auto& [rCoordinate, rpReader] : gpReplay->mReplayReaders)
 	{
 		mActiveCoordinates.push_back(rCoordinate);
-		CoordFrames& rFrames = mCoordinateFrames.try_emplace(rCoordinate).first->second;
-		if (rFrames.pNext == nullptr)
+		Cell& rCell = mCells.try_emplace(rCoordinate).first->second;
+		if (rCell.pNext == nullptr)
 		{
-			rFrames.pNext = std::make_unique<game::Frame>();
+			rCell.pNext = std::make_unique<game::Frame>();
 		}
 	}
 }
 #endif // BT_SERVER
 
-void GameBase::CreateFrameAtCoordinate(GridCoord coordinate)
+void GameBase::CreateCellAtCoordinate(GridCoord coordinate)
 {
 	// Heap: unordered_map insertion + make_unique<Frame>. Frame persists across game lifetime
 	ScopedSuppressAllocationTracking suppress;
 
-	CoordFrames& rFrames = mCoordinateFrames.try_emplace(coordinate).first->second;
+	Cell& rCell = mCells.try_emplace(coordinate).first->second;
 #if defined(BT_CLIENT)
 	// Client uses snapshot ring as the source of truth — seed slot 0.
-	rFrames.iSnapshotHead = 0;
-	rFrames.iSnapshotCount = 1;
-	rFrames.snapshots[0] = std::make_unique<game::Frame>();
-	game::Frame& rFrame = *rFrames.snapshots[0];
+	rCell.iSnapshotHead = 0;
+	rCell.iSnapshotCount = 1;
+	rCell.snapshots[0] = std::make_unique<game::Frame>();
+	game::Frame& rFrame = *rCell.snapshots[0];
 #else
-	rFrames.pCurrent = std::make_unique<game::Frame>();
-	game::Frame& rFrame = *rFrames.pCurrent;
+	rCell.pCurrent = std::make_unique<game::Frame>();
+	game::Frame& rFrame = *rCell.pCurrent;
 #endif
 	rFrame.interpolate.iTick = miTickCounter;
 	rFrame.interpolate.fCurrentTime = mfCurrentTime;
 	rFrame.interpolate.gameFlags.Set(game::GameFlags::kGame);
 	game::gpGame->InitializeFramePostRender(rFrame);
 
-	FrameStaticData& rStaticData = rFrames.staticData;
+	CellStaticData& rStaticData = rCell.staticData;
 	rStaticData.coordinate = coordinate;
 	GenerateIslandChain(coordinate, rStaticData.islands);
 	// navigationData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
@@ -968,9 +968,9 @@ void GameBase::PrepareActiveSet()
 #if defined(BT_SERVER)
 void GameBase::SwapFrames()
 {
-	for (auto& [rCoordinate, rFrames] : mCoordinateFrames)
+	for (auto& [rCoordinate, rCell] : mCells)
 	{
-		std::swap(rFrames.pCurrent, rFrames.pNext);
+		std::swap(rCell.pCurrent, rCell.pNext);
 	}
 
 	// After swap, .next holds old current frames (stale data, reusable memory).
@@ -979,11 +979,11 @@ void GameBase::SwapFrames()
 	{
 		game::gpGame->EnsureNextFrames();
 	}
-	else if (mCoordinateFrames.contains(game::gpGame->mClientGridCoordinate) && mCoordinateFrames.at(game::gpGame->mClientGridCoordinate).pNext == nullptr)
+	else if (mCells.contains(game::gpGame->mClientGridCoordinate) && mCells.at(game::gpGame->mClientGridCoordinate).pNext == nullptr)
 	{
 		// Heap: make_unique<Frame> for replay target coordinate
 		ScopedSuppressAllocationTracking suppress;
-		mCoordinateFrames.at(game::gpGame->mClientGridCoordinate).pNext = std::make_unique<game::Frame>();
+		mCells.at(game::gpGame->mClientGridCoordinate).pNext = std::make_unique<game::Frame>();
 	}
 }
 #endif // BT_SERVER

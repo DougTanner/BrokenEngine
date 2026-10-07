@@ -58,39 +58,39 @@ static nlohmann::json BuildCoordinateState(engine::GridCoord coordinate)
 	nlohmann::json result;
 	result["coord"] = {coordinate.iX, coordinate.iY};
 
-	auto it = gpGame->mCoordinateFrames.find(coordinate);
-	if (it == gpGame->mCoordinateFrames.end())
+	auto it = gpGame->mCells.find(coordinate);
+	if (it == gpGame->mCells.end())
 	{
 		result["present"] = false;
 		return result;
 	}
 
-	const engine::CoordFrames& rFrames = it->second;
+	const engine::Cell& rCell = it->second;
 	result["present"] = true;
-	result["confirmedTick"] = rFrames.iConfirmedTick;
-	result["confirmedOffset"] = rFrames.iConfirmedOffset;
-	result["highWaterValidatedTick"] = rFrames.iHighWaterValidatedTick;
-	result["lastFullStateTick"] = rFrames.iLastFullStateTick;
-	result["snapshotHead"] = rFrames.iSnapshotHead;
-	result["snapshotCount"] = rFrames.iSnapshotCount;
-	result["lastRenderedTick"] = rFrames.iLastRenderedTick;
-	result["lastRenderedTime"] = rFrames.fLastRenderedTime;
-	result["serverUpdateCount"] = rFrames.serverUpdates.size();
-	result["lastReplayConfirmedTick"] = rFrames.iLastReplayConfirmedTick;
-	result["lastReplayServerUpdateCount"] = rFrames.iLastReplayServerUpdateCount;
-	result["stuckFrameCount"] = rFrames.iStuckFrameCount;
+	result["confirmedTick"] = rCell.iConfirmedTick;
+	result["confirmedOffset"] = rCell.iConfirmedOffset;
+	result["highWaterValidatedTick"] = rCell.iHighWaterValidatedTick;
+	result["lastFullStateTick"] = rCell.iLastFullStateTick;
+	result["snapshotHead"] = rCell.iSnapshotHead;
+	result["snapshotCount"] = rCell.iSnapshotCount;
+	result["lastRenderedTick"] = rCell.iLastRenderedTick;
+	result["lastRenderedTime"] = rCell.fLastRenderedTime;
+	result["serverUpdateCount"] = rCell.serverUpdates.size();
+	result["lastReplayConfirmedTick"] = rCell.iLastReplayConfirmedTick;
+	result["lastReplayServerUpdateCount"] = rCell.iLastReplayServerUpdateCount;
+	result["stuckFrameCount"] = rCell.iStuckFrameCount;
 
 	result["pendingFullStateTick"] = nullptr;
-	if (rFrames.pendingFullState.has_value())
+	if (rCell.pendingFullState.has_value())
 	{
-		result["pendingFullStateTick"] = rFrames.pendingFullState->iTick;
+		result["pendingFullStateTick"] = rCell.pendingFullState->iTick;
 	}
 
 	result["firstServerUpdateTick"] = nullptr;
 	result["lastServerUpdateTick"] = nullptr;
-	if (!rFrames.serverUpdates.empty())
+	if (!rCell.serverUpdates.empty())
 	{
-		auto [firstUpdateIt, lastUpdateIt] = std::ranges::minmax_element(rFrames.serverUpdates, {}, [](const auto& rEntry)
+		auto [firstUpdateIt, lastUpdateIt] = std::ranges::minmax_element(rCell.serverUpdates, {}, [](const auto& rEntry)
 		{
 			return rEntry.first;
 		});
@@ -98,31 +98,31 @@ static nlohmann::json BuildCoordinateState(engine::GridCoord coordinate)
 		result["lastServerUpdateTick"] = lastUpdateIt->first;
 	}
 
-	bool bRingValid = rFrames.iSnapshotHead >= 0 && rFrames.iSnapshotHead < engine::kiNetworkBufferSize && rFrames.iSnapshotCount >= 0
-	               && rFrames.iSnapshotCount <= engine::kiNetworkBufferSize;
+	bool bRingValid = rCell.iSnapshotHead >= 0 && rCell.iSnapshotHead < engine::kiNetworkBufferSize && rCell.iSnapshotCount >= 0
+	               && rCell.iSnapshotCount <= engine::kiNetworkBufferSize;
 	int64_t iPreviousTick = -1;
-	for (int64_t i = 0; bRingValid && i < rFrames.iSnapshotCount; ++i)
+	for (int64_t i = 0; bRingValid && i < rCell.iSnapshotCount; ++i)
 	{
-		int64_t iPhysical = engine::SnapshotIndex(rFrames.iSnapshotHead, i);
-		const std::unique_ptr<Frame>& rpSnapshot = rFrames.snapshots[iPhysical];
+		int64_t iPhysical = engine::SnapshotIndex(rCell.iSnapshotHead, i);
+		const std::unique_ptr<Frame>& rpSnapshot = rCell.snapshots[iPhysical];
 		bRingValid = rpSnapshot != nullptr && (i == 0 || rpSnapshot->interpolate.iTick == iPreviousTick + 1);
 		if (rpSnapshot != nullptr)
 		{
 			iPreviousTick = rpSnapshot->interpolate.iTick;
 		}
 	}
-	if (rFrames.iConfirmedTick >= 0)
+	if (rCell.iConfirmedTick >= 0)
 	{
-		bRingValid = bRingValid && rFrames.iConfirmedOffset >= 0 && rFrames.iConfirmedOffset < rFrames.iSnapshotCount;
+		bRingValid = bRingValid && rCell.iConfirmedOffset >= 0 && rCell.iConfirmedOffset < rCell.iSnapshotCount;
 		if (bRingValid)
 		{
-			int64_t iConfirmedPhysical = engine::SnapshotIndex(rFrames.iSnapshotHead, rFrames.iConfirmedOffset);
-			bRingValid = rFrames.snapshots[iConfirmedPhysical] != nullptr
-			          && rFrames.snapshots[iConfirmedPhysical]->interpolate.iTick == rFrames.iConfirmedTick;
+			int64_t iConfirmedPhysical = engine::SnapshotIndex(rCell.iSnapshotHead, rCell.iConfirmedOffset);
+			bRingValid = rCell.snapshots[iConfirmedPhysical] != nullptr
+			          && rCell.snapshots[iConfirmedPhysical]->interpolate.iTick == rCell.iConfirmedTick;
 		}
 	}
 	result["ringValid"] = bRingValid;
-	result["tailTick"] = rFrames.iSnapshotCount > 0 ? iPreviousTick : -1;
+	result["tailTick"] = rCell.iSnapshotCount > 0 ? iPreviousTick : -1;
 	return result;
 }
 
@@ -150,8 +150,8 @@ static nlohmann::json BuildState()
 
 static void ExerciseMatchingTick(engine::GridCoord coordinate, nlohmann::json& rResult, bool& rbClockForced)
 {
-	auto it = gpGame->mCoordinateFrames.find(coordinate);
-	if (it == gpGame->mCoordinateFrames.end())
+	auto it = gpGame->mCells.find(coordinate);
+	if (it == gpGame->mCells.end())
 	{
 		throw std::runtime_error("client_full_state_fixture requires a received pending full state");
 	}
@@ -160,8 +160,8 @@ static void ExerciseMatchingTick(engine::GridCoord coordinate, nlohmann::json& r
 		throw std::runtime_error("client_full_state_fixture requires a received pending full state");
 	}
 
-	engine::CoordFrames& rFrames = it->second;
-	int64_t iPendingTick = rFrames.pendingFullState->iTick;
+	engine::Cell& rCell = it->second;
+	int64_t iPendingTick = rCell.pendingFullState->iTick;
 	int64_t iDeferTargetTick = gpGame->miTickCounter;
 	if (iPendingTick <= iDeferTargetTick)
 	{
@@ -170,22 +170,22 @@ static void ExerciseMatchingTick(engine::GridCoord coordinate, nlohmann::json& r
 
 	nlohmann::json beforeDefer = BuildCoordinateState(coordinate);
 	engine::ReconcileDesyncInfo deferDesynchronization = gpClientSession->mpReconciler->Run();
-	bool bPendingPreserved = rFrames.pendingFullState.has_value() && rFrames.pendingFullState->iTick == iPendingTick;
+	bool bPendingPreserved = rCell.pendingFullState.has_value() && rCell.pendingFullState->iTick == iPendingTick;
 	nlohmann::json afterDefer = BuildCoordinateState(coordinate);
 	if (!bPendingPreserved)
 	{
 		throw std::runtime_error("future pending full state was not deferred");
 	}
 
-	for (int64_t i = rFrames.iConfirmedTick + 1; i <= iPendingTick; ++i)
+	for (int64_t i = rCell.iConfirmedTick + 1; i <= iPendingTick; ++i)
 	{
-		if (!rFrames.serverUpdates.contains(i))
+		if (!rCell.serverUpdates.contains(i))
 		{
 			throw std::runtime_error("client_full_state_fixture requires contiguous server updates through the pending full state tick");
 		}
 	}
 
-	float fPendingTime = rFrames.pendingFullState->pFrame->interpolate.fCurrentTime;
+	float fPendingTime = rCell.pendingFullState->pFrame->interpolate.fCurrentTime;
 	rbClockForced = true;
 	int64_t iTickCounter = iPendingTick;
 	ASSERT(iTickCounter >= 0);
@@ -195,11 +195,11 @@ static void ExerciseMatchingTick(engine::GridCoord coordinate, nlohmann::json& r
 	engine::ReconcileDesyncInfo injectionDesynchronization = gpClientSession->mpReconciler->Run();
 
 	nlohmann::json afterInjection = BuildCoordinateState(coordinate);
-	bool bPendingCleared = !rFrames.pendingFullState.has_value();
+	bool bPendingCleared = !rCell.pendingFullState.has_value();
 	int64_t iHeadTick = -1;
-	if (rFrames.iSnapshotCount > 0 && rFrames.snapshots[rFrames.iSnapshotHead] != nullptr)
+	if (rCell.iSnapshotCount > 0 && rCell.snapshots[rCell.iSnapshotHead] != nullptr)
 	{
-		iHeadTick = rFrames.snapshots[rFrames.iSnapshotHead]->interpolate.iTick;
+		iHeadTick = rCell.snapshots[rCell.iSnapshotHead]->interpolate.iTick;
 	}
 
 	rResult["pendingTick"] = iPendingTick;
@@ -212,8 +212,8 @@ static void ExerciseMatchingTick(engine::GridCoord coordinate, nlohmann::json& r
 	rResult["afterInjection"] = std::move(afterInjection);
 	rResult["pendingCleared"] = bPendingCleared;
 	rResult["headTick"] = iHeadTick;
-	rResult["confirmedTick"] = rFrames.iConfirmedTick;
-	rResult["confirmedOffset"] = rFrames.iConfirmedOffset;
+	rResult["confirmedTick"] = rCell.iConfirmedTick;
+	rResult["confirmedOffset"] = rCell.iConfirmedOffset;
 }
 
 void CommandClientFullStateFixture(const nlohmann::json& rParameters, nlohmann::json& rResult)
@@ -275,12 +275,12 @@ void CommandClientFullStateFixture(const nlohmann::json& rParameters, nlohmann::
 		{
 			return rSlot.eState == engine::CoordSubscriptionState::kActive && rSlot.coordinate == coordinate;
 		});
-		auto it = gpGame->mCoordinateFrames.find(coordinate);
+		auto it = gpGame->mCells.find(coordinate);
 		if (!bActive)
 		{
 			throw std::runtime_error("client_full_state_fixture requires an active confirmed client coord");
 		}
-		if (it == gpGame->mCoordinateFrames.end())
+		if (it == gpGame->mCells.end())
 		{
 			throw std::runtime_error("client_full_state_fixture requires an active confirmed client coord");
 		}
@@ -343,8 +343,8 @@ void CommandClientFullStateFixture(const nlohmann::json& rParameters, nlohmann::
 	try
 	{
 		engine::GridCoord coordinate = sFixture.coordinate;
-		auto it = gpGame->mCoordinateFrames.find(coordinate);
-		if (it == gpGame->mCoordinateFrames.end())
+		auto it = gpGame->mCells.find(coordinate);
+		if (it == gpGame->mCells.end())
 		{
 			throw std::runtime_error("client_full_state_fixture requires a received pending full state");
 		}
@@ -353,8 +353,8 @@ void CommandClientFullStateFixture(const nlohmann::json& rParameters, nlohmann::
 			throw std::runtime_error("client_full_state_fixture requires a received pending full state");
 		}
 
-		engine::CoordFrames& rFrames = it->second;
-		int64_t iPendingTick = rFrames.pendingFullState->iTick;
+		engine::Cell& rCell = it->second;
+		int64_t iPendingTick = rCell.pendingFullState->iTick;
 		int64_t iDeferTargetTick = gpGame->miTickCounter;
 		if (iPendingTick <= iDeferTargetTick)
 		{
@@ -363,20 +363,20 @@ void CommandClientFullStateFixture(const nlohmann::json& rParameters, nlohmann::
 
 		nlohmann::json beforeDefer = BuildCoordinateState(coordinate);
 		engine::ReconcileDesyncInfo deferDesynchronization = gpClientSession->mpReconciler->Run();
-		bool bPendingPreserved = rFrames.pendingFullState.has_value() && rFrames.pendingFullState->iTick == iPendingTick;
+		bool bPendingPreserved = rCell.pendingFullState.has_value() && rCell.pendingFullState->iTick == iPendingTick;
 		nlohmann::json afterDefer = BuildCoordinateState(coordinate);
 		if (!bPendingPreserved)
 		{
 			throw std::runtime_error("future pending full state was not deferred");
 		}
 
-		int64_t iConfirmedBeforeGap = rFrames.iConfirmedTick;
-		int64_t iRemovedUpdateCount = static_cast<int64_t>(std::erase_if(rFrames.serverUpdates, [iConfirmedBeforeGap, iPendingTick](const auto& rEntry)
+		int64_t iConfirmedBeforeGap = rCell.iConfirmedTick;
+		int64_t iRemovedUpdateCount = static_cast<int64_t>(std::erase_if(rCell.serverUpdates, [iConfirmedBeforeGap, iPendingTick](const auto& rEntry)
 		{
 			return rEntry.first > iConfirmedBeforeGap && rEntry.first <= iPendingTick;
 		}));
 		int64_t iUncappedConsecutiveEndpoint = iConfirmedBeforeGap;
-		while (rFrames.serverUpdates.contains(iUncappedConsecutiveEndpoint + 1))
+		while (rCell.serverUpdates.contains(iUncappedConsecutiveEndpoint + 1))
 		{
 			++iUncappedConsecutiveEndpoint;
 		}
@@ -386,7 +386,7 @@ void CommandClientFullStateFixture(const nlohmann::json& rParameters, nlohmann::
 			throw std::runtime_error("client_full_state_fixture failed to create an update gap before pending full state");
 		}
 
-		float fPendingTime = rFrames.pendingFullState->pFrame->interpolate.fCurrentTime;
+		float fPendingTime = rCell.pendingFullState->pFrame->interpolate.fCurrentTime;
 		int64_t iTickCounter = iPendingTick;
 		ASSERT(iTickCounter >= 0);
 		gpGame->miTickCounter = iTickCounter;
@@ -395,19 +395,19 @@ void CommandClientFullStateFixture(const nlohmann::json& rParameters, nlohmann::
 		engine::ReconcileDesyncInfo adoptionDesynchronization = gpClientSession->mpReconciler->Run();
 
 		nlohmann::json afterAdoption = BuildCoordinateState(coordinate);
-		bool bObsoleteUpdatesAbsent = std::ranges::none_of(rFrames.serverUpdates, [iPendingTick](const auto& rEntry)
+		bool bObsoleteUpdatesAbsent = std::ranges::none_of(rCell.serverUpdates, [iPendingTick](const auto& rEntry)
 		{
 			return rEntry.first <= iPendingTick;
 		});
-		bool bRenderBaseNotOlder = rFrames.iLastRenderedTick < 0 || rFrames.iSnapshotCount <= 0
-		                        || rFrames.snapshots[rFrames.iSnapshotHead]->interpolate.iTick >= rFrames.iLastRenderedTick;
-		bool bPendingCleared = !rFrames.pendingFullState.has_value();
-		bool bAdoptedTicksMatch = rFrames.iConfirmedTick == iPendingTick && rFrames.iHighWaterValidatedTick == iPendingTick
-		                       && rFrames.iLastFullStateTick == iPendingTick;
-		bool bRingHeadIsAdopted = rFrames.iSnapshotCount > 0 && rFrames.snapshots[rFrames.iSnapshotHead] != nullptr
-		                       && rFrames.snapshots[rFrames.iSnapshotHead]->interpolate.iTick == iPendingTick;
+		bool bRenderBaseNotOlder = rCell.iLastRenderedTick < 0 || rCell.iSnapshotCount <= 0
+		                        || rCell.snapshots[rCell.iSnapshotHead]->interpolate.iTick >= rCell.iLastRenderedTick;
+		bool bPendingCleared = !rCell.pendingFullState.has_value();
+		bool bAdoptedTicksMatch = rCell.iConfirmedTick == iPendingTick && rCell.iHighWaterValidatedTick == iPendingTick
+		                       && rCell.iLastFullStateTick == iPendingTick;
+		bool bRingHeadIsAdopted = rCell.iSnapshotCount > 0 && rCell.snapshots[rCell.iSnapshotHead] != nullptr
+		                       && rCell.snapshots[rCell.iSnapshotHead]->interpolate.iTick == iPendingTick;
 		bool bDirectAdoptionProven = bDirectAdoptionRequired && !adoptionDesynchronization.bDesync && bPendingCleared && bAdoptedTicksMatch
-		                          && rFrames.iConfirmedOffset == 0 && bObsoleteUpdatesAbsent && bRingHeadIsAdopted;
+		                          && rCell.iConfirmedOffset == 0 && bObsoleteUpdatesAbsent && bRingHeadIsAdopted;
 
 		rResult["pendingTick"] = iPendingTick;
 		rResult["deferTargetTick"] = iDeferTargetTick;
@@ -422,7 +422,7 @@ void CommandClientFullStateFixture(const nlohmann::json& rParameters, nlohmann::
 		rResult["afterAdoption"] = std::move(afterAdoption);
 		rResult["pendingCleared"] = bPendingCleared;
 		rResult["adoptedTicksMatch"] = bAdoptedTicksMatch;
-		rResult["confirmedOffsetZero"] = rFrames.iConfirmedOffset == 0;
+		rResult["confirmedOffsetZero"] = rCell.iConfirmedOffset == 0;
 		rResult["obsoleteUpdatesAbsent"] = bObsoleteUpdatesAbsent;
 		rResult["ringHeadIsAdopted"] = bRingHeadIsAdopted;
 		rResult["directAdoptionProven"] = bDirectAdoptionProven;

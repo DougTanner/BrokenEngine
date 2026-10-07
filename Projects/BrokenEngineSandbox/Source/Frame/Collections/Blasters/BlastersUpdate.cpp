@@ -3,7 +3,7 @@
 #include "Blasters.h"
 
 #include "Data/Audio.h"
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
@@ -191,11 +191,11 @@ void BlastersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 	}
 }
 
-void BlastersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void BlastersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 }
 
-void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	BlasterCollisionIntervalScratch& rCollisionScratch = GetBlasterCollisionIntervalScratch();
 	// Heap: static vectors resized each frame, only allocates on first call or when count grows (capacity retained).
@@ -229,7 +229,7 @@ void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		rCollisionScratch.startTimes.at(static_cast<size_t>(iIndex)) = 0.0f;
 		rCollisionScratch.endTimes.at(static_cast<size_t>(iIndex)) = 1.0f;
 		rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
-		rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)) = engine::TracePointToFrameExit(engine::LocalFrameArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)) = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		float fMaxTime = std::numeric_limits<float>::max();
 		if (rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)).bHit)
 		{
@@ -261,7 +261,7 @@ void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 	});
 }
 
-void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	BlasterCollisionIntervalScratch& rCollisionScratch = GetBlasterCollisionIntervalScratch();
 	BlastersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBlasters;
@@ -275,7 +275,7 @@ void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		int64_t iIndex = i;
-		// Entity results are pre-filtered against terrain and frame-exit cutoffs.
+		// Entity results are pre-filtered against terrain and cell-exit cutoffs.
 		if ((engine::Collision::sResultSpans[engine::Collision::sLayerBaseOffsets[siCollisionLayerIndex] + i].iCount > 0))
 		{
 			rCurrentPostRender.pFlags[i].Set(kDestroy);

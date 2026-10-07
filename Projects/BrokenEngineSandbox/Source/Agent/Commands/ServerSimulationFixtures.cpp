@@ -395,7 +395,7 @@ static StatusChangeType StatusChangeTypeFromEntry(const nlohmann::json& rEntry)
 
 static void ValidateInjectedPosition(FXMVECTOR vecPosition)
 {
-	if (!common::InsideArea(vecPosition, engine::LocalFrameArea()))
+	if (!common::InsideArea(vecPosition, engine::LocalCellArea()))
 	{
 		throw std::runtime_error("inject_payload position must lie inside the cell");
 	}
@@ -904,19 +904,19 @@ void DrainPendingAgentStatusChanges(const ServerSession& rSession)
 	for (auto it = sFixture.pendingAgentStatusChanges.begin(); it != sFixture.pendingAgentStatusChanges.end();)
 	{
 		const engine::GridCoord& rCoordinate = it->first;
-		auto framesIt = gpGame->mCoordinateFrames.find(rCoordinate);
+		auto cellIt = gpGame->mCells.find(rCoordinate);
 		bool bActive = std::ranges::contains(gpGame->mActiveCoordinates, rCoordinate);
 		if (!bActive)
 		{
 			++it;
 			continue;
 		}
-		if (framesIt == gpGame->mCoordinateFrames.end())
+		if (cellIt == gpGame->mCells.end())
 		{
 			++it;
 			continue;
 		}
-		if (framesIt->second.pCurrent == nullptr)
+		if (cellIt->second.pCurrent == nullptr)
 		{
 			++it;
 			continue;

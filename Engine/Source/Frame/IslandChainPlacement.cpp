@@ -327,7 +327,7 @@ void GenerateIslandChain(GridCoord coordinate, std::vector<IslandPlacement>& rOu
 
 	// 2. BIG-ISLAND CHAIN — 2 Large then 3 Medium, contact-linked along a hard-turning curve from the Huge
 	// anchor (each link touches the chain tip — the anchor or the previous link). Stop as soon as a link
-	// cannot fit inside the frame, so the chain extends as far down the curve as the cell allows.
+	// cannot fit inside the cell, so the chain extends as far down the curve as the cell allows.
 	static constexpr Role kChainRoles[] = {Role::kLarge, Role::kLarge, Role::kMedium, Role::kMedium, Role::kMedium};
 	float fHeading = 0.25f * DirectX::XM_PI + SignedJitter(kfChainHeadingStartJitter, context.anchorRandom);
 	int64_t iTipIndex = 0;

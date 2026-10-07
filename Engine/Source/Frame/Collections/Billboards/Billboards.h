@@ -8,7 +8,7 @@
 namespace engine
 {
 
-struct FrameStaticData;
+struct CellStaticData;
 
 enum class BillboardFlags : uint8_t
 {
@@ -66,7 +66,7 @@ using billboard_t = BillboardsInterpolate::id_t;
 
 struct BillboardsPostRender : public Collection<BillboardsPostRender>
 {
-	static void Update(const game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
+	static void Update(const game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 	static void Add(game::Frame& __restrict rFrame, billboard_t&& rId, int64_t) = delete;
 	static void Add(game::Frame& __restrict rFrame, billboard_t& rId, int64_t iTypeIndex);
 

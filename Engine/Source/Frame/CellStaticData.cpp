@@ -1,11 +1,11 @@
-#include "FrameStaticData.h"
+#include "CellStaticData.h"
 
 #include "Frame/IslandTerrain.h"
 
 namespace engine
 {
 
-void FrameStaticData::Write(std::ostream& rStream, bool bIncludeNavigationData) const
+void CellStaticData::Write(std::ostream& rStream, bool bIncludeNavigationData) const
 {
 	common::Write(rStream, static_cast<int32_t>(std::ssize(islands)));
 	for (const IslandPlacement& rPlacement : islands)
@@ -20,13 +20,13 @@ void FrameStaticData::Write(std::ostream& rStream, bool bIncludeNavigationData) 
 	}
 }
 
-void FrameStaticData::Read(std::istream& rStream, bool bIncludeNavigationData)
+void CellStaticData::Read(std::istream& rStream, bool bIncludeNavigationData)
 {
 	int32_t iCount = 0;
 	common::Read(rStream, iCount);
 	// Trust boundary (save / network full-state): enforce the generated per-cell contract and bound the count
 	// against the stream before resize.
-	common::ValidateDeserializedCountCapacity(iCount, kiMaximumIslandsPerCell, sizeof(IslandPlacement::islandCrc) + sizeof(IslandPlacement::f2WorldPosition) + sizeof(IslandPlacement::fRotation), rStream, "FrameStaticData::Read");
+	common::ValidateDeserializedCountCapacity(iCount, kiMaximumIslandsPerCell, sizeof(IslandPlacement::islandCrc) + sizeof(IslandPlacement::f2WorldPosition) + sizeof(IslandPlacement::fRotation), rStream, "CellStaticData::Read");
 	islands.resize(iCount);
 	for (IslandPlacement& rPlacement : islands)
 	{
@@ -54,7 +54,7 @@ void FrameStaticData::Read(std::istream& rStream, bool bIncludeNavigationData)
 	islandRenderQueries = {};
 }
 
-void FrameStaticData::BuildRenderPlacementCache(const IslandTerrain& rIslandTerrain) const
+void CellStaticData::BuildRenderPlacementCache(const IslandTerrain& rIslandTerrain) const
 {
 	islandRenderQueries.resize(static_cast<size_t>(std::ssize(islands)));
 	for (int64_t i = 0; i < std::ssize(islands); ++i)

@@ -1,6 +1,6 @@
 #include "FrameBase.h"
 
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 #include "Frame/IslandTerrain.h"
 #include "Frame/NavBuild.h"
 
@@ -161,7 +161,7 @@ void FramePostRenderBase::AllocateAndCopy([[maybe_unused]] game::FramePostRender
 	AllocateAndCopyCollections(rCurrentBase.Collections(), rPreviousBase.Collections(), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(rCurrentBase.Collections())>)> {});
 }
 
-void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const game::FrameInput& __restrict rFrameInput, [[maybe_unused]] const FrameStaticData& rStaticData)
+void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const game::FrameInput& __restrict rFrameInput, [[maybe_unused]] const CellStaticData& rStaticData)
 {
 	game::FramePostRender& rCurrent = rFrame.postRender;
 	const game::FramePostRender& rPrevious = rPreviousFrame.postRender;
@@ -183,13 +183,13 @@ void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame
 	ForEachPostRenderUpdate(PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
 
 	// Setup pusher zones for spatial acceleration
-	PushersInterpolate::SetupZones(rFrame, LocalFrameArea());
+	PushersInterpolate::SetupZones(rFrame, LocalCellArea());
 }
 
 void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter, float fCurrentTime)
 {
 	// Mark this thread as inside a deterministic tick so a stray render-path GlobalElevation/GlobalNormal
-	// call (which walks mCoordinateFrames with libm trig) fails fast instead of silently desyncing across CPUs.
+	// call (which walks mCells with libm trig) fails fast instead of silently desyncing across CPUs.
 	common::FrameTickScope frameTickScope;
 
 	// Verify MXCSR has not been corrupted by external calls (audio, Vulkan, etc.)
@@ -200,7 +200,7 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter, 
 
 	game::Frame& rNext = *rReference.pNext;
 	const game::Frame& rCurrent = *rReference.pCurrent;
-	const FrameStaticData& rStaticData = *rReference.pStaticData;
+	const CellStaticData& rStaticData = *rReference.pStaticData;
 
 #if defined(BT_SERVER)
 	// NavData is derived from placements + per-template NavContour. Build it here on the
@@ -218,7 +218,7 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter, 
 	// Per-cell elevation grid (purely derived from islands + shared heightmaps). Both client
 	// and server build their own bit-identical copy here — same deterministic placements, same
 	// shared heightmaps, /fp:strict math — so it stays out of the CRC and is never serialized.
-	// Builds before any sim phase below so every FrameElevationSampler::Sample/FrameNormal caller this tick
+	// Builds before any sim phase below so every CellElevationSampler::Sample/CellNormal caller this tick
 	// sees a populated grid.
 	if (rStaticData.elevationGrid.empty() && !rStaticData.islands.empty())
 	{
@@ -248,7 +248,7 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter, 
 	game::FramePostRender::Update(rNext, rCurrent, *rReference.pFrameInput, rStaticData);
 
 	game::FramePostRender::PreCollision(rNext, rCurrent, rStaticData);
-	Collision::Collide(rNext.postRender.alignments, LocalFrameArea());
+	Collision::Collide(rNext.postRender.alignments, LocalCellArea());
 	game::FramePostRender::PostCollision(rNext, rCurrent, rStaticData);
 	game::FramePostRender::AreaDamage(rNext, rCurrent, rStaticData);
 

@@ -8,7 +8,7 @@
 namespace engine
 {
 
-struct FrameStaticData;
+struct CellStaticData;
 
 struct WindRadialKeyframe
 {
@@ -72,8 +72,8 @@ struct WindRadialsInterpolate : public Collection<WindRadialsInterpolate>,
 
 struct WindRadialsPostRender : public Collection<WindRadialsPostRender>
 {
-	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
-	static void Destroy(game::Frame& __restrict rFrame, const FrameStaticData& rStaticData);
+	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
+	static void Destroy(game::Frame& __restrict rFrame, const CellStaticData& rStaticData);
 
 	// Add controlled wind radial (fire-and-forget, auto-destroys when animation ends)
 	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, float fCurrentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fBaseIntensity, float fBaseSize);

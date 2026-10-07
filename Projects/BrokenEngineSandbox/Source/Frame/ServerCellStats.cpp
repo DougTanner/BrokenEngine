@@ -42,7 +42,7 @@ void PublishServerEntityCounts()
 
 	for (const engine::GridCoord& rCoordinate : gpGame->mActiveCoordinates)
 	{
-		ServerCellStats cellStatistics = GetServerCellStatistics((*gpGame->mCoordinateFrames.at(rCoordinate).pCurrent));
+		ServerCellStats cellStatistics = GetServerCellStatistics((*gpGame->mCells.at(rCoordinate).pCurrent));
 		iTotalPlayers += cellStatistics.iPlayers;
 		iTotalSpaceships += cellStatistics.iSpaceships;
 		iTotalBlasters += cellStatistics.iBlasters;

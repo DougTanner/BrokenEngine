@@ -13,7 +13,7 @@ struct Frame;
 namespace engine
 {
 
-struct FrameStaticData;
+struct CellStaticData;
 
 enum class PusherFlags : uint8_t
 {
@@ -86,7 +86,7 @@ struct PushersPostRender : public Collection<PushersPostRender>
 
 	static void AllocateAndCopy(PushersPostRender& rCurrent, const PushersPostRender& rPrevious);
 
-	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
+	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	static void Add(game::Frame& __restrict rFrame, pusher_t& rId);
 

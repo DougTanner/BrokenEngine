@@ -192,12 +192,12 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 	int64_t iUnitCount = 0;
 	bool bTruncated = false;
 
-	for (const auto& [rCoordinate, rFrames] : gpGame->mCoordinateFrames)
+	for (const auto& [rCoordinate, rCell] : gpGame->mCells)
 	{
 		subscribedCoordinates.push_back(engine::AgentCoordinateJson(rCoordinate));
 
 		// Island placements come from staticData, available regardless of whether a snapshot has arrived.
-		const engine::FrameStaticData& rStaticData = rFrames.staticData;
+		const engine::CellStaticData& rStaticData = rCell.staticData;
 		bool bHasFootprint = std::ssize(rStaticData.islandRenderQueries) == std::ssize(rStaticData.islands);
 		for (int64_t i = 0; i < std::ssize(rStaticData.islands); ++i)
 		{
@@ -216,7 +216,7 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 		}
 
 		// Units and counts need a rendered snapshot; RenderFrame asserts iSnapshotCount > 0.
-		if (rFrames.iSnapshotCount <= 0)
+		if (rCell.iSnapshotCount <= 0)
 		{
 			continue;
 		}

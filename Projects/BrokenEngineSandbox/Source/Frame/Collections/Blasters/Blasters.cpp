@@ -2,7 +2,7 @@
 
 #include "Blasters.h"
 
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 
 namespace engine
 {
@@ -109,7 +109,7 @@ void BlastersInterpolate::ClientInitializeAll(Frame& rFrame)
 
 bool BlastersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rSpawnInformation)
 {
-	if (!common::InsideArea(rSpawnInformation.vecPosition, engine::LocalFrameArea()))
+	if (!common::InsideArea(rSpawnInformation.vecPosition, engine::LocalCellArea()))
 	{
 		return false;
 	}
@@ -161,12 +161,12 @@ static void RemoveOwnedObjects([[maybe_unused]] Frame& rFrame, [[maybe_unused]] 
 #endif // BT_CLIENT
 }
 
-void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	BlastersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBlasters;
 	BlastersPostRender& rCurrentPostRender = *rFrame.postRender.pBlasters;
 
-	engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
+	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
 
 	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
 	{
@@ -200,7 +200,7 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 	}
 }
 
-void BlastersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void BlastersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	BlastersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBlasters;
 	BlastersPostRender& rCurrentPostRender = *rFrame.postRender.pBlasters;

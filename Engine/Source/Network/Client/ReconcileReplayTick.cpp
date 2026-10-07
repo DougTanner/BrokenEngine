@@ -16,27 +16,27 @@ namespace engine
 
 void ReconcileRollbackCoord(CoordWork& rWork, int64_t iRollbackOffset)
 {
-	engine::CoordFrames& rFrames = *rWork.pFrames;
+	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
 
 	ASSERT(iRollbackOffset >= 0);
-	int64_t iRollbackPhysical = SnapshotIndex(rFrames.iSnapshotHead, iRollbackOffset);
+	int64_t iRollbackPhysical = SnapshotIndex(rCell.iSnapshotHead, iRollbackOffset);
 	rScratch.replayStack.clear();
-	rScratch.replayStack.push_back(rFrames.snapshots[iRollbackPhysical].get());
+	rScratch.replayStack.push_back(rCell.snapshots[iRollbackPhysical].get());
 	rScratch.iReplayStackCount = 1;
-	rScratch.iReplayWriteHead = SnapshotIndex(rFrames.iSnapshotHead, iRollbackOffset + 1);
+	rScratch.iReplayWriteHead = SnapshotIndex(rCell.iSnapshotHead, iRollbackOffset + 1);
 	rScratch.iReplayWriteCount = 0;
 	rScratch.iLastValidatedIndex = -1;
 }
 
 int64_t ReconcileFindReplayRangeCoord(const CoordWork& rWork, int64_t iReplayStart)
 {
-	const engine::CoordFrames& rFrames = *rWork.pFrames;
+	const engine::Cell& rCell = *rWork.pCell;
 
 	int64_t iMaximumConsecutive = iReplayStart - 1;
 	for (int64_t i = iReplayStart; ; ++i)
 	{
-		if (!rFrames.serverUpdates.contains(i))
+		if (!rCell.serverUpdates.contains(i))
 		{
 			break;
 		}
@@ -82,11 +82,11 @@ static void LogTransferSummary(const CoordWork& rWork, int64_t iTick, int64_t iT
 
 static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, game::FrameInput& rFrameInput, bool bIsReplay)
 {
-	engine::CoordFrames& rFrames = *rWork.pFrames;
+	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
 
 	// Invariant: any tick whose CRC matched the server must never be re-simulated.
-	if (iTick <= rFrames.iHighWaterValidatedTick)
+	if (iTick <= rCell.iHighWaterValidatedTick)
 	{
 		DEBUG_BREAK();
 	}
@@ -100,13 +100,13 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, 
 	}
 
 	int64_t iNextSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
-	if (rFrames.snapshots[iNextSlot] == nullptr)
+	if (rCell.snapshots[iNextSlot] == nullptr)
 	{
-		rFrames.snapshots[iNextSlot] = std::make_unique<game::Frame>();
+		rCell.snapshots[iNextSlot] = std::make_unique<game::Frame>();
 	}
 
 	game::Frame* pCurrent = rScratch.replayStack.at(rScratch.iReplayStackCount - 1);
-	game::Frame* pNext = rFrames.snapshots[iNextSlot].get();
+	game::Frame* pNext = rCell.snapshots[iNextSlot].get();
 
 	pNext->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, iTick <= rScratch.iPreReconcileTailTick);
 
@@ -115,7 +115,7 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, 
 		.pNext = pNext,
 		.pCurrent = pCurrent,
 		.pFrameInput = &rFrameInput,
-		.pStaticData = &rFrames.staticData,
+		.pStaticData = &rCell.staticData,
 	};
 	engine::RunFrameTick(activeFrameReference, iTick, fTime);
 
@@ -157,9 +157,9 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, 
 			}
 		}
 	}
-	if (bHadTransfers && !bIsReplay && iTick > rWork.pFrames->iLastSpawnTransferLogTick)
+	if (bHadTransfers && !bIsReplay && iTick > rWork.pCell->iLastSpawnTransferLogTick)
 	{
-		rWork.pFrames->iLastSpawnTransferLogTick = iTick;
+		rWork.pCell->iLastSpawnTransferLogTick = iTick;
 		LogTransferSummary(rWork, iTick, iTransferPlayerCount, iTransferBlasterCount, iTransferSpaceshipCount, iTransferMissileCount, std::span<const engine::GlobalId>(transferPlayerIds, static_cast<size_t>(std::min<int64_t>(iTransferPlayerCount, 8))));
 	}
 	std::erase_if(rFrameInput.statusChanges, [](const game::StatusChange& rStatusChange)
@@ -179,9 +179,9 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, float fTime, 
 	return true;
 }
 
-static bool ReconcileValidateCrcCoord(CoordWork& rWork, int64_t iTick, const engine::CoordFrames::CoordServerUpdate& rUpdate, const game::FrameInput& rFrameInput)
+static bool ReconcileValidateCrcCoord(CoordWork& rWork, int64_t iTick, const engine::Cell::CoordServerUpdate& rUpdate, const game::FrameInput& rFrameInput)
 {
-	engine::CoordFrames& rFrames = *rWork.pFrames;
+	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
 
 	game::Frame& rCurrentFrame = *rScratch.replayStack.at(rScratch.iReplayStackCount - 1);
@@ -211,20 +211,20 @@ static bool ReconcileValidateCrcCoord(CoordWork& rWork, int64_t iTick, const eng
 
 	rScratch.iLastValidatedIndex = rScratch.iReplayStackCount - 1;
 	rScratch.iNewConfirmedTick = iTick;
-	rFrames.iHighWaterValidatedTick = std::max(rFrames.iHighWaterValidatedTick, iTick);
+	rCell.iHighWaterValidatedTick = std::max(rCell.iHighWaterValidatedTick, iTick);
 
 	return true;
 }
 
 void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iMaximumConsecutive, float& rfTime)
 {
-	engine::CoordFrames& rFrames = *rWork.pFrames;
+	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
 
 	for (int64_t i = iReplayStart; i <= iMaximumConsecutive; ++i)
 	{
-		auto it = rFrames.serverUpdates.find(i);
-		if (it == rFrames.serverUpdates.end())
+		auto it = rCell.serverUpdates.find(i);
+		if (it == rCell.serverUpdates.end())
 		{
 			break;
 		}
@@ -245,7 +245,7 @@ void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iMaxim
 		}
 
 		// The replay range is target-capped, so a matching pending full state is necessarily due.
-		if (rFrames.pendingFullState.has_value() && rFrames.pendingFullState->iTick == i)
+		if (rCell.pendingFullState.has_value() && rCell.pendingFullState->iTick == i)
 		{
 			ReconcileInjectPendingFullState(rWork);
 			rfTime = rScratch.replayStack.at(0)->interpolate.fCurrentTime;
@@ -259,7 +259,7 @@ void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iMaxim
 
 		bool bHadStatusChanges = !it->second.statusChanges.empty();
 
-		rFrames.serverUpdates.erase(it);
+		rCell.serverUpdates.erase(it);
 
 		if (bHadStatusChanges)
 		{
@@ -284,14 +284,14 @@ void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iMaxim
 // Validation and advancement of iConfirmedTick belong to the next reconciliation's CRC fast path.
 static bool ReconcileForwardStepCoord(CoordWork& rWork, int64_t iTick, float& rfTime)
 {
-	engine::CoordFrames& rFrames = *rWork.pFrames;
+	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
 
 	rfTime += engine::kfDeltaTime;
 
 	game::FrameInput frameInput;
-	auto it = rFrames.serverUpdates.find(iTick);
-	if (it != rFrames.serverUpdates.end())
+	auto it = rCell.serverUpdates.find(iTick);
+	if (it != rCell.serverUpdates.end())
 	{
 		frameInput.statusChanges = it->second.statusChanges;
 	}
@@ -307,7 +307,7 @@ static bool ReconcileForwardStepCoord(CoordWork& rWork, int64_t iTick, float& rf
 
 void ReconcileCatchUpCoord(CoordWork& rWork, int64_t iTargetTick, float& rfTime)
 {
-	engine::CoordFrames& rFrames = *rWork.pFrames;
+	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
 
 	int64_t iStartWriteCount = rScratch.iReplayWriteCount;
@@ -328,7 +328,7 @@ void ReconcileCatchUpCoord(CoordWork& rWork, int64_t iTargetTick, float& rfTime)
 	for (int64_t i = iStartWriteCount; i < rScratch.iReplayWriteCount; ++i)
 	{
 		int64_t iSlot = SnapshotIndex(rScratch.iReplayWriteHead, i);
-		rFrames.snapshots[iSlot]->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, false);
+		rCell.snapshots[iSlot]->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, false);
 	}
 }
 
@@ -336,17 +336,17 @@ void ReconcileCatchUpCoord(CoordWork& rWork, int64_t iTargetTick, float& rfTime)
 // Catch-up extends that tail toward iTargetTick, incorporating buffered server updates when available.
 void ReconcileFastPathCatchUp(CoordWork& rWork, int64_t iTargetTick)
 {
-	engine::CoordFrames& rFrames = *rWork.pFrames;
+	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
 
-	if (rFrames.iSnapshotCount == 0)
+	if (rCell.iSnapshotCount == 0)
 	{
 		return;
 	}
 
-	int64_t iTailOffset = rFrames.iSnapshotCount - 1;
-	int64_t iTailPhysical = SnapshotIndex(rFrames.iSnapshotHead, iTailOffset);
-	game::Frame* pTail = rFrames.snapshots[iTailPhysical].get();
+	int64_t iTailOffset = rCell.iSnapshotCount - 1;
+	int64_t iTailPhysical = SnapshotIndex(rCell.iSnapshotHead, iTailOffset);
+	game::Frame* pTail = rCell.snapshots[iTailPhysical].get();
 	if (pTail == nullptr)
 	{
 		return;
@@ -364,7 +364,7 @@ void ReconcileFastPathCatchUp(CoordWork& rWork, int64_t iTargetTick)
 	rScratch.iReplayWriteCount = 0;
 
 	float fTime = pTail->interpolate.fCurrentTime;
-	int64_t iStartCount = rFrames.iSnapshotCount;
+	int64_t iStartCount = rCell.iSnapshotCount;
 	int64_t iBudget = engine::kiNetworkBufferSize - iStartCount;
 	int64_t iCurrentTick = pTail->interpolate.iTick;
 	int64_t iCappedTarget = std::min(iTargetTick, iCurrentTick + iBudget);
@@ -381,10 +381,10 @@ void ReconcileFastPathCatchUp(CoordWork& rWork, int64_t iTargetTick)
 	for (int64_t i = 0; i < rScratch.iReplayWriteCount; ++i)
 	{
 		int64_t iSlot = SnapshotIndex(rScratch.iReplayWriteHead, i);
-		rFrames.snapshots[iSlot]->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, false);
+		rCell.snapshots[iSlot]->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, false);
 	}
 
-	rFrames.iSnapshotCount = std::min(iStartCount + rScratch.iReplayWriteCount, static_cast<int64_t>(engine::kiNetworkBufferSize));
+	rCell.iSnapshotCount = std::min(iStartCount + rScratch.iReplayWriteCount, static_cast<int64_t>(engine::kiNetworkBufferSize));
 }
 
 } // namespace engine

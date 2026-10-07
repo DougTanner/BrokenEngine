@@ -5,7 +5,7 @@
 #include "Frame/Collections/Explosions/Explosions.h"
 #include "Frame/Collections/Pushers/Pushers.h"
 #include "Frame/Collections/Collection.h"
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 #include "Ui/WrapperBase.h"
 
 #include "Frame/Collections/Blasters/Blasters.h"
@@ -351,12 +351,12 @@ static void RemoveOwnedObjects(Frame& rFrame, SpaceshipsInterpolate& rCurrentInt
 #endif
 }
 
-void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
 
-	engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
+	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
 
 	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
 	{
@@ -394,7 +394,7 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 	}
 }
 
-void SpaceshipsPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void SpaceshipsPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
@@ -410,7 +410,7 @@ void SpaceshipsPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[
 	});
 }
 
-void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
@@ -517,7 +517,7 @@ void SpaceshipsInterpolate::ClientInitializeAll(Frame& rFrame)
 
 bool SpaceshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 {
-	if (!common::InsideArea(rInfo.vecPosition, engine::LocalFrameArea()))
+	if (!common::InsideArea(rInfo.vecPosition, engine::LocalCellArea()))
 	{
 		return false;
 	}
@@ -567,7 +567,7 @@ bool SpaceshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInf
 	return true;
 }
 
-void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderUpdateSpaceships);
 

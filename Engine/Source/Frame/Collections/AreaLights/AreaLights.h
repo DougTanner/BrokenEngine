@@ -8,7 +8,7 @@
 namespace engine
 {
 
-struct FrameStaticData;
+struct CellStaticData;
 
 struct AreaLightsType
 {
@@ -61,7 +61,7 @@ using area_lights_t = AreaLightsInterpolate::id_t;
 
 struct AreaLightsPostRender : public Collection<AreaLightsPostRender>
 {
-	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
+	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	static void Add(game::Frame& __restrict rFrame, area_lights_t& rId, int64_t iTypeIndex);
 

@@ -10,7 +10,7 @@
 
 namespace engine
 {
-struct FrameStaticData;
+struct CellStaticData;
 } // namespace engine
 
 
@@ -224,24 +224,24 @@ struct PlayersPostRender : public engine::Collection<PlayersPostRender>
 	}
 
 	// Update (orchestrator in Players.cpp; per-player phase work split into helpers below)
-	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
-	static void ProcessUpdateStatusChanges(Frame& __restrict rFrame, const FrameInput& __restrict rFrameInput, const engine::FrameStaticData& rStaticData);
+	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
+	static void ProcessUpdateStatusChanges(Frame& __restrict rFrame, const FrameInput& __restrict rFrameInput, const engine::CellStaticData& rStaticData);
 
 	// Collision (PreCollision: Players.cpp; PostCollision: PlayersCombat.cpp)
-	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
-	static void PostCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
+	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
+	static void PostCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 
 	// Lifecycle (Transfer: PlayersNavigation.cpp; Destroy/Spawn: Players.cpp)
-	static void Transfer(Frame& __restrict rFrame, const engine::FrameStaticData& rStaticData);
-	static void Destroy(Frame& __restrict rFrame, const engine::FrameStaticData& rStaticData);
-	static void Spawn(Frame& __restrict rFrame, const FrameInput& __restrict rFrameInput, const engine::FrameStaticData& rStaticData);
+	static void Transfer(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
+	static void Destroy(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
+	static void Spawn(Frame& __restrict rFrame, const FrameInput& __restrict rFrameInput, const engine::CellStaticData& rStaticData);
 
 private:
 	// Per-player Update helpers (called from PlayersPostRender::Update orchestrator)
 	// Defined in PlayersNavigation.cpp:
-	static void XM_CALLCONV ComputeNavigation(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecFrameCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, float fDeltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, float& rfFrameChangeTimer);
+	static void XM_CALLCONV ComputeNavigation(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, float fDeltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, float& rfCellChangeTimer);
 	static void XM_CALLCONV ApplyMovement(int64_t iNavigationDirection, FXMVECTOR vecArtificialIntelligenceDirection, float fDeltaTime, float fAccelerationMultiplier, float fDecayMultiplier, XMVECTOR& rVecVelocity);
-	static void XM_CALLCONV ApplyTerrainPush(const engine::FrameStaticData& rStaticData, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity);
+	static void XM_CALLCONV ApplyTerrainPush(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity);
 	static void XM_CALLCONV ApplyPusherPush(const Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, int64_t i, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity);
 
 	// Defined in PlayersCombat.cpp:
@@ -271,7 +271,7 @@ public:
 	XMVECTOR* __restrict pVecAiDirections = nullptr;
 	float* __restrict pfTransferLockTimers = nullptr;
 	float* __restrict pfArrivalGracePeriods = nullptr;
-	float* __restrict pfFrameChangeTimers = nullptr;
+	float* __restrict pfCellChangeTimers = nullptr;
 	XMVECTOR* __restrict pVecIslandDestinations = nullptr;
 	engine::ClientGuid* __restrict pClientGuids = nullptr;
 	engine::GlobalId* __restrict pGlobalPlayerIds = nullptr;
@@ -285,7 +285,7 @@ public:
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfFrameChangeTimers, rSelf.pVecIslandDestinations, rSelf.pClientGuids, rSelf.pGlobalPlayerIds, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pClientGuids, rSelf.pGlobalPlayerIds, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -309,7 +309,7 @@ public:
 	// CRC-only subset: excludes pClientGuids and pGlobalPlayerIds which are server-side bookkeeping
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfFrameChangeTimers, rSelf.pVecIslandDestinations, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
 	}
 
 	bool LogDifferences(const PlayersPostRender& rOther) const;
@@ -332,7 +332,7 @@ public:
 		PlayerFlags_t flags = {PlayerFlags::kBlasterSpawnLeft};
 		float fTransferLockTimer = 0.0f;
 		float fArrivalGracePeriod = 0.0f;
-		float fFrameChangeTimer = 0.0f;
+		float fCellChangeTimer = 0.0f;
 		float fNavigationDelay = 60.0f;
 		engine::GlobalId globalPlayerId {};
 		engine::ClientGuid clientGuid {};

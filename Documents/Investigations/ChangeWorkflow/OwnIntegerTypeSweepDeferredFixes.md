@@ -87,8 +87,8 @@
 - F4 | `Engine/Source/Frame/FrameRegistry.h:55` | Rule 13 | `std::span<uint16_t> subscriberCounts {};` belongs to byte-backed scratch storage; widening changes the excluded layout.
 - F5 | `Engine/Source/Frame/FrameRegistry.cpp:130` | Rule 13 | `std::span<uint16_t>(puiCounts, static_cast<size_t>(iEligibleRows))` binds the same excluded byte-backed subscriber-count storage identified in F4.
 
-#### Engine/Source/Frame/FrameStaticData (out-of-bound)
-- F2 | `Engine/Source/Frame/FrameStaticData.cpp:25` | Rule 13 | `common::Read(rStream, iCount)` at line 26 reads serialized save/network bytes directly into this variable; changing its type changes the serialized layout.
+#### Engine/Source/Frame/CellStaticData (out-of-bound)
+- F2 | `Engine/Source/Frame/CellStaticData.cpp:25` | Rule 13 | `common::Read(rStream, iCount)` at line 26 reads serialized save/network bytes directly into this variable; changing its type changes the serialized layout.
 
 #### Engine/Source/Frame/GridCoord (out-of-bound)
 - F1 | `Engine/Source/Frame/GridCoord.h:8` | Rule 13 | Widening `iX` changes serialized grid-save bytes through `Write` at line 31 and `Read` at line 37, called by `Engine/Source/File/GridSave.cpp:41` and `:109`.

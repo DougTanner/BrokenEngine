@@ -8,7 +8,7 @@
 namespace engine
 {
 
-struct FrameStaticData;
+struct CellStaticData;
 
 struct WindTrailsInterpolate : public Collection<WindTrailsInterpolate, CollectionFlags::kIdToIndex>
 {
@@ -55,7 +55,7 @@ struct WindTrailsPostRender : public Collection<WindTrailsPostRender>
 {
 	static void AllocateAndCopy(WindTrailsPostRender& rCurrent, const WindTrailsPostRender& rPrevious);
 
-	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
+	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	// Add wind trail (Sync pattern - owner manages lifetime)
 	static void Add(game::Frame& __restrict rFrame, wind_trail_t& rId);

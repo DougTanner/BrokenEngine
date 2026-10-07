@@ -127,11 +127,11 @@ std::optional<int64_t> Game::ClientPlayerIndex(const PlayersPostRender& rPlayers
 #if defined(BT_CLIENT)
 XMVECTOR Game::GetClientPlayerPosition() const
 {
-	const engine::CoordFrames& rFrames = mCoordinateFrames.at(mClientGridCoordinate);
-	if (rFrames.iSnapshotCount > 0)
+	const engine::Cell& rCell = mCells.at(mClientGridCoordinate);
+	if (rCell.iSnapshotCount > 0)
 	{
-		int64_t iTailPhysical = engine::SnapshotIndex(rFrames.iSnapshotHead, rFrames.iSnapshotCount - 1);
-		const std::unique_ptr<Frame>& rpTail = rFrames.snapshots[iTailPhysical];
+		int64_t iTailPhysical = engine::SnapshotIndex(rCell.iSnapshotHead, rCell.iSnapshotCount - 1);
+		const std::unique_ptr<Frame>& rpTail = rCell.snapshots[iTailPhysical];
 		if (rpTail != nullptr)
 		{
 			std::optional<int64_t> playerIndex = ClientPlayerIndex(*rpTail->postRender.pPlayers);
@@ -141,7 +141,7 @@ XMVECTOR Game::GetClientPlayerPosition() const
 			}
 		}
 	}
-	XMVECTOR vecArea = engine::LocalFrameArea();
+	XMVECTOR vecArea = engine::LocalCellArea();
 	return XMVectorSet((XMVectorGetX(vecArea) + XMVectorGetZ(vecArea)) * 0.5f, (XMVectorGetY(vecArea) + XMVectorGetW(vecArea)) * 0.5f, 0.0f, 1.0f);
 }
 #endif // BT_CLIENT
@@ -157,19 +157,19 @@ void Game::ComputeActiveSet()
 	if (!(mGameFlags & engine::GameFlags::kMainMenu))
 	{
 		mActiveCoordinates.clear();
-		for (const auto& [rCoordinate, rFrames] : mCoordinateFrames)
+		for (const auto& [rCoordinate, rCell] : mCells)
 		{
-			if (rFrames.iSnapshotCount > 0 && (rFrames.iConfirmedTick >= 0 || rCoordinate == mClientGridCoordinate))
+			if (rCell.iSnapshotCount > 0 && (rCell.iConfirmedTick >= 0 || rCoordinate == mClientGridCoordinate))
 			{
 				mActiveCoordinates.push_back(rCoordinate);
 			}
 		}
 
 		{
-			auto it = mCoordinateFrames.find(mClientGridCoordinate);
-			if (it == mCoordinateFrames.end() || it->second.iSnapshotCount == 0)
+			auto it = mCells.find(mClientGridCoordinate);
+			if (it == mCells.end() || it->second.iSnapshotCount == 0)
 			{
-				CreateFrameAtCoordinate(mClientGridCoordinate);
+				CreateCellAtCoordinate(mClientGridCoordinate);
 			}
 			if (!std::ranges::contains(mActiveCoordinates, mClientGridCoordinate))
 			{
@@ -186,7 +186,7 @@ void Game::ComputeActiveSet()
 			// client-cell change and can be another coord entirely while render-camera selection falls back. Each
 			// neighbour rectangle therefore offsets the one local area every cell has by that neighbour's own offset
 			// from the camera basis, so both sides of the test are always in the same frame.
-			XMVECTOR vecArea = engine::LocalFrameArea();
+			XMVECTOR vecArea = engine::LocalCellArea();
 			float fCellMinX = XMVectorGetX(vecArea);
 			float fCellMaxY = XMVectorGetY(vecArea);
 			float fCellMaxX = XMVectorGetZ(vecArea);
@@ -194,10 +194,10 @@ void Game::ComputeActiveSet()
 
 			auto EnsureNeighbor = [&](engine::GridCoord neighbor)
 			{
-				auto it = mCoordinateFrames.find(neighbor);
-				if (it == mCoordinateFrames.end() || it->second.iSnapshotCount == 0)
+				auto it = mCells.find(neighbor);
+				if (it == mCells.end() || it->second.iSnapshotCount == 0)
 				{
-					CreateFrameAtCoordinate(neighbor);
+					CreateCellAtCoordinate(neighbor);
 				}
 				if (!std::ranges::contains(mActiveCoordinates, neighbor))
 				{
@@ -244,13 +244,13 @@ void Game::ComputeActiveSet()
 		mActiveCoordinates.push_back(mClientGridCoordinate);
 	}
 
-	// Delete local-only frames outside the active set, preserve network-subscribed frames
-	std::erase_if(mCoordinateFrames, [this](const std::pair<const engine::GridCoord, engine::CoordFrames>& rPair)
+	// Delete local-only cells outside the active set, preserve network-subscribed cells
+	std::erase_if(mCells, [this](const std::pair<const engine::GridCoord, engine::Cell>& rPair)
 	{
 		return !std::ranges::contains(mActiveCoordinates, rPair.first) && rPair.second.iConfirmedTick < 0;
 	});
 
-	ASSERT(std::ranges::count_if(mCoordinateFrames, [](const std::pair<const engine::GridCoord, engine::CoordFrames>& rPair)
+	ASSERT(std::ranges::count_if(mCells, [](const std::pair<const engine::GridCoord, engine::Cell>& rPair)
 	{
 		return rPair.second.iConfirmedTick < 0;
 	}) <= 9);
@@ -266,27 +266,27 @@ void Game::UpdateActiveIslands()
 	common::ScopedWorkbufferArena subscribedArena = common::gpThreadLocal->mWorkbuffer.Push();
 	for (const engine::GridCoord& rCoordinate : mActiveCoordinates)
 	{
-		auto it = mCoordinateFrames.find(rCoordinate);
-		if (it != mCoordinateFrames.end() && (it->second.iConfirmedTick >= 0 || rCoordinate == mClientGridCoordinate))
+		auto it = mCells.find(rCoordinate);
+		if (it != mCells.end() && (it->second.iConfirmedTick >= 0 || rCoordinate == mClientGridCoordinate))
 		{
 			subscribedArena.mBuffer.PushBack<engine::GridCoord>(rCoordinate);
 		}
 	}
-	engine::gpIslands->UpdateActiveIslands(mCoordinateFrames, subscribedArena.mBuffer.Span<const engine::GridCoord>());
+	engine::gpIslands->UpdateActiveIslands(mCells, subscribedArena.mBuffer.Span<const engine::GridCoord>());
 }
 #endif // BT_CLIENT
 
 #if defined(BT_SERVER)
 void Game::EnsureNextFrames()
 {
-	// Heap: coordinate-frame entries and their next frames persist across ticks.
+	// Heap: cell entries and their next frames persist across ticks.
 	ScopedSuppressAllocationTracking suppress;
 
 	for (const engine::GridCoord& rCoordinate : mActiveCoordinates)
 	{
-		if (mCoordinateFrames.try_emplace(rCoordinate).first->second.pNext == nullptr)
+		if (mCells.try_emplace(rCoordinate).first->second.pNext == nullptr)
 		{
-			mCoordinateFrames.at(rCoordinate).pNext = std::make_unique<Frame>();
+			mCells.at(rCoordinate).pNext = std::make_unique<Frame>();
 		}
 	}
 }
@@ -304,7 +304,7 @@ void Game::BuildFrameInputs()
 
 	for (const engine::GridCoord& rCoordinate : mActiveCoordinates)
 	{
-		if (!mCoordinateFrames.contains(rCoordinate))
+		if (!mCells.contains(rCoordinate))
 		{
 			continue;
 		}
@@ -313,9 +313,9 @@ void Game::BuildFrameInputs()
 	}
 
 	// Camera shake — read most recent ring frame (head + count - 1)
-	auto it = mCoordinateFrames.find(mClientGridCoordinate);
+	auto it = mCells.find(mClientGridCoordinate);
 	const Frame* pTailFrame = nullptr;
-	if (it != mCoordinateFrames.end() && it->second.iSnapshotCount > 0)
+	if (it != mCells.end() && it->second.iSnapshotCount > 0)
 	{
 		int64_t iTailPhysical = engine::SnapshotIndex(it->second.iSnapshotHead, it->second.iSnapshotCount - 1);
 		pTailFrame = it->second.snapshots[iTailPhysical].get();
@@ -417,22 +417,22 @@ void Game::CreateNewFrame(GameFlags_t gameFlags)
 	// game state lifetime, so workbuffer (lost on Pop) can't hold it.
 	ScopedSuppressAllocationTracking suppress;
 
-	mCoordinateFrames.clear();
-	engine::CoordFrames& rFrames = mCoordinateFrames.try_emplace(engine::kOriginCoordinate).first->second;
+	mCells.clear();
+	engine::Cell& rCell = mCells.try_emplace(engine::kOriginCoordinate).first->second;
 #if defined(BT_CLIENT)
-	rFrames.iSnapshotHead = 0;
-	rFrames.iSnapshotCount = 1;
-	rFrames.snapshots[0] = std::make_unique<Frame>();
-	Frame& rFrame = *rFrames.snapshots[0];
+	rCell.iSnapshotHead = 0;
+	rCell.iSnapshotCount = 1;
+	rCell.snapshots[0] = std::make_unique<Frame>();
+	Frame& rFrame = *rCell.snapshots[0];
 #else
-	rFrames.pCurrent = std::make_unique<Frame>();
-	Frame& rFrame = *rFrames.pCurrent;
+	rCell.pCurrent = std::make_unique<Frame>();
+	Frame& rFrame = *rCell.pCurrent;
 #endif
 	rFrame.interpolate.gameFlags.Set(gameFlags.meFlags);
 	InitializeFramePostRender(rFrame);
 
 	// Populate static data for origin coord (used as the main-menu cell)
-	engine::FrameStaticData& rStaticData = rFrames.staticData;
+	engine::CellStaticData& rStaticData = rCell.staticData;
 	rStaticData.coordinate = engine::kOriginCoordinate;
 	// Debug builds turn the main-menu cell into a single centered island browser ('E' cycles it);
 	// release builds keep the procedural island chain. Gameplay cells always use the chain.
@@ -452,15 +452,15 @@ void Game::CreateNewFrame(GameFlags_t gameFlags)
 	// navigationData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
 
 #if defined(BT_SERVER)
-	rFrames.pNext = std::make_unique<Frame>();
+	rCell.pNext = std::make_unique<Frame>();
 #endif
 }
 
 #if defined(BT_CLIENT)
 bool Game::ShouldUseCrosshair()
 {
-	auto it = mCoordinateFrames.find(mClientGridCoordinate);
-	if (it == mCoordinateFrames.end())
+	auto it = mCells.find(mClientGridCoordinate);
+	if (it == mCells.end())
 	{
 		return false;
 	}
@@ -623,7 +623,7 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 		if (bCycleMenuIslandPressed && (mGameFlags & engine::GameFlags::kMainMenu))
 		{
 			miMenuIslandIndex = (miMenuIslandIndex + 1) % std::ssize(engine::gpIslandTerrain->mIslandCrcsByArea);
-			auto it = mCoordinateFrames.find(engine::kOriginCoordinate);
+			auto it = mCells.find(engine::kOriginCoordinate);
 			BuildMenuIslandPlacement(miMenuIslandIndex, it->second.staticData.islands);
 			// Cycling rewrites the placement list on an existing cell — drop the derived elevation grid
 			// and the render-path query cache so RunFrameTick rebuilds both from the new placements

@@ -347,14 +347,14 @@ bool Replay::CaptureAcceptedTransfers(GridCoord destination, std::span<const gam
 
 void Replay::ActivateReplayReader(GridCoord coordinate, PendingReplayReader&& rPendingReader)
 {
-	if (!game::gpGame->mCoordinateFrames.contains(coordinate))
+	if (!game::gpGame->mCells.contains(coordinate))
 	{
-		game::gpGame->CreateFrameAtCoordinate(coordinate);
+		game::gpGame->CreateCellAtCoordinate(coordinate);
 	}
-	engine::CoordFrames& rFrames = game::gpGame->mCoordinateFrames.at(coordinate);
-	rFrames.pCurrent = std::move(rPendingReader.pSavedStart);
-	rFrames.pNext = std::make_unique<game::Frame>();
-	engine::TransferViaStream(*rFrames.pCurrent, *rFrames.pNext);
+	engine::Cell& rCell = game::gpGame->mCells.at(coordinate);
+	rCell.pCurrent = std::move(rPendingReader.pSavedStart);
+	rCell.pNext = std::make_unique<game::Frame>();
+	engine::TransferViaStream(*rCell.pCurrent, *rCell.pNext);
 	game::gpGame->mFrameInputs.insert_or_assign(coordinate, std::move(rPendingReader.initialInput));
 	mReplayReaders.emplace(coordinate, std::move(rPendingReader.pReader));
 	game::gpGame->mbReplaying = !mReplayReaders.empty() || !mPendingReplayReaders.empty();
@@ -660,8 +660,8 @@ void Replay::SaveLoadReplay()
 					if (rStagedReader.record.iActivationTick == iInitialTick)
 					{
 						initialCoordinates.insert(rStagedReader.record.coordinate);
-						auto it = stagedGrid.coordinateFrames.find(rStagedReader.record.coordinate);
-						if (it == stagedGrid.coordinateFrames.end())
+						auto it = stagedGrid.cells.find(rStagedReader.record.coordinate);
+						if (it == stagedGrid.cells.end())
 						{
 							throw std::ios_base::failure("ReplayManifest initial coord absent from grid");
 						}
@@ -675,7 +675,7 @@ void Replay::SaveLoadReplay()
 						}
 					}
 				}
-				if (initialCoordinates.size() != stagedGrid.coordinateFrames.size())
+				if (initialCoordinates.size() != stagedGrid.cells.size())
 				{
 					throw std::ios_base::failure("ReplayManifest initial coords do not match grid");
 				}
@@ -783,14 +783,14 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 
 			miReplayInitialTick = 0;
 			bool bHaveInitialTick = false;
-			for (const auto& [rCoordinate, rFrames] : game::gpGame->mCoordinateFrames)
+			for (const auto& [rCoordinate, rCell] : game::gpGame->mCells)
 			{
 				if (!bHaveInitialTick)
 				{
-					miReplayInitialTick = rFrames.pCurrent->interpolate.iTick;
+					miReplayInitialTick = rCell.pCurrent->interpolate.iTick;
 					bHaveInitialTick = true;
 				}
-				else if (rFrames.pCurrent->interpolate.iTick != miReplayInitialTick)
+				else if (rCell.pCurrent->interpolate.iTick != miReplayInitialTick)
 				{
 					LOG(kDefault, kError, "Replay recording start has inconsistent coord ticks");
 					mReplayWriters.clear();
@@ -802,7 +802,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 				game::FrameInput& rFrameInput = game::gpGame->mFrameInputs.try_emplace(rCoordinate).first->second;
 				std::vector<ReplayWriterState>& rWriterGenerations = mReplayWriters.try_emplace(rCoordinate).first->second;
 				rWriterGenerations.push_back({
-					.pWriter = std::make_unique<engine::DifferenceStreamWriter<game::Frame, game::FrameInput>>(*rFrames.pCurrent, rFrameInput),
+					.pWriter = std::make_unique<engine::DifferenceStreamWriter<game::Frame, game::FrameInput>>(*rCell.pCurrent, rFrameInput),
 					.iActivationTick = miReplayInitialTick,
 				});
 			}
@@ -843,8 +843,8 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 					}
 					else
 					{
-						auto it = game::gpGame->mCoordinateFrames.find(rCoordinate);
-						if (it != game::gpGame->mCoordinateFrames.end())
+						auto it = game::gpGame->mCells.find(rCoordinate);
+						if (it != game::gpGame->mCells.end())
 						{
 							pEndFrame = it->second.pCurrent.get();
 						}
@@ -956,13 +956,13 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 				{
 					continue;
 				}
-				if (!game::gpGame->mCoordinateFrames.contains(rCoordinate))
+				if (!game::gpGame->mCells.contains(rCoordinate))
 				{
 					continue;
 				}
 
 				game::FrameInput& rFrameInput = game::gpGame->mFrameInputs.try_emplace(rCoordinate).first->second;
-				rWriterState.pWriter->Update(game::gpGame->miTickCounter, rFrameInput, (*game::gpGame->mCoordinateFrames.at(rCoordinate).pCurrent));
+				rWriterState.pWriter->Update(game::gpGame->miTickCounter, rFrameInput, (*game::gpGame->mCells.at(rCoordinate).pCurrent));
 				bWriterUpdated = true;
 			}
 			if (bWriterUpdated)
@@ -1010,14 +1010,14 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 					LOG(kDefault, kError, "Replay reader advanced beyond terminal tick for coord ({},{})", coordinate.iX, coordinate.iY);
 					return AbortReplay();
 				}
-				rpReader->ValidateChecksum(game::gpGame->miTickCounter, (*game::gpGame->mCoordinateFrames.at(coordinate).pCurrent));
+				rpReader->ValidateChecksum(game::gpGame->miTickCounter, (*game::gpGame->mCells.at(coordinate).pCurrent));
 				if (!rpReader->TerminalConsumed())
 				{
 					LOG(kDefault, kError, "Replay reader terminal data was not fully consumed for coord ({},{})", coordinate.iX, coordinate.iY);
 					return AbortReplay();
 				}
 				rFrameInput.statusChanges.clear();
-				game::gpGame->mCoordinateFrames.erase(coordinate);
+				game::gpGame->mCells.erase(coordinate);
 				game::gpGame->mFrameInputs.erase(coordinate);
 				std::erase(game::gpGame->mActiveCoordinates, coordinate);
 				it = mReplayReaders.erase(it);
@@ -1085,7 +1085,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 				{
 					game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.insert_or_assign(rCoordinate, rFrameInput.statusChanges);
 				}
-				rpReader->ValidateChecksum(game::gpGame->miTickCounter, (*game::gpGame->mCoordinateFrames.at(rCoordinate).pCurrent));
+				rpReader->ValidateChecksum(game::gpGame->miTickCounter, (*game::gpGame->mCells.at(rCoordinate).pCurrent));
 			}
 
 			if (mReplayReaders.empty() && mPendingReplayReaders.empty())

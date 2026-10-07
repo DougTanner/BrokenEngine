@@ -141,8 +141,8 @@ static void FormatNetworkSynchronization(common::Workbuffer& rWorkbuffer)
 static void FormatNetworkPrediction(common::Workbuffer& rWorkbuffer)
 {
 	rWorkbuffer.Append("\n-- Prediction --\n");
-	auto it = game::gpGame->mCoordinateFrames.find(game::gpGame->mClientGridCoordinate);
-	if (it != game::gpGame->mCoordinateFrames.end() && it->second.iSnapshotCount > 0)
+	auto it = game::gpGame->mCells.find(game::gpGame->mClientGridCoordinate);
+	if (it != game::gpGame->mCells.end() && it->second.iSnapshotCount > 0)
 	{
 		gpProfileManager->mSmoothedRollback = game::gpGame->RenderFrame(game::gpGame->mClientGridCoordinate).interpolate.iTick - game::gpClientSession->mpRuntime->GetClientConfirmedTick();
 	}

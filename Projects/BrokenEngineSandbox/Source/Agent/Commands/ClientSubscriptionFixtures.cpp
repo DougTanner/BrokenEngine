@@ -107,8 +107,8 @@ void CommandClientStaleUpdateFixture(const nlohmann::json& rParams, [[maybe_unus
 		engine::Client& rClient = RequireFixtureClient("client_stale_update_fixture");
 		bool bHasActiveConfirmedCoordinate = std::ranges::any_of(rClient.mSubscriptions.mCoordinateSlots, [](const engine::ClientCoordSlot& rSlot)
 		{
-			auto it = gpGame->mCoordinateFrames.find(rSlot.coordinate);
-			return rSlot.eState == engine::CoordSubscriptionState::kActive && it != gpGame->mCoordinateFrames.end() && it->second.iConfirmedTick >= 0;
+			auto it = gpGame->mCells.find(rSlot.coordinate);
+			return rSlot.eState == engine::CoordSubscriptionState::kActive && it != gpGame->mCells.end() && it->second.iConfirmedTick >= 0;
 		});
 		if (!bHasActiveConfirmedCoordinate)
 		{

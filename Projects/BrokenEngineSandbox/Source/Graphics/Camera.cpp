@@ -41,8 +41,8 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 	// that same frame, so a target taken from it needs no conversion. Reading the index from a different cell's
 	// players would pick a position a whole cell away.
 	engine::GridCoord coordinate = rGameInterpolate.renderBasis.coordinate;
-	auto it = gpGame->mCoordinateFrames.find(coordinate);
-	bool bHasCoordinate = it != gpGame->mCoordinateFrames.end() && it->second.iSnapshotCount > 0;
+	auto it = gpGame->mCells.find(coordinate);
+	bool bHasCoordinate = it != gpGame->mCells.end() && it->second.iSnapshotCount > 0;
 	std::optional<int64_t> oPlayerIndex = bHasCoordinate ? gpGame->ClientPlayerIndex(*gpGame->RenderFrame(coordinate).postRender.pPlayers) : std::nullopt;
 	if (oPlayerIndex)
 	{

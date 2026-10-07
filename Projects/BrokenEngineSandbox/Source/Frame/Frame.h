@@ -93,13 +93,13 @@ struct FramePostRender : public engine::FramePostRenderBase
 	FramePostRender& operator=(FramePostRender&&) noexcept;
 
 	static void AllocateAndCopy(FramePostRender& __restrict rCurrent, const FramePostRender& __restrict rPrevious);
-	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const FrameInput& __restrict rFrameInput, const engine::FrameStaticData& rStaticData);
-	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
-	static void PostCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
-	static void AreaDamage(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
-	static void Transfer(Frame& __restrict rFrame, const engine::FrameStaticData& rStaticData);
-	static void Destroy(Frame& __restrict rFrame, const engine::FrameStaticData& rStaticData);
-	static void Spawn(Frame& __restrict rFrame, const FrameInput& __restrict rFrameInput, const engine::FrameStaticData& rStaticData);
+	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const FrameInput& __restrict rFrameInput, const engine::CellStaticData& rStaticData);
+	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
+	static void PostCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
+	static void AreaDamage(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
+	static void Transfer(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
+	static void Destroy(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
+	static void Spawn(Frame& __restrict rFrame, const FrameInput& __restrict rFrameInput, const engine::CellStaticData& rStaticData);
 
 	engine::AlignmentIdentifier enemyAlignment {};
 	engine::AlignmentIdentifier playerAlignment {};
@@ -130,7 +130,7 @@ struct FramePostRender : public engine::FramePostRenderBase
 // and DEBUG_BREAK between them, reading the pre-push size and capacity.
 // PrepareTransferRequest fills the per-axis delta and rewrites rRequest.data.vecPosition into the
 // destination cell's local frame; no consumer downstream converts it again.
-[[nodiscard]] bool PrepareTransferRequest(const FramePostRender& rPostRender, const engine::FrameBounds& rBounds, TransferRequest& rRequest);
+[[nodiscard]] bool PrepareTransferRequest(const FramePostRender& rPostRender, const engine::CellBounds& rBounds, TransferRequest& rRequest);
 void PushTransferRequest(FramePostRender& rPostRender, const TransferRequest& rRequest);
 
 // One registry query window: the context plus the single workbuffer allocation its spans point into. The owner

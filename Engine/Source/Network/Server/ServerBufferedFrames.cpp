@@ -4,7 +4,7 @@
 
 #include "Network/Server/ServerBufferedFrames.h"
 
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 #include "Network/Server/Server.h"
 #include "Network/NetworkCursor.h"
 
@@ -210,7 +210,7 @@ void ServerBufferedFrames::SendCoordinateFullState(int64_t iClientIdentifier, in
 	NetworkManager::SendPacket(pClient->pPeer, NetworkManager::CoordinateSlotReliable(iSlot), rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
-void ServerBufferedFrames::SendCoordinateStaticData(int64_t iClientIdentifier, int64_t iSlot, GridCoord coordinate, const FrameStaticData& rStaticData)
+void ServerBufferedFrames::SendCoordinateStaticData(int64_t iClientIdentifier, int64_t iSlot, GridCoord coordinate, const CellStaticData& rStaticData)
 {
 	ClientConnection* pClient = mrServer.FindClient(iClientIdentifier);
 	if (pClient == nullptr)
@@ -295,7 +295,7 @@ void ServerBufferedFrames::SendUpdate(ClientConnection& rClient, int64_t iTick)
 			rSlot.bHoldUpdatesUntilFullStateAck = true;
 			if (rSlot.iPendingFullStateTick != iTick)
 			{
-				SendCoordinateFullState(rClient.iClientId, i, iTick, coordinate, &(*game::gpGame->mCoordinateFrames.at(coordinate).pCurrent));
+				SendCoordinateFullState(rClient.iClientId, i, iTick, coordinate, &(*game::gpGame->mCells.at(coordinate).pCurrent));
 			}
 		}
 		if (rSlot.bHoldUpdatesUntilFullStateAck)

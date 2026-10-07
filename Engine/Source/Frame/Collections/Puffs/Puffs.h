@@ -8,7 +8,7 @@
 namespace engine
 {
 
-struct FrameStaticData;
+struct CellStaticData;
 
 struct PuffsType
 {
@@ -92,12 +92,12 @@ struct PuffsPostRender : public Collection<PuffsPostRender>
 {
 	static void AllocateAndCopy(PuffsPostRender& rCurrent, const PuffsPostRender& rPrevious);
 
-	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
+	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	// Destroy removes expired puffs whose controller has bDestroysSelf set.
 	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition);
 
-	static void Destroy(game::Frame& __restrict rFrame, const FrameStaticData& rStaticData);
+	static void Destroy(game::Frame& __restrict rFrame, const CellStaticData& rStaticData);
 
 	auto Members([[maybe_unused]] this auto&& rSelf)
 	{

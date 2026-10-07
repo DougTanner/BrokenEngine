@@ -8,7 +8,7 @@
 namespace engine
 {
 
-struct FrameStaticData;
+struct CellStaticData;
 
 struct HexShieldsType
 {
@@ -72,7 +72,7 @@ using hex_shields_t = HexShieldsInterpolate::id_t;
 
 struct HexShieldsPostRender : public Collection<HexShieldsPostRender>
 {
-	static void Update(const game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
+	static void Update(const game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	static void Add(game::Frame& __restrict rFrame, hex_shields_t& rId, int64_t iTypeIndex);
 	static void Remove(game::Frame& __restrict rFrame, hex_shields_t& rId);

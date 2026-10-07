@@ -22,7 +22,7 @@ Decisions this Plan makes (author's, with rationale):
 
 ### Spawn edit
 
-`{"collection":<name>,"spawn":[x,y,z],"writes"?:{...}}`, keys exactly these; `writes`, when present, is a non-empty object. `spawn` is the row's position in cell-local meters with w set to 1 (`common::ValidateVector<true>` requires it, `Common/AGENTS.md` `## Determinism and Math`). Before anything else, `common::InsideArea(vecPosition, engine::LocalFrameArea())` must hold, else `'spawn' position must lie inside the cell`; the test runs here because the player overload asserts instead of refusing (`Engine/Source/Frame/AGENTS.md`, the producer-must-test rule).
+`{"collection":<name>,"spawn":[x,y,z],"writes"?:{...}}`, keys exactly these; `writes`, when present, is a non-empty object. `spawn` is the row's position in cell-local meters with w set to 1 (`common::ValidateVector<true>` requires it, `Common/AGENTS.md` `## Determinism and Math`). Before anything else, `common::InsideArea(vecPosition, engine::LocalCellArea())` must hold, else `'spawn' position must lie inside the cell`; the test runs here because the player overload asserts instead of refusing (`Engine/Source/Frame/AGENTS.md`, the producer-must-test rule).
 
 Dispatch inside the `FrameCollections` fold, per descriptor `C` with `P = typename C::PostRender`; `SpawnInfo` is named only inside the branch that requires it, because `engine::PushersPostRender` declares none (`Pushers.h:85-95`):
 
@@ -38,7 +38,7 @@ A row edit may address a row spawned earlier in the same batch, because edits ap
 
 ### Destroy pass
 
-Top-level `"destroy":bool`, optional; `edit_frame`'s top-level keys become exactly `coord`, `edits`, and `destroy`. When `true`, after the last edit and before the `uiNextUuid` guard, call `FramePostRender::Destroy(stagedFrame, gpGame->mCoordinateFrames.at(coordinate).staticData)` once. `destroyed` is the sum over `FrameCollections` of `OwnerInFrame<P>(stagedFrame).iCount` before the pass minus after it (zero when `destroy` is absent or `false`), so a destroyed player or spaceship counts 2: its own row and the pusher row its hook releases in the same pass (`Players.cpp:221`, `Spaceships.cpp:345`). The staged frame's id maps are valid because `TransferViaStream` rebuilt them (`Frame.cpp:821-834`), so pusher release through `idToIndexMap.at` succeeds, and the commit read rebuilds them again.
+Top-level `"destroy":bool`, optional; `edit_frame`'s top-level keys become exactly `coord`, `edits`, and `destroy`. When `true`, after the last edit and before the `uiNextUuid` guard, call `FramePostRender::Destroy(stagedFrame, gpGame->mCells.at(coordinate).staticData)` once. `destroyed` is the sum over `FrameCollections` of `OwnerInFrame<P>(stagedFrame).iCount` before the pass minus after it (zero when `destroy` is absent or `false`), so a destroyed player or spaceship counts 2: its own row and the pusher row its hook releases in the same pass (`Players.cpp:221`, `Spaceships.cpp:345`). The staged frame's id maps are valid because `TransferViaStream` rebuilt them (`Frame.cpp:821-834`), so pusher release through `idToIndexMap.at` succeeds, and the commit read rebuilds them again.
 
 The kill states the pass consumes, as the hooks define them (the implementer copies the enumerator bit values from the flag enums into the documentation):
 

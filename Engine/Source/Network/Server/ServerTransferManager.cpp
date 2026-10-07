@@ -30,8 +30,8 @@ static engine::ClientGuid TransferDataClientGuid(const game::TransferData& rData
 // of materializing ghost entities that clients can't see.
 bool ServerTransferManager::IsDestinationLive(engine::GridCoord destination) const
 {
-	auto it = game::gpGame->mCoordinateFrames.find(destination);
-	if (it != game::gpGame->mCoordinateFrames.end() && it->second.pCurrent != nullptr
+	auto it = game::gpGame->mCells.find(destination);
+	if (it != game::gpGame->mCells.end() && it->second.pCurrent != nullptr
 	 && (game::Frame::OwnershipLayer(*it->second.pCurrent)).iCount > 0)
 	{
 		return true;
@@ -53,7 +53,7 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 {
 	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoordinates)
 	{
-		game::Frame& rNextFrame = (*game::gpGame->mCoordinateFrames.at(rCoord).pNext);
+		game::Frame& rNextFrame = (*game::gpGame->mCells.at(rCoord).pNext);
 		if (rNextFrame.postRender.transferRequests.empty())
 		{
 			continue;
@@ -85,14 +85,14 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 				continue;
 			}
 
-			auto it = game::gpGame->mCoordinateFrames.find(destination);
-			if (it == game::gpGame->mCoordinateFrames.end() || it->second.pNext == nullptr)
+			auto it = game::gpGame->mCells.find(destination);
+			if (it == game::gpGame->mCells.end() || it->second.pNext == nullptr)
 			{
-				game::gpGame->CreateFrameAtCoordinate(destination);
-				engine::CoordFrames& rFrames = game::gpGame->mCoordinateFrames.at(destination);
-				rFrames.pNext = std::make_unique<game::Frame>();
-				std::swap(rFrames.pCurrent, rFrames.pNext);
-				it = game::gpGame->mCoordinateFrames.find(destination);
+				game::gpGame->CreateCellAtCoordinate(destination);
+				engine::Cell& rCell = game::gpGame->mCells.at(destination);
+				rCell.pNext = std::make_unique<game::Frame>();
+				std::swap(rCell.pCurrent, rCell.pNext);
+				it = game::gpGame->mCells.find(destination);
 			}
 
 			mTransfers.try_emplace(destination).first->second.push_back(
@@ -129,7 +129,7 @@ void ServerTransferManager::SpawnTransfers(bool bFilterDestinationLiveness)
 {
 	for (const auto& [rCoord, rTransfers] : mTransfers)
 	{
-		game::Frame& rDestinationFrame = *game::gpGame->mCoordinateFrames.at(rCoord).pNext;
+		game::Frame& rDestinationFrame = *game::gpGame->mCells.at(rCoord).pNext;
 		for (const game::StatusChange& rTransfer : rTransfers)
 		{
 			// Liveness filtering requires non-player transfers to target live destinations, matching CollectTransfers.
@@ -157,7 +157,7 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 		// destination frame is changed in place by SpawnTransfers, so index these values before that mutation.
 		for (const auto& [rCoord, rTransfers] : mTransfers)
 		{
-			const game::Frame& rDestinationFrame = *game::gpGame->mCoordinateFrames.at(rCoord).pNext;
+			const game::Frame& rDestinationFrame = *game::gpGame->mCells.at(rCoord).pNext;
 			preCrcsArena.mBuffer.PushBack(rDestinationFrame.postRender.uiSharedCrc);
 		}
 
@@ -167,7 +167,7 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 		// arrived transfers land, so this is required for both live publication and replay publication.
 		for (int64_t i = 0; const auto& [rCoord, rTransfers] : mTransfers)
 		{
-			game::Frame& rDestinationFrame = *game::gpGame->mCoordinateFrames.at(rCoord).pNext;
+			game::Frame& rDestinationFrame = *game::gpGame->mCells.at(rCoord).pNext;
 			common::crc_t uiPreCrc = preCrcsArena.mBuffer.Span<const common::crc_t>()[i++];
 			rDestinationFrame.postRender.uiSharedCrc = rDestinationFrame.Crc();
 
@@ -235,7 +235,7 @@ void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferI
 {
 	for (const ClientTransferInfo& rClientTransfer : clientTransfers)
 	{
-		game::Frame& rDestinationFrame = *game::gpGame->mCoordinateFrames.at(rClientTransfer.destination).pNext;
+		game::Frame& rDestinationFrame = *game::gpGame->mCells.at(rClientTransfer.destination).pNext;
 		engine::RegistryOwnershipLayer destinationLayer = game::Frame::OwnershipLayer(rDestinationFrame);
 
 		// An invalid uuid means the transferred player never landed in the destination, so there is nothing to bind.
@@ -303,7 +303,7 @@ void ServerTransferManager::HarvestTransfers()
 	// Capture must precede ApplyPreparedTransfers so the snapshot excludes arriving entities.
 	for (const auto& [rCoord, rTransfers] : mTransfers)
 	{
-		if (gpReplay->CaptureAcceptedTransfers(rCoord, rTransfers, *game::gpGame->mCoordinateFrames.at(rCoord).pNext)) [[unlikely]]
+		if (gpReplay->CaptureAcceptedTransfers(rCoord, rTransfers, *game::gpGame->mCells.at(rCoord).pNext)) [[unlikely]]
 		{
 			LOG(kDefault, kError, "Replay transfer capture failed; recording invalidated");
 		}
@@ -317,13 +317,13 @@ void ServerTransferManager::PrepareReplayTransfers(engine::GridCoord coord, std:
 	std::vector<game::StatusChange>& rTransfers = mTransfers.try_emplace(coord).first->second;
 	rTransfers.append_range(recordedTransfers);
 
-	auto it = game::gpGame->mCoordinateFrames.find(coord);
-	if (it == game::gpGame->mCoordinateFrames.end() || it->second.pNext == nullptr)
+	auto it = game::gpGame->mCells.find(coord);
+	if (it == game::gpGame->mCells.end() || it->second.pNext == nullptr)
 	{
-		game::gpGame->CreateFrameAtCoordinate(coord);
-		engine::CoordFrames& rFrames = game::gpGame->mCoordinateFrames.at(coord);
-		rFrames.pNext = std::make_unique<game::Frame>();
-		std::swap(rFrames.pCurrent, rFrames.pNext);
+		game::gpGame->CreateCellAtCoordinate(coord);
+		engine::Cell& rCell = game::gpGame->mCells.at(coord);
+		rCell.pNext = std::make_unique<game::Frame>();
+		std::swap(rCell.pCurrent, rCell.pNext);
 	}
 }
 

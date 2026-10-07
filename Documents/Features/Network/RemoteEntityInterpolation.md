@@ -36,7 +36,7 @@ SCOPE
 FILE: Engine/Source/GameBase.h
 
 Add a new struct and per-coord buffer inside the #if defined(BT_CLIENT) block
-of CoordFrames (struct at line 39):
+of Cell (struct at line 39):
 
   struct InterpolationSnapshot
   {
@@ -76,7 +76,7 @@ Using fixed arrays avoids heap allocation in the hot path.
 FILE: Projects/BrokenEngineSandbox/Source/Network/Client/ReconcileReplay.cpp
 (ApplyCoordWriteback moved here from ClientReconciler.cpp; ~lines 44-53)
 
-After reconciliation writes back confirmed state to CoordFrames (in
+After reconciliation writes back confirmed state to Cell (in
 ApplyCoordWriteback, called from ApplyResult), record an
 interpolation snapshot for each non-client coord.
 
@@ -89,20 +89,20 @@ Where confirmedFrame is the frame at the new confirmed tick.
 
 NEW FUNCTION (as a static helper in ReconcileReplay.cpp):
 
-  static void RecordInterpolationSnapshot(CoordFrames& rSub, const game::Frame& rFrame)
+  static void RecordInterpolationSnapshot(Cell& rSub, const game::Frame& rFrame)
   {
-      int64_t iSlot = (rSub.iInterpolationHead + rSub.iInterpolationCount) % CoordFrames::kiInterpolationBufferSize;
-      if (rSub.iInterpolationCount >= CoordFrames::kiInterpolationBufferSize)
+      int64_t iSlot = (rSub.iInterpolationHead + rSub.iInterpolationCount) % Cell::kiInterpolationBufferSize;
+      if (rSub.iInterpolationCount >= Cell::kiInterpolationBufferSize)
       {
           // Buffer full: advance head, overwrite oldest
-          rSub.iInterpolationHead = (rSub.iInterpolationHead + 1) % CoordFrames::kiInterpolationBufferSize;
+          rSub.iInterpolationHead = (rSub.iInterpolationHead + 1) % Cell::kiInterpolationBufferSize;
       }
       else
       {
           ++rSub.iInterpolationCount;
       }
 
-      CoordFrames::InterpolationSnapshot& rSnapshot = rSub.interpolationBuffer[iSlot];
+      Cell::InterpolationSnapshot& rSnapshot = rSub.interpolationBuffer[iSlot];
       rSnapshot.iTick = rFrame.interpolate.iTick;
       rSnapshot.fTime = rFrame.interpolate.fCurrentTime;
 
@@ -148,10 +148,10 @@ interpolation overrides for non-client coords:
   {
       if (rCoord == cameraCoord) continue;  // client coord uses prediction
 
-      auto subIt = mCoordinateFrames.find(rCoord);
-      if (subIt == mCoordinateFrames.end()) continue;
+      auto subIt = mCells.find(rCoord);
+      if (subIt == mCells.end()) continue;
 
-      const CoordFrames& rSub = subIt->second;
+      const Cell& rSub = subIt->second;
       if (rSub.iInterpolationCount < 2) continue;  // need 2 snapshots minimum
 
       float fTargetTime = fRenderTime - kfInterpolationDelay;
@@ -166,18 +166,18 @@ NEW FUNCTION (in GameBase.cpp, #if defined(BT_CLIENT)):
 
   void GameBase::ApplySnapshotInterpolation(
       game::FrameInterpolate& rInterpolate,
-      const CoordFrames& rSub,
+      const Cell& rSub,
       float fTargetTime)
   {
       // Find two snapshots bracketing fTargetTime
       // Ring buffer: index 0 = oldest, iInterpolationCount-1 = newest
-      const CoordFrames::InterpolationSnapshot* pBefore = nullptr;
-      const CoordFrames::InterpolationSnapshot* pAfter = nullptr;
+      const Cell::InterpolationSnapshot* pBefore = nullptr;
+      const Cell::InterpolationSnapshot* pAfter = nullptr;
 
       for (int64_t i = 0; i < rSub.iInterpolationCount - 1; ++i)
       {
-          int64_t iIdx = (rSub.iInterpolationHead + i) % CoordFrames::kiInterpolationBufferSize;
-          int64_t iNextIdx = (rSub.iInterpolationHead + i + 1) % CoordFrames::kiInterpolationBufferSize;
+          int64_t iIdx = (rSub.iInterpolationHead + i) % Cell::kiInterpolationBufferSize;
+          int64_t iNextIdx = (rSub.iInterpolationHead + i + 1) % Cell::kiInterpolationBufferSize;
 
           if (rSub.interpolationBuffer[iIdx].fTime <= fTargetTime &&
               rSub.interpolationBuffer[iNextIdx].fTime >= fTargetTime)
@@ -193,9 +193,9 @@ NEW FUNCTION (in GameBase.cpp, #if defined(BT_CLIENT)):
           // Target time is outside buffer range.
           // Use newest two snapshots and extrapolate.
           int64_t iNewest = (rSub.iInterpolationHead + rSub.iInterpolationCount - 1)
-                            % CoordFrames::kiInterpolationBufferSize;
+                            % Cell::kiInterpolationBufferSize;
           int64_t iPrev = (rSub.iInterpolationHead + rSub.iInterpolationCount - 2)
-                          % CoordFrames::kiInterpolationBufferSize;
+                          % Cell::kiInterpolationBufferSize;
           pBefore = &rSub.interpolationBuffer[iPrev];
           pAfter = &rSub.interpolationBuffer[iNewest];
       }
@@ -242,7 +242,7 @@ FILE: Engine/Source/GameBase.h
 Add declaration (line ~111, inside #if defined(BT_CLIENT)):
 
   static void ApplySnapshotInterpolation(game::FrameInterpolate& rInterpolate,
-      const CoordFrames& rSub, float fTargetTime);
+      const Cell& rSub, float fTargetTime);
 
 
 ================================================================================
@@ -287,8 +287,8 @@ and everything renders as today.
 FILES MODIFIED
 ================================================================================
 
-1. Engine/Source/GameBase.h (CoordFrames struct at line 39)
-   - Add InterpolationSnapshot struct inside CoordFrames (#if BT_CLIENT)
+1. Engine/Source/GameBase.h (Cell struct at line 39)
+   - Add InterpolationSnapshot struct inside Cell (#if BT_CLIENT)
    - Add kiInterpolationBufferSize, interpolationBuffer[], iInterpolationHead,
      iInterpolationCount fields
    - Reset new fields in ResetClientState()
@@ -305,6 +305,6 @@ FILES MODIFIED
      for each non-client coord after confirmed state updates
    - Add RecordInterpolationSnapshot helper function
 
-4. Engine/Source/GameBase.h (CoordFrames::ResetClientState)
+4. Engine/Source/GameBase.h (Cell::ResetClientState)
    - Clear interpolation buffer fields (iInterpolationHead = 0,
      iInterpolationCount = 0)

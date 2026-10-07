@@ -3,7 +3,7 @@
 #include "Data/Texture.h"
 #include "Frame/Collections/Explosions/Explosions.h"
 #include "Frame/Collections/Pushers/Pushers.h"
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/HealthDamage.h"
@@ -196,7 +196,7 @@ void PlayersInterpolate::RemoveOwnedVisuals(Frame& rFrame, PlayersInterpolate& r
 }
 #endif // BT_CLIENT
 
-void PlayersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void PlayersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
@@ -223,7 +223,7 @@ void PlayersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[may
 	});
 }
 
-static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
@@ -262,7 +262,7 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 
 			// These offsets arrive from outside the simulation (network or harness), so refuse one outside this
 			// cell here.
-			if (!common::InsideArea(vecSpawnPosition, engine::LocalFrameArea()))
+			if (!common::InsideArea(vecSpawnPosition, engine::LocalCellArea()))
 			{
 				continue;
 			}
@@ -285,7 +285,7 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 	}
 }
 
-void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
@@ -335,7 +335,7 @@ void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __res
 				rCurrentPostRender.pFlags[iIndex].Set(kPendingUseMissiles, rUpdate.bUseMissiles);
 				rCurrentPostRender.puiPendingWeaponModeTicks[iIndex] = rUpdate.uiPendingWeaponModeTicks;
 				rCurrentPostRender.pfNavigationDelays[iIndex] = rUpdate.navigationDelaySeconds.count();
-				rCurrentPostRender.pfFrameChangeTimers[iIndex] = rUpdate.navigationDelaySeconds.count();
+				rCurrentPostRender.pfCellChangeTimers[iIndex] = rUpdate.navigationDelaySeconds.count();
 			}
 			else
 			{
@@ -351,7 +351,7 @@ void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __res
 	}
 }
 
-void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	ProcessSpawnStatusChanges(rFrame, rFrameInput, rStaticData);
 
@@ -388,7 +388,7 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 {
 	// A human-controlled unit outside its own cell is a bug, not gameplay.
-	ASSERT(common::InsideArea(rInfo.vecPosition, engine::LocalFrameArea()));
+	ASSERT(common::InsideArea(rInfo.vecPosition, engine::LocalCellArea()));
 
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
@@ -432,10 +432,10 @@ bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.pVecAiDirections[iIndex] = XMVectorZero();
 	rCurrentPostRender.pfTransferLockTimers[iIndex] = rInfo.fTransferLockTimer;
 	rCurrentPostRender.pfArrivalGracePeriods[iIndex] = rInfo.fArrivalGracePeriod;
-	// Always consume random for determinism, even if fFrameChangeTimer is pre-set
+	// Always consume random for determinism, even if fCellChangeTimer is pre-set
 	float fRandomTimer = 15.0f + common::Random<10.0f>(rFrame.postRender.randomEngine);
-	rCurrentPostRender.pfFrameChangeTimers[iIndex] = (rInfo.fFrameChangeTimer > 0.0f) ? rInfo.fFrameChangeTimer : fRandomTimer;
-	// Entering a frame is a fresh spawn for navigation, cross-frame transfers included: the wanted direction comes from the
+	rCurrentPostRender.pfCellChangeTimers[iIndex] = (rInfo.fCellChangeTimer > 0.0f) ? rInfo.fCellChangeTimer : fRandomTimer;
+	// Entering a cell is a fresh spawn for navigation, cross-cell transfers included: the wanted direction comes from the
 	// hull direction, and the cached steering, island destination, navigation mode, and waypoint index reset here.
 	// Flagship navigates to island destination on enter; non-flagship starts roaming and follows flagship via proximity
 	PlayerFlags_t spawnFlags = rInfo.flags;
@@ -611,7 +611,7 @@ struct PlayerCollisionIntervalScratch
 	std::vector<float> maximumTimes;
 };
 
-void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	// Function-local TLS defers construction until first use; default construction is allocation-free
 	// (empty vectors), so it is safe even before allocator startup completes. Growth sites suppress tracking.
@@ -643,7 +643,7 @@ void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, 
 		sCollisionFlags.at(static_cast<size_t>(i)) = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
 		rCollisionScratch.startTimes.at(static_cast<size_t>(i)) = 0.0f;
 		rCollisionScratch.endTimes.at(static_cast<size_t>(i)) = 1.0f;
-		engine::SegmentHit boundaryHit = engine::TracePointToFrameExit(engine::LocalFrameArea(), rPreviousFrame.interpolate.pPlayers->pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		engine::SegmentHit boundaryHit = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousFrame.interpolate.pPlayers->pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		rCollisionScratch.maximumTimes.at(static_cast<size_t>(i)) = boundaryHit.bHit ? boundaryHit.fTime : std::numeric_limits<float>::max();
 	}
 
@@ -667,7 +667,7 @@ void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, 
 
 // PlayersPostRender::Update orchestrates per-iteration helpers in PlayersNavigation.cpp and PlayersCombat.cpp.
 
-void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	PlayersPostRender& __restrict rCurrent = *rFrame.postRender.pPlayers;
 	const PlayersPostRender& rPrevious = *rPreviousFrame.postRender.pPlayers;
@@ -679,10 +679,10 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		return;
 	}
 
-	// Frame center: every cell's local frame is centered on the origin.
-	// W=1.0 keeps this a proper position — every downstream (frameCenter - vecPosition) and cardinal offset add stays W-clean,
+	// Cell center: every cell's local frame is centered on the origin.
+	// W=1.0 keeps this a proper position — every downstream (cellCenter - vecPosition) and cardinal offset add stays W-clean,
 	// so normalize fallbacks don't leak W into the AI direction and on into velocity.
-	XMVECTOR vecFrameCenter = XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.mfCurrent, 1.0f);
+	XMVECTOR vecCellCenter = XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.mfCurrent, 1.0f);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -699,7 +699,7 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		XMVECTOR vecAiDirection = rPrevious.pVecAiDirections[i];
 		float fTransferLockTimer = rPrevious.pfTransferLockTimers[i];
 		float fArrivalGracePeriod = std::max(0.0f, rPrevious.pfArrivalGracePeriods[i] - fDeltaTime);
-		float fFrameChangeTimer = rPrevious.pfFrameChangeTimers[i];
+		float fCellChangeTimer = rPrevious.pfCellChangeTimers[i];
 		float fNavigationDelay = rPrevious.pfNavigationDelays[i];
 		engine::GridCoord fleetWantedCoordinate = rPrevious.pFleetWantedCoordinates[i];
 		int64_t iPendingFleetWantedCoordinateTicks = rPrevious.puiPendingFleetWantedCoordinateTicks[i];
@@ -747,7 +747,7 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		}
 		else
 		{
-			ComputeNavigation(rFrame, rPreviousFrame, rStaticData, i, vecPosition, vecFrameCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, flags, fDeltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, fFrameChangeTimer);
+			ComputeNavigation(rFrame, rPreviousFrame, rStaticData, i, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, flags, fDeltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, fCellChangeTimer);
 
 			bool bLookTargetFound = false;
 			XMVECTOR vecLookPosition = XMVectorZero();
@@ -783,7 +783,7 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		rCurrent.pVecAiDirections[i] = vecAiDirection;
 		rCurrent.pfTransferLockTimers[i] = fTransferLockTimer;
 		rCurrent.pfArrivalGracePeriods[i] = fArrivalGracePeriod;
-		rCurrent.pfFrameChangeTimers[i] = fFrameChangeTimer;
+		rCurrent.pfCellChangeTimers[i] = fCellChangeTimer;
 		rCurrent.pfNavigationDelays[i] = fNavigationDelay;
 		rCurrent.pVecIslandDestinations[i] = vecIslandDestination;
 		rCurrent.pFleetWantedCoordinates[i] = fleetWantedCoordinate;
@@ -832,7 +832,7 @@ bool PlayersPostRender::LogDifferences(const PlayersPostRender& rOther) const
 		bEqual &= common::LogDifference<"pVecAiDirections">(i, pVecAiDirections[i], rOther.pVecAiDirections[i]);
 		bEqual &= common::LogDifference<"pfTransferLockTimers">(i, pfTransferLockTimers[i], rOther.pfTransferLockTimers[i]);
 		bEqual &= common::LogDifference<"pfArrivalGracePeriods">(i, pfArrivalGracePeriods[i], rOther.pfArrivalGracePeriods[i]);
-		bEqual &= common::LogDifference<"pfFrameChangeTimers">(i, pfFrameChangeTimers[i], rOther.pfFrameChangeTimers[i]);
+		bEqual &= common::LogDifference<"pfCellChangeTimers">(i, pfCellChangeTimers[i], rOther.pfCellChangeTimers[i]);
 		bEqual &= common::LogDifference<"pfNavigationDelays">(i, pfNavigationDelays[i], rOther.pfNavigationDelays[i]);
 		bEqual &= common::LogDifference<"pVecIslandDestinations">(i, pVecIslandDestinations[i], rOther.pVecIslandDestinations[i]);
 		bEqual &= common::LogDifference<"pClientGuids.uiHigh">(i, pClientGuids[i].uiHigh, rOther.pClientGuids[i].uiHigh);

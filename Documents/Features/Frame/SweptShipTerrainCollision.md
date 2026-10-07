@@ -16,13 +16,13 @@ Resolve these two architectural decisions in `/external-grill-plan` before imple
 After those choices:
 
 - Add a hand-rolled, allocation-free query beside `engine::TracePointAgainstTerrain` in `IslandTerrain`. Traverse only elevation cells whose footprints can intersect the swept shape, return the earliest normalized TOI, non-penetrating center, and deterministic contact normal, and define start-overlap, grid-edge/corner, zero-motion, exact-tie, and end-point ownership. Reuse the elevation sampler's floor-grid ownership and arithmetic order. Jolt may be read for conceptual inspiration only; copy no source and add no dependency or notice.
-- In Player and Spaceship `PreCollision`, trace the same previous/current endpoints and `[0,1]` interval used by the engine collision layer. Combine terrain TOI with frame-exit TOI into the layer's exclusive maximum time without shortening the object's interpolation window. Retain per-object terrain hits in phase-safe thread-local scratch through `PostCollision`.
-- In `PostCollision`, apply any earlier entity results, then apply the chosen terrain response when terrain precedes transfer. Suppress transfer for a terrain-clamped ship; preserve transfer when frame exit is earlier. Update current Interpolate position and PostRender velocity/direction state symmetrically on client and server, with position W=1 and direction/velocity/normal W=0.
+- In Player and Spaceship `PreCollision`, trace the same previous/current endpoints and `[0,1]` interval used by the engine collision layer. Combine terrain TOI with cell-exit TOI into the layer's exclusive maximum time without shortening the object's interpolation window. Retain per-object terrain hits in phase-safe thread-local scratch through `PostCollision`.
+- In `PostCollision`, apply any earlier entity results, then apply the chosen terrain response when terrain precedes transfer. Suppress transfer for a terrain-clamped ship; preserve transfer when cell exit is earlier. Update current Interpolate position and PostRender velocity/direction state symmetrically on client and server, with position W=1 and direction/velocity/normal W=0.
 - Convert Players and Spaceships together so their timing, tie, and transfer rules cannot drift. Keep shape-specific math in `IslandTerrain` and collection-specific response constants/behavior in the existing navigation TUs.
 
 ## Critical files
 
-- `Engine/Source/Frame/IslandTerrain.h` / `.cpp` — `TracePointAgainstTerrain`, `FrameElevationSampler`-aligned traversal, and the new swept-volume terrain query. `Engine/Source/Frame/FrameUtils.h` — `SegmentHit` and `TracePointToFrameExit`.
+- `Engine/Source/Frame/IslandTerrain.h` / `.cpp` — `TracePointAgainstTerrain`, `CellElevationSampler`-aligned traversal, and the new swept-volume terrain query. `Engine/Source/Frame/FrameUtils.h` — `SegmentHit` and `TracePointToCellExit`.
 - `Projects/BrokenEngineSandbox/Source/Frame/Collections/Players/Players.h`, `Players.cpp`, `PlayersCombat.cpp`, `PlayersNavigation.cpp` — `kfPlayerRadius`, collision scratch and cutoff binding, `PostCollision`, and `ApplyTerrainPush` response.
 - `Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.h`, `SpaceshipsCombat.cpp`, `SpaceshipsNavigation.cpp` — `kfSpaceshipRadius`, collision scratch and cutoff binding, `PostCollision`, `ApplyTerrainBounce`, and `AvoidTerrain` separation.
 - `Engine/Source/Frame/Collision.h` / `.cpp` — existing explicit motion intervals and exclusive `pfMaxTimes` contract; change only if the selected terrain tie policy cannot be expressed by that contract.
@@ -39,7 +39,7 @@ After those choices:
 ## Acceptance criteria
 
 - Players and Spaceships cannot tunnel through or end penetrated in a blocking piecewise-constant terrain cell when their selected volume, not merely their center, crosses it during a tick.
-- Start overlap, zero motion, exact grid-edge/corner crossings, simultaneous terrain/entity contact, and terrain/frame-exit ties have one documented deterministic outcome; terrain wins exact ties against entity and transfer.
+- Start overlap, zero motion, exact grid-edge/corner crossings, simultaneous terrain/entity contact, and terrain/cell-exit ties have one documented deterministic outcome; terrain wins exact ties against entity and transfer.
 - Terrain, entity collision, and frame transfer use the same explicit motion interval. Entity hits before terrain remain visible; hits at or after the exclusive terrain cutoff do not; no terrain-clamped ship also transfers.
 - Player response preserves the intended gentle push/slide behavior, Spaceship response preserves bounce/turn behavior, and predictive terrain avoidance remains distinct from authoritative contact.
 - Client and server builds pass; replay determinism passes across repeated runs; final-code proofs cover traversal ownership, TOI ordering, W lanes, phase-scratch lifetime, and absence of tick-path heap allocation.

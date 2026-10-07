@@ -30,7 +30,7 @@ static constexpr int64_t DistinctAxisSamplePositions()
 	return iDistinct;
 }
 
-// Fold the placements field by field in generation order, matching FrameStaticData::Write's member order rather
+// Fold the placements field by field in generation order, matching CellStaticData::Write's member order rather
 // than hashing the struct's object representation, whose tail padding is not guaranteed equal between endpoints.
 static common::crc_t PlacementsCrc(const std::vector<IslandPlacement>& rPlacements)
 {
@@ -80,7 +80,7 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 		return std::isfinite(fSample);
 	});
 
-	FrameBounds bounds = ComputeFrameBounds(LocalFrameArea());
+	CellBounds bounds = ComputeCellBounds(LocalCellArea());
 	rResult["coord"] = AgentCoordinateJson(coordinate);
 	rResult["area"] = {{"width", bounds.fMaxX - bounds.fMinX}, {"height", bounds.fMaxY - bounds.fMinY}};
 	rResult["terrain"] = {{"axisSamplePositions", DistinctAxisSamplePositions()}, {"samplesFinite", bSamplesFinite}};

@@ -183,7 +183,7 @@ void FramePostRender::AllocateAndCopy(FramePostRender& __restrict rCurrent, cons
 	engine::AllocateAndCopyCollections(GamePostRenderCollections(rCurrent), GamePostRenderCollections(rPrevious), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(GamePostRenderCollections(rCurrent))>)> {});
 }
 
-void FramePostRender::Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const FrameInput& __restrict rFrameInput, const engine::FrameStaticData& rStaticData)
+void FramePostRender::Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const FrameInput& __restrict rFrameInput, const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderUpdate);
 
@@ -200,7 +200,7 @@ void FramePostRender::Update(Frame& __restrict rFrame, const Frame& __restrict r
 	engine::ForEachPostRenderUpdate(GamePostRenderTypes {}, rFrame, rPreviousFrame, rStaticData);
 }
 
-void FramePostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void FramePostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	engine::ForEachPostRenderTransfer(engine::PostRenderBaseTypes {}, rFrame, rStaticData);
 
@@ -209,7 +209,7 @@ void FramePostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 	engine::ForEachPostRenderTransfer(GamePostRenderTypes {}, rFrame, rStaticData);
 }
 
-void FramePostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void FramePostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderDestroy);
 
@@ -220,7 +220,7 @@ void FramePostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 	engine::ForEachPostRenderDestroy(GamePostRenderTypes {}, rFrame, rStaticData);
 }
 
-static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameStaticData& rStaticData)
+static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData)
 {
 	FrameInterpolate& rInterpolate = rFrame.interpolate;
 
@@ -257,11 +257,11 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 	// Reject positions outside the cell, inside terrain (with full body clearance), or within visible range of any alive player
 	auto IsSpawnPositionValid = [&](FXMVECTOR vecPosition) -> bool
 	{
-		if (!common::InsideArea(vecPosition, engine::LocalFrameArea()))
+		if (!common::InsideArea(vecPosition, engine::LocalCellArea()))
 		{
 			return false;
 		}
-		if (engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData).Sample(vecPosition) > engine::gBaseHeight.mfCurrent - kfTerrainClearance)
+		if (engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) > engine::gBaseHeight.mfCurrent - kfTerrainClearance)
 		{
 			return false;
 		}
@@ -282,7 +282,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 
 	// Cell-area extents and grid pitch (area layout: x=minX, y=maxY, z=maxX, w=minY — see common::InsideArea)
 	XMFLOAT4A f4Area;
-	XMStoreFloat4A(&f4Area, engine::LocalFrameArea());
+	XMStoreFloat4A(&f4Area, engine::LocalCellArea());
 	float fAreaMinimumX = f4Area.x;
 	float fAreaMinimumY = f4Area.w;
 	float fPitchX = (f4Area.z - f4Area.x) / static_cast<float>(kiGridDimension);
@@ -400,7 +400,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::FrameSta
 	}
 }
 
-void FramePostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void FramePostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderSpawn);
 
@@ -424,7 +424,7 @@ void FramePostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_u
 	}
 }
 
-void FramePostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void FramePostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderPreCollision);
 
@@ -435,7 +435,7 @@ void FramePostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[
 	engine::ForEachPostRenderPreCollision(GamePostRenderTypes {}, rFrame, rPreviousFrame, rStaticData);
 }
 
-void FramePostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void FramePostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderPostCollision);
 
@@ -448,7 +448,7 @@ void FramePostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 	engine::Collision::siLayerCount = 0;
 }
 
-void FramePostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void FramePostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderAreaDamage);
 
@@ -748,7 +748,7 @@ void FramePostRender::ServerRead(std::istream& rStream)
 	engine::SharedCollectionsRead(rStream, GamePostRenderCollections(*this));
 }
 
-bool PrepareTransferRequest(const FramePostRender& rPostRender, const engine::FrameBounds& rBounds, TransferRequest& rRequest)
+bool PrepareTransferRequest(const FramePostRender& rPostRender, const engine::CellBounds& rBounds, TransferRequest& rRequest)
 {
 	int64_t iDeltaX = 0;
 	int64_t iDeltaY = 0;

@@ -50,7 +50,7 @@ void ServerSession::PrepareTick()
 
 	// Recompute active set each tick so new client subscriptions
 	// (requested by the client after the previous frame's assignment) are picked up immediately
-	// Heap: ComputeActiveSet/EnsureNextFrames may grow mActiveCoordinates and CoordFrames maps
+	// Heap: ComputeActiveSet/EnsureNextFrames may grow mActiveCoordinates and Cell maps
 	ScopedSuppressAllocationTracking suppress;
 
 	mpRuntime->ComputeActiveSet();
@@ -289,9 +289,9 @@ void ServerSession::FinalizeTickClients()
 
 void ServerSession::AddGameRequiredCoordinates()
 {
-	for (const auto& [rCoordinate, rFrames] : gpGame->mCoordinateFrames)
+	for (const auto& [rCoordinate, rCell] : gpGame->mCells)
 	{
-		if (rFrames.pCurrent->postRender.pPlayers->iCount > 0)
+		if (rCell.pCurrent->postRender.pPlayers->iCount > 0)
 		{
 			if (!std::ranges::contains(gpGame->mActiveCoordinates, rCoordinate))
 			{
@@ -361,11 +361,11 @@ void ServerSession::SubscriptionUpdates()
 		return;
 	}
 
-	// Clients update desired subscriptions from player assignments and frame-change notifications.
+	// Clients update desired subscriptions from player assignments and cell-change notifications.
 	for (const SubscriptionUpdate& rUpdate : rPendingUpdates)
 	{
 		SendAssignPlayer(rUpdate.iClientId, rUpdate.globalPlayerId, rUpdate.newCoordinate);
-		SendPlayerState(rUpdate.iClientId, PlayerStateWireType::kChangedFrame, rUpdate.globalPlayerId.iValue, rUpdate.newCoordinate);
+		SendPlayerState(rUpdate.iClientId, PlayerStateWireType::kChangedCell, rUpdate.globalPlayerId.iValue, rUpdate.newCoordinate);
 	}
 
 	rPendingUpdates.clear();
@@ -421,10 +421,10 @@ int64_t ServerSession::RelinkFromFrames(int64_t iClientId, const engine::ClientG
 	}
 
 	std::vector<engine::OwnedEntity> relinkEntries;
-	relinkEntries.reserve(gpGame->mCoordinateFrames.size());
-	for (const auto& [rCoordinate, rFrames] : gpGame->mCoordinateFrames)
+	relinkEntries.reserve(gpGame->mCells.size());
+	for (const auto& [rCoordinate, rCell] : gpGame->mCells)
 	{
-		const PlayersPostRender& rPlayers = *rFrames.pCurrent->postRender.pPlayers;
+		const PlayersPostRender& rPlayers = *rCell.pCurrent->postRender.pPlayers;
 		for (int64_t i = 0; i < rPlayers.iCount; ++i)
 		{
 			if (rPlayers.pClientGuids[i] == rGuid)

@@ -43,7 +43,7 @@ void WindRadialsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 	}
 }
 
-void WindRadialsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
+void WindRadialsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const CellStaticData& rStaticData)
 {
 }
 

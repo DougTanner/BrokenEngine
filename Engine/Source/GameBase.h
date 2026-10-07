@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 
 // game::FrameInput is the mapped type of mFrameInputs below, so the complete definition is required here.
 #include "Frame/FrameInput.h"
@@ -62,9 +62,9 @@ enum class GameFlags : uint64_t
 };
 using GameFlags_t = common::Flags<GameFlags>;
 
-struct CoordFrames
+struct Cell
 {
-	FrameStaticData staticData;
+	CellStaticData staticData;
 
 #if defined(BT_SERVER)
 	std::unique_ptr<game::Frame> pCurrent;
@@ -241,7 +241,7 @@ public:
 	// delta; camera blend / shake decay / mfTime and visual-error-offset decay use the same timing units.
 	double mfLastRenderFrameSeconds = 0.0;
 #endif // BT_CLIENT
-	std::unordered_map<GridCoord, CoordFrames> mCoordinateFrames;
+	std::unordered_map<GridCoord, Cell> mCells;
 	// Awake cells for this update: the coords simulated, published, and rendered. Populated by game policy
 	// (Game::ComputeActiveSet on the client, ServerSessionRuntime::ComputeActiveSet on the server); the append
 	// order is observable and reaches dispatch, broadcast, transfer, and render. Membership does not imply a
@@ -254,7 +254,7 @@ public:
 	std::unordered_map<GridCoord, game::FrameInput> mFrameInputs;
 
 	// Creates the cell's frame storage and static data on demand; the game supplies the frame's contents.
-	void CreateFrameAtCoordinate(GridCoord coordinate);
+	void CreateCellAtCoordinate(GridCoord coordinate);
 
 #if defined(BT_SERVER)
 	// True while replay playback owns the simulation, i.e. a reader is live or staged for a later tick.

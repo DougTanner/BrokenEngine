@@ -91,9 +91,9 @@ void ServerClientManager::LogConnectingClientDiagnostic(const engine::ClientConn
 	{
 		LOG(kNetwork, kInfo, "    Guid: ({},{}) FleetCount: {} Match: {}", rExistingGuid.uiHigh, rExistingGuid.uiLow, std::ssize(rExistingFleets), rExistingGuid == rClient.clientGuid);
 	}
-	for (const auto& [rCoordinate, rFrames] : gpGame->mCoordinateFrames)
+	for (const auto& [rCoordinate, rCell] : gpGame->mCells)
 	{
-		const PlayersPostRender& rPlayers = *rFrames.pCurrent->postRender.pPlayers;
+		const PlayersPostRender& rPlayers = *rCell.pCurrent->postRender.pPlayers;
 		if (rPlayers.iCount == 0)
 		{
 			continue;
@@ -206,12 +206,12 @@ void ServerClientManager::DetectPlayerDeaths()
 			engine::GlobalId globalId = rOwnedPlayer.globalId;
 			engine::GridCoord coordinate = rOwnedPlayer.coord;
 
-			if (!gpGame->mCoordinateFrames.contains(coordinate))
+			if (!gpGame->mCells.contains(coordinate))
 			{
 				continue;
 			}
 
-			const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(coordinate).pCurrent).postRender.pPlayers;
+			const PlayersPostRender& rPlayers = *(*gpGame->mCells.at(coordinate).pCurrent).postRender.pPlayers;
 			bool bFound = false;
 			for (const engine::GlobalId& rGlobalPlayerId : std::span<const engine::GlobalId>(rPlayers.pGlobalPlayerIds, static_cast<size_t>(rPlayers.iCount)))
 			{

@@ -25,7 +25,7 @@ void XM_CALLCONV SyncExplosionTrail(game::FrameInterpolate& rFrameInterpolate, s
 
 bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]] GridCoord coordinate, std::chrono::duration<float> currentTime, const SpawnInfo& rSpawnInformation)
 {
-	if (!common::InsideArea(rSpawnInformation.vecPosition, engine::LocalFrameArea()))
+	if (!common::InsideArea(rSpawnInformation.vecPosition, engine::LocalCellArea()))
 	{
 		return false;
 	}

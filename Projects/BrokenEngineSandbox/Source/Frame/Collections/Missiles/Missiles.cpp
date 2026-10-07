@@ -5,7 +5,7 @@
 #include "Data/Audio.h"
 #include "Frame/Collections/Explosions/Explosions.h"
 #include "Frame/Collections/Collection.h"
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 
 #include "Frame/HealthDamage.h"
 #include "Profile/ProfileManager.h"
@@ -302,12 +302,12 @@ static void RemoveOwnedObjects([[maybe_unused]] Frame& rFrame, [[maybe_unused]] 
 	rCurrentPostRender.puiRegistryTargets[i] = {};
 }
 
-void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
-	engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
+	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
 
 	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
 	{
@@ -349,7 +349,7 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 	}
 }
 
-void MissilesPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void MissilesPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
@@ -370,7 +370,7 @@ void MissilesPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 
 bool MissilesPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rSpawnInformation)
 {
-	if (!common::InsideArea(rSpawnInformation.vecPosition, engine::LocalFrameArea()))
+	if (!common::InsideArea(rSpawnInformation.vecPosition, engine::LocalCellArea()))
 	{
 		return false;
 	}
@@ -468,7 +468,7 @@ void MissilesPostRender::Fall(Frame& __restrict rFrame, int64_t i, std::chrono::
 #endif
 }
 
-void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData, [[maybe_unused]] int64_t i, [[maybe_unused]] bool bDirectional)
+void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData, [[maybe_unused]] int64_t i, [[maybe_unused]] bool bDirectional)
 {
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
@@ -489,7 +489,7 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	{
 		rCurrentPostRender.pFlags[i].Set(kDirectional);
 	}
-	rCurrentPostRender.pVecExplosionDirections[i] = bDirectional ? engine::gpIslandTerrain->FrameNormal(rStaticData, rCurrentInterpolate.pVecPositions[i]) : XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+	rCurrentPostRender.pVecExplosionDirections[i] = bDirectional ? engine::gpIslandTerrain->CellNormal(rStaticData, rCurrentInterpolate.pVecPositions[i]) : XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 	rCurrentInterpolate.pfDestroyedTimes[i] = kMissileDestroyTime.count();
 
 #if defined(BT_CLIENT)

@@ -344,7 +344,7 @@ void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::Client
 	{
 		rFleet.flagshipGlobalPlayerId = globalPlayerId;
 		rFleet.wantedCoordinate = engine::kOriginCoordinate;
-		rFleet.frameChangeTimerSeconds = std::chrono::duration<float>(common::Random(rFleet.navigationDelaySeconds.count(), mRandomEngine));
+		rFleet.cellChangeTimerSeconds = std::chrono::duration<float>(common::Random(rFleet.navigationDelaySeconds.count(), mRandomEngine));
 		mNavigation.mPendingFlagshipUpdates.push_back({.clientGuid = rClientGuid, .fleetGuid = rFleet.guid, .newWantedCoordinate = rFleet.wantedCoordinate});
 	}
 
@@ -463,7 +463,7 @@ void ServerFleetManager::ResetFleetForLoad(Fleet& rFleet, const engine::ClientGu
 	else
 	{
 		rFleet.wantedCoordinate = flagshipIt->coordinate;
-		rFleet.frameChangeTimerSeconds = rFleet.navigationDelaySeconds;
+		rFleet.cellChangeTimerSeconds = rFleet.navigationDelaySeconds;
 		mNavigation.mPendingFlagshipUpdates.push_back({.clientGuid = rClientGuid, .fleetGuid = rFleet.guid, .newWantedCoordinate = rFleet.wantedCoordinate});
 	}
 }
@@ -524,12 +524,12 @@ void ServerFleetManager::DetectDisconnectedPlayerDeaths()
 					continue;
 				}
 
-				if (!gpGame->mCoordinateFrames.contains(rMember.coordinate))
+				if (!gpGame->mCells.contains(rMember.coordinate))
 				{
 					continue;
 				}
 
-				const PlayersPostRender& rPlayers = *(*gpGame->mCoordinateFrames.at(rMember.coordinate).pCurrent).postRender.pPlayers;
+				const PlayersPostRender& rPlayers = *(*gpGame->mCells.at(rMember.coordinate).pCurrent).postRender.pPlayers;
 				bool bFound = false;
 				for (int64_t k = 0; k < rPlayers.iCount; ++k)
 				{

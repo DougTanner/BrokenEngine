@@ -8,7 +8,7 @@ struct Fleet;
 enum class PlayerStateWireType : uint8_t
 {
 	kSpawned,
-	kChangedFrame,
+	kChangedCell,
 	kDied,
 
 	kCount,
@@ -18,7 +18,7 @@ enum class PlayerEventType : uint8_t
 {
 	kAssigned,
 	kSpawned,
-	kChangedFrame,
+	kChangedCell,
 	kDied,
 };
 

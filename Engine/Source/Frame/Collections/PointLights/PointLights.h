@@ -9,7 +9,7 @@ namespace engine
 {
 
 class Wrapper;
-struct FrameStaticData;
+struct CellStaticData;
 
 struct PointLightsType
 {
@@ -82,7 +82,7 @@ using point_lights_t = PointLightsInterpolate::id_t;
 
 struct PointLightsPostRender : public Collection<PointLightsPostRender>
 {
-	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
+	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	// Add non-controlled point light
 	static void Add(game::Frame& __restrict rFrame, point_lights_t& rId, int64_t iTypeIndex);
@@ -92,7 +92,7 @@ struct PointLightsPostRender : public Collection<PointLightsPostRender>
 
 
 	// Destroy handles auto-removal of expired controlled lights
-	static void Destroy(game::Frame& __restrict rFrame, const FrameStaticData& rStaticData);
+	static void Destroy(game::Frame& __restrict rFrame, const CellStaticData& rStaticData);
 
 	point_lights_t* __restrict pIds = nullptr;
 	auto Members(this auto&& rSelf)

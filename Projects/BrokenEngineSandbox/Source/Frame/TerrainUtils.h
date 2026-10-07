@@ -6,7 +6,7 @@
 
 namespace engine
 {
-	struct FrameStaticData;
+	struct CellStaticData;
 } // namespace engine
 
 namespace game
@@ -19,9 +19,9 @@ struct AiSteeringResult
 	XMVECTOR vecArtificialIntelligenceDirection {};
 };
 
-AiSteeringResult XM_CALLCONV ComputeArtificialIntelligenceSteering(const engine::FrameStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecCurrentDirection, FXMVECTOR vecFrameCenter, float fDeltaTime, bool bAlternateContour);
+AiSteeringResult XM_CALLCONV ComputeArtificialIntelligenceSteering(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecCurrentDirection, FXMVECTOR vecCellCenter, float fDeltaTime, bool bAlternateContour);
 
-float XM_CALLCONV ComputeTerrainAvoidance(const engine::FrameStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecDirection, float fCurrentDeltaRotation);
+float XM_CALLCONV ComputeTerrainAvoidance(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecDirection, float fCurrentDeltaRotation);
 
 #if defined(BT_SERVER)
 

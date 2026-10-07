@@ -23,7 +23,7 @@ void BillboardsInterpolate::Sync(game::FrameInterpolate& rFrameInterpolate, id_t
 	rBillboards.pfExtra[iIndex] = rData.fExtra;
 }
 
-void BillboardsPostRender::Update([[maybe_unused]] const game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
+void BillboardsPostRender::Update([[maybe_unused]] const game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const CellStaticData& rStaticData)
 {
 }
 

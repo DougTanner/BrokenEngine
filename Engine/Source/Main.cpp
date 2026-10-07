@@ -448,8 +448,8 @@ static int64_t MainThread(HINSTANCE hInstance)
 			pGraphics = std::make_unique<Graphics>(hInstance, sHWindow);
 		}
 
-		auto it = pGame->mCoordinateFrames.find(game::gpGame->mClientGridCoordinate);
-		pAudioManager->Update(it != pGame->mCoordinateFrames.end() && it->second.iSnapshotCount > 0 ? &pGame->RenderFrame(game::gpGame->mClientGridCoordinate) : nullptr);
+		auto it = pGame->mCells.find(game::gpGame->mClientGridCoordinate);
+		pAudioManager->Update(it != pGame->mCells.end() && it->second.iSnapshotCount > 0 ? &pGame->RenderFrame(game::gpGame->mClientGridCoordinate) : nullptr);
 #else
 		{
 			// Heap: Win32 InvalidateRect may trigger internal GDI allocations

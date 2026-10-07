@@ -6,7 +6,7 @@
 
 #include "Agent/Commands/ClientNetworkFixtures.h"
 #include "File/PackChunks.h"
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 #include "Network/NetworkCursor.h"
 
 #include "Game.h"

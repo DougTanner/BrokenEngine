@@ -21,14 +21,14 @@ struct IslandRenderQuery
 	int64_t iHeightmapHeight = 0;
 };
 
-struct FrameStaticData
+struct CellStaticData
 {
 	GridCoord coordinate {};
 	std::vector<IslandPlacement> islands;
 	// Derived from islands + per-template NavContour. Built lazily on the per-coord
 	// frame-tick thread (server-only) and refreshed when the network resends staticData,
 	// so it lives outside the persisted save format. mutable lets RunFrameTick fill it
-	// through the const FrameStaticData& it gets from ActiveFrameReference.
+	// through the const CellStaticData& it gets from ActiveFrameReference.
 	mutable NavData navigationData;
 
 	// A completed navigation build can have no vertices (degenerate or underwater contours), so emptiness cannot
@@ -40,7 +40,7 @@ struct FrameStaticData
 	// frame-tick thread (both client and server build their own bit-identical copy from
 	// the same deterministic placements), refreshed when the network resends staticData,
 	// so it lives outside the persisted save format. mutable lets RunFrameTick fill it
-	// through the const FrameStaticData& it gets from ActiveFrameReference. Sized
+	// through the const CellStaticData& it gets from ActiveFrameReference. Sized
 	// kiElevationGridDimension^2 when populated.
 	mutable std::vector<float> elevationGrid;
 

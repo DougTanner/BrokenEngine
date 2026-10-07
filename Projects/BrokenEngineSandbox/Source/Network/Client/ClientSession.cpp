@@ -23,7 +23,7 @@ const char* ToString(SubscriptionChangeReason eReason)
 	{
 		case SubscriptionChangeReason::kAssigned:       return "kAssigned";
 		case SubscriptionChangeReason::kSpawned:        return "kSpawned";
-		case SubscriptionChangeReason::kChangedFrame:   return "kChangedFrame";
+		case SubscriptionChangeReason::kChangedCell:    return "kChangedCell";
 		case SubscriptionChangeReason::kDied:           return "kDied";
 		case SubscriptionChangeReason::kFleetSynchronization:      return "kFleetSync";
 		case SubscriptionChangeReason::kPollTick:       return "kPollTick";
@@ -129,13 +129,13 @@ void ClientSession::ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent)
 			}
 			UpdateDesiredCoordinates(SubscriptionChangeReason::kSpawned);
 			break;
-		case PlayerEventType::kChangedFrame:
+		case PlayerEventType::kChangedCell:
 			UpdatePlayerCoordinate(rEvent.globalPlayerId, rEvent.coordinate);
 			if (rEvent.globalPlayerId == gpGame->ClientPlayerIdentifier())
 			{
 				gpGame->SetClientGridCoordinate(rEvent.coordinate);
 			}
-			UpdateDesiredCoordinates(SubscriptionChangeReason::kChangedFrame);
+			UpdateDesiredCoordinates(SubscriptionChangeReason::kChangedCell);
 			break;
 		case PlayerEventType::kDied:
 			gpGame->RemoveClientPlayer(rEvent.globalPlayerId);
@@ -255,12 +255,12 @@ void ClientSession::OnServerLoad()
 	// Clear fleet state — server will re-sync
 	gpGame->mFleetSelection.Clear();
 
-	// Discard coordinate frames from the previous server state.
-	for (auto& [rCoordinate, rCoordinateFrames] : gpGame->mCoordinateFrames)
+	// Discard cells from the previous server state.
+	for (auto& [rCoordinate, rCell] : gpGame->mCells)
 	{
-		rCoordinateFrames.ResetClientState();
+		rCell.ResetClientState();
 	}
-	gpGame->mCoordinateFrames.clear();
+	gpGame->mCells.clear();
 
 	ResetClientPacketFaultFixture(*this);
 	mpReconciler->Reset();
@@ -271,9 +271,9 @@ void ClientSession::OnRuntimeDisconnected()
 {
 	ResetClientPacketFaultFixture(*this);
 	mpReconciler->Reset();
-	for (auto& [rCoordinate, rFrames] : gpGame->mCoordinateFrames)
+	for (auto& [rCoordinate, rCell] : gpGame->mCells)
 	{
-		rFrames.ResetClientState();
+		rCell.ResetClientState();
 	}
 	mpDesynchronizationCore->Reset();
 }
@@ -328,20 +328,20 @@ void ClientSession::SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid,
 
 void ClientSession::ApplyReceivedStaticData()
 {
-	// Heap: try_emplace may insert new CoordFrames, NavData vectors moved into staticData
+	// Heap: try_emplace may insert new Cell, NavData vectors moved into staticData
 	ScopedSuppressAllocationTracking suppress;
 
 	std::vector<engine::ReceivedStaticData>& rStaticDataList = mpRuntime->mpClient->mReceivedStaticData;
 	for (engine::ReceivedStaticData& rReceived : rStaticDataList)
 	{
-		engine::CoordFrames& rFrames = gpGame->mCoordinateFrames.try_emplace(rReceived.coordinate).first->second;
-		rFrames.staticData = std::move(rReceived.staticData);
-		rFrames.staticData.coordinate = rReceived.coordinate;
+		engine::Cell& rCell = gpGame->mCells.try_emplace(rReceived.coordinate).first->second;
+		rCell.staticData = std::move(rReceived.staticData);
+		rCell.staticData.coordinate = rReceived.coordinate;
 
 		// Subscription-driven island texture loading. AcquireTextureSlot is idempotent; duplicate
 		// CRCs across placements short-circuit on the hot path. Slot mint + chunk-load request
 		// happens here so the data is in-flight before UpdateActiveIslands references the slot.
-		for (const engine::IslandPlacement& rPlacement : rFrames.staticData.islands)
+		for (const engine::IslandPlacement& rPlacement : rCell.staticData.islands)
 		{
 			engine::gpIslandTerrainResidency->AcquireTextureSlot(rPlacement.islandCrc);
 		}
@@ -370,9 +370,9 @@ void ClientSession::HydrateReceivedFullState(Frame& rReceived, const Frame* pRin
 
 void ClientSession::ResetCoordinateStatesForResynchronization()
 {
-	for (auto& [rCoordinate, rCoordinateFrames] : gpGame->mCoordinateFrames)
+	for (auto& [rCoordinate, rCell] : gpGame->mCells)
 	{
-		rCoordinateFrames.ResetClientState();
+		rCell.ResetClientState();
 	}
 
 	mpReconciler->Reset();

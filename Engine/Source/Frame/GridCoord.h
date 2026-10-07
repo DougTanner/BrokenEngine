@@ -45,7 +45,7 @@ inline constexpr float kfCellWidth = 900.0f;
 inline constexpr float kfCellHeight = 900.0f;
 
 // Per-cell elevation grids use 4 MiB for 1,024 × 1,024 floats at ~0.88-unit spacing.
-// FrameElevationSampler::Sample quantizes queries to these sub-meter sample centers; IslandTerrain::BuildElevationGrid fills the grid.
+// CellElevationSampler::Sample quantizes queries to these sub-meter sample centers; IslandTerrain::BuildElevationGrid fills the grid.
 inline constexpr int64_t kiElevationGridDimension = 1'024;
 
 inline constexpr float kfBaseAreaMinimumX = -kfCellWidth / 2.0f;

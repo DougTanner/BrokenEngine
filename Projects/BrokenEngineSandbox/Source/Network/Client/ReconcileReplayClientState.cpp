@@ -18,7 +18,7 @@ static bool FindMatchingPlayerInCoordinate(std::span<const engine::CoordWork> wo
 			continue;
 		}
 
-		const engine::CoordFrames& rDestinationFrames = *rDestinationWork.pFrames;
+		const engine::Cell& rDestinationCell = *rDestinationWork.pCell;
 		const engine::CoordScratch& rDestinationScratch = rDestinationWork.scratch;
 
 		const Frame* pDestinationFrame = nullptr;
@@ -29,7 +29,7 @@ static bool FindMatchingPlayerInCoordinate(std::span<const engine::CoordWork> wo
 		else if ((rDestinationScratch.flags & engine::ReconcileScratchFlags::kCrcFastPath) && rDestinationScratch.outputLayout.iHead >= 0)
 		{
 			int64_t iConfirmedPhysical = SnapshotIndex(rDestinationScratch.outputLayout.iHead, rDestinationScratch.outputLayout.iConfirmedInner);
-			pDestinationFrame = rDestinationFrames.snapshots[iConfirmedPhysical].get();
+			pDestinationFrame = rDestinationCell.snapshots[iConfirmedPhysical].get();
 		}
 		if (pDestinationFrame == nullptr)
 		{

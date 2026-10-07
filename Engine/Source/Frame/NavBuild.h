@@ -32,7 +32,7 @@ inline int64_t NavGridCell(float fValue, float fMinimum, float fMaximum, int64_t
 	return std::clamp(iCell, 0i64, iZones - 1);
 }
 
-// Cell-local navigation data stored in FrameStaticData.
+// Cell-local navigation data stored in CellStaticData.
 struct NavData
 {
 	// Serialized content; layout changes require a kiNavDataVersion bump.

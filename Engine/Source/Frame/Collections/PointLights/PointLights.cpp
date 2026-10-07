@@ -8,7 +8,7 @@ namespace engine
 template struct Collection<PointLightsInterpolate, CollectionFlags::kIdToIndex>;
 template struct Collection<PointLightsPostRender>;
 
-void PointLightsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
+void PointLightsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unused]] const CellStaticData& rStaticData)
 {
 	DestroyExpiredControlled(rFrame.interpolate.pointLights, rFrame.postRender.pointLights, rFrame.interpolate.fCurrentTime, [](PointLightsInterpolate& rInterpolate, PointLightsPostRender& rPostRender, int64_t& i)
 	{

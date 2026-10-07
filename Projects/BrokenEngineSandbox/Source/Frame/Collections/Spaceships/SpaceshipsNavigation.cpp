@@ -1,7 +1,7 @@
 #include "Spaceships.h"
 
 #include "Frame/Collections/Pushers/Pushers.h"
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/TerrainUtils.h"
@@ -135,12 +135,12 @@ void XM_CALLCONV SpaceshipsPostRender::ApplyPusherResponse(const Frame& __restri
 	}
 }
 
-void SpaceshipsPostRender::ApplyTerrainBounce(const engine::FrameStaticData& rStaticData, SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, float fDeltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity)
+void SpaceshipsPostRender::ApplyTerrainBounce(const engine::CellStaticData& rStaticData, SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, float fDeltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity)
 {
-	float fTerrainElevation = engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData).Sample(rCurrentInterpolate.pVecPositions[i]);
+	float fTerrainElevation = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(rCurrentInterpolate.pVecPositions[i]);
 	if (fTerrainElevation >= XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
 	{
-		XMVECTOR vecTerrainNormal = XMVector3Normalize(XMVectorSetZ(engine::gpIslandTerrain->FrameNormal(rStaticData, rCurrentInterpolate.pVecPositions[i]), 0.0f));
+		XMVECTOR vecTerrainNormal = XMVector3Normalize(XMVectorSetZ(engine::gpIslandTerrain->CellNormal(rStaticData, rCurrentInterpolate.pVecPositions[i]), 0.0f));
 
 		rCurrentInterpolate.pVecPositions[i] = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime * kfSpaceshipTerrainBounceMove), vecTerrainNormal, rCurrentInterpolate.pVecPositions[i]);
 		// Enforce W=1.0 — terrain-bounce bypasses the main integration clamp.
@@ -155,7 +155,7 @@ void SpaceshipsPostRender::ApplyTerrainBounce(const engine::FrameStaticData& rSt
 	}
 }
 
-void SpaceshipsPostRender::AvoidTerrain([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData, int64_t iStart, int64_t iEnd)
+void SpaceshipsPostRender::AvoidTerrain([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData, int64_t iStart, int64_t iEnd)
 {
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;

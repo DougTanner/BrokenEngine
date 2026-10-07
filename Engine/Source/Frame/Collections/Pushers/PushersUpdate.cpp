@@ -47,7 +47,7 @@ void XM_CALLCONV PushersInterpolate::SetupZones([[maybe_unused]] const game::Fra
 	ZeroMemory(sppiPushersPerZone, sizeof(sppiPushersPerZone));
 
 	// Span the whole cell with the fixed zone grid
-	FrameBounds bounds = ComputeFrameBounds(vecArea);
+	CellBounds bounds = ComputeCellBounds(vecArea);
 	sfPusherAreaMinX = bounds.fMinX;
 	sfPusherAreaMinY = bounds.fMinY;
 	sfPusherZoneWidth = (bounds.fMaxX - bounds.fMinX) / static_cast<float>(kiPusherZones);
@@ -168,7 +168,7 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 	return vecPush;
 }
 
-void PushersPostRender::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
+void PushersPostRender::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const CellStaticData& rStaticData)
 {
 }
 

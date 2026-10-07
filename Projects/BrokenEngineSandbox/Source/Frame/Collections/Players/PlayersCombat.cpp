@@ -2,7 +2,7 @@
 
 #include "Data/Audio.h"
 #include "Frame/Collections/Explosions/Explosions.h"
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
@@ -214,12 +214,12 @@ static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[mayb
 	}
 }
 
-void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
 
-	engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
+	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
@@ -257,7 +257,7 @@ void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame,
 		}
 		else if (engine::IsOutOfBounds(bounds, rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
 		{
-			// Entity candidates at or beyond frame exit were filtered during PreCollision.
+			// Entity candidates at or beyond cell exit were filtered during PreCollision.
 			rCurrentPostRender.pFlags[i].Set(kTransfer);
 		}
 	}
@@ -402,7 +402,7 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 		XMVECTOR vecMissileVelocity = XMVectorScale(vecJitteredDirection, kfMissileInitialVelocity);
 
 		// Refuse before acquisition: a subscription taken for a row that is never appended is never released.
-		if (!common::InsideArea(vecMissilePosition, engine::LocalFrameArea()))
+		if (!common::InsideArea(vecMissilePosition, engine::LocalCellArea()))
 		{
 			continue;
 		}

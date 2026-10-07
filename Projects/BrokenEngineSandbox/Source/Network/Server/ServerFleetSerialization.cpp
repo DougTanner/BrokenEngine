@@ -42,7 +42,7 @@ static void WriteFleet(std::fstream& rFileStream, const Fleet& rFleet)
 	common::Write(rFileStream, rFleet.wantedCoordinate.iY);
 	common::Write(rFileStream, rFleet.uiPendingFleetWantedCoordinateTicks);
 	common::Write(rFileStream, rFleet.navigationDelaySeconds.count());
-	common::Write(rFileStream, rFleet.frameChangeTimerSeconds.count());
+	common::Write(rFileStream, rFleet.cellChangeTimerSeconds.count());
 	for (const FleetMember& rMember : rFleet.members)
 	{
 		common::Write(rFileStream, rMember.globalPlayerId.iValue);
@@ -73,21 +73,21 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	common::Read(rFileStream, fNavigationDelay);
 	rFleet.navigationDelaySeconds = std::chrono::duration<float>(fNavigationDelay);
 	// Trust boundary (save / replay file): the wire admits only [0, 60], so reject any other fleet delay. It
-	// resets frameChangeTimerSeconds, whose count > 0.0f test gates the fire: +Inf freezes fleet nav forever and NaN fires
+	// resets cellChangeTimerSeconds, whose count > 0.0f test gates the fire: +Inf freezes fleet nav forever and NaN fires
 	// every tick; it also feeds a common::Random bound.
 	if (!PlayersPostRender::IsNavigationDelayInRange(rFleet.navigationDelaySeconds.count()))
 	{
 		throw std::ios_base::failure("Fleet navigation delay");
 	}
-	float fFrameChangeTimer = 0.0f;
-	common::Read(rFileStream, fFrameChangeTimer);
-	rFleet.frameChangeTimerSeconds = std::chrono::duration<float>(fFrameChangeTimer);
-	// Trust boundary (save / replay file): finite-check only — frameChangeTimerSeconds legitimately goes/stays
+	float fCellChangeTimer = 0.0f;
+	common::Read(rFileStream, fCellChangeTimer);
+	rFleet.cellChangeTimerSeconds = std::chrono::duration<float>(fCellChangeTimer);
+	// Trust boundary (save / replay file): finite-check only — cellChangeTimerSeconds legitimately goes/stays
 	// negative in cardinal mode (FleetNavigationController fires without resetting), so a range test would
 	// reject valid data. A saved +Inf would freeze fleet nav forever.
-	if (!std::isfinite(rFleet.frameChangeTimerSeconds.count()))
+	if (!std::isfinite(rFleet.cellChangeTimerSeconds.count()))
 	{
-		throw std::ios_base::failure("Fleet frame change timer");
+		throw std::ios_base::failure("Fleet cell change timer");
 	}
 	// Trust boundary (save / replay file): bound the member count against the cap and stream before resize.
 	common::ValidateDeserializedCountCapacity(iMemberCount, kiMaximumFleetMembers, sizeof(int64_t) + sizeof(uint8_t) + 2 * sizeof(int32_t), rFileStream, "ReadFleet members");

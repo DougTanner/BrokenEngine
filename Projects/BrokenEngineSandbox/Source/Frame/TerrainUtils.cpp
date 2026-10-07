@@ -1,6 +1,6 @@
 #include "TerrainUtils.h"
 
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 
 namespace game
 {
@@ -14,11 +14,11 @@ constexpr float kfUrgentSteerMultiplier = 3.0f;
 constexpr float kfMinimumGradientSquared = 0.0001f;
 constexpr float kfReturnToIslandDistance = 150.0f;
 
-AiSteeringResult XM_CALLCONV ComputeArtificialIntelligenceSteering(const engine::FrameStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecCurrentDirection, FXMVECTOR vecFrameCenter, float fDeltaTime, bool bAlternateContour)
+AiSteeringResult XM_CALLCONV ComputeArtificialIntelligenceSteering(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecCurrentDirection, FXMVECTOR vecCellCenter, float fDeltaTime, bool bAlternateContour)
 {
 	XMVECTOR vecDirection = XMVector3Normalize(vecCurrentDirection);
 
-	XMVECTOR vecNormal = engine::gpIslandTerrain->FrameNormal(rStaticData, vecPosition);
+	XMVECTOR vecNormal = engine::gpIslandTerrain->CellNormal(rStaticData, vecPosition);
 	float fNormalX = XMVectorGetX(vecNormal);
 	float fNormalY = XMVectorGetY(vecNormal);
 	float fGradientSquared = fNormalX * fNormalX + fNormalY * fNormalY;
@@ -34,14 +34,14 @@ AiSteeringResult XM_CALLCONV ComputeArtificialIntelligenceSteering(const engine:
 			: XMVectorSet(-fNormalY, fNormalX, 0.0f, 0.0f);
 
 		// Elevation correction: push toward preferred elevation
-		float fElevationArtificialIntelligence = engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData).Sample(vecPosition);
+		float fElevationArtificialIntelligence = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition);
 		float fElevationError = fElevationArtificialIntelligence - kfPreferredElevation;
 		XMVECTOR vecCorrection = XMVectorScale(XMVectorSet(fNormalX, fNormalY, 0.0f, 0.0f), fElevationError * kfElevationCorrectionStrength);
 
 		vecDesiredDirection = XMVector3Normalize(XMVectorAdd(vecContour, vecCorrection));
 
 		XMVECTOR vecAhead = XMVectorAdd(vecPosition, XMVectorScale(vecDirection, kfLookAheadDistance));
-		float fElevationAhead = engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData).Sample(vecAhead);
+		float fElevationAhead = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecAhead);
 		if (fElevationAhead > kfHighElevationThreshold)
 		{
 			fLocalSteerRate *= kfUrgentSteerMultiplier;
@@ -49,12 +49,12 @@ AiSteeringResult XM_CALLCONV ComputeArtificialIntelligenceSteering(const engine:
 	}
 	else
 	{
-		vecDesiredDirection = XMVector3Normalize(XMVectorSubtract(vecFrameCenter, vecPosition));
+		vecDesiredDirection = XMVector3Normalize(XMVectorSubtract(vecCellCenter, vecPosition));
 	}
 
-	if (common::Distance(vecPosition, vecFrameCenter) > kfReturnToIslandDistance)
+	if (common::Distance(vecPosition, vecCellCenter) > kfReturnToIslandDistance)
 	{
-		vecDesiredDirection = XMVector3Normalize(XMVectorSubtract(vecFrameCenter, vecPosition));
+		vecDesiredDirection = XMVector3Normalize(XMVectorSubtract(vecCellCenter, vecPosition));
 		fLocalSteerRate = kfSteerRate * kfUrgentSteerMultiplier;
 	}
 
@@ -74,10 +74,10 @@ constexpr float kfAvoidTerrainDeltaAngleMinimum = 16.0f;
 constexpr float kfAvoidTerrainDeltaAngleMaximum = 32.0f;
 constexpr float kfDeltaAngleChangeAvoidTerrain = 0.995f;
 
-float XM_CALLCONV ComputeTerrainAvoidance(const engine::FrameStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecDirection, float fCurrentDeltaRotation)
+float XM_CALLCONV ComputeTerrainAvoidance(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, FXMVECTOR vecDirection, float fCurrentDeltaRotation)
 {
 	// All samples use this cell's grid, so reuse one sampler across the nested loop.
-	engine::FrameElevationSampler sampler = engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData);
+	engine::CellElevationSampler sampler = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData);
 
 	XMVECTOR vecLeftDirection = XMVector3Cross(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), vecDirection);
 	float fLeftElevation = 0.0f;

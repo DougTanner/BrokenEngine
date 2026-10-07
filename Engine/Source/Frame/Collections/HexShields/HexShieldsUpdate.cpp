@@ -50,7 +50,7 @@ void HexShieldsInterpolate::Sync(game::FrameInterpolate& rFrameInterpolate, id_t
 	rHexShields.pfColorMixes[iIndex] = rData.fColorMix;
 }
 
-void HexShieldsPostRender::Update([[maybe_unused]] const game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
+void HexShieldsPostRender::Update([[maybe_unused]] const game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const CellStaticData& rStaticData)
 {
 }
 

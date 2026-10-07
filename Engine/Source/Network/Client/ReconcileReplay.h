@@ -107,7 +107,7 @@ struct CoordScratch
 struct CoordWork
 {
 	engine::GridCoord coord {};
-	engine::CoordFrames* pFrames = nullptr;
+	engine::Cell* pCell = nullptr;
 	CoordScratch scratch;
 };
 
@@ -122,9 +122,9 @@ struct CrcFastPathCoordResult
 	int64_t iLowestUnresolvedMismatch = -1;
 };
 
-inline bool HasDuePendingFullState(const engine::CoordFrames& rFrames, int64_t iTargetTick)
+inline bool HasDuePendingFullState(const engine::Cell& rCell, int64_t iTargetTick)
 {
-	return rFrames.pendingFullState.has_value() && rFrames.pendingFullState->iTick <= iTargetTick;
+	return rCell.pendingFullState.has_value() && rCell.pendingFullState->iTick <= iTargetTick;
 }
 
 CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTargetTick);

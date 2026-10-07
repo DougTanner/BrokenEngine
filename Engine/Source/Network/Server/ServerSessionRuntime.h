@@ -46,7 +46,7 @@ private:
 	void ResetOnLastClientLeave();
 
 	void AddSubscribedCoords();
-	void SyncActiveFrames();
+	void SyncActiveCells();
 
 	// Tracks whether the engine client set was non-empty as of the previous post-poll sample so the
 	// network-driven pause/timescale reset fires on the non-empty -> empty transition.

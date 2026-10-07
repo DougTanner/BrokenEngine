@@ -1,7 +1,7 @@
 #include "Missiles.h"
 
 #include "Frame/Collections/Collection.h"
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Frame/HealthDamage.h"
@@ -97,7 +97,7 @@ void MissilesInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 	}
 }
 
-void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	MissilesPostRender& __restrict rCurrent = *rFrame.postRender.pMissiles;
 	const MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
@@ -299,7 +299,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 	}
 }
 
-void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	MissileCollisionIntervalScratch& rCollisionScratch = GetMissileCollisionIntervalScratch();
 	// Collision array pointers passed to AddLayer must remain valid through PostCollision; thread-local vectors retain capacity.
@@ -332,7 +332,7 @@ void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		rCollisionScratch.startTimes.at(static_cast<size_t>(iIndex)) = 0.0f;
 		rCollisionScratch.endTimes.at(static_cast<size_t>(iIndex)) = 1.0f;
 		rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
-		rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)) = engine::TracePointToFrameExit(engine::LocalFrameArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)) = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		float fMaximumTime = std::numeric_limits<float>::max();
 		if (rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)).bHit)
 		{
@@ -364,7 +364,7 @@ void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 	});
 }
 
-void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	MissileCollisionIntervalScratch& rCollisionScratch = GetMissileCollisionIntervalScratch();
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
@@ -388,7 +388,7 @@ void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 		}
 
 		int64_t iIndex = i;
-		// Entity results are pre-filtered against terrain and frame-exit cutoffs.
+		// Entity results are pre-filtered against terrain and cell-exit cutoffs.
 		if ((engine::Collision::sResultSpans[engine::Collision::sLayerBaseOffsets[siCollisionLayerIndex] + i].iCount > 0))
 		{
 			const engine::CollisionResult& rResult = engine::Collision::GetCollisions(siCollisionLayerIndex, i).front();

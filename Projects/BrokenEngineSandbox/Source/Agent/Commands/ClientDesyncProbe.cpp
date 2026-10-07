@@ -113,8 +113,8 @@ void CommandDesynchronizationProbe(const nlohmann::json& rParameters, nlohmann::
 		throw std::runtime_error("desync_probe requires a connected live client/server session");
 	}
 
-	auto it = gpGame->mCoordinateFrames.find(gpGame->mClientGridCoordinate);
-	if (it == gpGame->mCoordinateFrames.end())
+	auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
+	if (it == gpGame->mCells.end())
 	{
 		throw std::runtime_error("desync_probe requires a current client frame");
 	}

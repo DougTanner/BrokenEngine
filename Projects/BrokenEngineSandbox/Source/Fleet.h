@@ -44,7 +44,7 @@ struct Fleet
 	engine::GridCoord wantedCoordinate {};
 	uint8_t uiPendingFleetWantedCoordinateTicks = 0;
 	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
-	std::chrono::duration<float> frameChangeTimerSeconds = std::chrono::duration<float>::zero();
+	std::chrono::duration<float> cellChangeTimerSeconds = std::chrono::duration<float>::zero();
 };
 
 } // namespace game

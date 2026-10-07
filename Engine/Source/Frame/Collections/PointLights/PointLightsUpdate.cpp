@@ -88,7 +88,7 @@ void PointLightsInterpolate::Sync(game::FrameInterpolate& rFrameInterpolate, id_
 	rPointLights.pfRotations[iIndex] = rData.fRotation;
 }
 
-void PointLightsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
+void PointLightsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const CellStaticData& rStaticData)
 {
 }
 

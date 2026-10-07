@@ -13,7 +13,7 @@ namespace engine
 
 bool WriteGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, GridCoord clientGridCoordinate)
 {
-	int64_t iFrameCount = static_cast<int64_t>(game::gpGame->mCoordinateFrames.size());
+	int64_t iFrameCount = static_cast<int64_t>(game::gpGame->mCells.size());
 	int64_t iVersion = game::Frame::kiVersion;
 
 	bool bWritten = engine::gpFileManager->WriteFileAtomically(rFlags, rFilename, [&](std::fstream& fileStream)
@@ -28,8 +28,8 @@ bool WriteGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFile
 
 		// Sort by coord key for deterministic output
 		std::vector<uint64_t> keys;
-		keys.reserve(game::gpGame->mCoordinateFrames.size());
-		for (const auto& [rCoordinate, rFrames] : game::gpGame->mCoordinateFrames)
+		keys.reserve(game::gpGame->mCells.size());
+		for (const auto& [rCoordinate, rCell] : game::gpGame->mCells)
 		{
 			keys.push_back(rCoordinate.ToKey());
 		}
@@ -40,8 +40,8 @@ bool WriteGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFile
 			engine::GridCoord coordinate = engine::GridCoord::FromKey(uiKey);
 			coordinate.Write(fileStream);
 			// NavData is rebuilt lazily on first RunFrameTick — don't persist it.
-			game::gpGame->mCoordinateFrames.at(coordinate).staticData.Write(fileStream, /*bIncludeNavigationData=*/false);
-			fileStream << *game::gpGame->mCoordinateFrames.at(coordinate).pCurrent;
+			game::gpGame->mCells.at(coordinate).staticData.Write(fileStream, /*bIncludeNavigationData=*/false);
+			fileStream << *game::gpGame->mCells.at(coordinate).pCurrent;
 		}
 	});
 
@@ -57,7 +57,7 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 		if (stagedGrid.bHeaderValidated)
 		{
 			// Keep the established save-load failure state for callers that rebuild a fresh game after false.
-			game::gpGame->mCoordinateFrames.clear();
+			game::gpGame->mCells.clear();
 			game::ResetSaveState();
 		}
 		return false;
@@ -107,18 +107,18 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 		{
 			engine::GridCoord coordinate;
 			coordinate.Read(fileStream);
-			auto [itFrames, bInserted] = rStagedGrid.coordinateFrames.try_emplace(coordinate);
+			auto [itCell, bInserted] = rStagedGrid.cells.try_emplace(coordinate);
 			if (!bInserted)
 			{
 				throw std::ios_base::failure("duplicate grid coord");
 			}
 
-			engine::CoordFrames& rFrames = itFrames->second;
-			rFrames.staticData.Read(fileStream, /*bIncludeNavigationData=*/false);
-			rFrames.staticData.coordinate = coordinate;
+			engine::Cell& rCell = itCell->second;
+			rCell.staticData.Read(fileStream, /*bIncludeNavigationData=*/false);
+			rCell.staticData.coordinate = coordinate;
 			// Trust boundary (save file): generation places only loaded templates with centers inside the cell's base
 			// area. The center tests are range tests, so NaN and both infinities fail them too.
-			for (const IslandPlacement& rPlacement : rFrames.staticData.islands)
+			for (const IslandPlacement& rPlacement : rCell.staticData.islands)
 			{
 				if (!gpIslandTerrain->mIslands.contains(rPlacement.islandCrc))
 				{
@@ -136,11 +136,11 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			}
 			auto pFrame = std::make_unique<game::Frame>();
 			fileStream >> *pFrame;
-			rFrames.pCurrent = std::move(pFrame);
-			rFrames.pNext = std::make_unique<game::Frame>();
+			rCell.pCurrent = std::move(pFrame);
+			rCell.pNext = std::make_unique<game::Frame>();
 
-			int64_t iTick = rFrames.pCurrent->interpolate.iTick;
-			float fCurrentTime = rFrames.pCurrent->interpolate.fCurrentTime;
+			int64_t iTick = rCell.pCurrent->interpolate.iTick;
+			float fCurrentTime = rCell.pCurrent->interpolate.fCurrentTime;
 			if (!bHasLoadedClock)
 			{
 				if (iTick < 0 || iTick > std::numeric_limits<int64_t>::max() - engine::TimeStep::kiMaximumAccumulatorTicks || !std::isfinite(fCurrentTime))
@@ -159,10 +159,10 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 		}
 
 		// Save-file clientGridCoordinate is adopted by ServerLoad, Autoload, and Quickload as the followed cell, so it
-		// must match a frame just read; a mismatch is a torn grid.
-		if (!rStagedGrid.coordinateFrames.contains(rStagedGrid.clientGridCoordinate))
+		// must match a cell just read; a mismatch is a torn grid.
+		if (!rStagedGrid.cells.contains(rStagedGrid.clientGridCoordinate))
 		{
-			throw std::ios_base::failure("client grid coord absent from frames");
+			throw std::ios_base::failure("client grid coord absent from cells");
 		}
 
 	}
@@ -184,7 +184,7 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 
 void AdoptGridSave(StagedGridSave&& rStagedGrid)
 {
-	game::gpGame->mCoordinateFrames = std::move(rStagedGrid.coordinateFrames);
+	game::gpGame->mCells = std::move(rStagedGrid.cells);
 	game::AdoptSaveState(std::move(rStagedGrid.saveState));
 	game::gpGame->miNextGlobalId = rStagedGrid.iNextGlobalId;
 	int64_t iTickCounter = rStagedGrid.iTick;

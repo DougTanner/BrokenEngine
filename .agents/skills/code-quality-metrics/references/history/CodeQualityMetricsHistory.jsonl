@@ -1450,3 +1450,6 @@
 {"index":1448,"date":"2026-10-06","captureMode":"carry-forward","verbosity":0.036106694299,"structuralErosion":0.568986274026,"supported":556,"parsed":552}
 {"index":1449,"date":"2026-10-06","captureMode":"carry-forward","verbosity":0.036106694299,"structuralErosion":0.568986274026,"supported":556,"parsed":552}
 {"index":1450,"date":"2026-10-07","captureMode":"carry-forward","verbosity":0.036106694299,"structuralErosion":0.568986274026,"supported":556,"parsed":552}
+{"index":1451,"date":"2026-10-07","captureMode":"carry-forward","verbosity":0.036106694299,"structuralErosion":0.568986274026,"supported":556,"parsed":552}
+{"index":1452,"date":"2026-10-07","captureMode":"carry-forward","verbosity":0.036106694299,"structuralErosion":0.568986274026,"supported":556,"parsed":552}
+{"index":1453,"date":"2026-10-07","captureMode":"cpp-change","verbosity":0.036106694299,"structuralErosion":0.568986274026,"supported":556,"parsed":552}

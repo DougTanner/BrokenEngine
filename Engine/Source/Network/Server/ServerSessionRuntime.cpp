@@ -120,12 +120,12 @@ void ServerSessionRuntime::PreparePausedSubscriptions()
 {
 	for (const engine::PendingNewSubscription& rSubscription : mpServer->mPendingNewSubscriptions)
 	{
-		auto it = game::gpGame->mCoordinateFrames.find(rSubscription.coordinate);
-		if (it == game::gpGame->mCoordinateFrames.end())
+		auto it = game::gpGame->mCells.find(rSubscription.coordinate);
+		if (it == game::gpGame->mCells.end())
 		{
 			continue;
 		}
-		engine::FrameStaticData& rStaticData = it->second.staticData;
+		engine::CellStaticData& rStaticData = it->second.staticData;
 		if (!rStaticData.bNavigationDataBuilt)
 		{
 			// Heap: BuildCellNavigationData grows the navigationData vertex, polygon, and visibility-edge vectors, and
@@ -178,8 +178,8 @@ void ServerSessionRuntime::HandleResyncRequests()
 				continue;
 			}
 
-			auto it = game::gpGame->mCoordinateFrames.find(coord);
-			if (it == game::gpGame->mCoordinateFrames.end())
+			auto it = game::gpGame->mCells.find(coord);
+			if (it == game::gpGame->mCells.end())
 			{
 				continue;
 			}
@@ -212,8 +212,8 @@ void ServerSessionRuntime::SendNewSubscriptionFullStates()
 			return true;
 		}
 
-		auto it = game::gpGame->mCoordinateFrames.find(rSubscription.coordinate);
-		if (it == game::gpGame->mCoordinateFrames.end())
+		auto it = game::gpGame->mCells.find(rSubscription.coordinate);
+		if (it == game::gpGame->mCells.end())
 		{
 			return false;
 		}
@@ -303,18 +303,18 @@ void ServerSessionRuntime::AddSubscribedCoords()
 	}
 }
 
-void ServerSessionRuntime::SyncActiveFrames()
+void ServerSessionRuntime::SyncActiveCells()
 {
 	for (const engine::GridCoord& rCoord : game::gpGame->mActiveCoordinates)
 	{
-		if (!game::gpGame->mCoordinateFrames.contains(rCoord))
+		if (!game::gpGame->mCells.contains(rCoord))
 		{
-			game::gpGame->CreateFrameAtCoordinate(rCoord);
+			game::gpGame->CreateCellAtCoordinate(rCoord);
 		}
 	}
 
-	// Delete frames outside the active set, handing a recording writer its final complete current frame first.
-	for (auto it = game::gpGame->mCoordinateFrames.begin(); it != game::gpGame->mCoordinateFrames.end();)
+	// Delete cells outside the active set, handing a recording writer its final complete current frame first.
+	for (auto it = game::gpGame->mCells.begin(); it != game::gpGame->mCells.end();)
 	{
 		if (std::ranges::contains(game::gpGame->mActiveCoordinates, it->first))
 		{
@@ -323,7 +323,7 @@ void ServerSessionRuntime::SyncActiveFrames()
 		}
 
 		engine::gpReplay->RetireCoordinate(it->first, std::move(it->second.pCurrent));
-		it = game::gpGame->mCoordinateFrames.erase(it);
+		it = game::gpGame->mCells.erase(it);
 	}
 }
 
@@ -341,7 +341,7 @@ void ServerSessionRuntime::ComputeActiveSet()
 		game::gpGame->mActiveCoordinates.push_back(engine::kOriginCoordinate);
 	}
 
-	SyncActiveFrames();
+	SyncActiveCells();
 }
 
 } // namespace engine

@@ -2,7 +2,7 @@
 
 #if defined(BT_CLIENT)
 
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 #include "Frame/GridCoord.h"
 #include "Network/Client/ClientSubscriptions.h"
 #include "Network/NetworkCursor.h"
@@ -40,7 +40,7 @@ struct ReceivedCoordFullState
 struct ReceivedStaticData
 {
 	GridCoord coordinate {};
-	FrameStaticData staticData;
+	CellStaticData staticData;
 };
 
 struct ReceivedDebugFrame

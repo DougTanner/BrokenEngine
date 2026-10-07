@@ -1,7 +1,7 @@
 #include "Spaceships.h"
 
 #include "Data/Audio.h"
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
@@ -81,7 +81,7 @@ void XM_CALLCONV SpaceshipsPostRender::RegenerateHealth(FXMVECTOR vecPosition, b
 	}
 }
 
-void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	SpaceshipCollisionIntervalScratch& rCollisionScratch = GetSpaceshipCollisionIntervalScratch();
 	// Heap: static vectors resized each frame, only allocates on first call or when count grows (capacity retained).
@@ -110,7 +110,7 @@ void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFram
 		sCollisionDamages.at(static_cast<size_t>(i)) = kfSpaceshipCollisionDamage;
 		rCollisionScratch.startTimes.at(static_cast<size_t>(i)) = 0.0f;
 		rCollisionScratch.endTimes.at(static_cast<size_t>(i)) = 1.0f;
-		engine::SegmentHit boundaryHit = engine::TracePointToFrameExit(engine::LocalFrameArea(), rPreviousFrame.interpolate.pSpaceships->pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		engine::SegmentHit boundaryHit = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousFrame.interpolate.pSpaceships->pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		rCollisionScratch.maximumTimes.at(static_cast<size_t>(i)) = boundaryHit.bHit ? boundaryHit.fTime : std::numeric_limits<float>::max();
 	}
 
@@ -132,7 +132,7 @@ void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFram
 	});
 }
 
-void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
@@ -142,7 +142,7 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 		return;
 	}
 
-	engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
+	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
@@ -182,13 +182,13 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 
 		if (!(rCurrentPostRender.pFlags[i] & kExploding) && engine::IsOutOfBounds(bounds, rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
 		{
-			// PreCollision's exclusive maximum-time cutoff excludes entity contacts at or beyond frame exit.
+			// PreCollision's exclusive maximum-time cutoff excludes entity contacts at or beyond cell exit.
 			rCurrentPostRender.pFlags[i].Set(kTransfer);
 		}
 	}
 }
 
-void SpaceshipsPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void SpaceshipsPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;

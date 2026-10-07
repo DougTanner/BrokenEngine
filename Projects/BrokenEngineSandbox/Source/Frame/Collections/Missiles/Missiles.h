@@ -11,7 +11,7 @@
 
 namespace engine
 {
-	struct FrameStaticData;
+	struct CellStaticData;
 } // namespace engine
 
 namespace game
@@ -110,12 +110,12 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 {
 	static constexpr int64_t kiVersion = 11;
 
-	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
-	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
-	static void PostCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
-	static void Transfer(Frame& __restrict rFrame, const engine::FrameStaticData& rStaticData);
-	static void Destroy(Frame& __restrict rFrame, const engine::FrameStaticData& rStaticData);
-	static void Explode(Frame& __restrict rFrame, const engine::FrameStaticData& rStaticData, int64_t i, bool bDirectional);
+	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
+	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
+	static void PostCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
+	static void Transfer(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
+	static void Destroy(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
+	static void Explode(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData, int64_t i, bool bDirectional);
 	static void Fall(Frame& __restrict rFrame, int64_t i, std::chrono::duration<float> deltaTime);
 
 	MissileFlags_t* __restrict pFlags = nullptr;

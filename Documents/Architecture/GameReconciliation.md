@@ -57,7 +57,7 @@ flowchart TD
     NEXTCOORD -->|"Yes"| COORD
     NEXTCOORD -->|"No"| CLIENTSTATE["ReconcileUpdateClientState()<br/>track client<br/>migration"]:::state
 
-    CLIENTSTATE --> DONE["Writeback applied in-place<br/>on engine::CoordFrames"]
+    CLIENTSTATE --> DONE["Writeback applied in-place<br/>on engine::Cell"]
     FASTDONE --> NEXTCOORD
 ```
 
@@ -70,7 +70,7 @@ Full states arrive during initial subscription and active-slot resync flows. A s
 flowchart LR
     classDef injection fill:#dcfce7,stroke:#16a34a
 
-    PFS["CoordFrames::pendingFullState"]
+    PFS["Cell::pendingFullState"]
 
     PRE["ReconcileRollbackCoord()<br/>at confirmed frame"]:::injection
     MAIN["ReconcileReplayCoord()<br/>at matching replay tick"]:::injection
@@ -85,7 +85,7 @@ flowchart LR
 
 ## Extrapolation Mode
 
-No longer a distinct mode. Forward simulation from the confirmed server state is performed inline by the reconcile dispatch's catch-up pass (`ReconcileCatchUpCoord` simulates empty-input ticks up to the post-advance `miTickCounter`). The snapshot ring (`CoordFrames::snapshots[]`) is now the unified state buffer — there is no separate extrapolation stack or transition step.
+No longer a distinct mode. Forward simulation from the confirmed server state is performed inline by the reconcile dispatch's catch-up pass (`ReconcileCatchUpCoord` simulates empty-input ticks up to the post-advance `miTickCounter`). The snapshot ring (`Cell::snapshots[]`) is now the unified state buffer — there is no separate extrapolation stack or transition step.
 
 ## Main Loop Integration
 
@@ -179,14 +179,14 @@ flowchart LR
 
     subgraph wire_types ["PlayerStateWireType"]
         W0["kSpawned"]:::wire
-        W1["kChangedFrame"]:::wire
+        W1["kChangedCell"]:::wire
         W2["kDied"]:::wire
     end
 
     subgraph event_types ["ReceivedPlayerEvent"]
         E0["kAssigned"]:::event
         E1["kSpawned"]:::event
-        E2["kChangedFrame"]:::event
+        E2["kChangedCell"]:::event
         E3["kDied"]:::event
     end
 

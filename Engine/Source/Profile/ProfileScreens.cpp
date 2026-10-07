@@ -196,8 +196,8 @@ static void FormatCellReadout(common::Workbuffer& rWorkbuffer)
 	rWorkbuffer.Append(std::ssize(game::gpGame->mActiveCoordinates));
 	rWorkbuffer.Append("\n");
 
-	auto it = game::gpGame->mCoordinateFrames.find(game::gpGame->mClientGridCoordinate);
-	if (it != game::gpGame->mCoordinateFrames.end() && it->second.iSnapshotCount > 0)
+	auto it = game::gpGame->mCells.find(game::gpGame->mClientGridCoordinate);
+	if (it != game::gpGame->mCells.end() && it->second.iSnapshotCount > 0)
 	{
 		const game::Frame& rRenderFrame = game::gpGame->RenderFrame(game::gpGame->mClientGridCoordinate);
 		rWorkbuffer.Append("Tick: ");

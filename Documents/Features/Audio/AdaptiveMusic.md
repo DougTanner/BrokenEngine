@@ -114,7 +114,7 @@ Changes (3 files)
      is complete, guarded by #ifdef BT_CLIENT and !(mGameFlags & engine::GameFlags::kMainMenu):
 
        #if defined(BT_CLIENT)
-       if (!(mGameFlags & engine::GameFlags::kMainMenu) && mCoordinateFrames.contains(mClientGridCoordinate))
+       if (!(mGameFlags & engine::GameFlags::kMainMenu) && mCells.contains(mClientGridCoordinate))
        {
            const Frame& rFrame = RenderFrame(mClientGridCoordinate);
            float fDeltaTime = /* real-time delta from AudioManager's timer or similar */;

@@ -16,7 +16,7 @@ struct FrameInterpolate;
 namespace engine
 {
 
-struct FrameStaticData;
+struct CellStaticData;
 
 struct SoundsInterpolate : public Collection<SoundsInterpolate, CollectionFlags::kIdToIndex>
 {
@@ -53,7 +53,7 @@ using sound_t = SoundsInterpolate::id_t;
 
 struct SoundsPostRender : public Collection<SoundsPostRender>
 {
-	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
+	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	static void Add(game::Frame& __restrict rFrame, sound_t& rId);
 

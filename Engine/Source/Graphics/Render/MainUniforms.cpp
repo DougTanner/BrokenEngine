@@ -13,7 +13,7 @@
 namespace engine
 {
 
-static void DebugRenderFrameEdges(const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate)
+static void DebugRenderCellEdges(const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate)
 {
 	if constexpr (!kbDebugRender)
 	{
@@ -25,8 +25,8 @@ static void DebugRenderFrameEdges(const std::vector<GridCoord>& rActiveCoordinat
 
 	for (const GridCoord& rCoordinate : rActiveCoordinates)
 	{
-		auto it = game::gpGame->mCoordinateFrames.find(rCoordinate);
-		if (it == game::gpGame->mCoordinateFrames.end())
+		auto it = game::gpGame->mCells.find(rCoordinate);
+		if (it == game::gpGame->mCells.end())
 		{
 			continue;
 		}
@@ -34,7 +34,7 @@ static void DebugRenderFrameEdges(const std::vector<GridCoord>& rActiveCoordinat
 		// Every cell has the same local edges; the basis offset is what places this one on screen.
 		// vecArea packing: x=minX, y=maxY, z=maxX, w=minY
 		XMFLOAT2 f2Offset = MakeRenderBasis(rCoordinate, cameraCoordinate).f2Offset;
-		XMVECTOR vecArea = LocalFrameArea();
+		XMVECTOR vecArea = LocalCellArea();
 		float fMinX = XMVectorGetX(vecArea) + f2Offset.x;
 		float fMaxY = XMVectorGetY(vecArea) + f2Offset.y;
 		float fMaxX = XMVectorGetZ(vecArea) + f2Offset.x;
@@ -64,8 +64,8 @@ static void DebugRenderIslandBoundaries(const std::vector<GridCoord>& rActiveCoo
 
 	for (const GridCoord& rCoordinate : rActiveCoordinates)
 	{
-		auto it = game::gpGame->mCoordinateFrames.find(rCoordinate);
-		if (it == game::gpGame->mCoordinateFrames.end())
+		auto it = game::gpGame->mCells.find(rCoordinate);
+		if (it == game::gpGame->mCells.end())
 		{
 			continue;
 		}
@@ -107,15 +107,15 @@ static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoor
 	}
 
 	// Drawn at the underwater mask threshold depth (the depth that defines the hull boundary), below
-	// the magenta boundary rectangle / cyan frame edges at gBaseHeight. Debug lines are an overlay
+	// the magenta boundary rectangle / cyan cell edges at gBaseHeight. Debug lines are an overlay
 	// (no depth test), so the underwater Z is never occluded by terrain or water.
 	float fZ = common::kfUnderwaterMaskThresholdMeters;
 	static constexpr XMFLOAT4A kf4ValidAreaColor = {0.0f, 1.0f, 0.0f, 1.0f};
 
 	for (const GridCoord& rCoordinate : rActiveCoordinates)
 	{
-		auto it = game::gpGame->mCoordinateFrames.find(rCoordinate);
-		if (it == game::gpGame->mCoordinateFrames.end())
+		auto it = game::gpGame->mCells.find(rCoordinate);
+		if (it == game::gpGame->mCells.end())
 		{
 			continue;
 		}
@@ -163,8 +163,8 @@ static void DebugRenderNavigationData(const std::vector<GridCoord>& rActiveCoord
 
 	for (const GridCoord& rCoordinate : rActiveCoordinates)
 	{
-		auto it = game::gpGame->mCoordinateFrames.find(rCoordinate);
-		if (it == game::gpGame->mCoordinateFrames.end())
+		auto it = game::gpGame->mCells.find(rCoordinate);
+		if (it == game::gpGame->mCells.end())
 		{
 			continue;
 		}
@@ -560,7 +560,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	}
 
 	DebugRenderNavigationData(rActiveCoordinates, cameraCoordinate);
-	DebugRenderFrameEdges(rActiveCoordinates, cameraCoordinate);
+	DebugRenderCellEdges(rActiveCoordinates, cameraCoordinate);
 	DebugRenderIslandBoundaries(rActiveCoordinates, cameraCoordinate);
 	DebugRenderIslandValidArea(rActiveCoordinates, cameraCoordinate);
 

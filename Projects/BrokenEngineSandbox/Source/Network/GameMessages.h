@@ -50,7 +50,7 @@ struct PlayerStateDescriptor
 inline constexpr PlayerStateDescriptor kpPlayerStateDescriptors[] =
 {
 	{.eWireType = PlayerStateWireType::kSpawned, .eEventType = PlayerEventType::kSpawned, .pcName = "Spawned"},
-	{.eWireType = PlayerStateWireType::kChangedFrame, .eEventType = PlayerEventType::kChangedFrame, .pcName = "ChangedFrame"},
+	{.eWireType = PlayerStateWireType::kChangedCell, .eEventType = PlayerEventType::kChangedCell, .pcName = "ChangedCell"},
 	{.eWireType = PlayerStateWireType::kDied, .eEventType = PlayerEventType::kDied, .pcName = "Died"},
 };
 static_assert(std::size(kpPlayerStateDescriptors) == static_cast<size_t>(PlayerStateWireType::kCount));

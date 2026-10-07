@@ -10,7 +10,7 @@
 
 namespace engine
 {
-struct FrameStaticData;
+struct CellStaticData;
 } // namespace engine
 
 namespace game
@@ -88,11 +88,11 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 
 	static void AllocateAndCopy(BlastersPostRender& rCurrent, const BlastersPostRender& rPrevious);
 
-	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
-	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
-	static void PostCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::FrameStaticData& rStaticData);
-	static void Transfer(Frame& __restrict rFrame, const engine::FrameStaticData& rStaticData);
-	static void Destroy(Frame& __restrict rFrame, const engine::FrameStaticData& rStaticData);
+	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
+	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
+	static void PostCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
+	static void Transfer(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
+	static void Destroy(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 
 	BlasterFlags_t* __restrict pFlags = nullptr;
 	XMVECTOR* __restrict pVecVelocities = nullptr;

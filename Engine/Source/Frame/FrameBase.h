@@ -196,7 +196,7 @@ struct FramePostRenderBase
 	FramePostRenderBase& operator=(FramePostRenderBase&&) noexcept = default;
 
 	static void AllocateAndCopy(game::FramePostRender& __restrict rCurrent, const game::FramePostRender& __restrict rPrevious);
-	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const game::FrameInput& __restrict rFrameInput, const FrameStaticData& rStaticData);
+	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const game::FrameInput& __restrict rFrameInput, const CellStaticData& rStaticData);
 
 	common::RandomEngine randomEngine {};
 	uint64_t uiNextUuid = 1;
@@ -312,7 +312,7 @@ struct ActiveFrameReference
 	game::Frame* pNext = nullptr;
 	game::Frame* pCurrent = nullptr;
 	game::FrameInput* pFrameInput = nullptr;
-	const FrameStaticData* pStaticData = nullptr;
+	const CellStaticData* pStaticData = nullptr;
 };
 
 void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter, float fCurrentTime);

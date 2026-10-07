@@ -1,7 +1,7 @@
 #include "Players.h"
 
 #include "Frame/Collections/Pushers/Pushers.h"
-#include "Frame/FrameStaticData.h"
+#include "Frame/CellStaticData.h"
 #include "Frame/IslandTerrain.h"
 #include "Frame/NavQuery.h"
 #include "Ui/WrapperBase.h"
@@ -34,7 +34,7 @@ constexpr float kfNavigationLookahead = 8.0f;
 // 0 -> largest-area island in this frame, 1 -> smallest-area, 2+ -> the supplied random pick.
 // Largest/smallest scan the frame's placements deterministically (no RNG, first-found tie-break);
 // area uses the same anisotropic quad footprint the destination point is generated from.
-static int64_t SelectIslandPlacement(const engine::FrameStaticData& rStaticData, int64_t iWaypointIndex, int64_t iRandomPick)
+static int64_t SelectIslandPlacement(const engine::CellStaticData& rStaticData, int64_t iWaypointIndex, int64_t iRandomPick)
 {
 	if (iWaypointIndex >= 2)
 	{
@@ -57,7 +57,7 @@ static int64_t SelectIslandPlacement(const engine::FrameStaticData& rStaticData,
 	return iSelected;
 }
 
-static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFrame, const PlayersPostRender& rCurrent, const PlayersPostRender& rPrevious, const PlayersInterpolate& rPreviousInterpolate, int64_t i, FXMVECTOR vecPosition, const engine::FrameStaticData& rStaticData, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, float fDeltaTime, int64_t& riNavigationDirection, XMVECTOR& rVecIslandDestination, float& rfFrameChangeTimer)
+static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFrame, const PlayersPostRender& rCurrent, const PlayersPostRender& rPrevious, const PlayersInterpolate& rPreviousInterpolate, int64_t i, FXMVECTOR vecPosition, const engine::CellStaticData& rStaticData, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, float fDeltaTime, int64_t& riNavigationDirection, XMVECTOR& rVecIslandDestination, float& rfCellChangeTimer)
 {
 	// Fleet navigation: navigate toward fleet's wanted coord after countdown expires
 	if (!(fleetWantedCoordinate == rStaticData.coordinate) && iPendingFleetWantedCoordinateTicks == 0)
@@ -143,18 +143,18 @@ static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFram
 		rVecIslandDestination = XMVectorZero();
 	}
 
-	// Frame change timer: cycle back to island destination when roaming
+	// Cell change timer: cycle back to island destination when roaming
 	if (riNavigationDirection == -1)
 	{
-		rfFrameChangeTimer -= fDeltaTime;
-		if (rfFrameChangeTimer <= 0.0f)
+		rfCellChangeTimer -= fDeltaTime;
+		if (rfCellChangeTimer <= 0.0f)
 		{
 			riNavigationDirection = 4;
 		}
 	}
 }
 
-static bool ShouldRecomputeNavigation(const Frame& rFrame, const PlayersPostRender& rCurrent, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecArtificialIntelligenceDirection, int64_t iEntryNavigationDirection, bool bReseededDirection, int64_t iNavigationDirection, const engine::FrameStaticData& rStaticData)
+static bool ShouldRecomputeNavigation(const Frame& rFrame, const PlayersPostRender& rCurrent, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecArtificialIntelligenceDirection, int64_t iEntryNavigationDirection, bool bReseededDirection, int64_t iNavigationDirection, const engine::CellStaticData& rStaticData)
 {
 	// Cadence, mode changes, direction reseeding, and blocked position/lookahead probes request pathfinding.
 	// Destination selection in mode 4 also forces it; otherwise cached steering is reused without NavQueryDirection.
@@ -181,7 +181,7 @@ static bool ShouldRecomputeNavigation(const Frame& rFrame, const PlayersPostRend
 	return bRecompute;
 }
 
-static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] PlayersPostRender& rCurrent, [[maybe_unused]] int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecDestination, const engine::FrameStaticData& rStaticData, XMVECTOR& rVecArtificialIntelligenceDirection)
+static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] PlayersPostRender& rCurrent, [[maybe_unused]] int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecDestination, const engine::CellStaticData& rStaticData, XMVECTOR& rVecArtificialIntelligenceDirection)
 {
 	XMVECTOR vecDebugWaypoint = XMVectorZero();
 	XMVECTOR vecNavigationDirection = XMVectorZero();
@@ -218,12 +218,12 @@ static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] PlayersPostRend
 #endif // BT_CLIENT
 }
 
-void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData)
+void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
 
-	engine::FrameBounds bounds = engine::ComputeFrameBounds(engine::LocalFrameArea());
+	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
 
 	// Reverse iteration for swap-and-pop safety with RemoveIndexableElement
 	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
@@ -278,7 +278,7 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	}
 }
 
-void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::FrameStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecFrameCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, float fDeltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, float& rfFrameChangeTimer)
+void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, float fDeltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, float& rfCellChangeTimer)
 {
 	PlayersPostRender& __restrict rCurrent = *rFrame.postRender.pPlayers;
 	const PlayersPostRender& rPrevious = *rPreviousFrame.postRender.pPlayers;
@@ -297,7 +297,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 		bReseededDirection = true;
 	}
 
-	UpdateFleetAndFlagshipNavigation(rFrame, rCurrent, rPrevious, rPreviousInterpolate, i, vecPosition, rStaticData, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, flags, fDeltaTime, riNavigationDirection, rVecIslandDestination, rfFrameChangeTimer);
+	UpdateFleetAndFlagshipNavigation(rFrame, rCurrent, rPrevious, rPreviousInterpolate, i, vecPosition, rStaticData, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, flags, fDeltaTime, riNavigationDirection, rVecIslandDestination, rfCellChangeTimer);
 
 	bool bRecompute = ShouldRecomputeNavigation(rFrame, rCurrent, i, vecPosition, rVecArtificialIntelligenceDirection, iEntryNavigationDirection, bReseededDirection, riNavigationDirection, rStaticData);
 
@@ -335,7 +335,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 			// AABB; island-free cells skip draws and target the cell center.
 			if (rStaticData.islands.empty())
 			{
-				rVecIslandDestination = vecFrameCenter;
+				rVecIslandDestination = vecCellCenter;
 				bRecompute = true;
 			}
 			else
@@ -370,7 +370,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 		// Arrival check (unconditional — independent of the pathfind throttle). Zeroing the destination
 		// makes the next tick's mode-4 entry block immediately pick the next island in the
 		// largest -> smallest -> random sequence (no idle between islands). Staying in mode 4 keeps the
-		// tour progressing; the fleet still leaves the frame when the server frame-change timer fires.
+		// tour progressing; the fleet still leaves the cell when the server cell-change timer fires.
 		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, rVecIslandDestination)));
 		if (fDistanceSquared < 100.0f)
 		{
@@ -380,22 +380,22 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 	}
 	else if (riNavigationDirection >= 0)
 	{
-		// Navigate toward neighboring frame center
+		// Navigate toward neighboring cell center
 		rVecIslandDestination = XMVectorZero();
-		XMVECTOR vecDestination = vecFrameCenter;
+		XMVECTOR vecDestination = vecCellCenter;
 		switch (riNavigationDirection)
 		{
 			case 0:
-				vecDestination = XMVectorAdd(vecFrameCenter, XMVectorSet(0.0f, engine::kfCellHeight, 0.0f, 0.0f));
+				vecDestination = XMVectorAdd(vecCellCenter, XMVectorSet(0.0f, engine::kfCellHeight, 0.0f, 0.0f));
 				break;
 			case 1:
-				vecDestination = XMVectorAdd(vecFrameCenter, XMVectorSet(0.0f, -engine::kfCellHeight, 0.0f, 0.0f));
+				vecDestination = XMVectorAdd(vecCellCenter, XMVectorSet(0.0f, -engine::kfCellHeight, 0.0f, 0.0f));
 				break;
 			case 2:
-				vecDestination = XMVectorAdd(vecFrameCenter, XMVectorSet(engine::kfCellWidth, 0.0f, 0.0f, 0.0f));
+				vecDestination = XMVectorAdd(vecCellCenter, XMVectorSet(engine::kfCellWidth, 0.0f, 0.0f, 0.0f));
 				break;
 			case 3:
-				vecDestination = XMVectorAdd(vecFrameCenter, XMVectorSet(-engine::kfCellWidth, 0.0f, 0.0f, 0.0f));
+				vecDestination = XMVectorAdd(vecCellCenter, XMVectorSet(-engine::kfCellWidth, 0.0f, 0.0f, 0.0f));
 				break;
 			default:
 				break;
@@ -443,7 +443,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 	else
 	{
 		rVecIslandDestination = XMVectorZero();
-		auto [vecNewArtificialIntelligenceDirection] = ComputeArtificialIntelligenceSteering(rStaticData, vecPosition, rVecArtificialIntelligenceDirection, vecFrameCenter, fDeltaTime, i % 2 == 0);
+		auto [vecNewArtificialIntelligenceDirection] = ComputeArtificialIntelligenceSteering(rStaticData, vecPosition, rVecArtificialIntelligenceDirection, vecCellCenter, fDeltaTime, i % 2 == 0);
 		rVecArtificialIntelligenceDirection = vecNewArtificialIntelligenceDirection;
 #if defined(BT_CLIENT)
 		if constexpr (kbDebugRender)
@@ -461,14 +461,14 @@ void XM_CALLCONV PlayersPostRender::ApplyMovement(int64_t iNavigationDirection, 
 	rVecVelocity = engine::ApplyMovement(rVecVelocity, vecArtificialIntelligenceDirection, fDeltaTime, fAcceleration, kfPlayerDrag * fDecayMultiplier, fMaximumSpeed);
 }
 
-void XM_CALLCONV PlayersPostRender::ApplyTerrainPush(const engine::FrameStaticData& rStaticData, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity)
+void XM_CALLCONV PlayersPostRender::ApplyTerrainPush(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity)
 {
 	// Terrain collision - add velocity away from terrain, gentle at first then ramping up
-	float fElevation = engine::gpIslandTerrain->MakeFrameElevationSampler(rStaticData).Sample(vecPosition);
+	float fElevation = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition);
 	float fPushHeight = engine::gBaseHeight.mfCurrent - kfPlayerRadius - kfPushMargin;
 	if (fElevation >= fPushHeight) [[unlikely]]
 	{
-		XMVECTOR vecTerrainNormal = XMVector3Normalize(XMVectorSetZ(engine::gpIslandTerrain->FrameNormal(rStaticData, vecPosition), 0.0f));
+		XMVECTOR vecTerrainNormal = XMVector3Normalize(XMVectorSetZ(engine::gpIslandTerrain->CellNormal(rStaticData, vecPosition), 0.0f));
 		float fPenetration = fElevation - fPushHeight;
 		float fPushStrength = fPenetration * fPenetration * kfTerrainPushVelocity;
 		rVecVelocity = engine::ApplyClampedPush(rVecVelocity, vecTerrainNormal, fPushStrength, kfMaximumPushVelocity);

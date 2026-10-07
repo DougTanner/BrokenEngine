@@ -13,7 +13,7 @@ struct Frame;
 namespace engine
 {
 
-struct FrameStaticData;
+struct CellStaticData;
 class Wrapper;
 
 #if defined(BT_CLIENT)
@@ -241,9 +241,9 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 
 	static void AllocateAndCopy(ExplosionsPostRender& rCurrent, const ExplosionsPostRender& rPrevious);
 
-	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData);
+	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
-	static void Destroy(game::Frame& __restrict rFrame, const FrameStaticData& rStaticData);
+	static void Destroy(game::Frame& __restrict rFrame, const CellStaticData& rStaticData);
 
 	auto Members([[maybe_unused]] this auto&& rSelf)
 	{

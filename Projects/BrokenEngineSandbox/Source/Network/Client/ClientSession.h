@@ -28,7 +28,7 @@ enum class SubscriptionChangeReason : uint8_t
 {
 	kAssigned,
 	kSpawned,
-	kChangedFrame,
+	kChangedCell,
 	kDied,
 	kFleetSynchronization,
 	kPollTick,

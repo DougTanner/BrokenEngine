@@ -64,7 +64,7 @@ Structure: `ReadMember<IS_COLUMN, MEMBER>(const Frame&, int64_t iIndex, nlohmann
 
 - Any change to `edit_frame` behavior, value forms, refusals, or response; row add or remove; cells and pins; the save format.
 - `query_frame`, `query_players`, `query_collection`, and their extractors and schemas; `status`.
-- A column filter, paging, whole-collection or whole-frame dumps, binary export, and reads of `FrameStaticData`, `uiSharedCrc`, `transferRequests`, `idToIndexMap`, `iCapacity`, or client-only columns (not on the server).
+- A column filter, paging, whole-collection or whole-frame dumps, binary export, and reads of `CellStaticData`, `uiSharedCrc`, `transferRequests`, `idToIndexMap`, `iCapacity`, or client-only columns (not on the server).
 - Client-build code and client commands; the vcxproj files (no file is added).
 
 ## Risk triggers and invariants

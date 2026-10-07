@@ -14,7 +14,7 @@ struct FramePostRender;
 namespace engine
 {
 
-struct FrameStaticData;
+struct CellStaticData;
 
 template <auto MEMBER, common::FixedString NAME>
 struct FrameColumn
@@ -51,7 +51,7 @@ template<bool kbBlendVelocityToDirection = false>
 	return vecResult;
 }
 
-struct FrameBounds
+struct CellBounds
 {
 	float fMinX = 0.0f;
 	float fMinY = 0.0f;
@@ -66,7 +66,7 @@ struct SegmentHit
 	XMVECTOR vecPosition {};
 };
 
-inline FrameBounds XM_CALLCONV ComputeFrameBounds(FXMVECTOR vecArea)
+inline CellBounds XM_CALLCONV ComputeCellBounds(FXMVECTOR vecArea)
 {
 	// vecArea: x=minX, y=maxY, z=maxX, w=minY
 	return
@@ -78,9 +78,9 @@ inline FrameBounds XM_CALLCONV ComputeFrameBounds(FXMVECTOR vecArea)
 	};
 }
 
-inline SegmentHit XM_CALLCONV TracePointToFrameExit(FXMVECTOR vecArea, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition, float fStartTime, float fEndTime)
+inline SegmentHit XM_CALLCONV TracePointToCellExit(FXMVECTOR vecArea, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition, float fStartTime, float fEndTime)
 {
-	FrameBounds bounds = ComputeFrameBounds(vecArea);
+	CellBounds bounds = ComputeCellBounds(vecArea);
 	XMFLOAT4A f4Start {};
 	XMFLOAT4A f4End {};
 	XMStoreFloat4A(&f4Start, vecStartPosition);
@@ -129,9 +129,9 @@ inline SegmentHit XM_CALLCONV TracePointToFrameExit(FXMVECTOR vecArea, FXMVECTOR
 	};
 }
 
-// The one frame area, identical in every cell: geometry is centered cell-local, so the grid coordinate is
-// identity only and never scales an edge. Lanes follow the convention ComputeFrameBounds reads.
-inline XMVECTOR XM_CALLCONV LocalFrameArea()
+// The one cell area, identical in every cell: geometry is centered cell-local, so the grid coordinate is
+// identity only and never scales an edge. Lanes follow the convention ComputeCellBounds reads.
+inline XMVECTOR XM_CALLCONV LocalCellArea()
 {
 	return XMVectorSet(kfBaseAreaMinimumX, kfBaseAreaMaximumY, kfBaseAreaMaximumX, kfBaseAreaMinimumY);
 }
@@ -158,7 +158,7 @@ inline XMVECTOR XM_CALLCONV LocalFrameArea()
 
 inline constexpr int64_t kiInitialTransferCapacity = 32;
 
-inline bool XM_CALLCONV IsOutOfBounds(const FrameBounds& rBounds, FXMVECTOR vecPosition)
+inline bool XM_CALLCONV IsOutOfBounds(const CellBounds& rBounds, FXMVECTOR vecPosition)
 {
 	float fPositionX = XMVectorGetX(vecPosition);
 	float fPositionY = XMVectorGetY(vecPosition);
@@ -166,7 +166,7 @@ inline bool XM_CALLCONV IsOutOfBounds(const FrameBounds& rBounds, FXMVECTOR vecP
 	return !(fPositionX > rBounds.fMinX && fPositionX < rBounds.fMaxX && fPositionY > rBounds.fMinY && fPositionY < rBounds.fMaxY);
 }
 
-inline void XM_CALLCONV ComputeTransferDelta(const FrameBounds& rBounds, FXMVECTOR vecPosition, int64_t& riDeltaX, int64_t& riDeltaY)
+inline void XM_CALLCONV ComputeTransferDelta(const CellBounds& rBounds, FXMVECTOR vecPosition, int64_t& riDeltaX, int64_t& riDeltaY)
 {
 	float fPositionX = XMVectorGetX(vecPosition);
 	float fPositionY = XMVectorGetY(vecPosition);
@@ -260,7 +260,7 @@ constexpr void ForEachGraphicsResources(TypeList<TS...>)
 }
 
 template<typename... TS>
-void ForEachPostRenderUpdate(TypeList<TS...>, game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData)
+void ForEachPostRenderUpdate(TypeList<TS...>, game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData)
 {
 	([&]
 	{
@@ -270,7 +270,7 @@ void ForEachPostRenderUpdate(TypeList<TS...>, game::Frame& __restrict rFrame, co
 }
 
 template<typename... TS>
-void ForEachPostRenderPreCollision(TypeList<TS...>, game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData)
+void ForEachPostRenderPreCollision(TypeList<TS...>, game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData)
 {
 	([&]
 	{
@@ -282,7 +282,7 @@ void ForEachPostRenderPreCollision(TypeList<TS...>, game::Frame& __restrict rFra
 }
 
 template<typename... TS>
-void ForEachPostRenderPostCollision(TypeList<TS...>, game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData)
+void ForEachPostRenderPostCollision(TypeList<TS...>, game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData)
 {
 	([&]
 	{
@@ -294,7 +294,7 @@ void ForEachPostRenderPostCollision(TypeList<TS...>, game::Frame& __restrict rFr
 }
 
 template<typename... TS>
-void ForEachPostRenderAreaDamage(TypeList<TS...>, game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const FrameStaticData& rStaticData)
+void ForEachPostRenderAreaDamage(TypeList<TS...>, game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData)
 {
 	([&]
 	{
@@ -306,7 +306,7 @@ void ForEachPostRenderAreaDamage(TypeList<TS...>, game::Frame& __restrict rFrame
 }
 
 template<typename... TS>
-void ForEachPostRenderTransfer(TypeList<TS...>, game::Frame& __restrict rFrame, const FrameStaticData& rStaticData)
+void ForEachPostRenderTransfer(TypeList<TS...>, game::Frame& __restrict rFrame, const CellStaticData& rStaticData)
 {
 	([&]
 	{
@@ -318,7 +318,7 @@ void ForEachPostRenderTransfer(TypeList<TS...>, game::Frame& __restrict rFrame, 
 }
 
 template<typename... TS>
-void ForEachPostRenderDestroy(TypeList<TS...>, game::Frame& __restrict rFrame, const FrameStaticData& rStaticData)
+void ForEachPostRenderDestroy(TypeList<TS...>, game::Frame& __restrict rFrame, const CellStaticData& rStaticData)
 {
 	([&]
 	{
@@ -330,7 +330,7 @@ void ForEachPostRenderDestroy(TypeList<TS...>, game::Frame& __restrict rFrame, c
 }
 
 template<typename... TS>
-void ForEachPostRenderSpawn(TypeList<TS...>, game::Frame& __restrict rFrame, const FrameStaticData& rStaticData)
+void ForEachPostRenderSpawn(TypeList<TS...>, game::Frame& __restrict rFrame, const CellStaticData& rStaticData)
 {
 	([&]
 	{

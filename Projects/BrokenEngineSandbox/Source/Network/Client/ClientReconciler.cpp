@@ -14,8 +14,8 @@ namespace game
 
 static bool GetClientSnapshotPosition(XMVECTOR& rVecPosition)
 {
-	auto it = gpGame->mCoordinateFrames.find(gpGame->mClientGridCoordinate);
-	if (it == gpGame->mCoordinateFrames.end())
+	auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
+	if (it == gpGame->mCells.end())
 	{
 		return false;
 	}

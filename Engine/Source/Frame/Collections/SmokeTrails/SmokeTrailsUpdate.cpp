@@ -34,7 +34,7 @@ void SmokeTrailsInterpolate::Sync(game::FrameInterpolate& rFrameInterpolate, id_
 	rSmokeTrails.pfIntensities[iIndex] = rData.fIntensity;
 }
 
-void SmokeTrailsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const FrameStaticData& rStaticData)
+void SmokeTrailsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] const CellStaticData& rStaticData)
 {
 }
 

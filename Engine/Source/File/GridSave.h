@@ -15,7 +15,7 @@ struct StagedGridSave
 	int64_t iTick = 0;
 	float fCurrentTime = 0.0f;
 	bool bHeaderValidated = false;
-	std::unordered_map<GridCoord, CoordFrames> coordinateFrames;
+	std::unordered_map<GridCoord, Cell> cells;
 	game::SaveStagedState saveState;
 };
 

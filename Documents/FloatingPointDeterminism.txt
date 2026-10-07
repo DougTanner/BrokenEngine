@@ -104,11 +104,11 @@ iterated in simulation-critical paths:
 
   - Collision::sResults: accessed only by direct key lookup
     (GetCollisions(layerIndex, entityIndex)), never iterated.
-  - mCoordinateFrames: rendering (BeginRender) does not iterate the map at
+  - mCells: rendering (BeginRender) does not iterate the map at
     all; it walks the deterministic rActiveCoords vector, which
     supplies the iteration order. Server active-set computation does
     iterate the map itself, in unspecified hash order, in two places:
-    the erase pass in ServerSessionRuntime::SyncActiveFrames
+    the erase pass in ServerSessionRuntime::SyncActiveCells
     (Engine/Source/Network/Server/ServerSessionRuntime.cpp:299) and
     the AddGameRequiredCoordinates game hook
     (Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp:320).
@@ -118,8 +118,8 @@ iterated in simulation-critical paths:
     appends the same deduplicated coords whatever the visit order.
     The resulting order of mActiveCoordinates sets the dispatch order of
     per-cell ticks, which are independent by construction: simulation
-    code samples only its own cell's FrameStaticData and never
-    mCoordinateFrames (Engine/Source/Frame/AGENTS.md:28). It also sets the
+    code samples only its own cell's CellStaticData and never
+    mCells (Engine/Source/Frame/AGENTS.md:41). It also sets the
     order in which ServerTransferManager::CollectTransfers
     (Projects/BrokenEngineSandbox/Source/Network/Server/ServerTransferManager.cpp:52)
     appends each source cell's transfer requests to its destination
