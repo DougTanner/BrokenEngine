@@ -4,6 +4,7 @@
 
 #include "Network/Client/Client.h"
 #include "Network/Client/ClientSessionRuntime.h"
+#include "Network/Client/ReconcileReplay.h"
 
 #include "Network/Client/ClientSession.h"
 #include "Game.h"

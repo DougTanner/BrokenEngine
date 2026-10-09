@@ -6,6 +6,7 @@
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
+#include "Network/Client/ClientReconciler.h"
 #include "Network/GamePacketType.h"
 #include "Network/PlayerEvents.h"
 #include "Profile/ProfileManager.h"

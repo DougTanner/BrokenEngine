@@ -5,7 +5,6 @@
 #include "Frame/GridCoord.h"
 #include "Network/Client/ClientDesyncCore.h"
 
-#include "Network/Client/ClientReconciler.h"
 #include "Fleet.h"
 
 namespace engine
@@ -20,6 +19,7 @@ struct ReceivedDebugFrame;
 namespace game
 {
 
+class ClientReconciler;
 struct Frame;
 struct ReceivedPlayerEvent;
 enum class GamePacketType : uint8_t;

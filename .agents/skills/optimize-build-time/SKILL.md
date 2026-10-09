@@ -1,6 +1,6 @@
 ---
 name: optimize-build-time
-description: Measure a full rebuild of the BrokenEngineSandbox client and server with vcperf (C++ Build Insights), rank the slowest translation units, headers, template instantiations, and functions, apply source-structure fixes (Pch.h contents, unused includes, forward declarations, moving includes or bodies out of headers) through the Change Workflow, measure the rebuild again, and report each metric's before/after change in percent. Use only when the user explicitly runs it to find and fix slow C++ build time; compiler, linker, and project option changes are reported as recommendations, never applied.
+description: Measure a full rebuild of the BrokenEngineSandbox client and server plus DataPacker Release with vcperf (C++ Build Insights), rank the slowest translation units, headers, template instantiations, and functions, apply source-structure fixes (Pch.h contents, unused includes, forward declarations, moving includes or bodies out of headers) through the Change Workflow, measure the rebuild again, and report each metric's before/after change in percent. Use only when the user explicitly runs it to find and fix slow C++ build time; compiler, linker, and project option changes are reported as recommendations, never applied.
 argument-hint: [Debug|Profile|Release]
 allowed-tools: [Read, Grep, Glob, Bash, PowerShell, Agent]
 disable-model-invocation: true
@@ -10,21 +10,22 @@ disable-model-invocation: true
 
 ## Purpose
 
-Measures a full client and server rebuild with vcperf, fixes the source
-structure behind the ranked bottlenecks through the Change Workflow, measures
-again, and reports each metric's before/after change in percent.
+Measures a full client, server, and DataPacker Release rebuild with vcperf,
+fixes the source structure behind the ranked bottlenecks through the Change
+Workflow, measures again, and reports each metric's before/after change in
+percent.
 
 ## When to use
 
-- The user runs this skill by name to find out why the client and server C++
-  build is slow and to make it faster.
+- The user runs this skill by name to find out why the client, server, and
+  DataPacker Release C++ build is slow and to make it faster.
 - Not for CPU profiling of the running client or server; that is
   `/analyze-diagsession`.
 
 ## Inputs
 
-- The invocation argument: the build configuration, `Debug`, `Profile`, or
-  `Release`; `Debug` when absent.
+- The invocation argument: the Client and Server build configuration,
+  `Debug`, `Profile`, or `Release`; `Debug` when absent.
 - The session baseline, for each fix's change size in step 6.
 
 ## Steps
@@ -33,7 +34,8 @@ again, and reports each metric's before/after change in percent.
    run directory are recorded and its `baseline/` and `after/` directories
    exist.
    - Configuration: the invocation argument, `Debug` when absent; stop on any
-     other value. Targets: Client and Server.
+     other value. It applies to Client and Server. Targets: Client, Server,
+     and DataPacker, which builds in Release only (`/compile` `## Inputs`).
    - vcperf path: the last line this query prints; stop when it prints none.
 
      ```powershell
@@ -48,23 +50,28 @@ again, and reports each metric's before/after change in percent.
 2. Measure into `baseline/` with this measure sequence. Done when
    `baseline/summary.json` exists from a `Measure-BuildTrace.ps1` exit 0, or
    the skill has stopped with a report.
-   1. Start the trace: `### vcperf calls` Start, with its fallbacks.
-   2. Delete both targets' intermediate directories from the worktree root, so
+   1. Warm up: dispatch a `builder` with sub-step 4's brief, untraced and with
+      no intermediate deletion, so one-time work outside C++ compile time
+      settles before the trace. On its failure, report the builder's failing
+      row and end; no trace is running, so no Stop follows.
+   2. Start the trace: `### vcperf calls` Start, with its fallbacks.
+   3. Delete every target's intermediate directory from the worktree root, so
       MSBuild recompiles every translation unit, `Pch.cpp` included, and
       relinks:
 
       ```powershell
-      foreach ($path in 'Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Build/BrokenEngineSandbox/<Configuration>', 'Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Build/BrokenEngineSandboxServer/<Configuration>') { if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse } }
+      foreach ($path in 'Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Build/BrokenEngineSandbox/<Configuration>', 'Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Build/BrokenEngineSandboxServer/<Configuration>', 'DataPacker/Platforms/VisualStudio2026/Build/Release') { if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse } }
       ```
 
-   3. Dispatch one `builder` running `/compile` for Client then Server at the
-      configuration, stating no agent-harness scenario and Shared data mode
-      because no Local trigger path changed. Its `Evidence` row for the
-      envelope file is the summary's `-BuildEnvelope` input.
-   4. Stop the trace into the phase directory: `### vcperf calls` Stop, with
+   4. Dispatch one `builder` running `/compile` for Client then Server at the
+      configuration, then DataPacker in Release, stating no agent-harness
+      scenario and Shared data mode because no Local trigger path changed. Its
+      `Evidence` row for the one envelope file is the summary's
+      `-BuildEnvelope` input.
+   5. Stop the trace into the phase directory: `### vcperf calls` Stop, with
       its elevated retry. Stop also after a failed build, then report the
       builder's failing row and end.
-   5. Summarize the trace. Exit 0 continues; on exit 2 or 1, report the
+   6. Summarize the trace. Exit 0 continues; on exit 2 or 1, report the
       printed `code` and `message` and end.
 
       ```powershell
@@ -79,7 +86,7 @@ again, and reports each metric's before/after change in percent.
      moving includes or bodies out of headers.
    - Recommendation only: compiler, linker, and `.vcxproj` option changes, and
      any change to a `/compile` Local trigger path, such as
-     `Common/DataFile.h`
+     `Common/DataFile.h` or `DataPacker/**`
      ([`runtime-data-mode.md`](../compile/references/runtime-data-mode.md)
      `## Mode selection`).
 4. Run the Change Workflow from its Approve and classify step through its
@@ -177,8 +184,8 @@ path of the phase directory's `build.json`.
 - Apply only the categories step 3 marks applicable, and report every other
   proposal as a recommendation; a Local trigger path change stays a
   recommendation because both measures must build in Shared mode.
-- Keep the two measures like for like: the same targets, configuration, full
-  rebuild, and machine.
+- Keep the two measures like for like: the same targets, configurations,
+  warm-up, full rebuild, and machine.
 - Follow every successful Start with a Stop, including after a failed build.
 - Use the elevated forms only in the order and on the failures
   `### vcperf calls` names, and state no reboot or sign-out behavior of the

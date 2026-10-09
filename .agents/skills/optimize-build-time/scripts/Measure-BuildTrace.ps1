@@ -1,11 +1,11 @@
-# Summarizes one vcperf `/timetrace` JSON of a full BrokenEngineSandbox Client and Server rebuild for
-# /optimize-build-time, and with -Baseline compares it against an earlier summary.
+# Summarizes one vcperf `/timetrace` JSON of a full BrokenEngineSandbox Client and Server plus DataPacker
+# Release rebuild for /optimize-build-time, and with -Baseline compares it against an earlier summary.
 #
 # Inputs: -Trace is the vcperf `build.json`; -BuildEnvelope is the /compile builder's envelope file,
 # whose fenced `broken-engine-build-result/v1` blocks supply the wall-clock time and the worktree
 # root; -Baseline is an earlier `summary.json` from this script.
 #
-# Stdout contract: exactly one JSON object, schema `broken-engine-build-trace-summary/v1`, also
+# Stdout contract: exactly one JSON object, schema `broken-engine-build-trace-summary/v2`, also
 # written as `summary.json` beside the trace. Diagnostics go to stderr. Back-end time is a total
 # only: back-end passes carry no translation-unit name, and /MP nests compile passes under a shared
 # CL invocation. vcperf keeps a function or template entry only at 10 ms or more, so a comparison
@@ -27,7 +27,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot '..\..\..\scripts\AgentScriptCommon.psm1') -Force
 
-$script:Schema = 'broken-engine-build-trace-summary/v1'
+$script:Schema = 'broken-engine-build-trace-summary/v2'
 $script:BuildResultSchema = 'broken-engine-build-result/v1'
 $script:RankingSize = 20
 $script:BlockedCode = $null
@@ -130,6 +130,7 @@ function Get-InvocationTarget([string] $OutputPath) {
 	$normalized = $OutputPath.Replace('/', '\')
 	if ($normalized.IndexOf('\Build\BrokenEngineSandboxServer\', [StringComparison]::OrdinalIgnoreCase) -ge 0) { return 'Server' }
 	if ($normalized.IndexOf('\Build\BrokenEngineSandbox\', [StringComparison]::OrdinalIgnoreCase) -ge 0) { return 'Client' }
+	if ($normalized.IndexOf('\DataPacker\Platforms\', [StringComparison]::OrdinalIgnoreCase) -ge 0) { return 'DataPacker' }
 	return $null
 }
 
@@ -289,7 +290,7 @@ try {
 	$foreignCount = 0
 	$foreignUs = [long] 0
 	$keptCompilers = 0
-	$translationUnits = [ordered]@{ Client = 0; Server = 0 }
+	$translationUnits = [ordered]@{ Client = 0; Server = 0; DataPacker = 0 }
 	$frontEndByUnit = [Collections.Generic.Dictionary[string, AggregateRecord]]::new([StringComparer]::OrdinalIgnoreCase)
 	foreach ($invocation in $invocations) {
 		if (-not $invocation.Kept) {
@@ -308,7 +309,7 @@ try {
 			Stop-TraceSummary 'trace.pass-names' "$($invocation.Name) has $frontEndCount FrontEndPass and $backEndCount BackEndPass entries; the SDK pass names did not hold."
 		}
 		if ($null -eq $invocation.Target) {
-			Stop-TraceSummary 'trace.no-target' "$($invocation.Name) has no File Output under Build\BrokenEngineSandbox\ or Build\BrokenEngineSandboxServer\."
+			Stop-TraceSummary 'trace.no-target' "$($invocation.Name) has no File Output under Build\BrokenEngineSandbox\, Build\BrokenEngineSandboxServer\, or DataPacker\Platforms\."
 		}
 		for ($index = 0; $index -lt $frontEndCount; $index++) {
 			$frontEnd = $invocation.FrontEndPasses[$index]
