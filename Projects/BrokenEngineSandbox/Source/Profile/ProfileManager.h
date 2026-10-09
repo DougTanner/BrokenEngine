@@ -87,12 +87,11 @@ inline constexpr std::string_view kGameCpuTimerNames[]
 };
 static_assert(std::size(kGameCpuTimerNames) == static_cast<size_t>(kGameCpuTimerCount) - static_cast<size_t>(engine::kEngineCpuTimerCount));
 
-class ProfileManager : public engine::ProfileManagerBase
+class ProfileManager : public engine::ProfileManagerBase, public common::Singleton<ProfileManager>
 {
 public:
 
 	ProfileManager();
-	~ProfileManager() override;
 
 private:
 

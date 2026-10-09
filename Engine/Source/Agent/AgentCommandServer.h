@@ -73,7 +73,6 @@ private:
 	static constexpr int64_t kiMaximumResponseBytes = 16i64 * 1'024i64 * 1'024i64; // 16 MiB response cap
 
 	SOCKET muiListenSocket = INVALID_SOCKET;
-	SOCKET muiActiveSocket = INVALID_SOCKET; // current connection; final close is owned by ListenerLoop after I/O exits
 
 	std::mutex mMutex;
 	std::condition_variable mResponseReady;

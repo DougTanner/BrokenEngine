@@ -99,24 +99,8 @@ void Texture::LoadUint16Raw(const std::filesystem::path& rPath)
 	// Headerless linear unorm-16. Gaea's UshortRaw16 format. No gamma applies — source is
 	// already linear. Single-channel; R is populated, GBA left at 0 (matches kFloat32).
 	ASSERT(miWidth > 0 && miHeight > 0);
-	if (miWidth <= 0 || miHeight <= 0)
-	{
-		throw std::runtime_error("Uint16 raw texture dimensions are invalid");
-	}
 
-	uintmax_t uiWidth = static_cast<uintmax_t>(miWidth);
-	uintmax_t uiHeight = static_cast<uintmax_t>(miHeight);
-	static constexpr int64_t kiBytesPerPixel = sizeof(uint16_t);
-	if (uiWidth > std::numeric_limits<uintmax_t>::max() / uiHeight)
-	{
-		throw std::runtime_error("Uint16 raw texture dimensions overflow");
-	}
-	uintmax_t uiPixelCount = uiWidth * uiHeight;
-	if (uiPixelCount > std::numeric_limits<uintmax_t>::max() / kiBytesPerPixel)
-	{
-		throw std::runtime_error("Uint16 raw texture byte count overflow");
-	}
-	uintmax_t uiExpectedBytes = uiPixelCount * kiBytesPerPixel;
+	uintmax_t uiExpectedBytes = static_cast<uintmax_t>(miWidth) * static_cast<uintmax_t>(miHeight) * sizeof(uint16_t);
 
 	// Headerless: the file length is the only shape check available. Checked before the read because
 	// ReadEntireFile sizes its allocation from the on-disk length.
@@ -692,14 +676,13 @@ void WriteStagedIntermediate(const std::filesystem::path& rPath, const std::func
 	static std::atomic<uint64_t> suiSaveSequence {0};
 	std::filesystem::path stagingPath = rPath.parent_path();
 	// Keep the basename independent of the final path: tagged texture names must not route this stage.
-	stagingPath /= L".TextureSaveStage." + std::to_wstring(::GetCurrentProcessId()) + L"." + std::to_wstring(++suiSaveSequence) + L".tmp";
+	stagingPath /= L".TextureSaveStage." + std::to_wstring(++suiSaveSequence) + L".tmp";
 
 	try
 	{
 		std::fstream fileStreamOutput(stagingPath, std::ios::out | std::ios::binary | std::ios::trunc);
 		VERIFY_SUCCESS(fileStreamOutput.is_open());
 		rWriteBody(fileStreamOutput);
-		VERIFY_SUCCESS(fileStreamOutput.good());
 		fileStreamOutput.flush();
 		VERIFY_SUCCESS(fileStreamOutput.good());
 		fileStreamOutput.close();

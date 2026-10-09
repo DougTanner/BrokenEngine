@@ -79,7 +79,7 @@ void SaveClientState()
 	{
 		.fleetGuid              = gpGame->mRememberedFleetGuid,
 		.iFocusedShipId         = gpGame->mRememberedFocusedShipIdentifier.iValue,
-		.fCameraEyeHeightTarget = gpGame->mfRememberedCameraEyeHeightTarget,
+		.fCameraEyeHeightTarget = engine::gpCamera->mfCameraEyeHeightTarget,
 	};
 	engine::WriteVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, kpcClientStatePath, settings);
 }
@@ -103,7 +103,6 @@ void LoadClientState()
 
 	gpGame->mRememberedFleetGuid = settings.fleetGuid;
 	gpGame->mRememberedFocusedShipIdentifier = engine::GlobalId {.iValue = settings.iFocusedShipId};
-	gpGame->mfRememberedCameraEyeHeightTarget = settings.fCameraEyeHeightTarget;
 
 	// Apply zoom directly so the camera starts AT the saved zoom rather than easing from the default.
 	engine::gpCamera->RestoreEyeHeight(settings.fCameraEyeHeightTarget);

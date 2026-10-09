@@ -85,11 +85,6 @@ static AudioStreamingHarnessRigVoiceSummary InspectVoice(const StreamingVoice& r
 	return summary;
 }
 
-AudioStreamingHarnessRig::~AudioStreamingHarnessRig()
-{
-	Shutdown();
-}
-
 void AudioStreamingHarnessRig::Attach(AudioStreamingHarnessRig& rHarnessRig)
 {
 	AudioStreamingHarnessRig* pExpected = nullptr;
@@ -98,39 +93,21 @@ void AudioStreamingHarnessRig::Attach(AudioStreamingHarnessRig& rHarnessRig)
 
 void AudioStreamingHarnessRig::Detach(AudioStreamingHarnessRig& rHarnessRig)
 {
-	PackChunks* pPackChunks = gpFileManager != nullptr ? gpFileManager->mpPackChunks.get() : nullptr;
-	if (pPackChunks != nullptr)
-	{
-		// Shutdown drained active jobs; this excludes the remaining idle-loader lookup while detachment publishes null.
-		std::unique_lock lock(pPackChunks->mLoader.mQueueMutex);
-		AudioStreamingHarnessRig* pExpected = &rHarnessRig;
-		VERIFY_SUCCESS(gpAttachedAudioStreamingHarnessRig.compare_exchange_strong(pExpected, nullptr, std::memory_order_release, std::memory_order_relaxed));
-		return;
-	}
-
+	// Shutdown drained active jobs; this excludes the remaining idle-loader lookup while detachment publishes null.
+	std::unique_lock lock(gpFileManager->mpPackChunks->mLoader.mQueueMutex);
 	AudioStreamingHarnessRig* pExpected = &rHarnessRig;
 	VERIFY_SUCCESS(gpAttachedAudioStreamingHarnessRig.compare_exchange_strong(pExpected, nullptr, std::memory_order_release, std::memory_order_relaxed));
 }
 
 void AudioStreamingHarnessRig::Shutdown()
 {
-	if (mbShutdown)
-	{
-		return;
-	}
 	ReleaseInvalid();
 	ReleaseHold(AudioStreamingHarnessRigHoldOwner::kControlled);
 	ReleaseCoexistence();
 	ReleaseSaturation();
 	ReleaseControls();
-	if (gpAudioManager != nullptr)
-	{
-		gpAudioManager->mpStreamingVoices->Clear(false);
-	}
-	if (gpFileManager != nullptr)
-	{
-		gpFileManager->mpPackChunks->mLoader.WaitForLoadersIdle();
-	}
+	gpAudioManager->mpStreamingVoices->Clear(false);
+	gpFileManager->mpPackChunks->mLoader.WaitForLoadersIdle();
 	uint64_t uiGate = muiScenarioGate.load(std::memory_order_seq_cst);
 	if ((uiGate & 1) != 0)
 	{
@@ -140,15 +117,10 @@ void AudioStreamingHarnessRig::Shutdown()
 	{
 		SwitchToThread();
 	}
-	mbShutdown = true;
 }
 
 bool AudioStreamingHarnessRig::RequestHold()
 {
-	if (gpAudioManager == nullptr)
-	{
-		return false;
-	}
 	if (gpAudioManager->mbSuspended.load(std::memory_order_acquire))
 	{
 		return false;
@@ -167,10 +139,6 @@ bool AudioStreamingHarnessRig::RequestHold()
 
 bool AudioStreamingHarnessRig::Begin(common::crc_t crc, int64_t iOffset, int64_t iLength)
 {
-	if (gpAudioManager == nullptr)
-	{
-		return false;
-	}
 	if (!(mFlags & Flags::kMode))
 	{
 		mFlags.Set(Flags::kMode);
@@ -199,10 +167,6 @@ bool AudioStreamingHarnessRig::Begin(common::crc_t crc, int64_t iOffset, int64_t
 
 bool AudioStreamingHarnessRig::Play(common::crc_t crc)
 {
-	if (gpAudioManager == nullptr)
-	{
-		return false;
-	}
 	if (gpAudioManager->mbSuspended.load(std::memory_order_acquire))
 	{
 		return false;
@@ -214,10 +178,7 @@ bool AudioStreamingHarnessRig::Play(common::crc_t crc)
 
 void AudioStreamingHarnessRig::Clear()
 {
-	if (gpAudioManager != nullptr)
-	{
-		gpAudioManager->mpStreamingVoices->Clear(false);
-	}
+	gpAudioManager->mpStreamingVoices->Clear(false);
 }
 
 void AudioStreamingHarnessRig::ReleaseControls()
@@ -237,10 +198,6 @@ AudioStreamingHarnessRigAudioSnapshot AudioStreamingHarnessRig::InspectAudio() c
 {
 	ASSERT(common::gpMultithreading->IsMainThread());
 	AudioStreamingHarnessRigAudioSnapshot snapshot;
-	if (gpAudioManager == nullptr)
-	{
-		return snapshot;
-	}
 	const StreamingVoices& rVoices = *gpAudioManager->mpStreamingVoices;
 	if (rVoices.mpCurrentStream != nullptr)
 	{
@@ -292,11 +249,7 @@ void AudioStreamingHarnessRig::ResetHistory()
 
 bool AudioStreamingHarnessRig::BeginHistory()
 {
-	PackChunks* pPackChunks = gpFileManager != nullptr ? gpFileManager->mpPackChunks.get() : nullptr;
-	if (pPackChunks == nullptr)
-	{
-		return false;
-	}
+	PackChunks* pPackChunks = gpFileManager->mpPackChunks.get();
 	if (mbHistoryInitialized)
 	{
 		return true;
@@ -363,8 +316,7 @@ void AudioStreamingHarnessRig::ReleaseHold(AudioStreamingHarnessRigHoldOwner eOw
 
 void AudioStreamingHarnessRig::StartCoexistence(common::crc_t realtimeCrc, common::crc_t normalCrc)
 {
-	PackChunks* pPackChunks = gpFileManager != nullptr ? gpFileManager->mpPackChunks.get() : nullptr;
-	ASSERT(pPackChunks != nullptr);
+	PackChunks* pPackChunks = gpFileManager->mpPackChunks.get();
 	{
 		std::unique_lock lock(pPackChunks->mLoader.mQueueMutex);
 		ASSERT(meStagingOwner.load(std::memory_order_seq_cst) == StagingOwner::kNone);
@@ -376,11 +328,7 @@ void AudioStreamingHarnessRig::StartCoexistence(common::crc_t realtimeCrc, commo
 
 bool AudioStreamingHarnessRig::FinishCoexistence()
 {
-	PackChunks* pPackChunks = gpFileManager != nullptr ? gpFileManager->mpPackChunks.get() : nullptr;
-	if (pPackChunks == nullptr)
-	{
-		return true;
-	}
+	PackChunks* pPackChunks = gpFileManager->mpPackChunks.get();
 	if (meStagingOwner.load(std::memory_order_seq_cst) == StagingOwner::kNone)
 	{
 		return true;
@@ -395,11 +343,7 @@ bool AudioStreamingHarnessRig::FinishCoexistence()
 
 void AudioStreamingHarnessRig::ReleaseCoexistence()
 {
-	PackChunks* pPackChunks = gpFileManager != nullptr ? gpFileManager->mpPackChunks.get() : nullptr;
-	if (pPackChunks == nullptr)
-	{
-		return;
-	}
+	PackChunks* pPackChunks = gpFileManager->mpPackChunks.get();
 	bool bReleased = false;
 	{
 		std::unique_lock lock(pPackChunks->mLoader.mQueueMutex);
@@ -417,12 +361,7 @@ void AudioStreamingHarnessRig::ReleaseCoexistence()
 
 bool AudioStreamingHarnessRig::BeginSaturation()
 {
-	PackChunks* pPackChunks = gpFileManager != nullptr ? gpFileManager->mpPackChunks.get() : nullptr;
-	if (pPackChunks == nullptr)
-	{
-		return false;
-	}
-	std::unique_lock lock(pPackChunks->mLoader.mQueueMutex);
+	std::unique_lock lock(gpFileManager->mpPackChunks->mLoader.mQueueMutex);
 	if (meStagingOwner.load(std::memory_order_seq_cst) != StagingOwner::kNone)
 	{
 		return false;
@@ -433,11 +372,7 @@ bool AudioStreamingHarnessRig::BeginSaturation()
 
 void AudioStreamingHarnessRig::ReleaseSaturation()
 {
-	PackChunks* pPackChunks = gpFileManager != nullptr ? gpFileManager->mpPackChunks.get() : nullptr;
-	if (pPackChunks == nullptr)
-	{
-		return;
-	}
+	PackChunks* pPackChunks = gpFileManager->mpPackChunks.get();
 	bool bReleased = false;
 	{
 		std::unique_lock lock(pPackChunks->mLoader.mQueueMutex);
@@ -514,11 +449,7 @@ void AudioStreamingHarnessRig::RecordEntry(AudioStreamingHarnessRigPartition ePa
 AudioStreamingHarnessRigSnapshot AudioStreamingHarnessRig::InspectFile() const
 {
 	AudioStreamingHarnessRigSnapshot snapshot;
-	const PackChunks* pPackChunks = gpFileManager != nullptr ? gpFileManager->mpPackChunks.get() : nullptr;
-	if (pPackChunks == nullptr)
-	{
-		return snapshot;
-	}
+	const PackChunks* pPackChunks = gpFileManager->mpPackChunks.get();
 	for (int64_t k = 0; k < 8; ++k)
 	{
 		snapshot = {};
@@ -661,11 +592,7 @@ AudioStreamingHarnessRigSnapshot AudioStreamingHarnessRig::InspectFile() const
 AudioStreamingHarnessRigInvalidResult AudioStreamingHarnessRig::RunInvalid()
 {
 	AudioStreamingHarnessRigInvalidResult result;
-	PackChunks* pPackChunks = gpFileManager != nullptr ? gpFileManager->mpPackChunks.get() : nullptr;
-	if (pPackChunks == nullptr)
-	{
-		return result;
-	}
+	PackChunks* pPackChunks = gpFileManager->mpPackChunks.get();
 	common::crc_t crc = 0;
 	const LazyChunk* pAudioChunk = nullptr;
 	for (const auto& [rCandidateCrc, rChunk] : pPackChunks->mLazyChunkMap)
@@ -828,11 +755,6 @@ void AudioStreamingHarnessRig::PrepareLoaderDrain()
 	}
 }
 
-bool AudioStreamingHarnessRig::AllowOlderFadeRequests()
-{
-	return false;
-}
-
 AudioStreamingVoiceControl* AudioStreamingHarnessRig::CreateVoiceControl(StreamingVoice& rVoice)
 {
 	AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire);
@@ -867,10 +789,8 @@ void AudioStreamingHarnessRig::RetireVoiceControl(const AudioStreamingVoiceContr
 	{
 		return pCandidate.get() == pControl;
 	});
-	if (it != pHarnessRig->mVoiceControls.end())
-	{
-		pHarnessRig->mVoiceControls.erase(it);
-	}
+	ASSERT(it != pHarnessRig->mVoiceControls.end());
+	pHarnessRig->mVoiceControls.erase(it);
 }
 
 } // namespace engine

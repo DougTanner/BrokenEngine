@@ -110,19 +110,9 @@ static bool ReplayInventoryEntryLess(const ReplayManifestInventoryEntry& rLeft, 
 	return std::tie(rLeft.eKind, rLeft.uiCoordinateKey, rLeft.iActivationTick) < std::tie(rRight.eKind, rRight.uiCoordinateKey, rRight.iActivationTick);
 }
 
-static bool AppendReplayManifestPayload(const ReplayManifest& rManifest, std::vector<std::byte>& rPayload)
+static void AppendReplayManifestPayload(const ReplayManifest& rManifest, std::vector<std::byte>& rPayload)
 {
-	if (!std::in_range<int64_t>(rManifest.records.size()) || !std::in_range<int64_t>(rManifest.inventory.size()))
-	{
-		return false;
-	}
 	static constexpr size_t kuiFixedBytes = sizeof(int64_t) * 4 + 1;
-	if (rManifest.records.size() > (std::numeric_limits<size_t>::max() - kuiFixedBytes) / 16
-	 || rManifest.inventory.size() > (std::numeric_limits<size_t>::max() - kuiFixedBytes - rManifest.records.size() * 16) / 57)
-	{
-		return false;
-	}
-
 	rPayload.clear();
 	rPayload.reserve(kuiFixedBytes + rManifest.records.size() * 16 + rManifest.inventory.size() * 57);
 	auto AppendValue = [&rPayload]<std::integral TYPE>(TYPE value)
@@ -154,20 +144,12 @@ static bool AppendReplayManifestPayload(const ReplayManifest& rManifest, std::ve
 		AppendValue(rEntry.digest.iByteCount);
 		rPayload.insert(rPayload.end(), reinterpret_cast<const std::byte*>(rEntry.digest.sha256.data()), reinterpret_cast<const std::byte*>(rEntry.digest.sha256.data() + rEntry.digest.sha256.size()));
 	}
-	return true;
 }
 
 static bool ComputeReplayGenerationDigest(const ReplayManifest& rManifest, std::array<uint8_t, 32>& rDigest)
 {
 	std::vector<std::byte> payload;
-	if (!AppendReplayManifestPayload(rManifest, payload))
-	{
-		return false;
-	}
-	if (payload.size() > std::numeric_limits<size_t>::max() - sizeof(uint32_t) - kReplayManifestGenerationDomain.size())
-	{
-		return false;
-	}
+	AppendReplayManifestPayload(rManifest, payload);
 
 	std::vector<std::byte> rootPreimage;
 	rootPreimage.reserve(sizeof(uint32_t) + kReplayManifestGenerationDomain.size() + payload.size());
@@ -182,10 +164,6 @@ static bool ComputeReplayGenerationDigest(const ReplayManifest& rManifest, std::
 
 static bool BuildExpectedReplayInventory(ReplayManifest& rManifest, bool bHashFiles)
 {
-	if (rManifest.records.size() > (std::numeric_limits<size_t>::max() - 2) / 4)
-	{
-		return false;
-	}
 	rManifest.inventory.clear();
 	rManifest.inventory.reserve(2 + rManifest.records.size() * (rManifest.bHasFullFrames ? 4 : 3));
 	for (ReplayArtifactKind eKind : {ReplayArtifactKind::kGrid, ReplayArtifactKind::kMeta, ReplayArtifactKind::kCoordHeader, ReplayArtifactKind::kFrames, ReplayArtifactKind::kChecksums, ReplayArtifactKind::kFullFrames})
@@ -240,10 +218,7 @@ static bool InvalidateReplayManifest()
 static bool PublishReplayManifest(const ReplayManifest& rManifest, const std::array<uint8_t, 32>& rGenerationDigest)
 {
 	std::vector<std::byte> payload;
-	if (!AppendReplayManifestPayload(rManifest, payload))
-	{
-		return false;
-	}
+	AppendReplayManifestPayload(rManifest, payload);
 	return engine::gpFileManager->WriteFileAtomically({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, std::filesystem::path("F7.replay.manifest"), [&](std::fstream& rManifestStream)
 	{
 		rManifestStream.write(reinterpret_cast<const char*>(payload.data()), static_cast<std::streamsize>(std::ssize(payload)));
@@ -252,20 +227,14 @@ static bool PublishReplayManifest(const ReplayManifest& rManifest, const std::ar
 }
 
 Replay::Replay()
+: common::Singleton<Replay>(gpReplay)
 {
-	ASSERT(gpReplay == nullptr);
-
-	gpReplay = this;
 	ReplayHarnessRigs::Attach(*this);
 }
 
 Replay::~Replay()
 {
 	ReplayHarnessRigs::Detach(*this);
-	if (gpReplay == this)
-	{
-		gpReplay = nullptr;
-	}
 }
 
 void Replay::ClearReplayTransientState()

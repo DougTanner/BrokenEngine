@@ -9,7 +9,6 @@ Client-only `game::Camera` is the only concrete camera and is `final`. `engine::
 - Player focus resolves through the cell the supplied interpolate frame is local to — not the client cell — and that cell's `PlayersPostRender`, surviving spawn and transfer. Brief lookup failures extrapolate the last focus within the engine's bounded window; an absent player identity uses the main-menu pose.
 - Network reconciliation contributes a decaying camera-target offset only; authoritative simulation state is unchanged. Keep this integration consistent with `../../../../Documents/Architecture/GameReconciliation.md`.
 - `SunAngle` overrides the engine's angle while the Graphics settings or ImGui UI is up. The raw angle, its reset value, and its main-menu pause stay engine-owned.
-- `OnUpdateComplete` captures diff-checked client state each render frame, after matrix and visible-area calculation. Preserve the moment that state becomes visible to readers when changing zoom persistence or reset behavior.
 
 ## See Also
 

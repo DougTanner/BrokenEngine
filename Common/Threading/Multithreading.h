@@ -9,13 +9,11 @@ namespace common
 class Multithreading;
 inline Multithreading* gpMultithreading = nullptr;
 
-class Multithreading
+class Multithreading : public common::Singleton<Multithreading>
 {
 public:
 
 	explicit Multithreading(int64_t iWorkerCount);
-	Multithreading(Threads eThread, int64_t iWorkerCount, int64_t iWorkbufferSize);
-	~Multithreading();
 
 	int64_t WorkerCount() const
 	{

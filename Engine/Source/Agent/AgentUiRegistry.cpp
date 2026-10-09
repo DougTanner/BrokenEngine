@@ -7,14 +7,9 @@
 namespace engine
 {
 
-// Bounded copy into a fixed char buffer, always null-terminated. pcSource may be null.
+// Bounded copy into a fixed char buffer, always null-terminated.
 static void CopyTruncate(std::span<char> destination, const char* pcSource)
 {
-	if (pcSource == nullptr)
-	{
-		destination[0] = '\0';
-		return;
-	}
 	int64_t i = 0;
 	for (; i < std::ssize(destination) - 1 && pcSource[i] != '\0'; ++i)
 	{
@@ -57,17 +52,8 @@ static bool ContainsCaseInsensitive(std::string_view haystack, std::string_view 
 }
 
 AgentUiRegistry::AgentUiRegistry()
+: common::Singleton<AgentUiRegistry>(gpAgentUiRegistry)
 {
-	ASSERT(gpAgentUiRegistry == nullptr);
-	gpAgentUiRegistry = this;
-}
-
-AgentUiRegistry::~AgentUiRegistry()
-{
-	if (gpAgentUiRegistry == this)
-	{
-		gpAgentUiRegistry = nullptr;
-	}
 }
 
 int64_t AgentUiRegistry::FindPendingLabel(ImGuiID uiIdentifier) const
@@ -202,24 +188,21 @@ void AgentUiRegistry::Swap()
 	ImGuiContext* pContext = ImGui::GetCurrentContext();
 	int64_t& riWindowCount = miWindowCount[miWrite];
 	riWindowCount = 0;
-	if (pContext != nullptr)
+	for (ImGuiWindow* pWindow : pContext->Windows)
 	{
-		for (ImGuiWindow* pWindow : pContext->Windows)
+		if (!pWindow->WasActive)
 		{
-			if (pWindow == nullptr || !pWindow->WasActive)
-			{
-				continue;
-			}
-			if (riWindowCount >= kiMaxWindows)
-			{
-				break;
-			}
-			AgentUiWindow& rWindow = mWindows[miWrite][riWindowCount];
-			CopyTruncate(rWindow.pcName, pWindow->Name);
-			rWindow.f4Rectangle = XMFLOAT4(pWindow->Pos.x, pWindow->Pos.y, pWindow->Pos.x + pWindow->Size.x, pWindow->Pos.y + pWindow->Size.y);
-			rWindow.bFocused = (pContext->NavWindow == pWindow);
-			++riWindowCount;
+			continue;
 		}
+		if (riWindowCount >= kiMaxWindows)
+		{
+			break;
+		}
+		AgentUiWindow& rWindow = mWindows[miWrite][riWindowCount];
+		CopyTruncate(rWindow.pcName, pWindow->Name);
+		rWindow.f4Rectangle = XMFLOAT4(pWindow->Pos.x, pWindow->Pos.y, pWindow->Pos.x + pWindow->Size.x, pWindow->Pos.y + pWindow->Size.y);
+		rWindow.bFocused = (pContext->NavWindow == pWindow);
+		++riWindowCount;
 	}
 
 	// Publish: the write buffer becomes the read buffer; reset the new write buffer's item count for the next frame.
@@ -298,23 +281,15 @@ int64_t AgentUiRegistry::ResolveLabel(const char* pcLabel, const char* pcWindow)
 
 void ImGuiTestEngineHook_ItemAdd(ImGuiContext* pContext, ImGuiID uiIdentifier, const ImRect& rBoundingBox, [[maybe_unused]] const ImGuiLastItemData* pItemData)
 {
-	if (engine::gpAgentUiRegistry == nullptr)
-	{
-		return;
-	}
-	const char* pcWindow = (pContext->CurrentWindow != nullptr) ? pContext->CurrentWindow->Name : "";
+	const char* pcWindow = pContext->CurrentWindow->Name;
 	bool bDisabled = (pContext->CurrentItemFlags & ImGuiItemFlags_Disabled) != 0;
 	// ItemAdd invokes this hook before it sets LastItemData.Visible; use its exact rectangle/clip predicate here.
-	bool bVisible = pContext->CurrentWindow != nullptr && rBoundingBox.Overlaps(pContext->CurrentWindow->ClipRect);
+	bool bVisible = rBoundingBox.Overlaps(pContext->CurrentWindow->ClipRect);
 	engine::gpAgentUiRegistry->HookItemAdd(uiIdentifier, XMFLOAT4(rBoundingBox.Min.x, rBoundingBox.Min.y, rBoundingBox.Max.x, rBoundingBox.Max.y), pcWindow, bDisabled, bVisible);
 }
 
 void ImGuiTestEngineHook_ItemInfo(ImGuiContext* pContext, ImGuiID uiIdentifier, const char* pcLabel, ImGuiItemStatusFlags iStatusFlags)
 {
-	if (engine::gpAgentUiRegistry == nullptr)
-	{
-		return;
-	}
 	// Begin() registers window pseudo-items without ImGuiItemStatusFlags_Visible.
 	// Empty labels omit them from describe_ui and label lookup (kiNotFound), avoiding visible:false entries and kClipped window-label clicks.
 	// Window names remain queryable through the window snapshot.

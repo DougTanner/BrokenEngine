@@ -333,7 +333,6 @@ public:
 		PlayerFlags_t flags = {PlayerFlags::kBlasterSpawnLeft};
 		float fTransferLockTimer = 0.0f;
 		float fArrivalGracePeriod = 0.0f;
-		float fCellChangeTimer = 0.0f;
 		float fNavigationDelay = 60.0f;
 		engine::GlobalId globalPlayerId {};
 		engine::ClientGuid clientGuid {};

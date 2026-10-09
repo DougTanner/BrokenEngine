@@ -89,7 +89,7 @@ public:
 
 	bool Update(std::span<const std::byte> bytes)
 	{
-		return mbValid && std::in_range<ULONG>(bytes.size())
+		return mbValid
 #pragma warning(suppress: 26492) // CNG pbInput is SAL input-only and documented not modified.
 		    && (bytes.empty() || ::BCryptHashData(mpHash, reinterpret_cast<PUCHAR>(const_cast<std::byte*>(bytes.data())), static_cast<ULONG>(bytes.size()), 0) >= 0);
 	}
@@ -127,9 +127,8 @@ public:
 };
 
 FileManager::FileManager()
+: common::Singleton<FileManager>(gpFileManager)
 {
-	ASSERT(gpFileManager == nullptr);
-
 	if (!gLaunchOptions.appDataDirectory.empty())
 	{
 		mAppDataDirectory = gLaunchOptions.appDataDirectory;
@@ -188,8 +187,6 @@ FileManager::FileManager()
 	}
 
 	mpPackChunks = std::make_unique<PackChunks>(dataDirectory);
-
-	gpFileManager = this;
 }
 
 FileManager::~FileManager()
@@ -197,11 +194,6 @@ FileManager::~FileManager()
 	// Tear down PackChunks first (drains/joins loading threads, closes pack handles, frees the pool/buffers) before
 	// nulling gpFileManager; the loading threads never touch gpFileManager, so this keeps them stopped before it clears.
 	mpPackChunks.reset();
-
-	if (gpFileManager == this)
-	{
-		gpFileManager = nullptr;
-	}
 }
 
 std::filesystem::path FileManager::GetFilePath(const FileFlags_t& rFlags, const std::filesystem::path& rFilename)
@@ -343,14 +335,7 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 			return false;
 		}
 		int64_t iBytesRead = static_cast<int64_t>(uiBytesRead);
-		if (iBytesRead > static_cast<int64_t>(buffer.size()))
-		{
-			return false;
-		}
-		if (iByteCount > std::numeric_limits<int64_t>::max() - iBytesRead)
-		{
-			return false;
-		}
+		ASSERT(iBytesRead <= std::ssize(buffer));
 		if (!hasher.Update(std::span<const std::byte>(buffer.data(), static_cast<size_t>(iBytesRead))))
 		{
 			return false;

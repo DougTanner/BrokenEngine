@@ -7,7 +7,7 @@
 namespace engine
 {
 
-class Replay
+class Replay : public common::Singleton<Replay>
 {
 public:
 	enum class ReplayTickDecision : uint8_t

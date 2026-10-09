@@ -84,7 +84,6 @@ namespace toolcli
 	static std::optional<ProcessResult> RunBuildProcess(const std::filesystem::path& rExecutable, const std::vector<std::wstring>& rArguments)
 	{
 		RunProcessOptions options;
-		options.bCaptureOutput = true;
 		options.bKillOnJobClose = true;
 		options.FailureSink = FailBuild;
 		return RunProcess(&rExecutable, rArguments, options);
@@ -107,30 +106,17 @@ namespace toolcli
 			::GetSystemTime(&time);
 			wchar_t pTimestamp[32] {};
 			std::swprintf(pTimestamp, std::size(pTimestamp), L"%04u%02u%02uT%02u%02u%02u%03uZ", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
-			std::wstring baseName = ToLowerInvariant(std::wstring(targetStem)) + L"-" + pTimestamp + L"-" + std::to_wstring(::GetCurrentProcessId());
-			for (int64_t i = 0; i < 16; ++i)
+			std::filesystem::path path = rDirectory / (ToLowerInvariant(std::wstring(targetStem)) + L"-" + pTimestamp + L"-" + std::to_wstring(::GetCurrentProcessId()) + L".log");
+			std::filesystem::path extendedPath = ExtendedLengthPath(path);
+			Handle hFile(::CreateFileW(extendedPath.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr));
+			if (!hFile.IsValid())
 			{
-				std::wstring name = i == 0 ? baseName + L".log" : baseName + L"-" + std::to_wstring(i) + L".log";
-				std::filesystem::path candidate = rDirectory / name;
-				std::filesystem::path extendedCandidate = ExtendedLengthPath(candidate);
-				HANDLE hRawFile = ::CreateFileW(extendedCandidate.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
-				if (hRawFile == INVALID_HANDLE_VALUE)
-				{
-					int64_t iError = ::GetLastError();
-					if (iError != ERROR_FILE_EXISTS)
-					{
-						FailBuild("create retained build log failed (Windows error " + std::to_string(iError) + ")");
-						return false;
-					}
-					continue;
-				}
-				Handle hFile(hRawFile);
-				mhFile = std::move(hFile);
-				mPath = std::move(candidate);
-				return true;
+				FailBuildWindows("create retained build log");
+				return false;
 			}
-			FailBuild("could not create a collision-free retained build log name");
-			return false;
+			mhFile = std::move(hFile);
+			mPath = std::move(path);
+			return true;
 		}
 
 		void Write(std::span<const char> data)
@@ -298,7 +284,6 @@ namespace toolcli
 	static std::optional<int64_t> RunMsBuildToLog(const std::filesystem::path& rExecutable, const std::vector<std::wstring>& rArguments, RetainedLog& rLog, DiagnosticParser& rParser)
 	{
 		RunProcessOptions options;
-		options.bCaptureOutput = true;
 		options.bMergeStdError = true;
 		options.bKillOnJobClose = true;
 		options.FailureSink = FailBuild;
@@ -441,12 +426,7 @@ namespace toolcli
 				return std::nullopt;
 			}
 			std::wcerr << L"WorktreeCli: waiting for build lock on " << rTarget.stem().native() << L" (" << riWaitedSeconds << L"s elapsed)\n";
-			std::chrono::steady_clock::time_point sleepTime = std::chrono::steady_clock::now();
-			if (sleepTime >= deadline)
-			{
-				continue;
-			}
-			std::chrono::steady_clock::duration remaining = deadline - sleepTime;
+			std::chrono::steady_clock::duration remaining = deadline - std::chrono::steady_clock::now();
 			std::this_thread::sleep_for((std::min)(remaining, std::chrono::duration_cast<std::chrono::steady_clock::duration>(5s)));
 		}
 	}
@@ -707,16 +687,8 @@ namespace toolcli
 		std::vector<std::wstring> arguments = { rState.rMsBuild.native(), rState.rTarget.native() };
 		arguments.append_range(rState.rBuildArguments);
 		// Persistent MSBuild worker nodes inherit the pipe write handle and would stall the
-		// drain long after the build completes; honor an explicit caller choice when present.
-		bool bHasNodeReuse = std::ranges::any_of(rState.rBuildArguments, [](const std::wstring& rArgument)
-		{
-			std::wstring lower = ToLowerInvariant(rArgument);
-			return lower.starts_with(L"/nodereuse:") || lower.starts_with(L"-nodereuse:") || lower.starts_with(L"/nr:") || lower.starts_with(L"-nr:");
-		});
-		if (!bHasNodeReuse)
-		{
-			arguments.emplace_back(L"/nodeReuse:false");
-		}
+		// drain long after the build completes.
+		arguments.emplace_back(L"/nodeReuse:false");
 		std::wcerr << L"WorktreeCli: building " << rState.rTarget.native() << L'\n' << std::flush;
 		std::optional<int64_t> msbuildExitCode = RunMsBuildToLog(rState.rMsBuild, arguments, rState.retainedLog, rState.parser);
 		rState.FinalizeStreams();

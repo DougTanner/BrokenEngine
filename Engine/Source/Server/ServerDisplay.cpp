@@ -32,7 +32,6 @@ static std::string sProfileText;
 
 // Dirty-check state for the throttled repaint: coarse hash of the last content the window drew.
 static uint64_t suiLastContentHash = 0;
-static bool sbHasLastContentHash = false;
 
 // Entity totals for the left panel are summed once per tick from the game cell-stat seam and stay file-static for the
 // process's one window. Profiling-disabled builds skip aggregation, so these remain zero and the entity rows read zero.
@@ -108,10 +107,7 @@ void ServerUpdateDisplayStatistics()
 		iTotalExplosions += cellStatistics.iExplosions;
 	}
 
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterExplosions).iCount = iTotalExplosions;
-	}
+	gpProfileManager->GetCpuCounter(kCpuCounterExplosions).iCount = iTotalExplosions;
 
 #if !defined(ENABLE_CRT_DEBUG_HEAP)
 	mi_stats_merge();
@@ -187,13 +183,12 @@ bool ServerDisplayContentChanged()
 	Mix(gpProfileManager->miMimallocPeakHeapUsedMebibytes);
 #endif
 
-	if (sbHasLastContentHash && uiHash == suiLastContentHash)
+	if (uiHash == suiLastContentHash)
 	{
 		return false;
 	}
 
 	suiLastContentHash = uiHash;
-	sbHasLastContentHash = true;
 	return true;
 }
 
@@ -488,7 +483,8 @@ static void PaintProfilePanel(HDC hDeviceContextBuffer, int64_t iLeft, int64_t i
 
 static void PaintTabBar(HDC hDeviceContextBuffer, int64_t iWidth)
 {
-	for (auto [i, tabName] : std::views::enumerate(kTabNames))
+	// Bind each tab name by value: std::views::enumerate over kTabNames yields a const std::string_view&, which PREfast C26445 (gsl.view) rejects.
+	for (int64_t i = 0; std::string_view tabName : kTabNames)
 	{
 		int64_t iTabLeft = kiTabBarLeft + i * kiTabWidth;
 		RECT tabRectangle {.left = static_cast<LONG>(iTabLeft), .top = 0, .right = static_cast<int>(iTabLeft + kiTabWidth), .bottom = static_cast<int>(kiTabHeight)};
@@ -511,6 +507,7 @@ static void PaintTabBar(HDC hDeviceContextBuffer, int64_t iWidth)
 
 		SetTextColor(hDeviceContextBuffer, bActive ? RGB(255, 255, 255) : RGB(160, 160, 160));
 		TextOutA(hDeviceContextBuffer, static_cast<int>(iTabLeft + 12), 4, tabName.data(), static_cast<int>(tabName.size()));
+		++i;
 	}
 
 	// Bottom line across non-tab area

@@ -5,12 +5,11 @@
 namespace common
 {
 
-class DiagnosticLog
+class DiagnosticLog : public common::Singleton<DiagnosticLog>
 {
 public:
 
 	DiagnosticLog(int64_t iIndex, std::string_view filename);
-	~DiagnosticLog();
 
 	DiagnosticLog(const DiagnosticLog&) = delete;
 	DiagnosticLog& operator=(const DiagnosticLog&) = delete;
@@ -38,7 +37,6 @@ private:
 
 	std::ofstream mFile;
 	std::mutex mMutex;
-	int64_t miIndex = 0;
 };
 
 inline constexpr int64_t kDiagnosticLogCount = 4;

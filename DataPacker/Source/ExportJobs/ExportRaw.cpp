@@ -27,11 +27,7 @@ void ExportRaw::Export()
 		throw std::runtime_error("ExportRaw::Export invalid source file size");
 	}
 
-	int64_t iMaximumDataSize = std::numeric_limits<int64_t>::max() - common::kiChunkDataOffset - (common::kiAlignmentBytes - 1);
-	if (uiFileSize > static_cast<uintmax_t>(iMaximumDataSize))
-	{
-		throw std::runtime_error("ExportRaw::Export source file size overflow");
-	}
+	ASSERT(uiFileSize <= static_cast<uintmax_t>(std::numeric_limits<int64_t>::max() - common::kiChunkDataOffset - (common::kiAlignmentBytes - 1)));
 
 	std::fstream fileStream(mInputPath, std::ios::in | std::ios::binary);
 	if (!fileStream)

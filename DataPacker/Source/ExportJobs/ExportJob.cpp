@@ -39,9 +39,7 @@ static std::optional<std::string> ReadFingerprintMetadata(const std::filesystem:
 
 static void WriteFingerprintMetadata(const std::filesystem::path& rPath, std::string_view fingerprint)
 {
-	std::filesystem::path temporaryPath = rPath;
-	temporaryPath += ".tmp";
-	std::fstream stream(temporaryPath, std::ios::out | std::ios::binary);
+	std::fstream stream(rPath, std::ios::out | std::ios::binary);
 	int64_t iFingerprintCharacters = static_cast<int64_t>(fingerprint.size());
 	stream.write(reinterpret_cast<const char*>(&kiFingerprintMetadataMagic), sizeof(kiFingerprintMetadataMagic));
 	stream.write(reinterpret_cast<const char*>(&kiFingerprintMetadataVersion), sizeof(kiFingerprintMetadataVersion));
@@ -49,7 +47,6 @@ static void WriteFingerprintMetadata(const std::filesystem::path& rPath, std::st
 	stream.write(fingerprint.data(), fingerprint.size());
 	stream.close();
 	VERIFY_SUCCESS(stream.good());
-	VERIFY_SUCCESS(MoveFileExW(temporaryPath.native().c_str(), rPath.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
 }
 
 // Trust boundary: a cached chunk body is opaque bytes an earlier run left on disk, and CheckDirty only covers the
@@ -174,12 +171,6 @@ bool ExportJob::CheckDirty([[maybe_unused]] const std::filesystem::path& rPackFi
 {
 	// The pack is not inspected per job: RunExportJobs compares the published pack's timestamp against
 	// every clean job's .meta fingerprint, so an export killed before the pack rename stays dirty there.
-
-	if (gpFileManager->mbCleanExport)
-	{
-		mbDirty = true;
-		return mbDirty;
-	}
 
 	if (!std::filesystem::exists(mChunkFile))
 	{

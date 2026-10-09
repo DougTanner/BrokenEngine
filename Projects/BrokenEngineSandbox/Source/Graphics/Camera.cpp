@@ -81,12 +81,6 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 	return engine::CameraTarget::Extrapolate();
 }
 
-void Camera::OnUpdateComplete()
-{
-	// Refresh the in-memory client-state mirror for zoom-target changes (and any focus changes that came through unhooked paths). Diff-checked, so no-op on most frames.
-	gpGame->CaptureClientStateIfChanged();
-}
-
 // Return sun angle, applying UI slider override when in Graphics or ImGui mode
 float Camera::SunAngle() const
 {

@@ -2,8 +2,6 @@
 
 #include "FileManager.h"
 
-constexpr bool kbOptimizeShaders = true;
-
 
 static const std::filesystem::path& GetVulkanSdkBinariesDirectory()
 {
@@ -88,10 +86,7 @@ void ExportShader::Export()
 {
 	std::filesystem::path preProcessedFile = PreprocessShader();
 	std::filesystem::path spirvFile = CompileShader(preProcessedFile);
-	if constexpr (kbOptimizeShaders)
-	{
-		spirvFile = OptimizeShader(spirvFile);
-	}
+	spirvFile = OptimizeShader(spirvFile);
 	ReflectAndWriteShader(spirvFile);
 }
 
@@ -149,15 +144,7 @@ std::filesystem::path ExportShader::PreprocessShader()
 	std::filesystem::remove(preProcessedFile);
 
 	std::wstring commandLineParameters(L"");
-	if constexpr (kbOptimizeShaders)
-	{
-		commandLineParameters += L" -O";      // Enable optimization
-	}
-	else
-	{
-		commandLineParameters += L" -O0";     // Disable optimization
-		commandLineParameters += L" -g";      // Add debug info
-	}
+	commandLineParameters += L" -O";      // Enable optimization
 	commandLineParameters += L" -E";      // Pre-process only
 	commandLineParameters += L" -Werror"; // Treat warnings as errors
 	commandLineParameters += L" -MD";
@@ -203,15 +190,7 @@ std::filesystem::path ExportShader::CompileShader(const std::filesystem::path& r
 	std::filesystem::remove(spirvFile);
 
 	std::wstring commandLineParameters = L"";
-	if constexpr (kbOptimizeShaders)
-	{
-		commandLineParameters += L" -g0"; // Strip debug info
-	}
-	else
-	{
-		commandLineParameters += L" -Od"; // Disable optimization
-		commandLineParameters += L" -g";  // Add debug info
-	}
+	commandLineParameters += L" -g0"; // Strip debug info
 	commandLineParameters += L" -V";      // Generate binary
 	commandLineParameters += L" --target-env vulkan1.2"; // Also update VK_API_VERSION_1_2 in engine
 	commandLineParameters += L" -o \"" + spirvFile.native() + L"\"";
@@ -423,10 +402,6 @@ static std::optional<std::vector<CachedDependencyFingerprint>> ReadDependencyMet
 		{
 			return std::nullopt;
 		}
-		if (relativeDependencyPath.empty())
-		{
-			return std::nullopt;
-		}
 		if (*relativeDependencyPath.begin() == "..")
 		{
 			return std::nullopt;
@@ -512,16 +487,13 @@ static const std::string* FindMatchingDependencyRoot(const std::vector<std::stri
 	return nullptr;
 }
 
-static std::vector<std::filesystem::path> ParseRootDelimitedDependencies(const std::filesystem::path& rDependencyFilePath, std::string_view content, const std::vector<std::string>& rRootPrefixes, std::string_view lowerContent)
+static std::vector<std::filesystem::path> ParseRootDelimitedDependencies(std::string_view content, const std::vector<std::string>& rRootPrefixes, std::string_view lowerContent)
 {
 	std::vector<std::filesystem::path> dependencies;
 	int64_t iDependencyStart = 0;
 	while (iDependencyStart < std::ssize(content))
 	{
-		if (FindMatchingDependencyRoot(rRootPrefixes, lowerContent, iDependencyStart) == nullptr)
-		{
-			throw std::runtime_error(std::format("Shader dependency file \"{}\" contains an ambiguous or outside-root entry near \"{}\"", rDependencyFilePath.string(), content.substr(static_cast<size_t>(iDependencyStart))));
-		}
+		ASSERT(FindMatchingDependencyRoot(rRootPrefixes, lowerContent, iDependencyStart) != nullptr);
 
 		int64_t iDependencyEnd = std::ssize(content);
 		for (int64_t iSpace = static_cast<int64_t>(content.find(' ', static_cast<size_t>(iDependencyStart))); iSpace != static_cast<int64_t>(std::string_view::npos); iSpace = static_cast<int64_t>(content.find(' ', static_cast<size_t>(iSpace + 1))))
@@ -572,7 +544,7 @@ static std::vector<std::filesystem::path> ParseDependencyFile(const std::filesys
 	std::string lowerContent = common::ToLower(content);
 	if (FindMatchingDependencyRoot(rootPrefixes, lowerContent, 0) != nullptr)
 	{
-		return ParseRootDelimitedDependencies(rDependencyFilePath, content, rootPrefixes, lowerContent);
+		return ParseRootDelimitedDependencies(content, rootPrefixes, lowerContent);
 	}
 	return ParseWhitespaceDependencies(rDependencyFilePath, content);
 }
@@ -647,18 +619,13 @@ void ExportShader::CaptureDependencies()
 			bFoundRoot = true;
 			break;
 		}
-		if (!bFoundRoot)
-		{
-			throw std::runtime_error(std::format("Shader dependency \"{}\" is outside DataPacker input roots", dependency.string()));
-		}
+		ASSERT(bFoundRoot);
 	}
 }
 
 void ExportShader::UpdateCacheMetadata()
 {
-	std::filesystem::path temporaryPath = mDependencyMetadataFile;
-	temporaryPath += ".tmp";
-	std::fstream stream(temporaryPath, std::ios::out | std::ios::binary);
+	std::fstream stream(mDependencyMetadataFile, std::ios::out | std::ios::binary);
 	int64_t iCount = std::ssize(mDependencyFingerprints);
 	stream.write(reinterpret_cast<const char*>(&kiDependencyMetadataMagic), sizeof(kiDependencyMetadataMagic));
 	stream.write(reinterpret_cast<const char*>(&kiDependencyMetadataVersion), sizeof(kiDependencyMetadataVersion));
@@ -674,5 +641,4 @@ void ExportShader::UpdateCacheMetadata()
 	}
 	stream.close();
 	VERIFY_SUCCESS(stream.good());
-	VERIFY_SUCCESS(MoveFileExW(temporaryPath.native().c_str(), mDependencyMetadataFile.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
 }

@@ -163,10 +163,6 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 	}
 
 	int64_t iExpectedRawSize = common::ComputeImageByteSize(vkFormat, iWidth, iHeight, iMipMaps, 1, 1);
-	if (iExpectedRawSize <= 0 || !std::in_range<uLong>(iExpectedRawSize))
-	{
-		return;
-	}
 
 	if (header.iPayloadOffset != iLegacyHeaderSize)
 	{
@@ -174,10 +170,6 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 	}
 	// The minimum-file-size check above proves iPayloadOffset < iFileSize, so the payload is nonempty.
 	int64_t iPayloadSize = iFileSize - header.iPayloadOffset;
-	if (!std::in_range<uLong>(iPayloadSize))
-	{
-		return;
-	}
 	int64_t iCompressedPayloadBound = static_cast<int64_t>(compressBound(static_cast<uLong>(iExpectedRawSize)));
 	if (iPayloadSize != iExpectedRawSize && iPayloadSize > iCompressedPayloadBound)
 	{
@@ -228,7 +220,6 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 		fileStreamOut.write(reinterpret_cast<const char*>(&iHeight), sizeof(iHeight));
 		fileStreamOut.write(reinterpret_cast<const char*>(&iMipMaps), sizeof(iMipMaps));
 		fileStreamOut.write(reinterpret_cast<const char*>(compressed.data()), static_cast<std::streamsize>(std::ssize(compressed)));
-		fileStreamOut.flush();
 		fileStreamOut.close();
 		VERIFY_SUCCESS(fileStreamOut.good());
 

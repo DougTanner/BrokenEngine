@@ -59,17 +59,6 @@ static std::string GetFaceCubemapFingerprint(std::string_view operation, const s
 	return metadata.dump();
 }
 
-static void WriteFingerprintMetadata(const std::filesystem::path& rMetadataPath, std::string_view fingerprint)
-{
-	std::filesystem::path temporaryPath = rMetadataPath;
-	temporaryPath += ".tmp";
-	std::ofstream stream(temporaryPath, std::ios::binary | std::ios::trunc);
-	stream.write(fingerprint.data(), static_cast<std::streamsize>(fingerprint.size()));
-	stream.close();
-	VERIFY_SUCCESS(stream.good());
-	VERIFY_SUCCESS(MoveFileExW(temporaryPath.native().c_str(), rMetadataPath.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
-}
-
 static bool IsOutputCurrent(const std::filesystem::path& rOutputPath, const std::filesystem::path& rMetadataPath, std::string_view fingerprint, std::span<const std::filesystem::path> legacyInputs)
 {
 	if (std::filesystem::exists(GetDirtyMarkerPath(rMetadataPath)))
@@ -97,7 +86,7 @@ static bool IsOutputCurrent(const std::filesystem::path& rOutputPath, const std:
 	{
 		return false;
 	}
-	WriteFingerprintMetadata(rMetadataPath, fingerprint);
+	WriteEntireFile(rMetadataPath, fingerprint);
 	return true;
 }
 
@@ -116,7 +105,7 @@ static void BeginOutputUpdate(const std::filesystem::path& rMetadataPath)
 
 static void CompleteOutputUpdate(const std::filesystem::path& rMetadataPath, std::string_view fingerprint)
 {
-	WriteFingerprintMetadata(rMetadataPath, fingerprint);
+	WriteEntireFile(rMetadataPath, fingerprint);
 	VERIFY_SUCCESS(std::filesystem::remove(GetDirtyMarkerPath(rMetadataPath)));
 }
 
@@ -139,8 +128,8 @@ static void RemoveOrphanedOutput(const std::filesystem::path& rOutputPath, const
 }
 
 // Removes every producer-owned output that current inputs no longer expect, so a deleted or renamed source
-// cannot keep publishing a texture chunk. Only a mirrored cache sidecar (.meta from a completed write,
-// .meta.dirty from an interrupted one) proves this pre-pass wrote the output; a half-float file without one
+// cannot keep publishing a texture chunk. Only a mirrored cache sidecar (.meta or .meta.dirty, complete or
+// not) proves this pre-pass wrote the output; a half-float file without one
 // may belong to another producer, so it is never removed here. A sidecar whose output is already gone is
 // still cleaned up.
 static void ReconcileIblOutputs(const ExpectedIblOutputs& rExpectedOutputs, std::string_view outputStem)
@@ -188,20 +177,7 @@ static void ReconcileIblOutputs(const ExpectedIblOutputs& rExpectedOutputs, std:
 			}
 
 			std::filesystem::path relativePath = rSidecar.path().lexically_relative(cacheRoot);
-			if (relativePath.empty())
-			{
-				throw std::runtime_error(std::format("IBL cubemap cache entry \"{}\" is not inside its cache root.", rSidecar.path().string()));
-			}
-
-			if (relativePath.is_absolute())
-			{
-				throw std::runtime_error(std::format("IBL cubemap cache entry \"{}\" is not inside its cache root.", rSidecar.path().string()));
-			}
-
-			if (relativePath.begin()->string() == "..")
-			{
-				throw std::runtime_error(std::format("IBL cubemap cache entry \"{}\" is not inside its cache root.", rSidecar.path().string()));
-			}
+			ASSERT(!relativePath.empty() && relativePath.is_relative() && relativePath.begin()->string() != "..");
 
 			relativePath.replace_filename(outputName);
 

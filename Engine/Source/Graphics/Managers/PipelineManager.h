@@ -63,12 +63,11 @@ enum Pipelines
 	kPipelineCount,
 };
 
-class PipelineManager
+class PipelineManager : public common::Singleton<PipelineManager>
 {
 public:
 
 	PipelineManager();
-	~PipelineManager();
 
 	std::unordered_map<common::crc_t, Shader> mShaders;
 

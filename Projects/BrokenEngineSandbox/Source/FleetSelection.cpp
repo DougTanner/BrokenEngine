@@ -31,7 +31,7 @@ void FleetSelection::FocusNextFleet()
 	{
 		++miFocusedFleetIndex;
 		AutoSelectFirstAliveMember();
-		gpGame->CaptureClientStateIfChanged();
+		gpGame->CaptureClientState();
 	}
 }
 
@@ -41,7 +41,7 @@ void FleetSelection::FocusPreviousFleet()
 	{
 		--miFocusedFleetIndex;
 		AutoSelectFirstAliveMember();
-		gpGame->CaptureClientStateIfChanged();
+		gpGame->CaptureClientState();
 	}
 }
 
@@ -88,7 +88,7 @@ void FleetSelection::SelectPlayerInFleet(engine::GlobalId memberGlobalPlayerId)
 		}
 	}
 
-	gpGame->CaptureClientStateIfChanged();
+	gpGame->CaptureClientState();
 }
 
 void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
@@ -199,7 +199,7 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 		}
 
 		auto focusedIt = std::ranges::find(pFleet->members, mFocusedMemberGlobalId, &FleetMember::globalPlayerId);
-		if ((mFocusedMemberGlobalId.iValue != 0) && focusedIt != pFleet->members.end() && (focusedIt->flags & FleetMemberFlags::kIsDead))
+		if ((mFocusedMemberGlobalId.iValue != 0) && (focusedIt->flags & FleetMemberFlags::kIsDead))
 		{
 			mFocusedMemberGlobalId = {};
 			for (const FleetMember& rMember : pFleet->members)
@@ -240,7 +240,7 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 	}
 
 	// Capture the final focus for client-state persistence, including server-driven changes.
-	gpGame->CaptureClientStateIfChanged();
+	gpGame->CaptureClientState();
 }
 
 void FleetSelection::Clear()

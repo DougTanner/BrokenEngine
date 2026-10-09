@@ -102,10 +102,7 @@ bool DropRetainedEndFrame(Replay& rReplay, GridCoord coordinate)
 	{
 		return false;
 	}
-	if (it->second.empty())
-	{
-		return false;
-	}
+	ASSERT(!it->second.empty());
 
 	std::vector<Replay::ReplayWriterState>& rWriterGenerations = it->second;
 	if (!rWriterGenerations.back().bTerminal && std::ssize(rWriterGenerations) < 2)
@@ -136,10 +133,7 @@ bool ArmPersistenceFailure(const Replay& rReplay, PersistenceFailurePoint eFailu
 		{
 			return false;
 		}
-		if (it->second.empty())
-		{
-			return false;
-		}
+		ASSERT(!it->second.empty());
 		const std::vector<Replay::ReplayWriterState>& rWriterGenerations = it->second;
 		const Replay::ReplayWriterState* pSelectedGeneration = &rWriterGenerations.back();
 		if (pSelectedGeneration->bTerminal)

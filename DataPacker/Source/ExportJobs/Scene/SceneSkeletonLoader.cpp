@@ -158,19 +158,7 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 			{
 				throw std::runtime_error("ExportScene inverse-bind buffer view byte span exceeds its buffer");
 			}
-			if (rAccessor.byteOffset > std::numeric_limits<size_t>::max() - rBufferView.byteOffset)
-			{
-				throw std::runtime_error("ExportScene inverse-bind accessor data offset overflows");
-			}
 			size_t uiDataOffset = rBufferView.byteOffset + rAccessor.byteOffset;
-			if (uiDataOffset > rBuffer.data.size())
-			{
-				throw std::runtime_error("ExportScene inverse-bind accessor byte span exceeds its buffer");
-			}
-			if (uiAccessorSpan > rBuffer.data.size() - uiDataOffset)
-			{
-				throw std::runtime_error("ExportScene inverse-bind accessor byte span exceeds its buffer");
-			}
 			if (uiDataOffset % alignof(float) != 0)
 			{
 				throw std::runtime_error("ExportScene inverse-bind accessor data is not float-aligned");

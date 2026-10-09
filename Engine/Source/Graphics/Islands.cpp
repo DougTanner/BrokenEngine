@@ -9,11 +9,8 @@ namespace engine
 {
 
 Islands::Islands()
+: common::Singleton<Islands>(gpIslands)
 {
-	ASSERT(gpIslands == nullptr);
-
-	gpIslands = this;
-
 	// The record-once terrain CB binds this arena once. Template mesh residency changes only its
 	// sub-allocation offsets in indirect commands, never this VkBuffer handle.
 	mIslandMeshArena.Create(
@@ -81,29 +78,14 @@ Islands::Islands()
 
 Islands::~Islands()
 {
-	if (mIslandMeshVirtualBlock != VK_NULL_HANDLE)
-	{
-		vmaClearVirtualBlock(mIslandMeshVirtualBlock);
-		++miMeshArenaCapacityGeneration;
-		vmaDestroyVirtualBlock(mIslandMeshVirtualBlock);
-		mIslandMeshVirtualBlock = VK_NULL_HANDLE;
-	}
+	vmaClearVirtualBlock(mIslandMeshVirtualBlock);
+	vmaDestroyVirtualBlock(mIslandMeshVirtualBlock);
 	mIslandMeshArena.Destroy();
 
 	// SSBO buffers (std::array<Buffer>) free via RAII; the manually-allocated indirect buffers do not.
 	for (int64_t i = 0; i < kiMaxFramebuffers; ++i)
 	{
-		if (mIslandsIndirectVkBuffers.at(i) != VK_NULL_HANDLE)
-		{
-			vmaDestroyBuffer(gpDeviceManager->mpAllocator, mIslandsIndirectVkBuffers.at(i), mIslandsIndirectVmaAllocations.at(i));
-			mIslandsIndirectVkBuffers.at(i) = VK_NULL_HANDLE;
-			mIslandsIndirectVmaAllocations.at(i) = VK_NULL_HANDLE;
-			mppIslandsIndirectMappedVkDrawIndexedIndirectCommands.at(i) = nullptr;
-		}
-	}
-	if (gpIslands == this)
-	{
-		gpIslands = nullptr;
+		vmaDestroyBuffer(gpDeviceManager->mpAllocator, mIslandsIndirectVkBuffers.at(i), mIslandsIndirectVmaAllocations.at(i));
 	}
 }
 

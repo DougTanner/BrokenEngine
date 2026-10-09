@@ -39,7 +39,7 @@ enum class AudioManagerFlags : uint8_t
 };
 using AudioManagerFlags_t = common::Flags<AudioManagerFlags>;
 
-class AudioManager : public IVoiceNotify
+class AudioManager : public IVoiceNotify, public common::Singleton<AudioManager>
 {
 public:
 
@@ -48,7 +48,7 @@ public:
 
 	void Update(const game::Frame* pFrame);
 
-	void PlayOneShot(const game::Frame& rFrame, common::crc_t uiAudioCrc, bool b3d, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
+	void PlayOneShot(const game::Frame& rFrame, common::crc_t uiAudioCrc, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
 	// vecLocalPosition is local to emitterCoordinate; the mix converts it against the listener's own cell.
 	void XM_CALLCONV PlayOneShot3d(const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoordinate, FXMVECTOR vecLocalPosition, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
 

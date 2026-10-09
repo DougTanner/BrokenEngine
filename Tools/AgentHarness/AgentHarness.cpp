@@ -117,7 +117,7 @@ namespace toolcli
 		int64_t iRead = 0;
 		while ((iRead = static_cast<int64_t>(std::fread(pBuffer, 1, sizeof(pBuffer), stdin))) > 0)
 		{
-			if (std::ssize(rInput) > kiMaxRequestBytes || iRead > kiMaxRequestBytes - std::ssize(rInput))
+			if (iRead > kiMaxRequestBytes - std::ssize(rInput))
 			{
 				Fail("request exceeds 1 MiB");
 				return false;

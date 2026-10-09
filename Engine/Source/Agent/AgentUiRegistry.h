@@ -37,12 +37,11 @@ struct AgentUiPendingLabel
 // hooks fill item metadata and numeric wrappers attach displayed values; Swap() (after ImGui::Render()) publishes
 // the write table, so readers (describe_ui, label resolution) always see the last COMPLETED frame. Zero steady-state
 // heap: the tables are member arrays sized once at construction.
-class AgentUiRegistry
+class AgentUiRegistry : public common::Singleton<AgentUiRegistry>
 {
 public:
 
 	AgentUiRegistry();
-	~AgentUiRegistry();
 
 	AgentUiRegistry(const AgentUiRegistry&) = delete;
 	AgentUiRegistry& operator=(const AgentUiRegistry&) = delete;

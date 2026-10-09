@@ -37,7 +37,12 @@ handoff itself still carries the decision-relevant summary of each moved field,
 such as the count in `Changed files`, so main decides without opening the file;
 the file is for the workers main dispatches next, cited to them as path plus
 selector, and for main when a decision needs the detail. The report-file
-exemption for that file is in root `AGENTS.md` `## Environment`.
+exemption for that file is in root `AGENTS.md` `## Environment`. The Claude Code
+host still refuses a Claude Code subagent's `Write` of a `.md` file whose name
+begins with `analysis`, `report`, `findings`, or `summary` in any case (a
+host-internal list that can change), so the brief or worker naming a `Temp/`
+file a handoff cites under `Evidence` prefixes such a name, for example
+`temp-analysis.md`.
 
 A skill extends this form only by adding rows inside an existing field or by
 declaring extra fields in its own `## Handoff` section, each one line or one row

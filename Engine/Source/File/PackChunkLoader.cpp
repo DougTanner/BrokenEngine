@@ -291,7 +291,7 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 		if (loadRequest.eKind == LoadRequestKind::kRangeReload)
 		{
 			LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(loadRequest.crc);
-			bool bReloaded = mrPackChunks.RecommitAndReloadChunkRange(loadRequest.crc, loadRequest.iOffset, loadRequest.iLength);
+			bool bReloaded = mrPackChunks.RecommitAndReloadChunkRange(loadRequest.crc, loadRequest.iOffset, loadRequest.iLength, iThreadIndex);
 			rLazyChunk.eRangeReloadState.value.store(bReloaded ? ChunkRangeReloadState::kReady : ChunkRangeReloadState::kFailed, std::memory_order_release);
 		}
 		else
@@ -320,15 +320,7 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 
 void PackChunkLoader::PublishWake()
 {
-	uint64_t uiWakeSequence = mWakeSequence.load(std::memory_order_relaxed);
-	while (true)
-	{
-		ASSERT(uiWakeSequence != std::numeric_limits<uint64_t>::max());
-		if (mWakeSequence.compare_exchange_weak(uiWakeSequence, uiWakeSequence + 1, std::memory_order_release, std::memory_order_relaxed))
-		{
-			break;
-		}
-	}
+	mWakeSequence.fetch_add(1, std::memory_order_release);
 	mWakeSequence.notify_all();
 }
 
@@ -346,79 +338,13 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 	}
 #endif // BT_CLIENT
 
-	// Calculate sector-aligned read parameters for unbuffered I/O
-	int64_t iFileOffset = rLazyChunk.location.uiOffset + common::kiChunkDataOffset;
 	int64_t iOnDiskSize = rLazyChunk.location.uiSize - common::kiChunkDataOffset;
-	int64_t iAlignedOffset = common::RoundDown(iFileOffset, mrPackChunks.miSectorSize);
-	int64_t iPrefix = iFileOffset - iAlignedOffset;
 
 	// Compressed chunks read into this thread's scratch and decompress into pData; uncompressed chunks read directly into pData.
 	std::byte* pDecompressScratch = mrPackChunks.mpDecompressScratches[iThreadIndex];
-	std::byte* pReadBuffer = mrPackChunks.mpReadBuffers[iThreadIndex];
 	std::byte* pReadDestination = bCompressed ? pDecompressScratch : rLazyChunk.pData;
 
-	data::DataTypes eDataType = DataTypeFromFlags(rLazyChunk.header.flags);
-
-	// Bound each disk read to kiSubReadSize plus sector-alignment padding.
-	HANDLE hFile = mrPackChunks.mLazyPackFileHandles[eDataType];
-	int64_t iFilePosition = iAlignedOffset;
-	int64_t iDataCopied = 0;
-
-	while (iDataCopied < iOnDiskSize)
-	{
-		// Read one sector-aligned sub-chunk from disk. The pack handle is shared across loading threads, so the
-		// read must be positional (offset in an OVERLAPPED) rather than SetFilePointerEx + ReadFile — the latter
-		// mutates the handle's shared file position and would race between threads, tearing reads. A synchronous
-		// (non-FILE_FLAG_OVERLAPPED) handle still completes the read synchronously when given an OVERLAPPED; the
-		// explicit offset supersedes the shared file pointer, so concurrent positional reads don't interfere.
-		// iFilePosition stays sector-aligned (required by FILE_FLAG_NO_BUFFERING): it starts aligned and advances by
-		// uiBytesRead, which equals the sector-multiple iReadSize on every read except the final (loop-exiting) one.
-		int64_t iSourceOffset = (iDataCopied == 0) ? iPrefix : 0;
-		int64_t iReadSize = common::RoundUp(std::min(mrPackChunks.kiSubReadSize, iOnDiskSize - iDataCopied) + iSourceOffset, mrPackChunks.miSectorSize);
-		OVERLAPPED overlapped {};
-		overlapped.Offset = static_cast<DWORD>(iFilePosition & 0xFFFFFFFF);
-		overlapped.OffsetHigh = static_cast<DWORD>((iFilePosition >> 32) & 0xFFFFFFFF);
-		DWORD uiBytesRead = 0;
-		std::ignore = ReadFile(hFile, pReadBuffer, static_cast<DWORD>(iReadSize), &uiBytesRead, &overlapped);
-
-		int64_t iCopySize = std::min(static_cast<int64_t>(uiBytesRead) - iSourceOffset, iOnDiskSize - iDataCopied);
-		// A truncated .pack returns a 0-byte read that never advances iDataCopied; halt rather than spin.
-		ASSERT(iCopySize > 0);
-		std::byte* pSource = pReadBuffer + iSourceOffset;
-		std::byte* pDestination = pReadDestination + iDataCopied;
-
-		if (bCompressed)
-		{
-			// Compressed reads land in scratch; the decompress pass below will pull them back through cache anyway,
-			// so use a regular memcpy (not _mm_stream_si128) so the bytes stay hot for the LZ4/zlib decompress.
-			std::memcpy(pDestination, pSource, iCopySize);
-		}
-		else
-		{
-			// Non-temporal destination writes avoid cache pollution.
-			bool bAligned = (reinterpret_cast<uintptr_t>(pSource) % 16 == 0) && (reinterpret_cast<uintptr_t>(pDestination) % 16 == 0);
-			if (bAligned)
-			{
-				int64_t iStreamBytes = iCopySize & ~15i64;
-				for (int64_t i = 0; i < iStreamBytes; i += 16)
-				{
-					_mm_stream_si128(reinterpret_cast<__m128i*>(pDestination + i), _mm_loadu_si128(reinterpret_cast<const __m128i*>(pSource + i)));
-				}
-				if (iCopySize > iStreamBytes)
-				{
-					std::memcpy(pDestination + iStreamBytes, pSource + iStreamBytes, iCopySize - iStreamBytes);
-				}
-			}
-			else
-			{
-				std::memcpy(pDestination, pSource, iCopySize);
-			}
-			_mm_sfence();
-		}
-
-		iDataCopied += iCopySize;
-		iFilePosition += uiBytesRead;
-	}
+	ReadChunkRange(rLazyChunk, 0, iOnDiskSize, pReadDestination, iThreadIndex);
 
 	if (bCompressed)
 	{
@@ -463,6 +389,81 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 		// Non-texture chunks are ready immediately after disk load
 		rLazyChunk.eState.value.store(ChunkState::kReady, std::memory_order_release);
 		NotifyChunkCompletion();
+	}
+}
+
+void PackChunkLoader::ReadChunkRange(const LazyChunk& rLazyChunk, int64_t iChunkOffset, int64_t iSize, std::byte* pReadDestination, int64_t iThreadIndex)
+{
+	bool bCompressed = common::IsCompressed(rLazyChunk.header.flags);
+
+	// Calculate sector-aligned read parameters for unbuffered I/O
+	int64_t iFileOffset = rLazyChunk.location.uiOffset + common::kiChunkDataOffset + iChunkOffset;
+	int64_t iAlignedOffset = common::RoundDown(iFileOffset, PackChunks::kiSectorAlignment);
+	int64_t iPrefix = iFileOffset - iAlignedOffset;
+
+	std::byte* pReadBuffer = mrPackChunks.mpReadBuffers[iThreadIndex];
+
+	data::DataTypes eDataType = DataTypeFromFlags(rLazyChunk.header.flags);
+
+	// Bound each disk read to kiSubReadSize plus sector-alignment padding.
+	HANDLE hFile = mrPackChunks.mLazyPackFileHandles[eDataType];
+	int64_t iFilePosition = iAlignedOffset;
+	int64_t iDataCopied = 0;
+
+	while (iDataCopied < iSize)
+	{
+		// Read one sector-aligned sub-chunk from disk. The pack handle is shared across loading threads, so the
+		// read must be positional (offset in an OVERLAPPED) rather than SetFilePointerEx + ReadFile — the latter
+		// mutates the handle's shared file position and would race between threads, tearing reads. A synchronous
+		// (non-FILE_FLAG_OVERLAPPED) handle still completes the read synchronously when given an OVERLAPPED; the
+		// explicit offset supersedes the shared file pointer, so concurrent positional reads don't interfere.
+		// iFilePosition stays sector-aligned (required by FILE_FLAG_NO_BUFFERING): it starts aligned and advances by
+		// uiBytesRead, which equals the sector-multiple iReadSize on every read except the final (loop-exiting) one.
+		int64_t iSourceOffset = (iDataCopied == 0) ? iPrefix : 0;
+		int64_t iReadSize = common::RoundUp(std::min(PackChunks::kiSubReadSize, iSize - iDataCopied) + iSourceOffset, PackChunks::kiSectorAlignment);
+		OVERLAPPED overlapped {};
+		overlapped.Offset = static_cast<DWORD>(iFilePosition & 0xFFFFFFFF);
+		overlapped.OffsetHigh = static_cast<DWORD>((iFilePosition >> 32) & 0xFFFFFFFF);
+		DWORD uiBytesRead = 0;
+		std::ignore = ReadFile(hFile, pReadBuffer, static_cast<DWORD>(iReadSize), &uiBytesRead, &overlapped);
+
+		int64_t iCopySize = std::min(static_cast<int64_t>(uiBytesRead) - iSourceOffset, iSize - iDataCopied);
+		// A truncated .pack returns a 0-byte read that never advances iDataCopied; halt rather than spin.
+		ASSERT(iCopySize > 0);
+		std::byte* pSource = pReadBuffer + iSourceOffset;
+		std::byte* pDestination = pReadDestination + iDataCopied;
+
+		if (bCompressed)
+		{
+			// Compressed reads land in LoadChunk's scratch, which it decompresses right after this returns, so a
+			// regular memcpy (not _mm_stream_si128) keeps the bytes hot for the LZ4/zlib decompress.
+			std::memcpy(pDestination, pSource, iCopySize);
+		}
+		else
+		{
+			// Non-temporal destination writes avoid cache pollution.
+			bool bAligned = (reinterpret_cast<uintptr_t>(pSource) % 16 == 0) && (reinterpret_cast<uintptr_t>(pDestination) % 16 == 0);
+			if (bAligned)
+			{
+				int64_t iStreamBytes = iCopySize & ~15i64;
+				for (int64_t i = 0; i < iStreamBytes; i += 16)
+				{
+					_mm_stream_si128(reinterpret_cast<__m128i*>(pDestination + i), _mm_loadu_si128(reinterpret_cast<const __m128i*>(pSource + i)));
+				}
+				if (iCopySize > iStreamBytes)
+				{
+					std::memcpy(pDestination + iStreamBytes, pSource + iStreamBytes, iCopySize - iStreamBytes);
+				}
+			}
+			else
+			{
+				std::memcpy(pDestination, pSource, iCopySize);
+			}
+			_mm_sfence();
+		}
+
+		iDataCopied += iCopySize;
+		iFilePosition += uiBytesRead;
 	}
 }
 

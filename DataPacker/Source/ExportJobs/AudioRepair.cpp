@@ -75,10 +75,7 @@ static void SolveNaturalCubicSpline(std::span<const double> samplePositions, std
 	int64_t iCount = std::ssize(samplePositions);
 	secondDerivatives[0] = 0.0;
 	secondDerivatives[iCount - 1] = 0.0;
-	if (iCount < 3)
-	{
-		return;
-	}
+	ASSERT(iCount >= 3);
 
 	// Forward elimination over the interior tridiagonal system
 	std::vector<double> fDiagonal(iCount, 0.0);
@@ -235,7 +232,7 @@ static DeclipStatistics ReconstructClipRuns(std::vector<float>& rfSamples, int64
 	for (const ClipRun& rRun : rRuns)
 	{
 		int64_t iLength = rRun.iEnd - rRun.iStart + 1;
-		if (iLength > kiClipRunMaxFixSamples || rRun.iStart == 0 || rRun.iEnd == iFrames - 1)
+		if (iLength > kiClipRunMaxFixSamples)
 		{
 			++statistics.iRunsSkipped;
 			continue;
@@ -478,10 +475,6 @@ static double NormalizedSinc(double fArgument)
 void Resample(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSourceRate, int64_t iTargetRate, std::string_view relativeFile)
 {
 	if (iSourceRate == iTargetRate)
-	{
-		return;
-	}
-	if (rfSamples.empty())
 	{
 		return;
 	}

@@ -246,11 +246,6 @@ int64_t DeserializeStatusChangeBatch(std::span<const uint8_t> source, game::Stat
 {
 	int64_t iSourceSize = static_cast<int64_t>(source.size());
 
-	if (iSourceSize == 0)
-	{
-		return 0;
-	}
-
 	// Only the client decodes a batch, and it trusts its server's bytes, so the cursor only drives the loop to the end of
 	// the batch; nothing is checked per group or item.
 	BoundedCursor cursor {.pCursor = source.data(), .pEnd = source.data() + iSourceSize};
@@ -350,13 +345,7 @@ int64_t CompressStatusChangeBatch(std::span<const game::StatusChange> changes, s
 	std::memcpy(pOutput, &iUncompressedSize, sizeof(int32_t));
 
 	int64_t iCompressedSize = LZ4_compress_default(reinterpret_cast<const char*>(pSerialized), reinterpret_cast<char*>(pOutput + sizeof(int32_t)), static_cast<int>(iSerializedSize), static_cast<int>(iDestinationCapacity - sizeof(int32_t)));
-	if (iCompressedSize <= 0)
-	{
-		// Belt (the caller sizes destination to fit any valid capped batch): a 0 return means the batch did not fit. Drop it
-		// rather than ship the 4-byte prefix alone, which carries no decodable batch.
-		LOG(kNetwork, kError, "CompressStatusChangeBatch: LZ4 compression failed (items {}, serialized {}, dest capacity {})", iCount, iSerializedSize, iDestinationCapacity);
-		return 0;
-	}
+	ASSERT(iCompressedSize > 0);
 
 	return static_cast<int64_t>(sizeof(int32_t)) + iCompressedSize;
 }

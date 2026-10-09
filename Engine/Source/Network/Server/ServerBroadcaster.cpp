@@ -233,10 +233,6 @@ void ServerBroadcaster::ProcessUpdatePlayerRequests()
 		}
 		auto ownedIt = game::gpServerSession->mClientPlayers.mOwned.find(pClient->iClientId);
 		std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != game::gpServerSession->mClientPlayers.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
-		if (ownedPlayers.empty())
-		{
-			continue;
-		}
 
 		engine::GridCoord updateCoord {};
 		bool bFound = false;
@@ -260,10 +256,6 @@ void ServerBroadcaster::ProcessUpdatePlayerRequests()
 			continue;
 		}
 
-		if (!game::gpGame->mCells.contains(updateCoord))
-		{
-			continue;
-		}
 		int64_t iPlayerUuid = engine::RegistryUuidByGlobalId(game::Frame::OwnershipLayer((*game::gpGame->mCells.at(updateCoord).pCurrent)), rRequest.globalId).iValue;
 		if (iPlayerUuid == 0)
 		{

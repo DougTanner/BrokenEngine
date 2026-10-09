@@ -45,28 +45,13 @@ int64_t LogicalCoreCount()
 
 int64_t HardwareCoreCount()
 {
-	using LPFN_GLPI = BOOL(WINAPI*)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
-	HMODULE hmodule = GetModuleHandle(TEXT("kernel32"));
-	if (hmodule == nullptr)
-	{
-		LOG(kDefault, kWarning, "GetModuleHandle(TEXT(\"kernel32\")) returned nullptr");
-		return LogicalCoreCount();
-	}
-
-	LPFN_GLPI pGetLogicalProcessorInformation = reinterpret_cast<LPFN_GLPI>(GetProcAddress(hmodule, "GetLogicalProcessorInformation"));
-	if (pGetLogicalProcessorInformation == nullptr)
-	{
-		LOG(kDefault, kWarning, "GetProcAddress(hmodule, \"GetLogicalProcessorInformation\") returned nullptr");
-		return LogicalCoreCount();
-	}
-
 	std::vector<SYSTEM_LOGICAL_PROCESSOR_INFORMATION> buffer(1);
 	DWORD uiReturnLength = static_cast<DWORD>(std::ssize(buffer) * static_cast<int64_t>(sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION)));
 
 	BOOL bDone = FALSE;
 	while (bDone == FALSE)
 	{
-		BOOL bSuccess = pGetLogicalProcessorInformation(buffer.data(), &uiReturnLength);
+		BOOL bSuccess = GetLogicalProcessorInformation(buffer.data(), &uiReturnLength);
 
 		if (bSuccess == FALSE)
 		{

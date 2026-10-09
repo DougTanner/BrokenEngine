@@ -462,3 +462,8 @@ What a comment should say, in the fewest sentences that carry it: an invariant, 
 
 71. Use a raw string literal for a string with several backslashes: if (finalPath.starts_with(LR"(\\?\UNC\)"))
 	Not when the text needs an escape a raw literal cannot spell (\0, \x..), or a \n or \t whose raw form would need a literal line break or tab.
+
+72. Access a static member through its class name, never through an object, reference, or pointer, including this->. Static members are static data members (constexpr, const, or not), enumerators of an enum declared inside a class, and static member functions. Inside the class's own member functions the unqualified name is used:
+
+	common::RoundDown(iFileOffset, PackChunks::kiSectorAlignment)  // not mrPackChunks.kiSectorAlignment
+	engine::AreaLightsPostRender::Add(rFrame, rId, iTypeIndex)  // not rFrame.postRender.areaLights.Add(rFrame, rId, iTypeIndex)

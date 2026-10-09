@@ -153,7 +153,7 @@ static float OrientForTangent(common::crc_t crc, float fAttachWorld, common::Ran
 	float fY = rTemplate.fQuadFootprintY;
 	float fLong = std::max(fX, fY);
 	float fShort = std::min(fX, fY);
-	if (fShort <= 0.0f || fLong / fShort < kfLongAspectThreshold)
+	if (fLong / fShort < kfLongAspectThreshold)
 	{
 		return common::Random(2.0f * DirectX::XM_PI, rRotationRandom);
 	}

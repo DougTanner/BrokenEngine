@@ -114,10 +114,6 @@ std::shared_ptr<StaleUpdateState> PollBeforeDrain(Client& rClient, QueryCoordUpd
 	{
 		return nullptr;
 	}
-	if (pState->iSlotIndex >= std::ssize(rClient.mSubscriptions.mCoordinateSlots))
-	{
-		return nullptr;
-	}
 
 	ClientCoordSlot& rSlot = rClient.mSubscriptions.mCoordinateSlots.at(static_cast<size_t>(pState->iSlotIndex));
 	CoordUpdateState coordState = pfnQueryCoordUpdateState(pState->coord, pState->iTick);

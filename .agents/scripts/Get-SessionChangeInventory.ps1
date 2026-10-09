@@ -376,6 +376,7 @@ function Get-RoutingTrigger([object[]] $Entries) {
 	return [ordered]@{
 		coherenceReview = $coherenceReview
 		repoCodeReview = $cpp
+		overEngineeringReview = $classes.Contains('cpp')
 		glslReview = $glsl
 		codeStyleReview = $cpp
 		commentReview = $cpp -or $glsl

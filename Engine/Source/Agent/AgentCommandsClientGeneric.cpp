@@ -684,37 +684,34 @@ static nlohmann::json BuildDescribeUi()
 
 	nlohmann::json windows = nlohmann::json::array();
 	nlohmann::json items = nlohmann::json::array();
-	if (engine::gpAgentUiRegistry != nullptr)
+	for (int64_t i = 0; i < engine::gpAgentUiRegistry->miWindowCount[engine::gpAgentUiRegistry->miRead]; ++i)
 	{
-		for (int64_t i = 0; i < engine::gpAgentUiRegistry->miWindowCount[engine::gpAgentUiRegistry->miRead]; ++i)
+		const engine::AgentUiWindow& rWindow = engine::gpAgentUiRegistry->mWindows[engine::gpAgentUiRegistry->miRead][i];
+		windows.push_back({{"name", rWindow.pcName}, {"rect", {rWindow.f4Rectangle.x, rWindow.f4Rectangle.y, rWindow.f4Rectangle.z, rWindow.f4Rectangle.w}}, {"focused", rWindow.bFocused}});
+	}
+	for (int64_t i = 0; i < engine::gpAgentUiRegistry->miItemCount[engine::gpAgentUiRegistry->miRead]; ++i)
+	{
+		const engine::AgentUiItem& rItem = engine::gpAgentUiRegistry->mItems[engine::gpAgentUiRegistry->miRead][i];
+		if (rItem.pcLabel[0] == '\0')
 		{
-			const engine::AgentUiWindow& rWindow = engine::gpAgentUiRegistry->mWindows[engine::gpAgentUiRegistry->miRead][i];
-			windows.push_back({{"name", rWindow.pcName}, {"rect", {rWindow.f4Rectangle.x, rWindow.f4Rectangle.y, rWindow.f4Rectangle.z, rWindow.f4Rectangle.w}}, {"focused", rWindow.bFocused}});
+			continue; // no label recorded (invisible / no ItemInfo) — not addressable, omit
 		}
-		for (int64_t i = 0; i < engine::gpAgentUiRegistry->miItemCount[engine::gpAgentUiRegistry->miRead]; ++i)
+		nlohmann::json item =
 		{
-			const engine::AgentUiItem& rItem = engine::gpAgentUiRegistry->mItems[engine::gpAgentUiRegistry->miRead][i];
-			if (rItem.pcLabel[0] == '\0')
-			{
-				continue; // no label recorded (invisible / no ItemInfo) — not addressable, omit
-			}
-			nlohmann::json item =
-			{
-				{"label", rItem.pcLabel},
-				{"window", rItem.pcWindow},
-				{"rect", {rItem.f4Rectangle.x, rItem.f4Rectangle.y, rItem.f4Rectangle.z, rItem.f4Rectangle.w}},
-				{"disabled", rItem.bDisabled},
-				{"checked", (rItem.iStatusFlags & ImGuiItemStatusFlags_Checked) != 0},
-				{"inputable", (rItem.iStatusFlags & ImGuiItemStatusFlags_Inputable) != 0},
-				{"hovered", (rItem.iStatusFlags & ImGuiItemStatusFlags_HoveredRect) != 0},
-				{"visible", (rItem.iStatusFlags & ImGuiItemStatusFlags_Visible) != 0},
-			};
-			if (rItem.pcValue[0] != '\0')
-			{
-				item["value"] = rItem.pcValue;
-			}
-			items.push_back(std::move(item));
+			{"label", rItem.pcLabel},
+			{"window", rItem.pcWindow},
+			{"rect", {rItem.f4Rectangle.x, rItem.f4Rectangle.y, rItem.f4Rectangle.z, rItem.f4Rectangle.w}},
+			{"disabled", rItem.bDisabled},
+			{"checked", (rItem.iStatusFlags & ImGuiItemStatusFlags_Checked) != 0},
+			{"inputable", (rItem.iStatusFlags & ImGuiItemStatusFlags_Inputable) != 0},
+			{"hovered", (rItem.iStatusFlags & ImGuiItemStatusFlags_HoveredRect) != 0},
+			{"visible", (rItem.iStatusFlags & ImGuiItemStatusFlags_Visible) != 0},
+		};
+		if (rItem.pcValue[0] != '\0')
+		{
+			item["value"] = rItem.pcValue;
 		}
+		items.push_back(std::move(item));
 	}
 	result["windows"] = std::move(windows);
 	result["items"] = std::move(items);
@@ -725,10 +722,6 @@ static nlohmann::json BuildDescribeUi()
 static std::string CandidateLabels(const char* pcWindow)
 {
 	std::string candidates;
-	if (engine::gpAgentUiRegistry == nullptr)
-	{
-		return candidates;
-	}
 	for (int64_t i = 0; i < engine::gpAgentUiRegistry->miItemCount[engine::gpAgentUiRegistry->miRead]; ++i)
 	{
 		const engine::AgentUiItem& rItem = engine::gpAgentUiRegistry->mItems[engine::gpAgentUiRegistry->miRead][i];

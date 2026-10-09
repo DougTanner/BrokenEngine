@@ -19,7 +19,7 @@ struct Framebuffer
 	VkFramebuffer vkPresentFramebuffer = VK_NULL_HANDLE;
 };
 
-class SwapchainManager
+class SwapchainManager : public common::Singleton<SwapchainManager>
 {
 public:
 

@@ -52,17 +52,9 @@ public:
 		return iInsert;
 	}
 
-	// Remove a non-endpoint point. Silently ignored for endpoints or when at the floor of 2 points.
+	// Remove an interior (non-endpoint) point.
 	void RemovePoint(int64_t iIndex)
 	{
-		if (iIndex <= 0 || iIndex >= std::ssize(mPoints) - 1)
-		{
-			return;
-		}
-		if (std::ssize(mPoints) <= 2)
-		{
-			return;
-		}
 		mPoints.erase(mPoints.begin() + iIndex);
 	}
 
@@ -70,10 +62,6 @@ public:
 	// (with a small epsilon) so the sort order is preserved.
 	void MovePoint(int64_t iIndex, ImVec2 point)
 	{
-		if (iIndex < 0 || iIndex >= std::ssize(mPoints))
-		{
-			return;
-		}
 		point.y = std::clamp(point.y, mfYMinimum, mfYMaximum);
 		if (iIndex == 0)
 		{
@@ -95,7 +83,6 @@ public:
 	// Sample the curve at fCurveX in [0, 1] using monotone cubic Hermite (Fritsch-Carlson).
 	float Evaluate(float fCurveX) const
 	{
-		fCurveX = std::clamp(fCurveX, 0.0f, 1.0f);
 		int64_t iCount = std::ssize(mPoints);
 		if (fCurveX <= mPoints.at(0).x)
 		{
@@ -106,7 +93,7 @@ public:
 			return mPoints.at(iCount - 1).y;
 		}
 		int64_t i = 0;
-		while (i < iCount - 1 && mPoints.at(i + 1).x < fCurveX)
+		while (mPoints.at(i + 1).x < fCurveX)
 		{
 			++i;
 		}

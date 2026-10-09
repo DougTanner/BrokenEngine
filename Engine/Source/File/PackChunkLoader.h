@@ -48,6 +48,7 @@ public:
 private:
 	void LoadingThread(int64_t iThreadIndex);
 	void LoadChunk(const LoadRequest& rRequest, int64_t iThreadIndex);
+	void ReadChunkRange(const LazyChunk& rLazyChunk, int64_t iChunkOffset, int64_t iSize, std::byte* pReadDestination, int64_t iThreadIndex);
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
 public:
 #endif

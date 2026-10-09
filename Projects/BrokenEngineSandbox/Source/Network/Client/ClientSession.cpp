@@ -36,10 +36,8 @@ const char* ToString(SubscriptionChangeReason eReason)
 }
 
 ClientSession::ClientSession()
+: common::Singleton<ClientSession>(gpClientSession)
 {
-	ASSERT(gpClientSession == nullptr);
-
-	gpClientSession = this;
 	mpDesynchronizationCore = std::make_unique<engine::ClientDesyncCore>();
 	mpReconciler = std::make_unique<ClientReconciler>();
 	mpRuntime = std::make_unique<engine::ClientSessionRuntime>(*this);
@@ -51,10 +49,6 @@ ClientSession::~ClientSession()
 	DetachClientFullStateHarnessRig(*this);
 	DetachClientSubscriptionHarnessRigs(*this);
 	mpRuntime.reset();
-	if (gpClientSession == this)
-	{
-		gpClientSession = nullptr;
-	}
 }
 
 void ClientSession::ProcessReceivedGamePackets()
@@ -238,9 +232,7 @@ void ClientSession::OnServerLoad()
 	LOG(kDefault, kDebug, "ClientSession::OnServerLoad");
 
 	// Reset tick counter and time step — server tick resets to the saved value
-	static constexpr int64_t kiTickCounter = 0;
-	static_assert(kiTickCounter >= 0);
-	gpGame->miTickCounter = kiTickCounter;
+	gpGame->miTickCounter = 0;
 	gpGame->mTimeStep.mTickRemainderNanoseconds = 0ns;
 	gpGame->mTimeStep.mRealTime.Reset();
 	gpGame->ResetRenderClock();

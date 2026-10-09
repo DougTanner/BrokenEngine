@@ -87,7 +87,7 @@ struct DumpRenderTargetRequest
 	int64_t iCaptureToken = 0;
 };
 
-class Graphics
+class Graphics : public common::Singleton<Graphics>
 {
 public:
 
@@ -103,7 +103,7 @@ public:
 	void RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, std::chrono::duration<float> currentTime);
 	void Create();
 	void Refresh();
-	bool Destroy();
+	void Destroy();
 	void RecreateResources();
 	// Matching extents require both no deferred recreation and no pending swapchain-tier teardown to be settled.
 	// Refresh copies the wanted extent before recreation can defer, and a failed acquire/present can leave a teardown pending.

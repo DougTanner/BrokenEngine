@@ -20,11 +20,8 @@ constexpr float kfLargeIslandAreaMeters = 48'000.0f;   // 2x1/3x1 strips    = 53
 constexpr float kfMediumIslandAreaMeters = 16'000.0f;  // mid tiles; 4x4 (10k) falls below -> Small
 
 IslandTerrain::IslandTerrain()
+: common::Singleton<IslandTerrain>(gpIslandTerrain)
 {
-	ASSERT(gpIslandTerrain == nullptr);
-
-	gpIslandTerrain = this;
-
 	const std::unordered_map<common::crc_t, LazyChunk>& rChunkMap = gpFileManager->mpPackChunks->mLazyChunkMap;
 	for (const auto& [rCrc, rLazyChunk] : rChunkMap)
 	{
@@ -119,14 +116,6 @@ IslandTerrain::IslandTerrain()
 	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(mIslandCrcsSorted, LoadPriority::kRealtime);
 }
 
-IslandTerrain::~IslandTerrain()
-{
-	if (gpIslandTerrain == this)
-	{
-		gpIslandTerrain = nullptr;
-	}
-}
-
 #if defined(BT_SERVER)
 void IslandTerrain::WaitForElevationMaps(float fNavigationThreshold, float fNavigationClearanceMeters)
 #else
@@ -215,15 +204,12 @@ void IslandTerrain::WaitForElevationMaps()
 	ScopedBootTimer scopedTimer(kBootTimerIslands);
 	for (auto& [rCrc, rTemplate] : mIslands)
 	{
-		if (rTemplate.puiHeightmapHalf != nullptr)
-		{
-			// BuildNavContour consumes full-precision floats; dequantize the R16 heightmap into a transient
-			// boot buffer (one template at a time, freed each iteration).
-			int64_t iHeightmapTexels = static_cast<int64_t>(rTemplate.iHeightmapWidth) * static_cast<int64_t>(rTemplate.iHeightmapHeight);
-			std::vector<float> heightmapFloats(static_cast<size_t>(iHeightmapTexels));
-			DirectX::PackedVector::XMConvertHalfToFloatStream(heightmapFloats.data(), sizeof(float), rTemplate.puiHeightmapHalf, sizeof(uint16_t), static_cast<size_t>(iHeightmapTexels));
-			BuildNavContour(rTemplate.navContour, heightmapFloats, rTemplate.iHeightmapWidth, rTemplate.iHeightmapHeight, fNavigationThreshold, fNavigationClearanceMeters, rTemplate.fQuadFootprintX, rTemplate.fQuadFootprintY);
-		}
+		// BuildNavContour consumes full-precision floats; dequantize the R16 heightmap into a transient
+		// boot buffer (one template at a time, freed each iteration).
+		int64_t iHeightmapTexels = static_cast<int64_t>(rTemplate.iHeightmapWidth) * static_cast<int64_t>(rTemplate.iHeightmapHeight);
+		std::vector<float> heightmapFloats(static_cast<size_t>(iHeightmapTexels));
+		DirectX::PackedVector::XMConvertHalfToFloatStream(heightmapFloats.data(), sizeof(float), rTemplate.puiHeightmapHalf, sizeof(uint16_t), static_cast<size_t>(iHeightmapTexels));
+		BuildNavContour(rTemplate.navContour, heightmapFloats, rTemplate.iHeightmapWidth, rTemplate.iHeightmapHeight, fNavigationThreshold, fNavigationClearanceMeters, rTemplate.fQuadFootprintX, rTemplate.fQuadFootprintY);
 	}
 #endif
 }

@@ -62,7 +62,9 @@ namespace toolcli::landing
 		lease.expiresAt = rMetadata["expiresAt"].get<std::string>();
 		lease.duration = std::chrono::seconds(*durationSeconds);
 		// The envelope already proved claimedAt and heartbeatAt parse and are ordered; these calls exist to fill the lease ticks.
-		if (!ParseUtcTimestamp(lease.claimedAt, lease.iClaimedTicks) || !ParseUtcTimestamp(lease.heartbeatAt, lease.iHeartbeatTicks) || !ParseUtcTimestamp(lease.expiresAt, lease.iExpiresTicks))
+		ParseUtcTimestamp(lease.claimedAt, lease.iClaimedTicks);
+		ParseUtcTimestamp(lease.heartbeatAt, lease.iHeartbeatTicks);
+		if (!ParseUtcTimestamp(lease.expiresAt, lease.iExpiresTicks))
 		{
 			return std::nullopt;
 		}
@@ -162,7 +164,7 @@ namespace toolcli::landing
 		for (const std::wstring& rWorktree : worktrees)
 		{
 			std::error_code error;
-			if (!std::filesystem::is_directory(ExtendedLengthPath(rWorktree), error) || error)
+			if (!std::filesystem::is_directory(ExtendedLengthPath(rWorktree), error))
 			{
 				return false;
 			}
@@ -177,7 +179,7 @@ namespace toolcli::landing
 			}
 			std::filesystem::path gitDirectory = Utf8ToWide(*gitDirectoryText);
 			std::filesystem::path extendedGitDirectory = ExtendedLengthPath(std::move(gitDirectory));
-			if (!std::filesystem::is_directory(extendedGitDirectory, error) || error)
+			if (!std::filesystem::is_directory(extendedGitDirectory, error))
 			{
 				return false;
 			}

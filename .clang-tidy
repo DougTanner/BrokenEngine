@@ -42,7 +42,8 @@ Checks: >
   performance-for-range-copy,
   performance-unnecessary-copy-initialization,
   performance-unnecessary-value-param,
-  readability-implicit-bool-conversion
+  readability-implicit-bool-conversion,
+  readability-static-accessed-through-instance
 
 WarningsAsErrors: ''
 # Either separator: a header included relative to its includer gets a backslash path.

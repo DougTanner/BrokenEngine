@@ -152,11 +152,6 @@ static int64_t siEnemyBlasterTypeIndex = 0xFF;
 
 static void RegisterEnemyBlasterType()
 {
-	if (siEnemyBlasterTypeIndex != 0xFF)
-	{
-		return;
-	}
-
 #if defined(BT_CLIENT)
 	engine::PointLightsInterpolate::RegisterType(siEnemyBlasterPointLightTypeIndex,
 	{
@@ -193,33 +188,30 @@ void XM_CALLCONV SyncSpaceship(FrameInterpolate& rFrameInterpolate, engine::push
 #if defined(BT_CLIENT)
 static void RegisterSpaceshipHitFlashEffect()
 {
-	if (siSpaceshipHitFlashTypeIndex == 0xFF)
+	engine::PointLightsInterpolate::RegisterType(siSpaceshipHitFlashTypeIndex,
 	{
-		engine::PointLightsInterpolate::RegisterType(siSpaceshipHitFlashTypeIndex,
-		{
-			.uiCrc = data::kTexturesBlasterBC74pngCrc,
-			.uiColor = 0xFFFFFFFF,
-		});
+		.uiCrc = data::kTexturesBlasterBC74pngCrc,
+		.uiColor = 0xFFFFFFFF,
+	});
 
-		engine::PointLightsInterpolate::RegisterControllerType(giSpaceshipHitFlashControllerTypeIndex,
+	engine::PointLightsInterpolate::RegisterControllerType(giSpaceshipHitFlashControllerTypeIndex,
+	{
+		.iBaseTypeIndex = siSpaceshipHitFlashTypeIndex,
+		.iKeyframeCount = 2,
+		.bDestroysSelf = true,
+		.times = {std::chrono::duration<float>(0.0f), kHitFlashDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
+		.keyframes =
 		{
-			.iBaseTypeIndex = siSpaceshipHitFlashTypeIndex,
-			.iKeyframeCount = 2,
-			.bDestroysSelf = true,
-			.times = {std::chrono::duration<float>(0.0f), kHitFlashDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
-			.keyframes =
-			{
-				{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
-				{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
-				{},
-				{},
-			},
-			.ppVisibleAreaScales = {&gHitFlashVisibleAreaOne, &gHitFlashVisibleAreaTwo, nullptr, nullptr},
-			.ppVisibleIntensityScales = {&gHitFlashVisibleIntensityOne, &gHitFlashVisibleIntensityTwo, nullptr, nullptr},
-			.ppLightingAreaScales = {&gHitFlashLightingAreaOne, &gHitFlashLightingAreaTwo, nullptr, nullptr},
-			.ppLightingIntensityScales = {&gHitFlashLightingIntensityOne, &gHitFlashLightingIntensityTwo, nullptr, nullptr},
-		});
-	}
+			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
+			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
+			{},
+			{},
+		},
+		.ppVisibleAreaScales = {&gHitFlashVisibleAreaOne, &gHitFlashVisibleAreaTwo, nullptr, nullptr},
+		.ppVisibleIntensityScales = {&gHitFlashVisibleIntensityOne, &gHitFlashVisibleIntensityTwo, nullptr, nullptr},
+		.ppLightingAreaScales = {&gHitFlashLightingAreaOne, &gHitFlashLightingAreaTwo, nullptr, nullptr},
+		.ppLightingIntensityScales = {&gHitFlashLightingIntensityOne, &gHitFlashLightingIntensityTwo, nullptr, nullptr},
+	});
 }
 #endif // BT_CLIENT
 

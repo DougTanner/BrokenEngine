@@ -218,18 +218,6 @@ void AnimationData::EvaluateAnimation(int64_t iAnimationIndex, float fTime, std:
 	}
 }
 
-int64_t AnimationData::FindAnimation(std::string_view name) const
-{
-	for (int64_t i = 0; i < static_cast<int64_t>(mHeader.uiAnimationCount); ++i)
-	{
-		if (name == mpAnimations[i].pcName)
-		{
-			return i;
-		}
-	}
-	return -1;
-}
-
 XMVECTOR AnimationData::InterpolateKeyframes(const common::AnimationChannel& rChannel, float fTime) const
 {
 	int64_t iKeyframeCount = rChannel.uiKeyframeCount;

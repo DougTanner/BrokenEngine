@@ -34,12 +34,11 @@ inline constexpr int64_t kiLogBufferSize = 32 * 1'024;
 inline constexpr int64_t kiMinWorkbufferSize = 4 * 1'024;
 
 // Exactly one ThreadLocal per thread; it owns gpThreadLocal for its lifetime.
-class ThreadLocal
+class ThreadLocal : public common::Singleton<ThreadLocal>
 {
 public:
 
 	ThreadLocal() = delete;
-	~ThreadLocal();
 
 	// The only way to construct a ThreadLocal: returns a callable that, on whichever thread calls it (a thread start or a
 	// process entry), builds that thread's ThreadLocal and then invokes function with the callable's arguments.
@@ -73,9 +72,9 @@ private:
 
 	template <typename> friend struct ThreadLocalEntry;
 
-	// iWorkbufferReserveSize is the workbuffer's address-space ceiling in bytes; 0 means 64x the initial size with that
-	// size floored at 64 KiB first, so a thread constructed with a small initial workbuffer still has room to grow into.
-	ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> iThreadId = std::nullopt, bool bSetupExceptionHandling = true, int64_t iWorkbufferReserveSize = 0);
+	// The workbuffer reserve is 64x the initial size, with that size floored at 64 KiB first, so a thread constructed
+	// with a small initial workbuffer still has room to grow into.
+	ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> iThreadId = std::nullopt, bool bSetupExceptionHandling = true);
 
 	// Must precede mpLogBuffer/mWorkbuffer below: those alias this storage (ctor member-init order depends on it).
 	std::vector<char> mLogBufferMemory = std::vector<char>(kiLogBufferSize);

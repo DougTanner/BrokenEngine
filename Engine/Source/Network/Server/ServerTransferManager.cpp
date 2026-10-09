@@ -176,8 +176,8 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 			common::ToHex(std::span<char, 20>(acCrcPost), rDestinationFrame.postRender.uiSharedCrc);
 
 			char acPlayerIds[192] {};
+			char* pPlayerIdsWrite = acPlayerIds;
 			int64_t iPlayerIdCount = 0;
-			int64_t iPosition = 0;
 			for (const game::StatusChange& rTransfer : rTransfers)
 			{
 				if (rTransfer.eType != game::StatusChangeType::kTransferPlayer)
@@ -190,23 +190,8 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 					continue;
 				}
 
-				static constexpr int64_t kiReserve = 24; // ", " + max 20-digit int64
-				if (iPosition + kiReserve > std::ssize(acPlayerIds))
-				{
-					break;
-				}
-
-				if (iPlayerIdCount > 0)
-				{
-					acPlayerIds[iPosition++] = ',';
-					acPlayerIds[iPosition++] = ' ';
-				}
-				int64_t iWritten = std::snprintf(acPlayerIds + iPosition, static_cast<size_t>(std::ssize(acPlayerIds) - iPosition), "%lld", std::get<game::TransferData>(rTransfer.data).globalPlayerId.iValue);
-				if (iWritten <= 0)
-				{
-					break;
-				}
-				iPosition += iWritten;
+				// The final byte stays the zero terminator.
+				pPlayerIdsWrite = std::format_to_n(pPlayerIdsWrite, acPlayerIds + std::ssize(acPlayerIds) - 1 - pPlayerIdsWrite, "{}{}", iPlayerIdCount > 0 ? ", " : "", std::get<game::TransferData>(rTransfer.data).globalPlayerId.iValue).out;
 				++iPlayerIdCount;
 			}
 

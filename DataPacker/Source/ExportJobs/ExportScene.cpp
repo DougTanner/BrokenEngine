@@ -369,7 +369,7 @@ std::filesystem::path ExportScene::GetTextureIntermediateStagePath(int64_t iStag
 {
 	std::filesystem::path path = mInputPath.parent_path();
 	// Keep outer stages out of tag-first texture routing until they are published under the final name.
-	path /= L".TextureStage." + std::to_wstring(::GetCurrentProcessId()) + L"." + std::to_wstring(miId) + L"." + std::to_wstring(iStageIndex) + L".tmp";
+	path /= L".TextureStage." + std::to_wstring(miId) + L"." + std::to_wstring(iStageIndex) + L".tmp";
 	return path;
 }
 
@@ -491,44 +491,28 @@ void ExportScene::ProcessTextures(const tinygltf::Model& rGltfModel)
 
 	// Process each unique source/format pair on this export-job thread. BC encoding dispatches its
 	// block rows across the shared worker pool, while the outer stages remain available for cleanup.
-	try
+	for (const TextureAttempt& rAttempt : textureAttempts)
 	{
-		for (const TextureAttempt& rAttempt : textureAttempts)
-		{
-			const tinygltf::Image& rImage = rGltfModel.images.at(rAttempt.iSource);
-			std::lock_guard<std::mutex> lock(Texture::sEncodeMutex);
-			Texture texture(reinterpret_cast<const std::byte*>(rImage.image.data()), rImage.width, rImage.height, rImage.component);
-			texture.MakeMipmaps(rAttempt.vkFormat);
-			texture.Save(rAttempt.stagingPath, rAttempt.vkFormat, {});
-		}
-	}
-	catch (...)
-	{
-		CleanupTextureAttemptFiles();
-		throw;
+		const tinygltf::Image& rImage = rGltfModel.images.at(rAttempt.iSource);
+		std::lock_guard<std::mutex> lock(Texture::sEncodeMutex);
+		Texture texture(reinterpret_cast<const std::byte*>(rImage.image.data()), rImage.width, rImage.height, rImage.component);
+		texture.MakeMipmaps(rAttempt.vkFormat);
+		texture.Save(rAttempt.stagingPath, rAttempt.vkFormat, {});
 	}
 
 	// Publish every completed outer stage only after all unique workers succeeded. Record each final as soon as it
 	// is published, so a mid-loop failure's CleanupOnFailure removes the replaced prefix instead of leaving a mixed
 	// generation for the texture pass to pack.
 	mPublishedTextureFiles.reserve(static_cast<size_t>(std::ssize(textureAttempts)));
-	try
+	for (const TextureAttempt& rAttempt : textureAttempts)
 	{
-		for (const TextureAttempt& rAttempt : textureAttempts)
-		{
-			VERIFY_SUCCESS(MoveFileExW(rAttempt.stagingPath.native().c_str(), rAttempt.finalPath.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
-			mPublishedTextureFiles.push_back(rAttempt.finalPath);
-		}
-	}
-	catch (...)
-	{
-		CleanupTextureAttemptFiles();
-		throw;
+		VERIFY_SUCCESS(MoveFileExW(rAttempt.stagingPath.native().c_str(), rAttempt.finalPath.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
+		mPublishedTextureFiles.push_back(rAttempt.finalPath);
 	}
 	mTextureAttemptFiles.clear();
 
-	// Log each source slot, including slots sharing one unique worker, and retain the existing
-	// per-slot format/CRC ordering used by MainExport.
+	// Log each source slot, including slots sharing one unique worker, in glTF texture order so each logged
+	// index matches that slot's texture CRC index in MainExport.
 	int64_t iTextureIndex = 0;
 	for (int64_t i = 0; i < std::ssize(rGltfModel.textures); ++i)
 	{
@@ -641,19 +625,12 @@ void ExportScene::BuildMaterialInfos(const tinygltf::Model& rGltfModel, bool bHa
 		{
 			// Skinned material: use mesh node directly for mesh world matrix computation
 			// At runtime: meshWorld = identity * worldMatrices[meshNodeIndex]
-			if (rInfo.iNodeIndex >= 0)
-			{
-				rMaterialInfos.at(i).iParentNodeIndex = static_cast<int16_t>(rInfo.iNodeIndex);
-			}
-			else
-			{
-				// Fallback: use node 0 (typically skeleton root) when mesh node is missing
-				rMaterialInfos.at(i).iParentNodeIndex = 0;
-			}
+			ASSERT(rInfo.iNodeIndex >= 0);
+			rMaterialInfos.at(i).iParentNodeIndex = static_cast<int16_t>(rInfo.iNodeIndex);
 			XMStoreFloat4x4(&rMaterialInfos.at(i).f4x4RelativeTransform, XMMatrixIdentity());
 			LOG(kDefault, kVerbose, "  Material {}: skinned, mesh node {}", i, rMaterialInfos.at(i).iParentNodeIndex);
 		}
-		else if (rInfo.iNodeIndex >= 0 && bHasSkeleton && rInfo.iNodeIndex < std::ssize(rGltfModel.nodes))
+		else if (rInfo.iNodeIndex >= 0 && bHasSkeleton)
 		{
 			// Every node is its own joint (the skeleton used an identity node->joint mapping), so the
 			// nearest skeleton ancestor of a non-skinned material is its own mesh node.
@@ -747,7 +724,6 @@ void ExportScene::WriteModelFile(const std::vector<Material>& rMaterials, const 
 		fileStreamOut.write(reinterpret_cast<const char*>(indices32.data()), common::VectorByteSize(indices32));
 	}
 	fileStreamOut.write(reinterpret_cast<const char*>(rVertices.data()), common::VectorByteSize(rVertices));
-	fileStreamOut.flush();
 	fileStreamOut.close();
 	VERIFY_SUCCESS(fileStreamOut.good());
 	mIntermediateFiles.push_back(std::move(path));
@@ -782,11 +758,6 @@ void ExportScene::MainExport(const tinygltf::Model& rGltfModel)
 	int64_t iSceneArraysSize = common::SceneHeader::MaterialDataOffset(iTextureCount, iMaterialCount);
 	int64_t iMaterialShaderDataBytes = static_cast<int64_t>(MultiplySourceBytes(static_cast<uintmax_t>(uiMaterialCount), sizeof(common::MaterialShaderData), kpcContext));
 	int64_t iDataSize = iSceneArraysSize + iMaterialShaderDataBytes;
-	int64_t iMaximumDataSize = std::numeric_limits<int64_t>::max() - common::kiChunkDataOffset - (common::kiAlignmentBytes - 1);
-	if (iDataSize < 0 || iDataSize > iMaximumDataSize)
-	{
-		throw std::runtime_error("ExportScene chunk data size overflow");
-	}
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(iDataSize);
 	common::crc_t* pTextureCrcs = reinterpret_cast<common::crc_t*>(dataSpan.data());
 	uint32_t* puiIndexStarts = reinterpret_cast<uint32_t*>(dataSpan.data() + common::SceneHeader::IndexStartsOffset(iTextureCount));

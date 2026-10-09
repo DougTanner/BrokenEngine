@@ -48,17 +48,13 @@ void BlastersInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 	}
 	else
 	{
-		rFrame.postRender.areaLights.Add(rFrame, rBlasters.pAreaLights[iIndex], rType.iAreaLightTypeIndex);
+		engine::AreaLightsPostRender::Add(rFrame, rBlasters.pAreaLights[iIndex], rType.iAreaLightTypeIndex);
 	}
 
 	rBlasters.pWindTrails[iIndex] = {};
 	if (rBlasters.pfWindTrailIntensities[iIndex] > 0.0f)
 	{
 		engine::WindTrailsPostRender::Add(rFrame, rBlasters.pWindTrails[iIndex]);
-	}
-
-	if (rBlasters.pfWindTrailIntensities[iIndex] > 0.0f)
-	{
 		engine::WindTrailsInterpolate::Sync(rFrame.interpolate, rBlasters.pWindTrails[iIndex],
 		{
 			.vecPosition = rBlasters.pVecPositions[iIndex],

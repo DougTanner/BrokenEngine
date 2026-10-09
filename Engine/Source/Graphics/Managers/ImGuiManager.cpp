@@ -80,11 +80,8 @@ static ImVec4 WithAlpha(const ImVec4& rf4Color, float fAlpha)
 }
 
 ImGuiManager::ImGuiManager(HWND hwnd)
+: common::Singleton<ImGuiManager>(gpImGuiManager)
 {
-	ASSERT(gpImGuiManager == nullptr);
-
-	gpImGuiManager = this;
-
 	CreateRenderPass();
 	CreateFramebuffers();
 	CreateUiPrepassIndirectBuffer();
@@ -293,11 +290,6 @@ ImGuiManager::~ImGuiManager()
 	}
 
 	vkDestroyRenderPass(gpDeviceManager->mVkDevice, mImGuiVkRenderPass, nullptr);
-
-	if (gpImGuiManager == this)
-	{
-		gpImGuiManager = nullptr;
-	}
 }
 
 void ImGuiManager::CreateUiPrepassIndirectBuffer()

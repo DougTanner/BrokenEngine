@@ -46,6 +46,24 @@ int64_t ClientGridCoordinateValue(const nlohmann::json& rValue, std::string_view
 	return iValue;
 }
 
+engine::Client& RequireHarnessRigClient(std::string_view command)
+{
+	if (gpClientSession->mpRuntime->mpClient == nullptr)
+	{
+		throw std::runtime_error(std::format("{} requires an accepted connected client", command));
+	}
+	engine::Client& rClient = *gpClientSession->mpRuntime->mpClient;
+	if (!(rClient.mStateFlags & engine::Client::ClientStateFlags::kConnected))
+	{
+		throw std::runtime_error(std::format("{} requires an accepted connected client", command));
+	}
+	if (!(rClient.mStateFlags & engine::Client::ClientStateFlags::kConnectionAccepted))
+	{
+		throw std::runtime_error(std::format("{} requires an accepted connected client", command));
+	}
+	return rClient;
+}
+
 // set_client_grid_coord: move the client's grid cell and pin it against every game writer until
 // release_client_grid_coord or Game::Reset, so automation can drive the cross-cell subscribe and full-state
 // adoption path. Schema: {"coord":[x,y]}.
@@ -72,26 +90,7 @@ static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nl
 	engine::GridCoord coordinate {.iX = static_cast<int32_t>(ClientGridCoordinateValue(rCoordinate.at(0), "set_client_grid_coord")), .iY = static_cast<int32_t>(ClientGridCoordinateValue(rCoordinate.at(1), "set_client_grid_coord"))};
 
 	// Before player assignment the subscription policy falls back to origin, so the requested cell would be dropped.
-	if (gpGame == nullptr)
-	{
-		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned player");
-	}
-	if (gpClientSession == nullptr)
-	{
-		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned player");
-	}
-	if (gpClientSession->mpRuntime->mpClient == nullptr)
-	{
-		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned player");
-	}
-	if (!(gpClientSession->mpRuntime->mpClient->mStateFlags & engine::Client::ClientStateFlags::kConnected))
-	{
-		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned player");
-	}
-	if (gpClientSession->mpRuntime->mpClient->mpServerPeer == nullptr)
-	{
-		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned player");
-	}
+	RequireHarnessRigClient("set_client_grid_coord");
 	if ((gpGame->mGameFlags & engine::GameFlags::kMainMenu))
 	{
 		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned player");
@@ -122,10 +121,6 @@ static void CommandReleaseClientGridCoordinate(const nlohmann::json& rParameters
 	if (!rParameters.empty())
 	{
 		throw std::runtime_error("release_client_grid_coord accepts no params");
-	}
-	if (gpGame == nullptr)
-	{
-		throw std::runtime_error("release_client_grid_coord requires a live client game");
 	}
 
 	gpGame->mbClientGridCoordinatePinned = false;

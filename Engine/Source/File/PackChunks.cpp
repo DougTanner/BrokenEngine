@@ -197,6 +197,11 @@ static const char* ValidateChunkHeader(data::DataTypes eExpectedDataType, const 
 	{
 		return "chunk header data type mismatch";
 	}
+	// Audio streaming reads payload ranges straight from the pack, so a chunk flagged audio must be stored uncompressed.
+	if ((rChunkHeader.flags & common::ChunkFlags::kChunkAudio) && common::IsCompressed(rChunkHeader.flags))
+	{
+		return "audio chunk is compressed";
+	}
 	if (rChunkHeader.crc != rChunkLocation.crc)
 	{
 		return "chunk header CRC mismatch";
@@ -314,19 +319,27 @@ void PackChunks::LoadPackFiles()
 			continue;
 		}
 
-		std::fstream packStream(mPackFilePaths[i], std::ios::in | std::ios::binary);
-		// Trust boundary: a missing/locked lazy .pack leaves packStream closed; reading headers from it would build
+		// Opened before the size and header reads, which go through a handle reopened from it, so its share-read-only lock keeps the validated file unchanged until shutdown.
+		mLazyPackFileHandles[i] = CreateFileW(mPackFilePaths[i].c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+		// Trust boundary: a missing required .pack yields INVALID_HANDLE_VALUE, fatal like a missing manifest.
+		if (mLazyPackFileHandles[i] == INVALID_HANDLE_VALUE)
+		{
+			FailMissingRequiredAsset(mPackFilePaths[i], "pack file could not be opened for loading");
+		}
+
+		HANDLE hPackValidation = ReOpenFile(mLazyPackFileHandles[i], GENERIC_READ, FILE_SHARE_READ, 0);
+		// Trust boundary: a failed reopen leaves no handle to read the headers through; reading them would build
 		// the lazy map (and pool layout) from garbage. A required pack is as fatal as a missing manifest.
-		if (!packStream)
+		if (hPackValidation == INVALID_HANDLE_VALUE)
 		{
 			FailMissingRequiredAsset(mPackFilePaths[i], "pack file missing or unreadable");
 		}
-		packStream.seekg(0, std::ios::end);
-		int64_t iPackFileSize = static_cast<int64_t>(packStream.tellg());
-		if (!packStream.good())
+		LARGE_INTEGER packFileSize {};
+		if (!GetFileSizeEx(hPackValidation, &packFileSize))
 		{
 			FailMissingRequiredAsset(mPackFilePaths[i], "pack file size unreadable");
 		}
+		int64_t iPackFileSize = packFileSize.QuadPart;
 		for (const common::ChunkLocation& rChunkLocation : mChunkLocations[i])
 		{
 			if (const char* pcReason = ValidateChunkLocation(iPackFileSize, rChunkLocation); pcReason != nullptr)
@@ -334,8 +347,14 @@ void PackChunks::LoadPackFiles()
 				FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
 			}
 			common::ChunkHeader chunkHeader {};
-			packStream.seekg(rChunkLocation.uiOffset);
-			packStream.read(reinterpret_cast<char*>(&chunkHeader), sizeof(chunkHeader));
+			OVERLAPPED overlapped {};
+			overlapped.Offset = static_cast<DWORD>(rChunkLocation.uiOffset & 0xffffffff);
+			overlapped.OffsetHigh = static_cast<DWORD>(rChunkLocation.uiOffset >> 32);
+			DWORD uiBytesRead = 0;
+			if (!ReadFile(hPackValidation, &chunkHeader, static_cast<DWORD>(sizeof(chunkHeader)), &uiBytesRead, &overlapped) || uiBytesRead != sizeof(chunkHeader))
+			{
+				FailMissingRequiredAsset(mPackFilePaths[i], "pack header table truncated");
+			}
 			if (const char* pcReason = ValidateChunkHeader(static_cast<data::DataTypes>(i), rChunkLocation, chunkHeader); pcReason != nullptr)
 			{
 				FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
@@ -354,27 +373,15 @@ void PackChunks::LoadPackFiles()
 				miDecompressScratchSize = iOnDiskSize;
 			}
 		}
-		// Trust boundary: a truncated pack lets a per-chunk header seek/read run past EOF (failbit) — the headers
-		// already emplaced would be garbage. Treat the whole pack as corrupt rather than building a bad pool.
-		if (!packStream)
-		{
-			FailMissingRequiredAsset(mPackFilePaths[i], "pack header table truncated");
-		}
+		CloseHandle(hPackValidation);
 	}
 
 	// Pre-allocate memory pool for all lazy chunk data (eliminates heap lock contention during background loading)
 	int64_t iPoolOffset = 0;
 	for (const auto& [crc, rLazyChunk] : mLazyChunkMap)
 	{
-		if (rLazyChunk.iDataSize > std::numeric_limits<int64_t>::max() - (common::kiAlignmentBytes - 1))
-		{
-			FailMissingRequiredAsset(mPackFilePaths[DataTypeFromFlags(rLazyChunk.header.flags)], "lazy chunk size exceeds aligned pool-slot range");
-		}
 		int64_t iAlignedDataSize = common::RoundUp<int64_t, common::kiAlignmentBytes>(rLazyChunk.iDataSize);
-		if (iPoolOffset > std::numeric_limits<int64_t>::max() - iAlignedDataSize)
-		{
-			FailMissingRequiredAsset(mDataDirectory, "aggregate lazy chunk pool size exceeds supported range");
-		}
+		ASSERT(iPoolOffset <= std::numeric_limits<int64_t>::max() - iAlignedDataSize);
 		iPoolOffset += iAlignedDataSize;
 	}
 	miLazyPoolSize = iPoolOffset;
@@ -408,43 +415,16 @@ void PackChunks::LoadPackFiles()
 		}
 	}
 
-	// Query disk sector size for FILE_FLAG_NO_BUFFERING alignment requirements
-	DWORD uiSectorsPerCluster = 0, uiBytesPerSector = 0, uiNumberOfFreeClusters = 0, uiTotalNumberOfClusters = 0;
-	GetDiskFreeSpaceW(mDataDirectory.root_path().c_str(), &uiSectorsPerCluster, &uiBytesPerSector, &uiNumberOfFreeClusters, &uiTotalNumberOfClusters);
-	miSectorSize = uiBytesPerSector;
-
 	SYSTEM_INFO systemInfo {};
 	GetSystemInfo(&systemInfo);
 	miPageSize = systemInfo.dwPageSize;
 
-	for (int64_t i = 0; i < data::kDataTypeCount; ++i)
-	{
-		if (IsEagerChunk(static_cast<data::DataTypes>(i)))
-		{
-			continue;
-		}
-#if defined(BT_SERVER)
-		if (!IsServerChunk(static_cast<data::DataTypes>(i)))
-		{
-			continue;
-		}
-#endif
-
-		mLazyPackFileHandles[i] = CreateFileW(mPackFilePaths[i].c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
-		// Trust boundary: a missing required .pack yields INVALID_HANDLE_VALUE; storing it unchecked would later
-		// spin LoadChunk's sub-read loop forever on 0-byte reads. Same severity as a missing manifest.
-		if (mLazyPackFileHandles[i] == INVALID_HANDLE_VALUE)
-		{
-			FailMissingRequiredAsset(mPackFilePaths[i], "pack file could not be opened for loading");
-		}
-	}
-
 	// Allocate per-thread sector-aligned read buffers (one sub-read + sector padding each) so concurrent
 	// loading threads never share a read buffer.
-	miReadBufferSize = common::RoundUp(kiSubReadSize + miSectorSize, miSectorSize);
+	miReadBufferSize = common::RoundUp(kiSubReadSize + kiSectorAlignment, kiSectorAlignment);
 	for (std::byte*& rpReadBuffer : mpReadBuffers)
 	{
-		rpReadBuffer = static_cast<std::byte*>(_aligned_malloc(miReadBufferSize, static_cast<size_t>(miSectorSize)));
+		rpReadBuffer = static_cast<std::byte*>(_aligned_malloc(miReadBufferSize, static_cast<size_t>(kiSectorAlignment)));
 		if (rpReadBuffer == nullptr)
 		{
 			FailMissingRequiredAsset(mDataDirectory, "aligned read-buffer allocation failed");
@@ -693,11 +673,6 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 			rRequest.Reset();
 			return ChunkReadResult::kFailed;
 		}
-		if (rRequest.miEntryIndex >= std::ssize(mAudioReadEntries))
-		{
-			rRequest.Reset();
-			return ChunkReadResult::kFailed;
-		}
 		if (rRequest.muiCrc != crc)
 		{
 			rRequest.Reset();
@@ -788,20 +763,6 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 		return ChunkReadResult::kFailed;
 	}
 
-	if (rLazyChunk.location.uiSize < common::kiChunkDataOffset)
-	{
-		return ChunkReadResult::kFailed;
-	}
-	int64_t iPackDataSize = static_cast<int64_t>(rLazyChunk.location.uiSize - common::kiChunkDataOffset);
-	if (iOffset > iPackDataSize)
-	{
-		return ChunkReadResult::kFailed;
-	}
-	if (std::ssize(buffer) > iPackDataSize - iOffset)
-	{
-		return ChunkReadResult::kFailed;
-	}
-
 	if (rLazyChunk.eState.value.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
 	{
 		std::memcpy(buffer.data(), rLazyChunk.pData + iOffset, buffer.size());
@@ -849,10 +810,6 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 {
 	if (rRequest.mpPackChunks != this)
-	{
-		return;
-	}
-	if (rRequest.miEntryIndex >= std::ssize(mAudioReadEntries))
 	{
 		return;
 	}
@@ -967,62 +924,15 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 	const LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
 	data::DataTypes eDataType = DataTypeFromFlags(rLazyChunk.header.flags);
 	HANDLE hFile = mLazyPackFileHandles[eDataType];
-	if (hFile == nullptr)
-	{
-		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range pack handle is unavailable");
-	}
-	if (hFile == INVALID_HANDLE_VALUE)
-	{
-		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range pack handle is unavailable");
-	}
 
-	// Pack file offsets are unsigned on disk, so the overflow guards below run in uint64_t.
 	uint64_t uiOffset = static_cast<uint64_t>(iOffset);
 	uint64_t uiLength = static_cast<uint64_t>(iLength);
 	uint64_t uiDataFileOffset = rLazyChunk.location.uiOffset + common::kiChunkDataOffset;
-	if (uiDataFileOffset < rLazyChunk.location.uiOffset)
-	{
-		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range offset overflows");
-	}
-	if (uiOffset > std::numeric_limits<uint64_t>::max() - uiDataFileOffset)
-	{
-		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range offset overflows");
-	}
 	uint64_t uiLogicalFileOffset = uiDataFileOffset + uiOffset;
-	uint64_t uiAlignedOffset = common::RoundDown(uiLogicalFileOffset, static_cast<uint64_t>(miSectorSize));
+	uint64_t uiAlignedOffset = common::RoundDown(uiLogicalFileOffset, static_cast<uint64_t>(kiSectorAlignment));
 	uint64_t uiPrefix = uiLogicalFileOffset - uiAlignedOffset;
-	if (uiLength > std::numeric_limits<uint64_t>::max() - uiPrefix)
-	{
-		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range size overflows");
-	}
-	uint64_t uiPhysicalSize = common::RoundUp(uiPrefix + uiLength, static_cast<uint64_t>(miSectorSize));
-	if (uiPhysicalSize > static_cast<uint64_t>(miReadBufferSize))
-	{
-		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range physical extent is invalid");
-	}
-	if (uiAlignedOffset > std::numeric_limits<uint64_t>::max() - uiPhysicalSize)
-	{
-		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range physical extent is invalid");
-	}
-
-	if (uiLength > std::numeric_limits<uint64_t>::max() - uiLogicalFileOffset)
-	{
-		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range logical extent overflows");
-	}
-	uint64_t uiLogicalEnd = uiLogicalFileOffset + uiLength;
-	LARGE_INTEGER fileSize {};
-	if (!GetFileSizeEx(hFile, &fileSize))
-	{
-		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range exceeds the pack file");
-	}
-	if (fileSize.QuadPart < 0)
-	{
-		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range exceeds the pack file");
-	}
-	if (std::cmp_greater(uiLogicalEnd, fileSize.QuadPart))
-	{
-		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range exceeds the pack file");
-	}
+	uint64_t uiPhysicalSize = common::RoundUp(uiPrefix + uiLength, static_cast<uint64_t>(kiSectorAlignment));
+	ASSERT(uiPhysicalSize <= static_cast<uint64_t>(miReadBufferSize));
 
 	OVERLAPPED overlapped {};
 	overlapped.Offset = static_cast<DWORD>(uiAlignedOffset & 0xffffffff);
@@ -1078,7 +988,7 @@ void PackChunks::DecommitChunkRange(common::crc_t crc, int64_t iOffset, int64_t 
 	}
 }
 
-bool PackChunks::RecommitAndReloadChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength)
+bool PackChunks::RecommitAndReloadChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength, int64_t iThreadIndex)
 {
 	// Inverse of DecommitChunkRange for device-loss recovery: re-commit the same page-aligned interior, then re-read
 	// the whole [iOffset, iOffset + iLength) range straight from the pack file on disk. ReadChunkData cannot serve
@@ -1092,20 +1002,7 @@ bool PackChunks::RecommitAndReloadChunkRange(common::crc_t crc, int64_t iOffset,
 		return false;
 	}
 
-	// Device-loss recovery can run inside the allocation-tracked main loop, so suppress tracking for the transient stream.
-	data::DataTypes eDataType = DataTypeFromFlags(rLazyChunk.header.flags);
-	int64_t iDataOffset = rLazyChunk.location.uiOffset + common::kiChunkDataOffset;
-	ScopedSuppressAllocationTracking suppress; // Heap: transient std::fstream buffers on the device-loss recovery path
-	std::fstream packStream(mPackFilePaths[eDataType], std::ios::in | std::ios::binary);
-	if (!packStream.is_open())
-	{
-		LOG(kLoading, kError, "Recommit reload failed to open pack for chunk {}", crc);
-		DEBUG_BREAK();
-		return false;
-	}
-	packStream.seekg(iDataOffset + iOffset);
-	packStream.read(reinterpret_cast<char*>(rLazyChunk.pData + iOffset), static_cast<std::streamsize>(iLength));
-	ASSERT(packStream.good());
+	mLoader.ReadChunkRange(rLazyChunk, iOffset, iLength, rLazyChunk.pData + iOffset, iThreadIndex);
 
 	return true;
 }

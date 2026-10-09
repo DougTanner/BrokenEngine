@@ -18,7 +18,7 @@ enum DynamicBufferType
 	kBufferTypeCount,
 };
 
-class BufferManager
+class BufferManager : public common::Singleton<BufferManager>
 {
 public:
 

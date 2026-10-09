@@ -11,11 +11,6 @@ constexpr float ClampMagnitude(float fValue, float fMagnitudeLimit)
 	return fValue >= 0.0f ? std::min(fValue, fMagnitudeLimit) : -std::min(-fValue, fMagnitudeLimit);
 }
 
-consteval int64_t Ceiling(float fValue)
-{
-	return static_cast<float>(static_cast<int64_t>(fValue)) == fValue ? static_cast<int64_t>(fValue) : static_cast<int64_t>(fValue) + ((fValue > 0.0f) ? 1 : 0);
-}
-
 struct AreaVertices
 {
 	XMVECTOR vecTopLeft {};

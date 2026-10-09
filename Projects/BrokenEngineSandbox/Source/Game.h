@@ -53,7 +53,7 @@ struct WeaponModeKey
 };
 #endif
 
-class Game : public engine::GameBase
+class Game : public engine::GameBase, public common::Singleton<Game>
 {
 public:
 
@@ -105,7 +105,7 @@ public:
 #endif
 
 #if defined(BT_CLIENT)
-	void CaptureClientStateIfChanged();
+	void CaptureClientState();
 #endif
 
 #if defined(BT_CLIENT)
@@ -118,10 +118,9 @@ public:
 
 	FleetSelection mFleetSelection;
 
-	// In-memory mirror of ClientState.bin; loaded at startup, refreshed whenever any tracked field changes, and written on orderly exit.
+	// In-memory mirror of the focused fleet and ship in ClientState.bin; loaded at startup, refreshed on every focus change, and written on orderly exit.
 	game::FleetGuid mRememberedFleetGuid {};
 	engine::GlobalId mRememberedFocusedShipIdentifier {};
-	float mfRememberedCameraEyeHeightTarget = engine::CameraBase::kfCameraEyeHeightInitial;
 
 	static constexpr float kfVisualErrorDecayRate = 15.0f;
 	static constexpr float kfVisualErrorMaxDistance = 5.0f;

@@ -54,7 +54,6 @@ namespace toolcli
 
 	struct RunProcessOptions
 	{
-		bool bCaptureOutput = true;
 		bool bMergeStdError = false;
 		bool bKillOnJobClose = false;
 		bool bNoWindow = false;

@@ -67,9 +67,9 @@ static bool XM_CALLCONV IsAcquireCandidate(const SpaceshipsInterpolate& __restri
 }
 
 // Missile aim searches current-frame data; AcquireTarget selects firing and look targets from previous-frame data.
-static int64_t XM_CALLCONV FindTargetSpaceshipIndex(const SpaceshipsInterpolate& __restrict rSpaceshipsInterpolate, const SpaceshipsPostRender& __restrict rSpaceshipsPostRender, FXMVECTOR vecPlayerPosition, float fMaximumRange)
+static int64_t XM_CALLCONV FindTargetSpaceshipIndex(const SpaceshipsInterpolate& __restrict rSpaceshipsInterpolate, const SpaceshipsPostRender& __restrict rSpaceshipsPostRender, FXMVECTOR vecPlayerPosition)
 {
-	float fClosestDistance = fMaximumRange;
+	float fClosestDistance = kfMissileTargetRange;
 	int64_t iClosestSpaceship = -1;
 	for (int64_t j = 0; j < rSpaceshipsPostRender.iCount; ++j)
 	{
@@ -156,7 +156,7 @@ void PlayersPostRender::RegenerateShield(std::chrono::duration<float> deltaTime,
 }
 
 
-static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate, [[maybe_unused]] PlayersInterpolate& rPlayerInterpolate, PlayersPostRender& rPlayer, int64_t i, float fDamage, [[maybe_unused]] FXMVECTOR vecDamagePosition, [[maybe_unused]] float fHexShieldIntensity = 1.0f)
+static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate, [[maybe_unused]] PlayersInterpolate& rPlayerInterpolate, PlayersPostRender& rPlayer, int64_t i, float fDamage, [[maybe_unused]] FXMVECTOR vecDamagePosition)
 {
 	if (rPlayer.pfShields[i] > 0.0f)
 	{
@@ -175,8 +175,8 @@ static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[mayb
 		}
 		XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorSubtract(vecDamagePosition, rPlayerInterpolate.pVecPositions[i]));
 		XMStoreFloat4A(&rPlayerInterpolate.pHexShieldDirections[i].data[iLowestIntensityIndex], vecDamageDirection);
-		rPlayerInterpolate.pHexShieldVertexIntensities[i].data[iLowestIntensityIndex] = fHexShieldIntensity;
-		rPlayerInterpolate.pHexShieldFragmentIntensities[i].data[iLowestIntensityIndex] = fHexShieldIntensity;
+		rPlayerInterpolate.pHexShieldVertexIntensities[i].data[iLowestIntensityIndex] = 1.0f;
+		rPlayerInterpolate.pHexShieldFragmentIntensities[i].data[iLowestIntensityIndex] = 1.0f;
 #endif // BT_CLIENT
 
 		float fShieldDamage = std::min(rPlayer.pfShields[i], fDamage);
@@ -192,7 +192,7 @@ static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[mayb
 			{
 				rPlayer.pfShieldDownSoundCooldowns[i] = kShieldDownSoundCooldown.count();
 #if defined(BT_CLIENT)
-				engine::gpAudioManager->PlayOneShot(rFrame, data::kAudioShieldArmor570852__rafaelzimrp__magicshielddownwavCrc, false, gShieldDownVolume.mfCurrent);
+				engine::gpAudioManager->PlayOneShot(rFrame, data::kAudioShieldArmor570852__rafaelzimrp__magicshielddownwavCrc, gShieldDownVolume.mfCurrent);
 #endif
 			}
 		}
@@ -388,7 +388,7 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 		float fBarrelOffset = bLeftSide ? kfMissileSpawnBarrelOffset : -kfMissileSpawnBarrelOffset;
 
 		// Missiles aim at current positions; hull direction is the fallback when no eligible spaceship is in range.
-		int64_t iTargetSpaceship = FindTargetSpaceshipIndex(*rFrame.interpolate.pSpaceships, *rFrame.postRender.pSpaceships, rCurrentInterpolate.pVecPositions[i], kfMissileTargetRange);
+		int64_t iTargetSpaceship = FindTargetSpaceshipIndex(*rFrame.interpolate.pSpaceships, *rFrame.postRender.pSpaceships, rCurrentInterpolate.pVecPositions[i]);
 		XMVECTOR vecAimDirection = (iTargetSpaceship >= 0)
 			? common::DirectionTo(rCurrentInterpolate.pVecPositions[i], rFrame.interpolate.pSpaceships->pVecPositions[iTargetSpaceship])
 			: vecHullDirection;

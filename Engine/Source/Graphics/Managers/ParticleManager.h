@@ -5,14 +5,13 @@
 namespace engine
 {
 
-class ParticleManager
+class ParticleManager : public common::Singleton<ParticleManager>
 {
 public:
 
 	static void Spawn(shaders::ParticlesSpawnLayout& rParticlesSpawnLayout, shaders::ParticleLayout layout, common::crc_t uiTextureCrc);
 
 	ParticleManager();
-	~ParticleManager();
 
 	void RenderGlobal(int64_t iCommandBuffer);
 	void DiscardStagedSpawns();

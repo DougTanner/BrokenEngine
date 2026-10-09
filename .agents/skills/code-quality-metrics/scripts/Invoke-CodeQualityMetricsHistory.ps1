@@ -350,40 +350,54 @@ function New-CommitRow([string]$Repository, [int]$Index, [object]$Plan, [object]
     return [pscustomobject]@{ Kind = 'measured'; Row = (New-Row $Index $Plan.Sha $Plan.Date $true $evidence); Coverage = $evidence.coverage }
 }
 function Get-SvgEscape([string]$Value) { [Security.SecurityElement]::Escape($Value) }
-function Get-Polyline([object[]]$Rows, [string]$Name, [double]$Top, [double]$Bottom, [double]$Maximum) {
-    $points = [Collections.Generic.List[string]]::new(); $count = $Rows.Count; $width = 1610.0; $left = 110.0
+function Get-Polyline([object[]]$Rows, [string]$Name, [double]$Top, [double]$Bottom, [double]$Low, [double]$High) {
+    $points = [Collections.Generic.List[string]]::new(); $count = $Rows.Count; $width = 3440.0; $left = 300.0
     for ($index = 0; $index -lt $count; ++$index) {
         $x = if ($count -eq 1) { $left } else { $left + $width * $index / ($count - 1) }
-        $value = if ($Name -eq 'supported') { [double]$Rows[$index].supported / $Maximum } else { [double]$Rows[$index].$Name }
-        $y = $Bottom - ($Bottom - $Top) * [Math]::Min(1.0, [Math]::Max(0.0, $value))
+        $y = $Bottom - ($Bottom - $Top) * ([double]$Rows[$index].$Name - $Low) / ($High - $Low)
         $points.Add("$(Get-NumberText $x),$(Get-NumberText $y)")
     }
     return ($points -join ' ')
 }
 function New-HistorySvg([object[]]$Rows, [string]$SeriesDigest) {
-    $maxSupported = [Math]::Max(1.0, [double](($Rows | Measure-Object -Property supported -Maximum).Maximum))
+    $bands = @(
+        @{ Id = 'series-verbosity'; Name = 'verbosity'; Title = 'verbosity'; Color = '#65d6ff'; Top = 230.0; Bottom = 1070.0 },
+        @{ Id = 'series-structural-erosion'; Name = 'structuralErosion'; Title = 'structural erosion'; Color = '#ffb454'; Top = 1200.0; Bottom = 2040.0 })
     $lines = [Collections.Generic.List[string]]::new()
     $lines.Add('<?xml version="1.0" encoding="UTF-8"?>')
-    $lines.Add('<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1150" viewBox="0 0 1800 1150">')
+    $lines.Add('<svg xmlns="http://www.w3.org/2000/svg" width="3840" height="2160" viewBox="0 0 3840 2160">')
     $lines.Add('<title>Broken Engine code-quality history</title>')
     $lines.Add("<desc>seriesDigest=$SeriesDigest</desc>")
-    $lines.Add('<rect width="1800" height="1150" fill="#10151c"/>')
-    $lines.Add('<g fill="none" stroke="#384555" stroke-width="1">')
-    foreach ($y in @(120, 350, 580, 810)) { $lines.Add("<line x1=`"110`" y1=`"$y`" x2=`"1720`" y2=`"$y`"/>") }
+    $lines.Add('<rect width="3840" height="2160" fill="#10151c"/>')
+    $lines.Add('<g fill="none" stroke="#384555" stroke-width="2">')
+    foreach ($y in @(230, 1070, 1200, 2040)) { $lines.Add("<line x1=`"300`" y1=`"$y`" x2=`"3740`" y2=`"$y`"/>") }
     $lines.Add('</g>')
-    $lines.Add("<polyline id=`"series-verbosity`" fill=`"none`" stroke=`"#65d6ff`" stroke-width=`"3`" points=`"$(Get-Polyline $Rows 'verbosity' 120 350 1)`"/>")
-    $lines.Add("<polyline id=`"series-structural-erosion`" fill=`"none`" stroke=`"#ffb454`" stroke-width=`"3`" points=`"$(Get-Polyline $Rows 'structuralErosion' 350 580 1)`"/>")
-    $lines.Add("<polyline id=`"series-supported`" fill=`"none`" stroke=`"#9cf28a`" stroke-width=`"3`" points=`"$(Get-Polyline $Rows 'supported' 580 810 $maxSupported)`"/>")
-    $lines.Add('<g font-family="Segoe UI, sans-serif" font-size="18" fill="#d7e0ea">')
-    $lines.Add('<text x="110" y="80">Code-quality history</text>')
-    $lines.Add('<text x="110" y="115">verbosity</text><text x="110" y="345">structural erosion</text><text x="110" y="575">supported files</text>')
+    foreach ($band in $bands) {
+        $range = $Rows | Measure-Object -Property $band.Name -Minimum -Maximum
+        $minimum = [double]$range.Minimum; $maximum = [double]$range.Maximum; $margin = 0.05 * ($maximum - $minimum)
+        $low = $minimum - $margin; $high = $maximum + $margin
+        $grid = [Collections.Generic.List[string]]::new(); $labels = [Collections.Generic.List[string]]::new()
+        for ($k = 0; $k -le 4; ++$k) {
+            $value = ($minimum * (4 - $k) + $maximum * $k) / 4.0
+            $y = Get-NumberText ($band.Bottom - ($band.Bottom - $band.Top) * ($value - $low) / ($high - $low))
+            $grid.Add("<line x1=`"300`" y1=`"$y`" x2=`"3740`" y2=`"$y`"/>")
+            $labels.Add("<text x=`"280`" y=`"$y`" text-anchor=`"end`" dominant-baseline=`"middle`">$($value.ToString('0.0000', [Globalization.CultureInfo]::InvariantCulture))</text>")
+        }
+        $lines.Add('<g fill="none" stroke="#222b36" stroke-width="2">'); $lines.AddRange($grid); $lines.Add('</g>')
+        $lines.Add("<polyline id=`"$($band.Id)`" fill=`"none`" stroke=`"$($band.Color)`" stroke-width=`"6`" points=`"$(Get-Polyline $Rows $band.Name $band.Top $band.Bottom $low $high)`"/>")
+        $lines.Add('<g font-family="Segoe UI, sans-serif" font-size="32" fill="#d7e0ea">')
+        $lines.Add("<text x=`"300`" y=`"$(Get-NumberText ($band.Top - 24))`" font-size=`"40`">$($band.Title)</text>")
+        $lines.AddRange($labels); $lines.Add('</g>')
+    }
+    $lines.Add('<g font-family="Segoe UI, sans-serif" font-size="32" fill="#d7e0ea">')
+    $lines.Add('<text x="300" y="110" font-size="48">Code-quality history</text>')
     $step = [Math]::Max(1, [int][Math]::Ceiling($Rows.Count / 12.0)); $labelIndices = [Collections.Generic.HashSet[int]]::new()
     for ($index = 0; $index -lt $Rows.Count; $index += $step) { [void]$labelIndices.Add($index) }
     [void]$labelIndices.Add($Rows.Count - 1)
     foreach ($index in ($labelIndices | Sort-Object)) {
-        $x = if ($Rows.Count -eq 1) { 110.0 } else { 110.0 + 1610.0 * $index / ($Rows.Count - 1) }
+        $x = if ($Rows.Count -eq 1) { 300.0 } else { 300.0 + 3440.0 * $index / ($Rows.Count - 1) }
         $date = Get-SvgEscape (Get-LastDate $Rows[$index])
-        $lines.Add("<text x=`"$(Get-NumberText $x)`" y=`"850`" text-anchor=`"middle`">$date</text>")
+        $lines.Add("<text x=`"$(Get-NumberText $x)`" y=`"2100`" text-anchor=`"middle`">$date</text>")
     }
     $lines.Add('</g>')
     $lines.Add('</svg>')

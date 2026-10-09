@@ -42,27 +42,7 @@ namespace toolcli
 	bool NormalizePlanPath(std::wstring_view value, std::wstring& rPath)
 	{
 		std::filesystem::path path(value);
-		if (value.empty())
-		{
-			return false;
-		}
-		if (value.contains(L'\\'))
-		{
-			return false;
-		}
-		if (path.has_root_name())
-		{
-			return false;
-		}
-		if (path.has_root_directory())
-		{
-			return false;
-		}
 		if (value.rfind(L"Documents/Plans/", 0) != 0)
-		{
-			return false;
-		}
-		if (value.size() <= std::wstring_view(L"Documents/Plans/").size())
 		{
 			return false;
 		}
@@ -87,7 +67,6 @@ namespace toolcli
 
 	static bool ParsePlanBytes(Plan& rPlan)
 	{
-		rPlan.digest = coordination::HashSha256(rPlan.bytes).value_or("");
 		if (rPlan.bytes.starts_with("\xEF\xBB\xBF"))
 		{
 			rPlan.diagnostic = "manual";
@@ -369,8 +348,7 @@ namespace toolcli
 		for (const std::wstring& rPath : paths)
 		{
 			const Plan& rPlan = rPlans.at(rPath);
-			auto it = colors.find(rPath);
-			if (rPlan.bValid && (it == colors.end() || it->second == 0))
+			if (rPlan.bValid && !colors.contains(rPath))
 			{
 				Visit(rPath);
 			}

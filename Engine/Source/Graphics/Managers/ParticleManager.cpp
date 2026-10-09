@@ -6,20 +6,9 @@ namespace engine
 {
 
 ParticleManager::ParticleManager()
+: common::Singleton<ParticleManager>(gpParticleManager)
 {
-	ASSERT(gpParticleManager == nullptr);
-
-	gpParticleManager = this;
-
 	ScopedBootTimer scopedBootTimer(kBootTimerParticleManager);
-}
-
-ParticleManager::~ParticleManager()
-{
-	if (gpParticleManager == this)
-	{
-		gpParticleManager = nullptr;
-	}
 }
 
 void ParticleManager::Spawn(shaders::ParticlesSpawnLayout& rParticlesSpawnLayout, shaders::ParticleLayout layout, common::crc_t uiTextureCrc)
@@ -61,7 +50,7 @@ void ParticleManager::RenderGlobal(int64_t iCommandBuffer)
 	rGlobalLayout.fParticlesStretchVelocityStart = fStretchVelocityStart;
 	rGlobalLayout.fParticlesStretchVelocityMultiplier = 2.0f;
 	// Compute the stretch-range reciprocal once on the CPU; it is invariant across shader invocations.
-	rGlobalLayout.fParticlesStretchRangeInverse = 1.0f / std::max(fStretchVelocityEnd - fStretchVelocityStart, shaders::kfEpsilon);
+	rGlobalLayout.fParticlesStretchRangeInverse = 1.0f / (fStretchVelocityEnd - fStretchVelocityStart);
 
 	rLongParticlesSpawnLayout.iCount = mLongParticlesSpawnLayout.iCount;
 	std::memcpy(&rLongParticlesSpawnLayout.pParticles[0], &mLongParticlesSpawnLayout.pParticles[0], rLongParticlesSpawnLayout.iCount * sizeof(shaders::ParticleLayout));

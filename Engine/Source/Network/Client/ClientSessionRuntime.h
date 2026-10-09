@@ -45,7 +45,7 @@ public:
 		{
 			return;
 		}
-		if (!(mpClient->mStateFlags & Client::ClientStateFlags::kConnected) || mpClient->mpServerPeer == nullptr)
+		if (!(mpClient->mStateFlags & Client::ClientStateFlags::kConnected))
 		{
 			return;
 		}

@@ -90,12 +90,9 @@ void TextureManager::CreatePlaceholderTexture(Texture& rTexture, std::string_vie
 }
 
 TextureManager::TextureManager()
-: mTextureDescriptors(*this)
+: common::Singleton<TextureManager>(gpTextureManager)
+, mTextureDescriptors(*this)
 {
-	ASSERT(gpTextureManager == nullptr);
-
-	gpTextureManager = this;
-
 	ScopedBootTimer scopedBootTimer(kBootTimerTextureManager);
 
 	CreateSamplers();
@@ -264,11 +261,6 @@ TextureManager::~TextureManager()
 
 	DestroySamplers();
 	mRenderTargetTextures.DestroyLightingTextures();
-
-	if (gpTextureManager == this)
-	{
-		gpTextureManager = nullptr;
-	}
 }
 
 void TextureManager::DestroyScreenDependentResources()
@@ -652,10 +644,6 @@ void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 	for (common::crc_t crc : crcs)
 	{
 		LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(crc);
-		if (rLazyChunk.eState.value.load(std::memory_order_acquire) >= ChunkState::kReady)
-		{
-			continue;
-		}
 
 		// Upload in progress — spin until upload thread finishes and ProcessPendingTextures adopts
 		while (rLazyChunk.eState.value.load(std::memory_order_acquire) < ChunkState::kReady)

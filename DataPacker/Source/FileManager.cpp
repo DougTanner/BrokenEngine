@@ -119,7 +119,7 @@ static std::filesystem::path GetRepositoryRootFromExecutable()
 	std::filesystem::path repositoryRoot = executablePath.parent_path();
 	for (const wchar_t* pwcExpected : kpwcExpectedDirectories)
 	{
-		if (repositoryRoot.empty() || CompareStringOrdinal(repositoryRoot.filename().native().c_str(), -1, pwcExpected, -1, TRUE) != CSTR_EQUAL)
+		if (CompareStringOrdinal(repositoryRoot.filename().native().c_str(), -1, pwcExpected, -1, TRUE) != CSTR_EQUAL)
 		{
 			throw std::runtime_error(std::format(R"(DataPacker executable path has unexpected layout: {} (expected suffix DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe or DataPacker.Debug.exe))", executablePath.string()));
 		}
@@ -340,13 +340,19 @@ static void PublishMaterializedOutput(const std::filesystem::path& rSource, cons
 	}
 }
 
+void WriteEntireFile(const std::filesystem::path& rPath, std::string_view contents)
+{
+	std::ofstream stream(rPath, std::ios::binary | std::ios::trunc);
+	stream.write(contents.data(), static_cast<std::streamsize>(contents.size()));
+	stream.close();
+	VERIFY_SUCCESS(stream.good());
+}
+
 
 FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitializationResult, InitializationMode eMode)
+: common::Singleton<FileManager>(gpFileManager)
 {
-	ASSERT(gpFileManager == nullptr);
-
 	reInitializationResult = EnsureLocalResult::kAlreadyLocal;
-	gpFileManager = this;
 	wchar_t pcForbidExpensiveExport[2] {};
 	int64_t iForbidExpensiveExportLength = GetEnvironmentVariableW(L"BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT", pcForbidExpensiveExport, static_cast<DWORD>(std::size(pcForbidExpensiveExport)));
 	mbForbidExpensiveExport = iForbidExpensiveExportLength == 1 && pcForbidExpensiveExport[0] == L'1';
@@ -536,10 +542,6 @@ FileManager::EnsureLocalResult FileManager::EnsureLocal(OutputRoot eRoot)
 FileManager::EnsureLocalResult FileManager::MaterializeOutput(OutputRootInfo& rRoot)
 {
 	EstablishOutputDestinationParent(rRoot.destination);
-	if (rRoot.eState == OutputRootState::kLocal)
-	{
-		return EnsureLocalResult::kAlreadyLocal;
-	}
 	if (!rRoot.source.empty() && IsReparsePoint(rRoot.source))
 	{
 		throw std::runtime_error(std::format("Primary output source is a reparse point: {}", rRoot.source.string()));
@@ -580,13 +582,4 @@ FileManager::EnsureLocalResult FileManager::MaterializeOutput(OutputRootInfo& rR
 	rRoot.eState = OutputRootState::kLocal;
 	LOG(kDefault, kDebug, "Materialized worktree output \"{}\" from \"{}\" ({} bytes)", rRoot.destination.string(), rRoot.source.string(), inventory.uiAllocation);
 	return EnsureLocalResult::kMaterialized;
-}
-
-
-FileManager::~FileManager()
-{
-	if (gpFileManager == this)
-	{
-		gpFileManager = nullptr;
-	}
 }

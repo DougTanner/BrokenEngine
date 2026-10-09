@@ -21,18 +21,13 @@ using BufferFlags_t = common::Flags<BufferFlags>;
 enum class BufferBarrier
 {
 	kComputeRead,
-	kComputeReadWrite,
-	kUniformBufferRead,
 	kStorageBufferRead,
 	kShaderIndirectRead,
-
-	kNone,
 };
 
 struct BarrierInfo
 {
-	BufferBarrier eSource = BufferBarrier::kNone;
-	BufferBarrier eDestination = BufferBarrier::kNone;
+	BufferBarrier eDestination = BufferBarrier::kComputeRead;
 	VkBuffer vkBarrierBuffer = VK_NULL_HANDLE;
 };
 
@@ -77,7 +72,7 @@ public:
 	VkBuffer GetBuffer() const;
 
 	void RecordBindVertexBuffer(VkCommandBuffer vkCommandBuffer);
-	void RecordCopy(VkCommandBuffer vkCommandBuffer, VkPipelineStageFlags vkStageFlags = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+	void RecordCopy(VkCommandBuffer vkCommandBuffer);
 
 	BufferInfo mInfo {};
 

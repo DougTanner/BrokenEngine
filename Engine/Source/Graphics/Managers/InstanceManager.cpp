@@ -244,11 +244,8 @@ static void TryLoadRenderDocDll()
 }
 
 InstanceManager::InstanceManager(HINSTANCE hInstance, HWND hWindow)
+: common::Singleton<InstanceManager>(gpInstanceManager)
 {
-	ASSERT(gpInstanceManager == nullptr);
-
-	gpInstanceManager = this;
-
 	ScopedBootTimer scopedBootTimer(kBootTimerInstanceManager);
 
 	if constexpr (kbVulkanDebugLayers)
@@ -689,22 +686,6 @@ void InstanceManager::SelectDepthFormat()
 
 	if (mDepthVkFormat == VK_FORMAT_UNDEFINED)
 	{
-		for (const VkFormat& rVkFormat : pVkFormats)
-		{
-			VkFormatProperties vkFormatProperties {};
-			vkGetPhysicalDeviceFormatProperties(mVkPhysicalDevice, rVkFormat, &vkFormatProperties);
-
-			if ((vkFormatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
-			{
-				LOG(kGraphics, kInfo, "Depth format selected: {} (linear)\n", string_VkFormat(rVkFormat));
-				mDepthVkFormat = rVkFormat;
-				break;
-			}
-		}
-	}
-
-	if (mDepthVkFormat == VK_FORMAT_UNDEFINED)
-	{
 		throw std::runtime_error("Unable to find VkFormat for depth buffer");
 	}
 }
@@ -722,11 +703,6 @@ InstanceManager::~InstanceManager()
 	}
 
 	vkDestroyInstance(mVkInstance, nullptr);
-
-	if (gpInstanceManager == this)
-	{
-		gpInstanceManager = nullptr;
-	}
 }
 
 void InstanceManager::ReadLayerProperties()

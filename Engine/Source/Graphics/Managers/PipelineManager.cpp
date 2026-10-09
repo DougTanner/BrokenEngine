@@ -10,11 +10,8 @@ namespace engine
 {
 
 PipelineManager::PipelineManager()
+: common::Singleton<PipelineManager>(gpPipelineManager)
 {
-	ASSERT(gpPipelineManager == nullptr);
-
-	gpPipelineManager = this;
-
 	ScopedBootTimer scopedBootTimer(kBootTimerPipelineManager);
 
 	const std::unordered_map<common::crc_t, EagerChunk>& rChunkMap = gpFileManager->mpPackChunks->GetEagerChunkMap();
@@ -163,14 +160,6 @@ PipelineManager::PipelineManager()
 	CreateDebugRenderPipelines();
 
 	game::FrameInterpolate::GraphicsResources();
-}
-
-PipelineManager::~PipelineManager()
-{
-	if (gpPipelineManager == this)
-	{
-		gpPipelineManager = nullptr;
-	}
 }
 
 void PipelineManager::CreateTerrainDataPipelines()

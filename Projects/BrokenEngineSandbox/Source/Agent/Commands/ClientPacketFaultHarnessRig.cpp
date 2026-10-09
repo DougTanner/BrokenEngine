@@ -6,8 +6,8 @@
 #include "Network/Client/ClientSessionRuntime.h"
 #include "Network/NetworkMessages.h"
 
+#include "Agent/AgentCommands.h"
 #include "Network/Client/ClientSession.h"
-#include "Game.h"
 
 namespace game
 {
@@ -51,22 +51,7 @@ void CommandClientPacketFaultHarnessRig([[maybe_unused]] const nlohmann::json& r
 		{
 			throw std::runtime_error("client_packet_fault_harness_rig is already armed");
 		}
-		if (gpGame == nullptr)
-		{
-			throw std::runtime_error("client_packet_fault_harness_rig requires a connected client");
-		}
-		if (gpClientSession == nullptr)
-		{
-			throw std::runtime_error("client_packet_fault_harness_rig requires a connected client");
-		}
-		if (gpClientSession->mpRuntime->mpClient == nullptr)
-		{
-			throw std::runtime_error("client_packet_fault_harness_rig requires a connected client");
-		}
-		if (!(gpClientSession->mpRuntime->mpClient->mStateFlags & engine::Client::ClientStateFlags::kConnected))
-		{
-			throw std::runtime_error("client_packet_fault_harness_rig requires a connected client");
-		}
+		RequireHarnessRigClient("client_packet_fault_harness_rig");
 
 		std::vector<uint8_t> packet = {static_cast<uint8_t>(engine::PacketType::kServerCoordinateFullState), 0, 0};
 
@@ -93,15 +78,8 @@ void InjectArmedClientPacketFault()
 	ClientSession* pSession = spSession;
 	spSession = nullptr;
 
-	if (pSession == nullptr)
-	{
-		return;
-	}
+	ASSERT(pSession != nullptr);
 	if (gpClientSession != pSession)
-	{
-		return;
-	}
-	if (pSession->mpRuntime->mpClient == nullptr)
 	{
 		return;
 	}

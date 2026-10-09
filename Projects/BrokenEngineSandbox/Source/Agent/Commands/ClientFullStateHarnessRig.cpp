@@ -6,6 +6,7 @@
 #include "Network/Client/ClientSessionRuntime.h"
 #include "LaunchOptions.h"
 
+#include "Agent/AgentCommands.h"
 #include "Network/Client/ClientReconciler.h"
 #include "Network/Client/ClientSession.h"
 #include "Game.h"
@@ -25,7 +26,7 @@ static FullStateHarnessRigState sHarnessRig;
 
 static bool IsHarnessRigStalled(const engine::ClientDesyncCore& rCore)
 {
-	return sHarnessRig.bArmed && sHarnessRig.pSession != nullptr && sHarnessRig.pSession->mpDesynchronizationCore.get() == &rCore;
+	return sHarnessRig.bArmed && sHarnessRig.pSession->mpDesynchronizationCore.get() == &rCore;
 }
 
 static void ClearHarnessRig()
@@ -223,10 +224,6 @@ void CommandClientFullStateHarnessRig(const nlohmann::json& rParameters, nlohman
 	{
 		throw std::runtime_error("client_full_state_harness_rig requires an agent-mode client");
 	}
-	if (!rParameters.is_object())
-	{
-		throw std::runtime_error("client_full_state_harness_rig requires only string 'action'");
-	}
 	if (!rParameters.contains("action"))
 	{
 		throw std::runtime_error("client_full_state_harness_rig requires only string 'action'");
@@ -250,22 +247,7 @@ void CommandClientFullStateHarnessRig(const nlohmann::json& rParameters, nlohman
 
 	if (action == "arm_stall")
 	{
-		if (gpClientSession->mpRuntime->mpClient == nullptr)
-		{
-			throw std::runtime_error("client_full_state_harness_rig requires an accepted connection");
-		}
-		if (!(gpClientSession->mpRuntime->mpClient->mStateFlags & engine::Client::ClientStateFlags::kConnectionAccepted))
-		{
-			throw std::runtime_error("client_full_state_harness_rig requires an accepted connection");
-		}
-		if (!(gpClientSession->mpRuntime->mpClient->mStateFlags & engine::Client::ClientStateFlags::kConnected))
-		{
-			throw std::runtime_error("client_full_state_harness_rig requires an accepted connection");
-		}
-		if (gpClientSession->mpRuntime->mpClient->mpServerPeer == nullptr)
-		{
-			throw std::runtime_error("client_full_state_harness_rig requires an accepted connection");
-		}
+		RequireHarnessRigClient("client_full_state_harness_rig");
 		if (gpClientSession->mpDesynchronizationCore->IsStalled())
 		{
 			throw std::runtime_error("client_full_state_harness_rig is already stalled");

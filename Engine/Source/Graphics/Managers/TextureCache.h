@@ -7,18 +7,13 @@ namespace engine
 
 struct TextureFileCacheHeader
 {
-	static constexpr int64_t kiMagic = 0xCACE'F11E;
-	static constexpr int64_t kiVersion = 2;
+	static constexpr int64_t kiVersion = 3;
 
-	int64_t iMagic = 0;
-	int64_t iVersion = 0;
 	VkFormat vkFormat = VK_FORMAT_UNDEFINED;
 	int64_t iWidth = 0;
 	int64_t iHeight = 0;
 	int64_t iMipmapLevels = 0;
 	int64_t iArrayLayers = 0;
-	int64_t iDataSize = 0;
-	common::crc_t sourceCrc = 0;  // CRC of source texture used to generate this cache
 };
 
 class TextureCache
@@ -27,8 +22,8 @@ public:
 
 	void GeneratePhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionLookupTable();
 
-	bool TryLoadCachedTexture(const std::filesystem::path& rCachePath, Texture& rTexture, common::crc_t sourceCrc = 0);
-	void SaveTextureToCache(const std::filesystem::path& rCachePath, const Texture& rTexture, common::crc_t sourceCrc = 0);
+	bool TryLoadCachedTexture(const std::filesystem::path& rCachePath, const TextureInfo& rTextureInfo, Texture& rTexture);
+	void SaveTextureToCache(const std::filesystem::path& rCachePath, const Texture& rTexture);
 
 	// vkCurrentLayout is the source image's steady-state layout, used verbatim as the pre-copy barrier oldLayout and
 	// the post-copy restore newLayout (swapchain: VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; render targets: their parked layout

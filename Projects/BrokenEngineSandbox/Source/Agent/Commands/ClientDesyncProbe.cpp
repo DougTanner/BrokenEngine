@@ -6,6 +6,7 @@
 #include "Network/Client/ClientSessionRuntime.h"
 #include "Network/Client/ReconcileReplay.h"
 
+#include "Agent/AgentCommands.h"
 #include "Network/Client/ClientSession.h"
 #include "Game.h"
 
@@ -89,26 +90,7 @@ void CommandDesynchronizationProbe(const nlohmann::json& rParameters, nlohmann::
 		}
 	}
 
-	if (gpGame == nullptr)
-	{
-		throw std::runtime_error("desync_probe requires a connected live client/server session");
-	}
-	if (gpClientSession == nullptr)
-	{
-		throw std::runtime_error("desync_probe requires a connected live client/server session");
-	}
-	if (gpClientSession->mpRuntime->mpClient == nullptr)
-	{
-		throw std::runtime_error("desync_probe requires a connected live client/server session");
-	}
-	if (!(gpClientSession->mpRuntime->mpClient->mStateFlags & engine::Client::ClientStateFlags::kConnected))
-	{
-		throw std::runtime_error("desync_probe requires a connected live client/server session");
-	}
-	if (gpClientSession->mpRuntime->mpClient->mpServerPeer == nullptr)
-	{
-		throw std::runtime_error("desync_probe requires a connected live client/server session");
-	}
+	RequireHarnessRigClient("desync_probe");
 	if ((gpGame->mGameFlags & engine::GameFlags::kMainMenu))
 	{
 		throw std::runtime_error("desync_probe requires a connected live client/server session");

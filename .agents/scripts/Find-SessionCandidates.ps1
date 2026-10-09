@@ -96,6 +96,7 @@ $script:CandidatePatterns = @(
 	# `Num` as its own word in an identifier, so Number and Enumerate stay clear; a name reached through ::, ->
 	# or . belongs to another API.
 	@{ Kind = 'style-rule-14'; Pattern = '(?<!(?:::|->|\.)\s*)\b(?:\w*[a-z0-9_])?Num(?![a-z])'; Except = $script:CommentOrQuote }
+	@{ Kind = 'style-rule-72'; Pattern = $script:CodePrefix + '(?:\.|->)k[a-z0-9]*[A-Z]'; Except = '^\s*\*(?:\s|/|$)' }
 )
 $script:ScannedPatterns = $script:CandidatePatterns
 $script:Utf8 = [Text.UTF8Encoding]::new($false)

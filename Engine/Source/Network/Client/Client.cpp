@@ -15,11 +15,8 @@ namespace engine
 {
 
 Client::Client(const char* pcServerAddress, int64_t iPort, int64_t iCoordinateSlotCount, const ClientGuid& rGuid, GuidAssignedCallback pGuidAssignedCallback)
+: common::Singleton<Client>(gpClient)
 {
-	ASSERT(gpClient == nullptr);
-
-	gpClient = this;
-
 	mClientGuid = rGuid;
 	mpGuidAssignedCallback = pGuidAssignedCallback;
 
@@ -52,7 +49,7 @@ Client::Client(const char* pcServerAddress, int64_t iPort, int64_t iCoordinateSl
 
 Client::~Client()
 {
-	if (mpServerPeer != nullptr && (mStateFlags & ClientStateFlags::kConnected))
+	if (mStateFlags & ClientStateFlags::kConnected)
 	{
 		enet_peer_disconnect(mpServerPeer, 0);
 
@@ -78,11 +75,6 @@ Client::~Client()
 		// Heap: ENet destroys host data internally
 		ScopedSuppressAllocationTracking suppress;
 		enet_host_destroy(mpHost);
-	}
-
-	if (gpClient == this)
-	{
-		gpClient = nullptr;
 	}
 }
 
@@ -331,7 +323,7 @@ void Client::Flush()
 
 void Client::Disconnect()
 {
-	if (mpServerPeer != nullptr && (mStateFlags & ClientStateFlags::kConnected))
+	if (mStateFlags & ClientStateFlags::kConnected)
 	{
 		// Heap: ENet may queue a peer disconnect packet
 		ScopedSuppressAllocationTracking suppress;
@@ -783,7 +775,7 @@ void Client::ServerTimespeedUpdate(std::span<const uint8_t> packetData)
 
 bool Client::SendAcknowledgement()
 {
-	if (!(mStateFlags & ClientStateFlags::kConnected) || mpServerPeer == nullptr)
+	if (!(mStateFlags & ClientStateFlags::kConnected))
 	{
 		return false;
 	}
@@ -837,7 +829,7 @@ bool Client::SendAcknowledgement()
 
 void Client::SendDesynchronizationReport(int64_t iTick, GridCoord coordinate, common::crc_t uiExpectedCrc, common::crc_t uiActualCrc)
 {
-	if (!(mStateFlags & ClientStateFlags::kConnected) || mpServerPeer == nullptr)
+	if (!(mStateFlags & ClientStateFlags::kConnected))
 	{
 		return;
 	}
@@ -861,7 +853,7 @@ void Client::SendDesynchronizationReport(int64_t iTick, GridCoord coordinate, co
 
 void Client::SendDebugFrameRequest(int64_t iTick, GridCoord coordinate)
 {
-	if (!(mStateFlags & ClientStateFlags::kConnected) || mpServerPeer == nullptr)
+	if (!(mStateFlags & ClientStateFlags::kConnected))
 	{
 		return;
 	}
@@ -882,10 +874,6 @@ bool Client::SendSubscribe(GridCoord coordinate)
 		return false;
 	}
 	if (!(mStateFlags & ClientStateFlags::kConnectionAccepted))
-	{
-		return false;
-	}
-	if (mpServerPeer == nullptr)
 	{
 		return false;
 	}
@@ -913,7 +901,7 @@ bool Client::SendSubscribe(GridCoord coordinate)
 
 void Client::SendUnsubscribe(int64_t iSlot)
 {
-	if (!(mStateFlags & ClientStateFlags::kConnected) || mpServerPeer == nullptr)
+	if (!(mStateFlags & ClientStateFlags::kConnected))
 	{
 		return;
 	}
@@ -934,7 +922,7 @@ void Client::SendUnsubscribe(int64_t iSlot)
 
 void Client::SendResynchronizationRequest()
 {
-	if (!(mStateFlags & ClientStateFlags::kConnected) || mpServerPeer == nullptr)
+	if (!(mStateFlags & ClientStateFlags::kConnected))
 	{
 		return;
 	}

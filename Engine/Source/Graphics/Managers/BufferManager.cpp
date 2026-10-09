@@ -10,11 +10,8 @@ namespace engine
 {
 
 BufferManager::BufferManager()
+: common::Singleton<BufferManager>(gpBufferManager)
 {
-	ASSERT(gpBufferManager == nullptr);
-
-	gpBufferManager = this;
-
 	ScopedBootTimer scopedBootTimer(kBootTimerBufferManager);
 
 	CreateWaterMesh();
@@ -255,11 +252,6 @@ BufferManager::~BufferManager()
 {
 	DestroyWindHierarchicalBuffers();
 	DestroySmokeHierarchicalBuffers();
-
-	if (gpBufferManager == this)
-	{
-		gpBufferManager = nullptr;
-	}
 }
 
 void BufferManager::DestroySwapchainDependentBuffers()
@@ -763,7 +755,7 @@ static void BuildLodConcatenatedMesh(int64_t iLod0QuadX, int64_t iLod0QuadY, Buf
 
 void BufferManager::CreateWaterMesh()
 {
-	auto [iFullX, iFullY] = gpTextureManager->WaterDetailTextureSize(gWaterShapeDetail.mfCurrent);
+	auto [iFullX, iFullY] = TextureManager::WaterDetailTextureSize(gWaterShapeDetail.mfCurrent);
 	int64_t iLod0QuadX = iFullX - 1;
 	int64_t iLod0QuadY = iFullY - 1;
 

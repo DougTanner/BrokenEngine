@@ -6,11 +6,8 @@ namespace engine
 {
 
 DeviceManager::DeviceManager()
+: common::Singleton<DeviceManager>(gpDeviceManager)
 {
-	ASSERT(gpDeviceManager == nullptr);
-
-	gpDeviceManager = this;
-
 	ScopedBootTimer scopedBootTimer(kBootTimerDeviceManager);
 
 	std::vector<VkExtensionProperties> availableExtensions;
@@ -355,11 +352,6 @@ DeviceManager::~DeviceManager()
 	vkDestroyCommandPool(mVkDevice, mOneShotVkCommandPool, nullptr);
 
 	vkDestroyDevice(mVkDevice, nullptr);
-
-	if (gpDeviceManager == this)
-	{
-		gpDeviceManager = nullptr;
-	}
 }
 
 void DeviceManager::LoadPipelineCache()

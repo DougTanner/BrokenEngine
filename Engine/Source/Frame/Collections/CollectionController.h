@@ -95,8 +95,8 @@ inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateSca
 }
 
 // Spawns a paired controlled element while leaving collection-specific seeding to the caller.
-template <typename INTERPOLATE, typename POST_RENDER, typename GROW_FUNCTION, typename ADD_FUNCTION, typename SEED_FUNCTION>
-void XM_CALLCONV AddControlledElement(INTERPOLATE& rInterpolate, [[maybe_unused]] const POST_RENDER& rPostRender, float fCurrentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, GROW_FUNCTION GrowFunction, ADD_FUNCTION AddFunction, SEED_FUNCTION SeedFunction)
+template <typename INTERPOLATE, typename GROW_FUNCTION, typename ADD_FUNCTION, typename SEED_FUNCTION>
+void XM_CALLCONV AddControlledElement(INTERPOLATE& rInterpolate, float fCurrentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, GROW_FUNCTION GrowFunction, ADD_FUNCTION AddFunction, SEED_FUNCTION SeedFunction)
 {
 	GrowFunction();
 	int64_t iSpawnIndex = AddFunction();

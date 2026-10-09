@@ -308,15 +308,15 @@ void BeachSubdivider::SplitInBand(int64_t iTriangle, int64_t iA, int64_t iB, int
 	worklist.push_back(iChild2);
 	worklist.push_back(iChild3);
 
-	if (iNeighborAB >= 0 && triangleAlive.at(static_cast<size_t>(iNeighborAB)) != 0)
+	if (iNeighborAB >= 0)
 	{
 		worklist.push_back(iNeighborAB);
 	}
-	if (iNeighborBC >= 0 && triangleAlive.at(static_cast<size_t>(iNeighborBC)) != 0)
+	if (iNeighborBC >= 0)
 	{
 		worklist.push_back(iNeighborBC);
 	}
-	if (iNeighborCA >= 0 && triangleAlive.at(static_cast<size_t>(iNeighborCA)) != 0)
+	if (iNeighborCA >= 0)
 	{
 		worklist.push_back(iNeighborCA);
 	}

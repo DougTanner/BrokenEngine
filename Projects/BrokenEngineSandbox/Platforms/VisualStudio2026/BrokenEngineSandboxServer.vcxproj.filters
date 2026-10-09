@@ -327,6 +327,9 @@
     <ClInclude Include="..\..\..\..\Common\ScopedLambda.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Singleton.h">
+      <Filter>Common</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Common\Smoothed.h">
       <Filter>Common</Filter>
     </ClInclude>

@@ -518,11 +518,7 @@ void ClientSessionRuntime::SetDesiredCoordinates(std::span<const GridCoord> desi
 	{
 		mUnwantedTimestamps.erase(rCoordinate);
 	}
-	mDesiredCoordinates.clear();
-	if (!desiredCoordinates.empty())
-	{
-		mDesiredCoordinates.assign(desiredCoordinates.begin(), desiredCoordinates.end());
-	}
+	mDesiredCoordinates.assign(desiredCoordinates.begin(), desiredCoordinates.end());
 	LOG(kNetwork, kVerbose, "Desired subscriptions changed Reason: {} Count: {} Tick: {}", reason, std::ssize(desiredCoordinates), iTick);
 }
 

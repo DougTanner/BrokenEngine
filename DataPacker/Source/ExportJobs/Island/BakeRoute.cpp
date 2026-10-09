@@ -70,14 +70,6 @@ static std::string ReadTextFile(const std::filesystem::path& rFile)
 	return std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
 }
 
-static void WriteTextFile(const std::filesystem::path& rFile, std::string_view text)
-{
-	std::ofstream stream(rFile, std::ios::binary | std::ios::trunc);
-	stream.write(text.data(), static_cast<std::streamsize>(text.size()));
-	stream.close();
-	VERIFY_SUCCESS(stream.good());
-}
-
 static std::string BakeFingerprint(const IslandBakeContext& rContext, const RouteSubdivision& rRoute)
 {
 	nlohmann::json metadata;
@@ -614,7 +606,6 @@ void BakeRoute(const IslandBakeContext& rContext, const RouteSubdivision& rRoute
 		RunGaeaExport(rContext, rRoute, gaeaExecutable, routeDirectory, stagingDirectory, stagingPatchedArchetypeFile);
 
 		std::filesystem::remove(intermediatesDirectory / kpcBakeVersionFile);
-		std::filesystem::remove(intermediatesDirectory / kpcSplitVersionFile);
 		for (const char* pcFile : kpcIntermediateFiles)
 		{
 			std::filesystem::path source = stagingDirectory / pcFile;
@@ -623,7 +614,7 @@ void BakeRoute(const IslandBakeContext& rContext, const RouteSubdivision& rRoute
 		}
 		VERIFY_SUCCESS(MoveFileExW(stagingPatchedArchetypeFile.native().c_str(), patchedArchetypeFile.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
 		std::filesystem::remove_all(stagingDirectory);
-		WriteTextFile(intermediatesDirectory / kpcBakeVersionFile, bakeFingerprint);
+		WriteEntireFile(intermediatesDirectory / kpcBakeVersionFile, bakeFingerprint);
 	}
 	else
 	{
@@ -696,7 +687,7 @@ void BakeRoute(const IslandBakeContext& rContext, const RouteSubdivision& rRoute
 	// (or stale), so AreLeavesDirty re-splits next run — without re-running Gaea (BakeVersion is
 	// already stamped above, so IsGaeaRawDirty stays clean).
 	{
-		WriteTextFile(intermediatesDirectory / kpcSplitVersionFile, splitFingerprint);
+		WriteEntireFile(intermediatesDirectory / kpcSplitVersionFile, splitFingerprint);
 	}
 
 	LOG(kDefault, kDebug, "Island route \"{}\" ready ({} of {} chunk(s) written, {} rejected as too low{})", routeDirectory.string(), iWrittenLeaves, iLeafCount, iLeafCount - iWrittenLeaves, bGaeaDirty ? ", Gaea re-baked" : ", split-only reuse");

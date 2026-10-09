@@ -448,8 +448,9 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 		if (iCurrent == iEndNode)
 		{
 			int64_t iNode = iEndNode;
-			while (rMemory.pParent[iNode] != iStartNode && rMemory.pParent[iNode] != -1)
+			while (rMemory.pParent[iNode] != iStartNode)
 			{
+				ASSERT(rMemory.pParent[iNode] != -1);
 				iNode = rMemory.pParent[iNode];
 			}
 

@@ -66,12 +66,11 @@ struct AgentScript
 // Frame-stepped synthetic-input engine. Advanced one step per client main-loop iteration at the drain point
 // (before ImGui NewFrame), so on a rendered frame injected events land in that frame. Two sinks: ImGui IO events (UI driving) and
 // a RawInput snapshot overlay (engine key bindings). Zero steady-state heap — all state is fixed members.
-class AgentInput
+class AgentInput : public common::Singleton<AgentInput>
 {
 public:
 
 	AgentInput();
-	~AgentInput();
 
 	AgentInput(const AgentInput&) = delete;
 	AgentInput& operator=(const AgentInput&) = delete;

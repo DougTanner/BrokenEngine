@@ -28,7 +28,7 @@ TweaksSliderMapRegistrar::TweaksSliderMapRegistrar(std::initializer_list<std::pa
 		bool bInserted = TweaksSliderMap::Get().insert(rEntry).second;
 		if (!bInserted) [[unlikely]]
 		{
-			common::Assert(bInserted, std::format("Duplicate Tweaks slider key: \"{}\"", rEntry.first));
+			common::Assert(false, std::format("Duplicate Tweaks slider key: \"{}\"", rEntry.first));
 		}
 	}
 }

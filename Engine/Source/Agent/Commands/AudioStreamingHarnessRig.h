@@ -186,7 +186,6 @@ class AudioStreamingHarnessRig
 {
 public:
 	AudioStreamingHarnessRig() = default;
-	~AudioStreamingHarnessRig();
 
 	AudioStreamingHarnessRig(const AudioStreamingHarnessRig&) = delete;
 	AudioStreamingHarnessRig& operator=(const AudioStreamingHarnessRig&) = delete;
@@ -220,7 +219,6 @@ public:
 	static void CompleteAudioRead(bool bHeld);
 	static void CountRetry();
 	static void PrepareLoaderDrain();
-	static bool AllowOlderFadeRequests();
 	static AudioStreamingVoiceControl* CreateVoiceControl(StreamingVoice& rVoice);
 	static void RetireVoiceControl(const AudioStreamingVoiceControl* pControl);
 
@@ -284,7 +282,6 @@ private:
 	common::crc_t mInvalidCrc = 0;
 	int64_t miInvalidOffset = 0;
 	int64_t miInvalidLength = 0;
-	bool mbShutdown = false;
 };
 
 } // namespace engine

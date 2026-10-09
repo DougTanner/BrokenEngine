@@ -204,7 +204,7 @@ void ServerSessionRuntime::SendNewSubscriptionFullStates()
 	std::erase_if(mpServer->mPendingNewSubscriptions, [this](const engine::PendingNewSubscription& rSubscription)
 	{
 		const engine::ClientConnection* pClient = engine::gpServer->FindClient(rSubscription.iClientId);
-		bool bSlotStillValid = (pClient != nullptr && rSubscription.iSlot < std::ssize(pClient->slots)
+		bool bSlotStillValid = (pClient != nullptr
 		                     && (pClient->slots.at(rSubscription.iSlot).subscription.flags & engine::SubscriptionFlags::kActive)
 		                     && pClient->slots.at(rSubscription.iSlot).subscription.coordinate == rSubscription.coordinate);
 		if (!bSlotStillValid)

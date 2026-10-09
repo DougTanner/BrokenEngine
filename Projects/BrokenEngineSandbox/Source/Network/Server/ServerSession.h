@@ -27,7 +27,7 @@ struct SubscriptionUpdate
 	engine::GlobalId globalPlayerId {};
 };
 
-class ServerSession
+class ServerSession : public common::Singleton<ServerSession>
 {
 public:
 

@@ -34,10 +34,7 @@ void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
 		return;
 	}
 
-	if (wcscpy_s(spcAppDataOverride, std::size(spcAppDataOverride), pcDirectory) != 0)
-	{
-		spcAppDataOverride[0] = L'\0';
-	}
+	wcscpy_s(spcAppDataOverride, std::size(spcAppDataOverride), pcDirectory);
 }
 
 // Appends only after proving the result fits: wcscat_s on an overflowing input invokes the invalid-parameter handler,

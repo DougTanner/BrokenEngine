@@ -323,7 +323,12 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
   Local-generation path and the wrapper bootstrap's primary run are the only
   exceptions. Every invocation passes `EnableClangTidyCodeAnalysis=false` and
   `RunCodeAnalysis=false`; `-Prefast` is the sole exception to
-  `RunCodeAnalysis=false`. The clang-tidy reason is in
+  `RunCodeAnalysis=false`. `RunCodeAnalysis=false` still leaves cl `/analyze`
+  running with the compiler's default rules on every Release build whose
+  project sets `EnablePREfast` (client, server, DataPacker), where any
+  diagnostic fails the build under warnings-as-errors; only the rule-set path
+  that reports the C26xxx codes needs `-Prefast`. The clang-tidy reason and both
+  analysis paths (the "Microsoft code analysis" bullet) are in
   `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md`
   `## Build Configuration`.
 - A `builder` executing this skill runs the build itself and never dispatches

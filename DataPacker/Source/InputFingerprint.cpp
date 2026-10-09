@@ -1,5 +1,7 @@
 #include "InputFingerprint.h"
 
+#include "FileManager.h"
+
 
 // Opening the provider per hash is expensive; one process-lifetime handle serves every hash (BCrypt
 // algorithm handles are thread-safe) and is deliberately never closed.
@@ -31,10 +33,7 @@ public:
 
 	~Sha256Hasher()
 	{
-		if (mpHash != nullptr)
-		{
-			BCryptDestroyHash(mpHash);
-		}
+		BCryptDestroyHash(mpHash);
 	}
 
 	Sha256Hasher(const Sha256Hasher& rToCopy) = delete;
@@ -261,22 +260,7 @@ void InputFingerprintCache::Save()
 		{"version", kiFingerprintCacheVersion},
 		{"entries", std::move(entries)},
 	};
-	std::filesystem::path temporaryPath = mCacheFile;
-	temporaryPath += std::format(".{}.tmp", GetCurrentProcessId());
-	{
-		std::ofstream cacheStream(temporaryPath, std::ios::trunc);
-		cacheStream << cache.dump();
-		if (!cacheStream)
-		{
-			throw std::runtime_error(std::format("Failed to write fingerprint cache \"{}\"", temporaryPath.string()));
-		}
-	}
-	if (!MoveFileExW(temporaryPath.native().c_str(), mCacheFile.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
-	{
-		int64_t iError = GetLastError();
-		std::filesystem::remove(temporaryPath);
-		throw std::system_error(static_cast<int>(iError), std::system_category(), std::format("Failed to publish fingerprint cache \"{}\"", mCacheFile.string()));
-	}
+	WriteEntireFile(mCacheFile, cache.dump());
 	mbDirty = false;
 }
 
@@ -380,22 +364,7 @@ std::string InputFingerprintCache::GetPersistentFile(const std::filesystem::path
 		{"volumeSerialNumber", snapshot.uiVolumeSerialNumber},
 		{"fingerprint", fingerprint},
 	};
-	std::filesystem::path temporaryPath = metadataPath;
-	temporaryPath += std::format(".{}.tmp", GetCurrentProcessId());
-	{
-		std::ofstream metadataStream(temporaryPath, std::ios::trunc);
-		metadataStream << metadata.dump();
-		if (!metadataStream)
-		{
-			throw std::runtime_error(std::format("Failed to write fingerprint metadata \"{}\"", temporaryPath.string()));
-		}
-	}
-	if (!MoveFileExW(temporaryPath.native().c_str(), metadataPath.native().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
-	{
-		int64_t iError = GetLastError();
-		std::filesystem::remove(temporaryPath);
-		throw std::system_error(static_cast<int>(iError), std::system_category(), std::format("Failed to publish fingerprint metadata \"{}\"", metadataPath.string()));
-	}
+	WriteEntireFile(metadataPath, metadata.dump());
 	mCachedFingerprints.insert_or_assign(std::move(key), CachedFingerprint {.snapshot = snapshot, .fingerprint = fingerprint});
 	mbDirty = true;
 	return fingerprint;

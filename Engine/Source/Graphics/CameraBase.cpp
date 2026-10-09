@@ -59,20 +59,9 @@ CameraTarget CameraTarget::Extrapolate()
 }
 
 CameraBase::CameraBase(const CameraSetup& rCameraSetup)
+: common::Singleton<CameraBase>(gpCamera)
 {
-	ASSERT(gpCamera == nullptr);
-
-	gpCamera = this;
-
 	mVecPosition = rCameraSetup.vecInitialPosition;
-}
-
-CameraBase::~CameraBase()
-{
-	if (gpCamera == this)
-	{
-		gpCamera = nullptr;
-	}
 }
 
 void CameraBase::DiscardTrackingCaches()
@@ -192,11 +181,9 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 	mVecEyePosition = XMVectorAdd(mVecPosition, vecEyePositionRelative);
 
 	float fVibration = std::pow(mfShake, 0.5f);
-	gpRawInputManager->SetVibration(0, fVibration, fVibration);
+	gpRawInputManager->SetVibration(fVibration, fVibration);
 
 	CalculateMatricesAndVisibleArea();
-
-	OnUpdateComplete();
 }
 
 XMVECTOR CameraBase::ResolveTarget(const CameraTarget& rCameraTarget)
@@ -341,27 +328,9 @@ void CameraBase::RestoreEyeHeight(float fEyeHeight)
 	mfCameraEyeHeightTarget = fEyeHeight;
 }
 
-XMVECTOR XM_CALLCONV CameraBase::ScreenToWorld(FXMVECTOR vecScreenPosition, float fHeight)
-{
-	XMVECTOR vecPlane = XMPlaneFromPointNormal(XMVectorSet(0.0f, 0.0f, fHeight, 1.0f), XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f));
-
-	float fViewportWidth = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
-	float fViewportHeight = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
-	auto vecWorldPosition = XMVectorMultiply(XMVectorSet(fViewportWidth, fViewportHeight, 1.0f, 1.0f), vecScreenPosition);
-
-	vecWorldPosition = XMVectorSetZ(vecWorldPosition, 0.0f);
-	auto vecRayStart = XMVector3Unproject(vecWorldPosition, 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, XMMatrixIdentity());
-	vecWorldPosition = XMVectorSetZ(vecWorldPosition, 1.0f);
-	auto vecRayEnd = XMVector3Unproject(vecWorldPosition, 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, XMMatrixIdentity());
-
-	// The SDK returns all-lane QNaN when the line is parallel to the plane (a camera looking exactly along Z=fHeight).
-	XMVECTOR vecIntersection = XMPlaneIntersectLine(vecPlane, vecRayStart, vecRayEnd);
-	return XMVector3IsNaN(vecIntersection) ? XMVectorSet(0.0f, 0.0f, fHeight, 1.0f) : vecIntersection;
-}
-
 XMVECTOR XM_CALLCONV CameraBase::WorldToScreen(FXMVECTOR vecWorldPosition) const
 {
-	// Projection shares ScreenToWorld's viewport and matrices. X/Y are screen pixels and Z is projected depth.
+	// X/Y are screen pixels and Z is projected depth.
 	float fViewportWidth = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
 	float fViewportHeight = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	// The scalar XMVector3Project overload builds its viewport offset with W=0, so the returned screen position

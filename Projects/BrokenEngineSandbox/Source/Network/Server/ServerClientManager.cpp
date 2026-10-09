@@ -161,7 +161,7 @@ void ServerClientManager::Disconnects()
 		mDeadClientIds.erase(rDisconnect.iClientId);
 		mProcessedClientIds.erase(rDisconnect.iClientId);
 
-		gpServerSession->mpFleetManager->OnClientDisconnected(rDisconnect.clientGuid);
+		gpServerSession->mpFleetManager->OnClientDisconnected(rDisconnect.iClientId, rDisconnect.clientGuid);
 
 		std::erase_if(mClientsWaitingForSpawn, [&](const ClientSpawnInformation& rInformation)
 		{

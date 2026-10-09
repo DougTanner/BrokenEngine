@@ -84,18 +84,8 @@ static void CreateElevationTextureFromHeightmap(IslandTemplate& rTemplate, std::
 }
 
 IslandTerrainResidency::IslandTerrainResidency()
+: common::Singleton<IslandTerrainResidency>(gpIslandTerrainResidency)
 {
-	ASSERT(gpIslandTerrainResidency == nullptr);
-
-	gpIslandTerrainResidency = this;
-}
-
-IslandTerrainResidency::~IslandTerrainResidency()
-{
-	if (gpIslandTerrainResidency == this)
-	{
-		gpIslandTerrainResidency = nullptr;
-	}
 }
 
 int64_t IslandTerrainResidency::FirstMintTextureSlot(common::crc_t uiIslandCrc, IslandTemplate& rTemplate, const common::crc_t (&rTextureCrcs)[4], std::string_view name)

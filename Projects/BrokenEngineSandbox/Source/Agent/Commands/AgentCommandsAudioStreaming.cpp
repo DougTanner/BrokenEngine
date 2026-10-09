@@ -108,20 +108,14 @@ struct AudioStreamingHarnessRigCoexistenceState
 {
 	~AudioStreamingHarnessRigCoexistenceState()
 	{
-		if ((flags & AudioStreamingHarnessRigCoexistenceFlags::kStaging) && engine::gpFileManager != nullptr)
+		if (flags & AudioStreamingHarnessRigCoexistenceFlags::kStaging)
 		{
 			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseCoexistence();
 		}
 		if ((flags & AudioStreamingHarnessRigCoexistenceFlags::kControlled) && !(flags & AudioStreamingHarnessRigCoexistenceFlags::kComplete))
 		{
-			if (engine::gpFileManager != nullptr)
-			{
-				engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
-			}
-			if (engine::gpAudioManager != nullptr)
-			{
-				engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseControls();
-			}
+			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
+			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseControls();
 		}
 	}
 
@@ -135,14 +129,8 @@ struct AudioStreamingHarnessRigStartState
 	{
 		if (!bComplete)
 		{
-			if (engine::gpFileManager != nullptr)
-			{
-				engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
-			}
-			if (engine::gpAudioManager != nullptr)
-			{
-				engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseControls();
-			}
+			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
+			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseControls();
 		}
 	}
 
@@ -153,14 +141,8 @@ struct AudioStreamingHarnessRigReleaseState
 {
 	~AudioStreamingHarnessRigReleaseState()
 	{
-		if (engine::gpFileManager != nullptr)
-		{
-			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
-		}
-		if (engine::gpAudioManager != nullptr)
-		{
-			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseControls();
-		}
+		engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
+		engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseControls();
 	}
 };
 
@@ -168,10 +150,7 @@ struct AudioStreamingHarnessRigInvalidState
 {
 	~AudioStreamingHarnessRigInvalidState()
 	{
-		if (engine::gpFileManager != nullptr)
-		{
-			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseInvalid();
-		}
+		engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseInvalid();
 	}
 
 	engine::AudioStreamingHarnessRigInvalidResult result;
@@ -362,15 +341,9 @@ struct AudioStreamingHarnessRigSaturationState
 {
 	~AudioStreamingHarnessRigSaturationState()
 	{
-		if (engine::gpFileManager != nullptr)
-		{
-			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseSaturation();
-			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
-		}
-		if (engine::gpAudioManager != nullptr)
-		{
-			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseControls();
-		}
+		engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseSaturation();
+		engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
+		engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseControls();
 	}
 
 	AudioStreamingHarnessRigSaturationPhase ePhase = AudioStreamingHarnessRigSaturationPhase::kSetup;
@@ -443,14 +416,6 @@ void CommandAudioStreamingHarnessRig([[maybe_unused]] const nlohmann::json& rPar
 		{
 			throw std::runtime_error(kpcSchema);
 		}
-		if (engine::gpFileManager == nullptr)
-		{
-			throw std::runtime_error("audio_streaming_harness_rig requires initialized File and Audio managers");
-		}
-		if (engine::gpAudioManager == nullptr)
-		{
-			throw std::runtime_error("audio_streaming_harness_rig requires initialized File and Audio managers");
-		}
 
 		std::string action = rParameters.at("action").get<std::string>();
 		if (action != "start" && action != "inspect" && action != "clear" && action != "suspend" && action != "resume"
@@ -477,14 +442,6 @@ void CommandAudioStreamingHarnessRig([[maybe_unused]] const nlohmann::json& rPar
 			}
 			engine::gpAgentCommandServer->DeferResponse([pState]() -> std::optional<nlohmann::json>
 			{
-				if (engine::gpFileManager == nullptr)
-				{
-					throw std::runtime_error("audio_streaming_harness_rig managers were destroyed while start awaited quiescence");
-				}
-				if (engine::gpAudioManager == nullptr)
-				{
-					throw std::runtime_error("audio_streaming_harness_rig managers were destroyed while start awaited quiescence");
-				}
 				if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->Begin(data::kAudioMusicdoodlewavCrc, 0, kiAudioStreamingHarnessRigReadLength))
 				{
 					return std::nullopt;
@@ -538,14 +495,6 @@ void CommandAudioStreamingHarnessRig([[maybe_unused]] const nlohmann::json& rPar
 			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
 			engine::gpAgentCommandServer->DeferResponse([pState]() -> std::optional<nlohmann::json>
 			{
-				if (engine::gpFileManager == nullptr)
-				{
-					throw std::runtime_error("audio_streaming_harness_rig managers were destroyed while release_read awaited acknowledgement");
-				}
-				if (engine::gpAudioManager == nullptr)
-				{
-					throw std::runtime_error("audio_streaming_harness_rig managers were destroyed while release_read awaited acknowledgement");
-				}
 				engine::AudioStreamingHarnessRigSnapshot snapshot = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->InspectFile();
 				if (snapshot.eHoldState != engine::AudioStreamingHarnessRigHoldState::kIdle)
 				{
@@ -576,14 +525,6 @@ void CommandAudioStreamingHarnessRig([[maybe_unused]] const nlohmann::json& rPar
 			}
 			engine::gpAgentCommandServer->DeferResponse([pState]() -> std::optional<nlohmann::json>
 			{
-				if (engine::gpFileManager == nullptr)
-				{
-					throw std::runtime_error("audio_streaming_harness_rig managers were destroyed while coexistence staged work");
-				}
-				if (engine::gpAudioManager == nullptr)
-				{
-					throw std::runtime_error("audio_streaming_harness_rig managers were destroyed while coexistence staged work");
-				}
 				if ((pState->flags & AudioStreamingHarnessRigCoexistenceFlags::kStaging)
 				 && !engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->FinishCoexistence())
 				{
@@ -624,10 +565,6 @@ void CommandAudioStreamingHarnessRig([[maybe_unused]] const nlohmann::json& rPar
 			}
 			engine::gpAgentCommandServer->DeferResponse([pState]() -> std::optional<nlohmann::json>
 			{
-				if (engine::gpFileManager == nullptr)
-				{
-					throw std::runtime_error("audio_streaming_harness_rig File manager was destroyed while invalid awaited Loading");
-				}
 				if (!pState->bHasResult)
 				{
 					engine::AudioStreamingHarnessRigInvalidResult deferredInvalid = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->RunInvalid();
@@ -666,14 +603,6 @@ void CommandAudioStreamingHarnessRig([[maybe_unused]] const nlohmann::json& rPar
 		engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->mCommandFlags.Set(engine::AudioStreamingHarnessRigCommandFlags::kSaturationActive);
 		engine::gpAgentCommandServer->DeferResponse([pState]() -> std::optional<nlohmann::json>
 		{
-			if (engine::gpFileManager == nullptr)
-			{
-				throw std::runtime_error("audio_streaming_harness_rig managers were destroyed while saturate owned controls");
-			}
-			if (engine::gpAudioManager == nullptr)
-			{
-				throw std::runtime_error("audio_streaming_harness_rig managers were destroyed while saturate owned controls");
-			}
 			engine::AudioStreamingHarnessRigSnapshot fileSnapshot = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->InspectFile();
 			engine::AudioStreamingHarnessRigAudioSnapshot audioSnapshot = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->InspectAudio();
 			switch (pState->ePhase)

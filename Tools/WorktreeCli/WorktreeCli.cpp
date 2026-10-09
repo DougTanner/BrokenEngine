@@ -10,7 +10,7 @@ namespace toolcli
 {
 	static void PrintUsage(std::ostream& rOutput)
 	{
-		rOutput << "Usage: WorktreeCli.exe lock <token|claim|status|refresh|recover|release|steal> ...\n";
+		rOutput << "Usage: WorktreeCli.exe lock <token|claim|status|refresh|recover|release> ...\n";
 		rOutput << "       WorktreeCli.exe plan validate --repo COMMON-DIR --worktree CHECKOUT [--plan Documents/Plans/...md] [--lint-only]\n";
 		rOutput << "       WorktreeCli.exe plan list --repo COMMON-DIR --worktree CHECKOUT\n";
 		rOutput << "       WorktreeCli.exe plan claim-next --repo COMMON-DIR --primary-worktree PRIMARY --worktree SESSION --branch TARGET --owner TOKEN --session TOKEN [--plan Documents/Plans/...md]\n";

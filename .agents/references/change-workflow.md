@@ -47,7 +47,8 @@ OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no ef
 
 - Non-trivial ties (two viable approaches, neither architectural): fan out `researcher` subagents to validate each, compare pros/cons, then pick the simplest good solution.
 - Architectural decisions (new system shape, public API, data layout, threading model): stop and ask the user, presenting the problem, proposed solutions, and pros/cons of each.
-- Rare races and hand-edited files that have never been seen and have no named trigger: never a cost when comparing options and never a user question; treat a race as impossible or ASSERT it. Trust-boundary validation (`.agents/references/cpp-conventions.md`) still applies.
+- Races: a race is reachable when an existing actor — another thread, another process, or a repository tool such as DataPacker — can perform the interleaving under supported use. Remove a reachable race by construction (ordering, a lock, an exclusive handle, an atomic publish); rarity is no reason to keep it, because a rare timing failure is one a single user is unlikely ever to see or report. Treat a race no existing actor can perform as impossible or ASSERT it; it is never a cost when comparing options and never a user question.
+- Hand-edited files that have never been seen and have no named trigger: never a cost when comparing options and never a user question. Trust-boundary validation (`.agents/references/cpp-conventions.md`) still applies.
 - Questions a build, an existing harness command, or a code read settles: settle them that way, through the role that runs it, and never ask the user.
 
 <!-- session-context-part: Change Workflow, Steps 1-5 (continues in the next part) -->
@@ -125,8 +126,9 @@ A path nothing reaches today (a rejection, ASSERT, or recovery path no existing 
 <!-- session-context-part: Change Workflow, Steps 6-9, Convergence, and Risk tiers (continued from the previous part) -->
 #### Step 6 — Review and resolve correctness
 
-Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs after them; `/verify-external-claims` runs whenever a review or `/resolve-findings` handoff raises requests, before main decides the dependent finding or resolution; `/resolve-findings` runs after each finding main accepts, followed by re-review and retest of the affected regions only; a second round needs a reproducible blocker; `/external-diagnose-bug` runs before any further `/resolve-findings` attempt on a cause whose fix failed its retest, and its proven cause returns to `/resolve-findings` or a plan.
+Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs after them; `/verify-external-claims` runs whenever a review or `/resolve-findings` handoff raises requests, before main decides the dependent finding or resolution; `/resolve-findings` runs after each finding main accepts, followed by re-review and retest of the affected regions only; a second round needs a reproducible blocker; `/external-diagnose-bug` runs before any further `/resolve-findings` attempt on a cause whose fix failed its retest, and its proven cause returns to `/resolve-findings` or a plan. When `/over-engineering-review` runs, its finder and validator run first; when the validator changed C++, `/code-style-review` runs over the newly changed ranges and `/compile` builds its `Build required`, as in Step 5, and only then do `/repo-code-review` and `/comment-review` start, with the validator's handoff, or the finder's when the validator is skipped, as `/repo-code-review`'s implementation handoff. Other per-artifact reviews do not wait for the pair. The pair runs once per stage; a later `/resolve-findings` round's re-review covers its own fix.
 
+- fresh `reviewer` runs `/over-engineering-review` in its finder pass, then a fresh `implementer` runs its validator pass — when a `cpp`-class file changed (`overEngineeringReview`), every tier; skip the validator when the finder returns no removal candidates.
 - fresh `reviewer` runs `/repo-code-review` — when the change touches C++.
 - fresh `reviewer` runs `/glsl-review` — when the change touches shaders.
 - `mechanic` runs `/comment-review` — when the change touches C++ or GLSL.
@@ -137,7 +139,7 @@ Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs
 - separate `implementer` runs `/resolve-findings` — whenever main accepts a finding.
 - `implementer` runs `/external-diagnose-bug` — when a fix fails its retest.
 
-Main dispatches one fresh `reviewer` per changed artifact type, plus the `mechanic` for `/comment-review`, scoped to the changed bytes and the rules they touch. Scope, minimality, and simplicity checks run inside each Tier 2+ review; there is no separate scope dispatch. Main decides each finding once.
+Main dispatches one fresh `reviewer` per changed artifact type, plus the `mechanic` for `/comment-review` and, for C++, the `/over-engineering-review` finder `reviewer` and validator `implementer`, scoped to the changed bytes and the rules they touch. Scope, minimality, and simplicity checks run inside each Tier 2+ review; there is no separate scope dispatch. Main decides each finding once. `/over-engineering-review` candidates are not findings: the validator's re-proof, not main, decides each one, the landing reconciliation records the pair as one review row from the validator handoff, or the finder's when the validator is skipped, and the later reviews check the applied removals like any other changed bytes. Main decides each design suggestion from either pass once, by putting it to the user before the landing confirmation under `### User Interaction`; an accepted one follows the Step 8 Leftovers rule.
 
 #### Step 7 — Apply the triggered cleanup
 

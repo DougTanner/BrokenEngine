@@ -41,9 +41,9 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    adjudication is decided against. Hand-read the selected ranges for every
    Rule 2 form the narrow scanner does not emit, and in every review for
    rules 3, 4, 7, 8, 12, 13, 14, 16 (including its vector `.at()` clause), 21,
-   24, 31, 38, 42, 48, 49, 51, 56, 62, 65, 69 and 71, and for these halves of
-   rules split with another owner, except rule 47, whose half is checked by the
-   script run its bullet states:
+   24, 31, 38, 42, 48, 49, 51, 56, 62, 65, 69, 71 and 72, and for these halves
+   of rules split with another owner, except rule 47, whose half is checked by
+   the script run its bullet states:
    - rule 5: a mutex or OS lock, such as a critical section or SRW lock,
      locked and unlocked by hand instead of through a RAII lock owner; an OS
      allocation or handle, such as `VirtualAlloc`, `HeapAlloc`, `LocalAlloc`

@@ -118,7 +118,7 @@ ButtonResult Report(const Record& rRecord)
 			uiFlags |= MB_ICONWARNING;
 			break;
 	}
-	std::wstring title = Utf8ToWide(NormalizeUtf8(rRecord.title));
+	std::wstring title = Utf8ToWide(rRecord.title);
 	std::wstring message = Utf8ToWide(text);
 	int64_t iResult = MessageBoxW(nullptr, message.c_str(), title.c_str(), uiFlags);
 	return rRecord.eButtons == ButtonContract::kOk || iResult == IDOK ? ButtonResult::kAcknowledged : ButtonResult::kCancelled;

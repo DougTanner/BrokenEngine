@@ -677,10 +677,6 @@ static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::js
 		{
 			throw std::runtime_error("navQueryActivation requires recording and replay to be inactive");
 		}
-		else if (gpGame->mbReplaying)
-		{
-			throw std::runtime_error("navQueryActivation requires recording and replay to be inactive");
-		}
 	}
 	const nlohmann::json& rEntries = rParameters.at("entries");
 
@@ -875,14 +871,7 @@ bool QueueReplayTransferHarnessRig(const ServerSession& rSession, engine::GridCo
 		return false;
 	}
 
-	if (!IsTransferType(transfer.eType))
-	{
-		return false;
-	}
-	if (!std::holds_alternative<TransferData>(transfer.data))
-	{
-		return false;
-	}
+	ASSERT(IsTransferType(transfer.eType) && std::holds_alternative<TransferData>(transfer.data));
 
 	Bind(rSession);
 	sHarnessRig.replayTransferHarnessRigs.try_emplace(destination).first->second.push_back({.iTick = iTick, .change = std::move(transfer)});

@@ -7,7 +7,7 @@
 Each process resolves its asset data root and user AppData root once, at `FileManager` construction. Struct-layout files share one version header; one-shot writes are atomic.
 
 - Client and server launches must use the same data root; neither process can check it.
-- `FileManager` publishes `gpFileManager` only after platform directory setup and packed-asset construction succeed; code reachable during construction must not consume the global.
+- Code reachable during `FileManager` construction must not consume `gpFileManager`: the global is already set while platform directory setup and `mpPackChunks` construction run.
 - Directory creation and required boot-asset failures log their exact path and reason once, then throw `std::runtime_error`. Handle that type only around `FileManager` construction and eager-load completion, with `std::system_error` rethrown first; widening it over `MainThread` misclassifies unrelated runtime failures as startup exits.
 - Change an on-disk layout and its owning version together; only that version stops an old file being read as new.
 - Report failure detail through out-references beside a success return or success out-param; never store a failure reason for a later query.
@@ -33,7 +33,7 @@ Runtime reads assets only from `.manifest`-described `.pack` files. Eager types 
 - Cross-pack references are unvalidated at open and the lazy-chunk map is fixed at construction, so packs from different DataPacker runs can name a chunk absent for the whole process lifetime.
 - File owns all background packed-asset reads: two below-normal loader threads service whole chunks, range reloads, and client streaming-audio ranges. Real-time queued work wins; audio and other work then alternate so neither starves. Publish every accepted job and shutdown through the atomic wake sequence.
 - Client streaming-audio reads use six fixed Pack-owned 16 KiB result entries. The caller holds one request identity and exact range while polling; reset or destruction cancels it. Generation-tagged ownership makes cancelled queued and ready entries reusable at once, while an active loader keeps its entry until it acknowledges cancellation. File must outlive Audio.
-- Validate a streaming-audio request against its logical chunk payload before publishing. The loader validates the physical pack extent and complete read before discarding a cancelled generation, since corruption stays fatal even for an unwanted result. Loaders write only Pack-owned result storage; the polling main thread does the final copy to Audio.
+- Validate a streaming-audio request against its logical chunk payload before publishing. Pack open rejects any chunk whose header flags combine audio with compression, so that payload is the chunk's on-disk extent, already bounded inside the pack at open. A lazy pack is locked against writes, renames, and deletes before its size and headers are read and stays locked until shutdown, and every read of it, validation included, goes through that lock rather than its path, so the loader checks only for a complete read, before discarding a cancelled generation, since corruption stays fatal even for an unwanted result. Loaders write only Pack-owned result storage; the polling main thread does the final copy to Audio.
 - The [Agent audio harness rig](../Agent/AGENTS.md) may inspect Pack state and use loader-queue synchronization only in client Debug builds; elsewhere that state stays private.
 
 ## Lazy-Pool Invariants

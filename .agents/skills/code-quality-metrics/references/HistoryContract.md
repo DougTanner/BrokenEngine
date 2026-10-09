@@ -141,6 +141,8 @@ output JSONL SHA-256 (`digest`); `rows` is the pre-root seed rows plus `reused`,
 
 In every writing mode, `outputs.jsonl` and `outputs.svg` each contain the repository-relative path,
 byte count, and SHA-256. The files are named `CodeQualityMetricsHistory.jsonl` and
-`CodeQualityMetricsHistory.svg`. SVG is UTF-8 LF without BOM, fixed at 1800x1150, plots one point
-per row in each of its three panels, has no timestamps or machine paths, and embeds the series
-digest.
+`CodeQualityMetricsHistory.svg`. SVG is UTF-8 LF without BOM, fixed at 3840x2160, has no
+timestamps or machine paths, and embeds the series digest. It draws one band each for verbosity and
+structural erosion, with one point per row. Each band is scaled to its series' minimum and maximum
+over the rows plus a margin, and carries five left-axis value labels with fixed four decimals in the
+invariant culture. The count columns `supported` and `parsed` are not plotted.

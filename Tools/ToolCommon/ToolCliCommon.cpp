@@ -94,32 +94,27 @@ namespace toolcli
 			.lpSecurityDescriptor = nullptr,
 			.bInheritHandle = TRUE,
 		};
-		Handle hPipeRead;
-		Handle hPipeWrite;
-		if (rOptions.bCaptureOutput)
+		HANDLE hRawRead = INVALID_HANDLE_VALUE;
+		HANDLE hRawWrite = INVALID_HANDLE_VALUE;
+		if (::CreatePipe(&hRawRead, &hRawWrite, &pipeAttributes, 0) == FALSE)
 		{
-			HANDLE hRawRead = INVALID_HANDLE_VALUE;
-			HANDLE hRawWrite = INVALID_HANDLE_VALUE;
-			if (::CreatePipe(&hRawRead, &hRawWrite, &pipeAttributes, 0) == FALSE)
-			{
-				ReportProcessFailure(rOptions, "create output pipe");
-				return std::nullopt;
-			}
-			hPipeRead.Reset(hRawRead);
-			hPipeWrite.Reset(hRawWrite);
-			if (::SetHandleInformation(hPipeRead.Get(), HANDLE_FLAG_INHERIT, 0) == FALSE)
-			{
-				ReportProcessFailure(rOptions, "configure output pipe");
-				return std::nullopt;
-			}
+			ReportProcessFailure(rOptions, "create output pipe");
+			return std::nullopt;
+		}
+		Handle hPipeRead(hRawRead);
+		Handle hPipeWrite(hRawWrite);
+		if (::SetHandleInformation(hPipeRead.Get(), HANDLE_FLAG_INHERIT, 0) == FALSE)
+		{
+			ReportProcessFailure(rOptions, "configure output pipe");
+			return std::nullopt;
 		}
 
 		STARTUPINFOW startupInfo {};
 		startupInfo.cb = sizeof(startupInfo);
 		startupInfo.dwFlags = STARTF_USESTDHANDLES;
 		startupInfo.hStdInput = ::GetStdHandle(STD_INPUT_HANDLE);
-		startupInfo.hStdOutput = rOptions.bCaptureOutput ? hPipeWrite.Get() : ::GetStdHandle(STD_OUTPUT_HANDLE);
-		startupInfo.hStdError = rOptions.bCaptureOutput && rOptions.bMergeStdError ? hPipeWrite.Get() : ::GetStdHandle(STD_ERROR_HANDLE);
+		startupInfo.hStdOutput = hPipeWrite.Get();
+		startupInfo.hStdError = rOptions.bMergeStdError ? hPipeWrite.Get() : ::GetStdHandle(STD_ERROR_HANDLE);
 		PROCESS_INFORMATION processInformation {};
 		std::wstring commandLine = BuildCommandLine(rArguments);
 		DWORD uiCreationFlags = (rOptions.bNoWindow ? CREATE_NO_WINDOW : 0) | (rOptions.bKillOnJobClose ? CREATE_SUSPENDED : 0);
@@ -149,35 +144,32 @@ namespace toolcli
 		hPipeWrite.Reset();
 
 		ProcessResult result;
-		if (rOptions.bCaptureOutput)
+		char pBuffer[65'536] {};
+		DWORD uiRead = 0;
+		// A zero-byte write by the child completes ReadFile with TRUE/0; only a broken pipe is EOF.
+		while (::ReadFile(hPipeRead.Get(), pBuffer, sizeof(pBuffer), &uiRead, nullptr) != FALSE)
 		{
-			char pBuffer[65'536] {};
-			DWORD uiRead = 0;
-			// A zero-byte write by the child completes ReadFile with TRUE/0; only a broken pipe is EOF.
-			while (::ReadFile(hPipeRead.Get(), pBuffer, sizeof(pBuffer), &uiRead, nullptr) != FALSE)
+			int64_t iRead = uiRead;
+			if (iRead == 0)
 			{
-				int64_t iRead = uiRead;
-				if (iRead == 0)
-				{
-					continue;
-				}
-				if (rOptions.OutputSink)
-				{
-					rOptions.OutputSink(std::span<const char>(pBuffer, static_cast<size_t>(iRead)));
-				}
-				else
-				{
-					result.output.append(pBuffer, static_cast<size_t>(iRead));
-				}
+				continue;
 			}
-			int64_t iReadError = ::GetLastError();
-			if (iReadError != ERROR_BROKEN_PIPE)
+			if (rOptions.OutputSink)
 			{
-				ReportProcessFailure(rOptions, "read process output");
-				hPipeRead.Reset();
-				::WaitForSingleObject(hProcess.Get(), INFINITE);
-				return std::nullopt;
+				rOptions.OutputSink(std::span<const char>(pBuffer, static_cast<size_t>(iRead)));
 			}
+			else
+			{
+				result.output.append(pBuffer, static_cast<size_t>(iRead));
+			}
+		}
+		int64_t iReadError = ::GetLastError();
+		if (iReadError != ERROR_BROKEN_PIPE)
+		{
+			ReportProcessFailure(rOptions, "read process output");
+			hPipeRead.Reset();
+			::WaitForSingleObject(hProcess.Get(), INFINITE);
+			return std::nullopt;
 		}
 		if (::WaitForSingleObject(hProcess.Get(), INFINITE) != WAIT_OBJECT_0)
 		{

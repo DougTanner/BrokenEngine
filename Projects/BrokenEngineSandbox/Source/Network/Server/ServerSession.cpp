@@ -23,9 +23,8 @@ namespace game
 #if defined(BT_SERVER)
 
 ServerSession::ServerSession()
+: common::Singleton<ServerSession>(gpServerSession)
 {
-	ASSERT(gpServerSession == nullptr);
-	gpServerSession = this;
 	mpFleetManager = std::make_unique<ServerFleetManager>();
 	mpTransferManager = std::make_unique<engine::ServerTransferManager>();
 	mpBroadcaster = std::make_unique<engine::ServerBroadcaster>();
@@ -37,7 +36,6 @@ ServerSession::~ServerSession()
 {
 	DetachServerSimulationHarnessRigs(*this);
 	mpRuntime.reset();
-	gpServerSession = nullptr;
 }
 
 void ServerSession::PrepareTick()
@@ -58,10 +56,7 @@ void ServerSession::PrepareTick()
 
 	for (const engine::GridCoord& rCoordinate : gpGame->mActiveCoordinates)
 	{
-		if (!gpGame->mFrameInputs.contains(rCoordinate))
-		{
-			gpGame->mFrameInputs.try_emplace(rCoordinate);
-		}
+		gpGame->mFrameInputs.try_emplace(rCoordinate);
 	}
 
 	mpBroadcaster->PrepareTickStatusChanges();
@@ -164,10 +159,7 @@ void ServerSession::ParseReceivedGamePackets()
 					fleetGuid.uiLow = engine::ReadUint64(pCursor);
 					float fDelay = AdmitNavigationDelay(engine::ReadFloat(pCursor));
 					const engine::ClientConnection* pClient = engine::gpServer->FindClient(rPacket.iClientId);
-					if (pClient != nullptr)
-					{
-						mpFleetManager->UpdateFleetNavigationDelay(pClient->clientGuid, fleetGuid, std::chrono::duration<float>(fDelay));
-					}
+					mpFleetManager->UpdateFleetNavigationDelay(pClient->clientGuid, fleetGuid, std::chrono::duration<float>(fDelay));
 					break;
 				}
 				case GamePacketType::kClientSaveRequest:

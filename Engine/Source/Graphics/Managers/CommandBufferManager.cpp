@@ -11,11 +11,8 @@ namespace engine
 {
 
 CommandBufferManager::CommandBufferManager()
+: common::Singleton<CommandBufferManager>(gpCommandBufferManager)
 {
-	ASSERT(gpCommandBufferManager == nullptr);
-
-	gpCommandBufferManager = this;
-
 	ScopedBootTimer scopedBootTimer(kBootTimerCommandBufferManager);
 
 	// Each drawing command binds a specific VkFramebuffer, so record one command buffer per swapchain image.
@@ -37,11 +34,6 @@ CommandBufferManager::CommandBufferManager()
 CommandBufferManager::~CommandBufferManager()
 {
 	vkDestroySemaphore(gpDeviceManager->mVkDevice, mParticleSyncVkSemaphore, nullptr);
-
-	if (gpCommandBufferManager == this)
-	{
-		gpCommandBufferManager = nullptr;
-	}
 }
 
 void CommandBufferManager::RecordCommandBuffers()

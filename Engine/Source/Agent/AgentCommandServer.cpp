@@ -101,16 +101,11 @@ AgentCommandServer::~AgentCommandServer()
 	AudioStreamingHarnessRig::Detach(*mpAudioStreamingHarnessRig);
 	mpAudioStreamingHarnessRig.reset();
 #endif
-	// Request stop, close only the listener under the lock, and wake a pending response wait. The listener owns the
-	// active connection until ServeConnection exits, then performs its one final close before the jthread joins.
+	// Teardown only requests stop under the lock and wakes the listener; the listener closes both sockets itself
+	// before the jthread joins.
 	{
 		std::unique_lock lock(mMutex);
 		mListenerThread.request_stop();
-		if (muiListenSocket != INVALID_SOCKET)
-		{
-			closesocket(muiListenSocket);
-			muiListenSocket = INVALID_SOCKET;
-		}
 	}
 	mResponseReady.notify_all();
 }
@@ -139,11 +134,6 @@ void AgentCommandServer::ListenerLoop(std::stop_token stopToken)
 				break;
 			}
 
-			if (muiListenSocket == INVALID_SOCKET)
-			{
-				break;
-			}
-
 			uiClientSocket = accept(muiListenSocket, nullptr, nullptr);
 			if (uiClientSocket == INVALID_SOCKET)
 			{
@@ -155,10 +145,6 @@ void AgentCommandServer::ListenerLoop(std::stop_token stopToken)
 						return stopToken.stop_requested();
 					});
 					continue;
-				}
-				if (stopToken.stop_requested())
-				{
-					break;
 				}
 
 				LOG(kNetwork, kError, "AgentCommandServer accept failed: {}", iAcceptError);
@@ -181,27 +167,23 @@ void AgentCommandServer::ListenerLoop(std::stop_token stopToken)
 				closesocket(uiClientSocket);
 				break;
 			}
-			muiActiveSocket = uiClientSocket;
 		}
 
 		ServeConnection(uiClientSocket, stopToken);
 
-		// ServeConnection has returned, so the listener exclusively owns the final active-socket close. Bump the
-		// generation so any response still deferred from this connection is discarded
-		// by Drain instead of landing in the next connection's stream (id desync / wedged deferred branch), and drop
-		// any response the main thread published after the peer stopped waiting so it can't satisfy the next
-		// connection's first request. mDeferredPoll itself is main-thread-only — never bare-written here.
+		// Bump the generation so any response still deferred from this connection is discarded by Drain instead of
+		// landing in the next connection's stream (id desync / wedged deferred branch), and drop any response the main
+		// thread published after the peer stopped waiting so it can't satisfy the next connection's first request.
+		// mDeferredPoll itself is main-thread-only — never bare-written here.
 		{
 			std::unique_lock lock(mMutex);
 			++miConnectionGeneration;
 			mPendingResponse.reset();
-			if (muiActiveSocket != INVALID_SOCKET)
-			{
-				closesocket(muiActiveSocket);
-				muiActiveSocket = INVALID_SOCKET;
-			}
+			closesocket(uiClientSocket);
 		}
 	}
+
+	closesocket(muiListenSocket);
 }
 
 void AgentCommandServer::ServeConnection(SOCKET uiClientSocket, const std::stop_token& rStopToken)

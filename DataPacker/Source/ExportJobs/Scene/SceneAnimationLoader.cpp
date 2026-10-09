@@ -8,7 +8,7 @@ static bool IsValidIndex(int64_t iIndex, int64_t iSize)
 
 static size_t CheckedAnimationSize(size_t uiCount, size_t uiElementSize, std::string_view context)
 {
-	if (uiElementSize != 0 && uiCount > std::numeric_limits<size_t>::max() / uiElementSize)
+	if (uiCount > std::numeric_limits<size_t>::max() / uiElementSize)
 	{
 		throw std::runtime_error(std::format("{} has a byte size that overflows size_t.", context));
 	}
@@ -52,14 +52,7 @@ static const float* AccessorFloats(const tinygltf::Model& rModel, int64_t iAcces
 
 	int64_t iComponentSize = tinygltf::GetComponentSizeInBytes(static_cast<uint32_t>(rAccessor.componentType));
 	int64_t iComponentCount = tinygltf::GetNumComponentsInType(static_cast<uint32_t>(rAccessor.type));
-	if (iComponentSize <= 0)
-	{
-		throw std::runtime_error(std::format("{} accessor {} has an invalid component or element type.", context, iAccessor));
-	}
-	if (iComponentCount <= 0)
-	{
-		throw std::runtime_error(std::format("{} accessor {} has an invalid component or element type.", context, iAccessor));
-	}
+	ASSERT(iComponentSize > 0 && iComponentCount > 0);
 
 	const tinygltf::Buffer& rBuffer = rModel.buffers.at(static_cast<size_t>(rBufferView.buffer));
 	if (rBufferView.byteOffset > rBuffer.data.size() || rBufferView.byteLength > rBuffer.data.size() - rBufferView.byteOffset)
@@ -86,10 +79,6 @@ static const float* AccessorFloats(const tinygltf::Model& rModel, int64_t iAcces
 	if (uiBufferOffset % alignof(float) != 0)
 	{
 		throw std::runtime_error(std::format("{} accessor {} float data is misaligned.", context, iAccessor));
-	}
-	if (uiRequiredBytes > rBuffer.data.size() - uiBufferOffset)
-	{
-		throw std::runtime_error(std::format("{} accessor {} read lies outside buffer {}.", context, iAccessor, rBufferView.buffer));
 	}
 
 	return reinterpret_cast<const float*>(rBuffer.data.data() + uiBufferOffset);
@@ -185,10 +174,6 @@ static void EmitKeyframes(std::span<const float> times, std::span<const float> v
 		{
 			keyframe.f4Value = XMFLOAT4(values[j * iValueStride + 0], values[j * iValueStride + 1], values[j * iValueStride + 2], values[j * iValueStride + 3]);
 		}
-		else if (rChannel.uiTargetPath == common::AnimationChannel::kiTargetPathTranslation)
-		{
-			keyframe.f4Value = XMFLOAT4(values[j * iValueStride + 0], values[j * iValueStride + 1], values[j * iValueStride + 2], 0.0f);
-		}
 		else
 		{
 			keyframe.f4Value = XMFLOAT4(values[j * iValueStride + 0], values[j * iValueStride + 1], values[j * iValueStride + 2], 0.0f);
@@ -275,10 +260,6 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOutput)
 
 			const tinygltf::Accessor& rInputAccessor = rModel.accessors.at(static_cast<size_t>(rSampler.input));
 			const tinygltf::Accessor& rOutputAccessor = rModel.accessors.at(static_cast<size_t>(rSampler.output));
-			if (rInputAccessor.count == 0)
-			{
-				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) has no input keyframes.", rAnimation.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler));
-			}
 			if (!std::in_range<uint32_t>(rInputAccessor.count))
 			{
 				throw std::runtime_error(std::format("Animation \"{}\" channel (target node {}, path \"{}\", sampler {}) input keyframe count {} exceeds the supported limit {}.", rAnimation.name, rGltfChannel.target_node, rGltfChannel.target_path, rGltfChannel.sampler, rInputAccessor.count, std::numeric_limits<uint32_t>::max()));

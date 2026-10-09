@@ -130,86 +130,6 @@ namespace toolcli
 		return true;
 	}
 
-	static bool IsPathBelow(const std::filesystem::path& rChild, const std::filesystem::path& rParent)
-	{
-		std::error_code error;
-		std::filesystem::path child = std::filesystem::weakly_canonical(ExtendedLengthPath(rChild), error);
-		if (error)
-		{
-			return false;
-		}
-		std::filesystem::path parent = std::filesystem::weakly_canonical(ExtendedLengthPath(rParent), error);
-		if (error)
-		{
-			return false;
-		}
-		auto childIt = child.begin();
-		for (auto parentIt = parent.begin(); parentIt != parent.end(); ++parentIt, ++childIt)
-		{
-			if (childIt == child.end() || *childIt != *parentIt)
-			{
-				return false;
-			}
-		}
-		return true;
-	}
-
-
-	static bool IsCanonicalPositiveDecimal(std::wstring_view rValue)
-	{
-		return !rValue.empty() && rValue.size() <= 10 && rValue.front() >= L'1' && rValue.front() <= L'9' && std::all_of(rValue.begin() + 1, rValue.end(), [](wchar_t cValue)
-		{
-			return cValue >= L'0' && cValue <= L'9';
-		});
-	}
-
-	static bool RemovePlanAtomicTemporarySiblings(const std::filesystem::path& rWorktree, std::wstring_view planRelativePath)
-	{
-		std::filesystem::path planPath = rWorktree / planRelativePath;
-		if (!IsPathBelow(planPath, rWorktree))
-		{
-			return false;
-		}
-		std::filesystem::path parent = planPath.parent_path();
-		std::wstring prefix = planPath.filename().wstring() + L".tmp.";
-		std::error_code error;
-		for (std::filesystem::directory_iterator it(ExtendedLengthPath(parent), error), end; !error && it != end; it.increment(error))
-		{
-			std::wstring filename = it->path().filename().wstring();
-			if (!filename.starts_with(prefix))
-			{
-				continue;
-			}
-			std::wstring_view suffix(filename.data() + prefix.size(), filename.size() - prefix.size());
-			int64_t iSeparator = static_cast<int64_t>(suffix.find(L'.'));
-			if (iSeparator == -1 || suffix.find(L'.', static_cast<size_t>(iSeparator + 1)) != std::wstring_view::npos || !IsCanonicalPositiveDecimal(suffix.substr(0, static_cast<size_t>(iSeparator))) || !IsCanonicalPositiveDecimal(suffix.substr(static_cast<size_t>(iSeparator + 1))))
-			{
-				continue;
-			}
-			std::filesystem::path temporaryPath = parent / filename;
-			if (!IsPathBelow(temporaryPath, rWorktree))
-			{
-				continue;
-			}
-			std::error_code entryError;
-			if (!it->is_regular_file(entryError) || entryError)
-			{
-				continue;
-			}
-			DWORD uiAttributes = ::GetFileAttributesW(ExtendedLengthPath(temporaryPath).c_str());
-			if (uiAttributes == INVALID_FILE_ATTRIBUTES || (uiAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) != 0 || (uiAttributes & FILE_ATTRIBUTE_HIDDEN) == 0 || (uiAttributes & FILE_ATTRIBUTE_TEMPORARY) == 0)
-			{
-				continue;
-			}
-			if (::DeleteFileW(ExtendedLengthPath(temporaryPath).c_str()) == FALSE)
-			{
-				return false;
-			}
-		}
-		return !error || error == std::errc::no_such_file_or_directory;
-	}
-
-
 	static std::optional<std::filesystem::path> SchedulerRoot(std::wstring_view repository)
 	{
 		std::filesystem::path localApplicationData = GetLocalApplicationDataPath();
@@ -237,49 +157,42 @@ namespace toolcli
 
 	static bool ValidateClaim(const nlohmann::json& rClaim, std::wstring_view repository, std::wstring_view plan)
 	{
-		try
-		{
-			// An exact field count rejects every schema-v1 record, which is how the pre-cutover claims are collected.
-			if (!rClaim.is_object())
-			{
-				return false;
-			}
-			if (rClaim.size() != 9)
-			{
-				return false;
-			}
-			if (!rClaim.contains("schemaVersion"))
-			{
-				return false;
-			}
-			if (!coordination::JsonIntegerEquals(rClaim["schemaVersion"], 2))
-			{
-				return false;
-			}
-			std::unordered_map<std::string, std::string> fields;
-			for (const char* pcField : { "repository", "plan", "owner", "session", "worktree", "branch", "claimedAt", "expiresAt" })
-			{
-				if (!ReadRequiredString(rClaim, pcField, fields.try_emplace(pcField).first->second))
-				{
-					return false;
-				}
-			}
-			if (fields.at("repository") != WideToUtf8(repository))
-			{
-				return false;
-			}
-			if (fields.at("plan") != WideToUtf8(plan))
-			{
-				return false;
-			}
-			int64_t iClaimedAt = 0;
-			int64_t iExpiresAt = 0;
-			return ParseCanonicalUtcTimestamp(fields.at("claimedAt"), iClaimedAt) && ParseCanonicalUtcTimestamp(fields.at("expiresAt"), iExpiresAt) && iExpiresAt > iClaimedAt && iExpiresAt - iClaimedAt == kiClaimLifetimeTicks;
-		}
-		catch (const nlohmann::json::exception&)
+		// An exact field count rejects every schema-v1 record, which is how the pre-cutover claims are collected.
+		if (!rClaim.is_object())
 		{
 			return false;
 		}
+		if (rClaim.size() != 9)
+		{
+			return false;
+		}
+		if (!rClaim.contains("schemaVersion"))
+		{
+			return false;
+		}
+		if (!coordination::JsonIntegerEquals(rClaim["schemaVersion"], 2))
+		{
+			return false;
+		}
+		std::unordered_map<std::string, std::string> fields;
+		for (const char* pcField : { "repository", "plan", "owner", "session", "worktree", "branch", "claimedAt", "expiresAt" })
+		{
+			if (!ReadRequiredString(rClaim, pcField, fields.try_emplace(pcField).first->second))
+			{
+				return false;
+			}
+		}
+		if (fields.at("repository") != WideToUtf8(repository))
+		{
+			return false;
+		}
+		if (fields.at("plan") != WideToUtf8(plan))
+		{
+			return false;
+		}
+		int64_t iClaimedAt = 0;
+		int64_t iExpiresAt = 0;
+		return ParseCanonicalUtcTimestamp(fields.at("claimedAt"), iClaimedAt) && ParseCanonicalUtcTimestamp(fields.at("expiresAt"), iExpiresAt) && iExpiresAt > iClaimedAt && iExpiresAt - iClaimedAt == kiClaimLifetimeTicks;
 	}
 
 	static bool ReadClaim(const std::filesystem::path& rPath, Claim& rClaim)
@@ -981,15 +894,10 @@ namespace toolcli
 		return kiExitOk;
 	}
 
-	static bool RenderDependencies(const Plan& rPlan, std::wstring_view removed, std::string& rBytes)
+	static void RenderDependencies(const Plan& rPlan, std::wstring_view removed, std::string& rBytes)
 	{
 		std::vector<std::wstring> dependencies = rPlan.dependencies;
-		auto found = std::find(dependencies.begin(), dependencies.end(), removed);
-		if (found == dependencies.end())
-		{
-			return false;
-		}
-		dependencies.erase(found);
+		dependencies.erase(std::find(dependencies.begin(), dependencies.end(), removed));
 		int64_t iLineEnd = static_cast<int64_t>(rPlan.bytes.find('\n'));
 		int64_t iSuffixStart = iLineEnd == -1 ? std::ssize(rPlan.bytes) : (iLineEnd > 0 && rPlan.bytes[static_cast<size_t>(iLineEnd - 1)] == '\r' ? iLineEnd - 1 : iLineEnd);
 		nlohmann::json metadata = { { "createdUtc", rPlan.createdUtc }, { "dependsOn", nlohmann::json::array() } };
@@ -998,7 +906,19 @@ namespace toolcli
 			metadata["dependsOn"].push_back(WideToUtf8(rDependency));
 		}
 		rBytes = std::string(kMarkerPrefix) + metadata.dump() + std::string(kMarkerSuffix) + rPlan.bytes.substr(static_cast<size_t>(iSuffixStart));
-		return true;
+	}
+
+	static bool WritePlanBytes(const std::filesystem::path& rPath, std::string_view contents)
+	{
+		Handle hFile(::CreateFileW(ExtendedLengthPath(rPath).c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+		if (!hFile.IsValid())
+		{
+			return false;
+		}
+		DWORD uiWritten = 0;
+		bool bSucceeded = ::WriteFile(hFile.Get(), contents.data(), static_cast<DWORD>(contents.size()), &uiWritten, nullptr) != FALSE;
+		int64_t iWritten = uiWritten;
+		return bSucceeded && std::cmp_equal(iWritten, contents.size());
 	}
 
 	// Terminal preparation removes the target from every direct dependency child's byte-zero marker and deletes the target Plan file. Both edits are idempotent: a child whose marker no longer lists the target is not selected, and an absent target is skipped.
@@ -1058,7 +978,6 @@ namespace toolcli
 		struct ChildRewrite
 		{
 			std::wstring path;
-			std::string before;
 			std::string after;
 		};
 		std::vector<ChildRewrite> rewrites;
@@ -1085,11 +1004,8 @@ namespace toolcli
 			{
 				return Failure("child-invalid", kiExitStateConflict);
 			}
-			ChildRewrite rewrite { .path = rPath, .before = rPlan.bytes, .after = {} };
-			if (!RenderDependencies(rPlan, target, rewrite.after))
-			{
-				return Failure("child-invalid", kiExitStateConflict);
-			}
+			ChildRewrite rewrite { .path = rPath, .after = {} };
+			RenderDependencies(rPlan, target, rewrite.after);
 			rewrites.push_back(std::move(rewrite));
 		}
 		std::filesystem::path targetDiskPath = worktree / target;
@@ -1103,60 +1019,20 @@ namespace toolcli
 		{
 			return Failure("plan-untracked", kiExitStateConflict);
 		}
-		// The sweep matches the same temporary filename shape the staging below creates, so it has to finish
-		// before anything is staged or it would delete this operation's own pending files.
-		if (!RemovePlanAtomicTemporarySiblings(worktree, target))
-		{
-			return Failure("orphan-cleanup-failed");
-		}
 		for (const ChildRewrite& rRewrite : rewrites)
 		{
-			if (!RemovePlanAtomicTemporarySiblings(worktree, rRewrite.path))
+			if (!WritePlanBytes(worktree / rRewrite.path, rRewrite.after))
 			{
-				return Failure("orphan-cleanup-failed");
-			}
-		}
-		std::vector<std::filesystem::path> stagedPaths(static_cast<size_t>(std::ssize(rewrites)));
-		auto DiscardStaged = [&stagedPaths](int64_t iFirst, int64_t iLast)
-		{
-			for (int64_t i = iFirst; i < iLast; ++i)
-			{
-				::DeleteFileW(stagedPaths.at(i).c_str());
-			}
-		};
-		for (int64_t i = 0; i < std::ssize(rewrites); ++i)
-		{
-			if (!coordination::StageBytesAtomic(worktree / rewrites.at(i).path, rewrites.at(i).after, stagedPaths.at(i)))
-			{
-				DiscardStaged(0, i);
-				return Failure("rewrite-failed");
-			}
-		}
-		auto RestorePublished = [&rewrites, &worktree](int64_t iCount)
-		{
-			bool bRestored = true;
-			for (int64_t i = 0; i < iCount; ++i)
-			{
-				bRestored = coordination::WriteBytesAtomic(worktree / rewrites.at(i).path, rewrites.at(i).before) && bRestored;
-			}
-			return bRestored;
-		};
-		for (int64_t i = 0; i < std::ssize(rewrites); ++i)
-		{
-			if (!coordination::CommitStagedBytes(stagedPaths.at(i), worktree / rewrites.at(i).path))
-			{
-				RestorePublished(i);
-				DiscardStaged(i + 1, std::ssize(rewrites));
 				return Failure("rewrite-failed");
 			}
 		}
 		nlohmann::json changed = nlohmann::json::array();
 		if (bTargetPresent)
 		{
-			// The target is deleted last, so no failure path ever has to bring a deleted Plan file back.
+			// The target is deleted last, so a failed child rewrite leaves the target Plan file in place.
 			if (::DeleteFileW(ExtendedLengthPath(targetDiskPath).c_str()) == FALSE)
 			{
-				return RestorePublished(std::ssize(rewrites)) ? Failure("delete-failed") : Failure("rewrite-failed");
+				return Failure("delete-failed");
 			}
 			changed.push_back(WideToUtf8(target));
 		}

@@ -376,7 +376,8 @@ void ReconcileFastPathCatchUp(CoordWork& rWork, int64_t iTargetTick)
 		rCell.snapshots[iSlot]->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, false);
 	}
 
-	rCell.iSnapshotCount = std::min(iStartCount + rScratch.iReplayWriteCount, static_cast<int64_t>(engine::kiNetworkBufferSize));
+	rCell.iSnapshotCount = iStartCount + rScratch.iReplayWriteCount;
+	ASSERT(rCell.iSnapshotCount <= engine::kiNetworkBufferSize);
 }
 
 } // namespace engine

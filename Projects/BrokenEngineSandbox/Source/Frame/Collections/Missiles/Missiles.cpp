@@ -154,7 +154,7 @@ void MissilesInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 
 	int64_t iAreaLightType = (rPostRender.pFlags[iIndex] & kTargetEnemy)
 		? siPlayerExhaustAreaLightTypeIndex : siEnemyExhaustAreaLightTypeIndex;
-	rFrame.postRender.areaLights.Add(rFrame, rMissiles.puiAreaLights[iIndex], iAreaLightType);
+	engine::AreaLightsPostRender::Add(rFrame, rMissiles.puiAreaLights[iIndex], iAreaLightType);
 
 	engine::SmokeTrailsPostRender::Add(rFrame, rMissiles.puiSmokeTrails[iIndex], siSmokeTrailTypeIndex);
 
@@ -432,15 +432,8 @@ void MissilesPostRender::Fall(Frame& __restrict rFrame, int64_t i, std::chrono::
 {
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
-	if (rCurrentPostRender.pFlags[i] & kExploding)
-	{
-		return;
-	}
-
-	if (rCurrentPostRender.pFlags[i] & kFalling)
-	{
-		return;
-	}
+	ASSERT(!(rCurrentPostRender.pFlags[i] & kExploding));
+	ASSERT(!(rCurrentPostRender.pFlags[i] & kFalling));
 
 	// The registry subscription is released by the Update caller, which is the only site holding a live query
 	// window; the falling missile itself keeps no handle past that release.
@@ -473,10 +466,7 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
-	if (rCurrentPostRender.pFlags[i] & kExploding) [[unlikely]]
-	{
-		return;
-	}
+	ASSERT(!(rCurrentPostRender.pFlags[i] & kExploding));
 	// PostCollision runs after the Update query window is gone, so the handle is only cleared.
 	rCurrentPostRender.puiRegistryTargets[i] = {};
 

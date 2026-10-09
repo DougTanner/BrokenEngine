@@ -68,9 +68,9 @@ public:
 	void DecommitChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength);
 	// Inverse of DecommitChunkRange: MEM_COMMITs the interior and re-reads [iOffset, iOffset + iLength)
 	// straight from the pack file on disk into the pool (NOT via the decommitted resident copy). Uncompressed chunks only.
-	// Returns true on success; false on soft-fail (MEM_COMMIT failure / pack-open failure). On false the
+	// Returns true on success; false on soft-fail (MEM_COMMIT failure). On false the
 	// caller must NOT read the range — the interior may be decommitted or hold partial data.
-	[[nodiscard]] bool RecommitAndReloadChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength);
+	[[nodiscard]] bool RecommitAndReloadChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength, int64_t iThreadIndex);
 
 	MemoryStats GetEagerStatistics() const;
 	MemoryStats GetLazyStatistics() const;
@@ -140,7 +140,6 @@ private:
 	// thread's chunk reads). Size is shared — identical for every thread.
 	std::byte* mpReadBuffers[PackChunkLoader::kiLoadingThreadCount] {};
 	int64_t miReadBufferSize = 0;
-	int64_t miSectorSize = 0;
 	int64_t miPageSize = 0; // VM page granularity for lazy-chunk sub-range decommit/recommit
 
 	// Pre-allocated memory pool for all lazy chunk data (VirtualAlloc MEM_COMMIT — committed, not pre-faulted)
@@ -154,6 +153,9 @@ private:
 
 	// Sub-read size for chunked disk reads (256KB balances NVMe throughput vs L3 cache pressure)
 	static constexpr int64_t kiSubReadSize = 256 * 1'024;
+
+	// FILE_FLAG_NO_BUFFERING alignment: a multiple of both supported logical sector sizes (512, 4096) and the physical-sector alignment Microsoft recommends.
+	static constexpr int64_t kiSectorAlignment = 4'096;
 
 public:
 	PackChunkLoader mLoader;

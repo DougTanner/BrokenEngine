@@ -66,7 +66,7 @@ Loaded textures, global texture descriptors, cached generated textures, and rend
 - Light-type textures consume a fixed reservation of bindless slots for pre-blurred results. Grow that reservation if the registered lighting-texture count exceeds its capacity.
 - A lighting texture's pre-blurred result is found under its own CRC salted with `kBlurSalt`, so the blur write site and every read site agree without a second lookup table. `ReblurAllLightingTextures` re-runs the blur for every ready lighting texture after a change that invalidates the results.
 - Three owned-by-value units carry the detail: `TextureDescriptors` (global descriptor Set 0, the bindless texture array, per-pipeline binding tracking, deferred descriptor updates), `TextureCache` (GPU-to-CPU readback, the on-disk cache of generated textures, PBR BRDF lookup tables), and `RenderTargetTextures` (creation and sizing of effect render targets).
-- The on-disk cache is versioned: a cached file is reused only when its magic number, version, format, extent, mip count, layer count, and source CRC all match the request, and the version is stamped on write. Any newly generated texture reuses this cache rather than regenerating every boot or adding a second caching path.
+- The on-disk cache is versioned: a cached file is reused only when its shared version header (`../../File/AGENTS.md`) validates and its format, extent, mip count, and layer count all match the request; the payload size is derived from that request, not read from the file. Any newly generated texture reuses this cache rather than regenerating every boot or adding a second caching path.
 
 Water's variance-table consumption is documented in Water shaders (`../../../Data/Shaders/Water/AGENTS.md`).
 

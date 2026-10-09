@@ -188,7 +188,7 @@ void ProfileManagerBase::CpuStop(int64_t iCpuTimer, CpuStopFlags_t flags)
 		{
 			for (auto& [rThreadId, rStates] : mPerThreadTimerStates)
 			{
-				if (std::ssize(rStates) > iCpuTimer && rStates.at(static_cast<size_t>(iCpuTimer)).startTimePoint != std::chrono::steady_clock::time_point())
+				if (rStates.at(static_cast<size_t>(iCpuTimer)).startTimePoint != std::chrono::steady_clock::time_point())
 				{
 					pState = &rStates.at(static_cast<size_t>(iCpuTimer));
 					break;
@@ -268,30 +268,6 @@ void ProfileManagerBase::AddRawCpuTimerAuxiliaryCount(int64_t iCpuTimer, int64_t
 	}
 }
 
-void ProfileManagerBase::LatchRawCpuTimer(int64_t iCpuTimer, bool bAccept)
-{
-	if constexpr (kbProfiling)
-	{
-		std::lock_guard lock(mCpuTimerMutex);
-		RawCpuTimerState& rRawTimer = mpRawCpuTimers[static_cast<size_t>(iCpuTimer)];
-		int64_t iAuxiliaryCount = rRawTimer.iAuxiliaryCount.exchange(0, std::memory_order_relaxed);
-		if (bAccept)
-		{
-			++rRawTimer.record.iSampleSequence;
-			rRawTimer.record.iSampleMicroseconds = rRawTimer.iTotalTimeNanoseconds / 1'000;
-			rRawTimer.record.iInvocationCount = rRawTimer.iInvocationCount;
-			rRawTimer.record.iAuxiliaryCount = iAuxiliaryCount;
-		}
-		rRawTimer.iTotalTimeNanoseconds = 0;
-		rRawTimer.iInvocationCount = 0;
-		if (!bAccept)
-		{
-			rRawTimer.flags.Set(RawCpuTimerStateFlags::kEventArmed, false);
-			rRawTimer.iMinimumSampleTick = 0;
-		}
-	}
-}
-
 void ProfileManagerBase::LatchRawCpuTimers(bool bAccept, int64_t iSampleTick)
 {
 	if constexpr (kbProfiling)
@@ -331,19 +307,6 @@ void ProfileManagerBase::LatchRawCpuTimers(bool bAccept, int64_t iSampleTick)
 		{
 			OnRawCpuTimersLatched(iSampleTick);
 		}
-	}
-}
-
-bool ProfileManagerBase::ArmRawCpuTimerEvent(int64_t iCpuTimer, int64_t iMinimumSampleTick)
-{
-	if constexpr (kbProfiling)
-	{
-		std::lock_guard lock(mCpuTimerMutex);
-		return ArmRawCpuTimerEventLocked(iCpuTimer, iMinimumSampleTick);
-	}
-	else
-	{
-		return false;
 	}
 }
 
@@ -421,7 +384,7 @@ bool ProfileManagerBase::AcknowledgeRawCpuTimerEvent(int64_t iCpuTimer, int64_t 
 	if constexpr (kbProfiling)
 	{
 		RawCpuTimerEventRecord& rEvent = mpRawCpuTimers[static_cast<size_t>(iCpuTimer)].eventRecord;
-		if (!(rEvent.flags & RawCpuTimerEventFlags::kAvailable) || iEventSequence == 0 || iEventSequence != rEvent.iEventSequence)
+		if (!(rEvent.flags & RawCpuTimerEventFlags::kAvailable) || iEventSequence != rEvent.iEventSequence)
 		{
 			return false;
 		}
@@ -698,7 +661,7 @@ void ProfileManagerBase::DiscardSkippedFrameSamples()
 		// AcquireToGlobal stays running across the skipped frames; restart it now. The boot render loop can resume before it ever started, so a missing state is valid.
 		for (auto& [rThreadId, rStates] : mPerThreadTimerStates)
 		{
-			if (std::ssize(rStates) > kCpuTimerAcquireToGlobal && rStates.at(static_cast<size_t>(kCpuTimerAcquireToGlobal)).startTimePoint != std::chrono::steady_clock::time_point())
+			if (rStates.at(static_cast<size_t>(kCpuTimerAcquireToGlobal)).startTimePoint != std::chrono::steady_clock::time_point())
 			{
 				CpuTimerThreadState& rState = rStates.at(static_cast<size_t>(kCpuTimerAcquireToGlobal));
 				rState.startTimePoint = now;

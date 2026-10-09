@@ -28,8 +28,8 @@ inline constexpr int64_t kiMaxSerializedStatusChangeBatchBytes = kiMaximumStatus
 inline constexpr int64_t kiMaxCompressStatusChangeWorkbufferBytes = kiMaxSerializedStatusChangeBatchBytes + 15 + kiMaximumStatusChangesPerCell * static_cast<int64_t>(sizeof(int64_t));
 
 // Worst-case bytes CompressStatusChangeBatch can emit for a valid capped batch (4-byte uncompressed-size prefix +
-// LZ4 payload). Sizes the server's reused compression scratch so any valid batch always fits; the codec still checks
-// the LZ4 return as a belt.
+// LZ4 payload). Sizes the server's reused compression scratch so any valid batch always fits; the codec asserts the
+// LZ4 return.
 inline constexpr int64_t kiMaxCompressedStatusChangeBatchBytes = static_cast<int64_t>(sizeof(int32_t)) + LZ4_COMPRESSBOUND(kiMaxSerializedStatusChangeBatchBytes);
 
 // Type-specific serialization (no compression)

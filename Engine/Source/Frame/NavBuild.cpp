@@ -80,7 +80,7 @@ static void ExtractContourEdges(std::vector<ContourEdge>& rEdges, std::span<cons
 				{
 					return 0.5f;
 				}
-				return std::clamp((fA - fThresholdValue) / fDenominator, 0.0f, 1.0f);
+				return (fA - fThresholdValue) / fDenominator;
 			};
 
 			uint64_t uiKeyTop = EncodeEdgeKey(0, i, j);
@@ -425,10 +425,6 @@ void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData,
 	{
 		auto [iStart, iEnd] = std::pair<int64_t, int64_t>(PolygonRange(rContour.polygonOffsets, i, iVertexTotal));
 		int64_t iCount = iEnd - iStart;
-		if (iCount < 3)
-		{
-			continue;
-		}
 		ASSERT(common::IsPolygonCcw(std::span<const XMFLOAT2>(&rContour.vertices.at(static_cast<size_t>(iStart)), static_cast<size_t>(iCount))));
 	}
 }

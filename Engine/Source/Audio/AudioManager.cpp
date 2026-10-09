@@ -211,21 +211,14 @@ void AudioManager::InitializeAudioSubsystems(const wchar_t* pcSelectedDeviceIden
 }
 
 AudioManager::AudioManager()
+: common::Singleton<AudioManager>(gpAudioManager)
 {
-	ASSERT(gpAudioManager == nullptr);
-
-	gpAudioManager = this;
-
 	LOG(kAudio, kInfo, "\nAudioManager");
 
 	try
 	{
 		std::wstring selectedDeviceIdentifier = InitializeAudioEndpoint();
-
-		if (mpAudioEngine != nullptr)
-		{
-			InitializeAudioSubsystems(selectedDeviceIdentifier.empty() ? nullptr : selectedDeviceIdentifier.c_str());
-		}
+		InitializeAudioSubsystems(selectedDeviceIdentifier.empty() ? nullptr : selectedDeviceIdentifier.c_str());
 	}
 	catch ([[maybe_unused]] const std::exception& rException)
 	{
@@ -246,11 +239,6 @@ AudioManager::~AudioManager()
 	if (mpAudioEngine != nullptr)
 	{
 		mpAudioEngine->Update();
-	}
-
-	if (gpAudioManager == this)
-	{
-		gpAudioManager = nullptr;
 	}
 }
 
@@ -300,13 +288,13 @@ void AudioManager::PlayMusic(common::crc_t uiAudioCrc)
 	mpStreamingVoices->Play(uiAudioCrc);
 }
 
-void AudioManager::PlayOneShot(const game::Frame& rFrame, common::crc_t uiAudioCrc, bool b3d, float fVolume, float fPitch, float fPitchRange)
+void AudioManager::PlayOneShot(const game::Frame& rFrame, common::crc_t uiAudioCrc, float fVolume, float fPitch, float fPitchRange)
 {
 	if (mbSuspended.load(std::memory_order_acquire))
 	{
 		return;
 	}
-	mpStaticVoices->PlayOneShot(rFrame, uiAudioCrc, b3d, fVolume, fPitch, fPitchRange);
+	mpStaticVoices->PlayOneShot(rFrame, uiAudioCrc, fVolume, fPitch, fPitchRange);
 }
 
 void XM_CALLCONV AudioManager::PlayOneShot3d(const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoordinate, FXMVECTOR vecLocalPosition, float fVolume, float fPitch, float fPitchRange)

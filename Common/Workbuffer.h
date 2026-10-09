@@ -236,21 +236,12 @@ public:
 		rOther.mpBuffer = nullptr;
 	}
 
-	// Transfer frame ownership to an allocation carrying a different pointer type.
-	template<typename U>
-	[[nodiscard]] ScopedWorkbufferAllocation<U> Adopt(U pData) && noexcept
-	{
-		Workbuffer& rBuffer = *mpBuffer;
-		mpBuffer = nullptr;
-		return ScopedWorkbufferAllocation<U>(rBuffer, pData);
-	}
-
 private:
 
 	ScopedWorkbufferAllocation(Workbuffer& rBuffer, T pData)
 	: mpBuffer(&rBuffer)
 	, mpData(pData)
-	, miOwningDepth(rBuffer.miDepth) // Frame already opened by RawPushBuffer (or inherited via Adopt); capture the top depth.
+	, miOwningDepth(rBuffer.miDepth) // Frame already opened by RawPushBuffer; capture the top depth.
 	{
 	}
 
@@ -265,7 +256,6 @@ private:
 	int64_t miOwningDepth = 0;
 
 	friend class Workbuffer;
-	template<typename> friend class ScopedWorkbufferAllocation;
 };
 
 inline ScopedWorkbufferArena Workbuffer::Push()
@@ -338,15 +328,5 @@ struct std::formatter<common::ScopedWorkbufferArena> : std::formatter<std::strin
 	auto format(const common::ScopedWorkbufferArena& rValue, CONTEXT& rContext) const
 	{
 		return std::formatter<std::string_view>::format(rValue.mBuffer.View(), rContext);
-	}
-};
-
-template <>
-struct std::formatter<common::ScopedWorkbufferAllocation<const char*>> : std::formatter<std::string_view>
-{
-	template <typename CONTEXT>
-	auto format(const common::ScopedWorkbufferAllocation<const char*>& rValue, CONTEXT& rContext) const
-	{
-		return std::formatter<std::string_view>::format(rValue.mpData, rContext);
 	}
 };

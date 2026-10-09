@@ -72,7 +72,7 @@ private:
 	friend class CameraBase;
 };
 
-class CameraBase
+class CameraBase : public common::Singleton<CameraBase>
 {
 public:
 
@@ -159,7 +159,7 @@ public:
 	float mfLightingTexelEyeHeight = 0.0f;
 
 	explicit CameraBase(const CameraSetup& rCameraSetup);
-	virtual ~CameraBase();
+	virtual ~CameraBase() = default;
 
 	void Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime);
 
@@ -170,7 +170,6 @@ public:
 
 	virtual float SunAngle() const = 0;
 
-	XMVECTOR XM_CALLCONV ScreenToWorld(FXMVECTOR vecScreenPosition, float fHeight);
 	XMVECTOR XM_CALLCONV WorldToScreen(FXMVECTOR vecWorldPosition) const;
 
 	inline bool XM_CALLCONV InVisibleArea(XMFLOAT4 f4VisibleArea, XMFLOAT4 f4Position, float fAdjustLeft = 0.0f, float fAdjustRight = 0.0f, float fAdjustTop = 0.0f, float fAdjustBottom = 0.0f)
@@ -190,7 +189,6 @@ protected:
 	// Derived-camera policy. The concrete camera knows the real interpolate frame type and casts back to it.
 	virtual bool IsMainMenuFrame(const FrameInterpolateBase& rFrameInterpolate) const = 0;
 	virtual CameraTarget PullTarget(const FrameInterpolateBase& rFrameInterpolate) = 0;
-	virtual void OnUpdateComplete() = 0;
 
 	void CalculateMatricesAndVisibleArea();
 

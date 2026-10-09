@@ -5,7 +5,7 @@
 namespace engine
 {
 
-class InstanceManager
+class InstanceManager : public common::Singleton<InstanceManager>
 {
 public:
 

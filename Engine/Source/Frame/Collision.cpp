@@ -497,13 +497,6 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 		return;
 	}
 
-	// Pre-existing inactive entries never generate candidates. Newly accepted destroy collisions are
-	// resolved later after the global sort.
-	if ((rLayerA.pFlags[i] & kAlreadyCollided) || (rLayerB.pFlags[j] & kAlreadyCollided))
-	{
-		return;
-	}
-
 	float fStartTime = std::max(rLayerA.fStartTime, rLayerB.fStartTime);
 	float fEndTime = std::min(rLayerA.fEndTime, rLayerB.fEndTime);
 	if (fStartTime > fEndTime)

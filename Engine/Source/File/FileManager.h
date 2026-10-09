@@ -188,7 +188,7 @@ constexpr bool IsEagerChunk(data::DataTypes eDataType);
 // Used to skip opening (and locking) pack files the server never reads — Audio, Texture, etc.
 constexpr bool IsServerChunk(data::DataTypes eDataType);
 
-class FileManager
+class FileManager : public common::Singleton<FileManager>
 {
 public:
 
@@ -269,7 +269,7 @@ bool FileManager::WriteFileAtomically(const FileFlags_t& rFlags, const std::file
 
 // Shared version+size on-disk header convention. Writes int64 version then int64 size (sizeof for
 // trivially-copyable types, 0 otherwise — non-trivial types validate version only). Single source for
-// WriteVersionedFile/ReadVersionedFile, DifferenceStream save/load, and GameSaveLoad grid saves.
+// WriteVersionedFile/ReadVersionedFile, DifferenceStream save/load, GameSaveLoad grid saves, and the TextureCache file cache.
 template <typename STRUCT_TYPE>
 void WriteVersionHeader(std::fstream& rFileStream)
 {

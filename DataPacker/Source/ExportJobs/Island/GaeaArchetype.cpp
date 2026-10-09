@@ -1,5 +1,7 @@
 #include "GaeaArchetype.h"
 
+#include "FileManager.h"
+
 
 constexpr const wchar_t* kpwcGaeaDefaultPath = LR"(C:\Program Files\QuadSpinner\Gaea 2\Gaea.Swarm.exe)";
 constexpr const char* kpcGaeaEnvVar = "GAEA2_PATH";
@@ -11,20 +13,6 @@ constexpr const char* kpcGaeaEnvVar = "GAEA2_PATH";
 // in BakeOne via ReadArchetypeSeaLevel and multiplied by elevationMeters to derive the per-island
 // beach offset (engine-Z 0 == beach; sea floor sits at -(Level × elevationMeters)).
 constexpr float kfGaeaSeaLevelDefault = 0.1f;
-
-static void WriteFileBytes(const std::filesystem::path& rFile, std::string_view bytes)
-{
-	// Atomic replace: partial write on crash leaves a stray .tmp, not a half-written archetype.
-	// PID suffix so concurrent crashes from peer DataPacker processes leave distinct orphan
-	// .<pid>.tmp files instead of clobbering each other's in-flight writes.
-	std::filesystem::path tempFile = rFile;
-	tempFile += L"." + std::to_wstring(GetCurrentProcessId()) + L".tmp";
-	std::ofstream stream(tempFile, std::ios::binary);
-	stream.write(bytes.data(), bytes.size());
-	stream.close();
-	VERIFY_SUCCESS(stream.good());
-	std::filesystem::rename(tempFile, rFile);
-}
 
 // Recursive walker: every object whose key is exactly "Seed" with a numeric value is overwritten
 // with iSeed. Gaea's `--seed` CLI flag only mixes a global seed into per-node randomness; it
@@ -190,5 +178,5 @@ void PatchArchetype(const std::filesystem::path& rTerrainFile, const WorldDimens
 		PatchArchetypeMesherResolution(terrainJson, *oiMeshResolution);
 	}
 
-	WriteFileBytes(rTerrainFile, terrainJson.dump(2));
+	WriteEntireFile(rTerrainFile, terrainJson.dump(2));
 }

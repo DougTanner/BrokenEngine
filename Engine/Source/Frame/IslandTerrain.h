@@ -118,12 +118,11 @@ struct CellElevationSampler
 	[[nodiscard]] float XM_CALLCONV Sample(FXMVECTOR vecLocalPosition) const;
 };
 
-class IslandTerrain
+class IslandTerrain : public common::Singleton<IslandTerrain>
 {
 public:
 
 	IslandTerrain();
-	~IslandTerrain();
 
 #if defined(BT_SERVER)
 	void WaitForElevationMaps(float fNavigationThreshold, float fNavigationClearanceMeters);

@@ -92,7 +92,7 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 		sbHeldVisibleArea = false;
 		++gPresentationContinuity.lighting.iHistoryResets;
 	}
-	sbLightingRefreshFrame = bScheduledRefresh || !sTemporalAreaLatch.bInitialized || !sbHeldVisibleArea
+	sbLightingRefreshFrame = bScheduledRefresh || !sbHeldVisibleArea
 	                      || (bLightingEnabled && !IsVisibleAreaInsideHeldCombineCrop(rf4VisibleArea, sf4HeldVisibleArea, sTemporalAreaLatch.f4CurrentArea, fCombineTextureWidth, fCombineTextureHeight));
 	if (sbLightingRefreshFrame)
 	{

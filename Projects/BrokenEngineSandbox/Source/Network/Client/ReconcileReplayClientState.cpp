@@ -9,47 +9,6 @@ namespace game
 
 #if defined(BT_CLIENT)
 
-static bool FindMatchingPlayerInCoordinate(std::span<const engine::CoordWork> works, engine::GridCoord destination, engine::GlobalId globalPlayerId)
-{
-	for (const engine::CoordWork& rDestinationWork : works)
-	{
-		if (rDestinationWork.coord != destination)
-		{
-			continue;
-		}
-
-		const engine::Cell& rDestinationCell = *rDestinationWork.pCell;
-		const engine::CoordScratch& rDestinationScratch = rDestinationWork.scratch;
-
-		const Frame* pDestinationFrame = nullptr;
-		if (rDestinationScratch.iReplayStackCount > 0)
-		{
-			pDestinationFrame = rDestinationScratch.replayStack.at(static_cast<size_t>(rDestinationScratch.iReplayStackCount - 1));
-		}
-		else if ((rDestinationScratch.flags & engine::ReconcileScratchFlags::kCrcFastPath) && rDestinationScratch.outputLayout.iHead >= 0)
-		{
-			int64_t iConfirmedPhysical = SnapshotIndex(rDestinationScratch.outputLayout.iHead, rDestinationScratch.outputLayout.iConfirmedInner);
-			pDestinationFrame = rDestinationCell.snapshots[iConfirmedPhysical].get();
-		}
-		if (pDestinationFrame == nullptr)
-		{
-			continue;
-		}
-		const Frame& rDestinationFrame = *pDestinationFrame;
-		for (int64_t j = 0; j < rDestinationFrame.postRender.pPlayers->iCount; ++j)
-		{
-			if (rDestinationFrame.postRender.pPlayers->pGlobalPlayerIds[j] == globalPlayerId)
-			{
-				LOG(kNetwork, kVerbose, "ReconcileUpdateClientState Transfer matched GlobalPlayerId: {} Coord: ({},{})", globalPlayerId, destination.iX, destination.iY);
-				return true;
-			}
-		}
-		LOG(kNetwork, kVerbose, "ReconcileUpdateClientState Transfer global ID match failed Coord: ({},{}) PlayerCount: {}", destination.iX, destination.iY, rDestinationFrame.postRender.pPlayers->iCount);
-		break;
-	}
-	return false;
-}
-
 void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool bAnyFullReplay, ConfirmedClientState& rInOutState)
 {
 	ConfirmedClientState clientState = rInOutState;
@@ -97,8 +56,6 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 					}
 					LOG(kNetwork, kVerbose, "ReconcileUpdateClientState TransferPlayer GlobalPlayerId: {} Source: ({},{}) Dest: ({},{})", clientState.clientGlobalPlayerIdentifier, rWork.coord.iX, rWork.coord.iY, destination.iX, destination.iY);
 					clientState.fPreviousClientArmor = rRequest.data.fHealth;
-
-					FindMatchingPlayerInCoordinate(works, destination, clientState.clientGlobalPlayerIdentifier);
 				}
 			}
 		}

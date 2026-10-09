@@ -127,7 +127,7 @@ enum class ContractViolationKind : uint8_t
 	kRate,
 };
 
-class Server
+class Server : public common::Singleton<Server>
 {
 public:
 
@@ -168,16 +168,14 @@ private:
 	void Disconnect(const ENetEvent& rEvent);
 	void DispatchIncoming(ENetEvent& rEvent, bool bFastForward);
 
-	ClientConnection* FindHandshakenClient(int64_t iClientId);
-
-	void ClientAcknowledgementStream(std::span<const uint8_t> packetData, int64_t iClientId);
-	void ClientDesynchronizationReport(std::span<const uint8_t> packetData, int64_t iClientId);
-	void ClientDebugFrameRequest(std::span<const uint8_t> packetData, ENetPeer* pPeer, int64_t iClientId);
-	void ClientHello(std::span<const uint8_t> packetData, ENetPeer* pPeer, int64_t iClientId);
-	void RejectHello(ENetPeer* pPeer, int64_t iClientId, const char* pcMessage);
-	void ClientSubscribe(std::span<const uint8_t> packetData, int64_t iClientId);
-	void ClientUnsubscribe(std::span<const uint8_t> packetData, int64_t iClientId);
-	void ClientResynchronizationRequest(std::span<const uint8_t> packetData, int64_t iClientId);
+	void ClientAcknowledgementStream(std::span<const uint8_t> packetData, ClientConnection& rClient);
+	void ClientDesynchronizationReport(std::span<const uint8_t> packetData, ClientConnection& rClient);
+	void ClientDebugFrameRequest(std::span<const uint8_t> packetData, ClientConnection& rClient);
+	void ClientHello(std::span<const uint8_t> packetData, ClientConnection& rClient);
+	void RejectHello(const ClientConnection& rClient, const char* pcMessage);
+	void ClientSubscribe(std::span<const uint8_t> packetData, ClientConnection& rClient);
+	void ClientUnsubscribe(std::span<const uint8_t> packetData, ClientConnection& rClient);
+	void ClientResynchronizationRequest(std::span<const uint8_t> packetData, const ClientConnection& rClient);
 	void SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char* pcMessage, const ClientGuid* pGuid);
 	void SendSubscribeAccept(const ClientConnection& rClient, int64_t iSlot, GridCoord coordinate);
 	void SendTimespeedUpdate(ENetPeer* pPeer, int64_t iMultiply, int64_t iDivide);

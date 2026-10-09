@@ -326,13 +326,11 @@ namespace toolcli::coordination
 		return WriteBytesAtomic(rPath, rMetadata.dump(2) + "\n");
 	}
 
-	bool StageBytesAtomic(const std::filesystem::path& rPath, std::string_view contents, std::filesystem::path& rStagedPath)
+	bool WriteBytesAtomic(const std::filesystem::path& rPath, std::string_view contents)
 	{
-		// The process-wide sequence gives sequential staged writes distinct temporary suffixes until it wraps.
-		static int64_t siSequence = 0;
-		std::filesystem::path temporaryPath = ExtendedLengthPath(rPath);
-		siSequence = (siSequence + 1) % 4'294'967'296;
-		temporaryPath += L".tmp." + std::to_wstring(::GetCurrentProcessId()) + L"." + std::to_wstring(siSequence);
+		std::filesystem::path targetPath = ExtendedLengthPath(rPath);
+		std::filesystem::path temporaryPath = targetPath;
+		temporaryPath += L".tmp." + std::to_wstring(::GetCurrentProcessId());
 		Handle hFile(::CreateFileW(temporaryPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_TEMPORARY, nullptr));
 		if (!hFile.IsValid())
 		{
@@ -341,31 +339,14 @@ namespace toolcli::coordination
 		DWORD uiWritten = 0;
 		bool bSucceeded = ::WriteFile(hFile.Get(), contents.data(), static_cast<DWORD>(contents.size()), &uiWritten, nullptr) != FALSE;
 		int64_t iWritten = uiWritten;
-		bSucceeded = bSucceeded && std::cmp_equal(iWritten, contents.size()) && ::FlushFileBuffers(hFile.Get()) != FALSE;
+		bSucceeded = bSucceeded && std::cmp_equal(iWritten, contents.size());
 		hFile.Reset();
-		if (!bSucceeded)
-		{
-			::DeleteFileW(temporaryPath.c_str());
-			return false;
-		}
-		rStagedPath = std::move(temporaryPath);
-		return true;
-	}
-
-	bool CommitStagedBytes(const std::filesystem::path& rStagedPath, const std::filesystem::path& rPath)
-	{
-		if (::MoveFileExW(rStagedPath.c_str(), ExtendedLengthPath(rPath).c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE)
+		if (bSucceeded && ::MoveFileExW(temporaryPath.c_str(), targetPath.c_str(), MOVEFILE_REPLACE_EXISTING) != FALSE)
 		{
 			return true;
 		}
-		::DeleteFileW(rStagedPath.c_str());
+		::DeleteFileW(temporaryPath.c_str());
 		return false;
-	}
-
-	bool WriteBytesAtomic(const std::filesystem::path& rPath, std::string_view contents)
-	{
-		std::filesystem::path stagedPath;
-		return StageBytesAtomic(rPath, contents, stagedPath) && CommitStagedBytes(stagedPath, rPath);
 	}
 
 	void PrintMetadata(const nlohmann::json& rMetadata)

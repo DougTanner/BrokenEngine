@@ -68,6 +68,7 @@
     <ClInclude Include="..\..\..\Common\Math\ConvexHull.h" />
     <ClInclude Include="..\..\..\Common\Math\Random.h" />
     <ClInclude Include="..\..\..\Common\ScopedLambda.h" />
+    <ClInclude Include="..\..\..\Common\Singleton.h" />
     <ClInclude Include="..\..\..\Common\Smoothed.h" />
     <ClInclude Include="..\..\..\Common\StableVector.h" />
     <ClInclude Include="..\..\..\Common\Workbuffer.h" />

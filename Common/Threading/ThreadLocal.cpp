@@ -3,9 +3,10 @@
 namespace common
 {
 
-ThreadLocal::ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> iThreadId, bool bSetupExceptionHandling, int64_t iWorkbufferReserveSize)
-: miThreadId(iThreadId)
-, mWorkbufferMemory(iWorkbufferReserveSize > 0 ? iWorkbufferReserveSize : 64 * std::max(iWorkbufferSize, 64i64 * 1'024i64))
+ThreadLocal::ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> iThreadId, bool bSetupExceptionHandling)
+: common::Singleton<ThreadLocal>(gpThreadLocal, nullptr)
+, miThreadId(iThreadId)
+, mWorkbufferMemory(64 * std::max(iWorkbufferSize, 64i64 * 1'024i64))
 , mpLogBuffer(mLogBufferMemory.data())
 , mWorkbuffer(mWorkbufferMemory)
 {
@@ -14,9 +15,7 @@ ThreadLocal::ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> iThread
 	// Sized ahead of the publish below, so this thread's own logging finds a usable workbuffer the moment gpThreadLocal is visible.
 	mWorkbufferMemory.Resize(iWorkbufferSize);
 
-	ASSERT(gpThreadLocal == nullptr);
-
-	gpThreadLocal = this;
+	Register();
 
 	ConfigureThreadFloatingPoint();
 
@@ -24,11 +23,6 @@ ThreadLocal::ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> iThread
 	{
 		SetupExceptionHandling();
 	}
-}
-
-ThreadLocal::~ThreadLocal()
-{
-	gpThreadLocal = nullptr;
 }
 
 } // namespace common

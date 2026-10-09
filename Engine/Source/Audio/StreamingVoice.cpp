@@ -47,7 +47,7 @@ std::chrono::duration<float> StreamingVoice::GetRemainingTime() const
 
 bool StreamingVoice::ShouldTransition() const
 {
-	return GetRemainingTime() <= kCrossfadeDuration || miNextReadOffset >= mpLazyChunk->header.iSize || (mFlags & kLastBufferSubmitted);
+	return GetRemainingTime() <= kCrossfadeDuration || (mFlags & kLastBufferSubmitted);
 }
 
 void StreamingVoice::UpdateRequests(bool bAllowRequests)

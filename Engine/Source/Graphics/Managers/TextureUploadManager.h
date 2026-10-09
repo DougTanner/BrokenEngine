@@ -5,12 +5,11 @@
 namespace engine
 {
 
-class TextureUploadManager
+class TextureUploadManager : public common::Singleton<TextureUploadManager>
 {
 public:
 
 	TextureUploadManager();
-	~TextureUploadManager();
 
 	TextureUploadManager(const TextureUploadManager&) = delete; // The upload thread retains this object's address until it is joined.
 	TextureUploadManager& operator=(const TextureUploadManager&) = delete;

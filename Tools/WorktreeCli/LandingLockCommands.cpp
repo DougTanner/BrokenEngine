@@ -128,12 +128,6 @@ namespace toolcli
 		kUnverifiable,
 	};
 
-	enum class LandingReleaseOperation
-	{
-		kRelease,
-		kSteal,
-	};
-
 	static int64_t EmitLandingConflict(const Locator& rLocator, const nlohmann::json& rMetadata, LandingRecordState eRecordState)
 	{
 		if (eRecordState == LandingRecordState::kReadable)
@@ -221,17 +215,6 @@ namespace toolcli
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 		}
-		nlohmann::json revalidatedMetadata;
-		if (!ReadMetadata(rLocator.path, revalidatedMetadata))
-		{
-			std::error_code error;
-			bool bRevalidatedExists = std::filesystem::exists(ExtendedLengthPath(rLocator.path), error);
-			return EmitLandingConflict(rLocator, rMetadata, !error && !bRevalidatedExists ? LandingRecordState::kAbsent : LandingRecordState::kUnverifiable);
-		}
-		if (revalidatedMetadata != rMetadata)
-		{
-			return EmitLandingConflict(rLocator, revalidatedMetadata, LandingRecordState::kReadable);
-		}
 		rMetadata = landing::NewLandingMetadata(rLocator, owner, session, worktree, std::chrono::seconds(iLeaseSeconds));
 		if (!WriteMetadataAtomic(rLocator.path, rMetadata))
 		{
@@ -242,33 +225,23 @@ namespace toolcli
 		return kiExitOk;
 	}
 
-	static int64_t HandleReleaseOrSteal(const Locator& rLocator, const nlohmann::json& rMetadata, bool bExists, LandingReleaseOperation eOperation, std::wstring_view owner, std::wstring_view expectedOwner)
+	static int64_t HandleRelease(const Locator& rLocator, const nlohmann::json& rMetadata, bool bExists, std::wstring_view owner)
 	{
 		if (!bExists)
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 		}
-		if (eOperation == LandingReleaseOperation::kRelease && !HasOwner(rMetadata, owner))
-		{
-			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
-		}
-		if (eOperation == LandingReleaseOperation::kSteal && !HasOwner(rMetadata, expectedOwner))
+		if (!HasOwner(rMetadata, owner))
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 		}
 
-		if (eOperation == LandingReleaseOperation::kRelease)
+		if (::DeleteFileW(ExtendedLengthPath(rLocator.path).c_str()) == FALSE)
 		{
-			if (::DeleteFileW(ExtendedLengthPath(rLocator.path).c_str()) == FALSE)
-			{
-				FailWindows("release lock");
-				return kiExitFailure;
-			}
-			return kiExitOk;
+			FailWindows("release lock");
+			return kiExitFailure;
 		}
-
-		// steal: a lease-based landing lock is never stolen; recover is the expired-lease takeover.
-		return EmitLandingConflict(rLocator, rMetadata, LandingRecordState::kReadable);
+		return kiExitOk;
 	}
 
 	// Bounded blocking claim. Every attempt reads, classifies, and writes under its own guard scope; the guard is
@@ -338,8 +311,8 @@ namespace toolcli
 						{
 							return EmitLandingConflict(rLocator, metadata, LandingRecordState::kReadable);
 						}
-						// The standalone recover verb re-reads to revalidate metadata it was handed; here the metadata was
-						// read inside this same guard scope, which serializes every lock transition, so it cannot have moved.
+						// The metadata was read inside this same guard scope, which serializes every lock transition, so it
+						// cannot have moved.
 						metadata = landing::NewLandingMetadata(rLocator, owner, session, worktree, std::chrono::seconds(iLeaseSeconds));
 						if (!WriteMetadataAtomic(rLocator.path, metadata))
 						{
@@ -366,11 +339,11 @@ namespace toolcli
 			int64_t iRemainingMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count();
 			// A sleep that reaches the deadline leaves no attempt after it, so report the lease this attempt read
 			// rather than waking past the deadline with nothing left to classify.
-			if (now >= deadline || iSleepMilliseconds >= iRemainingMilliseconds)
+			if (iSleepMilliseconds >= iRemainingMilliseconds)
 			{
 				return EmitLandingConflict(rLocator, metadata, LandingRecordState::kReadable);
 			}
-			std::this_thread::sleep_for(std::chrono::milliseconds(std::max<int64_t>(1, std::min<int64_t>(iSleepMilliseconds, iRemainingMilliseconds))));
+			std::this_thread::sleep_for(std::chrono::milliseconds(iSleepMilliseconds));
 		}
 	}
 
@@ -378,11 +351,11 @@ namespace toolcli
 	{
 		if (std::ssize(argumentValues) < 3)
 		{
-			Fail("lock requires claim, status, refresh, recover, release, or steal");
+			Fail("lock requires claim, status, refresh, recover, or release");
 			return kiExitFailure;
 		}
 		std::wstring verb = ToLowerInvariant(argumentValues[2]);
-		if (verb != L"claim" && verb != L"status" && verb != L"refresh" && verb != L"recover" && verb != L"release" && verb != L"steal")
+		if (verb != L"claim" && verb != L"status" && verb != L"refresh" && verb != L"recover" && verb != L"release")
 		{
 			Fail("unknown lock verb");
 			return kiExitFailure;
@@ -400,9 +373,9 @@ namespace toolcli
 		{
 			return kiExitFailure;
 		}
-		if ((verb == L"claim" || verb == L"steal" || verb == L"recover") && (owner.empty() || session.empty() || worktree.empty()))
+		if ((verb == L"claim" || verb == L"recover") && (owner.empty() || session.empty() || worktree.empty()))
 		{
-			Fail("claim, steal, and recover require --owner, --session, and --worktree");
+			Fail("claim and recover require --owner, --session, and --worktree");
 			return kiExitFailure;
 		}
 		if ((verb == L"release" || verb == L"refresh") && owner.empty())
@@ -410,9 +383,9 @@ namespace toolcli
 			Fail("release and refresh require --owner");
 			return kiExitFailure;
 		}
-		if ((verb == L"steal" || verb == L"recover") && expectedOwner.empty())
+		if (verb == L"recover" && expectedOwner.empty())
 		{
-			Fail("steal and recover require --expect");
+			Fail("recover requires --expect");
 			return kiExitFailure;
 		}
 		if ((verb == L"claim" || verb == L"recover") && !landing::IsValidLeaseDuration(std::chrono::seconds(iLeaseSeconds)))
@@ -490,7 +463,7 @@ namespace toolcli
 			return HandleRecover(*locator, metadata, bExists, owner, expectedOwner, session, worktree, iLeaseSeconds);
 		}
 
-		return HandleReleaseOrSteal(*locator, metadata, bExists, verb == L"release" ? LandingReleaseOperation::kRelease : LandingReleaseOperation::kSteal, owner, expectedOwner);
+		return HandleRelease(*locator, metadata, bExists, owner);
 	}
 
 } // namespace toolcli

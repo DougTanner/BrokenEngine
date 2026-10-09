@@ -18,7 +18,7 @@ void StaticVoices::Initialize(AudioEngine* pAudioEngine, const int64_t* piMaster
 	mVoices.reserve(kiMaxStaticVoices + kiMaxFadeOutPool);
 }
 
-void StaticVoices::PlayOneShot([[maybe_unused]] const game::Frame& rFrame, common::crc_t uiAudioCrc, bool bThreeDimensional, float fVolume, float fPitch, float fPitchRange)
+void StaticVoices::PlayOneShot([[maybe_unused]] const game::Frame& rFrame, common::crc_t uiAudioCrc, float fVolume, float fPitch, float fPitchRange)
 {
 	ASSERT(rFrame.interpolate.frameFlags & FrameFlags::kPostRender);
 
@@ -35,7 +35,7 @@ void StaticVoices::PlayOneShot([[maybe_unused]] const game::Frame& rFrame, commo
 	}
 
 	std::lock_guard<std::mutex> lock(mOneShotMutex);
-	PlayOneShotLocked(uiAudioCrc, bThreeDimensional, fVolume, fPitch, fPitchRange);
+	PlayOneShotLocked(uiAudioCrc, false, fVolume, fPitch, fPitchRange);
 }
 
 IXAudio2SourceVoice* StaticVoices::PlayOneShotLocked(common::crc_t uiAudioCrc, bool bThreeDimensional, float fVolume, float& rfPitch, float fPitchRange)

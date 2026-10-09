@@ -65,7 +65,7 @@ static void CreateImageView(VkImage vkImage, const TextureInfo& rInfo, bool bChe
 	VkName(VK_OBJECT_TYPE_IMAGE_VIEW, rVkImageView, rInfo.name.data());
 }
 
-void Texture::RecordBeginRenderPass(VkCommandBuffer vkCommandBuffer, VkRenderPass vkRenderPass, VkFramebuffer vkFramebuffer, VkExtent2D vkExtent2D, VkClearColorValue vkClearColorValue, RenderPassFlags_t renderPassFlags, VkSubpassContents vkSubpassContents)
+void Texture::RecordBeginRenderPass(VkCommandBuffer vkCommandBuffer, VkRenderPass vkRenderPass, VkFramebuffer vkFramebuffer, VkExtent2D vkExtent2D, VkClearColorValue vkClearColorValue, RenderPassFlags_t renderPassFlags)
 {
 	VkClearValue pVkClearValues[] =
 	{
@@ -99,7 +99,7 @@ void Texture::RecordBeginRenderPass(VkCommandBuffer vkCommandBuffer, VkRenderPas
 		.clearValueCount = bClear ? static_cast<uint32_t>(iAttachmentCount) : 0,
 		.pClearValues = bClear ? pVkClearValues : nullptr,
 	};
-	vkCmdBeginRenderPass(vkCommandBuffer, &vkRenderPassBeginInfo, vkSubpassContents);
+	vkCmdBeginRenderPass(vkCommandBuffer, &vkRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
 
 Texture::Texture(const TextureInfo& rInfo, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction)

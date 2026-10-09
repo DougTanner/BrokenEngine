@@ -16,7 +16,7 @@ enum class TextureManagerFlags : uint8_t
 	kPendingLightingReblur  = 1 << 1,
 };
 
-class TextureManager
+class TextureManager : public common::Singleton<TextureManager>
 {
 public:
 

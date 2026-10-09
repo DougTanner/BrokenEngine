@@ -4,7 +4,7 @@ namespace engine
 {
 
 // Float-backed container for a setting (float / bool / discrete-enum flavors).
-// Thread contract: no atomics. All writes (mfCurrent/Set/Reset/Toggle/SetPercent/SetIndex) are main-thread
+// Thread contract: no atomics. All writes (mfCurrent/Set/Reset/Toggle/SetIndex) are main-thread
 // operations. The writer sites span several subsystems — menu/Tweaks screens (ImGuiManager::Prepare), input
 // handling, render-target maintenance, swapchain creation, texture-capability clamps, and settings load, among
 // others — so this is not a single-writer contract. mfCurrent is unsynchronized, so the invariant that keeps reads
@@ -123,21 +123,6 @@ public:
 		}
 	}
 
-	template <typename T>
-	T GetDefault() const
-	{
-		static_assert(!std::is_same_v<T, float>);
-
-		if constexpr (std::is_same_v<T, bool>)
-		{
-			return mfDefault == 1.0f;
-		}
-		else
-		{
-			return static_cast<T>(mfDefault);
-		}
-	}
-
 	void Set(float fValue)
 	{
 		mfCurrent = std::clamp(Snap(fValue, mfStep), mfMin, mfMax);
@@ -172,16 +157,6 @@ public:
 
 		mfCurrent = mfPrevious = static_cast<float>(value);
 		GetIndex();
-	}
-
-	float Percent() const
-	{
-		return (mfCurrent - mfMin) / (mfMax - mfMin);
-	}
-
-	void SetPercent(float fPercent)
-	{
-		Set(mfMin + fPercent * (mfMax - mfMin));
 	}
 
 	int64_t GetIndex() const

@@ -41,7 +41,7 @@ public:
 
 	void Initialize(AudioEngine* pAudioEngine, const int64_t* piMasteringVoiceChannels);
 
-	void PlayOneShot(const game::Frame& rFrame, common::crc_t uiAudioCrc, bool bThreeDimensional, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
+	void PlayOneShot(const game::Frame& rFrame, common::crc_t uiAudioCrc, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
 	// vecLocalPosition is local to emitterCoordinate; the cull and mix convert it against mListenerCoordinate.
 	void XM_CALLCONV PlayOneShotThreeDimensional(const game::Frame& rFrame, common::crc_t uiAudioCrc, GridCoord emitterCoordinate, FXMVECTOR vecLocalPosition, float fVolume, float fPitch = 1.0f, float fPitchRange = 0.0f);
 

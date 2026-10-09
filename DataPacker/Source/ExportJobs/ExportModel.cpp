@@ -98,24 +98,12 @@ void ExportModel::Export()
 	ReadSourceBytes(fileStream, std::span<char>(reinterpret_cast<char*>(vertices.data()), static_cast<size_t>(uiVertexBytes)), kpcContext);
 	fileStream.close();
 
-	if (uiIndexBytes > static_cast<uintmax_t>(std::numeric_limits<int64_t>::max()) - (common::kiAlignmentBytes - 1))
-	{
-		throw std::runtime_error("ExportModel::Export index data size overflow");
-	}
 	int64_t iIndexCount = static_cast<int64_t>(uiIndexCount);
 	int64_t iIndicesSize = std::ssize(indices16) > 0
 		? common::ModelHeader::VerticesOffset(iIndexCount, sizeof(uint16_t))
 		: common::ModelHeader::VerticesOffset(iIndexCount, sizeof(uint32_t));
-	if (iIndicesSize < 0 || uiVertexBytes > static_cast<uintmax_t>(std::numeric_limits<int64_t>::max() - iIndicesSize))
-	{
-		throw std::runtime_error("ExportModel::Export model data size overflow");
-	}
 	int64_t iDataSize = iIndicesSize + static_cast<int64_t>(uiVertexBytes);
-	int64_t iMaximumDataSize = std::numeric_limits<int64_t>::max() - common::kiChunkDataOffset - (common::kiAlignmentBytes - 1);
-	if (iDataSize > iMaximumDataSize)
-	{
-		throw std::runtime_error("ExportModel::Export chunk data size overflow");
-	}
+	ASSERT(iDataSize <= std::numeric_limits<int64_t>::max() - common::kiChunkDataOffset - (common::kiAlignmentBytes - 1));
 	auto [pHeader, dataSpan] = AllocateHeaderAndData(iDataSize);
 	pHeader->modelHeader.iIndexCount = iIndexCount;
 	pHeader->modelHeader.iVertexCount = static_cast<int64_t>(uiVertexCount);

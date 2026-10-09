@@ -55,7 +55,7 @@ common::ScopedWorkbufferAllocation<char*> AppendUtf8(common::Workbuffer& rWorkbu
 
 bool WrapperToggle(std::string_view label, engine::Wrapper* pWrapper);
 bool WrapperSlider(std::string_view label, engine::Wrapper* pWrapper, std::string_view format = "%.2f");
-bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper, float fStep);
+bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper);
 
 // RadioRow draws an optional header and wraps option buttons to the available width. Present mode, sample count, quality, and
 // theme share this enum/index mapping; exact discrete float equality selects the checked option, and a click writes

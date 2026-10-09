@@ -50,11 +50,8 @@ namespace toolcli::coordination
 	std::optional<Locator> MakeLocator(std::wstring_view domain, std::wstring_view logicalKey);
 	bool EnsureParentDirectory(const std::filesystem::path& rPath);
 	bool ReadMetadata(const std::filesystem::path& rPath, nlohmann::json& rMetadata);
-	// Durable byte replacement for small coordination artifacts, including paths beyond MAX_PATH.
-	// The staging pair splits that replacement so a caller can prepare several files before publishing any of them;
-	// A failed write after file creation and a failed commit both attempt to remove the temporary file.
-	bool StageBytesAtomic(const std::filesystem::path& rPath, std::string_view contents, std::filesystem::path& rStagedPath);
-	bool CommitStagedBytes(const std::filesystem::path& rStagedPath, const std::filesystem::path& rPath);
+	// Atomic byte replacement for small coordination artifacts, including paths beyond MAX_PATH.
+	// A failed write after file creation and a failed rename both attempt to remove the temporary file.
 	bool WriteBytesAtomic(const std::filesystem::path& rPath, std::string_view contents);
 	bool WriteMetadataAtomic(const std::filesystem::path& rPath, const nlohmann::json& rMetadata);
 	void PrintMetadata(const nlohmann::json& rMetadata);

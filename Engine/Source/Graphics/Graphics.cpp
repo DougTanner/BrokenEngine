@@ -81,12 +81,10 @@ float SmokeSimulationPixelsY()
 }
 
 Graphics::Graphics(HINSTANCE instanceHandle, HWND windowHandle)
+: common::Singleton<Graphics>(gpGraphics)
 {
 	mInstanceHandle = instanceHandle;
 	mWindowHandle = windowHandle;
-	ASSERT(gpGraphics == nullptr);
-
-	gpGraphics = this;
 
 	CHECK_VK(volkInitialize());
 
@@ -114,11 +112,6 @@ Graphics::~Graphics()
 {
 	meDestroyType = DestroyType::kSurface;
 	Destroy();
-
-	if (gpGraphics == this)
-	{
-		gpGraphics = nullptr;
-	}
 }
 
 void Graphics::WaitAllFramebufferFencesIdle()
@@ -431,10 +424,6 @@ void Graphics::Create()
 		{
 			meDestroyType = DestroyType::kSurface;
 			Destroy();
-			if (gpGraphics == this)
-			{
-				gpGraphics = nullptr;
-			}
 			throw;
 		}
 	}
@@ -599,66 +588,45 @@ void Graphics::RecreateResources()
 
 	if (mDestroyFlags & DestroyFlags::kShadowTextures)
 	{
-		if (gpTextureManager != nullptr)
-		{
-			gpTextureManager->mRenderTargetTextures.CreateShadowTextures();
-		}
+		gpTextureManager->mRenderTargetTextures.CreateShadowTextures();
 	}
 
 	if (mDestroyFlags & DestroyFlags::kObjectShadows)
 	{
-		if (gpTextureManager != nullptr)
-		{
-			gpTextureManager->mRenderTargetTextures.CreateObjectShadowsTextures();
-		}
+		gpTextureManager->mRenderTargetTextures.CreateObjectShadowsTextures();
 	}
 
 	if (mDestroyFlags & DestroyFlags::kLightingTextures)
 	{
-		if (gpTextureManager != nullptr)
-		{
-			gpTextureManager->mRenderTargetTextures.CreateLightingTextures();
-		}
+		gpTextureManager->mRenderTargetTextures.CreateLightingTextures();
 	}
 
 	if (mDestroyFlags & DestroyFlags::kWaterMesh)
 	{
-		if (gpBufferManager != nullptr)
-		{
-			gpBufferManager->CreateWaterMesh();
-		}
-		if (gpTextureManager != nullptr)
-		{
-			// Texel grid must match the water-mesh vertex grid (see RenderTargetTextures.h comment).
-			gpTextureManager->mRenderTargetTextures.CreateWaterDisplacementTextures();
-		}
+		gpBufferManager->CreateWaterMesh();
+		// Texel grid must match the water-mesh vertex grid (see RenderTargetTextures.h comment).
+		gpTextureManager->mRenderTargetTextures.CreateWaterDisplacementTextures();
 	}
 
 	if (mDestroyFlags & DestroyFlags::kTerrainElevation)
 	{
-		if (gpTextureManager != nullptr)
-		{
-			gpTextureManager->mRenderTargetTextures.CreateTerrainTextures();
-		}
+		gpTextureManager->mRenderTargetTextures.CreateTerrainTextures();
 	}
 
 	if (mDestroyFlags & DestroyFlags::kSmokeTextures)
 	{
-		if (gpTextureManager != nullptr)
-		{
-			gpTextureManager->mRenderTargetTextures.CreateSmokeTextures();
-			gpTextureManager->mRenderTargetTextures.CreateWindTextures();
-		}
+		gpTextureManager->mRenderTargetTextures.CreateSmokeTextures();
+		gpTextureManager->mRenderTargetTextures.CreateWindTextures();
 	}
 
 	mDestroyFlags.meFlags = static_cast<decltype(mDestroyFlags.meFlags)>(0);
 }
 
-bool Graphics::Destroy()
+void Graphics::Destroy()
 {
 	if (meDestroyType == DestroyType::kNone)
 	{
-		return false;
+		return;
 	}
 
 	LOG(kGraphics, kInfo, "Graphics::Destroy() {}", static_cast<int64_t>(meDestroyType));
@@ -765,8 +733,6 @@ bool Graphics::Destroy()
 	}
 
 	meDestroyType = DestroyType::kNone;
-
-	return true;
 }
 
 } // namespace engine

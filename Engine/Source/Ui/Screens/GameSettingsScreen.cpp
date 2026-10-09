@@ -78,7 +78,7 @@ void GameSettingsScreen::Render()
 		ImGui::PopStyleVar(2);
 	}
 
-	WrapperPlusMinus("Font Size", &gUiFontScale, 0.1f);
+	WrapperPlusMinus("Font Size", &gUiFontScale);
 
 	ImGui::Separator();
 

@@ -97,7 +97,7 @@ static nlohmann::json BuildFleets()
 		nlohmann::json fleetJson;
 		fleetJson["index"] = i;
 		fleetJson["focused"] = bFocused;
-		if (bFocused && pFocused != nullptr)
+		if (bFocused)
 		{
 			nlohmann::json members = nlohmann::json::array();
 			for (const FleetMember& rMember : pFocused->members)

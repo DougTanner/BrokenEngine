@@ -23,7 +23,7 @@ inline constexpr int64_t kiIslandMeshArenaBytes = 64i64 * 1'024i64 * 1'024i64;
 // submitted. All instances are allocated at boot and indexed by gpSwapchainManager->miFramebufferIndex, so they survive swapchain
 // recreation.
 
-class Islands
+class Islands : public common::Singleton<Islands>
 {
 public:
 

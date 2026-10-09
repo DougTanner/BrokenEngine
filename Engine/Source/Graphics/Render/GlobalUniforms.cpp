@@ -384,7 +384,7 @@ static void XM_CALLCONV PopulateShadowParameters(shaders::GlobalLayout& rGlobalL
 
 	// Separable Gaussian blur kernel precomputed for ShadowBlurH/V: the kernel is symmetric, so store the
 	// half-kernel [0, radius] and the reciprocal of the full-span weight sum (center counts once, each side twice).
-	float fShadowBlurSigma = std::max(gShadowBlurSigma.mfCurrent, 1.0e-6f);
+	float fShadowBlurSigma = gShadowBlurSigma.mfCurrent;
 	float fShadowBlurWeightSum = 0.0f;
 	for (int64_t i = 0; i <= shaders::kiShadowBlurRadius; ++i)
 	{

@@ -101,8 +101,8 @@ public:
 
 	void WriteArrayBindingDescriptors(TextureBinding& rBinding, VkSampler vkSampler);
 	void SynchronizeFullArrayBindingGenerations(const TextureBinding& rBinding);
-	// Resolve the single-texture view from rBinding.pTexture, falling back to the CRC's mTextureMap entry.
-	void WriteSingleTextureBinding(common::crc_t crc, TextureBinding& rBinding, VkSampler vkSampler);
+	// Writes rBinding.pTexture's view; a single-texture binding always holds a non-null texture.
+	void WriteSingleTextureBinding(TextureBinding& rBinding, VkSampler vkSampler);
 	void WriteFullArrayDescriptors(const Pipeline& rPipeline, int64_t iBinding, std::span<Texture* const> textures, VkSampler vkSampler);
 	void WriteArrayElementFromLive(Texture* const* ppArray, int64_t iIndex);
 	void RegisterIslandSlotBindings(common::crc_t bindingKey, Texture** ppTextures, int64_t iSlot);

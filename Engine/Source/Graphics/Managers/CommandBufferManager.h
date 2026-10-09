@@ -5,7 +5,7 @@
 namespace engine
 {
 
-class CommandBufferManager
+class CommandBufferManager : public common::Singleton<CommandBufferManager>
 {
 public:
 

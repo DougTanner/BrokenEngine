@@ -49,22 +49,10 @@ void PublishServerEntityCounts()
 		iTotalMissiles += cellStatistics.iMissiles;
 	}
 
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterPlayers).iCount = iTotalPlayers;
-	}
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterSpaceships).iCount = iTotalSpaceships;
-	}
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterBlasters).iCount = iTotalBlasters;
-	}
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->GetCpuCounter(kCpuCounterMissiles).iCount = iTotalMissiles;
-	}
+	gpProfileManager->GetCpuCounter(kCpuCounterPlayers).iCount = iTotalPlayers;
+	gpProfileManager->GetCpuCounter(kCpuCounterSpaceships).iCount = iTotalSpaceships;
+	gpProfileManager->GetCpuCounter(kCpuCounterBlasters).iCount = iTotalBlasters;
+	gpProfileManager->GetCpuCounter(kCpuCounterMissiles).iCount = iTotalMissiles;
 }
 
 } // namespace game

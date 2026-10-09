@@ -432,9 +432,7 @@ bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.pVecAiDirections[iIndex] = XMVectorZero();
 	rCurrentPostRender.pfTransferLockTimers[iIndex] = rInfo.fTransferLockTimer;
 	rCurrentPostRender.pfArrivalGracePeriods[iIndex] = rInfo.fArrivalGracePeriod;
-	// Always consume random for determinism, even if fCellChangeTimer is pre-set
-	float fRandomTimer = 15.0f + common::Random<10.0f>(rFrame.postRender.randomEngine);
-	rCurrentPostRender.pfCellChangeTimers[iIndex] = (rInfo.fCellChangeTimer > 0.0f) ? rInfo.fCellChangeTimer : fRandomTimer;
+	rCurrentPostRender.pfCellChangeTimers[iIndex] = 15.0f + common::Random<10.0f>(rFrame.postRender.randomEngine);
 	// Entering a cell is a fresh spawn for navigation, cross-cell transfers included: the wanted direction comes from the
 	// hull direction, and the cached steering, island destination, navigation mode, and waypoint index reset here.
 	// Flagship navigates to island destination on enter; non-flagship starts roaming and follows flagship via proximity

@@ -51,10 +51,7 @@ static bool WriteIfChanged(std::string_view content, const std::filesystem::path
 		{
 			return false;
 		}
-		std::fstream stream(rPath, std::ios::out | std::ios::binary);
-		stream << content;
-		stream.close();
-		VERIFY_SUCCESS(stream.good());
+		WriteEntireFile(rPath, content);
 		LOG(kDefault, kDebug, "Re-generated {}", logName);
 	}
 	return true;
@@ -211,10 +208,6 @@ static std::optional<int64_t> GetReadableFileSize(const std::filesystem::path& r
 	{
 		return std::nullopt;
 	}
-	if (!std::in_range<uint64_t>(uiFileSizeValue))
-	{
-		return std::nullopt;
-	}
 	if (!std::in_range<std::streamoff>(uiFileSizeValue))
 	{
 		return std::nullopt;
@@ -245,14 +238,6 @@ static bool LoadPublishedManifestChunkTable(const std::filesystem::path& rManife
 		return false;
 	}
 	if (iManifestChunkCount > iMaxChunks)
-	{
-		return false;
-	}
-	if (!std::in_range<size_t>(iManifestChunkCount))
-	{
-		return false;
-	}
-	if (static_cast<uint64_t>(iManifestChunkCount) > static_cast<uint64_t>(std::numeric_limits<std::streamsize>::max()) / sizeof(common::ChunkLocation))
 	{
 		return false;
 	}
@@ -591,7 +576,7 @@ static std::expected<bool, FileManager::EnsureLocalResult> RunDirtyExport(const 
 template <IsExportJob T>
 std::expected<bool, FileManager::EnsureLocalResult> RunExportJobs(DataPackerRunSummary& rRunSummary)
 {
-	bool bDirty = gpFileManager->mbCleanExport;
+	bool bDirty = false;
 
 	std::filesystem::path manifestFile = gpFileManager->mOutputDirectory;
 	manifestFile /= T::kName;

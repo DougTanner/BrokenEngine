@@ -51,11 +51,6 @@ void ServerFleetManager::ProcessCreateFleetRequests()
 	for (const PendingCreateFleetRequest& rRequest : mPendingCreateFleetRequests)
 	{
 		const engine::ClientConnection* pClient = engine::gpServer->FindClient(rRequest.iClientId);
-		if (pClient == nullptr)
-		{
-			continue;
-		}
-
 		engine::ClientGuid guid = pClient->clientGuid;
 		auto it = mFleets.find(guid);
 		if (it != mFleets.end() && std::ssize(it->second) >= kiMaximumFleetsPerClient)
@@ -81,11 +76,6 @@ void ServerFleetManager::ProcessDeleteFleetRequests()
 	for (const PendingDeleteFleetRequest& rRequest : mPendingDeleteFleetRequests)
 	{
 		const engine::ClientConnection* pClient = engine::gpServer->FindClient(rRequest.iClientId);
-		if (pClient == nullptr)
-		{
-			continue;
-		}
-
 		engine::ClientGuid guid = pClient->clientGuid;
 		auto it = mFleets.find(guid);
 		if (it == mFleets.end())
@@ -121,11 +111,6 @@ void ServerFleetManager::ProcessSpawnIntoFleetRequests()
 	for (const PendingSpawnIntoFleetRequest& rRequest : mPendingSpawnIntoFleetRequests)
 	{
 		const engine::ClientConnection* pClient = engine::gpServer->FindClient(rRequest.iClientId);
-		if (pClient == nullptr)
-		{
-			continue;
-		}
-
 		engine::ClientGuid guid = pClient->clientGuid;
 		auto it = mFleets.find(guid);
 		if (it == mFleets.end())
@@ -161,11 +146,6 @@ void ServerFleetManager::ProcessRespawnInFleetRequests()
 	for (const PendingRespawnInFleetRequest& rRequest : mPendingRespawnInFleetRequests)
 	{
 		const engine::ClientConnection* pClient = engine::gpServer->FindClient(rRequest.iClientId);
-		if (pClient == nullptr)
-		{
-			continue;
-		}
-
 		engine::ClientGuid guid = pClient->clientGuid;
 		auto it = mFleets.find(guid);
 		if (it == mFleets.end())
@@ -398,7 +378,7 @@ void ServerFleetManager::OnClientConnected(int64_t iClientId, const engine::Clie
 	SendFleetSyncToClient(iClientId, rClientGuid);
 }
 
-void ServerFleetManager::OnClientDisconnected(const engine::ClientGuid& rClientGuid)
+void ServerFleetManager::OnClientDisconnected(int64_t iClientId, const engine::ClientGuid& rClientGuid)
 {
 	// Mark as disconnected — fleet data stays in mFleets
 	auto it = mGuidToClientId.find(rClientGuid);
@@ -406,6 +386,16 @@ void ServerFleetManager::OnClientDisconnected(const engine::ClientGuid& rClientG
 	{
 		it->second = 0;
 	}
+
+	// The Process*FleetRequests loops rely on this purge: every request they see names a live client.
+	auto IsFromClient = [iClientId](const auto& rRequest)
+	{
+		return rRequest.iClientId == iClientId;
+	};
+	std::erase_if(mPendingCreateFleetRequests, IsFromClient);
+	std::erase_if(mPendingDeleteFleetRequests, IsFromClient);
+	std::erase_if(mPendingSpawnIntoFleetRequests, IsFromClient);
+	std::erase_if(mPendingRespawnInFleetRequests, IsFromClient);
 }
 
 void ServerFleetManager::OnResetForLoad(int64_t iClientId, const engine::ClientGuid& rClientGuid)

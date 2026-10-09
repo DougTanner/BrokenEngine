@@ -1,5 +1,14 @@
 #pragma once
 
+#if defined(BT_CLIENT)
+namespace engine
+{
+
+class Client;
+
+} // namespace engine
+#endif
+
 namespace game
 {
 
@@ -12,6 +21,9 @@ void ExecuteAgentCommand(std::string_view command, const nlohmann::json& rParame
 // One agent-supplied grid coordinate value, named by command in the failure message. Accepts the full
 // signed-int32 identity domain and throws for an integer outside it or a non-integer.
 int64_t ClientGridCoordinateValue(const nlohmann::json& rValue, std::string_view command);
+
+// The session's connected client once the server has accepted it; otherwise throws, named by command.
+engine::Client& RequireHarnessRigClient(std::string_view command);
 
 // Defined in AgentCommandsClient.cpp, which is compiled only into the client; returns true when handled.
 // Handler exceptions propagate to engine::AgentCommandServer::Drain().

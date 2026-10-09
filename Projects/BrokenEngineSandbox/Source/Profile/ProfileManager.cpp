@@ -7,11 +7,8 @@ ProfileManager* gpProfileManager = nullptr;
 
 ProfileManager::ProfileManager()
 : ProfileManagerBase(mGameCpuCounters, mGameCpuTimers, kGameCpuCounterNames, kGameCpuTimerNames)
+, common::Singleton<ProfileManager>(gpProfileManager)
 {
-	ASSERT(gpProfileManager == nullptr);
-
-	gpProfileManager = this;
-
 	if constexpr (kbProfiling)
 	{
 #if defined(BT_SERVER)
@@ -38,13 +35,5 @@ void ProfileManager::OnRawCpuTimersLatched(int64_t iSampleTick)
 }
 
 #endif // BT_SERVER
-
-ProfileManager::~ProfileManager()
-{
-	if (gpProfileManager == this)
-	{
-		gpProfileManager = nullptr;
-	}
-}
 
 } // namespace game

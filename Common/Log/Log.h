@@ -46,32 +46,18 @@ struct LogBuffer
 	_Ret_range_(0, LINE_COUNT)
 	int64_t Tail(_Out_writes_to_(LINE_COUNT, return) const char** ppLines, int64_t iMaxLines) const
 	{
+		static_assert(WRAP, "Tail requires a wrapping LogBuffer");
 		int64_t iCurrentWritePosition = iWritePosition.load(std::memory_order_relaxed);
 		int64_t iAvailable = std::min(iCurrentWritePosition, kiLineCount);
 		int64_t iCount = std::min(iAvailable, iMaxLines);
 		int64_t iFilled = 0;
-		if constexpr (WRAP)
+		int64_t iFirst = iCurrentWritePosition - iCount;
+		for (int64_t i = 0; i < iCount; ++i)
 		{
-			int64_t iFirst = iCurrentWritePosition - iCount;
-			for (int64_t i = 0; i < iCount; ++i)
+			const char* pLine = pcLines[(iFirst + i) % kiLineCount];
+			if (pLine[0] != '\0')
 			{
-				const char* pLine = pcLines[(iFirst + i) % kiLineCount];
-				if (pLine[0] != '\0')
-				{
-					ppLines[iFilled++] = pLine;
-				}
-			}
-		}
-		else
-		{
-			int64_t iFirst = iAvailable - iCount;
-			for (int64_t i = 0; i < iCount; ++i)
-			{
-				const char* pLine = pcLines[iFirst + i];
-				if (pLine[0] != '\0')
-				{
-					ppLines[iFilled++] = pLine;
-				}
+				ppLines[iFilled++] = pLine;
 			}
 		}
 		return iFilled;

@@ -125,8 +125,9 @@ bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, s
 	return bChanged;
 }
 
-bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper, float fStep)
+bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper)
 {
+	static constexpr float kfStep = 0.1f;
 	bool bChanged = false;
 	ImGui::Text("%s", label.data());
 	ImGui::SameLine();
@@ -137,7 +138,7 @@ bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper, float f
 #endif
 	if (ImGui::Button("-"))
 	{
-		pWrapper->Set(pWrapper->mfCurrent - fStep);
+		pWrapper->Set(pWrapper->mfCurrent - kfStep);
 		bChanged = true;
 	}
 	ImGui::SameLine();
@@ -145,7 +146,7 @@ bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper, float f
 	ImGui::SameLine();
 	if (ImGui::Button("+"))
 	{
-		pWrapper->Set(pWrapper->mfCurrent + fStep);
+		pWrapper->Set(pWrapper->mfCurrent + kfStep);
 		bChanged = true;
 	}
 #if defined(BT_CLIENT)

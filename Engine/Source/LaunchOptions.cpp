@@ -153,11 +153,11 @@ bool ParseLaunchOptions()
 				wchar_t* pcEnd = nullptr;
 				int64_t iWidth = static_cast<int64_t>(std::wcstoll(pcValue, &pcEnd, 10));
 				int64_t iHeight = 0;
-				if (pcEnd != nullptr && pcEnd != pcValue && (*pcEnd == L'x' || *pcEnd == L'X'))
+				if (pcEnd != pcValue && (*pcEnd == L'x' || *pcEnd == L'X'))
 				{
 					iHeight = static_cast<int64_t>(std::wcstoll(pcEnd + 1, &pcEnd, 10));
 				}
-				if (iWidth < 1 || iWidth > kiMaxDimension || iHeight < 1 || iHeight > kiMaxDimension || pcEnd == nullptr || *pcEnd != L'\0')
+				if (iWidth < 1 || iWidth > kiMaxDimension || iHeight < 1 || iHeight > kiMaxDimension || *pcEnd != L'\0')
 				{
 					LOG(kDefault, kError, "Launch option --windowed expects WxH with dimensions in [1, 16384]: {}", std::wstring(pcValue));
 					gLaunchOptions.vkWindowedExtent = VkExtent2D {.width = 0, .height = 0};

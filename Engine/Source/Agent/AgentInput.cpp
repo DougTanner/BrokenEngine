@@ -26,17 +26,8 @@ static float MaximumCornerDelta(const XMFLOAT4& rRectangleA, const XMFLOAT4& rRe
 }
 
 AgentInput::AgentInput()
+: common::Singleton<AgentInput>(gpAgentInput)
 {
-	ASSERT(gpAgentInput == nullptr);
-	gpAgentInput = this;
-}
-
-AgentInput::~AgentInput()
-{
-	if (gpAgentInput == this)
-	{
-		gpAgentInput = nullptr;
-	}
 }
 
 bool AgentInput::BeginScript(const AgentScript& rScript)
@@ -111,12 +102,6 @@ void AgentInput::ReissueImGuiMousePosition()
 
 bool AgentInput::StabilizeTarget()
 {
-	if (gpAgentUiRegistry == nullptr)
-	{
-		Finish(AgentScriptStatus::kNotFound);
-		return false;
-	}
-
 	int64_t iIndex = gpAgentUiRegistry->ResolveLabel(mScript.pcLabel, mScript.bHasWindow ? mScript.pcWindow : nullptr);
 	if (iIndex == AgentUiRegistry::kiNotFound)
 	{

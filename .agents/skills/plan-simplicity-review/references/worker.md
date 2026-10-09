@@ -60,8 +60,8 @@ steps change product, user interface, tooling, or public interface behavior.
 4. ASSERT-and-defer floor. Weigh the minimal fallback every time — an ASSERT or
    clear failure at the point the rare condition would manifest, dealt with
    later if it ever occurs. Honor the repository's no-useless-ASSERT rule
-   (`.agents/references/cpp-conventions.md`): prefer making the condition impossible or
-   recovering gracefully over an ASSERT that adds nothing.
+   (`.agents/references/cpp-conventions.md`): prefer making the condition impossible over
+   an ASSERT that adds nothing.
 5. Configuration and extension surface. Report options, hooks, and formats with
    no current consumer.
 6. Bandaid versus root cause. For any step that fixes, guards, works around, or
@@ -123,7 +123,13 @@ steps change product, user interface, tooling, or public interface behavior.
     window, and a likelihood signal such as measured cadence, bounded timing,
     multiplicity, or an analogous incident. An analogous incident counts only
     when it shares the relevant failure mechanism, trigger or window, and
-    affected consumer.
+    affected consumer. A reachable race
+    (`.agents/references/change-workflow.md` `### Resolving Ambiguity`) is
+    credible exposure without a likelihood signal, and is not code reachability
+    alone: the existing actor is the named workflow and its concurrent access is
+    the timing window. That heading requires removing such a race by
+    construction, so such a race is never reported as ultra-rare under question
+    1, and its removal is never offered as a `user-judgment` trade-off.
   - `hypothetical` — static code or specification reachability, or a possible
     consequence without the evidence above. Code reachability alone never counts
     as occurrence evidence.

@@ -4,7 +4,7 @@ Worker-pool, persistent-worker, and per-thread runtime state shared by engine an
 
 ## Worker Pool
 
-The primary `Multithreading` instance owns `gpMultithreading`. The named-pool constructor creates an independent pool without replacing that singleton. Each worker owns a `ThreadLocal` and its workbuffer.
+The `Multithreading` instance owns `gpMultithreading`. Each worker owns a `ThreadLocal` and its workbuffer.
 
 `Dispatch` splits the range `WorkerCount() + 1` ways, because the calling thread processes the leftover share itself. Size per-partition scratch for that count, not for `WorkerCount()`. It also reads `gpThreadLocal` without a null check, so only call it from a thread that has a live `ThreadLocal`.
 

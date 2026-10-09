@@ -9,7 +9,7 @@ Players represent a flagship and AI-driven wingmen through one collection. Stabl
 - Path queries run on a deterministic cadence staggered by tick and stable global ID, with immediate recomputation for mode, destination, or direction changes.
 - The cadence also breaks off-schedule when a navigation polygon contains either the lookahead point along the carried steering bearing or the current position. Both tests are needed: containment ahead does not imply containment at the position, and a ship already driven inside sits there as its steady state. Key this on nav-polygon containment, not a terrain-elevation probe — the polygon is that elevation contour inflated outward, so a ship stranded in the band between them measures clear terrain and never re-paths.
 - Random draws, arrival checks, and mode transitions remain outside the pathfinding throttle. Modes 4 and 5 must consume the same number of random draws on any tick they can flip between, so mode 5 mirrors mode 4's three entry draws (island pick, footprint X, footprint Y) on every tick it runs. In a cell with no islands neither mode draws: mode 5 skips the mirror and mode 4 navigates to the cell center instead of an island. Only the draw count matters — each `common::Random` advances the shared random stream once no matter what bound it is given — so mode 5's mirror draws are load-bearing, not dead code, even though it throws their results away.
-- Spawning consumes its cell-change random draw even when transfer data already supplies the resulting timer.
+- Spawning always consumes its cell-change random draw.
 - Preserve cached steering and client debug waypoints across ticks where pathfinding is skipped.
 
 ## State Boundaries

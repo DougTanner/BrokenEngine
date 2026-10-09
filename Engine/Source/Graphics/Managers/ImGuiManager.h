@@ -43,7 +43,7 @@ struct TextArea
 	char pcText[kiMaxCharacters] {};
 };
 
-class ImGuiManager
+class ImGuiManager : public common::Singleton<ImGuiManager>
 {
 public:
 

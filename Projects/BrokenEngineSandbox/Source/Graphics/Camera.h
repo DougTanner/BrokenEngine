@@ -26,7 +26,6 @@ protected:
 
 	bool IsMainMenuFrame(const engine::FrameInterpolateBase& rFrameInterpolate) const override;
 	engine::CameraTarget PullTarget(const engine::FrameInterpolateBase& rFrameInterpolate) override;
-	void OnUpdateComplete() override;
 
 };
 

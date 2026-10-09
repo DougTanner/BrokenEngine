@@ -15,7 +15,7 @@ enum class DeviceCapabilityFlags : uint8_t
 	kWideLinesEnabled                             = 1 << 3,
 };
 
-class DeviceManager
+class DeviceManager : public common::Singleton<DeviceManager>
 {
 public:
 

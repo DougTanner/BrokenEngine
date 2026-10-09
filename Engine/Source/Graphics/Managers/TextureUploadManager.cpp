@@ -8,18 +8,8 @@ namespace engine
 {
 
 TextureUploadManager::TextureUploadManager()
+: common::Singleton<TextureUploadManager>(gpTextureUploadManager)
 {
-	ASSERT(gpTextureUploadManager == nullptr);
-
-	gpTextureUploadManager = this;
-}
-
-TextureUploadManager::~TextureUploadManager()
-{
-	if (gpTextureUploadManager == this)
-	{
-		gpTextureUploadManager = nullptr;
-	}
 }
 
 void TextureUploadManager::InitializeTransferResources()
@@ -329,13 +319,10 @@ void TextureUploadManager::UploadThread()
 			}
 
 			// Device lost during upload -- DestroyTransferResources will clean up GPU resources.
-			if (mCurrentCrc != 0)
-			{
-				LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(mCurrentCrc);
-				rLazyChunk.eState.value.store(ChunkState::kDiskLoaded, std::memory_order_release);
-				miPendingAdoptions.fetch_add(1, std::memory_order_relaxed); // kUploading -> kDiskLoaded: arm the pending-adoption counter
-				mCurrentCrc = 0;
-			}
+			LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(mCurrentCrc);
+			rLazyChunk.eState.value.store(ChunkState::kDiskLoaded, std::memory_order_release);
+			miPendingAdoptions.fetch_add(1, std::memory_order_relaxed); // kUploading -> kDiskLoaded: arm the pending-adoption counter
+			mCurrentCrc = 0;
 			// workLock already holds the non-recursive mWorkMutex; locking it again would self-deadlock.
 			// Publish the exit and notify the drain waiter before leaving the thread, since it cannot acknowledge another probe.
 			mbThreadExited.store(true, std::memory_order_release);
@@ -374,15 +361,7 @@ bool TextureUploadManager::DequeueNextUpload()
 
 bool TextureUploadManager::HandleUploadEarlyOut(LazyChunk& rLazyChunk)
 {
-	if (mTransferVkCommandPool == VK_NULL_HANDLE)
-	{
-		DEBUG_BREAK();
-		rLazyChunk.eState.value.store(ChunkState::kDiskLoaded, std::memory_order_release);
-		miPendingAdoptions.fetch_add(1, std::memory_order_relaxed); // kUploading -> kDiskLoaded: arm the pending-adoption counter
-		gpFileManager->mpPackChunks->mLoader.NotifyChunkCompletion();
-		mCurrentCrc = 0;
-		return true;
-	}
+	ASSERT(mTransferVkCommandPool != VK_NULL_HANDLE);
 
 	// Early out: same queue (concurrent vkQueueSubmit is not thread-safe)
 	if (gpDeviceManager->mTransferVkQueue == gpDeviceManager->mGraphicsVkQueue)

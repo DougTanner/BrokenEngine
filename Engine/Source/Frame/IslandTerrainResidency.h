@@ -12,12 +12,11 @@ namespace engine
 // in moving-camera traversal without holding GPU memory indefinitely.
 inline constexpr int64_t kiGraceRenderFrames = 300;
 
-class IslandTerrainResidency
+class IslandTerrainResidency : public common::Singleton<IslandTerrainResidency>
 {
 public:
 
 	IslandTerrainResidency();
-	~IslandTerrainResidency();
 
 	// Client-only: assign or retrieve the bindless texture-array slot for an island template.
 	// First call for a CRC binds its 4 textures into mRenderTargetTextures at the next free slot.

@@ -43,16 +43,15 @@ struct RawInput
 };
 
 #if defined(BT_CLIENT)
-class RawInputManager
+class RawInputManager : public common::Singleton<RawInputManager>
 {
 public:
 
 	RawInputManager();
-	~RawInputManager();
 
 	void HandleRawInput(LPARAM iMessageParameter);
 	void UpdateFocus(bool bHasFocus, HWND hWindow);
-	bool SetVibration(int64_t iPlayer, float fLeftMotor, float fRightMotor, float fLeftTrigger = 0.0f, float fRightTrigger = 0.0f);
+	bool SetVibration(float fLeftMotor, float fRightMotor);
 
 	void Update(bool bLostFocus);
 

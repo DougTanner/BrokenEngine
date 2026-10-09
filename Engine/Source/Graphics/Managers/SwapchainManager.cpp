@@ -10,11 +10,8 @@ namespace engine
 {
 
 SwapchainManager::SwapchainManager(VkSwapchainKHR vkOldSwapchain)
+: common::Singleton<SwapchainManager>(gpSwapchainManager)
 {
-	ASSERT(gpSwapchainManager == nullptr);
-
-	gpSwapchainManager = this;
-
 	ScopedBootTimer scopedBootTimer(kBootTimerSwapchainManager);
 
 	CreateRenderPass();
@@ -524,11 +521,6 @@ SwapchainManager::~SwapchainManager()
 	vkDestroyFramebuffer(gpDeviceManager->mVkDevice, mHdrVkFramebuffer, nullptr);
 	vkDestroyRenderPass(gpDeviceManager->mVkDevice, mHdrVkRenderPass, nullptr);
 	vkDestroyRenderPass(gpDeviceManager->mVkDevice, mVkRenderPass, nullptr);
-
-	if (gpSwapchainManager == this)
-	{
-		gpSwapchainManager = nullptr;
-	}
 }
 
 VkSwapchainKHR SwapchainManager::ReleaseHandleForRecreation()

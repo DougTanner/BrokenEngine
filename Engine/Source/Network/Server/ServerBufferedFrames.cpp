@@ -60,17 +60,7 @@ void ServerBufferedFrames::BufferFrame(int64_t iTick, std::span<const std::pair<
 			else
 			{
 				int64_t iCompressedSize = game::NetworkSessionContract::CompressStatusChanges(std::span<const game::StatusChange>(rUpdateData.statusChanges.data(), static_cast<size_t>(iStatusChangeCount)), std::span<uint8_t>(mCompressionBuffer));
-				if (iCompressedSize > 0)
-				{
-					buffered.compressedData.assign(mCompressionBuffer.begin(), mCompressionBuffer.begin() + iCompressedSize);
-				}
-				else
-				{
-					// Compression failed despite the sized scratch — drop the payload (logged kError by the codec)
-					// rather than buffer an empty prefix, which the client's status-change decoder rejects as a corrupt
-					// payload — a fatal response to the server's own encoding failure.
-					LOG(kNetwork, kError, "Server::BufferFrame compression failed, dropping payload Coord: ({},{}) Frame: {} Count: {}", rCoordinate.iX, rCoordinate.iY, iTick, iStatusChangeCount);
-				}
+				buffered.compressedData.assign(mCompressionBuffer.begin(), mCompressionBuffer.begin() + iCompressedSize);
 			}
 		}
 

@@ -351,9 +351,7 @@ public:
 	void RegisterRawCpuTimer(int64_t iCpuTimer);
 	void RegisterRawCpuTimerEvent(int64_t iCpuTimer);
 	void AddRawCpuTimerAuxiliaryCount(int64_t iCpuTimer, int64_t iCount);
-	void LatchRawCpuTimer(int64_t iCpuTimer, bool bAccept);
 	void LatchRawCpuTimers(bool bAccept, int64_t iSampleTick);
-	bool ArmRawCpuTimerEvent(int64_t iCpuTimer, int64_t iMinimumSampleTick);
 	// The caller must hold mCpuTimerMutex.
 	bool ArmRawCpuTimerEventLocked(int64_t iCpuTimer, int64_t iMinimumSampleTick);
 	// The caller must hold mCpuTimerMutex. Publication is performed by the derived latch hook.

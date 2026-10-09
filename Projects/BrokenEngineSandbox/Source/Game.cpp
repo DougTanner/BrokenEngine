@@ -30,11 +30,8 @@ static void BuildMenuIslandPlacement(int64_t iIndex, std::vector<engine::IslandP
 }
 
 Game::Game()
+: common::Singleton<Game>(gpGame)
 {
-	ASSERT(gpGame == nullptr);
-
-	gpGame = this;
-
 	InitializeLocalization();
 
 	int64_t iNextAlignment = 1;
@@ -370,11 +367,6 @@ Game::~Game()
 	{
 		ShowCursor(TRUE);
 	}
-
-	if (gpGame == this)
-	{
-		gpGame = nullptr;
-	}
 }
 
 void Game::Reset()
@@ -516,25 +508,20 @@ void Game::ApplyStandardMenuAction(engine::StandardMenuAction eAction)
 
 void Game::ChangeFrame(GameFlags_t gameFlags)
 {
+	ASSERT(gameFlags & GameFlags::kMainMenu);
+
 #if defined(BT_CLIENT)
 	gpClientSession->mpRuntime->Disconnect();
 #endif
 
-	if ((gameFlags & GameFlags::kMainMenu && (mGameFlags & engine::GameFlags::kMainMenu)) || (gameFlags & GameFlags::kGame && !(mGameFlags & engine::GameFlags::kMainMenu)))
+	if (mGameFlags & engine::GameFlags::kMainMenu)
 	{
 		DEBUG_BREAK();
 		return;
 	}
 
 #if defined(BT_CLIENT)
-	if (gameFlags & GameFlags::kMainMenu)
-	{
-		StartMenuMusic();
-	}
-	else
-	{
-		StartGameMusic();
-	}
+	StartMenuMusic();
 #endif // BT_CLIENT
 
 	mGameFlags.Set(engine::GameFlags::kMainMenu, gameFlags & GameFlags::kMainMenu);
@@ -644,30 +631,16 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 #endif // BT_CLIENT
 
 #if defined(BT_CLIENT)
-void Game::CaptureClientStateIfChanged()
+void Game::CaptureClientState()
 {
 	// When no fleet is focused (boot before first sync, or post-disconnect cleared fleets), preserve the remembered fleet/ship —
 	// don't overwrite the just-loaded saved state with zeros. The next valid focus (user click or post-sync auto-activate) updates it.
-	game::FleetGuid newFleetGuid = mRememberedFleetGuid;
-	engine::GlobalId newShipIdentifier = mRememberedFocusedShipIdentifier;
 	const Fleet* pFleet = mFleetSelection.FocusedFleet();
 	if (pFleet != nullptr)
 	{
-		newFleetGuid = pFleet->guid;
-		newShipIdentifier = mFleetSelection.mFocusedMemberGlobalId;
+		mRememberedFleetGuid = pFleet->guid;
+		mRememberedFocusedShipIdentifier = mFleetSelection.mFocusedMemberGlobalId;
 	}
-
-	float fNewCameraEyeHeightTarget = engine::gpCamera->mfCameraEyeHeightTarget;
-
-	if (newFleetGuid == mRememberedFleetGuid && newShipIdentifier == mRememberedFocusedShipIdentifier
-	 && fNewCameraEyeHeightTarget == mfRememberedCameraEyeHeightTarget)
-	{
-		return;
-	}
-
-	mRememberedFleetGuid              = newFleetGuid;
-	mRememberedFocusedShipIdentifier          = newShipIdentifier;
-	mfRememberedCameraEyeHeightTarget = fNewCameraEyeHeightTarget;
 }
 #endif // BT_CLIENT
 

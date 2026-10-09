@@ -24,7 +24,7 @@ void RenderTargetTextures::CreateWaterDisplacementTextures()
 {
 	// Both water pipelines sample Gerstner displacement and normals computed by WaterDisplacement.comp.
 	// The texel grid matches the LOD0 vertex grid built in BufferManager::CreateWaterMesh via WaterDetailTextureSize.
-	auto [iWaterX, iWaterY] = gpTextureManager->WaterDetailTextureSize(gWaterShapeDetail.mfCurrent);
+	auto [iWaterX, iWaterY] = TextureManager::WaterDetailTextureSize(gWaterShapeDetail.mfCurrent);
 	mWaterDisplacementTexture.Create(
 	{
 		.textureFlags = {},

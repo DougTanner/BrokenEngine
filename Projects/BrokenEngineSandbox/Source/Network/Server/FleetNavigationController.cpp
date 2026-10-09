@@ -19,7 +19,9 @@ static engine::GridCoord NavigationDirectionOffset(int64_t iNavigationDirection)
 		case 1: return {.iX = 0, .iY = -1};
 		case 2: return {.iX = 1, .iY = 0};
 		case 3: return {.iX = -1, .iY = 0};
-		default: return {.iX = 0, .iY = 0};
+		default:
+			ASSERT(false);
+			std::unreachable();
 	}
 }
 

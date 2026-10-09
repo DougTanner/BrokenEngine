@@ -564,28 +564,13 @@ void TextureDescriptors::UnregisterBindingsForKey(common::crc_t bindingKey)
 	mTextureBindings.erase(bindingKey);
 }
 
-void TextureDescriptors::WriteSingleTextureBinding(common::crc_t crc, TextureBinding& rBinding, VkSampler vkSampler)
+void TextureDescriptors::WriteSingleTextureBinding(TextureBinding& rBinding, VkSampler vkSampler)
 {
-	VkImageView vkImageView = VK_NULL_HANDLE;
-	int64_t iGeneration = 0;
-	if (rBinding.pTexture != nullptr)
-	{
-		vkImageView = rBinding.pTexture->mVkImageView;
-		iGeneration = rBinding.pTexture->miGeneration;
-	}
-	else
-	{
-		auto it = mrTextureManager.mTextureMap.find(crc);
-		if (it != mrTextureManager.mTextureMap.end())
-		{
-			vkImageView = it->second.mVkImageView;
-			iGeneration = it->second.miGeneration;
-		}
-	}
+	VkImageView vkImageView = rBinding.pTexture->mVkImageView;
 	if (vkImageView != VK_NULL_HANDLE)
 	{
 		PipelineDescriptorWriter::UpdateImageDescriptor(*rBinding.pPipeline, rBinding.iBinding, vkSampler, vkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-		rBinding.iTextureGeneration = iGeneration;
+		rBinding.iTextureGeneration = rBinding.pTexture->miGeneration;
 	}
 }
 
@@ -597,7 +582,7 @@ void TextureDescriptors::RewriteSamplerDescriptors()
 		PipelineDescriptorWriter::UpdateImageDescriptor(*rBinding.pPipeline, rBinding.iBinding, vkSampler, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_SAMPLER);
 	}
 
-	for (auto& [rCrc, rBindings] : mTextureBindings)
+	for ([[maybe_unused]] auto& [rCrc, rBindings] : mTextureBindings)
 	{
 		for (TextureBinding& rBinding : rBindings)
 		{
@@ -613,7 +598,7 @@ void TextureDescriptors::RewriteSamplerDescriptors()
 			}
 			else
 			{
-				WriteSingleTextureBinding(rCrc, rBinding, vkSampler);
+				WriteSingleTextureBinding(rBinding, vkSampler);
 			}
 		}
 	}

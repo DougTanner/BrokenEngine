@@ -14,7 +14,6 @@ namespace toolcli
 		std::wstring path;
 		std::filesystem::path diskPath;
 		std::string bytes;
-		std::string digest;
 		std::string createdUtc;
 		std::vector<std::wstring> dependencies;
 		bool bDependenciesKnown = false;

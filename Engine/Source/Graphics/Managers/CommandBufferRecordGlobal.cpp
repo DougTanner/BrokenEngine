@@ -354,12 +354,12 @@ void CommandBufferRecordGlobal::RecordParticleUpdatePasses(VkCommandBuffer vkCom
 {
 	BarrierInfo pBarriers[]
 	{
-		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kComputeRead, .vkBarrierBuffer = gpBufferManager->mLongParticlesStorageBuffer.mDeviceLocalVkBuffer},
-		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kShaderIndirectRead, .vkBarrierBuffer = pPipelines[kPipelineLongParticlesUpdate].mIndirectVkBuffer},
-		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kShaderIndirectRead, .vkBarrierBuffer = pPipelines[kPipelineLongParticlesRender].mIndirectVkBuffer},
-		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kComputeRead, .vkBarrierBuffer = gpBufferManager->mSquareParticlesStorageBuffer.mDeviceLocalVkBuffer},
-		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kShaderIndirectRead, .vkBarrierBuffer = pPipelines[kPipelineSquareParticlesUpdate].mIndirectVkBuffer},
-		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kShaderIndirectRead, .vkBarrierBuffer = pPipelines[kPipelineSquareParticlesRender].mIndirectVkBuffer},
+		{.eDestination = BufferBarrier::kComputeRead, .vkBarrierBuffer = gpBufferManager->mLongParticlesStorageBuffer.mDeviceLocalVkBuffer},
+		{.eDestination = BufferBarrier::kShaderIndirectRead, .vkBarrierBuffer = pPipelines[kPipelineLongParticlesUpdate].mIndirectVkBuffer},
+		{.eDestination = BufferBarrier::kShaderIndirectRead, .vkBarrierBuffer = pPipelines[kPipelineLongParticlesRender].mIndirectVkBuffer},
+		{.eDestination = BufferBarrier::kComputeRead, .vkBarrierBuffer = gpBufferManager->mSquareParticlesStorageBuffer.mDeviceLocalVkBuffer},
+		{.eDestination = BufferBarrier::kShaderIndirectRead, .vkBarrierBuffer = pPipelines[kPipelineSquareParticlesUpdate].mIndirectVkBuffer},
+		{.eDestination = BufferBarrier::kShaderIndirectRead, .vkBarrierBuffer = pPipelines[kPipelineSquareParticlesRender].mIndirectVkBuffer},
 	};
 	Buffer::RecordBarriers(vkCommandBuffer, pBarriers);
 
@@ -367,7 +367,7 @@ void CommandBufferRecordGlobal::RecordParticleUpdatePasses(VkCommandBuffer vkCom
 	pPipelines[kPipelineLongParticlesUpdate].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 	BarrierInfo pLongParticleBarrier[]
 	{
-		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kStorageBufferRead, .vkBarrierBuffer = gpBufferManager->mLongParticlesStorageBuffer.mDeviceLocalVkBuffer},
+		{.eDestination = BufferBarrier::kStorageBufferRead, .vkBarrierBuffer = gpBufferManager->mLongParticlesStorageBuffer.mDeviceLocalVkBuffer},
 	};
 	Buffer::RecordBarriers(vkCommandBuffer, pLongParticleBarrier);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerLongParticlesUpdate);
@@ -376,7 +376,7 @@ void CommandBufferRecordGlobal::RecordParticleUpdatePasses(VkCommandBuffer vkCom
 	pPipelines[kPipelineSquareParticlesUpdate].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 	BarrierInfo pSquareParticleBarrier[]
 	{
-		{.eSource = BufferBarrier::kComputeReadWrite, .eDestination = BufferBarrier::kStorageBufferRead, .vkBarrierBuffer = gpBufferManager->mSquareParticlesStorageBuffer.mDeviceLocalVkBuffer},
+		{.eDestination = BufferBarrier::kStorageBufferRead, .vkBarrierBuffer = gpBufferManager->mSquareParticlesStorageBuffer.mDeviceLocalVkBuffer},
 	};
 	Buffer::RecordBarriers(vkCommandBuffer, pSquareParticleBarrier);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerSquareParticlesUpdate);

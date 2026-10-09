@@ -86,11 +86,7 @@ void StreamingVoices::Update(std::chrono::duration<float> deltaTime)
 	}
 	for (int64_t i = 0; i + 1 < std::ssize(mPreviousStreams); ++i)
 	{
-#if defined(BT_DEBUG)
-		mPreviousStreams.at(i)->UpdateRequests(AudioStreamingHarnessRig::AllowOlderFadeRequests());
-#else
 		mPreviousStreams.at(i)->UpdateRequests(false);
-#endif
 	}
 
 	if (mpCurrentStream != nullptr)
@@ -134,10 +130,6 @@ void StreamingVoices::CancelPendingReads()
 void StreamingVoices::Clear(bool bNullVoicesBeforeDestroy)
 {
 	CancelPendingReads();
-	for (const std::unique_ptr<StreamingVoice>& rpStream : mStreamsToDestroy)
-	{
-		rpStream->CancelPendingReads();
-	}
 
 	if (bNullVoicesBeforeDestroy)
 	{
@@ -148,18 +140,7 @@ void StreamingVoices::Clear(bool bNullVoicesBeforeDestroy)
 
 		for (const std::unique_ptr<StreamingVoice>& rpStream : mPreviousStreams)
 		{
-			if (rpStream != nullptr)
-			{
-				rpStream->mpVoice = nullptr;
-			}
-		}
-
-		for (const std::unique_ptr<StreamingVoice>& rpStream : mStreamsToDestroy)
-		{
-			if (rpStream != nullptr)
-			{
-				rpStream->mpVoice = nullptr;
-			}
+			rpStream->mpVoice = nullptr;
 		}
 	}
 

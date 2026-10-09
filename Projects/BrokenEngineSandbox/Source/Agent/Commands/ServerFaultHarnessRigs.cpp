@@ -160,10 +160,6 @@ void CommandEnginePacketFaultHarnessRig(const nlohmann::json& rParameters, nlohm
 	{
 		throw std::runtime_error("engine_packet_fault_harness_rig requires exactly one handshaken client");
 	}
-	if (pPeer == nullptr)
-	{
-		throw std::runtime_error("engine_packet_fault_harness_rig requires exactly one handshaken client");
-	}
 
 	// One declared ack entry in both cases. "truncated" carries only 10 of the 37 bytes that entry needs, so the
 	// shared reader throws and the dispatch catch records "corrupt payload"; "size_mismatch" carries a readable
@@ -214,14 +210,6 @@ void CommandServerPreHandshakeAcknowledgmentHarnessRig([[maybe_unused]] const nl
 		{
 			throw std::runtime_error("server_pre_handshake_ack_harness_rig requires exactly one handshaken client");
 		}
-		if (pClient == nullptr)
-		{
-			throw std::runtime_error("server_pre_handshake_ack_harness_rig requires exactly one handshaken client");
-		}
-		if (pClient->pPeer == nullptr)
-		{
-			throw std::runtime_error("server_pre_handshake_ack_harness_rig requires exactly one handshaken client");
-		}
 		if (pClient->iTickPacketCount > engine::kiMaximumClientPacketsPerTick - 1)
 		{
 			throw std::runtime_error("server_pre_handshake_ack_harness_rig requires packet-count headroom");
@@ -257,10 +245,7 @@ void CommandServerPreHandshakeAcknowledgmentHarnessRig([[maybe_unused]] const nl
 		engine::NetworkMessages::Write(rWorkbuffer, message);
 		std::span<const uint8_t> packetData(reinterpret_cast<const uint8_t*>(rWorkbuffer.View().data()), rWorkbuffer.View().size());
 		int64_t iPacketSize = static_cast<int64_t>(packetData.size());
-		if (iPacketSize != engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize)
-		{
-			throw std::runtime_error("server_pre_handshake_ack_harness_rig failed to serialize the fixed ACK layout");
-		}
+		ASSERT(iPacketSize == engine::NetworkMessages::ClientAckStreamMessage::kiFixedSize);
 
 		{
 			pClient->bHandshakeComplete = false;

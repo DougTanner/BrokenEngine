@@ -15,32 +15,6 @@
 namespace game
 {
 
-static engine::Client& RequireHarnessRigClient(std::string_view command)
-{
-	if (gpGame == nullptr)
-	{
-		throw std::runtime_error(std::format("{} requires an accepted connected client", command));
-	}
-	if (gpClientSession == nullptr)
-	{
-		throw std::runtime_error(std::format("{} requires an accepted connected client", command));
-	}
-	if (gpClientSession->mpRuntime->mpClient == nullptr)
-	{
-		throw std::runtime_error(std::format("{} requires an accepted connected client", command));
-	}
-	engine::Client& rClient = *gpClientSession->mpRuntime->mpClient;
-	if (!(rClient.mStateFlags & engine::Client::ClientStateFlags::kConnected))
-	{
-		throw std::runtime_error(std::format("{} requires an accepted connected client", command));
-	}
-	if (!(rClient.mStateFlags & engine::Client::ClientStateFlags::kConnectionAccepted))
-	{
-		throw std::runtime_error(std::format("{} requires an accepted connected client", command));
-	}
-	return rClient;
-}
-
 void CommandClientSubscribeAcceptHarnessRig(const nlohmann::json& rParams, nlohmann::json& rResult)
 {
 	if constexpr (!kbDebugInput)
@@ -120,10 +94,6 @@ void CommandClientStaleUpdateHarnessRig(const nlohmann::json& rParams, [[maybe_u
 		engine::ClientNetworkHarnessRigs::ArmStaleUpdate(rClient, pState);
 		engine::gpAgentCommandServer->DeferResponse([pState, pClient]() -> std::optional<nlohmann::json>
 		{
-			if (gpClientSession == nullptr)
-			{
-				throw std::runtime_error("client_stale_update_harness_rig client was replaced or disconnected");
-			}
 			if (gpClientSession->mpRuntime->mpClient.get() != pClient)
 			{
 				throw std::runtime_error("client_stale_update_harness_rig client was replaced or disconnected");
@@ -292,10 +262,6 @@ void CommandClientCancelledSubscriptionHarnessRig([[maybe_unused]] const nlohman
 		std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::now() + 4s;
 		engine::gpAgentCommandServer->DeferResponse([pState, pClient, coordinate, iSlot, bPolicyUnchanged, bCancelledToUnsubscribed, bAcceptToUnsubscribing, deadline]() -> std::optional<nlohmann::json>
 		{
-			if (gpClientSession == nullptr)
-			{
-				throw std::runtime_error("client_cancelled_subscription_harness_rig client was replaced or disconnected");
-			}
 			if (gpClientSession->mpRuntime->mpClient.get() != pClient)
 			{
 				throw std::runtime_error("client_cancelled_subscription_harness_rig client was replaced or disconnected");

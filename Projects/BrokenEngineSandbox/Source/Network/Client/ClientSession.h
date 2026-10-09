@@ -39,7 +39,7 @@ enum class SubscriptionChangeReason : uint8_t
 
 const char* ToString(SubscriptionChangeReason eReason);
 
-class ClientSession
+class ClientSession : public common::Singleton<ClientSession>
 {
 public:
 

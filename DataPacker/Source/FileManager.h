@@ -2,7 +2,7 @@
 
 #include "InputFingerprint.h"
 
-class FileManager
+class FileManager : public common::Singleton<FileManager>
 {
 public:
 	enum class OutputRoot
@@ -26,7 +26,6 @@ public:
 	};
 
 	FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitializationResult, InitializationMode eMode = InitializationMode::kFull);
-	~FileManager();
 
 	std::filesystem::path mpInputDirectories[2];
 	std::filesystem::path mCacheDirectory;
@@ -36,7 +35,6 @@ public:
 	std::string mProjectName;
 	std::unique_ptr<InputFingerprintCache> mpInputFingerprintCache;
 
-	bool mbCleanExport = false;
 	bool mbForbidExpensiveExport = false;
 	bool mbForbidGaeaExport = false;
 
@@ -66,5 +64,7 @@ private:
 	OutputRootInfo mAttributionOutput;
 
 };
+
+void WriteEntireFile(const std::filesystem::path& rPath, std::string_view contents);
 
 inline FileManager* gpFileManager = nullptr;

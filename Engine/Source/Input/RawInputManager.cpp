@@ -8,11 +8,8 @@ namespace engine
 {
 
 RawInputManager::RawInputManager()
+: common::Singleton<RawInputManager>(gpRawInputManager)
 {
-	ASSERT(gpRawInputManager == nullptr);
-
-	gpRawInputManager = this;
-
 	try
 	{
 		mpGamePad = std::make_unique<GamePad>();
@@ -20,18 +17,6 @@ RawInputManager::RawInputManager()
 	catch ([[maybe_unused]] const std::exception& rException)
 	{
 		LOG(kInput, kError, "Failed GamePad: {}", rException.what());
-	}
-	catch (...)
-	{
-		LOG(kInput, kError, "Failed GamePad");
-	}
-}
-
-RawInputManager::~RawInputManager()
-{
-	if (gpRawInputManager == this)
-	{
-		gpRawInputManager = nullptr;
 	}
 }
 
@@ -86,11 +71,11 @@ void RawInputManager::UpdateFocus(bool bHasFocus, HWND hWindow)
 	}
 }
 
-bool RawInputManager::SetVibration(int64_t iPlayer, float fLeftMotor, float fRightMotor, float fLeftTrigger, float fRightTrigger)
+bool RawInputManager::SetVibration(float fLeftMotor, float fRightMotor)
 {
 	if (mpGamePad != nullptr)
 	{
-		return mpGamePad->SetVibration(static_cast<int>(iPlayer), fLeftMotor, fRightMotor, fLeftTrigger, fRightTrigger);
+		return mpGamePad->SetVibration(0, fLeftMotor, fRightMotor, 0.0f, 0.0f);
 	}
 
 	return false;

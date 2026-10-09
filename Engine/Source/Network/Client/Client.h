@@ -50,7 +50,7 @@ struct ReceivedDebugFrame
 	std::unique_ptr<game::Frame> pFrame;
 };
 
-class Client
+class Client : public common::Singleton<Client>
 {
 public:
 
@@ -64,7 +64,7 @@ public:
 	{
 		static_assert(std::is_enum_v<TTYPE>, "SendSimplePacket type tag must be an enum (engine::PacketType or game::GamePacketType)");
 
-		if (!(mStateFlags & ClientStateFlags::kConnected) || mpServerPeer == nullptr)
+		if (!(mStateFlags & ClientStateFlags::kConnected))
 		{
 			return;
 		}

@@ -29,23 +29,7 @@ struct ExportedIsland
 	float fWorldElevationMeters = 0.0f;
 };
 
-static int64_t CheckedProduct(int64_t iLeft, int64_t iRight, std::string_view what)
-{
-	if (iRight != 0 && iLeft > std::numeric_limits<int64_t>::max() / iRight)
-	{
-		throw std::runtime_error(std::format("{} size overflows int64_t.", what));
-	}
-	return iLeft * iRight;
-}
-
-static int64_t CheckedSum(int64_t iLeft, int64_t iRight, std::string_view what)
-{
-	if (iLeft > std::numeric_limits<int64_t>::max() - iRight)
-	{
-		throw std::runtime_error(std::format("{} size overflows int64_t.", what));
-	}
-	return iLeft + iRight;
-}
+constexpr int64_t kiJpegSidecarQuality = 90;
 
 
 // Convex hull (Andrew's monotone chain) of the island's valid area — the pixels at or above
@@ -179,18 +163,18 @@ static void VerifyHullCcwConvex(const ExportedIsland& rOut)
 // Shared encode tail: mask invisible underwater texels flat, build the BC mip chain, write the
 // committed intermediate, then the debug JPEG sidecar. Each caller still constructs / crops / packs
 // its own Texture and holds Texture::sEncodeMutex; only this trailing sequence is shared.
-static void MaskMipSaveTexture(Texture& rTexture, const std::vector<float>& rHeightmapData, int64_t iElevationWidth, int64_t iElevationHeight, int64_t iMaskDivisor, const float (&rFlatValues)[4], VkFormat vkFormat, const std::filesystem::path& rSavePath, TextureOptions_t saveOptions, const std::filesystem::path& rJpegPath, int64_t iJpegQuality, TextureOptions_t jpegOptions)
+static void MaskMipSaveTexture(Texture& rTexture, const std::vector<float>& rHeightmapData, int64_t iElevationWidth, int64_t iElevationHeight, int64_t iMaskDivisor, const float (&rFlatValues)[4], VkFormat vkFormat, const std::filesystem::path& rSavePath, TextureOptions_t saveOptions, const std::filesystem::path& rJpegPath, TextureOptions_t jpegOptions)
 {
 	rTexture.MaskByHeightmap(rHeightmapData, iElevationWidth, iElevationHeight, iMaskDivisor, common::kfUnderwaterMaskThresholdMeters, rFlatValues);
 	rTexture.MakeMipmaps(vkFormat);
 	rTexture.Save(rSavePath, vkFormat, saveOptions);
-	rTexture.SaveJpegSidecar(rJpegPath, iJpegQuality, jpegOptions);
+	rTexture.SaveJpegSidecar(rJpegPath, kiJpegSidecarQuality, jpegOptions);
 }
 
 // Loads the four grayscale material-mask PNGs (Rock/Sand/Snow/Flow), packs them into one BC7 RGBA texture
 // cropped + 4x downsampled to match the heightmap footprint, and saves it. Serialized behind
 // Texture::sEncodeMutex like the other island textures.
-static void EncodeMaterialMasks(const std::filesystem::path& rInputPath, const std::filesystem::path& rTextureSourceDirectory, const std::filesystem::path& rDiagnosticsDirectory, const BakedDimensions& rBaked, const std::vector<float>& rHeightmapData, int64_t iElevationWidth, int64_t iElevationHeight, int64_t iJpegSidecarQuality)
+static void EncodeMaterialMasks(const std::filesystem::path& rInputPath, const std::filesystem::path& rTextureSourceDirectory, const std::filesystem::path& rDiagnosticsDirectory, const BakedDimensions& rBaked, const std::vector<float>& rHeightmapData, int64_t iElevationWidth, int64_t iElevationHeight)
 {
 	std::lock_guard<std::mutex> lock(Texture::sEncodeMutex);
 
@@ -246,7 +230,7 @@ static void EncodeMaterialMasks(const std::filesystem::path& rInputPath, const s
 	// mask channels go to zero underwater (no rock/sand/snow/flow override below the cut line).
 	const float pfFlatMasks[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 	// kVerifyNoAlpha omitted: A channel carries real data (Flow mask).
-	MaskMipSaveTexture(texture, rHeightmapData, iElevationWidth, iElevationHeight, 1, pfFlatMasks, VK_FORMAT_BC7_UNORM_BLOCK, rInputPath / kpcIslandMasks, {}, rDiagnosticsDirectory / "Masks.jpg", iJpegSidecarQuality, {});
+	MaskMipSaveTexture(texture, rHeightmapData, iElevationWidth, iElevationHeight, 1, pfFlatMasks, VK_FORMAT_BC7_UNORM_BLOCK, rInputPath / kpcIslandMasks, {}, rDiagnosticsDirectory / "Masks.jpg", {});
 }
 
 // Reads MeshProcessed.bin ([int32 vertexCount, int32 indexCount, float3 positions, uint32 indices]) into
@@ -262,10 +246,6 @@ static void ReadProcessedMesh(const std::filesystem::path& rIntermediatesDir, Ex
 
 	static constexpr int64_t kiMeshHeaderBytes = static_cast<int64_t>(sizeof(int32_t)) * 2;
 	uintmax_t uiMeshFileBytes = std::filesystem::file_size(meshFile);
-	if (uiMeshFileBytes < kiMeshHeaderBytes)
-	{
-		throw std::runtime_error(std::format("Processed mesh file \"{}\" is {} bytes; expected at least {} bytes for its header.", meshFile.string(), uiMeshFileBytes, kiMeshHeaderBytes));
-	}
 
 	int32_t iMeshVertexCount = 0;
 	int32_t iMeshIndexCount = 0;
@@ -295,12 +275,11 @@ static void ReadProcessedMesh(const std::filesystem::path& rIntermediatesDir, Ex
 
 	int64_t iVertexCount = iMeshVertexCount;
 	int64_t iIndexCount = iMeshIndexCount;
-	int64_t iPositionElementCount = CheckedProduct(iVertexCount, 3, "processed mesh position element");
-	int64_t iPositionBytes = CheckedProduct(iPositionElementCount, sizeof(float), "processed mesh position");
-	int64_t iMeshPositionElementCount = CheckedProduct(iVertexCount, 2, "processed mesh XY position element");
-	int64_t iIndexBytes = CheckedProduct(iIndexCount, sizeof(uint32_t), "processed mesh index");
-	int64_t iPayloadBytes = CheckedSum(iPositionBytes, iIndexBytes, "processed mesh payload");
-	int64_t iExpectedFileBytes = CheckedSum(kiMeshHeaderBytes, iPayloadBytes, "processed mesh file");
+	int64_t iPositionElementCount = iVertexCount * 3;
+	int64_t iPositionBytes = iPositionElementCount * static_cast<int64_t>(sizeof(float));
+	int64_t iMeshPositionElementCount = iVertexCount * 2;
+	int64_t iIndexBytes = iIndexCount * static_cast<int64_t>(sizeof(uint32_t));
+	int64_t iExpectedFileBytes = kiMeshHeaderBytes + iPositionBytes + iIndexBytes;
 	if (uiMeshFileBytes != static_cast<uintmax_t>(iExpectedFileBytes))
 	{
 		throw std::runtime_error(std::format("Processed mesh file \"{}\" is {} bytes; expected {} bytes for {} vertices and {} indices.", meshFile.string(), uiMeshFileBytes, iExpectedFileBytes, iMeshVertexCount, iMeshIndexCount));
@@ -309,11 +288,11 @@ static void ReadProcessedMesh(const std::filesystem::path& rIntermediatesDir, Ex
 	std::vector<float> meshPositionsXYZ(static_cast<size_t>(iPositionElementCount));
 	std::vector<float> meshPositions(static_cast<size_t>(iMeshPositionElementCount));
 	std::vector<uint32_t> meshIndices(static_cast<size_t>(iIndexCount));
-	if (iPositionBytes > 0 && (!meshStream.read(reinterpret_cast<char*>(meshPositionsXYZ.data()), static_cast<std::streamsize>(iPositionBytes)) || meshStream.gcount() != static_cast<std::streamsize>(iPositionBytes)))
+	if (!meshStream.read(reinterpret_cast<char*>(meshPositionsXYZ.data()), static_cast<std::streamsize>(iPositionBytes)) || meshStream.gcount() != static_cast<std::streamsize>(iPositionBytes))
 	{
 		throw std::runtime_error(std::format("Failed to read processed mesh positions from \"{}\".", meshFile.string()));
 	}
-	if (iIndexBytes > 0 && (!meshStream.read(reinterpret_cast<char*>(meshIndices.data()), static_cast<std::streamsize>(iIndexBytes)) || meshStream.gcount() != static_cast<std::streamsize>(iIndexBytes)))
+	if (!meshStream.read(reinterpret_cast<char*>(meshIndices.data()), static_cast<std::streamsize>(iIndexBytes)) || meshStream.gcount() != static_cast<std::streamsize>(iIndexBytes))
 	{
 		throw std::runtime_error(std::format("Failed to read processed mesh indices from \"{}\".", meshFile.string()));
 	}
@@ -379,7 +358,7 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 		throw std::runtime_error(std::format("Island leaf \"{}\" has invalid world dimensions: {}x{} m footprint, {} m elevation.", rInputPath.string(), baked.fWidthMeters, baked.fHeightMeters, baked.fElevationMeters));
 	}
 
-	int64_t iCropPixelCount = CheckedProduct(baked.iCropWidth, baked.iCropHeight, "island crop pixel");
+	int64_t iCropPixelCount = baked.iCropWidth * baked.iCropHeight;
 	if (iCropPixelCount > std::numeric_limits<int64_t>::max() / 4)
 	{
 		throw std::runtime_error(std::format("Island leaf \"{}\" crop dimensions are too large for texture pixels.", rInputPath.string()));
@@ -392,12 +371,8 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	rOut.fWorldElevationMeters = baked.fElevationMeters;
 	int64_t iElevationWidth = baked.iCropWidth / kiElevationDivisor;
 	int64_t iElevationHeight = baked.iCropHeight / kiElevationDivisor;
-	if (iElevationWidth <= 0 || iElevationHeight <= 0 || !std::in_range<int32_t>(iElevationWidth) || !std::in_range<int32_t>(iElevationHeight))
-	{
-		throw std::runtime_error(std::format("Island leaf \"{}\" has invalid elevation dimensions: {}x{}.", rInputPath.string(), iElevationWidth, iElevationHeight));
-	}
-	int64_t iElevationPixelCount = CheckedProduct(iElevationWidth, iElevationHeight, "island elevation pixel");
-	int64_t iElevationBytes = CheckedProduct(iElevationPixelCount, sizeof(float), "island elevation");
+	int64_t iElevationPixelCount = iElevationWidth * iElevationHeight;
+	int64_t iElevationBytes = iElevationPixelCount * static_cast<int64_t>(sizeof(float));
 
 	// Read the downsampled engine-meter elevation up front so it can drive both the per-texture
 	// underwater mask (below) and the chunk payload heightmap (further down). Same buffer, single
@@ -445,12 +420,11 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	// mip, and zlib catches the across-block repetition for free.
 	if (bEncodeTextures)
 	{
-		static constexpr int64_t kiJpegSidecarQuality = 90;
 		{
 			std::lock_guard<std::mutex> lock(Texture::sEncodeMutex);
 			Texture texture(intermediatesDirectory / "AmbientOcclusion.r16", FileType::kUint16Raw, baked.iCropWidth, baked.iCropHeight);
 			const float pfFlatAmbientOcclusion[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-			MaskMipSaveTexture(texture, rOut.cpuHeightmapData, iElevationWidth, iElevationHeight, kiElevationDivisor, pfFlatAmbientOcclusion, VK_FORMAT_BC4_UNORM_BLOCK, rInputPath / kpcIslandAmbientOcclusion, {}, diagnosticsDirectory / "AmbientOcclusion.jpg", kiJpegSidecarQuality, TextureOptions::kGrayscale);
+			MaskMipSaveTexture(texture, rOut.cpuHeightmapData, iElevationWidth, iElevationHeight, kiElevationDivisor, pfFlatAmbientOcclusion, VK_FORMAT_BC4_UNORM_BLOCK, rInputPath / kpcIslandAmbientOcclusion, {}, diagnosticsDirectory / "AmbientOcclusion.jpg", TextureOptions::kGrayscale);
 		}
 
 		{
@@ -460,7 +434,7 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 			// Flat alpha stays 255 so BC7 keeps its alpha-free mode and the kVerifyNoAlpha assert
 			// at Save still passes — RGB carries the underwater zero, alpha is invariant.
 			const float pfFlatColor[4] = {0.0f, 0.0f, 0.0f, 255.0f};
-			MaskMipSaveTexture(texture, rOut.cpuHeightmapData, iElevationWidth, iElevationHeight, kiElevationDivisor, pfFlatColor, VK_FORMAT_BC7_UNORM_BLOCK, rInputPath / kpcIslandColor, TextureOptions::kVerifyNoAlpha, diagnosticsDirectory / "Color.jpg", kiJpegSidecarQuality, {});
+			MaskMipSaveTexture(texture, rOut.cpuHeightmapData, iElevationWidth, iElevationHeight, kiElevationDivisor, pfFlatColor, VK_FORMAT_BC7_UNORM_BLOCK, rInputPath / kpcIslandColor, TextureOptions::kVerifyNoAlpha, diagnosticsDirectory / "Color.jpg", {});
 		}
 
 		{
@@ -469,14 +443,14 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 			texture.Crop(baked.iCropX, baked.iCropY, baked.iCropWidth, baked.iCropHeight);
 			// Flat (127.5, 127.5) → shader 2x-1 → (0, 0) → reconstructed Z=1 → flat tangent normal (0,0,1).
 			const float pfFlatNormals[4] = {127.5f, 127.5f, 0.0f, 0.0f};
-			MaskMipSaveTexture(texture, rOut.cpuHeightmapData, iElevationWidth, iElevationHeight, kiElevationDivisor, pfFlatNormals, VK_FORMAT_BC5_UNORM_BLOCK, rInputPath / kpcIslandNormals, {}, diagnosticsDirectory / "Normals.jpg", kiJpegSidecarQuality, {});
+			MaskMipSaveTexture(texture, rOut.cpuHeightmapData, iElevationWidth, iElevationHeight, kiElevationDivisor, pfFlatNormals, VK_FORMAT_BC5_UNORM_BLOCK, rInputPath / kpcIslandNormals, {}, diagnosticsDirectory / "Normals.jpg", {});
 		}
 
 		// Material masks: pack Rock / Sand / Snow / Flow PNGs into a single BC7 RGBA texture cropped to
 		// match Color / Normals UVs, then 4x downsampled for ~25% of Color's footprint. R=Rock, G=Sand,
 		// B=Snow, A=Flow (Flow channel reserved; Terrain.frag ignores it today). Source PNGs are 8-bit
 		// palette grayscale at the same dimensions as Color.png (stb decodes the palette to luminance).
-		EncodeMaterialMasks(rInputPath, textureSourceDirectory, diagnosticsDirectory, baked, rOut.cpuHeightmapData, iElevationWidth, iElevationHeight, kiJpegSidecarQuality);
+		EncodeMaterialMasks(rInputPath, textureSourceDirectory, diagnosticsDirectory, baked, rOut.cpuHeightmapData, iElevationWidth, iElevationHeight);
 	}
 
 }

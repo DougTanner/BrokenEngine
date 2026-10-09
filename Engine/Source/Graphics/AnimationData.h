@@ -14,7 +14,6 @@ public:
 	void EvaluateMaterial(int64_t iMaterialIndex, const XMMATRIX* pmatWorldMatrices, common::MeshData* pMeshData, common::JointMatrix* pJointMatrices, int64_t iJointMatrixOffset) const;
 	void EvaluateAnimation(int64_t iAnimationIndex, float fTime, std::span<common::MeshData> meshData, common::JointMatrix* pJointMatrices, int64_t iJointMatrixOffset) const;
 	int64_t SkinnedMaterialCount(int64_t iMaterialCount) const;
-	int64_t FindAnimation(std::string_view name) const;
 
 	common::crc_t mCrc = 0;
 	common::AnimationHeader mHeader {};
