@@ -1,7 +1,7 @@
 #pragma once
 
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
-#include "Agent/Commands/AudioStreamingFixture.h"
+#include "Agent/Commands/AudioStreamingHarnessRig.h"
 #endif
 
 namespace engine
@@ -44,7 +44,7 @@ public:
 	void ClearDeferredResponse();
 
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
-	std::unique_ptr<AudioStreamingFixture> mpAudioStreamingFixture = std::make_unique<AudioStreamingFixture>();
+	std::unique_ptr<AudioStreamingHarnessRig> mpAudioStreamingHarnessRig = std::make_unique<AudioStreamingHarnessRig>();
 #endif
 
 private:

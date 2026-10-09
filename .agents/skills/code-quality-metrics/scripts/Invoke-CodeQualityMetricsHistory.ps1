@@ -1,22 +1,23 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Contract', 'Generate')]
+    [ValidateSet('Contract', 'Generate', 'Rebuild')]
     [string]$Mode,
     [Parameter(Mandatory = $true)]
     [string]$RepositoryRoot,
     [Parameter(Mandatory = $true)]
     [string]$BaseCommit,
-    [string]$TipCommit,
-    [string]$DateUtc,
+    [string]$SeedPath,
     [string]$OutputDirectory
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$script:PrefixLines = 648
 $script:HistoryRelativePath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'
+$script:GeneratorRelativePath = '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1'
+$script:HeaderText = '{"schema":"code-quality-metrics-history/v2"}'
+$script:RowFields = @('index', 'sha', 'date', 'measured', 'verbosity', 'structuralErosion', 'supported', 'parsed')
 $script:MetricExtensions = @('.h', '.cpp')
 $script:ExcludedRoots = @('ThirdParty', '.agents', '.claude', 'Temp')
 
@@ -105,111 +106,78 @@ function Test-MetricPath([string]$Path) {
 function Test-PycachePath([string]$Path) {
     return $Path -match '(^|/)__pycache__(/|$)'
 }
-function Get-ExplicitUtcDate([string]$Value) {
-    if (-not $Value -or $Value -notmatch '^\d{4}-\d{2}-\d{2}$') { throw 'DateUtc must be an explicit UTC date in YYYY-MM-DD form.' }
-    $parsed = [datetime]::MinValue
-    if (-not [datetime]::TryParseExact($Value, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$parsed)) { throw 'DateUtc is not a valid calendar date.' }
-    return $parsed.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
-}
-function Get-RowDateText([object]$Value) {
-    if ($Value -is [datetime]) { return $Value.ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture) }
-    return [string]$Value
+function Assert-CommitDate([object]$Value, [string]$Name) {
+    $parsed = [DateTimeOffset]::MinValue
+    if ($Value -isnot [string] -or $Value -cnotmatch '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$' -or
+        -not [DateTimeOffset]::TryParse($Value, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$parsed)) { throw "$Name must be a strict ISO 8601 date with offset." }
 }
 function Get-LastDate([object]$Row) {
-    $dateText = Get-RowDateText $Row.date
-    if ($dateText -match '^(\d{4}-\d{2}-\d{2})') { return $matches[1] }
+    if ([string]$Row.date -match '^(\d{4}-\d{2}-\d{2})') { return $matches[1] }
     throw 'History row date is not an ISO date.'
 }
 function Assert-FiniteRange([object]$Value, [string]$Name) {
-    if ($Value -is [string] -or $Value -is [bool]) { throw "$Name must be a JSON number." }
+    if ($null -eq $Value -or $Value -is [string] -or $Value -is [bool]) { throw "$Name must be a JSON number." }
     $number = [double]$Value
     if ([double]::IsNaN($number) -or [double]::IsInfinity($number) -or $number -lt 0.0 -or $number -gt 1.0) { throw "$Name must be a finite number in [0,1]." }
 }
 function Assert-Count([object]$Value, [string]$Name, [int]$Maximum = [int]::MaxValue) {
-    if ($Value -is [string] -or $Value -is [bool]) { throw "$Name must be a JSON integer." }
+    if ($null -eq $Value -or $Value -is [string] -or $Value -is [bool]) { throw "$Name must be a JSON integer." }
     $raw = [double]$Value
     if ([double]::IsNaN($raw) -or [double]::IsInfinity($raw) -or [Math]::Truncate($raw) -ne $raw) { throw "$Name must be a JSON integer." }
     $number = [int64]$Value
     if ($number -lt 0 -or $number -gt $Maximum) { throw "$Name must be a non-negative integer." }
     return [int]$number
 }
-function Assert-PropertySet([object]$Value, [string[]]$Required, [string[]]$Optional = @()) {
+function Assert-PropertySet([object]$Value, [string[]]$Required) {
     if ($null -eq $Value -or $null -eq $Value.PSObject) { throw 'History row is not a JSON object.' }
     $names = @($Value.PSObject.Properties.Name)
     foreach ($name in $Required) { if ($names -notcontains $name) { throw "History row is missing '$name'." } }
-    foreach ($name in $names) { if ($Required -notcontains $name -and $Optional -notcontains $name) { throw "History row contains unexpected field '$name'." } }
+    foreach ($name in $names) { if ($Required -notcontains $name) { throw "History row contains unexpected field '$name'." } }
 }
-function Read-History([string]$Repository, [string]$Base) {
-    $path = Join-Path $Repository ($script:HistoryRelativePath -replace '/', '\')
-    Assert-CommitObject $Base 'BaseCommit'
-    $bytes = Invoke-GitBytes $Repository @('cat-file', 'blob', ($Base + ':' + $script:HistoryRelativePath))
+# Validates a v2 table (a commit blob or a seed file); a v1 table fails the exact header check.
+function Read-History([byte[]]$Bytes, [string]$Name) {
     $encoding = [Text.UTF8Encoding]::new($false, $true)
-    try { $text = $encoding.GetString($bytes) } catch { throw 'History JSONL is not strict UTF-8.' }
-    if ($text.StartsWith([char]0xFEFF)) { throw 'History JSONL must not contain a UTF-8 BOM.' }
-    if (-not $text.EndsWith("`n")) { throw 'History JSONL must end with LF.' }
-    $lines = @($text -split "`n")
-    if ($lines[-1] -ne '') { throw 'History JSONL line splitting failed.' }
-    $lines = $lines[0..($lines.Count - 2)]
-    if ($lines.Count -lt $script:PrefixLines) { throw 'History JSONL has fewer lines than the immutable prefix.' }
-    $header = $lines[0].TrimEnd("`r") | ConvertFrom-Json
-    if ($header.schema -ne 'code-quality-metrics-history/v1') { throw 'History JSONL header schema is not code-quality-metrics-history/v1.' }
-    $legacy = [Collections.Generic.List[object]]::new()
-    $allLegacy = [Collections.Generic.List[object]]::new()
-    for ($index = 1; $index -lt $script:PrefixLines; ++$index) {
-        $row = $lines[$index].TrimEnd("`r") | ConvertFrom-Json
-        Assert-PropertySet $row @('index', 'sha', 'date', 'cppChanging') @('verbosity', 'structuralErosion', 'supported', 'parsed')
-        if ((Assert-Count $row.index "legacy[$($index - 1)].index") -ne ($index - 1)) { throw "Legacy history index is not contiguous at row $($index - 1)." }
-        if ([string]$row.sha -notmatch '^[0-9a-f]{40}$') { throw "Legacy history SHA is invalid at index $($index - 1)." }
-        if ($row.cppChanging -isnot [bool]) { throw "Legacy cppChanging must be a JSON boolean at index $($index - 1)." }
-        $allLegacy.Add($row)
-        if ([bool]$row.cppChanging -and (-not (Test-MetricPropertySet $row))) { throw "Legacy metric values are missing at index $($index - 1)." }
-        if (-not [bool]$row.cppChanging) { continue }
-        Assert-FiniteRange $row.verbosity "legacy[$($index - 1)].verbosity"
-        Assert-FiniteRange $row.structuralErosion "legacy[$($index - 1)].structuralErosion"
-        [void](Assert-Count $row.supported "legacy[$($index - 1)].supported")
-        [void](Assert-Count $row.parsed "legacy[$($index - 1)].parsed" ([int]$row.supported))
-        $legacy.Add($row)
+    try { $text = $encoding.GetString($Bytes) } catch { throw "$Name is not strict UTF-8." }
+    if ($text.StartsWith([char]0xFEFF)) { throw "$Name must not contain a UTF-8 BOM." }
+    if ($text.Contains("`r")) { throw "$Name must use LF line endings." }
+    if (-not $text.EndsWith("`n")) { throw "$Name must end with LF." }
+    $lines = @($text.Substring(0, $text.Length - 1) -split "`n")
+    if ($lines[0] -cne $script:HeaderText) { throw "$Name header is not exactly $($script:HeaderText)." }
+    $rows = [Collections.Generic.List[object]]::new()
+    for ($lineIndex = 1; $lineIndex -lt $lines.Count; ++$lineIndex) {
+        $index = $lineIndex - 1
+        $row = $lines[$lineIndex] | ConvertFrom-Json -DateKind String
+        Assert-PropertySet $row $script:RowFields
+        if ((Assert-Count $row.index "row[$index].index") -ne $index) { throw "$Name index is not contiguous at row $index." }
+        if ($row.sha -isnot [string] -or $row.sha -cnotmatch '^[0-9a-f]{40}$') { throw "$Name sha is invalid at row $index." }
+        Assert-CommitDate $row.date "$Name date at row $index"
+        if ($row.measured -isnot [bool]) { throw "$Name measured must be a JSON boolean at row $index." }
+        Assert-FiniteRange $row.verbosity "row[$index].verbosity"
+        Assert-FiniteRange $row.structuralErosion "row[$index].structuralErosion"
+        $supported = Assert-Count $row.supported "row[$index].supported"
+        [void](Assert-Count $row.parsed "row[$index].parsed" $supported)
+        $rows.Add($row)
     }
-    $suffix = [Collections.Generic.List[object]]::new()
-    for ($lineIndex = $script:PrefixLines; $lineIndex -lt $lines.Count; ++$lineIndex) {
-        $row = $lines[$lineIndex].TrimEnd("`r") | ConvertFrom-Json
-        Assert-PropertySet $row @('index', 'date', 'captureMode', 'verbosity', 'structuralErosion', 'supported', 'parsed')
-        $expectedIndex = $script:PrefixLines - 1 + $suffix.Count
-        if ((Assert-Count $row.index "live[$expectedIndex].index") -ne $expectedIndex) { throw "Live history index is not contiguous at row $expectedIndex." }
-        $rowDate = Get-RowDateText $row.date
-        if ($rowDate -notmatch '^\d{4}-\d{2}-\d{2}$') { throw "Live history date is not YYYY-MM-DD at index $expectedIndex." }
-        [void](Get-ExplicitUtcDate $rowDate)
-        if ([string]$row.captureMode -notin @('catch-up', 'cpp-change', 'carry-forward')) { throw "Live history captureMode is invalid at index $expectedIndex." }
-        if ($suffix.Count -gt 0 -and [string]$row.captureMode -eq 'catch-up') { throw 'Catch-up is allowed only for the first live history row.' }
-        Assert-FiniteRange $row.verbosity "live[$expectedIndex].verbosity"
-        Assert-FiniteRange $row.structuralErosion "live[$expectedIndex].structuralErosion"
-        $supported = Assert-Count $row.supported "live[$expectedIndex].supported"
-        [void](Assert-Count $row.parsed "live[$expectedIndex].parsed" $supported)
-        if ($suffix.Count -eq 0 -and [string]$row.captureMode -ne 'catch-up') { throw 'The first live history row must be the one-time catch-up point.' }
-        if ($suffix.Count -gt 0 -and (Get-LastDate $row) -lt (Get-LastDate $suffix[$suffix.Count - 1])) { throw "Live history dates must be nondecreasing at index $expectedIndex." }
-        $suffix.Add($row)
-    }
-    return [pscustomobject]@{
-        Path = $path
-        Bytes = $bytes
-        Header = $header
-        Legacy = $legacy
-        Suffix = $suffix
-        Rows = @($allLegacy + $suffix)
-        PrefixEvidence = [ordered]@{ lines = $script:PrefixLines }
-        HistoryBytesSha256 = Get-BytesSha256 $bytes
-    }
+    if ($rows.Count -eq 0) { throw "$Name has no rows." }
+    return [pscustomobject]@{ Bytes = $Bytes; Rows = $rows.ToArray(); HistoryBytesSha256 = Get-BytesSha256 $Bytes }
 }
-function Test-MetricPropertySet([object]$Row) {
-    if ($null -eq $Row -or $null -eq $Row.PSObject) { return $false }
-    $names = @($Row.PSObject.Properties.Name)
-    return $names -contains 'verbosity' -and $names -contains 'structuralErosion' -and $names -contains 'supported' -and $names -contains 'parsed'
+function Read-CommitHistory([string]$Repository, [string]$Commit) {
+    Read-History (Invoke-GitBytes $Repository @('cat-file', 'blob', ($Commit + ':' + $script:HistoryRelativePath))) "History JSONL at $Commit"
+}
+# Oldest first: the repository root, then each first-parent commit through Base, with its committer date.
+function Get-FirstParentChain([string]$Repository, [string]$Base) {
+    $chain = [Collections.Generic.List[object]]::new()
+    foreach ($line in @(Invoke-Git $Repository @('log', '--first-parent', '--reverse', '--format=%H%x09%cI', $Base))) {
+        $parts = ([string]$line) -split "`t"
+        if ($parts.Count -ne 2 -or $parts[0] -cnotmatch '^[0-9a-f]{40}$') { throw "Git first-parent record is malformed: $line" }
+        Assert-CommitDate $parts[1] "Committer date of $($parts[0])"
+        $chain.Add([pscustomobject]@{ Sha = $parts[0]; Date = $parts[1] })
+    }
+    return $chain.ToArray()
 }
 function Get-NameStatusRecords([string]$Repository, [string]$Base, [string]$Tip) {
     $records = [Collections.Generic.List[object]]::new()
-    $arguments = @('diff', '--name-status', '--find-renames=50%', '--no-ext-diff')
-    if ($Base -eq $Tip) { $arguments += @($Base, '--') } else { $arguments += @($Base, $Tip, '--') }
-    foreach ($line in @(Invoke-Git $Repository $arguments)) {
+    foreach ($line in @(Invoke-Git $Repository @('diff', '--name-status', '--find-renames=50%', '--no-ext-diff', $Base, $Tip, '--'))) {
         $text = [string]$line
         if (-not $text.Trim()) { continue }
         $parts = $text -split "`t"
@@ -221,13 +189,6 @@ function Get-NameStatusRecords([string]$Repository, [string]$Base, [string]$Tip)
         else {
             if ($parts.Count -lt 2) { throw "Git change record is malformed: $text" }
             $records.Add([pscustomobject]@{ Status = $status.Substring(0, 1); OldPath = $null; Path = ($parts[1] -replace '\\', '/') })
-        }
-    }
-    if ($Base -eq $Tip) {
-        foreach ($line in @(Invoke-Git $Repository @('status', '--porcelain=v1', '--untracked-files=all'))) {
-            $text = [string]$line
-            if ($text.Length -lt 4 -or $text.Substring(0, 2) -ne '??') { continue }
-            $records.Add([pscustomobject]@{ Status = 'A'; OldPath = $null; Path = ($text.Substring(3) -replace '\\', '/') })
         }
     }
     return @($records)
@@ -330,11 +291,11 @@ function Invoke-ChildJson([string]$Repository, [string]$RelativeScript, [string[
 function Get-BootstrapIdentity([string]$Repository) {
     Invoke-ChildJson $Repository '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1' @('-Mode', 'BootstrapIdentity', '-RepositoryRoot', $Repository)
 }
-function Get-Snapshot([string]$Repository) {
-    Invoke-ChildJson $Repository '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1' @('-Mode', 'Snapshot', '-Target', 'Engine/Source', '-Scope', 'Recursive', '-RepositoryRoot', $Repository)
+function Get-CommitSnapshot([string]$Repository, [string]$Commit) {
+    Invoke-ChildJson $Repository '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1' @('-Mode', 'Snapshot', '-Target', 'Engine/Source', '-Scope', 'Recursive', '-Commit', $Commit, '-RepositoryRoot', $Repository)
 }
 function Get-SnapshotEvidence([object]$Report) {
-    if ($Report.schemaVersion -ne 'broken-engine-code-quality-metrics/v2' -or $Report.mode -ne 'Snapshot') { throw 'Snapshot did not return the v2 Snapshot report.' }
+    if ($Report.schemaVersion -ne 'broken-engine-code-quality-metrics/v3' -or $Report.mode -ne 'Snapshot') { throw 'Snapshot did not return the v3 Snapshot report.' }
     $metrics = $Report.current.corpusMetrics
     foreach ($name in @('verbosity', 'structuralErosion')) {
         if ($null -eq $metrics.$name) { throw "Snapshot corpusMetrics is missing $name." }
@@ -351,20 +312,42 @@ function Get-SnapshotEvidence([object]$Report) {
     }
 }
 function Get-NumberText([double]$Value) { $Value.ToString('0.############', [Globalization.CultureInfo]::InvariantCulture) }
-function New-LiveRow([int]$Index, [string]$Date, [string]$CaptureMode, [double]$Verbosity, [double]$Erosion, [int]$Supported, [int]$Parsed) {
-    [pscustomobject][ordered]@{ index = $Index; date = $Date; captureMode = $CaptureMode; verbosity = [double](Get-NumberText $Verbosity); structuralErosion = [double](Get-NumberText $Erosion); supported = $Supported; parsed = $Parsed }
+function New-Row([int]$Index, [string]$Sha, [string]$Date, [bool]$Measured, [object]$Values) {
+    [pscustomobject][ordered]@{ index = $Index; sha = $Sha; date = $Date; measured = $Measured; verbosity = [double](Get-NumberText $Values.verbosity); structuralErosion = [double](Get-NumberText $Values.structuralErosion); supported = [int]$Values.supported; parsed = [int]$Values.parsed }
 }
-function Get-EffectiveRows([object[]]$Rows) {
-    $effective = [Collections.Generic.List[object]]::new(); $last = $null
-    foreach ($row in $Rows) {
-        if (Test-MetricPropertySet $row) {
-            $last = [pscustomobject][ordered]@{ index = [int]$row.index; date = Get-RowDateText $row.date; verbosity = [double]$row.verbosity; structuralErosion = [double]$row.structuralErosion; supported = [int]$row.supported; parsed = [int]$row.parsed }
-        }
-        elseif ($null -eq $last) { throw "History row $($row.index) has no metric values to inherit." }
-        else { $last = [pscustomobject][ordered]@{ index = [int]$row.index; date = Get-RowDateText $row.date; verbosity = $last.verbosity; structuralErosion = $last.structuralErosion; supported = $last.supported; parsed = $last.parsed } }
-        $effective.Add($last)
-    }
-    return $effective.ToArray()
+function Get-RowsBytes([object[]]$Rows) {
+    $builder = [Text.StringBuilder]::new()
+    foreach ($row in $Rows) { [void]$builder.Append((Get-CanonicalJson $row)).Append("`n") }
+    return , [Text.UTF8Encoding]::new($false).GetBytes($builder.ToString())
+}
+function Get-PreparedCapture([string]$Repository) {
+    $identity = Get-BootstrapIdentity $Repository
+    $manifest = Get-CaptureManifest $Repository
+    $captureValue = [ordered]@{ bootstrapIdentity = $identity; manifest = $manifest.manifest }
+    return [ordered]@{ digest = Get-CanonicalJsonSha256 $captureValue; bootstrapIdentityDigest = Get-CanonicalJsonSha256 $identity; scbContentDigest = [string]$identity.scbContentDigest; manifest = $manifest.manifest; manifestDigest = $manifest.digest }
+}
+# One commit Snapshot inside the BootstrapIdentity/manifest window, checked against the capture prepared once per run.
+function Measure-Commit([string]$Repository, [string]$Sha, [object]$Capture) {
+    $identityBefore = Get-BootstrapIdentity $Repository
+    $manifestBefore = Get-CaptureManifest $Repository
+    if ($Capture.bootstrapIdentityDigest -ne (Get-CanonicalJsonSha256 $identityBefore) -or $Capture.manifestDigest -ne $manifestBefore.digest) { throw "Prepared capture identity drifted before the Snapshot of $Sha." }
+    $evidence = Get-SnapshotEvidence (Get-CommitSnapshot $Repository $Sha)
+    $identityAfter = Get-BootstrapIdentity $Repository
+    $manifestAfter = Get-CaptureManifest $Repository
+    if ((Get-CanonicalJsonSha256 $identityBefore) -ne (Get-CanonicalJsonSha256 $identityAfter)) { throw "Bootstrap identity drifted during the Snapshot of $Sha." }
+    if ($manifestBefore.digest -ne $manifestAfter.digest) { throw "scb-check capture manifest drifted during the Snapshot of $Sha." }
+    return $evidence
+}
+function Get-CommitPlan([string]$Repository, [object]$Parent, [object]$Commit) {
+    $patch = Get-PatchEvidence $Repository $Parent.Sha $Commit.Sha
+    return [pscustomobject]@{ Sha = $Commit.Sha; Date = $Commit.Date; CaptureMode = $(if ($patch.cppChanged) { 'cpp-change' } else { 'carry-forward' }); Patch = $patch }
+}
+# The per-commit step Generate and Rebuild share: carry the previous values, take a seed row, or measure.
+function New-CommitRow([string]$Repository, [int]$Index, [object]$Plan, [object]$Previous, [object]$Capture, [object]$SeedRow) {
+    if ($Plan.CaptureMode -eq 'carry-forward') { return [pscustomobject]@{ Kind = 'carried'; Row = (New-Row $Index $Plan.Sha $Plan.Date $false $Previous); Coverage = $null } }
+    if ($null -ne $SeedRow) { return [pscustomobject]@{ Kind = 'reused'; Row = (New-Row $Index $Plan.Sha $Plan.Date ([bool]$SeedRow.measured) $SeedRow); Coverage = $null } }
+    $evidence = Measure-Commit $Repository $Plan.Sha $Capture
+    return [pscustomobject]@{ Kind = 'measured'; Row = (New-Row $Index $Plan.Sha $Plan.Date $true $evidence); Coverage = $evidence.coverage }
 }
 function Get-SvgEscape([string]$Value) { [Security.SecurityElement]::Escape($Value) }
 function Get-Polyline([object[]]$Rows, [string]$Name, [double]$Top, [double]$Bottom, [double]$Maximum) {
@@ -415,110 +398,153 @@ function Assert-UniqueOutput([string]$Repository, [string]$Path) {
     if (Test-Path -LiteralPath $full) { throw "OutputDirectory already exists and is never overwritten: '$full'." }
     return $full
 }
-function Get-Plan([string]$Repository, [object]$History, [string]$Base, [string]$Tip) {
-    $patch = Get-PatchEvidence $Repository $base $tip
-    $captureMode = if ($History.Suffix.Count -eq 0) { 'catch-up' } elseif ($patch.cppChanged) { 'cpp-change' } else { 'carry-forward' }
-    $generatorPath = Join-Path $Repository '.agents\skills\code-quality-metrics\scripts\Invoke-CodeQualityMetricsHistory.ps1'
-    $generatorDigest = Get-FileSha256 $generatorPath
-    $capture = $null
-    if ($captureMode -ne 'carry-forward') {
-        $identity = Get-BootstrapIdentity $Repository
-        $manifest = Get-CaptureManifest $Repository
-        $captureValue = [ordered]@{ bootstrapIdentity = $identity; manifest = $manifest.manifest }
-        $capture = [ordered]@{ digest = Get-CanonicalJsonSha256 $captureValue; bootstrapIdentityDigest = Get-CanonicalJsonSha256 $identity; scbContentDigest = [string]$identity.scbContentDigest; manifest = $manifest.manifest; manifestDigest = $manifest.digest }
+# Lag-by-one: one plan per first-parent commit after the newest table row on Base's chain, through Base, oldest first.
+function Get-GeneratePlans([string]$Repository, [object]$History, [string]$Base) {
+    $chain = @(Get-FirstParentChain $Repository $Base)
+    $positions = [Collections.Generic.Dictionary[string, int]]::new([StringComparer]::Ordinal)
+    for ($position = 0; $position -lt $chain.Count; ++$position) { $positions[$chain[$position].Sha] = $position }
+    $anchor = -1
+    for ($rowIndex = $History.Rows.Count - 1; $rowIndex -ge 0 -and $anchor -lt 0; --$rowIndex) {
+        $sha = [string]$History.Rows[$rowIndex].sha
+        if ($positions.ContainsKey($sha)) { $anchor = $positions[$sha] }
     }
-    return [ordered]@{ decision = [ordered]@{ captureMode = $captureMode; reason = if ($History.Suffix.Count -eq 0) { 'no-live-suffix' } elseif ($patch.cppChanged) { 'metric-supported-cpp-change' } else { 'no-metric-supported-cpp-change' }; forceSnapshot = $captureMode -ne 'carry-forward' }; source = [ordered]@{ baseCommit = $base; tipCommit = $tip }; patch = $patch; generator = [ordered]@{ relativePath = ' .agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1'.Trim(); sha256 = $generatorDigest }; capture = $capture }
+    if ($anchor -lt 0) { throw "No history table row is on BaseCommit's first-parent chain, as after a squash or rewrite of main; nothing was measured. Recover with -Mode Rebuild, passing the current table as -SeedPath." }
+    $plans = [Collections.Generic.List[object]]::new()
+    for ($position = $anchor + 1; $position -lt $chain.Count; ++$position) { $plans.Add((Get-CommitPlan $Repository $chain[$position - 1] $chain[$position])) }
+    return $plans.ToArray()
 }
-function New-Contract([string]$Repository, [object]$History, [object]$Plan) {
-    [ordered]@{
-        schemaVersion = 'broken-engine-code-quality-history-contract/v1'
-        mode = 'Contract'
-        source = $Plan.source
-        prefix = $History.PrefixEvidence
-        series = [ordered]@{ rows = $History.Rows.Count; liveRows = $History.Suffix.Count; lastIndex = [int]$History.Rows[-1].index; lastDate = Get-LastDate $History.Rows[-1]; historyBytesSha256 = $History.HistoryBytesSha256 }
-        patch = $Plan.patch
-        decision = $Plan.decision
-        generator = $Plan.generator
-        capture = $Plan.capture
-        snapshot = if ($Plan.decision.forceSnapshot) { [ordered]@{ target = 'Engine/Source'; scope = 'Recursive'; coverageRequired = $true } } else { $null }
-    }
+function Get-Generator([string]$Repository) {
+    [ordered]@{ relativePath = $script:GeneratorRelativePath; sha256 = Get-FileSha256 (Join-Path $Repository ($script:GeneratorRelativePath -replace '/', '\')) }
 }
-function Assert-DateAfterHistory([object]$History, [string]$Date) {
-    if ($History.Rows.Count -gt 0 -and $Date -lt (Get-LastDate $History.Rows[-1])) { throw "DateUtc must not be earlier than the latest history date $(Get-LastDate $History.Rows[-1])." }
-}
-function Invoke-History([string]$Repository, [object]$History, [object]$Plan, [string]$Date, [string]$Output, [string]$Head) {
-    $outputFull = Assert-UniqueOutput $Repository $Output
-    [IO.Directory]::CreateDirectory($outputFull) | Out-Null
-    $identityBefore = $null; $manifestBefore = $null; $snapshotEvidence = $null
-    if ($Plan.decision.forceSnapshot) {
-        $identityBefore = Get-BootstrapIdentity $Repository
-        $manifestBefore = Get-CaptureManifest $Repository
-        # The Snapshot measures the working tree, so the recorded row is a function of TipCommit only while the tree is that commit.
-        if ($Head -ne $Plan.source.tipCommit -or @(Invoke-Git $Repository @('status', '--porcelain=v1', '--untracked-files=all', '--ignore-submodules=all') | Where-Object { ([string]$_).Trim() }).Count -gt 0) { throw 'Generate requires a clean working tree checked out at TipCommit.' }
-        $snapshot = Get-Snapshot $Repository
-        $snapshotEvidence = Get-SnapshotEvidence $snapshot
-        $identityAfter = Get-BootstrapIdentity $Repository
-        $manifestAfter = Get-CaptureManifest $Repository
-        if ((Get-CanonicalJsonSha256 $identityBefore) -ne (Get-CanonicalJsonSha256 $identityAfter)) { throw 'Bootstrap identity drifted during Snapshot.' }
-        if ($manifestBefore.digest -ne $manifestAfter.digest) { throw 'scb-check capture manifest drifted during Snapshot.' }
-        if ($Plan.capture.bootstrapIdentityDigest -ne (Get-CanonicalJsonSha256 $identityBefore) -or $Plan.capture.manifestDigest -ne $manifestBefore.digest) { throw 'Prepared capture identity drifted before Generate.' }
-    }
-    else {
-        $last = $History.Rows[-1]
-        $snapshotEvidence = [ordered]@{ verbosity = [double]$last.verbosity; structuralErosion = [double]$last.structuralErosion; supported = [int]$last.supported; parsed = [int]$last.parsed; coverage = $null }
-    }
-    $index = [int]$History.Rows[-1].index + 1
-    $row = New-LiveRow $index $Date $Plan.decision.captureMode $snapshotEvidence.verbosity $snapshotEvidence.structuralErosion $snapshotEvidence.supported $snapshotEvidence.parsed
-    $rowText = (Get-CanonicalJson $row) + "`n"
-    $rowBytes = [Text.UTF8Encoding]::new($false).GetBytes($rowText)
-    $jsonlBytes = [byte[]]($History.Bytes + $rowBytes)
-    $seriesDigest = Get-BytesSha256 $jsonlBytes
-    $svgRows = @(Get-EffectiveRows @($History.Rows)) + @($row)
-    $svgText = New-HistorySvg $svgRows $seriesDigest
-    $svgBytes = [Text.UTF8Encoding]::new($false).GetBytes($svgText)
-    $jsonlPath = Join-Path $outputFull 'CodeQualityMetricsHistory.jsonl'; $svgPath = Join-Path $outputFull 'CodeQualityMetricsHistory.svg'
-    [IO.File]::WriteAllBytes($jsonlPath, $jsonlBytes); [IO.File]::WriteAllBytes($svgPath, $svgBytes)
+function Write-HistoryPair([string]$Repository, [string]$OutputFull, [byte[]]$JsonlBytes, [object[]]$Rows) {
+    $seriesDigest = Get-BytesSha256 $JsonlBytes
+    $svgBytes = [Text.UTF8Encoding]::new($false).GetBytes((New-HistorySvg $Rows $seriesDigest))
+    $jsonlPath = Join-Path $OutputFull 'CodeQualityMetricsHistory.jsonl'; $svgPath = Join-Path $OutputFull 'CodeQualityMetricsHistory.svg'
+    [IO.File]::WriteAllBytes($jsonlPath, $JsonlBytes); [IO.File]::WriteAllBytes($svgPath, $svgBytes)
     if (-not (Test-Path -LiteralPath $jsonlPath -PathType Leaf) -or -not (Test-Path -LiteralPath $svgPath -PathType Leaf)) { throw 'History output persistence did not produce both required files.' }
     $jsonlInfo = Get-Item -LiteralPath $jsonlPath -Force; $svgInfo = Get-Item -LiteralPath $svgPath -Force
-    [ordered]@{
-        schemaVersion = 'broken-engine-code-quality-history-update/v1'
-        mode = 'Generate'
-        date = $Date
-        captureMode = $Plan.decision.captureMode
-        source = $Plan.source
-        prefix = $History.PrefixEvidence
-        patch = $Plan.patch
-        generator = $Plan.generator
-        capture = $Plan.capture
-        series = [ordered]@{ index = $index; digest = $seriesDigest; historyBytesSha256 = $History.HistoryBytesSha256; row = $row; coverage = $snapshotEvidence.coverage }
-        outputs = [ordered]@{
+    return [pscustomobject]@{
+        Digest = $seriesDigest
+        Outputs = [ordered]@{
             jsonl = [ordered]@{ path = Get-RelativePosix $Repository $jsonlPath; bytes = [int64]$jsonlInfo.Length; sha256 = Get-FileSha256 $jsonlPath }
             svg = [ordered]@{ path = Get-RelativePosix $Repository $svgPath; bytes = [int64]$svgInfo.Length; sha256 = Get-FileSha256 $svgPath }
         }
     }
+}
+function New-Contract([object]$History, [string]$Base, [object[]]$Plans, [object]$Generator, [object]$Capture) {
+    $last = $History.Rows[-1]
+    [ordered]@{
+        schemaVersion = 'broken-engine-code-quality-history-contract/v2'
+        mode = 'Contract'
+        source = [ordered]@{ baseCommit = $Base }
+        series = [ordered]@{ rows = $History.Rows.Count; lastIndex = [int]$last.index; lastDate = [string]$last.date; historyBytesSha256 = $History.HistoryBytesSha256 }
+        rows = @($Plans | ForEach-Object { [ordered]@{ sha = $_.Sha; captureMode = $_.CaptureMode; patch = $_.Patch } })
+        generator = $Generator
+        capture = $Capture
+        snapshot = if ($null -ne $Capture) { [ordered]@{ target = 'Engine/Source'; scope = 'Recursive'; coverageRequired = $true } } else { $null }
+    }
+}
+function Invoke-Generate([string]$Repository, [object]$History, [string]$Base, [object[]]$Plans, [object]$Generator, [string]$Output) {
+    $outputFull = Assert-UniqueOutput $Repository $Output
+    $capture = if (@($Plans | Where-Object { $_.CaptureMode -eq 'cpp-change' }).Count -gt 0) { Get-PreparedCapture $Repository } else { $null }
+    [IO.Directory]::CreateDirectory($outputFull) | Out-Null
+    $previous = $History.Rows[-1]
+    $appended = [Collections.Generic.List[object]]::new(); $entries = [Collections.Generic.List[object]]::new()
+    foreach ($plan in $Plans) {
+        $step = New-CommitRow $Repository ([int]$previous.index + 1) $plan $previous $capture $null
+        $appended.Add($step.Row)
+        $entries.Add([ordered]@{ sha = $plan.Sha; captureMode = $plan.CaptureMode; patch = $plan.Patch; row = $step.Row; coverage = $step.Coverage })
+        $previous = $step.Row
+    }
+    $jsonlBytes = [byte[]]($History.Bytes + (Get-RowsBytes $appended.ToArray()))
+    $pair = Write-HistoryPair $Repository $outputFull $jsonlBytes (@($History.Rows) + $appended.ToArray())
+    [ordered]@{
+        schemaVersion = 'broken-engine-code-quality-history-update/v2'
+        mode = 'Generate'
+        source = [ordered]@{ baseCommit = $Base }
+        generator = $Generator
+        capture = $capture
+        rows = $entries.ToArray()
+        series = [ordered]@{ digest = $pair.Digest; historyBytesSha256 = $History.HistoryBytesSha256 }
+        outputs = $pair.Outputs
+    }
+}
+# Rows before the root's seed row are copied; each first-parent commit of Base then reuses its seed row, is measured, or is carried.
+function Invoke-Rebuild([string]$Repository, [string]$Base, [string]$Seed, [string]$Output) {
+    $seedBytes = [IO.File]::ReadAllBytes($Seed)
+    $seedHistory = Read-History $seedBytes 'Seed'
+    $chain = @(Get-FirstParentChain $Repository $Base)
+    $rootPosition = -1
+    for ($rowIndex = 0; $rowIndex -lt $seedHistory.Rows.Count -and $rootPosition -lt 0; ++$rowIndex) { if ([string]$seedHistory.Rows[$rowIndex].sha -ceq $chain[0].Sha) { $rootPosition = $rowIndex } }
+    if ($rootPosition -lt 0) { throw "Seed has no row for BaseCommit's root commit $($chain[0].Sha)." }
+    $seedRows = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+    for ($rowIndex = $rootPosition + 1; $rowIndex -lt $seedHistory.Rows.Count; ++$rowIndex) {
+        $sha = [string]$seedHistory.Rows[$rowIndex].sha
+        if ($sha -ceq $chain[0].Sha -or $seedRows.ContainsKey($sha)) { throw "Seed holds more than one row for $sha." }
+        $seedRows[$sha] = $seedHistory.Rows[$rowIndex]
+    }
+    $plans = [Collections.Generic.List[object]]::new()
+    for ($position = 1; $position -lt $chain.Count; ++$position) { $plans.Add((Get-CommitPlan $Repository $chain[$position - 1] $chain[$position])) }
+    $outputFull = Assert-UniqueOutput $Repository $Output
+    $capture = if (@($plans | Where-Object { $_.CaptureMode -eq 'cpp-change' -and -not $seedRows.ContainsKey($_.Sha) }).Count -gt 0) { Get-PreparedCapture $Repository } else { $null }
+    [IO.Directory]::CreateDirectory($outputFull) | Out-Null
+    $rows = [Collections.Generic.List[object]]::new()
+    for ($rowIndex = 0; $rowIndex -lt $rootPosition; ++$rowIndex) {
+        $seedRow = $seedHistory.Rows[$rowIndex]
+        $rows.Add((New-Row $rowIndex ([string]$seedRow.sha) ([string]$seedRow.date) ([bool]$seedRow.measured) $seedRow))
+    }
+    $rootSeed = $seedHistory.Rows[$rootPosition]
+    $previous = New-Row $rootPosition $chain[0].Sha $chain[0].Date ([bool]$rootSeed.measured) $rootSeed
+    $rows.Add($previous)
+    $counts = @{ reused = 1; measured = 0; carried = 0 }
+    foreach ($plan in $plans) {
+        $seedRow = if ($plan.CaptureMode -eq 'cpp-change' -and $seedRows.ContainsKey($plan.Sha)) { $seedRows[$plan.Sha] } else { $null }
+        $step = New-CommitRow $Repository $rows.Count $plan $previous $capture $seedRow
+        ++$counts[$step.Kind]
+        $rows.Add($step.Row)
+        $previous = $step.Row
+    }
+    $headerBytes = [Text.UTF8Encoding]::new($false).GetBytes($script:HeaderText + "`n")
+    $jsonlBytes = [byte[]]($headerBytes + (Get-RowsBytes $rows.ToArray()))
+    $pair = Write-HistoryPair $Repository $outputFull $jsonlBytes $rows.ToArray()
+    [ordered]@{
+        schemaVersion = 'broken-engine-code-quality-history-rebuild/v1'
+        mode = 'Rebuild'
+        source = [ordered]@{ baseCommit = $Base; seedSha256 = Get-BytesSha256 $seedBytes }
+        capture = $capture
+        series = [ordered]@{ rows = $rows.Count; reused = $counts.reused; measured = $counts.measured; carried = $counts.carried; digest = $pair.Digest }
+        outputs = $pair.Outputs
+    }
+}
+function Get-RepositoryPath([string]$Repository, [string]$Path) {
+    if ([IO.Path]::IsPathRooted($Path)) { return $Path }
+    return (Join-Path $Repository $Path)
 }
 
 try {
     if (-not $RepositoryRoot) { throw 'RepositoryRoot must be an existing directory.' }
     $repository = Get-CanonicalPath $RepositoryRoot
     Assert-OrdinaryDirectory $repository 'RepositoryRoot'
-    if ($Mode -eq 'Generate' -and -not $OutputDirectory) { throw 'Generate requires a unique Temp OutputDirectory.' }
-    if ($Mode -eq 'Generate') { $date = Get-ExplicitUtcDate $DateUtc } elseif ($DateUtc) { $date = Get-ExplicitUtcDate $DateUtc } else { $date = $null }
-    $head = Get-GitSha $repository 'HEAD'
+    if ($Mode -eq 'Contract' -and ($OutputDirectory -or $SeedPath)) { throw 'Contract is read-only and accepts neither OutputDirectory nor SeedPath.' }
+    if ($Mode -ne 'Contract' -and -not $OutputDirectory) { throw "$Mode requires a unique Temp OutputDirectory." }
+    if ($Mode -eq 'Generate' -and $SeedPath) { throw 'Generate reads the table at BaseCommit and does not accept SeedPath.' }
+    if ($Mode -eq 'Rebuild' -and -not $SeedPath) { throw 'Rebuild requires a v2 SeedPath.' }
     $base = $BaseCommit.ToLowerInvariant()
-    $tip = if ($TipCommit) { $TipCommit.ToLowerInvariant() } else { $head }
-    Assert-CommitObject $base 'BaseCommit'; Assert-CommitObject $tip 'TipCommit'
-    [void](Get-GitSha $repository $base); [void](Get-GitSha $repository $tip)
-    $history = Read-History $repository $base
-    if ($date) { Assert-DateAfterHistory $history $date }
-    $plan = Get-Plan $repository $history $base $tip
-    if ($Mode -eq 'Contract') {
-        if ($OutputDirectory) { throw 'Contract is read-only and does not accept OutputDirectory.' }
-        [Console]::Out.WriteLine((Get-CanonicalJson (New-Contract $repository $history $plan)))
+    Assert-CommitObject $base 'BaseCommit'
+    [void](Get-GitSha $repository $base)
+    if ($Mode -eq 'Rebuild') {
+        $receipt = Invoke-Rebuild $repository $base (Get-RepositoryPath $repository $SeedPath) (Get-RepositoryPath $repository $OutputDirectory)
     }
     else {
-        $outputPath = if ([IO.Path]::IsPathRooted($OutputDirectory)) { $OutputDirectory } else { Join-Path $repository $OutputDirectory }
-        [Console]::Out.WriteLine((Get-CanonicalJson (Invoke-History $repository $history $plan $date $outputPath $head)))
+        $history = Read-CommitHistory $repository $base
+        $plans = @(Get-GeneratePlans $repository $history $base)
+        $generator = Get-Generator $repository
+        if ($Mode -eq 'Contract') {
+            $capture = if (@($plans | Where-Object { $_.CaptureMode -eq 'cpp-change' }).Count -gt 0) { Get-PreparedCapture $repository } else { $null }
+            $receipt = New-Contract $history $base $plans $generator $capture
+        }
+        else { $receipt = Invoke-Generate $repository $history $base $plans $generator (Get-RepositoryPath $repository $OutputDirectory) }
     }
+    [Console]::Out.WriteLine((Get-CanonicalJson $receipt))
 }
 catch { Fail $_.Exception.Message }

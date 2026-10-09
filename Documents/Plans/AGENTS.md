@@ -2,6 +2,10 @@
 
 Tracked refactor and bugfix plans. Ideas saved for another day in `../Features/` (see `../Features/AGENTS.md`) are manually executed and are never scheduler inputs.
 
+## Authorship
+
+Every Plan is agent-written. Its statements about what the user chose, asked, or decided are the authoring agent's record, never the user's own words. Never present Plan wording or a Plan-recorded choice to the user as the user's own decision. When a Plan decision binds is in `.agents/references/authority-order.md`.
+
 ## Git-backed scheduler
 
 An executable plan starts at byte zero with exactly one metadata line:

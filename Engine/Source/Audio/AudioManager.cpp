@@ -1,6 +1,6 @@
 #include "AudioManager.h"
 #if defined(BT_DEBUG)
-#include "Agent/Commands/AudioStreamingFixture.h"
+#include "Agent/Commands/AudioStreamingHarnessRig.h"
 #endif
 
 #if defined(BT_CLIENT)
@@ -484,7 +484,7 @@ void AudioManager::Update(const game::Frame* pFrame)
 	float fDeltaTime = common::NanosecondsToFloatSeconds<float>(mRealTime.GetDeltaNs(true));
 
 #if defined(BT_DEBUG)
-	if (AudioStreamingFixture* pFixture = gpAttachedAudioStreamingFixture.load(std::memory_order_acquire); pFixture == nullptr || !(pFixture->mFlags & AudioStreamingFixture::Flags::kMode))
+	if (AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire); pHarnessRig == nullptr || !(pHarnessRig->mFlags & AudioStreamingHarnessRig::Flags::kMode))
 	{
 		mpStreamingVoices->CheckTrackTransition();
 	}

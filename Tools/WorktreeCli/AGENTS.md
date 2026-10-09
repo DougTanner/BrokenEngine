@@ -11,7 +11,7 @@ Use `Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe` throug
 - `build` prints one `broken-engine-build-result/v1` JSON object to stdout; human progress goes to stderr. It retains the combined MSBuild stream in the invoking worktree's ignored `Temp\AgentBuildLogs\` path and parses structured diagnostics from that same stream.
 - Exit code `0` is success, `2` is a state conflict or negative result, and `1` is usage, transport, or OS failure. A build whose MSBuild step succeeded but whose retained log came out incomplete still exits `1`, with `retainedLog.complete` false.
 
-`BROKEN_ENGINE_MSBUILD_PATH` pins discovery and fails when invalid. `BROKEN_ENGINE_BUILD_LOCK_WAIT_SECONDS` may only shorten the standard 500-second lock wait and exists for fixtures.
+`BROKEN_ENGINE_MSBUILD_PATH` pins discovery and fails when invalid. `BROKEN_ENGINE_BUILD_LOCK_WAIT_SECONDS` may only shorten the standard 500-second lock wait and exists for tests.
 
 ## Coordination State
 

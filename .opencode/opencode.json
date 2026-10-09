@@ -21,6 +21,7 @@
 			"gaea2-modify": "ask",
 			"gaea2-save": "ask",
 			"next-plan": "ask",
+			"optimize-build-time": "ask",
 			"save-plan": "ask",
 			"session-audit": "ask",
 			"what": "ask"

@@ -35,7 +35,7 @@ using EnginePostRenderTypes = engine::TupleToTypeList_t<decltype(std::declval<en
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 133 + engine::kiNavDataVersion + PlayersInterpolate::kiVersion + PlayersPostRender::kiVersion + SumVersions(GameInterpolateTypes {}) + SumVersions(GamePostRenderTypes {}) + SumVersions(EngineInterpolateTypes {}) + SumVersions(EnginePostRenderTypes {});
+const int64_t Frame::kiVersion = 134 + engine::kiNavDataVersion + PlayersInterpolate::kiVersion + PlayersPostRender::kiVersion + SumVersions(GameInterpolateTypes {}) + SumVersions(GamePostRenderTypes {}) + SumVersions(EngineInterpolateTypes {}) + SumVersions(EnginePostRenderTypes {});
 
 FrameInterpolate::FrameInterpolate()
 : pPlayers(std::make_unique<PlayersInterpolate>())
@@ -491,7 +491,7 @@ RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XMVECTOR*
 	int64_t iLayerOffset = common::RoundUp(iAscendingBytes + iScratchBytes, 16i64);
 	int64_t iTotalBytes = iLayerOffset + static_cast<int64_t>(sizeof(engine::RegistrySourceLayer));
 	auto pBuffer = rWorkbuffer.PushBuffer<std::byte*>(iTotalBytes);
-	std::byte* pBufferBytes = static_cast<std::byte*>(pBuffer.mpData);
+	std::byte* pBufferBytes = pBuffer.mpData;
 	int64_t* pAscendingRows = reinterpret_cast<int64_t*>(pBufferBytes);
 	std::byte* pScratch = pBufferBytes + iAscendingBytes;
 	engine::RegistrySourceLayer* pLayers = reinterpret_cast<engine::RegistrySourceLayer*>(pBufferBytes + iLayerOffset);

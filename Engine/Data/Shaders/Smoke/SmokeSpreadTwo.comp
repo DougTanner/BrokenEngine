@@ -57,15 +57,20 @@ void main()
 	vec4 f4Result = vec4(0.0f);
 	if (bInBounds)
 	{
-		// Pass-Two reads the previous frame's Pass-One output (plus deposits) at the same UV, still in
+		// Pass-Two reads the previous refresh's Pass-One output (plus deposits) at the same UV, still in
 		// previous-area coords — the frame's single previous→current remap is Pass-One's job
-		// — so input texcoord == output texcoord; the world
-		// position for the elevation lookup uses current f4SmokeArea
-		vec2 f2WorldPosition = VisibleAreaToWorld(f2Texcoord, globalLayout.f4SmokeArea);
+		// — so input texcoord == output texcoord. The world position driving elevation, curl, and noise
+		// therefore comes from the previous area the texel lies in; wind, already remapped this frame, is
+		// re-sampled at that world position in the current area.
+		vec2 f2WorldPosition = VisibleAreaToWorld(f2Texcoord, globalLayout.f4PreviousSmokeArea);
 		vec2 f2VisibleAreaTexcoord = WorldToVisibleArea(vec3(f2WorldPosition, 0.0f), globalLayout.f4VisibleArea);
 		float fElevation = textureLod(elevationTextureSampler, f2VisibleAreaTexcoord, 0.0f).x;
 
-		f4Result = SmokeSpread(globalLayout, textureSampler, noiseTextureSampler, windTextureSamplerOne, windTextureSamplerTwo, f2Texcoord, f2WorldPosition, f2Texcoord, globalLayout.fSmokeNoiseScaleTwo);
+		vec2 f2WindTexcoord = WorldToSmokeTexcoord(globalLayout.f4SmokeArea, f2WorldPosition);
+		vec2 f2WindSample = SmokeWindSample(globalLayout, windTextureSamplerOne, windTextureSamplerTwo, f2WindTexcoord);
+		// The curl offset joins the swirl noise: SmokeSpread adds fSmokeStepCount * f2Noise to this same input coordinate
+		vec2 f2CurlOffset = SmokeCurlOffset(globalLayout, noiseTextureSampler, f2WorldPosition, length(f2WindSample));
+		f4Result = SmokeSpread(globalLayout, textureSampler, noiseTextureSampler, f2Texcoord + globalLayout.fSmokeStepCount * f2CurlOffset, f2WorldPosition, f2WindSample, globalLayout.fSmokeNoiseScaleTwo);
 
 		// Extra decay over terrain
 		if (fElevation > 0.0f)
@@ -74,9 +79,14 @@ void main()
 			f4Result.x *= pow(globalLayout.fSmokeDecay, max(1.0f, fElevation - 5.0f));
 		}
 
-		// Extra decay at edge of simulation area.
+		// Extra decay at edge of simulation area, applied once per frame since the previous refresh. Repeated
+		// multiplication instead of pow() keeps a single step exact.
 		// f2Texcoord is in [0, 1] by construction (texel center / imageSize) so the inner min(...) is non-negative; outer min clamps to 1.
-		f4Result.x *= min(1.0f, globalLayout.fSmokeEdgeDecayDistanceInverse * min(f2Texcoord.x, min(1.0f - f2Texcoord.x, min(f2Texcoord.y, 1.0f - f2Texcoord.y))));
+		float fEdgeDecay = min(1.0f, globalLayout.fSmokeEdgeDecayDistanceInverse * min(f2Texcoord.x, min(1.0f - f2Texcoord.x, min(f2Texcoord.y, 1.0f - f2Texcoord.y))));
+		for (int iStep = 0; iStep < int(globalLayout.fSmokeStepCount); ++iStep)
+		{
+			f4Result.x *= fEdgeDecay;
+		}
 
 		const float kfSmokeHalfMinSubnormal = 5.9604644775390625e-8f;
 		const float kfSmokeHalfFixedPointDecay = 0.99951171875f;

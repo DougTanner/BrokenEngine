@@ -35,6 +35,6 @@ Only the claim script maps these Debug names to the requested configuration — 
 
 - [Launch](AgentHarness/launch.md) — executable startup, process identity, readiness, fresh client state, and an additional client.
 - [Verification](AgentHarness/verification.md) — common setup, chosen-player placement, and durable caveat routing.
-- [Replay](AgentHarness/replay.md) — determinism, transfer fixtures, persistent GUID/cell crossing, and manifest integrity.
+- [Replay](AgentHarness/replay.md) — determinism, transfer harness rigs, persistent GUID/cell crossing, and manifest integrity.
 - [Cross-cell](AgentHarness/cross-cell.md) — client subscription movement and full-state adoption.
 - [Server window](AgentHarness/server-window.md) — DPI-aware GDI capture and click recipe.

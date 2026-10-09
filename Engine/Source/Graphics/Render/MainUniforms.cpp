@@ -488,7 +488,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 
 	// Per-frame visible-area LOD draw params for water. The water pipeline binds a single concat
 	// mesh buffer holding all LODs; per-frame we tell vkCmdDrawIndexedIndirect which LOD's index
-	// range and vertex base to draw. engine::Camera computes miVisibleAreaLevelOfDetail from eye distance with 4×
+	// range and vertex base to draw. engine::CameraBase computes miVisibleAreaLevelOfDetail from eye distance with 4×
 	// hysteresis bands; mesh density and snap-grid are in lockstep. Terrain draws via one
 	// vkCmdDrawIndexedIndirect per island template in CommandBufferRecordMain.cpp.
 	int64_t iLevelOfDetail = engine::gpCamera->miVisibleAreaLevelOfDetail;

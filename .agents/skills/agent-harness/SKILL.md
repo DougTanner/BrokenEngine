@@ -22,6 +22,12 @@ length-prefixed JSON.
 - The user or a plan's Verification section asks to launch, drive, query, or
   screenshot the game.
 - A request for GPU frame capture or RenderDoc capture analysis.
+- Any user request to launch the game for their own play or testing: always,
+  with no further prompting, run only the project
+  [`launch.md`](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/launch.md#normal-launch)
+  `## Normal launch` recipe in place of the worker steps, leave both processes
+  running for the user, and return `Criterion results: 0/0 passed` with the
+  launch command and both PIDs as `Decisive checks` rows.
 
 ## Inputs
 
@@ -69,9 +75,11 @@ authority/criterion revision is required; when the blocked criterion belongs to
 a claimed Plan and the values it needs appear only in rendered pixels, that
 decision follows the screenshot-only deferral rule in
 [`../next-plan/SKILL.md`](../next-plan/SKILL.md) `## Rules`, which defers the
-Plan rather than waiving the criterion. Never fake state with pixel guessing or
-log scraping, create an out-of-scope runtime edit, waive the gate with a
-follow-up plan, or silently skip the criterion.
+Plan rather than waiving the criterion. Never fake state with pixel guessing,
+log scraping, or seeding: seeding commands set preconditions only, and the
+state a criterion observes must come from the code path under test. Never
+create an out-of-scope runtime edit, waive the gate with a follow-up plan, or
+silently skip the criterion.
 
 Return the shared handoff form in
 [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),

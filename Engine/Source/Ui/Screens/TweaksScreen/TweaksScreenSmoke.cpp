@@ -14,6 +14,7 @@ const TweaksSliderMapRegistrar gSmokeRegistrar
 	{"Smoke Power", &gSmokePower},
 	{"Smoke Decay", &gSmokeDecay},
 	{"Smoke Edge Decay Distance", &gSmokeEdgeDecayDistance},
+	{"Smoke Update Cadence", &gSmokeUpdateCadence},
 	{"Smoke Color Min", &gSmokeColorMinimum},
 	{"Smoke Color Multiplier", &gSmokeColorMultiplier},
 	{"Smoke Lighting Multiplier", &gSmokeLightingMultiplier},
@@ -22,6 +23,10 @@ const TweaksSliderMapRegistrar gSmokeRegistrar
 	{"Smoke Wind Noise Scale", &gSmokeWindNoiseScale},
 	{"Smoke Noise Quantity", &gSmokeNoiseQuantity},
 	{"Smoke Wind Noise Quantity", &gSmokeWindNoiseQuantity},
+	{"Smoke Curl Strength Low", &gSmokeCurlStrengthLow},
+	{"Smoke Curl Strength High", &gSmokeCurlStrengthHigh},
+	{"Smoke Curl Scale", &gSmokeCurlScale},
+	{"Smoke Curl Speed", &gSmokeCurlSpeed},
 	{"Wind To Smoke Strength", &gWindToSmokeStrength},
 	{"Wind To Smoke Power", &gWindToSmokePower},
 	{"Wind Displacement Noise Scale", &gWindDisplacementNoiseScale},
@@ -55,6 +60,7 @@ void RenderSmokeSection(TweaksScreenBase& rScreen)
 				rScreen.WrapperSlider("Smoke Power", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Decay", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Edge Decay Distance", iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Update Cadence", iSection, 1.0f);
 
 				rScreen.WrapperSeparatorText("Color");
 				rScreen.WrapperSlider("Smoke Color Min", iSection, 1.0f);
@@ -67,6 +73,10 @@ void RenderSmokeSection(TweaksScreenBase& rScreen)
 				rScreen.WrapperSlider("Smoke Wind Noise Scale", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Noise Quantity", iSection, 1.0f);
 				rScreen.WrapperSlider("Smoke Wind Noise Quantity", iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Curl Strength Low", iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Curl Strength High", iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Curl Scale", iSection, 1.0f);
+				rScreen.WrapperSlider("Smoke Curl Speed", iSection, 1.0f);
 
 				ImGui::TableNextColumn();
 

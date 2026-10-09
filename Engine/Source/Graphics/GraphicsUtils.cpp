@@ -2,7 +2,7 @@
 
 #include "GraphicsUtils.h"
 
-#include "Graphics/EngineCamera.h"
+#include "Graphics/CameraBase.h"
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/WrapperBase.h"
 

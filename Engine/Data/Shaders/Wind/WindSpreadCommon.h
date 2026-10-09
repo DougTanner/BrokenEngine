@@ -17,7 +17,7 @@ vec2 WindSpread(GlobalLayout globalLayout, sampler2D windTextureSampler, sampler
 
 	// Magnitude-dependent behavior: weak wind is laminar, strong wind is turbulent
 	float fMagnitude = length(f2Wind);
-	float fMagnitudeFactor = clamp((fMagnitude - globalLayout.fWindThresholdLow) / max(globalLayout.fWindThresholdHigh - globalLayout.fWindThresholdLow, 0.001f), 0.0f, 1.0f);
+	float fMagnitudeFactor = WindMagnitudeFactor(globalLayout, fMagnitude);
 	// Momentum: slider up = more momentum = less spread/swirl/diffusion
 	float fSpread = 1.0f - mix(globalLayout.fWindMomentumLow, globalLayout.fWindMomentumHigh, fMagnitudeFactor);
 

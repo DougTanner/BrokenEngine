@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import argparse, contextlib, hashlib, json, math, os, re, stat, subprocess, sys, tempfile
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
-from normalize_code_quality_metrics_cpp import normalize_cpp_bytes
+from normalize_code_quality_metrics_cpp import normalize_cpp_bytes, _directive_at, _lex_kinds
 
-SCHEMA="broken-engine-code-quality-metrics/v2"; TARGETS_SCHEMA="broken-engine-code-quality-targets/v1"; PROFILE="BrokenEngineExtended"
+SCHEMA="broken-engine-code-quality-metrics/v3"; TARGETS_SCHEMA="broken-engine-code-quality-targets/v1"; PROFILE="BrokenEngineExtended"
 EXCLUDED={"ThirdParty",".agents",".claude","Temp"}; REASONS=("baseline-inapplicable","context-change","current-inapplicable","membership-change","parse-status-change")
 RENAME_SIMILARITY=50
 MAX_ANALYZER_SOURCE_ENTRIES=1024; MAX_ANALYZER_SOURCE_BYTES=1024*1024
+POINTER_LISTS=("longLowComplexityFunctions","deepNestingFunctions","sameNameForwarderFunctions","uncalledFunctions")
+LEVEL_NODES={"if_statement","for_statement","for_range_loop","while_statement","do_statement","switch_statement","try_statement","lambda_expression"}
+CALLEE_FIELDS={"field_expression":"field","qualified_identifier":"name","template_function":"name"}
+ENTRY_POINTS={"main","wmain","WinMain","wWinMain"}; IDENTIFIER=re.compile(rb"\b[A-Za-z_]\w*")
 
 class MetricsError(RuntimeError): pass
 class TargetMetricFailure(MetricsError):
@@ -114,12 +118,12 @@ def baseline(root:Path,sha:str)->dict[str,tuple[dict[str,str],bytes]]:
    b=run(root,"show",f"{sha}:{p}");out[p]=(ident(p,mode,b),b)
  return out
 def metric(n:float,d:float,app:bool=True)->dict[str,Any]:return {"applicable":bool(app and d!=0),"value":n/d if app and d else None,"numerator":n,"denominator":d}
-def metrics(fs:Iterable[dict[str,Any]], lines:Iterable[tuple[str,int]], sloc:dict[str,set[int]])->dict[str,Any]:
+def metrics(fs:Iterable[dict[str,Any]], lines:Iterable[tuple[str,int]], sloc:dict[str,set[int]], walks:Iterable[dict[str,Any]])->dict[str,Any]:
  fs=list(fs); total=sum(len(x) for x in sloc.values()); mass=sum(x["mass"] for x in fs); high=sum(x["mass"] for x in fs if x["cc"]>10); union=defaultdict(set)
  for p,l in lines:
   if l in sloc.get(p,set()):union[p].add(l)
- excess=sum(max(x["cc"]-1,0) for x in fs)
- return {"structuralErosion":metric(high,mass),"verbosity":metric(sum(map(len,union.values())),total),"excessDecisions":metric(excess,1 if fs else 0)}
+ excess=sum(max(x["cc"]-1,0) for x in fs); walks=list(walks); comment=sum(x["commentOnly"] for x in walks)
+ return {"structuralErosion":metric(high,mass),"verbosity":metric(sum(map(len,union.values())),total),"excessDecisions":metric(excess,1 if fs else 0),"commentDensity":metric(comment,comment+sum(x["code"] for x in walks)),"sameNameForwarders":metric(sum(len(x["forwarders"]) for x in walks),1 if fs else 0)}
 def area(p:str)->str:
  x=p.split("/")[:-1]
  if x[:2]==["Engine","Source"]:return "/".join(x[:3]) if len(x)>2 else "Engine/Source"
@@ -128,8 +132,10 @@ def area(p:str)->str:
  return x[0] if x else "[root]"
 def aggregate(fs:list[dict[str,Any]])->dict[str,Any]:
  out={n:metric(sum(x["metrics"][n]["numerator"] for x in fs),sum(x["metrics"][n]["denominator"] for x in fs)) for n in ("structuralErosion","verbosity")}
- # Excess decisions is a scope total, so its denominator tracks function presence rather than file count.
+ # Excess decisions and same-name forwarders are scope totals, so their denominator tracks function presence rather than file count.
  out["excessDecisions"]=metric(sum(x["metrics"]["excessDecisions"]["numerator"] for x in fs),1 if any(x["metrics"]["excessDecisions"]["denominator"] for x in fs) else 0)
+ out["commentDensity"]=metric(sum(x["metrics"]["commentDensity"]["numerator"] for x in fs),sum(x["metrics"]["commentDensity"]["denominator"] for x in fs))
+ out["sameNameForwarders"]=metric(sum(x["metrics"]["sameNameForwarders"]["numerator"] for x in fs),1 if any(x["metrics"]["sameNameForwarders"]["denominator"] for x in fs) else 0)
  return out
 def area_rows(fs:list[dict[str,Any]])->list[dict[str,Any]]:
  grouped=defaultdict(list)
@@ -200,9 +206,83 @@ def typed_signatures(parsed:Any)->dict[tuple[int,str],str|None]:
   if key in out:out[key]=None
   else:out[key]=value
  return out
+def line_classes(source:bytes,kinds:bytearray)->tuple[int,int]:
+ comment=code=0;start=0
+ while start<len(source):
+  end=source.find(b"\n",start);end=len(source) if end<0 else end
+  present={kinds[i] for i in range(start,end) if source[i] not in b" \t\v\f"}
+  if present-{1}:code+=1
+  elif present:comment+=1
+  start=end+1
+ return comment,code
+def define_tokens(source:bytes,kinds:bytearray)->list[str]:
+ out=[];start=0
+ while start<len(source):
+  directive=_directive_at(source,kinds,start)
+  if directive is None:
+   end=source.find(b"\n",start);start=len(source) if end<0 else end+1;continue
+  end,next_start,name,_=directive
+  if name==b"define":out.extend(x.decode("ascii") for x in IDENTIFIER.findall(bytes(byte if kind==0 else 32 for byte,kind in zip(source[start:end],kinds[start:end]))))
+  start=next_start
+ return out
+def opens_level(node:Any)->bool:
+ if node.type!="if_statement":return node.type in LEVEL_NODES
+ return not any(child.type=="constexpr" for child in node.children) and node.parent.type!="else_clause"
+def nesting_depth(unit:Any)->int:
+ best=0;pending=[(child,0) for child in unit.children]
+ while pending:
+  node,depth=pending.pop()
+  if node.type=="function_definition":continue
+  depth+=opens_level(node);best=max(best,depth);pending.extend((child,depth) for child in node.children)
+ return best
+def forwards(body:Any,name:str,text:Any)->bool:
+ statements=[child for child in body.named_children if child.type!="comment"]
+ if len(statements)!=1 or statements[0].type not in {"return_statement","expression_statement"}:return False
+ calls=list(nodes(statements[0],"call_expression"))
+ if len(calls)!=1:return False
+ callee=calls[0].child_by_field_name("function")
+ while callee is not None and callee.type in CALLEE_FIELDS:callee=callee.child_by_field_name(CALLEE_FIELDS[callee.type])
+ return callee is not None and callee.type in {"identifier","field_identifier"} and text(callee)==name
+def constructor(unit:Any,node:Any,name:str,simple:Any)->bool:
+ scope=node.parent.child_by_field_name("scope") if node.parent.type=="qualified_identifier" else None
+ if scope is not None and simple(scope)==name:return True
+ owner=unit.parent
+ while owner is not None and owner.type not in {"class_specifier","struct_specifier","union_specifier"}:owner=owner.parent
+ owner_name=None if owner is None else owner.child_by_field_name("name")
+ return owner_name is not None and simple(owner_name)==name
+def file_walks(rel:str,parsed:Any,raw:bytes)->dict[str,Any]:
+ lf=raw.replace(b"\r\n",b"\n").replace(b"\r",b"\n");kinds=_lex_kinds(lf);comment,code=line_classes(lf,kinds)
+ source=parsed.source.encode("utf-8");found=defaultdict(list);pending=[parsed.native_tree.root_node]
+ def text(node:Any)->str:return source[node.start_byte:node.end_byte].decode("utf-8","replace")
+ def simple(node:Any)->str:return text(node.child_by_field_name("name") if node.type=="template_type" else node)
+ while pending:
+  node=pending.pop();pending.extend(node.children)
+  if node.type in {"function_definition","function_declarator","identifier","field_identifier","virtual"}:found[node.type].append(node)
+ declared=set();virtual=set()
+ for declarator in found["function_declarator"]:
+  inner=declarator.child_by_field_name("declarator");name=None if inner is None else declarator_name(inner)
+  if name is None:continue
+  declared.add((name.start_byte,name.end_byte))
+  if any(child.type=="virtual_specifier" for child in declarator.children):virtual.add(text(name))
+ for keyword in found["virtual"]:
+  declarator=keyword.parent.child_by_field_name("declarator");name=None if declarator is None else declarator_name(declarator)
+  if name is not None:virtual.add(text(name))
+ references=Counter(text(x) for kind in ("identifier","field_identifier") for x in found[kind] if (x.start_byte,x.end_byte) not in declared);references.update(define_tokens(lf,kinds))
+ deep=[];forwarders=[];candidates=[]
+ for unit in found["function_definition"]:
+  body=unit.child_by_field_name("body");declarator=unit.child_by_field_name("declarator")
+  if body is None:continue
+  node=None if declarator is None else declarator_name(declarator);destructor=node is not None and node.parent.type=="destructor_name"
+  name=None if node is None else text(node.parent if destructor else node);row={"path":rel,"name":name,"startLine":unit.start_point.row+1,"endLine":unit.end_point.row+1}
+  depth=nesting_depth(unit)
+  if depth>=4:deep.append({**row,"depth":depth})
+  if name is not None and forwards(body,name,text):forwarders.append(row)
+  if node is not None and not destructor and name not in ENTRY_POINTS and not constructor(unit,node,name,simple):candidates.append(row)
+ return {"commentOnly":comment,"code":code,"deep":deep,"forwarders":forwarders,"candidates":candidates,"references":references,"virtual":virtual}
+def ordered(rows:Iterable[dict[str,Any]])->list[dict[str,Any]]:return sorted(rows,key=lambda x:(x["path"],x["startLine"],x["name"] or ""))
 def capture(entries:dict[str,tuple[dict[str,str],bytes]],capture_root:Path,analyzer_source:Path)->dict[str,Any]:
- empty={"structuralErosion":metric(0,0,False),"verbosity":metric(0,0,False),"excessDecisions":metric(0,0,False)}
- if not entries:return {"corpusManifest":[],"corpusCounts":{"supported":0,"parsed":0,"omitted":0},"skips":[],"corpusMetrics":empty,"files":[],"areas":[],"outliers":[],"cloneGroups":[],"highComplexityFunctions":[],"_functions":[],"_parsed":set(),"_instances":[],"_failures":[]}
+ empty={"structuralErosion":metric(0,0,False),"verbosity":metric(0,0,False),"excessDecisions":metric(0,0,False),"commentDensity":metric(0,0,False),"sameNameForwarders":metric(0,0,False)}
+ if not entries:return {"corpusManifest":[],"corpusCounts":{"supported":0,"parsed":0,"omitted":0},"skips":[],"corpusMetrics":empty,"files":[],"areas":[],"outliers":[],"cloneGroups":[],"highComplexityFunctions":[],**{k:[] for k in POINTER_LISTS},"_functions":[],"_parsed":set(),"_instances":[],"_failures":[]}
  sys.path.insert(0,str(analyzer_source))
  try:
   import scb_check.pipeline as pipe
@@ -214,23 +294,27 @@ def capture(entries:dict[str,tuple[dict[str,str],bytes]],capture_root:Path,analy
  pipe.dispatch_parse_source_file=parse
  try:
   with tempfile.TemporaryDirectory(prefix="capture-",dir=capture_root) as t:
-   cr=Path(t); pm={}; files=[]; sloc={}; signatures={};failures=[]
+   cr=Path(t); pm={}; files=[]; sloc={}; walks={}; signatures={};failures=[]
    for rel in sorted(entries):
     _,b=entries[rel]
-    analysis_bytes=normalize_cpp_bytes(b)
-    f=cr.joinpath(*rel.split("/"));f.parent.mkdir(parents=True,exist_ok=True);f.write_bytes(analysis_bytes);f=f.resolve();pm[f]=rel
+    f=cr.joinpath(*rel.split("/"));f.parent.mkdir(parents=True,exist_ok=True);f=f.resolve();pm[f]=rel
     try:
+     analysis_bytes=normalize_cpp_bytes(b)
      parsed=parse(f,analysis_bytes.decode("utf-8","replace"))
     except Exception:
      failures.append({"path":rel,"stage":"dispatch-parse","code":"dispatch-parse-failure","line":1,"column":0});continue
     else:
+     f.write_bytes(analysis_bytes)
      try:problem=normalized_tree_problem(parsed,analysis_bytes)
      except Exception:
       failures.append({"path":rel,"stage":"dispatch-parse","code":"normalized-tree-unavailable","line":1,"column":0});continue
      if problem is not None:
       failures.append({"path":rel,**problem});continue
+     try:walked=file_walks(rel,parsed,b)
+     except Exception:
+      failures.append({"path":rel,"stage":"dispatch-parse","code":"normalized-tree-unavailable","line":1,"column":0});continue
     files.append(f)
-    sloc[rel]=set(parsed.module.sloc_lines)
+    sloc[rel]=set(parsed.module.sloc_lines);walks[rel]=walked
     try:signatures[rel]=typed_signatures(parsed)
     except Exception:failures.append({"path":rel,"stage":"signature-extraction","code":"signature-extraction-failure","line":1,"column":0})
    with contextlib.redirect_stdout(sys.stderr):result=pipe.analyze_files(tuple(sorted(files)),include_all=True,disable_sg=True)
@@ -251,18 +335,21 @@ def capture(entries:dict[str,tuple[dict[str,str],bytes]],capture_root:Path,analy
   inst.append({"groupHash":c.group_hash,"path":p,"startLine":c.start_line,"endLine":c.end_line,"sloc":sum(i in sloc.get(p,set()) for i in range(c.start_line,c.end_line+1)),"sourceSha256":digest(span),"occurrenceOrdinal":0})
  inst.sort(key=lambda x:(x["groupHash"],x["path"],x["startLine"],x["endLine"])); ordinal=defaultdict(int)
  for x in inst:x["occurrenceOrdinal"],ordinal[x["groupHash"]]=ordinal[x["groupHash"]],ordinal[x["groupHash"]]+1
- lines=((x["path"],i) for x in inst for i in range(x["startLine"],x["endLine"]+1)); cm=metrics(funcs,lines,sloc)
- files=[{"path":p,"area":area(p),"metrics":metrics((x for x in funcs if x["path"]==p),((x["path"],i) for x in inst if x["path"]==p for i in range(x["startLine"],x["endLine"]+1)),{p:sloc[p]})} for p in sorted(sloc)]
+ lines=((x["path"],i) for x in inst for i in range(x["startLine"],x["endLine"]+1)); cm=metrics(funcs,lines,sloc,walks.values())
+ files=[{"path":p,"area":area(p),"metrics":metrics((x for x in funcs if x["path"]==p),((x["path"],i) for x in inst if x["path"]==p for i in range(x["startLine"],x["endLine"]+1)),{p:sloc[p]},(walks[p],))} for p in sorted(sloc)]
  areas=area_rows(files);out=outlier_buckets(files,areas,cm)
  groups=[{"groupHash":g,"instances":[x for x in inst if x["groupHash"]==g]} for g in sorted(ordinal)]
- return {"corpusManifest":[entries[p][0] for p in sorted(entries)],"corpusCounts":{"supported":len(entries),"parsed":len(sloc),"omitted":len(entries)-len(sloc)},"skips":[{"path":p,"code":"upstream-omitted"} for p in sorted(set(entries)-set(sloc))],"corpusMetrics":cm,"files":files,"areas":areas,"outliers":out,"cloneGroups":groups,"highComplexityFunctions":[x for x in funcs if x["cc"]>10],"_functions":funcs,"_parsed":set(sloc),"_instances":inst,"_failures":failures}
+ references=Counter();virtual=set()
+ for x in walks.values():references.update(x["references"]);virtual|=x["virtual"]
+ pointers={"longLowComplexityFunctions":[x for x in funcs if x["endLine"]-x["startLine"]+1>100 and x["cc"]<=10],"deepNestingFunctions":ordered(y for x in walks.values() for y in x["deep"]),"sameNameForwarderFunctions":ordered(y for x in walks.values() for y in x["forwarders"]),"uncalledFunctions":ordered(y for x in walks.values() for y in x["candidates"] if references[y["name"]]==0 and y["name"] not in virtual)}
+ return {"corpusManifest":[entries[p][0] for p in sorted(entries)],"corpusCounts":{"supported":len(entries),"parsed":len(sloc),"omitted":len(entries)-len(sloc)},"skips":[{"path":p,"code":"upstream-omitted"} for p in sorted(set(entries)-set(sloc))],"corpusMetrics":cm,"files":files,"areas":areas,"outliers":out,"cloneGroups":groups,"highComplexityFunctions":[x for x in funcs if x["cc"]>10],**pointers,"_functions":funcs,"_parsed":set(sloc),"_instances":inst,"_failures":failures}
 def restrict(v:dict[str,Any],paths:set[str])->dict[str,Any]:
  fs=[x for x in v["files"] if x["path"] in paths]; return {"targetManifest":[x for x in v["corpusManifest"] if x["path"] in paths],"targetCounts":{"supported":len(paths),"parsed":len(v["_parsed"]&paths),"omitted":len(paths-v["_parsed"])},"targetMetrics":aggregate(fs),"targetOutliers":outlier_buckets(fs,area_rows(fs),v["corpusMetrics"]),"_failures":[x for x in v["_failures"] if x["path"] in paths]}
 def capture_view(corpus:dict[str,Any],target:dict[str,Any])->dict[str,Any]:
- return {"corpusManifest":corpus["corpusManifest"],"targetManifest":target["targetManifest"],"corpusCounts":corpus["corpusCounts"],"targetCounts":target["targetCounts"],"skips":corpus["skips"],"corpusMetrics":corpus["corpusMetrics"],"targetMetrics":target["targetMetrics"],"files":corpus["files"],"areas":corpus["areas"],"outliers":corpus["outliers"],"targetOutliers":target["targetOutliers"],"cloneGroups":corpus["cloneGroups"],"highComplexityFunctions":corpus["highComplexityFunctions"],"_functions":corpus["_functions"],"_parsed":corpus["_parsed"],"_instances":corpus["_instances"],"_targetFailures":target["_failures"]}
+ return {"corpusManifest":corpus["corpusManifest"],"targetManifest":target["targetManifest"],"corpusCounts":corpus["corpusCounts"],"targetCounts":target["targetCounts"],"skips":corpus["skips"],"corpusMetrics":corpus["corpusMetrics"],"targetMetrics":target["targetMetrics"],"files":corpus["files"],"areas":corpus["areas"],"outliers":corpus["outliers"],"targetOutliers":target["targetOutliers"],"cloneGroups":corpus["cloneGroups"],"highComplexityFunctions":corpus["highComplexityFunctions"],**{k:corpus[k] for k in POINTER_LISTS},"_functions":corpus["_functions"],"_parsed":corpus["_parsed"],"_instances":corpus["_instances"],"_targetFailures":target["_failures"]}
 def deltas(b:dict[str,Any],c:dict[str,Any],reasons:list[str])->dict[str,Any]:
  out={}
- for n in ("structuralErosion","verbosity","excessDecisions"):
+ for n in ("structuralErosion","verbosity","excessDecisions","commentDensity","sameNameForwarders"):
   x,y=b[n],c[n]; rs=set(reasons)
   if not x["applicable"]:rs.add("baseline-inapplicable")
   if not y["applicable"]:rs.add("current-inapplicable")
@@ -338,21 +425,26 @@ def canonical_tool(tool:dict[str,Any])->dict[str,Any]:
 def common_metrics(v:dict[str,Any],paths:set[str])->dict[str,Any]:
  fs=[x for x in v["files"] if x["path"] in paths];return aggregate(fs)
 def build(q:dict[str,Any])->dict[str,Any]:
- if set(q)!={"mode","repositoryRoot","captureRoot","analyzerSource","tool"}|({"target","scope"} if q.get("mode")=="Snapshot" else {"targets","baseline"}):fail("unknown or missing request field")
+ commit=q.get("commit") if q.get("mode")=="Snapshot" else None
+ if set(q)!={"mode","repositoryRoot","captureRoot","analyzerSource","tool"}|({"target","scope"}|({"commit"} if "commit" in q else set()) if q.get("mode")=="Snapshot" else {"targets","baseline"}):fail("unknown or missing request field")
  root=Path(q["repositoryRoot"]);cap=Path(q["captureRoot"])
  if not root.is_absolute() or not cap.is_absolute() or not cap.is_dir():fail("invalid capture root")
  check_components(root,cap,False)
- if not isinstance(q["tool"],dict) or set(q["tool"])!={"adapterVersion","lockSha256","python","disableSg"} or q["tool"]["adapterVersion"]!="5":fail("invalid tool identity")
+ if not isinstance(q["tool"],dict) or set(q["tool"])!={"adapterVersion","lockSha256","python","disableSg"} or q["tool"]["adapterVersion"]!="7":fail("invalid tool identity")
  if not isinstance(q["tool"]["python"],dict) or set(q["tool"]["python"])!={"implementation","version","architecture","executableSha256"}:fail("invalid python identity")
  analyzer_source=validate_analyzer_source(root,q["analyzerSource"])
- before=current(root)
+ # A commit Snapshot reads that commit's blobs, so the working tree is never consulted.
+ before=current(root) if commit is None else baseline(root,commit)
  if q["mode"]=="Snapshot":
   target=canon(q["target"]);p=root.joinpath(*target.split("/"))
   if q["scope"]=="Exact" and pure_glsl_header(target):fail(f"target is not classified as C++ for BrokenEngineExtended: {target}")
   if q["scope"]=="Exact": paths={target} if target in before else fail("Exact target not discovered")
   else:
-   check_components(root,p,False)
-   if not p.is_dir() or p.is_symlink() or getattr(p.lstat(),"st_file_attributes",0)&0x400:fail("directory target must exist and be ordinary")
+   if commit is not None:
+    if run(root,"cat-file","-t",f"{commit}:{target}").strip()!=b"tree":fail("directory target must be a tree in the commit")
+   else:
+    check_components(root,p,False)
+    if not p.is_dir() or p.is_symlink() or getattr(p.lstat(),"st_file_attributes",0)&0x400:fail("directory target must exist and be ordinary")
    prefix=target+"/";paths={x for x in before if x.startswith(prefix) and (q["scope"]=="Recursive" or "/" not in x[len(prefix):])}
   cv=capture(before,cap,analyzer_source);cur=capture_view(cv,restrict(cv,paths));base=None;comparison=None;select={"kind":"snapshot","scope":q["scope"],"target":target,"paths":sorted(paths)}
  elif q["mode"]=="Compare":
@@ -377,8 +469,9 @@ def build(q:dict[str,Any])->dict[str,Any]:
   clones,groups=clone_changes(base,cur,pairs);functions=matched_changes(base,cur,pairs)
   comparison={"contextChanges":context,"corpus":deltas(base["corpusMetrics"],cur["corpusMetrics"],corpus_reasons),"target":deltas(base["targetMetrics"],cur["targetMetrics"],target_reasons),"commonParsedCohort":{"baselinePaths":sorted(cohort_base),"currentPaths":sorted(cohort_current),"metrics":deltas(common_metrics(base,cohort_base),common_metrics(cur,cohort_current),cohort_reasons),"suppressionReasons":cohort_reasons},"coverage":{"baseline":{"corpus":base["corpusCounts"],"target":base["targetCounts"]},"current":{"corpus":cur["corpusCounts"],"target":cur["targetCounts"]},"deltas":{"corpus":{k:cur["corpusCounts"][k]-base["corpusCounts"][k] for k in base["corpusCounts"]},"target":{k:cur["targetCounts"][k]-base["targetCounts"][k] for k in base["targetCounts"]}}},"cloneGroups":groups,"cloneInstances":clones,"functions":functions};select={"kind":"manifest","pairs":pairs,"paths":sorted(ct)}
  else:fail("invalid mode")
- after=current(root)
- if {p:x[0] for p,x in before.items()}!={p:x[0] for p,x in after.items()}:fail("capture drift")
+ if commit is None:
+  after=current(root)
+  if {p:x[0] for p,x in before.items()}!={p:x[0] for p,x in after.items()}:fail("capture drift")
  def pub(v:Any)->Any:return None if v is None else {k:x for k,x in v.items() if not k.startswith("_")}
  return {"schemaVersion":SCHEMA,"mode":q["mode"],"profile":PROFILE,"tool":canonical_tool(q["tool"]),"targetSelection":select,"baseline":pub(base),"current":pub(cur),"comparison":comparison}
 def norm(x:Any)->Any:

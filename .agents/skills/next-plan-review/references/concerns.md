@@ -2,8 +2,9 @@
 
 Build a chronological evidence table covering the objective, tier/card/approval,
 implementation, propagation, checks, domain and conditional reviews, fix loops,
-build/harness work, reconciliation, landing approval, and landing. Include Plan
-selection, final preparation, and claim/release only when they occurred.
+build/harness work, reconciliation, user redirects of an action main chose,
+landing approval, and landing. Include Plan selection, final preparation, and
+claim/release only when they occurred.
 Locate the governing user objective and, when present, the latest approved plan
 from transcript evidence. The latest approved plan governs conformance. Without an
 approved plan, the governing scope is the user objective plus recorded acceptance
@@ -94,15 +95,26 @@ against how often the problem fires.
 
 Carry an improvement forward only when this landing's evidence supports it
 directly, the signal is durable rather than one session's stylistic preference,
-and it would plausibly change a future decision. A correction also names the
-existing owning skill, script, or document and the concrete decision rule that
-owner is missing or leaves ambiguous; an owner that states the broad principle
-but does not decide the case still qualifies, and a candidate with no such gap
-does not. Recommend a genuinely unowned capability as a new capability rather
-than forcing it into a correction to an owner that does not own it.
+and it would plausibly change a future decision; a user redirect is direct
+evidence, and its improvement names the instruction that should have produced
+the behavior the user asked for. A correction also names the existing owning
+skill, script, or document and one of these gaps:
+
+- a concrete decision rule that owner is missing or leaves ambiguous; an owner
+  that states the broad principle but does not decide the case still qualifies;
+- a required step marked `missing` under concern 3, corrected in that step's
+  trigger text — the skill `description`, its `## When to use`, or the Change
+  Workflow step bullet;
+- a stated rule left unfollowed because it is hard to find, corrected by moving
+  or rewording that rule, never by a second copy.
+
+A candidate with no such gap does not qualify. Recommend a genuinely unowned
+capability as a new capability rather than forcing it into a correction to an
+owner that does not own it.
 
 When the evidence proves a recurring failure, propose the highest enforcement
-that evidence supports, in this order: make the invalid state unrepresentable;
-add deterministic validation, a lint rule, or a banned-API rule; centralize the
-behavior in one canonical helper; add a runtime check; state it in prose only
-when the judgment cannot be encoded.
+that evidence supports, naming the recorded instance it would have caught, in
+this order: make the invalid state unrepresentable; add deterministic
+validation, a lint rule, or a banned-API rule; centralize the behavior in one
+canonical helper; add a runtime check; state it in prose only when the
+judgment cannot be encoded.

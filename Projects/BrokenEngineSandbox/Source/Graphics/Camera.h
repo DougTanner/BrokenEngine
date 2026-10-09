@@ -5,7 +5,7 @@
 namespace game
 {
 
-class Camera final : public engine::Camera
+class Camera final : public engine::CameraBase
 {
 public:
 

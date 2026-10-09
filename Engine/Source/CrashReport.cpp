@@ -153,7 +153,7 @@ void HandleException(std::optional<const std::exception*> pException)
 	writer.Write("<End callstack>\n");
 
 	writer.Write("\n\n\n<Begin DxDiag>\n");
-	// The DxDiag thread writes sDxDiag without a lock. The agent fixture and SIGABRT handler can run before it completes,
+	// The DxDiag thread writes sDxDiag without a lock. The agent harness rig and SIGABRT handler can run before it completes,
 	// so read the string only after completion is published; the section markers remain unconditional.
 	if (sbDxDiagComplete.load(std::memory_order_acquire))
 	{

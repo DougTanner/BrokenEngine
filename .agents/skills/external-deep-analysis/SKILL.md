@@ -137,11 +137,12 @@ remains exact-file scope.
 22. Include the Phase-0 scoped hints and Phase-1 investigation paths as evidence
     to inspect, without expanding the original finding boundary. Done when that
     evidence reached the analysis and the boundary is unchanged.
-23. Treat every forwarded `hints.highComplexityFunctions` item whose `path` lies
-    in the resolved target as navigation evidence to inspect. Do not require a
-    decomposition, a cyclomatic-complexity-ten outcome, or a threshold verdict
-    from that hint. Done when every in-target item has been inspected as
-    navigation evidence.
+23. Treat every forwarded `hints.extremeComplexityFunctions`,
+    `hints.longLowComplexityFunctions`, `hints.deepNestingFunctions`,
+    `hints.sameNameForwarderFunctions`, and `hints.uncalledFunctions` item whose
+    `path` lies in the resolved target as navigation evidence to inspect. Do not
+    require a decomposition or a threshold verdict from those hints. Done when
+    every in-target item has been inspected as navigation evidence.
 24. Keep hints outside the resolved target evidence-only; they never become
     checklist items. Done when no out-of-target hint became a checklist item.
 25. For excess-decision evidence, prefer in-place deletion, merging, flattening,
@@ -226,14 +227,13 @@ tracked bytes landed.
 
 - The Phase-0 Snapshot is a single capture analyzing the complete corpus and the
   resolved target together; never substitute separate corpus and target runs.
-- `hints` arrives already ordered, truncated, and counted in four categories —
-  target file and area outliers, target-intersecting clone groups, target
-  high-complexity functions, and target skips — each stating its `total` and
-  `emitted` counts, including zeroes.
+- `hints` arrives already ordered, truncated, and counted per category, as
+  `.agents/skills/code-quality-metrics/references/MetricContract.md`
+  `## Output` defines.
 - The forwarded hints are scoped evidence to inspect, never findings: they do
   not expand the original target, create Plans, alter the Debt Score, or replace
   source inspection.
-- `CC > 10` remains navigation only, and structural erosion alone is navigation.
+- `CC > 30` remains navigation only, and structural erosion alone is navigation.
 - One-shot sequential or threshold-driven extraction is metric-neutral.
 - An accepted finding preserves its originating phase, symbols, evidence,
   invariant exposure, and unmet acceptance criterion.

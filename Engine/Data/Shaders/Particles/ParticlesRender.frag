@@ -35,20 +35,24 @@ void main()
 
 	// Hoist SSBO reads (one access per field)
 	float fVisibleIntensity = render.pParticles[i].fVisibleIntensity;
+	float fSpawnIntensity = render.pParticles[i].fSpawnIntensity;
 	float fIntensityPower = render.pParticles[i].fIntensityPower;
 	uint uiColor = render.pParticles[i].iColor;
+	uint uiColorEnd = render.pParticles[i].iColorEnd;
 	int iCookie = render.pParticles[i].iCookie;
 
-	// Aggressive decay can make fVisibleIntensity negative. Positive powers use a nonnegative base so dead particles
-	// stay invisible; sliders allow zero power, where pow(0,y<=0) is undefined, so nonpositive powers use 1.0f.
-	float fIntensity = fIntensityPower <= 0.0f ? 1.0f : pow(max(fVisibleIntensity, 0.0f), fIntensityPower);
-
-	vec4 f4Color = unpackUnorm4x8(uiColor).abgr;
+	// Blend weight is the fraction of log-intensity decay from spawn to the update free threshold, which this value must
+	// match (ParticlesUpdate.comp). Spawn guarantees fSpawnIntensity > 0 and update frees slots below the threshold, so
+	// both log2 arguments and the intensity pow base are positive.
+	const float fIntensityEpsilon = 0.5f;
+	float fFade = clamp(log2(fSpawnIntensity / fVisibleIntensity) / max(log2(fSpawnIntensity / fIntensityEpsilon), kfEpsilon), 0.0f, 1.0f);
+	float fIntensity = pow(fVisibleIntensity, fIntensityPower);
+	vec4 f4Color = mix(unpackUnorm4x8(uiColor).abgr, unpackUnorm4x8(uiColorEnd).abgr, fFade);
 	float fCookie = texture(sampler2D(pTextures[nonuniformEXT(iCookie)], particleSampler), f2InTexcoord).x;
 	// Output alpha = 0 is correct under kAdd blend (VK_BLEND_FACTOR_ONE/ONE — alpha contribution discarded by additive sum)
 	f4OutColor = vec4(fCookie * fIntensity * f4Color.w * f4Color.xyz, 0.0f);
 
-	float fHeightFraction = clamp((f3InWorldPosition.z - globalLayout.fBaseHeight) * globalLayout.fSmokeObjectHeightInv, 0.0f, 1.0f);
+	float fHeightFraction = clamp((f3InWorldPosition.z - globalLayout.fBaseHeight) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
 	float fSmokeFade = 1.0f - fHeightFraction * fHeightFraction;
 	f4OutColor.xyz *= SmokeShadow(globalLayout, f3InWorldPosition, smokeSampler, fSmokeFade);
 }

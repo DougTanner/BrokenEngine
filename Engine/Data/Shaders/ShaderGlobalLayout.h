@@ -61,7 +61,8 @@ struct GlobalLayout
 	vec2 f2PreviousSmokeAreaSizeInverse INIT; // (1/(z-x), 1/(w-y)) of f4PreviousSmokeArea (Smoke/Wind OccupancyDilate previous-area remap)
 	float fSmokeMax INIT;
 	float fSmokePower INIT;
-	float fSmokeDecay INIT;
+	float fSmokeDecay INIT; // gSmokeDecay^fSmokeStepCount: one refresh decays for every frame since the previous refresh
+	float fSmokeStepCount INIT; // Frames since the previous smoke refresh; scales spread offsets and edge decay
 	float fSmokeColorMin INIT;
 	float fSmokeColorMultiplier INIT;
 	float fSmokeLightingMultiplier INIT;
@@ -71,7 +72,12 @@ struct GlobalLayout
 	float fSmokeNoiseQuantity INIT;
 	float fSmokeNoiseScaleOne INIT;
 	float fSmokeNoiseScaleTwo INIT;
-	float fSmokeObjectHeightInv INIT;
+	float fSmokeCurlScale INIT; // Noise UV per world meter (SmokeCurlOffset); left raw because it multiplies the per-invocation world position
+	vec2 f2SmokeCurlTimeOffset INIT; // gSmokeCurlSpeed-scaled circular time offset in noise UV, from fElapsedTime only (SmokeCurlOffset)
+	vec2 f2SmokeCurlOffsetScale INIT; // Finer smoke texel in meters / signed f4SmokeArea extents: smoke UV per unit curl per unit strength per step; 0 (both curl strengths 0) disables (SmokeCurlOffset)
+	float fSmokeCurlStrengthLow INIT; // Calm-wind curl strength; left raw because SmokeCurlOffset blends it toward High by the per-invocation wind factor
+	float fSmokeCurlStrengthHigh INIT; // Strong-wind curl strength; left raw for the same per-invocation blend
+	float fSmokeObjectHeightInverse INIT;
 	float fSmokeEdgeDecayDistanceInverse INIT;
 	uint32_t uiSmokeTilesX INIT;
 	uint32_t uiSmokeTilesY INIT;
@@ -221,7 +227,7 @@ struct GlobalLayout
 	float fWaterDepthLookupTableSunsetFade INIT;
 	float fWaterFresnel INIT;
 	float fWaterColorBottom INIT;
-	float fWaterColorHeightInv INIT;
+	float fWaterColorHeightInverse INIT;
 	float fWaterColorNoiseAmount INIT;
 	float fWaterColorNoiseWeightOne INIT;
 	float fWaterColorNoiseWeightTwo INIT;

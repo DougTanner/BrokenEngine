@@ -1,5 +1,5 @@
 # Writes one part of the Change Workflow context to stdout for the SessionStart
-# hooks in .claude/settings.json.
+# hooks in .claude/settings.json and .codex/config.toml.
 # Claude Code caps a single hook output at 10,000 characters and replaces
 # anything longer with a saved-file preview, so change-workflow.md carries three
 # `<!-- session-context-part: <title> -->` marker lines that name where it splits

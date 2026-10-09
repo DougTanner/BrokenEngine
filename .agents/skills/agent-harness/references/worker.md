@@ -335,8 +335,8 @@ and the handoff this run returns.
     - `exitCode` is the registered process's exit code, or `null` when the exit
       code was not captured — usually because the watcher could not bind it, a
       process that had already exited when `Register` ran; prove an intentional
-      clean exit (after `crash_report_fixture`, for example) from `exitCode`,
-      never from a second launch.
+      clean exit (after `crash_report_harness_rig`,
+      for example) from `exitCode`, never from a second launch.
     - Exit `0` means every registered role still holds its registered exact
       identity — the registered PID plus its registered start time, never a
       process-name search.

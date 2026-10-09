@@ -6,7 +6,7 @@
 
 #include "File/Replay.h"
 
-#include "Agent/Commands/ServerSimulationFixtures.h"
+#include "Agent/Commands/ServerSimulationHarnessRigs.h"
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
@@ -295,7 +295,7 @@ void ServerTransferManager::HarvestTransfers()
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena transfersArena = rWorkbuffer.Push();
 	CollectTransfers(transfersArena);
-	game::DrainReplayTransferFixtures(*game::gpServerSession, *this);
+	game::DrainReplayTransferHarnessRigs(*game::gpServerSession, *this);
 
 	SortTransfersByType();
 
@@ -363,7 +363,7 @@ void ServerTransferManager::ApplyReplayTransfers()
 void ServerTransferManager::ResetState()
 {
 	mTransfers.clear();
-	game::ResetReplayTransferFixtures(*game::gpServerSession);
+	game::ResetReplayTransferHarnessRigs(*game::gpServerSession);
 	game::gpServerSession->mPendingSubscriptionUpdates.clear();
 }
 

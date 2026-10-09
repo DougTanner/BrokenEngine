@@ -5,6 +5,7 @@
 #include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
+#include "Ui/SmokeWrappersBase.h"
 #include "Ui/SunMoonWrappersBase.h"
 
 namespace engine
@@ -23,7 +24,7 @@ enum class GraphicsSettingsFlags : uint8_t
 
 struct GraphicsSettings
 {
-	static constexpr int64_t kiVersion = 15;
+	static constexpr int64_t kiVersion = 16;
 
 	common::Flags<GraphicsSettingsFlags> flags {};
 	uint8_t uiPadding[3] {};
@@ -35,6 +36,7 @@ struct GraphicsSettings
 	float fSmokeSimulationArea = 0.0f;
 	float fMinimumAmbient = 0.0f;
 	float fLightingUpdateCadence = 1.0f;
+	float fSmokeUpdateCadence = 1.0f;
 	// The quality levels are the single source of truth for the wrappers they drive; those wrapper values are
 	// never persisted directly. uint8_t, not the enum: the file layout must not follow GraphicsQualityLevel.
 	uint8_t uiWaterLevel = 0;
@@ -56,13 +58,14 @@ static_assert(BT_OFFSETOF(GraphicsSettings, fMipmapLevelOfDetailBias) == 20, "Gr
 static_assert(BT_OFFSETOF(GraphicsSettings, fSmokeSimulationArea) == 24, "GraphicsSettings::fSmokeSimulationArea offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, fMinimumAmbient) == 28, "GraphicsSettings::fMinimumAmbient offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, fLightingUpdateCadence) == 32, "GraphicsSettings::fLightingUpdateCadence offset changed — existing setting bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiWaterLevel) == 36, "GraphicsSettings::uiWaterLevel offset changed — the quality bytes are appended after the floats");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiTerrainShadowsLevel) == 37, "GraphicsSettings::uiTerrainShadowsLevel offset changed — existing quality bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiObjectShadowsLevel) == 38, "GraphicsSettings::uiObjectShadowsLevel offset changed — existing quality bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiLightingLevel) == 39, "GraphicsSettings::uiLightingLevel offset changed — existing quality bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiSmokeDetailLevel) == 40, "GraphicsSettings::uiSmokeDetailLevel offset changed — existing quality bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiQualityPadding) == 41, "GraphicsSettings padding changed — GraphicsSettings must remain 44 bytes");
-static_assert(sizeof(GraphicsSettings) == 44, "GraphicsSettings::kiVersion must be bumped with this layout");
+static_assert(BT_OFFSETOF(GraphicsSettings, fSmokeUpdateCadence) == 36, "GraphicsSettings::fSmokeUpdateCadence offset changed — existing setting bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiWaterLevel) == 40, "GraphicsSettings::uiWaterLevel offset changed — the quality bytes are appended after the floats");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiTerrainShadowsLevel) == 41, "GraphicsSettings::uiTerrainShadowsLevel offset changed — existing quality bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiObjectShadowsLevel) == 42, "GraphicsSettings::uiObjectShadowsLevel offset changed — existing quality bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiLightingLevel) == 43, "GraphicsSettings::uiLightingLevel offset changed — existing quality bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiSmokeDetailLevel) == 44, "GraphicsSettings::uiSmokeDetailLevel offset changed — existing quality bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiQualityPadding) == 45, "GraphicsSettings padding changed — GraphicsSettings must remain 48 bytes");
+static_assert(sizeof(GraphicsSettings) == 48, "GraphicsSettings::kiVersion must be bumped with this layout");
 constexpr char kpcGraphicsSettingsPath[] = "GraphicsSettings.bin";
 
 void SaveGraphicsSettings()
@@ -80,6 +83,7 @@ void SaveGraphicsSettings()
 		.fSmokeSimulationArea = gSmokeSimulationArea.mfCurrent,
 		.fMinimumAmbient = gSunMoonMinimumAmbient.mfCurrent,
 		.fLightingUpdateCadence = gLightingUpdateCadence.mfCurrent,
+		.fSmokeUpdateCadence = gSmokeUpdateCadence.mfCurrent,
 		.uiWaterLevel = static_cast<uint8_t>(gWaterLevel.Get<int64_t>()),
 		.uiTerrainShadowsLevel = static_cast<uint8_t>(gTerrainShadowsLevel.Get<int64_t>()),
 		.uiObjectShadowsLevel = static_cast<uint8_t>(gObjectShadowsLevel.Get<int64_t>()),
@@ -139,6 +143,11 @@ static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsS
 	if (!gLightingUpdateCadence.IsInRange(rGraphicsSettings.fLightingUpdateCadence))
 	{
 		return "fLightingUpdateCadence";
+	}
+
+	if (!gSmokeUpdateCadence.IsInRange(rGraphicsSettings.fSmokeUpdateCadence))
+	{
+		return "fSmokeUpdateCadence";
 	}
 
 	if (!IsValidGraphicsQualityLevel(rGraphicsSettings.uiWaterLevel))
@@ -206,6 +215,7 @@ bool LoadGraphicsSettings()
 		gSmokeSimulationArea.Set(graphicsSettings.fSmokeSimulationArea);
 		gSunMoonMinimumAmbient.Set(graphicsSettings.fMinimumAmbient);
 		gLightingUpdateCadence.Set(graphicsSettings.fLightingUpdateCadence);
+		gSmokeUpdateCadence.Set(graphicsSettings.fSmokeUpdateCadence);
 		gWindEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kWind);
 		gLightingEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kLighting);
 		LoadGraphicsQualityLevel(gWaterLevel, graphicsSettings.uiWaterLevel);
@@ -238,6 +248,7 @@ void ResetGraphicsSettings()
 	gSmokeSimulationArea.mfCurrent = gSmokeSimulationArea.mfDefault;
 	gSunMoonMinimumAmbient.mfCurrent = gSunMoonMinimumAmbient.mfDefault;
 	gLightingUpdateCadence.mfCurrent = gLightingUpdateCadence.mfDefault;
+	gSmokeUpdateCadence.mfCurrent = gSmokeUpdateCadence.mfDefault;
 	gWindEnabled.mfCurrent = gWindEnabled.mfDefault;
 	gLightingEnabled.mfCurrent = gLightingEnabled.mfDefault;
 

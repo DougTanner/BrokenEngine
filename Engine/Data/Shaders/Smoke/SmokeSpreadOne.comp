@@ -60,7 +60,8 @@ void main()
 	vec4 f4Result = vec4(0.0f);
 	if (bInBounds)
 	{
-		f4Result = SmokeSpread(globalLayout, textureSampler, noiseTextureSampler, windTextureSamplerOne, windTextureSamplerTwo, f2InputTexcoord, f2WorldPosition, f2OutputTexcoord, globalLayout.fSmokeNoiseScaleOne);
+		vec2 f2WindSample = SmokeWindSample(globalLayout, windTextureSamplerOne, windTextureSamplerTwo, f2OutputTexcoord);
+		f4Result = SmokeSpread(globalLayout, textureSampler, noiseTextureSampler, f2InputTexcoord, f2WorldPosition, f2WindSample, globalLayout.fSmokeNoiseScaleOne);
 		imageStore(outputImage, ivec2(uiX, uiY), f4Result);
 	}
 

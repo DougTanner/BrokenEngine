@@ -20,7 +20,7 @@ At 1/1 timescale the client runs `targetBehindTicks` behind the latest server ti
 
 1. Client `set_log_level {"category":"Network","level":"Debug"}`.
 2. Server `timescale {"faster":false}` once, then poll client `query_profile` until `clock.targetBehindTicks` is at most 2 (about 11 s at 1/2).
-3. Server `pause {"paused":true}`; after about 2 s, require the client `client_full_state_fixture {"action":"clear"}` to report `coordState.present:true` with `coordState.tailTick` above the server `status.tick`. That command always reports coord [0,0], so [0,0] must be in the server's `status.activeCoords`.
+3. Server `pause {"paused":true}`; after about 2 s, require the client `client_full_state_harness_rig {"action":"clear"}` to report `coordState.present:true` with `coordState.tailTick` above the server `status.tick`. That command always reports coord [0,0], so [0,0] must be in the server's `status.activeCoords`.
 4. Server `inject_payload {"entries":[{"coord":[0,0],"type":"SpawnPlayer"}]}`; require `deferred:true`.
 5. Server `pause {"paused":false}`.
 6. Client `get_logs {"pattern":"resimulation completed","category":"Network"}`; require a line with `Replayed: true` and `DesyncTick: -1`.

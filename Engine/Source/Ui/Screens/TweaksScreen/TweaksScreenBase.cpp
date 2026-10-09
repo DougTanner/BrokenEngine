@@ -497,7 +497,7 @@ void TweaksScreenBase::RunSliderAuditFrame()
 		{
 			// Heap: TweaksSliderMap iteration touches its hash buckets; mirror the registration-side suppression.
 			ScopedSuppressAllocationTracking suppress;
-			for (const auto& [key, pWrapper] : TweaksSliderMap::Get())
+			for (std::string_view key : std::views::keys(TweaksSliderMap::Get()))
 			{
 				if (!mAuditTouched.contains(key))
 				{

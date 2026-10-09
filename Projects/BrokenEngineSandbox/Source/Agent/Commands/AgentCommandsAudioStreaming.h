@@ -5,7 +5,7 @@
 namespace game
 {
 
-void CommandAudioStreamingFixture(const nlohmann::json& rParameters, nlohmann::json& rResult);
+void CommandAudioStreamingHarnessRig(const nlohmann::json& rParameters, nlohmann::json& rResult);
 
 } // namespace game
 

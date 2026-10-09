@@ -4,7 +4,7 @@
 
 #include "AudioUtility.h"
 #if defined(BT_DEBUG)
-#include "Agent/Commands/AudioStreamingFixture.h"
+#include "Agent/Commands/AudioStreamingHarnessRig.h"
 #endif
 #include "File/FileManager.h"
 #include "File/PackChunks.h"
@@ -30,7 +30,7 @@ StreamingVoice::~StreamingVoice()
 	CancelPendingReads();
 	DestroyXAudio2SourceVoice(mpAudioEngine, mpVoice);
 #if defined(BT_DEBUG)
-	AudioStreamingFixture::RetireVoiceControl(mpAudioStreamingControl);
+	AudioStreamingHarnessRig::RetireVoiceControl(mpAudioStreamingControl);
 #endif
 }
 

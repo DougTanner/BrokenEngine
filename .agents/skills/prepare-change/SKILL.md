@@ -7,7 +7,7 @@ description: >-
   Workflow Approve and classify and Prepare and explore alternatives steps
   require, for a change that is not a claimed executable Plan. Preparation only;
   never implements the change.
-allowed-tools: [Read, Write, Edit, Glob, Grep]
+allowed-tools: [Read, Write, Edit, Glob, Grep, PowerShell]
 ---
 
 # Prepare Change

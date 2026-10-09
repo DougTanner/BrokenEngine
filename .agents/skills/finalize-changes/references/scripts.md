@@ -127,11 +127,12 @@ reconstructs the assessment from Git output.
 - `Invoke-FinalizeCandidateCommit.ps1` never advances primary. Its result is
   `broken-engine-finalize-candidate/v5`, carrying only the candidate.
 - `Invoke-CodeQualityMetricsHistory.ps1 -Mode Generate` uses the exact
-  `RepositoryRoot,BaseCommit,TipCommit,DateUtc,OutputDirectory` interface and
+  `RepositoryRoot,BaseCommit,OutputDirectory` interface and
   writes only `CodeQualityMetricsHistory.jsonl` and
   `CodeQualityMetricsHistory.svg` into that directory. Production reads history
   bytes from the supplied immutable BaseCommit; it never uses a working-tree
-  JSONL suffix. The producer alone decides what the new row contains.
+  JSONL suffix. The producer alone decides which rows it appends and what they
+  contain.
 - `Invoke-FinalizeApprovalPreparation.ps1` squashes the session work to
   one commit whose parent is the session's merge-base with primary, and never
   requires the session to already contain the live primary tip. Recovering a
@@ -237,11 +238,14 @@ and overwrites the artifact; the stale receipt is never reused, because its
   tree it did not verify. A run that waited reports one `git.index-lock-wait`
   diagnostic naming the seconds spent, on a landed result as well as a failed
   one. Allow a landing invocation on the default budget a command timeout of up
-  to 20 minutes; its worst case is about 13 minutes — the omitted-token route's
+  to 20 minutes; its worst case is about 15 minutes — the omitted-token route's
   300-second lock-claim wait, this 500-second index-lock budget, and the
-  landing's own Git work, plus the measured roughly 60-second history Snapshot
-  path — so a caller raising that budget must raise its host timeout
-  by the same amount. Pass the post-confirmation claim's owner token as
+  landing's own Git work, plus about 2 minutes (unvalidated) per history commit
+  Snapshot (one in the ordinary case; which commits get measured is in
+  [`HistoryContract.md`](../../code-quality-metrics/references/HistoryContract.md)
+  `## Source table and decision`) — so a caller raising that budget must raise
+  its host timeout by the same amount, and by about 2 minutes per extra
+  measured C++ commit. Pass the post-confirmation claim's owner token as
   `-OwnerToken` so landing continues under that same lease, which it accepts only
   as a same-actor continuation under the `worker.md` `## Bundled scripts` ownership
   rule, preserving the raw `$SessionLabel`. Without `-OwnerToken`, it derives
@@ -255,8 +259,7 @@ and overwrites the artifact; the stale receipt is never reused, because its
   without the duration gate to release a live retained claim because it performs
   no rebase or advance; foreign, mismatched, and unverifiable claims are untouched.
   Under the held 3600-second lease, after any internal rebase, it runs Generate
-  with one UTC row date frozen once for the whole landing and reused by every
-  attempt, so an internal rebase cannot shift the recorded date. Landing
+  with the primary tip it now builds on as BaseCommit. Landing
   measures the approved source patch from the confirmed candidate's own parent,
   so a candidate whose parent is behind live primary — including one where the
   intervening commits only rewrote the two generated history paths — is the
@@ -268,7 +271,7 @@ and overwrites the artifact; the stale receipt is never reused, because its
   files are then committed over the approved source commit through a temporary
   index as one sole-parent commit with the frozen approved metadata; no branch
   ref moves while that object is built. The final result is
-  `broken-engine-finalize-landing/v5` and separates
+  `broken-engine-finalize-landing/v6` and separates
   `approvedSource`, `rebasedSource`, `historyUpdate`, and `final` commit/tree
   fields. The reviewed PNG deletion remains an ordinary source change; only the
   two generated paths are allowed after confirmation. When primary

@@ -19,9 +19,9 @@ Public contract, inputs, and handoff form: [`../SKILL.md`](../SKILL.md).
    Require `VALID` and exit `0`. Report `BLOCKED` if the command cannot run,
    returns `SETUP_ERROR`/2, or the validator does not validate its own skill. Do
    not continue with a weaker check.
-3. Run the same command once for the target, using `-Fixture` only for a
-   deliberately disposable fixture outside `.agents/skills/`. Done when the exact
-   command, exit status, and complete output are captured.
+3. Run the same command once for the target, using `-AllowOutsideSkills` only
+   for a deliberately disposable test package outside `.agents/skills/`. Done
+   when the exact command, exit status, and complete output are captured.
 4. Classify the target result. `INVALID`/1 is a mechanical Critical finding;
    `SETUP_ERROR`/2, an unrecognized result class, or a result/exit mismatch is
    `BLOCKED`.
@@ -97,4 +97,4 @@ Public contract, inputs, and handoff form: [`../SKILL.md`](../SKILL.md).
   `/progressive-disclosure-review`; report neither here.
 - For validator changes, run the disposable `VALID`/`INVALID`/`SETUP_ERROR`
   matrix in [`frontmatter-schema.md`](frontmatter-schema.md). Do not commit
-  fixture packages.
+  test packages.

@@ -16,13 +16,9 @@ using enum MissileFlags;
 // Collision storage is thread-local because frame ticks run in parallel.
 static thread_local int64_t siCollisionLayerIndex = 0;
 static thread_local std::vector<engine::CollisionFlags_t> sCollisionFlags;
-static thread_local std::vector<float> sCollisionRadii;
-static thread_local std::vector<float> sCollisionDamages;
 
 struct MissileCollisionIntervalScratch
 {
-	std::vector<float> startTimes;
-	std::vector<float> endTimes;
 	std::vector<float> maximumTimes;
 	std::vector<engine::SegmentHit> terrainHits;
 	std::vector<engine::SegmentHit> boundaryHits;
@@ -315,10 +311,6 @@ void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 
 	int64_t iCount = rCurrentInterpolate.iCount;
 	sCollisionFlags.resize(static_cast<size_t>(iCount));
-	sCollisionRadii.resize(static_cast<size_t>(iCount));
-	sCollisionDamages.resize(static_cast<size_t>(iCount));
-	rCollisionScratch.startTimes.resize(static_cast<size_t>(iCount));
-	rCollisionScratch.endTimes.resize(static_cast<size_t>(iCount));
 	rCollisionScratch.maximumTimes.resize(static_cast<size_t>(iCount));
 	rCollisionScratch.terrainHits.resize(static_cast<size_t>(iCount));
 	rCollisionScratch.boundaryHits.resize(static_cast<size_t>(iCount));
@@ -327,10 +319,6 @@ void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 	{
 		int64_t iIndex = i;
 		sCollisionFlags.at(static_cast<size_t>(iIndex)) = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {engine::CollisionFlags::kDestroyOnCollide};
-		sCollisionRadii.at(static_cast<size_t>(iIndex)) = kfMissileCollisionRadius;
-		sCollisionDamages.at(static_cast<size_t>(iIndex)) = 0.0f;  // Damage via area damage system
-		rCollisionScratch.startTimes.at(static_cast<size_t>(iIndex)) = 0.0f;
-		rCollisionScratch.endTimes.at(static_cast<size_t>(iIndex)) = 1.0f;
 		rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)) = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		float fMaximumTime = std::numeric_limits<float>::max();
@@ -349,14 +337,12 @@ void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 	{
 		.pVecStartPositions = rPreviousInterpolate.pVecPositions,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
-		.pfStartTimes = rCollisionScratch.startTimes.data(),
-		.pfEndTimes = rCollisionScratch.endTimes.data(),
 		.pfMaxTimes = rCollisionScratch.maximumTimes.data(),
-		.pfRadii = sCollisionRadii.data(),
-		.pfDamages = sCollisionDamages.data(),
 		.pFlags = sCollisionFlags.data(),
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
+		.fRadius = kfMissileCollisionRadius,
+		.fDamage = 0.0f,  // Damage via area damage system
 		.bSweptTest = true,
 		.uiCategory = CollisionCategory::kuiMissile,
 		.uiCollidesWith = CollidesWith::kuiMissile,

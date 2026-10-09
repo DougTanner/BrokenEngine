@@ -17,7 +17,7 @@ This plan's fullscreen sky pass is distinct from those water
 reflections; to avoid confusion with the existing water "Skybox"
 naming, prefer a non-colliding naming scheme for the new work
 (e.g. kPipelineSky / Sky.frag instead of kPipelineSkybox /
-Skybox.frag).  engine::Camera drives a sun angle that controls day/night
+Skybox.frag).  engine::CameraBase drives a sun angle that controls day/night
 lighting via PopulateSunAndLighting() in GlobalUniforms.cpp.
 
 Why

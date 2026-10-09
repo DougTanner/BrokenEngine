@@ -1,8 +1,8 @@
 #include "Network/Client/ClientSession.h"
 
-#include "Agent/Commands/ClientFullStateFixture.h"
-#include "Agent/Commands/ClientPacketFaultFixture.h"
-#include "Agent/Commands/ClientSubscriptionFixtures.h"
+#include "Agent/Commands/ClientFullStateHarnessRig.h"
+#include "Agent/Commands/ClientPacketFaultHarnessRig.h"
+#include "Agent/Commands/ClientSubscriptionHarnessRigs.h"
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
@@ -46,9 +46,9 @@ ClientSession::ClientSession()
 
 ClientSession::~ClientSession()
 {
-	ResetClientPacketFaultFixture(*this);
-	DetachClientFullStateFixture(*this);
-	DetachClientSubscriptionFixtures(*this);
+	ResetClientPacketFaultHarnessRig(*this);
+	DetachClientFullStateHarnessRig(*this);
+	DetachClientSubscriptionHarnessRigs(*this);
 	mpRuntime.reset();
 	if (gpClientSession == this)
 	{
@@ -262,14 +262,14 @@ void ClientSession::OnServerLoad()
 	}
 	gpGame->mCells.clear();
 
-	ResetClientPacketFaultFixture(*this);
+	ResetClientPacketFaultHarnessRig(*this);
 	mpReconciler->Reset();
 	mpDesynchronizationCore->Reset();
 }
 
 void ClientSession::OnRuntimeDisconnected()
 {
-	ResetClientPacketFaultFixture(*this);
+	ResetClientPacketFaultHarnessRig(*this);
 	mpReconciler->Reset();
 	for (auto& [rCoordinate, rCell] : gpGame->mCells)
 	{

@@ -259,7 +259,7 @@ Execution card:
 - Out of scope: <boundary>
 - Tier trigger: <trigger or none>
 - Interfaces and invariants: <contracts>
-- Acceptance checks: <check and expected observation>
+- Acceptance checks: <check and expected observation; a bug-fix criterion (one stating a defect no longer occurs) also names its pre-change red run: an /external-diagnose-bug Reproducing signal, or a run on a build of the unedited tree, requested through a Build required handoff, that the implementer records before its first edit>
 - Roles: <required and conditional assignments>
 ```
 

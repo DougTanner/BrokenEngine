@@ -1,8 +1,8 @@
 ---
 name: builder
 description: Builds via /compile. Returns the build reporting /compile's `## Handoff` defines.
-model: sonnet
-effort: xhigh
+model: haiku
+effort: high
 disallowedTools: Agent
 ---
 

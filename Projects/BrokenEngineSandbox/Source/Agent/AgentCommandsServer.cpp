@@ -4,9 +4,9 @@
 
 #include "File/Replay.h"
 
-#include "Agent/Commands/ServerFaultFixtures.h"
+#include "Agent/Commands/ServerFaultHarnessRigs.h"
 #include "Agent/Commands/ServerFrameEdit.h"
-#include "Agent/Commands/ServerSimulationFixtures.h"
+#include "Agent/Commands/ServerSimulationHarnessRigs.h"
 #include "Agent/AgentCommandsServerQueries.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
@@ -107,7 +107,7 @@ static void CommandStatus([[maybe_unused]] const nlohmann::json& rParameters, nl
 	rResult["nextGlobalId"] = gpGame->miNextGlobalId;
 	rResult["pendingFlagshipUpdateCount"] = std::ssize(gpServerSession->mpFleetManager->mNavigation.mPendingFlagshipUpdates);
 	rResult["harvestedTransferTotal"] = gpServerSession->miHarvestedTransferTotal;
-	rResult["pendingTransferFixtureCount"] = CountReplayTransferFixtures(*gpServerSession);
+	rResult["pendingTransferHarnessRigCount"] = CountReplayTransferHarnessRigs(*gpServerSession);
 	rResult["pendingAgentStatusChangeCount"] = CountPendingAgentStatusChanges(*gpServerSession);
 }
 
@@ -300,19 +300,19 @@ bool ExecuteAgentCommandServer(std::string_view command, const nlohmann::json& r
 		CommandStatus(rParameters, rResult);
 		return true;
 	}
-	if (command == "game_packet_fault_fixture")
+	if (command == "game_packet_fault_harness_rig")
 	{
-		CommandGamePacketFaultFixture(rParameters, rResult);
+		CommandGamePacketFaultHarnessRig(rParameters, rResult);
 		return true;
 	}
-	if (command == "engine_packet_fault_fixture")
+	if (command == "engine_packet_fault_harness_rig")
 	{
-		CommandEnginePacketFaultFixture(rParameters, rResult);
+		CommandEnginePacketFaultHarnessRig(rParameters, rResult);
 		return true;
 	}
-	if (command == "server_pre_handshake_ack_fixture")
+	if (command == "server_pre_handshake_ack_harness_rig")
 	{
-		CommandServerPreHandshakeAcknowledgmentFixture(rParameters, rResult);
+		CommandServerPreHandshakeAcknowledgmentHarnessRig(rParameters, rResult);
 		return true;
 	}
 	if (command == "pause")
@@ -345,7 +345,7 @@ bool ExecuteAgentCommandServer(std::string_view command, const nlohmann::json& r
 		CommandEditFrame(rParameters, rResult);
 		return true;
 	}
-	if (ExecuteServerSimulationFixtureCommand(command, rParameters, rResult))
+	if (ExecuteServerSimulationHarnessRigCommand(command, rParameters, rResult))
 	{
 		return true;
 	}

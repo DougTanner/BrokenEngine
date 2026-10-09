@@ -45,7 +45,11 @@ Checks: >
   readability-implicit-bool-conversion
 
 WarningsAsErrors: ''
-HeaderFilterRegex: '(Common|Engine|DataPacker|Projects)/.*\.(h|hpp)$'
+# Either separator: a header included relative to its includer gets a backslash path.
+# ThirdParty is excluded explicitly because it has its own Engine/ and DataPacker/
+# subfolders (e.g. ThirdParty/Prebuilts/Source/Engine) that the filter would match.
+HeaderFilterRegex: '[/\\](Common|Engine|DataPacker|Projects)[/\\].*\.(h|hpp)$'
+ExcludeHeaderFilterRegex: '[/\\]ThirdParty[/\\]'
 FormatStyle: none
 
 # VS 2026 ships clang-tidy.exe without its LLVM resource-dir headers, so DirectXMath's

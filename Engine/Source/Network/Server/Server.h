@@ -154,7 +154,7 @@ public:
 	// Callers MUST NOT touch their ClientConnection* afterward -- the client may have been removed.
 	void RecordContractViolation(int64_t iClientId, ContractViolationKind eKind, std::string_view reason, int64_t iPacketType, int64_t iSize);
 
-	// Wire dispatch entry point for one received packet. Public so a harness fixture can inject a
+	// Wire dispatch entry point for one received packet. Public so a harness rig can inject a
 	// deliberately malformed packet through the real admission, dispatch, and violation path.
 	void Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer);
 

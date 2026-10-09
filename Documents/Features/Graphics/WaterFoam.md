@@ -48,7 +48,7 @@ Pass the fetched displacement W through as a new varying (`layout (location = 4)
 ## Out of scope
 
 - Dedicated foam texture / asset pipeline work (reuse `noiseTextureSampler`; revisit only if the pattern quality disappoints)
-- Refraction (separate plan: `WaterRefraction.md`)
+- Refraction
 - Any change to the existing shading model (specular lobes, Fresnel, depth-LUT color)
 - Foam persistence/advection simulation
 

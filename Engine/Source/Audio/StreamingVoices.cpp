@@ -5,7 +5,7 @@
 #include "AudioManager.h"
 #include "StreamingVoice.h"
 #if defined(BT_DEBUG)
-#include "Agent/Commands/AudioStreamingFixture.h"
+#include "Agent/Commands/AudioStreamingHarnessRig.h"
 #endif
 
 #include "File/FileManager.h"
@@ -69,8 +69,8 @@ void StreamingVoices::Update(std::chrono::duration<float> deltaTime)
 	if (mpCurrentStream != nullptr)
 	{
 #if defined(BT_DEBUG)
-		AudioStreamingFixture* pFixture = gpAttachedAudioStreamingFixture.load(std::memory_order_acquire);
-		mpCurrentStream->UpdateRequests(pFixture == nullptr || !(pFixture->mFlags & AudioStreamingFixture::Flags::kPublicationStopped));
+		AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire);
+		mpCurrentStream->UpdateRequests(pHarnessRig == nullptr || !(pHarnessRig->mFlags & AudioStreamingHarnessRig::Flags::kPublicationStopped));
 #else
 		mpCurrentStream->UpdateRequests(true);
 #endif
@@ -78,8 +78,8 @@ void StreamingVoices::Update(std::chrono::duration<float> deltaTime)
 	if (!mPreviousStreams.empty())
 	{
 #if defined(BT_DEBUG)
-		AudioStreamingFixture* pFixture = gpAttachedAudioStreamingFixture.load(std::memory_order_acquire);
-		mPreviousStreams.back()->UpdateRequests(pFixture == nullptr || !(pFixture->mFlags & AudioStreamingFixture::Flags::kControlledPublication));
+		AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire);
+		mPreviousStreams.back()->UpdateRequests(pHarnessRig == nullptr || !(pHarnessRig->mFlags & AudioStreamingHarnessRig::Flags::kControlledPublication));
 #else
 		mPreviousStreams.back()->UpdateRequests(true);
 #endif
@@ -87,7 +87,7 @@ void StreamingVoices::Update(std::chrono::duration<float> deltaTime)
 	for (int64_t i = 0; i + 1 < std::ssize(mPreviousStreams); ++i)
 	{
 #if defined(BT_DEBUG)
-		mPreviousStreams.at(i)->UpdateRequests(AudioStreamingFixture::AllowOlderFadeRequests());
+		mPreviousStreams.at(i)->UpdateRequests(AudioStreamingHarnessRig::AllowOlderFadeRequests());
 #else
 		mPreviousStreams.at(i)->UpdateRequests(false);
 #endif
@@ -187,8 +187,8 @@ void StreamingVoices::CreateStream(common::crc_t uiAudioCrc)
 	{
 		mpCurrentStream = std::make_unique<StreamingVoice>(mpAudioEngine, pVoice, &rLazyChunk);
 #if defined(BT_DEBUG)
-		mpCurrentStream->mpAudioStreamingControl = AudioStreamingFixture::CreateVoiceControl(*mpCurrentStream);
-		AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kStartup, std::numeric_limits<uint32_t>::max(), uiAudioCrc, 0, rLazyChunk.header.iSize, AudioStreamingFixtureQueueState::kFree, 0, false);
+		mpCurrentStream->mpAudioStreamingControl = AudioStreamingHarnessRig::CreateVoiceControl(*mpCurrentStream);
+		AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kStartup, std::numeric_limits<uint32_t>::max(), uiAudioCrc, 0, rLazyChunk.header.iSize, AudioStreamingHarnessRigQueueState::kFree, 0, false);
 #endif
 	}
 	else

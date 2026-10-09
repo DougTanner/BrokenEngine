@@ -99,7 +99,7 @@ static int64_t ResolveEffectiveMaterial(LoadVerticesContext& rContext, int64_t i
 	}
 
 	// Original material claimed by another node or deformation mode - create a new split material
-	int iEffectiveMaterial = static_cast<int>(rMaterials.size());
+	int64_t iEffectiveMaterial = std::ssize(rMaterials);
 	rMaterialNodeMap.insert_or_assign(key, iEffectiveMaterial);
 	rMaterials.emplace_back();
 	MaterialNodeInfo newInfo;

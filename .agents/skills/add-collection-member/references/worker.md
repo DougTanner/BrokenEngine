@@ -95,8 +95,7 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
     - Owner-fed state travels through `SyncData` and `Sync()`, and every
       `Sync()` aggregate initializer and caller has to agree.
     - Follow the target's live pattern: Spaceships carries its persistent
-      columns through `PersistentMembers()`, Pushers copies in Update, and
-      Sounds copies in `AllocateAndCopy()`.
+      columns through `PersistentMembers()` and Pushers copies in Update.
 
     Done when the chosen carry-forward mechanism is wired and every affected
     initializer and caller agrees.

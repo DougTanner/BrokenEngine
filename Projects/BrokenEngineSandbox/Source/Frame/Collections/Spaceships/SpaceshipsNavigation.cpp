@@ -2,6 +2,7 @@
 
 #include "Frame/Collections/Pushers/Pushers.h"
 #include "Frame/CellStaticData.h"
+#include "Ui/WrapperBase.h"
 
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/TerrainUtils.h"
@@ -30,7 +31,6 @@ constexpr float kfSpaceshipReturnDistance = 180.0f;
 constexpr float kfSpaceshipReturnedDistance = kfSpaceshipReturnDistance - 20.0f;
 
 constexpr float kfSpaceshipTerrainBounceRotation = 8.0f;
-constexpr float kfSpaceshipTerrainBounceMove = kfSpaceshipRadius * 2.0f;
 constexpr float kfSpaceshipTerrainBounceVelocity = 4.0f;
 
 // Terrain avoidance (player-proximity skip constants; sampling constants in TerrainUtils.cpp)
@@ -135,23 +135,24 @@ void XM_CALLCONV SpaceshipsPostRender::ApplyPusherResponse(const Frame& __restri
 	}
 }
 
-void SpaceshipsPostRender::ApplyTerrainBounce(const engine::CellStaticData& rStaticData, SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, float fDeltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity)
+void SpaceshipsPostRender::ApplyTerrainBounce(const engine::CellStaticData& rStaticData, const SpaceshipsInterpolate& rPreviousInterpolate, SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, float fDeltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity)
 {
-	float fTerrainElevation = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(rCurrentInterpolate.pVecPositions[i]);
-	if (fTerrainElevation >= XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
+	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], kfSpaceshipRadius, engine::gBaseHeight.mfCurrent, false);
+	if (result.flags & engine::DiscTerrainFlags::kStartOverlap) [[unlikely]]
 	{
-		XMVECTOR vecTerrainNormal = XMVector3Normalize(XMVectorSetZ(engine::gpIslandTerrain->CellNormal(rStaticData, rCurrentInterpolate.pVecPositions[i]), 0.0f));
+		LOG(kDefault, kWarning, "Spaceship terrain start overlap Cell: ({},{}) Index: {} Start: {} Moved: {}", rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(rPreviousInterpolate.pVecPositions[i], 1), common::Wb(result.fStartOverlapDistance, 1));
+	}
 
-		rCurrentInterpolate.pVecPositions[i] = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime * kfSpaceshipTerrainBounceMove), vecTerrainNormal, rCurrentInterpolate.pVecPositions[i]);
-		// Enforce W=1.0 — terrain-bounce bypasses the main integration clamp.
-		rCurrentInterpolate.pVecPositions[i] = XMVectorSetW(rCurrentInterpolate.pVecPositions[i], 1.0f);
-
-		float fDirectionTerrainCrossZ = XMVectorGetZ(XMVector3Cross(rCurrentInterpolate.pVecDirections[i], vecTerrainNormal));
+	// The resolved position carries W=1.0 — this write bypasses the main integration clamp.
+	rCurrentInterpolate.pVecPositions[i] = result.vecPosition;
+	if (result.flags & engine::DiscTerrainFlags::kContact) [[unlikely]]
+	{
+		float fDirectionTerrainCrossZ = XMVectorGetZ(XMVector3Cross(rCurrentInterpolate.pVecDirections[i], result.vecNormal));
 		rfDeltaRotation = fDirectionTerrainCrossZ > 0.0f ? kfSpaceshipTerrainBounceRotation : -kfSpaceshipTerrainBounceRotation;
 
-		// Velocity W stays exactly 0 because vecTerrainNormal inherits W=0 from XMVector3Cross in IslandTerrain.cpp's NormalFromElevation.
-		rVecVelocity = XMVector3Reflect(rVecVelocity, vecTerrainNormal);
-		rVecVelocity = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime * kfSpaceshipTerrainBounceVelocity), vecTerrainNormal, rVecVelocity);
+		// Velocity W stays exactly 0 because ResolveDiscAgainstTerrain returns the contact normal with W=0.
+		rVecVelocity = XMVector3Reflect(rVecVelocity, result.vecNormal);
+		rVecVelocity = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime * kfSpaceshipTerrainBounceVelocity), result.vecNormal, rVecVelocity);
 	}
 }
 

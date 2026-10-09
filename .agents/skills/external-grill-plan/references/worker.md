@@ -20,9 +20,8 @@ inputs, the interview question format, and the handoff form live in
    when the plan adds or rewrites a non-trivial subsystem, algorithm, or data
    structure. Done when that gate has run or the plan does not trigger it.
 6. Search the repository until local evidence either resolves a candidate
-   decision or proves that user judgment is required. Do not ask the user to
-   rediscover code facts. Done when every candidate decision is evidence-resolved
-   or proven to need user judgment.
+   decision or proves that user judgment is required. Done when every
+   candidate decision is evidence-resolved or proven to need user judgment.
 7. Scan remaining decisions through the compact checklist in
    `### Decision Checklist` and map them as a dependency tree. Done when every
    remaining decision sits in that tree.

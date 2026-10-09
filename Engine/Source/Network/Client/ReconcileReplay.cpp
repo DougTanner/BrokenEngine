@@ -113,8 +113,8 @@ static bool ApplyCrcFastPath(CoordWork& rWork, const ReconcileInputs& rInputs, C
 	}
 
 	// The walk may have set the output layout via CrcApplyMatchResult —
-	// preserve those as the floor result. If full replay validates further, ReconcileValidateCrcCoord
-	// and ReconcileReplayCoord will overwrite them. Count must be recomputed from scratch
+	// preserve those as the floor result. If full replay validates further or injects a full state,
+	// ComputeOutputLayout overwrites them. Count must be recomputed from scratch
 	// because walk's count included old speculative frames that replay will overwrite.
 	rScratch.flags.Set(ReconcileScratchFlags::kCrcFastPath, false);
 	rScratch.outputLayout.iCount = 0;
@@ -262,9 +262,10 @@ static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const Ri
 	return false;
 }
 
-// Compute output layout: confirmed frame + remaining replay/catch-up frames. Four subcases
-// fold together: validation past the base, validation at the base, walk advanced confirmed
-// but replay didn't validate further, and catch-up after a gap.
+// Compute output layout: confirmed frame + remaining replay/catch-up frames, plus up to
+// kiRenderBehindTicks frames below the confirmed frame after validation past the base. Four
+// subcases fold together: validation past the base, validation at the base, walk advanced
+// confirmed but replay didn't validate further, and catch-up after a gap.
 static void ComputeOutputLayout(CoordWork& rWork, int64_t iRollbackOffset)
 {
 	engine::Cell& rCell = *rWork.pCell;
@@ -272,7 +273,25 @@ static void ComputeOutputLayout(CoordWork& rWork, int64_t iRollbackOffset)
 
 	if (rScratch.iLastValidatedIndex > 0)
 	{
-		rScratch.outputLayout.iCount = rScratch.iReplayWriteCount - (rScratch.iLastValidatedIndex - 1);
+		// Replay-stack frame k sits k slots past its base: the rollback base in the pre-replay ring,
+		// whose older slots stay valid history, or an injected full state, which has none below it.
+		int64_t iBaseHead = rCell.iSnapshotHead;
+		int64_t iBaseOffset = iRollbackOffset;
+		if (rScratch.iInjectedBaseSlot >= 0)
+		{
+			iBaseHead = rScratch.iInjectedBaseSlot;
+			iBaseOffset = 0;
+		}
+		rScratch.outputLayout = ComputeRetention(iBaseHead, iBaseOffset + 1 + rScratch.iReplayWriteCount, iBaseOffset + rScratch.iLastValidatedIndex);
+
+		// Writes past the ring size overwrote the oldest pre-replay slots; drop them from the head.
+		int64_t iExcess = rScratch.outputLayout.iCount - engine::kiNetworkBufferSize;
+		if (iExcess > 0)
+		{
+			rScratch.outputLayout.iHead = SnapshotIndex(rScratch.outputLayout.iHead, iExcess);
+			rScratch.outputLayout.iCount -= iExcess;
+			rScratch.outputLayout.iConfirmedInner -= iExcess;
+		}
 	}
 	else if (rScratch.iLastValidatedIndex == 0)
 	{
@@ -297,9 +316,9 @@ static void ComputeOutputLayout(CoordWork& rWork, int64_t iRollbackOffset)
 		};
 	}
 
-	// An injected full state stays the ring base: a validated index of zero is the injected frame
-	// itself and a negative index validated nothing after it, while index one or higher is a later
-	// replayed frame that supersedes the injection.
+	// A validated index of zero is the injected frame itself and a negative index validated nothing
+	// after it, so the injected full state stays the ring head at confirmed offset zero; from index
+	// one the retention above places head and confirmed offset, never below the injection.
 	if (rScratch.iInjectedBaseSlot >= 0 && rScratch.iLastValidatedIndex <= 0)
 	{
 		rScratch.outputLayout.iHead = rScratch.iInjectedBaseSlot;

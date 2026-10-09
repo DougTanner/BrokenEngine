@@ -4,7 +4,7 @@
 
 #if defined(BT_CLIENT)
 
-#include "Agent/Commands/ClientNetworkFixtures.h"
+#include "Agent/Commands/ClientNetworkHarnessRigs.h"
 #include "File/PackChunks.h"
 #include "Frame/CellStaticData.h"
 #include "Network/NetworkCursor.h"
@@ -88,7 +88,7 @@ Client::~Client()
 
 void Client::ResetAllSlots()
 {
-	ClientNetworkFixtures::Reset(*this);
+	ClientNetworkHarnessRigs::Reset(*this);
 	mSubscriptions.Reset();
 }
 
@@ -553,7 +553,7 @@ void Client::ServerCoordinateUpdateOrResend(std::span<const uint8_t> packetData,
 
 		if (bProcessRoundTripTime)
 		{
-			ClientNetworkFixtures::CaptureStaleUpdate(*this, packetData, rMessage.uiSlotIndex, rMessage.uiEpoch, rMessage.iTick);
+			ClientNetworkHarnessRigs::CaptureStaleUpdate(*this, packetData, rMessage.uiSlotIndex, rMessage.uiEpoch, rMessage.iTick);
 		}
 	};
 
@@ -673,7 +673,7 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = static_cast<uint8_t>(iSlotIndex), .uiEpoch = static_cast<uint16_t>(iEpoch)};
 		NetworkMessages::Write(rWorkbuffer, unsubscribe);
-		if (!ClientNetworkFixtures::ObserveSubscribeAcceptCleanup(*this, unsubscribe.uiSlotIndex, std::ssize(rWorkbuffer.View())))
+		if (!ClientNetworkHarnessRigs::ObserveSubscribeAcceptCleanup(*this, unsubscribe.uiSlotIndex, std::ssize(rWorkbuffer.View())))
 		{
 			NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 		}
@@ -744,7 +744,7 @@ void Client::ServerUnsubscribeAcknowledgement(std::span<const uint8_t> packetDat
 	}
 
 	mSubscriptions.FreeSlot(iSlotIndex);
-	ClientNetworkFixtures::ObserveUnsubscribeAck(*this, iSlotIndex);
+	ClientNetworkHarnessRigs::ObserveUnsubscribeAck(*this, iSlotIndex);
 }
 
 void Client::ServerLoadNotification(std::span<const uint8_t> packetData)

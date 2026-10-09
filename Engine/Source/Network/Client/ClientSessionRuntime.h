@@ -76,6 +76,8 @@ public:
 	// Pass the tick sampled before reconciliation.
 	void ApplyClockCorrection(int64_t iPreReconcileTick);
 	void ResetClock();
+	// The clock reference: -1 exactly when miLatestServerTick < 0, otherwise never below it.
+	int64_t EstimatedLatestServerTick() const;
 
 	game::ClientSession& mrSession;
 	std::unique_ptr<Client> mpClient;
@@ -83,6 +85,8 @@ public:
 	common::Flags<ClientSessionStateFlags> mStateFlags;
 	char mcDiscoveredAddress[16] {};
 	int64_t miLatestServerTick = -1;
+	// Arrival time of miLatestServerTick, backdated by the estimate's lead over that tick when it arrived.
+	std::chrono::steady_clock::time_point mLatestServerTickArrival {};
 	int64_t miClockError = 0;
 	int64_t miClockOffset = 0;
 	int64_t miClockTargetBehind = 0;

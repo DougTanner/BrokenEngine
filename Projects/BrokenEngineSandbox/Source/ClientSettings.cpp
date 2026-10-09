@@ -65,7 +65,7 @@ struct ClientStateSettings
 
 	game::FleetGuid fleetGuid {};
 	int64_t iFocusedShipId = 0;
-	float fCameraEyeHeightTarget = engine::Camera::kfCameraEyeHeightInitial;
+	float fCameraEyeHeightTarget = engine::CameraBase::kfCameraEyeHeightInitial;
 	uint8_t uiPadding[4] {};
 };
 constexpr char kpcClientStatePath[] = "ClientState.bin";
@@ -95,9 +95,9 @@ void LoadClientState()
 		return;
 	}
 
-	if (!std::isfinite(settings.fCameraEyeHeightTarget) || settings.fCameraEyeHeightTarget < engine::kfMinimumEyeHeight || settings.fCameraEyeHeightTarget > engine::Camera::kfEyeHeightMaximum)
+	if (!std::isfinite(settings.fCameraEyeHeightTarget) || settings.fCameraEyeHeightTarget < engine::kfMinimumEyeHeight || settings.fCameraEyeHeightTarget > engine::CameraBase::kfEyeHeightMaximum)
 	{
-		LOG(kDefault, kWarning, "LoadClientState rejected {}: camera eye-height target {} is outside [{}, {}]", kpcClientStatePath, settings.fCameraEyeHeightTarget, engine::kfMinimumEyeHeight, engine::Camera::kfEyeHeightMaximum);
+		LOG(kDefault, kWarning, "LoadClientState rejected {}: camera eye-height target {} is outside [{}, {}]", kpcClientStatePath, settings.fCameraEyeHeightTarget, engine::kfMinimumEyeHeight, engine::CameraBase::kfEyeHeightMaximum);
 		return;
 	}
 

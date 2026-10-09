@@ -40,9 +40,9 @@ f3LightingColor += fSSS * f3WaterSSSColor * f3SunOrMoon;
 
 - Physical scattering / transmittance model (this is an art-directed additive tint)
 - Interaction with the wave-trough height darken (they compose: darken pulls troughs down, SSS lifts crests — complementary, tune together but no code coupling)
-- Foam, caustics, glitter (separate plans)
+- Foam, glitter (separate plans)
 
 ## Notes
 
 - Client-only rendering path; no determinism/CRC exposure.
-- Overlaps in spirit with the existing height term inside the color-noise mix (`f3InPosition.z * fWaterColorHeightInv` in the `f3WaterColor` blend) — that term shifts between two fixed color constants, while SSS adds a tunable sun-coupled tint. If they fight during tuning, note it in Tweaks rather than pre-coupling them.
+- Overlaps in spirit with the existing height term inside the color-noise mix (`f3InPosition.z * fWaterColorHeightInverse` in the `f3WaterColor` blend) — that term shifts between two fixed color constants, while SSS adds a tunable sun-coupled tint. If they fight during tuning, note it in Tweaks rather than pre-coupling them.

@@ -200,6 +200,32 @@ if ($IslandReadiness.SchemaVersion -cne 'broken-engine-island-scene-readiness/v1
 
 This is a criterion-specific gate, not general launch readiness. It holds the client visible and proves a ready client tick plus two stable complete footprint samples.
 
+## Normal launch
+
+For a user request to launch the game for their own play or testing. These are the `## Launch` executables without the harness: no claim, process check, readiness wait, or release, and none of the agent-only arguments (`--agent-port`, `--app-data-directory`, `--log-file`, `--windowed`, hidden windows). The client therefore opens a normal window that takes physical input, its fullscreen state follows the order in [`Engine/Source/AGENTS.md`](../../../../Engine/Source/AGENTS.md) `## Startup and Main Loop`, and both processes use the per-user AppData, so the user's own settings and saves apply. `--loopback-only` stays, as in every same-machine run.
+
+The server is single-instance per machine (a second one shows a modal and exits), so first check that none is running:
+
+```powershell
+Get-Process -Name 'BrokenEngineSandboxServer*' -ErrorAction SilentlyContinue | Select-Object Id, ProcessName
+```
+
+If that lists a process, report it to the user instead of stopping it. Otherwise launch both, substituting the executable names for the compiled configuration as `## Launch` states:
+
+```powershell
+$ROOT = '<absolute adopted worktree>'
+$GameDataDirectory = '<normalized Data path>'
+$Output = Join-Path $ROOT 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output'
+$ServerExe = Join-Path $Output 'BrokenEngineSandboxServer.Debug.exe'
+$ClientExe = Join-Path $Output 'BrokenEngineSandbox.Debug.exe'
+$QuotedData = '"' + $GameDataDirectory + '"'
+$ServerProcess = Start-Process -FilePath $ServerExe -ArgumentList @('--loopback-only', '--data-directory', $QuotedData) -PassThru -ErrorAction Stop
+$ClientProcess = Start-Process -FilePath $ClientExe -ArgumentList @('--loopback-only', '--data-directory', $QuotedData) -PassThru -ErrorAction Stop
+[ordered]@{ serverPid = $ServerProcess.Id; clientPid = $ClientProcess.Id } | ConvertTo-Json -Compress
+```
+
+The client connects as `## Launch` describes. Leave both processes running for the user, who closes them; never quit, stop, or release them. While this server runs, any harness server launch on the machine exits immediately, so a later harness run waits until the user closes it.
+
 ## Durable caveats
 
 - Client weapon-mode requests received during paused or other zero-tick updates and internally queued flagship navigation updates persist until the first advancing update. Client `kClientFleetNavigationDelay` requests apply immediately. To verify load-requeued flagship updates, use `load {"pauseAfterLoad":true}` and inspect `pendingFlagshipUpdateCount` before unpausing.

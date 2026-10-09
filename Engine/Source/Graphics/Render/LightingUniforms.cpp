@@ -1,6 +1,6 @@
 #if defined(BT_CLIENT)
 
-#include "Graphics/EngineCamera.h"
+#include "Graphics/CameraBase.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/HeightLerpWrapperQuartet.h"
 #include "Ui/LightingWrappersBase.h"
@@ -71,7 +71,7 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 	float fCombineTextureHeight = static_cast<float>(gpTextureManager->mRenderTargetTextures.mpCombineTextures[0].mInfo.vkExtent3D.height);
 	const XMFLOAT4& rf4VisibleArea = engine::gpCamera->mf4RenderVisibleArea;
 
-	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::Camera::kfLightingHeadroomMultiplier, engine::gpCamera->mfLightingTexelEyeHeight, fLightingTextureWidth, fLightingTextureHeight, gpSwapchainManager->mfAspectRatio, gFieldOfView.mfCurrent, engine::gpCamera->mVecPosition);
+	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::CameraBase::kfLightingHeadroomMultiplier, engine::gpCamera->mfLightingTexelEyeHeight, fLightingTextureWidth, fLightingTextureHeight, gpSwapchainManager->mfAspectRatio, gFieldOfView.mfCurrent, engine::gpCamera->mVecPosition);
 
 	// Temporal accumulation publishes the current and previous world areas from one refresh epoch; a skip retains both.
 	static LightingTemporalAreaLatch sTemporalAreaLatch {};
@@ -248,10 +248,10 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	rMainLayout.uiWaterNormalIndexTwo = static_cast<uint32_t>(gWaterNormalIndexTwo.Get<int64_t>());
 	rMainLayout.uiWaterNormalIndexThree = static_cast<uint32_t>(gWaterNormalIndexThree.Get<int64_t>());
 	// Normal weights use a fixed fade band from the default eye height to twice that height, with no author controls.
-	// engine::Camera owns the fade endpoint; LerpAtHeight resolves the weights before upload.
-	float fWaterNormalWeightOne = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightOneMinimum.mfCurrent, gLightingSampledNormalsWeightOneMaximum.mfCurrent);
-	float fWaterNormalWeightTwo = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightTwoMinimum.mfCurrent, gLightingSampledNormalsWeightTwoMaximum.mfCurrent);
-	float fWaterNormalWeightThree = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightThreeMinimum.mfCurrent, gLightingSampledNormalsWeightThreeMaximum.mfCurrent);
+	// engine::CameraBase owns the fade endpoint; LerpAtHeight resolves the weights before upload.
+	float fWaterNormalWeightOne = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::CameraBase::kfCameraEyeHeightDefault, engine::CameraBase::kfWaveFadeEndHeight, gLightingSampledNormalsWeightOneMinimum.mfCurrent, gLightingSampledNormalsWeightOneMaximum.mfCurrent);
+	float fWaterNormalWeightTwo = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::CameraBase::kfCameraEyeHeightDefault, engine::CameraBase::kfWaveFadeEndHeight, gLightingSampledNormalsWeightTwoMinimum.mfCurrent, gLightingSampledNormalsWeightTwoMaximum.mfCurrent);
+	float fWaterNormalWeightThree = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::CameraBase::kfCameraEyeHeightDefault, engine::CameraBase::kfWaveFadeEndHeight, gLightingSampledNormalsWeightThreeMinimum.mfCurrent, gLightingSampledNormalsWeightThreeMaximum.mfCurrent);
 	rMainLayout.fWaterNormalWeightOne = fWaterNormalWeightOne;
 	rMainLayout.fWaterNormalWeightTwo = fWaterNormalWeightTwo;
 	rMainLayout.fWaterNormalWeightThree = fWaterNormalWeightThree;
@@ -318,9 +318,9 @@ void RenderLightingMain(int64_t iCommandBuffer)
 	std::memcpy(&rMainLayout.pfWaterSpecularAntialiasingMipmapVariance[2 * shaders::kiWaterSpecularAntialiasingMipTableSize], gpTextureManager->mpfWaterNormalMipVariance[gWaterNormalIndexThree.Get<int64_t>()], shaders::kiWaterSpecularAntialiasingMipTableSize * sizeof(float));
 	// Full-detail reference weights for WATER_SPEC_AA_FADE_HANDOFF: the same LerpAtHeight the live
 	// fWaterNormalWeight* uploads above use, evaluated at the near-camera endpoint height.
-	rMainLayout.fWaterNormalWeightFullOne = engine::LerpAtHeight(engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightOneMinimum.mfCurrent, gLightingSampledNormalsWeightOneMaximum.mfCurrent);
-	rMainLayout.fWaterNormalWeightFullTwo = engine::LerpAtHeight(engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightTwoMinimum.mfCurrent, gLightingSampledNormalsWeightTwoMaximum.mfCurrent);
-	rMainLayout.fWaterNormalWeightFullThree = engine::LerpAtHeight(engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, gLightingSampledNormalsWeightThreeMinimum.mfCurrent, gLightingSampledNormalsWeightThreeMaximum.mfCurrent);
+	rMainLayout.fWaterNormalWeightFullOne = engine::LerpAtHeight(engine::CameraBase::kfCameraEyeHeightDefault, engine::CameraBase::kfCameraEyeHeightDefault, engine::CameraBase::kfWaveFadeEndHeight, gLightingSampledNormalsWeightOneMinimum.mfCurrent, gLightingSampledNormalsWeightOneMaximum.mfCurrent);
+	rMainLayout.fWaterNormalWeightFullTwo = engine::LerpAtHeight(engine::CameraBase::kfCameraEyeHeightDefault, engine::CameraBase::kfCameraEyeHeightDefault, engine::CameraBase::kfWaveFadeEndHeight, gLightingSampledNormalsWeightTwoMinimum.mfCurrent, gLightingSampledNormalsWeightTwoMaximum.mfCurrent);
+	rMainLayout.fWaterNormalWeightFullThree = engine::LerpAtHeight(engine::CameraBase::kfCameraEyeHeightDefault, engine::CameraBase::kfCameraEyeHeightDefault, engine::CameraBase::kfWaveFadeEndHeight, gLightingSampledNormalsWeightThreeMinimum.mfCurrent, gLightingSampledNormalsWeightThreeMaximum.mfCurrent);
 
 	rMainLayout.fLightingWaterReflectedAmount = gLightingWaterReflectedAmount.mfCurrent;
 	rMainLayout.fLightingWaterReflectedNormalBlendWave = gLightingWaterReflectedNormalBlendWave.mfCurrent;

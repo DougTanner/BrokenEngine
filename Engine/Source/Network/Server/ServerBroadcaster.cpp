@@ -6,7 +6,7 @@
 
 #include "Network/Server/ServerTransferManager.h"
 
-#include "Agent/Commands/ServerSimulationFixtures.h"
+#include "Agent/Commands/ServerSimulationHarnessRigs.h"
 #include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"

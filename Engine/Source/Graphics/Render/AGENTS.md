@@ -25,6 +25,7 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
 - Lighting snaps its footprint to the light-deposit grid; shadow snaps to its own world-sized texel grid. Both publish current and previous areas for temporal sampling, and recreation reseeds history from the current area for one frame.
 - Each frame that publishes also copies what it published — camera basis, water origins, and each owner's area pair and history-reset count — into the `gPresentationContinuity` snapshot in `Render.h`, which only the agent probe reads (`../../Agent/AGENTS.md`). A new retained or reduced value that a continuity guarantee covers joins it; a frame that skips rendering leaves it untouched.
 - Smoke and wind spread remap through current and previous world areas. Their enable, disable, recreate, and occupancy paths must clear or drain stale tiles without relying on command-buffer re-recording.
+- Smoke refreshes on its update cadence, or earlier once the live visible area leaves the held smoke area (crop safety, no margin). A skipped frame publishes the held area as both current and previous and zeroes the dilate dispatch, so wind's remap is the identity that frame and the next refresh remaps held to current for both.
 
 ## Area Roles
 

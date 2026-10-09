@@ -12,7 +12,7 @@ Client-only 3D and streaming audio through DirectXTK `AudioEngine`. `AudioManage
 - Each streaming voice reads ahead through three fixed 16 KiB slots. Preserve its request and submit order when a later range completes first, and retry a full File result pool without advancing the slot, cursor, or destination.
 - Keep the current stream and newest fade eligible to request data, cancel older fades' pending reads before demotion, and cancel every pending streaming read before clearing or destroying its voice or resetting the audio graph.
 - Suspend stops XAudio2 processing before clearing voices. Teardown distinguishes voices already destroyed by device loss from voices still owned by the engine.
-- The [Agent audio fixture](../Agent/AGENTS.md) may inspect streaming state and attach non-owning per-voice controls only in client Debug builds; production state remains private elsewhere.
+- The [Agent audio harness rig](../Agent/AGENTS.md) may inspect streaming state and attach non-owning per-voice controls only in client Debug builds; production state remains private elsewhere.
 
 ## Simulation Boundary
 

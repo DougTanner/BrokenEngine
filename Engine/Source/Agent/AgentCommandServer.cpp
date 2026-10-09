@@ -89,7 +89,7 @@ AgentCommandServer::AgentCommandServer(int64_t iPort)
 		ListenerLoop(std::move(stopToken));
 	}, 64 * 1'024));
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
-	AudioStreamingFixture::Attach(*mpAudioStreamingFixture);
+	AudioStreamingHarnessRig::Attach(*mpAudioStreamingHarnessRig);
 #endif
 }
 
@@ -97,9 +97,9 @@ AgentCommandServer::~AgentCommandServer()
 {
 	ClearDeferredResponse();
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
-	mpAudioStreamingFixture->Shutdown();
-	AudioStreamingFixture::Detach(*mpAudioStreamingFixture);
-	mpAudioStreamingFixture.reset();
+	mpAudioStreamingHarnessRig->Shutdown();
+	AudioStreamingHarnessRig::Detach(*mpAudioStreamingHarnessRig);
+	mpAudioStreamingHarnessRig.reset();
 #endif
 	// Request stop, close only the listener under the lock, and wake a pending response wait. The listener owns the
 	// active connection until ServeConnection exits, then performs its one final close before the jthread joins.

@@ -6,7 +6,7 @@
 #if defined(BT_CLIENT)
 #include "Graphics/Managers/TextureUploadManager.h"
 #if defined(BT_DEBUG)
-#include "Agent/Commands/AudioStreamingFixture.h"
+#include "Agent/Commands/AudioStreamingHarnessRig.h"
 #endif
 #endif
 
@@ -748,7 +748,7 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 
 		std::memcpy(buffer.data(), rEntry.data.data(), static_cast<size_t>(rEntry.iLength));
 #if defined(BT_DEBUG)
-		AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillReady, rRequest.miEntryIndex, crc, iOffset, rEntry.iLength, AudioStreamingFixtureQueueState::kReady, rRequest.muiGeneration, false);
+		AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillReady, rRequest.miEntryIndex, crc, iOffset, rEntry.iLength, AudioStreamingHarnessRigQueueState::kReady, rRequest.muiGeneration, false);
 #endif
 		uint64_t uiFreeOwnership = PackAudioReadOwnership(AudioChunkReadState::kFree, rRequest.muiGeneration);
 		if (!rEntry.uiOwnership.compare_exchange_strong(uiOwnership, uiFreeOwnership, std::memory_order_acq_rel))
@@ -834,14 +834,14 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 			continue;
 		}
 #if defined(BT_DEBUG)
-		AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillQueued, i, crc, iOffset, buffer.size(), AudioStreamingFixtureQueueState::kQueued, uiGeneration, false);
+		AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillQueued, i, crc, iOffset, buffer.size(), AudioStreamingHarnessRigQueueState::kQueued, uiGeneration, false);
 #endif
 		mLoader.PublishWake();
 		return ChunkReadResult::kPending;
 	}
 
 #if defined(BT_DEBUG)
-	AudioStreamingFixture::CountRetry();
+	AudioStreamingHarnessRig::CountRetry();
 #endif
 	return ChunkReadResult::kRetry;
 }
@@ -875,7 +875,7 @@ void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 		if (rEntry.uiOwnership.compare_exchange_weak(uiOwnership, uiCancelledOwnership, std::memory_order_acq_rel))
 		{
 #if defined(BT_DEBUG)
-			AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kRefillCancelled, rRequest.miEntryIndex, rRequest.muiCrc, rRequest.miOffset, rRequest.miLength, static_cast<AudioStreamingFixtureQueueState>(eState), uiRequestGeneration, eState != AudioChunkReadState::kLoading);
+			AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillCancelled, rRequest.miEntryIndex, rRequest.muiCrc, rRequest.miOffset, rRequest.miLength, static_cast<AudioStreamingHarnessRigQueueState>(eState), uiRequestGeneration, eState != AudioChunkReadState::kLoading);
 #endif
 			break;
 		}
@@ -959,11 +959,9 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 	int64_t iOffset = rEntry.iOffset;
 	int64_t iLength = rEntry.iLength;
 #if defined(BT_DEBUG)
-	AudioStreamingFixturePartition ePartition = iThreadIndex == 0
-		? AudioStreamingFixturePartition::kLoader0
-		: AudioStreamingFixturePartition::kLoader1;
-	AudioStreamingFixture::Record(ePartition, AudioStreamingFixturePhase::kRefillLoading, iIndex, crc, iOffset, iLength, AudioStreamingFixtureQueueState::kLoading, uiGeneration, false);
-	bool bHeld = AudioStreamingFixture::HoldAudioRead(crc, iOffset, iLength, iIndex, uiGeneration);
+	AudioStreamingHarnessRigPartition ePartition = iThreadIndex == 0 ? AudioStreamingHarnessRigPartition::kLoader0 : AudioStreamingHarnessRigPartition::kLoader1;
+	AudioStreamingHarnessRig::Record(ePartition, AudioStreamingHarnessRigPhase::kRefillLoading, iIndex, crc, iOffset, iLength, AudioStreamingHarnessRigQueueState::kLoading, uiGeneration, false);
+	bool bHeld = AudioStreamingHarnessRig::HoldAudioRead(crc, iOffset, iLength, iIndex, uiGeneration);
 #endif
 
 	const LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
@@ -1051,8 +1049,8 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 		VERIFY_SUCCESS(rEntry.uiOwnership.compare_exchange_strong(uiExpectedOwnership, uiFreeOwnership, std::memory_order_acq_rel));
 	}
 #if defined(BT_DEBUG)
-	AudioStreamingFixture::Record(ePartition, bCurrent ? AudioStreamingFixturePhase::kRefillReady : AudioStreamingFixturePhase::kRefillCancelled, iIndex, crc, iOffset, iLength, bCurrent ? AudioStreamingFixtureQueueState::kReady : AudioStreamingFixtureQueueState::kFree, uiGeneration, !bCurrent);
-	AudioStreamingFixture::CompleteAudioRead(bHeld);
+	AudioStreamingHarnessRig::Record(ePartition, bCurrent ? AudioStreamingHarnessRigPhase::kRefillReady : AudioStreamingHarnessRigPhase::kRefillCancelled, iIndex, crc, iOffset, iLength, bCurrent ? AudioStreamingHarnessRigQueueState::kReady : AudioStreamingHarnessRigQueueState::kFree, uiGeneration, !bCurrent);
+	AudioStreamingHarnessRig::CompleteAudioRead(bHeld);
 #endif
 	mLoader.NotifyChunkCompletion();
 }

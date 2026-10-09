@@ -32,7 +32,7 @@ and parsing only.
    repository skill, use this worktree as the lookup directory. For an
    uninstalled package, place a copy under a temporary lookup directory at
    `.agents/skills/<name>/`. Done when the lookup directory contains only the
-   intended fixture changes.
+   intended test changes.
 2. Create an empty temporary state directory and start `codex app-server
    --stdio` with `CODEX_HOME` set only for that process. Keep its input open.
    Done when the process accepts JSON messages or its startup failure is
@@ -53,7 +53,7 @@ and parsing only.
    name and path with `enabled: true` and no target-package error. Record
    unrelated errors separately. Done when the target has a bounded loader
    verdict backed by the response.
-5. Stop the process and remove only the temporary state and fixture paths made
+5. Stop the process and remove only the temporary state and test paths made
    for this check. Done when those paths are gone and personal configuration
    and credentials remain untouched.
 

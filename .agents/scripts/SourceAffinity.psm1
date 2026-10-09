@@ -74,10 +74,12 @@ function Get-CodeText
 	return $builder.ToString()
 }
 
-# Implements the SKILL.md whole-file affinity rule literally: skip the BOM, whitespace,
-# comment, '#pragma once' and include prologue; require the exact guard form as the first
-# substantive directive; track nesting to find that guard's matching '#endif'; require no
-# substantive content after it.
+# Implements the whole-file affinity rule of the VisualStudio2026 AGENTS.md vcxproj File Inclusion
+# Rules literally: skip the BOM, whitespace, comment, '#pragma once' and include prologue; require
+# '#if defined(BT_CLIENT)' or '#if defined(BT_SERVER)' as the first substantive directive, optionally
+# followed by further ' && defined(NAME)' or ' && !defined(NAME)' terms, so the guard is false in
+# the opposite build; track nesting to find that guard's matching '#endif'; require no substantive
+# content after it.
 function Resolve-FileAffinity
 {
 	param([string] $Text)
@@ -181,20 +183,16 @@ function Resolve-FileAffinity
 
 	$guardLine = $codeLines[$firstSubstantive]
 	$guarded = ''
-	if ($guardLine -ceq '#if defined(BT_CLIENT)')
+	if ($guardLine -cmatch '^#if defined\(BT_(CLIENT|SERVER)\)( && !?defined\(\w+\))*$')
 	{
-		$guarded = 'client'
-	}
-	elseif ($guardLine -ceq '#if defined(BT_SERVER)')
-	{
-		$guarded = 'server'
+		$guarded = $Matches[1].ToLowerInvariant()
 	}
 	else
 	{
 		return [ordered]@{
 			affinity = 'shared'
 			code = 'affinity.no-whole-file-guard'
-			detail = 'The first substantive directive is not an exact BT_CLIENT/BT_SERVER guard.'
+			detail = 'The first substantive directive is not a recognized BT_CLIENT/BT_SERVER guard.'
 		}
 	}
 
@@ -241,7 +239,7 @@ function Resolve-FileAffinity
 	return [ordered]@{
 		affinity = $guarded
 		code = "affinity.whole-file-$guarded-guard"
-		detail = 'The exact guard is the first substantive directive and its matching #endif is last.'
+		detail = 'The recognized guard is the first substantive directive and its matching #endif is last.'
 	}
 }
 

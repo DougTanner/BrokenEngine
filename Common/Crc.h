@@ -72,7 +72,6 @@ constexpr crc_t Crc(std::string_view data)
 	return crc;
 }
 
-#pragma warning(suppress: 26497) // consteval is stricter than constexpr
 consteval crc_t CrcConsteval(std::string_view data)
 {
 	return Crc(data);

@@ -96,6 +96,7 @@ struct ExplosionType
 	uint32_t uiBaseParticleCount = 0;
 	common::crc_t particleCrc = common::CrcConsteval(R"(Textures\Particles\[BC4]Long\5.png)");
 	uint32_t uiParticleColor = 0xFF0000FF;
+	uint32_t uiParticleColorEnd = 0x800000FF;
 
 	float fParticlePositionJitter = 0.5f;
 	float fParticleVelocityMinimum = 1.0f;
@@ -129,7 +130,7 @@ struct ExplosionType
 	float fSecondaryPositionMinimum = 0.25f;
 	float fSecondaryPositionJitter = 1.0f;
 
-	// Per-type runtime tweak multipliers (Particles tab). Null on server, optional on client.
+	// Per-type runtime tweak multipliers (Particles tab). Optional; null means unscaled.
 	Wrapper* pParticleWidthScale = nullptr;
 	Wrapper* pParticleLengthScale = nullptr;
 	Wrapper* pParticleLengthSpreadScale = nullptr;

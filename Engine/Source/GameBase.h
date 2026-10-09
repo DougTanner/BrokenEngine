@@ -7,7 +7,6 @@
 
 #if defined(BT_CLIENT)
 #include "Frame/Frame.h"
-#include "Graphics/Camera.h"
 #endif
 
 namespace game
@@ -155,8 +154,8 @@ constexpr int64_t SnapshotIndex(int64_t iHead, int64_t iLogical)
 // tail as an extra committed tick of starvation cushion), so every rendered position lies between
 // two already-simulated ticks and velocity changes never require extrapolation. Raise this to
 // absorb more jitter at the cost of visual latency (31.25 ms per tick at 32 Hz). Drives the
-// retention floor in ReconcileReplayCrc's fast-path and the source index in
-// GameBase::RenderFrame — change here and the reconcile/render pair move together.
+// reconcile retention floor (ComputeRetention, applied by the CRC fast path and full replay) and
+// the source index in GameBase::RenderFrame — change here and the reconcile/render pair move together.
 inline constexpr int64_t kiRenderBehindTicks = 2;
 
 // Standard-menu contract. The engine owns the six standard menu screens (Ui/Screens); this is the

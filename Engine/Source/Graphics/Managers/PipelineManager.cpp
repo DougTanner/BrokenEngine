@@ -246,7 +246,7 @@ void PipelineManager::CreateSmokeWindPipelines()
 		mpPipelines[rDescription.ePipeline].Create(
 		{
 			.name = rDescription.name,
-			.flags = {PipelineFlags::kCompute},
+			.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 			.ppShaders = {&mShaders.at(rDescription.shaderCrc)},
 			.descriptorInfos =
 			{

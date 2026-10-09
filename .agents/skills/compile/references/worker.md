@@ -323,6 +323,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
   Local-generation path and the wrapper bootstrap's primary run are the only
   exceptions. Every invocation passes `EnableClangTidyCodeAnalysis=false` and
   `RunCodeAnalysis=false`; `-Prefast` is the sole exception to
-  `RunCodeAnalysis=false`. VS2026 clang-tidy crashes on this codebase.
+  `RunCodeAnalysis=false`. The clang-tidy reason is in
+  `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md`
+  `## Build Configuration`.
 - A `builder` executing this skill runs the build itself and never dispatches
   another agent.

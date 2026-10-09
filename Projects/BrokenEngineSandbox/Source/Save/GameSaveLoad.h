@@ -7,7 +7,7 @@ namespace game
 
 struct ReplayStagedMeta;
 
-// The game half of the engine replay lifetime: metadata, replay-only game fixtures, and client resynchronization.
+// The game half of the engine replay lifetime: metadata, replay-only game harness rigs, and client resynchronization.
 bool WriteReplayMetadata(const engine::FileFlags_t& rFlags, const std::filesystem::path& rFilename);
 bool ReadReplayMetadata(const engine::FileFlags_t& rFlags, const std::filesystem::path& rFilename, ReplayStagedMeta& rStagedMetadata);
 void AdoptReplayMetadata(const ReplayStagedMeta&& rStagedMetadata);

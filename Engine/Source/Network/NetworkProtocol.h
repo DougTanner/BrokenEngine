@@ -70,13 +70,18 @@ inline constexpr int64_t kiClockSnapThreshold = 28; // |clockError| >= this (tic
 // interarrival deviation; the one-way tail half-width is roughly 1.5x that mean, motivating the 3x factor. The safety
 // term is specified in wall-clock microseconds.
 inline constexpr int64_t kiJitterSafetyMicroseconds = 109'375;
-// Slack between the clock-servo target (latestServerTick - miCurrentTargetBehind) and the hard sim
+// Slack between the clock-servo target (EstimatedLatestServerTick() - miCurrentTargetBehind) and the hard sim
 // ceiling in GameBase::ClientUpdate. The servo steers toward the bare target so the sim never rests
 // against the ceiling; the slack absorbs per-packet arrival jitter and the single-tick targetBehind
 // raise step in EvaluateClock (which lowers the ceiling by one tick per call) without stalling the sim.
 // Must stay below EvaluateClock's |error| >= 4 aggressive-correction threshold so steady state never
 // triggers it.
 inline constexpr int64_t kiSimulationCeilingSlackTicks = 3;
+// Cap on ClientSessionRuntime::EstimatedLatestServerTick's lead over the latest received server tick. It covers the
+// longest measured arrival gap (about 15 ticks at kChina: an 11-packet drop run plus the 100 ms one-way delay spread)
+// and stays well below kiClockSnapThreshold, so a real server stop speculates at most this plus
+// kiSimulationCeilingSlackTicks past the latest received tick without a clock snap.
+inline constexpr int64_t kiMaximumEstimatedServerTickLead = 16;
 inline constexpr int64_t kiMaximumPacketSize = 64 * 1'024;
 inline constexpr int64_t kiMaximumStatusChangesPerCell = 1'024;
 

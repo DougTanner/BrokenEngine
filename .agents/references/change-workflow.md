@@ -12,16 +12,16 @@ This file, `.agents/references/change-workflow.md`, carries the Change Workflow,
 
 ### Delegation roles
 
-This table is the authoritative spawned-agent routing policy; role definitions and the Codex TOMLs enforce it. Skills name a role and describe the work. Definitions: `.claude/agents/<role>.md` and `.opencode/agent/<role>.md`. Codex resolves a role through the Model column — `.codex/agents/` is model-named.
+This table is the authoritative spawned-agent routing policy; role definitions and the Codex TOMLs enforce it. Skills name a role and describe the work. Definitions: `.claude/agents/<role>.md` and `.opencode/agent/<role>.md`. Codex resolves a role through the Model column — `.codex/agents/` is model-named, and the ChatGPT Codex line below the table names any exception.
 
 | `subagent_type` | Model | Effort | Work |
 | --- | --- | --- | --- |
 | `planner` | Fable | medium | Plans, design |
 | `reviewer` | Opus | medium | Every independent findings-only review and audit except `/comment-review`; adversarial review that tries to disprove the change |
-| `implementer` | Opus | medium | Preparation, implementation, propagation, docs, plans, harness, finalization |
+| `implementer` | Opus | high | Preparation, implementation, propagation, docs, plans, harness, finalization |
 | `researcher` | Opus | medium | Research requiring judgment; approach options for /plan-alternatives |
-| `locator` | Sonnet | xhigh | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links, never summaries |
-| `builder` | Sonnet | xhigh | `/compile`, which owns the return contract |
+| `locator` | Haiku | high | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links, never summaries |
+| `builder` | Haiku | high | `/compile`, which owns the return contract |
 | `mechanic` | Sonnet | xhigh | Checklist edits — `/code-style-review`, `/update-vcxproj`; the findings-only checklist review `/comment-review` |
 
 - Delegate by `subagent_type`; an ad-hoc `model:` cannot lock in effort. On Claude only, a documented host-unavailability fallback to `general-purpose` may pass `model:` and runs without a locked-in effort
@@ -29,7 +29,7 @@ This table is the authoritative spawned-agent routing policy; role definitions a
 - Host plan mode never substitutes for Change Workflow steps: a plan produced there still gets Step 3's `/plan-audit` (and the Tier-3 additions) before implementation
 - Every independent findings-only review or audit the table above assigns to `reviewer` runs as that subagent (`.claude/agents/reviewer.md`), including `/next-plan-review`, which runs directly in one fresh reviewer. `/comment-review` remains the `mechanic` exception; same-context `/implement-plan` and `/update-claude-docs` audits remain with their implementer; and `/coherence-review` may make only the narrow caller-authorized meaning-preserving wording and formatting fixes its worker contract allows, followed by that contract's self-check. Do not follow review findings blindly. Use judgement on each one: accept it when the failure is real and reachable, and be especially careful with findings that add guards, options, or machinery for cases nobody has observed (YAGNI and over-engineering).
 
-ChatGPT Codex: Fable -> Astra (gpt-6-astra medium); Opus -> Sol (gpt-6.1-sol medium); Sonnet -> Luna (gpt-6-luna max).
+ChatGPT Codex: Fable -> Astra (gpt-6-astra medium); Opus -> Sol (gpt-6.1-sol medium); Sonnet -> Luna (gpt-6-luna max); Haiku -> Luna (gpt-6-luna max, through `sonnet.toml`).
 OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no effort mapping.
 
 ## Main-session conduct
@@ -48,6 +48,7 @@ OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no ef
 - Non-trivial ties (two viable approaches, neither architectural): fan out `researcher` subagents to validate each, compare pros/cons, then pick the simplest good solution.
 - Architectural decisions (new system shape, public API, data layout, threading model): stop and ask the user, presenting the problem, proposed solutions, and pros/cons of each.
 - Rare races and hand-edited files that have never been seen and have no named trigger: never a cost when comparing options and never a user question; treat a race as impossible or ASSERT it. Trust-boundary validation (`.agents/references/cpp-conventions.md`) still applies.
+- Questions a build, an existing harness command, or a code read settles: settle them that way, through the role that runs it, and never ask the user.
 
 <!-- session-context-part: Change Workflow, Steps 1-5 (continues in the next part) -->
 ## IMPORTANT: Change Workflow (YOU MUST follow this when changing anything tracked in this repository)
@@ -124,7 +125,7 @@ A path nothing reaches today (a rejection, ASSERT, or recovery path no existing 
 <!-- session-context-part: Change Workflow, Steps 6-9, Convergence, and Risk tiers (continued from the previous part) -->
 #### Step 6 — Review and resolve correctness
 
-Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs after them; `/verify-external-claims` runs whenever a review or `/resolve-findings` handoff raises requests, before main decides the dependent finding or resolution; `/resolve-findings` runs after each finding main accepts, followed by re-review and retest of the affected regions only; a second round needs a reproducible blocker.
+Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs after them; `/verify-external-claims` runs whenever a review or `/resolve-findings` handoff raises requests, before main decides the dependent finding or resolution; `/resolve-findings` runs after each finding main accepts, followed by re-review and retest of the affected regions only; a second round needs a reproducible blocker; `/external-diagnose-bug` runs before any further `/resolve-findings` attempt on a cause whose fix failed its retest, and its proven cause returns to `/resolve-findings` or a plan.
 
 - fresh `reviewer` runs `/repo-code-review` — when the change touches C++.
 - fresh `reviewer` runs `/glsl-review` — when the change touches shaders.
@@ -134,6 +135,7 @@ Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs
 - `reviewer` runs `/adversarial-review` — Tier 3 always; optional at any tier for one concrete unresolved hypothesis.
 - main runs `/verify-external-claims`, dispatching one `locator` as its evidence worker — for the external claims a review or `/resolve-findings` handoff raises.
 - separate `implementer` runs `/resolve-findings` — whenever main accepts a finding.
+- `implementer` runs `/external-diagnose-bug` — when a fix fails its retest.
 
 Main dispatches one fresh `reviewer` per changed artifact type, plus the `mechanic` for `/comment-review`, scoped to the changed bytes and the rules they touch. Scope, minimality, and simplicity checks run inside each Tier 2+ review; there is no separate scope dispatch. Main decides each finding once.
 

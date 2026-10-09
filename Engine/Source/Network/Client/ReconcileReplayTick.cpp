@@ -270,14 +270,6 @@ void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iMaxim
 			++rScratch.profiling.iKnockOnReplayTicks;
 		}
 	}
-
-	// Record the replay output layout with the confirmed frame at its head. Index zero belongs to an
-	// injected full state, whose slot ComputeOutputLayout selects instead.
-	if (rScratch.iLastValidatedIndex > 0)
-	{
-		rScratch.outputLayout.iHead = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iLastValidatedIndex - 1);
-		rScratch.outputLayout.iConfirmedInner = 0;
-	}
 }
 
 // Forward ticks incorporate available server StatusChanges but leave their updates buffered.

@@ -1,7 +1,7 @@
 #include "Agent/AgentCommands.h"
 
-#include "Agent/Commands/CollectionLayoutCapacityFixture.h"
-#include "Agent/Commands/RegistryFixture.h"
+#include "Agent/Commands/CollectionLayoutCapacityHarnessRig.h"
+#include "Agent/Commands/RegistryHarnessRig.h"
 #include "Game.h"
 
 #if defined(BT_CLIENT)
@@ -19,15 +19,15 @@ void ExecuteAgentCommand(std::string_view command, const nlohmann::json& rParame
 	}
 
 	// Game-owned commands reachable on both endpoints dispatch before the side-specific fallthrough.
-	if (command == "collection_layout_capacity_fixture")
+	if (command == "collection_layout_capacity_harness_rig")
 	{
-		CommandCollectionLayoutCapacityFixture(rParameters, rResult);
+		CommandCollectionLayoutCapacityHarnessRig(rParameters, rResult);
 		return;
 	}
 
-	if (command == "registry_fixture")
+	if (command == "registry_harness_rig")
 	{
-		CommandRegistryFixture(rParameters, rResult);
+		CommandRegistryHarnessRig(rParameters, rResult);
 		return;
 	}
 

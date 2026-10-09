@@ -69,8 +69,9 @@ struct CoordScratch
 	int64_t iReplayWriteHead = 0;
 	int64_t iReplayWriteCount = 0;
 	int64_t iLastValidatedIndex = -1;
-	// Physical slot of a full state injected during this reconcile, or -1. It is the authoritative
-	// output-ring base until a later validated replay frame supersedes it.
+	// Physical slot of a full state injected during this reconcile, or -1. ComputeOutputLayout bases
+	// the output ring on it: it is the head and confirmed frame when validation reaches no later
+	// replayed frame, and retention never goes below it when one is validated.
 	int64_t iInjectedBaseSlot = -1;
 	int64_t iNewConfirmedTick = -1;
 	RingLayout outputLayout;

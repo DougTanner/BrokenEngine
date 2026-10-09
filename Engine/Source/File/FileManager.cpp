@@ -333,7 +333,7 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 
 	Sha256Hasher hasher;
 	auto bufferAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<std::byte*>(64 * 1'024);
-	std::span<std::byte> buffer(static_cast<std::byte*>(bufferAllocation.mpData), 64 * 1'024);
+	std::span<std::byte> buffer(bufferAllocation.mpData, 64 * 1'024);
 	int64_t iByteCount = 0;
 	for (;;)
 	{

@@ -5,7 +5,7 @@
 #if defined(BT_CLIENT)
 #include "Graphics/Managers/TextureUploadManager.h"
 #if defined(BT_DEBUG)
-#include "Agent/Commands/AudioStreamingFixture.h"
+#include "Agent/Commands/AudioStreamingHarnessRig.h"
 #endif
 #endif
 
@@ -90,7 +90,7 @@ void PackChunkLoader::RequestChunkLoad(std::span<const common::crc_t> crcs, Load
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
 				if (common::gpMultithreading->IsMainThread())
 				{
-					AudioStreamingFixture::Record(AudioStreamingFixturePartition::kMain, AudioStreamingFixturePhase::kExistingQueued, std::numeric_limits<uint32_t>::max(), crc, 0, rLazyChunk.iDataSize, AudioStreamingFixtureQueueState::kQueued, 0, false);
+					AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kExistingQueued, std::numeric_limits<uint32_t>::max(), crc, 0, rLazyChunk.iDataSize, AudioStreamingHarnessRigQueueState::kQueued, 0, false);
 				}
 #endif
 				bAddedAny = true;
@@ -158,20 +158,12 @@ void PackChunkLoader::ResetChunkRangeReloadState(common::crc_t crc, int64_t iOff
 	std::unique_lock lock(mQueueMutex);
 	LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(crc);
 	ChunkRangeReloadState eState = rLazyChunk.eRangeReloadState.value.load(std::memory_order_acquire);
-	if (eState == ChunkRangeReloadState::kPending)
-	{
-		ASSERT(false); // A pending range can still be writing into the lazy pool.
-		return;
-	}
+	ASSERT(eState != ChunkRangeReloadState::kPending); // A pending range can still be writing into the lazy pool.
 	if (eState == ChunkRangeReloadState::kIdle)
 	{
 		return;
 	}
-	if (rLazyChunk.iRangeReloadOffset != iOffset || rLazyChunk.iRangeReloadLength != iLength)
-	{
-		ASSERT(false); // A consumer may only reset its own completed request.
-		return;
-	}
+	ASSERT(rLazyChunk.iRangeReloadOffset == iOffset && rLazyChunk.iRangeReloadLength == iLength); // A consumer may only reset its own completed request.
 
 	rLazyChunk.iRangeReloadOffset = 0;
 	rLazyChunk.iRangeReloadLength = 0;
@@ -200,7 +192,7 @@ void PackChunkLoader::WaitForLoadersIdle()
 	// Drain before the all-texture reset: a late kUploading store would escape the reset, and RequestChunkLoad skips
 	// states >= kDiskLoaded, leaving that texture permanently unrequested.
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
-	AudioStreamingFixture::PrepareLoaderDrain();
+	AudioStreamingHarnessRig::PrepareLoaderDrain();
 #endif
 	std::unique_lock lock(mQueueMutex);
 	LOG(kLoading, kInfo, "PackChunks loader drain begin queued={} active={}", mRequestQueue.size(), miActiveLoadJobs);
@@ -249,7 +241,7 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 			bool bAudioWork = false;
 #endif
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
-			if (AudioStreamingFixture* pFixture = gpAttachedAudioStreamingFixture.load(std::memory_order_acquire); pFixture != nullptr && pFixture->meStagingOwner.load(std::memory_order_seq_cst) != AudioStreamingFixture::StagingOwner::kNone)
+			if (AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire); pHarnessRig != nullptr && pHarnessRig->meStagingOwner.load(std::memory_order_seq_cst) != AudioStreamingHarnessRig::StagingOwner::kNone)
 			{
 				bExistingWork = false;
 				bRealtimeWork = false;
@@ -311,7 +303,7 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 		if (!bAudioRead)
 		{
 			const LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(loadRequest.crc);
-			AudioStreamingFixture::Record(iThreadIndex == 0 ? AudioStreamingFixturePartition::kLoader0 : AudioStreamingFixturePartition::kLoader1, AudioStreamingFixturePhase::kExistingComplete, std::numeric_limits<uint32_t>::max(), loadRequest.crc, loadRequest.iOffset, loadRequest.eKind == LoadRequestKind::kWholeChunk ? rLazyChunk.iDataSize : loadRequest.iLength, AudioStreamingFixtureQueueState::kReady, 0, false);
+			AudioStreamingHarnessRig::Record(iThreadIndex == 0 ? AudioStreamingHarnessRigPartition::kLoader0 : AudioStreamingHarnessRigPartition::kLoader1, AudioStreamingHarnessRigPhase::kExistingComplete, std::numeric_limits<uint32_t>::max(), loadRequest.crc, loadRequest.iOffset, loadRequest.eKind == LoadRequestKind::kWholeChunk ? rLazyChunk.iDataSize : loadRequest.iLength, AudioStreamingHarnessRigQueueState::kReady, 0, false);
 		}
 #endif
 

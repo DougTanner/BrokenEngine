@@ -15,7 +15,7 @@ function Invoke-CodexWorktree([string] $ReattachWorktree) {
 	$repositoryRoot = [System.IO.Path]::GetFullPath($repositoryRoot.Trim())
 	$startArguments = @{
 		Client = 'codex'; RepositoryRoot = $repositoryRoot
-		ClientArguments = @('--no-daemon', '--dangerously-bypass-approvals-and-sandbox')
+		ClientArguments = @('--no-daemon', '--dangerously-bypass-approvals-and-sandbox', '--dangerously-bypass-hook-trust')
 	}
 	if (-not [string]::IsNullOrWhiteSpace($ReattachWorktree)) { $startArguments.ReattachWorktree = $ReattachWorktree }
 	& (Join-Path $repositoryRoot '.agents\scripts\Start-AgentWorktreeSession.ps1') @startArguments

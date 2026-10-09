@@ -7,7 +7,7 @@
 #include "Network/Server/ServerTransferManager.h"
 #include "Network/NetworkCursor.h"
 
-#include "Agent/Commands/ServerSimulationFixtures.h"
+#include "Agent/Commands/ServerSimulationHarnessRigs.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/ServerCellStats.h"
 #include "Network/Server/ServerClientManager.h"
@@ -35,7 +35,7 @@ ServerSession::ServerSession()
 
 ServerSession::~ServerSession()
 {
-	DetachServerSimulationFixtures(*this);
+	DetachServerSimulationHarnessRigs(*this);
 	mpRuntime.reset();
 	gpServerSession = nullptr;
 }

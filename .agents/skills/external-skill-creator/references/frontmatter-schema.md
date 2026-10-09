@@ -115,19 +115,20 @@ The mechanical command accepts exactly one target:
 pwsh -NoProfile -File .agents/skills/external-skill-creator/scripts/Validate-Skill.ps1 -Path <skill-directory-or-SKILL.md>
 ```
 
-Repository targets must be below `.agents/skills/`. Pass `-Fixture` only for a disposable external fixture.
+Repository targets must be below `.agents/skills/`. Pass `-AllowOutsideSkills` only for a disposable external test package.
 
 - `VALID <path>` with exit `0`: every mechanical check passed.
 - One or more line-ordered `INVALID <path>:<line> <code>: <message>` diagnostics with exit `1`: target content is invalid.
 - `SETUP_ERROR <code>: <message>` with exit `2`: invocation, path resolution, file read, or internal validation failed.
 
 For validator changes, create disposable packages under a temporary directory;
-never track fixtures. Require `VALID`/0 from valid main-session and subagent
-`-Fixture` packages; `INVALID`/1 from main-session section misordering and
-subagent section misplacement;
+never track test packages. Require `VALID`/0 from valid main-session and
+subagent `-AllowOutsideSkills` packages; `INVALID`/1 from main-session section
+misordering and subagent section misplacement;
 `VALID`/0 with paired `context` and `agent` metadata in each shape;
 `INVALID`/1 with `RELATIONSHIP001` for an incomplete pair; `INVALID`/1 after
-corrupting a known field; `INVALID`/1 carrying `HANDOFF001` from a fixture whose
-`## Handoff` fence contains a `Status:` line; `INVALID`/1 for broken bundled
-links and off-contract handoff vocabulary; `SETUP_ERROR`/2 for nonexistent and
-out-of-scope targets; and `VALID`/0 from the repository self-check.
+corrupting a known field; `INVALID`/1 carrying `HANDOFF001` from a test
+package whose `## Handoff` fence contains a `Status:` line; `INVALID`/1 for
+broken bundled links and off-contract handoff vocabulary; `SETUP_ERROR`/2 for
+nonexistent and out-of-scope targets; and `VALID`/0 from the repository
+self-check.

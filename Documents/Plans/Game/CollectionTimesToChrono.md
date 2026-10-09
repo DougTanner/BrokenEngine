@@ -23,13 +23,13 @@ Time parameters: `CollectionController.h:58,87,99,135` (`fElapsedTime`, `fCurren
 
 Seed time locals: `CollectionController.h:77,151`; `Explosions.cpp:205,212-213,231,246,249`; `WindRadialsUpdate.cpp:26,35-36,50`; `MissilesUpdate.cpp:61,68,105,117,119`; `Players.cpp:436,465,471-472,519,675,690-691,696-698,700-703`; `PlayersNavigation.cpp:60,281,457`; `Spaceships.cpp:259,262,273,276,581,599-601`; `SpaceshipsNavigation.cpp:43,116,138`. These are the starting set, not the boundary. The selection rule below is the boundary.
 
-Consumers outside the collection directories that read a migrated column: `Engine/Source/Audio/StaticVoices.cpp:456`; `MissilesRender.cpp:103-111`; `PlayersRender.cpp:85,231-233,274`; `SpaceshipsRender.cpp:116,163-165,195`; `Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:403`; `Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsServerQueries.cpp:111`; `Projects/BrokenEngineSandbox/Source/Agent/Commands/CollectionLayoutCapacityFixture.cpp:47-68`; `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerFrameEdit.cpp`; the generated `Projects/BrokenEngineSandbox/Source/Agent/Commands/AgentFieldNames.h`.
+Consumers outside the collection directories that read a migrated column: `Engine/Source/Audio/StaticVoices.cpp:456`; `MissilesRender.cpp:103-111`; `PlayersRender.cpp:85,231-233,274`; `SpaceshipsRender.cpp:116,163-165,195`; `Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp:403`; `Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsServerQueries.cpp:111`; `Projects/BrokenEngineSandbox/Source/Agent/Commands/CollectionLayoutCapacityHarnessRig.cpp:47-68`; `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerFrameEdit.cpp`; the generated `Projects/BrokenEngineSandbox/Source/Agent/Commands/AgentFieldNames.h`.
 
 ### Serialization, CRC, and copy mechanics
 
 - Element-type agnostic, no constraint: `MultiCrc`, `MultiWrite`, and `MultiRead` (`Engine/Source/Frame/Collections/Collection.h:28-70`) hash, write, and read each column as raw bytes through `common::Crc`/`Write`/`Read` over `std::span<const T>` (`Common/Crc.h:84-88`, `Common/Serialization.h:81-110`). Allocation, copy, and row copy (`CollectionMemory.h:57-87,226-238`) `memcpy` raw elements. They require only `std::is_trivially_copyable_v` and `alignof <= 64` (`CollectionMemory.h:62-63,76-77,229`). `std::chrono::duration<float>` holds exactly one `float`, so it satisfies both. Its object representation is the same 4 bytes as the `float` it replaces, so the CRC, save, and wire bytes of every row are unchanged.
 - Constraint 1, difference logging: `common::LogDifference` (`Common/Log/LogDifference.h:28-40`) routes only `float`/`double` to the allocation-free `Wb` formatter. A `duration<float>` would fall to the default heap-allocating `std::format` path. So the `LogDifferences` call sites pass `.count()` on both operands (`Explosions.cpp:274,282`, `Players.cpp:805` and the other time-column rows there, `Spaceships.cpp:656` and peers, `Missiles.cpp:534` and peers). `Common/` stays unchanged.
-- Constraint 2, the `edit_frame` agent command: `ServerFrameEdit.cpp` `ReadElement` has no `duration<float>` branch and ends in `static_assert(false)` (`:76-120`). Its array-column branch `static_assert`s a `float` element (`:198`) and assigns `FloatFromValue` (`:206`), and `explosions` `pfTrailTimes` is an editable array column. The change adds a `std::chrono::duration<float>` branch to `ReadElement` assigning `std::chrono::duration<float>(FloatFromValue(rValue, name))`, which mirrors `ServerSimulationFixtures.cpp:332-334`. Change the array branch's `static_assert` and assignment so they accept a `duration<float>` element the same way. The JSON value form stays a finite number of seconds.
+- Constraint 2, the `edit_frame` agent command: `ServerFrameEdit.cpp` `ReadElement` has no `duration<float>` branch and ends in `static_assert(false)` (`:76-120`). Its array-column branch `static_assert`s a `float` element (`:198`) and assigns `FloatFromValue` (`:206`), and `explosions` `pfTrailTimes` is an editable array column. The change adds a `std::chrono::duration<float>` branch to `ReadElement` assigning `std::chrono::duration<float>(FloatFromValue(rValue, name))`, which mirrors `ServerSimulationHarnessRigs.cpp:332-334`. Change the array branch's `static_assert` and assignment so they accept a `duration<float>` element the same way. The JSON value form stays a finite number of seconds.
 - Constraint 3, JSON output: `nlohmann::json` cannot hold a `duration`, so `AgentCommandsServerQueries.cpp:111` emits `.count()`. The JSON key stays unchanged.
 
 ## Design
@@ -63,7 +63,7 @@ Risk tier: Tier 3. Triggers: serialization and data layout (the element type of 
 - `Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/` (`Missiles.h`, `Missiles.cpp`, `MissilesUpdate.cpp`, `MissilesRender.cpp`)
 - `Projects/BrokenEngineSandbox/Source/Frame/Collections/Blasters/BlastersUpdate.cpp`
 - `Projects/BrokenEngineSandbox/Source/Frame/Frame.h`, `Frame.cpp`
-- `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerFrameEdit.cpp`, `CollectionLayoutCapacityFixture.cpp`, `AgentFieldNames.h` (generated)
+- `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerFrameEdit.cpp`, `CollectionLayoutCapacityHarnessRig.cpp`, `AgentFieldNames.h` (generated)
 - `Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsServerQueries.cpp`
 - `Projects/BrokenEngineSandbox/Source/Ui/Screens/HudScreen.cpp`
 - `Engine/Source/Audio/StaticVoices.cpp`
@@ -72,7 +72,7 @@ Risk tier: Tier 3. Triggers: serialization and data layout (the element type of 
 
 - Every inventoried column, Spawn/Sync field, type field, constant, parameter, and local, plus every other declaration the selection rule matches in the two collection trees.
 - The `.count()`/`duration<float>(…)` boundary conversions at the listed outside consumers, the `LogDifferences` call sites, and `BuildSpaceshipRegistryWindow`'s parameter.
-- The `ServerFrameEdit.cpp` `ReadElement` duration branch and the array-column branch; the `CollectionLayoutCapacityFixture.cpp` assignments and comparisons (wrap the fixture scalar in `duration<float>`).
+- The `ServerFrameEdit.cpp` `ReadElement` duration branch and the array-column branch; the `CollectionLayoutCapacityHarnessRig.cpp` assignments and comparisons (wrap the harness rig scalar in `duration<float>`).
 - Regenerating `AgentFieldNames.h` and updating the listed documentation names.
 
 ## Out of scope

@@ -5,6 +5,7 @@ param(
     [string]$Scope,
     [string]$Targets,
     [string]$Baseline,
+    [string]$Commit,
     [string]$RepositoryRoot,
     [switch]$Digest,
     [switch]$Phase0Hints,
@@ -237,6 +238,19 @@ function New-HintCategory([object]$Ordered, [int]$Total) {
     }
     return [ordered]@{ items = @($items); total = $Total; emitted = $items.Count }
 }
+function Get-FunctionHintCategory([object]$Report, [string]$Field, [Collections.Generic.HashSet[string]]$TargetPaths, [string[]]$Fields, [scriptblock]$Select, [scriptblock]$Weight) {
+    $rows = [Collections.Generic.List[object]]::new()
+    $allRows = @(Get-MetricContractField $Report "current.$Field")
+    for ($index = 0; $index -lt $allRows.Count; ++$index) {
+        $rowPath = "current.$Field[$index]"
+        Confirm-MetricContractRowField $allRows[$index] @('path') $rowPath
+        if (-not $TargetPaths.Contains([string]$allRows[$index].path)) { continue }
+        Confirm-MetricContractRowField $allRows[$index] (@('name', 'startLine', 'endLine') + $Fields) $rowPath
+        if (& $Select $allRows[$index]) { $rows.Add($allRows[$index]) }
+    }
+    # The single ordinal key breaks ties by path, then numeric start line (zero-padded), then name.
+    return New-HintCategory (Get-OrderedDigestRow @($rows) $Weight { param($row) "$($row.path)`0$(([long]$row.startLine).ToString('D10'))`0$($row.name)" }) $rows.Count
+}
 function Get-Phase0Hint([object]$Report) {
     $targetPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     $identities = @(Get-MetricContractField $Report 'current.targetManifest')
@@ -291,16 +305,13 @@ function Get-Phase0Hint([object]$Report) {
     foreach ($candidate in $cloneOrdered) { $cloneDigests.Add($candidate.Digest) }
     $cloneGroups = New-HintCategory $cloneDigests $cloneCandidates.Count
 
-    $functionRows = [Collections.Generic.List[object]]::new()
-    $allFunctions = @(Get-MetricContractField $Report 'current.highComplexityFunctions')
-    for ($index = 0; $index -lt $allFunctions.Count; ++$index) {
-        $functionPath = "current.highComplexityFunctions[$index]"
-        Confirm-MetricContractRowField $allFunctions[$index] @('path') $functionPath
-        if (-not $targetPaths.Contains([string]$allFunctions[$index].path)) { continue }
-        Confirm-MetricContractRowField $allFunctions[$index] @('mass', 'owner', 'name', 'signature') $functionPath
-        $functionRows.Add($allFunctions[$index])
-    }
-    $functions = New-HintCategory (Get-OrderedDigestRow @($functionRows) { param($row) [double]$row.mass } { param($row) "$($row.owner)/$($row.name)/$($row.signature)" }) $functionRows.Count
+    $all = { param($row) $true }
+    $lines = { param($row) [double]$row.endLine - [double]$row.startLine + 1 }
+    $extremeComplexity = Get-FunctionHintCategory $Report 'highComplexityFunctions' $targetPaths @('cc', 'mass') { param($row) [double]$row.cc -gt 30 } { param($row) [double]$row.mass }
+    $longLowComplexity = Get-FunctionHintCategory $Report 'longLowComplexityFunctions' $targetPaths @() $all $lines
+    $deepNesting = Get-FunctionHintCategory $Report 'deepNestingFunctions' $targetPaths @('depth') $all { param($row) [double]$row.depth }
+    $sameNameForwarders = Get-FunctionHintCategory $Report 'sameNameForwarderFunctions' $targetPaths @() $all { param($row) 0.0 }
+    $uncalled = Get-FunctionHintCategory $Report 'uncalledFunctions' $targetPaths @() $all $lines
 
     $skipRows = [Collections.Generic.List[object]]::new()
     $allSkips = @(Get-MetricContractField $Report 'current.skips')
@@ -313,14 +324,18 @@ function Get-Phase0Hint([object]$Report) {
     return [ordered]@{
         targetOutliers = $outliers
         cloneGroups = $cloneGroups
-        highComplexityFunctions = $functions
+        extremeComplexityFunctions = $extremeComplexity
+        longLowComplexityFunctions = $longLowComplexity
+        deepNestingFunctions = $deepNesting
+        sameNameForwarderFunctions = $sameNameForwarders
+        uncalledFunctions = $uncalled
         skips = $skips
     }
 }
 function New-CodeQualityDigest([object]$Report, [string]$ReportMode, [bool]$IncludeHints) {
     # The digest only selects, orders, and counts fields the report already contains.
     $digest = [ordered]@{
-        schemaVersion = 'broken-engine-code-quality-evidence/v2'
+        schemaVersion = 'broken-engine-code-quality-evidence/v3'
         profile = Get-MetricContractField $Report 'profile'
         targetSelection = Get-MetricContractField $Report 'targetSelection'
         coverage = $null
@@ -352,9 +367,10 @@ try {
     if (-not $RepositoryRoot) { throw 'RepositoryRoot must be an existing directory.' }
     if ($Scope -and $Scope -notin @('Exact', 'Directory', 'Recursive')) { throw 'Scope must be Exact, Directory, or Recursive.' }
     if ($Baseline -and $Baseline -notmatch '^[0-9a-f]{40}$') { throw 'Baseline must be a 40-character lowercase hexadecimal commit SHA.' }
-    if ($Mode -eq 'BootstrapIdentity' -and ($Target -or $Scope -or $Targets -or $Baseline -or $Digest -or $Phase0Hints -or $OutputPath -or $DigestPath)) { throw 'BootstrapIdentity requires only RepositoryRoot.' }
-    if ($Mode -eq 'Snapshot' -and ((-not $Target) -or (-not $Scope) -or $Targets -or $Baseline)) { throw 'Snapshot requires only Target and Scope.' }
-    if ($Mode -eq 'Compare' -and ((-not $Targets) -or (-not $Baseline) -or $Target -or $Scope)) { throw 'Compare requires only Targets and Baseline.' }
+    if ($Commit -and $Commit -cnotmatch '^[0-9a-f]{40}$') { throw 'Commit must be a 40-character lowercase hexadecimal commit SHA.' }
+    if ($Mode -eq 'BootstrapIdentity' -and ($Target -or $Scope -or $Targets -or $Baseline -or $Commit -or $Digest -or $Phase0Hints -or $OutputPath -or $DigestPath)) { throw 'BootstrapIdentity requires only RepositoryRoot.' }
+    if ($Mode -eq 'Snapshot' -and ((-not $Target) -or (-not $Scope) -or $Targets -or $Baseline)) { throw 'Snapshot requires only Target and Scope, plus an optional Commit.' }
+    if ($Mode -eq 'Compare' -and ((-not $Targets) -or (-not $Baseline) -or $Target -or $Scope -or $Commit)) { throw 'Compare requires only Targets and Baseline.' }
     if ($DigestPath -and $Digest) { throw 'DigestPath and Digest are mutually exclusive: DigestPath already writes the digest.' }
     if ($DigestPath) {
         # Refused here rather than only at the final write, so an existing file costs no analyzer run.
@@ -432,8 +448,8 @@ try {
         $pendingText = ($identity | ConvertTo-Json -Compress -Depth 16) + "`n"
     }
     else {
-        $request = [ordered]@{ mode = $Mode; repositoryRoot = $repository; captureRoot = $environment; analyzerSource = Get-CanonicalPath $sourceStage.Source; tool = [ordered]@{ adapterVersion = '5'; lockSha256 = $lockSha; python = [ordered]@{ implementation = $probe.implementation; version = $probe.version; architecture = $probe.arch; executableSha256 = $pythonSha }; disableSg = $true } }
-        if ($Mode -eq 'Snapshot') { $request.target = $Target; $request.scope = $Scope } else { $request.targets = [IO.Path]::GetFullPath($Targets); $request.baseline = $Baseline }
+        $request = [ordered]@{ mode = $Mode; repositoryRoot = $repository; captureRoot = $environment; analyzerSource = Get-CanonicalPath $sourceStage.Source; tool = [ordered]@{ adapterVersion = '7'; lockSha256 = $lockSha; python = [ordered]@{ implementation = $probe.implementation; version = $probe.version; architecture = $probe.arch; executableSha256 = $pythonSha }; disableSg = $true } }
+        if ($Mode -eq 'Snapshot') { $request.target = $Target; $request.scope = $Scope; if ($Commit) { $request.commit = $Commit } } else { $request.targets = [IO.Path]::GetFullPath($Targets); $request.baseline = $Baseline }
         $requestPath = Join-Path $environment ("request-" + [guid]::NewGuid().ToString('N') + '.json')
         $requestFailure = $null
         $requestDiagnostics = $null

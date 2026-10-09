@@ -45,6 +45,7 @@ void ParticleManager::Spawn(shaders::ParticlesSpawnLayout& rParticlesSpawnLayout
 	}
 
 	layout.iCookie = static_cast<int32_t>(gpTextureManager->mTextureDescriptors.CrcToIndex(uiTextureCrc));
+	layout.fSpawnIntensity = layout.fVisibleIntensity;
 	rParticlesSpawnLayout.pParticles[rParticlesSpawnLayout.iCount] = layout;
 	++rParticlesSpawnLayout.iCount;
 }

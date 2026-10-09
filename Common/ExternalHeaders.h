@@ -433,6 +433,8 @@ inline constexpr bool XmIsInf(float fValue)
 #pragma warning(disable : 26427) // Global initializer accesses extern object (i.22). (DT: TweaksScreen slider arrays bind to extern Wrapper globals by design)
 #pragma warning(disable : 26461) // Pointer argument can be marked as pointer to const (con.3). (DT: Vulkan handle typedefs are pointers to opaque types; const-qualifying handles is non-idiomatic)
 #pragma warning(disable : 26814) // The const variable can be computed at compile-time. Consider using constexpr (con.5). (DT: clang-cl rejects offsetof in constexpr contexts; extern-const definitions cannot be inline constexpr without header relocation)
+#pragma warning(disable : 26459) // You called an STL function with a raw pointer parameter that may be unsafe (stl.1). (DT: Style guide rule 60 prescribes std::copy with std::begin/std::end on C arrays)
+#pragma warning(disable : 26497) // The function can be marked constexpr if compile-time evaluation is desired (f.4). (DT: Pairs with disabled 26440/26496: constexpr everywhere is clutter; required compile-time uses fail to compile without it)
 
 // Portable constexpr offsetof for layout-lock static_asserts. UCRT's offsetof macro expands to a
 // reinterpret_cast that MSVC's cl.exe tolerates inside a constant expression (non-conforming extension)

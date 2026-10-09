@@ -3,3 +3,22 @@ enabled = true
 min_wait_timeout_ms = 500000
 default_wait_timeout_ms = 500000
 max_wait_timeout_ms = 500000
+
+# additionalContextLimit = 0: each part may exceed Codex's 2,500-token spill
+# threshold within the script's own 9,500-character budget.
+[[hooks.SessionStart]]
+
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "pwsh -NoProfile -File .agents/scripts/Write-SessionWorkflowContext.ps1 -Part 1"
+additionalContextLimit = 0
+
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "pwsh -NoProfile -File .agents/scripts/Write-SessionWorkflowContext.ps1 -Part 2"
+additionalContextLimit = 0
+
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "pwsh -NoProfile -File .agents/scripts/Write-SessionWorkflowContext.ps1 -Part 3"
+additionalContextLimit = 0

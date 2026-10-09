@@ -1,6 +1,6 @@
 #if defined(BT_CLIENT)
 
-#include "Graphics/EngineCamera.h"
+#include "Graphics/CameraBase.h"
 #include "Ui/HeightLerpWrapperQuartet.h"
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/MiscWrappersBase.h"
@@ -291,7 +291,7 @@ static void PopulateShadowArea(shaders::GlobalLayout& rGlobalLayout, float fShad
 	// area, so the grid is bit-stable at settled height and integer-texel XY pan does not shimmer. textureWidth / kfShadowHeadroomMultiplier
 	// pixels span that frustum; the headroom covers the live area throughout zoom transitions. Use the actual clamped extent for
 	// device-independent coverage and center f4ShadowArea on the camera, snapped to the texel grid.
-	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::Camera::kfShadowHeadroomMultiplier, engine::gpCamera->mfShadowTexelEyeHeight, fShadowTextureSizeWidth, fShadowTextureSizeHeight, gpSwapchainManager->mfAspectRatio, gFieldOfView.mfCurrent, engine::gpCamera->mVecPosition);
+	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::CameraBase::kfShadowHeadroomMultiplier, engine::gpCamera->mfShadowTexelEyeHeight, fShadowTextureSizeWidth, fShadowTextureSizeHeight, gpSwapchainManager->mfAspectRatio, gFieldOfView.mfCurrent, engine::gpCamera->mVecPosition);
 	rGlobalLayout.f4ShadowArea = area.f4Area;
 
 	// Latch the previous world area. A recreate makes the previous area current and forces pure-current temporal
@@ -474,6 +474,13 @@ void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> curr
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 
 	rGlobalLayout.fElapsedTime = currentTime.count();
+	// Smoke curl time offset (SmokeCurlOffset): the swirl noise's circular time offset (0.04 noise UV/s in SmokeSpread)
+	// scaled by kfSmokeCurlTimeScale to 0.001 noise UV/s, about one glass feature per 10 s at Smoke Curl Speed 1.
+	static constexpr float kfSmokeCurlTimeScale = 0.025f;
+	float fSmokeCurlTime = 0.01f * currentTime.count();
+	float fSmokeCurlTimeOffsetScale = gSmokeCurlSpeed.mfCurrent * kfSmokeCurlTimeScale * 2.0f;
+	rGlobalLayout.f2SmokeCurlTimeOffset.x = fSmokeCurlTimeOffsetScale * (-1.0f + 2.0f * std::sin(fSmokeCurlTime));
+	rGlobalLayout.f2SmokeCurlTimeOffset.y = fSmokeCurlTimeOffsetScale * (-1.0f + 2.0f * std::cos(fSmokeCurlTime));
 	float fBaseHeight = gBaseHeight.mfCurrent;
 	rGlobalLayout.fBaseHeight = fBaseHeight;
 	rGlobalLayout.fBaseHeightInverse = 1.0f / std::max(fBaseHeight, 0.001f);

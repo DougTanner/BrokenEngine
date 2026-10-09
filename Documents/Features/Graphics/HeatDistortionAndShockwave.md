@@ -1,10 +1,6 @@
 Screen-Space Heat Distortion and Explosion Shockwaves
 ======================================================
 
-
-## Coordination
-
-- `Documents/Features/Graphics/WaterRefraction.md`: mandatory reciprocal scene-color-copy coordination. Either plan may land first; the first creates the shared `RenderTargetTextures` resource from `gpSwapchainManager->mHdrTexture` (F16, pre-resolve), and the later plan reuses it and verifies both copy points.
 Context
 -------
 The engine has no screen-space distortion effects. Explosions spawn
@@ -44,9 +40,6 @@ Dependencies
 - The scene-copy format depends on whether HdrResolveAndColorGrading
   lands first: HDR intermediate (R16G16B16A16_SFLOAT) vs swapchain
   format (B8G8R8A8_UNORM).
-- The scene-color-copy texture should be shared with
-  Documents/Features/Graphics/WaterRefraction.md -- whichever plan
-  lands first creates it.
 
 Changes (12 files)
 ------------------

@@ -1,11 +1,12 @@
 <#
 .SYNOPSIS
-Validates one repository skill package or one disposable fixture.
+Validates one repository skill package or one test package.
 
 .DESCRIPTION
-Pass exactly one -Path followed by a skill directory or SKILL.md. Add -Fixture
-for a deliberately disposable target outside .agents/skills. Both option names
-are case-insensitive; other options and duplicate options are setup errors.
+Pass exactly one -Path followed by a skill directory or SKILL.md. Add
+-AllowOutsideSkills for a deliberately disposable target outside .agents/skills.
+Both option names are case-insensitive; other options and duplicate options are
+setup errors.
 
 .OUTPUTS
 VALID/0, INVALID/1, or SETUP_ERROR/2. Run Get-Help -Full for this contract.
@@ -40,7 +41,7 @@ function Read-Invocation
 	}
 
 	$pathValues = [System.Collections.Generic.List[string]]::new()
-	$fixtureCount = 0
+	$allowOutsideSkillsCount = 0
 	for ($i = 0; $i -lt $InvocationArguments.Count; $i++)
 	{
 		$argument = [string] $InvocationArguments[$i]
@@ -53,20 +54,20 @@ function Read-Invocation
 			$pathValues.Add([string] $InvocationArguments[$i])
 			continue
 		}
-		if ($argument -ieq '-Fixture')
+		if ($argument -ieq '-AllowOutsideSkills')
 		{
-			$fixtureCount++
+			$allowOutsideSkillsCount++
 			continue
 		}
 		Write-SetupError 'INVOCATION' 'provide exactly one -Path target'
 	}
 
-	if ($pathValues.Count -ne 1 -or $fixtureCount -gt 1)
+	if ($pathValues.Count -ne 1 -or $allowOutsideSkillsCount -gt 1)
 	{
 		Write-SetupError 'INVOCATION' 'provide exactly one -Path target'
 	}
 
-	return [pscustomobject] @{ Path = $pathValues[0]; Fixture = $fixtureCount -eq 1 }
+	return [pscustomobject] @{ Path = $pathValues[0]; AllowOutsideSkills = $allowOutsideSkillsCount -eq 1 }
 }
 
 function Test-LexicalParentEscape
@@ -760,7 +761,7 @@ try
 {
 	$invocation = Read-Invocation
 	$Path = $invocation.Path
-	$Fixture = $invocation.Fixture
+	$AllowOutsideSkills = $invocation.AllowOutsideSkills
 
 	$scriptDirectory = Split-Path -Parent $PSCommandPath
 	$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptDirectory '../../../..'))
@@ -794,13 +795,13 @@ try
 
 	$skillFile = [System.IO.Path]::GetFullPath($skillFile)
 	$skillDirectory = Split-Path -Parent $skillFile
-	if (-not $Fixture)
+	if (-not $AllowOutsideSkills)
 	{
 		$relativeToSkills = [System.IO.Path]::GetRelativePath($skillsRoot, $skillFile)
 		$relativeParts = $relativeToSkills -split '[\\/]'
 		if ((Test-LexicalParentEscape $relativeToSkills) -or $relativeParts.Count -ne 2 -or $relativeParts[1] -cne 'SKILL.md')
 		{
-			Write-SetupError 'SCOPE' 'repository validation targets must match .agents/skills/<name>/SKILL.md; use -Fixture for disposable fixtures'
+			Write-SetupError 'SCOPE' 'repository validation targets must match .agents/skills/<name>/SKILL.md; use -AllowOutsideSkills for test packages'
 		}
 	}
 

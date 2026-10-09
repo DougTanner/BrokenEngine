@@ -3,7 +3,7 @@
 #include "Agent/AgentCommandsShared.h"
 
 #include "Agent/Commands/CellCoordinateProbe.h"
-#include "Agent/Commands/CrashReportFixture.h"
+#include "Agent/Commands/CrashReportHarnessRig.h"
 
 namespace engine
 {
@@ -235,9 +235,9 @@ bool ExecuteSharedAgentCommand(std::string_view command, const nlohmann::json& r
 	{
 		CommandSetLogLevel(rParameters, rResult);
 	}
-	else if (command == "crash_report_fixture")
+	else if (command == "crash_report_harness_rig")
 	{
-		CommandCrashReportFixture(rParameters, rResult);
+		CommandCrashReportHarnessRig(rParameters, rResult);
 	}
 	else if (command == "cell_coordinate_probe")
 	{

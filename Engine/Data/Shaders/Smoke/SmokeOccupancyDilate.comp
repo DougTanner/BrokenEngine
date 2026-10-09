@@ -24,13 +24,14 @@ layout (set = 1, binding = 2) buffer activeTileBuffer
 	uint activeTiles[];
 };
 
-layout (scalar, set = 1, binding = 3) readonly buffer ownOccupancyBuffer
+layout (scalar, set = 1, binding = 3) buffer ownOccupancyBuffer
 {
 	uint ownOccupancy[];
 };
 
 // Before SmokeSpreadComputeB, TextureOne is sampled at the output tile UV without cross-frame remapping, so use a
-// direct 5x5 (Chebyshev-2) tile lookup. Union TextureTwo occupancy at the output index to rewrite stale storage.
+// direct Chebyshev tile lookup of radius 2 at every Smoke Update Cadence. Union TextureTwo occupancy at the output
+// index to rewrite stale storage, clearing it so the spread re-marks only nonzero output.
 // SmokeSpreadComputeA samples TextureTwo with the separate scale-aware SmokeOccupancyDilateRemap pass.
 void main()
 {
@@ -44,20 +45,26 @@ void main()
 	uint uiTileY = uiTileIndex / uiTilesX;
 	uint uiTileX = uiTileIndex - uiTileY * uiTilesX;
 
-	bool bActive = (ownOccupancy[uiTileIndex >> 5] & (1u << (uiTileIndex & 31))) != 0;
-	for (int iDy = -2; iDy <= 2 && !bActive; ++iDy)
+	uint uiOwnBit = 1u << (uiTileIndex & 31);
+	bool bActive = (atomicAnd(ownOccupancy[uiTileIndex >> 5], ~uiOwnBit) & uiOwnBit) != 0;
+	// Each neighbor row's grid-clamped [x - r, x + r] span is one contiguous run of row-major occupancy bits, so it is
+	// tested with word masks. Its at most 2r + 1 bits span at most 2 words only while r <= 16.
+	const int iRadius = 2;
+	int iMinX = max(int(uiTileX) - iRadius, 0);
+	int iMaxX = min(int(uiTileX) + iRadius, int(uiTilesX) - 1);
+	int iMinY = max(int(uiTileY) - iRadius, 0);
+	int iMaxY = min(int(uiTileY) + iRadius, int(uiTilesY) - 1);
+	for (int iNy = iMinY; iNy <= iMaxY && !bActive; ++iNy)
 	{
-		for (int iDx = -2; iDx <= 2 && !bActive; ++iDx)
-		{
-			int iNx = int(uiTileX) + iDx;
-			int iNy = int(uiTileY) + iDy;
-			if (iNx < 0 || iNy < 0 || uint(iNx) >= uiTilesX || uint(iNy) >= uiTilesY)
-				continue;
-
-			uint uiNeighborIndex = uint(iNy) * uiTilesX + uint(iNx);
-			if ((occupancy[uiNeighborIndex >> 5] & (1u << (uiNeighborIndex & 31))) != 0)
-				bActive = true;
-		}
+		uint uiRowStart = uint(iNy) * uiTilesX;
+		uint uiLo = uiRowStart + uint(iMinX);
+		uint uiHi = uiRowStart + uint(iMaxX);
+		uint uiLoMask = ~0u << (uiLo & 31u);
+		uint uiHiMask = ~0u >> (31u - (uiHi & 31u));
+		if ((uiLo >> 5) == (uiHi >> 5))
+			bActive = (occupancy[uiLo >> 5] & uiLoMask & uiHiMask) != 0;
+		else
+			bActive = ((occupancy[uiLo >> 5] & uiLoMask) | (occupancy[uiHi >> 5] & uiHiMask)) != 0;
 	}
 
 	if (bActive)

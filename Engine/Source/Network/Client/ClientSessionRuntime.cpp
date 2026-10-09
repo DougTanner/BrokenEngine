@@ -4,7 +4,7 @@
 
 #if defined(BT_CLIENT)
 
-#include "Agent/Commands/ClientNetworkFixtures.h"
+#include "Agent/Commands/ClientNetworkHarnessRigs.h"
 #include "Network/Client/Client.h"
 #include "Network/NetworkDiscoveryScanner.h"
 
@@ -71,16 +71,16 @@ static bool ContainsCoordinate(std::span<const GridCoord> coordinates, GridCoord
 	});
 }
 
-static ClientNetworkFixtures::CoordUpdateState QueryFixtureCoordinateUpdateState(GridCoord coordinate, int64_t iTick)
+static ClientNetworkHarnessRigs::CoordUpdateState QueryHarnessRigCoordinateUpdateState(GridCoord coordinate, int64_t iTick)
 {
 	auto it = game::gpGame->mCells.find(coordinate);
 	if (it == game::gpGame->mCells.end())
 	{
 		return {};
 	}
-	ClientNetworkFixtures::CoordUpdateState state {.iConfirmedTick = it->second.iConfirmedTick};
-	state.flags.Set(ClientNetworkFixtures::CoordUpdateFlags::kPresent);
-	state.flags.Set(ClientNetworkFixtures::CoordUpdateFlags::kUpdateRetained, it->second.serverUpdates.contains(iTick));
+	ClientNetworkHarnessRigs::CoordUpdateState state {.iConfirmedTick = it->second.iConfirmedTick};
+	state.flags.Set(ClientNetworkHarnessRigs::CoordUpdateFlags::kPresent);
+	state.flags.Set(ClientNetworkHarnessRigs::CoordUpdateFlags::kUpdateRetained, it->second.serverUpdates.contains(iTick));
 	return state;
 }
 
@@ -148,7 +148,7 @@ void ClientSessionRuntime::Disconnect()
 {
 	// Heap: Client/ENet and discovery teardown may allocate during cleanup
 	ScopedSuppressAllocationTracking suppress;
-	ClientNetworkFixtures::Detach();
+	ClientNetworkHarnessRigs::Detach();
 	mpClient.reset();
 	mpDiscoveryScanner.reset();
 	ResetClock();
@@ -264,12 +264,12 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 		ResetForServerLoad();
 		mrSession.OnServerLoad();
 	}
-	std::shared_ptr<ClientNetworkFixtures::StaleUpdateState> pDeliveredFixture = ClientNetworkFixtures::PollBeforeDrain(*mpClient, &QueryFixtureCoordinateUpdateState);
+	std::shared_ptr<ClientNetworkHarnessRigs::StaleUpdateState> pDeliveredHarnessRig = ClientNetworkHarnessRigs::PollBeforeDrain(*mpClient, &QueryHarnessRigCoordinateUpdateState);
 	mrSession.ProcessReceivedGamePackets();
 	mrSession.ApplyReceivedStaticData();
 	ApplyReceivedFullStates();
 	ApplyReceivedUpdates();
-	ClientNetworkFixtures::PollAfterDrain(*mpClient, pDeliveredFixture, &QueryFixtureCoordinateUpdateState);
+	ClientNetworkHarnessRigs::PollAfterDrain(*mpClient, pDeliveredHarnessRig, &QueryHarnessRigCoordinateUpdateState);
 
 	SendAckAndFlush();
 }
@@ -383,7 +383,18 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 				continue;
 			}
 
-			miLatestServerTick = std::max(miLatestServerTick, rUpdate.iTick);
+			if (rUpdate.iTick > miLatestServerTick)
+			{
+				// An arrival never steps the estimate down: a newer tick that arrives below it (an out-of-order
+				// arrival, or the first arrival after a gap) backdates the stamp by the lead so the estimate keeps its
+				// value. Each later newer arrival restarts the tick phase, dropping the fraction of a tick elapsed, so
+				// the lead eases back; a newer tick at or above the estimate clears it. Sampling now before the
+				// estimate keeps a tick boundary between the two clock reads from lowering it.
+				std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+				int64_t iLeadTicks = std::max<int64_t>(0, EstimatedLatestServerTick() - rUpdate.iTick);
+				miLatestServerTick = rUpdate.iTick;
+				mLatestServerTickArrival = now - iLeadTicks * game::gpGame->mTimeStep.SimulationToWall(engine::kTickNanoseconds);
+			}
 
 			if (static_cast<int64_t>(rCell.serverUpdates.size()) >= engine::kiMaximumBufferedFrames)
 			{
@@ -457,6 +468,18 @@ int64_t ClientSessionRuntime::GetServerUpdateBufferSize() const
 		}
 	}
 	return iTotal;
+}
+
+int64_t ClientSessionRuntime::EstimatedLatestServerTick() const
+{
+	if (miLatestServerTick < 0)
+	{
+		return -1;
+	}
+	// Elapsed time is non-negative, so integer division floors to whole scaled ticks.
+	int64_t iTickWallNanoseconds = game::gpGame->mTimeStep.SimulationToWall(engine::kTickNanoseconds).count();
+	int64_t iElapsedTicks = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - mLatestServerTickArrival).count() / iTickWallNanoseconds;
+	return miLatestServerTick + std::min(iElapsedTicks, kiMaximumEstimatedServerTickLead);
 }
 
 void ClientSessionRuntime::SendAckAndFlush()
@@ -674,13 +697,14 @@ std::chrono::nanoseconds ClientSessionRuntime::EvaluateClock(int64_t iPreReconci
 		miLowerTargetBehindStreakStartTick = -1;
 	}
 	miClockTargetBehind = miCurrentTargetBehind;
-	miClockOffset = iPreReconcileTick - miLatestServerTick;
-	miClockError = iPreReconcileTick - (miLatestServerTick - miCurrentTargetBehind);
+	int64_t iEstimatedLatestServerTick = EstimatedLatestServerTick();
+	miClockOffset = iPreReconcileTick - iEstimatedLatestServerTick;
+	miClockError = iPreReconcileTick - (iEstimatedLatestServerTick - miCurrentTargetBehind);
 	bool bPeriodic = iPreReconcileTick % (kiTickRate * 32) == 0 && iPreReconcileTick != miLastPeriodicClockLogTick;
 	bool bError = std::abs(miClockError) >= 4 && iPreReconcileTick != miLastClockErrorLogTick;
 	if (miCurrentTargetBehind != miLastLoggedClockTargetBehind || bPeriodic || bError)
 	{
-		LOG(kNetwork, kVerbose, "ClockSync TargetBehind: {} Error: {} Offset: {} JitterUs: {} LatestServer: {} SimTick: {}", miCurrentTargetBehind, miClockError, miClockOffset, iJitterMicroseconds, miLatestServerTick, iPreReconcileTick);
+		LOG(kNetwork, kVerbose, "ClockSync TargetBehind: {} Error: {} Offset: {} JitterUs: {} LatestServer: {} SimTick: {}", miCurrentTargetBehind, miClockError, miClockOffset, iJitterMicroseconds, iEstimatedLatestServerTick, iPreReconcileTick);
 		miLastLoggedClockTargetBehind = miCurrentTargetBehind;
 		if (bPeriodic)
 		{
@@ -710,8 +734,9 @@ void ClientSessionRuntime::ApplyClockCorrection(int64_t iPreReconcileTick)
 		// Snap tick counter to recover from extreme clock error. Sim runs BEHIND latestServerTick.
 		// Clamp at 0 so a fresh post-load server (latestServerTick < currentTargetBehind)
 		// doesn't drive the client tick negative.
-		int64_t iSnapTick = std::max<int64_t>(0, miLatestServerTick - miCurrentTargetBehind);
-		LOG(kNetwork, kWarning, "ClientSessionRuntime::ApplyClockCorrection Clock snap OldTick: {} NewTick: {} LatestServerTick: {} TargetBehind: {}", iPreReconcileTick, iSnapTick, miLatestServerTick, miCurrentTargetBehind);
+		int64_t iEstimatedLatestServerTick = EstimatedLatestServerTick();
+		int64_t iSnapTick = std::max<int64_t>(0, iEstimatedLatestServerTick - miCurrentTargetBehind);
+		LOG(kNetwork, kWarning, "ClientSessionRuntime::ApplyClockCorrection Clock snap OldTick: {} NewTick: {} LatestServerTick: {} TargetBehind: {}", iPreReconcileTick, iSnapTick, iEstimatedLatestServerTick, miCurrentTargetBehind);
 		int64_t iTickCounter = iSnapTick;
 		ASSERT(iTickCounter >= 0);
 		game::gpGame->miTickCounter = iTickCounter;

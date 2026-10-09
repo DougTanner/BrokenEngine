@@ -271,9 +271,16 @@ vec3 BlendSmokePrecomputed(vec3 f3Color, float fSmokePow, vec3 f3LightingSum, Gl
 	return (1.0f - fSmokePow) * f3Color + fSmokePow * f3SmokeLighting * min(vec3(1.25f), vec3(fSmokeDensity));
 }
 
-float LightingDepositEdgeFade(vec2 f2FragCoord, vec2 f2SizeInv)
+// Blend weight in [0, 1] for every wind-driven Low/High pair, from the wind velocity magnitude: the wind solver's own
+// constants and the smoke curl strength share it so both agree on what counts as calm and strong wind.
+float WindMagnitudeFactor(GlobalLayout globalLayout, float fMagnitude)
 {
-	vec2 f2Uv = f2FragCoord * f2SizeInv;
+	return clamp((fMagnitude - globalLayout.fWindThresholdLow) / max(globalLayout.fWindThresholdHigh - globalLayout.fWindThresholdLow, 0.001f), 0.0f, 1.0f);
+}
+
+float LightingDepositEdgeFade(vec2 f2FragCoord, vec2 f2SizeInverse)
+{
+	vec2 f2Uv = f2FragCoord * f2SizeInverse;
 	float fEdgeDist = min(min(f2Uv.x, 1.0f - f2Uv.x), min(f2Uv.y, 1.0f - f2Uv.y));
 	return smoothstep(0.0f, 0.05f, fEdgeDist);
 }

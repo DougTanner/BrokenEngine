@@ -10,6 +10,7 @@
 #include "CrashReport.h"
 
 #include "Frame/TerrainUtils.h"
+#include "Graphics/Camera.h"
 #include "Profile/ProfileManager.h"
 #include "Ui/Screens/TweaksScreen/TweaksScreen.h"
 #include "Game.h"

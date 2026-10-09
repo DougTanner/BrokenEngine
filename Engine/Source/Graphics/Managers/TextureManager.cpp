@@ -35,16 +35,16 @@ std::tuple<int64_t, int64_t> TextureManager::DetailTextureSize(float fMultiplier
 
 std::tuple<int64_t, int64_t> TextureManager::LightingDetailTextureSize(float fMultiplier)
 {
-	// Pre-size every lighting deposit/spread/combine texture by Camera::kfLightingHeadroomMultiplier so the constant
+	// Pre-size every lighting deposit/spread/combine texture by CameraBase::kfLightingHeadroomMultiplier so the constant
 	// on-screen-pixel-size texel grid retains coverage margin while its camera-height reference expands immediately
 	// outward and contracts gradually inward. Centralized so all lighting consumers stay byte-consistent
 	// (deposit quads must land on the same texels the area math snaps to). Clamp AFTER the multiply (DetailTextureSize
 	// clamps pre-multiply); force width even so downstream half-width math stays integer.
 	auto [iBaseX, iBaseY] = DetailTextureSize(fMultiplier);
 	int64_t iLimit = static_cast<int64_t>(gpInstanceManager->mVkPhysicalDeviceProperties.limits.maxImageDimension2D);
-	int64_t iX = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseX) * engine::Camera::kfLightingHeadroomMultiplier)), iLimit);
+	int64_t iX = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseX) * engine::CameraBase::kfLightingHeadroomMultiplier)), iLimit);
 	iX &= ~1i64;
-	int64_t iY = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseY) * engine::Camera::kfLightingHeadroomMultiplier)), iLimit);
+	int64_t iY = std::min(static_cast<int64_t>(std::lround(static_cast<float>(iBaseY) * engine::CameraBase::kfLightingHeadroomMultiplier)), iLimit);
 	return std::make_tuple(iX, iY);
 }
 
@@ -718,6 +718,7 @@ void TextureManager::WaitForTextures(std::span<Texture* const> textures)
 
 void RegisterLightingTextureCrc(common::crc_t crc)
 {
+	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(std::span(&crc, 1), LoadPriority::kNormal);
 	// Heap: unordered_set insert during startup registration
 	ScopedSuppressAllocationTracking suppress;
 	gpTextureUploadManager->mLightingTextureCrcs.insert(crc);

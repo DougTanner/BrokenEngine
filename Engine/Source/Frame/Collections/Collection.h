@@ -1,6 +1,5 @@
 #pragma once
 
-#include "File/PackChunks.h"
 #include "CollectionController.h"
 #include "CollectionId.h"
 #include "CollectionLifecycle.h"
@@ -118,7 +117,7 @@ enum class CollectionFlags : uint32_t
 using CollectionFlags_t = common::Flags<CollectionFlags>;
 
 #if defined(BT_CLIENT)
-// Register a CRC for pre-blur (implemented in TextureManager.cpp)
+// Request the CRC's chunk load and register it for pre-blur (implemented in TextureManager.cpp)
 void RegisterLightingTextureCrc(common::crc_t uiCrc);
 #endif
 
@@ -142,7 +141,6 @@ struct TypeRegistry
 			if (rType.uiCrc != 0)
 			{
 #if defined(BT_CLIENT)
-				gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(std::span(&rType.uiCrc, 1), LoadPriority::kNormal);
 				RegisterLightingTextureCrc(rType.uiCrc);
 #endif
 			}
@@ -153,7 +151,6 @@ struct TypeRegistry
 			if (rType.particleCrc != 0)
 			{
 #if defined(BT_CLIENT)
-				gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(std::span(&rType.particleCrc, 1), LoadPriority::kNormal);
 				RegisterLightingTextureCrc(rType.particleCrc);
 #endif
 			}
@@ -205,7 +202,7 @@ struct OptionalIdToIndex<T, FLAGS>
 		// id_t/Uuid ordering compares only iValue, so sorting raw int64_t keys preserves CRC byte order.
 		int64_t iKeyCount = static_cast<int64_t>(idToIndexMap.size());
 		auto keysAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<int64_t*>(iKeyCount * sizeof(int64_t));
-		int64_t* pKeys = static_cast<int64_t*>(keysAllocation.mpData);
+		int64_t* pKeys = keysAllocation.mpData;
 		for (int64_t i = 0; const auto& [rKey, riValue] : idToIndexMap)
 		{
 			pKeys[i++] = rKey.uuid.iValue;

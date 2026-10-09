@@ -352,7 +352,11 @@ bool ProfileManagerBase::ArmRawCpuTimerEventLocked(int64_t iCpuTimer, int64_t iM
 	if constexpr (kbProfiling)
 	{
 		RawCpuTimerState& rRawTimer = mpRawCpuTimers[static_cast<size_t>(iCpuTimer)];
-		ASSERT(!(rRawTimer.flags & RawCpuTimerStateFlags::kEventArmed));
+		if (rRawTimer.flags & RawCpuTimerStateFlags::kEventArmed)
+		{
+			return false;
+		}
+
 		if (!(rRawTimer.flags & RawCpuTimerStateFlags::kEventRegistered))
 		{
 			return false;

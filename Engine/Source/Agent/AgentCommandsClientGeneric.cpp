@@ -1139,6 +1139,7 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 		{"targetBehindTicks", iClockTargetBehind},
 		{"errorTicks", iClockError},
 	};
+	rResult["fps"] = engine::gpGraphics->mRendersInTheLastSecond.Get();
 
 	nlohmann::json counters = nlohmann::json::array();
 	for (int64_t i = 0; i < gpProfileManager->miCpuCounterCount; ++i)

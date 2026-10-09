@@ -5,8 +5,8 @@
 // The engine owns the cross-cell transfer machinery: harvest, adjacency and destination-liveness validation,
 // deterministic type ordering, destination materialization, and the post-spawn destination CRC recompute. The game
 // supplies the StatusChange payloads carried across the boundary and the transfer classification. The game Agent
-// fixture owns its replay-transfer queue and drains it before sorting. Naming game types keeps this header out of the
-// Engine.h aggregation; its consumers include it directly.
+// harness rig owns its replay-transfer queue and drains it before sorting. Naming game types keeps this header out of
+// the Engine.h aggregation; its consumers include it directly.
 
 namespace engine
 {

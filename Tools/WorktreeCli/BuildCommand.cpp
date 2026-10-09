@@ -54,7 +54,7 @@ namespace toolcli
 		return value;
 	}
 
-	// Fixtures may shorten (never lengthen) the lock wait through BROKEN_ENGINE_BUILD_LOCK_WAIT_SECONDS.
+	// Tests may shorten (never lengthen) the lock wait through BROKEN_ENGINE_BUILD_LOCK_WAIT_SECONDS.
 	static int64_t GetBuildLockWaitSeconds()
 	{
 		std::optional<std::wstring> override = GetEnvironmentValue(L"BROKEN_ENGINE_BUILD_LOCK_WAIT_SECONDS");

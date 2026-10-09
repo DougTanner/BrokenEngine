@@ -98,10 +98,12 @@ Use the following rules for C++ code
 	Milliseconds - ms
 	Seconds - std::chrono::seconds seekSeconds = 1s;
 
-13. Default to int64_t: int64_t iCount = 0;
-    -Use int8_t, int16_t when packing into structs and arrays (if higher range of larger types is not required)
+13. Default to int64_t for run-time variables and calculations (fast on x64, and one simple type that always fits): int64_t iCount = 0;
+	-Packed data (struct and array members stored in bulk, and every serialized field) uses the narrowest fixed-width integer (int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t) its range needs, unsigned when the value is never negative (if higher range of larger types is not required)
 	-Use unsigned integers when doing bitwise operations
 	-Our own variables, parameters, members, and return values use our types (int64_t by default) even when the value comes from another API; convert to the API's type only where the value is passed to that API: vkCmdDraw(cmd, static_cast<uint32_t>(iVertexCount), 1, 0, 0);
+	-Keep the type a layout fixes: uint8_t for raw bytes (serialized, wire, file, audio, pixel, or opaque API data); the stored type of a wire, file, save, replay, settings, serialized Collection, or GPU field or element, including the variable it is read into or written from, converted to int64_t only after a range check (std::in_range<int64_t>, or a tighter bound); an OS or third-party struct mirror; and the API's type for a value whose address an API takes: VkDeviceSize vkVertexOffset = 0; vkCmdBindVertexBuffers(cmd, 0, 1, &vkBuffer, &vkVertexOffset);
+	-Keep unsigned arithmetic that needs the full unsigned range: a counter that relies on unsigned wrap, an overflow guard written against UINT64_MAX or SIZE_MAX, and a value that can exceed INT64_MAX before its range check (file sizes, unsigned sequence numbers, unsigned JSON values); convert to int64_t once range-checked
 
 14. Use "Count" not "Num", ex: int64_t kiThreadCount = 3; not kiNumThreads
 
@@ -228,8 +230,8 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`. `
 	#include "Graphics/GraphicsUtils.h"
 	#include "Input/Input.h"
 
-	#include "Agent/Commands/ServerFaultFixtures.h"
-	#include "Agent/Commands/ServerSimulationFixtures.h"
+	#include "Agent/Commands/ServerFaultHarnessRigs.h"
+	#include "Agent/Commands/ServerSimulationHarnessRigs.h"
 	#include "Agent/AgentCommandsServerQueries.h"
 	#include "Network/Server/ServerFleetManager.h"
 	#include "Network/Server/ServerSession.h"

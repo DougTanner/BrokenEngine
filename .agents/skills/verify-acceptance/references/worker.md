@@ -22,7 +22,8 @@ owns the triggers, inputs, and handoff form.
 
 4. Keep every check inside the evidence ceiling the change's tier allows, and
    run only checks that change no tracked file. Done when no row's evidence
-   exceeds that tier's ceiling.
+   exceeds that tier's ceiling and every row meets the minimums
+   `## Tier evidence ceiling` sets for its criterion.
 
 5. Fill the `Criteria` section and set `Status` per the public `SKILL.md`
    handoff. Done when the count line reports every approved item and each
@@ -32,7 +33,12 @@ owns the triggers, inputs, and handoff form.
 
 Tier 1 checks are static, schema, link, validator, and compilation of changed
 C++; Tier 2 adds the smallest observable scenario; Tier 3 adds exposed invariant
-or integration checks.
+or integration checks. At any tier, a bug-fix criterion settles only once its
+pre-change red run is on record, each as the execution card `Acceptance checks:`
+field in [`next-plan`](../../next-plan/SKILL.md) `## Handoff` defines it; a
+`query_profile` timing criterion settles only on cohorts compared as the
+`query_profile` caveat in [`commands-client.md`](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-client.md)
+`## Durable caveats` requires.
 
 ## Rules
 

@@ -77,7 +77,7 @@ public:
 	void SendResynchronizationRequest();
 	void Disconnect();
 
-	// Wire dispatch entry point for one received packet. Public so harness fixtures can exercise the real dispatch,
+	// Wire dispatch entry point for one received packet. Public so harness rigs can exercise the real dispatch,
 	// classification, and response paths.
 	void Receive(std::span<const uint8_t> packetData);
 

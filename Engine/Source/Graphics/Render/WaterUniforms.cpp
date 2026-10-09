@@ -1,6 +1,6 @@
 #if defined(BT_CLIENT)
 
-#include "Graphics/EngineCamera.h"
+#include "Graphics/CameraBase.h"
 #include "Ui/HeightLerpWrapperQuartet.h"
 #include "Ui/WaterWrappersBase.h"
 #include "Render.h"
@@ -52,7 +52,7 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	double fSizeBaseTwo = static_cast<double>(gLightingSampledNormalsTwoSize.mfCurrent);
 	double fSizeBaseThree = static_cast<double>(gLightingSampledNormalsThreeSize.mfCurrent);
 	// Camera-height-driven speed lerp — single-sourced fade endpoint shared with LightingUniforms.cpp.
-	float fCameraHeightZoomFactor = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::Camera::kfCameraEyeHeightDefault, engine::Camera::kfWaveFadeEndHeight, 0.0f, 1.0f);
+	float fCameraHeightZoomFactor = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::CameraBase::kfCameraEyeHeightDefault, engine::CameraBase::kfWaveFadeEndHeight, 0.0f, 1.0f);
 	double fSpeedOne = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedOneMinimum.mfCurrent, gLightingSampledNormalsSpeedOneMaximum.mfCurrent, fCameraHeightZoomFactor));
 	double fSpeedTwo = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedTwoMinimum.mfCurrent, gLightingSampledNormalsSpeedTwoMaximum.mfCurrent, fCameraHeightZoomFactor));
 	double fSpeedThree = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedThreeMinimum.mfCurrent, gLightingSampledNormalsSpeedThreeMaximum.mfCurrent, fCameraHeightZoomFactor));
@@ -169,7 +169,7 @@ void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAng
 
 	rGlobalLayout.fWaterFresnel = std::pow(fDayPercent, 0.5f) * gWaterFresnel.mfCurrent;
 	rGlobalLayout.fWaterColorBottom = gWaterColorBottom.mfCurrent;
-	rGlobalLayout.fWaterColorHeightInv = 1.0f / gWaterColorHeight.mfCurrent;
+	rGlobalLayout.fWaterColorHeightInverse = 1.0f / gWaterColorHeight.mfCurrent;
 	rGlobalLayout.fWaterColorNoiseAmount = gWaterColorNoiseAmount.mfCurrent;
 	rGlobalLayout.fWaterColorNoiseWeightOne = gWaterColorNoiseWeightOne.mfCurrent;
 	rGlobalLayout.fWaterColorNoiseWeightTwo = gWaterColorNoiseWeightTwo.mfCurrent;

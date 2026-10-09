@@ -165,7 +165,7 @@ enums and both CPU/GLSL consumers for shared headers. Check client/server and
 per-collection mirrors without abstracting deliberate parallel boilerplate.
 
 Engine code may call game hooks and use game globals/types; flag the reverse
-ownership leak only when an engine-owned type acquires a game-specific concept.
+ownership leak when an engine-owned type acquires a game-specific concept.
 Prefer the game's own aggregation headers where repository instructions require
 them.
 

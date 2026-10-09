@@ -1,6 +1,6 @@
 # Graphics - Game Camera
 
-Client-only `game::Camera` is the only concrete camera and is `final`. `engine::Camera` (`../../../../Engine/Source/Graphics/EngineCamera.h`) owns everything generic — the display-rate update, matrices, visible-area snapping, LOD latching, texel-grid references, zoom, jump/chase, shake, sun angle, and the `engine::gpCamera` global. This layer supplies only game policy.
+Client-only `game::Camera` is the only concrete camera and is `final`. `engine::CameraBase` (`../../../../Engine/Source/Graphics/CameraBase.h`) owns everything generic — the display-rate update, matrices, visible-area snapping, LOD latching, texel-grid references, zoom, jump/chase, shake, sun angle, and the `engine::gpCamera` global. This layer supplies only game policy.
 
 ## Game Policy
 
@@ -13,5 +13,5 @@ Client-only `game::Camera` is the only concrete camera and is `final`. `engine::
 
 ## See Also
 
-- `../../../../Engine/Source/Graphics/AGENTS.md` - `engine::Camera` and renderer grids
+- `../../../../Engine/Source/Graphics/AGENTS.md` - `engine::CameraBase` and renderer grids
 - Engine Input (`../../../../Engine/Source/Input/AGENTS.md`) - Per-frame scroll delta

@@ -153,7 +153,7 @@ ZoneRange Collision::CalculateObjectZoneRange(const CollisionLayer& rLayer, int6
 		fMinimumY = f4Position.y;
 		fMaximumY = f4Position.y;
 	}
-	return CalculateZoneRange(fMinimumX, fMaximumX, fMinimumY, fMaximumY, rLayer.pfRadii[iIndex]);
+	return CalculateZoneRange(fMinimumX, fMaximumX, fMinimumY, fMaximumY, rLayer.fRadius);
 }
 
 void Collision::InsertObjectIntoZones(LayerPairZones& rPairZones, int64_t iIndex, const ZoneRange& rRange, bool bIsLayerA)
@@ -196,8 +196,8 @@ void Collision::InsertLayerObjectsIntoZones(LayerPairZones& rPairZones, const Co
 
 static XMVECTOR XM_CALLCONV PositionAtTime(const CollisionLayer& rLayer, int64_t iIndex, float fTime)
 {
-	float fStartTime = rLayer.pfStartTimes[iIndex];
-	float fEndTime = rLayer.pfEndTimes[iIndex];
+	float fStartTime = rLayer.fStartTime;
+	float fEndTime = rLayer.fEndTime;
 	if (fEndTime <= fStartTime)
 	{
 		return rLayer.pVecStartPositions[iIndex];
@@ -449,7 +449,7 @@ static void XM_CALLCONV RecordCollision(const CollisionCandidate& rCandidate, FX
 			.iOtherIndex = iOther,
 			.iOtherLayerIndex = iOtherLayer,
 			.uiOtherCategory = rOtherLayer.uiCategory,
-			.fDamageReceived = rOtherLayer.pfDamages[iOther],
+			.fDamageReceived = rOtherLayer.fDamage,
 			.fTimeOfImpact = rCandidate.fTimeOfImpact,
 			.vecContactPoint = rCandidate.vecContactPoint,
 			.vecSelfPosition = vecSelfPosition,
@@ -504,8 +504,8 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 		return;
 	}
 
-	float fStartTime = std::max(rLayerA.pfStartTimes[i], rLayerB.pfStartTimes[j]);
-	float fEndTime = std::min(rLayerA.pfEndTimes[i], rLayerB.pfEndTimes[j]);
+	float fStartTime = std::max(rLayerA.fStartTime, rLayerB.fStartTime);
+	float fEndTime = std::min(rLayerA.fEndTime, rLayerB.fEndTime);
 	if (fStartTime > fEndTime)
 	{
 		return;
@@ -515,8 +515,8 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 	XMVECTOR vecEndA = PositionAtTime(rLayerA, i, fEndTime);
 	XMVECTOR vecStartB = PositionAtTime(rLayerB, j, fStartTime);
 	XMVECTOR vecEndB = PositionAtTime(rLayerB, j, fEndTime);
-	float fRadiusA = rLayerA.pfRadii[i];
-	float fRadiusB = rLayerB.pfRadii[j];
+	float fRadiusA = rLayerA.fRadius;
+	float fRadiusB = rLayerB.fRadius;
 
 	bool bCollided = false;
 	float fTimeOfImpact = fEndTime;

@@ -23,13 +23,9 @@ constexpr float kfHealthRegenerationDistance = 60.0f;
 // thread_local: parallel per-Frame tick via Dispatch
 static thread_local int64_t siCollisionLayerIndex = 0;
 static thread_local std::vector<engine::CollisionFlags_t> sCollisionFlags;
-static thread_local std::vector<float> sCollisionRadii;
-static thread_local std::vector<float> sCollisionDamages;
 
 struct SpaceshipCollisionIntervalScratch
 {
-	std::vector<float> startTimes;
-	std::vector<float> endTimes;
 	std::vector<float> maximumTimes;
 };
 
@@ -98,18 +94,10 @@ void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFram
 
 	int64_t iCount = rCurrentInterpolate.iCount;
 	sCollisionFlags.resize(static_cast<size_t>(iCount));
-	sCollisionRadii.resize(static_cast<size_t>(iCount));
-	sCollisionDamages.resize(static_cast<size_t>(iCount));
-	rCollisionScratch.startTimes.resize(static_cast<size_t>(iCount));
-	rCollisionScratch.endTimes.resize(static_cast<size_t>(iCount));
 	rCollisionScratch.maximumTimes.resize(static_cast<size_t>(iCount));
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		sCollisionFlags.at(static_cast<size_t>(i)) = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
-		sCollisionRadii.at(static_cast<size_t>(i)) = kfSpaceshipRadius;
-		sCollisionDamages.at(static_cast<size_t>(i)) = kfSpaceshipCollisionDamage;
-		rCollisionScratch.startTimes.at(static_cast<size_t>(i)) = 0.0f;
-		rCollisionScratch.endTimes.at(static_cast<size_t>(i)) = 1.0f;
 		engine::SegmentHit boundaryHit = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousFrame.interpolate.pSpaceships->pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		rCollisionScratch.maximumTimes.at(static_cast<size_t>(i)) = boundaryHit.bHit ? boundaryHit.fTime : std::numeric_limits<float>::max();
 	}
@@ -118,14 +106,12 @@ void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFram
 	{
 		.pVecStartPositions = rPreviousFrame.interpolate.pSpaceships->pVecPositions,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
-		.pfStartTimes = rCollisionScratch.startTimes.data(),
-		.pfEndTimes = rCollisionScratch.endTimes.data(),
 		.pfMaxTimes = rCollisionScratch.maximumTimes.data(),
-		.pfRadii = sCollisionRadii.data(),
-		.pfDamages = sCollisionDamages.data(),
 		.pFlags = sCollisionFlags.data(),
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
+		.fRadius = kfSpaceshipRadius,
+		.fDamage = kfSpaceshipCollisionDamage,
 		.uiCategory = CollisionCategory::kuiSpaceship,
 		.uiCollidesWith = CollidesWith::kuiSpaceship,
 		.pAlignments = rCurrentPostRender.pAlignments,

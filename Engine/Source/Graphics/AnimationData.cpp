@@ -323,7 +323,7 @@ void AnimationData::EvaluateWorldMatrices(int64_t iAnimationIndex, float fTime, 
 	int64_t iTotalSize = 3 * iVectorSize;
 
 	auto bufferAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<std::byte*>(iTotalSize);
-	std::byte* pBuffer = static_cast<std::byte*>(bufferAllocation.mpData);
+	std::byte* pBuffer = bufferAllocation.mpData;
 	XMVECTOR* pvecTranslations = reinterpret_cast<XMVECTOR*>(pBuffer);
 	XMVECTOR* pvecRotations    = reinterpret_cast<XMVECTOR*>(pBuffer + iVectorSize);
 	XMVECTOR* pvecScales       = reinterpret_cast<XMVECTOR*>(pBuffer + 2 * iVectorSize);

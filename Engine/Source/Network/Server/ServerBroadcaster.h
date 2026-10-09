@@ -4,7 +4,7 @@
 
 // The engine owns per-cell publication assembly and the deferred-injection drain: the broadcast snapshot of this
 // tick's status changes, the deterministic type grouping the wire format depends on, and the per-coordinate update
-// handed to ServerSessionRuntime::PublishTick. The game supplies the StatusChange payloads. The game Agent fixture
+// handed to ServerSessionRuntime::PublishTick. The game supplies the StatusChange payloads. The game Agent harness rig
 // owns its deferred injection queue; it drains once per tick before that tick's snapshot. Naming game types keeps
 // this header out of the Engine.h aggregation; its consumers include it directly.
 

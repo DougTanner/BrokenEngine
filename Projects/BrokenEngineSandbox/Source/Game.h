@@ -121,7 +121,7 @@ public:
 	// In-memory mirror of ClientState.bin; loaded at startup, refreshed whenever any tracked field changes, and written on orderly exit.
 	game::FleetGuid mRememberedFleetGuid {};
 	engine::GlobalId mRememberedFocusedShipIdentifier {};
-	float mfRememberedCameraEyeHeightTarget = engine::Camera::kfCameraEyeHeightInitial;
+	float mfRememberedCameraEyeHeightTarget = engine::CameraBase::kfCameraEyeHeightInitial;
 
 	static constexpr float kfVisualErrorDecayRate = 15.0f;
 	static constexpr float kfVisualErrorMaxDistance = 5.0f;

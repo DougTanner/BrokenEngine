@@ -44,7 +44,7 @@
 #include "Graphics/Managers/TextureUploadManager.h"
 
 #include "Graphics/AnimationData.h"
-#include "Graphics/EngineCamera.h"
+#include "Graphics/CameraBase.h"
 #include "Graphics/OneShotCommandBuffer.h"
 #include "Graphics/Screenshot.h"
 

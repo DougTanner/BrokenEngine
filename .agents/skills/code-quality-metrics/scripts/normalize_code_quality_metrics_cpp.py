@@ -19,6 +19,7 @@ _SAL_ANNOTATIONS = (b"_Ret_range_", b"_Out_writes_to_", b"_Ret_notnull_", b"_Pos
 _EXPRESSION_PREFIXES = (b"alignof", b"co_await", b"co_return", b"co_yield", b"delete", b"do", b"else",
                         b"for", b"if", b"new", b"noexcept", b"return", b"sizeof", b"switch", b"throw",
                         b"typeid", b"while")
+_COMMA_EXPRESSION_PREFIXES = tuple(prefix for prefix in _EXPRESSION_PREFIXES if prefix != b"for")
 
 
 def _mark(kinds: bytearray, start: int, end: int, kind: int) -> None:
@@ -510,61 +511,127 @@ def _assignment_operator_at(source: bytes, kinds: bytearray, index: int) -> bool
             (index + 1 == len(source) or kinds[index + 1] != 0 or source[index + 1] != ord("=")))
 
 
-def _contains_assignment(source: bytes, kinds: bytearray, start: int, end: int) -> bool:
-    return any(_assignment_operator_at(source, kinds, index) for index in range(start, end))
-
-
-def _assignment_comma_operand(source: bytes, kinds: bytearray, start: int, end: int) -> bool:
-    commas: list[int] = []
-    depth = 0
-    for index in range(start, end):
-        if kinds[index] != 0:
+def _mask_comma_assignments(source: bytes, kinds: bytearray, result: bytearray) -> None:
+    """Blank the assigning first operand's `lhs =` in each parenthesized comma expression."""
+    for opening, byte in enumerate(source):
+        if byte != ord("(") or kinds[opening] != 0:
             continue
-        if source[index] in b"([{":
-            depth += 1
-        elif source[index] in b")]}":
-            depth = max(0, depth - 1)
-        elif depth == 0 and source[index] == ord(","):
-            commas.append(index)
-    bounds = [start, *commas, end]
-    return any(_contains_assignment(source, kinds, bounds[index], bounds[index + 1]) and
-               _contains_assignment(source, kinds, bounds[index + 1] + 1, bounds[index + 2])
-               for index in range(len(bounds) - 2))
-
-
-def _mask_comma_folds(source: bytes, kinds: bytearray, result: bytearray) -> None:
-    search = 0
-    while True:
-        ellipsis = source.find(b"...", search)
-        if ellipsis < 0:
-            return
-        search = ellipsis + 3
-        if any(kinds[index] != 0 for index in range(ellipsis, ellipsis + 3)):
+        name = _identifier_before(source, kinds, opening)
+        if name is not None and name[0] not in _COMMA_EXPRESSION_PREFIXES:
             continue
-        openings: list[int] = []
-        for index in range(ellipsis):
-            if kinds[index] == 0:
-                if source[index] == ord("("):
-                    openings.append(index)
-                elif source[index] == ord(")") and openings:
-                    openings.pop()
-        if not openings:
+        previous = _previous_code(source, kinds, opening)
+        if name is None and previous is not None and source[previous] in b")]>":
             continue
-        opening = openings[-1]
         closing = _matching_delimiter(source, kinds, opening, ord("("), ord(")"))
-        if closing is None or closing < ellipsis:
+        if closing is None:
             continue
-        comma = _previous_code(source, kinds, ellipsis)
-        if comma is None or source[comma] != ord(","):
+        depth = 0
+        assignment = None
+        for index in range(opening + 1, closing):
+            if kinds[index] != 0:
+                continue
+            if source[index] in b"([{":
+                depth += 1
+            elif source[index] in b")]}":
+                depth -= 1
+            elif depth == 0 and source[index] == ord(","):
+                if assignment is not None:
+                    _mask_non_newlines(result, opening + 1, assignment + 1)
+                break
+            elif depth == 0 and assignment is None and _assignment_operator_at(source, kinds, index):
+                assignment = index
+
+
+def _mask_declarator_alternatives(source: bytes, kinds: bytearray, result: bytearray) -> None:
+    """Keep the first alternative of a conditional group that spells only a function declarator."""
+    groups: list[tuple[int, list[int]]] = []
+    line_start = 0
+    while line_start < len(source):
+        directive = _directive_at(source, kinds, line_start)
+        if directive is None:
+            end, _ = _line_end(source, line_start)
+            line_start = end + 1
             continue
-        payload_start = _next_code(source, kinds, opening + 1)
-        payload_end = _previous_code(source, kinds, comma)
-        if payload_start is None or payload_end is None or source[payload_start] != ord("("):
+        directive_end, next_start, name, _ = directive
+        if name in (b"if", b"ifdef", b"ifndef"):
+            groups.append((line_start, []))
+        elif name in (b"elif", b"else") and groups:
+            groups[-1][1].append(line_start)
+        elif name == b"endif" and groups:
+            start, alternatives = groups.pop()
+            following = _next_code(source, kinds, directive_end)
+            if (alternatives and following is not None and source[following] == ord("{") and
+                    not any(kinds[index] == 0 and source[index] in b";{}" for index in range(start, directive_end))):
+                _mask_non_newlines(result, alternatives[0], directive_end)
+        line_start = next_start
+
+
+def _mask_typename_brace_arguments(source: bytes, kinds: bytearray, result: bytearray) -> None:
+    """Blank `typename` that opens a brace-initialized argument."""
+    keyword = b"typename"
+    start = 0
+    while True:
+        index = source.find(keyword, start)
+        if index < 0:
+            return
+        end = index + len(keyword)
+        start = end
+        if kinds[index:end] != bytes(len(keyword)) or (index > 0 and source[index - 1] in _IDENT) or (end < len(source) and source[end] in _IDENT):
             continue
-        if _matching_delimiter(source, kinds, payload_start, ord("("), ord(")")) != payload_end:
+        previous = _previous_code(source, kinds, index)
+        if previous is None or source[previous] not in b"(,":
             continue
-        if _assignment_comma_operand(source, kinds, payload_start + 1, payload_end):
-            _mask_non_newlines(result, opening, closing + 1)
+        depth = 0
+        code = _next_code(source, kinds, end)
+        while code is not None:
+            if source[code] == ord("<"):
+                depth += 1
+            elif source[code] == ord(">"):
+                depth -= 1
+            elif depth == 0 and source[code] == ord("{"):
+                _mask_non_newlines(result, index, end)
+                break
+            elif depth == 0 and source[code] not in _IDENT + b":":
+                break
+            code = _next_code(source, kinds, code + 1)
+
+
+def _mask_member_pointer_template_arguments(source: bytes, kinds: bytearray, result: bytearray) -> None:
+    """Blank `OWNER::*` that ends a template argument."""
+    start = 0
+    while True:
+        index = source.find(b"::*", start)
+        if index < 0:
+            return
+        start = index + 3
+        if kinds[index:start] != bytes(3):
+            continue
+        closing = _next_code(source, kinds, start)
+        owner = _identifier_before(source, kinds, index)
+        if closing is not None and source[closing] == ord(">") and owner is not None:
+            _mask_non_newlines(result, owner[1], start)
+
+
+def _mask_macro_scope_members(source: bytes, kinds: bytearray, result: bytearray) -> None:
+    """Blank `::identifier` after an all-caps macro invocation."""
+    start = 0
+    while True:
+        index = source.find(b"::", start)
+        if index < 0:
+            return
+        start = index + 2
+        if kinds[index:start] != bytes(2):
+            continue
+        closing = _previous_code(source, kinds, index)
+        if closing is None or source[closing] != ord(")"):
+            continue
+        opening = _matching_opening(source, kinds, closing, ord("("), ord(")"))
+        macro = None if opening is None else _identifier_before(source, kinds, opening)
+        if macro is None or not macro[0].isupper():
+            continue
+        member = _next_code_token(source, kinds, start, len(source))
+        if member is not None and member[0][0] in _IDENT:
+            _mask_non_newlines(result, index, member[2])
 
 
 def _mask_namespace_declaration(source: bytes, kinds: bytearray, result: bytearray, start: int, first: bytes) -> None:
@@ -634,7 +701,11 @@ def normalize_cpp_bytes(source: bytes) -> bytes:
                 if semicolon is not None and source[semicolon] == ord(";"):
                     _mask_non_newlines(result, index, token[2])
     _mask_nested_aggregate_designators(source, kinds, result)
-    _mask_comma_folds(source, kinds, result)
+    _mask_comma_assignments(source, kinds, result)
+    _mask_declarator_alternatives(source, kinds, result)
+    _mask_typename_brace_arguments(source, kinds, result)
+    _mask_member_pointer_template_arguments(source, kinds, result)
+    _mask_macro_scope_members(source, kinds, result)
     return bytes(result)
 
 

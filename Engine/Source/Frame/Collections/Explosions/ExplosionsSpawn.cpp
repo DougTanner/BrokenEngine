@@ -167,7 +167,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 
 	int64_t iTotalParticles = rSpawnInformation.uiParticleCount + rType.uiBaseParticleCount;
 
-	// Per-type tweak multipliers (Particles tab). Null on server, optional on client.
+	// Per-type tweak multipliers (Particles tab).
 	auto Scale = [](const Wrapper* pWrapper)
 	{
 		return pWrapper != nullptr ? pWrapper->mfCurrent : 1.0f;
@@ -226,6 +226,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 			ParticleManager::Spawn(gpParticleManager->mLongParticlesSpawnLayout,
 			{
 				.iColor = static_cast<int32_t>(uiParticleColor),
+				.iColorEnd = static_cast<int32_t>(rType.uiParticleColorEnd),
 				.fVelocityDecay = rType.fParticleVelocityDecay * fVelocityDecayScale,
 				.fGravity = rType.fParticleGravity * fGravityScale,
 				.fIntensityDecay = rType.fParticleIntensityDecay * fIntensityDecayScale,

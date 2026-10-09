@@ -22,5 +22,5 @@ public:
 
 protected:
 
-	virtual void Export() override;
+	void Export() override;
 };

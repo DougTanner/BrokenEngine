@@ -2,9 +2,9 @@
 
 #include "Agent/Commands/AgentCommandsAudioStreaming.h"
 #include "Agent/Commands/ClientDesyncProbe.h"
-#include "Agent/Commands/ClientFullStateFixture.h"
-#include "Agent/Commands/ClientPacketFaultFixture.h"
-#include "Agent/Commands/ClientSubscriptionFixtures.h"
+#include "Agent/Commands/ClientFullStateHarnessRig.h"
+#include "Agent/Commands/ClientPacketFaultHarnessRig.h"
+#include "Agent/Commands/ClientSubscriptionHarnessRigs.h"
 
 #if defined(BT_CLIENT)
 
@@ -135,34 +135,34 @@ static void CommandReleaseClientGridCoordinate(const nlohmann::json& rParameters
 
 bool ExecuteAgentCommandClient(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (command == "audio_streaming_fixture")
+	if (command == "audio_streaming_harness_rig")
 	{
-		CommandAudioStreamingFixture(rParameters, rResult);
+		CommandAudioStreamingHarnessRig(rParameters, rResult);
 		return true;
 	}
-	if (command == "client_subscribe_accept_fixture")
+	if (command == "client_subscribe_accept_harness_rig")
 	{
-		CommandClientSubscribeAcceptFixture(rParameters, rResult);
+		CommandClientSubscribeAcceptHarnessRig(rParameters, rResult);
 		return true;
 	}
-	if (command == "client_stale_update_fixture")
+	if (command == "client_stale_update_harness_rig")
 	{
-		CommandClientStaleUpdateFixture(rParameters, rResult);
+		CommandClientStaleUpdateHarnessRig(rParameters, rResult);
 		return true;
 	}
-	if (command == "client_cancelled_subscription_fixture")
+	if (command == "client_cancelled_subscription_harness_rig")
 	{
-		CommandClientCancelledSubscriptionFixture(rParameters, rResult);
+		CommandClientCancelledSubscriptionHarnessRig(rParameters, rResult);
 		return true;
 	}
-	if (command == "client_packet_fault_fixture")
+	if (command == "client_packet_fault_harness_rig")
 	{
-		CommandClientPacketFaultFixture(rParameters, rResult);
+		CommandClientPacketFaultHarnessRig(rParameters, rResult);
 		return true;
 	}
-	if (command == "client_full_state_fixture")
+	if (command == "client_full_state_harness_rig")
 	{
-		CommandClientFullStateFixture(rParameters, rResult);
+		CommandClientFullStateHarnessRig(rParameters, rResult);
 		return true;
 	}
 	if (command == "describe_scene")

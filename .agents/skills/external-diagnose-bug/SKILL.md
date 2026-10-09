@@ -1,10 +1,11 @@
 ---
 name: external-diagnose-bug
 description: >-
-  Find and prove the root cause of a bug or performance regression before any
-  fix exists. Use when the user says "diagnose" or "debug this", or reports
-  something misbehaving, desyncing, mismatched CRC, or slow. Diagnosis only —
-  never fixes, commits, or lands.
+  Find and prove the root cause of a bug or performance regression before a fix
+  exists or after one fails its retest. Use when the user says "diagnose" or
+  "debug this", or reports something misbehaving, desyncing, mismatched CRC, or
+  slow, or when a fix fails its Change Workflow retest. Diagnosis only — never
+  fixes, commits, or lands.
 allowed-tools: [Read, Grep, Glob, Edit, PowerShell]
 ---
 
@@ -22,13 +23,17 @@ Adapted from an external MIT-licensed skill; see [LICENSE](LICENSE).
 
 - The user says "diagnose" or "debug this".
 - The user reports something misbehaving, desyncing, mismatched CRC, or slow.
+- A fix fails its retest at the Change Workflow Review and resolve correctness
+  step.
 
 ## Inputs
 
 Require the reported symptom and expected behavior, the reproduction scope,
 the session baseline when one exists, and every supplied log, capture, command
-result, or other evidence. Name any missing input needed to build a reproducing
-signal.
+result, or other evidence. A Review and resolve correctness step dispatch also
+names that origin, carries the failed retest as evidence, and gives the fix's
+stated root cause as an unproven hypothesis. Name any missing input needed to
+build a reproducing signal.
 
 ## Handoff
 
@@ -54,6 +59,8 @@ missing environment/input; use `none` when absent.
 
 Use `PASS` only with a proven root cause. Use `BLOCKED` when the diagnosis
 cannot be proven, naming what evidence, input, or environment is still needed.
+On a Review and resolve correctness step dispatch, return that `BLOCKED`
+wherever the steps would otherwise ask the user.
 
 ## References
 

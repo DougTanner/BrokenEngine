@@ -34,7 +34,7 @@ and any fixed workflow or compatibility decisions.
 
 In validate mode, supply one repository skill directory or its `SKILL.md` as
 `Path`. A deliberately disposable package outside `.agents/skills/` also
-requires `Fixture: true`.
+requires `AllowOutsideSkills: true`.
 
 ## Handoff
 

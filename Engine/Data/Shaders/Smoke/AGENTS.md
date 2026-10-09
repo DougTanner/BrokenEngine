@@ -4,7 +4,9 @@ Smoke is a client-only 2D density field over a camera-following world rectangle.
 
 ## Frame and Remap Contract
 
-Each frame runs pass B, pass A, then deposit. Pass B reads the previous frame's pass-A output in previous-area coordinates without remapping. Pass A performs the single previous-area-to-current-area remap. Fresh deposits then enter pass A's output so consumers see them in the same frame.
+Each refresh runs pass B, pass A, then deposit. Pass B reads the previous refresh's pass-A output in previous-area coordinates without remapping. Pass A performs the single previous-area-to-current-area remap. Fresh deposits then enter pass A's output so consumers see them in the same frame. At Smoke Update Cadence 1 every frame refreshes.
+
+A frame between refreshes runs no spread, and every reader samples the texture where it lies; deposits keep landing in it. The area publication for those frames is owned by Render (`../../../Source/Graphics/Render/AGENTS.md` `## Precision and History`). The dilate radius stays 2 tiles at every cadence, so smoke whose per-refresh gather offset passes that radius-2 halo has no active output tile and is deleted, and strong-wind plume fronts thin at higher cadence.
 
 The asymmetric remap requires matching occupancy dilation: B uses direct tile lookup, while A remaps output-tile centers into the previous grid before lookup. Both variants union input activity with existing output occupancy so texels left behind by camera movement are revisited and cleared.
 

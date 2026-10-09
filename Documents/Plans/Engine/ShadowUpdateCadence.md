@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-07T12:28:15.491Z","dependsOn":["Documents/Plans/Engine/SmokeUpdateCadence.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-07T12:28:15.491Z","dependsOn":[]} -->
 # Terrain Shadow Update Cadence
 
 ## Context

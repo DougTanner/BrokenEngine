@@ -8,7 +8,7 @@
 #include "File/Replay.h"
 #include "GameBase.h"
 
-#include "Agent/Commands/ServerSimulationFixtures.h"
+#include "Agent/Commands/ServerSimulationHarnessRigs.h"
 #include "Network/Server/ServerFleetSerialization.h"
 #include "Network/Server/ServerSession.h"
 #include "Profile/ProfileManager.h"
@@ -40,7 +40,7 @@ void AdoptReplayMetadata(const ReplayStagedMeta&& rStagedMetadata)
 
 void OnReplayStreamsInvalidated()
 {
-	ResetReplayTransferFixtures(*game::gpServerSession);
+	ResetReplayTransferHarnessRigs(*game::gpServerSession);
 }
 
 void OnStateReplaced()

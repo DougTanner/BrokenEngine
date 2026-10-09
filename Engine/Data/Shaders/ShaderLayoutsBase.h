@@ -294,6 +294,7 @@ CONSTEXPR int kiMaxParticles = 16 * 1024;
 struct ParticleLayout
 {
 	int32_t iColor INIT;
+	int32_t iColorEnd INIT;
 	int32_t iCookie INIT;
 
 	float fVelocityDecay INIT;
@@ -303,6 +304,7 @@ struct ParticleLayout
 	float fSize INIT;
 	float fLength INIT;
 	float fVisibleIntensity INIT;
+	float fSpawnIntensity INIT;
 	float fIntensityPower INIT;
 
 	float fSizeDecay INIT;

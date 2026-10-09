@@ -5,9 +5,11 @@ the handoff form live in [`../SKILL.md`](../SKILL.md).
 
 ## Steps
 
-1. Read, for each authorized hypothesis, the callers, consumers, schemas,
-   instructions, generated outputs, or sibling paths it needs; diff-only reading
-   is insufficient. Done when every hypothesis has its dependent sites read.
+1. For each authorized hypothesis, read callers, consumers, schemas,
+   instructions, generated outputs, or sibling paths it needs, beyond the diff;
+   start with the one the change's safety most rests on and report it first, in
+   `Traced clean` or as the first finding. Done when every hypothesis has its
+   dependent sites read.
 2. Test the contract appropriate to the artifact. For code and shaders, trace
    logic, integration, lifetime, threading, determinism, edge states, and build
    reachability. For scripts, project metadata, schemas, and data, trace inputs,

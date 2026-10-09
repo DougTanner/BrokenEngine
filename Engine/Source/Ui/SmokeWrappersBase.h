@@ -9,6 +9,7 @@ extern Wrapper gSmokeMaximum;
 extern Wrapper gSmokePower;
 extern Wrapper gSmokeDecay;
 extern Wrapper gSmokeEdgeDecayDistance;
+extern Wrapper gSmokeUpdateCadence;
 
 extern Wrapper gSmokeColorMinimum;
 extern Wrapper gSmokeColorMultiplier;
@@ -19,6 +20,10 @@ extern Wrapper gSmokeNoiseScaleTwo;
 extern Wrapper gSmokeWindNoiseScale;
 extern Wrapper gSmokeNoiseQuantity;
 extern Wrapper gSmokeWindNoiseQuantity;
+extern Wrapper gSmokeCurlStrengthLow;
+extern Wrapper gSmokeCurlStrengthHigh;
+extern Wrapper gSmokeCurlScale;
+extern Wrapper gSmokeCurlSpeed;
 
 // Wind Displacement (Smoke tab's Wind Displacement section)
 extern Wrapper gWindToSmokeStrength;

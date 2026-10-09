@@ -33,13 +33,13 @@ public:
 
 	~ExportScene() override = default;
 
-	virtual bool CheckDirty(const std::filesystem::path& rPackFile) override;
+	bool CheckDirty(const std::filesystem::path& rPackFile) override;
 
 protected:
 
-	virtual std::string GetInputFingerprint() const override;
-	virtual void Export() override;
-	virtual void UpdateCacheMetadata() override;
+	std::string GetInputFingerprint() const override;
+	void Export() override;
+	void UpdateCacheMetadata() override;
 
 private:
 

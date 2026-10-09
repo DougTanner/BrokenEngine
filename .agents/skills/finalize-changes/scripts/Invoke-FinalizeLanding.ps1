@@ -43,7 +43,7 @@ if (-not (Test-Path -LiteralPath $exclusionModule)) {
 Import-Module $exclusionModule -Force
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-finalize-landing/v5'
+	schemaVersion = 'broken-engine-finalize-landing/v6'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Landing transaction did not complete.'
@@ -53,7 +53,7 @@ $result = [ordered]@{
 	candidate = [ordered]@{ commit = $ApprovedSessionCommit; tree = $ApprovedCandidateTree; treeVerified = $false }
 	approvedSource = [ordered]@{ commit = $ApprovedSessionCommit; tree = $ApprovedCandidateTree; parent = $null; patch = $null; metadata = $null }
 	rebasedSource = [ordered]@{ commit = $null; tree = $null; parent = $null; patch = $null }
-	historyUpdate = [ordered]@{ status = 'not-run'; rowDate = $null; jsonl = $null; svg = $null }
+	historyUpdate = [ordered]@{ status = 'not-run'; jsonl = $null; svg = $null }
 	final = [ordered]@{ commit = $null; tree = $null; parent = $null; replacement = $false }
 	landed = [ordered]@{ commit = $null; tree = $null; rebaseAttempts = 0 }
 	locks = [ordered]@{ landingOwner = $null; landingClaimed = $false; landingReleased = $false; claim = $null }
@@ -82,9 +82,6 @@ $script:ApprovedPatchIdentity = $null
 $script:ApprovedSourceParent = $null
 $script:HistoryTempRoot = $null
 $script:HistoryTempParent = $null
-# The one UTC row date this landing records, frozen under the lease so an internal rebase cannot
-# shift the history point the user confirmed.
-$script:LandingHistoryDate = $null
 $script:LandingOwner = $null
 $script:LandingClaimed = $false
 # The lease duration this landing needs to hold through the whole advance. WorktreeCli's refresh
@@ -155,7 +152,7 @@ function New-LandingProjection {
 	} 'Invoke-FinalizeLanding'
 	$residuals = New-LandingCollection @($result.residuals) { param($residual); $text = Get-BoundedLandingText ([string]$residual) 512; [ordered]@{ message = $text.Text; messageLength = $text.Length; messageTruncated = $text.Truncated } } 'Invoke-FinalizeLanding'
 	return [ordered]@{
-		schemaVersion = 'broken-engine-finalize-landing/v5'; status = $result.status; code = $code.Text; message = $message.Text; messageLength = $message.Length; messageTruncated = $message.Truncated
+		schemaVersion = 'broken-engine-finalize-landing/v6'; status = $result.status; code = $code.Text; message = $message.Text; messageLength = $message.Length; messageTruncated = $message.Truncated
 		primaryAdvanced = [bool]$result.primaryAdvanced; candidate = [ordered]@{ commit = Get-LandingGitObjectId $result.candidate.commit; tree = Get-LandingGitObjectId $result.candidate.tree; treeVerified = [bool]$result.candidate.treeVerified }
 		landed = [ordered]@{ commit = $(if ($result.status -ceq 'landed') { Get-LandingGitObjectId $result.landed.commit } else { $null }); tree = $(if ($result.status -ceq 'landed') { Get-LandingGitObjectId $result.landed.tree } else { $null }); rebaseAttempts = [int]$result.landed.rebaseAttempts }
 		approvedSource = [ordered]@{ commit = Get-LandingGitObjectId $result.approvedSource.commit; tree = Get-LandingGitObjectId $result.approvedSource.tree; parent = Get-LandingGitObjectId $result.approvedSource.parent; patch = $result.approvedSource.patch; metadata = $result.approvedSource.metadata }
@@ -191,10 +188,10 @@ function Get-JsonResponse($Response, [string] $Operation) {
 	}
 }
 
-# Generation is a plain landing step: the producer decides on its own what the row contains, so this
-# only runs it against the final tree and hands back the two fixed paths it wrote into a fresh
-# ignored Temp child.
-function Invoke-HistoryGenerate([string] $SourceCommit, [string] $PrimaryTip) {
+# Generation is a plain landing step: the producer decides on its own which rows to append, ending
+# with the primary tip this landing builds on (never the landing commit itself), so this only runs it
+# and hands back the two fixed paths it wrote into a fresh ignored Temp child.
+function Invoke-HistoryGenerate([string] $PrimaryTip) {
 	$script:HistoryTempParent = Join-Path $script:CurrentIdentity.Worktree 'Temp\FinalizeHistory'
 	New-Item -ItemType Directory -Path $script:HistoryTempParent -Force | Out-Null
 	$relativeTempParent = [IO.Path]::GetRelativePath($script:CurrentIdentity.Worktree, $script:HistoryTempParent).Replace('\', '/')
@@ -203,7 +200,7 @@ function Invoke-HistoryGenerate([string] $SourceCommit, [string] $PrimaryTip) {
 	if (Test-Path -LiteralPath $script:HistoryTempRoot) { Throw-Landing 2 'history.temp-collision' 'History Generate selected an existing output directory.' }
 	$historyScript = Join-Path $script:CurrentIdentity.Worktree '.agents\skills\code-quality-metrics\scripts\Invoke-CodeQualityMetricsHistory.ps1'
 	if (-not (Test-Path -LiteralPath $historyScript -PathType Leaf)) { Throw-Landing 1 'history.generate-unavailable' "The code-quality history Generate producer is missing: '$historyScript'." }
-	$arguments = @('-NoProfile', '-File', $historyScript, '-Mode', 'Generate', '-RepositoryRoot', $script:CurrentIdentity.Worktree, '-BaseCommit', $PrimaryTip, '-TipCommit', $SourceCommit, '-DateUtc', $script:LandingHistoryDate, '-OutputDirectory', $script:HistoryTempRoot)
+	$arguments = @('-NoProfile', '-File', $historyScript, '-Mode', 'Generate', '-RepositoryRoot', $script:CurrentIdentity.Worktree, '-BaseCommit', $PrimaryTip, '-OutputDirectory', $script:HistoryTempRoot)
 	$response = Invoke-FinalizeNativeText "$PSHOME\pwsh.exe" $arguments $script:CurrentIdentity.Worktree
 	if ($response.ExitCode -ne 0) { Throw-Landing 2 'history.generate-failed' "History Generate failed: $($response.Stderr.Trim())" }
 	$artifacts = [pscustomobject]@{ JsonPath = (Join-Path $script:HistoryTempRoot 'CodeQualityMetricsHistory.jsonl'); SvgPath = (Join-Path $script:HistoryTempRoot 'CodeQualityMetricsHistory.svg') }
@@ -472,13 +469,13 @@ function New-FrozenReplacementCommit([string] $Tree, [string] $Parent) {
 function New-LandingHistoryCommit {
 	try {
 		[void](Assert-NoHistorySourceChanges $script:LandingPrimaryTip $script:LandingCommit)
-		$artifacts = Invoke-HistoryGenerate $script:LandingCommit $script:LandingPrimaryTip
+		$artifacts = Invoke-HistoryGenerate $script:LandingPrimaryTip
 		$finalTree = New-HistoryOverlayTree $artifacts $script:LandingCommit
 		$finalCommit = New-FrozenReplacementCommit $finalTree $script:LandingPrimaryTip
 		$finalParent = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', '-s', '--format=%P', $finalCommit)).Trim()
 		$actualTree = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "$finalCommit^{tree}")).Trim()
 		if ($finalParent -cne $script:LandingPrimaryTip -or $actualTree -cne $finalTree) { Throw-Landing 1 'history.replacement-invalid' 'The landing commit does not have the current primary sole parent and validated tree.' }
-		$result.historyUpdate = [ordered]@{ status = 'pass'; rowDate = $script:LandingHistoryDate; jsonl = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; svg = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg' }
+		$result.historyUpdate = [ordered]@{ status = 'pass'; jsonl = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; svg = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg' }
 		$result.final.commit = $finalCommit; $result.final.tree = $finalTree; $result.final.parent = $finalParent; $result.final.replacement = $true
 		return [pscustomobject]@{ Commit = $finalCommit; Tree = $finalTree; Parent = $finalParent }
 	}
@@ -789,7 +786,7 @@ function Complete-RecoveredLanding($InitialMatch, [string] $InitialPrimaryRef) {
 	$result.tips.current = $match.Commit; $result.tips.primary = $claimedPrimaryRef
 	$result.final = [ordered]@{ commit = $match.Commit; tree = $match.Tree; parent = $match.Parent; replacement = $true }
 	$jsonPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; $svgPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'
-	$result.historyUpdate = [ordered]@{ status = 'recovered'; rowDate = $null; jsonl = $jsonPath; svg = $svgPath }
+	$result.historyUpdate = [ordered]@{ status = 'recovered'; jsonl = $jsonPath; svg = $svgPath }
 	$result.landed.commit = $match.Commit; $result.landed.tree = $match.Tree; $result.primaryAdvanced = $true
 	return $true
 }
@@ -1054,11 +1051,10 @@ try {
 	$result.locks.landingClaimed = $true
 	if ($script:LandingOwnerAdopted) { Refresh-LandingOwner }
 	Assert-ApprovedCandidateTree
-	# Freeze all source-commit metadata and the one UTC row date while this lease is held. A later
-	# rebase may change object IDs, but it must not change what the user approved or the history point.
+	# Freeze all source-commit metadata while this lease is held. A later rebase may change object
+	# IDs, but it must not change what the user approved.
 	$script:FrozenCommitMetadata = Get-FrozenCommitMetadata $ApprovedSessionCommit
 	$result.approvedSource.metadata = $script:FrozenCommitMetadata
-	$script:LandingHistoryDate = [DateTime]::UtcNow.ToString('yyyy-MM-dd')
 	$result.rebasedSource.commit = $script:LandingCommit
 	$result.rebasedSource.tree = $script:LandingTree
 	$result.rebasedSource.parent = $script:LandingPrimaryTip

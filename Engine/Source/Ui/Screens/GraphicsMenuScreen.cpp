@@ -8,6 +8,7 @@
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/LocalizationBase.h"
 #include "Ui/MenuUtils.h"
+#include "Ui/SmokeWrappersBase.h"
 #include "Ui/SunMoonWrappersBase.h"
 
 #include "Game.h"
@@ -178,6 +179,7 @@ void GraphicsMenuScreen::Render()
 			ApplySmokeDetailLevel();
 		}
 		ColumnSlider("Smoke Area", &gSmokeSimulationArea);
+		ColumnSlider("Smoke Update Cadence", &gSmokeUpdateCadence, "%.0f");
 		ImGui::EndDisabled();
 
 		ImGui::Separator();

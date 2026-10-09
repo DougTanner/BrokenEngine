@@ -5,7 +5,7 @@
 #include "Network/Client/ClientSession.h"
 #endif
 #if defined(BT_SERVER)
-#include "Agent/Commands/ReplayFixtures.h"
+#include "Agent/Commands/ReplayHarnessRigs.h"
 #include "File/Replay.h"
 #include "Network/Server/ServerSession.h"
 #include "Network/Server/ServerTransferManager.h"
@@ -236,11 +236,16 @@ void GameBase::ClientUpdate()
 	PrepareActiveSet();
 
 	// Hard ceiling: clock-servo target + kiSimulationCeilingSlackTicks. EvaluateClock steers the
-	// sim toward the bare target, so this clamp engages only on genuine arrival stalls (loss bursts),
-	// not per-packet jitter, while StatusChanges still normally arrive before their tick simulates.
+	// sim toward the bare target, and the target and this ceiling both read the estimated latest server
+	// tick, which keeps advancing through an arrival gap for up to kiMaximumEstimatedServerTickLead ticks,
+	// so this clamp freezes the sim until the next arrival only once a gap outlasts that cap, not on per-packet
+	// jitter or ordinary loss bursts. While a lead left by a gap, a debug pause, or a server hitch longer than the
+	// server's kiMaximumAccumulatorTicks cap is above the slack, the estimate eases back by holding still at some
+	// arrivals, and each such hold stalls a sim at the ceiling.
 	// Extreme "sim way behind target" is handled by the snap path in Reconcile.
 	const engine::ClientSessionRuntime& rRuntime = *game::gpClientSession->mpRuntime;
-	int64_t iCeiling = rRuntime.miLatestServerTick < 0 ? -1 : rRuntime.miLatestServerTick - rRuntime.miCurrentTargetBehind + engine::kiSimulationCeilingSlackTicks;
+	int64_t iEstimatedLatestServerTick = rRuntime.EstimatedLatestServerTick();
+	int64_t iCeiling = iEstimatedLatestServerTick < 0 ? -1 : iEstimatedLatestServerTick - rRuntime.miCurrentTargetBehind + engine::kiSimulationCeilingSlackTicks;
 	int64_t iAbsorbedTicks = 0;
 	if (iCeiling >= 0 && iFullTicks > 0)
 	{
@@ -254,10 +259,11 @@ void GameBase::ClientUpdate()
 		}
 	}
 
-	// When latestServerTick stalls (loss burst), the ceiling freezes the sim entirely, then releases
-	// the backlog as a burst — log at the transition. Frequent stalls outside loss bursts indicate a
-	// clock-servo / kiSimulationCeilingSlackTicks tuning problem (the servo should keep steady-state jitter
-	// away from the ceiling).
+	// When the estimated latest server tick stops at its cap (an arrival gap longer than
+	// kiMaximumEstimatedServerTickLead, such as a server stop), the ceiling freezes the sim entirely, then
+	// releases the backlog as a burst — log at the transition. Frequent stalls without such a gap, a debug pause,
+	// or a server hitch indicate a clock-servo / kiSimulationCeilingSlackTicks tuning problem (the servo should
+	// keep steady-state jitter away from the ceiling).
 	{
 		static int64_t siCeilingStallFrames = 0;
 		static int64_t siCeilingAbsorbedTicks = 0;
@@ -342,7 +348,7 @@ void GameBase::ServerUpdate()
 		LOG(kDefault, kWarning, "ServerUpdate FullTicks: {} (expected 1)", iFullTicks);
 	}
 	int64_t iUnusedTicks = 0;
-	if (ReplayFixtures::IsWriterPauseArmed(*gpReplay) && iFullTicks > 1)
+	if (ReplayHarnessRigs::IsWriterPauseArmed(*gpReplay) && iFullTicks > 1)
 	{
 		iUnusedTicks = iFullTicks - 1;
 		iFullTicks = 1;
@@ -536,10 +542,10 @@ game::Frame& GameBase::RenderFrame(GridCoord coordinate) const
 {
 	// Returns the frame kiRenderBehindTicks slots behind tail when possible so the one-tick render
 	// window spans (source -> source+1) — a true interpolation between two committed ticks, with
-	// the newer committed ticks up to tail held as starvation cushion. When the ring hasn't
-	// populated that many slots yet (cold start or a replay/rollback that didn't apply retention),
-	// fall back to the oldest available; callers force fDeltaTime = 0 for that coord so no
-	// extrapolation occurs.
+	// the newer committed ticks up to tail held as starvation cushion. When the ring holds fewer
+	// slots (cold start, or a reconcile whose base has fewer committed ticks above it, such as a
+	// just-adopted full state), fall back to the oldest available; callers force fDeltaTime = 0
+	// for that coord so no extrapolation occurs.
 	const Cell& rCell = mCells.at(coordinate);
 	ASSERT(rCell.iSnapshotCount > 0);
 	int64_t iDesiredLogical = rCell.iSnapshotCount - 1 - kiRenderBehindTicks;

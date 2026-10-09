@@ -12,7 +12,18 @@ namespace game
 
 #if defined(BT_CLIENT)
 
-static bool GetClientSnapshotPosition(XMVECTOR& rVecPosition)
+static bool GetClientPlayerPosition(const Frame& rFrame, XMVECTOR& rVecPosition)
+{
+	std::optional<int64_t> oClientPlayerIndex = gpGame->ClientPlayerIndex(*rFrame.postRender.pPlayers);
+	if (!oClientPlayerIndex.has_value())
+	{
+		return false;
+	}
+	rVecPosition = rFrame.interpolate.pPlayers->pVecPositions[*oClientPlayerIndex];
+	return true;
+}
+
+static bool GetClientSnapshotPosition(XMVECTOR& rVecPosition, int64_t& riTick)
 {
 	auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
 	if (it == gpGame->mCells.end())
@@ -23,19 +34,33 @@ static bool GetClientSnapshotPosition(XMVECTOR& rVecPosition)
 	{
 		return false;
 	}
-	int64_t iPhysical = engine::SnapshotIndex(it->second.iSnapshotHead, it->second.iSnapshotCount - 1);
-	const std::unique_ptr<game::Frame>& rpSnapshot = it->second.snapshots[iPhysical];
-	if (rpSnapshot == nullptr)
+	const Frame& rFrame = gpGame->RenderFrame(gpGame->mClientGridCoordinate);
+	riTick = rFrame.interpolate.iTick;
+	return GetClientPlayerPosition(rFrame, rVecPosition);
+}
+
+// A full replay can leave the ring without history before its confirmed frame, so the replayed timeline's frame at
+// iTick is looked up in the client coord's replay stack rather than the ring.
+static bool GetClientReplayedPosition(std::span<const engine::CoordWork> works, int64_t iTick, XMVECTOR& rVecPosition)
+{
+	for (const engine::CoordWork& rWork : works)
 	{
+		if (rWork.coord != gpGame->mClientGridCoordinate)
+		{
+			continue;
+		}
+		const engine::CoordScratch& rScratch = rWork.scratch;
+		for (int64_t i = 0; i < rScratch.iReplayStackCount; ++i)
+		{
+			const Frame& rFrame = *rScratch.replayStack.at(static_cast<size_t>(i));
+			if (rFrame.interpolate.iTick == iTick)
+			{
+				return GetClientPlayerPosition(rFrame, rVecPosition);
+			}
+		}
 		return false;
 	}
-	std::optional<int64_t> oClientPlayerIndex = gpGame->ClientPlayerIndex(*rpSnapshot->postRender.pPlayers);
-	if (!oClientPlayerIndex.has_value())
-	{
-		return false;
-	}
-	rVecPosition = rpSnapshot->interpolate.pPlayers->pVecPositions[*oClientPlayerIndex];
-	return true;
+	return false;
 }
 
 engine::ReconcileDesyncInfo ClientReconciler::Run()
@@ -53,10 +78,12 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 	ASSERT(inputs.iTargetTick >= 0);
 	common::LogTickScope logTickScope(inputs.iTargetTick);
 
-	// Capture client pre-writeback position for visual error smoothing. Read before the dispatch,
-	// which is the single engine entry point; the value goes unused when no coord is eligible.
+	// Capture the client position at the render source tick for visual error smoothing, so the post-replay read
+	// compares the same tick and excludes the ticks this dispatch commits. Read before the dispatch, which is the
+	// single engine entry point; the value goes unused when no coord is eligible.
 	XMVECTOR vecPreWritebackPosition {};
-	bool bCapturedPrePosition = GetClientSnapshotPosition(vecPreWritebackPosition);
+	int64_t iPreWritebackTick = -1;
+	bool bCapturedPrePosition = GetClientSnapshotPosition(vecPreWritebackPosition, iPreWritebackTick);
 
 	engine::ReconcileDispatchResult dispatch = mDispatcher.Run(inputs);
 
@@ -85,12 +112,13 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 
 	// Player-transfer migration updates previous client armor.
 	ConfirmedClientState newConfirmedClientState = mConfirmedClientState;
-	ReconcileUpdateClientState(std::span<const engine::CoordWork>(mDispatcher.mWorks.data(), static_cast<size_t>(mDispatcher.miActiveCount)), dispatch.bAnyFullReplay, newConfirmedClientState);
+	std::span<const engine::CoordWork> activeWorks(mDispatcher.mWorks.data(), static_cast<size_t>(mDispatcher.miActiveCount));
+	ReconcileUpdateClientState(activeWorks, dispatch.bAnyFullReplay, newConfirmedClientState);
 
 	if (bCapturedPrePosition && dispatch.bAnyFullReplay)
 	{
 		XMVECTOR vecPostWritebackPosition {};
-		if (GetClientSnapshotPosition(vecPostWritebackPosition))
+		if (GetClientReplayedPosition(activeWorks, iPreWritebackTick, vecPostWritebackPosition))
 		{
 			XMVECTOR vecError = XMVectorSubtract(vecPreWritebackPosition, vecPostWritebackPosition);
 			XMVECTOR vecTotal = XMVectorAdd(gpGame->mVecVisualErrorOffset, vecError);

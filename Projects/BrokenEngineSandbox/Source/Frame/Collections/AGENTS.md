@@ -7,6 +7,7 @@ Game-specific SOA collections built on the engine Collection framework (`../../.
 ## Game-Specific Rules
 
 - Transferable entity collections resolve collision/terrain outcomes before marking surviving out-of-bounds rows for Transfer.
+- Players and Spaceships stop at terrain in PostRender Update: each sweeps its disc from the previous to the current Interpolate position against the cell's elevation grid, blocked at the base height (`gBaseHeight`), and writes the resolved position back to the current Interpolate row. On contact Players slide along the terrain once and Spaceships bounce off it. A start already inside terrain logs a warning; spawn sites test at most the body's center against terrain, so a warning right after a spawn is expected.
 - Collision scratch uses heap-suppressed `thread_local` vectors because cell ticks dispatch in parallel and their backing storage must survive through PostCollision; the frame workbuffer cannot own it.
 - Collections with client-owned visual/audio objects hydrate them after shared state arrives. Players instead recreate missing owned visuals during Update. Hydration is filling a newly allocated collection slot from transferred or loaded data.
 - Players and Spaceships receive a fresh one-second arrival grace timer after transfer. It suppresses targeting and behavior scans, not collision or damage.

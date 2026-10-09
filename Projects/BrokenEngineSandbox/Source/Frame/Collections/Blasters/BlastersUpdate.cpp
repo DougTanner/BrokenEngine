@@ -25,13 +25,9 @@ using enum BlasterFlags;
 // thread_local: parallel per-Frame tick via Dispatch
 static thread_local int64_t siCollisionLayerIndex = 0;
 static thread_local std::vector<engine::CollisionFlags_t> sCollisionFlags;
-static thread_local std::vector<float> sCollisionRadii;
-static thread_local std::vector<float> sCollisionDamages;
 
 struct BlasterCollisionIntervalScratch
 {
-	std::vector<float> startTimes;
-	std::vector<float> endTimes;
 	std::vector<float> maxTimes;
 	std::vector<engine::SegmentHit> terrainHits;
 	std::vector<engine::SegmentHit> boundaryHits;
@@ -212,10 +208,6 @@ void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 
 	int64_t iCount = rCurrentInterpolate.iCount;
 	sCollisionFlags.resize(static_cast<size_t>(iCount));
-	sCollisionRadii.resize(static_cast<size_t>(iCount));
-	sCollisionDamages.resize(static_cast<size_t>(iCount));
-	rCollisionScratch.startTimes.resize(static_cast<size_t>(iCount));
-	rCollisionScratch.endTimes.resize(static_cast<size_t>(iCount));
 	rCollisionScratch.maxTimes.resize(static_cast<size_t>(iCount));
 	rCollisionScratch.terrainHits.resize(static_cast<size_t>(iCount));
 	rCollisionScratch.boundaryHits.resize(static_cast<size_t>(iCount));
@@ -224,10 +216,6 @@ void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 	{
 		int64_t iIndex = i;
 		sCollisionFlags.at(static_cast<size_t>(iIndex)) = engine::CollisionFlags::kDestroyOnCollide;
-		sCollisionRadii.at(static_cast<size_t>(iIndex)) = kfBlasterCollisionRadius;
-		sCollisionDamages.at(static_cast<size_t>(iIndex)) = kfBlasterDamage;
-		rCollisionScratch.startTimes.at(static_cast<size_t>(iIndex)) = 0.0f;
-		rCollisionScratch.endTimes.at(static_cast<size_t>(iIndex)) = 1.0f;
 		rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)) = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		float fMaxTime = std::numeric_limits<float>::max();
@@ -246,14 +234,12 @@ void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 	{
 		.pVecStartPositions = rPreviousInterpolate.pVecPositions,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
-		.pfStartTimes = rCollisionScratch.startTimes.data(),
-		.pfEndTimes = rCollisionScratch.endTimes.data(),
 		.pfMaxTimes = rCollisionScratch.maxTimes.data(),
-		.pfRadii = sCollisionRadii.data(),
-		.pfDamages = sCollisionDamages.data(),
 		.pFlags = sCollisionFlags.data(),
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
+		.fRadius = kfBlasterCollisionRadius,
+		.fDamage = kfBlasterDamage,
 		.bSweptTest = true,
 		.uiCategory = CollisionCategory::kuiBlaster,
 		.uiCollidesWith = CollidesWith::kuiBlaster,

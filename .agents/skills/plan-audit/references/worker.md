@@ -37,9 +37,12 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    affected-site hunts. Do not explore unrelated plans/subsystems. Done when
    every search traces to a plan claim.
 6. Verify structural assumptions, call sites, mirrored client/server paths,
-   ownership, data layout, frame phase, threading, determinism, serialization,
-   build wiring, and runtime verification where relevant. Done when each
-   relevant item is verified against the repository.
+   ownership (including each file, type, or public function the plan adds,
+   against the Code placement bullet in
+   [`../../../references/cpp-conventions.md`](../../../references/cpp-conventions.md)),
+   data layout, frame phase, threading, determinism, serialization, build
+   wiring, and runtime verification where relevant. Done when each relevant
+   item is verified against the repository.
 7. When the plan puts concurrent writers on one target, first make it prove the
    requirement truly needs a single canonical target; when it does not, require
    partitioned ownership with independently published results; when it does,

@@ -43,7 +43,10 @@ Triggers, inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
   the change or edit a tracked file.
 - Every plan statement and card field rests on evidence read in this session;
   cite the `repository-path:line` for anything a reader would otherwise take on
-  trust.
+  trust. For a guard, constant, or ordering the plan changes whose reason the
+  code does not state, that evidence includes the commit that introduced it
+  (`git log -S '<exact code text>' -- <file>`) and its message, or
+  `no recorded reason` when the history is silent.
 - Leave a decision the request does not settle unresolved and return it for
   main, per the `## Directives` trivial-choices bullet in root
   [AGENTS.md](../../../../AGENTS.md); an architectural choice is always the

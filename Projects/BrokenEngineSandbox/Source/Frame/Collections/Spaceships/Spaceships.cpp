@@ -588,7 +588,7 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 		const engine::IslandPlacement& rPlacement = rStaticData.islands.at(i);
 		XMStoreFloat4(&islandCandidatesAllocation.mpData[i], XMVectorSet(rPlacement.f2WorldPosition.x, rPlacement.f2WorldPosition.y, engine::gBaseHeight.mfCurrent, 1.0f));
 	}
-	std::span<const XMFLOAT4> islandCandidates(static_cast<XMFLOAT4*>(islandCandidatesAllocation.mpData), static_cast<size_t>(iIslandCount));
+	std::span<const XMFLOAT4> islandCandidates(islandCandidatesAllocation.mpData, static_cast<size_t>(iIslandCount));
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -626,7 +626,7 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 			vecVelocity = XMVectorScale(XMVectorNegate(rPrevious.pVecDamageDirections[i]), kfDeathKnockbackSpeed);
 		}
 
-		ApplyTerrainBounce(rStaticData, rCurrentInterpolate, i, fDeltaTime, fDeltaRotation, vecVelocity);
+		ApplyTerrainBounce(rStaticData, rPreviousInterpolate, rCurrentInterpolate, i, fDeltaTime, fDeltaRotation, vecVelocity);
 
 		fDeltaRotation = common::ClampMagnitude(fDeltaRotation, kfSpaceshipMaxTurnRate);
 

@@ -475,6 +475,23 @@ void XM_CALLCONV PlayersPostRender::ApplyTerrainPush(const engine::CellStaticDat
 	}
 }
 
+void XM_CALLCONV PlayersPostRender::ResolveTerrainContact(const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, XMVECTOR& rVecVelocity)
+{
+	// Hard contact at gBaseHeight; ApplyTerrainPush is the softer band in front of it.
+	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, vecPreviousPosition, rVecPosition, kfPlayerRadius, engine::gBaseHeight.mfCurrent, true);
+	if (result.flags & engine::DiscTerrainFlags::kStartOverlap) [[unlikely]]
+	{
+		LOG(kDefault, kWarning, "Player terrain start overlap Cell: ({},{}) Index: {} Start: {} Moved: {}", rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPreviousPosition, 1), common::Wb(result.fStartOverlapDistance, 1));
+	}
+
+	rVecPosition = result.vecPosition;
+	if (result.flags & engine::DiscTerrainFlags::kContact) [[unlikely]]
+	{
+		float fVelocityIntoNormal = std::min(0.0f, XMVectorGetX(XMVector3Dot(rVecVelocity, result.vecNormal)));
+		rVecVelocity = XMVectorSubtract(rVecVelocity, XMVectorScale(result.vecNormal, fVelocityIntoNormal));
+	}
+}
+
 void XM_CALLCONV PlayersPostRender::ApplyPusherPush(const Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, int64_t i, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity)
 {
 	const PlayersInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pPlayers;

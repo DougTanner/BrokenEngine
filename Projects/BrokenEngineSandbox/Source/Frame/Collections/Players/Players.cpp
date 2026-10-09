@@ -600,14 +600,10 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 
 // Player collision arrays
 // thread_local: parallel per-Frame tick via Dispatch
-static thread_local std::vector<float> sCollisionRadii;
-static thread_local std::vector<float> sCollisionDamages;
 static thread_local std::vector<engine::CollisionFlags_t> sCollisionFlags;
 
 struct PlayerCollisionIntervalScratch
 {
-	std::vector<float> startTimes;
-	std::vector<float> endTimes;
 	std::vector<float> maximumTimes;
 };
 
@@ -630,19 +626,11 @@ void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, 
 	}
 
 	int64_t iCount = rCurrentInterpolate.iCount;
-	sCollisionRadii.resize(static_cast<size_t>(iCount));
-	sCollisionDamages.resize(static_cast<size_t>(iCount));
 	sCollisionFlags.resize(static_cast<size_t>(iCount));
-	rCollisionScratch.startTimes.resize(static_cast<size_t>(iCount));
-	rCollisionScratch.endTimes.resize(static_cast<size_t>(iCount));
 	rCollisionScratch.maximumTimes.resize(static_cast<size_t>(iCount));
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		sCollisionRadii.at(static_cast<size_t>(i)) = kfPlayerRadius;
-		sCollisionDamages.at(static_cast<size_t>(i)) = 0.0f; // Player doesn't deal collision damage
 		sCollisionFlags.at(static_cast<size_t>(i)) = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
-		rCollisionScratch.startTimes.at(static_cast<size_t>(i)) = 0.0f;
-		rCollisionScratch.endTimes.at(static_cast<size_t>(i)) = 1.0f;
 		engine::SegmentHit boundaryHit = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousFrame.interpolate.pPlayers->pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
 		rCollisionScratch.maximumTimes.at(static_cast<size_t>(i)) = boundaryHit.bHit ? boundaryHit.fTime : std::numeric_limits<float>::max();
 	}
@@ -651,14 +639,12 @@ void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, 
 	{
 		.pVecStartPositions = rPreviousFrame.interpolate.pPlayers->pVecPositions,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
-		.pfStartTimes = rCollisionScratch.startTimes.data(),
-		.pfEndTimes = rCollisionScratch.endTimes.data(),
 		.pfMaxTimes = rCollisionScratch.maximumTimes.data(),
-		.pfRadii = sCollisionRadii.data(),
-		.pfDamages = sCollisionDamages.data(),
 		.pFlags = sCollisionFlags.data(),
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
+		.fRadius = kfPlayerRadius,
+		.fDamage = 0.0f, // Player doesn't deal collision damage
 		.uiCategory = CollisionCategory::kuiPlayer,
 		.uiCollidesWith = CollidesWith::kuiPlayer,
 		.pAlignments = rCurrentPostRender.pAlignments,
@@ -767,6 +753,7 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		RegenerateShield(std::chrono::duration<float>(fDeltaTime), std::chrono::duration<float>(fShieldCooldown), fShield);
 		ApplyTerrainPush(rStaticData, vecPosition, vecVelocity);
 		ApplyPusherPush(rFrame, rPreviousFrame, i, vecPosition, vecVelocity);
+		ResolveTerrainContact(rStaticData, i, vecPosition, rFrame.interpolate.pPlayers->pVecPositions[i], vecVelocity);
 
 		SetNavigationDirection(flags, iNavigationDirection);
 		SetNavigationWaypointIndex(flags, iNavigationWaypointIndex);

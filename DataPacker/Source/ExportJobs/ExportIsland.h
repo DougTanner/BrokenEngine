@@ -38,14 +38,14 @@ public:
 	// Git-tracked island textures for a change that cannot alter a single texel.
 	static constexpr int64_t kiTextureVersion = 2;
 
-	virtual bool CheckDirty(const std::filesystem::path& rPackFile) override;
+	bool CheckDirty(const std::filesystem::path& rPackFile) override;
 
 protected:
 
-	virtual std::string GetInputFingerprint() const override;
-	virtual void Export() override;
-	virtual void UpdateCacheMetadata() override;
-	virtual void CleanupOnFailure() override;
+	std::string GetInputFingerprint() const override;
+	void Export() override;
+	void UpdateCacheMetadata() override;
+	void CleanupOnFailure() override;
 
 private:
 
