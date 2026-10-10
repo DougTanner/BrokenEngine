@@ -2,7 +2,7 @@
 
 ## Authorization and when to use
 
-Use this mode only when an approved plan explicitly requires Microsoft PREfast verification. Outside this explicitly authorized mode, omit `-Prefast` so the build keeps `EnableClangTidyCodeAnalysis=false` and `RunCodeAnalysis=false`.
+Use this mode only when an approved plan explicitly requires Microsoft PREfast verification. Outside this explicitly authorized mode, omit `-Prefast` so the build keeps the Microsoft rule-set path off.
 
 ## Retained protections
 
@@ -10,7 +10,7 @@ Retain every ordinary game-build protection the skill states: the rules for taki
 
 ## Invocation and coverage
 
-`Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md` owns the Microsoft code analysis explanation in its "Microsoft code analysis" bullet: the two Release paths selected by `RunCodeAnalysis`, the `EnablePREfast` gate, the rule set, `CodeAnalysisTreatWarningsAsErrors`, and the `CodeAnalysisNeverReportRuleErrors` prohibition. The facts this mode adds on top of it:
+`Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md` owns the Microsoft code analysis explanation in its "Microsoft code analysis" bullet: the two Release paths selected by the toolchain's `RunMsvcAnalysis`, the `EnablePREfast` gate, the rule set, `CodeAnalysisTreatWarningsAsErrors`, and the `CodeAnalysisNeverReportRuleErrors` prohibition. The facts this mode adds on top of it:
 
 - Report "analysis executed" and "policy passed" as separate facts — a zero exit alone establishes only the second.
 - `RunNativeCodeAnalysis` is an incremental target, so a green incremental run could otherwise mean "skipped as up-to-date". A full `-Prefast` build therefore forces the rebuild itself, and its returned result covers a full analysis pass — no separate rebuild or regeneration evidence is needed. Budget for the longer runtime: this is a from-scratch Release rebuild of the whole target, not an incremental one.

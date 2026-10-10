@@ -778,8 +778,8 @@ void Server::SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char*
 	NetworkMessages::ServerConnectionResponseMessage message
 	{
 		.uiLoadGeneration = static_cast<uint8_t>(miLoadGeneration),
-		.uiAccepted = bAccepted ? 1ui32 : 0ui32,
-		.uiDebugInput = kbDebugInput ? 1ui32 : 0ui32,
+		.uiAccepted = static_cast<uint8_t>(bAccepted ? 1 : 0),
+		.uiDebugInput = static_cast<uint8_t>(kbDebugInput ? 1 : 0),
 		.guid = (pGloballyUniqueIdentifier != nullptr) ? *pGloballyUniqueIdentifier : ClientGuid {},
 		.bHasGuid = bAccepted && pGloballyUniqueIdentifier != nullptr,
 		.rejectionMessage = (!bAccepted && pcMessage != nullptr) ? pcMessage : "",

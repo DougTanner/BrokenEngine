@@ -20,6 +20,9 @@ delegated `builder`; separate-role requirements return to the manager.
 - PREfast verification runs only when an approved plan explicitly requires it;
   never infer PREfast authorization from a routine compile, rebuild, or
   link-error check.
+- Clang-tidy verification runs only when an approved plan explicitly requires
+  a clang-tidy run; never infer it from a routine compile, rebuild, or
+  link-error check.
 - Not for AgentTools bootstrap or promotion.
 - When the changed set contains a non-Markdown path under `Tools/WorktreeCli/`,
   `Tools/AgentHarness/`, or `Tools/ToolCommon/`, the rebuilt tools are promoted
@@ -60,6 +63,9 @@ skill-specific inputs:
   approval, before the first BrokenEngineSandbox build;
 - whether an approved plan explicitly requires PREfast verification —
   [references/prefast-mode.md](references/prefast-mode.md)
+  `## Authorization and when to use`;
+- whether an approved plan explicitly requires a clang-tidy run —
+  [references/clang-tidy-mode.md](references/clang-tidy-mode.md)
   `## Authorization and when to use`.
 
 ## Handoff
@@ -77,6 +83,9 @@ the execution and result discipline in
   `/p:DataBuildMode`, `/p:RunDataPacker`, and `/p:GameDataDirectory` switch
   values, plus your reason whenever your own judgment overrode the
   `dataBuildMode` that `Resolve-CompileContext.ps1` reported.
+- `Decisive checks` — for a `-ClangTidy` build, one row naming whether analysis
+  executed, the de-duplicated warning count, and the `clang-diagnostic-error`
+  parse-error count with the first unparsable file.
 - `Evidence` — one row per build carrying its `retainedLog.path`, plus one row
   for this dispatch's envelope file as path plus `##` selector.
 - `Residuals` — one row per failed or skipped required build, counting

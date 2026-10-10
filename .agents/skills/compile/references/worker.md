@@ -98,8 +98,10 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      WorktreeCli, AgentHarness) read neither reference.
 
 6. Read [prefast-mode.md](prefast-mode.md) before building when an approved plan
-   explicitly requires PREfast verification. Done when that reference has been
-   read, or it stays unloaded because no such authorization exists.
+   explicitly requires PREfast verification, and
+   [clang-tidy-mode.md](clang-tidy-mode.md) when one explicitly requires a
+   clang-tidy run. Done when each such reference has been read, or stays
+   unloaded because its authorization does not exist.
 
 7. Compose one bundled-script invocation per target. Done when the exact command
    is chosen without any shell variable, composed MSBuild `/p:` switch, or state
@@ -139,6 +141,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
      authorized.
    - `-Prefast` — Client/Server Release only; see
      [prefast-mode.md](prefast-mode.md).
+   - `-ClangTidy` — Client/Server Debug or Release and DataPacker only, never
+     with `-Prefast`; see [clang-tidy-mode.md](clang-tidy-mode.md).
    - `-RepositoryRoot`, `-PrimaryCheckout`, `-Baseline` — pass only what the
      caller explicitly supplied, exactly as in step 1.
 
@@ -322,13 +326,14 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
 - Ordinary builds do not run DataPacker, Gaea, or texture export; the authorized
   Local-generation path and the wrapper bootstrap's primary run are the only
   exceptions. Every invocation passes `EnableClangTidyCodeAnalysis=false` and
-  `RunCodeAnalysis=false`; `-Prefast` is the sole exception to
-  `RunCodeAnalysis=false`. `RunCodeAnalysis=false` still leaves cl `/analyze`
-  running with the compiler's default rules on every Release build whose
-  project sets `EnablePREfast` (client, server, DataPacker), where any
-  diagnostic fails the build under warnings-as-errors; only the rule-set path
-  that reports the C26xxx codes needs `-Prefast`. The clang-tidy reason and both
-  analysis paths (the "Microsoft code analysis" bullet) are in
+  `RunCodeAnalysis=false`; `-Prefast` and `-ClangTidy` are the only exceptions,
+  and `-ClangTidy` keeps the rule-set path off. `RunCodeAnalysis=false` still
+  leaves cl `/analyze` running with the compiler's default rules on every
+  Release build whose project sets `EnablePREfast` (client, server,
+  DataPacker), where any diagnostic fails the build under warnings-as-errors;
+  only the rule-set path that reports the C26xxx codes needs `-Prefast`. The
+  clang-tidy reason and both analysis paths (the "Microsoft code analysis"
+  bullet) are in
   `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md`
   `## Build Configuration`.
 - A `builder` executing this skill runs the build itself and never dispatches

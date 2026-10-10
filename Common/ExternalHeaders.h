@@ -5,6 +5,12 @@
 	#error "AVX/AVX2/AVX512 detected - banned for cross-CPU determinism; remove /arch:AVX*"
 #endif
 
+// clang (used only by clang-tidy) treats __restrict as part of a pointer's type, so std::is_pointer and
+// std::remove_pointer fail on collection member pointers; MSVC ignores it for type identity, so match MSVC.
+#if defined(__clang__)
+	#define __restrict
+#endif
+
 // Disable all warnings while parsing external headers
 #include <codeanalysis/warnings.h>
 #pragma warning(push, 0)

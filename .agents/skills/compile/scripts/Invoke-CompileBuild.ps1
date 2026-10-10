@@ -20,6 +20,7 @@ param(
 	[switch] $ForbidExpensiveExport,
 	[switch] $AcceptDeletionOnlyException,
 	[switch] $Prefast,
+	[switch] $ClangTidy,
 	[string] $RepositoryRoot,
 	[string] $PrimaryCheckout,
 	[string] $Baseline
@@ -144,6 +145,11 @@ function Get-AnalysisArguments {
 		# EnableMicrosoftCodeAnalysis=true only guards against an upstream default change.
 		return @('/p:EnableClangTidyCodeAnalysis=false', '/p:EnableMicrosoftCodeAnalysis=true', '/p:RunCodeAnalysis=true', '/verbosity:minimal')
 	}
+	if ($ClangTidy) {
+		# EnableMicrosoftCodeAnalysis=false keeps the rule-set path off under RunCodeAnalysis=true. Normal verbosity
+		# names the ClangTidy target and its invocation per project, the only execution trace a --quiet clean run leaves.
+		return @('/p:EnableClangTidyCodeAnalysis=true', '/p:EnableMicrosoftCodeAnalysis=false', '/p:RunCodeAnalysis=true', '/verbosity:normal')
+	}
 	return @('/p:EnableClangTidyCodeAnalysis=false', '/p:RunCodeAnalysis=false', '/verbosity:minimal')
 }
 
@@ -164,8 +170,8 @@ function Invoke-WorktreeCliBuild([string[]] $DataProperties) {
 	}
 	foreach ($property in $DataProperties) { $arguments.Add($property) }
 	foreach ($argument in (Get-AnalysisArguments)) { $arguments.Add($argument) }
-	if ($Prefast -and $script:SelectedFiles.Count -eq 0) {
-		# RunNativeCodeAnalysis is incremental, so an up-to-date full build would report green without analyzing.
+	if (($Prefast -or $ClangTidy) -and $script:SelectedFiles.Count -eq 0) {
+		# RunNativeCodeAnalysis and ClangTidy are incremental, so an up-to-date full build would report green without analyzing.
 		# The --files path reuses this argument list for its MSBuild evaluation query, so it stays incremental.
 		$arguments.Add('/t:Rebuild')
 	}
@@ -201,6 +207,10 @@ try {
 	}
 	if ($Prefast -and (-not $isGameTarget -or $script:ResolvedConfiguration -cne 'Release')) {
 		Stop-CompileInvoke 'parameter.prefast-invalid' 'PREfast verification applies to Client or Server Release builds only.'
+	}
+	# Profile is blocked because the global property would override the client Profile's clang-tidy opt-out.
+	if ($ClangTidy -and ($Prefast -or $script:ResolvedConfiguration -ceq 'Profile' -or -not ($isGameTarget -or $Target -ceq 'DataPacker'))) {
+		Stop-CompileInvoke 'parameter.clangtidy-invalid' 'Clang-Tidy verification applies to Client or Server Debug or Release builds and DataPacker builds only, and never with -Prefast.'
 	}
 	if (-not $isGameTarget) {
 		foreach ($pair in @(
