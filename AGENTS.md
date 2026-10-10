@@ -53,8 +53,8 @@ A client/server game engine using data-oriented design, with data pre-packer (of
 
 ## Static Analysis
 
-- `.editorconfig` — formatting: Allman, tabs, spacing, include sort.
-- `.clang-tidy` — checks mapped to `Documents/C++StyleGuide.txt`; `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md` owns enablement and exclusions.
+- `.editorconfig` — formatting: Allman, tabs, spacing.
+- `.clang-tidy` — clang-tidy check list; `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md` owns enablement and exclusions.
 
 ## Client/Server Targets
 

@@ -15,13 +15,15 @@
 # group, then path compared one folder level at a time with folders before files and names ordinal
 # case-insensitive; no blank line inside a group, exactly one between groups; equal keys keep their
 # order.
-# Violation kinds: order, blank-missing and blank-extra are fixable; unresolved is not. Without -Fix the
-# script only reports. With -Fix it rewrites each file whose violations are all fixable, replacing only
-# the rewritten segments' lines and keeping the BOM, line endings and final newline, and leaves every
-# other file byte-identical. Stdout carries one broken-engine-include-order/v1 JSON object: status
-# (pass, fail, error), message, files (scanned count), violations (path, line, kind; the rows still
-# present after any rewrite), rewritten (paths), truncated (violation rows capped at 400). Exit 0 when
-# no violation remains, 1 when any remains, 2 on an input error.
+# Violation kinds: order, blank-missing and blank-extra are fixable; unresolved and common are not. A
+# common violation is a quoted include, at any conditional depth, resolving under Common/ in a file
+# outside Common/ and Tools/ (rule 47d: those files reach common:: headers through Pch.h). Without
+# -Fix the script only reports. With -Fix it rewrites each file whose violations are all fixable,
+# replacing only the rewritten segments' lines and keeping the BOM, line endings and final newline, and
+# leaves every other file byte-identical. Stdout carries one broken-engine-include-order/v1 JSON
+# object: status (pass, fail, error), message, files (scanned count), violations (path, line, kind; the
+# rows still present after any rewrite), rewritten (paths), truncated (violation rows capped at 400).
+# Exit 0 when no violation remains, 1 when any remains, 2 on an input error.
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
 	[string[]] $Path,
@@ -183,6 +185,15 @@ function Test-IncludeFile([string] $File) {
 	$violations = [Collections.Generic.List[object]]::new()
 	$replacements = @{}
 	$fixable = $true
+	if ($File -notmatch '^(?:Common|Tools)/') {
+		for ($line = 0; $line -lt $lines.Count; $line++) {
+			$match = [regex]::Match($lines[$line], $script:IncludePattern)
+			if (-not $match.Success -or $match.Groups[1].Value -ne '"') { continue }
+			if ((Resolve-Include $File $match.Groups[2].Value) -notmatch '^Common/') { continue }
+			$violations.Add([ordered]@{ path = $File; line = $line + 1; kind = 'common' })
+			$fixable = $false
+		}
+	}
 	$firstInclude = -1
 	$index = 0
 	while ($index -lt $lines.Count) {

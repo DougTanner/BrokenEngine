@@ -1,6 +1,7 @@
 # Sweep type: style-guide
 
-Brings C++ files up to the style guide rules the Change Workflow checks.
+Brings C++ files up to the style guide rules `/code-style-review` and
+`/comment-review` check.
 `Documents/C++StyleGuide.txt` is the authority for every rule; the user rulings
 below are the only additions.
 
@@ -20,7 +21,16 @@ Procedure:
    Adjudicate every row it returns, `style-rule-17` rows included, against
    `Documents/C++StyleGuide.txt`: a scanner row is a candidate, not a verdict.
    If the scanner cannot run, say so in the output and continue by hand.
-2. Hand-read every line of every unit file for the rest of the rule set.
+2. Run the include-order check without `-Fix` on exactly the unit files,
+   from the repository root, with the repository root and the scanner path
+   arguments the prompt states:
+   `pwsh -NoProfile -Command "& '.agents/scripts/Test-IncludeOrder.ps1' -RepositoryRoot '<repository root>' -Path <scanner path arguments>"`.
+   Adjudicate every row it returns against rule 47 in
+   `Documents/C++StyleGuide.txt` as step 1 does: a row is a candidate, not a
+   verdict, and a rejected row goes under `## Rejected scanner rows`.
+   If the script cannot run, say so on the output's `Scanner:` line and
+   continue by hand.
+3. Hand-read every line of every unit file for the rest of the rule set.
 
 User rulings (never report these as findings):
 

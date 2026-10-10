@@ -124,7 +124,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      parameter the function only reads — unless it is one of step 9's rule 40
      permitted forms;
    - rule 41: the "always write `std::`" half;
-   - rule 47: include grouping and order, not hand read: run
+   - rule 47: include grouping and order, and rule 47d's `common::` half (the
+     `common` kind), not hand read: run
      `pwsh -NoProfile -Command "& '.agents/scripts/Test-IncludeOrder.ps1' -RepositoryRoot '<absolute repository toplevel>' -Path '<file>','<file>' -Fix"`
      once over the distinct paths of the selected `cpp`-class ranges (or the
      caller-supplied scope's files). Only `status` `pass` or `fail` is usable;
@@ -169,7 +170,7 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    different form.
    Every other guide rule has another owner: `/repo-code-review` owns rule 9's
    control-flow recovery and empty custom exception type parts, rule 67, rule
-   53's `reserve` half, rule 60's destination-size half, and rule 47's
+   53's `reserve` half, rule 60's destination-size half, and rule 47d's
    external-header half
    ([`../../repo-code-review/references/checks.md`](../../repo-code-review/references/checks.md)),
    `/comment-review` owns rule 64, and the compiler owns rule 63 (the rotate
