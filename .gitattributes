@@ -23,3 +23,8 @@
 *.BC5_UNORM_BLOCK     binary
 *.BC7_UNORM_BLOCK     binary
 *.R16G16B16A16_SFLOAT binary
+
+# Whitespace errors `git diff --check` reports, which Invoke-StaticChecks.ps1's file-hygiene row runs.
+* whitespace=blank-at-eol,-space-before-tab,-blank-at-eof
+*.md -whitespace
+*.txt -whitespace

@@ -32,11 +32,11 @@ $script:CppClasses = @('cpp', 'dual-language-header')
 # step 16 removes, and one style-rule-<n> kind per rule of Documents/C++StyleGuide.txt that its step 9
 # adjudicates. A line reports every kind that matches it, each as its own row. An entry's Except clears a
 # match that is one of the rule's permitted forms or a form another kind reports. The style-rule-61,
-# style-rule-22, style-rule-59, style-rule-62 and style-rule-51 kinds are not in this table: each needs
-# another head-side line too, so Test-Rule61Line, Test-Rule22Line, Test-Rule59Line, Test-Rule62Line and
-# Test-Rule51Line decide theirs. That worker's step 6 hand-read list, its step 16 rule 70 check, and these
-# style-rule-<n> kinds together make the review's style mandate, and a rule is on two lists when each covers
-# a different form, so update step 6 when a kind changes.
+# style-rule-22, style-rule-59, style-rule-74, style-rule-62 and style-rule-51 kinds are not in this table:
+# each needs another head-side line too, so Test-Rule61Line, Test-Rule22Line, Test-Rule59Line,
+# Test-Rule74Line, Test-Rule62Line and Test-Rule51Line decide theirs. That worker's step 6 hand-read list,
+# its step 16 rule 70 check, and these style-rule-<n> kinds together make the review's style mandate, and a
+# rule is on two lists when each covers a different form, so update step 6 when a kind changes.
 $script:ScalarType = '(?:(?:unsigned|signed)\s+)?(?:bool|char|wchar_t|short|int|long(?:\s+long)?|float|double)|unsigned|u?int(?:8|16|32|64)_t|size_t|u?intptr_t|ptrdiff_t'
 $script:IntegerType = '(?:(?:unsigned|signed)\s+)?(?:short|int|long(?:\s+long)?)|unsigned|u?int(?:8|16|32|64)_t|size_t|ptrdiff_t'
 # The prose-prone kinds share style-rule-2's comment-and-string alternative, so a line holding a comment
@@ -54,7 +54,7 @@ $script:CandidatePatterns = @(
 	@{ Kind = 'assert-false'; Pattern = '(?i)\bassert\s*\(\s*false\s*\)' }
 	@{ Kind = 'fixme'; Pattern = '(?://|/\*|^\s*\*).*\bFIXME\b' }
 	@{ Kind = 'hack'; Pattern = '(?://|/\*|^\s*\*).*\bHACK\b' }
-	@{ Kind = 'style-rule-2'; Pattern = '^\s*(?:[A-Za-z_]\w*(?:::[A-Za-z_]\w*)?(?:<[^{};]*>)?\s+)+(?:[*&]\s*)?[A-Za-z_]\w*(?:\s*\[[^\]]*\])?\s*\{\s*$'; Except = '(?://|/\*|\*/|["''])|^\s*(?:class|struct|union|enum|namespace|return|if|else|for|while|switch|try|catch|do)\b' }
+	@{ Kind = 'style-rule-2'; Pattern = '^\s*(?:[A-Za-z_]\w*(?:::[A-Za-z_]\w*)?(?:<[^{};]*>)?\s+)+(?:[*&]\s*)?[A-Za-z_]\w*(?:\s*\[[^\]]*\])?\s*\{\s*$|^\s*(?:namespace|class|struct|enum|union)\b[^;()]*\{\s*$|\}\s*(?:else|catch)\b'; Except = '(?://|/\*|\*/|["''])|^\s*(?:return|if|else|for|while|switch|try|catch|do)\b|^\s*(?:class|struct|union|enum|namespace)\b(?![^;()]*\{\s*$)' }
 	@{ Kind = 'style-rule-15'; Pattern = $script:CodePrefix + '\bauto\b'; Except = 'auto\s*&?&?\s*\[|\bauto\s+(?:vec|mat)[A-Z]|\bauto\s*&?\s+(?:it|\w+It)\b|=\s*\[|=\s*[&*]?(?:[\w:.]|->)*<[^<>]*>\s*[({]|\bdecltype\s*\(\s*auto\s*\)' }
 	@{ Kind = 'style-rule-18'; Pattern = '^\s*(?:static\s+)?const\s+(?![^=({;<]*(?:<[^;]*>)?[^=({;<]*[&*])(?:[A-Za-z_][\w:]*(?:<[^;]*>)?\s+)+[A-Za-z_]\w*\s*[={(]|^\s*(?:static\s+)?const\s+auto\s*\[|^\s*(?:[A-Za-z_][\w:]*(?:<[^;]*>)?\s*\*?\s+)+const\s+[A-Za-z_]\w*\s*[={(]|\bfor\s*\(\s*const\s+(?:[A-Za-z_][\w:]*(?:<[^;]*>)?\s+)+[A-Za-z_]\w*\s*:' }
 	@{ Kind = 'style-rule-19'; Pattern = '\btemplate\s*<[^>]*(?:\bclass\b|[\w.]\s+[A-Z0-9_]*[a-z]\w*\s*(?:[,=>]|$))' }
@@ -97,6 +97,7 @@ $script:CandidatePatterns = @(
 	# or . belongs to another API.
 	@{ Kind = 'style-rule-14'; Pattern = '(?<!(?:::|->|\.)\s*)\b(?:\w*[a-z0-9_])?Num(?![a-z])'; Except = $script:CommentOrQuote }
 	@{ Kind = 'style-rule-72'; Pattern = $script:CodePrefix + '(?:\.|->)k[a-z0-9]*[A-Z]'; Except = '^\s*\*(?:\s|/|$)' }
+	@{ Kind = 'style-rule-73'; Pattern = $script:CodePrefix + '(?:\b(?:if|for|while|switch|catch)\(|\(\s+\S|[^\s;]\s+\)|\[\s+\S|\S\s+\]|\{\s+\}|\S\s+,|,(?=[^\s)])|[^\s(;]\s+;|\bfor\s*\([^;]*;[^\s;)]|!\s+[\w(]|(?<![\w)\]]\s*)(?:\+\+|--)\s+\w|\w\s+(?:\+\+|--)(?!\s*[\w(])|\b(?!(?:return|case|co_return|co_yield|co_await|throw|delete|sizeof|else|do|new|typename|operator|and|or|not)\b)[A-Za-z_]\w*\s+[*&]{1,2}[A-Za-z_(]|\w\s+\.\s*[A-Za-z_]|\w\.\s+[A-Za-z_]|\w->\s|\w\s+->(?=\w)|\)\s*(?:noexcept\s*)?(?:(?<!\s):(?!:)|(?<!:):(?=[^:\s]))|^\s*:(?=[^:\s]))|^\s*(?:class|struct)\s[^;{(]*?(?:(?<![:\s]):(?!:)|(?<!:):(?=[^:\s]))'; Except = '^\s*\*(?:\s|/|$)|^\s*case\b' }
 )
 $script:ScannedPatterns = $script:CandidatePatterns
 $script:Utf8 = [Text.UTF8Encoding]::new($false)
@@ -305,6 +306,20 @@ function Test-Rule59Line([string] $Path, [int] $Line, [string] $Text) {
 	return $false
 }
 
+function Test-Rule74Line([string] $Path, [int] $Line, [string] $Text) {
+	# An indented line breaks rule 74 when the nearest preceding non-blank head-side line indented less than it
+	# is a lone `{` directly after a namespace line. A deeper line stops at its own nearer head, so only the
+	# namespace's first indented level is reported.
+	if ($Text -cnotmatch '^(\s+)\S') { return $false }
+	$indent = $Matches[1].Length
+	$lines = Get-NewSideLine $Path
+	for ($number = $Line - 1; $number -ge 1; $number--) {
+		if ($lines[$number - 1] -cnotmatch '^(\s*)\S' -or $Matches[1].Length -ge $indent) { continue }
+		return $lines[$number - 1].Trim() -ceq '{' -and $number -ge 2 -and $lines[$number - 2] -cmatch '^\s*(?:inline\s+)?namespace\b'
+	}
+	return $false
+}
+
 function Test-Rule62Line([string] $Path, [int] $Line, [string] $Text) {
 	# An `if` (an `else if` counts as its `if`) line is a rule 62 candidate when its condition, which may
 	# continue over later head-side lines until its parentheses close, has a `||` at depth one outside
@@ -392,6 +407,7 @@ try {
 		if (Test-Rule61Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-61') }
 		if (Test-Rule22Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-22') }
 		if (Test-Rule59Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-59') }
+		if (Test-Rule74Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-74') }
 		$kinds.AddRange((Test-CandidatePattern $line.Path $line.Text))
 		if (Test-Rule62Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-62') }
 		if (Test-Rule51Line $line.Path $line.Line $line.Text) { $kinds.Add('style-rule-51') }
@@ -417,6 +433,7 @@ try {
 	$counts['style-rule-59'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-59' }).Count
 	$counts['style-rule-62'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-62' }).Count
 	$counts['style-rule-51'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-51' }).Count
+	$counts['style-rule-74'] = @($sorted | Where-Object { $_.kind -ceq 'style-rule-74' }).Count
 	$result.counts = $counts
 	# A file result has no stdout budget, so it carries every hit.
 	$toFile = -not [string]::IsNullOrWhiteSpace($OutputPath)

@@ -1,8 +1,10 @@
 # The static checks for the Run targeted pre-review checks
 # step, selected from the session change inventory and run in one pass: `validate-skill`
-# for each changed skill package and `markdown-links` for every changed markdown file. The
-# first composes an existing script (the bundled skill validator); only the markdown link and anchor
-# check is new here. The
+# for each changed skill package, `markdown-links` for every changed markdown file, and
+# `file-hygiene` for every changed text file: Git's whitespace errors (`git diff --check` under the
+# `.gitattributes` whitespace attribute) and space-indented GLSL on added lines, and per file invalid
+# UTF-8, an added BOM, and a missing final newline the baseline side had. The
+# first composes an existing script (the bundled skill validator). The
 # run reports results only — it never decides whether a failing check blocks a slice, never edits a
 # file, and writes nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is
 # safe under a read-only sandbox. Stdout carries only the result document.
@@ -12,8 +14,8 @@
 # setup failure (invalid root, missing composed script, unavailable inventory) exits 2 with no rows, and
 # an unexpected error exits 1 with status `error`. `-Head <commit>` selects the changed
 # files from a committed head instead of the working tree, and `-IncludeUntracked` adds the untracked
-# files when checking the working tree. Only `markdown-links` reads content from that commit;
-# `validate-skill` validates the working tree's copy of each selected package.
+# files when checking the working tree. `markdown-links` and `file-hygiene` read content from that
+# commit; `validate-skill` validates the working tree's copy of each selected package.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -34,6 +36,7 @@ $script:Utf8 = [Text.UTF8Encoding]::new($false)
 $script:Root = $null
 $script:HeadSha = ''
 $script:HeadPaths = $null
+$script:UntrackedPaths = @()
 $script:HeadingSlugs = @{}
 # Inline markdown link: the target is everything up to the closing parenthesis or the optional title.
 $script:LinkPattern = '\[(?:[^\[\]]*)\]\(\s*([^)\s]+)'
@@ -59,7 +62,7 @@ function Complete-StaticChecks([int] $ExitCode, [string] $Status, [string] $Code
 	exit $ExitCode
 }
 
-function Invoke-StaticCheckProcess([string] $FileName, [string[]] $Arguments, [string] $WorkingDirectory) {
+function Invoke-StaticCheckProcess([string] $FileName, [string[]] $Arguments, [string] $WorkingDirectory, [switch] $RawStdout) {
 	$start = [Diagnostics.ProcessStartInfo]::new()
 	$start.FileName = $FileName
 	$start.WorkingDirectory = $WorkingDirectory
@@ -74,12 +77,17 @@ function Invoke-StaticCheckProcess([string] $FileName, [string[]] $Arguments, [s
 	$process = [Diagnostics.Process]::new()
 	$process.StartInfo = $start
 	if (-not $process.Start()) { throw "Could not start $FileName with: $($Arguments -join ' ')" }
-	$stdoutTask = $process.StandardOutput.ReadToEndAsync()
+	# Decoding stdout as text would hide a BOM and turn invalid bytes into replacement characters, so the
+	# byte checks read it raw.
+	$memory = [IO.MemoryStream]::new()
+	$stdoutTask = if ($RawStdout) { $process.StandardOutput.BaseStream.CopyToAsync($memory) } else { $process.StandardOutput.ReadToEndAsync() }
 	$stderrTask = $process.StandardError.ReadToEndAsync()
 	$process.WaitForExit()
+	$stdout = $stdoutTask.GetAwaiter().GetResult()
+	if ($RawStdout) { $stdout = $memory.ToArray() }
 	$run = [pscustomobject] @{
 		ExitCode = $process.ExitCode
-		Stdout = $stdoutTask.GetAwaiter().GetResult()
+		Stdout = $stdout
 		Stderr = $stderrTask.GetAwaiter().GetResult()
 	}
 	$process.Dispose()
@@ -92,10 +100,11 @@ function Get-StaticCheckShell() {
 	return $shell
 }
 
-function Invoke-StaticCheckGit([string[]] $Arguments) {
-	$run = Invoke-StaticCheckProcess 'git' (@('-C', $script:Root, '--no-pager') + $Arguments) $script:Root
+function Invoke-StaticCheckGit([string[]] $Arguments, [switch] $RawStdout) {
+	$run = Invoke-StaticCheckProcess 'git' (@('-C', $script:Root, '--no-pager') + $Arguments) $script:Root -RawStdout:$RawStdout
 	if ($run.ExitCode -ne 0) { throw "git $($Arguments -join ' ') failed with exit $($run.ExitCode): $($run.Stderr.Trim())" }
-	return $run.Stdout
+	# The comma keeps a raw byte[] from being unrolled into the pipeline.
+	return , $run.Stdout
 }
 
 function Get-InventoryDocument() {
@@ -104,8 +113,8 @@ function Get-InventoryDocument() {
 	if ($IncludeUntracked) {
 		# The inventory reports an untracked path only when the caller lists it, so the pass-through
 		# switch supplies the whole untracked set in the comma-separated form that script splits.
-		$untracked = @((Invoke-StaticCheckGit @('ls-files', '--others', '--exclude-standard', '-z')) -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) })
-		if ($untracked.Count -gt 0) { $arguments += @('-IncludeUntracked', ($untracked -join ',')) }
+		$script:UntrackedPaths = @((Invoke-StaticCheckGit @('ls-files', '--others', '--exclude-standard', '-z')) -split "`0" | Where-Object { -not [string]::IsNullOrEmpty($_) })
+		if ($script:UntrackedPaths.Count -gt 0) { $arguments += @('-IncludeUntracked', ($script:UntrackedPaths -join ',')) }
 	}
 	$run = Invoke-StaticCheckProcess (Get-StaticCheckShell) $arguments $script:Root
 	$document = $null
@@ -322,6 +331,105 @@ function Invoke-MarkdownLinkCheck([object] $Inventory, [bool] $Truncated) {
 	return New-CheckRow 'markdown-links' $true $status ([ordered]@{ linkCount = $linkCount; failures = [object[]] $failures.ToArray() })
 }
 
+function Add-WhitespaceFailure([string[]] $Arguments, [int] $CleanExit, [int] $FindingsExit, [Collections.Generic.List[object]] $Failures) {
+	$run = Invoke-StaticCheckProcess 'git' (@('-C', $script:Root, '--no-pager', '-c', 'core.quotePath=false') + $Arguments) $script:Root
+	if ($run.ExitCode -ne $CleanExit -and $run.ExitCode -ne $FindingsExit) { throw "git $($Arguments -join ' ') failed with exit $($run.ExitCode): $($run.Stderr.Trim())" }
+	# Each finding is one `<path>:<line>: <problem>.` line followed by the offending `+` lines.
+	foreach ($line in ($run.Stdout -split "`n")) {
+		if ($line.StartsWith('+') -or $line.TrimEnd("`r") -cnotmatch '^(.+):(\d+): (.+?)\.?$') { continue }
+		$Failures.Add([ordered]@{ path = $Matches[1]; line = [int] $Matches[2]; problem = $Matches[3] })
+	}
+}
+
+function Test-SpaceIndentedLine([string] $Text) {
+	# The style-rule-1 candidate pattern and its block-comment exception (Find-SessionCandidates.ps1); a
+	# tab-then-space aligned line starts with a tab and stays clear.
+	return $Text -cmatch '^ +[^ ]' -and $Text -cnotmatch '^ +\*(?:\s|/|$)'
+}
+
+function Add-AddedGlslIndentFailure([string[]] $DiffArguments, [string[]] $Paths, [Collections.Generic.List[object]] $Failures) {
+	$diff = Invoke-StaticCheckGit (@('-c', 'core.quotePath=false', 'diff', '-U0', '-M', '--no-color', '--no-ext-diff') + $DiffArguments + @('--') + $Paths)
+	$path = $null
+	$number = 0
+	$inHunk = $false
+	foreach ($line in ($diff -split "`n")) {
+		$line = $line.TrimEnd("`r")
+		if ($line.StartsWith('diff --git ')) { $path = $null; $inHunk = $false; continue }
+		if (-not $inHunk -and $line.StartsWith('+++ ')) { $path = if ($line -ceq '+++ /dev/null') { $null } else { $line.Substring(6).TrimEnd("`t") }; continue }
+		if ($line -cmatch '^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@') { $inHunk = $true; $number = [int] $Matches[1]; continue }
+		# With -U0 a hunk holds no context lines, and only an added line advances the new-side number.
+		if (-not $inHunk -or -not $line.StartsWith('+')) { continue }
+		if ($null -ne $path -and (Test-SpaceIndentedLine $line.Substring(1))) { $Failures.Add([ordered]@{ path = $path; line = $number; problem = 'indent with spaces' }) }
+		$number++
+	}
+}
+
+function Invoke-FileHygieneCheck([object] $Inventory, [bool] $Truncated) {
+	$failures = [Collections.Generic.List[object]]::new()
+	$diffArguments = @($Inventory.baselineSha)
+	if (-not [string]::IsNullOrEmpty($script:HeadSha)) { $diffArguments += $script:HeadSha }
+	# Untracked paths exist only against the working tree; a commit-valued head has none.
+	$untracked = @(if ([string]::IsNullOrEmpty($script:HeadSha)) { $script:UntrackedPaths })
+
+	# Whitespace errors on added lines; -M keeps a renamed file's unchanged lines from counting as added.
+	Add-WhitespaceFailure (@('diff', '--check', '-M', '--no-color') + $diffArguments) 0 2 $failures
+	$nullDevice = if ($IsWindows) { 'NUL' } else { '/dev/null' }
+	foreach ($path in $untracked) { Add-WhitespaceFailure @('diff', '--no-index', '--check', '--no-color', '--', $nullDevice, $path) 1 3 $failures }
+
+	$entries = @{}
+	foreach ($entry in $Inventory.entries) { if ($entry.status -cne 'D') { $entries[$entry.path] = $entry } }
+
+	# GLSL indentation on added lines. -M pairs a rename only when the pathspec holds both of its paths.
+	$glslPaths = Get-ChangedPath $Inventory { param($entry) $entry.class -cin @('glsl', 'dual-language-header') }
+	$untrackedGlsl = [Collections.Generic.HashSet[string]]::new([string[]] @())
+	$pathspec = [Collections.Generic.List[string]]::new()
+	foreach ($path in $glslPaths) {
+		if ($untracked -ccontains $path) { [void] $untrackedGlsl.Add($path); continue }
+		$pathspec.Add($path)
+		if ($null -ne $entries[$path].oldPath) { $pathspec.Add($entries[$path].oldPath) }
+	}
+	# An empty pathspec would diff every path.
+	if ($pathspec.Count -gt 0) { Add-AddedGlslIndentFailure $diffArguments ([string[]] $pathspec) $failures }
+
+	# File-level byte checks: gitlinks and symlinks carry no file bytes, and binary is Git's own decision.
+	$bytePaths = Get-ChangedPath $Inventory { param($entry) $entry.class -cne 'binary' -and $entry.current.mode -cin @('100644', '100755') }
+	foreach ($path in $bytePaths) {
+		$entry = $entries[$path]
+		# Plain assignments: an `if` expression would unroll the byte[] into the pipeline.
+		$head = $null
+		if ([string]::IsNullOrEmpty($script:HeadSha)) { $head = [IO.File]::ReadAllBytes((Join-Path $script:Root ($path -replace '/', [IO.Path]::DirectorySeparatorChar))) }
+		else { $head = Invoke-StaticCheckGit @('cat-file', 'blob', "$($script:HeadSha):$path") -RawStdout }
+		$baseline = $null
+		if ($null -ne $entry.baseline) {
+			$baselinePath = if ($null -ne $entry.oldPath) { $entry.oldPath } else { $path }
+			$baseline = Invoke-StaticCheckGit @('cat-file', 'blob', "$($Inventory.baselineSha):$baselinePath") -RawStdout
+		}
+		$text = $null
+		try { $text = Get-AgentNormalizedText $head }
+		catch { $failures.Add([ordered]@{ path = $path; line = $null; problem = 'invalid UTF-8' }) }
+		$headBom = $head.Length -ge 3 -and $head[0] -eq 0xEF -and $head[1] -eq 0xBB -and $head[2] -eq 0xBF
+		$baselineBom = $null -ne $baseline -and $baseline.Length -ge 3 -and $baseline[0] -eq 0xEF -and $baseline[1] -eq 0xBB -and $baseline[2] -eq 0xBF
+		if ($headBom -and -not $baselineBom) { $failures.Add([ordered]@{ path = $path; line = $null; problem = 'added BOM' }) }
+		# A file whose baseline side also lacked a final newline keeps that state.
+		$baselineFinal = $null -eq $baseline -or ($baseline.Length -gt 0 -and $baseline[$baseline.Length - 1] -eq 0x0A)
+		if ($head.Length -gt 0 -and $head[$head.Length - 1] -ne 0x0A -and $baselineFinal) { $failures.Add([ordered]@{ path = $path; line = $null; problem = 'no newline at end of file' }) }
+		if ($null -eq $text -or -not $untrackedGlsl.Contains($path)) { continue }
+		$number = 0
+		foreach ($line in ($text -split "`n")) {
+			$number++
+			if (Test-SpaceIndentedLine $line) { $failures.Add([ordered]@{ path = $path; line = $number; problem = 'indent with spaces' }) }
+		}
+	}
+
+	$detail = [ordered]@{ fileCount = $bytePaths.Count; failures = [object[]] $failures.ToArray() }
+	if ($failures.Count -gt 0) { return New-CheckRow 'file-hygiene' $true 'fail' $detail }
+	if ($bytePaths.Count -eq 0) {
+		if (-not $Truncated) { return New-CheckRow 'file-hygiene' $false 'skipped' $null }
+		return New-CheckRow 'file-hygiene' $true 'blocked' ([ordered]@{ reason = 'The inventory truncated its entry table, so the changed text files could not be selected.' })
+	}
+	return New-CheckRow 'file-hygiene' $true 'pass' $detail
+}
+
 try {
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot
 	if (-not (Test-Path -LiteralPath $script:Root -PathType Container)) {
@@ -337,10 +445,11 @@ try {
 	$truncated = [bool] $inventory.truncated
 	$result.truncated = $truncated
 
-	# Both rows are always present, triggered or not.
+	# All three rows are always present, triggered or not.
 	$checks = @(
 		(Invoke-ValidateSkillCheck $inventory)
 		(Invoke-MarkdownLinkCheck $inventory $truncated)
+		(Invoke-FileHygieneCheck $inventory $truncated)
 	)
 	$result.checks = [object[]] $checks
 	$triggeredStatuses = @($checks | Where-Object { $_.triggered } | ForEach-Object { $_.status })

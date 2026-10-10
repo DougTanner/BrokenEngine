@@ -162,7 +162,17 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      executable and the hit is in the same namespace;
    - rule 70: a dead fallback statement in a selected range directly after an
      `ASSERT(false)` the session did not add, which step 10 replaces as step 16
-     states; step 16 covers a session-added `ASSERT(false)`.
+     states; step 16 covers a session-added `ASSERT(false)`;
+   - rule 73: a missing space beside a binary, assignment or ternary operator
+     (including `<`, `>`, a binary `*`, `&` or `&&` unless a name and a space
+     precede it and a name or `(` follows it, and a ternary `:` unless a `)`
+     precedes it with only spaces between) or extra spaces there that align
+     no columns, a pointer or reference sign spaced on both sides (`T * p`), a
+     space between a function name and its `(` (`Update (iCount)`), more than
+     one space between a control keyword and `(` or after a `for` header `;`,
+     no space after a second `;` that a clause follows (`n;++i`), and more
+     than one space after a comma unless the extra spaces align columns,
+     which the `style-rule-73` kind does not match.
 
    The hand-read rules, rule 47 through the script run, step 16's rule 70
    check, and the rules the scanner's `style-rule-<n>` kinds cover are this

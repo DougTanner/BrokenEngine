@@ -467,3 +467,30 @@ What a comment should say, in the fewest sentences that carry it: an invariant, 
 
 	common::RoundDown(iFileOffset, PackChunks::kiSectorAlignment)  // not mrPackChunks.kiSectorAlignment
 	engine::AreaLightsPostRender::Add(rFrame, rId, iTypeIndex)  // not rFrame.postRender.areaLights.Add(rFrame, rId, iTypeIndex)
+
+73. Put a space after `if`, `for`, `while`, `switch` and `catch` before the `(`. Put no space after a function name, just inside parentheses or brackets, or between empty braces. Put no space before a comma or `;`, and one space after a comma (more to align columns) and after a `for` header `;` that a clause follows. A space may precede the `;` or `)` that closes an empty `for` clause. A unary `!`, `++` or `--` touches its operand, and a pointer `*` or reference `&` touches the type. Put no space around `.` or `->` member access. Put one space on each side of a binary, assignment or ternary operator (more to align columns) and of an inheritance or constructor-initializer colon. A space just inside a non-empty brace list is optional (rule 3), and a trailing comma before a one-line list's `}` is followed by a space (rules 3 and 42):
+
+	for (int64_t i = 0; i < iCount; ++i)
+	if (!bQuit)
+	Update(iCount);
+	Clear();
+	pValues[i] = iA + iB;
+	Uuid uuid {};
+	int64_t* pValue = nullptr;
+	const Foo& rFoo = rFoos[i];
+	iCount = rFoo.miCount > 0 ? pBar->miCount : 0;
+	struct Derived : Base
+	Foo(int64_t iCount) : miCount(iCount)
+	Key key { .uiKey = uiKey, .uiFlags = uiFlags, };
+
+74. Do not indent namespace contents. A nested namespace and its contents start at the enclosing namespace's indentation:
+
+	namespace game
+	{
+
+	namespace CollisionCategory
+	{
+	inline constexpr uint16_t kuiNone = 0x0000;
+	} // namespace CollisionCategory
+
+	} // namespace game
