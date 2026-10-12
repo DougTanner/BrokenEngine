@@ -7,7 +7,7 @@ reported.
 ## Steps
 
 1. Read [MetricContract.md](MetricContract.md) before creating a targets file or consuming a report; read [Remediation.md](Remediation.md) only when explaining advisory results. Done when each reference the request needs has been read.
-2. For the history workflow, read [HistoryContract.md](HistoryContract.md) before using `BootstrapIdentity`, `Contract`, `Generate`, or `Rebuild`. Done when that reference has been read, or no history mode is requested.
+2. For the history workflow, read [HistoryContract.md](HistoryContract.md) before using `BootstrapIdentity`, `Contract`, or `Generate`. Done when that reference has been read, or no history mode is requested.
 3. Run the public PowerShell entry point from the repository root, using the mode section below that matches the request. Done when that mode's invocation has been issued from the repository root.
    - Both Snapshot and Compare write canonical compact JSON to stdout and, when requested, the same full report to `-OutputPath`.
    - Add `-Digest` to emit a compact `broken-engine-code-quality-evidence/v3` summary to stdout instead of the full report, or `-Phase0Hints` (which implies `-Digest`) to add capped hints for the target paths, defined in [MetricContract.md](MetricContract.md) `## Output`.
@@ -21,10 +21,10 @@ emits one path-free identity object and never starts the analyzer.
 ### History
 
 `Invoke-CodeQualityMetricsHistory.ps1 -Mode Contract` is a read-only decision; `-Mode Generate`
-and `-Mode Rebuild` write only the `CodeQualityMetricsHistory.jsonl`/`.svg` pair into the supplied
-ignored `Temp` directory.
+writes only the `CodeQualityMetricsHistory.jsonl`/`.svg` pair into the supplied ignored `Temp`
+directory.
 
-Contract/Generate/Rebuild behavior is owned by [HistoryContract.md](HistoryContract.md). Landing
+Contract/Generate behavior is owned by [HistoryContract.md](HistoryContract.md). Landing
 is owned by [`/finalize-changes`](../../finalize-changes/SKILL.md).
 
 ### Snapshot

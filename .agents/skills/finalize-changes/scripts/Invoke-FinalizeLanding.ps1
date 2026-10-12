@@ -188,9 +188,9 @@ function Get-JsonResponse($Response, [string] $Operation) {
 	}
 }
 
-# Generation is a plain landing step: the producer decides on its own which rows to append, ending
-# with the primary tip this landing builds on (never the landing commit itself), so this only runs it
-# and hands back the two fixed paths it wrote into a fresh ignored Temp child.
+# Generation is a plain landing step: the producer appends the single row for the primary tip this
+# landing builds on (never the landing commit itself), so this only runs it and hands back the two
+# fixed paths it wrote into a fresh ignored Temp child.
 function Invoke-HistoryGenerate([string] $PrimaryTip) {
 	$script:HistoryTempParent = Join-Path $script:CurrentIdentity.Worktree 'Temp\FinalizeHistory'
 	New-Item -ItemType Directory -Path $script:HistoryTempParent -Force | Out-Null

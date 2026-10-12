@@ -40,15 +40,14 @@ own the exact parameter spellings for `Snapshot`, `Compare`, and
 the brief.
 
 - Mode: `Snapshot`, `Compare`, `BootstrapIdentity`, or the history modes
-  `Contract`, `Generate`, and `Rebuild` (worker `### Snapshot`, `### Compare`,
+  `Contract` and `Generate` (worker `### Snapshot`, `### Compare`,
   `### Bootstrap identity`, `### History`).
 - Target path and scope kind — `Exact`, `Directory`, or `Recursive` — for
   `Snapshot`, plus an optional full-SHA commit to measure instead of the
   working tree (worker `### Snapshot`).
 - Targets file and full-SHA baseline for `Compare` (worker `### Compare`).
-- Full-SHA base commit for `Contract`, `Generate`, and `Rebuild`, plus for
-  `Generate` and `Rebuild` a new output directory beneath `Temp/`, and for
-  `Rebuild` a v2 seed table.
+- Full-SHA base commit for `Contract` and `Generate`, plus for `Generate` a new
+  output directory beneath `Temp/`.
 - The absolute repository root, which every mode takes.
 
 ## Handoff

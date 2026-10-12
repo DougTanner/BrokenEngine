@@ -29,8 +29,9 @@ Facts at baseline `be855f6a`:
   (-0.0608), 197 (-0.0499), 195 (-0.0423), 211 (-0.0378), 395 (-0.0341), and
   186 (+0.0281) — all in the archive era.
 - Rows 0-645 are archive rows whose SHAs resolve only in offline archives of
-  the old repositories (`references/history/README.md`); rows 646 onward
-  follow `main`'s first-parent commits and resolve here.
+  the old repositories (`references/history/README.md`); some rows from 646
+  on name commits since squashed off `main` and may not resolve here
+  (`references/HistoryContract.md` `## Source table and decision`).
 - Each row stores corpus values of one commit Snapshot
   (`references/HistoryContract.md` `## Capture and drift`), measured by the
   analyzer of the run that added it; commit `1e9e821d` re-measured
@@ -107,7 +108,7 @@ commits and values, not machine paths.
   `Invoke-CodeQualityMetrics.ps1`, `Invoke-CodeQualityMetricsHistory.ps1`, or
   any other file under `.agents/skills/code-quality-metrics/`
 - Any change to the history table, the SVG chart, or their contracts;
-  running `Generate` or `Rebuild` to change tracked output
+  running `Generate` to change tracked output
 - Refactoring any C++ to lower the metric
 - Implementing any recommendation the record makes; follow-on changes wait
   for the user's decision

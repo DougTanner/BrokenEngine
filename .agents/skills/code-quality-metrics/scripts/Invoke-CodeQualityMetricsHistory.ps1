@@ -1,13 +1,12 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Contract', 'Generate', 'Rebuild')]
+    [ValidateSet('Contract', 'Generate')]
     [string]$Mode,
     [Parameter(Mandatory = $true)]
     [string]$RepositoryRoot,
     [Parameter(Mandatory = $true)]
     [string]$BaseCommit,
-    [string]$SeedPath,
     [string]$OutputDirectory
 )
 
@@ -134,7 +133,7 @@ function Assert-PropertySet([object]$Value, [string[]]$Required) {
     foreach ($name in $Required) { if ($names -notcontains $name) { throw "History row is missing '$name'." } }
     foreach ($name in $names) { if ($Required -notcontains $name) { throw "History row contains unexpected field '$name'." } }
 }
-# Validates a v2 table (a commit blob or a seed file); a v1 table fails the exact header check.
+# Validates a v2 table (a commit blob); a v1 table fails the exact header check.
 function Read-History([byte[]]$Bytes, [string]$Name) {
     $encoding = [Text.UTF8Encoding]::new($false, $true)
     try { $text = $encoding.GetString($Bytes) } catch { throw "$Name is not strict UTF-8." }
@@ -163,17 +162,6 @@ function Read-History([byte[]]$Bytes, [string]$Name) {
 }
 function Read-CommitHistory([string]$Repository, [string]$Commit) {
     Read-History (Invoke-GitBytes $Repository @('cat-file', 'blob', ($Commit + ':' + $script:HistoryRelativePath))) "History JSONL at $Commit"
-}
-# Oldest first: the repository root, then each first-parent commit through Base, with its committer date.
-function Get-FirstParentChain([string]$Repository, [string]$Base) {
-    $chain = [Collections.Generic.List[object]]::new()
-    foreach ($line in @(Invoke-Git $Repository @('log', '--first-parent', '--reverse', '--format=%H%x09%cI', $Base))) {
-        $parts = ([string]$line) -split "`t"
-        if ($parts.Count -ne 2 -or $parts[0] -cnotmatch '^[0-9a-f]{40}$') { throw "Git first-parent record is malformed: $line" }
-        Assert-CommitDate $parts[1] "Committer date of $($parts[0])"
-        $chain.Add([pscustomobject]@{ Sha = $parts[0]; Date = $parts[1] })
-    }
-    return $chain.ToArray()
 }
 function Get-NameStatusRecords([string]$Repository, [string]$Base, [string]$Tip) {
     $records = [Collections.Generic.List[object]]::new()
@@ -338,16 +326,15 @@ function Measure-Commit([string]$Repository, [string]$Sha, [object]$Capture) {
     if ($manifestBefore.digest -ne $manifestAfter.digest) { throw "scb-check capture manifest drifted during the Snapshot of $Sha." }
     return $evidence
 }
-function Get-CommitPlan([string]$Repository, [object]$Parent, [object]$Commit) {
-    $patch = Get-PatchEvidence $Repository $Parent.Sha $Commit.Sha
-    return [pscustomobject]@{ Sha = $Commit.Sha; Date = $Commit.Date; CaptureMode = $(if ($patch.cppChanged) { 'cpp-change' } else { 'carry-forward' }); Patch = $patch }
+function Get-CommitPlan([string]$Repository, [string]$Comparison, [string]$Sha, [string]$Date) {
+    $patch = Get-PatchEvidence $Repository $Comparison $Sha
+    return [pscustomobject]@{ Sha = $Sha; Date = $Date; CaptureMode = $(if ($patch.cppChanged) { 'cpp-change' } else { 'carry-forward' }); Patch = $patch }
 }
-# The per-commit step Generate and Rebuild share: carry the previous values, take a seed row, or measure.
-function New-CommitRow([string]$Repository, [int]$Index, [object]$Plan, [object]$Previous, [object]$Capture, [object]$SeedRow) {
-    if ($Plan.CaptureMode -eq 'carry-forward') { return [pscustomobject]@{ Kind = 'carried'; Row = (New-Row $Index $Plan.Sha $Plan.Date $false $Previous); Coverage = $null } }
-    if ($null -ne $SeedRow) { return [pscustomobject]@{ Kind = 'reused'; Row = (New-Row $Index $Plan.Sha $Plan.Date ([bool]$SeedRow.measured) $SeedRow); Coverage = $null } }
+# Generate's per-row step: carry the previous values or measure.
+function New-CommitRow([string]$Repository, [int]$Index, [object]$Plan, [object]$Previous, [object]$Capture) {
+    if ($Plan.CaptureMode -eq 'carry-forward') { return [pscustomobject]@{ Row = (New-Row $Index $Plan.Sha $Plan.Date $false $Previous); Coverage = $null } }
     $evidence = Measure-Commit $Repository $Plan.Sha $Capture
-    return [pscustomobject]@{ Kind = 'measured'; Row = (New-Row $Index $Plan.Sha $Plan.Date $true $evidence); Coverage = $evidence.coverage }
+    return [pscustomobject]@{ Row = (New-Row $Index $Plan.Sha $Plan.Date $true $evidence); Coverage = $evidence.coverage }
 }
 function Get-SvgEscape([string]$Value) { [Security.SecurityElement]::Escape($Value) }
 function Get-Polyline([object[]]$Rows, [string]$Name, [double]$Top, [double]$Bottom, [double]$Low, [double]$High) {
@@ -412,20 +399,15 @@ function Assert-UniqueOutput([string]$Repository, [string]$Path) {
     if (Test-Path -LiteralPath $full) { throw "OutputDirectory already exists and is never overwritten: '$full'." }
     return $full
 }
-# Lag-by-one: one plan per first-parent commit after the newest table row on Base's chain, through Base, oldest first.
+# One row per landing, Base's, compared with the newest row's commit because carry-forward copies that row. Archive
+# rows and commits squashed off main do not resolve here; the empty tree is then the comparison, so the row is measured.
 function Get-GeneratePlans([string]$Repository, [object]$History, [string]$Base) {
-    $chain = @(Get-FirstParentChain $Repository $Base)
-    $positions = [Collections.Generic.Dictionary[string, int]]::new([StringComparer]::Ordinal)
-    for ($position = 0; $position -lt $chain.Count; ++$position) { $positions[$chain[$position].Sha] = $position }
-    $anchor = -1
-    for ($rowIndex = $History.Rows.Count - 1; $rowIndex -ge 0 -and $anchor -lt 0; --$rowIndex) {
-        $sha = [string]$History.Rows[$rowIndex].sha
-        if ($positions.ContainsKey($sha)) { $anchor = $positions[$sha] }
-    }
-    if ($anchor -lt 0) { throw "No history table row is on BaseCommit's first-parent chain, as after a squash or rewrite of main; nothing was measured. Recover with -Mode Rebuild, passing the current table as -SeedPath." }
-    $plans = [Collections.Generic.List[object]]::new()
-    for ($position = $anchor + 1; $position -lt $chain.Count; ++$position) { $plans.Add((Get-CommitPlan $Repository $chain[$position - 1] $chain[$position])) }
-    return $plans.ToArray()
+    $date = (Invoke-Git $Repository @('log', '-1', '--format=%cI', $Base) | Select-Object -First 1).ToString().Trim()
+    Assert-CommitDate $date "Committer date of $Base"
+    $comparison = [string]$History.Rows[-1].sha
+    & git -C $Repository cat-file -e "$comparison^{commit}" 2>$null
+    if ($LASTEXITCODE -ne 0) { $comparison = '4b825dc642cb6eb9a060e54bf8d69288fbee4904' }
+    return Get-CommitPlan $Repository $comparison $Base $date
 }
 function Get-Generator([string]$Repository) {
     [ordered]@{ relativePath = $script:GeneratorRelativePath; sha256 = Get-FileSha256 (Join-Path $Repository ($script:GeneratorRelativePath -replace '/', '\')) }
@@ -448,7 +430,7 @@ function Write-HistoryPair([string]$Repository, [string]$OutputFull, [byte[]]$Js
 function New-Contract([object]$History, [string]$Base, [object[]]$Plans, [object]$Generator, [object]$Capture) {
     $last = $History.Rows[-1]
     [ordered]@{
-        schemaVersion = 'broken-engine-code-quality-history-contract/v2'
+        schemaVersion = 'broken-engine-code-quality-history-contract/v3'
         mode = 'Contract'
         source = [ordered]@{ baseCommit = $Base }
         series = [ordered]@{ rows = $History.Rows.Count; lastIndex = [int]$last.index; lastDate = [string]$last.date; historyBytesSha256 = $History.HistoryBytesSha256 }
@@ -465,7 +447,7 @@ function Invoke-Generate([string]$Repository, [object]$History, [string]$Base, [
     $previous = $History.Rows[-1]
     $appended = [Collections.Generic.List[object]]::new(); $entries = [Collections.Generic.List[object]]::new()
     foreach ($plan in $Plans) {
-        $step = New-CommitRow $Repository ([int]$previous.index + 1) $plan $previous $capture $null
+        $step = New-CommitRow $Repository ([int]$previous.index + 1) $plan $previous $capture
         $appended.Add($step.Row)
         $entries.Add([ordered]@{ sha = $plan.Sha; captureMode = $plan.CaptureMode; patch = $plan.Patch; row = $step.Row; coverage = $step.Coverage })
         $previous = $step.Row
@@ -473,60 +455,13 @@ function Invoke-Generate([string]$Repository, [object]$History, [string]$Base, [
     $jsonlBytes = [byte[]]($History.Bytes + (Get-RowsBytes $appended.ToArray()))
     $pair = Write-HistoryPair $Repository $outputFull $jsonlBytes (@($History.Rows) + $appended.ToArray())
     [ordered]@{
-        schemaVersion = 'broken-engine-code-quality-history-update/v2'
+        schemaVersion = 'broken-engine-code-quality-history-update/v3'
         mode = 'Generate'
         source = [ordered]@{ baseCommit = $Base }
         generator = $Generator
         capture = $capture
         rows = $entries.ToArray()
         series = [ordered]@{ digest = $pair.Digest; historyBytesSha256 = $History.HistoryBytesSha256 }
-        outputs = $pair.Outputs
-    }
-}
-# Rows before the root's seed row are copied; each first-parent commit of Base then reuses its seed row, is measured, or is carried.
-function Invoke-Rebuild([string]$Repository, [string]$Base, [string]$Seed, [string]$Output) {
-    $seedBytes = [IO.File]::ReadAllBytes($Seed)
-    $seedHistory = Read-History $seedBytes 'Seed'
-    $chain = @(Get-FirstParentChain $Repository $Base)
-    $rootPosition = -1
-    for ($rowIndex = 0; $rowIndex -lt $seedHistory.Rows.Count -and $rootPosition -lt 0; ++$rowIndex) { if ([string]$seedHistory.Rows[$rowIndex].sha -ceq $chain[0].Sha) { $rootPosition = $rowIndex } }
-    if ($rootPosition -lt 0) { throw "Seed has no row for BaseCommit's root commit $($chain[0].Sha)." }
-    $seedRows = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
-    for ($rowIndex = $rootPosition + 1; $rowIndex -lt $seedHistory.Rows.Count; ++$rowIndex) {
-        $sha = [string]$seedHistory.Rows[$rowIndex].sha
-        if ($sha -ceq $chain[0].Sha -or $seedRows.ContainsKey($sha)) { throw "Seed holds more than one row for $sha." }
-        $seedRows[$sha] = $seedHistory.Rows[$rowIndex]
-    }
-    $plans = [Collections.Generic.List[object]]::new()
-    for ($position = 1; $position -lt $chain.Count; ++$position) { $plans.Add((Get-CommitPlan $Repository $chain[$position - 1] $chain[$position])) }
-    $outputFull = Assert-UniqueOutput $Repository $Output
-    $capture = if (@($plans | Where-Object { $_.CaptureMode -eq 'cpp-change' -and -not $seedRows.ContainsKey($_.Sha) }).Count -gt 0) { Get-PreparedCapture $Repository } else { $null }
-    [IO.Directory]::CreateDirectory($outputFull) | Out-Null
-    $rows = [Collections.Generic.List[object]]::new()
-    for ($rowIndex = 0; $rowIndex -lt $rootPosition; ++$rowIndex) {
-        $seedRow = $seedHistory.Rows[$rowIndex]
-        $rows.Add((New-Row $rowIndex ([string]$seedRow.sha) ([string]$seedRow.date) ([bool]$seedRow.measured) $seedRow))
-    }
-    $rootSeed = $seedHistory.Rows[$rootPosition]
-    $previous = New-Row $rootPosition $chain[0].Sha $chain[0].Date ([bool]$rootSeed.measured) $rootSeed
-    $rows.Add($previous)
-    $counts = @{ reused = 1; measured = 0; carried = 0 }
-    foreach ($plan in $plans) {
-        $seedRow = if ($plan.CaptureMode -eq 'cpp-change' -and $seedRows.ContainsKey($plan.Sha)) { $seedRows[$plan.Sha] } else { $null }
-        $step = New-CommitRow $Repository $rows.Count $plan $previous $capture $seedRow
-        ++$counts[$step.Kind]
-        $rows.Add($step.Row)
-        $previous = $step.Row
-    }
-    $headerBytes = [Text.UTF8Encoding]::new($false).GetBytes($script:HeaderText + "`n")
-    $jsonlBytes = [byte[]]($headerBytes + (Get-RowsBytes $rows.ToArray()))
-    $pair = Write-HistoryPair $Repository $outputFull $jsonlBytes $rows.ToArray()
-    [ordered]@{
-        schemaVersion = 'broken-engine-code-quality-history-rebuild/v1'
-        mode = 'Rebuild'
-        source = [ordered]@{ baseCommit = $Base; seedSha256 = Get-BytesSha256 $seedBytes }
-        capture = $capture
-        series = [ordered]@{ rows = $rows.Count; reused = $counts.reused; measured = $counts.measured; carried = $counts.carried; digest = $pair.Digest }
         outputs = $pair.Outputs
     }
 }
@@ -539,26 +474,19 @@ try {
     if (-not $RepositoryRoot) { throw 'RepositoryRoot must be an existing directory.' }
     $repository = Get-CanonicalPath $RepositoryRoot
     Assert-OrdinaryDirectory $repository 'RepositoryRoot'
-    if ($Mode -eq 'Contract' -and ($OutputDirectory -or $SeedPath)) { throw 'Contract is read-only and accepts neither OutputDirectory nor SeedPath.' }
-    if ($Mode -ne 'Contract' -and -not $OutputDirectory) { throw "$Mode requires a unique Temp OutputDirectory." }
-    if ($Mode -eq 'Generate' -and $SeedPath) { throw 'Generate reads the table at BaseCommit and does not accept SeedPath.' }
-    if ($Mode -eq 'Rebuild' -and -not $SeedPath) { throw 'Rebuild requires a v2 SeedPath.' }
+    if ($Mode -eq 'Contract' -and $OutputDirectory) { throw 'Contract is read-only and does not accept OutputDirectory.' }
+    if ($Mode -eq 'Generate' -and -not $OutputDirectory) { throw 'Generate requires a unique Temp OutputDirectory.' }
     $base = $BaseCommit.ToLowerInvariant()
     Assert-CommitObject $base 'BaseCommit'
     [void](Get-GitSha $repository $base)
-    if ($Mode -eq 'Rebuild') {
-        $receipt = Invoke-Rebuild $repository $base (Get-RepositoryPath $repository $SeedPath) (Get-RepositoryPath $repository $OutputDirectory)
+    $history = Read-CommitHistory $repository $base
+    $plans = @(Get-GeneratePlans $repository $history $base)
+    $generator = Get-Generator $repository
+    if ($Mode -eq 'Contract') {
+        $capture = if (@($plans | Where-Object { $_.CaptureMode -eq 'cpp-change' }).Count -gt 0) { Get-PreparedCapture $repository } else { $null }
+        $receipt = New-Contract $history $base $plans $generator $capture
     }
-    else {
-        $history = Read-CommitHistory $repository $base
-        $plans = @(Get-GeneratePlans $repository $history $base)
-        $generator = Get-Generator $repository
-        if ($Mode -eq 'Contract') {
-            $capture = if (@($plans | Where-Object { $_.CaptureMode -eq 'cpp-change' }).Count -gt 0) { Get-PreparedCapture $repository } else { $null }
-            $receipt = New-Contract $history $base $plans $generator $capture
-        }
-        else { $receipt = Invoke-Generate $repository $history $base $plans $generator (Get-RepositoryPath $repository $OutputDirectory) }
-    }
+    else { $receipt = Invoke-Generate $repository $history $base $plans $generator (Get-RepositoryPath $repository $OutputDirectory) }
     [Console]::Out.WriteLine((Get-CanonicalJson $receipt))
 }
 catch { Fail $_.Exception.Message }

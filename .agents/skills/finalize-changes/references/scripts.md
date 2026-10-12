@@ -240,15 +240,14 @@ and overwrites the artifact; the stale receipt is never reused, because its
   one. Allow a landing invocation on the default budget a command timeout of up
   to 20 minutes; its worst case is about 15 minutes — the omitted-token route's
   300-second lock-claim wait, this 500-second index-lock budget, and the
-  landing's own Git work, plus about 2 minutes (unvalidated) per history commit
-  Snapshot (one in the ordinary case; which commits get measured is in
+  landing's own Git work, plus about 2 minutes (unvalidated) for its at most
+  one history commit Snapshot (when one is taken is in
   [`HistoryContract.md`](../../code-quality-metrics/references/HistoryContract.md)
   `## Source table and decision`) — so a caller raising that budget must raise
-  its host timeout by the same amount, and by about 2 minutes per extra
-  measured C++ commit. Pass the post-confirmation claim's owner token as
-  `-OwnerToken` so landing continues under that same lease, which it accepts only
-  as a same-actor continuation under the `worker.md` `## Bundled scripts` ownership
-  rule, preserving the raw `$SessionLabel`. Without `-OwnerToken`, it derives
+  its host timeout by the same amount. Pass the post-confirmation claim's owner
+  token as `-OwnerToken` so landing continues under that same lease, which it
+  accepts only as a same-actor continuation under the `worker.md`
+  `## Bundled scripts` ownership rule, preserving the raw `$SessionLabel`. Without `-OwnerToken`, it derives
   `$SessionLabel/landing`, first inspects the lock, and adopts a live owner only
   when that exact derived session and the same canonical worktree match and the
   recorded integer lease duration is at least the 3600-second landing duration; it
