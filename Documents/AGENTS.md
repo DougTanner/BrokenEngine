@@ -8,7 +8,6 @@ Holds design-time documentation and three parallel planning trees. No build arti
 - `C++StyleGuide.txt` — numbered style rules (Hungarian notation, Allman braces, `auto` restrictions, DirectXMath conventions). Source of truth for the `code-style-review`, `comment-review`, and `repo-code-review` skills.
 - `FloatingPointDeterminism.txt` — the rules that keep rollback and replay bit-identical across client and server: `/fp:strict`, FMA3 disabled, per-thread MXCSR, fixed 32 Hz timestep, deterministic RNG, single shared CRC. Read before touching simulation math.
 - `UserInterfaceDesign.txt` — the ImGui layout contract for player-facing screens: one scale factor (`engine::UiScale()`), the three sizing rules, shared layout constants, pivot centering, size-to-content, themed buttons, and vertical rhythm. Layout counterpart to `FloatingPointDeterminism.txt`; source of truth for `Ui/Screens/` geometry. Read before touching menu/HUD layout.
-- `azure-game-server-guide.md` — Azure VM hosting guide for the dedicated server: sizing/costs, NSG rules, deployment set, remote debugging.
 - `Architecture/` — external detail too large for AGENTS.md: Mermaid diagrams (`FrameUpdatePipeline.md`, `GameReconciliation.md`) and the network protocol specification (`Network.md`). Relevant subsystem AGENTS.md files link to them; update the affected document when its phase ordering, reconciliation flow, or protocol contract changes.
 
 ## Planning Trees
