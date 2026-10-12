@@ -49,8 +49,9 @@ Triggers, inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
   `no recorded reason` when the history is silent.
 - Leave a decision the request does not settle unresolved and return it for
   main, per the `## Directives` trivial-choices bullet in root
-  [AGENTS.md](../../../../AGENTS.md); an architectural choice is always the
-  user's.
+  [AGENTS.md](../../../../AGENTS.md); which decisions go to the user is in
+  [`change-workflow.md`](../../../references/change-workflow.md)
+  `### Resolving Ambiguity`.
 - Scope the plan to the smallest complete change, per the minimum-sufficient
   change directive in root [AGENTS.md](../../../../AGENTS.md).
 - Delegation conduct is in

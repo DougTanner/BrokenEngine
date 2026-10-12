@@ -46,7 +46,7 @@ OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no ef
 ### Resolving Ambiguity
 
 - Non-trivial ties (two viable approaches, neither architectural): fan out `researcher` subagents to validate each, compare pros/cons, then pick the simplest good solution.
-- Architectural decisions (new system shape, public API, data layout, threading model): stop and ask the user, presenting the problem, proposed solutions, and pros/cons of each.
+- Architectural decisions (new system shape, public API, data layout, threading model), and any reading of the request that changes observable behavior and that neither the request nor a build, an existing harness command, or a code read settles: stop and ask the user, presenting the problem, proposed solutions, and pros/cons of each.
 - Races: a race is reachable when an existing actor — another thread, another process, or a repository tool such as DataPacker — can perform the interleaving under supported use. Remove a reachable race by construction (ordering, a lock, an exclusive handle, an atomic publish); rarity is no reason to keep it, because a rare timing failure is one a single user is unlikely ever to see or report. Treat a race no existing actor can perform as impossible or ASSERT it; it is never a cost when comparing options and never a user question.
 - Hand-edited files that have never been seen and have no named trigger: never a cost when comparing options and never a user question. Trust-boundary validation (`.agents/references/cpp-conventions.md`) still applies.
 - Questions a build, an existing harness command, or a code read settles: settle them that way, through the role that runs it, and never ask the user.

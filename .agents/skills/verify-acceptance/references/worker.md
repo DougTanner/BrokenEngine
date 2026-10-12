@@ -33,10 +33,12 @@ owns the triggers, inputs, and handoff form.
 
 Tier 1 checks are static, schema, link, validator, and compilation of changed
 C++; Tier 2 adds the smallest observable scenario; Tier 3 adds exposed invariant
-or integration checks. At any tier, a bug-fix criterion settles only once its
-pre-change red run is on record, each as the execution card `Acceptance checks:`
-field in [`next-plan`](../../next-plan/SKILL.md) `## Handoff` defines it; a
-`query_profile` timing criterion settles only on cohorts compared as the
+or integration checks. At any tier, a criterion for new or fixed behavior
+settles only on a check the unedited tree could not pass, and a bug-fix
+criterion only once its pre-change red run is on record, each as the execution
+card `Acceptance checks:` field in [`next-plan`](../../next-plan/SKILL.md)
+`## Handoff` defines it; a `query_profile` timing criterion settles only on
+cohorts compared as the
 `query_profile` caveat in [`commands-client.md`](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-client.md)
 `## Durable caveats` requires.
 

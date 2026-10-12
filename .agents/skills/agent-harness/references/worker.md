@@ -617,8 +617,12 @@ and the handoff this run returns.
       failed: cleanup succeeded and the lock was released, but a registered role
       had exited unexpectedly.
 
-47. Read the release result. Done when the release outcome is classified and
-    reported.
+47. Read the release result, then search for `DEBUG_BREAK at` in the
+    `--log-file` of each process this run started: the server and client log
+    paths from the project harness doc's launch, for each PID step 45 retains,
+    and each additional client's. A log no process of this run opened still holds an
+    earlier run's lines and is never searched. Done when the release outcome is
+    classified and reported and every such log has been searched.
 
     - Exit `0` (`status` `pass`) means every supplied PID is absent and the lock
       was released; report the payload's per-step outcomes verbatim, including
@@ -630,6 +634,11 @@ and the handoff this run returns.
       `release.lock-owner-mismatch` and `release.lock-absent`, which are never a
       success.
     - Never reconstruct the quit, wait, stop, or release steps inline.
+    - Report each log with a match as one `Evidence` row: the log path with
+      `DEBUG_BREAK at` as selector, the match count, the first matched line,
+      and the line logged just before it, which names the cause of an `ASSERT`
+      failure or a Vulkan validation message. A match is a note for main and
+      never changes a criterion result, `Status`, or a retry.
 
 ### Process verification report
 

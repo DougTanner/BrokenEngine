@@ -259,7 +259,7 @@ Execution card:
 - Out of scope: <boundary>
 - Tier trigger: <trigger or none>
 - Interfaces and invariants: <contracts>
-- Acceptance checks: <check and expected observation; a bug-fix criterion (one stating a defect no longer occurs) also names its pre-change red run: an /external-diagnose-bug Reproducing signal, or a run on a build of the unedited tree, requested through a Build required handoff, that the implementer records before its first edit>
+- Acceptance checks: <check and expected observation; a criterion for new or fixed behavior names a check the unedited tree could not pass, and a bug-fix criterion (one stating a defect no longer occurs) also names its pre-change red run: an /external-diagnose-bug Reproducing signal, or a run on a build of the unedited tree, requested through a Build required handoff, that the implementer records before its first edit; when the proven cause is a general rule, the bug-fix check also covers one input beyond the reported case that a patch for only that case would still fail, settled by a code read of the general fix when the agent settling it is confident the change is correct because it is small and self-contained, and otherwise by a run; a criterion for a performance gain the change exists to make covers one independent optimization and states that the optimization is reverted when the criterion fails, and when `query_profile` measures the gain it also names its baseline cohorts and expects a gap outside the cohort-to-cohort range the `query_profile` caveat in `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-client.md` `## Durable caveats` defines>
 - Roles: <required and conditional assignments>
 ```
 

@@ -50,8 +50,17 @@ per item, never a paragraph, and never by re-rendering the form itself.
 `Build required` stays present and `Residuals` stays last. A target that
 `/compile` builds in Release only carries `Release|x64` and no other
 configuration/platform under `Build required`. Independent review and
-verification use a context that did not produce the work. A focused
-correction/retest also uses an independent context.
+verification use a context that did not produce the work, and treat every
+conclusion a supplied handoff states — `Self-audit resolved` results, a
+`Decisive checks` row that reports a read rather than recorded command output,
+a claim that a site is safe or unaffected — as a hypothesis to disprove from
+code they read themselves, never as evidence; recorded command, build, and
+harness output stays evidence, and the handoff's changed regions and focus
+areas still bound the scope. When the brief states the change's tier, a changed
+byte that reaches a surface that tier excludes in
+[`risk-tiers.md`](risk-tiers.md) `### Risk tiers` is a tier-escalation finding
+naming the higher tier's trigger. A focused correction/retest also uses an
+independent context.
 
 A worker ends its turn with the handoff as its final answer and never enters an
 open-ended wait after delivering it; whatever comes next is a fresh dispatch

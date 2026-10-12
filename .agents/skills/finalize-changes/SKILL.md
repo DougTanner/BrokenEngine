@@ -147,9 +147,10 @@ change contains exactly the paths `Complete-NextPlan.ps1 -Reject` reported and
 the acceptance table has no non-PASS row. The authorizing user message fills
 the capsule's confirmation row.
 
-Confirmation binds the reviewed diff, not commit hashes. A clean identical
-rebase onto an advanced primary lands without re-asking, and needs no re-review
-or rebuild. An actual rebase conflict
+Confirmation binds the reviewed diff, not commit hashes. Landing's clean
+identical rebase onto an advanced primary after confirmation lands without
+re-asking, and needs no re-review or rebuild; a rebuild before the summary is
+owned by `references/worker.md` step 5. An actual rebase conflict
 requiring manual resolution, a change to the session bytes, or a meaningful
 semantic change re-runs review of the affected regions and requires a refreshed
 summary, a fresh `SmartGit launch:` line for the new commit that main runs the

@@ -63,7 +63,10 @@ boundary, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 
 9. State three to five hypotheses before testing any of them, ranked most to
    least likely. Each states its prediction: "if X is the cause, then changing
-   Y removes the failure." Done when each ranked entry carries its prediction.
+   Y removes the failure." For a regression with a known-good commit, read the
+   commits that landed on the suspect paths since it
+   (`git log --first-parent <good>..HEAD -- <paths>`) as hypothesis input.
+   Done when each ranked entry carries its prediction.
 10. Sharpen or drop every hypothesis you cannot state a prediction for; it is a
     guess. Done when no prediction-less hypothesis remains.
 11. Show the ranked list to the user before testing; they often re-rank it

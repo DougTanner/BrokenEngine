@@ -1,5 +1,5 @@
 ---
-description: Plan, code, shader, and session reviews; audits; adversarial review that tries to disprove the change. Findings only unless the invoked skill or the caller's prompt authorizes edits.
+description: Plan, code, shader, and session reviews; audits; adversarial review that tries to disprove the change. Findings only unless the invoked skill or the caller's prompt authorizes edits. Direct dispatch runs no prompt assembly — the caller supplies the judgment inputs the assigned skill's `## Inputs` requires for the dispatched case and takes every machine-derived value from the existing scripts `.agents/references/subagent-reporting.md` names.
 mode: subagent
 model: opencode/union-alpha
 permission:

@@ -6,8 +6,15 @@ and the handoff form.
 
 ## Steps
 
-1. Confirm a checkable root cause for each assigned item before editing it. Done
-   when every item has a named cause, or is left unchanged because its cause is
+1. Confirm a checkable root cause for each assigned item before editing it.
+   Silencing the check that reported it — a silencing change
+   [`checks.md`](../../repo-code-review/references/checks.md)
+   `### ASSERT behavior` lists, or a `.clang-tidy` or `<ClangTidyChecks>`
+   change — is not a cause and never the fix. The one exception is a confirmed
+   cause showing the diagnostic, `ASSERT`, or CRC entry itself is wrong: fix it
+   at that site, a false diagnostic only by a fix that section
+   allows and never by a `.clang-tidy` or `<ClangTidyChecks>` change. Done when
+   every item has a named cause, or is left unchanged because its cause is
    uncertain or out of scope.
 2. Apply the smallest change that restores approved behavior for each item with
    a confirmed cause. Done when the edit is complete within the assigned files

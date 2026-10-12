@@ -74,7 +74,8 @@ reach.
   file, or `.pack` paths.
 - Allocation-tracked paths and logging — Engine/Game code under allocation
   tracking, and changed logs there.
-- ASSERT behavior — an added or changed assertion.
+- ASSERT behavior — an added, changed, or deleted assertion, or a change that
+  silences a check.
 - Collections, persistence, and identity — `Collection<T>` columns and other
   persisted or wire-visible layouts.
 - Determinism, threading, and frame phases — CRC-fed or replay state,

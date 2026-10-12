@@ -10,10 +10,13 @@ inputs, modes, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    settled and each changed region has been read.
 2. Review those changed bytes against the rules they touch: a statement that
    contradicts the source it cites, a fact that now disagrees with its owning
-   location, an instruction that cannot be followed as written, and a path,
-   link, or anchor that does not resolve. This component passes when no accepted
-   semantic finding remains unresolved. Done when every changed region has been
-   judged that way.
+   location, an instruction that cannot be followed as written, a path, link,
+   or anchor that does not resolve, and a rewritten sentence that drops a
+   number, unit, condition, exception, or "only when" scope the old text
+   carried, or turns a hedge into a stronger claim, unless the text still
+   states it elsewhere or the brief records the drop as intended. This
+   component passes when no accepted semantic finding remains unresolved. Done
+   when every changed region has been judged that way.
 3. At Tier 2+, run the authorization, minimality, and KISS passes of
    [`scope-authorization.md`](../../../references/scope-authorization.md) over
    the same regions. Done when each pass has run against the supplied

@@ -44,8 +44,10 @@ the continuation capsule `SKILL.md` `### Landing confirmation` lists and skips
 1-8. A blocked result that needs recovery is returned as a handoff for the
 recovery dispatch: main dispatches a fresh preparation worker whose
 continuation capsule carries that blocked disposition as its unresolved-issue
-item and, for a `primary.path-overlap` blocker that in-worker recovery
-returned, `Temp/finalize-primary-movement-result.json` as path plus selector.
+item and, for a blocker that in-worker overlap recovery returned — the
+original `primary.path-overlap` result, or the original `needs-review` result
+on step 5's build route — `Temp/finalize-primary-movement-result.json` as path
+plus selector.
 Every preparation dispatch recovers `primary.path-overlap` itself under
 `## Recovery`.
 
@@ -106,9 +108,19 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
      which owns every status and code.
    - A blocker returns no launch line and no landing summary, and names the
      candidate parent and live primary whenever either is available.
-   - A `needs-review` result follows the documented lossless checker-result
-     handoff in [`scripts.md#bundled-scripts`](scripts.md#bundled-scripts), is
-     consumed as a usable non-conflict terminal, and proceeds directly to the
+   - When a `needs-review` or `primary.path-overlap` result's `changes.items`
+     and `ownedPaths.items` each hold a `.cpp` or `.h` path under `Common/`,
+     `Engine/`, or `Projects/`, the session's source builds with that foreign
+     source before the summary: a `needs-review` result runs the overlap
+     recovery in `## Recovery` in this same dispatch, returning the original
+     `needs-review` result wherever that recovery returns the original
+     `primary.path-overlap` result, and on either route the recovery's clean
+     path returns the meaning-change handoff with `Build required` naming the
+     client and the server even when its inspection finds no meaning change.
+   - Any other `needs-review` result follows the documented lossless
+     checker-result handoff in
+     [`scripts.md#bundled-scripts`](scripts.md#bundled-scripts), is consumed as
+     a usable non-conflict terminal, and proceeds directly to the
      `SmartGit launch:` line in step 6 and the existing landing summary.
    - A `primary.path-overlap` result runs the overlap recovery in
      `## Recovery` in this same dispatch.
