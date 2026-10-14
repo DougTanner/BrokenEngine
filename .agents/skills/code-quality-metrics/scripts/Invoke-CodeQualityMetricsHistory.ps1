@@ -15,8 +15,18 @@ $ErrorActionPreference = 'Stop'
 
 $script:HistoryRelativePath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'
 $script:GeneratorRelativePath = '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetricsHistory.ps1'
-$script:HeaderText = '{"schema":"code-quality-metrics-history/v2"}'
-$script:RowFields = @('index', 'sha', 'date', 'measured', 'verbosity', 'structuralErosion', 'supported', 'parsed')
+$script:HeaderText = '{"schema":"code-quality-metrics-history/v3"}'
+$script:AreaFields = @('verbosityEngine', 'verbosityCommon', 'verbosityDataPacker', 'verbosityGame', 'verbosityAgentTools')
+$script:RowFields = @('index', 'sha', 'date', 'measured', 'verbosity') + $script:AreaFields + @('supported', 'parsed')
+# History areas (HistoryContract.md): the first matching prefix wins, so both Agent/ folders precede Engine/ and Projects/.
+$script:HistoryAreaPrefixes = @(
+    @('Engine/Source/Agent/', 'verbosityAgentTools'),
+    @('Projects/BrokenEngineSandbox/Source/Agent/', 'verbosityAgentTools'),
+    @('Tools/', 'verbosityAgentTools'),
+    @('Engine/', 'verbosityEngine'),
+    @('Common/', 'verbosityCommon'),
+    @('DataPacker/', 'verbosityDataPacker'),
+    @('Projects/', 'verbosityGame'))
 $script:MetricExtensions = @('.h', '.cpp')
 $script:ExcludedRoots = @('ThirdParty', '.agents', '.claude', 'Temp')
 
@@ -133,7 +143,7 @@ function Assert-PropertySet([object]$Value, [string[]]$Required) {
     foreach ($name in $Required) { if ($names -notcontains $name) { throw "History row is missing '$name'." } }
     foreach ($name in $names) { if ($Required -notcontains $name) { throw "History row contains unexpected field '$name'." } }
 }
-# Validates a v2 table (a commit blob); a v1 table fails the exact header check.
+# Validates a v3 table (a commit blob); an older table fails the exact header check.
 function Read-History([byte[]]$Bytes, [string]$Name) {
     $encoding = [Text.UTF8Encoding]::new($false, $true)
     try { $text = $encoding.GetString($Bytes) } catch { throw "$Name is not strict UTF-8." }
@@ -152,7 +162,7 @@ function Read-History([byte[]]$Bytes, [string]$Name) {
         Assert-CommitDate $row.date "$Name date at row $index"
         if ($row.measured -isnot [bool]) { throw "$Name measured must be a JSON boolean at row $index." }
         Assert-FiniteRange $row.verbosity "row[$index].verbosity"
-        Assert-FiniteRange $row.structuralErosion "row[$index].structuralErosion"
+        foreach ($field in $script:AreaFields) { if ($null -ne $row.$field) { Assert-FiniteRange $row.$field "row[$index].$field" } }
         $supported = Assert-Count $row.supported "row[$index].supported"
         [void](Assert-Count $row.parsed "row[$index].parsed" $supported)
         $rows.Add($row)
@@ -283,25 +293,37 @@ function Get-CommitSnapshot([string]$Repository, [string]$Commit) {
     Invoke-ChildJson $Repository '.agents/skills/code-quality-metrics/scripts/Invoke-CodeQualityMetrics.ps1' @('-Mode', 'Snapshot', '-Target', 'Engine/Source', '-Scope', 'Recursive', '-Commit', $Commit, '-RepositoryRoot', $Repository)
 }
 function Get-SnapshotEvidence([object]$Report) {
-    if ($Report.schemaVersion -ne 'broken-engine-code-quality-metrics/v3' -or $Report.mode -ne 'Snapshot') { throw 'Snapshot did not return the v3 Snapshot report.' }
-    $metrics = $Report.current.corpusMetrics
-    foreach ($name in @('verbosity', 'structuralErosion')) {
-        if ($null -eq $metrics.$name) { throw "Snapshot corpusMetrics is missing $name." }
-        Assert-FiniteRange $metrics.$name.value "snapshot.corpusMetrics.$name.value"
-    }
+    if ($Report.schemaVersion -ne 'broken-engine-code-quality-metrics/v4' -or $Report.mode -ne 'Snapshot') { throw 'Snapshot did not return the v4 Snapshot report.' }
+    $verbosity = $Report.current.corpusMetrics.verbosity
+    if ($null -eq $verbosity) { throw 'Snapshot corpusMetrics is missing verbosity.' }
+    Assert-FiniteRange $verbosity.value 'snapshot.corpusMetrics.verbosity.value'
     $supported = Assert-Count $Report.current.corpusCounts.supported 'snapshot.corpusCounts.supported'
     $parsed = Assert-Count $Report.current.corpusCounts.parsed 'snapshot.corpusCounts.parsed' $supported
-    return [ordered]@{
-        verbosity = [double]$metrics.verbosity.value
-        structuralErosion = [double]$metrics.structuralErosion.value
-        supported = $supported
-        parsed = $parsed
-        coverage = [ordered]@{ corpusCounts = $Report.current.corpusCounts; targetCounts = $Report.current.targetCounts }
+    $numerators = @{}; $denominators = @{}
+    foreach ($field in $script:AreaFields) { $numerators[$field] = [int64]0; $denominators[$field] = [int64]0 }
+    foreach ($file in @($Report.current.files)) {
+        $path = [string]$file.path
+        $match = $script:HistoryAreaPrefixes | Where-Object { $path.StartsWith($_[0], [StringComparison]::Ordinal) } | Select-Object -First 1
+        if ($null -eq $match) { continue }
+        $denominator = Assert-Count $file.metrics.verbosity.denominator "snapshot.files[$path].verbosity.denominator"
+        $numerators[$match[1]] += Assert-Count $file.metrics.verbosity.numerator "snapshot.files[$path].verbosity.numerator" $denominator
+        $denominators[$match[1]] += $denominator
     }
+    $evidence = [ordered]@{ verbosity = [double]$verbosity.value }
+    foreach ($field in $script:AreaFields) { $evidence[$field] = if ($denominators[$field] -eq 0) { $null } else { [double]$numerators[$field] / $denominators[$field] } }
+    $evidence.supported = $supported
+    $evidence.parsed = $parsed
+    $evidence.coverage = [ordered]@{ corpusCounts = $Report.current.corpusCounts; targetCounts = $Report.current.targetCounts }
+    return $evidence
 }
 function Get-NumberText([double]$Value) { $Value.ToString('0.############', [Globalization.CultureInfo]::InvariantCulture) }
+# Values is Snapshot evidence or, for carry-forward, the previous row; a null history-area value stays null.
 function New-Row([int]$Index, [string]$Sha, [string]$Date, [bool]$Measured, [object]$Values) {
-    [pscustomobject][ordered]@{ index = $Index; sha = $Sha; date = $Date; measured = $Measured; verbosity = [double](Get-NumberText $Values.verbosity); structuralErosion = [double](Get-NumberText $Values.structuralErosion); supported = [int]$Values.supported; parsed = [int]$Values.parsed }
+    $row = [ordered]@{ index = $Index; sha = $Sha; date = $Date; measured = $Measured; verbosity = [double](Get-NumberText $Values.verbosity) }
+    foreach ($field in $script:AreaFields) { $row[$field] = if ($null -eq $Values.$field) { $null } else { [double](Get-NumberText $Values.$field) } }
+    $row.supported = [int]$Values.supported
+    $row.parsed = [int]$Values.parsed
+    return [pscustomobject]$row
 }
 function Get-RowsBytes([object[]]$Rows) {
     $builder = [Text.StringBuilder]::new()
@@ -340,51 +362,105 @@ function Get-SvgEscape([string]$Value) { [Security.SecurityElement]::Escape($Val
 function Get-Polyline([object[]]$Rows, [string]$Name, [double]$Top, [double]$Bottom, [double]$Low, [double]$High) {
     $points = [Collections.Generic.List[string]]::new(); $count = $Rows.Count; $width = 3440.0; $left = 300.0
     for ($index = 0; $index -lt $count; ++$index) {
+        $value = $Rows[$index].$Name
+        if ($null -eq $value) { continue }
         $x = if ($count -eq 1) { $left } else { $left + $width * $index / ($count - 1) }
-        $y = $Bottom - ($Bottom - $Top) * ([double]$Rows[$index].$Name - $Low) / ($High - $Low)
+        $y = $Bottom - ($Bottom - $Top) * ([double]$value - $Low) / ($High - $Low)
         $points.Add("$(Get-NumberText $x),$(Get-NumberText $y)")
     }
     return ($points -join ' ')
 }
-function New-HistorySvg([object[]]$Rows, [string]$SeriesDigest) {
-    $bands = @(
-        @{ Id = 'series-verbosity'; Name = 'verbosity'; Title = 'verbosity'; Color = '#65d6ff'; Top = 230.0; Bottom = 1070.0 },
-        @{ Id = 'series-structural-erosion'; Name = 'structuralErosion'; Title = 'structural erosion'; Color = '#ffb454'; Top = 1200.0; Bottom = 2040.0 })
-    $lines = [Collections.Generic.List[string]]::new()
-    $lines.Add('<?xml version="1.0" encoding="UTF-8"?>')
-    $lines.Add('<svg xmlns="http://www.w3.org/2000/svg" width="3840" height="2160" viewBox="0 0 3840 2160">')
-    $lines.Add('<title>Broken Engine code-quality history</title>')
-    $lines.Add("<desc>seriesDigest=$SeriesDigest</desc>")
-    $lines.Add('<rect width="3840" height="2160" fill="#10151c"/>')
-    $lines.Add('<g fill="none" stroke="#384555" stroke-width="2">')
-    foreach ($y in @(230, 1070, 1200, 2040)) { $lines.Add("<line x1=`"300`" y1=`"$y`" x2=`"3740`" y2=`"$y`"/>") }
-    $lines.Add('</g>')
-    foreach ($band in $bands) {
-        $range = $Rows | Measure-Object -Property $band.Name -Minimum -Maximum
-        $minimum = [double]$range.Minimum; $maximum = [double]$range.Maximum; $margin = 0.05 * ($maximum - $minimum)
-        $low = $minimum - $margin; $high = $maximum + $margin
-        $grid = [Collections.Generic.List[string]]::new(); $labels = [Collections.Generic.List[string]]::new()
-        for ($k = 0; $k -le 4; ++$k) {
-            $value = ($minimum * (4 - $k) + $maximum * $k) / 4.0
-            $y = Get-NumberText ($band.Bottom - ($band.Bottom - $band.Top) * ($value - $low) / ($high - $low))
-            $grid.Add("<line x1=`"300`" y1=`"$y`" x2=`"3740`" y2=`"$y`"/>")
-            $labels.Add("<text x=`"280`" y=`"$y`" text-anchor=`"end`" dominant-baseline=`"middle`">$($value.ToString('0.0000', [Globalization.CultureInfo]::InvariantCulture))</text>")
-        }
-        $lines.Add('<g fill="none" stroke="#222b36" stroke-width="2">'); $lines.AddRange($grid); $lines.Add('</g>')
-        $lines.Add("<polyline id=`"$($band.Id)`" fill=`"none`" stroke=`"$($band.Color)`" stroke-width=`"6`" points=`"$(Get-Polyline $Rows $band.Name $band.Top $band.Bottom $low $high)`"/>")
-        $lines.Add('<g font-family="Segoe UI, sans-serif" font-size="32" fill="#d7e0ea">')
-        $lines.Add("<text x=`"300`" y=`"$(Get-NumberText ($band.Top - 24))`" font-size=`"40`">$($band.Title)</text>")
-        $lines.AddRange($labels); $lines.Add('</g>')
+$script:HistorySeries = @(
+    @{ Id = 'series-verbosity'; Name = 'verbosity'; Title = 'verbosity: overall (all code)'; Color = '#65d6ff' },
+    @{ Id = 'series-verbosity-engine'; Name = 'verbosityEngine'; Title = 'verbosity: Engine'; Color = '#ffb454' },
+    @{ Id = 'series-verbosity-common'; Name = 'verbosityCommon'; Title = 'verbosity: Common'; Color = '#9be564' },
+    @{ Id = 'series-verbosity-data-packer'; Name = 'verbosityDataPacker'; Title = 'verbosity: DataPacker'; Color = '#c792ea' },
+    @{ Id = 'series-verbosity-game'; Name = 'verbosityGame'; Title = 'verbosity: Game'; Color = '#ff6b81' },
+    @{ Id = 'series-verbosity-agent-tools'; Name = 'verbosityAgentTools'; Title = 'verbosity: AgentTools'; Color = '#f2e85c' })
+# One y range over every non-null value of all six series, so every band and the overlay share one scale.
+function Get-HistoryRange([object[]]$Rows) {
+    $values = @(foreach ($row in $Rows) { foreach ($series in $script:HistorySeries) { $row.($series.Name) } })
+    $range = $values | Where-Object { $null -ne $_ } | Measure-Object -Minimum -Maximum
+    $minimum = [double]$range.Minimum; $maximum = [double]$range.Maximum; $margin = 0.05 * ($maximum - $minimum)
+    return [pscustomobject]@{ Minimum = $minimum; Maximum = $maximum; Low = $minimum - $margin; High = $maximum + $margin }
+}
+function Get-SvgHeader([string]$Title, [string]$SeriesDigest) {
+    @('<?xml version="1.0" encoding="UTF-8"?>',
+        '<svg xmlns="http://www.w3.org/2000/svg" width="3840" height="2160" viewBox="0 0 3840 2160">',
+        "<title>$Title</title>",
+        "<desc>seriesDigest=$SeriesDigest</desc>",
+        '<rect width="3840" height="2160" fill="#10151c"/>')
+}
+# Five grid lines and value labels for one plot area.
+function Get-ValueAxis([object]$Range, [double]$Top, [double]$Bottom) {
+    $grid = [Collections.Generic.List[string]]::new(); $labels = [Collections.Generic.List[string]]::new()
+    for ($k = 0; $k -le 4; ++$k) {
+        $value = ($Range.Minimum * (4 - $k) + $Range.Maximum * $k) / 4.0
+        $y = Get-NumberText ($Bottom - ($Bottom - $Top) * ($value - $Range.Low) / ($Range.High - $Range.Low))
+        $grid.Add("<line x1=`"300`" y1=`"$y`" x2=`"3740`" y2=`"$y`"/>")
+        $labels.Add("<text x=`"280`" y=`"$y`" text-anchor=`"end`" dominant-baseline=`"middle`">$($value.ToString('0.0000', [Globalization.CultureInfo]::InvariantCulture))</text>")
     }
-    $lines.Add('<g font-family="Segoe UI, sans-serif" font-size="32" fill="#d7e0ea">')
-    $lines.Add('<text x="300" y="110" font-size="48">Code-quality history</text>')
+    return [pscustomobject]@{ Grid = $grid.ToArray(); Labels = $labels.ToArray() }
+}
+function Get-DateLabels([object[]]$Rows, [double]$Y) {
     $step = [Math]::Max(1, [int][Math]::Ceiling($Rows.Count / 12.0)); $labelIndices = [Collections.Generic.HashSet[int]]::new()
     for ($index = 0; $index -lt $Rows.Count; $index += $step) { [void]$labelIndices.Add($index) }
     [void]$labelIndices.Add($Rows.Count - 1)
     foreach ($index in ($labelIndices | Sort-Object)) {
         $x = if ($Rows.Count -eq 1) { 300.0 } else { 300.0 + 3440.0 * $index / ($Rows.Count - 1) }
         $date = Get-SvgEscape (Get-LastDate $Rows[$index])
-        $lines.Add("<text x=`"$(Get-NumberText $x)`" y=`"2100`" text-anchor=`"middle`">$date</text>")
+        "<text x=`"$(Get-NumberText $x)`" y=`"$(Get-NumberText $Y)`" text-anchor=`"middle`">$date</text>"
+    }
+}
+function New-HistorySvg([object[]]$Rows, [string]$SeriesDigest) {
+    $series = $script:HistorySeries
+    # Six 230-unit bands separated by 86-unit title gaps fill the plot area y 230-2040.
+    $bands = @(for ($k = 0; $k -lt $series.Count; ++$k) { $series[$k] + @{ Top = 230.0 + 316.0 * $k; Bottom = 460.0 + 316.0 * $k } })
+    $range = Get-HistoryRange $Rows
+    $lines = [Collections.Generic.List[string]]::new()
+    $lines.AddRange([string[]](Get-SvgHeader 'Broken Engine code-quality history' $SeriesDigest))
+    $lines.Add('<g fill="none" stroke="#384555" stroke-width="2">')
+    foreach ($y in @($bands | ForEach-Object { $_.Top; $_.Bottom })) { $lines.Add("<line x1=`"300`" y1=`"$y`" x2=`"3740`" y2=`"$y`"/>") }
+    $lines.Add('</g>')
+    foreach ($band in $bands) {
+        $axis = Get-ValueAxis $range $band.Top $band.Bottom
+        $lines.Add('<g fill="none" stroke="#222b36" stroke-width="2">'); $lines.AddRange($axis.Grid); $lines.Add('</g>')
+        $lines.Add("<polyline id=`"$($band.Id)`" fill=`"none`" stroke=`"$($band.Color)`" stroke-width=`"6`" points=`"$(Get-Polyline $Rows $band.Name $band.Top $band.Bottom $range.Low $range.High)`"/>")
+        $lines.Add('<g font-family="Segoe UI, sans-serif" font-size="32" fill="#d7e0ea">')
+        $lines.Add("<text x=`"300`" y=`"$(Get-NumberText ($band.Top - 24))`" font-size=`"40`">$($band.Title)</text>")
+        $lines.AddRange($axis.Labels); $lines.Add('</g>')
+    }
+    $lines.Add('<g font-family="Segoe UI, sans-serif" font-size="32" fill="#d7e0ea">')
+    $lines.Add('<text x="300" y="110" font-size="48">Code-quality history</text>')
+    $lines.AddRange([string[]](Get-DateLabels $Rows 2100))
+    $lines.Add('</g>')
+    $lines.Add('</svg>')
+    return (($lines -join "`n") + "`n")
+}
+# All six series in one plot area y 230-1880, date labels below it, and a legend along the bottom.
+function New-HistoryOverlaySvg([object[]]$Rows, [string]$SeriesDigest) {
+    $series = $script:HistorySeries
+    $top = 230.0; $bottom = 1880.0
+    $range = Get-HistoryRange $Rows
+    $axis = Get-ValueAxis $range $top $bottom
+    $lines = [Collections.Generic.List[string]]::new()
+    $lines.AddRange([string[]](Get-SvgHeader 'Broken Engine code-quality history overlay' $SeriesDigest))
+    $lines.Add('<g fill="none" stroke="#384555" stroke-width="2">')
+    foreach ($y in @($top, $bottom)) { $lines.Add("<line x1=`"300`" y1=`"$y`" x2=`"3740`" y2=`"$y`"/>") }
+    $lines.Add('</g>')
+    $lines.Add('<g fill="none" stroke="#222b36" stroke-width="2">'); $lines.AddRange($axis.Grid); $lines.Add('</g>')
+    foreach ($entry in $series) {
+        $lines.Add("<polyline id=`"$($entry.Id)`" fill=`"none`" stroke=`"$($entry.Color)`" stroke-width=`"6`" points=`"$(Get-Polyline $Rows $entry.Name $top $bottom $range.Low $range.High)`"/>")
+    }
+    $lines.Add('<g font-family="Segoe UI, sans-serif" font-size="32" fill="#d7e0ea">')
+    $lines.Add('<text x="300" y="110" font-size="48">Code-quality history</text>')
+    $lines.AddRange($axis.Labels)
+    $lines.AddRange([string[]](Get-DateLabels $Rows 1940))
+    # One 573-unit legend slot per series across the 3440-unit plot width.
+    for ($k = 0; $k -lt $series.Count; ++$k) {
+        $x = 300.0 + 573.0 * $k
+        $lines.Add("<rect x=`"$(Get-NumberText $x)`" y=`"2064`" width=`"60`" height=`"12`" fill=`"$($series[$k].Color)`"/>")
+        $lines.Add("<text x=`"$(Get-NumberText ($x + 76))`" y=`"2070`" dominant-baseline=`"middle`">$($series[$k].Title)</text>")
     }
     $lines.Add('</g>')
     $lines.Add('</svg>')
@@ -415,15 +491,18 @@ function Get-Generator([string]$Repository) {
 function Write-HistoryPair([string]$Repository, [string]$OutputFull, [byte[]]$JsonlBytes, [object[]]$Rows) {
     $seriesDigest = Get-BytesSha256 $JsonlBytes
     $svgBytes = [Text.UTF8Encoding]::new($false).GetBytes((New-HistorySvg $Rows $seriesDigest))
+    $overlayBytes = [Text.UTF8Encoding]::new($false).GetBytes((New-HistoryOverlaySvg $Rows $seriesDigest))
     $jsonlPath = Join-Path $OutputFull 'CodeQualityMetricsHistory.jsonl'; $svgPath = Join-Path $OutputFull 'CodeQualityMetricsHistory.svg'
-    [IO.File]::WriteAllBytes($jsonlPath, $JsonlBytes); [IO.File]::WriteAllBytes($svgPath, $svgBytes)
-    if (-not (Test-Path -LiteralPath $jsonlPath -PathType Leaf) -or -not (Test-Path -LiteralPath $svgPath -PathType Leaf)) { throw 'History output persistence did not produce both required files.' }
-    $jsonlInfo = Get-Item -LiteralPath $jsonlPath -Force; $svgInfo = Get-Item -LiteralPath $svgPath -Force
+    $overlayPath = Join-Path $OutputFull 'CodeQualityMetricsHistoryOverlay.svg'
+    [IO.File]::WriteAllBytes($jsonlPath, $JsonlBytes); [IO.File]::WriteAllBytes($svgPath, $svgBytes); [IO.File]::WriteAllBytes($overlayPath, $overlayBytes)
+    if (@($jsonlPath, $svgPath, $overlayPath | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) }).Count -gt 0) { throw 'History output persistence did not produce all three required files.' }
+    $jsonlInfo = Get-Item -LiteralPath $jsonlPath -Force; $svgInfo = Get-Item -LiteralPath $svgPath -Force; $overlayInfo = Get-Item -LiteralPath $overlayPath -Force
     return [pscustomobject]@{
         Digest = $seriesDigest
         Outputs = [ordered]@{
             jsonl = [ordered]@{ path = Get-RelativePosix $Repository $jsonlPath; bytes = [int64]$jsonlInfo.Length; sha256 = Get-FileSha256 $jsonlPath }
             svg = [ordered]@{ path = Get-RelativePosix $Repository $svgPath; bytes = [int64]$svgInfo.Length; sha256 = Get-FileSha256 $svgPath }
+            overlaySvg = [ordered]@{ path = Get-RelativePosix $Repository $overlayPath; bytes = [int64]$overlayInfo.Length; sha256 = Get-FileSha256 $overlayPath }
         }
     }
 }
@@ -455,7 +534,7 @@ function Invoke-Generate([string]$Repository, [object]$History, [string]$Base, [
     $jsonlBytes = [byte[]]($History.Bytes + (Get-RowsBytes $appended.ToArray()))
     $pair = Write-HistoryPair $Repository $outputFull $jsonlBytes (@($History.Rows) + $appended.ToArray())
     [ordered]@{
-        schemaVersion = 'broken-engine-code-quality-history-update/v3'
+        schemaVersion = 'broken-engine-code-quality-history-update/v4'
         mode = 'Generate'
         source = [ordered]@{ baseCommit = $Base }
         generator = $Generator

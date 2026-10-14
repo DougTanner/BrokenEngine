@@ -15,8 +15,8 @@ allowed-tools: [Read, Write, Edit, Grep, Glob, Agent, Bash, PowerShell]
 
 ## Purpose
 
-When the Phase-0 triage gate passes, run the two native analysis skills in
-order, verify their findings independently, then hand proven residuals to the
+After Phase-0 metric evidence, run the two native analysis skills in order,
+verify their findings independently, then hand proven residuals to the
 repository's plan-authoring and finalization workflows.
 
 ## When to use
@@ -60,9 +60,9 @@ remains exact-file scope.
 5. Consume the digest's `profile`, `targetSelection`, `coverage`, and `hints`
    fields. Done when those four fields are in hand.
 6. Read the retained full report's `current.targetMetrics` and
-   `current.corpusMetrics` `structuralErosion`, `verbosity`, and
-   `excessDecisions` values, because the digest carries no metric values, and
-   keep all six for the final summary. Done when all six values are in hand.
+   `current.corpusMetrics` `verbosity` and `excessDecisions` values, because
+   the digest carries no metric values, and keep all four for the final
+   summary. Done when all four values are in hand.
 7. Judge every `excessDecisions` reading by the interpretation bar in
    `.agents/skills/code-quality-metrics/references/MetricContract.md` `## Output`.
    Done when every `excessDecisions` reading is judged that way.
@@ -79,92 +79,71 @@ remains exact-file scope.
     summary even when only target omissions are forwarded. Done when both are
     retained.
 
-#### Triage Gate
-
-12. When the run's stated trigger is solely a `structuralErosion` outlier, stop
-    after Phase 0 unless at least one corroborating signal holds for the
-    resolved target:
-
-    1. `hints.targetOutliers.items` contains a bucket whose `metric` is
-       `verbosity` with `totalCount` above zero (verbosity buckets exist even
-       when empty);
-    2. the digest's clone-group hints carry at least thirty SLOC summed over
-       their `targetInstances[].sloc`;
-    3. `pwsh -NoProfile -File .agents/scripts/Get-AnalysisManifest.ps1 -Path <resolved-target> -Extension .h,.cpp`
-       — adding `-Recurse` only for Recursive scope — flags any in-target file
-       `reduceFileCandidate`;
-    4. the retained report's
-       `current.targetMetrics.structuralErosion.numerator` is at least one
-       thousand.
-
-    Done when every signal has been evaluated and the stop-or-continue outcome
-    is settled.
-13. Judge those signals in context: a target reading above the corpus is not by
-    itself evidence, because the corpus value is about 0.553 and a
-    single-function file saturates at 1.0. Done when each evaluated signal
-    carries that judgment.
-14. Treat an explicit user direction to run the full pipeline regardless of
-    metrics as overriding this gate. Done when such a direction, where given,
-    has continued the run.
-15. When that manifest command cannot run for the resolved target, treat that
-    signal as failed and record its blocker as a residual. Done when the failed
-    signal carries that residual.
-16. On a stop, report this file's `## Handoff` target and
-    metric bullets, record the outcome as `triage skip` naming each signal
-    evaluated, and run none of Phases 1-4, plan authoring, or the Debt Score.
-    Done when the `triage skip` report is returned and no later phase has run.
-
 ### Phase 1: Architecture Shape
 
-17. Invoke `external-architecture-review` natively through the normal skill
+12. Invoke `external-architecture-review` natively through the normal skill
     surface with the resolved target and scope mode. Do not open a
     client-specific skill installation or reproduce its workflow here. Done when
     that review has returned.
-18. Include the Phase-0 scoped hints as investigation evidence without expanding
+13. Include the Phase-0 scoped hints as investigation evidence without expanding
     the target. Done when those hints reached that review and the target is
     unchanged.
-19. Retain its scoped manifest, authorities, verified findings, external-claim
+14. Retain its scoped manifest, authorities, verified findings, external-claim
     residuals, and handoff note for Phase 2. Done when each of those results is
     retained.
-20. Do not choose plan locations, filenames, groups, collisions, dependencies,
+15. Do not choose plan locations, filenames, groups, collisions, dependencies,
     or duplicate decisions at this stage. Done when no such choice has been made
     at this stage.
 
 ### Phase 2: In-Function Mechanics
 
-21. Invoke `external-refactor-clean` natively through the normal skill surface
+16. Invoke `external-refactor-clean` natively through the normal skill surface
     with the same target and scope mode. Done when that analysis has returned.
-22. Include the Phase-0 scoped hints and Phase-1 investigation paths as evidence
+17. Include the Phase-0 scoped hints and Phase-1 investigation paths as evidence
     to inspect, without expanding the original finding boundary. Done when that
     evidence reached the analysis and the boundary is unchanged.
-23. Treat every forwarded `hints.extremeComplexityFunctions`,
+18. Treat every forwarded `hints.extremeComplexityFunctions`,
     `hints.longLowComplexityFunctions`, `hints.deepNestingFunctions`,
     `hints.sameNameForwarderFunctions`, and `hints.uncalledFunctions` item whose
     `path` lies in the resolved target as navigation evidence to inspect. Do not
-    require a decomposition or a threshold verdict from those hints. Done when
-    every in-target item has been inspected as navigation evidence.
-24. Keep hints outside the resolved target evidence-only; they never become
+    require a decomposition or a threshold verdict from those hints.
+
+    A `hints.extremeComplexityFunctions` entry (selection:
+    `.agents/skills/code-quality-metrics/references/MetricContract.md`
+    `## Output`) is a reason to read that function, never a reason to split it.
+    CC is inflated by counted `&&`/`||`, the one-`if`-per-guard style of
+    `Documents/C++StyleGuide.txt` rule 62, both client/server `#if` branches
+    counted together, lambdas folded into the enclosing function, and
+    per-check validation at trust boundaries.
+    Complexity is often earned — one cohesive dispatch, per-check rejections at
+    a trust boundary, ordered setup sharing local state — and code that belongs
+    together stays together. A finding names a specific unearned piece, such as
+    a fused separate job or a copy-paste, never size alone.
+
+    Done when every in-target item has been inspected as navigation evidence and
+    every finding drawn from a complexity hint names its unearned piece.
+19. Keep hints outside the resolved target evidence-only; they never become
     checklist items. Done when no out-of-target hint became a checklist item.
-25. Judge excess-decision candidates and claimed simplifications by the
+20. Judge excess-decision candidates and claimed simplifications by the
     excess-decision paragraph of
     `.agents/skills/code-quality-metrics/references/Remediation.md`. Done when
     every excess-decision candidate and every claimed simplification meets that
     paragraph.
-26. Keep its file-size triage separate from ordinary findings. Every oversized
+21. Keep its file-size triage separate from ordinary findings. Every oversized
     file retains the explicit instruction `run /reduce-file <path>`; do not
     analyze it inline or silently convert it into a generic refactor item. Done
     when every oversized file carries that instruction.
 
 ### Phase 3: Findings Verification
 
-27. After both reports complete, have the main context dispatch fresh `reviewer`
+22. After both reports complete, have the main context dispatch fresh `reviewer`
     roles in scoped slices. Done when every slice has been dispatched and has
     returned.
-28. Keep reviewers findings-only: they may read the scoped source, authorities,
+23. Keep reviewers findings-only: they may read the scoped source, authorities,
     and reports supplied by the main context, but must not write, rewrite,
     delete, score, or relocate a plan and must not delegate. Done when no
     reviewer wrote, scored, or relocated a plan, and none delegated.
-29. For every candidate, require a verdict and evidence for:
+24. For every candidate, require a verdict and evidence for:
 
     1. Correctness — cited path, symbol, behavior, and repository authority exist
        and support the claimed root cause.
@@ -178,18 +157,18 @@ remains exact-file scope.
        remain residuals.
 
     Done when every candidate carries all four verdicts with evidence.
-30. Decide on reviewer evidence once in the main context: drop disproven
+25. Decide on reviewer evidence once in the main context: drop disproven
     candidates and retain verified caveats. Done when every candidate is dropped
     or accepted.
-31. Keep oversized-file items labeled as `/reduce-file` follow-ups. Done when
+26. Keep oversized-file items labeled as `/reduce-file` follow-ups. Done when
     each such item carries that label.
 
 ### Phase 4: Route, Verify, and Land
 
-32. Route every accepted candidate through `create-follow-up-plans`, passing
+27. Route every accepted candidate through `create-follow-up-plans`, passing
     oversized files with their required `/reduce-file <path>` instruction
     intact. Done when every accepted candidate is routed.
-33. Follow the `.agents/references/change-workflow.md` Verify the acceptance table and
+28. Follow the `.agents/references/change-workflow.md` Verify the acceptance table and
     Verify and land steps through `finalize-changes` for acceptance and
     landing. Done when the applicable finalization outcome is known.
 
@@ -200,7 +179,7 @@ report:
 
 - exact target, scope mode, file count, and applicable authorities;
 - metric profile, target and corpus coverage, the target's and corpus's
-  `structuralErosion`, `verbosity`, and `excessDecisions` values, scoped-hint total/emitted counts,
+  `verbosity` and `excessDecisions` values, scoped-hint total/emitted counts,
   and every metric residual, so successive runs over the same target show the
   trend;
 - architecture and refactor-clean finding counts;
@@ -212,9 +191,6 @@ report:
   mostly Small/Medium, HIGH for multiple Large or any Architectural, and
   CRITICAL for several Architectural items or a core-invariant threat;
 - verification result, finalization outcome, and tracked Plan validation state.
-
-A `triage skip` reports only the target and metric bullets plus its evaluated
-signals; the remaining bullets do not apply.
 
 The Debt Score is a run retrospective only; never put it in a Plan. Do not call
 a written Plan claimed or scheduler-visible until finalization confirms its
@@ -230,7 +206,7 @@ tracked bytes landed.
 - The forwarded hints are scoped evidence to inspect, never findings: they do
   not expand the original target, create Plans, alter the Debt Score, or replace
   source inspection.
-- `CC > 30` remains navigation only, and structural erosion alone is navigation.
+- `CC > 30` remains navigation only.
 - An accepted finding preserves its originating phase, symbols, evidence,
   invariant exposure, and unmet acceptance criterion.
 - Analysis findings are pre-existing or out-of-scope debt, never permission to

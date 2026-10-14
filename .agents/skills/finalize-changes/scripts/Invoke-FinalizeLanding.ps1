@@ -53,7 +53,7 @@ $result = [ordered]@{
 	candidate = [ordered]@{ commit = $ApprovedSessionCommit; tree = $ApprovedCandidateTree; treeVerified = $false }
 	approvedSource = [ordered]@{ commit = $ApprovedSessionCommit; tree = $ApprovedCandidateTree; parent = $null; patch = $null; metadata = $null }
 	rebasedSource = [ordered]@{ commit = $null; tree = $null; parent = $null; patch = $null }
-	historyUpdate = [ordered]@{ status = 'not-run'; jsonl = $null; svg = $null }
+	historyUpdate = [ordered]@{ status = 'not-run'; jsonl = $null; svg = $null; overlaySvg = $null }
 	final = [ordered]@{ commit = $null; tree = $null; parent = $null; replacement = $false }
 	landed = [ordered]@{ commit = $null; tree = $null; rebaseAttempts = 0 }
 	locks = [ordered]@{ landingOwner = $null; landingClaimed = $false; landingReleased = $false; claim = $null }
@@ -189,7 +189,7 @@ function Get-JsonResponse($Response, [string] $Operation) {
 }
 
 # Generation is a plain landing step: the producer appends the single row for the primary tip this
-# landing builds on (never the landing commit itself), so this only runs it and hands back the two
+# landing builds on (never the landing commit itself), so this only runs it and hands back the three
 # fixed paths it wrote into a fresh ignored Temp child.
 function Invoke-HistoryGenerate([string] $PrimaryTip) {
 	$script:HistoryTempParent = Join-Path $script:CurrentIdentity.Worktree 'Temp\FinalizeHistory'
@@ -203,8 +203,8 @@ function Invoke-HistoryGenerate([string] $PrimaryTip) {
 	$arguments = @('-NoProfile', '-File', $historyScript, '-Mode', 'Generate', '-RepositoryRoot', $script:CurrentIdentity.Worktree, '-BaseCommit', $PrimaryTip, '-OutputDirectory', $script:HistoryTempRoot)
 	$response = Invoke-FinalizeNativeText "$PSHOME\pwsh.exe" $arguments $script:CurrentIdentity.Worktree
 	if ($response.ExitCode -ne 0) { Throw-Landing 2 'history.generate-failed' "History Generate failed: $($response.Stderr.Trim())" }
-	$artifacts = [pscustomobject]@{ JsonPath = (Join-Path $script:HistoryTempRoot 'CodeQualityMetricsHistory.jsonl'); SvgPath = (Join-Path $script:HistoryTempRoot 'CodeQualityMetricsHistory.svg') }
-	foreach ($path in @($artifacts.JsonPath, $artifacts.SvgPath)) {
+	$artifacts = [pscustomobject]@{ JsonPath = (Join-Path $script:HistoryTempRoot 'CodeQualityMetricsHistory.jsonl'); SvgPath = (Join-Path $script:HistoryTempRoot 'CodeQualityMetricsHistory.svg'); OverlaySvgPath = (Join-Path $script:HistoryTempRoot 'CodeQualityMetricsHistoryOverlay.svg') }
+	foreach ($path in @($artifacts.JsonPath, $artifacts.SvgPath, $artifacts.OverlaySvgPath)) {
 		$item = Get-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
 		if ($null -eq $item -or $item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { Throw-Landing 2 'history.output-invalid' "History Generate did not write an ordinary '$([IO.Path]::GetFileName($path))' output." }
 	}
@@ -357,7 +357,7 @@ function Invoke-LandingPrimaryCheckout([string] $Commit) {
 
 # For an overlay-producing mode, the replacement commit is built only after the lease is live. Its
 # metadata is copied before any rebase, while the temporary index contains the rebased source tree
-# plus exactly the two generated history blobs. No branch ref moves while these objects are being constructed.
+# plus exactly the three generated history blobs. No branch ref moves while these objects are being constructed.
 function Get-FrozenCommitMetadata([string] $Commit) {
 	return [ordered]@{
 		message = Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', '--no-show-signature', '-s', '--format=%B', $Commit)
@@ -386,7 +386,7 @@ function Assert-NoHistorySourceChanges([string] $Base, [string] $Tip) {
 	$guard = Get-LandingChangeGuard $Base $Tip
 	foreach ($line in @($guard -split "`n" | Where-Object { $_ })) {
 		$path = $line.Substring($line.IndexOf("`t") + 1)
-		if ($path -cin @('.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg')) {
+		if ($path -cin @('.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg')) {
 			Throw-Landing 2 'history.source-changed' 'The approved source patch changes a reserved history output path.'
 		}
 	}
@@ -396,7 +396,7 @@ function Assert-NoHistorySourceChanges([string] $Base, [string] $Tip) {
 # Recovery uses blob identity to distinguish a source commit from a replacement commit. Missing or
 # differing reserved paths are a normal non-match here: the overlay recovery search owns that shape.
 function Test-HistoryPathsUnchanged([string] $BaseRevision, [string] $LandedRevision) {
-	$paths = @('.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg')
+	$paths = @('.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg')
 	try {
 		foreach ($path in $paths) {
 			$base = Invoke-FinalizeNativeText 'git.exe' @('-C', $script:CurrentIdentity.Worktree, 'rev-parse', "${BaseRevision}:$path") $script:CurrentIdentity.Worktree
@@ -418,11 +418,13 @@ function New-HistoryOverlayTree($Artifacts, [string] $SourceCommit) {
 		Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('read-tree', $SourceCommit) | Out-Null
 		$jsonBlob = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('hash-object', '-w', '--path', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', $Artifacts.JsonPath)).Trim()
 		$svgBlob = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('hash-object', '-w', '--path', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg', $Artifacts.SvgPath)).Trim()
+		$overlaySvgBlob = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('hash-object', '-w', '--path', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg', $Artifacts.OverlaySvgPath)).Trim()
 		Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('update-index', '--add', '--cacheinfo', "100644,$jsonBlob,.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl") | Out-Null
 		Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('update-index', '--add', '--cacheinfo', "100644,$svgBlob,.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg") | Out-Null
+		Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('update-index', '--add', '--cacheinfo', "100644,$overlaySvgBlob,.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg") | Out-Null
 		$tree = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('write-tree')).Trim()
 		$changes = Get-TreeChangeGuard (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "$SourceCommit^{tree}")).Trim() $tree
-		$expected = @('.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg')
+		$expected = @('.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg')
 		$actual = @($changes -split "`n" | Where-Object { $_ } | ForEach-Object { $_.Substring($_.IndexOf("`t") + 1) } | Sort-Object)
 		$unexpected = @($actual | Where-Object { $_ -cnotin $expected })
 		$missing = @($expected | Where-Object { $_ -cnotin $actual })
@@ -432,7 +434,7 @@ function New-HistoryOverlayTree($Artifacts, [string] $SourceCommit) {
 			$detail = @()
 			if ($unexpected.Count -ne 0) { $detail += "unexpected paths: $($unexpected -join ', ')" }
 			if ($missing.Count -ne 0) { $detail += "missing reserved paths: $($missing -join ', ')" }
-			Throw-Landing 2 'history.overlay-invalid' "The paths the temporary history overlay changed are not exactly the reserved JSONL/SVG pair ($($detail -join '; '))."
+			Throw-Landing 2 'history.overlay-invalid' "The paths the temporary history overlay changed are not exactly the three reserved history paths ($($detail -join '; '))."
 		}
 		return $tree
 	}
@@ -463,7 +465,7 @@ function New-FrozenReplacementCommit([string] $Tree, [string] $Parent) {
 	finally { $process.Dispose(); Remove-Item -LiteralPath $messagePath -Force -ErrorAction SilentlyContinue }
 }
 
-# The landing commit: the approved source tree plus exactly the two generated history files, under
+# The landing commit: the approved source tree plus exactly the three generated history files, under
 # the frozen approved commit metadata. A failure here restores the branch the internal rebase moved,
 # so the documented re-invocation with the approved arguments still passes strict sanity.
 function New-LandingHistoryCommit {
@@ -475,7 +477,7 @@ function New-LandingHistoryCommit {
 		$finalParent = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', '-s', '--format=%P', $finalCommit)).Trim()
 		$actualTree = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "$finalCommit^{tree}")).Trim()
 		if ($finalParent -cne $script:LandingPrimaryTip -or $actualTree -cne $finalTree) { Throw-Landing 1 'history.replacement-invalid' 'The landing commit does not have the current primary sole parent and validated tree.' }
-		$result.historyUpdate = [ordered]@{ status = 'pass'; jsonl = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; svg = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg' }
+		$result.historyUpdate = [ordered]@{ status = 'pass'; jsonl = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; svg = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'; overlaySvg = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg' }
 		$result.final.commit = $finalCommit; $result.final.tree = $finalTree; $result.final.parent = $finalParent; $result.final.replacement = $true
 		return [pscustomobject]@{ Commit = $finalCommit; Tree = $finalTree; Parent = $finalParent }
 	}
@@ -617,9 +619,9 @@ function Get-LandingPatchIdentity([string] $Base, [string] $Tip) {
 }
 
 function Get-LandingNonHistoryPatchIdentity([string] $Base, [string] $Tip) {
-	$exclude = @('.', ':(exclude).agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', ':(exclude).agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg')
+	$exclude = @('.', ':(exclude).agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', ':(exclude).agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg', ':(exclude).agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg')
 	$guard = Get-LandingChangeGuard $Base $Tip
-	$filtered = @($guard -split "`n" | Where-Object { $_ -and $_.Substring($_.IndexOf("`t") + 1) -cnotin @('.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg') }) -join "`n"
+	$filtered = @($guard -split "`n" | Where-Object { $_ -and $_.Substring($_.IndexOf("`t") + 1) -cnotin @('.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg', '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg') }) -join "`n"
 	return [pscustomobject]@{ PatchId = Get-LandingPatchId $Base $Tip $exclude; Changes = $filtered }
 }
 
@@ -786,7 +788,8 @@ function Complete-RecoveredLanding($InitialMatch, [string] $InitialPrimaryRef) {
 	$result.tips.current = $match.Commit; $result.tips.primary = $claimedPrimaryRef
 	$result.final = [ordered]@{ commit = $match.Commit; tree = $match.Tree; parent = $match.Parent; replacement = $true }
 	$jsonPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; $svgPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'
-	$result.historyUpdate = [ordered]@{ status = 'recovered'; jsonl = $jsonPath; svg = $svgPath }
+	$overlaySvgPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg'
+	$result.historyUpdate = [ordered]@{ status = 'recovered'; jsonl = $jsonPath; svg = $svgPath; overlaySvg = $overlaySvgPath }
 	$result.landed.commit = $match.Commit; $result.landed.tree = $match.Tree; $result.primaryAdvanced = $true
 	return $true
 }
@@ -804,8 +807,8 @@ function Get-LandingCommitMetadata([string] $Commit) {
 }
 
 # The one matcher a crashed landing needs: walking first-parent back to the approved primary tip, the
-# landed commit is the single-parent commit carrying the frozen approved metadata, both generated
-# history paths, and the approved patch outside those two paths. No match at a primary head that does
+# landed commit is the single-parent commit carrying the frozen approved metadata, all three generated
+# history paths, and the approved patch outside those three paths. No match at a primary head that does
 # not carry the frozen metadata is ordinary foreign movement, so this landing continues normally.
 function Test-LandingFrozenMetadata($Metadata) {
 	$expected = if ($null -ne $script:FrozenCommitMetadata) { $script:FrozenCommitMetadata } else { Get-FrozenCommitMetadata $ApprovedSessionCommit }
@@ -817,6 +820,7 @@ function Find-LandedCommit([string] $PrimaryHead) {
 	if (-not (Test-FinalizeGitSuccess $script:PrimaryIdentity.Worktree @('merge-base', '--is-ancestor', $ExpectedPrimaryTip, $PrimaryHead))) { Throw-Landing 2 'history.recovery-nonancestor' 'Current primary does not descend from the approved primary ancestor.' }
 	$headMatchesFrozen = Test-LandingFrozenMetadata (Get-LandingCommitMetadata $PrimaryHead)
 	$jsonPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'; $svgPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'
+	$overlaySvgPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg'
 	$commits = @((Invoke-FinalizeGit $script:PrimaryIdentity.Worktree @('rev-list', '--first-parent', $PrimaryHead)).Split("`n") | Where-Object { $_ })
 	$recoveryMatches = [Collections.Generic.List[object]]::new()
 	foreach ($commit in $commits) {
@@ -824,13 +828,13 @@ function Find-LandedCommit([string] $PrimaryHead) {
 		$parents = @((Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('show', '-s', '--format=%P', $commit)).Trim() -split ' ' | Where-Object { $_ })
 		if ($parents.Count -ne 1) { continue }
 		if (-not (Test-LandingFrozenMetadata (Get-LandingCommitMetadata $commit))) { continue }
-		if (-not (Test-FinalizeGitSuccess $script:CurrentIdentity.Worktree @('cat-file', '-e', "${commit}:$jsonPath")) -or -not (Test-FinalizeGitSuccess $script:CurrentIdentity.Worktree @('cat-file', '-e', "${commit}:$svgPath"))) { continue }
+		if (-not (Test-FinalizeGitSuccess $script:CurrentIdentity.Worktree @('cat-file', '-e', "${commit}:$jsonPath")) -or -not (Test-FinalizeGitSuccess $script:CurrentIdentity.Worktree @('cat-file', '-e', "${commit}:$svgPath")) -or -not (Test-FinalizeGitSuccess $script:CurrentIdentity.Worktree @('cat-file', '-e', "${commit}:$overlaySvgPath"))) { continue }
 		$patch = Get-LandingNonHistoryPatchIdentity $parents[0] $commit
 		$approved = if ($null -ne $script:ApprovedPatchIdentity) { $script:ApprovedPatchIdentity } else { [pscustomobject]@{ PatchId = Get-LandingPatchId $script:ApprovedSourceParent $ApprovedSessionCommit; Changes = Assert-NoHistorySourceChanges $script:ApprovedSourceParent $ApprovedSessionCommit } }
 		if ($patch.PatchId -cne $approved.PatchId -or $patch.Changes -cne $approved.Changes) { continue }
 		$recoveryMatches.Add([pscustomobject]@{ Commit = $commit; Parent = $parents[0]; Tree = (Invoke-FinalizeGit $script:CurrentIdentity.Worktree @('rev-parse', "$commit^{tree}")).Trim() })
 	}
-	if ($recoveryMatches.Count -eq 0) { if (-not $headMatchesFrozen) { return $null }; Throw-Landing 2 'history.recovery-not-found' 'No first-parent commit matches the frozen metadata, the approved source patch, and the generated history pair.' }
+	if ($recoveryMatches.Count -eq 0) { if (-not $headMatchesFrozen) { return $null }; Throw-Landing 2 'history.recovery-not-found' 'No first-parent commit matches the frozen metadata, the approved source patch, and the three generated history files.' }
 	if ($recoveryMatches.Count -ne 1) { Throw-Landing 2 'history.recovery-ambiguous' "Found $($recoveryMatches.Count) first-parent commits matching the frozen landing transaction." }
 	return $recoveryMatches[0]
 }

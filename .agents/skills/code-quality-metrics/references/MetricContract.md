@@ -39,7 +39,7 @@ Emitted pairs sort by baseline path, then current path.
 Output is compact UTF-8 JSON without BOM and with exactly one final LF. Object keys retain the
 construction order below; arrays whose members are sets use the stated ordinal sort. Finite floats
 round to 12 fractional digits and negative zero is zero. No absolute or volatile value appears.
-Top-level fields, in order, are `schemaVersion` (`broken-engine-code-quality-metrics/v3`), `mode`,
+Top-level fields, in order, are `schemaVersion` (`broken-engine-code-quality-metrics/v4`), `mode`,
 `profile` (always `BrokenEngineExtended`), `tool`, `targetSelection`, `baseline`, `current`, and
 `comparison`.
 
@@ -52,7 +52,7 @@ each pair `{baseline,current}` of nullable `{path,mode,sha256}` identities.
 `deepNestingFunctions`, `sameNameForwarderFunctions`, and `uncalledFunctions`. A MetricValue is exactly
 `{applicable,value,numerator,denominator}`; counts are `{supported,parsed,omitted}`; skips are
 `{path,code:"upstream-omitted"}`; file and area rows are `{path,area,metrics}` and `{area,metrics}`.
-`outliers` are corpus-wide positive top-ten `structuralErosion` and `verbosity` metrics, and
+`outliers` are corpus-wide positive top-ten `verbosity` file and area buckets, and
 `targetOutliers` are target-only positive top-ten file and area buckets measured against the
 corresponding corpus metric; the `excessDecisions`, `commentDensity`, and `sameNameForwarders`
 metric values never enter outlier or Phase-0 hint buckets. Both use `items`, `totalCount`, and
@@ -62,8 +62,7 @@ direct parent label, another nested first component, or `[root]`. Clone instance
 deduplicated by `(groupHash,path,startLine,endLine)`, and contain
 `groupHash,path,startLine,endLine,sloc,sourceSha256,occurrenceOrdinal`, where the source hash covers
 the exact LF-normalized inclusive span. `verbosity` is the union of emitted CloneBlock intervals
-intersected with parsed SLOC, divided by parsed SLOC; `structuralErosion` is mass of functions with
-CC above ten divided by total mass, mass being `CC * sqrt(SLOC)`; `excessDecisions` is the total
+intersected with parsed SLOC, divided by parsed SLOC; `excessDecisions` is the total
 `sum(max(CC - 1, 0))` over functions in the scope. For `excessDecisions`, numerator and value are
 that total, and denominator is `1` when the scope contains at least one function, otherwise `0`
 with `applicable:false` and a null value. `commentDensity` is comment-only lines divided by
@@ -71,17 +70,19 @@ comment-only plus code lines of parsed files, classified over the raw bytes with
 LF and no line after the final LF: a line with any non-whitespace code or string/char-literal byte
 (preprocessor lines included) is code, a line whose non-whitespace bytes are all comment is
 comment-only, and any other line is blank. `sameNameForwarders` takes the `excessDecisions` shape
-over the count of same-name forwarders in the scope. All five metrics appear in corpus, target, file,
+over the count of same-name forwarders in the scope. All four metrics appear in corpus, target, file,
 area, common-parsed-cohort, and comparison delta maps. Excess decisions are net scope evidence:
 unchanged means only no net decision removal, never redistribution without source-diff evidence. A
 target decrease proves simplification only when the diff shows decision removal and the corpus shows
 no attributable offset elsewhere, or a separately evidenced structural benefit independently
 justifies extraction.
 
-The four lists after `highComplexityFunctions` are corpus-wide, uncapped navigation pointers, sorted
-by path, then numeric `startLine`, then name. A function unit is a tree-sitter `function_definition`
-with a body; a nested definition is its own unit and a lambda belongs to its enclosing unit. Its name
-is the declarator name, `~Name` for a destructor, and null for a nameless (operator) unit.
+`highComplexityFunctions` holds the functions with CC above ten, each row carrying its `mass`,
+`CC * sqrt(SLOC)`. The four lists after `highComplexityFunctions` are corpus-wide, uncapped
+navigation pointers, sorted by path, then numeric `startLine`, then name. A function unit is a
+tree-sitter `function_definition` with a body; a nested definition is its own unit and a lambda
+belongs to its enclosing unit. Its name is the declarator name, `~Name` for a destructor, and null
+for a nameless (operator) unit.
 `longLowComplexityFunctions` holds `highComplexityFunctions`-shaped rows spanning more than 100 lines
 at CC ten or less. `deepNestingFunctions` rows are `{path,name,startLine,endLine,depth}` for units of
 depth at least four, `name` possibly null; depth is the largest count of level-opening ancestors
@@ -118,7 +119,7 @@ and target deltas also suppress for logical membership and paired parse-status c
 reasons are only `baseline-inapplicable`, `context-change`, `current-inapplicable`,
 `membership-change`, or `parse-status-change`, sorted ordinally.
 
-`-Digest` replaces stdout with `{schemaVersion:"broken-engine-code-quality-evidence/v3",profile,
+`-Digest` replaces stdout with `{schemaVersion:"broken-engine-code-quality-evidence/v4",profile,
 targetSelection,coverage,comparison}` selected from that same report, adding capped `hints` under
 `-Phase0Hints`. `-OutputPath` always receives the full report. `hints` holds eight
 `{items,total,emitted}` categories of target-path rows, at most ten items each, in this order:
@@ -181,5 +182,5 @@ without starting `Analyze-CodeQualityMetrics.py`. Its path-free output is the ty
 `broken-engine-code-quality-bootstrap-identity/v1` object documented in
 [HistoryContract.md](HistoryContract.md). It contains Python implementation/version/architecture
 and executable SHA, lock SHA, cache key, venv Python SHA, `sg` SHA/version, canonical completion
-identity SHA, and the scb content digest. Snapshot and Compare continue to emit the exact v3 shape
+identity SHA, and the scb content digest. Snapshot and Compare continue to emit the exact shape
 above; BootstrapIdentity is a separate mode and does not add fields to those reports.

@@ -335,7 +335,7 @@ function Get-Phase0Hint([object]$Report) {
 function New-CodeQualityDigest([object]$Report, [string]$ReportMode, [bool]$IncludeHints) {
     # The digest only selects, orders, and counts fields the report already contains.
     $digest = [ordered]@{
-        schemaVersion = 'broken-engine-code-quality-evidence/v3'
+        schemaVersion = 'broken-engine-code-quality-evidence/v4'
         profile = Get-MetricContractField $Report 'profile'
         targetSelection = Get-MetricContractField $Report 'targetSelection'
         coverage = $null

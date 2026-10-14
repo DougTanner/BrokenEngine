@@ -8,7 +8,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 from normalize_code_quality_metrics_cpp import normalize_cpp_bytes, _directive_at, _lex_kinds
 
-SCHEMA="broken-engine-code-quality-metrics/v3"; TARGETS_SCHEMA="broken-engine-code-quality-targets/v1"; PROFILE="BrokenEngineExtended"
+SCHEMA="broken-engine-code-quality-metrics/v4"; TARGETS_SCHEMA="broken-engine-code-quality-targets/v1"; PROFILE="BrokenEngineExtended"
 EXCLUDED={"ThirdParty",".agents",".claude","Temp"}; REASONS=("baseline-inapplicable","context-change","current-inapplicable","membership-change","parse-status-change")
 RENAME_SIMILARITY=50
 MAX_ANALYZER_SOURCE_ENTRIES=1024; MAX_ANALYZER_SOURCE_BYTES=1024*1024
@@ -119,11 +119,11 @@ def baseline(root:Path,sha:str)->dict[str,tuple[dict[str,str],bytes]]:
  return out
 def metric(n:float,d:float,app:bool=True)->dict[str,Any]:return {"applicable":bool(app and d!=0),"value":n/d if app and d else None,"numerator":n,"denominator":d}
 def metrics(fs:Iterable[dict[str,Any]], lines:Iterable[tuple[str,int]], sloc:dict[str,set[int]], walks:Iterable[dict[str,Any]])->dict[str,Any]:
- fs=list(fs); total=sum(len(x) for x in sloc.values()); mass=sum(x["mass"] for x in fs); high=sum(x["mass"] for x in fs if x["cc"]>10); union=defaultdict(set)
+ fs=list(fs); total=sum(len(x) for x in sloc.values()); union=defaultdict(set)
  for p,l in lines:
   if l in sloc.get(p,set()):union[p].add(l)
  excess=sum(max(x["cc"]-1,0) for x in fs); walks=list(walks); comment=sum(x["commentOnly"] for x in walks)
- return {"structuralErosion":metric(high,mass),"verbosity":metric(sum(map(len,union.values())),total),"excessDecisions":metric(excess,1 if fs else 0),"commentDensity":metric(comment,comment+sum(x["code"] for x in walks)),"sameNameForwarders":metric(sum(len(x["forwarders"]) for x in walks),1 if fs else 0)}
+ return {"verbosity":metric(sum(map(len,union.values())),total),"excessDecisions":metric(excess,1 if fs else 0),"commentDensity":metric(comment,comment+sum(x["code"] for x in walks)),"sameNameForwarders":metric(sum(len(x["forwarders"]) for x in walks),1 if fs else 0)}
 def area(p:str)->str:
  x=p.split("/")[:-1]
  if x[:2]==["Engine","Source"]:return "/".join(x[:3]) if len(x)>2 else "Engine/Source"
@@ -131,7 +131,7 @@ def area(p:str)->str:
  if x and x[0] in {"Common","Tools"}:return "/".join(x[:2]) if len(x)>1 else x[0]
  return x[0] if x else "[root]"
 def aggregate(fs:list[dict[str,Any]])->dict[str,Any]:
- out={n:metric(sum(x["metrics"][n]["numerator"] for x in fs),sum(x["metrics"][n]["denominator"] for x in fs)) for n in ("structuralErosion","verbosity")}
+ out={"verbosity":metric(sum(x["metrics"]["verbosity"]["numerator"] for x in fs),sum(x["metrics"]["verbosity"]["denominator"] for x in fs))}
  # Excess decisions and same-name forwarders are scope totals, so their denominator tracks function presence rather than file count.
  out["excessDecisions"]=metric(sum(x["metrics"]["excessDecisions"]["numerator"] for x in fs),1 if any(x["metrics"]["excessDecisions"]["denominator"] for x in fs) else 0)
  out["commentDensity"]=metric(sum(x["metrics"]["commentDensity"]["numerator"] for x in fs),sum(x["metrics"]["commentDensity"]["denominator"] for x in fs))
@@ -144,9 +144,8 @@ def area_rows(fs:list[dict[str,Any]])->list[dict[str,Any]]:
 def outlier_buckets(files:list[dict[str,Any]],areas:list[dict[str,Any]],corpus_metrics:dict[str,Any])->list[dict[str,Any]]:
  out=[]
  for kind,rows,key in (("file",files,"path"),("area",areas,"area")):
-  for name in ("structuralErosion","verbosity"):
-   values=sorted(({"kind":kind,"metric":name,"key":x[key],"delta":x["metrics"][name]["value"]-corpus_metrics[name]["value"]} for x in rows if x["metrics"][name]["applicable"] and corpus_metrics[name]["applicable"] and x["metrics"][name]["value"]>corpus_metrics[name]["value"]),key=lambda x:(-x["delta"],x["key"]))
-   out.append({"kind":kind,"metric":name,"items":values[:10],"totalCount":len(values),"truncatedCount":max(0,len(values)-10)})
+  values=sorted(({"kind":kind,"metric":"verbosity","key":x[key],"delta":x["metrics"]["verbosity"]["value"]-corpus_metrics["verbosity"]["value"]} for x in rows if x["metrics"]["verbosity"]["applicable"] and corpus_metrics["verbosity"]["applicable"] and x["metrics"]["verbosity"]["value"]>corpus_metrics["verbosity"]["value"]),key=lambda x:(-x["delta"],x["key"]))
+  out.append({"kind":kind,"metric":"verbosity","items":values[:10],"totalCount":len(values),"truncatedCount":max(0,len(values)-10)})
  return out
 def nodes(node:Any,kind:str)->Iterable[Any]:
  if node.type==kind:yield node
@@ -281,7 +280,7 @@ def file_walks(rel:str,parsed:Any,raw:bytes)->dict[str,Any]:
  return {"commentOnly":comment,"code":code,"deep":deep,"forwarders":forwarders,"candidates":candidates,"references":references,"virtual":virtual}
 def ordered(rows:Iterable[dict[str,Any]])->list[dict[str,Any]]:return sorted(rows,key=lambda x:(x["path"],x["startLine"],x["name"] or ""))
 def capture(entries:dict[str,tuple[dict[str,str],bytes]],capture_root:Path,analyzer_source:Path)->dict[str,Any]:
- empty={"structuralErosion":metric(0,0,False),"verbosity":metric(0,0,False),"excessDecisions":metric(0,0,False),"commentDensity":metric(0,0,False),"sameNameForwarders":metric(0,0,False)}
+ empty={"verbosity":metric(0,0,False),"excessDecisions":metric(0,0,False),"commentDensity":metric(0,0,False),"sameNameForwarders":metric(0,0,False)}
  if not entries:return {"corpusManifest":[],"corpusCounts":{"supported":0,"parsed":0,"omitted":0},"skips":[],"corpusMetrics":empty,"files":[],"areas":[],"outliers":[],"cloneGroups":[],"highComplexityFunctions":[],**{k:[] for k in POINTER_LISTS},"_functions":[],"_parsed":set(),"_instances":[],"_failures":[]}
  sys.path.insert(0,str(analyzer_source))
  try:
@@ -349,7 +348,7 @@ def capture_view(corpus:dict[str,Any],target:dict[str,Any])->dict[str,Any]:
  return {"corpusManifest":corpus["corpusManifest"],"targetManifest":target["targetManifest"],"corpusCounts":corpus["corpusCounts"],"targetCounts":target["targetCounts"],"skips":corpus["skips"],"corpusMetrics":corpus["corpusMetrics"],"targetMetrics":target["targetMetrics"],"files":corpus["files"],"areas":corpus["areas"],"outliers":corpus["outliers"],"targetOutliers":target["targetOutliers"],"cloneGroups":corpus["cloneGroups"],"highComplexityFunctions":corpus["highComplexityFunctions"],**{k:corpus[k] for k in POINTER_LISTS},"_functions":corpus["_functions"],"_parsed":corpus["_parsed"],"_instances":corpus["_instances"],"_targetFailures":target["_failures"]}
 def deltas(b:dict[str,Any],c:dict[str,Any],reasons:list[str])->dict[str,Any]:
  out={}
- for n in ("structuralErosion","verbosity","excessDecisions","commentDensity","sameNameForwarders"):
+ for n in ("verbosity","excessDecisions","commentDensity","sameNameForwarders"):
   x,y=b[n],c[n]; rs=set(reasons)
   if not x["applicable"]:rs.add("baseline-inapplicable")
   if not y["applicable"]:rs.add("current-inapplicable")

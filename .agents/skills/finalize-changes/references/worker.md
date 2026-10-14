@@ -189,7 +189,7 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
       both checkouts verified, and the lock released.
 12. Read what landing proved it added to the landed commit.
     - An exit-0 landing already proves the landed commit is the reviewed source
-      commit, or its clean patch-identical rebase, plus exactly the two generated
+      commit, or its clean patch-identical rebase, plus exactly the three generated
       metrics-history files
       ([`scripts.md`](scripts.md#primary-movement-check) owns the generator and
       the output names) and nothing else;

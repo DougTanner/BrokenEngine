@@ -41,7 +41,8 @@ function Test-IndexPathSnapshot([string]$Root,$Snapshot){$actual=Get-IndexPathSn
 function Assert-CheckoutIdentity([string]$Current,[string]$Primary){$ct=(Invoke-Git $Current @('rev-parse','--show-toplevel')).Trim();$pt=(Invoke-Git $Primary @('rev-parse','--show-toplevel')).Trim();if(-not([IO.Path]::GetFullPath($ct).TrimEnd('\','/').Equals($Current,[StringComparison]::OrdinalIgnoreCase))-or-not([IO.Path]::GetFullPath($pt).TrimEnd('\','/').Equals($Primary,[StringComparison]::OrdinalIgnoreCase))){Stop-Candidate 1 'identity.not-root' 'Current and primary worktrees must be Git roots.'};$cc=(Invoke-Git $Current @('rev-parse','--path-format=absolute','--git-common-dir')).Trim();$pc=(Invoke-Git $Primary @('rev-parse','--path-format=absolute','--git-common-dir')).Trim();if(-not$cc.Equals($pc,[StringComparison]::OrdinalIgnoreCase)){Stop-Candidate 1 'identity.repository-mismatch' 'Current and primary worktrees must share one common Git directory.'};if((Invoke-Git $Current @('branch','--show-current')).Trim()-cne$CurrentBranch-or(Invoke-Git $Primary @('branch','--show-current')).Trim()-cne$PrimaryBranch){Stop-Candidate 2 'identity.branch-mismatch' 'Checked-out branches do not match the requested branches.'}}
 $historyJsonPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl'
 $historySvgPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.svg'
-$historyPaths = @($historyJsonPath, $historySvgPath)
+$historyOverlaySvgPath = '.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistoryOverlay.svg'
+$historyPaths = @($historyJsonPath, $historySvgPath, $historyOverlaySvgPath)
 function Assert-HistoryPathsClean([string]$Root) {
 	foreach($path in $historyPaths) {
 		$pathspec=Get-LiteralPathspec $path
@@ -52,7 +53,7 @@ function Assert-HistoryPathsClean([string]$Root) {
 		if($worktree.ExitCode-notin@(0,1)-or$index.ExitCode-notin@(0,1)){Stop-Candidate 1 'history.source-status-failed' 'Git could not verify the reserved history JSONL/SVG paths.'}
 	}
 }
-function Assert-HistoryTreeUnchanged([string]$Root,[string]$Base,[string]$Tip) { $changed=@((Invoke-Git $Root @('diff','--name-only',$Base,$Tip,'--',$historyJsonPath,$historySvgPath))|ForEach-Object{([string]$_).Trim()}|Where-Object{$_});if($changed.Count-ne 0){Stop-Candidate 2 'history.source-changed' 'The candidate source patch changes generator-owned history JSONL/SVG paths.'} }
+function Assert-HistoryTreeUnchanged([string]$Root,[string]$Base,[string]$Tip) { $changed=@((Invoke-Git $Root @('diff','--name-only',$Base,$Tip,'--',$historyJsonPath,$historySvgPath,$historyOverlaySvgPath))|ForEach-Object{([string]$_).Trim()}|Where-Object{$_});if($changed.Count-ne 0){Stop-Candidate 2 'history.source-changed' 'The candidate source patch changes generator-owned history JSONL/SVG paths.'} }
 
 try {
 	if(-not(Test-Path -LiteralPath $CommitMessageFile -PathType Leaf)){Stop-Candidate 1 'input.message-missing' 'CommitMessageFile must be an existing ordinary file.'};foreach($h in @($Baseline,$ExpectedCurrentTip,$ExpectedPrimaryTip)){if($h-cnotmatch'^[0-9a-f]{8,40}\z'){Stop-Candidate 1 'input.commit-invalid' 'Baseline and expected tips must be 8 to 40 lowercase hexadecimal object ID characters.'}}

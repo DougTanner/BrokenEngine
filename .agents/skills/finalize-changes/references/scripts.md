@@ -128,8 +128,9 @@ reconstructs the assessment from Git output.
   `broken-engine-finalize-candidate/v5`, carrying only the candidate.
 - `Invoke-CodeQualityMetricsHistory.ps1 -Mode Generate` uses the exact
   `RepositoryRoot,BaseCommit,OutputDirectory` interface and
-  writes only `CodeQualityMetricsHistory.jsonl` and
-  `CodeQualityMetricsHistory.svg` into that directory. Production reads history
+  writes only `CodeQualityMetricsHistory.jsonl`,
+  `CodeQualityMetricsHistory.svg`, and `CodeQualityMetricsHistoryOverlay.svg`
+  into that directory. Production reads history
   bytes from the supplied immutable BaseCommit; it never uses a working-tree
   JSONL suffix. The producer alone decides which rows it appends and what they
   contain.
@@ -261,21 +262,21 @@ and overwrites the artifact; the stale receipt is never reused, because its
   with the primary tip it now builds on as BaseCommit. Landing
   measures the approved source patch from the confirmed candidate's own parent,
   so a candidate whose parent is behind live primary — including one where the
-  intervening commits only rewrote the two generated history paths — is the
+  intervening commits only rewrote the three generated history paths — is the
   ordinary bounded internal rebase case rather than a blocked result, and
   `-ExpectedPrimaryTip` remains the approved primary ancestor used for recovery
   matching. The producer receives a new, absent child
   directory beneath an existing ignored `Temp` parent; it never reuses an output
-  directory, and landing makes no capture decision of its own. Both generated
+  directory, and landing makes no capture decision of its own. All three generated
   files are then committed over the approved source commit through a temporary
   index as one sole-parent commit with the frozen approved metadata; no branch
   ref moves while that object is built. The final result is
   `broken-engine-finalize-landing/v6` and separates
   `approvedSource`, `rebasedSource`, `historyUpdate`, and `final` commit/tree
   fields. The reviewed PNG deletion remains an ordinary source change; only the
-  two generated paths are allowed after confirmation. When primary
+  three generated paths are allowed after confirmation. When primary
   advanced first it makes at most one internal rebase, which requires a provably
-  byte-identical patch outside those two paths. Report the commit from the
+  byte-identical patch outside those three paths. Report the commit from the
   result's `landed` block rather than `candidate`. A blocked result reports its
   `disposition` and a `lock` projection; act on those, never a memorized code
   list. A `retryable-wait` result may be re-invoked with the approval-bound
@@ -291,11 +292,11 @@ and overwrites the artifact; the stale receipt is never reused, because its
   and always retains the lease; `landing.retry-exhausted` is retryable and leaves
   the confirmed session commit restored. Blocked `history.source-changed` means
   the approved source patch itself — measured from that candidate's own parent —
-  rewrites one of the two generated history paths, or that patch changed after
+  rewrites one of the three generated history paths, or that patch changed after
   confirmation; it is a genuine block that returns for re-review and a refreshed
   confirmation, never a condition a rebase can cure. Blocked
   `history.overlay-invalid` means the temporary overlay tree changed something
-  other than the exact reserved JSONL/SVG pair; its message names the unexpected
+  other than exactly the three reserved history paths; its message names the unexpected
   paths, and any reserved path the overlay failed to add. That guard runs before
   the compare-and-swap advance, so the run changed nothing on primary and the
   message is the whole evidence. A rolled-back
@@ -307,8 +308,8 @@ and overwrites the artifact; the stale receipt is never reused, because its
   including against a tip its own internal rebase produced. Recovery walks
   first-parent from the primary ref back to `-ExpectedPrimaryTip` and accepts a
   commit only when it has exactly one parent, carries the frozen approved commit
-  metadata, contains both generated history paths, and its patch identity
-  excluding those two paths equals the approved patch identity. No match is
+  metadata, contains all three generated history paths, and its patch identity
+  excluding those three paths equals the approved patch identity. No match is
   ordinary foreign primary movement, not a blocker, when the primary head itself
   does not carry the frozen metadata; a head that does carry it with no matching
   commit blocks, as do multiple matches and a primary head that does not descend
