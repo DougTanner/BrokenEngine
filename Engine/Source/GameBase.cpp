@@ -39,9 +39,9 @@ GameBase::~GameBase()
 }
 
 #if defined(BT_CLIENT)
-// Fixed policy order: BeginPoll -> quit -> modal gate -> cursor -> pause/back-out -> engine toggles -> game
-// callback -> previous-snapshot assignment. The modal gate skips everything after it except that assignment, so a modal frame still
-// resolves quit and still advances the previous snapshot that the next frame's edge detection needs.
+// Fixed policy order: BeginPoll -> quit -> modal gate -> chat gate -> cursor -> pause/back-out -> engine toggles -> game
+// callback -> previous-snapshot assignment. The modal and chat gates skip everything after them except that assignment, so a
+// gated frame still resolves quit and still advances the previous snapshot that the next frame's edge detection needs.
 void GameBase::ProcessInput(bool bLostFocus)
 {
 	MenuInput menuInput {};
@@ -54,6 +54,18 @@ void GameBase::ProcessInput(bool bLostFocus)
 	}
 
 	if (meUiState == UiState::kModal)
+	{
+		gpInput->mPreviousRawInput = gpRawInputManager->mRawInput;
+		return;
+	}
+
+	// The opening frame takes the gate too, so its Enter never reaches the engine toggles or the game callback. The box
+	// opens only while the Tweaks overlay is hidden, because ChatScreen renders only then.
+	if (menuInput.flags & MenuInputFlags::kOpenChat && !(mGameFlags & GameFlags::kMainMenu) && meUiState == UiState::kNone && !mbShowImGui)
+	{
+		mChatLog.bInputOpen = true;
+	}
+	if (mChatLog.bInputOpen)
 	{
 		gpInput->mPreviousRawInput = gpRawInputManager->mRawInput;
 		return;

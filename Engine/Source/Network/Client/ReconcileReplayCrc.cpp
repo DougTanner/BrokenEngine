@@ -130,7 +130,6 @@ static CrcValidateResult CrcValidateLoop(const CoordWork& rWork, int64_t iTarget
 					++iAdditionalMismatchesWithStatusChanges;
 				}
 			}
-			// NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) — read only by the kVerbose summary LOG below, which compiles out at default log levels
 			iLastMismatchTick = iTick;
 			if (iLowestUnresolved == std::numeric_limits<int64_t>::max())
 			{
@@ -185,12 +184,12 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 		},
 	};
 
-	if (rCell.serverUpdates.empty() && !HasDuePendingFullState(rCell, iTargetTick))
+	if (rCell.serverUpdates.empty() && FindDuePendingFullState(rCell, iTargetTick) == nullptr)
 	{
 		return result;
 	}
 
-	if (HasDuePendingFullState(rCell, iTargetTick))
+	if (FindDuePendingFullState(rCell, iTargetTick) != nullptr)
 	{
 		result.bHandled = false;
 		LOG(kNetwork, kVerbose, "CrcFastPathProcessCoord Due pending full state forces reconcile Coord: ({},{})", rWork.coord.iX, rWork.coord.iY);

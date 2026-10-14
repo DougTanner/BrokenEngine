@@ -64,7 +64,6 @@ inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateKey
 	{
 		return rController.keyframes[0];
 	}
-	// NOLINTNEXTLINE(clang-analyzer-security.ArrayBound) — registered controllers always have iKeyframeCount >= 2; the analyzer's count==0 path cannot occur
 	if (fElapsedTime >= rController.times[iKeyframeCount - 1].count())
 	{
 		return rController.keyframes[iKeyframeCount - 1];

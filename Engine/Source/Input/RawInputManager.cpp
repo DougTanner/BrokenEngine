@@ -26,13 +26,13 @@ void RawInputManager::UpdateFocus(bool bHasFocus, HWND hWindow)
 	mhWindow = hWindow;
 
 	// Keyboard HID (usage page 0x01, usage 0x06). Register and unregister share the same device struct and
-	// differ only in dwFlags: RIDEV_NOLEGACY adds the HID keyboard and ignores legacy keyboard messages;
-	// RIDEV_REMOVE unregisters it.
+	// differ only in dwFlags: 0 adds the HID keyboard and keeps the legacy keyboard messages ImGui text entry
+	// needs; RIDEV_REMOVE unregisters it.
 	RAWINPUTDEVICE rawInputDevice
 	{
 		.usUsagePage = 0x01,
 		.usUsage = 0x06,
-		.dwFlags = static_cast<DWORD>(bHasFocus ? RIDEV_NOLEGACY : RIDEV_REMOVE),
+		.dwFlags = static_cast<DWORD>(bHasFocus ? 0 : RIDEV_REMOVE),
 		.hwndTarget = nullptr,
 	};
 	if (bHasFocus)

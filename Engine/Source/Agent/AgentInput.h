@@ -7,8 +7,8 @@ namespace engine
 
 struct RawInput;
 
-// Which synthetic-input script is running. Each agent input command (click / hover / set_slider / key / mouse)
-// compiles to one of these; only one runs at a time.
+// Which synthetic-input script is running. Each agent input command (click / hover / set_slider / key / mouse /
+// type_text) compiles to one of these; only one runs at a time.
 enum class AgentScriptKind : uint8_t
 {
 	kClick,
@@ -16,6 +16,7 @@ enum class AgentScriptKind : uint8_t
 	kSetSlider,
 	kKey,
 	kMouse,
+	kTypeText,
 };
 
 enum class AgentMouseAction : uint8_t
@@ -49,6 +50,8 @@ struct AgentScript
 	bool bHasWindow = false;
 
 	char pcValueText[32] {}; // set_slider value text (ASCII, typed via ImGui temp-input)
+
+	char pcTypedText[NetworkMessages::ClientChatMessage::kiMaxTextBytes + 1] {}; // type_text UTF-8 text, typed into the active ImGui text field
 
 	int64_t iTimeoutFrames = 120; // stabilization timeout (click / hover / set_slider)
 	int64_t iHoldFrames = 2;      // hover / key hold duration

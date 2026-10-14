@@ -68,6 +68,17 @@ struct ClientConnection
 	std::chrono::steady_clock::time_point desynchronizationReportDeadline {};
 	std::chrono::steady_clock::time_point debugFrameRequestDeadline {};
 
+	enum class StateFlags : uint8_t
+	{
+		kCrashReportReceived = 1 << 0, // one crash report is admitted per connection; a repeat counts a rate violation
+	};
+
+	common::Flags<StateFlags> stateFlags;
+
+	// Chat token bucket: the epoch default makes the first message refill to the cap
+	float fChatTokens = 5.0f;
+	std::chrono::steady_clock::time_point chatTokenRefillTime {};
+
 	// Client->server contract enforcement (see NetworkProtocol.h / Server::RecordContractViolation)
 	int64_t iCorruptViolations = 0;             // lifetime, never reset
 	int64_t iRateViolations = 0;                // too-fast strikes still outstanding after decay
@@ -171,11 +182,13 @@ private:
 	void ClientAcknowledgementStream(std::span<const uint8_t> packetData, ClientConnection& rClient);
 	void ClientDesynchronizationReport(std::span<const uint8_t> packetData, ClientConnection& rClient);
 	void ClientDebugFrameRequest(std::span<const uint8_t> packetData, ClientConnection& rClient);
+	void ClientChat(std::span<const uint8_t> packetData, ClientConnection& rClient);
 	void ClientHello(std::span<const uint8_t> packetData, ClientConnection& rClient);
 	void RejectHello(const ClientConnection& rClient, const char* pcMessage);
 	void ClientSubscribe(std::span<const uint8_t> packetData, ClientConnection& rClient);
 	void ClientUnsubscribe(std::span<const uint8_t> packetData, ClientConnection& rClient);
 	void ClientResynchronizationRequest(std::span<const uint8_t> packetData, const ClientConnection& rClient);
+	void ClientCrashReport(std::span<const uint8_t> packetData, ClientConnection& rClient);
 	void SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char* pcMessage, const ClientGuid* pGuid);
 	void SendSubscribeAccept(const ClientConnection& rClient, int64_t iSlot, GridCoord coordinate);
 	void SendTimespeedUpdate(ENetPeer* pPeer, int64_t iMultiply, int64_t iDivide);
@@ -189,6 +202,10 @@ private:
 	std::chrono::steady_clock::time_point mPreviousPollEnd {};
 	std::chrono::steady_clock::time_point mBudgetGraceDeadline {};
 	int64_t miLoadGeneration = 0;
+
+	// Bounds the disk space clients can fill with crash reports however often they reconnect.
+	static constexpr int64_t kiMaximumStoredCrashReports = 32;
+	int64_t miStoredCrashReportCount = 0;
 
 	ServerBufferedFrames mBufferedFrames = ServerBufferedFrames(*this);
 

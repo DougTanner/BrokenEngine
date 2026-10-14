@@ -320,13 +320,13 @@ static std::vector<float> LoadElevationMeters(const std::filesystem::path& rInte
 	{
 		throw std::runtime_error(std::format("Failed to read complete Gaea elevation output \"{}\".", elevationFile.string()));
 	}
-	for (auto [i, fRaw] : std::views::enumerate(fullElevationMeters))
+	for (const auto& [i, rfRaw] : std::views::enumerate(fullElevationMeters))
 	{
-		if (!std::isfinite(fRaw) || fRaw < 0.0f || fRaw > 1.0f)
+		if (!std::isfinite(rfRaw) || rfRaw < 0.0f || rfRaw > 1.0f)
 		{
-			throw std::runtime_error(std::format("Gaea produced \"{}\" with elevation pixel {} at {}, outside the normalized [0, 1] range. Verify the archetype's Elevation Export node uses FloatRaw32 format and that the graph feeding it is clamped to [0, 1].", elevationFile.string(), i, fRaw));
+			throw std::runtime_error(std::format("Gaea produced \"{}\" with elevation pixel {} at {}, outside the normalized [0, 1] range. Verify the archetype's Elevation Export node uses FloatRaw32 format and that the graph feeding it is clamped to [0, 1].", elevationFile.string(), i, rfRaw));
 		}
-		fRaw = (fRaw - fSeaLevelNormalized) * fElevationMeters;
+		rfRaw = (rfRaw - fSeaLevelNormalized) * fElevationMeters;
 	}
 	return fullElevationMeters;
 }
@@ -520,11 +520,11 @@ static void LoadMesherMesh(const std::filesystem::path& rIntermediatesDirectory,
 		}
 	}
 
-	for (auto [i, iIndex] : std::views::enumerate(std::as_const(rMeshIndices)))
+	for (const auto& [i, ruiIndex] : std::views::enumerate(std::as_const(rMeshIndices)))
 	{
-		if (iIndex >= static_cast<uint32_t>(iVertexCount))
+		if (ruiIndex >= static_cast<uint32_t>(iVertexCount))
 		{
-			throw std::runtime_error(std::format("Gaea Mesher output \"{}\" index {} references vertex {}, past the {} vertices in the mesh.", meshGltfFile.string(), i, iIndex, iVertexCount));
+			throw std::runtime_error(std::format("Gaea Mesher output \"{}\" index {} references vertex {}, past the {} vertices in the mesh.", meshGltfFile.string(), i, ruiIndex, iVertexCount));
 		}
 	}
 

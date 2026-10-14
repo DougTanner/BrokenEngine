@@ -53,11 +53,10 @@ static void ApplyCoordWriteback(CoordWork& rWork)
 	}
 }
 
-static void AdoptUnreachablePendingFullState(CoordWork& rWork)
+static void AdoptUnreachablePendingFullState(CoordWork& rWork, engine::Cell::PendingFullState& rPending)
 {
 	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
-	engine::Cell::PendingFullState& rPending = *rCell.pendingFullState;
 
 	ASSERT(rPending.pFrame != nullptr);
 	ASSERT(rPending.pFrame->interpolate.iTick == rPending.iTick);
@@ -129,7 +128,7 @@ static bool EarlyReturnIfNoServerData(CoordWork& rWork, const ReconcileInputs& r
 	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
 
-	if (rCell.serverUpdates.contains(rCell.iConfirmedTick + 1) || HasDuePendingFullState(rCell, rInputs.iTargetTick))
+	if (rCell.serverUpdates.contains(rCell.iConfirmedTick + 1) || FindDuePendingFullState(rCell, rInputs.iTargetTick) != nullptr)
 	{
 		return false;
 	}
@@ -158,7 +157,7 @@ static void DetermineRollbackBase(CoordWork& rWork, const ReconcileInputs& rInpu
 	riRollbackOffset = rFastPathResult.preWritebackLayout.iConfirmedInner;
 	rbShrunkRollback = false;
 
-	if (rFastPathResult.iLowestUnresolvedMismatch > rCell.iConfirmedTick + 1 && !HasDuePendingFullState(rCell, rInputs.iTargetTick))
+	if (rFastPathResult.iLowestUnresolvedMismatch > rCell.iConfirmedTick + 1 && FindDuePendingFullState(rCell, rInputs.iTargetTick) == nullptr)
 	{
 		int64_t iShrunkTick = rFastPathResult.iLowestUnresolvedMismatch - 1;
 		if (iShrunkTick <= rCell.iHighWaterValidatedTick)
@@ -220,7 +219,8 @@ static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const Ri
 	rfTime = rScratch.replayStack.at(0)->interpolate.fCurrentTime;
 
 	// Inject a due pending full state at the confirmed frame. Future states remain queued.
-	if (HasDuePendingFullState(rCell, rInputs.iTargetTick) && rCell.pendingFullState->iTick == rCell.iConfirmedTick)
+	engine::Cell::PendingFullState* pDuePendingFullState = FindDuePendingFullState(rCell, rInputs.iTargetTick);
+	if (pDuePendingFullState != nullptr && pDuePendingFullState->iTick == rCell.iConfirmedTick)
 	{
 		ReconcileInjectPendingFullState(rWork);
 		rfTime = rScratch.replayStack.at(0)->interpolate.fCurrentTime;
@@ -229,25 +229,26 @@ static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const Ri
 			LOG(kNetwork, kVerbose, "ReconcileCoord Injected pending full state Coord: ({},{}) AtTick: {}", rWork.coord.iX, rWork.coord.iY, rCell.iConfirmedTick);
 		}
 	}
-	else if (eMode == ReplayMode::kPrimary && HasDuePendingFullState(rCell, rInputs.iTargetTick) && rCell.pendingFullState->iTick < rCell.iConfirmedTick)
+	else if (eMode == ReplayMode::kPrimary && pDuePendingFullState != nullptr && pDuePendingFullState->iTick < rCell.iConfirmedTick)
 	{
-		LOG(kNetwork, kVerbose, "ReconcileCoord Discarded stale pending full state Coord: ({},{}) FullStateTick: {} ConfirmedTick: {}", rWork.coord.iX, rWork.coord.iY, rCell.pendingFullState->iTick, rCell.iConfirmedTick);
+		LOG(kNetwork, kVerbose, "ReconcileCoord Discarded stale pending full state Coord: ({},{}) FullStateTick: {} ConfirmedTick: {}", rWork.coord.iX, rWork.coord.iY, pDuePendingFullState->iTick, rCell.iConfirmedTick);
 		rCell.pendingFullState.reset();
 	}
 
 	riReplayStart = riRollbackTick + 1;
 	int64_t iUncappedMaximumConsecutive = ReconcileFindReplayRangeCoord(rWork, riReplayStart);
-	if (eMode == ReplayMode::kPrimary && HasDuePendingFullState(rCell, rInputs.iTargetTick) && rCell.pendingFullState->iTick > iUncappedMaximumConsecutive)
+	pDuePendingFullState = FindDuePendingFullState(rCell, rInputs.iTargetTick);
+	if (eMode == ReplayMode::kPrimary && pDuePendingFullState != nullptr && pDuePendingFullState->iTick > iUncappedMaximumConsecutive)
 	{
-		int64_t iAdoptedTick = rCell.pendingFullState->iTick;
-		AdoptUnreachablePendingFullState(rWork);
+		int64_t iAdoptedTick = pDuePendingFullState->iTick;
+		AdoptUnreachablePendingFullState(rWork, *pDuePendingFullState);
 		rfTime = rScratch.replayStack.at(0)->interpolate.fCurrentTime;
 		riReplayStart = iAdoptedTick + 1;
 		return false;
 	}
 	int64_t iMaximumConsecutive = std::min(iUncappedMaximumConsecutive, rInputs.iTargetTick);
 
-	if (eMode == ReplayMode::kFallback && iMaximumConsecutive < riReplayStart && !HasDuePendingFullState(rCell, rInputs.iTargetTick))
+	if (eMode == ReplayMode::kFallback && iMaximumConsecutive < riReplayStart && pDuePendingFullState == nullptr)
 	{
 		if (rScratch.iNewConfirmedTick >= 0)
 		{
@@ -362,7 +363,7 @@ void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs)
 	// are unchanged since the last full replay attempt, the result would be the same.
 	int64_t iCurrentUpdateCount = static_cast<int64_t>(rCell.serverUpdates.size());
 	if (rCell.iConfirmedTick == rCell.iLastReplayConfirmedTick && iCurrentUpdateCount == rCell.iLastReplayServerUpdateCount
-	 && !HasDuePendingFullState(rCell, rInputs.iTargetTick))
+	 && FindDuePendingFullState(rCell, rInputs.iTargetTick) == nullptr)
 	{
 		DEBUG_BREAK();
 	}

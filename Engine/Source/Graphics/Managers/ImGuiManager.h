@@ -11,6 +11,7 @@ class TweaksScreen;
 namespace engine
 {
 
+class ChatScreen;
 class GameSettingsScreen;
 class GraphicsMenuScreen;
 class MainMenuScreen;
@@ -86,6 +87,7 @@ public:
 	std::unique_ptr<SoundMenuScreen> mpSoundMenuScreen;
 	std::unique_ptr<GameSettingsScreen> mpGameSettingsScreen;
 	std::unique_ptr<game::HudScreen> mpHudScreen;
+	std::unique_ptr<ChatScreen> mpChatScreen;
 
 private:
 

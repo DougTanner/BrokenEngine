@@ -134,6 +134,7 @@ void Client::Poll(const NetworkTimeState& rTimeState)
 					}
 				}
 				mStateFlags.Set(ClientStateFlags::kConnected, false);
+				mStateFlags.Set(ClientStateFlags::kConnectionAccepted, false);
 				mStateFlags.Set(ClientStateFlags::kDisconnectedEvent);
 				mpServerPeer = nullptr;
 				LOG(kNetwork, kInfo, "ENET_EVENT_TYPE_DISCONNECT");
@@ -227,6 +228,9 @@ void Client::Receive(std::span<const uint8_t> packetData)
 				break;
 			case PacketType::kServerTimespeedUpdate:
 				ServerTimespeedUpdate(packetData);
+				break;
+			case PacketType::kServerChat:
+				ServerChat(packetData);
 				break;
 			default:
 				if (static_cast<uint8_t>(eType) >= static_cast<uint8_t>(PacketType::kGamePacketStart))
@@ -329,7 +333,51 @@ void Client::Disconnect()
 		ScopedSuppressAllocationTracking suppress;
 		enet_peer_disconnect(mpServerPeer, 0);
 		mStateFlags.Set(ClientStateFlags::kConnected, false);
+		mStateFlags.Set(ClientStateFlags::kConnectionAccepted, false);
 	}
+}
+
+bool Client::UploadCrashReport(std::span<const uint8_t> report)
+{
+	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+	{
+		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+		NetworkMessages::ClientCrashReportMessage message {.report = {.puiData = report.data(), .iSize = static_cast<int32_t>(std::ssize(report))}};
+		NetworkMessages::Write(rWorkbuffer, message);
+		NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	}
+
+	// Heap: ENet queues the disconnect and allocates event packets while servicing.
+	ScopedSuppressAllocationTracking suppress;
+
+	// Deferred, not enet_peer_disconnect, which would discard the queued report. ENet sends the disconnect only after
+	// the server acknowledges every reliable command, so the disconnect event means the report was delivered.
+	enet_peer_disconnect_later(mpServerPeer, 0);
+
+	std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::now() + 5s;
+	ENetEvent event {};
+	for (std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now(); now < deadline; now = std::chrono::steady_clock::now())
+	{
+		int64_t iWaitMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count();
+		int64_t iServiceResult = enet_host_service(mpHost, &event, static_cast<enet_uint32>(iWaitMilliseconds));
+		if (iServiceResult < 0)
+		{
+			return false;
+		}
+		if (event.type == ENET_EVENT_TYPE_RECEIVE)
+		{
+			enet_packet_destroy(event.packet);
+		}
+		else if (event.type == ENET_EVENT_TYPE_DISCONNECT)
+		{
+			// Same peer state Poll leaves after a disconnect, so ~Client skips its disconnect drain.
+			mStateFlags.Set(ClientStateFlags::kConnected, false);
+			mStateFlags.Set(ClientStateFlags::kConnectionAccepted, false);
+			mpServerPeer = nullptr;
+			return true;
+		}
+	}
+	return false;
 }
 
 static std::unique_ptr<game::Frame> DecompressAndReadFrame(int64_t iUncompressedSize, const NetworkMessages::PacketPayload& rCompressedPayload)
@@ -773,6 +821,20 @@ void Client::ServerTimespeedUpdate(std::span<const uint8_t> packetData)
 	game::gpGame->mTimeStep.SetTimeScale(message.iMultiply, message.iDivide);
 }
 
+void Client::ServerChat(std::span<const uint8_t> packetData)
+{
+	if (!(mStateFlags & ClientStateFlags::kConnectionAccepted))
+	{
+		return;
+	}
+
+	NetworkMessages::ServerChatMessage message {};
+	NetworkMessages::Read(packetData, message);
+
+	game::gpGame->mChatLog.Append(message.iSenderId, message.text);
+	LOG(kNetwork, kInfo, "Client::ServerChat Player {}: {}", message.iSenderId, message.text);
+}
+
 bool Client::SendAcknowledgement()
 {
 	if (!(mStateFlags & ClientStateFlags::kConnected))
@@ -869,10 +931,6 @@ void Client::SendDebugFrameRequest(int64_t iTick, GridCoord coordinate)
 
 bool Client::SendSubscribe(GridCoord coordinate)
 {
-	if (!(mStateFlags & ClientStateFlags::kConnected))
-	{
-		return false;
-	}
 	if (!(mStateFlags & ClientStateFlags::kConnectionAccepted))
 	{
 		return false;
@@ -934,6 +992,30 @@ void Client::SendResynchronizationRequest()
 	NetworkMessages::ClientResyncRequestMessage message {};
 	NetworkMessages::Write(rWorkbuffer, message);
 	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+}
+
+void Client::SendChat(std::string_view text)
+{
+	if (!(mStateFlags & ClientStateFlags::kConnected))
+	{
+		return;
+	}
+	if (!(mStateFlags & ClientStateFlags::kConnectionAccepted))
+	{
+		return;
+	}
+	if (!IsValidChatText(text))
+	{
+		return;
+	}
+
+	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+	NetworkMessages::ClientChatMessage message {.text = text};
+	NetworkMessages::Write(rWorkbuffer, message);
+	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	// Send the chat message now instead of waiting for the tick-cadence ack flush.
+	Flush();
 }
 
 void Client::SendHello()

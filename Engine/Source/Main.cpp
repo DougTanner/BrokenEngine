@@ -377,6 +377,11 @@ static int64_t MainThread(HINSTANCE hInstance)
 
 	LOG(kDefault, kInfo, "\nEnter main loop");
 	LogIndent(1);
+#if defined(BT_CLIENT)
+	// Write and upload while the client connection is still alive; unwinding destroys it before ProcessMain's catch.
+	try
+	{
+#endif
 	while (true)
 	{
 		gpProfileManager->CpuStart(kCpuTimerMessagesAndInput);
@@ -468,7 +473,7 @@ static int64_t MainThread(HINSTANCE hInstance)
 				// Keep a slow heartbeat while visible-but-unchanged so the free-running tick/timer text (deliberately outside the content hash) stays visibly alive instead of reading as a hung server.
 				static constexpr int64_t kiServerDisplayHeartbeatWindows = 4; // 4 x 8-tick windows = 1 Hz at the 32 Hz tick rate
 				static int64_t siServerDisplayHeartbeatCounter = 0;
-				if (!IsIconic(sHWindow) && IsWindowVisible(sHWindow))
+				if (IsIconic(sHWindow) == FALSE && IsWindowVisible(sHWindow) != FALSE)
 				{
 					bool bHeartbeat = ++siServerDisplayHeartbeatCounter >= kiServerDisplayHeartbeatWindows;
 					if (ServerDisplayContentChanged() || bHeartbeat)
@@ -481,6 +486,27 @@ static int64_t MainThread(HINSTANCE hInstance)
 		}
 #endif // BT_CLIENT
 	}
+#if defined(BT_CLIENT)
+	}
+	catch (const std::exception& rException)
+	{
+		if (IsDebuggerPresent() == 0) [[likely]]
+		{
+			HandleException(&rException);
+			TryUploadCrashReport();
+		}
+		throw;
+	}
+	catch (...)
+	{
+		if (IsDebuggerPresent() == 0) [[likely]]
+		{
+			HandleException();
+			TryUploadCrashReport();
+		}
+		throw;
+	}
+#endif
 	LogIndent(-1);
 	LOG(kDefault, kInfo, "Exit main loop\n\n");
 
@@ -915,6 +941,7 @@ static int64_t ProcessMain(HINSTANCE hInstance)
 			throw;
 		}
 		engine::HandleException(&rException);
+		engine::PromptCrashReportDesktopCopy();
 	}
 	catch (...)
 	{
@@ -923,6 +950,7 @@ static int64_t ProcessMain(HINSTANCE hInstance)
 			throw;
 		}
 		engine::HandleException();
+		engine::PromptCrashReportDesktopCopy();
 	}
 
 #if defined(BT_CLIENT)

@@ -53,10 +53,6 @@ engine::Client& RequireHarnessRigClient(std::string_view command)
 		throw std::runtime_error(std::format("{} requires an accepted connected client", command));
 	}
 	engine::Client& rClient = *gpClientSession->mpRuntime->mpClient;
-	if (!(rClient.mStateFlags & engine::Client::ClientStateFlags::kConnected))
-	{
-		throw std::runtime_error(std::format("{} requires an accepted connected client", command));
-	}
 	if (!(rClient.mStateFlags & engine::Client::ClientStateFlags::kConnectionAccepted))
 	{
 		throw std::runtime_error(std::format("{} requires an accepted connected client", command));

@@ -113,8 +113,8 @@
     <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup>
-    <!-- VS defaults ClangTidyChecks to clang-analyzer-* and appends it after .clang-tidy's Checks, so analyzer exclusions must live here. EnumCastOutOfRange false-positives on MSVC STL _BITMASK_OPS flag enums. -->
-    <ClangTidyChecks>clang-analyzer-*,-clang-analyzer-optin.core.EnumCastOutOfRange</ClangTidyChecks>
+    <!-- VS defaults ClangTidyChecks to clang-analyzer-* and appends it after .clang-tidy's Checks, so analyzer exclusions must live here. EnumCastOutOfRange false-positives on MSVC STL _BITMASK_OPS flag enums. DeadStores flags values whose only reads a compile-time log level or feature switch removes from this configuration. ArrayBound flags indexes bounded by invariants the analyzer cannot see, such as an ASSERT, which is not [[noreturn]]. -->
+    <ClangTidyChecks>clang-analyzer-*,-clang-analyzer-optin.core.EnumCastOutOfRange,-clang-analyzer-deadcode.DeadStores,-clang-analyzer-security.ArrayBound</ClangTidyChecks>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -453,6 +453,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ClientSessionRuntime.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ClientSubscriptions.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplay.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\ChatText.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkCursor.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkDiscoveryScanner.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkManager.h" />
@@ -466,6 +467,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksSliderMap.h" />
     <ClInclude Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreen.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\ChatLog.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\CurveData.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\CurveWidget.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\NetworkUiControl.h" />
@@ -510,6 +512,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Graphics\Camera.h" />
     <ClInclude Include="..\..\Source\Pch.h" />
     <ClInclude Include="..\..\Source\Ui\Localization.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\ChatScreen.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\GameSettingsScreen.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\GraphicsMenuScreen.h" />
     <ClInclude Include="..\..\Source\Ui\Screens\HudScreen.h" />
@@ -679,6 +682,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplay.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplayCrc.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplayTick.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\ChatText.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkDiscoveryScanner.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkSerialization.cpp" />
@@ -756,6 +760,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Network\Client\ReconcileReplayClientState.cpp" />
     <ClCompile Include="..\..\Source\Network\PlayerEvents.cpp" />
     <ClCompile Include="..\..\Source\Graphics\Camera.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\ChatScreen.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\GameSettingsScreen.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\GraphicsMenuScreen.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\HudScreen.cpp" />

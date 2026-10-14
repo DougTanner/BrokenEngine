@@ -8,8 +8,9 @@ namespace engine
 {
 
 // Writes a real crash report through the production handler (no exception object, so its text is the deterministic
-// "Unknown exception") and then exits. The exit is deliberate and intentionally leaves the request unanswered: the
-// harness observes transport loss plus exit code 0, so no response is built here.
+// "Unknown exception"), uploads it from a connected client as the main-loop crash path does, and then exits. The exit is
+// deliberate and intentionally leaves the request unanswered: the harness observes transport loss plus exit code 0, so no
+// response is built here.
 void CommandCrashReportHarnessRig([[maybe_unused]] const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	if constexpr (!kbDebugInput)
@@ -28,6 +29,9 @@ void CommandCrashReportHarnessRig([[maybe_unused]] const nlohmann::json& rParame
 		}
 
 		HandleException();
+#if defined(BT_CLIENT)
+		TryUploadCrashReport();
+#endif
 		ExitProcess(0);
 	}
 }

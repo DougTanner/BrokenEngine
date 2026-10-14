@@ -28,7 +28,8 @@ inline LaunchOptions gLaunchOptions {};
 bool ParseLaunchOptions();
 
 // True for an agent-harness client: a kbAgent build launched with --agent-port. Every physical (human) input
-// chokepoint is suppressed for the process lifetime, leaving the harness's synthetic input as the sole source.
+// chokepoint is suppressed for the process lifetime, leaving the harness's synthetic input as the sole source,
+// except IME result characters, which still reach an active ImGui text field on a focused window.
 // Constant from the ProcessMain parse (equals agent-channel existence) — never flips mid-run. Reading game kbAgent is the
 // sanctioned engine->game direction.
 inline bool PhysicalInputSuppressed()

@@ -4,6 +4,7 @@
 
 #include "Data/Raw.h"
 #include "File/PackChunks.h"
+#include "Ui/Screens/ChatScreen.h"
 #include "Ui/Screens/GameSettingsScreen.h"
 #include "Ui/Screens/GraphicsMenuScreen.h"
 #include "Ui/Screens/MainMenuScreen.h"
@@ -98,7 +99,6 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 	}
 	ImGuiIO& rInputOutput = ImGui::GetIO();
 	rInputOutput.IniFilename = nullptr;
-	rInputOutput.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	rInputOutput.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
 	// Load one default font for Latin and CJK text, with oversampling for crisp rendering
@@ -171,6 +171,7 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 	mpSoundMenuScreen = std::make_unique<SoundMenuScreen>();
 	mpGameSettingsScreen = std::make_unique<GameSettingsScreen>();
 	mpHudScreen = std::make_unique<game::HudScreen>();
+	mpChatScreen = std::make_unique<ChatScreen>();
 }
 
 // Reset all geometry before scaling to prevent cumulative drift across resolution changes, including fields without explicit overrides.
@@ -483,6 +484,7 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 	if (!game::gpGame->mbShowImGui)
 	{
 		mpHudScreen->Render();
+		mpChatScreen->Render();
 		mpPauseMenuScreen->Render();
 		mpGraphicsMenuScreen->Render();
 		mpSoundMenuScreen->Render();

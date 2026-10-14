@@ -44,7 +44,7 @@ public:
 	StreamingVoice() = delete;
 	StreamingVoice(AudioEngine* pAudioEngine, IXAudio2SourceVoice* pVoice, const LazyChunk* pLazyChunk);
 
-	~StreamingVoice();
+	~StreamingVoice() override;
 
 	StreamingVoice(const StreamingVoice&) = delete;
 	StreamingVoice& operator=(const StreamingVoice&) = delete;

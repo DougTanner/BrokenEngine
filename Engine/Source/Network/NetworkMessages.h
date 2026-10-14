@@ -596,6 +596,24 @@ struct ClientResyncRequestMessage
 	}
 };
 
+struct ClientCrashReportMessage
+{
+	static constexpr PacketType keType = PacketType::kClientCrashReport;
+	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(int32_t);
+	static constexpr int64_t kiMinSize = kiFixedSize + 1;
+	static constexpr int64_t kiMaxSize = kiFixedSize + kiMaximumCrashReportSize;
+
+	PacketPayload report {};
+
+	template <typename TVISITOR>
+	static void Visit(TVISITOR& rVisitor, ClientCrashReportMessage& rMessage)
+	{
+		rVisitor.Type(keType);
+		rVisitor.Field(rMessage.report.iSize);
+		rVisitor.Payload(rMessage.report);
+	}
+};
+
 struct ServerSubscribeAcceptMessage
 {
 	static constexpr PacketType keType = PacketType::kServerSubscribeAccept;
@@ -661,6 +679,39 @@ struct ServerTimespeedUpdateMessage
 		rVisitor.Type(keType);
 		rVisitor.Field(rMessage.iMultiply);
 		rVisitor.Field(rMessage.iDivide);
+	}
+};
+
+struct ClientChatMessage
+{
+	static constexpr PacketType keType = PacketType::kClientChat;
+	static constexpr int64_t kiMaxTextBytes = 256;
+	static constexpr int64_t kiMinSize = kiPacketTypeSize + 1 + sizeof(uint8_t); // one text byte plus the terminator
+	static constexpr int64_t kiMaxSize = kiPacketTypeSize + kiMaxTextBytes + sizeof(uint8_t);
+
+	std::string_view text;
+
+	template <typename TVISITOR>
+	static void Visit(TVISITOR& rVisitor, ClientChatMessage& rMessage)
+	{
+		rVisitor.Type(keType);
+		rVisitor.NullTerminatedString(rMessage.text);
+	}
+};
+
+struct ServerChatMessage
+{
+	static constexpr PacketType keType = PacketType::kServerChat;
+
+	int64_t iSenderId = 0;
+	std::string_view text;
+
+	template <typename TVISITOR>
+	static void Visit(TVISITOR& rVisitor, ServerChatMessage& rMessage)
+	{
+		rVisitor.Type(keType);
+		rVisitor.Field(rMessage.iSenderId);
+		rVisitor.NullTerminatedString(rMessage.text);
 	}
 };
 

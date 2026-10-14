@@ -83,7 +83,7 @@ Use the following rules for C++ code
 8. Use i/j/k variable names in for loops, but prefer range-based for loop when possible. When a counter is the zero-based ordinal of every visited element, std::views::enumerate with a structured binding is recommended over a counter initializer statement, which remains allowed; the element's reference and constness come from the underlying range, so enumerate a const range for read-only access. If any other counter variable is required with a range-based for loop, use the C++20 syntax to include an initializer statement. Use "it" for iterators.
 
 	for (const Island& rIsland : mIslands)
-	for (auto [i, rMember] : std::views::enumerate(pFleet->members))
+	for (const auto& [i, rMember] : std::views::enumerate(pFleet->members))
 	for (int64_t i = 0; i < std::ssize(mIslands); ++i)  // only when i also indexes another container, runs in reverse or over part of the range, or the body resizes mIslands
 
 9. Exceptions are for fatal errors only (things that would cause the program to crash), not control flow. Use standard-library exception types by default. Define a custom exception only when it adds useful functionality, such as concrete data or behavior; do not add an empty derived type merely to rename or categorize a failure.
@@ -494,3 +494,5 @@ What a comment should say, in the fewest sentences that carry it: an invariant, 
 	} // namespace CollisionCategory
 
 	} // namespace game
+
+75. Never suppress a compiler, clang-tidy, or static-analyzer diagnostic in source code: no NOLINT, NOLINTNEXTLINE, or NOLINTBEGIN/NOLINTEND comment, and no #pragma warning(disable or suppress) or #pragma clang diagnostic ignored around code. Fix the cause in code. When no meaning-preserving fix exists, report the diagnostic to the user, who either chooses a different fix or disables the check in configuration: .clang-tidy Checks, a vcxproj's <ClangTidyChecks>, a vcxproj's <DisableSpecificWarnings>, or the project-wide disable list in Common/ExternalHeaders.h. The pragmas that wrap third-party includes in Common/ExternalHeaders.h and Tools/ToolCommon/ToolCliCommon.h are that configuration, not code suppressions.

@@ -180,7 +180,7 @@ struct OptionalIdToIndex<T, FLAGS>
 		ScopedSuppressAllocationTracking suppress;
 		idToIndexMap.clear();
 		idToIndexMap.reserve(ids.size());
-		for (auto [i, rId] : std::views::enumerate(ids))
+		for (const auto& [i, rId] : std::views::enumerate(ids))
 		{
 			if (rId.uuid.iValue == 0)
 			{

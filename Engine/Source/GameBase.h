@@ -7,6 +7,7 @@
 
 #if defined(BT_CLIENT)
 #include "Frame/Frame.h"
+#include "Ui/ChatLog.h"
 #endif
 
 namespace game
@@ -225,6 +226,10 @@ public:
 	UiState meUiState = UiState::kPause;
 	char mModalMessage[256] = {};
 	bool mbShowImGui = false;
+#if defined(BT_CLIENT)
+	// Stored here rather than in ChatScreen so an ImGuiManager recreation keeps the history and an open input box.
+	ChatLog mChatLog;
+#endif // BT_CLIENT
 
 	TimeStep mTimeStep;
 	// Sim-clock delta covered by the most recent ServerUpdate / ClientUpdate iteration.

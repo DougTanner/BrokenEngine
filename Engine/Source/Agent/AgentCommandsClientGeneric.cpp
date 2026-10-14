@@ -405,7 +405,7 @@ static void CommandResize(const nlohmann::json& rParameters, nlohmann::json& rRe
 	int64_t iClientHeight = common::RoundUp<int64_t, 8>(iHeight);
 
 	// Reject while minimized: WM_SIZE never fires for a minimized window, so the deferred poll can't converge.
-	if (IsIconic(engine::gpGraphics->mWindowHandle))
+	if (IsIconic(engine::gpGraphics->mWindowHandle) != FALSE)
 	{
 		throw std::runtime_error("window is minimized");
 	}
@@ -509,7 +509,7 @@ static void CommandFullscreen(const nlohmann::json& rParameters, nlohmann::json&
 
 	// Reject while minimized: the style toggle drives a swapchain recreate that can't converge off-screen, so the
 	// deferred poll would never settle (mirrors resize).
-	if (IsIconic(engine::gpGraphics->mWindowHandle))
+	if (IsIconic(engine::gpGraphics->mWindowHandle) != FALSE)
 	{
 		throw std::runtime_error("window is minimized");
 	}
@@ -983,6 +983,26 @@ static void CommandKey(const nlohmann::json& rParameters, [[maybe_unused]] nlohm
 	BeginScriptAndDefer(script, false, false, false, std::string());
 }
 
+// type_text {text}: type UTF-8 text (up to 256 bytes, empty allowed) into the active ImGui text field through ImGui IO,
+// then press and release Enter.
+static void CommandTypeText(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
+{
+	engine::AgentScript script;
+	if (!rParameters.contains("text") || !rParameters.at("text").is_string())
+	{
+		throw std::runtime_error("type_text requires string 'text'");
+	}
+	std::string text = rParameters.at("text").get<std::string>();
+	if (text.size() >= std::size(script.pcTypedText))
+	{
+		throw std::runtime_error("type_text requires string 'text'");
+	}
+	script.eKind = engine::AgentScriptKind::kTypeText;
+	CopyStringParameter(script.pcTypedText, text);
+	ThrowIfClientNotRendering();
+	BeginScriptAndDefer(script, false, false, false, std::string());
+}
+
 // mouse {x, y, action:"move|down|up|click|wheel", button?="left", notches?}: raw pixel coords feeding both the ImGui
 // IO sink and the RawInput overlay (normalized) for world clicks / unlabeled targets and camera-zoom wheel.
 // (x/y optional for wheel — both or neither)
@@ -1252,6 +1272,11 @@ bool ExecuteClientAgentCommand(std::string_view command, const nlohmann::json& r
 	if (command == "key")
 	{
 		CommandKey(rParameters, rResult);
+		return true;
+	}
+	if (command == "type_text")
+	{
+		CommandTypeText(rParameters, rResult);
 		return true;
 	}
 	if (command == "mouse")

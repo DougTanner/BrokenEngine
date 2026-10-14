@@ -320,7 +320,7 @@ void AnimationData::EvaluateWorldMatrices(int64_t iAnimationIndex, float fTime, 
 	const int64_t* piAnimatedNodes = mAnimatedNodes.data() + iAnimationIndex * mHeader.skeleton.uiNodeCount;
 	for (int64_t i = 0; i < mHeader.skeleton.uiNodeCount; ++i)
 	{
-		if (piAnimatedNodes[i])
+		if (piAnimatedNodes[i] != 0)
 		{
 			const common::ModelNode& rNode = mpNodes[i];
 			pvecTranslations[i] = XMLoadFloat4(&rNode.f4BindTranslation);
@@ -355,7 +355,7 @@ void AnimationData::EvaluateWorldMatrices(int64_t iAnimationIndex, float fTime, 
 	for (int64_t i = 0; i < mHeader.skeleton.uiNodeCount; ++i)
 	{
 		XMMATRIX matLocal {};
-		if (piAnimatedNodes[i])
+		if (piAnimatedNodes[i] != 0)
 		{
 			const common::ModelNode& rNode = mpNodes[i];
 			XMMATRIX matBindMatrix = XMLoadFloat4x4(&rNode.f4x4BindMatrix);

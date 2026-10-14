@@ -22,6 +22,7 @@ enum class ClientSessionStateFlags : uint8_t
 	kServerDiscovered      = 1 << 0,
 	kDiscoveryScanTimedOut = 1 << 1,
 	kNoFreeSlotLogged      = 1 << 2,
+	kConnectionWasAccepted = 1 << 3,
 };
 
 class ClientSessionRuntime

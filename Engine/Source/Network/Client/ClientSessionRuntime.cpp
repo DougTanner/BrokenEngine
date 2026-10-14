@@ -121,6 +121,7 @@ void ClientSessionRuntime::ResetForConnect()
 	mStateFlags.Set(ClientSessionStateFlags::kServerDiscovered, false);
 	mStateFlags.Set(ClientSessionStateFlags::kDiscoveryScanTimedOut, false);
 	mStateFlags.Set(ClientSessionStateFlags::kNoFreeSlotLogged, false);
+	mStateFlags.Set(ClientSessionStateFlags::kConnectionWasAccepted, false);
 }
 
 void ClientSessionRuntime::Connect(std::string_view serverAddress, int64_t iPort, int64_t iCoordinateSlots)
@@ -156,6 +157,7 @@ void ClientSessionRuntime::Disconnect()
 	mStateFlags.Set(ClientSessionStateFlags::kServerDiscovered, false);
 	mStateFlags.Set(ClientSessionStateFlags::kDiscoveryScanTimedOut, false);
 	mStateFlags.Set(ClientSessionStateFlags::kNoFreeSlotLogged, false);
+	mStateFlags.Set(ClientSessionStateFlags::kConnectionWasAccepted, false);
 	mrSession.OnRuntimeDisconnected();
 }
 
@@ -224,7 +226,9 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 	}
 
 	mpClient->Poll(rTimeState);
-	if (!(mpClient->mStateFlags & Client::ClientStateFlags::kConnectionAccepted))
+	// Client clears kConnectionAccepted on disconnect; the session bit keeps a lost accepted connection on the accepted
+	// branch, whose disconnect check routes it to OnConnectionLost rather than OnConnectionFailed.
+	if (!(mpClient->mStateFlags & Client::ClientStateFlags::kConnectionAccepted) && !(mStateFlags & ClientSessionStateFlags::kConnectionWasAccepted))
 	{
 		if (const char* pcRejection = mpClient->mpcRejectionReason[0] != '\0' ? mpClient->mpcRejectionReason : nullptr; pcRejection != nullptr)
 		{
@@ -243,6 +247,7 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 		return;
 	}
 
+	mStateFlags.Set(ClientSessionStateFlags::kConnectionWasAccepted);
 	mrSession.OnConnectionAccepted();
 	mrSession.PollDesynchronizationState();
 	if (mpClient == nullptr)
@@ -528,7 +533,8 @@ void ClientSessionRuntime::SynchronizeSubscriptions()
 	{
 		return;
 	}
-	if (!(mpClient->mStateFlags & Client::ClientStateFlags::kConnectionAccepted))
+	// Same gate as PollAndDrain, so local subscription bookkeeping continues until the disconnect event is handled.
+	if (!(mpClient->mStateFlags & Client::ClientStateFlags::kConnectionAccepted) && !(mStateFlags & ClientSessionStateFlags::kConnectionWasAccepted))
 	{
 		return;
 	}

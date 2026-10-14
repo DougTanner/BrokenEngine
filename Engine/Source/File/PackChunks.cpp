@@ -335,7 +335,7 @@ void PackChunks::LoadPackFiles()
 			FailMissingRequiredAsset(mPackFilePaths[i], "pack file missing or unreadable");
 		}
 		LARGE_INTEGER packFileSize {};
-		if (!GetFileSizeEx(hPackValidation, &packFileSize))
+		if (GetFileSizeEx(hPackValidation, &packFileSize) == FALSE)
 		{
 			FailMissingRequiredAsset(mPackFilePaths[i], "pack file size unreadable");
 		}
@@ -351,7 +351,7 @@ void PackChunks::LoadPackFiles()
 			overlapped.Offset = static_cast<DWORD>(rChunkLocation.uiOffset & 0xffffffff);
 			overlapped.OffsetHigh = static_cast<DWORD>(rChunkLocation.uiOffset >> 32);
 			DWORD uiBytesRead = 0;
-			if (!ReadFile(hPackValidation, &chunkHeader, static_cast<DWORD>(sizeof(chunkHeader)), &uiBytesRead, &overlapped) || uiBytesRead != sizeof(chunkHeader))
+			if (ReadFile(hPackValidation, &chunkHeader, static_cast<DWORD>(sizeof(chunkHeader)), &uiBytesRead, &overlapped) == FALSE || uiBytesRead != sizeof(chunkHeader))
 			{
 				FailMissingRequiredAsset(mPackFilePaths[i], "pack header table truncated");
 			}
@@ -939,7 +939,7 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 	overlapped.OffsetHigh = static_cast<DWORD>(uiAlignedOffset >> 32);
 	DWORD uiBytesRead = 0;
 	BOOL bRead = ReadFile(hFile, mpReadBuffers[iThreadIndex], static_cast<DWORD>(uiPhysicalSize), &uiBytesRead, &overlapped);
-	if (!bRead)
+	if (bRead == FALSE)
 	{
 		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range read was incomplete");
 	}

@@ -56,3 +56,7 @@ Risk tier: Tier 2 — `.agents/references/risk-tiers.md`; trigger: struct member
 
 - Verification: compile the client (`/compile`), then `/agent-harness` runs `audio_streaming_harness_rig` `start`, `inspect`, `coexistence`, and `saturate` and confirms `kGapFree`/coherence results and the reported `reservationStart`, `reservationBoundary`, `retryCount`, and record `sequence` values behave as before.
 - Entries the investigation listed for this harness rig that keep their type (hold generation packing) are covered by the bitwise unsigned bullet of rule 13 in `Documents/C++StyleGuide.txt`.
+
+## Coordination
+
+- `Documents/Plans/Game/ExtractAudioStreamingSaturationStep.md` moves the `saturate` poll lambda of `CommandAudioStreamingHarnessRig`, which reads `uiRetryCount` in `kWaitForRetry` (`AgentCommandsAudioStreaming.cpp:718`), into a file-static step function. Whichever lands second rebases onto the other's edits.

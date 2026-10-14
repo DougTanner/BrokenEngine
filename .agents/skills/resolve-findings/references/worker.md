@@ -9,13 +9,14 @@ and the handoff form.
 1. Confirm a checkable root cause for each assigned item before editing it.
    Silencing the check that reported it — a silencing change
    [`checks.md`](../../repo-code-review/references/checks.md)
-   `### ASSERT behavior` lists, or a `.clang-tidy` or `<ClangTidyChecks>`
-   change — is not a cause and never the fix. The one exception is a confirmed
-   cause showing the diagnostic, `ASSERT`, or CRC entry itself is wrong: fix it
-   at that site, a false diagnostic only by a fix that section
-   allows and never by a `.clang-tidy` or `<ClangTidyChecks>` change. Done when
-   every item has a named cause, or is left unchanged because its cause is
-   uncertain or out of scope.
+   `### ASSERT behavior` lists, or a configuration change
+   `Documents/C++StyleGuide.txt` rule 75 names — is not a cause and never the
+   fix. The one exception is a confirmed cause showing the diagnostic,
+   `ASSERT`, or CRC entry itself is wrong: fix it at that site, a false
+   diagnostic only by a meaning-preserving code fix; when none exists, leave it
+   unchanged and return it to the manager for the user's decision under rule 75.
+   Done when every item has a named cause, or is left unchanged because its
+   cause is uncertain or out of scope.
 2. Apply the smallest change that restores approved behavior for each item with
    a confirmed cause. Done when the edit is complete within the assigned files
    and functions.

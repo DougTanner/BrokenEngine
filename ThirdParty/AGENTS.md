@@ -13,7 +13,7 @@ Compiled units link through the shared ThirdParty static library. `Prebuilts/Pla
 
 Runtime wrappers live mainly under `Prebuilts/Source/Engine/`; offline asset wrappers live under `Prebuilts/Source/DataPacker/`. Some libraries compile directly from a permitted upstream subtree when their build does not use a unity wrapper. Preserve existing deterministic choices such as the scalar BC encoder and integer-quantized Clipper2 path.
 
-Leaving one of a library's files out of a wrapper is a decision, not an oversight. DirectXTK's `Keyboard.cpp` is deliberately not compiled: our own Raw Input path owns keyboard state and registers the keyboard with `RIDEV_NOLEGACY` (a Windows flag that stops the old-style keyboard messages from being delivered at all). Compiling it would add a second, half-fed source of keyboard state, let the debug UI swallow key presses, and break bindings that read the generic Alt/Shift/Ctrl virtual keys — the Alt+F4 quit binding among them — because DirectXTK reports only the left/right-specific keys. Do not unify the keyboard onto DirectXTK to match the mouse and gamepad paths; see `Engine/Source/Input/AGENTS.md`.
+Leaving one of a library's files out of a wrapper is a decision, not an oversight. DirectXTK's `Keyboard.cpp` is deliberately not compiled: our own Raw Input path owns keyboard state. Compiling it would add a second source of keyboard state, let the debug UI swallow key presses, and break bindings that read the generic Alt/Shift/Ctrl virtual keys — the Alt+F4 quit binding among them — because DirectXTK reports only the left/right-specific keys. Do not unify the keyboard onto DirectXTK to match the mouse and gamepad paths; see `Engine/Source/Input/AGENTS.md`.
 
 ## License Policy
 

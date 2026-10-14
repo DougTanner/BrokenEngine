@@ -151,7 +151,7 @@ static bool IsRecognizedLinkRaw(const std::filesystem::path& rLink, const std::f
 	}
 	std::vector<uint8_t> bytes(MAXIMUM_REPARSE_DATA_BUFFER_SIZE);
 	DWORD uiReturned = 0;
-	if (!DeviceIoControl(link.get(), FSCTL_GET_REPARSE_POINT, nullptr, 0, bytes.data(), static_cast<DWORD>(std::ssize(bytes)), &uiReturned, nullptr))
+	if (DeviceIoControl(link.get(), FSCTL_GET_REPARSE_POINT, nullptr, 0, bytes.data(), static_cast<DWORD>(std::ssize(bytes)), &uiReturned, nullptr) == FALSE)
 	{
 		return false;
 	}
@@ -255,7 +255,7 @@ static MaterializationInventory BuildMaterializationInventory(const std::filesys
 	DWORD uiBytesPerSector = 0;
 	DWORD uiFreeClusters = 0;
 	DWORD uiTotalClusters = 0;
-	if (!GetDiskFreeSpaceW(rDestination.root_path().native().c_str(), &uiSectorsPerCluster, &uiBytesPerSector, &uiFreeClusters, &uiTotalClusters))
+	if (GetDiskFreeSpaceW(rDestination.root_path().native().c_str(), &uiSectorsPerCluster, &uiBytesPerSector, &uiFreeClusters, &uiTotalClusters) == FALSE)
 	{
 		throw std::runtime_error("GetDiskFreeSpaceW failed");
 	}
@@ -326,7 +326,7 @@ static void PublishMaterializedOutput(const std::filesystem::path& rSource, cons
 		if (!std::filesystem::exists(rDestination) && bRecognizedPrimaryLink)
 		{
 			EstablishOutputDestinationParent(rDestination);
-			if (!CreateSymbolicLinkW(rDestination.native().c_str(), rSource.native().c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE))
+			if (CreateSymbolicLinkW(rDestination.native().c_str(), rSource.native().c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE) == FALSE)
 			{
 				bPreserveStaging = true;
 				LOG(kDefault, kError, "Failed to restore output link \"{}\"; complete recovery copy retained at \"{}\" (Win32 {})", rDestination.string(), rStaging.string(), GetLastError());
@@ -511,7 +511,7 @@ FileManager::EnsureLocalResult FileManager::ReconcileWorktreeOutput(OutputRootIn
 	}
 	if (rRoot.eState == OutputRootState::kAbsent && IsOrdinaryDirectory(rRoot.source))
 	{
-		if (CreateSymbolicLinkW(rRoot.destination.native().c_str(), rRoot.source.native().c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE))
+		if (CreateSymbolicLinkW(rRoot.destination.native().c_str(), rRoot.source.native().c_str(), SYMBOLIC_LINK_FLAG_DIRECTORY | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE) != FALSE)
 		{
 			rRoot.eState = OutputRootState::kRecognizedPrimaryLink;
 			LOG(kDefault, kDebug, "Linked worktree output \"{}\" to \"{}\"", rRoot.destination.string(), rRoot.source.string());
@@ -554,7 +554,7 @@ FileManager::EnsureLocalResult FileManager::MaterializeOutput(OutputRootInfo& rR
 	}
 	MaterializationInventory inventory = BuildMaterializationInventory(rRoot.source, rRoot.destination);
 	ULARGE_INTEGER available {};
-	if (!GetDiskFreeSpaceExW(rRoot.destination.root_path().native().c_str(), &available, nullptr, nullptr))
+	if (GetDiskFreeSpaceExW(rRoot.destination.root_path().native().c_str(), &available, nullptr, nullptr) == FALSE)
 	{
 		int64_t iError = GetLastError();
 		diagnostic::Record record

@@ -1,6 +1,6 @@
 # `/Engine/Source/Ui/Screens/` - Engine ImGui Screens
 
-Engine-owned ImGui screens: the six standard player-facing menus — Main Menu, Pause, Graphics, Sound, Game Settings, and Modal — plus the `TweaksScreen/` debug family. `ImGuiManager` owns construction and per-frame invocation. The HUD and the game extension of TweaksScreen stay in the game project. This document owns the runtime contracts that code changes must preserve.
+Engine-owned ImGui screens: the six standard player-facing menus — Main Menu, Pause, Graphics, Sound, Game Settings, and Modal — plus the in-game `ChatScreen` and the `TweaksScreen/` debug family. `ImGuiManager` owns construction and per-frame invocation. The HUD and the game extension of TweaksScreen stay in the game project. This document owns the runtime contracts that code changes must preserve.
 
 ## Standard Menu Contract
 
@@ -22,6 +22,7 @@ Engine-owned ImGui screens: the six standard player-facing menus — Main Menu, 
 - Compare GPU timers in Immediate mode or with fixed GPU clocks; FIFO down-clocking and boosting around the refresh cap makes per-pass times workload-dependent.
 - The Graphics header's Defaults action calls `ResetGraphicsSettings()` immediately and stays on the screen.
 - The Game Settings language buttons stay in their own language and are never routed through the translation table.
+- `ChatScreen` draws the chat state in `GameBase::mChatLog` only in game with `UiState::kNone`; anywhere else it closes the input box and clears its text. `ImGuiManager` calls it only while Tweaks is hidden, and `GameBase::ProcessInput` opens the box only then, so an open box is always drawn. Every Enter in the box passes the text to `Client::SendChat`, which owns every send check, then clears and closes the box; deactivating the field without Enter (Esc or a click elsewhere) also clears and closes it. History lines sit in the lower-left corner and fade out over `kChatFadeDuration` from arrival, and are drawn unfaded while the box is open. The `Player N` label is fixed mixed-case text, never routed through the translation table.
 
 ## Shared Authoring Rules
 

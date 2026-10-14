@@ -539,7 +539,6 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 		// ProcessMain's handler instead of being answered as a command failure.
 		InjectArmedClientPacketFault();
 
-		// Return drives two independent game actions; poll the edge once and let both branches read it.
 		bool bReturnPressed = rInputPoll.KeyboardPressed(VK_RETURN);
 		bool bCycleMenuIslandPressed = rInputPoll.KeyboardPressed('E');
 
@@ -565,7 +564,7 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 			{
 				engine::gpClient->SendSimplePacket(GamePacketType::kClientReplayPlaybackRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
 			}
-			if (bReturnPressed)
+			if (rInputPoll.KeyboardPressed(VK_BACK))
 			{
 				engine::gpClient->SendSimplePacket(GamePacketType::kClientResetRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
 			}

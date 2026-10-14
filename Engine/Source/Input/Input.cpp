@@ -22,7 +22,13 @@ InputPoll Input::BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuI
 		mStateFlags.Set(InputStateFlags::kScrollWheelInitialized);
 	}
 
-	InputPoll inputPoll(rRawInput, mPreviousRawInput);
+	// The keyboard belongs to the UI while the last rendered frame had an editable text field active. ImGui resets
+	// PlatformImeData.WantTextInput in NewFrame and sets it during that frame, so at poll time it describes the frame
+	// just rendered; io.WantTextInput is one frame staler and io.WantCaptureKeyboard is also set by mouse-dragged sliders.
+	const ImGuiContext* pImGuiContext = ImGui::GetCurrentContext();
+	bool bUserInterfaceOwnsKeyboard = pImGuiContext != nullptr && pImGuiContext->PlatformImeData.WantTextInput;
+
+	InputPoll inputPoll(rRawInput, mPreviousRawInput, bUserInterfaceOwnsKeyboard);
 
 	bool bKeyboardMouse = (rRawInput.mouseButtons & MouseButtons::kMouseButtonLeft) || (rRawInput.mouseButtons & MouseButtons::kMouseButtonRight) || rRawInput.pbKeyboardKeys['A'] || rRawInput.pbKeyboardKeys['D'] || rRawInput.pbKeyboardKeys['W'] || rRawInput.pbKeyboardKeys['S'] || rRawInput.pbKeyboardKeys[VK_LEFT] || rRawInput.pbKeyboardKeys[VK_RIGHT] || rRawInput.pbKeyboardKeys[VK_UP] || rRawInput.pbKeyboardKeys[VK_DOWN] || rRawInput.pbKeyboardKeys[VK_NUMPAD1] || rRawInput.pbKeyboardKeys[VK_NUMPAD3] || rRawInput.pbKeyboardKeys[VK_NUMPAD5] || rRawInput.pbKeyboardKeys[VK_NUMPAD2];
 
@@ -75,6 +81,7 @@ InputPoll Input::BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuI
 	rMenuInput.f2Gamepad = rRawInput.f2LeftThumbstick;
 
 	rMenuInput.flags.Set(kPauseMenu, inputPoll.KeyboardPressed(VK_ESCAPE) || inputPoll.MousePressed(MouseButtons::kMouseButtonMiddle) || inputPoll.GamepadPressed(GamepadButtons::kGamepadMenu) || inputPoll.GamepadPressed(GamepadButtons::kGamepadButtonB));
+	rMenuInput.flags.Set(kOpenChat, inputPoll.KeyboardPressed(VK_RETURN));
 	if constexpr (kbDebugInput)
 	{
 		rMenuInput.flags.Set(kMenuDebugTexture, inputPoll.KeyboardPressed(VK_F2));
@@ -86,22 +93,25 @@ InputPoll Input::BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuI
 	XMFLOAT2 f2Move {};
 	if constexpr (kbFreeCamera)
 	{
-		static constexpr float kfFreeCameraAxis = 0.5f;
-		if (rRawInput.pbKeyboardKeys['W'])
+		if (!bUserInterfaceOwnsKeyboard)
 		{
-			f2Move.y += kfFreeCameraAxis;
-		}
-		if (rRawInput.pbKeyboardKeys['S'])
-		{
-			f2Move.y -= kfFreeCameraAxis;
-		}
-		if (rRawInput.pbKeyboardKeys['A'])
-		{
-			f2Move.x -= kfFreeCameraAxis;
-		}
-		if (rRawInput.pbKeyboardKeys['D'])
-		{
-			f2Move.x += kfFreeCameraAxis;
+			static constexpr float kfFreeCameraAxis = 0.5f;
+			if (rRawInput.pbKeyboardKeys['W'])
+			{
+				f2Move.y += kfFreeCameraAxis;
+			}
+			if (rRawInput.pbKeyboardKeys['S'])
+			{
+				f2Move.y -= kfFreeCameraAxis;
+			}
+			if (rRawInput.pbKeyboardKeys['A'])
+			{
+				f2Move.x -= kfFreeCameraAxis;
+			}
+			if (rRawInput.pbKeyboardKeys['D'])
+			{
+				f2Move.x += kfFreeCameraAxis;
+			}
 		}
 	}
 	gpCamera->mCameraInput.f2Move = f2Move;
@@ -112,11 +122,10 @@ InputPoll Input::BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuI
 	// WheelingWindow retains its earlier target, and ImPlot's owner suppresses notches for two polls after exit; the
 	// next owner-free poll can zoom. Hover resolves in NewFrame after this poll, so panel-edge crossings use the prior
 	// hover.
-	const ImGuiContext* pImGuiContext = ImGui::GetCurrentContext();
 	const ImGuiWindow* pHoveredWindow = pImGuiContext != nullptr ? pImGuiContext->HoveredWindow : nullptr;
 	bool bUserInterfaceOwnsScroll = (pImGuiContext != nullptr && pImGuiContext->WheelingWindow != nullptr)
 	                             || (pImGuiContext != nullptr && !ImGui::TestKeyOwner(ImGuiKey_MouseWheelY, ImGuiKeyOwner_NoOwner))
-	                             || (pHoveredWindow != nullptr && !pHoveredWindow->Collapsed && pHoveredWindow->ScrollMax.y != 0.0f && !(pHoveredWindow->Flags & (ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMouseInputs)));
+	                             || (pHoveredWindow != nullptr && !pHoveredWindow->Collapsed && pHoveredWindow->ScrollMax.y != 0.0f && (pHoveredWindow->Flags & (ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMouseInputs)) == 0);
 	// The previous snapshot advances after every edge consumer even when the wheel is swallowed, so suppressed
 	// notches cannot surface later as zoom.
 	gpCamera->mCameraInput.iScrollDelta = bUserInterfaceOwnsScroll ? 0 : rRawInput.iScrollWheelValue - mPreviousRawInput.iScrollWheelValue;

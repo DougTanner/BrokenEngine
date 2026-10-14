@@ -29,6 +29,9 @@ enum class PacketType : uint8_t
 	kServerUnsubscribeAck,
 	kServerLoadNotification,    // Server loaded a save, clients must reset state
 	kServerTimespeedUpdate,     // Server broadcasts the current time scale to all clients
+	kClientCrashReport,         // Client uploads the leading bytes of its crash report while crashing
+	kClientChat,                // Client sends one chat message to the server
+	kServerChat,                // Server relays a validated chat message to every handshaken client
 	kGamePacketStart,           // All values >= this are game-layer packets forwarded as raw bytes
 };
 
@@ -53,12 +56,15 @@ inline constexpr const char* PacketTypeName(PacketType eType)
 		case PacketType::kServerUnsubscribeAck:         return "kServerUnsubscribeAck";
 		case PacketType::kServerLoadNotification:       return "kServerLoadNotification";
 		case PacketType::kServerTimespeedUpdate:        return "kServerTimespeedUpdate";
+		case PacketType::kClientCrashReport:            return "kClientCrashReport";
+		case PacketType::kClientChat:                   return "kClientChat";
+		case PacketType::kServerChat:                   return "kServerChat";
 		case PacketType::kGamePacketStart:              return "kGamePacketStart";
 	}
 	return "Unknown";
 }
 
-inline constexpr int64_t kiProtocolVersion = 21;
+inline constexpr int64_t kiProtocolVersion = 23;
 inline constexpr int64_t kiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
 inline constexpr int64_t kiDefaultPort = 27'015;
 inline constexpr int64_t kiMaximumResendFrames = 8;
@@ -83,6 +89,8 @@ inline constexpr int64_t kiSimulationCeilingSlackTicks = 3;
 // kiSimulationCeilingSlackTicks past the latest received tick without a clock snap.
 inline constexpr int64_t kiMaximumEstimatedServerTickLead = 16;
 inline constexpr int64_t kiMaximumPacketSize = 64 * 1'024;
+// The report's header, exception text, and callstack lead the file; the log dump after them can reach tens of MiB.
+inline constexpr int64_t kiMaximumCrashReportSize = 1'024 * 1'024;
 inline constexpr int64_t kiMaximumStatusChangesPerCell = 1'024;
 
 // Tag-distinct 128-bit identifier. TAG only separates instantiations at compile time and contributes no
@@ -179,6 +187,8 @@ inline constexpr ClientPacketContract GetClientPacketContract(PacketType eType)
 		case PacketType::kClientSubscribe:         return {.iMinimumSize = NetworkMessages::ClientSubscribeMessage::kiFixedSize, .iMaximumSize = NetworkMessages::ClientSubscribeMessage::kiFixedSize, .iMaximumPerTick = 64};
 		case PacketType::kClientUnsubscribe:       return {.iMinimumSize = NetworkMessages::ClientUnsubscribeMessage::kiFixedSize, .iMaximumSize = NetworkMessages::ClientUnsubscribeMessage::kiFixedSize, .iMaximumPerTick = 64};
 		case PacketType::kClientResynchronizationRequest:     return {.iMinimumSize = NetworkMessages::ClientResyncRequestMessage::kiFixedSize, .iMaximumSize = NetworkMessages::ClientResyncRequestMessage::kiFixedSize, .iMaximumPerTick = 4};
+		case PacketType::kClientCrashReport:       return {.iMinimumSize = NetworkMessages::ClientCrashReportMessage::kiMinSize, .iMaximumSize = NetworkMessages::ClientCrashReportMessage::kiMaxSize, .iMaximumPerTick = 1};
+		case PacketType::kClientChat:              return {.iMinimumSize = NetworkMessages::ClientChatMessage::kiMinSize, .iMaximumSize = NetworkMessages::ClientChatMessage::kiMaxSize, .iMaximumPerTick = 8};
 		default:                                   return {};
 	}
 }

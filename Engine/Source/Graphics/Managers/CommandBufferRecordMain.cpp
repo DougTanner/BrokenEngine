@@ -16,7 +16,6 @@ namespace engine
 void CommandBufferRecordMain::Record(int64_t iFramebuffer)
 {
 	CommandBuffers& rCommandBuffers = gpCommandBufferManager->mPerFramebufferCommandBuffers.at(iFramebuffer);
-	Pipeline* pPipelines = gpPipelineManager->mpPipelines;
 	int64_t iCommandBuffer = iFramebuffer;
 
 	VkCommandBufferBeginInfo vkCommandBufferBeginInfo
@@ -34,7 +33,7 @@ void CommandBufferRecordMain::Record(int64_t iFramebuffer)
 	if constexpr (kbDebugPrintf)
 	{
 		gpTextureManager->mRenderTargetTextures.mLogTexture.RecordBeginRenderPass(vkCommandBuffer);
-		pPipelines[kPipelineLog].RecordDraw(iCommandBuffer, vkCommandBuffer, 1, 0, {static_cast<float>(iCommandBuffer), 0.0f, 0.0f, 0.0f});
+		gpPipelineManager->mpPipelines[kPipelineLog].RecordDraw(iCommandBuffer, vkCommandBuffer, 1, 0, {static_cast<float>(iCommandBuffer), 0.0f, 0.0f, 0.0f});
 		vkCmdEndRenderPass(vkCommandBuffer);
 	}
 

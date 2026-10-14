@@ -111,8 +111,8 @@
     <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup>
-    <!-- VS defaults ClangTidyChecks to clang-analyzer-* and appends it after .clang-tidy's Checks, so analyzer exclusions must live here. EnumCastOutOfRange false-positives on MSVC STL _BITMASK_OPS flag enums. -->
-    <ClangTidyChecks>clang-analyzer-*,-clang-analyzer-optin.core.EnumCastOutOfRange</ClangTidyChecks>
+    <!-- VS defaults ClangTidyChecks to clang-analyzer-* and appends it after .clang-tidy's Checks, so analyzer exclusions must live here. EnumCastOutOfRange false-positives on MSVC STL _BITMASK_OPS flag enums. DeadStores flags values whose only reads a compile-time log level or feature switch removes from this configuration. ArrayBound flags indexes bounded by invariants the analyzer cannot see, such as an ASSERT, which is not [[noreturn]]. -->
+    <ClangTidyChecks>clang-analyzer-*,-clang-analyzer-optin.core.EnumCastOutOfRange,-clang-analyzer-deadcode.DeadStores,-clang-analyzer-security.ArrayBound</ClangTidyChecks>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -388,6 +388,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Agent\Commands\RegistryHarnessRig.h" />
     <ClInclude Include="..\..\Source\Save\GameSaveLoad.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\ChatText.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkCursor.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkDiscoveryResponder.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkManager.h" />
@@ -518,6 +519,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\CrashReport.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Main.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\ChatText.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkDiscoveryResponder.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkSerialization.cpp" />

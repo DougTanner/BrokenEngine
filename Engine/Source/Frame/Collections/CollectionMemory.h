@@ -167,8 +167,7 @@ inline bool IsMemberTupleSubset(const SUBSET_TUPLE& rSubsetMembers, const FULL_T
 		{
 			return std::apply([&](const auto&... rFullMemberPointers)
 			{
-				// Compare via uintptr_t: clang rejects static_cast<const void*> on &(T* __restrict) as casting away __restrict
-				return ((reinterpret_cast<uintptr_t>(&rSubsetMemberPointer) == reinterpret_cast<uintptr_t>(&rFullMemberPointers)) || ...);
+				return ((static_cast<const void*>(&rSubsetMemberPointer) == static_cast<const void*>(&rFullMemberPointers)) || ...);
 			}, rFullMembers);
 		}(rSubsetMemberPointers) && ...);
 	}, rSubsetMembers);

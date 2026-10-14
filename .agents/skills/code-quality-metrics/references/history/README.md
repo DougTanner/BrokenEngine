@@ -17,7 +17,9 @@ baseline commit on `main`, `e571f6f1` (row 646), this repository's root commit a
   branch `1.0.0`).
 - Rows 641–645: the short `2.1.0` rebuild era (binary asset history stripped with git-filter-repo).
 
-Archive SHAs do not resolve in this repository, only in offline archives of the old
-`BrokenEnginePublic` repositories; their rows are trend data. From row 1165 on, one row is appended
-per landing; [`../HistoryContract.md`](../HistoryContract.md) `## Source table and decision` owns
-which rows resolve here and how planning treats those that do not.
+Rows 324–645 resolve only in offline archives of the old `BrokenEnginePublic` repositories. Rows
+0–323 also resolve here today — row 0 through branch `1.0.0`, rows 1–323 only as objects no ref
+reaches, which a prune can remove — so treat every archive row as trend data. From row 1165 on,
+one row is appended per landing; [`../HistoryContract.md`](../HistoryContract.md)
+`## Source table and decision` owns which rows resolve here and how planning treats those that do
+not.

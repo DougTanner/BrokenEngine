@@ -145,29 +145,26 @@ remains exact-file scope.
     every in-target item has been inspected as navigation evidence.
 24. Keep hints outside the resolved target evidence-only; they never become
     checklist items. Done when no out-of-target hint became a checklist item.
-25. For excess-decision evidence, prefer in-place deletion, merging, flattening,
-    or existing dispatch. Extract only for independently meaningful
-    responsibility, reuse, or a genuinely separate abstraction. Done when every
-    excess-decision candidate takes one of those forms.
-26. Treat a target decrease as proof of simplification only when the diff shows
-    decision removal and the corpus shows no attributable offset elsewhere, or a
-    separately evidenced structural benefit independently justifies extraction.
-    Done when every claimed simplification meets one of those conditions.
-27. Keep its file-size triage separate from ordinary findings. Every oversized
+25. Judge excess-decision candidates and claimed simplifications by the
+    excess-decision paragraph of
+    `.agents/skills/code-quality-metrics/references/Remediation.md`. Done when
+    every excess-decision candidate and every claimed simplification meets that
+    paragraph.
+26. Keep its file-size triage separate from ordinary findings. Every oversized
     file retains the explicit instruction `run /reduce-file <path>`; do not
     analyze it inline or silently convert it into a generic refactor item. Done
     when every oversized file carries that instruction.
 
 ### Phase 3: Findings Verification
 
-28. After both reports complete, have the main context dispatch fresh `reviewer`
+27. After both reports complete, have the main context dispatch fresh `reviewer`
     roles in scoped slices. Done when every slice has been dispatched and has
     returned.
-29. Keep reviewers findings-only: they may read the scoped source, authorities,
+28. Keep reviewers findings-only: they may read the scoped source, authorities,
     and reports supplied by the main context, but must not write, rewrite,
     delete, score, or relocate a plan and must not delegate. Done when no
     reviewer wrote, scored, or relocated a plan, and none delegated.
-30. For every candidate, require a verdict and evidence for:
+29. For every candidate, require a verdict and evidence for:
 
     1. Correctness — cited path, symbol, behavior, and repository authority exist
        and support the claimed root cause.
@@ -181,18 +178,18 @@ remains exact-file scope.
        remain residuals.
 
     Done when every candidate carries all four verdicts with evidence.
-31. Decide on reviewer evidence once in the main context: drop disproven
+30. Decide on reviewer evidence once in the main context: drop disproven
     candidates and retain verified caveats. Done when every candidate is dropped
     or accepted.
-32. Keep oversized-file items labeled as `/reduce-file` follow-ups. Done when
+31. Keep oversized-file items labeled as `/reduce-file` follow-ups. Done when
     each such item carries that label.
 
 ### Phase 4: Route, Verify, and Land
 
-33. Route every accepted candidate through `create-follow-up-plans`, passing
+32. Route every accepted candidate through `create-follow-up-plans`, passing
     oversized files with their required `/reduce-file <path>` instruction
     intact. Done when every accepted candidate is routed.
-34. Follow the `.agents/references/change-workflow.md` Verify the acceptance table and
+33. Follow the `.agents/references/change-workflow.md` Verify the acceptance table and
     Verify and land steps through `finalize-changes` for acceptance and
     landing. Done when the applicable finalization outcome is known.
 
@@ -234,7 +231,6 @@ tracked bytes landed.
   not expand the original target, create Plans, alter the Debt Score, or replace
   source inspection.
 - `CC > 30` remains navigation only, and structural erosion alone is navigation.
-- One-shot sequential or threshold-driven extraction is metric-neutral.
 - An accepted finding preserves its originating phase, symbols, evidence,
   invariant exposure, and unmet acceptance criterion.
 - Analysis findings are pre-existing or out-of-scope debt, never permission to

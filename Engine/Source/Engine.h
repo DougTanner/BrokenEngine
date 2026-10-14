@@ -13,6 +13,7 @@
 #include "Network/NetworkManager.h"
 #include "Network/NetworkProtocol.h"
 #include "Network/NetworkMessages.h"
+#include "Network/ChatText.h"
 #include "Network/NetworkSessionContract.h"
 #include "Network/NetworkSerialization.h"
 #include "Network/NetworkSimulation.h"

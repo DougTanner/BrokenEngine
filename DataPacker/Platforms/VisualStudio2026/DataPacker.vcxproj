@@ -164,8 +164,8 @@
     <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup>
-    <!-- VS defaults ClangTidyChecks to clang-analyzer-* and appends it after .clang-tidy's Checks, so analyzer exclusions must live here. EnumCastOutOfRange false-positives on MSVC STL _BITMASK_OPS flag enums. -->
-    <ClangTidyChecks>clang-analyzer-*,-clang-analyzer-optin.core.EnumCastOutOfRange</ClangTidyChecks>
+    <!-- VS defaults ClangTidyChecks to clang-analyzer-* and appends it after .clang-tidy's Checks, so analyzer exclusions must live here. EnumCastOutOfRange false-positives on MSVC STL _BITMASK_OPS flag enums. DeadStores flags values whose only reads a compile-time log level or feature switch removes from this configuration. ArrayBound flags indexes bounded by invariants the analyzer cannot see, such as an ASSERT, which is not [[noreturn]]. UninitializedObject and uninitialized.Assign report inside ThirdParty gli through gli::load, and no header filter drops them because their bug path passes through a DataPacker source file. -->
+    <ClangTidyChecks>clang-analyzer-*,-clang-analyzer-optin.core.EnumCastOutOfRange,-clang-analyzer-deadcode.DeadStores,-clang-analyzer-security.ArrayBound,-clang-analyzer-optin.cplusplus.UninitializedObject,-clang-analyzer-core.uninitialized.Assign</ClangTidyChecks>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

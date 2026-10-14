@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T15:35:36.040Z","dependsOn":[]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T15:35:36.040Z","dependsOn":["Documents/Plans/Engine/RemoveWarningSuppressionPragmas.md"]} -->
 # Replace the engine and DataPacker SHA-256 hashers with one Common helper on the built-in CNG handle
 
 ## Context
@@ -63,6 +63,12 @@ Expected Tier 3 (trigger: a change spanning independently owned subsystems — C
 - A warm-cache DataPacker run over unchanged data exports nothing (`DataPacker/Source/AGENTS.md` describes the warm-cache check), which shows the fingerprints are unchanged.
 - Through `/agent-harness`, a server replay recorded by the baseline build plays back under the changed server build with its manifest digest check passing, and a replay recorded by the changed build plays back too.
 - No `BCryptOpenAlgorithmProvider`, `BCRYPT_OBJECT_LENGTH` query, or `Sha256Hasher` class remains in `Engine/` or `DataPacker/`.
+
+## Coordination
+
+- `Documents/Plans/Engine/ExtractReplayManifestReader.md` moves the generation digest comparison at `Replay.cpp:522` into a new file-static `ReadReplayManifest`. Whichever lands second rebases onto the other's edits.
+- `Documents/Plans/Engine/ExtractReplayStopRecording.md` moves the publish chain at `Replay.cpp:903` into a new `Replay::StopRecording`. Whichever lands second rebases onto the other's edits.
+- Move the file-local `Sha256Hasher::Update` into `common::Sha256Hasher` in the form `Documents/Plans/Engine/RemoveWarningSuppressionPragmas.md` left at its C26492 site, without restoring a suppression pragma; a 26492 disable that Plan added to the `Common/ExternalHeaders.h` disable list also covers `Common/WindowsUtils.cpp`.
 
 ## Notes
 

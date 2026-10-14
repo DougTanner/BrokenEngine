@@ -450,6 +450,40 @@ void AgentInput::AdvanceFrame()
 			}
 			return;
 		}
+
+		case AgentScriptKind::kTypeText:
+		{
+			// ImGui IO only: type the text into the active text field, then press Enter on its own frames.
+			if (miPhase == 0)
+			{
+				if (pInputOutput != nullptr)
+				{
+					pInputOutput->AddInputCharactersUTF8(mScript.pcTypedText);
+				}
+				miPhase = 1;
+				return;
+			}
+			if (miPhase == 1)
+			{
+				if (pInputOutput != nullptr)
+				{
+					pInputOutput->AddKeyEvent(ImGuiKey_Enter, true);
+				}
+				miPhase = 2;
+				return;
+			}
+			if (miPhase == 2)
+			{
+				if (pInputOutput != nullptr)
+				{
+					pInputOutput->AddKeyEvent(ImGuiKey_Enter, false);
+				}
+				miPhase = 3;
+				return;
+			}
+			Finish(AgentScriptStatus::kDone);
+			return;
+		}
 	}
 }
 
@@ -464,23 +498,23 @@ void AgentInput::Overlay(RawInput& rRawInput)
 		}
 	}
 
-	if (muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonLeft))
+	if ((muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonLeft)) != 0)
 	{
 		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonLeft, true);
 	}
-	if (muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonMiddle))
+	if ((muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonMiddle)) != 0)
 	{
 		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonMiddle, true);
 	}
-	if (muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonRight))
+	if ((muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonRight)) != 0)
 	{
 		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonRight, true);
 	}
-	if (muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonExtraOne))
+	if ((muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonExtraOne)) != 0)
 	{
 		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonExtraOne, true);
 	}
-	if (muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonExtraTwo))
+	if ((muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonExtraTwo)) != 0)
 	{
 		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonExtraTwo, true);
 	}

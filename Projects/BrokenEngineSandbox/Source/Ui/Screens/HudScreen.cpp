@@ -256,7 +256,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 
 		gpGame->mFleetSelection.mSpawnIntoFleetToggle.Update(std::ssize(pFleet->members));
 
-		for (auto [i, rMember] : std::views::enumerate(pFleet->members))
+		for (const auto& [i, rMember] : std::views::enumerate(pFleet->members))
 		{
 			bool bSelected = (rMember.globalPlayerId.iValue != 0) && rMember.globalPlayerId == gpGame->mFleetSelection.mFocusedMemberGlobalId;
 

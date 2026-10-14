@@ -123,9 +123,13 @@ struct CrcFastPathCoordResult
 	int64_t iLowestUnresolvedMismatch = -1;
 };
 
-inline bool HasDuePendingFullState(const engine::Cell& rCell, int64_t iTargetTick)
+inline engine::Cell::PendingFullState* FindDuePendingFullState(engine::Cell& rCell, int64_t iTargetTick)
 {
-	return rCell.pendingFullState.has_value() && rCell.pendingFullState->iTick <= iTargetTick;
+	if (!rCell.pendingFullState || rCell.pendingFullState->iTick > iTargetTick)
+	{
+		return nullptr;
+	}
+	return &*rCell.pendingFullState;
 }
 
 CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTargetTick);

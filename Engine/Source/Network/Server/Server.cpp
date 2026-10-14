@@ -25,6 +25,10 @@ constexpr std::chrono::seconds kBudgetStallGrace = 1s;
 
 constexpr std::chrono::seconds kDesynchronizationDiagnosticCooldown = 2s;
 
+// Per-client chat token bucket: a burst of five messages, then one per second of steady_clock time.
+constexpr float kfChatTokenBurst = 5.0f;
+constexpr float kfChatTokensPerSecond = 1.0f;
+
 Server::Server(int64_t iPort)
 : common::Singleton<Server>(gpServer)
 {
@@ -224,10 +228,11 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 	// a rate violation; subsequent crossings drop silently. Sustained floods can add two violations per
 	// update and disconnect in about eight updates (0.25 s at 32 Hz). Poll's unscheduled-stall grace drops
 	// crossings without charging ACK backlogs. Handshaken subscribe/unsubscribe requests bypass this budget
-	// because they are reliable with no retry; gates 3–5 still enforce size and per-type caps. Pre-handshake
-	// requests remain budgeted because gate 4 drops them before gate 5. RecordContractViolation can remove
-	// pClient; return immediately afterward.
-	bool bBudgetExempt = pClient->bHandshakeComplete && (eType == PacketType::kClientSubscribe || eType == PacketType::kClientUnsubscribe);
+	// because they are reliable with no retry, and a handshaken crash report because one report exceeds the
+	// byte budget; gates 3–5 still enforce size and per-type caps. Pre-handshake requests remain budgeted
+	// because gate 4 drops them before gate 5. RecordContractViolation can remove pClient; return immediately
+	// afterward.
+	bool bBudgetExempt = pClient->bHandshakeComplete && (eType == PacketType::kClientSubscribe || eType == PacketType::kClientUnsubscribe || eType == PacketType::kClientCrashReport);
 	if (!bBudgetExempt)
 	{
 		bool bPacketWasUnderBudget = pClient->iTickPacketCount <= kiMaximumClientPacketsPerTick;
@@ -315,6 +320,12 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 				break;
 			case PacketType::kClientResynchronizationRequest:
 				ClientResynchronizationRequest(packetData, *pClient);
+				break;
+			case PacketType::kClientCrashReport:
+				ClientCrashReport(packetData, *pClient);
+				break;
+			case PacketType::kClientChat:
+				ClientChat(packetData, *pClient);
 				break;
 			default:
 				// Only game-range types reach the default -- engine sentinel types are caught at gate 3.
@@ -546,6 +557,44 @@ void Server::ClientDebugFrameRequest(std::span<const uint8_t> packetData, Client
 	mBufferedFrames.SendDebugFrame(rClient.pPeer, message.iTick, message.coord);
 }
 
+void Server::ClientChat(std::span<const uint8_t> packetData, ClientConnection& rClient)
+{
+	NetworkMessages::ClientChatMessage message {};
+	NetworkMessages::Read(packetData, message);
+	// Before the token bucket, so corrupt text does not spend a token. Bytes after an embedded NUL are never relayed,
+	// because only the validated text is re-encoded below.
+	if (!IsValidChatText(message.text))
+	{
+		NetworkMessages::ThrowCorruptStream("Server::ClientChat");
+	}
+
+	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+	float fElapsedSeconds = std::chrono::duration<float>(now - rClient.chatTokenRefillTime).count();
+	rClient.fChatTokens = std::min(rClient.fChatTokens + fElapsedSeconds * kfChatTokensPerSecond, kfChatTokenBurst);
+	rClient.chatTokenRefillTime = now;
+	// A rate limit is not corruption: the message drops with no violation.
+	if (rClient.fChatTokens < 1.0f)
+	{
+		return;
+	}
+	rClient.fChatTokens -= 1.0f;
+
+	// The text view points into packetData, which stays valid for the whole Receive call.
+	for (const ClientConnection& rRecipient : mClients)
+	{
+		if (!rRecipient.bHandshakeComplete)
+		{
+			continue;
+		}
+
+		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+		NetworkMessages::ServerChatMessage relay {.iSenderId = rClient.iClientId, .text = message.text};
+		NetworkMessages::Write(rWorkbuffer, relay);
+		NetworkManager::SendPacket(rRecipient.pPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	}
+}
+
 void Server::ClientHello(std::span<const uint8_t> packetData, ClientConnection& rClient)
 {
 	NetworkMessages::ClientHelloMessage message {};
@@ -768,6 +817,49 @@ void Server::ClientResynchronizationRequest(std::span<const uint8_t> packetData,
 	// Heap: pending resync client-id vector grows on request
 	ScopedSuppressAllocationTracking suppress;
 	mPendingResynchronizationClientIds.push_back(rClient.iClientId);
+}
+
+void Server::ClientCrashReport(std::span<const uint8_t> packetData, ClientConnection& rClient)
+{
+	NetworkMessages::ClientCrashReportMessage message {};
+	NetworkMessages::Read(packetData, message);
+	// Read bounds the declared size by the bytes present but does not require it to reach the packet end.
+	if (message.report.iSize != std::ssize(packetData) - NetworkMessages::ClientCrashReportMessage::kiFixedSize)
+	{
+		NetworkMessages::ThrowCorruptStream("Server::ClientCrashReport");
+	}
+
+	if (rClient.stateFlags & ClientConnection::StateFlags::kCrashReportReceived)
+	{
+		RecordContractViolation(rClient.iClientId, ContractViolationKind::kRate, "repeat crash report", packetData[0], std::ssize(packetData));
+		return;
+	}
+	rClient.stateFlags.Set(ClientConnection::StateFlags::kCrashReportReceived);
+
+	if (miStoredCrashReportCount >= kiMaximumStoredCrashReports)
+	{
+		LOG(kNetwork, kWarning, "Server::ClientCrashReport Not stored, per-run cap reached Client: {}", rClient.iClientId);
+		return;
+	}
+
+	ScopedSuppressAllocationTracking suppress;
+	// Heap: timestamp formatting, the file path, and the file stream allocate
+	char acFilename[96] {};
+	std::chrono::sys_seconds now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
+	std::format_to_n(acFilename, std::ssize(acFilename) - 1, "CrashReport-{:%Y%m%dT%H%M%SZ}-{}-{:016X}{:016X}.txt", now, miStoredCrashReportCount, rClient.clientGuid.uiHigh, rClient.clientGuid.uiLow);
+
+	bool bWritten = gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, std::filesystem::path(acFilename), [&message](std::fstream& rStream)
+	{
+		rStream.write(reinterpret_cast<const char*>(message.report.puiData), message.report.iSize);
+	});
+	if (!bWritten)
+	{
+		LOG(kNetwork, kWarning, "Server::ClientCrashReport Write failed Client: {} File: {}", rClient.iClientId, acFilename);
+		return;
+	}
+
+	++miStoredCrashReportCount;
+	LOG(kNetwork, kInfo, "Server::ClientCrashReport Stored Client: {} File: {}", rClient.iClientId, acFilename);
 }
 
 void Server::SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char* pcMessage, const ClientGuid* pGloballyUniqueIdentifier)

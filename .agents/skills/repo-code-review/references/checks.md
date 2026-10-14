@@ -114,12 +114,13 @@ convention, whose preferred fixes are these, in order from best to last resort:
   the assertion may carry real diagnostic value.
 
 Do not accept a change that silences a check instead of fixing its cause: an
-`ASSERT` added only to silence an analyzer, a new `NOLINT` or
-`#pragma warning(disable`, deleting an `ASSERT` the convention above would
-keep, or removing from the CRC state that is still simulated. For an analyzer
-diagnostic — the analyzer-silencing `ASSERT`, `NOLINT`, or warning-pragma case
-— require an analyzer-visible reachable guard, or a narrow suppression that
-states the proven invariant or why the diagnostic is false.
+`ASSERT` added only to silence an analyzer, a suppression comment or pragma that
+`Documents/C++StyleGuide.txt` rule 75 forbids, deleting an `ASSERT` the
+convention above would keep, or removing from the CRC state that is still
+simulated. For an analyzer diagnostic, require a meaning-preserving code fix the
+analyzer accepts (for a reachability diagnostic, a guard it can see on the
+reachable path); otherwise report a finding that routes the diagnostic to the
+user's decision under rule 75.
 
 ### Collections, persistence, and identity
 

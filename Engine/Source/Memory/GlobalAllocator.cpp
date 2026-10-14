@@ -238,6 +238,7 @@ struct MemoryInitializer
 		std::signal(SIGABRT, [](int)
 		{
 			engine::HandleException();
+			engine::PromptCrashReportDesktopCopy();
 		});
 
 #if defined(ENABLE_CRT_DEBUG_HEAP)

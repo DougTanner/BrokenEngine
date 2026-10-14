@@ -723,8 +723,10 @@ and command source-file ownership). These engine-generic caveats hold for every
 project:
 
 - Physical mouse, keyboard, wheel, and gamepad input is suppressed for an
-  agent-mode client. Synthetic input is the sole game/ImGui source; Alt+F4 and
-  window Close still quit. Focus messages remain real; an agent client boots
-  with audio suspended, and `audio_resume` resumes it without OS focus.
+  agent-mode client. Synthetic input is the sole game/ImGui source, except IME
+  result characters (`Engine/Source/Input/AGENTS.md`
+  `## Focus and Agent Input`); Alt+F4 and window Close still quit. Focus
+  messages remain real; an agent client boots with audio suspended, and
+  `audio_resume` resumes it without OS focus.
 - Keep ownership warm during long soaks. Never leave a background heartbeat/poll
   process after the session.

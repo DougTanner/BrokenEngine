@@ -144,7 +144,7 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 
 	HANDLE hStandardInputPipeRead = nullptr;
 	HANDLE hStandardInputPipeWrite = nullptr;
-	if (!CreatePipe(&hStandardInputPipeRead, &hStandardInputPipeWrite, &securityAttributes, 0))
+	if (CreatePipe(&hStandardInputPipeRead, &hStandardInputPipeWrite, &securityAttributes, 0) == FALSE)
 	{
 		return std::nullopt;
 	}
@@ -153,7 +153,7 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 
 	HANDLE hStandardOutputPipeRead = nullptr;
 	HANDLE hStandardOutputPipeWrite = nullptr;
-	if (!CreatePipe(&hStandardOutputPipeRead, &hStandardOutputPipeWrite, &securityAttributes, 0))
+	if (CreatePipe(&hStandardOutputPipeRead, &hStandardOutputPipeWrite, &securityAttributes, 0) == FALSE)
 	{
 		return std::nullopt;
 	}
@@ -161,12 +161,12 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 	ScopedHandle pStandardOutputPipeWrite(hStandardOutputPipeWrite);
 
 	// Strip inheritance from parent-side pipe ends; the attribute list below only applies to the child-side two.
-	if (!SetHandleInformation(hStandardInputPipeWrite, HANDLE_FLAG_INHERIT, 0))
+	if (SetHandleInformation(hStandardInputPipeWrite, HANDLE_FLAG_INHERIT, 0) == FALSE)
 	{
 		return std::nullopt;
 	}
 
-	if (!SetHandleInformation(hStandardOutputPipeRead, HANDLE_FLAG_INHERIT, 0))
+	if (SetHandleInformation(hStandardOutputPipeRead, HANDLE_FLAG_INHERIT, 0) == FALSE)
 	{
 		return std::nullopt;
 	}
@@ -180,7 +180,7 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 	auto attributeListBuffer = std::make_unique<uint8_t[]>(uiAttributeListSize);
 	LPPROC_THREAD_ATTRIBUTE_LIST pAttributeList = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attributeListBuffer.get());
 	_Analysis_assume_(pAttributeList != nullptr);
-	if (!InitializeProcThreadAttributeList(pAttributeList, 1, 0, &uiAttributeListSize))
+	if (InitializeProcThreadAttributeList(pAttributeList, 1, 0, &uiAttributeListSize) == FALSE)
 	{
 		return std::nullopt;
 	}
@@ -190,7 +190,7 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 		DeleteProcThreadAttributeList(pAttributeList);
 	});
 	HANDLE ahHandlesToInherit[] = { hStandardInputPipeRead, hStandardOutputPipeWrite };
-	if (!UpdateProcThreadAttribute(pAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, ahHandlesToInherit, sizeof(ahHandlesToInherit), nullptr, nullptr))
+	if (UpdateProcThreadAttribute(pAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, ahHandlesToInherit, sizeof(ahHandlesToInherit), nullptr, nullptr) == FALSE)
 	{
 		return std::nullopt;
 	}
@@ -204,7 +204,7 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 	extendedStartupInfo.lpAttributeList = pAttributeList;
 
 	PROCESS_INFORMATION processInformation {};
-	if (!CreateProcessW(rExecutableFile.native().c_str(), rCommandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT, nullptr, nullptr, &extendedStartupInfo.StartupInfo, &processInformation))
+	if (CreateProcessW(rExecutableFile.native().c_str(), rCommandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT, nullptr, nullptr, &extendedStartupInfo.StartupInfo, &processInformation) == FALSE)
 	{
 		return std::nullopt;
 	}

@@ -47,7 +47,6 @@ int64_t ReconcileFindReplayRangeCoord(const CoordWork& rWork, int64_t iReplaySta
 
 static void LogTransferSummary(const CoordWork& rWork, int64_t iTick, int64_t iTransferPlayerCount, int64_t iTransferBlasterCount, int64_t iTransferSpaceshipCount, int64_t iTransferMissileCount, std::span<const engine::GlobalId> transferPlayerIds)
 {
-	// NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) — read only by the kVerbose LOGs below, which compile out at default log levels
 	int64_t iTransferTotal = iTransferPlayerCount + iTransferBlasterCount + iTransferSpaceshipCount + iTransferMissileCount;
 	if (iTransferPlayerCount > 0)
 	{

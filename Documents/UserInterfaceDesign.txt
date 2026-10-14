@@ -11,7 +11,7 @@ ThemePalettes) and engine MenuUtils (kMenuChromes). This contract covers only
 layout: scale, sizing, placement, rhythm, and primitives.
 
 Scope: the player-facing screens — MainMenu, Pause, Graphics, Audio, Game
-Settings, Modal, and the HUD. TweaksScreen is a developer tool and a sanctioned
+Settings, Modal, Chat, and the HUD. TweaksScreen is a developer tool and a sanctioned
 exception, called out where it diverges. Audio is the player-facing name of the
 screen the code still calls Sound.
 
@@ -19,7 +19,7 @@ screen the code still calls Sound.
 1. Purpose & Scope
 -------------------
 Every pixel the player sees is drawn by ImGui through the engine standard menu
-screens and the game HUD under Ui/Screens/, rendered by the engine ImGuiManager. This document governs their
+screens, the engine ChatScreen, and the game HUD under Ui/Screens/, rendered by the engine ImGuiManager. This document governs their
 layout. Text color, panel fills, borders, and button chrome are not layout —
 they live in the per-theme tables and are deliberately excluded so a theme
 edit never touches a screen's geometry.

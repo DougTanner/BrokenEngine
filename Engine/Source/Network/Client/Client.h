@@ -75,7 +75,12 @@ public:
 	void SendDesynchronizationReport(int64_t iTick, GridCoord coordinate, common::crc_t uiExpectedCrc, common::crc_t uiActualCrc);
 	void SendDebugFrameRequest(int64_t iTick, GridCoord coordinate);
 	void SendResynchronizationRequest();
+	// Sends only valid chat text on an accepted connection; anything else is discarded unsent.
+	void SendChat(std::string_view text);
 	void Disconnect();
+	// Crash path only, on a connected and accepted client: sends the report, then disconnects. Returns whether the ENet
+	// disconnect event arrived within 5 s; the deferred disconnect completes only after the server acknowledges the report.
+	bool UploadCrashReport(std::span<const uint8_t> report);
 
 	// Wire dispatch entry point for one received packet. Public so harness rigs can exercise the real dispatch,
 	// classification, and response paths.
@@ -132,6 +137,7 @@ private:
 	void ServerUnsubscribeAcknowledgement(std::span<const uint8_t> packetData);
 	void ServerLoadNotification(std::span<const uint8_t> packetData);
 	void ServerTimespeedUpdate(std::span<const uint8_t> packetData);
+	void ServerChat(std::span<const uint8_t> packetData);
 	void SendHello();
 	void TrackReceivedTick(int64_t iSlot, int64_t iTick);
 

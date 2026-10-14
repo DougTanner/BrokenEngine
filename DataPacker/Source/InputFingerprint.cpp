@@ -411,8 +411,8 @@ InputFingerprintCache::FileSnapshot InputFingerprintCache::Snapshot(const std::f
 	ScopedHandle fileHandle(hFile);
 	FILE_BASIC_INFO basicInfo {};
 	BY_HANDLE_FILE_INFORMATION fileInfo {};
-	if (!GetFileInformationByHandleEx(fileHandle.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo))
-	 || !GetFileInformationByHandle(fileHandle.get(), &fileInfo))
+	if (GetFileInformationByHandleEx(fileHandle.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo)) == FALSE
+	 || GetFileInformationByHandle(fileHandle.get(), &fileInfo) == FALSE)
 	{
 		throw std::system_error(static_cast<int>(GetLastError()), std::system_category(), std::format("Failed to inspect \"{}\" for fingerprinting", rPath.string()));
 	}

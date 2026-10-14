@@ -293,3 +293,7 @@ One Plan, one landing; the stages order the work so each builds and runs.
 | Status-change and transfer rejection | A `SpawnShip` with global ID 0, an `eType` at or above `kCount`, or a spawn request type byte at or above `kCount` is rejected: replay read throws, `inject_payload` reports the error, the server counts one contract violation | `/agent-harness` `inject_payload`, `game_packet_fault_harness_rig` or code reading for the packet path |
 | Collision masks | Each ship type collides with the other two and never with itself; the engine assert passes at startup; ramming between enemy types reduces both ships' hull | Code reading plus the random-spawn fight run above |
 | Per-controller models | A fleet Fighter and a random Fighter in one cell render through different pipelines (screenshot shows both placeholder models) | `/agent-harness` screenshot |
+
+## Coordination
+
+- `Documents/Plans/Game/DeduplicateDescribeSceneUnitLoops.md` replaces the three `describe_scene` unit loops in `CommandDescribeScene` (`AgentScene.cpp:240-338`) with one file-static `AppendVisibleUnits` template. Whichever lands second rebases onto the other's edits; landed after it, each ship type is one `AppendVisibleUnits` call.

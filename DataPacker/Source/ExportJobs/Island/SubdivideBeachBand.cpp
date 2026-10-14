@@ -242,7 +242,7 @@ void BeachSubdivider::Run()
 		int64_t iMidpointAB = LookupMidpoint(iA, iB);
 		int64_t iMidpointBC = LookupMidpoint(iB, iC);
 		int64_t iMidpointCA = LookupMidpoint(iC, iA);
-		int64_t iExistingMidpoints = (iMidpointAB != UINT32_MAX) + (iMidpointBC != UINT32_MAX) + (iMidpointCA != UINT32_MAX);
+		int64_t iExistingMidpoints = (iMidpointAB != UINT32_MAX ? 1 : 0) + (iMidpointBC != UINT32_MAX ? 1 : 0) + (iMidpointCA != UINT32_MAX ? 1 : 0);
 
 		if (!bBandTrigger && iExistingMidpoints == 0)
 		{

@@ -17,6 +17,7 @@ enum class MenuInputFlags : uint64_t
 	kQuit              = 0x00000020,
 	kToggleProfileText = 0x00000040,
 	kTogglePauseFrame  = 0x00000080,
+	kOpenChat          = 0x00000100,
 	kQuicksave         = 0x00000200,
 	kQuickload         = 0x00000400,
 	kSaveReplay        = 0x00000800,
@@ -42,8 +43,8 @@ struct MenuInput
 };
 
 // Borrowed view of the current and previous raw snapshots, handed out by BeginPoll so engine policy and the
-// game callback detect edges against the same pair. It stores no state of its own and is only valid until
-// the previous snapshot advances, so it must never outlive GameBase::ProcessInput.
+// game callback detect edges against the same pair, plus whether the UI owns the keyboard this poll. It is
+// only valid until the previous snapshot advances, so it must never outlive GameBase::ProcessInput.
 class InputPoll
 {
 public:
@@ -53,7 +54,7 @@ public:
 
 	bool KeyboardPressed(int64_t iKey) const
 	{
-		return mrCurrent.pbKeyboardKeys[iKey] && !mrPrevious.pbKeyboardKeys[iKey];
+		return !mbUserInterfaceOwnsKeyboard && mrCurrent.pbKeyboardKeys[iKey] && !mrPrevious.pbKeyboardKeys[iKey];
 	}
 	bool MousePressed(MouseButtons eButton) const
 	{
@@ -68,9 +69,11 @@ private:
 
 	friend class Input;
 
-	InputPoll(const RawInput& rCurrent, const RawInput& rPrevious) : mrCurrent(rCurrent), mrPrevious(rPrevious)
+	InputPoll(const RawInput& rCurrent, const RawInput& rPrevious, bool bUserInterfaceOwnsKeyboard) : mrCurrent(rCurrent), mrPrevious(rPrevious), mbUserInterfaceOwnsKeyboard(bUserInterfaceOwnsKeyboard)
 	{
 	}
+
+	bool mbUserInterfaceOwnsKeyboard = false;
 
 };
 

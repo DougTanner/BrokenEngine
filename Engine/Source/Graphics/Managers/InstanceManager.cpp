@@ -749,7 +749,6 @@ void InstanceManager::ReadLayerProperties()
 	}
 
 	LOG(kGraphics, kInfo, "");
-	// NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) — pcLayer is read only by the LOG below, which compiles out below the kGraphics threshold
 	for (const char* pcLayer : mValidationLayers)
 	{
 		LOG(kGraphics, kInfo, "Found \"{}\"", pcLayer);

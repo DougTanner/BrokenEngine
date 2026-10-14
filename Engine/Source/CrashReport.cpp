@@ -12,6 +12,14 @@ static wchar_t spcAppDataOverride[MAX_PATH + 1] {};
 static constinit wchar_t spcDesktopReportPath[MAX_PATH + 1] {};
 static constinit wchar_t spcUserReportPath[MAX_PATH + 1] {};
 constexpr wchar_t kpcFallbackReportPath[] = L"Crash-Report.txt";
+static constinit std::atomic<bool> sbReportWritten(false);
+static_assert(decltype(sbReportWritten)::is_always_lock_free);
+
+static const wchar_t* ReportPath()
+{
+	// Startup resolution failed when the buffer is empty; the fallback path is relative to the working directory.
+	return spcUserReportPath[0] != L'\0' ? spcUserReportPath : kpcFallbackReportPath;
+}
 
 void SetCrashReportAppDataDirectory(const wchar_t* pcDirectory)
 {
@@ -107,23 +115,20 @@ void ResolveCrashReportPaths()
 
 void HandleException(std::optional<const std::exception*> pException)
 {
+	// The first writer owns the report: ProcessMain's catch after the main-loop catch, or a SIGABRT during the upload
+	// or unwinding, must not rewrite the report that may already be uploaded.
+	if (sbReportWritten.exchange(true))
+	{
+		return;
+	}
+
 	// Non-logging break: this runs from the SIGABRT handler during heap corruption, possibly while this thread already
 	// holds the log mutex, so logging here would deadlock or re-fault before any crash-report bytes are written.
 	DEBUG_BREAK_NO_LOG();
 
-	// An agent-launched instance must never block on a modal dialog — take the unprompted branch so the report still saves.
-	int64_t iResult = (gLaunchOptions.iAgentPort != 0) ? IDNO : MessageBox(nullptr, "Save crash report to desktop?", game::kGameName.data(), MB_YESNO | MB_SYSTEMMODAL);
-
-	// Select an already-resolved path: this runs from the SIGABRT handler during heap corruption, so no path lookup,
+	// The path is already resolved: this runs from the SIGABRT handler during heap corruption, so no path lookup,
 	// directory creation, or string building may happen here — ResolveCrashReportPaths did all of it at startup.
-	const wchar_t* pcPath = iResult == IDYES ? spcDesktopReportPath : spcUserReportPath;
-	if (pcPath[0] == L'\0')
-	{
-		// Startup resolution failed for this candidate; the fallback path is relative to the working directory.
-		pcPath = kpcFallbackReportPath;
-	}
-
-	common::CrashFileWriter writer(pcPath);
+	common::CrashFileWriter writer(ReportPath());
 
 	writer.Write("\n\n\nPlease send this crash report to brokenteapotstudios@gmail.com, and if possible describe exactly what you were doing when it occurred.\n");
 
@@ -160,6 +165,70 @@ void HandleException(std::optional<const std::exception*> pException)
 
 	common::LogDumpBuffers(writer);
 }
+
+void PromptCrashReportDesktopCopy()
+{
+	// An agent-launched instance must never block on a modal dialog, and an empty Desktop path leaves no copy target.
+	if (gLaunchOptions.iAgentPort != 0)
+	{
+		return;
+	}
+
+	if (spcDesktopReportPath[0] == L'\0')
+	{
+		return;
+	}
+
+	if (MessageBox(nullptr, "Save crash report to desktop?", game::kGameName.data(), MB_YESNO | MB_SYSTEMMODAL) == IDYES)
+	{
+		// Nothing on the crash path may recover or log a failed copy.
+		CopyFileW(ReportPath(), spcDesktopReportPath, FALSE);
+	}
+}
+
+#if defined(BT_CLIENT)
+
+void TryUploadCrashReport()
+{
+	try
+	{
+		if (gpClient == nullptr)
+		{
+			return;
+		}
+
+		if (!(gpClient->mStateFlags & Client::ClientStateFlags::kConnectionAccepted))
+		{
+			return;
+		}
+
+		// Heap: one-shot kiMaximumCrashReportSize read buffer on the crash path, outside the main-loop allocation budget.
+		ScopedSuppressAllocationTracking suppress;
+		std::vector<uint8_t> report(static_cast<size_t>(kiMaximumCrashReportSize));
+		std::fstream reportStream(std::filesystem::path(ReportPath()), std::ios::in | std::ios::binary);
+		reportStream.read(reinterpret_cast<char*>(report.data()), static_cast<std::streamsize>(std::ssize(report)));
+		int64_t iReadSize = static_cast<int64_t>(reportStream.gcount());
+		if (iReadSize == 0)
+		{
+			return;
+		}
+
+		if (gpClient->UploadCrashReport(std::span<const uint8_t>(report.data(), static_cast<size_t>(iReadSize))))
+		{
+			LOG(kNetwork, kInfo, "TryUploadCrashReport Delivered Bytes: {}", iReadSize);
+		}
+		else
+		{
+			LOG(kNetwork, kWarning, "TryUploadCrashReport Not delivered Bytes: {}", iReadSize);
+		}
+	}
+	// A failed upload must not replace the crash being handled.
+	catch (...)
+	{
+	}
+}
+
+#endif // BT_CLIENT
 
 static bool DxDiagCallFailed(int64_t iHresult, std::string_view call)
 {
