@@ -314,7 +314,7 @@ void RenderTargetTextures::CreateLightingTextures()
 	}
 
 	// Create combine textures (UNORM tone-mapped output, sized to max of start/end). LightingTemporal.comp blends the
-	// previous-frame history into these in place; LightingHistoryCopy.comp publishes the result to history.
+	// last-refresh history into these in place; LightingHistoryCopy.comp publishes the result to history.
 	auto [iCombineX, iCombineY] = TextureManager::LightingDetailTextureSize(std::max(fSpreadMultiplierStart, fSpreadMultiplierEnd));
 	static constexpr std::string_view kCombineNames[3] {"CombineRed", "CombineGreen", "CombineBlue"};
 	for (int64_t i = 0; i < 3; ++i)
@@ -351,7 +351,7 @@ void RenderTargetTextures::CreateLightingTextures()
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
 
-	// History textures: previous-frame combine outputs reprojected + EMA-blended by LightingTemporal.comp.
+	// History textures: last-refresh combine outputs reprojected + EMA-blended by LightingTemporal.comp.
 	// Clones of the combine textures (same bumped extent, RGBA8 UNORM); SAMPLED (read as history), STORAGE
 	// (descriptor-set compatibility with combine bindings) so LightingHistoryCopy.comp can refresh them in-place.
 	static constexpr std::string_view kHistoryNames[3] {"LightingHistoryRed", "LightingHistoryGreen", "LightingHistoryBlue"};

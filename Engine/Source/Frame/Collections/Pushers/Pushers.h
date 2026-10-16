@@ -84,8 +84,6 @@ struct PushersPostRender : public Collection<PushersPostRender>
 	// Bump on any SOA layout change — feeds the Frame::kiVersion save/replay gate
 	static constexpr int64_t kiVersion = 1;
 
-	static void AllocateAndCopy(PushersPostRender& rCurrent, const PushersPostRender& rPrevious);
-
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	static void Add(game::Frame& __restrict rFrame, pusher_t& rId);

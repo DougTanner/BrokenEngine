@@ -13,6 +13,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$sharedScripts = Join-Path $PSScriptRoot '..\..\..\scripts'
+if (-not (Test-Path -LiteralPath (Join-Path $sharedScripts 'AgentScriptCommon.psm1'))) {
+	$sharedScripts = Join-Path $PSScriptRoot '..\..\..\..\.agents\scripts'
+}
+Import-Module (Join-Path $sharedScripts 'AgentScriptCommon.psm1') -Force
 
 $xperf = 'C:\Program Files (x86)\Windows Kits\10\Windows Performance Toolkit\xperf.exe'
 if (-not (Test-Path -LiteralPath $xperf -PathType Leaf)) {
@@ -33,7 +38,8 @@ $cacheRoot = [System.IO.Path]::GetFullPath($SymbolCacheRoot)
 $processStart = [System.Diagnostics.ProcessStartInfo]::new()
 $processStart.FileName = $xperf
 $processStart.UseShellExecute = $false
-$processStart.Environment['_NT_SYMBOL_PATH'] = "$(Join-Path $repository 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output');srv*$(Join-Path $cacheRoot 'symsrv')*https://msdl.microsoft.com/download/symbols"
+$projectOutputs = @(Get-AgentGameProjects $repository | ForEach-Object { Join-Path $repository "Projects\$_\Platforms\VisualStudio2026\Output" })
+$processStart.Environment['_NT_SYMBOL_PATH'] = "$($projectOutputs -join ';');srv*$(Join-Path $cacheRoot 'symsrv')*https://msdl.microsoft.com/download/symbols"
 $processStart.Environment['_NT_SYMCACHE_PATH'] = Join-Path $cacheRoot 'symc'
 foreach ($argument in @('-i', $EtlPath, '-symbols', '-tle', '-tti', '-a', 'profile', '-detail', '-ao', $OutputPath)) {
 	$processStart.ArgumentList.Add($argument)

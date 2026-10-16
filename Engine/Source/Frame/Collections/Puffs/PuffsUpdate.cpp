@@ -11,7 +11,7 @@ void PuffsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restric
 {
 	PuffsInterpolate& __restrict rCurrent = rFrameInterpolate.puffs;
 	const PuffsInterpolate& rPrevious = rPreviousFrame.interpolate.puffs;
-	SimulationTime currentTime(std::chrono::duration<float>(rPreviousFrame.interpolate.fCurrentTime + rFrameInterpolate.fDeltaTime));
+	SimulationTime currentTime = TickToSimulationTime(rPreviousFrame.interpolate.iTick) + common::FloatSecondsToNanoseconds(std::chrono::duration<float>(rFrameInterpolate.fDeltaTime));
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -25,7 +25,7 @@ void PuffsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restric
 
 		if (iControllerTypeIndex != kiInvalidControllerType)
 		{
-			std::chrono::duration<float> elapsedTime = currentTime - rCurrent.pStartTimes[i];
+			std::chrono::duration<float> elapsedTime(common::NanosecondsToFloatSeconds<float>(currentTime - rCurrent.pStartTimes[i]));
 			const PuffControllerType& rController = PuffsInterpolate::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
 
 			PuffKeyframe interpolated = InterpolateScaledKeyframes(rController, elapsedTime, [](PuffControllerType& rScaledController, const PuffControllerType& rOriginalController, int64_t j)

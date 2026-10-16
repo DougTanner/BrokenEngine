@@ -30,7 +30,15 @@ Signed modulation: crevices (`fConcavity > 0.5`) gain snow, exposed faces lose i
 
 ### New uniform / slider
 
-One `GlobalLayout` float `fTerrainSnowCurvature` after `fTerrainSnowAmbientOcclusionExclusion` (`ShaderLayoutsBase.h:438`); `Wrapper gTerrainSnowCurvature` in `TerrainWrappersBase.{h,cpp}` next to the two existing snow wrappers; "Snow Curvature" entry in the slider map and `WrapperSlider` call in `TweaksScreenTerrain.cpp` (next to "Snow AO Exclusion"); upload in `GlobalUniforms.cpp` next to the existing `fTerrainSnow*` assignments (~line 396). Suggested range [-1, 1], default 0 (negative flips the effect — snow on ridges — probably useless but free and occasionally illustrative while tuning).
+One `GlobalLayout` float `fTerrainSnowCurvature` after
+`fTerrainSnowAmbientOcclusionExclusion` (`ShaderLayoutsBase.h:438`);
+`Wrapper gTerrainSnowCurvature` in `TerrainWrappersBase.{h,cpp}` next to the two
+existing snow wrappers; "Snow Curvature" entry in the slider map and
+`WrapperSlider` call in `TweaksScreenTerrain.cpp` (next to "Snow AO Exclusion");
+upload in `GlobalUniforms.cpp` next to the existing `fTerrainSnow*` assignments
+(~line 396). Suggested range [-1, 1], default 0 (negative flips the effect —
+snow on ridges — probably useless but free and occasionally illustrative while
+tuning).
 
 ## Critical files
 

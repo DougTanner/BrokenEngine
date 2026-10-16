@@ -8,7 +8,6 @@
 
 #if defined(BT_SERVER)
 #include "Network/Server/ServerSession.h"
-#include "Save/GameSaveLoad.h"
 #endif
 #if defined(BT_CLIENT)
 #include "Ui/NetworkUiControl.h"
@@ -58,36 +57,24 @@ class Game : public engine::GameBase, public common::Singleton<Game>
 public:
 
 	Game();
-	~Game() override;
+	~Game();
 
-	void Reset();
-#if defined(BT_CLIENT)
-	bool ShouldUseCrosshair() override;
-#endif
-
-	void ChangeFrame(GameFlags_t gameFlags);
-	void CreateNewFrame(GameFlags_t gameFlags);
+	void ResetGameState();
 
 #if defined(BT_CLIENT)
-	void ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engine::InputPoll& rInputPoll) override;
+	void ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engine::InputPoll& rInputPoll);
 
-	engine::StandardMenuModel GetStandardMenuModel() const override;
-	void ApplyStandardMenuAction(engine::StandardMenuAction eAction) override;
-#endif
+	// The standard menu screens read this every render pass, and again after any action that can
+	// change it, because an action's effect must be visible to later decisions in the same pass.
+	engine::StandardMenuModel GetStandardMenuModel() const;
+	void ApplyStandardMenuAction(engine::StandardMenuAction eAction);
 
-	void ComputeActiveSet();
-#if defined(BT_CLIENT)
-	void UpdateActiveIslands();
+	bool HasFocusedClientEntity() const;
+	void UpdateCameraShake();
 #endif
-#if defined(BT_SERVER)
-	void EnsureNextFrames();
-#endif
-	void BuildFrameInputs();
-	void HarvestTransfers();
 
 #if defined(BT_SERVER)
 	std::unique_ptr<ServerSession> mpServerSession;
-	GameSaveLoad mGameSaveLoad;
 #endif
 #if defined(BT_CLIENT)
 	std::unique_ptr<ClientSession> mpClientSession;
@@ -101,10 +88,6 @@ public:
 	std::optional<int64_t> ClientPlayerIndex(const PlayersPostRender& rPlayers) const;
 
 #if defined(BT_CLIENT)
-	XMVECTOR GetClientPlayerPosition() const;
-#endif
-
-#if defined(BT_CLIENT)
 	void CaptureClientState();
 #endif
 
@@ -113,7 +96,6 @@ public:
 #endif
 
 #if defined(BT_CLIENT)
-	XMVECTOR mVecVisualErrorOffset {};
 	engine::NetworkUiControl<WeaponModeKey> mWeaponModeToggle {};
 
 	FleetSelection mFleetSelection;
@@ -121,44 +103,6 @@ public:
 	// In-memory mirror of the focused fleet and ship in ClientState.bin; loaded at startup, refreshed on every focus change, and written on orderly exit.
 	game::FleetGuid mRememberedFleetGuid {};
 	engine::GlobalId mRememberedFocusedShipIdentifier {};
-
-	static constexpr float kfVisualErrorDecayRate = 15.0f;
-	static constexpr float kfVisualErrorMaxDistance = 5.0f;
-	static constexpr float kfVisualErrorMinDistance = 0.001f;
-#endif
-
-	// Debug-only main-menu island browser index into engine::gpIslandTerrain->mIslandCrcsByArea
-	// (largest footprint first); advanced by 'E'.
-	int64_t miMenuIslandIndex = 0;
-
-	engine::GridCoord mVisibleNeighbors[8] {};
-	int64_t miVisibleNeighborCount = 0;
-
-#if defined(BT_CLIENT)
-	// Harness-only viewer pin: set by set_client_grid_coord, cleared by release_client_grid_coord or Reset.
-	// Survives server load and replay restart so a recipe can hold one cell subscribed across playback loops.
-	bool mbClientGridCoordinatePinned = false;
-#endif
-
-	void SetClientGridCoordinate(engine::GridCoord coordinate)
-	{
-#if defined(BT_CLIENT)
-		if (mbClientGridCoordinatePinned)
-		{
-			return;
-		}
-#endif
-		mClientGridCoordinate = coordinate;
-		miVisibleNeighborCount = 0;
-	}
-
-#if defined(BT_CLIENT)
-	void PinClientGridCoordinate(engine::GridCoord coordinate)
-	{
-		mbClientGridCoordinatePinned = false;
-		SetClientGridCoordinate(coordinate);
-		mbClientGridCoordinatePinned = true;
-	}
 #endif
 
 private:

@@ -43,7 +43,15 @@ Invalid enum string values cause silent deactivation. Verified valid values (fro
 - `Snowfield.Direction`: compass directions — shipping examples exercise only `N` and `E` (one each); the remaining compass values (`NE`, `SE`, `S`, `SW`, `W`, `NW`) follow the same enum pattern but are not example-verified — confirm via a Gaea save/load before relying on one.
 - `Export.Format`: `UshortRaw16`, `FloatRaw32`, `PNG8`, `PNG16`, `Exr`, `Tiff16`, `GLTF` (case-sensitive — the current shipping examples contain no `Export` nodes, but their `SaveDefinition.Format: PNG16` blocks confirm the uppercase casing; the Broken Engine island archetype uses `PNG8` for color, `FloatRaw32` for elevation, `UshortRaw16` for AO, and `GLTF` for mesh). Others exist — copy from a known-good terrain when unsure.
 - `RenderIntentOverride` (not Export-specific — appears on many node types: Combine, Adjust, Stratify, ...): `Mask`, `Color`, `Heightfield` — all three observed in shipping examples.
-- `SatMap.Library` (the `CLUTLibrary` enum): `Green`, `Sand`, `Blue`, `Color` — and absent = Rocky (the default). The names `Sandy`/`Rocky`/`Colorful` you'll see in QuadSpinner's UI library browser are display labels; the JSON enum values are `Sand`/(absent)/`Color`. Writing `Library: Sandy` throws `JsonSerializationException: Error converting value "Sandy" to type 'QuadSpinner.Gaea.Nodes.CLUTLibrary'` and Gaea refuses to load the file. (`Blue` ships only in `Glacier - Complex Setup.terrain`, which `inspect_samples.py` currently skips — its strict JSON parser rejects that file's trailing commas — so `--enum SatMap.Library` won't list it.)
+- `SatMap.Library` (the `CLUTLibrary` enum): `Green`, `Sand`, `Blue`, `Color` —
+  and absent = Rocky (the default). The names `Sandy`/`Rocky`/`Colorful` you'll
+  see in QuadSpinner's UI library browser are display labels; the JSON enum
+  values are `Sand`/(absent)/`Color`. Writing `Library: Sandy` throws
+  `JsonSerializationException: Error converting value "Sandy" to type 'QuadSpinner.Gaea.Nodes.CLUTLibrary'`
+  and Gaea refuses to load the file. (`Blue` ships only in
+  `Glacier - Complex Setup.terrain`, which `inspect_samples.py` currently skips
+  — its strict JSON parser rejects that file's trailing commas — so
+  `--enum SatMap.Library` won't list it.)
 
 When unsure, grep the shipping `.terrain` files in `C:/Program Files/QuadSpinner/Gaea 2/Examples/` for `"<Type>"` and inspect the enum value used.
 

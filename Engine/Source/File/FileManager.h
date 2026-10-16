@@ -265,7 +265,7 @@ bool FileManager::WriteFileAtomically(const FileFlags_t& rFlags, const std::file
 
 // Shared version+size on-disk header convention. Writes int64 version then int64 size (sizeof for
 // trivially-copyable types, 0 otherwise — non-trivial types validate version only). Single source for
-// WriteVersionedFile/ReadVersionedFile, DifferenceStream save/load, GameSaveLoad grid saves, and the TextureCache file cache.
+// WriteVersionedFile/ReadVersionedFile, DifferenceStream save/load, WriteGridSave grid saves, and the TextureCache file cache.
 template <typename STRUCT_TYPE>
 void WriteVersionHeader(std::fstream& rFileStream)
 {

@@ -4,11 +4,11 @@ Client-only `game::Camera` is the only concrete camera and is `final`. `engine::
 
 ## Game Policy
 
-- `IsMainMenuFrame` and `PullTarget` cast the engine's `FrameInterpolateBase` back to `game::FrameInterpolate`, relying on the `GameBase` contract that the concrete render interpolate is the game frame type.
-- `PullTarget` returns one of the three closed engine target values: the canonical menu pose (`CameraTarget::Direct`) for the main menu or an invalid client player, the raw focused-player position paired with `gpGame->mVecVisualErrorOffset` (`CameraTarget::Tracked`), or `CameraTarget::Extrapolate` after the missing-player diagnostic. The engine adds the reconciliation offset only after the raw position has updated its tracking velocity. Menu target constants stay game-owned.
+- `PullTarget` casts the engine's `FrameInterpolateBase` back to `game::FrameInterpolate`, relying on the `GameBase` contract that the concrete render interpolate is the game frame type.
+- `PullTarget` returns one of the three closed engine target values: the canonical menu pose (`CameraTarget::Direct`) for the main menu or an invalid client player, the raw focused-player position paired with the inherited visual-error offset (`CameraTarget::Tracked`), or `CameraTarget::Extrapolate` after the missing-player diagnostic. Menu target constants stay game-owned.
 - Player focus resolves through the cell the supplied interpolate frame is local to — not the client cell — and that cell's `PlayersPostRender`, surviving spawn and transfer. Brief lookup failures extrapolate the last focus within the engine's bounded window; an absent player identity uses the main-menu pose.
 - Network reconciliation contributes a decaying camera-target offset only; authoritative simulation state is unchanged. Keep this integration consistent with `../../../../Documents/Architecture/GameReconciliation.md`.
-- `SunAngle` overrides the engine's angle while the Graphics settings or ImGui UI is up. The raw angle, its reset value, and its main-menu pause stay engine-owned.
+- `SunAngle` returns the sun-angle override slider's value in place of the engine's angle while the Graphics settings or ImGui UI is up. The raw angle, its reset value, and its main-menu pause stay engine-owned.
 
 ## See Also
 

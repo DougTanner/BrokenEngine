@@ -122,7 +122,6 @@ static nlohmann::json BuildCellState(engine::GridCoord coordinate, const engine:
 	result["snapshotHead"] = rCell.iSnapshotHead;
 	result["snapshotCount"] = rCell.iSnapshotCount;
 	result["lastRenderedTick"] = rCell.iLastRenderedTick;
-	result["lastRenderedTime"] = rCell.fLastRenderedTime;
 	result["serverUpdateCount"] = rCell.serverUpdates.size();
 	result["lastReplayConfirmedTick"] = rCell.iLastReplayConfirmedTick;
 	result["lastReplayServerUpdateCount"] = rCell.iLastReplayServerUpdateCount;

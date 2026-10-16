@@ -24,15 +24,13 @@ struct SpaceshipsPostRender;
 
 using player_t = engine::Id<PlayersInterpolate>;
 
-enum class GameFlags : uint64_t
-{
-	kMainMenu    = 0x00000001,
-	kGame        = 0x00000002,
-};
-using GameFlags_t = common::Flags<GameFlags>;
-
 struct FrameInterpolate : public engine::FrameInterpolateBase
 {
+#if defined(BT_CLIENT)
+	// Called on Game creation, before the engine collections register
+	static void AssignExplosionTuning();
+#endif
+
 	// Called on Game creation
 	static void Register();
 
@@ -48,6 +46,7 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
 	static void EndRender(int64_t iCommandBuffer);
+	static void DebugRender(const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 #endif
 
 	FrameInterpolate();
@@ -55,7 +54,6 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 	FrameInterpolate(FrameInterpolate&&) noexcept;
 	FrameInterpolate& operator=(FrameInterpolate&&) noexcept;
 
-	GameFlags_t gameFlags;
 	float fSpawnTimer = 0.0f;
 
 	std::unique_ptr<PlayersInterpolate> pPlayers;
@@ -67,7 +65,7 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 	// The game frame-wide values Write, Read, and ServerRead serialize after the base values, in stream order.
 	static auto Values()
 	{
-		return engine::FrameColumnList<FRAME_COLUMN(FrameInterpolate, fSpawnTimer), FRAME_COLUMN(FrameInterpolate, gameFlags)> {};
+		return engine::FrameColumnList<FRAME_COLUMN(FrameInterpolate, fSpawnTimer)> {};
 	}
 
 	static common::crc_t Crcs(const FrameInterpolate& rCurrent);
@@ -110,9 +108,6 @@ struct FramePostRender : public engine::FramePostRenderBase
 	std::unique_ptr<MissilesPostRender> pMissiles;
 	std::unique_ptr<SpaceshipsPostRender> pSpaceships;
 
-	// Transient transfer output buffer (not serialized, not in CRC/equality)
-	std::vector<TransferRequest> transferRequests;
-
 	// The game frame-wide values Write, Read, and ServerRead serialize after the base values, in stream order.
 	static auto Values()
 	{
@@ -125,13 +120,6 @@ struct FramePostRender : public engine::FramePostRenderBase
 	void Read(std::istream& rStream);
 	void ServerRead(std::istream& rStream);
 };
-
-// Cross-cell transfer producers push through these two calls: the split keeps the capacity-hit LOG
-// and DEBUG_BREAK between them, reading the pre-push size and capacity.
-// PrepareTransferRequest fills the per-axis delta and rewrites rRequest.data.vecPosition into the
-// destination cell's local frame; no consumer downstream converts it again.
-[[nodiscard]] bool PrepareTransferRequest(const FramePostRender& rPostRender, const engine::CellBounds& rBounds, TransferRequest& rRequest);
-void PushTransferRequest(FramePostRender& rPostRender, const TransferRequest& rRequest);
 
 // One registry query window: the context plus the single workbuffer allocation its spans point into. The owner
 // keeps the whole object alive for the window; the allocation pops when it dies, so no context span outlives it.

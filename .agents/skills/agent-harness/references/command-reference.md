@@ -13,6 +13,47 @@ The BrokenEngineSandbox server monitor is a project-owned GDI window, not a prot
 - `ping`: no params. Returns `{"build":"server"|"client","tick":int}`; tick is `-1` before game creation.
 - `quit`: no params. Requests clean shutdown; server autosaves. Returns `{}`.
 - `get_logs`: `{"count"?:64,"pattern"?:"ECMAScript regex","category"?:"Default|Temp|Audio|Graphics|Loading|NavData|Network|Input|Replay"}`. Pattern scans the whole selected wrapping ring (512 cross-category lines when category is omitted; 128 lines for one category), then returns the last `count` matching lines chronologically as `{"lines":[...]}`. Matching is case-sensitive; use character classes rather than `(?i)`.
-- `set_log_level`: `{"level":"Verbose|Debug|Info|Warning|Error","category"?:name}`. Returns one effective level or a category map. Each category has a compile-time floor, set by the project's `keLogLevel*` constants in its `Pch.h` (the `keLogLevels` table in `Common/Log/Log.h`; mechanism: [`Common/Log/AGENTS.md`](../../../../Common/Log/AGENTS.md)); a request below that floor clamps up to it. An effective level above the requested one therefore means the lines below it are compiled out of that build, not filtered at runtime, and no runtime level emits them. A run that needs those lines lowers that category's floor through a verification-only temporary source edit ([`.agents/references/change-workflow.md`](../../../references/change-workflow.md) `#### Step 5 — Run targeted pre-review checks`).
-- `cell_coordinate_probe`: `{"coord":[x,y]}` and nothing else — a params object that is not exactly that one key fails with `cell_coordinate_probe accepts only 'coord'`; both endpoints accept it. Any pair of integers in the signed-int32 range is valid — the cell needs no subscription, no loaded frame, and no adjacency — while an integer outside that range fails with `cell_coordinate_probe 'coord' values must fit in a signed 32-bit integer` and a non-integer value, a non-array `coord`, or an array of any other size fails with `cell_coordinate_probe 'coord' must be an array of 2 integers`. Its one precondition is loaded island templates; without them it fails with `cell_coordinate_probe requires loaded island templates`. Read-only: it generates a throwaway placement list and elevation grid for the requested cell, reports them, and frees them, touching no live cell, tick, or subscription. Returns `{"coord":[x,y],"area":{"width":900.0,"height":900.0},"terrain":{"samplesFinite":true},"placements":{"count":int,"crc":uint64},"elevation":{"crc":uint64}}`. Run the same coordinate on the client and on the server and require both CRCs to be equal; the two endpoints generate the cell independently from the same coordinate.
-- `crash_report_harness_rig`: no params. Simulates a production crash on demand so the agent can observe the real report, upload, and exit. Debug-only: a non-`kbDebugInput` build fails with `crash_report_harness_rig requires kbDebugInput build` whatever object the params are. In a `kbDebugInput` build params must be exactly `{}` — any other object fails with `crash_report_harness_rig requires empty params`. Each failure is an ordinary command failure that leaves the process running. On success it deliberately never responds: the endpoint writes its crash report, uploads it when the client is connected and accepted by a server and the connection has not already carried a report (waiting up to 5 s for ENet to confirm delivery), and exits, so AgentHarness reports `no response (timed out or peer closed)` and returns exit code 1 while the game process itself exits with code 0.
+- `set_log_level`:
+  `{"level":"Verbose|Debug|Info|Warning|Error","category"?:name}`. Returns one
+  effective level or a category map. Each category has a compile-time floor, set
+  by the `keLogLevel*` constants in `Engine/Source/EngineSwitches.h` (the
+  `keLogLevels` table in `Common/Log/Log.h`; mechanism:
+  [`Common/Log/AGENTS.md`](../../../../Common/Log/AGENTS.md)); a request below
+  that floor clamps up to it. An effective level above the requested one
+  therefore means the lines below it are compiled out of that build, not
+  filtered at runtime, and no runtime level emits them. A run that needs those
+  lines lowers that category's floor through a verification-only temporary
+  source edit
+  ([`.agents/references/change-workflow.md`](../../../references/change-workflow.md)
+  `#### Step 5 — Run targeted pre-review checks`).
+- `cell_coordinate_probe`: `{"coord":[x,y]}` and nothing else — a params object
+  that is not exactly that one key fails with
+  `cell_coordinate_probe accepts only 'coord'`; both endpoints accept it. Any
+  pair of integers in the signed-int32 range is valid — the cell needs no
+  subscription, no loaded frame, and no adjacency — while an integer outside
+  that range fails with
+  `cell_coordinate_probe 'coord' values must fit in a signed 32-bit integer` and
+  a non-integer value, a non-array `coord`, or an array of any other size fails
+  with `cell_coordinate_probe 'coord' must be an array of 2 integers`. Its one
+  precondition is loaded island templates; without them it fails with
+  `cell_coordinate_probe requires loaded island templates`. Read-only: it
+  generates a throwaway placement list and elevation grid for the requested
+  cell, reports them, and frees them, touching no live cell, tick, or
+  subscription. Returns
+  `{"coord":[x,y],"area":{"width":900.0,"height":900.0},"terrain":{"samplesFinite":true},"placements":{"count":int,"crc":uint64},"elevation":{"crc":uint64}}`.
+  Run the same coordinate on the client and on the server and require both CRCs
+  to be equal; the two endpoints generate the cell independently from the same
+  coordinate.
+- `crash_report_harness_rig`: no params. Simulates a production crash on demand
+  so the agent can observe the real report, upload, and exit. Debug-only: a
+  non-`kbDebugInput` build fails with
+  `crash_report_harness_rig requires kbDebugInput build` whatever object the
+  params are. In a `kbDebugInput` build params must be exactly `{}` — any other
+  object fails with `crash_report_harness_rig requires empty params`. Each
+  failure is an ordinary command failure that leaves the process running. On
+  success it deliberately never responds: the endpoint writes its crash report,
+  uploads it when the client is connected and accepted by a server and the
+  connection has not already carried a report (waiting up to 5 s for ENet to
+  confirm delivery), and exits, so AgentHarness reports
+  `no response (timed out or peer closed)` and returns exit code 1 while the
+  game process itself exits with code 0.

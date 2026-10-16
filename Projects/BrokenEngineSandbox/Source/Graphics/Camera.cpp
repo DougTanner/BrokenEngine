@@ -16,18 +16,12 @@ Camera::Camera()
 {
 }
 
-bool Camera::IsMainMenuFrame(const engine::FrameInterpolateBase& rFrameInterpolate) const
-{
-	// GameBase guarantees the concrete render interpolate is the game frame type.
-	return static_cast<const FrameInterpolate&>(rFrameInterpolate).gameFlags & GameFlags::kMainMenu;
-}
-
 engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFrameInterpolate)
 {
 	const FrameInterpolate& rGameInterpolate = static_cast<const FrameInterpolate&>(rFrameInterpolate);
 
-	// Main-menu frames and an invalid client-player identity use the canonical menu pose to avoid retaining a stale gameplay target.
-	if (rGameInterpolate.gameFlags & GameFlags::kMainMenu)
+	// The main menu and an invalid client-player identity use the canonical menu pose to avoid retaining a stale gameplay target.
+	if (gpGame->mGameFlags & engine::GameFlags::kMainMenu)
 	{
 		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 0.0f)));
 	}
@@ -55,7 +49,7 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 			mLastTrackedPlayerIdentifier = focusedPlayerIdentifier;
 		}
 
-		return engine::CameraTarget::Tracked(vecPlayerPosition, gpGame->mVecVisualErrorOffset);
+		return engine::CameraTarget::Tracked(vecPlayerPosition, mVecVisualErrorOffset);
 	}
 
 	static std::chrono::duration<float> sLastLogTime(-1.0f);

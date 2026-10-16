@@ -19,9 +19,29 @@ Done when every surviving proposal carries the evidence step 1 records — or it
 
 ### 2. Draft and classify
 
-Choose the owning area `Documents/Plans/AGENTS.md` `## Plan files` lists and a concise PascalCase filename; never overwrite a collision. Draft the smallest decision-complete plan with `# Title`, `## Context`, `## Design`, `## Critical files`, `## In scope`, `## Out of scope`, `## Acceptance criteria` when the diff is insufficient, and `## Notes`. Include verified root cause, originating gap, implementation boundary, and applicable determinism/CRC, serialization/`.pack`/`kiVersion`, replay, wire, affinity, threading, allocation, shader, build, or live-verification exposure. Pre-stage architectural choices instead of deciding them. Phrase every choice you do make as the author's recommendation with its rationale rather than in binding language, per [`../../../references/authority-order.md`](../../../references/authority-order.md). Do not add unit tests or unsupported implementation detail.
+Choose the owning area `Documents/Plans/AGENTS.md` `## Plan files` lists and a
+concise PascalCase filename; never overwrite a collision. Draft the smallest
+decision-complete plan with `# Title`, `## Context`, `## Design`,
+`## Critical files`, `## In scope`, `## Out of scope`, `## Acceptance criteria`
+when the diff is insufficient, and `## Notes`. Include verified root cause,
+originating gap, implementation boundary, and applicable determinism/CRC,
+serialization/`.pack`/`kiVersion`, replay, wire, affinity, threading,
+allocation, shader, build, or live-verification exposure. Pre-stage
+architectural choices instead of deciding them. Phrase every choice you do make
+as the author's recommendation with its rationale rather than in binding
+language, per
+[`../../../references/authority-order.md`](../../../references/authority-order.md).
+Do not add unit tests or unsupported implementation detail.
 
-Derive the future implementation's Change Workflow Tier 1/2/3 from the highest risk trigger in [`risk-tiers.md`](../../../references/risk-tiers.md) and record that trigger in the Plan. Put only directional prerequisites in `dependsOn`; put mandatory nondirectional constraints in reciprocal standard `## Coordination` sections in every affected Plan. A follow-up authored during a `/next-plan` run never names the Plan that run is completing; the claim-exit step in [`../../next-plan/SKILL.md`](../../next-plan/SKILL.md#steps) shows why the edge cannot survive completion. Do not add score, effort ranking, queue tier, queue row, request file, or claim data.
+Derive the future implementation's Change Workflow Tier 1/2/3 from the highest
+risk trigger in [`risk-tiers.md`](../../../references/risk-tiers.md) and record
+that trigger in the Plan. Put only directional prerequisites in `dependsOn`; put
+mandatory nondirectional constraints in reciprocal standard `## Coordination`
+sections in every affected Plan. A follow-up authored during a `/next-plan` run
+never names the Plan that run is completing; the claim-exit step in
+[`../../next-plan/SKILL.md`](../../next-plan/SKILL.md#steps) shows why the edge
+cannot survive completion. Do not add score, effort ranking, queue tier, queue
+row, request file, or claim data.
 
 For a tooling-friction proposal, draft the body from [`tooling-friction-plan-template.md`](tooling-friction-plan-template.md).
 
@@ -57,7 +77,24 @@ Done when exactly one row's route was taken for each proposal.
 - Reject each proposal class [`../SKILL.md`](../SKILL.md) `## When to use` excludes, stating why.
 - Tooling friction observed during a `/next-plan` run is a separate category.
 - So is a script or documented tool invocation that returned an oversized result flooding the main context, cited by the context-efficiency envelope (tool, invocation, measured size, checkpoint).
-- For tooling-friction proposals only, these substitutions replace the corresponding root-cause-based requirements in these rules and in `## Steps` — the proof steps, the grouping and duplicate rules, and the drafted Plan's verified root cause; every other requirement still applies, and ordinary proposals keep the full root-cause bar unchanged. The observed in-session symptom with its citation — exact command or script path, observed output or malformed result, and the rework or workaround it forced — substitutes for the unmet acceptance criterion or accepted residual, and for the confirmed root cause wherever one is required, including in the drafted Plan. For a context-efficiency proposal, the envelope fields — tool, invocation, measured size — plus the separately supplied checkpoint substitute for the observed-output citation and for the rework or workaround it forced.
-- Proven root cause is deferred to the fix session, by the route the Plan's `## Design` states. For the pre-existing and out-of-scope proof, verify that the misbehaving skill or script is outside the claimed Plan's `## In scope`; when it is inside, the failure is an in-scope blocker of the active change and is rejected as a friction follow-up. Grouping and duplicate detection key on (skill or script, observed symptom) instead of root cause; re-observing an already-recorded symptom updates nothing and is rejected as a duplicate.
+- For tooling-friction proposals only, these substitutions replace the
+  corresponding root-cause-based requirements in these rules and in `## Steps` —
+  the proof steps, the grouping and duplicate rules, and the drafted Plan's
+  verified root cause; every other requirement still applies, and ordinary
+  proposals keep the full root-cause bar unchanged. The observed in-session
+  symptom with its citation — exact command or script path, observed output or
+  malformed result, and the rework or workaround it forced — substitutes for the
+  unmet acceptance criterion or accepted residual, and for the confirmed root
+  cause wherever one is required, including in the drafted Plan. For a
+  context-efficiency proposal, the envelope fields — tool, invocation, measured
+  size — plus the separately supplied checkpoint substitute for the
+  observed-output citation and for the rework or workaround it forced.
+- Proven root cause is deferred to the fix session, by the route the Plan's
+  `## Design` states. For the pre-existing and out-of-scope proof, verify that
+  the misbehaving skill or script is outside the claimed Plan's `## In scope`;
+  when it is inside, the failure is an in-scope blocker of the active change and
+  is rejected as a friction follow-up. Grouping and duplicate detection key on
+  (skill or script, observed symptom) instead of root cause; re-observing an
+  already-recorded symptom updates nothing and is rejected as a duplicate.
 - Plan files and the metadata line that must be their very first bytes are ordinary tracked Git content; write them directly, with or without a live Plan claim. `Documents/Features` remains manual and is not an alternate executable-Plan store.
 - Report a written Plan as tracked content; do not describe it as claimed or landed until that has actually happened.

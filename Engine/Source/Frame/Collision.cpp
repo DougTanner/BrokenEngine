@@ -93,12 +93,14 @@ struct LayerPairZones
 // StableVector construction only records the reserved count, so these reserve no address space and make
 // no OS call until their first Resize; growth then commits more of that reservation without moving.
 thread_local common::StableVector<LayerPairZones> Collision::sLayerPairZones(64 * kiCollisionLayerPairPreallocate);
+thread_local common::StableVector<SegmentHit> Collision::sTerrainHits(kiRowReserveCount);
+thread_local common::StableVector<SegmentHit> Collision::sBoundaryHits(kiRowReserveCount);
 
 using enum CollisionFlags;
 
 int64_t Collision::AddLayer(const CollisionLayer& rLayer)
 {
-	ASSERT(rLayer.pfMaxTimes != nullptr && rLayer.pVecVelocities != nullptr);
+	ASSERT(rLayer.pVecVelocities != nullptr);
 	if (sLayers.empty())
 	{
 		ScopedSuppressAllocationTracking suppress;
@@ -113,9 +115,58 @@ int64_t Collision::AddLayer(const CollisionLayer& rLayer)
 		LOG(kDefault, kError, "Collision: sLayers overflow (count: {}, capacity: {}). Increase kiCollisionLayerPreallocate in Collision.h", siLayerCount, std::ssize(sLayers));
 		ASSERT(false);
 	}
-	sLayers.at(iLayerIndex) = rLayer;
+
+	// The same base AllocateResultStorage later writes to sLayerBaseOffsets
+	int64_t iBase = 0;
+	for (int64_t i = 0; i < iLayerIndex; ++i)
+	{
+		iBase += sLayers.at(i).iCount;
+	}
+	int64_t iEnd = iBase + rLayer.iCount;
+	int64_t iRowCount = (sMaximumTimes.Size() == 0) ? std::max(kiCollisionResultSpanPreallocate, iEnd) : iEnd;
+	if (iRowCount > sMaximumTimes.Size())
+	{
+		sMaximumTimes.Resize(iRowCount);
+		sFlags.Resize(iRowCount);
+		sTerrainHits.Resize(iRowCount);
+		sBoundaryHits.Resize(iRowCount);
+	}
+
+	for (int64_t i = 0; i < rLayer.iCount; ++i)
+	{
+		SegmentHit terrainHit {};
+		if (rLayer.pTerrainStaticData != nullptr)
+		{
+			terrainHit = TracePointAgainstTerrain(*rLayer.pTerrainStaticData, rLayer.pVecStartPositions[i], rLayer.pVecEndPositions[i]);
+		}
+		SegmentHit boundaryHit = TracePointToCellExit(LocalCellArea(), rLayer.pVecStartPositions[i], rLayer.pVecEndPositions[i]);
+		// A cell-exit hit time is finite and below float max, so a terrain-free layer's cutoff is exactly the boundary time.
+		float fMaximumTime = std::numeric_limits<float>::max();
+		if (terrainHit.bHit)
+		{
+			fMaximumTime = terrainHit.fTime;
+		}
+		if (boundaryHit.bHit)
+		{
+			fMaximumTime = std::min(fMaximumTime, boundaryHit.fTime);
+		}
+		sTerrainHits[iBase + i] = terrainHit;
+		sBoundaryHits[iBase + i] = boundaryHit;
+		sMaximumTimes[iBase + i] = fMaximumTime;
+	}
+
+	CollisionLayer& rStoredLayer = sLayers.at(iLayerIndex);
+	rStoredLayer = rLayer;
+	rStoredLayer.pfMaxTimes = sMaximumTimes.Data() + iBase;
+	rStoredLayer.pFlags = sFlags.Data() + iBase;
 	++siLayerCount;
 	return iLayerIndex;
+}
+
+std::span<CollisionFlags_t> Collision::GetLayerFlags(int64_t iLayerIndex)
+{
+	const CollisionLayer& rLayer = sLayers.at(iLayerIndex);
+	return {rLayer.pFlags, static_cast<size_t>(rLayer.iCount)};
 }
 
 ZoneRange Collision::CalculateZoneRange(float fMinimumX, float fMaximumX, float fMinimumY, float fMaximumY, float fRadius)
@@ -631,6 +682,27 @@ std::span<const CollisionResult> Collision::GetCollisions(int64_t iLayerIndex, i
 	if (rSpan.iCount > 0)
 	{
 		return {sResultEntries.Data() + rSpan.iOffset, static_cast<size_t>(rSpan.iCount)};
+	}
+	return {};
+}
+
+CollisionOutcome Collision::GetOutcome(int64_t iLayerIndex, int64_t iIndex)
+{
+	if (!GetCollisions(iLayerIndex, iIndex).empty())
+	{
+		return {.eType = CollisionOutcomeType::kEntity};
+	}
+
+	int64_t iRow = sLayerBaseOffsets[iLayerIndex] + iIndex;
+	const SegmentHit& rTerrainHit = sTerrainHits[iRow];
+	const SegmentHit& rBoundaryHit = sBoundaryHits[iRow];
+	if (rTerrainHit.bHit && (!rBoundaryHit.bHit || rTerrainHit.fTime <= rBoundaryHit.fTime))
+	{
+		return {.eType = CollisionOutcomeType::kTerrain, .vecTerrainPosition = rTerrainHit.vecPosition};
+	}
+	if (rBoundaryHit.bHit)
+	{
+		return {.eType = CollisionOutcomeType::kCellExit};
 	}
 	return {};
 }

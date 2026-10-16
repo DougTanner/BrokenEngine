@@ -7,6 +7,7 @@
 #if defined(BT_SERVER)
 #include "Agent/Commands/ReplayHarnessRigs.h"
 #include "File/Replay.h"
+#include "Network/Server/ServerBroadcaster.h"
 #include "Network/Server/ServerSession.h"
 #include "Network/Server/ServerTransferManager.h"
 #endif
@@ -21,6 +22,11 @@ namespace engine
 
 GameBase::GameBase()
 {
+	// Registration order fixes type indices: engine collections, then the game's.
+#if defined(BT_CLIENT)
+	game::FrameInterpolate::AssignExplosionTuning();
+#endif
+	ForEachRegister(InterpolateTypes {});
 	game::FrameInterpolate::Register();
 
 #if defined(BT_SERVER)
@@ -39,9 +45,10 @@ GameBase::~GameBase()
 }
 
 #if defined(BT_CLIENT)
-// Fixed policy order: BeginPoll -> quit -> modal gate -> chat gate -> cursor -> pause/back-out -> engine toggles -> game
-// callback -> previous-snapshot assignment. The modal and chat gates skip everything after them except that assignment, so a
-// gated frame still resolves quit and still advances the previous snapshot that the next frame's edge detection needs.
+// Fixed policy order: BeginPoll -> quit -> modal gate -> chat gate -> cursor -> pause/back-out -> engine toggles ->
+// game::gpGame->ProcessGameMenuInput -> previous-snapshot assignment. The modal and chat gates skip everything after
+// them except that assignment, so a gated frame still resolves quit and still advances the previous snapshot that the
+// next frame's edge detection needs.
 void GameBase::ProcessInput(bool bLostFocus)
 {
 	MenuInput menuInput {};
@@ -59,8 +66,8 @@ void GameBase::ProcessInput(bool bLostFocus)
 		return;
 	}
 
-	// The opening frame takes the gate too, so its Enter never reaches the engine toggles or the game callback. The box
-	// opens only while the Tweaks overlay is hidden, because ChatScreen renders only then.
+	// The opening frame takes the gate too, so its Enter never reaches the engine toggles or ProcessGameMenuInput. The
+	// box opens only while the Tweaks overlay is hidden, because ChatScreen renders only then.
 	if (menuInput.flags & MenuInputFlags::kOpenChat && !(mGameFlags & GameFlags::kMainMenu) && meUiState == UiState::kNone && !mbShowImGui)
 	{
 		mChatLog.bInputOpen = true;
@@ -145,7 +152,7 @@ void GameBase::ProcessInput(bool bLostFocus)
 			gDebugTextureIndex.Set(fPrevious);
 		}
 
-		// Local pause state flips here so the callback's pause packet reports the state the client just entered.
+		// Local pause state flips here so ProcessGameMenuInput's pause packet reports the state the client just entered.
 		if (menuInput.flags & MenuInputFlags::kTogglePauseFrame)
 		{
 			mGameFlags.Toggle(GameFlags::kPaused);
@@ -177,10 +184,10 @@ void GameBase::ProcessInput(bool bLostFocus)
 		}
 	}
 
-	ProcessGameMenuInput(menuInput, inputPoll);
+	game::gpGame->ProcessGameMenuInput(menuInput, inputPoll);
 
-	// Runs after every edge consumer, including the game callback and the modal path that skips it; moving this
-	// earlier silently breaks edge detection for whatever still has to run.
+	// Runs after every edge consumer, including game::gpGame->ProcessGameMenuInput and the modal path that skips it;
+	// moving this earlier silently breaks edge detection for whatever still has to run.
 	gpInput->mPreviousRawInput = gpRawInputManager->mRawInput;
 }
 #endif // BT_CLIENT
@@ -246,7 +253,7 @@ void GameBase::ClientUpdate()
 		iFullTicks = 0;
 	}
 
-	game::gpClientSession->UpdateDesiredCoordinates(game::SubscriptionChangeReason::kPollTick);
+	game::gpClientSession->mpRuntime->UpdateDesiredCoordinates("kPollTick");
 	game::gpClientSession->mpRuntime->SynchronizeSubscriptions();
 	PrepareActiveSet();
 
@@ -297,12 +304,10 @@ void GameBase::ClientUpdate()
 	}
 
 	// Set mfLastDeltaTime after the ceiling clamp so it records executed sim seconds (iFullTicks * kfDeltaTime), in
-	// lockstep with miTickCounter and mfCurrentTime. PrepareActiveSet runs earlier and has no client-side reader of
-	// this delta.
+	// lockstep with miTickCounter. PrepareActiveSet runs earlier and has no client-side reader of this delta.
 	mfLastDeltaTime = static_cast<float>(iFullTicks) * kfDeltaTime;
 
 	miTickCounter += iFullTicks;
-	mfCurrentTime += static_cast<float>(iFullTicks) * kfDeltaTime;
 
 	gpProfileManager->CpuStart(game::kCpuTimerFrameUpdate);
 	game::gpClientSession->Reconcile();
@@ -381,9 +386,7 @@ void GameBase::ServerUpdate()
 	for (int64_t i = 0; i < iFullTicks; ++i)
 	{
 		int64_t iPreviousTickCounter = miTickCounter;
-		float fPreviousCurrentTime = mfCurrentTime;
 		++miTickCounter;
-		mfCurrentTime += kfDeltaTime;
 
 		common::LogTickScope perTickScope(miTickCounter);
 
@@ -414,12 +417,11 @@ void GameBase::ServerUpdate()
 					// Replay stopped after this iteration advanced the sim clock but before it finalized a frame.
 					// Restore the exact pre-tick values so buffered-frame indexing remains contiguous.
 					miTickCounter = iPreviousTickCounter;
-					mfCurrentTime = fPreviousCurrentTime;
 					iFullTicks = iFinalizedTicks;
 					mfLastDeltaTime = static_cast<float>(iFinalizedTicks) * kfDeltaTime;
 					// Rebuild only active frames; normal input/manager progression resumes on the next server update.
-					game::gpGame->ComputeActiveSet();
-					game::gpGame->EnsureNextFrames();
+					game::gpServerSession->mpRuntime->ComputeActiveSet();
+					EnsureNextFrames();
 				}
 				break;
 			}
@@ -471,7 +473,7 @@ void GameBase::ServerUpdate()
 		gpProfileManager->mFullUpdatesInTheLastSecond.Set(iFullTicks);
 	}
 
-	game::gpGame->mGameSaveLoad.TickAutosave();
+	mServerSaveLoad.TickAutosave();
 }
 #endif // BT_SERVER
 
@@ -514,7 +516,7 @@ void GameBase::BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveC
 	{
 		for (int64_t j = iBegin; j < iEnd; ++j)
 		{
-			RunFrameTick(rActiveFrameReferences.at(static_cast<size_t>(j)), miTickCounter, mfCurrentTime);
+			RunFrameTick(rActiveFrameReferences.at(static_cast<size_t>(j)), miTickCounter);
 		}
 	};
 	if constexpr (kbFrameDispatch)
@@ -535,7 +537,7 @@ void GameBase::FinalizeFrameTick()
 	// Transfer entities that crossed cell boundaries into destination cells
 	if (!mbReplaying)
 	{
-		game::gpGame->HarvestTransfers();
+		game::gpServerSession->mpTransferManager->HarvestTransfers();
 	}
 	else
 	{
@@ -579,7 +581,7 @@ void GameBase::ResetRenderClock()
 }
 
 // Render-side sim clock advance. Integrates mfRenderTime (sim seconds) and returns fDeltaTime in [0, kfDt], the
-// sub-tick interpolation offset from the window start fWindowStartTime. fWindowStartTime is the source frame's fCurrentTime; bPaused freezes the
+// sub-tick interpolation offset from the window start fWindowStartTime. fWindowStartTime is the source frame's tick instant; bPaused freezes the
 // clock; bHaveInterpolationWindow gates the seeded steady-state path; fSimulationDeltaSeconds is this frame's sim delta
 // (wall x current time ratio). Clamped to [fWindowStartTime, fWindowStartTime + kfDt] so rendering only ever interpolates between two committed
 // ticks, never extrapolates. Preserve exact float ops — client-render-clock invariants.
@@ -731,11 +733,11 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 		const Cell& rCameraCell = mCells.at(cameraCoordinate);
 		bool bHaveInterpolationWindow = (rCameraCell.iSnapshotCount >= kiRenderBehindTicks + 1);
 		// RenderFrame returns the frame kiRenderBehindTicks behind tail once populated, else the oldest
-		// available. Either way, its fCurrentTime is the START of the current render window. Promoted to double so mfRenderTime - fWindowStartTime keeps
+		// available. Either way, its tick's instant is the START of the current render window. Promoted to double so mfRenderTime - fWindowStartTime keeps
 		// nanosecond precision even after hours of accumulated game time (float ULP at ~16384s is 2ms,
 		// which would otherwise quantize the alpha and visibly stutter at high zoom).
 		const game::Frame& rSourceFrame = RenderFrame(cameraCoordinate);
-		double fWindowStartTime = rSourceFrame.interpolate.fCurrentTime;
+		double fWindowStartTime = common::NanosecondsToFloatSeconds<double>(TickToSimulationTime(rSourceFrame.interpolate.iTick).time_since_epoch());
 
 		bool bPaused = mGameFlags & GameFlags::kPaused;
 
@@ -763,14 +765,12 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 		{
 			const game::Frame& rFrame = RenderFrame(rCoordinate);
 			Cell& rCell = mCells.at(rCoordinate);
-			if (rFrame.interpolate.iTick < rCell.iLastRenderedTick
-			 || (rFrame.interpolate.iTick == rCell.iLastRenderedTick && rFrame.interpolate.fCurrentTime < rCell.fLastRenderedTime))
+			if (rFrame.interpolate.iTick < rCell.iLastRenderedTick)
 			{
-				LOG(kNetwork, kError, "Render regressed to older frame Coord: ({},{}) Tick: {} LastTick: {} Time: {} LastTime: {}", rCoordinate.iX, rCoordinate.iY, rFrame.interpolate.iTick, rCell.iLastRenderedTick, common::Wb(rFrame.interpolate.fCurrentTime, 4), common::Wb(rCell.fLastRenderedTime, 4));
+				LOG(kNetwork, kError, "Render regressed to older frame Coord: ({},{}) Tick: {} LastTick: {}", rCoordinate.iX, rCoordinate.iY, rFrame.interpolate.iTick, rCell.iLastRenderedTick);
 				DEBUG_BREAK();
 			}
 			rCell.iLastRenderedTick = rFrame.interpolate.iTick;
-			rCell.fLastRenderedTime = rFrame.interpolate.fCurrentTime;
 			float fCoordinateDeltaTime = (rCell.iSnapshotCount >= kiRenderBehindTicks + 1) ? fDeltaTime : 0.0f;
 			game::FrameInterpolate::AllocateAndCopy(mRenderInterpolates.try_emplace(rCoordinate).first->second, rFrame.interpolate);
 			game::FrameInterpolate::Update(mRenderInterpolates.at(rCoordinate), rFrame, fCoordinateDeltaTime);
@@ -811,19 +811,6 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 	if (bHaveRenderableCamera)
 	{
 		gpCamera->Update(mRenderInterpolates.at(cameraCoordinate), static_cast<float>(mfLastRenderFrameSeconds));
-	}
-
-	// Decay visual error offset for smooth reconciliation corrections using the sim-scaled render delta
-	// (wall delta multiplied by the active time ratio; equal to wall time at ratio 1.0), matching the
-	// camera and player interpolation rather than a fixed 1/refreshRate.
-	{
-		float fDisplayDeltaTime = static_cast<float>(mfLastRenderFrameSeconds);
-		float fDecay = std::exp(-game::Game::kfVisualErrorDecayRate * fDisplayDeltaTime);
-		game::gpGame->mVecVisualErrorOffset = XMVectorScale(game::gpGame->mVecVisualErrorOffset, fDecay);
-		if (XMVectorGetX(XMVector3Length(game::gpGame->mVecVisualErrorOffset)) < game::Game::kfVisualErrorMinDistance)
-		{
-			game::gpGame->mVecVisualErrorOffset = {};
-		}
 	}
 }
 
@@ -895,9 +882,9 @@ void GameBase::Render()
 	const std::vector<GridCoord>& rActiveCoordinates = mActiveCoordinates;
 
 	// Interpolate elapsed time with the sub-step remainder for smooth rendering
-	float fCurrentTime = mfCurrentTime + std::max(0.0f, common::NanosecondsToFloatSeconds<float>(mTimeStep.mTickRemainderNanoseconds));
+	std::chrono::duration<float> elapsedTime(common::NanosecondsToFloatSeconds<float>((TickToSimulationTime(miTickCounter) + std::max(0ns, mTimeStep.mTickRemainderNanoseconds)).time_since_epoch()));
 
-	GridCoord cameraCoordinate = game::gpGame->mClientGridCoordinate;
+	GridCoord cameraCoordinate = mClientGridCoordinate;
 	bool bHaveRenderableCamera = false;
 	SelectRenderCamera(rActiveCoordinates, cameraCoordinate, bHaveRenderableCamera);
 	UpdateRenderInterpolation(rActiveCoordinates, cameraCoordinate, bHaveRenderableCamera);
@@ -912,13 +899,19 @@ void GameBase::Render()
 	}
 
 	// Pack island instances after the current camera update and only once the acquired framebuffer index is valid.
-	game::gpGame->UpdateActiveIslands();
-	gpGraphics->RenderGlobal(std::chrono::duration<float>(fCurrentTime));
+	UpdateActiveIslands();
+	gpGraphics->RenderGlobal(elapsedTime);
 
 	// Capture command buffer index before async launch to avoid re-reading in async thread
 	int64_t iCommandBuffer = gpSwapchainManager->miFramebufferIndex;
-	gpGraphics->RenderMainPresentAcquire(iCommandBuffer, mRenderInterpolates, rActiveCoordinates, cameraCoordinate, std::chrono::duration<float>(fCurrentTime));
+	gpGraphics->RenderMainPresentAcquire(iCommandBuffer, mRenderInterpolates, rActiveCoordinates, cameraCoordinate, elapsedTime);
 
+}
+
+bool GameBase::ShouldUseCrosshair() const
+{
+	auto it = mCells.find(mClientGridCoordinate);
+	return it != mCells.end() && it->second.TailFrame() != nullptr && !(mGameFlags & GameFlags::kMainMenu) && meUiState == UiState::kNone;
 }
 #endif // BT_CLIENT
 
@@ -942,12 +935,8 @@ void GameBase::RefreshReplayActiveSet()
 }
 #endif // BT_SERVER
 
-void GameBase::CreateCellAtCoordinate(GridCoord coordinate)
+game::Frame& GameBase::CreateCellFrame(Cell& rCell, GridCoord coordinate)
 {
-	// Heap: unordered_map insertion + make_unique<Frame>. Frame persists across game lifetime
-	ScopedSuppressAllocationTracking suppress;
-
-	Cell& rCell = mCells.try_emplace(coordinate).first->second;
 #if defined(BT_CLIENT)
 	// Client uses snapshot ring as the source of truth — seed slot 0.
 	rCell.iSnapshotHead = 0;
@@ -958,15 +947,90 @@ void GameBase::CreateCellAtCoordinate(GridCoord coordinate)
 	rCell.pCurrent = std::make_unique<game::Frame>();
 	game::Frame& rFrame = *rCell.pCurrent;
 #endif
-	rFrame.interpolate.iTick = miTickCounter;
-	rFrame.interpolate.fCurrentTime = mfCurrentTime;
-	rFrame.interpolate.gameFlags.Set(game::GameFlags::kGame);
+	rFrame.postRender.uiFrameIdentifier = muiNextFrameId++;
+	rFrame.postRender.randomEngine.TimeSeed();
 	game::gpGame->InitializeFramePostRender(rFrame);
 
-	CellStaticData& rStaticData = rCell.staticData;
-	rStaticData.coordinate = coordinate;
-	GenerateIslandChain(coordinate, rStaticData.islands);
+	rCell.staticData.coordinate = coordinate;
+	return rFrame;
+}
+
+void GameBase::CreateCellAtCoordinate(GridCoord coordinate)
+{
+	// Heap: unordered_map insertion + make_unique<Frame>. Frame persists across game lifetime
+	ScopedSuppressAllocationTracking suppress;
+
+	Cell& rCell = mCells.try_emplace(coordinate).first->second;
+	game::Frame& rFrame = CreateCellFrame(rCell, coordinate);
+	rFrame.interpolate.iTick = miTickCounter;
+
+	GenerateIslandChain(coordinate, rCell.staticData.islands);
 	// navigationData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
+}
+
+void GameBase::CreateNewFrame()
+{
+	// Heap: make_unique<Frame> with all its SOA collections. Frame persists across the entire
+	// game state lifetime, so workbuffer (lost on Pop) can't hold it.
+	ScopedSuppressAllocationTracking suppress;
+
+	mCells.clear();
+	Cell& rCell = mCells.try_emplace(kOriginCoordinate).first->second;
+	CreateCellFrame(rCell, kOriginCoordinate);
+
+	// Debug builds turn the main-menu cell into a single centered island browser ('E' cycles it);
+	// release builds keep the procedural island chain. Gameplay cells always use the chain.
+	bool bMenuBrowse = false;
+	if constexpr (kbDebugInput)
+	{
+		bMenuBrowse = static_cast<bool>(mGameFlags & GameFlags::kMainMenu);
+	}
+	if (bMenuBrowse)
+	{
+		BuildMenuIslandPlacement(miMenuIslandIndex, rCell.staticData.islands);
+	}
+	else
+	{
+		GenerateIslandChain(kOriginCoordinate, rCell.staticData.islands);
+	}
+	// navigationData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
+
+#if defined(BT_SERVER)
+	rCell.pNext = std::make_unique<game::Frame>();
+#endif
+}
+
+// Debug-only main-menu island browser: build the origin cell as a single island centered at (0,0),
+// selected by index into the boot-fixed area-sorted list of all packed islands (largest footprint
+// first). clear()+push_back reuses the vector's capacity (grown once under
+// ScopedSuppressAllocationTracking in CreateNewFrame), so the cycle path never heap-allocates in the
+// main loop.
+void GameBase::BuildMenuIslandPlacement(int64_t iIndex, std::vector<IslandPlacement>& rOutput)
+{
+	rOutput.clear();
+	common::crc_t islandCrc = gpIslandTerrain->mIslandCrcsByArea.at(static_cast<size_t>(iIndex));
+	rOutput.push_back({.islandCrc = islandCrc, .f2WorldPosition = {0.0f, 0.0f}, .fRotation = 0.0f});
+}
+
+void GameBase::ChangeFrameToMainMenu()
+{
+#if defined(BT_CLIENT)
+	game::gpClientSession->mpRuntime->Disconnect();
+#endif
+
+	if (mGameFlags & GameFlags::kMainMenu)
+	{
+		DEBUG_BREAK();
+		return;
+	}
+
+#if defined(BT_CLIENT)
+	game::gpGame->StartMenuMusic();
+#endif // BT_CLIENT
+
+	mGameFlags.Set(GameFlags::kMainMenu);
+	CreateNewFrame();
+	ResetSession();
 }
 
 void GameBase::PrepareActiveSet()
@@ -978,14 +1042,91 @@ void GameBase::PrepareActiveSet()
 		// SyncReplayTick creates and overwrites each recorded FrameInput. Do not advance normal server managers here.
 		return;
 	}
+
+	game::gpServerSession->mpRuntime->ComputeActiveSet();
+	EnsureNextFrames();
+	game::gpServerSession->mpBroadcaster->BuildFrameInputs();
+#else
+	game::gpClientSession->mpRuntime->ComputeActiveSet();
+	game::gpGame->UpdateCameraShake();
+#endif // BT_SERVER
+}
+
+void GameBase::SetClientGridCoordinate(GridCoord coordinate)
+{
+#if defined(BT_CLIENT)
+	if (game::gpClientSession->mpRuntime->mStateFlags & ClientSessionStateFlags::kClientGridCoordinatePinned)
+	{
+		return;
+	}
+#endif // BT_CLIENT
+	mClientGridCoordinate = coordinate;
+#if defined(BT_CLIENT)
+	game::gpClientSession->mpRuntime->miVisibleNeighborCount = 0;
+#endif // BT_CLIENT
+}
+
+void GameBase::ResetSession()
+{
+	LOG(kDefault, kDebug, "GameBase::ResetSession()");
+
+	miTickCounter = 0;
+
+#if defined(BT_SERVER)
+	gpReplay->ResetStreams();
+	mGameFlags.Set(GameFlags::kSaveReplay, false);
 #endif // BT_SERVER
 
-	game::gpGame->ComputeActiveSet();
-#if defined(BT_SERVER)
-	game::gpGame->EnsureNextFrames();
-#endif
-	game::gpGame->BuildFrameInputs();
+#if defined(BT_CLIENT)
+	gpCamera->ResetForSession();
+	gbSmokeClear = true;
+	gpParticleManager->mbReset = true;
+	WindTrailsInterpolate::sPreviousPositions.clear();
+#endif // BT_CLIENT
+
+	mGameFlags.Set(GameFlags::kPaused, false);
+	game::gpGame->ResetGameState();
+#if defined(BT_CLIENT)
+	game::gpClientSession->mpRuntime->mStateFlags.Set(ClientSessionStateFlags::kClientGridCoordinatePinned, false);
+#endif // BT_CLIENT
+	SetClientGridCoordinate(kOriginCoordinate);
+	mActiveCoordinates.clear();
+	mActiveCoordinates.push_back(mClientGridCoordinate);
 }
+
+#if defined(BT_SERVER)
+void GameBase::EnsureNextFrames()
+{
+	// Heap: cell entries and their next frames persist across ticks.
+	ScopedSuppressAllocationTracking suppress;
+
+	for (const GridCoord& rCoordinate : mActiveCoordinates)
+	{
+		if (mCells.try_emplace(rCoordinate).first->second.pNext == nullptr)
+		{
+			mCells.at(rCoordinate).pNext = std::make_unique<game::Frame>();
+		}
+	}
+}
+#endif // BT_SERVER
+
+#if defined(BT_CLIENT)
+void GameBase::UpdateActiveIslands()
+{
+	// Include confirmed cells and the client cell's provisional frame.
+	// The filtered coordinates use per-frame workbuffer storage; Islands::UpdateActiveIslands' nested reservation pops before this arena.
+	common::ScopedWorkbufferArena subscribedArena = common::gpThreadLocal->mWorkbuffer.Push();
+	for (const GridCoord& rCoordinate : mActiveCoordinates)
+	{
+		auto it = mCells.find(rCoordinate);
+		if (it != mCells.end() && (it->second.iConfirmedTick >= 0 || rCoordinate == mClientGridCoordinate))
+		{
+			subscribedArena.mBuffer.PushBack<GridCoord>(rCoordinate);
+		}
+	}
+	gpIslands->UpdateActiveIslands(mCells, subscribedArena.mBuffer.Span<const GridCoord>());
+}
+#endif // BT_CLIENT
 
 #if defined(BT_SERVER)
 void GameBase::SwapFrames()
@@ -999,7 +1140,7 @@ void GameBase::SwapFrames()
 	// Ensure active entries exist for next iteration's AllocateAndCopy.
 	if (!mbReplaying)
 	{
-		game::gpGame->EnsureNextFrames();
+		EnsureNextFrames();
 	}
 	else if (mCells.contains(game::gpGame->mClientGridCoordinate) && mCells.at(game::gpGame->mClientGridCoordinate).pNext == nullptr)
 	{

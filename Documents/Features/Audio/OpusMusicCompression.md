@@ -6,7 +6,16 @@ Revisit When: shipped data size or download size starts to matter (the first ext
 
 `ExportAudio::Export` (`DataPacker/Source/ExportJobs/ExportAudio.cpp`) decodes each `.wav` to float, runs `audiorepair::RepairAudio`, resamples to `audiorepair::kiAudioExportSampleRate` (48 kHz), and stores raw interleaved 16-bit PCM with a `WAVE_FORMAT_PCM` `AudioHeader` (`Common/DataFile.h`). Music and sound effects share this path; a `Music` path component only limits repair.
 
-At runtime the Audio pack is lazy and client-only (`IsEagerChunk`, `IsServerChunk` in `Engine/Source/File/PackChunks.cpp`). `StreamingVoice` (`Engine/Source/Audio/StreamingVoice.h`) plays music from start to end. It reads ahead through three 16 KiB slots (`kiBufferCount`, `kiBufferSize`) with `PackChunks::TryReadChunkData`. File loader threads do the reads, and `AudioManager::Update` on the main thread polls them and submits slots to XAudio2 in order. `GetRemainingTime` divides the remaining payload bytes by `nAvgBytesPerSec`, and `ShouldTransition` uses that time to start the `kCrossfadeDuration` crossfade to the next track. Music has no seek and no loop. `_loop` looping applies only to static voices.
+At runtime the Audio pack is lazy and client-only (`IsEagerChunk`,
+`IsServerChunk` in `Engine/Source/File/PackChunks.cpp`). `StreamingVoice`
+(`Engine/Source/Audio/StreamingVoice.h`) plays music from start to end. It reads
+ahead through three 16 KiB slots (`kiBufferCount`, `kiBufferSize`) with
+`PackChunks::TryReadChunkData`. File loader threads do the reads, and
+`AudioManager::Update` on the main thread polls them and submits slots to
+XAudio2 in order. `GetRemainingTime` divides the remaining payload bytes by
+`nAvgBytesPerSec`, and `ShouldTransition` uses that time to start the
+`kCrossfadeDuration` crossfade to the next track. Music has no seek and no loop.
+`_loop` looping applies only to static voices.
 
 Sizes, measured from the primary checkout's built `Audio.pack` (DataPacker output of 2026-10-06; this worktree has no built packs):
 
@@ -19,7 +28,17 @@ Sizes, measured from the primary checkout's built `Audio.pack` (DataPacker outpu
 - **Scope.** Only music is encoded as Opus. Sound effects keep the current PCM path and resident playback. The existing `bMusic` test in `ExportAudio::Export` selects the encoder after repair and resampling. Opus runs natively at 48 kHz, so the mastering-rate contract in `Engine/Source/Audio/AGENTS.md` still holds.
 - **Encoder (choice).** One option is to link libopusenc into DataPacker as a new ThirdParty library. The other is to run the opus-tools `opusenc` CLI, the way `ExportShader.cpp` runs `glslc`/`glslangValidator`. Unlike those tools, `opusenc` does not ship with the Vulkan SDK, so it would become a new build-machine dependency, and the repaired, resampled samples would first be written to a temporary WAV. The bitrate is also a choice; 96 kbps is the working figure.
 - **Payload framing (choice).** The payload could be Ogg Opus decoded with opusfile, which also pulls in libogg. Or it could be raw Opus packets with an engine-defined length prefix decoded with libopus alone. Today's reads are sequential, so either suits the range-read path.
-- **Decoder library (choice).** One option is libopus with opusfile, both BSD-3-Clause from Xiph; libopus's `COPYING` also references royalty-free patent licenses. The alternative is Vorbis through `ThirdParty/stb/stb_vorbis.c` (MIT or public domain). That file is already present but no project compiles it. It only decodes, so DataPacker would still need a Vorbis encoder library, and Vorbis gives lower quality per bit (Opus 3.999 vs Vorbis 3.513 in the HydrogenAudio 64 kbps listening test). Either way, a new library needs explicit user approval and license review under `ThirdParty/AGENTS.md`. Integration goes through `ThirdParty/Prebuilts/Source/` wrappers, and ThirdParty is otherwise not modified.
+- **Decoder library (choice).** One option is libopus with opusfile, both
+  BSD-3-Clause from Xiph; libopus's `COPYING` also references royalty-free
+  patent licenses. The alternative is Vorbis through
+  `ThirdParty/stb/stb_vorbis.c` (MIT or public domain). That file is already
+  present but no project compiles it. It only decodes, so DataPacker would still
+  need a Vorbis encoder library, and Vorbis gives lower quality per bit
+  (Opus 3.999 vs Vorbis 3.513 in the HydrogenAudio 64 kbps listening test).
+  Either way, a new library needs explicit user approval and license review
+  under `ThirdParty/AGENTS.md`. Integration goes through
+  `ThirdParty/Prebuilts/Source/` wrappers, and ThirdParty is otherwise not
+  modified.
 - **Pack format.** `AudioHeader` must mark the codec. It also needs the decoded length, because `GetRemainingTime` can no longer derive time from compressed bytes. Pack open rejects audio chunks that carry `kLz4Compressed` or `kZlibCompressed`, so those flags cannot mark the codec. Bump `DataHeader::kiVersion` and `ExportAudio::kiVersion` so older packs are rejected. Music has no PCM fallback.
 - **Runtime decode.** `StreamingVoice` keeps its ordered range reads and slot pipeline, and also feeds the compressed bytes through a per-voice decoder into PCM slots. A crossfade therefore runs two decoders at once. PCM handed to XAudio2 still passes `AssertValidPackedAudio`. Which thread decodes is a choice:
   - the main thread inside `AudioManager::Update`, where reads are polled and slots submitted today;

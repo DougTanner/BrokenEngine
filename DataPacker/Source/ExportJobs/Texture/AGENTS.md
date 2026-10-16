@@ -12,11 +12,25 @@ Final texture chunks use LZ4 and store compressed and uncompressed sizes for `Fi
 
 ## Encoding
 
-Mip generation, format conversion, underwater masking, and direct BC4/5/7 block compression are offline quality-sensitive work. Preserve deterministic inputs and the configured base encoders; the optional bc7e.ispc route remains disabled. The shared worker pool dispatches bounded block-row ranges, and whole encode chains remain serialized by the caller-held `sEncodeMutex`; [Common threading](../../../../Common/Threading/AGENTS.md) owns `Dispatch` participation and reentrancy. `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` fails before encoding in both the job entry point and shared encoding path.
+Mip generation, format conversion, underwater masking, and direct BC4/5/7 block
+compression are offline quality-sensitive work. Preserve deterministic inputs
+and the configured base encoders; the optional bc7e.ispc route remains disabled.
+The shared worker pool dispatches bounded block-row ranges, and whole encode
+chains remain serialized by the caller-held `sEncodeMutex`;
+[Common threading](../../../../Common/Threading/AGENTS.md) owns `Dispatch`
+participation and reentrancy. `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` fails
+before encoding in both the job entry point and shared encoding path.
 
 ## Migration
 
-`MigrateLegacyIntermediates()` runs before readers consume cached intermediates. It walks the tracked asset input directories (`gpFileManager->mpInputDirectories`), not the `%LOCALAPPDATA%` cache, and rewrites qualifying files in place. It is idempotent: files already carrying the magic marker are skipped. Migration validates the legacy shape and payload before that rewrite; preserve the ordering, because the write is not transactional and it is changing tracked files. Dimensions, mip count, texture format, and payload meaning must survive migration.
+`MigrateLegacyIntermediates()` runs before readers consume cached intermediates.
+It walks the tracked asset input directories
+(`gpFileManager->mpInputDirectories`), not the `%LOCALAPPDATA%` cache, and
+rewrites qualifying files in place. It is idempotent: files already carrying the
+magic marker are skipped. Migration validates the legacy shape and payload
+before that rewrite; preserve the ordering, because the write is not
+transactional and it is changing tracked files. Dimensions, mip count, texture
+format, and payload meaning must survive migration.
 
 Eligibility is deliberately narrow: the inverse format map recognizes only the BC4, BC5, BC7, and R16 intermediate extensions, and everything else is skipped. The IBL (image-based lighting) `.R16G16B16A16_SFLOAT` cubemap intermediates are excluded on purpose — they are legacy-shaped by design and carry no magic marker, so they look exactly like unmarked files awaiting migration. Widening the format map would zlib-wrap and re-header raw half-float cube faces and silently break IBL.
 

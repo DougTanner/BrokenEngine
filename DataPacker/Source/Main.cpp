@@ -59,8 +59,8 @@ static bool WriteIfChanged(std::string_view content, const std::filesystem::path
 
 // Generated symbol name -> the relative file that produced it. PathToCppVariable strips every non-identifier byte, so
 // distinct paths can collapse onto one name and silently emit a duplicate constant. The table is shared by every type
-// in the run and is filled for clean types too, so a cross-type collision is caught even when only one type regenerates
-// its header.
+// in one project's run and is filled for clean types too, so a cross-type collision is caught even when only one type
+// regenerates its header.
 static std::unordered_map<std::string, std::string> sGeneratedCrcNames;
 
 template <typename T>
@@ -116,12 +116,12 @@ static bool IsFileLockedError(const std::error_code& rError)
 	return rError.category() == std::system_category() && IsFileLockedError(rError.value());
 }
 
-// Publishes the manifest and pack over the previous output. A running BrokenEngineSandbox client or server keeps its
+// Publishes the manifest and pack over the previous output. A running game client or server keeps its
 // packs open share-read-only for the whole process lifetime, so without this the pack rename fails after the manifest
 // already published, leaving a torn publish. Returns false when the user cancels the export at the retry prompt.
 static bool PublishManifestAndPack(const std::filesystem::path& rTemporaryManifestFile, const std::filesystem::path& rManifestFile, const std::filesystem::path& rTemporaryPackFile, const std::filesystem::path& rPackFile)
 {
-	std::string lockedFailure = std::format("\"{}\" is locked by a running BrokenEngineSandbox client or server.", rPackFile.string());
+	std::string lockedFailure = std::format("\"{}\" is locked by a running game client or server.", rPackFile.string());
 
 	bool bManifestPublished = false;
 	// Empty means no prompt is pending; otherwise it is the sentence describing why publishing failed
@@ -696,6 +696,7 @@ static bool GenerateDataHeader(const std::filesystem::path& rOutPath)
 bool MainThread(int64_t iArgumentCount, char* ppcArguments[], DataPackerRunSummary& rRunSummary)
 {
 	common::Multithreading multithreading(std::max<int64_t>(0, common::HardwareCoreCount() - 3));
+	sGeneratedCrcNames.clear();
 
 	LOG(kDefault, kDebug, "\nData Packer");
 	ScopedLogIndent scopedLogIndent;
@@ -773,19 +774,60 @@ bool MaterializeData(char* ppcArguments[])
 	return eResult != FileManager::EnsureLocalResult::kCancelled && eResult != FileManager::EnsureLocalResult::kFailed;
 }
 
-static bool RunCommand(int64_t iArgumentCount, char* ppcArguments[])
+static std::filesystem::path GetRepositoryRootFromExecutable()
 {
-	if (iArgumentCount >= 2 && std::string_view(ppcArguments[1]) == "--materialize-data")
+	std::wstring executableBuffer(32'768, L'\0');
+	int64_t iLength = GetModuleFileNameW(nullptr, executableBuffer.data(), static_cast<DWORD>(executableBuffer.size()));
+	if (iLength == 0 || iLength >= std::ssize(executableBuffer))
 	{
-		// CLI trust boundary: data materialization takes exactly the two input roots and output Data path
-		if (iArgumentCount != 5)
-		{
-			std::printf("--materialize-data requires exactly <engine-data> <project-data> <output-data>\n");
-			return false;
-		}
-		return MaterializeData(ppcArguments);
+		throw std::runtime_error(std::format("Unable to resolve DataPacker executable path (GetModuleFileNameW returned {}, Win32 {})", iLength, GetLastError()));
 	}
 
+	std::filesystem::path executablePath(std::wstring(executableBuffer.data(), static_cast<size_t>(iLength)));
+	std::wstring executableName = executablePath.filename().native();
+	if (CompareStringOrdinal(executableName.c_str(), -1, L"DataPacker.exe", -1, TRUE) != CSTR_EQUAL
+	 && CompareStringOrdinal(executableName.c_str(), -1, L"DataPacker.Debug.exe", -1, TRUE) != CSTR_EQUAL)
+	{
+		throw std::runtime_error(std::format(R"(DataPacker executable path has unexpected layout: {} (expected suffix DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe or DataPacker.Debug.exe))", executablePath.string()));
+	}
+
+	static constexpr const wchar_t* kpwcExpectedDirectories[] =
+	{
+		L"Output",
+		L"VisualStudio2026",
+		L"Platforms",
+		L"DataPacker",
+	};
+	std::filesystem::path repositoryRoot = executablePath.parent_path();
+	for (const wchar_t* pwcExpected : kpwcExpectedDirectories)
+	{
+		if (CompareStringOrdinal(repositoryRoot.filename().native().c_str(), -1, pwcExpected, -1, TRUE) != CSTR_EQUAL)
+		{
+			throw std::runtime_error(std::format(R"(DataPacker executable path has unexpected layout: {} (expected suffix DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe or DataPacker.Debug.exe))", executablePath.string()));
+		}
+		repositoryRoot = repositoryRoot.parent_path();
+	}
+	return repositoryRoot;
+}
+
+// Must select the same projects, in the same order, as Get-AgentGameProjects in AgentScriptCommon.psm1.
+static std::vector<std::wstring> DiscoverGameProjects(const std::filesystem::path& rRepositoryRoot)
+{
+	std::vector<std::wstring> projectNames;
+	for (const std::filesystem::directory_entry& rEntry : std::filesystem::directory_iterator(rRepositoryRoot / "Projects"))
+	{
+		std::wstring projectName = rEntry.path().filename().native();
+		if (rEntry.is_directory() && std::filesystem::is_regular_file(rEntry.path() / "Platforms" / "VisualStudio2026" / (projectName + L".vcxproj")))
+		{
+			projectNames.push_back(std::move(projectName));
+		}
+	}
+	std::ranges::sort(projectNames);
+	return projectNames;
+}
+
+static bool RunProject(int64_t iArgumentCount, char* ppcArguments[])
+{
 	std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
 	DataPackerRunSummary runSummary;
 	auto LogSummary = [&runSummary, startTime](bool bSuccess)
@@ -817,6 +859,38 @@ static bool RunCommand(int64_t iArgumentCount, char* ppcArguments[])
 		LogSummary(false);
 		throw;
 	}
+}
+
+static bool RunCommand(int64_t iArgumentCount, char* ppcArguments[])
+{
+	if (iArgumentCount >= 2 && std::string_view(ppcArguments[1]) == "--materialize-data")
+	{
+		// CLI trust boundary: data materialization takes exactly the two input roots and output Data path
+		if (iArgumentCount != 5)
+		{
+			std::printf("--materialize-data requires exactly <engine-data> <project-data> <output-data>\n");
+			return false;
+		}
+		return MaterializeData(ppcArguments);
+	}
+
+	if (iArgumentCount != 1)
+	{
+		return RunProject(iArgumentCount, ppcArguments);
+	}
+
+	std::filesystem::path repositoryRoot = GetRepositoryRootFromExecutable();
+	std::string engineDataDirectory = (repositoryRoot / "Engine" / "Data").string();
+	bool bSuccess = true;
+	for (const std::wstring& rProjectName : DiscoverGameProjects(repositoryRoot))
+	{
+		std::filesystem::path projectDirectory = repositoryRoot / "Projects" / rProjectName;
+		std::string projectDataDirectory = (projectDirectory / "Data").string();
+		std::string outputDirectory = (projectDirectory / "Platforms" / "VisualStudio2026" / "Output" / "Data").string();
+		std::array<char*, 4> projectArguments { ppcArguments[0], engineDataDirectory.data(), projectDataDirectory.data(), outputDirectory.data() };
+		bSuccess &= RunProject(std::ssize(projectArguments), projectArguments.data());
+	}
+	return bSuccess;
 }
 
 static bool RunCommandWithExceptionHandling(int64_t iArgumentCount, char* ppcArguments[])

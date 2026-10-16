@@ -34,9 +34,11 @@ and the handoff this run returns.
 
 ### Select the project
 
-3. Target the project the latest `/compile` result built, unless the user or
-   plan names a different one. Default today: BrokenEngineSandbox. Done when the
-   target project is named.
+3. Target the game project the user, plan, or brief names; otherwise the only
+   game the latest `/compile` result built. When it built several and none is
+   named, stop before the claim and return the game choice as a `Residuals` row;
+   never pick one by default. Done when the target project is named or the
+   choice is returned.
 
 4. Read the selected project's `Projects/<Project>/Documents/AgentHarness.md`
    hub before launching. Done when that hub has been read.
@@ -56,7 +58,10 @@ and the handoff this run returns.
    pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot '<absolute adopted worktree>' -Session '<short task label>' -GameDataDirectory '<normalized Data path>'
    ```
 
-   - It requires the selected project's server and client executables (reading
+   - It takes the project from the
+     `Projects\<Name>\Platforms\VisualStudio2026\Output\Data` suffix of
+     `-GameDataDirectory`, so the data path selects the game. It requires that
+     project's server and client executables (reading
      their names and `Output` directory from the project's root
      `## Machine-readable launch configuration`, not from the human `launch.md`
      recipe) unless you pass `-ServerOnly` to declare a server-only session,
@@ -87,13 +92,16 @@ and the handoff this run returns.
      resume a worker whose turn has ended.
    - If the host call times out, re-invoke the identical command; it resumes the
      same wait.
-   - Pass the latest `/compile` result's normalized `GameDataDirectory` verbatim
-     as `-GameDataDirectory` — the same packed data the launch below selects
-     with `--data-directory`. Only when the approved acceptance needs derived
-     data, such as a deliberately corrupted pack, pass instead a real byte copy
-     of that directory that keeps every `.manifest` unchanged, never links to
-     it, under `<absolute adopted worktree>\Temp`, as both `-GameDataDirectory`
-     and `--data-directory`; the scenario derives the copy. Delete the copy when
+   - Pass the selected game's normalized `GameDataDirectory` from the latest
+     `/compile` result verbatim as `-GameDataDirectory` — the same packed data
+     the launch below selects with `--data-directory`. Only when the approved
+     acceptance needs derived data, such as a deliberately corrupted pack, pass
+     instead a real byte copy of that directory that keeps every `.manifest`
+     unchanged, never links to it, under `<absolute adopted worktree>\Temp` with
+     the layout suffix kept, such as
+     `<absolute adopted worktree>\Temp\<label>\Projects\<Name>\Platforms\VisualStudio2026\Output\Data`,
+     as both `-GameDataDirectory` and `--data-directory`; the scenario derives
+     the copy. Delete the copy's `Temp\<label>` directory when
      the run ends with nothing launched or once its last release (step 44)
      returns exit `0`; otherwise name its path under `Evidence`.
    - Add `-Configuration <name>` only for a build other than `Debug`.
@@ -112,16 +120,22 @@ and the handoff this run returns.
      `<absolute AgentHarness path>` values in later calls, then report the claim
      metadata verbatim.
    - Every result — pass, blocked, or error — echoes the supplied data path as
-     `gameDataDirectory`, canonicalized once the pack-version check resolves it,
-     and carries a `packVersion` field that is `null` except on the
+     `gameDataDirectory`, canonicalized once the claim reaches the project
+     derivation; carries `project`, the derived game project, `null` until
+     derived; and carries a `packVersion` field that is `null` except on the
      `claim.pack-version-mismatch` block below.
-   - Exit `2` (`status` `blocked`) carries one of three codes. A
+   - Exit `2` (`status` `blocked`) carries one of four codes. A
      `claim.foreign-owner` reports a holder the script judged stale and
      continues into the takeover steps, which reconfirm that under step 11,
-     while `claim.executable-missing` and
+     while `claim.project-underivable`, `claim.executable-missing`, and
      `claim.pack-version-mismatch` end the attempt here; for every exit `2` the
      script never launches the game, so the Launch and ping-wait steps below are
      not performed and their absence is not a further failure to diagnose.
+   - `claim.project-underivable` means `-GameDataDirectory` lacks the
+     `Projects\<Name>\Platforms\VisualStudio2026\Output\Data` suffix: nothing
+     was provisioned and no owner token or lock was taken, so re-enter passing
+     the selected game's latest `/compile` `GameDataDirectory`, or a derived
+     copy that keeps the suffix (step 5).
    - `claim.executable-missing` means a required project executable is absent
      for the requested configuration: no provisioning ran and no lock was taken,
      so route `/compile` for the named executables and re-enter; when only the

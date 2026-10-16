@@ -10,7 +10,7 @@
 namespace game
 {
 
-void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rData, engine::AlignmentIdentifier playerAlignment)
+void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rData)
 {
 	switch (eType)
 	{
@@ -36,16 +36,16 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 				.iTypeIndex = rData.uiTypeIndex,
 				.alignment = rData.alignment,
 				// Wind-trail tuning is client-only visual debug state; reset to canonical defaults on server-authored transfer.
-				.fWindTrailIntensity = rData.alignment == playerAlignment ? gWindDepositPlayerBlastersIntensity.mfDefault : gWindDepositSpaceshipsBlastersIntensity.mfDefault,
-				.fWindTrailWidth = rData.alignment == playerAlignment ? gWindDepositPlayerBlastersWidth.mfDefault : gWindDepositSpaceshipsBlastersWidth.mfDefault,
-				.fWindTrailLengthMultiplier = rData.alignment == playerAlignment ? gWindDepositPlayerBlastersLengthMultiplier.mfDefault : gWindDepositSpaceshipsBlastersLengthMultiplier.mfDefault,
+				.fWindTrailIntensity = rData.alignment == rFrame.postRender.playerAlignment ? gWindDepositPlayerBlastersIntensity.mfDefault : gWindDepositSpaceshipsBlastersIntensity.mfDefault,
+				.fWindTrailWidth = rData.alignment == rFrame.postRender.playerAlignment ? gWindDepositPlayerBlastersWidth.mfDefault : gWindDepositSpaceshipsBlastersWidth.mfDefault,
+				.fWindTrailLengthMultiplier = rData.alignment == rFrame.postRender.playerAlignment ? gWindDepositPlayerBlastersLengthMultiplier.mfDefault : gWindDepositSpaceshipsBlastersLengthMultiplier.mfDefault,
 			});
 			break;
 
 		case StatusChangeType::kTransferMissile:
 		{
 			MissileFlags_t missileFlags;
-			if (rData.alignment == playerAlignment)
+			if (rData.alignment == rFrame.postRender.playerAlignment)
 			{
 				missileFlags.Set(MissileFlags::kTargetEnemy);
 			}
@@ -93,7 +93,7 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 				.transferLockTimer = std::chrono::duration<float>(1.0f),
 				.arrivalGracePeriod = kArrivalGracePeriod,
 				.navigationDelay = rData.navigationDelaySeconds,
-				.globalPlayerId = rData.globalPlayerId,
+				.globalPlayerId = rData.globalId,
 				.fleetWantedCoordinate = rData.fleetWantedCoordinate,
 				.iPendingFleetWantedCoordinateTicks = rData.uiPendingFleetWantedCoordinateTicks,
 				.iPendingWeaponModeTicks = rData.uiPendingWeaponModeTicks,

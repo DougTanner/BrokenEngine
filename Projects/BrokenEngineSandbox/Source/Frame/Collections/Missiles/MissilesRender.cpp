@@ -39,23 +39,17 @@ struct [[nodiscard]] MissilesRenderActiveGuard
 void MissilesInterpolate::GraphicsResources()
 {
 	engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kuiCrc, engine::kBufferMain, kpcName, sizeof(shaders::ModelLayout));
-	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipeline(kuiCrc, kpcName, kMissileModelCrc, pStorageBuffers);
-	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelineShadow(kuiCrc, kpcName, kMissileModelCrc, pStorageBuffers);
+	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(kuiCrc, kpcName, kMissileModelCrc, pStorageBuffers);
 }
 
 void MissilesInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
 {
 	siRendered = 0;
 
-	int64_t iTotalCapacity = 0;
-	for (const engine::GridCoord& rCoordinate : rActiveCoordinates)
+	int64_t iTotalCapacity = engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const MissilesInterpolate&
 	{
-		auto it = rRenderInterpolates.find(rCoordinate);
-		if (it != rRenderInterpolates.end())
-		{
-			iTotalCapacity += it->second.pMissiles->iCapacity;
-		}
-	}
+		return *rInterpolate.pMissiles;
+	});
 
 	if (iTotalCapacity == 0)
 	{
@@ -64,8 +58,7 @@ void MissilesInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, c
 
 	if (engine::Buffer* pBuffer = engine::gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, engine::kBufferMain, kpcName, sizeof(shaders::ModelLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kuiCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, pBuffer);
-		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kuiCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, pBuffer);
+		engine::gpPipelineManager->mDynamicPipelines.UpdateModelPipelineDescriptors(kuiCrc, iCommandBuffer, 2, pBuffer);
 	}
 }
 
@@ -131,8 +124,7 @@ void MissilesInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	{
 		gpProfileManager->GetCpuCounter(game::kCpuCounterMissilesRendered).iCount = siRendered;
 	}
-	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
-	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
+	engine::gpPipelineManager->mDynamicPipelines.WriteModelPipelineIndirectBuffers(kuiCrc, iCommandBuffer, siRendered);
 }
 
 } // namespace game

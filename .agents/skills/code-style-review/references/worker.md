@@ -53,9 +53,9 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    - rule 6: a feature toggle — a compile-time switch that turns a feature on
      or off, not every `kb*` constant, since rule 3 gives that prefix to any
      `constexpr bool` — defined as a macro, defined outside the project's
-     `Pch.h`, not declared `inline constexpr bool kb*`, or tested with a plain
-     `if` instead of `if constexpr`, unless it is one of step 9's rule 6
-     permitted forms;
+     `Pch.h` or `Engine/Source/EngineSwitches.h`, not declared
+     `inline constexpr bool kb*`, or tested with a plain `if` instead of
+     `if constexpr`, unless it is one of step 9's rule 6 permitted forms;
    - rule 9: a `throw` whose operand is not an exception object, such as a
      string, a number, or another non-exception value;
    - rule 11: a functional-notation cast `T(x)` whose `T` is a built-in type or
@@ -216,8 +216,9 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
      one: rule 5, ownership handed straight to a RAII owner; rule 6, a
      preprocessor guard `if constexpr` cannot replace — around an `#include`,
      a namespace-scope declaration, or code naming a symbol declared only in
-     that configuration — or a `kb*` definition block in `Pch.h`, or a feature
-     toggle in a dual-language header, which GLSL must also read; rule 11, a
+     that configuration — or a `kb*` definition block in a project's `Pch.h`
+     or `Engine/Source/EngineSwitches.h`, or a feature toggle in a
+     dual-language header, which GLSL must also read; rule 11, a
      macro argument, a function type, or a functional-notation cast in code of
      a dual-language header that GLSL compiles, since GLSL has no
      `static_cast`; rule 17, a container that is not a
@@ -280,7 +281,7 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
     - When an `assert-false` row is an `ASSERT(false)` kept as an intended
       assertion rather than temporary instrumentation, check the next
       statement against rule 70. `ASSERT` always throws
-      (`Common/AGENTS.md:41`), so a fallback `return` there never runs and
+      (`Common/AGENTS.md:79`), so a fallback `return` there never runs and
       step 10 applies the `std::unreachable()` replacement.
     - Done when a search for their exact text or existing unique debug tag
       returns zero remaining matches in session-added C++, where a kept,

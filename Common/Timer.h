@@ -11,6 +11,13 @@ constexpr FLOAT_TYPE NanosecondsToFloatSeconds(std::chrono::nanoseconds nanoseco
 	return std::chrono::duration_cast<std::chrono::duration<FLOAT_TYPE, std::ratio<1, 1>>>(nanoseconds).count();
 }
 
+// Nearest whole nanosecond, ties to even. Exact and deterministic: a float significand (24 bits) times 10^9
+// (2^9 x 1953125, 21 bits) fits in a double's 53-bit significand, so the scale inside round never rounds.
+constexpr std::chrono::nanoseconds FloatSecondsToNanoseconds(std::chrono::duration<float> seconds)
+{
+	return std::chrono::round<std::chrono::nanoseconds>(std::chrono::duration<double>(seconds));
+}
+
 class Timer
 {
 	static_assert(std::chrono::steady_clock::is_steady);

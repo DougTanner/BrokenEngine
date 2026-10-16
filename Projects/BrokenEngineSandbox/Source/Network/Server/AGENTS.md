@@ -1,6 +1,6 @@
 # Network Server - Game Session and Managers
 
-Server-only game networking. `ServerSession` is the game-policy wrapper over `engine::ServerSessionRuntime`, which owns host/discovery/pacing and the fixed poll/tick/paused phase order. It owns the client and fleet managers and holds the engine-owned transfer and broadcast managers (`../../../../../Engine/Source/Network/Server/AGENTS.md`), supplying the game payloads and policy queues they work on; game hooks mutate game state around the deterministic Frame tick.
+Server-only game networking. `ServerSession` is the game-policy wrapper over `engine::ServerSessionRuntime`, which owns host/discovery/pacing and the fixed poll/tick/paused phase order. It owns the client and fleet managers and holds the engine-owned transfer and broadcast managers (`../../../../../Engine/Source/Network/Server/AGENTS.md`), supplying the game payloads and policy queues they work on; the game functions the engine calls mutate game state around the deterministic Frame tick.
 
 ## State Ownership
 
@@ -17,24 +17,38 @@ Server-only game networking. `ServerSession` is the game-policy wrapper over `en
 ## Timing and Paused Availability
 
 - Poll transport and LAN discovery run before simulation work on every update, including while paused: a zero-tick update still builds navigation data for pending subscriptions and services and flushes the resync and new-subscription full-state queues, so a newly connected client receives initial state without a simulation tick.
-- An update polls more than once and the after-poll hook runs at every poll, so each handler must empty the request queue it processes; a request left queued is applied a second time later in the same update. The before-poll hook clears only queues whose requests are meant to expire unprocessed.
+- An update polls more than once and `AfterNetworkPoll` runs at every poll, so each handler must empty the request queue it processes; a request left queued is applied a second time later in the same update. `BeforeNetworkPoll` clears only queues whose requests are meant to expire unprocessed.
 
 ## Deterministic Tick Contracts
 
-- The engine runtime owns the active set and calls the game hook to contribute every coordinate holding at least one Player. It forwards ownership of each departing current Frame directly to the engine replay owner before erasing the coordinate storage. Retention after that handoff, and generation activation, belong to the [File Replay contract](../../../../../Engine/Source/File/AGENTS.md#replay-streams).
+- The engine runtime owns the active set and calls the game function `AddGameRequiredCoordinates` to contribute every coordinate holding at least one Player. Retention after the departing-Frame handoff, and generation activation, belong to the [File Replay contract](../../../../../Engine/Source/File/AGENTS.md#replay-streams).
 - Normal update prepares tick inputs; replay uses coordinates with live readers and consumes its recorded `FrameInput` order exactly, without sorting it again.
 - Apply transfer ownership relinks before death detection: a transferred Player updates its client/GUID ownership record before the tick's death pass, so a live handoff is never treated as a death. A replay transfer recorded in the post-dispatch channel at event tick `E` is applied and published after dispatch at `E`; the newly activated destination first dispatches at `E + 1`.
 - Spawn assignment completes on the advancing update that builds the spawn status change: the player row is born owned by the requesting client's GUID carried in the spawn status change, and no pairing pass runs after the tick. That GUID is the persistent relink key.
-- Fleet navigation defers flagship updates through `StatusChange`s. Within `BuildFrameInputs`, queued player updates, fleet timers and pending flagship updates, and waiting-client spawn construction and assignment run once per update and only on advancing updates, staying deferred through paused and other zero-tick updates. The agent status-change drain and the broadcast snapshot run in every normal-play tick's `PrepareTick`, after those once-per-update natural changes, so spawn construction precedes the drain.
+- Fleet navigation defers flagship updates through `StatusChange`s. Within
+  `ServerSession::BuildAdvancingFrameInputs`, which the engine
+  `ServerBroadcaster::BuildFrameInputs` calls after its frame-input reset,
+  queued player updates, fleet timers and pending flagship updates, and
+  waiting-client spawn construction and assignment run once per update and only
+  on advancing updates, staying deferred through paused and other zero-tick
+  updates. The agent status-change drain and the broadcast snapshot run in every
+  normal-play tick's `PrepareTick`, after those once-per-update natural changes,
+  so spawn construction precedes the drain.
 - Agent-injected `StatusChange`s remain queued until the first normal tick at or after the entry's target tick whose coordinate is active and has a committed current Frame; consumed changes then follow the engine-owned status-change ordering.
-- Transfer validation, deterministic ordering, destination materialization and CRC recompute, and publication assembly are engine-owned ([engine Server contract](../../../../../Engine/Source/Network/Server/AGENTS.md#transfers-and-publication)). The game half is the transfer payloads, the ownership relink above, waiting-client spawn coordination, fleet notification, and pending subscription updates; replay-transfer and injected-status harness rig state follows the [game Agent contract](../../Agent/AGENTS.md#contracts).
+- Transfer validation, deterministic ordering, destination materialization and
+  CRC recompute, and publication assembly are engine-owned
+  ([engine Server contract](../../../../../Engine/Source/Network/Server/AGENTS.md#transfers-and-publication)).
+  The game half is the transfer payloads, the ownership relink above,
+  waiting-client spawn coordination, fleet notification, and pending
+  subscription updates; replay-transfer and injected-status harness rig state
+  follows the [game Agent contract](../../Agent/AGENTS.md#contracts).
 
 ## Trust and Lifecycle Boundaries
 
 - Engine `Server` owns packet admission and violation accounting, including handler throws; this layer supplies game contracts, dispatches admitted packets, and catches/logs handler failures. Side-specific bounds validate navigation timing, fleet sizes, and save/replay fleet data without partially applying a request.
 - Connect-time new-client processing, including its ownership relink, begins only after the engine accepts `ClientHello` and marks the handshake complete. After every eligible relink attempt, notify the fleet manager even when no Players were found, because a persistent fleet can outlive all its Players and still needs synchronization on reconnect.
 - A client is dead only after all owned players are gone; skip death handling while a player is mid-transfer.
-- Load reset advances the engine-owned debugging-load generation before notification, slot clearing, or transient reset. It then clears client, transfer, and broadcast transient state after restored fleet state is read; resetting the two engine managers clears their game Agent harness rig queues through the existing hooks, so no second clear belongs here. Do not erase restored fleet RNG or pending navigation updates.
+- Load reset advances the engine-owned debugging-load generation before notification, slot clearing, or transient reset. It then clears client, transfer, and broadcast transient state after restored fleet state is read; resetting the two engine managers clears their game Agent harness rig queues through the existing game functions they call, so no second clear belongs here. Do not erase restored fleet RNG or pending navigation updates.
 
 ## See Also
 

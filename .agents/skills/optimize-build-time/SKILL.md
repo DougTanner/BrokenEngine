@@ -1,6 +1,15 @@
 ---
 name: optimize-build-time
-description: Measure a full rebuild of the BrokenEngineSandbox client and server plus DataPacker Release with vcperf (C++ Build Insights), rank the slowest translation units, headers, template instantiations, and functions, apply source-structure fixes (Pch.h contents, unused includes, forward declarations, moving includes or bodies out of headers) through the Change Workflow, measure the rebuild again, and report each metric's before/after change in percent. Use only when the user explicitly runs it to find and fix slow C++ build time; compiler, linker, and project option changes are reported as recommendations, never applied.
+description: >-
+  Measure a full rebuild of the BrokenEngineSandbox client and server plus
+  DataPacker Release with vcperf (C++ Build Insights), rank the slowest
+  translation units, headers, template instantiations, and functions, apply
+  source-structure fixes (Pch.h contents, unused includes, forward declarations,
+  moving includes or bodies out of headers) through the Change Workflow, measure
+  the rebuild again, and report each metric's before/after change in percent.
+  Use only when the user explicitly runs it to find and fix slow C++ build time;
+  compiler, linker, and project option changes are reported as recommendations,
+  never applied.
 argument-hint: [Debug|Profile|Release]
 allowed-tools: [Read, Grep, Glob, Bash, PowerShell, Agent]
 disable-model-invocation: true

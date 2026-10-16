@@ -1,6 +1,17 @@
 # Broken Engine
 
-A client/server game engine using data-oriented design, with data pre-packer (offline; runtime reads only `.pack` chunks). Top-down RTS-scale camera: kilometers above an ocean with islands, small units on screen. West is -x, East is +x, North is +y, South is -y, Up is +z, Down is -z. Client/server simulation is deterministic; rare user input favors CPU/GPU smoothness over round-trip latency. The world is an unbounded sparse grid of cells, each simulated independently in parallel; every position is local to its own cell and there is no absolute world position, only a client-side conversion into the camera's cell at the point of use (`Engine/Source/Frame/AGENTS.md`). Fixed sim tick rate; render free-runs via interpolation. PostRender state is bit-deterministic (`/fp:strict`, CRC-checked per tick); Interpolate/render and client-only visuals are not, and stay out of the CRC.
+A client/server game engine using data-oriented design, with data pre-packer
+(offline; runtime reads only `.pack` chunks). Top-down RTS-scale camera:
+kilometers above an ocean with islands, small units on screen. West is -x, East
+is +x, North is +y, South is -y, Up is +z, Down is -z. Client/server simulation
+is deterministic; rare user input favors CPU/GPU smoothness over round-trip
+latency. The world is an unbounded sparse grid of cells, each simulated
+independently in parallel; every position is local to its own cell and there is
+no absolute world position, only a client-side conversion into the camera's cell
+at the point of use (`Engine/Source/Frame/AGENTS.md`). Fixed sim tick rate;
+render free-runs via interpolation. PostRender state is bit-deterministic
+(`/fp:strict`, CRC-checked per tick); Interpolate/render and client-only visuals
+are not, and stay out of the CRC.
 
 ## Environment
 
@@ -12,7 +23,7 @@ A client/server game engine using data-oriented design, with data pre-packer (of
 - Claude Code's host note against writing report files exempts every `Temp/` file a handoff cites under `Evidence`: that file is input to the workers main dispatches next, not a report.
 - Scripts: PowerShell 7 by default; Python only where a Python-only runtime forces it — full rule in `/external-skill-creator`.
 - Session worktrees are created without `Engine/Data/Islands` and `Engine/Data/Textures` (~989 MB), skipped by Git sparse checkout, so `git status` reports no change for them. Run `git sparse-checkout disable` in the worktree before editing or adding files under either tree; an authorized Local generation build through `/compile` restores them itself. Mechanics: `.agents/skills/compile/references/runtime-data-mode.md`.
-- In a session worktree, ThirdParty submodule contents are symbolic links into the primary checkout: a Glob or Grep directory search skips them and `git grep` does not see them (uninitialized submodule). Search them with Grep on an explicit file path, Read on a known path, or `rg -L` from the shell.
+- In a session worktree, ThirdParty submodule contents are symbolic links into the primary checkout: a Glob or Grep directory search skips them and `git grep` does not see them (uninitialized submodule). Search them with Grep on an explicit file path, Read on a known path, or `rg -L` from the shell. `.claude/skills` is likewise a symbolic link to `.agents/skills`; search `.agents/skills` instead.
 
 ## IMPORTANT: Session rules
 
@@ -22,15 +33,44 @@ A client/server game engine using data-oriented design, with data pre-packer (of
 
 ## Directives
 
-- Minimum sufficient change: request and approved plan are target and ceiling — smallest complete change satisfying acceptance criteria and invariants; no speculative features, abstractions, configuration, extension points, or cleanup. A claimed executable Plan is unapproved until the user approves it, and the ceiling measures the finished change, never which option to recommend (`.agents/references/authority-order.md`, `.agents/references/change-workflow.md` `### User Interaction`, `.agents/references/scope-authorization.md`). Update related sites only when omission would make them incorrect; ignore polish.
+- Minimum sufficient change: request and approved plan are target and ceiling —
+  smallest complete change satisfying acceptance criteria and invariants; no
+  speculative features, abstractions, configuration, extension points, or
+  cleanup. A claimed executable Plan is unapproved until the user approves it,
+  and the ceiling measures the finished change, never which option to recommend
+  (`.agents/references/authority-order.md`,
+  `.agents/references/change-workflow.md` `### User Interaction`,
+  `.agents/references/scope-authorization.md`). Update related sites only when
+  omission would make them incorrect; ignore polish.
 - KISS, YAGNI, DRY: reuse existing mechanisms. Extract helpers only for current duplication, never for hypothetical use. Mirrored patterns stay parallel.
 - Never add or offer backward compatibility: keep one current format, path, or behavior, remove obsolete compatibility code, and bump a changed format's owning version so older files are rejected.
-- Progressive disclosure: each fact — including a genuinely new term's definition — lives once at its owning layer and is referenced elsewhere: AGENTS.md carries the constraints, invariants, and routing every session needs; a skill carries its when-to-use and how-to-invoke workflow; scripts and skill `references/` carry mechanics, schemas, and long detail; code comments carry local non-obvious rationale. Comment content: `Documents/C++StyleGuide.txt` rule 64. Review: `/progressive-disclosure-review` for the layering, `/comment-review` for comments.
+- Progressive disclosure: each fact — including a genuinely new term's
+  definition — lives once at its owning layer and is referenced elsewhere:
+  AGENTS.md carries the constraints, invariants, and routing every session
+  needs; a skill carries its when-to-use and how-to-invoke workflow; scripts and
+  skill `references/` carry mechanics, schemas, and long detail; code comments
+  carry local non-obvious rationale. Comment content:
+  `Documents/C++StyleGuide.txt` rule 64. Review:
+  `/progressive-disclosure-review` for the layering, `/comment-review` for
+  comments.
 - Bounded reading: a citation that names a `##` section is the reading scope — locate that heading and read only that section, never the whole file.
 - Skill layout follows consumption shape: a main-session skill keeps the workflow the invoking session consumes in `SKILL.md` and may still delegate; a subagent skill keeps its dispatcher-facing contract in `SKILL.md` and its executor steps and rules in `references/worker.md`. The shared type rule and layout references live in `.agents/references/skill-skeleton.md`.
 - One term per concept: use the established repository term or the code's own name, never a coined nickname; prefer plain words over formal ones.
 - Do not add unit tests
-- Bundled scripts: run a repository script exactly as its skill documents it — never wrap, reimplement, or work around one; a script that cannot be run as documented is a bug to report. Canonical invocation form: `pwsh -NoProfile -File <repo-relative script path> [arguments]`, run from the session worktree root; never an absolute path or `-ExecutionPolicy Bypass`. Never change the working directory (no `cd`, no `Set-Location`); address scratch files by path from the worktree root. One script per shell call with nothing chained before or after it; using that call's own output (assigning it, piping to `ConvertFrom-Json`, or reading `$LASTEXITCODE` after it) is allowed from the PowerShell tool only. Import a `.psm1` with `Import-Module ./<repo-relative path>` (leading `./` required) and call its functions in the same shell call. When a parameter takes an array, use `pwsh -NoProfile -Command "& '<repo-relative path>' -Param 'a','b'"` instead of `-File`.
+- Bundled scripts: run a repository script exactly as its skill documents it —
+  never wrap, reimplement, or work around one; a script that cannot be run as
+  documented is a bug to report. Canonical invocation form:
+  `pwsh -NoProfile -File <repo-relative script path> [arguments]`, run from the
+  session worktree root; never an absolute path or `-ExecutionPolicy Bypass`.
+  Never change the working directory (no `cd`, no `Set-Location`); address
+  scratch files by path from the worktree root. One script per shell call with
+  nothing chained before or after it; using that call's own output (assigning
+  it, piping to `ConvertFrom-Json`, or reading `$LASTEXITCODE` after it) is
+  allowed from the PowerShell tool only. Import a `.psm1` with
+  `Import-Module ./<repo-relative path>` (leading `./` required) and call its
+  functions in the same shell call. When a parameter takes an array, use
+  `pwsh -NoProfile -Command "& '<repo-relative path>' -Param 'a','b'"` instead
+  of `-File`.
 - Trivial choices (naming, small implementation details, options with the same outcome): pick the simplest and proceed; a worker returns any other decision to main.
 - A finished subagent is never resumed or messaged again; every next step is a fresh dispatch carrying a continuation capsule, defined in `.agents/references/subagent-handoff.md` `## Continuation capsule`.
 
@@ -63,4 +103,11 @@ Same source, two executables: client (graphics, audio, input) defines `BT_CLIENT
 
 - Live verification: invoke `/agent-harness` for all harness operations — launching and driving the client/server, sim setup, UI input, state queries, screenshots, logs, replay determinism checks.
 - C++ conventions: `.agents/references/cpp-conventions.md`.
-- Trust policy is set by data direction: the server fully validates every client-to-server record and every grid save, answering a bad value under the bad-value rule in `.agents/references/cpp-conventions.md`; server-to-client data travels under ENet's datagram checksum and the client trusts it; replays and the agent command channel are exempt developer tools. Owners: `Engine/Source/Network/AGENTS.md` `## Corrupt Input Policy`, `Engine/Source/File/AGENTS.md` `## Grid Saves` and `## Replay Streams`, `Engine/Source/Agent/AGENTS.md` `## Architecture`.
+- Trust policy is set by data direction: the server fully validates every
+  client-to-server record and every grid save, answering a bad value under the
+  bad-value rule in `.agents/references/cpp-conventions.md`; server-to-client
+  data travels under ENet's datagram checksum and the client trusts it; replays
+  and the agent command channel are exempt developer tools. Owners:
+  `Engine/Source/Network/AGENTS.md` `## Corrupt Input Policy`,
+  `Engine/Source/File/AGENTS.md` `## Grid Saves` and `## Replay Streams`,
+  `Engine/Source/Agent/AGENTS.md` `## Architecture`.

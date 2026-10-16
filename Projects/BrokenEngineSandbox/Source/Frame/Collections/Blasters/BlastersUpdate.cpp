@@ -24,21 +24,6 @@ using enum BlasterFlags;
 // Collision layer index (set each frame in PreCollision)
 // thread_local: parallel per-Frame tick via Dispatch
 static thread_local int64_t siCollisionLayerIndex = 0;
-static thread_local std::vector<engine::CollisionFlags_t> sCollisionFlags;
-
-struct BlasterCollisionIntervalScratch
-{
-	std::vector<float> maxTimes;
-	std::vector<engine::SegmentHit> terrainHits;
-	std::vector<engine::SegmentHit> boundaryHits;
-};
-
-static BlasterCollisionIntervalScratch& GetBlasterCollisionIntervalScratch()
-{
-	// Function-local TLS is constructed allocation-free on first use, including before allocator startup; growth sites suppress allocation tracking.
-	static thread_local BlasterCollisionIntervalScratch sScratch;
-	return sScratch;
-}
 
 constexpr float kfBlasterCollisionRadius = 0.5f;
 
@@ -120,14 +105,10 @@ static void XM_CALLCONV SynchronizeBlaster(FrameInterpolate& rFrameInterpolate, 
 	if ((pointLight.uuid.iValue != 0))
 	{
 		float fSize = rType.f2Size.x;
-		const engine::PointLightsType& rPointLightType = engine::PointLightsInterpolate::sTypes.at(static_cast<size_t>(rType.iPointLightTypeIndex));
 		engine::PointLightsInterpolate::Sync(rFrameInterpolate, pointLight,
 		{
 			.vecPosition = vecPosition,
 			.fVisibleArea = fSize,
-			.fVisibleIntensity = rPointLightType.pVisibleIntensityWrapper != nullptr ? rPointLightType.pVisibleIntensityWrapper->mfCurrent : rPointLightType.fVisibleIntensity,
-			.fLightingArea = rPointLightType.pLightingAreaWrapper != nullptr ? rPointLightType.pLightingAreaWrapper->mfCurrent : rPointLightType.fLightingArea,
-			.fLightingIntensity = rPointLightType.pLightingIntensityWrapper != nullptr ? rPointLightType.pLightingIntensityWrapper->mfCurrent : rPointLightType.fLightingIntensity,
 			.fRotation = 0.0f,
 		});
 	}
@@ -193,11 +174,6 @@ void BlastersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 
 void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
-	BlasterCollisionIntervalScratch& rCollisionScratch = GetBlasterCollisionIntervalScratch();
-	// Heap: static vectors resized each frame, only allocates on first call or when count grows (capacity retained).
-	// .data() pointers are passed to AddLayer and must survive until PostCollision, so workbuffer can't be used
-	ScopedSuppressAllocationTracking suppress;
-
 	BlastersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBlasters;
 	BlastersPostRender& rCurrentPostRender = *rFrame.postRender.pBlasters;
 
@@ -206,36 +182,10 @@ void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		return;
 	}
 
-	int64_t iCount = rCurrentInterpolate.iCount;
-	sCollisionFlags.resize(static_cast<size_t>(iCount));
-	rCollisionScratch.maxTimes.resize(static_cast<size_t>(iCount));
-	rCollisionScratch.terrainHits.resize(static_cast<size_t>(iCount));
-	rCollisionScratch.boundaryHits.resize(static_cast<size_t>(iCount));
-	const BlastersInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pBlasters;
-	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
-	{
-		int64_t iIndex = i;
-		sCollisionFlags.at(static_cast<size_t>(iIndex)) = engine::CollisionFlags::kDestroyOnCollide;
-		rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i]);
-		rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)) = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i]);
-		float fMaxTime = std::numeric_limits<float>::max();
-		if (rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)).bHit)
-		{
-			fMaxTime = rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)).fTime;
-		}
-		if (rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)).bHit)
-		{
-			fMaxTime = std::min(fMaxTime, rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)).fTime);
-		}
-		rCollisionScratch.maxTimes.at(static_cast<size_t>(iIndex)) = fMaxTime;
-	}
-
 	siCollisionLayerIndex = engine::Collision::AddLayer(
 	{
-		.pVecStartPositions = rPreviousInterpolate.pVecPositions,
+		.pVecStartPositions = rPreviousFrame.interpolate.pBlasters->pVecPositions,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
-		.pfMaxTimes = rCollisionScratch.maxTimes.data(),
-		.pFlags = sCollisionFlags.data(),
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
 		.fRadius = kfBlasterCollisionRadius,
@@ -244,12 +194,18 @@ void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 		.uiCategory = CollisionCategory::kuiBlaster,
 		.uiCollidesWith = CollidesWith::kuiBlaster,
 		.pAlignments = rCurrentPostRender.pAlignments,
+		.pTerrainStaticData = &rStaticData,
 	});
+
+	std::span<engine::CollisionFlags_t> flags = engine::Collision::GetLayerFlags(siCollisionLayerIndex);
+	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
+	{
+		flags[static_cast<size_t>(i)] = engine::CollisionFlags::kDestroyOnCollide;
+	}
 }
 
 void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
-	BlasterCollisionIntervalScratch& rCollisionScratch = GetBlasterCollisionIntervalScratch();
 	BlastersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBlasters;
 	BlastersPostRender& rCurrentPostRender = *rFrame.postRender.pBlasters;
 
@@ -260,35 +216,33 @@ void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		int64_t iIndex = i;
 		// Entity results are pre-filtered against terrain and cell-exit cutoffs.
-		if ((engine::Collision::sResultSpans[engine::Collision::sLayerBaseOffsets[siCollisionLayerIndex] + i].iCount > 0))
+		engine::CollisionOutcome outcome = engine::Collision::GetOutcome(siCollisionLayerIndex, i);
+		if (outcome.eType == engine::CollisionOutcomeType::kEntity)
 		{
 			rCurrentPostRender.pFlags[i].Set(kDestroy);
 			continue;
 		}
 
-		const engine::SegmentHit& rTerrainHit = rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex));
-		const engine::SegmentHit& rBoundaryHit = rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex));
-		if (rTerrainHit.bHit && (!rBoundaryHit.bHit || rTerrainHit.fTime <= rBoundaryHit.fTime)) [[unlikely]]
+		if (outcome.eType == engine::CollisionOutcomeType::kTerrain) [[unlikely]]
 		{
 			rCurrentPostRender.pFlags[i].Set(kDestroy);
-			XMVECTOR vecCollisionPosition = rTerrainHit.vecPosition;
+			XMVECTOR vecCollisionPosition = outcome.vecTerrainPosition;
 
 			// Add jitter for visual variety
 			vecCollisionPosition = common::RandomPositionJitter<kfTerrainImpactJitter>(vecCollisionPosition, rFrame.postRender.randomEngine);
 
 			[[maybe_unused]] float fRotation = common::Random<XM_2PI>(rFrame.postRender.randomEngine);
 #if defined(BT_CLIENT)
-			engine::PointLightsPostRender::AddControlled(rFrame, engine::SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)), siTerrainCraterControllerIndex, vecCollisionPosition, fRotation);
-			engine::PuffsPostRender::AddControlled(rFrame, engine::SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)), siTerrainPuffControllerIndex, vecCollisionPosition);
+			engine::PointLightsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), siTerrainCraterControllerIndex, vecCollisionPosition, fRotation);
+			engine::PuffsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), siTerrainPuffControllerIndex, vecCollisionPosition);
 #endif
 
 #if defined(BT_CLIENT)
 			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster16793__pushtobreak__earth1wavCrc, rStaticData.coordinate, vecCollisionPosition, gTerrainImpactVolume.mfCurrent);
 #endif
 		}
-		else if (rBoundaryHit.bHit) [[unlikely]]
+		else if (outcome.eType == engine::CollisionOutcomeType::kCellExit) [[unlikely]]
 		{
 			rCurrentPostRender.pFlags[i].Set(kTransfer);
 		}

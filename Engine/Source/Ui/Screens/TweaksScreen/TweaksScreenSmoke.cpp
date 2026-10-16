@@ -5,6 +5,8 @@
 #include "Ui/SmokeWrappersBase.h"
 #include "TweaksSliderMap.h"
 
+#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
+
 namespace engine
 {
 
@@ -95,7 +97,7 @@ void RenderSmokeSection(TweaksScreenBase& rScreen)
 
 			ImGui::EndTabItem();
 		}
-		RenderTweakExtensionSubtabs(rScreen, iSection, 1);
+		game::RenderSmokeTweakExtensions(rScreen, iSection, 1);
 		ImGui::EndTabBar();
 	}
 }

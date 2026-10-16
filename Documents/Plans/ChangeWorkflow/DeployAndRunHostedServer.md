@@ -24,7 +24,13 @@ Main-session decisions the user did not object to (these are not user decisions)
 
 ## Design
 
-This Plan adds to `/deploy-server`: package and copy, the VM-side launch, auto-logon and scheduled-task setup, start, and clean stop. Its acceptance is end to end, because only a client on the user's PC crossing the internet exercises the NSG, the Windows Firewall rule, and the auto-logon start together: a Release client built with `ConnectClientToHostedServer.md`'s IP connects through the Remote Server button and plays, then the scripts stop and restart the server and the world resumes from the autosave.
+This Plan adds to `/deploy-server`: package and copy, the VM-side launch,
+auto-logon and scheduled-task setup, start, and clean stop. Its acceptance is
+end to end, because only a client on the user's PC crossing the internet
+exercises the NSG, the Windows Firewall rule, and the auto-logon start together:
+a Release client built with `ConnectClientToHostedServer.md`'s IP connects
+through the Remote Server button and plays, then the scripts stop and restart
+the server and the world resumes from the autosave.
 
 ### How the server reaches its final autosave
 
@@ -75,20 +81,60 @@ The deploy set is the exe plus `Data\Islands.manifest` and `Data\Islands.pack`, 
 
 - `beadmin` is the administrator from `ProvisionAzureServerVm.md`, used by SSH and the user's RDP.
 - `beserver` is a dedicated local non-administrator account, a member of `Users`. `Initialize-ServerHost.ps1` creates it with a random 32-character password from `System.Security.Cryptography.RandomNumberGenerator` that meets Windows complexity rules. The password never leaves the VM and is never printed.
-- Auto-logon: set `AutoAdminLogon` `1`, `DefaultUserName` `beserver`, and `DefaultPassword` under `HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon` (https://learn.microsoft.com/en-us/troubleshoot/windows-server/user-profiles-and-logon/turn-on-automatic-logon). That page warns that the password "is stored in the registry in plain text", remotely readable by Authenticated Users. This Plan accepts that because the account is non-administrative and used only for this, and because the NSG admits remote-administration ports only from the user's IP. The same page notes that an interactive console logon by a different user rewrites `DefaultUserName`, so `SKILL.md` tells the user to RDP as `beadmin` in a normal session, never `mstsc /admin`.
+- Auto-logon: set `AutoAdminLogon` `1`, `DefaultUserName` `beserver`, and
+  `DefaultPassword` under
+  `HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon`
+  (https://learn.microsoft.com/en-us/troubleshoot/windows-server/user-profiles-and-logon/turn-on-automatic-logon).
+  That page warns that the password "is stored in the registry in plain text",
+  remotely readable by Authenticated Users. This Plan accepts that because the
+  account is non-administrative and used only for this, and because the NSG
+  admits remote-administration ports only from the user's IP. The same page
+  notes that an interactive console logon by a different user rewrites
+  `DefaultUserName`, so `SKILL.md` tells the user to RDP as `beadmin` in a
+  normal session, never `mstsc /admin`.
 - Scheduled task `BrokenEngineServer`:
   - Trigger `New-ScheduledTaskTrigger -AtLogOn -User beserver`.
   - Principal `New-ScheduledTaskPrincipal -UserId beserver -LogonType Interactive`, so it runs in the auto-logon desktop session.
-  - Action `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\BrokenEngine\Scripts\Start-Server.ps1`. `Bypass` appears only in this VM task action, never in a repository invocation. The reason is that `about_Execution_Policies` warns "during sign on, a PowerShell logon script could start execution before the Windows Desktop is ready", which fails the `RemoteSigned` zone check, and "Using an execution policy of **ByPass** or **AllSigned** doesn't require a Zone check".
+  - Action
+    `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\BrokenEngine\Scripts\Start-Server.ps1`.
+    `Bypass` appears only in this VM task action, never in a repository
+    invocation. The reason is that `about_Execution_Policies` warns "during sign
+    on, a PowerShell logon script could start execution before the Windows
+    Desktop is ready", which fails the `RemoteSigned` zone check, and "Using an
+    execution policy of **ByPass** or **AllSigned** doesn't require a Zone
+    check".
   - Default settings, with no `New-ScheduledTaskSettingsSet` overrides. The task ends when `Start-Server.ps1` returns, so neither the default three-day execution time limit nor the multiple-instances policy applies to the running server.
   - `Publish-Server.ps1` also starts the task on demand, after it has stopped any running server.
-- Windows Firewall: create `BrokenEngine-Game-UDP`, an inbound Allow rule for UDP local port 27015, `-Program C:\BrokenEngine\Server\BrokenEngineSandboxServer.exe`, `-Profile Any`. Remove any existing rule of that name first. The rule must exist before the first launch, because when no allow rule exists the user is prompted, and "If the user isn't a local admin and they are prompted, block rules are created. It doesn't matter what option is selected" (https://learn.microsoft.com/en-us/windows/security/operating-system-security/network-security/windows-firewall/rules). `beserver` is not an admin. The NSG remains the outer filter.
+- Windows Firewall: create `BrokenEngine-Game-UDP`, an inbound Allow rule for
+  UDP local port 27015,
+  `-Program C:\BrokenEngine\Server\BrokenEngineSandboxServer.exe`,
+  `-Profile Any`. Remove any existing rule of that name first. The rule must
+  exist before the first launch, because when no allow rule exists the user is
+  prompted, and "If the user isn't a local admin and they are prompted, block
+  rules are created. It doesn't matter what option is selected"
+  (https://learn.microsoft.com/en-us/windows/security/operating-system-security/network-security/windows-firewall/rules).
+  `beserver` is not an admin. The NSG remains the outer filter.
 
 ### Channels to the VM
 
 - Bootstrap through `az vm run-command invoke --command-id RunPowerShellScript`, which needs no inbound port. Per https://learn.microsoft.com/en-us/azure/virtual-machines/windows/run-command it runs "as System", one script at a time, with output limited to the last 4,096 bytes.
-- Everything after bootstrap, including the file copy, uses the user's PC's built-in OpenSSH client (`ssh`, `scp`) against the OpenSSH Server. This Plan chooses that transport because it installs nothing on either side and the NSG already admits TCP 22 from the user's IP. Microsoft documents that OpenSSH Server, "Beginning with Windows Server 2025 ... is now installed by default" and is enabled with `Start-Service sshd` and `Set-Service -Name sshd -StartupType 'Automatic'` (https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse).
-- Key authentication: the local scripts run unattended and cannot type a password. `Initialize-ServerVm.ps1` therefore creates `$HOME\.ssh\brokenengine-server` (`ssh-keygen -t ed25519 -N ""`) when absent. The bootstrap writes its public key to `C:\ProgramData\ssh\administrators_authorized_keys` and sets that file's ACL with `icacls ... /inheritance:r /grant "*S-1-5-32-544:F" /grant "SYSTEM:F"`, as https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement prescribes for administrator accounts.
+- Everything after bootstrap, including the file copy, uses the user's PC's
+  built-in OpenSSH client (`ssh`, `scp`) against the OpenSSH Server. This Plan
+  chooses that transport because it installs nothing on either side and the NSG
+  already admits TCP 22 from the user's IP. Microsoft documents that OpenSSH
+  Server, "Beginning with Windows Server 2025 ... is now installed by default"
+  and is enabled with `Start-Service sshd` and
+  `Set-Service -Name sshd -StartupType 'Automatic'`
+  (https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse).
+- Key authentication: the local scripts run unattended and cannot type a
+  password. `Initialize-ServerVm.ps1` therefore creates
+  `$HOME\.ssh\brokenengine-server` (`ssh-keygen -t ed25519 -N ""`) when absent.
+  The bootstrap writes its public key to
+  `C:\ProgramData\ssh\administrators_authorized_keys` and sets that file's ACL
+  with `icacls ... /inheritance:r /grant "*S-1-5-32-544:F" /grant "SYSTEM:F"`,
+  as
+  https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement
+  prescribes for administrator accounts.
 - Every `ssh`/`scp` call passes `-i <key> -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$HOME\.ssh\brokenengine-server_known_hosts`. The remote shell is `cmd.exe`, so remote steps run as `powershell -NoProfile -File C:\BrokenEngine\Scripts\<script>.ps1`.
 - Each local script reads the VM's address from Azure: `az network public-ip show -g brokenengine-server-rg -n brokenengine-server-ip --query ipAddress -o tsv`. No script stores a copy.
 
@@ -104,7 +150,14 @@ Local scripts run on the user's PC in PowerShell 7 with `pwsh -NoProfile -File .
   5. Poll over SSH, for up to 10 minutes, until `query user` lists an active `beserver` session.
 - `Publish-Server.ps1`:
   1. Require the VM to be running.
-  2. Resolve `BrokenEngineSandboxServer.exe` from the session worktree's `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Output/`. Resolve `Islands.manifest` and `Islands.pack` from the primary checkout's `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Output/Data/`, which is the Shared data both Release builds consume (`.agents/skills/compile/references/runtime-data-mode.md` `## Mode selection`). The primary root is the parent of `git rev-parse --path-format=absolute --git-common-dir`.
+  2. Resolve `BrokenEngineSandboxServer.exe` from the session worktree's
+     `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Output/`. Resolve
+     `Islands.manifest` and `Islands.pack` from the primary checkout's
+     `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Output/Data/`,
+     which is the Shared data both Release builds consume
+     (`.agents/skills/compile/references/runtime-data-mode.md`
+     `## Mode selection`). The primary root is the parent of
+     `git rev-parse --path-format=absolute --git-common-dir`.
   3. If `BrokenEngineSandboxServer` is running on the VM, run `Stop-Server.ps1` over SSH and fail if it fails.
   4. `scp` the VM-side scripts to `C:\BrokenEngine\Scripts\`, the exe to `C:\BrokenEngine\Server\`, and the two Islands files to `C:\BrokenEngine\Server\Data\`.
   5. Run `schtasks /Run /TN BrokenEngineServer` over SSH.
@@ -116,7 +169,17 @@ Local scripts run on the user's PC in PowerShell 7 with `pwsh -NoProfile -File .
   3. If `Stop-Server.ps1` fails, do not deallocate. Exit with a code whose message gives the raw `az vm deallocate` command from `SKILL.md` for the user to choose.
   4. Report `ServerAutosave.save`'s `LastWriteTimeUtc` and the final power state.
 
-VM-side scripts are copied to `C:\BrokenEngine\Scripts\` and run by Windows PowerShell 5.1, "the version of PowerShell that ships in Windows" (https://learn.microsoft.com/en-us/powershell/scripting/what-is-windows-powershell). PowerShell 7 is not on the image, and installing it would add a download step for three short scripts. They must therefore use only Windows PowerShell 5.1 syntax and cmdlets. That is a deliberate exception to the repository's PowerShell 7 default, and `SKILL.md` states it. Over SSH, Windows Server's default `RemoteSigned` execution policy runs them, because only downloads marked as coming from the internet need a signature and scp adds no such mark (https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_execution_policies). The logon task is the one exception, explained above.
+VM-side scripts are copied to `C:\BrokenEngine\Scripts\` and run by Windows
+PowerShell 5.1, "the version of PowerShell that ships in Windows"
+(https://learn.microsoft.com/en-us/powershell/scripting/what-is-windows-powershell).
+PowerShell 7 is not on the image, and installing it would add a download step
+for three short scripts. They must therefore use only Windows PowerShell 5.1
+syntax and cmdlets. That is a deliberate exception to the repository's
+PowerShell 7 default, and `SKILL.md` states it. Over SSH, Windows Server's
+default `RemoteSigned` execution policy runs them, because only downloads marked
+as coming from the internet need a signature and scp adds no such mark
+(https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_execution_policies).
+The logon task is the one exception, explained above.
 
 - `vm/Initialize-ServerHost.ps1` runs as SYSTEM through run-command and is safe to rerun. It:
   - enables `sshd` and installs the administrator key;

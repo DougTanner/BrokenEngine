@@ -92,42 +92,6 @@ static bool IsReparsePoint(const std::filesystem::path& rPath)
 	return uiAttributes != INVALID_FILE_ATTRIBUTES && (uiAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
 }
 
-static std::filesystem::path GetRepositoryRootFromExecutable()
-{
-	std::wstring executableBuffer(32'768, L'\0');
-	int64_t iLength = GetModuleFileNameW(nullptr, executableBuffer.data(), static_cast<DWORD>(executableBuffer.size()));
-	if (iLength == 0 || iLength >= std::ssize(executableBuffer))
-	{
-		throw std::runtime_error(std::format("Unable to resolve DataPacker executable path (GetModuleFileNameW returned {}, Win32 {})", iLength, GetLastError()));
-	}
-
-	std::filesystem::path executablePath(std::wstring(executableBuffer.data(), static_cast<size_t>(iLength)));
-	std::wstring executableName = executablePath.filename().native();
-	if (CompareStringOrdinal(executableName.c_str(), -1, L"DataPacker.exe", -1, TRUE) != CSTR_EQUAL
-	 && CompareStringOrdinal(executableName.c_str(), -1, L"DataPacker.Debug.exe", -1, TRUE) != CSTR_EQUAL)
-	{
-		throw std::runtime_error(std::format(R"(DataPacker executable path has unexpected layout: {} (expected suffix DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe or DataPacker.Debug.exe))", executablePath.string()));
-	}
-
-	static constexpr const wchar_t* kpwcExpectedDirectories[] =
-	{
-		L"Output",
-		L"VisualStudio2026",
-		L"Platforms",
-		L"DataPacker",
-	};
-	std::filesystem::path repositoryRoot = executablePath.parent_path();
-	for (const wchar_t* pwcExpected : kpwcExpectedDirectories)
-	{
-		if (CompareStringOrdinal(repositoryRoot.filename().native().c_str(), -1, pwcExpected, -1, TRUE) != CSTR_EQUAL)
-		{
-			throw std::runtime_error(std::format(R"(DataPacker executable path has unexpected layout: {} (expected suffix DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe or DataPacker.Debug.exe))", executablePath.string()));
-		}
-		repositoryRoot = repositoryRoot.parent_path();
-	}
-	return repositoryRoot;
-}
-
 static void EstablishOutputDestinationParent(const std::filesystem::path& rDestination)
 {
 	const std::filesystem::path& rParent = rDestination.parent_path();
@@ -360,20 +324,10 @@ FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitial
 	int64_t iForbidGaeaExportLength = GetEnvironmentVariableW(L"BT_DATAPACKER_FORBID_GAEA_EXPORT", pcForbidGaeaExport, static_cast<DWORD>(std::size(pcForbidGaeaExport)));
 	mbForbidGaeaExport = iForbidGaeaExportLength == 1 && pcForbidGaeaExport[0] == L'1';
 
-	if (argvSpan.size() == 1)
-	{
-		std::filesystem::path repositoryRoot = GetRepositoryRootFromExecutable();
-		mpInputDirectories[0] = repositoryRoot / "Engine" / "Data";
-		mpInputDirectories[1] = repositoryRoot / "Projects" / "BrokenEngineSandbox" / "Data";
-		mOutputDirectory = repositoryRoot / "Projects" / "BrokenEngineSandbox" / "Platforms" / "VisualStudio2026" / "Output" / "Data";
-	}
-	else
-	{
-		ASSERT(argvSpan.size() == 4);
-		mpInputDirectories[0] = argvSpan[1];
-		mpInputDirectories[1] = argvSpan[2];
-		mOutputDirectory = argvSpan[3];
-	}
+	ASSERT(argvSpan.size() == 4);
+	mpInputDirectories[0] = argvSpan[1];
+	mpInputDirectories[1] = argvSpan[2];
+	mOutputDirectory = argvSpan[3];
 
 	mpInputDirectories[0] = std::filesystem::canonical(mpInputDirectories[0]);
 	mpInputDirectories[1] = std::filesystem::canonical(mpInputDirectories[1]);

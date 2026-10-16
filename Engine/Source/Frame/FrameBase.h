@@ -20,11 +20,13 @@
 #include "Frame/Collections/WindTrails/WindTrails.h"
 #endif
 #include "Frame/FrameUtils.h"
+#include "Frame/NavBuild.h"
 
 namespace game
 {
 
 struct FrameInput;
+struct TransferRequest;
 
 } // namespace game
 
@@ -113,7 +115,6 @@ struct FrameInterpolateBase
 	RenderBasis renderBasis {};
 #endif
 	int64_t iTick = 0;
-	float fCurrentTime = 0.0f;
 	float fDeltaTime = 0.0f;
 
 #if defined(BT_CLIENT)
@@ -173,7 +174,7 @@ struct FrameInterpolateBase
 	// The frame-wide values Write, Read, and ServerRead serialize, in stream order.
 	static auto Values()
 	{
-		return FrameColumnList<FRAME_COLUMN(FrameInterpolateBase, iTick), FRAME_COLUMN(FrameInterpolateBase, fCurrentTime), FRAME_COLUMN(FrameInterpolateBase, fDeltaTime)> {};
+		return FrameColumnList<FRAME_COLUMN(FrameInterpolateBase, iTick), FRAME_COLUMN(FrameInterpolateBase, fDeltaTime)> {};
 	}
 
 	common::crc_t Crcs() const;
@@ -191,7 +192,7 @@ static_assert(std::is_same_v<decltype(std::declval<FrameInterpolateBase>().Colle
 
 struct FramePostRenderBase
 {
-	FramePostRenderBase() = default;
+	FramePostRenderBase();
 	~FramePostRenderBase() = default;
 	FramePostRenderBase(FramePostRenderBase&&) noexcept = default;
 	FramePostRenderBase& operator=(FramePostRenderBase&&) noexcept = default;
@@ -234,6 +235,16 @@ struct FramePostRenderBase
 	WindRadialsPostRender windRadials {};
 	WindTrailsPostRender windTrails {};
 #endif
+
+	// Transient transfer output buffer (not serialized, not in CRC/equality)
+	std::vector<game::TransferRequest> transferRequests;
+
+	// Cross-cell transfer producers push through these two calls: the split keeps the capacity-hit LOG
+	// and DEBUG_BREAK between them, reading the pre-push size and capacity.
+	// PrepareTransferRequest fills the per-axis delta and rewrites rRequest.data.vecPosition into the
+	// destination cell's local frame.
+	[[nodiscard]] bool PrepareTransferRequest(const CellBounds& rBounds, game::TransferRequest& rRequest) const;
+	void PushTransferRequest(const game::TransferRequest& rRequest);
 
 	auto Collections(this auto&& rSelf)
 	{
@@ -295,6 +306,13 @@ static_assert(std::is_same_v<decltype(std::declval<FramePostRenderBase>().Collec
 using InterpolateTypes = TupleToTypeList_t<decltype(std::declval<FrameInterpolateBase>().Collections())>;
 using PostRenderBaseTypes = TupleToTypeList_t<decltype(std::declval<FramePostRenderBase>().Collections())>;
 
+// The engine's share of game::Frame::kiVersion: navigation plus every shared engine collection.
+inline constexpr int64_t kiFrameBaseVersion = kiNavDataVersion + SumVersions(TupleToTypeList_t<decltype(std::declval<FrameInterpolateBase&>().ServerCollections())> {}) + SumVersions(TupleToTypeList_t<decltype(std::declval<FramePostRenderBase&>().ServerCollections())> {});
+
+// Base collection pair checks for the build-local read (Collections()) and the shared read (ServerCollections()).
+void ValidateBaseCollectionPairs(FrameInterpolateBase& rInterpolate, const FramePostRenderBase& rPostRender);
+void ValidateBaseServerCollectionPairs(FrameInterpolateBase& rInterpolate, const FramePostRenderBase& rPostRender);
+
 // Inline definition - must be after FramePostRenderBase is complete
 inline Uuid Uuid::Generate(FramePostRenderBase& rFramePostRender)
 {
@@ -316,6 +334,11 @@ struct ActiveFrameReference
 	const CellStaticData* pStaticData = nullptr;
 };
 
-void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter, float fCurrentTime);
+void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter);
+
+// The game::FrameInput stream and its CRC; the read hands each StatusChange to game::AdmitFrameInputStatusChange.
+void WriteFrameInput(std::ostream& rStream, const game::FrameInput& rInput);
+void ReadFrameInput(std::istream& rStream, game::FrameInput& rInput);
+[[nodiscard]] common::crc_t FrameInputCrc(const game::FrameInput& rInput);
 
 } // namespace engine

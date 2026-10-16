@@ -7,8 +7,6 @@
 #include "Network/Server/ServerTransferManager.h"
 
 #include "Agent/Commands/ServerSimulationHarnessRigs.h"
-#include "Network/Server/ServerClientManager.h"
-#include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
 #include "Game.h"
 
@@ -31,37 +29,7 @@ void ServerBroadcaster::BuildFrameInputs()
 	bool bAdvancing = game::gpGame->mfLastDeltaTime > 0.0f;
 	if (bAdvancing)
 	{
-		std::erase_if(game::gpServerSession->mpClientManager->mClientsWaitingForSpawn, [&](const game::ClientSpawnInformation& rClientSpawnInformation)
-		{
-			if ((rClientSpawnInformation.fleetGuid.uiHigh == 0 && rClientSpawnInformation.fleetGuid.uiLow == 0))
-			{
-				return false;
-			}
-
-			game::ServerFleetManager::FleetLookupResult result = game::gpServerSession->mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.memberGlobalPlayerId);
-			if (result.flags & game::ServerFleetManager::FleetLookupFlags::kFound)
-			{
-				return false;
-			}
-
-			LOG(kNetwork, kWarning, "ServerBroadcaster::BuildFrameInputs Dropping queued spawn Client: {} FleetGuid: ({},{})", rClientSpawnInformation.iClientId, rClientSpawnInformation.fleetGuid.uiHigh, rClientSpawnInformation.fleetGuid.uiLow);
-			return true;
-		});
-
-		// Inject weapon mode toggle StatusChanges
-		ProcessUpdatePlayerRequests();
-
-		// Tick fleet timers and inject fleet coord updates only when this update advances. Subtracting
-		// a zero delta does not make TickFleetTimers inert: an already-expired timer can still fire,
-		// consume random state, and queue an update that no frame tick could consume. Deferring the
-		// timer and all queued work here applies them in order on the first advancing update.
-		game::gpServerSession->mpFleetManager->TickFleetTimers();
-		game::gpServerSession->mpFleetManager->ProcessFlagshipUpdates();
-
-		// After ProcessFlagshipUpdates so the flagship update this queues is consumed on the following update and its
-		// fleet-RNG draw keeps its position, and before the first tick's PrepareTickStatusChanges drain so a drain that
-		// releases agent entries for the origin coordinate sorts this spawn in with them.
-		game::gpServerSession->mpClientManager->SpawnWaitingClients();
+		game::gpServerSession->BuildAdvancingFrameInputs();
 	}
 }
 
@@ -219,61 +187,9 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 	game::gpServerSession->mpTransferManager->mTransfers.clear();
 }
 
-void ServerBroadcaster::ProcessUpdatePlayerRequests()
-{
-	// Heap: pending player-update requests may grow frame status changes
-	ScopedSuppressAllocationTracking suppress;
-
-	for (const PendingUpdatePlayerRequest& rRequest : mPendingUpdatePlayerRequests)
-	{
-		engine::ClientConnection* pClient = engine::gpServer->FindClient(rRequest.iClientId);
-		if (pClient == nullptr)
-		{
-			continue;
-		}
-		auto ownedIt = game::gpServerSession->mClientPlayers.mOwned.find(pClient->iClientId);
-		std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != game::gpServerSession->mClientPlayers.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
-
-		engine::GridCoord updateCoord {};
-		bool bFound = false;
-		for (const engine::OwnedEntity& rOwnedPlayer : ownedPlayers)
-		{
-			if (rOwnedPlayer.globalId == rRequest.globalId)
-			{
-				updateCoord = rOwnedPlayer.coord;
-				bFound = true;
-				break;
-			}
-		}
-		if (!bFound)
-		{
-			continue;
-		}
-
-		auto it = game::gpGame->mFrameInputs.find(updateCoord);
-		if (it == game::gpGame->mFrameInputs.end())
-		{
-			continue;
-		}
-
-		int64_t iPlayerUuid = engine::RegistryUuidByGlobalId(game::Frame::OwnershipLayer((*game::gpGame->mCells.at(updateCoord).pCurrent)), rRequest.globalId).iValue;
-		if (iPlayerUuid == 0)
-		{
-			continue;
-		}
-
-		int64_t iPendingWeaponModeTicks = engine::kiTickRate;
-		game::StatusChange updateChange {.eType = game::StatusChangeType::kUpdatePlayer, .data = game::UpdatePlayerData{.iPlayerUuid = iPlayerUuid, .bUseMissiles = rRequest.bUseMissiles, .navigationDelaySeconds = rRequest.navigationDelaySeconds, .uiPendingWeaponModeTicks = static_cast<uint8_t>(iPendingWeaponModeTicks)}};
-		it->second.statusChanges.push_back(updateChange);
-
-		LOG(kNetwork, kDebug, "ServerBroadcaster::ProcessUpdatePlayerRequests Client: {} GlobalPlayer: {} PlayerUuid: {} Coord: ({},{}) Missiles: {} NavDelay: {}", rRequest.iClientId, rRequest.globalId, iPlayerUuid, updateCoord.iX, updateCoord.iY, rRequest.bUseMissiles, common::Wb(rRequest.navigationDelaySeconds.count(), 3));
-	}
-}
-
 void ServerBroadcaster::ResetState()
 {
 	mBroadcastStatusChanges.clear();
-	mPendingUpdatePlayerRequests.clear();
 	game::ResetPendingAgentStatusChanges(*game::gpServerSession);
 }
 

@@ -103,7 +103,7 @@ public:
 	common::Flags<ClientStateFlags> mStateFlags;
 	char mpcRejectionReason[256] = {};
 
-	// Heap: raw game packet buffer grows on assign/player-state packets
+	// Heap: raw game packet buffer grows on assign/owned-entity-state packets
 	std::vector<std::pair<int64_t, std::vector<uint8_t>>> mReceivedGamePackets;
 	std::vector<std::vector<ReceivedCoordUpdate>> mReceivedCoordinateUpdates;
 	std::vector<ReceivedCoordFullState> mReceivedFullStates;

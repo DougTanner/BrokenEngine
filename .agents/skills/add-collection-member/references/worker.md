@@ -15,8 +15,8 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
 
    | Variant | Live exemplar | Inspect for |
    |---|---|---|
-   | Shared-only game collection struct | `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.h`: `SpaceshipsPostRender`, `SpaceshipsPostRender::Spawn`, `Spaceships.cpp` `SpaceshipsPostRender::AllocateAndCopy` | `SharedMembers()` with `Members()` forwarding to it; per-struct versions, `PersistentMembers()` carry-forward, spawn initialization |
-   | Shared/client-split game pair | `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.h`, `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.cpp`, `MissilesInterpolate::Update` | `SharedMembers()` plus guarded `ClientMembers()`, `Members()` composition, spawn, copy, `ClientInit`, transfer send |
+   | Shared-only game collection struct | `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.h`: `SpaceshipsPostRender`, `SpaceshipsPostRender::Spawn`, `SpaceshipsPostRender::PersistentMembers` | `SharedMembers()` with `Members()` forwarding to it; per-struct versions, `PersistentMembers()` carry-forward, spawn initialization |
+   | Shared/client-split game pair | `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.h`, `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.cpp`, `MissilesInterpolate::Update` | `SharedMembers()` plus guarded `ClientMembers()`, `Members()` composition, spawn, copy, `ClientInitialize`, transfer send |
    | Server-visible engine pair | `/Engine/Source/Frame/Collections/Pushers/Pushers.h`, `PushersInterpolate::Sync`, `PushersPostRender::Add` | Existing `Members()`-only shape, per-struct versions, owner sync, zero-init, difference logging, ID map |
    | Owner-synchronized client-only pair | `/Engine/Source/Frame/Collections/Sounds/Sounds.h`, `SoundsInterpolate::Sync`, `SoundsPostRender::Add` | Whole-file `BT_CLIENT`, `Members()` only, full carry-forward copy, `SyncData`/`Sync`, Add defaults, no shared version or differences |
    | Controller-driven, fire-and-forget client-only pair | `/Engine/Source/Frame/Collections/Puffs/Puffs.h`, `PuffsInterpolate::Update`, `PuffsPostRender::AddControlled` | Whole-file `BT_CLIENT`, `Members()` only, selective controller copy, unconditional animated stores, complete Add initialization |
@@ -122,9 +122,9 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
     Use Blasters for the live send/receive shape. Match existing client guards;
     do not invent a second receive path. Done when transfer is either fully
     wired end to end or explicitly decided against.
-13. Create a client-owned handle or resource in per-row `ClientInit`.
+13. Create a client-owned handle or resource in per-row `ClientInitialize`.
 
-    - Make it survive `ClientInitAll` full-state hydration through
+    - Make it survive `ClientInitializeAll` full-state hydration through
       `/Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp`,
       local spawn, and teardown/removal.
     - Copy it only where ownership persists.

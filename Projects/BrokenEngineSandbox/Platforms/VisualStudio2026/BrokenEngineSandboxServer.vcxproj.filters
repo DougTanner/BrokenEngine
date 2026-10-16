@@ -183,6 +183,9 @@
     <ClInclude Include="..\..\..\..\Engine\Source\File\Replay.h">
       <Filter>Engine\File</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\File\ServerSaveLoad.h">
+      <Filter>Engine\File</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Game.h">
       <Filter>Game</Filter>
     </ClInclude>
@@ -196,6 +199,9 @@
       <Filter>Game</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Network\PlayerEvents.h">
+      <Filter>Game\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Network\StatusChangeCodec.h">
       <Filter>Game\Network</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Network\GameMessages.h">
@@ -462,6 +468,9 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Engine.h">
       <Filter>Engine</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\EngineSwitches.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\GameBase.h">
       <Filter>Engine</Filter>
     </ClInclude>
@@ -496,6 +505,9 @@
       <Filter>Game\Agent\Commands</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Save\GameSaveLoad.h">
+      <Filter>Game\Save</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Save\GameSaveState.h">
       <Filter>Game\Save</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Collection.h">
@@ -626,6 +638,9 @@
     <ClCompile Include="..\..\..\..\Engine\Source\File\Replay.cpp">
       <Filter>Engine\File</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\File\ServerSaveLoad.cpp">
+      <Filter>Engine\File</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\Game.cpp">
       <Filter>Game</Filter>
     </ClCompile>
@@ -633,6 +648,9 @@
       <Filter>Game</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Network\PlayerEvents.cpp">
+      <Filter>Game\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Network\StatusChangeCodec.cpp">
       <Filter>Game\Network</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Network\Server\ServerSession.cpp">

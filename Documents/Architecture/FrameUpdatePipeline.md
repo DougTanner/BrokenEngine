@@ -14,9 +14,36 @@ flowchart LR
 
 ## Frame Registry Query Windows
 
-The engine [`FrameRegistry`](../../Engine/Source/Frame/FrameRegistry.cpp) answers "which row of another collection" questions during the tick, and the game opens exactly two windows for it from [`Frame.h`](../../Projects/BrokenEngineSandbox/Source/Frame/Frame.h). The Missile-Update window opens inside the Update phase before Spaceships Update runs. A Spaceship is eligible while it still publishes a valid registry id and its previous-frame arrival grace has run out, and the window binds both position columns: current positions, which acquisition ranks and range-checks against, and previous-frame positions, which a retained Missile homes on. Subscriber counts come from the previous frame's Missile handles. Still-active targetless Missiles are acquired after the loop and only home from the next tick. The Player-Spawn window is rebuilt in the Spawn phase, after Update, Transfer, and Destroy, from current Spaceship lifecycle state and fully initialized Missile handles; it binds no previous-frame positions, and is then reused across the whole player spawn loop.
+The engine [`FrameRegistry`](../../Engine/Source/Frame/FrameRegistry.cpp)
+answers "which row of another collection" questions during the tick, and the
+game opens exactly two windows for it from
+[`Frame.h`](../../Projects/BrokenEngineSandbox/Source/Frame/Frame.h). The
+Missile-Update window opens inside the Update phase before Spaceships Update
+runs. A Spaceship is eligible while it still publishes a valid registry id and
+its previous-frame arrival grace has run out, and the window binds both position
+columns: current positions, which acquisition ranks and range-checks against,
+and previous-frame positions, which a retained Missile homes on. Subscriber
+counts come from the previous frame's Missile handles. Still-active targetless
+Missiles are acquired after the loop and only home from the next tick. The
+Player-Spawn window is rebuilt in the Spawn phase, after Update, Transfer, and
+Destroy, from current Spaceship lifecycle state and fully initialized Missile
+handles; it binds no previous-frame positions, and is then reused across the
+whole player spawn loop.
 
-Each window makes one combined workbuffer reservation for its source rows, registry scratch, alignment padding, and layer descriptor. The pointer-derived spans are formed only after that reservation returns, and the single scoped allocation owns them for the context lifetime ([`Engine/Source/Frame/AGENTS.md`](../../Engine/Source/Frame/AGENTS.md)). The worker workbuffer's 64 KiB initial size remains a performance preallocation, not a hard bound: a grow while a context is live does not invalidate it (that same document). Under these rules acquisition batch rows and results come from fixed-size stack chunks in Missiles Update and from single-entry stack storage at player spawn. Subscriber accounting uses `uint16_t` storage and asserts before accepting the 65,536th subscription. No context outlives its phase. The ownership layer is not a window and is never built from a phase; its by-value lifetime and post-tick main-thread-only restriction are engine contracts in that same document.
+Each window makes one combined workbuffer reservation for its source rows,
+registry scratch, alignment padding, and layer descriptor. The pointer-derived
+spans are formed only after that reservation returns, and the single scoped
+allocation owns them for the context lifetime
+([`Engine/Source/Frame/AGENTS.md`](../../Engine/Source/Frame/AGENTS.md)). The
+worker workbuffer's 64 KiB initial size remains a performance preallocation, not
+a hard bound: a grow while a context is live does not invalidate it (that same
+document). Under these rules acquisition batch rows and results come from
+fixed-size stack chunks in Missiles Update and from single-entry stack storage
+at player spawn. Subscriber accounting uses `uint16_t` storage and asserts
+before accepting the 65,536th subscription. No context outlives its phase. The
+ownership layer is not a window and is never built from a phase; its by-value
+lifetime and post-tick main-thread-only restriction are engine contracts in that
+same document.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -26,9 +53,19 @@ flowchart LR
 
 ## Client Main Loop
 
-The client main loop is [`Main.cpp`](../../Engine/Source/Main.cpp): input precedes [`GameBase::ClientUpdate()`](../../Engine/Source/GameBase.cpp), then [`GameBase::Render()`](../../Engine/Source/GameBase.cpp), then audio update. [`ClientSessionRuntime.cpp`](../../Engine/Source/Network/Client/ClientSessionRuntime.cpp) owns engine network-cycle boundaries; [`ClientSession.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp) and [`ClientReconciler.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Client/ClientReconciler.cpp) own game reconciliation policy, while the replay/catch-up machinery they drive is engine-owned in [`ReconcileReplayTick.cpp`](../../Engine/Source/Network/Client/ReconcileReplayTick.cpp).
+The client main loop is [`Main.cpp`](../../Engine/Source/Main.cpp): input
+precedes [`GameBase::ClientUpdate()`](../../Engine/Source/GameBase.cpp), then
+[`GameBase::Render()`](../../Engine/Source/GameBase.cpp), then audio update.
+[`ClientSessionRuntime.cpp`](../../Engine/Source/Network/Client/ClientSessionRuntime.cpp)
+owns engine network-cycle boundaries;
+[`ClientSession.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp)
+and
+[`ClientReconciler.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Client/ClientReconciler.cpp)
+own game reconciliation policy, while the replay/catch-up machinery they drive
+is engine-owned in
+[`ReconcileReplayTick.cpp`](../../Engine/Source/Network/Client/ReconcileReplayTick.cpp).
 
-`GameBase::ProcessInput` has a fixed internal order. [`Input::BeginPoll`](../../Engine/Source/Input/Input.cpp) publishes the display-frame raw snapshot and produces menu and camera input; engine menu policy runs next (quit, then the modal gate, cursor, pause/back-out, engine toggles); `Game::ProcessGameMenuInput` runs last; and `Input::previous-snapshot assignment` advances the previous snapshot on every path, including the modal path that skips the game callback.
+`GameBase::ProcessInput` has a fixed internal order. [`Input::BeginPoll`](../../Engine/Source/Input/Input.cpp) publishes the display-frame raw snapshot and produces menu and camera input; engine menu policy runs next (quit, then the modal gate, cursor, pause/back-out, engine toggles); `Game::ProcessGameMenuInput` runs last; and `Input::previous-snapshot assignment` advances the previous snapshot on every path, including the modal path that skips `Game::ProcessGameMenuInput`.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -39,12 +76,22 @@ flowchart LR
 ```mermaid
 %%{init: {'theme': 'default'}}%%
 flowchart LR
-    beginPoll["Input::BeginPoll"] --> policy["Engine menu policy"] --> callback["Game::ProcessGameMenuInput"] --> completePoll["Input::previous-snapshot assignment"] --> clientUpdate["GameBase::ClientUpdate"]
+    beginPoll["Input::BeginPoll"] --> policy["Engine menu policy"] --> gameInput["Game::ProcessGameMenuInput"] --> completePoll["Input::previous-snapshot assignment"] --> clientUpdate["GameBase::ClientUpdate"]
 ```
 
 ## Server Main Loop
 
-The server main loop in [`Main.cpp`](../../Engine/Source/Main.cpp) calls [`GameBase::ServerUpdate()`](../../Engine/Source/GameBase.cpp), followed by `ServerUpdateDisplayStatistics()`. `ServerUpdate()` establishes the high-level boundaries for network intake, game tick preparation, shared frame simulation, and network completion. [`ServerSessionRuntime.cpp`](../../Engine/Source/Network/Server/ServerSessionRuntime.cpp) owns the engine network cycle; [`ServerSession.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp) owns game session preparation. After the fixed-tick wait, `ServerSessionRuntime::PollTickBoundary` polls a second time so commands that arrived during the wait enter the imminent tick.
+The server main loop in [`Main.cpp`](../../Engine/Source/Main.cpp) calls
+[`GameBase::ServerUpdate()`](../../Engine/Source/GameBase.cpp), followed by
+`ServerUpdateDisplayStatistics()`. `ServerUpdate()` establishes the high-level
+boundaries for network intake, game tick preparation, shared frame simulation,
+and network completion.
+[`ServerSessionRuntime.cpp`](../../Engine/Source/Network/Server/ServerSessionRuntime.cpp)
+owns the engine network cycle;
+[`ServerSession.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp)
+owns game session preparation. After the fixed-tick wait,
+`ServerSessionRuntime::PollTickBoundary` polls a second time so commands that
+arrived during the wait enter the imminent tick.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -55,11 +102,41 @@ flowchart LR
 
 ## Replay Transfer Publication
 
-Replay transfers are recorded on the exact tick that harvested them, in the difference stream's post-dispatch channel rather than inside any `FrameInput`; the authoritative state and network publication stay on that same harvest tick. For an event at `E`, the recording path calls `mPostDispatchRecords.emplace_back(E)` with the harvested transfers. The channel is named for when its transfers are applied, not for when its record is read: during playback, `SyncReplayTick` first checksum-validates and removes any prior generation whose terminal tick is `E`, then activates a later generation due at `E`, loads that generation's exact-tick post-dispatch record, and stages its transfer before the frame dispatch for `E`. The active set was fixed before that activation, so the returned coordinate is absent from this dispatch. `FinalizeFrameTick` applies the staged transfer after dispatch and publishes the destination for `E`; the next iteration refreshes the replay active set and gives the new generation its first simulation dispatch at `E + 1`. At most one reader owns a coordinate at a time.
+Replay transfers are recorded on the exact tick that harvested them, in the
+difference stream's post-dispatch channel rather than inside any `FrameInput`;
+the authoritative state and network publication stay on that same harvest tick.
+For an event at `E`, the recording path calls
+`mPostDispatchRecords.emplace_back(E)` with the harvested transfers. The channel
+is named for when its transfers are applied, not for when its record is read:
+during playback, `SyncReplayTick` first checksum-validates and removes any prior
+generation whose terminal tick is `E`, then activates a later generation due at
+`E`, loads that generation's exact-tick post-dispatch record, and stages its
+transfer before the frame dispatch for `E`. The active set was fixed before that
+activation, so the returned coordinate is absent from this dispatch.
+`FinalizeFrameTick` applies the staged transfer after dispatch and publishes the
+destination for `E`; the next iteration refreshes the replay active set and
+gives the new generation its first simulation dispatch at `E + 1`. At most one
+reader owns a coordinate at a time.
 
-`SyncReplayTick` returns a dispatch decision to the shared server loop. `kStopBeforeDispatch` always runs `SaveLoadReplay` and breaks the current fixed-tick iteration before frame dispatch. A corrupt replay abort has no load flag, so `SaveLoadReplay` does not reload and the server rolls its tick/time back and rebuilds normal active/next-frame state before the break. When the last reader retires, Replay arms `kLoadReplay` before returning the same stop decision; `SaveLoadReplay` reloads the initial replay state, and its first dispatch occurs in a later fixed-tick iteration.
+`SyncReplayTick` returns a dispatch decision to the shared server loop.
+`kStopBeforeDispatch` always runs `SaveLoadReplay` and breaks the current
+fixed-tick iteration before frame dispatch. A corrupt replay abort has no load
+flag, so `SaveLoadReplay` does not reload and the server rolls its tick/time
+back and rebuilds normal active/next-frame state before the break. When the last
+reader retires, Replay arms `kLoadReplay` before returning the same stop
+decision; `SaveLoadReplay` reloads the initial replay state, and its first
+dispatch occurs in a later fixed-tick iteration.
 
-Network publication observes the returned coordinate only after the transfer has been applied, its CRC recomputed, and the Frames swapped. If an existing subscription spans the coordinate's absent interval, the current tick is also the first entry in its newly created server delta ring and lies beyond the slot's prior ACK floor. Before serializing that returning delta, the server sends the current Frame as the existing reliable full state and holds updates and resends until a matching accepted ACK reaches that full-state tick. A newer restart replaces the held target; an explicit resync already sent at the same tick supplies the full state without a duplicate. The replay activation and wire formats remain unchanged.
+Network publication observes the returned coordinate only after the transfer has
+been applied, its CRC recomputed, and the Frames swapped. If an existing
+subscription spans the coordinate's absent interval, the current tick is also
+the first entry in its newly created server delta ring and lies beyond the
+slot's prior ACK floor. Before serializing that returning delta, the server
+sends the current Frame as the existing reliable full state and holds updates
+and resends until a matching accepted ACK reaches that full-state tick. A newer
+restart replaces the held target; an explicit resync already sent at the same
+tick supplies the full state without a duplicate. The replay activation and wire
+formats remain unchanged.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -99,7 +176,20 @@ flowchart LR
 
 ## Collection Phase Participation
 
-[`FrameBase.h`](../../Engine/Source/Frame/FrameBase.h) provides engine registration; game [`Frame.h`](../../Projects/BrokenEngineSandbox/Source/Frame/Frame.h) declares game frame ownership; [`FrameCollections.h`](../../Projects/BrokenEngineSandbox/Source/Frame/FrameCollections.h) provides game collection registration to the compile-time folds in [`FrameUtils.h`](../../Engine/Source/Frame/FrameUtils.h). `Update` is mandatory for every registered collection and compile-checked by its fold. Other phase participation is declaration-driven: collections participate only when their matching hook is declared.
+[`FrameBase.h`](../../Engine/Source/Frame/FrameBase.h) provides engine
+registration; game
+[`Frame.h`](../../Projects/BrokenEngineSandbox/Source/Frame/Frame.h) declares
+game frame ownership;
+[`FrameCollections.h`](../../Projects/BrokenEngineSandbox/Source/Frame/FrameCollections.h)
+provides game collection registration to the compile-time folds in
+[`FrameUtils.h`](../../Engine/Source/Frame/FrameUtils.h). `Update` is mandatory
+for every registered collection and compile-checked by its fold. Other phase
+participation is declaration-driven: collections participate only when their
+matching hook is declared. Engine code walks the engine collections immediately
+before each game call — registration in the `GameBase` constructor, graphics
+resources in `PipelineManager`, the PostRender phases from PreCollision on in
+`RunFrameTick`, and begin/render/end in the main render pass — so engine
+registration, and with it the engine type indices, always comes first.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%

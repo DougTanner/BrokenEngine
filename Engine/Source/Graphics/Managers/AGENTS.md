@@ -11,7 +11,14 @@ Vulkan services exposed through `gp*` globals. `Graphics` constructs its manager
 - The shared descriptor pool serves graphics and compute pipelines. Most pipelines consume global Set 0, but legacy standalone compute pipelines retain their own layouts and do not. Pipeline-specific sets and bindless arrays must remain valid through partial recreation.
 - The texture-descriptor registry owns island bindless-slot metadata and descriptor registrations. Fixed bindless-array storage addresses and slot indices are registry identity. During the post-fence bindless write epoch (a time window in which bindless descriptor writes are safe), eviction redirects all five island channels to slot-0 placeholders and retires their registrations before any view is freed or slot is reused; restoration exposes elevation only after the four lazy channels are ready.
 - A pipeline rebuild clears raw pipeline registrations but preserves live island-slot metadata. Registering a rebuilt bindless consumer must recreate its live per-slot descriptors so an in-flight lazy adoption still reaches that pipeline.
-- Boot fails loud when the device does not advertise `VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT` (the device's promise that it can blend into a given pixel format) for every special-format render target the MAX/ADD-blended prepasses write: elevation, lighting, smoke, and wind. Blending without it is silent undefined behavior at pipeline creation, so this device dependency is hard, unlike the sampler linear-filter probe that downgrades gracefully. Adding a blended prepass on a new format must extend that guard.
+- Boot fails loud when the device does not advertise
+  `VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT` (the device's promise that it
+  can blend into a given pixel format) for every special-format render target
+  the MAX/ADD-blended prepasses write: elevation, lighting, smoke, and wind.
+  Blending without it is silent undefined behavior at pipeline creation, so this
+  device dependency is hard, unlike the sampler linear-filter probe that
+  downgrades gracefully. Adding a blended prepass on a new format must extend
+  that guard.
 - Pack-backed shaders, models, fonts, and textures are trust boundaries. Validate declared ranges, counts, dimensions, and derived byte sizes against the resident chunk before allocation or copy. Boot consumers throw `std::ios_base::failure`; the texture upload thread and per-frame adoption `ASSERT` (`../../File/AGENTS.md`).
 
 ## Manager Contracts
@@ -22,7 +29,13 @@ Renderer-wide frame and recreation ordering stays in Graphics; the contracts bel
 
 Vulkan instance, physical-device selection, and the Win32 surface. Capability validation runs against the finally selected device before logical-device creation and covers the selected required core/Vulkan 1.2 features plus format-specific optimal-tiling support; `DeviceManager` must enable every feature required here.
 
-Under RenderDoc (`renderdoc.dll` loaded), the validation layer, its `VK_EXT_layer_settings` extension, and the `VkLayerSettingsCreateInfoEXT` `pNext` chain must be dropped together; the retry path on a machine without the Vulkan SDK drops the same `pNext` plus the portability flag to stay spec-valid. `kbRenderDoc` plus a loaded DLL exposes the in-app capture API under a `%TEMP%\RenderDoc` path template, and `--renderdoc` force-loads the DLL before instance creation at the cost of validation layers.
+Under RenderDoc (`renderdoc.dll` loaded), the validation layer, its
+`VK_EXT_layer_settings` extension, and the `VkLayerSettingsCreateInfoEXT`
+`pNext` chain must be dropped together; the retry path on a machine without the
+Vulkan SDK drops the same `pNext` plus the portability flag to stay spec-valid.
+`kbRenderDoc` plus a loaded DLL exposes the in-app capture API under a
+`%TEMP%\RenderDoc` path template, and `--renderdoc` force-loads the DLL before
+instance creation at the cost of validation layers.
 
 ### DeviceManager
 
@@ -53,8 +66,33 @@ Per-framebuffer command buffers and the submission graph. The Global and Main re
 All GPU buffers: vertex (terrain, water, models), uniform (per-framebuffer view/projection), and storage (dynamic game objects, particles, skinning). Model buffers are indexed by CRC.
 
 - Collections register storage buffers during `CreatePipelines()` through the CRC-keyed dynamic buffer system with three categories (main, visible lights, wind deposit). Access is templated with runtime size validation, and automatic resizing defers destruction to avoid validation errors from in-flight command buffers.
-- Skinning bump-allocates mesh data and joint matrices per frame with per-command-buffer offset tracking, auto-grows by doubling, and propagates descriptor updates to model pipelines. Joint matrices use a compact 3-row format (48 bytes) since the fourth row is always identity. Multiple grows within one frame are safe: buffers are per-framebuffer, the top-of-frame per-framebuffer fence wait drains any prior submission before a grow runs, and record-once command buffers reach skinning data only through descriptor sets the grow repoints.
-- Smoke and wind share one occupancy + active-tile-list pattern for hierarchical indirect dispatch. Smoke pairs one bit-packed occupancy buffer with each ping-pong texture and shares one active-tile list between both spread halves: deposits mark the first texture's occupancy; each spread's dilate reads its input occupancy and read-and-clears its output texture's prior occupancy as a stale-storage union term, then the spread re-marks nonzero output. Smoke dilates dispatch through per-framebuffer host-visible indirect commands so a smoke skip frame dispatches nothing and leaves occupancy intact; wind still resets its occupancy with a fill. Wind keeps a separate occupancy and active-tile-list pair per ping-pong texture, with both spread variants recorded and runtime state plus indirect dispatch selecting useful work. Occupancy describes persistent texture contents, so every occupancy buffer starts at zero. Wind hierarchy storage is created with the wind textures, which zero-fill its occupancy, so it survives pipeline-only rebuilds together with the retained texture contents; smoke hierarchy storage is pipeline-owned. Replacing smoke hierarchy storage also re-arms the one-frame smoke clear: Global first observes the zeroed occupancy, Main then clears both retained ping-pong images, and fresh `SmokeOne` deposits after that clear must mark occupancy A.
+- Skinning bump-allocates mesh data and joint matrices per frame with
+  per-command-buffer offset tracking, auto-grows by doubling, and propagates
+  descriptor updates to model pipelines. Joint matrices use a compact 3-row
+  format (48 bytes) since the fourth row is always identity. Multiple grows
+  within one frame are safe: buffers are per-framebuffer, the top-of-frame
+  per-framebuffer fence wait drains any prior submission before a grow runs, and
+  record-once command buffers reach skinning data only through descriptor sets
+  the grow repoints.
+- Smoke and wind share one occupancy + active-tile-list pattern for hierarchical
+  indirect dispatch. Smoke pairs one bit-packed occupancy buffer with each
+  ping-pong texture and shares one active-tile list between both spread halves:
+  deposits mark the first texture's occupancy; each spread's dilate reads its
+  input occupancy and read-and-clears its output texture's prior occupancy as a
+  stale-storage union term, then the spread re-marks nonzero output. Smoke
+  dilates dispatch through per-framebuffer host-visible indirect commands so a
+  smoke skip frame dispatches nothing and leaves occupancy intact; wind still
+  resets its occupancy with a fill. Wind keeps a separate occupancy and
+  active-tile-list pair per ping-pong texture, with both spread variants
+  recorded and runtime state plus indirect dispatch selecting useful work.
+  Occupancy describes persistent texture contents, so every occupancy buffer
+  starts at zero. Wind hierarchy storage is created with the wind textures,
+  which zero-fill its occupancy, so it survives pipeline-only rebuilds together
+  with the retained texture contents; smoke hierarchy storage is pipeline-owned.
+  Replacing smoke hierarchy storage also re-arms the one-frame smoke clear:
+  Global first observes the zeroed occupancy, Main then clears both retained
+  ping-pong images, and fresh `SmokeOne` deposits after that clear must mark
+  occupancy A.
 - Swapchain recreation tears down and rebuilds only per-framebuffer buffers, preserving static geometry.
 
 ### TextureManager
@@ -62,7 +100,7 @@ All GPU buffers: vertex (terrain, water, models), uniform (per-framebuffer view/
 Loaded textures, global texture descriptors, cached generated textures, and renderer targets. Lazy textures begin on a white placeholder and enter the bounded per-frame adoption path after a load request. Non-indirect pipelines request at creation, indirect pipelines defer until their first positive instance write, priority textures request at boot, and `InitializeBootTextures` replays every registered lighting-texture CRC so a device recreation does not strand them on the placeholder.
 
 - Swapchain recreation selectively rebuilds screen-dependent targets and descriptor sets while preserving loaded textures.
-- Explicit repeat/clamp samplers cover authored/generated deposit lookup and visible-light textures. Unflagged combined samplers, explicit offscreen linear variants, and dedicated smoke/wind variants all omit anisotropy; internal render-target reads remain non-anisotropic. Format-specific elevation, model-material, and water-normal variants remain separate.
+- Explicit repeat/clamp samplers cover authored/generated deposit lookup and visible-light textures. Unflagged combined samplers, explicit offscreen linear variants, and dedicated smoke/wind variants all omit anisotropy, so unflagged render-target reads such as object shadows and terrain elevation stay non-anisotropic; the border samplers follow the player's anisotropy setting. Format-specific elevation, model-material, and water-normal variants remain separate.
 - Light-type textures consume a fixed reservation of bindless slots for pre-blurred results. Grow that reservation if the registered lighting-texture count exceeds its capacity.
 - A lighting texture's pre-blurred result is found under its own CRC salted with `kBlurSalt`, so the blur write site and every read site agree without a second lookup table. `ReblurAllLightingTextures` re-runs the blur for every ready lighting texture after a change that invalidates the results.
 - Three owned-by-value units carry the detail: `TextureDescriptors` (global descriptor Set 0, the bindless texture array, per-pipeline binding tracking, deferred descriptor updates), `TextureCache` (GPU-to-CPU readback, the on-disk cache of generated textures, PBR BRDF lookup tables), and `RenderTargetTextures` (creation and sizing of effect render targets).
@@ -72,11 +110,24 @@ Water's variance-table consumption is documented in Water shaders (`../../../Dat
 
 ### TextureUploadManager
 
-A dedicated upload thread with a fixed staging budget, persisting large-texture progress across frames. The budget caps size, not rate: the render loop signals the thread once per iteration, including iterations `GameBase::Render` skips for a deferred swapchain, and the thread waits for a signal before each chunk, so uploads spread across frames instead of bursting. Block-compressed partial copies support BC4, BC5, and BC7. Queue selection prefers transfer-only work but resolves to foreground adoption when transfer aliases graphics or the distinct present family, so concurrent submissions do not share that queue.
+A dedicated upload thread with a fixed staging budget, persisting large-texture
+progress across frames. The budget caps size, not rate: the render loop signals
+the thread once per iteration, including iterations `GameBase::Render` skips for
+a deferred swapchain, and the thread waits for a signal before each chunk, so
+uploads spread across frames instead of bursting. Block-compressed partial
+copies support BC4, BC5, and BC7. Queue selection prefers transfer-only work but
+resolves to foreground adoption when transfer aliases graphics or the distinct
+present family, so concurrent submissions do not share that queue.
 
 - Distinct transfer queues release image ownership for the matching graphics acquire; maintenance9-capable devices may use the simplified path. Device loss preserves CPU data for re-upload.
 - `WaitIdle` is a teardown drain handshake: the upload thread acknowledges only from a no-submit-in-flight point, and every exit path publishes exit state so a waiter cannot deadlock. Frame permits remain binary and must be drained before release. Fatal upload failures are published for the main thread and survive transfer-resource recreation; device loss remains a separate recovery path.
-- Pack texture headers and derived copy ranges are validated before the upload thread may hand work to foreground adoption, and again before foreground fallback allocation or copy: positive signed dimensions and mip counts, the pack ceilings and a realizable mip chain, the selected device's limits for that exact image format, square cubemaps, and enough resident bytes for every layer and mip. Upload-thread failures travel the published fatal path. Other upload failures leave active ownership intact for that path.
+- Pack texture headers and derived copy ranges are validated before the upload
+  thread may hand work to foreground adoption, and again before foreground
+  fallback allocation or copy: positive signed dimensions and mip counts, the
+  pack ceilings and a realizable mip chain, the selected device's limits for
+  that exact image format, square cubemaps, and enough resident bytes for every
+  layer and mip. Upload-thread failures travel the published fatal path. Other
+  upload failures leave active ownership intact for that path.
 - The pending-adoption counter belongs to this manager because it outlives `TextureManager` during device recreation. Keep file-state rearming and adoption completion synchronized with that counter.
 - The registered lighting-texture CRC set belongs to this manager for the same reason: startup registration happens once, so a set owned by `TextureManager` would come back empty from every device recreation. Unlike the counter, it is main-thread-only and unsynchronized — written by startup registration, read by adoption and reblur — so the upload thread must never touch it.
 
@@ -90,13 +141,25 @@ Loads SPIR-V from pack chunks and owns fixed engine pipelines plus CRC-keyed dyn
 
 ### ParticleManager
 
-Stages CPU particle spawns for fixed-capacity GPU compute allocation and simulation. Worker spawns first cull by the camera cell's visible area and intensity, so callers pass camera-cell positions, then append under the spawn mutex during joined frame-tick work. `RenderGlobal` runs after the worker join, copies staged spawns into the current framebuffer's mapped storage, and clears CPU staging; when `GameBase::Render` skips `RenderGlobal` for a deferred swapchain it clears staging with `DiscardStagedSpawns` instead, so ticks keep spawning without accumulating past the staging limit. Bindless texture-index assignment mutates descriptor bookkeeping while spawning; its safety relies on this tick/render phase exclusion. Keep that exclusion if spawn or descriptor work moves between phases. The pool follows the camera's cell through `RetainedAreaBasis`: a one-cell step shifts every allocated particle by the whole-cell offset in the update pass, and a larger step resets the pool.
+Stages CPU particle spawns for fixed-capacity GPU compute allocation and
+simulation. Worker spawns first cull by the camera cell's visible area and
+intensity, so callers pass camera-cell positions, then append under the spawn
+mutex during joined frame-tick work. `RenderGlobal` runs after the worker join,
+copies staged spawns into the current framebuffer's mapped storage, and clears
+CPU staging; when `GameBase::Render` skips `RenderGlobal` for a deferred
+swapchain it clears staging with `DiscardStagedSpawns` instead, so ticks keep
+spawning without accumulating past the staging limit. Bindless texture-index
+assignment mutates descriptor bookkeeping while spawning; its safety relies on
+this tick/render phase exclusion. Keep that exclusion if spawn or descriptor
+work moves between phases. The pool follows the camera's cell through
+`RetainedAreaBasis`: a one-cell step shifts every allocated particle by the
+whole-cell offset in the update pass, and a larger step resets the pool.
 
 ### ImGuiManager
 
 Integrates Dear ImGui with a dedicated load-preserving overlay pass. It records the UI command buffer each frame, waits for Main, signals presentation, and signals the per-framebuffer fence as the frame's final graphics submission.
 
-- Owns the engine standard menu screens and `ChatScreen` (`mpChatScreen`) plus the game HUD and TweaksScreen objects, the latter being the sanctioned engine-to-game dependency exception described by the Engine hub. Standard screens and `ChatScreen` are called as `Render()`; game screens are called through their own signatures. Screen behavior belongs to UI documentation (`../../Ui/Screens/AGENTS.md`).
+- Owns the engine standard menu screens, `ChatScreen` (`mpChatScreen`), and the engine Tweaks screen, plus the game HUD object, the sanctioned engine-to-game dependency exception described by the Engine hub. Engine screens are called as `Render()`; the HUD is called through its own signature. Screen behavior belongs to UI documentation (`../../Ui/Screens/AGENTS.md`).
 - Theme geometry resets to ImGui defaults before scaling so it can be reapplied safely. Font scale composes framebuffer and user scaling. UI dimensions use a 2160-pixel reference height through `UiScale()`, a repository-wide convention: every authored pixel constant in engine and game UI code is written for a 2160-high screen and multiplied by `UiScale()` at use, under authoring rules owned by the engine screens hub (`../../Ui/Screens/AGENTS.md`).
 - Opaque-region registration is rectangular, so rounded opaque windows must remain visually compatible with rectangular scene occlusion.
 - The Win32 backend publishes physical cursor state during frame preparation. Synthetic agent mouse position is reissued afterward so it wins last-writer ordering. Physical-input suppression parks the cursor unless an agent pin owns it and always clears backend gamepad navigation state.

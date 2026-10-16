@@ -1,20 +1,70 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-15T23:40:29.507Z","dependsOn":["Documents/Plans/Engine/EngineOwnedSaveSettingsAndSwitches.md","Documents/Plans/Engine/RemoveSandboxGameplayFromEngine.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-15T23:40:29.507Z","dependsOn":[]} -->
 # Move the game-agnostic session protocol from Sandbox Network into the engine session runtimes
 
 Tier 3 (`.agents/references/risk-tiers.md`): the change adds engine packet types below `kGamePacketStart`, shifting every game packet identifier, so it alters the wire protocol (`engine::kiProtocolVersion` bump); it moves the admission and value validation of seven client-to-server packet types from the game dispatch to engine `Server::Receive`, a trust-boundary change; and it spans engine Network Server, engine Network Client, `GameBase`, and game Network Server/Client.
 
-Line numbers cite baseline `f1d140ae`. Paths under `Network/`, `Agent/`, `Save/`, `Ui/` and bare `Game.*`/`FleetSelection.cpp` mean `Projects/BrokenEngineSandbox/Source/...`; `Engine/` paths are repository-relative. This Plan lands after `RemoveSandboxGameplayFromEngine.md`, which renames `ServerSession::mClientPlayers` to `mClientOwnedEntities` and `SubscriptionUpdate::globalPlayerId` to `globalId`, adds `ServerSession::OnOwnedEntityChangedCell` (the fleet forward `ServerTransferManager` calls), and moves `mPendingUpdatePlayerRequests` onto `ServerSession` with a clear in `ResetClientsForLoad`; and after `EngineOwnedSaveSettingsAndSwitches.md`, which moves the server save, load, and reset entry points into `engine::ServerSaveLoad` held as `GameBase::mServerSaveLoad` and leaves `game::OnStateReplaced` in `Save/GameSaveLoad.cpp`. Carry their landed names and signatures forward; where a recommended name below differs from one they introduced for the same thing, use theirs. Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other.
+Line numbers cite baseline `f1d140ae`. Paths under `Network/`, `Agent/`,
+`Save/`, `Ui/` and bare `Game.*`/`FleetSelection.cpp` mean
+`Projects/BrokenEngineSandbox/Source/...`; `Engine/` paths are
+repository-relative. This Plan lands after `RemoveSandboxGameplayFromEngine.md`,
+which renames `ServerSession::mClientPlayers` to `mClientOwnedEntities` and
+`SubscriptionUpdate::globalPlayerId` to `globalId`, adds
+`ServerSession::OnOwnedEntityChangedCell` (the fleet forward
+`ServerTransferManager` calls), and moves `mPendingUpdatePlayerRequests` onto
+`ServerSession` with a clear in `ResetClientsForLoad`; and after
+`EngineOwnedSaveSettingsAndSwitches.md`, which moves the server save, load, and
+reset entry points into `engine::ServerSaveLoad` held as
+`GameBase::mServerSaveLoad` and leaves `game::OnStateReplaced` in
+`Save/GameSaveLoad.cpp`. Carry their landed names and signatures forward; where
+a recommended name below differs from one they introduced for the same thing,
+use theirs. Where a statement here and the code disagree, the code wins; report
+the contradiction instead of matching one side to the other.
 
 ## Context
 
-Relayed user direction for this planning session (the dispatching session's record, not the user's words): a second game project will be created beside `Projects/BrokenEngineSandbox`; engine code may call expected `game::` classes, globals, and members by name as its hook contract, but must not name Sandbox gameplay (Blaster, Spaceship, Missile, Player, `bUseMissiles`, Fleet); fleets stay game-owned behind neutral hooks; no backward compatibility, so a protocol change bumps `kiProtocolVersion`; the server fully validates client-to-server records.
+Relayed user direction for this planning session (the dispatching session's
+record, not the user's words): a second game project will be created beside
+`Projects/BrokenEngineSandbox`; engine code may call expected `game::` classes,
+globals, and members by name as its hook contract, but must not name Sandbox
+gameplay (Blaster, Spaceship, Missile, Player, `bUseMissiles`, Fleet); fleets
+stay game-owned behind neutral hooks; no backward compatibility, so a protocol
+change bumps `kiProtocolVersion`; the server fully validates client-to-server
+records.
 
 Several session mechanisms in game Network use only engine types and engine state, so a second game would have to copy them:
 
-- Owned-entity notifications. The server sends `kServerAssignPlayer`/`kServerPlayerState` (`Network/Server/ServerSession.cpp:295-322`), relinks a reconnecting or post-load client's entities by `ClientGuid` (`:399-443`), forwards changed-cell notifications queued by the engine transfer manager (`:337-355`, queued at `Engine/Source/Network/Server/ServerTransferManager.cpp:243`), and detects owned-entity death (`Network/Server/ServerClientManager.cpp:214-281`). Relink and death detection read `PlayersPostRender` directly although the engine ownership layer (`game::Frame::OwnershipLayer`, `Frame/Frame.cpp:538`, binding `pGlobalIds`/`pClientGuids`) already exposes exactly those columns and the engine registry (`Engine/Source/Network/Server/OwnedEntityRegistry.h:14`) holds the result. The wire layouts (`Network/GameMessages.h:9-56`) and the client parse (`Network/PlayerEvents.cpp:12-32`) are game-agnostic.
-- Debug-control requests. Save, load, reset, replay record, replay playback, pause, and timespeed (`Network/GamePacketType.h:18-24`, contract rows `:41-72`, handlers `Network/Server/ServerSession.cpp:165-233`, `StepTimescale` `:324-335`) touch only `GameFlags`, `gpReplay`, `TimeStep`, `Server::BroadcastTimespeedIfChanged`, and the server save entry points; the debug gate is engine (`Engine/Source/Network/Client/Client.h:97` `kServerDebugInput`, `Engine/Source/Network/NetworkMessages.h:536`); the client senders (`Game.cpp:541-589`) map only engine `MenuInputFlags` plus Backspace.
+- Owned-entity notifications. The server sends
+  `kServerAssignPlayer`/`kServerPlayerState`
+  (`Network/Server/ServerSession.cpp:295-322`), relinks a reconnecting or
+  post-load client's entities by `ClientGuid` (`:399-443`), forwards
+  changed-cell notifications queued by the engine transfer manager (`:337-355`,
+  queued at `Engine/Source/Network/Server/ServerTransferManager.cpp:243`), and
+  detects owned-entity death (`Network/Server/ServerClientManager.cpp:214-281`).
+  Relink and death detection read `PlayersPostRender` directly although the
+  engine ownership layer (`game::Frame::OwnershipLayer`, `Frame/Frame.cpp:538`,
+  binding `pGlobalIds`/`pClientGuids`) already exposes exactly those columns and
+  the engine registry (`Engine/Source/Network/Server/OwnedEntityRegistry.h:14`)
+  holds the result. The wire layouts (`Network/GameMessages.h:9-56`) and the
+  client parse (`Network/PlayerEvents.cpp:12-32`) are game-agnostic.
+- Debug-control requests. Save, load, reset, replay record, replay playback,
+  pause, and timespeed (`Network/GamePacketType.h:18-24`, contract rows
+  `:41-72`, handlers `Network/Server/ServerSession.cpp:165-233`, `StepTimescale`
+  `:324-335`) touch only `GameFlags`, `gpReplay`, `TimeStep`,
+  `Server::BroadcastTimespeedIfChanged`, and the server save entry points; the
+  debug gate is engine (`Engine/Source/Network/Client/Client.h:97`
+  `kServerDebugInput`, `Engine/Source/Network/NetworkMessages.h:536`); the
+  client senders (`Game.cpp:541-589`) map only engine `MenuInputFlags` plus
+  Backspace.
 - Server session sequencing. `ServerSession::PrepareTick` (`ServerSession.cpp:41-63`) makes only engine calls; `AddGameRequiredCoordinates` (`:281-293`) is the ownership-layer nonempty test `ServerTransferManager.cpp:35` already uses; `ResetClientsForLoad` (`:357-397`) is a generic generation/notification/slot/relink/reset sequence around three fleet calls; the game drain (`:86-104`, `:235-244`) repeats the engine contract lookup, admission, catch, and violation accounting.
-- Client session sequencing. `ClientSession::ApplyReceivedStaticData` (`Network/Client/ClientSession.cpp:314-334`) uses only engine types; `Reconcile` (`:153-176`), the desync-core ownership and polling (`ClientSession.h:68`, `ClientSession.cpp:208-212`), the cell reset loops (`:256-264`, `:356-365`), and the `mUnwantedTimestamps` clear are engine mechanics. `ClientReconciler::Run` (`Network/Client/ClientReconciler.cpp:95-111`, `:155-173`) fills the engine desync record, logs `CONFIRMED DESYNC`, sets `ProfileManagerBase` counters, logs replay bursts, and sets the `StaticVoices` skip flag, all engine-only.
+- Client session sequencing. `ClientSession::ApplyReceivedStaticData`
+  (`Network/Client/ClientSession.cpp:314-334`) uses only engine types;
+  `Reconcile` (`:153-176`), the desync-core ownership and polling
+  (`ClientSession.h:68`, `ClientSession.cpp:208-212`), the cell reset loops
+  (`:256-264`, `:356-365`), and the `mUnwantedTimestamps` clear are engine
+  mechanics. `ClientReconciler::Run`
+  (`Network/Client/ClientReconciler.cpp:95-111`, `:155-173`) fills the engine
+  desync record, logs `CONFIRMED DESYNC`, sets `ProfileManagerBase` counters,
+  logs replay bursts, and sets the `StaticVoices` skip flag, all engine-only.
 
 ## Design
 
@@ -31,17 +81,116 @@ One Plan, one landing; the stages order the work so each builds and runs, and th
 
 - Move `ServerSession::PrepareTick` verbatim into `ServerSessionRuntime::PrepareTick()`; `GameBase::ServerUpdate` (`Engine/Source/GameBase.cpp:390`) calls it through `mpRuntime`. Keep its `mFrameInputs.try_emplace` loop: in a multi-tick update its `ComputeActiveSet` can add a coordinate after `ServerBroadcaster::BuildFrameInputs` ran, so it is not a removable duplicate of `ServerBroadcaster.cpp:26-29`.
 - Replace the `AddGameRequiredCoordinates` hook with an engine step in `ServerSessionRuntime::ComputeActiveSet` that adds every cell whose `game::Frame::OwnershipLayer(*pCurrent).iCount > 0`, at the same position in the sequence.
-- Replace `ServerSession::ResetClientsForLoad` with `ServerSessionRuntime::ResetForLoad()`: advance the load generation; log; suppress allocation tracking; `BroadcastLoadNotification`; for each client free active slots, clear its registry entries, and relink (logging the no-GUID-match line when nothing relinks); call one game hook `ServerSession::OnResetForLoad()`; then `ServerTransferManager::ResetState`, `ServerBroadcaster::ResetState`, `ResetTransportForLoad`. The game hook does, in this order: clear `mPendingFlagshipUpdates`; for each client `ServerFleetManager::OnResetForLoad`; `ServerClientManager::ResetState`; zero `miHarvestedTransferTotal`; the prerequisite's `mPendingUpdatePlayerRequests.clear()`; `ServerFleetManager::ClearPendingRequests`. Rationale for the reordering: `OnResetForLoad` reads only its own client's registry entries and `mGuidToClientId`, so running it after every relink instead of interleaved changes no state and no per-client reliable-channel order; the flagship clear still precedes every `OnResetForLoad` push; the remaining clears are independent. Its one caller, `game::OnStateReplaced` (`Save/GameSaveLoad.cpp:46-49`), calls `gpServerSession->mpRuntime->ResetForLoad()`.
-- Engine-owned deferred-packet drain. Rename `engine::ReceivedGamePacket`/`Server::mReceivedGamePackets` (`Engine/Source/Network/Server/Server.h:27`, `:158`) to `DeferredClientPacket`/`mDeferredClientPackets`, since stage 3 queues engine packets there too. `ServerSessionRuntime::Poll` and `PollTickBoundary` call a new `DispatchDeferredClientPackets()` immediately before `mrSession.AfterNetworkPoll()` (today the first statement of `AfterNetworkPoll` is the game drain, so position is unchanged). It walks the queue in arrival order inside one `try`/`catch (const std::exception&)` per packet whose catch logs and records one `kCorrupt` violation (reason `"deferred packet handler threw"`). A game-range packet takes `game::NetworkSessionContract::GetGamePacketContract` (a new static wrapper over `game::GetGamePacketContract`), then `Server::AdmitGamePacket`, then the game hook `ServerSession::HandleGamePacket(const engine::DeferredClientPacket&)`, which holds today's switch body minus the debug-control cases. Stage 3 adds the engine branch.
+- Replace `ServerSession::ResetClientsForLoad` with
+  `ServerSessionRuntime::ResetForLoad()`: advance the load generation; log;
+  suppress allocation tracking; `BroadcastLoadNotification`; for each client
+  free active slots, clear its registry entries, and relink (logging the
+  no-GUID-match line when nothing relinks); call one game hook
+  `ServerSession::OnResetForLoad()`; then `ServerTransferManager::ResetState`,
+  `ServerBroadcaster::ResetState`, `ResetTransportForLoad`. The game hook does,
+  in this order: clear `mPendingFlagshipUpdates`; for each client
+  `ServerFleetManager::OnResetForLoad`; `ServerClientManager::ResetState`; zero
+  `miHarvestedTransferTotal`; the prerequisite's
+  `mPendingUpdatePlayerRequests.clear()`;
+  `ServerFleetManager::ClearPendingRequests`. Rationale for the reordering:
+  `OnResetForLoad` reads only its own client's registry entries and
+  `mGuidToClientId`, so running it after every relink instead of interleaved
+  changes no state and no per-client reliable-channel order; the flagship clear
+  still precedes every `OnResetForLoad` push; the remaining clears are
+  independent. Its one caller, `game::OnStateReplaced`
+  (`Save/GameSaveLoad.cpp:46-49`), calls
+  `gpServerSession->mpRuntime->ResetForLoad()`.
+- Engine-owned deferred-packet drain. Rename
+  `engine::ReceivedGamePacket`/`Server::mReceivedGamePackets`
+  (`Engine/Source/Network/Server/Server.h:27`, `:158`) to
+  `DeferredClientPacket`/`mDeferredClientPackets`, since stage 3 queues engine
+  packets there too. `ServerSessionRuntime::Poll` and `PollTickBoundary` call a
+  new `DispatchDeferredClientPackets()` immediately before
+  `mrSession.AfterNetworkPoll()` (today the first statement of
+  `AfterNetworkPoll` is the game drain, so position is unchanged). It walks the
+  queue in arrival order inside one `try`/`catch (const std::exception&)` per
+  packet whose catch logs and records one `kCorrupt` violation (reason
+  `"deferred packet handler threw"`). A game-range packet takes
+  `game::NetworkSessionContract::GetGamePacketContract` (a new static wrapper
+  over `game::GetGamePacketContract`), then `Server::AdmitGamePacket`, then the
+  game hook
+  `ServerSession::HandleGamePacket(const engine::DeferredClientPacket&)`, which
+  holds today's switch body minus the debug-control cases. Stage 3 adds the
+  engine branch.
 
 ### 2. Owned-entity notification protocol
 
-- Wire. Add engine `PacketType::kServerOwnedEntityAssign` and `kServerOwnedEntityState` and remove `GamePacketType::kServerAssignPlayer`/`kServerPlayerState`. Move `AssignPlayerMessage`, `PlayerStateMessage`, `PlayerStateDescriptor`/`kpPlayerStateDescriptors` (`GameMessages.h:9-56`) and `PlayerStateWireType`/`PlayerEventType`/`ReceivedPlayerEvent` (`Network/PlayerEvents.h:8-30`) into `Engine/Source/Network/NetworkMessages.h` as engine layouts with `keType` (recommended names `ServerOwnedEntityAssignMessage`, `ServerOwnedEntityStateMessage`, `OwnedEntityStateWireType`, `OwnedEntityEventType`, `ReceivedOwnedEntityEvent`, `kpOwnedEntityStateDescriptors`). Field order and widths after the type byte stay byte-identical (16 and 17 bytes); descriptor names stay `Spawned`, `ChangedCell`, `Died`.
-- Server state. Move the owned-entity registry (`ServerSession::mClientOwnedEntities` after the prerequisite, `ServerSession.h:52`) under the same name and the changed-cell queue (`mPendingSubscriptionUpdates` and `SubscriptionUpdate`, `:23-28`, `:54`) onto `ServerSessionRuntime` (recommended `mPendingOwnedEntityCellChanges`/`OwnedEntityCellChange`, fields unchanged). Every reader and writer follows: `ServerTransferManager.cpp:236-247` (the queue append now targets the runtime) and `:352`; `ServerBroadcaster.cpp:234-235` or the prerequisite's moved `ProcessUpdatePlayerRequests`; `ServerFleetManager.cpp:362-363`, `:439-440`; `ServerClientManager.cpp`. The prerequisite's `OnOwnedEntityChangedCell` hook is unchanged.
-- Server sends and relink. `ServerSessionRuntime` gains `SendOwnedEntityAssign`, `SendOwnedEntityState` (same reliable channel, flags, and `ASSERT`ed size as today; log `ServerSessionRuntime::SendOwnedEntityState State: <name> Client: <id> GlobalId: <id> Grid: (<x>,<y>)`), `AssignOwnedEntity(iClientId, globalId, coord)` = registry `Add` + assign + `kSpawned` state, and `RelinkOwnedEntities(iClientId, rGuid, eContext)` carrying today's `RelinkFromFrames` logic (empty-GUID early return, scan of every cell's `pCurrent` through `game::Frame::OwnershipLayer` `pClientGuids`/`pGlobalIds`, sort by global ID, `Reserve`, `AssignOwnedEntity` per entry, per-context log) and returning the count; `RelinkContext` moves with it. `ServerClientManager::NewClients` and `SpawnWaitingClients` call these; `NewClients` keeps the dead/processed/waiting skips, `LogConnectingClientDiagnostic`, and `OnClientConnected`.
+- Wire. Add engine `PacketType::kServerOwnedEntityAssign` and
+  `kServerOwnedEntityState` and remove
+  `GamePacketType::kServerAssignPlayer`/`kServerPlayerState`. Move
+  `AssignPlayerMessage`, `PlayerStateMessage`,
+  `PlayerStateDescriptor`/`kpPlayerStateDescriptors` (`GameMessages.h:9-56`) and
+  `PlayerStateWireType`/`PlayerEventType`/`ReceivedPlayerEvent`
+  (`Network/PlayerEvents.h:8-30`) into `Engine/Source/Network/NetworkMessages.h`
+  as engine layouts with `keType` (recommended names
+  `ServerOwnedEntityAssignMessage`, `ServerOwnedEntityStateMessage`,
+  `OwnedEntityStateWireType`, `OwnedEntityEventType`,
+  `ReceivedOwnedEntityEvent`, `kpOwnedEntityStateDescriptors`). Field order and
+  widths after the type byte stay byte-identical (16 and 17 bytes); descriptor
+  names stay `Spawned`, `ChangedCell`, `Died`.
+- Server state. Move the owned-entity registry
+  (`ServerSession::mClientOwnedEntities` after the prerequisite,
+  `ServerSession.h:52`) under the same name and the changed-cell queue
+  (`mPendingSubscriptionUpdates` and `SubscriptionUpdate`, `:23-28`, `:54`) onto
+  `ServerSessionRuntime` (recommended
+  `mPendingOwnedEntityCellChanges`/`OwnedEntityCellChange`, fields unchanged).
+  Every reader and writer follows: `ServerTransferManager.cpp:236-247` (the
+  queue append now targets the runtime) and `:352`;
+  `ServerBroadcaster.cpp:234-235` or the prerequisite's moved
+  `ProcessUpdatePlayerRequests`; `ServerFleetManager.cpp:362-363`, `:439-440`;
+  `ServerClientManager.cpp`. The prerequisite's `OnOwnedEntityChangedCell` hook
+  is unchanged.
+- Server sends and relink. `ServerSessionRuntime` gains `SendOwnedEntityAssign`,
+  `SendOwnedEntityState` (same reliable channel, flags, and `ASSERT`ed size as
+  today; log
+  `ServerSessionRuntime::SendOwnedEntityState State: <name> Client: <id> GlobalId: <id> Grid: (<x>,<y>)`),
+  `AssignOwnedEntity(iClientId, globalId, coord)` = registry `Add` + assign +
+  `kSpawned` state, and `RelinkOwnedEntities(iClientId, rGuid, eContext)`
+  carrying today's `RelinkFromFrames` logic (empty-GUID early return, scan of
+  every cell's `pCurrent` through `game::Frame::OwnershipLayer`
+  `pClientGuids`/`pGlobalIds`, sort by global ID, `Reserve`, `AssignOwnedEntity`
+  per entry, per-context log) and returning the count; `RelinkContext` moves
+  with it. `ServerClientManager::NewClients` and `SpawnWaitingClients` call
+  these; `NewClients` keeps the dead/processed/waiting skips,
+  `LogConnectingClientDiagnostic`, and `OnClientConnected`.
 - Changed-cell send. `ServerSessionRuntime::CompleteTick` replaces `mrSession.SubscriptionUpdates()` with `SendNewSubscriptionFullStates()` followed by sending the queued assign plus `kChangedCell` state per entry and clearing the queue — today's `SubscriptionUpdates` body.
-- Death scan. `ServerSessionRuntime::CompleteTick` runs `DetectOwnedEntityDeaths()` immediately before `mrSession.FinalizeTickClients()`, carrying today's `DetectPlayerDeaths` loop (skip clients with no entries or with a pending changed-cell entry; skip absent cells; membership test through the ownership layer `pGlobalIds`; reverse iteration; `kDied` state, log, `RemoveAt`) and calling the game hook `ServerSession::OnOwnedEntityDied(iClientId, rClientGuid, globalId)` per death. The game hook calls `ServerFleetManager::OnPlayerDeath` and then inserts the client into `mDeadClientIds` when its registry list is now empty; that equals today's after-loop check because the list empties only on its last removal. Today's `mDeadClientIds` skip is dropped from the scan: a client enters that set only when its list is empty, and the only registry `Add` sites (`SpawnWaitingClients` after `QueueSpawnForClient` erased the id, and the load relink followed by `ServerClientManager::ResetState`) leave no dead client with entries at scan time. `FinalizeTickClients` keeps `DetectDisconnectedPlayerDeaths` and `PublishServerEntityCounts`.
-- Client. `Client::Receive` decodes the two engine packets (under its existing catches: `std::ios_base::failure` `ASSERT`s, other exceptions warn) into a new `Client::mReceivedOwnedEntityEvents`, cleared at `Client::Poll` entry and in `ServerLoadNotification` exactly where `mReceivedGamePackets` is cleared today (`Client.cpp:101`, `:796`), growth under suppressed allocation tracking. `ClientSessionRuntime::PollAndDrain` drains it immediately before `mrSession.ProcessReceivedGamePackets()`, calling the game hook `ClientSession::ApplyOwnedEntityEvent` per event inside one `try`/`catch (const std::exception&)` that logs `kWarning`, preserving today's ordinary-local-failure boundary. The game keeps `ApplyPlayerEvent`'s body (owned-id and coordinate bookkeeping on `Game`, focus, `SetClientGridCoordinate`, the weapon-toggle reset on death, `UpdateDesiredCoordinates`) as that hook. The owned-id lists stay on `Game` because server replay metadata (`Game::RestoreReplayMetadata`, `Save/GameSaveLoad.cpp:20-38`), `FleetSelection.cpp`, and `HudScreen.cpp` also use them.
+- Death scan. `ServerSessionRuntime::CompleteTick` runs
+  `DetectOwnedEntityDeaths()` immediately before
+  `mrSession.FinalizeTickClients()`, carrying today's `DetectPlayerDeaths` loop
+  (skip clients with no entries or with a pending changed-cell entry; skip
+  absent cells; membership test through the ownership layer `pGlobalIds`;
+  reverse iteration; `kDied` state, log, `RemoveAt`) and calling the game hook
+  `ServerSession::OnOwnedEntityDied(iClientId, rClientGuid, globalId)` per
+  death. The game hook calls `ServerFleetManager::OnPlayerDeath` and then
+  inserts the client into `mDeadClientIds` when its registry list is now empty;
+  that equals today's after-loop check because the list empties only on its last
+  removal. Today's `mDeadClientIds` skip is dropped from the scan: a client
+  enters that set only when its list is empty, and the only registry `Add` sites
+  (`SpawnWaitingClients` after `QueueSpawnForClient` erased the id, and the load
+  relink followed by `ServerClientManager::ResetState`) leave no dead client
+  with entries at scan time. `FinalizeTickClients` keeps
+  `DetectDisconnectedPlayerDeaths` and `PublishServerEntityCounts`.
+- Client. `Client::Receive` decodes the two engine packets (under its existing
+  catches: `std::ios_base::failure` `ASSERT`s, other exceptions warn) into a new
+  `Client::mReceivedOwnedEntityEvents`, cleared at `Client::Poll` entry and in
+  `ServerLoadNotification` exactly where `mReceivedGamePackets` is cleared today
+  (`Client.cpp:101`, `:796`), growth under suppressed allocation tracking.
+  `ClientSessionRuntime::PollAndDrain` drains it immediately before
+  `mrSession.ProcessReceivedGamePackets()`, calling the game hook
+  `ClientSession::ApplyOwnedEntityEvent` per event inside one
+  `try`/`catch (const std::exception&)` that logs `kWarning`, preserving today's
+  ordinary-local-failure boundary. The game keeps `ApplyPlayerEvent`'s body
+  (owned-id and coordinate bookkeeping on `Game`, focus,
+  `SetClientGridCoordinate`, the weapon-toggle reset on death,
+  `UpdateDesiredCoordinates`) as that hook. The owned-id lists stay on `Game`
+  because server replay metadata (`Game::RestoreReplayMetadata`,
+  `Save/GameSaveLoad.cpp:20-38`), `FleetSelection.cpp`, and `HudScreen.cpp` also
+  use them.
 - Delete `Network/PlayerEvents.h/.cpp`: move `ParseFleetSynchronization`, its only remaining content, into `ClientSession.cpp` as a file-static function; fix includes; project membership through `/update-vcxproj`.
 
 ### 3. Debug-control requests
@@ -49,7 +198,16 @@ One Plan, one landing; the stages order the work so each builds and runs, and th
 - Add engine `PacketType` values `kClientSaveRequest`, `kClientLoadRequest`, `kClientResetRequest`, `kClientReplayRecordRequest`, `kClientReplayPlaybackRequest`, `kClientPauseRequest`, `kClientTimespeedRequest` (stage 2's two values and these seven appended after `kServerChat`, before `kGamePacketStart`), with `PacketTypeName` rows; remove them from `GamePacketType` and `GetGamePacketContract`. Bump `kiProtocolVersion`.
 - Contract rows move into `GetClientPacketContract` unchanged in size, cap, and handshake requirement, returning the sentinel when `kbDebugInput` is false: type-only rows `{kiPacketTypeSize, kiPacketTypeSize, 2}`; pause `{2, 2, 4}`; timespeed `{2, 2, 8}`. Add `NetworkMessages::ClientPauseRequestMessage` and `ClientTimespeedRequestMessage` (type byte plus one `uint8_t`) and use their `kiFixedSize`.
 - `Server::Receive` runs gates 3–5 on them like every engine type, then its switch: pause and timespeed decode through `NetworkMessages::Read` and throw `ThrowCorruptStream` on a byte other than 0 or 1 (recorded by the existing catch as one `kCorrupt` violation, as today's game catch records it); every debug-control type then appends to `mDeferredClientPackets` with the type byte stripped, keeping arrival order with game packets so a load or reset clears exactly the requests it clears today.
-- `DispatchDeferredClientPackets` branches on an engine type: skip the packet when `FindClient` returns null (parity with `AdmitGamePacket`'s first check), otherwise run the handler. Handlers keep today's logs and checks (`ServerSession.cpp:165-229`) with the class prefix changed: save, load, and reset call `game::gpGame->mServerSaveLoad.ServerSave`/`ServerLoad`/`ServerReset` with `ServerQuicksave.save`, load falling back to reset on failure; replay record/playback keep their rejection conditions; pause sets `kPaused`; timespeed calls `ServerSessionRuntime::StepTimescale(bool)`, moved from `ServerSession`. `Agent/AgentCommandsServer.cpp:131` calls the runtime method.
+- `DispatchDeferredClientPackets` branches on an engine type: skip the packet
+  when `FindClient` returns null (parity with `AdmitGamePacket`'s first check),
+  otherwise run the handler. Handlers keep today's logs and checks
+  (`ServerSession.cpp:165-229`) with the class prefix changed: save, load, and
+  reset call
+  `game::gpGame->mServerSaveLoad.ServerSave`/`ServerLoad`/`ServerReset` with
+  `ServerQuicksave.save`, load falling back to reset on failure; replay
+  record/playback keep their rejection conditions; pause sets `kPaused`;
+  timespeed calls `ServerSessionRuntime::StepTimescale(bool)`, moved from
+  `ServerSession`. `Agent/AgentCommandsServer.cpp:131` calls the runtime method.
 - Senders. Move the debug-control sends from `Game::ProcessGameMenuInput` (`Game.cpp:536-589`) into `GameBase::ProcessInput` at the end of its `kbDebugInput` engine-toggle block, after the local pause flip and before `ProcessGameMenuInput`, with the same `kServerDebugInput` gate, the same `MenuInputFlags` and Backspace mapping, and the same `SendSimplePacket` byte layout. The game keeps the Return connect and 'E' island browser.
 - `ReadBooleanByte` stays file-static in `ServerSession.cpp`: after this stage only the game `kClientUpdatePlayerRequest` handler uses it, and cursor primitives in `NetworkCursor.h` are unchecked by contract.
 
@@ -61,11 +219,37 @@ One Plan, one landing; the stages order the work so each builds and runs, and th
 - Move `ResetCoordinateStatesForResynchronization` into the runtime: cell `ResetClientState` loop, game hook `ClientSession::ResetReconciler()`, `mUnwantedTimestamps.clear()`, in today's order; `ClientSessionRuntime.cpp:398` and `ClientDesyncCore.cpp:131` call it.
 - Replace the `OnRuntimeDisconnected` hook: `ClientSessionRuntime::Disconnect` calls `ResetReconciler`, the cell loop, and the desync-core reset in today's order.
 - `ClientSessionRuntime::ResetForServerLoad` adds, before `mrSession.OnServerLoad()`: tick counter zero, time-step remainder zero, real-time reset, `ResetRenderClock`, cell `ResetClientState` loop and `mCells.clear()`, desync-core reset. `OnServerLoad` keeps its log, the identity, armor, visual-error, weapon-toggle, and fleet clears, and `mpReconciler->Reset()`; desired-coordinate building stays game.
-- `ReconcileDispatchResult` replaces `CoordWork* pDesyncWork` with `ReconcileDesyncInfo desync` (`Engine/Source/Network/Client/ReconcileReplay.h:146-154`). At the end of `ReconcileDispatcher::Run`, when the active count is nonzero: with a desync work, log `CONFIRMED DESYNC ...` verbatim and fill `desync` (moving the client frame); otherwise set the five `ProfileManagerBase` counters, log the replay burst, and set `StaticVoices::mbSkipNextInvalidation` on a full replay — today's non-desync path. `ClientReconciler::Run` returns `std::move(dispatch.desync)` when set and keeps the confirmed client state, `ReconcileUpdateClientState`, and visual-error accumulation (`:124-133`, `:161-196`).
+- `ReconcileDispatchResult` replaces `CoordWork* pDesyncWork` with
+  `ReconcileDesyncInfo desync`
+  (`Engine/Source/Network/Client/ReconcileReplay.h:146-154`). At the end of
+  `ReconcileDispatcher::Run`, when the active count is nonzero: with a desync
+  work, log `CONFIRMED DESYNC ...` verbatim and fill `desync` (moving the client
+  frame); otherwise set the five `ProfileManagerBase` counters, log the replay
+  burst, and set `StaticVoices::mbSkipNextInvalidation` on a full replay —
+  today's non-desync path. `ClientReconciler::Run` returns
+  `std::move(dispatch.desync)` when set and keeps the confirmed client state,
+  `ReconcileUpdateClientState`, and visual-error accumulation (`:124-133`,
+  `:161-196`).
 
 ### Documentation
 
-Update the owning layer for each moved fact: `Engine/Source/Network/AGENTS.md` (`## Ownership` session-runtime and engine-packet lines), `Engine/Source/Network/Server/AGENTS.md` (registry, relink, death scan, changed-cell queue, `ResetForLoad`, deferred drain and debug-control admission), `Engine/Source/Network/Client/AGENTS.md` (static data, desync core, owned-entity events), `Projects/BrokenEngineSandbox/Source/Network/AGENTS.md` (debug-control and `PlayerStateWireType` lines leave), its `Server/AGENTS.md` and `Client/AGENTS.md`, `Documents/Architecture/Network.md` (`## Client → Server Contract` choke points, table rows, version paragraph, violation reason; `## Session Ownership and Phase Order`), `Documents/Architecture/GameReconciliation.md` (`## Player Event Parsing`, `Reconcile` nodes), and the harness documents whose log lines change (`Projects/BrokenEngineSandbox/Documents/AgentHarness/replay.md` steps 1, 2, 5, 10: `ServerSession::ResetClientsForLoad`, `ServerSession::SendPlayerState`, `GlobalPlayer:`). Comments naming `ClientSession::ApplyReceivedStaticData` (`Engine/Source/Graphics/Managers/TextureManager.cpp:218`, `Game.cpp:614`) follow the move.
+Update the owning layer for each moved fact: `Engine/Source/Network/AGENTS.md`
+(`## Ownership` session-runtime and engine-packet lines),
+`Engine/Source/Network/Server/AGENTS.md` (registry, relink, death scan,
+changed-cell queue, `ResetForLoad`, deferred drain and debug-control admission),
+`Engine/Source/Network/Client/AGENTS.md` (static data, desync core, owned-entity
+events), `Projects/BrokenEngineSandbox/Source/Network/AGENTS.md` (debug-control
+and `PlayerStateWireType` lines leave), its `Server/AGENTS.md` and
+`Client/AGENTS.md`, `Documents/Architecture/Network.md`
+(`## Client → Server Contract` choke points, table rows, version paragraph,
+violation reason; `## Session Ownership and Phase Order`),
+`Documents/Architecture/GameReconciliation.md` (`## Player Event Parsing`,
+`Reconcile` nodes), and the harness documents whose log lines change
+(`Projects/BrokenEngineSandbox/Documents/AgentHarness/replay.md` steps 1, 2, 5,
+10: `ServerSession::ResetClientsForLoad`, `ServerSession::SendPlayerState`,
+`GlobalPlayer:`). Comments naming `ClientSession::ApplyReceivedStaticData`
+(`Engine/Source/Graphics/Managers/TextureManager.cpp:218`, `Game.cpp:614`)
+follow the move.
 
 ## Critical files
 
@@ -82,8 +266,40 @@ Update the owning layer for each moved fact: `Engine/Source/Network/AGENTS.md` (
 
 ## In scope
 
-- Engine: the nine new `PacketType` values and names, `kiProtocolVersion`, the seven debug-control contract rows; the owned-entity and pause/timespeed message layouts and owned-entity enums/descriptors; `ServerSessionRuntime::PrepareTick`, `ComputeActiveSet` ownership step, `ResetForLoad`, `DispatchDeferredClientPackets` and its debug-control handlers, `StepTimescale`, `SendOwnedEntityAssign`, `SendOwnedEntityState`, `AssignOwnedEntity`, `RelinkOwnedEntities`, `DetectOwnedEntityDeaths`, the changed-cell send in `CompleteTick`, the registry and changed-cell queue members; `Server::Receive` debug-control and owned-entity cases, the `DeferredClientPacket` rename; `Client::Receive` owned-entity cases and `mReceivedOwnedEntityEvents` with its two clears; `ClientSessionRuntime` owned-entity drain, static-data application, `mpDesynchronizationCore`, `Reconcile`, `ResetCoordinateStatesForResynchronization`, `Disconnect` and `ResetForServerLoad` additions; `ReconcileDispatchResult::desync` and the end of `ReconcileDispatcher::Run`; `GameBase::ProcessInput` debug-control senders; the reader sites listed in the Design.
-- Game: `ServerSession` hooks `HandleGamePacket`, `OnResetForLoad`, `OnOwnedEntityDied`, and removal of `PrepareTick`, `SendAssignPlayer`, `SendPlayerState`, `StepTimescale`, `SubscriptionUpdates`, `ResetClientsForLoad`, `RelinkFromFrames`, `ParseReceivedGamePackets`, `AddGameRequiredCoordinates`, `mClientOwnedEntities` (moved to the runtime), `mPendingSubscriptionUpdates`, `SubscriptionUpdate`, and the debug-control cases; `ServerClientManager::NewClients`, `SpawnWaitingClients`, `OnClientDisconnected` registry path, removal of `DetectPlayerDeaths`; `ServerFleetManager` registry reads; `ClientSession` hooks `ApplyOwnedEntityEvent`, `RunReconciler`, `ResetReconciler`, narrowed `OnServerLoad`, `ProcessReceivedGamePackets` reduced to fleet sync, removal of `Reconcile`, `ApplyReceivedStaticData`, `PollDesynchronizationState`, `OnRuntimeDisconnected`, `ResetCoordinateStatesForResynchronization`, `mpDesynchronizationCore`; `ClientReconciler::Run` desync and profiling tail; `GamePacketType` and `GetGamePacketContract` entries; `GameMessages.h` owned-entity layouts; `PlayerEvents.*` deletion; `Game::ProcessGameMenuInput` debug-control sends; `NetworkSessionContract::GetGamePacketContract`; the agent and save call sites listed.
+- Engine: the nine new `PacketType` values and names, `kiProtocolVersion`, the
+  seven debug-control contract rows; the owned-entity and pause/timespeed
+  message layouts and owned-entity enums/descriptors;
+  `ServerSessionRuntime::PrepareTick`, `ComputeActiveSet` ownership step,
+  `ResetForLoad`, `DispatchDeferredClientPackets` and its debug-control
+  handlers, `StepTimescale`, `SendOwnedEntityAssign`, `SendOwnedEntityState`,
+  `AssignOwnedEntity`, `RelinkOwnedEntities`, `DetectOwnedEntityDeaths`, the
+  changed-cell send in `CompleteTick`, the registry and changed-cell queue
+  members; `Server::Receive` debug-control and owned-entity cases, the
+  `DeferredClientPacket` rename; `Client::Receive` owned-entity cases and
+  `mReceivedOwnedEntityEvents` with its two clears; `ClientSessionRuntime`
+  owned-entity drain, static-data application, `mpDesynchronizationCore`,
+  `Reconcile`, `ResetCoordinateStatesForResynchronization`, `Disconnect` and
+  `ResetForServerLoad` additions; `ReconcileDispatchResult::desync` and the end
+  of `ReconcileDispatcher::Run`; `GameBase::ProcessInput` debug-control senders;
+  the reader sites listed in the Design.
+- Game: `ServerSession` hooks `HandleGamePacket`, `OnResetForLoad`,
+  `OnOwnedEntityDied`, and removal of `PrepareTick`, `SendAssignPlayer`,
+  `SendPlayerState`, `StepTimescale`, `SubscriptionUpdates`,
+  `ResetClientsForLoad`, `RelinkFromFrames`, `ParseReceivedGamePackets`,
+  `AddGameRequiredCoordinates`, `mClientOwnedEntities` (moved to the runtime),
+  `mPendingSubscriptionUpdates`, `SubscriptionUpdate`, and the debug-control
+  cases; `ServerClientManager::NewClients`, `SpawnWaitingClients`,
+  `OnClientDisconnected` registry path, removal of `DetectPlayerDeaths`;
+  `ServerFleetManager` registry reads; `ClientSession` hooks
+  `ApplyOwnedEntityEvent`, `RunReconciler`, `ResetReconciler`, narrowed
+  `OnServerLoad`, `ProcessReceivedGamePackets` reduced to fleet sync, removal of
+  `Reconcile`, `ApplyReceivedStaticData`, `PollDesynchronizationState`,
+  `OnRuntimeDisconnected`, `ResetCoordinateStatesForResynchronization`,
+  `mpDesynchronizationCore`; `ClientReconciler::Run` desync and profiling tail;
+  `GamePacketType` and `GetGamePacketContract` entries; `GameMessages.h`
+  owned-entity layouts; `PlayerEvents.*` deletion; `Game::ProcessGameMenuInput`
+  debug-control sends; `NetworkSessionContract::GetGamePacketContract`; the
+  agent and save call sites listed.
 - The documents under `### Documentation`; project membership.
 
 ## Out of scope
@@ -98,8 +314,23 @@ Update the owning layer for each moved fact: `Engine/Source/Network/AGENTS.md` (
 ## Risk triggers and invariants
 
 - Wire/protocol: game packet identifiers shift by nine; client and server must build from the same change; the bumped `kiProtocolVersion` makes the Hello gate reject a mismatched peer. Owned-entity and debug-control payload bytes after the type byte are unchanged.
-- Trust boundary: every debug-control request is admitted once, by its engine contract row at `Server::Receive` (budget, contract size, handshake gate, per-type cap, `kbDebugInput` sentinel), then value-validated (pause/timespeed byte 0 or 1) before it is queued; a bad value counts one `kCorrupt` violation and mutates nothing; a client removed mid-drain has its queued requests skipped. `RecordContractViolation` remains the last use of a `ClientConnection` (`Engine/Source/Network/Server/AGENTS.md` `## Session Invariants`). Server-to-client owned-entity data stays trusted: no client value checks; corrupt bytes `ASSERT` through `Client::Receive`.
-- Ordering: deferred packets execute in arrival order at the old drain position; the drain precedes `NewClients` and the fleet request processing; the death scan precedes `FinalizeTickClients`; changed-cell sends follow `SendNewSubscriptionFullStates`; the load generation advances before notification, slot clearing, or reset mutation, and the flagship clear precedes every fleet `OnResetForLoad`; owned-entity events are applied before fleet sync each poll, and events buffered before a load notification in the same poll are discarded.
+- Trust boundary: every debug-control request is admitted once, by its engine
+  contract row at `Server::Receive` (budget, contract size, handshake gate,
+  per-type cap, `kbDebugInput` sentinel), then value-validated (pause/timespeed
+  byte 0 or 1) before it is queued; a bad value counts one `kCorrupt` violation
+  and mutates nothing; a client removed mid-drain has its queued requests
+  skipped. `RecordContractViolation` remains the last use of a
+  `ClientConnection` (`Engine/Source/Network/Server/AGENTS.md`
+  `## Session Invariants`). Server-to-client owned-entity data stays trusted: no
+  client value checks; corrupt bytes `ASSERT` through `Client::Receive`.
+- Ordering: deferred packets execute in arrival order at the old drain position;
+  the drain precedes `NewClients` and the fleet request processing; the death
+  scan precedes `FinalizeTickClients`; changed-cell sends follow
+  `SendNewSubscriptionFullStates`; the load generation advances before
+  notification, slot clearing, or reset mutation, and the flagship clear
+  precedes every fleet `OnResetForLoad`; owned-entity events are applied before
+  fleet sync each poll, and events buffered before a load notification in the
+  same poll are discarded.
 - Determinism: no Frame, StatusChange, or CRC'd state changes; the order of spawn status changes and flagship updates entering Frame inputs is unchanged; replay CRCs stay identical.
 - Allocation: moved code keeps its `ScopedSuppressAllocationTracking` scopes; the new client event vector grows under suppression.
 - Affinity: moved server code stays `BT_SERVER`, client code `BT_CLIENT`; the `GameBase` senders stay `BT_CLIENT` and `kbDebugInput`-gated.

@@ -47,8 +47,8 @@ void ServerClientManager::NewClients()
 			continue;
 		}
 
-		auto ownedIt = gpServerSession->mClientPlayers.mOwned.find(rClient.iClientId);
-		if (ownedIt != gpServerSession->mClientPlayers.mOwned.end() && !ownedIt->second.empty())
+		auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(rClient.iClientId);
+		if (ownedIt != gpServerSession->mClientOwnedEntities.mOwned.end() && !ownedIt->second.empty())
 		{
 			continue;
 		}
@@ -138,7 +138,7 @@ void ServerClientManager::SpawnWaitingClients()
 		// Client handles subscriptions — no full state sent here.
 		gpServerSession->SendAssignPlayer(rClientSpawnInformation.iClientId, globalPlayerId, engine::kOriginCoordinate);
 		gpServerSession->SendPlayerState(rClientSpawnInformation.iClientId, PlayerStateWireType::kSpawned, globalPlayerId.iValue, engine::kOriginCoordinate);
-		gpServerSession->mClientPlayers.Add(rClientSpawnInformation.iClientId, globalPlayerId, engine::kOriginCoordinate);
+		gpServerSession->mClientOwnedEntities.Add(rClientSpawnInformation.iClientId, globalPlayerId, engine::kOriginCoordinate);
 
 		gpServerSession->mpFleetManager->OnPlayerSpawned(rClientSpawnInformation.iClientId, rClientSpawnInformation.clientGuid, rClientSpawnInformation, globalPlayerId);
 	}
@@ -153,8 +153,8 @@ void ServerClientManager::OnClientDisconnected(int64_t iClientId, const engine::
 
 	LOG(kNetwork, kVerbose, "ServerClientManager::OnClientDisconnected Client: {} Players: {}", iClientId, [&]()
 	{
-		auto ownedIt = gpServerSession->mClientPlayers.mOwned.find(iClientId);
-		return ownedIt != gpServerSession->mClientPlayers.mOwned.end() ? std::ssize(ownedIt->second) : 0i64;
+		auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(iClientId);
+		return ownedIt != gpServerSession->mClientOwnedEntities.mOwned.end() ? std::ssize(ownedIt->second) : 0i64;
 	}());
 	mDeadClientIds.erase(iClientId);
 	mProcessedClientIds.erase(iClientId);
@@ -166,7 +166,7 @@ void ServerClientManager::OnClientDisconnected(int64_t iClientId, const engine::
 		return rInformation.iClientId == iClientId;
 	});
 
-	gpServerSession->mClientPlayers.mOwned.erase(iClientId);
+	gpServerSession->mClientOwnedEntities.mOwned.erase(iClientId);
 }
 
 void ServerClientManager::DetectPlayerDeaths()
@@ -174,8 +174,8 @@ void ServerClientManager::DetectPlayerDeaths()
 	std::vector<engine::ClientConnection>& rClients = engine::gpServer->mClients;
 	for (const engine::ClientConnection& rClient : rClients)
 	{
-		auto ownedIt = gpServerSession->mClientPlayers.mOwned.find(rClient.iClientId);
-		std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != gpServerSession->mClientPlayers.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
+		auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(rClient.iClientId);
+		std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != gpServerSession->mClientOwnedEntities.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
 
 		if (ownedPlayers.empty())
 		{
@@ -223,15 +223,15 @@ void ServerClientManager::DetectPlayerDeaths()
 			{
 				gpServerSession->SendPlayerState(rClient.iClientId, PlayerStateWireType::kDied, globalId.iValue, coordinate);
 				LOG(kNetwork, kVerbose, "ServerClientManager::DetectPlayerDeaths Client: {} GlobalPlayer: {} Coord: ({},{})", rClient.iClientId, globalId, coordinate.iX, coordinate.iY);
-				gpServerSession->mClientPlayers.RemoveAt(rClient.iClientId, i);
+				gpServerSession->mClientOwnedEntities.RemoveAt(rClient.iClientId, i);
 
 				gpServerSession->mpFleetManager->OnPlayerDeath(rClient.clientGuid, globalId);
 			}
 		}
 
 		// Mark client as dead only when ALL owned players are dead
-		ownedIt = gpServerSession->mClientPlayers.mOwned.find(rClient.iClientId);
-		if (ownedIt == gpServerSession->mClientPlayers.mOwned.end() || ownedIt->second.empty())
+		ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(rClient.iClientId);
+		if (ownedIt == gpServerSession->mClientOwnedEntities.mOwned.end() || ownedIt->second.empty())
 		{
 			mDeadClientIds.insert(rClient.iClientId);
 		}

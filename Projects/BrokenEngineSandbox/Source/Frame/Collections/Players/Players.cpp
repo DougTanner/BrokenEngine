@@ -87,14 +87,6 @@ void PlayersInterpolate::Register()
 
 	engine::ExplosionsInterpolate::RegisterType(siExplosionTypeIndex,
 	{
-#if defined(BT_CLIENT)
-		.iPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::siPrimaryLightControllerTypeIndex,
-		.iSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::siSecondaryLightControllerTypeIndex,
-		.iPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::siPrimaryPuffControllerTypeIndex,
-		.iSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::siSecondaryPuffControllerTypeIndex,
-		.iTrailTypeIndex = engine::ExplosionsInterpolate::siExplosionTrailTypeIndex,
-		.iWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::siWindRadialControllerTypeIndex,
-#endif // BT_CLIENT
 		.iBaseParticleCount = kiExplosionBaseParticleCount,
 		.uiParticleColor = 0xFF0000FF,
 		.fParticleVelocityMinimum = kfExplosionParticleVelocityMinimum,
@@ -183,7 +175,7 @@ void PlayersInterpolate::RemoveOwnedVisuals(Frame& rFrame, PlayersInterpolate& r
 {
 	if ((rCurrentInterpolate.pWindTrails[i].uuid.iValue != 0))
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.windTrails, rFrame.postRender.windTrails, rCurrentInterpolate.pWindTrails[i], rFrame.interpolate.windTrails.Members(), rFrame.postRender.windTrails.Members());
+		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pWindTrails[i]);
 	}
 	if ((rCurrentInterpolate.pHexShields[i].uuid.iValue != 0))
 	{
@@ -358,8 +350,7 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 	{
 		if (!(rCurrentInterpolate.pWindTrails[i].uuid.iValue != 0) && !(rCurrentPostRender.pFlags[i] & kExploding))
 		{
-			engine::WindTrailsPostRender::Add(rFrame, rCurrentInterpolate.pWindTrails[i]);
-			engine::WindTrailsInterpolate::Sync(rFrame.interpolate, rCurrentInterpolate.pWindTrails[i],
+			engine::WindTrailsPostRender::Add(rFrame, rCurrentInterpolate.pWindTrails[i],
 			{
 				.vecPosition = rCurrentInterpolate.pVecPositions[i],
 				.fIntensity = game::gWindDepositPlayerIntensity.mfCurrent,
@@ -508,13 +499,7 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 
 		if (engine::gAnimationDataMap.contains(kPlayerModel))
 		{
-			const engine::AnimationData& rAnimationData = engine::gAnimationDataMap.at(kPlayerModel);
-			std::chrono::duration<float> animationDuration(rAnimationData.mpAnimations[0].fDuration);
-			animationTime += deltaTime;
-			if (animationTime.count() >= animationDuration.count())
-			{
-				animationTime = std::chrono::duration<float>(std::fmod(animationTime.count(), animationDuration.count()));
-			}
+			animationTime = engine::gAnimationDataMap.at(kPlayerModel).AdvanceLoopingTime(animationTime, deltaTime);
 			rCurrent.pAnimationTimes[i] = animationTime;
 		}
 
@@ -591,25 +576,8 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 }
 
 
-// Player collision arrays
-// thread_local: parallel per-Frame tick via Dispatch
-static thread_local std::vector<engine::CollisionFlags_t> sCollisionFlags;
-
-struct PlayerCollisionIntervalScratch
-{
-	std::vector<float> maximumTimes;
-};
-
 void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
-	// Function-local TLS defers construction until first use; default construction is allocation-free
-	// (empty vectors), so it is safe even before allocator startup completes. Growth sites suppress tracking.
-	static thread_local PlayerCollisionIntervalScratch sScratch;
-	PlayerCollisionIntervalScratch& rCollisionScratch = sScratch;
-	// Heap: static vectors resized each frame, only allocates on first call or when count grows (capacity retained).
-	// .data() pointers are passed to AddLayer and must survive until PostCollision, so workbuffer can't be used
-	ScopedSuppressAllocationTracking suppress;
-
 	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
 	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
 
@@ -618,22 +586,10 @@ void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, 
 		return;
 	}
 
-	int64_t iCount = rCurrentInterpolate.iCount;
-	sCollisionFlags.resize(static_cast<size_t>(iCount));
-	rCollisionScratch.maximumTimes.resize(static_cast<size_t>(iCount));
-	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
-	{
-		sCollisionFlags.at(static_cast<size_t>(i)) = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
-		engine::SegmentHit boundaryHit = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousFrame.interpolate.pPlayers->pVecPositions[i], rCurrentInterpolate.pVecPositions[i]);
-		rCollisionScratch.maximumTimes.at(static_cast<size_t>(i)) = boundaryHit.bHit ? boundaryHit.fTime : std::numeric_limits<float>::max();
-	}
-
 	siCollisionLayerIndex = engine::Collision::AddLayer(
 	{
 		.pVecStartPositions = rPreviousFrame.interpolate.pPlayers->pVecPositions,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
-		.pfMaxTimes = rCollisionScratch.maximumTimes.data(),
-		.pFlags = sCollisionFlags.data(),
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
 		.fRadius = kfPlayerRadius,
@@ -642,6 +598,12 @@ void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, 
 		.uiCollidesWith = CollidesWith::kuiPlayer,
 		.pAlignments = rCurrentPostRender.pAlignments,
 	});
+
+	std::span<engine::CollisionFlags_t> flags = engine::Collision::GetLayerFlags(siCollisionLayerIndex);
+	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
+	{
+		flags[static_cast<size_t>(i)] = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
+	}
 }
 
 // PlayersPostRender::Update orchestrates per-iteration helpers in PlayersNavigation.cpp and PlayersCombat.cpp.
@@ -783,7 +745,7 @@ bool PlayersInterpolate::LogDifferences(const PlayersInterpolate& rOther) const
 		bEqual &= common::LogDifference<"pVecPositions">(i, pVecPositions[i], rOther.pVecPositions[i]);
 		bEqual &= common::LogDifference<"pVecDirections">(i, pVecDirections[i], rOther.pVecDirections[i]);
 		bEqual &= common::LogDifference<"pDestroyedTimes">(i, pDestroyedTimes[i], rOther.pDestroyedTimes[i]);
-		bEqual &= common::LogDifference<"puiPushers">(i, pPushers[i], rOther.pPushers[i]);
+		bEqual &= common::LogDifference<"pPushers">(i, pPushers[i], rOther.pPushers[i]);
 	}
 
 	return bEqual;
@@ -818,9 +780,9 @@ bool PlayersPostRender::LogDifferences(const PlayersPostRender& rOther) const
 		bEqual &= common::LogDifference<"pClientGuids.uiHigh">(i, pClientGuids[i].uiHigh, rOther.pClientGuids[i].uiHigh);
 		bEqual &= common::LogDifference<"pClientGuids.uiLow">(i, pClientGuids[i].uiLow, rOther.pClientGuids[i].uiLow);
 		bEqual &= common::LogDifference<"pGlobalPlayerIds">(i, pGlobalPlayerIds[i], rOther.pGlobalPlayerIds[i]);
-		bEqual &= common::LogDifference<"pFleetWantedCoords.iX">(i, pFleetWantedCoordinates[i].iX, rOther.pFleetWantedCoordinates[i].iX);
-		bEqual &= common::LogDifference<"pFleetWantedCoords.iY">(i, pFleetWantedCoordinates[i].iY, rOther.pFleetWantedCoordinates[i].iY);
-		bEqual &= common::LogDifference<"puiPendingFleetWantedCoordTicks">(i, puiPendingFleetWantedCoordinateTicks[i], rOther.puiPendingFleetWantedCoordinateTicks[i]);
+		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iX">(i, pFleetWantedCoordinates[i].iX, rOther.pFleetWantedCoordinates[i].iX);
+		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iY">(i, pFleetWantedCoordinates[i].iY, rOther.pFleetWantedCoordinates[i].iY);
+		bEqual &= common::LogDifference<"puiPendingFleetWantedCoordinateTicks">(i, puiPendingFleetWantedCoordinateTicks[i], rOther.puiPendingFleetWantedCoordinateTicks[i]);
 		bEqual &= common::LogDifference<"puiPendingWeaponModeTicks">(i, puiPendingWeaponModeTicks[i], rOther.puiPendingWeaponModeTicks[i]);
 	}
 

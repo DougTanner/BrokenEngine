@@ -10,7 +10,14 @@ A destroyed spaceship explodes in place and vanishes; nothing outlives it:
 - While the ship explodes, `SpaceshipsPostRender::Update` (`Spaceships.cpp`) replaces its velocity with a knockback away from the damage direction at `kfDeathKnockbackSpeed`. The `Spawn` phase hook emits a smaller explosion every `kSpaceshipDestroyExplosionInterval`, and `SpaceshipsRender.cpp` shrinks the model by the remaining destroy fraction.
 - `SpaceshipsPostRender::Destroy` removes the row once `pDestroyedTimes` reaches zero.
 
-No message tells the client about a destruction. The client runs the same deterministic tick itself, then rolls back and replays a cell whose CRC mismatches the server's (`Documents/Architecture/GameReconciliation.md`), marking replayed ticks with `FrameFlags::kRecalculated` (`Engine/Source/Frame/FrameBase.h`). At both `BeginExplosion` and `Destroy` the client has the ship's position and `SpaceshipsPostRender::pVecVelocities`, which is shared PostRender state. By `Destroy` that velocity is the knockback; the ship's flight velocity was overwritten on the first exploding tick.
+No message tells the client about a destruction. The client runs the same
+deterministic tick itself, then rolls back and replays a cell whose CRC
+mismatches the server's (`Documents/Architecture/GameReconciliation.md`),
+marking replayed ticks with `FrameFlags::kRecalculated`
+(`Engine/Source/Frame/FrameBase.h`). At both `BeginExplosion` and `Destroy` the
+client has the ship's position and `SpaceshipsPostRender::pVecVelocities`, which
+is shared PostRender state. By `Destroy` that velocity is the knockback; the
+ship's flight velocity was overwritten on the first exploding tick.
 
 Client-only effect collections (`Puffs`, `PointLights`, `SmokeTrails`, and others) live in the frame under `BT_CLIENT`, so they roll back and replay with it. Effects outside the frame, such as GPU particles and audio one-shots, skip `kRecalculated` ticks instead. `Explosions` is shared: its rows are CRC'd and spawning one draws from the frame random engine (`Engine/Source/Frame/Collections/Explosions/AGENTS.md`).
 

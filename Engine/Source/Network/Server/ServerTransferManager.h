@@ -13,7 +13,7 @@ namespace engine
 
 struct ClientTransferInfo
 {
-	engine::GlobalId globalPlayerId {};
+	engine::GlobalId globalId {};
 	engine::GridCoord destination {};
 	engine::ClientGuid clientGuid {};
 };
@@ -30,6 +30,8 @@ public:
 
 
 	std::unordered_map<engine::GridCoord, std::vector<game::StatusChange>> mTransfers;
+
+	int64_t miHarvestedTransferTotal = 0; // transfers applied since the current game state began; agent status reporting only, never CRC, wire, or save state
 
 private:
 

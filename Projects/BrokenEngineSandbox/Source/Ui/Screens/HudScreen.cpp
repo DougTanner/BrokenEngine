@@ -195,7 +195,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	if (ImGui::Button("[<]"))
 	{
 		gpGame->mFleetSelection.FocusPreviousFleet();
-		gpClientSession->UpdateDesiredCoordinates(SubscriptionChangeReason::kFocusPreviousFleet);
+		gpClientSession->mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kFocusPreviousFleet));
 		LOG(kDefault, kVerbose, "HUD FocusPrevFleet NewIndex: {} FleetCount: {}", gpGame->mFleetSelection.miFocusedFleetIndex, iFleetCount);
 	}
 	ImGui::EndDisabled();
@@ -215,7 +215,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	if (ImGui::Button("[>]"))
 	{
 		gpGame->mFleetSelection.FocusNextFleet();
-		gpClientSession->UpdateDesiredCoordinates(SubscriptionChangeReason::kFocusNextFleet);
+		gpClientSession->mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kFocusNextFleet));
 		LOG(kDefault, kVerbose, "HUD FocusNextFleet NewIndex: {} FleetCount: {}", gpGame->mFleetSelection.miFocusedFleetIndex, iFleetCount);
 	}
 	ImGui::EndDisabled();
@@ -278,7 +278,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 				if (ImGui::Selectable(pcLabel, bSelected))
 				{
 					gpGame->mFleetSelection.SelectPlayerInFleet(rMember.globalPlayerId);
-					gpClientSession->UpdateDesiredCoordinates(SubscriptionChangeReason::kSelectPlayer);
+					gpClientSession->mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kSelectPlayer));
 				}
 			}
 			else

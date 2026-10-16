@@ -39,20 +39,18 @@ struct PointLightsInterpolate : public Collection<PointLightsInterpolate, Collec
 	{
 		XMVECTOR vecPosition = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 		float fVisibleArea = 0.0f;
-		float fVisibleIntensity = 0.0f;
-		float fLightingArea = 0.0f;
-		float fLightingIntensity = 0.0f;
 		float fRotation = 0.0f;
 	};
 
-	// Sync owned point light with parent-provided data
+	// Sync owned point light with parent-provided data; Render takes its intensities and lighting area from its type.
 	static void Sync(game::FrameInterpolate& rFrameInterpolate, id_t id, const SyncData& rData);
 
 	uint8_t* __restrict puiTypeIndices = nullptr;
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	float* __restrict pfRotations = nullptr;
 
-	// Owner Sync writes these values directly; controllers animate them from their keyframes.
+	// Owner Sync writes the visible area directly; controllers animate all four from their keyframes. Render uses the
+	// other three only for controlled rows.
 	float* __restrict pfVisibleAreas = nullptr;
 	float* __restrict pfVisibleIntensities = nullptr;
 	float* __restrict pfLightingAreas = nullptr;

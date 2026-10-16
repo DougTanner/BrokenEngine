@@ -27,7 +27,14 @@ Analyze with the `rdc_*` scripts through `qrenderdoc --python`. qrenderdoc is a 
 
 The embedded interpreter has two quirks the launch must work around:
 
-- No `sys.argv`. The script's own arguments (capture path and flags) cannot ride on the `qrenderdoc --python <script>` command line — the interpreter never sees them, and qrenderdoc rejects them as its own unknown options. Pass them through the `RDC_ARGS` environment variable instead: the launching shell sets it, the child qrenderdoc inherits it, and the scripts `shlex.split` it when `sys.argv` is absent (standalone runs still use the normal `sys.argv` path). Because `shlex` is POSIX-mode, it treats `\` as an escape; single-quote each Windows path inside `RDC_ARGS` so backslashes survive.
+- No `sys.argv`. The script's own arguments (capture path and flags) cannot ride
+  on the `qrenderdoc --python <script>` command line — the interpreter never
+  sees them, and qrenderdoc rejects them as its own unknown options. Pass them
+  through the `RDC_ARGS` environment variable instead: the launching shell sets
+  it, the child qrenderdoc inherits it, and the scripts `shlex.split` it when
+  `sys.argv` is absent (standalone runs still use the normal `sys.argv` path).
+  Because `shlex` is POSIX-mode, it treats `\` as an escape; single-quote each
+  Windows path inside `RDC_ARGS` so backslashes survive.
 - No `__file__`. The scripts fall back to the *working directory* to add themselves to `sys.path` (so `import rdc_common` resolves), so qrenderdoc must be launched with `-WorkingDirectory` set to the scripts directory; otherwise the import fails before any argument is read.
 
 Write the following **temporary-script contents** to
@@ -67,7 +74,14 @@ All live in `.agents/skills/agent-harness/scripts/` and share `rdc_common.py` (d
 
 - `rdc_summary.py <rdc> [--out FILE]` — recursive action tree (eventId, kind, name, draw/dispatch params) with a per-kind totals footer. Default out `<capture>.summary.txt`. Start here to find a draw's eventId.
 - `rdc_pipeline.py <rdc> --event N [--out FILE]` — pipeline state at event `N`: bound shaders, viewport/scissor, depth/blend, color/depth targets with format + dimensions, vertex/index bindings. Default out `<capture>.pipeline_evN.txt`.
-- `rdc_texture.py <rdc> --event N [--target K | --depth] [--out PNG]` — saves one bound color target (`--target K`, default 0) or the depth target (`--depth`) as PNG. Here the `--out` PNG is the completion file (its absolute path also prints to stdout); default `<capture>_evN_targetK.png` (`<capture>_evN_depth.png` with `--depth`). When pixel comparison is the point, `Read` the PNG for the single target under analysis and compare it against a `screenshot` of the same session; never sweep-read every dumped target or event.
+- `rdc_texture.py <rdc> --event N [--target K | --depth] [--out PNG]` — saves
+  one bound color target (`--target K`, default 0) or the depth target
+  (`--depth`) as PNG. Here the `--out` PNG is the completion file (its absolute
+  path also prints to stdout); default `<capture>_evN_targetK.png`
+  (`<capture>_evN_depth.png` with `--depth`). When pixel comparison is the
+  point, `Read` the PNG for the single target under analysis and compare it
+  against a `screenshot` of the same session; never sweep-read every dumped
+  target or event.
 
 ## Fallbacks and raw export
 

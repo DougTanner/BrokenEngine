@@ -203,7 +203,7 @@ static void FormatCellReadout(common::Workbuffer& rWorkbuffer)
 		rWorkbuffer.Append("Tick: ");
 		rWorkbuffer.Append(rRenderFrame.interpolate.iTick);
 		rWorkbuffer.Append("\nTime: ");
-		rWorkbuffer.AppendFloat(rRenderFrame.interpolate.fCurrentTime, 1);
+		rWorkbuffer.AppendFloat(common::NanosecondsToFloatSeconds<float>(TickToSimulationTime(rRenderFrame.interpolate.iTick).time_since_epoch()), 1);
 		rWorkbuffer.Append("s\n");
 	}
 	rWorkbuffer.Append("\n");

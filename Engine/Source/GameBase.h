@@ -9,6 +9,9 @@
 #include "Frame/Frame.h"
 #include "Ui/ChatLog.h"
 #endif
+#if defined(BT_SERVER)
+#include "File/ServerSaveLoad.h"
+#endif
 
 namespace game
 {
@@ -21,13 +24,6 @@ struct StatusChange;
 
 namespace engine
 {
-
-#if defined(BT_CLIENT)
-// Complete definitions come from Input/Input.h — included directly by GameBase.cpp and aggregated by Engine.h —
-// so this public header stays independent of PCH include order.
-struct MenuInput;
-class InputPoll;
-#endif // BT_CLIENT
 
 #if defined(BT_SERVER)
 // File/Replay.h names game types, so it stays out of Engine.h and out of this header; GameBase.cpp includes it.
@@ -62,6 +58,13 @@ enum class GameFlags : uint64_t
 };
 using GameFlags_t = common::Flags<GameFlags>;
 
+#if defined(BT_CLIENT)
+constexpr int64_t SnapshotIndex(int64_t iHead, int64_t iLogical)
+{
+	return (iHead + iLogical) % kiNetworkBufferSize;
+}
+#endif // BT_CLIENT
+
 struct Cell
 {
 	CellStaticData staticData;
@@ -85,9 +88,8 @@ struct Cell
 	int64_t iHighWaterValidatedTick = -1;
 
 	// Monotonic guard for the rendered frame: the renderer must never regress to an older tick
-	// or an earlier interpolated time for the same coord. Trips DEBUG_BREAK in UpdateRenderInterpolation().
+	// for the same coord. Trips DEBUG_BREAK in UpdateRenderInterpolation().
 	int64_t iLastRenderedTick = -1;
-	float fLastRenderedTime = 0.0f;
 
 	struct CoordServerUpdate
 	{
@@ -121,13 +123,21 @@ struct Cell
 	int64_t iLastReplayConfirmedTick = -1;
 	int64_t iLastReplayServerUpdateCount = -1;
 
+	const game::Frame* TailFrame() const
+	{
+		if (iSnapshotCount == 0)
+		{
+			return nullptr;
+		}
+		return snapshots[SnapshotIndex(iSnapshotHead, iSnapshotCount - 1)].get();
+	}
+
 	void ResetClientState()
 	{
 		iConfirmedTick = -1;
 		iConfirmedOffset = -1;
 		iHighWaterValidatedTick = -1;
 		iLastRenderedTick = -1;
-		fLastRenderedTime = 0.0f;
 		iSnapshotHead = 0;
 		iSnapshotCount = 0;
 		serverUpdates.clear();
@@ -145,11 +155,6 @@ struct Cell
 };
 
 #if defined(BT_CLIENT)
-constexpr int64_t SnapshotIndex(int64_t iHead, int64_t iLogical)
-{
-	return (iHead + iLogical) % kiNetworkBufferSize;
-}
-
 // Number of committed ticks the renderer stays behind the ring tail. Render interpolates across
 // the one-tick window starting kiRenderBehindTicks behind tail (e.g. 2 = [tail-2, tail-1], holding
 // tail as an extra committed tick of starvation cushion), so every rendered position lies between
@@ -168,16 +173,6 @@ enum class StandardMenuFeature : uint8_t
 	kRemoteServer = 0x02,
 };
 using StandardMenuFeature_t = common::Flags<StandardMenuFeature>;
-
-enum class StandardMenuState : uint8_t
-{
-	kClientPresent           = 0x01,
-	kDiscoveryScannerPresent = 0x02,
-	kServerDiscovered        = 0x04,
-	kConnectionAccepted      = 0x08,
-	kAutoConnect             = 0x10,
-};
-using StandardMenuState_t = common::Flags<StandardMenuState>;
 
 struct StandardMenuModel
 {
@@ -200,16 +195,10 @@ class GameBase
 public:
 
 	GameBase();
-	virtual ~GameBase();
+	~GameBase();
 
 #if defined(BT_CLIENT)
-	virtual bool ShouldUseCrosshair() = 0;
-	virtual void ProcessGameMenuInput(const MenuInput& rMenuInput, const InputPoll& rInputPoll) = 0;
-
-	// The standard menu screens read this every render pass, and again after any action that can
-	// change it, because an action's effect must be visible to later decisions in the same pass.
-	virtual StandardMenuModel GetStandardMenuModel() const = 0;
-	virtual void ApplyStandardMenuAction(StandardMenuAction eAction) = 0;
+	bool ShouldUseCrosshair() const;
 
 	void ProcessInput(bool bLostFocus);
 	void ClientUpdate();
@@ -220,7 +209,17 @@ public:
 #endif // BT_CLIENT
 #if defined(BT_SERVER)
 	void ServerUpdate();
+	void EnsureNextFrames();
 #endif // BT_SERVER
+
+	void ResetSession();
+	void CreateNewFrame();
+	void ChangeFrameToMainMenu();
+
+	static void BuildMenuIslandPlacement(int64_t iIndex, std::vector<IslandPlacement>& rOutput);
+	// Debug-only main-menu island browser index into gpIslandTerrain->mIslandCrcsByArea (largest footprint first);
+	// advanced by 'E'.
+	int64_t miMenuIslandIndex = 0;
 
 	GameFlags_t mGameFlags;
 	UiState meUiState = UiState::kPause;
@@ -236,7 +235,7 @@ public:
 	// Equals iFullTicks * kfDeltaTime — zero during pause, scales with mTimeStep multiplier.
 	// For per-tick systems (those running inside the for-iFullTicks loop), keep using kfDeltaTime.
 	// For systems outside the per-tick loop that run once per advancing Update and represent
-	// sim-time progression (e.g. ServerFleetManager::TickFleetTimers), use this to respect
+	// sim-time progression (e.g. game timers advanced once per update), use this to respect
 	// time-scaling without each one re-deriving the delta.
 	float mfLastDeltaTime = 0.0f;
 #if defined(BT_CLIENT)
@@ -246,14 +245,15 @@ public:
 	double mfLastRenderFrameSeconds = 0.0;
 #endif // BT_CLIENT
 	std::unordered_map<GridCoord, Cell> mCells;
-	// Awake cells for this update: the coords simulated, published, and rendered. Populated by game policy
-	// (Game::ComputeActiveSet on the client, ServerSessionRuntime::ComputeActiveSet on the server); the append
-	// order is observable and reaches dispatch, broadcast, transfer, and render. Membership does not imply a
+	// Awake cells for this update: the coords simulated, published, and rendered. Populated by the session runtimes
+	// (ClientSessionRuntime::ComputeActiveSet on the client, ServerSessionRuntime::ComputeActiveSet on the server); the
+	// append order is observable and reaches dispatch, broadcast, transfer, and render. Membership does not imply a
 	// client is watching a cell, so liveness checks must not be derived from it.
 	std::vector<GridCoord> mActiveCoordinates;
-	// game::Game caches the visible-neighbor ring keyed off this coord, so every write goes through
-	// Game::SetClientGridCoordinate, which invalidates that cache.
+	// The client session runtime caches the visible-neighbor ring keyed off this coord, so every write goes through
+	// SetClientGridCoordinate, which invalidates that cache.
 	GridCoord mClientGridCoordinate {};
+	void SetClientGridCoordinate(GridCoord coordinate);
 
 	std::unordered_map<GridCoord, game::FrameInput> mFrameInputs;
 
@@ -267,6 +267,8 @@ public:
 
 	// Owns gpReplay for this game's lifetime; every user reaches it through that global.
 	std::unique_ptr<Replay> mpReplay;
+
+	ServerSaveLoad mServerSaveLoad;
 
 	// Reusable server-side dispatch references; capacity persists across ticks as the active-cell count changes.
 	std::vector<ActiveFrameReference> mActiveFrameReferences;
@@ -283,6 +285,7 @@ public:
 
 private:
 
+	void UpdateActiveIslands();
 	bool IsCoordinateRenderable(GridCoord coordinate) const;
 	void SelectRenderCamera(const std::vector<GridCoord>& rActiveCoordinates, GridCoord& rCameraCoordinate, bool& rbHaveRenderableCamera) const;
 	void UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, bool bHaveRenderableCamera);
@@ -301,7 +304,6 @@ protected:
 public:
 	int64_t miTickCounter = 0;
 
-	float mfCurrentTime = 0.0f;
 	uint16_t muiNextFrameId = 0;
 
 	int64_t miNextGlobalId = 1;
@@ -323,6 +325,10 @@ protected:
 	HANDLE mMinimizedThrottleTimer = nullptr;
 	std::optional<std::chrono::steady_clock::time_point> mMinimizedThrottleLast;
 #endif // BT_CLIENT
+
+private:
+
+	game::Frame& CreateCellFrame(Cell& rCell, GridCoord coordinate);
 };
 
 } // namespace engine

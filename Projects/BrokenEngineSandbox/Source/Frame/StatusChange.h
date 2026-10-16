@@ -35,6 +35,9 @@ inline constexpr bool IsTransferType(StatusChangeType eType)
 
 static_assert(static_cast<uint8_t>(StatusChangeType::kTransferSpaceship) == static_cast<uint8_t>(StatusChangeType::kTransferPlayer) + 1 && static_cast<uint8_t>(StatusChangeType::kTransferBlaster) == static_cast<uint8_t>(StatusChangeType::kTransferPlayer) + 2 && static_cast<uint8_t>(StatusChangeType::kTransferMissile) == static_cast<uint8_t>(StatusChangeType::kTransferPlayer) + 3, "IsTransferType assumes kTransferPlayer..kTransferMissile stay contiguous; inserting an enumerator between them breaks the range check.");
 
+// The transfer type whose rows carry the owned-entity identity Frame::OwnershipLayer binds.
+inline constexpr StatusChangeType kOwnedEntityTransferType = StatusChangeType::kTransferPlayer;
+
 inline const char* StatusChangeTypeName(StatusChangeType eType)
 {
 	switch (eType)
@@ -94,7 +97,7 @@ struct TransferData
 {
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.vecPosition, rSelf.vecDirection, rSelf.vecVelocity, rSelf.alignment, rSelf.fHealth, rSelf.fShield, rSelf.uiTypeIndex, rSelf.fAcceleration, rSelf.nextBlasterFireTimeSeconds, rSelf.nextSecondarySpawnTimeSeconds, rSelf.shieldCooldownSeconds, rSelf.shieldDownSoundCooldownSeconds, rSelf.animationTimeSeconds, rSelf.uiPlayerFlags, rSelf.nextBlasterSpawnTimeSeconds, rSelf.navigationDelaySeconds, rSelf.deltaRotationDelaySeconds, rSelf.timeSeconds, rSelf.nextJitterSeconds, rSelf.fDeltaRotation, rSelf.fDeltaRotationMaximum, rSelf.fPitch, rSelf.globalPlayerId, rSelf.fleetWantedCoordinate, rSelf.uiPendingFleetWantedCoordinateTicks, rSelf.uiPendingWeaponModeTicks);
+		return std::tie(rSelf.vecPosition, rSelf.vecDirection, rSelf.vecVelocity, rSelf.alignment, rSelf.fHealth, rSelf.fShield, rSelf.uiTypeIndex, rSelf.fAcceleration, rSelf.nextBlasterFireTimeSeconds, rSelf.nextSecondarySpawnTimeSeconds, rSelf.shieldCooldownSeconds, rSelf.shieldDownSoundCooldownSeconds, rSelf.animationTimeSeconds, rSelf.uiPlayerFlags, rSelf.nextBlasterSpawnTimeSeconds, rSelf.navigationDelaySeconds, rSelf.deltaRotationDelaySeconds, rSelf.timeSeconds, rSelf.nextJitterSeconds, rSelf.fDeltaRotation, rSelf.fDeltaRotationMaximum, rSelf.fPitch, rSelf.globalId, rSelf.fleetWantedCoordinate, rSelf.uiPendingFleetWantedCoordinateTicks, rSelf.uiPendingWeaponModeTicks);
 	}
 
 	bool operator==(const TransferData& rOther) const
@@ -138,7 +141,7 @@ struct TransferData
 	float fPitch = 0.0f;
 
 	// Global player ID (player transfers only)
-	engine::GlobalId globalPlayerId {};
+	engine::GlobalId globalId {};
 
 	// Fleet wanted coord (player transfers only)
 	engine::GridCoord fleetWantedCoordinate {};

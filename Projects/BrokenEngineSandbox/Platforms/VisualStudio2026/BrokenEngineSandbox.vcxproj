@@ -144,7 +144,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;$(ProjectDir)..\..\Pack\steamworks_sdk_156\sdk\redistributable_bin\win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <EntryPointSymbol>
       </EntryPointSymbol>
       <AdditionalDependencies>ThirdParty.$(Configuration).lib;ws2_32.lib;winmm.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -207,7 +207,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;$(ProjectDir)..\..\Pack\steamworks_sdk_156\sdk\redistributable_bin\win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <EntryPointSymbol>
       </EntryPointSymbol>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -276,7 +276,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;$(ProjectDir)..\..\Pack\steamworks_sdk_156\sdk\redistributable_bin\win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <EntryPointSymbol>
       </EntryPointSymbol>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -395,6 +395,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\TimeStep.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\CrashReport.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Engine.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\EngineSwitches.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\GameBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\LaunchOptions.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandServer.h" />
@@ -484,6 +485,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SoundSettings.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\TweaksSettings.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.h" />
     <ClInclude Include="..\..\Data\Shaders\ShaderLayouts.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Blasters\Blasters.h" />
@@ -506,6 +508,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Network\Client\ClientSession.h" />
     <ClInclude Include="..\..\Source\Network\Client\ClientReconciler.h" />
     <ClInclude Include="..\..\Source\Network\PlayerEvents.h" />
+    <ClInclude Include="..\..\Source\Network\StatusChangeCodec.h" />
     <ClInclude Include="..\..\Source\Network\GameMessages.h" />
     <ClInclude Include="..\..\Source\Network\GamePacketType.h" />
     <ClInclude Include="..\..\Source\Network\NetworkSessionContract.h" />
@@ -716,6 +719,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettings.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\TweaksSettings.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp" />
     <ClCompile Include="..\..\Source\Ui\LightingWrappers.cpp" />
     <ClCompile Include="..\..\Source\Ui\ParticleWrappers.cpp" />
@@ -724,7 +728,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Ui\SoundWrappers.cpp" />
     <ClCompile Include="..\..\Source\Ui\WindDepositsWrappers.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreen.cpp" />
-    <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenHexShield.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenHexShield.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenLightingEffectsVisible.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenLightingEffectsLighting.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenParticles.cpp" />
@@ -755,6 +759,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Network\Client\ClientReconciler.cpp" />
     <ClCompile Include="..\..\Source\Network\Client\ReconcileReplayClientState.cpp" />
     <ClCompile Include="..\..\Source\Network\PlayerEvents.cpp" />
+    <ClCompile Include="..\..\Source\Network\StatusChangeCodec.cpp" />
     <ClCompile Include="..\..\Source\Graphics\Camera.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\ChatScreen.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\GameSettingsScreen.cpp" />
@@ -833,6 +838,8 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterReflectionProjection.h" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\Water.vert" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterDisplacement.comp" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Smoke\SmokeOccupancyDilate.comp" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Smoke\SmokeOccupancyDilateRemap.comp" />
   </ItemGroup>
   <Target Name="ValidateDataBuildProperties" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(DataBuildMode)'!='Local' and '$(DataBuildMode)'!='Shared'" Text="DataBuildMode must be Local or Shared; received '$(DataBuildMode)'." />

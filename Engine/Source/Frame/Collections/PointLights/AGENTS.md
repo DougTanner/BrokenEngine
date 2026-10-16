@@ -8,6 +8,6 @@ Client-only point lights support owner-driven and fire-and-forget controlled lif
 - The player-facing Lighting toggle gates only the deposit indirect count; the visible sprite retains the shared rendered count.
 - The visible sprite may be world-axis-aligned or camera-facing by type. The deposit is always world-axis-aligned and samples the blurred texture; the sprite samples the unblurred texture.
 - Clamp deposit area to the renderer's minimum detail-texel footprint using the un-bumped detail texture size.
-- Controller wrappers apply when controlled lights are seeded and animated. Owner `Sync` writes bypass those wrappers.
+- Controller wrappers apply when controlled lights are seeded and animated. A light with no controller takes its visible intensity, lighting area, and lighting intensity from its type at render, through the type's tuning wrapper when one is set; owner `Sync` writes only position, visible area, and rotation.
 - `PersistentMembers()` carries type/controller/start-time metadata and base rotation through `AllocateAndCopyMembers()`; identity is owned and copied by the paired PostRender ID storage. Position and animated values are rewritten by owner sync or controller update, so any new persistent state must follow one of those lifecycles explicitly.
 - Future controller start times remain at the first keyframe until animation begins.

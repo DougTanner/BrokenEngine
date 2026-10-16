@@ -21,16 +21,6 @@ void BlastersInterpolate::Register()
 }
 #endif
 
-void BlastersInterpolate::AllocateAndCopy(BlastersInterpolate& rCurrent, const BlastersInterpolate& rPrevious)
-{
-	engine::AllocateAndCopyMembers(rCurrent, rPrevious);
-}
-
-void BlastersPostRender::AllocateAndCopy(BlastersPostRender& rCurrent, const BlastersPostRender& rPrevious)
-{
-	engine::AllocateAndCopyMembers(rCurrent, rPrevious);
-}
-
 #if defined(BT_CLIENT)
 void BlastersInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 {
@@ -54,8 +44,7 @@ void BlastersInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 	rBlasters.pWindTrails[iIndex] = {};
 	if (rBlasters.pfWindTrailIntensities[iIndex] > 0.0f)
 	{
-		engine::WindTrailsPostRender::Add(rFrame, rBlasters.pWindTrails[iIndex]);
-		engine::WindTrailsInterpolate::Sync(rFrame.interpolate, rBlasters.pWindTrails[iIndex],
+		engine::WindTrailsPostRender::Add(rFrame, rBlasters.pWindTrails[iIndex],
 		{
 			.vecPosition = rBlasters.pVecPositions[iIndex],
 			.fIntensity = rBlasters.pfWindTrailIntensities[iIndex],
@@ -67,14 +56,10 @@ void BlastersInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 	if ((rBlasters.pPointLights[iIndex].uuid.iValue != 0))
 	{
 		float fSize = rType.f2Size.x;
-		const engine::PointLightsType& rPointLightType = engine::PointLightsInterpolate::sTypes.at(static_cast<size_t>(rType.iPointLightTypeIndex));
 		engine::PointLightsInterpolate::Sync(rFrame.interpolate, rBlasters.pPointLights[iIndex],
 		{
 			.vecPosition = rBlasters.pVecPositions[iIndex],
 			.fVisibleArea = fSize,
-			.fVisibleIntensity = rPointLightType.fVisibleIntensity,
-			.fLightingArea = rPointLightType.fLightingArea,
-			.fLightingIntensity = rPointLightType.fLightingIntensity,
 			.fRotation = 0.0f,
 		});
 	}
@@ -144,15 +129,15 @@ static void RemoveOwnedObjects([[maybe_unused]] Frame& rFrame, [[maybe_unused]] 
 #if defined(BT_CLIENT)
 	if ((rCurrentInterpolate.pPointLights[i].uuid.iValue != 0))
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.pointLights, rFrame.postRender.pointLights, rCurrentInterpolate.pPointLights[i], rFrame.interpolate.pointLights.Members(), rFrame.postRender.pointLights.Members());
+		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pPointLights[i]);
 	}
 	else
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.areaLights, rFrame.postRender.areaLights, rCurrentInterpolate.pAreaLights[i], rFrame.interpolate.areaLights.Members(), rFrame.postRender.areaLights.Members());
+		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pAreaLights[i]);
 	}
 	if ((rCurrentInterpolate.pWindTrails[i].uuid.iValue != 0))
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.windTrails, rFrame.postRender.windTrails, rCurrentInterpolate.pWindTrails[i], rFrame.interpolate.windTrails.Members(), rFrame.postRender.windTrails.Members());
+		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pWindTrails[i]);
 	}
 #endif // BT_CLIENT
 }
@@ -164,13 +149,11 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 
 	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
 
-	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
+	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
-		if (!(rCurrentPostRender.pFlags[i] & kTransfer)) [[likely]]
-		{
-			continue;
-		}
-
+		return rCurrentPostRender.pFlags[i] & kTransfer;
+	}, [&](int64_t i)
+	{
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
 
 		TransferRequest request
@@ -183,17 +166,17 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.uiTypeIndex = rCurrentInterpolate.puiTypeIndices[i],
 			},
 		};
-		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
+		if (rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
 		{
 			LOG(kDefault, kError, "Blaster Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) TypeIndex: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int64_t>(request.iDeltaX), static_cast<int64_t>(request.iDeltaY), static_cast<int64_t>(rCurrentInterpolate.puiTypeIndices[i]), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
-		PushTransferRequest(rFrame.postRender, request);
+		rFrame.postRender.PushTransferRequest(request);
 
 		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i);
 
 		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
-	}
+	});
 }
 
 void BlastersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)

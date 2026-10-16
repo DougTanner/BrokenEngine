@@ -19,6 +19,7 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      caller explicitly supplied that input; an empty or unset value counts as
      not supplied, so omit the parameter and let the derived default apply.
      Pass the same explicitly supplied values to the build invocation.
+   - Append `-Project <Name>` only as step 3's game selection directs.
    - `-IncludeDevEnvDir` is not an agent-run option: the build entry point
      requests DevEnvDir itself for an authorized Local generation build.
 
@@ -34,6 +35,12 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      given; without one, a session worktree resolves its baseline through the
      session context, which may advance it to the session's real divergence
      point, and falls back to `HEAD` whenever that resolution fails.
+   - `project` — the game project: the `-Project` name, otherwise the only game
+     project discovered under `Projects/`; `null` when several exist and none
+     was named, which leaves `gameDataDirectory` and
+     `generatedDataIncludeRoot` `null` and `recommendedTargets` empty.
+     `projects` — every discovered game project, in ordinal order. A `-Project`
+     name that is not among them blocks under `project.not-found`.
    - `changedPaths`/`changedPathCount` — the complete changed-path set: the
      single baseline diff (committed, staged, and unstaged tracked changes) plus
      untracked files, separator-normalized. `changedPathsTruncated`,
@@ -54,10 +61,25 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
 3. Fix the target and configuration list from that evidence. Done when every
    target this request will build is named.
 
-   - Start from `recommendedTargets`, which is advisory: a `BrokenEngineSandbox`
-     row is `-Target Client` and a `BrokenEngineSandboxServer` row is
-     `-Target Server`, but you still fix the final list, because the rules below
-     depend on session state and request inputs the script cannot see.
+   - Start from `recommendedTargets`, which is advisory: with `<project>` the
+     step 2 `project`, a `<project>` row is `-Target Client` and a
+     `<project>Server` row is `-Target Server`, but you still fix the final
+     list, because the rules below depend on session state and request inputs
+     the script cannot see.
+   - Game selection: when the caller named a game, pass `-Project <Name>` to
+     step 1 and to each Client/Server invocation. With one game and none
+     named, the invocations stay as shown, with no `-Project`. When none is
+     named and step 1 reports `project` `null` with two or more `projects`,
+     build each requested non-game target once, without `-Project`; then, for
+     each game in `projects` order, rerun step 1 with `-Project <Name>`, read
+     it per step 2, and fix, compose, run, and classify that game's
+     Client/Server invocations per steps 3, 5, and 7-10, each with
+     `-Project <Name>`, so that game's own context (its data mode,
+     `gameDataDirectory`, `recommendedTargets`) drives its builds. One game's
+     block or failure does not stop the next game's builds. Every other step
+     runs once per dispatch: step 4 clears every game's target executables
+     before the first build, and step 9's one envelope file holds every game's
+     envelopes.
    - If the session's approved plan or acceptance table includes an
      agent-harness scenario, build both client and server in the same request
      regardless of changed-file affinity — the harness launches both executables
@@ -86,9 +108,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      (`/agent-harness`, Ownership and takeover). Do not discover this as a link
      error.
 
-5. Select the runtime data mode for every build targeting a BrokenEngineSandbox
-   project. Done when [runtime-data-mode.md](runtime-data-mode.md) has been read
-   and its modes and authorization rules are mapped onto the build invocation's
+5. Select the runtime data mode for every build targeting a game project. Done
+   when [runtime-data-mode.md](runtime-data-mode.md) has been read and its
+   modes and authorization rules are mapped onto the build invocation's
    parameters.
 
    - Client or server, full or selective, whichever source files a selective
@@ -117,7 +139,7 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
 # DataPacker: Release only, and Release is the default.
 pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Target DataPacker
 
-# BrokenEngineSandbox client, then server. Substitute Profile/Release only when requested.
+# Game client, then server; add -Project <Name> per step 3. Substitute Profile/Release only when requested.
 pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Target Client -Configuration Debug
 pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Target Server -Configuration Debug
 
@@ -139,6 +161,7 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
      `-ForbidExpensiveExport`, `-AcceptDeletionOnlyException` — Client/Server
      only; [runtime-data-mode.md](runtime-data-mode.md) owns when each one is
      authorized.
+   - `-Project` — Client/Server only; the game project per step 3.
    - `-Prefast` — Client/Server Release only; see
      [prefast-mode.md](prefast-mode.md).
    - `-ClangTidy` — Client/Server Debug or Release and DataPacker only, never
@@ -228,8 +251,10 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
     - `broken-engine-compile-invoke-result/v1` — the build never ran.
       `status`/`code`/`message` name the block; exit `2` is a structured block
       (parameter contract, context, provisioning, missing AgentTools or target,
-      data-mode authorization, ThirdParty output ownership) and exit `1` is an
-      internal error. Report the exact `code` and `message` and stop; never
+      data-mode authorization, ThirdParty output ownership, stale process
+      Vulkan SDK as `vulkan-sdk.stale-environment`) and exit `1` is an
+      internal error. Report the exact `code` and `message` and stop — inside
+      step 3's several-games loop, stop only that game's invocations; never
       present it as a build result.
 
     - Both envelopes are guaranteed only from successful parameter binding
@@ -280,19 +305,15 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
   builds it locally (`.agents/scripts/Build-WorktreeDataPacker.ps1`), so
   `DataPacker.exe` is already present at session start; a session that changes
   DataPacker-relevant sources performs a full local rebuild on its first
-  DataPacker build. When that prebuild is stamped, bootstrap also runs the
-  primary's DataPacker over the primary checkout's current asset inputs into the
-  primary `Output\Data`, refreshing the data Shared-mode worktrees consume,
-  first waiting up to its `-WaitSeconds` budget for any `BrokenEngineSandbox*`
-  process to exit and skipping the run with a warning only if one is still alive
-  when that budget expires; those inputs are not checked against HEAD, and a
-  nonzero exit fails session start. DataPacker's `"BrokenEngineDataPacker"`
-  mutex and the AgentTools bootstrap mutex are the two PC-global build
-  coordination points; add no others (the seed copy reuses the bootstrap mutex
-  for its prebuild). They now nest: bootstrap holds its own mutex while that run
-  waits for `"BrokenEngineDataPacker"`, and that wait is deliberately unbounded,
-  so a peer DataPacker run or a rare island bake can block session start long
-  enough to time other session starts out.
+  DataPacker build. Bootstrap also refreshes primary Shared data per game
+  ([Wrapper bootstrap Shared-data refresh](runtime-data-mode.md#wrapper-bootstrap-shared-data-refresh)),
+  and a nonzero DataPacker exit fails session start. DataPacker's
+  `"BrokenEngineDataPacker"` mutex and the AgentTools bootstrap mutex are the
+  two PC-global build coordination points; add no others (the seed copy reuses
+  the bootstrap mutex for its prebuild). They now nest: bootstrap holds its own
+  mutex while that refresh waits for `"BrokenEngineDataPacker"`, and that wait
+  is deliberately unbounded, so a peer DataPacker run or a rare island bake can
+  block session start long enough to time other session starts out.
 - DataPacker's mutex coordinates across worktrees and its shared chunks live
   under `%LOCALAPPDATA%\BrokenEngine\DataPackerCache\<Project>`; do not add
   another PC-global DataPacker lock or a checkout-local cache copy (the

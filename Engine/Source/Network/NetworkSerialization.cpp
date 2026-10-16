@@ -5,119 +5,10 @@
 #include "Network/NetworkCursor.h"
 
 #include "Frame/StatusChange.h"
+#include "Network/StatusChangeCodec.h"
 
 namespace engine
 {
-
-static void SerializeBlasterTransfer(uint8_t*& rpCursor, const game::TransferData& rData)
-{
-	WriteVector4(rpCursor, rData.vecPosition);
-	WriteVector4(rpCursor, rData.vecVelocity);
-	WriteUint8(rpCursor, rData.uiTypeIndex);
-	WriteUint32(rpCursor, rData.alignment.uiValue);
-}
-
-static void SerializeSpaceshipTransfer(uint8_t*& rpCursor, const game::TransferData& rData)
-{
-	WriteVector4(rpCursor, rData.vecPosition);
-	WriteVector4(rpCursor, rData.vecDirection);
-	WriteVector4(rpCursor, rData.vecVelocity);
-	WriteUint32(rpCursor, rData.alignment.uiValue);
-	WriteFloat(rpCursor, rData.fHealth);
-	WriteFloat(rpCursor, rData.nextBlasterSpawnTimeSeconds.count());
-	WriteFloat(rpCursor, rData.fDeltaRotation);
-}
-
-static void SerializeMissileTransfer(uint8_t*& rpCursor, const game::TransferData& rData)
-{
-	WriteVector4(rpCursor, rData.vecPosition);
-	WriteVector4(rpCursor, rData.vecDirection);
-	WriteVector4(rpCursor, rData.vecVelocity);
-	WriteUint32(rpCursor, rData.alignment.uiValue);
-	WriteFloat(rpCursor, rData.fAcceleration);
-	WriteFloat(rpCursor, rData.deltaRotationDelaySeconds.count());
-	WriteFloat(rpCursor, rData.timeSeconds.count());
-	WriteFloat(rpCursor, rData.nextJitterSeconds.count());
-	WriteFloat(rpCursor, rData.fDeltaRotation);
-	WriteFloat(rpCursor, rData.fDeltaRotationMaximum);
-	WriteFloat(rpCursor, rData.fPitch);
-}
-
-static void SerializePlayerTransfer(uint8_t*& rpCursor, const game::TransferData& rData)
-{
-	WriteVector4(rpCursor, rData.vecPosition);
-	WriteVector4(rpCursor, rData.vecDirection);
-	WriteVector4(rpCursor, rData.vecVelocity);
-	WriteUint32(rpCursor, rData.alignment.uiValue);
-	WriteFloat(rpCursor, rData.fHealth);
-	WriteFloat(rpCursor, rData.fShield);
-	WriteFloat(rpCursor, rData.nextBlasterFireTimeSeconds.count());
-	WriteFloat(rpCursor, rData.nextSecondarySpawnTimeSeconds.count());
-	WriteFloat(rpCursor, rData.shieldCooldownSeconds.count());
-	WriteFloat(rpCursor, rData.shieldDownSoundCooldownSeconds.count());
-	WriteFloat(rpCursor, rData.animationTimeSeconds.count());
-	WriteUint16(rpCursor, rData.uiPlayerFlags);
-	WriteFloat(rpCursor, rData.navigationDelaySeconds.count());
-	WriteInt64(rpCursor, rData.globalPlayerId.iValue);
-	WriteGridCoord(rpCursor, rData.fleetWantedCoordinate);
-	WriteUint8(rpCursor, rData.uiPendingFleetWantedCoordinateTicks);
-	WriteUint8(rpCursor, rData.uiPendingWeaponModeTicks);
-}
-
-static void DeserializeBlasterTransfer(const uint8_t*& rpCursor, game::TransferData& rData)
-{
-	rData.vecPosition = ReadVector4(rpCursor);
-	rData.vecVelocity = ReadVector4(rpCursor);
-	rData.uiTypeIndex = ReadUint8(rpCursor);
-	rData.alignment = AlignmentIdentifier(ReadUint32(rpCursor));
-}
-
-static void DeserializeSpaceshipTransfer(const uint8_t*& rpCursor, game::TransferData& rData)
-{
-	rData.vecPosition = ReadVector4(rpCursor);
-	rData.vecDirection = ReadVector4(rpCursor);
-	rData.vecVelocity = ReadVector4(rpCursor);
-	rData.alignment = AlignmentIdentifier(ReadUint32(rpCursor));
-	rData.fHealth = ReadFloat(rpCursor);
-	rData.nextBlasterSpawnTimeSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
-	rData.fDeltaRotation = ReadFloat(rpCursor);
-}
-
-static void DeserializeMissileTransfer(const uint8_t*& rpCursor, game::TransferData& rData)
-{
-	rData.vecPosition = ReadVector4(rpCursor);
-	rData.vecDirection = ReadVector4(rpCursor);
-	rData.vecVelocity = ReadVector4(rpCursor);
-	rData.alignment = AlignmentIdentifier(ReadUint32(rpCursor));
-	rData.fAcceleration = ReadFloat(rpCursor);
-	rData.deltaRotationDelaySeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
-	rData.timeSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
-	rData.nextJitterSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
-	rData.fDeltaRotation = ReadFloat(rpCursor);
-	rData.fDeltaRotationMaximum = ReadFloat(rpCursor);
-	rData.fPitch = ReadFloat(rpCursor);
-}
-
-static void DeserializePlayerTransfer(const uint8_t*& rpCursor, game::TransferData& rData)
-{
-	rData.vecPosition = ReadVector4(rpCursor);
-	rData.vecDirection = ReadVector4(rpCursor);
-	rData.vecVelocity = ReadVector4(rpCursor);
-	rData.alignment = AlignmentIdentifier(ReadUint32(rpCursor));
-	rData.fHealth = ReadFloat(rpCursor);
-	rData.fShield = ReadFloat(rpCursor);
-	rData.nextBlasterFireTimeSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
-	rData.nextSecondarySpawnTimeSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
-	rData.shieldCooldownSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
-	rData.shieldDownSoundCooldownSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
-	rData.animationTimeSeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
-	rData.uiPlayerFlags = ReadUint16(rpCursor);
-	rData.navigationDelaySeconds = std::chrono::duration<float>(ReadFloat(rpCursor));
-	rData.globalPlayerId.iValue = ReadInt64(rpCursor);
-	rData.fleetWantedCoordinate = ReadGridCoord(rpCursor);
-	rData.uiPendingFleetWantedCoordinateTicks = ReadUint8(rpCursor);
-	rData.uiPendingWeaponModeTicks = ReadUint8(rpCursor);
-}
 
 // Serialize a group of StatusChanges that share the same type
 static void SerializeGroup(uint8_t*& rpCursor, game::StatusChangeType eType, const game::StatusChange* pChanges, std::span<const int64_t> indices)
@@ -134,56 +25,9 @@ static void SerializeGroup(uint8_t*& rpCursor, game::StatusChangeType eType, con
 
 	for (int64_t i : indices)
 	{
-		const game::StatusChangeData& rData = pChanges[i].data;
 		const uint8_t* pItemStart = rpCursor;
 
-		switch (eType)
-		{
-			case game::StatusChangeType::kSpawnPlayer:
-			{
-				const game::SpawnPlayerData& rSpawn = std::get<game::SpawnPlayerData>(rData);
-				WriteInt64(rpCursor, rSpawn.iGlobalId);
-				WriteUint8(rpCursor, rSpawn.bIsFlagship ? 1 : 0);
-				WriteGridCoord(rpCursor, rSpawn.fleetWantedCoordinate);
-				WriteUint8(rpCursor, rSpawn.uiPendingFleetWantedCoordinateTicks);
-				WriteFloat(rpCursor, rSpawn.fSpawnOffsetX);
-				WriteFloat(rpCursor, rSpawn.fSpawnOffsetY);
-				break;
-			}
-			case game::StatusChangeType::kTransferBlaster:
-				SerializeBlasterTransfer(rpCursor, std::get<game::TransferData>(rData));
-				break;
-			case game::StatusChangeType::kTransferSpaceship:
-				SerializeSpaceshipTransfer(rpCursor, std::get<game::TransferData>(rData));
-				break;
-			case game::StatusChangeType::kTransferMissile:
-				SerializeMissileTransfer(rpCursor, std::get<game::TransferData>(rData));
-				break;
-			case game::StatusChangeType::kTransferPlayer:
-				SerializePlayerTransfer(rpCursor, std::get<game::TransferData>(rData));
-				break;
-			case game::StatusChangeType::kDestroyPlayer:
-				WriteInt64(rpCursor, std::get<game::DestroyPlayerData>(rData).iPlayerUuid);
-				break;
-			case game::StatusChangeType::kUpdatePlayer:
-			{
-				const game::UpdatePlayerData& rUpdate = std::get<game::UpdatePlayerData>(rData);
-				WriteInt64(rpCursor, rUpdate.iPlayerUuid);
-				WriteUint8(rpCursor, rUpdate.bUseMissiles ? 1 : 0);
-				WriteFloat(rpCursor, rUpdate.navigationDelaySeconds.count());
-				WriteUint8(rpCursor, rUpdate.uiPendingWeaponModeTicks);
-				break;
-			}
-			case game::StatusChangeType::kUpdateFleet:
-			{
-				const game::UpdateFleetData& rUpdate = std::get<game::UpdateFleetData>(rData);
-				WriteInt64(rpCursor, rUpdate.iPlayerUuid);
-				WriteUint8(rpCursor, rUpdate.bIsFlagship ? 1 : 0);
-				WriteGridCoord(rpCursor, rUpdate.fleetWantedCoordinate);
-				WriteUint8(rpCursor, rUpdate.uiPendingFleetWantedCoordinateTicks);
-				break;
-			}
-		}
+		game::WriteStatusChangePayload(rpCursor, pChanges[i]);
 
 		ASSERT(rpCursor - pItemStart <= kiMaxStatusChangeBytesPerItem);
 	}
@@ -264,55 +108,7 @@ int64_t DeserializeStatusChangeBatch(std::span<const uint8_t> source, game::Stat
 			rChange = {};
 			rChange.eType = eType;
 
-			rChange.data = game::DefaultDataForType(eType);
-
-			switch (eType)
-			{
-				case game::StatusChangeType::kSpawnPlayer:
-				{
-					game::SpawnPlayerData& rSpawn = std::get<game::SpawnPlayerData>(rChange.data);
-					rSpawn.iGlobalId = ReadInt64(cursor.pCursor);
-					rSpawn.bIsFlagship = ReadUint8(cursor.pCursor) != 0;
-					rSpawn.fleetWantedCoordinate = ReadGridCoord(cursor.pCursor);
-					rSpawn.uiPendingFleetWantedCoordinateTicks = ReadUint8(cursor.pCursor);
-					rSpawn.fSpawnOffsetX = ReadFloat(cursor.pCursor);
-					rSpawn.fSpawnOffsetY = ReadFloat(cursor.pCursor);
-					break;
-				}
-				case game::StatusChangeType::kTransferBlaster:
-					DeserializeBlasterTransfer(cursor.pCursor, std::get<game::TransferData>(rChange.data));
-					break;
-				case game::StatusChangeType::kTransferSpaceship:
-					DeserializeSpaceshipTransfer(cursor.pCursor, std::get<game::TransferData>(rChange.data));
-					break;
-				case game::StatusChangeType::kTransferMissile:
-					DeserializeMissileTransfer(cursor.pCursor, std::get<game::TransferData>(rChange.data));
-					break;
-				case game::StatusChangeType::kTransferPlayer:
-					DeserializePlayerTransfer(cursor.pCursor, std::get<game::TransferData>(rChange.data));
-					break;
-				case game::StatusChangeType::kDestroyPlayer:
-					std::get<game::DestroyPlayerData>(rChange.data).iPlayerUuid = ReadInt64(cursor.pCursor);
-					break;
-				case game::StatusChangeType::kUpdatePlayer:
-				{
-					game::UpdatePlayerData& rUpdate = std::get<game::UpdatePlayerData>(rChange.data);
-					rUpdate.iPlayerUuid = ReadInt64(cursor.pCursor);
-					rUpdate.bUseMissiles = ReadUint8(cursor.pCursor) != 0;
-					rUpdate.navigationDelaySeconds = std::chrono::duration<float>(ReadFloat(cursor.pCursor));
-					rUpdate.uiPendingWeaponModeTicks = ReadUint8(cursor.pCursor);
-					break;
-				}
-				case game::StatusChangeType::kUpdateFleet:
-				{
-					game::UpdateFleetData& rUpdate = std::get<game::UpdateFleetData>(rChange.data);
-					rUpdate.iPlayerUuid = ReadInt64(cursor.pCursor);
-					rUpdate.bIsFlagship = ReadUint8(cursor.pCursor) != 0;
-					rUpdate.fleetWantedCoordinate = ReadGridCoord(cursor.pCursor);
-					rUpdate.uiPendingFleetWantedCoordinateTicks = ReadUint8(cursor.pCursor);
-					break;
-				}
-			}
+			game::ReadStatusChangePayload(cursor.pCursor, rChange);
 		}
 	}
 

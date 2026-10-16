@@ -1,6 +1,6 @@
 # HexShields - Geodesic Shield Meshes
 
-Client-only geodesic shield meshes with directional damage visualization. Fully owner-driven — no autonomous simulation; the game-layer `Players` collection owns lifetime, per-frame `Sync` data, and damage-channel writes (including the slot-recycling policy).
+Client-only geodesic shield meshes with directional damage visualization. Fully owner-driven — no autonomous simulation; a game-layer collection owns lifetime, per-frame `Sync` data, and damage-channel writes (including the slot-recycling policy).
 
 ## Unique Aspects
 

@@ -7,10 +7,6 @@
 #include "File/Replay.h"
 
 #include "Agent/Commands/ServerSimulationHarnessRigs.h"
-#include "Frame/Collections/Blasters/Blasters.h"
-#include "Frame/Collections/Missiles/Missiles.h"
-#include "Frame/Collections/Spaceships/Spaceships.h"
-#include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
 #include "Game.h"
 #include "SpawnTransfer.h"
@@ -23,10 +19,10 @@ static engine::ClientGuid TransferDataClientGuid(const game::TransferData& rData
 	return {.uiHigh = rData.uiClientGuidHigh, .uiLow = rData.uiClientGuidLow};
 }
 
-// A destination is "live" if it has a committed player or any client actively subscribes to it.
+// A destination is "live" if it has a committed owned entity or any client actively subscribes to it.
 // Deliberately does not consult mActiveCoordinates: ComputeActiveSet force-adds kOriginCoordinate (0,0)
-// every tick as an initial-fleet-spawn bootstrap, so membership there doesn't imply anyone is
-// watching. This check is used to decide whether non-Player transfers should be dropped instead
+// every tick as an initial-spawn bootstrap, so membership there doesn't imply anyone is
+// watching. This check is used to decide whether non-owned transfers should be dropped instead
 // of materializing ghost entities that clients can't see.
 bool ServerTransferManager::IsDestinationLive(engine::GridCoord destination) const
 {
@@ -77,9 +73,9 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 				continue;
 			}
 
-			// Player arrivals create subscriptions. Other transfers require a player or an active subscription,
-			// including subscriptions to empty sibling cells, to avoid creating unseen entities.
-			if (rRequest.eType != game::StatusChangeType::kTransferPlayer && !IsDestinationLive(destination))
+			// Owned-entity arrivals create subscriptions. Other transfers require an owned entity or an active
+			// subscription, including subscriptions to empty sibling cells, to avoid creating unseen entities.
+			if (rRequest.eType != game::kOwnedEntityTransferType && !IsDestinationLive(destination))
 			{
 				LOG(kNetwork, kVerbose, "Dropping transfer to unsubscribed Frame Tick: {} Source: ({},{}) Dest: ({},{}) Type: {}", rNextFrame.interpolate.iTick, rCoord.iX, rCoord.iY, destination.iX, destination.iY, game::StatusChangeTypeName(rRequest.eType));
 				continue;
@@ -101,11 +97,11 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 				.data = game::StatusChangeData(rRequest.data),
 			});
 
-			if (rRequest.eType == game::StatusChangeType::kTransferPlayer && (rRequest.data.globalPlayerId.iValue != 0))
+			if (rRequest.eType == game::kOwnedEntityTransferType && (rRequest.data.globalId.iValue != 0))
 			{
 				rTransfersArena.mBuffer.PushBack(ClientTransferInfo
 				{
-					.globalPlayerId = rRequest.data.globalPlayerId,
+					.globalId = rRequest.data.globalId,
 					.destination = destination,
 					.clientGuid = TransferDataClientGuid(rRequest.data),
 				});
@@ -132,16 +128,16 @@ void ServerTransferManager::SpawnTransfers(bool bFilterDestinationLiveness)
 		game::Frame& rDestinationFrame = *game::gpGame->mCells.at(rCoord).pNext;
 		for (const game::StatusChange& rTransfer : rTransfers)
 		{
-			// Liveness filtering requires non-player transfers to target live destinations, matching CollectTransfers.
+			// Liveness filtering requires non-owned transfers to target live destinations, matching CollectTransfers.
 			// Replay spawning bypasses this check.
-			if (bFilterDestinationLiveness && rTransfer.eType != game::StatusChangeType::kTransferPlayer && !IsDestinationLive(rCoord)) [[unlikely]]
+			if (bFilterDestinationLiveness && rTransfer.eType != game::kOwnedEntityTransferType && !IsDestinationLive(rCoord)) [[unlikely]]
 			{
-				LOG(kDefault, kError, "Non-Player transfer reached Spawn for non-live Frame Tick: {} Dest: ({},{}) Type: {}", rDestinationFrame.interpolate.iTick, rCoord.iX, rCoord.iY, game::StatusChangeTypeName(rTransfer.eType));
+				LOG(kDefault, kError, "Non-owned transfer reached Spawn for non-live Frame Tick: {} Dest: ({},{}) Type: {}", rDestinationFrame.interpolate.iTick, rCoord.iX, rCoord.iY, game::StatusChangeTypeName(rTransfer.eType));
 				DEBUG_BREAK();
 			}
 
 			game::TransferData data = std::get<game::TransferData>(rTransfer.data);
-			game::SpawnTransfer(rDestinationFrame, rTransfer.eType, data, game::gpGame->mPlayerAlignment);
+			game::SpawnTransfer(rDestinationFrame, rTransfer.eType, data);
 		}
 	}
 }
@@ -175,29 +171,29 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 			common::ToHex(std::span<char, 20>(acCrcPre), uiPreCrc);
 			common::ToHex(std::span<char, 20>(acCrcPost), rDestinationFrame.postRender.uiSharedCrc);
 
-			char acPlayerIds[192] {};
-			char* pPlayerIdsWrite = acPlayerIds;
-			int64_t iPlayerIdCount = 0;
+			char acOwnedIds[192] {};
+			char* pOwnedIdsWrite = acOwnedIds;
+			int64_t iOwnedIdCount = 0;
 			for (const game::StatusChange& rTransfer : rTransfers)
 			{
-				if (rTransfer.eType != game::StatusChangeType::kTransferPlayer)
+				if (rTransfer.eType != game::kOwnedEntityTransferType)
 				{
 					continue;
 				}
 
-				if (iPlayerIdCount >= 8)
+				if (iOwnedIdCount >= 8)
 				{
 					continue;
 				}
 
 				// The final byte stays the zero terminator.
-				pPlayerIdsWrite = std::format_to_n(pPlayerIdsWrite, acPlayerIds + std::ssize(acPlayerIds) - 1 - pPlayerIdsWrite, "{}{}", iPlayerIdCount > 0 ? ", " : "", std::get<game::TransferData>(rTransfer.data).globalPlayerId.iValue).out;
-				++iPlayerIdCount;
+				pOwnedIdsWrite = std::format_to_n(pOwnedIdsWrite, acOwnedIds + std::ssize(acOwnedIds) - 1 - pOwnedIdsWrite, "{}{}", iOwnedIdCount > 0 ? ", " : "", std::get<game::TransferData>(rTransfer.data).globalId.iValue).out;
+				++iOwnedIdCount;
 			}
 
-			if (iPlayerIdCount > 0)
+			if (iOwnedIdCount > 0)
 			{
-				LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} PlayerCount: {} BlasterCount: {} SpaceshipCount: {} MissileCount: {} CrcPre: {} CrcPost: {} PlayerIds: [{}]", rCoord.iX, rCoord.iY, std::ssize(rTransfers), (game::Frame::OwnershipLayer(rDestinationFrame)).iCount, rDestinationFrame.postRender.pBlasters->iCount, rDestinationFrame.postRender.pSpaceships->iCount, rDestinationFrame.postRender.pMissiles->iCount, acCrcPre, acCrcPost, acPlayerIds);
+				LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {} OwnedIds: [{}]", rCoord.iX, rCoord.iY, std::ssize(rTransfers), (game::Frame::OwnershipLayer(rDestinationFrame)).iCount, acCrcPre, acCrcPost, acOwnedIds);
 			}
 			else
 			{
@@ -207,7 +203,7 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 				});
 				if (bAnySubscribed)
 				{
-					LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} PlayerCount: {} BlasterCount: {} SpaceshipCount: {} MissileCount: {} CrcPre: {} CrcPost: {}", rCoord.iX, rCoord.iY, std::ssize(rTransfers), (game::Frame::OwnershipLayer(rDestinationFrame)).iCount, rDestinationFrame.postRender.pBlasters->iCount, rDestinationFrame.postRender.pSpaceships->iCount, rDestinationFrame.postRender.pMissiles->iCount, acCrcPre, acCrcPost);
+					LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {}", rCoord.iX, rCoord.iY, std::ssize(rTransfers), (game::Frame::OwnershipLayer(rDestinationFrame)).iCount, acCrcPre, acCrcPost);
 				}
 			}
 		}
@@ -223,8 +219,8 @@ void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferI
 		game::Frame& rDestinationFrame = *game::gpGame->mCells.at(rClientTransfer.destination).pNext;
 		engine::RegistryOwnershipLayer destinationLayer = game::Frame::OwnershipLayer(rDestinationFrame);
 
-		// An invalid uuid means the transferred player never landed in the destination, so there is nothing to bind.
-		if (!(engine::RegistryUuidByGlobalId(destinationLayer, rClientTransfer.globalPlayerId).iValue != 0))
+		// An invalid uuid means the transferred owned entity never landed in the destination, so there is nothing to bind.
+		if (!(engine::RegistryUuidByGlobalId(destinationLayer, rClientTransfer.globalId).iValue != 0))
 		{
 			continue;
 		}
@@ -233,23 +229,23 @@ void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferI
 		std::vector<engine::ClientConnection>& rClients = engine::gpServer->mClients;
 		for (const engine::ClientConnection& rClient : rClients)
 		{
-			auto ownedIt = game::gpServerSession->mClientPlayers.mOwned.find(rClient.iClientId);
-			std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != game::gpServerSession->mClientPlayers.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
-			for (const engine::OwnedEntity& rOwnedPlayer : ownedPlayers)
+			auto ownedIt = game::gpServerSession->mClientOwnedEntities.mOwned.find(rClient.iClientId);
+			std::span<const engine::OwnedEntity> ownedEntities = ownedIt != game::gpServerSession->mClientOwnedEntities.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
+			for (const engine::OwnedEntity& rOwnedEntity : ownedEntities)
 			{
-				if (rOwnedPlayer.globalId == rClientTransfer.globalPlayerId)
+				if (rOwnedEntity.globalId == rClientTransfer.globalId)
 				{
-					game::gpServerSession->mClientPlayers.UpdateCoord(rClient.iClientId, rClientTransfer.globalPlayerId, rClientTransfer.destination);
+					game::gpServerSession->mClientOwnedEntities.UpdateCoord(rClient.iClientId, rClientTransfer.globalId, rClientTransfer.destination);
 					game::gpServerSession->mPendingSubscriptionUpdates.push_back(
 					{
 						.iClientId = rClient.iClientId,
 						.newCoordinate = rClientTransfer.destination,
-						.globalPlayerId = rClientTransfer.globalPlayerId,
+						.globalId = rClientTransfer.globalId,
 					});
 
-					engine::AssignRegistryClientGuid(destinationLayer, rClientTransfer.globalPlayerId, rClient.clientGuid);
+					engine::AssignRegistryClientGuid(destinationLayer, rClientTransfer.globalId, rClient.clientGuid);
 
-					game::gpServerSession->mpFleetManager->OnPlayerTransferred(rClient.clientGuid, rClientTransfer.globalPlayerId, rClientTransfer.destination);
+					game::gpServerSession->OnOwnedEntityChangedCell(rClient.clientGuid, rClientTransfer.globalId, rClientTransfer.destination);
 
 					bFoundClient = true;
 					break;
@@ -261,11 +257,11 @@ void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferI
 			}
 		}
 
-		// Orphaned players (client disconnected): preserve GUID and update fleet
+		// Orphaned owned entities (client disconnected): preserve the GUID and report the cell change
 		if (!bFoundClient && (rClientTransfer.clientGuid.uiHigh != 0 || rClientTransfer.clientGuid.uiLow != 0))
 		{
-			engine::AssignRegistryClientGuid(destinationLayer, rClientTransfer.globalPlayerId, rClientTransfer.clientGuid);
-			game::gpServerSession->mpFleetManager->OnPlayerTransferred(rClientTransfer.clientGuid, rClientTransfer.globalPlayerId, rClientTransfer.destination);
+			engine::AssignRegistryClientGuid(destinationLayer, rClientTransfer.globalId, rClientTransfer.clientGuid);
+			game::gpServerSession->OnOwnedEntityChangedCell(rClientTransfer.clientGuid, rClientTransfer.globalId, rClientTransfer.destination);
 		}
 	}
 }
@@ -295,6 +291,12 @@ void ServerTransferManager::HarvestTransfers()
 	}
 
 	ApplyPreparedTransfers(transfersArena, true);
+
+	// mTransfers still holds the batch just applied; the broadcaster clears it later this tick.
+	for (const auto& [rCoordinate, rTransfers] : mTransfers)
+	{
+		miHarvestedTransferTotal += std::ssize(rTransfers);
+	}
 }
 
 void ServerTransferManager::PrepareReplayTransfers(engine::GridCoord coord, std::span<const game::StatusChange> recordedTransfers)
@@ -322,20 +324,20 @@ void ServerTransferManager::ApplyReplayTransfers()
 	{
 		for (const game::StatusChange& rTransfer : rTransfers)
 		{
-			if (rTransfer.eType != game::StatusChangeType::kTransferPlayer)
+			if (rTransfer.eType != game::kOwnedEntityTransferType)
 			{
 				continue;
 			}
 
 			const game::TransferData& rData = std::get<game::TransferData>(rTransfer.data);
-			if (!(rData.globalPlayerId.iValue != 0))
+			if (!(rData.globalId.iValue != 0))
 			{
 				continue;
 			}
 
 			clientTransfersArena.mBuffer.PushBack(ClientTransferInfo
 			{
-				.globalPlayerId = rData.globalPlayerId,
+				.globalId = rData.globalId,
 				.destination = rCoord,
 				.clientGuid = TransferDataClientGuid(rData),
 			});
@@ -350,6 +352,7 @@ void ServerTransferManager::ResetState()
 	mTransfers.clear();
 	game::ResetReplayTransferHarnessRigs(*game::gpServerSession);
 	game::gpServerSession->mPendingSubscriptionUpdates.clear();
+	miHarvestedTransferTotal = 0;
 }
 
 } // namespace engine

@@ -16,7 +16,7 @@ struct GlobalLayout
 	vec4 f4VisibleArea INIT;
 	vec4 f4ShadowArea INIT;
 	vec4 f4ShadowAreaExtra INIT;
-	vec4 f4ShadowAreaPrevious INIT; // Previous-frame f4ShadowArea, for ShadowTemporal.comp reprojection
+	vec4 f4ShadowAreaPrevious INIT; // f4ShadowArea as it stood before the latest refresh, for ShadowTemporal.comp reprojection
 
 	vec4 f4SunMoonNormal INIT;
 	vec4 f4SunColor INIT;
@@ -137,7 +137,7 @@ struct GlobalLayout
 	float fLightingAddTerrain INIT;
 	float fSpreadDirectionalityStart INIT;
 	vec4 f4LightingArea INIT;
-	vec4 f4LightingAreaPrevious INIT; // Previous-frame f4LightingArea, for LightingTemporal.comp reprojection
+	vec4 f4LightingAreaPrevious INIT; // f4LightingArea as it stood before the latest refresh, for LightingTemporal.comp reprojection
 	vec2 f2LightingAreaExtentInverse INIT; // 1 / lighting-area extent (LightingSpread.frag world->texcoord)
 	float fLightingTemporalBlend INIT; // EMA weight toward current; 1.0 on the first frame so seeded history is never shown
 	vec2 f2LightingDepositSizeInverse INIT; // 1 / (lightTiles * kiComputeTileSize) (LightingDepositEdgeFade)

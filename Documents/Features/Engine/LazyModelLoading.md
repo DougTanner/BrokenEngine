@@ -6,9 +6,33 @@ Revisit When: model loading becomes a meaningful share of startup time, or the u
 
 Pack data types split into eager and lazy at runtime only, in `IsEagerChunk` (`Engine/Source/File/PackChunks.cpp`): Scene, Model, Shader, and Raw are eager; Audio, Islands, and Texture are lazy. Eager packs are read whole by the startup task in `PackChunks::LoadPackFiles`, and `PackChunks::GetEagerChunkMap` blocks until that task finishes. Lazy chunks are loaded on request by `PackChunkLoader` into the lazy pool, which is laid out once at construction over the whole lazy chunk map.
 
-Model upload happens entirely at boot. The `BufferManager` constructor walks the eager map, validates each `ChunkFlags::kModel` chunk's `ModelHeader`, and creates one device-local index-plus-vertex `Buffer` per model in `BufferManager::mModelMap`, keyed by model CRC and filled through a one-shot staged copy. Consumers resolve that map while pipelines are created: `ResolveModelChunkShaders` (`Engine/Source/Graphics/Managers/DynamicPipelines.cpp`) maps a scene's `modelCrc` to its buffer, the HexShields pipelines bind the DualGeodesicIcosahedron model directly, and `ModelPipeline::Create` validates material ranges against the buffer's index count. `ModelPipeline::RecordDrawIndirect` and `Pipeline::RecordDrawIndirect` bind the vertex buffer inside the Global and Main command buffers, which are recorded once (`Engine/Source/Graphics/AGENTS.md`), so the buffer handle is fixed into the recording.
+Model upload happens entirely at boot. The `BufferManager` constructor walks the
+eager map, validates each `ChunkFlags::kModel` chunk's `ModelHeader`, and
+creates one device-local index-plus-vertex `Buffer` per model in
+`BufferManager::mModelMap`, keyed by model CRC and filled through a one-shot
+staged copy. Consumers resolve that map while pipelines are created:
+`ResolveModelChunkShaders`
+(`Engine/Source/Graphics/Managers/DynamicPipelines.cpp`) maps a scene's
+`modelCrc` to its buffer, the HexShields pipelines bind the
+DualGeodesicIcosahedron model directly, and `ModelPipeline::Create` validates
+material ranges against the buffer's index count.
+`ModelPipeline::RecordDrawIndirect` and `Pipeline::RecordDrawIndirect` bind the
+vertex buffer inside the Global and Main command buffers, which are recorded
+once (`Engine/Source/Graphics/AGENTS.md`), so the buffer handle is fixed into
+the recording.
 
-Textures already load lazily without re-recording. `Pipeline::WriteIndirectBuffer` and `ModelPipeline::WriteIndirectBuffer` request a pipeline's texture chunks through `PackChunkLoader::RequestChunkLoad` on the first positive instance count. The loader hands `kTexture` chunks to `TextureUploadManager::RequestUpload`, and the texture stays on the white placeholder until adoption swaps its bindless descriptor. That upload path copies images only (block-compressed partial copies, image ownership transfer); other lazy chunk types stop at `kReady`. Island terrain meshes are the buffer precedent: `IslandTemplate` mesh data slices the lazy Islands chunk, lands in a stable mesh arena whose residency is published through indirect records rather than a re-record, and has its CPU slice released by `PackChunks::DecommitChunkRange` (`IslandTemplate::bMeshCpuDecommitted`).
+Textures already load lazily without re-recording.
+`Pipeline::WriteIndirectBuffer` and `ModelPipeline::WriteIndirectBuffer` request
+a pipeline's texture chunks through `PackChunkLoader::RequestChunkLoad` on the
+first positive instance count. The loader hands `kTexture` chunks to
+`TextureUploadManager::RequestUpload`, and the texture stays on the white
+placeholder until adoption swaps its bindless descriptor. That upload path
+copies images only (block-compressed partial copies, image ownership transfer);
+other lazy chunk types stop at `kReady`. Island terrain meshes are the buffer
+precedent: `IslandTemplate` mesh data slices the lazy Islands chunk, lands in a
+stable mesh arena whose residency is published through indirect records rather
+than a re-record, and has its CPU slice released by
+`PackChunks::DecommitChunkRange` (`IslandTemplate::bMeshCpuDecommitted`).
 
 The server never opens the Model pack: `IsServerChunk` accepts Islands only. DataPacker has no notion of eager or lazy, Model chunks are written uncompressed, and the lazy open path already validates any chunk type's location and header, so moving Model to the lazy set changes no `.pack` or `.manifest` layout and needs no `common::DataHeader::kiVersion` bump.
 

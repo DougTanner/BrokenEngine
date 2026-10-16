@@ -23,7 +23,7 @@ void WindRadialsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 		return;
 	}
 
-	SimulationTime currentTime(std::chrono::duration<float>(rPreviousFrame.interpolate.fCurrentTime + rFrameInterpolate.fDeltaTime));
+	SimulationTime currentTime = TickToSimulationTime(rPreviousFrame.interpolate.iTick) + common::FloatSecondsToNanoseconds(std::chrono::duration<float>(rFrameInterpolate.fDeltaTime));
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -33,7 +33,7 @@ void WindRadialsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 
 		int64_t iControllerTypeIndex = rCurrent.puiControllerTypeIndices[i];
 		SimulationTime startTime = rCurrent.pStartTimes[i];
-		std::chrono::duration<float> elapsedTime = currentTime - startTime;
+		std::chrono::duration<float> elapsedTime(common::NanosecondsToFloatSeconds<float>(currentTime - startTime));
 		const WindRadialControllerType& rController = WindRadialsInterpolate::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
 		WindRadialKeyframe interpolated = InterpolateKeyframes(rController, elapsedTime);
 

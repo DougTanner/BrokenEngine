@@ -5,6 +5,8 @@
 #include "Ui/WindWrappersBase.h"
 #include "TweaksSliderMap.h"
 
+#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
+
 namespace engine
 {
 
@@ -76,7 +78,7 @@ void RenderWindSection(TweaksScreenBase& rScreen)
 
 			ImGui::EndTabItem();
 		}
-		RenderTweakExtensionSubtabs(rScreen, iSection, 1);
+		game::RenderWindTweakExtensions(rScreen, iSection, 1);
 		ImGui::EndTabBar();
 	}
 }

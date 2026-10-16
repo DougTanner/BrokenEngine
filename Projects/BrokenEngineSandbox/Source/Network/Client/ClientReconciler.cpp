@@ -121,16 +121,13 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 		if (GetClientReplayedPosition(activeWorks, iPreWritebackTick, vecPostWritebackPosition))
 		{
 			XMVECTOR vecError = XMVectorSubtract(vecPreWritebackPosition, vecPostWritebackPosition);
-			XMVECTOR vecTotal = XMVectorAdd(gpGame->mVecVisualErrorOffset, vecError);
-			float fTotal = XMVectorGetX(XMVector3Length(vecTotal));
-			if (fTotal > Game::kfVisualErrorMaxDistance)
+			float fTotal = engine::gpCamera->AddVisualErrorOffset(vecError);
+			if (fTotal > engine::CameraBase::kfVisualErrorMaxDistance)
 			{
-				gpGame->mVecVisualErrorOffset = {};
-				LOG(kNetwork, kWarning, "Visual error offset reset (exceeded max) Coord: ({},{}) Delta: {} Max: {}", gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY, common::Wb(XMVectorGetX(XMVector3Length(vecError)), 3), common::Wb(Game::kfVisualErrorMaxDistance, 1));
+				LOG(kNetwork, kWarning, "Visual error offset reset (exceeded max) Coord: ({},{}) Delta: {} Max: {}", gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY, common::Wb(XMVectorGetX(XMVector3Length(vecError)), 3), common::Wb(engine::CameraBase::kfVisualErrorMaxDistance, 1));
 			}
 			else
 			{
-				gpGame->mVecVisualErrorOffset = vecTotal;
 				float fDelta = XMVectorGetX(XMVector3Length(vecError));
 				if (fTotal > 0.1f)
 				{

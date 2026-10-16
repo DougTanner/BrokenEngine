@@ -37,7 +37,7 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 					{
 						continue;
 					}
-					if (rRequest.data.globalPlayerId != clientState.clientGlobalPlayerIdentifier)
+					if (rRequest.data.globalId != clientState.clientGlobalPlayerIdentifier)
 					{
 						continue;
 					}

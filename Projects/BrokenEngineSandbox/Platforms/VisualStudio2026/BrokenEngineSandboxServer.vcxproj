@@ -142,7 +142,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;$(ProjectDir)..\..\Pack\steamworks_sdk_156\sdk\redistributable_bin\win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <EntryPointSymbol>
       </EntryPointSymbol>
       <AdditionalDependencies>ThirdParty.$(Configuration).lib;ws2_32.lib;winmm.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -205,7 +205,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;$(ProjectDir)..\..\Pack\steamworks_sdk_156\sdk\redistributable_bin\win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <EntryPointSymbol>
       </EntryPointSymbol>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -274,7 +274,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;$(ProjectDir)..\..\Pack\steamworks_sdk_156\sdk\redistributable_bin\win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(ProjectDir)..\..\..\..\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <EntryPointSymbol>
       </EntryPointSymbol>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -350,6 +350,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\File\PackChunkLoader.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\File\PackChunks.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\File\Replay.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\File\ServerSaveLoad.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Collection.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\CollectionLifecycle.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\CollectionController.h" />
@@ -375,6 +376,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\TimeStep.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\CrashReport.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Engine.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\EngineSwitches.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\GameBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\LaunchOptions.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandServer.h" />
@@ -387,6 +389,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Agent\Commands\ServerSimulationHarnessRigs.h" />
     <ClInclude Include="..\..\Source\Agent\Commands\ServerFrameEdit.h" />
     <ClInclude Include="..\..\Source\Save\GameSaveLoad.h" />
+    <ClInclude Include="..\..\Source\Save\GameSaveState.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\ChatText.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkCursor.h" />
@@ -436,6 +439,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Version.h" />
     <ClInclude Include="..\..\Source\SpawnTransfer.h" />
     <ClInclude Include="..\..\Source\Network\PlayerEvents.h" />
+    <ClInclude Include="..\..\Source\Network\StatusChangeCodec.h" />
     <ClInclude Include="..\..\Source\Network\GameMessages.h" />
     <ClInclude Include="..\..\Source\Network\Server\ServerSession.h" />
     <ClInclude Include="..\..\Source\Network\Server\ServerFleetManager.h" />
@@ -480,6 +484,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\File\PackChunkLoader.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\File\PackChunks.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\File\Replay.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\File\ServerSaveLoad.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\Explosions.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\ExplosionsSpawn.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collections\Explosions\ExplosionsUpdate.cpp" />
@@ -565,6 +570,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Game.cpp" />
     <ClCompile Include="..\..\Source\SpawnTransfer.cpp" />
     <ClCompile Include="..\..\Source\Network\PlayerEvents.cpp" />
+    <ClCompile Include="..\..\Source\Network\StatusChangeCodec.cpp" />
     <ClCompile Include="..\..\Source\Network\Server\ServerSession.cpp" />
     <ClCompile Include="..\..\Source\Network\Server\ServerFleetManager.cpp" />
     <ClCompile Include="..\..\Source\Network\Server\ServerFleetSerialization.cpp" />

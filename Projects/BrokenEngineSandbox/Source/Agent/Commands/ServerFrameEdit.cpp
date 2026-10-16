@@ -44,7 +44,7 @@ static engine::FrameColumnList<FIRST..., SECOND..., THIRD..., FOURTH...> Concate
 
 using FrameValueColumns = decltype(ConcatenateColumns(engine::FrameInterpolateBase::Values(), FrameInterpolate::Values(), engine::FramePostRenderBase::Values(), FramePostRender::Values()));
 
-constexpr std::array<std::string_view, 3> kRefusedFrameValues {"iTick", "fCurrentTime", "fDeltaTime"};
+constexpr std::array<std::string_view, 2> kRefusedFrameValues {"iTick", "fDeltaTime"};
 
 static consteval bool IsRefusedFrameValue(std::string_view name)
 {
@@ -187,7 +187,7 @@ static void ReadElement(const nlohmann::json& rWrites, std::string_view name, EL
 	}
 	else if constexpr (std::is_same_v<ELEMENT, engine::SimulationTime>)
 	{
-		rElement = engine::SimulationTime(std::chrono::duration<float>(FloatFromValue(rValue, name)));
+		rElement = engine::SimulationTime(std::chrono::nanoseconds(IntegerFromValue<int64_t>(rValue, name)));
 	}
 	else if constexpr (std::is_same_v<ELEMENT, int32_t> || std::is_same_v<ELEMENT, uint8_t> || std::is_same_v<ELEMENT, uint16_t> || std::is_same_v<ELEMENT, uint64_t>)
 	{

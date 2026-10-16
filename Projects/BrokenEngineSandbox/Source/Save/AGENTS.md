@@ -2,13 +2,11 @@
 
 ## Overview
 
-`GameSaveLoad` orchestrates server save, load, reset, and autosave, and this subsystem supplies the game half of the engine-owned grid save and replay contracts. Files are versioned by `game::Frame::kiVersion`; navigation and elevation are derived and are not persisted.
+This subsystem supplies the game half of the engine-owned server save/load, grid save, and replay contracts (`../../../../Engine/Source/File/AGENTS.md` `## Grid Saves` and `## Replay Streams`). Files are versioned by `game::Frame::kiVersion`; navigation and elevation are derived and are not persisted.
 
 ## Save and Load
 
-- Grid file framing, validation, staging, and adoption are engine-owned (`../../../../Engine/Source/File/AGENTS.md`); this subsystem owns only when a save, load, reset, or autosave runs and what happens around it. Return the actual commit result to callers.
-- Successful loads preserve the saved simulation clock and resynchronize clients to that state. Fresh-game paths reset server fleet management explicitly.
-- Server load and reset discard pending raw profile samples before mutating or restoring frame state; this diagnostic cleanup does not alter the persisted payload.
+- `GameSaveState.h` declares the game half the engine grid save calls by name — the staged value and its four entry points; fleet serialization defines them (`../Network/Server/AGENTS.md`).
 
 ## Replay Contract
 

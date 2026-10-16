@@ -1,10 +1,6 @@
 #include "Game.h"
 
-#include "Audio/StreamingVoices.h"
-#include "File/Replay.h"
 #include "Input/Input.h"
-#include "Network/Server/ServerBroadcaster.h"
-#include "Network/Server/ServerTransferManager.h"
 
 #include "Frame/Collections/Players/Players.h"
 #include "Network/GamePacketType.h"
@@ -15,18 +11,6 @@ namespace game
 
 static constexpr float kfCameraShakeAdd = 0.25f;
 static constexpr float kfCameraShakeMax = 1.0f;
-
-// Debug-only main-menu island browser: build the origin cell as a single island centered at (0,0),
-// selected by index into the boot-fixed area-sorted list of all packed islands (largest footprint
-// first). clear()+push_back reuses the vector's capacity (grown once under
-// ScopedSuppressAllocationTracking in CreateNewFrame), so the cycle path never heap-allocates in the
-// main loop.
-static void BuildMenuIslandPlacement(int64_t iIndex, std::vector<engine::IslandPlacement>& rOutput)
-{
-	rOutput.clear();
-	common::crc_t islandCrc = engine::gpIslandTerrain->mIslandCrcsByArea.at(static_cast<size_t>(iIndex));
-	rOutput.push_back({.islandCrc = islandCrc, .f2WorldPosition = {0.0f, 0.0f}, .fRotation = 0.0f});
-}
 
 Game::Game()
 : common::Singleton<Game>(gpGame, this)
@@ -40,14 +24,14 @@ Game::Game()
 
 #if defined(BT_SERVER)
 	mpServerSession = std::make_unique<ServerSession>();
-	if (!mGameSaveLoad.Autoload())
+	if (!mServerSaveLoad.Autoload())
 	{
-		CreateNewFrame(GameFlags::kGame);
+		CreateNewFrame();
 	}
 	meUiState = engine::UiState::kNone;
 #else
-	CreateNewFrame(GameFlags::kMainMenu);
 	mGameFlags.Set(engine::GameFlags::kMainMenu);
+	CreateNewFrame();
 #endif // BT_SERVER
 
 #if defined(BT_CLIENT)
@@ -56,10 +40,6 @@ Game::Game()
 
 #if defined(BT_CLIENT)
 	StartMenuMusic();
-	engine::gpAudioManager->mpStreamingVoices->mGetNextTrack = [this]()
-	{
-		return GetNextMusicTrack();
-	};
 #endif // BT_CLIENT
 
 }
@@ -121,201 +101,16 @@ std::optional<int64_t> Game::ClientPlayerIndex(const PlayersPostRender& rPlayers
 }
 
 #if defined(BT_CLIENT)
-XMVECTOR Game::GetClientPlayerPosition() const
+bool Game::HasFocusedClientEntity() const
 {
-	const engine::Cell& rCell = mCells.at(mClientGridCoordinate);
-	if (rCell.iSnapshotCount > 0)
-	{
-		int64_t iTailPhysical = engine::SnapshotIndex(rCell.iSnapshotHead, rCell.iSnapshotCount - 1);
-		const std::unique_ptr<Frame>& rpTail = rCell.snapshots[iTailPhysical];
-		if (rpTail != nullptr)
-		{
-			std::optional<int64_t> playerIndex = ClientPlayerIndex(*rpTail->postRender.pPlayers);
-			if (playerIndex)
-			{
-				return rpTail->interpolate.pPlayers->pVecPositions[*playerIndex];
-			}
-		}
-	}
-	XMVECTOR vecArea = engine::LocalCellArea();
-	return XMVectorSet((XMVectorGetX(vecArea) + XMVectorGetZ(vecArea)) * 0.5f, (XMVectorGetY(vecArea) + XMVectorGetW(vecArea)) * 0.5f, 0.0f, 1.0f);
-}
-#endif // BT_CLIENT
-
-void Game::ComputeActiveSet()
-{
-#if defined(BT_SERVER)
-	gpServerSession->mpRuntime->ComputeActiveSet();
-#else
-	// Heap: mActiveCoordinates vector clear/push_back may allocate. Persists as Game member across frame updates
-	ScopedSuppressAllocationTracking suppress;
-
-	if (!(mGameFlags & engine::GameFlags::kMainMenu))
-	{
-		mActiveCoordinates.clear();
-		for (const auto& [rCoordinate, rCell] : mCells)
-		{
-			if (rCell.iSnapshotCount > 0 && (rCell.iConfirmedTick >= 0 || rCoordinate == mClientGridCoordinate))
-			{
-				mActiveCoordinates.push_back(rCoordinate);
-			}
-		}
-
-		{
-			auto it = mCells.find(mClientGridCoordinate);
-			if (it == mCells.end() || it->second.iSnapshotCount == 0)
-			{
-				CreateCellAtCoordinate(mClientGridCoordinate);
-			}
-			if (!std::ranges::contains(mActiveCoordinates, mClientGridCoordinate))
-			{
-				mActiveCoordinates.push_back(mClientGridCoordinate);
-			}
-		}
-
-		miVisibleNeighborCount = 0;
-		if ((ClientPlayerIdentifier().iValue != 0))
-		{
-			// Camera-zoom-dependent VisibleArea: mf4LargeVisibleArea packs (minX, maxY, maxX, minY).
-			const XMFLOAT4& rf4Visible = engine::gpCamera->mf4LargeVisibleArea;
-			// The visible area is in the camera basis cell's frame, which is not always the client cell: it lags a
-			// client-cell change and can be another coord entirely while render-camera selection falls back. Each
-			// neighbour rectangle therefore offsets the one local area every cell has by that neighbour's own offset
-			// from the camera basis, so both sides of the test are always in the same frame.
-			XMVECTOR vecArea = engine::LocalCellArea();
-			float fCellMinX = XMVectorGetX(vecArea);
-			float fCellMaxY = XMVectorGetY(vecArea);
-			float fCellMaxX = XMVectorGetZ(vecArea);
-			float fCellMinY = XMVectorGetW(vecArea);
-
-			auto EnsureNeighbor = [&](engine::GridCoord neighbor)
-			{
-				auto it = mCells.find(neighbor);
-				if (it == mCells.end() || it->second.iSnapshotCount == 0)
-				{
-					CreateCellAtCoordinate(neighbor);
-				}
-				if (!std::ranges::contains(mActiveCoordinates, neighbor))
-				{
-					mActiveCoordinates.push_back(neighbor);
-				}
-			};
-
-			// Adjacent-only clamp: at wide zoom the VisibleArea may extend past the 3x3 ring;
-			// only the immediate ring is ever subscribed regardless.
-			for (int64_t i = -1; i <= 1; ++i)
-			{
-				for (int64_t j = -1; j <= 1; ++j)
-				{
-					if (i == 0 && j == 0)
-					{
-						continue;
-					}
-					// A cell at the numeric edge of the grid has no neighbour in that direction; skip it rather than
-					// wrap to the opposite end.
-					engine::GridCoord neighbor {};
-					if (!engine::TryAddGridCoordinate(mClientGridCoordinate, i, j, neighbor))
-					{
-						continue;
-					}
-					XMFLOAT2 f2Offset = engine::MakeRenderBasis(neighbor, engine::gpCamera->mBasisCoordinate).f2Offset;
-					float fNeighborMinX = fCellMinX + f2Offset.x;
-					float fNeighborMaxX = fCellMaxX + f2Offset.x;
-					float fNeighborMinY = fCellMinY + f2Offset.y;
-					float fNeighborMaxY = fCellMaxY + f2Offset.y;
-					if (rf4Visible.x < fNeighborMaxX && rf4Visible.z > fNeighborMinX && rf4Visible.w < fNeighborMaxY
-					 && rf4Visible.y > fNeighborMinY)
-					{
-						mVisibleNeighbors[miVisibleNeighborCount++] = neighbor;
-						EnsureNeighbor(neighbor);
-					}
-				}
-			}
-		}
-
-	}
-	else
-	{
-		mActiveCoordinates.clear();
-		mActiveCoordinates.push_back(mClientGridCoordinate);
-	}
-
-	// Delete local-only cells outside the active set, preserve network-subscribed cells
-	std::erase_if(mCells, [this](const std::pair<const engine::GridCoord, engine::Cell>& rPair)
-	{
-		return !std::ranges::contains(mActiveCoordinates, rPair.first) && rPair.second.iConfirmedTick < 0;
-	});
-
-	ASSERT(std::ranges::count_if(mCells, [](const std::pair<const engine::GridCoord, engine::Cell>& rPair)
-	{
-		return rPair.second.iConfirmedTick < 0;
-	}) <= 9);
-
-#endif // BT_SERVER
+	return ClientPlayerIdentifier().iValue != 0;
 }
 
-#if defined(BT_CLIENT)
-void Game::UpdateActiveIslands()
+void Game::UpdateCameraShake()
 {
-	// Include confirmed cells and the client cell's provisional frame.
-	// The filtered coordinates use per-frame workbuffer storage; UpdateActiveIslands' nested reservation pops before this arena.
-	common::ScopedWorkbufferArena subscribedArena = common::gpThreadLocal->mWorkbuffer.Push();
-	for (const engine::GridCoord& rCoordinate : mActiveCoordinates)
-	{
-		auto it = mCells.find(rCoordinate);
-		if (it != mCells.end() && (it->second.iConfirmedTick >= 0 || rCoordinate == mClientGridCoordinate))
-		{
-			subscribedArena.mBuffer.PushBack<engine::GridCoord>(rCoordinate);
-		}
-	}
-	engine::gpIslands->UpdateActiveIslands(mCells, subscribedArena.mBuffer.Span<const engine::GridCoord>());
-}
-#endif // BT_CLIENT
-
-#if defined(BT_SERVER)
-void Game::EnsureNextFrames()
-{
-	// Heap: cell entries and their next frames persist across ticks.
-	ScopedSuppressAllocationTracking suppress;
-
-	for (const engine::GridCoord& rCoordinate : mActiveCoordinates)
-	{
-		if (mCells.try_emplace(rCoordinate).first->second.pNext == nullptr)
-		{
-			mCells.at(rCoordinate).pNext = std::make_unique<Frame>();
-		}
-	}
-}
-#endif // BT_SERVER
-
-void Game::BuildFrameInputs()
-{
-#if defined(BT_SERVER)
-	gpServerSession->mpBroadcaster->BuildFrameInputs();
-#else
-	// Heap: unordered_map clear/insert for per-coordinate FrameInputs. Map persists as Game member
-	ScopedSuppressAllocationTracking suppress;
-
-	mFrameInputs.clear();
-
-	for (const engine::GridCoord& rCoordinate : mActiveCoordinates)
-	{
-		if (!mCells.contains(rCoordinate))
-		{
-			continue;
-		}
-
-		mFrameInputs.try_emplace(rCoordinate);
-	}
-
-	// Camera shake — read most recent ring frame (head + count - 1)
+	// Camera shake — read most recent ring frame
 	auto it = mCells.find(mClientGridCoordinate);
-	const Frame* pTailFrame = nullptr;
-	if (it != mCells.end() && it->second.iSnapshotCount > 0)
-	{
-		int64_t iTailPhysical = engine::SnapshotIndex(it->second.iSnapshotHead, it->second.iSnapshotCount - 1);
-		pTailFrame = it->second.snapshots[iTailPhysical].get();
-	}
+	const Frame* pTailFrame = it != mCells.end() ? it->second.TailFrame() : nullptr;
 	if ((ClientPlayerIdentifier().iValue != 0) && pTailFrame != nullptr)
 	{
 		const Frame& rCurrentFrame = *pTailFrame;
@@ -332,20 +127,8 @@ void Game::BuildFrameInputs()
 			mfPreviousClientArmor = fCurrentArmor;
 		}
 	}
-#endif // BT_SERVER
 }
-
-void Game::HarvestTransfers()
-{
-#if defined(BT_SERVER)
-	gpServerSession->mpTransferManager->HarvestTransfers();
-	// mTransfers still holds the batch just applied; the broadcaster clears it later this tick.
-	for (const auto& [rCoordinate, rTransfers] : gpServerSession->mpTransferManager->mTransfers)
-	{
-		gpServerSession->miHarvestedTransferTotal += std::ssize(rTransfers);
-	}
-#endif
-}
+#endif // BT_CLIENT
 
 Game::~Game()
 {
@@ -355,7 +138,6 @@ Game::~Game()
 	}
 #if defined(BT_CLIENT)
 	mpClientSession.reset();
-	engine::gpAudioManager->mpStreamingVoices->mGetNextTrack = nullptr;
 #endif // BT_CLIENT
 
 #if defined(BT_SERVER)
@@ -368,123 +150,27 @@ Game::~Game()
 	}
 }
 
-void Game::Reset()
+void Game::ResetGameState()
 {
-	LOG(kDefault, kDebug, "Game::Reset()");
-
-	miTickCounter = 0;
-	mfCurrentTime = 0.0f;
-
-#if defined(BT_SERVER)
-	engine::gpReplay->ResetStreams();
-	mGameFlags.Set(engine::GameFlags::kSaveReplay, false);
-#endif // BT_SERVER
-
 #if defined(BT_CLIENT)
-	engine::gpCamera->ResetForSession();
-	engine::gbSmokeClear = true;
-	engine::gpParticleManager->mbReset = true;
-	engine::WindTrailsInterpolate::sPreviousPositions.clear();
-	mVecVisualErrorOffset = {};
 	mWeaponModeToggle.Reset();
 #endif // BT_CLIENT
-
-	mGameFlags.Set(engine::GameFlags::kPaused, false);
 	mClientPlayerIdentifiers.clear();
 	mClientPlayerCoordinates.clear();
 #if defined(BT_CLIENT)
 	mFleetSelection.Clear();
-	mbClientGridCoordinatePinned = false;
 #endif
 	mfPreviousClientArmor = 0.0f;
-	SetClientGridCoordinate(engine::kOriginCoordinate);
-	mActiveCoordinates.clear();
-	mActiveCoordinates.push_back(mClientGridCoordinate);
-}
-
-void Game::CreateNewFrame(GameFlags_t gameFlags)
-{
-	// Heap: make_unique<Frame> with all its SOA collections. Frame persists across the entire
-	// game state lifetime, so workbuffer (lost on Pop) can't hold it.
-	ScopedSuppressAllocationTracking suppress;
-
-	mCells.clear();
-	engine::Cell& rCell = mCells.try_emplace(engine::kOriginCoordinate).first->second;
-#if defined(BT_CLIENT)
-	rCell.iSnapshotHead = 0;
-	rCell.iSnapshotCount = 1;
-	rCell.snapshots[0] = std::make_unique<Frame>();
-	Frame& rFrame = *rCell.snapshots[0];
-#else
-	rCell.pCurrent = std::make_unique<Frame>();
-	Frame& rFrame = *rCell.pCurrent;
-#endif
-	rFrame.interpolate.gameFlags.Set(gameFlags.meFlags);
-	InitializeFramePostRender(rFrame);
-
-	// Populate static data for origin coord (used as the main-menu cell)
-	engine::CellStaticData& rStaticData = rCell.staticData;
-	rStaticData.coordinate = engine::kOriginCoordinate;
-	// Debug builds turn the main-menu cell into a single centered island browser ('E' cycles it);
-	// release builds keep the procedural island chain. Gameplay cells always use the chain.
-	bool bMenuBrowse = false;
-	if constexpr (kbDebugInput)
-	{
-		bMenuBrowse = static_cast<bool>(gameFlags & GameFlags::kMainMenu);
-	}
-	if (bMenuBrowse)
-	{
-		BuildMenuIslandPlacement(miMenuIslandIndex, rStaticData.islands);
-	}
-	else
-	{
-		engine::GenerateIslandChain(engine::kOriginCoordinate, rStaticData.islands);
-	}
-	// navigationData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
-
-#if defined(BT_SERVER)
-	rCell.pNext = std::make_unique<Frame>();
-#endif
 }
 
 #if defined(BT_CLIENT)
-bool Game::ShouldUseCrosshair()
-{
-	auto it = mCells.find(mClientGridCoordinate);
-	if (it == mCells.end())
-	{
-		return false;
-	}
-	if (it->second.iSnapshotCount == 0)
-	{
-		return false;
-	}
-	int64_t iTailPhysical = engine::SnapshotIndex(it->second.iSnapshotHead, it->second.iSnapshotCount - 1);
-	const std::unique_ptr<Frame>& rpTail = it->second.snapshots[iTailPhysical];
-	if (rpTail == nullptr)
-	{
-		return false;
-	}
-	return rpTail->interpolate.gameFlags & GameFlags::kGame && meUiState == engine::UiState::kNone;
-}
-
 engine::StandardMenuModel Game::GetStandardMenuModel() const
 {
-	const engine::ClientSessionRuntime& rRuntime = *gpClientSession->mpRuntime;
-
-	engine::StandardMenuState_t state;
-	state.Set(engine::StandardMenuState::kClientPresent, rRuntime.mpClient != nullptr);
-	state.Set(engine::StandardMenuState::kDiscoveryScannerPresent, rRuntime.mpDiscoveryScanner != nullptr);
-	state.Set(engine::StandardMenuState::kServerDiscovered, rRuntime.mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered);
-	// Set only while a client exists, so the menu can test this bit on its own.
-	state.Set(engine::StandardMenuState::kConnectionAccepted, rRuntime.mpClient != nullptr && (rRuntime.mpClient->mStateFlags & engine::Client::ClientStateFlags::kConnectionAccepted));
-	state.Set(engine::StandardMenuState::kAutoConnect, kbAutoConnect);
-
 	return engine::StandardMenuModel
 	{
 		.pcTitle = "BROKEN ENGINE",
 		.features = {engine::StandardMenuFeature::kLocalServer, engine::StandardMenuFeature::kRemoteServer},
-		.state = state,
+		.state = gpClientSession->mpRuntime->GetStandardMenuState(),
 	};
 }
 
@@ -499,34 +185,11 @@ void Game::ApplyStandardMenuAction(engine::StandardMenuAction eAction)
 			gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kiDefaultPort, NetworkSessionContract::kiCoordinateSlots);
 			break;
 		case engine::StandardMenuAction::kChangeFrameToMainMenu:
-			ChangeFrame(GameFlags::kMainMenu);
+			ChangeFrameToMainMenu();
 			break;
 	}
 }
 #endif // BT_CLIENT
-
-void Game::ChangeFrame(GameFlags_t gameFlags)
-{
-	ASSERT(gameFlags & GameFlags::kMainMenu);
-
-#if defined(BT_CLIENT)
-	gpClientSession->mpRuntime->Disconnect();
-#endif
-
-	if (mGameFlags & engine::GameFlags::kMainMenu)
-	{
-		DEBUG_BREAK();
-		return;
-	}
-
-#if defined(BT_CLIENT)
-	StartMenuMusic();
-#endif // BT_CLIENT
-
-	mGameFlags.Set(engine::GameFlags::kMainMenu, gameFlags & GameFlags::kMainMenu);
-	CreateNewFrame(gameFlags);
-	Reset();
-}
 
 #if defined(BT_CLIENT)
 void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engine::InputPoll& rInputPoll)
@@ -655,8 +318,6 @@ common::crc_t Game::GetNextMusicTrack()
 
 void Game::InitializeFramePostRender(Frame& rFrame)
 {
-	rFrame.postRender.uiFrameIdentifier = muiNextFrameId++;
-	rFrame.postRender.randomEngine.TimeSeed();
 	rFrame.postRender.playerAlignment = mPlayerAlignment;
 	rFrame.postRender.enemyAlignment = mEnemyAlignment;
 	rFrame.postRender.alignments = mAlignments;

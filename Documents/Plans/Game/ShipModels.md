@@ -1,13 +1,38 @@
 <!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:05:45.634Z","dependsOn":["Documents/Plans/Game/FlightPlaneClimbing.md","Documents/Plans/Game/ShipTypeSplit.md"]} -->
 # Give each ship type a fleet model and a random-spawn model
 
-Tier 2 (`.agents/references/risk-tiers.md`): the change adds four source model assets and their DataPacker intermediates, and rewires the client-only model selection, scale, and orientation constants in the three `*Render.cpp` files. No CRC'd state, wire format, save, or replay format changes; the server is untouched. Line numbers cite baseline `c1420821` where a file exists there; `Documents/Plans/Game/ShipTypeSplit.md` (prerequisite) renames `Players/` to `Omnis/` and `Spaceships/` to `Fighters/`, adds `Battleships/`, and introduces the per-controller model constants this Plan fills in, so carry its names forward. Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other. Paths below `Frame/` mean `Projects/BrokenEngineSandbox/Source/Frame/`; `Models/` means `Projects/BrokenEngineSandbox/Data/Models/`.
+Tier 2 (`.agents/references/risk-tiers.md`): the change adds four source model
+assets and their DataPacker intermediates, and rewires the client-only model
+selection, scale, and orientation constants in the three `*Render.cpp` files. No
+CRC'd state, wire format, save, or replay format changes; the server is
+untouched. Line numbers cite baseline `c1420821` where a file exists there;
+`Documents/Plans/Game/ShipTypeSplit.md` (prerequisite) renames `Players/` to
+`Omnis/` and `Spaceships/` to `Fighters/`, adds `Battleships/`, and introduces
+the per-controller model constants this Plan fills in, so carry its names
+forward. Where a statement here and the code disagree, the code wins; report the
+contradiction instead of matching one side to the other. Paths below `Frame/`
+mean `Projects/BrokenEngineSandbox/Source/Frame/`; `Models/` means
+`Projects/BrokenEngineSandbox/Data/Models/`.
 
 ## Context
 
-`ShipTypeSplit` decision 17 gives every ship type two render pipelines, one per `ShipController`, but fills both with placeholders: fleet rows draw `data::kModelsspaceship2scenegltfCrc` (today's Player model, `PlayersRender.cpp:19-20`, scale `0.3667f`) and random rows draw `data::kModelsSpaceshipscenegltfCrc` (today's Spaceship model, `SpaceshipsRender.cpp:15-16`, scale `0.00175f`), with Battleships at three times both scales. So a fleet Fighter, a fleet Omni, and a fleet Battleship all look alike apart from size, and so do the three random types.
+`ShipTypeSplit` decision 17 gives every ship type two render pipelines, one per
+`ShipController`, but fills both with placeholders: fleet rows draw
+`data::kModelsspaceship2scenegltfCrc` (today's Player model,
+`PlayersRender.cpp:19-20`, scale `0.3667f`) and random rows draw
+`data::kModelsSpaceshipscenegltfCrc` (today's Spaceship model,
+`SpaceshipsRender.cpp:15-16`, scale `0.00175f`), with Battleships at three times
+both scales. So a fleet Fighter, a fleet Omni, and a fleet Battleship all look
+alike apart from size, and so do the three random types.
 
-The user decided (this session, binding): each type gets two distinct models, one for human-fleet ships and one for random spawns, so the two are told apart at a glance. Sizes: Battleship large and battleship-like (lowest flight plane), Omni medium and omni-directional, Fighter small and including an airplane-like craft. The existing `spaceship2` (JCarvajal, CC-BY-4.0) is one of the two Omni models and the existing `Spaceship` (MatiasMyma, CC-BY-4.0) is one of the two Fighter models, so four models are new: one small airplane-like craft, one medium omni-directional craft, two large battleships.
+The user decided (this session, binding): each type gets two distinct models,
+one for human-fleet ships and one for random spawns, so the two are told apart
+at a glance. Sizes: Battleship large and battleship-like (lowest flight plane),
+Omni medium and omni-directional, Fighter small and including an airplane-like
+craft. The existing `spaceship2` (JCarvajal, CC-BY-4.0) is one of the two Omni
+models and the existing `Spaceship` (MatiasMyma, CC-BY-4.0) is one of the two
+Fighter models, so four models are new: one small airplane-like craft, one
+medium omni-directional craft, two large battleships.
 
 Pipeline facts the design rests on (verified at baseline):
 
@@ -36,15 +61,50 @@ Each decision is recorded as made; the alternatives are not open.
    | Battleship | `kFleet` | `Battleship` (new) | Battleship | `https://sketchfab.com/3d-models/battleship-9282c849bb414ffb9bd04c931856a637` | Matthaiios (`https://sketchfab.com/Matthaiios`) | CC-BY-4.0 | 17.4k triangles |
    | Battleship | `kRandomSpawn` | `LowPolyBattleship` (new) | Low poly battleship | `https://sketchfab.com/3d-models/low-poly-battleship-8d5e7633b6084c5f947f7134c495a59b` | minehffd (`https://sketchfab.com/minehffd`) | CC-BY-4.0 | 19.3k triangles |
 
-   Fleet-versus-random assignment is the trivial choice: the two existing models keep the controller they already draw (`spaceship2` was the human Player, `Spaceship` the random Spaceship), the airplane goes to the human fleet because it is the model the user named, and the Battleship with emissive detail goes to the fleet. No franchise-derived model (Star Wars, StarCraft) was chosen because the uploader's CC licence cannot clear the underlying IP. The generated symbols are `data::kModelsJetFighterscenegltfCrc`, `data::kModelsFlyingSaucerscenegltfCrc`, `data::kModelsBattleshipscenegltfCrc`, `data::kModelsLowPolyBattleshipscenegltfCrc`.
+   Fleet-versus-random assignment is the trivial choice: the two existing models
+   keep the controller they already draw (`spaceship2` was the human Player,
+   `Spaceship` the random Spaceship), the airplane goes to the human fleet
+   because it is the model the user named, and the Battleship with emissive
+   detail goes to the fleet. No franchise-derived model (Star Wars, StarCraft)
+   was chosen because the uploader's CC licence cannot clear the underlying IP.
+   The generated symbols are `data::kModelsJetFighterscenegltfCrc`,
+   `data::kModelsFlyingSaucerscenegltfCrc`,
+   `data::kModelsBattleshipscenegltfCrc`,
+   `data::kModelsLowPolyBattleshipscenegltfCrc`.
 
 2. **Download is a user step; the agent never fetches model files.** Sketchfab downloads need a signed-in account. For each new folder the user downloads the **glTF** format from the source page and unzips it so the folder holds exactly `scene.gltf`, `scene.bin`, `textures/`, and `license.txt`, as the existing folders do. No decimation, re-export, or texture resizing: every chosen model is already under 20k triangles.
 
-3. **Each downloaded `scene.gltf` is checked before DataPacker runs, and a failing model stops the Plan.** Read the JSON: `extensionsUsed` must not name `KHR_materials_pbrSpecularGlossiness`; no primitive `attributes` may carry `COLOR_0` unless every material of that scene also has a `baseColorTexture` or a non-white `baseColorFactor`; `images` at most 64, `materials` at most 128, `skins` at most one. A model that fails is not converted or substituted; the implementer returns the failure to main with the offending field, because choosing a replacement model is not a trivial choice.
+3. **Each downloaded `scene.gltf` is checked before DataPacker runs, and a
+   failing model stops the Plan.** Read the JSON: `extensionsUsed` must not name
+   `KHR_materials_pbrSpecularGlossiness`; no primitive `attributes` may carry
+   `COLOR_0` unless every material of that scene also has a `baseColorTexture`
+   or a non-white `baseColorFactor`; `images` at most 64, `materials` at most
+   128, `skins` at most one. A model that fails is not converted or substituted;
+   the implementer returns the failure to main with the offending field, because
+   choosing a replacement model is not a trivial choice.
 
-4. **Scale from measured extent.** For each of the four new models, compute the model's native longest horizontal extent `L` from `scene.gltf`: the per-primitive POSITION accessor `min`/`max`, transformed by the node chain's `scale`/`matrix` down to the root (Sketchfab commonly bakes a unit conversion into a root node). Set `kfModelScale` so the rendered longest extent equals the type's collision diameter: `kfModelScale = 2 / L`, written as a literal with four significant digits and a comment naming `L`. Radii are `ShipTypeSplit`'s: `kfFighterRadius = 1.5f`, `kfOmniRadius = 1.1f`, `kfBattleshipRadius = 4.5f`. The two existing models keep their scales (`0.00175f` for `Spaceship`, `0.3667f` for `spaceship2`); the Battleship placeholders' tripled scales are deleted with the placeholders.
+4. **Scale from measured extent.** For each of the four new models, compute the
+   model's native longest horizontal extent `L` from `scene.gltf`: the
+   per-primitive POSITION accessor `min`/`max`, transformed by the node chain's
+   `scale`/`matrix` down to the root (Sketchfab commonly bakes a unit conversion
+   into a root node). Set `kfModelScale` so the rendered longest extent equals
+   the type's collision diameter: `kfModelScale = 2 / L`, written as a literal
+   with four significant digits and a comment naming `L`. Radii are
+   `ShipTypeSplit`'s: `kfFighterRadius = 1.5f`, `kfOmniRadius = 1.1f`,
+   `kfBattleshipRadius = 4.5f`. The two existing models keep their scales
+   (`0.00175f` for `Spaceship`, `0.3667f` for `spaceship2`); the Battleship
+   placeholders' tripled scales are deleted with the placeholders.
 
-5. **Orientation per model.** Each `*Render.cpp` carries one pre-rotation matrix per model, selected with the model by `pController`. Start every new model from its type's existing fixup (Fighters and Battleships: `RotationX(PI/2) * RotationZ(PI/2)`; Omnis: `RotationX(PI/2)`), then correct by multiples of `PI/2` about Z (and `PI` about X if upside down) until a harness screenshot shows the hull upright and the nose pointing along the ship's direction of travel; record the final matrix as a `static` constant like `SpaceshipsRender.cpp:94`. Nothing else in the transform chain (death shrink, roll, the Fighter climb tilt, yaw, translation, rotation-acceleration tilt) changes.
+5. **Orientation per model.** Each `*Render.cpp` carries one pre-rotation matrix
+   per model, selected with the model by `pController`. Start every new model
+   from its type's existing fixup (Fighters and Battleships:
+   `RotationX(PI/2) * RotationZ(PI/2)`; Omnis: `RotationX(PI/2)`), then correct
+   by multiples of `PI/2` about Z (and `PI` about X if upside down) until a
+   harness screenshot shows the hull upright and the nose pointing along the
+   ship's direction of travel; record the final matrix as a `static` constant
+   like `SpaceshipsRender.cpp:94`. Nothing else in the transform chain (death
+   shrink, roll, the Fighter climb tilt, yaw, translation, rotation-acceleration
+   tilt) changes.
 
 6. **No new engine or DataPacker code.** The four assets go through the existing scene export unchanged; no format version moves.
 
@@ -60,7 +120,14 @@ After the four folders are in place, run DataPacker for the sandbox through `/co
 
 ### Render wiring (`Frame/Collections/Fighters/FightersRender.cpp`, `Omnis/OmnisRender.cpp`, `Battleships/BattleshipsRender.cpp`)
 
-`ShipTypeSplit` decision 17 leaves each file with two model CRCs, two scales, two dynamic buffers, two pipelines (`"<Type>Fleet"`, `"<Type>Random"`), and a `Render` that partitions rows by `pController`. `Documents/Plans/Game/FlightPlaneClimbing.md` (prerequisite, its decision 13) then inserts the client-only climb tilt `XMMatrixRotationY(-pfClimbTilts[i])` between roll and yaw in `FightersRender`. This Plan changes only the constants and adds the per-model pre-rotation, which takes the existing pre-rotation slot ahead of roll:
+`ShipTypeSplit` decision 17 leaves each file with two model CRCs, two scales,
+two dynamic buffers, two pipelines (`"<Type>Fleet"`, `"<Type>Random"`), and a
+`Render` that partitions rows by `pController`.
+`Documents/Plans/Game/FlightPlaneClimbing.md` (prerequisite, its decision 13)
+then inserts the client-only climb tilt `XMMatrixRotationY(-pfClimbTilts[i])`
+between roll and yaw in `FightersRender`. This Plan changes only the constants
+and adds the per-model pre-rotation, which takes the existing pre-rotation slot
+ahead of roll:
 
 ```cpp
 // FightersRender.cpp
@@ -72,7 +139,17 @@ constexpr float kfFighterRandomModelScale = 0.00175f;
 static const XMMATRIX smatFighterRandomPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
 ```
 
-Omnis mirror this with `kModelsspaceship2scenegltfCrc`/`0.3667f`/`RotationX(PI/2)` for `kFleet` and `kModelsFlyingSaucerscenegltfCrc` for `kRandomSpawn`; Battleships with `kModelsBattleshipscenegltfCrc` for `kFleet` and `kModelsLowPolyBattleshipscenegltfCrc` for `kRandomSpawn`, both scaled from `kfBattleshipRadius`. Inside each `Render`, the per-row `fSize` and pre-rotation come from the row's controller, the same branch that already selects the pipeline. The animation-clock lookup (`Players.cpp:516-518`, `Spaceships.cpp:263-265` at baseline, per-model after `ShipTypeSplit`) keeps using the row's own model CRC; none of the four new models carries an animation, so the clock stays inert for them.
+Omnis mirror this with
+`kModelsspaceship2scenegltfCrc`/`0.3667f`/`RotationX(PI/2)` for `kFleet` and
+`kModelsFlyingSaucerscenegltfCrc` for `kRandomSpawn`; Battleships with
+`kModelsBattleshipscenegltfCrc` for `kFleet` and
+`kModelsLowPolyBattleshipscenegltfCrc` for `kRandomSpawn`, both scaled from
+`kfBattleshipRadius`. Inside each `Render`, the per-row `fSize` and pre-rotation
+come from the row's controller, the same branch that already selects the
+pipeline. The animation-clock lookup (`Players.cpp:516-518`,
+`Spaceships.cpp:263-265` at baseline, per-model after `ShipTypeSplit`) keeps
+using the row's own model CRC; none of the four new models carries an animation,
+so the clock stays inert for them.
 
 If `ShipTypeSplit` landed any `#if 0` model block or any "three times the Fighter scale" placeholder expression, delete it here; the intended end state is six live constants and no dead alternatives.
 

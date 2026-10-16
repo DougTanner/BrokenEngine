@@ -46,10 +46,7 @@ public:
 	std::vector<std::unique_ptr<StreamingVoice>> mPreviousStreams;
 private:
 	std::vector<std::unique_ptr<StreamingVoice>> mStreamsToDestroy;
-public:
-	std::function<common::crc_t()> mGetNextTrack;
-private:
-	// Track whose CreateStream failed during a transition; retried before asking mGetNextTrack again. 0 = none.
+	// Track whose CreateStream failed during a transition; retried before asking the game for the next track again. 0 = none.
 	common::crc_t muiRetryTrackCrc = 0;
 };
 

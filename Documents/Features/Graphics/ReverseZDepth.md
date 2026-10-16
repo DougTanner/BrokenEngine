@@ -4,9 +4,26 @@ Revisit When: depth fighting is visible between ships, hex shields, water, or te
 
 ## Context
 
-`CameraBase::CalculateMatricesAndVisibleArea` (`Engine/Source/Graphics/CameraBase.cpp`) builds the projection with `XMMatrixPerspectiveFovRH`. The near clip is `kfNearClip` (1 m) and the far clip is `max(kfMinimumFarClip, eye distance * kfFarClipPerEyeDistance)`, which is `max(400, eye distance * 2.667)`. Depth uses the conventional mapping: near maps to 0 and far to 1. The viewport range (`ConfigureViewportScissor` in `Engine/Source/Graphics/Objects/PipelineCreator.cpp`) and the depth clear value (`Texture::RecordBeginRenderPass` in `Engine/Source/Graphics/Objects/Texture.cpp`) both use `kfMinDepth` = 0 and `kfMaxDepth` = 1 from `Texture.h`. Every pipeline compares with `VK_COMPARE_OP_LESS` (`PipelineCreator.cpp`).
+`CameraBase::CalculateMatricesAndVisibleArea`
+(`Engine/Source/Graphics/CameraBase.cpp`) builds the projection with
+`XMMatrixPerspectiveFovRH`. The near clip is `kfNearClip` (1 m) and the far clip
+is `max(kfMinimumFarClip, eye distance * kfFarClipPerEyeDistance)`, which is
+`max(400, eye distance * 2.667)`. Depth uses the conventional mapping: near maps
+to 0 and far to 1. The viewport range (`ConfigureViewportScissor` in
+`Engine/Source/Graphics/Objects/PipelineCreator.cpp`) and the depth clear value
+(`Texture::RecordBeginRenderPass` in
+`Engine/Source/Graphics/Objects/Texture.cpp`) both use `kfMinDepth` = 0 and
+`kfMaxDepth` = 1 from `Texture.h`. Every pipeline compares with
+`VK_COMPARE_OP_LESS` (`PipelineCreator.cpp`).
 
-`InstanceManager::SelectDepthFormat` (`Engine/Source/Graphics/Managers/InstanceManager.cpp`) takes the first format that supports a depth attachment with optimal tiling, in this order: `D32_SFLOAT`, `D32_SFLOAT_S8_UINT`, `D24_UNORM_S8_UINT`, `D16_UNORM`, `D16_UNORM_S8_UINT`. With a float format and conventional Z, float precision is finest near 0, where the perspective projection already concentrates precision. Distant geometry therefore gets the coarsest depth steps, and at RTS altitude nearly all geometry is distant.
+`InstanceManager::SelectDepthFormat`
+(`Engine/Source/Graphics/Managers/InstanceManager.cpp`) takes the first format
+that supports a depth attachment with optimal tiling, in this order:
+`D32_SFLOAT`, `D32_SFLOAT_S8_UINT`, `D24_UNORM_S8_UINT`, `D16_UNORM`,
+`D16_UNORM_S8_UINT`. With a float format and conventional Z, float precision is
+finest near 0, where the perspective projection already concentrates precision.
+Distant geometry therefore gets the coarsest depth steps, and at RTS altitude
+nearly all geometry is distant.
 
 The depth buffer is `SwapchainManager::mDepthTexture`. It is created with only `VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT`, and the HDR render pass attaches it with `storeOp` `DONT_CARE`. No shader samples depth and nothing copies it, so the code has no depth-based position reconstruction, depth fade, or soft particles today. The change touches only code that writes depth, tests it, or interprets projected depth.
 

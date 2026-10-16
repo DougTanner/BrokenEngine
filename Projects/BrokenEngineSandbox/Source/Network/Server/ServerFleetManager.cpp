@@ -359,8 +359,8 @@ void ServerFleetManager::OnClientConnected(int64_t iClientId, const engine::Clie
 	ScopedSuppressAllocationTracking suppress;
 
 	mGuidToClientId.insert_or_assign(rClientGuid, iClientId);
-	auto ownedIt = gpServerSession->mClientPlayers.mOwned.find(iClientId);
-	std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != gpServerSession->mClientPlayers.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
+	auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(iClientId);
+	std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != gpServerSession->mClientOwnedEntities.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
 
 	auto fleetIt = mFleets.find(rClientGuid);
 	if (fleetIt != mFleets.end())
@@ -436,8 +436,8 @@ void ServerFleetManager::RefreshFleetMembers(Fleet& rFleet, std::span<const engi
 
 void ServerFleetManager::ResetFleetForLoad(Fleet& rFleet, const engine::ClientGuid& rClientGuid)
 {
-	auto ownedIt = gpServerSession->mClientPlayers.mOwned.find(FindClientIdForGuid(rClientGuid));
-	std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != gpServerSession->mClientPlayers.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
+	auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(FindClientIdForGuid(rClientGuid));
+	std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != gpServerSession->mClientOwnedEntities.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
 	RefreshFleetMembers(rFleet, ownedPlayers);
 
 	auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);

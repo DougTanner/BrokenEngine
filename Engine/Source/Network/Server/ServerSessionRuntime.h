@@ -7,7 +7,6 @@
 namespace game
 {
 
-class ServerSession;
 struct Frame;
 
 } // namespace game
@@ -21,7 +20,7 @@ class ServerSessionRuntime
 {
 public:
 
-	explicit ServerSessionRuntime(game::ServerSession& rSession, int64_t iPort);
+	explicit ServerSessionRuntime(int64_t iPort);
 	~ServerSessionRuntime();
 
 	void Poll(const NetworkTimeState& rTimeState);
@@ -34,7 +33,6 @@ public:
 	void PublishTick(int64_t iTick, std::span<const std::pair<GridCoord, GridUpdateData>> gridUpdates, std::span<const std::pair<GridCoord, const game::Frame*>> fullFrames);
 	void ComputeActiveSet();
 
-	game::ServerSession& mrSession;
 	std::unique_ptr<Server> mpServer;
 	std::unique_ptr<NetworkDiscoveryResponder> mpDiscoveryResponder;
 	HANDLE mTimerHandle = nullptr;

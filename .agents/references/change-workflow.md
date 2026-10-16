@@ -27,7 +27,18 @@ This table is the authoritative spawned-agent routing policy; role definitions a
 - Delegate by `subagent_type`; an ad-hoc `model:` cannot lock in effort. On Claude only, a documented host-unavailability fallback to `general-purpose` may pass `model:` and runs without a locked-in effort
 - Host built-in agent types (`Explore`, `Plan`, `general-purpose`) never substitute for a role, including inside plan mode — route the work through the table above. The documented host-unavailability fallback is the only exception
 - Host plan mode never substitutes for Change Workflow steps: a plan produced there still gets Step 3's `/plan-audit` (and the Tier-3 additions) before implementation
-- Every independent findings-only review or audit the table above assigns to `reviewer` runs as that subagent (`.claude/agents/reviewer.md`), including `/next-plan-review`, which runs directly in one fresh reviewer. `/comment-review` remains the `mechanic` exception; same-context `/implement-plan` and `/update-claude-docs` audits remain with their implementer; and `/coherence-review` may make only the narrow caller-authorized meaning-preserving wording and formatting fixes its worker contract allows, followed by that contract's self-check. Do not follow review findings blindly. Use judgement on each one: accept it when the failure is real and reachable, and be especially careful with findings that add guards, options, or machinery for cases nobody has observed (YAGNI and over-engineering).
+- Every independent findings-only review or audit the table above assigns to
+  `reviewer` runs as that subagent (`.claude/agents/reviewer.md`), including
+  `/next-plan-review`, which runs directly in one fresh reviewer.
+  `/comment-review` remains the `mechanic` exception; same-context
+  `/implement-plan` and `/update-claude-docs` audits remain with their
+  implementer; and `/coherence-review` may make only the narrow
+  caller-authorized meaning-preserving wording and formatting fixes its worker
+  contract allows, followed by that contract's self-check. Do not follow review
+  findings blindly. Use judgement on each one: accept it when the failure is
+  real and reachable, and be especially careful with findings that add guards,
+  options, or machinery for cases nobody has observed (YAGNI and
+  over-engineering).
 
 ChatGPT Codex: Fable -> Astra (gpt-6-astra medium); Opus -> Sol (gpt-6.1-sol medium); Sonnet -> Luna (gpt-6-luna max); Haiku -> Luna (gpt-6-luna max, through `sonnet.toml`).
 OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no effort mapping.
@@ -36,18 +47,53 @@ OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no ef
 
 ### User Interaction
 
-- IMPORTANT: Every question or decision request aimed at the user must be answerable from the current message without hidden reasoning or remembered scrollback. Provide the FULL context needed to understand as rendered message text the user is guaranteed to see — text emitted before a question-tool call may never be displayed, so present first and ask only after the context is visible — and explain what the answer changes or blocks. When relevant, give options, trade-offs, and a recommendation. The user has NOT read the source code or plan file.
+- IMPORTANT: Every question or decision request aimed at the user must be
+  answerable from the current message without hidden reasoning or remembered
+  scrollback. Provide the FULL context needed to understand as rendered message
+  text the user is guaranteed to see — text emitted before a question-tool call
+  may never be displayed, so present first and ask only after the context is
+  visible — and explain what the answer changes or blocks. When relevant, give
+  options, trade-offs, and a recommendation. The user has NOT read the source
+  code or plan file.
 - AVOID jargon: the user is NOT a domain expert. Use everyday words and short sentences. Define an unavoidable technical term in one clause the first time it appears.
 - Explain fully when asked; use headings and bullet points so a longer explanation stays skimmable.
 - Reporting work: state what was built and what was verified separately, and name every required check still open; "done" means those checks have closed. A defect is stated with its evidence and effect, never as a verdict or count alone.
-- Comparing options: use the same criteria, evidence, detail, and tone for each; recommend one, but never sell the favorite by its benefit and the alternative by its risk. Prefer removing a cause over suppressing a symptom; a plan's scope or its author's choice is never a reason for an option unless the user set it (`.agents/references/authority-order.md`). Start each option with a written label such as `Option 1:`, never a list marker the client renders, and make a question that names options use those same labels.
-- Footer: the main session's final message of any turn that ran Change Workflow work ends with `Follow-up Plans created:` followed by one repo-relative path per Plan created that turn, tagged `landed in <commit>`, `unlanded in worktree`, or `executed in this change` for a Plan folded in by the Leftovers do-now rule, or the single word `none`. Each path also answers whether the Plan is worth doing in this session while its context is fresh: `do now: yes` when it is Tier 1 or 2, bounded, and every file and fact it needs was already read or changed this session, so doing it adds little new context; otherwise `do now: no`, with the failed condition in a few words. A `do now: yes` on a `landed in <commit>` Plan ends with `(run /next-plan <path>)`, because only the user can start `/next-plan`. One line per Plan: `Documents/Plans/<area>/<Plan>.md — unlanded in worktree — do now: no (needs files not read this session)`. The verdict is an answer, never a question; the user decides, and it never displaces a pending landing question or the session-complete marker. Only the `/next-plan` session-complete marker may follow it.
+- Comparing options: use the same criteria, evidence, detail, and tone for each;
+  recommend one, but never sell the favorite by its benefit and the alternative
+  by its risk. Prefer removing a cause over suppressing a symptom; a plan's
+  scope or its author's choice is never a reason for an option unless the user
+  set it (`.agents/references/authority-order.md`). Start each option with a
+  written label such as `Option 1:`, never a list marker the client renders, and
+  make a question that names options use those same labels.
+- Footer: the main session's final message of any turn that ran Change Workflow
+  work ends with `Follow-up Plans created:` followed by one repo-relative path
+  per Plan created that turn, tagged `landed in <commit>`,
+  `unlanded in worktree`, or `executed in this change` for a Plan folded in by
+  the Leftovers do-now rule, or the single word `none`. Each path also answers
+  whether the Plan is worth doing in this session while its context is fresh:
+  `do now: yes` when it is Tier 1 or 2, bounded, and every file and fact it
+  needs was already read or changed this session, so doing it adds little new
+  context; otherwise `do now: no`, with the failed condition in a few words. A
+  `do now: yes` on a `landed in <commit>` Plan ends with
+  `(run /next-plan <path>)`, because only the user can start `/next-plan`. One
+  line per Plan:
+  `Documents/Plans/<area>/<Plan>.md — unlanded in worktree — do now: no (needs files not read this session)`.
+  The verdict is an answer, never a question; the user decides, and it never
+  displaces a pending landing question or the session-complete marker. Only the
+  `/next-plan` session-complete marker may follow it.
 
 ### Resolving Ambiguity
 
 - Non-trivial ties (two viable approaches, neither architectural): fan out `researcher` subagents to validate each, compare pros/cons, then pick the simplest good solution.
 - Architectural decisions (new system shape, public API, data layout, threading model), and any reading of the request that changes observable behavior and that neither the request nor a build, an existing harness command, or a code read settles: stop and ask the user, presenting the problem, proposed solutions, and pros/cons of each.
-- Races: a race is reachable when an existing actor — another thread, another process, or a repository tool such as DataPacker — can perform the interleaving under supported use. Remove a reachable race by construction (ordering, a lock, an exclusive handle, an atomic publish); rarity is no reason to keep it, because a rare timing failure is one a single user is unlikely ever to see or report. Treat a race no existing actor can perform as impossible or ASSERT it; it is never a cost when comparing options and never a user question.
+- Races: a race is reachable when an existing actor — another thread, another
+  process, or a repository tool such as DataPacker — can perform the
+  interleaving under supported use. Remove a reachable race by construction
+  (ordering, a lock, an exclusive handle, an atomic publish); rarity is no
+  reason to keep it, because a rare timing failure is one a single user is
+  unlikely ever to see or report. Treat a race no existing actor can perform as
+  impossible or ASSERT it; it is never a cost when comparing options and never a
+  user question.
 - Hand-edited files that have never been seen and have no named trigger: never a cost when comparing options and never a user question. Trust-boundary validation (`.agents/references/cpp-conventions.md`) still applies.
 - Questions a build, an existing harness command, or a code read settles: settle them that way, through the role that runs it, and never ask the user.
 
@@ -88,7 +134,17 @@ From user intent and any such preparation, main locks in the objective, the appr
 Order: `/prepare-change` first at Tier 2+, because the alternative investigations need the drafted plan's objective and mechanism; at Tier 1 there is no plan file, so main briefs from the Step 1 preparation where that step's `/prepare-change` bullet applied, and from the request otherwise. Then `/plan-alternatives` when its trigger fires. A chosen alternative returns to `/prepare-change` for a redraft before Step 3; the skill owns the claimed-Plan and Tier-1 routes.
 
 - `implementer` runs `/prepare-change` to prepare the plan — Tier 2+.
-- main dispatches one `researcher` per axis for `/plan-alternatives`, concurrently and blind — every tier, on `/plan-simplicity-review`'s trigger (that skill's `## When to use`): Tier 1 axis 1 (Reuse), Tier 2 axes 1-2 (adds Remove the need), Tier 3 axes 1-3 (adds Reshape). Each brief is the shared task-brief form with `Skill: /plan-alternatives`, the objective, evidence paths under `Governing paths:`, the tier, fixed user decisions, one line naming the drafted mechanism as candidate zero, and the assigned axis — never the plan's rationale, never the plan's `## In scope`/`## Out of scope` sections, and never the plan file's path, in any field and in any form, positive or negative. Main compares the handoffs per that skill's `## Handoff` and presents per that skill's `### User presentation`.
+- main dispatches one `researcher` per axis for `/plan-alternatives`,
+  concurrently and blind — every tier, on `/plan-simplicity-review`'s trigger
+  (that skill's `## When to use`): Tier 1 axis 1 (Reuse), Tier 2 axes 1-2 (adds
+  Remove the need), Tier 3 axes 1-3 (adds Reshape). Each brief is the shared
+  task-brief form with `Skill: /plan-alternatives`, the objective, evidence
+  paths under `Governing paths:`, the tier, fixed user decisions, one line
+  naming the drafted mechanism as candidate zero, and the assigned axis — never
+  the plan's rationale, never the plan's `## In scope`/`## Out of scope`
+  sections, and never the plan file's path, in any field and in any form,
+  positive or negative. Main compares the handoffs per that skill's `## Handoff`
+  and presents per that skill's `### User presentation`.
 
 #### Step 3 — Plan review
 
@@ -104,8 +160,10 @@ Main reports a blocker if the `reviewer` role is unavailable for `/plan-audit`. 
 
 #### Step 4 — Implement and propagate
 
-Order: the slices run in parallel; `/update-affected-code` runs after them.
+Order: the acceptance checks the execution card marks `before the first edit` run first, on the unedited tree; then the slices run in parallel; `/update-affected-code` runs after them.
 
+- `builder` runs `/compile` for the unedited-tree build a check marked `before the first edit` needs — when it needs one.
+- `implementer` records each acceptance check the execution card marks `before the first edit`, on the unedited tree — a card with none adds no step.
 - `implementer` runs `/implement-plan` for each disjoint slice — every tier.
 - `implementer` runs `/update-affected-code` — after any C++ or GLSL change.
 
@@ -121,12 +179,37 @@ Order: the full applicable static pass and `/code-style-review` run after propag
 
 Full builds and runtime or harness scenarios remain acceptance-table work.
 
-A path nothing reaches today (a rejection, ASSERT, or recovery path no existing harness command or ordinary save file triggers) is verified by code reading, plus the build when code changed; the execution card, when one exists, says so. Never propose a new harness command, a hand-edited file, or a temporary source edit only to observe it. A verification-only temporary source edit is never made by main: an `implementer` saves each edited file's pre-edit bytes to `Temp/`, makes the edit, and returns `Build required`; after the harness run, a fresh `implementer` whose continuation capsule names those copies restores the files from them byte for byte, sets each restored file's write time to the current time so the incremental build sees it as newer than the outputs built from the edit, and returns `Build required` again.
+A path nothing reaches today (a rejection, ASSERT, or recovery path no existing
+harness command or ordinary save file triggers) is verified by code reading,
+plus the build when code changed; the execution card, when one exists, says so.
+Never propose a new harness command, a hand-edited file, or a temporary source
+edit only to observe it. A verification-only temporary source edit is never made
+by main: an `implementer` saves each edited file's pre-edit bytes to `Temp/`,
+makes the edit, and returns `Build required`; after the harness run, a fresh
+`implementer` whose continuation capsule names those copies restores the files
+from them byte for byte, sets each restored file's write time to the current
+time so the incremental build sees it as newer than the outputs built from the
+edit, and returns `Build required` again.
 
 <!-- session-context-part: Change Workflow, Steps 6-9, Convergence, and Risk tiers (continued from the previous part) -->
 #### Step 6 — Review and resolve correctness
 
-Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs after them; `/verify-external-claims` runs whenever a review or `/resolve-findings` handoff raises requests, before main decides the dependent finding or resolution; `/resolve-findings` runs after each finding main accepts, followed by re-review and retest of the affected regions only; a second round needs a reproducible blocker; `/external-diagnose-bug` runs before any further `/resolve-findings` attempt on a cause whose fix failed its retest, and its proven cause returns to `/resolve-findings` or a plan. When `/over-engineering-review` runs, its finder and validator run first; when the validator changed C++, `/code-style-review` runs over the newly changed ranges and `/compile` builds its `Build required`, as in Step 5, and only then do `/repo-code-review` and `/comment-review` start, with the validator's handoff, or the finder's when the validator is skipped, as `/repo-code-review`'s implementation handoff. Other per-artifact reviews do not wait for the pair. The pair runs once per stage; a later `/resolve-findings` round's re-review covers its own fix.
+Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs
+after them; `/verify-external-claims` runs whenever a review or
+`/resolve-findings` handoff raises requests, before main decides the dependent
+finding or resolution; `/resolve-findings` runs after each finding main accepts,
+followed by re-review and retest of the affected regions only; a second round
+needs a reproducible blocker; `/external-diagnose-bug` runs before any further
+`/resolve-findings` attempt on a cause whose fix failed its retest, and its
+proven cause returns to `/resolve-findings` or a plan. When
+`/over-engineering-review` runs, its finder and validator run first; when the
+validator changed C++, `/code-style-review` runs over the newly changed ranges
+and `/compile` builds its `Build required`, as in Step 5, and only then do
+`/repo-code-review` and `/comment-review` start, with the validator's handoff,
+or the finder's when the validator is skipped, as `/repo-code-review`'s
+implementation handoff. Other per-artifact reviews do not wait for the pair. The
+pair runs once per stage; a later `/resolve-findings` round's re-review covers
+its own fix.
 
 - fresh `reviewer` runs `/over-engineering-review` in its finder pass, then a fresh `implementer` runs its validator pass — when a `cpp`-class file changed (`overEngineeringReview`), every tier; skip the validator when the finder returns no removal candidates.
 - fresh `reviewer` runs `/repo-code-review` — when the change touches C++.
@@ -139,7 +222,18 @@ Order: the per-artifact-type reviews run in parallel; `/adversarial-review` runs
 - separate `implementer` runs `/resolve-findings` — whenever main accepts a finding.
 - `implementer` runs `/external-diagnose-bug` — when a fix fails its retest.
 
-Main dispatches one fresh `reviewer` per changed artifact type, plus the `mechanic` for `/comment-review` and, for C++, the `/over-engineering-review` finder `reviewer` and validator `implementer`, scoped to the changed bytes and the rules they touch. Scope, minimality, and simplicity checks run inside each Tier 2+ review; there is no separate scope dispatch. Main decides each finding once. `/over-engineering-review` candidates are not findings: the validator's re-proof, not main, decides each one, the landing reconciliation records the pair as one review row from the validator handoff, or the finder's when the validator is skipped, and the later reviews check the applied removals like any other changed bytes. Main decides each design suggestion from either pass once, by putting it to the user before the landing confirmation under `### User Interaction`; an accepted one follows the Step 8 Leftovers rule.
+Main dispatches one fresh `reviewer` per changed artifact type, plus the
+`mechanic` for `/comment-review` and, for C++, the `/over-engineering-review`
+finder `reviewer` and validator `implementer`, scoped to the changed bytes and
+the rules they touch. Scope, minimality, and simplicity checks run inside each
+Tier 2+ review; there is no separate scope dispatch. Main decides each finding
+once. `/over-engineering-review` candidates are not findings: the validator's
+re-proof, not main, decides each one, the landing reconciliation records the
+pair as one review row from the validator handoff, or the finder's when the
+validator is skipped, and the later reviews check the applied removals like any
+other changed bytes. Main decides each design suggestion from either pass once,
+by putting it to the user before the landing confirmation under
+`### User Interaction`; an accepted one follows the Step 8 Leftovers rule.
 
 #### Step 7 — Apply the triggered cleanup
 
@@ -157,7 +251,24 @@ Order: `/verify-acceptance` runs after Step 7; `/create-follow-up-plans` runs wh
 - fresh read-only `reviewer` runs `/verify-acceptance` — for a stage completing without landing; a stage landing in the same session gets this from Step 9's landing table instead, and where the Step 6 combined pass applies that pass is this reviewer, read-only apart from the one `Temp/` handoff file `/coherence-review` `## Handoff` requires.
 - `implementer` runs `/create-follow-up-plans` — for every proven out-of-scope leftover not fixed inside the current change.
 
-Leftovers: a proven leftover that is itself small (Tier 1 or 2, bounded, decidable from evidence already in hand), such as the same defect at a sibling site, is fixed inside the current change without asking: record it as approved scope (on the execution card when one exists), reclassify the whole change at the highest applicable tier, run every step that tier triggers for the touched regions (plan review included), and report the expansion in the message already being sent. This rule governs over a plan's `## Out of scope` entry that would route such a leftover to residuals or a follow-up Plan, except an entry the user's own words chose (`.agents/references/authority-order.md`). When the turn footer marks a follow-up Plan `unlanded in worktree` as `do now: yes` and the user directs it before the landing confirmation, main executes that Plan as approved scope of the current change regardless of the current change's tier, with the same recording, reclassification, and triggered steps; its Plan file is deleted from the worktree instead of landing, so nothing is claimed or completed. Every other proven out-of-scope leftover, including one the user directs to defer, goes through `/create-follow-up-plans`. One proven before the Step 6 dispatch is authored first, with the Plan path recorded as approved scope, so that round's reviews cover it; one proven later routes here unchanged.
+Leftovers: a proven leftover that is itself small (Tier 1 or 2, bounded,
+decidable from evidence already in hand), such as the same defect at a sibling
+site, is fixed inside the current change without asking: record it as approved
+scope (on the execution card when one exists), reclassify the whole change at
+the highest applicable tier, run every step that tier triggers for the touched
+regions (plan review included), and report the expansion in the message already
+being sent. This rule governs over a plan's `## Out of scope` entry that would
+route such a leftover to residuals or a follow-up Plan, except an entry the
+user's own words chose (`.agents/references/authority-order.md`). When the turn
+footer marks a follow-up Plan `unlanded in worktree` as `do now: yes` and the
+user directs it before the landing confirmation, main executes that Plan as
+approved scope of the current change regardless of the current change's tier,
+with the same recording, reclassification, and triggered steps; its Plan file is
+deleted from the worktree instead of landing, so nothing is claimed or
+completed. Every other proven out-of-scope leftover, including one the user
+directs to defer, goes through `/create-follow-up-plans`. One proven before the
+Step 6 dispatch is authored first, with the Plan path recorded as approved
+scope, so that round's reviews cover it; one proven later routes here unchanged.
 
 #### Step 9 — Verify and land
 

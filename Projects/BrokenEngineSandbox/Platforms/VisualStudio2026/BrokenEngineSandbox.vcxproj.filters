@@ -288,6 +288,9 @@
     <ClInclude Include="..\..\Source\Network\PlayerEvents.h">
       <Filter>Game\Network</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\Network\StatusChangeCodec.h">
+      <Filter>Game\Network</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Network\GameMessages.h">
       <Filter>Game\Network</Filter>
     </ClInclude>
@@ -528,6 +531,9 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SoundSettings.h">
       <Filter>Engine\Ui</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\TweaksSettings.h">
+      <Filter>Engine\Ui</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.h">
       <Filter>Engine\Ui</Filter>
     </ClInclude>
@@ -622,6 +628,9 @@
       <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Engine.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\EngineSwitches.h">
       <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\GameBase.h">
@@ -957,6 +966,9 @@
       <Filter>Game\Network\Client</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Network\PlayerEvents.cpp">
+      <Filter>Game\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Network\StatusChangeCodec.cpp">
       <Filter>Game\Network</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Pch.cpp">
@@ -1422,8 +1434,8 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenSound.cpp">
       <Filter>Engine\Ui\Screens\TweaksScreen</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenHexShield.cpp">
-      <Filter>Game\Ui\Screens\TweaksScreen</Filter>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenHexShield.cpp">
+      <Filter>Engine\Ui\Screens\TweaksScreen</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenSmoke.cpp">
       <Filter>Engine\Ui\Screens\TweaksScreen</Filter>
@@ -1516,6 +1528,9 @@
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettings.cpp">
+      <Filter>Engine\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\TweaksSettings.cpp">
       <Filter>Engine\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp">
@@ -1759,6 +1774,12 @@
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Wind\WindSpreadTwo.comp">
       <Filter>Engine\Data\Shaders\Wind</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Smoke\SmokeOccupancyDilate.comp">
+      <Filter>Engine\Data\Shaders\Smoke</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Smoke\SmokeOccupancyDilateRemap.comp">
+      <Filter>Engine\Data\Shaders\Smoke</Filter>
     </None>
   </ItemGroup>
 </Project>

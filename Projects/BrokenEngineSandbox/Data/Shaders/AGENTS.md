@@ -4,7 +4,15 @@ Project-level extension point for the engine's shader layout system. The sole fi
 
 ## Why this indirection exists
 
-Nearly every shader (engine and game) writes `#include "ShaderLayouts.h"`. The DataPacker passes both the engine and game `Data/Shaders` dirs as include roots, but only the game dir contains a file named `ShaderLayouts.h` (the engine ships `ShaderLayoutsBase.h`), so the unqualified include always resolves here regardless of include-search order. This wrapper then pulls in the engine base via a relative path. C++ resolves the same way: the game `Data` dir is on the vcxproj include paths and the game precompiled header includes this file, so anything added here is visible to both GLSL and C++ with no extra wiring. The seam lets the game inject layout extensions without forking engine shaders.
+Nearly every shader (engine and game) writes `#include "ShaderLayouts.h"`. The
+DataPacker passes both the engine and game `Data/Shaders` dirs as include roots,
+but only the game dir contains a file named `ShaderLayouts.h` (the engine ships
+`ShaderLayoutsBase.h`), so the unqualified include always resolves here
+regardless of include-search order. This wrapper then pulls in the engine base
+via a relative path. C++ resolves the same way: the game `Data` dir is on the
+vcxproj include paths and the game precompiled header includes this file, so
+anything added here is visible to both GLSL and C++ with no extra wiring. The
+seam lets the game inject layout extensions without forking engine shaders.
 
 ## Invariants
 

@@ -18,7 +18,17 @@ The authoring steps, repository conventions, and writing guidance selected by
 10. Remove duplicated guidance, speculative options, and examples that do not clarify a non-trivial requirement. Done when none of those remain.
 11. Restate each rule positively as the action to take, keeping a prohibition only where it cannot be stated positively and pairing it with what to do instead. Done when every rule is positive or paired that way.
 12. End each workflow step on a checkable done-condition. Done when every step has one.
-13. Run the mechanical validator against the `external-skill-creator` package and then the finished skill. Fix target mechanical findings and rerun until both return `VALID` with exit `0`; treat a setup, invocation, read, or internal-validator failure as `BLOCKED`. Record both results in the author handoff, return `NEEDS_ACTION`, and name fresh `/external-skill-creator` validate-mode review as the manager's required next action under shared `Residuals`. The manager dispatches the independent reviewer and owns the finding-fix cycle; the author executor does not dispatch or wait for that review. Done when both author mechanical checks pass and the independent validation request is present in the handoff, or a `BLOCKED` result stopped the run.
+13. Run the mechanical validator against the `external-skill-creator` package
+    and then the finished skill. Fix target mechanical findings and rerun until
+    both return `VALID` with exit `0`; treat a setup, invocation, read, or
+    internal-validator failure as `BLOCKED`. Record both results in the author
+    handoff, return `NEEDS_ACTION`, and name fresh `/external-skill-creator`
+    validate-mode review as the manager's required next action under shared
+    `Residuals`. The manager dispatches the independent reviewer and owns the
+    finding-fix cycle; the author executor does not dispatch or wait for that
+    review. Done when both author mechanical checks pass and the independent
+    validation request is present in the handoff, or a `BLOCKED` result stopped
+    the run.
 14. Apply [`validation.md`](validation.md): run a loader check when the authored change affects loading or claims loader compatibility, and run focused host checks only for changed client-dependent behavior or claimed compatibility. Done when the handoff separates structural, loader, observed runtime, and unverified evidence for every intended client without requiring model turns solely to remove an unverified result.
 
 ## Rules
@@ -33,7 +43,14 @@ The authoring steps, repository conventions, and writing guidance selected by
 - Keep essential cross-client trigger contexts in `description`; use `when_to_use` only for supplemental Claude trigger text and do not rely on it for Codex discovery.
 - Use the shared frontmatter schema as the sole repository contract. Do not copy fields from a client installation into repository frontmatter without extending the schema and validator together.
 - Keep the body lean because it remains in context after invocation; `/progressive-disclosure-review` owns the measurement command and the body and reference size thresholds.
-- Write `scripts/` in PowerShell 7. Use Python only when a Python-only runtime or library forces it (RenderDoc, Gaea 2 terrain tooling, the code-quality-metrics analyzer). Host Python is located through `.agents/scripts/Detect-Python.ps1` (x64 CPython 3.12+, the repository-wide floor) or the skill's own pinned bootstrap; an external tool's embedded or version-matched interpreter (RenderDoc, per the agent-harness renderdoc reference) follows that tool's rules instead. A new Python script requires explicit justification.
+- Write `scripts/` in PowerShell 7. Use Python only when a Python-only runtime
+  or library forces it (RenderDoc, Gaea 2 terrain tooling, the
+  code-quality-metrics analyzer). Host Python is located through
+  `.agents/scripts/Detect-Python.ps1` (x64 CPython 3.12+, the repository-wide
+  floor) or the skill's own pinned bootstrap; an external tool's embedded or
+  version-matched interpreter (RenderDoc, per the agent-harness renderdoc
+  reference) follows that tool's rules instead. A new Python script requires
+  explicit justification.
 - `../../../references/skill-skeleton.md` owns consumption shapes, section order and placement, and the subagent private marker line; steps 5 and 6 apply it, and its reviewer checklist is the shape check before validation.
 
 ### Writing Guidance

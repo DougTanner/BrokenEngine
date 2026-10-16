@@ -6,6 +6,9 @@
 #include "Ui/ShadowWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
+#include "Graphics/Camera.h"
+#include "Game.h"
+
 namespace engine
 {
 
@@ -66,9 +69,9 @@ CameraBase::CameraBase(const CameraSetup& rCameraSetup)
 
 void CameraBase::DiscardTrackingCaches()
 {
-	mVecLastKnownPlayerPosition = {};
-	mVecLastKnownPlayerVelocity = {};
-	mfLastKnownPlayerTime = 0.0f;
+	mVecLastKnownTargetPosition = {};
+	mVecLastKnownTargetVelocity = {};
+	mfLastKnownTargetTime = 0.0f;
 	mVecJumpStartPosition = {};
 	mVecPreviousTargetPosition = {};
 	mfJumpStartTime = 0.0f;
@@ -106,14 +109,14 @@ void CameraBase::ShiftToRenderedCell(GridCoord cameraCoordinate)
 	mVecEyePosition = XMVectorAdd(mVecEyePosition, vecShift);
 	mVecJumpStartPosition = XMVectorAdd(mVecJumpStartPosition, vecShift);
 	mVecPreviousTargetPosition = XMVectorAdd(mVecPreviousTargetPosition, vecShift);
-	mVecLastKnownPlayerPosition = XMVectorAdd(mVecLastKnownPlayerPosition, vecShift);
+	mVecLastKnownTargetPosition = XMVectorAdd(mVecLastKnownTargetPosition, vecShift);
 }
 
 void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime)
 {
 	// fDeltaTime is the sim-scaled render delta the engine just measured: wall delta multiplied by the active time
 	// ratio (equal to wall time at ratio 1.0). Driving camera blend, shake decay, and mfTime off the same source
-	// keeps the camera in sync with the interpolated player across vsync misses; otherwise different deltas would
+	// keeps the camera in sync with the interpolated target across vsync misses; otherwise different deltas would
 	// produce visible relative stutter at high zoom.
 	mfTime += fDeltaTime;
 
@@ -125,7 +128,7 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 
 	miFrame = rFrameInterpolate.iTick;
 
-	bool bMainMenuFrame = IsMainMenuFrame(rFrameInterpolate);
+	bool bMainMenuFrame = game::gpGame->mGameFlags & GameFlags::kMainMenu;
 
 	if (!bMainMenuFrame)
 	{
@@ -162,8 +165,8 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 		}
 	}
 
-	// Free camera already is the target, so the derived policy is not consulted at all while it drives the pose.
-	XMVECTOR vecTargetPosition = ResolveTarget(bFreeCameraActive ? CameraTarget::Direct(mVecPosition) : PullTarget(rFrameInterpolate));
+	// Free camera already is the target, so the game camera's PullTarget is not consulted while it drives the pose.
+	XMVECTOR vecTargetPosition = ResolveTarget(bFreeCameraActive ? CameraTarget::Direct(mVecPosition) : static_cast<game::Camera&>(*this).PullTarget(rFrameInterpolate));
 
 	UpdatePosition(vecTargetPosition, fDeltaTime);
 	UpdateEyeHeight();
@@ -184,6 +187,15 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 	gpRawInputManager->SetVibration(fVibration, fVibration);
 
 	CalculateMatricesAndVisibleArea();
+
+	// Decay the visual error offset for smooth reconciliation corrections on the sim-scaled render delta the camera and
+	// entity interpolation use. PullTarget read it above.
+	float fDecay = std::exp(-kfVisualErrorDecayRate * fDeltaTime);
+	mVecVisualErrorOffset = XMVectorScale(mVecVisualErrorOffset, fDecay);
+	if (XMVectorGetX(XMVector3Length(mVecVisualErrorOffset)) < kfVisualErrorMinDistance)
+	{
+		mVecVisualErrorOffset = {};
+	}
 }
 
 XMVECTOR CameraBase::ResolveTarget(const CameraTarget& rCameraTarget)
@@ -195,21 +207,21 @@ XMVECTOR CameraBase::ResolveTarget(const CameraTarget& rCameraTarget)
 
 	if (rCameraTarget.meKind == CameraTarget::Kind::kExtrapolate)
 	{
-		// Player not found — extrapolate from last known position and velocity
-		float fElapsedTime = std::clamp(mfTime - mfLastKnownPlayerTime, 0.0f, 2.0f);
-		return XMVectorMultiplyAdd(XMVectorReplicate(fElapsedTime), mVecLastKnownPlayerVelocity, mVecLastKnownPlayerPosition);
+		// Target not found — extrapolate from last known position and velocity
+		float fElapsedTime = std::clamp(mfTime - mfLastKnownTargetTime, 0.0f, 2.0f);
+		return XMVectorMultiplyAdd(XMVectorReplicate(fElapsedTime), mVecLastKnownTargetVelocity, mVecLastKnownTargetPosition);
 	}
 
 	// Compute velocity from position delta using sim-scaled render time. The raw tracked position feeds the velocity
 	// and last-known state; the reconciliation offset is added only to the returned target.
-	if (mfLastKnownPlayerTime > 0.0f && mfTime > mfLastKnownPlayerTime)
+	if (mfLastKnownTargetTime > 0.0f && mfTime > mfLastKnownTargetTime)
 	{
-		float fElapsedTime = mfTime - mfLastKnownPlayerTime;
-		mVecLastKnownPlayerVelocity = XMVectorScale(XMVectorSubtract(rCameraTarget.mVecPosition, mVecLastKnownPlayerPosition), 1.0f / fElapsedTime);
+		float fElapsedTime = mfTime - mfLastKnownTargetTime;
+		mVecLastKnownTargetVelocity = XMVectorScale(XMVectorSubtract(rCameraTarget.mVecPosition, mVecLastKnownTargetPosition), 1.0f / fElapsedTime);
 	}
 
-	mVecLastKnownPlayerPosition = rCameraTarget.mVecPosition;
-	mfLastKnownPlayerTime = mfTime;
+	mVecLastKnownTargetPosition = rCameraTarget.mVecPosition;
+	mfLastKnownTargetTime = mfTime;
 	return XMVectorAdd(rCameraTarget.mVecPosition, rCameraTarget.mVecVisualOffset);
 }
 
@@ -320,12 +332,28 @@ void CameraBase::ResetForSession()
 	// contraction across sessions.
 	mfShadowTexelEyeHeight = 0.0f;
 	mfLightingTexelEyeHeight = 0.0f;
+	mVecVisualErrorOffset = {};
 }
 
 void CameraBase::RestoreEyeHeight(float fEyeHeight)
 {
 	mfCameraEyeHeight = fEyeHeight;
 	mfCameraEyeHeightTarget = fEyeHeight;
+}
+
+float XM_CALLCONV CameraBase::AddVisualErrorOffset(FXMVECTOR vecError)
+{
+	XMVECTOR vecTotal = XMVectorAdd(mVecVisualErrorOffset, vecError);
+	float fTotal = XMVectorGetX(XMVector3Length(vecTotal));
+	if (fTotal > kfVisualErrorMaxDistance)
+	{
+		mVecVisualErrorOffset = {};
+	}
+	else
+	{
+		mVecVisualErrorOffset = vecTotal;
+	}
+	return fTotal;
 }
 
 XMVECTOR XM_CALLCONV CameraBase::WorldToScreen(FXMVECTOR vecWorldPosition) const

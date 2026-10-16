@@ -24,8 +24,6 @@ struct SmokeTrailsInterpolate : public Collection<SmokeTrailsInterpolate, Collec
 	static constexpr common::crc_t kuiCrc = common::CrcConsteval("SmokeTrails");
 	static constexpr bool kbManualRender = true;
 
-	static void AllocateAndCopy(SmokeTrailsInterpolate& rCurrent, const SmokeTrailsInterpolate& rPrevious);
-
 	// SyncData for parent-provided values
 	struct SyncData
 	{
@@ -59,8 +57,6 @@ using smoke_trails_t = SmokeTrailsInterpolate::id_t;
 
 struct SmokeTrailsPostRender : public Collection<SmokeTrailsPostRender>
 {
-	static void AllocateAndCopy(SmokeTrailsPostRender& rCurrent, const SmokeTrailsPostRender& rPrevious);
-
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	static void Add(game::Frame& __restrict rFrame, smoke_trails_t& rId, int64_t iTypeIndex);

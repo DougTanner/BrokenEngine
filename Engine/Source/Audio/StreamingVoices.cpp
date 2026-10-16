@@ -11,6 +11,8 @@
 #include "File/FileManager.h"
 #include "File/PackChunks.h"
 
+#include "Game.h"
+
 namespace engine
 {
 
@@ -46,11 +48,11 @@ void StreamingVoices::Play(common::crc_t uiAudioCrc)
 
 void StreamingVoices::CheckTrackTransition()
 {
-	if (mGetNextTrack && (mpCurrentStream == nullptr || mpCurrentStream->ShouldTransition()))
+	if (mpCurrentStream == nullptr || mpCurrentStream->ShouldTransition())
 	{
 		// A failed CreateStream (voice allocation) must not consume another playlist entry: retry the
 		// same track next call instead of advancing past it.
-		common::crc_t uiNextTrackCrc = muiRetryTrackCrc != 0 ? muiRetryTrackCrc : mGetNextTrack();
+		common::crc_t uiNextTrackCrc = muiRetryTrackCrc != 0 ? muiRetryTrackCrc : game::gpGame->GetNextMusicTrack();
 		if (mpCurrentStream != nullptr)
 		{
 			TransitionCurrentToPrevious();
@@ -142,7 +144,7 @@ void StreamingVoices::Clear(bool bNullVoicesBeforeDestroy)
 	mpCurrentStream.reset();
 	mPreviousStreams.clear();
 	mStreamsToDestroy.clear();
-	// Post-clear playback restarts from the next-track callback, not a stale retry.
+	// Post-clear playback restarts from the game's next track, not a stale retry.
 	muiRetryTrackCrc = 0;
 }
 

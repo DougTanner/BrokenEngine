@@ -60,9 +60,7 @@ public:
 	void SendDeleteFleetRequest(const FleetGuid& rFleetGuid);
 	void SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay);
 
-	void UpdateDesiredCoordinates(SubscriptionChangeReason eReason);
-
-	// Game policy the engine desync core calls back into
+	// Game policy the engine desync core calls by name
 	void ResetCoordinateStatesForResynchronization();
 
 	std::unique_ptr<engine::ClientDesyncCore> mpDesynchronizationCore;

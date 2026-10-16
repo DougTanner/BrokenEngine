@@ -7,11 +7,37 @@ Line numbers cite baseline `2b4cb8d38aa57ca7ccd45983cc5121f64e85cf15`, plus the 
 
 User direction (binding): `edit_frame` adds a row in any collection by calling that collection's existing static `Spawn(Frame&, SpawnInfo)` on the staged frame and then applying the edit's writes to the new row; it removes rows immediately through the collections' kill-state columns plus one `FramePostRender::Destroy` pass on the staged frame. Links (uuids, pusher handles, registry ids) are set only by `Spawn` and `Destroy`; identity and handle columns stay refused.
 
-Why these two mechanisms: every server collection's row append is its `Spawn(SpawnInfo)` overload, which mints the row's uuid and pusher (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Players/Players.cpp:388-457`, `Spaceships/Spaceships.cpp:518-568`), its registry id (`Spaceships.cpp:552`), draws the random numbers the simulation expects (`Players.cpp:436`; `Missiles/Missiles.cpp:405-419`; `Engine/Source/Frame/Collections/Explosions/ExplosionsSpawn.cpp:67`), and tests the cell bounds (`Engine/Source/Frame/AGENTS.md`, the refuse-outside-the-cell rule). Every server collection's row removal is the predicate sweep in its `Destroy` phase hook, which releases owned pushers and clears handles (`Players.cpp:199-224`; `Spaceships.cpp:339-352`, `:397-411`; `Missiles.cpp:300-302`, `:352-369`; `Blasters/Blasters.cpp:203-217`; `Engine/Source/Frame/Collections/Explosions/Explosions.cpp:200-262`), and `FramePostRender::Destroy` (`Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:212-221`) already runs every hook, engine, players, then game, so a new collection joins it automatically. Both are callable on the main thread against a staged `Frame`: none opens a registry query window or reads a collision queue, and the staged copy carries the frame's uuid counter and random engine (`Engine/Source/Frame/FrameBase.h:144-145`).
+Why these two mechanisms: every server collection's row append is its
+`Spawn(SpawnInfo)` overload, which mints the row's uuid and pusher
+(`Projects/BrokenEngineSandbox/Source/Frame/Collections/Players/Players.cpp:388-457`,
+`Spaceships/Spaceships.cpp:518-568`), its registry id (`Spaceships.cpp:552`),
+draws the random numbers the simulation expects (`Players.cpp:436`;
+`Missiles/Missiles.cpp:405-419`;
+`Engine/Source/Frame/Collections/Explosions/ExplosionsSpawn.cpp:67`), and tests
+the cell bounds (`Engine/Source/Frame/AGENTS.md`, the refuse-outside-the-cell
+rule). Every server collection's row removal is the predicate sweep in its
+`Destroy` phase hook, which releases owned pushers and clears handles
+(`Players.cpp:199-224`; `Spaceships.cpp:339-352`, `:397-411`;
+`Missiles.cpp:300-302`, `:352-369`; `Blasters/Blasters.cpp:203-217`;
+`Engine/Source/Frame/Collections/Explosions/Explosions.cpp:200-262`), and
+`FramePostRender::Destroy`
+(`Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:212-221`) already runs
+every hook, engine, players, then game, so a new collection joins it
+automatically. Both are callable on the main thread against a staged `Frame`:
+none opens a registry query window or reads a collision queue, and the staged
+copy carries the frame's uuid counter and random engine
+(`Engine/Source/Frame/FrameBase.h:144-145`).
 
 Decisions this Plan makes (author's, with rationale):
 
-1. A spawn edit supplies only the position; every other `SpawnInfo` field keeps its default, and the edit's `writes` set whatever else the scenario needs. One uniform rule for every collection, and the per-collection defaults are already documented by each `SpawnInfo` struct. The one exception: a spawned player gets a global id minted from `gpGame->miNextGlobalId`, the way `inject_payload` `SpawnPlayer` does (`commands-server.md:69`), because that id must be unique process-wide and no write could guarantee that. The counter advances only when the batch commits.
+1. A spawn edit supplies only the position; every other `SpawnInfo` field keeps
+   its default, and the edit's `writes` set whatever else the scenario needs.
+   One uniform rule for every collection, and the per-collection defaults are
+   already documented by each `SpawnInfo` struct. The one exception: a spawned
+   player gets a global id minted from `gpGame->miNextGlobalId`, the way
+   `inject_payload` `SpawnPlayer` does (`commands-server.md:69`), because that
+   id must be unique process-wide and no write could guarantee that. The counter
+   advances only when the batch commits.
 2. The agent spawns players through this path as unowned synthetic AI, like `inject_payload` `SpawnPlayer`: no fleet or ownership bookkeeping runs. An owned player removed by the Destroy pass is detected as a death on the next tick and respawned by its fleet (`Projects/BrokenEngineSandbox/Source/Network/Server/ServerClientManager.cpp:203-232`); documented, not prevented.
 3. `pushers` cannot be spawned: a pusher row belongs to its player or spaceship and has no `SpawnInfo` overload (`Engine/Source/Frame/Collections/Pushers/Pushers.h:91-93`). Explosions use their four-argument overload with the cell's coordinate and the frame's `fCurrentTime` (`Explosions.h:270-271`); type index 0 is spawned and `puiTypeIndices` is a write.
 4. A blaster spawned with the default zero velocity gets a zero direction, because `XMVector3Normalize` returns the zero vector for zero length (`Blasters.cpp:127`); the agent writes `pVecVelocities` and `pVecDirections` as it needs. That settles the open item from the research.
@@ -22,7 +48,14 @@ Decisions this Plan makes (author's, with rationale):
 
 ### Spawn edit
 
-`{"collection":<name>,"spawn":[x,y,z],"writes"?:{...}}`, keys exactly these; `writes`, when present, is a non-empty object. `spawn` is the row's position in cell-local meters with w set to 1 (`common::ValidateVector<true>` requires it, `Common/AGENTS.md` `## Determinism and Math`). Before anything else, `common::InsideArea(vecPosition, engine::LocalCellArea())` must hold, else `'spawn' position must lie inside the cell`; the test runs here because the player overload asserts instead of refusing (`Engine/Source/Frame/AGENTS.md`, the producer-must-test rule).
+`{"collection":<name>,"spawn":[x,y,z],"writes"?:{...}}`, keys exactly these;
+`writes`, when present, is a non-empty object. `spawn` is the row's position in
+cell-local meters with w set to 1 (`common::ValidateVector<true>` requires it,
+`Common/AGENTS.md` `## Determinism and Math`). Before anything else,
+`common::InsideArea(vecPosition, engine::LocalCellArea())` must hold, else
+`'spawn' position must lie inside the cell`; the test runs here because the
+player overload asserts instead of refusing (`Engine/Source/Frame/AGENTS.md`,
+the producer-must-test rule).
 
 Dispatch inside the `FrameCollections` fold, per descriptor `C` with `P = typename C::PostRender`; `SpawnInfo` is named only inside the branch that requires it, because `engine::PushersPostRender` declares none (`Pushers.h:85-95`):
 
@@ -38,7 +71,18 @@ A row edit may address a row spawned earlier in the same batch, because edits ap
 
 ### Destroy pass
 
-Top-level `"destroy":bool`, optional; `edit_frame`'s top-level keys become exactly `coord`, `edits`, and `destroy`. When `true`, after the last edit and before the `uiNextUuid` guard, call `FramePostRender::Destroy(stagedFrame, gpGame->mCells.at(coordinate).staticData)` once. `destroyed` is the sum over `FrameCollections` of `OwnerInFrame<P>(stagedFrame).iCount` before the pass minus after it (zero when `destroy` is absent or `false`), so a destroyed player or spaceship counts 2: its own row and the pusher row its hook releases in the same pass (`Players.cpp:221`, `Spaceships.cpp:345`). The staged frame's id maps are valid because `TransferViaStream` rebuilt them (`Frame.cpp:821-834`), so pusher release through `idToIndexMap.at` succeeds, and the commit read rebuilds them again.
+Top-level `"destroy":bool`, optional; `edit_frame`'s top-level keys become
+exactly `coord`, `edits`, and `destroy`. When `true`, after the last edit and
+before the `uiNextUuid` guard, call
+`FramePostRender::Destroy(stagedFrame, gpGame->mCells.at(coordinate).staticData)`
+once. `destroyed` is the sum over `FrameCollections` of
+`OwnerInFrame<P>(stagedFrame).iCount` before the pass minus after it (zero when
+`destroy` is absent or `false`), so a destroyed player or spaceship counts 2:
+its own row and the pusher row its hook releases in the same pass
+(`Players.cpp:221`, `Spaceships.cpp:345`). The staged frame's id maps are valid
+because `TransferViaStream` rebuilt them (`Frame.cpp:821-834`), so pusher
+release through `idToIndexMap.at` succeeds, and the commit read rebuilds them
+again.
 
 The kill states the pass consumes, as the hooks define them (the implementer copies the enumerator bit values from the flag enums into the documentation):
 
@@ -63,7 +107,16 @@ Unchanged. The resynchronization refusal (`ServerFrameEdit.cpp:394-399`) reads t
 
 ### Documentation
 
-- `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md` `edit_frame` entry: the spawn edit form and its position rule; that every other `SpawnInfo` field keeps its default (each collection's `SpawnInfo` struct lists them), that players get a minted global id, that explosions spawn type index 0, that pushers cannot be spawned, and that a default blaster has zero velocity and direction; the `destroy` key, the kill-state table with enumerator values, the swap-and-pop note (indices change only after the pass; address rows before it), the one-tick-later alternative, and the fleet-respawn note for owned players; the random-draw and uuid note; the response fields; delete "Rows cannot be added or removed".
+- `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md`
+  `edit_frame` entry: the spawn edit form and its position rule; that every
+  other `SpawnInfo` field keeps its default (each collection's `SpawnInfo`
+  struct lists them), that players get a minted global id, that explosions spawn
+  type index 0, that pushers cannot be spawned, and that a default blaster has
+  zero velocity and direction; the `destroy` key, the kill-state table with
+  enumerator values, the swap-and-pop note (indices change only after the pass;
+  address rows before it), the one-tick-later alternative, and the fleet-respawn
+  note for owned players; the random-draw and uuid note; the response fields;
+  delete "Rows cannot be added or removed".
 - `Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md` `## Contracts`, the `edit_frame` writes and refusal bullet (`:17`): rows are added only through each collection's `Spawn(SpawnInfo)` and removed only through the collections' own `Destroy` hooks run by one `FramePostRender::Destroy` pass, so links are never written directly; a collection with a `SpawnInfo` overload is spawnable with no further code.
 
 ## Critical files
@@ -73,7 +126,14 @@ Unchanged. The resynchronization refusal (`ServerFrameEdit.cpp:394-399`) reads t
 
 ## In scope
 
-- `ServerFrameEdit.cpp`: `ApplyEdit` (the spawn edit arm and its key check), a `SpawnRow` helper per the dispatch above, `WriteRow`'s key check (`:296-302`) so a `spawn` key routes to the spawn arm instead of failing, `CommandEditFrame` (the `destroy` key in the top-level key check at `:377-383`, the local global-id counter, the pass, the `destroyed` count, the response fields at `:431-432`), and the includes those need (`Frame/Collections/Pushers/Pushers.h` is reached through `FrameBase.h`; `Explosions.h` likewise).
+- `ServerFrameEdit.cpp`: `ApplyEdit` (the spawn edit arm and its key check), a
+  `SpawnRow` helper per the dispatch above, `WriteRow`'s key check (`:296-302`)
+  so a `spawn` key routes to the spawn arm instead of failing,
+  `CommandEditFrame` (the `destroy` key in the top-level key check at
+  `:377-383`, the local global-id counter, the pass, the `destroyed` count, the
+  response fields at `:431-432`), and the includes those need
+  (`Frame/Collections/Pushers/Pushers.h` is reached through `FrameBase.h`;
+  `Explosions.h` likewise).
 - The documentation edits under `### Documentation`.
 
 ## Out of scope
@@ -119,4 +179,11 @@ By code reading: `SpawnRow` calls the player overload only after `InsideArea` pa
 ## Execution card
 
 - Goal: the spawn edit, the `destroy` pass, the response fields, and the documentation edits under `## In scope`.
-- Tier 3; roles as the Change Workflow assigns: `implementer` runs `/implement-plan` in one slice, then `/update-affected-code`; `builder` runs `/compile` (server Debug and Profile); `reviewer` runs `/plan-audit` and `/plan-simplicity-review` before implementation, `/external-grill-plan` after `/plan-audit`, and `/repo-code-review`, `/comment-review`, `/coherence-review`, and `/adversarial-review` after; `/update-claude-docs` and `/progressive-disclosure-review` follow; `/finalize-changes` lands with user confirmation.
+- Tier 3; roles as the Change Workflow assigns: `implementer` runs
+  `/implement-plan` in one slice, then `/update-affected-code`; `builder` runs
+  `/compile` (server Debug and Profile); `reviewer` runs `/plan-audit` and
+  `/plan-simplicity-review` before implementation, `/external-grill-plan` after
+  `/plan-audit`, and `/repo-code-review`, `/comment-review`,
+  `/coherence-review`, and `/adversarial-review` after; `/update-claude-docs`
+  and `/progressive-disclosure-review` follow; `/finalize-changes` lands with
+  user confirmation.

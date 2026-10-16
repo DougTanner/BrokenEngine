@@ -31,8 +31,6 @@ struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>, pub
 
 	static void Register();
 
-	static void AllocateAndCopy(BlastersInterpolate& rCurrent, const BlastersInterpolate& rPrevious);
-
 	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame);
 
 #if defined(BT_CLIENT)
@@ -85,8 +83,6 @@ using BlasterFlags_t = common::Flags<BlasterFlags>;
 struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 {
 	static constexpr int64_t kiVersion = 2;
-
-	static void AllocateAndCopy(BlastersPostRender& rCurrent, const BlastersPostRender& rPrevious);
 
 	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);

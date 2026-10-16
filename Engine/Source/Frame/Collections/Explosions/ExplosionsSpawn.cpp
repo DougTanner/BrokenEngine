@@ -98,14 +98,14 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 #if defined(BT_CLIENT)
 		if (rType.iSecondaryLightControllerTypeIndex != kiInvalidControllerType)
 		{
-			PointLightsPostRender::AddControlled(rFrame, currentTime + durationDelay, rType.iSecondaryLightControllerTypeIndex, vecSecondaryPosition, fSecondaryRotation);
+			PointLightsPostRender::AddControlled(rFrame, currentTime + common::FloatSecondsToNanoseconds(durationDelay), rType.iSecondaryLightControllerTypeIndex, vecSecondaryPosition, fSecondaryRotation);
 		}
 #endif
 
 #if defined(BT_CLIENT)
 		if (rType.iSecondaryPuffControllerTypeIndex != kiInvalidControllerType)
 		{
-			PuffsPostRender::AddControlled(rFrame, currentTime + durationDelay, rType.iSecondaryPuffControllerTypeIndex, vecSecondaryPosition);
+			PuffsPostRender::AddControlled(rFrame, currentTime + common::FloatSecondsToNanoseconds(durationDelay), rType.iSecondaryPuffControllerTypeIndex, vecSecondaryPosition);
 		}
 #endif
 	}

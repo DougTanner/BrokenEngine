@@ -3,7 +3,6 @@
 #include "Spaceships.h"
 
 #include "Data/Scene.h"
-#include "File/PackChunks.h"
 
 #include "Profile/ProfileManager.h"
 
@@ -25,8 +24,7 @@ constexpr float kfRoll = 0.2f;
 void SpaceshipsInterpolate::GraphicsResources()
 {
 	engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kuiCrc, engine::kBufferMain, kpcName, sizeof(shaders::ModelLayout));
-	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipeline(kuiCrc, kpcName, kuiSpaceshipModel, pStorageBuffers);
-	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelineShadow(kuiCrc, kpcName, kuiSpaceshipModel, pStorageBuffers);
+	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(kuiCrc, kpcName, kuiSpaceshipModel, pStorageBuffers);
 }
 
 static int64_t siRendered = 0;
@@ -55,15 +53,10 @@ void SpaceshipsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 {
 	siRendered = 0;
 
-	int64_t iTotalCapacity = 0;
-	for (const engine::GridCoord& rCoordinate : rActiveCoordinates)
+	int64_t iTotalCapacity = engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const SpaceshipsInterpolate&
 	{
-		auto it = rRenderInterpolates.find(rCoordinate);
-		if (it != rRenderInterpolates.end())
-		{
-			iTotalCapacity += it->second.pSpaceships->iCapacity;
-		}
-	}
+		return *rInterpolate.pSpaceships;
+	});
 
 	if (iTotalCapacity == 0)
 	{
@@ -72,8 +65,7 @@ void SpaceshipsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 
 	if (engine::Buffer* pBuffer = engine::gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, engine::kBufferMain, kpcName, sizeof(shaders::ModelLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kuiCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, pBuffer);
-		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kuiCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, pBuffer);
+		engine::gpPipelineManager->mDynamicPipelines.UpdateModelPipelineDescriptors(kuiCrc, iCommandBuffer, 2, pBuffer);
 	}
 }
 
@@ -97,14 +89,9 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
 
 	const engine::AnimationData* pAnimationData = nullptr;
-	int64_t iMaterialCount = 0;
-	int64_t iSkinnedMaterialCount = 0;
 	if (engine::gAnimationDataMap.contains(kuiSpaceshipModel))
 	{
 		pAnimationData = &engine::gAnimationDataMap.at(kuiSpaceshipModel);
-		iMaterialCount = engine::gpFileManager->mpPackChunks->GetEagerChunkMap().at(kuiSpaceshipModel).pHeader->sceneHeader.uiMaterialCount;
-
-		iSkinnedMaterialCount = pAnimationData->SkinnedMaterialCount(iMaterialCount);
 	}
 
 	// Visibility culling runs on the main thread before worker dispatch.
@@ -130,24 +117,10 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 	}
 
 	// Skinning output for all visible spaceships is allocated on the main thread before worker dispatch.
-	int64_t iMeshDataBase = 0;
-	int64_t iJointBase = 0;
-	common::MeshData* pMeshDataBuffer = nullptr;
-	common::JointMatrix* pJointMatricesBuffer = nullptr;
-	int64_t iJointsPerShip = 0;
-
-	if (pAnimationData != nullptr && iVisibleCount > 0)
+	engine::SkinningReservation skinningReservation {};
+	if (pAnimationData != nullptr)
 	{
-		iMeshDataBase = engine::gpBufferManager->AllocateMeshData(iCommandBuffer, iVisibleCount * iMaterialCount);
-		pMeshDataBuffer = reinterpret_cast<common::MeshData*>(engine::gpBufferManager->mMeshDataStorageBuffers.at(iCommandBuffer).mpMappedMemory);
-
-		iJointsPerShip = iSkinnedMaterialCount * pAnimationData->mHeader.skeleton.uiSkinJointCount;
-		int64_t iTotalJoints = iVisibleCount * iJointsPerShip;
-		if (iTotalJoints > 0)
-		{
-			iJointBase = engine::gpBufferManager->AllocateJointMatrices(iCommandBuffer, iTotalJoints);
-		}
-		pJointMatricesBuffer = reinterpret_cast<common::JointMatrix*>(engine::gpBufferManager->mJointMatrixStorageBuffers.at(iCommandBuffer).mpMappedMemory);
+		skinningReservation = pAnimationData->ReserveSkinning(iCommandBuffer, iVisibleCount);
 	}
 
 	int64_t iRenderedOffset = siRendered;
@@ -185,14 +158,7 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 
 			if (pAnimationData != nullptr)
 			{
-				int64_t iShipMeshDataBase = iMeshDataBase + j * iMaterialCount;
-				rModelLayout.uiMeshDataBase = static_cast<uint32_t>(iShipMeshDataBase);
-
-				common::MeshData* pMeshData = pMeshDataBuffer + iShipMeshDataBase;
-
-				int64_t iJointMatrixOffset = iJointBase + j * iJointsPerShip;
-
-				pAnimationData->EvaluateAnimation(0, rCurrent.pAnimationTimes[i].count(), std::span(pMeshData, static_cast<size_t>(iMaterialCount)), pJointMatricesBuffer, iJointMatrixOffset);
+				rModelLayout.uiMeshDataBase = static_cast<uint32_t>(pAnimationData->EvaluateInstance(skinningReservation, j, rCurrent.pAnimationTimes[i].count()));
 			}
 		}
 	};
@@ -209,8 +175,7 @@ void SpaceshipsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	{
 		gpProfileManager->GetCpuCounter(game::kCpuCounterSpaceshipsRendered).iCount = siRendered;
 	}
-	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
-	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
+	engine::gpPipelineManager->mDynamicPipelines.WriteModelPipelineIndirectBuffers(kuiCrc, iCommandBuffer, siRendered);
 }
 
 } // namespace game

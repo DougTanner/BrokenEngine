@@ -1,10 +1,17 @@
 # `/Engine/Source/Ui/Screens/` - Engine ImGui Screens
 
-Engine-owned ImGui screens: the six standard player-facing menus — Main Menu, Pause, Graphics, Sound, Game Settings, and Modal — plus the in-game `ChatScreen` and the `TweaksScreen/` debug family. `ImGuiManager` owns construction and per-frame invocation. The HUD and the game extension of TweaksScreen stay in the game project. This document owns the runtime contracts that code changes must preserve.
+Engine-owned ImGui screens: the six standard player-facing menus — Main Menu, Pause, Graphics, Sound, Game Settings, and Modal — plus the in-game `ChatScreen` and the `TweaksScreen/` debug family. `ImGuiManager` owns construction and per-frame invocation. The HUD and the game's Tweaks content stay in the game project. This document owns the runtime contracts that code changes must preserve.
 
 ## Standard Menu Contract
 
-- A standard screen takes `Render()`, reaches the game through `game::gpGame`, and never names a game session type. It uses the engine-owned `meUiState`, `mModalMessage`, `mGameFlags`, and the `GameFlags::kMainMenu` bit through `game::gpGame`, including the quit flag; calls `GetStandardMenuModel()` for the title, offered features, and live client/discovery state; and routes game-owned side effects through `ApplyStandardMenuAction()`. Engine-owned game, sound, and graphics settings save/reset are called directly, never as actions.
+- A standard screen takes `Render()`, reaches the game through `game::gpGame`,
+  and never names a game session type. It uses the engine-owned `meUiState`,
+  `mModalMessage`, `mGameFlags`, and the `GameFlags::kMainMenu` bit through
+  `game::gpGame`, including the quit flag; calls `GetStandardMenuModel()` for
+  the title, offered features, and live client/discovery state; and routes
+  game-owned side effects through `ApplyStandardMenuAction()`. Engine-owned
+  game, sound, and graphics settings save/reset are called directly, never as
+  actions.
 - `StandardMenuModel` is a snapshot taken at entry, so a screen rereads the model after any action a later decision in the same render pass depends on; Main Menu does that after starting discovery and after connecting.
 - `StandardMenuModel::pcTitle` must point to storage that outlives the render pass; a workbuffer allocation would dangle.
 - Missing `StandardMenuFeature::kLocalServer` suppresses discovery, auto-connect, the scanning placeholder, and the Local Server entry; missing `kRemoteServer` hides its disabled placeholder. Button width is measured over the full label set either way, so a disabled feature never reflows the column.
@@ -18,11 +25,20 @@ Engine-owned ImGui screens: the six standard player-facing menus — Main Menu, 
 - Time of Day stays visible and enabled while the Graphics screen is open, and the camera keeps returning that override. The main-menu entry point seeds it from the live camera; the pause-menu entry point does not, so opening Graphics in game reuses the retained override and may snap the sun. A new entry point must pick one of the two behaviors.
 - Disabling a Graphics parent control never resets its child values.
 - Water quality keeps the mesh-detail scale fixed at `0.25`: Low disables vertex displacement, Medium uses the fixed low-wave band, High the low- and medium-wave bands.
-- Anisotropy applies only to visible image passes such as models, terrain, and water; offscreen lighting, shadow, smoke, and wind passes use non-anisotropic samplers.
+- Anisotropy applies to visible image passes such as models, terrain, and water; TextureManager (`../../Graphics/Managers/AGENTS.md` `### TextureManager`) lists which samplers omit anisotropy.
 - Compare GPU timers in Immediate mode or with fixed GPU clocks; FIFO down-clocking and boosting around the refresh cap makes per-pass times workload-dependent.
 - The Graphics header's Defaults action calls `ResetGraphicsSettings()` immediately and stays on the screen.
 - The Game Settings language buttons stay in their own language and are never routed through the translation table.
-- `ChatScreen` draws the chat state in `GameBase::mChatLog` only in game with `UiState::kNone`; anywhere else it closes the input box and clears its text. `ImGuiManager` calls it only while Tweaks is hidden, and `GameBase::ProcessInput` opens the box only then, so an open box is always drawn. Every Enter in the box passes the text to `Client::SendChat`, which owns every send check, then clears and closes the box; deactivating the field without Enter (Esc or a click elsewhere) also clears and closes it. History lines sit in the lower-left corner and fade out over `kChatFadeDuration` from arrival, and are drawn unfaded while the box is open. The `Player N` label is fixed mixed-case text, never routed through the translation table.
+- `ChatScreen` draws the chat state in `GameBase::mChatLog` only in game with
+  `UiState::kNone`; anywhere else it closes the input box and clears its text.
+  `ImGuiManager` calls it only while Tweaks is hidden, and
+  `GameBase::ProcessInput` opens the box only then, so an open box is always
+  drawn. Every Enter in the box passes the text to `Client::SendChat`, which
+  owns every send check, then clears and closes the box; deactivating the field
+  without Enter (Esc or a click elsewhere) also clears and closes it. History
+  lines sit in the lower-left corner and fade out over `kChatFadeDuration` from
+  arrival, and are drawn unfaded while the box is open. The `Player N` label is
+  fixed mixed-case text, never routed through the translation table.
 
 ## Shared Authoring Rules
 
@@ -38,5 +54,5 @@ These apply to every ImGui screen, engine or game.
 ## See Also
 
 - `TweaksScreen/AGENTS.md` - Tweaks runtime parameter UI
-- `../../../../Projects/BrokenEngineSandbox/Source/Ui/Screens/AGENTS.md` - Game HUD and `game::TweaksScreen`
+- The game project's own `Source/Ui/Screens/AGENTS.md` - Game HUD and game Tweaks content
 - `../../Graphics/Managers/AGENTS.md#imguimanager` - Screen invocation and opaque regions

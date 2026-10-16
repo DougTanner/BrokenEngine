@@ -423,7 +423,8 @@ void IslandTerrainResidency::RestorationSweep()
 				rTemplate.iMeshArenaBlockedGeneration = gpIslands->miMeshArenaCapacityGeneration;
 				rTemplate.eMeshResidency = IslandMeshResidency::kArenaBlocked;
 				gpIslands->WriteMeshIndirect(rTemplate.iTemplateArrayIndex, 0, 0, 0);
-				LOG(kGraphics, kWarning, "Island mesh arena exhausted: crc={}", rCrc);
+				LOG(kGraphics, kError, "Island mesh arena exhausted: crc={}. Increase kiIslandMeshArenaBytes in Islands.h", rCrc);
+				DEBUG_BREAK();
 				break;
 			}
 			ASSERT(EvictTemplate(uiEvictCrc, *pEvictTemplate, MeshEvictionReason::kArenaExhaustion));

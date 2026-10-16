@@ -50,16 +50,6 @@ void XM_CALLCONV SyncExplosionTrail(game::FrameInterpolate& rFrameInterpolate, s
 
 #endif // BT_CLIENT
 
-void ExplosionsInterpolate::AllocateAndCopy(ExplosionsInterpolate& rCurrent, const ExplosionsInterpolate& rPrevious)
-{
-	AllocateAndCopyMembers(rCurrent, rPrevious);
-}
-
-void ExplosionsPostRender::AllocateAndCopy(ExplosionsPostRender& rCurrent, const ExplosionsPostRender& rPrevious)
-{
-	engine::AllocateAndCopyMembers(rCurrent, rPrevious);
-}
-
 void ExplosionsInterpolate::Register()
 {
 #if defined(BT_CLIENT)
@@ -88,7 +78,7 @@ void ExplosionsInterpolate::Register()
 	});
 
 	// Keyframes are normalized; wrappers supply their magnitudes.
-	PointLightsInterpolate::RegisterControllerType(siPrimaryLightControllerTypeIndex,
+	PointLightsInterpolate::RegisterControllerType(giExplosionPrimaryLightControllerTypeIndex,
 	{
 		.iBaseTypeIndex = siExplosionPointLightTypeIndex,
 		.iKeyframeCount = 3,
@@ -107,7 +97,7 @@ void ExplosionsInterpolate::Register()
 		.ppLightingIntensityScales = {sTuning.pPrimaryLightingIntensityOne, sTuning.pPrimaryLightingIntensityTwo, sTuning.pPrimaryLightingIntensityThree, nullptr},
 	});
 
-	PointLightsInterpolate::RegisterControllerType(siSecondaryLightControllerTypeIndex,
+	PointLightsInterpolate::RegisterControllerType(giExplosionSecondaryLightControllerTypeIndex,
 	{
 		.iBaseTypeIndex = siExplosionPointLightTypeIndex,
 		.iKeyframeCount = 3,
@@ -132,7 +122,7 @@ void ExplosionsInterpolate::Register()
 		.uiColor = 0xFFFFFFFF,
 	});
 
-	PuffsInterpolate::RegisterControllerType(siPrimaryPuffControllerTypeIndex,
+	PuffsInterpolate::RegisterControllerType(giExplosionPrimaryPuffControllerTypeIndex,
 	{
 		.iBaseTypeIndex = siExplosionPuffTypeIndex,
 		.iKeyframeCount = 2,
@@ -149,7 +139,7 @@ void ExplosionsInterpolate::Register()
 		.ppIntensityScales = {sTuning.pPrimaryPuffIntensityOne, sTuning.pPrimaryPuffIntensityTwo, nullptr, nullptr},
 	});
 
-	PuffsInterpolate::RegisterControllerType(siSecondaryPuffControllerTypeIndex,
+	PuffsInterpolate::RegisterControllerType(giExplosionSecondaryPuffControllerTypeIndex,
 	{
 		.iBaseTypeIndex = siExplosionPuffTypeIndex,
 		.iKeyframeCount = 2,
@@ -173,7 +163,7 @@ void ExplosionsInterpolate::Register()
 		.fWidth = kfExplosionTrailWidth,
 	});
 
-	WindRadialsInterpolate::RegisterControllerType(siWindRadialControllerTypeIndex,
+	WindRadialsInterpolate::RegisterControllerType(giExplosionWindRadialControllerTypeIndex,
 	{
 		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
@@ -192,7 +182,7 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 	ExplosionsInterpolate& rInterpolate = rFrame.interpolate.explosions;
 	ExplosionsPostRender& rPostRender = rFrame.postRender.explosions;
 
-	SimulationTime currentTime = SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime));
+	SimulationTime currentTime = TickToSimulationTime(rFrame.interpolate.iTick);
 
 	for (int64_t i = 0; i < rInterpolate.iCount; ++i)
 	{
@@ -200,7 +190,7 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 		const ExplosionType& rType = ExplosionsInterpolate::sTypes.at(static_cast<size_t>(iTypeIndex));
 
 		SimulationTime startTime = rInterpolate.pStartTimes[i];
-		std::chrono::duration<float> explosionTime = currentTime - startTime;
+		std::chrono::nanoseconds explosionTime = currentTime - startTime;
 		float fTimePercent = rInterpolate.pfTimePercents[i];
 
 		int64_t iTrailCount = rInterpolate.piTrailCounts[i];
@@ -219,9 +209,9 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 			}
 
 			std::chrono::duration<float> trailEndTime = fTimePercent * rType.trailDelayTime + rInterpolate.pTrailTimes[j][i];
-			if (explosionTime.count() >= trailEndTime.count())
+			if (explosionTime >= common::FloatSecondsToNanoseconds(trailEndTime))
 			{
-				RemoveIndexableElementAndClearHandle(rFrame.interpolate.smokeTrails, rFrame.postRender.smokeTrails, rTrailId, rFrame.interpolate.smokeTrails.Members(), rFrame.postRender.smokeTrails.Members());
+				RemoveIndexableElementAndClearHandle(rFrame, rTrailId);
 			}
 		}
 #endif // BT_CLIENT
@@ -233,11 +223,11 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 			continue;
 		}
 
-		std::chrono::duration<float> endTime = std::chrono::duration<float>::zero();
+		std::chrono::nanoseconds endTime = 0ns;
 		for (int64_t j = 0; j < iTrailCount; ++j)
 		{
 			std::chrono::duration<float> trailEndTime = fTimePercent * rType.trailDelayTime + rInterpolate.pTrailTimes[j][i];
-			endTime = std::max(endTime, trailEndTime);
+			endTime = std::max(endTime, common::FloatSecondsToNanoseconds(trailEndTime));
 		}
 
 		if (explosionTime < endTime)
@@ -261,7 +251,7 @@ bool ExplosionsInterpolate::LogDifferences(const ExplosionsInterpolate& rOther) 
 	{
 		bEqual &= common::LogDifference<"puiTypeIndices">(i, puiTypeIndices[i], rOther.puiTypeIndices[i]);
 		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
-		bEqual &= common::LogDifference<"pStartTimes">(i, pStartTimes[i].time_since_epoch(), rOther.pStartTimes[i].time_since_epoch());
+		bEqual &= common::LogDifference<"pStartTimes">(i, pStartTimes[i].time_since_epoch().count(), rOther.pStartTimes[i].time_since_epoch().count());
 		bEqual &= common::LogDifference<"pVecPositions">(i, pVecPositions[i], rOther.pVecPositions[i]);
 		bEqual &= common::LogDifference<"pVecDirections">(i, pVecDirections[i], rOther.pVecDirections[i]);
 		bEqual &= common::LogDifference<"pfTimePercents">(i, pfTimePercents[i], rOther.pfTimePercents[i]);

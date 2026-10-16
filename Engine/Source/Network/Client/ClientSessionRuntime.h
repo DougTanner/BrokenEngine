@@ -5,13 +5,6 @@
 #include "Frame/GridCoord.h"
 #include "Network/Client/Client.h"
 
-namespace game
-{
-
-class ClientSession;
-
-} // namespace game
-
 namespace engine
 {
 
@@ -19,17 +12,30 @@ class NetworkDiscoveryScanner;
 
 enum class ClientSessionStateFlags : uint8_t
 {
-	kServerDiscovered      = 1 << 0,
-	kDiscoveryScanTimedOut = 1 << 1,
-	kNoFreeSlotLogged      = 1 << 2,
-	kConnectionWasAccepted = 1 << 3,
+	kServerDiscovered           = 1 << 0,
+	kDiscoveryScanTimedOut      = 1 << 1,
+	kNoFreeSlotLogged           = 1 << 2,
+	kConnectionWasAccepted      = 1 << 3,
+	// Harness-only viewer pin: set by set_client_grid_coord, cleared by release_client_grid_coord or GameBase::ResetSession.
+	// Survives server load and replay restart so a recipe can hold one cell subscribed across playback loops.
+	kClientGridCoordinatePinned = 1 << 4,
 };
+
+enum class StandardMenuState : uint8_t
+{
+	kClientPresent           = 0x01,
+	kDiscoveryScannerPresent = 0x02,
+	kServerDiscovered        = 0x04,
+	kConnectionAccepted      = 0x08,
+	kAutoConnect             = 0x10,
+};
+using StandardMenuState_t = common::Flags<StandardMenuState>;
 
 class ClientSessionRuntime
 {
 public:
 
-	explicit ClientSessionRuntime(game::ClientSession& rSession);
+	ClientSessionRuntime();
 	~ClientSessionRuntime();
 
 	void Connect(std::string_view serverAddress, int64_t iPort, int64_t iCoordinateSlots);
@@ -66,8 +72,13 @@ public:
 	}
 
 	void SetDesiredCoordinates(std::span<const GridCoord> desiredCoordinates, std::string_view reason, int64_t iTick);
+	void UpdateDesiredCoordinates(std::string_view reason);
 	void SynchronizeSubscriptions();
 	void ClearSubscriptionState();
+
+	void ComputeActiveSet();
+	void PinClientGridCoordinate(GridCoord coordinate);
+	StandardMenuState_t GetStandardMenuState() const;
 
 	int64_t GetConfirmedTick() const;
 	int64_t GetClientConfirmedTick() const;
@@ -80,7 +91,6 @@ public:
 	// The clock reference: -1 exactly when miLatestServerTick < 0, otherwise never below it.
 	int64_t EstimatedLatestServerTick() const;
 
-	game::ClientSession& mrSession;
 	std::unique_ptr<Client> mpClient;
 	std::unique_ptr<NetworkDiscoveryScanner> mpDiscoveryScanner;
 	common::Flags<ClientSessionStateFlags> mStateFlags;
@@ -95,6 +105,8 @@ public:
 	std::vector<GridCoord> mDesiredCoordinates;
 	std::vector<GridCoord> mSubscriptionQueue;
 	std::unordered_map<GridCoord, std::chrono::steady_clock::time_point> mUnwantedTimestamps;
+	GridCoord mVisibleNeighbors[8] {};
+	int64_t miVisibleNeighborCount = 0;
 
 private:
 

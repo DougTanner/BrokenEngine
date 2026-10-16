@@ -123,8 +123,6 @@ struct SpaceshipsPostRender : public engine::Collection<SpaceshipsPostRender>
 {
 	static constexpr int64_t kiVersion = 6;
 
-	static void AllocateAndCopy(SpaceshipsPostRender& rCurrent, const SpaceshipsPostRender& rPrevious);
-
 	// Simulation never produces non-finite health; reject it as a corrupt stream, since NaN or +inf health never dies.
 	static void PostRead(const SpaceshipsPostRender& rCurrent)
 	{

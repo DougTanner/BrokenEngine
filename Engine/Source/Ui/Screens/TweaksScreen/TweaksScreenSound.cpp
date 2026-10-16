@@ -5,6 +5,8 @@
 #include "Ui/SoundSettingsWrappersBase.h"
 #include "TweaksSliderMap.h"
 
+#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
+
 namespace engine
 {
 
@@ -39,13 +41,13 @@ void RenderSoundSection(TweaksScreenBase& rScreen)
 	{
 		if (rScreen.BeginSubtab("Volumes", iSection, 0))
 		{
-			// Engine settings rendered inline (no outer table) so the game-side hook can own its own 2-column table at full sub-tab width.
+			// Engine settings rendered inline (no outer table) so the game's RenderSoundTweakExtensions, called by name below, can own its own 2-column table at full sub-tab width.
 			rScreen.WrapperSeparatorText("Settings");
 			rScreen.WrapperSlider("Master", iSection, 1.0f, "Master Volume");
 			rScreen.WrapperSlider("Music", iSection, 1.0f, "Music Volume");
 			rScreen.WrapperSlider("Sound", iSection, 1.0f, "Sound Volume");
 
-			RenderTweakExtensionInline(rScreen, iSection);
+			game::RenderSoundTweakExtensions(rScreen);
 
 			ImGui::EndTabItem();
 		}

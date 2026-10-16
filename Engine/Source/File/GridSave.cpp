@@ -83,7 +83,7 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 
 	int64_t iFrameCount = 0;
 	common::Read(fileStream, iFrameCount);
-	// Trust boundary (save file): a corrupt count/capacity anywhere in the grid / fleet / frame
+	// Trust boundary (save file): a corrupt count/capacity anywhere in the grid / game save state / frame
 	// deserialization throws std::ios_base::failure (or .at()/bad_alloc) — abort the load gracefully
 	// (return false) so a hand-crafted or truncated save file can't overrun a buffer or crash the server.
 	bool bHasLoadedClock = false;
@@ -140,19 +140,17 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			rCell.pNext = std::make_unique<game::Frame>();
 
 			int64_t iTick = rCell.pCurrent->interpolate.iTick;
-			float fCurrentTime = rCell.pCurrent->interpolate.fCurrentTime;
 			if (!bHasLoadedClock)
 			{
-				if (iTick < 0 || iTick > std::numeric_limits<int64_t>::max() - engine::TimeStep::kiMaximumAccumulatorTicks || !std::isfinite(fCurrentTime))
+				if (iTick < 0 || iTick > engine::TimeStep::kiMaximumSavedTick)
 				{
 					throw std::ios_base::failure("invalid frame clock");
 				}
 
 				rStagedGrid.iTick = iTick;
-				rStagedGrid.fCurrentTime = fCurrentTime;
 				bHasLoadedClock = true;
 			}
-			else if (iTick != rStagedGrid.iTick || std::bit_cast<uint32_t>(fCurrentTime) != std::bit_cast<uint32_t>(rStagedGrid.fCurrentTime))
+			else if (iTick != rStagedGrid.iTick)
 			{
 				throw std::ios_base::failure("inconsistent frame clocks");
 			}
@@ -190,7 +188,6 @@ void AdoptGridSave(StagedGridSave&& rStagedGrid)
 	int64_t iTickCounter = rStagedGrid.iTick;
 	ASSERT(iTickCounter >= 0);
 	game::gpGame->miTickCounter = iTickCounter;
-	game::gpGame->mfCurrentTime = rStagedGrid.fCurrentTime;
 }
 
 } // namespace engine

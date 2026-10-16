@@ -161,7 +161,7 @@ Changes (15 files)
 
     GraphicsResources():
     - CreateDynamicBuffer for model LOD (sizeof ModelLayout)
-    - CreateModelPipeline + CreateModelPipelineShadow for the tree model
+    - CreateModelPipelines for the tree model
     - CreateDynamicBuffer for billboard LOD (sizeof TreeBillboardLayout)
     - Create a DynamicPipeline for billboard rendering (new pipeline type
       or use CreatePipelineBillboards variant)

@@ -4,7 +4,14 @@ Revisit When: the scene reads as dead calm between events — smoke only moves w
 
 ## Context
 
-Wind is a client-only 2D velocity field (`Engine/Data/Shaders/Wind/AGENTS.md`), stepped by wall-clock time and never fed back into frame state. Its only sources are local deposits: `WindRadials` (explosions) and `WindTrails` (ships, blasters). `WindSpread` (`Engine/Data/Shaders/Wind/WindSpreadCommon.h`) adds world-anchored swirl noise and blends every behavior constant as a Low/High pair by `WindMagnitudeFactor`. The field covers the smoke area, and outside the wind passes themselves only the two smoke spread passes sample it, through `SmokeWindSample` (`Engine/Data/Shaders/Smoke/SmokeSpreadCommon.h`).
+Wind is a client-only 2D velocity field (`Engine/Data/Shaders/Wind/AGENTS.md`),
+stepped by wall-clock time and never fed back into frame state. Its only sources
+are local deposits: `WindRadials` (explosions) and `WindTrails` (ships,
+blasters). `WindSpread` (`Engine/Data/Shaders/Wind/WindSpreadCommon.h`) adds
+world-anchored swirl noise and blends every behavior constant as a Low/High pair
+by `WindMagnitudeFactor`. The field covers the smoke area, and outside the wind
+passes themselves only the two smoke spread passes sample it, through
+`SmokeWindSample` (`Engine/Data/Shaders/Smoke/SmokeSpreadCommon.h`).
 
 Two gaps remain:
 
@@ -13,7 +20,14 @@ Two gaps remain:
 
 ## Design
 
-- **Ambient wind as an analytic term, not stored.** A global direction and strength (sliders), modulated by slow world-anchored noise for gusts and direction drift. Add it inside `SmokeWindSample` instead of depositing it into the field, so the wind field still decays to exact zero and its sparse dispatch stays sparse (`Wind/AGENTS.md` `## Sparse Dispatch Invariants`). Storing a field-wide ambient would make every wind tile permanently active. `SmokeWindSample` takes only a wind texcoord today, so it gains the world position both callers already compute.
+- **Ambient wind as an analytic term, not stored.** A global direction and
+  strength (sliders), modulated by slow world-anchored noise for gusts and
+  direction drift. Add it inside `SmokeWindSample` instead of depositing it into
+  the field, so the wind field still decays to exact zero and its sparse
+  dispatch stays sparse (`Wind/AGENTS.md` `## Sparse Dispatch Invariants`).
+  Storing a field-wide ambient would make every wind tile permanently active.
+  `SmokeWindSample` takes only a wind texcoord today, so it gains the world
+  position both callers already compute.
 - **Island deflection.** Where terrain elevation is above sea level, project out the uphill component of velocity using the elevation gradient, so flow slides along slopes and around peaks. Applied to the ambient term at the read site, it bends ambient wind around islands; on a windward slope the removed uphill component also slows the wind there, which is what lets smoke pile up.
 - **Tuning.** Every new behavior constant follows the Low/High pair rule in `Wind/AGENTS.md`.
 

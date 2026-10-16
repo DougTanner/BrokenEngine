@@ -2,7 +2,15 @@
 
 What the structural-erosion line on the code-quality history chart measures, what drives its up and down periods, and whether controlling it deserves emphasis. Findings only; the recommendation waits for the user's decision.
 
-Evidence base: the history table `.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl` read at `8b74870d` (rows 0-1168, 768 measured), and `/code-quality-metrics` commit Snapshots (`Target Engine/Source`, `Scope Recursive`, `-Commit <sha>`, the capture a history row stores per `HistoryContract.md` `## Capture and drift`) run with the analyzer at `8b74870d`. The analyzer and normalizer scripts last changed in `9c746fa0` (row 1139), so that analyzer measures every row from 1139 on. Commit `1e9e821d` (**not reachable from `main`**) re-measured rows 724-1138 (its first-parent positions 78-492) with it.
+Evidence base: the history table
+`.agents/skills/code-quality-metrics/references/history/CodeQualityMetricsHistory.jsonl`
+read at `8b74870d` (rows 0-1168, 768 measured), and `/code-quality-metrics`
+commit Snapshots (`Target Engine/Source`, `Scope Recursive`, `-Commit <sha>`,
+the capture a history row stores per `HistoryContract.md`
+`## Capture and drift`) run with the analyzer at `8b74870d`. The analyzer and
+normalizer scripts last changed in `9c746fa0` (row 1139), so that analyzer
+measures every row from 1139 on. Commit `1e9e821d` (**not reachable from
+`main`**) re-measured rows 724-1138 (its first-parent positions 78-492) with it.
 
 ## Computation
 

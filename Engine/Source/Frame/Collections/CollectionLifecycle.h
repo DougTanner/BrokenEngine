@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CollectionId.h"
 #include "CollectionMemory.h"
 
 namespace engine
@@ -104,6 +105,34 @@ void RemoveIndexableElementAndClearHandle(INTERPOLATE& rInterpolate, POST_RENDER
 	ASSERT((rId.uuid.iValue != 0));
 	RemoveIndexableElement(rInterpolate, rPostRender, rId, std::forward<INTERPOLATE_TUPLE>(rInterpolateTuple), std::forward<POST_RENDER_TUPLE>(rPostRenderTuple));
 	rId = {};
+}
+
+// Position of collection type T in a Collections() tuple of references; the tuple size when T is absent.
+template <typename T, typename... TS>
+consteval int64_t CollectionTupleIndex([[maybe_unused]] std::type_identity<std::tuple<TS...>> typeIdentity)
+{
+	std::array<bool, sizeof...(TS)> bMatches {std::is_same_v<T, std::remove_reference_t<TS>>...};
+	int64_t iIndex = 0;
+	while (iIndex < std::ssize(bMatches) && !bMatches[static_cast<size_t>(iIndex)])
+	{
+		++iIndex;
+	}
+	return iIndex;
+}
+
+// Frame-collection form: both frame halves list each collection pair at the same Collections() index.
+template <typename FRAME, typename INTERPOLATE>
+void RemoveIndexableElementAndClearHandle(FRAME& rFrame, Id<INTERPOLATE>& rId)
+{
+	using InterpolateTuple = decltype(rFrame.interpolate.Collections());
+	using PostRenderTuple = decltype(rFrame.postRender.Collections());
+	static constexpr int64_t kiIndex = CollectionTupleIndex<INTERPOLATE>(std::type_identity<InterpolateTuple> {});
+	static_assert(kiIndex < static_cast<int64_t>(std::tuple_size_v<InterpolateTuple>), "RemoveIndexableElementAndClearHandle: the handle's collection is not a frame collection");
+
+	INTERPOLATE& rInterpolate = std::get<static_cast<size_t>(kiIndex)>(rFrame.interpolate.Collections());
+	std::tuple_element_t<static_cast<size_t>(kiIndex), PostRenderTuple> rPostRender = std::get<static_cast<size_t>(kiIndex)>(rFrame.postRender.Collections());
+
+	RemoveIndexableElementAndClearHandle(rInterpolate, rPostRender, rId, rInterpolate.Members(), rPostRender.Members());
 }
 
 // Removes element at index from paired collections using swap-and-pop: the last row moves into index iIndex, so

@@ -39,6 +39,7 @@ void AnimationData::Load(std::span<const std::byte> animationData, int64_t iMate
 	const std::byte* pAnimationData = animationData.data();
 	int64_t iAnimationBytes = std::ssize(animationData);
 	mCrc = crc;
+	miMaterialCount = iMaterialCount;
 
 	// The animation extent is EagerChunk::iDataSize (ChunkLocation::uiSize - kiChunkDataOffset) minus the scene-array prefix.
 	if (iAnimationBytes < static_cast<int64_t>(sizeof(mHeader)))
@@ -199,6 +200,43 @@ int64_t AnimationData::SkinnedMaterialCount(int64_t iMaterialCount) const
 		}
 	}
 	return iSkinnedMaterialCount;
+}
+
+SkinningReservation AnimationData::ReserveSkinning(int64_t iCommandBuffer, int64_t iInstanceCount) const
+{
+	SkinningReservation reservation {};
+	reservation.iMaterialCount = miMaterialCount;
+	reservation.iMeshDataBase = gpBufferManager->AllocateMeshData(iCommandBuffer, iInstanceCount * miMaterialCount);
+
+	// No joint reservation when no material is skinned: EvaluateMaterial then writes joint offset 0, which no shader reads.
+	reservation.iJointsPerInstance = SkinnedMaterialCount(miMaterialCount) * mHeader.skeleton.uiSkinJointCount;
+	int64_t iJointCount = iInstanceCount * reservation.iJointsPerInstance;
+	if (iJointCount > 0)
+	{
+		reservation.iJointBase = gpBufferManager->AllocateJointMatrices(iCommandBuffer, iJointCount);
+	}
+
+	reservation.pMeshData = reinterpret_cast<common::MeshData*>(gpBufferManager->mMeshDataStorageBuffers.at(iCommandBuffer).mpMappedMemory);
+	reservation.pJointMatrices = reinterpret_cast<common::JointMatrix*>(gpBufferManager->mJointMatrixStorageBuffers.at(iCommandBuffer).mpMappedMemory);
+	return reservation;
+}
+
+int64_t AnimationData::EvaluateInstance(const SkinningReservation& rReservation, int64_t iInstance, float fTime) const
+{
+	int64_t iMeshDataBase = rReservation.iMeshDataBase + iInstance * rReservation.iMaterialCount;
+	EvaluateAnimation(0, fTime, std::span(rReservation.pMeshData + iMeshDataBase, static_cast<size_t>(rReservation.iMaterialCount)), rReservation.pJointMatrices, rReservation.iJointBase + iInstance * rReservation.iJointsPerInstance);
+	return iMeshDataBase;
+}
+
+std::chrono::duration<float> AnimationData::AdvanceLoopingTime(std::chrono::duration<float> time, std::chrono::duration<float> deltaTime) const
+{
+	std::chrono::duration<float> animationDuration(mpAnimations[0].fDuration);
+	time += deltaTime;
+	if (time.count() >= animationDuration.count())
+	{
+		time = std::chrono::duration<float>(std::fmod(time.count(), animationDuration.count()));
+	}
+	return time;
 }
 
 void AnimationData::EvaluateAnimation(int64_t iAnimationIndex, float fTime, std::span<common::MeshData> meshData, common::JointMatrix* pJointMatrices, int64_t iJointMatrixOffset) const

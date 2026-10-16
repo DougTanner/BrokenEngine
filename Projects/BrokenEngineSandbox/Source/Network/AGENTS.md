@@ -1,6 +1,6 @@
 # Game Network - Sessions and Game Wire Payloads
 
-Game-layer packet extensions, status-change payload formats, and multiplayer orchestration. Engine transport, channels, ACK state, cursors, hostile-input enforcement, and the status-change batch codec body are owned by `../../../../Engine/Source/Network/AGENTS.md`.
+Game-layer packet extensions, status-change payload formats and their per-type read/write (`StatusChangeCodec`), and multiplayer orchestration. Engine transport, channels, ACK state, cursors, hostile-input enforcement, and the status-change batch envelope, ordering, and framing are owned by `../../../../Engine/Source/Network/AGENTS.md`.
 
 ## Game Packet Contracts
 
@@ -11,12 +11,21 @@ Game-layer packet extensions, status-change payload formats, and multiplayer orc
 
 ## Status-Change Wire Format
 
-- `StatusChangeType` is declared with Frame status data, but its append-only wire compatibility contract is owned here. Adding a type requires matching write, read, and default-data handling in the engine codec; keep the per-item maximum large enough for every payload.
+- `StatusChangeType` is declared with Frame status data, but its append-only wire compatibility contract is owned here. Adding a type requires matching write and read handling in `StatusChangeCodec` and default-data handling in `DefaultDataForType`; keep the per-item maximum large enough for every payload.
 - Any incompatible `StatusChange` or `TransferData` layout change — type tag, field order, field width, variant arm membership, or per-item wire size — requires the game codec author to increment `engine::kiProtocolVersion`; Engine Network owns the shared Hello rejection gate.
 - The protocol gate is distinct from `FrameInput::kiVersion` (replay-input compatibility) and `Frame::kiVersion` (deterministic-Frame/save/replay compatibility); neither Frame version substitutes for the protocol bump.
 - Client-only values still occupy identical server-side wire space.
 - A `StatusChange` payload member the codec deliberately never writes or reads occupies no wire bytes, so it takes no protocol bump; the server supplies such a member locally.
-- `GameMessages` owns the field order and byte size of game payloads. Each message struct carries one `Visit` descriptor that both the writing and the reading side route through, plus a `static_assert`ed `kiSize`, and the wire-sensitive event enums sit in the same descriptor table. Add or change a game payload there rather than hand-writing a write on one side and a matching read on the other, which is how the two sides drift apart. Local-only synthesized states never enter the stream. Numeric `PlayerStateWireType` values are serialized; each `kpPlayerStateDescriptors` array index and row `eWireType` must match that numeric value; append enum values and matching descriptors before `kCount`.
+- `GameMessages` owns the field order and byte size of game payloads. Each
+  message struct carries one `Visit` descriptor that both the writing and the
+  reading side route through, plus a `static_assert`ed `kiSize`, and the
+  wire-sensitive event enums sit in the same descriptor table. Add or change a
+  game payload there rather than hand-writing a write on one side and a matching
+  read on the other, which is how the two sides drift apart. Local-only
+  synthesized states never enter the stream. Numeric `PlayerStateWireType`
+  values are serialized; each `kpPlayerStateDescriptors` array index and row
+  `eWireType` must match that numeric value; append enum values and matching
+  descriptors before `kCount`.
 
 ## Layering
 

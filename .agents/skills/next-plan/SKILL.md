@@ -171,16 +171,18 @@ The `argument-hint` value selects the Plan:
    object or no row reports a touch.
 7. Present for approval per this file's `### Implementation approval`. Done
    when the user's decision arrives.
-8. Implement the approved change. Main dispatches one `/implement-plan`
-   `implementer` per `Slices` row of the latest handoff that returned that
-   field, each brief citing as the approved plan the step-4 preparation
-   snapshot (the `Temp/` path whose `## In scope` and `## Out of scope` the
-   preparation handoff cites, or the difference preparation's snapshot on the
-   changes-requested route) and copying that row as the assigned items and
-   allowed file scope; main never reads the snapshot's `## In scope` itself.
-   Main assigns each change the user approved after the plan to exactly one
-   row, adding one slice when none fits, and passes `none` for those changes
-   to every other row. `Slices: none`
+8. Implement the approved change. After the pre-edit acceptance checks the
+   Change Workflow Implement and propagate step in
+   [change-workflow.md](../../references/change-workflow.md) orders, main
+   dispatches one `/implement-plan` `implementer` per `Slices` row of the
+   latest handoff that returned that field, each brief citing as the approved
+   plan the step-4 preparation snapshot (the `Temp/` path whose `## In scope`
+   and `## Out of scope` the preparation handoff cites, or the difference
+   preparation's snapshot on the changes-requested route) and copying that row
+   as the assigned items and allowed file scope; main never reads the
+   snapshot's `## In scope` itself. Main assigns each change the user approved
+   after the plan to exactly one row, adding one slice when none fits, and
+   passes `none` for those changes to every other row. `Slices: none`
    dispatches no implementer. Done when its own acceptance checks pass.
 9. Run the checkpoint exactly once, however the run ends: after step 8's
    acceptance checks, before step 10 when that step applies, and before
@@ -275,7 +277,27 @@ Execution card:
 - Out of scope: <boundary>
 - Tier trigger: <trigger or none>
 - Interfaces and invariants: <contracts>
-- Acceptance checks: <check and expected observation; a criterion for new or fixed behavior names a check the unedited tree could not pass, and a bug-fix criterion (one stating a defect no longer occurs) also names its pre-change red run: an /external-diagnose-bug Reproducing signal, or a run on a build of the unedited tree, requested through a Build required handoff, that the implementer records before its first edit; when the proven cause is a general rule, the bug-fix check also covers one input beyond the reported case that a patch for only that case would still fail, settled by a code read of the general fix when the agent settling it is confident the change is correct because it is small and self-contained, and otherwise by a run; a criterion for a performance gain the change exists to make covers one independent optimization and states that the optimization is reverted when the criterion fails, and when `query_profile` measures the gain it also names its baseline cohorts and expects a gap outside the cohort-to-cohort range the `query_profile` caveat in `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-client.md` `## Durable caveats` defines>
+- Acceptance checks: <check and expected observation; a criterion for new or
+  fixed behavior names a check the unedited tree could not pass, and a bug-fix
+  criterion (one stating a defect no longer occurs) also names its pre-change
+  red run: an /external-diagnose-bug Reproducing signal, or a run on a build of
+  the unedited tree; a criterion compared against the unedited tree, such as a
+  result that must stay unchanged, names that pre-change baseline run; the card
+  marks each red run on a build of the unedited tree and each pre-change
+  baseline run `before the first edit`, the literal text the Change Workflow
+  Implement and propagate step's pre-edit bullets key on to record that run
+  before the first slice, and cites a Reproducing signal as-is, unmarked; when
+  the proven cause is a general rule, the bug-fix check also covers one input
+  beyond the reported case that a patch for only that case would still fail,
+  settled by a code read of the general fix when the agent settling it is
+  confident the change is correct because it is small and self-contained, and
+  otherwise by a run; a criterion for a performance gain the change exists to
+  make covers one independent optimization and states that the optimization is
+  reverted when the criterion fails, and when `query_profile` measures the gain
+  it also names its baseline cohorts and expects a gap outside the
+  cohort-to-cohort range the `query_profile` caveat in
+  `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-client.md`
+  `## Durable caveats` defines>
 - Roles: <required and conditional assignments>
 ```
 

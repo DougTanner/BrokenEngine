@@ -631,7 +631,7 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ClientConnection& 
 	ClientGuid clientGuid = message.bHasGuid ? message.guid : ClientGuid {};
 
 	// Idempotent replay: an already-handshaken client re-sends the accept using its STORED GUID.
-	// Do not overwrite established identity (fleet ownership is GUID-keyed) or mint a fresh GUID.
+	// Do not overwrite established identity (game entity ownership is GUID-keyed) or mint a fresh GUID.
 	if (rClient.bHandshakeComplete)
 	{
 		LOG(kNetwork, kInfo, "Server::ClientHello Replay Client: {} GUID: {} {}", rClient.iClientId, rClient.clientGuid.uiHigh, rClient.clientGuid.uiLow);
@@ -640,7 +640,7 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ClientConnection& 
 		return;
 	}
 
-	// One live handshaken peer per GUID: fleet ownership is GUID-keyed, so a second peer must not take over the first's identity.
+	// One live handshaken peer per GUID: game entity ownership is GUID-keyed, so a second peer must not take over the first's identity.
 	// This peer's own record is not yet handshaken (the replay branch returned otherwise), so it cannot match itself.
 	if ((clientGuid.uiHigh != 0 || clientGuid.uiLow != 0))
 	{
@@ -705,7 +705,7 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, ClientConnecti
 		return;
 	}
 
-	// The origin is always simulated and permits the initial fleet spawn.
+	// The origin is always simulated and permits the initial game spawn.
 	bool bAdjacent = (coordinate == kOriginCoordinate);
 	bAdjacent |= std::ranges::any_of(rClient.authorizedCoordinates, [&coordinate](const GridCoord& rOwnedCoordinate)
 	{

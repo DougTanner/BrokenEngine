@@ -108,14 +108,6 @@ void SpaceshipsInterpolate::Register()
 {
 	engine::ExplosionsInterpolate::RegisterType(giSpaceshipExplosionTypeIndex,
 	{
-#if defined(BT_CLIENT)
-		.iPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::siPrimaryLightControllerTypeIndex,
-		.iSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::siSecondaryLightControllerTypeIndex,
-		.iPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::siPrimaryPuffControllerTypeIndex,
-		.iSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::siSecondaryPuffControllerTypeIndex,
-		.iTrailTypeIndex = engine::ExplosionsInterpolate::siExplosionTrailTypeIndex,
-		.iWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::siWindRadialControllerTypeIndex,
-#endif // BT_CLIENT
 		.iBaseParticleCount = kiSpaceshipExplosionBaseParticleCount,
 		.uiParticleColor = kuiSpaceshipExplosionParticleColor,
 		.fParticleVelocityMinimum = kfSpaceshipExplosionParticleVelocityMinimum,
@@ -220,7 +212,7 @@ void SpawnSpaceshipExplosion(Frame& __restrict rFrame, engine::GridCoord emitter
 	XMVECTOR vecJitteredPosition = common::RandomPositionJitter<kfSpaceshipExplosionPositionJitter>(vecPosition, rFrame.postRender.randomEngine);
 	XMVECTOR vecJitteredDirection = common::RandomDirectionJitter<kfSpaceshipExplosionDirectionJitter>(vecDirection, rFrame.postRender.randomEngine);
 
-	engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, engine::SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)),
+	engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick),
 	{
 		.iTypeIndex = giSpaceshipExplosionTypeIndex,
 		.vecPosition = vecJitteredPosition,
@@ -254,10 +246,15 @@ void SpaceshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict
 	float fClimbStep = kfSpaceshipMaxSpeed * deltaTime.count();
 
 #if defined(BT_CLIENT)
-	std::chrono::duration<float> animationDuration = std::chrono::duration<float>::zero();
+	// Null unless the model's first animation has a positive duration.
+	const engine::AnimationData* pAnimationData = nullptr;
 	if (engine::gAnimationDataMap.contains(kuiSpaceshipModel))
 	{
-		animationDuration = std::chrono::duration<float>(engine::gAnimationDataMap.at(kuiSpaceshipModel).mpAnimations[0].fDuration);
+		const engine::AnimationData& rAnimationData = engine::gAnimationDataMap.at(kuiSpaceshipModel);
+		if (rAnimationData.mpAnimations[0].fDuration > 0.0f)
+		{
+			pAnimationData = &rAnimationData;
+		}
 	}
 #endif
 
@@ -301,13 +298,9 @@ void SpaceshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict
 		}
 
 #if defined(BT_CLIENT)
-		if (animationDuration > std::chrono::duration<float>::zero())
+		if (pAnimationData != nullptr)
 		{
-			animationTime += deltaTime;
-			if (animationTime.count() >= animationDuration.count())
-			{
-				animationTime = std::chrono::duration<float>(std::fmod(animationTime.count(), animationDuration.count()));
-			}
+			animationTime = pAnimationData->AdvanceLoopingTime(animationTime, deltaTime);
 		}
 #endif // BT_CLIENT
 
@@ -343,11 +336,6 @@ void SpaceshipsInterpolate::AllocateAndCopy(SpaceshipsInterpolate& rCurrent, con
 	engine::AllocateAndCopyMembers(rCurrent, rPrevious);
 }
 
-void SpaceshipsPostRender::AllocateAndCopy(SpaceshipsPostRender& rCurrent, const SpaceshipsPostRender& rPrevious)
-{
-	engine::AllocateAndCopyMembers(rCurrent, rPrevious);
-}
-
 static void RemoveOwnedObjects(Frame& rFrame, SpaceshipsInterpolate& rCurrentInterpolate, int64_t i, bool bClearRegistryId)
 {
 	if (bClearRegistryId)
@@ -358,7 +346,7 @@ static void RemoveOwnedObjects(Frame& rFrame, SpaceshipsInterpolate& rCurrentInt
 #if defined(BT_CLIENT)
 	if ((rCurrentInterpolate.puiWindTrails[i].uuid.iValue != 0))
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.windTrails, rFrame.postRender.windTrails, rCurrentInterpolate.puiWindTrails[i], rFrame.interpolate.windTrails.Members(), rFrame.postRender.windTrails.Members());
+		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiWindTrails[i]);
 	}
 #endif
 }
@@ -370,13 +358,11 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 
 	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
 
-	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
+	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
-		if (!(rCurrentPostRender.pFlags[i] & kTransfer)) [[likely]]
-		{
-			continue;
-		}
-
+		return rCurrentPostRender.pFlags[i] & kTransfer;
+	}, [&](int64_t i)
+	{
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
 
 		TransferRequest request
@@ -393,17 +379,17 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 				.fDeltaRotation = rCurrentInterpolate.pfDeltaRotations[i],
 			},
 		};
-		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
+		if (rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
 		{
 			LOG(kDefault, kError, "Spaceship Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) Health: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), common::Wb(rCurrentPostRender.pfHealths[i], 1), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
-		PushTransferRequest(rFrame.postRender, request);
+		rFrame.postRender.PushTransferRequest(request);
 
 		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i, true);
 
 		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
-	}
+	});
 }
 
 void SpaceshipsPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
@@ -502,9 +488,7 @@ void SpaceshipsInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 	SpaceshipsInterpolate& rSpaceships = *rFrame.interpolate.pSpaceships;
 
 	rSpaceships.puiWindTrails[iIndex] = {};
-	engine::WindTrailsPostRender::Add(rFrame, rSpaceships.puiWindTrails[iIndex]);
-
-	engine::WindTrailsInterpolate::Sync(rFrame.interpolate, rSpaceships.puiWindTrails[iIndex],
+	engine::WindTrailsPostRender::Add(rFrame, rSpaceships.puiWindTrails[iIndex],
 	{
 		.vecPosition = rSpaceships.pVecPositions[iIndex],
 		.fIntensity = game::gWindDepositSpaceshipsIntensity.mfCurrent,

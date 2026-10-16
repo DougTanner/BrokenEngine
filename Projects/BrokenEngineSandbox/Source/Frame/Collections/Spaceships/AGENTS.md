@@ -11,9 +11,21 @@ Enemy spaceships combine terrain-aware steering, health and damage, weapon fire,
 - Body, collision, effect, and model sizing derive from the shared spaceship radius.
 - The simulation keeps the Interpolate `pDestroyedTimes` at the -1 spawn sentinel or in [0, `kSpaceshipDestroyTime`]. The Interpolate `PostRead` rejects any other row on every Frame read.
 - `SpaceshipsPostRender::Update` reads previous-frame Players for steering, health regeneration, and targeting. `AvoidTerrain` and the Spawn-phase enemy-blaster targeting read current-frame Players after Players update. The split is intentional; changing the source frame shifts CRC-visible behavior by one tick.
-- Under the [shared arrival-grace contract](../AGENTS.md#game-specific-rules), arrival grace and the blaster cooldown count down unconditionally before behavior gating. While the decremented grace remains positive, a non-exploding spaceship retains carried motion, pusher response, and terrain bounce while skipping health regeneration, AI steering, acceleration, drag, terrain avoidance, and firing. Ordinary behavior resumes in the same tick that grace reaches zero; exploding spaceships continue through the existing death path.
+- Under the [shared arrival-grace contract](../AGENTS.md#game-specific-rules),
+  arrival grace and the blaster cooldown count down unconditionally before
+  behavior gating. While the decremented grace remains positive, a non-exploding
+  spaceship retains carried motion, pusher response, and terrain bounce while
+  skipping health regeneration, AI steering, acceleration, drag, terrain
+  avoidance, and firing. Ordinary behavior resumes in the same tick that grace
+  reaches zero; exploding spaceships continue through the existing death path.
 - The PostRender Spawn phase hook never creates spaceships, despite the name: it emits the staggered death explosions and fires enemy blasters. Creation is the separate `SpawnInfo` overload of `Spawn`, called from the frame's group spawner and from cross-cell transfer. Enemy-creation logic belongs in that overload, not in the phase hook, which runs per tick per ship inside the blaster-fire loop.
-- Cross-phase field ownership: the steering delta rotation (this tick's turn amount) lives in the Interpolate struct and is read by Interpolate Update and by Render, but it is decayed and written from PostRender Update. That crossing is deliberate — do not "fix" it by moving the field to PostRender, which would change the CRC member set and the render read path. The terrain-resolved position is the only other Interpolate field PostRender Update writes; do not treat any other Interpolate field as writable from PostRender Update.
+- Cross-phase field ownership: the steering delta rotation (this tick's turn
+  amount) lives in the Interpolate struct and is read by Interpolate Update and
+  by Render, but it is decayed and written from PostRender Update. That crossing
+  is deliberate — do not "fix" it by moving the field to PostRender, which would
+  change the CRC member set and the render read path. The terrain-resolved
+  position is the only other Interpolate field PostRender Update writes; do not
+  treat any other Interpolate field as writable from PostRender Update.
 
 ## Rendering Invariants
 

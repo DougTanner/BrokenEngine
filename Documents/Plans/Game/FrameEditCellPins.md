@@ -5,16 +5,52 @@ Line numbers cite baseline `2b4cb8d38aa57ca7ccd45983cc5121f64e85cf15`. Where a s
 
 ## Context
 
-User direction (binding): the Debug-only server harness initializes a cell at an unloaded coordinate (through `CreateCellAtCoordinate`) and removes a loaded cell, using a Debug-only pinned-coordinate set that keeps edited or initialized playerless cells in the active set; pinning also lifts `edit_frame`'s refusal of a playerless non-origin cell while a client is handshaken. Pinned coordinates are stored in the save, which is a save-format change: the owning version is bumped so older saves are rejected. Save and reload of a scenario use the existing `save` and `load` commands.
+User direction (binding): the Debug-only server harness initializes a cell at an
+unloaded coordinate (through `CreateCellAtCoordinate`) and removes a loaded
+cell, using a Debug-only pinned-coordinate set that keeps edited or initialized
+playerless cells in the active set; pinning also lifts `edit_frame`'s refusal of
+a playerless non-origin cell while a client is handshaken. Pinned coordinates
+are stored in the save, which is a save-format change: the owning version is
+bumped so older saves are rejected. Save and reload of a scenario use the
+existing `save` and `load` commands.
 
-Why a pin is needed: the server's active set is recomputed every update and every tick (`Engine/Source/Network/Server/ServerSessionRuntime.cpp:330-345`, called from `Engine/Source/GameBase.cpp:352`, `:961`, and `Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp:56`) as active subscriptions plus the game hook's player cells (`ServerSession.cpp:290-302`) plus the origin, and `SyncActiveCells` creates a cell for every entering coordinate and erases every other (`ServerSessionRuntime.cpp:306-328`). A bare `CreateCellAtCoordinate` is therefore undone within the update, and a playerless non-origin cell a client once subscribed to is erased when the load-time resynchronization frees every subscription (`ServerSession.cpp:386-395`), which is why `edit_frame` refuses it (`Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerFrameEdit.cpp:394-399`). The same mechanism drops a reloaded save's playerless cells, although `WriteGridSave` writes every loaded frame (`Engine/Source/File/GridSave.cpp:29-45`), so without saved pins a scenario built in such a cell would not reload.
+Why a pin is needed: the server's active set is recomputed every update and
+every tick (`Engine/Source/Network/Server/ServerSessionRuntime.cpp:330-345`,
+called from `Engine/Source/GameBase.cpp:352`, `:961`, and
+`Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp:56`) as
+active subscriptions plus the game hook's player cells
+(`ServerSession.cpp:290-302`) plus the origin, and `SyncActiveCells` creates a
+cell for every entering coordinate and erases every other
+(`ServerSessionRuntime.cpp:306-328`). A bare `CreateCellAtCoordinate` is
+therefore undone within the update, and a playerless non-origin cell a client
+once subscribed to is erased when the load-time resynchronization frees every
+subscription (`ServerSession.cpp:386-395`), which is why `edit_frame` refuses it
+(`Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerFrameEdit.cpp:394-399`).
+The same mechanism drops a reloaded save's playerless cells, although
+`WriteGridSave` writes every loaded frame
+(`Engine/Source/File/GridSave.cpp:29-45`), so without saved pins a scenario
+built in such a cell would not reload.
 
 Decisions this Plan makes (author's, with rationale):
 
 1. The pinned set is `game::ServerSession::mPinnedCoordinates`, consulted by `AddGameRequiredCoordinates`. The session already owns the hook, the fleet state the save's game half carries, and the relink policy; a pin is "keep this cell active", nothing else.
-2. Two commands, `pin_cell` and `unpin_cell`, each `{"coord":[x,y]}`, in `AgentCommandsServer.cpp` beside the other simulation controls. Pinning creates the cell by running `ComputeActiveSet()` the way `ServerLoad` does (`Projects/BrokenEngineSandbox/Source/Save/GameSaveLoad.cpp:78`); unpinning removes the cell the same way when nothing else keeps the cell. Origin and player cells need no special case: pinning them changes nothing and unpinning them leaves them loaded, which the response reports.
+2. Two commands, `pin_cell` and `unpin_cell`, each `{"coord":[x,y]}`, in
+   `AgentCommandsServer.cpp` beside the other simulation controls. Pinning
+   creates the cell by running `ComputeActiveSet()` the way `ServerLoad` does
+   (`Projects/BrokenEngineSandbox/Source/Save/GameSaveLoad.cpp:78`); unpinning
+   removes the cell the same way when nothing else keeps the cell. Origin and
+   player cells need no special case: pinning them changes nothing and unpinning
+   them leaves them loaded, which the response reports.
 3. Pins are saved in the game half of the grid save after the fleet data, read into `SaveStagedState`, adopted with it, and cleared by `ResetSaveState` (`Projects/BrokenEngineSandbox/Source/Network/Server/ServerFleetSerialization.cpp:209-230`), so `reset`, a failed load, and a fresh game start unpinned, and `load` restores the pins before `ServerLoad` recomputes the active set. The engine reader keeps carrying the game half uninspected (`Engine/Source/File/AGENTS.md` `## Grid Saves`).
-4. The owning version is `game::Frame::kiVersion`: the grid save header is `WriteVersionHeader<game::Frame>` (`GridSave.cpp:21`, validated at `:77` through `Engine/Source/File/FileManager.h:274-288`). Its base constant moves from 134 to 135 (`Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:38`). The same constant gates replay streams (`Engine/Source/File/DifferenceStream.h:79`, `:241-249`) and the client handshake (`Engine/Source/Network/Server/AGENTS.md` `## Session Invariants`), so older replays and mismatched builds are rejected too, as the repository's no-compatibility rule requires.
+4. The owning version is `game::Frame::kiVersion`: the grid save header is
+   `WriteVersionHeader<game::Frame>` (`GridSave.cpp:21`, validated at `:77`
+   through `Engine/Source/File/FileManager.h:274-288`). Its base constant moves
+   from 135 to 136 (`Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:27`).
+   The same constant gates replay streams
+   (`Engine/Source/File/DifferenceStream.h:79`, `:241-249`) and the client
+   handshake (`Engine/Source/Network/Server/AGENTS.md` `## Session Invariants`),
+   so older replays and mismatched builds are rejected too, as the repository's
+   no-compatibility rule requires.
 5. Both commands require `kbDebugInput` and share `edit_frame`'s replay refusal (recording, playback, pending transition): a pin changes the recorded cell set outside the recorded inputs, and one refusal rule is simpler than analysing what a recording would capture.
 6. Non-Debug builds keep the member and the save fields, always empty, so one save format exists.
 7. Pinned cells are not live transfer destinations: `ServerTransferManager::IsDestinationLive` sees players and subscriptions only (`Engine/Source/Network/Server/ServerTransferManager.cpp:31-50`), so a non-player transfer out of a pinned cell into a neighbour that holds no player or subscription is dropped with a Network log. Documented; not changed.
@@ -44,13 +80,22 @@ In `Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsServer.cpp`, two hand
 - `WriteSaveState` (`ServerFleetSerialization.cpp:209-212`): after `WriteFleetData`, write `int64_t` count then each coordinate through `GridCoord::Write` (`Engine/Source/Frame/GridCoord.h:29`), in the vector's order (pin order is the only order that exists, and the save is already deterministic per server state).
 - `ReadSaveState` (`:214-217`): after `ReadFleetData`, read the count, `common::ValidateDeserializedCount(iCount, 2 * sizeof(int32_t), rFileStream, "ReadSaveState pins")`, resize, read each through `GridCoord::Read`. The count bound is the trust-boundary check the save reader owes (`Engine/Source/File/AGENTS.md` `## Grid Saves`); a duplicate or unloaded pinned coordinate is harmless, because the hook deduplicates and `SyncActiveCells` creates a missing cell.
 - `AdoptSaveState` (`:219-225`): `gpServerSession->mPinnedCoordinates = std::move(rStagedState.pinnedCoordinates);`. `ResetSaveState` (`:227-230`): also `gpServerSession->mPinnedCoordinates.clear();`.
-- `Frame.cpp:38`: `134` becomes `135`, with no comment change.
+- `Frame.cpp:27`: `135` becomes `136`, with no comment change.
 
 Load order holds without further change: `ReadGridSave` stages the game half before the frames (`GridSave.cpp:104`), `AdoptGridSave` adopts it (`:188`), `ServerLoad` then resynchronizes and calls `ComputeActiveSet` (`GameSaveLoad.cpp:77-78`), which keeps every pinned cell's saved frame. A fresh process that runs `load` gets the pins from the file.
 
 ### Documentation
 
-- `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md`: entries for `pin_cell` and `unpin_cell` after `reset` (schema, responses, that a pin keeps the cell in the active set across updates, loads, and process restarts through the save, the origin and player-cell behavior, the `kbDebugInput` and replay refusals, and the transfer caveat from decision 7); in the `edit_frame` entry, the resynchronization paragraph's "keeps only cells with a player and the origin" and the refusal sentence add pinned cells, and the recipe gains "pin a cell first to build a scenario in an empty cell"; in the `save`/`load` entries, that the save carries the pinned cells and that a save from an older `Frame::kiVersion` loads as `resetToFresh:true`.
+- `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md`:
+  entries for `pin_cell` and `unpin_cell` after `reset` (schema, responses, that
+  a pin keeps the cell in the active set across updates, loads, and process
+  restarts through the save, the origin and player-cell behavior, the
+  `kbDebugInput` and replay refusals, and the transfer caveat from decision 7);
+  in the `edit_frame` entry, the resynchronization paragraph's "keeps only cells
+  with a player and the origin" and the refusal sentence add pinned cells, and
+  the recipe gains "pin a cell first to build a scenario in an empty cell"; in
+  the `save`/`load` entries, that the save carries the pinned cells and that a
+  save from an older `Frame::kiVersion` loads as `resetToFresh:true`.
 - `Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md` `## Contracts`: one bullet — the Debug pinned-coordinate set lives on the server session, joins the active set through the game hook, is saved with the fleet data and cleared by reset, and admits a playerless cell to `edit_frame`'s resynchronizing path.
 - `Projects/BrokenEngineSandbox/Source/Network/Server/AGENTS.md` `## Deterministic Tick Contracts`, first bullet: the hook contributes every coordinate holding a Player and every Debug-pinned coordinate.
 - `Projects/BrokenEngineSandbox/Source/Save/AGENTS.md` `## Save and Load`: the game half of the grid save is the fleet data plus the pinned coordinates; reset clears both.
@@ -68,7 +113,7 @@ Load order holds without further change: `ReadGridSave` stages the game half bef
 
 - `ServerSession.h`: the `mPinnedCoordinates` member. `ServerSession.cpp` `AddGameRequiredCoordinates` (`:290-302`).
 - `ServerFleetSerialization.h` `SaveStagedState`; `ServerFleetSerialization.cpp` `WriteSaveState`, `ReadSaveState`, `AdoptSaveState`, `ResetSaveState` (`:209-230`).
-- `Frame.cpp:38`: the base constant.
+- `Frame.cpp:27`: the base constant.
 - `AgentCommandsServer.cpp`: `CommandPinCell`, `CommandUnpinCell`, two rows in `ExecuteAgentCommandServer` (`:296-366`), and the include of `Network/Server/ServerSession.h` if not already present.
 - `ServerFrameEdit.cpp:394-399`: the refusal condition and message; its include.
 - The documentation edits under `### Documentation`.
@@ -111,15 +156,23 @@ Harness checks (`/agent-harness`, Debug server, after `reset`; `[2,3]` is a cell
 | 9 | Profile server: `pin_cell` | `ok:false` with `pin_cell requires kbDebugInput build` |
 | 10 | Unknown key or malformed `coord`: `pin_cell {"coord":[1.0,2]}`, `pin_cell {"coord":[1,2],"x":1}` | `ok:false` each, no pin added (`unpin_cell [1,2]` then fails with `coord is not pinned`) |
 
-By code reading: `WriteVersionHeader<game::Frame>` and `ReadAndValidateVersionHeader<game::Frame>` compare `Frame::kiVersion`, so a save written at 134-based versions fails the header check and `load` returns `resetToFresh:true`; `ReadSaveState` bounds the count before resizing; `ResetSaveState` clears pins on both the `reset` and the failed-load path (`GridSave.cpp:57-62`).
+By code reading: `WriteVersionHeader<game::Frame>` and `ReadAndValidateVersionHeader<game::Frame>` compare `Frame::kiVersion`, so a save written at 135-based versions fails the header check and `load` returns `resetToFresh:true`; `ReadSaveState` bounds the count before resizing; `ResetSaveState` clears pins on both the `reset` and the failed-load path (`GridSave.cpp:57-62`).
 
 ## Coordination
 
 - `Documents/Plans/Engine/RemoveSandboxGameplayFromEngine.md` moves `SaveStagedState` and the `WriteSaveState`, `ReadSaveState`, `AdoptSaveState`, and `ResetSaveState` declarations from `ServerFleetSerialization.h` into the new server-only `Save/GameSaveState.h`; the definitions stay in `ServerFleetSerialization.cpp`. Whichever lands second rebases onto the other's edits; landed after that Plan, `pinnedCoordinates` is added to `SaveStagedState` in `Save/GameSaveState.h`.
-- `Documents/Plans/Engine/GameShellIntoGameBase.md` also increments the `Frame::kiVersion` base literal (`Frame.cpp:38`); the second to land increments the then-current literal again. That Plan's server `GameBase::ComputeActiveSet` forwards to the `gpServerSession->mpRuntime->ComputeActiveSet()` call the pin commands make, so the commands need no other change.
-- `Documents/Plans/Game/ShipTypeSplit.md` also increments the `Frame::kiVersion` base literal (`Frame.cpp:38`, its decision 22); the second to land increments the then-current literal again. This Plan's 134 → 135 holds only if it lands before both that Plan and `GameShellIntoGameBase.md`; otherwise its new value is one above the then-current literal.
+- The landed GameShellIntoGameBase change already incremented the `Frame::kiVersion` base literal to 135, so this Plan increments that then-current literal. That change's server `GameBase::PrepareActiveSet` calls the same `gpServerSession->mpRuntime->ComputeActiveSet()` the pin commands make, so the commands need no other change.
+- `Documents/Plans/Game/ShipTypeSplit.md` also increments the `Frame::kiVersion` base literal (`Frame.cpp:27`, its decision 22); the second to land increments the then-current literal again. This Plan's 135 → 136 holds only if it lands before that Plan; otherwise its new value is one above the then-current literal.
 
 ## Execution card
 
 - Goal: the pinned set and hook, the two commands, the lifted refusal, the saved pin list with the version bump, and the documentation edits under `## In scope`.
-- Tier 3; roles as the Change Workflow assigns: `implementer` runs `/implement-plan` in two slices (session, save, and version first; commands, refusal, and documentation second), then `/update-affected-code`; `builder` runs `/compile` (server Debug and Profile, client Debug); `reviewer` runs `/plan-audit` and `/plan-simplicity-review` before implementation, `/external-grill-plan` after `/plan-audit`, and `/repo-code-review`, `/comment-review`, `/coherence-review`, and `/adversarial-review` after; `/update-claude-docs` and `/progressive-disclosure-review` follow; `/finalize-changes` lands with user confirmation.
+- Tier 3; roles as the Change Workflow assigns: `implementer` runs
+  `/implement-plan` in two slices (session, save, and version first; commands,
+  refusal, and documentation second), then `/update-affected-code`; `builder`
+  runs `/compile` (server Debug and Profile, client Debug); `reviewer` runs
+  `/plan-audit` and `/plan-simplicity-review` before implementation,
+  `/external-grill-plan` after `/plan-audit`, and `/repo-code-review`,
+  `/comment-review`, `/coherence-review`, and `/adversarial-review` after;
+  `/update-claude-docs` and `/progressive-disclosure-review` follow;
+  `/finalize-changes` lands with user confirmation.

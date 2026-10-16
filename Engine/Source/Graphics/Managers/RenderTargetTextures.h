@@ -51,7 +51,7 @@ public:
 	// Terrain/Water read it with one texture sample in the ambient path.
 	Texture mAmbientCombineTexture;
 
-	// Persistent previous-frame combined lighting (3 directional + ambient), reprojected by LightingTemporal.comp to
+	// Persistent last-refresh combined lighting (3 directional + ambient), reprojected by LightingTemporal.comp to
 	// de-flicker the texel-ramp resample (mirror of mShadowHistoryTexture). LightingHistoryCopy.comp publishes the
 	// temporal result over the whole texture on refresh.
 	Texture mpLightingHistoryTextures[3];
@@ -68,7 +68,7 @@ public:
 	Texture mShadowTexture;
 	Texture mShadowBlurTexture;
 	Texture mShadowBlurIntermediateTexture;
-	Texture mShadowHistoryTexture; // Previous-frame final shadow, refreshed by ShadowHistoryCopy.comp for ShadowTemporal reprojection
+	Texture mShadowHistoryTexture; // Last-refresh final shadow, refreshed by ShadowHistoryCopy.comp for ShadowTemporal reprojection
 
 	Texture mObjectShadowsTexture;
 	Texture mObjectShadowsBlurTexture;

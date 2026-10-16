@@ -188,7 +188,7 @@ using common::Log;
 using common::LogIndent;
 using common::ScopedLogIndent;
 
-// Per-category compile-time thresholds (keLogLevel* defined in each project's Pch.h before Common.h)
+// Per-category compile-time thresholds (keLogLevel* defined before Common.h by each project's Pch.h; the game's come from Engine/Source/EngineSwitches.h, which its Pch.h includes)
 inline constexpr LogLevel keLogLevels[]
 {
 	keLogLevelDefault, keLogLevelTemporary,

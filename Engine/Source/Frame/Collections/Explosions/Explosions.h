@@ -83,15 +83,22 @@ enum class ExplosionFlags : uint8_t
 };
 using ExplosionFlags_t = common::Flags<ExplosionFlags>;
 
+// Engine effect controllers. ExplosionsInterpolate::Register sets them on the client, before the game registers any
+// ExplosionType; on the server they stay invalid, so every ExplosionType there defaults to no effect.
+inline int64_t giExplosionPrimaryLightControllerTypeIndex = kiInvalidControllerType;
+inline int64_t giExplosionSecondaryLightControllerTypeIndex = kiInvalidControllerType;
+inline int64_t giExplosionPrimaryPuffControllerTypeIndex = kiInvalidControllerType;
+inline int64_t giExplosionSecondaryPuffControllerTypeIndex = kiInvalidControllerType;
+inline int64_t giExplosionWindRadialControllerTypeIndex = kiInvalidControllerType;
+
 struct ExplosionType
 {
-	// Controller type indices for fire-and-forget effects
-	int64_t iPrimaryLightControllerTypeIndex = kiInvalidControllerType;
-	int64_t iSecondaryLightControllerTypeIndex = kiInvalidControllerType;
-	int64_t iPrimaryPuffControllerTypeIndex = kiInvalidControllerType;
-	int64_t iSecondaryPuffControllerTypeIndex = kiInvalidControllerType;
-	int64_t iTrailTypeIndex = kiInvalidTrailType;
-	int64_t iWindRadialControllerTypeIndex = kiInvalidControllerType;
+	// Controller type indices for fire-and-forget effects; kiInvalidControllerType disables that effect.
+	int64_t iPrimaryLightControllerTypeIndex = giExplosionPrimaryLightControllerTypeIndex;
+	int64_t iSecondaryLightControllerTypeIndex = giExplosionSecondaryLightControllerTypeIndex;
+	int64_t iPrimaryPuffControllerTypeIndex = giExplosionPrimaryPuffControllerTypeIndex;
+	int64_t iSecondaryPuffControllerTypeIndex = giExplosionSecondaryPuffControllerTypeIndex;
+	int64_t iWindRadialControllerTypeIndex = giExplosionWindRadialControllerTypeIndex;
 
 	int64_t iBaseParticleCount = 0;
 	common::crc_t particleCrc = common::CrcConsteval(R"(Textures\Particles\[BC4]Long\5.png)");
@@ -152,21 +159,41 @@ struct ExplosionType
 struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 	public TypeRegistry<ExplosionType>
 {
-	static constexpr int64_t kiVersion = 1;
+	static constexpr int64_t kiVersion = 2;
 
 	// Register default explosion effect types (called from ForEachRegister)
 	static void Register();
 
-	static void AllocateAndCopy(ExplosionsInterpolate& rCurrent, const ExplosionsInterpolate& rPrevious);
-
 	// Spawn caps the trail count at the fixed trail slots; reject any other count as a corrupt stream, since trail loops index those slots by it.
+	// Start times, time percents, and trail times must lie in the ranges Spawn produces, so Destroy's nanosecond expiry
+	// arithmetic cannot overflow. Each float test is one range test so NaN and both infinities fail it too.
 	static void PostRead(const ExplosionsInterpolate& rCurrent)
 	{
+		static constexpr SimulationTime kLatestStartTime = TickToSimulationTime(TimeStep::kiMaximumSavedTick);
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
 		{
 			if (rCurrent.piTrailCounts[i] < 0 || rCurrent.piTrailCounts[i] > kiMaxExplosionTrails)
 			{
 				throw std::ios_base::failure("ExplosionsInterpolate piTrailCounts");
+			}
+			if (rCurrent.pStartTimes[i] < SimulationTime() || rCurrent.pStartTimes[i] > kLatestStartTime)
+			{
+				throw std::ios_base::failure("ExplosionsInterpolate pStartTimes");
+			}
+			if (!(rCurrent.pfTimePercents[i] >= 0.0f && rCurrent.pfTimePercents[i] <= 1.0f))
+			{
+				throw std::ios_base::failure("ExplosionsInterpolate pfTimePercents");
+			}
+
+			const ExplosionType& rType = sTypes.at(static_cast<size_t>(rCurrent.puiTypeIndices[i]));
+			float fMaximumTrailTime = (rType.trailTimeMinimum + rType.trailTimeRandom).count();
+			for (int64_t j = 0; j < rCurrent.piTrailCounts[i]; ++j)
+			{
+				float fTrailTime = rCurrent.pTrailTimes[j][i].count();
+				if (!(fTrailTime >= 0.0f && fTrailTime <= fMaximumTrailTime))
+				{
+					throw std::ios_base::failure("ExplosionsInterpolate pTrailTimes");
+				}
 			}
 		}
 	}
@@ -175,12 +202,7 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 	static inline ExplosionTuning sTuning;
 	static inline int64_t siTotalCount = 0;
 
-	static inline int64_t siPrimaryLightControllerTypeIndex = kiInvalidControllerType;
-	static inline int64_t siSecondaryLightControllerTypeIndex = kiInvalidControllerType;
-	static inline int64_t siPrimaryPuffControllerTypeIndex = kiInvalidControllerType;
-	static inline int64_t siSecondaryPuffControllerTypeIndex = kiInvalidControllerType;
 	static inline int64_t siExplosionTrailTypeIndex = kiInvalidTrailType;
-	static inline int64_t siWindRadialControllerTypeIndex = kiInvalidControllerType;
 #endif // BT_CLIENT
 
 	static void Update(game::FrameInterpolate& __restrict rCurrentFrameInterpolate, const game::Frame& __restrict rPreviousFrame);
@@ -239,8 +261,6 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 {
 	// Bump on any SOA layout change — feeds the Frame::kiVersion save/replay gate
 	static constexpr int64_t kiVersion = 1;
-
-	static void AllocateAndCopy(ExplosionsPostRender& rCurrent, const ExplosionsPostRender& rPrevious);
 
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 

@@ -147,8 +147,8 @@ void DestroyExpiredControlled(INTERPOLATE& rInterpolate, POST_RENDER& rPostRende
 			continue;
 		}
 
-		std::chrono::duration<float> elapsedTime = currentTime - rInterpolate.pStartTimes[i];
-		if (elapsedTime > rController.times[rController.iKeyframeCount - 1]) [[unlikely]]
+		std::chrono::nanoseconds elapsedTime = currentTime - rInterpolate.pStartTimes[i];
+		if (elapsedTime > common::FloatSecondsToNanoseconds(rController.times[rController.iKeyframeCount - 1])) [[unlikely]]
 		{
 			RemoveFunction(rInterpolate, rPostRender, i);
 		}

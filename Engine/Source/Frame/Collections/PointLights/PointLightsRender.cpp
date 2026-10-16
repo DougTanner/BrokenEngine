@@ -6,6 +6,7 @@
 #include "Graphics/Objects/PipelineDescriptorWriter.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
+#include "Ui/WrapperBase.h"
 
 #include "Profile/ProfileManager.h"
 
@@ -75,8 +76,17 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 		XMVECTOR vecLocalPosition = rCurrent.pVecPositions[i];
 		const PointLightsType& rType = PointLightsInterpolate::sTypes.at(rCurrent.puiTypeIndices[i]);
 		float fRotation = rCurrent.pfRotations[i];
-		float fLightingArea = std::max(rCurrent.pfLightingAreas[i], fMinLightingArea);
+		float fVisibleIntensity = rCurrent.pfVisibleIntensities[i];
+		float fLightingArea = rCurrent.pfLightingAreas[i];
 		float fLightingIntensity = rCurrent.pfLightingIntensities[i];
+		if (rCurrent.puiControllerTypeIndices[i] == kiInvalidControllerType)
+		{
+			// Owner-synced lights take live tuning from their type; controlled lights keep their animated values.
+			fVisibleIntensity = rType.pVisibleIntensityWrapper != nullptr ? rType.pVisibleIntensityWrapper->mfCurrent : rType.fVisibleIntensity;
+			fLightingArea = rType.pLightingAreaWrapper != nullptr ? rType.pLightingAreaWrapper->mfCurrent : rType.fLightingArea;
+			fLightingIntensity = rType.pLightingIntensityWrapper != nullptr ? rType.pLightingIntensityWrapper->mfCurrent : rType.fLightingIntensity;
+		}
+		fLightingArea = std::max(fLightingArea, fMinLightingArea);
 
 		XMFLOAT4A f4Position {};
 		if (!IsPointVisible(Rebase(rBasis, vecLocalPosition), f4Position))
@@ -98,7 +108,6 @@ void PointLightsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 		BuildAxisAlignedQuad(pPointLightsLayouts[siRendered], f4Position, fLightingArea, f4Parameters, rType.uiColor);
 
 		float fVisibleArea = rCurrent.pfVisibleAreas[i];
-		float fVisibleIntensity = rCurrent.pfVisibleIntensities[i];
 
 		shaders::VisibleLightQuadLayout& rVisibleLayout = pVisibleLightsLayouts[siRendered];
 

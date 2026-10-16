@@ -17,4 +17,8 @@ struct FrameInput
 	friend std::istream& operator>>(std::istream& rStream, FrameInput& rInput);
 };
 
+// engine::ReadFrameInput calls this after each StatusChange payload read; it throws std::ios_base::failure for a
+// change the game cannot adopt.
+void AdmitFrameInputStatusChange(const StatusChange& rChange);
+
 } // namespace game

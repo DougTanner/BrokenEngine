@@ -7,7 +7,7 @@
 #include "Ui/WrapperBase.h"
 #include "Render.h"
 
-#include "Frame/Collections/Players/Players.h"
+#include "Profile/ProfileManager.h"
 #include "Game.h"
 
 namespace engine
@@ -457,6 +457,24 @@ static void PopulateHexShield(shaders::MainLayout& rMainLayout)
 	rMainLayout.fHexShieldDirectionMultiplier = engine::gHexShieldDirectionMultiplier.mfCurrent;
 }
 
+// The engine collections begin and end each render transaction ahead of the game's.
+static void BeginFrameInterpolateRender(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
+{
+	ExplosionsInterpolate::siTotalCount = 0;
+	ForEachBeginRender(InterpolateTypes {}, iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
+	game::FrameInterpolate::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
+}
+
+static void EndFrameInterpolateRender(int64_t iCommandBuffer)
+{
+	if constexpr (kbProfiling)
+	{
+		gpProfileManager->GetCpuCounter(kCpuCounterExplosions).iCount = ExplosionsInterpolate::siTotalCount;
+	}
+	ForEachEndRender(InterpolateTypes {}, iCommandBuffer);
+	game::FrameInterpolate::EndRender(iCommandBuffer);
+}
+
 void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, std::chrono::duration<float> currentTime)
 {
 	if (rActiveCoordinates.empty() || rRenderInterpolates.find(cameraCoordinate) == rRenderInterpolates.end())
@@ -464,8 +482,8 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 		// Active-set computation and reset include the client cell, and boot prerender seeds the origin; the empty-set check is defensive.
 		// A missing camera interpolate can coexist with other renderable cells. Begin/end publication without per-cell Render clears indirect counts and per-transaction profile counters; collection BeginRender skips missing interpolates.
 		// Return before accessing the absent camera interpolate.
-		game::FrameInterpolate::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
-		game::FrameInterpolate::EndRender(iCommandBuffer);
+		BeginFrameInterpolateRender(iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
+		EndFrameInterpolateRender(iCommandBuffer);
 		RenderLightingSpreadIndirect(iCommandBuffer);
 		if constexpr (kbDebugRender)
 		{
@@ -510,7 +528,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 		gpPipelineManager->mpPipelines[kPipelineWaterDisplacement].WriteIndirectComputeBuffer(iCommandBuffer, (rWaterLevelOfDetail.iQuadCountX + 1 + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize, (rWaterLevelOfDetail.iQuadCountY + 1 + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize, 1);
 	}
 
-	game::FrameInterpolate::BeginRender(iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
+	BeginFrameInterpolateRender(iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
 
 	// Render the camera cell first to keep its index at zero.
 	auto RenderFrame = [&](const GridCoord& rCoordinate)
@@ -522,6 +540,8 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 		}
 		const game::FrameInterpolate& rFrameInterpolate = it->second;
 		// Automatically dispatched main collections
+		ExplosionsInterpolate::siTotalCount += rFrameInterpolate.explosions.iCount;
+		ForEachInterpolateRender(InterpolateTypes {}, rFrameInterpolate, iCommandBuffer);
 		game::FrameInterpolate::Render(rFrameInterpolate, iCommandBuffer);
 		// Manually rendered trail collections
 		SmokeTrailsInterpolate::Render(rFrameInterpolate, iCommandBuffer);
@@ -537,22 +557,15 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 		RenderFrame(rCoordinate);
 	}
 
-	game::FrameInterpolate::EndRender(iCommandBuffer);
+	EndFrameInterpolateRender(iCommandBuffer);
 
 	// EndRender publishes deposit indirect counts before spread indirect parameters are published.
 	RenderLightingSpreadIndirect(iCommandBuffer);
 
-	// Phase 4: Game-specific debug rendering (per-coord, positions from fully-interpolated frame)
+	// Phase 4: Game-specific debug rendering (positions from fully-interpolated frame)
 	if constexpr (kbDebugRender)
 	{
-		for (const GridCoord& rCoordinate : rActiveCoordinates)
-		{
-			auto it = rRenderInterpolates.find(rCoordinate);
-			if (it != rRenderInterpolates.end())
-			{
-				game::PlayersInterpolate::DebugRender(it->second, rCoordinate);
-			}
-		}
+		game::FrameInterpolate::DebugRender(rRenderInterpolates, rActiveCoordinates);
 	}
 
 	DebugRenderNavigationData(rActiveCoordinates, cameraCoordinate);
@@ -576,7 +589,8 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	static const siv::BasicPerlinNoise<float> sPerlinRoll(0);
 	static const siv::BasicPerlinNoise<float> sPerlinPitch(1);
 	static const siv::BasicPerlinNoise<float> sPerlinYaw(2);
-	auto matCameraShake = XMMatrixRotationRollPitchYaw(kfMaxRoll * fCameraShake * (-1.0f + 2.0f * sPerlinRoll.octave1D_01(8.0f * rFrameInterpolate.fCurrentTime, 4)), kfMaxPitch * fCameraShake * (-1.0f + 2.0f * sPerlinPitch.octave1D_01(8.0f * rFrameInterpolate.fCurrentTime, 4)), kfMaxYaw * fCameraShake * (-1.0f + 2.0f * sPerlinYaw.octave1D_01(8.0f * rFrameInterpolate.fCurrentTime, 4)));
+	float fShakeTime = common::NanosecondsToFloatSeconds<float>(TickToSimulationTime(rFrameInterpolate.iTick).time_since_epoch());
+	auto matCameraShake = XMMatrixRotationRollPitchYaw(kfMaxRoll * fCameraShake * (-1.0f + 2.0f * sPerlinRoll.octave1D_01(8.0f * fShakeTime, 4)), kfMaxPitch * fCameraShake * (-1.0f + 2.0f * sPerlinPitch.octave1D_01(8.0f * fShakeTime, 4)), kfMaxYaw * fCameraShake * (-1.0f + 2.0f * sPerlinYaw.octave1D_01(8.0f * fShakeTime, 4)));
 
 	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ViewProjection[0]), XMMatrixTranspose(XMMatrixMultiply(engine::gpCamera->mMatView, XMMatrixMultiply(matCameraShake, engine::gpCamera->mMatPerspective))));
 

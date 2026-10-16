@@ -13,6 +13,8 @@
 #include "Ui/WrapperBase.h"
 #include "Render.h"
 
+#include "Graphics/Camera.h"
+
 namespace engine
 {
 
@@ -502,7 +504,7 @@ void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> curr
 	RenderSmokeGlobal(iCommandBuffer);
 	RenderWindGlobal(iCommandBuffer);
 
-	float fSunAngle = engine::gpCamera->SunAngle();
+	float fSunAngle = static_cast<game::Camera*>(engine::gpCamera)->SunAngle();
 
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 

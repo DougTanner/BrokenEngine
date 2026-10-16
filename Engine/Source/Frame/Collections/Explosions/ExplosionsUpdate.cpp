@@ -17,7 +17,7 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 	ExplosionsInterpolate& rCurrent = rCurrentFrameInterpolate.explosions;
 	const ExplosionsInterpolate& rPrevious = rPreviousFrame.interpolate.explosions;
 
-	[[maybe_unused]] SimulationTime currentTime(std::chrono::duration<float>(rPreviousFrame.interpolate.fCurrentTime + rCurrentFrameInterpolate.fDeltaTime));
+	[[maybe_unused]] SimulationTime currentTime = TickToSimulationTime(rPreviousFrame.interpolate.iTick) + common::FloatSecondsToNanoseconds(std::chrono::duration<float>(rCurrentFrameInterpolate.fDeltaTime));
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -65,7 +65,7 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 
 #if defined(BT_CLIENT)
 		const ExplosionType& rType = sTypes.at(static_cast<size_t>(iTypeIndex));
-		std::chrono::duration<float> explosionTime = currentTime - rPrevious.pStartTimes[i];
+		std::chrono::nanoseconds explosionTime = currentTime - rPrevious.pStartTimes[i];
 
 		for (int64_t j = 0; j < iTrailCount; ++j)
 		{
@@ -81,14 +81,14 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 			std::chrono::duration<float> trailEndTime = fTimePercent * rType.trailDelayTime + effectiveTrailTime;
 
 			// For expired trails, sync with zero intensity (they'll be removed in Destroy phase)
-			if (explosionTime.count() >= trailEndTime.count())
+			if (explosionTime >= common::FloatSecondsToNanoseconds(trailEndTime))
 			{
 				XMVECTOR vecTrailEnd = rCurrent.pVecTrailEndPositions[j][i];
 				SyncExplosionTrail(rCurrentFrameInterpolate, trailId, vecTrailEnd, 0.0f);
 				continue;
 			}
 
-			float fTrailPercent = (explosionTime - fTimePercent * rType.trailDelayTime) / effectiveTrailTime;
+			float fTrailPercent = (std::chrono::duration<float>(common::NanosecondsToFloatSeconds<float>(explosionTime)) - fTimePercent * rType.trailDelayTime) / effectiveTrailTime;
 			fTrailPercent = std::clamp(fTrailPercent, 0.0f, 1.0f);
 
 			XMVECTOR vecTrailStart = rCurrent.pVecTrailStartPositions[j][i];

@@ -71,10 +71,7 @@ static bool ContainsCoordinate(std::span<const GridCoord> coordinates, GridCoord
 	});
 }
 
-ClientSessionRuntime::ClientSessionRuntime(game::ClientSession& rSession)
-:	mrSession(rSession)
-{
-}
+ClientSessionRuntime::ClientSessionRuntime() = default;
 
 ClientSessionRuntime::~ClientSessionRuntime() = default;
 
@@ -121,7 +118,7 @@ void ClientSessionRuntime::Connect(std::string_view serverAddress, int64_t iPort
 	mpClient = std::make_unique<Client>(serverAddressString.c_str(), iPort, iCoordinateSlots, clientGuid, &PersistClientGuidToDisk);
 	if (mpClient->mpHost == nullptr)
 	{
-		mrSession.OnConnectionFailed();
+		game::gpClientSession->OnConnectionFailed();
 		Disconnect();
 	}
 }
@@ -144,7 +141,7 @@ void ClientSessionRuntime::Disconnect()
 	mStateFlags.Set(ClientSessionStateFlags::kDiscoveryScanTimedOut, false);
 	mStateFlags.Set(ClientSessionStateFlags::kNoFreeSlotLogged, false);
 	mStateFlags.Set(ClientSessionStateFlags::kConnectionWasAccepted, false);
-	mrSession.OnRuntimeDisconnected();
+	game::gpClientSession->OnRuntimeDisconnected();
 }
 
 void ClientSessionRuntime::StartDiscovery()
@@ -219,12 +216,12 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 	{
 		if (const char* pcRejection = mpClient->mpcRejectionReason[0] != '\0' ? mpClient->mpcRejectionReason : nullptr; pcRejection != nullptr)
 		{
-			mrSession.OnConnectionRejected(pcRejection);
+			game::gpClientSession->OnConnectionRejected(pcRejection);
 			Disconnect();
 		}
 		else if (mpClient->mStateFlags & Client::ClientStateFlags::kDisconnectedEvent)
 		{
-			mrSession.OnConnectionFailed();
+			game::gpClientSession->OnConnectionFailed();
 			Disconnect();
 		}
 		else
@@ -235,15 +232,15 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 	}
 
 	mStateFlags.Set(ClientSessionStateFlags::kConnectionWasAccepted);
-	mrSession.OnConnectionAccepted();
-	mrSession.PollDesynchronizationState();
+	game::gpClientSession->OnConnectionAccepted();
+	game::gpClientSession->PollDesynchronizationState();
 	if (mpClient == nullptr)
 	{
 		return;
 	}
 	if (mpClient->mStateFlags & Client::ClientStateFlags::kDisconnectedEvent)
 	{
-		mrSession.OnConnectionLost();
+		game::gpClientSession->OnConnectionLost();
 		if (mpClient != nullptr)
 		{
 			Disconnect();
@@ -254,10 +251,10 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 	{
 		mpClient->miCommittedLoadGeneration = *iLoadGeneration;
 		ResetForServerLoad();
-		mrSession.OnServerLoad();
+		game::gpClientSession->OnServerLoad();
 	}
-	mrSession.ProcessReceivedGamePackets();
-	mrSession.ApplyReceivedStaticData();
+	game::gpClientSession->ProcessReceivedGamePackets();
+	game::gpClientSession->ApplyReceivedStaticData();
 	ApplyReceivedFullStates();
 	ApplyReceivedUpdates();
 
@@ -282,13 +279,7 @@ void ClientSessionRuntime::ApplyReceivedFullStates()
 
 		Cell& rCell = game::gpGame->mCells.try_emplace(coordinate).first->second;
 
-		const game::Frame* pRingTail = nullptr;
-		if (rCell.iSnapshotCount > 0)
-		{
-			int64_t iTailPhysical = SnapshotIndex(rCell.iSnapshotHead, rCell.iSnapshotCount - 1);
-			pRingTail = rCell.snapshots[iTailPhysical].get();
-		}
-		mrSession.HydrateReceivedFullState(*rFullState.pFrame, pRingTail);
+		game::gpClientSession->HydrateReceivedFullState(*rFullState.pFrame, rCell.TailFrame());
 
 		if (rCell.iConfirmedTick < 0)
 		{
@@ -301,8 +292,6 @@ void ClientSessionRuntime::ApplyReceivedFullStates()
 			rCell.iConfirmedTick = iTick;
 			rCell.iLastFullStateTick = iTick;
 			rCell.iConfirmedOffset = 0;
-
-			float fFullStateTime = rCell.snapshots[0]->interpolate.fCurrentTime;
 
 			// Only the first full state sets the game clock. Start behind the server by the jitter-safety floor,
 			// matching EvaluateClock, to avoid a ~150 ms ceiling stall and an initial target-behind error.
@@ -317,7 +306,6 @@ void ClientSessionRuntime::ApplyReceivedFullStates()
 				int64_t iTickCounter = iTick - iAppliedBehind;
 				ASSERT(iTickCounter >= 0);
 				game::gpGame->miTickCounter = iTickCounter;
-				game::gpGame->mfCurrentTime = fFullStateTime - static_cast<float>(iAppliedBehind) * engine::kfDeltaTime;
 				game::gpGame->ResetRenderClock();
 			}
 		}
@@ -395,7 +383,7 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 				// when several coords are over budget, and the reset plus the discard below empties every
 				// serverUpdates map, so this branch cannot arm again for at least kiMaximumBufferedFrames ticks.
 				mpClient->SendResynchronizationRequest();
-				mrSession.ResetCoordinateStatesForResynchronization();
+				game::gpClientSession->ResetCoordinateStatesForResynchronization();
 				for (std::vector<ReceivedCoordUpdate>& rDrainedUpdates : rAllUpdates)
 				{
 					rDrainedUpdates.clear();
@@ -512,6 +500,36 @@ void ClientSessionRuntime::SetDesiredCoordinates(std::span<const GridCoord> desi
 	LOG(kNetwork, kVerbose, "Desired subscriptions changed Reason: {} Count: {} Tick: {}", reason, std::ssize(desiredCoordinates), iTick);
 }
 
+void ClientSessionRuntime::UpdateDesiredCoordinates(std::string_view reason)
+{
+	std::optional<common::LogTickScope> optionalTickScope;
+	InitializeLogTickScope(optionalTickScope);
+
+	static constexpr int64_t kiMaximumDesiredCoordinates = 9;
+	GridCoord desiredCoordinates[kiMaximumDesiredCoordinates] {};
+	int64_t iDesiredCount = 0;
+	auto PushCoordinate = [&](GridCoord coordinate)
+	{
+		ASSERT(iDesiredCount < kiMaximumDesiredCoordinates);
+		desiredCoordinates[iDesiredCount++] = coordinate;
+	};
+
+	if (game::gpGame->HasFocusedClientEntity())
+	{
+		PushCoordinate(game::gpGame->mClientGridCoordinate);
+		for (const GridCoord& rCoordinate : std::span<const GridCoord>(mVisibleNeighbors, static_cast<size_t>(miVisibleNeighborCount)))
+		{
+			PushCoordinate(rCoordinate);
+		}
+	}
+	else
+	{
+		PushCoordinate(kOriginCoordinate);
+	}
+
+	SetDesiredCoordinates(std::span<const GridCoord>(desiredCoordinates, static_cast<size_t>(iDesiredCount)), reason, game::gpGame->miTickCounter);
+}
+
 void ClientSessionRuntime::SynchronizeSubscriptions()
 {
 	if (mpClient == nullptr)
@@ -623,6 +641,132 @@ void ClientSessionRuntime::ClearSubscriptionState()
 	mDesiredCoordinates.clear();
 	mUnwantedTimestamps.clear();
 	mSubscriptionQueue.clear();
+}
+
+void ClientSessionRuntime::ComputeActiveSet()
+{
+	// Heap: mActiveCoordinates vector clear/push_back may allocate. Persists as Game member across frame updates
+	ScopedSuppressAllocationTracking suppress;
+
+	if (!(game::gpGame->mGameFlags & GameFlags::kMainMenu))
+	{
+		game::gpGame->mActiveCoordinates.clear();
+		for (const auto& [rCoordinate, rCell] : game::gpGame->mCells)
+		{
+			if (rCell.iSnapshotCount > 0 && (rCell.iConfirmedTick >= 0 || rCoordinate == game::gpGame->mClientGridCoordinate))
+			{
+				game::gpGame->mActiveCoordinates.push_back(rCoordinate);
+			}
+		}
+
+		{
+			auto it = game::gpGame->mCells.find(game::gpGame->mClientGridCoordinate);
+			if (it == game::gpGame->mCells.end() || it->second.iSnapshotCount == 0)
+			{
+				game::gpGame->CreateCellAtCoordinate(game::gpGame->mClientGridCoordinate);
+			}
+			if (!std::ranges::contains(game::gpGame->mActiveCoordinates, game::gpGame->mClientGridCoordinate))
+			{
+				game::gpGame->mActiveCoordinates.push_back(game::gpGame->mClientGridCoordinate);
+			}
+		}
+
+		miVisibleNeighborCount = 0;
+		if (game::gpGame->HasFocusedClientEntity())
+		{
+			// Camera-zoom-dependent VisibleArea: mf4LargeVisibleArea packs (minX, maxY, maxX, minY).
+			const XMFLOAT4& rf4Visible = gpCamera->mf4LargeVisibleArea;
+			// The visible area is in the camera basis cell's frame, which is not always the client cell: it lags a
+			// client-cell change and can be another coord entirely while render-camera selection falls back. Each
+			// neighbour rectangle therefore offsets the one local area every cell has by that neighbour's own offset
+			// from the camera basis, so both sides of the test are always in the same frame.
+			XMVECTOR vecArea = LocalCellArea();
+			float fCellMinX = XMVectorGetX(vecArea);
+			float fCellMaxY = XMVectorGetY(vecArea);
+			float fCellMaxX = XMVectorGetZ(vecArea);
+			float fCellMinY = XMVectorGetW(vecArea);
+
+			auto EnsureNeighbor = [&](GridCoord neighbor)
+			{
+				auto it = game::gpGame->mCells.find(neighbor);
+				if (it == game::gpGame->mCells.end() || it->second.iSnapshotCount == 0)
+				{
+					game::gpGame->CreateCellAtCoordinate(neighbor);
+				}
+				if (!std::ranges::contains(game::gpGame->mActiveCoordinates, neighbor))
+				{
+					game::gpGame->mActiveCoordinates.push_back(neighbor);
+				}
+			};
+
+			// Adjacent-only clamp: at wide zoom the VisibleArea may extend past the 3x3 ring;
+			// only the immediate ring is ever subscribed regardless.
+			for (int64_t i = -1; i <= 1; ++i)
+			{
+				for (int64_t j = -1; j <= 1; ++j)
+				{
+					if (i == 0 && j == 0)
+					{
+						continue;
+					}
+					// A cell at the numeric edge of the grid has no neighbour in that direction; skip it rather than
+					// wrap to the opposite end.
+					GridCoord neighbor {};
+					if (!TryAddGridCoordinate(game::gpGame->mClientGridCoordinate, i, j, neighbor))
+					{
+						continue;
+					}
+					XMFLOAT2 f2Offset = MakeRenderBasis(neighbor, gpCamera->mBasisCoordinate).f2Offset;
+					float fNeighborMinX = fCellMinX + f2Offset.x;
+					float fNeighborMaxX = fCellMaxX + f2Offset.x;
+					float fNeighborMinY = fCellMinY + f2Offset.y;
+					float fNeighborMaxY = fCellMaxY + f2Offset.y;
+					if (rf4Visible.x < fNeighborMaxX && rf4Visible.z > fNeighborMinX && rf4Visible.w < fNeighborMaxY
+					 && rf4Visible.y > fNeighborMinY)
+					{
+						mVisibleNeighbors[miVisibleNeighborCount++] = neighbor;
+						EnsureNeighbor(neighbor);
+					}
+				}
+			}
+		}
+
+	}
+	else
+	{
+		game::gpGame->mActiveCoordinates.clear();
+		game::gpGame->mActiveCoordinates.push_back(game::gpGame->mClientGridCoordinate);
+	}
+
+	// Delete local-only cells outside the active set, preserve network-subscribed cells
+	std::erase_if(game::gpGame->mCells, [](const std::pair<const GridCoord, Cell>& rPair)
+	{
+		return !std::ranges::contains(game::gpGame->mActiveCoordinates, rPair.first) && rPair.second.iConfirmedTick < 0;
+	});
+
+	ASSERT(std::ranges::count_if(game::gpGame->mCells, [](const std::pair<const GridCoord, Cell>& rPair)
+	{
+		return rPair.second.iConfirmedTick < 0;
+	}) <= 9);
+}
+
+void ClientSessionRuntime::PinClientGridCoordinate(GridCoord coordinate)
+{
+	mStateFlags.Set(ClientSessionStateFlags::kClientGridCoordinatePinned, false);
+	game::gpGame->SetClientGridCoordinate(coordinate);
+	mStateFlags.Set(ClientSessionStateFlags::kClientGridCoordinatePinned);
+}
+
+StandardMenuState_t ClientSessionRuntime::GetStandardMenuState() const
+{
+	StandardMenuState_t state;
+	state.Set(StandardMenuState::kClientPresent, mpClient != nullptr);
+	state.Set(StandardMenuState::kDiscoveryScannerPresent, mpDiscoveryScanner != nullptr);
+	state.Set(StandardMenuState::kServerDiscovered, mStateFlags & ClientSessionStateFlags::kServerDiscovered);
+	// Set only while a client exists, so the menu can test this bit on its own.
+	state.Set(StandardMenuState::kConnectionAccepted, mpClient != nullptr && (mpClient->mStateFlags & Client::ClientStateFlags::kConnectionAccepted));
+	state.Set(StandardMenuState::kAutoConnect, kbAutoConnect);
+	return state;
 }
 
 std::chrono::nanoseconds ClientSessionRuntime::EvaluateClock(int64_t iPreReconcileTick)

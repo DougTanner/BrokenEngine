@@ -159,6 +159,7 @@ PipelineManager::PipelineManager()
 
 	CreateDebugRenderPipelines();
 
+	ForEachGraphicsResources(InterpolateTypes {});
 	game::FrameInterpolate::GraphicsResources();
 }
 

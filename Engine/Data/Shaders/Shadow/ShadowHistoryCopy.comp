@@ -10,7 +10,7 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 };
 
 // Separate storage images keep this history refresh non-aliasing: temporal has already completed its
-// in-place blend in ShadowBlur, then this pass copies the whole texture for next frame.
+// in-place blend in ShadowBlur, then this pass copies the whole texture for the next refresh.
 layout (set = 1, binding = 1, r16) uniform readonly image2D shadowBlurTexture;
 layout (set = 1, binding = 2, r16) uniform writeonly image2D shadowHistoryTexture;
 

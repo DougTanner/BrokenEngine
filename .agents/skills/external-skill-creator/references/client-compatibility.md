@@ -21,7 +21,16 @@ not establish that the client enforces it.
 
 ## Claude Code
 
-Claude Code reads the repository frontmatter controls. For a genuinely user-only skill, set `disable-model-invocation: true`; this prevents automatic use and native skill-to-skill invocation. Omit it when a documented workflow must invoke the skill, and make the description state the exact automatic or chaining contexts. Set `user-invocable: false` only for a model-only skill: it hides the skill from the menu and prevents explicit `/skill-name` invocation. `when_to_use` is appended to `description` within their combined 1,536-character cap, `paths` gates activation by matching files, and `shell` selects Bash or PowerShell for commands. This package permits automatic validate-mode selection while author mode remains explicitly requested.
+Claude Code reads the repository frontmatter controls. For a genuinely user-only
+skill, set `disable-model-invocation: true`; this prevents automatic use and
+native skill-to-skill invocation. Omit it when a documented workflow must invoke
+the skill, and make the description state the exact automatic or chaining
+contexts. Set `user-invocable: false` only for a model-only skill: it hides the
+skill from the menu and prevents explicit `/skill-name` invocation.
+`when_to_use` is appended to `description` within their combined 1,536-character
+cap, `paths` gates activation by matching files, and `shell` selects Bash or
+PowerShell for commands. This package permits automatic validate-mode selection
+while author mode remains explicitly requested.
 
 Users invoke a listed Claude skill explicitly as `/skill-name`; `.claude/skills` exposes the repository package.
 

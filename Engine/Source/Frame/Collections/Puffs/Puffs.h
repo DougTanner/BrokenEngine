@@ -57,8 +57,6 @@ struct PuffsInterpolate : public Collection<PuffsInterpolate>,
 	static constexpr const char* kpcName = "Puffs";
 	static constexpr common::crc_t kCrc = common::CrcConsteval("Puffs");
 
-	static void AllocateAndCopy(PuffsInterpolate& rCurrent, const PuffsInterpolate& rPrevious);
-
 	static void Update(game::FrameInterpolate& __restrict rFrameInterpolate, const game::Frame& __restrict rPreviousFrame);
 
 	uint8_t* __restrict puiTypeIndices = nullptr;
@@ -90,8 +88,6 @@ struct PuffsInterpolate : public Collection<PuffsInterpolate>,
 
 struct PuffsPostRender : public Collection<PuffsPostRender>
 {
-	static void AllocateAndCopy(PuffsPostRender& rCurrent, const PuffsPostRender& rPrevious);
-
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	// Destroy removes expired puffs whose controller has bDestroysSelf set.

@@ -6,7 +6,14 @@ Use this mode only when an approved plan explicitly requires a clang-tidy run. O
 
 ## Retained protections
 
-Retain every ordinary build protection the skill states: the rules for taking and releasing the short-lived operation lock, immutable prebuilt WorktreeCli, worktree provisioning and lifecycle validation, WorktreeCli target serialization, synchronous foreground execution, and, for a game build, data-mode selection with the authoritative data properties from [runtime-data-mode.md](runtime-data-mode.md). `-ClangTidy` changes only the analysis switches and the log verbosity and, on a full build, forces a rebuild. Do not invoke MSBuild or clang-tidy outside WorktreeCli.
+Retain every ordinary build protection the skill states: the rules for taking
+and releasing the short-lived operation lock, immutable prebuilt WorktreeCli,
+worktree provisioning and lifecycle validation, WorktreeCli target
+serialization, synchronous foreground execution, and, for a game build,
+data-mode selection with the authoritative data properties from
+[runtime-data-mode.md](runtime-data-mode.md). `-ClangTidy` changes only the
+analysis switches and the log verbosity and, on a full build, forces a rebuild.
+Do not invoke MSBuild or clang-tidy outside WorktreeCli.
 
 Do not combine `-ClangTidy` with `-RunDataPacker`, although the script does not block it: when Local generation is authorized, run the generation build as an ordinary build first, then run each `-ClangTidy` build without `-RunDataPacker` against the existing Local output, so a forced rebuild never repeats an export.
 
@@ -14,7 +21,16 @@ Do not combine `-ClangTidy` with `-RunDataPacker`, although the script does not 
 
 `-ClangTidy` is accepted for Client and Server Debug and Release builds and for DataPacker, which builds Release only. Profile, every other target, and the combination with `-Prefast` block before any child process runs, under `parameter.clangtidy-invalid` — except that `-Prefast` invalid for the target or configuration on its own blocks first under `parameter.prefast-invalid`.
 
-The mode passes `EnableClangTidyCodeAnalysis=true`, `EnableMicrosoftCodeAnalysis=false`, `RunCodeAnalysis=true`, and `/verbosity:normal`. Its Release builds take the `RunMsvcAnalysis`-off path that the "Microsoft code analysis" bullet of `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md` `## Build Configuration` owns. The repository-root `.clang-tidy` sets an empty `WarningsAsErrors`, so a clang-tidy warning never fails the build. A parse error (`clang-diagnostic-error`) makes clang-tidy exit 1, which fails the build through `MSB6006` and leaves the project's remaining sources unanalyzed, so coverage requires a run with no parse errors.
+The mode passes `EnableClangTidyCodeAnalysis=true`,
+`EnableMicrosoftCodeAnalysis=false`, `RunCodeAnalysis=true`, and
+`/verbosity:normal`. Its Release builds take the `RunMsvcAnalysis`-off path that
+the "Microsoft code analysis" bullet of
+`Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md`
+`## Build Configuration` owns. The repository-root `.clang-tidy` sets an empty
+`WarningsAsErrors`, so a clang-tidy warning never fails the build. A parse error
+(`clang-diagnostic-error`) makes clang-tidy exit 1, which fails the build
+through `MSB6006` and leaves the project's remaining sources unanalyzed, so
+coverage requires a run with no parse errors.
 
 - The `ClangTidy` target is incremental through its own tracking logs, so a full `-ClangTidy` build forces the rebuild itself and its result covers every compile item of the target. Budget for the longer runtime: this is a from-scratch rebuild of the whole target plus a clang-tidy pass over every compile item.
 - Exception: a `-ClangTidy` run that also passes `-Files`, or any other incremental run, re-checks only what clang-tidy's own tracking finds out of date; `-Files` neither limits nor guarantees which files it re-checks, so the run carries no coverage guarantee. Only a full run establishes coverage.

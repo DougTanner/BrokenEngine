@@ -22,7 +22,7 @@ runner applies. The purpose and the triggers live in
    | Requested variant | Live exemplar files and symbols | Pattern to preserve |
    |---|---|---|
    | Shared-only game collection struct | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.h`: `SpaceshipsPostRender`; sibling `.cpp` files | `SharedMembers()` plus `Members()` returning it, so a later client-only field cannot silently join the CRC; no special frame dispatch |
-   | Shared game state plus client-owned state | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.h`: both structs; `Missiles.cpp`: `ClientInit`, `ClientInitAll`, `Transfer`; `MissilesUpdate.cpp` | guarded `ClientMembers()`, client `tuple_cat`, hydration, owned-object teardown, transfer payload |
+   | Shared game state plus client-owned state | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.h`: both structs; `Missiles.cpp`: `ClientInitialize`, `ClientInitializeAll`, `Transfer`; `MissilesUpdate.cpp` | guarded `ClientMembers()`, client `tuple_cat`, hydration, owned-object teardown, transfer payload |
    | Server-visible engine collection | `Engine/Source/Frame/Collections/Pushers/Pushers.h`: both structs; sibling `.cpp` files; `Engine/Source/Frame/FrameBase.h` | direct FrameBase storage, server tuple registration, index helpers, per-struct `kiVersion` declarations folded through server tuple registration |
    | Owner-synchronized whole-file client-only collection | `Engine/Source/Frame/Collections/Sounds/Sounds.h`: both structs; sibling `.cpp` files; `FrameBase.h` | outer `BT_CLIENT` guard, `Members()` only, owner `Sync`/Add/Remove, custom client-only identity only when required |
    | Controller-driven fire-and-forget client-only collection | `Engine/Source/Frame/Collections/Puffs/Puffs.h`: both structs; `Puffs.cpp`, `PuffsUpdate.cpp`, `PuffsRender.cpp`; `FrameBase.h` | `Members()` only, controller metadata copy, paired Add/Destroy, no owner handle or persisted version |
@@ -113,7 +113,10 @@ runner applies. The purpose and the triggers live in
     - [ ] Transferable state has matching send and receive wiring; source-owned
       client objects are removed and destination objects recreated. Shared
       collections with client-owned objects initialize them at local spawn and
-      after server state arrives (`ClientInit`/`ClientInitAll` pattern).
+      after server state arrives (`ClientInitialize`/`ClientInitializeAll`
+      pattern), adding the `ClientInitializeAll` call to
+      `ClientSession::HydrateReceivedFullState` in
+      `/Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp`.
 
     Done when that box holds.
 15. Settle the harness exposure decision, the second decision that auditor cannot

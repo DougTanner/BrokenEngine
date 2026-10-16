@@ -190,6 +190,12 @@ template<typename TUPLE>
 using TupleToTypeList_t = typename TupleToTypeList<TUPLE>::type;
 
 template<typename... TS>
+consteval int64_t SumVersions(TypeList<TS...>)
+{
+	return (0i64 + ... + TS::kiVersion);
+}
+
+template<typename... TS>
 void ForEachInterpolateUpdate(TypeList<TS...>, game::FrameInterpolate& __restrict rCurrent, const game::Frame& __restrict rPreviousFrame)
 {
 	([&]

@@ -59,7 +59,25 @@ ModelPipeline* DynamicPipelines::CreateModelPipeline(const ModelPipelineSpec& rM
 	return pResult;
 }
 
-void DynamicPipelines::CreateModelPipeline(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers)
+void DynamicPipelines::CreateModelPipelines(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers)
+{
+	CreateMainModelPipeline(crc, name, sceneCrc, pStorageBuffers);
+	CreateShadowModelPipeline(crc, name, sceneCrc, pStorageBuffers);
+}
+
+void DynamicPipelines::UpdateModelPipelineDescriptors(common::crc_t crc, int64_t iCommandBuffer, int64_t iBinding, Buffer* pBuffer)
+{
+	mModelPipelineMaps[kDynamicModelPipelineModel].at(crc)->UpdateStorageBufferDescriptors(iCommandBuffer, iBinding, pBuffer);
+	mModelPipelineMaps[kDynamicModelPipelineModelShadow].at(crc)->UpdateStorageBufferDescriptors(iCommandBuffer, iBinding, pBuffer);
+}
+
+void DynamicPipelines::WriteModelPipelineIndirectBuffers(common::crc_t crc, int64_t iCommandBuffer, int64_t iCount)
+{
+	mModelPipelineMaps[kDynamicModelPipelineModel].at(crc)->WriteIndirectBuffer(iCommandBuffer, iCount);
+	mModelPipelineMaps[kDynamicModelPipelineModelShadow].at(crc)->WriteIndirectBuffer(iCommandBuffer, iCount);
+}
+
+void DynamicPipelines::CreateMainModelPipeline(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers)
 {
 	if (mModelPipelineMaps[kDynamicModelPipelineModel].contains(crc))
 	{
@@ -105,7 +123,7 @@ void DynamicPipelines::CreateModelPipeline(common::crc_t crc, std::string_view n
 	}
 }
 
-void DynamicPipelines::CreateModelPipelineShadow(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers)
+void DynamicPipelines::CreateShadowModelPipeline(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers)
 {
 	if (mModelPipelineMaps[kDynamicModelPipelineModelShadow].contains(crc))
 	{

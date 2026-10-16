@@ -13,14 +13,6 @@ namespace engine
 
 class ServerSessionRuntime;
 
-struct PendingUpdatePlayerRequest
-{
-	int64_t iClientId = 0;
-	engine::GlobalId globalId {};
-	bool bUseMissiles = false;
-	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
-};
-
 class ServerBroadcaster
 {
 public:
@@ -28,13 +20,10 @@ public:
 	void BuildFrameInputs();
 	void PrepareTickStatusChanges();
 	void BuildTickPublication(int64_t iTick, engine::ServerSessionRuntime& rRuntime, const common::ScopedWorkbufferArena& rPublicationArena);
-	void ProcessUpdatePlayerRequests();
 
 	void ResetState();
 
 	std::unordered_map<engine::GridCoord, std::vector<game::StatusChange>> mBroadcastStatusChanges;
-
-	std::vector<PendingUpdatePlayerRequest> mPendingUpdatePlayerRequests;
 };
 
 } // namespace engine

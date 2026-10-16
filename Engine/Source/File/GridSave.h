@@ -2,7 +2,7 @@
 
 #if defined(BT_SERVER)
 
-#include "Network/Server/ServerFleetSerialization.h"
+#include "Save/GameSaveState.h"
 
 namespace engine
 {
@@ -13,7 +13,6 @@ struct StagedGridSave
 	GridCoord clientGridCoordinate {};
 	int64_t iNextGlobalId = 0;
 	int64_t iTick = 0;
-	float fCurrentTime = 0.0f;
 	bool bHeaderValidated = false;
 	std::unordered_map<GridCoord, Cell> cells;
 	game::SaveStagedState saveState;

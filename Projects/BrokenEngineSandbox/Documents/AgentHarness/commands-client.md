@@ -4,31 +4,205 @@
 
 ### Client commands
 
-- `send_raw_packet`: `{"bytes":[int,...]}`; `bytes` is required and no other field is accepted. Each byte is an integer in `0..255`, the first being the packet type. Requires an accepted connected client. Sends the bytes unchanged as one reliable packet to the server over the client's own connection and returns `{"size"}`, the byte count sent. The server's ordinary admission and corrupt-input checks ([Client to Server Contract](../../../../Documents/Architecture/Network.md#client--server-contract)) decide the outcome, which the server log shows: `Server::RecordContractViolation First` at a client's first violation of a kind, `Server::RecordContractViolation Disconnecting` at the limit, and, at `Network` `Debug` level, `Server::Receive dropped corrupt packet`. For example `{"bytes":[0]}` sends a server-only packet type, which the server counts as one corrupt-data violation with reason `not client-sendable`.
+- `send_raw_packet`: `{"bytes":[int,...]}`; `bytes` is required and no other
+  field is accepted. Each byte is an integer in `0..255`, the first being the
+  packet type. Requires an accepted connected client. Sends the bytes unchanged
+  as one reliable packet to the server over the client's own connection and
+  returns `{"size"}`, the byte count sent. The server's ordinary admission and
+  corrupt-input checks
+  ([Client to Server Contract](../../../../Documents/Architecture/Network.md#client--server-contract))
+  decide the outcome, which the server log shows:
+  `Server::RecordContractViolation First` at a client's first violation of a
+  kind, `Server::RecordContractViolation Disconnecting` at the limit, and, at
+  `Network` `Debug` level, `Server::Receive dropped corrupt packet`. For example
+  `{"bytes":[0]}` sends a server-only packet type, which the server counts as
+  one corrupt-data violation with reason `not client-sendable`.
 - `desync_probe`: packet mode `{"desyncReports"?:0..8,"debugFrameRequests"?:0..8}` or mutually exclusive recovery mode `{"triggerRecovery":true}`. Requires an accepted connected client and in-game current state. Returns `{"tick","coord":[x,y],"desyncDebugFrames","stalled","desyncReports","debugFrameRequests","triggerRecovery"}`.
-- `set_client_grid_coord`: `{"coord":[x,y]}`. The object accepts only `coord`, an array of exactly two integers anywhere in the signed-int32 range; only an integer that does not fit in `int32` is rejected. Moves the client's grid cell and immediately refreshes its desired subscriptions, so automation can drive the cross-cell subscribe and full-state adoption path. Requires an accepted connected client with a valid assigned player. Returns `{"clientGridCoord":[x,y]}`. Any invalid input returns the normal `ok:false`/`error` envelope and changes no state. The command also pins the coordinate: while pinned, the game's own writers — player events, fleet selection and synchronization, and the server-load clear — leave it unchanged, so a server load or replay loop restart keeps it. A repeated `set_client_grid_coord` moves the pin; only `release_client_grid_coord` or a game reset (main-menu connect or frame change, including connection loss) clears it. The pin is never persisted. The server remains the subscription authority — a non-adjacent cell is accepted locally and rejected on the wire.
+- `set_client_grid_coord`: `{"coord":[x,y]}`. The object accepts only `coord`,
+  an array of exactly two integers anywhere in the signed-int32 range; only an
+  integer that does not fit in `int32` is rejected. Moves the client's grid cell
+  and immediately refreshes its desired subscriptions, so automation can drive
+  the cross-cell subscribe and full-state adoption path. Requires an accepted
+  connected client with a valid assigned player. Returns
+  `{"clientGridCoord":[x,y]}`. Any invalid input returns the normal
+  `ok:false`/`error` envelope and changes no state. The command also pins the
+  coordinate: while pinned, the game's own writers — player events, fleet
+  selection and synchronization, and the server-load clear — leave it unchanged,
+  so a server load or replay loop restart keeps it. A repeated
+  `set_client_grid_coord` moves the pin; only `release_client_grid_coord` or a
+  game reset (main-menu connect or frame change, including connection loss)
+  clears it. The pin is never persisted. The server remains the subscription
+  authority — a non-adjacent cell is accepted locally and rejected on the wire.
 - `release_client_grid_coord`: no params (only an empty object is accepted). Requires a running game. Clears the `set_client_grid_coord` pin and returns the current `{"clientGridCoord":[x,y]}`. The viewer stays in that cell until the next game writer, such as a player event, moves it.
 - `screenshot`: `{"path"?,"maxWidth"?:1568,"format"?:"jpg"|"png","quality"?:80}`. A `quality` outside `1..100` is a parameter error. A `maxWidth` value `<= 0` disables downscaling and preserves native framebuffer dimensions. Default path is `%TEMP%\Screenshots\agent_N.<ext>` using the process temp directory. Returns `{"path","width","height"}` — the saved file and its pixel dimensions, never image bytes. Requires `kbScreenshots`.
-- `renderdoc_capture`: `{"frames"?:1}`; `frames` is `1..8`. Triggers RenderDoc capture(s) of the next presented frame(s) and returns `{"paths":[absolute .rdc paths]}`. Requires a client launched with `--renderdoc`; otherwise returns `ok:false` naming `--renderdoc`. Temporarily restores a minimized client without activation, captures, then re-minimizes; an already-visible client fails when swapchain recreation is deferred. Occupies the single channel until RenderDoc has serialized every capture. The wait is bounded by the deferred-response drain-count liveness timeout (`kiDeferredTimeoutDrains` drains, counted once per client render frame), not wall-clock, so set `--timeout-ms` at least as large as the expected wall-clock capture time. See [RenderDoc capture](../../../../.agents/skills/agent-harness/references/renderdoc.md).
+- `renderdoc_capture`: `{"frames"?:1}`; `frames` is `1..8`. Triggers RenderDoc
+  capture(s) of the next presented frame(s) and returns
+  `{"paths":[absolute .rdc paths]}`. Requires a client launched with
+  `--renderdoc`; otherwise returns `ok:false` naming `--renderdoc`. Temporarily
+  restores a minimized client without activation, captures, then re-minimizes;
+  an already-visible client fails when swapchain recreation is deferred.
+  Occupies the single channel until RenderDoc has serialized every capture. The
+  wait is bounded by the deferred-response drain-count liveness timeout
+  (`kiDeferredTimeoutDrains` drains, counted once per client render frame), not
+  wall-clock, so set `--timeout-ms` at least as large as the expected wall-clock
+  capture time. See
+  [RenderDoc capture](../../../../.agents/skills/agent-harness/references/renderdoc.md).
 - `resize`: `{"width","height"}` within `320x180..16384x16384`; rounds each to 8, then returns OS-applied `{"width","height"}`. Rejects while minimized and never changes persisted/fullscreen state.
 - `fullscreen`: `{"on":bool}`. Toggles borderless fullscreen/windowed without persisting. Windowed restore uses launch extent, not a later resize. Returns `{"fullscreen","width","height"}`. Rejects while minimized.
 - `window_state`: `{"minimized":bool}`. Minimize uses normal minimize; restore does not activate and waits for settled swapchain. Returns `{"minimized","width"?,"height"?}`.
 - `audio_resume`: no params. Resumes client audio; an agent client boots with audio suspended, so send this before any scenario that must observe audio. Completes synchronously with the normal envelope; repeating it is accepted.
-- `audio_streaming_harness_rig`: Debug-only music streaming controls and snapshot, exact schema `{"action":"inspect"|"play"|"clear"|"suspend"|"resume"|"clear_history"|"hold_read"|"release_read"|"stall_loaders"|"release_loaders"|"stop_publication"|"resume_publication"|"load_chunk"}` plus exactly the fields its action lists; an extra or missing field fails. Other builds return an error naming `kbDebugInput`. Every action returns a snapshot. `inspect` changes nothing. `play` `{"crc"}` plays that music track through the ordinary stream path; the first `play` in a process clears the playing music and stops playlist transitions for the rest of the process. It fails while audio is suspended or when no voice is allocated. Music CRCs are the `kAudioMusic*Crc` constants of the generated `Data/Audio.h`; a snapshot's `current.crc` names the playing track. `clear`, `suspend`, and `resume` use the ordinary stop-music and audio suspend/resume paths. `clear_history` releases the read hold and the loader stall, waits until no Audio read and no record write is in flight, then empties `records`, zeroes `retryCount` and the partition counters, and starts recording; nothing is recorded before the first `clear_history`. `hold_read` `{"crc","offset","length"}` holds the next Audio read of exactly that range a loader starts until `release_read`, and fails unless the hold is idle; music reads are 16 KiB at 16 KiB-aligned offsets, a track's last read shorter. `release_read` releases the hold and replies once no read is held. `stall_loaders` stops both loader threads from starting any job until `release_loaders`; a running job finishes. `stop_publication` stops the current voice from starting new reads until `resume_publication`; reads already started still complete. `load_chunk` `{"crc","priority"}` queues an ordinary whole-chunk load at `"realtime"` or `"normal"` priority; a chunk already requested or loaded is unchanged. A loader drain (device loss, teardown) releases the hold and the stall.
+- `audio_streaming_harness_rig`: Debug-only music streaming controls and
+  snapshot, exact schema
+  `{"action":"inspect"|"play"|"clear"|"suspend"|"resume"|"clear_history"|"hold_read"|"release_read"|"stall_loaders"|"release_loaders"|"stop_publication"|"resume_publication"|"load_chunk"}`
+  plus exactly the fields its action lists; an extra or missing field fails.
+  Other builds return an error naming `kbDebugInput`. Every action returns a
+  snapshot. `inspect` changes nothing. `play` `{"crc"}` plays that music track
+  through the ordinary stream path; the first `play` in a process clears the
+  playing music and stops playlist transitions for the rest of the process. It
+  fails while audio is suspended or when no voice is allocated. Music CRCs are
+  the `kAudioMusic*Crc` constants of the generated `Data/Audio.h`; a snapshot's
+  `current.crc` names the playing track. `clear`, `suspend`, and `resume` use
+  the ordinary stop-music and audio suspend/resume paths. `clear_history`
+  releases the read hold and the loader stall, waits until no Audio read and no
+  record write is in flight, then empties `records`, zeroes `retryCount` and the
+  partition counters, and starts recording; nothing is recorded before the first
+  `clear_history`. `hold_read` `{"crc","offset","length"}` holds the next Audio
+  read of exactly that range a loader starts until `release_read`, and fails
+  unless the hold is idle; music reads are 16 KiB at 16 KiB-aligned offsets, a
+  track's last read shorter. `release_read` releases the hold and replies once
+  no read is held. `stall_loaders` stops both loader threads from starting any
+  job until `release_loaders`; a running job finishes. `stop_publication` stops
+  the current voice from starting new reads until `resume_publication`; reads
+  already started still complete. `load_chunk` `{"crc","priority"}` queues an
+  ordinary whole-chunk load at `"realtime"` or `"normal"` priority; a chunk
+  already requested or loaded is unchanged. A loader drain (device loss,
+  teardown) releases the hold and the stall.
 
-  Snapshot fields: `scenarioGeneration` counts completed `clear_history` calls; `retryCount` counts the times a voice found all six read entries in use since the last one. `holdOwner` is `none|controlled` and `holdState` `idle|armed|consumed`; `heldPoolIndex` (null when no read is held), `heldGeneration`, and `heldState` describe the held entry. `controls` is exactly `holdArmed,loaderStaged,publicationStopped`. `poolEntries` has six index-ordered `index,state,generation,crc,offset,length` rows with `state` `free|queued|loading|ready`; a Free row has zero CRC/offset/length. `current` and `newestFade` contain `present,crc,volume,fadingIn,fadingOut,pendingSlots,buffersQueued,underrunning`, where `underrunning` means the voice has not submitted its last buffer, no buffer is queued, and the next slot is not ready; `olderFades` contains `count,pendingSlots,underrunningCount`. `partitions` lists `main`, `loader0`, and `loader1` with `head` and `dropped`, capacities 32, 24, and 24; `overflow` is true when any partition dropped a record. `gapFree` is true when the copied `records` form an unbroken sequence since the last `clear_history` (a dropped record takes no sequence), and `coherent` when, in addition, nothing was dropped and the copy saw no concurrent change. `records` are ordered by `sequence`, each `sequence,scenarioGeneration,partition,phase,threadId,threadPriority,poolIndex,crc,offset,length,state,generation,cancelAcknowledged`. `phase` is `startup` (a voice was created); `refill_queued`, `refill_loading`, `refill_ready`, or `refill_cancelled` for an Audio read, where `cancelAcknowledged` is true when the cancelled entry was freed at that point; `existing_queued` for a whole-chunk load queued from the main thread; and `existing_complete` for a finished whole-chunk or range load.
+  Snapshot fields: `scenarioGeneration` counts completed `clear_history` calls;
+  `retryCount` counts the times a voice found all six read entries in use since
+  the last one. `holdOwner` is `none|controlled` and `holdState`
+  `idle|armed|consumed`; `heldPoolIndex` (null when no read is held),
+  `heldGeneration`, and `heldState` describe the held entry. `controls` is
+  exactly `holdArmed,loaderStaged,publicationStopped`. `poolEntries` has six
+  index-ordered `index,state,generation,crc,offset,length` rows with `state`
+  `free|queued|loading|ready`; a Free row has zero CRC/offset/length. `current`
+  and `newestFade` contain
+  `present,crc,volume,fadingIn,fadingOut,pendingSlots,buffersQueued,underrunning`,
+  where `underrunning` means the voice has not submitted its last buffer, no
+  buffer is queued, and the next slot is not ready; `olderFades` contains
+  `count,pendingSlots,underrunningCount`. `partitions` lists `main`, `loader0`,
+  and `loader1` with `head` and `dropped`, capacities 32, 24, and 24; `overflow`
+  is true when any partition dropped a record. `gapFree` is true when the copied
+  `records` form an unbroken sequence since the last `clear_history` (a dropped
+  record takes no sequence), and `coherent` when, in addition, nothing was
+  dropped and the copy saw no concurrent change. `records` are ordered by
+  `sequence`, each
+  `sequence,scenarioGeneration,partition,phase,threadId,threadPriority,poolIndex,crc,offset,length,state,generation,cancelAcknowledged`.
+  `phase` is `startup` (a voice was created); `refill_queued`, `refill_loading`,
+  `refill_ready`, or `refill_cancelled` for an Audio read, where
+  `cancelAcknowledged` is true when the cancelled entry was freed at that point;
+  `existing_queued` for a whole-chunk load queued from the main thread; and
+  `existing_complete` for a finished whole-chunk or range load.
 - `dump_render_target`: `{"name","index"?:0,"channel"?:0,"path"?,"raw"?:false}`. Unknown names list valid names. Single-channel output normalizes to grayscale PNG; four-byte RGBA writes direct PNG; float formats require raw `.bin`. The default base path is `%TEMP%\Screenshots\dump_<name>_N`. Requires `kbScreenshots`.
-- `describe_ui`: no params. Returns UI state, `tweaksVisible` (true while the F3 Tweaks overlay is shown), game flags, framebuffer, mouse, windows, and labeled items with rect/disabled/checked/inputable/hovered/visible fields. Menu controls created with `MenuUtils::WrapperSlider` and `MenuUtils::WrapperPlusMinus` also include optional `value` text for the current numeric value, using the control's display format. Other items omit the field; checkbox state and radio controls created with `MenuUtils::RadioRow` expose their state through `checked`.
+- `describe_ui`: no params. Returns UI state, `tweaksVisible` (true while the F3
+  Tweaks overlay is shown), game flags, framebuffer, mouse, windows, and labeled
+  items with rect/disabled/checked/inputable/hovered/visible fields. Menu
+  controls created with `MenuUtils::WrapperSlider` and
+  `MenuUtils::WrapperPlusMinus` also include optional `value` text for the
+  current numeric value, using the control's display format. Other items omit
+  the field; checkbox state and radio controls created with
+  `MenuUtils::RadioRow` expose their state through `checked`.
 - `click`: `{"label","window"?,"timeoutFrames"?:120,"describeUiAfter"?:true}`. `timeoutFrames` is an integer in `0..1797`; a value outside that range is a parameter error. The limit counts client drains/frames rather than wall-clock time, so duration varies with the client drain rate. Stabilizes and clicks the item center. Returns found/enabled and optional UI. Ambiguous/not-found errors list candidates; scrolled-out targets fail.
 - `hover`: `{"label","window"?,"holdFrames"?:2}`. `holdFrames` is an integer in `0..1681`; a value outside that range is a parameter error. The limit counts client drains/frames rather than wall-clock time, so duration varies with the client drain rate. Returns found/enabled plus UI.
 - `set_slider`: `{"label","window"?,"value":number}`. Uses Ctrl+Click, typing, Enter. Returns found/enabled. Tweaks overlay sliders are reachable only in Debug clients, where `kbDebugInput` lets F3 open the overlay; in Profile and Release clients they fail with `no widget matches label`.
 - `get_wrapper`: `{"key":string}`. Read-only lookup of a Tweaks-registered wrapper. Returns `value`, `min`, and `max`, each a `"%.6f"` string matching the slider's own display format. `key` is the registrar's slider map key, not the display label where the two differ. Needs no F3 overlay and works in every client build. A missing or non-string `key` fails with `get_wrapper requires string 'key'`; an unregistered key fails with `get_wrapper: no Tweaks slider key '<key>'`.
-- `key`: `{"key":name,"holdFrames"?:1}`. `holdFrames` is an integer in `0..1798` (default `1`); a value outside that range is a parameter error. The limit counts client drains/frames rather than wall-clock time, so duration varies with the client drain rate. Supports case-insensitive single letters/digits; `ESC`/`ESCAPE`, `SPACE`, `TAB`, `ENTER`/`RETURN`, `UP`/`DOWN`/`LEFT`/`RIGHT`, and `F1`–`F24`. Returns `{"ok":true}`. While the client is not rendering (minimized or swapchain recreate deferred), only the RawInput overlay takes effect; `key` sends no ImGui event.
+- `key`: `{"key":name,"holdFrames"?:1}`. `holdFrames` is an integer in `0..1798`
+  (default `1`); a value outside that range is a parameter error. The limit
+  counts client drains/frames rather than wall-clock time, so duration varies
+  with the client drain rate. Supports case-insensitive single letters/digits;
+  `ESC`/`ESCAPE`, `SPACE`, `TAB`, `ENTER`/`RETURN`, `UP`/`DOWN`/`LEFT`/`RIGHT`,
+  and `F1`–`F24`. Returns `{"ok":true}`. While the client is not rendering
+  (minimized or swapchain recreate deferred), only the RawInput overlay takes
+  effect; `key` sends no ImGui event.
 - `type_text`: `{"text":string}`. Types the UTF-8 text into the active ImGui text field through ImGui character input, then presses and releases Enter on its own frames. An empty string only presses Enter. A missing, non-string, or longer-than-256-byte `text` fails with `type_text requires string 'text'`. Returns `{"ok":true}`.
-- `mouse`: `{"action"?:"move"|"down"|"up"|"click"|"wheel","x"?,"y"?,"button"?:"left"|"right"|"middle","notches"?:1}`. Non-wheel actions require x/y. Wheel `notches` is an integer in `-17895697..17895697` whose running total with every earlier synthetic wheel command must also stay within that range; any other value fails without changing input state. Wheel accepts both coordinates or neither and always feeds the ImGui wheel event. It also feeds camera zoom unless the hovered ImGui window can actually scroll, ImGui's wheeling lock holds an earlier scroll target, or an ImGui key owner claims `ImGuiKey_MouseWheelY` (including ImPlot); menus that do not scroll still zoom the camera. ImPlot ownership remains visible for the first two input polls after leaving a plot; the following poll first sees no owner. A coordinate mouse move runs two active frames and, once complete, establishes the new target. A direct coordinate-bearing background wheel immediately after plot hover may remain UI-owned; a subsequent notch after that command completes reaches the camera. Returns `{"ok":true}`. While the client is not rendering (minimized or swapchain recreate deferred), only the RawInput overlay takes effect; `mouse` ImGui events sent then never reach ImGui.
-- `describe_scene`: `{"includeUnits"?:true,"maxUnits"?:200,"unitTypes"?:["player","spaceship","blaster"]}`. `unitTypes` is an array of those three strings; absent means every type, an empty array emits no unit rows, and any other value or unknown string is a parameter error. It applies only when `includeUnits` is true. A negative `maxUnits` is a parameter error. Returns `camera{basisCoord,eye,visibleArea,lod}`, `uiState`, `tweaksVisible` (true while the F3 Tweaks overlay is shown), `gameFlags`, `tick`, `clientGridCoord`, `subscribedCoords`, `cellStates[{coord,confirmedTick,confirmedOffset,highWaterValidatedTick,lastFullStateTick,snapshotHead,snapshotCount,lastRenderedTick,lastRenderedTime,serverUpdateCount,lastReplayConfirmedTick,lastReplayServerUpdateCount,stuckFrameCount,pendingFullStateTick:int|null,firstServerUpdateTick:int|null,lastServerUpdateTick:int|null,tailTick}]`, `fleets[{index,focused,members?}]`, `units[{type,globalId?,coord,local,screen,armor?,shield?,health?,alignment,flags?,windTrailIntensity?,windTrailWidth?,windTrailLengthMultiplier?}]`, ring-wide `counts{players,spaceships,missiles,blasters}` summed over every subscribed cell that has a snapshot, `islands[{coord,local,rotation,footprint?}]`, and `truncated`. `camera.basisCoord` is the cell the camera's own values are local to: `eye` and `visibleArea` are in that cell's meters, while each unit's `local` is in its own `coord` cell, so compare them only after adding `(coord - basisCoord) * 900` per axis. An island's `local` is its placement center in its cell's meters. Blaster rows carry the three `windTrail*` fields and no `flags`. Unit positions come from the committed snapshot and trail rendered pixels. `cellStates` has one row per `subscribedCoords` entry, whether or not `includeUnits` is set or the cell has a snapshot, and reports that cell's reconciliation state: `confirmedTick` is -1 until the cell adopts a full state, and again after a resync reset, and `tailTick` is the newest snapshot tick, or -1 with no snapshot.
-- `query_profile`: no params (only an empty object is accepted). Client-only profile query; returns `gpuTimers[{index,name,currentUs,averageUs,maxUs}]` for every timer row, including zeros, frame-coherent `shadowSample{sequence,currentUs}`, `clock{offsetTicks,targetBehindTicks,errorTicks}`, integer `fps`, and `counters[{index,name,count}]` for every CPU counter, including zero rows hidden by the Profile UI. The shadow sample is published after the matching framebuffer fence; sequence advances only when a new available Shadow result is latched. The clock fields are the same smoothed values the network profile overlay's Clock line prints, in sim ticks, sampled at the moment of the query with no frame latch; the overlay prints target-behind with a leading minus while `targetBehindTicks` is the positive stored value, and all three read zero until a client session publishes a clock correction. `fps` is the frame count the profile overlay's fps header prints (renders in the last second), sampled at the moment of the query.
-- `presentation_continuity_probe`: no params (only an empty object is accepted). Read-only client query of the presentation state the most recently published render frame sent. Returns `{"publishedFrames":int,"basisCoord":[x,y],"water":{"origin":[x,y],"reducedNoiseOrigin":[x,y],"noiseFrequency":float}}` plus a `shadow`, `lighting`, and `smoke` object each shaped `{"currentArea":[x,y,z,w],"previousArea":[x,y,z,w],"historyResets":int}`. Take every sample with the client restored (`window_state {"minimized":false}`): a minimized client defers swapchain recreation, publishes no frame, and leaves the whole snapshot standing still. `publishedFrames` counts publications, so two samples carrying the same value describe the same rendered frame — re-take such a pair instead of reading it as continuity. `water.origin` is the camera's cell-local position in the top-level `basisCoord`; `reducedNoiseOrigin` is a unitless reduced phase value rather than a position, and `noiseFrequency` is the multiplier the noise reduction applies to the absolute camera position before reducing modulo 10. Each `currentArea`/`previousArea` is a cell-local rectangle in the top-level `basisCoord`, in the shared component order `x`=left, `y`=top, `z`=right, `w`=bottom. `historyResets` is a monotonic per-owner count of the multi-cell camera jumps that discarded that owner's history.
+- `mouse`:
+  `{"action"?:"move"|"down"|"up"|"click"|"wheel","x"?,"y"?,"button"?:"left"|"right"|"middle","notches"?:1}`.
+  Non-wheel actions require x/y. Wheel `notches` is an integer in
+  `-17895697..17895697` whose running total with every earlier synthetic wheel
+  command must also stay within that range; any other value fails without
+  changing input state. Wheel accepts both coordinates or neither and always
+  feeds the ImGui wheel event. It also feeds camera zoom unless the hovered
+  ImGui window can actually scroll, ImGui's wheeling lock holds an earlier
+  scroll target, or an ImGui key owner claims `ImGuiKey_MouseWheelY` (including
+  ImPlot); menus that do not scroll still zoom the camera. ImPlot ownership
+  remains visible for the first two input polls after leaving a plot; the
+  following poll first sees no owner. A coordinate mouse move runs two active
+  frames and, once complete, establishes the new target. A direct
+  coordinate-bearing background wheel immediately after plot hover may remain
+  UI-owned; a subsequent notch after that command completes reaches the camera.
+  Returns `{"ok":true}`. While the client is not rendering (minimized or
+  swapchain recreate deferred), only the RawInput overlay takes effect; `mouse`
+  ImGui events sent then never reach ImGui.
+- `describe_scene`:
+  `{"includeUnits"?:true,"maxUnits"?:200,"unitTypes"?:["player","spaceship","blaster"]}`.
+  `unitTypes` is an array of those three strings; absent means every type, an
+  empty array emits no unit rows, and any other value or unknown string is a
+  parameter error. It applies only when `includeUnits` is true. A negative
+  `maxUnits` is a parameter error. Returns
+  `camera{basisCoord,eye,visibleArea,lod}`, `uiState`, `tweaksVisible` (true
+  while the F3 Tweaks overlay is shown), `gameFlags`, `tick`, `clientGridCoord`,
+  `subscribedCoords`,
+  `cellStates[{coord,confirmedTick,confirmedOffset,highWaterValidatedTick,lastFullStateTick,snapshotHead,snapshotCount,lastRenderedTick,serverUpdateCount,lastReplayConfirmedTick,lastReplayServerUpdateCount,stuckFrameCount,pendingFullStateTick:int|null,firstServerUpdateTick:int|null,lastServerUpdateTick:int|null,tailTick}]`,
+  `fleets[{index,focused,members?}]`,
+  `units[{type,globalId?,coord,local,screen,armor?,shield?,health?,alignment,flags?,windTrailIntensity?,windTrailWidth?,windTrailLengthMultiplier?}]`,
+  ring-wide `counts{players,spaceships,missiles,blasters}` summed over every
+  subscribed cell that has a snapshot,
+  `islands[{coord,local,rotation,footprint?}]`, and `truncated`.
+  `camera.basisCoord` is the cell the camera's own values are local to: `eye`
+  and `visibleArea` are in that cell's meters, while each unit's `local` is in
+  its own `coord` cell, so compare them only after adding
+  `(coord - basisCoord) * 900` per axis. An island's `local` is its placement
+  center in its cell's meters. Blaster rows carry the three `windTrail*` fields
+  and no `flags`. Unit positions come from the committed snapshot and trail
+  rendered pixels. `cellStates` has one row per `subscribedCoords` entry,
+  whether or not `includeUnits` is set or the cell has a snapshot, and reports
+  that cell's reconciliation state: `confirmedTick` is -1 until the cell adopts
+  a full state, and again after a resync reset, and `tailTick` is the newest
+  snapshot tick, or -1 with no snapshot.
+- `query_profile`: no params (only an empty object is accepted). Client-only
+  profile query; returns `gpuTimers[{index,name,currentUs,averageUs,maxUs}]` for
+  every timer row, including zeros, frame-coherent
+  `shadowSample{sequence,currentUs}`,
+  `clock{offsetTicks,targetBehindTicks,errorTicks}`, integer `fps`, and
+  `counters[{index,name,count}]` for every CPU counter, including zero rows
+  hidden by the Profile UI. The shadow sample is published after the matching
+  framebuffer fence; sequence advances only when a new available Shadow result
+  is latched. The clock fields are the same smoothed values the network profile
+  overlay's Clock line prints, in sim ticks, sampled at the moment of the query
+  with no frame latch; the overlay prints target-behind with a leading minus
+  while `targetBehindTicks` is the positive stored value, and all three read
+  zero until a client session publishes a clock correction. `fps` is the frame
+  count the profile overlay's fps header prints (renders in the last second),
+  sampled at the moment of the query.
+- `presentation_continuity_probe`: no params (only an empty object is accepted).
+  Read-only client query of the presentation state the most recently published
+  render frame sent. Returns
+  `{"publishedFrames":int,"basisCoord":[x,y],"water":{"origin":[x,y],"reducedNoiseOrigin":[x,y],"noiseFrequency":float}}`
+  plus a `shadow`, `lighting`, and `smoke` object each shaped
+  `{"currentArea":[x,y,z,w],"previousArea":[x,y,z,w],"historyResets":int}`. Take
+  every sample with the client restored (`window_state {"minimized":false}`): a
+  minimized client defers swapchain recreation, publishes no frame, and leaves
+  the whole snapshot standing still. `publishedFrames` counts publications, so
+  two samples carrying the same value describe the same rendered frame — re-take
+  such a pair instead of reading it as continuity. `water.origin` is the
+  camera's cell-local position in the top-level `basisCoord`;
+  `reducedNoiseOrigin` is a unitless reduced phase value rather than a position,
+  and `noiseFrequency` is the multiplier the noise reduction applies to the
+  absolute camera position before reducing modulo 10. Each
+  `currentArea`/`previousArea` is a cell-local rectangle in the top-level
+  `basisCoord`, in the shared component order `x`=left, `y`=top, `z`=right,
+  `w`=bottom. `historyResets` is a monotonic per-owner count of the multi-cell
+  camera jumps that discarded that owner's history.
 
 ### Client command behavior
 
@@ -38,9 +212,29 @@ Capture commands temporarily restore a minimized client without activation, wait
 
 Only labeled visible ImGui items are addressable. Scroll a clipped container with `mouse` wheel, then retry. `describe_scene.units` are visible-area-filtered while counts span subscribed cells that have a snapshot; edge projection may lie slightly outside the framebuffer. Only players have global IDs, and only the focused fleet lists members. Each cell emits its blaster rows after its player and spaceship rows, while the `maxUnits` cap is shared across all subscribed cells.
 
-Injected mouse position owns `io.MousePos`: a coordinate-carrying script such as `hover`, `click`, or coordinate-bearing `mouse move` pins an ImGui mouse position from when that script issues it until the next accepted script begins. A later coordinate-free script such as `key` clears the pin; after that, `describe_ui.mouse` reports ImGui's no-mouse sentinel, and a coordinate-free `mouse wheel` does not target the previous pixel. Send wheel coordinates explicitly; do not rely on a pin surviving an intervening script. With no pin, a focused agent client's `describe_ui.mouse` reports ImGui's no-mouse sentinel rather than the real cursor, and the RawInput game mouse stays at a frozen boot-time snapshot (under agent suppression, physical mouse messages never reach DirectXTK Mouse).
+Injected mouse position owns `io.MousePos`: a coordinate-carrying script such as
+`hover`, `click`, or coordinate-bearing `mouse move` pins an ImGui mouse
+position from when that script issues it until the next accepted script begins.
+A later coordinate-free script such as `key` clears the pin; after that,
+`describe_ui.mouse` reports ImGui's no-mouse sentinel, and a coordinate-free
+`mouse wheel` does not target the previous pixel. Send wheel coordinates
+explicitly; do not rely on a pin surviving an intervening script. With no pin, a
+focused agent client's `describe_ui.mouse` reports ImGui's no-mouse sentinel
+rather than the real cursor, and the RawInput game mouse stays at a frozen
+boot-time snapshot (under agent suppression, physical mouse messages never reach
+DirectXTK Mouse).
 
 ## Durable caveats
 
-- When comparing `query_profile` timings, run and discard a warm-up cohort first, take baselines only after values settle, and compare at least five cohorts per side, of equal sample count, captured within one process lifetime, alternating the sides cohort by cohort when a runtime toggle switches between them; a single-condition measurement is one side. Report each side's median and range, call a gap inside the cohort-to-cohort range no measurable difference, and discard a cohort in which every sample of the measured timer row is zero, since the measured work did not run. For the server `NavQuery` raw row, retain every observed sequence and gap marker; do not reconstruct skipped sequences or use the overlapping `averageUs`/`maxUs` smoother rows as cohorts.
+- When comparing `query_profile` timings, run and discard a warm-up cohort
+  first, take baselines only after values settle, and compare at least five
+  cohorts per side, of equal sample count, captured within one process lifetime,
+  alternating the sides cohort by cohort when a runtime toggle switches between
+  them; a single-condition measurement is one side. Report each side's median
+  and range, call a gap inside the cohort-to-cohort range no measurable
+  difference, and discard a cohort in which every sample of the measured timer
+  row is zero, since the measured work did not run. For the server `NavQuery`
+  raw row, retain every observed sequence and gap marker; do not reconstruct
+  skipped sequences or use the overlapping `averageUs`/`maxUs` smoother rows as
+  cohorts.
 - Client capture/input/UI/`query_profile` commands live in `Engine/Source/Agent/AgentCommandsClientGeneric.cpp`, which also dispatches `presentation_continuity_probe` to its own `Engine/Source/Agent/Commands/PresentationContinuityProbe.cpp` module; the desync probe, grid-cell move, and client dispatch live in `AgentCommandsClient.cpp`, and scene commands live in `AgentScene.cpp`.

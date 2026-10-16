@@ -11,7 +11,7 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 	GlobalLayout globalLayout;
 };
 
-// 4 history samplers (previous-frame combine outputs) + 4 combine storage images (read-write, blended in place).
+// 4 history samplers (last-refresh combine outputs) + 4 combine storage images (read-write, blended in place).
 layout (set = 1, binding = 1) uniform sampler2D historyR;
 layout (set = 1, binding = 2) uniform sampler2D historyG;
 layout (set = 1, binding = 3) uniform sampler2D historyB;
@@ -21,9 +21,9 @@ layout (set = 1, binding = 6, rgba8) uniform image2D combineImageG; // kVkFormat
 layout (set = 1, binding = 7, rgba8) uniform image2D combineImageB; // kVkFormatCombine
 layout (set = 1, binding = 8, rgba8) uniform image2D combineImageAmbient; // kVkFormatCombine
 
-// Temporal accumulation: blend the freshly-combined lighting (in place) with the previous frame's result,
+// Temporal accumulation: blend the freshly-combined lighting (in place) with the last refresh's result,
 // reprojected into the current texel grid by world position. While the texel-ramp rescales the grid this
-// averages out the per-frame resample jitter (an exponential moving average) so it stops flickering; at a
+// averages out the per-refresh resample jitter (an exponential moving average) so it stops flickering; at a
 // settled grid history == current so it is a no-op. Mirror of ShadowTemporal.comp over the four combine outputs.
 void main()
 {
@@ -39,7 +39,7 @@ void main()
 	vec2 f2Uv = (vec2(i2Coord) + 0.5f) / vec2(i2Size);
 	vec2 f2World = VisibleAreaToWorld(f2Uv, globalLayout.f4LightingArea);
 
-	// This texel's world position -> previous-frame UV. Disocclusion (reprojected UV outside [0,1] = newly
+	// This texel's world position -> last-refresh UV. Disocclusion (reprojected UV outside [0,1] = newly
 	// revealed): keep current (the history fetch would be off-grid / stale).
 	vec2 f2PreviousUv = WorldToVisibleArea(vec3(f2World, 0.0f), globalLayout.f4LightingAreaPrevious);
 	if (any(lessThan(f2PreviousUv, vec2(0.0f))) || any(greaterThan(f2PreviousUv, vec2(1.0f))))

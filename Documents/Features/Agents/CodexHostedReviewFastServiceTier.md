@@ -6,9 +6,23 @@ Revisit When: Codex-hosted Sol review turnaround becomes a bottleneck worth the 
 
 Reviews dispatched from Claude Code can run on Codex's fast (priority) service tier: `.agents/skills/claude-to-codex/scripts/Invoke-Codex.ps1` passes `-c "service_tier=..."` from its `$serviceTier` switch to the detached `codex exec` invocation. That switch is currently `default` (fast tier disabled) and was deliberately scoped to the Claude Code route only.
 
-Codex-hosted sessions never call that script. Their `reviewer` role resolves to `.codex/agents/sol.toml`, which sets only `model = "gpt-5.6-sol"` and `model_reasoning_effort = "medium"` and carries no service-tier setting, so the tier falls back to the user's `~/.codex/config.toml`. The suggested maintainer profile documented at `README.md:151` sets `service_tier = "default"`. Root cause: Sol reviews started inside Codex therefore run on the standard tier while the identical review started from Claude Code runs fast, purely because of where it was dispatched.
+Codex-hosted sessions never call that script. Their `reviewer` role resolves to
+`.codex/agents/sol.toml`, which sets only `model = "gpt-5.6-sol"` and
+`model_reasoning_effort = "medium"` and carries no service-tier setting, so the
+tier falls back to the user's `~/.codex/config.toml`. The suggested maintainer
+profile documented at `README.md:151` sets `service_tier = "default"`. Root
+cause: Sol reviews started inside Codex therefore run on the standard tier while
+the identical review started from Claude Code runs fast, purely because of where
+it was dispatched.
 
-External behavior verified against the openai/codex sources during the session that recorded this Plan: `service_tier` is a documented top-level Codex config key accepting `fast` and `flex` (wire value `priority`); the `fast_mode` feature flag is Stable and default-enabled; gpt-5.6 models advertise the fast tier; a tier the model does not advertise degrades silently to standard with a warning. Cost under ChatGPT sign-in is roughly 2.5x subscription credit burn for roughly 1.5x speed on GPT-5.6, which is why fast tier is wanted for the medium-effort Sol reviewer and explicitly not wanted for the Luna workers.
+External behavior verified against the openai/codex sources during the session
+that recorded this Plan: `service_tier` is a documented top-level Codex config
+key accepting `fast` and `flex` (wire value `priority`); the `fast_mode` feature
+flag is Stable and default-enabled; gpt-5.6 models advertise the fast tier; a
+tier the model does not advertise degrades silently to standard with a warning.
+Cost under ChatGPT sign-in is roughly 2.5x subscription credit burn for
+roughly 1.5x speed on GPT-5.6, which is why fast tier is wanted for the
+medium-effort Sol reviewer and explicitly not wanted for the Luna workers.
 
 One fact is unverified and must be settled first: whether a per-agent TOML under `.codex/agents/` honors a `service_tier` key at all. Only the top-level `~/.codex/config.toml` key is confirmed.
 
@@ -58,4 +72,14 @@ The 2.5x-for-1.5x cost trade and the reviewer-only scoping are the user's decisi
 
 ### Session findings (2026-08-21)
 
-Preparation settled this document's open fact: the installed Codex CLI (v0.148.0) honors a `service_tier` key in per-agent role TOMLs under `.codex/agents/`, because its role-config strings list `service_tier` alongside `model_reasoning_effort`, and a role's tier takes precedence over a tier supplied in the spawn request. The CLI's `models_cache.json` also shows that `gpt-5.6-sol` advertises the fast tier, so the Design's "Supported" branch is the expected outcome. The one thing still unproven is that a role-file tier overrides a user-level `~/.codex/config.toml` setting of `service_tier = "default"`. Settling that requires an observed run, and that run must produce positive evidence the request actually used the fast tier rather than merely showing no warnings.
+Preparation settled this document's open fact: the installed Codex CLI
+(v0.148.0) honors a `service_tier` key in per-agent role TOMLs under
+`.codex/agents/`, because its role-config strings list `service_tier` alongside
+`model_reasoning_effort`, and a role's tier takes precedence over a tier
+supplied in the spawn request. The CLI's `models_cache.json` also shows that
+`gpt-5.6-sol` advertises the fast tier, so the Design's "Supported" branch is
+the expected outcome. The one thing still unproven is that a role-file tier
+overrides a user-level `~/.codex/config.toml` setting of
+`service_tier = "default"`. Settling that requires an observed run, and that run
+must produce positive evidence the request actually used the fast tier rather
+than merely showing no warnings.

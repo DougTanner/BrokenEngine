@@ -1,6 +1,14 @@
 ---
 name: gaea2-diagnose
-description: Diagnose why Gaea 2 rejected a .terrain file or failed a build. Use when the user reports an error like "File is corrupt or missing additional data", "Swarm failed to load", a node loading as deactivated (dashed border), or unexpected behavior after a /gaea2-save round-trip. Finds the latest Gaea 2 session log (under %APPDATA%\QuadSpinner\Gaea\2.0\Logs — NOT Gaea 1's location), decodes its base64+gzip ERR payloads to extract the underlying Newtonsoft exception with JSON path, then cross-references the shipping Examples library to suggest the valid value or shape.
+description: >-
+  Diagnose why Gaea 2 rejected a .terrain file or failed a build. Use when the
+  user reports an error like "File is corrupt or missing additional data",
+  "Swarm failed to load", a node loading as deactivated (dashed border), or
+  unexpected behavior after a /gaea2-save round-trip. Finds the latest Gaea 2
+  session log (under %APPDATA%\QuadSpinner\Gaea\2.0\Logs — NOT Gaea 1's
+  location), decodes its base64+gzip ERR payloads to extract the underlying
+  Newtonsoft exception with JSON path, then cross-references the shipping
+  Examples library to suggest the valid value or shape.
 argument-hint: [--latest-swarm | --blob <base64> | --log <path>]
 allowed-tools: [Read, Edit, Bash, PowerShell, Glob, Grep]
 disable-model-invocation: true

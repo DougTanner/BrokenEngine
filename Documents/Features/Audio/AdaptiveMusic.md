@@ -103,15 +103,15 @@ Changes (3 files)
    - Keep kMenuMusicPlaylist and miMenuMusicIndex unchanged (menu stays sequential)
 
    Game.cpp:
-   - In the mpStreamingVoices->mGetNextTrack lambda (Game constructor), change the
-     else branch of GetNextMusicTrack() to return mAdaptiveMusic.GetTrack()
+   - In Game::GetNextMusicTrack() (which StreamingVoices calls by name when a track
+     ends), change the else branch to return mAdaptiveMusic.GetTrack()
      instead of sequential indexing
    - Add mAdaptiveMusic.Update() call. This must run from a location that
      executes every frame on the client with access to the render frame.
-     The best location is inside the existing mpStreamingVoices->mGetNextTrack --
-     but that only fires on track end. Instead, add the Update call in
-     Game::ChangeFrame() (which runs every client frame) after the frame
-     is complete, guarded by #ifdef BT_CLIENT and !(mGameFlags & engine::GameFlags::kMainMenu):
+     The best location is inside the existing Game::GetNextMusicTrack() --
+     but that only fires on track end. Instead, the Update call must go in a
+     client game site that runs every frame; no location has been chosen yet.
+     Place it after the frame is complete, guarded by #ifdef BT_CLIENT and !(mGameFlags & engine::GameFlags::kMainMenu):
 
        #if defined(BT_CLIENT)
        if (!(mGameFlags & engine::GameFlags::kMainMenu) && mCells.contains(mClientGridCoordinate))
@@ -125,12 +125,12 @@ Changes (3 files)
    - When adaptive music decides to transition (intensity changed), call
      engine::gpAudioManager->PlayMusic(mAdaptiveMusic.GetTrack()) directly
      to trigger a mid-track crossfade. This bypasses the normal end-of-track
-     callback path. The Update() method returns bool indicating a transition
-     occurred, and the caller invokes PlayMusic().
-   - GetNextMusicTrack() still serves as the end-of-track callback: when a
-     track finishes naturally, it returns the track for the current intensity
-     (which may have changed during playback), providing seamless looping
-     within an intensity tier.
+     GetNextMusicTrack() call. The Update() method returns bool indicating a
+     transition occurred, and the caller invokes PlayMusic().
+   - StreamingVoices still calls game::gpGame->GetNextMusicTrack() directly
+     at end of track: when a track finishes naturally, it returns the track
+     for the current intensity (which may have changed during playback),
+     providing seamless looping within an intensity tier.
 
 Notes
 -----

@@ -182,11 +182,27 @@ try {
 		# out peer session starts; that cost is accepted. A peer whose own $WaitSeconds bootstrap-mutex
 		# deadline expires during that wait fails with the existing mutex-timeout error, which is the
 		# expected outcome there rather than a defect.
-		$refreshedDataDirectory = $null
+		$refreshedDataDirectories = [Collections.Generic.List[string]]::new()
+		$gameProjects = @()
 		if ($dataPackerPrebuiltClean) {
+			# Only game projects whose client project is committed at HEAD are refreshed, so a project still
+			# uncommitted in the primary can never fail session start.
+			$discoveredProjects = @(Get-AgentGameProjects $root)
+			$committedProjectFiles = @(Invoke-AgentGit (@('-C', $root, 'ls-tree', '--name-only', 'HEAD', '--') + @($discoveredProjects | ForEach-Object { "Projects/$_/Platforms/VisualStudio2026/$_.vcxproj" })))
+			# A game's first export runs against an empty per-game DataPacker cache, a full Engine/Data
+			# re-export that would hold this mutex for hours, so a game with no primary Output\Data yet is
+			# skipped, which also leaves it out of the process wait below.
+			$gameProjects = @(foreach ($committedProject in @($discoveredProjects | Where-Object { "Projects/$_/Platforms/VisualStudio2026/$_.vcxproj" -cin $committedProjectFiles })) {
+				$committedDataDirectory = Join-Path $root "Projects\$committedProject\Platforms\VisualStudio2026\Output\Data"
+				if (Test-Path -LiteralPath $committedDataDirectory -PathType Container) { $committedProject }
+				else { Write-Warning "Skipped the primary data refresh for '$committedProject' because '$committedDataDirectory' does not exist yet. Run '$dataPackerExe' once by hand with no arguments, which packs every game; later session starts refresh it normally." }
+			})
+		}
+		if ($gameProjects.Count -ne 0) {
 			# A pack locked by a running game auto-cancels the export instead of prompting, which would hard-fail
-			# session start, so wait the game out and skip the run only if it outlives the wait budget.
-			$gameProcesses = @(Get-Process -Name 'BrokenEngineSandbox*' -ErrorAction SilentlyContinue)
+			# session start, so wait every game out and skip the run only if one outlives the wait budget.
+			$gameProcessNames = @($gameProjects | ForEach-Object { "$_*" })
+			$gameProcesses = @(Get-Process -Name $gameProcessNames -ErrorAction SilentlyContinue)
 			if ($gameProcesses.Count -ne 0) {
 				Write-Host "Pausing the primary data refresh for up to $WaitSeconds seconds until the game exits: $(($gameProcesses | ForEach-Object { "$($_.ProcessName) ($($_.Id))" } | Sort-Object -Unique) -join '; ') is running."
 				$gameStopwatch = [Diagnostics.Stopwatch]::StartNew()
@@ -196,7 +212,7 @@ try {
 					$remainingMilliseconds = $gameDeadlineMilliseconds - [int]$gameStopwatch.ElapsedMilliseconds
 					Start-Sleep -Milliseconds ([Math]::Min(5000, $remainingMilliseconds))
 					# A full re-snapshot, so a game started mid-wait also blocks the refresh.
-					$gameProcesses = @(Get-Process -Name 'BrokenEngineSandbox*' -ErrorAction SilentlyContinue)
+					$gameProcesses = @(Get-Process -Name $gameProcessNames -ErrorAction SilentlyContinue)
 				}
 				if ($gameProcesses.Count -eq 0) { Write-Host "The game closed after $([int]$gameStopwatch.Elapsed.TotalSeconds) seconds, so the primary data refresh is proceeding." }
 			}
@@ -204,53 +220,56 @@ try {
 				Write-Warning "The $WaitSeconds second wait for the game to exit was exhausted, so the primary DataPacker run was skipped and parent data was left as-is: $(($gameProcesses | ForEach-Object { "$($_.ProcessName) ($($_.Id))" } | Sort-Object -Unique) -join '; ') is still running."
 			}
 			else {
-				$gameDataDirectory = Join-Path $root 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output\Data'
-				# Shared Client builds compare this stamp with the shader-source fingerprint of their own HEAD.
-				# The old stamp goes before the export, and a failed delete aborts here, so data exported from
-				# sources the stamp does not describe is never vouched for. It sits beside Data, not inside it,
-				# to keep the Data inventory.
-				$shaderStampPath = Join-Path (Split-Path -Parent $gameDataDirectory) 'SharedDataShaderStamp.txt'
-				if (Test-Path -LiteralPath $shaderStampPath -PathType Leaf) { [IO.File]::Delete($shaderStampPath) }
-				# Best-effort like the DataPacker prebuild snapshots: a failure leaves the data unstamped.
-				$shaderPreFingerprint = $null
-				try {
-					$shaderPreFingerprint = Get-AgentShaderSourceFingerprint $root 'HEAD'
-					$shaderPreDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Engine/Data/Shaders', 'Projects/BrokenEngineSandbox/Data/Shaders', ':(exclude,glob,icase)**/AGENTS.md'))
-				}
-				catch { Write-Warning "Could not snapshot the primary shader sources, so the Shared-data shader stamp will not be written: $($_.Exception.Message)"; $shaderPreFingerprint = $null }
-				$hadNoninteractive = Test-Path Env:BT_DATAPACKER_NONINTERACTIVE
-				$previousNoninteractive = [Environment]::GetEnvironmentVariable('BT_DATAPACKER_NONINTERACTIVE', 'Process')
-				try {
-					# The child inherits this process's environment block, so the restore below keeps the flag
-					# out of the agent CLI this bootstrap's caller launches afterwards.
-					$env:BT_DATAPACKER_NONINTERACTIVE = '1'
-					$dataPackerExitCode = Invoke-WorktreeCliTrackedProcess -Executable $dataPackerExe -ArgumentList @((Join-Path $root 'Engine\Data'), (Join-Path $root 'Projects\BrokenEngineSandbox\Data'), $gameDataDirectory) -WorkingDirectory $root
-				}
-				finally {
-					if ($hadNoninteractive) { $env:BT_DATAPACKER_NONINTERACTIVE = $previousNoninteractive }
-					else { Remove-Item Env:BT_DATAPACKER_NONINTERACTIVE -ErrorAction SilentlyContinue }
-				}
-				if ($dataPackerExitCode -ne 0) { throw "The primary DataPacker run failed with exit code $dataPackerExitCode, so '$gameDataDirectory' may be incomplete. Fix the offending asset in the primary checkout outside an agent session (or run DataPacker there directly), then retry." }
-				$refreshedDataDirectory = $gameDataDirectory
-				# The mutex excludes peer bootstraps but not a landing or user edit during the export, so the
-				# stamp is written only when the shader sources, AGENTS.md files aside, were clean and unchanged
-				# across it.
-				if ($null -ne $shaderPreFingerprint) {
+				foreach ($gameProject in $gameProjects) {
+					$gameDataDirectory = Join-Path $root "Projects\$gameProject\Platforms\VisualStudio2026\Output\Data"
+					$shaderPathspec = "Projects/$gameProject/Data/Shaders"
+					# Shared Client builds compare this stamp with the shader-source fingerprint of their own HEAD.
+					# The old stamp goes before the export, and a failed delete aborts here, so data exported from
+					# sources the stamp does not describe is never vouched for. It sits beside Data, not inside it,
+					# to keep the Data inventory.
+					$shaderStampPath = Join-Path (Split-Path -Parent $gameDataDirectory) 'SharedDataShaderStamp.txt'
+					if (Test-Path -LiteralPath $shaderStampPath -PathType Leaf) { [IO.File]::Delete($shaderStampPath) }
+					# Best-effort like the DataPacker prebuild snapshots: a failure leaves the data unstamped.
+					$shaderPreFingerprint = $null
 					try {
-						$shaderPostFingerprint = Get-AgentShaderSourceFingerprint $root 'HEAD'
-						$shaderPostDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Engine/Data/Shaders', 'Projects/BrokenEngineSandbox/Data/Shaders', ':(exclude,glob,icase)**/AGENTS.md'))
-						if ($shaderPreFingerprint -cne $shaderPostFingerprint -or $shaderPreDirty.Count -ne 0 -or $shaderPostDirty.Count -ne 0) {
-							Write-Warning "Primary shader sources were uncommitted or changed during the data refresh, so the Shared-data shader stamp was not written; Shared Client builds will block until a clean refresh."
-						}
-						else { [IO.File]::WriteAllText($shaderStampPath, $shaderPreFingerprint + "`n") }
+						$shaderPreFingerprint = Get-AgentShaderSourceFingerprint $root 'HEAD' $gameProject
+						$shaderPreDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Engine/Data/Shaders', $shaderPathspec, ':(exclude,glob,icase)**/AGENTS.md'))
 					}
-					catch { Write-Warning "Could not write the Shared-data shader stamp, so Shared Client builds will block until a clean refresh: $($_.Exception.Message)" }
+					catch { Write-Warning "Could not snapshot the primary shader sources, so the Shared-data shader stamp will not be written: $($_.Exception.Message)"; $shaderPreFingerprint = $null }
+					$hadNoninteractive = Test-Path Env:BT_DATAPACKER_NONINTERACTIVE
+					$previousNoninteractive = [Environment]::GetEnvironmentVariable('BT_DATAPACKER_NONINTERACTIVE', 'Process')
+					try {
+						# The child inherits this process's environment block, so the restore below keeps the flag
+						# out of the agent CLI this bootstrap's caller launches afterwards.
+						$env:BT_DATAPACKER_NONINTERACTIVE = '1'
+						$dataPackerExitCode = Invoke-WorktreeCliTrackedProcess -Executable $dataPackerExe -ArgumentList @((Join-Path $root 'Engine\Data'), (Join-Path $root "Projects\$gameProject\Data"), $gameDataDirectory) -WorkingDirectory $root
+					}
+					finally {
+						if ($hadNoninteractive) { $env:BT_DATAPACKER_NONINTERACTIVE = $previousNoninteractive }
+						else { Remove-Item Env:BT_DATAPACKER_NONINTERACTIVE -ErrorAction SilentlyContinue }
+					}
+					if ($dataPackerExitCode -ne 0) { throw "The primary DataPacker run failed with exit code $dataPackerExitCode, so '$gameDataDirectory' may be incomplete. Fix the offending asset in the primary checkout outside an agent session (or run DataPacker there directly), then retry." }
+					$refreshedDataDirectories.Add($gameDataDirectory)
+					# The mutex excludes peer bootstraps but not a landing or user edit during the export, so the
+					# stamp is written only when the shader sources, AGENTS.md files aside, were clean and unchanged
+					# across it.
+					if ($null -ne $shaderPreFingerprint) {
+						try {
+							$shaderPostFingerprint = Get-AgentShaderSourceFingerprint $root 'HEAD' $gameProject
+							$shaderPostDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Engine/Data/Shaders', $shaderPathspec, ':(exclude,glob,icase)**/AGENTS.md'))
+							if ($shaderPreFingerprint -cne $shaderPostFingerprint -or $shaderPreDirty.Count -ne 0 -or $shaderPostDirty.Count -ne 0) {
+								Write-Warning "Primary shader sources were uncommitted or changed during the data refresh, so the Shared-data shader stamp was not written; Shared Client builds will block until a clean refresh."
+							}
+							else { [IO.File]::WriteAllText($shaderStampPath, $shaderPreFingerprint + "`n") }
+						}
+						catch { Write-Warning "Could not write the Shared-data shader stamp, so Shared Client builds will block until a clean refresh: $($_.Exception.Message)" }
+					}
 				}
 			}
 		}
 		Write-Host ''
 		Write-Host "Built primary AgentTools and ThirdParty at '$worktreeCliOutput', '$agentHarnessOutput', and '$thirdPartyOutput'."
-		if ($null -ne $refreshedDataDirectory) { Write-Host "Refreshed primary data at '$refreshedDataDirectory'." }
+		foreach ($refreshedDataDirectory in $refreshedDataDirectories) { Write-Host "Refreshed primary data at '$refreshedDataDirectory'." }
 	}
 	finally { if ($held) { $mutex.ReleaseMutex() }; $mutex.Dispose() }
 }

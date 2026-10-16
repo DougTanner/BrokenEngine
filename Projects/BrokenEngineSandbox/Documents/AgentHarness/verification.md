@@ -12,11 +12,28 @@ Set up server and client state with the recipe below, then verify and release pe
 
 ### Chosen player placement
 
-To place players at exact positions instead of the single default spawn point, send one `inject_payload` batch holding two `SpawnPlayer` entries on the same active coord whose `fSpawnOffsetX`/`fSpawnOffsetY` offsets lie about 600 m apart, for example `"fSpawnOffsetX":-300,"fSpawnOffsetY":0` and `"fSpawnOffsetX":300,"fSpawnOffsetY":0` (a cell is 900 m square, so an offset must stay inside +/-450 or the batch fails). No response reports the tick that applied the batch, so poll `query_players {"coord":[x,y]}` on that coord until both minted `globalIds` from the injection response appear in `players` (`total` rises by two), then send `pause {"paused":true}` and read the exact positions with a final `query_players`.
+To place players at exact positions instead of the single default spawn point,
+send one `inject_payload` batch holding two `SpawnPlayer` entries on the same
+active coord whose `fSpawnOffsetX`/`fSpawnOffsetY` offsets lie about 600 m
+apart, for example `"fSpawnOffsetX":-300,"fSpawnOffsetY":0` and
+`"fSpawnOffsetX":300,"fSpawnOffsetY":0` (a cell is 900 m square, so an offset
+must stay inside +/-450 or the batch fails). No response reports the tick that
+applied the batch, so poll `query_players {"coord":[x,y]}` on that coord until
+both minted `globalIds` from the injection response appear in `players` (`total`
+rises by two), then send `pause {"paused":true}` and read the exact positions
+with a final `query_players`.
 
 ### Forced reconciliation re-simulation
 
-At 1/1 timescale the client runs `targetBehindTicks` behind the latest server tick, so a server injection reaches the client before the client simulates that tick and nothing is re-simulated. To force a rollback and re-simulation, the injection must apply on a tick the client has already simulated: slowing the timescale shrinks the lag, and pausing until the client's `tailTick` passes the server tick guarantees it. Command contracts: [server](commands-server.md#server-commands), [client](commands-client.md#client-commands), and the engine-shared [`get_logs`/`set_log_level`](../../../../.agents/skills/agent-harness/references/command-reference.md).
+At 1/1 timescale the client runs `targetBehindTicks` behind the latest server
+tick, so a server injection reaches the client before the client simulates that
+tick and nothing is re-simulated. To force a rollback and re-simulation, the
+injection must apply on a tick the client has already simulated: slowing the
+timescale shrinks the lag, and pausing until the client's `tailTick` passes the
+server tick guarantees it. Command contracts:
+[server](commands-server.md#server-commands),
+[client](commands-client.md#client-commands), and the engine-shared
+[`get_logs`/`set_log_level`](../../../../.agents/skills/agent-harness/references/command-reference.md).
 
 1. Client `set_log_level {"category":"Network","level":"Debug"}`.
 2. Server `timescale {"faster":false}` once, then poll client `query_profile` until `clock.targetBehindTicks` is at most 2 (about 11 s at 1/2).

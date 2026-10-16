@@ -29,7 +29,7 @@ ServerSession::ServerSession()
 	mpTransferManager = std::make_unique<engine::ServerTransferManager>();
 	mpBroadcaster = std::make_unique<engine::ServerBroadcaster>();
 	mpClientManager = std::make_unique<ServerClientManager>();
-	mpRuntime = std::make_unique<engine::ServerSessionRuntime>(*this, engine::kiDefaultPort);
+	mpRuntime = std::make_unique<engine::ServerSessionRuntime>(engine::kiDefaultPort);
 }
 
 ServerSession::~ServerSession()
@@ -111,7 +111,7 @@ void ServerSession::ParseReceivedGamePackets()
 					globalId.iValue = engine::ReadInt64(pCursor);
 					bool bUseMissiles = ReadBooleanByte(pCursor);
 					float fNavigationDelay = AdmitNavigationDelay(engine::ReadFloat(pCursor));
-					mpBroadcaster->mPendingUpdatePlayerRequests.push_back({.iClientId = rPacket.iClientId, .globalId = globalId, .bUseMissiles = bUseMissiles, .navigationDelaySeconds = std::chrono::duration<float>(fNavigationDelay)});
+					mPendingUpdatePlayerRequests.push_back({.iClientId = rPacket.iClientId, .globalId = globalId, .bUseMissiles = bUseMissiles, .navigationDelaySeconds = std::chrono::duration<float>(fNavigationDelay)});
 					break;
 				}
 				case GamePacketType::kClientCreateFleetRequest:
@@ -165,7 +165,7 @@ void ServerSession::ParseReceivedGamePackets()
 				case GamePacketType::kClientSaveRequest:
 				{
 					LOG(kDefault, kDebug, "ServerSession::kClientSaveRequest Client: {}", rPacket.iClientId);
-					if (!gpGame->mGameSaveLoad.ServerSave(std::filesystem::path("ServerQuicksave.save")))
+					if (!gpGame->mServerSaveLoad.ServerSave(std::filesystem::path("ServerQuicksave.save")))
 					{
 						LOG(kDefault, kWarning, "ServerSession::kClientSaveRequest ServerSave failed");
 					}
@@ -174,20 +174,20 @@ void ServerSession::ParseReceivedGamePackets()
 				case GamePacketType::kClientLoadRequest:
 				{
 					LOG(kDefault, kDebug, "ServerSession::kClientLoadRequest Client: {}", rPacket.iClientId);
-					if (!gpGame->mGameSaveLoad.ServerLoad(std::filesystem::path("ServerQuicksave.save")))
+					if (!gpGame->mServerSaveLoad.ServerLoad(std::filesystem::path("ServerQuicksave.save")))
 					{
 						// Corrupt/truncated save: engine::ReadGridSave already left a clean-slate grid, but ServerLoad's success
 						// tail (client reset + active-set recompute) never ran. Fall back exactly like ServerReset
 						// (fresh frame + reset connected clients for load) rather than ticking a torn grid.
 						LOG(kDefault, kError, "ServerSession::kClientLoadRequest ServerLoad failed; resetting to fresh game");
-						gpGame->mGameSaveLoad.ServerReset();
+						gpGame->mServerSaveLoad.ServerReset();
 					}
 					break;
 				}
 				case GamePacketType::kClientResetRequest:
 				{
 					LOG(kDefault, kDebug, "ServerSession::kClientResetRequest Client: {}", rPacket.iClientId);
-					gpGame->mGameSaveLoad.ServerReset();
+					gpGame->mServerSaveLoad.ServerReset();
 					break;
 				}
 				case GamePacketType::kClientReplayRecordRequest:
@@ -250,7 +250,7 @@ void ServerSession::BeforeNetworkPoll()
 	// injected player requests, so retain them; a positive delta keeps their existing one-update lifetime.
 	if (gpGame->mfLastDeltaTime > 0.0f)
 	{
-		mpBroadcaster->mPendingUpdatePlayerRequests.clear();
+		mPendingUpdatePlayerRequests.clear();
 	}
 	// Fleet request queues drain inside their own Process*Requests, so there is nothing left to clear here.
 }
@@ -290,6 +290,97 @@ void ServerSession::AddGameRequiredCoordinates()
 			}
 		}
 	}
+}
+
+void ServerSession::BuildAdvancingFrameInputs()
+{
+	std::erase_if(mpClientManager->mClientsWaitingForSpawn, [&](const game::ClientSpawnInformation& rClientSpawnInformation)
+	{
+		if ((rClientSpawnInformation.fleetGuid.uiHigh == 0 && rClientSpawnInformation.fleetGuid.uiLow == 0))
+		{
+			return false;
+		}
+
+		game::ServerFleetManager::FleetLookupResult result = mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.memberGlobalPlayerId);
+		if (result.flags & game::ServerFleetManager::FleetLookupFlags::kFound)
+		{
+			return false;
+		}
+
+		LOG(kNetwork, kWarning, "ServerSession::BuildAdvancingFrameInputs Dropping queued spawn Client: {} FleetGuid: ({},{})", rClientSpawnInformation.iClientId, rClientSpawnInformation.fleetGuid.uiHigh, rClientSpawnInformation.fleetGuid.uiLow);
+		return true;
+	});
+
+	// Inject weapon mode toggle StatusChanges
+	ProcessUpdatePlayerRequests();
+
+	// Tick fleet timers and inject fleet coord updates only when this update advances. Subtracting
+	// a zero delta does not make TickFleetTimers inert: an already-expired timer can still fire,
+	// consume random state, and queue an update that no frame tick could consume. Deferring the
+	// timer and all queued work here applies them in order on the first advancing update.
+	mpFleetManager->TickFleetTimers();
+	mpFleetManager->ProcessFlagshipUpdates();
+
+	// After ProcessFlagshipUpdates so the flagship update this queues is consumed on the following update and its
+	// fleet-RNG draw keeps its position, and before the first tick's PrepareTickStatusChanges drain so a drain that
+	// releases agent entries for the origin coordinate sorts this spawn in with them.
+	mpClientManager->SpawnWaitingClients();
+}
+
+void ServerSession::ProcessUpdatePlayerRequests()
+{
+	// Heap: pending player-update requests may grow frame status changes
+	ScopedSuppressAllocationTracking suppress;
+
+	for (const PendingUpdatePlayerRequest& rRequest : mPendingUpdatePlayerRequests)
+	{
+		engine::ClientConnection* pClient = engine::gpServer->FindClient(rRequest.iClientId);
+		if (pClient == nullptr)
+		{
+			continue;
+		}
+		auto ownedIt = mClientOwnedEntities.mOwned.find(pClient->iClientId);
+		std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != mClientOwnedEntities.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
+
+		engine::GridCoord updateCoord {};
+		bool bFound = false;
+		for (const engine::OwnedEntity& rOwnedPlayer : ownedPlayers)
+		{
+			if (rOwnedPlayer.globalId == rRequest.globalId)
+			{
+				updateCoord = rOwnedPlayer.coord;
+				bFound = true;
+				break;
+			}
+		}
+		if (!bFound)
+		{
+			continue;
+		}
+
+		auto it = game::gpGame->mFrameInputs.find(updateCoord);
+		if (it == game::gpGame->mFrameInputs.end())
+		{
+			continue;
+		}
+
+		int64_t iPlayerUuid = engine::RegistryUuidByGlobalId(game::Frame::OwnershipLayer((*game::gpGame->mCells.at(updateCoord).pCurrent)), rRequest.globalId).iValue;
+		if (iPlayerUuid == 0)
+		{
+			continue;
+		}
+
+		int64_t iPendingWeaponModeTicks = engine::kiTickRate;
+		game::StatusChange updateChange {.eType = game::StatusChangeType::kUpdatePlayer, .data = game::UpdatePlayerData {.iPlayerUuid = iPlayerUuid, .bUseMissiles = rRequest.bUseMissiles, .navigationDelaySeconds = rRequest.navigationDelaySeconds, .uiPendingWeaponModeTicks = static_cast<uint8_t>(iPendingWeaponModeTicks)}};
+		it->second.statusChanges.push_back(updateChange);
+
+		LOG(kNetwork, kDebug, "ServerSession::ProcessUpdatePlayerRequests Client: {} GlobalPlayer: {} PlayerUuid: {} Coord: ({},{}) Missiles: {} NavDelay: {}", rRequest.iClientId, rRequest.globalId, iPlayerUuid, updateCoord.iX, updateCoord.iY, rRequest.bUseMissiles, common::Wb(rRequest.navigationDelaySeconds.count(), 3));
+	}
+}
+
+void ServerSession::OnOwnedEntityChangedCell(const engine::ClientGuid& rClientGuid, engine::GlobalId globalId, engine::GridCoord destination)
+{
+	mpFleetManager->OnPlayerTransferred(rClientGuid, globalId, destination);
 }
 
 void ServerSession::SendAssignPlayer(int64_t iClientId, engine::GlobalId globalId, engine::GridCoord coordinate)
@@ -347,8 +438,8 @@ void ServerSession::SubscriptionUpdates()
 	// Clients update desired subscriptions from player assignments and cell-change notifications.
 	for (const SubscriptionUpdate& rUpdate : rPendingUpdates)
 	{
-		SendAssignPlayer(rUpdate.iClientId, rUpdate.globalPlayerId, rUpdate.newCoordinate);
-		SendPlayerState(rUpdate.iClientId, PlayerStateWireType::kChangedCell, rUpdate.globalPlayerId.iValue, rUpdate.newCoordinate);
+		SendAssignPlayer(rUpdate.iClientId, rUpdate.globalId, rUpdate.newCoordinate);
+		SendPlayerState(rUpdate.iClientId, PlayerStateWireType::kChangedCell, rUpdate.globalId.iValue, rUpdate.newCoordinate);
 	}
 
 	rPendingUpdates.clear();
@@ -376,7 +467,7 @@ void ServerSession::ResetClientsForLoad()
 			}
 		}
 
-		mClientPlayers.Clear(rClient.iClientId);
+		mClientOwnedEntities.Clear(rClient.iClientId);
 		if (RelinkFromFrames(rClient.iClientId, rClient.clientGuid, RelinkContext::kLoad) == 0)
 		{
 			LOG(kDefault, kDebug, "ServerSession::ResetClientsForLoad Client: {} no GUID match, will respawn", rClient.iClientId);
@@ -387,8 +478,8 @@ void ServerSession::ResetClientsForLoad()
 
 	mpClientManager->ResetState();
 	mpTransferManager->ResetState();
-	miHarvestedTransferTotal = 0;
 	mpBroadcaster->ResetState();
+	mPendingUpdatePlayerRequests.clear();
 	// ReadFleetData restores mFleets and OnResetForLoad restores mGuidToClientId; preserve both while clearing pending requests.
 	mpFleetManager->ClearPendingRequests();
 	// OnResetForLoad queues flagship updates after the initial clear; retain those updates.
@@ -422,11 +513,11 @@ int64_t ServerSession::RelinkFromFrames(int64_t iClientId, const engine::ClientG
 		return rLeft.globalId.iValue < rRight.globalId.iValue;
 	});
 
-	mClientPlayers.Reserve(iClientId, std::ssize(relinkEntries));
+	mClientOwnedEntities.Reserve(iClientId, std::ssize(relinkEntries));
 
 	for (const engine::OwnedEntity& rEntry : relinkEntries)
 	{
-		mClientPlayers.Add(iClientId, rEntry.globalId, rEntry.coord);
+		mClientOwnedEntities.Add(iClientId, rEntry.globalId, rEntry.coord);
 		SendAssignPlayer(iClientId, rEntry.globalId, rEntry.coord);
 		SendPlayerState(iClientId, PlayerStateWireType::kSpawned, rEntry.globalId.iValue, rEntry.coord);
 		if (eContext == RelinkContext::kConnect)

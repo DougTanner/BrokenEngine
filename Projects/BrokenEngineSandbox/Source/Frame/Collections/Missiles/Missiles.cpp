@@ -134,7 +134,7 @@ void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine:
 #endif // BT_CLIENT
 
 #if defined(BT_CLIENT)
-void MissilesInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
+void MissilesInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 {
 	MissilesInterpolate& rMissiles = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rPostRender = *rFrame.postRender.pMissiles;
@@ -163,7 +163,7 @@ void MissilesInterpolate::ClientInit(Frame& rFrame, int64_t iIndex)
 	SynchronizeMissile(rFrame.interpolate, rMissiles.puiAreaLights[iIndex], rMissiles.puiSmokeTrails[iIndex], rPostRender.puiSounds[iIndex], rMissiles.pVecPositions[iIndex], rMissiles.pVecDirections[iIndex], rPostRender.pVecVelocities[iIndex], rMissiles.pVecPositions[iIndex], rPostRender.pFlags[iIndex], rPostRender.pfPitches[iIndex], rPostRender.pfDeltaRotations[iIndex], rPostRender.pfExhaustLengths[iIndex]);
 }
 
-void MissilesInterpolate::ClientInitAll(Frame& rFrame)
+void MissilesInterpolate::ClientInitializeAll(Frame& rFrame)
 {
 	MissilesInterpolate& rMissiles = *rFrame.interpolate.pMissiles;
 	for (int64_t i = 0; i < rMissiles.iCount; ++i)
@@ -172,7 +172,7 @@ void MissilesInterpolate::ClientInitAll(Frame& rFrame)
 		{
 			continue;
 		}
-		ClientInit(rFrame, i);
+		ClientInitialize(rFrame, i);
 	}
 }
 #endif // BT_CLIENT
@@ -216,14 +216,6 @@ void MissilesInterpolate::Register()
 
 	engine::ExplosionsInterpolate::RegisterType(siMissileExplosionTypeIndex,
 	{
-#if defined(BT_CLIENT)
-		.iPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::siPrimaryLightControllerTypeIndex,
-		.iSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::siSecondaryLightControllerTypeIndex,
-		.iPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::siPrimaryPuffControllerTypeIndex,
-		.iSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::siSecondaryPuffControllerTypeIndex,
-		.iTrailTypeIndex = engine::ExplosionsInterpolate::siExplosionTrailTypeIndex,
-		.iWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::siWindRadialControllerTypeIndex,
-#endif // BT_CLIENT
 		.iBaseParticleCount = kiMissileExplosionBaseParticleCount,
 		.uiParticleColor = kuiMissileExplosionParticleColor,
 		.fParticleVelocityMinimum = kfMissileExplosionParticleVelocityMinimum,
@@ -261,7 +253,7 @@ static void SpawnMissileExplosion(Frame& __restrict rFrame, engine::GridCoord em
 			vecExplosionPosition = common::RandomPositionJitter<0.2f>(vecPosition, rFrame.postRender.randomEngine);
 		}
 
-		engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, engine::SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)),
+		engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick),
 			{
 				.iTypeIndex = siMissileExplosionTypeIndex,
 				.vecPosition = vecExplosionPosition,
@@ -284,16 +276,16 @@ static void RemoveOwnedObjects([[maybe_unused]] Frame& rFrame, [[maybe_unused]] 
 #if defined(BT_CLIENT)
 	if ((rCurrentInterpolate.puiAreaLights[i].uuid.iValue != 0))
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.areaLights, rFrame.postRender.areaLights, rCurrentInterpolate.puiAreaLights[i], rFrame.interpolate.areaLights.Members(), rFrame.postRender.areaLights.Members());
+		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiAreaLights[i]);
 	}
 
 	if ((rCurrentInterpolate.puiSmokeTrails[i].uuid.iValue != 0))
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.smokeTrails, rFrame.postRender.smokeTrails, rCurrentInterpolate.puiSmokeTrails[i], rFrame.interpolate.smokeTrails.Members(), rFrame.postRender.smokeTrails.Members());
+		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiSmokeTrails[i]);
 	}
 	if ((rCurrentPostRender.puiSounds[i].uuid.iValue != 0))
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.sounds, rFrame.postRender.sounds, rCurrentPostRender.puiSounds[i], rFrame.interpolate.sounds.Members(), rFrame.postRender.sounds.Members());
+		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentPostRender.puiSounds[i]);
 	}
 #endif // BT_CLIENT
 
@@ -309,13 +301,11 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 
 	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
 
-	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
+	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
-		if (!(rCurrentPostRender.pFlags[i] & kTransfer)) [[likely]]
-		{
-			continue;
-		}
-
+		return rCurrentPostRender.pFlags[i] & kTransfer;
+	}, [&](int64_t i)
+	{
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
 
 		TransferRequest request
@@ -336,17 +326,17 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.fPitch = rCurrentPostRender.pfPitches[i],
 			},
 		};
-		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
+		if (rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
 		{
 			LOG(kDefault, kError, "Missile Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, rFrame.postRender.transferRequests.size(), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
-		PushTransferRequest(rFrame.postRender, request);
+		rFrame.postRender.PushTransferRequest(request);
 
 		RemoveOwnedObjects(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
 
 		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
-	}
+	});
 }
 
 void MissilesPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
@@ -422,7 +412,7 @@ bool MissilesPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rSpawn
 
 	// Sync owned objects after Add()
 #if defined(BT_CLIENT)
-	MissilesInterpolate::ClientInit(rFrame, iIndex);
+	MissilesInterpolate::ClientInitialize(rFrame, iIndex);
 #endif // BT_CLIENT
 
 	return true;
@@ -445,18 +435,15 @@ void MissilesPostRender::Fall(Frame& __restrict rFrame, int64_t i, std::chrono::
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	if ((rCurrentInterpolate.puiAreaLights[i].uuid.iValue != 0))
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.areaLights, rFrame.postRender.areaLights, rCurrentInterpolate.puiAreaLights[i], rFrame.interpolate.areaLights.Members(), rFrame.postRender.areaLights.Members());
-		rCurrentInterpolate.puiAreaLights[i] = {};
+		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiAreaLights[i]);
 	}
 	if ((rCurrentInterpolate.puiSmokeTrails[i].uuid.iValue != 0))
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.smokeTrails, rFrame.postRender.smokeTrails, rCurrentInterpolate.puiSmokeTrails[i], rFrame.interpolate.smokeTrails.Members(), rFrame.postRender.smokeTrails.Members());
-		rCurrentInterpolate.puiSmokeTrails[i] = {};
+		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiSmokeTrails[i]);
 	}
 	if ((rCurrentPostRender.puiSounds[i].uuid.iValue != 0))
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.sounds, rFrame.postRender.sounds, rCurrentPostRender.puiSounds[i], rFrame.interpolate.sounds.Members(), rFrame.postRender.sounds.Members());
-		rCurrentPostRender.puiSounds[i] = {};
+		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentPostRender.puiSounds[i]);
 	}
 #endif
 }
@@ -485,8 +472,7 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 #if defined(BT_CLIENT)
 	if ((rCurrentInterpolate.puiAreaLights[i].uuid.iValue != 0))
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.areaLights, rFrame.postRender.areaLights, rCurrentInterpolate.puiAreaLights[i], rFrame.interpolate.areaLights.Members(), rFrame.postRender.areaLights.Members());
-		rCurrentInterpolate.puiAreaLights[i] = {};
+		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiAreaLights[i]);
 	}
 #endif
 
@@ -494,8 +480,7 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 #if defined(BT_CLIENT)
 	if ((rCurrentPostRender.puiSounds[i].uuid.iValue != 0))
 	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame.interpolate.sounds, rFrame.postRender.sounds, rCurrentPostRender.puiSounds[i], rFrame.interpolate.sounds.Members(), rFrame.postRender.sounds.Members());
-		rCurrentPostRender.puiSounds[i] = {};
+		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentPostRender.puiSounds[i]);
 	}
 #endif
 
@@ -544,7 +529,7 @@ bool MissilesPostRender::LogDifferences(const MissilesPostRender& rOther) const
 		bEqual &= common::LogDifference<"pDeltaRotationDelays">(i, pDeltaRotationDelays[i], rOther.pDeltaRotationDelays[i]);
 		bEqual &= common::LogDifference<"pfDeltaRotations">(i, pfDeltaRotations[i], rOther.pfDeltaRotations[i]);
 		bEqual &= common::LogDifference<"pNextJitter">(i, pNextJitter[i], rOther.pNextJitter[i]);
-		bEqual &= common::LogDifference<"pfDeltaRotationMax">(i, pfDeltaRotationMaximum[i], rOther.pfDeltaRotationMaximum[i]);
+		bEqual &= common::LogDifference<"pfDeltaRotationMaximum">(i, pfDeltaRotationMaximum[i], rOther.pfDeltaRotationMaximum[i]);
 		bEqual &= common::LogDifference<"pfAccelerations">(i, pfAccelerations[i], rOther.pfAccelerations[i]);
 		bEqual &= common::LogDifference<"pfPitches">(i, pfPitches[i], rOther.pfPitches[i]);
 		bEqual &= common::LogDifference<"pfExhaustLengths">(i, pfExhaustLengths[i], rOther.pfExhaustLengths[i]);

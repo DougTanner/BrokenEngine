@@ -5,7 +5,15 @@ triggers, inputs, and the handoff form — lives in [`../SKILL.md`](../SKILL.md)
 
 ## Steps
 
-1. Take the changed shader files and regions from the read-only inventory: `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character SHA> -Regions` (add `-Head <commit>` for a committed head). It writes no file and prints one `broken-engine-session-change-inventory/v1` object: every `entries` row whose `class` is `glsl` or `dual-language-header` is in scope, and those class rules are the only statement of which `.h` files are shader sources — never restate or reconstruct that classification inline. The `regions` rows give the changed ranges. Done when every in-scope `entries` row and its changed ranges are listed.
+1. Take the changed shader files and regions from the read-only inventory:
+   `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character SHA> -Regions`
+   (add `-Head <commit>` for a committed head). It writes no file and prints one
+   `broken-engine-session-change-inventory/v1` object: every `entries` row whose
+   `class` is `glsl` or `dual-language-header` is in scope, and those class
+   rules are the only statement of which `.h` files are shader sources — never
+   restate or reconstruct that classification inline. The `regions` rows give
+   the changed ranges. Done when every in-scope `entries` row and its changed
+   ranges are listed.
 2. Only `status` `pass` is usable; any other status means the changed-file list is unavailable — report that outcome instead of reconstructing the list inline. Done when the run's status is `pass`, or the non-pass outcome is reported in place of a review.
 3. `truncated` true means the run emitted a short list, so the shader selection is incomplete, which blocks the review exactly as a non-pass status does. Done when `truncated` is false, or the incomplete selection is reported as blocking.
 4. An untracked shader file appears only when the caller supplies it with `-IncludeUntracked '<comma-separated paths>'`, and `counts.unlistedUntracked` reports how many untracked files the run did not list. Include the transitive shader headers those files reach. Done when the review set holds the in-scope files plus every transitive shader header they reach.
@@ -21,13 +29,30 @@ triggers, inputs, and the handoff form — lives in [`../SKILL.md`](../SKILL.md)
 9. Compare field order, scalar widths, array strides, offsets, descriptor constants, writes, and binding roles. Do not infer layout from a generic `vec3` rule when `layout(scalar)` applies. Done when each of those attributes has been compared.
 10. Apply the correctness checks in the footgun reference. Done when every check in that reference has been applied to the changed regions.
 11. Report only reachable failures supported by the changed code and repository evidence. Do not turn a generic checklist item into a finding. Done when every recorded finding cites changed code or repository evidence.
-12. Emit an external-claim request per `/verify-external-claims` ([`../../verify-external-claims/SKILL.md`](../../verify-external-claims/SKILL.md), `## Inputs`) covering one single checkable statement for every finding that depends on a non-obvious GLSL, Vulkan, extension, device, or compiler claim, using only the official source set in [`../../verify-external-claims/references/worker.md`](../../verify-external-claims/references/worker.md). Do not browse directly. A pending verdict makes the review `NEEDS_ACTION` and keeps the dependent finding unconfirmed. Done when every such finding carries one single-claim request and the shared status reflects any pending verdict.
+12. Emit an external-claim request per `/verify-external-claims`
+    ([`../../verify-external-claims/SKILL.md`](../../verify-external-claims/SKILL.md),
+    `## Inputs`) covering one single checkable statement for every finding that
+    depends on a non-obvious GLSL, Vulkan, extension, device, or compiler claim,
+    using only the official source set in
+    [`../../verify-external-claims/references/worker.md`](../../verify-external-claims/references/worker.md).
+    Do not browse directly. A pending verdict makes the review `NEEDS_ACTION`
+    and keeps the dependent finding unconfirmed. Done when every such finding
+    carries one single-claim request and the shared status reflects any pending
+    verdict.
 13. Keep locally provable repository-contract findings separate. Done when no locally provable repository-contract finding sits inside an external-claim request.
 14. For a Tier-2+ change, also run the scope authorization, minimality, and KISS passes in [`../../../references/scope-authorization.md`](../../../references/scope-authorization.md) over the changed shader regions step 1 already produced. Done when each pass has a verdict for every changed shader region, or the change is Tier 1.
 15. Report the result in the `Scope:` field. Done when the `Scope:` field carries that verdict.
 16. Return the report. Done when the handoff carries every section the public contract's form requires.
 17. A shader-facing shared header has both C++ and GLSL surfaces, so explicitly require `/repo-code-review` as the sibling domain review when such a header changed; this review does not replace it. Done when the report names `/repo-code-review` as required whenever a changed file is a shader-facing shared header.
-18. Report a changed shader over ~5,000 `bt-token-v1` (measure every changed shader in one batched run: `pwsh -NoProfile -Command "& '.agents/scripts/Measure-Tokens.ps1' -Path 'a','b','c' -Json"` — use `-Command`, not `-File`, because under `-File` the comma-separated list binds as one filename and the run fails; the single-path `-File ... -Path <path>` form still works for one file) as a size observation in `Residuals`; splitting it via `ShaderFunctions.h`/`*Common.h` is follow-up work, not part of this findings-only review. Done when every changed shader over that size has a `Residuals` size observation.
+18. Report a changed shader over ~5,000 `bt-token-v1` (measure every changed
+    shader in one batched run:
+    `pwsh -NoProfile -Command "& '.agents/scripts/Measure-Tokens.ps1' -Path 'a','b','c' -Json"`
+    — use `-Command`, not `-File`, because under `-File` the comma-separated
+    list binds as one filename and the run fails; the single-path
+    `-File ... -Path <path>` form still works for one file) as a size
+    observation in `Residuals`; splitting it via `ShaderFunctions.h`/`*Common.h`
+    is follow-up work, not part of this findings-only review. Done when every
+    changed shader over that size has a `Residuals` size observation.
 
 ## Rules
 
@@ -47,7 +72,19 @@ triggers, inputs, and the handoff form — lives in [`../SKILL.md`](../SKILL.md)
 
 - Require evidence before asserting device-, driver-, or compiler-specific cost. Accept a capture, target-device limit/property, compiler output, SPIR-V/disassembly, or a documented repository production constraint. Otherwise request measurement or emit external verification; do not report folklore as a defect.
 - Inspect hot-path `pow`, transcendental functions, normalization, dependent reads, loop bounds, SSBO/image access, workgroup dimensions, bank layout, divergence, `discard`, and depth writes only where the changed path is demonstrably hot or contract-significant.
-- Flag an expression with at least one uniform or push-constant operand whose operands are all uniforms, push constants, spec/compile-time constants, or values derived only from those: every invocation computes the identical result, so it belongs on the CPU — precompute it into an existing field or a new uploaded field (reciprocals follow the existing `*Inverse` naming; the `inverse()` ban and pre-normalized `f4SunMoonNormal` are the established precedents). A uniform-only sub-expression inside a varying expression qualifies too (`uniformA * uniformB * varying` hoists the uniform product). This is locally provable from the source; it needs no device or compiler evidence. Also flag the redundant twin: re-deriving on the GPU a value the CPU already uploads in final form (e.g. `normalize()` of an already-normalized uniform). Weigh triviality per the footgun reference before proposing a layout change.
+- Flag an expression with at least one uniform or push-constant operand whose
+  operands are all uniforms, push constants, spec/compile-time constants, or
+  values derived only from those: every invocation computes the identical
+  result, so it belongs on the CPU — precompute it into an existing field or a
+  new uploaded field (reciprocals follow the existing `*Inverse` naming; the
+  `inverse()` ban and pre-normalized `f4SunMoonNormal` are the established
+  precedents). A uniform-only sub-expression inside a varying expression
+  qualifies too (`uniformA * uniformB * varying` hoists the uniform product).
+  This is locally provable from the source; it needs no device or compiler
+  evidence. Also flag the redundant twin: re-deriving on the GPU a value the CPU
+  already uploads in final form (e.g. `normalize()` of an already-normalized
+  uniform). Weigh triviality per the footgun reference before proposing a layout
+  change.
 - For a positive integer exponent, compare semantics and generated code. `x * x * x` contains two multiplications, not one; do not assume how `pow` lowers without compiler evidence.
 - Do not impose universal subgroup width, workgroup-size, bank-count, FP16-throughput, occupancy, or early-Z cost thresholds. Establish the target device and evidence first.
 

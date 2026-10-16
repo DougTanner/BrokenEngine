@@ -18,14 +18,11 @@ public:
 
 	Camera();
 
-	float SunAngle() const override;
+	float SunAngle() const;
+
+	engine::CameraTarget PullTarget(const engine::FrameInterpolateBase& rFrameInterpolate);
 
 	engine::GlobalId mLastTrackedPlayerIdentifier {};
-
-protected:
-
-	bool IsMainMenuFrame(const engine::FrameInterpolateBase& rFrameInterpolate) const override;
-	engine::CameraTarget PullTarget(const engine::FrameInterpolateBase& rFrameInterpolate) override;
 
 };
 

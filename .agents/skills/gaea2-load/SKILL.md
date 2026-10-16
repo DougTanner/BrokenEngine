@@ -38,7 +38,14 @@ Convert a Gaea 2 `.terrain` JSON into:
 
    - `ok` (exit 0) — `markdownPath`, `passthroughPath`, and `versionDrift` are populated. Continue to step 4.
    - `input.needs-user` (exit 2) — the path was empty or didn't end in `.terrain`. Ask the user for the file (step 1's rule), then re-run.
-   - `python.missing` / `python.stale` (exit 2) — no usable x64 CPython 3.12+ interpreter, and nothing else ran. Do not install anything: report to the user that Python is missing or too old, quoting the envelope's `message` (it carries the probe's own `MISSING`/`STALE` line), and — for `python.missing` — the `installCommand` the envelope carries as the suggested command for them to run (`installCommand` is null for a stale interpreter, which the user resolves by upgrading). Stop until they say it's installed.
+   - `python.missing` / `python.stale` (exit 2) — no usable x64 CPython 3.12+
+     interpreter, and nothing else ran. Do not install anything: report to the
+     user that Python is missing or too old, quoting the envelope's `message`
+     (it carries the probe's own `MISSING`/`STALE` line), and — for
+     `python.missing` — the `installCommand` the envelope carries as the
+     suggested command for them to run (`installCommand` is null for a stale
+     interpreter, which the user resolves by upgrading). Stop until they say
+     it's installed.
    - `input.not-found`, `load.failed`, `load.output-missing`, `internal.error` (exit 1) — report `message` plus the envelope's `stderr`, which carries the failing script's own diagnostics.
 
 4. Act on the envelope's `versionDrift` object, which carries `state` and a `notice` (the probe's own output). Done when its `state` has been handled.

@@ -32,16 +32,7 @@ struct TweakSectionDescription
 	void (*pRender)(TweaksScreenBase& rScreen) = nullptr;
 };
 
-struct TweakExtensionHook
-{
-	// The engine section this entry extends.
-	const int64_t* piSection = nullptr;
-	// Sub-tab label; nullptr draws the content inline at the section's inline position instead of as a sub-tab.
-	const char* pcLabel = nullptr;
-	void (*pRender)(TweaksScreenBase& rScreen) = nullptr;
-};
-
-// Persisted section layout, engine-owned and embedded by value in the game settings struct so exactly one
+// Persisted section layout, embedded by value in the engine TweaksSettings struct so exactly one
 // array bound and one sizeof exist in the program. Padding is explicit (uiPadding) because the whole object is
 // written verbatim and repeated saves of unchanged settings must be byte-identical.
 struct TweakSectionState
@@ -67,7 +58,6 @@ public:
 	inline static int64_t msiSectionCount = 0;
 
 	TweaksScreenBase();
-	virtual ~TweaksScreenBase() = default;
 
 	// RegisterEngineTweakSections and game::RegisterGameTweakSections register sections on one thread before the first UI frame; the registry is immutable during rendering.
 	static void RegisterSection(int64_t& riSection, const TweakSectionDescription& rDescription);
@@ -120,6 +110,7 @@ inline int64_t giTweakSectionMiscellaneous = kiInvalidTweakSection;
 inline int64_t giTweakSectionSound = kiInvalidTweakSection;
 inline int64_t giTweakSectionSmoke = kiInvalidTweakSection;
 inline int64_t giTweakSectionWind = kiInvalidTweakSection;
+inline int64_t giTweakSectionHexShield = kiInvalidTweakSection;
 
 void RenderPhysicallyBasedRenderingSection(TweaksScreenBase& rScreen);
 void RenderTerrainSection(TweaksScreenBase& rScreen);
@@ -131,12 +122,10 @@ void RenderMiscellaneousSection(TweaksScreenBase& rScreen);
 void RenderSoundSection(TweaksScreenBase& rScreen);
 void RenderSmokeSection(TweaksScreenBase& rScreen);
 void RenderWindSection(TweaksScreenBase& rScreen);
-
-void RenderTweakExtensionSubtabs(TweaksScreenBase& rScreen, int64_t iSection, int64_t iFirstSubtab);
-void RenderTweakExtensionInline(TweaksScreenBase& rScreen, int64_t iSection);
+void RenderHexShieldSection(TweaksScreenBase& rScreen);
 
 // Registers the engine's sections. Called from Main.cpp immediately before the Graphics ctor (which builds
-// ImGuiManager -> TweaksScreen) and therefore before game::LoadTweaksSettings(). Deliberately not in the
+// ImGuiManager -> TweaksScreenBase) and therefore before LoadTweaksSettings(). Deliberately not in the
 // TweaksScreenBase ctor: device loss recreates Graphics in place and would double-register.
 void RegisterEngineTweakSections();
 

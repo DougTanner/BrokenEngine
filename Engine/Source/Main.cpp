@@ -7,6 +7,7 @@
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/SoundSettings.h"
 #include "Ui/SoundSettingsWrappersBase.h"
+#include "Ui/TweaksSettings.h"
 #include "CrashReport.h"
 
 #include "Frame/FlightPlaneTable.h"
@@ -298,9 +299,9 @@ static int64_t MainThread(HINSTANCE hInstance)
 	gpInput = pInput.get();
 
 	// Load tweaks settings (requires both Game and ImGuiManager)
-	game::LoadTweaksSettings();
+	LoadTweaksSettings();
 
-	// Load persistent client state (focused fleet/ship + zoom). Requires engine::gpCamera and gpGame; both exist by here.
+	// Load persistent client state (the game's camera focus + zoom). Requires engine::gpCamera and gpGame; both exist by here.
 	game::LoadClientState();
 
 	gpProfileManager->BootStop(kBootTimerVulkan);
@@ -328,8 +329,9 @@ static int64_t MainThread(HINSTANCE hInstance)
 		{
 			continue;
 		}
-		gpGraphics->RenderGlobal(std::chrono::duration<float>(pGame->RenderFrame(pGame->mClientGridCoordinate).interpolate.fCurrentTime));
-		gpGraphics->RenderMainPresentAcquire(gpSwapchainManager->miFramebufferIndex, pGame->mRenderInterpolates, bootActiveCoordinates, kOriginCoordinate, std::chrono::duration<float>(pGame->RenderFrame(pGame->mClientGridCoordinate).interpolate.fCurrentTime));
+		std::chrono::duration<float> elapsedTime(common::NanosecondsToFloatSeconds<float>(TickToSimulationTime(pGame->RenderFrame(pGame->mClientGridCoordinate).interpolate.iTick).time_since_epoch()));
+		gpGraphics->RenderGlobal(elapsedTime);
+		gpGraphics->RenderMainPresentAcquire(gpSwapchainManager->miFramebufferIndex, pGame->mRenderInterpolates, bootActiveCoordinates, kOriginCoordinate, elapsedTime);
 	}
 	gpProfileManager->BootStop(kBootTimerRenderPresent);
 
@@ -516,14 +518,14 @@ static int64_t MainThread(HINSTANCE hInstance)
 	gbAllocationTrackingReady.store(false, std::memory_order_relaxed);
 
 #if defined(BT_SERVER)
-	if (!pGame->mGameSaveLoad.Autosave())
+	if (!pGame->mServerSaveLoad.Autosave())
 	{
 		LOG(kDefault, kError, "Final autosave failed during shutdown");
 	}
 #endif
 
 #if defined(BT_CLIENT)
-	game::SaveTweaksSettings();
+	SaveTweaksSettings();
 	SaveSoundSettings();
 	SaveGraphicsSettings();
 	SaveGameSettings();
@@ -875,7 +877,7 @@ static int64_t ProcessMain(HINSTANCE hInstance)
 	ScopedHandle pMutex(nullptr);
 	if constexpr (kbSingleInstance)
 	{
-		HANDLE hMutex = CreateMutex(nullptr, TRUE, "BrokenEngineSandboxServer");
+		HANDLE hMutex = CreateMutex(nullptr, TRUE, game::kGameName.data());
 		pMutex.reset(hMutex);
 		if (GetLastError() == ERROR_ALREADY_EXISTS)
 		{

@@ -57,8 +57,8 @@ struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame);
 
 #if defined(BT_CLIENT)
-	static void ClientInit(Frame& rFrame, int64_t iIndex);
-	static void ClientInitAll(Frame& rFrame);
+	static void ClientInitialize(Frame& rFrame, int64_t iIndex);
+	static void ClientInitializeAll(Frame& rFrame);
 #endif
 
 	XMVECTOR* __restrict pVecPositions = nullptr;

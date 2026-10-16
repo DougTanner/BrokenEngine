@@ -663,7 +663,7 @@ static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::js
 		else if (rScheduled.change.eType == StatusChangeType::kTransferPlayer)
 		{
 			int64_t iGlobalId = iNextGlobalId++;
-			std::get<TransferData>(rScheduled.change.data).globalPlayerId = engine::GlobalId {.iValue = iGlobalId};
+			std::get<TransferData>(rScheduled.change.data).globalId = engine::GlobalId {.iValue = iGlobalId};
 			globalIds.push_back(iGlobalId);
 		}
 	}

@@ -2,15 +2,79 @@
 
 ## Mode selection
 
-Every worktree game build uses one data mode and one authoritative directory for both client and server:
+Every worktree game build uses one data mode and one authoritative directory for both client and server of its game project, `Projects\<Name>` below:
 
-- Shared is the default for ordinary code changes. Its Data directory is the primary checkout's `Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output\Data`; this mode consumes primary generated headers/packs and disables every DataPacker build/export step.
-- Local is mandatory when tracked changes from the resolved baseline, staged changes, unstaged changes, or untracked files touch `DataPacker/**`, `Engine/Data/**`, `Projects/BrokenEngineSandbox/Data/**`, `Common/DataFile.h`, generated-header logic, exporter versions/fingerprints, compression, chunk layout, or pack/manifest contracts. Its Data directory is the same path under the worktree's own repository root. A session worktree is created without the `Engine/Data/Islands` and `Engine/Data/Textures` source trees, which Git sparse checkout skips: run `git sparse-checkout disable` in the worktree (about 1.25 s, safe with a dirty worktree, keeps uncommitted edits) before editing or adding an asset under either tree: an edit target that is not on disk cannot be changed, and an addition made while the tree is skipped leaves the tracked bytes beside it still absent.
-- Agent-documentation exemption: a changed path whose filename is `AGENTS.md` (ordinal case-insensitive) never counts as a path trigger, at any depth under any of those four path triggers, unless one of its directory segments is `Raw` (ordinal case-insensitive) — DataPacker packs any file under a `Raw` directory whatever its extension, so such a path stays a trigger. The context script applies the exemption itself, so an exempt path never appears in `triggerMatches`. This is independent of the deletion-only exception below: it needs no switch and no reference search, and it covers additions and modifications, not only deletions.
-- Formatting-only exemption: a modified `DataPacker/**` `.h`/`.cpp` whose baseline and current token text match — only line breaks and runs of blanks in code, and blanks beside brackets, braces, parentheses, commas, semicolons, comments, or directives differ, while comments, directives, and string/character literals compare verbatim, including a directive's indentation and the line ending that closes a `//` comment or directive — never counts as a path trigger. The context script applies the exemption itself, so such a path never appears in `triggerMatches`. It needs no switch and is independent of the deletion-only exception below, whose "any modification keeps the Local requirement" does not cover it. Any token change, and every addition, deletion, or rename, stays a trigger.
+- Shared is the default for ordinary code changes. Its Data directory is the
+  primary checkout's
+  `Projects\<Name>\Platforms\VisualStudio2026\Output\Data`; this
+  mode consumes primary generated headers/packs and disables every DataPacker
+  build/export step.
+- Local is mandatory when tracked changes from the resolved baseline, staged
+  changes, unstaged changes, or untracked files touch `DataPacker/**`,
+  `Engine/Data/**`, `Projects/<Name>/Data/**`,
+  `Common/DataFile.h`, generated-header logic, exporter versions/fingerprints,
+  compression, chunk layout, or pack/manifest contracts. Its Data directory is
+  the same path under the worktree's own repository root. A session worktree
+  is created without the `Engine/Data/Islands` and `Engine/Data/Textures`
+  source trees, which Git sparse checkout skips: run
+  `git sparse-checkout disable` in the worktree (about 1.25 s, safe with a
+  dirty worktree, keeps uncommitted edits) before editing or adding an asset
+  under either tree: an edit target that is not on disk cannot be changed,
+  and an addition made while the tree is skipped leaves the tracked bytes
+  beside it still absent.
+- Agent-documentation exemption: a changed path whose filename is `AGENTS.md`
+  (ordinal case-insensitive) never counts as a path trigger, at any depth
+  under any of those four path triggers, unless one of its directory segments
+  is `Raw` (ordinal case-insensitive) — DataPacker packs any file under a
+  `Raw` directory whatever its extension, so such a path stays a trigger. The
+  context script applies the exemption itself, so an exempt path never appears
+  in `triggerMatches`. This is independent of the deletion-only exception
+  below: it needs no switch and no reference search, and it covers additions
+  and modifications, not only deletions.
+- Formatting-only exemption: a modified `DataPacker/**` `.h`/`.cpp` whose
+  baseline and current token text match — only line breaks and runs of blanks
+  in code, and blanks beside brackets, braces, parentheses, commas,
+  semicolons, comments, or directives differ, while comments, directives, and
+  string/character literals compare verbatim, including a directive's
+  indentation and the line ending that closes a `//` comment or directive —
+  never counts as a path trigger. The context script applies the exemption
+  itself, so such a path never appears in `triggerMatches`. It needs no switch
+  and is independent of the deletion-only exception below, whose "any
+  modification keeps the Local requirement" does not cover it. Any token
+  change, and every addition, deletion, or rename, stays a trigger.
 - A user may force Local. Never force Shared over a Local trigger. Local never falls back to Shared data. Generate Local output only with explicit authorization; a user-approved plan or acceptance criterion requiring shader or data repack is authorization.
-- An absent worktree `Data` output is not missing setup. A linked worktree that has never generated has no `Output\Data` directory at all; that is the legitimate expected starting state. On an authorized Local generation build DataPacker seeds it from the primary checkout itself — the `## Local generation` section below states the exact mechanism and its conditions. Without that authorization a Local game build whose worktree `Output\Data` directory is absent blocks under `data-mode.local-output-missing` before provisioning or MSBuild runs, because the game projects consume the generated headers directly. The way forward is generation authorization (`-RunDataPacker`); when `-DataBuildMode Local` alone forced Local, dropping that override is the alternative only when no changed file can affect generated bytes. Never ask the user to pre-stage output or hand-run an export because the directory is absent. The only thing an agent must supply is generation *authorization*; once generation is authorized, the genuine blockers are validation and environment failures DataPacker reports itself — an unrecognized reparse point or insufficient disk — never a user-prepared directory.
-- Deletion-only exception: pure deletions of source asset files under `Engine/Data/**` or `Projects/BrokenEngineSandbox/Data/**` do not trigger Local when a repository-wide search proves nothing tracked references the deleted asset's generated identity (its generated CRC constant, chunk, or path). Claim it with `-DataBuildMode Shared -AcceptDeletionOnlyException`; the build re-checks every trigger-matching changed path against `deletionOnlyCandidates` and blocks under one typed code when any of them is not a baseline deletion or lies outside those two asset prefixes, so the switch asserts your reference-search evidence and never substitutes for it. Without `RunDataPacker` the build consumes only pre-existing generated output, which a source deletion cannot alter — the dead chunk persists in the published pack and the unused constant in the generated header until the next real DataPacker export drops both. Record the reference-search evidence with the mode selection. Any addition, modification, rename, exporter, or contract change keeps the Local requirement.
+- An absent worktree `Data` output is not missing setup. A linked worktree
+  that has never generated has no `Output\Data` directory at all; that is the
+  legitimate expected starting state. On an authorized Local generation build
+  DataPacker seeds it from the primary checkout itself — the
+  `## Local generation` section below states the exact mechanism and its
+  conditions. Without that authorization a Local game build whose worktree
+  `Output\Data` directory is absent blocks under
+  `data-mode.local-output-missing` before provisioning or MSBuild runs,
+  because the game projects consume the generated headers directly. The way
+  forward is generation authorization (`-RunDataPacker`); when
+  `-DataBuildMode Local` alone forced Local, dropping that override is the
+  alternative only when no changed file can affect generated bytes. Never ask
+  the user to pre-stage output or hand-run an export because the directory is
+  absent. The only thing an agent must supply is generation *authorization*;
+  once generation is authorized, the genuine blockers are validation and
+  environment failures DataPacker reports itself — an unrecognized reparse
+  point or insufficient disk — never a user-prepared directory.
+- Deletion-only exception: pure deletions of source asset files under
+  `Engine/Data/**` or `Projects/<Name>/Data/**` do not trigger
+  Local when a repository-wide search proves nothing tracked references the
+  deleted asset's generated identity (its generated CRC constant, chunk, or
+  path). Claim it with `-DataBuildMode Shared -AcceptDeletionOnlyException`;
+  the build re-checks every trigger-matching changed path against
+  `deletionOnlyCandidates` and blocks under one typed code when any of them is
+  not a baseline deletion or lies outside those two asset prefixes, so the
+  switch asserts your reference-search evidence and never substitutes for it.
+  Without `RunDataPacker` the build consumes only pre-existing generated
+  output, which a source deletion cannot alter — the dead chunk persists in
+  the published pack and the unused constant in the generated header until
+  the next real DataPacker export drops both. Record the reference-search
+  evidence with the mode selection. Any addition, modification, rename,
+  exporter, or contract change keeps the Local requirement.
 
 ## Repository-root detection and mode derivation
 
@@ -29,20 +93,116 @@ The build invocation derives the mode, both directories, and the four `DataBuild
 
 ## Generated Data directory inventory
 
-A correctly generated Data directory holds 23 files: `Data.h`, `DataTypes.h`, and one nonempty header, manifest, and pack for each of `Audio`, `Scene`, `Islands`, `Model`, `Shader`, `Texture`, and `Raw`. The build does not inspect the selected Data directory's inventory or contents, so a malformed, partial, or stale directory is not detected as such — it surfaces only as an ordinary compile or runtime failure. The one exception is Shared shader provenance: a Shared Client build checks the primary's shader stamp, described in `## Wrapper bootstrap Shared-data refresh`; every other kind of staleness is still undetected.
+A correctly generated Data directory holds 23 files: `Data.h`, `DataTypes.h`,
+and one nonempty header, manifest, and pack for each of `Audio`, `Scene`,
+`Islands`, `Model`, `Shader`, `Texture`, and `Raw`. The build does not inspect
+the selected Data directory's inventory or contents, so a malformed, partial,
+or stale directory is not detected as such — it surfaces only as an ordinary
+compile or runtime failure. The one exception is Shared shader provenance: a
+Shared Client build checks the primary's shader stamp, described in
+`## Wrapper bootstrap Shared-data refresh`; every other kind of staleness is
+still undetected.
 
 ## Wrapper bootstrap Shared-data refresh
 
-The wrapper bootstrap refreshes Shared data on a best-effort basis: at session start it runs the primary's DataPacker over the primary checkout's current asset inputs, which are not checked against HEAD, and it skips the run when the DataPacker prebuild was not stamped. It first waits up to its `-WaitSeconds` budget for any `BrokenEngineSandbox*` process to exit, and skips the run with a warning only if one is still alive when that budget expires. A peer session starting mid-session can therefore move primary Data under this session, and a regenerated header can force a recompile here.
+The wrapper bootstrap refreshes Shared data on a best-effort basis: at session
+start it runs the primary's DataPacker over the primary checkout's current
+asset inputs, which are not checked against HEAD, once per game project whose
+client `.vcxproj` is committed at the primary `HEAD`, into that game's primary
+`Output\Data`, and it skips the runs when the DataPacker prebuild was not
+stamped. It skips, with one warning, a game whose primary `Output\Data` does
+not exist yet, because that game's first export is a full Engine/Data
+re-export into an empty per-game DataPacker cache; the warning tells the user
+to run the primary DataPacker once by hand with no arguments, after which
+session starts refresh that game. It first waits up to its `-WaitSeconds`
+budget for any process named after one of the games it refreshes (`<Name>*`)
+to exit, and skips the runs with a warning only if one is still alive when that
+budget expires. A peer session starting mid-session can therefore move primary
+Data under this session, and a regenerated header can force a recompile here.
 
-The refresh also records shader provenance in `SharedDataShaderStamp.txt`, beside the primary's `Output\Data` directory: before its export it deletes the stamp, aborting session start if the delete fails, and after a successful export it writes the shader-source fingerprint of `HEAD` only when both shader trees, `AGENTS.md` files aside, were clean and unchanged across the export. The shader-source fingerprint is one SHA-256 over the `HEAD` file listing of `Engine/Data/Shaders` and `Projects/BrokenEngineSandbox/Data/Shaders` that leaves out every `AGENTS.md`, like the agent-documentation exemption in `## Mode selection` but without its `Raw` carve-out, because a `Raw` file reaches `Raw.pack`, not `Shader.pack`. A skipped refresh leaves the stamp alone. Before provisioning, a Shared Client build compares that stamp with the shader-source fingerprint of its own worktree's `HEAD` and blocks under `data-mode.shared-shader-unverified` when the stamp is missing or differs, because the client compiles the shader layout headers from the worktree but loads the primary `Shader.pack`; Server builds load no shaders and are not checked. The block names its case's cheaper remedy, when one exists, selected from the stamp and from the shader-source fingerprints of primary main's and the worktree's `HEAD`: a new session start, whose refresh re-exports primary main, when the worktree's `HEAD` already matches primary main; none when the worktree's fingerprint changed since its session baseline, because neither a refresh nor a rebase puts that change into the primary `Shader.pack`; otherwise a rebase onto primary main when the stamp matches primary main; otherwise a new session start followed by that rebase. Every block then names Local generation authorization (`-DataBuildMode Local -RunDataPacker`), which always clears it because the check runs only for a Shared build, with its cost: up to about 1 GB of restored and generated data, and, unlike a session start or a rebase, it clears the block only for builds that pass `-DataBuildMode Local`, because each `/compile` derives the data mode from the changed paths, so every later game build (client and server) in the session must also pass it. When the block names a new session start, a missing stamp can also mean a peer's session-start refresh is exporting right now: retry after it finishes, then rebase when the block also names a rebase. In that case a missing stamp that persists across session starts can mean the primary checkout's shader sources are uncommitted or changing: commit or discard those changes, then start a new session, or use Local generation authorization. The check runs only at build time, so rerun `/compile` before a launch to check again after a peer refresh. A committed shader deletion built under the deletion-only exception mismatches and blocks; its remedy is Local generation authorization. A primary DataPacker run outside the bootstrap, such as a Visual Studio build in the primary checkout, rewrites Shared data without updating the stamp; the next session start stamps it again.
+Each game's refresh also records shader provenance in
+`SharedDataShaderStamp.txt`, beside that game's primary `Output\Data`
+directory: before its export it deletes the stamp, aborting session start if
+the delete fails, and after a successful export it writes the shader-source
+fingerprint of `HEAD` only when both shader trees, `AGENTS.md` files aside,
+were clean and unchanged across the export. The shader-source fingerprint is
+one SHA-256 over the `HEAD` file listing of `Engine/Data/Shaders` and the
+game's `Projects/<Name>/Data/Shaders` that leaves out every `AGENTS.md`,
+like the agent-documentation exemption in
+`## Mode selection` but without its `Raw` carve-out, because a `Raw` file
+reaches `Raw.pack`, not `Shader.pack`. A skipped refresh leaves the stamp
+alone. Before provisioning, a Shared Client build compares that stamp with the
+shader-source fingerprint of its own worktree's `HEAD` and blocks under
+`data-mode.shared-shader-unverified` when the stamp is missing or differs,
+because the client compiles the shader layout headers from the worktree but
+loads the primary `Shader.pack`; Server builds load no shaders and are not
+checked. The block names its case's cheaper remedy, when one exists, selected
+from the stamp and from the shader-source fingerprints of primary main's and
+the worktree's `HEAD`: a new session start, whose refresh re-exports primary
+main, when the worktree's `HEAD` already matches primary main; none when the
+worktree's fingerprint changed since its session baseline, because neither a
+refresh nor a rebase puts that change into the primary `Shader.pack`;
+otherwise a rebase onto primary main when the stamp matches primary main;
+otherwise a new session start followed by that rebase. Every block then names
+Local generation authorization (`-DataBuildMode Local -RunDataPacker`), which
+always clears it because the check runs only for a Shared build, with its
+cost: up to about 1 GB of restored and generated data, and, unlike a session
+start or a rebase, it clears the block only for builds that pass
+`-DataBuildMode Local`, because each `/compile` derives the data mode from the
+changed paths, so every later game build (client and server) in the session
+must also pass it. When the block names a new session start, a missing stamp
+can also mean a peer's session-start refresh is exporting right now: retry
+after it finishes, then rebase when the block also names a rebase. In that
+case a missing stamp that persists across session starts can mean the primary
+checkout's shader sources are uncommitted or changing: commit or discard those
+changes, then start a new session, or use Local generation authorization. The
+check runs only at build time, so rerun `/compile` before a launch to check
+again after a peer refresh. A committed shader deletion built under the
+deletion-only exception mismatches and blocks; its remedy is Local generation
+authorization. A primary DataPacker run outside the bootstrap, such as a
+Visual Studio build in the primary checkout, rewrites Shared data without
+updating the stamp; the next session start stamps it again.
 
 Ordinary Shared work otherwise remains unchanged: primary Data, no `RunDataPacker`, and no materialization or export.
 
 ## Local generation
 
-Local mode may build the worktree Release DataPacker as a standalone compile check (`-Target DataPacker`). An authorized same-baseline Local generation is the single invocation `-RunDataPacker`, which internally invokes the worktree DataPacker exactly once with `--materialize-data` over `Engine\Data` and `Projects\BrokenEngineSandbox\Data` into the Local Data directory, requires exit `0`, then runs the one `RunDataPacker=true` game build. Because that invocation reads the whole of `Engine\Data`, it first restores any sparse-skipped tree itself — when the worktree's `core.sparseCheckout` is still `true` it runs `git sparse-checkout disable` in the worktree and blocks under `data.sparse-restore-failed` if that exits non-zero — so a generation build needs no manual restore. Materialization performs no exports and never creates, inspects, or materializes Attribution. In a validated linked worktree, dirty output uses copy-on-write materialization, staging primary files and atomically replacing only the affected recognized link.
+Local mode may build the worktree Release DataPacker as a standalone compile
+check (`-Target DataPacker`). An authorized same-baseline Local generation is
+the single invocation `-RunDataPacker`, which internally invokes the worktree
+DataPacker exactly once with `--materialize-data` over `Engine\Data` and
+`Projects\<Name>\Data` into the Local Data directory, requires
+exit `0`, then runs the one `RunDataPacker=true` game build. Because that
+invocation reads the whole of `Engine\Data`, it first restores any
+sparse-skipped tree itself — when the worktree's `core.sparseCheckout` is
+still `true` it runs `git sparse-checkout disable` in the worktree and blocks
+under `data.sparse-restore-failed` if that exits non-zero — so a generation
+build needs no manual restore. Materialization performs no exports and never
+creates, inspects, or materializes Attribution. In a validated linked
+worktree, dirty output uses copy-on-write materialization, staging primary
+files and atomically replacing only the affected recognized link.
 
-Agent-driven Local generation forbids Gaea by default: the invocation scopes `BT_DATAPACKER_FORBID_GAEA_EXPORT=1` around the whole generation build and restores the caller's prior environment exactly. `-AllowGaeaExport` omits that guard and is authorized only by an explicit user-approved plan or acceptance criterion that requires regenerating Gaea output; changed island inputs, DataPacker code, fingerprints, or cache state alone never authorize a Gaea run. If the guard blocks a dirty Gaea route, the generation build failed: report the exception and do not pass `-AllowGaeaExport` or retry without that explicit approval. `-ForbidExpensiveExport` additionally scopes `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` around the same generation build and restores the caller's prior environment exactly; `DataPacker/Source/AGENTS.md` owns when that guard is wanted, in its `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT` paragraph. `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT` retains its broader independent meaning; never clear either caller-provided guard.
+The data mode and the Local generation build are per game: a request that
+builds several games runs one `-RunDataPacker` build for each game that needs
+it, each materializing that game's `Data` into its own Local Data directory.
+A Local generation authorization covers each game the request builds, because
+`## Mode selection` grants a repack for the plan or criterion, not for one
+game project. The deletion-only exception and the Shared shader stamp check
+apply per invocation, so per game.
+
+Agent-driven Local generation forbids Gaea by default: the invocation scopes
+`BT_DATAPACKER_FORBID_GAEA_EXPORT=1` around the whole generation build and
+restores the caller's prior environment exactly. `-AllowGaeaExport` omits that
+guard and is authorized only by an explicit user-approved plan or acceptance
+criterion that requires regenerating Gaea output; changed island inputs,
+DataPacker code, fingerprints, or cache state alone never authorize a Gaea
+run. If the guard blocks a dirty Gaea route, the generation build failed:
+report the exception and do not pass `-AllowGaeaExport` or retry without that
+explicit approval. `-ForbidExpensiveExport` additionally scopes
+`BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` around the same generation build and
+restores the caller's prior environment exactly; `DataPacker/Source/AGENTS.md`
+owns when that guard is wanted, in its `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT`
+paragraph. `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT` retains its broader
+independent meaning; never clear either caller-provided guard.
 
 Never copy worktree DataPacker/data source changes into the primary checkout to test them.

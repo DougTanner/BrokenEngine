@@ -20,7 +20,13 @@ Vulkan 1.2 GLSL compiled to SPIR-V by DataPacker. The project `ShaderLayouts.h` 
 - Directional lighting uses four EWNS channels. Light-source deposits derive directional weights from world-space source offsets; surface-normal deposits use the projected blended normal. Keep the documented epsilon fallbacks at family leaves.
 - Final lighting and shadow helpers are plain texture reads: every pass writes its whole texture, so the border samplers (transparent black for lighting, white for shadow) own rejection outside the footprint. Keep those sampler flags on every consumer pipeline.
 - Skip redundant normalization only where the identity is proven: `reflect(I, N)` preserves length for unit inputs, and `cross(a, b)` is unit only for unit orthogonal inputs.
-- Never call GLSL `inverse()` on a `mat3` or `mat4`: NVIDIA's shader compiler hangs forever while the pipeline is being created, and reports nothing. This is a recorded debugging result — reading the shader source cannot show it. Supply inverse transforms from the CPU or use a proven family-specific alternative. That call is the only confirmed trigger; large `mat4[]` arrays were investigated and ruled out, because the runtime-sized `jointMatrices[]` storage buffer (`Model/ModelCommon.h`) is indexed dynamically without hanging.
+- Never call GLSL `inverse()` on a `mat3` or `mat4`: NVIDIA's shader compiler
+  hangs forever while the pipeline is being created, and reports nothing. This
+  is a recorded debugging result — reading the shader source cannot show it.
+  Supply inverse transforms from the CPU or use a proven family-specific
+  alternative. That call is the only confirmed trigger; large `mat4[]` arrays
+  were investigated and ruled out, because the runtime-sized `jointMatrices[]`
+  storage buffer (`Model/ModelCommon.h`) is indexed dynamically without hanging.
 
 ## Top-Level Shaders
 

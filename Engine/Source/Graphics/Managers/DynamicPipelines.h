@@ -45,8 +45,9 @@ public:
 	explicit DynamicPipelines(std::unordered_map<common::crc_t, Shader>& rShaders);
 
 	ModelPipeline* CreateModelPipeline(const ModelPipelineSpec& rModelPipelineSpec);
-	void CreateModelPipeline(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers);
-	void CreateModelPipelineShadow(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers);
+	void CreateModelPipelines(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers);
+	void UpdateModelPipelineDescriptors(common::crc_t crc, int64_t iCommandBuffer, int64_t iBinding, Buffer* pBuffer);
+	void WriteModelPipelineIndirectBuffers(common::crc_t crc, int64_t iCommandBuffer, int64_t iCount);
 	void CreatePipelineVisibleLights(common::crc_t crc, std::string_view name, Buffer* pStorageBuffers);
 	void CreatePipelineBillboards(common::crc_t crc, std::string_view name, int64_t iBufferSize);
 	void CreatePipelineHexShields(common::crc_t crc, std::string_view name, int64_t iBufferSize);
@@ -65,6 +66,8 @@ public:
 private:
 
 	void AddPipeline(DynamicPipelineType eType, common::crc_t crc, const PipelineInfo& rPipelineInfo);
+	void CreateMainModelPipeline(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers);
+	void CreateShadowModelPipeline(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers);
 
 	std::unordered_map<common::crc_t, Shader>& mrShaders;
 };

@@ -274,9 +274,9 @@ void Replay::ClearReplayTransientState()
 
 void Replay::ClearReplayAbortState()
 {
-	// Live simulation resumes from the replayed frames, so relink clients and fleets to them as a load does. That also
-	// frees every subscription, so the next active-set rebuild retires every non-origin cell holding no Player until
-	// clients resubscribe.
+	// Live simulation resumes from the replayed frames, so relink clients and their owned entities to them as a load
+	// does. That also frees every subscription, so the next active-set rebuild retires every non-origin cell holding no
+	// owned entity until clients resubscribe.
 	ClearReplayTransientState();
 	game::gpServerSession->mpTransferManager->mTransfers.clear();
 	game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.clear();
@@ -486,7 +486,7 @@ void Replay::SaveLoadReplay()
 					throw std::ios_base::failure("ReplayManifest missing initial record");
 				}
 
-				// Parse the grid into isolated state. Its membership must correlate with the manifest before Reset
+				// Parse the grid into isolated state. Its membership must correlate with the manifest before ResetSession
 				// and adoption, because those operations notify clients and replace the live game state.
 				engine::StagedGridSave stagedGrid;
 				if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("F7.replay.grid"), stagedGrid))
@@ -514,9 +514,7 @@ void Replay::SaveLoadReplay()
 						}
 						const game::Frame& rGridFrame = *it->second.pCurrent;
 						const game::Frame& rSavedStart = *rStagedReader.pendingReader.pSavedStart;
-						if (rSavedStart.interpolate.iTick != iInitialTick
-						 || std::bit_cast<uint32_t>(rSavedStart.interpolate.fCurrentTime) != std::bit_cast<uint32_t>(stagedGrid.fCurrentTime)
-						 || rSavedStart.Crc() != rGridFrame.Crc())
+						if (rSavedStart.interpolate.iTick != iInitialTick || rSavedStart.Crc() != rGridFrame.Crc())
 						{
 							throw std::ios_base::failure("ReplayManifest initial stream does not match grid");
 						}
@@ -528,10 +526,9 @@ void Replay::SaveLoadReplay()
 				}
 
 				ReplayHarnessRigs::TransferCaptureSnapshot recordingCaptureInfo = ReplayHarnessRigs::CaptureSnapshot(*this);
-				game::gpGame->Reset();
+				game::gpGame->ResetSession();
 				engine::AdoptGridSave(std::move(stagedGrid));
 
-				float fInitialTime = stagedReaders.front().pendingReader.pSavedStart->interpolate.fCurrentTime;
 				for (StagedReplayReader& rStagedReader : stagedReaders)
 				{
 					if (rStagedReader.record.iActivationTick == iInitialTick)
@@ -547,13 +544,12 @@ void Replay::SaveLoadReplay()
 				int64_t iTickCounter = iInitialTick;
 				ASSERT(iTickCounter >= 0);
 				game::gpGame->miTickCounter = iTickCounter;
-				game::gpGame->mfCurrentTime = fInitialTime;
 
 				game::AdoptReplayMetadata(std::move(stagedMeta));
 				game::OnStateReplaced();
 
 				// Replay owns each active generation until its reader reaches the recorded end. Rebuild directly from
-				// the successfully loaded readers so normal subscription/player pruning cannot erase an empty coord.
+				// the successfully loaded readers so normal subscription/owned-entity pruning cannot erase an empty coord.
 				game::gpGame->mActiveCoordinates.clear();
 				game::gpGame->mActiveCoordinates.reserve(mReplayReaders.size());
 				for (const auto& [rCoordinate, rpReader] : mReplayReaders)
@@ -561,7 +557,7 @@ void Replay::SaveLoadReplay()
 					game::gpGame->mActiveCoordinates.push_back(rCoordinate);
 				}
 
-				// Game::Reset clears stream-owned diagnostic state. Restore recording evidence so each replay loop
+				// GameBase::ResetSession clears stream-owned diagnostic state. Restore recording evidence so each replay loop
 				// relatches playback.
 				ReplayHarnessRigs::PlaybackAdopted(*this, recordingCaptureInfo);
 				// Replay I/O is outside sim time; do not carry its wall time or pre-load debt into the new loop.

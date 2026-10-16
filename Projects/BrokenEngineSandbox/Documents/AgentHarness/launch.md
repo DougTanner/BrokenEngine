@@ -12,7 +12,15 @@ Start each launch sequence, after the claim (worker step 5) and before directory
 Get-Process -Name 'BrokenEngineSandboxServer*' -ErrorAction SilentlyContinue | Select-Object Id, ProcessName
 ```
 
-If that lists a process, launch nothing and run no `Baseline`, `Register`, or `Check`. Release the just-taken lock through `Invoke-HarnessRelease.ps1` (worker step 44) with no `-ServerPid`/`-ClientPid` and no `-ProcessCheckStatePath`, because no process started and no role is registered. Return `BLOCKED` with one `Residuals` row naming each listed PID and process name as a running server blocking the harness server, mark every criterion `BLOCKED` citing that row, and add no `HARNESS-F` finding. Never stop, quit, or signal a listed process; it belongs to the user. If it lists nothing, continue with the sequence below unchanged.
+If that lists a process, launch nothing and run no `Baseline`, `Register`, or
+`Check`. Release the just-taken lock through `Invoke-HarnessRelease.ps1` (worker
+step 44) with no `-ServerPid`/`-ClientPid` and no `-ProcessCheckStatePath`,
+because no process started and no role is registered. Return `BLOCKED` with one
+`Residuals` row naming each listed PID and process name as a running server
+blocking the harness server, mark every criterion `BLOCKED` citing that row, and
+add no `HARNESS-F` finding. Never stop, quit, or signal a listed process; it
+belongs to the user. If it lists nothing, continue with the sequence below
+unchanged.
 
 Next create the directories and fix this run's single process-check state path. The timestamp makes that path new for every run, so no earlier run's registrations are ever inherited:
 
@@ -108,9 +116,52 @@ $LifecycleRecord | ConvertTo-Json -Compress
 
 Then `Register` the client with `-Role 'client'` and the snapshot's `clientPid`/`clientStartTimeUtc`, and run the same immediate `Check`. The skill owns the process-check result shape and exit codes: exit `0` healthy, exit `2` an unexpected exit whose findings name the role, report path, exception headline, and retained evidence location, exit `1` a setup or state failure.
 
-Both processes share the absolute app-data root recorded as `appDataRoot`, so saves, settings, caches, and replay artifacts land under this worktree instead of the per-user AppData folder, each process in its own `game::kGameName` child. That name separates only the client and server children, so an additional simultaneous client gets its own root instead (see [Additional simultaneous client](#additional-simultaneous-client)). Crash reports are always written under the `--app-data-directory` root when the complete identity fits the fixed path buffer: `<app-data-root>\<Game Name>\<Game-Name>-Crash-Report.txt`; otherwise the existing `%APPDATA%` per-user location remains. A Yes at the save-to-desktop prompt only adds a Desktop copy. These are the identities the process check baselines, which is why its `-GameName` is the role's `<Game Name>` (`Broken Engine Sandbox Server` or `Broken Engine Sandbox`) and its `-ConfiguredAppDataRoot` is the same root this block launches with. A report the check reports as newly written stays on disk as evidence; never delete, move, or rewrite one. A fresh root has no autosave and cold `pipeline.cache`/`BrdfLut.cache`, so the first launch after creating it is slower; wrapper-worktree setup pre-seeds those two caches into the shared `Temp\AppData` root while creating the worktree, taking each file independently from the primary checkout's `Temp\AppData\Broken Engine Sandbox` when present and otherwise from `%APPDATA%\Broken Engine Sandbox`, skipping a file present in neither source so that file stays cold, so the cold-cache cost applies mainly to per-scenario roots. The stopped-server AppData recipe below reads and backs up from `<absolute app-data root>\Broken Engine Sandbox Server`, not `%APPDATA%`.
+Both processes share the absolute app-data root recorded as `appDataRoot`, so
+saves, settings, caches, and replay artifacts land under this worktree instead
+of the per-user AppData folder, each process in its own `game::kGameName` child.
+That name separates only the client and server children, so an additional
+simultaneous client gets its own root instead (see
+[Additional simultaneous client](#additional-simultaneous-client)). Crash
+reports are always written under the `--app-data-directory` root when the
+complete identity fits the fixed path buffer:
+`<app-data-root>\<Game Name>\<Game-Name>-Crash-Report.txt`; otherwise the
+existing `%APPDATA%` per-user location remains. A Yes at the save-to-desktop
+prompt only adds a Desktop copy. These are the identities the process check
+baselines, which is why its `-GameName` is the role's `<Game Name>`
+(`Broken Engine Sandbox Server` or `Broken Engine Sandbox`) and its
+`-ConfiguredAppDataRoot` is the same root this block launches with. A report the
+check reports as newly written stays on disk as evidence; never delete, move, or
+rewrite one. A fresh root has no autosave and cold
+`pipeline.cache`/`BrdfLut.cache`, so the first launch after creating it is
+slower; wrapper-worktree setup pre-seeds those two caches into the shared
+`Temp\AppData` root while creating the worktree, taking each file independently
+from the primary checkout's `Temp\AppData\Broken Engine Sandbox` when present
+and otherwise from `%APPDATA%\Broken Engine Sandbox`, skipping a file present in
+neither source so that file stays cold, so the cold-cache cost applies mainly to
+per-scenario roots. The stopped-server AppData recipe below reads and backs up
+from `<absolute app-data root>\Broken Engine Sandbox Server`, not `%APPDATA%`.
 
-The latest compact JSON snapshot is authoritative. Retain each snapshot outside shell state; its `serverStartTimeUtc`/`clientStartTimeUtc` values are only for the matching `Register` call, and its `processCheckStatePath` is the value every later process check, wait helper, and release call uses. If the client launch fails, use the earlier snapshot and release only its non-null `serverPid`; do not invent a client PID. If the server launch fails, no PID argument exists. After both launches, release with both exact non-null numeric PIDs. `reset` is server-scoped and never clears the client's own persisted state: the client writes `ClientState.bin` once during normal orderly shutdown under `<absolute app-data root>\Broken Engine Sandbox`; focus/zoom changes made during play remain in memory and may be lost on exception, crash, or hard kill. A shared root can expose run two to the root's most recent orderly-exit snapshot (or no state for a fresh root), so shared roots cannot prove fresh client state and invalidate fresh before/after comparisons. A scenario that requires fresh client state must instead use a per-scenario directory that does not exist yet, for example `<absolute app-data root>\AppData-CameraComparison`, and record that the entire per-scenario root was absent before the launch block's `New-Item` created it. Scenarios that deliberately depend on persisted client or server state keep the shared `<absolute adopted worktree>\Temp\AppData` root above, which is also what the cold-cache note and the stopped-server recipe below assume.
+The latest compact JSON snapshot is authoritative. Retain each snapshot outside
+shell state; its `serverStartTimeUtc`/`clientStartTimeUtc` values are only for
+the matching `Register` call, and its `processCheckStatePath` is the value every
+later process check, wait helper, and release call uses. If the client launch
+fails, use the earlier snapshot and release only its non-null `serverPid`; do
+not invent a client PID. If the server launch fails, no PID argument exists.
+After both launches, release with both exact non-null numeric PIDs. `reset` is
+server-scoped and never clears the client's own persisted state: the client
+writes `ClientState.bin` once during normal orderly shutdown under
+`<absolute app-data root>\Broken Engine Sandbox`; focus/zoom changes made during
+play remain in memory and may be lost on exception, crash, or hard kill. A
+shared root can expose run two to the root's most recent orderly-exit snapshot
+(or no state for a fresh root), so shared roots cannot prove fresh client state
+and invalidate fresh before/after comparisons. A scenario that requires fresh
+client state must instead use a per-scenario directory that does not exist yet,
+for example `<absolute app-data root>\AppData-CameraComparison`, and record that
+the entire per-scenario root was absent before the launch block's `New-Item`
+created it. Scenarios that deliberately depend on persisted client or server
+state keep the shared `<absolute adopted worktree>\Temp\AppData` root above,
+which is also what the cold-cache note and the stopped-server recipe below
+assume.
 
 After both generic deadline-limited `Wait-HarnessPing.ps1` readiness checks succeed (server port `27100`, then client port `27101`), restore the minimized agent-mode client and require a successful response confirming `result.minimized:false` before relying on Debug/Profile UI auto-connect:
 
@@ -125,11 +176,24 @@ if ($WindowStateResponse.ok -ne $true -or $WindowStateResponse.result.minimized 
 }
 ```
 
-Keep the client visible for the scenario. The Debug and Profile clients auto-connect: once server discovery finds the local server the client enters gameplay by itself, so the main menu and its `LOCAL SERVER` button are gone without any click, and clicking that label there fails with `no widget matches label` against in-gameplay HUD candidates. Only a Release client stays on the main menu and needs `click "LOCAL SERVER"`, and only after discovery replaces the disabled `SCANNING...` button with it. The server loads its exit autosave, so use `reset` when the scenario needs fresh state.
+Keep the client visible for the scenario. The Debug and Profile clients
+auto-connect: once server discovery finds the local server the client enters
+gameplay by itself, so the main menu and its `LOCAL SERVER` button are gone
+without any click, and clicking that label there fails with
+`no widget matches label` against in-gameplay HUD candidates. Only a Release
+client stays on the main menu and needs `click "LOCAL SERVER"`, and only after
+discovery replaces the disabled `SCANNING...` button with it. The server loads
+its exit autosave, so use `reset` when the scenario needs fresh state.
 
 ### Additional simultaneous client
 
-Launch this only for a criterion that needs two clients connected at once; the skill owns the convention, this block owns the concrete values. Run it after the first client is ready. Create its own app-data root first — a directory holding no state from any earlier run, so the two clients never share the `Broken Engine Sandbox` per-client directory and a later run never inherits the previous run's client settings. The fixed path below is reused across runs, so remove a leftover root before creating it:
+Launch this only for a criterion that needs two clients connected at once; the
+skill owns the convention, this block owns the concrete values. Run it after the
+first client is ready. Create its own app-data root first — a directory holding
+no state from any earlier run, so the two clients never share the
+`Broken Engine Sandbox` per-client directory and a later run never inherits the
+previous run's client settings. The fixed path below is reused across runs, so
+remove a leftover root before creating it:
 
 ```powershell
 $ROOT = '<absolute adopted worktree>'
@@ -210,7 +274,17 @@ This is a criterion-specific gate, not general launch readiness. It holds the cl
 
 ## Normal launch
 
-For a user request to launch the game for their own play or testing. These are the `## Launch` executables without the harness run: a running-server check, then a harness lock claim under session `normal-launch` that is never released, but no process check, readiness wait, heartbeat, or release, and none of the agent-only arguments (`--agent-port`, `--app-data-directory`, `--log-file`, `--windowed`, hidden windows). The client therefore opens a normal window that takes physical input, its fullscreen state follows the order in [`Engine/Source/AGENTS.md`](../../../../Engine/Source/AGENTS.md) `## Startup and Main Loop`, and both processes use the per-user AppData, so the user's own settings and saves apply. `--loopback-only` stays, as in every same-machine run.
+For a user request to launch the game for their own play or testing. These are
+the `## Launch` executables without the harness run: a running-server check,
+then a harness lock claim under session `normal-launch` that is never released,
+but no process check, readiness wait, heartbeat, or release, and none of the
+agent-only arguments (`--agent-port`, `--app-data-directory`, `--log-file`,
+`--windowed`, hidden windows). The client therefore opens a normal window that
+takes physical input, its fullscreen state follows the order in
+[`Engine/Source/AGENTS.md`](../../../../Engine/Source/AGENTS.md)
+`## Startup and Main Loop`, and both processes use the per-user AppData, so the
+user's own settings and saves apply. `--loopback-only` stays, as in every
+same-machine run.
 
 The server is single-instance per machine (a second one shows a modal and exits), so first check that no server started without `--agent-port` is running. A server carrying `--agent-port` belongs to another session's harness run, which the claim below waits out; a server whose command line cannot be read counts as started without it:
 
@@ -244,7 +318,16 @@ $ClientProcess = Start-Process -FilePath $ClientExe -ArgumentList @('--loopback-
 [ordered]@{ serverPid = $ServerProcess.Id; clientPid = $ClientProcess.Id } | ConvertTo-Json -Compress
 ```
 
-The client connects as `## Launch` describes. If a launch fails, only report it to the user; the claimed lock goes stale five minutes after the claim and the takeover steps take it over. Leave both processes running for the user, who closes them; never quit, stop, or release them, and never heartbeat or release the lock. The claim's owner token is not kept, so after the launch this session does not hold the harness lock and `/compile` never sends `quit` to these processes. A harness run started meanwhile waits in its claim until the user closes the server, then takes the stale lock over through worker steps 11-15; when the server closed within five minutes of the claim, that run waits out the rest of those five minutes.
+The client connects as `## Launch` describes. If a launch fails, only report it
+to the user; the claimed lock goes stale five minutes after the claim and the
+takeover steps take it over. Leave both processes running for the user, who
+closes them; never quit, stop, or release them, and never heartbeat or release
+the lock. The claim's owner token is not kept, so after the launch this session
+does not hold the harness lock and `/compile` never sends `quit` to these
+processes. A harness run started meanwhile waits in its claim until the user
+closes the server, then takes the stale lock over through worker steps 11-15;
+when the server closed within five minutes of the claim, that run waits out the
+rest of those five minutes.
 
 ## Durable caveats
 

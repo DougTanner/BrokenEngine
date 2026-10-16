@@ -4,9 +4,23 @@ Revisit When: the user opens a window in which every other agent session is clos
 
 ## Context
 
-Moves every ThirdParty submodule to the newest commit of its newest mainline branch, adds `branch = <name>` to every `.gitmodules` entry, adds nlohmann/json as its own submodule, ports our code, verifies, and commits on `main`. Today 21 submodules live under `ThirdParty/` (`.gitmodules:1-64`) and only lz4 carries a branch line (`.gitmodules:49`, `release`). nlohmann::json 3.10.4 comes from the copy tinygltf v2 vendors (`Common/ExternalHeaders.h:317-323`, `Tools/ToolCommon/ToolCliCommon.h:19-24`).
+Moves every ThirdParty submodule to the newest commit of its newest mainline
+branch, adds `branch = <name>` to every `.gitmodules` entry, adds nlohmann/json
+as its own submodule, ports our code, verifies, and commits on `main`. Today 21
+submodules live under `ThirdParty/` (`.gitmodules:1-64`) and only lz4 carries a
+branch line (`.gitmodules:49`, `release`). nlohmann::json 3.10.4 comes from the
+copy tinygltf v2 vendors (`Common/ExternalHeaders.h:317-323`,
+`Tools/ToolCommon/ToolCliCommon.h:19-24`).
 
-The work runs in the primary checkout `C:\Users\dougt\Documents\BrokenEngine` on `main`, never in a session worktree. A linked worktree consumes primary's submodule trees and ThirdParty Output through link farms, so it cannot build a changed pin: provisioning rejects any pin that differs from primary (`.agents/scripts/Provision-WorktreeThirdParty.ps1:227-231`), and `-Target ThirdParty` builds only in primary (`.agents/skills/compile/scripts/Invoke-CompileBuild.ps1:252-258`). Provisioning returns early in primary (`Provision-WorktreeThirdParty.ps1:157-160`), so `/compile` there builds every target against primary's own trees.
+The work runs in the primary checkout `C:\Users\dougt\Documents\BrokenEngine` on
+`main`, never in a session worktree. A linked worktree consumes primary's
+submodule trees and ThirdParty Output through link farms, so it cannot build a
+changed pin: provisioning rejects any pin that differs from primary
+(`.agents/scripts/Provision-WorktreeThirdParty.ps1:227-231`), and
+`-Target ThirdParty` builds only in primary
+(`.agents/skills/compile/scripts/Invoke-CompileBuild.ps1:252-258`). Provisioning
+returns early in primary (`Provision-WorktreeThirdParty.ps1:157-160`), so
+`/compile` there builds every target against primary's own trees.
 
 Upstream facts below come from `git ls-remote`, `gh api`, and blobless clones under `Temp/upstream/<lib>.git` in session worktree `d09942d1-84a2-4805-b13c-a36e4f232b3c`, gathered 2026-10-15. Those clones are machine-local and ignored; the executing session re-reads upstream. At authoring time primary `main` was `f1d140ae` and its 21 gitlinks equal those at `e202a3dc`.
 
@@ -16,14 +30,45 @@ The authoring agent records these as the user's choices from the 2026-10-15 sess
 
 - Run location: the primary checkout, with every other session closed or idle for the whole procedure, because the link farms point straight into primary's submodule trees and Output (`Provision-WorktreeThirdParty.ps1:261-273`), so moving them changes every live worktree's sources and libraries. Afterwards other worktrees rebase onto the new primary tip, the documented pin-mismatch remedy (`Provision-WorktreeThirdParty.ps1:231`, `Documents/FreshMachineSetup.md:31`).
 - Branch rule: per library, the head of the mainline branch (default, main/master, dev/develop, or a release line) with the newest head. Topic, bot, per-feature, and gh-pages branches never qualify. The table in `## Branch choices` stands. The executing session re-verifies heads, records each SHA when it sets that gitlink, and checks the commit against that record, not against a later `ls-remote`.
-- tinygltf: the gitlink moves to the `release` head, but we keep consuming the v2 C++ API from the head's `attic/tiny_gltf.h`. Upstream `5aa461e` ("Deprecate legacy v1/v2/v3 C++ API; make v3 C the mainline") moved it there. Its diff against our pinned `tiny_gltf.h` is 28 lines, all in the implementation's JSON-backend selection plus one `urldecode` cleanup, none in the public API. The vendored `stb_image.h`, `stb_image_write.h`, and `json.hpp` only moved. Every tiny_gltf include site defines `TINYGLTF_NO_INCLUDE_JSON` and includes nlohmann `single_include/nlohmann/json.hpp` first, so only one nlohmann version is compiled. No DataPacker glTF code changes and no v3 C port. Trade-off accepted: the attic copy is deprecated and untested upstream, and later tinygltf updates may stop carrying it. The first DataPacker build settles whether `attic/tiny_gltf.h` compiles against nlohmann develop.
+- tinygltf: the gitlink moves to the `release` head, but we keep consuming the
+  v2 C++ API from the head's `attic/tiny_gltf.h`. Upstream `5aa461e` ("Deprecate
+  legacy v1/v2/v3 C++ API; make v3 C the mainline") moved it there. Its diff
+  against our pinned `tiny_gltf.h` is 28 lines, all in the implementation's
+  JSON-backend selection plus one `urldecode` cleanup, none in the public API.
+  The vendored `stb_image.h`, `stb_image_write.h`, and `json.hpp` only moved.
+  Every tiny_gltf include site defines `TINYGLTF_NO_INCLUDE_JSON` and includes
+  nlohmann `single_include/nlohmann/json.hpp` first, so only one nlohmann
+  version is compiled. No DataPacker glTF code changes and no v3 C port.
+  Trade-off accepted: the attic copy is deprecated and untested upstream, and
+  later tinygltf updates may stop carrying it. The first DataPacker build
+  settles whether `attic/tiny_gltf.h` compiles against nlohmann develop.
 - nlohmann/json: new submodule `ThirdParty/json` (`https://github.com/nlohmann/json.git`, branch `develop`), consumed only through `single_include/nlohmann/json.hpp`. The dependency is approved (`ThirdParty/AGENTS.md` `## License Policy` step 4), with the license review in `## License review`. The C5311 pragmas go away (`## API-break inventory`).
 - openexr `main`: the unity wrapper and config shims are reworked, the bundled libdeflate (MIT) is compiled, and OpenJPH and zstd are not. Link stubs cover all four entry points `compression.c` references.
 - mimalloc `dev3`: the startup-reserve check at `Engine/Source/Memory/GlobalAllocator.cpp:250-257` checks `mi_stats_get` reserved and committed against `kiMimallocArenaReserveMebibytes`, and keeps the warning path.
 - imgui `master`: `Engine/Source/Ui/MenuUtils.cpp:310` gets the new `AddRect` argument order, and `Engine/Source/Graphics/Managers/DeviceManager.cpp:270-271` reserves ImGui's two samplers. If implot `master` does not build against imgui `master` (WIP), the executing session stops and asks the user.
-- Upstream symbolic links: the openexr `main` head tracks `src/test/OpenEXRFuzzTest/oss-fuzz -> ../oss-fuzz` and the tinygltf `release` head tracks `attic/examples/saver/Makefile -> Makefile.dev` (mode `120000`); neither current pin has one. Primary runs with `core.symlinks=true`, so checking these heads out would create reparse points inside the submodule trees, and every linked worktree's provisioning would then throw `contains unsupported reparse point` (`Provision-WorktreeThirdParty.ps1:62-77`). So `core.symlinks` is set to `false` in the two submodules' own config before their checkout (step 6), and Git writes each link as a plain file holding the link text. The recorded mode stays `120000` and status stays clean. `Documents/FreshMachineSetup.md` gains the same settings for a fresh clone. Trade-off accepted: the setting is machine-local, and a future upstream link in any other library fails provisioning the same way.
+- Upstream symbolic links: the openexr `main` head tracks
+  `src/test/OpenEXRFuzzTest/oss-fuzz -> ../oss-fuzz` and the tinygltf `release`
+  head tracks `attic/examples/saver/Makefile -> Makefile.dev` (mode `120000`);
+  neither current pin has one. Primary runs with `core.symlinks=true`, so
+  checking these heads out would create reparse points inside the submodule
+  trees, and every linked worktree's provisioning would then throw
+  `contains unsupported reparse point`
+  (`Provision-WorktreeThirdParty.ps1:62-77`). So `core.symlinks` is set to
+  `false` in the two submodules' own config before their checkout (step 6), and
+  Git writes each link as a plain file holding the link text. The recorded mode
+  stays `120000` and status stays clean. `Documents/FreshMachineSetup.md` gains
+  the same settings for a fresh clone. Trade-off accepted: the setting is
+  machine-local, and a future upstream link in any other library fails
+  provisioning the same way.
 - No attribution change (`DataPacker/Source/Attribution.cpp`).
-- Verification: a full forced DataPacker re-export under temporary bumps of every output-affecting exporter version (`## Execution procedure` step 12), comparing every output file the manifests describe, never the tracked `.PreExport` markers (they store the version, e.g. `Projects/BrokenEngineSandbox/Data/Models/Spaceship/scene.gltf.PreExport` ends in `"version":992}`). After that come the full build matrix, an `/agent-harness` smoke run, and a replay determinism check. Each submodule's `git -C ThirdParty/<lib> status --porcelain` must be empty before the commit.
+- Verification: a full forced DataPacker re-export under temporary bumps of
+  every output-affecting exporter version (`## Execution procedure` step 12),
+  comparing every output file the manifests describe, never the tracked
+  `.PreExport` markers (they store the version, e.g.
+  `Projects/BrokenEngineSandbox/Data/Models/Spaceship/scene.gltf.PreExport` ends
+  in `"version":992}`). After that come the full build matrix, an
+  `/agent-harness` smoke run, and a replay determinism check. Each submodule's
+  `git -C ThirdParty/<lib> status --porcelain` must be empty before the commit.
 
 ## Branch choices
 
@@ -60,17 +105,61 @@ The executing session classifies the change Tier 3 and follows `.agents/referenc
 
 1. Window. The user closes or idles every other Claude Code, Codex, and OpenCode session and every running BrokenEngineSandbox client or server, and starts none until step 19. Run `pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Wait-AgentToolsQuiescence.ps1 -RepositoryRoot '<primary>'`, and continue only on disposition `quiescent`.
 2. Session. The user starts the agent CLI directly at `<primary>`, not through the session wrapper, which would create a worktree (`Documents/FreshMachineSetup.md:45`). Confirm `git status --porcelain` is empty on branch `main`, and record `HEAD` as `<start>`. `<start>` is the explicit `-Baseline` for every `/compile` brief, for `Invoke-StaticChecks.ps1`, and for review scopes.
-3. Baseline data. Run `pwsh -NoProfile -File .agents/scripts/Bootstrap-AgentTools.ps1 -RepositoryRoot '<primary>'`, the primary maintenance this plan authorizes. On the unchanged tree it rebuilds the AgentTools, ThirdParty Debug/Profile/Release, and the DataPacker prebuild, and refreshes primary data (`Bootstrap-AgentTools.ps1:124-253`). It skips every build on a dirty primary (`:49-57`), so it runs only on a clean tree. Then copy the 23 files of `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Output/Data` (`.agents/skills/compile/references/runtime-data-mode.md` `## Generated Data directory inventory`) to `Temp/ThirdPartyUpdate/BaselineData/`.
+3. Baseline data. Run
+   `pwsh -NoProfile -File .agents/scripts/Bootstrap-AgentTools.ps1 -RepositoryRoot '<primary>'`,
+   the primary maintenance this plan authorizes. On the unchanged tree it
+   rebuilds the AgentTools, ThirdParty Debug/Profile/Release, and the DataPacker
+   prebuild, and refreshes primary data (`Bootstrap-AgentTools.ps1:124-253`). It
+   skips every build on a dirty primary (`:49-57`), so it runs only on a clean
+   tree. Then copy the 23 files of
+   `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Output/Data`
+   (`.agents/skills/compile/references/runtime-data-mode.md`
+   `## Generated Data directory inventory`) to
+   `Temp/ThirdPartyUpdate/BaselineData/`.
 4. Branch lines. For each of the 21 existing entries, run `git config -f .gitmodules submodule.ThirdParty/<lib>.branch <branch>` from `## Branch choices`; lz4 changes from `release` to `dev`.
-5. Re-verify. For each of the 22 repositories, list `git ls-remote --heads <url>` and confirm the chosen branch is still the newest mainline head. If a head moved or a newer mainline branch appeared, take it, update `.gitmodules`, and re-run that library's `## API-break inventory` diff before porting. For each re-verified head, run `git ls-tree -r <sha>` in the submodule repository when the head is local there, and otherwise in a blobless clone under `Temp/upstream/<lib>.git`, which json always needs because it has no repository until step 6: if a mode-`120000` entry appears in any library other than openexr and tinygltf, stop and ask the user.
-6. Move pins. First run `git -C ThirdParty/openexr config core.symlinks false` and `git -C ThirdParty/tinygltf config core.symlinks false`, which write each submodule's own machine-local config (`## Decisions`). Then run `git submodule update --remote --checkout -- ThirdParty/<lib>` for the 21 entries, then `git submodule add -b develop https://github.com/nlohmann/json.git ThirdParty/json`. Immediately record each `git -C ThirdParty/<lib> rev-parse HEAD` with its committer date in `Temp/ThirdPartyUpdate/Pins.txt`, then `git add .gitmodules ThirdParty/<lib>` for all 22. Confirm `Get-ChildItem -LiteralPath <path> -Force -Recurse -Attributes ReparsePoint` prints nothing for every one of the 22 submodule trees, the paths `git config -f .gitmodules --get-regexp '\.path$'` lists, including `ThirdParty/json`. `--remote` re-resolves each branch head, so a head that moved after step 5 can bring a link step 5 never checked; any output from this scan means stop and ask the user. This mirrors the check provisioning runs on each submodule (`Provision-WorktreeThirdParty.ps1:62-77`), which itself returns early in primary.
+5. Re-verify. For each of the 22 repositories, list
+   `git ls-remote --heads <url>` and confirm the chosen branch is still the
+   newest mainline head. If a head moved or a newer mainline branch appeared,
+   take it, update `.gitmodules`, and re-run that library's
+   `## API-break inventory` diff before porting. For each re-verified head, run
+   `git ls-tree -r <sha>` in the submodule repository when the head is local
+   there, and otherwise in a blobless clone under `Temp/upstream/<lib>.git`,
+   which json always needs because it has no repository until step 6: if a
+   mode-`120000` entry appears in any library other than openexr and tinygltf,
+   stop and ask the user.
+6. Move pins. First run `git -C ThirdParty/openexr config core.symlinks false`
+   and `git -C ThirdParty/tinygltf config core.symlinks false`, which write each
+   submodule's own machine-local config (`## Decisions`). Then run
+   `git submodule update --remote --checkout -- ThirdParty/<lib>` for the 21
+   entries, then
+   `git submodule add -b develop https://github.com/nlohmann/json.git ThirdParty/json`.
+   Immediately record each `git -C ThirdParty/<lib> rev-parse HEAD` with its
+   committer date in `Temp/ThirdPartyUpdate/Pins.txt`, then
+   `git add .gitmodules ThirdParty/<lib>` for all 22. Confirm
+   `Get-ChildItem -LiteralPath <path> -Force -Recurse -Attributes ReparsePoint`
+   prints nothing for every one of the 22 submodule trees, the paths
+   `git config -f .gitmodules --get-regexp '\.path$'` lists, including
+   `ThirdParty/json`. `--remote` re-resolves each branch head, so a head that
+   moved after step 5 can bring a link step 5 never checked; any output from
+   this scan means stop and ask the user. This mirrors the check provisioning
+   runs on each submodule (`Provision-WorktreeThirdParty.ps1:62-77`), which
+   itself returns early in primary.
 7. Port. Change our code and `Documents/FreshMachineSetup.md` as `## In scope` lists, using `## API-break inventory`.
 8. Build ThirdParty, then AgentTools. Through `/compile`, build ThirdParty Debug, Profile, and Release in place in primary; ThirdParty builds are allowed there. Then build WorktreeCli and AgentHarness, which are Release-only candidates under `Temp`. Compile errors in our wrappers or consumers are ported in our code only. If implot fails against imgui `master`, stop and ask the user.
 9. Build DataPacker and the game. Build DataPacker Release; the build script refuses any other DataPacker configuration (`.agents/skills/compile/SKILL.md` `## Inputs`). Then build Client and Server in Debug, Profile, and Release, in the data mode `Resolve-CompileContext.ps1` reports. In primary, Local and Shared both resolve to primary's `Output/Data` (`runtime-data-mode.md` `## Mode selection`).
 10. Propagate and check. Run `/update-affected-code`, then `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<primary>' -Baseline <start>`.
 11. Review. Run the `## Review roles` passes, resolve accepted findings, and rebuild what they touch.
 12. Forced re-export, with Local generation authorized by this plan and Gaea forbidden (no `-AllowGaeaExport` and no `-ForbidExpensiveExport`).
-    - Add `1'000'000` to the base literal of each of these (e.g. `Version(31)` becomes `Version(1'000'031)`): `ExportAudio::kiVersion` (`DataPacker/Source/ExportJobs/ExportAudio.h:13`), `ExportIsland::kiVersion` and `kiTextureVersion` (`ExportIsland.h:26,39`), `ExportModel::kiVersion` (`ExportModel.h:14`), `ExportRaw::kiVersion` (`ExportRaw.h:13`), `ExportScene::kiVersion` (`ExportScene.h:17`), `ExportShader::kiVersion` (`ExportShader.h:13`), `ExportTexture::kiVersion` (`ExportTexture.h:15`), `kiSplitVersion` (`Island/BakeRoute.cpp:38`), and `kiCubemapIblFingerprintVersion` (`ExportCubemapIbl.cpp:8`).
+    - Add `1'000'000` to the base literal of each of these (e.g. `Version(31)`
+      becomes `Version(1'000'031)`): `ExportAudio::kiVersion`
+      (`DataPacker/Source/ExportJobs/ExportAudio.h:13`),
+      `ExportIsland::kiVersion` and `kiTextureVersion` (`ExportIsland.h:26,39`),
+      `ExportModel::kiVersion` (`ExportModel.h:14`), `ExportRaw::kiVersion`
+      (`ExportRaw.h:13`), `ExportScene::kiVersion` (`ExportScene.h:17`),
+      `ExportShader::kiVersion` (`ExportShader.h:13`),
+      `ExportTexture::kiVersion` (`ExportTexture.h:15`), `kiSplitVersion`
+      (`Island/BakeRoute.cpp:38`), and `kiCubemapIblFingerprintVersion`
+      (`ExportCubemapIbl.cpp:8`).
     - Leave alone `kiBakeVersion` (`BakeRoute.cpp:37`, Gaea) and the cache-bookkeeping versions (`ExportJob.cpp:9`, `ExportShader.cpp:319`, `InputFingerprint.cpp:86,90`).
     - Run `/compile -Target Client -Configuration Release -DataBuildMode Local -RunDataPacker`. If the Gaea guard blocks a route, stop and report it.
     - Byte-compare all 23 `Output/Data` files with `Temp/ThirdPartyUpdate/BaselineData/`, and confirm `git status` shows no tracked change under `Engine/Data` or `Projects/BrokenEngineSandbox/Data` other than the four `.PreExport` markers.
@@ -180,7 +269,14 @@ Every license file at the new heads was read. All match the old pins except zlib
 - `ThirdParty/Prebuilts/Source/DataPacker/openexr/`: the `openexr.c` file list, the four HT/zstd stubs with their comment, and reworked or new config shims. Plus their `ThirdParty.vcxproj`/`.filters` registration and any include-path change in all three ThirdParty configurations, through `/update-vcxproj`.
 - mimalloc: `Engine/Source/Memory/GlobalAllocator.cpp:250-271`, the reserve check through `mi_stats_get` and its comment, and the `Engine/Source/Memory/AGENTS.md:11` sentence that describes it.
 - imgui: `Engine/Source/Ui/MenuUtils.cpp:310` and `Engine/Source/Graphics/Managers/DeviceManager.cpp:270-271`.
-- `Documents/FreshMachineSetup.md` `## 3. Clone with symlinks and submodules`: after the clone, run the commands below so a fresh primary matches `## Decisions`. A setting change alone leaves an existing link on disk, and so does `git checkout -- <path>` (observed with Git 2.54.0.windows.1), so each link is removed and checked out again. The paths are the two submodules' mode-`120000` entries at the committed pins (`git -C ThirdParty/<lib> ls-files -s`), shown here for the `## Branch choices` heads.
+- `Documents/FreshMachineSetup.md` `## 3. Clone with symlinks and submodules`:
+  after the clone, run the commands below so a fresh primary matches
+  `## Decisions`. A setting change alone leaves an existing link on disk, and so
+  does `git checkout -- <path>` (observed with Git 2.54.0.windows.1), so each
+  link is removed and checked out again. The paths are the two submodules'
+  mode-`120000` entries at the committed pins
+  (`git -C ThirdParty/<lib> ls-files -s`), shown here for the
+  `## Branch choices` heads.
   - `git -C ThirdParty/openexr config core.symlinks false`
   - `git -C ThirdParty/openexr rm -q -- src/test/OpenEXRFuzzTest/oss-fuzz`
   - `git -C ThirdParty/openexr checkout HEAD -- src/test/OpenEXRFuzzTest/oss-fuzz`

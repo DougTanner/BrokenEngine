@@ -15,8 +15,7 @@
 namespace engine
 {
 
-ServerSessionRuntime::ServerSessionRuntime(game::ServerSession& rSession, int64_t iPort)
-:	mrSession(rSession)
+ServerSessionRuntime::ServerSessionRuntime(int64_t iPort)
 {
 	mpDiscoveryResponder = std::make_unique<NetworkDiscoveryResponder>();
 	timeBeginPeriod(1);
@@ -43,7 +42,7 @@ ServerSessionRuntime::~ServerSessionRuntime()
 void ServerSessionRuntime::ResetOnLastClientLeave()
 {
 	// Runtime-owned reset after each post-poll sample: clear network-driven pause and timescale when the
-	// engine client set transitions from non-empty to empty. Sampling after the complete game hook catches
+	// engine client set transitions from non-empty to empty. Sampling after the game's AfterNetworkPoll returns catches
 	// every removal path, while an already-empty server retains its commanded pause and timescale.
 	bool bHasClients = !mpServer->mClients.empty();
 	if (mbHadClients && !bHasClients)
@@ -62,10 +61,10 @@ void ServerSessionRuntime::Poll(const NetworkTimeState& rTimeState)
 	ASSERT(common::gpMultithreading->IsMainThread());
 	// Heap: ENet/discovery polling and game request queues may grow
 	ScopedSuppressAllocationTracking suppress;
-	mrSession.BeforeNetworkPoll();
+	game::gpServerSession->BeforeNetworkPoll();
 	mpServer->Poll(rTimeState, ServerPollMode::kUpdateStart);
 	mpDiscoveryResponder->Poll();
-	mrSession.AfterNetworkPoll();
+	game::gpServerSession->AfterNetworkPoll();
 	ResetOnLastClientLeave();
 }
 
@@ -79,7 +78,7 @@ void ServerSessionRuntime::PollTickBoundary(const NetworkTimeState& rTimeState)
 	// Heap: ENet polling and game request queues may grow
 	ScopedSuppressAllocationTracking suppress;
 	mpServer->Poll(rTimeState, ServerPollMode::kTickBoundary);
-	mrSession.AfterNetworkPoll();
+	game::gpServerSession->AfterNetworkPoll();
 	ResetOnLastClientLeave();
 }
 
@@ -234,14 +233,14 @@ void ServerSessionRuntime::CompleteTick(int64_t iTick)
 	// Heap: client/resync/subscription bookkeeping and ENet sends outside publication construction
 	ScopedSuppressAllocationTracking suppress;
 	HandleResyncRequests();
-	mrSession.FinalizeTickClients();
+	game::gpServerSession->FinalizeTickClients();
 	{
 		ScopedResumeAllocationTracking resume;
 		common::ScopedWorkbufferArena publicationArena = common::gpThreadLocal->mWorkbuffer.Push();
-		mrSession.mpBroadcaster->BuildTickPublication(iTick, *this, publicationArena);
+		game::gpServerSession->mpBroadcaster->BuildTickPublication(iTick, *this, publicationArena);
 	}
-	mrSession.mpBroadcaster->mBroadcastStatusChanges.clear();
-	mrSession.SubscriptionUpdates();
+	game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.clear();
+	game::gpServerSession->SubscriptionUpdates();
 	mpServer->Flush();
 }
 
@@ -334,7 +333,7 @@ void ServerSessionRuntime::ComputeActiveSet()
 
 	game::gpGame->mActiveCoordinates.clear();
 	AddSubscribedCoords();
-	mrSession.AddGameRequiredCoordinates();
+	game::gpServerSession->AddGameRequiredCoordinates();
 
 	if (!std::ranges::contains(game::gpGame->mActiveCoordinates, engine::kOriginCoordinate))
 	{

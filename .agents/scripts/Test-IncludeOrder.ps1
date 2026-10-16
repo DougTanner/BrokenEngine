@@ -291,11 +291,8 @@ try {
 	# client project. Engine/ and Common/ resolve through the first one's include list, which differs from
 	# its server project's only by the RenderDoc directory.
 	$gameProjects = [Collections.Generic.List[hashtable]]::new()
-	[string[]] $names = @([IO.Directory]::GetDirectories((Join-Path $script:Root 'Projects')) | ForEach-Object { [IO.Path]::GetFileName($_) })
-	[Array]::Sort($names, [StringComparer]::Ordinal)
-	foreach ($name in $names) {
+	foreach ($name in @(Get-AgentGameProjects $script:Root)) {
 		$project = "Projects/$name/Platforms/VisualStudio2026/$name.vcxproj"
-		if (-not [IO.File]::Exists((Join-Path $script:Root $project))) { continue }
 		$script:ExcludedFiles += "Projects/$name/Source/Pch.h"
 		$gameProjects.Add(@{ Prefix = "^Projects/$([regex]::Escape($name))/"; Project = $project })
 	}

@@ -182,12 +182,21 @@ function Compare-AgentModelVersion([string] $Left, [string] $Right) {
 	return 0
 }
 
-# The Shared-data shader stamp value: SHA-256 over the revision's file listing of both shader trees.
-# AGENTS.md files never reach Shader.pack, so they are left out at every depth.
-function Get-AgentShaderSourceFingerprint([string] $Root, [string] $Revision) {
-	$listing = @(Invoke-AgentGit @('-C', $Root, 'ls-tree', '-r', $Revision, '--', 'Engine/Data/Shaders', 'Projects/BrokenEngineSandbox/Data/Shaders') |
+# The game projects under Root: each Projects/<Name> directory holding Platforms/VisualStudio2026/<Name>.vcxproj,
+# read from the filesystem so an untracked project counts. Names are in ordinal order.
+function Get-AgentGameProjects([string] $Root) {
+	[string[]] $names = @([IO.Directory]::GetDirectories((Join-Path $Root 'Projects')) | ForEach-Object { [IO.Path]::GetFileName($_) } |
+		Where-Object { [IO.File]::Exists((Join-Path $Root "Projects/$_/Platforms/VisualStudio2026/$_.vcxproj")) })
+	[Array]::Sort($names, [StringComparer]::Ordinal)
+	return $names
+}
+
+# The Shared-data shader stamp value: SHA-256 over the revision's file listing of the engine's and the project's
+# shader trees. AGENTS.md files never reach Shader.pack, so they are left out at every depth.
+function Get-AgentShaderSourceFingerprint([string] $Root, [string] $Revision, [string] $Project) {
+	$listing = @(Invoke-AgentGit @('-C', $Root, 'ls-tree', '-r', $Revision, '--', 'Engine/Data/Shaders', "Projects/$Project/Data/Shaders") |
 		Where-Object { -not [IO.Path]::GetFileName(($_ -split "`t", 2)[1]).Equals('AGENTS.md', [StringComparison]::OrdinalIgnoreCase) })
 	return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.UTF8Encoding]::new($false).GetBytes($listing -join "`n"))).ToLowerInvariant()
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentShaderSourceFingerprint
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentShaderSourceFingerprint

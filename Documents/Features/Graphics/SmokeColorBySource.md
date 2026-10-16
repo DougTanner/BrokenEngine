@@ -8,7 +8,17 @@ Smoke is a client-only 2D density field (`Engine/Data/Shaders/Smoke/AGENTS.md`):
 
 The only color variation today is by density: `fSmokeColorMin + fSmokeColorMultiplier * density` scales the lit smoke color, capped at 1.25, so thin smoke reads darker than thick smoke. Every source makes the same grey smoke.
 
-Sources do not map one-to-one onto collections. Missiles (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.cpp`) and explosions (`Engine/Source/Frame/Collections/Explosions/ExplosionsSpawn.cpp`) both deposit through `SmokeTrails`, each under its own registered trail type; explosions, blaster terrain hits (`BlastersUpdate.cpp`), and player impacts (`PlayersCombat.cpp`) deposit through `Puffs`. A per-type color already exists but never reaches the field: `SmokeTrailsType::iColor` and `PuffsType::uiColor`, all registered as `0xFFFFFFFF`, are copied into each instance's `uiColor` (`QuadLayout`, `AxisAlignedQuadLayout`), but the deposit vertex shaders do not forward it and `Smoke.frag` writes density only.
+Sources do not map one-to-one onto collections. Missiles
+(`Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.cpp`)
+and explosions
+(`Engine/Source/Frame/Collections/Explosions/ExplosionsSpawn.cpp`) both deposit
+through `SmokeTrails`, each under its own registered trail type; explosions,
+blaster terrain hits (`BlastersUpdate.cpp`), and player impacts
+(`PlayersCombat.cpp`) deposit through `Puffs`. A per-type color already exists
+but never reaches the field: `SmokeTrailsType::iColor` and `PuffsType::uiColor`,
+all registered as `0xFFFFFFFF`, are copied into each instance's `uiColor`
+(`QuadLayout`, `AxisAlignedQuadLayout`), but the deposit vertex shaders do not
+forward it and `Smoke.frag` writes density only.
 
 ## Design
 

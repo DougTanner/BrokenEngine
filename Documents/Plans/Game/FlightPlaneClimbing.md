@@ -1,20 +1,81 @@
 <!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:09:43.448Z","dependsOn":["Documents/Plans/Game/ShipTypeSplit.md"]} -->
 # Give every ship a target flight plane and climb smoothly toward it
 
-Tier 3 (`.agents/references/risk-tiers.md`): the change alters CRC'd Interpolate and PostRender state, adds a status-change type to the wire, save, and replay formats, and spans the game Frame, Network, Agent, and the engine codec. Line numbers cite baseline `c1420821` unless marked `90fa6c85`; the prerequisite Plans rename the files, columns, and status changes named below, so the post-Plan names are used throughout and each citation names the current-tree site it stands for. Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other. Paths below `Frame/`, `Network/`, and `Agent/` mean `Projects/BrokenEngineSandbox/Source/<dir>/`; `Engine/` paths are repository-relative. Flight-plane series; the term is "flight plane".
+Tier 3 (`.agents/references/risk-tiers.md`): the change alters CRC'd Interpolate
+and PostRender state, adds a status-change type to the wire, save, and replay
+formats, and spans the game Frame, Network, Agent, and the engine codec. Line
+numbers cite baseline `c1420821` unless marked `90fa6c85`; the prerequisite
+Plans rename the files, columns, and status changes named below, so the
+post-Plan names are used throughout and each citation names the current-tree
+site it stands for. Where a statement here and the code disagree, the code wins;
+report the contradiction instead of matching one side to the other. Paths below
+`Frame/`, `Network/`, and `Agent/` mean
+`Projects/BrokenEngineSandbox/Source/<dir>/`; `Engine/` paths are
+repository-relative. Flight-plane series; the term is "flight plane".
 
 ## Context
 
-`Documents/Plans/Engine/FlightPlaneData.md` loads the three planes (low 6 m and medium 50 m with `engine::FlightPlaneFlags::kTerrainCollision`, high 100 m without it) into `engine::gpFlightPlanes` (`Count()`, `Plane(i)`, `Lowest()`, `Highest()`), and every ship still flies on `Lowest()`. `Documents/Plans/Game/ShipTypeSplit.md` gives the three types (Fighters, Omnis, Battleships) one `ShipOrders_t pOrders` column whose bits 8-15 are reserved for the target flight plane, one `ShipController pController` column, the shared `ShipBehaviours.h`, `ShipQueries.h`, and `ShipStatusChanges.h`, and `TransferData` carrying `uiOrders` for every ship transfer.
+`Documents/Plans/Engine/FlightPlaneData.md` loads the three planes (low 6 m and
+medium 50 m with `engine::FlightPlaneFlags::kTerrainCollision`, high 100 m
+without it) into `engine::gpFlightPlanes` (`Count()`, `Plane(i)`, `Lowest()`,
+`Highest()`), and every ship still flies on `Lowest()`.
+`Documents/Plans/Game/ShipTypeSplit.md` gives the three types (Fighters, Omnis,
+Battleships) one `ShipOrders_t pOrders` column whose bits 8-15 are reserved for
+the target flight plane, one `ShipController pController` column, the shared
+`ShipBehaviours.h`, `ShipQueries.h`, and `ShipStatusChanges.h`, and
+`TransferData` carrying `uiOrders` for every ship transfer.
 
 Current-tree evidence this design rests on:
 
-- Positions and velocities are full `XMVECTOR`s with a Z lane, CRC'd and transferred. Omnis force Z to the lowest plane every Interpolate tick (`Players.cpp:478`); Fighters glide Z toward `gBaseHeight` by at most `kfSpaceshipMaxSpeed * fDeltaTime` right after their position integration, landing exactly on it (the target-height glide in `SpaceshipsInterpolate::Update`), and store velocity Z as 0 (the velocity-Z store after `ApplyTerrainBounce` in `SpaceshipsPostRender::Update`); Battleships copy both, because death knockback (`Spaceships.cpp:626`, `SpaceshipsCombat.cpp:161`) and pusher pushes otherwise drift Z. Missiles flatten their own velocity Z (`MissilesUpdate.cpp:209`); the Omni navigation fallback flattens its direction (`PlayersNavigation.cpp:211,432`).
+- Positions and velocities are full `XMVECTOR`s with a Z lane, CRC'd and
+  transferred. Omnis force Z to the lowest plane every Interpolate tick
+  (`Players.cpp:478`); Fighters glide Z toward `gBaseHeight` by at most
+  `kfSpaceshipMaxSpeed * fDeltaTime` right after their position integration,
+  landing exactly on it (the target-height glide in
+  `SpaceshipsInterpolate::Update`), and store velocity Z as 0 (the velocity-Z
+  store after `ApplyTerrainBounce` in `SpaceshipsPostRender::Update`);
+  Battleships copy both, because death knockback (`Spaceships.cpp:626`,
+  `SpaceshipsCombat.cpp:161`) and pusher pushes otherwise drift Z. Missiles
+  flatten their own velocity Z (`MissilesUpdate.cpp:209`); the Omni navigation
+  fallback flattens its direction (`PlayersNavigation.cpp:211,432`).
 - `engine::NavQuerySnapToNavigable` and `NavQueryDirection` assert the position and destination Z equal the lowest plane (`Engine/Source/Frame/NavQuery.cpp:574-575,608-610`); the four call sites are `PlayersNavigation.cpp:175,194/196,359,414/416`. The flagship-follow test uses the 3D distance to the flagship (`PlayersNavigation.cpp:120`).
-- Heading rotations are yaw-only (`XMMatrixRotationZ` at `Spaceships.cpp:283`, `PlayersCombat.cpp:397,459`); left vectors come from a cross with +Z (`PlayersCombat.cpp:293,387`, `TerrainUtils.cpp:82`); `common::RotateTowardsPercent` mixes a 3D cross with `XMVector2AngleBetweenNormals` (`Common/Math/MathUtils.cpp:53-58`). Omni `AcquireTarget` writes a 3D lead position (`PlayersCombat.cpp:124`) and `UpdateFacing` stores its normalized 3D direction in `pVecWantedDirections` (`:147`), which Interpolate Update feeds to `RotateTowardsPercent` (`Players.cpp:482`); once targets sit on other planes that direction has Z ≠ 0, so decision 16 projects it horizontally. Every other direction fed to them keeps Z = 0 after this Plan, so none is changed.
-- Terrain contact: the Omni push band uses the lowest plane minus radius and margin (`PlayersNavigation.cpp:468`). Both hard contacts call `engine::ResolveDiscAgainstTerrain(rStaticData, vecStart, vecEnd, fRadius, fThresholdHeight, bSlide)` (`Engine/Source/Frame/IslandTerrain.h:203`, `90fa6c85`), where elevation at or above `fThresholdHeight` blocks, and both pass the lowest plane (FlightPlaneData's replacement of `gBaseHeight`): the Omni slide in `ResolveTerrainContact` (`PlayersNavigation.cpp:481`, `90fa6c85`; ShipTypeSplit's shared `ResolveTerrainContact`) and the Fighter bounce in `ApplyTerrainBounce` (`SpaceshipsNavigation.cpp:140`, `90fa6c85`). The function snaps an overlapped start with its Z set to the lowest plane (`IslandTerrain.cpp:943`, `90fa6c85`), so the `NavQuerySnapToNavigable` Z assert holds whatever threshold the caller passes. `ComputeTerrainAvoidance` and `ComputeArtificialIntelligenceSteering` use absolute elevation thresholds (`TerrainUtils.cpp:8,12,71-72,109`) and are steering, not contact.
+- Heading rotations are yaw-only (`XMMatrixRotationZ` at `Spaceships.cpp:283`,
+  `PlayersCombat.cpp:397,459`); left vectors come from a cross with +Z
+  (`PlayersCombat.cpp:293,387`, `TerrainUtils.cpp:82`);
+  `common::RotateTowardsPercent` mixes a 3D cross with
+  `XMVector2AngleBetweenNormals` (`Common/Math/MathUtils.cpp:53-58`). Omni
+  `AcquireTarget` writes a 3D lead position (`PlayersCombat.cpp:124`) and
+  `UpdateFacing` stores its normalized 3D direction in `pVecWantedDirections`
+  (`:147`), which Interpolate Update feeds to `RotateTowardsPercent`
+  (`Players.cpp:482`); once targets sit on other planes that direction has Z ≠
+  0, so decision 16 projects it horizontally. Every other direction fed to them
+  keeps Z = 0 after this Plan, so none is changed.
+- Terrain contact: the Omni push band uses the lowest plane minus radius and
+  margin (`PlayersNavigation.cpp:468`). Both hard contacts call
+  `engine::ResolveDiscAgainstTerrain(rStaticData, vecStart, vecEnd, fRadius, fThresholdHeight, bSlide)`
+  (`Engine/Source/Frame/IslandTerrain.h:203`, `90fa6c85`), where elevation at or
+  above `fThresholdHeight` blocks, and both pass the lowest plane
+  (FlightPlaneData's replacement of `gBaseHeight`): the Omni slide in
+  `ResolveTerrainContact` (`PlayersNavigation.cpp:481`, `90fa6c85`;
+  ShipTypeSplit's shared `ResolveTerrainContact`) and the Fighter bounce in
+  `ApplyTerrainBounce` (`SpaceshipsNavigation.cpp:140`, `90fa6c85`). The
+  function snaps an overlapped start with its Z set to the lowest plane
+  (`IslandTerrain.cpp:943`, `90fa6c85`), so the `NavQuerySnapToNavigable` Z
+  assert holds whatever threshold the caller passes. `ComputeTerrainAvoidance`
+  and `ComputeArtificialIntelligenceSteering` use absolute elevation thresholds
+  (`TerrainUtils.cpp:8,12,71-72,109`) and are steering, not contact.
 - Spawns: the fleet spawn builds its position at the lowest plane (`Players.cpp:261`); the random group spawner samples terrain against the lowest plane minus `kfTerrainClearance` (`Frame.cpp:229,264,297,387`). The harness `inject_payload` forces Z to the lowest plane and parses `[x,y]` only (`ServerSimulationHarnessRigs.cpp:344-353,441,538`).
-- Fleet state: `Fleet` (`Projects/BrokenEngineSandbox/Source/Fleet.h:38-48`) is server-owned per client GUID, written and read by `ServerFleetSerialization.cpp:34-129` into the grid save, which `Frame::kiVersion` gates (`Save/AGENTS.md`). `FleetNavigationController::ProcessFlagshipUpdates` (`FleetNavigationController.cpp:135-177`) is the per-member status-change push pattern; agent-injected status changes queue through the simulation-harness-rig `ScheduledStatusChange` queue (`ServerSimulationHarnessRigs.cpp:405-571`) and are consumed at the first normal tick at or after their target tick (`Network/Server/AGENTS.md`), so they are recorded in `FrameInput` and replay.
+- Fleet state: `Fleet` (`Projects/BrokenEngineSandbox/Source/Fleet.h:38-48`) is
+  server-owned per client GUID, written and read by
+  `ServerFleetSerialization.cpp:34-129` into the grid save, which
+  `Frame::kiVersion` gates (`Save/AGENTS.md`).
+  `FleetNavigationController::ProcessFlagshipUpdates`
+  (`FleetNavigationController.cpp:135-177`) is the per-member status-change push
+  pattern; agent-injected status changes queue through the
+  simulation-harness-rig `ScheduledStatusChange` queue
+  (`ServerSimulationHarnessRigs.cpp:405-571`) and are consumed at the first
+  normal tick at or after their target tick (`Network/Server/AGENTS.md`), so
+  they are recorded in `FrameInput` and replay.
 - `IsAdoptableStatusChange` (`Projects/BrokenEngineSandbox/Source/SpawnTransfer.cpp:109-117`) is the one payload gate the replay reader (`FrameInput.cpp:64`), `inject_payload` (`ServerSimulationHarnessRigs.cpp:514`), and transfer adoption share. `PostRead` (`Players.h:211-224`) is the per-collection grid-save row gate.
 - The random-spawn RNG is `rFrame.postRender.randomEngine`; `common::Random(int64_t iMax, RandomEngine&)` draws an integer in [0, iMax] (`Common/Math/Random.h:66`).
 - Fighter render builds `scale * preRotate * roll * yaw * translation` with roll from `pfDeltaRotations` (`SpaceshipsRender.cpp:172-176`); forward is +X in the frame between `smatPreRotate` and `matYaw`, so pitch is a rotation about Y there.
@@ -23,22 +84,144 @@ Current-tree evidence this design rests on:
 
 Each decision is recorded as made; the alternatives are not open.
 
-1. **Target plane lives in `ShipOrders` bits 8-15** as the plane index (0 = lowest), written only by controllers: the fleet path through `kSpawnShip` and the new `kUpdateFlightPlane`, the director at spawn. `ShipTypes.h` gains `GetTargetFlightPlane(ShipOrders_t)` and `SetTargetFlightPlane(ShipOrders_t&, int64_t)` mirroring the navigation-bit accessors. No new PostRender column: the orders word is already CRC'd, persisted, and carried by every ship transfer, so a mid-climb transfer and a mid-climb save keep the target for free.
+1. **Target plane lives in `ShipOrders` bits 8-15** as the plane index (0 =
+   lowest), written only by controllers: the fleet path through `kSpawnShip` and
+   the new `kUpdateFlightPlane`, the director at spawn. `ShipTypes.h` gains
+   `GetTargetFlightPlane(ShipOrders_t)` and
+   `SetTargetFlightPlane(ShipOrders_t&, int64_t)` mirroring the navigation-bit
+   accessors. No new PostRender column: the orders word is already CRC'd,
+   persisted, and carried by every ship transfer, so a mid-climb transfer and a
+   mid-climb save keep the target for free.
 2. **The current plane is derived, never stored.** A ship is on plane `i` exactly when its position Z equals `Plane(i).fHeightMeters` (bit equality; arrival assigns that value, decision 3). `FlightPlaneAtHeight(float)` returns the index or none. Between planes a ship is on no plane. `FlightPlaneAtHeight` is used within this Plan (`SkipsTerrainContact`) and by `CrossPlaneWeapons` (no missile launch between planes). Later Plans consume `GetTargetFlightPlane`.
-3. **Climb in Interpolate Update, exact arrival.** After the velocity integration each type's Interpolate Update calls `ClimbTowardsFlightPlane(vecPosition, iTargetPlane, fClimbRate, fDeltaTime)`: with `fStep = fClimbRate * fDeltaTime` and `fDelta = target - z`, the new Z is `z + fStep` when `fDelta > fStep`, `z - fStep` when `fDelta < -fStep`, else exactly `target`. Fixed operation order, basic IEEE operations only, one shared path, so it is bit-deterministic under `/fp:strict`. It runs on exploding rows too (no branch). Each type's lowest-plane Z pin or glide is replaced by this call: the Omni `XMVectorSetZ(..., Lowest())` (`Players.cpp:478`) and the Fighter glide toward `gBaseHeight` (the target-height glide in `SpaceshipsInterpolate::Update`), which Battleships copy.
-4. **Velocity Z is always zero.** Each type's PostRender Update writes `XMVectorSetZ(vecVelocity, 0.0f)` as the last velocity operation before the store, after terrain contact and pushes, so pushers, knockback, and area-damage directions keep their 3D falloff and 3D direction but can never move Z. With decision 3 and the spawn rule (decision 7) Z is always on a plane or strictly between the lowest and highest plane heights, so no clamp exists; saves and transfers carrying another Z are rejected (decision 9).
+3. **Climb in Interpolate Update, exact arrival.** After the velocity
+   integration each type's Interpolate Update calls
+   `ClimbTowardsFlightPlane(vecPosition, iTargetPlane, fClimbRate, fDeltaTime)`:
+   with `fStep = fClimbRate * fDeltaTime` and `fDelta = target - z`, the new Z
+   is `z + fStep` when `fDelta > fStep`, `z - fStep` when `fDelta < -fStep`,
+   else exactly `target`. Fixed operation order, basic IEEE operations only, one
+   shared path, so it is bit-deterministic under `/fp:strict`. It runs on
+   exploding rows too (no branch). Each type's lowest-plane Z pin or glide is
+   replaced by this call: the Omni `XMVectorSetZ(..., Lowest())`
+   (`Players.cpp:478`) and the Fighter glide toward `gBaseHeight` (the
+   target-height glide in `SpaceshipsInterpolate::Update`), which Battleships
+   copy.
+4. **Velocity Z is always zero.** Each type's PostRender Update writes
+   `XMVectorSetZ(vecVelocity, 0.0f)` as the last velocity operation before the
+   store, after terrain contact and pushes, so pushers, knockback, and
+   area-damage directions keep their 3D falloff and 3D direction but can never
+   move Z. With decision 3 and the spawn rule (decision 7) Z is always on a
+   plane or strictly between the lowest and highest plane heights, so no clamp
+   exists; saves and transfers carrying another Z are rejected (decision 9).
 5. **Climb rates** (`inline constexpr float`, each type's header): `kfFighterClimbRate = 25.0f`, `kfOmniClimbRate = 12.0f`, `kfBattleshipClimbRate = 5.0f` m/s. Battleships pass theirs for uniformity; with decision 6 their target is always the lowest plane.
 6. **Plane access.** `ShipBehaviours.h` gains `HighestFlightPlane(ShipType)` = `min(kiHighestFlightPlane, gpFlightPlanes->Count() - 1)` with per-type `kiBattleshipHighestFlightPlane = 0`, `kiOmniHighestFlightPlane = 1`, `kiFighterHighestFlightPlane = 2` in the type headers, and `IsFlightPlaneAllowed(ShipType, int64_t iPlane)` = `0 <= iPlane && iPlane <= HighestFlightPlane(eType)`. Every admission of a plane value (decision 9) uses it.
-7. **Spawn height is the target plane's height**; nothing climbs at birth. `kSpawnShip` (`SpawnShipData` gains `uint8_t uiTargetFlightPlane`) spawns at `Plane(uiTargetFlightPlane).fHeightMeters` with the orders bits set. `SpawnRandomShipGroup` draws one `common::Random(HighestFlightPlane(ShipType::kFighter), rFrame.postRender.randomEngine)` per group, before the validity grid, so the whole group shares a plane; the validity grid and the per-ship check sample terrain against that plane's height minus `kfTerrainClearance`, and skip the terrain test when the plane lacks `kTerrainCollision`. The spawn-center search and chevron are otherwise unchanged. One extra draw per group shifts every later draw; the version bumps cover it.
-8. **Fleets hold a target plane per ship type.** `Fleet` gains `std::array<uint8_t, std::to_underlying(ShipType::kCount)> auiTargetFlightPlanes {}` (default 0, today's behaviour), written to and read from the fleet save payload after `cellChangeTimerSeconds`, read under the bad-value rule (`IsFlightPlaneAllowed` per type, else `std::ios_base::failure("Fleet target flight plane")`). It is not on the FleetSync wire and the client never reads it. `ServerFleetManager::FleetLookupResult` gains `int64_t iTargetFlightPlane` (the member's type's value) and `SpawnWaitingClients` copies it into `SpawnShipData::uiTargetFlightPlane`, so joins and respawns are born on the fleet's plane for their type. The only writer is the harness command (decision 10); fleet AI choosing planes is a later Plan.
-9. **New status change `kUpdateFlightPlane`** with `UpdateFlightPlaneData { ShipType eType; int64_t iUuid; uint8_t uiTargetFlightPlane; }`, appended after `kUpdateFleet` (before `kCount`), applied in `ApplyUpdateStatusChanges` beside `kUpdateShip` by `SetTargetFlightPlane` on the row found through `eType` and `iUuid`. Admission under the bad-value rule: `IsAdoptableStatusChange` rejects an `UpdateFlightPlaneData` or `SpawnShipData` whose `uiTargetFlightPlane` fails `IsFlightPlaneAllowed(eType, ...)`, and rejects a ship `TransferData` whose `uiOrders` target plane fails it for the transfer's type or whose position Z is non-finite or outside `[Lowest().fHeightMeters, Highest().fHeightMeters]`; each type's `PostRead` rejects a row on the same two tests (`"<Type>PostRender target flight plane"`, `"<Type>Interpolate position height"`). No client-to-server packet changes: the only producers are the server (fleet lookup, harness command) and the director, so the server validates nothing new on the wire.
-10. **Control surface: one harness command, no HUD.** `set_fleet_flight_plane` `{"globalId": int, "type": "Fighter"|"Omni"|"Battleship", "plane": int}` in `ServerSimulationHarnessRigs.cpp`: finds the fleet whose members contain `globalId` across `mFleets`, rejects an unknown type name or a plane failing `IsFlightPlaneAllowed`, writes `auiTargetFlightPlanes[type]`, and for every member of that type not `kIsDead` whose coordinate has a current frame resolves the row through `ShipUuidByGlobalId` and queues one `kUpdateFlightPlane` through the `inject_payload` scheduled queue at tick `miTickCounter + 1`. Returns `{"membersUpdated": n}`. Errors: `"no fleet contains globalId"`, `"'type' must be Fighter|Omni|Battleship"`, `"'plane' is not allowed for <type>"`. `inject_payload` also gains the kind `UpdateFlightPlane` (`eType`, `iUuid` required, `uiTargetFlightPlane` required) through the existing `IsAdoptableStatusChange` gate; a fleet-panel HUD control is out of scope.
-11. **Terrain contact uses the ship's own Z and is skipped on a no-collision plane.** `z` is the sweep-end Z, `XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])`, the current Interpolate position after this tick's climb. `ApplyTerrainPush` gains a `float fHeight` parameter after `fRadius`, which each caller passes `z`, and its band becomes `fHeight - fRadius - kfPushMargin` in place of the lowest-plane height; its `vecPosition` (the sweep start the caller already passes, `rPreviousInterpolate.pVecPositions[i]`) still supplies the XY of the elevation and normal samples. `ResolveTerrainContact` and `ApplyTerrainBounce` pass `z` to `engine::ResolveDiscAgainstTerrain` as `fThresholdHeight`. All three sites are skipped when `SkipsTerrainContact(z)` (on a plane without `kTerrainCollision`) holds; the skip test, `fHeight`, and `fThresholdHeight` read that same value. Between planes the ship's current Z is the threshold, so a climbing ship can still touch a peak taller than its height. `ComputeTerrainAvoidance` and `ComputeArtificialIntelligenceSteering` are unchanged.
-12. **Navigation keeps querying the lowest plane.** `ComputeNavigation` (`ShipBehaviours.cpp`) flattens both arguments with `XMVectorSetZ(v, gpFlightPlanes->Lowest().fHeightMeters)` immediately before each of the four `NavQuery*` calls (`PlayersNavigation.cpp:175,194/196,359,414/416`), so the NavQuery asserts hold; the returned direction has Z = 0 and the snapped island destination keeps the lowest plane's Z as today. `FollowFlagship` compares `XMVector2LengthSq` of the delta to the flagship, so a wingman on another plane than its flagship is neither forever far nor forever close. Everything else in navigation and steering keeps 3D distances; a per-plane contour is the next Plan's.
-13. **Fighter tilt is a client-only Interpolate column.** `FightersInterpolate` gains `float* __restrict pfClimbTilts` under `BT_CLIENT`, in `ClientMembers()` only (never CRC'd, persisted, or transferred; hydrated to 0 on spawn and arrival). Fighter Interpolate Update writes `kfFighterClimbTilt * ((zNew - zOld) / (kfFighterClimbRate * fDeltaTime))` with `kfFighterClimbTilt = 0.35f` radians, so the tilt is full during a climb and 0 on the plane; `FightersRender` inserts `XMMatrixRotationY(-pfClimbTilts[i])` between `matRoll` and `matYaw`. The sign is a trivial choice: the implementer flips it if the nose dips while climbing. Omnis and Battleships do not tilt.
-14. **Versions.** `FightersInterpolate::kiVersion`, `FightersPostRender::kiVersion`, `OmnisInterpolate::kiVersion`, `OmnisPostRender::kiVersion`, `BattleshipsInterpolate::kiVersion`, `BattleshipsPostRender::kiVersion` each +1 (Z and velocity semantics, orders bits); `FrameInput::kiVersion` +1 and `engine::kiProtocolVersion` +1 (new status-change type, `SpawnShipData` byte); grid saves are gated by `Frame::kiVersion` (`Engine/Source/File/GridSave.cpp:17`, `Save/AGENTS.md`), which the collection bumps change; its bump covers the fleet payload change. No backward compatibility.
+7. **Spawn height is the target plane's height**; nothing climbs at birth.
+   `kSpawnShip` (`SpawnShipData` gains `uint8_t uiTargetFlightPlane`) spawns at
+   `Plane(uiTargetFlightPlane).fHeightMeters` with the orders bits set.
+   `SpawnRandomShipGroup` draws one
+   `common::Random(HighestFlightPlane(ShipType::kFighter), rFrame.postRender.randomEngine)`
+   per group, before the validity grid, so the whole group shares a plane; the
+   validity grid and the per-ship check sample terrain against that plane's
+   height minus `kfTerrainClearance`, and skip the terrain test when the plane
+   lacks `kTerrainCollision`. The spawn-center search and chevron are otherwise
+   unchanged. One extra draw per group shifts every later draw; the version
+   bumps cover it.
+8. **Fleets hold a target plane per ship type.** `Fleet` gains
+   `std::array<uint8_t, std::to_underlying(ShipType::kCount)> auiTargetFlightPlanes {}`
+   (default 0, today's behaviour), written to and read from the fleet save
+   payload after `cellChangeTimerSeconds`, read under the bad-value rule
+   (`IsFlightPlaneAllowed` per type, else
+   `std::ios_base::failure("Fleet target flight plane")`). It is not on the
+   FleetSync wire and the client never reads it.
+   `ServerFleetManager::FleetLookupResult` gains `int64_t iTargetFlightPlane`
+   (the member's type's value) and `SpawnWaitingClients` copies it into
+   `SpawnShipData::uiTargetFlightPlane`, so joins and respawns are born on the
+   fleet's plane for their type. The only writer is the harness command
+   (decision 10); fleet AI choosing planes is a later Plan.
+9. **New status change `kUpdateFlightPlane`** with
+   `UpdateFlightPlaneData { ShipType eType; int64_t iUuid; uint8_t uiTargetFlightPlane; }`,
+   appended after `kUpdateFleet` (before `kCount`), applied in
+   `ApplyUpdateStatusChanges` beside `kUpdateShip` by `SetTargetFlightPlane` on
+   the row found through `eType` and `iUuid`. Admission under the bad-value
+   rule: `IsAdoptableStatusChange` rejects an `UpdateFlightPlaneData` or
+   `SpawnShipData` whose `uiTargetFlightPlane` fails
+   `IsFlightPlaneAllowed(eType, ...)`, and rejects a ship `TransferData` whose
+   `uiOrders` target plane fails it for the transfer's type or whose position Z
+   is non-finite or outside `[Lowest().fHeightMeters, Highest().fHeightMeters]`;
+   each type's `PostRead` rejects a row on the same two tests
+   (`"<Type>PostRender target flight plane"`,
+   `"<Type>Interpolate position height"`). No client-to-server packet changes:
+   the only producers are the server (fleet lookup, harness command) and the
+   director, so the server validates nothing new on the wire.
+10. **Control surface: one harness command, no HUD.** `set_fleet_flight_plane`
+    `{"globalId": int, "type": "Fighter"|"Omni"|"Battleship", "plane": int}` in
+    `ServerSimulationHarnessRigs.cpp`: finds the fleet whose members contain
+    `globalId` across `mFleets`, rejects an unknown type name or a plane failing
+    `IsFlightPlaneAllowed`, writes `auiTargetFlightPlanes[type]`, and for every
+    member of that type not `kIsDead` whose coordinate has a current frame
+    resolves the row through `ShipUuidByGlobalId` and queues one
+    `kUpdateFlightPlane` through the `inject_payload` scheduled queue at tick
+    `miTickCounter + 1`. Returns `{"membersUpdated": n}`. Errors:
+    `"no fleet contains globalId"`, `"'type' must be Fighter|Omni|Battleship"`,
+    `"'plane' is not allowed for <type>"`. `inject_payload` also gains the kind
+    `UpdateFlightPlane` (`eType`, `iUuid` required, `uiTargetFlightPlane`
+    required) through the existing `IsAdoptableStatusChange` gate; a fleet-panel
+    HUD control is out of scope.
+11. **Terrain contact uses the ship's own Z and is skipped on a no-collision
+    plane.** `z` is the sweep-end Z,
+    `XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])`, the current
+    Interpolate position after this tick's climb. `ApplyTerrainPush` gains a
+    `float fHeight` parameter after `fRadius`, which each caller passes `z`, and
+    its band becomes `fHeight - fRadius - kfPushMargin` in place of the
+    lowest-plane height; its `vecPosition` (the sweep start the caller already
+    passes, `rPreviousInterpolate.pVecPositions[i]`) still supplies the XY of
+    the elevation and normal samples. `ResolveTerrainContact` and
+    `ApplyTerrainBounce` pass `z` to `engine::ResolveDiscAgainstTerrain` as
+    `fThresholdHeight`. All three sites are skipped when
+    `SkipsTerrainContact(z)` (on a plane without `kTerrainCollision`) holds; the
+    skip test, `fHeight`, and `fThresholdHeight` read that same value. Between
+    planes the ship's current Z is the threshold, so a climbing ship can still
+    touch a peak taller than its height. `ComputeTerrainAvoidance` and
+    `ComputeArtificialIntelligenceSteering` are unchanged.
+12. **Navigation keeps querying the lowest plane.** `ComputeNavigation`
+    (`ShipBehaviours.cpp`) flattens both arguments with
+    `XMVectorSetZ(v, gpFlightPlanes->Lowest().fHeightMeters)` immediately before
+    each of the four `NavQuery*` calls
+    (`PlayersNavigation.cpp:175,194/196,359,414/416`), so the NavQuery asserts
+    hold; the returned direction has Z = 0 and the snapped island destination
+    keeps the lowest plane's Z as today. `FollowFlagship` compares
+    `XMVector2LengthSq` of the delta to the flagship, so a wingman on another
+    plane than its flagship is neither forever far nor forever close. Everything
+    else in navigation and steering keeps 3D distances; a per-plane contour is
+    the next Plan's.
+13. **Fighter tilt is a client-only Interpolate column.** `FightersInterpolate`
+    gains `float* __restrict pfClimbTilts` under `BT_CLIENT`, in
+    `ClientMembers()` only (never CRC'd, persisted, or transferred; hydrated to
+    0 on spawn and arrival). Fighter Interpolate Update writes
+    `kfFighterClimbTilt * ((zNew - zOld) / (kfFighterClimbRate * fDeltaTime))`
+    with `kfFighterClimbTilt = 0.35f` radians, so the tilt is full during a
+    climb and 0 on the plane; `FightersRender` inserts
+    `XMMatrixRotationY(-pfClimbTilts[i])` between `matRoll` and `matYaw`. The
+    sign is a trivial choice: the implementer flips it if the nose dips while
+    climbing. Omnis and Battleships do not tilt.
+14. **Versions.** `FightersInterpolate::kiVersion`,
+    `FightersPostRender::kiVersion`, `OmnisInterpolate::kiVersion`,
+    `OmnisPostRender::kiVersion`, `BattleshipsInterpolate::kiVersion`,
+    `BattleshipsPostRender::kiVersion` each +1 (Z and velocity semantics, orders
+    bits); `FrameInput::kiVersion` +1 and `engine::kiProtocolVersion` +1 (new
+    status-change type, `SpawnShipData` byte); grid saves are gated by
+    `Frame::kiVersion` (`Engine/Source/File/GridSave.cpp:17`, `Save/AGENTS.md`),
+    which the collection bumps change; its bump covers the fleet payload change.
+    No backward compatibility.
 15. **`describe_scene`, `query_collection`.** The three ship extractors add `targetFlightPlane` (the orders field); `local` already carries Z. `edit_frame` is unchanged: `pfClimbTilts` is client-only and `pOrders` is already a column token.
-16. **The Omni wanted direction is projected horizontally before the yaw rotation.** `AcquireTarget` and `UpdateFacing` are unchanged: `pVecWantedDirections` keeps the unit 3D lead direction. The Omni Interpolate Update (today's `Players.cpp:482`) feeds `RotateTowardsPercent` the horizontal part, `XMVector3Normalize(XMVectorSetZ(vecWanted, 0.0f))`, and skips the rotation when that horizontal part has zero length (target exactly overhead), so the hull direction keeps Z = 0 and `RotateTowardsPercent` always receives a unit vector. Aiming shots with the column's Z is `CrossPlaneWeapons`'s.
+16. **The Omni wanted direction is projected horizontally before the yaw
+    rotation.** `AcquireTarget` and `UpdateFacing` are unchanged:
+    `pVecWantedDirections` keeps the unit 3D lead direction. The Omni
+    Interpolate Update (today's `Players.cpp:482`) feeds `RotateTowardsPercent`
+    the horizontal part, `XMVector3Normalize(XMVectorSetZ(vecWanted, 0.0f))`,
+    and skips the rotation when that horizontal part has zero length (target
+    exactly overhead), so the hull direction keeps Z = 0 and
+    `RotateTowardsPercent` always receives a unit vector. Aiming shots with the
+    column's Z is `CrossPlaneWeapons`'s.
 
 ## Design
 
@@ -60,7 +243,14 @@ inline void SetTargetFlightPlane(ShipOrders_t& rOrders, int64_t iPlane);
 [[nodiscard]] XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(FXMVECTOR vecPosition, int64_t iTargetPlane, float fClimbRate, float fDeltaTime); // decision 3; W stays 1
 ```
 
-`ApplyTerrainPush` (ShipTypeSplit's signature, `fRadius` included) gains `float fHeight` after `fRadius` and bands at it; each caller passes the sweep-end Z `XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])` and keeps passing the sweep start as `vecPosition`. `ResolveTerrainContact` and `ApplyTerrainBounce` pass the sweep-end Z to `engine::ResolveDiscAgainstTerrain` as `fThresholdHeight`; each caller skips the call when `SkipsTerrainContact(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i]))` (decision 11).
+`ApplyTerrainPush` (ShipTypeSplit's signature, `fRadius` included) gains
+`float fHeight` after `fRadius` and bands at it; each caller passes the
+sweep-end Z `XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])` and keeps
+passing the sweep start as `vecPosition`. `ResolveTerrainContact` and
+`ApplyTerrainBounce` pass the sweep-end Z to `engine::ResolveDiscAgainstTerrain`
+as `fThresholdHeight`; each caller skips the call when
+`SkipsTerrainContact(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i]))`
+(decision 11).
 
 `Frame/StatusChange.h`: `kUpdateFlightPlane` after `kUpdateFleet`; `UpdateFlightPlaneData`; `SpawnShipData::uiTargetFlightPlane` after `uiPendingFleetWantedCoordinateTicks`; `StatusChangeData` gains the alternative; `DefaultDataForType` and `StatusChangeTypeName` (`"UpdateFlightPlane"`) follow. `Engine/Source/Network/NetworkSerialization.cpp` writes and reads the three fields in declaration order and the new `SpawnShipData` byte after the pending-ticks byte.
 
@@ -76,7 +266,23 @@ if (XMVectorGetX(XMVector3LengthSq(vecWantedHorizontal)) > 0.0f)
 
 Per-row sequence, each type's Interpolate Update: integrate, `ClimbTowardsFlightPlane(vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kf<Type>ClimbRate, fDeltaTime)`, `XMVectorSetW(..., 1.0f)`; Fighters then write `pfClimbTilts` (client). Each type's PostRender Update: existing script, terrain contact under the skip rule, pushes, then `vecVelocity = XMVectorSetZ(vecVelocity, 0.0f)`, store.
 
-`Projects/BrokenEngineSandbox/Source/Fleet.h`: `auiTargetFlightPlanes`. `Network/Server/ServerFleetSerialization.cpp`: write and read it (decision 8). `Network/Server/ServerFleetManager.h/.cpp`: `FleetLookupResult::iTargetFlightPlane`. `Network/Server/ServerClientManager.cpp`: copy into `SpawnShipData`. `Frame/Collections/Ships/ShipStatusChanges.cpp`: `kSpawnShip` height and orders, `kUpdateFlightPlane` arm. `Frame/Frame.cpp` `SpawnRandomShipGroup`: decision 7. `Projects/BrokenEngineSandbox/Source/SpawnTransfer.cpp` `IsAdoptableStatusChange`: decision 9. `Agent/Commands/ServerSimulationHarnessRigs.cpp`: `set_fleet_flight_plane`, the `UpdateFlightPlane` kind, and the `inject_payload` positions: `SpawnShip` validates its offset at `Plane(uiTargetFlightPlane)` height, and the transfer default position and parsed `vecPosition` take Z from a new optional `fHeight` field defaulting to `Lowest().fHeightMeters` (replacing the forced lowest-plane Z at `:353,441`). `Agent/AgentCommandsServerQueries.cpp`: `targetFlightPlane`. `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md`: the command, the kind, `fHeight`, `targetFlightPlane`.
+`Projects/BrokenEngineSandbox/Source/Fleet.h`: `auiTargetFlightPlanes`.
+`Network/Server/ServerFleetSerialization.cpp`: write and read it (decision 8).
+`Network/Server/ServerFleetManager.h/.cpp`:
+`FleetLookupResult::iTargetFlightPlane`.
+`Network/Server/ServerClientManager.cpp`: copy into `SpawnShipData`.
+`Frame/Collections/Ships/ShipStatusChanges.cpp`: `kSpawnShip` height and orders,
+`kUpdateFlightPlane` arm. `Frame/Frame.cpp` `SpawnRandomShipGroup`: decision 7.
+`Projects/BrokenEngineSandbox/Source/SpawnTransfer.cpp`
+`IsAdoptableStatusChange`: decision 9.
+`Agent/Commands/ServerSimulationHarnessRigs.cpp`: `set_fleet_flight_plane`, the
+`UpdateFlightPlane` kind, and the `inject_payload` positions: `SpawnShip`
+validates its offset at `Plane(uiTargetFlightPlane)` height, and the transfer
+default position and parsed `vecPosition` take Z from a new optional `fHeight`
+field defaulting to `Lowest().fHeightMeters` (replacing the forced lowest-plane
+Z at `:353,441`). `Agent/AgentCommandsServerQueries.cpp`: `targetFlightPlane`.
+`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md`: the
+command, the kind, `fHeight`, `targetFlightPlane`.
 
 ## Critical files
 
@@ -138,4 +344,11 @@ Per-row sequence, each type's Interpolate Update: integrate, `ClimbTowardsFlight
 
 ## Coordination
 
-- `Documents/Plans/Engine/RemoveSandboxGameplayFromEngine.md` moves the per-type status-change codec switch and writers out of `Engine/Source/Network/NetworkSerialization.cpp` into the game's new `Network/StatusChangeCodec.cpp`. Whichever lands second rebases onto the other's edits. If that Plan lands first, this Plan's `UpdateFlightPlaneData` fields and the new `SpawnShipData` byte are written and read in `StatusChangeCodec.cpp`, and the risk line about the codec as the engine's only `game::UpdateFlightPlaneData` site becomes: engine code does not name it.
+- `Documents/Plans/Engine/RemoveSandboxGameplayFromEngine.md` moves the per-type
+  status-change codec switch and writers out of
+  `Engine/Source/Network/NetworkSerialization.cpp` into the game's new
+  `Network/StatusChangeCodec.cpp`. Whichever lands second rebases onto the
+  other's edits. If that Plan lands first, this Plan's `UpdateFlightPlaneData`
+  fields and the new `SpawnShipData` byte are written and read in
+  `StatusChangeCodec.cpp`, and the risk line about the codec as the engine's
+  only `game::UpdateFlightPlaneData` site becomes: engine code does not name it.

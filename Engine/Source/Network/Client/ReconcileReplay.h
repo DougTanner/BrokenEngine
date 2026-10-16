@@ -139,8 +139,8 @@ void ReconcileInjectPendingFullState(CoordWork& rWork);
 
 void ReconcileRollbackCoord(CoordWork& rWork, int64_t iRollbackOffset);
 int64_t ReconcileFindReplayRangeCoord(const CoordWork& rWork, int64_t iReplayStart);
-void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iMaximumConsecutive, float& rfTime);
-void ReconcileCatchUpCoord(CoordWork& rWork, int64_t iTargetTick, float& rfTime);
+void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iMaximumConsecutive);
+void ReconcileCatchUpCoord(CoordWork& rWork, int64_t iTargetTick);
 void ReconcileFastPathCatchUp(CoordWork& rWork, int64_t iTargetTick);
 
 struct ReconcileDispatchResult

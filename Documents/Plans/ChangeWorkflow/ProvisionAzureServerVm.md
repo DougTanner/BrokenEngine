@@ -3,7 +3,14 @@
 
 ## Context
 
-This is the second of four Plans that put the dedicated server on the internet. `Documents/Plans/Engine/HardenServerForUnattendedHosting.md` (the prerequisite) makes the server safe to run unattended on a public port. This Plan creates the Azure resources, and the repository skill that creates them. Next, `Documents/Plans/Engine/ConnectClientToHostedServer.md` embeds the VM's static public IP in the client, and `Documents/Plans/ChangeWorkflow/DeployAndRunHostedServer.md` deploys and runs the server.
+This is the second of four Plans that put the dedicated server on the internet.
+`Documents/Plans/Engine/HardenServerForUnattendedHosting.md` (the prerequisite)
+makes the server safe to run unattended on a public port. This Plan creates the
+Azure resources, and the repository skill that creates them. Next,
+`Documents/Plans/Engine/ConnectClientToHostedServer.md` embeds the VM's static
+public IP in the client, and
+`Documents/Plans/ChangeWorkflow/DeployAndRunHostedServer.md` deploys and runs
+the server.
 
 User decisions (this session, binding):
 

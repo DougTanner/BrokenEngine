@@ -1,6 +1,13 @@
 # Engine UI - Shared Wrapper and Screen Infrastructure
 
-Shared runtime settings, standard localization, player-facing menu helpers, the six standard menu screens, renderer quality levels, network-pending controls, and client-only curve/editor support. Screen composition and the standard-menu `GameBase` contract live in Screens (`Screens/AGENTS.md`); engine Tweaks registration contracts live in TweaksScreen (`Screens/TweaksScreen/AGENTS.md`); the game-side localization facade lives in game UI (`../../../Projects/BrokenEngineSandbox/Source/Ui/AGENTS.md`). Game, sound, and graphics settings persistence is engine-owned here.
+Shared runtime settings, standard localization, player-facing menu helpers, the
+six standard menu screens, renderer quality levels, network-pending controls,
+and client-only curve/editor support. Screen composition and the standard-menu
+game contract live in Screens (`Screens/AGENTS.md`); engine Tweaks registration
+contracts live in TweaksScreen (`Screens/TweaksScreen/AGENTS.md`); the game-side
+localization facade lives in game UI (the game project's own
+`Source/Ui/AGENTS.md`). Tweaks, game, sound, and graphics settings persistence
+is engine-owned here.
 
 ## Wrapper Contracts
 
@@ -13,7 +20,7 @@ Shared runtime settings, standard localization, player-facing menu helpers, the 
 
 ## Localization
 
-- `LocalizationBase.h` owns the localization vocabulary: `Language` (a scoped `int32_t` enum whose values 0..5 are persisted in the game settings file), `kiLanguageCount`, the `LanguageOption` labels in enum order, the selected-language state `geLanguage`, and `StandardString` with the standard menu strings. Game UI re-exports these through its facade (`../../../Projects/BrokenEngineSandbox/Source/Ui/AGENTS.md`).
+- `LocalizationBase.h` owns the localization vocabulary: `Language` (a scoped `int32_t` enum whose values 0..5 are persisted in the game settings file), `kiLanguageCount`, the `LanguageOption` labels in enum order, the selected-language state `geLanguage`, and `StandardString` with the standard menu strings. Game UI re-exports these through its facade (the game project's own `Source/Ui/AGENTS.md`).
 - The UTF-32 standard table lives in `LocalizationBase.cpp` with internal linkage. Its outer extent stays deduced so the trailing all-empty sentinel row plus the `static_assert` catches a dropped or added row; an empty language cell falls back to English.
 - `InitializeLocalization` sets the locale and uppercases the table in place. It is startup work, called from the `Game` constructor on both builds, and never runs in the main loop.
 
@@ -34,18 +41,28 @@ Shared runtime settings, standard localization, player-facing menu helpers, the 
 - `GraphicsSettings.bin` version 17 persists Water quality, Smoke Update Cadence, and Terrain Shadow Update Cadence. Lighting defaults on; version 16 files intentionally fail the current-format gate and reset with the other graphics settings.
 - The loaders check every persisted language index, float, quality level, and graphics sample count before applying any. A non-finite or out-of-range value, or a sample count that is not one of `gSampleCount`'s allowed values, rejects the whole file with one warning, and every setting it holds stays at its default, as when the file is missing. Accepted floats keep the wrapper's normal snapping.
 - `GameSettings.cpp` persists the selected language, UI font scale, opaque-UI toggle, UI opacity, and UI theme in `GameSettings.bin` version 2. The language is stored as a fixed-width `int32_t` so the `Language` enum's underlying type never decides the file layout; an index outside the enum rejects the file.
+- `TweaksSettings.cpp` persists the ImGui visibility toggle, the sun-angle override, and the Tweaks section state in `TweaksSettings.bin` version 14, versioned POD written through the engine versioned-file helpers, in `kbDebugInput` builds only.
 
 ## Shared Types
 
 - `engine::UiState`, the unguarded `engine::GameBase` members `meUiState`, `mModalMessage`, and `mbShowImGui`, and the unguarded `GameBase::mGameFlags` main-menu flag form the shared engine/game UI-state contract. The engine owns their public vocabulary and storage for both client and server; the game HUD retains its own state transitions, gating, and rendering semantics.
-- The client-only `StandardMenuFeature`, `StandardMenuState`, `StandardMenuModel`, and `StandardMenuAction` types plus the `GetStandardMenuModel` and `ApplyStandardMenuAction` virtuals extend that contract for the engine-owned menus. They are the only surface through which a standard screen reaches game-owned networking and frame transitions; their usage rules live in Screens (`Screens/AGENTS.md`). No server declaration depends on them.
+- The client-only `StandardMenuFeature`, `StandardMenuState`, `StandardMenuModel`, and `StandardMenuAction` types plus the `game::Game` members `GetStandardMenuModel` and `ApplyStandardMenuAction`, which the screens call, extend that contract for the engine-owned menus. They are the only surface through which a standard screen reaches game-owned networking and frame transitions; their usage rules live in Screens (`Screens/AGENTS.md`). No server declaration depends on them.
 - The client-only `GameBase::mChatLog` (`ChatLog.h`) is the chat state: a `ChatLog::kiCapacity`-entry history ring that `Client::ServerChat` appends to, plus the input box's open flag and text. `GameBase::ProcessInput` opens the box; `ChatScreen` draws the history and closes the box (`Screens/AGENTS.md`).
 - Height-dependent wrapper groups resolve camera-height-conditioned render values; Render (`../Graphics/Render/AGENTS.md`) owns how those resolved values reach the per-frame GPU buffers.
 - Client-only curves use bounded monotone cubic interpolation and an ImPlot editor. Endpoints remain X-locked and interior control points ordered.
 - The Lighting tab deliberately keeps two combine curves, `gCombineCurveOld` and `gCombineCurveNew`, behind the `gbUseCombineCurveNew` toggle so tuning can be compared live against the shipping baseline. They currently hold identical control points; that is the A/B setup, not dead duplication. Collapse to a single curve once tuning settles.
 - `NetworkUiControl` disables a control while authoritative state has not resolved its request; call `Update` every frame with that authoritative state.
 
-Engine UI headers stay out of `Engine.h` and are included directly, or through the game facade for localization, so tuning edits recompile little. `ChatLog.h` is the one exception: `GameBase.h` stores `mChatLog` by value, so it includes `ChatLog.h` and carries it into `Engine.h`. Headers compiling into both builds carry no `BT_CLIENT`/`BT_SERVER` guard: localization, most wrapper storage so server-side simulation can read defaults, and the shared menu helper that shared game UI code includes on both sides. Client-only ImPlot types and menu panel, font, and chrome state remain `BT_CLIENT`-guarded, and game screen headers guard their client-only members without hiding shared declarations needed by server-side screens.
+Engine UI headers stay out of `Engine.h` and are included directly, or through
+the game facade for localization, so tuning edits recompile little. `ChatLog.h`
+is the one exception: `GameBase.h` stores `mChatLog` by value, so it includes
+`ChatLog.h` and carries it into `Engine.h`. Headers compiling into both builds
+carry no `BT_CLIENT`/`BT_SERVER` guard: localization, most wrapper storage so
+server-side simulation can read defaults, and the shared menu helper that shared
+game UI code includes on both sides. Client-only ImPlot types and menu panel,
+font, and chrome state remain `BT_CLIENT`-guarded, and game screen headers guard
+their client-only members without hiding shared declarations needed by
+server-side screens.
 
 ## See Also
 

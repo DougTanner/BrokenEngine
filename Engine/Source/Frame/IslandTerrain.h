@@ -155,7 +155,7 @@ public:
 
 	// Same CRCs as mIslandCrcsSorted, ordered by footprint area (fWorldFootprintXMeters *
 	// fWorldFootprintYMeters) descending, CRC ascending as a stable tiebreak. Drives only the
-	// debug main-menu island browser (Game::BuildMenuIslandPlacement) so it cycles largest-first.
+	// debug main-menu island browser (GameBase::BuildMenuIslandPlacement) so it cycles largest-first.
 	// Kept separate from mIslandCrcsSorted, whose CRC order is load-bearing (template slot
 	// assignment + world-gen placement RNG) and must not change.
 	std::vector<common::crc_t> mIslandCrcsByArea;

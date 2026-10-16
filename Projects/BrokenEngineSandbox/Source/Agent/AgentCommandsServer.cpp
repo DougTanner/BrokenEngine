@@ -3,6 +3,7 @@
 #if defined(BT_SERVER)
 
 #include "File/Replay.h"
+#include "Network/Server/ServerTransferManager.h"
 
 #include "Agent/Commands/ServerFrameEdit.h"
 #include "Agent/Commands/ServerSimulationHarnessRigs.h"
@@ -105,7 +106,7 @@ static void CommandStatus([[maybe_unused]] const nlohmann::json& rParameters, nl
 
 	rResult["nextGlobalId"] = gpGame->miNextGlobalId;
 	rResult["pendingFlagshipUpdateCount"] = std::ssize(gpServerSession->mpFleetManager->mNavigation.mPendingFlagshipUpdates);
-	rResult["harvestedTransferTotal"] = gpServerSession->miHarvestedTransferTotal;
+	rResult["harvestedTransferTotal"] = gpServerSession->mpTransferManager->miHarvestedTransferTotal;
 	rResult["pendingTransferHarnessRigCount"] = CountReplayTransferHarnessRigs(*gpServerSession);
 	rResult["pendingAgentStatusChangeCount"] = CountPendingAgentStatusChanges(*gpServerSession);
 }
@@ -136,7 +137,7 @@ static void CommandTimescale(const nlohmann::json& rParameters, nlohmann::json& 
 static void CommandSave(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	std::filesystem::path file = rParameters.contains("file") ? BareFilenameParameter(rParameters.at("file")) : std::filesystem::path("ServerQuicksave.save");
-	if (!gpGame->mGameSaveLoad.ServerSave(file))
+	if (!gpGame->mServerSaveLoad.ServerSave(file))
 	{
 		throw std::runtime_error("save failed to write '" + PathToUtf8(file) + "'");
 	}
@@ -153,11 +154,11 @@ static void CommandLoad(const nlohmann::json& rParameters, nlohmann::json& rResu
 	std::filesystem::path file = rParameters.contains("file") ? BareFilenameParameter(rParameters.at("file")) : std::filesystem::path("ServerQuicksave.save");
 
 	bool bResetToFresh = false;
-	if (!gpGame->mGameSaveLoad.ServerLoad(file))
+	if (!gpGame->mServerSaveLoad.ServerLoad(file))
 	{
 		// A load failure after header validation clears the grid without running ServerLoad's success tail.
 		// Rebuild a fresh game as kClientLoadRequest does before simulation resumes.
-		gpGame->mGameSaveLoad.ServerReset();
+		gpGame->mServerSaveLoad.ServerReset();
 		bResetToFresh = true;
 	}
 	if (bPauseAfterLoad)
@@ -172,7 +173,7 @@ static void CommandLoad(const nlohmann::json& rParameters, nlohmann::json& rResu
 
 static void CommandReset([[maybe_unused]] const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	gpGame->mGameSaveLoad.ServerReset();
+	gpGame->mServerSaveLoad.ServerReset();
 	rResult = nlohmann::json::object();
 }
 

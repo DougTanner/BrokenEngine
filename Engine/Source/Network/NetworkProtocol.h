@@ -64,7 +64,7 @@ inline constexpr const char* PacketTypeName(PacketType eType)
 	return "Unknown";
 }
 
-inline constexpr int64_t kiProtocolVersion = 23;
+inline constexpr int64_t kiProtocolVersion = 25;
 inline constexpr int64_t kiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
 inline constexpr int64_t kiDefaultPort = 27'015;
 inline constexpr int64_t kiMaximumResendFrames = 8;
@@ -108,8 +108,8 @@ struct Guid128
 struct ClientGuidTag;
 using ClientGuid = Guid128<ClientGuidTag>;
 
-static_assert(sizeof(ClientGuid) == 16, "ClientGuid size changed — ClientGuid.bin and the fleet save owner records are 16 raw bytes");
-static_assert(alignof(ClientGuid) == alignof(uint64_t), "ClientGuid alignment changed — PlayersPostRender::pClientGuids column stride shifts");
+static_assert(sizeof(ClientGuid) == 16, "ClientGuid size changed — ClientGuid.bin and the game save owner records are 16 raw bytes");
+static_assert(alignof(ClientGuid) == alignof(uint64_t), "ClientGuid alignment changed — the game owned-entity client-GUID column stride shifts");
 static_assert(BT_OFFSETOF(ClientGuid, uiHigh) == 0, "ClientGuid::uiHigh offset changed — existing ClientGuid.bin and saves read uiHigh first");
 static_assert(BT_OFFSETOF(ClientGuid, uiLow) == 8, "ClientGuid::uiLow offset changed — existing ClientGuid.bin and saves read uiLow second");
 static_assert(std::is_trivially_copyable_v<ClientGuid>, "ClientGuid must stay trivially copyable — WriteVersionedFile stamps sizeof only for trivially copyable types");

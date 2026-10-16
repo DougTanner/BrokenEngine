@@ -22,20 +22,6 @@ constexpr float kfHealthRegenerationDistance = 60.0f;
 // PreCollision sets the collision layer index when spaceships are present.
 // thread_local: parallel per-Frame tick via Dispatch
 static thread_local int64_t siCollisionLayerIndex = 0;
-static thread_local std::vector<engine::CollisionFlags_t> sCollisionFlags;
-
-struct SpaceshipCollisionIntervalScratch
-{
-	std::vector<float> maximumTimes;
-};
-
-static SpaceshipCollisionIntervalScratch& GetSpaceshipCollisionIntervalScratch()
-{
-	// Function-local TLS defers construction until first use; empty vectors require no allocation before allocator startup.
-	// Vector growth suppresses allocation tracking.
-	static thread_local SpaceshipCollisionIntervalScratch sScratch;
-	return sScratch;
-}
 
 // Shared type indices (defined in Spaceships.cpp, set during Register())
 extern int64_t giSpaceshipExplosionTypeIndex;
@@ -79,11 +65,6 @@ void XM_CALLCONV SpaceshipsPostRender::RegenerateHealth(FXMVECTOR vecPosition, b
 
 void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
-	SpaceshipCollisionIntervalScratch& rCollisionScratch = GetSpaceshipCollisionIntervalScratch();
-	// Heap: static vectors resized each frame, only allocates on first call or when count grows (capacity retained).
-	// .data() pointers are passed to AddLayer and must survive until PostCollision, so workbuffer can't be used
-	ScopedSuppressAllocationTracking suppress;
-
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
 
@@ -92,22 +73,10 @@ void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFram
 		return;
 	}
 
-	int64_t iCount = rCurrentInterpolate.iCount;
-	sCollisionFlags.resize(static_cast<size_t>(iCount));
-	rCollisionScratch.maximumTimes.resize(static_cast<size_t>(iCount));
-	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
-	{
-		sCollisionFlags.at(static_cast<size_t>(i)) = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
-		engine::SegmentHit boundaryHit = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousFrame.interpolate.pSpaceships->pVecPositions[i], rCurrentInterpolate.pVecPositions[i]);
-		rCollisionScratch.maximumTimes.at(static_cast<size_t>(i)) = boundaryHit.bHit ? boundaryHit.fTime : std::numeric_limits<float>::max();
-	}
-
 	siCollisionLayerIndex = engine::Collision::AddLayer(
 	{
 		.pVecStartPositions = rPreviousFrame.interpolate.pSpaceships->pVecPositions,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
-		.pfMaxTimes = rCollisionScratch.maximumTimes.data(),
-		.pFlags = sCollisionFlags.data(),
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
 		.fRadius = kfSpaceshipRadius,
@@ -116,6 +85,12 @@ void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFram
 		.uiCollidesWith = CollidesWith::kuiSpaceship,
 		.pAlignments = rCurrentPostRender.pAlignments,
 	});
+
+	std::span<engine::CollisionFlags_t> flags = engine::Collision::GetLayerFlags(siCollisionLayerIndex);
+	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
+	{
+		flags[static_cast<size_t>(i)] = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
+	}
 }
 
 void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
@@ -139,29 +114,25 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 
 		// Check collision results - spaceships take damage from player blasters only
 		// Note: Missile damage is handled via area damage system in AreaDamage phase
-		if ((engine::Collision::sResultSpans[engine::Collision::sLayerBaseOffsets[siCollisionLayerIndex] + i].iCount > 0))
+		for (const engine::CollisionResult& rResult : engine::Collision::GetCollisions(siCollisionLayerIndex, i))
 		{
-			std::span<const engine::CollisionResult> collisions = engine::Collision::GetCollisions(siCollisionLayerIndex, i);
-			for (const engine::CollisionResult& rResult : collisions)
+			if (rResult.uiOtherCategory == CollisionCategory::kuiBlaster)
 			{
-				if (rResult.uiOtherCategory == CollisionCategory::kuiBlaster)
+				rCurrentPostRender.pfHealths[i] -= rResult.fDamageReceived;
+
+#if defined(BT_CLIENT)
+				engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster793907__cvltiv8r__snaresbycvltiv8r301wavCrc, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], gSpaceshipHitVolume.mfCurrent);
+#endif
+
+#if defined(BT_CLIENT)
+				engine::PointLightsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), giSpaceshipHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
+#endif
+
+				if (rCurrentPostRender.pfHealths[i] <= 0.0f)
 				{
-					rCurrentPostRender.pfHealths[i] -= rResult.fDamageReceived;
-
-#if defined(BT_CLIENT)
-					engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster793907__cvltiv8r__snaresbycvltiv8r301wavCrc, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], gSpaceshipHitVolume.mfCurrent);
-#endif
-
-#if defined(BT_CLIENT)
-					engine::PointLightsPostRender::AddControlled(rFrame, engine::SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)), giSpaceshipHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
-#endif
-
-					if (rCurrentPostRender.pfHealths[i] <= 0.0f)
-					{
-						XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorNegate(rResult.vecOtherVelocity));
-						BeginExplosion(rFrame, rStaticData.coordinate, i, vecDamageDirection);
-						break;
-					}
+					XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorNegate(rResult.vecOtherVelocity));
+					BeginExplosion(rFrame, rStaticData.coordinate, i, vecDamageDirection);
+					break;
 				}
 			}
 		}

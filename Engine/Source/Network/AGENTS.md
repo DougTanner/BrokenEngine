@@ -8,10 +8,31 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
 - Each coordinate slot has independent ACK floor, bitfield, and epoch state (epoch is the reuse counter). Epoch mismatch drops stale traffic after slot reuse; unsubscribe carries the observed epoch, so a stale request cannot free a reused slot while the server still ACKs the no-op.
 - Load generation identifies the server's current debugging-load world across connection bootstrap and load-scoped subscription traffic. Both receivers compare it with their own before applying the slot epoch or mutating transport/game state; a mismatch logs a Network warning and returns. Epoch stays the reuse counter within one load generation. Wire and reset behavior: [Network architecture](../../../Documents/Architecture/Network.md#debug-load-generation).
 - Engine packet types remain below `kGamePacketStart`; game packets are forwarded opaquely.
-- Every incompatible wire change increments `engine::kiProtocolVersion`: a game `StatusChange` or `TransferData` layout change is bumped by its game codec owner; an engine packet layout change or an added engine packet type is bumped here, because inserting a type before `kGamePacketStart` shifts every game packet identifier. Engine Network owns the shared version and the Hello rejection gate the handshake applies (`Server/AGENTS.md`). `Frame::kiVersion` is a separate deterministic-Frame/save/replay compatibility gate, not a substitute for the protocol-version bump.
+- Every incompatible wire change increments `engine::kiProtocolVersion`: a game
+  `StatusChange` or `TransferData` layout change is bumped by its game codec
+  owner; an engine packet layout change or an added engine packet type is bumped
+  here, because inserting a type before `kGamePacketStart` shifts every game
+  packet identifier. Engine Network owns the shared version and the Hello
+  rejection gate the handshake applies (`Server/AGENTS.md`). `Frame::kiVersion`
+  is a separate deterministic-Frame/save/replay compatibility gate, not a
+  substitute for the protocol-version bump.
 - Cursor primitives are unchecked. A reader of client data validates exact fixed layouts or gates every variable-length read with `BoundedCursor` before passing its cursor to a primitive.
-- A client-to-server packet is admitted only through its contract row, which owns size bounds, per-tick caps, handshake/debug gating, and violation reporting ([Client to Server Contract](../../../Documents/Architecture/Network.md#client--server-contract)). A new packet adds a row there; its handler keeps only the residual semantic validation the row names. Send commands at tick cadence, not render cadence; immediately flushing an already-authorized rare user request is permitted because it changes departure time, not packet count.
-- Client and server both disable the ENet peer throttle, set 1 MB socket send and receive buffers, and set the ENet datagram checksum to `enet_crc32`. The pairing is deliberate; tuning the throttle or buffers on one side alone leaves the ends disagreeing about how much burst traffic they absorb. A build pair where only one side sets the checksum exchanges no datagram, so the connection times out in ENet before Hello can report anything; builds that both set it but differ in `kiProtocolVersion` still reach the Hello rejection.
+- A client-to-server packet is admitted only through its contract row, which
+  owns size bounds, per-tick caps, handshake/debug gating, and violation
+  reporting
+  ([Client to Server Contract](../../../Documents/Architecture/Network.md#client--server-contract)).
+  A new packet adds a row there; its handler keeps only the residual semantic
+  validation the row names. Send commands at tick cadence, not render cadence;
+  immediately flushing an already-authorized rare user request is permitted
+  because it changes departure time, not packet count.
+- Client and server both disable the ENet peer throttle, set 1 MB socket send
+  and receive buffers, and set the ENet datagram checksum to `enet_crc32`. The
+  pairing is deliberate; tuning the throttle or buffers on one side alone leaves
+  the ends disagreeing about how much burst traffic they absorb. A build pair
+  where only one side sets the checksum exchanges no datagram, so the connection
+  times out in ENet before Hello can report anything; builds that both set it
+  but differ in `kiProtocolVersion` still reach the Hello rejection.
+- Client and server builds must agree on the `kbDesynchronizationDebugFrames` value.
 - ENet service, discovery polling, sends, and simulation queues are main-thread-only. Their workbuffer and state have no locking by design.
 
 ## Corrupt Input Policy
@@ -33,19 +54,41 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
 
 - `NetworkManager` owns ENet lifetime, channel math, and the allocation-suppressed send path.
 - `NetworkProtocol` owns shared packet identifiers, compatibility constants, slot identity, ACK structures, and client-to-server contract rows.
-- `NetworkDiscoveryResponder` (server) and `NetworkDiscoveryScanner` (client) own LAN discovery — a second, self-contained wire protocol that does not use ENet: raw non-blocking UDP on `kiDiscoveryPort` (`kiDefaultPort + 1`), carrying nothing but the 4-byte magic number `kiDiscoveryMagic` ("BRKN") each way. The two halves must change together: the reply carries no payload, so the client takes the server's address from the reply's sender and connects on the default game port. The scanner pings loopback before broadcasting to the LAN so a same-machine server always wins the race, and `--loopback-only` stays symmetric — responder bound to loopback, scanner skipping the broadcast.
+- `NetworkDiscoveryResponder` (server) and `NetworkDiscoveryScanner` (client)
+  own LAN discovery — a second, self-contained wire protocol that does not use
+  ENet: raw non-blocking UDP on `kiDiscoveryPort` (`kiDefaultPort + 1`),
+  carrying nothing but the 4-byte magic number `kiDiscoveryMagic` ("BRKN") each
+  way. The two halves must change together: the reply carries no payload, so the
+  client takes the server's address from the reply's sender and connects on the
+  default game port. The scanner pings loopback before broadcasting to the LAN
+  so a same-machine server always wins the race, and `--loopback-only` stays
+  symmetric — responder bound to loopback, scanner skipping the broadcast.
 - `NetworkMessages` owns engine packet field order, sizes, and paired encode/decode; evolve an engine packet through its shared layout rather than mirroring fields in client/server leaves.
 - `ChatText` owns `IsValidChatText`, the one chat-text rule both sides apply: `Client::SendChat` sends only text that passes it, and the server rejects text that fails it as corrupt before relaying ([Client to Server Contract](../../../Documents/Architecture/Network.md#client--server-contract)).
 - Client and server leaves own the side-specific transport peers, receive buffers, contracts, slots, and packet handling.
-- `ClientSessionRuntime` and `ServerSessionRuntime` own the reusable session mechanics and phase order that canonical game sessions compose with synchronous typed policy hooks ([Network architecture](../../../Documents/Architecture/Network.md#session-ownership-and-phase-order)). `game::NetworkSessionContract` supplies Frame/status types, protocol constants, codecs, and game packet contracts at compile time; runtimes use no virtual session base, runtime type erasure, or additional global manager.
-- `NetworkSerialization` owns the status-change batch codec body: the per-type group envelope and the LZ4 framing. Game Network owns the status-change type set and the payload formats; the codec implements their per-type read/write itself, and `game::NetworkSessionContract` wraps the codec. Batches emit non-empty type groups in ascending `StatusChangeType` order, preserving input order within each type; published server tick inputs use that sequence because clients apply the wire order, so changing it can alter index-sensitive state and the CRC.
-- `ServerTransferManager` and `ServerBroadcaster` own cross-cell transfer handling and per-cell publication assembly, including the deliberate game-type ownership that entails (`Server/AGENTS.md`).
+- `ClientSessionRuntime` and `ServerSessionRuntime` own the reusable session
+  mechanics and phase order that canonical game sessions compose with
+  synchronous game policy functions the runtimes call by name ([Network
+  architecture](../../../Documents/Architecture/Network.md#session-ownership-and-phase-order)).
+  `game::NetworkSessionContract` supplies Frame/status types, protocol
+  constants, codecs, and game packet contracts at compile time; runtimes use no
+  virtual session base, runtime type erasure, or additional global manager.
+- `NetworkSerialization` owns the status-change batch codec: the per-type group
+  envelope, the per-item size bound, and the LZ4 framing. Game Network owns the
+  status-change type set and each type's payload read/write
+  (`game::WriteStatusChangePayload`/`game::ReadStatusChangePayload`), which the
+  codec calls directly per item; `game::NetworkSessionContract` wraps the codec.
+  Batches emit non-empty type groups in ascending `StatusChangeType` order,
+  preserving input order within each type; published server tick inputs use that
+  sequence because clients apply the wire order, so changing it can alter
+  index-sensitive state and the CRC.
+- `ServerTransferManager` and `ServerBroadcaster` own cross-cell transfer handling and per-cell publication assembly. They name `game::StatusChange`, whole game Frames, and the game functions and members listed in `Server/AGENTS.md`, which they call directly by name, never game entity types.
 - A status-change batch is all-or-nothing: the server drops a whole over-cap batch rather than send part of one, and the client decodes the batch it receives without checks under the corrupt-input policy above. Applying part of a batch would silently desync the cell.
 
 ## See Also
 
 - Client (`Client/AGENTS.md`)
 - Server (`Server/AGENTS.md`)
-- Game Network (`../../../Projects/BrokenEngineSandbox/Source/Network/AGENTS.md`)
+- Game Network (the game project's own `Source/Network/AGENTS.md`)
 - Network architecture (`../../../Documents/Architecture/Network.md`)
 - Game reconciliation (`../../../Documents/Architecture/GameReconciliation.md`)

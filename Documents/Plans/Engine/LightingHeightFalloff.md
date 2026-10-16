@@ -1,13 +1,44 @@
 <!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:01:51.106Z","dependsOn":["Documents/Plans/Engine/SmokePerFlightPlane.md"]} -->
 # Dim each light's 2D lighting deposit by its height above the surface under it
 
-Tier 2: client-only render behaviour of the lighting deposit stage (three CPU depositor sites plus one sprite shader); nothing CRC'd, serialized, networked, or threaded changes. Line numbers cite baseline `c1420821`; after `FlightPlaneData` lands, the `gBaseHeight.mfCurrent` read at `GraphicsUtils.cpp:109` is already `engine::gpFlightPlanes->Lowest().fHeightMeters` and the `fBaseHeight` uniform names are kept (its decision 8); `SmokePerFlightPlane` then generalizes that projection per plane (Context). Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other. Flight-plane series.
+Tier 2: client-only render behaviour of the lighting deposit stage (three CPU
+depositor sites plus one sprite shader); nothing CRC'd, serialized, networked,
+or threaded changes. Line numbers cite baseline `c1420821`; after
+`FlightPlaneData` lands, the `gBaseHeight.mfCurrent` read at
+`GraphicsUtils.cpp:109` is already
+`engine::gpFlightPlanes->Lowest().fHeightMeters` and the `fBaseHeight` uniform
+names are kept (its decision 8); `SmokePerFlightPlane` then generalizes that
+projection per plane (Context). Where a statement here and the code disagree,
+the code wins; report the contradiction instead of matching one side to the
+other. Flight-plane series.
 
 ## Context
 
-Lighting spread is 2D: every dynamic light deposits into the three RGBA16F EWNS targets at the point where its eye line meets the surface under it, then `LightingSpread.frag` spreads that texture (`Engine/Data/Shaders/Lighting/AGENTS.md`). A light keeps its full 3D position (`PointLights.h:52`, `AreaLights` corner positions), but its height above the ground plays no part in what it deposits, so a light on the high flight plane (100 m) would light the terrain and the ships on the low plane exactly as a light 6 m above them. The user chose the cheap option: dim each light at deposit time, on the CPU, by its height above the surface under it, with zero GPU cost, accepting that a ship on the same high plane as the light is dimmed too and that per-pixel 3D lighting of ship decks is deferred.
+Lighting spread is 2D: every dynamic light deposits into the three RGBA16F EWNS
+targets at the point where its eye line meets the surface under it, then
+`LightingSpread.frag` spreads that texture
+(`Engine/Data/Shaders/Lighting/AGENTS.md`). A light keeps its full 3D position
+(`PointLights.h:52`, `AreaLights` corner positions), but its height above the
+ground plays no part in what it deposits, so a light on the high flight plane
+(100 m) would light the terrain and the ships on the low plane exactly as a
+light 6 m above them. The user chose the cheap option: dim each light at deposit
+time, on the CPU, by its height above the surface under it, with zero GPU cost,
+accepting that a ship on the same high plane as the light is dimmed too and that
+per-pixel 3D lighting of ship decks is deferred.
 
-- Projection, as `Documents/Plans/Engine/SmokePerFlightPlane.md` (prerequisite, its decision 7) leaves it: `ProjectToFlightPlane(vecLocalPosition, rBasis, iPlane)` (`Engine/Source/Graphics/GraphicsUtils.cpp`, today's `ProjectToBaseHeight` body at `:104-110`) queries `gpIslandTerrain->GlobalElevation` in the light's own cell and intersects the eye line with the plane `max(elevation, Plane(iPlane).fHeightMeters)` through `common::ToBaseHeight` (`Common/Math/MathUtils.cpp:6-11`), and `ProjectToBaseHeight` is `ProjectToFlightPlane(.., 0)`. `ProjectToBaseHeight` callers: `PointLightsRender.cpp:90`, `AreaLightsRender.cpp:129-132`, plus the non-light depositors `WindRadialsRender.cpp:79`, `WindTrailsRender.cpp:100-101`; the smoke depositors (`PuffsRender.cpp:73`, `SmokeTrailsRender.cpp:82-83`) call `ProjectToFlightPlane` per plane.
+- Projection, as `Documents/Plans/Engine/SmokePerFlightPlane.md` (prerequisite,
+  its decision 7) leaves it:
+  `ProjectToFlightPlane(vecLocalPosition, rBasis, iPlane)`
+  (`Engine/Source/Graphics/GraphicsUtils.cpp`, today's `ProjectToBaseHeight`
+  body at `:104-110`) queries `gpIslandTerrain->GlobalElevation` in the light's
+  own cell and intersects the eye line with the plane
+  `max(elevation, Plane(iPlane).fHeightMeters)` through `common::ToBaseHeight`
+  (`Common/Math/MathUtils.cpp:6-11`), and `ProjectToBaseHeight` is
+  `ProjectToFlightPlane(.., 0)`. `ProjectToBaseHeight` callers:
+  `PointLightsRender.cpp:90`, `AreaLightsRender.cpp:129-132`, plus the non-light
+  depositors `WindRadialsRender.cpp:79`, `WindTrailsRender.cpp:100-101`; the
+  smoke depositors (`PuffsRender.cpp:73`, `SmokeTrailsRender.cpp:82-83`) call
+  `ProjectToFlightPlane` per plane.
 - Deposit intensity: point lights write `f4Parameters.y = fLightingIntensity` (`PointLightsRender.cpp:94-98`), area lights `f4Parameters.y = fLightingIntensity * fIntensityMultiplier` (`AreaLightsRender.cpp:144-150`); both reach the fragment shaders as `f4InParams.y` (`PointLight.frag:86`, `AreaLight.frag` deposit path). Hex shields write `rLayout.fLightingIntensity` (`HexShieldsRender.cpp:103`) and project per vertex in `HexShield.vert:89-95` onto the lowest plane, not the terrain.
 - Deposit values are Reinhard-compressed at spread pass 0 (`LightingSpread.frag:39-51,144-149`, `gLightingDepositCompress` 4.0), so a multiplier applied before the deposit is not the same as the same multiplier at the receiver; accepted.
 - `VisibleLight.frag:34-41` fades a light's sprite as the terrain under it rises above `fBaseHeight` over a fixed `0.25 * fBaseHeight` (1.5 m) band. A light 100 m up over a 60 m peak is therefore invisible today, and so is a missile exhaust light arcing over a hill (missiles climb: `kfMissilePitchMinimum` 0.75 rad, `Missiles.h:29-30`).
@@ -19,12 +50,48 @@ Lighting spread is 2D: every dynamic light deposits into the three RGBA16F EWNS 
 
 Each decision is recorded as made; the alternatives are not open.
 
-1. **Falloff curve:** linear. `fHeight = z_light - SurfaceHeight`, `multiplier = clamp(1 - fHeight / gLightingDepositHeightFalloffDistance, 0, 1)`. Every light at or below its surface (all low-plane ships at 6 m over water or low terrain, crater lights on the terrain, lights under a peak) gets exactly `1.0f`, so today's content changes only for lights already above the plane (missile exhausts in their arc). One tuning value, no start offset, no exponential: the simplest curve that reaches zero and is readable on a slider.
-2. **Tuning value:** `engine::gLightingDepositHeightFalloffDistance` = `Wrapper(150.0f, 1.0f, 400.0f)`, declared in `LightingWrappersBase.h` and defined in `LightingWrappersBase.cpp` directly after `gLightingDepositCompress` in `// Write - Deposit`; Tweaks label `"Deposit Height Falloff Distance"` directly after `"Deposit Compress"`. At the default the three planes deposit 1.0, 0.71, and 0.37 over water and a high-plane light over a 60 m peak deposits 0.73. The minimum of 1.0f is load-bearing: it keeps the divide finite (comment it as `gSpreadRingCount` does).
-3. **Surface height:** `SurfaceHeight(vecLocalPosition, rBasis) = std::max(gpIslandTerrain->GlobalElevation(rBasis.coordinate, vecLocalPosition), gpFlightPlanes->Lowest().fHeightMeters)`, the plane-0 surface extracted from `ProjectToFlightPlane`'s clamp. `ProjectToFlightPlane` now projects onto `std::max(SurfaceHeight(vecLocalPosition, rBasis), Plane(iPlane).fHeightMeters)`, which equals its `max(elevation, Plane(iPlane).fHeightMeters)` exactly because plane heights ascend, so projection and falloff read one definition and `ProjectToBaseHeight` stays `ProjectToFlightPlane(.., 0)`.
-4. **Where the multiplier applies:** the three depositors of the lighting deposit stage, each after its own cull so a culled light pays no elevation query: point lights at their position, area lights at the quad centre (`vecCenter`, one query per light, not four), hex shields at the shield position. Hex shields take the falloff because they are a depositor into the same targets and a shield on a higher plane would otherwise light the ground at full strength; their per-vertex `HexShield.vert` projection onto the lowest plane is left as is (see Out of scope).
+1. **Falloff curve:** linear. `fHeight = z_light - SurfaceHeight`,
+   `multiplier = clamp(1 - fHeight / gLightingDepositHeightFalloffDistance, 0, 1)`.
+   Every light at or below its surface (all low-plane ships at 6 m over water or
+   low terrain, crater lights on the terrain, lights under a peak) gets exactly
+   `1.0f`, so today's content changes only for lights already above the plane
+   (missile exhausts in their arc). One tuning value, no start offset, no
+   exponential: the simplest curve that reaches zero and is readable on a
+   slider.
+2. **Tuning value:** `engine::gLightingDepositHeightFalloffDistance` =
+   `Wrapper(150.0f, 1.0f, 400.0f)`, declared in `LightingWrappersBase.h` and
+   defined in `LightingWrappersBase.cpp` directly after
+   `gLightingDepositCompress` in `// Write - Deposit`; Tweaks label
+   `"Deposit Height Falloff Distance"` directly after `"Deposit Compress"`. At
+   the default the three planes deposit 1.0, 0.71, and 0.37 over water and a
+   high-plane light over a 60 m peak deposits 0.73. The minimum of 1.0f is
+   load-bearing: it keeps the divide finite (comment it as `gSpreadRingCount`
+   does).
+3. **Surface height:**
+   `SurfaceHeight(vecLocalPosition, rBasis) = std::max(gpIslandTerrain->GlobalElevation(rBasis.coordinate, vecLocalPosition), gpFlightPlanes->Lowest().fHeightMeters)`,
+   the plane-0 surface extracted from `ProjectToFlightPlane`'s clamp.
+   `ProjectToFlightPlane` now projects onto
+   `std::max(SurfaceHeight(vecLocalPosition, rBasis), Plane(iPlane).fHeightMeters)`,
+   which equals its `max(elevation, Plane(iPlane).fHeightMeters)` exactly
+   because plane heights ascend, so projection and falloff read one definition
+   and `ProjectToBaseHeight` stays `ProjectToFlightPlane(.., 0)`.
+4. **Where the multiplier applies:** the three depositors of the lighting
+   deposit stage, each after its own cull so a culled light pays no elevation
+   query: point lights at their position, area lights at the quad centre
+   (`vecCenter`, one query per light, not four), hex shields at the shield
+   position. Hex shields take the falloff because they are a depositor into the
+   same targets and a shield on a higher plane would otherwise light the ground
+   at full strength; their per-vertex `HexShield.vert` projection onto the
+   lowest plane is left as is (see Out of scope).
 5. **Lighting area is not widened with height.** A wider, dimmer pool would cost deposit fill, and spread already widens the pool; nothing in the request asks for it.
-6. **`VisibleLight.frag` sprite fade re-bases to the light itself:** the comparison height becomes `max(f3InPosition.z, globalLayout.fBaseHeight)`; the 1.5 m band stays `0.25f * globalLayout.fBaseHeight`. A sprite at or below the lowest plane behaves exactly as today; a sprite above it fades only when the terrain under it rises above the light. This also makes crater sprites on terrain above 7.5 m and missile exhaust sprites over hills visible, which today's base-height comparison hides; both are the same correction, not separate features.
+6. **`VisibleLight.frag` sprite fade re-bases to the light itself:** the
+   comparison height becomes `max(f3InPosition.z, globalLayout.fBaseHeight)`;
+   the 1.5 m band stays `0.25f * globalLayout.fBaseHeight`. A sprite at or below
+   the lowest plane behaves exactly as today; a sprite above it fades only when
+   the terrain under it rises above the light. This also makes crater sprites on
+   terrain above 7.5 m and missile exhaust sprites over hills visible, which
+   today's base-height comparison hides; both are the same correction, not
+   separate features.
 7. **No new uniform, shader layout, or GPU work.** The multiplier travels in the existing `f4Parameters.y` and `fLightingIntensity` fields.
 
 ## Design
@@ -39,7 +106,11 @@ float SurfaceHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasis);
 float LightingDepositHeightFalloff(XMVECTOR vecLocalPosition, const RenderBasis& rBasis);
 ```
 
-`GraphicsUtils.cpp`: `ProjectToFlightPlane` becomes `return common::ToBaseHeight(Rebase(rBasis, vecLocalPosition), engine::gpCamera->mVecEyePosition, std::max(SurfaceHeight(vecLocalPosition, rBasis), engine::gpFlightPlanes->Plane(iPlane).fHeightMeters));`; `ProjectToBaseHeight` is unchanged. `LightingDepositHeightFalloff` is `std::clamp(1.0f - (XMVectorGetZ(vecLocalPosition) - SurfaceHeight(vecLocalPosition, rBasis)) / gLightingDepositHeightFalloffDistance.mfCurrent, 0.0f, 1.0f)`; the file gains `#include "Ui/LightingWrappersBase.h"`.
+`GraphicsUtils.cpp`: `ProjectToFlightPlane` becomes
+`return common::ToBaseHeight(Rebase(rBasis, vecLocalPosition), engine::gpCamera->mVecEyePosition, std::max(SurfaceHeight(vecLocalPosition, rBasis), engine::gpFlightPlanes->Plane(iPlane).fHeightMeters));`;
+`ProjectToBaseHeight` is unchanged. `LightingDepositHeightFalloff` is
+`std::clamp(1.0f - (XMVectorGetZ(vecLocalPosition) - SurfaceHeight(vecLocalPosition, rBasis)) / gLightingDepositHeightFalloffDistance.mfCurrent, 0.0f, 1.0f)`;
+the file gains `#include "Ui/LightingWrappersBase.h"`.
 
 Depositor sites:
 

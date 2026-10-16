@@ -33,10 +33,12 @@ length-prefixed JSON.
 ## Inputs
 
 Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`,
-and normalized `GameDataDirectory`. That result must also include the server
-executable, and the client executable unless the scenario launches only the
-server, for the requested configuration; request that build by stating the
-agent-harness scenario trigger in [`/compile`](../compile/SKILL.md) `## Inputs`.
+and normalized `GameDataDirectory` for the game the scenario targets, which the
+brief names when that `/compile` built several. That result must also include
+the server executable, and the client executable unless the scenario launches
+only the server, for the requested configuration; request that build by
+stating the agent-harness scenario trigger in
+[`/compile`](../compile/SKILL.md) `## Inputs`.
 A replay determinism check needs a `kbDebugInput` build, so request `Debug` for
 it;
 [`replay.md`](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/replay.md)

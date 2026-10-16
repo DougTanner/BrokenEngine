@@ -5,8 +5,6 @@
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "TweaksSliderMap.h"
 
-#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
-
 namespace engine
 {
 
@@ -50,40 +48,7 @@ void RegisterEngineTweakSections()
 	TweaksScreenBase::RegisterSection(giTweakSectionSound, {.displayName = "Sound", .stableKey = "Sound", .pRender = RenderSoundSection});
 	TweaksScreenBase::RegisterSection(giTweakSectionSmoke, {.displayName = "Smoke", .stableKey = "Smoke", .pRender = RenderSmokeSection});
 	TweaksScreenBase::RegisterSection(giTweakSectionWind, {.displayName = "Wind", .stableKey = "Wind", .pRender = RenderWindSection});
-}
-
-void RenderTweakExtensionSubtabs(TweaksScreenBase& rScreen, int64_t iSection, int64_t iFirstSubtab)
-{
-	for (int64_t i = iFirstSubtab; const TweakExtensionHook& rHook : game::kTweakExtensionHooks)
-	{
-		if (*rHook.piSection != iSection)
-		{
-			continue;
-		}
-
-		if (rHook.pcLabel == nullptr)
-		{
-			continue;
-		}
-
-		if (rScreen.BeginSubtab(rHook.pcLabel, iSection, i))
-		{
-			rHook.pRender(rScreen);
-			ImGui::EndTabItem();
-		}
-		++i;
-	}
-}
-
-void RenderTweakExtensionInline(TweaksScreenBase& rScreen, int64_t iSection)
-{
-	for (const TweakExtensionHook& rHook : game::kTweakExtensionHooks)
-	{
-		if (*rHook.piSection == iSection && rHook.pcLabel == nullptr)
-		{
-			rHook.pRender(rScreen);
-		}
-	}
+	TweaksScreenBase::RegisterSection(giTweakSectionHexShield, {.displayName = "Hex Shield", .stableKey = "HexShield", .pRender = RenderHexShieldSection});
 }
 
 TweaksScreenBase::TweaksScreenBase()

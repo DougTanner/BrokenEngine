@@ -5,75 +5,36 @@
 namespace game
 {
 
-// Same-session-only CRC: feeds the replay DifferenceStream writer-side dedup and a verbose reader log,
-// never persisted or compared cross-build. Unlike the frame CRC it needs no game::Frame::kiVersion bump
-// when the mixing algorithm changes.
 common::crc_t FrameInput::Crc() const
 {
-	common::crc_t uiChecksum = 0;
-	for (const StatusChange& rStatusChange : statusChanges)
-	{
-		uiChecksum = (uiChecksum ^ common::Crc(rStatusChange.eType)) * common::kCrcMultiplier;
-		std::visit([&](const auto& rPayload)
-		{
-			uiChecksum = (uiChecksum ^ common::Crc(rPayload)) * common::kCrcMultiplier;
-		}, rStatusChange.data);
-	}
-	return uiChecksum;
+	return engine::FrameInputCrc(*this);
 }
 
 std::ostream& operator<<(std::ostream& rStream, const FrameInput& rInput)
 {
-	int64_t iStatusCount = std::ssize(rInput.statusChanges);
-	common::Write(rStream, iStatusCount);
-	for (const StatusChange& rChange : rInput.statusChanges)
-	{
-		common::Write(rStream, rChange.eType);
-		std::visit([&](const auto& rPayload)
-		{
-			common::Write(rStream, rPayload);
-		}, rChange.data);
-	}
-
+	engine::WriteFrameInput(rStream, rInput);
 	return rStream;
 }
 
 std::istream& operator>>(std::istream& rStream, FrameInput& rInput)
 {
-	int64_t iStatusCount = 0;
-	common::Read(rStream, iStatusCount);
-	// Bound the count against the replay stream before the resize — each
-	// StatusChange serializes at least a type byte plus one payload byte.
-	common::ValidateDeserializedCount(iStatusCount, sizeof(uint8_t) + 1, rStream, "FrameInput statusChanges");
-	rInput.statusChanges.resize(iStatusCount);
-	for (StatusChange& rChange : rInput.statusChanges)
-	{
-		common::Read(rStream, rChange.eType);
-		// An unknown type tag seats the default variant alternative and reads
-		// the wrong payload byte count, silently desyncing the rest of the stream — reject it.
-		if (!IsKnownStatusChangeType(rChange.eType))
-		{
-			throw std::ios_base::failure("FrameInput StatusChange type");
-		}
-		rChange.data = DefaultDataForType(rChange.eType);
-		std::visit([&](auto& rPayload)
-		{
-			common::Read(rStream, rPayload);
-		}, rChange.data);
-		// Reject a payload the game cannot adopt before the replay reaches the simulation.
-		if (!IsAdoptableStatusChange(rChange))
-		{
-			throw std::ios_base::failure("FrameInput StatusChange payload");
-		}
-		// Every legitimate spawn carries a real global ID; a zero ID would create an
-		// unaddressable Player row.
-		if (rChange.eType == StatusChangeType::kSpawnPlayer && std::get<SpawnPlayerData>(rChange.data).iGlobalId == 0)
-		{
-			throw std::ios_base::failure("FrameInput SpawnPlayer global ID");
-		}
-	}
-
+	engine::ReadFrameInput(rStream, rInput);
 	return rStream;
+}
+
+void AdmitFrameInputStatusChange(const StatusChange& rChange)
+{
+	// Reject a payload the game cannot adopt before the replay reaches the simulation.
+	if (!IsAdoptableStatusChange(rChange))
+	{
+		throw std::ios_base::failure("FrameInput StatusChange payload");
+	}
+	// Every legitimate spawn carries a real global ID; a zero ID would create an
+	// unaddressable Player row.
+	if (rChange.eType == StatusChangeType::kSpawnPlayer && std::get<SpawnPlayerData>(rChange.data).iGlobalId == 0)
+	{
+		throw std::ios_base::failure("FrameInput SpawnPlayer global ID");
+	}
 }
 
 } // namespace game

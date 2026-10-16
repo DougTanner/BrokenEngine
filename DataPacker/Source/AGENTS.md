@@ -8,35 +8,120 @@ The vcxproj provisions ThirdParty before linking and requires the prebuilt confi
 
 `Main.cpp` orchestrates legacy-intermediate migration, Scene and Island pre-export (including Gaea baking), IBL cubemap convolution, the remaining asset exports, generated headers, and ThirdParty attribution collection. Every asset type and each IBL cubemap pre-pass runs even after an earlier failure, and each type's job failures become one structured aggregate diagnostic.
 
-Each normal command emits a `kInfo` run summary after the single-instance mutex is acquired, counting jobs across every export type. A dirty type counts as exported each successful future whose job is dirty in its final state, after any rejected cached body has re-exported, and counts each caught job exception once as failed; a wholly clean type counts nothing. Setup, type-level stream, publish, and contained IBL pre-pass failures affect the aggregate result without becoming failed jobs, and an exceptional exit reports the partial counts before rethrowing. Migration, Gaea baking, IBL generation, and `--materialize-data` are not countable export jobs.
+Each normal command emits a `kInfo` run summary after the single-instance mutex
+is acquired, counting jobs across every export type; a zero-argument command
+emits one summary per project. A dirty type counts as
+exported each successful future whose job is dirty in its final state, after any
+rejected cached body has re-exported, and counts each caught job exception once
+as failed; a wholly clean type counts nothing. Setup, type-level stream,
+publish, and contained IBL pre-pass failures affect the aggregate result without
+becoming failed jobs, and an exceptional exit reports the partial counts before
+rethrowing. Migration, Gaea baking, IBL generation, and `--materialize-data` are
+not countable export jobs.
 
-Opaque source and intermediate files are trust-boundary inputs. A validation-only reader change must bound and completely read each fixed-size field, verify that every read returned the requested bytes, then validate values, derived arithmetic, and exact payload byte bounds — representability only where the destination type can actually be exceeded — before allocation or other use, leaving valid serialized formats and payloads unchanged. Preserve each reader's established failure path: export jobs fail through their aggregate, legacy migration skips malformed candidates. Versioned format or payload changes follow the owning detail documentation.
+Opaque source and intermediate files are trust-boundary inputs. A
+validation-only reader change must bound and completely read each fixed-size
+field, verify that every read returned the requested bytes, then validate
+values, derived arithmetic, and exact payload byte bounds — representability
+only where the destination type can actually be exceeded — before allocation or
+other use, leaving valid serialized formats and payloads unchanged. Preserve
+each reader's established failure path: export jobs fail through their
+aggregate, legacy migration skips malformed candidates. Versioned format or
+payload changes follow the owning detail documentation.
 
 The Gaea bake is separate from `ExportJob`: version-specific archetype handling stays in `ExportJobs/Island/GaeaArchetype.{h,cpp}`, while route orchestration, region processing, and shoreline subdivision remain version-agnostic. Each route patches a temporary archetype inside the shared cache; source `.terrain` files are never changed. `ExportJobs/Island/AGENTS.md` owns the cache location, and `ExportJobs/AGENTS.md` owns chunk rules and island chunk consumption.
 
 Island elevation is meters-absolute: archetype Sea level and `Island.json` elevation scale place the beach at engine Z 0, and DataPacker validates the resulting sea floor against `common::kfSeaBottomMeters`. Auto-crop removes only deepest-water pixels, retaining the landmass plus shallow-water coastline halo. The runtime applies no per-island height or water-depth multiplier.
 
-The named Win32 single-instance mutex makes a second process wait for the first. Under a debugger, top-level exceptions remain unwrapped so they break at the throw site. Otherwise the shared diagnostic reporter owns export aggregates, the prompts and errors raised while materializing outputs, and top-level exception presentation, and it LOGs every record before any UI. A materialization diagnostic ends in a terminal `EnsureLocal` result rather than an exception, so it never reaches the top-level exception presenter and is never reported twice.
+The named Win32 single-instance mutex makes a second process wait for the first.
+Under a debugger, top-level exceptions remain unwrapped so they break at the
+throw site. Otherwise the shared diagnostic reporter owns export aggregates, the
+prompts and errors raised while materializing outputs, and top-level exception
+presentation, and it LOGs every record before any UI. A materialization
+diagnostic ends in a terminal `EnsureLocal` result rather than an exception, so
+it never reaches the top-level exception presenter and is never reported twice.
 
-Diagnostic mode defaults to interactive and changes monotonically to noninteractive through either of two independent triggers: `BT_DATAPACKER_NONINTERACTIVE=1`, read once inside `Report()` because top-level exception handlers can report before `FileManager` exists, or `FileManager` proving a linked worktree through Git common-directory agreement and the expected output path. Without that variable, missing, malformed, ambiguous, or early identity information fails closed to interactive system-modal behavior. A noninteractive run never opens a diagnostic MessageBox: OK records are acknowledged, while OK/Cancel warnings force Cancel before materialization or output changes.
+Diagnostic mode defaults to interactive and changes monotonically to
+noninteractive through either of two independent triggers:
+`BT_DATAPACKER_NONINTERACTIVE=1`, read once inside `Report()` because top-level
+exception handlers can report before `FileManager` exists, or `FileManager`
+proving a linked worktree through Git common-directory agreement and the
+expected output path. Without that variable, missing, malformed, ambiguous, or
+early identity information fails closed to interactive system-modal behavior. A
+noninteractive run never opens a diagnostic MessageBox: OK records are
+acknowledged, while OK/Cancel warnings force Cancel before materialization or
+output changes.
 
-Set `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` for verification runs that must stop before expensive export work; `ExportJobs/AGENTS.md` owns where the guard stops each job. `BT_DATAPACKER_FORBID_GAEA_EXPORT=1` independently blocks only immediately before a Gaea process launch. The wrapper bootstrap's primary DataPacker run at session start is the one deliberate caller that sets neither guard, so a full multi-hour island bake is permitted there, and can hold session start, unless the launching environment already forbids it.
+Set `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` for verification runs that must
+stop before expensive export work; `ExportJobs/AGENTS.md` owns where the guard
+stops each job. `BT_DATAPACKER_FORBID_GAEA_EXPORT=1` independently blocks only
+immediately before a Gaea process launch. The wrapper bootstrap's primary
+DataPacker run at session start is the one deliberate caller that sets neither
+guard, so a full multi-hour island bake is permitted there, and can hold session
+start, unless the launching environment already forbids it.
 
-`FileManager` (`gpFileManager`) owns input/output/cache paths, ThirdParty resolution, CLI parsing, and worktree output copy-on-write. An eligible linked worktree reads validated primary-checkout ThirdParty and generated Data/Attribution symlinks. A linked worktree pointed at any output directory other than its canonical `Projects/<project>/Platforms/VisualStudio2026/Output/Data` under that worktree, with `<project>` taken from the supplied project data directory, fails the whole run before any export. Unexpected reparse points fail closed. Writers must call `EnsureLocal` after detecting a required change and before opening an output handle; materialization validates and copies into a sibling staging directory before replacing only the recognized symlink, and low-disk cancellation preserves that symlink. `kFailed` and `kCancelled` are terminal materialization results, while an export function's contained `false` records an ordinary export failure and still permits later asset types to run. Construction returns its initialization result through the required output parameter; on either terminal result, callers immediately destroy the local owner and stop before using cache or export accessors, and destruction clears the early-published `gpFileManager`.
+`FileManager` (`gpFileManager`) owns input/output/cache paths, ThirdParty
+resolution, CLI parsing, and worktree output copy-on-write. An eligible linked
+worktree reads validated primary-checkout ThirdParty and generated
+Data/Attribution symlinks. A linked worktree pointed at any output directory
+other than its canonical
+`Projects/<project>/Platforms/VisualStudio2026/Output/Data` under that worktree,
+with `<project>` taken from the supplied project data directory, fails the whole
+run before any export. Unexpected reparse points fail closed. Writers must call
+`EnsureLocal` after detecting a required change and before opening an output
+handle; materialization validates and copies into a sibling staging directory
+before replacing only the recognized symlink, and low-disk cancellation
+preserves that symlink. `kFailed` and `kCancelled` are terminal materialization
+results, while an export function's contained `false` records an ordinary export
+failure and still permits later asset types to run. Construction returns its
+initialization result through the required output parameter; on either terminal
+result, callers immediately destroy the local owner and stop before using cache
+or export accessors, and destruction clears the early-published `gpFileManager`.
 
-Input fingerprints are hex SHA-256 content hashes; directory fingerprints combine sorted relative child paths. Gaea `BakeFingerprint` hashes `Island.json` and its resolved `.terrain` in a line-ending-stable text mode that normalizes CRLF, lone LF, and lone CR to CRLF while preserving every other byte, including a BOM and final-newline presence. The fingerprint-cache identity includes the hash mode, so stable-text and raw hashes never alias. A persistent snapshot-validated fingerprint cache keeps warm runs sub-second by rehashing only changed files; large shared-cache files additionally use adjacent fingerprint metadata so unchanged snapshots avoid rehashing. Its entries are written sorted by path, so rewriting unchanged content produces byte-identical output.
+Input fingerprints are hex SHA-256 content hashes; directory fingerprints
+combine sorted relative child paths. Gaea `BakeFingerprint` hashes `Island.json`
+and its resolved `.terrain` in a line-ending-stable text mode that normalizes
+CRLF, lone LF, and lone CR to CRLF while preserving every other byte, including
+a BOM and final-newline presence. The fingerprint-cache identity includes the
+hash mode, so stable-text and raw hashes never alias. A persistent
+snapshot-validated fingerprint cache keeps warm runs sub-second by rehashing
+only changed files; large shared-cache files additionally use adjacent
+fingerprint metadata so unchanged snapshots avoid rehashing. Its entries are
+written sorted by path, so rewriting unchanged content produces byte-identical
+output.
 
 When a DataPacker change alters only fingerprint or cache-metadata formats, not exported bytes, do not verify by letting the format mismatch trigger a full re-export: the existing chunks, packs, and Gaea caches are known-good. Instead write every new-format fingerprint and cache-metadata file by hand from the current known-good inputs and caches, then verify with a warm-cache run, which exports nothing and finishes sub-second.
 
-CLI accepts zero arguments, deriving sandbox paths from executable layout, or exactly three paths: engine data, project data, and output. `--materialize-data <engine-data> <project-data> <output-data>` is the exact-arity data-only copy-on-write entry point.
+CLI accepts zero arguments or exactly three paths: engine data, project data, and output. Zero arguments packs every game project that follows `Projects/AGENTS.md` `## Standard Project Layout` into its own `Projects/<Name>/Platforms/VisualStudio2026/Output/Data`, with the repository root derived from the executable layout, and exits non-zero when any project's run fails. `--materialize-data <engine-data> <project-data> <output-data>` is the exact-arity data-only copy-on-write entry point.
 
 Tools builds have no allocation tracker, so the engine LOG float-format-spec restriction does not apply here. `Pch.h` log categories default to `kVerbose`.
 
 ## Design Patterns
 
-- Export processing: `RunExportJobs<T>()` performs content-based dirty checks and launches one `std::async` task per asset. The whole type dirties when the current jobs' path CRCs differ from the published manifest's path CRCs, so an add, removal, or count-preserving rename cannot keep a stale pack, manifest, or generated header, and also when the published pack is older than any job's `.meta` fingerprint, so an export killed between fingerprint commit and pack rename republishes from cached chunks on the next run. Case-folded relative paths must be unique before deterministic sorting and aggregate assembly. Generated CRC header symbols must be unique across the whole run, and every discovered job participates in that check even when its type is clean.
+- Export processing: `RunExportJobs<T>()` performs content-based dirty checks
+  and launches one `std::async` task per asset. The whole type dirties when the
+  current jobs' path CRCs differ from the published manifest's path CRCs, so an
+  add, removal, or count-preserving rename cannot keep a stale pack, manifest,
+  or generated header, and also when the published pack is older than any job's
+  `.meta` fingerprint, so an export killed between fingerprint commit and pack
+  rename republishes from cached chunks on the next run. Case-folded relative
+  paths must be unique before deterministic sorting and aggregate assembly.
+  Generated CRC header symbols must be unique per project run, and every
+  discovered job participates in that check even when its type is clean.
 - Attribution generation: ThirdParty license collection detects changes before materializing Attribution and is additive: it copies selected licenses that are missing or newer than the generated files, but does not reconcile obsolete generated files or directories, so stale Attribution entries are accepted.
-- Atomic output: Jobs write temporary files and rename only on complete success, discarding a failed temporary output without replacing the prior one; generated headers update only when content differs. A dirty export stages its manifest, pack, and header beside their finals in the output tree, so each publish rename stays on one volume. A running client or server holds its packs open for the whole process lifetime, so publishing a type probes the destination pack before the manifest rename and releases that handle before the pack rename, which Windows refuses while any handle, including this process's own, is open. A sharing or lock violation at the probe, or any pack rename failure, prompts to retry or cancel rather than failing unannounced. Cancelling discards that type's temporary manifest and pack and fails the type; an already-published manifest then stays beside the unreplaced pack until the next run re-dirties the type and republishes it.
+- Atomic output: Jobs write temporary files and rename only on complete success,
+  discarding a failed temporary output without replacing the prior one;
+  generated headers update only when content differs. A dirty export stages its
+  manifest, pack, and header beside their finals in the output tree, so each
+  publish rename stays on one volume. A running client or server holds its packs
+  open for the whole process lifetime, so publishing a type probes the
+  destination pack before the manifest rename and releases that handle before
+  the pack rename, which Windows refuses while any handle, including this
+  process's own, is open. A sharing or lock violation at the probe, or any pack
+  rename failure, prompts to retry or cancel rather than failing unannounced.
+  Cancelling discards that type's temporary manifest and pack and fails the
+  type; an already-published manifest then stays beside the unreplaced pack
+  until the next run re-dirties the type and republishes it.
 - Reproducibility: Chunk ordering and direct base BC encoding are machine-independent, but OpenCL IBL convolution and GPU-accelerated Gaea bytes assume one authoritative bake host.
 
 ## Output Structure

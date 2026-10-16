@@ -5,9 +5,6 @@
 namespace game
 {
 
-void SaveTweaksSettings();
-void LoadTweaksSettings();
-
 void SaveClientState();
 void LoadClientState();
 

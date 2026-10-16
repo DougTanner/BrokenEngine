@@ -207,14 +207,11 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 
 	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
 
-	// Reverse iteration for swap-and-pop safety with RemoveIndexableElement
-	for (int64_t i = rCurrentInterpolate.iCount - 1; i >= 0; --i)
+	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
-		if (!(rCurrentPostRender.pFlags[i] & kTransfer)) [[likely]]
-		{
-			continue;
-		}
-
+		return rCurrentPostRender.pFlags[i] & kTransfer;
+	}, [&](int64_t i)
+	{
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
 
 		// Build transfer request
@@ -238,18 +235,18 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 				.navigationDelaySeconds = rCurrentPostRender.pNavigationDelays[i],
 			},
 		};
-		request.data.globalPlayerId = rCurrentPostRender.pGlobalPlayerIds[i];
+		request.data.globalId = rCurrentPostRender.pGlobalPlayerIds[i];
 		request.data.fleetWantedCoordinate = rCurrentPostRender.pFleetWantedCoordinates[i];
 		request.data.uiPendingFleetWantedCoordinateTicks = rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[i];
 		request.data.uiPendingWeaponModeTicks = rCurrentPostRender.puiPendingWeaponModeTicks[i];
 		request.data.uiClientGuidHigh = rCurrentPostRender.pClientGuids[i].uiHigh;
 		request.data.uiClientGuidLow = rCurrentPostRender.pClientGuids[i].uiLow;
-		if (PrepareTransferRequest(rFrame.postRender, bounds, request)) [[unlikely]]
+		if (rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
 		{
 			LOG(kDefault, kError, "Player Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) GlobalPlayerId: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), rCurrentPostRender.pGlobalPlayerIds[i], rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
-		PushTransferRequest(rFrame.postRender, request);
+		rFrame.postRender.PushTransferRequest(request);
 
 		engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.pPushers[i]);
 #if defined(BT_CLIENT)
@@ -257,7 +254,7 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 #endif // BT_CLIENT
 
 		engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, rCurrentPostRender.pIds[i], rCurrentInterpolate.Members(), rCurrentPostRender.Members());
-	}
+	});
 }
 
 void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer)
@@ -385,24 +382,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 
 		if (bRecompute)
 		{
-			XMVECTOR vecDebugWaypoint = XMVectorZero();
-			XMVECTOR vecNavigationDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, vecDebugWaypoint);
-			float fNavigationLengthSquared = XMVectorGetX(XMVector3LengthSq(vecNavigationDirection));
-			if (fNavigationLengthSquared > 0.001f)
-			{
-				rVecArtificialIntelligenceDirection = vecNavigationDirection;
-			}
-			else
-			{
-				rVecArtificialIntelligenceDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
-				LOG(kNavData, kWarning, "Player {} navQuery returned zero, fallback dir={}", i, common::WbV2(rVecArtificialIntelligenceDirection, 1));
-			}
-#if defined(BT_CLIENT)
-			if constexpr (kbDebugRender)
-			{
-				rCurrent.pVecDebugNavigationWaypoints[i] = vecDebugWaypoint;
-			}
-#endif // BT_CLIENT
+			RecomputeNavigationPath(rCurrent, i, vecPosition, vecDestination, rStaticData, rVecArtificialIntelligenceDirection);
 		}
 	}
 	else

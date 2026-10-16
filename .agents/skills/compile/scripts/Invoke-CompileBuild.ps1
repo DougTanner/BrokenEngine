@@ -21,6 +21,7 @@ param(
 	[switch] $AcceptDeletionOnlyException,
 	[switch] $Prefast,
 	[switch] $ClangTidy,
+	[string] $Project,
 	[string] $RepositoryRoot,
 	[string] $PrimaryCheckout,
 	[string] $Baseline
@@ -50,20 +51,17 @@ $script:ReleaseOnlyTargets = @('DataPacker', 'WorktreeCli', 'AgentHarness')
 $script:AgentToolsTargets = @('WorktreeCli', 'AgentHarness')
 $script:GaeaGuardVariable = 'BT_DATAPACKER_FORBID_GAEA_EXPORT'
 $script:ExpensiveExportGuardVariable = 'BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT'
+# The Client and Server entries, the selective targets, and the data output suffix derive from the
+# resolved game project.
 $script:TargetFiles = @{
 	ThirdParty = 'ThirdParty\Prebuilts\Platforms\VisualStudio2026\ThirdParty.sln'
 	DataPacker = 'DataPacker\Platforms\VisualStudio2026\DataPacker.sln'
-	Client = 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\BrokenEngineSandbox.sln'
-	Server = 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\BrokenEngineSandboxServer.sln'
 	WorktreeCli = 'Tools\WorktreeCli\Platforms\VisualStudio2026\WorktreeCli.sln'
 	AgentHarness = 'Tools\AgentHarness\Platforms\VisualStudio2026\AgentHarness.sln'
 }
 # --files requires a .vcxproj target, so a selective compile builds the project, not the solution.
-$script:SelectiveTargetFiles = @{
-	Client = 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\BrokenEngineSandbox.vcxproj'
-	Server = 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\BrokenEngineSandboxServer.vcxproj'
-}
-$script:DataOutputSuffix = 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output\Data'
+$script:SelectiveTargetFiles = @{}
+$script:DataOutputSuffix = $null
 
 $script:BlockedCode = $null
 # Set the moment WorktreeCli's inherited stdout can carry its envelope: after that, nothing this
@@ -219,7 +217,8 @@ try {
 			@{ Set = [bool]$RunDataPacker; Name = '-RunDataPacker' },
 			@{ Set = [bool]$AllowGaeaExport; Name = '-AllowGaeaExport' },
 			@{ Set = [bool]$ForbidExpensiveExport; Name = '-ForbidExpensiveExport' },
-			@{ Set = [bool]$AcceptDeletionOnlyException; Name = '-AcceptDeletionOnlyException' })) {
+			@{ Set = [bool]$AcceptDeletionOnlyException; Name = '-AcceptDeletionOnlyException' },
+			@{ Set = -not [string]::IsNullOrWhiteSpace($Project); Name = '-Project' })) {
 			if ($pair.Set) { Stop-CompileInvoke 'parameter.game-only' "$($pair.Name) applies to Client or Server builds only." }
 		}
 	}
@@ -239,6 +238,7 @@ try {
 	if (-not [string]::IsNullOrWhiteSpace($RepositoryRoot)) { $contextArguments.AddRange([string[]]@('-RepositoryRoot', $RepositoryRoot)) }
 	if (-not [string]::IsNullOrWhiteSpace($PrimaryCheckout)) { $contextArguments.AddRange([string[]]@('-PrimaryCheckout', $PrimaryCheckout)) }
 	if (-not [string]::IsNullOrWhiteSpace($Baseline)) { $contextArguments.AddRange([string[]]@('-Baseline', $Baseline)) }
+	if (-not [string]::IsNullOrWhiteSpace($Project)) { $contextArguments.AddRange([string[]]@('-Project', $Project)) }
 	if ($RunDataPacker) { $contextArguments.Add('-IncludeDevEnvDir') }
 	$contextResponse = Invoke-CompileScript 'Resolve-CompileContext.ps1' $contextArguments.ToArray()
 	$context = ConvertFrom-ChildJson $contextResponse.Stdout 'Resolve-CompileContext.ps1'
@@ -261,6 +261,18 @@ try {
 	# The effective data mode decides which authorizations hold, so it resolves from the read-only
 	# context alone and its guards block before provisioning or any other side effect can run.
 	if ($isGameTarget) {
+		# One run builds one game; with several game projects the caller names one per run.
+		if ($null -eq $context.project) {
+			$discovered = @($context.projects | ForEach-Object { [string]$_ })
+			Stop-CompileInvoke 'project.unresolved' "No game project resolved for $Target; discovered: $(if ($discovered.Count -eq 0) { 'none' } else { $discovered -join ', ' }). Pass -Project <Name> to build one game per run."
+		}
+		$gameProject = [string]$context.project
+		$projectDirectory = "Projects\$gameProject\Platforms\VisualStudio2026"
+		$script:TargetFiles.Client = "$projectDirectory\$gameProject.sln"
+		$script:TargetFiles.Server = "$projectDirectory\$($gameProject)Server.sln"
+		$script:SelectiveTargetFiles.Client = "$projectDirectory\$gameProject.vcxproj"
+		$script:SelectiveTargetFiles.Server = "$projectDirectory\$($gameProject)Server.vcxproj"
+		$script:DataOutputSuffix = "$projectDirectory\Output\Data"
 		$reportedMode = [string]$context.dataBuildMode
 		$selectedMode = if ([string]::IsNullOrWhiteSpace($DataBuildMode)) { $reportedMode } else { $DataBuildMode }
 		# The effective mode decides this, not the override alone: a derived Shared mode would otherwise
@@ -274,7 +286,7 @@ try {
 			$nonDeletion = @($triggerPaths | Where-Object { $_ -cnotin $deletionOnly })
 			# The exception covers source assets only. The trigger label carries the context's own
 			# separator and case normalization, so it is matched instead of the raw path.
-			$nonAsset = @($context.triggerMatches | Where-Object { [string]$_.trigger -cnotin @('Engine/Data/**', 'Projects/BrokenEngineSandbox/Data/**') } | ForEach-Object { [string]$_.path })
+			$nonAsset = @($context.triggerMatches | Where-Object { [string]$_.trigger -cnotin @('Engine/Data/**', "Projects/$gameProject/Data/**") } | ForEach-Object { [string]$_.path })
 			if (-not $AcceptDeletionOnlyException) {
 				Stop-CompileInvoke 'data-mode.shared-over-local' "Shared was requested over a Local path trigger ($($triggerPaths -join ', ')). Only the deletion-only exception permits this, through -AcceptDeletionOnlyException with its recorded reference-search evidence."
 			}
@@ -282,7 +294,7 @@ try {
 				Stop-CompileInvoke 'deletion-only.unsupported' "The deletion-only exception does not cover these changed paths, which are not baseline deletions: $($nonDeletion -join ', ')."
 			}
 			if ($nonAsset.Count -gt 0) {
-				Stop-CompileInvoke 'deletion-only.unsupported' "The deletion-only exception covers source assets under Engine/Data/** and Projects/BrokenEngineSandbox/Data/** only; these changed paths are outside it: $($nonAsset -join ', ')."
+				Stop-CompileInvoke 'deletion-only.unsupported' "The deletion-only exception covers source assets under Engine/Data/** and Projects/$gameProject/Data/** only; these changed paths are outside it: $($nonAsset -join ', ')."
 			}
 		}
 		# Only an authorized generation build creates the Local Data directory; without it MSBuild
@@ -304,7 +316,7 @@ try {
 		if ($Target -ceq 'Client' -and $selectedMode -ceq 'Shared') {
 			$sharedDataDirectory = Join-Path $primary $script:DataOutputSuffix
 			$shaderStampPath = Join-Path (Split-Path -Parent $sharedDataDirectory) 'SharedDataShaderStamp.txt'
-			$worktreeShaderFingerprint = Get-AgentShaderSourceFingerprint $script:Root 'HEAD'
+			$worktreeShaderFingerprint = Get-AgentShaderSourceFingerprint $script:Root 'HEAD' $gameProject
 			$shaderStamp = $null
 			try { $shaderStamp = [IO.File]::ReadAllText($shaderStampPath).Trim() }
 			catch [IO.FileNotFoundException], [IO.DirectoryNotFoundException] { }
@@ -314,9 +326,9 @@ try {
 				# Primary main's fingerprint is read with the stamp writer's own function; the worktree's own
 				# shader change is measured from its session baseline, because a merge base with primary main
 				# does not survive a primary history squash.
-				$primaryShaderFingerprint = Get-AgentShaderSourceFingerprint $primary 'HEAD'
+				$primaryShaderFingerprint = Get-AgentShaderSourceFingerprint $primary 'HEAD' $gameProject
 				$sessionBaseline = [string]$context.baseline
-				$baselineShaderFingerprint = Get-AgentShaderSourceFingerprint $script:Root $sessionBaseline
+				$baselineShaderFingerprint = Get-AgentShaderSourceFingerprint $script:Root $sessionBaseline $gameProject
 				$localRemedy = "Local generation authorization (-DataBuildMode Local -RunDataPacker) clears this in every case, because this check runs only for a Shared build. Cost: up to about 1 GB, from restoring the sparse-skipped Engine/Data art trees and generating this worktree's own Data output; and each /compile derives the data mode from this worktree's changed paths, so every later game build (client and server) in this session must also pass -DataBuildMode Local; a Client build without it blocks here again."
 				$retryLead = $null
 				if ($worktreeShaderFingerprint -ceq $primaryShaderFingerprint) {
@@ -370,6 +382,22 @@ try {
 		$resolvedFiles.Add((Get-AgentCanonicalPath $candidate))
 	}
 	$script:SelectedFiles = $resolvedFiles.ToArray()
+
+	# An agent host keeps the VK_SDK_PATH it inherited at start, while wrapper bootstrap rebuilds the
+	# shared ThirdParty prebuilt in its own wrapper session's environment, which is current only when
+	# that terminal started after the last Vulkan SDK change, so the two can compile against different
+	# Vulkan headers. The expected value takes the user level over the machine level, as Windows does
+	# when it builds a new process environment.
+	if ($Target -cnotin $script:AgentToolsTargets) {
+		$expectedSdk = [Environment]::GetEnvironmentVariable('VK_SDK_PATH', 'User')
+		if ([string]::IsNullOrEmpty($expectedSdk)) { $expectedSdk = [Environment]::GetEnvironmentVariable('VK_SDK_PATH', 'Machine') }
+		if (-not [string]::IsNullOrEmpty($expectedSdk)) {
+			$processSdk = [string][Environment]::GetEnvironmentVariable('VK_SDK_PATH')
+			if (-not [string]::Equals($processSdk.TrimEnd('\', '/'), $expectedSdk.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
+				Stop-CompileInvoke 'vulkan-sdk.stale-environment' "This process has VK_SDK_PATH '$processSdk', but the current user/machine environment sets '$expectedSdk': the agent host started before a Vulkan SDK change, so this build would compile against different Vulkan headers than the shared ThirdParty prebuilt. Restart the agent host from a fresh environment (a new wrapper session started from a new Windows Terminal tab, or, if this block persists, after fully restarting the terminal application, for example VS Code), then rerun /compile."
+			}
+		}
+	}
 
 	if (-not $isGameTarget) {
 		$script:Summary.Add("Target $Target ($($script:ResolvedConfiguration)) at $($script:TargetPath); no runtime data mode applies.")
@@ -431,7 +459,7 @@ try {
 	$materialize = Start-CompileChild $dataPacker @(
 		'--materialize-data',
 		(Join-Path $script:Root 'Engine\Data'),
-		(Join-Path $script:Root 'Projects\BrokenEngineSandbox\Data'),
+		(Join-Path $script:Root "Projects\$gameProject\Data"),
 		$gameDataDirectory) $true
 	if (-not [string]::IsNullOrWhiteSpace($materialize.Stdout)) { Write-CompileDiagnostic $materialize.Stdout.Trim() }
 	if ($materialize.ExitCode -ne 0) {

@@ -1,6 +1,6 @@
 ---
 name: compile
-description: Builds Broken Engine projects through WorktreeCli's serialized MSBuild driver and governs immutable prebuilt AgentTools bootstrap/maintenance policy. Use whenever you need to build, rebuild, compile, or check for compile/link errors in ThirdParty, DataPacker, AgentHarness, WorktreeCli, or BrokenEngineSandbox (client or server).
+description: Builds Broken Engine projects through WorktreeCli's serialized MSBuild driver and governs immutable prebuilt AgentTools bootstrap/maintenance policy. Use whenever you need to build, rebuild, compile, or check for compile/link errors in ThirdParty, DataPacker, AgentHarness, WorktreeCli, or a game project such as BrokenEngineSandbox (client or server).
 allowed-tools: [PowerShell]
 ---
 
@@ -15,8 +15,8 @@ delegated `builder`; separate-role requirements return to the manager.
 ## When to use
 
 - Any request to build, rebuild, compile, or check for compile/link errors in
-  ThirdParty, DataPacker, AgentHarness, WorktreeCli, or BrokenEngineSandbox
-  (client or server).
+  ThirdParty, DataPacker, AgentHarness, WorktreeCli, or a game project under
+  `Projects/` (client or server).
 - PREfast verification runs only when an approved plan explicitly requires it;
   never infer PREfast authorization from a routine compile, rebuild, or
   link-error check.
@@ -46,14 +46,17 @@ skill-specific inputs:
   [`ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md`](../../../ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md)
   `## Consumer Provisioning`: from any other checkout `-Target ThirdParty` is
   blocked, so never request it from a session worktree;
+- optionally, the game project (`Projects/<Name>`) a client or server build
+  targets. With one game project none is needed; with several and none named,
+  a game build request builds every game project in turn;
 - the repository root, primary checkout, and baseline the caller explicitly
   supplied, or none;
 - whether the session's approved plan or acceptance table includes an
   agent-harness scenario; a delegator requesting the build states this trigger,
   counting any acceptance criterion or check settled by running `/agent-harness`
   as such a scenario. An included agent-harness scenario adds the client and
-  the server to the targets, so name both;
-- for a BrokenEngineSandbox build, the Local generation authorization a
+  the server of every game built to the targets, so name both;
+- for a game build, the Local generation authorization a
   user-approved plan or acceptance criterion grants, the deletion-only
   reference-search evidence — a basis only when every trigger-matching
   changed path is a whole-file deletion of a source asset (baseline diff
@@ -65,7 +68,7 @@ skill-specific inputs:
   `## Mode selection` and `## Local generation` own which authorizations are
   valid, and a change hitting any `## Mode selection` Local trigger makes
   Local mandatory, so request the Local generation authorization at plan
-  approval, before the first BrokenEngineSandbox build;
+  approval, before the first game build;
 - whether an approved plan explicitly requires PREfast verification —
   [references/prefast-mode.md](references/prefast-mode.md)
   `## Authorization and when to use`;
@@ -81,12 +84,13 @@ Return the shared handoff form in
 the execution and result discipline in
 [`references/worker.md`](references/worker.md).
 
-- `Decisive checks` — one row per build: target, configuration, `status`,
-  `exitCode`, `failureKind`, and, for a failing build with a `severity: error`
-  diagnostic, the first one's `code` and `file`.
-- `Decisive checks` — for a game build, one row naming the envelope's
-  `/p:DataBuildMode`, `/p:RunDataPacker`, and `/p:GameDataDirectory` switch
-  values, plus your reason whenever your own judgment overrode the
+- `Decisive checks` — one row per build: target, configuration, the game for a
+  client or server build, `status`, `exitCode`, `failureKind`, and, for a
+  failing build with a `severity: error` diagnostic, the first one's `code` and
+  `file`.
+- `Decisive checks` — for a game build, one row naming the game and the
+  envelope's `/p:DataBuildMode`, `/p:RunDataPacker`, and `/p:GameDataDirectory`
+  switch values, plus your reason whenever your own judgment overrode the
   `dataBuildMode` that `Resolve-CompileContext.ps1` reported.
 - `Decisive checks` — for a `-ClangTidy` build, one row naming whether analysis
   executed, the de-duplicated warning count, and the `clang-diagnostic-error`

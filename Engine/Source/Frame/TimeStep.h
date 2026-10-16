@@ -9,10 +9,15 @@ inline constexpr int64_t kiTickRate = 32;
 inline constexpr std::chrono::nanoseconds kTickNanoseconds = 1'000'000'000ns / kiTickRate;
 inline constexpr float kfDeltaTime = common::NanosecondsToFloatSeconds<float>(kTickNanoseconds);
 
-// Tag clock for simulation instants; it has no now() because the frame clock is the frame's current time
+// Tag clock for simulation instants; it has no now() because a frame's time is a function of its tick
 struct SimulationClock {};
-// A moment on the frame clock, in seconds.
-using SimulationTime = std::chrono::time_point<SimulationClock, std::chrono::duration<float>>;
+// A moment on the simulation clock, in nanoseconds since tick 0.
+using SimulationTime = std::chrono::time_point<SimulationClock, std::chrono::nanoseconds>;
+
+constexpr SimulationTime TickToSimulationTime(int64_t iTick)
+{
+	return SimulationTime(iTick * kTickNanoseconds);
+}
 
 // Manages fixed timestep accumulator and time scaling for Frame updates
 class TimeStep
@@ -45,6 +50,8 @@ public:
 
 	static constexpr int64_t kiMaximumTicksPerFrame = 12;  // Threshold for the server's auto-reduction
 	static constexpr int64_t kiMaximumAccumulatorTicks = 4;
+	// Largest tick a grid save may hold: the instant of every tick a loaded server reaches in its first update fits int64_t.
+	static constexpr int64_t kiMaximumSavedTick = std::numeric_limits<int64_t>::max() / kTickNanoseconds.count() - kiMaximumAccumulatorTicks;
 
 	// Slowest slow motion (1/32). The server's per-update client packet and byte budgets span one scheduled
 	// update, which slow motion lengthens: at 1/32 an update holds ~32 honest acks and a stall too short to

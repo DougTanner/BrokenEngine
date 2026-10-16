@@ -5,7 +5,14 @@
 
 This is the third of four Plans that put the dedicated server on the internet. `Documents/Plans/ChangeWorkflow/ProvisionAzureServerVm.md` (the prerequisite) provisioned an Azure VM with a Standard static public IP and wrote that address into `## Server address` below. `Documents/Plans/ChangeWorkflow/DeployAndRunHostedServer.md` follows. It deploys the server and proves this Plan's connection end to end.
 
-Today the client cannot reach a server outside its LAN. Main Menu's Remote Server entry is always drawn disabled, with the comment "displayed disabled because no connection action is available" (`Engine/Source/Ui/Screens/MainMenuScreen.cpp:122-129`). The only connection actions are the discovered loopback or LAN server (`Projects/BrokenEngineSandbox/Source/Game.cpp:499-501`, `:598-603`) and the main-menu Return-key fallback to `127.0.0.1` (`:604-607`). No launch option or UI field takes an address (`Engine/Source/LaunchOptions.cpp`).
+Today the client cannot reach a server outside its LAN. Main Menu's Remote
+Server entry is always drawn disabled, with the comment "displayed disabled
+because no connection action is available"
+(`Engine/Source/Ui/Screens/MainMenuScreen.cpp:122-129`). The only connection
+actions are the discovered loopback or LAN server
+(`Projects/BrokenEngineSandbox/Source/Game.cpp:499-501`, `:598-603`) and the
+main-menu Return-key fallback to `127.0.0.1` (`:604-607`). No launch option or
+UI field takes an address (`Engine/Source/LaunchOptions.cpp`).
 
 User decisions (this session, binding):
 

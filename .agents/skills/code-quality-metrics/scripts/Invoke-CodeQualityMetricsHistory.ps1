@@ -19,14 +19,15 @@ $script:HeaderText = '{"schema":"code-quality-metrics-history/v3"}'
 $script:AreaFields = @('verbosityEngine', 'verbosityCommon', 'verbosityDataPacker', 'verbosityGame', 'verbosityAgentTools')
 $script:RowFields = @('index', 'sha', 'date', 'measured', 'verbosity') + $script:AreaFields + @('supported', 'parsed')
 # History areas (HistoryContract.md): the first matching prefix wins, so both Agent/ folders precede Engine/ and Projects/.
+# Each prefix is an anchored case-sensitive pattern; [^/]+ stands for any one project directory.
 $script:HistoryAreaPrefixes = @(
-    @('Engine/Source/Agent/', 'verbosityAgentTools'),
-    @('Projects/BrokenEngineSandbox/Source/Agent/', 'verbosityAgentTools'),
-    @('Tools/', 'verbosityAgentTools'),
-    @('Engine/', 'verbosityEngine'),
-    @('Common/', 'verbosityCommon'),
-    @('DataPacker/', 'verbosityDataPacker'),
-    @('Projects/', 'verbosityGame'))
+    @('^Engine/Source/Agent/', 'verbosityAgentTools'),
+    @('^Projects/[^/]+/Source/Agent/', 'verbosityAgentTools'),
+    @('^Tools/', 'verbosityAgentTools'),
+    @('^Engine/', 'verbosityEngine'),
+    @('^Common/', 'verbosityCommon'),
+    @('^DataPacker/', 'verbosityDataPacker'),
+    @('^Projects/', 'verbosityGame'))
 $script:MetricExtensions = @('.h', '.cpp')
 $script:ExcludedRoots = @('ThirdParty', '.agents', '.claude', 'Temp')
 
@@ -303,7 +304,7 @@ function Get-SnapshotEvidence([object]$Report) {
     foreach ($field in $script:AreaFields) { $numerators[$field] = [int64]0; $denominators[$field] = [int64]0 }
     foreach ($file in @($Report.current.files)) {
         $path = [string]$file.path
-        $match = $script:HistoryAreaPrefixes | Where-Object { $path.StartsWith($_[0], [StringComparison]::Ordinal) } | Select-Object -First 1
+        $match = $script:HistoryAreaPrefixes | Where-Object { $path -cmatch $_[0] } | Select-Object -First 1
         if ($null -eq $match) { continue }
         $denominator = Assert-Count $file.metrics.verbosity.denominator "snapshot.files[$path].verbosity.denominator"
         $numerators[$match[1]] += Assert-Count $file.metrics.verbosity.numerator "snapshot.files[$path].verbosity.numerator" $denominator

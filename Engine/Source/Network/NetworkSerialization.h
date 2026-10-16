@@ -2,9 +2,10 @@
 
 #include "Network/NetworkProtocol.h" // kiMaximumStatusChangesPerCell for the shared batch-size bounds below
 
-// The engine owns the batch codec body (NetworkSerialization.cpp): the tagged [type][count] group envelope
-// and each payload type's read/write. The game supplies the StatusChangeType enum and the concrete payload variants. The game type is forward-declared rather than included so this
-// engine header stays free of game dependencies; the codec .cpp includes the game header for the full type.
+// The engine owns the batch codec (NetworkSerialization.cpp): the tagged [type][count] group envelope, ascending type
+// order, and LZ4 framing. The game owns the StatusChangeType enum and each type's payload bytes, which the codec writes
+// and reads through game::WriteStatusChangePayload and game::ReadStatusChangePayload. The game type is forward-declared
+// rather than included so this engine header stays free of game dependencies; the codec .cpp includes the game headers.
 namespace game
 {
 struct StatusChange;
@@ -13,9 +14,8 @@ struct StatusChange;
 namespace engine
 {
 
-// Upper bound on a single serialized StatusChange of any type. A game wire fact, but shared here (the codec is
-// engine-owned) so the codec's SerializeGroup per-item ASSERT and the engine Server's compression-scratch sizing
-// reference one source.
+// Upper bound on a single serialized StatusChange payload of any type. A game wire fact, kept here so the engine
+// codec's SerializeGroup per-item ASSERT and the engine Server's compression-scratch sizing reference one source.
 inline constexpr int64_t kiMaxStatusChangeBytesPerItem = 120;
 
 // Worst-case serialized bytes for a full kiMaximumStatusChangesPerCell batch: every item at its max size plus a

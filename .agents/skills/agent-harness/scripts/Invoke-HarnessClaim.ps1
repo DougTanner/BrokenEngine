@@ -14,6 +14,8 @@ param(
 	[Parameter(Mandatory)][string] $Session,
 	# The packed data the launch will read. Pass the latest /compile result's normalized
 	# GameDataDirectory verbatim, so the pairing check judges the same data the game will be given.
+	# Its Projects\<Name>\Platforms\VisualStudio2026\Output\Data suffix names the game project whose
+	# executables are checked, so they can never belong to a different game than the data.
 	[Parameter(Mandatory)][string] $GameDataDirectory,
 	[string] $Key = 'default',
 	[string] $Configuration = 'Debug',
@@ -40,6 +42,7 @@ $result = [ordered]@{
 	session = $Session
 	key = $Key
 	gameDataDirectory = $GameDataDirectory
+	project = $null
 	owner = $null
 	agentHarness = $null
 	claim = $null
@@ -248,12 +251,23 @@ try {
 		Complete-HarnessClaim 1 'error' 'claim.provisioner-missing' "Provisioning script is missing: '$provisioner'."
 	}
 
+	$dataDirectory = Get-AgentCanonicalPath $GameDataDirectory
+	$result.gameDataDirectory = $dataDirectory
+	$segments = $dataDirectory.Split('\')
+	if ($segments.Count -lt 6 -or $segments[-6] -cne 'Projects' -or $segments[-4] -cne 'Platforms' -or
+		$segments[-3] -cne 'VisualStudio2026' -or $segments[-2] -cne 'Output' -or $segments[-1] -cne 'Data') {
+		Complete-HarnessClaim 2 'blocked' 'claim.project-underivable' ("GameDataDirectory '$dataDirectory' does not end in " +
+			'Projects\<Name>\Platforms\VisualStudio2026\Output\Data, so its game project cannot be derived.')
+	}
+	$project = $segments[-5]
+	$result.project = $project
+
 	# The project harness doc owns the executable names and their Output directory, so the launch
 	# block stays the single source of truth: only those three assignments are read, and the doc's
 	# hardcoded Debug suffix becomes the requested configuration's suffix — none for Release, whose
 	# TargetName is the bare project name. Missing executables block here, before provisioning and
 	# before the lock, so a build routes through /compile and re-enters.
-	$harnessDocument = Join-Path $root 'Projects\BrokenEngineSandbox\Documents\AgentHarness.md'
+	$harnessDocument = Join-Path $root "Projects\$project\Documents\AgentHarness.md"
 	$launchText = ''
 	if (Test-Path -LiteralPath $harnessDocument -PathType Leaf) {
 		# A read failure leaves the text empty so it reports the same unreadable-doc code as a parse failure.
@@ -290,8 +304,6 @@ try {
 	# process exit when process checking is active, otherwise only as a ping timeout. Proving the
 	# pairing here — before provisioning and before the lock — blocks with no owner token or claim left
 	# behind, and the caller supplies the same data directory the launch will pass to the game.
-	$dataDirectory = Get-AgentCanonicalPath $GameDataDirectory
-	$result.gameDataDirectory = $dataDirectory
 	$expectedVersion = Get-ExpectedPackVersion (Join-Path $root 'Common\DataFile.h')
 	if ($null -eq $expectedVersion.Version) {
 		Complete-HarnessClaim 1 'error' 'claim.pack-version-underivable' `

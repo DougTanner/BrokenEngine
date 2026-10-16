@@ -124,6 +124,11 @@ public:
 	float mfShake = 0.0f;
 	int64_t miFrame = 0;
 
+	XMVECTOR mVecVisualErrorOffset {};
+	static constexpr float kfVisualErrorDecayRate = 15.0f;
+	static constexpr float kfVisualErrorMaxDistance = 5.0f;
+	static constexpr float kfVisualErrorMinDistance = 0.001f;
+
 	// Visible-area LOD (read by renderer to pick which mesh-LOD region to draw). Equation:
 	// floor(log4(eyeDistance / kfMinimumEyeHeight)) clamped to BufferManager::kiVisibleAreaLodCount-1.
 	// Higher LOD = fewer mesh quads (each dim halved per LOD; total quads /4 per LOD).
@@ -135,9 +140,9 @@ public:
 
 	float mfCameraEyeHeight = kfCameraEyeHeightInitial;
 	float mfCameraEyeHeightTarget = kfCameraEyeHeightInitial;
-	XMVECTOR mVecLastKnownPlayerPosition {};
-	XMVECTOR mVecLastKnownPlayerVelocity {};
-	float mfLastKnownPlayerTime = 0.0f;
+	XMVECTOR mVecLastKnownTargetPosition {};
+	XMVECTOR mVecLastKnownTargetVelocity {};
+	float mfLastKnownTargetTime = 0.0f;
 
 	XMVECTOR mVecJumpStartPosition {};
 	XMVECTOR mVecPreviousTargetPosition {};
@@ -159,16 +164,17 @@ public:
 	float mfLightingTexelEyeHeight = 0.0f;
 
 	explicit CameraBase(const CameraSetup& rCameraSetup);
-	virtual ~CameraBase() = default;
 
 	void Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime);
 
 	void ResetForSession();
 	void RestoreEyeHeight(float fEyeHeight);
 
-	float mfSunAngle = 1.4f;
+	// Adds the error to the offset, or zeroes the offset when the sum is longer than kfVisualErrorMaxDistance. Returns
+	// the sum's length either way.
+	float XM_CALLCONV AddVisualErrorOffset(FXMVECTOR vecError);
 
-	virtual float SunAngle() const = 0;
+	float mfSunAngle = 1.4f;
 
 	XMVECTOR XM_CALLCONV WorldToScreen(FXMVECTOR vecWorldPosition) const;
 
@@ -185,10 +191,6 @@ public:
 	}
 
 protected:
-
-	// Derived-camera policy. The concrete camera knows the real interpolate frame type and casts back to it.
-	virtual bool IsMainMenuFrame(const FrameInterpolateBase& rFrameInterpolate) const = 0;
-	virtual CameraTarget PullTarget(const FrameInterpolateBase& rFrameInterpolate) = 0;
 
 	void CalculateMatricesAndVisibleArea();
 

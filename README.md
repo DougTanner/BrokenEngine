@@ -44,7 +44,13 @@ Setting up a new machine? [Documents/FreshMachineSetup.md](Documents/FreshMachin
 
 ### SmartGit
 
-- When agent worktrees run in parallel, enable **Edit -> Preferences -> Commands -> Log and Working Tree Window -> Log -> Allow multiple Log Windows for the same repository or file**. Each worktree's finalization opens a Log anchored at its landing candidate; without this setting, SmartGit reuses and retargets an existing Log for the shared repository, replacing another session's review view. See SmartGit's [Commands preferences](https://docs.syntevo.com/SmartGit/Latest/Manual/GUI/Preferences/Commands).
+- When agent worktrees run in parallel, enable **Edit -> Preferences ->
+  Commands -> Log and Working Tree Window -> Log -> Allow multiple Log Windows
+  for the same repository or file**. Each worktree's finalization opens a Log
+  anchored at its landing candidate; without this setting, SmartGit reuses and
+  retargets an existing Log for the shared repository, replacing another
+  session's review view. See SmartGit's
+  [Commands preferences](https://docs.syntevo.com/SmartGit/Latest/Manual/GUI/Preferences/Commands).
 
 ## Windows Shell Tools
 
@@ -52,7 +58,15 @@ Setting up a new machine? [Documents/FreshMachineSetup.md](Documents/FreshMachin
 	```powershell
 	winget install --id Git.Git --exact --source winget
 	```
-- Install PowerShell 7 as the **MSI**; its manifest declares `ElevationRequirement: elevatesSelf`, so run it from an ordinary shell and approve the UAC prompt. `Microsoft.PowerShell` defaults to the MSIX/Store package, which lands under `C:\Program Files\WindowsApps`; those ACLs cannot be granted to the Codex sandbox users, so every sandboxed `pwsh` exec fails with `CreateProcessAsUserW failed: 5 (Access is denied)` and `/codex-review` degrades to `CODEX-UNAVAILABLE` and its Opus reviewer fallback. `--installer-type wix` selects the MSI, which installs to `C:\Program Files\PowerShell\7` and works under the sandbox.
+- Install PowerShell 7 as the **MSI**; its manifest declares
+  `ElevationRequirement: elevatesSelf`, so run it from an ordinary shell and
+  approve the UAC prompt. `Microsoft.PowerShell` defaults to the MSIX/Store
+  package, which lands under `C:\Program Files\WindowsApps`; those ACLs cannot
+  be granted to the Codex sandbox users, so every sandboxed `pwsh` exec fails
+  with `CreateProcessAsUserW failed: 5 (Access is denied)` and `/codex-review`
+  degrades to `CODEX-UNAVAILABLE` and its Opus reviewer fallback.
+  `--installer-type wix` selects the MSI, which installs to
+  `C:\Program Files\PowerShell\7` and works under the sandbox.
 	```powershell
 	winget install --id Microsoft.PowerShell --exact --source winget --installer-type wix --scope machine
 	```
@@ -199,7 +213,13 @@ js_repl = false
 url = "https://developers.openai.com/mcp"
 ```
 
-Keep the runtime-generated `node_repl` command and environment values intact; edit its existing `[mcp_servers.node_repl]` block to add `enabled = false`. Restart Codex and open a new thread after capability changes, then verify the active state with `codex plugin list` and `codex mcp list`. The profile disables Visualize, Google Calendar, Slack, Browser, Documents, PDF, Spreadsheets, Presentations, Template Creator, Sites, and OpenAI Templates, plus `js_repl`, `node_repl`, and `sites-design-picker`; it retains `openaiDeveloperDocs`.
+Keep the runtime-generated `node_repl` command and environment values intact;
+edit its existing `[mcp_servers.node_repl]` block to add `enabled = false`.
+Restart Codex and open a new thread after capability changes, then verify the
+active state with `codex plugin list` and `codex mcp list`. The profile disables
+Visualize, Google Calendar, Slack, Browser, Documents, PDF, Spreadsheets,
+Presentations, Template Creator, Sites, and OpenAI Templates, plus `js_repl`,
+`node_repl`, and `sites-design-picker`; it retains `openaiDeveloperDocs`.
 
 ### OpenCode
 

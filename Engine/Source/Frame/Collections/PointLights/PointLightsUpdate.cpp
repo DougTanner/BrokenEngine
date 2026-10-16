@@ -11,7 +11,7 @@ void PointLightsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 {
 	PointLightsInterpolate& __restrict rCurrent = rFrameInterpolate.pointLights;
 	const PointLightsInterpolate& rPrevious = rPreviousFrame.interpolate.pointLights;
-	SimulationTime currentTime(std::chrono::duration<float>(rPreviousFrame.interpolate.fCurrentTime + rFrameInterpolate.fDeltaTime));
+	SimulationTime currentTime = TickToSimulationTime(rPreviousFrame.interpolate.iTick) + common::FloatSecondsToNanoseconds(std::chrono::duration<float>(rFrameInterpolate.fDeltaTime));
 
 	if (rCurrent.iCount == 0)
 	{
@@ -35,7 +35,7 @@ void PointLightsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 
 		if (iControllerTypeIndex != kiInvalidControllerType)
 		{
-			std::chrono::duration<float> elapsedTime = currentTime - rCurrent.pStartTimes[i];
+			std::chrono::duration<float> elapsedTime(common::NanosecondsToFloatSeconds<float>(currentTime - rCurrent.pStartTimes[i]));
 			const ControllerType& rController = sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
 
 			ControllerKeyframe interpolated = InterpolateScaledKeyframes(rController, elapsedTime, [](ControllerType& rScaledController, const ControllerType& rOriginalController, int64_t j)
@@ -81,9 +81,6 @@ void PointLightsInterpolate::Sync(game::FrameInterpolate& rFrameInterpolate, id_
 
 	rPointLights.pVecPositions[iIndex] = XMVectorSetW(rData.vecPosition, 1.0f);
 	rPointLights.pfVisibleAreas[iIndex] = rData.fVisibleArea;
-	rPointLights.pfVisibleIntensities[iIndex] = rData.fVisibleIntensity;
-	rPointLights.pfLightingAreas[iIndex] = rData.fLightingArea;
-	rPointLights.pfLightingIntensities[iIndex] = rData.fLightingIntensity;
 	rPointLights.pfRotations[iIndex] = rData.fRotation;
 }
 

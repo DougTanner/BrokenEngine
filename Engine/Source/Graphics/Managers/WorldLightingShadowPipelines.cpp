@@ -211,7 +211,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		},
 	});
 
-	// Temporal accumulation: gather the reprojected previous-frame shadow and blend it in place into
+	// Temporal accumulation: gather the reprojected last-refresh shadow and blend it in place into
 	// mShadowBlurTexture. ShadowHistoryCopy then refreshes the distinct history image over the final window.
 	mpPipelines[kPipelineShadowTemporal].Create(
 	{

@@ -43,8 +43,8 @@ struct MenuInput
 };
 
 // Borrowed view of the current and previous raw snapshots, handed out by BeginPoll so engine policy and the
-// game callback detect edges against the same pair, plus whether the UI owns the keyboard this poll. It is
-// only valid until the previous snapshot advances, so it must never outlive GameBase::ProcessInput.
+// game's ProcessGameMenuInput detect edges against the same pair, plus whether the UI owns the keyboard this poll.
+// It is only valid until the previous snapshot advances, so it must never outlive GameBase::ProcessInput.
 class InputPoll
 {
 public:

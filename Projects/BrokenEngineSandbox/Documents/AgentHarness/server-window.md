@@ -4,7 +4,13 @@
 
 ### Server GDI monitoring window capture and click
 
-The server monitoring window is a plain Win32 GDI window, not a JSON-command or ImGui surface. The client `screenshot`, `describe_ui`, and `click` commands cannot observe or drive it. When a criterion needs that window, copy the following complete block verbatim into the ignored `<absolute adopted worktree>\Temp\Capture-ServerWindow.ps1`, then run it with the exact `serverPid` retained by the launch snapshot. Do not replace PID ownership with a process-name search or add this as a tracked helper.
+The server monitoring window is a plain Win32 GDI window, not a JSON-command or
+ImGui surface. The client `screenshot`, `describe_ui`, and `click` commands
+cannot observe or drive it. When a criterion needs that window, copy the
+following complete block verbatim into the ignored
+`<absolute adopted worktree>\Temp\Capture-ServerWindow.ps1`, then run it with
+the exact `serverPid` retained by the launch snapshot. Do not replace PID
+ownership with a process-name search or add this as a tracked helper.
 
 ```powershell
 param(
@@ -496,4 +502,12 @@ pwsh -NoProfile -File .\Temp\Capture-ServerWindow.ps1 -ServerPid <exact retained
 
 Run the acceptance scenario with `-Target Profile`; it switches only the server's Profile tab and writes the before/after captures. The optional `-Target ProfileCopy` click uses the live painted client height and the Copy rectangle `x=260..340`, `y=clientHeight-48..clientHeight-20`; it replaces the current clipboard contents, so use it only when clipboard mutation is intended. `Map` and `Profile` centers are `(300,16)` and `(400,16)` in client coordinates.
 
-This recipe changes the interactive Windows desktop: it moves the physical cursor, temporarily changes foreground focus and z-order, and (for `ProfileCopy`) replaces clipboard contents. Visibility, minimized state, topmost state, and cursor are restored in `finally`; foreground and exact z-order restoration are best effort. In the observed verification, cross-process `PostMessage`/`SendMessageTimeout` for `WM_LBUTTONDOWN`/`WM_LBUTTONUP` returned success but did not trigger the server handler. That is a narrow observed pitfall for this verification, not a universal Windows/API limitation, so those posted-message results are not click evidence.
+This recipe changes the interactive Windows desktop: it moves the physical
+cursor, temporarily changes foreground focus and z-order, and (for
+`ProfileCopy`) replaces clipboard contents. Visibility, minimized state, topmost
+state, and cursor are restored in `finally`; foreground and exact z-order
+restoration are best effort. In the observed verification, cross-process
+`PostMessage`/`SendMessageTimeout` for `WM_LBUTTONDOWN`/`WM_LBUTTONUP` returned
+success but did not trigger the server handler. That is a narrow observed
+pitfall for this verification, not a universal Windows/API limitation, so those
+posted-message results are not click evidence.

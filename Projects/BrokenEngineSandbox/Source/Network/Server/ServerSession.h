@@ -24,7 +24,15 @@ struct SubscriptionUpdate
 {
 	int64_t iClientId = 0;
 	engine::GridCoord newCoordinate {};
-	engine::GlobalId globalPlayerId {};
+	engine::GlobalId globalId {};
+};
+
+struct PendingUpdatePlayerRequest
+{
+	int64_t iClientId = 0;
+	engine::GlobalId globalId {};
+	bool bUseMissiles = false;
+	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
 };
 
 class ServerSession : public common::Singleton<ServerSession>
@@ -49,11 +57,17 @@ public:
 	int64_t RelinkFromFrames(int64_t iClientId, const engine::ClientGuid& rGuid, RelinkContext eContext);
 	void WriteFleetData(std::fstream& rFileStream) const;
 
-	engine::OwnedEntityRegistry mClientPlayers;
+	// Engine ServerBroadcaster::BuildFrameInputs calls this once per advancing update, after the frame-input reset and
+	// before the first tick's PrepareTickStatusChanges drain.
+	void BuildAdvancingFrameInputs();
+
+	// Engine ServerTransferManager calls this after a transferred owned entity's client GUID is assigned in its destination.
+	void OnOwnedEntityChangedCell(const engine::ClientGuid& rClientGuid, engine::GlobalId globalId, engine::GridCoord destination);
+
+	engine::OwnedEntityRegistry mClientOwnedEntities;
 
 	std::vector<SubscriptionUpdate> mPendingSubscriptionUpdates;
-
-	int64_t miHarvestedTransferTotal = 0; // transfers applied since the current game state began; agent status reporting only, never CRC, wire, or save state
+	std::vector<PendingUpdatePlayerRequest> mPendingUpdatePlayerRequests;
 
 	std::unique_ptr<ServerFleetManager> mpFleetManager;
 	std::unique_ptr<engine::ServerTransferManager> mpTransferManager;
@@ -68,8 +82,9 @@ private:
 	void AfterNetworkPoll();
 	void ParseReceivedGamePackets();
 	void FinalizeTickClients();
+	void ProcessUpdatePlayerRequests();
 
-	// ServerSessionRuntime::ComputeActiveSet hook
+	// ServerSessionRuntime::ComputeActiveSet calls this by name
 	void AddGameRequiredCoordinates();
 
 };

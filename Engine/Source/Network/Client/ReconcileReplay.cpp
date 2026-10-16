@@ -192,7 +192,7 @@ enum class ReplayMode
 	kFallback,
 };
 
-static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const RingLayout& rPreWritebackLayout, int64_t& riRollbackTick, int64_t& riRollbackOffset, bool& rbShrunkRollback, ReplayMode eMode, float& rfTime, int64_t& riReplayStart)
+static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const RingLayout& rPreWritebackLayout, int64_t& riRollbackTick, int64_t& riRollbackOffset, bool& rbShrunkRollback, ReplayMode eMode, int64_t& riReplayStart)
 {
 	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
@@ -216,14 +216,12 @@ static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const Ri
 	}
 
 	ReconcileRollbackCoord(rWork, riRollbackOffset);
-	rfTime = rScratch.replayStack.at(0)->interpolate.fCurrentTime;
 
 	// Inject a due pending full state at the confirmed frame. Future states remain queued.
 	engine::Cell::PendingFullState* pDuePendingFullState = FindDuePendingFullState(rCell, rInputs.iTargetTick);
 	if (pDuePendingFullState != nullptr && pDuePendingFullState->iTick == rCell.iConfirmedTick)
 	{
 		ReconcileInjectPendingFullState(rWork);
-		rfTime = rScratch.replayStack.at(0)->interpolate.fCurrentTime;
 		if (eMode == ReplayMode::kPrimary)
 		{
 			LOG(kNetwork, kVerbose, "ReconcileCoord Injected pending full state Coord: ({},{}) AtTick: {}", rWork.coord.iX, rWork.coord.iY, rCell.iConfirmedTick);
@@ -242,7 +240,6 @@ static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const Ri
 	{
 		int64_t iAdoptedTick = pDuePendingFullState->iTick;
 		AdoptUnreachablePendingFullState(rWork, *pDuePendingFullState);
-		rfTime = rScratch.replayStack.at(0)->interpolate.fCurrentTime;
 		riReplayStart = iAdoptedTick + 1;
 		return false;
 	}
@@ -259,7 +256,7 @@ static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const Ri
 		return true;
 	}
 
-	ReconcileReplayCoord(rWork, riReplayStart, iMaximumConsecutive, rfTime);
+	ReconcileReplayCoord(rWork, riReplayStart, iMaximumConsecutive);
 	return false;
 }
 
@@ -337,13 +334,9 @@ void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs)
 
 	// Capture pre-reconcile ring tail tick so ReconcileReplayCoord can distinguish actual
 	// re-simulation (replay of a tick that already existed) from first-time forward sim.
-	if (rCell.iSnapshotCount > 0)
+	if (const game::Frame* pTail = rCell.TailFrame(); pTail != nullptr)
 	{
-		int64_t iTailPhysical = SnapshotIndex(rCell.iSnapshotHead, rCell.iSnapshotCount - 1);
-		if (rCell.snapshots[iTailPhysical] != nullptr)
-		{
-			rScratch.iPreReconcileTailTick = rCell.snapshots[iTailPhysical]->interpolate.iTick;
-		}
+		rScratch.iPreReconcileTailTick = pTail->interpolate.iTick;
 	}
 
 	CrcFastPathCoordResult fastPathResult {};
@@ -375,13 +368,12 @@ void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs)
 	bool bShrunkRollback = false;
 	DetermineRollbackBase(rWork, rInputs, fastPathResult, iRollbackTick, iRollbackOffset, bShrunkRollback);
 
-	float fTime = 0.0f;
 	int64_t iReplayStart = 0;
-	RunReplay(rWork, rInputs, fastPathResult.preWritebackLayout, iRollbackTick, iRollbackOffset, bShrunkRollback, ReplayMode::kPrimary, fTime, iReplayStart);
+	RunReplay(rWork, rInputs, fastPathResult.preWritebackLayout, iRollbackTick, iRollbackOffset, bShrunkRollback, ReplayMode::kPrimary, iReplayStart);
 
 	if (rScratch.iDesyncTick >= 0 && bShrunkRollback && rScratch.iDesyncTick == iReplayStart)
 	{
-		if (RunReplay(rWork, rInputs, fastPathResult.preWritebackLayout, iRollbackTick, iRollbackOffset, bShrunkRollback, ReplayMode::kFallback, fTime, iReplayStart))
+		if (RunReplay(rWork, rInputs, fastPathResult.preWritebackLayout, iRollbackTick, iRollbackOffset, bShrunkRollback, ReplayMode::kFallback, iReplayStart))
 		{
 			return;
 		}
@@ -392,7 +384,7 @@ void ReconcileCoord(CoordWork& rWork, const ReconcileInputs& rInputs)
 		return;
 	}
 
-	ReconcileCatchUpCoord(rWork, rInputs.iTargetTick, fTime);
+	ReconcileCatchUpCoord(rWork, rInputs.iTargetTick);
 
 	ComputeOutputLayout(rWork, iRollbackOffset);
 

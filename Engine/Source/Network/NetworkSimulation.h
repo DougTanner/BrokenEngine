@@ -14,6 +14,8 @@ enum class NetworkSimulationLevel : uint8_t
 	kChina,        // China (behind firewall) to East Coast
 };
 
+inline constexpr engine::NetworkSimulationLevel keNetworkSimulation = engine::NetworkSimulationLevel::kDisabled;
+
 struct NetworkSimulationConfig
 {
 	float fPacketLossPercent = 0.0f;

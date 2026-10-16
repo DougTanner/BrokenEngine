@@ -7,15 +7,16 @@ namespace game
 
 struct Frame;
 
+// Row labels of ServerCellStats::entityCounts, indexed by ServerEntityCount.
+inline constexpr std::array<const char*, 4> kServerEntityCountNames {"Players", "Spaceships", "Blasters", "Missiles"};
+enum class ServerEntityCount : uint8_t { kPlayers, kSpaceships, kBlasters, kMissiles };
+
 // One cell's monitoring snapshot; the tick/time are the ones the cell last advanced to.
 struct ServerCellStats
 {
 	int64_t iTick = 0;
 	std::chrono::duration<float> durationCurrentTime = std::chrono::duration<float>::zero();
-	int64_t iPlayers = 0;
-	int64_t iSpaceships = 0;
-	int64_t iBlasters = 0;
-	int64_t iMissiles = 0;
+	std::array<int64_t, std::size(kServerEntityCountNames)> entityCounts {};
 	int64_t iExplosions = 0;
 };
 

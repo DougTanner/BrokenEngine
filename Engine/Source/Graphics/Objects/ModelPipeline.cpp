@@ -29,11 +29,11 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 
 			ASSERT(pipelineInfo.descriptorInfos.at(i + 1).flags == DescriptorFlags::kEmpty);
 
-			pipelineInfo.descriptorInfos.at(i + 1).flags = DescriptorFlags::kCombinedSamplers;
+			pipelineInfo.descriptorInfos.at(i + 1).flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorder};
 			pipelineInfo.descriptorInfos.at(i + 1).iCount = static_cast<int64_t>(std::size(gpTextureManager->mRenderTargetTextures.mppLightingFinalTextures));
 			pipelineInfo.descriptorInfos.at(i + 1).ppTextures = gpTextureManager->mRenderTargetTextures.mppLightingFinalTextures;
 
-			pipelineInfo.descriptorInfos.at(i + 2).flags = DescriptorFlags::kCombinedSamplers;
+			pipelineInfo.descriptorInfos.at(i + 2).flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerBorderWhite};
 			pipelineInfo.descriptorInfos.at(i + 2).pTexture = &gpTextureManager->mRenderTargetTextures.mShadowBlurTexture;
 
 			// The smoke sampler (kSamplerSmoke) uses LINEAR filtering for R16_SFLOAT smoke ping-pong textures. Same CLAMP_TO_BORDER + INT_TRANSPARENT_BLACK as the border sampler; aniso/lodbias are no-ops at mipLevels = 1.

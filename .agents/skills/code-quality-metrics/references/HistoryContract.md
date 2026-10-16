@@ -41,7 +41,7 @@ starts with (ordinal), checked in this order:
 
 | Prefix | History area (row field) |
 | --- | --- |
-| `Engine/Source/Agent/`, `Projects/BrokenEngineSandbox/Source/Agent/`, `Tools/` | AgentTools (`verbosityAgentTools`) |
+| `Engine/Source/Agent/`, `Projects/<Name>/Source/Agent/`, `Tools/` | AgentTools (`verbosityAgentTools`) |
 | `Engine/` | Engine (`verbosityEngine`) |
 | `Common/` | Common (`verbosityCommon`) |
 | `DataPacker/` | DataPacker (`verbosityDataPacker`) |

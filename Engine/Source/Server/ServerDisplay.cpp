@@ -35,10 +35,7 @@ static uint64_t suiLastContentHash = 0;
 
 // Entity totals for the left panel are summed once per tick from the game cell-stat seam and stay file-static for the
 // process's one window. Profiling-disabled builds skip aggregation, so these remain zero and the entity rows read zero.
-static int64_t siTotalPlayers = 0;
-static int64_t siTotalSpaceships = 0;
-static int64_t siTotalBlasters = 0;
-static int64_t siTotalMissiles = 0;
+static std::array<int64_t, std::size(game::kServerEntityCountNames)> sTotalEntityCounts {};
 
 // Persistent GDI objects (one window per process): the back-buffer DC/bitmap and font are created on first
 // paint and the bitmap is recreated only when the client size changes; the palette brushes/pens are a fixed
@@ -91,19 +88,16 @@ void ServerUpdateDisplayStatistics()
 		return;
 	}
 
-	siTotalPlayers = 0;
-	siTotalSpaceships = 0;
-	siTotalBlasters = 0;
-	siTotalMissiles = 0;
+	sTotalEntityCounts.fill(0);
 	int64_t iTotalExplosions = 0;
 
 	for (const GridCoord& rCoordinate : game::gpGame->mActiveCoordinates)
 	{
 		game::ServerCellStats cellStatistics = game::GetServerCellStatistics((*game::gpGame->mCells.at(rCoordinate).pCurrent));
-		siTotalPlayers += cellStatistics.iPlayers;
-		siTotalSpaceships += cellStatistics.iSpaceships;
-		siTotalBlasters += cellStatistics.iBlasters;
-		siTotalMissiles += cellStatistics.iMissiles;
+		for (int64_t i = 0; i < std::ssize(sTotalEntityCounts); ++i)
+		{
+			sTotalEntityCounts[i] += cellStatistics.entityCounts[i];
+		}
 		iTotalExplosions += cellStatistics.iExplosions;
 	}
 
@@ -145,13 +139,13 @@ bool ServerDisplayContentChanged()
 		Mix(rCoordinate.iX);
 		Mix(rCoordinate.iY);
 
-		// Mix each count separately — summing would alias conversions (e.g. spaceship death -1 spaceship
-		// +1 explosion leaves the sum unchanged) and skip a repaint whose displayed numbers did change.
+		// Mix each count separately — summing would alias conversions (e.g. a death that removes one entity
+		// and adds one explosion leaves the sum unchanged) and skip a repaint whose displayed numbers did change.
 		game::ServerCellStats cellStatistics = game::GetServerCellStatistics((*game::gpGame->mCells.at(rCoordinate).pCurrent));
-		Mix(cellStatistics.iPlayers);
-		Mix(cellStatistics.iSpaceships);
-		Mix(cellStatistics.iBlasters);
-		Mix(cellStatistics.iMissiles);
+		for (int64_t iEntityCount : cellStatistics.entityCounts)
+		{
+			Mix(iEntityCount);
+		}
 		Mix(cellStatistics.iExplosions);
 	}
 
@@ -301,7 +295,7 @@ static void PaintGridMap(HDC hDeviceContextBuffer, std::span<char> buffer, int64
 			if (bIsActive && iCellSize >= 24)
 			{
 				game::ServerCellStats cellStatistics = game::GetServerCellStatistics((*game::gpGame->mCells.at(coordinate).pCurrent));
-				int64_t iEntityCount = cellStatistics.iPlayers + cellStatistics.iSpaceships + cellStatistics.iBlasters + cellStatistics.iMissiles + cellStatistics.iExplosions;
+				int64_t iEntityCount = std::ranges::fold_left(cellStatistics.entityCounts, cellStatistics.iExplosions, std::plus {});
 
 				SetTextColor(hDeviceContextBuffer, RGB(220, 220, 220));
 
@@ -592,10 +586,10 @@ void PaintServerDisplay(HWND hWindow)
 
 	SetTextColor(hDeviceContextBuffer, RGB(150, 220, 150));
 
-	TextLine("Players: %lld", siTotalPlayers);
-	TextLine("Spaceships: %lld", siTotalSpaceships);
-	TextLine("Blasters: %lld", siTotalBlasters);
-	TextLine("Missiles: %lld", siTotalMissiles);
+	for (int64_t i = 0; i < std::ssize(sTotalEntityCounts); ++i)
+	{
+		TextLine("%s: %lld", game::kServerEntityCountNames[i], sTotalEntityCounts[i]);
+	}
 	iTextLength = std::min<int64_t>(std::snprintf(pcLine, sizeof(pcLine), "Explosions: %lld", gpProfileManager->GetCpuCounter(kCpuCounterExplosions).iCount), static_cast<int64_t>(sizeof(pcLine)) - 1);
 	TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iTextLength));
 

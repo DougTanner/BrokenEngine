@@ -7,6 +7,7 @@
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/PbrWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
+#include "Ui/TweaksSettings.h"
 #include "Ui/WaterWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
@@ -439,7 +440,7 @@ void Graphics::Create()
 		{
 			if (game::gpGame != nullptr)
 			{
-				game::LoadTweaksSettings();
+				LoadTweaksSettings();
 			}
 		}
 	}
@@ -710,7 +711,7 @@ void Graphics::Destroy()
 			// runs a second Destroy() after mpImGuiManager.reset() below already nulled the global on the first pass.
 			if (game::gpGame != nullptr && gpImGuiManager != nullptr)
 			{
-				game::SaveTweaksSettings();
+				SaveTweaksSettings();
 			}
 		}
 		mpImGuiManager.reset();

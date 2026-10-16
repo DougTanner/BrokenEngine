@@ -1,34 +1,157 @@
 <!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:19:47.086Z","dependsOn":["Documents/Plans/Game/FlightPlaneClimbing.md"]} -->
 # Weapons and targeting across flight planes
 
-Tier 3 (`.agents/references/risk-tiers.md`): the change alters CRC'd PostRender state and the save, replay, and Hello compatibility gate `Frame::kiVersion`, and spans the game Frame and the engine frame registry. Line numbers cite baseline `c1420821`; the prerequisite Plans rename the files, columns, and functions named below, so the post-Plan names are used throughout and each citation names the current-tree site it stands for. Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other. Paths below `Frame/` mean `Projects/BrokenEngineSandbox/Source/Frame/`; `Engine/` paths are repository-relative. Flight-plane series.
+Tier 3 (`.agents/references/risk-tiers.md`): the change alters CRC'd PostRender
+state and the save, replay, and Hello compatibility gate `Frame::kiVersion`, and
+spans the game Frame and the engine frame registry. Line numbers cite baseline
+`c1420821`; the prerequisite Plans rename the files, columns, and functions
+named below, so the post-Plan names are used throughout and each citation names
+the current-tree site it stands for. Where a statement here and the code
+disagree, the code wins; report the contradiction instead of matching one side
+to the other. Paths below `Frame/` mean
+`Projects/BrokenEngineSandbox/Source/Frame/`; `Engine/` paths are
+repository-relative. Flight-plane series.
 
 ## Context
 
-After `Documents/Plans/Game/FlightPlaneClimbing.md` ships sit on one of three planes (6, 50, 100 m) or climb between them with velocity Z always 0; `ShipTypes.h` offers `GetTargetFlightPlane`, and `ShipBehaviours.h` offers `FlightPlaneAtHeight` and `ClimbTowardsFlightPlane`. `Documents/Plans/Game/ShipTypeSplit.md` gives Fighters and Battleships the Spawn-phase blaster fire at the nearest enemy ship, Omnis `AcquireTarget`, `UpdateFacing`, `SpawnBlasters`, and `SpawnMissiles`, and the queries `FindNearestEnemyShip` and `BuildShipRegistryWindow`. Weapons still assume one plane. The user decided (this session, binding): Fighters and Battleships fire flat on their own plane; Omnis pitch their blaster aim up or down at their target; a fired blaster flies in 3D; a missile stays on the plane it was launched on for its whole powered flight, as today (velocity Z zeroed, Z held), and takes only targets on that plane, so a missile-firing Omni must be on its target's plane to fire; a ship between planes launches no missiles; explosion and pusher falloff stay 3D; sim rotation stays heading-only (the Omni pitch is a firing direction, never a hull pitch); no backward compatibility.
+After `Documents/Plans/Game/FlightPlaneClimbing.md` ships sit on one of three
+planes (6, 50, 100 m) or climb between them with velocity Z always 0;
+`ShipTypes.h` offers `GetTargetFlightPlane`, and `ShipBehaviours.h` offers
+`FlightPlaneAtHeight` and `ClimbTowardsFlightPlane`.
+`Documents/Plans/Game/ShipTypeSplit.md` gives Fighters and Battleships the
+Spawn-phase blaster fire at the nearest enemy ship, Omnis `AcquireTarget`,
+`UpdateFacing`, `SpawnBlasters`, and `SpawnMissiles`, and the queries
+`FindNearestEnemyShip` and `BuildShipRegistryWindow`. Weapons still assume one
+plane. The user decided (this session, binding): Fighters and Battleships fire
+flat on their own plane; Omnis pitch their blaster aim up or down at their
+target; a fired blaster flies in 3D; a missile stays on the plane it was
+launched on for its whole powered flight, as today (velocity Z zeroed, Z held),
+and takes only targets on that plane, so a missile-firing Omni must be on its
+target's plane to fire; a ship between planes launches no missiles; explosion
+and pusher falloff stay 3D; sim rotation stays heading-only (the Omni pitch is a
+firing direction, never a hull pitch); no backward compatibility.
 
 Current-tree evidence this design rests on:
 
 - `FrameInterpolate::IsVisible` tests X and Y only, ±65 by ±45 m (`Engine/Source/Frame/FrameBase.h:165-170`); the Omni blaster and missile target ranges are 3D distances of 120 and 160 m (`PlayersCombat.cpp:24-25,80,107`); the Fighter nearest-enemy search is a 3D distance (`Spaceships.cpp:95`); registry acquisition ranks by 3D radius and 3D angle (`Engine/Source/Frame/FrameRegistry.cpp:184-190`) and is a deterministic stream (`Frame/AGENTS.md`: never hoisted, cached, or parallelized).
 - Fighter steering is yaw-only (`Spaceships.cpp:283`); the Fighter fire cone is a 3D angle against the hull direction (`Spaceships.cpp:454-458`, `kfSpawnBlasterPlayerAngle = 0.1`), so a target above the ship is never in the cone; the blaster velocity is the hull direction times `kfBlastersSpeed` (`:464-465`), so it has Z = 0.
-- Omni `AcquireTarget` writes a 3D lead position through `common::ComputeLeadPosition` (`PlayersCombat.cpp:124`, 3D solve at `Common/Math/MathUtils.cpp:88-119`); `UpdateFacing` stores its normalized 3D direction in `pVecWantedDirections` (`:147`); Interpolate Update feeds that column's horizontal projection to `common::RotateTowardsPercent` (`Players.cpp:482`; FlightPlaneClimbing decision 16), so the hull stays horizontal while the column keeps the 3D lead direction decision 3 pitches shots from. Omni blasters leave along the jittered hull direction (`:292-311`, jitter is a rotation about Z, `MathUtils.cpp:60-64`); left vectors come from a cross with +Z (`:293,387`).
+- Omni `AcquireTarget` writes a 3D lead position through
+  `common::ComputeLeadPosition` (`PlayersCombat.cpp:124`, 3D solve at
+  `Common/Math/MathUtils.cpp:88-119`); `UpdateFacing` stores its normalized 3D
+  direction in `pVecWantedDirections` (`:147`); Interpolate Update feeds that
+  column's horizontal projection to `common::RotateTowardsPercent`
+  (`Players.cpp:482`; FlightPlaneClimbing decision 16), so the hull stays
+  horizontal while the column keeps the 3D lead direction decision 3 pitches
+  shots from. Omni blasters leave along the jittered hull direction (`:292-311`,
+  jitter is a rotation about Z, `MathUtils.cpp:60-64`); left vectors come from a
+  cross with +Z (`:293,387`).
 - Blasters integrate a 3D velocity (`BlastersUpdate.cpp:164`), take their direction from it (`:168`), sweep 3D spheres (`:233-247`, `Engine/Source/Frame/Collision.cpp:210-214,539`), and trace terrain in 3D (`:219`); the transfer payload carries the full velocity (`Engine/Source/Network/NetworkSerialization.cpp` blaster serializer); the client area light is built from the 3D direction (`:139-140`). Nothing in a blaster's flight is planar.
-- Missiles: powered flight zeroes velocity Z every tick (`MissilesUpdate.cpp:209`), falling flight applies gravity to Z (`:213`, `Missiles.cpp:449`); homing is yaw-only through the cross-product Z sign (`:185-186,198-199`) and a rotation about Z (`:76`); the retained target's previous-frame position comes from `ResolveRegistryHandle` (`:167,183`); the target is dropped when the handle no longer resolves (`:168-172`); the acquire radius is 45 m in 3D (`Missiles.h:32`, registry `:185`), so a missile on plane 0 can acquire a plane-1 ship directly overhead (44 m apart) and orbit beneath it; terrain is traced in 3D (`:322`); a falling missile at or below sea level despawns silently (`:397`). A retained target is released only at expiry while the window is live (`MissilesUpdate.cpp:230-235`); `ReleaseRegistryTarget` decrements the held source's subscriber count (`Engine/Source/Frame/FrameRegistry.cpp:230-239`).
-- Omni missile launch: `AcquireTarget` sets `kFireMissile` for any target within 160 m in 3D (`PlayersCombat.cpp:134-136`); `SpawnMissiles` resets the spawn interval and toggles the launch side (`:379-381`), aims with `common::DirectionTo` at the `FindTargetSpaceshipIndex` target or falls back to the hull direction (`:390-394`), and pre-moves and fires along the jittered aim (`:396-402`), so an aim with Z moves the spawn position and first-tick velocity off the Omni's Z. Its one-row acquisition (`:410-423`) and the Missile Update acquisition (`MissilesUpdate.cpp:245-256`) both call `AcquireRegistryTargets`, whose batch carries only an optional alignment filter (`Engine/Source/Frame/FrameRegistry.h:41-50`).
+- Missiles: powered flight zeroes velocity Z every tick
+  (`MissilesUpdate.cpp:209`), falling flight applies gravity to Z (`:213`,
+  `Missiles.cpp:449`); homing is yaw-only through the cross-product Z sign
+  (`:185-186,198-199`) and a rotation about Z (`:76`); the retained target's
+  previous-frame position comes from `ResolveRegistryHandle` (`:167,183`); the
+  target is dropped when the handle no longer resolves (`:168-172`); the acquire
+  radius is 45 m in 3D (`Missiles.h:32`, registry `:185`), so a missile on plane
+  0 can acquire a plane-1 ship directly overhead (44 m apart) and orbit beneath
+  it; terrain is traced in 3D (`:322`); a falling missile at or below sea level
+  despawns silently (`:397`). A retained target is released only at expiry while
+  the window is live (`MissilesUpdate.cpp:230-235`); `ReleaseRegistryTarget`
+  decrements the held source's subscriber count
+  (`Engine/Source/Frame/FrameRegistry.cpp:230-239`).
+- Omni missile launch: `AcquireTarget` sets `kFireMissile` for any target within
+  160 m in 3D (`PlayersCombat.cpp:134-136`); `SpawnMissiles` resets the spawn
+  interval and toggles the launch side (`:379-381`), aims with
+  `common::DirectionTo` at the `FindTargetSpaceshipIndex` target or falls back
+  to the hull direction (`:390-394`), and pre-moves and fires along the jittered
+  aim (`:396-402`), so an aim with Z moves the spawn position and first-tick
+  velocity off the Omni's Z. Its one-row acquisition (`:410-423`) and the
+  Missile Update acquisition (`MissilesUpdate.cpp:245-256`) both call
+  `AcquireRegistryTargets`, whose batch carries only an optional alignment
+  filter (`Engine/Source/Frame/FrameRegistry.h:41-50`).
 - Area damage is a 3D distance with linear falloff (`Engine/Source/Frame/AreaDamage.cpp:38-53`); missiles register it at explosion (`Missiles.cpp:515-521`, radius 7 m).
 
 ## Decisions
 
 Each decision is recorded as made; the alternatives are not open.
 
-1. **Flat shooters take only targets in a height band.** `ShipBehaviours.h` gains `inline constexpr float kfFlatFireHeightTolerance = 2.0f` (the blaster collision radius 0.5 plus the Fighter radius 1.5, the smallest hull, so a flat shot can reach the collision sphere of any in-band target). `FindNearestEnemyShip` gains `float fMaximumHeightDifference` after `alignment`; a candidate whose `std::abs(zCandidate - zFrom)` exceeds it is skipped before the distance compare. The Fighter and Battleship Spawn-phase fire passes `kfFlatFireHeightTolerance`; every other caller (steering, health regeneration) passes `std::numeric_limits<float>::max()`, so navigation is untouched. Their fire cone compares the hull direction with the horizontal direction to the target (`XMVectorSetZ(vecToTarget, 0.0f)` before the normalize), so the band never narrows the cone. Blaster spawn position and velocity are unchanged: the hull direction has Z = 0, so the shot is flat on the ship's own Z.
+1. **Flat shooters take only targets in a height band.** `ShipBehaviours.h`
+   gains `inline constexpr float kfFlatFireHeightTolerance = 2.0f` (the blaster
+   collision radius 0.5 plus the Fighter radius 1.5, the smallest hull, so a
+   flat shot can reach the collision sphere of any in-band target).
+   `FindNearestEnemyShip` gains `float fMaximumHeightDifference` after
+   `alignment`; a candidate whose `std::abs(zCandidate - zFrom)` exceeds it is
+   skipped before the distance compare. The Fighter and Battleship Spawn-phase
+   fire passes `kfFlatFireHeightTolerance`; every other caller (steering, health
+   regeneration) passes `std::numeric_limits<float>::max()`, so navigation is
+   untouched. Their fire cone compares the hull direction with the horizontal
+   direction to the target (`XMVectorSetZ(vecToTarget, 0.0f)` before the
+   normalize), so the band never narrows the cone. Blaster spawn position and
+   velocity are unchanged: the hull direction has Z = 0, so the shot is flat on
+   the ship's own Z.
 2. **The visibility test stays X and Y only.** It models the top-down visible footprint, within which all planes are stacked; the `kfFlatFireHeightTolerance` band of decisions 1, 6, and 7 is the only height gate flat shooters and missiles need, and the Omni blaster aim acquires across planes by design.
-3. **Omnis aim in 3D, face in 2D.** `AcquireTarget` and `UpdateFacing` are unchanged: `pVecWantedDirections` keeps the unit 3D lead direction, and the hull faces its horizontal projection through FlightPlaneClimbing decision 16, so the hull direction keeps Z = 0. `SpawnBlasters` pitches each shot to the aim: with `fHorizontal = XMVectorGetX(XMVector2Length(vecWanted))` the fire direction is `XMVector3Normalize(XMVectorSetZ(XMVectorScale(vecJitteredDirection, fHorizontal), XMVectorGetZ(vecWanted)))`, so yaw comes from the jittered hull direction as today and pitch from the lead direction; the blaster velocity is that direction times `kfOmniBlastersSpeed`. No pitch clamp: the ranges bound the pitch. Spawn position, barrel offset, and pre-move are unchanged. The aim reticle (`RenderCombatAim`, client) keeps reading the column as today.
+3. **Omnis aim in 3D, face in 2D.** `AcquireTarget` and `UpdateFacing` are
+   unchanged: `pVecWantedDirections` keeps the unit 3D lead direction, and the
+   hull faces its horizontal projection through FlightPlaneClimbing decision 16,
+   so the hull direction keeps Z = 0. `SpawnBlasters` pitches each shot to the
+   aim: with `fHorizontal = XMVectorGetX(XMVector2Length(vecWanted))` the fire
+   direction is
+   `XMVector3Normalize(XMVectorSetZ(XMVectorScale(vecJitteredDirection, fHorizontal), XMVectorGetZ(vecWanted)))`,
+   so yaw comes from the jittered hull direction as today and pitch from the
+   lead direction; the blaster velocity is that direction times
+   `kfOmniBlastersSpeed`. No pitch clamp: the ranges bound the pitch. Spawn
+   position, barrel offset, and pre-move are unchanged. The aim reticle
+   (`RenderCombatAim`, client) keeps reading the column as today.
 4. **Blasters need no flight change.** Integration, direction, swept collision, terrain trace, transfer, and render are already 3D (Context); the only new inputs are the pitched Omni velocities. A downward shot that misses ends at the sea floor through the terrain trace with today's impact effects; a sea-surface impact is out of scope.
 5. **Missiles keep their launch plane.** Missile flight is unchanged: powered flight zeroes velocity Z every tick (`MissilesUpdate.cpp:209`), so a missile holds its launch Z, and falling flight keeps gravity. Decisions 6 and 7 make every launch start exactly on a plane and keep every target on that plane; nothing climbs, so no missile column, `TransferData` field, or serializer changes.
-6. **Omnis launch missiles only on a plane, at a target in the band.** `SpawnMissiles` gains two skips beside its existing ones, before the spawn-interval reset and the side toggle (today's `PlayersCombat.cpp:379-381`), so a skipped launch spends neither: (a) when `FlightPlaneAtHeight(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i]))` is none (between planes, FlightPlaneClimbing decision 2); (b) when the aim search (today's `FindTargetSpaceshipIndex`, `PlayersCombat.cpp:70-88`, called at `:391`), which now skips a candidate whose `std::abs(zCandidate - zOmni)` exceeds `kfFlatFireHeightTolerance` before the distance compare, finds no target. The hull-direction fallback is removed. The aim direction is horizontal, `common::DirectionTo(vecOmniPosition, XMVectorSetZ(vecTargetPosition, XMVectorGetZ(vecOmniPosition)))`, so the spawn position, pre-move, initial velocity, missile direction, and stored direction keep the Omni's exact plane height and Z = 0. `AcquireTarget` still sets `kFireMissile` for any target within 160 m in 3D, as the blaster aim needs; an Omni whose only targets are on other planes launches no missiles, and reaching a target's plane is left to the fleet's plane order.
-7. **Missile registry targets stay in the band.** `engine::RegistryBatch` gains `float fMaximumHeightDifference`, defaulting to `std::numeric_limits<float>::max()` (optional, like the alignment filter); `AcquireRegistryTargets` skips a candidate whose `std::abs(XMVectorGetZ(vecToSource))` exceeds it, before the radius test. Both missile batches, the Omni spawn acquisition and the Missile Update acquisition, pass `kfFlatFireHeightTolerance`; the registry harness rig keeps the default. Missile PostRender Update drops a retained target that has left the band: when the handle resolves but `std::abs(XMVectorGetZ(retained.vecPreviousPosition) - XMVectorGetZ(rCurrentInterpolate.pVecPositions[i]))` exceeds `kfFlatFireHeightTolerance`, it calls `engine::ReleaseRegistryTarget(window.context, uiTarget)` (the source is still eligible, so its count must drop before this tick's acquisitions), resets `vecStoredDirection` as the unresolved branch does, and takes the no-target path; the missile re-acquires in the post-loop pass.
-8. **Versions.** No collection layout, `StatusChange` payload, or wire byte changes, so no collection `kiVersion`, `FrameInput::kiVersion` (bumped only for bytes a server build writes, `Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md`), or `engine::kiProtocolVersion` (incompatible wire changes, `Engine/Source/Network/AGENTS.md`) moves. The behaviour change shifts computed frame CRCs without a contributing version bump, so the `Frame::kiVersion` base (`Frame.cpp:38`) goes up by one (`Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md` and the comment above it). That one gate rejects older grid saves (`Engine/Source/File/GridSave.cpp:17,79`, `Projects/BrokenEngineSandbox/Source/Save/AGENTS.md`), replays (the difference-stream header, `Engine/Source/File/DifferenceStream.h:79`), and mismatched clients at Hello (`Documents/Architecture/Network.md` `kClientHello`). No backward compatibility.
+6. **Omnis launch missiles only on a plane, at a target in the band.**
+   `SpawnMissiles` gains two skips beside its existing ones, before the
+   spawn-interval reset and the side toggle (today's
+   `PlayersCombat.cpp:379-381`), so a skipped launch spends neither: (a) when
+   `FlightPlaneAtHeight(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i]))` is
+   none (between planes, FlightPlaneClimbing decision 2); (b) when the aim
+   search (today's `FindTargetSpaceshipIndex`, `PlayersCombat.cpp:70-88`, called
+   at `:391`), which now skips a candidate whose `std::abs(zCandidate - zOmni)`
+   exceeds `kfFlatFireHeightTolerance` before the distance compare, finds no
+   target. The hull-direction fallback is removed. The aim direction is
+   horizontal,
+   `common::DirectionTo(vecOmniPosition, XMVectorSetZ(vecTargetPosition, XMVectorGetZ(vecOmniPosition)))`,
+   so the spawn position, pre-move, initial velocity, missile direction, and
+   stored direction keep the Omni's exact plane height and Z = 0.
+   `AcquireTarget` still sets `kFireMissile` for any target within 160 m in 3D,
+   as the blaster aim needs; an Omni whose only targets are on other planes
+   launches no missiles, and reaching a target's plane is left to the fleet's
+   plane order.
+7. **Missile registry targets stay in the band.** `engine::RegistryBatch` gains
+   `float fMaximumHeightDifference`, defaulting to
+   `std::numeric_limits<float>::max()` (optional, like the alignment filter);
+   `AcquireRegistryTargets` skips a candidate whose
+   `std::abs(XMVectorGetZ(vecToSource))` exceeds it, before the radius test.
+   Both missile batches, the Omni spawn acquisition and the Missile Update
+   acquisition, pass `kfFlatFireHeightTolerance`; the registry harness rig keeps
+   the default. Missile PostRender Update drops a retained target that has left
+   the band: when the handle resolves but
+   `std::abs(XMVectorGetZ(retained.vecPreviousPosition) - XMVectorGetZ(rCurrentInterpolate.pVecPositions[i]))`
+   exceeds `kfFlatFireHeightTolerance`, it calls
+   `engine::ReleaseRegistryTarget(window.context, uiTarget)` (the source is
+   still eligible, so its count must drop before this tick's acquisitions),
+   resets `vecStoredDirection` as the unresolved branch does, and takes the
+   no-target path; the missile re-acquires in the post-loop pass.
+8. **Versions.** No collection layout, `StatusChange` payload, or wire byte
+   changes, so no collection `kiVersion`, `FrameInput::kiVersion` (bumped only
+   for bytes a server build writes,
+   `Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md`), or
+   `engine::kiProtocolVersion` (incompatible wire changes,
+   `Engine/Source/Network/AGENTS.md`) moves. The behaviour change shifts
+   computed frame CRCs without a contributing version bump, so the
+   `Frame::kiVersion` base (`Frame.cpp:38`) goes up by one
+   (`Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md` and the comment above
+   it). That one gate rejects older grid saves
+   (`Engine/Source/File/GridSave.cpp:17,79`,
+   `Projects/BrokenEngineSandbox/Source/Save/AGENTS.md`), replays (the
+   difference-stream header, `Engine/Source/File/DifferenceStream.h:79`), and
+   mismatched clients at Hello (`Documents/Architecture/Network.md`
+   `kClientHello`). No backward compatibility.
 9. **Nothing else moves.** Area damage and pushers keep their 3D falloff; the registry's radius, ranking, and both query windows are unchanged; `kTargetFleet`/`kTargetRandom` are still set from alignment; ship hulls do not pitch; the missile model keeps its yaw-only render; no harness command or field changes.
 
 ## Design
@@ -47,7 +170,14 @@ inline constexpr float kfFlatFireHeightTolerance = 2.0f; // blaster collision ra
 
 Fighter and Battleship Spawn-phase fire (today's `Spaceships.cpp:443-466`): `FindNearestEnemyShip(rFrame, vecPosition, alignment, kfFlatFireHeightTolerance, vecNearestEnemy)`, `IsVisible` as today, cone against `XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecNearestEnemy, vecPosition), 0.0f))`, blaster spawn unchanged. Their PostRender Update steering and regeneration calls pass `std::numeric_limits<float>::max()`.
 
-Omni `SpawnBlasters` (today's `PlayersCombat.cpp:310-311`): after the jitter, `vecFireDirection` per decision 3, `vecBlasterVelocity = XMVectorScale(vecFireDirection, kfOmniBlastersSpeed)`; the pre-move at `:313` uses `vecFireDirection`. `SpawnMissiles` per decision 6: the plane skip and the band-limited aim search with its no-target skip move ahead of the spawn-interval reset (today's `:379`); the horizontal aim replaces the ternary at `:392-394`; its one-row acquisition batch passes `.fMaximumHeightDifference = kfFlatFireHeightTolerance`.
+Omni `SpawnBlasters` (today's `PlayersCombat.cpp:310-311`): after the jitter,
+`vecFireDirection` per decision 3,
+`vecBlasterVelocity = XMVectorScale(vecFireDirection, kfOmniBlastersSpeed)`; the
+pre-move at `:313` uses `vecFireDirection`. `SpawnMissiles` per decision 6: the
+plane skip and the band-limited aim search with its no-target skip move ahead of
+the spawn-interval reset (today's `:379`); the horizontal aim replaces the
+ternary at `:392-394`; its one-row acquisition batch passes
+`.fMaximumHeightDifference = kfFlatFireHeightTolerance`.
 
 `Engine/Source/Frame/FrameRegistry.h` `RegistryBatch`, after `pAlignments`:
 
@@ -55,7 +185,14 @@ Omni `SpawnBlasters` (today's `PlayersCombat.cpp:310-311`): after the jitter, `v
 float fMaximumHeightDifference = std::numeric_limits<float>::max(); // Optional; skips sources farther above or below the origin
 ```
 
-`Engine/Source/Frame/FrameRegistry.cpp` `AcquireRegistryTargets`: the band test after `vecToSource`, before the radius test; `iCandidateIndex` is still taken first, so subscriber indexing is unchanged. `MissilesUpdate.cpp`: the retained-target band drop in PostRender Update (today's `:163-173`), and the `AcquireChunk` batch passes `.fMaximumHeightDifference = kfFlatFireHeightTolerance`; the expiry release is no longer the only release site while the window is live. `Frame/Frame.cpp`: the `Frame::kiVersion` base.
+`Engine/Source/Frame/FrameRegistry.cpp` `AcquireRegistryTargets`: the band test
+after `vecToSource`, before the radius test; `iCandidateIndex` is still taken
+first, so subscriber indexing is unchanged. `MissilesUpdate.cpp`: the
+retained-target band drop in PostRender Update (today's `:163-173`), and the
+`AcquireChunk` batch passes
+`.fMaximumHeightDifference = kfFlatFireHeightTolerance`; the expiry release is
+no longer the only release site while the window is live. `Frame/Frame.cpp`: the
+`Frame::kiVersion` base.
 
 ## Critical files
 
@@ -113,4 +250,10 @@ float fMaximumHeightDifference = std::numeric_limits<float>::max(); // Optional;
 
 ## Coordination
 
-- `Documents/Plans/Engine/RemoveSandboxGameplayFromEngine.md` moves the engine codec, including the blaster transfer serializer this Plan's Context cites in `Engine/Source/Network/NetworkSerialization.cpp`, into the game's new `Network/StatusChangeCodec.cpp`, and changes the engine seam sites the prerequisite `Game/ShipTypeSplit.md` renames. This Plan edits none of that Plan's sites. Whichever lands second rebases onto the other's file layout; landed after that Plan, the serializer citation names `StatusChangeCodec.cpp`.
+- `Documents/Plans/Engine/RemoveSandboxGameplayFromEngine.md` moves the engine
+  codec, including the blaster transfer serializer this Plan's Context cites in
+  `Engine/Source/Network/NetworkSerialization.cpp`, into the game's new
+  `Network/StatusChangeCodec.cpp`, and changes the engine seam sites the
+  prerequisite `Game/ShipTypeSplit.md` renames. This Plan edits none of that
+  Plan's sites. Whichever lands second rebases onto the other's file layout;
+  landed after that Plan, the serializer citation names `StatusChangeCodec.cpp`.

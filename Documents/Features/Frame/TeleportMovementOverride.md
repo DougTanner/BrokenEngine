@@ -63,8 +63,9 @@ Deliberately left open for the implementing session to decide with the user:
   `StatusChangeTypeName`, and add the explicit `DefaultDataForType` case. `DefaultDataForType`
   has a `default:` arm returning `TransferData{}`, so a forgotten case fails silently rather
   than failing to compile — this must be checked by hand.
-- `Engine/Source/Network/NetworkSerialization.cpp` — both codec switches, and
-  `kiMaxStatusChangeBytesPerItem` (`NetworkSerialization.h`) if the payload grows past it.
+- `Projects/BrokenEngineSandbox/Source/Network/StatusChangeCodec.cpp` — both codec switches, and
+  `kiMaxStatusChangeBytesPerItem` (`Engine/Source/Network/NetworkSerialization.h`) if the
+  payload grows past it.
 - `FrameInput::kiVersion` bump — required for any `StatusChange` payload change
   (`Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md`, `FrameInput` serialization rule).
 - `engine::kiProtocolVersion` bump — required for any incompatible `StatusChange` layout

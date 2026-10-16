@@ -14,10 +14,10 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 layout (set = 1, binding = 1) uniform sampler2D shadowHistorySampler;
 layout (set = 1, binding = 2, r16) uniform image2D shadowBlurTexture; // kVkFormatShadow
 
-// Temporal accumulation: blend the freshly-blurred shadow (in place) with the previous frame's result,
+// Temporal accumulation: blend the freshly-blurred shadow (in place) with the last refresh's result,
 // reprojected into the current texel grid by world position. While the texel-ramp rescales the grid this
-// averages out the per-frame resample jitter (an exponential moving average) so high-contrast edges stop
-// flickering; at a settled grid history == current so it is a no-op.
+// averages out the per-refresh resample jitter (an exponential moving average) so high-contrast edges
+// stop flickering; at a settled grid history == current so it is a no-op.
 void main()
 {
 	// The dispatch rounds the texture extent up to whole tiles, so the tail threads guard against it.
@@ -29,8 +29,8 @@ void main()
 
 	float fCurrent = imageLoad(shadowBlurTexture, ivec2(uiX, uiY)).x;
 
-	// This texel's world position -> previous-frame UV. Reprojection makes the blend correct under pan/zoom
-	// (the grid moves frame-to-frame). Disocclusion (reprojected UV outside [0,1] = newly revealed): keep current.
+	// This texel's world position -> last-refresh UV. Reprojection makes the blend correct under pan/zoom (the
+	// grid moves refresh-to-refresh). Disocclusion (reprojected UV outside [0,1] = newly revealed): keep current.
 	vec2 f2Uv = (vec2(float(uiX), float(uiY)) + 0.5f) * globalLayout.f2ShadowTextureSizeInverse;
 	vec2 f2World = VisibleAreaToWorld(f2Uv, globalLayout.f4ShadowArea);
 	vec2 f2PreviousUv = WorldToVisibleArea(vec3(f2World, 0.0f), globalLayout.f4ShadowAreaPrevious);

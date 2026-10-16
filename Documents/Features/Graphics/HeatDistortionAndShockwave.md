@@ -284,7 +284,7 @@ Changes (12 files)
          const ExplosionsInterpolate& rExplosions = it->second.interpolate.mExplosions;
          for (int64_t i = 0; i < rExplosions.miCount && iDistortionCount < shaders::kiMaxDistortionSources; ++i)
          {
-             float fAge = fCurrentTime - rExplosions.pStartTimes[i].time_since_epoch().count();
+             float fAge = fCurrentTime - common::NanosecondsToFloatSeconds<float>(rExplosions.pStartTimes[i].time_since_epoch());
              float fMaxAge = 3.0f * rExplosions.pfTimePercents[i];
              if (fAge > fMaxAge) continue;
 

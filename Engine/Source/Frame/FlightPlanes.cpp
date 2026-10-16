@@ -9,6 +9,17 @@ FlightPlanes::FlightPlanes(std::span<const FlightPlane> planes)
 : common::Singleton<FlightPlanes>(gpFlightPlanes, this)
 , mPlanes(planes)
 {
+	// Every height is positive and above its predecessor. These run first because the terrain check below reads
+	// Highest(), which needs a non-empty table.
+	ASSERT(!planes.empty());
+	ASSERT(std::ssize(planes) <= kiMaxFlightPlanes);
+	float fPreviousHeightMeters = 0.0f;
+	for (const FlightPlane& rPlane : planes)
+	{
+		ASSERT(rPlane.fHeightMeters > fPreviousHeightMeters);
+		fPreviousHeightMeters = rPlane.fHeightMeters;
+	}
+
 	// The header elevation ceiling bounds every heightmap texel, so no terrain reaches the highest plane.
 	for ([[maybe_unused]] const auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
 	{

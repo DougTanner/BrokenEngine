@@ -1,9 +1,13 @@
 # The static checks for the Run targeted pre-review checks
 # step, selected from the session change inventory and run in one pass: `validate-skill`
-# for each changed skill package, `markdown-links` for every changed markdown file, and
+# for each changed skill package, `markdown-links` for every changed markdown file,
 # `file-hygiene` for every changed text file: Git's whitespace errors (`git diff --check` under the
 # `.gitattributes` whitespace attribute) and space-indented GLSL on added lines, and per file invalid
-# UTF-8, an added BOM, and a missing final newline the baseline side had. The
+# UTF-8, an added BOM, and a missing final newline the baseline side had; and `line-length` for every
+# changed markdown file and `Documents/<name>.txt` guide: every line of the whole file, not only the
+# added lines, longer than 500 characters without its line ending (Grep elides such a line), apart
+# from, in a markdown file only, fence delimiters, lines inside a fence, and table rows (first
+# non-space character `|`). The
 # first composes an existing script (the bundled skill validator). The
 # run reports results only — it never decides whether a failing check blocks a slice, never edits a
 # file, and writes nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is
@@ -14,8 +18,8 @@
 # setup failure (invalid root, missing composed script, unavailable inventory) exits 2 with no rows, and
 # an unexpected error exits 1 with status `error`. `-Head <commit>` selects the changed
 # files from a committed head instead of the working tree, and `-IncludeUntracked` adds the untracked
-# files when checking the working tree. `markdown-links` and `file-hygiene` read content from that
-# commit; `validate-skill` validates the working tree's copy of each selected package.
+# files when checking the working tree. `markdown-links`, `file-hygiene`, and `line-length`
+# read content from that commit; `validate-skill` validates the working tree's copy of each selected package.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -29,6 +33,7 @@ Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 
 $script:MaximumMessageLength = 256
+$script:MaximumLineLength = 500
 
 $script:InventoryScript = Join-Path $PSScriptRoot 'Get-SessionChangeInventory.ps1'
 $script:ValidateSkillScript = Join-Path $PSScriptRoot '../skills/external-skill-creator/scripts/Validate-Skill.ps1'
@@ -43,7 +48,7 @@ $script:LinkPattern = '\[(?:[^\[\]]*)\]\(\s*([^)\s]+)'
 $script:SchemePattern = '^[A-Za-z][A-Za-z0-9+.-]*:'
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-static-checks/v2'
+	schemaVersion = 'broken-engine-static-checks/v4'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Static checks did not run.'
@@ -294,22 +299,21 @@ function Invoke-ValidateSkillCheck([object] $Inventory) {
 	if ($paths.Count -eq 0) {
 		if ([bool] $Inventory.truncated) { return New-CheckRow 'validate-skill' $true 'blocked' ([ordered]@{ reason = 'The inventory truncated its entry table, so the changed skill packages could not be selected.' }) }
 	}
-	$results = [Collections.Generic.List[object]]::new()
+	$failures = [Collections.Generic.List[object]]::new()
 	$status = 'pass'
-	$passedCount = 0
 	foreach ($path in $paths) {
 		$run = Invoke-StaticCheckProcess (Get-StaticCheckShell) @('-NoProfile', '-File', $script:ValidateSkillScript, '-Path', (Join-Path $script:Root ($path -replace '/', [IO.Path]::DirectorySeparatorChar))) $script:Root
 		# Exit 1 is the validator's ordinary INVALID result; only its exit 2 setup error blocks the check.
 		$rowStatus = switch ($run.ExitCode) { 0 { 'pass' } 1 { 'fail' } default { 'blocked' } }
 		if ($rowStatus -ceq 'blocked' -or ($rowStatus -ceq 'fail' -and $status -cne 'blocked')) { $status = $rowStatus }
-		# Every package names itself and its exit code, but only the packages that did not pass carry the
-		# validator's output; a passing package would otherwise contribute an unbounded block of lines for a
-		# result its exit code already states, and a sweep runs every package.
-		if ($rowStatus -ceq 'pass') { $passedCount++; $results.Add([ordered]@{ path = $path; exitCode = $run.ExitCode }); continue }
+		# Only a package that did not pass is listed in failures, with its exit code and the validator's
+		# output; a passing package only adds to packageCount, because its exit code already states the
+		# result and a sweep runs every package.
+		if ($rowStatus -ceq 'pass') { continue }
 		$lines = @(($run.Stdout -split "`r`n|`n|`r") | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-		$results.Add([ordered]@{ path = $path; exitCode = $run.ExitCode; lines = [object[]] $lines })
+		$failures.Add([ordered]@{ path = $path; exitCode = $run.ExitCode; lines = [object[]] $lines })
 	}
-	return New-CheckRow 'validate-skill' $true $status ([ordered]@{ passedCount = $passedCount; results = [object[]] $results.ToArray() })
+	return New-CheckRow 'validate-skill' $true $status ([ordered]@{ packageCount = $paths.Count; failures = [object[]] $failures.ToArray() })
 }
 
 function Invoke-MarkdownLinkCheck([object] $Inventory, [bool] $Truncated) {
@@ -329,6 +333,42 @@ function Invoke-MarkdownLinkCheck([object] $Inventory, [bool] $Truncated) {
 	}
 	$status = if ($failures.Count -gt 0) { 'fail' } else { 'pass' }
 	return New-CheckRow 'markdown-links' $true $status ([ordered]@{ linkCount = $linkCount; failures = [object[]] $failures.ToArray() })
+}
+
+function Get-LineLengthFailure([string] $Path) {
+	$failures = [Collections.Generic.List[object]]::new()
+	$markdown = $Path.ToLowerInvariant().EndsWith('.md')
+	$fenced = $false
+	$number = 0
+	foreach ($line in ((Get-HeadText $Path) -split "`r`n|`n|`r")) {
+		$number++
+		if ($markdown) {
+			# The Get-HeadingSlug fence toggle: a fenced code line must stay copyable as one line, and a
+			# table row cannot wrap without breaking the table.
+			if ($line -match '^\s*(?:```|~~~)') { $fenced = -not $fenced; continue }
+			if ($fenced -or $line -match '^\s*\|') { continue }
+		}
+		if ($line.Length -gt $script:MaximumLineLength) { $failures.Add([ordered]@{ path = $Path; line = $number; length = $line.Length }) }
+	}
+	return , $failures
+}
+
+function Invoke-LineLengthCheck([object] $Inventory, [bool] $Truncated) {
+	$paths = Get-ChangedPath $Inventory {
+		param($entry)
+		$path = $entry.path.ToLowerInvariant()
+		$path.EndsWith('.md') -or $path -match '^documents/[^/]+\.txt$'
+	}
+	if ($paths.Count -eq 0) {
+		if (-not $Truncated) { return New-CheckRow 'line-length' $false 'skipped' $null }
+		return New-CheckRow 'line-length' $true 'blocked' ([ordered]@{ reason = 'The inventory truncated its entry table, so the changed markdown and guide files could not be selected.' })
+	}
+	$failures = [Collections.Generic.List[object]]::new()
+	foreach ($path in $paths) {
+		foreach ($failure in (Get-LineLengthFailure $path)) { $failures.Add($failure) }
+	}
+	$status = if ($failures.Count -gt 0) { 'fail' } else { 'pass' }
+	return New-CheckRow 'line-length' $true $status ([ordered]@{ fileCount = $paths.Count; failures = [object[]] $failures.ToArray() })
 }
 
 function Add-WhitespaceFailure([string[]] $Arguments, [int] $CleanExit, [int] $FindingsExit, [Collections.Generic.List[object]] $Failures) {
@@ -445,11 +485,12 @@ try {
 	$truncated = [bool] $inventory.truncated
 	$result.truncated = $truncated
 
-	# All three rows are always present, triggered or not.
+	# All four rows are always present, triggered or not.
 	$checks = @(
 		(Invoke-ValidateSkillCheck $inventory)
 		(Invoke-MarkdownLinkCheck $inventory $truncated)
 		(Invoke-FileHygieneCheck $inventory $truncated)
+		(Invoke-LineLengthCheck $inventory $truncated)
 	)
 	$result.checks = [object[]] $checks
 	$triggeredStatuses = @($checks | Where-Object { $_.triggered } | ForEach-Object { $_.status })

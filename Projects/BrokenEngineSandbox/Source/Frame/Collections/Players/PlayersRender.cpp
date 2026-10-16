@@ -3,7 +3,6 @@
 #include "Players.h"
 
 #include "Data/Scene.h"
-#include "File/PackChunks.h"
 #include "Frame/FlightPlanes.h"
 #include "Graphics/Debug/DebugRender.h"
 
@@ -46,8 +45,7 @@ constexpr float kfDeathShrinkPower = 2.0f;
 void PlayersInterpolate::GraphicsResources()
 {
 	engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kCrc, engine::kBufferMain, kName, sizeof(shaders::ModelLayout));
-	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipeline(kCrc, kName, kPlayerModel, pStorageBuffers);
-	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelineShadow(kCrc, kName, kPlayerModel, pStorageBuffers);
+	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(kCrc, kName, kPlayerModel, pStorageBuffers);
 }
 
 static int64_t siRendered = 0;
@@ -178,31 +176,19 @@ void PlayersInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, co
 {
 	siRendered = 0;
 
-	int64_t iTotalCount = 0;
-	for (const engine::GridCoord& rCoordinate : rActiveCoordinates)
+	int64_t iTotalCapacity = engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const PlayersInterpolate&
 	{
-		auto it = rRenderInterpolates.find(rCoordinate);
-		if (it != rRenderInterpolates.end())
-		{
-			// Players uses iCount not iCapacity for buffer sizing since count is always small
-			const game::FrameInterpolate& rInterpolate = it->second;
-			int64_t iCount = (rInterpolate.gameFlags & GameFlags::kMainMenu) ? 0 : rInterpolate.pPlayers->iCount;
-			iTotalCount += iCount;
-		}
-	}
+		return *rInterpolate.pPlayers;
+	});
 
-	if (iTotalCount == 0)
+	if (iTotalCapacity == 0)
 	{
 		return;
 	}
 
-	int64_t iRequiredSize = iTotalCount * static_cast<int64_t>(sizeof(shaders::ModelLayout));
-	engine::Buffer& rBuffer = engine::gpBufferManager->mDynamicStorageBuffers[engine::kBufferMain].at(kCrc).at(iCommandBuffer);
-	if (rBuffer.mInfo.iDataSize < iRequiredSize)
+	if (engine::Buffer* pBuffer = engine::gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, engine::kBufferMain, kName, sizeof(shaders::ModelLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		engine::gpBufferManager->ResizeDynamicBuffer(kCrc, engine::kBufferMain, kName, iRequiredSize, iCommandBuffer);
-		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, &rBuffer);
-		engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kCrc)->UpdateStorageBufferDescriptors(iCommandBuffer, 2, &rBuffer);
+		engine::gpPipelineManager->mDynamicPipelines.UpdateModelPipelineDescriptors(kCrc, iCommandBuffer, 2, pBuffer);
 	}
 }
 
@@ -213,7 +199,7 @@ void PlayersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpo
 	const PlayersInterpolate& rCurrent = *rFrameInterpolate.pPlayers;
 	const engine::RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 
-	int64_t iCount = (rFrameInterpolate.gameFlags & GameFlags::kMainMenu) ? 0 : rCurrent.iCount;
+	int64_t iCount = rCurrent.iCount;
 
 	if (iCount == 0)
 	{
@@ -224,6 +210,14 @@ void PlayersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpo
 
 	auto [pPlayerLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kCrc, engine::kBufferMain, iCommandBuffer);
 	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
+
+	const engine::AnimationData* pAnimationData = nullptr;
+	engine::SkinningReservation skinningReservation {};
+	if (engine::gAnimationDataMap.contains(kPlayerModel))
+	{
+		pAnimationData = &engine::gAnimationDataMap.at(kPlayerModel);
+		skinningReservation = pAnimationData->ReserveSkinning(iCommandBuffer, iCount);
+	}
 
 	for (int64_t i = 0; i < iCount; ++i)
 	{
@@ -254,24 +248,9 @@ void PlayersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpo
 		rPlayerLayout.f4ColorAdd = {0.0f, 0.0f, 0.0f, 0.0f};
 		rPlayerLayout.uiMeshDataBase = 0;
 
-		if (engine::gAnimationDataMap.contains(kPlayerModel))
+		if (pAnimationData != nullptr)
 		{
-			const engine::AnimationData& rAnimationData = engine::gAnimationDataMap.at(kPlayerModel);
-			const engine::EagerChunk& rChunk = engine::gpFileManager->mpPackChunks->GetEagerChunkMap().at(kPlayerModel);
-			int64_t iMaterialCount = rChunk.pHeader->sceneHeader.uiMaterialCount;
-
-			int64_t iMeshDataBase = engine::gpBufferManager->AllocateMeshData(iCommandBuffer, iMaterialCount);
-			rPlayerLayout.uiMeshDataBase = static_cast<uint32_t>(iMeshDataBase);
-
-			common::MeshData* pMeshData = reinterpret_cast<common::MeshData*>(engine::gpBufferManager->mMeshDataStorageBuffers.at(iCommandBuffer).mpMappedMemory) + iMeshDataBase;
-
-			int64_t iSkinnedMaterialCount = rAnimationData.SkinnedMaterialCount(iMaterialCount);
-
-			int64_t iJointMatrixOffset = engine::gpBufferManager->AllocateJointMatrices(iCommandBuffer, iSkinnedMaterialCount * rAnimationData.mHeader.skeleton.uiSkinJointCount);
-
-			common::JointMatrix* pJointMatrices = reinterpret_cast<common::JointMatrix*>(engine::gpBufferManager->mJointMatrixStorageBuffers.at(iCommandBuffer).mpMappedMemory);
-
-			rAnimationData.EvaluateAnimation(0, rCurrent.pAnimationTimes[i].count(), std::span(pMeshData, static_cast<size_t>(iMaterialCount)), pJointMatrices, iJointMatrixOffset);
+			rPlayerLayout.uiMeshDataBase = static_cast<uint32_t>(pAnimationData->EvaluateInstance(skinningReservation, i, rCurrent.pAnimationTimes[i].count()));
 		}
 
 		++siRendered;
@@ -280,8 +259,7 @@ void PlayersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpo
 
 void PlayersInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModel].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
-	engine::gpPipelineManager->mDynamicPipelines.mModelPipelineMaps[engine::kDynamicModelPipelineModelShadow].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
+	engine::gpPipelineManager->mDynamicPipelines.WriteModelPipelineIndirectBuffers(kCrc, iCommandBuffer, siRendered);
 }
 
 void PlayersInterpolate::DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate)
@@ -299,7 +277,7 @@ void PlayersInterpolate::DebugRender(const FrameInterpolate& __restrict rFrameIn
 	const PlayersPostRender& rPostRender = *gpGame->RenderFrame(coordinate).postRender.pPlayers;
 	const SpaceshipsPostRender& rSpaceshipsPostRender = *gpGame->RenderFrame(coordinate).postRender.pSpaceships;
 
-	int64_t iCount = (rFrameInterpolate.gameFlags & GameFlags::kMainMenu) ? 0 : rPlayers.iCount;
+	int64_t iCount = rPlayers.iCount;
 
 	for (int64_t i = 0; i < iCount; ++i)
 	{

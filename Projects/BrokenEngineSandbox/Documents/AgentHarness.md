@@ -4,7 +4,14 @@ Project-specific launch configuration, verification routes, durable caveats, and
 
 ## Common convention
 
-Every command request uses a JSON envelope with `cmd`, optional `params`, and optional `id`; every response places returned fields under `result`. A side-specific command sent to the other executable returns `unknown command`. The six engine-shared command schemas, and the cell-local position shape every result uses, are in [command-reference.md](../../../.agents/skills/agent-harness/references/command-reference.md); game commands are split into [server](AgentHarness/commands-server.md) and [client](AgentHarness/commands-client.md) references.
+Every command request uses a JSON envelope with `cmd`, optional `params`, and
+optional `id`; every response places returned fields under `result`. A
+side-specific command sent to the other executable returns `unknown command`.
+The six engine-shared command schemas, and the cell-local position shape every
+result uses, are in
+[command-reference.md](../../../.agents/skills/agent-harness/references/command-reference.md);
+game commands are split into [server](AgentHarness/commands-server.md) and
+[client](AgentHarness/commands-client.md) references.
 
 ## Scenario routing
 

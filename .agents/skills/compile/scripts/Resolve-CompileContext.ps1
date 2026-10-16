@@ -1,7 +1,8 @@
 # Resolves the deterministic build context /compile needs before any build command runs:
-# repository identities, the changed-path set, the path-rule-derived data mode and its
-# directories, and optionally DevEnvDir. Read-only: it launches no writing command and
-# emits nothing but stdout JSON and stderr diagnostics.
+# repository identities, the game project (the -Project name, else the only game project
+# discovered), the changed-path set, the path-rule-derived data mode and its directories, and
+# optionally DevEnvDir. Read-only: it launches no writing command and emits nothing but stdout
+# JSON and stderr diagnostics.
 #
 # dataBuildMode is derived from path rules alone, except that a modified DataPacker .h/.cpp
 # whose baseline and current token text match is not a trigger. The semantic Local triggers
@@ -14,6 +15,7 @@ param(
 	[string] $RepositoryRoot,
 	[string] $Baseline,
 	[string] $PrimaryCheckout,
+	[string] $Project,
 	[switch] $IncludeDevEnvDir
 )
 
@@ -28,12 +30,11 @@ Import-Module (Join-Path $sharedScripts 'FinalizeWorkflowCommon.psm1') -Force
 
 $script:MaximumReportedPaths = 512
 $script:MaximumOutputBytes = 65536
-$script:DataOutputSuffix = 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output\Data'
-# The four path-matchable Local triggers stated in SKILL.md.
+# The path-matchable Local triggers stated in references/runtime-data-mode.md ## Mode selection; a
+# resolved project appends its own Projects/<Project>/Data/** row.
 $script:PathTriggers = @(
 	[pscustomobject]@{ trigger = 'DataPacker/**'; prefix = 'DataPacker/'; exact = $null }
 	[pscustomobject]@{ trigger = 'Engine/Data/**'; prefix = 'Engine/Data/'; exact = $null }
-	[pscustomobject]@{ trigger = 'Projects/BrokenEngineSandbox/Data/**'; prefix = 'Projects/BrokenEngineSandbox/Data/'; exact = $null }
 	[pscustomobject]@{ trigger = 'Common/DataFile.h'; prefix = $null; exact = 'Common/DataFile.h' }
 )
 
@@ -46,6 +47,8 @@ $script:Result = [ordered]@{
 	repositoryRoot = $null
 	primaryCheckout = $null
 	baseline = $null
+	project = $null
+	projects = @()
 	changedPaths = @()
 	changedPathCount = 0
 	changedPathsTruncated = $false
@@ -179,21 +182,22 @@ function Get-ContextTokenText([string] $Text) {
 	return $segments -join "`0"
 }
 
-function Get-ContextRecommendedTargets([string[]] $Paths) {
+function Get-ContextRecommendedTargets([string[]] $Paths, [string] $Project) {
 	# A changed path under one of the shared roots recommends both executables; any other path
 	# contributes nothing, so this stays advisory and the worker still fixes the final list.
-	$sharedPrefixes = @('Common/', 'Engine/', 'Projects/BrokenEngineSandbox/Source/')
+	if ([string]::IsNullOrEmpty($Project)) { return @() }
+	$sharedPrefixes = @('Common/', 'Engine/', "Projects/$Project/Source/")
 	foreach ($path in $Paths) {
 		foreach ($prefix in $sharedPrefixes) {
 			if ($path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
 				return @(
-					[pscustomobject][ordered]@{ project = 'BrokenEngineSandbox'; configuration = 'Debug'; reason = 'shared-code' }
-					[pscustomobject][ordered]@{ project = 'BrokenEngineSandboxServer'; configuration = 'Debug'; reason = 'shared-code' }
+					[pscustomobject][ordered]@{ project = $Project; configuration = 'Debug'; reason = 'shared-code' }
+					[pscustomobject][ordered]@{ project = "$($Project)Server"; configuration = 'Debug'; reason = 'shared-code' }
 				)
 			}
 		}
 	}
-	return @([pscustomobject][ordered]@{ project = 'BrokenEngineSandbox'; configuration = 'Debug'; reason = 'default' })
+	return @([pscustomobject][ordered]@{ project = $Project; configuration = 'Debug'; reason = 'default' })
 }
 
 function Get-ContextDevEnvDirectory {
@@ -226,6 +230,21 @@ try {
 		Stop-CompileContext 'repository-root.mismatch' "RepositoryRoot '$root' is not its own Git top level '$topLevel'."
 	}
 	$script:Result.repositoryRoot = $root
+
+	# With several game projects and none named, the project stays null and the caller picks from projects.
+	$projects = @(Get-AgentGameProjects $root)
+	$script:Result.projects = $projects
+	if (-not [string]::IsNullOrWhiteSpace($Project)) {
+		$projectInput = $Project.Trim()
+		if ($projectInput -cnotin $projects) {
+			Stop-CompileContext 'project.not-found' "Project '$projectInput' is not a game project under '$root'; discovered: $(if ($projects.Count -eq 0) { 'none' } else { $projects -join ', ' })."
+		}
+		$script:Result.project = $projectInput
+	}
+	elseif ($projects.Count -eq 1) { $script:Result.project = $projects[0] }
+	if ($null -ne $script:Result.project) {
+		$script:PathTriggers += [pscustomobject]@{ trigger = "Projects/$($script:Result.project)/Data/**"; prefix = "Projects/$($script:Result.project)/Data/"; exact = $null }
+	}
 
 	$primaryInput = if ([string]::IsNullOrWhiteSpace($PrimaryCheckout)) { $null } else { $PrimaryCheckout.Trim() }
 	if ($null -eq $primaryInput) {
@@ -319,10 +338,12 @@ try {
 	$script:Result.deletionOnlyCandidates = @(@($deletions) | Select-Object -First $script:MaximumReportedPaths)
 
 	$script:Result.dataBuildMode = if ($triggerMatches.Count -gt 0) { 'Local' } else { 'Shared' }
-	$dataOwner = if ($script:Result.dataBuildMode -ceq 'Local') { $root } else { $primary }
-	$gameDataDirectory = Get-AgentCanonicalPath (Join-Path $dataOwner $script:DataOutputSuffix)
-	$script:Result.gameDataDirectory = $gameDataDirectory
-	$script:Result.generatedDataIncludeRoot = Get-AgentCanonicalPath ([IO.Path]::GetDirectoryName($gameDataDirectory))
+	if ($null -ne $script:Result.project) {
+		$dataOwner = if ($script:Result.dataBuildMode -ceq 'Local') { $root } else { $primary }
+		$gameDataDirectory = Get-AgentCanonicalPath (Join-Path $dataOwner "Projects\$($script:Result.project)\Platforms\VisualStudio2026\Output\Data")
+		$script:Result.gameDataDirectory = $gameDataDirectory
+		$script:Result.generatedDataIncludeRoot = Get-AgentCanonicalPath ([IO.Path]::GetDirectoryName($gameDataDirectory))
+	}
 
 	if ($IncludeDevEnvDir) { $script:Result.devEnvDir = Get-ContextDevEnvDirectory }
 
@@ -330,7 +351,7 @@ try {
 		Complete-CompileContext 2 'blocked' 'changed-paths.capacity-exceeded' "The changed-path evidence exceeds the $($script:MaximumReportedPaths)-entry report cap and cannot be reported completely."
 	}
 
-	$script:Result.recommendedTargets = @(Get-ContextRecommendedTargets @($changed))
+	$script:Result.recommendedTargets = @(Get-ContextRecommendedTargets @($changed) $script:Result.project)
 	Complete-CompileContext 0 'pass' 'ok' "Compile context resolved; data mode $($script:Result.dataBuildMode) from path rules."
 }
 catch {

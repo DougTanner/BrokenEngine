@@ -53,12 +53,49 @@ For each affected project pair:
    authority (`Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md`)
    and take the rest of the record as given; re-derive nothing by hand. In fix
    mode, require each intended item once and forbidden/stale old-name items zero
-   times. Done when every affected item's ownership and filter come from its
-   record and those counts hold in the pair.
-3. Run once after inspection or repair:
+   times.
+
+   In fix mode, an `Engine/**` or `Common/**` path that gains membership — an
+   addition, a rename's new name, or the added side of an affinity change —
+   goes through the script, never a hand edit. Run it once per path batch,
+   outside the per-pair loop: one run applies each record to every game pair
+   the `Projects/AGENTS.md` `## Standard Project Layout` defines. On exit `1`
+   it writes nothing; on `input.too-many-paths` or `resolver.truncated`, rerun
+   in smaller batches until every path is applied, and on any other code report
+   its `code` and `message`. For a `.h` under `Engine/Data/Shaders/`, pass the
+   scoped-authority answer as `-ShaderHeaderMembership` (`None` for a GLSL-only
+   client `None` item; `Client`, `Server`, or `Both` for C++-consumed
+   `ClInclude` sides); one answer applies to every shader header in a run, so
+   give headers with different answers separate runs:
+
+   ```powershell
+   pwsh -NoProfile -File .agents/skills/update-vcxproj/scripts/Update-EngineVcxprojItem.ps1 <path> [<path> ...] [-ShaderHeaderMembership <None|Client|Server|Both>]
+   ```
+
+   An `Engine/**` or `Common/**` removal or a rename's old name goes through
+   its `-Remove` form, run before a rename's add run:
+
+   ```powershell
+   pwsh -NoProfile -File .agents/skills/update-vcxproj/scripts/Update-EngineVcxprojItem.ps1 -Remove <path> [<path> ...]
+   ```
+
+   The removed side of an affinity change, game, tool, and DataPacker paths,
+   generated `$(GameDataDirectory)` headers, and DataPacker membership of
+   `Common/**` stay hand edits. Done when every affected item's ownership and
+   filter come from its record and those counts hold in the pair.
+3. Run once after inspection or hand repair:
 
    ```powershell
    pwsh -NoProfile -File .agents/skills/update-vcxproj/scripts/Test-VcxprojPair.ps1 -ProjectPath <project>.vcxproj
+   ```
+
+   After an `Update-EngineVcxprojItem.ps1` run, run this multi-project form
+   once in place of those projects' single-pair runs, validating every game
+   client and server project the standard layout defines, not only those named
+   in its output, because its per-path records can be truncated:
+
+   ```powershell
+   pwsh -NoProfile -Command "& '.agents/skills/update-vcxproj/scripts/Test-VcxprojPair.ps1' -ProjectPath '<project>.vcxproj','<project>.vcxproj'"
    ```
 
    Require exit `0`. On compact failure, report its `code` and violations, fix

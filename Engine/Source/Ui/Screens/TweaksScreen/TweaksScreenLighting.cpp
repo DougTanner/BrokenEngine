@@ -6,6 +6,8 @@
 #include "Ui/LightingWrappersBase.h"
 #include "TweaksSliderMap.h"
 
+#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
+
 namespace engine
 {
 
@@ -285,7 +287,7 @@ void RenderLightingSection(TweaksScreenBase& rScreen)
 
 			ImGui::EndTabItem();
 		}
-		RenderTweakExtensionSubtabs(rScreen, iSection, 3);
+		game::RenderLightingTweakExtensions(rScreen, iSection, 3);
 		ImGui::EndTabBar();
 	}
 }

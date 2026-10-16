@@ -110,7 +110,7 @@ flowchart TD
 
         TICK["TickRealtime()<br/>compute iFullTicks"]:::physics
         PREPARE_ACTIVE["PrepareActiveSet()"]:::physics
-        ADVANCE["Advance miTickCounter<br/>and mfCurrentTime"]:::physics
+        ADVANCE["Advance miTickCounter"]:::physics
         RECONCILE_STEP["ClientSession::Reconcile()<br/>single pass: drops validated,<br/>replays mismatches,<br/>forward sims to target tick"]:::reconcile
 
         STALL_CHECK -->|"No"| TICK --> PREPARE_ACTIVE --> ADVANCE --> RECONCILE_STEP

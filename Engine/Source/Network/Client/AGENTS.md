@@ -2,7 +2,18 @@
 
 ## Overview
 
-Client-only (`BT_CLIENT`) ENet peer and composed `ClientSessionRuntime`. The peer owns wire dispatch, slots, ACK/timing/bandwidth state, and receive buffers. The runtime owns connection and GUID persistence, discovery, subscription and clock state, generic full-state and delta adoption, received-update buffering and confirmation, ordered receive draining, ACK/flush, and resets. This directory also owns replay and desync machinery. The [game client session](../../../../Projects/BrokenEngineSandbox/Source/Network/Client/AGENTS.md) owns static-data application, gameplay hydration and smoke continuity, reconciliation/desync policy, UI, and gameplay policy. Collection hydration rules are in the [game collection detail](../../../../Projects/BrokenEngineSandbox/Source/Frame/Collections/AGENTS.md).
+Client-only (`BT_CLIENT`) ENet peer and composed `ClientSessionRuntime`. The
+peer owns wire dispatch, slots, ACK/timing/bandwidth state, and receive buffers.
+The runtime owns connection and GUID persistence, discovery, the client active
+set and its visible-neighbor cache, the desired coordinates derived from them,
+the harness viewer pin, subscription and clock state, generic full-state and
+delta adoption, received-update buffering and confirmation, ordered receive
+draining, ACK/flush, and resets. This directory also owns replay and desync
+machinery. The game client session (the game project's own
+`Source/Network/Client/AGENTS.md`) owns static-data application, gameplay
+hydration and smoke continuity, reconciliation/desync policy, UI, and gameplay
+policy. Collection hydration rules are in the game collection detail (the game
+project's own `Source/Frame/Collections/AGENTS.md`).
 
 ## Receive Paths
 
@@ -14,7 +25,22 @@ Server updates use separate delta, full-state, static-data, debug-frame, and loa
 
 - Seed the current load generation from the first accepted connection response. Load notification processing commits the newest generation and resets the old world before normal subscription updates run. Incoming load-scoped subscription traffic with any other generation logs a Network warning and returns before slot, epoch, cancellation, ACK, timing, receive-buffer, or game-state mutation ([Network architecture](../../../../Documents/Architecture/Network.md#debug-load-generation)).
 - Exact epoch checks apply only after the server assigns an epoch. Slot clearing retains the last assigned epoch for the connection lifetime; a `kUnsubscribed` slot admits subscribe accepts, and a `kUnsubscribed` or `kUnsubscribing` slot admits out-of-order full/static state for a coord with a live subscribe request, only when their epoch is wrap-aware newer than the retained one. This prevents retired traffic from reactivating a slot.
-- The client never picks a slot index for a subscribe: the client adopts the slot the server's accept or full state names. Record shape and consumption order are on `SubscribeRequests` (`ClientSubscriptions.h`), relying on the server's answer rule in [Server Session Invariants](../Server/AGENTS.md#session-invariants); leaving the desired set marks the coord's live record cancelled. The one exception is the out-of-range accept branch in `Client::ServerSubscribeAccept`, which consumes nothing. An accept whose consumed record was cancelled or missing heals or commits and then unsubscribes. Full state and static data never consume a record. Out-of-order full state may claim a `kUnsubscribed` or `kUnsubscribing` slot only while its coord has a live record; otherwise it is a ghost on `kUnsubscribed`, which sends an epoch-qualified unsubscribe and retires its epoch there so the late accept for that subscription is dropped instead of committed, and it is dropped on `kUnsubscribing`. A same-coord active slot may heal its epoch on a legitimate re-subscribe. Load reset clears every record.
+- The client never picks a slot index for a subscribe: the client adopts the
+  slot the server's accept or full state names. Record shape and consumption
+  order are on `SubscribeRequests` (`ClientSubscriptions.h`), relying on the
+  server's answer rule in
+  [Server Session Invariants](../Server/AGENTS.md#session-invariants); leaving
+  the desired set marks the coord's live record cancelled. The one exception is
+  the out-of-range accept branch in `Client::ServerSubscribeAccept`, which
+  consumes nothing. An accept whose consumed record was cancelled or missing
+  heals or commits and then unsubscribes. Full state and static data never
+  consume a record. Out-of-order full state may claim a `kUnsubscribed` or
+  `kUnsubscribing` slot only while its coord has a live record; otherwise it is
+  a ghost on `kUnsubscribed`, which sends an epoch-qualified unsubscribe and
+  retires its epoch there so the late accept for that subscription is dropped
+  instead of committed, and it is dropped on `kUnsubscribing`. A same-coord
+  active slot may heal its epoch on a legitimate re-subscribe. Load reset clears
+  every record.
 - Timeouts: a live record unanswered for 5 s logs one warning and keeps waiting; it is never cancelled or resent. A `kWaitingFullState` slot has no client timeout ([Server Buffered State](../Server/AGENTS.md#buffered-state)). Only a `kUnsubscribing` slot is freed after 5 s without its ACK.
 - Static data requires matching coord identity and exact epoch on `kWaitingFullState`, and a live record plus a newer retained epoch on `kUnsubscribed` or `kUnsubscribing`. A coord mismatch drops silently because full state owns ghost unsubscribe. Static data buffers without slot mutation. The payload carries no cell area; every consumer reads the one constant area ([Frame](../../Frame/AGENTS.md)).
 - `kWaitingFullState` accepts deltas without advancing the ACK floor; only `kActive` tracks received ticks. A gap beyond `kiNetworkBufferSize` disconnects.
@@ -23,7 +49,17 @@ Server updates use separate delta, full-state, static-data, debug-frame, and loa
 
 ## Transport Timing Inputs
 
-`Client.cpp` seeds pipeline RTT from the handshake, refines it once per monotonic echoed client timestamp, and excludes resends because off-cadence arrivals would corrupt interarrival jitter. At load, `ClientSessionRuntime.cpp` resets timing history and skips the first restored interval so pre-load wall time cannot affect the new clock. When no active slot remains, it clears `miLatestServerTick` because that baseline sets the simulation ceiling; the clock reference the servo and ceiling read is its wall-clock estimate, `EstimatedLatestServerTick`. Signed clock correction floors the time-step remainder at zero so it cannot produce a negative target tick. Keep these behaviors at their existing boundaries; formulas and simulation-ceiling behavior are in [Network](../../../../Documents/Architecture/Network.md).
+`Client.cpp` seeds pipeline RTT from the handshake, refines it once per
+monotonic echoed client timestamp, and excludes resends because off-cadence
+arrivals would corrupt interarrival jitter. At load, `ClientSessionRuntime.cpp`
+resets timing history and skips the first restored interval so pre-load wall
+time cannot affect the new clock. When no active slot remains, it clears
+`miLatestServerTick` because that baseline sets the simulation ceiling; the
+clock reference the servo and ceiling read is its wall-clock estimate,
+`EstimatedLatestServerTick`. Signed clock correction floors the time-step
+remainder at zero so it cannot produce a negative target tick. Keep these
+behaviors at their existing boundaries; formulas and simulation-ceiling behavior
+are in [Network](../../../../Documents/Architecture/Network.md).
 
 ## Reconciliation Replay Chain
 
@@ -36,4 +72,5 @@ This directory owns CRC fast-path, rollback/ring orchestration, replay, per-coor
 
 - `ClientDesyncCore` owns debug-frame correlation and repeated-desync escalation to disconnect. Real desync freezes ACK tracking and, only when `kbDesynchronizationDebugFrames` is enabled, clones the mismatching client frame for comparison and requests a debug frame; disabled builds do none of these. The game-side seam is documented in the game client-session leaf.
 - Outside `Client::Poll`, `kConnectionAccepted` holds only while the peer is both connected and accepted: every path that clears `kConnected` clears it too, so a caller that needs an accepted connection tests it alone.
+- `GameBase::SetClientGridCoordinate()` is the single write path for the client's cell: on the client it invalidates the runtime's visible-neighbor cache and ignores every write while the harness viewer pin is set.
 - Network fast-forward skips the simulated delay and flushes pending packets. Load reset purges affected coord channels and preserves the control channel ([`ClientSessionRuntime::ResetForServerLoad`](ClientSessionRuntime.cpp)); an unsubscribed slot's older delayed packets are left to the epoch checks, because the server may reuse the slot before its unsubscribe ACK arrives. A delayed reliable rejection is delivered before ENet disconnect teardown ([`Client::Poll`](Client.cpp)).

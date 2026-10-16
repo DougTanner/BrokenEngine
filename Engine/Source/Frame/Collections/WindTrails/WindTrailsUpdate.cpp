@@ -24,7 +24,7 @@ void WindTrailsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFram
 {
 }
 
-void WindTrailsPostRender::Add(game::Frame& __restrict rFrame, wind_trail_t& rId)
+void WindTrailsPostRender::Add(game::Frame& __restrict rFrame, wind_trail_t& rId, const WindTrailsInterpolate::SyncData& rSyncData)
 {
 	ASSERT(!(rId.uuid.iValue != 0));
 
@@ -36,6 +36,7 @@ void WindTrailsPostRender::Add(game::Frame& __restrict rFrame, wind_trail_t& rId
 	rId = newId;
 	rPostRender.pIds[iSpawnIndex] = newId;
 	ZeroMemberRow(iSpawnIndex, rInterpolate.Members());
+	WindTrailsInterpolate::Sync(rFrame.interpolate, newId, rSyncData);
 }
 
 } // namespace engine

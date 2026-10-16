@@ -58,7 +58,7 @@ engine::Client& RequireHarnessRigClient(std::string_view command)
 }
 
 // set_client_grid_coord: move the client's grid cell and pin it against every game writer until
-// release_client_grid_coord or Game::Reset, so automation can drive the cross-cell subscribe and full-state
+// release_client_grid_coord or GameBase::ResetSession, so automation can drive the cross-cell subscribe and full-state
 // adoption path. Schema: {"coord":[x,y]}.
 static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
@@ -90,8 +90,8 @@ static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nl
 	}
 
 	// Order is an invariant: the setter clears the visible-neighbour cache keyed by the old cell.
-	gpGame->PinClientGridCoordinate(coordinate);
-	gpClientSession->UpdateDesiredCoordinates(SubscriptionChangeReason::kPollTick);
+	gpClientSession->mpRuntime->PinClientGridCoordinate(coordinate);
+	gpClientSession->mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kPollTick));
 
 	rResult["clientGridCoord"] = {coordinate.iX, coordinate.iY};
 }
@@ -108,7 +108,7 @@ static void CommandReleaseClientGridCoordinate(const nlohmann::json& rParameters
 		throw std::runtime_error("release_client_grid_coord accepts no params");
 	}
 
-	gpGame->mbClientGridCoordinatePinned = false;
+	gpClientSession->mpRuntime->mStateFlags.Set(engine::ClientSessionStateFlags::kClientGridCoordinatePinned, false);
 
 	rResult["clientGridCoord"] = {gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY};
 }

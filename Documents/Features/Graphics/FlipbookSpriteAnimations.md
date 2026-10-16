@@ -104,7 +104,7 @@ Changes (11 files)
    - BeginRender(): AccumulateRenderCapacity, ResizeDynamicBufferIfNeeded
    - Render(): For each flipbook instance:
        a. Visibility cull via IsPointVisible
-       b. Compute elapsed time = fCurrentTime - pStartTimes[i].time_since_epoch().count()
+       b. Compute elapsed seconds = common::NanosecondsToFloatSeconds<float>(TickToSimulationTime(iTick) - pStartTimes[i])
        c. Compute frame index = (startFrameOffset + floor(elapsed * frameRate))
           % frameCount
        d. Compute UV rect from frame index, columns, rows:

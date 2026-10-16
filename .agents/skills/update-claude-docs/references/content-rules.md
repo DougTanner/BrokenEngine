@@ -14,7 +14,7 @@
 
 - Describe responsibilities, ownership, relationships, data flow, algorithms, and reasons a design constraint exists.
 - Do not list members, enum values, variables, files, uniforms, bindings, push constants, or method call chains. Do not name-drop a symbol introduced by the current change merely to document the diff.
-- Link to the authoritative owner instead of duplicating parent, sibling, parallel-hierarchy, or `Documents/Architecture/` guidance. Use `@path` only for an intentional Claude import; use Markdown links for see-also references.
+- Link to the authoritative owner instead of duplicating parent, sibling, parallel-hierarchy, or `Documents/Architecture/` guidance. Use `@path` only for an intentional Claude import; use Markdown links for see-also references, except that an engine document's reference to a game document follows `Engine/Source/AGENTS.md` `## Hub Conventions`.
 - Every ancestor AGENTS.md loads automatically alongside a child document, so a child never references, links, or "See Also"s its parent or any other ancestor AGENTS.md. Remove such a reference whenever you edit the text around it.
 
 ## Removing Text
