@@ -50,6 +50,7 @@ void PlaybackAdopted(Replay& rReplay, const TransferCaptureSnapshot& rRecordingS
 [[nodiscard]] bool DropRetainedEndFrame(Replay& rReplay, GridCoord coordinate);
 [[nodiscard]] bool ArmPersistenceFailure(const Replay& rReplay, PersistenceFailurePoint eFailurePoint, GridCoord coordinate = {});
 [[nodiscard]] bool ConsumePersistenceFailure(const Replay& rReplay, PersistenceFailurePoint eFailurePoint, GridCoord coordinate = {}, int64_t iActivationTick = -1);
+[[nodiscard]] bool InjectMalformedFullFrames(const Replay& rReplay, GridCoord coordinate, int64_t iActivationTick, const FileFlags_t& rFileFlags, const std::filesystem::path& rCoordinateReplayPath);
 [[nodiscard]] bool IsWriterPauseArmed(const Replay& rReplay);
 void ArmPauseAfterNextWriterInput(const Replay& rReplay, bool bPendingRecordingStart);
 [[nodiscard]] bool ObserveWriterInput(const Replay& rReplay, int64_t iTick);

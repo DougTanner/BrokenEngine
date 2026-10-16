@@ -210,6 +210,8 @@ std::filesystem::path ExportShader::OptimizeShader(const std::filesystem::path& 
 
 	std::wstring spirvOptCommandLineParameters = L"";
 	spirvOptCommandLineParameters += L" -O";
+	// Keep unreferenced inputs and bindings: reflection derives vertex stride, attribute offsets, and descriptor layouts from the interface
+	spirvOptCommandLineParameters += L" --preserve-interface";
 	spirvOptCommandLineParameters += L" --target-env=vulkan1.2";
 	spirvOptCommandLineParameters += L" --scalar-block-layout";
 	spirvOptCommandLineParameters += L" -o \"" + optimizedSpirvFile.native() + L"\"";

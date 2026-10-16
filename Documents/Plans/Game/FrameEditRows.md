@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-06T17:48:32.995Z","dependsOn":["Documents/Plans/Game/FrameEditRead.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-06T17:48:32.995Z","dependsOn":[]} -->
 # `edit_frame`: add rows through each collection's `Spawn` and remove rows through one `Destroy` pass
 
 Line numbers cite baseline `2b4cb8d38aa57ca7ccd45983cc5121f64e85cf15`, plus the names `Documents/Plans/Game/FrameEditNaming.md` introduces (`FrameCollections`, `OwnerInFrame`) and the `read_frame` command of `Documents/Plans/Game/FrameEditRead.md`. Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other.

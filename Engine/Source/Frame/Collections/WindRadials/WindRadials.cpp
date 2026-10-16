@@ -10,7 +10,7 @@ template struct Collection<WindRadialsPostRender>;
 
 void WindRadialsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unused]] const CellStaticData& rStaticData)
 {
-	DestroyExpiredControlled(rFrame.interpolate.windRadials, rFrame.postRender.windRadials, rFrame.interpolate.fCurrentTime, [](WindRadialsInterpolate& rInterpolate, WindRadialsPostRender& rPostRender, int64_t& riIndex)
+	DestroyExpiredControlled(rFrame.interpolate.windRadials, rFrame.postRender.windRadials, SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)), [](WindRadialsInterpolate& rInterpolate, WindRadialsPostRender& rPostRender, int64_t& riIndex)
 	{
 		DestroyElement(rInterpolate, rPostRender, riIndex, rInterpolate.Members(), rPostRender.Members());
 		--riIndex;

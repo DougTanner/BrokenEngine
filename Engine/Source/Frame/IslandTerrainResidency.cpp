@@ -84,7 +84,7 @@ static void CreateElevationTextureFromHeightmap(IslandTemplate& rTemplate, std::
 }
 
 IslandTerrainResidency::IslandTerrainResidency()
-: common::Singleton<IslandTerrainResidency>(gpIslandTerrainResidency)
+: common::Singleton<IslandTerrainResidency>(gpIslandTerrainResidency, this)
 {
 }
 

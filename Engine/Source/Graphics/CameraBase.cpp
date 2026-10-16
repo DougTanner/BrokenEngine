@@ -59,7 +59,7 @@ CameraTarget CameraTarget::Extrapolate()
 }
 
 CameraBase::CameraBase(const CameraSetup& rCameraSetup)
-: common::Singleton<CameraBase>(gpCamera)
+: common::Singleton<CameraBase>(gpCamera, this)
 {
 	mVecPosition = rCameraSetup.vecInitialPosition;
 }

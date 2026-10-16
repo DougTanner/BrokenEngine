@@ -78,15 +78,14 @@ public:
 	// Sends only valid chat text on an accepted connection; anything else is discarded unsent.
 	void SendChat(std::string_view text);
 	void Disconnect();
-	// Crash path only, on a connected and accepted client: sends the report, then disconnects. Returns whether the ENet
-	// disconnect event arrived within 5 s; the deferred disconnect completes only after the server acknowledges the report.
-	bool UploadCrashReport(std::span<const uint8_t> report);
+	// The caller ensures a connected and accepted client; this send does not check the connection.
+	void SendCrashReport(std::span<const uint8_t> report, ENetPacketFreeCallback pFreeCallback);
+	// Crash path only, on a connected and accepted client: sends the report with pFreeCallback, then disconnects and
+	// services ENet for up to 5 s. The disconnect event does not prove delivery, because a server disconnect or an ENet
+	// timeout also ends the wait; the free callback's ENET_PACKET_FLAG_SENT does.
+	void UploadCrashReport(std::span<const uint8_t> report, ENetPacketFreeCallback pFreeCallback);
 
-	// Wire dispatch entry point for one received packet. Public so harness rigs can exercise the real dispatch,
-	// classification, and response paths.
-	void Receive(std::span<const uint8_t> packetData);
-
-	enum class ClientStateFlags : uint8_t
+	enum class ClientStateFlags : uint16_t
 	{
 		kConnected                = 1 << 0,
 		kConnectionAccepted       = 1 << 1,
@@ -96,6 +95,8 @@ public:
 		kLoadNotificationReceived = 1 << 5,
 		kSkipNextJitterInterval   = 1 << 6,
 		kServerDebugInput         = 1 << 7, // the accepting server takes debug-control requests (its kbDebugInput)
+		kCrashReportChecked       = 1 << 8, // PollPendingCrashReport has looked for an unsent report on this connection
+		kCrashReportSent          = 1 << 9, // this connection carried a crash report; the server counts a second as a violation
 	};
 
 	ENetPeer* mpServerPeer = nullptr;
@@ -128,6 +129,7 @@ private:
 	void ResetAllSlots();
 	void DispatchIncoming(ENetEvent& rEvent, bool bFastForward);
 	void Receive(ENetEvent& rEvent);
+	void Receive(std::span<const uint8_t> packetData);
 	void ServerCoordinateFullState(std::span<const uint8_t> packetData);
 	void ServerCoordinateStaticData(std::span<const uint8_t> packetData);
 	void ServerCoordinateUpdateOrResend(std::span<const uint8_t> packetData, bool bProcessRoundTripTime);

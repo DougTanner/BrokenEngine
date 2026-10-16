@@ -6,7 +6,7 @@ namespace engine
 {
 
 ParticleManager::ParticleManager()
-: common::Singleton<ParticleManager>(gpParticleManager)
+: common::Singleton<ParticleManager>(gpParticleManager, this)
 {
 	ScopedBootTimer scopedBootTimer(kBootTimerParticleManager);
 }

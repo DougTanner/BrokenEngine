@@ -9,6 +9,7 @@
 #include "Ui/SoundSettingsWrappersBase.h"
 #include "CrashReport.h"
 
+#include "Frame/FlightPlaneTable.h"
 #include "Frame/TerrainUtils.h"
 #include "Graphics/Camera.h"
 #include "Profile/ProfileManager.h"
@@ -270,6 +271,7 @@ static int64_t MainThread(HINSTANCE hInstance)
 
 	// Create terrain collision data (before Graphics, which creates Islands that reads beach elevation)
 	auto pIslandTerrain = std::make_unique<IslandTerrain>();
+	auto pFlightPlanes = std::make_unique<FlightPlanes>(game::kFlightPlanes);
 	auto pIslandTerrainResidency = std::make_unique<IslandTerrainResidency>();
 
 	// Wait for islands to load and initialize heightmaps before Graphics ctor. Terrain mesh CPU
@@ -335,11 +337,12 @@ static int64_t MainThread(HINSTANCE hInstance)
 	ShowWindow(sHWindow, gLaunchOptions.iAgentPort != 0 ? SW_SHOWMINNOACTIVE : SW_SHOWDEFAULT);
 #else
 	auto pIslandTerrain = std::make_unique<IslandTerrain>();
+	auto pFlightPlanes = std::make_unique<FlightPlanes>(game::kFlightPlanes);
 	if (HandleEagerLoadCompletion() != 0)
 	{
 		return 1;
 	}
-	gpIslandTerrain->WaitForElevationMaps(game::NavigationThresholdElevation(gBaseHeight.mfCurrent), game::NavigationClearanceMeters());
+	gpIslandTerrain->WaitForElevationMaps(game::NavigationThresholdElevation(gpFlightPlanes->Lowest().fHeightMeters), game::NavigationClearanceMeters());
 
 	auto pGame = std::make_unique<game::Game>();
 

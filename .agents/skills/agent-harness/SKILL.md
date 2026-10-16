@@ -23,11 +23,12 @@ length-prefixed JSON.
   screenshot the game.
 - A request for GPU frame capture or RenderDoc capture analysis.
 - Any user request to launch the game for their own play or testing: always,
-  with no further prompting, run only the project
+  with no further prompting, run the project
   [`launch.md`](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/launch.md#normal-launch)
-  `## Normal launch` recipe in place of the worker steps, leave both processes
-  running for the user, and return `Criterion results: 0/0 passed` with the
-  launch command and both PIDs as `Decisive checks` rows.
+  `## Normal launch` recipe in place of the worker steps, apart from the worker
+  steps it cites, leave both processes running for the user, and return
+  `Criterion results: 0/0 passed` with the launch command and both PIDs as
+  `Decisive checks` rows.
 
 ## Inputs
 

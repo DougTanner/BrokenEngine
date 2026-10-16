@@ -10,7 +10,8 @@
 # `pass` / `failed` / `error` / `blocked`.
 #
 # Recognized declaration form: `TYPE* __restrict pName` or the C-array-of-pointer column
-# `TYPE* pName[COUNT]`, each one tuple entry. Recognized guards: `#if defined(BT_CLIENT)` and
+# `TYPE* pName[COUNT]`, each one tuple entry; TYPE may carry a template argument list, such as
+# `std::chrono::duration<float>`. Recognized guards: `#if defined(BT_CLIENT)` and
 # `#if defined(BT_SERVER)` with optional `#else`.
 #
 # Guard parity is per-build tuple membership, not literal guard text: a column is flagged only when
@@ -305,7 +306,7 @@ function Read-CollectionHeader
 
 		if ($structOpened -and $depthBefore -eq ($structDepth + 1))
 		{
-			if ($trimmed -cmatch '^[A-Za-z_][\w:]*\s*\*\s*__restrict\s+(\w+)\s*[=;]' -or $trimmed -cmatch '^[A-Za-z_][\w:]*\s*\*\s+(\w+)\s*\[[^\]]+\]\s*[=;]')
+			if ($trimmed -cmatch '^[A-Za-z_][\w:]*(?:<[\w:<>,\s]*>)?\s*\*\s*__restrict\s+(\w+)\s*[=;]' -or $trimmed -cmatch '^[A-Za-z_][\w:]*(?:<[\w:<>,\s]*>)?\s*\*\s+(\w+)\s*\[[^\]]+\]\s*[=;]')
 			{
 				$null = $current.Declarations.Add([pscustomobject]@{
 					Member = $Matches[1]

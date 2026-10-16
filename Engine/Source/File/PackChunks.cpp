@@ -574,84 +574,6 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 	}
 }
 
-bool PackChunks::ReadChunkData(common::crc_t crc, int64_t iOffset, std::span<std::byte> buffer)
-{
-	// Check eager chunks first. No locking needed: they are read-only once the async eager load publishes
-	// mbEagerLoadComplete — skip the lookup until then so a boot-window read can't race the populating task.
-	if (mbEagerLoadComplete.load(std::memory_order_acquire))
-	{
-		auto it = mEagerChunkMap.find(crc);
-		if (it != mEagerChunkMap.end())
-		{
-			const EagerChunk& rEagerChunk = it->second;
-			// Use the chunk-table data extent, not pHeader->iSize: a scene chunk's iSize excludes its appended animation section
-			int64_t iDataSize = rEagerChunk.iDataSize;
-
-			if (iOffset + buffer.size() > static_cast<uint64_t>(iDataSize))
-			{
-				return false;
-			}
-
-			std::memcpy(buffer.data(), rEagerChunk.pData + iOffset, buffer.size());
-			return true;
-		}
-	}
-
-	auto it = mLazyChunkMap.find(crc);
-	if (it != mLazyChunkMap.end())
-	{
-		LazyChunk& rLazyChunk = it->second;
-
-		// If chunk is loaded, read from memory. No lock: pData visibility comes from the eState release
-		// (LoadChunk) / acquire (here) pair, not PackChunkLoader::mQueueMutex — the lockless writers never take it.
-		// pData/iDataSize are fixed at construction, so no reset can move them out from under this read.
-		if (rLazyChunk.eState.value.load(std::memory_order_acquire) >= ChunkState::kDiskLoaded)
-		{
-			// An adopted texture keeps its pData/iDataSize while its pool pages are decommitted, so a texture CRC
-			// reaching this path would copy from decommitted memory. eState is the authority for non-texture reads.
-			ASSERT(!(rLazyChunk.header.flags & common::ChunkFlags::kTexture));
-
-			if (iOffset + buffer.size() > static_cast<uint64_t>(rLazyChunk.iDataSize))
-			{
-				return false;
-			}
-
-			std::memcpy(buffer.data(), rLazyChunk.pData + iOffset, buffer.size());
-			return true;
-		}
-
-		data::DataTypes eDataType = DataTypeFromFlags(rLazyChunk.header.flags);
-
-		// Chunk not loaded - read directly from pack file
-		// This path is used for streaming audio data without loading entire chunk
-		std::fstream packStream(mPackFilePaths[eDataType], std::ios::in | std::ios::binary);
-
-		if (!packStream.is_open())
-		{
-			return false;
-		}
-
-		int64_t iDataOffset = rLazyChunk.location.uiOffset + common::kiChunkDataOffset;
-		int64_t iDataSize = rLazyChunk.location.uiSize - common::kiChunkDataOffset;
-
-		if (iOffset + buffer.size() > static_cast<uint64_t>(iDataSize))
-		{
-			packStream.close();
-			return false;
-		}
-
-		packStream.seekg(iDataOffset + iOffset);
-		packStream.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
-		// Past the bounds check above, a short read means the pack file itself is truncated.
-		ASSERT(packStream.good());
-		packStream.close();
-
-		return true;
-	}
-
-	return false;
-}
-
 #if defined(BT_CLIENT)
 
 ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, int64_t iOffset, std::span<std::byte> buffer)
@@ -983,16 +905,14 @@ void PackChunks::DecommitChunkRange(common::crc_t crc, int64_t iOffset, int64_t 
 	if (iAlignedEnd > iAlignedStart)
 	{
 		// MEM_RELEASE would discard the pool reservation that RecommitAndReloadChunkRange recommits at this address.
-#pragma warning(suppress: 6250) // Intentional MEM_DECOMMIT; retaining the lazy-pool reservation is required.
 		VirtualFree(reinterpret_cast<void*>(iAlignedStart), static_cast<SIZE_T>(iAlignedEnd - iAlignedStart), MEM_DECOMMIT);
 	}
 }
 
 bool PackChunks::RecommitAndReloadChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength, int64_t iThreadIndex)
 {
-	// Inverse of DecommitChunkRange for device-loss recovery: re-commit the same page-aligned interior, then re-read
-	// the whole [iOffset, iOffset + iLength) range straight from the pack file on disk. ReadChunkData cannot serve
-	// this — for a loaded chunk it copies from the (now-decommitted) resident pool and would fault — so read directly.
+	// Inverse of DecommitChunkRange: re-commit the same page-aligned interior, then re-read the whole
+	// [iOffset, iOffset + iLength) range straight from the pack file on disk.
 	LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
 	// Compressed chunks store decompressed bytes in the pool, so a raw disk reload corrupts that representation without
 	// necessarily crashing. This path requires uncompressed chunks; island chunks satisfy that contract.

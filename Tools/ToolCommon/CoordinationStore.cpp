@@ -1,15 +1,14 @@
 #include "CoordinationStore.h"
 
+#include "../../Common/Sha256Hasher.h"
 #include "ToolCliCommon.h"
 
 #include <algorithm>
-#include <bcrypt.h>
 #include <chrono>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <thread>
-#include <vector>
 
 #pragma comment(lib, "bcrypt.lib")
 
@@ -141,38 +140,12 @@ namespace toolcli::coordination
 		return pBuffer;
 	}
 
-	std::optional<std::string> HashSha256(std::string_view value)
+	std::optional<std::string> HashSha256(std::string value)
 	{
-		BCRYPT_ALG_HANDLE hAlgorithm = nullptr;
-		if (::BCryptOpenAlgorithmProvider(&hAlgorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) < 0)
-		{
-			return std::nullopt;
-		}
-		DWORD uiObjectLength = 0;
-		DWORD uiResultLength = 0;
-		if (::BCryptGetProperty(hAlgorithm, BCRYPT_OBJECT_LENGTH, reinterpret_cast<PUCHAR>(&uiObjectLength), sizeof(uiObjectLength), &uiResultLength, 0) < 0)
-		{
-			::BCryptCloseAlgorithmProvider(hAlgorithm, 0);
-			return std::nullopt;
-		}
-		int64_t iObjectLength = uiObjectLength;
-		std::vector<UCHAR> hashObject(static_cast<size_t>(iObjectLength));
-		BCRYPT_HASH_HANDLE hHash = nullptr;
-		if (::BCryptCreateHash(hAlgorithm, &hHash, hashObject.data(), static_cast<ULONG>(iObjectLength), nullptr, 0, 0) < 0
-		 || ::BCryptHashData(hHash, reinterpret_cast<PUCHAR>(const_cast<char*>(value.data())), static_cast<ULONG>(value.size()), 0) < 0)
-		{
-			if (hHash != nullptr)
-			{
-				::BCryptDestroyHash(hHash);
-			}
-			::BCryptCloseAlgorithmProvider(hAlgorithm, 0);
-			return std::nullopt;
-		}
-		UCHAR pDigest[32] {};
-		bool bSucceeded = ::BCryptFinishHash(hHash, pDigest, static_cast<ULONG>(sizeof(pDigest)), 0) >= 0;
-		::BCryptDestroyHash(hHash);
-		::BCryptCloseAlgorithmProvider(hAlgorithm, 0);
-		if (!bSucceeded)
+		common::Sha256Hasher hasher;
+		hasher.Update(std::as_writable_bytes(std::span(value)));
+		std::array<uint8_t, 32> pDigest {};
+		if (!hasher.Finish(pDigest))
 		{
 			return std::nullopt;
 		}

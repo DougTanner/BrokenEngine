@@ -25,8 +25,9 @@ delegated `builder`; separate-role requirements return to the manager.
   link-error check.
 - Not for AgentTools bootstrap or promotion.
 - When the changed set contains a non-Markdown path under `Tools/WorktreeCli/`,
-  `Tools/AgentHarness/`, or `Tools/ToolCommon/`, the rebuilt tools are promoted
-  through `/finalize-changes`, which owns that promotion and bootstrap policy —
+  `Tools/AgentHarness/`, or `Tools/ToolCommon/`, or `Common/Sha256Hasher.h`, the
+  rebuilt tools are promoted through `/finalize-changes`, which owns that
+  promotion and bootstrap policy —
   [`agenttools.md`](../finalize-changes/references/agenttools.md).
 
 ## Inputs
@@ -40,7 +41,11 @@ skill-specific inputs:
   the build script refuses any other configuration for them. Agent tooling
   runs only the Release executables, since each Debug build is named
   `<Project>.Debug.exe`. Those Debug configurations are for humans debugging
-  the tools, and DataPacker's Debug export is very slow;
+  the tools, and DataPacker's Debug export is very slow. ThirdParty builds run
+  only in the primary checkout, per
+  [`ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md`](../../../ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md)
+  `## Consumer Provisioning`: from any other checkout `-Target ThirdParty` is
+  blocked, so never request it from a session worktree;
 - the repository root, primary checkout, and baseline the caller explicitly
   supplied, or none;
 - whether the session's approved plan or acceptance table includes an

@@ -28,7 +28,7 @@ struct SoundsInterpolate : public Collection<SoundsInterpolate, CollectionFlags:
 		common::crc_t uiCrc = 0;
 		float fVolume = 0.0f;
 		float fPitch = 0.0f;
-		float fFadeOutTime = 0.0f;
+		std::chrono::duration<float> fadeOutTime = std::chrono::duration<float>::zero();
 	};
 
 	// Sync owned sound with parent-provided data
@@ -39,13 +39,13 @@ struct SoundsInterpolate : public Collection<SoundsInterpolate, CollectionFlags:
 	common::crc_t* __restrict puiCrcs = nullptr;
 	float* __restrict pfVolumes = nullptr;
 	float* __restrict pfPitches = nullptr;
-	float* __restrict pfFadeOutTimes = nullptr;
+	std::chrono::duration<float>* __restrict pFadeOutTimes = nullptr;
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	XMVECTOR* __restrict pVecVelocities = nullptr;
 
 	auto Members(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiCrcs, rSelf.pfVolumes, rSelf.pfPitches, rSelf.pfFadeOutTimes, rSelf.pVecPositions, rSelf.pVecVelocities);
+		return std::tie(rSelf.puiCrcs, rSelf.pfVolumes, rSelf.pfPitches, rSelf.pFadeOutTimes, rSelf.pVecPositions, rSelf.pVecVelocities);
 	}
 
 };

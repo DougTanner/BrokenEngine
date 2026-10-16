@@ -2,12 +2,11 @@
 
 #include "Frame/Collections/Pushers/Pushers.h"
 #include "Frame/CellStaticData.h"
+#include "Frame/FlightPlanes.h"
 #include "Frame/IslandTerrain.h"
 #include "Frame/NavQuery.h"
-#include "Ui/WrapperBase.h"
 
 #include "Frame/TerrainUtils.h"
-#include "Profile/ProfileManager.h"
 
 namespace game
 {
@@ -57,7 +56,7 @@ static int64_t SelectIslandPlacement(const engine::CellStaticData& rStaticData, 
 	return iSelected;
 }
 
-static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFrame, const PlayersPostRender& rCurrent, const PlayersPostRender& rPrevious, const PlayersInterpolate& rPreviousInterpolate, int64_t i, FXMVECTOR vecPosition, const engine::CellStaticData& rStaticData, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, float fDeltaTime, int64_t& riNavigationDirection, XMVECTOR& rVecIslandDestination, float& rfCellChangeTimer)
+static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFrame, const PlayersPostRender& rCurrent, const PlayersPostRender& rPrevious, const PlayersInterpolate& rPreviousInterpolate, int64_t i, FXMVECTOR vecPosition, const engine::CellStaticData& rStaticData, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer)
 {
 	// Fleet navigation: navigate toward fleet's wanted coord after countdown expires
 	if (!(fleetWantedCoordinate == rStaticData.coordinate) && iPendingFleetWantedCoordinateTicks == 0)
@@ -146,8 +145,8 @@ static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFram
 	// Cell change timer: cycle back to island destination when roaming
 	if (riNavigationDirection == -1)
 	{
-		rfCellChangeTimer -= fDeltaTime;
-		if (rfCellChangeTimer <= 0.0f)
+		rCellChangeTimer -= deltaTime;
+		if (rCellChangeTimer.count() <= 0.0f)
 		{
 			riNavigationDirection = 4;
 		}
@@ -164,8 +163,8 @@ static bool ShouldRecomputeNavigation(const Frame& rFrame, const PlayersPostRend
 
 	// The throttle carries the shared world-space bearing for up to kiNavigationRecomputeInterval ticks. Recompute when
 	// either the kfNavigationLookahead point or current position is inside a nav polygon: lookahead alone misses ships
-	// already stranded inside. NavigationThresholdElevation and ApplyTerrainPush use
-	// gBaseHeight - kfPlayerRadius - kfPushMargin; the nav polygon inflates that contour, leaving a no-nav band
+	// already stranded inside. NavigationThresholdElevation and ApplyTerrainPush use the lowest flight plane's height minus
+	// kfPlayerRadius and kfPushMargin; the nav polygon inflates that contour, leaving a no-nav band
 	// with zero terrain push. rVecArtificialIntelligenceDirection, vecPosition, and server-built, wire-shipped navigationData match on
 	// client/server, and this check draws no RNG. Roam mode -1 is exempt because ComputeArtificialIntelligenceSteering re-steers
 	// every tick.
@@ -184,24 +183,7 @@ static bool ShouldRecomputeNavigation(const Frame& rFrame, const PlayersPostRend
 static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] PlayersPostRender& rCurrent, [[maybe_unused]] int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecDestination, const engine::CellStaticData& rStaticData, XMVECTOR& rVecArtificialIntelligenceDirection)
 {
 	XMVECTOR vecDebugWaypoint = XMVectorZero();
-	XMVECTOR vecNavigationDirection = XMVectorZero();
-#if defined(BT_SERVER)
-	bool bEnteredAStar = false;
-#endif // BT_SERVER
-	{
-		engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderUpdateNavigationQuery);
-#if defined(BT_SERVER)
-		vecNavigationDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, &vecDebugWaypoint, &bEnteredAStar);
-#else
-		vecNavigationDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, &vecDebugWaypoint);
-#endif // BT_SERVER
-	}
-#if defined(BT_SERVER)
-	if constexpr (kbProfiling)
-	{
-		gpProfileManager->AddRawCpuTimerAuxiliaryCount(game::kCpuTimerPostRenderUpdateNavigationQuery, static_cast<int64_t>(bEnteredAStar));
-	}
-#endif // BT_SERVER
+	XMVECTOR vecNavigationDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, vecDebugWaypoint);
 	if (XMVectorGetX(XMVector3LengthSq(vecNavigationDirection)) > 0.001f)
 	{
 		rVecArtificialIntelligenceDirection = vecNavigationDirection;
@@ -247,13 +229,13 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 				.alignment = rCurrentPostRender.pAlignments[i],
 				.fHealth = rCurrentPostRender.pfArmors[i],
 				.fShield = rCurrentPostRender.pfShields[i],
-				.nextBlasterFireTimeSeconds = std::chrono::duration<float>(rCurrentPostRender.pfNextBlasterFireTimes[i]),
-				.nextSecondarySpawnTimeSeconds = std::chrono::duration<float>(rCurrentPostRender.pfNextSecondarySpawnTimes[i]),
-				.shieldCooldownSeconds = std::chrono::duration<float>(rCurrentPostRender.pfShieldCooldowns[i]),
-				.shieldDownSoundCooldownSeconds = std::chrono::duration<float>(rCurrentPostRender.pfShieldDownSoundCooldowns[i]),
-				.animationTimeSeconds = std::chrono::duration<float>(rCurrentInterpolate.pfAnimationTimes[i]),
+				.nextBlasterFireTimeSeconds = rCurrentPostRender.pNextBlasterFireTimes[i],
+				.nextSecondarySpawnTimeSeconds = rCurrentPostRender.pNextSecondarySpawnTimes[i],
+				.shieldCooldownSeconds = rCurrentPostRender.pShieldCooldowns[i],
+				.shieldDownSoundCooldownSeconds = rCurrentPostRender.pShieldDownSoundCooldowns[i],
+				.animationTimeSeconds = rCurrentInterpolate.pAnimationTimes[i],
 				.uiPlayerFlags = static_cast<uint16_t>(std::to_underlying(rCurrentPostRender.pFlags[i].meFlags) & ~std::to_underlying(kTransfer)),
-				.navigationDelaySeconds = std::chrono::duration<float>(rCurrentPostRender.pfNavigationDelays[i]),
+				.navigationDelaySeconds = rCurrentPostRender.pNavigationDelays[i],
 			},
 		};
 		request.data.globalPlayerId = rCurrentPostRender.pGlobalPlayerIds[i];
@@ -278,7 +260,7 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	}
 }
 
-void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, float fDeltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, float& rfCellChangeTimer)
+void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer)
 {
 	PlayersPostRender& __restrict rCurrent = *rFrame.postRender.pPlayers;
 	const PlayersPostRender& rPrevious = *rPreviousFrame.postRender.pPlayers;
@@ -297,7 +279,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 		bReseededDirection = true;
 	}
 
-	UpdateFleetAndFlagshipNavigation(rFrame, rCurrent, rPrevious, rPreviousInterpolate, i, vecPosition, rStaticData, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, flags, fDeltaTime, riNavigationDirection, rVecIslandDestination, rfCellChangeTimer);
+	UpdateFleetAndFlagshipNavigation(rFrame, rCurrent, rPrevious, rPreviousInterpolate, i, vecPosition, rStaticData, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, flags, deltaTime, riNavigationDirection, rVecIslandDestination, rCellChangeTimer);
 
 	bool bRecompute = ShouldRecomputeNavigation(rFrame, rCurrent, i, vecPosition, rVecArtificialIntelligenceDirection, iEntryNavigationDirection, bReseededDirection, riNavigationDirection, rStaticData);
 
@@ -353,7 +335,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 
 				float fX = fIslandMinimumX + common::Random(rTemplate.fQuadFootprintX, rFrame.postRender.randomEngine);
 				float fY = fIslandMinimumY + common::Random(rTemplate.fQuadFootprintY, rFrame.postRender.randomEngine);
-				rVecIslandDestination = XMVectorSet(fX, fY, engine::gBaseHeight.mfCurrent, 1.0f);
+				rVecIslandDestination = XMVectorSet(fX, fY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 
 				// Snap to navigable area if inside an obstacle
 				rVecIslandDestination = engine::NavQuerySnapToNavigable(rVecIslandDestination, rStaticData.navigationData);
@@ -404,24 +386,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 		if (bRecompute)
 		{
 			XMVECTOR vecDebugWaypoint = XMVectorZero();
-			XMVECTOR vecNavigationDirection = XMVectorZero();
-#if defined(BT_SERVER)
-			bool bEnteredAStar = false;
-#endif // BT_SERVER
-			{
-				engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderUpdateNavigationQuery);
-#if defined(BT_SERVER)
-				vecNavigationDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, kbDebugRender ? &vecDebugWaypoint : nullptr, &bEnteredAStar);
-#else
-				vecNavigationDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, kbDebugRender ? &vecDebugWaypoint : nullptr);
-#endif // BT_SERVER
-			}
-#if defined(BT_SERVER)
-			if constexpr (kbProfiling)
-			{
-				gpProfileManager->AddRawCpuTimerAuxiliaryCount(game::kCpuTimerPostRenderUpdateNavigationQuery, static_cast<int64_t>(bEnteredAStar));
-			}
-#endif // BT_SERVER
+			XMVECTOR vecNavigationDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, vecDebugWaypoint);
 			float fNavigationLengthSquared = XMVectorGetX(XMVector3LengthSq(vecNavigationDirection));
 			if (fNavigationLengthSquared > 0.001f)
 			{
@@ -443,7 +408,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 	else
 	{
 		rVecIslandDestination = XMVectorZero();
-		auto [vecNewArtificialIntelligenceDirection] = ComputeArtificialIntelligenceSteering(rStaticData, vecPosition, rVecArtificialIntelligenceDirection, vecCellCenter, fDeltaTime, i % 2 == 0);
+		auto [vecNewArtificialIntelligenceDirection] = ComputeArtificialIntelligenceSteering(rStaticData, vecPosition, rVecArtificialIntelligenceDirection, vecCellCenter, deltaTime.count(), i % 2 == 0);
 		rVecArtificialIntelligenceDirection = vecNewArtificialIntelligenceDirection;
 #if defined(BT_CLIENT)
 		if constexpr (kbDebugRender)
@@ -454,18 +419,18 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 	}
 }
 
-void XM_CALLCONV PlayersPostRender::ApplyMovement(int64_t iNavigationDirection, FXMVECTOR vecArtificialIntelligenceDirection, float fDeltaTime, float fAccelerationMultiplier, float fDecayMultiplier, XMVECTOR& rVecVelocity)
+void XM_CALLCONV PlayersPostRender::ApplyMovement(int64_t iNavigationDirection, FXMVECTOR vecArtificialIntelligenceDirection, std::chrono::duration<float> deltaTime, float fAccelerationMultiplier, float fDecayMultiplier, XMVECTOR& rVecVelocity)
 {
 	float fAcceleration = (iNavigationDirection == 5 ? kfPlayerCatchUpAcceleration : kfPlayerAcceleration) * fAccelerationMultiplier;
 	float fMaximumSpeed = iNavigationDirection == 5 ? kfPlayerCatchUpMaximumSpeed : kfPlayerMaximumSpeed;
-	rVecVelocity = engine::ApplyMovement(rVecVelocity, vecArtificialIntelligenceDirection, fDeltaTime, fAcceleration, kfPlayerDrag * fDecayMultiplier, fMaximumSpeed);
+	rVecVelocity = engine::ApplyMovement(rVecVelocity, vecArtificialIntelligenceDirection, deltaTime.count(), fAcceleration, kfPlayerDrag * fDecayMultiplier, fMaximumSpeed);
 }
 
 void XM_CALLCONV PlayersPostRender::ApplyTerrainPush(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity)
 {
 	// Terrain collision - add velocity away from terrain, gentle at first then ramping up
 	float fElevation = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition);
-	float fPushHeight = engine::gBaseHeight.mfCurrent - kfPlayerRadius - kfPushMargin;
+	float fPushHeight = engine::gpFlightPlanes->Lowest().fHeightMeters - kfPlayerRadius - kfPushMargin;
 	if (fElevation >= fPushHeight) [[unlikely]]
 	{
 		XMVECTOR vecTerrainNormal = XMVector3Normalize(XMVectorSetZ(engine::gpIslandTerrain->CellNormal(rStaticData, vecPosition), 0.0f));
@@ -477,8 +442,8 @@ void XM_CALLCONV PlayersPostRender::ApplyTerrainPush(const engine::CellStaticDat
 
 void XM_CALLCONV PlayersPostRender::ResolveTerrainContact(const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, XMVECTOR& rVecVelocity)
 {
-	// Hard contact at gBaseHeight; ApplyTerrainPush is the softer band in front of it.
-	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, vecPreviousPosition, rVecPosition, kfPlayerRadius, engine::gBaseHeight.mfCurrent, true);
+	// Hard contact at the lowest flight plane's height; ApplyTerrainPush is the softer band in front of it.
+	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, vecPreviousPosition, rVecPosition, kfPlayerRadius, engine::gpFlightPlanes->Lowest().fHeightMeters, true);
 	if (result.flags & engine::DiscTerrainFlags::kStartOverlap) [[unlikely]]
 	{
 		LOG(kDefault, kWarning, "Player terrain start overlap Cell: ({},{}) Index: {} Start: {} Moved: {}", rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPreviousPosition, 1), common::Wb(result.fStartOverlapDistance, 1));

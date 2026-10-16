@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Frame/FrameUtils.h"
 #include "Frame/GridCoord.h"
 #include "Frame/NavBuild.h"
 #if defined(BT_CLIENT)
@@ -68,15 +67,15 @@ struct IslandTemplate
 	int64_t iMeshIndexCount = 0;
 
 	// Per-island valid-area convex hull (CCW) in island-local meters, centered. Slices the kIsland
-	// chunk payload after the mesh indices (set by WaitForElevationMaps). Shared: the server packs
-	// island placements against the rotated hull (IslandChainPlacement) and the client also debug-
-	// renders it (MainUniforms DebugRenderIslandValidArea). A count < 3 (or null pointer) means no
-	// usable polygon.
+	// chunk payload after the mesh indices. Shared: the server packs island placements against the
+	// rotated hull (IslandChainPlacement) and the client also debug-renders it (MainUniforms
+	// DebugRenderIslandValidArea). WaitForElevationMaps sets a non-null pointer and a count of at
+	// least 3 for every template.
 	const XMFLOAT2* pf2ValidAreaVertices = nullptr;
 	int64_t iValidAreaVertexCount = 0;
 
 #if defined(BT_CLIENT)
-	// Phase 5 LRU eviction state. bGpuResident means "slot points at this template's real
+	// LRU eviction state. bGpuResident means "slot points at this template's real
 	// Texture*s AND those Textures have live GPU resources". False while in slot-0 fallback
 	// (the neutral placeholder textures) — covers both first-mint-pre-adopt and
 	// post-eviction-pre-restore. iReferenceCount is recomputed from scratch each frame in
@@ -162,7 +161,6 @@ public:
 	std::vector<common::crc_t> mIslandCrcsByArea;
 
 	// IslandChainPlacement selects roles from size buckets in the same CRC order on client and server.
-	// Empty buckets fall back through related buckets, then mIslandCrcsSorted.
 	std::vector<common::crc_t> mHugeCrcs;      // area >= kfHugeIslandAreaMeters   (1x1 full tiles, ~400x400)
 	std::vector<common::crc_t> mLargeCrcs;     // area >= kfLargeIslandAreaMeters  (2x1 / 3x1 strips)
 	std::vector<common::crc_t> mMediumCrcs;    // area >= kfMediumIslandAreaMeters (mid tiles)
@@ -174,31 +172,5 @@ public:
 };
 
 inline IslandTerrain* gpIslandTerrain = nullptr;
-
-SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticData, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition, float fStartTime, float fEndTime);
-
-enum class DiscTerrainFlags : uint8_t
-{
-	kContact      = 1 << 0,
-	kStartOverlap = 1 << 1,
-};
-
-// vecPosition is the resolved center, with the end position's Z and W = 1. vecNormal (Z = 0, W = 0) is the first
-// contact's horizontal normal and holds only with kContact. kStartOverlap is set whenever the start overlapped
-// blocking terrain; fStartOverlapDistance is how far the navigation snap moved it, 0 when the snap left it in place.
-struct DiscTerrainResult
-{
-	XMVECTOR vecPosition {};
-	XMVECTOR vecNormal {};
-	common::Flags<DiscTerrainFlags> flags;
-	float fStartOverlapDistance = 0.0f;
-};
-
-// Sim path. Sweeps a horizontal disc of fRadius from vecStart to vecEnd over the cell's own elevation grid, where a
-// grid cell at or above fThresholdHeight blocks, and stops it at first contact; with bSlide the remaining motion,
-// less its component into the contact normal, is swept once more. An overlapped start is first moved by
-// NavQuerySnapToNavigable, the end moving with it, and the cells still overlapping the resolved start are left out
-// of both sweeps. Reads only rStaticData, never mCells.
-DiscTerrainResult XM_CALLCONV ResolveDiscAgainstTerrain(const CellStaticData& rStaticData, FXMVECTOR vecStart, FXMVECTOR vecEnd, float fRadius, float fThresholdHeight, bool bSlide);
 
 } // namespace engine

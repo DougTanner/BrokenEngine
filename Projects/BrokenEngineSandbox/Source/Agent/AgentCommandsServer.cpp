@@ -4,7 +4,6 @@
 
 #include "File/Replay.h"
 
-#include "Agent/Commands/ServerFaultHarnessRigs.h"
 #include "Agent/Commands/ServerFrameEdit.h"
 #include "Agent/Commands/ServerSimulationHarnessRigs.h"
 #include "Agent/AgentCommandsServerQueries.h"
@@ -179,46 +178,14 @@ static void CommandReset([[maybe_unused]] const nlohmann::json& rParameters, nlo
 
 static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParameters.is_object())
+	if (!rParameters.empty())
 	{
-		throw std::runtime_error("query_profile params must be an object");
-	}
-
-	bool bAcknowledgementRequested = false;
-	int64_t iAcknowledgementSequence = 0;
-	for (const auto& [rKey, rValue] : rParameters.items())
-	{
-		if (rKey != "ackActivationEventSequence")
-		{
-			throw std::runtime_error("query_profile unknown parameter '" + rKey + "'");
-		}
-		if (!rValue.is_number_unsigned() || rValue.get<uint64_t>() == 0)
-		{
-			throw std::runtime_error("'ackActivationEventSequence' must be a nonzero unsigned integer");
-		}
-		bAcknowledgementRequested = true;
-		iAcknowledgementSequence = static_cast<int64_t>(rValue.get<uint64_t>());
-	}
-	if constexpr (!kbProfiling)
-	{
-		if (bAcknowledgementRequested)
-		{
-			throw std::runtime_error("ackActivationEventSequence requires a profiling server");
-		}
+		throw std::runtime_error("query_profile requires empty params");
 	}
 
 	nlohmann::json timers = nlohmann::json::array();
 	{
 		std::lock_guard lock(gpProfileManager->mCpuTimerMutex);
-		bool bActivationEventAcknowledged = false;
-		if constexpr (kbProfiling)
-		{
-			if (bAcknowledgementRequested)
-			{
-				bActivationEventAcknowledged = gpProfileManager->AcknowledgeRawCpuTimerEvent(game::kCpuTimerPostRenderUpdateNavigationQuery, iAcknowledgementSequence);
-			}
-		}
-
 		for (int64_t i = 0; i < gpProfileManager->miCpuTimerCount; ++i)
 		{
 			engine::CpuTimer& rTimer = gpProfileManager->GetCpuTimer(i);
@@ -239,25 +206,6 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 					timer["sampleUs"] = rawRecord.iSampleMicroseconds;
 					timer["queryCount"] = rawRecord.iInvocationCount;
 					timer["aStarCount"] = rawRecord.iAuxiliaryCount;
-
-					engine::RawCpuTimerEventRecord eventRecord = gpProfileManager->mpRawCpuTimers[static_cast<size_t>(i)].eventRecord;
-					bool bEventAvailable = eventRecord.flags & engine::RawCpuTimerEventFlags::kAvailable;
-					bool bEventOverrun = eventRecord.flags & engine::RawCpuTimerEventFlags::kOverrun;
-					timer["activationEvent"] = {
-						{"available", bEventAvailable},
-						{"eventSequence", eventRecord.iEventSequence},
-						{"sampleSequence", eventRecord.iSampleSequence},
-						{"sampleTick", eventRecord.iSampleTick},
-						{"sampleUs", eventRecord.iSampleMicroseconds},
-						{"queryCount", eventRecord.iInvocationCount},
-						{"aStarCount", eventRecord.iAuxiliaryCount},
-						{"qualifying", bEventAvailable && eventRecord.iInvocationCount == 8 && eventRecord.iAuxiliaryCount == 8},
-						{"overrun", bEventOverrun},
-					};
-					if (bAcknowledgementRequested)
-					{
-						timer["activationEventAcknowledged"] = bActivationEventAcknowledged;
-					}
 				}
 			}
 			timers.push_back(std::move(timer));
@@ -300,21 +248,6 @@ bool ExecuteAgentCommandServer(std::string_view command, const nlohmann::json& r
 		CommandStatus(rParameters, rResult);
 		return true;
 	}
-	if (command == "game_packet_fault_harness_rig")
-	{
-		CommandGamePacketFaultHarnessRig(rParameters, rResult);
-		return true;
-	}
-	if (command == "engine_packet_fault_harness_rig")
-	{
-		CommandEnginePacketFaultHarnessRig(rParameters, rResult);
-		return true;
-	}
-	if (command == "server_pre_handshake_ack_harness_rig")
-	{
-		CommandServerPreHandshakeAcknowledgmentHarnessRig(rParameters, rResult);
-		return true;
-	}
 	if (command == "pause")
 	{
 		CommandPause(rParameters, rResult);
@@ -343,6 +276,11 @@ bool ExecuteAgentCommandServer(std::string_view command, const nlohmann::json& r
 	if (command == "edit_frame")
 	{
 		CommandEditFrame(rParameters, rResult);
+		return true;
+	}
+	if (command == "read_frame")
+	{
+		CommandReadFrame(rParameters, rResult);
 		return true;
 	}
 	if (ExecuteServerSimulationHarnessRigCommand(command, rParameters, rResult))

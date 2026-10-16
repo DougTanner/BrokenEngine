@@ -13,9 +13,6 @@ namespace engine
 {
 
 struct LazyChunk;
-#if defined(BT_DEBUG)
-struct AudioStreamingVoiceControl;
-#endif
 
 inline constexpr int64_t kiBufferCount = 3;
 inline constexpr int64_t kiBufferSize = 16 * 1'024;
@@ -120,10 +117,6 @@ public:
 	IXAudio2SourceVoice* mpVoice = nullptr;
 private:
 	AudioEngine* mpAudioEngine = nullptr;
-#if defined(BT_DEBUG)
-public:
-	AudioStreamingVoiceControl* mpAudioStreamingControl = nullptr;
-#endif
 };
 
 } // namespace engine

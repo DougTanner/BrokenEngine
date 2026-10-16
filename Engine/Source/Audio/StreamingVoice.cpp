@@ -2,13 +2,10 @@
 
 #if defined(BT_CLIENT)
 
-#include "AudioUtility.h"
-#if defined(BT_DEBUG)
-#include "Agent/Commands/AudioStreamingHarnessRig.h"
-#endif
 #include "File/FileManager.h"
 #include "File/PackChunks.h"
 #include "Ui/SoundSettingsWrappersBase.h"
+#include "AudioUtility.h"
 
 namespace engine
 {
@@ -29,9 +26,6 @@ StreamingVoice::~StreamingVoice()
 {
 	CancelPendingReads();
 	DestroyXAudio2SourceVoice(mpAudioEngine, mpVoice);
-#if defined(BT_DEBUG)
-	AudioStreamingHarnessRig::RetireVoiceControl(mpAudioStreamingControl);
-#endif
 }
 
 std::chrono::duration<float> StreamingVoice::GetRemainingTime() const
@@ -79,12 +73,6 @@ void StreamingVoice::UpdateRequests(bool bAllowRequests)
 	{
 		return;
 	}
-#if defined(BT_DEBUG)
-	if (mpAudioStreamingControl != nullptr && mpAudioStreamingControl->uiPublicationAllowance == 0)
-	{
-		return;
-	}
-#endif
 	if (mbReadDone)
 	{
 		return;
@@ -112,12 +100,6 @@ void StreamingVoice::UpdateRequests(bool bAllowRequests)
 		{
 			return;
 		}
-#if defined(BT_DEBUG)
-		if (mpAudioStreamingControl != nullptr && eResult != ChunkReadResult::kFailed)
-		{
-			--mpAudioStreamingControl->uiPublicationAllowance;
-		}
-#endif
 		if (eResult == ChunkReadResult::kFailed)
 		{
 			mSlotBytesRead[iSlot] = 0;

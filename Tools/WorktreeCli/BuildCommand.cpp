@@ -54,22 +54,6 @@ namespace toolcli
 		return value;
 	}
 
-	// Tests may shorten (never lengthen) the lock wait through BROKEN_ENGINE_BUILD_LOCK_WAIT_SECONDS.
-	static int64_t GetBuildLockWaitSeconds()
-	{
-		std::optional<std::wstring> override = GetEnvironmentValue(L"BROKEN_ENGINE_BUILD_LOCK_WAIT_SECONDS");
-		if (override)
-		{
-			wchar_t* pEnd = nullptr;
-			int64_t iSeconds = std::wcstol(override->c_str(), &pEnd, 10);
-			if (pEnd != override->c_str() && *pEnd == L'\0' && iSeconds >= 0 && iSeconds < kiBuildLockWaitSeconds)
-			{
-				return iSeconds;
-			}
-		}
-		return kiBuildLockWaitSeconds;
-	}
-
 	static void FailBuild(std::string_view message)
 	{
 		Fail(message);
@@ -393,7 +377,7 @@ namespace toolcli
 
 		std::wstring lockName = ToLowerInvariant(rTarget.stem().native()) + L".lock";
 		rLockPath = lockDirectory / lockName;
-		int64_t iWaitSeconds = GetBuildLockWaitSeconds();
+		int64_t iWaitSeconds = kiBuildLockWaitSeconds;
 		std::chrono::steady_clock::time_point waitStart = std::chrono::steady_clock::now();
 		std::chrono::steady_clock::time_point deadline = waitStart + std::chrono::seconds(iWaitSeconds);
 		std::filesystem::path extendedLockPath = ExtendedLengthPath(rLockPath);

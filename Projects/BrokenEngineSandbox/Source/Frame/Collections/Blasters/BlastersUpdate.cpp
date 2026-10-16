@@ -216,8 +216,8 @@ void BlastersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 	{
 		int64_t iIndex = i;
 		sCollisionFlags.at(static_cast<size_t>(iIndex)) = engine::CollisionFlags::kDestroyOnCollide;
-		rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
-		rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)) = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i]);
+		rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)) = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i]);
 		float fMaxTime = std::numeric_limits<float>::max();
 		if (rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)).bHit)
 		{
@@ -280,8 +280,8 @@ void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 
 			[[maybe_unused]] float fRotation = common::Random<XM_2PI>(rFrame.postRender.randomEngine);
 #if defined(BT_CLIENT)
-			engine::PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), siTerrainCraterControllerIndex, vecCollisionPosition, fRotation);
-			engine::PuffsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), siTerrainPuffControllerIndex, vecCollisionPosition);
+			engine::PointLightsPostRender::AddControlled(rFrame, engine::SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)), siTerrainCraterControllerIndex, vecCollisionPosition, fRotation);
+			engine::PuffsPostRender::AddControlled(rFrame, engine::SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)), siTerrainPuffControllerIndex, vecCollisionPosition);
 #endif
 
 #if defined(BT_CLIENT)

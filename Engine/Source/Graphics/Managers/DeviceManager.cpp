@@ -6,7 +6,7 @@ namespace engine
 {
 
 DeviceManager::DeviceManager()
-: common::Singleton<DeviceManager>(gpDeviceManager)
+: common::Singleton<DeviceManager>(gpDeviceManager, this)
 {
 	ScopedBootTimer scopedBootTimer(kBootTimerDeviceManager);
 
@@ -178,8 +178,6 @@ DeviceManager::DeviceManager()
 	}
 	vkDeviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(iUniqueFamilyCount);
 	vkDeviceCreateInfo.pQueueCreateInfos = pVkDeviceQueueCreateInfo;
-	vkDeviceCreateInfo.enabledLayerCount = kbVulkanDebugLayers ? static_cast<uint32_t>(std::ssize(gpInstanceManager->mValidationLayers)) : 0;
-	vkDeviceCreateInfo.ppEnabledLayerNames = kbVulkanDebugLayers ? gpInstanceManager->mValidationLayers.data() : nullptr;
 	vkDeviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(std::ssize(deviceExtensions));
 	vkDeviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
 	VkPhysicalDeviceFeatures vkPhysicalDeviceFeatures
@@ -269,8 +267,11 @@ DeviceManager::DeviceManager()
 		// submerged-vert sink).
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 8'192},
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 1'024},
-		// Three global samplers * up to four framebuffers + two standalone particle samplers = 14; reserve 16.
+		// Only global Set 0 declares samplers: three per set * up to four framebuffers = 12, plus the ImGui backend's
+		// IMGUI_IMPL_VULKAN_MINIMUM_SAMPLER_POOL_SIZE (2) = 14; reserve 16.
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 16},
+		// Only global Set 0's bindless array is a sampled image: (texture chunks + kiLightingBlurSlots) per set * up to
+		// four framebuffers, plus the ImGui backend's IMGUI_IMPL_VULKAN_MINIMUM_SAMPLED_IMAGE_POOL_SIZE (8).
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 4 * 1'024},
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 1'024},
 	};

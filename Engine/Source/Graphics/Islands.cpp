@@ -9,7 +9,7 @@ namespace engine
 {
 
 Islands::Islands()
-: common::Singleton<Islands>(gpIslands)
+: common::Singleton<Islands>(gpIslands, this)
 {
 	// The record-once terrain CB binds this arena once. Template mesh residency changes only its
 	// sub-allocation offsets in indirect commands, never this VkBuffer handle.

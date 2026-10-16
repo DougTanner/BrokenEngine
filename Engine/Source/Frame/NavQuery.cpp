@@ -1,8 +1,10 @@
 #include "NavQuery.h"
 
-#include "Ui/WrapperBase.h"
+#include "Frame/FlightPlanes.h"
 #include "NavBuild.h"
 #include "NavBuildInternal.h"
+
+#include "Profile/ProfileManager.h"
 
 namespace engine
 {
@@ -398,7 +400,7 @@ struct AStarHeap
 
 // A* pathfinding on the visibility graph with temporary start/end nodes
 // Returns the direction toward the first waypoint, or zero vector if no path found
-static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVertices, const NavData& rNavData, const AStarMemory& rMemory, float fBaseHeight, XMVECTOR* pOutNextWaypoint)
+static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVertices, const NavData& rNavData, const AStarMemory& rMemory, float fBaseHeight, XMVECTOR& rVecNextWaypoint)
 {
 	int64_t iVertexCount = std::ssize(rNavData.vertices);
 	int64_t iStartNode = iVertexCount;
@@ -455,10 +457,7 @@ static XMVECTOR AStarPath(XMFLOAT2 f2Start, XMFLOAT2 f2End, const XMFLOAT2* pVer
 			}
 
 			XMFLOAT2 f2Waypoint = GetPosition(iNode);
-			if (pOutNextWaypoint != nullptr)
-			{
-				*pOutNextWaypoint = XMVectorSet(f2Waypoint.x, f2Waypoint.y, fBaseHeight, 1.0f);
-			}
+			rVecNextWaypoint = XMVectorSet(f2Waypoint.x, f2Waypoint.y, fBaseHeight, 1.0f);
 			XMVECTOR vecDirection = XMVectorSet(f2Waypoint.x - f2Start.x, f2Waypoint.y - f2Start.y, 0.0f, 0.0f);
 			return XMVector3Normalize(vecDirection);
 		}
@@ -572,7 +571,7 @@ bool XM_CALLCONV NavQueryPointBlocked(FXMVECTOR vecPosition, const NavData& rNav
 
 XMVECTOR XM_CALLCONV NavQuerySnapToNavigable(FXMVECTOR vecPosition, const NavData& rNavData)
 {
-	float fBaseHeight = gBaseHeight.mfCurrent;
+	float fBaseHeight = gpFlightPlanes->Lowest().fHeightMeters;
 	ASSERT(XMVectorGetZ(vecPosition) == fBaseHeight);
 
 	const XMFLOAT2* pVertices = rNavData.vertices.data();
@@ -590,31 +589,16 @@ XMVECTOR XM_CALLCONV NavQuerySnapToNavigable(FXMVECTOR vecPosition, const NavDat
 	return XMVectorSet(f2BestPoint.x, f2BestPoint.y, fBaseHeight, 1.0f);
 }
 
-#if defined(BT_SERVER)
-XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDestination, const NavData& rNavData, XMVECTOR* pOutNextWaypoint, bool* pOutEnteredAStar)
-#else
-XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDestination, const NavData& rNavData, XMVECTOR* pOutNextWaypoint)
-#endif // BT_SERVER
+XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDestination, const NavData& rNavData, XMVECTOR& rVecNextWaypoint)
 {
-#if defined(BT_SERVER)
-	if constexpr (kbProfiling)
-	{
-		if (pOutEnteredAStar != nullptr)
-		{
-			*pOutEnteredAStar = false;
-		}
-	}
-#endif // BT_SERVER
+	ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderUpdateNavigationQuery);
 
-	float fBaseHeight = gBaseHeight.mfCurrent;
+	float fBaseHeight = gpFlightPlanes->Lowest().fHeightMeters;
 	ASSERT(XMVectorGetZ(vecPosition) == fBaseHeight);
 	ASSERT(XMVectorGetZ(vecDestination) == fBaseHeight);
 
 	// Seed the waypoint with the destination and W=1 before early exits; successful paths replace it.
-	if (pOutNextWaypoint != nullptr)
-	{
-		*pOutNextWaypoint = XMVectorSetW(vecDestination, 1.0f);
-	}
+	rVecNextWaypoint = XMVectorSetW(vecDestination, 1.0f);
 
 	XMVECTOR vecDelta = XMVectorSubtract(vecDestination, vecPosition);
 	if (XMVectorGetX(XMVector3LengthSq(vecDelta)) < 1e-8f)
@@ -656,10 +640,7 @@ XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDesti
 		XMVECTOR vecEscape = XMVectorSet(f2SnapPoint.x - f4Position.x, f2SnapPoint.y - f4Position.y, 0.0f, 0.0f);
 		if (XMVectorGetX(XMVector3LengthSq(vecEscape)) > 1e-8f)
 		{
-			if (pOutNextWaypoint != nullptr)
-			{
-				*pOutNextWaypoint = XMVectorSet(f2SnapPoint.x, f2SnapPoint.y, fBaseHeight, 1.0f);
-			}
+			rVecNextWaypoint = XMVectorSet(f2SnapPoint.x, f2SnapPoint.y, fBaseHeight, 1.0f);
 			return XMVector3Normalize(vecEscape);
 		}
 		f2Position = f2SnapPoint;
@@ -672,10 +653,7 @@ XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDesti
 
 	if (!SegmentBlockedByObstacle(f2Position, f2Destination, pVertices, rNavData))
 	{
-		if (pOutNextWaypoint != nullptr)
-		{
-			*pOutNextWaypoint = XMVectorSet(f2Destination.x, f2Destination.y, fBaseHeight, 1.0f);
-		}
+		rVecNextWaypoint = XMVectorSet(f2Destination.x, f2Destination.y, fBaseHeight, 1.0f);
 		vecResult = XMVector3Normalize(XMVectorSet(f2Destination.x - f2Position.x, f2Destination.y - f2Position.y, 0.0f, 0.0f));
 	}
 	else
@@ -683,13 +661,10 @@ XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDesti
 #if defined(BT_SERVER)
 		if constexpr (kbProfiling)
 		{
-			if (pOutEnteredAStar != nullptr)
-			{
-				*pOutEnteredAStar = true;
-			}
+			gpProfileManager->AddRawCpuTimerAuxiliaryCount(game::kCpuTimerPostRenderUpdateNavigationQuery, 1);
 		}
 #endif // BT_SERVER
-		vecResult = AStarPath(f2Position, f2Destination, pVertices, rNavData, aStarMemory, fBaseHeight, pOutNextWaypoint);
+		vecResult = AStarPath(f2Position, f2Destination, pVertices, rNavData, aStarMemory, fBaseHeight, rVecNextWaypoint);
 
 		// Fallback: if A* found no path, slide along the nearest obstacle boundary. The visibility graph
 		// spans the whole cell, so a miss means it is disconnected — an invariant violation worth a warning.

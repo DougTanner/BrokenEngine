@@ -316,7 +316,7 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
 ## Exceptional references
 
 When the landing-commit/landed diff contains a non-Markdown path under
-`Tools/WorktreeCli/`, `Tools/AgentHarness/`, or `Tools/ToolCommon/`, load
-`agenttools.md` for shared-artifact idle waiting, disclosure,
-promotion, and bootstrap coordination. This is the sole AgentTools trigger;
+`Tools/WorktreeCli/`, `Tools/AgentHarness/`, or `Tools/ToolCommon/`, or
+`Common/Sha256Hasher.h`, load `agenttools.md` for shared-artifact idle waiting,
+disclosure, promotion, and bootstrap coordination. This is the sole AgentTools trigger;
 non-triggering routes do not load it.

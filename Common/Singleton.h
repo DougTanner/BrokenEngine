@@ -3,9 +3,9 @@
 namespace common
 {
 
-// The derived class passes its gp* global, which is cleared after the derived class's members are destroyed. It is
-// set before those members are constructed, unless the derived class also passes nullptr and calls Register() once
-// the state that readers of the global need exists.
+// The derived class passes its gp* global and its this pointer. The global is set before the derived class's members
+// are constructed, unless the derived class passes nullptr in place of this and calls Register(this) once the state
+// that readers of the global need exists. It is cleared after those members are destroyed.
 template <typename T>
 class Singleton
 {
@@ -16,16 +16,11 @@ public:
 
 protected:
 
-	explicit Singleton(T*& rpSlot)
-	: Singleton(rpSlot, nullptr)
-	{
-		Register();
-	}
-
-	Singleton(T*& rpSlot, [[maybe_unused]] std::nullptr_t pNull)
+	Singleton(T*& rpSlot, T* pSelf)
 	: mrpSlot(rpSlot)
 	{
 		ASSERT(mrpSlot == nullptr);
+		Register(pSelf);
 	}
 
 	~Singleton()
@@ -33,9 +28,9 @@ protected:
 		mrpSlot = nullptr;
 	}
 
-	void Register()
+	void Register(T* pSelf)
 	{
-		mrpSlot = static_cast<T*>(this);
+		mrpSlot = pSelf;
 	}
 
 private:

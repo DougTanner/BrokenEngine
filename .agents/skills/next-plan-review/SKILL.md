@@ -35,6 +35,8 @@ included, runs the full audit in [`references/worker.md`](references/worker.md).
   friction; recorded provenance supplies it when available.
 - The optional exact session ID.
 - The optional bounded-friction-mode designation with its one recorded friction.
+- The optional usage-analysis request, which the caller supplies only when the
+  user explicitly asked for it.
 - The authoritative shared task-brief fields from
   [`../../references/subagent-reporting.md`](../../references/subagent-reporting.md)
   `## Task brief`,
@@ -54,6 +56,17 @@ Require the shared handoff form in
   `<event> | <evidence> | <session ID> <timestamp or record>`.
 - `Assessment` — one row per assessed concern,
   `<concern> | <verdict> | <one-sentence basis> | <citation>`.
+- `Observed usage` — present only when the usage-analysis request was made,
+  absent in bounded friction mode, and `none` when provenance is `BLOCKED`. Its first row states that the counters
+  are observed transcript usage, distinct from main-context chars, elapsed
+  time, and billed cost. Then one row per transcript and model,
+  `<transcript label> | <status> | <model> | <messageCount> | <inputTokens> | <outputTokens> | <cacheReadInputTokens> | <cacheCreationInputTokens>`,
+  with `<status>` `complete` or `partial`; one
+  `<transcript label> | partial | none` row for a `partial` result with no
+  resolved model; and one `<transcript label> | unsupported (<reason>)` row per
+  unsupported transcript. The label is the parent's session ID, a Claude child's
+  `<parent session ID>/agent-<agentId>`, or a Codex row's own session ID;
+  child rows come after the parent's rows and are never merged with them.
 
 The shared `Decisive checks` rows carry provenance, sessions read, sourced
 timeline, pauses, and conformance, minimality, and process evidence. Each

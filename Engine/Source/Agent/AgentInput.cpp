@@ -26,7 +26,7 @@ static float MaximumCornerDelta(const XMFLOAT4& rRectangleA, const XMFLOAT4& rRe
 }
 
 AgentInput::AgentInput()
-: common::Singleton<AgentInput>(gpAgentInput)
+: common::Singleton<AgentInput>(gpAgentInput, this)
 {
 }
 

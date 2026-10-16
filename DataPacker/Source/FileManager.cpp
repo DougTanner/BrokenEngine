@@ -350,7 +350,7 @@ void WriteEntireFile(const std::filesystem::path& rPath, std::string_view conten
 
 
 FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitializationResult, InitializationMode eMode)
-: common::Singleton<FileManager>(gpFileManager)
+: common::Singleton<FileManager>(gpFileManager, this)
 {
 	reInitializationResult = EnsureLocalResult::kAlreadyLocal;
 	wchar_t pcForbidExpensiveExport[2] {};

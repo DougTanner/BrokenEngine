@@ -8,6 +8,7 @@
 #include "Network/Server/ServerSessionRuntime.h"
 #include "Network/NetworkCursor.h"
 
+#include "Network/Server/ServerClientManager.h"
 #include "Game.h"
 
 namespace engine
@@ -30,7 +31,7 @@ constexpr float kfChatTokenBurst = 5.0f;
 constexpr float kfChatTokensPerSecond = 1.0f;
 
 Server::Server(int64_t iPort)
-: common::Singleton<Server>(gpServer)
+: common::Singleton<Server>(gpServer, this)
 {
 	ENetAddress address {};
 	address.host = (gLaunchOptions.flags & LaunchOptionFlags::kLoopbackOnly) ? htonl(INADDR_LOOPBACK) : ENET_HOST_ANY;
@@ -84,7 +85,6 @@ void Server::Poll(const NetworkTimeState& rTimeState, ServerPollMode ePollMode)
 		return;
 	}
 
-	mPendingDisconnects.clear();
 	// mPendingNewSubscriptions / mPendingResynchronizationClientIds are intentionally NOT cleared here. Their consumers
 	// (ServerSessionRuntime::SendNewSubscriptionFullStates / ServerSessionRuntime::HandleResyncRequests) run post-tick,
 	// so a per-poll clear would drop a subscribe/resync accepted between servicings. They persist until the runtime
@@ -189,11 +189,6 @@ void Server::Disconnect(const ENetEvent& rEvent)
 {
 	int64_t iClientId = reinterpret_cast<int64_t>(rEvent.peer->data);
 
-	ClientConnection* pClient = FindClient(iClientId);
-	if (pClient != nullptr)
-	{
-		mPendingDisconnects.push_back({.iClientId = iClientId, .clientGuid = pClient->clientGuid});
-	}
 	RemoveClient(iClientId);
 
 	if constexpr (keNetworkSimulation != engine::NetworkSimulationLevel::kDisabled)
@@ -358,6 +353,7 @@ void Server::RemoveClient(int64_t iClientId)
 	{
 		if (mClients.at(i).iClientId == iClientId)
 		{
+			game::gpServerSession->mpClientManager->OnClientDisconnected(iClientId, mClients.at(i).clientGuid);
 			if (i != std::ssize(mClients) - 1)
 			{
 				mClients.at(i) = std::move(mClients.back());
@@ -435,18 +431,7 @@ void Server::RecordContractViolation(int64_t iClientId, ContractViolationKind eK
 	{
 		LOG(kNetwork, kWarning, "Server::RecordContractViolation Disconnecting Client: {} Kind: {} Violations: {} Reason: {} Type: {} Size: {}", iClientId, pcKind, riViolations, reason, iPacketType, iSize);
 
-		// Capture peer/GUID before the client record is removed below.
-		ENetPeer* pPeer = pClient->pPeer;
-		ClientGuid clientGuid = pClient->clientGuid;
-
-		{
-			ScopedSuppressAllocationTracking suppress;
-			// Heap: push the disconnect ourselves (not via the ENet DISCONNECT event) so the game layer
-			// persists fleet state; the later DISCONNECT event finds no client (gate 1) and is a safe no-op.
-			mPendingDisconnects.push_back({.iClientId = iClientId, .clientGuid = clientGuid});
-		}
-
-		enet_peer_disconnect(pPeer, 0);
+		enet_peer_disconnect(pClient->pPeer, 0);
 		RemoveClient(iClientId);
 	}
 }
@@ -693,13 +678,6 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ClientConnection& 
 void Server::RejectHello(const ClientConnection& rClient, const char* pcMessage)
 {
 	SendConnectionResponse(rClient.pPeer, false, pcMessage, nullptr);
-
-	// An accepted client's removal must reach the game layer: the later DISCONNECT event finds no record and publishes nothing.
-	if (rClient.bHandshakeComplete)
-	{
-		ScopedSuppressAllocationTracking suppress;
-		mPendingDisconnects.push_back({.iClientId = rClient.iClientId, .clientGuid = rClient.clientGuid});
-	}
 
 	enet_peer_disconnect_later(rClient.pPeer, 0);
 	RemoveClient(rClient.iClientId);

@@ -43,7 +43,7 @@ namespace toolcli::coordination
 	bool ParseUtcTimestamp(const std::string& rValue, int64_t& rTicks);
 	uint64_t CurrentUtcTicks();
 	std::string FormatUtcTimestamp(uint64_t uiTicks);
-	std::optional<std::string> HashSha256(std::string_view value);
+	std::optional<std::string> HashSha256(std::string value);
 	std::optional<std::wstring> CanonicalizeDirectoryPath(std::wstring_view value);
 	std::optional<std::wstring> NormalizeRelativeKey(std::wstring_view value);
 	std::optional<std::wstring> NormalizeRepositoryRelativeKey(std::wstring_view value);

@@ -10,7 +10,7 @@ namespace engine
 {
 
 SwapchainManager::SwapchainManager(VkSwapchainKHR vkOldSwapchain)
-: common::Singleton<SwapchainManager>(gpSwapchainManager)
+: common::Singleton<SwapchainManager>(gpSwapchainManager, this)
 {
 	ScopedBootTimer scopedBootTimer(kBootTimerSwapchainManager);
 

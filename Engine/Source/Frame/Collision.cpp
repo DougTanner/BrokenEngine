@@ -98,6 +98,7 @@ using enum CollisionFlags;
 
 int64_t Collision::AddLayer(const CollisionLayer& rLayer)
 {
+	ASSERT(rLayer.pfMaxTimes != nullptr && rLayer.pVecVelocities != nullptr);
 	if (sLayers.empty())
 	{
 		ScopedSuppressAllocationTracking suppress;
@@ -194,20 +195,7 @@ void Collision::InsertLayerObjectsIntoZones(LayerPairZones& rPairZones, const Co
 	}
 }
 
-static XMVECTOR XM_CALLCONV PositionAtTime(const CollisionLayer& rLayer, int64_t iIndex, float fTime)
-{
-	float fStartTime = rLayer.fStartTime;
-	float fEndTime = rLayer.fEndTime;
-	if (fEndTime <= fStartTime)
-	{
-		return rLayer.pVecStartPositions[iIndex];
-	}
-
-	float fPercent = (fTime - fStartTime) / (fEndTime - fStartTime);
-	return XMVectorLerp(rLayer.pVecStartPositions[iIndex], rLayer.pVecEndPositions[iIndex], fPercent);
-}
-
-static bool XM_CALLCONV SweptSphereTest(FXMVECTOR vecStartA, FXMVECTOR vecEndA, float fRadiusA, FXMVECTOR vecStartB, GXMVECTOR vecEndB, float fRadiusB, float fStartTime, float fEndTime, float& rfTimeOfImpact)
+static bool XM_CALLCONV SweptSphereTest(FXMVECTOR vecStartA, FXMVECTOR vecEndA, float fRadiusA, FXMVECTOR vecStartB, GXMVECTOR vecEndB, float fRadiusB, float& rfTimeOfImpact)
 {
 	XMVECTOR vecRelativeStart = XMVectorSubtract(vecStartB, vecStartA);
 	XMVECTOR vecRelativeDelta = XMVectorSubtract(XMVectorSubtract(vecEndB, vecStartB), XMVectorSubtract(vecEndA, vecStartA));
@@ -216,7 +204,7 @@ static bool XM_CALLCONV SweptSphereTest(FXMVECTOR vecStartA, FXMVECTOR vecEndA, 
 	float fQuadraticConstant = XMVectorGetX(XMVector3Dot(vecRelativeStart, vecRelativeStart)) - fCombinedRadius * fCombinedRadius;
 	if (fQuadraticConstant <= 0.0f)
 	{
-		rfTimeOfImpact = fStartTime;
+		rfTimeOfImpact = 0.0f;
 		return true;
 	}
 
@@ -240,11 +228,11 @@ static bool XM_CALLCONV SweptSphereTest(FXMVECTOR vecStartA, FXMVECTOR vecEndA, 
 		return false;
 	}
 
-	// Earliest contact time within the common absolute tick interval
+	// Earliest contact time as a fraction of the tick
 	float fNormalizedTime = (-fQuadraticLinear - std::sqrt(fDiscriminant)) / (2.0f * fQuadraticSquared);
 	if (fNormalizedTime >= 0.0f && fNormalizedTime <= 1.0f)
 	{
-		rfTimeOfImpact = fStartTime + fNormalizedTime * (fEndTime - fStartTime);
+		rfTimeOfImpact = fNormalizedTime;
 		return true;
 	}
 	return false;
@@ -453,7 +441,7 @@ static void XM_CALLCONV RecordCollision(const CollisionCandidate& rCandidate, FX
 			.fTimeOfImpact = rCandidate.fTimeOfImpact,
 			.vecContactPoint = rCandidate.vecContactPoint,
 			.vecSelfPosition = vecSelfPosition,
-			.vecOtherVelocity = rOtherLayer.pVecVelocities != nullptr ? rOtherLayer.pVecVelocities[iOther] : XMVectorZero(),
+			.vecOtherVelocity = rOtherLayer.pVecVelocities[iOther],
 		},
 	};
 	++rScratch.iPendingResultCount;
@@ -497,31 +485,24 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 		return;
 	}
 
-	float fStartTime = std::max(rLayerA.fStartTime, rLayerB.fStartTime);
-	float fEndTime = std::min(rLayerA.fEndTime, rLayerB.fEndTime);
-	if (fStartTime > fEndTime)
-	{
-		return;
-	}
-
-	XMVECTOR vecStartA = PositionAtTime(rLayerA, i, fStartTime);
-	XMVECTOR vecEndA = PositionAtTime(rLayerA, i, fEndTime);
-	XMVECTOR vecStartB = PositionAtTime(rLayerB, j, fStartTime);
-	XMVECTOR vecEndB = PositionAtTime(rLayerB, j, fEndTime);
+	XMVECTOR vecStartA = XMVectorLerp(rLayerA.pVecStartPositions[i], rLayerA.pVecEndPositions[i], 0.0f);
+	XMVECTOR vecEndA = XMVectorLerp(rLayerA.pVecStartPositions[i], rLayerA.pVecEndPositions[i], 1.0f);
+	XMVECTOR vecStartB = XMVectorLerp(rLayerB.pVecStartPositions[j], rLayerB.pVecEndPositions[j], 0.0f);
+	XMVECTOR vecEndB = XMVectorLerp(rLayerB.pVecStartPositions[j], rLayerB.pVecEndPositions[j], 1.0f);
 	float fRadiusA = rLayerA.fRadius;
 	float fRadiusB = rLayerB.fRadius;
 
 	bool bCollided = false;
-	float fTimeOfImpact = fEndTime;
+	float fTimeOfImpact = 1.0f;
 	XMVECTOR vecImpactA = vecEndA;
 	XMVECTOR vecImpactB = vecEndB;
 
 	if (bSweptPair)
 	{
-		if (SweptSphereTest(vecStartA, vecEndA, fRadiusA, vecStartB, vecEndB, fRadiusB, fStartTime, fEndTime, fTimeOfImpact))
+		if (SweptSphereTest(vecStartA, vecEndA, fRadiusA, vecStartB, vecEndB, fRadiusB, fTimeOfImpact))
 		{
-			vecImpactA = PositionAtTime(rLayerA, i, fTimeOfImpact);
-			vecImpactB = PositionAtTime(rLayerB, j, fTimeOfImpact);
+			vecImpactA = XMVectorLerp(rLayerA.pVecStartPositions[i], rLayerA.pVecEndPositions[i], fTimeOfImpact);
+			vecImpactB = XMVectorLerp(rLayerB.pVecStartPositions[j], rLayerB.pVecEndPositions[j], fTimeOfImpact);
 			bCollided = true;
 		}
 	}
@@ -539,8 +520,8 @@ static void TestAndCollectPair(const CollisionPairContext& rPairContext, int64_t
 
 	}
 
-	float fMaximumTimeA = rLayerA.pfMaxTimes != nullptr ? rLayerA.pfMaxTimes[i] : std::numeric_limits<float>::max();
-	float fMaximumTimeB = rLayerB.pfMaxTimes != nullptr ? rLayerB.pfMaxTimes[j] : std::numeric_limits<float>::max();
+	float fMaximumTimeA = rLayerA.pfMaxTimes[i];
+	float fMaximumTimeB = rLayerB.pfMaxTimes[j];
 	if (fTimeOfImpact >= fMaximumTimeA || fTimeOfImpact >= fMaximumTimeB)
 	{
 		return;

@@ -169,13 +169,9 @@ public:
 private:
 	friend class PackChunks;
 
-#if defined(BT_DEBUG)
-public:
-#endif
 	PackChunks* mpPackChunks = nullptr;
 	int64_t miEntryIndex = static_cast<int64_t>(std::numeric_limits<uint32_t>::max());
 	uint64_t muiGeneration = 0;
-private:
 	common::crc_t muiCrc = 0;
 	int64_t miOffset = 0;
 	int64_t miLength = 0;
@@ -200,7 +196,7 @@ public:
 
 	std::fstream OpenFile(const FileFlags_t& rFlags, const std::filesystem::path& rFilename);
 	void RemoveFile(const FileFlags_t& rFlags, const std::filesystem::path& rFilename);
-	[[nodiscard]] bool ComputeSha256(std::span<const std::byte> bytes, std::array<uint8_t, 32>& rOut);
+	[[nodiscard]] bool ComputeSha256(std::span<std::byte> bytes, std::array<uint8_t, 32>& rOut);
 	[[nodiscard]] bool ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std::filesystem::path& rFilename, FileContentDigest& rOut);
 
 	// Writes through "<rFilename>.tmp"; a stream or rename failure leaves the destination intact and attempts temporary-file cleanup.

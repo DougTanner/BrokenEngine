@@ -4,9 +4,9 @@
 
 #if defined(BT_CLIENT)
 
-#include "Agent/Commands/ClientNetworkHarnessRigs.h"
 #include "Network/Client/Client.h"
 #include "Network/NetworkDiscoveryScanner.h"
+#include "CrashReport.h"
 
 #include "Network/Client/ClientSession.h"
 #include "Profile/ProfileManager.h"
@@ -69,19 +69,6 @@ static bool ContainsCoordinate(std::span<const GridCoord> coordinates, GridCoord
 	{
 		return rCoordinate == coordinate;
 	});
-}
-
-static ClientNetworkHarnessRigs::CoordUpdateState QueryHarnessRigCoordinateUpdateState(GridCoord coordinate, int64_t iTick)
-{
-	auto it = game::gpGame->mCells.find(coordinate);
-	if (it == game::gpGame->mCells.end())
-	{
-		return {};
-	}
-	ClientNetworkHarnessRigs::CoordUpdateState state {.iConfirmedTick = it->second.iConfirmedTick};
-	state.flags.Set(ClientNetworkHarnessRigs::CoordUpdateFlags::kPresent);
-	state.flags.Set(ClientNetworkHarnessRigs::CoordUpdateFlags::kUpdateRetained, it->second.serverUpdates.contains(iTick));
-	return state;
 }
 
 ClientSessionRuntime::ClientSessionRuntime(game::ClientSession& rSession)
@@ -149,7 +136,6 @@ void ClientSessionRuntime::Disconnect()
 {
 	// Heap: Client/ENet and discovery teardown may allocate during cleanup
 	ScopedSuppressAllocationTracking suppress;
-	ClientNetworkHarnessRigs::Detach();
 	mpClient.reset();
 	mpDiscoveryScanner.reset();
 	ResetClock();
@@ -219,6 +205,7 @@ void ClientSessionRuntime::ResetForServerLoad()
 void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 {
 	ASSERT(common::gpMultithreading->IsMainThread());
+	PollPendingCrashReport(mpClient.get());
 	PollDiscovery();
 	if (mpClient == nullptr)
 	{
@@ -269,12 +256,10 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 		ResetForServerLoad();
 		mrSession.OnServerLoad();
 	}
-	std::shared_ptr<ClientNetworkHarnessRigs::StaleUpdateState> pDeliveredHarnessRig = ClientNetworkHarnessRigs::PollBeforeDrain(*mpClient, &QueryHarnessRigCoordinateUpdateState);
 	mrSession.ProcessReceivedGamePackets();
 	mrSession.ApplyReceivedStaticData();
 	ApplyReceivedFullStates();
 	ApplyReceivedUpdates();
-	ClientNetworkHarnessRigs::PollAfterDrain(*mpClient, pDeliveredHarnessRig, &QueryHarnessRigCoordinateUpdateState);
 
 	SendAckAndFlush();
 }

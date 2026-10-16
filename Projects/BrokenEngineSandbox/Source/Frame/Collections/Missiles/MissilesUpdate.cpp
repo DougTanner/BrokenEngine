@@ -34,7 +34,7 @@ static MissileCollisionIntervalScratch& GetMissileCollisionIntervalScratch()
 constexpr float kfAccelerationAtMaximumDeltaAngle = 0.9f;
 constexpr float kfVelocityDecay = 1.0f;
 constexpr float kfVelocityToDirection = 16.0f;
-constexpr float kfJitterIntervalRandom = 0.0025f;
+constexpr std::chrono::duration<float> kJitterIntervalRandom = std::chrono::duration<float>(0.0025f);
 constexpr float kfDirectionJitterRandom = 0.06f;
 constexpr float kfDeltaAngleJitterRandom = 0.5f;
 constexpr float kfDeltaAngleJitterRandomWithTarget = 1.0f;
@@ -54,37 +54,37 @@ void MissilesInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 	MissilesInterpolate& rCurrent = *rCurrentFrameInterpolate.pMissiles;
 	const MissilesInterpolate& rPrevious = *rPreviousFrame.interpolate.pMissiles;
 	const MissilesPostRender& rPreviousPostRender = *rPreviousFrame.postRender.pMissiles;
-	float fDeltaTime = rCurrentFrameInterpolate.fDeltaTime;
+	std::chrono::duration<float> deltaTime(rCurrentFrameInterpolate.fDeltaTime);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		XMVECTOR vecPreviousPosition = rPrevious.pVecPositions[i];
 		XMVECTOR vecPosition = vecPreviousPosition;
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
-		float fDestroyedTime = rPrevious.pfDestroyedTimes[i];
+		std::chrono::duration<float> destroyedTime = rPrevious.pDestroyedTimes[i];
 		MissileFlags_t flags = rPreviousPostRender.pFlags[i];
 
 		if (!(flags & kExploding)) [[likely]]
 		{
-			vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime), rPreviousPostRender.pVecVelocities[i], vecPosition);
+			vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
 			// Positions must always have W=1.0 — prevents W-lane drift via MultiplyAdd.
 			vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
 			if (!(flags & kFalling))
 			{
 				// PostRender::Update already applies the rotation delay percentage.
-				vecDirection = XMVector3Normalize(XMVector4Transform(vecDirection, XMMatrixRotationZ(fDeltaTime * rPreviousPostRender.pfDeltaRotations[i])));
+				vecDirection = XMVector3Normalize(XMVector4Transform(vecDirection, XMMatrixRotationZ(deltaTime.count() * rPreviousPostRender.pfDeltaRotations[i])));
 			}
 		}
 
-		if (fDestroyedTime > 0.0f)
+		if (destroyedTime > std::chrono::duration<float>::zero())
 		{
-			fDestroyedTime = std::max(fDestroyedTime - fDeltaTime, 0.0f);
+			destroyedTime = std::max(destroyedTime - deltaTime, std::chrono::duration<float>::zero());
 		}
 
 		rCurrent.pVecPositions[i] = vecPosition;
 		rCurrent.pVecDirections[i] = vecDirection;
-		rCurrent.pfDestroyedTimes[i] = fDestroyedTime;
+		rCurrent.pDestroyedTimes[i] = destroyedTime;
 
 		// Sync owned objects (IDs copied in AllocateAndCopy)
 #if defined(BT_CLIENT)
@@ -98,46 +98,46 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 	MissilesPostRender& __restrict rCurrent = *rFrame.postRender.pMissiles;
 	const MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	const MissilesPostRender& rPrevious = *rPreviousFrame.postRender.pMissiles;
-	float fDeltaTime = rFrame.interpolate.fDeltaTime;
+	std::chrono::duration<float> deltaTime(rFrame.interpolate.fDeltaTime);
 
 	// Before Spaceships Update, current registry ids and interpolated positions still align with previous rows.
 	// Bind previous positions for retained-target homing, previous arrival grace for eligibility, and previous
 	// missile handles while current handles are being updated.
-	RegistryWindow window = BuildSpaceshipRegistryWindow(rFrame, rPreviousFrame.interpolate.pSpaceships->pVecPositions, rPreviousFrame.postRender.pSpaceships->pfArrivalGracePeriods, *rPreviousFrame.postRender.pMissiles);
+	RegistryWindow window = BuildSpaceshipRegistryWindow(rFrame, rPreviousFrame.interpolate.pSpaceships->pVecPositions, rPreviousFrame.postRender.pSpaceships->pArrivalGracePeriods, *rPreviousFrame.postRender.pMissiles);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		// Load dynamic fields (static fields copied via memcpy in AllocateAndCopy)
 		XMVECTOR vecVelocity = rPrevious.pVecVelocities[i];
 		engine::registry_id_t uiTarget = rPrevious.puiRegistryTargets[i];
-		float fTime = rPrevious.pfTimes[i] + fDeltaTime;
+		std::chrono::duration<float> missileTime = rPrevious.pTimes[i] + deltaTime;
 		float fDeltaRotation = rPrevious.pfDeltaRotations[i];
-		float fDeltaRotationDelay = rPrevious.pfDeltaRotationDelays[i];
+		std::chrono::duration<float> deltaRotationDelay = rPrevious.pDeltaRotationDelays[i];
 		float fExhaustLength = rPrevious.pfExhaustLengths[i];
-		float fNextJitter = rPrevious.pfNextJitter[i];
+		std::chrono::duration<float> nextJitter = rPrevious.pNextJitter[i];
 		XMVECTOR vecStoredDirection = rPrevious.pVecStoredDirections[i];
 
-		if (!(rCurrent.pFlags[i] & kExploding) && !(rCurrent.pFlags[i] & kFalling) && fTime < kMissileLifetime.count()) [[likely]]
+		if (!(rCurrent.pFlags[i] & kExploding) && !(rCurrent.pFlags[i] & kFalling) && missileTime < kMissileLifetime) [[likely]]
 		{
-			fNextJitter -= fDeltaTime;
+			nextJitter -= deltaTime;
 
-			vecVelocity = XMVectorMultiply(XMVectorReplicate(1.0f - fDeltaTime * kfVelocityDecay), vecVelocity);
+			vecVelocity = XMVectorMultiply(XMVectorReplicate(1.0f - deltaTime.count() * kfVelocityDecay), vecVelocity);
 
 			float fDeltaAnglePercent = std::abs(fDeltaRotation) / rCurrent.pfDeltaRotationMaximum[i];
 			fDeltaAnglePercent = std::clamp(fDeltaAnglePercent, 0.0f, 1.0f);
 			float fAdjustedAcceleration = (1.0f - fDeltaAnglePercent) * rCurrent.pfAccelerations[i] + fDeltaAnglePercent * kfAccelerationAtMaximumDeltaAngle * rCurrent.pfAccelerations[i];
-			vecVelocity = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime * fAdjustedAcceleration), rCurrentInterpolate.pVecDirections[i], vecVelocity);
+			vecVelocity = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count() * fAdjustedAcceleration), rCurrentInterpolate.pVecDirections[i], vecVelocity);
 
-			float fVelocityToDirectionPercent = 1.0f - fDeltaTime * kfVelocityToDirection;
+			float fVelocityToDirectionPercent = 1.0f - deltaTime.count() * kfVelocityToDirection;
 			XMVECTOR vecVelocityComponent = XMVectorMultiply(XMVectorReplicate(fVelocityToDirectionPercent), XMVector3Normalize(vecVelocity));
 			XMVECTOR vecDirectionComponent = XMVectorMultiply(XMVectorReplicate(1.0f - fVelocityToDirectionPercent), rCurrentInterpolate.pVecDirections[i]);
 			vecVelocity = XMVectorMultiply(XMVector3Length(vecVelocity), XMVector3Normalize(XMVectorAdd(vecVelocityComponent, vecDirectionComponent)));
 
-			fDeltaRotation = (1.0f - fDeltaTime * kfDeltaRotationDecay) * fDeltaRotation;
+			fDeltaRotation = (1.0f - deltaTime.count() * kfDeltaRotationDecay) * fDeltaRotation;
 
-			if (fNextJitter < 0.0f)
+			if (nextJitter < std::chrono::duration<float>::zero())
 			{
-				fNextJitter = common::Random<kfJitterIntervalRandom>(rFrame.postRender.randomEngine);
+				nextJitter = std::chrono::duration<float>(common::Random<kJitterIntervalRandom.count()>(rFrame.postRender.randomEngine));
 
 				int64_t iRandom = common::Random(2i64, rFrame.postRender.randomEngine);
 				float fDeltaAnglePercentExtra = 1.0f + 3.0f * fDeltaAnglePercent;
@@ -178,27 +178,27 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			// Retained targets steer toward the source's previous-frame position.
 			if (bRetained)
 			{
-				fDeltaRotationDelay -= fDeltaTime;
+				deltaRotationDelay -= deltaTime;
 
 				XMVECTOR vecTargetPosition = retained.vecPreviousPosition;
 				XMVECTOR vecToTargetNormal = XMVector3Normalize(XMVectorSubtract(vecTargetPosition, rCurrentInterpolate.pVecPositions[i]));
 				float fDirectionDestinationCrossZ = XMVectorGetZ(XMVector3Cross(rCurrentInterpolate.pVecDirections[i], vecToTargetNormal));
 				float fWantedDeltaRotation = fDirectionDestinationCrossZ > 0.0f ? kfDeltaRotationTowardsTarget : -kfDeltaRotationTowardsTarget;
 
-				float fDelayPercent = std::clamp(1.0f - fDeltaRotationDelay / kMissileDeltaRotationDelay.count(), 0.0f, 1.0f);
+				float fDelayPercent = std::clamp(1.0f - deltaRotationDelay / kMissileDeltaRotationDelay, 0.0f, 1.0f);
 				fWantedDeltaRotation *= fDelayPercent;
 
 				fDeltaRotation = kfDeltaRotationChange * fDeltaRotation + (1.0f - kfDeltaRotationChange) * fWantedDeltaRotation;
 			}
 			else
 			{
-				fDeltaRotationDelay -= fDeltaTime;
+				deltaRotationDelay -= deltaTime;
 
 				XMVECTOR vecCurrentDirection = rCurrentInterpolate.pVecDirections[i];
 				float fDirectionCrossZ = XMVectorGetZ(XMVector3Cross(vecCurrentDirection, vecStoredDirection));
 				float fWantedDeltaRotation = fDirectionCrossZ > 0.0f ? kfDeltaRotationTowardsStored : -kfDeltaRotationTowardsStored;
 
-				float fDelayPercent = std::clamp(1.0f - fDeltaRotationDelay / kMissileDeltaRotationDelay.count(), 0.0f, 1.0f);
+				float fDelayPercent = std::clamp(1.0f - deltaRotationDelay / kMissileDeltaRotationDelay, 0.0f, 1.0f);
 				fWantedDeltaRotation *= fDelayPercent;
 
 				fDeltaRotation = kfDeltaRotationChange * fDeltaRotation + (1.0f - kfDeltaRotationChange) * fWantedDeltaRotation;
@@ -210,7 +210,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		}
 		else if (rCurrent.pFlags[i] & kFalling)
 		{
-			vecVelocity = XMVectorSetZ(vecVelocity, XMVectorGetZ(vecVelocity) - kfMissileGravity * fDeltaTime);
+			vecVelocity = XMVectorSetZ(vecVelocity, XMVectorGetZ(vecVelocity) - kfMissileGravity * deltaTime.count());
 		}
 
 		// Save dynamic fields (static fields copied via memcpy in AllocateAndCopy)
@@ -221,17 +221,17 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		rCurrent.pVecVelocities[i] = vecVelocity;
 		rCurrent.pVecStoredDirections[i] = vecStoredDirection;
 		rCurrent.puiRegistryTargets[i] = uiTarget;
-		rCurrent.pfTimes[i] = fTime;
-		rCurrent.pfDeltaRotationDelays[i] = fDeltaRotationDelay;
+		rCurrent.pTimes[i] = missileTime;
+		rCurrent.pDeltaRotationDelays[i] = deltaRotationDelay;
 		rCurrent.pfDeltaRotations[i] = fDeltaRotation;
 		rCurrent.pfExhaustLengths[i] = fExhaustLength;
-		rCurrent.pfNextJitter[i] = fNextJitter;
+		rCurrent.pNextJitter[i] = nextJitter;
 
-		if (!(rCurrent.pFlags[i] & kExploding) && !(rCurrent.pFlags[i] & kFalling) && fTime >= kMissileLifetime.count())
+		if (!(rCurrent.pFlags[i] & kExploding) && !(rCurrent.pFlags[i] & kFalling) && missileTime.count() >= kMissileLifetime.count())
 		{
 			// The only release site: this is the one missile transition that happens while the window is live.
 			engine::ReleaseRegistryTarget(window.context, rCurrent.puiRegistryTargets[i]);
-			Fall(rFrame, i, std::chrono::duration<float>(fDeltaTime));
+			Fall(rFrame, i, deltaTime);
 		}
 	}
 
@@ -269,7 +269,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			continue;
 		}
 
-		if (rCurrent.pfTimes[i] >= kMissileLifetime.count())
+		if (rCurrent.pTimes[i].count() >= kMissileLifetime.count())
 		{
 			continue;
 		}
@@ -319,8 +319,8 @@ void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 	{
 		int64_t iIndex = i;
 		sCollisionFlags.at(static_cast<size_t>(iIndex)) = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {engine::CollisionFlags::kDestroyOnCollide};
-		rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
-		rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)) = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)) = engine::TracePointAgainstTerrain(rStaticData, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i]);
+		rCollisionScratch.boundaryHits.at(static_cast<size_t>(iIndex)) = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i]);
 		float fMaximumTime = std::numeric_limits<float>::max();
 		if (rCollisionScratch.terrainHits.at(static_cast<size_t>(iIndex)).bHit)
 		{

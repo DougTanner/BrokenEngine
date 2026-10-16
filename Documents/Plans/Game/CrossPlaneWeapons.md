@@ -110,3 +110,7 @@ float fMaximumHeightDifference = std::numeric_limits<float>::max(); // Optional;
 | Battleship fires flat | A fleet Battleship on plane 0 with an enemy on plane 0 ahead produces blasters with `dir[2]` 0 at `local[2]` 6.0; with the enemy overhead on plane 1 it produces none | `/agent-harness`: `edit_frame`, `query_collection` |
 | Area damage crosses planes only by 3D distance | A missile exploding on a plane-1 target leaves a plane-0 Fighter under it at full `health`; `AreaDamage::Get` is unchanged | `/agent-harness` `query_collection`; code reading |
 | Repeated-run replay determinism | No `LogDifferences CRC` mismatch across repeated playback loops of a recording with Omni cross-plane blasters, same-plane missiles on two planes, skipped missile launches, and flat Fighter and Battleship fire | `/agent-harness` replay (`replay.md`) |
+
+## Coordination
+
+- `Documents/Plans/Engine/RemoveSandboxGameplayFromEngine.md` moves the engine codec, including the blaster transfer serializer this Plan's Context cites in `Engine/Source/Network/NetworkSerialization.cpp`, into the game's new `Network/StatusChangeCodec.cpp`, and changes the engine seam sites the prerequisite `Game/ShipTypeSplit.md` renames. This Plan edits none of that Plan's sites. Whichever lands second rebases onto the other's file layout; landed after that Plan, the serializer citation names `StatusChangeCodec.cpp`.

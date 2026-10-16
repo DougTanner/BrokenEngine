@@ -134,29 +134,25 @@ static void BuildValidAreaHull(ExportedIsland& rOut)
 	}
 }
 
-// Runtime SAT (common::ConvexHullsOverlap) requires convex CCW hulls; verify hulls with at least three
-// vertices before serialization so invalid winding/convexity cannot let islands overlap at the
-// waterline.
+// Runtime SAT (common::ConvexHullsOverlap) requires convex CCW hulls; verify the hull before
+// serialization so invalid winding/convexity cannot let islands overlap at the waterline.
 static void VerifyHullCcwConvex(const ExportedIsland& rOut)
 {
-	if (rOut.iValidAreaVertexCount >= 3)
+	// cpuValidAreaVertices is interleaved x,y floats; XMFLOAT2 is a padding-free {float,float}, so
+	// it aliases the same bytes as the hull vertices for the shared CCW predicate.
+	ASSERT(common::IsPolygonCcw(std::span<const XMFLOAT2>(reinterpret_cast<const XMFLOAT2*>(rOut.cpuValidAreaVertices.data()), static_cast<size_t>(rOut.iValidAreaVertexCount))));
+	for (int64_t i = 0; i < rOut.iValidAreaVertexCount; ++i)
 	{
-		// cpuValidAreaVertices is interleaved x,y floats; XMFLOAT2 is a padding-free {float,float}, so
-		// it aliases the same bytes as the hull vertices for the shared CCW predicate.
-		ASSERT(common::IsPolygonCcw(std::span<const XMFLOAT2>(reinterpret_cast<const XMFLOAT2*>(rOut.cpuValidAreaVertices.data()), static_cast<size_t>(rOut.iValidAreaVertexCount))));
-		for (int64_t i = 0; i < rOut.iValidAreaVertexCount; ++i)
-		{
-			int64_t iPreviousVertex = (i + rOut.iValidAreaVertexCount - 1) % rOut.iValidAreaVertexCount;
-			int64_t iNextVertex = (i + 1) % rOut.iValidAreaVertexCount;
-			float fPreviousX = rOut.cpuValidAreaVertices.at(iPreviousVertex * 2);
-			float fPreviousY = rOut.cpuValidAreaVertices.at(iPreviousVertex * 2 + 1);
-			float fCurrentX = rOut.cpuValidAreaVertices.at(i * 2);
-			float fCurrentY = rOut.cpuValidAreaVertices.at(i * 2 + 1);
-			float fNextX = rOut.cpuValidAreaVertices.at(iNextVertex * 2);
-			float fNextY = rOut.cpuValidAreaVertices.at(iNextVertex * 2 + 1);
-			float fCross = (fCurrentX - fPreviousX) * (fNextY - fPreviousY) - (fCurrentY - fPreviousY) * (fNextX - fPreviousX);
-			ASSERT(fCross > 0.0f);
-		}
+		int64_t iPreviousVertex = (i + rOut.iValidAreaVertexCount - 1) % rOut.iValidAreaVertexCount;
+		int64_t iNextVertex = (i + 1) % rOut.iValidAreaVertexCount;
+		float fPreviousX = rOut.cpuValidAreaVertices.at(iPreviousVertex * 2);
+		float fPreviousY = rOut.cpuValidAreaVertices.at(iPreviousVertex * 2 + 1);
+		float fCurrentX = rOut.cpuValidAreaVertices.at(i * 2);
+		float fCurrentY = rOut.cpuValidAreaVertices.at(i * 2 + 1);
+		float fNextX = rOut.cpuValidAreaVertices.at(iNextVertex * 2);
+		float fNextY = rOut.cpuValidAreaVertices.at(iNextVertex * 2 + 1);
+		float fCross = (fCurrentX - fPreviousX) * (fNextY - fPreviousY) - (fCurrentY - fPreviousY) * (fNextX - fPreviousX);
+		ASSERT(fCross > 0.0f);
 	}
 }
 
@@ -399,6 +395,10 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	// Convex hull of the valid (above-threshold) region — same heightmap + threshold as the texture
 	// masking. Packed into the chunk payload after the mesh (see Export()); debug render draws it.
 	BuildValidAreaHull(rOut);
+	if (rOut.iValidAreaVertexCount < 3)
+	{
+		throw std::runtime_error(std::format("Island leaf \"{}\" has a valid-area hull with {} vertices; at least 3 are required.", rInputPath.string(), rOut.iValidAreaVertexCount));
+	}
 
 	VerifyHullCcwConvex(rOut);
 

@@ -314,13 +314,10 @@ inline constexpr bool XmIsInf(float fValue)
 	#include "clipper2/clipper.offset.h"
 #endif
 
-// nlohmann::json (vendored under tinygltf) - runtime agent command channel (BT_ENGINE) and offline island
-// bake archetype/route loaders (BT_DATA_PACKER). The warning-suppression pragma travels with the header.
+// nlohmann::json (ThirdParty/json submodule) - runtime agent command channel (BT_ENGINE) and offline island
+// bake archetype/route loaders (BT_DATA_PACKER).
 #if defined(BT_ENGINE) || defined(BT_DATA_PACKER)
-	#pragma warning(push)
-	#pragma warning(disable : 5311) // nlohmann::json 3.10.4 uses the pre-C++20 literal-operator-id form 'operator "" _json'
-	#include "tinygltf/json.hpp"
-	#pragma warning(pop)
+	#include "json/single_include/nlohmann/json.hpp"
 #endif
 
 // DataPacker-only third-party consumption headers (offline asset tooling). Centralized here, gated by
@@ -328,7 +325,7 @@ inline constexpr bool XmIsInf(float fValue)
 // .cpp/.h files. The library *implementation* units stay in the Prebuilts/Source/DataPacker unity .cpp's by
 // necessity. Config defines/pragmas not covered by the global warning span above travel with their header.
 #if defined(BT_ENGINE) || defined(BT_DATA_PACKER)
-	// FileManager uses BCrypt to bind replay manifests to the exact persisted component bytes.
+	// common::Sha256Hasher hashes through BCrypt.
 	#include <bcrypt.h>
 	#pragma comment(lib, "bcrypt.lib")
 #endif
@@ -376,9 +373,11 @@ inline constexpr bool XmIsInf(float fValue)
 	#include "stb/stb_image_resize2.h"
 	#include "stb/stb_image_write.h"
 
-	// tinygltf - glTF scene loader (consumption only; implementation in the Prebuilts unity .cpp). Its
-	// vendored nlohmann::json is included above via the shared BT_ENGINE || BT_DATA_PACKER gate.
-	#include "tinygltf/tiny_gltf.h"
+	// tinygltf - glTF scene loader (consumption only; implementation in the Prebuilts unity .cpp). The v2 C++
+	// API lives in attic/. TINYGLTF_NO_INCLUDE_JSON skips its vendored json.hpp in favor of the ThirdParty/json
+	// copy included above via the shared BT_ENGINE || BT_DATA_PACKER gate.
+	#define TINYGLTF_NO_INCLUDE_JSON
+	#include "tinygltf/attic/tiny_gltf.h"
 
 	// meshoptimizer - vertex remap / cache optimization
 	#include "meshoptimizer.h"
@@ -413,6 +412,7 @@ inline constexpr bool XmIsInf(float fValue)
 
 // Disable specific warnings
 #pragma warning(disable : 4324) // Structure was padded due to alignment specifier
+#pragma warning(disable : 4073) // Initializers put in library initialization area (DT: Log.cpp uses init_seg(lib) on purpose so logging outlives every default-phase static)
 
 // Disable specific code analysis warnings
 #pragma warning(disable : 26429) // Symbol is never tested for nullness, it can be marked as not_null (DT: Requires using gsl::not_null)
@@ -442,6 +442,7 @@ inline constexpr bool XmIsInf(float fValue)
 #pragma warning(disable : 26814) // The const variable can be computed at compile-time. Consider using constexpr (con.5). (DT: clang-cl rejects offsetof in constexpr contexts; extern-const definitions cannot be inline constexpr without header relocation)
 #pragma warning(disable : 26459) // You called an STL function with a raw pointer parameter that may be unsafe (stl.1). (DT: Style guide rule 60 prescribes std::copy with std::begin/std::end on C arrays)
 #pragma warning(disable : 26497) // The function can be marked constexpr if compile-time evaluation is desired (f.4). (DT: Pairs with disabled 26440/26496: constexpr everywhere is clutter; required compile-time uses fail to compile without it)
+#pragma warning(disable : 6250) // Calling 'VirtualFree' without the MEM_RELEASE flag might free memory but not address descriptors (VADs) (DT: decommitting while keeping the reservation is intentional; the lazy pack pool recommits the same addresses)
 
 // Portable constexpr offsetof for layout-lock static_asserts. UCRT's offsetof macro expands to a
 // reinterpret_cast that MSVC's cl.exe tolerates inside a constant expression (non-conforming extension)

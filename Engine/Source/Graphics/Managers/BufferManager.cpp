@@ -10,7 +10,7 @@ namespace engine
 {
 
 BufferManager::BufferManager()
-: common::Singleton<BufferManager>(gpBufferManager)
+: common::Singleton<BufferManager>(gpBufferManager, this)
 {
 	ScopedBootTimer scopedBootTimer(kBootTimerBufferManager);
 

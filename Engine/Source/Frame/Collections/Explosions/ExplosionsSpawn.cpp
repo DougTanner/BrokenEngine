@@ -23,7 +23,7 @@ void XM_CALLCONV SyncExplosionTrail(game::FrameInterpolate& rFrameInterpolate, s
 
 #endif // BT_CLIENT
 
-bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]] GridCoord coordinate, std::chrono::duration<float> currentTime, const SpawnInfo& rSpawnInformation)
+bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]] GridCoord coordinate, SimulationTime currentTime, const SpawnInfo& rSpawnInformation)
 {
 	if (!common::InsideArea(rSpawnInformation.vecPosition, engine::LocalCellArea()))
 	{
@@ -43,7 +43,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 
 	rInterpolate.puiTypeIndices[iSpawnIndex] = static_cast<uint8_t>(rSpawnInformation.iTypeIndex);
 	rInterpolate.pFlags[iSpawnIndex] = rSpawnInformation.flags;
-	rInterpolate.pfStartTimes[iSpawnIndex] = currentTime.count();
+	rInterpolate.pStartTimes[iSpawnIndex] = currentTime;
 	rInterpolate.pVecPositions[iSpawnIndex] = rSpawnInformation.vecPosition;
 	rInterpolate.pVecDirections[iSpawnIndex] = rSpawnInformation.vecDirection;
 
@@ -54,7 +54,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 	// Initialize trail arrays to invalid
 	for (int64_t j = 0; j < kiMaxExplosionTrails; ++j)
 	{
-		rInterpolate.pfTrailTimes[j][iSpawnIndex] = 0.0f;
+		rInterpolate.pTrailTimes[j][iSpawnIndex] = std::chrono::duration<float>::zero();
 #if defined(BT_CLIENT)
 		rInterpolate.pTrails[j][iSpawnIndex] = smoke_trails_t {};
 		rInterpolate.pfTrailIntensities[j][iSpawnIndex] = 0.0f;
@@ -84,7 +84,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 
 	// Fire-and-forget effects: Secondary explosions (staggered)
 	int64_t iSecondaryExplosions = rType.iSecondaryExplosionCount;
-	std::chrono::duration<float> durationDelayDelta(iSecondaryExplosions > 0 ? (0.75f * rSpawnInformation.fTimePercent * rType.fPrimaryTime) / static_cast<float>(iSecondaryExplosions) : 0.0f);
+	std::chrono::duration<float> durationDelayDelta = iSecondaryExplosions > 0 ? (0.75f * rSpawnInformation.fTimePercent * rType.primaryTime) / static_cast<float>(iSecondaryExplosions) : std::chrono::duration<float>::zero();
 	std::chrono::duration<float> durationDelay = durationDelayDelta;
 
 	for (int64_t k = 0; k < iSecondaryExplosions; ++k, durationDelay += durationDelayDelta)
@@ -98,14 +98,14 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 #if defined(BT_CLIENT)
 		if (rType.iSecondaryLightControllerTypeIndex != kiInvalidControllerType)
 		{
-			PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(currentTime.count() + durationDelay.count()), rType.iSecondaryLightControllerTypeIndex, vecSecondaryPosition, fSecondaryRotation);
+			PointLightsPostRender::AddControlled(rFrame, currentTime + durationDelay, rType.iSecondaryLightControllerTypeIndex, vecSecondaryPosition, fSecondaryRotation);
 		}
 #endif
 
 #if defined(BT_CLIENT)
 		if (rType.iSecondaryPuffControllerTypeIndex != kiInvalidControllerType)
 		{
-			PuffsPostRender::AddControlled(rFrame, std::chrono::duration<float>(currentTime.count() + durationDelay.count()), rType.iSecondaryPuffControllerTypeIndex, vecSecondaryPosition);
+			PuffsPostRender::AddControlled(rFrame, currentTime + durationDelay, rType.iSecondaryPuffControllerTypeIndex, vecSecondaryPosition);
 		}
 #endif
 	}
@@ -115,7 +115,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 	if (rType.iWindRadialControllerTypeIndex != kiInvalidControllerType)
 	{
 		float fWindSizePercent = std::sqrt(rSpawnInformation.fSizePercent);
-		WindRadialsPostRender::AddControlled(rFrame, currentTime.count(), rType.iWindRadialControllerTypeIndex, rSpawnInformation.vecPosition, ExplosionsInterpolate::sTuning.pWindIntensity->mfCurrent * fWindSizePercent, ExplosionsInterpolate::sTuning.pWindWidth->mfCurrent * fWindSizePercent);
+		WindRadialsPostRender::AddControlled(rFrame, currentTime, rType.iWindRadialControllerTypeIndex, rSpawnInformation.vecPosition, ExplosionsInterpolate::sTuning.pWindIntensity->mfCurrent * fWindSizePercent, ExplosionsInterpolate::sTuning.pWindWidth->mfCurrent * fWindSizePercent);
 	}
 #endif
 
@@ -124,7 +124,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 
 	for (int64_t j = 0; j < iTrailCount; ++j)
 	{
-		std::chrono::duration<float> durationTrailTime(rSpawnInformation.fTimePercent * (rType.fTrailTimeMinimum + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fTrailTimeRandom));
+		std::chrono::duration<float> durationTrailTime = rSpawnInformation.fTimePercent * (rType.trailTimeMinimum + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.trailTimeRandom);
 		[[maybe_unused]] float fTrailIntensity = rSpawnInformation.fSmokePercent * (rType.fTrailIntensityMinimum + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fTrailIntensityRandom);
 
 		XMVECTOR vecTrailDirection = vecDirection2dNormal;
@@ -136,7 +136,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 		[[maybe_unused]] XMVECTOR vecTrailStart = XMVectorMultiplyAdd(vecTrailDirection, XMVectorReplicate(rType.fTrailStart), rSpawnInformation.vecPosition);
 		[[maybe_unused]] float fTrailLength = rType.fTrailLengthMinimum + common::Random<1.0f>(rFrame.postRender.randomEngine) * rType.fTrailLengthRandom;
 
-		rInterpolate.pfTrailTimes[j][iSpawnIndex] = durationTrailTime.count();
+		rInterpolate.pTrailTimes[j][iSpawnIndex] = durationTrailTime;
 
 #if defined(BT_CLIENT)
 		// j == 0 is the central trail along the explosion direction; j > 0 are angle-jittered side trails
@@ -145,7 +145,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 		float fDurationMultiplier = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailDuration->mfCurrent : ExplosionsInterpolate::sTuning.pSecondaryTrailDuration->mfCurrent;
 		fTrailIntensity *= bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailIntensity->mfCurrent : ExplosionsInterpolate::sTuning.pSecondaryTrailIntensity->mfCurrent;
 		// Scaling the head's travel distance by Duration keeps head speed constant when Update later scales
-		// pfTrailTimes by the same Duration multiplier — so increasing Duration extends both space and time
+		// pTrailTimes by the same Duration multiplier — so increasing Duration extends both space and time
 		// in lockstep rather than slowing the head into the engine's smoke-decay window.
 		fTrailLength *= fLengthMultiplier * fDurationMultiplier;
 
@@ -165,7 +165,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 #endif // BT_CLIENT
 	}
 
-	int64_t iTotalParticles = rSpawnInformation.uiParticleCount + rType.uiBaseParticleCount;
+	int64_t iTotalParticles = rSpawnInformation.iParticleCount + rType.iBaseParticleCount;
 
 	// Per-type tweak multipliers (Particles tab).
 	auto Scale = [](const Wrapper* pWrapper)

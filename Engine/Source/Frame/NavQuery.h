@@ -5,11 +5,7 @@ namespace engine
 
 struct NavData;
 
-#if defined(BT_SERVER)
-XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDestination, const NavData& rNavData, XMVECTOR* pOutNextWaypoint = nullptr, bool* pOutEnteredAStar = nullptr);
-#else
-XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDestination, const NavData& rNavData, XMVECTOR* pOutNextWaypoint = nullptr);
-#endif // BT_SERVER
+XMVECTOR XM_CALLCONV NavQueryDirection(FXMVECTOR vecPosition, FXMVECTOR vecDestination, const NavData& rNavData, XMVECTOR& rVecNextWaypoint);
 XMVECTOR XM_CALLCONV NavQuerySnapToNavigable(FXMVECTOR vecPosition, const NavData& rNavData);
 
 // Is the position inside a no-navigation polygon? Reads x/y only, so unlike the two entry points above

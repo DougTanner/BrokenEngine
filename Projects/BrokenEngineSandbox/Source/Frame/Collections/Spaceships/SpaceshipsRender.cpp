@@ -113,7 +113,7 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		if (rCurrent.pfDestroyedTimes[i] == 0.0f)
+		if (rCurrent.pDestroyedTimes[i] == std::chrono::duration<float>::zero())
 		{
 			continue;
 		}
@@ -160,9 +160,9 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 			int64_t i = visibleIndicesAllocation.mpData[j];
 
 			float fSize = kfSpaceshipRadius * kfModelScale;
-			if (rCurrent.pfDestroyedTimes[i] > 0.0f)
+			if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
 			{
-				fSize *= std::pow(rCurrent.pfDestroyedTimes[i] / kfSpaceshipDestroyTime, 0.75f);
+				fSize *= std::pow(rCurrent.pDestroyedTimes[i] / kSpaceshipDestroyTime, 0.75f);
 			}
 
 			XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
@@ -192,7 +192,7 @@ void SpaceshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInte
 
 				int64_t iJointMatrixOffset = iJointBase + j * iJointsPerShip;
 
-				pAnimationData->EvaluateAnimation(0, rCurrent.pfAnimationTimes[i], std::span(pMeshData, static_cast<size_t>(iMaterialCount)), pJointMatricesBuffer, iJointMatrixOffset);
+				pAnimationData->EvaluateAnimation(0, rCurrent.pAnimationTimes[i].count(), std::span(pMeshData, static_cast<size_t>(iMaterialCount)), pJointMatricesBuffer, iJointMatrixOffset);
 			}
 		}
 	};

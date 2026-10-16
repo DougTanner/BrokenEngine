@@ -453,7 +453,7 @@ void StaticVoices::PriorityPass(const SoundsInterpolate& rSoundsInterpolate, con
 		{
 			continue;
 		}
-		float fFadeOutTime = rSoundsInterpolate.pfFadeOutTimes[iIndex];
+		float fFadeOutTime = rSoundsInterpolate.pFadeOutTimes[iIndex].count();
 		StaticVoice& rNewVoice = mVoices.emplace_back(pVoice, id, fSoundVolume, fPitch, fFadeOutTime, vecPosition, vecVelocity, uiCrc);
 		if (acquiredVoice.bFromPool)
 		{
@@ -571,11 +571,11 @@ void StaticVoices::UpdateListenerPosition()
 	}
 
 	// mVecListenerPosition is the camera eye in full XYZ, so altitude contributes to manual fade distance.
-	// mX3dAudioListener.Position is the camera look-at on the gBaseHeight plane for pan/Doppler; its XY-only vector to
+	// mX3dAudioListener.Position is the camera look-at on the lowest flight plane for pan/Doppler; its XY-only vector to
 	// ground emitters keeps screen-left audible on the left rather than collapsed toward center by altitude. Listener
 	// velocity is zero because RTS camera-motion Doppler is negligible and snap/jump easing must not add artifacts.
 	mVecListenerPosition = engine::gpCamera->mVecEyePosition;
-	XMVECTOR vecPanListener = XMVectorSetZ(engine::gpCamera->mVecPosition, gBaseHeight.mfCurrent);
+	XMVECTOR vecPanListener = XMVectorSetZ(engine::gpCamera->mVecPosition, gpFlightPlanes->Lowest().fHeightMeters);
 	XMFLOAT3A f3PanPosition {};
 	XMStoreFloat3A(&f3PanPosition, vecPanListener);
 	mX3dAudioListener.OrientFront = {0.0f, 0.0f, -1.0f};

@@ -73,6 +73,8 @@
 #endif // BT_CLIENT
 
 #include "Frame/IslandTerrain.h"
+#include "Frame/TerrainCollisionUtils.h"
+#include "Frame/FlightPlanes.h"
 
 #if defined(BT_CLIENT)
 #include "Frame/IslandTerrainResidency.h"

@@ -182,4 +182,12 @@ function Compare-AgentModelVersion([string] $Left, [string] $Right) {
 	return 0
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion
+# The Shared-data shader stamp value: SHA-256 over the revision's file listing of both shader trees.
+# AGENTS.md files never reach Shader.pack, so they are left out at every depth.
+function Get-AgentShaderSourceFingerprint([string] $Root, [string] $Revision) {
+	$listing = @(Invoke-AgentGit @('-C', $Root, 'ls-tree', '-r', $Revision, '--', 'Engine/Data/Shaders', 'Projects/BrokenEngineSandbox/Data/Shaders') |
+		Where-Object { -not [IO.Path]::GetFileName(($_ -split "`t", 2)[1]).Equals('AGENTS.md', [StringComparison]::OrdinalIgnoreCase) })
+	return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.UTF8Encoding]::new($false).GetBytes($listing -join "`n"))).ToLowerInvariant()
+}
+
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentShaderSourceFingerprint

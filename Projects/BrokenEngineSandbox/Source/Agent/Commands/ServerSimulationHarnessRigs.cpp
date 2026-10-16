@@ -6,13 +6,12 @@
 
 #include "Agent/Commands/ReplayHarnessRigs.h"
 #include "File/Replay.h"
+#include "Frame/FlightPlanes.h"
 #include "Network/Server/ServerTransferManager.h"
-#include "Ui/WrapperBase.h"
 
 #include "Agent/AgentCommandsServerQueries.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Network/Server/ServerSession.h"
-#include "Profile/ProfileManager.h"
 #include "Game.h"
 #include "SpawnTransfer.h"
 
@@ -71,7 +70,7 @@ static void CommandReplayRecord([[maybe_unused]] const nlohmann::json& rParamete
 		{
 			throw std::runtime_error("replay_record start rejected: playback is active or pending");
 		}
-		// Paused ticks skip SyncReplayTick, which consumes kSaveReplay as a start/stop toggle.
+		// SyncReplayTick consumes kSaveReplay as a start request on a dispatched tick; SaveLoadReplay consumes it as a stop request on its next run.
 		// A pending flag inverts writer presence to give the requested state; setting it schedules a transition, and clearing it cancels one.
 		bool bFlagPending = gpGame->mGameFlags & engine::GameFlags::kSaveReplay;
 		bool bEffective = (!engine::gpReplay->mReplayWriters.empty()) != bFlagPending;
@@ -350,7 +349,7 @@ static void ParseInjectedField(const nlohmann::json& rEntry, DATA_TYPE& rData)
 		}
 		// The caller supplies local XY only; the W lane follows the position/direction invariant.
 		static constexpr bool kbIsPosition = FIELD::kpMember == &TransferData::vecPosition;
-		rMember = XMVectorSet(FiniteFloatFromValue(rValue.at(0), kName), FiniteFloatFromValue(rValue.at(1), kName), kbIsPosition ? engine::gBaseHeight.mfCurrent : 0.0f, kbIsPosition ? 1.0f : 0.0f);
+		rMember = XMVectorSet(FiniteFloatFromValue(rValue.at(0), kName), FiniteFloatFromValue(rValue.at(1), kName), kbIsPosition ? engine::gpFlightPlanes->Lowest().fHeightMeters : 0.0f, kbIsPosition ? 1.0f : 0.0f);
 	}
 	else
 	{
@@ -438,7 +437,7 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 
 		TransferData& rData = std::get<TransferData>(scheduled.change.data);
 		// Transfer payloads are destination-local, so the default arrival point is the cell centre.
-		rData.vecPosition = XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.mfCurrent, 1.0f);
+		rData.vecPosition = XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 		rData.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 		rData.vecVelocity = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 		rData.alignment = gpGame->mPlayerAlignment;
@@ -535,7 +534,7 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 					INJECTED_FIELD(SpawnPlayerData, bIsFlagship),
 					INJECTED_FIELD(SpawnPlayerData, fleetWantedCoordinate)>(rEntry, rData);
 				// Spawn silently skips an out-of-cell offset, so reject it here.
-				ValidateInjectedPosition(XMVectorSet(rData.fSpawnOffsetX, rData.fSpawnOffsetY, engine::gBaseHeight.mfCurrent, 1.0f));
+				ValidateInjectedPosition(XMVectorSet(rData.fSpawnOffsetX, rData.fSpawnOffsetY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f));
 				break;
 			}
 			case StatusChangeType::kDestroyPlayer:
@@ -573,13 +572,9 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 
 static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParameters.is_object())
-	{
-		throw std::runtime_error("inject_payload params must be an object");
-	}
 	for (const auto& [rKey, rValue] : rParameters.items())
 	{
-		if (rKey != "entries" && rKey != "navQueryActivation" && rKey != "pauseAfterWriterInput")
+		if (rKey != "entries" && rKey != "pauseAfterWriterInput")
 		{
 			throw std::runtime_error("inject_payload unknown parameter '" + rKey + "'");
 		}
@@ -612,71 +607,10 @@ static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::js
 		bPauseAfterWriterInput = rParameters.at("pauseAfterWriterInput").get<bool>();
 	}
 
-	bool bArmNavigationQuery = false;
-	if (rParameters.contains("navQueryActivation"))
-	{
-		const nlohmann::json& rActivation = rParameters.at("navQueryActivation");
-		if (!rActivation.is_object())
-		{
-			throw std::runtime_error("'navQueryActivation' must be an object");
-		}
-		for (const auto& [rKey, rValue] : rActivation.items())
-		{
-			if (rKey != "arm")
-			{
-				throw std::runtime_error("navQueryActivation unknown parameter '" + rKey + "'");
-			}
-		}
-		if (!rActivation.contains("arm"))
-		{
-			throw std::runtime_error("navQueryActivation requires boolean 'arm': true");
-		}
-		if (!rActivation.at("arm").is_boolean())
-		{
-			throw std::runtime_error("navQueryActivation requires boolean 'arm': true");
-		}
-		if (!rActivation.at("arm").get<bool>())
-		{
-			throw std::runtime_error("navQueryActivation requires boolean 'arm': true");
-		}
-		bArmNavigationQuery = true;
-	}
-
 	// Replay playback loads recorded mFrameInputs through SyncReplayTick's LoadDifference; live injection is incompatible with simulation and broadcasts.
 	if (gpGame->mbReplaying)
 	{
 		throw std::runtime_error("cannot inject during replay playback");
-	}
-	if (bArmNavigationQuery)
-	{
-		if constexpr (!kbProfiling)
-		{
-			throw std::runtime_error("navQueryActivation requires a profiling server");
-		}
-		else if (gpGame->mGameFlags & engine::GameFlags::kPaused)
-		{
-			throw std::runtime_error("navQueryActivation requires an unpaused normal server state");
-		}
-		else if (gpGame->mGameFlags & engine::GameFlags::kSaveReplay)
-		{
-			throw std::runtime_error("navQueryActivation requires an unpaused normal server state");
-		}
-		else if (gpGame->mGameFlags & engine::GameFlags::kLoadReplay)
-		{
-			throw std::runtime_error("navQueryActivation requires an unpaused normal server state");
-		}
-		else if (gpGame->mTimeStep.miTimeMultiply != 1)
-		{
-			throw std::runtime_error("navQueryActivation requires timescale 1/1");
-		}
-		else if (gpGame->mTimeStep.miTimeDivide != 1)
-		{
-			throw std::runtime_error("navQueryActivation requires timescale 1/1");
-		}
-		else if ((!engine::gpReplay->mReplayWriters.empty()))
-		{
-			throw std::runtime_error("navQueryActivation requires recording and replay to be inactive");
-		}
 	}
 	const nlohmann::json& rEntries = rParameters.at("entries");
 
@@ -690,16 +624,6 @@ static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::js
 		const std::pair<engine::GridCoord, ScheduledStatusChange>& rBuiltEntry = built.emplace_back(BuildInjectedEntry(rEntry));
 		bHasTransfer = bHasTransfer || IsTransferType(rBuiltEntry.second.change.eType);
 		bHasTick = bHasTick || rEntry.contains("tick");
-	}
-	// The arm's prepared queue swap covers only the status queue.
-	if (bArmNavigationQuery && bHasTransfer)
-	{
-		throw std::runtime_error("navQueryActivation cannot be combined with transfer entries");
-	}
-	// The arm's sample floor and the writer-input pause both assume the batch enters the next tick.
-	if (bArmNavigationQuery && bHasTick)
-	{
-		throw std::runtime_error("navQueryActivation cannot be combined with entry 'tick'");
 	}
 	bool bPendingStart = (gpGame->mGameFlags & engine::GameFlags::kPaused) && (gpGame->mGameFlags & engine::GameFlags::kSaveReplay)
 	                  && engine::gpReplay->mReplayWriters.empty();
@@ -717,13 +641,14 @@ static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::js
 		{
 			throw std::runtime_error("pauseAfterWriterInput is already armed");
 		}
+		// The writer-input pause assumes the batch enters the next tick.
 		if (bHasTick)
 		{
 			throw std::runtime_error("pauseAfterWriterInput cannot be combined with entry 'tick'");
 		}
 	}
 
-	// Ids are reserved here and committed to miNextGlobalId only with the queue, so a rejected arm consumes none.
+	// Ids are reserved here and committed to miNextGlobalId only with the queue.
 	int64_t iNextGlobalId = gpGame->miNextGlobalId;
 	nlohmann::json globalIds = nlohmann::json::array();
 	for (std::pair<engine::GridCoord, ScheduledStatusChange>& rBuiltEntry : built)
@@ -747,74 +672,26 @@ static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::js
 		rResult["pauseAfterWriterInput"] = bPauseAfterWriterInput;
 	}
 
-	int64_t iQueuedAtTick = 0;
-	int64_t iMinimumSampleTick = 0;
-	if (bArmNavigationQuery)
+	gpGame->miNextGlobalId = iNextGlobalId;
+	for (const std::pair<engine::GridCoord, ScheduledStatusChange>& rBuiltEntry : built)
 	{
-		if constexpr (kbProfiling)
+		const auto& [rCoordinate, rScheduled] = rBuiltEntry;
+		if (IsTransferType(rScheduled.change.eType))
 		{
-			// Prepare a complete queue copy before touching the profiler state. A failed allocation leaves both the
-			// existing queue and the event arm unchanged.
-			decltype(sHarnessRig.pendingAgentStatusChanges) preparedPendingAgentStatusChanges = sHarnessRig.pendingAgentStatusChanges;
-			for (const std::pair<engine::GridCoord, ScheduledStatusChange>& rBuiltEntry : built)
-			{
-				preparedPendingAgentStatusChanges.try_emplace(rBuiltEntry.first).first->second.push_back(rBuiltEntry.second);
-			}
-
-			// Prepare every response field that could allocate before arming. The command failure path must not report an
-			// error after committing the event and queue transaction.
-			rResult["injected"] = std::ssize(built);
-			rResult["globalIds"] = std::move(globalIds);
-			rResult["deferred"] = static_cast<bool>(gpGame->mGameFlags & engine::GameFlags::kPaused);
-
-			// Drain is the main-thread serialization point. Keep the event arm and queue commit in one critical section
-			// so another tick cannot move the floor or observe a partially committed transaction.
-			std::lock_guard lock(gpProfileManager->mCpuTimerMutex);
-			iQueuedAtTick = gpGame->miTickCounter;
-			static constexpr int64_t kiMinimumSampleTickOffset = engine::kiTickRate + 1;
-			if (iQueuedAtTick > std::numeric_limits<int64_t>::max() - kiMinimumSampleTickOffset)
-			{
-				throw std::runtime_error("navQueryActivation tick range exhausted");
-			}
-			iMinimumSampleTick = iQueuedAtTick + kiMinimumSampleTickOffset;
-			rResult["navQueryActivation"] =
-			{
-				{"armed", true},
-				{"queuedAtTick", iQueuedAtTick},
-				{"minimumSampleTick", iMinimumSampleTick},
-			};
-			if (!gpProfileManager->ArmRawCpuTimerEventLocked(game::kCpuTimerPostRenderUpdateNavigationQuery, iMinimumSampleTick))
-			{
-				throw std::runtime_error("navQueryActivation event is pending, occupied, or overrun");
-			}
-			gpGame->miNextGlobalId = iNextGlobalId;
-			static_assert(noexcept(preparedPendingAgentStatusChanges.swap(sHarnessRig.pendingAgentStatusChanges)));
-			preparedPendingAgentStatusChanges.swap(sHarnessRig.pendingAgentStatusChanges);
+			VERIFY_SUCCESS(QueueReplayTransferHarnessRig(*gpServerSession, rCoordinate, rScheduled.iTick, rScheduled.change));
+		}
+		else
+		{
+			QueueAgentStatusChange(*gpServerSession, rCoordinate, rScheduled.iTick, rScheduled.change);
 		}
 	}
-	else
+	if (bPauseAfterWriterInput)
 	{
-		gpGame->miNextGlobalId = iNextGlobalId;
-		for (const std::pair<engine::GridCoord, ScheduledStatusChange>& rBuiltEntry : built)
-		{
-			const auto& [rCoordinate, rScheduled] = rBuiltEntry;
-			if (IsTransferType(rScheduled.change.eType))
-			{
-				VERIFY_SUCCESS(QueueReplayTransferHarnessRig(*gpServerSession, rCoordinate, rScheduled.iTick, rScheduled.change));
-			}
-			else
-			{
-				QueueAgentStatusChange(*gpServerSession, rCoordinate, rScheduled.iTick, rScheduled.change);
-			}
-		}
-		if (bPauseAfterWriterInput)
-		{
-			engine::ReplayHarnessRigs::ArmPauseAfterNextWriterInput(*engine::gpReplay, bPendingStart);
-		}
-		rResult["injected"] = std::ssize(built);
-		rResult["globalIds"] = std::move(globalIds);
-		rResult["deferred"] = static_cast<bool>(gpGame->mGameFlags & engine::GameFlags::kPaused);
+		engine::ReplayHarnessRigs::ArmPauseAfterNextWriterInput(*engine::gpReplay, bPendingStart);
 	}
+	rResult["injected"] = std::ssize(built);
+	rResult["globalIds"] = std::move(globalIds);
+	rResult["deferred"] = static_cast<bool>(gpGame->mGameFlags & engine::GameFlags::kPaused);
 }
 
 bool ExecuteServerSimulationHarnessRigCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)

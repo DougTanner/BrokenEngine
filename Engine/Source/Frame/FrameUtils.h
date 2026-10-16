@@ -78,7 +78,7 @@ inline CellBounds XM_CALLCONV ComputeCellBounds(FXMVECTOR vecArea)
 	};
 }
 
-inline SegmentHit XM_CALLCONV TracePointToCellExit(FXMVECTOR vecArea, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition, float fStartTime, float fEndTime)
+inline SegmentHit XM_CALLCONV TracePointToCellExit(FXMVECTOR vecArea, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition)
 {
 	CellBounds bounds = ComputeCellBounds(vecArea);
 	XMFLOAT4A f4Start {};
@@ -124,7 +124,7 @@ inline SegmentHit XM_CALLCONV TracePointToCellExit(FXMVECTOR vecArea, FXMVECTOR 
 	return
 	{
 		.bHit = true,
-		.fTime = fStartTime + fPercent * (fEndTime - fStartTime),
+		.fTime = fPercent,
 		.vecPosition = XMVectorLerp(vecStartPosition, vecEndPosition, fPercent),
 	};
 }

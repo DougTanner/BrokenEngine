@@ -26,7 +26,7 @@ struct [[nodiscard]] ScopedLogDifferenceContext
 inline constexpr int64_t kiLogDifferencePrecision = 3;
 
 template <typename T>
-using LogDifferenceValue = std::conditional_t<std::is_same_v<T, float> || std::is_same_v<T, double>, Wb,
+using LogDifferenceValue = std::conditional_t<std::is_same_v<T, float> || std::is_same_v<T, double> || std::is_same_v<T, std::chrono::duration<float>>, Wb,
 	std::conditional_t<std::is_same_v<T, XMFLOAT2>, WbV2,
 	std::conditional_t<std::is_same_v<T, XMFLOAT3>, WbV3,
 	std::conditional_t<std::is_same_v<T, XMFLOAT4> || std::is_same_v<T, XMFLOAT4A> || std::is_same_v<T, XMVECTOR>, WbV4, std::decay_t<const T&>>>>>;
@@ -38,6 +38,10 @@ inline LogDifferenceValue<T> WrapLogDifferenceValue(const T& rValue)
 	if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>)
 	{
 		return Wb(static_cast<float>(rValue), kiLogDifferencePrecision);
+	}
+	else if constexpr (std::is_same_v<T, std::chrono::duration<float>>)
+	{
+		return Wb(rValue.count(), kiLogDifferencePrecision);
 	}
 	else if constexpr (std::is_same_v<T, XMFLOAT2>)
 	{

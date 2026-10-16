@@ -52,7 +52,7 @@ static bool ContainsCaseInsensitive(std::string_view haystack, std::string_view 
 }
 
 AgentUiRegistry::AgentUiRegistry()
-: common::Singleton<AgentUiRegistry>(gpAgentUiRegistry)
+: common::Singleton<AgentUiRegistry>(gpAgentUiRegistry, this)
 {
 }
 

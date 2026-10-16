@@ -8,7 +8,7 @@ namespace engine
 {
 
 TextureUploadManager::TextureUploadManager()
-: common::Singleton<TextureUploadManager>(gpTextureUploadManager)
+: common::Singleton<TextureUploadManager>(gpTextureUploadManager, this)
 {
 }
 

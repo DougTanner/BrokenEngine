@@ -93,7 +93,7 @@ struct ExplosionType
 	int64_t iTrailTypeIndex = kiInvalidTrailType;
 	int64_t iWindRadialControllerTypeIndex = kiInvalidControllerType;
 
-	uint32_t uiBaseParticleCount = 0;
+	int64_t iBaseParticleCount = 0;
 	common::crc_t particleCrc = common::CrcConsteval(R"(Textures\Particles\[BC4]Long\5.png)");
 	uint32_t uiParticleColor = 0xFF0000FF;
 	uint32_t uiParticleColorEnd = 0x800000FF;
@@ -112,11 +112,11 @@ struct ExplosionType
 	float fParticleIntensityDecay = 2.4f;
 	float fParticleIntensityPower = 2.5f;
 
-	float fPrimaryTime = 0.075f;
+	std::chrono::duration<float> primaryTime = std::chrono::duration<float>(0.075f);
 
-	float fTrailDelayTime = 0.0f;
-	float fTrailTimeMinimum = 0.2f;
-	float fTrailTimeRandom = 0.2f;
+	std::chrono::duration<float> trailDelayTime = std::chrono::duration<float>::zero();
+	std::chrono::duration<float> trailTimeMinimum = std::chrono::duration<float>(0.2f);
+	std::chrono::duration<float> trailTimeRandom = std::chrono::duration<float>(0.2f);
 	float fTrailIntensityMinimum = 0.025f;
 	float fTrailIntensityRandom = 0.025f;
 	float fTrailStart = 0.6f;
@@ -175,19 +175,19 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 	static inline ExplosionTuning sTuning;
 	static inline int64_t siTotalCount = 0;
 
-	static inline uint8_t suiPrimaryLightControllerTypeIndex = static_cast<uint8_t>(kiInvalidControllerType);
-	static inline uint8_t suiSecondaryLightControllerTypeIndex = static_cast<uint8_t>(kiInvalidControllerType);
-	static inline uint8_t suiPrimaryPuffControllerTypeIndex = static_cast<uint8_t>(kiInvalidControllerType);
-	static inline uint8_t suiSecondaryPuffControllerTypeIndex = static_cast<uint8_t>(kiInvalidControllerType);
+	static inline int64_t siPrimaryLightControllerTypeIndex = kiInvalidControllerType;
+	static inline int64_t siSecondaryLightControllerTypeIndex = kiInvalidControllerType;
+	static inline int64_t siPrimaryPuffControllerTypeIndex = kiInvalidControllerType;
+	static inline int64_t siSecondaryPuffControllerTypeIndex = kiInvalidControllerType;
 	static inline int64_t siExplosionTrailTypeIndex = kiInvalidTrailType;
-	static inline uint8_t suiWindRadialControllerTypeIndex = static_cast<uint8_t>(kiInvalidControllerType);
+	static inline int64_t siWindRadialControllerTypeIndex = kiInvalidControllerType;
 #endif // BT_CLIENT
 
 	static void Update(game::FrameInterpolate& __restrict rCurrentFrameInterpolate, const game::Frame& __restrict rPreviousFrame);
 
 	uint8_t* __restrict puiTypeIndices = nullptr;
 	ExplosionFlags_t* __restrict pFlags = nullptr;
-	float* __restrict pfStartTimes = nullptr;
+	SimulationTime* __restrict pStartTimes = nullptr;
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	XMVECTOR* __restrict pVecDirections = nullptr;
 
@@ -198,7 +198,7 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 #if defined(BT_CLIENT)
 	smoke_trails_t* pTrails[kiMaxExplosionTrails] = {};
 #endif
-	float* pfTrailTimes[kiMaxExplosionTrails] = {};
+	std::chrono::duration<float>* pTrailTimes[kiMaxExplosionTrails] = {};
 #if defined(BT_CLIENT)
 	float* pfTrailIntensities[kiMaxExplosionTrails] = {};
 	XMVECTOR* pVecTrailStartPositions[kiMaxExplosionTrails] = {};
@@ -207,7 +207,7 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiTypeIndices, rSelf.pFlags, rSelf.pfStartTimes, rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfTimePercents, rSelf.piTrailCounts, rSelf.pfTrailTimes);
+		return std::tie(rSelf.puiTypeIndices, rSelf.pFlags, rSelf.pStartTimes, rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfTimePercents, rSelf.piTrailCounts, rSelf.pTrailTimes);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -261,7 +261,7 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 		ExplosionFlags_t flags {};
 		int64_t iTrailCount = 0;
 		float fTrailAngle = XM_2PI;
-		uint32_t uiParticleCount = 0;
+		int64_t iParticleCount = 0;
 		float fParticleAngle = XM_2PI;
 		float fSizePercent = 1.0f;
 		float fSmokePercent = 1.0f;
@@ -269,7 +269,7 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 	};
 
 	// coordinate is the cell rSpawnInformation.vecPosition is local to.
-	static bool Spawn(game::Frame& __restrict rFrame, GridCoord coordinate, std::chrono::duration<float> currentTime, const SpawnInfo& rSpawnInformation);
+	static bool Spawn(game::Frame& __restrict rFrame, GridCoord coordinate, SimulationTime currentTime, const SpawnInfo& rSpawnInformation);
 };
 
 extern template struct Collection<ExplosionsInterpolate>;

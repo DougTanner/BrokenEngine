@@ -75,7 +75,7 @@ Changes (11 files)
    - FlipbooksInterpolate: Collection<FlipbooksInterpolate> with
      ControllerTypeRegistry. SOA members: puiTypeIndices,
      pVecPositions, pfAlphas, pfSizes, pfRotations,
-     puiControllerTypeIndices, pfStartTimes, puiStartFrameOffsets
+     puiControllerTypeIndices, pStartTimes, puiStartFrameOffsets
    - Members() returns std::tie of all SOA members
    - Standard render interface: GraphicsResources, BeginRender, Render,
      EndRender
@@ -104,7 +104,7 @@ Changes (11 files)
    - BeginRender(): AccumulateRenderCapacity, ResizeDynamicBufferIfNeeded
    - Render(): For each flipbook instance:
        a. Visibility cull via IsPointVisible
-       b. Compute elapsed time = fCurrentTime - pfStartTimes[i]
+       b. Compute elapsed time = fCurrentTime - pStartTimes[i].time_since_epoch().count()
        c. Compute frame index = (startFrameOffset + floor(elapsed * frameRate))
           % frameCount
        d. Compute UV rect from frame index, columns, rows:

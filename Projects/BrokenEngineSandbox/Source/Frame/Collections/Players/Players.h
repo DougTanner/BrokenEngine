@@ -18,10 +18,10 @@ namespace game
 {
 
 // Shared constants (used across Players*.cpp files)
-inline constexpr float kfDestroyTime = 0.7f;
-inline constexpr float kfDestroyExplosionInterval = 0.005f;
+inline constexpr std::chrono::duration<float> kDestroyTime = std::chrono::duration<float>(0.7f);
+inline constexpr std::chrono::duration<float> kDestroyExplosionInterval = std::chrono::duration<float>(0.005f);
 inline constexpr float kfPlayerBlastersSpeed = 150.0f;
-inline constexpr float kfBlasterFireInterval = 0.05f;
+inline constexpr std::chrono::duration<float> kBlasterFireInterval = std::chrono::duration<float>(0.05f);
 
 inline constexpr float kfPlayerRadius = 1.1f;
 
@@ -65,17 +65,30 @@ struct PlayersInterpolate : public engine::Collection<PlayersInterpolate, engine
 	static inline int64_t siAreaLightTypeIndex = 0xFF;
 	static inline int64_t siBlasterTypeIndex = 0xFF;
 	static inline int64_t siExplosionTypeIndex = 0xFF;
-	static inline uint8_t suiImpactPuffControllerTypeIndex = 0xFF;
-	static inline uint8_t suiImpactPointLightControllerTypeIndex = 0xFF;
+	static inline int64_t siImpactPuffControllerTypeIndex = engine::kiInvalidControllerType;
+	static inline int64_t siImpactPointLightControllerTypeIndex = engine::kiInvalidControllerType;
 	static inline int64_t siHexShieldTypeIndex = 0xFF;
 
+	// Simulation keeps the destroyed time in [0, kDestroyTime]; reject anything else as a corrupt stream, since a huge or +inf value
+	// puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
+	static void PostRead(const PlayersInterpolate& rCurrent)
+	{
+		for (int64_t i = 0; i < rCurrent.iCount; ++i)
+		{
+			std::chrono::duration<float> destroyedTime = rCurrent.pDestroyedTimes[i];
+			if (!(destroyedTime.count() >= 0.0f && destroyedTime.count() <= kDestroyTime.count()))
+			{
+				throw std::ios_base::failure("PlayersInterpolate pDestroyedTimes");
+			}
+		}
+	}
 
 	static void Update(FrameInterpolate& __restrict rFrameInterpolate, const Frame& __restrict rPreviousFrame);
 
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	XMVECTOR* __restrict pVecDirections = nullptr;
-	float* __restrict pfDestroyedTimes = nullptr;
-	float* __restrict pfAnimationTimes = nullptr;
+	std::chrono::duration<float>* __restrict pDestroyedTimes = nullptr;
+	std::chrono::duration<float>* __restrict pAnimationTimes = nullptr;
 	engine::pusher_t* __restrict pPushers = nullptr;
 #if defined(BT_CLIENT)
 	float* __restrict pfRotationAccelerationXs = nullptr;
@@ -91,7 +104,7 @@ struct PlayersInterpolate : public engine::Collection<PlayersInterpolate, engine
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfDestroyedTimes, rSelf.pfAnimationTimes, rSelf.pPushers);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pAnimationTimes, rSelf.pPushers);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -119,7 +132,7 @@ struct PlayersInterpolate : public engine::Collection<PlayersInterpolate, engine
 	// CRC excludes client-only animation time and cell-local pusher handles.
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfDestroyedTimes);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes);
 	}
 
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
@@ -193,11 +206,11 @@ struct PlayersPostRender : public engine::Collection<PlayersPostRender>
 	static inline thread_local int64_t siCollisionLayerIndex = 0;
 
 
-	// Simulation keeps the blaster countdown in [0, kfBlasterFireInterval], which bounds SpawnBlasters to one shot per tick.
+	// Simulation keeps the blaster countdown in [0, kBlasterFireInterval], which bounds SpawnBlasters to one shot per tick.
 	// Written as one range test so NaN and both infinities fail it too.
 	static bool IsBlasterFireTimeInRange(float fTime)
 	{
-		return fTime >= 0.0f && fTime <= kfBlasterFireInterval;
+		return fTime >= 0.0f && fTime <= kBlasterFireInterval.count();
 	}
 
 	// Navigation delays in seconds match the HUD slider's [0, 60] range. Written as one range test so NaN and both infinities fail it too.
@@ -212,13 +225,13 @@ struct PlayersPostRender : public engine::Collection<PlayersPostRender>
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
 		{
-			if (!IsBlasterFireTimeInRange(rCurrent.pfNextBlasterFireTimes[i]))
+			if (!IsBlasterFireTimeInRange(rCurrent.pNextBlasterFireTimes[i].count()))
 			{
-				throw std::ios_base::failure("PlayersPostRender pfNextBlasterFireTimes");
+				throw std::ios_base::failure("PlayersPostRender pNextBlasterFireTimes");
 			}
-			if (!IsNavigationDelayInRange(rCurrent.pfNavigationDelays[i]))
+			if (!IsNavigationDelayInRange(rCurrent.pNavigationDelays[i].count()))
 			{
-				throw std::ios_base::failure("PlayersPostRender pfNavigationDelays");
+				throw std::ios_base::failure("PlayersPostRender pNavigationDelays");
 			}
 		}
 	}
@@ -239,8 +252,8 @@ struct PlayersPostRender : public engine::Collection<PlayersPostRender>
 private:
 	// Per-player Update helpers (called from PlayersPostRender::Update orchestrator)
 	// Defined in PlayersNavigation.cpp:
-	static void XM_CALLCONV ComputeNavigation(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, float fDeltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, float& rfCellChangeTimer);
-	static void XM_CALLCONV ApplyMovement(int64_t iNavigationDirection, FXMVECTOR vecArtificialIntelligenceDirection, float fDeltaTime, float fAccelerationMultiplier, float fDecayMultiplier, XMVECTOR& rVecVelocity);
+	static void XM_CALLCONV ComputeNavigation(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer);
+	static void XM_CALLCONV ApplyMovement(int64_t iNavigationDirection, FXMVECTOR vecArtificialIntelligenceDirection, std::chrono::duration<float> deltaTime, float fAccelerationMultiplier, float fDecayMultiplier, XMVECTOR& rVecVelocity);
 	static void XM_CALLCONV ApplyTerrainPush(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity);
 	static void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, XMVECTOR& rVecVelocity);
 	static void XM_CALLCONV ApplyPusherPush(const Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, int64_t i, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity);
@@ -260,23 +273,23 @@ public:
 	player_t* __restrict pIds = nullptr;
 	PlayerFlags_t* __restrict pFlags = nullptr;
 	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
-	float* __restrict pfNextBlasterFireTimes = nullptr;
-	float* __restrict pfNextSecondarySpawnTimes = nullptr;
+	std::chrono::duration<float>* __restrict pNextBlasterFireTimes = nullptr;
+	std::chrono::duration<float>* __restrict pNextSecondarySpawnTimes = nullptr;
 	XMVECTOR* __restrict pVecVelocities = nullptr;
 	XMVECTOR* __restrict pVecWantedDirections = nullptr;
 	float* __restrict pfArmors = nullptr;
 	float* __restrict pfShields = nullptr;
-	float* __restrict pfShieldCooldowns = nullptr;
-	float* __restrict pfDestroyedExplosionTimes = nullptr;
-	float* __restrict pfShieldDownSoundCooldowns = nullptr;
+	std::chrono::duration<float>* __restrict pShieldCooldowns = nullptr;
+	std::chrono::duration<float>* __restrict pDestroyedExplosionTimes = nullptr;
+	std::chrono::duration<float>* __restrict pShieldDownSoundCooldowns = nullptr;
 	XMVECTOR* __restrict pVecAiDirections = nullptr;
-	float* __restrict pfTransferLockTimers = nullptr;
-	float* __restrict pfArrivalGracePeriods = nullptr;
-	float* __restrict pfCellChangeTimers = nullptr;
+	std::chrono::duration<float>* __restrict pTransferLockTimers = nullptr;
+	std::chrono::duration<float>* __restrict pArrivalGracePeriods = nullptr;
+	std::chrono::duration<float>* __restrict pCellChangeTimers = nullptr;
 	XMVECTOR* __restrict pVecIslandDestinations = nullptr;
 	engine::ClientGuid* __restrict pClientGuids = nullptr;
 	engine::GlobalId* __restrict pGlobalPlayerIds = nullptr;
-	float* __restrict pfNavigationDelays = nullptr;
+	std::chrono::duration<float>* __restrict pNavigationDelays = nullptr;
 	engine::GridCoord* __restrict pFleetWantedCoordinates = nullptr;
 	uint8_t* __restrict puiPendingFleetWantedCoordinateTicks = nullptr;
 	uint8_t* __restrict puiPendingWeaponModeTicks = nullptr;
@@ -286,7 +299,7 @@ public:
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pClientGuids, rSelf.pGlobalPlayerIds, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pDestroyedExplosionTimes, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pClientGuids, rSelf.pGlobalPlayerIds, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -310,7 +323,7 @@ public:
 	// CRC-only subset: excludes pClientGuids and pGlobalPlayerIds which are server-side bookkeeping
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pfNextBlasterFireTimes, rSelf.pfNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pfShieldCooldowns, rSelf.pfDestroyedExplosionTimes, rSelf.pfShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pfTransferLockTimers, rSelf.pfArrivalGracePeriods, rSelf.pfCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pfNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pDestroyedExplosionTimes, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
 	}
 
 	bool LogDifferences(const PlayersPostRender& rOther) const;
@@ -323,17 +336,17 @@ public:
 		engine::AlignmentIdentifier alignment {};
 		float fArmor = 0.0f;
 		float fShield = 0.0f;
-		float fNextBlasterFireTime = 0.0f;
-		float fNextSecondarySpawnTime = 0.0f;
-		float fShieldCooldown = 0.0f;
-		float fShieldDownSoundCooldown = 0.0f;
-		float fAnimationTime = 0.0f;
+		std::chrono::duration<float> nextBlasterFireTime = std::chrono::duration<float>::zero();
+		std::chrono::duration<float> nextSecondarySpawnTime = std::chrono::duration<float>::zero();
+		std::chrono::duration<float> shieldCooldown = std::chrono::duration<float>::zero();
+		std::chrono::duration<float> shieldDownSoundCooldown = std::chrono::duration<float>::zero();
+		std::chrono::duration<float> animationTime = std::chrono::duration<float>::zero();
 		float fShieldRotation = 0.0f;
 		float fShieldShrink = 1.0f;
 		PlayerFlags_t flags = {PlayerFlags::kBlasterSpawnLeft};
-		float fTransferLockTimer = 0.0f;
-		float fArrivalGracePeriod = 0.0f;
-		float fNavigationDelay = 60.0f;
+		std::chrono::duration<float> transferLockTimer = std::chrono::duration<float>::zero();
+		std::chrono::duration<float> arrivalGracePeriod = std::chrono::duration<float>::zero();
+		std::chrono::duration<float> navigationDelay = std::chrono::duration<float>(60.0f);
 		engine::GlobalId globalPlayerId {};
 		engine::ClientGuid clientGuid {};
 		engine::GridCoord fleetWantedCoordinate {};

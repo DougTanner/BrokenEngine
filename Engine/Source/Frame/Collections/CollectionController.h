@@ -55,26 +55,26 @@ struct ControllerType
 };
 
 template <typename CONTROLLER_TYPE>
-inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateKeyframes(const CONTROLLER_TYPE& rController, float fElapsedTime)
+inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateKeyframes(const CONTROLLER_TYPE& rController, std::chrono::duration<float> elapsedTime)
 {
 	using KeyframeType = std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)>;
 	int64_t iKeyframeCount = rController.iKeyframeCount;
 
-	if (fElapsedTime <= rController.times[0].count())
+	if (elapsedTime.count() <= rController.times[0].count())
 	{
 		return rController.keyframes[0];
 	}
-	if (fElapsedTime >= rController.times[iKeyframeCount - 1].count())
+	if (elapsedTime.count() >= rController.times[iKeyframeCount - 1].count())
 	{
 		return rController.keyframes[iKeyframeCount - 1];
 	}
 
 	for (int64_t j = 1; j < iKeyframeCount; ++j)
 	{
-		if (fElapsedTime < rController.times[j].count())
+		if (elapsedTime < rController.times[j])
 		{
-			float fPreviousTime = rController.times[j - 1].count();
-			float fPercent = (fElapsedTime - fPreviousTime) / (rController.times[j].count() - fPreviousTime);
+			std::chrono::duration<float> previousTime = rController.times[j - 1];
+			float fPercent = (elapsedTime - previousTime) / (rController.times[j] - previousTime);
 			return KeyframeType::Interpolate(rController.keyframes[j - 1], rController.keyframes[j], fPercent);
 		}
 	}
@@ -83,19 +83,19 @@ inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateKey
 }
 
 template <typename CONTROLLER_TYPE, typename SCALE_FUNCTION>
-inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateScaledKeyframes(const CONTROLLER_TYPE& rController, float fElapsedTime, SCALE_FUNCTION ScaleFunction)
+inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateScaledKeyframes(const CONTROLLER_TYPE& rController, std::chrono::duration<float> elapsedTime, SCALE_FUNCTION ScaleFunction)
 {
 	CONTROLLER_TYPE scaledController = rController;
 	for (int64_t j = 0; j < rController.iKeyframeCount; ++j)
 	{
 		ScaleFunction(scaledController, rController, j);
 	}
-	return InterpolateKeyframes(scaledController, fElapsedTime);
+	return InterpolateKeyframes(scaledController, elapsedTime);
 }
 
 // Spawns a paired controlled element while leaving collection-specific seeding to the caller.
 template <typename INTERPOLATE, typename GROW_FUNCTION, typename ADD_FUNCTION, typename SEED_FUNCTION>
-void XM_CALLCONV AddControlledElement(INTERPOLATE& rInterpolate, float fCurrentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, GROW_FUNCTION GrowFunction, ADD_FUNCTION AddFunction, SEED_FUNCTION SeedFunction)
+void XM_CALLCONV AddControlledElement(INTERPOLATE& rInterpolate, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, GROW_FUNCTION GrowFunction, ADD_FUNCTION AddFunction, SEED_FUNCTION SeedFunction)
 {
 	GrowFunction();
 	int64_t iSpawnIndex = AddFunction();
@@ -103,7 +103,7 @@ void XM_CALLCONV AddControlledElement(INTERPOLATE& rInterpolate, float fCurrentT
 	rInterpolate.pVecPositions[iSpawnIndex] = XMVectorSetW(vecPosition, 1.0f);
 	SeedFunction(iSpawnIndex);
 	rInterpolate.puiControllerTypeIndices[iSpawnIndex] = static_cast<uint8_t>(iControllerTypeIndex);
-	rInterpolate.pfStartTimes[iSpawnIndex] = fCurrentTime;
+	rInterpolate.pStartTimes[iSpawnIndex] = currentTime;
 }
 
 // PointLights use ControllerType; Puffs use a custom controller type.
@@ -131,7 +131,7 @@ struct ControllerTypeRegistry
 
 // The removal callback takes the loop index by reference.
 template <typename INTERPOLATE, typename POST_RENDER, typename REMOVE_FUNCTION>
-void DestroyExpiredControlled(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, float fCurrentTime, REMOVE_FUNCTION RemoveFunction)
+void DestroyExpiredControlled(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, SimulationTime currentTime, REMOVE_FUNCTION RemoveFunction)
 {
 	for (int64_t i = 0; i < rInterpolate.iCount; ++i)
 	{
@@ -147,8 +147,8 @@ void DestroyExpiredControlled(INTERPOLATE& rInterpolate, POST_RENDER& rPostRende
 			continue;
 		}
 
-		float fElapsedTime = fCurrentTime - rInterpolate.pfStartTimes[i];
-		if (fElapsedTime > rController.times[rController.iKeyframeCount - 1].count()) [[unlikely]]
+		std::chrono::duration<float> elapsedTime = currentTime - rInterpolate.pStartTimes[i];
+		if (elapsedTime > rController.times[rController.iKeyframeCount - 1]) [[unlikely]]
 		{
 			RemoveFunction(rInterpolate, rPostRender, i);
 		}

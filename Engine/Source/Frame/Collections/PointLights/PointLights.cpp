@@ -10,7 +10,7 @@ template struct Collection<PointLightsPostRender>;
 
 void PointLightsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unused]] const CellStaticData& rStaticData)
 {
-	DestroyExpiredControlled(rFrame.interpolate.pointLights, rFrame.postRender.pointLights, rFrame.interpolate.fCurrentTime, [](PointLightsInterpolate& rInterpolate, PointLightsPostRender& rPostRender, int64_t& i)
+	DestroyExpiredControlled(rFrame.interpolate.pointLights, rFrame.postRender.pointLights, SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)), [](PointLightsInterpolate& rInterpolate, PointLightsPostRender& rPostRender, int64_t& i)
 	{
 		RemoveIndexableElement(rInterpolate, rPostRender, rPostRender.pIds[i], rInterpolate.Members(), rPostRender.Members());
 		--i;

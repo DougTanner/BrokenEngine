@@ -251,15 +251,6 @@ void ProfileManagerBase::RegisterRawCpuTimer(int64_t iCpuTimer)
 	}
 }
 
-void ProfileManagerBase::RegisterRawCpuTimerEvent(int64_t iCpuTimer)
-{
-	if constexpr (kbProfiling)
-	{
-		ASSERT(mpRawCpuTimers != nullptr);
-		mpRawCpuTimers[static_cast<size_t>(iCpuTimer)].flags.Set(RawCpuTimerStateFlags::kEventRegistered);
-	}
-}
-
 void ProfileManagerBase::AddRawCpuTimerAuxiliaryCount(int64_t iCpuTimer, int64_t iCount)
 {
 	if constexpr (kbProfiling)
@@ -268,7 +259,7 @@ void ProfileManagerBase::AddRawCpuTimerAuxiliaryCount(int64_t iCpuTimer, int64_t
 	}
 }
 
-void ProfileManagerBase::LatchRawCpuTimers(bool bAccept, int64_t iSampleTick)
+void ProfileManagerBase::LatchRawCpuTimers(bool bAccept)
 {
 	if constexpr (kbProfiling)
 	{
@@ -292,109 +283,6 @@ void ProfileManagerBase::LatchRawCpuTimers(bool bAccept, int64_t iSampleTick)
 			rRawTimer.iTotalTimeNanoseconds = 0;
 			rRawTimer.iInvocationCount = 0;
 		}
-
-		if (!bAccept)
-		{
-			// A rejected latch invalidates only unpublished arms. Retained payloads and their metadata remain diagnostic state.
-			for (int64_t i = 0; i < miCpuTimerCount; ++i)
-			{
-				RawCpuTimerState& rRawTimer = mpRawCpuTimers[static_cast<size_t>(i)];
-				rRawTimer.flags.Set(RawCpuTimerStateFlags::kEventArmed, false);
-				rRawTimer.iMinimumSampleTick = 0;
-			}
-		}
-		else
-		{
-			OnRawCpuTimersLatched(iSampleTick);
-		}
-	}
-}
-
-bool ProfileManagerBase::ArmRawCpuTimerEventLocked(int64_t iCpuTimer, int64_t iMinimumSampleTick)
-{
-	if constexpr (kbProfiling)
-	{
-		RawCpuTimerState& rRawTimer = mpRawCpuTimers[static_cast<size_t>(iCpuTimer)];
-		if (rRawTimer.flags & RawCpuTimerStateFlags::kEventArmed)
-		{
-			return false;
-		}
-
-		if (!(rRawTimer.flags & RawCpuTimerStateFlags::kEventRegistered))
-		{
-			return false;
-		}
-
-		if (rRawTimer.eventRecord.flags & RawCpuTimerEventFlags::kAvailable)
-		{
-			return false;
-		}
-
-		if (rRawTimer.eventRecord.flags & RawCpuTimerEventFlags::kOverrun)
-		{
-			return false;
-		}
-
-		rRawTimer.flags.Set(RawCpuTimerStateFlags::kEventArmed);
-		rRawTimer.iMinimumSampleTick = iMinimumSampleTick;
-		return true;
-	}
-	else
-	{
-		return false;
-	}
-}
-
-bool ProfileManagerBase::PublishRawCpuTimerEvent(int64_t iCpuTimer, int64_t iSampleTick)
-{
-	if constexpr (kbProfiling)
-	{
-		RawCpuTimerState& rRawTimer = mpRawCpuTimers[static_cast<size_t>(iCpuTimer)];
-		RawCpuTimerEventRecord& rEvent = rRawTimer.eventRecord;
-		if (rEvent.flags & RawCpuTimerEventFlags::kAvailable)
-		{
-			rEvent.flags.Set(RawCpuTimerEventFlags::kOverrun);
-			return false;
-		}
-		if (!(rRawTimer.flags & RawCpuTimerStateFlags::kEventRegistered) || !(rRawTimer.flags & RawCpuTimerStateFlags::kEventArmed) || rEvent.flags & RawCpuTimerEventFlags::kOverrun || iSampleTick < rRawTimer.iMinimumSampleTick)
-		{
-			return false;
-		}
-
-		++rEvent.iEventSequence;
-		rEvent.iSampleSequence = rRawTimer.record.iSampleSequence;
-		rEvent.iSampleTick = iSampleTick;
-		rEvent.iSampleMicroseconds = rRawTimer.record.iSampleMicroseconds;
-		rEvent.iInvocationCount = rRawTimer.record.iInvocationCount;
-		rEvent.iAuxiliaryCount = rRawTimer.record.iAuxiliaryCount;
-		rEvent.flags.Set(RawCpuTimerEventFlags::kAvailable);
-		rEvent.flags.Set(RawCpuTimerEventFlags::kOverrun, false);
-		rRawTimer.flags.Set(RawCpuTimerStateFlags::kEventArmed, false);
-		rRawTimer.iMinimumSampleTick = 0;
-		return true;
-	}
-	else
-	{
-		return false;
-	}
-}
-
-bool ProfileManagerBase::AcknowledgeRawCpuTimerEvent(int64_t iCpuTimer, int64_t iEventSequence)
-{
-	if constexpr (kbProfiling)
-	{
-		RawCpuTimerEventRecord& rEvent = mpRawCpuTimers[static_cast<size_t>(iCpuTimer)].eventRecord;
-		if (!(rEvent.flags & RawCpuTimerEventFlags::kAvailable) || iEventSequence != rEvent.iEventSequence)
-		{
-			return false;
-		}
-
-		rEvent.flags.Clear({RawCpuTimerEventFlags::kAvailable, RawCpuTimerEventFlags::kOverrun});
-		return true;
-	}
-	else
-	{
-		return false;
 	}
 }
 #endif // BT_SERVER

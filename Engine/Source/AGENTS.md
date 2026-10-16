@@ -4,7 +4,7 @@
 
 Shared C++23 runtime for the client and server. Managers are constructed in dependency order and destroyed in reverse; fixed-rate simulation feeds a free-running interpolated renderer.
 
-Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.md`) when main-loop or frame-phase order changes.
+Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.md`) when main-loop order, frame-phase order, or phase participation changes.
 
 ## Hub Conventions
 
@@ -40,7 +40,9 @@ Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.
 
 A crash runs in a fixed order: `HandleException` writes the report, a connected client uploads it, the main thread unwinds, and only then does `PromptCrashReportDesktopCopy` offer the Desktop copy. The write and the prompt use fixed buffers because they are reachable during heap corruption. Do not add allocator-dependent formatting or path construction there, and do not log from them. Nothing on them may allocate or follow a pointer the heap owns, so `--app-data-directory` reaches crash handling through a fixed buffer populated during startup rather than through the launch options' heap-owned path storage; reading an inline scalar of the statically allocated launch options, such as the agent port that suppresses the prompt in an agent launch, stays within the rule. The override is used only when the complete report path fits the fixed path buffer; otherwise the existing per-user report location remains. Both report file paths — the Desktop one and the per-user one — are resolved once at startup into fixed buffers, after launch options are parsed, by `ResolveCrashReportPaths`, which also creates the per-user report directory. `HandleException` always writes the per-user path, falling back to a fixed working-directory-relative file name when that buffer is empty because its startup resolution failed. The prompt never shows in an agent launch or when the Desktop buffer is empty; Yes copies the written report to the Desktop path.
 
-Only the client main-loop catch, when no debugger is attached, and the agent crash-report harness rig call `TryUploadCrashReport`, on the main thread after the write. It may allocate and log, never propagates an exception, and sends the first `kiMaximumCrashReportSize` bytes only when the client is connected and accepted. `ProcessMain`'s catches and the SIGABRT handler write and prompt but never upload.
+Only the client main-loop catch, when no debugger is attached, and the agent crash-report harness rig call `TryUploadCrashReport`, on the main thread after the write. It may allocate and log, never propagates an exception, and sends the first `kiMaximumCrashReportSize` bytes only when the client is connected and accepted and the connection has not already carried a report; the per-connection limit is the `kClientCrashReport` row of [Client to Server Contract](../../Documents/Architecture/Network.md#client--server-contract). `ProcessMain`'s catches and the SIGABRT handler write and prompt but never upload.
+
+A report counts as sent once it ends with a fixed trailer; `HandleException` truncates the file it writes, so every new report starts unsent. The trailer is appended only after ENet confirms that the server received the whole report. Once per accepted connection, `PollPendingCrashReport`, called at the top of `ClientSessionRuntime::PollAndDrain`, sends the report at the path this process's `HandleException` writes when it is non-empty and unsent; a report an earlier session left at a different path is never sent.
 
 The background DxDiag reader appends to its report string without a lock, and the agent crash-report harness rig can enter the exception path while that reader is still running. The report always writes the DxDiag begin/end markers but includes the collected text only once the reader publishes completion.
 

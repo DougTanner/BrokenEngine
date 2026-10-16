@@ -23,7 +23,7 @@ void WindRadialsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 		return;
 	}
 
-	float fCurrentTime = rPreviousFrame.interpolate.fCurrentTime + rFrameInterpolate.fDeltaTime;
+	SimulationTime currentTime(std::chrono::duration<float>(rPreviousFrame.interpolate.fCurrentTime + rFrameInterpolate.fDeltaTime));
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -32,10 +32,10 @@ void WindRadialsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __r
 		float fBaseSize = rCurrent.pfBaseSizes[i];
 
 		int64_t iControllerTypeIndex = rCurrent.puiControllerTypeIndices[i];
-		float fStartTime = rCurrent.pfStartTimes[i];
-		float fElapsedTime = fCurrentTime - fStartTime;
+		SimulationTime startTime = rCurrent.pStartTimes[i];
+		std::chrono::duration<float> elapsedTime = currentTime - startTime;
 		const WindRadialControllerType& rController = WindRadialsInterpolate::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
-		WindRadialKeyframe interpolated = InterpolateKeyframes(rController, fElapsedTime);
+		WindRadialKeyframe interpolated = InterpolateKeyframes(rController, elapsedTime);
 
 		rCurrent.pVecPositions[i] = vecPosition;
 		rCurrent.pfIntensities[i] = fBaseIntensity * interpolated.fIntensity;
@@ -47,14 +47,14 @@ void WindRadialsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFra
 {
 }
 
-void XM_CALLCONV WindRadialsPostRender::AddControlled(game::Frame& __restrict rFrame, float fCurrentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fBaseIntensity, float fBaseSize)
+void XM_CALLCONV WindRadialsPostRender::AddControlled(game::Frame& __restrict rFrame, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fBaseIntensity, float fBaseSize)
 {
 	WindRadialsInterpolate& rInterpolate = rFrame.interpolate.windRadials;
 	WindRadialsPostRender& rPostRender = rFrame.postRender.windRadials;
 
 	const WindRadialControllerType& rController = WindRadialsInterpolate::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
 
-	AddControlledElement(rInterpolate, fCurrentTime, iControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
+	AddControlledElement(rInterpolate, currentTime, iControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
 	{
 		GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
 	}, [&rInterpolate, &rPostRender]()

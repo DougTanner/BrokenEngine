@@ -4,8 +4,8 @@
 
 #include "Data/Scene.h"
 #include "File/PackChunks.h"
+#include "Frame/FlightPlanes.h"
 #include "Graphics/Debug/DebugRender.h"
-#include "Ui/WrapperBase.h"
 
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Profile/ProfileManager.h"
@@ -82,7 +82,7 @@ static void XM_CALLCONV RenderCombatAim(const SpaceshipsInterpolate& __restrict 
 
 	for (int64_t j = 0; j < rSpaceships.iCount; ++j)
 	{
-		if (rSpaceships.pfDestroyedTimes[j] != -1.0f)
+		if (rSpaceships.pDestroyedTimes[j] != std::chrono::duration<float>(-1.0f))
 		{
 			continue;
 		}
@@ -152,7 +152,7 @@ static void XM_CALLCONV RenderNavigation(const PlayersInterpolate& __restrict rP
 		XMFLOAT3A f3NavigationStart {};
 		XMFLOAT3A f3NavigationEnd {};
 		XMStoreFloat3A(&f3NavigationStart, engine::Rebase(rBasis, vecPosition));
-		XMStoreFloat3A(&f3NavigationEnd, engine::Rebase(rBasis, XMVectorSetZ(vecWaypoint, engine::gBaseHeight.mfCurrent)));
+		XMStoreFloat3A(&f3NavigationEnd, engine::Rebase(rBasis, XMVectorSetZ(vecWaypoint, engine::gpFlightPlanes->Lowest().fHeightMeters)));
 		engine::DebugRender::Line(f3NavigationStart, f3NavigationEnd, {0.0f, 1.0f, 0.0f, 1.0f});
 		engine::DebugRender::Circle(f3NavigationEnd, kfPlayerRadius * 0.5f, {0.0f, 1.0f, 0.0f, 1.0f});
 	}
@@ -162,14 +162,14 @@ static void XM_CALLCONV RenderNavigation(const PlayersInterpolate& __restrict rP
 		if (bFlagshipFound)
 		{
 			XMFLOAT3A f3Destination {};
-			XMStoreFloat3A(&f3Destination, engine::Rebase(rBasis, XMVectorSetZ(vecFlagshipPosition, engine::gBaseHeight.mfCurrent)));
+			XMStoreFloat3A(&f3Destination, engine::Rebase(rBasis, XMVectorSetZ(vecFlagshipPosition, engine::gpFlightPlanes->Lowest().fHeightMeters)));
 			engine::DebugRender::Circle(f3Destination, kfPlayerRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
 		}
 	}
 	else if (XMVectorGetW(rPostRender.pVecIslandDestinations[i]) > 0.0f)
 	{
 		XMFLOAT3A f3Destination {};
-		XMStoreFloat3A(&f3Destination, engine::Rebase(rBasis, XMVectorSetZ(rPostRender.pVecIslandDestinations[i], engine::gBaseHeight.mfCurrent)));
+		XMStoreFloat3A(&f3Destination, engine::Rebase(rBasis, XMVectorSetZ(rPostRender.pVecIslandDestinations[i], engine::gpFlightPlanes->Lowest().fHeightMeters)));
 		engine::DebugRender::Circle(f3Destination, kfPlayerRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
 	}
 }
@@ -228,9 +228,9 @@ void PlayersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpo
 	for (int64_t i = 0; i < iCount; ++i)
 	{
 		float fSize = kfPlayerRadius * kfModelScale;
-		if (rCurrent.pfDestroyedTimes[i] > 0.0f)
+		if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
 		{
-			fSize *= std::pow(rCurrent.pfDestroyedTimes[i] / kfDestroyTime, kfDeathShrinkPower);
+			fSize *= std::pow(rCurrent.pDestroyedTimes[i] / kDestroyTime, kfDeathShrinkPower);
 		}
 
 		// The position is local to the rendered cell; one conversion into the camera cell's frame feeds both the
@@ -271,7 +271,7 @@ void PlayersInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpo
 
 			common::JointMatrix* pJointMatrices = reinterpret_cast<common::JointMatrix*>(engine::gpBufferManager->mJointMatrixStorageBuffers.at(iCommandBuffer).mpMappedMemory);
 
-			rAnimationData.EvaluateAnimation(0, rCurrent.pfAnimationTimes[i], std::span(pMeshData, static_cast<size_t>(iMaterialCount)), pJointMatrices, iJointMatrixOffset);
+			rAnimationData.EvaluateAnimation(0, rCurrent.pAnimationTimes[i].count(), std::span(pMeshData, static_cast<size_t>(iMaterialCount)), pJointMatrices, iJointMatrixOffset);
 		}
 
 		++siRendered;

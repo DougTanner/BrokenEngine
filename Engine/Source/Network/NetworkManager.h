@@ -42,12 +42,13 @@ public:
 		return iChannel == kiChannelUnreliable || (IsCoordinateChannel(iChannel) && (iChannel % 2) == 1);
 	}
 
-	static inline void SendPacket(ENetPeer* pPeer, int64_t iChannel, common::Workbuffer& rWorkbuffer, uint32_t uiFlags)
+	static inline void SendPacket(ENetPeer* pPeer, int64_t iChannel, common::Workbuffer& rWorkbuffer, uint32_t uiFlags, ENetPacketFreeCallback pFreeCallback = nullptr)
 	{
 		std::span<const uint8_t> packetSpan = rWorkbuffer.Span<uint8_t>();
 		ScopedSuppressAllocationTracking suppress;
 		// Heap: ENet allocates packet data internally
 		ENetPacket* pPacket = enet_packet_create(packetSpan.data(), packetSpan.size(), uiFlags);
+		pPacket->freeCallback = pFreeCallback;
 		if (enet_peer_send(pPeer, static_cast<enet_uint8>(iChannel), pPacket) < 0)
 		{
 			// enet_peer_send does not take ownership of the packet on failure — free it to avoid a leak.

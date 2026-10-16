@@ -1,8 +1,8 @@
 # Main-Context, Control-Work, and Routing Checks
 
-Read this reference when assessing main-session token efficiency, control-work
-classification, and headless execution-model routing for
-[`/next-plan-review`](../SKILL.md).
+Read this reference when assessing main-session token efficiency, reporting
+observed usage, control-work classification, and headless execution-model
+routing for [`/next-plan-review`](../SKILL.md).
 
 ## Measure main-session token efficiency
 
@@ -52,6 +52,14 @@ Not findings: content the user pasted or asked to display; a Plan body,
 execution card, or user-facing text main itself must approve or present; a
 handoff within those field rules whose every row main acted on; and a narrow
 change having no unnecessary subagents.
+
+## Report observed usage
+
+`Get-TranscriptUsage.ps1`'s counters are observed usage for one transcript. They
+are not billed cost, main-context size, or elapsed time; they never feed
+concern 4's char-based checks and never become a finding on their own. Report
+them in the rows [`../SKILL.md`](../SKILL.md) `## Handoff` `Observed usage`
+defines.
 
 ## Classify control work
 

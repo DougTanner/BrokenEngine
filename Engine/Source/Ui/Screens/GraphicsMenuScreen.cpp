@@ -8,6 +8,7 @@
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/LocalizationBase.h"
 #include "Ui/MenuUtils.h"
+#include "Ui/ShadowWrappersBase.h"
 #include "Ui/SmokeWrappersBase.h"
 #include "Ui/SunMoonWrappersBase.h"
 
@@ -158,6 +159,7 @@ void GraphicsMenuScreen::Render()
 		{
 			ApplyTerrainShadowsLevel();
 		}
+		ColumnSlider("Terrain Shadow Update Cadence", &gShadowUpdateCadence, "%.0f");
 
 		ImGui::Separator();
 

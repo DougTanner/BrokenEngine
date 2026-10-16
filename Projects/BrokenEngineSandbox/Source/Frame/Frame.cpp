@@ -261,7 +261,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::CellStat
 		{
 			return false;
 		}
-		if (engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) > engine::gBaseHeight.mfCurrent - kfTerrainClearance)
+		if (engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) > engine::gpFlightPlanes->Lowest().fHeightMeters - kfTerrainClearance)
 		{
 			return false;
 		}
@@ -294,7 +294,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::CellStat
 	{
 		for (int64_t j = 0; j < kiGridDimension; ++j)
 		{
-			auto vecGridCell = XMVectorSet(fAreaMinimumX + (static_cast<float>(j) + 0.5f) * fPitchX, fAreaMinimumY + (static_cast<float>(i) + 0.5f) * fPitchY, engine::gBaseHeight.mfCurrent, 1.0f);
+			auto vecGridCell = XMVectorSet(fAreaMinimumX + (static_cast<float>(j) + 0.5f) * fPitchX, fAreaMinimumY + (static_cast<float>(i) + 0.5f) * fPitchY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 			aValidGrid[i * kiGridDimension + j] = IsSpawnPositionValid(vecGridCell);
 		}
 	}
@@ -384,7 +384,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::CellStat
 		float fLocalSide = aLocalOffsets[i].y;
 		float fWorldX = fBestAnchorX + fBestFacingCosine * fLocalForward - fBestFacingSine * fLocalSide;
 		float fWorldY = fBestAnchorY + fBestFacingSine * fLocalForward + fBestFacingCosine * fLocalSide;
-		auto vecSpawnPosition = XMVectorSet(fWorldX, fWorldY, engine::gBaseHeight.mfCurrent, 1.0f);
+		auto vecSpawnPosition = XMVectorSet(fWorldX, fWorldY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 		if (!IsSpawnPositionValid(vecSpawnPosition))
 		{
 			continue;
@@ -461,7 +461,7 @@ void FramePostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[ma
 
 // Both spatial windows bind the same single spaceship source layer and the same missile subscription layer; they
 // differ only in which arrival-grace column decides eligibility and whether previous positions are available.
-RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XMVECTOR* pVecPreviousPositions, const float* pfArrivalGracePeriods, const MissilesPostRender& rSubscribers)
+RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XMVECTOR* pVecPreviousPositions, const std::chrono::duration<float>* pArrivalGracePeriods, const MissilesPostRender& rSubscribers)
 {
 	const SpaceshipsInterpolate& rSpaceships = *rFrame.interpolate.pSpaceships;
 	const SpaceshipsPostRender& rSpaceshipsPostRender = *rFrame.postRender.pSpaceships;
@@ -473,7 +473,7 @@ RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XMVECTOR*
 	// A spaceship is targetable after its arrival grace expires while it publishes a registry id.
 	auto IsEligible = [&](int64_t i)
 	{
-		return (rSpaceships.puiRegistryIds[i].uuid.iValue != 0) && pfArrivalGracePeriods[i] <= 0.0f;
+		return (rSpaceships.puiRegistryIds[i].uuid.iValue != 0) && pArrivalGracePeriods[i].count() <= 0.0f;
 	};
 
 	int64_t iEligibleCount = 0;

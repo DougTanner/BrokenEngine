@@ -11,7 +11,6 @@ class AudioStreamingHarnessRig;
 inline std::atomic<AudioStreamingHarnessRig*> gpAttachedAudioStreamingHarnessRig = nullptr;
 
 class PackChunks;
-class StreamingVoice;
 
 enum class AudioStreamingHarnessRigPartition : uint8_t
 {
@@ -43,7 +42,6 @@ enum class AudioStreamingHarnessRigHoldOwner : uint8_t
 {
 	kNone,
 	kControlled,
-	kInvalid,
 };
 
 enum class AudioStreamingHarnessRigHoldState : uint8_t
@@ -72,20 +70,13 @@ using AudioStreamingHarnessRigVoiceFlags_t = common::Flags<AudioStreamingHarness
 
 enum class AudioStreamingHarnessRigAudioSnapshotFlags : uint8_t
 {
-	kControlledPublication = 0x01,
-	kSaturationActive = 0x02,
+	kPublicationStopped = 0x01,
 };
 using AudioStreamingHarnessRigAudioSnapshotFlags_t = common::Flags<AudioStreamingHarnessRigAudioSnapshotFlags>;
 
-enum class AudioStreamingHarnessRigCommandFlags : uint8_t
-{
-	kSaturationActive = 0x01,
-};
-using AudioStreamingHarnessRigCommandFlags_t = common::Flags<AudioStreamingHarnessRigCommandFlags>;
-
 struct AudioStreamingHarnessRigRecord
 {
-	uint64_t uiSequence = 0;
+	int64_t iSequence = 0;
 	int64_t iScenarioGeneration = 0;
 	int64_t iGeneration = 0;
 	int64_t iThreadId = 0;
@@ -115,9 +106,9 @@ struct AudioStreamingHarnessRigSnapshot
 	uint64_t uiScenarioGate = 0;
 	int64_t iScenarioGeneration = 0;
 	int64_t iActiveWriters = 0;
-	uint64_t uiReservationStart = 0;
-	uint64_t uiReservationBoundary = 0;
-	uint64_t uiRetryCount = 0;
+	int64_t iReservationStart = 0;
+	int64_t iReservationBoundary = 0;
+	int64_t iRetryCount = 0;
 	AudioStreamingHarnessRigHoldOwner eHoldOwner = AudioStreamingHarnessRigHoldOwner::kNone;
 	AudioStreamingHarnessRigHoldState eHoldState = AudioStreamingHarnessRigHoldState::kIdle;
 	AudioStreamingHarnessRigSnapshotFlags_t flags;
@@ -133,22 +124,6 @@ struct AudioStreamingHarnessRigSnapshot
 	int64_t iRecordCount = 0;
 	std::array<AudioStreamingHarnessRigPoolEntry, 6> poolEntries {};
 	std::array<AudioStreamingHarnessRigRecord, 80> records {};
-};
-
-struct AudioStreamingHarnessRigInvalidResult
-{
-	bool bMissingCrcFailed = false;
-	bool bWrongCrcFailed = false;
-	bool bOverflowFailed = false;
-	bool bOutOfRangeFailed = false;
-	bool bZeroLengthFailed = false;
-	bool bOversizeFailed = false;
-	bool bShortAccepted = false;
-	bool bTooSmallPollFailed = false;
-	bool bTooSmallPollNoWrite = false;
-	bool bLoadingCancelled = false;
-	bool bLoadingEntryNotReused = false;
-	bool bPending = false;
 };
 
 struct AudioStreamingHarnessRigVoiceSummary
@@ -172,14 +147,7 @@ struct AudioStreamingHarnessRigAudioSnapshot
 	AudioStreamingHarnessRigVoiceSummary current;
 	AudioStreamingHarnessRigVoiceSummary newestFade;
 	AudioStreamingHarnessRigOlderFades olderFades;
-	int64_t iPublicationAllowance = 0;
 	AudioStreamingHarnessRigAudioSnapshotFlags_t flags;
-};
-
-struct AudioStreamingVoiceControl
-{
-	StreamingVoice* pVoice = nullptr;
-	uint32_t uiPublicationAllowance = 0;
 };
 
 class AudioStreamingHarnessRig
@@ -193,95 +161,67 @@ public:
 	static void Detach(AudioStreamingHarnessRig& rHarnessRig);
 	void Shutdown();
 
-	bool RequestHold();
-	bool Begin(common::crc_t crc, int64_t iOffset, int64_t iLength);
 	bool Play(common::crc_t crc);
 	void Clear();
-	void ReleaseControls();
 	AudioStreamingHarnessRigAudioSnapshot InspectAudio() const;
 
 	bool BeginHistory();
 	AudioStreamingHarnessRigSnapshot InspectFile() const;
 	bool ArmHold(AudioStreamingHarnessRigHoldOwner eOwner, common::crc_t crc, int64_t iOffset, int64_t iLength);
 	void ReleaseHold(AudioStreamingHarnessRigHoldOwner eOwner);
-	void StartCoexistence(common::crc_t realtimeCrc, common::crc_t normalCrc);
-	bool FinishCoexistence();
-	void ReleaseCoexistence();
-	bool BeginSaturation();
-	void ReleaseSaturation();
-	AudioStreamingHarnessRigInvalidResult RunInvalid();
-	void ReleaseInvalid();
-
-	AudioStreamingHarnessRigCommandFlags_t mCommandFlags;
+	void StallLoaders();
+	void ReleaseLoaders();
+	void LoadChunk(common::crc_t crc, LoadPriority ePriority);
 
 	static void Record(AudioStreamingHarnessRigPartition ePartition, AudioStreamingHarnessRigPhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioStreamingHarnessRigQueueState eState, int64_t iGeneration, bool bCancelAcknowledged);
 	static bool HoldAudioRead(common::crc_t crc, int64_t iOffset, int64_t iLength, int64_t iIndex, int64_t iGeneration);
 	static void CompleteAudioRead(bool bHeld);
 	static void CountRetry();
 	static void PrepareLoaderDrain();
-	static AudioStreamingVoiceControl* CreateVoiceControl(StreamingVoice& rVoice);
-	static void RetireVoiceControl(const AudioStreamingVoiceControl* pControl);
 
 	enum class Flags : uint8_t
 	{
 		kMode = 0x01,
-		kHoldPending = 0x02,
-		kHistoryStarted = 0x04,
-		kControlledPublication = 0x08,
-		kPublicationStopped = 0x10,
+		kPublicationStopped = 0x02,
 	};
 	using Flags_t = common::Flags<Flags>;
 
-	enum class StagingOwner : uint8_t
-	{
-		kNone,
-		kCoexistence,
-		kSaturation,
-	};
-
 	Flags_t mFlags;
-	std::atomic<StagingOwner> meStagingOwner {StagingOwner::kNone};
+	std::atomic<bool> mbLoadersStalled = false;
 
 private:
 	struct HistoryEntry
 	{
 		AudioStreamingHarnessRigRecord record {};
-		std::atomic<int64_t> iPublishedSequence {0};
+		std::atomic<int64_t> iPublishedSequence = 0;
 	};
 
 	template <int64_t SIZE>
 	struct History
 	{
 		std::array<HistoryEntry, static_cast<size_t>(SIZE)> entries {};
-		std::atomic<uint32_t> uiHead {0};
-		std::atomic<uint32_t> uiDropped {0};
+		std::atomic<int64_t> iHead = 0;
+		std::atomic<int64_t> iDropped = 0;
 	};
 
 	void ResetHistory();
 	void RecordEntry(AudioStreamingHarnessRigPartition ePartition, AudioStreamingHarnessRigPhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioStreamingHarnessRigQueueState eState, int64_t iGeneration, bool bCancelAcknowledged);
 
-	std::vector<std::unique_ptr<AudioStreamingVoiceControl>> mVoiceControls;
-	std::atomic<uint64_t> muiScenarioGate {0};
-	std::atomic<int64_t> miActiveWriters {0};
-	std::atomic<uint64_t> muiNextSequence {0};
-	std::atomic<uint64_t> muiRetryCount {0};
-	uint64_t muiReservationStart = 0;
+	std::atomic<uint64_t> muiScenarioGate = 0;
+	std::atomic<int64_t> miActiveWriters = 0;
+	std::atomic<int64_t> miNextSequence = 0;
+	std::atomic<int64_t> miRetryCount = 0;
+	int64_t miReservationStart = 0;
 	bool mbResetPending = false;
-	bool mbHistoryInitialized = false;
 	History<32> mMainHistory;
 	History<24> mLoader0History;
 	History<24> mLoader1History;
-	std::atomic<uint64_t> muiHoldToken {0};
-	std::atomic<common::crc_t> mHoldCrc {0};
-	std::atomic<int64_t> miHoldOffset {0};
-	std::atomic<int64_t> miHoldLength {0};
-	std::atomic<int64_t> miHeldIndex {4'294'967'295i64};
-	std::atomic<int64_t> miHeldGeneration {0};
-	ChunkReadRequest mInvalidRequest;
-	std::array<std::byte, 16 * 1'024> mInvalidBuffer {};
-	common::crc_t mInvalidCrc = 0;
-	int64_t miInvalidOffset = 0;
-	int64_t miInvalidLength = 0;
+	std::atomic<uint64_t> muiHoldToken = 0;
+	std::atomic<common::crc_t> mHoldCrc = 0;
+	std::atomic<int64_t> miHoldOffset = 0;
+	std::atomic<int64_t> miHoldLength = 0;
+	std::atomic<int64_t> miHeldIndex = 4'294'967'295i64;
+	std::atomic<int64_t> miHeldGeneration = 0;
 };
 
 } // namespace engine

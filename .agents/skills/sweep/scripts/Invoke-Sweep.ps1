@@ -113,14 +113,15 @@ function Get-Section([string] $Path, [string] $Heading)
 
 # The build fields main branches on, from the C++ files changed since the given commit: Client and Server for any
 # change, DataPacker when one is under DataPacker/ or Common/ (DataPacker's Pch.h includes Common.h), WorktreeCli and
-# AgentHarness when one is under Tools/, and the Profile build when one now mentions BT_PROFILE.
+# AgentHarness when one is under Tools/ or is Common/Sha256Hasher.h (ToolCommon includes it by path), and the Profile
+# build when one now mentions BT_PROFILE.
 function Get-BuildFields([string] $Since)
 {
 	$cpp = @(git -C $root diff --name-only $Since -- '*.h' '*.cpp')
 	if ($cpp.Count -eq 0) { return 'cpp=no builds=none profile=no' }
 	$builds = @('Client', 'Server')
 	if ($cpp | Where-Object { $_ -match '^(DataPacker|Common)/' }) { $builds += 'DataPacker' }
-	if ($cpp | Where-Object { $_.StartsWith('Tools/') }) { $builds += 'WorktreeCli', 'AgentHarness' }
+	if ($cpp | Where-Object { $_.StartsWith('Tools/') -or $_ -eq 'Common/Sha256Hasher.h' }) { $builds += 'WorktreeCli', 'AgentHarness' }
 	# Greps every C++ file rather than passing the changed paths, which can exceed the command-line length limit.
 	$profiled = @(git -C $root grep -l 'BT_PROFILE' -- '*.h' '*.cpp')
 	$profileBuild = if ($cpp | Where-Object { $profiled -contains $_ }) { 'yes' } else { 'no' }

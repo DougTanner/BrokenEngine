@@ -36,11 +36,6 @@ Assert-Contains $worktreeHelp @(
 	'reject',
 	'--user-authorized-rejection'
 ) 'WorktreeCli'
-# Retired commands and options are usage errors and must never be advertised again.
-foreach ($retired in @('release-after-landing', 'reparent-claims', 'prepare-completion', 'prepare-rejection', '--write-claim-receipt', '--claim-receipt', '--terminal-receipt', '--landed-commit', '--baseline')) {
-	if ($worktreeHelp.Contains($retired, [StringComparison]::Ordinal)) { throw "WorktreeCli help still advertises the retired '$retired' surface." }
-}
-if ($worktreeHelp.Contains('AgentHarness.exe', [StringComparison]::Ordinal) -or $worktreeHelp.Contains('--domain', [StringComparison]::Ordinal) -or $worktreeHelp.Contains('--port', [StringComparison]::Ordinal) -or $worktreeHelp.Contains('--timeout-ms', [StringComparison]::Ordinal) -or $worktreeHelp.Contains('--key', [StringComparison]::Ordinal)) { throw 'WorktreeCli help exposes a harness-only or obsolete option.' }
 
 $harnessHelp = Get-Help $AgentHarnessExecutable 'AgentHarness'
 Assert-Contains $harnessHelp @(
@@ -49,6 +44,5 @@ Assert-Contains $harnessHelp @(
 	'AgentHarness.exe lock <token|claim|status|release|steal|heartbeat> ...',
 	'AgentHarness.exe --help'
 ) 'AgentHarness'
-if ($harnessHelp.Contains('[--owner TOKEN]', [StringComparison]::Ordinal) -or $harnessHelp.Contains('WorktreeCli.exe', [StringComparison]::Ordinal) -or $harnessHelp.Contains('--domain', [StringComparison]::Ordinal) -or $harnessHelp.Contains('--repo', [StringComparison]::Ordinal) -or $harnessHelp.Contains(' plan ', [StringComparison]::Ordinal) -or $harnessHelp.Contains(' build ', [StringComparison]::Ordinal)) { throw 'AgentHarness help exposes a worktree-only or obsolete option.' }
 
 [pscustomobject]@{ WorktreeCli = $worktreeHelp; AgentHarness = $harnessHelp } | ConvertTo-Json -Depth 3

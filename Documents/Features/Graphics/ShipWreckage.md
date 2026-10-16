@@ -6,9 +6,9 @@ Revisit When: ship deaths feel abrupt in playtests, or after `Documents/Features
 
 A destroyed spaceship explodes in place and vanishes; nothing outlives it:
 
-- A lethal blaster hit (collision) or missile splash (area damage) calls `BeginExplosion` (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/SpaceshipsCombat.cpp`). It sets `kExploding`, starts `pfDestroyedTimes` at `kfSpaceshipDestroyTime` (`Spaceships.h`), plays the death sound, and spawns the first explosion.
-- While the ship explodes, `SpaceshipsPostRender::Update` (`Spaceships.cpp`) replaces its velocity with a knockback away from the damage direction at `kfDeathKnockbackSpeed`. The `Spawn` phase hook emits a smaller explosion every `kfSpaceshipDestroyExplosionInterval`, and `SpaceshipsRender.cpp` shrinks the model by the remaining destroy fraction.
-- `SpaceshipsPostRender::Destroy` removes the row once `pfDestroyedTimes` reaches zero.
+- A lethal blaster hit (collision) or missile splash (area damage) calls `BeginExplosion` (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/SpaceshipsCombat.cpp`). It sets `kExploding`, starts `pDestroyedTimes` at `kSpaceshipDestroyTime` (`Spaceships.h`), plays the death sound, and spawns the first explosion.
+- While the ship explodes, `SpaceshipsPostRender::Update` (`Spaceships.cpp`) replaces its velocity with a knockback away from the damage direction at `kfDeathKnockbackSpeed`. The `Spawn` phase hook emits a smaller explosion every `kSpaceshipDestroyExplosionInterval`, and `SpaceshipsRender.cpp` shrinks the model by the remaining destroy fraction.
+- `SpaceshipsPostRender::Destroy` removes the row once `pDestroyedTimes` reaches zero.
 
 No message tells the client about a destruction. The client runs the same deterministic tick itself, then rolls back and replays a cell whose CRC mismatches the server's (`Documents/Architecture/GameReconciliation.md`), marking replayed ticks with `FrameFlags::kRecalculated` (`Engine/Source/Frame/FrameBase.h`). At both `BeginExplosion` and `Destroy` the client has the ship's position and `SpaceshipsPostRender::pVecVelocities`, which is shared PostRender state. By `Destroy` that velocity is the knockback; the ship's flight velocity was overwritten on the first exploding tick.
 
@@ -19,7 +19,7 @@ Client-only effect collections (`Puffs`, `PointLights`, `SmokeTrails`, and other
 - **Chunks.** When a ship dies, replace it with a few chunks at its position, each with the ship's velocity plus a small random spread and spin. Chunks fall under gravity, tumble, and render through the model path the spaceship uses.
 - **Smoke.** Each chunk owns a `SmokeTrails` trail synced to its position, the way a missile owns its trail (`SynchronizeMissileTrail`), using the dark wreck shade from `Documents/Features/Graphics/SmokeColorBySource.md` once that exists.
 - **Secondary bursts.** A few small delayed bursts along the chunks' paths, built from the client-only explosion children (puffs, point lights, GPU particles) rather than `ExplosionsPostRender::Spawn`, whose shared row and random draws would diverge the client's CRC. Puffs already hold a future start time for delayed effects.
-- **Impact.** Each tick traces the chunk's movement with `engine::TracePointAgainstTerrain` (`Engine/Source/Frame/IslandTerrain.h`), as falling missiles do. A hit at or below z = 0 (the sea test falling missiles use) triggers an ocean splash from `OceanImpactSplashes.md`; a hit above it triggers a small explosion from the same client-only children. The chunk is then removed.
+- **Impact.** Each tick traces the chunk's movement with `engine::TracePointAgainstTerrain` (`Engine/Source/Frame/TerrainCollisionUtils.h`), as falling missiles do. A hit at or below z = 0 (the sea test falling missiles use) triggers an ocean splash from `OceanImpactSplashes.md`; a hit above it triggers a small explosion from the same client-only children. The chunk is then removed.
 - **Client-only.** Nothing collides with chunks, the server never sees them, and per-client divergence is acceptable: no shared member, wire data, or CRC exposure. Chunk randomness comes from a client-only random engine, never the frame random engine, so client and server random streams stay in lockstep.
 
 Open choices:

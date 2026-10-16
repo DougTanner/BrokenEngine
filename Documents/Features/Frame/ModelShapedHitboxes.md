@@ -35,7 +35,7 @@ Open choices a plan must decide:
 
 ## Out of scope
 
-- Terrain collision and navigation clearance (`ResolveDiscAgainstTerrain` in `Engine/Source/Frame/IslandTerrain.h`, and the navigation values `TerrainUtils.h` derives from `kfPlayerRadius`).
+- Terrain collision and navigation clearance (`ResolveDiscAgainstTerrain` in `Engine/Source/Frame/TerrainCollisionUtils.h`, and the navigation values `TerrainUtils.h` derives from `kfPlayerRadius`).
 - Area damage (`Engine/Source/Frame/AreaDamage.cpp`), which measures distance to the entity center.
 - Concave or per-triangle mesh collision.
 

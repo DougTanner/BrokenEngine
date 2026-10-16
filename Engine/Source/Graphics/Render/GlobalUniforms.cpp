@@ -284,24 +284,26 @@ static void XM_CALLCONV PopulateShadowStretch(shaders::GlobalLayout& rGlobalLayo
 	rGlobalLayout.f2ShadowStretchTranslation.y = -fSumCubes * XMVectorGetY(vecSunMoonNormal);
 }
 
-static void PopulateShadowArea(shaders::GlobalLayout& rGlobalLayout, float fShadowTextureSizeWidth, float fShadowTextureSizeHeight, float& rfWorldTexelX, float& rfFullWidth)
+static void PopulateShadowArea(int64_t iCommandBuffer, shaders::GlobalLayout& rGlobalLayout, float fShadowTextureSizeWidth, float fShadowTextureSizeHeight, float& rfWorldTexelX, float& rfFullWidth, XMFLOAT4& rf4ShadowArea)
 {
 	// Shadow texels use a coverage-safe eye-height reference: outward zoom expands it immediately, inward zoom contracts it at the existing
 	// rate, and it never falls below live height. Derive texel size from the analytic straight-down gFieldOfView/aspect frustum, not the snapped render
 	// area, so the grid is bit-stable at settled height and integer-texel XY pan does not shimmer. textureWidth / kfShadowHeadroomMultiplier
 	// pixels span that frustum; the headroom covers the live area throughout zoom transitions. Use the actual clamped extent for
-	// device-independent coverage and center f4ShadowArea on the camera, snapped to the texel grid.
+	// device-independent coverage and center the computed shadow area on the camera, snapped to the texel grid.
 	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::CameraBase::kfShadowHeadroomMultiplier, engine::gpCamera->mfShadowTexelEyeHeight, fShadowTextureSizeWidth, fShadowTextureSizeHeight, gpSwapchainManager->mfAspectRatio, gFieldOfView.mfCurrent, engine::gpCamera->mVecPosition);
-	rGlobalLayout.f4ShadowArea = area.f4Area;
 
-	// Latch the previous world area. A recreate makes the previous area current and forces pure-current temporal
-	// output; otherwise ShadowTemporal.comp rejects reprojected samples that land outside the previous footprint.
+	// The shadow chain's current and previous world areas advance together on a refresh and are both held on a skip,
+	// so consumers keep sampling the texture through the area it was written with. A recreate makes the previous
+	// area current and forces pure-current temporal output; otherwise ShadowTemporal.comp rejects reprojected
+	// samples that land outside the previous footprint.
 	static TemporalAreaLatch sTemporalAreaLatch {};
-	// The retained rectangle is in the camera cell's frame; follow a camera cell change before it is compared with
-	// this frame's area, and let a multi-cell jump take the existing reset.
+	// Both retained rectangles are in the camera cell's frame; follow a camera cell change before either is compared
+	// or published, and let a multi-cell jump take the existing reset.
 	static RetainedAreaBasis sRetainedAreaBasis {};
 	if (std::optional<XMFLOAT2> of2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
 	{
+		ShiftArea(sTemporalAreaLatch.f4CurrentArea, *of2Shift);
 		ShiftArea(sTemporalAreaLatch.f4PreviousArea, *of2Shift);
 	}
 	else
@@ -309,28 +311,57 @@ static void PopulateShadowArea(shaders::GlobalLayout& rGlobalLayout, float fShad
 		gbShadowTemporalReset = true;
 		++gPresentationContinuity.shadow.iHistoryResets;
 	}
-	// The latch publishes the previous area through a local so the probe snapshot can report the same rectangle the
-	// mapped write-only layout receives.
-	XMFLOAT4 f4PreviousArea {};
-	rGlobalLayout.fShadowTemporalBlend = sTemporalAreaLatch.Update(area.f4Area, gbShadowTemporalReset, gShadowTemporalBlend.mfCurrent, f4PreviousArea);
-	rGlobalLayout.f4ShadowAreaPrevious = f4PreviousArea;
-	gPresentationContinuity.shadow.f4CurrentArea = area.f4Area;
-	gPresentationContinuity.shadow.f4PreviousArea = f4PreviousArea;
+
+	// Refresh on schedule, or early once the live visible area leaves the held area (crop safety).
+	static int64_t siShadowRenderFrame = 0;
+	++siShadowRenderFrame;
+	bool bShadowRefreshFrame = gbShadowTemporalReset || !sTemporalAreaLatch.bInitialized
+	                        || siShadowRenderFrame % gShadowUpdateCadence.Get<int64_t>() == 0
+	                        || !IsVisibleAreaInsideHeldArea(engine::gpCamera->mf4RenderVisibleArea, sTemporalAreaLatch.f4CurrentArea);
+	if (bShadowRefreshFrame)
+	{
+		rGlobalLayout.fShadowTemporalBlend = sTemporalAreaLatch.Update(area.f4Area, gbShadowTemporalReset, gShadowTemporalBlend.mfCurrent, rGlobalLayout.f4ShadowAreaPrevious);
+		rGlobalLayout.f4ShadowArea = sTemporalAreaLatch.f4CurrentArea;
+	}
+	else
+	{
+		rGlobalLayout.f4ShadowArea = sTemporalAreaLatch.f4CurrentArea;
+		rGlobalLayout.f4ShadowAreaPrevious = sTemporalAreaLatch.f4PreviousArea;
+		rGlobalLayout.fShadowTemporalBlend = sTemporalAreaLatch.fBlend;
+	}
+	gPresentationContinuity.shadow.f4CurrentArea = sTemporalAreaLatch.f4CurrentArea;
+	gPresentationContinuity.shadow.f4PreviousArea = sTemporalAreaLatch.f4PreviousArea;
+
+	// The six passes share one refresh: a skip zeroes the elevation instance count and every compute's Z group count,
+	// so the recorded Global CB draws and dispatches nothing for them. Pipeline recreation zeroes these slots, so write
+	// them every frame, and only iCommandBuffer's slot, since the other slots may still be in use by the GPU.
+	VkExtent3D vkShadowTextureExtent = gpTextureManager->mRenderTargetTextures.mShadowTexture.mInfo.vkExtent3D;
+	int64_t iShadowGroupsX = TileCount(vkShadowTextureExtent.width);
+	int64_t iShadowGroupsY = TileCount(vkShadowTextureExtent.height);
+	int64_t iShadowGroupsZ = bShadowRefreshFrame ? 1 : 0;
+	Pipeline* pPipelines = gpPipelineManager->mpPipelines;
+	pPipelines[kPipelineShadowElevation].WriteIndirectBuffer(iCommandBuffer, bShadowRefreshFrame ? kiMaxActivePlacements : 0);
+	pPipelines[kPipelineShadow].WriteIndirectComputeBuffer(iCommandBuffer, iShadowGroupsX, iShadowGroupsY, iShadowGroupsZ);
+	pPipelines[kPipelineShadowBlurH].WriteIndirectComputeBuffer(iCommandBuffer, iShadowGroupsX, iShadowGroupsY, iShadowGroupsZ);
+	pPipelines[kPipelineShadowBlurV].WriteIndirectComputeBuffer(iCommandBuffer, iShadowGroupsX, iShadowGroupsY, iShadowGroupsZ);
+	pPipelines[kPipelineShadowTemporal].WriteIndirectComputeBuffer(iCommandBuffer, iShadowGroupsX, iShadowGroupsY, iShadowGroupsZ);
+	pPipelines[kPipelineShadowHistoryCopy].WriteIndirectComputeBuffer(iCommandBuffer, iShadowGroupsX, iShadowGroupsY, iShadowGroupsZ);
 
 	rfWorldTexelX = area.fWorldTexelX;
 	rfFullWidth = area.fFullWidth;
+	rf4ShadowArea = sTemporalAreaLatch.f4CurrentArea;
 }
 
-static void PopulateShadowSunExtension(shaders::GlobalLayout& rGlobalLayout, float fSunAngle, float fWorldTexelX, float fFullWidth, float fShadowElevationTextureSizeWidth, float fShadowTextureSizeWidth, float& rfShadowSunAngle)
+static void PopulateShadowSunExtension(shaders::GlobalLayout& rGlobalLayout, const XMFLOAT4& rf4ShadowArea, float fSunAngle, float fWorldTexelX, float fFullWidth, float fShadowElevationTextureSizeWidth, float fShadowTextureSizeWidth, float& rfShadowSunAngle)
 {
 	// Sun-direction extension: extend by half the shadow-area width on the sun side. The elevation
 	// texture is 1.5x wider than the shadow texture and rasterizes f4ShadowAreaExtra; the extension
 	// fills exactly the extra half.
-	rGlobalLayout.f4ShadowAreaExtra = rGlobalLayout.f4ShadowArea;
+	XMFLOAT4 f4ShadowAreaExtra = rf4ShadowArea;
 	float fHalfWidth = fFullWidth * 0.5f;
 	if (fSunAngle >= XM_PI + XM_PIDIV2 || fSunAngle < XM_PIDIV2)
 	{
-		rGlobalLayout.f4ShadowAreaExtra.z += fHalfWidth;
+		f4ShadowAreaExtra.z += fHalfWidth;
 
 		rGlobalLayout.fShadowWidthScale = fWorldTexelX;
 		if (fSunAngle >= 0.0f && fSunAngle < XM_PIDIV2)
@@ -349,7 +380,7 @@ static void PopulateShadowSunExtension(shaders::GlobalLayout& rGlobalLayout, flo
 	}
 	else
 	{
-		rGlobalLayout.f4ShadowAreaExtra.x -= fHalfWidth;
+		f4ShadowAreaExtra.x -= fHalfWidth;
 
 		rGlobalLayout.fShadowWidthScale = -fWorldTexelX;
 		rfShadowSunAngle = fSunAngle >= XM_PI ? fSunAngle - XM_PI : XM_PI - fSunAngle;
@@ -359,9 +390,10 @@ static void PopulateShadowSunExtension(shaders::GlobalLayout& rGlobalLayout, flo
 		rGlobalLayout.iShadowIncrement = -1;
 		rGlobalLayout.iShadowStartOffset = static_cast<int32_t>(fShadowElevationTextureSizeWidth - fShadowTextureSizeWidth); // Elevation extension half-width, from real extents.
 	}
+	rGlobalLayout.f4ShadowAreaExtra = f4ShadowAreaExtra;
 }
 
-static void XM_CALLCONV PopulateShadowParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAngle, float fDayPercent, float fNoonPercent, FXMVECTOR vecSunMoonNormal, FXMVECTOR vecAmbientColor)
+static void XM_CALLCONV PopulateShadowParameters(int64_t iCommandBuffer, shaders::GlobalLayout& rGlobalLayout, float fSunAngle, float fDayPercent, float fNoonPercent, FXMVECTOR vecSunMoonNormal, FXMVECTOR vecAmbientColor)
 {
 	VkExtent3D vkShadowTextureExtent = gpTextureManager->mRenderTargetTextures.mShadowTexture.mInfo.vkExtent3D;
 	float fShadowTextureSizeWidth = static_cast<float>(vkShadowTextureExtent.width);
@@ -398,8 +430,8 @@ static void XM_CALLCONV PopulateShadowParameters(shaders::GlobalLayout& rGlobalL
 	rGlobalLayout.fObjectShadowsBlurSigma = gObjectShadowsBlurSigma.mfCurrent;
 	rGlobalLayout.iObjectShadowsBlurRadius = static_cast<int32_t>(gObjectShadowsBlurRadius.mfCurrent);
 	rGlobalLayout.fObjectShadowsGrow = gObjectShadowsGrow.mfCurrent;
-	rGlobalLayout.fObjectShadowsIntensity = fDayPercent * gObjectShadowsNoon.mfCurrent + (1.0f - fDayPercent) * gObjectShadowsSunset.mfCurrent;
-	rGlobalLayout.fObjectShadowsIntensity *= std::pow(fDayPercent, 0.1f);
+	float fObjectShadowsIntensity = fDayPercent * gObjectShadowsNoon.mfCurrent + (1.0f - fDayPercent) * gObjectShadowsSunset.mfCurrent;
+	rGlobalLayout.fObjectShadowsIntensity = fObjectShadowsIntensity * std::pow(fDayPercent, 0.1f);
 	// fShadowSunsetOffset contributes to fShadowAngleOffsetSum after the sun extension resolves the shadow sun angle.
 	float fShadowSunsetOffset = fShadowEvening * gShadowFeatherSunsetOffset.mfCurrent;
 
@@ -425,10 +457,11 @@ static void XM_CALLCONV PopulateShadowParameters(shaders::GlobalLayout& rGlobalL
 
 	float fWorldTexelX = 0.0f;
 	float fFullWidth = 0.0f;
-	PopulateShadowArea(rGlobalLayout, fShadowTextureSizeWidth, fShadowTextureSizeHeight, fWorldTexelX, fFullWidth);
+	XMFLOAT4 f4ShadowArea {};
+	PopulateShadowArea(iCommandBuffer, rGlobalLayout, fShadowTextureSizeWidth, fShadowTextureSizeHeight, fWorldTexelX, fFullWidth, f4ShadowArea);
 
 	float fShadowSunAngle = 0.0f;
-	PopulateShadowSunExtension(rGlobalLayout, fSunAngle, fWorldTexelX, fFullWidth, fShadowElevationTextureSizeWidth, fShadowTextureSizeWidth, fShadowSunAngle);
+	PopulateShadowSunExtension(rGlobalLayout, f4ShadowArea, fSunAngle, fWorldTexelX, fFullWidth, fShadowElevationTextureSizeWidth, fShadowTextureSizeWidth, fShadowSunAngle);
 
 	// Shadow.comp's per-occluder feather term uses the sum of the shadow sun angle and noon/sunset offsets.
 	rGlobalLayout.fShadowAngleOffsetSum = fShadowSunAngle + fShadowNoonOffset + fShadowSunsetOffset;
@@ -481,7 +514,7 @@ void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> curr
 	float fSmokeCurlTimeOffsetScale = gSmokeCurlSpeed.mfCurrent * kfSmokeCurlTimeScale * 2.0f;
 	rGlobalLayout.f2SmokeCurlTimeOffset.x = fSmokeCurlTimeOffsetScale * (-1.0f + 2.0f * std::sin(fSmokeCurlTime));
 	rGlobalLayout.f2SmokeCurlTimeOffset.y = fSmokeCurlTimeOffsetScale * (-1.0f + 2.0f * std::cos(fSmokeCurlTime));
-	float fBaseHeight = gBaseHeight.mfCurrent;
+	float fBaseHeight = gpFlightPlanes->Lowest().fHeightMeters;
 	rGlobalLayout.fBaseHeight = fBaseHeight;
 	rGlobalLayout.fBaseHeightInverse = 1.0f / std::max(fBaseHeight, 0.001f);
 	rGlobalLayout.fAspectRatioInverse = 1.0f / gpSwapchainManager->mfAspectRatio;
@@ -497,7 +530,7 @@ void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> curr
 	XMVECTOR vecSunMoonNormal = XMVectorZero();
 	XMVECTOR vecAmbientColor = XMVectorZero();
 	PopulateSunAndLighting(rGlobalLayout, fSunAngle, fDayPercent, fNoonPercent, vecSunMoonNormal, vecAmbientColor);
-	PopulateShadowParameters(rGlobalLayout, fSunAngle, fDayPercent, fNoonPercent, vecSunMoonNormal, vecAmbientColor);
+	PopulateShadowParameters(iCommandBuffer, rGlobalLayout, fSunAngle, fDayPercent, fNoonPercent, vecSunMoonNormal, vecAmbientColor);
 	PopulateTerrainParameters(rGlobalLayout, fDayPercent, fNoonPercent);
 	PopulateWaterParameters(rGlobalLayout, fSunAngle, fDayPercent, currentTime);
 

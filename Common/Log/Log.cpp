@@ -4,10 +4,7 @@
 
 // Library-phase dynamic initialization: this TU is constructed before every default-phase (user) static and destroyed
 // after them, so ordinary static initializers and destructors are inside the window where logging is safe.
-#pragma warning(push)
-#pragma warning(disable : 4073) // "initializers put in library initialization area": that placement is the point here
 #pragma init_seg(lib)
-#pragma warning(pop)
 
 namespace common
 {

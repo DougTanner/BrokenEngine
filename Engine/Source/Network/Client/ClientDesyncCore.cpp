@@ -133,10 +133,6 @@ void ClientDesyncCore::RecoverFromDesync()
 
 void ClientDesyncCore::Reset()
 {
-	if (mpfnResetObserver != nullptr)
-	{
-		mpfnResetObserver(*this);
-	}
 	if (engine::gpClient != nullptr)
 	{
 		game::gpClientSession->mpRuntime->mpClient->mStateFlags.Set(engine::Client::ClientStateFlags::kDesynchronizationDebugMode, false);

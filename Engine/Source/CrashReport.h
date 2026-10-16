@@ -9,6 +9,7 @@ void HandleException(std::optional<const std::exception*> pException = std::null
 void PromptCrashReportDesktopCopy();
 #if defined(BT_CLIENT)
 void TryUploadCrashReport();
+void PollPendingCrashReport(Client* pClient);
 #endif
 void ReadDxDiag();
 

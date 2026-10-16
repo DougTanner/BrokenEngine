@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-07T12:28:30.718Z","dependsOn":["Documents/Plans/Engine/ShadowUpdateCadence.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-07T12:28:30.718Z","dependsOn":[]} -->
 # Balance Render Cadence Phases
 
 ## Context

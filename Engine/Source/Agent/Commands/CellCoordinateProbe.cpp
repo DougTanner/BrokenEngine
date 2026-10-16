@@ -10,26 +10,6 @@
 namespace engine
 {
 
-// How many of the terrain grid's kiElevationGridDimension sample positions along one axis resolve to distinct floats;
-// fewer means neighbouring samples share a float at this coordinate. The positions increase monotonically, so
-// exact inequality against the predecessor — not an approximate comparison — finds every such collapse.
-static constexpr int64_t DistinctAxisSamplePositions()
-{
-	static constexpr float kfGridPitch = kfCellWidth / static_cast<float>(kiElevationGridDimension);
-	int64_t iDistinct = 0;
-	float fPrevious = 0.0f;
-	for (int64_t i = 0; i < kiElevationGridDimension; ++i)
-	{
-		float fPosition = kfBaseAreaMinimumX + (static_cast<float>(i) + 0.5f) * kfGridPitch;
-		if (i == 0 || fPosition != fPrevious)
-		{
-			++iDistinct;
-		}
-		fPrevious = fPosition;
-	}
-	return iDistinct;
-}
-
 // Fold the placements field by field in generation order, matching CellStaticData::Write's member order rather
 // than hashing the struct's object representation, whose tail padding is not guaranteed equal between endpoints.
 static common::crc_t PlacementsCrc(const std::vector<IslandPlacement>& rPlacements)
@@ -48,7 +28,7 @@ static common::crc_t PlacementsCrc(const std::vector<IslandPlacement>& rPlacemen
 // subscribing to it or touching live cells. Schema: {"coord":[x,y]}.
 void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParameters.is_object() || rParameters.size() != 1 || !rParameters.contains("coord"))
+	if (rParameters.size() != 1 || !rParameters.contains("coord"))
 	{
 		throw std::runtime_error("cell_coordinate_probe accepts only 'coord'");
 	}
@@ -83,7 +63,7 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 	CellBounds bounds = ComputeCellBounds(LocalCellArea());
 	rResult["coord"] = AgentCoordinateJson(coordinate);
 	rResult["area"] = {{"width", bounds.fMaxX - bounds.fMinX}, {"height", bounds.fMaxY - bounds.fMinY}};
-	rResult["terrain"] = {{"axisSamplePositions", DistinctAxisSamplePositions()}, {"samplesFinite", bSamplesFinite}};
+	rResult["terrain"] = {{"samplesFinite", bSamplesFinite}};
 	rResult["placements"] = {{"count", std::ssize(placements)}, {"crc", PlacementsCrc(placements)}};
 	rResult["elevation"] = {{"crc", common::Crc(std::span<const float>(elevationGrid.data(), static_cast<size_t>(std::ssize(elevationGrid))))}};
 }

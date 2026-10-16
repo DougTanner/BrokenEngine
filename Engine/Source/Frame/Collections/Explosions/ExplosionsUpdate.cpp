@@ -17,13 +17,12 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 	ExplosionsInterpolate& rCurrent = rCurrentFrameInterpolate.explosions;
 	const ExplosionsInterpolate& rPrevious = rPreviousFrame.interpolate.explosions;
 
-	[[maybe_unused]] std::chrono::duration<float> currentTime(rPreviousFrame.interpolate.fCurrentTime + rCurrentFrameInterpolate.fDeltaTime);
+	[[maybe_unused]] SimulationTime currentTime(std::chrono::duration<float>(rPreviousFrame.interpolate.fCurrentTime + rCurrentFrameInterpolate.fDeltaTime));
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		int64_t iTypeIndex = rPrevious.puiTypeIndices[i];
 		ExplosionFlags_t flags = rPrevious.pFlags[i];
-		std::chrono::duration<float> startTime(rPrevious.pfStartTimes[i]);
 		XMVECTOR vecPosition = rPrevious.pVecPositions[i];
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
 
@@ -33,7 +32,7 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 
 		rCurrent.puiTypeIndices[i] = static_cast<uint8_t>(iTypeIndex);
 		rCurrent.pFlags[i] = flags;
-		rCurrent.pfStartTimes[i] = startTime.count();
+		rCurrent.pStartTimes[i] = rPrevious.pStartTimes[i];
 		rCurrent.pVecPositions[i] = vecPosition;
 		rCurrent.pVecDirections[i] = vecDirection;
 
@@ -46,7 +45,7 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 		{
 			if (j < iTrailCount)
 			{
-				rCurrent.pfTrailTimes[j][i] = rPrevious.pfTrailTimes[j][i];
+				rCurrent.pTrailTimes[j][i] = rPrevious.pTrailTimes[j][i];
 #if defined(BT_CLIENT)
 				rCurrent.pfTrailIntensities[j][i] = rPrevious.pfTrailIntensities[j][i];
 				rCurrent.pVecTrailStartPositions[j][i] = rPrevious.pVecTrailStartPositions[j][i];
@@ -55,7 +54,7 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 			}
 			else
 			{
-				rCurrent.pfTrailTimes[j][i] = 0.0f;
+				rCurrent.pTrailTimes[j][i] = std::chrono::duration<float>::zero();
 #if defined(BT_CLIENT)
 				rCurrent.pfTrailIntensities[j][i] = 0.0f;
 				rCurrent.pVecTrailStartPositions[j][i] = XMVectorZero();
@@ -66,7 +65,7 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 
 #if defined(BT_CLIENT)
 		const ExplosionType& rType = sTypes.at(static_cast<size_t>(iTypeIndex));
-		std::chrono::duration<float> explosionTime = currentTime - startTime;
+		std::chrono::duration<float> explosionTime = currentTime - rPrevious.pStartTimes[i];
 
 		for (int64_t j = 0; j < iTrailCount; ++j)
 		{
@@ -78,8 +77,8 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 
 			// j == 0 is the central trail along the explosion direction; j > 0 are angle-jittered side trails
 			float fDurationMultiplier = (j == 0) ? sTuning.pPrimaryTrailDuration->mfCurrent : sTuning.pSecondaryTrailDuration->mfCurrent;
-			std::chrono::duration<float> effectiveTrailTime(rCurrent.pfTrailTimes[j][i] * fDurationMultiplier);
-			std::chrono::duration<float> trailEndTime = std::chrono::duration<float>(fTimePercent * rType.fTrailDelayTime) + effectiveTrailTime;
+			std::chrono::duration<float> effectiveTrailTime = rCurrent.pTrailTimes[j][i] * fDurationMultiplier;
+			std::chrono::duration<float> trailEndTime = fTimePercent * rType.trailDelayTime + effectiveTrailTime;
 
 			// For expired trails, sync with zero intensity (they'll be removed in Destroy phase)
 			if (explosionTime.count() >= trailEndTime.count())
@@ -89,7 +88,7 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 				continue;
 			}
 
-			float fTrailPercent = (explosionTime - std::chrono::duration<float>(fTimePercent * rType.fTrailDelayTime)) / effectiveTrailTime;
+			float fTrailPercent = (explosionTime - fTimePercent * rType.trailDelayTime) / effectiveTrailTime;
 			fTrailPercent = std::clamp(fTrailPercent, 0.0f, 1.0f);
 
 			XMVECTOR vecTrailStart = rCurrent.pVecTrailStartPositions[j][i];

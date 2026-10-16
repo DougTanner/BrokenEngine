@@ -13,7 +13,8 @@ namespace engine
 //
 // Framing (both directions): 4-byte little-endian uint32 payload length, then UTF-8 JSON.
 // Envelope: request {"id"?, "cmd", "params"?} -> success {"id","ok":true,"result"} / failure {"id","ok":false,"error"}.
-// An unknown top-level request key (anything but id/cmd/params) is rejected before dispatch as a failure envelope.
+// An unknown top-level request key (anything but id/cmd/params) is rejected before dispatch as a failure envelope,
+// then a present non-object "params" is rejected the same way with "params must be an object".
 class AgentCommandServer
 {
 public:

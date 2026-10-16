@@ -67,12 +67,15 @@ try {
  if($status.ExitCode -ne 0){throw (New-NextPlanStateBlocker "git status could not read the session worktree. $($status.Stderr.Trim())")}
  $dirty=@(Get-DirtyPath $status.Stdout)
  if($dirty.Count -ne 0){
-  # Uncommitted scheduler input must never reach selection or healing. A held claim is exempt when every dirty path is
-  # a Plan: plan claim-next returns the held claim before selection, and healing reads only primary-tip Plans.
+  # Uncommitted scheduler input must never reach selection or healing. A run whose early lookup reported the held claim
+  # is exempt whatever is dirty: healing reads only primary-tip Plans, and plan claim-next targets the held Plan,
+  # returning the claim before selection while it is still live at the primary tip, and otherwise claiming that same
+  # Plan afresh while it is eligible and unclaimed or returning none, never claiming another Plan; the overlap check
+  # below protects retained work.
   $schedulerPaths=@($dirty|Where-Object{$_.StartsWith('Documents/Plans/',[StringComparison]::Ordinal)})
-  $heldPlansOnly=$null -ne $heldClaim -and $schedulerPaths.Count -eq $dirty.Count
-  if($schedulerPaths.Count -ne 0 -and -not $heldPlansOnly){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "A plan claim cannot run while scheduler input is uncommitted; $($schedulerPaths.Count) path(s) under Documents/Plans/ are modified or untracked: $(Format-DirtyPath $schedulerPaths). No Plan was claimed and the worktree was not touched. Report this to the user, who decides whether to set those paths aside (git stash push -u -m '<tag>' -- <those paths>, rerun this command, then git stash apply --index <that stash entry>, which keeps a staged version) or to land that work first." 'stop-report-to-user'}
-  if(-not $ResumeRetained -and -not $heldPlansOnly){$route=if($targeted){' To resume uncommitted work retained by an earlier deferral of this Plan, rerun this command with -ResumeRetained.'}else{''};Complete-Claim 2 'blocked' 'claim.worktree-dirty' "Session worktree must be clean before a plan claim; $($dirty.Count) path(s) are modified or untracked: $(Format-DirtyPath $dirty). No Plan was claimed and the worktree was not touched.$route" $(if($targeted){'resume-with-flag'}else{'stop-report-to-user'})}
+  $claimHeld=$null -ne $heldClaim
+  if($schedulerPaths.Count -ne 0 -and -not $claimHeld){Complete-Claim 2 'blocked' 'claim.worktree-dirty' "A plan claim cannot run while scheduler input is uncommitted; $($schedulerPaths.Count) path(s) under Documents/Plans/ are modified or untracked: $(Format-DirtyPath $schedulerPaths). No Plan was claimed and the worktree was not touched. Report this to the user, who decides whether to set those paths aside (git stash push -u -m '<tag>' -- <those paths>, rerun this command, then git stash apply --index <that stash entry>, which keeps a staged version) or to land that work first." 'stop-report-to-user'}
+  if(-not $ResumeRetained -and -not $claimHeld){$route=if($targeted){' To resume uncommitted work retained by an earlier deferral of this Plan, rerun this command with -ResumeRetained.'}else{''};Complete-Claim 2 'blocked' 'claim.worktree-dirty' "Session worktree must be clean before a plan claim; $($dirty.Count) path(s) are modified or untracked: $(Format-DirtyPath $dirty). No Plan was claimed and the worktree was not touched.$route" $(if($targeted){'resume-with-flag'}else{'stop-report-to-user'})}
   if($context.SessionHead -cne $context.PrimaryTip){
    # The claim below fast-forwards the session, which would overwrite a retained path the primary movement also changed.
    # NUL-delimited output keeps both sides of the comparison in the same raw path form.
@@ -121,7 +124,9 @@ try {
   if($candidates.Count -gt 1){$result.candidates=@($candidates);Complete-Claim 2 'blocked' 'plan-name-ambiguous' "Pattern '$pattern' matched multiple validated executable Plans; use a canonical Documents/Plans path." 'stop-report-to-user'}
   $Plan=$candidates[0]
  }
- $claimArguments=@('plan','claim-next','--repo',$context.CommonDirectory,'--primary-worktree',$context.Primary,'--worktree',$context.Worktree,'--branch',$context.SessionBranch,'--owner',$context.Owner,'--session',$context.Session);if($Plan){$claimArguments+=@('--plan',$Plan)}
+ # A bare run holding a claim targets that Plan, so a claim healed away since the lookup ends in none or a fresh claim on
+ # that same Plan, never in a claim on another Plan over this Plan's retained work.
+ $claimArguments=@('plan','claim-next','--repo',$context.CommonDirectory,'--primary-worktree',$context.Primary,'--worktree',$context.Worktree,'--branch',$context.SessionBranch,'--owner',$context.Owner,'--session',$context.Session);if($Plan){$claimArguments+=@('--plan',$Plan)}elseif($null -ne $heldClaim){$claimArguments+=@('--plan',[string]$heldClaim.plan)}
  # claim-next reports claim-plan-mismatch before none, so reaching the none branch proves this session holds no other
  # claim; a user-authorized takeover releases the named holder's claim there at most once, then claims through this path.
  $takeover=$UserAuthorizedTakeover.IsPresent
@@ -131,7 +136,7 @@ try {
   if($response.ExitCode -ne 0){$exit=if($response.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'claim.rejected' 'WorktreeCli rejected the plan claim.' 'stop-report-to-user'}
   $code=[string]$claim.code
   if($code -cne 'none'){break}
-  $message=if($targeted){Get-TargetedNoneMessage $context $Plan}else{'No eligible Plan is available.'}
+  $message=if($targeted){Get-TargetedNoneMessage $context $Plan}elseif($null -ne $heldClaim){Get-TargetedNoneMessage $context ([string]$heldClaim.plan)}else{'No eligible Plan is available.'}
   if(-not $takeover -or -not $result.Contains('holder') -or [string]$result.holder.session -ceq $context.Session){Complete-Claim 0 'pass' 'none-available' $message 'checkpoint-followup-gate'}
   $takeover=$false
   # Every scheduler claim is created by this script with owner and session both set to the session ID, and plan unclaim

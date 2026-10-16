@@ -40,6 +40,9 @@ $WatcherBindTimeoutSeconds = 5
 $ExitCodeWaitSeconds = 2
 $NoExceptionText = '(no exception text)'
 $CallstackMarker = '<Begin callstack>'
+# Mirrors kpcCrashReportSentTrailer in Engine/Source/CrashReport.cpp. The client appends it in
+# binary mode, so each newline is a single LF byte.
+$CrashReportSentTrailer = [Text.Encoding]::ASCII.GetBytes("`nThis crash report was sent to the server.`n")
 $VersionPrefix = 'Game version:'
 # The registered start time is a formatted round-trip of the live one, so only formatting rounding
 # may separate them; anything larger is a different process holding a recycled PID.
@@ -124,9 +127,25 @@ function Get-CandidateSnapshot([string] $Path) {
 	return [ordered]@{ path = $Path; exists = $exists; byteSize = $byteSize; lastWriteTimeUtc = $lastWriteTimeUtc }
 }
 
+function Test-EndsWithSentTrailer([string] $Path) {
+	try {
+		$bytes = [IO.File]::ReadAllBytes($Path)
+		$tail = [byte[]]$bytes[(-$CrashReportSentTrailer.Length)..-1]
+		return [Linq.Enumerable]::SequenceEqual($tail, $CrashReportSentTrailer)
+	}
+	catch {
+		# An unreadable report is announced as a changed one rather than hidden as stale.
+		return $false
+	}
+}
+
 function Test-CandidateChanged($Baseline, $Current) {
 	if ([bool]$Baseline.exists -ne [bool]$Current.exists) { return $true }
 	if (-not [bool]$Current.exists) { return $false }
+	# A live client appends the sent trailer to the pre-launch report once the server confirms
+	# delivery, and that report is still stale. A report this run wrote replaces the file, so it can
+	# match only when its untagged size equals the baseline size.
+	if ([int64]$Current.byteSize -eq ([int64]$Baseline.byteSize + $CrashReportSentTrailer.Length) -and (Test-EndsWithSentTrailer ([string]$Current.path))) { return $false }
 	if ([string]$Baseline.byteSize -cne [string]$Current.byteSize) { return $true }
 	return ([string]$Baseline.lastWriteTimeUtc -cne [string]$Current.lastWriteTimeUtc)
 }
@@ -359,14 +378,14 @@ try {
 				$exitCodeText = 'unknown'
 				if ($null -ne $exitCode) { $exitCodeText = [string]$exitCode }
 				$exitedRoles += "$($record.role) (exit code $exitCodeText)"
-				# The registered process is gone. Only a candidate that differs from the pre-launch
-				# baseline is this run's report; an unchanged one predates the launch and is stale.
+				# Only a report this run wrote is its crash evidence. A candidate unchanged since the
+				# pre-launch baseline, or changed only by the client appending its sent trailer, is stale.
 				$changed = @(foreach ($candidate in @($record.candidates)) {
 					$current = Get-CandidateSnapshot ([string]$candidate.path)
 					if (Test-CandidateChanged $candidate $current) { $current }
 				})
 				if ($changed.Count -eq 0) {
-					# No report changed, so the exit is reported with no report evidence rather than invented evidence.
+					# No report was written, so the exit is reported with no report evidence rather than invented evidence.
 					$findings += [ordered]@{ role = $record.role; reportPath = $null; headline = $null; exitCode = $exitCode; evidencePath = $evidencePath }
 					continue
 				}
@@ -387,7 +406,7 @@ try {
 					if ($null -eq $finding.reportPath) { continue }
 					$reported += "$($finding.role) -> $($finding.reportPath): $($finding.headline)"
 				}
-				$reportDetail = ' No crash report changed since launch.'
+				$reportDetail = ' No crash report written since launch.'
 				if ($reported.Count -gt 0) { $reportDetail = " Crash report(s): $($reported -join '; ')." }
 				Complete-ProcessCheck 2 'blocked' 'check.unexpected-exit' ("Registered role(s) $($exitedRoles -join ', ') " +
 					"exited unexpectedly.$reportDetail Evidence: '$evidencePath'.")

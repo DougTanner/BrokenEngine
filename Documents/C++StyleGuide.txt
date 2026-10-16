@@ -230,7 +230,6 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`. `
 	#include "Graphics/GraphicsUtils.h"
 	#include "Input/Input.h"
 
-	#include "Agent/Commands/ServerFaultHarnessRigs.h"
 	#include "Agent/Commands/ServerSimulationHarnessRigs.h"
 	#include "Agent/AgentCommandsServerQueries.h"
 	#include "Network/Server/ServerFleetManager.h"

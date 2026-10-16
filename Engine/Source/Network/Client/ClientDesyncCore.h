@@ -26,7 +26,7 @@ public:
 
 	bool IsStalled() const
 	{
-		return mDesyncDebugState.iTick >= 0 || (mpfnAdditionalStall != nullptr && mpfnAdditionalStall(*this));
+		return mDesyncDebugState.iTick >= 0;
 	}
 
 	void OnDesyncDetected(ReconcileDesyncInfo&& rDesyncInfo);
@@ -34,9 +34,6 @@ public:
 	bool PollDesyncTimeout();
 	void RecoverFromDesync();
 	void Reset();
-
-	bool (*mpfnAdditionalStall)(const ClientDesyncCore&) = nullptr;
-	void (*mpfnResetObserver)(ClientDesyncCore&) = nullptr;
 
 	struct DesyncDebugState
 	{

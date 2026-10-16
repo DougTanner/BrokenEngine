@@ -83,12 +83,22 @@ inline void ShiftArea(XMFLOAT4& rf4Area, XMFLOAT2 f2Offset)
 	rf4Area.w += f2Offset.y;
 }
 
+// Areas are x = left, y = top (max-Y), z = right, w = bottom (min-Y). No margin: the held area must still cover the
+// whole live visible area.
+inline bool IsVisibleAreaInsideHeldArea(const XMFLOAT4& rf4VisibleArea, const XMFLOAT4& rf4HeldArea)
+{
+	return rf4VisibleArea.x >= rf4HeldArea.x && rf4VisibleArea.z <= rf4HeldArea.z && rf4VisibleArea.y <= rf4HeldArea.y
+	    && rf4VisibleArea.w >= rf4HeldArea.w;
+}
+
 struct TemporalAreaLatch
 {
 	bool bInitialized = false;
+	XMFLOAT4 f4CurrentArea {};
 	XMFLOAT4 f4PreviousArea {};
+	float fBlend = 1.0f;
 
-	float Update(const XMFLOAT4& rf4CurrentArea, bool& rbReset, float fBlend, XMFLOAT4& rf4PreviousArea)
+	float Update(const XMFLOAT4& rf4CurrentArea, bool& rbReset, float fRequestedBlend, XMFLOAT4& rf4PreviousArea)
 	{
 		if (rbReset)
 		{
@@ -96,17 +106,23 @@ struct TemporalAreaLatch
 			bInitialized = false;
 		}
 
-		float fResolvedBlend = fBlend;
+		float fResolvedBlend = fRequestedBlend;
 		if (!bInitialized)
 		{
+			f4CurrentArea = rf4CurrentArea;
 			f4PreviousArea = rf4CurrentArea;
 			bInitialized = true;
 			fResolvedBlend = 1.0f;
 		}
+		else
+		{
+			f4PreviousArea = f4CurrentArea;
+			f4CurrentArea = rf4CurrentArea;
+		}
 
 		rf4PreviousArea = f4PreviousArea;
-		f4PreviousArea = rf4CurrentArea;
-		return fResolvedBlend;
+		fBlend = fResolvedBlend;
+		return fBlend;
 	}
 };
 

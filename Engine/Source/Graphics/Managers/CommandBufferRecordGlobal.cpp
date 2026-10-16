@@ -68,30 +68,28 @@ void CommandBufferRecordGlobal::Record(int64_t iFramebuffer)
 void CommandBufferRecordGlobal::RecordShadowPasses(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer, Pipeline* pPipelines)
 {
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerShadow);
-	// Record-time group counts cover the whole shadow texture: every extent change destroys and re-records
-	// these command buffers (Graphics recreation is at least the command-buffer destroy tier).
-	int64_t iShadowTilesX = TileCount(gpTextureManager->mRenderTargetTextures.mShadowTexture.mInfo.vkExtent3D.width);
-	int64_t iShadowTilesY = TileCount(gpTextureManager->mRenderTargetTextures.mShadowTexture.mInfo.vkExtent3D.height);
+	// PopulateShadowArea writes every pass's indirect counts per frame: the whole shadow texture on a refresh,
+	// nothing on a skip. The render-pass clear and the layout transitions run either way.
 	gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.RecordBeginRenderPass(vkCommandBuffer);
-	// Fixed-count prepass consumes the shared global placement arena populated by
+	// The refresh-frame prepass covers the shared global placement arena populated by
 	// Islands::UpdateActiveIslands; cleared slots beyond the written total remain degenerate.
-	pPipelines[kPipelineShadowElevation].RecordDraw(iCommandBuffer, vkCommandBuffer, kiMaxActivePlacements, 0, {1.0f, 0.0f, 0.0f, 0.0f});
+	pPipelines[kPipelineShadowElevation].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {1.0f, 0.0f, 0.0f, 0.0f});
 	vkCmdEndRenderPass(vkCommandBuffer);
-	pPipelines[kPipelineShadow].RecordCompute(iCommandBuffer, vkCommandBuffer, iShadowTilesX, iShadowTilesY);
+	pPipelines[kPipelineShadow].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 	gpTextureManager->mRenderTargetTextures.mShadowTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadOnly);
 	gpTextureManager->mRenderTargetTextures.mShadowBlurIntermediateTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
-	pPipelines[kPipelineShadowBlurH].RecordCompute(iCommandBuffer, vkCommandBuffer, iShadowTilesX, iShadowTilesY);
+	pPipelines[kPipelineShadowBlurH].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 	gpTextureManager->mRenderTargetTextures.mShadowBlurIntermediateTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadOnly);
 	gpTextureManager->mRenderTargetTextures.mShadowBlurTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
-	pPipelines[kPipelineShadowBlurV].RecordCompute(iCommandBuffer, vkCommandBuffer, iShadowTilesX, iShadowTilesY);
+	pPipelines[kPipelineShadowBlurV].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 	// Same-layout barrier: ShadowTemporal reads and writes ShadowBlur in place after BlurV. Its history
 	// sampler remains read-only, then ShadowHistoryCopy refreshes the distinct storage image after another barrier.
 	gpTextureManager->mRenderTargetTextures.mShadowBlurTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
 	gpTextureManager->mRenderTargetTextures.mShadowHistoryTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadOnly);
-	pPipelines[kPipelineShadowTemporal].RecordCompute(iCommandBuffer, vkCommandBuffer, iShadowTilesX, iShadowTilesY);
+	pPipelines[kPipelineShadowTemporal].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 	gpTextureManager->mRenderTargetTextures.mShadowBlurTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
 	gpTextureManager->mRenderTargetTextures.mShadowHistoryTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadOnly, TextureLayout::kComputeReadWrite);
-	pPipelines[kPipelineShadowHistoryCopy].RecordCompute(iCommandBuffer, vkCommandBuffer, iShadowTilesX, iShadowTilesY);
+	pPipelines[kPipelineShadowHistoryCopy].RecordComputeIndirect(iCommandBuffer, vkCommandBuffer);
 	gpTextureManager->mRenderTargetTextures.mShadowBlurTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 	gpTextureManager->mRenderTargetTextures.mShadowHistoryTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 	gpTextureManager->mRenderTargetTextures.mShadowTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadOnly, TextureLayout::kComputeReadWrite);

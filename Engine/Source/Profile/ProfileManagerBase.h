@@ -56,28 +56,9 @@ struct RawCpuTimerRecord
 	int64_t iAuxiliaryCount = 0;
 };
 
-enum class RawCpuTimerEventFlags : uint8_t
-{
-	kAvailable = 1 << 0,
-	kOverrun = 1 << 1,
-};
-
 enum class RawCpuTimerStateFlags : uint8_t
 {
 	kRegistered = 1 << 0,
-	kEventRegistered = 1 << 1,
-	kEventArmed = 1 << 2,
-};
-
-struct RawCpuTimerEventRecord
-{
-	int64_t iEventSequence = 0;
-	int64_t iSampleSequence = 0;
-	int64_t iSampleTick = 0;
-	int64_t iSampleMicroseconds = 0;
-	int64_t iInvocationCount = 0;
-	int64_t iAuxiliaryCount = 0;
-	common::Flags<RawCpuTimerEventFlags> flags {};
 };
 #endif // BT_SERVER
 
@@ -349,15 +330,8 @@ public:
 
 #if defined(BT_SERVER)
 	void RegisterRawCpuTimer(int64_t iCpuTimer);
-	void RegisterRawCpuTimerEvent(int64_t iCpuTimer);
 	void AddRawCpuTimerAuxiliaryCount(int64_t iCpuTimer, int64_t iCount);
-	void LatchRawCpuTimers(bool bAccept, int64_t iSampleTick);
-	// The caller must hold mCpuTimerMutex.
-	bool ArmRawCpuTimerEventLocked(int64_t iCpuTimer, int64_t iMinimumSampleTick);
-	// The caller must hold mCpuTimerMutex. Publication is performed by the derived latch hook.
-	bool PublishRawCpuTimerEvent(int64_t iCpuTimer, int64_t iSampleTick);
-	// The caller must hold mCpuTimerMutex.
-	bool AcknowledgeRawCpuTimerEvent(int64_t iCpuTimer, int64_t iEventSequence);
+	void LatchRawCpuTimers(bool bAccept);
 #endif // BT_SERVER
 
 #if defined(BT_CLIENT)
@@ -446,11 +420,6 @@ public:
 protected:
 
 #if defined(BT_SERVER)
-	// Called while mCpuTimerMutex is held, after accepted raw records have been copied.
-	virtual void OnRawCpuTimersLatched(int64_t)
-	{
-	}
-
 	struct RawCpuTimerState
 	{
 		int64_t iTotalTimeNanoseconds = 0;
@@ -458,8 +427,6 @@ protected:
 		std::atomic<int64_t> iAuxiliaryCount = 0;
 		RawCpuTimerRecord record {};
 		common::Flags<RawCpuTimerStateFlags> flags {};
-		RawCpuTimerEventRecord eventRecord {};
-		int64_t iMinimumSampleTick = 0;
 	};
 
 public:

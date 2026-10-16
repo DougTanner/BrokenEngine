@@ -1,7 +1,5 @@
 #include "Agent/AgentCommands.h"
 
-#include "Agent/Commands/CollectionLayoutCapacityHarnessRig.h"
-#include "Agent/Commands/RegistryHarnessRig.h"
 #include "Game.h"
 
 #if defined(BT_CLIENT)
@@ -15,19 +13,6 @@ void ExecuteAgentCommand(std::string_view command, const nlohmann::json& rParame
 {
 	if (engine::ExecuteSharedAgentCommand(command, rParameters, rResult, gpGame != nullptr ? gpGame->miTickCounter : -1))
 	{
-		return;
-	}
-
-	// Game-owned commands reachable on both endpoints dispatch before the side-specific fallthrough.
-	if (command == "collection_layout_capacity_harness_rig")
-	{
-		CommandCollectionLayoutCapacityHarnessRig(rParameters, rResult);
-		return;
-	}
-
-	if (command == "registry_harness_rig")
-	{
-		CommandRegistryHarnessRig(rParameters, rResult);
 		return;
 	}
 

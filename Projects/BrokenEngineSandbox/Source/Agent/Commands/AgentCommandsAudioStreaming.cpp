@@ -5,16 +5,12 @@
 #include "Agent/Commands/AudioStreamingHarnessRig.h"
 #include "Agent/AgentCommandServer.h"
 
-#if defined(BT_DEBUG)
-#include "Data/Audio.h"
-#endif
-
 namespace game
 {
 
 #if defined(BT_DEBUG)
 
-constexpr int64_t kiAudioStreamingHarnessRigReadLength = 16 * 1'024;
+constexpr const char* kpcAudioStreamingHarnessRigSchema = "audio_streaming_harness_rig requires {\"action\":\"inspect|play|clear|suspend|resume|clear_history|hold_read|release_read|stall_loaders|release_loaders|stop_publication|resume_publication|load_chunk\"} plus exactly its action's fields: play {\"crc\"}, hold_read {\"crc\",\"offset\",\"length\"}, load_chunk {\"crc\",\"priority\":\"realtime|normal\"}";
 
 static const char* AudioStreamingHarnessRigPartitionName(engine::AudioStreamingHarnessRigPartition ePartition)
 {
@@ -76,8 +72,6 @@ static const char* AudioStreamingHarnessRigHoldOwnerName(engine::AudioStreamingH
 			return "none";
 		case engine::AudioStreamingHarnessRigHoldOwner::kControlled:
 			return "controlled";
-		case engine::AudioStreamingHarnessRigHoldOwner::kInvalid:
-			return "invalid";
 	}
 	return "unknown";
 }
@@ -95,67 +89,6 @@ static const char* AudioStreamingHarnessRigHoldStateName(engine::AudioStreamingH
 	}
 	return "unknown";
 }
-
-enum class AudioStreamingHarnessRigCoexistenceFlags : uint8_t
-{
-	kStaging = 0x01,
-	kControlled = 0x02,
-	kComplete = 0x04,
-};
-using AudioStreamingHarnessRigCoexistenceFlags_t = common::Flags<AudioStreamingHarnessRigCoexistenceFlags>;
-
-struct AudioStreamingHarnessRigCoexistenceState
-{
-	~AudioStreamingHarnessRigCoexistenceState()
-	{
-		if (flags & AudioStreamingHarnessRigCoexistenceFlags::kStaging)
-		{
-			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseCoexistence();
-		}
-		if ((flags & AudioStreamingHarnessRigCoexistenceFlags::kControlled) && !(flags & AudioStreamingHarnessRigCoexistenceFlags::kComplete))
-		{
-			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
-			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseControls();
-		}
-	}
-
-	AudioStreamingHarnessRigCoexistenceFlags_t flags;
-	int64_t iStartSequence = 0;
-};
-
-struct AudioStreamingHarnessRigStartState
-{
-	~AudioStreamingHarnessRigStartState()
-	{
-		if (!bComplete)
-		{
-			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
-			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseControls();
-		}
-	}
-
-	bool bComplete = false;
-};
-
-struct AudioStreamingHarnessRigReleaseState
-{
-	~AudioStreamingHarnessRigReleaseState()
-	{
-		engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
-		engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseControls();
-	}
-};
-
-struct AudioStreamingHarnessRigInvalidState
-{
-	~AudioStreamingHarnessRigInvalidState()
-	{
-		engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseInvalid();
-	}
-
-	engine::AudioStreamingHarnessRigInvalidResult result;
-	bool bHasResult = false;
-};
 
 static nlohmann::json BuildAudioStreamingHarnessRigVoiceSummary(const engine::AudioStreamingHarnessRigVoiceSummary& rSummary)
 {
@@ -183,7 +116,7 @@ static nlohmann::json BuildAudioStreamingHarnessRigSnapshot()
 		audioSnapshot = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->InspectAudio();
 		snapshot = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->InspectFile();
 		bCombinedCoherent = before.uiScenarioGate == snapshot.uiScenarioGate && before.iActiveWriters == snapshot.iActiveWriters
-		                 && before.uiReservationBoundary == snapshot.uiReservationBoundary && before.uiRetryCount == snapshot.uiRetryCount
+		                 && before.iReservationBoundary == snapshot.iReservationBoundary && before.iRetryCount == snapshot.iRetryCount
 		                 && before.eHoldOwner == snapshot.eHoldOwner && before.eHoldState == snapshot.eHoldState
 		                 && (before.flags & engine::AudioStreamingHarnessRigSnapshotFlags::kLoaderStaged) == (snapshot.flags & engine::AudioStreamingHarnessRigSnapshotFlags::kLoaderStaged)
 		                 && before.iHeldIndex == snapshot.iHeldIndex && before.iHeldGeneration == snapshot.iHeldGeneration
@@ -200,12 +133,8 @@ static nlohmann::json BuildAudioStreamingHarnessRigSnapshot()
 	}
 	snapshot.flags.Set(engine::AudioStreamingHarnessRigSnapshotFlags::kCoherent, (snapshot.flags & engine::AudioStreamingHarnessRigSnapshotFlags::kCoherent) && bCombinedCoherent);
 	nlohmann::json result;
-	result["scenarioGate"] = snapshot.uiScenarioGate;
 	result["scenarioGeneration"] = snapshot.iScenarioGeneration;
-	result["activeWriters"] = snapshot.iActiveWriters;
-	result["reservationStart"] = snapshot.uiReservationStart;
-	result["reservationBoundary"] = snapshot.uiReservationBoundary;
-	result["retryCount"] = snapshot.uiRetryCount;
+	result["retryCount"] = snapshot.iRetryCount;
 	result["holdOwner"] = AudioStreamingHarnessRigHoldOwnerName(snapshot.eHoldOwner);
 	result["holdState"] = AudioStreamingHarnessRigHoldStateName(snapshot.eHoldState);
 	result["heldPoolIndex"] = snapshot.iHeldIndex == 4'294'967'295i64
@@ -219,9 +148,7 @@ static nlohmann::json BuildAudioStreamingHarnessRigSnapshot()
 	{
 		{"holdArmed", snapshot.eHoldState != engine::AudioStreamingHarnessRigHoldState::kIdle},
 		{"loaderStaged", snapshot.flags & engine::AudioStreamingHarnessRigSnapshotFlags::kLoaderStaged},
-		{"controlledPublication", audioSnapshot.flags & engine::AudioStreamingHarnessRigAudioSnapshotFlags::kControlledPublication},
-		{"saturationActive", audioSnapshot.flags & engine::AudioStreamingHarnessRigAudioSnapshotFlags::kSaturationActive},
-		{"publicationAllowance", audioSnapshot.iPublicationAllowance},
+		{"publicationStopped", audioSnapshot.flags & engine::AudioStreamingHarnessRigAudioSnapshotFlags::kPublicationStopped},
 	};
 	result["poolEntries"] = nlohmann::json::array();
 	for (const engine::AudioStreamingHarnessRigPoolEntry& rEntry : snapshot.poolEntries)
@@ -250,16 +177,13 @@ static nlohmann::json BuildAudioStreamingHarnessRigSnapshot()
 		{{"name", "loader0"}, {"head", snapshot.iLoader0Head}, {"dropped", snapshot.iLoader0Dropped}},
 		{{"name", "loader1"}, {"head", snapshot.iLoader1Head}, {"dropped", snapshot.iLoader1Dropped}},
 	});
-	bool bOverflow = snapshot.iMainDropped != 0 || snapshot.iLoader0Dropped != 0 || snapshot.iLoader1Dropped != 0;
-	result["overflow"] = bOverflow;
-	result["evidenceValid"] = (snapshot.flags & engine::AudioStreamingHarnessRigSnapshotFlags::kCoherent)
-	                       && (snapshot.flags & engine::AudioStreamingHarnessRigSnapshotFlags::kGapFree) && !bOverflow;
+	result["overflow"] = snapshot.iMainDropped != 0 || snapshot.iLoader0Dropped != 0 || snapshot.iLoader1Dropped != 0;
 	result["records"] = nlohmann::json::array();
 	for (int64_t i = 0; i < snapshot.iRecordCount; ++i)
 	{
 		const engine::AudioStreamingHarnessRigRecord& rRecord = snapshot.records.at(i);
 		nlohmann::json record;
-		record["sequence"] = rRecord.uiSequence;
+		record["sequence"] = rRecord.iSequence;
 		record["scenarioGeneration"] = rRecord.iScenarioGeneration;
 		record["partition"] = AudioStreamingHarnessRigPartitionName(rRecord.ePartition);
 		record["phase"] = AudioStreamingHarnessRigPhaseName(rRecord.ePhase);
@@ -279,111 +203,50 @@ static nlohmann::json BuildAudioStreamingHarnessRigSnapshot()
 	return result;
 }
 
-static nlohmann::json BuildAudioStreamingHarnessRigInvalidResult(const engine::AudioStreamingHarnessRigInvalidResult& rInvalid)
+static void RequireAudioStreamingHarnessRigFields(const nlohmann::json& rParameters, std::initializer_list<std::string_view> fields)
 {
-	return
+	if (std::ssize(rParameters) != std::ssize(fields) + 1)
 	{
-		{"missingCrcFailed", rInvalid.bMissingCrcFailed},
-		{"wrongCrcFailed", rInvalid.bWrongCrcFailed},
-		{"overflowFailed", rInvalid.bOverflowFailed},
-		{"outOfRangeFailed", rInvalid.bOutOfRangeFailed},
-		{"zeroLengthFailed", rInvalid.bZeroLengthFailed},
-		{"oversizeFailed", rInvalid.bOversizeFailed},
-		{"shortAccepted", rInvalid.bShortAccepted},
-		{"tooSmallPollFailed", rInvalid.bTooSmallPollFailed},
-		{"tooSmallPollNoWrite", rInvalid.bTooSmallPollNoWrite},
-		{"loadingCancelled", rInvalid.bLoadingCancelled},
-		{"loadingEntryNotReused", rInvalid.bLoadingEntryNotReused},
-	};
-}
-
-static bool AudioStreamingHarnessRigEvidenceValid(const engine::AudioStreamingHarnessRigSnapshot& rSnapshot)
-{
-	return (rSnapshot.flags & engine::AudioStreamingHarnessRigSnapshotFlags::kCoherent)
-	    && (rSnapshot.flags & engine::AudioStreamingHarnessRigSnapshotFlags::kGapFree) && rSnapshot.iMainDropped == 0
-	    && rSnapshot.iLoader0Dropped == 0 && rSnapshot.iLoader1Dropped == 0;
-}
-
-static int64_t CountAudioStreamingHarnessRigRecords(const engine::AudioStreamingHarnessRigSnapshot& rSnapshot, engine::AudioStreamingHarnessRigPhase ePhase, common::crc_t crc, int64_t iAfterSequence = 0)
-{
-	int64_t iCount = 0;
-	for (int64_t i = 0; i < rSnapshot.iRecordCount; ++i)
-	{
-		const engine::AudioStreamingHarnessRigRecord& rRecord = rSnapshot.records.at(i);
-		iCount += rRecord.uiSequence > static_cast<uint64_t>(iAfterSequence) && rRecord.ePhase == ePhase && rRecord.crc == crc ? 1 : 0;
+		throw std::runtime_error(kpcAudioStreamingHarnessRigSchema);
 	}
-	return iCount;
-}
-
-static bool HasAudioStreamingHarnessRigAcknowledgement(const engine::AudioStreamingHarnessRigSnapshot& rSnapshot, common::crc_t crc)
-{
-	for (int64_t i = 0; i < rSnapshot.iRecordCount; ++i)
+	for (std::string_view field : fields)
 	{
-		const engine::AudioStreamingHarnessRigRecord& rRecord = rSnapshot.records.at(i);
-		if (rRecord.crc == crc && rRecord.ePhase == engine::AudioStreamingHarnessRigPhase::kRefillCancelled && rRecord.bCancelAcknowledged)
+		if (!rParameters.contains(field))
 		{
-			return true;
+			throw std::runtime_error(kpcAudioStreamingHarnessRigSchema);
 		}
 	}
-	return false;
 }
 
-enum class AudioStreamingHarnessRigSaturationPhase : uint8_t
+static common::crc_t ReadAudioStreamingHarnessRigCrc(const nlohmann::json& rValue)
 {
-	kSetup,
-	kWaitForPrimaryStream,
-	kWaitForMandatoryStream,
-	kWaitForRetry,
-	kWaitForSettled,
-};
+	if (!rValue.is_number_unsigned())
+	{
+		throw std::runtime_error(kpcAudioStreamingHarnessRigSchema);
+	}
+	return rValue.get<common::crc_t>();
+}
 
-struct AudioStreamingHarnessRigSaturationState
+static int64_t ReadAudioStreamingHarnessRigInteger(const nlohmann::json& rValue)
 {
-	~AudioStreamingHarnessRigSaturationState()
+	if (!rValue.is_number_integer())
 	{
-		engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseSaturation();
-		engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
-		engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseControls();
+		throw std::runtime_error(kpcAudioStreamingHarnessRigSchema);
 	}
+	return rValue.get<int64_t>();
+}
 
-	AudioStreamingHarnessRigSaturationPhase ePhase = AudioStreamingHarnessRigSaturationPhase::kSetup;
-	nlohmann::json saturated;
-	float fSaturatedCurrentVolume = 0.0f;
-	float fSaturatedNewestVolume = 0.0f;
-};
-
-static bool IsAudioStreamingHarnessRigSaturated(const engine::AudioStreamingHarnessRigSnapshot& rFile, const engine::AudioStreamingHarnessRigAudioSnapshot& rAudio)
+static engine::LoadPriority ReadAudioStreamingHarnessRigPriority(const nlohmann::json& rValue)
 {
-	if (!AudioStreamingHarnessRigEvidenceValid(rFile))
+	if (rValue == "realtime")
 	{
-		return false;
+		return engine::LoadPriority::kRealtime;
 	}
-	if (rFile.uiRetryCount == 0)
+	if (rValue == "normal")
 	{
-		return false;
+		return engine::LoadPriority::kNormal;
 	}
-	if (!(rFile.flags & engine::AudioStreamingHarnessRigSnapshotFlags::kLoaderStaged))
-	{
-		return false;
-	}
-	int64_t iNonFree = 0;
-	int64_t iPrimaryStreamHeld = 0;
-	int64_t iMandatoryStreamQueued = 0;
-	int64_t iSongStreamQueued = 0;
-	for (const engine::AudioStreamingHarnessRigPoolEntry& rEntry : rFile.poolEntries)
-	{
-		iNonFree += rEntry.eState != engine::AudioStreamingHarnessRigQueueState::kFree ? 1 : 0;
-		iPrimaryStreamHeld += rEntry.crc == data::kAudioMusicdoodlewavCrc && rEntry.eState == engine::AudioStreamingHarnessRigQueueState::kLoading ? 1 : 0;
-		iMandatoryStreamQueued += rEntry.crc == data::kAudioMusicMandatoryOvertimewavCrc && rEntry.eState == engine::AudioStreamingHarnessRigQueueState::kQueued ? 1 : 0;
-		iSongStreamQueued += rEntry.crc == data::kAudioMusicsong18wavCrc && rEntry.eState == engine::AudioStreamingHarnessRigQueueState::kQueued ? 1 : 0;
-	}
-	return iNonFree == 6 && iPrimaryStreamHeld == 1 && iMandatoryStreamQueued == 3 && iSongStreamQueued == 2
-	    && CountAudioStreamingHarnessRigRecords(rFile, engine::AudioStreamingHarnessRigPhase::kRefillCancelled, data::kAudioMusicdoodlewavCrc) >= 1
-	    && (rAudio.current.flags & engine::AudioStreamingHarnessRigVoiceFlags::kPresent)
-	    && rAudio.current.crc == data::kAudioMusicsong18wavCrc
-	    && (rAudio.newestFade.flags & engine::AudioStreamingHarnessRigVoiceFlags::kPresent)
-	    && rAudio.newestFade.crc == data::kAudioMusicMandatoryOvertimewavCrc && rAudio.olderFades.iCount >= 1
-	    && rAudio.olderFades.iUnderrunningCount >= 1;
+	throw std::runtime_error(kpcAudioStreamingHarnessRigSchema);
 }
 
 #endif
@@ -399,64 +262,46 @@ void CommandAudioStreamingHarnessRig([[maybe_unused]] const nlohmann::json& rPar
 	{
 		// Heap: hostile-input validation and the bounded JSON harness rig response
 		ScopedSuppressAllocationTracking suppress;
-		static constexpr const char* kpcSchema = "audio_streaming_harness_rig requires exactly {\"action\":\"start|inspect|clear|suspend|resume|hold_read|release_read|coexistence|invalid|saturate\"}";
-		if (!rParameters.is_object())
-		{
-			throw std::runtime_error(kpcSchema);
-		}
-		if (rParameters.size() != 1)
-		{
-			throw std::runtime_error(kpcSchema);
-		}
 		if (!rParameters.contains("action"))
 		{
-			throw std::runtime_error(kpcSchema);
+			throw std::runtime_error(kpcAudioStreamingHarnessRigSchema);
 		}
 		if (!rParameters.at("action").is_string())
 		{
-			throw std::runtime_error(kpcSchema);
+			throw std::runtime_error(kpcAudioStreamingHarnessRigSchema);
 		}
 
+		engine::AudioStreamingHarnessRig& rHarnessRig = *engine::gpAgentCommandServer->mpAudioStreamingHarnessRig;
 		std::string action = rParameters.at("action").get<std::string>();
-		if (action != "start" && action != "inspect" && action != "clear" && action != "suspend" && action != "resume"
-		 && action != "hold_read" && action != "release_read" && action != "coexistence" && action != "invalid" && action != "saturate")
+		if (action == "play")
 		{
-			throw std::runtime_error("audio_streaming_harness_rig 'action' must be start|inspect|clear|suspend|resume|hold_read|release_read|coexistence|invalid|saturate");
-		}
-		static bool sbHarnessRigActionIssued = false;
-		bool bFirstHarnessRigAction = !sbHarnessRigActionIssued;
-		sbHarnessRigActionIssued = true;
-
-		if (action == "start")
-		{
-			std::shared_ptr<AudioStreamingHarnessRigStartState> pState = std::make_shared<AudioStreamingHarnessRigStartState>();
-			if (engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->Begin(data::kAudioMusicdoodlewavCrc, 0, kiAudioStreamingHarnessRigReadLength))
+			RequireAudioStreamingHarnessRigFields(rParameters, {"crc"});
+			if (!rHarnessRig.Play(ReadAudioStreamingHarnessRigCrc(rParameters.at("crc"))))
 			{
-				if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->Play(data::kAudioMusicdoodlewavCrc))
-				{
-					throw std::runtime_error("audio_streaming_harness_rig start requires a live audio voice");
-				}
-				rResult = BuildAudioStreamingHarnessRigSnapshot();
-				pState->bComplete = true;
-				return;
+				throw std::runtime_error("audio_streaming_harness_rig play requires a live audio voice");
 			}
-			engine::gpAgentCommandServer->DeferResponse([pState]() -> std::optional<nlohmann::json>
-			{
-				if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->Begin(data::kAudioMusicdoodlewavCrc, 0, kiAudioStreamingHarnessRigReadLength))
-				{
-					return std::nullopt;
-				}
-				ScopedSuppressAllocationTracking deferredSuppress;
-				if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->Play(data::kAudioMusicdoodlewavCrc))
-				{
-					throw std::runtime_error("audio_streaming_harness_rig start requires a live audio voice");
-				}
-				nlohmann::json result = BuildAudioStreamingHarnessRigSnapshot();
-				pState->bComplete = true;
-				return result;
-			});
+			rResult = BuildAudioStreamingHarnessRigSnapshot();
 			return;
 		}
+		if (action == "hold_read")
+		{
+			RequireAudioStreamingHarnessRigFields(rParameters, {"crc", "offset", "length"});
+			if (!rHarnessRig.ArmHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled, ReadAudioStreamingHarnessRigCrc(rParameters.at("crc")), ReadAudioStreamingHarnessRigInteger(rParameters.at("offset")), ReadAudioStreamingHarnessRigInteger(rParameters.at("length"))))
+			{
+				throw std::runtime_error("audio_streaming_harness_rig hold_read requires an idle hold");
+			}
+			rResult = BuildAudioStreamingHarnessRigSnapshot();
+			return;
+		}
+		if (action == "load_chunk")
+		{
+			RequireAudioStreamingHarnessRigFields(rParameters, {"crc", "priority"});
+			rHarnessRig.LoadChunk(ReadAudioStreamingHarnessRigCrc(rParameters.at("crc")), ReadAudioStreamingHarnessRigPriority(rParameters.at("priority")));
+			rResult = BuildAudioStreamingHarnessRigSnapshot();
+			return;
+		}
+
+		RequireAudioStreamingHarnessRigFields(rParameters, {});
 		if (action == "inspect")
 		{
 			rResult = BuildAudioStreamingHarnessRigSnapshot();
@@ -464,7 +309,7 @@ void CommandAudioStreamingHarnessRig([[maybe_unused]] const nlohmann::json& rPar
 		}
 		if (action == "clear")
 		{
-			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->Clear();
+			rHarnessRig.Clear();
 			rResult = BuildAudioStreamingHarnessRigSnapshot();
 			return;
 		}
@@ -480,20 +325,29 @@ void CommandAudioStreamingHarnessRig([[maybe_unused]] const nlohmann::json& rPar
 			rResult = BuildAudioStreamingHarnessRigSnapshot();
 			return;
 		}
-		if (action == "hold_read")
+		if (action == "clear_history")
 		{
-			if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->RequestHold())
+			if (rHarnessRig.BeginHistory())
 			{
-				throw std::runtime_error("audio_streaming_harness_rig hold_read is valid only before the first start in a fresh process");
+				rResult = BuildAudioStreamingHarnessRigSnapshot();
+				return;
 			}
-			rResult = BuildAudioStreamingHarnessRigSnapshot();
+			engine::gpAgentCommandServer->DeferResponse([]() -> std::optional<nlohmann::json>
+			{
+				if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->BeginHistory())
+				{
+					return std::nullopt;
+				}
+				ScopedSuppressAllocationTracking deferredSuppress;
+				nlohmann::json result = BuildAudioStreamingHarnessRigSnapshot();
+				return result;
+			});
 			return;
 		}
 		if (action == "release_read")
 		{
-			std::shared_ptr<AudioStreamingHarnessRigReleaseState> pState = std::make_shared<AudioStreamingHarnessRigReleaseState>();
-			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
-			engine::gpAgentCommandServer->DeferResponse([pState]() -> std::optional<nlohmann::json>
+			rHarnessRig.ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
+			engine::gpAgentCommandServer->DeferResponse([]() -> std::optional<nlohmann::json>
 			{
 				engine::AudioStreamingHarnessRigSnapshot snapshot = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->InspectFile();
 				if (snapshot.eHoldState != engine::AudioStreamingHarnessRigHoldState::kIdle)
@@ -504,298 +358,37 @@ void CommandAudioStreamingHarnessRig([[maybe_unused]] const nlohmann::json& rPar
 				{
 					return std::nullopt;
 				}
-				engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseControls();
 				ScopedSuppressAllocationTracking deferredSuppress;
 				nlohmann::json result = BuildAudioStreamingHarnessRigSnapshot();
 				return result;
 			});
 			return;
 		}
-		if (action == "coexistence")
+		if (action == "stall_loaders")
 		{
-			std::shared_ptr<AudioStreamingHarnessRigCoexistenceState> pState = std::make_shared<AudioStreamingHarnessRigCoexistenceState>();
-			engine::AudioStreamingHarnessRigSnapshot before = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->InspectFile();
-			pState->iStartSequence = static_cast<int64_t>(before.uiReservationBoundary);
-			pState->flags.Set(AudioStreamingHarnessRigCoexistenceFlags::kControlled, engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->InspectAudio().flags & engine::AudioStreamingHarnessRigAudioSnapshotFlags::kControlledPublication);
-			pState->flags.Set(AudioStreamingHarnessRigCoexistenceFlags::kStaging);
-			engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->StartCoexistence(data::kAudioBlaster16793__pushtobreak__earth1wavCrc, data::kAudioBlaster793907__cvltiv8r__snaresbycvltiv8r301wavCrc);
-			if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->Play(data::kAudioMusicdoodlewavCrc))
-			{
-				throw std::runtime_error("audio_streaming_harness_rig coexistence requires a live audio voice");
-			}
-			engine::gpAgentCommandServer->DeferResponse([pState]() -> std::optional<nlohmann::json>
-			{
-				if ((pState->flags & AudioStreamingHarnessRigCoexistenceFlags::kStaging)
-				 && !engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->FinishCoexistence())
-				{
-					return std::nullopt;
-				}
-				pState->flags.Set(AudioStreamingHarnessRigCoexistenceFlags::kStaging, false);
-				engine::AudioStreamingHarnessRigSnapshot snapshot = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->InspectFile();
-				if (pState->flags & AudioStreamingHarnessRigCoexistenceFlags::kControlled)
-				{
-					if (CountAudioStreamingHarnessRigRecords(snapshot, engine::AudioStreamingHarnessRigPhase::kExistingComplete, data::kAudioBlaster16793__pushtobreak__earth1wavCrc) != 1)
-					{
-						return std::nullopt;
-					}
-					if (CountAudioStreamingHarnessRigRecords(snapshot, engine::AudioStreamingHarnessRigPhase::kExistingComplete, data::kAudioBlaster793907__cvltiv8r__snaresbycvltiv8r301wavCrc) != 1)
-					{
-						return std::nullopt;
-					}
-					if (CountAudioStreamingHarnessRigRecords(snapshot, engine::AudioStreamingHarnessRigPhase::kRefillReady, data::kAudioMusicdoodlewavCrc, pState->iStartSequence) < 3)
-					{
-						return std::nullopt;
-					}
-				}
-				ScopedSuppressAllocationTracking deferredSuppress;
-				nlohmann::json result = BuildAudioStreamingHarnessRigSnapshot();
-				pState->flags.Set(AudioStreamingHarnessRigCoexistenceFlags::kComplete);
-				return result;
-			});
+			rHarnessRig.StallLoaders();
+			rResult = BuildAudioStreamingHarnessRigSnapshot();
 			return;
 		}
-		if (action == "invalid")
+		if (action == "release_loaders")
 		{
-			std::shared_ptr<AudioStreamingHarnessRigInvalidState> pState = std::make_shared<AudioStreamingHarnessRigInvalidState>();
-			engine::AudioStreamingHarnessRigInvalidResult invalid = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->RunInvalid();
-			if (!invalid.bPending)
-			{
-				pState->result = invalid;
-				pState->bHasResult = true;
-			}
-			engine::gpAgentCommandServer->DeferResponse([pState]() -> std::optional<nlohmann::json>
-			{
-				if (!pState->bHasResult)
-				{
-					engine::AudioStreamingHarnessRigInvalidResult deferredInvalid = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->RunInvalid();
-					if (deferredInvalid.bPending)
-					{
-						return std::nullopt;
-					}
-					pState->result = deferredInvalid;
-					pState->bHasResult = true;
-				}
-				engine::AudioStreamingHarnessRigSnapshot snapshot = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->InspectFile();
-				if (snapshot.eHoldState != engine::AudioStreamingHarnessRigHoldState::kIdle)
-				{
-					return std::nullopt;
-				}
-				if (snapshot.iHeldIndex != 4'294'967'295i64)
-				{
-					return std::nullopt;
-				}
-				ScopedSuppressAllocationTracking deferredSuppress;
-				nlohmann::json result = BuildAudioStreamingHarnessRigInvalidResult(pState->result);
-				result["snapshot"] = BuildAudioStreamingHarnessRigSnapshot();
-				return result;
-			});
+			rHarnessRig.ReleaseLoaders();
+			rResult = BuildAudioStreamingHarnessRigSnapshot();
 			return;
 		}
-		if (!bFirstHarnessRigAction)
+		if (action == "stop_publication")
 		{
-			throw std::runtime_error("audio_streaming_harness_rig saturate is valid only as the first harness rig action in a fresh process");
+			rHarnessRig.mFlags.Set(engine::AudioStreamingHarnessRig::Flags::kPublicationStopped);
+			rResult = BuildAudioStreamingHarnessRigSnapshot();
+			return;
 		}
-		std::shared_ptr<AudioStreamingHarnessRigSaturationState> pState = std::make_shared<AudioStreamingHarnessRigSaturationState>();
-		if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->RequestHold())
+		if (action == "resume_publication")
 		{
-			throw std::runtime_error("audio_streaming_harness_rig saturate could not reserve its controlled hold");
+			rHarnessRig.mFlags.Set(engine::AudioStreamingHarnessRig::Flags::kPublicationStopped, false);
+			rResult = BuildAudioStreamingHarnessRigSnapshot();
+			return;
 		}
-		engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->mCommandFlags.Set(engine::AudioStreamingHarnessRigCommandFlags::kSaturationActive);
-		engine::gpAgentCommandServer->DeferResponse([pState]() -> std::optional<nlohmann::json>
-		{
-			engine::AudioStreamingHarnessRigSnapshot fileSnapshot = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->InspectFile();
-			engine::AudioStreamingHarnessRigAudioSnapshot audioSnapshot = engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->InspectAudio();
-			switch (pState->ePhase)
-			{
-				case AudioStreamingHarnessRigSaturationPhase::kSetup:
-					if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->Begin(data::kAudioMusicdoodlewavCrc, 0, kiAudioStreamingHarnessRigReadLength))
-					{
-						return std::nullopt;
-					}
-					if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->Play(data::kAudioMusicdoodlewavCrc))
-					{
-						throw std::runtime_error("audio_streaming_harness_rig saturate requires stream A");
-					}
-					pState->ePhase = AudioStreamingHarnessRigSaturationPhase::kWaitForPrimaryStream;
-					return std::nullopt;
-				case AudioStreamingHarnessRigSaturationPhase::kWaitForPrimaryStream:
-				{
-					bool bPrimaryStreamHeld = std::ranges::any_of(fileSnapshot.poolEntries, [](const engine::AudioStreamingHarnessRigPoolEntry& rEntry)
-					{
-						return rEntry.crc == data::kAudioMusicdoodlewavCrc && rEntry.iOffset == 0 && rEntry.iLength == kiAudioStreamingHarnessRigReadLength && rEntry.eState == engine::AudioStreamingHarnessRigQueueState::kLoading;
-					});
-					bool bReadyOne = false;
-					bool bReadyTwo = false;
-					for (int64_t i = 0; i < fileSnapshot.iRecordCount; ++i)
-					{
-						const engine::AudioStreamingHarnessRigRecord& rRecord = fileSnapshot.records.at(i);
-						if (rRecord.crc == data::kAudioMusicdoodlewavCrc
-						 && rRecord.ePartition == engine::AudioStreamingHarnessRigPartition::kMain
-						 && rRecord.ePhase == engine::AudioStreamingHarnessRigPhase::kRefillReady)
-						{
-							bReadyOne = bReadyOne || rRecord.iOffset == kiAudioStreamingHarnessRigReadLength;
-							bReadyTwo = bReadyTwo || rRecord.iOffset == 2 * kiAudioStreamingHarnessRigReadLength;
-						}
-					}
-					if (!bPrimaryStreamHeld)
-					{
-						return std::nullopt;
-					}
-					if (!bReadyOne)
-					{
-						return std::nullopt;
-					}
-					if (!bReadyTwo)
-					{
-						return std::nullopt;
-					}
-					if (!(audioSnapshot.current.flags & engine::AudioStreamingHarnessRigVoiceFlags::kPresent))
-					{
-						return std::nullopt;
-					}
-					if (audioSnapshot.current.crc != data::kAudioMusicdoodlewavCrc)
-					{
-						return std::nullopt;
-					}
-					if (audioSnapshot.current.flags & engine::AudioStreamingHarnessRigVoiceFlags::kFadingIn)
-					{
-						return std::nullopt;
-					}
-					if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->BeginSaturation())
-					{
-						return std::nullopt;
-					}
-					if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->Play(data::kAudioMusicMandatoryOvertimewavCrc))
-					{
-						throw std::runtime_error("audio_streaming_harness_rig saturate requires stream B");
-					}
-					pState->ePhase = AudioStreamingHarnessRigSaturationPhase::kWaitForMandatoryStream;
-					return std::nullopt;
-				}
-				case AudioStreamingHarnessRigSaturationPhase::kWaitForMandatoryStream:
-				{
-					int64_t iMandatoryStreamQueued = 0;
-					for (const engine::AudioStreamingHarnessRigPoolEntry& rEntry : fileSnapshot.poolEntries)
-					{
-						iMandatoryStreamQueued += rEntry.crc == data::kAudioMusicMandatoryOvertimewavCrc && rEntry.eState == engine::AudioStreamingHarnessRigQueueState::kQueued ? 1 : 0;
-					}
-					if (iMandatoryStreamQueued != 3)
-					{
-						return std::nullopt;
-					}
-					if (!(audioSnapshot.current.flags & engine::AudioStreamingHarnessRigVoiceFlags::kPresent))
-					{
-						return std::nullopt;
-					}
-					if (audioSnapshot.current.crc != data::kAudioMusicMandatoryOvertimewavCrc)
-					{
-						return std::nullopt;
-					}
-					if (audioSnapshot.current.fVolume < 0.4f)
-					{
-						return std::nullopt;
-					}
-					if (!(audioSnapshot.newestFade.flags & engine::AudioStreamingHarnessRigVoiceFlags::kPresent))
-					{
-						return std::nullopt;
-					}
-					if (audioSnapshot.newestFade.crc != data::kAudioMusicdoodlewavCrc)
-					{
-						return std::nullopt;
-					}
-					if (audioSnapshot.newestFade.fVolume < 0.4f)
-					{
-						return std::nullopt;
-					}
-					if (!engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->Play(data::kAudioMusicsong18wavCrc))
-					{
-						throw std::runtime_error("audio_streaming_harness_rig saturate requires stream C");
-					}
-					pState->ePhase = AudioStreamingHarnessRigSaturationPhase::kWaitForRetry;
-					return std::nullopt;
-				}
-				case AudioStreamingHarnessRigSaturationPhase::kWaitForRetry:
-					if (fileSnapshot.uiRetryCount == 0)
-					{
-						return std::nullopt;
-					}
-					engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->mFlags.Set(engine::AudioStreamingHarnessRig::Flags::kPublicationStopped);
-					if (!IsAudioStreamingHarnessRigSaturated(fileSnapshot, audioSnapshot))
-					{
-						return std::nullopt;
-					}
-					pState->fSaturatedCurrentVolume = audioSnapshot.current.fVolume;
-					pState->fSaturatedNewestVolume = audioSnapshot.newestFade.fVolume;
-					{
-						ScopedSuppressAllocationTracking deferredSuppress;
-						pState->saturated = BuildAudioStreamingHarnessRigSnapshot();
-					}
-					engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseSaturation();
-					engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseHold(engine::AudioStreamingHarnessRigHoldOwner::kControlled);
-					pState->ePhase = AudioStreamingHarnessRigSaturationPhase::kWaitForSettled;
-					return std::nullopt;
-				case AudioStreamingHarnessRigSaturationPhase::kWaitForSettled:
-					if (!AudioStreamingHarnessRigEvidenceValid(fileSnapshot))
-					{
-						return std::nullopt;
-					}
-					if (fileSnapshot.flags & engine::AudioStreamingHarnessRigSnapshotFlags::kLoaderStaged)
-					{
-						return std::nullopt;
-					}
-					if (fileSnapshot.eHoldState != engine::AudioStreamingHarnessRigHoldState::kIdle)
-					{
-						return std::nullopt;
-					}
-					if (fileSnapshot.iHeldIndex != 4'294'967'295i64)
-					{
-						return std::nullopt;
-					}
-					if (!HasAudioStreamingHarnessRigAcknowledgement(fileSnapshot, data::kAudioMusicdoodlewavCrc))
-					{
-						return std::nullopt;
-					}
-					if (CountAudioStreamingHarnessRigRecords(fileSnapshot, engine::AudioStreamingHarnessRigPhase::kRefillReady, data::kAudioMusicMandatoryOvertimewavCrc) == 0)
-					{
-						return std::nullopt;
-					}
-					if (CountAudioStreamingHarnessRigRecords(fileSnapshot, engine::AudioStreamingHarnessRigPhase::kRefillReady, data::kAudioMusicsong18wavCrc) == 0)
-					{
-						return std::nullopt;
-					}
-					if (!(audioSnapshot.current.flags & engine::AudioStreamingHarnessRigVoiceFlags::kPresent))
-					{
-						return std::nullopt;
-					}
-					if (audioSnapshot.current.crc != data::kAudioMusicsong18wavCrc)
-					{
-						return std::nullopt;
-					}
-					if (audioSnapshot.current.fVolume <= pState->fSaturatedCurrentVolume)
-					{
-						return std::nullopt;
-					}
-					if (!(audioSnapshot.newestFade.flags & engine::AudioStreamingHarnessRigVoiceFlags::kPresent))
-					{
-						return std::nullopt;
-					}
-					if (audioSnapshot.newestFade.crc != data::kAudioMusicMandatoryOvertimewavCrc)
-					{
-						return std::nullopt;
-					}
-					if (audioSnapshot.newestFade.fVolume >= pState->fSaturatedNewestVolume)
-					{
-						return std::nullopt;
-					}
-					engine::gpAgentCommandServer->mpAudioStreamingHarnessRig->ReleaseControls();
-					{
-						ScopedSuppressAllocationTracking deferredSuppress;
-						return nlohmann::json {{"saturated", std::move(pState->saturated)}, {"settled", BuildAudioStreamingHarnessRigSnapshot()}};
-					}
-			}
-			return std::nullopt;
-		});
-		return;
+		throw std::runtime_error(kpcAudioStreamingHarnessRigSchema);
 	}
 #endif
 }

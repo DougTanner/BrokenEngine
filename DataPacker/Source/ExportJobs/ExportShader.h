@@ -10,7 +10,7 @@ public:
 
 	static std::optional<common::ChunkFlags_t> Handles(const std::filesystem::directory_entry& rDirectoryEntry);
 
-	static constexpr int64_t kiVersion = Version(15 + VK_HEADER_VERSION);
+	static constexpr int64_t kiVersion = Version(16 + VK_HEADER_VERSION);
 
 	ExportShader(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile);
 

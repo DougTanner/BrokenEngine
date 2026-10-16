@@ -81,7 +81,7 @@ Edit the `name: ...` line under the node's heading. If no `name:` line exists (t
    ...
    ```
 3. Add `n<NEW_ID>["<Type>"]` to the Mermaid block (between `flowchart TD` and the edges).
-4. The save step needs port info for new nodes, which lives only in `.passthrough.json`. Present the `### New node port-catalogue message` below to the user. Offer to find a node of the same type in the shipping examples (`C:/Program Files/QuadSpinner/Gaea 2/Examples/`) and quote its port block. (`.agents/skills/gaea2-shared/examples/` is intentionally empty — see its README.)
+4. The save step needs port info for new nodes, which lives only in `.passthrough.json`. Present the `### New node port-catalogue message` below to the user. Offer to find a node of the same type in the shipping examples (`C:/Program Files/QuadSpinner/Gaea 2/Examples/`) and quote its port block.
 5. Check the per-type requirements in `../gaea2-shared/references/node-conventions.md` `` ## Types that require `Version: 2` `` and `## Per-type enum constraints`. Several node types need specific fields (e.g. `Version: 2`) or valid enum values, otherwise Gaea silently loads them as deactivated. The validator in step 3 catches the field-level ones; whether an enum value is legal it cannot judge — you must.
 
 #### Remove a node

@@ -91,7 +91,6 @@ void TextureCache::CopyImageToHostMemory(VkImage vkSourceImage, VkExtent3D vkExt
 	oneShotCommandBuffer.Execute();
 
 	// VMA keeps pMappedData valid for the mapped staging allocation's lifetime.
-#pragma warning(suppress: 6387)
 	std::memcpy(rOutputData.data(), stagingBuffer.vmaAllocationInfo.pMappedData, iTotalSize);
 }
 

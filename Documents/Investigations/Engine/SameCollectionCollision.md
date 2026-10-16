@@ -4,7 +4,7 @@ Ships are being split into the Fighters, Omnis, and Battleships Collections. Fle
 
 ## Why same-layer collision is unsupported
 
-- The rule is documented in `Engine/Source/Frame/AGENTS.md:18`, and `Engine/Source/Frame/Collision.cpp:282-286` asserts that no layer's `uiCollidesWith` contains its own `uiCategory`.
+- The rule is documented in `Engine/Source/Frame/AGENTS.md:16`, and `Engine/Source/Frame/Collision.cpp:282-286` asserts that no layer's `uiCollidesWith` contains its own `uiCategory`.
 - Pairs are enumerated as `j = i + 1` (`Collision.cpp:289-291`), so the loop never reaches the diagonal. Each layer pair fills separate A and B zone lists (`Collision.cpp:68-71`, `:318-319`). If A were the same layer as B, the narrowphase walk (`:610-647`) would test each object against itself and test every unordered pair twice.
 - Result routing is not the blocker: pending results are keyed by (layer, object) (`:369`, `:400`), and `CommitCandidate` already writes both sides (`:471-472`).
 - The broadphase is an 8x8 grid in XY over the cell (`Collision.h:8-9`, `Collision.cpp:265-266`), while the narrowphase tests are 3D (`:216`, `:539`). Flight planes therefore remove no broadphase work but cause no false hits.
@@ -31,7 +31,7 @@ Should it apply to enemies only, which the alignment gate already enforces, or a
 ### (a) Self-pair mode in the engine
 
 Allow `uiCollidesWith & uiCategory` on one layer and enumerate the diagonal once with `i < j`. Both rows receive the result through the existing routing.
-- Sites: assert `Collision.cpp:282-286`; loop `:289-291`; single zone insert `:318-319`; skip `iOther <= i` in `:639-647`; doc `Frame/AGENTS.md:18`; game masks `HealthDamage.h:52-64`; own-category handling in each PostCollision.
+- Sites: assert `Collision.cpp:282-286`; loop `:289-291`; single zone insert `:318-319`; skip `iOther <= i` in `:639-647`; doc `Frame/AGENTS.md:16`; game masks `HealthDamage.h:52-64`; own-category handling in each PostCollision.
 - Determinism and CRC: the sort stays total because each pair is unique. The collision scratch is `thread_local` outside the Frame (`Collision.h:74-115`); damage outcomes enter the CRC (`Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:781-785`). Bump `Frame::kiVersion` (`Frame.cpp:38`) so replays recorded under the old rules are rejected.
 - Cost: n²/2 tests per zone for dense fleets. The candidate preallocation of 512 (`Collision.h:13`) overflows with a `DEBUG_BREAK` (`Collision.cpp:565-569`).
 - Risks: low. The change is contained in one engine function, and other layers are unchanged.

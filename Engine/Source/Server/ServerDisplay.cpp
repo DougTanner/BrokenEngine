@@ -110,7 +110,6 @@ void ServerUpdateDisplayStatistics()
 	gpProfileManager->GetCpuCounter(kCpuCounterExplosions).iCount = iTotalExplosions;
 
 #if !defined(ENABLE_CRT_DEBUG_HEAP)
-	mi_stats_merge();
 	mi_stats_t mimallocStatistics = {};
 	mimallocStatistics.size = sizeof(mi_stats_t);
 	mimallocStatistics.version = MI_STAT_VERSION;
@@ -200,23 +199,23 @@ static void PaintGridMap(HDC hDeviceContextBuffer, std::span<char> buffer, int64
 	}
 
 	// Compute grid bounds with 1-cell padding
-	int32_t iMinimumX = game::gpGame->mActiveCoordinates.at(0).iX;
-	int32_t iMaximumX = iMinimumX;
-	int32_t iMinimumY = game::gpGame->mActiveCoordinates.at(0).iY;
-	int32_t iMaximumY = iMinimumY;
+	int64_t iMinimumX = game::gpGame->mActiveCoordinates.at(0).iX;
+	int64_t iMaximumX = iMinimumX;
+	int64_t iMinimumY = game::gpGame->mActiveCoordinates.at(0).iY;
+	int64_t iMaximumY = iMinimumY;
 
 	for (const GridCoord& rCoordinate : game::gpGame->mActiveCoordinates)
 	{
-		iMinimumX = std::min(iMinimumX, rCoordinate.iX);
-		iMaximumX = std::max(iMaximumX, rCoordinate.iX);
-		iMinimumY = std::min(iMinimumY, rCoordinate.iY);
-		iMaximumY = std::max(iMaximumY, rCoordinate.iY);
+		iMinimumX = std::min<int64_t>(iMinimumX, rCoordinate.iX);
+		iMaximumX = std::max<int64_t>(iMaximumX, rCoordinate.iX);
+		iMinimumY = std::min<int64_t>(iMinimumY, rCoordinate.iY);
+		iMaximumY = std::max<int64_t>(iMaximumY, rCoordinate.iY);
 	}
 
-	iMinimumX -= 1;
-	iMaximumX += 1;
-	iMinimumY -= 1;
-	iMaximumY += 1;
+	iMinimumX = std::max<int64_t>(iMinimumX - 1, std::numeric_limits<decltype(GridCoord::iX)>::min());
+	iMaximumX = std::min<int64_t>(iMaximumX + 1, std::numeric_limits<decltype(GridCoord::iX)>::max());
+	iMinimumY = std::max<int64_t>(iMinimumY - 1, std::numeric_limits<decltype(GridCoord::iY)>::min());
+	iMaximumY = std::min<int64_t>(iMaximumY + 1, std::numeric_limits<decltype(GridCoord::iY)>::max());
 
 	int64_t iGridWidth = iMaximumX - iMinimumX + 1;
 	int64_t iGridHeight = iMaximumY - iMinimumY + 1;

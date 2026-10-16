@@ -80,28 +80,13 @@ public:
 			WriteVersionHeader<DIFFERENCE_TYPE>(rHeaderStream);
 
 			rHeaderStream << mSavedStart;
-			if constexpr (std::is_trivially_copyable_v<DIFFERENCE_TYPE>)
-			{
-				common::Write(rHeaderStream, mInitialDifference);
-			}
-			else
-			{
-				rHeaderStream << mInitialDifference;
-			}
+			rHeaderStream << mInitialDifference;
 			common::Write(rHeaderStream, iDifferenceCount);
 			rHeaderStream << rSavedEnd;
 			common::Write(rHeaderStream, iPostDispatchCount);
 			for (const auto& [riTick, rPostDispatch] : mPostDispatchRecords)
 			{
-				common::Write(rHeaderStream, riTick);
-				if constexpr (std::is_trivially_copyable_v<DIFFERENCE_TYPE>)
-				{
-					common::Write(rHeaderStream, rPostDispatch);
-				}
-				else
-				{
-					rHeaderStream << rPostDispatch;
-				}
+				WriteDifferenceRecord(rHeaderStream, riTick, rPostDispatch);
 			}
 		});
 		LOG(kReplay, kVerbose, "DifferenceStreamWriter save at frame {}: Count {} Checksum {}", rSavedEnd.interpolate.iTick, iDifferenceCount, rSavedEnd.Crc());
@@ -111,15 +96,7 @@ public:
 		{
 			for (const auto& [riTick, rDifference] : mDifferences)
 			{
-				common::Write(rFramesStream, riTick);
-				if constexpr (std::is_trivially_copyable_v<DIFFERENCE_TYPE>)
-				{
-					common::Write(rFramesStream, rDifference);
-				}
-				else
-				{
-					rFramesStream << rDifference;
-				}
+				WriteDifferenceRecord(rFramesStream, riTick, rDifference);
 			}
 		});
 
@@ -198,6 +175,12 @@ public:
 
 private:
 
+	static void WriteDifferenceRecord(std::ostream& rStream, int64_t iTick, const DIFFERENCE_TYPE& rDifference)
+	{
+		common::Write(rStream, iTick);
+		rStream << rDifference;
+	}
+
 	SAVED_TYPE mSavedStart {};
 	DIFFERENCE_TYPE mInitialDifference {};
 
@@ -267,14 +250,7 @@ public:
 		}
 
 		headerStream >> rSavedStart;
-		if constexpr (std::is_trivially_copyable_v<DIFFERENCE_TYPE>)
-		{
-			common::Read(headerStream, rInitialDifference);
-		}
-		else
-		{
-			headerStream >> rInitialDifference;
-		}
+		headerStream >> rInitialDifference;
 		mCurrentDifference = rInitialDifference;
 		common::Read(headerStream, miDifferenceCount);
 		headerStream >> mSavedEnd;
@@ -303,30 +279,11 @@ public:
 		for (int64_t i = 0; i < iPostDispatchCount; ++i)
 		{
 			int64_t iTick = 0;
-			common::Read(headerStream, iTick);
-			if (headerStream.gcount() != static_cast<std::streamsize>(sizeof(iTick)))
+			DIFFERENCE_TYPE postDispatch {};
+			if (!ReadDifferenceRecord(headerStream, iTick, postDispatch))
 			{
 				LOG(kDefault, kWarning, "DifferenceStreamReader post-dispatch section doesn't match its count");
 				return;
-			}
-			DIFFERENCE_TYPE postDispatch {};
-			if constexpr (std::is_trivially_copyable_v<DIFFERENCE_TYPE>)
-			{
-				common::Read(headerStream, postDispatch);
-				if (headerStream.gcount() != static_cast<std::streamsize>(sizeof(DIFFERENCE_TYPE)))
-				{
-					LOG(kDefault, kWarning, "DifferenceStreamReader post-dispatch section doesn't match its count");
-					return;
-				}
-			}
-			else
-			{
-				headerStream >> postDispatch;
-				if (!headerStream)
-				{
-					LOG(kDefault, kWarning, "DifferenceStreamReader post-dispatch section doesn't match its count");
-					return;
-				}
 			}
 			// A coord activated by a transfer records that transfer at its own start tick, so unlike a
 			// difference record the start tick is in range. The terminal tick is not: recording stops
@@ -373,30 +330,11 @@ public:
 		for (int64_t i = 0; i < miDifferenceCount; ++i)
 		{
 			int64_t iTick = 0;
-			common::Read(fileStream, iTick);
-			if (fileStream.gcount() != static_cast<std::streamsize>(sizeof(iTick)))
+			DIFFERENCE_TYPE difference {};
+			if (!ReadDifferenceRecord(fileStream, iTick, difference))
 			{
 				LOG(kDefault, kWarning, "Recorded frames file size doesn't match header");
 				return;
-			}
-			DIFFERENCE_TYPE difference {};
-			if constexpr (std::is_trivially_copyable_v<DIFFERENCE_TYPE>)
-			{
-				common::Read(fileStream, difference);
-				if (fileStream.gcount() != static_cast<std::streamsize>(sizeof(DIFFERENCE_TYPE)))
-				{
-					LOG(kDefault, kWarning, "Recorded frames file size doesn't match header");
-					return;
-				}
-			}
-			else
-			{
-				fileStream >> difference;
-				if (!fileStream)
-				{
-					LOG(kDefault, kWarning, "Recorded frames file size doesn't match header");
-					return;
-				}
 			}
 			if (iTick <= miStartTick || iTick > mSavedEnd.interpolate.iTick + 1
 			 || (!mDifferences.empty() && iTick <= std::get<0>(mDifferences.back())))
@@ -599,6 +537,17 @@ private:
 		kFullFramesActive          = 0x04,
 		kFullFramesInvalid         = 0x08,
 	};
+
+	static bool ReadDifferenceRecord(std::istream& rStream, int64_t& riTick, DIFFERENCE_TYPE& rDifference)
+	{
+		common::Read(rStream, riTick);
+		if (rStream.gcount() != static_cast<std::streamsize>(sizeof(riTick)))
+		{
+			return false;
+		}
+		rStream >> rDifference;
+		return static_cast<bool>(rStream);
+	}
 
 	bool TryReadFullFrame(SAVED_TYPE& rSavedFrame)
 	{

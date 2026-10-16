@@ -11,7 +11,7 @@ Setting up a new machine? [Documents/FreshMachineSetup.md](Documents/FreshMachin
 
 ## Prerequisites
 
-- Vulkan SDK - 1.4.328.1 - https://vulkan.lunarg.com/sdk/home#windows
+- Vulkan SDK - 1.4.363.0 - https://vulkan.lunarg.com/sdk/home#windows
 	- Volk header, source, and library
 	- Vulkan Memory Allocator header
 	- **Runtime Requirement**: GPU driver with Vulkan 1.2 or higher support

@@ -63,14 +63,14 @@ struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	XMVECTOR* __restrict pVecDirections = nullptr;
-	float* __restrict pfDestroyedTimes = nullptr;
+	std::chrono::duration<float>* __restrict pDestroyedTimes = nullptr;
 #if defined(BT_CLIENT)
 	engine::area_lights_t* __restrict puiAreaLights = nullptr;
 	engine::smoke_trails_t* __restrict puiSmokeTrails = nullptr;
 #endif
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfDestroyedTimes);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -123,10 +123,10 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 	XMVECTOR* __restrict pVecExplosionDirections = nullptr;
 	XMVECTOR* __restrict pVecStoredDirections = nullptr;
 	engine::registry_id_t* __restrict puiRegistryTargets = nullptr;
-	float* __restrict pfTimes = nullptr;
-	float* __restrict pfDeltaRotationDelays = nullptr;
+	std::chrono::duration<float>* __restrict pTimes = nullptr;
+	std::chrono::duration<float>* __restrict pDeltaRotationDelays = nullptr;
 	float* __restrict pfDeltaRotations = nullptr;
-	float* __restrict pfNextJitter = nullptr;
+	std::chrono::duration<float>* __restrict pNextJitter = nullptr;
 	float* __restrict pfDeltaRotationMaximum = nullptr;
 	float* __restrict pfAccelerations = nullptr;
 	float* __restrict pfPitches = nullptr;
@@ -137,7 +137,7 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecExplosionDirections, rSelf.pVecStoredDirections, rSelf.puiRegistryTargets, rSelf.pfTimes, rSelf.pfDeltaRotationDelays, rSelf.pfDeltaRotations, rSelf.pfNextJitter, rSelf.pfDeltaRotationMaximum, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.pfExhaustLengths, rSelf.pAlignments);
+		return std::tie(rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecExplosionDirections, rSelf.pVecStoredDirections, rSelf.puiRegistryTargets, rSelf.pTimes, rSelf.pDeltaRotationDelays, rSelf.pfDeltaRotations, rSelf.pNextJitter, rSelf.pfDeltaRotationMaximum, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.pfExhaustLengths, rSelf.pAlignments);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)

@@ -13,6 +13,7 @@ const TweaksSliderMapRegistrar gShadowRegistrar
 	{"Resolution", &gShadowRenderMultiplier},
 	{"Shadow Texel Ramp Speed", &gShadowTexelRampMetersPerSecond},
 	{"Shadow Temporal Blend", &gShadowTemporalBlend},
+	{"Shadow Update Cadence", &gShadowUpdateCadence},
 	{"Feather Noon", &gShadowFeatherNoon},
 	{"Feather Noon Offset", &gShadowFeatherNoonOffset},
 	{"Feather Sunset", &gShadowFeatherSunset},
@@ -42,6 +43,7 @@ void RenderShadowSection(TweaksScreenBase& rScreen)
 	rScreen.WrapperSlider("Resolution", iSection);
 	rScreen.WrapperSlider("Texel Contraction Speed", iSection, 2.0f, "Shadow Texel Ramp Speed");
 	rScreen.WrapperSlider("Temporal Blend", iSection, 2.0f, "Shadow Temporal Blend");
+	rScreen.WrapperSlider("Update Cadence", iSection, 2.0f, "Shadow Update Cadence");
 
 	rScreen.WrapperSeparatorText("Feather");
 	rScreen.WrapperSlider("Feather Noon", iSection);

@@ -264,6 +264,12 @@
     <ClInclude Include="..\..\Source\Game.h">
       <Filter>Game</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\Fleet.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Version.h">
+      <Filter>Game</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\SpawnTransfer.h">
       <Filter>Game</Filter>
     </ClInclude>
@@ -429,6 +435,9 @@
     <ClInclude Include="..\..\..\..\Common\ScopedLambda.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Sha256Hasher.h">
+      <Filter>Common</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Common\Singleton.h">
       <Filter>Common</Filter>
     </ClInclude>
@@ -543,6 +552,9 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Audio\AudioManager.h">
       <Filter>Engine\Audio</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\FlightPlaneTable.h">
+      <Filter>Game\Frame</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Frame\Frame.h">
       <Filter>Game\Frame</Filter>
     </ClInclude>
@@ -636,9 +648,6 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\AudioStreamingHarnessRig.h">
       <Filter>Engine\Agent\Commands</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\ClientNetworkHarnessRigs.h">
-      <Filter>Engine\Agent\Commands</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\CrashReportHarnessRig.h">
       <Filter>Engine\Agent\Commands</Filter>
     </ClInclude>
@@ -657,22 +666,7 @@
     <ClInclude Include="..\..\Source\Agent\Commands\AgentCommandsAudioStreaming.h">
       <Filter>Game\Agent\Commands</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Agent\Commands\ClientSubscriptionHarnessRigs.h">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\Agent\Commands\ClientFullStateHarnessRig.h">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\Agent\Commands\ClientDesyncProbe.h">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\Agent\Commands\ClientPacketFaultHarnessRig.h">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityHarnessRig.h">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\Agent\Commands\RegistryHarnessRig.h">
       <Filter>Game\Agent\Commands</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Collection.h">
@@ -706,6 +700,9 @@
       <Filter>Engine\Frame</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandTerrainResidency.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\TerrainCollisionUtils.h">
       <Filter>Engine\Frame</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavBuild.h">
@@ -874,6 +871,9 @@
       <Filter>Engine\Ui\Screens</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Alignments.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.h">
       <Filter>Engine\Frame</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Common\ErrorUtils.h">
@@ -1178,9 +1178,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\AudioStreamingHarnessRig.cpp">
       <Filter>Engine\Agent\Commands</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\ClientNetworkHarnessRigs.cpp">
-      <Filter>Engine\Agent\Commands</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\CrashReportHarnessRig.cpp">
       <Filter>Engine\Agent\Commands</Filter>
     </ClCompile>
@@ -1202,22 +1199,7 @@
     <ClCompile Include="..\..\Source\Agent\Commands\AgentCommandsAudioStreaming.cpp">
       <Filter>Game\Agent\Commands</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Agent\Commands\ClientSubscriptionHarnessRigs.cpp">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Agent\Commands\ClientFullStateHarnessRig.cpp">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Source\Agent\Commands\ClientDesyncProbe.cpp">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Agent\Commands\ClientPacketFaultHarnessRig.cpp">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityHarnessRig.cpp">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Agent\Commands\RegistryHarnessRig.cpp">
       <Filter>Game\Agent\Commands</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameBase.cpp">
@@ -1233,6 +1215,9 @@
       <Filter>Engine\Frame</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandTerrainResidency.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\TerrainCollisionUtils.cpp">
       <Filter>Engine\Frame</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\NavBuild.cpp">
@@ -1569,6 +1554,9 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Alignments.cpp">
       <Filter>Engine\Frame</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\GraphicsUtils.cpp">
       <Filter>Engine\Graphics</Filter>
     </ClCompile>
@@ -1577,9 +1565,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Objects\Blasters.frag">
-      <Filter>Engine\Data\Shaders\Objects</Filter>
-    </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Terrain\Terrain.frag">
       <Filter>Engine\Data\Shaders\Terrain</Filter>
     </None>
@@ -1626,12 +1611,6 @@
       <Filter>Engine\Data\Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingHistoryCopy.comp">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\FirstLightSpread.comp">
-      <Filter>Engine\Data\Shaders\Lighting</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingBlur.frag">
       <Filter>Engine\Data\Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingSpread.frag">
@@ -1732,12 +1711,6 @@
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Particles\Billboards.vert">
       <Filter>Engine\Data\Shaders\Particles</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Objects\AlphaMesh.vert">
-      <Filter>Engine\Data\Shaders\Objects</Filter>
-    </None>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Objects\AlphaMesh.frag">
-      <Filter>Engine\Data\Shaders\Objects</Filter>
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\VisibleLight.frag">
       <Filter>Engine\Data\Shaders\Lighting</Filter>

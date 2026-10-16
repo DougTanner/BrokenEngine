@@ -189,6 +189,51 @@ bool ConsumePersistenceFailure(const Replay& rReplay, PersistenceFailurePoint eF
 	return true;
 }
 
+bool InjectMalformedFullFrames(const Replay& rReplay, GridCoord coordinate, int64_t iActivationTick, const FileFlags_t& rFileFlags, const std::filesystem::path& rCoordinateReplayPath)
+{
+	if (!ConsumePersistenceFailure(rReplay, PersistenceFailurePoint::kFullFramesRecord, coordinate, iActivationTick))
+	{
+		return true;
+	}
+
+	std::filesystem::path fullFramesPath = std::filesystem::path(rCoordinateReplayPath).concat(".fullframes");
+	std::fstream fullFramesStream = gpFileManager->OpenFile({FileFlags::kAppDataDirectory, FileFlags::kRead}, fullFramesPath);
+	fullFramesStream.seekg(0, std::ios::end);
+	int64_t iBeforeBytes = fullFramesStream.tellg();
+	bool bFullFramesTruncated = fullFramesStream.is_open() && iBeforeBytes > 0 && std::in_range<std::streamsize>(iBeforeBytes);
+	std::vector<std::byte> prefix;
+	if (bFullFramesTruncated)
+	{
+		prefix.resize(static_cast<size_t>(iBeforeBytes - 1));
+		fullFramesStream.seekg(0, std::ios::beg);
+		if (!prefix.empty())
+		{
+			fullFramesStream.read(reinterpret_cast<char*>(prefix.data()), static_cast<std::streamsize>(std::ssize(prefix)));
+			bFullFramesTruncated = fullFramesStream.gcount() == std::ssize(prefix);
+		}
+	}
+	fullFramesStream.close();
+	if (bFullFramesTruncated)
+	{
+		bFullFramesTruncated = gpFileManager->WriteFileAtomically(rFileFlags, fullFramesPath, [&](std::fstream& rFullFramesStream)
+		{
+			if (!prefix.empty())
+			{
+				rFullFramesStream.write(reinterpret_cast<const char*>(prefix.data()), static_cast<std::streamsize>(std::ssize(prefix)));
+			}
+		});
+	}
+	if (bFullFramesTruncated)
+	{
+		LOG(kDefault, kDebug, "Injected malformed replay fullframes for coord ({},{}); bytes {} -> {}", coordinate.iX, coordinate.iY, iBeforeBytes, std::ssize(prefix));
+	}
+	else
+	{
+		LOG(kDefault, kError, "Injected malformed replay fullframes failed for coord ({},{}); deleting replay sibling set", coordinate.iX, coordinate.iY);
+	}
+	return bFullFramesTruncated;
+}
+
 bool IsWriterPauseArmed(const Replay& rReplay)
 {
 	const Binding* pBinding = FindBinding(rReplay);

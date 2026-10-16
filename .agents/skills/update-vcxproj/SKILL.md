@@ -55,8 +55,11 @@ Membership outcomes: <settled>/<total> settled
 
 Use `Debug|x64` for game client/server unless approved otherwise,
 `Release|x64` for DataPacker, and the AgentTools promotion route for
-tool source membership. Verify-only/`None`-only membership requires no build.
-Never claim a build ran.
+tool source membership. Verify-only/`None`-only membership requires no build,
+and neither does game client/server membership whose only added or removed
+items are `ClInclude` or `None`
+([VisualStudio2026 `AGENTS.md`](../../../Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md)
+`## vcxproj File Inclusion Rules`). Never claim a build ran.
 
 ## References
 

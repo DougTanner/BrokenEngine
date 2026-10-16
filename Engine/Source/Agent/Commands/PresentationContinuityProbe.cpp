@@ -33,7 +33,7 @@ static nlohmann::json RetainedAreaJson(const RetainedAreaReport& rReport)
 // each retained-history owner, so the harness can observe continuity across a camera cell change.
 void CommandPresentationContinuityProbe(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParameters.is_object() || !rParameters.empty())
+	if (!rParameters.empty())
 	{
 		throw std::runtime_error("presentation_continuity_probe requires empty params");
 	}

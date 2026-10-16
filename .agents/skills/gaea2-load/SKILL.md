@@ -24,7 +24,6 @@ Convert a Gaea 2 `.terrain` JSON into:
 
    - If `$ARGUMENTS` is empty or doesn't end in `.terrain`, ask the user for the file path.
    - If it's a bare filename (no directory), try `C:/Program Files/QuadSpinner/Gaea 2/Examples/<name>.terrain` — that's where Gaea ships its example library.
-   - The shared `.agents/skills/gaea2-shared/examples/` directory is intentionally empty (the example files are © QuadSpinner and aren't redistributed); see its `README.md` for the rationale and the 28-file working set.
 
 2. Run the load wrapper from the session worktree root. One call resolves the input path, checks Python, probes Gaea version drift, and runs the loader — which writes `Temp/<basename>.md` and `Temp/<basename>.passthrough.json`. Done when that one call has returned.
 

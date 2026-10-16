@@ -9,8 +9,8 @@ namespace engine
 // handling, render-target maintenance, swapchain creation, texture-capability clamps, and settings load, among
 // others — so this is not a single-writer contract. mfCurrent is unsynchronized, so the invariant that keeps reads
 // safe is not "single writer" but "no write overlaps an active gpMultithreading->Dispatch() window": the main thread
-// is blocked inside Dispatch for the tick, so a wrapper read from a worker thread there (e.g. gBaseHeight in
-// NavQuery.cpp) cannot race a concurrent writer.
+// is blocked inside Dispatch for the tick, so a wrapper read from a worker thread there cannot race a concurrent
+// writer.
 class Wrapper
 {
 public:
@@ -217,7 +217,6 @@ private:
 // Internal-only wrappers (not bound to any UI: not Tweaks, not GraphicsMenuScreen, not SoundMenuScreen).
 extern Wrapper gFieldOfView;
 extern Wrapper gWireframe;
-extern Wrapper gBaseHeight;
 
 extern Wrapper gVisibleAreaExtraTop;
 extern Wrapper gVisibleAreaExtraBottom;

@@ -1,8 +1,5 @@
 #include "Network/Client/ClientSession.h"
 
-#include "Agent/Commands/ClientFullStateHarnessRig.h"
-#include "Agent/Commands/ClientPacketFaultHarnessRig.h"
-#include "Agent/Commands/ClientSubscriptionHarnessRigs.h"
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
@@ -36,7 +33,7 @@ const char* ToString(SubscriptionChangeReason eReason)
 }
 
 ClientSession::ClientSession()
-: common::Singleton<ClientSession>(gpClientSession)
+: common::Singleton<ClientSession>(gpClientSession, this)
 {
 	mpDesynchronizationCore = std::make_unique<engine::ClientDesyncCore>();
 	mpReconciler = std::make_unique<ClientReconciler>();
@@ -45,9 +42,6 @@ ClientSession::ClientSession()
 
 ClientSession::~ClientSession()
 {
-	ResetClientPacketFaultHarnessRig(*this);
-	DetachClientFullStateHarnessRig(*this);
-	DetachClientSubscriptionHarnessRigs(*this);
 	mpRuntime.reset();
 }
 
@@ -255,14 +249,12 @@ void ClientSession::OnServerLoad()
 	}
 	gpGame->mCells.clear();
 
-	ResetClientPacketFaultHarnessRig(*this);
 	mpReconciler->Reset();
 	mpDesynchronizationCore->Reset();
 }
 
 void ClientSession::OnRuntimeDisconnected()
 {
-	ResetClientPacketFaultHarnessRig(*this);
 	mpReconciler->Reset();
 	for (auto& [rCoordinate, rCell] : gpGame->mCells)
 	{

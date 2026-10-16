@@ -307,7 +307,7 @@ void DrawPanelAccents(ImDrawList* pDrawList, const ImVec2& rvMinimum, const ImVe
 	const MenuChrome& rChrome = kMenuChromes[static_cast<size_t>(engine::GetUiTheme())];
 	float fUiScale = engine::UiScale();
 	float fPanelRounding = kfPanelRounding * fUiScale;
-	pDrawList->AddRect(rvMinimum, rvMaximum, ChromeColor(rChrome.f4PanelBorder), fPanelRounding, 0, kfPanelBorderThickness * fUiScale);
+	pDrawList->AddRect(rvMinimum, rvMaximum, ChromeColor(rChrome.f4PanelBorder), fPanelRounding, kfPanelBorderThickness * fUiScale);
 	pDrawList->AddRectFilled(ImVec2(rvMinimum.x + fPanelRounding, rvMinimum.y), ImVec2(rvMaximum.x - fPanelRounding, rvMinimum.y + kfAccentStripThickness * fUiScale), ChromeColor(rChrome.f4Accent));
 }
 

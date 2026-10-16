@@ -46,8 +46,6 @@ public:
 	bool IsChunkReady(common::crc_t crc) const;
 	void WaitForChunks(std::span<const common::crc_t> crcs);
 
-	bool ReadChunkData(common::crc_t crc, int64_t iOffset, std::span<std::byte> buffer);
-
 #if defined(BT_CLIENT)
 	ChunkReadResult TryReadChunkData(ChunkReadRequest& rRequest, common::crc_t crc, int64_t iOffset, std::span<std::byte> buffer);
 	void CancelChunkRead(ChunkReadRequest& rRequest);
@@ -128,9 +126,9 @@ private:
 	// (a lazy completion behind the const accessor).
 	mutable std::future<void> mLoadingFuture;
 
-	// Published (release) at the end of the async eager-load task; eager-map readers (ReadChunkData,
-	// IsChunkReady, the memory-stats getters) acquire it before touching mEagerChunkMap / mPackFileData,
-	// which the task populates. Gates the boot window only — always true once the first frame runs.
+	// Published (release) at the end of the async eager-load task; eager-map readers (IsChunkReady, the
+	// memory-stats getters) acquire it before touching mEagerChunkMap / mPackFileData, which the task populates.
+	// Gates the boot window only — always true once the first frame runs.
 	std::atomic<bool> mbEagerLoadComplete {false};
 
 	// Persistent pack file handles for lazy loading (opened with FILE_FLAG_NO_BUFFERING)

@@ -57,7 +57,7 @@ bool GameSaveLoad::ServerSave(const std::filesystem::path& rFilename)
 bool GameSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 {
 	ScopedSuppressAllocationTracking suppress;
-	gpProfileManager->LatchRawCpuTimers(false, game::gpGame->miTickCounter);
+	gpProfileManager->LatchRawCpuTimers(false);
 
 	engine::GridCoord loadedClientGridCoordinate {};
 	if (!engine::ReadGridSave({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, rFilename, loadedClientGridCoordinate))
@@ -83,7 +83,7 @@ bool GameSaveLoad::ServerLoad(const std::filesystem::path& rFilename)
 void GameSaveLoad::ServerReset()
 {
 	ScopedSuppressAllocationTracking suppress;
-	gpProfileManager->LatchRawCpuTimers(false, game::gpGame->miTickCounter);
+	gpProfileManager->LatchRawCpuTimers(false);
 
 	game::gpGame->CreateNewFrame(game::GameFlags::kGame);
 	game::gpGame->miNextGlobalId = 1;

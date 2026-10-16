@@ -141,7 +141,7 @@ struct RegistryWindow
 	engine::RegistryQueryContext context {};
 };
 
-[[nodiscard]] RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XMVECTOR* pVecPreviousPositions, const float* pfArrivalGracePeriods, const MissilesPostRender& rSubscribers);
+[[nodiscard]] RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XMVECTOR* pVecPreviousPositions, const std::chrono::duration<float>* pArrivalGracePeriods, const MissilesPostRender& rSubscribers);
 
 struct Frame
 {

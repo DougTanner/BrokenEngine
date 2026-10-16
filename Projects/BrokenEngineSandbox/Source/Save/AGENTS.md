@@ -8,7 +8,7 @@
 
 - Grid file framing, validation, staging, and adoption are engine-owned (`../../../../Engine/Source/File/AGENTS.md`); this subsystem owns only when a save, load, reset, or autosave runs and what happens around it. Return the actual commit result to callers.
 - Successful loads preserve the saved simulation clock and resynchronize clients to that state. Fresh-game paths reset server fleet management explicitly.
-- Server load and reset cancel pending raw profile samples and unpublished event arms before mutating or restoring frame state; this diagnostic cleanup does not alter the persisted payload.
+- Server load and reset discard pending raw profile samples before mutating or restoring frame state; this diagnostic cleanup does not alter the persisted payload.
 
 ## Replay Contract
 

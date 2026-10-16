@@ -24,7 +24,7 @@ public:
 	void QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalPlayerId);
 	void NewClients();
 	void SpawnWaitingClients();
-	void Disconnects();
+	void OnClientDisconnected(int64_t iClientId, const engine::ClientGuid& rClientGuid);
 	void DetectPlayerDeaths();
 	void ResetState();
 

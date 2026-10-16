@@ -42,11 +42,11 @@ struct SmokeTrailsInterpolate : public Collection<SmokeTrailsInterpolate, Collec
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	XMVECTOR* __restrict pVecSmoothedPositions = nullptr;
 	float* __restrict pfIntensities = nullptr;
-	float* __restrict pfStartTimes = nullptr;
+	SimulationTime* __restrict pStartTimes = nullptr;
 
 	auto Members(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiTypeIndices, rSelf.pVecPositions, rSelf.pVecSmoothedPositions, rSelf.pfIntensities, rSelf.pfStartTimes);
+		return std::tie(rSelf.puiTypeIndices, rSelf.pVecPositions, rSelf.pVecSmoothedPositions, rSelf.pfIntensities, rSelf.pStartTimes);
 	}
 
 	static void GraphicsResources();

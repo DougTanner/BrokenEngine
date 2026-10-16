@@ -81,7 +81,7 @@ static ImVec4 WithAlpha(const ImVec4& rf4Color, float fAlpha)
 }
 
 ImGuiManager::ImGuiManager(HWND hwnd)
-: common::Singleton<ImGuiManager>(gpImGuiManager)
+: common::Singleton<ImGuiManager>(gpImGuiManager, this)
 {
 	CreateRenderPass();
 	CreateFramebuffers();

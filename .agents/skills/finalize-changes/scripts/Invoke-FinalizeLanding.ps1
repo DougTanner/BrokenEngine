@@ -988,93 +988,89 @@ try {
 			$result.locks.landingOwner = $script:LandingOwner
 			$script:LandingClaimed = $true
 			$result.locks.landingClaimed = $true
-			Release-LandingLockIfSafe
 		}
-		Complete-LandedState
-		Write-Output ((New-LandingProjection) | ConvertTo-Json -Depth 10 -Compress)
-		exit 0
-	}
-
-	# The primary tip is deliberately not asserted here: an advance racing this landing is answered
-	# by the post-claim check and the internal rebase, not by refusing before the lock is held.
-	[void] (Assert-LandingSanity $ExpectedCurrentTip '')
-	if ($ExpectedCurrentTip -cne $script:LandingCommit) { Throw-Landing 2 'approval.session-tip-changed' 'Session tip is not the explicit user-approved commit.' }
-
-	if ([string]::IsNullOrWhiteSpace($OwnerToken)) {
-		# Refresh preserves a lease's recorded duration, so a matching short lease cannot be adopted for
-		# the full landing transaction.
-		$lockState = Get-FinalizeLandingLockState $script:WorktreeCliPath $result.identities.gitCommonDirectory $script:CurrentIdentity.Worktree
-		$leaseDurationSeconds = if (@($lockState.Status.PSObject.Properties.Name) -ccontains 'leaseDurationSeconds') { $lockState.Status.leaseDurationSeconds } else { $null }
-		$leaseDurationIsInteger = $leaseDurationSeconds -is [int] -or $leaseDurationSeconds -is [long]
-		if (($lockState.Kind -ceq 'live') -and (Test-FinalizeLandingLockClaimIdentity $lockState.Status ([string]$lockState.Status.owner) $script:LandingSession $script:CurrentIdentity.Worktree) -and $leaseDurationIsInteger -and [int64]$leaseDurationSeconds -ge $script:LandingLeaseSeconds) {
-			$script:LandingOwner = [string]$lockState.Status.owner
-			$script:LandingOwnerAdopted = $true
-		}
-		else {
-			$tokenResponse = Invoke-WorktreeCli @('lock', 'token')
-			if ($tokenResponse.ExitCode -ne 0 -or $tokenResponse.Stdout.Trim() -cnotmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') {
-				Throw-Landing 1 'landing-lock.token-failed' 'WorktreeCli could not generate a canonical landing owner token.'
-			}
-			$script:LandingOwner = $tokenResponse.Stdout.Trim()
-		}
-		$result.locks.landingOwner = $script:LandingOwner
-		$claimOutcome = Invoke-FinalizeLandingLockClaim -WorktreeCliExecutable $script:WorktreeCliPath -GitCommonDirectory $result.identities.gitCommonDirectory -Owner $script:LandingOwner -Session $script:LandingSession -Worktree $script:CurrentIdentity.Worktree -LeaseSeconds $script:LandingLeaseSeconds -WaitSeconds 300
 	}
 	else {
-		# Lease continuity: a live lease under the supplied token whose recorded session and worktree
-		# match this landing identity, and which was minted for at least the landing lease duration,
-		# is the same actor continuing, so it is used as is. Anything else — another session or
-		# worktree, a shorter lease, expired, or absent — stays foreign contention, and no fresh
-		# token is ever minted behind the caller's back.
-		$script:LandingOwner = $OwnerToken
-		$result.locks.landingOwner = $script:LandingOwner
-		$lockState = Get-FinalizeLandingLockState $script:WorktreeCliPath $result.identities.gitCommonDirectory $script:CurrentIdentity.Worktree
-		$sameActor = ($lockState.Kind -ceq 'live') -and (Test-FinalizeLandingLockClaimIdentity $lockState.Status $script:LandingOwner $SessionLabel $script:CurrentIdentity.Worktree)
-		$leaseSeconds = if ($sameActor -and @($lockState.Status.PSObject.Properties.Name) -ccontains 'leaseDurationSeconds') { $lockState.Status.leaseDurationSeconds -as [int] } else { $null }
-		$claimOutcome = if ($sameActor -and $null -ne $leaseSeconds -and $leaseSeconds -ge $script:LandingLeaseSeconds) {
-			[pscustomobject]@{ Claimed = $true; Code = 'ok'; Message = 'Landing continues under the caller lease already live for this session and worktree.'; Disposition = 'terminal'; RequiresUserAuthority = $false; RetryAfterMilliseconds = 0; Owner = $script:LandingOwner; Lock = $lockState.Status; Attempts = 1 }
+		# The primary tip is deliberately not asserted here: an advance racing this landing is answered
+		# by the post-claim check and the internal rebase, not by refusing before the lock is held.
+		[void] (Assert-LandingSanity $ExpectedCurrentTip '')
+		if ($ExpectedCurrentTip -cne $script:LandingCommit) { Throw-Landing 2 'approval.session-tip-changed' 'Session tip is not the explicit user-approved commit.' }
+
+		if ([string]::IsNullOrWhiteSpace($OwnerToken)) {
+			# Refresh preserves a lease's recorded duration, so a matching short lease cannot be adopted for
+			# the full landing transaction.
+			$lockState = Get-FinalizeLandingLockState $script:WorktreeCliPath $result.identities.gitCommonDirectory $script:CurrentIdentity.Worktree
+			$leaseDurationSeconds = if (@($lockState.Status.PSObject.Properties.Name) -ccontains 'leaseDurationSeconds') { $lockState.Status.leaseDurationSeconds } else { $null }
+			$leaseDurationIsInteger = $leaseDurationSeconds -is [int] -or $leaseDurationSeconds -is [long]
+			if (($lockState.Kind -ceq 'live') -and (Test-FinalizeLandingLockClaimIdentity $lockState.Status ([string]$lockState.Status.owner) $script:LandingSession $script:CurrentIdentity.Worktree) -and $leaseDurationIsInteger -and [int64]$leaseDurationSeconds -ge $script:LandingLeaseSeconds) {
+				$script:LandingOwner = [string]$lockState.Status.owner
+				$script:LandingOwnerAdopted = $true
+			}
+			else {
+				$tokenResponse = Invoke-WorktreeCli @('lock', 'token')
+				if ($tokenResponse.ExitCode -ne 0 -or $tokenResponse.Stdout.Trim() -cnotmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') {
+					Throw-Landing 1 'landing-lock.token-failed' 'WorktreeCli could not generate a canonical landing owner token.'
+				}
+				$script:LandingOwner = $tokenResponse.Stdout.Trim()
+			}
+			$result.locks.landingOwner = $script:LandingOwner
+			$claimOutcome = Invoke-FinalizeLandingLockClaim -WorktreeCliExecutable $script:WorktreeCliPath -GitCommonDirectory $result.identities.gitCommonDirectory -Owner $script:LandingOwner -Session $script:LandingSession -Worktree $script:CurrentIdentity.Worktree -LeaseSeconds $script:LandingLeaseSeconds -WaitSeconds 300
 		}
 		else {
-			$refusal = if ($sameActor) { "The supplied owner token's lease is shorter than the $($script:LandingLeaseSeconds)-second landing lease and cannot be extended." } else { 'The supplied owner token is not a live landing lease for this session and worktree.' }
-			[pscustomobject]@{ Claimed = $false; Code = 'landing-lock.retryable-wait'; Message = $refusal; Disposition = 'retryable-wait'; RequiresUserAuthority = $false; RetryAfterMilliseconds = 500; Owner = $script:LandingOwner; Lock = $lockState.Status; Attempts = 1 }
+			# Lease continuity: a live lease under the supplied token whose recorded session and worktree
+			# match this landing identity, and which was minted for at least the landing lease duration,
+			# is the same actor continuing, so it is used as is. Anything else — another session or
+			# worktree, a shorter lease, expired, or absent — stays foreign contention, and no fresh
+			# token is ever minted behind the caller's back.
+			$script:LandingOwner = $OwnerToken
+			$result.locks.landingOwner = $script:LandingOwner
+			$lockState = Get-FinalizeLandingLockState $script:WorktreeCliPath $result.identities.gitCommonDirectory $script:CurrentIdentity.Worktree
+			$sameActor = ($lockState.Kind -ceq 'live') -and (Test-FinalizeLandingLockClaimIdentity $lockState.Status $script:LandingOwner $SessionLabel $script:CurrentIdentity.Worktree)
+			$leaseSeconds = if ($sameActor -and @($lockState.Status.PSObject.Properties.Name) -ccontains 'leaseDurationSeconds') { $lockState.Status.leaseDurationSeconds -as [int] } else { $null }
+			$claimOutcome = if ($sameActor -and $null -ne $leaseSeconds -and $leaseSeconds -ge $script:LandingLeaseSeconds) {
+				[pscustomobject]@{ Claimed = $true; Code = 'ok'; Message = 'Landing continues under the caller lease already live for this session and worktree.'; Disposition = 'terminal'; RequiresUserAuthority = $false; RetryAfterMilliseconds = 0; Owner = $script:LandingOwner; Lock = $lockState.Status; Attempts = 1 }
+			}
+			else {
+				$refusal = if ($sameActor) { "The supplied owner token's lease is shorter than the $($script:LandingLeaseSeconds)-second landing lease and cannot be extended." } else { 'The supplied owner token is not a live landing lease for this session and worktree.' }
+				[pscustomobject]@{ Claimed = $false; Code = 'landing-lock.retryable-wait'; Message = $refusal; Disposition = 'retryable-wait'; RequiresUserAuthority = $false; RetryAfterMilliseconds = 500; Owner = $script:LandingOwner; Lock = $lockState.Status; Attempts = 1 }
+			}
 		}
-	}
-	$result.locks.claim = [ordered]@{
-		code = $claimOutcome.Code
-		disposition = $claimOutcome.Disposition
-		requiresUserAuthority = $claimOutcome.RequiresUserAuthority
-		retryAfterMilliseconds = $claimOutcome.RetryAfterMilliseconds
-		attempts = $claimOutcome.Attempts
-		lock = $claimOutcome.Lock
-	}
-	if (-not $claimOutcome.Claimed) {
-		$exitCode = if ($claimOutcome.Disposition -ceq 'terminal') { 1 } else { 2 }
-		Throw-Landing $exitCode 'landing-lock.claim-failed' $claimOutcome.Message $claimOutcome.Disposition $claimOutcome.RequiresUserAuthority $claimOutcome.RetryAfterMilliseconds
-	}
-	$script:LandingClaimed = $true
-	$result.locks.landingClaimed = $true
-	if ($script:LandingOwnerAdopted) { Refresh-LandingOwner }
-	Assert-ApprovedCandidateTree
-	# Freeze all source-commit metadata while this lease is held. A later rebase may change object
-	# IDs, but it must not change what the user approved.
-	$script:FrozenCommitMetadata = Get-FrozenCommitMetadata $ApprovedSessionCommit
-	$result.approvedSource.metadata = $script:FrozenCommitMetadata
-	$result.rebasedSource.commit = $script:LandingCommit
-	$result.rebasedSource.tree = $script:LandingTree
-	$result.rebasedSource.parent = $script:LandingPrimaryTip
-	$result.rebasedSource.patch = $result.approvedSource.patch
+		$result.locks.claim = [ordered]@{
+			code = $claimOutcome.Code
+			disposition = $claimOutcome.Disposition
+			requiresUserAuthority = $claimOutcome.RequiresUserAuthority
+			retryAfterMilliseconds = $claimOutcome.RetryAfterMilliseconds
+			attempts = $claimOutcome.Attempts
+			lock = $claimOutcome.Lock
+		}
+		if (-not $claimOutcome.Claimed) {
+			$exitCode = if ($claimOutcome.Disposition -ceq 'terminal') { 1 } else { 2 }
+			Throw-Landing $exitCode 'landing-lock.claim-failed' $claimOutcome.Message $claimOutcome.Disposition $claimOutcome.RequiresUserAuthority $claimOutcome.RetryAfterMilliseconds
+		}
+		$script:LandingClaimed = $true
+		$result.locks.landingClaimed = $true
+		if ($script:LandingOwnerAdopted) { Refresh-LandingOwner }
+		Assert-ApprovedCandidateTree
+		# Freeze all source-commit metadata while this lease is held. A later rebase may change object
+		# IDs, but it must not change what the user approved.
+		$script:FrozenCommitMetadata = Get-FrozenCommitMetadata $ApprovedSessionCommit
+		$result.approvedSource.metadata = $script:FrozenCommitMetadata
+		$result.rebasedSource.commit = $script:LandingCommit
+		$result.rebasedSource.tree = $script:LandingTree
+		$result.rebasedSource.parent = $script:LandingPrimaryTip
+		$result.rebasedSource.patch = $result.approvedSource.patch
 
-	# At most one rebase-and-retry per invocation, entirely under the held lease: a second stale
-	# result means contention this landing should not keep fighting. The retry left the branch on the
-	# rebased commit, so exhaustion restores the confirmed one the documented rerun expects.
-	if (-not (Invoke-LandingAdvanceAttempt)) {
-		Invoke-LandingRebaseOntoPrimary
+		# At most one rebase-and-retry per invocation, entirely under the held lease: a second stale
+		# result means contention this landing should not keep fighting. The retry left the branch on the
+		# rebased commit, so exhaustion restores the confirmed one the documented rerun expects.
 		if (-not (Invoke-LandingAdvanceAttempt)) {
-			Restore-LandingSessionBranch 'landing.retry-exhausted' 'Primary advanced again after the rebased candidate was prepared; this landing made its one retry.' 'retryable-wait' 500
+			Invoke-LandingRebaseOntoPrimary
+			if (-not (Invoke-LandingAdvanceAttempt)) {
+				Restore-LandingSessionBranch 'landing.retry-exhausted' 'Primary advanced again after the rebased candidate was prepared; this landing made its one retry.' 'retryable-wait' 500
+			}
 		}
 	}
-	Release-LandingLockIfSafe
-	if ($script:LandingClaimed) { Throw-Landing 2 'landing-lock.release-failed' 'Landing lock could not be released after the primary advance.' }
+	# The finally block makes the only post-advance release attempt; the tail reports a lock it retains.
 	Complete-LandedState
 }
 catch {

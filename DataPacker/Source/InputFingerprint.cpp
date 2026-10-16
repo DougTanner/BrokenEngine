@@ -3,79 +3,25 @@
 #include "FileManager.h"
 
 
-// Opening the provider per hash is expensive; one process-lifetime handle serves every hash (BCrypt
-// algorithm handles are thread-safe) and is deliberately never closed.
-static BCRYPT_ALG_HANDLE GetSha256Algorithm()
+static std::string FinishFingerprint(common::Sha256Hasher& rHasher)
 {
-	static BCRYPT_ALG_HANDLE spAlgorithm = []()
+	std::array<uint8_t, 32> digest {};
+	if (!rHasher.Finish(digest))
 	{
-		BCRYPT_ALG_HANDLE pAlgorithm = nullptr;
-		if (BCryptOpenAlgorithmProvider(&pAlgorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) < 0)
-		{
-			throw std::runtime_error("Unable to initialize SHA-256");
-		}
-		return pAlgorithm;
-	}();
-	return spAlgorithm;
+		throw std::runtime_error("Unable to compute fingerprint hash");
+	}
+	std::string result;
+	result.reserve(64);
+	for (int64_t iByte : digest)
+	{
+		result += std::format("{:02x}", iByte);
+	}
+	return result;
 }
-
-class Sha256Hasher
-{
-public:
-
-	Sha256Hasher()
-	{
-		if (BCryptCreateHash(GetSha256Algorithm(), &mpHash, nullptr, 0, nullptr, 0, 0) < 0)
-		{
-			throw std::runtime_error("Unable to initialize SHA-256");
-		}
-	}
-
-	~Sha256Hasher()
-	{
-		BCryptDestroyHash(mpHash);
-	}
-
-	Sha256Hasher(const Sha256Hasher& rToCopy) = delete;
-	Sha256Hasher& operator=(const Sha256Hasher& rToCopy) = delete;
-
-	void Update(std::span<const std::byte> bytes)
-	{
-		if (!bytes.empty() && BCryptHashData(mpHash, reinterpret_cast<PUCHAR>(const_cast<std::byte*>(bytes.data())), static_cast<ULONG>(bytes.size()), 0) < 0)
-		{
-			throw std::runtime_error("Unable to hash fingerprint data");
-		}
-	}
-
-	void Update(std::string_view text)
-	{
-		Update(std::as_bytes(std::span(text)));
-	}
-
-	std::string Finish()
-	{
-		uint8_t pDigest[32] {};
-		if (BCryptFinishHash(mpHash, pDigest, sizeof(pDigest), 0) < 0)
-		{
-			throw std::runtime_error("Unable to finish fingerprint hash");
-		}
-		std::string result;
-		result.reserve(64);
-		for (int64_t iByte : pDigest)
-		{
-			result += std::format("{:02x}", iByte);
-		}
-		return result;
-	}
-
-private:
-
-	BCRYPT_HASH_HANDLE mpHash = nullptr;
-};
 
 static std::string HashFileContents(const std::filesystem::path& rPath, InputFingerprintMode eMode)
 {
-	Sha256Hasher hasher;
+	common::Sha256Hasher hasher;
 	std::fstream stream(rPath, std::ios::in | std::ios::binary);
 	std::vector<std::byte> buffer(64 * 1'024);
 	std::vector<std::byte> normalizedBuffer;
@@ -130,9 +76,10 @@ static std::string HashFileContents(const std::filesystem::path& rPath, InputFin
 	}
 	if (bPendingCarriageReturn)
 	{
-		hasher.Update("\r\n");
+		std::array<std::byte, 2> crLf {static_cast<std::byte>('\r'), static_cast<std::byte>('\n')};
+		hasher.Update(crLf);
 	}
-	return hasher.Finish();
+	return FinishFingerprint(hasher);
 }
 
 constexpr const char* kpcPersistentFingerprintMagic = "DataPackerInputFingerprint";
@@ -385,16 +332,18 @@ std::string InputFingerprintCache::GetDirectory(const std::filesystem::path& rPa
 		return std::filesystem::relative(rLeft, rPath).generic_string() < std::filesystem::relative(rRight, rPath).generic_string();
 	});
 
-	Sha256Hasher hasher;
+	common::Sha256Hasher hasher;
+	std::array<std::byte, 1> separator {};
 	for (const std::filesystem::path& rFile : files)
 	{
 		std::string relativePath = std::filesystem::relative(rFile, rPath).generic_string();
-		hasher.Update(relativePath);
-		hasher.Update(std::string_view("\0", 1));
-		hasher.Update(GetFile(rFile));
-		hasher.Update(std::string_view("\0", 1));
+		hasher.Update(std::as_writable_bytes(std::span(relativePath)));
+		hasher.Update(separator);
+		std::string fingerprint = GetFile(rFile);
+		hasher.Update(std::as_writable_bytes(std::span(fingerprint)));
+		hasher.Update(separator);
 	}
-	return hasher.Finish();
+	return FinishFingerprint(hasher);
 }
 
 InputFingerprintCache::FileSnapshot InputFingerprintCache::Snapshot(const std::filesystem::path& rPath)

@@ -132,7 +132,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 		// heightmaps so the tallest terrain wins per pixel instead of last-draw-wins. RTT clears to
 		// mfSeaFloorElevation (the shared ocean floor, the lowest any heightmap reaches), so single-island
 		// pixels are unchanged (max(floor, v) == v).
-		.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kMax, PipelineFlags::kUpdateAfterBind},
+		.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kIndirectHostVisible, PipelineFlags::kMax, PipelineFlags::kUpdateAfterBind},
 		.ppShaders = {&mrShaders.at(data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc), &mrShaders.at(data::kShadersTerrainTerrainElevationfragCrc)},
 		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
 		.vkTargetRenderPass = gpTextureManager->mRenderTargetTextures.mShadowElevationTexture.mVkRenderPass,
@@ -149,7 +149,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 	mpPipelines[kPipelineShadow].Create(
 	{
 		.name = "Shadow",
-		.flags = {PipelineFlags::kCompute},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowcompCrc)},
 		.descriptorInfos =
 		{
@@ -162,7 +162,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 	mpPipelines[kPipelineShadowBlurH].Create(
 	{
 		.name = "ShadowBlurH",
-		.flags = {PipelineFlags::kCompute},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowBlurHcompCrc)},
 		.descriptorInfos =
 		{
@@ -175,7 +175,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 	mpPipelines[kPipelineShadowBlurV].Create(
 	{
 		.name = "ShadowBlurV",
-		.flags = {PipelineFlags::kCompute},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowBlurVcompCrc)},
 		.descriptorInfos =
 		{
@@ -216,7 +216,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 	mpPipelines[kPipelineShadowTemporal].Create(
 	{
 		.name = "ShadowTemporal",
-		.flags = {PipelineFlags::kCompute},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowTemporalcompCrc)},
 		.descriptorInfos =
 		{
@@ -229,7 +229,7 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 	mpPipelines[kPipelineShadowHistoryCopy].Create(
 	{
 		.name = "ShadowHistoryCopy",
-		.flags = {PipelineFlags::kCompute},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
 		.ppShaders = {&mrShaders.at(data::kShadersShadowShadowHistoryCopycompCrc)},
 		.descriptorInfos =
 		{

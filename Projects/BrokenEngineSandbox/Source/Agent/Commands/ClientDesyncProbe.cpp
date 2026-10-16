@@ -52,11 +52,6 @@ void CommandDesynchronizationProbe(const nlohmann::json& rParameters, nlohmann::
 	// Heap: validation errors, JSON result, and triggerRecovery's serialized Frame snapshot
 	ScopedSuppressAllocationTracking suppress;
 
-	if (!rParameters.is_object())
-	{
-		throw std::runtime_error("desync_probe params must be an object");
-	}
-
 	int64_t iKnownParameterCount = static_cast<int64_t>(rParameters.contains("desyncReports")) + static_cast<int64_t>(rParameters.contains("debugFrameRequests")) + static_cast<int64_t>(rParameters.contains("triggerRecovery"));
 	if (std::ssize(rParameters) != iKnownParameterCount)
 	{

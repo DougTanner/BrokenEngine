@@ -7,6 +7,35 @@
 namespace engine
 {
 
+static bool ParseDirectoryOption(std::wstring_view value, std::string_view optionName, std::filesystem::path& rDirectory)
+{
+	std::filesystem::path requestedDirectory = value;
+	if (!requestedDirectory.is_absolute())
+	{
+		LOG(kDefault, kError, "Launch option {} must be absolute: \"{}\"", optionName, requestedDirectory);
+		return false;
+	}
+
+	std::error_code canonicalError;
+	std::filesystem::path canonicalDirectory = std::filesystem::canonical(requestedDirectory, canonicalError);
+	if (canonicalError)
+	{
+		LOG(kDefault, kError, "Launch option {} is missing or unusable: \"{}\" (error {})", optionName, requestedDirectory, canonicalError.value());
+		return false;
+	}
+
+	std::error_code typeError;
+	bool bIsDirectory = std::filesystem::is_directory(canonicalDirectory, typeError);
+	if (typeError || !bIsDirectory)
+	{
+		LOG(kDefault, kError, "Launch option {} is not a usable directory: \"{}\" (error {})", optionName, canonicalDirectory, typeError.value());
+		return false;
+	}
+
+	rDirectory = std::move(canonicalDirectory);
+	return true;
+}
+
 bool ParseLaunchOptions()
 {
 	// Runs in ProcessMain before allocation tracking, so any allocation is untracked. CommandLineToArgvW allocates via
@@ -75,33 +104,10 @@ bool ParseLaunchOptions()
 				continue;
 			}
 
-			std::filesystem::path requestedDirectory = pArgumentValues[++i];
-			if (!requestedDirectory.is_absolute())
+			if (!ParseDirectoryOption(pArgumentValues[++i], "--data-directory", gLaunchOptions.dataDirectory))
 			{
-				LOG(kDefault, kError, "Launch option --data-directory must be absolute: \"{}\"", requestedDirectory);
 				bSuccess = false;
-				continue;
 			}
-
-			std::error_code canonicalError;
-			std::filesystem::path canonicalDirectory = std::filesystem::canonical(requestedDirectory, canonicalError);
-			if (canonicalError)
-			{
-				LOG(kDefault, kError, "Launch option --data-directory is missing or unusable: \"{}\" (error {})", requestedDirectory, canonicalError.value());
-				bSuccess = false;
-				continue;
-			}
-
-			std::error_code typeError;
-			bool bIsDirectory = std::filesystem::is_directory(canonicalDirectory, typeError);
-			if (typeError || !bIsDirectory)
-			{
-				LOG(kDefault, kError, "Launch option --data-directory is not a usable directory: \"{}\" (error {})", canonicalDirectory, typeError.value());
-				bSuccess = false;
-				continue;
-			}
-
-			gLaunchOptions.dataDirectory = std::move(canonicalDirectory);
 		}
 		else if (std::wcscmp(pArgumentValues[i], L"--app-data-directory") == 0)
 		{
@@ -113,33 +119,10 @@ bool ParseLaunchOptions()
 				continue;
 			}
 
-			std::filesystem::path requestedDirectory = pArgumentValues[++i];
-			if (!requestedDirectory.is_absolute())
+			if (!ParseDirectoryOption(pArgumentValues[++i], "--app-data-directory", gLaunchOptions.appDataDirectory))
 			{
-				LOG(kDefault, kError, "Launch option --app-data-directory must be absolute: \"{}\"", requestedDirectory);
 				bSuccess = false;
-				continue;
 			}
-
-			std::error_code canonicalError;
-			std::filesystem::path canonicalDirectory = std::filesystem::canonical(requestedDirectory, canonicalError);
-			if (canonicalError)
-			{
-				LOG(kDefault, kError, "Launch option --app-data-directory is missing or unusable: \"{}\" (error {})", requestedDirectory, canonicalError.value());
-				bSuccess = false;
-				continue;
-			}
-
-			std::error_code typeError;
-			bool bIsDirectory = std::filesystem::is_directory(canonicalDirectory, typeError);
-			if (typeError || !bIsDirectory)
-			{
-				LOG(kDefault, kError, "Launch option --app-data-directory is not a usable directory: \"{}\" (error {})", canonicalDirectory, typeError.value());
-				bSuccess = false;
-				continue;
-			}
-
-			gLaunchOptions.appDataDirectory = std::move(canonicalDirectory);
 		}
 		else if (std::wcscmp(pArgumentValues[i], L"--windowed") == 0)
 		{

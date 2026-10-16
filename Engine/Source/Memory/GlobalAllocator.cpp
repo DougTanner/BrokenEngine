@@ -247,21 +247,21 @@ struct MemoryInitializer
 		// Purge off so freed pages are never decommitted and recommitted during gameplay; set here because upstream has no compile-time default for it.
 		mi_option_set(mi_option_purge_delay, -1);
 
-		// mimalloc's process init reserves the arena from the Mimalloc.cpp wrapper default; this only verifies it became arena 0 (id 1).
-		std::size_t uiArenaBytes = 0;
-		void* pArena = mi_arena_area(1, &uiArenaBytes);
-		int64_t iArenaMebibytes = static_cast<int64_t>(uiArenaBytes / (1'024 * 1'024));
-		if (pArena == nullptr || iArenaMebibytes < kiMimallocArenaReserveMebibytes)
+		// mimalloc's process init reserves and commits the arena from the Mimalloc.cpp wrapper default; mimalloc exposes no id for that arena, so this
+		// only verifies the process totals cover it. mimalloc's OS layer counts reserved and committed bytes even with MI_STATS off.
+		mi_stats_t statistics = {};
+		statistics.size = sizeof(mi_stats_t);
+		statistics.version = MI_STAT_VERSION;
+		bool bStatisticsRead = mi_stats_get(&statistics);
+		int64_t iReservedMebibytes = statistics.reserved.current / (1'024 * 1'024);
+		int64_t iCommittedMebibytes = statistics.committed.current / (1'024 * 1'024);
+		if (!bStatisticsRead || iReservedMebibytes < kiMimallocArenaReserveMebibytes || iCommittedMebibytes < kiMimallocArenaReserveMebibytes)
 		{
-			LOG(kDefault, kWarning, "mimalloc arena reserve of {} MiB not found (arena 0: {} MiB); continuing on on-demand arenas", kiMimallocArenaReserveMebibytes, iArenaMebibytes);
+			LOG(kDefault, kWarning, "mimalloc arena reserve of {} MiB not found (reserved: {} MiB, committed: {} MiB); continuing on on-demand arenas", kiMimallocArenaReserveMebibytes, iReservedMebibytes, iCommittedMebibytes);
 		}
 
 		if constexpr (kbMimallocDiagnostics)
 		{
-			mi_stats_t statistics = {};
-			statistics.size = sizeof(mi_stats_t);
-			statistics.version = MI_STAT_VERSION;
-			mi_stats_get(&statistics);
 			iArenaCountAfterReserve = statistics.arena_count.total;
 
 			mi_register_output([](const char* pcMessage, [[maybe_unused]] void* pArgument)
@@ -277,8 +277,6 @@ struct MemoryInitializer
 #if !defined(ENABLE_CRT_DEBUG_HEAP)
 		if constexpr (kbMimallocDiagnostics)
 		{
-			mi_stats_merge();
-
 			mi_stats_t statistics = {};
 			statistics.size = sizeof(mi_stats_t);
 			statistics.version = MI_STAT_VERSION;

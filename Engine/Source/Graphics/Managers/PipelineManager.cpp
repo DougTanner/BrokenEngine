@@ -10,7 +10,7 @@ namespace engine
 {
 
 PipelineManager::PipelineManager()
-: common::Singleton<PipelineManager>(gpPipelineManager)
+: common::Singleton<PipelineManager>(gpPipelineManager, this)
 {
 	ScopedBootTimer scopedBootTimer(kBootTimerPipelineManager);
 

@@ -20,6 +20,17 @@ Every skill that needs host Python requires x64 CPython 3.12 or newer. `code-qua
 git -c core.symlinks=true clone --recurse-submodules <repository-url>
 ```
 
+Then, from the clone's root, run the commands below. The openexr and tinygltf submodules each track one symbolic link, which linked-worktree provisioning rejects as an unsupported reparse point, so these commands turn symlinks off in those two submodules and check each link out again as a plain file holding the link text:
+
+```
+git -C ThirdParty/openexr config core.symlinks false
+git -C ThirdParty/openexr rm -q -- src/test/OpenEXRFuzzTest/oss-fuzz
+git -C ThirdParty/openexr checkout HEAD -- src/test/OpenEXRFuzzTest/oss-fuzz
+git -C ThirdParty/tinygltf config core.symlinks false
+git -C ThirdParty/tinygltf rm -q -- attic/examples/saver/Makefile
+git -C ThirdParty/tinygltf checkout HEAD -- attic/examples/saver/Makefile
+```
+
 This clone is the **primary checkout**. Agent sessions run in linked worktrees that share its immutable build outputs; the steps below prepare those outputs once. Session creation also needs per-worktree Git configuration, which requires `git config extensions.worktreeConfig true` in this clone once; the first wrapper run (step 6) applies it for you if it is not set, and it changes nothing about the primary checkout itself.
 
 The first recursive submodule initialization requires network access. For an existing checkout that needs the metrics dependency, run `git submodule update --init --recursive -- ThirdParty/scb-check`; its first fetch also requires network access. The first `code-quality-metrics` run also requires network access to bootstrap its locked dependencies.

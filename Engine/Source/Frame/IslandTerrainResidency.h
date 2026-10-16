@@ -7,7 +7,7 @@
 namespace engine
 {
 
-// Phase 5 LRU grace: a template's GPU resources stay resident this many render frames after its
+// LRU grace: a template's GPU resources stay resident this many render frames after its
 // last placement reference drops. ~5s @60Hz, ~2.5s @120Hz. Chosen to cover transient absences
 // in moving-camera traversal without holding GPU memory indefinitely.
 inline constexpr int64_t kiGraceRenderFrames = 300;
@@ -24,7 +24,7 @@ public:
 	// textures) until RestorationSweep detects per-texture adoption and patches the slot to real.
 	int64_t AcquireTextureSlot(common::crc_t uiIslandCrc);
 
-	// Phase 5 LRU eviction sweeps. Both must run inside RenderGlobal post-fence-wait
+	// LRU eviction sweeps. Both must run inside RenderGlobal post-fence-wait
 	// (descriptor-patch safety window), bracketing TextureManager::ProcessPendingTextures.
 	void EvictionSweep();
 	void RestorationSweep();

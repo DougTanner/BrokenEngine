@@ -241,7 +241,7 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 			bool bAudioWork = false;
 #endif
 #if defined(BT_CLIENT) && defined(BT_DEBUG)
-			if (AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire); pHarnessRig != nullptr && pHarnessRig->meStagingOwner.load(std::memory_order_seq_cst) != AudioStreamingHarnessRig::StagingOwner::kNone)
+			if (AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire); pHarnessRig != nullptr && pHarnessRig->mbLoadersStalled.load(std::memory_order_seq_cst))
 			{
 				bExistingWork = false;
 				bRealtimeWork = false;
@@ -373,7 +373,7 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 
 	LOG(kLoading, kDebug, "Lazy chunk {} \"{}\" size {}", rRequest.crc, std::string_view(rLazyChunk.header.pcPath), rLazyChunk.location.uiSize);
 
-	// The disk-read bytes in pData are published to ReadChunkData's resident-copy path and the stats
+	// The disk-read bytes in pData are published to the lazy-chunk consumers that acquire eState and the stats
 	// readers by the eState release-stores below; that release / acquire pairing — not mQueueMutex — is
 	// the memory-visibility contract for lazy chunk data.
 #if defined(BT_CLIENT)

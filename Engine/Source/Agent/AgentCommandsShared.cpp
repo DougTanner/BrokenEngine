@@ -112,7 +112,6 @@ static void CommandQuit([[maybe_unused]] const nlohmann::json& rParameters, nloh
 
 static void CommandGetLogs(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	// .contains() is null-safe (false for a non-object params); .at().get() throws on a mistyped count (designed error path).
 	int64_t iCount = rParameters.contains("count") ? rParameters.at("count").get<int64_t>() : 64;
 	if (iCount < 0)
 	{

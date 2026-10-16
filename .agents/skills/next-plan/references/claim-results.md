@@ -35,9 +35,12 @@ Any other claim run, bare or targeted, is refused with `stop-report-to-user`,
 never `resume-with-flag`, when the session worktree holds an uncommitted
 `Documents/Plans` path; that result's `message` names those paths and the
 user's options. The one exception is that off-tip run when the early lookup
-reports the held claim: if its only uncommitted paths are under
-`Documents/Plans`, it proceeds, reports them as `retained`, and is refused at
-the dirty-worktree gate only when the fast-forward would touch one of them.
+reports the held claim: whatever its uncommitted paths, it proceeds, reports
+them as `retained`, and is refused at the dirty-worktree gate only when the
+fast-forward would touch one of them. Such a run targets the held Plan, so a
+claim no longer live at the primary tip ends in `none-available`, or in a fresh
+claim on that same Plan while it is still eligible, never in a claim on a
+different Plan.
 
 Otherwise, before it validates and claims, the claim script brings the session
 branch up to the primary tip by fast-forward only when the session is behind,
@@ -51,8 +54,7 @@ up by the next invocation. A `claim.session-diverged` result carries no
 `divergence` object: its `message` lists every commit the session holds and
 primary lacks, names the repair-script recovery route for a session whose
 primary branch was rewritten under it, and it may also carry the `retained`
-projection under `-ResumeRetained` or for that held-claim run whose only
-uncommitted paths are under `Documents/Plans`.
+projection under `-ResumeRetained` or for that held-claim run.
 
 ## Reading the queue listing
 
@@ -86,7 +88,8 @@ naming the released session; a release WorktreeCli refuses stops with
 `claim.takeover-failed` and `stop-report-to-user`, still carrying `holder`.
 Because the listing is an unguarded later snapshot, an eligible or otherwise
 unclassifiable result instead directs a retry. A bare `none-available` result
-skips this diagnosis. A partial pattern matching several validated executable
+skips this diagnosis unless the run targeted its held Plan, which it diagnoses
+the same way. A partial pattern matching several validated executable
 Plans yields `plan-name-ambiguous`, whose `message` names no match; the matching
 Plan paths are in the result's `candidates` array.
 
@@ -124,9 +127,10 @@ one thing to do next, drawn from these six values:
   was held; run [the `/next-plan` steps](../SKILL.md#steps) step 9 checkpoint
   once, then follow the row for a released or absent claim in
   [post-checkpoint outcomes](../SKILL.md#post-checkpoint-outcomes).
-- `resume-with-flag` — a `-Plan` run found an unclean worktree whose dirty paths
-  are all outside `Documents/Plans`; the rerun with
-  `-ResumeRetained` is gated by [the `/next-plan` rules](../SKILL.md#rules).
+- `resume-with-flag` — a `-Plan` run holding no claim the early lookup reports
+  found an unclean worktree whose dirty paths are all outside `Documents/Plans`;
+  the rerun with `-ResumeRetained` is gated by
+  [the `/next-plan` rules](../SKILL.md#rules).
 - `retry-later` — tell the user, and the same command can be run again later.
 - `finalize-changes` — the Plan terminal state is prepared; land the change
   through `/finalize-changes`.

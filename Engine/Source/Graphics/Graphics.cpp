@@ -81,7 +81,7 @@ float SmokeSimulationPixelsY()
 }
 
 Graphics::Graphics(HINSTANCE instanceHandle, HWND windowHandle)
-: common::Singleton<Graphics>(gpGraphics)
+: common::Singleton<Graphics>(gpGraphics, this)
 {
 	mInstanceHandle = instanceHandle;
 	mWindowHandle = windowHandle;

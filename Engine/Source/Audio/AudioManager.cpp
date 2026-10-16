@@ -211,7 +211,7 @@ void AudioManager::InitializeAudioSubsystems(const wchar_t* pcSelectedDeviceIden
 }
 
 AudioManager::AudioManager()
-: common::Singleton<AudioManager>(gpAudioManager)
+: common::Singleton<AudioManager>(gpAudioManager, this)
 {
 	LOG(kAudio, kInfo, "\nAudioManager");
 

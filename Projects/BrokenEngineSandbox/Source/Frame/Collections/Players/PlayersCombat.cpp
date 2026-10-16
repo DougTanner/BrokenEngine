@@ -51,11 +51,11 @@ constexpr int64_t kiDeathTrailCount = 2;
 // Firing, look targets, and missile aim require a living, visible spaceship past arrival grace.
 static bool XM_CALLCONV IsAcquireCandidate(const SpaceshipsInterpolate& __restrict rSpaceshipsInterpolate, const SpaceshipsPostRender& __restrict rSpaceshipsPostRender, FXMVECTOR vecPlayerPosition, int64_t j)
 {
-	if (rSpaceshipsInterpolate.pfDestroyedTimes[j] != -1.0f)
+	if (rSpaceshipsInterpolate.pDestroyedTimes[j] != std::chrono::duration<float>(-1.0f))
 	{
 		return false;
 	}
-	if (rSpaceshipsPostRender.pfArrivalGracePeriods[j] > 0.0f)
+	if (rSpaceshipsPostRender.pArrivalGracePeriods[j] > std::chrono::duration<float>::zero())
 	{
 		return false;
 	}
@@ -185,12 +185,12 @@ static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[mayb
 
 		if (rPlayer.pfShields[i] <= 0.0f)
 		{
-			rPlayer.pfShieldCooldowns[i] = kShieldCooldown.count();
+			rPlayer.pShieldCooldowns[i] = kShieldCooldown;
 
 			// Play shield down sound with cooldown to prevent spam
-			if (rPlayer.pfShieldDownSoundCooldowns[i] <= 0.0f)
+			if (rPlayer.pShieldDownSoundCooldowns[i].count() <= 0.0f)
 			{
-				rPlayer.pfShieldDownSoundCooldowns[i] = kShieldDownSoundCooldown.count();
+				rPlayer.pShieldDownSoundCooldowns[i] = kShieldDownSoundCooldown;
 #if defined(BT_CLIENT)
 				engine::gpAudioManager->PlayOneShot(rFrame, data::kAudioShieldArmor570852__rafaelzimrp__magicshielddownwavCrc, gShieldDownVolume.mfCurrent);
 #endif
@@ -242,8 +242,8 @@ void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame,
 					ApplyDamage(rFrame, rStaticData.coordinate, rCurrentInterpolate, rCurrentPostRender, i, rResult.fDamageReceived, rResult.vecContactPoint);
 
 #if defined(BT_CLIENT)
-					engine::PuffsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), PlayersInterpolate::suiImpactPuffControllerTypeIndex, rResult.vecContactPoint);
-					engine::PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), PlayersInterpolate::suiImpactPointLightControllerTypeIndex, rResult.vecContactPoint, 0.0f);
+					engine::PuffsPostRender::AddControlled(rFrame, engine::SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)), PlayersInterpolate::siImpactPuffControllerTypeIndex, rResult.vecContactPoint);
+					engine::PointLightsPostRender::AddControlled(rFrame, engine::SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)), PlayersInterpolate::siImpactPointLightControllerTypeIndex, rResult.vecContactPoint, 0.0f);
 #endif
 				}
 			}
@@ -252,8 +252,8 @@ void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame,
 		if (rCurrentPostRender.pfArmors[i] <= 0.0f)
 		{
 			rCurrentPostRender.pFlags[i].Set(kExploding);
-			rCurrentInterpolate.pfDestroyedTimes[i] = kfDestroyTime;
-			rCurrentPostRender.pfDestroyedExplosionTimes[i] = kfDestroyExplosionInterval;
+			rCurrentInterpolate.pDestroyedTimes[i] = kDestroyTime;
+			rCurrentPostRender.pDestroyedExplosionTimes[i] = kDestroyExplosionInterval;
 		}
 		else if (engine::IsOutOfBounds(bounds, rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
 		{
@@ -292,14 +292,14 @@ void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]]
 		XMVECTOR vecBaseDirection = rCurrentInterpolate.pVecDirections[i];
 		XMVECTOR vecLeftNormal = XMVector3Normalize(XMVector3Cross(vecBaseDirection, XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)));
 
-		ASSERT(IsBlasterFireTimeInRange(rCurrentPostRender.pfNextBlasterFireTimes[i]));
-		rCurrentPostRender.pfNextBlasterFireTimes[i] -= deltaTime.count();
+		ASSERT(IsBlasterFireTimeInRange(rCurrentPostRender.pNextBlasterFireTimes[i].count()));
+		rCurrentPostRender.pNextBlasterFireTimes[i] -= deltaTime;
 
-		while (rCurrentPostRender.pfNextBlasterFireTimes[i] <= 0.0f)
+		while (rCurrentPostRender.pNextBlasterFireTimes[i].count() <= 0.0f)
 		{
 			// Timer went negative by this amount when it crossed zero inside this tick, which equals
 			// the elapsed time from the fire moment to the end of the tick (kfDeltaTime - fire_offset).
-			std::chrono::duration<float> interFrameTime(-rCurrentPostRender.pfNextBlasterFireTimes[i]);
+			std::chrono::duration<float> interFrameTime = -rCurrentPostRender.pNextBlasterFireTimes[i];
 
 			// Rewind player to the fire-moment position (end-of-tick position minus elapsed time times velocity).
 			XMVECTOR vecPlayerPositionAtSpawn = XMVectorSubtract(rCurrentInterpolate.pVecPositions[i], XMVectorScale(rCurrentPostRender.pVecVelocities[i], interFrameTime.count()));
@@ -333,7 +333,7 @@ void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]]
 			}
 #endif
 
-			rCurrentPostRender.pfNextBlasterFireTimes[i] += kfBlasterFireInterval;
+			rCurrentPostRender.pNextBlasterFireTimes[i] += kBlasterFireInterval;
 		}
 	}
 }
@@ -348,12 +348,12 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 	// rows and every current missile handle. Missiles spawned below may grow their collection, which the context
 	// tolerates because its subscription binding was already consumed. Previous rows no longer align after
 	// Transfer and Destroy, so no previous positions are bound; new missiles do not home until the next tick.
-	RegistryWindow window = BuildSpaceshipRegistryWindow(rFrame, nullptr, rFrame.postRender.pSpaceships->pfArrivalGracePeriods, *rFrame.postRender.pMissiles);
+	RegistryWindow window = BuildSpaceshipRegistryWindow(rFrame, nullptr, rFrame.postRender.pSpaceships->pArrivalGracePeriods, *rFrame.postRender.pMissiles);
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		// Always decrement timer so releasing and re-pressing fires immediately after cooldown
-		rCurrentPostRender.pfNextSecondarySpawnTimes[i] -= deltaTime.count();
+		rCurrentPostRender.pNextSecondarySpawnTimes[i] -= deltaTime;
 
 		if (!(rCurrentPostRender.pFlags[i] & kFireMissile))
 		{
@@ -366,7 +366,7 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 			continue;
 		}
 
-		if (rCurrentPostRender.pfNextSecondarySpawnTimes[i] >= 0.0f)
+		if (rCurrentPostRender.pNextSecondarySpawnTimes[i].count() >= 0.0f)
 		{
 			continue;
 		}
@@ -376,7 +376,7 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 			continue;
 		}
 
-		rCurrentPostRender.pfNextSecondarySpawnTimes[i] = kMissileSpawnInterval.count();
+		rCurrentPostRender.pNextSecondarySpawnTimes[i] = kMissileSpawnInterval;
 
 		rCurrentPostRender.pFlags[i].Toggle(kMissileSpawnLeft);
 		bool bLeftSide = rCurrentPostRender.pFlags[i] & kMissileSpawnLeft;
@@ -447,14 +447,14 @@ void PlayersPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict 
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		if (!((rCurrentPostRender.pFlags[i] & kExploding) && rCurrentPostRender.pfDestroyedExplosionTimes[i] <= 0.0f && rCurrentInterpolate.pfDestroyedTimes[i] > 0.0f))
+		if (!((rCurrentPostRender.pFlags[i] & kExploding) && rCurrentPostRender.pDestroyedExplosionTimes[i].count() <= 0.0f && rCurrentInterpolate.pDestroyedTimes[i] > std::chrono::duration<float>::zero()))
 		{
 			continue;
 		}
 
-		rCurrentPostRender.pfDestroyedExplosionTimes[i] = kfDestroyExplosionInterval;
+		rCurrentPostRender.pDestroyedExplosionTimes[i] = kDestroyExplosionInterval;
 
-		float fPercent = rCurrentInterpolate.pfDestroyedTimes[i] / kfDestroyTime;
+		float fPercent = rCurrentInterpolate.pDestroyedTimes[i] / kDestroyTime;
 
 		XMVECTOR vecDirection = XMVector4Transform(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(common::Random<XM_2PI>(rFrame.postRender.randomEngine)));
 
@@ -464,7 +464,7 @@ void PlayersPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict 
 		float fAdjustedPercent = (std::pow((1.0f - fPercent) + 1.0f, kfDeathRadialPower) - 1.0f) * kfExplosionsRadius;
 		vecJitteredPosition = XMVectorMultiplyAdd(vecJitteredDirection, XMVectorReplicate(fAdjustedPercent), vecJitteredPosition);
 
-		engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime),
+		engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, engine::SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)),
 		{
 			.iTypeIndex = PlayersInterpolate::siExplosionTypeIndex,
 			.vecPosition = vecJitteredPosition,
@@ -472,7 +472,7 @@ void PlayersPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict 
 			.flags = {engine::ExplosionFlags::kDestroysSelf, engine::ExplosionFlags::kYellow},
 			.iTrailCount = kiDeathTrailCount,
 			.fTrailAngle = fPercent * XM_PIDIV2,
-			.uiParticleCount = static_cast<uint32_t>(fPercent * kfExplosionParticleCount),
+			.iParticleCount = static_cast<int64_t>(fPercent * kfExplosionParticleCount),
 			.fParticleAngle = fPercent * XM_PIDIV2,
 			.fSizePercent = fPercent * kfExplosionSizeStart + (1.0f - fPercent) * kfExplosionSizeEnd,
 			.fSmokePercent = fPercent * kfExplosionSmoke,

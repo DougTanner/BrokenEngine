@@ -103,7 +103,7 @@ struct RenderDocCaptureState
 	HWND windowHandle = nullptr;
 	RenderDocCapturePhase ePhase = RenderDocCapturePhase::kAwaitCaptures;
 	bool bRestoreMinimized = false;
-	uint32_t uiBaselineCaptures = 0;
+	int64_t iBaselineCaptures = 0;
 	int64_t iFrames = 1;
 };
 
@@ -290,7 +290,7 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 	}
 	else
 	{
-		pState->uiBaselineCaptures = pRenderDocApi->GetNumCaptures();
+		pState->iBaselineCaptures = static_cast<int64_t>(pRenderDocApi->GetNumCaptures());
 		if (iFrames == 1)
 		{
 			pRenderDocApi->TriggerCapture();
@@ -307,7 +307,7 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 		{
 			if (IsIconic(pState->windowHandle) == FALSE && engine::gpGraphics->ExtentSettled())
 			{
-				pState->uiBaselineCaptures = pRenderDocApi->GetNumCaptures();
+				pState->iBaselineCaptures = static_cast<int64_t>(pRenderDocApi->GetNumCaptures());
 				if (pState->iFrames == 1)
 				{
 					pRenderDocApi->TriggerCapture();
@@ -324,7 +324,7 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 		{
 			// RenderDoc increments GetNumCaptures() only after a capture is fully serialized; the Drain liveness
 			// timeout bounds a capture that never lands (the dtor re-minimizes on that path).
-			if (pRenderDocApi->GetNumCaptures() < pState->uiBaselineCaptures + static_cast<uint32_t>(pState->iFrames))
+			if (static_cast<int64_t>(pRenderDocApi->GetNumCaptures()) < pState->iBaselineCaptures + pState->iFrames)
 			{
 				return std::nullopt;
 			}
@@ -354,7 +354,7 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 		}
 
 		nlohmann::json paths = nlohmann::json::array();
-		for (int64_t i = pState->uiBaselineCaptures; i < pState->uiBaselineCaptures + static_cast<uint32_t>(pState->iFrames); ++i)
+		for (int64_t i = pState->iBaselineCaptures; i < pState->iBaselineCaptures + pState->iFrames; ++i)
 		{
 			// Two-call GetCapture: first with a null buffer to size the path (length includes the NUL), then read it.
 			uint32_t uiPathLength = 0;
@@ -1118,7 +1118,7 @@ static void CommandMouse(const nlohmann::json& rParameters, [[maybe_unused]] nlo
 
 static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (!rParameters.is_object() || !rParameters.empty())
+	if (!rParameters.empty())
 	{
 		throw std::runtime_error("query_profile requires empty params");
 	}
@@ -1165,6 +1165,36 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 		counters.push_back(std::move(counter));
 	}
 	rResult["counters"] = std::move(counters);
+}
+
+// send_raw_packet: send the given bytes unchanged to the server as one reliable packet on the control channel; the
+// server's own admission and corrupt-input checks decide the outcome. Schema: {"bytes":[int,...]}; result: {"size"}.
+static void CommandSendRawPacket(const nlohmann::json& rParameters, nlohmann::json& rResult)
+{
+	if (rParameters.size() != 1 || !rParameters.contains("bytes") || !rParameters.at("bytes").is_array())
+	{
+		throw std::runtime_error("send_raw_packet requires exactly {\"bytes\":[int,...]}");
+	}
+	if (engine::gpClient == nullptr || !(engine::gpClient->mStateFlags & engine::Client::ClientStateFlags::kConnectionAccepted))
+	{
+		throw std::runtime_error("send_raw_packet requires an accepted connected client");
+	}
+
+	const nlohmann::json& rBytes = rParameters.at("bytes");
+	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+	for (const nlohmann::json& rByte : rBytes)
+	{
+		// Out-of-range values are rejected because the uint8_t cast would send different bytes than the caller gave.
+		if (!rByte.is_number_unsigned() || rByte.get<uint64_t>() > 255)
+		{
+			throw std::runtime_error("send_raw_packet 'bytes' must hold integers in 0..255");
+		}
+		rWorkbuffer.PushBack<uint8_t>(static_cast<uint8_t>(rByte.get<uint64_t>()));
+	}
+	engine::NetworkManager::SendPacket(engine::gpClient->mpServerPeer, engine::NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+
+	rResult["size"] = static_cast<int64_t>(rBytes.size());
 }
 
 const char* UiStateName(UiState eState)
@@ -1292,6 +1322,11 @@ bool ExecuteClientAgentCommand(std::string_view command, const nlohmann::json& r
 	if (command == "presentation_continuity_probe")
 	{
 		CommandPresentationContinuityProbe(rParameters, rResult);
+		return true;
+	}
+	if (command == "send_raw_packet")
+	{
+		CommandSendRawPacket(rParameters, rResult);
 		return true;
 	}
 	return false;

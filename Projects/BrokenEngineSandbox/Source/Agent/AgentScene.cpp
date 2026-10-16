@@ -111,6 +111,77 @@ static nlohmann::json BuildFleets()
 	return fleets;
 }
 
+static nlohmann::json BuildCellState(engine::GridCoord coordinate, const engine::Cell& rCell)
+{
+	nlohmann::json result;
+	result["coord"] = engine::AgentCoordinateJson(coordinate);
+	result["confirmedTick"] = rCell.iConfirmedTick;
+	result["confirmedOffset"] = rCell.iConfirmedOffset;
+	result["highWaterValidatedTick"] = rCell.iHighWaterValidatedTick;
+	result["lastFullStateTick"] = rCell.iLastFullStateTick;
+	result["snapshotHead"] = rCell.iSnapshotHead;
+	result["snapshotCount"] = rCell.iSnapshotCount;
+	result["lastRenderedTick"] = rCell.iLastRenderedTick;
+	result["lastRenderedTime"] = rCell.fLastRenderedTime;
+	result["serverUpdateCount"] = rCell.serverUpdates.size();
+	result["lastReplayConfirmedTick"] = rCell.iLastReplayConfirmedTick;
+	result["lastReplayServerUpdateCount"] = rCell.iLastReplayServerUpdateCount;
+	result["stuckFrameCount"] = rCell.iStuckFrameCount;
+
+	result["pendingFullStateTick"] = nullptr;
+	if (rCell.pendingFullState.has_value())
+	{
+		result["pendingFullStateTick"] = rCell.pendingFullState->iTick;
+	}
+
+	result["firstServerUpdateTick"] = nullptr;
+	result["lastServerUpdateTick"] = nullptr;
+	if (!rCell.serverUpdates.empty())
+	{
+		auto [firstUpdateIt, lastUpdateIt] = std::ranges::minmax_element(rCell.serverUpdates, {}, [](const auto& rEntry)
+		{
+			return rEntry.first;
+		});
+		result["firstServerUpdateTick"] = firstUpdateIt->first;
+		result["lastServerUpdateTick"] = lastUpdateIt->first;
+	}
+
+	result["tailTick"] = -1;
+	if (rCell.iSnapshotCount > 0)
+	{
+		result["tailTick"] = rCell.snapshots[engine::SnapshotIndex(rCell.iSnapshotHead, rCell.iSnapshotCount - 1)]->interpolate.iTick;
+	}
+	return result;
+}
+
+// rBuildRow(i) returns only the type-specific fields; this adds the shared type, coord, local, and screen keys.
+template <typename BUILD_ROW>
+static void AppendVisibleUnits(std::string_view type, const XMVECTOR* pVecPositions, int64_t iRowCount, engine::GridCoord coordinate, const engine::RenderBasis& rBasis, XMFLOAT4 f4VisibleArea, int64_t iMaximumUnits, int64_t& riUnitCount, bool& rbTruncated, nlohmann::json& rUnits, BUILD_ROW&& rBuildRow)
+{
+	for (int64_t i = 0; i < iRowCount; ++i)
+	{
+		XMVECTOR vecLocalPosition = pVecPositions[i];
+		XMVECTOR vecRenderPosition = engine::Rebase(rBasis, vecLocalPosition);
+		if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecRenderPosition))
+		{
+			continue;
+		}
+		if (riUnitCount >= iMaximumUnits)
+		{
+			rbTruncated = true;
+			break;
+		}
+		XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecRenderPosition);
+		nlohmann::json row = rBuildRow(i);
+		row["type"] = type;
+		row["coord"] = engine::AgentCoordinateJson(coordinate);
+		row["local"] = engine::AgentLocalPositionJson(vecLocalPosition);
+		row["screen"] = Vector2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen));
+		rUnits.push_back(std::move(row));
+		++riUnitCount;
+	}
+}
+
 void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	if (rParameters.contains("includeUnits") && !rParameters.at("includeUnits").is_boolean())
@@ -183,6 +254,7 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 	rResult["fleets"] = BuildFleets();
 
 	nlohmann::json subscribedCoordinates = nlohmann::json::array();
+	nlohmann::json cellStates = nlohmann::json::array();
 	nlohmann::json units = nlohmann::json::array();
 	nlohmann::json islands = nlohmann::json::array();
 	int64_t iPlayerTotal = 0;
@@ -195,6 +267,7 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 	for (const auto& [rCoordinate, rCell] : gpGame->mCells)
 	{
 		subscribedCoordinates.push_back(engine::AgentCoordinateJson(rCoordinate));
+		cellStates.push_back(BuildCellState(rCoordinate, rCell));
 
 		// Island placements come from staticData, available regardless of whether a snapshot has arrived.
 		const engine::CellStaticData& rStaticData = rCell.staticData;
@@ -241,66 +314,32 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 		{
 			const PlayersInterpolate& rPlayersInterpolate = *rFrame.interpolate.pPlayers;
 			const PlayersPostRender& rPlayersPost = *rFrame.postRender.pPlayers;
-			for (int64_t i = 0; i < rPlayersPost.iCount; ++i)
+			AppendVisibleUnits("player", rPlayersInterpolate.pVecPositions, rPlayersPost.iCount, rCoordinate, basis, f4VisibleArea, iMaximumUnits, iUnitCount, bTruncated, units, [&](int64_t i) -> nlohmann::json
 			{
-				XMVECTOR vecLocalPosition = rPlayersInterpolate.pVecPositions[i];
-				XMVECTOR vecRenderPosition = engine::Rebase(basis, vecLocalPosition);
-				if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecRenderPosition))
+				return
 				{
-					continue;
-				}
-				if (iUnitCount >= iMaximumUnits)
-				{
-					bTruncated = true;
-					break;
-				}
-				XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecRenderPosition);
-				units.push_back(
-				{
-					{"type", "player"},
 					{"globalId", rPlayersPost.pGlobalPlayerIds[i].iValue},
-					{"coord", engine::AgentCoordinateJson(rCoordinate)},
-					{"local", engine::AgentLocalPositionJson(vecLocalPosition)},
-					{"screen", Vector2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen))},
 					{"armor", rPlayersPost.pfArmors[i]},
 					{"shield", rPlayersPost.pfShields[i]},
 					{"alignment", rPlayersPost.pAlignments[i].uiValue},
 					{"flags", PlayerFlagNames(rPlayersPost.pFlags[i])},
-				});
-				++iUnitCount;
-			}
+				};
+			});
 		}
 
 		if (bIncludeSpaceships)
 		{
 			const SpaceshipsInterpolate& rShipsInterpolate = *rFrame.interpolate.pSpaceships;
 			const SpaceshipsPostRender& rShipsPost = *rFrame.postRender.pSpaceships;
-			for (int64_t i = 0; i < rShipsPost.iCount; ++i)
+			AppendVisibleUnits("spaceship", rShipsInterpolate.pVecPositions, rShipsPost.iCount, rCoordinate, basis, f4VisibleArea, iMaximumUnits, iUnitCount, bTruncated, units, [&](int64_t i) -> nlohmann::json
 			{
-				XMVECTOR vecLocalPosition = rShipsInterpolate.pVecPositions[i];
-				XMVECTOR vecRenderPosition = engine::Rebase(basis, vecLocalPosition);
-				if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecRenderPosition))
+				return
 				{
-					continue;
-				}
-				if (iUnitCount >= iMaximumUnits)
-				{
-					bTruncated = true;
-					break;
-				}
-				XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecRenderPosition);
-				units.push_back(
-				{
-					{"type", "spaceship"},
-					{"coord", engine::AgentCoordinateJson(rCoordinate)},
-					{"local", engine::AgentLocalPositionJson(vecLocalPosition)},
-					{"screen", Vector2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen))},
 					{"health", rShipsPost.pfHealths[i]},
 					{"alignment", rShipsPost.pAlignments[i].uiValue},
 					{"flags", SpaceshipFlagNames(rShipsPost.pFlags[i])},
-				});
-				++iUnitCount;
-			}
+				};
+			});
 		}
 
 		// Blasters stay last so a cell over the unit budget truncates these rows instead of displacing the others.
@@ -308,37 +347,21 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 		{
 			const BlastersInterpolate& rBlastersInterpolate = *rFrame.interpolate.pBlasters;
 			const BlastersPostRender& rBlastersPost = *rFrame.postRender.pBlasters;
-			for (int64_t i = 0; i < rBlastersPost.iCount; ++i)
+			AppendVisibleUnits("blaster", rBlastersInterpolate.pVecPositions, rBlastersPost.iCount, rCoordinate, basis, f4VisibleArea, iMaximumUnits, iUnitCount, bTruncated, units, [&](int64_t i) -> nlohmann::json
 			{
-				XMVECTOR vecLocalPosition = rBlastersInterpolate.pVecPositions[i];
-				XMVECTOR vecRenderPosition = engine::Rebase(basis, vecLocalPosition);
-				if (!engine::gpCamera->InVisibleArea(f4VisibleArea, vecRenderPosition))
+				return
 				{
-					continue;
-				}
-				if (iUnitCount >= iMaximumUnits)
-				{
-					bTruncated = true;
-					break;
-				}
-				XMVECTOR vecScreen = engine::gpCamera->WorldToScreen(vecRenderPosition);
-				units.push_back(
-				{
-					{"type", "blaster"},
-					{"coord", engine::AgentCoordinateJson(rCoordinate)},
-					{"local", engine::AgentLocalPositionJson(vecLocalPosition)},
-					{"screen", Vector2ToJson(XMVectorGetX(vecScreen), XMVectorGetY(vecScreen))},
 					{"alignment", rBlastersPost.pAlignments[i].uiValue},
 					{"windTrailIntensity", rBlastersInterpolate.pfWindTrailIntensities[i]},
 					{"windTrailWidth", rBlastersInterpolate.pfWindTrailWidths[i]},
 					{"windTrailLengthMultiplier", rBlastersInterpolate.pfWindTrailLengthMultipliers[i]},
-				});
-				++iUnitCount;
-			}
+				};
+			});
 		}
 	}
 
 	rResult["subscribedCoords"] = std::move(subscribedCoordinates);
+	rResult["cellStates"] = std::move(cellStates);
 	rResult["units"] = std::move(units);
 	rResult["counts"] =
 	{

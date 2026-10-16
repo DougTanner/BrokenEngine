@@ -127,7 +127,7 @@ void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine:
 			.uiCrc = data::kAudioMissile182794__qubodup__rocketlaunch_loopwavCrc,
 			.fVolume = gMissileLoopVolume.mfCurrent,
 			.fPitch = fPitch,
-			.fFadeOutTime = kMissileSoundFadeOutTime.count(),
+			.fadeOutTime = kMissileSoundFadeOutTime,
 		});
 	}
 }
@@ -168,7 +168,7 @@ void MissilesInterpolate::ClientInitAll(Frame& rFrame)
 	MissilesInterpolate& rMissiles = *rFrame.interpolate.pMissiles;
 	for (int64_t i = 0; i < rMissiles.iCount; ++i)
 	{
-		if (rMissiles.pfDestroyedTimes[i] >= 0.0f)
+		if (rMissiles.pDestroyedTimes[i].count() >= 0.0f)
 		{
 			continue;
 		}
@@ -217,14 +217,14 @@ void MissilesInterpolate::Register()
 	engine::ExplosionsInterpolate::RegisterType(siMissileExplosionTypeIndex,
 	{
 #if defined(BT_CLIENT)
-		.iPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryLightControllerTypeIndex,
-		.iSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryLightControllerTypeIndex,
-		.iPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryPuffControllerTypeIndex,
-		.iSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryPuffControllerTypeIndex,
+		.iPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::siPrimaryLightControllerTypeIndex,
+		.iSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::siSecondaryLightControllerTypeIndex,
+		.iPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::siPrimaryPuffControllerTypeIndex,
+		.iSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::siSecondaryPuffControllerTypeIndex,
 		.iTrailTypeIndex = engine::ExplosionsInterpolate::siExplosionTrailTypeIndex,
-		.iWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::suiWindRadialControllerTypeIndex,
+		.iWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::siWindRadialControllerTypeIndex,
 #endif // BT_CLIENT
-		.uiBaseParticleCount = static_cast<uint32_t>(kiMissileExplosionBaseParticleCount),
+		.iBaseParticleCount = kiMissileExplosionBaseParticleCount,
 		.uiParticleColor = kuiMissileExplosionParticleColor,
 		.fParticleVelocityMinimum = kfMissileExplosionParticleVelocityMinimum,
 		.fParticleVelocityRandom = kfMissileExplosionParticleVelocityRandom,
@@ -261,7 +261,7 @@ static void SpawnMissileExplosion(Frame& __restrict rFrame, engine::GridCoord em
 			vecExplosionPosition = common::RandomPositionJitter<0.2f>(vecPosition, rFrame.postRender.randomEngine);
 		}
 
-		engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime),
+		engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, engine::SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)),
 			{
 				.iTypeIndex = siMissileExplosionTypeIndex,
 				.vecPosition = vecExplosionPosition,
@@ -269,7 +269,7 @@ static void SpawnMissileExplosion(Frame& __restrict rFrame, engine::GridCoord em
 				.flags = {engine::ExplosionFlags::kDestroysSelf, engine::ExplosionFlags::kYellow},
 				.iTrailCount = static_cast<int64_t>(2.0f * fScaledPercent * (flags & kDirectional ? 0.6f : 1.0f) * kfExplosionTrailCountMinimum + kfExplosionTrailCountRandom * common::Random(rFrame.postRender.randomEngine)),
 				.fTrailAngle = flags & kDirectional ? XM_PI : XM_2PI,
-				.uiParticleCount = static_cast<uint32_t>(2.0f * fScaledPercent * kfExplosionParticleCount),
+				.iParticleCount = static_cast<int64_t>(2.0f * fScaledPercent * kfExplosionParticleCount),
 				.fParticleAngle = flags & kDirectional ? XM_PI : XM_2PI,
 				.fSizePercent = 0.5f + 2.0f * fScaledPercent,
 				.fSmokePercent = flags & kDirectional ? fScaledPercent : 0.5f * fScaledPercent,
@@ -328,9 +328,9 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.vecVelocity = rCurrentPostRender.pVecVelocities[i],
 				.alignment = rCurrentPostRender.pAlignments[i],
 				.fAcceleration = rCurrentPostRender.pfAccelerations[i],
-				.deltaRotationDelaySeconds = std::chrono::duration<float>(rCurrentPostRender.pfDeltaRotationDelays[i]),
-				.timeSeconds = std::chrono::duration<float>(rCurrentPostRender.pfTimes[i]),
-				.nextJitterSeconds = std::chrono::duration<float>(rCurrentPostRender.pfNextJitter[i]),
+				.deltaRotationDelaySeconds = rCurrentPostRender.pDeltaRotationDelays[i],
+				.timeSeconds = rCurrentPostRender.pTimes[i],
+				.nextJitterSeconds = rCurrentPostRender.pNextJitter[i],
 				.fDeltaRotation = rCurrentPostRender.pfDeltaRotations[i],
 				.fDeltaRotationMaximum = rCurrentPostRender.pfDeltaRotationMaximum[i],
 				.fPitch = rCurrentPostRender.pfPitches[i],
@@ -357,7 +357,7 @@ void MissilesPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
 		bool bSilentDespawn = rCurrentPostRender.pFlags[i] & kSilentDespawn;
-		bool bExplosionFinished = (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pfDestroyedTimes[i] <= 0.0f;
+		bool bExplosionFinished = (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pDestroyedTimes[i].count() <= 0.0f;
 		return bSilentDespawn || bExplosionFinished;
 	}, [&](int64_t i)
 	{
@@ -394,21 +394,21 @@ bool MissilesPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rSpawn
 		flags.Set(kFalling);
 	}
 	rCurrentPostRender.pFlags[iIndex] = flags;
-	rCurrentInterpolate.pfDestroyedTimes[iIndex] = -1.0f; // Sentinel: -1.0f = not exploding
+	rCurrentInterpolate.pDestroyedTimes[iIndex] = std::chrono::duration<float>(-1.0f); // Sentinel: -1.0f = not exploding
 
 	rCurrentPostRender.pVecVelocities[iIndex] = rSpawnInformation.vecVelocity;
 	rCurrentPostRender.pVecExplosionDirections[iIndex] = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 	rCurrentPostRender.pVecStoredDirections[iIndex] = rSpawnInformation.vecStoredDirection;
 	rCurrentPostRender.puiRegistryTargets[iIndex] = rSpawnInformation.uiTarget;
-	rCurrentPostRender.pfTimes[iIndex] = rSpawnInformation.time.count();
+	rCurrentPostRender.pTimes[iIndex] = rSpawnInformation.time;
 	// An arrival restores the ramp verbatim — including the negative value of a finished ramp — and draws no fresh ramp delay.
-	rCurrentPostRender.pfDeltaRotationDelays[iIndex] = rSpawnInformation.bTransfer
-		? rSpawnInformation.deltaRotationDelay.count()
-		: 0.5f * kMissileDeltaRotationDelay.count() + common::Random<kMissileDeltaRotationDelay.count()>(rFrame.postRender.randomEngine);
+	rCurrentPostRender.pDeltaRotationDelays[iIndex] = rSpawnInformation.bTransfer
+		? rSpawnInformation.deltaRotationDelay
+		: 0.5f * kMissileDeltaRotationDelay + std::chrono::duration<float>(common::Random<kMissileDeltaRotationDelay.count()>(rFrame.postRender.randomEngine));
 	rCurrentPostRender.pfDeltaRotations[iIndex] = rSpawnInformation.fDeltaRotation;
 	float fExhaustLength = (flags & kFalling) ? 0.0f : kfMissileExhaustLength + common::Random<kfMissileExhaustLengthRandom>(rFrame.postRender.randomEngine);
 	rCurrentPostRender.pfExhaustLengths[iIndex] = fExhaustLength;
-	rCurrentPostRender.pfNextJitter[iIndex] = rSpawnInformation.nextJitter.count();
+	rCurrentPostRender.pNextJitter[iIndex] = rSpawnInformation.nextJitter;
 	rCurrentPostRender.pfDeltaRotationMaximum[iIndex] = rSpawnInformation.bTransfer
 		? rSpawnInformation.fDeltaRotationMaximum
 		: (flags & kFalling) ? 0.0f : kfDeltaRotationLimitMinimum + common::Random<kfDeltaRotationLimitRandom>(rFrame.postRender.randomEngine);
@@ -480,7 +480,7 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		rCurrentPostRender.pFlags[i].Set(kDirectional);
 	}
 	rCurrentPostRender.pVecExplosionDirections[i] = bDirectional ? engine::gpIslandTerrain->CellNormal(rStaticData, rCurrentInterpolate.pVecPositions[i]) : XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
-	rCurrentInterpolate.pfDestroyedTimes[i] = kMissileDestroyTime.count();
+	rCurrentInterpolate.pDestroyedTimes[i] = kMissileDestroyTime;
 
 #if defined(BT_CLIENT)
 	if ((rCurrentInterpolate.puiAreaLights[i].uuid.iValue != 0))
@@ -521,7 +521,7 @@ bool MissilesInterpolate::LogDifferences(const MissilesInterpolate& rOther) cons
 	{
 		bEqual &= common::LogDifference<"pVecPositions">(i, pVecPositions[i], rOther.pVecPositions[i]);
 		bEqual &= common::LogDifference<"pVecDirections">(i, pVecDirections[i], rOther.pVecDirections[i]);
-		bEqual &= common::LogDifference<"pfDestroyedTimes">(i, pfDestroyedTimes[i], rOther.pfDestroyedTimes[i]);
+		bEqual &= common::LogDifference<"pDestroyedTimes">(i, pDestroyedTimes[i], rOther.pDestroyedTimes[i]);
 	}
 
 	return bEqual;
@@ -540,10 +540,10 @@ bool MissilesPostRender::LogDifferences(const MissilesPostRender& rOther) const
 		bEqual &= common::LogDifference<"pVecExplosionDirections">(i, pVecExplosionDirections[i], rOther.pVecExplosionDirections[i]);
 		bEqual &= common::LogDifference<"pVecStoredDirections">(i, pVecStoredDirections[i], rOther.pVecStoredDirections[i]);
 		bEqual &= common::LogDifference<"puiRegistryTargets">(i, puiRegistryTargets[i], rOther.puiRegistryTargets[i]);
-		bEqual &= common::LogDifference<"pfTimes">(i, pfTimes[i], rOther.pfTimes[i]);
-		bEqual &= common::LogDifference<"pfDeltaRotationDelays">(i, pfDeltaRotationDelays[i], rOther.pfDeltaRotationDelays[i]);
+		bEqual &= common::LogDifference<"pTimes">(i, pTimes[i], rOther.pTimes[i]);
+		bEqual &= common::LogDifference<"pDeltaRotationDelays">(i, pDeltaRotationDelays[i], rOther.pDeltaRotationDelays[i]);
 		bEqual &= common::LogDifference<"pfDeltaRotations">(i, pfDeltaRotations[i], rOther.pfDeltaRotations[i]);
-		bEqual &= common::LogDifference<"pfNextJitter">(i, pfNextJitter[i], rOther.pfNextJitter[i]);
+		bEqual &= common::LogDifference<"pNextJitter">(i, pNextJitter[i], rOther.pNextJitter[i]);
 		bEqual &= common::LogDifference<"pfDeltaRotationMax">(i, pfDeltaRotationMaximum[i], rOther.pfDeltaRotationMaximum[i]);
 		bEqual &= common::LogDifference<"pfAccelerations">(i, pfAccelerations[i], rOther.pfAccelerations[i]);
 		bEqual &= common::LogDifference<"pfPitches">(i, pfPitches[i], rOther.pfPitches[i]);

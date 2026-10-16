@@ -362,18 +362,25 @@ void AgentCommandServer::Drain()
 
 		// Reject an unknown top-level envelope key before dispatch (before mDeferredIdentifier is armed) so a typo'd field
 		// can never be silently ignored. Only id/cmd/params are legitimate; the first offending key is reported.
-		bool bUnknownKey = false;
+		bool bRejected = false;
 		for (const auto& [rKey, rValue] : request.request.items())
 		{
 			if (rKey != "cmd" && rKey != "params" && rKey != "id")
 			{
 				response["ok"] = false;
 				response["error"] = "unknown envelope key '" + rKey + "'";
-				bUnknownKey = true;
+				bRejected = true;
 				break;
 			}
 		}
-		if (!bUnknownKey)
+		// A present params must be an object, so no handler tests its type; an absent params dispatches as {}.
+		if (!bRejected && request.request.contains("params") && !request.request["params"].is_object())
+		{
+			response["ok"] = false;
+			response["error"] = "params must be an object";
+			bRejected = true;
+		}
+		if (!bRejected)
 		{
 			std::string command = request.request["cmd"].get<std::string>();
 			const nlohmann::json& rParameters = request.request.contains("params") ? request.request["params"] : nlohmann::json::object();

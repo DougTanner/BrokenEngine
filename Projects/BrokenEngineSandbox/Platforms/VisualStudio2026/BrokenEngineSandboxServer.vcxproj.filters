@@ -186,6 +186,12 @@
     <ClInclude Include="..\..\Source\Game.h">
       <Filter>Game</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\Fleet.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Version.h">
+      <Filter>Game</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\SpawnTransfer.h">
       <Filter>Game</Filter>
     </ClInclude>
@@ -330,6 +336,9 @@
     <ClInclude Include="..\..\..\..\Common\ScopedLambda.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\Sha256Hasher.h">
+      <Filter>Common</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\Common\Singleton.h">
       <Filter>Common</Filter>
     </ClInclude>
@@ -395,6 +404,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.h">
       <Filter>Engine\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\FlightPlaneTable.h">
+      <Filter>Game\Frame</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Frame\Frame.h">
       <Filter>Game\Frame</Filter>
@@ -477,19 +489,10 @@
     <ClInclude Include="..\..\Source\Agent\AgentCommandsServerQueries.h">
       <Filter>Game\Agent</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Agent\Commands\ServerFaultHarnessRigs.h">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\Agent\Commands\ServerSimulationHarnessRigs.h">
       <Filter>Game\Agent\Commands</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Agent\Commands\ServerFrameEdit.h">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityHarnessRig.h">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\Agent\Commands\RegistryHarnessRig.h">
       <Filter>Game\Agent\Commands</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Save\GameSaveLoad.h">
@@ -523,6 +526,9 @@
       <Filter>Engine\Frame</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\TerrainCollisionUtils.h">
       <Filter>Engine\Frame</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavBuild.h">
@@ -589,6 +595,9 @@
       <Filter>Engine\Ui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Alignments.h">
+      <Filter>Engine\Frame</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.h">
       <Filter>Engine\Frame</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Common\ErrorUtils.h">
@@ -806,19 +815,10 @@
     <ClCompile Include="..\..\Source\Agent\AgentCommandsServerQueries.cpp">
       <Filter>Game\Agent</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Agent\Commands\ServerFaultHarnessRigs.cpp">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Source\Agent\Commands\ServerSimulationHarnessRigs.cpp">
       <Filter>Game\Agent\Commands</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Agent\Commands\ServerFrameEdit.cpp">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityHarnessRig.cpp">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Agent\Commands\RegistryHarnessRig.cpp">
       <Filter>Game\Agent\Commands</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Save\GameSaveLoad.cpp">
@@ -834,6 +834,9 @@
       <Filter>Engine\Frame</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\TerrainCollisionUtils.cpp">
       <Filter>Engine\Frame</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\NavBuild.cpp">
@@ -925,6 +928,9 @@
       <Filter>Game\Ui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Alignments.cpp">
+      <Filter>Engine\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.cpp">
       <Filter>Engine\Frame</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Server\ServerDisplay.cpp">

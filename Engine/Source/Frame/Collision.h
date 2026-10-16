@@ -28,12 +28,10 @@ struct CollisionLayer
 	// Pointers to collection-owned ephemeral static buffers
 	const XMVECTOR* pVecStartPositions = nullptr;
 	const XMVECTOR* pVecEndPositions = nullptr;
-	const float* pfMaxTimes = nullptr;         // Optional exclusive entity-collision cutoff
+	const float* pfMaxTimes = nullptr;         // Exclusive entity-collision cutoff
 	CollisionFlags_t* pFlags = nullptr;       // Per-object flags (read/write for kAlreadyCollided)
-	const XMVECTOR* pVecVelocities = nullptr; // Optional: velocity/direction per object
+	const XMVECTOR* pVecVelocities = nullptr; // Velocity/direction per object
 	int64_t iCount = 0;
-	float fStartTime = 0.0f;                  // Normalized absolute tick time
-	float fEndTime = 1.0f;                    // Normalized absolute tick time
 	float fRadius = 0.0f;
 	float fDamage = 0.0f;
 	bool bSweptTest = false;                  // Sweep every pair involving this layer
@@ -53,7 +51,7 @@ struct CollisionResult
 	float fTimeOfImpact = 0.0f;
 	XMVECTOR vecContactPoint {};
 	XMVECTOR vecSelfPosition {};
-	XMVECTOR vecOtherVelocity {};  // Velocity of the colliding object (zero if not provided)
+	XMVECTOR vecOtherVelocity {};  // Velocity of the colliding object
 };
 
 // Result span for a single object (offset into sResultEntries + count)

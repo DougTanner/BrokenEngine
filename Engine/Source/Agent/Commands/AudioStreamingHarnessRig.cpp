@@ -101,11 +101,8 @@ void AudioStreamingHarnessRig::Detach(AudioStreamingHarnessRig& rHarnessRig)
 
 void AudioStreamingHarnessRig::Shutdown()
 {
-	ReleaseInvalid();
 	ReleaseHold(AudioStreamingHarnessRigHoldOwner::kControlled);
-	ReleaseCoexistence();
-	ReleaseSaturation();
-	ReleaseControls();
+	ReleaseLoaders();
 	gpAudioManager->mpStreamingVoices->Clear(false);
 	gpFileManager->mpPackChunks->mLoader.WaitForLoadersIdle();
 	uint64_t uiGate = muiScenarioGate.load(std::memory_order_seq_cst);
@@ -119,57 +116,16 @@ void AudioStreamingHarnessRig::Shutdown()
 	}
 }
 
-bool AudioStreamingHarnessRig::RequestHold()
-{
-	if (gpAudioManager->mbSuspended.load(std::memory_order_acquire))
-	{
-		return false;
-	}
-	if (mFlags & Flags::kHistoryStarted)
-	{
-		return false;
-	}
-	if (mFlags & Flags::kHoldPending)
-	{
-		return false;
-	}
-	mFlags.Set(Flags::kHoldPending);
-	return true;
-}
-
-bool AudioStreamingHarnessRig::Begin(common::crc_t crc, int64_t iOffset, int64_t iLength)
-{
-	if (!(mFlags & Flags::kMode))
-	{
-		mFlags.Set(Flags::kMode);
-		gpAudioManager->mpStreamingVoices->Clear(false);
-	}
-	if (mFlags & Flags::kHistoryStarted)
-	{
-		return true;
-	}
-	if (!BeginHistory())
-	{
-		return false;
-	}
-	if (mFlags & Flags::kHoldPending)
-	{
-		if (!ArmHold(AudioStreamingHarnessRigHoldOwner::kControlled, crc, iOffset, iLength))
-		{
-			return false;
-		}
-		mFlags.Set(Flags::kHoldPending, false);
-		mFlags.Set(Flags::kControlledPublication);
-	}
-	mFlags.Set(Flags::kHistoryStarted);
-	return true;
-}
-
 bool AudioStreamingHarnessRig::Play(common::crc_t crc)
 {
 	if (gpAudioManager->mbSuspended.load(std::memory_order_acquire))
 	{
 		return false;
+	}
+	if (!(mFlags & Flags::kMode))
+	{
+		mFlags.Set(Flags::kMode);
+		gpAudioManager->mpStreamingVoices->Clear(false);
 	}
 	gpAudioManager->mpStreamingVoices->Play(crc);
 	const std::unique_ptr<StreamingVoice>& pCurrent = gpAudioManager->mpStreamingVoices->mpCurrentStream;
@@ -181,19 +137,6 @@ void AudioStreamingHarnessRig::Clear()
 	gpAudioManager->mpStreamingVoices->Clear(false);
 }
 
-void AudioStreamingHarnessRig::ReleaseControls()
-{
-	mFlags.Set(Flags::kHoldPending, false);
-	mFlags.Set(Flags::kControlledPublication, false);
-	mFlags.Set(Flags::kPublicationStopped, false);
-	mCommandFlags.Set(AudioStreamingHarnessRigCommandFlags::kSaturationActive, false);
-	for (const std::unique_ptr<AudioStreamingVoiceControl>& pControl : mVoiceControls)
-	{
-		pControl->pVoice->mpAudioStreamingControl = nullptr;
-	}
-	mVoiceControls.clear();
-}
-
 AudioStreamingHarnessRigAudioSnapshot AudioStreamingHarnessRig::InspectAudio() const
 {
 	ASSERT(common::gpMultithreading->IsMainThread());
@@ -202,10 +145,6 @@ AudioStreamingHarnessRigAudioSnapshot AudioStreamingHarnessRig::InspectAudio() c
 	if (rVoices.mpCurrentStream != nullptr)
 	{
 		snapshot.current = InspectVoice(*rVoices.mpCurrentStream);
-		if (rVoices.mpCurrentStream->mpAudioStreamingControl != nullptr)
-		{
-			snapshot.iPublicationAllowance = rVoices.mpCurrentStream->mpAudioStreamingControl->uiPublicationAllowance;
-		}
 	}
 	if (!rVoices.mPreviousStreams.empty())
 	{
@@ -218,12 +157,7 @@ AudioStreamingHarnessRigAudioSnapshot AudioStreamingHarnessRig::InspectAudio() c
 		snapshot.olderFades.iPendingSlots += older.iPendingSlots;
 		snapshot.olderFades.iUnderrunningCount += older.flags & AudioStreamingHarnessRigVoiceFlags::kUnderrunning ? 1 : 0;
 	}
-	snapshot.flags.Set(AudioStreamingHarnessRigAudioSnapshotFlags::kControlledPublication, mFlags & Flags::kControlledPublication);
-	snapshot.flags.Set(AudioStreamingHarnessRigAudioSnapshotFlags::kSaturationActive, mCommandFlags & AudioStreamingHarnessRigCommandFlags::kSaturationActive);
-	if (!(snapshot.flags & AudioStreamingHarnessRigAudioSnapshotFlags::kControlledPublication))
-	{
-		snapshot.iPublicationAllowance = 0;
-	}
+	snapshot.flags.Set(AudioStreamingHarnessRigAudioSnapshotFlags::kPublicationStopped, mFlags & Flags::kPublicationStopped);
 	return snapshot;
 }
 
@@ -231,8 +165,8 @@ void AudioStreamingHarnessRig::ResetHistory()
 {
 	auto Reset = [](auto& rHistory)
 	{
-		rHistory.uiHead.store(0, std::memory_order_relaxed);
-		rHistory.uiDropped.store(0, std::memory_order_relaxed);
+		rHistory.iHead.store(0, std::memory_order_relaxed);
+		rHistory.iDropped.store(0, std::memory_order_relaxed);
 		for (HistoryEntry& rEntry : rHistory.entries)
 		{
 			rEntry.iPublishedSequence.store(0, std::memory_order_relaxed);
@@ -242,26 +176,19 @@ void AudioStreamingHarnessRig::ResetHistory()
 	Reset(mMainHistory);
 	Reset(mLoader0History);
 	Reset(mLoader1History);
-	muiRetryCount.store(0, std::memory_order_seq_cst);
-	muiReservationStart = muiNextSequence.load(std::memory_order_seq_cst);
-	mbHistoryInitialized = true;
+	miRetryCount.store(0, std::memory_order_seq_cst);
+	miReservationStart = miNextSequence.load(std::memory_order_seq_cst);
 }
 
 bool AudioStreamingHarnessRig::BeginHistory()
 {
 	PackChunks* pPackChunks = gpFileManager->mpPackChunks.get();
-	if (mbHistoryInitialized)
-	{
-		return true;
-	}
 	if (!mbResetPending)
 	{
 		uint64_t uiGate = muiScenarioGate.load(std::memory_order_seq_cst);
 		muiScenarioGate.store((uiGate & 1) != 0 ? uiGate + 1 : uiGate + 2, std::memory_order_seq_cst);
-		ReleaseInvalid();
 		ReleaseHold(AudioStreamingHarnessRigHoldOwner::kControlled);
-		ReleaseCoexistence();
-		ReleaseSaturation();
+		ReleaseLoaders();
 		mbResetPending = true;
 	}
 	if (miActiveWriters.load(std::memory_order_seq_cst) != 0)
@@ -314,78 +241,29 @@ void AudioStreamingHarnessRig::ReleaseHold(AudioStreamingHarnessRigHoldOwner eOw
 	}
 }
 
-void AudioStreamingHarnessRig::StartCoexistence(common::crc_t realtimeCrc, common::crc_t normalCrc)
-{
-	PackChunks* pPackChunks = gpFileManager->mpPackChunks.get();
-	{
-		std::unique_lock lock(pPackChunks->mLoader.mQueueMutex);
-		ASSERT(meStagingOwner.load(std::memory_order_seq_cst) == StagingOwner::kNone);
-		meStagingOwner.store(StagingOwner::kCoexistence, std::memory_order_seq_cst);
-	}
-	pPackChunks->mLoader.RequestChunkLoad(std::span(&realtimeCrc, 1), LoadPriority::kRealtime);
-	pPackChunks->mLoader.RequestChunkLoad(std::span(&normalCrc, 1), LoadPriority::kNormal);
-}
-
-bool AudioStreamingHarnessRig::FinishCoexistence()
-{
-	PackChunks* pPackChunks = gpFileManager->mpPackChunks.get();
-	if (meStagingOwner.load(std::memory_order_seq_cst) == StagingOwner::kNone)
-	{
-		return true;
-	}
-	if (!pPackChunks->HasQueuedAudioRead())
-	{
-		return false;
-	}
-	ReleaseCoexistence();
-	return true;
-}
-
-void AudioStreamingHarnessRig::ReleaseCoexistence()
-{
-	PackChunks* pPackChunks = gpFileManager->mpPackChunks.get();
-	bool bReleased = false;
-	{
-		std::unique_lock lock(pPackChunks->mLoader.mQueueMutex);
-		if (meStagingOwner.load(std::memory_order_seq_cst) == StagingOwner::kCoexistence)
-		{
-			meStagingOwner.store(StagingOwner::kNone, std::memory_order_seq_cst);
-			bReleased = true;
-		}
-	}
-	if (bReleased)
-	{
-		pPackChunks->mLoader.PublishWake();
-	}
-}
-
-bool AudioStreamingHarnessRig::BeginSaturation()
+void AudioStreamingHarnessRig::StallLoaders()
 {
 	std::unique_lock lock(gpFileManager->mpPackChunks->mLoader.mQueueMutex);
-	if (meStagingOwner.load(std::memory_order_seq_cst) != StagingOwner::kNone)
-	{
-		return false;
-	}
-	meStagingOwner.store(StagingOwner::kSaturation, std::memory_order_seq_cst);
-	return true;
+	mbLoadersStalled.store(true, std::memory_order_seq_cst);
 }
 
-void AudioStreamingHarnessRig::ReleaseSaturation()
+void AudioStreamingHarnessRig::ReleaseLoaders()
 {
 	PackChunks* pPackChunks = gpFileManager->mpPackChunks.get();
 	bool bReleased = false;
 	{
 		std::unique_lock lock(pPackChunks->mLoader.mQueueMutex);
-		if (meStagingOwner.load(std::memory_order_seq_cst) == StagingOwner::kSaturation)
-		{
-			meStagingOwner.store(StagingOwner::kNone, std::memory_order_seq_cst);
-			bReleased = true;
-		}
+		bReleased = mbLoadersStalled.exchange(false, std::memory_order_seq_cst);
 	}
 	if (bReleased)
 	{
 		pPackChunks->mLoader.PublishWake();
 	}
+}
+
+void AudioStreamingHarnessRig::LoadChunk(common::crc_t crc, LoadPriority ePriority)
+{
+	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(std::span(&crc, 1), ePriority);
 }
 
 void AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition ePartition, AudioStreamingHarnessRigPhase ePhase, int64_t iPoolIndex, common::crc_t crc, int64_t iOffset, int64_t iLength, AudioStreamingHarnessRigQueueState eState, int64_t iGeneration, bool bCancelAcknowledged)
@@ -411,17 +289,17 @@ void AudioStreamingHarnessRig::RecordEntry(AudioStreamingHarnessRigPartition ePa
 	}
 	auto Write = [&](auto& rHistory)
 	{
-		int64_t iIndex = rHistory.uiHead.fetch_add(1, std::memory_order_seq_cst);
+		int64_t iIndex = rHistory.iHead.fetch_add(1, std::memory_order_seq_cst);
 		if (iIndex >= std::ssize(rHistory.entries))
 		{
-			rHistory.uiDropped.fetch_add(1, std::memory_order_seq_cst);
+			rHistory.iDropped.fetch_add(1, std::memory_order_seq_cst);
 			return;
 		}
-		uint64_t uiSequence = muiNextSequence.fetch_add(1, std::memory_order_seq_cst) + 1;
+		int64_t iSequence = miNextSequence.fetch_add(1, std::memory_order_seq_cst) + 1;
 		HistoryEntry& rEntry = rHistory.entries[iIndex];
 		rEntry.record =
 		{
-			.uiSequence = uiSequence,
+			.iSequence = iSequence,
 			.iScenarioGeneration = static_cast<int64_t>(uiGate >> 1),
 			.iGeneration = iGeneration,
 			.iThreadId = static_cast<int64_t>(GetCurrentThreadId()),
@@ -435,7 +313,7 @@ void AudioStreamingHarnessRig::RecordEntry(AudioStreamingHarnessRigPartition ePa
 			.eState = eState,
 			.bCancelAcknowledged = bCancelAcknowledged,
 		};
-		rEntry.iPublishedSequence.store(static_cast<int64_t>(uiSequence), std::memory_order_release);
+		rEntry.iPublishedSequence.store(iSequence, std::memory_order_release);
 	};
 	switch (ePartition)
 	{
@@ -458,13 +336,13 @@ AudioStreamingHarnessRigSnapshot AudioStreamingHarnessRig::InspectFile() const
 		snapshot.uiScenarioGate = muiScenarioGate.load(std::memory_order_acquire);
 		snapshot.iScenarioGeneration = static_cast<int64_t>(snapshot.uiScenarioGate >> 1);
 		snapshot.iActiveWriters = miActiveWriters.load(std::memory_order_seq_cst);
-		snapshot.uiReservationStart = muiReservationStart;
-		snapshot.uiReservationBoundary = muiNextSequence.load(std::memory_order_acquire);
-		snapshot.uiRetryCount = muiRetryCount.load(std::memory_order_seq_cst);
+		snapshot.iReservationStart = miReservationStart;
+		snapshot.iReservationBoundary = miNextSequence.load(std::memory_order_acquire);
+		snapshot.iRetryCount = miRetryCount.load(std::memory_order_seq_cst);
 		uint64_t uiHoldToken = muiHoldToken.load(std::memory_order_seq_cst);
 		snapshot.eHoldOwner = HoldOwner(uiHoldToken);
 		snapshot.eHoldState = HoldState(uiHoldToken);
-		snapshot.flags.Set(AudioStreamingHarnessRigSnapshotFlags::kLoaderStaged, meStagingOwner.load(std::memory_order_seq_cst) != StagingOwner::kNone);
+		snapshot.flags.Set(AudioStreamingHarnessRigSnapshotFlags::kLoaderStaged, mbLoadersStalled.load(std::memory_order_seq_cst));
 		snapshot.iHeldIndex = miHeldIndex.load(std::memory_order_seq_cst);
 		snapshot.iHeldGeneration = miHeldGeneration.load(std::memory_order_seq_cst);
 		for (int64_t i = 0; i < std::ssize(pPackChunks->mAudioReadEntries); ++i)
@@ -498,8 +376,8 @@ AudioStreamingHarnessRigSnapshot AudioStreamingHarnessRig::InspectFile() const
 		}
 		auto Copy = [&](const auto& rHistory, int64_t& riHead, int64_t& riDropped)
 		{
-			riHead = rHistory.uiHead.load(std::memory_order_acquire);
-			riDropped = rHistory.uiDropped.load(std::memory_order_acquire);
+			riHead = rHistory.iHead.load(std::memory_order_acquire);
+			riDropped = rHistory.iDropped.load(std::memory_order_acquire);
 			int64_t iCount = std::min<int64_t>(riHead, std::ssize(rHistory.entries));
 			for (int64_t i = 0; i < iCount; ++i)
 			{
@@ -525,11 +403,11 @@ AudioStreamingHarnessRigSnapshot AudioStreamingHarnessRig::InspectFile() const
 		{
 			continue;
 		}
-		if (snapshot.uiReservationBoundary != muiNextSequence.load(std::memory_order_acquire))
+		if (snapshot.iReservationBoundary != miNextSequence.load(std::memory_order_acquire))
 		{
 			continue;
 		}
-		if (snapshot.uiRetryCount != muiRetryCount.load(std::memory_order_seq_cst))
+		if (snapshot.iRetryCount != miRetryCount.load(std::memory_order_seq_cst))
 		{
 			continue;
 		}
@@ -545,7 +423,7 @@ AudioStreamingHarnessRigSnapshot AudioStreamingHarnessRig::InspectFile() const
 		{
 			continue;
 		}
-		if (static_cast<bool>(snapshot.flags & AudioStreamingHarnessRigSnapshotFlags::kLoaderStaged) != (meStagingOwner.load(std::memory_order_seq_cst) != StagingOwner::kNone))
+		if (static_cast<bool>(snapshot.flags & AudioStreamingHarnessRigSnapshotFlags::kLoaderStaged) != mbLoadersStalled.load(std::memory_order_seq_cst))
 		{
 			continue;
 		}
@@ -558,26 +436,26 @@ AudioStreamingHarnessRigSnapshot AudioStreamingHarnessRig::InspectFile() const
 		{
 			continue;
 		}
-		if (snapshot.iMainHead != mMainHistory.uiHead.load(std::memory_order_acquire))
+		if (snapshot.iMainHead != mMainHistory.iHead.load(std::memory_order_acquire))
 		{
 			continue;
 		}
-		if (snapshot.iLoader0Head != mLoader0History.uiHead.load(std::memory_order_acquire))
+		if (snapshot.iLoader0Head != mLoader0History.iHead.load(std::memory_order_acquire))
 		{
 			continue;
 		}
-		if (snapshot.iLoader1Head != mLoader1History.uiHead.load(std::memory_order_acquire))
+		if (snapshot.iLoader1Head != mLoader1History.iHead.load(std::memory_order_acquire))
 		{
 			continue;
 		}
 		std::sort(snapshot.records.begin(), snapshot.records.begin() + snapshot.iRecordCount, [](const AudioStreamingHarnessRigRecord& rLeft, const AudioStreamingHarnessRigRecord& rRight)
 		{
-			return rLeft.uiSequence < rRight.uiSequence;
+			return rLeft.iSequence < rRight.iSequence;
 		});
-		snapshot.flags.Set(AudioStreamingHarnessRigSnapshotFlags::kGapFree, snapshot.iRecordCount == static_cast<int64_t>(snapshot.uiReservationBoundary - snapshot.uiReservationStart));
+		snapshot.flags.Set(AudioStreamingHarnessRigSnapshotFlags::kGapFree, snapshot.iRecordCount == snapshot.iReservationBoundary - snapshot.iReservationStart);
 		for (int64_t i = 0; (snapshot.flags & AudioStreamingHarnessRigSnapshotFlags::kGapFree) && i < snapshot.iRecordCount; ++i)
 		{
-			snapshot.flags.Set(AudioStreamingHarnessRigSnapshotFlags::kGapFree, snapshot.records[i].uiSequence == snapshot.uiReservationStart + static_cast<uint64_t>(i) + 1);
+			snapshot.flags.Set(AudioStreamingHarnessRigSnapshotFlags::kGapFree, snapshot.records[i].iSequence == snapshot.iReservationStart + i + 1);
 		}
 		if (!(snapshot.flags & AudioStreamingHarnessRigSnapshotFlags::kGapFree) && snapshot.iMainDropped == 0 && snapshot.iLoader0Dropped == 0 && snapshot.iLoader1Dropped == 0)
 		{
@@ -587,95 +465,6 @@ AudioStreamingHarnessRigSnapshot AudioStreamingHarnessRig::InspectFile() const
 		return snapshot;
 	}
 	return snapshot;
-}
-
-AudioStreamingHarnessRigInvalidResult AudioStreamingHarnessRig::RunInvalid()
-{
-	AudioStreamingHarnessRigInvalidResult result;
-	PackChunks* pPackChunks = gpFileManager->mpPackChunks.get();
-	common::crc_t crc = 0;
-	const LazyChunk* pAudioChunk = nullptr;
-	for (const auto& [rCandidateCrc, rChunk] : pPackChunks->mLazyChunkMap)
-	{
-		if ((rChunk.header.flags & common::ChunkFlags::kChunkAudio) && rChunk.eState.value.load(std::memory_order_acquire) < ChunkState::kDiskLoaded)
-		{
-			crc = rCandidateCrc;
-			pAudioChunk = &rChunk;
-			break;
-		}
-	}
-	if (pAudioChunk == nullptr)
-	{
-		ReleaseInvalid();
-		return result;
-	}
-	std::array<std::byte, 16 * 1'024 + 1> bytes {};
-	ChunkReadRequest request;
-	common::crc_t missingCrc = std::numeric_limits<common::crc_t>::max();
-	while (pPackChunks->mLazyChunkMap.contains(missingCrc))
-	{
-		--missingCrc;
-	}
-	common::crc_t wrongCrc = missingCrc - 1;
-	while (pPackChunks->mLazyChunkMap.contains(wrongCrc))
-	{
-		--wrongCrc;
-	}
-	result.bMissingCrcFailed = pPackChunks->TryReadChunkData(request, missingCrc, 0, std::span(bytes).first(1)) == ChunkReadResult::kFailed;
-	std::ignore = pPackChunks->TryReadChunkData(request, crc, 0, std::span(bytes).first(1));
-	result.bWrongCrcFailed = pPackChunks->TryReadChunkData(request, wrongCrc, 0, std::span(bytes).first(1)) == ChunkReadResult::kFailed;
-	request.Reset();
-	result.bOverflowFailed = pPackChunks->TryReadChunkData(request, crc, static_cast<int64_t>(std::numeric_limits<uint64_t>::max()), std::span(bytes).first(1)) == ChunkReadResult::kFailed;
-	result.bOutOfRangeFailed = pPackChunks->TryReadChunkData(request, crc, pAudioChunk->iDataSize, std::span(bytes).first(1)) == ChunkReadResult::kFailed;
-	result.bZeroLengthFailed = pPackChunks->TryReadChunkData(request, crc, 0, std::span<std::byte>()) == ChunkReadResult::kFailed;
-	result.bOversizeFailed = pPackChunks->TryReadChunkData(request, crc, 0, std::span(bytes)) == ChunkReadResult::kFailed;
-	ChunkReadResult eShort = pPackChunks->TryReadChunkData(request, crc, 0, std::span(bytes).first(1));
-	result.bShortAccepted = eShort == ChunkReadResult::kPending || eShort == ChunkReadResult::kReady;
-	request.Reset();
-	if (mInvalidRequest.mpPackChunks == nullptr)
-	{
-		mInvalidCrc = crc;
-		miInvalidOffset = 0;
-		miInvalidLength = std::min<int64_t>(pAudioChunk->iDataSize, std::ssize(mInvalidBuffer));
-		if (!ArmHold(AudioStreamingHarnessRigHoldOwner::kInvalid, crc, miInvalidOffset, miInvalidLength))
-		{
-			result.bPending = true;
-			return result;
-		}
-		ChunkReadResult eResult = pPackChunks->TryReadChunkData(mInvalidRequest, crc, miInvalidOffset, std::span(mInvalidBuffer).first(static_cast<size_t>(miInvalidLength)));
-		result.bPending = eResult == ChunkReadResult::kPending;
-		if (!result.bPending)
-		{
-			ReleaseInvalid();
-		}
-		return result;
-	}
-	int64_t iIndex = mInvalidRequest.miEntryIndex;
-	int64_t iGeneration = static_cast<int64_t>(mInvalidRequest.muiGeneration);
-	uint64_t uiOwnership = pPackChunks->mAudioReadEntries[iIndex].uiOwnership.load(std::memory_order_acquire);
-	if (AudioReadState(uiOwnership) != AudioChunkReadState::kLoading)
-	{
-		result.bPending = true;
-		return result;
-	}
-	std::fill(mInvalidBuffer.begin(), mInvalidBuffer.end(), std::byte {0x5a});
-	ChunkReadResult ePoll = pPackChunks->TryReadChunkData(mInvalidRequest, mInvalidCrc, miInvalidOffset, std::span(mInvalidBuffer).first(static_cast<size_t>(miInvalidLength - 1)));
-	result.bTooSmallPollFailed = ePoll == ChunkReadResult::kFailed;
-	result.bTooSmallPollNoWrite = std::ranges::all_of(mInvalidBuffer, [](std::byte uiValue)
-	{
-		return uiValue == std::byte {0x5a};
-	});
-	uiOwnership = pPackChunks->mAudioReadEntries[iIndex].uiOwnership.load(std::memory_order_acquire);
-	result.bLoadingCancelled = static_cast<int64_t>(AudioReadGeneration(uiOwnership)) != iGeneration;
-	result.bLoadingEntryNotReused = AudioReadState(uiOwnership) == AudioChunkReadState::kLoading;
-	ReleaseInvalid();
-	return result;
-}
-
-void AudioStreamingHarnessRig::ReleaseInvalid()
-{
-	mInvalidRequest.Reset();
-	ReleaseHold(AudioStreamingHarnessRigHoldOwner::kInvalid);
 }
 
 bool AudioStreamingHarnessRig::HoldAudioRead(common::crc_t crc, int64_t iOffset, int64_t iLength, int64_t iIndex, int64_t iGeneration)
@@ -706,8 +495,13 @@ bool AudioStreamingHarnessRig::HoldAudioRead(common::crc_t crc, int64_t iOffset,
 	{
 		return false;
 	}
+	// Claiming the held index before consuming the token means only its claimant ever resets it, so a loader that loses the token to a re-armed hold cannot clear the winner's index.
+	int64_t iExpectedIndex = 4'294'967'295i64;
+	if (!pHarnessRig->miHeldIndex.compare_exchange_strong(iExpectedIndex, iIndex, std::memory_order_seq_cst))
+	{
+		return false;
+	}
 	pHarnessRig->miHeldGeneration.store(iGeneration, std::memory_order_seq_cst);
-	pHarnessRig->miHeldIndex.store(iIndex, std::memory_order_seq_cst);
 	uint64_t uiConsumedToken = PackHoldToken(HoldOwner(uiHoldToken), AudioStreamingHarnessRigHoldState::kConsumed, HoldGeneration(uiHoldToken));
 	if (!pHarnessRig->muiHoldToken.compare_exchange_strong(uiHoldToken, uiConsumedToken, std::memory_order_seq_cst))
 	{
@@ -740,7 +534,7 @@ void AudioStreamingHarnessRig::CountRetry()
 {
 	if (AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire); pHarnessRig != nullptr && (pHarnessRig->muiScenarioGate.load(std::memory_order_seq_cst) & 1) != 0)
 	{
-		pHarnessRig->muiRetryCount.fetch_add(1, std::memory_order_seq_cst);
+		pHarnessRig->miRetryCount.fetch_add(1, std::memory_order_seq_cst);
 	}
 }
 
@@ -748,49 +542,9 @@ void AudioStreamingHarnessRig::PrepareLoaderDrain()
 {
 	if (AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire); pHarnessRig != nullptr)
 	{
-		pHarnessRig->ReleaseInvalid();
 		pHarnessRig->ReleaseHold(AudioStreamingHarnessRigHoldOwner::kControlled);
-		pHarnessRig->ReleaseCoexistence();
-		pHarnessRig->ReleaseSaturation();
+		pHarnessRig->ReleaseLoaders();
 	}
-}
-
-AudioStreamingVoiceControl* AudioStreamingHarnessRig::CreateVoiceControl(StreamingVoice& rVoice)
-{
-	AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire);
-	if (pHarnessRig == nullptr)
-	{
-		return nullptr;
-	}
-	if (!(pHarnessRig->mFlags & Flags::kControlledPublication))
-	{
-		return nullptr;
-	}
-	auto pControl = std::make_unique<AudioStreamingVoiceControl>();
-	pControl->pVoice = &rVoice;
-	pControl->uiPublicationAllowance = static_cast<uint32_t>(kiBufferCount);
-	AudioStreamingVoiceControl* pResult = pControl.get();
-	pHarnessRig->mVoiceControls.push_back(std::move(pControl));
-	return pResult;
-}
-
-void AudioStreamingHarnessRig::RetireVoiceControl(const AudioStreamingVoiceControl* pControl)
-{
-	if (pControl == nullptr)
-	{
-		return;
-	}
-	AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire);
-	if (pHarnessRig == nullptr)
-	{
-		return;
-	}
-	auto it = std::ranges::find_if(pHarnessRig->mVoiceControls, [pControl](const std::unique_ptr<AudioStreamingVoiceControl>& pCandidate)
-	{
-		return pCandidate.get() == pControl;
-	});
-	ASSERT(it != pHarnessRig->mVoiceControls.end());
-	pHarnessRig->mVoiceControls.erase(it);
 }
 
 } // namespace engine

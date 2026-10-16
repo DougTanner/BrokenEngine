@@ -52,8 +52,8 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::G
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
 
 	rCurrentPostRender.pFlags[i].Set(kExploding);
-	rCurrentInterpolate.pfDestroyedTimes[i] = kfSpaceshipDestroyTime;
-	rCurrentPostRender.pfDestroyedExplosionTimes[i] = kfSpaceshipDestroyExplosionInterval;
+	rCurrentInterpolate.pDestroyedTimes[i] = kSpaceshipDestroyTime;
+	rCurrentPostRender.pDestroyedExplosionTimes[i] = kSpaceshipDestroyExplosionInterval;
 
 	// Store damage direction for knockback
 	rCurrentPostRender.pVecDamageDirections[i] = vecDamageDirection;
@@ -98,7 +98,7 @@ void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFram
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		sCollisionFlags.at(static_cast<size_t>(i)) = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
-		engine::SegmentHit boundaryHit = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousFrame.interpolate.pSpaceships->pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		engine::SegmentHit boundaryHit = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousFrame.interpolate.pSpaceships->pVecPositions[i], rCurrentInterpolate.pVecPositions[i]);
 		rCollisionScratch.maximumTimes.at(static_cast<size_t>(i)) = boundaryHit.bHit ? boundaryHit.fTime : std::numeric_limits<float>::max();
 	}
 
@@ -153,7 +153,7 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 #endif
 
 #if defined(BT_CLIENT)
-					engine::PointLightsPostRender::AddControlled(rFrame, std::chrono::duration<float>(rFrame.interpolate.fCurrentTime), giSpaceshipHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
+					engine::PointLightsPostRender::AddControlled(rFrame, engine::SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)), giSpaceshipHitFlashControllerTypeIndex, rResult.vecContactPoint, 0.0f);
 #endif
 
 					if (rCurrentPostRender.pfHealths[i] <= 0.0f)

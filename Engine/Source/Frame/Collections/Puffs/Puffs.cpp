@@ -20,7 +20,7 @@ void PuffsPostRender::AllocateAndCopy(PuffsPostRender& rCurrent, const PuffsPost
 
 void PuffsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unused]] const CellStaticData& rStaticData)
 {
-	DestroyExpiredControlled(rFrame.interpolate.puffs, rFrame.postRender.puffs, rFrame.interpolate.fCurrentTime, [](PuffsInterpolate& rInterpolate, PuffsPostRender& rPostRender, int64_t& i)
+	DestroyExpiredControlled(rFrame.interpolate.puffs, rFrame.postRender.puffs, SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime)), [](PuffsInterpolate& rInterpolate, PuffsPostRender& rPostRender, int64_t& i)
 	{
 		DestroyElement(rInterpolate, rPostRender, i, rInterpolate.Members(), rPostRender.Members());
 		--i;

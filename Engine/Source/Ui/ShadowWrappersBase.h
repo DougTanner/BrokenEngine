@@ -8,6 +8,7 @@ namespace engine
 extern Wrapper gShadowRenderMultiplier;
 extern Wrapper gShadowTexelRampMetersPerSecond;
 extern Wrapper gShadowTemporalBlend;
+extern Wrapper gShadowUpdateCadence;
 
 extern Wrapper gShadowFeatherNoon;
 extern Wrapper gShadowFeatherNoonOffset;

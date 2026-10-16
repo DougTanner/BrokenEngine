@@ -6,6 +6,7 @@ namespace game
 {
 
 void CommandEditFrame(const nlohmann::json& rParameters, nlohmann::json& rResult);
+void CommandReadFrame(const nlohmann::json& rParameters, nlohmann::json& rResult);
 
 } // namespace game
 

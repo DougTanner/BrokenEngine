@@ -326,6 +326,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Common\Math\Random.h" />
     <ClInclude Include="..\..\..\..\Common\Math\ConvexHull.h" />
     <ClInclude Include="..\..\..\..\Common\ScopedLambda.h" />
+    <ClInclude Include="..\..\..\..\Common\Sha256Hasher.h" />
     <ClInclude Include="..\..\..\..\Common\Singleton.h" />
     <ClInclude Include="..\..\..\..\Common\Smoothed.h" />
     <ClInclude Include="..\..\..\..\Common\StableVector.h" />
@@ -377,6 +378,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\AreaDamage.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collision.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Alignments.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\FrameRegistry.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\CellStaticData.h" />
@@ -384,6 +386,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\IslandTerrainResidency.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Frame\TerrainCollisionUtils.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavBuild.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavBuildInternal.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\NavQuery.h" />
@@ -400,19 +403,13 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentUiRegistry.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandsClientGeneric.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\AudioStreamingHarnessRig.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\ClientNetworkHarnessRigs.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\CrashReportHarnessRig.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\CellCoordinateProbe.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\PresentationContinuityProbe.h" />
     <ClInclude Include="..\..\Source\Agent\AgentCommands.h" />
     <ClInclude Include="..\..\Source\Agent\AgentScene.h" />
     <ClInclude Include="..\..\Source\Agent\Commands\AgentCommandsAudioStreaming.h" />
-    <ClInclude Include="..\..\Source\Agent\Commands\ClientSubscriptionHarnessRigs.h" />
-    <ClInclude Include="..\..\Source\Agent\Commands\ClientFullStateHarnessRig.h" />
     <ClInclude Include="..\..\Source\Agent\Commands\ClientDesyncProbe.h" />
-    <ClInclude Include="..\..\Source\Agent\Commands\ClientPacketFaultHarnessRig.h" />
-    <ClInclude Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityHarnessRig.h" />
-    <ClInclude Include="..\..\Source\Agent\Commands\RegistryHarnessRig.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\CameraBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Graphics.h" />
@@ -492,6 +489,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Frame\Collections\Blasters\Blasters.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Missiles\Missiles.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Spaceships\Spaceships.h" />
+    <ClInclude Include="..\..\Source\Frame\FlightPlaneTable.h" />
     <ClInclude Include="..\..\Source\Frame\Frame.h" />
     <ClInclude Include="..\..\Source\Frame\FrameInput.h" />
     <ClInclude Include="..\..\Source\Frame\TerrainUtils.h" />
@@ -500,6 +498,8 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Frame\StatusChange.h" />
     <ClInclude Include="..\..\Source\Frame\Collections\Players\Players.h" />
     <ClInclude Include="..\..\Source\Game.h" />
+    <ClInclude Include="..\..\Source\Fleet.h" />
+    <ClInclude Include="..\..\Source\Version.h" />
     <ClInclude Include="..\..\Source\SpawnTransfer.h" />
     <ClInclude Include="..\..\Source\ClientSettings.h" />
     <ClInclude Include="..\..\Source\FleetSelection.h" />
@@ -593,12 +593,14 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\AreaDamage.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Collision.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\Alignments.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameRegistry.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\CellStaticData.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandChainPlacement.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandTerrain.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\IslandTerrainResidency.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Frame\TerrainCollisionUtils.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\NavBuild.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\NavCellData.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\NavQuery.cpp" />
@@ -617,7 +619,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentUiRegistry.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentCommandsClientGeneric.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\AudioStreamingHarnessRig.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\ClientNetworkHarnessRigs.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\CrashReportHarnessRig.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\CellCoordinateProbe.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\PresentationContinuityProbe.cpp" />
@@ -625,12 +626,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Agent\AgentCommandsClient.cpp" />
     <ClCompile Include="..\..\Source\Agent\AgentScene.cpp" />
     <ClCompile Include="..\..\Source\Agent\Commands\AgentCommandsAudioStreaming.cpp" />
-    <ClCompile Include="..\..\Source\Agent\Commands\ClientSubscriptionHarnessRigs.cpp" />
-    <ClCompile Include="..\..\Source\Agent\Commands\ClientFullStateHarnessRig.cpp" />
     <ClCompile Include="..\..\Source\Agent\Commands\ClientDesyncProbe.cpp" />
-    <ClCompile Include="..\..\Source\Agent\Commands\ClientPacketFaultHarnessRig.cpp" />
-    <ClCompile Include="..\..\Source\Agent\Commands\CollectionLayoutCapacityHarnessRig.cpp" />
-    <ClCompile Include="..\..\Source\Agent\Commands\RegistryHarnessRig.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\CameraBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Debug\DebugRender.cpp" />
@@ -772,13 +768,10 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\..\Engine\Data\Shaders\Objects\AlphaMesh.frag" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Objects\AlphaMesh.vert" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\AreaLight.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingHistoryCopy.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Particles\Billboards.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Particles\Billboards.vert" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Objects\Blasters.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Clear.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Debug\DebugRender.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Debug\DebugRender.vert" />
@@ -793,8 +786,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <None Include="..\..\..\..\Engine\Data\Shaders\Particles\ParticlesSpawn.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Particles\ParticlesUpdate.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\PointLight.frag" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\FirstLightSpread.comp" />
-    <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingBlur.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingSpread.frag" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightCombine.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\LightingTemporal.comp" />

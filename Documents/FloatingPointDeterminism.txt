@@ -119,7 +119,7 @@ iterated in simulation-critical paths:
     The resulting order of mActiveCoordinates sets the dispatch order of
     per-cell ticks, which are independent by construction: simulation
     code samples only its own cell's CellStaticData and never
-    mCells (Engine/Source/Frame/AGENTS.md:41). It also sets the
+    mCells (Engine/Source/Frame/AGENTS.md:38). It also sets the
     order in which ServerTransferManager::CollectTransfers
     (Projects/BrokenEngineSandbox/Source/Network/Server/ServerTransferManager.cpp:52)
     appends each source cell's transfer requests to its destination

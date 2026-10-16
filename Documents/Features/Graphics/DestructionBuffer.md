@@ -170,7 +170,7 @@ Changes (8 files)
 6. Projects/BrokenEngineSandbox/Source/Frame/Collections/
    Spaceships/Spaceships.h
    Add to SpaceshipsInterpolate, inside the #if defined(BT_CLIENT)
-   block alongside pfAnimationTimes:
+   block alongside pAnimationTimes:
 
      float* __restrict pfDamageFractions = nullptr;
 

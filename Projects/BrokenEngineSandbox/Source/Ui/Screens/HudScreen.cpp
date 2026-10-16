@@ -400,7 +400,7 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 			if (gpClientSession != nullptr && (gpGame->ClientPlayerIdentifier().iValue != 0))
 			{
 				gpGame->mWeaponModeToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
-				float fNavigationDelay = rPlayers.pfNavigationDelays[*oPlayerIndex];
+				float fNavigationDelay = rPlayers.pNavigationDelays[*oPlayerIndex].count();
 				gpClientSession->SendUpdatePlayerRequest(gpGame->ClientPlayerIdentifier().iValue, !bUseMissiles, fNavigationDelay);
 			}
 		}

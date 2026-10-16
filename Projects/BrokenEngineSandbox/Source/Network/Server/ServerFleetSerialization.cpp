@@ -15,10 +15,6 @@ namespace game
 void SendFleetSync(int64_t iClientId, const std::vector<Fleet>& rFleets)
 {
 	engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientId);
-	if (pClient == nullptr)
-	{
-		return;
-	}
 
 	LOG(kNetwork, kVerbose, "SendFleetSync Client: {} Fleets: {}", iClientId, std::ssize(rFleets));
 

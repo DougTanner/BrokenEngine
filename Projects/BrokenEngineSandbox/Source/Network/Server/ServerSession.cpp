@@ -23,7 +23,7 @@ namespace game
 #if defined(BT_SERVER)
 
 ServerSession::ServerSession()
-: common::Singleton<ServerSession>(gpServerSession)
+: common::Singleton<ServerSession>(gpServerSession, this)
 {
 	mpFleetManager = std::make_unique<ServerFleetManager>();
 	mpTransferManager = std::make_unique<engine::ServerTransferManager>();
@@ -258,7 +258,6 @@ void ServerSession::BeforeNetworkPoll()
 void ServerSession::AfterNetworkPoll()
 {
 	ParseReceivedGamePackets();
-	mpClientManager->Disconnects();
 	mpClientManager->NewClients();
 	// Ordering contract: Create runs first so requests naming a fleet created in the same poll can
 	// resolve its guid. SpawnInto before Respawn also matters: both append to the client manager's
@@ -296,10 +295,6 @@ void ServerSession::AddGameRequiredCoordinates()
 void ServerSession::SendAssignPlayer(int64_t iClientId, engine::GlobalId globalId, engine::GridCoord coordinate)
 {
 	engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientId);
-	if (pClient == nullptr)
-	{
-		return;
-	}
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
@@ -313,10 +308,6 @@ void ServerSession::SendAssignPlayer(int64_t iClientId, engine::GlobalId globalI
 void ServerSession::SendPlayerState(int64_t iClientId, PlayerStateWireType eWireType, int64_t iGlobalPlayerId, engine::GridCoord coordinate)
 {
 	engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientId);
-	if (pClient == nullptr)
-	{
-		return;
-	}
 
 	const GameMessages::PlayerStateDescriptor& rDescriptor = GameMessages::kpPlayerStateDescriptors[static_cast<size_t>(eWireType)];
 	LOG(kNetwork, kInfo, "ServerSession::SendPlayerState State: {} Client: {} GlobalPlayer: {} Grid: ({},{})", rDescriptor.pcName, iClientId, iGlobalPlayerId, coordinate.iX, coordinate.iY);

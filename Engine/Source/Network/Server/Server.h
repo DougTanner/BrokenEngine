@@ -153,7 +153,6 @@ public:
 	void BroadcastTimespeedIfChanged();
 
 	std::vector<ClientConnection> mClients;
-	std::vector<PendingDisconnect> mPendingDisconnects;
 	std::vector<PendingNewSubscription> mPendingNewSubscriptions;
 	std::vector<int64_t> mPendingResynchronizationClientIds;
 	std::vector<ReceivedGamePacket> mReceivedGamePackets;
@@ -165,10 +164,6 @@ public:
 	// Callers MUST NOT touch their ClientConnection* afterward -- the client may have been removed.
 	void RecordContractViolation(int64_t iClientId, ContractViolationKind eKind, std::string_view reason, int64_t iPacketType, int64_t iSize);
 
-	// Wire dispatch entry point for one received packet. Public so a harness rig can inject a
-	// deliberately malformed packet through the real admission, dispatch, and violation path.
-	void Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer);
-
 private:
 	friend class ServerBufferedFrames;
 	friend class ServerSessionRuntime;
@@ -178,6 +173,7 @@ private:
 	void Connect(const ENetEvent& rEvent);
 	void Disconnect(const ENetEvent& rEvent);
 	void DispatchIncoming(ENetEvent& rEvent, bool bFastForward);
+	void Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer);
 
 	void ClientAcknowledgementStream(std::span<const uint8_t> packetData, ClientConnection& rClient);
 	void ClientDesynchronizationReport(std::span<const uint8_t> packetData, ClientConnection& rClient);

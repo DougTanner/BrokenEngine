@@ -77,12 +77,7 @@ void StreamingVoices::Update(std::chrono::duration<float> deltaTime)
 	}
 	if (!mPreviousStreams.empty())
 	{
-#if defined(BT_DEBUG)
-		AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire);
-		mPreviousStreams.back()->UpdateRequests(pHarnessRig == nullptr || !(pHarnessRig->mFlags & AudioStreamingHarnessRig::Flags::kControlledPublication));
-#else
 		mPreviousStreams.back()->UpdateRequests(true);
-#endif
 	}
 	for (int64_t i = 0; i + 1 < std::ssize(mPreviousStreams); ++i)
 	{
@@ -168,7 +163,6 @@ void StreamingVoices::CreateStream(common::crc_t uiAudioCrc)
 	{
 		mpCurrentStream = std::make_unique<StreamingVoice>(mpAudioEngine, pVoice, &rLazyChunk);
 #if defined(BT_DEBUG)
-		mpCurrentStream->mpAudioStreamingControl = AudioStreamingHarnessRig::CreateVoiceControl(*mpCurrentStream);
 		AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kStartup, std::numeric_limits<uint32_t>::max(), uiAudioCrc, 0, rLazyChunk.header.iSize, AudioStreamingHarnessRigQueueState::kFree, 0, false);
 #endif
 	}

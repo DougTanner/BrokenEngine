@@ -42,71 +42,6 @@ void ChunkReadRequest::Reset()
 	throw std::runtime_error(message);
 }
 
-class Sha256Hasher
-{
-public:
-
-	Sha256Hasher()
-	{
-		if (::BCryptOpenAlgorithmProvider(&mpAlgorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) < 0)
-		{
-			return;
-		}
-
-		DWORD uiObjectLength = 0;
-		DWORD uiResultLength = 0;
-		if (::BCryptGetProperty(mpAlgorithm, BCRYPT_OBJECT_LENGTH, reinterpret_cast<PUCHAR>(&uiObjectLength), sizeof(uiObjectLength), &uiResultLength, 0) < 0)
-		{
-			return;
-		}
-		int64_t iResultLength = static_cast<int64_t>(uiResultLength);
-		if (iResultLength != static_cast<int64_t>(sizeof(uiObjectLength)))
-		{
-			return;
-		}
-		mHashObject.resize(uiObjectLength);
-		if (::BCryptCreateHash(mpAlgorithm, &mpHash, mHashObject.data(), uiObjectLength, nullptr, 0, 0) < 0)
-		{
-			return;
-		}
-		mbValid = true;
-	}
-
-	~Sha256Hasher()
-	{
-		if (mpHash != nullptr)
-		{
-			::BCryptDestroyHash(mpHash);
-		}
-		if (mpAlgorithm != nullptr)
-		{
-			::BCryptCloseAlgorithmProvider(mpAlgorithm, 0);
-		}
-	}
-
-	Sha256Hasher(const Sha256Hasher&) = delete;
-	Sha256Hasher& operator=(const Sha256Hasher&) = delete;
-
-	bool Update(std::span<const std::byte> bytes)
-	{
-		return mbValid
-#pragma warning(suppress: 26492) // CNG pbInput is SAL input-only and documented not modified.
-		    && (bytes.empty() || ::BCryptHashData(mpHash, reinterpret_cast<PUCHAR>(const_cast<std::byte*>(bytes.data())), static_cast<ULONG>(bytes.size()), 0) >= 0);
-	}
-
-	bool Finish(std::array<uint8_t, 32>& rDigest)
-	{
-		return mbValid && ::BCryptFinishHash(mpHash, rDigest.data(), static_cast<ULONG>(rDigest.size()), 0) >= 0;
-	}
-
-private:
-
-	BCRYPT_ALG_HANDLE mpAlgorithm = nullptr;
-	BCRYPT_HASH_HANDLE mpHash = nullptr;
-	std::vector<uint8_t> mHashObject;
-	bool mbValid = false;
-};
-
 class FileHandle
 {
 public:
@@ -127,7 +62,7 @@ public:
 };
 
 FileManager::FileManager()
-: common::Singleton<FileManager>(gpFileManager)
+: common::Singleton<FileManager>(gpFileManager, this)
 {
 	if (!gLaunchOptions.appDataDirectory.empty())
 	{
@@ -277,17 +212,14 @@ void FileManager::RemoveFile(const FileFlags_t& rFlags, const std::filesystem::p
 	std::filesystem::remove(file);
 }
 
-bool FileManager::ComputeSha256(std::span<const std::byte> bytes, std::array<uint8_t, 32>& rOut)
+bool FileManager::ComputeSha256(std::span<std::byte> bytes, std::array<uint8_t, 32>& rOut)
 {
-	Sha256Hasher hasher;
+	common::Sha256Hasher hasher;
 	std::array<uint8_t, 32> digest {};
 	while (!bytes.empty())
 	{
 		int64_t iChunkSize = !std::in_range<ULONG>(bytes.size()) ? static_cast<int64_t>(std::numeric_limits<ULONG>::max()) : static_cast<int64_t>(bytes.size());
-		if (!hasher.Update(bytes.first(static_cast<size_t>(iChunkSize))))
-		{
-			return false;
-		}
+		hasher.Update(bytes.first(static_cast<size_t>(iChunkSize)));
 		bytes = bytes.subspan(static_cast<size_t>(iChunkSize));
 	}
 	if (!hasher.Finish(digest))
@@ -323,7 +255,7 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 		return false;
 	}
 
-	Sha256Hasher hasher;
+	common::Sha256Hasher hasher;
 	auto bufferAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<std::byte*>(64 * 1'024);
 	std::span<std::byte> buffer(bufferAllocation.mpData, 64 * 1'024);
 	int64_t iByteCount = 0;
@@ -336,10 +268,7 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 		}
 		int64_t iBytesRead = static_cast<int64_t>(uiBytesRead);
 		ASSERT(iBytesRead <= std::ssize(buffer));
-		if (!hasher.Update(std::span<const std::byte>(buffer.data(), static_cast<size_t>(iBytesRead))))
-		{
-			return false;
-		}
+		hasher.Update(buffer.first(static_cast<size_t>(iBytesRead)));
 		iByteCount += iBytesRead;
 		if (iBytesRead == 0)
 		{

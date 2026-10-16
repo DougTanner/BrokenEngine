@@ -74,7 +74,10 @@ and the handoff this run returns.
      only the claim until it succeeds or the holder becomes stale under step 11,
      so the invocation above is itself the wait and has no budget of its own —
      never hand-write a poll loop, invent a sleep window, or add a wait
-     parameter.
+     parameter. A stale holder is still waited on while a project server
+     started without `--agent-port` is running, because a harness server cannot
+     start beside it; once none remains the wait ends with
+     `claim.foreign-owner`.
    - Run it synchronously in the foreground and remain in-turn until its exit
      code and JSON result are captured, giving the call the maximum available
      execution timeout so the wait is not preempted. Never use `Start-Job`, a
@@ -344,10 +347,10 @@ and the handoff this run returns.
       each exited role's exit code, and a zero exit code never makes a
       disappearance intentional — and its findings carry any crash report
       written since that role's pre-launch baseline.
-      - A report unchanged since that baseline is stale and is never announced
-        as a new crash, and a role that exited without changing any report
-        reports `reportPath` and `headline` as `null` rather than inventing
-        evidence.
+      - A report unchanged since that baseline, or changed only by the client
+        appending its sent trailer, is stale and is never announced as a new
+        crash, and a role that exited without writing a report reports
+        `reportPath` and `headline` as `null` rather than inventing evidence.
     - Exit `1` is a setup or state failure.
     - Never delete, move, or rewrite a reported crash report or its retained
       evidence; report it by path.
@@ -530,7 +533,9 @@ and the handoff this run returns.
 
     - Request envelope: `{"cmd":"<name>","params":{...},"id":<optional JSON>}`.
       Omit `params` only for parameterless commands. Unknown top-level fields
-      fail.
+      fail. An absent `params` dispatches as `{}`; a present non-object
+      `params`, `null` included, fails for every command with
+      `params must be an object` before the command runs.
     - Responses are `{"id":<echo|null>,"ok":true,"result":{...}}` or
       `{"id":...,"ok":false,"error":"..."}`.
     - Parameters are an external trust boundary and invalid values must produce

@@ -1,12 +1,13 @@
 # AgentTools Landing
 
 Load only when the landing-commit/landed diff changes a non-Markdown path under
-`Tools/WorktreeCli/`, `Tools/AgentHarness/`, or `Tools/ToolCommon/`. This is the
+`Tools/WorktreeCli/`, `Tools/AgentHarness/`, or `Tools/ToolCommon/`, or changes
+`Common/Sha256Hasher.h`, which the tools compile by path. This is the
 exhaustive authoritative shared-artifact trigger; ordinary Git changes, Markdown in
 those trees, landing-commit build outputs, data reads, locks, and claims do not qualify.
 
-These trees are shared tool infrastructure: every linked worktree consumes the
-same authoritative binaries. When a change here could break another live worktree —
+These trigger paths are shared tool infrastructure: every linked worktree consumes
+the same authoritative binaries. When a change to them could break another live worktree —
 a changed CLI contract, a changed lock or claim format, or a behavior other
 sessions depend on mid-run — pause and warn the user before landing. When it
 cannot affect another live worktree, continue without a pause.

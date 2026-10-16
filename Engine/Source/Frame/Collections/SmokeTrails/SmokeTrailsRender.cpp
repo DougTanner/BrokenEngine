@@ -65,7 +65,6 @@ void SmokeTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 		const SmokeTrailsType& rType = SmokeTrailsInterpolate::sTypes.at(rCurrent.puiTypeIndices[riIndex]);
 		float fIntensity = rCurrent.pfIntensities[riIndex];
 		float fWidth = rType.fWidth;
-		std::chrono::duration<float> startTime(rCurrent.pfStartTimes[riIndex]);
 		XMVECTOR vecLocalSmoothedPosition = rCurrent.pVecSmoothedPositions[riIndex];
 
 		XMFLOAT4A f4Position {};
@@ -96,7 +95,7 @@ void SmokeTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 		XMVECTOR vecPointTwo = XMVectorAdd(vecBasePosition, XMVectorScale(vecLeftNormal, -gSmokeTrailsWidthCurrent.mfCurrent * fWidth));
 
 		float fLength = gSmokeTrailsLength.mfCurrent + gSmokeTrailsLengthJitter.mfCurrent * common::Random(sRandomEngine);
-		if (std::chrono::duration<float>(rFrameInterpolate.fCurrentTime) - startTime < std::chrono::duration<float>(50ms))
+		if (SimulationTime(std::chrono::duration<float>(rFrameInterpolate.fCurrentTime)) - rCurrent.pStartTimes[riIndex] < std::chrono::duration<float>(50ms))
 		{
 			fLength = 0.0f;
 		}

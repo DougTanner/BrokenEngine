@@ -6,7 +6,15 @@
 
 Follow the skill's generic launch requirements (`--loopback-only`, log parents under the absolute adopted worktree's `Temp`, `Start-Process -PassThru` PID retention, and the per-role process-check sequence), then launch these executables. Every fence below is its own independent shell call and they run in the order shown; assign each fence's path values locally and substitute values retained from an earlier fence as literals.
 
-First create the directories and fix this run's single process-check state path. The timestamp makes that path new for every run, so no earlier run's registrations are ever inherited:
+Start each launch sequence, after the claim (worker step 5) and before directory setup, by checking that no server is already running. The server is single-instance per machine, so a harness server started while any `BrokenEngineSandboxServer*` process runs exits at once. A relaunch under worker steps 28-29 skips this check, because this run's own server may still be alive; each fresh claim followed by a new launch sequence runs it again:
+
+```powershell
+Get-Process -Name 'BrokenEngineSandboxServer*' -ErrorAction SilentlyContinue | Select-Object Id, ProcessName
+```
+
+If that lists a process, launch nothing and run no `Baseline`, `Register`, or `Check`. Release the just-taken lock through `Invoke-HarnessRelease.ps1` (worker step 44) with no `-ServerPid`/`-ClientPid` and no `-ProcessCheckStatePath`, because no process started and no role is registered. Return `BLOCKED` with one `Residuals` row naming each listed PID and process name as a running server blocking the harness server, mark every criterion `BLOCKED` citing that row, and add no `HARNESS-F` finding. Never stop, quit, or signal a listed process; it belongs to the user. If it lists nothing, continue with the sequence below unchanged.
+
+Next create the directories and fix this run's single process-check state path. The timestamp makes that path new for every run, so no earlier run's registrations are ever inherited:
 
 ```powershell
 $ROOT = '<absolute adopted worktree>'
@@ -202,15 +210,27 @@ This is a criterion-specific gate, not general launch readiness. It holds the cl
 
 ## Normal launch
 
-For a user request to launch the game for their own play or testing. These are the `## Launch` executables without the harness: no claim, process check, readiness wait, or release, and none of the agent-only arguments (`--agent-port`, `--app-data-directory`, `--log-file`, `--windowed`, hidden windows). The client therefore opens a normal window that takes physical input, its fullscreen state follows the order in [`Engine/Source/AGENTS.md`](../../../../Engine/Source/AGENTS.md) `## Startup and Main Loop`, and both processes use the per-user AppData, so the user's own settings and saves apply. `--loopback-only` stays, as in every same-machine run.
+For a user request to launch the game for their own play or testing. These are the `## Launch` executables without the harness run: a running-server check, then a harness lock claim under session `normal-launch` that is never released, but no process check, readiness wait, heartbeat, or release, and none of the agent-only arguments (`--agent-port`, `--app-data-directory`, `--log-file`, `--windowed`, hidden windows). The client therefore opens a normal window that takes physical input, its fullscreen state follows the order in [`Engine/Source/AGENTS.md`](../../../../Engine/Source/AGENTS.md) `## Startup and Main Loop`, and both processes use the per-user AppData, so the user's own settings and saves apply. `--loopback-only` stays, as in every same-machine run.
 
-The server is single-instance per machine (a second one shows a modal and exits), so first check that none is running:
+The server is single-instance per machine (a second one shows a modal and exits), so first check that no server started without `--agent-port` is running. A server carrying `--agent-port` belongs to another session's harness run, which the claim below waits out; a server whose command line cannot be read counts as started without it:
 
 ```powershell
-Get-Process -Name 'BrokenEngineSandboxServer*' -ErrorAction SilentlyContinue | Select-Object Id, ProcessName
+Get-CimInstance Win32_Process -Filter "Name LIKE 'BrokenEngineSandboxServer%'" |
+	Where-Object { [string]$_.CommandLine -notmatch '--agent-port' } |
+	Select-Object ProcessId, Name
 ```
 
-If that lists a process, report it to the user instead of stopping it. Otherwise launch both, substituting the executable names for the compiled configuration as `## Launch` states:
+If that lists a process, report it to the user instead of stopping it; take no lock and launch nothing. Otherwise claim the harness lock in the form worker step 5 shows, under that step's run rules (foreground, maximum host timeout, identical re-invocation after a host timeout, never backgrounded), passing the same normalized Data path the launch passes to `--data-directory`, and `-Configuration <name>` only for a build other than `Debug`:
+
+```powershell
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot '<absolute adopted worktree>' -Session 'normal-launch' -GameDataDirectory '<normalized Data path>'
+```
+
+- Exit `0`: launch below. Do not keep the claim's owner token.
+- `claim.foreign-owner`: follow worker step 7's `claim.foreign-owner` bullet. When step 11 classifies the holder fresh, re-invoke the claim; when stale, run steps 11-15 with session label `normal-launch`, using step 1's fixed ports (`27100`, `27101`, and `27102`) and the expected executables from the project hub step 4 reads. A completed steal continues to the launch below, and its new owner token is not kept either; a `BLOCKED` takeover is reported to the user with nothing launched.
+- Any other non-zero exit: report the claim result to the user and launch nothing.
+
+Then launch both, substituting the executable names for the compiled configuration as `## Launch` states:
 
 ```powershell
 $ROOT = '<absolute adopted worktree>'
@@ -224,7 +244,7 @@ $ClientProcess = Start-Process -FilePath $ClientExe -ArgumentList @('--loopback-
 [ordered]@{ serverPid = $ServerProcess.Id; clientPid = $ClientProcess.Id } | ConvertTo-Json -Compress
 ```
 
-The client connects as `## Launch` describes. Leave both processes running for the user, who closes them; never quit, stop, or release them. While this server runs, any harness server launch on the machine exits immediately, so a later harness run waits until the user closes it.
+The client connects as `## Launch` describes. If a launch fails, only report it to the user; the claimed lock goes stale five minutes after the claim and the takeover steps take it over. Leave both processes running for the user, who closes them; never quit, stop, or release them, and never heartbeat or release the lock. The claim's owner token is not kept, so after the launch this session does not hold the harness lock and `/compile` never sends `quit` to these processes. A harness run started meanwhile waits in its claim until the user closes the server, then takes the stale lock over through worker steps 11-15; when the server closed within five minutes of the claim, that run waits out the rest of those five minutes.
 
 ## Durable caveats
 

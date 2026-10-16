@@ -20,7 +20,7 @@ static void DebugRenderCellEdges(const std::vector<GridCoord>& rActiveCoordinate
 		return;
 	}
 
-	float fZ = gBaseHeight.mfCurrent;
+	float fZ = gpFlightPlanes->Lowest().fHeightMeters;
 	static constexpr XMFLOAT4A kf4EdgeColor = {0.0f, 1.0f, 1.0f, 1.0f};
 
 	for (const GridCoord& rCoordinate : rActiveCoordinates)
@@ -59,7 +59,7 @@ static void DebugRenderIslandBoundaries(const std::vector<GridCoord>& rActiveCoo
 		return;
 	}
 
-	float fZ = gBaseHeight.mfCurrent;
+	float fZ = gpFlightPlanes->Lowest().fHeightMeters;
 	static constexpr XMFLOAT4A kf4BoundaryColor = {1.0f, 0.0f, 1.0f, 1.0f};
 
 	for (const GridCoord& rCoordinate : rActiveCoordinates)
@@ -107,7 +107,7 @@ static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoor
 	}
 
 	// Drawn at the underwater mask threshold depth (the depth that defines the hull boundary), below
-	// the magenta boundary rectangle / cyan cell edges at gBaseHeight. Debug lines are an overlay
+	// the magenta boundary rectangle / cyan cell edges at the lowest flight plane. Debug lines are an overlay
 	// (no depth test), so the underwater Z is never occluded by terrain or water.
 	float fZ = common::kfUnderwaterMaskThresholdMeters;
 	static constexpr XMFLOAT4A kf4ValidAreaColor = {0.0f, 1.0f, 0.0f, 1.0f};
@@ -126,10 +126,6 @@ static void DebugRenderIslandValidArea(const std::vector<GridCoord>& rActiveCoor
 		for (const IslandPlacement& rPlacement : it->second.staticData.islands)
 		{
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
-			if (rTemplate.pf2ValidAreaVertices == nullptr || rTemplate.iValidAreaVertexCount < 3)
-			{
-				continue;
-			}
 
 			float fCosine = std::cos(rPlacement.fRotation);
 			float fSine = std::sin(rPlacement.fRotation);
@@ -157,7 +153,7 @@ static void DebugRenderNavigationData(const std::vector<GridCoord>& rActiveCoord
 		return;
 	}
 
-	float fZ = gBaseHeight.mfCurrent;
+	float fZ = gpFlightPlanes->Lowest().fHeightMeters;
 	static constexpr XMFLOAT4A kf4PolygonColor = {1.0f, 1.0f, 0.0f, 1.0f};
 	static constexpr XMFLOAT4A kf4VertexColor = {1.0f, 0.5f, 0.0f, 1.0f};
 

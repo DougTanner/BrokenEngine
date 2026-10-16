@@ -6,6 +6,7 @@ namespace engine
 Wrapper gShadowRenderMultiplier(0.1f, 0.05f, 1.0f);
 Wrapper gShadowTexelRampMetersPerSecond(150.0f, 10.0f, 2'000.0f);
 Wrapper gShadowTemporalBlend(0.2f, 0.05f, 1.0f);
+Wrapper gShadowUpdateCadence(4.0f, 1.0f, 4.0f, 1.0f);
 
 Wrapper gShadowFeatherNoon(2.5f, 0.0f, 8.0f);
 Wrapper gShadowFeatherNoonOffset(2.1f, 2.1f, 5.0f);

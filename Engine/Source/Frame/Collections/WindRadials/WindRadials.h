@@ -50,17 +50,17 @@ struct WindRadialsInterpolate : public Collection<WindRadialsInterpolate>,
 	float* __restrict pfSizes = nullptr;
 
 	uint8_t* __restrict puiControllerTypeIndices = nullptr;
-	float* __restrict pfStartTimes = nullptr;
+	SimulationTime* __restrict pStartTimes = nullptr;
 	float* __restrict pfBaseIntensities = nullptr;
 	float* __restrict pfBaseSizes = nullptr;
 
 	auto Members(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pfIntensities, rSelf.pfSizes, rSelf.puiControllerTypeIndices, rSelf.pfStartTimes, rSelf.pfBaseIntensities, rSelf.pfBaseSizes);
+		return std::tie(rSelf.pVecPositions, rSelf.pfIntensities, rSelf.pfSizes, rSelf.puiControllerTypeIndices, rSelf.pStartTimes, rSelf.pfBaseIntensities, rSelf.pfBaseSizes);
 	}
 	auto PersistentMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiControllerTypeIndices, rSelf.pfStartTimes, rSelf.pfBaseIntensities, rSelf.pfBaseSizes);
+		return std::tie(rSelf.puiControllerTypeIndices, rSelf.pStartTimes, rSelf.pfBaseIntensities, rSelf.pfBaseSizes);
 	}
 
 	static void GraphicsResources();
@@ -76,7 +76,7 @@ struct WindRadialsPostRender : public Collection<WindRadialsPostRender>
 	static void Destroy(game::Frame& __restrict rFrame, const CellStaticData& rStaticData);
 
 	// Add controlled wind radial (fire-and-forget, auto-destroys when animation ends)
-	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, float fCurrentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fBaseIntensity, float fBaseSize);
+	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fBaseIntensity, float fBaseSize);
 
 	auto Members([[maybe_unused]] this auto&& rSelf)
 	{

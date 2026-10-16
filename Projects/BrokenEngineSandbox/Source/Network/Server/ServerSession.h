@@ -41,7 +41,6 @@ public:
 	~ServerSession();
 
 	void PrepareTick();
-	void ParseReceivedGamePackets();
 	void SendAssignPlayer(int64_t iClientId, engine::GlobalId globalId, engine::GridCoord coordinate);
 	void SendPlayerState(int64_t iClientId, PlayerStateWireType eWireType, int64_t iGlobalPlayerId, engine::GridCoord coordinate);
 	void StepTimescale(bool bFaster); // step time scale one notch (faster/slower) and broadcast; shared by the packet handler and the agent command
@@ -67,6 +66,7 @@ private:
 
 	void BeforeNetworkPoll();
 	void AfterNetworkPoll();
+	void ParseReceivedGamePackets();
 	void FinalizeTickClients();
 
 	// ServerSessionRuntime::ComputeActiveSet hook

@@ -17,8 +17,8 @@
 namespace engine
 {
 
-// On-disk version of the F7.replay.manifest generation inventory. Old manifests are rejected on read.
-constexpr int64_t kiReplayManifestVersion = 4;
+// On-disk version of F7.replay.manifest. Old manifests are rejected on read.
+constexpr int64_t kiReplayManifestVersion = 5;
 constexpr int64_t kiInvalidReplayManifestVersion = 0;
 
 template <std::integral TYPE>
@@ -71,23 +71,14 @@ enum class ReplayArtifactKind : uint8_t
 	kFullFrames = 5,
 };
 
-struct ReplayManifestInventoryEntry
-{
-	ReplayArtifactKind eKind {};
-	uint64_t uiCoordinateKey = 0;
-	int64_t iActivationTick = -1;
-	engine::FileContentDigest digest;
-};
-
 struct ReplayManifest
 {
 	int64_t iInitialTick = 0;
 	std::vector<ReplayManifestRecord> records;
 	bool bHasFullFrames = false;
-	std::vector<ReplayManifestInventoryEntry> inventory;
 };
 
-constexpr std::string_view kReplayManifestGenerationDomain = "broken-engine/replay-manifest-generation/v4";
+constexpr std::string_view kReplayManifestGenerationDomain = "broken-engine/replay-manifest-generation/v5";
 static_assert(kReplayManifestGenerationDomain.size() == 43);
 
 static std::filesystem::path ReplayArtifactFilename(ReplayArtifactKind eKind, uint64_t uiCoordinateKey, int64_t iActivationTick)
@@ -105,16 +96,11 @@ static std::filesystem::path ReplayArtifactFilename(ReplayArtifactKind eKind, ui
 	return {};
 }
 
-static bool ReplayInventoryEntryLess(const ReplayManifestInventoryEntry& rLeft, const ReplayManifestInventoryEntry& rRight)
-{
-	return std::tie(rLeft.eKind, rLeft.uiCoordinateKey, rLeft.iActivationTick) < std::tie(rRight.eKind, rRight.uiCoordinateKey, rRight.iActivationTick);
-}
-
 static void AppendReplayManifestPayload(const ReplayManifest& rManifest, std::vector<std::byte>& rPayload)
 {
-	static constexpr size_t kuiFixedBytes = sizeof(int64_t) * 4 + 1;
+	static constexpr int64_t kiFixedBytes = sizeof(int64_t) * 3 + 1;
 	rPayload.clear();
-	rPayload.reserve(kuiFixedBytes + rManifest.records.size() * 16 + rManifest.inventory.size() * 57);
+	rPayload.reserve(static_cast<size_t>(kiFixedBytes + std::ssize(rManifest.records) * 16));
 	auto AppendValue = [&rPayload]<std::integral TYPE>(TYPE value)
 	{
 		using UnsignedType = std::make_unsigned_t<TYPE>;
@@ -135,15 +121,6 @@ static void AppendReplayManifestPayload(const ReplayManifest& rManifest, std::ve
 		AppendValue(rRecord.coordinate.iY);
 	}
 	AppendValue(static_cast<uint8_t>(rManifest.bHasFullFrames ? 1 : 0));
-	AppendValue(static_cast<int64_t>(std::ssize(rManifest.inventory)));
-	for (const ReplayManifestInventoryEntry& rEntry : rManifest.inventory)
-	{
-		AppendValue(static_cast<uint8_t>(rEntry.eKind));
-		AppendValue(rEntry.uiCoordinateKey);
-		AppendValue(rEntry.iActivationTick);
-		AppendValue(rEntry.digest.iByteCount);
-		rPayload.insert(rPayload.end(), reinterpret_cast<const std::byte*>(rEntry.digest.sha256.data()), reinterpret_cast<const std::byte*>(rEntry.digest.sha256.data() + rEntry.digest.sha256.size()));
-	}
 }
 
 static bool ComputeReplayGenerationDigest(const ReplayManifest& rManifest, std::array<uint8_t, 32>& rDigest)
@@ -151,60 +128,41 @@ static bool ComputeReplayGenerationDigest(const ReplayManifest& rManifest, std::
 	std::vector<std::byte> payload;
 	AppendReplayManifestPayload(rManifest, payload);
 
+	int64_t iArtifactCount = 2 + std::ssize(rManifest.records) * (rManifest.bHasFullFrames ? 4 : 3);
 	std::vector<std::byte> rootPreimage;
-	rootPreimage.reserve(sizeof(uint32_t) + kReplayManifestGenerationDomain.size() + payload.size());
+	rootPreimage.reserve(sizeof(uint32_t) + kReplayManifestGenerationDomain.size() + static_cast<size_t>(std::ssize(payload) + iArtifactCount * 32));
 	for (int64_t i = 0; i < static_cast<int64_t>(sizeof(uint32_t)); ++i)
 	{
 		rootPreimage.push_back(static_cast<std::byte>((static_cast<uint32_t>(kReplayManifestGenerationDomain.size()) >> (i * 8)) & 0xFFui32));
 	}
 	rootPreimage.insert(rootPreimage.end(), reinterpret_cast<const std::byte*>(kReplayManifestGenerationDomain.data()), reinterpret_cast<const std::byte*>(kReplayManifestGenerationDomain.data() + kReplayManifestGenerationDomain.size()));
 	rootPreimage.append_range(payload);
-	return engine::gpFileManager->ComputeSha256(rootPreimage, rDigest);
-}
-
-static bool BuildExpectedReplayInventory(ReplayManifest& rManifest, bool bHashFiles)
-{
-	rManifest.inventory.clear();
-	rManifest.inventory.reserve(2 + rManifest.records.size() * (rManifest.bHasFullFrames ? 4 : 3));
-	for (ReplayArtifactKind eKind : {ReplayArtifactKind::kGrid, ReplayArtifactKind::kMeta, ReplayArtifactKind::kCoordHeader, ReplayArtifactKind::kFrames, ReplayArtifactKind::kChecksums, ReplayArtifactKind::kFullFrames})
+	auto AppendArtifactDigest = [&rootPreimage](ReplayArtifactKind eKind, uint64_t uiCoordinateKey, int64_t iActivationTick)
 	{
-		if (eKind == ReplayArtifactKind::kFullFrames && !rManifest.bHasFullFrames)
-		{
-			continue;
-		}
-		if (eKind == ReplayArtifactKind::kGrid || eKind == ReplayArtifactKind::kMeta)
-		{
-			rManifest.inventory.push_back({.eKind = eKind});
-			continue;
-		}
-		for (const ReplayManifestRecord& rRecord : rManifest.records)
-		{
-			rManifest.inventory.push_back({.eKind = eKind, .uiCoordinateKey = rRecord.coordinate.ToKey(), .iActivationTick = rRecord.iActivationTick});
-		}
-	}
-	std::ranges::sort(rManifest.inventory, ReplayInventoryEntryLess);
-	for (int64_t i = 1; i < std::ssize(rManifest.inventory); ++i)
-	{
-		if (rManifest.inventory.at(i - 1).eKind == rManifest.inventory.at(i).eKind
-		 && rManifest.inventory.at(i - 1).uiCoordinateKey == rManifest.inventory.at(i).uiCoordinateKey
-		 && rManifest.inventory.at(i - 1).iActivationTick == rManifest.inventory.at(i).iActivationTick)
+		engine::FileContentDigest digest;
+		if (!engine::gpFileManager->ComputeOrdinaryFileSha256({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, ReplayArtifactFilename(eKind, uiCoordinateKey, iActivationTick), digest))
 		{
 			return false;
 		}
-	}
-
-	if (!bHashFiles)
-	{
+		rootPreimage.insert(rootPreimage.end(), reinterpret_cast<const std::byte*>(digest.sha256.data()), reinterpret_cast<const std::byte*>(digest.sha256.data() + digest.sha256.size()));
 		return true;
-	}
-	for (ReplayManifestInventoryEntry& rEntry : rManifest.inventory)
+	};
+	if (!AppendArtifactDigest(ReplayArtifactKind::kGrid, 0, -1) || !AppendArtifactDigest(ReplayArtifactKind::kMeta, 0, -1))
 	{
-		if (!engine::gpFileManager->ComputeOrdinaryFileSha256({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, ReplayArtifactFilename(rEntry.eKind, rEntry.uiCoordinateKey, rEntry.iActivationTick), rEntry.digest))
+		return false;
+	}
+	for (const ReplayManifestRecord& rRecord : rManifest.records)
+	{
+		uint64_t uiCoordinateKey = rRecord.coordinate.ToKey();
+		if (!AppendArtifactDigest(ReplayArtifactKind::kCoordHeader, uiCoordinateKey, rRecord.iActivationTick)
+		 || !AppendArtifactDigest(ReplayArtifactKind::kFrames, uiCoordinateKey, rRecord.iActivationTick)
+		 || !AppendArtifactDigest(ReplayArtifactKind::kChecksums, uiCoordinateKey, rRecord.iActivationTick)
+		 || (rManifest.bHasFullFrames && !AppendArtifactDigest(ReplayArtifactKind::kFullFrames, uiCoordinateKey, rRecord.iActivationTick)))
 		{
 			return false;
 		}
 	}
-	return true;
+	return engine::gpFileManager->ComputeSha256(rootPreimage, rDigest);
 }
 
 static bool InvalidateReplayManifest()
@@ -226,8 +184,76 @@ static bool PublishReplayManifest(const ReplayManifest& rManifest, const std::ar
 	});
 }
 
+static bool ReadReplayManifest(ReplayManifest& rManifest)
+{
+	std::fstream manifestStream = engine::gpFileManager->OpenFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("F7.replay.manifest"));
+	if (!manifestStream)
+	{
+		LOG(kDefault, kError, "Failed to read replay manifest");
+		return false;
+	}
+	int64_t iManifestVersion = 0;
+	if (!ReadReplayManifestValue(manifestStream, iManifestVersion))
+	{
+		throw std::ios_base::failure("ReplayManifest version");
+	}
+	if (iManifestVersion != kiReplayManifestVersion)
+	{
+		LOG(kDefault, kError, "Replay manifest version {} != {}", iManifestVersion, kiReplayManifestVersion);
+		return false;
+	}
+
+	if (!ReadReplayManifestValue(manifestStream, rManifest.iInitialTick))
+	{
+		throw std::ios_base::failure("ReplayManifest initial tick");
+	}
+	int64_t iCoordinateCount = 0;
+	if (!ReadReplayManifestValue(manifestStream, iCoordinateCount))
+	{
+		throw std::ios_base::failure("ReplayManifest activation count");
+	}
+	common::ValidateDeserializedCount(iCoordinateCount, sizeof(ReplayManifestRecord::iActivationTick) + sizeof(GridCoord::iX) + sizeof(GridCoord::iY), manifestStream, "ReplayManifest records");
+	rManifest.records.reserve(iCoordinateCount);
+	for (int64_t i = 0; i < iCoordinateCount; ++i)
+	{
+		ReplayManifestRecord record {};
+		if (!ReadReplayManifestValue(manifestStream, record.iActivationTick) || !ReadReplayManifestValue(manifestStream, record.coordinate.iX) || !ReadReplayManifestValue(manifestStream, record.coordinate.iY))
+		{
+			throw std::ios_base::failure("ReplayManifest activation record");
+		}
+		rManifest.records.push_back(record);
+	}
+	uint8_t uiHasFullFrames = 0;
+	if (!ReadReplayManifestValue(manifestStream, uiHasFullFrames) || uiHasFullFrames > 1)
+	{
+		throw std::ios_base::failure("ReplayManifest fullframes flag");
+	}
+	rManifest.bHasFullFrames = uiHasFullFrames != 0;
+	if (rManifest.bHasFullFrames != kbReplayFullFrames)
+	{
+		throw std::ios_base::failure("ReplayManifest fullframes build mismatch");
+	}
+	std::array<uint8_t, 32> generationDigest {};
+	manifestStream.read(reinterpret_cast<char*>(generationDigest.data()), static_cast<std::streamsize>(generationDigest.size()));
+	if (!manifestStream || manifestStream.peek() != std::char_traits<char>::eof())
+	{
+		throw std::ios_base::failure("ReplayManifest trailing data");
+	}
+
+	std::array<uint8_t, 32> expectedGenerationDigest {};
+	if (!ComputeReplayGenerationDigest(rManifest, expectedGenerationDigest))
+	{
+		throw std::ios_base::failure("ReplayManifest inventory file");
+	}
+	if (expectedGenerationDigest != generationDigest)
+	{
+		throw std::ios_base::failure("ReplayManifest generation digest");
+	}
+	return true;
+}
+
 Replay::Replay()
-: common::Singleton<Replay>(gpReplay)
+: common::Singleton<Replay>(gpReplay, this)
 {
 	ReplayHarnessRigs::Attach(*this);
 }
@@ -268,6 +294,8 @@ void Replay::ResetStreams()
 void Replay::InvalidateReplayRecording()
 {
 	mReplayWriters.clear();
+	// A pending stop request outliving the writers would read as a record start at the next SyncReplayTick.
+	game::gpGame->mGameFlags.Set(engine::GameFlags::kSaveReplay, false);
 	miReplayInitialTick = 0;
 	ReplayHarnessRigs::Reset(*this);
 	game::OnReplayStreamsInvalidated();
@@ -359,7 +387,7 @@ void Replay::SaveLoadReplay()
 		{
 			// Heap: DifferenceStream reader + Frame deserialization + ReplayMeta file I/O
 			ScopedSuppressAllocationTracking suppress;
-			gpProfileManager->LatchRawCpuTimers(false, game::gpGame->miTickCounter);
+			gpProfileManager->LatchRawCpuTimers(false);
 
 			// Outside the try: its catch clears the replay harness rig and transfer-capture state that a live recording still uses.
 			ASSERT(!(!mReplayWriters.empty() || (game::gpGame->mGameFlags & engine::GameFlags::kSaveReplay)));
@@ -375,164 +403,14 @@ void Replay::SaveLoadReplay()
 				}
 				ClearReplayTransientState();
 
-				// The valid manifest is the generation commit marker. Validate it before reading any component.
-				std::fstream manifestStream = engine::gpFileManager->OpenFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, std::filesystem::path("F7.replay.manifest"));
-				if (!manifestStream)
-				{
-					LOG(kDefault, kError, "Failed to read replay manifest");
-					ReplayHarnessRigs::Reset(*this);
-					return;
-				}
-				int64_t iManifestVersion = 0;
-				if (!ReadReplayManifestValue(manifestStream, iManifestVersion))
-				{
-					throw std::ios_base::failure("ReplayManifest version");
-				}
-				if (iManifestVersion != kiReplayManifestVersion)
-				{
-					LOG(kDefault, kError, "Replay manifest version {} != {}", iManifestVersion, kiReplayManifestVersion);
-					ReplayHarnessRigs::Reset(*this);
-					return;
-				}
-
+				// The valid manifest is the generation commit marker. Validate it before parsing any component.
 				ReplayManifest manifest;
-				if (!ReadReplayManifestValue(manifestStream, manifest.iInitialTick))
+				if (!ReadReplayManifest(manifest))
 				{
-					throw std::ios_base::failure("ReplayManifest initial tick");
-				}
-				int64_t iCoordinateCount = 0;
-				if (!ReadReplayManifestValue(manifestStream, iCoordinateCount))
-				{
-					throw std::ios_base::failure("ReplayManifest activation count");
+					ReplayHarnessRigs::Reset(*this);
+					return;
 				}
 				int64_t iInitialTick = manifest.iInitialTick;
-				if (iInitialTick < 0 || iInitialTick > std::numeric_limits<int64_t>::max() - 1)
-				{
-					throw std::ios_base::failure("ReplayManifest initial tick");
-				}
-				common::ValidateDeserializedCount(iCoordinateCount, sizeof(ReplayManifestRecord::iActivationTick) + sizeof(GridCoord::iX) + sizeof(GridCoord::iY), manifestStream, "ReplayManifest records");
-				if (iCoordinateCount <= 0)
-				{
-					throw std::ios_base::failure("ReplayManifest empty records");
-				}
-				manifest.records.reserve(iCoordinateCount);
-				for (int64_t i = 0; i < iCoordinateCount; ++i)
-				{
-					ReplayManifestRecord record {};
-					if (!ReadReplayManifestValue(manifestStream, record.iActivationTick) || !ReadReplayManifestValue(manifestStream, record.coordinate.iX) || !ReadReplayManifestValue(manifestStream, record.coordinate.iY))
-					{
-						throw std::ios_base::failure("ReplayManifest activation record");
-					}
-					if (record.iActivationTick < iInitialTick)
-					{
-						throw std::ios_base::failure("ReplayManifest non-canonical record");
-					}
-					if (record.iActivationTick > std::numeric_limits<int64_t>::max() - 1)
-					{
-						throw std::ios_base::failure("ReplayManifest non-canonical record");
-					}
-					if (!manifest.records.empty() && !ReplayManifestRecordLess(manifest.records.back(), record))
-					{
-						throw std::ios_base::failure("ReplayManifest non-canonical record");
-					}
-					manifest.records.push_back(record);
-				}
-				uint8_t uiHasFullFrames = 0;
-				if (!ReadReplayManifestValue(manifestStream, uiHasFullFrames) || uiHasFullFrames > 1)
-				{
-					throw std::ios_base::failure("ReplayManifest fullframes flag");
-				}
-				manifest.bHasFullFrames = uiHasFullFrames != 0;
-				if (manifest.bHasFullFrames != kbReplayFullFrames)
-				{
-					throw std::ios_base::failure("ReplayManifest fullframes build mismatch");
-				}
-
-				int64_t iInventoryCount = 0;
-				if (!ReadReplayManifestValue(manifestStream, iInventoryCount))
-				{
-					throw std::ios_base::failure("ReplayManifest inventory count");
-				}
-				common::ValidateDeserializedCount(iInventoryCount, 57, manifestStream, "ReplayManifest inventory");
-				if (iInventoryCount <= 0)
-				{
-					throw std::ios_base::failure("ReplayManifest empty inventory");
-				}
-				manifest.inventory.reserve(iInventoryCount);
-				for (int64_t i = 0; i < iInventoryCount; ++i)
-				{
-					uint8_t uiKind = 0;
-					ReplayManifestInventoryEntry entry;
-					if (!ReadReplayManifestValue(manifestStream, uiKind))
-					{
-						throw std::ios_base::failure("ReplayManifest inventory entry");
-					}
-					if (uiKind > static_cast<uint8_t>(ReplayArtifactKind::kFullFrames))
-					{
-						throw std::ios_base::failure("ReplayManifest inventory entry");
-					}
-					if (!ReadReplayManifestValue(manifestStream, entry.uiCoordinateKey))
-					{
-						throw std::ios_base::failure("ReplayManifest inventory entry");
-					}
-					if (!ReadReplayManifestValue(manifestStream, entry.iActivationTick))
-					{
-						throw std::ios_base::failure("ReplayManifest inventory entry");
-					}
-					if (!ReadReplayManifestValue(manifestStream, entry.digest.iByteCount))
-					{
-						throw std::ios_base::failure("ReplayManifest inventory entry");
-					}
-					if (entry.digest.iByteCount < 0)
-					{
-						throw std::ios_base::failure("ReplayManifest inventory entry");
-					}
-					entry.eKind = static_cast<ReplayArtifactKind>(uiKind);
-					manifestStream.read(reinterpret_cast<char*>(entry.digest.sha256.data()), static_cast<std::streamsize>(entry.digest.sha256.size()));
-					if (!manifestStream)
-					{
-						throw std::ios_base::failure("ReplayManifest inventory digest");
-					}
-					if (!manifest.inventory.empty() && !ReplayInventoryEntryLess(manifest.inventory.back(), entry))
-					{
-						throw std::ios_base::failure("ReplayManifest non-canonical inventory");
-					}
-					manifest.inventory.push_back(entry);
-				}
-				std::array<uint8_t, 32> generationDigest {};
-				manifestStream.read(reinterpret_cast<char*>(generationDigest.data()), static_cast<std::streamsize>(generationDigest.size()));
-				if (!manifestStream || manifestStream.peek() != std::char_traits<char>::eof())
-				{
-					throw std::ios_base::failure("ReplayManifest trailing data");
-				}
-
-				ReplayManifest expectedManifest = manifest;
-				if (!BuildExpectedReplayInventory(expectedManifest, false) || std::ssize(expectedManifest.inventory) != std::ssize(manifest.inventory))
-				{
-					throw std::ios_base::failure("ReplayManifest inventory shape");
-				}
-				if (!std::ranges::equal(expectedManifest.inventory, manifest.inventory, [](const ReplayManifestInventoryEntry& rExpected, const ReplayManifestInventoryEntry& rActual)
-				{
-					return rExpected.eKind == rActual.eKind && rExpected.uiCoordinateKey == rActual.uiCoordinateKey && rExpected.iActivationTick == rActual.iActivationTick;
-				}))
-				{
-					throw std::ios_base::failure("ReplayManifest inventory identity");
-				}
-				std::array<uint8_t, 32> expectedGenerationDigest {};
-				if (!ComputeReplayGenerationDigest(manifest, expectedGenerationDigest) || expectedGenerationDigest != generationDigest)
-				{
-					throw std::ios_base::failure("ReplayManifest generation digest");
-				}
-				for (const ReplayManifestInventoryEntry& rEntry : manifest.inventory)
-				{
-					engine::FileContentDigest actualDigest;
-					std::filesystem::path filename = ReplayArtifactFilename(rEntry.eKind, rEntry.uiCoordinateKey, rEntry.iActivationTick);
-					if (!engine::gpFileManager->ComputeOrdinaryFileSha256({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, filename, actualDigest)
-					 || actualDigest.iByteCount != rEntry.digest.iByteCount || actualDigest.sha256 != rEntry.digest.sha256)
-					{
-						throw std::ios_base::failure("ReplayManifest inventory file");
-					}
-				}
 				const std::vector<ReplayManifestRecord>& rRecordedRecords = manifest.records;
 
 				game::ReplayStagedMeta stagedMeta {};
@@ -706,6 +584,105 @@ void Replay::SaveLoadReplay()
 				return;
 			}
 		}
+
+		if ((game::gpGame->mGameFlags & engine::GameFlags::kSaveReplay) && !mReplayWriters.empty())
+		{
+			// Heap: manifest records, DifferenceStream writer saves, ReplayMeta + manifest file I/O
+			ScopedSuppressAllocationTracking suppress;
+			game::gpGame->mGameFlags.Set(engine::GameFlags::kSaveReplay, false);
+			game::OnReplayStreamsInvalidated();
+
+			// Preserve the valid manifest's deterministic coord ordering after writer state is cleared.
+			std::vector<ReplayManifestRecord> recordedRecords;
+			for (const auto& [rCoordinate, rWriterGenerations] : mReplayWriters)
+			{
+				for (const ReplayWriterState& rWriterState : rWriterGenerations)
+				{
+					recordedRecords.push_back({.iActivationTick = rWriterState.iActivationTick, .coordinate = rCoordinate});
+				}
+			}
+			std::ranges::sort(recordedRecords, ReplayManifestRecordLess);
+
+			bool bReplayWritten = true;
+
+			for (const auto& [rCoordinate, rWriterGenerations] : mReplayWriters)
+			{
+				for (const ReplayWriterState& rWriterState : rWriterGenerations)
+				{
+					std::filesystem::path coordinateReplayPath = ReplayArtifactFilename(ReplayArtifactKind::kCoordHeader, rCoordinate.ToKey(), rWriterState.iActivationTick);
+					engine::FileFlags_t fileFlags {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite, engine::FileFlags::kBackup};
+					const game::Frame* pEndFrame = nullptr;
+					if (rWriterState.bTerminal)
+					{
+						pEndFrame = rWriterState.pRetainedEndFrame.get();
+					}
+					else
+					{
+						auto it = game::gpGame->mCells.find(rCoordinate);
+						if (it != game::gpGame->mCells.end())
+						{
+							pEndFrame = it->second.pCurrent.get();
+						}
+					}
+
+					bool bWriterSaved = false;
+					if (pEndFrame != nullptr)
+					{
+						if (!rWriterState.bTerminal)
+						{
+							UpdateTerminalReplayWriter(rCoordinate, rWriterState, *pEndFrame);
+						}
+						bWriterSaved = rWriterState.pWriter->Save(fileFlags, coordinateReplayPath, *pEndFrame);
+						if (ReplayHarnessRigs::ConsumePersistenceFailure(*this, ReplayHarnessRigs::PersistenceFailurePoint::kCoordinateWriter, rCoordinate, rWriterState.iActivationTick))
+						{
+							LOG(kDefault, kError, "Injected replay writer failure for coord ({},{}) activation {}; deleting replay sibling set", rCoordinate.iX, rCoordinate.iY, rWriterState.iActivationTick);
+							rWriterState.pWriter->CleanupFiles(fileFlags, coordinateReplayPath);
+							bWriterSaved = false;
+						}
+					}
+					else
+					{
+						LOG(kDefault, kError, "Replay writer for coord ({},{}) activation {} has no terminal frame; deleting partial replay set", rCoordinate.iX, rCoordinate.iY, rWriterState.iActivationTick);
+						rWriterState.pWriter->CleanupFiles(fileFlags, coordinateReplayPath);
+					}
+					if (bWriterSaved && !ReplayHarnessRigs::InjectMalformedFullFrames(*this, rCoordinate, rWriterState.iActivationTick, fileFlags, coordinateReplayPath))
+					{
+						rWriterState.pWriter->CleanupFiles(fileFlags, coordinateReplayPath);
+						bWriterSaved = false;
+					}
+					bReplayWritten = bWriterSaved && bReplayWritten;
+				}
+			}
+
+			mReplayWriters.clear();
+			miReplayInitialTick = 0;
+
+			// Write replay metadata for F8 load
+			bool bMetadataWritten = !ReplayHarnessRigs::ConsumePersistenceFailure(*this, ReplayHarnessRigs::PersistenceFailurePoint::kMetadata) && game::WriteReplayMetadata({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, ReplayArtifactFilename(ReplayArtifactKind::kMeta, 0, -1));
+			bReplayWritten = bMetadataWritten && bReplayWritten;
+
+			if (bReplayWritten)
+			{
+				ReplayManifest manifest
+				{
+					.iInitialTick = recordedRecords.empty() ? 0 : recordedRecords.front().iActivationTick,
+					.records = std::move(recordedRecords),
+					.bHasFullFrames = kbReplayFullFrames,
+				};
+				std::array<uint8_t, 32> generationDigest {};
+				bReplayWritten = !ReplayHarnessRigs::ConsumePersistenceFailure(*this, ReplayHarnessRigs::PersistenceFailurePoint::kInventory) && ComputeReplayGenerationDigest(manifest, generationDigest) && !ReplayHarnessRigs::ConsumePersistenceFailure(*this, ReplayHarnessRigs::PersistenceFailurePoint::kFinalManifest) && PublishReplayManifest(manifest, generationDigest);
+			}
+			ReplayHarnessRigs::RecordingStopped(*this, bReplayWritten);
+
+			if (bReplayWritten)
+			{
+				LOG(kDefault, kDebug, "Recording stopped");
+			}
+			else
+			{
+				LOG(kDefault, kError, "Replay persistence failed; recording stopped without a complete replay");
+			}
+		}
 	}
 }
 
@@ -778,140 +755,6 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 
 			ReplayHarnessRigs::RecordingStarted(*this);
 			LOG(kDefault, kDebug, "Recording started for {} coords", mReplayWriters.size());
-			return ReplayTickDecision::kDispatch;
-		}
-
-		if ((game::gpGame->mGameFlags & engine::GameFlags::kSaveReplay) && !mReplayWriters.empty())
-		{
-			game::gpGame->mGameFlags.Set(engine::GameFlags::kSaveReplay, false);
-			game::OnReplayStreamsInvalidated();
-
-			// Preserve the valid manifest's deterministic coord ordering after writer state is cleared.
-			std::vector<ReplayManifestRecord> recordedRecords;
-			for (const auto& [rCoordinate, rWriterGenerations] : mReplayWriters)
-			{
-				for (const ReplayWriterState& rWriterState : rWriterGenerations)
-				{
-					recordedRecords.push_back({.iActivationTick = rWriterState.iActivationTick, .coordinate = rCoordinate});
-				}
-			}
-			std::ranges::sort(recordedRecords, ReplayManifestRecordLess);
-
-			bool bReplayWritten = true;
-
-			for (const auto& [rCoordinate, rWriterGenerations] : mReplayWriters)
-			{
-				for (const ReplayWriterState& rWriterState : rWriterGenerations)
-				{
-					std::filesystem::path coordinateReplayPath = ReplayArtifactFilename(ReplayArtifactKind::kCoordHeader, rCoordinate.ToKey(), rWriterState.iActivationTick);
-					engine::FileFlags_t fileFlags {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite, engine::FileFlags::kBackup};
-					const game::Frame* pEndFrame = nullptr;
-					if (rWriterState.bTerminal)
-					{
-						pEndFrame = rWriterState.pRetainedEndFrame.get();
-					}
-					else
-					{
-						auto it = game::gpGame->mCells.find(rCoordinate);
-						if (it != game::gpGame->mCells.end())
-						{
-							pEndFrame = it->second.pCurrent.get();
-						}
-					}
-
-					bool bWriterSaved = false;
-					if (pEndFrame != nullptr)
-					{
-						if (!rWriterState.bTerminal)
-						{
-							UpdateTerminalReplayWriter(rCoordinate, rWriterState, *pEndFrame);
-						}
-						bWriterSaved = rWriterState.pWriter->Save(fileFlags, coordinateReplayPath, *pEndFrame);
-						if (ReplayHarnessRigs::ConsumePersistenceFailure(*this, ReplayHarnessRigs::PersistenceFailurePoint::kCoordinateWriter, rCoordinate, rWriterState.iActivationTick))
-						{
-							LOG(kDefault, kError, "Injected replay writer failure for coord ({},{}) activation {}; deleting replay sibling set", rCoordinate.iX, rCoordinate.iY, rWriterState.iActivationTick);
-							rWriterState.pWriter->CleanupFiles(fileFlags, coordinateReplayPath);
-							bWriterSaved = false;
-						}
-					}
-					else
-					{
-						LOG(kDefault, kError, "Replay writer for coord ({},{}) activation {} has no terminal frame; deleting partial replay set", rCoordinate.iX, rCoordinate.iY, rWriterState.iActivationTick);
-						rWriterState.pWriter->CleanupFiles(fileFlags, coordinateReplayPath);
-					}
-					if (bWriterSaved && ReplayHarnessRigs::ConsumePersistenceFailure(*this, ReplayHarnessRigs::PersistenceFailurePoint::kFullFramesRecord, rCoordinate, rWriterState.iActivationTick))
-					{
-						std::filesystem::path fullFramesPath = std::filesystem::path(coordinateReplayPath).concat(".fullframes");
-						std::fstream fullFramesStream = engine::gpFileManager->OpenFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, fullFramesPath);
-						fullFramesStream.seekg(0, std::ios::end);
-						int64_t iBeforeBytes = fullFramesStream.tellg();
-						bool bFullFramesTruncated = fullFramesStream.is_open() && iBeforeBytes > 0
-						                         && std::in_range<std::streamsize>(iBeforeBytes);
-						std::vector<std::byte> prefix;
-						if (bFullFramesTruncated)
-						{
-							prefix.resize(static_cast<size_t>(iBeforeBytes - 1));
-							fullFramesStream.seekg(0, std::ios::beg);
-							if (!prefix.empty())
-							{
-								fullFramesStream.read(reinterpret_cast<char*>(prefix.data()), static_cast<std::streamsize>(std::ssize(prefix)));
-								bFullFramesTruncated = fullFramesStream.gcount() == std::ssize(prefix);
-							}
-						}
-						fullFramesStream.close();
-						if (bFullFramesTruncated)
-						{
-							bFullFramesTruncated = engine::gpFileManager->WriteFileAtomically(fileFlags, fullFramesPath, [&](std::fstream& rFullFramesStream)
-							{
-								if (!prefix.empty())
-								{
-									rFullFramesStream.write(reinterpret_cast<const char*>(prefix.data()), static_cast<std::streamsize>(std::ssize(prefix)));
-								}
-							});
-						}
-						if (bFullFramesTruncated)
-						{
-							LOG(kDefault, kDebug, "Injected malformed replay fullframes for coord ({},{}); bytes {} -> {}", rCoordinate.iX, rCoordinate.iY, iBeforeBytes, std::ssize(prefix));
-						}
-						else
-						{
-							LOG(kDefault, kError, "Injected malformed replay fullframes failed for coord ({},{}); deleting replay sibling set", rCoordinate.iX, rCoordinate.iY);
-							rWriterState.pWriter->CleanupFiles(fileFlags, coordinateReplayPath);
-							bWriterSaved = false;
-						}
-					}
-					bReplayWritten = bWriterSaved && bReplayWritten;
-				}
-			}
-
-			mReplayWriters.clear();
-			miReplayInitialTick = 0;
-
-			// Write replay metadata for F8 load
-			bool bMetadataWritten = !ReplayHarnessRigs::ConsumePersistenceFailure(*this, ReplayHarnessRigs::PersistenceFailurePoint::kMetadata) && game::WriteReplayMetadata({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, ReplayArtifactFilename(ReplayArtifactKind::kMeta, 0, -1));
-			bReplayWritten = bMetadataWritten && bReplayWritten;
-
-			if (bReplayWritten)
-			{
-				ReplayManifest manifest
-				{
-					.iInitialTick = recordedRecords.empty() ? 0 : recordedRecords.front().iActivationTick,
-					.records = std::move(recordedRecords),
-					.bHasFullFrames = kbReplayFullFrames,
-				};
-				std::array<uint8_t, 32> generationDigest {};
-				bReplayWritten = !ReplayHarnessRigs::ConsumePersistenceFailure(*this, ReplayHarnessRigs::PersistenceFailurePoint::kInventory) && BuildExpectedReplayInventory(manifest, true) && ComputeReplayGenerationDigest(manifest, generationDigest) && !ReplayHarnessRigs::ConsumePersistenceFailure(*this, ReplayHarnessRigs::PersistenceFailurePoint::kFinalManifest) && PublishReplayManifest(manifest, generationDigest);
-			}
-			ReplayHarnessRigs::RecordingStopped(*this, bReplayWritten);
-
-			if (bReplayWritten)
-			{
-				LOG(kDefault, kDebug, "Recording stopped");
-			}
-			else
-			{
-				LOG(kDefault, kError, "Replay persistence failed; recording stopped without a complete replay");
-			}
 			return ReplayTickDecision::kDispatch;
 		}
 

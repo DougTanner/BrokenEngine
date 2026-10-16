@@ -4,7 +4,7 @@ namespace common
 {
 
 Multithreading::Multithreading(int64_t iWorkerCount)
-: common::Singleton<Multithreading>(gpMultithreading)
+: common::Singleton<Multithreading>(gpMultithreading, this)
 {
 	mWorkers.reserve(static_cast<size_t>(iWorkerCount));
 	for (int64_t i = 0; i < iWorkerCount; ++i)

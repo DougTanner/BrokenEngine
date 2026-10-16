@@ -22,7 +22,7 @@ Each complete leaf produces a `kIsland` chunk plus independently routed BC textu
 
 Masking occurs before mip generation. Underwater texels use format-specific flat values so constant regions survive through mipmaps and compression, while shoreline above `common::kfUnderwaterMaskThresholdMeters` remains available to rendering and placement. That one shared constant is the whole cut line: DataPacker bakes both the texture mask and the valid-area hull from it, and the engine publishes the same value to the shaders and to the debug hull draw. Never introduce a second local threshold — nothing would catch baked textures drifting out of step with the shader.
 
-The island payload stores the quantized elevation field, XY mesh data, indices, and valid-area hull. Runtime terrain reconstructs Z from elevation. The hull must remain convex and counter-clockwise because deterministic client/server island placement consumes it through `common::ConvexHullsOverlap`; producer checks enforce those properties before serialization.
+The island payload stores the quantized elevation field, XY mesh data, indices, and valid-area hull. Runtime terrain reconstructs Z from elevation. The hull must have at least three vertices and remain convex and counter-clockwise because deterministic client/server island placement consumes it through `common::ConvexHullsOverlap` with no substitute shape; producer checks enforce those properties before serialization, so a leaf whose hull has fewer than three vertices fails its export.
 
 Large shared route inputs use persistent fingerprints rather than repeated content reads. JPEG diagnostics belong only in the parallel `%LOCALAPPDATA%/BrokenEngine/DataPackerCache/.../Gaea/Diagnostics/` tree, never the source checkout.
 

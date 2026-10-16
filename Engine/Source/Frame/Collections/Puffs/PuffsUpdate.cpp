@@ -11,7 +11,7 @@ void PuffsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restric
 {
 	PuffsInterpolate& __restrict rCurrent = rFrameInterpolate.puffs;
 	const PuffsInterpolate& rPrevious = rPreviousFrame.interpolate.puffs;
-	std::chrono::duration<float> currentTime(rPreviousFrame.interpolate.fCurrentTime + rFrameInterpolate.fDeltaTime);
+	SimulationTime currentTime(std::chrono::duration<float>(rPreviousFrame.interpolate.fCurrentTime + rFrameInterpolate.fDeltaTime));
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -22,14 +22,13 @@ void PuffsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restric
 
 		// Load controller fields (copied in AllocateAndCopy)
 		int64_t iControllerTypeIndex = rCurrent.puiControllerTypeIndices[i];
-		std::chrono::duration<float> startTime(rCurrent.pfStartTimes[i]);
 
 		if (iControllerTypeIndex != kiInvalidControllerType)
 		{
-			std::chrono::duration<float> elapsedTime = currentTime - startTime;
+			std::chrono::duration<float> elapsedTime = currentTime - rCurrent.pStartTimes[i];
 			const PuffControllerType& rController = PuffsInterpolate::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
 
-			PuffKeyframe interpolated = InterpolateScaledKeyframes(rController, elapsedTime.count(), [](PuffControllerType& rScaledController, const PuffControllerType& rOriginalController, int64_t j)
+			PuffKeyframe interpolated = InterpolateScaledKeyframes(rController, elapsedTime, [](PuffControllerType& rScaledController, const PuffControllerType& rOriginalController, int64_t j)
 			{
 				if (rOriginalController.ppAreaScales[j] != nullptr)
 				{
@@ -57,14 +56,14 @@ void PuffsPostRender::Update([[maybe_unused]] game::Frame& __restrict rFrame, [[
 {
 }
 
-void XM_CALLCONV PuffsPostRender::AddControlled(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition)
+void XM_CALLCONV PuffsPostRender::AddControlled(game::Frame& __restrict rFrame, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition)
 {
 	PuffsInterpolate& rInterpolate = rFrame.interpolate.puffs;
 	PuffsPostRender& rPostRender = rFrame.postRender.puffs;
 
 	const PuffControllerType& rController = PuffsInterpolate::sControllerTypes.at(static_cast<size_t>(iControllerTypeIndex));
 
-	AddControlledElement(rInterpolate, currentTime.count(), iControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
+	AddControlledElement(rInterpolate, currentTime, iControllerTypeIndex, vecPosition, [&rInterpolate, &rPostRender]()
 	{
 		GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
 	}, [&rInterpolate, &rPostRender]()

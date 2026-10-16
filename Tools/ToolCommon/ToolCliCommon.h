@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
@@ -11,13 +13,11 @@
 #include <utility>
 #include <vector>
 #include <windows.h>
+// The CNG header needs the Windows types <windows.h> declares, so it follows it.
+#include <bcrypt.h>
 
-// nlohmann::json (vendored under tinygltf). The warning-suppression pragma travels with the header,
-// mirroring Common/ExternalHeaders.h for the PCH-backed builds.
-#pragma warning(push)
-#pragma warning(disable : 5311) // nlohmann::json 3.10.4 uses the pre-C++20 literal-operator-id form 'operator "" _json'
-#include "tinygltf/json.hpp"
-#pragma warning(pop)
+// nlohmann::json (ThirdParty/json submodule), mirroring Common/ExternalHeaders.h for the PCH-backed builds.
+#include "json/single_include/nlohmann/json.hpp"
 
 namespace toolcli
 {

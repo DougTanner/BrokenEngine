@@ -54,6 +54,13 @@ Triggers, inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
   `### Resolving Ambiguity`.
 - Scope the plan to the smallest complete change, per the minimum-sufficient
   change directive in root [AGENTS.md](../../../../AGENTS.md).
+- Apply the Change Workflow Verify the acceptance table step's Leftovers rule in
+  [`change-workflow.md`](../../../references/change-workflow.md) to every
+  leftover the preparation proves, such as the same defect at a sibling site:
+  when a plan is drafted, each small one goes into its `## In scope`, named in
+  the card's `### What does this plan do?`, so the Plan review step reviews it;
+  every other one, and every small one when no plan is drafted, returns under
+  `Residuals`.
 - Delegation conduct is in
   [`../../../references/subagent-reporting.md`](../../../references/subagent-reporting.md);
   never route work to another worker.

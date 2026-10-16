@@ -244,7 +244,7 @@ static void TryLoadRenderDocDll()
 }
 
 InstanceManager::InstanceManager(HINSTANCE hInstance, HWND hWindow)
-: common::Singleton<InstanceManager>(gpInstanceManager)
+: common::Singleton<InstanceManager>(gpInstanceManager, this)
 {
 	ScopedBootTimer scopedBootTimer(kBootTimerInstanceManager);
 

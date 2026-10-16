@@ -143,3 +143,7 @@ The post-split `RenderNavigation` in the ship render files: decision 9.
 | Audio pans by XY | With a Fighter on plane 2 firing left of screen centre, `query_audio` (or the audio harness rig's per-voice matrix) reports a left-weighted output matrix equal to the same ship firing on plane 0 at the same XY | `/agent-harness` audio rig, or code reading of `ApplyThreeDimensionalVolume` if no rig exposes the matrix |
 | Low plane unchanged | With every ship on plane 0, screenshots over water and over terrain and the Tweaks-default audio mix match a baseline session at `c1420821` plus the prerequisites, up to the lighting and shadow passes' own temporal noise | `/agent-harness` `verification.md` smoke run, `screenshot`, baseline then change |
 | No determinism change | No `LogDifferences CRC` or `CONFIRMED DESYNC` over a multi-minute connected session containing climbs | `get_logs` diff |
+
+## Coordination
+
+- `Documents/Plans/Engine/GameShellIntoGameBase.md` deletes the `Camera::IsMainMenuFrame` override beside the `Camera::PullTarget` return this Plan edits (decision 1), and moves `mVecVisualErrorOffset`, which `PullTarget` reads through `gpGame`, into `GameBase` under the same name. Whichever lands second rebases onto the other's `Camera.cpp` edits.

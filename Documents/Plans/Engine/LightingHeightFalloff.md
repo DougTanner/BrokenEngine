@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:01:51.106Z","dependsOn":["Documents/Plans/Engine/FlightPlaneData.md","Documents/Plans/Engine/SmokePerFlightPlane.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:01:51.106Z","dependsOn":["Documents/Plans/Engine/SmokePerFlightPlane.md"]} -->
 # Dim each light's 2D lighting deposit by its height above the surface under it
 
 Tier 2: client-only render behaviour of the lighting deposit stage (three CPU depositor sites plus one sprite shader); nothing CRC'd, serialized, networked, or threaded changes. Line numbers cite baseline `c1420821`; after `FlightPlaneData` lands, the `gBaseHeight.mfCurrent` read at `GraphicsUtils.cpp:109` is already `engine::gpFlightPlanes->Lowest().fHeightMeters` and the `fBaseHeight` uniform names are kept (its decision 8); `SmokePerFlightPlane` then generalizes that projection per plane (Context). Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other. Flight-plane series.

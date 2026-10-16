@@ -145,35 +145,6 @@ void GameBase::ProcessInput(bool bLostFocus)
 			gDebugTextureIndex.Set(fPrevious);
 		}
 
-		// Only an applied timespeed change sets mbTimeScaleChanged; sending a request in the later game callback does not.
-		if (mTimeStep.mbTimeScaleChanged)
-		{
-			mTimeStep.mbTimeScaleChanged = false;
-			LOG(kNetwork, kWarning, "Timespeed changed Multiply: {} Divide: {}", mTimeStep.miTimeMultiply, mTimeStep.miTimeDivide);
-
-			if (mTimeStep.miTimeMultiply == 1 && mTimeStep.miTimeDivide == 1)
-			{
-				gpImGuiManager->UpdateTextArea(kTextDebug, "");
-			}
-			else
-			{
-				common::ScopedWorkbufferArena scopedWorkbufferArena = common::gpThreadLocal->mWorkbuffer.Push();
-				if (mTimeStep.miTimeMultiply > 1)
-				{
-					common::gpThreadLocal->mWorkbuffer.Append("Time ratio: ");
-					common::gpThreadLocal->mWorkbuffer.Append(mTimeStep.miTimeMultiply);
-					common::gpThreadLocal->mWorkbuffer.Append("x");
-				}
-				else
-				{
-					common::gpThreadLocal->mWorkbuffer.Append("Time ratio: 1/");
-					common::gpThreadLocal->mWorkbuffer.Append(mTimeStep.miTimeDivide);
-					common::gpThreadLocal->mWorkbuffer.Append("x");
-				}
-				gpImGuiManager->UpdateTextArea(kTextDebug, common::gpThreadLocal->mWorkbuffer.View());
-			}
-		}
-
 		// Local pause state flips here so the callback's pause packet reports the state the client just entered.
 		if (menuInput.flags & MenuInputFlags::kTogglePauseFrame)
 		{
@@ -229,6 +200,38 @@ void GameBase::ClientUpdate()
 			.iExpectedUpdatesPerSecond = kiTickRate * mTimeStep.miTimeMultiply / mTimeStep.miTimeDivide,
 		};
 		game::gpClientSession->mpRuntime->PollAndDrain(networkTimeState);
+	}
+
+	if constexpr (kbDebugInput)
+	{
+		// ProcessInput's pause toggle also writes kTextDebug and runs earlier each frame: this note replaces a same-frame PAUSED, and a later pause press replaces this note.
+		if (mTimeStep.mbTimeScaleChanged)
+		{
+			mTimeStep.mbTimeScaleChanged = false;
+			LOG(kNetwork, kWarning, "Timespeed changed Multiply: {} Divide: {}", mTimeStep.miTimeMultiply, mTimeStep.miTimeDivide);
+
+			if (mTimeStep.miTimeMultiply == 1 && mTimeStep.miTimeDivide == 1)
+			{
+				gpImGuiManager->UpdateTextArea(kTextDebug, "");
+			}
+			else
+			{
+				common::ScopedWorkbufferArena scopedWorkbufferArena = common::gpThreadLocal->mWorkbuffer.Push();
+				if (mTimeStep.miTimeMultiply > 1)
+				{
+					common::gpThreadLocal->mWorkbuffer.Append("Time ratio: ");
+					common::gpThreadLocal->mWorkbuffer.Append(mTimeStep.miTimeMultiply);
+					common::gpThreadLocal->mWorkbuffer.Append("x");
+				}
+				else
+				{
+					common::gpThreadLocal->mWorkbuffer.Append("Time ratio: 1/");
+					common::gpThreadLocal->mWorkbuffer.Append(mTimeStep.miTimeDivide);
+					common::gpThreadLocal->mWorkbuffer.Append("x");
+				}
+				gpImGuiManager->UpdateTextArea(kTextDebug, common::gpThreadLocal->mWorkbuffer.View());
+			}
+		}
 	}
 
 	if (game::gpClientSession->mpDesynchronizationCore->IsStalled())
@@ -339,8 +342,9 @@ void GameBase::ServerUpdate()
 	int64_t iFullTicks = mTimeStep.TickRealtime();
 	// Second poll of the update: drains commands that arrived during WaitForTick so they enter the imminent
 	// tick rather than the next one. It runs before the pause/timespeed decision below, so a pause request
-	// arriving in the boundary window (Debug builds only, kbDebugInput) prevents the imminent tick. A
-	// save/load-replay request arriving here is serviced next update by design -- SaveLoadReplay already ran.
+	// arriving in the boundary window (Debug builds only, kbDebugInput) prevents the imminent tick. A record-stop
+	// or load-replay request arriving here is serviced next update by design -- SaveLoadReplay already ran; a
+	// record-start request waits for the first dispatched tick's SyncReplayTick.
 	game::gpServerSession->mpRuntime->PollTickBoundary(networkTimeState);
 	bool bAcceptRawCpuTimers = false;
 	if constexpr (kbProfiling)
@@ -399,7 +403,7 @@ void GameBase::ServerUpdate()
 			{
 				if constexpr (kbProfiling)
 				{
-					gpProfileManager->LatchRawCpuTimers(false, miTickCounter);
+					gpProfileManager->LatchRawCpuTimers(false);
 					bRawCpuTimersNoDispatchLatched = true;
 				}
 				// Loop completion reloads before observers see an empty grid. Replay abort leaves no load request,
@@ -425,7 +429,7 @@ void GameBase::ServerUpdate()
 #if defined(BT_SERVER)
 		if constexpr (kbProfiling)
 		{
-			gpProfileManager->LatchRawCpuTimers(bAcceptRawCpuTimers, miTickCounter);
+			gpProfileManager->LatchRawCpuTimers(bAcceptRawCpuTimers);
 		}
 #endif // BT_SERVER
 		FinalizeFrameTick();
@@ -442,7 +446,7 @@ void GameBase::ServerUpdate()
 	{
 		if constexpr (kbProfiling)
 		{
-			gpProfileManager->LatchRawCpuTimers(false, miTickCounter);
+			gpProfileManager->LatchRawCpuTimers(false);
 		}
 	}
 	if (iUnusedTicks > 0 && !(mGameFlags & GameFlags::kPaused))

@@ -118,6 +118,14 @@ The `argument-hint` value selects the Plan:
    authorization rests only on that item as presented under
    `### Implementation approval`, never on an approval that did not carry it.
 
+   The brief also has the preparation `implementer` apply the Change Workflow
+   Verify the acceptance table step's Leftovers rule in
+   [change-workflow.md](../../references/change-workflow.md) to every leftover
+   it proves, such as the same defect at a sibling site: each small one goes on
+   the snapshot's execution card as approved scope, named in the card's
+   `### What does this plan do?`, and into `Slices`, so the Plan review step
+   reviews it, and every other one returns under `Residuals`.
+
    After that preparation handoff, and before the Plan review reviewers, main
    runs `/plan-alternatives` when its trigger fires and presents per that
    skill's `### User presentation`.
@@ -150,13 +158,17 @@ The `argument-hint` value selects the Plan:
    `.agents/skills/<name>/` files) citations, and returns under
    `Decisive checks`, without quoting the diff or the uncited names, one row
    with the count of changed cited paths and one row per changed cited path
-   stating whether its change touches a statement the preparation handoff or
-   execution card relies on.
+   whose change touches a statement the preparation handoff or execution card
+   relies on.
+   A changed cited path whose change leaves the relied-on statements' wording
+   intact and moves them only within their `##` section (or within the file,
+   for a file without `##` headings) counts in the count row but is not a
+   touch and gets no per-path row.
    When any row reports a touch, return to step 4, rerun the affected Plan
    review checks in step 5, and repeat this final refresh before approval;
    reuse review evidence whose inputs did not change. Done when the claim
    result reports the held claim and either the claim result carries no `sync`
-   object, the count row reports zero, or every per-path row reports no touch.
+   object or no row reports a touch.
 7. Present for approval per this file's `### Implementation approval`. Done
    when the user's decision arrives.
 8. Implement the approved change. Main dispatches one `/implement-plan`
@@ -225,12 +237,16 @@ per-statement enumeration of unaffected results.
 
 - `Claim` — the Plan path, or none; with the resolved state when claimed.
 - `Classification` — `Tier 1`, `Tier 2`, or `Tier 3`, and the trigger.
-- `Verification` — one row per contradiction, unresolved decision, and verified
-  Plan statement whose result requires a card or implementation change, on the
-  form `<kind> — <Plan citation> — <result and the change it requires>`, then one
-  final row `Unaffected statements: <count>`; a quantitative feasibility
-  estimate is not repeated here, and step 4 governs one returned as a `Findings`
-  row.
+- `Verification` — one row per unresolved decision, contradiction needing a
+  user decision or override, problem found gone or empty realized change,
+  scope widened beyond the Plan's `## In scope`, and dropped or weakened Plan
+  acceptance criterion or invariant, on the form
+  `<kind> — <Plan citation> — <result and the change it requires>`; then one
+  row `Snapshot corrections: <count>` for every other verified Plan statement
+  whose result requires a card or implementation change, each written in the
+  snapshot's corrections section, which `Evidence` cites; then one final row
+  `Unaffected statements: <count>`; a quantitative feasibility estimate is not
+  repeated here, and step 4 governs one returned as a `Findings` row.
 - `Slices` — the only source of the slice partition; the card's `Roles`
   carries role assignments, not the split. One row per disjoint implementation
   slice: the snapshot items it owns, named by section and label or bullet,
@@ -297,8 +313,15 @@ preparation and Plan review. When approval came with the choice, the redraft
 goes to implementation unless those reviews add a user decision, widen scope
 beyond the choice, or raise the tier; in that case, and when the choice came
 without approval, main presents only the difference. When the approved presentation differs from the
-execution card, main updates the card to the approved scope before the run
-continues.
+execution card, main dispatches, before step 8, one fresh preparation
+`implementer` whose continuation capsule
+([`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
+`## Continuation capsule`) carries the snapshot step 8 cites as the approved
+plan with its `##` selectors, and the user's approval
+answers; that worker updates the card's affected fields to the approved scope,
+and the dispatch always names `Slices` in its `Return:`, whether or not the
+update changes the snapshot's scope, so step 8 dispatches from that handoff's
+`Slices`. Main does not read or edit the card or the snapshot for this update.
 
 ### IMPORTANT: Session-complete marker
 

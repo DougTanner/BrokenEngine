@@ -88,14 +88,14 @@ void PlayersInterpolate::Register()
 	engine::ExplosionsInterpolate::RegisterType(siExplosionTypeIndex,
 	{
 #if defined(BT_CLIENT)
-		.iPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryLightControllerTypeIndex,
-		.iSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryLightControllerTypeIndex,
-		.iPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiPrimaryPuffControllerTypeIndex,
-		.iSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::suiSecondaryPuffControllerTypeIndex,
+		.iPrimaryLightControllerTypeIndex = engine::ExplosionsInterpolate::siPrimaryLightControllerTypeIndex,
+		.iSecondaryLightControllerTypeIndex = engine::ExplosionsInterpolate::siSecondaryLightControllerTypeIndex,
+		.iPrimaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::siPrimaryPuffControllerTypeIndex,
+		.iSecondaryPuffControllerTypeIndex = engine::ExplosionsInterpolate::siSecondaryPuffControllerTypeIndex,
 		.iTrailTypeIndex = engine::ExplosionsInterpolate::siExplosionTrailTypeIndex,
-		.iWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::suiWindRadialControllerTypeIndex,
+		.iWindRadialControllerTypeIndex = engine::ExplosionsInterpolate::siWindRadialControllerTypeIndex,
 #endif // BT_CLIENT
-		.uiBaseParticleCount = static_cast<uint32_t>(kiExplosionBaseParticleCount),
+		.iBaseParticleCount = kiExplosionBaseParticleCount,
 		.uiParticleColor = 0xFF0000FF,
 		.fParticleVelocityMinimum = kfExplosionParticleVelocityMinimum,
 		.fParticleVelocityRandom = kfExplosionParticleVelocityRandom,
@@ -126,8 +126,7 @@ void PlayersInterpolate::Register()
 		.uiCrc = data::kTexturesBC7ExplosionpngCrc,
 		.uiColor = 0xFFFFFFFF,
 	});
-	int64_t iImpactPointLightControllerTypeIndex = suiImpactPointLightControllerTypeIndex;
-	engine::PointLightsInterpolate::RegisterControllerType(iImpactPointLightControllerTypeIndex,
+	engine::PointLightsInterpolate::RegisterControllerType(siImpactPointLightControllerTypeIndex,
 	{
 		.iBaseTypeIndex = iImpactPointLightTypeIndex,
 		.iKeyframeCount = 2,
@@ -145,7 +144,6 @@ void PlayersInterpolate::Register()
 		.ppLightingAreaScales = {&gPlayerImpactLightingAreaOne, &gPlayerImpactLightingAreaTwo, nullptr, nullptr},
 		.ppLightingIntensityScales = {&gPlayerImpactLightingIntensityOne, &gPlayerImpactLightingIntensityTwo, nullptr, nullptr},
 	});
-	suiImpactPointLightControllerTypeIndex = static_cast<uint8_t>(iImpactPointLightControllerTypeIndex);
 
 	// Hits trigger the impact puff controller.
 	int64_t iImpactPuffTypeIndex = 0xFF;
@@ -154,8 +152,7 @@ void PlayersInterpolate::Register()
 		.uiCrc = data::kTexturesSmokeBC44jpgCrc,
 		.uiColor = 0xFFFFFFFF,
 	});
-	int64_t iImpactPuffControllerTypeIndex = suiImpactPuffControllerTypeIndex;
-	engine::PuffsInterpolate::RegisterControllerType(iImpactPuffControllerTypeIndex,
+	engine::PuffsInterpolate::RegisterControllerType(siImpactPuffControllerTypeIndex,
 	{
 		.iBaseTypeIndex = iImpactPuffTypeIndex,
 		.iKeyframeCount = 2,
@@ -171,7 +168,6 @@ void PlayersInterpolate::Register()
 		.ppAreaScales = {&gPlayerImpactPuffAreaOne, &gPlayerImpactPuffAreaTwo, nullptr, nullptr},
 		.ppIntensityScales = {&gPlayerImpactPuffIntensityOne, &gPlayerImpactPuffIntensityTwo, nullptr, nullptr},
 	});
-	suiImpactPuffControllerTypeIndex = static_cast<uint8_t>(iImpactPuffControllerTypeIndex);
 
 	engine::HexShieldsInterpolate::RegisterType(siHexShieldTypeIndex,
 	{
@@ -214,7 +210,7 @@ void PlayersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[may
 	// Remove dead players (reverse iteration for swap-and-pop safety)
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
-		return (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pfDestroyedTimes[i] <= 0.0f;
+		return (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pDestroyedTimes[i].count() <= 0.0f;
 	},
 	[&](int64_t i)
 	{
@@ -258,7 +254,7 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 			}
 
 			// The cell's local frame is centered on the origin, so the spawn offset is the local position.
-			XMVECTOR vecSpawnPosition = XMVectorSet(rSpawnData.fSpawnOffsetX, rSpawnData.fSpawnOffsetY, engine::gBaseHeight.mfCurrent, 1.0f);
+			XMVECTOR vecSpawnPosition = XMVectorSet(rSpawnData.fSpawnOffsetX, rSpawnData.fSpawnOffsetY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 
 			// These offsets arrive from outside the simulation (network or harness), so refuse one outside this
 			// cell here.
@@ -274,7 +270,7 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 				.vecVelocity = XMVectorZero(),
 				.alignment = rFrame.postRender.playerAlignment,
 				.flags = spawnFlags,
-				.fArrivalGracePeriod = kArrivalGracePeriod.count(),
+				.arrivalGracePeriod = kArrivalGracePeriod,
 				.globalPlayerId = {.iValue = rSpawnData.iGlobalId},
 				// Empty unless the spawn request carries an owning client: agent-injected rows are born unowned.
 				.clientGuid = rSpawnData.clientGuid,
@@ -333,8 +329,8 @@ void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __res
 				// Weapon mode change is deferred via countdown ticks
 				rCurrentPostRender.pFlags[iIndex].Set(kPendingUseMissiles, rUpdate.bUseMissiles);
 				rCurrentPostRender.puiPendingWeaponModeTicks[iIndex] = rUpdate.uiPendingWeaponModeTicks;
-				rCurrentPostRender.pfNavigationDelays[iIndex] = rUpdate.navigationDelaySeconds.count();
-				rCurrentPostRender.pfCellChangeTimers[iIndex] = rUpdate.navigationDelaySeconds.count();
+				rCurrentPostRender.pNavigationDelays[iIndex] = rUpdate.navigationDelaySeconds;
+				rCurrentPostRender.pCellChangeTimers[iIndex] = rUpdate.navigationDelaySeconds;
 			}
 			else
 			{
@@ -401,8 +397,8 @@ bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 
 	rCurrentInterpolate.pVecPositions[iIndex] = rInfo.vecPosition;
 	rCurrentInterpolate.pVecDirections[iIndex] = rInfo.vecDirection;
-	rCurrentInterpolate.pfDestroyedTimes[iIndex] = 0.0f;
-	rCurrentInterpolate.pfAnimationTimes[iIndex] = rInfo.fAnimationTime;
+	rCurrentInterpolate.pDestroyedTimes[iIndex] = std::chrono::duration<float>::zero();
+	rCurrentInterpolate.pAnimationTimes[iIndex] = rInfo.animationTime;
 	rCurrentInterpolate.pPushers[iIndex] = {};
 	engine::PushersPostRender::Add(rFrame, rCurrentInterpolate.pPushers[iIndex]);
 #if defined(BT_CLIENT)
@@ -419,19 +415,19 @@ bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 
 	rCurrentPostRender.pIds[iIndex] = newId;
 	rCurrentPostRender.pAlignments[iIndex] = rInfo.alignment;
-	rCurrentPostRender.pfNextBlasterFireTimes[iIndex] = rInfo.fNextBlasterFireTime;
-	rCurrentPostRender.pfNextSecondarySpawnTimes[iIndex] = rInfo.fNextSecondarySpawnTime;
+	rCurrentPostRender.pNextBlasterFireTimes[iIndex] = rInfo.nextBlasterFireTime;
+	rCurrentPostRender.pNextSecondarySpawnTimes[iIndex] = rInfo.nextSecondarySpawnTime;
 	rCurrentPostRender.pVecVelocities[iIndex] = rInfo.vecVelocity;
 	rCurrentPostRender.pVecWantedDirections[iIndex] = rInfo.vecDirection;
 	rCurrentPostRender.pfArmors[iIndex] = rInfo.bTransfer ? rInfo.fArmor : kfPlayerArmor;
 	rCurrentPostRender.pfShields[iIndex] = rInfo.bTransfer ? rInfo.fShield : kfPlayerShield;
-	rCurrentPostRender.pfShieldCooldowns[iIndex] = rInfo.fShieldCooldown;
-	rCurrentPostRender.pfDestroyedExplosionTimes[iIndex] = 0.0f;
-	rCurrentPostRender.pfShieldDownSoundCooldowns[iIndex] = rInfo.fShieldDownSoundCooldown;
+	rCurrentPostRender.pShieldCooldowns[iIndex] = rInfo.shieldCooldown;
+	rCurrentPostRender.pDestroyedExplosionTimes[iIndex] = std::chrono::duration<float>::zero();
+	rCurrentPostRender.pShieldDownSoundCooldowns[iIndex] = rInfo.shieldDownSoundCooldown;
 	rCurrentPostRender.pVecAiDirections[iIndex] = XMVectorZero();
-	rCurrentPostRender.pfTransferLockTimers[iIndex] = rInfo.fTransferLockTimer;
-	rCurrentPostRender.pfArrivalGracePeriods[iIndex] = rInfo.fArrivalGracePeriod;
-	rCurrentPostRender.pfCellChangeTimers[iIndex] = 15.0f + common::Random<10.0f>(rFrame.postRender.randomEngine);
+	rCurrentPostRender.pTransferLockTimers[iIndex] = rInfo.transferLockTimer;
+	rCurrentPostRender.pArrivalGracePeriods[iIndex] = rInfo.arrivalGracePeriod;
+	rCurrentPostRender.pCellChangeTimers[iIndex] = std::chrono::duration<float>(15.0f + common::Random<10.0f>(rFrame.postRender.randomEngine));
 	// Entering a cell is a fresh spawn for navigation, cross-cell transfers included: the wanted direction comes from the
 	// hull direction, and the cached steering, island destination, navigation mode, and waypoint index reset here.
 	// Flagship navigates to island destination on enter; non-flagship starts roaming and follows flagship via proximity
@@ -439,7 +435,7 @@ bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	SetNavigationDirection(spawnFlags, (rInfo.flags & kIsFlagship) ? 4i64 : -1i64);
 	SetNavigationWaypointIndex(spawnFlags, 0);
 	rCurrentPostRender.pFlags[iIndex] = spawnFlags;
-	rCurrentPostRender.pfNavigationDelays[iIndex] = rInfo.fNavigationDelay;
+	rCurrentPostRender.pNavigationDelays[iIndex] = rInfo.navigationDelay;
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
 	rCurrentPostRender.pClientGuids[iIndex] = rInfo.clientGuid;
 	rCurrentPostRender.pGlobalPlayerIds[iIndex] = rInfo.globalPlayerId;
@@ -459,34 +455,34 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 	PlayersInterpolate& rCurrent = *rFrameInterpolate.pPlayers;
 	const PlayersInterpolate& rPrevious = *rPreviousFrame.interpolate.pPlayers;
 	const PlayersPostRender& rPreviousPostRender = *rPreviousFrame.postRender.pPlayers;
-	float fDeltaTime = rFrameInterpolate.fDeltaTime;
+	std::chrono::duration<float> deltaTime(rFrameInterpolate.fDeltaTime);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		XMVECTOR vecPosition = rPrevious.pVecPositions[i];
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
-		float fDestroyedTime = rPrevious.pfDestroyedTimes[i];
-		float fAnimationTime = rPrevious.pfAnimationTimes[i];
+		std::chrono::duration<float> destroyedTime = rPrevious.pDestroyedTimes[i];
+		std::chrono::duration<float> animationTime = rPrevious.pAnimationTimes[i];
 
 		if (!(rPreviousPostRender.pFlags[i] & kExploding)) [[likely]]
 		{
-			vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(fDeltaTime), rPreviousPostRender.pVecVelocities[i], vecPosition);
+			vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
 		}
-		vecPosition = XMVectorSetZ(vecPosition, engine::gBaseHeight.mfCurrent);
+		vecPosition = XMVectorSetZ(vecPosition, engine::gpFlightPlanes->Lowest().fHeightMeters);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation (pos.W += dt * vel.W).
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
-		vecDirection = common::RotateTowardsPercent(vecDirection, rPreviousPostRender.pVecWantedDirections[i], common::ExponentialInterpolant(kfRotateTowardsSpeed, fDeltaTime));
+		vecDirection = common::RotateTowardsPercent(vecDirection, rPreviousPostRender.pVecWantedDirections[i], common::ExponentialInterpolant(kfRotateTowardsSpeed, deltaTime.count()));
 
 		if (rPreviousPostRender.pFlags[i] & kExploding) [[unlikely]]
 		{
-			fDestroyedTime = std::max(fDestroyedTime - fDeltaTime, 0.0f);
+			destroyedTime = std::max(destroyedTime - deltaTime, std::chrono::duration<float>::zero());
 		}
 
 		rCurrent.pVecPositions[i] = vecPosition;
 		rCurrent.pVecDirections[i] = vecDirection;
-		rCurrent.pfDestroyedTimes[i] = fDestroyedTime;
-		rCurrent.pfAnimationTimes[i] = fAnimationTime;
+		rCurrent.pDestroyedTimes[i] = destroyedTime;
+		rCurrent.pAnimationTimes[i] = animationTime;
 
 		engine::PushersInterpolate::Sync(rFrameInterpolate, rCurrent.pPushers[i],
 		{
@@ -505,21 +501,21 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 
 		float fShieldRotation = rPrevious.pfShieldRotations[i];
 		float fShieldShrink = rPrevious.pfShieldShrinks[i];
-		fShieldRotation += fDeltaTime * kfShieldRotationSpeed;
-		fShieldShrink = std::clamp(fShieldShrink + (rPreviousPostRender.pfShields[i] > 0.0f ? fDeltaTime * kfShieldShrinkSpeed : -fDeltaTime * kfShieldShrinkSpeed), 0.0f, 1.0f);
+		fShieldRotation += deltaTime.count() * kfShieldRotationSpeed;
+		fShieldShrink = std::clamp(fShieldShrink + (rPreviousPostRender.pfShields[i] > 0.0f ? deltaTime.count() * kfShieldShrinkSpeed : -deltaTime.count() * kfShieldShrinkSpeed), 0.0f, 1.0f);
 		rCurrent.pfShieldRotations[i] = fShieldRotation;
 		rCurrent.pfShieldShrinks[i] = fShieldShrink;
 
 		if (engine::gAnimationDataMap.contains(kPlayerModel))
 		{
 			const engine::AnimationData& rAnimationData = engine::gAnimationDataMap.at(kPlayerModel);
-			float fAnimationDuration = rAnimationData.mpAnimations[0].fDuration;
-			fAnimationTime += fDeltaTime;
-			if (fAnimationTime >= fAnimationDuration)
+			std::chrono::duration<float> animationDuration(rAnimationData.mpAnimations[0].fDuration);
+			animationTime += deltaTime;
+			if (animationTime.count() >= animationDuration.count())
 			{
-				fAnimationTime = std::fmod(fAnimationTime, fAnimationDuration);
+				animationTime = std::chrono::duration<float>(std::fmod(animationTime.count(), animationDuration.count()));
 			}
-			rCurrent.pfAnimationTimes[i] = fAnimationTime;
+			rCurrent.pAnimationTimes[i] = animationTime;
 		}
 
 		if ((rCurrent.pWindTrails[i].uuid.iValue != 0))
@@ -538,8 +534,8 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 		HexShieldIntensities hexShieldFragmentIntensities {};
 		for (int64_t j = 0; j < shaders::kiHexShieldDirections; ++j)
 		{
-			hexShieldVertexIntensities.data[j] = std::max(rPrevious.pHexShieldVertexIntensities[i].data[j] - gHexShieldIntensityDecay.mfCurrent * fDeltaTime, 0.0f);
-			hexShieldFragmentIntensities.data[j] = std::max(rPrevious.pHexShieldFragmentIntensities[i].data[j] - gHexShieldIntensityDecay.mfCurrent * fDeltaTime, 0.0f);
+			hexShieldVertexIntensities.data[j] = std::max(rPrevious.pHexShieldVertexIntensities[i].data[j] - gHexShieldIntensityDecay.mfCurrent * deltaTime.count(), 0.0f);
+			hexShieldFragmentIntensities.data[j] = std::max(rPrevious.pHexShieldFragmentIntensities[i].data[j] - gHexShieldIntensityDecay.mfCurrent * deltaTime.count(), 0.0f);
 		}
 		rCurrent.pHexShieldDirections[i] = hexShieldDirections;
 		rCurrent.pHexShieldVertexIntensities[i] = hexShieldVertexIntensities;
@@ -628,7 +624,7 @@ void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		sCollisionFlags.at(static_cast<size_t>(i)) = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
-		engine::SegmentHit boundaryHit = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousFrame.interpolate.pPlayers->pVecPositions[i], rCurrentInterpolate.pVecPositions[i], 0.0f, 1.0f);
+		engine::SegmentHit boundaryHit = engine::TracePointToCellExit(engine::LocalCellArea(), rPreviousFrame.interpolate.pPlayers->pVecPositions[i], rCurrentInterpolate.pVecPositions[i]);
 		rCollisionScratch.maximumTimes.at(static_cast<size_t>(i)) = boundaryHit.bHit ? boundaryHit.fTime : std::numeric_limits<float>::max();
 	}
 
@@ -655,7 +651,7 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 	PlayersPostRender& __restrict rCurrent = *rFrame.postRender.pPlayers;
 	const PlayersPostRender& rPrevious = *rPreviousFrame.postRender.pPlayers;
 	const PlayersInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pPlayers;
-	float fDeltaTime = rFrame.interpolate.fDeltaTime;
+	std::chrono::duration<float> deltaTime(rFrame.interpolate.fDeltaTime);
 
 	if (rCurrent.iCount == 0)
 	{
@@ -665,25 +661,25 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 	// Cell center: every cell's local frame is centered on the origin.
 	// W=1.0 keeps this a proper position — every downstream (cellCenter - vecPosition) and cardinal offset add stays W-clean,
 	// so normalize fallbacks don't leak W into the AI direction and on into velocity.
-	XMVECTOR vecCellCenter = XMVectorSet(0.0f, 0.0f, engine::gBaseHeight.mfCurrent, 1.0f);
+	XMVECTOR vecCellCenter = XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		PlayerFlags_t flags = rPrevious.pFlags[i];
-		float fNextBlasterFireTime = rPrevious.pfNextBlasterFireTimes[i];
-		float fNextSecondarySpawnTime = rPrevious.pfNextSecondarySpawnTimes[i];
+		std::chrono::duration<float> nextBlasterFireTime = rPrevious.pNextBlasterFireTimes[i];
+		std::chrono::duration<float> nextSecondarySpawnTime = rPrevious.pNextSecondarySpawnTimes[i];
 		XMVECTOR vecVelocity = rPrevious.pVecVelocities[i];
 		XMVECTOR vecWantedDirection = rPrevious.pVecWantedDirections[i];
 		float fArmor = rPrevious.pfArmors[i];
 		float fShield = rPrevious.pfShields[i];
-		float fShieldCooldown = std::max(0.0f, rPrevious.pfShieldCooldowns[i] - fDeltaTime);
-		float fDestroyedExplosionTime = std::max(0.0f, rPrevious.pfDestroyedExplosionTimes[i] - fDeltaTime);
-		float fShieldDownSoundCooldown = std::max(0.0f, rPrevious.pfShieldDownSoundCooldowns[i] - fDeltaTime);
+		std::chrono::duration<float> shieldCooldown = std::max(std::chrono::duration<float>::zero(), rPrevious.pShieldCooldowns[i] - deltaTime);
+		std::chrono::duration<float> destroyedExplosionTime = std::max(std::chrono::duration<float>::zero(), rPrevious.pDestroyedExplosionTimes[i] - deltaTime);
+		std::chrono::duration<float> shieldDownSoundCooldown = std::max(std::chrono::duration<float>::zero(), rPrevious.pShieldDownSoundCooldowns[i] - deltaTime);
 		XMVECTOR vecAiDirection = rPrevious.pVecAiDirections[i];
-		float fTransferLockTimer = rPrevious.pfTransferLockTimers[i];
-		float fArrivalGracePeriod = std::max(0.0f, rPrevious.pfArrivalGracePeriods[i] - fDeltaTime);
-		float fCellChangeTimer = rPrevious.pfCellChangeTimers[i];
-		float fNavigationDelay = rPrevious.pfNavigationDelays[i];
+		std::chrono::duration<float> transferLockTimer = rPrevious.pTransferLockTimers[i];
+		std::chrono::duration<float> arrivalGracePeriod = std::max(std::chrono::duration<float>::zero(), rPrevious.pArrivalGracePeriods[i] - deltaTime);
+		std::chrono::duration<float> cellChangeTimer = rPrevious.pCellChangeTimers[i];
+		std::chrono::duration<float> navigationDelay = rPrevious.pNavigationDelays[i];
 		engine::GridCoord fleetWantedCoordinate = rPrevious.pFleetWantedCoordinates[i];
 		int64_t iPendingFleetWantedCoordinateTicks = rPrevious.puiPendingFleetWantedCoordinateTicks[i];
 		int64_t iPendingWeaponModeTicks = rPrevious.puiPendingWeaponModeTicks[i];
@@ -724,13 +720,13 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		}
 
 		// Transfer lock skips navigation, target acquisition, and movement acceleration.
-		if (fTransferLockTimer > 0.0f)
+		if (transferLockTimer > std::chrono::duration<float>::zero())
 		{
-			fTransferLockTimer -= fDeltaTime;
+			transferLockTimer -= deltaTime;
 		}
 		else
 		{
-			ComputeNavigation(rFrame, rPreviousFrame, rStaticData, i, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, flags, fDeltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, fCellChangeTimer);
+			ComputeNavigation(rFrame, rPreviousFrame, rStaticData, i, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, flags, deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
 
 			bool bLookTargetFound = false;
 			XMVECTOR vecLookPosition = XMVectorZero();
@@ -738,7 +734,7 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 
 			float fAccelerationMultiplier = (1.0f - kfPlayerJitterRange * 0.5f) + common::Random<kfPlayerJitterRange>(rFrame.postRender.randomEngine);
 			float fDecayMultiplier = (1.0f - kfPlayerJitterRange * 0.5f) + common::Random<kfPlayerJitterRange>(rFrame.postRender.randomEngine);
-			ApplyMovement(iNavigationDirection, vecAiDirection, fDeltaTime, fAccelerationMultiplier, fDecayMultiplier, vecVelocity);
+			ApplyMovement(iNavigationDirection, vecAiDirection, deltaTime, fAccelerationMultiplier, fDecayMultiplier, vecVelocity);
 
 			if (bLookTargetFound)
 			{
@@ -747,7 +743,7 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		}
 
 		// Shield regeneration and pushes also run while transfer-locked.
-		RegenerateShield(std::chrono::duration<float>(fDeltaTime), std::chrono::duration<float>(fShieldCooldown), fShield);
+		RegenerateShield(deltaTime, shieldCooldown, fShield);
 		ApplyTerrainPush(rStaticData, vecPosition, vecVelocity);
 		ApplyPusherPush(rFrame, rPreviousFrame, i, vecPosition, vecVelocity);
 		ResolveTerrainContact(rStaticData, i, vecPosition, rFrame.interpolate.pPlayers->pVecPositions[i], vecVelocity);
@@ -755,20 +751,20 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		SetNavigationDirection(flags, iNavigationDirection);
 		SetNavigationWaypointIndex(flags, iNavigationWaypointIndex);
 		rCurrent.pFlags[i] = flags;
-		rCurrent.pfNextBlasterFireTimes[i] = fNextBlasterFireTime;
-		rCurrent.pfNextSecondarySpawnTimes[i] = fNextSecondarySpawnTime;
+		rCurrent.pNextBlasterFireTimes[i] = nextBlasterFireTime;
+		rCurrent.pNextSecondarySpawnTimes[i] = nextSecondarySpawnTime;
 		rCurrent.pVecVelocities[i] = vecVelocity;
 		rCurrent.pVecWantedDirections[i] = vecWantedDirection;
 		rCurrent.pfArmors[i] = fArmor;
 		rCurrent.pfShields[i] = fShield;
-		rCurrent.pfShieldCooldowns[i] = fShieldCooldown;
-		rCurrent.pfDestroyedExplosionTimes[i] = fDestroyedExplosionTime;
-		rCurrent.pfShieldDownSoundCooldowns[i] = fShieldDownSoundCooldown;
+		rCurrent.pShieldCooldowns[i] = shieldCooldown;
+		rCurrent.pDestroyedExplosionTimes[i] = destroyedExplosionTime;
+		rCurrent.pShieldDownSoundCooldowns[i] = shieldDownSoundCooldown;
 		rCurrent.pVecAiDirections[i] = vecAiDirection;
-		rCurrent.pfTransferLockTimers[i] = fTransferLockTimer;
-		rCurrent.pfArrivalGracePeriods[i] = fArrivalGracePeriod;
-		rCurrent.pfCellChangeTimers[i] = fCellChangeTimer;
-		rCurrent.pfNavigationDelays[i] = fNavigationDelay;
+		rCurrent.pTransferLockTimers[i] = transferLockTimer;
+		rCurrent.pArrivalGracePeriods[i] = arrivalGracePeriod;
+		rCurrent.pCellChangeTimers[i] = cellChangeTimer;
+		rCurrent.pNavigationDelays[i] = navigationDelay;
 		rCurrent.pVecIslandDestinations[i] = vecIslandDestination;
 		rCurrent.pFleetWantedCoordinates[i] = fleetWantedCoordinate;
 		rCurrent.puiPendingFleetWantedCoordinateTicks[i] = static_cast<uint8_t>(iPendingFleetWantedCoordinateTicks);
@@ -786,7 +782,7 @@ bool PlayersInterpolate::LogDifferences(const PlayersInterpolate& rOther) const
 	{
 		bEqual &= common::LogDifference<"pVecPositions">(i, pVecPositions[i], rOther.pVecPositions[i]);
 		bEqual &= common::LogDifference<"pVecDirections">(i, pVecDirections[i], rOther.pVecDirections[i]);
-		bEqual &= common::LogDifference<"pfDestroyedTimes">(i, pfDestroyedTimes[i], rOther.pfDestroyedTimes[i]);
+		bEqual &= common::LogDifference<"pDestroyedTimes">(i, pDestroyedTimes[i], rOther.pDestroyedTimes[i]);
 		bEqual &= common::LogDifference<"puiPushers">(i, pPushers[i], rOther.pPushers[i]);
 	}
 
@@ -804,20 +800,20 @@ bool PlayersPostRender::LogDifferences(const PlayersPostRender& rOther) const
 		bEqual &= common::LogDifference<"pIds">(i, pIds[i].uuid.iValue, rOther.pIds[i].uuid.iValue);
 		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
 		bEqual &= common::LogDifference<"pAlignments">(i, pAlignments[i], rOther.pAlignments[i]);
-		bEqual &= common::LogDifference<"pfNextBlasterFireTimes">(i, pfNextBlasterFireTimes[i], rOther.pfNextBlasterFireTimes[i]);
-		bEqual &= common::LogDifference<"pfNextSecondarySpawnTimes">(i, pfNextSecondarySpawnTimes[i], rOther.pfNextSecondarySpawnTimes[i]);
+		bEqual &= common::LogDifference<"pNextBlasterFireTimes">(i, pNextBlasterFireTimes[i], rOther.pNextBlasterFireTimes[i]);
+		bEqual &= common::LogDifference<"pNextSecondarySpawnTimes">(i, pNextSecondarySpawnTimes[i], rOther.pNextSecondarySpawnTimes[i]);
 		bEqual &= common::LogDifference<"pVecVelocities">(i, pVecVelocities[i], rOther.pVecVelocities[i]);
 		bEqual &= common::LogDifference<"pVecWantedDirections">(i, pVecWantedDirections[i], rOther.pVecWantedDirections[i]);
 		bEqual &= common::LogDifference<"pfArmors">(i, pfArmors[i], rOther.pfArmors[i]);
 		bEqual &= common::LogDifference<"pfShields">(i, pfShields[i], rOther.pfShields[i]);
-		bEqual &= common::LogDifference<"pfShieldCooldowns">(i, pfShieldCooldowns[i], rOther.pfShieldCooldowns[i]);
-		bEqual &= common::LogDifference<"pfDestroyedExplosionTimes">(i, pfDestroyedExplosionTimes[i], rOther.pfDestroyedExplosionTimes[i]);
-		bEqual &= common::LogDifference<"pfShieldDownSoundCooldowns">(i, pfShieldDownSoundCooldowns[i], rOther.pfShieldDownSoundCooldowns[i]);
+		bEqual &= common::LogDifference<"pShieldCooldowns">(i, pShieldCooldowns[i], rOther.pShieldCooldowns[i]);
+		bEqual &= common::LogDifference<"pDestroyedExplosionTimes">(i, pDestroyedExplosionTimes[i], rOther.pDestroyedExplosionTimes[i]);
+		bEqual &= common::LogDifference<"pShieldDownSoundCooldowns">(i, pShieldDownSoundCooldowns[i], rOther.pShieldDownSoundCooldowns[i]);
 		bEqual &= common::LogDifference<"pVecAiDirections">(i, pVecAiDirections[i], rOther.pVecAiDirections[i]);
-		bEqual &= common::LogDifference<"pfTransferLockTimers">(i, pfTransferLockTimers[i], rOther.pfTransferLockTimers[i]);
-		bEqual &= common::LogDifference<"pfArrivalGracePeriods">(i, pfArrivalGracePeriods[i], rOther.pfArrivalGracePeriods[i]);
-		bEqual &= common::LogDifference<"pfCellChangeTimers">(i, pfCellChangeTimers[i], rOther.pfCellChangeTimers[i]);
-		bEqual &= common::LogDifference<"pfNavigationDelays">(i, pfNavigationDelays[i], rOther.pfNavigationDelays[i]);
+		bEqual &= common::LogDifference<"pTransferLockTimers">(i, pTransferLockTimers[i], rOther.pTransferLockTimers[i]);
+		bEqual &= common::LogDifference<"pArrivalGracePeriods">(i, pArrivalGracePeriods[i], rOther.pArrivalGracePeriods[i]);
+		bEqual &= common::LogDifference<"pCellChangeTimers">(i, pCellChangeTimers[i], rOther.pCellChangeTimers[i]);
+		bEqual &= common::LogDifference<"pNavigationDelays">(i, pNavigationDelays[i], rOther.pNavigationDelays[i]);
 		bEqual &= common::LogDifference<"pVecIslandDestinations">(i, pVecIslandDestinations[i], rOther.pVecIslandDestinations[i]);
 		bEqual &= common::LogDifference<"pClientGuids.uiHigh">(i, pClientGuids[i].uiHigh, rOther.pClientGuids[i].uiHigh);
 		bEqual &= common::LogDifference<"pClientGuids.uiLow">(i, pClientGuids[i].uiLow, rOther.pClientGuids[i].uiLow);

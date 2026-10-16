@@ -8,7 +8,7 @@ namespace engine
 {
 
 RawInputManager::RawInputManager()
-: common::Singleton<RawInputManager>(gpRawInputManager)
+: common::Singleton<RawInputManager>(gpRawInputManager, this)
 {
 	try
 	{

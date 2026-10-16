@@ -4,7 +4,6 @@
 
 #if defined(BT_CLIENT)
 
-#include "Agent/Commands/ClientNetworkHarnessRigs.h"
 #include "File/PackChunks.h"
 #include "Frame/CellStaticData.h"
 #include "Network/NetworkCursor.h"
@@ -15,7 +14,7 @@ namespace engine
 {
 
 Client::Client(const char* pcServerAddress, int64_t iPort, int64_t iCoordinateSlotCount, const ClientGuid& rGuid, GuidAssignedCallback pGuidAssignedCallback)
-: common::Singleton<Client>(gpClient)
+: common::Singleton<Client>(gpClient, this)
 {
 	mClientGuid = rGuid;
 	mpGuidAssignedCallback = pGuidAssignedCallback;
@@ -80,7 +79,6 @@ Client::~Client()
 
 void Client::ResetAllSlots()
 {
-	ClientNetworkHarnessRigs::Reset(*this);
 	mSubscriptions.Reset();
 }
 
@@ -337,21 +335,25 @@ void Client::Disconnect()
 	}
 }
 
-bool Client::UploadCrashReport(std::span<const uint8_t> report)
+void Client::SendCrashReport(std::span<const uint8_t> report, ENetPacketFreeCallback pFreeCallback)
 {
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-	{
-		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-		NetworkMessages::ClientCrashReportMessage message {.report = {.puiData = report.data(), .iSize = static_cast<int32_t>(std::ssize(report))}};
-		NetworkMessages::Write(rWorkbuffer, message);
-		NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
-	}
+	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+	NetworkMessages::ClientCrashReportMessage message {.report = {.puiData = report.data(), .iSize = static_cast<int32_t>(std::ssize(report))}};
+	NetworkMessages::Write(rWorkbuffer, message);
+	NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE, pFreeCallback);
+	mStateFlags.Set(ClientStateFlags::kCrashReportSent);
+}
+
+void Client::UploadCrashReport(std::span<const uint8_t> report, ENetPacketFreeCallback pFreeCallback)
+{
+	SendCrashReport(report, pFreeCallback);
 
 	// Heap: ENet queues the disconnect and allocates event packets while servicing.
 	ScopedSuppressAllocationTracking suppress;
 
-	// Deferred, not enet_peer_disconnect, which would discard the queued report. ENet sends the disconnect only after
-	// the server acknowledges every reliable command, so the disconnect event means the report was delivered.
+	// Deferred, not enet_peer_disconnect, which would discard the queued report; ENet sends the disconnect only after
+	// the server acknowledges every reliable command.
 	enet_peer_disconnect_later(mpServerPeer, 0);
 
 	std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::now() + 5s;
@@ -362,7 +364,7 @@ bool Client::UploadCrashReport(std::span<const uint8_t> report)
 		int64_t iServiceResult = enet_host_service(mpHost, &event, static_cast<enet_uint32>(iWaitMilliseconds));
 		if (iServiceResult < 0)
 		{
-			return false;
+			return;
 		}
 		if (event.type == ENET_EVENT_TYPE_RECEIVE)
 		{
@@ -374,10 +376,9 @@ bool Client::UploadCrashReport(std::span<const uint8_t> report)
 			mStateFlags.Set(ClientStateFlags::kConnected, false);
 			mStateFlags.Set(ClientStateFlags::kConnectionAccepted, false);
 			mpServerPeer = nullptr;
-			return true;
+			return;
 		}
 	}
-	return false;
 }
 
 static std::unique_ptr<game::Frame> DecompressAndReadFrame(int64_t iUncompressedSize, const NetworkMessages::PacketPayload& rCompressedPayload)
@@ -525,7 +526,7 @@ void Client::ServerCoordinateStaticData(std::span<const uint8_t> packetData)
 
 void Client::ServerCoordinateUpdateOrResend(std::span<const uint8_t> packetData, bool bProcessRoundTripTime)
 {
-	auto Receive = [this, bProcessRoundTripTime, packetData](const NetworkMessages::CoordUpdateFields& rMessage)
+	auto Receive = [this, bProcessRoundTripTime](const NetworkMessages::CoordUpdateFields& rMessage)
 	{
 		if (rMessage.uiLoadGeneration != miCommittedLoadGeneration)
 		{
@@ -589,11 +590,6 @@ void Client::ServerCoordinateUpdateOrResend(std::span<const uint8_t> packetData,
 		if (actions & ClientSubscriptions::CoordUpdateFlags::kTrackTick)
 		{
 			TrackReceivedTick(rMessage.uiSlotIndex, rMessage.iTick);
-		}
-
-		if (bProcessRoundTripTime)
-		{
-			ClientNetworkHarnessRigs::CaptureStaleUpdate(*this, packetData, rMessage.uiSlotIndex, rMessage.uiEpoch, rMessage.iTick);
 		}
 	};
 
@@ -713,10 +709,7 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = static_cast<uint8_t>(iSlotIndex), .uiEpoch = static_cast<uint16_t>(iEpoch)};
 		NetworkMessages::Write(rWorkbuffer, unsubscribe);
-		if (!ClientNetworkHarnessRigs::ObserveSubscribeAcceptCleanup(*this, unsubscribe.uiSlotIndex, std::ssize(rWorkbuffer.View())))
-		{
-			NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
-		}
+		NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 		return;
 	}
 
@@ -784,7 +777,6 @@ void Client::ServerUnsubscribeAcknowledgement(std::span<const uint8_t> packetDat
 	}
 
 	mSubscriptions.FreeSlot(iSlotIndex);
-	ClientNetworkHarnessRigs::ObserveUnsubscribeAck(*this, iSlotIndex);
 }
 
 void Client::ServerLoadNotification(std::span<const uint8_t> packetData)

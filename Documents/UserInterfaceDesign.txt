@@ -316,17 +316,17 @@ Screen-specific commitments this contract makes, each verified visually:
     directly below Multisampling, with the sampling settings it belongs to.
   - Graphics: every slider row reads label first, then bar — the name is drawn
     left of a bar that fills the rest of the column, instead of trailing it.
-    Display precision follows behavior: Water Detail uses three decimals,
-    smooth Minimum Ambient uses four, and whole-frame Lighting Update Cadence
-    and Smoke Update Cadence use no decimals.
+    Display precision follows behavior: smooth Minimum Ambient uses four
+    decimals, and whole-frame Terrain Shadow Update Cadence, Lighting Update
+    Cadence, and Smoke Update Cadence use no decimals.
   - Graphics: heavy features use Low/Medium/High rows rather than raw detail
     sliders — Terrain Shadows, Object Shadows, Lighting Detail, and Smoke Detail
-    (replacing Smoke Pixels), all on the right. A smooth Water Detail slider
-    spanning one-eighth through one-half resolution sits first; Terrain Shadows
-    and Object Shadows follow as standalone rows. The Lighting group follows
-    with its toggle, detail row, and update-cadence slider; the Smoke group then
-    carries its toggle, detail row, area slider, and update-cadence slider
-    directly above Wind.
+    (replacing Smoke Pixels), all on the right. A Low/Medium/High Water row
+    sits first; Terrain Shadows
+    follows with its update-cadence slider, then Object Shadows as a standalone
+    row. The Lighting group follows with its toggle, detail row, and
+    update-cadence slider; the Smoke group then carries its toggle, detail row,
+    area slider, and update-cadence slider directly above Wind.
     Dependent controls remain visible and dimmed while their parent is off,
     matching the sample-count, sample-shading, and anisotropy groups on the left.
     The three option labels repeat verbatim down the column.

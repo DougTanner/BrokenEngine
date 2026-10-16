@@ -70,15 +70,15 @@ struct PuffsInterpolate : public Collection<PuffsInterpolate>,
 
 	// Controller fields (kiInvalidControllerType = not controlled)
 	uint8_t* __restrict puiControllerTypeIndices = nullptr;
-	float* __restrict pfStartTimes = nullptr;
+	SimulationTime* __restrict pStartTimes = nullptr;
 
 	auto Members(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiTypeIndices, rSelf.pVecPositions, rSelf.pfIntensities, rSelf.pfAreas, rSelf.pfRotations, rSelf.puiControllerTypeIndices, rSelf.pfStartTimes);
+		return std::tie(rSelf.puiTypeIndices, rSelf.pVecPositions, rSelf.pfIntensities, rSelf.pfAreas, rSelf.pfRotations, rSelf.puiControllerTypeIndices, rSelf.pStartTimes);
 	}
 	auto PersistentMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiTypeIndices, rSelf.puiControllerTypeIndices, rSelf.pfStartTimes);
+		return std::tie(rSelf.puiTypeIndices, rSelf.puiControllerTypeIndices, rSelf.pStartTimes);
 	}
 
 	static void GraphicsResources();
@@ -95,7 +95,7 @@ struct PuffsPostRender : public Collection<PuffsPostRender>
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	// Destroy removes expired puffs whose controller has bDestroysSelf set.
-	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition);
+	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition);
 
 	static void Destroy(game::Frame& __restrict rFrame, const CellStaticData& rStaticData);
 

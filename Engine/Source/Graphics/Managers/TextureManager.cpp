@@ -90,7 +90,7 @@ void TextureManager::CreatePlaceholderTexture(Texture& rTexture, std::string_vie
 }
 
 TextureManager::TextureManager()
-: common::Singleton<TextureManager>(gpTextureManager)
+: common::Singleton<TextureManager>(gpTextureManager, this)
 , mTextureDescriptors(*this)
 {
 	ScopedBootTimer scopedBootTimer(kBootTimerTextureManager);

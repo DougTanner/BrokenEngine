@@ -106,7 +106,7 @@ XMVECTOR ProjectToBaseHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasi
 	// The elevation query is answered in the emitter's own cell, from the coordinate the basis carries; the
 	// projection toward the eye is the conversion point, so the rebase happens exactly once here.
 	float fElevation = gpIslandTerrain->GlobalElevation(rBasis.coordinate, vecLocalPosition);
-	return common::ToBaseHeight(Rebase(rBasis, vecLocalPosition), engine::gpCamera->mVecEyePosition, std::max(fElevation, gBaseHeight.mfCurrent));
+	return common::ToBaseHeight(Rebase(rBasis, vecLocalPosition), engine::gpCamera->mVecEyePosition, std::max(fElevation, gpFlightPlanes->Lowest().fHeightMeters));
 }
 
 void BuildAxisAlignedQuad(shaders::AxisAlignedQuadLayout& rLayout, const XMFLOAT4A& rf4Position, float fArea, const XMFLOAT4A& rf4Parameters, uint32_t uiColor)

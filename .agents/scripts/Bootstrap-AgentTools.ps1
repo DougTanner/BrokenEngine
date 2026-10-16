@@ -32,7 +32,7 @@ $capabilityScript = Join-Path $PSScriptRoot 'Test-AgentToolsCapabilities.ps1'
 function Get-AgentToolsSourceStamp {
 	# The stamp records built-source provenance only; a rev-parse failure must never block the
 	# build, so on failure the stamp is simply left unwritten.
-	try { return (@(Invoke-AgentGit @('-C', $root, 'rev-parse', 'HEAD:Tools/WorktreeCli', 'HEAD:Tools/AgentHarness', 'HEAD:Tools/ToolCommon')) -join "`n") }
+	try { return (@(Invoke-AgentGit @('-C', $root, 'rev-parse', 'HEAD:Tools/WorktreeCli', 'HEAD:Tools/AgentHarness', 'HEAD:Tools/ToolCommon', 'HEAD:Common/Sha256Hasher.h')) -join "`n") }
 	catch { return $null }
 }
 
@@ -44,12 +44,13 @@ $claimOwner = [guid]::NewGuid().ToString()
 Register-WorktreeCliSession -RepositoryRoot $root -Owner $claimOwner -Label 'agenttools bootstrap' -Worktree $root -WaitSeconds $WaitSeconds | Out-Null
 try {
 	# Never compile uncertified working-tree bytes into the shared binaries: if the primary has
-	# uncommitted Tools/ThirdParty changes, skip all builds and start on the existing binaries.
-	$dirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Tools', 'ThirdParty'))
+	# uncommitted changes under Tools/ or ThirdParty/, or to Common/Sha256Hasher.h, which the
+	# AgentTools compile by path, skip all builds and start on the existing binaries.
+	$dirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Tools', 'ThirdParty', 'Common/Sha256Hasher.h'))
 	if ($dirty.Count -ne 0) {
-		Write-Warning "Primary has uncommitted changes under Tools/ or ThirdParty/, so shared AgentTools and ThirdParty binaries were NOT rebuilt: $($dirty -join '; ')."
+		Write-Warning "Primary has uncommitted changes under Tools/ or ThirdParty/, or to Common/Sha256Hasher.h, so shared AgentTools and ThirdParty binaries were NOT rebuilt: $($dirty -join '; ')."
 		if (-not (Test-Path -LiteralPath $worktreeCli -PathType Leaf) -or -not (Test-Path -LiteralPath $agentHarness -PathType Leaf)) {
-			throw "Primary AgentTools executables are missing and uncommitted Tools/ThirdParty changes block a rebuild. Commit or stash those changes, then retry."
+			throw "Primary AgentTools executables are missing and uncommitted changes under Tools/ or ThirdParty/, or to Common/Sha256Hasher.h, block a rebuild. Commit or stash those changes, then retry."
 		}
 		& $capabilityScript -WorktreeCliExecutable $worktreeCli -AgentHarnessExecutable $agentHarness | Out-Null
 		Write-Host ''
@@ -148,8 +149,8 @@ try {
 		# not a landing or user VS build, so the stamp is written only when the before and after snapshots
 		# (the three DataPacker/Common/ThirdParty tree hashes plus a clean DataPacker/Common/ThirdParty
 		# state) are identical. The pre-snapshot is captured above, before the ThirdParty lib build, so it
-		# covers every input DataPacker consumes; the pre-mutex Tools/ThirdParty dirty early-return (lines
-		# 48-57) plus this scoped gate keep the normal path clean.
+		# covers every input DataPacker consumes; the pre-mutex Tools/, ThirdParty/, and Common/Sha256Hasher.h
+		# dirty early-return (lines 49-58) plus this scoped gate keep the normal path clean.
 		try {
 			if ($null -ne $dataPackerPreTrees -and $dataPackerPreDirty.Count -eq 0) {
 				Invoke-BootstrapBuild $dataPackerSolution 'Release' $dataPackerExe
@@ -204,18 +205,19 @@ try {
 			}
 			else {
 				$gameDataDirectory = Join-Path $root 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output\Data'
-				# Shared Client builds compare this stamp with their own shader trees. The old stamp goes before
-				# the export, and a failed delete aborts here, so data exported from sources the stamp does not
-				# describe is never vouched for. It sits beside Data, not inside it, to keep the Data inventory.
+				# Shared Client builds compare this stamp with the shader-source fingerprint of their own HEAD.
+				# The old stamp goes before the export, and a failed delete aborts here, so data exported from
+				# sources the stamp does not describe is never vouched for. It sits beside Data, not inside it,
+				# to keep the Data inventory.
 				$shaderStampPath = Join-Path (Split-Path -Parent $gameDataDirectory) 'SharedDataShaderStamp.txt'
 				if (Test-Path -LiteralPath $shaderStampPath -PathType Leaf) { [IO.File]::Delete($shaderStampPath) }
 				# Best-effort like the DataPacker prebuild snapshots: a failure leaves the data unstamped.
-				$shaderPreTrees = $null
+				$shaderPreFingerprint = $null
 				try {
-					$shaderPreTrees = @(Invoke-AgentGit @('-C', $root, 'rev-parse', 'HEAD:Engine/Data/Shaders', 'HEAD:Projects/BrokenEngineSandbox/Data/Shaders'))
-					$shaderPreDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Engine/Data/Shaders', 'Projects/BrokenEngineSandbox/Data/Shaders'))
+					$shaderPreFingerprint = Get-AgentShaderSourceFingerprint $root 'HEAD'
+					$shaderPreDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Engine/Data/Shaders', 'Projects/BrokenEngineSandbox/Data/Shaders', ':(exclude,glob,icase)**/AGENTS.md'))
 				}
-				catch { Write-Warning "Could not snapshot the primary shader sources, so the Shared-data shader stamp will not be written: $($_.Exception.Message)"; $shaderPreTrees = $null }
+				catch { Write-Warning "Could not snapshot the primary shader sources, so the Shared-data shader stamp will not be written: $($_.Exception.Message)"; $shaderPreFingerprint = $null }
 				$hadNoninteractive = Test-Path Env:BT_DATAPACKER_NONINTERACTIVE
 				$previousNoninteractive = [Environment]::GetEnvironmentVariable('BT_DATAPACKER_NONINTERACTIVE', 'Process')
 				try {
@@ -231,15 +233,16 @@ try {
 				if ($dataPackerExitCode -ne 0) { throw "The primary DataPacker run failed with exit code $dataPackerExitCode, so '$gameDataDirectory' may be incomplete. Fix the offending asset in the primary checkout outside an agent session (or run DataPacker there directly), then retry." }
 				$refreshedDataDirectory = $gameDataDirectory
 				# The mutex excludes peer bootstraps but not a landing or user edit during the export, so the
-				# stamp is written only when the shader trees were clean and unchanged across it.
-				if ($null -ne $shaderPreTrees) {
+				# stamp is written only when the shader sources, AGENTS.md files aside, were clean and unchanged
+				# across it.
+				if ($null -ne $shaderPreFingerprint) {
 					try {
-						$shaderPostTrees = @(Invoke-AgentGit @('-C', $root, 'rev-parse', 'HEAD:Engine/Data/Shaders', 'HEAD:Projects/BrokenEngineSandbox/Data/Shaders'))
-						$shaderPostDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Engine/Data/Shaders', 'Projects/BrokenEngineSandbox/Data/Shaders'))
-						if (($shaderPreTrees -join "`n") -cne ($shaderPostTrees -join "`n") -or $shaderPreDirty.Count -ne 0 -or $shaderPostDirty.Count -ne 0) {
+						$shaderPostFingerprint = Get-AgentShaderSourceFingerprint $root 'HEAD'
+						$shaderPostDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Engine/Data/Shaders', 'Projects/BrokenEngineSandbox/Data/Shaders', ':(exclude,glob,icase)**/AGENTS.md'))
+						if ($shaderPreFingerprint -cne $shaderPostFingerprint -or $shaderPreDirty.Count -ne 0 -or $shaderPostDirty.Count -ne 0) {
 							Write-Warning "Primary shader sources were uncommitted or changed during the data refresh, so the Shared-data shader stamp was not written; Shared Client builds will block until a clean refresh."
 						}
-						else { [IO.File]::WriteAllText($shaderStampPath, ($shaderPreTrees -join "`n") + "`n") }
+						else { [IO.File]::WriteAllText($shaderStampPath, $shaderPreFingerprint + "`n") }
 					}
 					catch { Write-Warning "Could not write the Shared-data shader stamp, so Shared Client builds will block until a clean refresh: $($_.Exception.Message)" }
 				}

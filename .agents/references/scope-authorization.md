@@ -15,7 +15,8 @@ than guessing.
    named change requires (includes, declarations, documents the change makes
    wrong). An unmapped region is an
    `unauthorized` finding; a region matching an `## Out of scope` entry is
-   likewise `unauthorized`.
+   likewise `unauthorized`, unless scope added under the Leftovers rule covers
+   it.
 2. Minimality pass over added bytes only: flag an unused option, a speculative
    path with no current consumer, one-use indirection with no required
    contract, or backward-compatibility code the authorization source did not

@@ -21,13 +21,13 @@ using enum ExplosionFlags;
 
 #if defined(BT_CLIENT)
 
-constexpr float kfWindDepositDuration = 0.3f;
+constexpr std::chrono::duration<float> kWindDepositDuration = std::chrono::duration<float>(0.3f);
 
-constexpr float kfPrimaryTime = 0.06f;
+constexpr std::chrono::duration<float> kPrimaryTime = std::chrono::duration<float>(0.06f);
 
-constexpr float kfPrimaryPuffStartTime = 0.0f;
-constexpr float kfPrimaryPuffEndTime = 0.2f;
-constexpr float kfSecondaryPuffTimes = 0.4f * (kfPrimaryPuffEndTime - kfPrimaryPuffStartTime);
+constexpr std::chrono::duration<float> kPrimaryPuffStartTime = std::chrono::duration<float>::zero();
+constexpr std::chrono::duration<float> kPrimaryPuffEndTime = std::chrono::duration<float>(0.2f);
+constexpr std::chrono::duration<float> kSecondaryPuffTimes = 0.4f * (kPrimaryPuffEndTime - kPrimaryPuffStartTime);
 
 constexpr float kfExplosionTrailWidth = 1.0f;
 
@@ -88,13 +88,12 @@ void ExplosionsInterpolate::Register()
 	});
 
 	// Keyframes are normalized; wrappers supply their magnitudes.
-	int64_t iPrimaryLightControllerTypeIndex = suiPrimaryLightControllerTypeIndex;
-	PointLightsInterpolate::RegisterControllerType(iPrimaryLightControllerTypeIndex,
+	PointLightsInterpolate::RegisterControllerType(siPrimaryLightControllerTypeIndex,
 	{
 		.iBaseTypeIndex = siExplosionPointLightTypeIndex,
 		.iKeyframeCount = 3,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.4f * kfPrimaryTime), std::chrono::duration<float>(3.0f * kfPrimaryTime), std::chrono::duration<float>(0.0f)},
+		.times = {std::chrono::duration<float>(0.0f), 0.4f * kPrimaryTime, 3.0f * kPrimaryTime, std::chrono::duration<float>(0.0f)},
 		.keyframes =
 		{
 			{.fVisibleArea = 0.3f, .fVisibleIntensity = 0.25f, .fLightingArea = 0.6f, .fLightingIntensity = 0.25f, .fRotation = 0.0f},
@@ -107,15 +106,13 @@ void ExplosionsInterpolate::Register()
 		.ppLightingAreaScales = {sTuning.pPrimaryLightingAreaOne, sTuning.pPrimaryLightingAreaTwo, sTuning.pPrimaryLightingAreaThree, nullptr},
 		.ppLightingIntensityScales = {sTuning.pPrimaryLightingIntensityOne, sTuning.pPrimaryLightingIntensityTwo, sTuning.pPrimaryLightingIntensityThree, nullptr},
 	});
-	suiPrimaryLightControllerTypeIndex = static_cast<uint8_t>(iPrimaryLightControllerTypeIndex);
 
-	int64_t iSecondaryLightControllerTypeIndex = suiSecondaryLightControllerTypeIndex;
-	PointLightsInterpolate::RegisterControllerType(iSecondaryLightControllerTypeIndex,
+	PointLightsInterpolate::RegisterControllerType(siSecondaryLightControllerTypeIndex,
 	{
 		.iBaseTypeIndex = siExplosionPointLightTypeIndex,
 		.iKeyframeCount = 3,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(1.0f * kfPrimaryTime), std::chrono::duration<float>(3.0f * kfPrimaryTime), std::chrono::duration<float>(0.0f)},
+		.times = {std::chrono::duration<float>(0.0f), 1.0f * kPrimaryTime, 3.0f * kPrimaryTime, std::chrono::duration<float>(0.0f)},
 		.keyframes =
 		{
 			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
@@ -128,7 +125,6 @@ void ExplosionsInterpolate::Register()
 		.ppLightingAreaScales = {sTuning.pSecondaryLightingAreaOne, sTuning.pSecondaryLightingAreaTwo, sTuning.pSecondaryLightingAreaThree, nullptr},
 		.ppLightingIntensityScales = {sTuning.pSecondaryLightingIntensityOne, sTuning.pSecondaryLightingIntensityTwo, sTuning.pSecondaryLightingIntensityThree, nullptr},
 	});
-	suiSecondaryLightControllerTypeIndex = static_cast<uint8_t>(iSecondaryLightControllerTypeIndex);
 
 	PuffsInterpolate::RegisterType(siExplosionPuffTypeIndex,
 	{
@@ -136,13 +132,12 @@ void ExplosionsInterpolate::Register()
 		.uiColor = 0xFFFFFFFF,
 	});
 
-	int64_t iPrimaryPuffControllerTypeIndex = suiPrimaryPuffControllerTypeIndex;
-	PuffsInterpolate::RegisterControllerType(iPrimaryPuffControllerTypeIndex,
+	PuffsInterpolate::RegisterControllerType(siPrimaryPuffControllerTypeIndex,
 	{
 		.iBaseTypeIndex = siExplosionPuffTypeIndex,
 		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>(kfPrimaryPuffStartTime), std::chrono::duration<float>(kfPrimaryPuffEndTime), std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
+		.times = {kPrimaryPuffStartTime, kPrimaryPuffEndTime, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.keyframes =
 		{
 			{.fArea = 1.0f, .fIntensity = 1.0f, .fRotation = 0.0f},
@@ -153,15 +148,13 @@ void ExplosionsInterpolate::Register()
 		.ppAreaScales = {sTuning.pPrimaryPuffAreaOne, sTuning.pPrimaryPuffAreaTwo, nullptr, nullptr},
 		.ppIntensityScales = {sTuning.pPrimaryPuffIntensityOne, sTuning.pPrimaryPuffIntensityTwo, nullptr, nullptr},
 	});
-	suiPrimaryPuffControllerTypeIndex = static_cast<uint8_t>(iPrimaryPuffControllerTypeIndex);
 
-	int64_t iSecondaryPuffControllerTypeIndex = suiSecondaryPuffControllerTypeIndex;
-	PuffsInterpolate::RegisterControllerType(iSecondaryPuffControllerTypeIndex,
+	PuffsInterpolate::RegisterControllerType(siSecondaryPuffControllerTypeIndex,
 	{
 		.iBaseTypeIndex = siExplosionPuffTypeIndex,
 		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(kfSecondaryPuffTimes), std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
+		.times = {std::chrono::duration<float>(0.0f), kSecondaryPuffTimes, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.keyframes =
 		{
 			{.fArea = 1.0f, .fIntensity = 1.0f, .fRotation = 0.0f},
@@ -172,7 +165,6 @@ void ExplosionsInterpolate::Register()
 		.ppAreaScales = {sTuning.pSecondaryPuffAreaOne, sTuning.pSecondaryPuffAreaTwo, nullptr, nullptr},
 		.ppIntensityScales = {sTuning.pSecondaryPuffIntensityOne, sTuning.pSecondaryPuffIntensityTwo, nullptr, nullptr},
 	});
-	suiSecondaryPuffControllerTypeIndex = static_cast<uint8_t>(iSecondaryPuffControllerTypeIndex);
 
 	SmokeTrailsInterpolate::RegisterType(siExplosionTrailTypeIndex,
 	{
@@ -181,15 +173,13 @@ void ExplosionsInterpolate::Register()
 		.fWidth = kfExplosionTrailWidth,
 	});
 
-	int64_t iWindRadialControllerTypeIndex = suiWindRadialControllerTypeIndex;
-	WindRadialsInterpolate::RegisterControllerType(iWindRadialControllerTypeIndex,
+	WindRadialsInterpolate::RegisterControllerType(siWindRadialControllerTypeIndex,
 	{
 		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>(0.0f), std::chrono::duration<float>(kfWindDepositDuration), std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
+		.times = {std::chrono::duration<float>(0.0f), kWindDepositDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
 		.keyframes = {{.fIntensity = 1.0f, .fSize = 1.0f}, {.fIntensity = 0.0f, .fSize = 1.0f}, {}, {}},
 	});
-	suiWindRadialControllerTypeIndex = static_cast<uint8_t>(iWindRadialControllerTypeIndex);
 #endif // BT_CLIENT
 }
 
@@ -202,22 +192,22 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 	ExplosionsInterpolate& rInterpolate = rFrame.interpolate.explosions;
 	ExplosionsPostRender& rPostRender = rFrame.postRender.explosions;
 
-	float fCurrentTime = rFrame.interpolate.fCurrentTime;
+	SimulationTime currentTime = SimulationTime(std::chrono::duration<float>(rFrame.interpolate.fCurrentTime));
 
 	for (int64_t i = 0; i < rInterpolate.iCount; ++i)
 	{
 		int64_t iTypeIndex = rInterpolate.puiTypeIndices[i];
 		const ExplosionType& rType = ExplosionsInterpolate::sTypes.at(static_cast<size_t>(iTypeIndex));
 
-		float fStartTime = rInterpolate.pfStartTimes[i];
-		float fExplosionTime = fCurrentTime - fStartTime;
+		SimulationTime startTime = rInterpolate.pStartTimes[i];
+		std::chrono::duration<float> explosionTime = currentTime - startTime;
 		float fTimePercent = rInterpolate.pfTimePercents[i];
 
 		int64_t iTrailCount = rInterpolate.piTrailCounts[i];
 
 #if defined(BT_CLIENT)
 		// Remove expired trails (cleanup happens every frame, not just at explosion expiration).
-		// Cleanup uses unmultiplied pfTrailTimes so it fires in lockstep with the shared explosion-entry
+		// Cleanup uses unmultiplied pTrailTimes so it fires in lockstep with the shared explosion-entry
 		// destruction below — applying the client-only Duration multiplier here would let the entry be
 		// destroyed before the cleanup fires, orphaning the SmokeTrail and leaking it indefinitely.
 		for (int64_t j = 0; j < iTrailCount; ++j)
@@ -228,8 +218,8 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 				continue;
 			}
 
-			float fTrailEndTime = fTimePercent * rType.fTrailDelayTime + rInterpolate.pfTrailTimes[j][i];
-			if (fExplosionTime >= fTrailEndTime)
+			std::chrono::duration<float> trailEndTime = fTimePercent * rType.trailDelayTime + rInterpolate.pTrailTimes[j][i];
+			if (explosionTime.count() >= trailEndTime.count())
 			{
 				RemoveIndexableElementAndClearHandle(rFrame.interpolate.smokeTrails, rFrame.postRender.smokeTrails, rTrailId, rFrame.interpolate.smokeTrails.Members(), rFrame.postRender.smokeTrails.Members());
 			}
@@ -243,14 +233,14 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 			continue;
 		}
 
-		float fEndTime = 0.0f;
+		std::chrono::duration<float> endTime = std::chrono::duration<float>::zero();
 		for (int64_t j = 0; j < iTrailCount; ++j)
 		{
-			float fTrailEndTime = fTimePercent * rType.fTrailDelayTime + rInterpolate.pfTrailTimes[j][i];
-			fEndTime = std::max(fEndTime, fTrailEndTime);
+			std::chrono::duration<float> trailEndTime = fTimePercent * rType.trailDelayTime + rInterpolate.pTrailTimes[j][i];
+			endTime = std::max(endTime, trailEndTime);
 		}
 
-		if (fExplosionTime < fEndTime)
+		if (explosionTime < endTime)
 		{
 			continue;
 		}
@@ -271,7 +261,7 @@ bool ExplosionsInterpolate::LogDifferences(const ExplosionsInterpolate& rOther) 
 	{
 		bEqual &= common::LogDifference<"puiTypeIndices">(i, puiTypeIndices[i], rOther.puiTypeIndices[i]);
 		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
-		bEqual &= common::LogDifference<"pfStartTimes">(i, pfStartTimes[i], rOther.pfStartTimes[i]);
+		bEqual &= common::LogDifference<"pStartTimes">(i, pStartTimes[i].time_since_epoch(), rOther.pStartTimes[i].time_since_epoch());
 		bEqual &= common::LogDifference<"pVecPositions">(i, pVecPositions[i], rOther.pVecPositions[i]);
 		bEqual &= common::LogDifference<"pVecDirections">(i, pVecDirections[i], rOther.pVecDirections[i]);
 		bEqual &= common::LogDifference<"pfTimePercents">(i, pfTimePercents[i], rOther.pfTimePercents[i]);
@@ -279,7 +269,7 @@ bool ExplosionsInterpolate::LogDifferences(const ExplosionsInterpolate& rOther) 
 
 		for (int64_t j = 0; j < piTrailCounts[i]; ++j)
 		{
-			bEqual &= common::LogDifference<"pfTrailTimes">(i, pfTrailTimes[j][i], rOther.pfTrailTimes[j][i]);
+			bEqual &= common::LogDifference<"pTrailTimes">(i, pTrailTimes[j][i], rOther.pTrailTimes[j][i]);
 		}
 	}
 

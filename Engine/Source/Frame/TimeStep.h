@@ -9,6 +9,11 @@ inline constexpr int64_t kiTickRate = 32;
 inline constexpr std::chrono::nanoseconds kTickNanoseconds = 1'000'000'000ns / kiTickRate;
 inline constexpr float kfDeltaTime = common::NanosecondsToFloatSeconds<float>(kTickNanoseconds);
 
+// Tag clock for simulation instants; it has no now() because the frame clock is the frame's current time
+struct SimulationClock {};
+// A moment on the frame clock, in seconds.
+using SimulationTime = std::chrono::time_point<SimulationClock, std::chrono::duration<float>>;
+
 // Manages fixed timestep accumulator and time scaling for Frame updates
 class TimeStep
 {

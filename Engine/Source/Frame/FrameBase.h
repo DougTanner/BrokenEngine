@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Frame/Alignments.h"
+#include "Frame/TimeStep.h"
 #if defined(BT_CLIENT)
 #include "Frame/Collections/AreaLights/AreaLights.h"
 #include "Frame/Collections/Billboards/Billboards.h"

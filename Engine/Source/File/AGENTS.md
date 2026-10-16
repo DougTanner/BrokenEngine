@@ -8,8 +8,7 @@ Each process resolves its asset data root and user AppData root once, at `FileMa
 
 - Client and server launches must use the same data root; neither process can check it.
 - Code reachable during `FileManager` construction must not consume `gpFileManager`: the global is already set while platform directory setup and `mpPackChunks` construction run.
-- Directory creation and required boot-asset failures log their exact path and reason once, then throw `std::runtime_error`. Handle that type only around `FileManager` construction and eager-load completion, with `std::system_error` rethrown first; widening it over `MainThread` misclassifies unrelated runtime failures as startup exits.
-- Change an on-disk layout and its owning version together; only that version stops an old file being read as new.
+- Directory creation and required boot-asset failures throw `std::runtime_error`; catch it only around `FileManager` construction and eager-load completion, rethrowing `std::system_error` first; one over `MainThread` misclassifies unrelated runtime failures as startup exits.
 - Report failure detail through out-references beside a success return or success out-param; never store a failure reason for a later query.
 
 ## Grid Saves
@@ -20,7 +19,7 @@ Server-only. The whole simulation grid is one versioned file, written atomically
 
 ## Packed Assets
 
-Runtime reads assets only from `.manifest`-described `.pack` files. Eager types load whole at startup; lazy chunks load on demand on loader threads that publish chunk state with release/acquire ordering. The server opens only the pack types it consumes.
+Eager types load whole at startup; lazy chunks load on demand on loader threads publishing chunk state with release/acquire. The server opens only the pack types it consumes.
 
 - Keep the eager/lazy split and the server's accepted set aligned with what DataPacker emits; nothing at runtime checks that split.
 - Eager acquisition checks file size, open, and complete read before validating or publishing chunks. The eager-load future carries failure: every lazy chunk wait consumes it before waiting on loader threads, and a startup path returning before the first such wait consumes it explicitly, so a failed task never passes as successful startup.
@@ -33,28 +32,23 @@ Runtime reads assets only from `.manifest`-described `.pack` files. Eager types 
 - Cross-pack references are unvalidated at open and the lazy-chunk map is fixed at construction, so packs from different DataPacker runs can name a chunk absent for the whole process lifetime.
 - File owns all background packed-asset reads: two below-normal loader threads service whole chunks, range reloads, and client streaming-audio ranges. Real-time queued work wins; audio and other work then alternate so neither starves. Publish every accepted job and shutdown through the atomic wake sequence.
 - Client streaming-audio reads use six fixed Pack-owned 16 KiB result entries. The caller holds one request identity and exact range while polling; reset or destruction cancels it. Generation-tagged ownership makes cancelled queued and ready entries reusable at once, while an active loader keeps its entry until it acknowledges cancellation. File must outlive Audio.
-- Validate a streaming-audio request against its logical chunk payload before publishing. Pack open rejects any chunk whose header flags combine audio with compression, so that payload is the chunk's on-disk extent, already bounded inside the pack at open. A lazy pack is locked against writes, renames, and deletes before its size and headers are read and stays locked until shutdown, and every read of it, validation included, goes through that lock rather than its path, so the loader checks only for a complete read, before discarding a cancelled generation, since corruption stays fatal even for an unwanted result. Loaders write only Pack-owned result storage; the polling main thread does the final copy to Audio.
+- Validate a streaming-audio request against its logical chunk payload before publishing: pack open rejects compressed audio, so that payload is the on-disk extent bounded at open. A lazy pack is locked against writes, renames, and deletes from before its size and header reads until shutdown, and every read, validation included, uses that lock, not the path, so the loader checks only for a complete read, before discarding a cancelled generation: corruption stays fatal even for an unwanted result. Loaders write only Pack-owned result storage; the polling main thread copies to Audio.
 - The [Agent audio harness rig](../Agent/AGENTS.md) may inspect Pack state and use loader-queue synchronization only in client Debug builds; elsewhere that state stays private.
-
-## Lazy-Pool Invariants
-
-All lazy chunk data lives in one virtual-memory reservation laid out once at construction by cumulative aligned size over the full chunk map, so each chunk's pointer and size are fixed for the process lifetime and describe its reservation, not its resident bytes.
-
-- Never compact those pointers or recompute the offsets: their fixedness lets a reader use a chunk pointer under the state acquire alone, with no lock.
+- Lazy chunks live in one virtual-memory reservation laid out at construction; each chunk's pointer and size, fixed for the process lifetime, describe reserved, not resident, bytes. Never compact pointers or recompute offsets: readers use a chunk pointer after the state acquire, with no lock.
 
 ## Replay Streams
 
-Server-only. `Replay` owns writer and reader lifetime, the manifest committing a recording, staged playback adoption, and per-tick checksum comparison; `GameBase` constructs it and users reach it through `gpReplay`. Recording writes one stream set per active cell plus recording-wide grid and metadata; playback validates the whole set before replacing live state, then resimulates, comparing each tick against the recorded checksum.
+Server-only. Recording writes one stream set per active cell plus recording-wide grid and metadata; playback validates the whole set before replacing live state, then resimulates against recorded tick checksums.
 
 - Replay operations exist only when `kbDebugInput` enables their tick-time implementation, gated in this subsystem's replay entry points; only the constant is game-defined.
 - As a debug-only developer tool, replay streams are exempt from trust-boundary validation: existing replay checks may stay; no new ones are required.
-- A generation is one activation lifetime, identified in its stream files and inventory by coord and activation tick.
+- A generation is one activation lifetime, identified in its stream files and manifest record by coord and activation tick.
 - The manifest is the commit marker: recording start invalidates it before replacing any component, and stop publishes it only after every generation and the game metadata succeed.
 - Missing retained terminal state for an evicted coord invalidates only that generation's files; other writers and metadata still attempt their writes.
 - The in-memory active-coord list is not order-significant: coords dispatch in parallel and every consumer is coord-keyed.
 - Replay persistence never gates an accepted live transfer: a capture failure invalidates recording state instead, and the accepted batch still completes.
-- Server replay harness rig controls and observations live in the engine Agent's Replay-bound slot (`../Agent/AGENTS.md`); ordinary recording, playback, persistence, transfer capture, and generation storage stay here. Writer state and storage are public only so harness rig code can select and alter a retained generation; do not expose reader state or move replay algorithms with them.
-- Whether playback is running is one engine-owned `GameBase` flag, not a reader-map query, because tick-path engine and game code read it every update. Republish it after every live or pending reader-set change, including the clears on abort, retirement, and loop transition.
+- Replay harness rig controls and observations live in the Agent's Replay-bound slot (`../Agent/AGENTS.md`); writer state and storage are public only for it to select and alter a retained generation. Keep reader state private and replay algorithms here.
+- Whether playback is running is one engine-owned `GameBase` flag because tick-path engine and game code read it every update. Republish it after every live or pending reader-set change, including the clears on abort, retirement, and loop transition.
 - Recording and playback are mutually exclusive, a pending request counting as active: every path that sets a record-start or playback request refuses it, before changing anything, while the running-state or pending-request flags show the opposite mode. `Replay`'s `ASSERT`s on consuming those requests catch a skipped check; they are not recovery.
 - A coord's later generation activates only after the retiring reader's coord is removed. Adjacent lifetimes may meet at the tick after the prior saved end; overlap or a skipped activation aborts playback. Loop only after the last reader retires.
 - Loop completion and abort both stop the current fixed-tick iteration before dispatch, then diverge: completion reloads the initial state, abort keeps the current frames, restores the pre-tick clock, and resumes live simulation. Abort also runs the game state-replacement hook (`../../../Projects/BrokenEngineSandbox/Source/Save/AGENTS.md` `## Replay Contract`).

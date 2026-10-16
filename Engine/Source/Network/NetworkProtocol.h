@@ -29,7 +29,7 @@ enum class PacketType : uint8_t
 	kServerUnsubscribeAck,
 	kServerLoadNotification,    // Server loaded a save, clients must reset state
 	kServerTimespeedUpdate,     // Server broadcasts the current time scale to all clients
-	kClientCrashReport,         // Client uploads the leading bytes of its crash report while crashing
+	kClientCrashReport,         // Client sends the leading bytes of its crash report while crashing, or on its next accepted connection while that report is unsent
 	kClientChat,                // Client sends one chat message to the server
 	kServerChat,                // Server relays a validated chat message to every handshaken client
 	kGamePacketStart,           // All values >= this are game-layer packets forwarded as raw bytes

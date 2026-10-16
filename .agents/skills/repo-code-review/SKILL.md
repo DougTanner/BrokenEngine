@@ -33,8 +33,14 @@ Require a self-contained brief containing:
 - the session baseline as a full Git SHA, complete immutable authorized C++ diff,
   and exact changed files/regions, separated from pre-existing and concurrently
   owned changes;
-- a `broken-engine-code-quality-targets/v1` targets file produced by
-  `.agents/scripts/Get-SessionChangeInventory.ps1 -EmitTargets` from that
+- a `broken-engine-code-quality-targets/v1` targets file, produced for a
+  manager-saved run by
+  `pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1
+  -RepositoryRoot '<absolute repository toplevel>'
+  -Baseline <full 40-character SHA> -EmitTargets |
+  Set-Content -LiteralPath Temp/code-review-targets.json -NoNewline`, adding
+  `-IncludeUntracked '<comma-separated paths>'` for authorized untracked
+  additions and `-Head <commit>` for a committed head, from that
   authorized diff (or focused re-review), listing the script-selected baseline
   and current C++ paths of additions, deletions, and renames; it excludes
   pre-existing and concurrently owned changes. Its `paths` are the C++ target
@@ -52,15 +58,11 @@ The targets file is the authoritative supplied input. A `/codex-review` prompt
 supplies it as the `Targets file: <path>` entry in its evidence section (the
 receipt's `targetsPath`, written next to the prompt file), and inlines the same
 bytes there as a copy of that file. Otherwise the dispatching manager saves one
-read-only run to a file by piping that script call's own stdout inside the
-same single PowerShell-tool call, which the root `AGENTS.md` bundled-scripts
-rule permits as using that call's own output:
-`pwsh -NoProfile -File .agents/scripts/Get-SessionChangeInventory.ps1
--RepositoryRoot '<absolute repository toplevel>' -Baseline <full 40-character SHA>
--EmitTargets | Set-Content -LiteralPath Temp/code-review-targets.json
--NoNewline`, adding `-IncludeUntracked '<comma-separated paths>'` for authorized
-untracked additions and `-Head <commit>` for a committed head. That gitignored
-`Temp/` path is the save-path convention, and the manager supplies the path, not
+read-only run to a file with the targets-file bullet's invocation above, piping
+that script call's own stdout inside the same single PowerShell-tool call,
+which the root `AGENTS.md` bundled-scripts rule permits as using that call's
+own output. That invocation's gitignored `Temp/` path is the save-path
+convention, and the manager supplies the path, not
 the targets bytes, to the review worker. The run reports its own `status` rather
 than a field of the saved file: on `pass` (exit 0) stdout carries only the
 targets bytes, while `blocked` (exit 2) or `error` (exit 1) sends no targets

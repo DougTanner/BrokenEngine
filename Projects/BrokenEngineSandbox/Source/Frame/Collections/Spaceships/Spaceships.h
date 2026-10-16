@@ -16,8 +16,8 @@ struct CellStaticData;
 namespace game
 {
 
-inline constexpr float kfSpaceshipDestroyTime = 0.25f;
-inline constexpr float kfSpaceshipDestroyExplosionInterval = 0.024f;
+inline constexpr std::chrono::duration<float> kSpaceshipDestroyTime = std::chrono::duration<float>(0.25f);
+inline constexpr std::chrono::duration<float> kSpaceshipDestroyExplosionInterval = std::chrono::duration<float>(0.024f);
 
 inline constexpr float kfSpaceshipRadius = 1.5f;
 
@@ -33,13 +33,27 @@ inline constexpr float kfSpaceshipMaxPusherPushVelocity = kfSpaceshipMaxSpeed * 
 
 struct SpaceshipsInterpolate : public engine::Collection<SpaceshipsInterpolate>
 {
-	static constexpr int64_t kiVersion = 3;
+	static constexpr int64_t kiVersion = 4;
 	static constexpr const char* kpcName = "Spaceships";
 	static constexpr common::crc_t kuiCrc = common::CrcConsteval("Spaceships");
 
 	static void Register();
 
 	static void AllocateAndCopy(SpaceshipsInterpolate& rCurrent, const SpaceshipsInterpolate& rPrevious);
+
+	// Simulation keeps the destroyed time at the -1 sentinel or in [0, kSpaceshipDestroyTime]; reject anything else as a corrupt stream, since a
+	// huge or +inf value puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
+	static void PostRead(const SpaceshipsInterpolate& rCurrent)
+	{
+		for (int64_t i = 0; i < rCurrent.iCount; ++i)
+		{
+			std::chrono::duration<float> destroyedTime = rCurrent.pDestroyedTimes[i];
+			if (!(destroyedTime == std::chrono::duration<float>(-1.0f) || (destroyedTime.count() >= 0.0f && destroyedTime.count() <= kSpaceshipDestroyTime.count())))
+			{
+				throw std::ios_base::failure("SpaceshipsInterpolate pDestroyedTimes");
+			}
+		}
+	}
 
 	static void Update(FrameInterpolate& __restrict rCurrentFrameInterpolate, const Frame& __restrict rPreviousFrame);
 
@@ -50,7 +64,7 @@ struct SpaceshipsInterpolate : public engine::Collection<SpaceshipsInterpolate>
 
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	XMVECTOR* __restrict pVecDirections = nullptr;
-	float* __restrict pfDestroyedTimes = nullptr;
+	std::chrono::duration<float>* __restrict pDestroyedTimes = nullptr;
 	engine::pusher_t* __restrict puiPushers = nullptr;
 	engine::registry_id_t* __restrict puiRegistryIds = nullptr;
 #if defined(BT_CLIENT)
@@ -58,16 +72,16 @@ struct SpaceshipsInterpolate : public engine::Collection<SpaceshipsInterpolate>
 #endif
 	float* __restrict pfDeltaRotations = nullptr;
 #if defined(BT_CLIENT)
-	float* __restrict pfAnimationTimes = nullptr;
+	std::chrono::duration<float>* __restrict pAnimationTimes = nullptr;
 #endif
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfDestroyedTimes, rSelf.puiPushers, rSelf.puiRegistryIds, rSelf.pfDeltaRotations);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.puiPushers, rSelf.puiRegistryIds, rSelf.pfDeltaRotations);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pfAnimationTimes, rSelf.puiWindTrails);
+		return std::tie(rSelf.pAnimationTimes, rSelf.puiWindTrails);
 	}
 #endif
 	auto Members(this auto&& rSelf)
@@ -133,10 +147,10 @@ struct SpaceshipsPostRender : public engine::Collection<SpaceshipsPostRender>
 
 private:
 	// Defined in SpaceshipsNavigation.cpp:
-	static void XM_CALLCONV ComputeSteering(std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, FXMVECTOR vecDirection, bool bPlayerAlive, FXMVECTOR vecNearestPlayer, float fDeltaTime, SpaceshipFlags_t& rFlags, float& rfDeltaRotation);
-	static void XM_CALLCONV ApplyMovement(const Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, SpaceshipFlags_t flags, float fDeltaTime, XMVECTOR& rVecVelocity);
+	static void XM_CALLCONV ComputeSteering(std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, FXMVECTOR vecDirection, bool bPlayerAlive, FXMVECTOR vecNearestPlayer, std::chrono::duration<float> deltaTime, SpaceshipFlags_t& rFlags, float& rfDeltaRotation);
+	static void XM_CALLCONV ApplyMovement(const Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, SpaceshipFlags_t flags, std::chrono::duration<float> deltaTime, XMVECTOR& rVecVelocity);
 	static void XM_CALLCONV ApplyPusherResponse(const Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, XMVECTOR& rVecVelocity);
-	static void ApplyTerrainBounce(const engine::CellStaticData& rStaticData, const SpaceshipsInterpolate& rPreviousInterpolate, SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, float fDeltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity);
+	static void ApplyTerrainBounce(const engine::CellStaticData& rStaticData, const SpaceshipsInterpolate& rPreviousInterpolate, SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, std::chrono::duration<float> deltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity);
 
 	// Defined in SpaceshipsCombat.cpp:
 	static void XM_CALLCONV RegenerateHealth(FXMVECTOR vecPosition, bool bPlayerAlive, FXMVECTOR vecNearestPlayer, SpaceshipFlags_t flags, std::chrono::duration<float> deltaTime, float& rfHealth);
@@ -146,14 +160,14 @@ public:
 	XMVECTOR* __restrict pVecVelocities = nullptr;
 	XMVECTOR* __restrict pVecDamageDirections = nullptr;
 	float* __restrict pfHealths = nullptr;
-	float* __restrict pfDestroyedExplosionTimes = nullptr;
-	float* __restrict pfNextBlasterSpawnTimes = nullptr;
+	std::chrono::duration<float>* __restrict pDestroyedExplosionTimes = nullptr;
+	std::chrono::duration<float>* __restrict pNextBlasterSpawnTimes = nullptr;
 	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
-	float* __restrict pfArrivalGracePeriods = nullptr;
+	std::chrono::duration<float>* __restrict pArrivalGracePeriods = nullptr;
 	// Server Members() must match SharedMembers() for wire/CRC parity; client-only fields stay outside SharedMembers().
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pfDestroyedExplosionTimes, rSelf.pfNextBlasterSpawnTimes, rSelf.pAlignments, rSelf.pfArrivalGracePeriods);
+		return std::tie(rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.pNextBlasterSpawnTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods);
 	}
 	auto Members(this auto&& rSelf)
 	{
@@ -174,8 +188,8 @@ public:
 		XMVECTOR vecVelocity = DirectX::XMVectorZero();
 		engine::AlignmentIdentifier alignment {};
 		float fHealth = 0.0f;
-		float fNextBlasterSpawnTime = 0.0f;
-		float fArrivalGracePeriod = 0.0f;
+		std::chrono::duration<float> nextBlasterSpawnTime = std::chrono::duration<float>::zero();
+		std::chrono::duration<float> arrivalGracePeriod = std::chrono::duration<float>::zero();
 		float fDeltaRotation = 0.0f;
 	};
 

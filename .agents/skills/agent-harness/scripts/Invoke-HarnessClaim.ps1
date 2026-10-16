@@ -3,8 +3,11 @@
 # A foreign owner is waited out, not stolen from: provisioning runs once and only the claim attempt
 # repeats, until the lock is acquired or the holder's own heartbeat reaches the staleness point, and
 # nothing touches the holder's processes, heartbeat, or claim. A holder that keeps refreshing its
-# heartbeat is waited on for as long as it holds the lock. An ended wait reports the holder record
-# the last claim attempt itself printed.
+# heartbeat is waited on for as long as it holds the lock. A stale holder is still waited on while a
+# project server started without --agent-port is running: that server holds the machine-wide
+# single-instance mutex, so no harness server can start beside it, and the takeover steps quit only
+# --agent-port listeners. An ended wait reports the holder record the last claim attempt itself
+# printed.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -265,6 +268,8 @@ try {
 	}
 	$outputRelative = $outputMatch.Groups[1].Value
 	$outputDirectory = Join-Path $root $outputRelative
+	# The wait loop's running-server probe matches this base name, so it covers every configuration.
+	$serverBaseName = [regex]::Replace($serverMatch.Groups[1].Value, '\.Debug\.exe$', '')
 	$requiredExecutables = @($serverMatch.Groups[1].Value)
 	if (-not $ServerOnly) { $requiredExecutables += $clientMatch.Groups[1].Value }
 	$missingExecutables = @()
@@ -338,8 +343,9 @@ try {
 	# Only the claim attempt repeats: provisioning, the harness path, and the owner token above stay
 	# valid for the whole wait, and the same owner token reclaims after each foreign-owner refusal.
 	# The wait ends only when the lock is acquired or the refused holder's heartbeat reaches
-	# $StaleHeartbeatSeconds old, so a holder that keeps its heartbeat fresh is waited on instead of
-	# being given up on, and a holder the worker may take over is not waited past.
+	# $StaleHeartbeatSeconds old while no project server started without --agent-port is running, so a
+	# holder that keeps its heartbeat fresh is waited on instead of being given up on, and a holder the
+	# worker may take over is not waited past once no such server remains.
 	$stopwatch = [Diagnostics.Stopwatch]::StartNew()
 	$attempts = 0
 	while ($true) {
@@ -361,7 +367,13 @@ try {
 		# takeover steps become available.
 		$heartbeatUtc = ConvertTo-LockUtc (Get-LockField $record 'heartbeatAt')
 		$remainingMilliseconds = ($heartbeatUtc.AddSeconds($StaleHeartbeatSeconds) - [datetime]::UtcNow).TotalMilliseconds
-		if ($remainingMilliseconds -le 0) { break }
+		if ($remainingMilliseconds -le 0) {
+			# A null CommandLine casts to empty, so a server whose command line cannot be read keeps the wait.
+			$gameServers = @(Get-CimInstance Win32_Process -Filter "Name LIKE '$serverBaseName%'" |
+				Where-Object { [string]$_.CommandLine -notmatch '--agent-port' })
+			if ($gameServers.Count -eq 0) { break }
+			$remainingMilliseconds = $PollMilliseconds
+		}
 		Start-Sleep -Milliseconds ([Math]::Min($PollMilliseconds, $remainingMilliseconds))
 	}
 

@@ -1,6 +1,5 @@
 #include "ToolCliCommon.h"
 
-#include <bcrypt.h>
 #include <cstdio>
 #include <iostream>
 #include <utility>

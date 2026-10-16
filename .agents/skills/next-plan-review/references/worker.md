@@ -139,6 +139,21 @@ step owns.
    - Measure the main session's context entries per
      [`measurement.md`](measurement.md) `## Measure main-session token
      efficiency` before assessing concern 4.
+   - Only when the usage-analysis request was supplied and provenance is
+     proven, run once per proven Claude transcript — the parent and each Claude
+     child row Step 6 inventoried —
+     `pwsh -NoProfile -File .agents/skills/next-plan-review/scripts/Get-TranscriptUsage.ps1 -TranscriptPath '<path>'`,
+     assigning its output to a variable and piping it to `ConvertFrom-Json`. A
+     child's path is
+     `<directory containing the proven parent transcript>/<parent session ID>/subagents/agent-<agentId>.jsonl`,
+     where `<agentId>` is the `toolUseResult.agentId` on the parent's
+     tool-result record answering that child's delegation `tool_use`; never
+     glob the directory. A child whose agent ID is absent or does not match
+     `^[A-Za-z0-9]+$` gets an `unsupported (no agent ID)` row, and every Codex
+     transcript an `unsupported (codex)` row, each with no helper run. Report
+     the rows per [`measurement.md`](measurement.md) `## Report observed
+     usage`; a derived path is a helper argument only. Without the request this
+     bullet runs nothing.
    - Done when every requirement above has been completed for the proven parent
      and every routing-inventory row.
 9. Use the shared handoff form and extension block in

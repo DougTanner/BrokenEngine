@@ -299,20 +299,47 @@ try {
 		}
 		# The client compiles the shader layout headers from this worktree but loads the primary's
 		# Shader.pack, so a Shared Client build needs the stamp the bootstrap refresh writes to name the
-		# same shader trees; a mismatch crashes the client at startup. The server loads no shaders.
+		# same shader-source fingerprint; a mismatch crashes the client at startup. The server loads no
+		# shaders.
 		if ($Target -ceq 'Client' -and $selectedMode -ceq 'Shared') {
 			$sharedDataDirectory = Join-Path $primary $script:DataOutputSuffix
 			$shaderStampPath = Join-Path (Split-Path -Parent $sharedDataDirectory) 'SharedDataShaderStamp.txt'
-			$worktreeShaderTrees = @(Invoke-AgentGit @('-C', $script:Root, 'rev-parse', 'HEAD:Engine/Data/Shaders', 'HEAD:Projects/BrokenEngineSandbox/Data/Shaders')) -join "`n"
+			$worktreeShaderFingerprint = Get-AgentShaderSourceFingerprint $script:Root 'HEAD'
 			$shaderStamp = $null
 			try { $shaderStamp = [IO.File]::ReadAllText($shaderStampPath).Trim() }
 			catch [IO.FileNotFoundException], [IO.DirectoryNotFoundException] { }
-			$remedies = 'Start a new session to refresh primary data when primary main is ahead of the last Shared data export, rebase onto primary main when this worktree is behind it, or rerun with Local generation authorization (-DataBuildMode Local -RunDataPacker) when this worktree carries shader changes primary main lacks.'
-			if ($null -eq $shaderStamp) {
-				Stop-CompileInvoke 'data-mode.shared-shader-unverified' "The Shared data at '$sharedDataDirectory' has no shader provenance stamp ('$shaderStampPath'), so its Shader.pack cannot be matched to this worktree's shader sources. A session-start refresh deletes the stamp while it exports: retry after a running refresh finishes. If no refresh is running: $remedies The refresh writes no stamp while the primary checkout's shader sources are uncommitted or changing, so commit or discard those changes before starting a new session, or use Local generation authorization."
-			}
-			if ($shaderStamp -cne $worktreeShaderTrees) {
-				Stop-CompileInvoke 'data-mode.shared-shader-unverified' "The Shared data at '$sharedDataDirectory' was exported from shader trees $($shaderStamp -replace "`n", ', '), but this worktree's HEAD has $($worktreeShaderTrees -replace "`n", ', '), so its Shader.pack does not match the shader layouts this build compiles. $remedies"
+			if ($null -eq $shaderStamp -or $shaderStamp -cne $worktreeShaderFingerprint) {
+				# The block names its case's cheaper remedy, when one exists, plus Local generation
+				# authorization, which always clears it because this check runs only for a Shared build.
+				# Primary main's fingerprint is read with the stamp writer's own function; the worktree's own
+				# shader change is measured from its session baseline, because a merge base with primary main
+				# does not survive a primary history squash.
+				$primaryShaderFingerprint = Get-AgentShaderSourceFingerprint $primary 'HEAD'
+				$sessionBaseline = [string]$context.baseline
+				$baselineShaderFingerprint = Get-AgentShaderSourceFingerprint $script:Root $sessionBaseline
+				$localRemedy = "Local generation authorization (-DataBuildMode Local -RunDataPacker) clears this in every case, because this check runs only for a Shared build. Cost: up to about 1 GB, from restoring the sparse-skipped Engine/Data art trees and generating this worktree's own Data output; and each /compile derives the data mode from this worktree's changed paths, so every later game build (client and server) in this session must also pass -DataBuildMode Local; a Client build without it blocks here again."
+				$retryLead = $null
+				if ($worktreeShaderFingerprint -ceq $primaryShaderFingerprint) {
+					$remedy = "With this session's game closed, any wrapper session start, a peer's included, refreshes the Shared data: its bootstrap re-exports it from primary main, whose shader trees already match this worktree's HEAD; after it, rerun /compile in this session. Cost: one session start; this session keeps running, and no rebase is needed."
+					$retryLead = 'retry after a running refresh finishes.'
+				}
+				elseif ($worktreeShaderFingerprint -cne $baselineShaderFingerprint) {
+					$remedy = "This worktree's commits change the shader trees since its session baseline $($sessionBaseline.Substring(0, 8)), so neither a session-start refresh nor a rebase puts those changes into the primary Shader.pack."
+				}
+				elseif ($shaderStamp -ceq $primaryShaderFingerprint) {
+					$remedy = "Rebase onto primary main: the Shared data was exported from primary main's shader trees, and this worktree's commits leave its shader trees unchanged since its session baseline, so a rebase makes them match. Cost: commit or set aside uncommitted work first; no data is regenerated."
+				}
+				else {
+					$remedy = "With this session's game closed, any wrapper session start, a peer's included, refreshes the Shared data from primary main; after it, rebase onto primary main, then rerun /compile in this session: the Shared data predates primary main and this worktree is behind it, so neither step alone clears this. Cost: one session start and a rebase; this session keeps running."
+					$retryLead = 'if one is running, wait for it to finish, then rebase onto primary main, because this worktree is behind primary main and a retry alone blocks again.'
+				}
+				if ($null -eq $shaderStamp) {
+					# A finished refresh stamps primary main's fingerprint, so only a new-session remedy keeps the
+					# retry lead and the uncommitted-primary condition.
+					$missingStampRemedy = if ($null -eq $retryLead) { $remedy } else { "A session-start refresh deletes the stamp while it exports: $retryLead If no refresh is running: $remedy The refresh writes no stamp while the primary checkout's shader sources are uncommitted or changing, so commit or discard those changes before the next session start." }
+					Stop-CompileInvoke 'data-mode.shared-shader-unverified' "The Shared data at '$sharedDataDirectory' has no shader provenance stamp ('$shaderStampPath'), so its Shader.pack cannot be matched to this worktree's shader sources. $missingStampRemedy $localRemedy"
+				}
+				Stop-CompileInvoke 'data-mode.shared-shader-unverified' "The Shared data at '$sharedDataDirectory' was exported from shader-source fingerprint $shaderStamp, but this worktree's HEAD has $worktreeShaderFingerprint, so its Shader.pack does not match the shader layouts this build compiles. $remedy $localRemedy"
 			}
 		}
 	}

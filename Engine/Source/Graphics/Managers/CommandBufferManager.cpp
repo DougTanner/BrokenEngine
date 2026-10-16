@@ -11,7 +11,7 @@ namespace engine
 {
 
 CommandBufferManager::CommandBufferManager()
-: common::Singleton<CommandBufferManager>(gpCommandBufferManager)
+: common::Singleton<CommandBufferManager>(gpCommandBufferManager, this)
 {
 	ScopedBootTimer scopedBootTimer(kBootTimerCommandBufferManager);
 

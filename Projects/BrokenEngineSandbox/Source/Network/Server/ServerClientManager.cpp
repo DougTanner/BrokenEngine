@@ -146,30 +146,27 @@ void ServerClientManager::SpawnWaitingClients()
 	mClientsWaitingForSpawn.clear();
 }
 
-void ServerClientManager::Disconnects()
+void ServerClientManager::OnClientDisconnected(int64_t iClientId, const engine::ClientGuid& rClientGuid)
 {
-	// Heap: drain disconnect events; registry and fleet-manager bookkeeping
+	// Heap: registry and fleet-manager bookkeeping
 	ScopedSuppressAllocationTracking suppress;
 
-	for (const engine::PendingDisconnect& rDisconnect : gpServerSession->mpRuntime->mpServer->mPendingDisconnects)
+	LOG(kNetwork, kVerbose, "ServerClientManager::OnClientDisconnected Client: {} Players: {}", iClientId, [&]()
 	{
-		LOG(kNetwork, kVerbose, "ServerClientManager::Disconnects Client: {} Players: {}", rDisconnect.iClientId, [&]()
-		{
-			auto ownedIt = gpServerSession->mClientPlayers.mOwned.find(rDisconnect.iClientId);
-			return ownedIt != gpServerSession->mClientPlayers.mOwned.end() ? std::ssize(ownedIt->second) : 0i64;
-		}());
-		mDeadClientIds.erase(rDisconnect.iClientId);
-		mProcessedClientIds.erase(rDisconnect.iClientId);
+		auto ownedIt = gpServerSession->mClientPlayers.mOwned.find(iClientId);
+		return ownedIt != gpServerSession->mClientPlayers.mOwned.end() ? std::ssize(ownedIt->second) : 0i64;
+	}());
+	mDeadClientIds.erase(iClientId);
+	mProcessedClientIds.erase(iClientId);
 
-		gpServerSession->mpFleetManager->OnClientDisconnected(rDisconnect.iClientId, rDisconnect.clientGuid);
+	gpServerSession->mpFleetManager->OnClientDisconnected(iClientId, rClientGuid);
 
-		std::erase_if(mClientsWaitingForSpawn, [&](const ClientSpawnInformation& rInformation)
-		{
-			return rInformation.iClientId == rDisconnect.iClientId;
-		});
+	std::erase_if(mClientsWaitingForSpawn, [&](const ClientSpawnInformation& rInformation)
+	{
+		return rInformation.iClientId == iClientId;
+	});
 
-		gpServerSession->mClientPlayers.mOwned.erase(rDisconnect.iClientId);
-	}
+	gpServerSession->mClientPlayers.mOwned.erase(iClientId);
 }
 
 void ServerClientManager::DetectPlayerDeaths()

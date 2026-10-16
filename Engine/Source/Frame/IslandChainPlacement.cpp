@@ -74,67 +74,24 @@ static float SignedJitter(float fRadius, common::RandomEngine& rRandom)
 	return common::Random(2.0f * fRadius, rRandom) - fRadius;
 }
 
-// The CRC bucket for a role, falling back through related buckets to mIslandCrcsSorted (asserted
-// non-empty), so small asset sets still place something.
+// The CRC bucket for a role. Each role uses its own bucket, which the IslandTerrain constructor asserts
+// is non-empty.
 static const std::vector<common::crc_t>& PickBucket(Role eRole)
 {
 	const IslandTerrain& rTerrain = *gpIslandTerrain;
 	switch (eRole)
 	{
 		case Role::kHuge:
-			if (!rTerrain.mHugeCrcs.empty())
-			{
-				return rTerrain.mHugeCrcs;
-			}
-			if (!rTerrain.mLargeCrcs.empty())
-			{
-				return rTerrain.mLargeCrcs;
-			}
-			if (!rTerrain.mMediumCrcs.empty())
-			{
-				return rTerrain.mMediumCrcs;
-			}
-			return rTerrain.mIslandCrcsSorted;
+			return rTerrain.mHugeCrcs;
 		case Role::kLarge:
-			if (!rTerrain.mLargeCrcs.empty())
-			{
-				return rTerrain.mLargeCrcs;
-			}
-			if (!rTerrain.mMediumCrcs.empty())
-			{
-				return rTerrain.mMediumCrcs;
-			}
-			if (!rTerrain.mHugeCrcs.empty())
-			{
-				return rTerrain.mHugeCrcs;
-			}
-			return rTerrain.mIslandCrcsSorted;
+			return rTerrain.mLargeCrcs;
 		case Role::kMedium:
-			if (!rTerrain.mMediumCrcs.empty())
-			{
-				return rTerrain.mMediumCrcs;
-			}
-			if (!rTerrain.mLargeCrcs.empty())
-			{
-				return rTerrain.mLargeCrcs;
-			}
-			if (!rTerrain.mSmallCrcs.empty())
-			{
-				return rTerrain.mSmallCrcs;
-			}
-			return rTerrain.mIslandCrcsSorted;
+			return rTerrain.mMediumCrcs;
 		case Role::kSmall:
-			if (!rTerrain.mSmallCrcs.empty())
-			{
-				return rTerrain.mSmallCrcs;
-			}
-			if (!rTerrain.mMediumCrcs.empty())
-			{
-				return rTerrain.mMediumCrcs;
-			}
-			return rTerrain.mIslandCrcsSorted;
+			return rTerrain.mSmallCrcs;
 	}
-	return rTerrain.mIslandCrcsSorted;
+	ASSERT(false);
+	std::unreachable();
 }
 
 // Random template CRC for a role. common::Random(N) is inclusive on N — pass size - 1.
@@ -162,26 +119,6 @@ static float OrientForTangent(common::crc_t crc, float fAttachWorld, common::Ran
 	return fBase + SignedJitter(kfTangentRotationJitter, rRotationRandom);
 }
 
-// Degenerate valid-area hulls use a four-corner footprint rectangle in rRectangleStorage.
-static const XMFLOAT2* LocalHull(const IslandTemplate& rTemplate, XMFLOAT2 (&rRectangleStorage)[4], int64_t& rCount)
-{
-	const XMFLOAT2* pLocalHull = rTemplate.pf2ValidAreaVertices;
-	int64_t iCount = rTemplate.iValidAreaVertexCount;
-	if (pLocalHull == nullptr || iCount < 3)
-	{
-		float fHalfWidth = 0.5f * rTemplate.fQuadFootprintX;
-		float fHalfHeight = 0.5f * rTemplate.fQuadFootprintY;
-		rRectangleStorage[0] = {-fHalfWidth, -fHalfHeight};
-		rRectangleStorage[1] = { fHalfWidth, -fHalfHeight};
-		rRectangleStorage[2] = { fHalfWidth,  fHalfHeight};
-		rRectangleStorage[3] = {-fHalfWidth,  fHalfHeight};
-		pLocalHull = rRectangleStorage;
-		iCount = 4;
-	}
-	rCount = iCount;
-	return pLocalHull;
-}
-
 static int64_t CommitPlacement(CellContext& rContext, common::crc_t crc, XMFLOAT2 f2Local, float fRotation, const common::ConvexHull2D& rCandidate)
 {
 	// placedHullViews hold raw vertex pointers into placedHullStorage, reserved to kiMaximumIslandsPerCell.
@@ -202,9 +139,6 @@ static int64_t CommitPlacement(CellContext& rContext, common::crc_t crc, XMFLOAT
 static bool PlaceAnchor(CellContext& rContext, common::crc_t crc, float fTargetLocalX, float fTargetLocalY, float fRotation, XMFLOAT2& rAcceptedLocalOut)
 {
 	const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(crc);
-	XMFLOAT2 rectangleHull[4] {};
-	int64_t iLocalCount = 0;
-	const XMFLOAT2* pLocalHull = LocalHull(rTemplate, rectangleHull, iLocalCount);
 
 	common::SinCos rotation = common::DeterministicSinCos(fRotation);
 	float fAbsoluteCosine = std::abs(rotation.fCos);
@@ -222,8 +156,8 @@ static bool PlaceAnchor(CellContext& rContext, common::crc_t crc, float fTargetL
 	float fLocalY = std::clamp(fTargetLocalY, -fLimitY, fLimitY);
 	XMFLOAT2 f2Local {fLocalX, fLocalY};
 
-	rContext.scratch.resize(static_cast<size_t>(iLocalCount));
-	common::ConvexHull2D candidate = common::BuildWorldHull(std::span<const XMFLOAT2>(pLocalHull, static_cast<size_t>(iLocalCount)), f2Local, rotation.fCos, rotation.fSin, std::span<XMFLOAT2>(rContext.scratch));
+	rContext.scratch.resize(static_cast<size_t>(rTemplate.iValidAreaVertexCount));
+	common::ConvexHull2D candidate = common::BuildWorldHull(std::span<const XMFLOAT2>(rTemplate.pf2ValidAreaVertices, static_cast<size_t>(rTemplate.iValidAreaVertexCount)), f2Local, rotation.fCos, rotation.fSin, std::span<XMFLOAT2>(rContext.scratch));
 	CommitPlacement(rContext, crc, f2Local, fRotation, candidate);
 	rAcceptedLocalOut = {fLocalX, fLocalY};
 	return true;
@@ -236,9 +170,6 @@ static bool PlaceAnchor(CellContext& rContext, common::crc_t crc, float fTargetL
 static bool TryTouchPlace(CellContext& rContext, common::crc_t crc, int64_t iHost, float fDirection, float fRotation, int64_t& rPlacedIndexOut)
 {
 	const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(crc);
-	XMFLOAT2 rectangleHull[4] {};
-	int64_t iLocalCount = 0;
-	const XMFLOAT2* pLocalHull = LocalHull(rTemplate, rectangleHull, iLocalCount);
 
 	common::SinCos direction = common::DeterministicSinCos(fDirection);
 	float fDirectionX = direction.fCos;
@@ -249,10 +180,10 @@ static bool TryTouchPlace(CellContext& rContext, common::crc_t crc, int64_t iHos
 	float fCosine = rotation.fCos;
 	float fSine = rotation.fSin;
 	float fCandidateMinimum = std::numeric_limits<float>::max();
-	for (int64_t i = 0; i < iLocalCount; ++i)
+	for (int64_t i = 0; i < rTemplate.iValidAreaVertexCount; ++i)
 	{
-		float fRotatedX = pLocalHull[i].x * fCosine - pLocalHull[i].y * fSine;
-		float fRotatedY = pLocalHull[i].x * fSine + pLocalHull[i].y * fCosine;
+		float fRotatedX = rTemplate.pf2ValidAreaVertices[i].x * fCosine - rTemplate.pf2ValidAreaVertices[i].y * fSine;
+		float fRotatedY = rTemplate.pf2ValidAreaVertices[i].x * fSine + rTemplate.pf2ValidAreaVertices[i].y * fCosine;
 		fCandidateMinimum = std::min(fCandidateMinimum, fRotatedX * fDirectionX + fRotatedY * fDirectionY);
 	}
 
@@ -270,8 +201,8 @@ static bool TryTouchPlace(CellContext& rContext, common::crc_t crc, int64_t iHos
 	float fPlacementDistance = fHostMaximum + kfTouchGapMeters - fCandidateMinimum - (f2Host.x * fDirectionX + f2Host.y * fDirectionY);
 	XMFLOAT2 f2Local {f2Host.x + fPlacementDistance * fDirectionX, f2Host.y + fPlacementDistance * fDirectionY};
 
-	rContext.scratch.resize(static_cast<size_t>(iLocalCount));
-	common::ConvexHull2D candidate = common::BuildWorldHull(std::span<const XMFLOAT2>(pLocalHull, static_cast<size_t>(iLocalCount)), f2Local, fCosine, fSine, std::span<XMFLOAT2>(rContext.scratch));
+	rContext.scratch.resize(static_cast<size_t>(rTemplate.iValidAreaVertexCount));
+	common::ConvexHull2D candidate = common::BuildWorldHull(std::span<const XMFLOAT2>(rTemplate.pf2ValidAreaVertices, static_cast<size_t>(rTemplate.iValidAreaVertexCount)), f2Local, fCosine, fSine, std::span<XMFLOAT2>(rContext.scratch));
 
 	// Keep the whole cluster inside the cell (the touch pose is not clamped — that would break contact).
 	float fLimitX = rContext.fHalfWidth - kfCellEdgeMarginMeters;

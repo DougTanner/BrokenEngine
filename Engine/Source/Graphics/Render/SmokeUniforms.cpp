@@ -43,13 +43,6 @@ static void WriteSmokeDilateDispatch(int64_t iCommandBuffer, int64_t iDilateGrou
 	gpPipelineManager->mpPipelines[kPipelineSmokeOccupancyDilateRemap].WriteIndirectComputeBuffer(iCommandBuffer, iDilateGroups, 1, iGroupCountZ);
 }
 
-// Smoke area .y is max-Y and .w is min-Y. No margin: the held area must still cover the whole live visible area.
-static bool IsVisibleAreaInsideHeldSmokeArea(const XMFLOAT4& rf4VisibleArea, const XMFLOAT4& rf4HeldSmokeArea)
-{
-	return rf4VisibleArea.x >= rf4HeldSmokeArea.x && rf4VisibleArea.z <= rf4HeldSmokeArea.z && rf4VisibleArea.y <= rf4HeldSmokeArea.y
-	    && rf4VisibleArea.w >= rf4HeldSmokeArea.w;
-}
-
 void RenderSmokeGlobal(int64_t iCommandBuffer)
 {
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
@@ -187,7 +180,7 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	gpPipelineManager->mpPipelines[kPipelineSmokeClearB].WriteIndirectBuffer(iCommandBuffer, 0);
 
 	// Refresh on schedule, or early once the camera leaves the held area so no unsimulated edge comes into view.
-	if (siSmokeRenderFrame % iSmokeUpdateCadence != 0 && IsVisibleAreaInsideHeldSmokeArea(rf4Visible, sf4PreviousSmokeArea))
+	if (siSmokeRenderFrame % iSmokeUpdateCadence != 0 && IsVisibleAreaInsideHeldArea(rf4Visible, sf4PreviousSmokeArea))
 	{
 		// Skip: wind's remap reduces to the identity over the held area, and the next refresh remaps held -> current.
 		rGlobalLayout.f4SmokeArea = sf4PreviousSmokeArea;

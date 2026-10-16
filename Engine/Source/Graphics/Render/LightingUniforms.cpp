@@ -20,41 +20,6 @@ static bool IsVisibleAreaInsideHeldCombineCrop(const XMFLOAT4& rf4VisibleArea, c
 	    && rf4VisibleArea.y <= rf4HeldVisibleArea.y + fHeldCombineTexelY && rf4VisibleArea.w >= rf4HeldVisibleArea.w - fHeldCombineTexelY;
 }
 
-struct LightingTemporalAreaLatch
-{
-	bool bInitialized = false;
-	XMFLOAT4 f4CurrentArea {};
-	XMFLOAT4 f4PreviousArea {};
-	float fBlend = 1.0f;
-
-	float Update(const XMFLOAT4& rf4CurrentArea, bool& rbReset, float fRequestedBlend, XMFLOAT4& rf4PreviousArea)
-	{
-		if (rbReset)
-		{
-			rbReset = false;
-			bInitialized = false;
-		}
-
-		float fResolvedBlend = fRequestedBlend;
-		if (!bInitialized)
-		{
-			f4CurrentArea = rf4CurrentArea;
-			f4PreviousArea = rf4CurrentArea;
-			bInitialized = true;
-			fResolvedBlend = 1.0f;
-		}
-		else
-		{
-			f4PreviousArea = f4CurrentArea;
-			f4CurrentArea = rf4CurrentArea;
-		}
-
-		rf4PreviousArea = f4PreviousArea;
-		fBlend = fResolvedBlend;
-		return fBlend;
-	}
-};
-
 static bool sbLightingRefreshFrame = true; // Cached before global lighting publication so the spread, combine, and temporal chain share one refresh epoch
 
 static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, bool bScheduledRefresh, bool bLightingEnabled)
@@ -74,7 +39,7 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 	WorldSizedTexelArea area = ComputeWorldSizedTexelArea(engine::CameraBase::kfLightingHeadroomMultiplier, engine::gpCamera->mfLightingTexelEyeHeight, fLightingTextureWidth, fLightingTextureHeight, gpSwapchainManager->mfAspectRatio, gFieldOfView.mfCurrent, engine::gpCamera->mVecPosition);
 
 	// Temporal accumulation publishes the current and previous world areas from one refresh epoch; a skip retains both.
-	static LightingTemporalAreaLatch sTemporalAreaLatch {};
+	static TemporalAreaLatch sTemporalAreaLatch {};
 	static XMFLOAT4 sf4HeldVisibleArea {};
 	static bool sbHeldVisibleArea = false;
 	// Every rectangle retained across frames here is in the camera cell's frame; follow a camera cell change before

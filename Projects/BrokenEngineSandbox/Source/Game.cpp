@@ -6,7 +6,6 @@
 #include "Network/Server/ServerBroadcaster.h"
 #include "Network/Server/ServerTransferManager.h"
 
-#include "Agent/Commands/ClientPacketFaultHarnessRig.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Network/GamePacketType.h"
 #include "Ui/Localization.h"
@@ -30,7 +29,7 @@ static void BuildMenuIslandPlacement(int64_t iIndex, std::vector<engine::IslandP
 }
 
 Game::Game()
-: common::Singleton<Game>(gpGame)
+: common::Singleton<Game>(gpGame, this)
 {
 	InitializeLocalization();
 
@@ -534,11 +533,6 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 {
 	if constexpr (kbDebugInput)
 	{
-		// Deliver an armed client_packet_fault_harness_rig packet here: this is the first client main-loop point after
-		// the agent drain that sits outside AgentCommandServer::Drain's catch, so the corrupt-stream ASSERT reaches
-		// ProcessMain's handler instead of being answered as a command failure.
-		InjectArmedClientPacketFault();
-
 		bool bReturnPressed = rInputPoll.KeyboardPressed(VK_RETURN);
 		bool bCycleMenuIslandPressed = rInputPoll.KeyboardPressed('E');
 

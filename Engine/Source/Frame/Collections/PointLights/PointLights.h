@@ -60,16 +60,16 @@ struct PointLightsInterpolate : public Collection<PointLightsInterpolate, Collec
 
 	// Controller fields (kiInvalidControllerType = not controlled)
 	uint8_t* __restrict puiControllerTypeIndices = nullptr;
-	float* __restrict pfStartTimes = nullptr;
+	SimulationTime* __restrict pStartTimes = nullptr;
 	float* __restrict pfBaseRotations = nullptr;
 
 	auto Members(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiTypeIndices, rSelf.pVecPositions, rSelf.pfRotations, rSelf.pfVisibleAreas, rSelf.pfVisibleIntensities, rSelf.pfLightingAreas, rSelf.pfLightingIntensities, rSelf.puiControllerTypeIndices, rSelf.pfStartTimes, rSelf.pfBaseRotations);
+		return std::tie(rSelf.puiTypeIndices, rSelf.pVecPositions, rSelf.pfRotations, rSelf.pfVisibleAreas, rSelf.pfVisibleIntensities, rSelf.pfLightingAreas, rSelf.pfLightingIntensities, rSelf.puiControllerTypeIndices, rSelf.pStartTimes, rSelf.pfBaseRotations);
 	}
 	auto PersistentMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiTypeIndices, rSelf.puiControllerTypeIndices, rSelf.pfStartTimes, rSelf.pfBaseRotations);
+		return std::tie(rSelf.puiTypeIndices, rSelf.puiControllerTypeIndices, rSelf.pStartTimes, rSelf.pfBaseRotations);
 	}
 
 	static void GraphicsResources();
@@ -88,7 +88,7 @@ struct PointLightsPostRender : public Collection<PointLightsPostRender>
 	static void Add(game::Frame& __restrict rFrame, point_lights_t& rId, int64_t iTypeIndex);
 
 	// Fire-and-forget keyframe animation; the controller's bDestroysSelf enables removal after the final keyframe.
-	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, std::chrono::duration<float> currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fRotation);
+	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fRotation);
 
 
 	// Destroy handles auto-removal of expired controlled lights

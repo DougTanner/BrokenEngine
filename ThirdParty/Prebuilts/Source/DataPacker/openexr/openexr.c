@@ -5,15 +5,23 @@
 
 #include "openexr/src/lib/OpenEXRCore/attributes.c"
 #include "openexr/src/lib/OpenEXRCore/base.c"
+#include "openexr/src/lib/OpenEXRCore/bytes.c"
 #include "openexr/src/lib/OpenEXRCore/channel_list.c"
 #include "openexr/src/lib/OpenEXRCore/coding.c"
+#include "openexr/src/lib/OpenEXRCore/color_metadata.c"
+#include "openexr/src/lib/OpenEXRCore/compression.c"
 #include "openexr/src/lib/OpenEXRCore/context.c"
 #include "openexr/src/lib/OpenEXRCore/chunk.c"
+#include "openexr/src/lib/OpenEXRCore/debug.c"
 #include "openexr/src/lib/OpenEXRCore/decoding.c"
+#include "openexr/src/lib/OpenEXRCore/encoding.c"
 #include "openexr/src/lib/OpenEXRCore/float_vector.c"
 #include "openexr/src/lib/OpenEXRCore/internal_b44.c"
 #include "openexr/src/lib/OpenEXRCore/internal_b44_table.c"
+#include "openexr/src/lib/OpenEXRCore/internal_b44_table_init.c"
 #include "openexr/src/lib/OpenEXRCore/internal_dwa.c"
+#include "openexr/src/lib/OpenEXRCore/internal_dwa_table.c"
+#include "openexr/src/lib/OpenEXRCore/internal_dwa_table_init.c"
 #include "openexr/src/lib/OpenEXRCore/internal_huf.c"
 #include "openexr/src/lib/OpenEXRCore/internal_piz.c"
 #include "openexr/src/lib/OpenEXRCore/internal_pxr24.c"
@@ -22,14 +30,37 @@
 #include "openexr/src/lib/OpenEXRCore/internal_zip.c"
 #include "openexr/src/lib/OpenEXRCore/memory.c"
 #include "openexr/src/lib/OpenEXRCore/opaque.c"
+#include "openexr/src/lib/OpenEXRCore/pack.c"
 #include "openexr/src/lib/OpenEXRCore/parse_header.c"
 #include "openexr/src/lib/OpenEXRCore/part.c"
 #include "openexr/src/lib/OpenEXRCore/part_attr.c"
 #include "openexr/src/lib/OpenEXRCore/preview.c"
+#include "openexr/src/lib/OpenEXRCore/std_attr.c"
 #include "openexr/src/lib/OpenEXRCore/string.c"
 #include "openexr/src/lib/OpenEXRCore/string_vector.c"
 #include "openexr/src/lib/OpenEXRCore/unpack.c"
 #include "openexr/src/lib/OpenEXRCore/validation.c"
 #include "openexr/src/lib/OpenEXRCore/write_header.c"
+
+// Our inputs are one-scanline chunks (NONE, RLE, ZIPS), so the HT and zstd codecs are not compiled.
+exr_result_t internal_exr_undo_ht(exr_decode_pipeline_t* decode, const void* compressed_data, uint64_t comp_buf_size, void* uncompressed_data, uint64_t uncompressed_size)
+{
+	return EXR_ERR_FEATURE_NOT_IMPLEMENTED;
+}
+
+exr_result_t internal_exr_undo_zstd(exr_decode_pipeline_t* decode, const void* compressed_data, uint64_t comp_buf_size, void* uncompressed_data, uint64_t uncompressed_size)
+{
+	return EXR_ERR_FEATURE_NOT_IMPLEMENTED;
+}
+
+exr_result_t internal_exr_apply_ht(exr_encode_pipeline_t* encode)
+{
+	return EXR_ERR_FEATURE_NOT_IMPLEMENTED;
+}
+
+exr_result_t internal_exr_apply_zstd(exr_encode_pipeline_t* encode)
+{
+	return EXR_ERR_FEATURE_NOT_IMPLEMENTED;
+}
 
 #pragma warning(pop)

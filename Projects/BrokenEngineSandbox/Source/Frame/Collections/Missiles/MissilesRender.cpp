@@ -100,15 +100,15 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 		}
 
 		// Sentinel value: 0.0f means explosion finished, skip rendering
-		if (rCurrent.pfDestroyedTimes[i] == 0.0f)
+		if (rCurrent.pDestroyedTimes[i] == std::chrono::duration<float>::zero())
 		{
 			continue;
 		}
 
 		float fScale = kfMissileScale;
-		if (rCurrent.pfDestroyedTimes[i] > 0.0f)
+		if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
 		{
-			fScale *= std::pow(rCurrent.pfDestroyedTimes[i] / kMissileDestroyTime.count(), 0.5f);
+			fScale *= std::pow(rCurrent.pDestroyedTimes[i] / kMissileDestroyTime, 0.5f);
 		}
 
 		XMMATRIX matScaling = XMMatrixScaling(kfMissileWidth * fScale, fScale, fScale);

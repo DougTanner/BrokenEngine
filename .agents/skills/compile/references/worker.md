@@ -165,8 +165,22 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
 
 9. Run each build invocation synchronously in the foreground and remain in-turn
    until its process exit code and single JSON result are captured. Done when
-   every requested target has returned that pair.
+   every requested target has returned that pair and each build's block is in
+   this dispatch's envelope file.
 
+   - Create `Temp/AgentBuildEnvelopes/` if absent, in a call of its own before
+     the first build call, as the root `AGENTS.md` bundled-scripts rule
+     requires. `Temp/` is gitignored, so the directory is absent in a fresh
+     worktree.
+   - Write every build's captured `broken-engine-build-result/v1` envelope
+     verbatim into one Markdown file there, unique to this dispatch and named
+     `compile-<UTC yyyyMMddTHHmmssfffZ>-<process id>.md`.
+   - The file carries a single `##` heading for the dispatch, with one fenced
+     block per build.
+   - The first build's own PowerShell call creates the file and the heading,
+     and each later build's own call appends its block to the same file. Each
+     block is written from that call's own captured output — never a new
+     script, never a retyped envelope.
    - Give the call the maximum available execution timeout so the 500-second
      target-lock wait is not preempted. Never use `Start-Job`, a trailing `&`, a
      fire-and-forget watcher, or a host background-execution parameter such as
@@ -229,20 +243,6 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
 11. Parse and report only the structured result described above after every
     requested target has returned. Done when the handoff `../SKILL.md` defines
     is returned.
-
-    - Create `Temp/AgentBuildEnvelopes/` if absent, in a call of its own before
-      the first build call in step 9, as the root `AGENTS.md` bundled-scripts
-      rule requires. `Temp/` is gitignored, so the directory is absent in a
-      fresh worktree.
-    - Write every build's captured `broken-engine-build-result/v1` envelope
-      verbatim into one Markdown file there, unique to this dispatch and named
-      `compile-<UTC yyyyMMddTHHmmssfffZ>-<process id>.md`.
-    - The file carries a single `##` heading for the dispatch, with one fenced
-      block per build.
-    - The first build's own PowerShell call in step 9 creates the file and the
-      heading, and each later build's own call appends its block to the same
-      file. Each block is written from that call's own captured output — never a
-      new script, never a retyped envelope.
 
 ## Rules
 

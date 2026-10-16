@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:03:09.308Z","dependsOn":["Documents/Plans/Engine/FlightPlaneData.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:03:09.308Z","dependsOn":[]} -->
 # One smoke field per flight plane, with between-plane deposits and eye-ray compositing
 
 Tier 2: client-only render behaviour in one subsystem (Graphics plus the two smoke-depositing engine collections and the compositing shaders). Smoke is not CRC'd, no wire, save, replay, or pack format changes, and no threading or trust surface moves. Line numbers cite baseline `c1420821`. Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other. Flight-plane series; `Documents/Plans/Engine/FlightPlaneData.md` (prerequisite) supplies `engine::FlightPlane`, `engine::FlightPlanes`, and `engine::gpFlightPlanes` with `Count()`, `Plane(i)`, `Lowest()`, `Highest()`, and the island-ceiling guarantee that every heightmap texel lies strictly below `Highest().fHeightMeters`.

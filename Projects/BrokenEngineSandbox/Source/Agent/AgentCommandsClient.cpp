@@ -2,9 +2,6 @@
 
 #include "Agent/Commands/AgentCommandsAudioStreaming.h"
 #include "Agent/Commands/ClientDesyncProbe.h"
-#include "Agent/Commands/ClientFullStateHarnessRig.h"
-#include "Agent/Commands/ClientPacketFaultHarnessRig.h"
-#include "Agent/Commands/ClientSubscriptionHarnessRigs.h"
 
 #if defined(BT_CLIENT)
 
@@ -68,10 +65,6 @@ static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nl
 	// Heap: validation errors and JSON result
 	ScopedSuppressAllocationTracking suppress;
 
-	if (!rParameters.is_object())
-	{
-		throw std::runtime_error("set_client_grid_coord params must be an object");
-	}
 	if (rParameters.size() != 1 || !rParameters.contains("coord"))
 	{
 		throw std::runtime_error("set_client_grid_coord accepts only 'coord'");
@@ -110,10 +103,6 @@ static void CommandReleaseClientGridCoordinate(const nlohmann::json& rParameters
 	// Heap: validation errors and JSON result
 	ScopedSuppressAllocationTracking suppress;
 
-	if (!rParameters.is_object())
-	{
-		throw std::runtime_error("release_client_grid_coord accepts no params");
-	}
 	if (!rParameters.empty())
 	{
 		throw std::runtime_error("release_client_grid_coord accepts no params");
@@ -129,31 +118,6 @@ bool ExecuteAgentCommandClient(std::string_view command, const nlohmann::json& r
 	if (command == "audio_streaming_harness_rig")
 	{
 		CommandAudioStreamingHarnessRig(rParameters, rResult);
-		return true;
-	}
-	if (command == "client_subscribe_accept_harness_rig")
-	{
-		CommandClientSubscribeAcceptHarnessRig(rParameters, rResult);
-		return true;
-	}
-	if (command == "client_stale_update_harness_rig")
-	{
-		CommandClientStaleUpdateHarnessRig(rParameters, rResult);
-		return true;
-	}
-	if (command == "client_cancelled_subscription_harness_rig")
-	{
-		CommandClientCancelledSubscriptionHarnessRig(rParameters, rResult);
-		return true;
-	}
-	if (command == "client_packet_fault_harness_rig")
-	{
-		CommandClientPacketFaultHarnessRig(rParameters, rResult);
-		return true;
-	}
-	if (command == "client_full_state_harness_rig")
-	{
-		CommandClientFullStateHarnessRig(rParameters, rResult);
 		return true;
 	}
 	if (command == "describe_scene")
