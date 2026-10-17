@@ -143,7 +143,11 @@ Order: `/prepare-change` first at Tier 2+, because the alternative investigation
   naming the drafted mechanism as candidate zero, and the assigned axis — never
   the plan's rationale, never the plan's `## In scope`/`## Out of scope`
   sections, and never the plan file's path, in any field and in any form,
-  positive or negative. Main compares the handoffs per that skill's `## Handoff`
+  positive or negative. Main writes the candidate-zero line from the
+  preparation handoff's `Candidate zero` field whenever a preparation handoff
+  returned it with a value other than `none`, reading neither the plan
+  snapshot nor the plan file for it.
+  Main compares the handoffs per that skill's `## Handoff`
   and presents per that skill's `### User presentation`.
 
 #### Step 3 — Plan review
