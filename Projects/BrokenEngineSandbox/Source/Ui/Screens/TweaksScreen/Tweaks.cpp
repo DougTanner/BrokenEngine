@@ -1,4 +1,4 @@
-#include "TweaksScreen.h"
+#include "Tweaks.h"
 
 #if defined(BT_CLIENT)
 
@@ -7,14 +7,14 @@ namespace game
 
 void RegisterGameTweakSections()
 {
-	engine::TweaksScreenBase::RegisterSection(giTweakSectionParticles,
+	engine::TweaksScreen::RegisterSection(giTweakSectionParticles,
 	{
 		.displayName = "Particles", .stableKey = "Particles",
 		.pRender = RenderParticlesSection,
 	});
 }
 
-void RenderLightingTweakExtensions(engine::TweaksScreenBase& rScreen, int64_t iSection, int64_t iFirstSubtab)
+void RenderLightingTweakExtensions(engine::TweaksScreen& rScreen, int64_t iSection, int64_t iFirstSubtab)
 {
 	if (rScreen.BeginSubtab("Visible", iSection, iFirstSubtab))
 	{
@@ -28,7 +28,7 @@ void RenderLightingTweakExtensions(engine::TweaksScreenBase& rScreen, int64_t iS
 	}
 }
 
-void RenderSmokeTweakExtensions(engine::TweaksScreenBase& rScreen, int64_t iSection, int64_t iFirstSubtab)
+void RenderSmokeTweakExtensions(engine::TweaksScreen& rScreen, int64_t iSection, int64_t iFirstSubtab)
 {
 	if (rScreen.BeginSubtab("Deposits", iSection, iFirstSubtab))
 	{
@@ -37,7 +37,7 @@ void RenderSmokeTweakExtensions(engine::TweaksScreenBase& rScreen, int64_t iSect
 	}
 }
 
-void RenderWindTweakExtensions(engine::TweaksScreenBase& rScreen, int64_t iSection, int64_t iFirstSubtab)
+void RenderWindTweakExtensions(engine::TweaksScreen& rScreen, int64_t iSection, int64_t iFirstSubtab)
 {
 	if (rScreen.BeginSubtab("Deposits", iSection, iFirstSubtab))
 	{
@@ -46,7 +46,7 @@ void RenderWindTweakExtensions(engine::TweaksScreenBase& rScreen, int64_t iSecti
 	}
 }
 
-void RenderSoundTweakExtensions(engine::TweaksScreenBase& rScreen)
+void RenderSoundTweakExtensions(engine::TweaksScreen& rScreen)
 {
 	RenderSoundEffects(rScreen);
 }

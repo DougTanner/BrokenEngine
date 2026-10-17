@@ -1,4 +1,4 @@
-#include "TweaksScreen.h"
+#include "Tweaks.h"
 
 #include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
 
@@ -34,7 +34,7 @@ const engine::TweaksSliderMapRegistrar gSoundEffectsRegistrar
 	{"Spaceship Hit Volume", &gSpaceshipHitVolume},
 };
 
-void RenderSoundEffects(engine::TweaksScreenBase& rScreen)
+void RenderSoundEffects(engine::TweaksScreen& rScreen)
 {
 	int64_t iSection = engine::giTweakSectionSound;
 

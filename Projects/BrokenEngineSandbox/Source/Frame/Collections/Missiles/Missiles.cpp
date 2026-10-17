@@ -8,7 +8,7 @@
 #include "Frame/CellStaticData.h"
 
 #include "Frame/HealthDamage.h"
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 #include "Ui/ParticleWrappers.h"
 #if defined(BT_CLIENT)
 #include "Data/Scene.h"

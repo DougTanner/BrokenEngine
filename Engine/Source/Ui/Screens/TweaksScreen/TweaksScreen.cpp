@@ -1,4 +1,4 @@
-#include "TweaksScreenBase.h"
+#include "TweaksScreen.h"
 
 #if defined(BT_CLIENT)
 
@@ -13,16 +13,16 @@ namespace engine
 static common::crc_t ComputeLayoutCrc()
 {
 	common::crc_t crcKeys[kiMaxTweakSections] {};
-	for (int64_t i = 0; i < TweaksScreenBase::msiSectionCount; ++i)
+	for (int64_t i = 0; i < TweaksScreen::msiSectionCount; ++i)
 	{
-		crcKeys[i] = common::Crc(TweaksScreenBase::msSectionDescriptions[i].stableKey);
+		crcKeys[i] = common::Crc(TweaksScreen::msSectionDescriptions[i].stableKey);
 	}
-	return common::Crc(std::span<const common::crc_t>(crcKeys, static_cast<size_t>(TweaksScreenBase::msiSectionCount)));
+	return common::Crc(std::span<const common::crc_t>(crcKeys, static_cast<size_t>(TweaksScreen::msiSectionCount)));
 }
 
 constexpr float kfUiScale = 1.5f;
 
-void TweaksScreenBase::RegisterSection(int64_t& riSection, const TweakSectionDescription& rDescription)
+void TweaksScreen::RegisterSection(int64_t& riSection, const TweakSectionDescription& rDescription)
 {
 	ASSERT(riSection == kiInvalidTweakSection);
 	ASSERT(msiSectionCount < kiMaxTweakSections);
@@ -31,27 +31,27 @@ void TweaksScreenBase::RegisterSection(int64_t& riSection, const TweakSectionDes
 	++msiSectionCount;
 }
 
-common::Flags<TweakSectionFlags> TweaksScreenBase::AllSectionFlags()
+common::Flags<TweakSectionFlags> TweaksScreen::AllSectionFlags()
 {
 	return static_cast<TweakSectionFlags>((1ui32 << msiSectionCount) - 1ui32);
 }
 
 void RegisterEngineTweakSections()
 {
-	TweaksScreenBase::RegisterSection(giTweakSectionPbr, {.displayName = "Pbr", .stableKey = "Pbr", .pRender = RenderPhysicallyBasedRenderingSection});
-	TweaksScreenBase::RegisterSection(giTweakSectionTerrain, {.displayName = "Terrain", .stableKey = "Terrain", .pRender = RenderTerrainSection});
-	TweaksScreenBase::RegisterSection(giTweakSectionWater, {.displayName = "Water", .stableKey = "Water", .pRender = RenderWaterSection});
-	TweaksScreenBase::RegisterSection(giTweakSectionLighting, {.displayName = "Lighting", .stableKey = "Lighting", .pRender = RenderLightingSection});
-	TweaksScreenBase::RegisterSection(giTweakSectionShadow, {.displayName = "Shadow", .stableKey = "Shadow", .pRender = RenderShadowSection});
-	TweaksScreenBase::RegisterSection(giTweakSectionSunMoon, {.displayName = "Sun/Moon", .stableKey = "SunMoon", .pRender = RenderSunMoonSection});
-	TweaksScreenBase::RegisterSection(giTweakSectionMiscellaneous, {.displayName = "Misc", .stableKey = "Misc", .pRender = RenderMiscellaneousSection});
-	TweaksScreenBase::RegisterSection(giTweakSectionSound, {.displayName = "Sound", .stableKey = "Sound", .pRender = RenderSoundSection});
-	TweaksScreenBase::RegisterSection(giTweakSectionSmoke, {.displayName = "Smoke", .stableKey = "Smoke", .pRender = RenderSmokeSection});
-	TweaksScreenBase::RegisterSection(giTweakSectionWind, {.displayName = "Wind", .stableKey = "Wind", .pRender = RenderWindSection});
-	TweaksScreenBase::RegisterSection(giTweakSectionHexShield, {.displayName = "Hex Shield", .stableKey = "HexShield", .pRender = RenderHexShieldSection});
+	TweaksScreen::RegisterSection(giTweakSectionPbr, {.displayName = "Pbr", .stableKey = "Pbr", .pRender = RenderPhysicallyBasedRenderingSection});
+	TweaksScreen::RegisterSection(giTweakSectionTerrain, {.displayName = "Terrain", .stableKey = "Terrain", .pRender = RenderTerrainSection});
+	TweaksScreen::RegisterSection(giTweakSectionWater, {.displayName = "Water", .stableKey = "Water", .pRender = RenderWaterSection});
+	TweaksScreen::RegisterSection(giTweakSectionLighting, {.displayName = "Lighting", .stableKey = "Lighting", .pRender = RenderLightingSection});
+	TweaksScreen::RegisterSection(giTweakSectionShadow, {.displayName = "Shadow", .stableKey = "Shadow", .pRender = RenderShadowSection});
+	TweaksScreen::RegisterSection(giTweakSectionSunMoon, {.displayName = "Sun/Moon", .stableKey = "SunMoon", .pRender = RenderSunMoonSection});
+	TweaksScreen::RegisterSection(giTweakSectionMiscellaneous, {.displayName = "Misc", .stableKey = "Misc", .pRender = RenderMiscellaneousSection});
+	TweaksScreen::RegisterSection(giTweakSectionSound, {.displayName = "Sound", .stableKey = "Sound", .pRender = RenderSoundSection});
+	TweaksScreen::RegisterSection(giTweakSectionSmoke, {.displayName = "Smoke", .stableKey = "Smoke", .pRender = RenderSmokeSection});
+	TweaksScreen::RegisterSection(giTweakSectionWind, {.displayName = "Wind", .stableKey = "Wind", .pRender = RenderWindSection});
+	TweaksScreen::RegisterSection(giTweakSectionHexShield, {.displayName = "Hex Shield", .stableKey = "HexShield", .pRender = RenderHexShieldSection});
 }
 
-TweaksScreenBase::TweaksScreenBase()
+TweaksScreen::TweaksScreen()
 {
 	// Every section must already be registered; msiSectionCount below is the final count. Registration runs
 	// from Main.cpp rather than here because device loss recreates Graphics, and so this object, in place -
@@ -68,7 +68,7 @@ TweaksScreenBase::TweaksScreenBase()
 	}
 }
 
-void TweaksScreenBase::RenderWaveCountRadioButtons(Wrapper& rCountWrapper)
+void TweaksScreen::RenderWaveCountRadioButtons(Wrapper& rCountWrapper)
 {
 	if (!mActiveSlider.empty())
 	{
@@ -89,7 +89,7 @@ void TweaksScreenBase::RenderWaveCountRadioButtons(Wrapper& rCountWrapper)
 	ImGui::NewLine();
 }
 
-void TweaksScreenBase::ChevronIndexSelector(std::string_view label, Wrapper& rWrapper, std::span<const std::string_view> names)
+void TweaksScreen::ChevronIndexSelector(std::string_view label, Wrapper& rWrapper, std::span<const std::string_view> names)
 {
 	// Match WrapperSlider's alpha-fade-while-dragging behavior so this widget keeps its layout slot when another slider is active.
 	bool bAnotherSliderActive = !mActiveSlider.empty();
@@ -124,7 +124,7 @@ void TweaksScreenBase::ChevronIndexSelector(std::string_view label, Wrapper& rWr
 	}
 }
 
-bool TweaksScreenBase::BeginSubtab(const char* pcLabel, int64_t iSection, int64_t iTab)
+bool TweaksScreen::BeginSubtab(const char* pcLabel, int64_t iSection, int64_t iTab)
 {
 	bool bApplySavedSubtab = (mApplySubtab & SectionFlag(iSection)) && miActiveSubtab[iSection] == iTab;
 	if (!ImGui::BeginTabItem(pcLabel, nullptr, bApplySavedSubtab ? ImGuiTabItemFlags_SetSelected : 0))
@@ -143,7 +143,7 @@ bool TweaksScreenBase::BeginSubtab(const char* pcLabel, int64_t iSection, int64_
 	return true;
 }
 
-void TweaksScreenBase::WrapperSlider(std::string_view label, int64_t iSection, float fWidthMultiplier, std::string_view mapKey)
+void TweaksScreen::WrapperSlider(std::string_view label, int64_t iSection, float fWidthMultiplier, std::string_view mapKey)
 {
 	if (mapKey.empty())
 	{
@@ -218,7 +218,7 @@ void TweaksScreenBase::WrapperSlider(std::string_view label, int64_t iSection, f
 	}
 }
 
-void TweaksScreenBase::Render()
+void TweaksScreen::Render()
 {
 	if constexpr (kbDebugInput)
 	{
@@ -262,7 +262,7 @@ void TweaksScreenBase::Render()
 	}
 }
 
-void TweaksScreenBase::RenderToggleBar()
+void TweaksScreen::RenderToggleBar()
 {
 	// Capture state at start (mActiveSlider can change during WrapperSlider)
 	bool bSliderActive = !mActiveSlider.empty();
@@ -328,7 +328,7 @@ void TweaksScreenBase::RenderToggleBar()
 	ImGui::PopStyleColor(2);
 }
 
-void TweaksScreenBase::WrapperSeparatorText(std::string_view label)
+void TweaksScreen::WrapperSeparatorText(std::string_view label)
 {
 	if (!mActiveSlider.empty())
 	{
@@ -341,7 +341,7 @@ void TweaksScreenBase::WrapperSeparatorText(std::string_view label)
 	}
 }
 
-void TweaksScreenBase::SaveState(TweakSectionState& rState) const
+void TweaksScreen::SaveState(TweakSectionState& rState) const
 {
 	// Clear first so unregistered slots and uiPadding are written as zeros: two saves of unchanged settings must be byte-identical.
 	rState = {};
@@ -357,7 +357,7 @@ void TweaksScreenBase::SaveState(TweakSectionState& rState) const
 	rState.crcLayout = ComputeLayoutCrc();
 }
 
-void TweaksScreenBase::LoadState(const TweakSectionState& rState)
+void TweaksScreen::LoadState(const TweakSectionState& rState)
 {
 	if (rState.crcLayout != ComputeLayoutCrc())
 	{
@@ -377,7 +377,7 @@ void TweaksScreenBase::LoadState(const TweakSectionState& rState)
 	mApplySubtab = AllSectionFlags();
 }
 
-void TweaksScreenBase::RenderSectionWindow(int64_t iSection)
+void TweaksScreen::RenderSectionWindow(int64_t iSection)
 {
 	bool bHasActiveSlider = (!mActiveSlider.empty() && miActiveSliderSection == iSection);
 
@@ -414,7 +414,7 @@ void TweaksScreenBase::RenderSectionWindow(int64_t iSection)
 	}
 }
 
-void TweaksScreenBase::RunSliderAuditFrame()
+void TweaksScreen::RunSliderAuditFrame()
 {
 	if constexpr (kbDebugInput)
 	{

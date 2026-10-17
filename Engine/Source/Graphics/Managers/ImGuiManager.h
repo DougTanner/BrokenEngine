@@ -17,7 +17,7 @@ class MainMenuScreen;
 class ModalScreen;
 class PauseMenuScreen;
 class SoundMenuScreen;
-class TweaksScreenBase;
+class TweaksScreen;
 
 enum class UiTheme : uint8_t;
 
@@ -60,7 +60,7 @@ public:
 
 	float mfUiScale = 1.0f;
 
-	std::unique_ptr<TweaksScreenBase> mpTweaksScreen;
+	std::unique_ptr<TweaksScreen> mpTweaksScreen;
 
 	VkBuffer mUiPrepassIndirectVkBuffer = VK_NULL_HANDLE;
 

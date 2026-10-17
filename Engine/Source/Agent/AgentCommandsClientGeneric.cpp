@@ -8,7 +8,7 @@
 #include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
 #include "Ui/WrapperBase.h"
 
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace engine

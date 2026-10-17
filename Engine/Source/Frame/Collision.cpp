@@ -1,7 +1,7 @@
 #include "Collision.h"
 
 #include "Frame/Frame.h"
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 
 namespace engine
 {

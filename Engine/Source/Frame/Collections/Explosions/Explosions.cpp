@@ -2,7 +2,7 @@
 
 #if defined(BT_CLIENT)
 #include "Data/Texture.h"
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 #include "Ui/WrapperBase.h"
 #include "Graphics/Managers/ParticleManager.h"
 #include "Frame/Collections/PointLights/PointLights.h"

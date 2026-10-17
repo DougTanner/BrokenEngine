@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-16T13:05:05.556Z","dependsOn":["Documents/Plans/Engine/AgentHarnessIntoEngine.md","Documents/Plans/Engine/EngineOwnedProfileManager.md","Documents/Plans/Engine/RemoveNetworkSessionContractStruct.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-16T13:05:05.556Z","dependsOn":["Documents/Plans/Engine/AgentHarnessIntoEngine.md","Documents/Plans/Engine/RemoveNetworkSessionContractStruct.md"]} -->
 # Sweep `Engine/` and `Common/` for remaining engine-to-game hooks
 
 Tier 3 (`.agents/references/risk-tiers.md`): fixes may land in any engine
@@ -42,7 +42,7 @@ A read-only survey at the baseline covered `Engine/`, `Common/`, and `Projects/B
   `StreamingVoices::mGetNextTrack` (`Engine/Source/Audio/StreamingVoices.h:50`).
 - Removed by prerequisite Plans written alongside this one: the `ProfileManagerBase` span constructor and game `ProfileManager` subclass (`Documents/Plans/Engine/EngineOwnedProfileManager.md`); the `game::NetworkSessionContract` trait struct and `engine::NetworkSessionContractType` concept (`Documents/Plans/Engine/RemoveNetworkSessionContractStruct.md`).
 - Reviewed and kept, with the reason:
-  - Tweaks section registry `TweakSectionDescription::pRender` and `RegisterSection` (`TweaksScreenBase.h:25-33,66,73`), reached from the direct call `game::RegisterGameTweakSections`: a dense startup-assigned index space shared by engine and game sections and iterated generically (toggle bar, windows, slider audit), whose game-controlled count and order fold into the persisted `crcLayout`; a constexpr game table would change only its shape.
+  - Tweaks section registry `TweakSectionDescription::pRender` and `RegisterSection` (`TweaksScreen.h:25-33,66,73`), reached from the direct call `game::RegisterGameTweakSections`: a dense startup-assigned index space shared by engine and game sections and iterated generically (toggle bar, windows, slider audit), whose game-controlled count and order fold into the persisted `crcLayout`; a constexpr game table would change only its shape.
   - `TweaksSliderMapRegistrar` static-initialization registry (`Engine/Source/Ui/TweaksSliderMap.h:17-20`, `TweaksSliderMap.cpp:18`): a data registry co-located with each slider; it carries data, not calls into the game.
   - Visual-effect type registries `Collection::RegisterType` and `RegisterControllerType` (`Engine/Source/Frame/Collections/Collection.h:132`, `CollectionController.h:116`): a data registry whose type indices the game assigns and orders, reach saved and CRC'd rows, and are validated on grid-save read.
   - Opt-in collection phase calls through `requires` over type lists (`Engine/Source/Frame/FrameUtils.h:197-289`): compile-time per-type dispatch, already direct calls.

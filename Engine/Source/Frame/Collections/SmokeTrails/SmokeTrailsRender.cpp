@@ -7,7 +7,7 @@
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/SmokeWrappersBase.h"
 
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 
 namespace engine
 {

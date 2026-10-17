@@ -1,4 +1,4 @@
-#include "TweaksScreenBase.h"
+#include "TweaksScreen.h"
 
 #if defined(BT_CLIENT)
 
@@ -13,7 +13,7 @@ const TweaksSliderMapRegistrar gMiscellaneousRegistrar
 	{"Debug Texture Range", &gMiscDebugTextureLinearRange},
 };
 
-void RenderMiscellaneousSection(TweaksScreenBase& rScreen)
+void RenderMiscellaneousSection(TweaksScreen& rScreen)
 {
 	int64_t iSection = giTweakSectionMiscellaneous;
 

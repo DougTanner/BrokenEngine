@@ -63,7 +63,7 @@ Several session mechanisms in game Network use only engine types and engine stat
   (`:256-264`, `:356-365`), and the `mUnwantedTimestamps` clear are engine
   mechanics. `ClientReconciler::Run`
   (`Network/Client/ClientReconciler.cpp:95-111`, `:155-173`) fills the engine
-  desync record, logs `CONFIRMED DESYNC`, sets `ProfileManagerBase` counters,
+  desync record, logs `CONFIRMED DESYNC`, sets `ProfileManager` counters,
   logs replay bursts, and sets the `StaticVoices` skip flag, all engine-only.
 
 ## Design
@@ -224,7 +224,7 @@ One Plan, one landing; the stages order the work so each builds and runs, and th
   (`Engine/Source/Network/Client/ReconcileReplay.h:146-154`). At the end of
   `ReconcileDispatcher::Run`, when the active count is nonzero: with a desync
   work, log `CONFIRMED DESYNC ...` verbatim and fill `desync` (moving the client
-  frame); otherwise set the five `ProfileManagerBase` counters, log the replay
+  frame); otherwise set the five `ProfileManager` counters, log the replay
   burst, and set `StaticVoices::mbSkipNextInvalidation` on a full replay —
   today's non-desync path. `ClientReconciler::Run` returns
   `std::move(dispatch.desync)` when set and keeps the confirmed client state,

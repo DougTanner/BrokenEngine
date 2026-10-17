@@ -276,10 +276,7 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerBufferedFrames.h">
       <Filter>Engine\Network\Server</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManagerBase.h">
-      <Filter>Engine\Profile</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\Profile\ProfileManager.h">
+    <ClInclude Include="..\..\Source\Profile\ProfileRows.h">
       <Filter>Game\Profile</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Common\Common.h">
@@ -621,6 +618,9 @@
     <ClInclude Include="..\..\Source\Frame\ServerCellStats.h">
       <Filter>Game\Frame</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManager.h">
+      <Filter>Engine\Profile</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Engine\Source\File\FileManager.cpp">
@@ -707,14 +707,8 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Main.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManagerBase.cpp">
-      <Filter>Engine\Profile</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileScreens.cpp">
       <Filter>Engine\Profile</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Profile\ProfileManager.cpp">
-      <Filter>Game\Profile</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Common\ErrorUtils.cpp">
       <Filter>Common</Filter>
@@ -956,6 +950,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\ServerCellStats.cpp">
       <Filter>Game\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManager.cpp">
+      <Filter>Engine\Profile</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

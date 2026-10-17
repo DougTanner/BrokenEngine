@@ -1,4 +1,4 @@
-#include "TweaksScreenBase.h"
+#include "TweaksScreen.h"
 
 #if defined(BT_CLIENT)
 
@@ -40,7 +40,7 @@ const TweaksSliderMapRegistrar gPhysicallyBasedRenderingRegistrar
 	{"Emissive", &gPhysicallyBasedRenderingEmissive},
 };
 
-void RenderPhysicallyBasedRenderingSection(TweaksScreenBase& rScreen)
+void RenderPhysicallyBasedRenderingSection(TweaksScreen& rScreen)
 {
 	int64_t iSection = giTweakSectionPbr;
 

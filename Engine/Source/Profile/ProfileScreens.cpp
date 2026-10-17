@@ -3,9 +3,9 @@
 #include "File/PackChunks.h"
 #include "Graphics/CameraBase.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
-#include "ProfileManagerBase.h"
+#include "ProfileManager.h"
 
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace engine

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Profile/ProfileManagerBase.h"
+#include "Profile/ProfileManager.h"
 
 #include "Frame/AreaDamage.h"
 #include "Frame/Collision.h"

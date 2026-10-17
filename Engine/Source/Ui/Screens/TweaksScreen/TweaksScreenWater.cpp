@@ -1,4 +1,4 @@
-#include "TweaksScreenBase.h"
+#include "TweaksScreen.h"
 
 #if defined(BT_CLIENT)
 
@@ -118,7 +118,7 @@ const TweaksSliderMapRegistrar gWaterRegistrar
 	{"Beach Skybox 3 Reduction", &gLightingWaterSkyboxThreeBeachReduction},
 };
 
-void RenderWaterSection(TweaksScreenBase& rScreen)
+void RenderWaterSection(TweaksScreen& rScreen)
 {
 	int64_t iSection = giTweakSectionWater;
 

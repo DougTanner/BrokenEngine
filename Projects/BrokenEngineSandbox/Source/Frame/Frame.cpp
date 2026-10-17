@@ -2,7 +2,7 @@
 
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/FrameCollections.h"
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 #include "Ui/LightingWrappers.h"
 #include "Ui/SmokeWrappers.h"
 #include "Ui/WindDepositsWrappers.h"

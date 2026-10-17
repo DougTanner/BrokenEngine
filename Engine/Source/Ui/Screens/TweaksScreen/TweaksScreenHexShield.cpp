@@ -1,4 +1,4 @@
-#include "TweaksScreenBase.h"
+#include "TweaksScreen.h"
 
 #if defined(BT_CLIENT)
 
@@ -23,7 +23,7 @@ const TweaksSliderMapRegistrar gHexShieldRegistrar
 	{"Direction Multiplier", &gHexShieldDirectionMultiplier},
 };
 
-void RenderHexShieldSection(TweaksScreenBase& rScreen)
+void RenderHexShieldSection(TweaksScreen& rScreen)
 {
 	int64_t iSection = giTweakSectionHexShield;
 

@@ -9,7 +9,7 @@
 #include "CrashReport.h"
 
 #include "Network/Client/ClientSession.h"
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace engine

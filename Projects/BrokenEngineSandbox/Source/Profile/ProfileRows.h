@@ -48,7 +48,7 @@ enum GameCpuTimers : int64_t
 };
 
 // One entry per game enumerator, in order; static_assert guards a dropped/extra name (which would otherwise
-// silently misalign the overlay rows). Mirrors the engine kXxx*Names tables — see engine ProfileManagerBase.h.
+// silently misalign the overlay rows). Mirrors the engine kXxx*Names tables — see engine ProfileManager.h.
 inline constexpr std::string_view kGameCpuCounterNames[]
 {
 	"Players",
@@ -87,22 +87,4 @@ inline constexpr std::string_view kGameCpuTimerNames[]
 };
 static_assert(std::size(kGameCpuTimerNames) == static_cast<size_t>(kGameCpuTimerCount) - static_cast<size_t>(engine::kEngineCpuTimerCount));
 
-class ProfileManager : public engine::ProfileManagerBase, public common::Singleton<ProfileManager>
-{
-public:
-
-	ProfileManager();
-
-	// Names live in the kGameCpu*Names tables above (static_assert-guarded); these arrays carry only per-row runtime state.
-	engine::CpuCounter mGameCpuCounters[static_cast<int64_t>(kGameCpuCounterCount) - static_cast<int64_t>(engine::kEngineCpuCounterCount)] {};
-
-private:
-
-	engine::CpuTimer mGameCpuTimers[static_cast<int64_t>(kGameCpuTimerCount) - static_cast<int64_t>(engine::kEngineCpuTimerCount)] {};
-};
-
-extern ProfileManager* gpProfileManager;
-
 } // namespace game
-
-using game::gpProfileManager;

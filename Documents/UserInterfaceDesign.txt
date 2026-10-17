@@ -79,7 +79,7 @@ Files:
   Engine/Source/Graphics/Managers/ImGuiManager.cpp:194  ImGuiManager::SetupThemeGeometry (style geometry and scale floor)
   Engine/Source/Graphics/Managers/ImGuiManager.cpp:226  rStyle.ScaleAllSizes(std::max(kfMinimumStyleGeometryFactor, 2.0f * fUiScale));
   Engine/Source/Ui/MenuUtils.h:7   inline constexpr float kfMenuUiScale = 2.0f;
-  Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenBase.cpp:28  static constexpr float kfUiScale = 1.5f;  (sanctioned exception)
+  Engine/Source/Ui/Screens/TweaksScreen/TweaksScreen.cpp:28  static constexpr float kfUiScale = 1.5f;  (sanctioned exception)
   Engine/Source/Ui/MenuUtils.h
     kfMainMenuHeadingScale, kfLanguageMenuFontScale, kfLanguageMenuGeometryScale
 

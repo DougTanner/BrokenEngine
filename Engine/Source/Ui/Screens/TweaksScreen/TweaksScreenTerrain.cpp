@@ -1,4 +1,4 @@
-#include "TweaksScreenBase.h"
+#include "TweaksScreen.h"
 
 #if defined(BT_CLIENT)
 
@@ -31,7 +31,7 @@ const TweaksSliderMapRegistrar gTerrainRegistrar
 	{"Rock Normals Blend", &gTerrainRockNormalsBlend},
 };
 
-void RenderTerrainSection(TweaksScreenBase& rScreen)
+void RenderTerrainSection(TweaksScreen& rScreen)
 {
 	int64_t iSection = giTweakSectionTerrain;
 

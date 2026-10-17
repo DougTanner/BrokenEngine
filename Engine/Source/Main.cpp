@@ -13,8 +13,8 @@
 #include "Frame/FlightPlaneTable.h"
 #include "Frame/TerrainUtils.h"
 #include "Graphics/Camera.h"
-#include "Profile/ProfileManager.h"
-#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
+#include "Profile/ProfileRows.h"
+#include "Ui/Screens/TweaksScreen/Tweaks.h"
 #include "Game.h"
 
 namespace engine
@@ -132,7 +132,7 @@ static int64_t MainThread(HINSTANCE hInstance)
 #endif
 	auto pMultithreading = std::make_unique<common::Multithreading>(iBackgroundThreadCount);
 
-	auto pProfileManager = std::make_unique<game::ProfileManager>();
+	auto pProfileManager = std::make_unique<ProfileManager>();
 
 	std::future<void> readDxDiag;
 	if constexpr (kbDxDiag)

@@ -1,4 +1,4 @@
-#include "TweaksScreen.h"
+#include "Tweaks.h"
 
 #include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
 
@@ -55,7 +55,7 @@ const engine::TweaksSliderMapRegistrar gParticlesRegistrar
 	{"Spaceship Particle Intensity Power", &gSpaceshipExplosionParticleIntensityPower},
 };
 
-void RenderParticlesSection(engine::TweaksScreenBase& rScreen)
+void RenderParticlesSection(engine::TweaksScreen& rScreen)
 {
 	int64_t iSection = giTweakSectionParticles;
 

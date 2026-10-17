@@ -4,7 +4,7 @@
 #include "Network/Client/ReconcileReplay.h"
 
 #include "Frame/Collections/Players/Players.h"
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace game

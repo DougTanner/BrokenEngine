@@ -2,7 +2,7 @@
 
 #include "TweaksSettings.h"
 
-#include "Ui/Screens/TweaksScreen/TweaksScreenBase.h"
+#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 
 #include "Game.h"

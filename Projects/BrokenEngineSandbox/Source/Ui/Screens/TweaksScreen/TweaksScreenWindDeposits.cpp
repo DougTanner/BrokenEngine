@@ -1,4 +1,4 @@
-#include "TweaksScreen.h"
+#include "Tweaks.h"
 
 #include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
 
@@ -26,7 +26,7 @@ const engine::TweaksSliderMapRegistrar gWindDepositsRegistrar
 	{"Explosions Deposit Intensity", &gWindDepositExplosionsIntensity},
 };
 
-void RenderWindDepositsTab(engine::TweaksScreenBase& rScreen)
+void RenderWindDepositsTab(engine::TweaksScreen& rScreen)
 {
 	int64_t iSection = engine::giTweakSectionWind;
 

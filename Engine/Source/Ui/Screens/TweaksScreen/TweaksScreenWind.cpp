@@ -1,11 +1,11 @@
-#include "TweaksScreenBase.h"
+#include "TweaksScreen.h"
 
 #if defined(BT_CLIENT)
 
 #include "Ui/WindWrappersBase.h"
 #include "TweaksSliderMap.h"
 
-#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
+#include "Ui/Screens/TweaksScreen/Tweaks.h"
 
 namespace engine
 {
@@ -33,7 +33,7 @@ const TweaksSliderMapRegistrar gWindRegistrar
 	{"Wind Diffusion Low", &gWindDiffusionLow},
 };
 
-void RenderWindSection(TweaksScreenBase& rScreen)
+void RenderWindSection(TweaksScreen& rScreen)
 {
 	int64_t iSection = giTweakSectionWind;
 

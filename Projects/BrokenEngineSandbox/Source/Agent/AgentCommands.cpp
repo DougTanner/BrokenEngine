@@ -3,7 +3,7 @@
 #include "Game.h"
 
 #if defined(BT_CLIENT)
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 #endif
 
 namespace game

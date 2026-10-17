@@ -1,11 +1,11 @@
-#include "TweaksScreenBase.h"
+#include "TweaksScreen.h"
 
 #if defined(BT_CLIENT)
 
 #include "Ui/SoundSettingsWrappersBase.h"
 #include "TweaksSliderMap.h"
 
-#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
+#include "Ui/Screens/TweaksScreen/Tweaks.h"
 
 namespace engine
 {
@@ -33,7 +33,7 @@ const TweaksSliderMapRegistrar gSoundRegistrar
 	{"Listener Audible Floor High", &gListenerAudibleFloor.high},
 };
 
-void RenderSoundSection(TweaksScreenBase& rScreen)
+void RenderSoundSection(TweaksScreen& rScreen)
 {
 	int64_t iSection = giTweakSectionSound;
 

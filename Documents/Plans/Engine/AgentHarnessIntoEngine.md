@@ -11,7 +11,7 @@ The game Agent (`Projects/BrokenEngineSandbox/Source/Agent/`) holds commands and
 
 - `audio_streaming_harness_rig` (`Commands/AgentCommandsAudioStreaming.cpp:1-398`) uses only `engine::AudioStreamingHarnessRig`, `gpAgentCommandServer`, and `gpAudioManager`.
 - `desync_probe` (`Commands/ClientDesyncProbe.cpp:16-153`) uses engine `Client`, `ClientDesyncCore`, `ReconcileDesyncInfo`, `GameBase` cells and `SnapshotIndex`. Its only game-owned reach is `gpClientSession->mpDesynchronizationCore` (`Network/Client/ClientSession.h:68`), which `Documents/Plans/Engine/SharedSessionProtocol.md` moves into engine ownership.
-- Server `status` core fields, `pause`, and `query_profile` (`AgentCommandsServer.cpp:82-106,113-122,179-227`) read only `GameBase`, `engine::gpReplay`, `engine::gpServer`, and `ProfileManagerBase` members, except the status fields that read `game::gpServerSession` (`pendingFlagshipUpdateCount` `:107`, `harvestedTransferTotal` `:108`, and `pendingAgentStatusChangeCount` `:110` once `FrameEditRows.md` removes `pendingTransferHarnessRigCount` `:109`) and the `NavQuery` raw-row block at `:200-210`. `CoordinateFromParameter` (`:229-242`) is a wrapper over `engine::AgentGridCoordinateValue`.
+- Server `status` core fields, `pause`, and `query_profile` (`AgentCommandsServer.cpp:82-106,113-122,179-227`) read only `GameBase`, `engine::gpReplay`, `engine::gpServer`, and `ProfileManager` members, except the status fields that read `game::gpServerSession` (`pendingFlagshipUpdateCount` `:107`, `harvestedTransferTotal` `:108`, and `pendingAgentStatusChangeCount` `:110` once `FrameEditRows.md` removes `pendingTransferHarnessRigCount` `:109`) and the `NavQuery` raw-row block at `:200-210`. `CoordinateFromParameter` (`:229-242`) is a wrapper over `engine::AgentGridCoordinateValue`.
 - `replay_record`, `replay_play`, `replay_transfer_capture`, `replay_drop_retained_end_frame`, and `replay_inject_persistence_failure` (`Commands/ServerSimulationHarnessRigs.cpp:51-255`) touch only `engine::gpReplay`, `GameFlags`, `mbReplaying`, and `engine::ReplayHarnessRigs`, except the four count names at `:136-139` (the slot clear at `:86` goes with the replay-transfer queue `FrameEditRows.md` removes).
 - `describe_scene` (`AgentScene.cpp:185-375`): the camera, UI state, tick, client cell, `subscribedCoords`, `cellStates` (`:114-155`), islands (`:272-289`), and the visible-unit cull (`:157-183`) are engine state; units, fleets, flag names, and counts are game. The shared `.agents/skills/agent-harness/scripts/Wait-IslandSceneReady.ps1:347-389` requires `clientGridCoord` and `islands` from it.
 - Duplicates of engine code: `game::ClientGridCoordinateValue`
@@ -95,7 +95,7 @@ game types), so a game that omits one fails to link with the hook's name.
   `:200-210` replaced by
   `game::AppendAgentCpuTimerFields(int64_t iTimer, nlohmann::json& rTimer)`,
   called for every timer inside the timer lock; the game defines it with that
-  block. The engine names `game::gpProfileManager`, as the client handler
+  block. The engine names `gpProfileManager`, as the client handler
   already does (`AgentCommandsClientGeneric.cpp:1126`).
   `EngineOwnedSaveSettingsAndSwitches.md` leaves the CPU timer enum game-owned,
   which is why the `NavQuery` fields need the hook.

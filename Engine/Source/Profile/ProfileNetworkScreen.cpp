@@ -2,10 +2,10 @@
 
 #if defined(BT_CLIENT)
 
-#include "ProfileManagerBase.h"
+#include "ProfileManager.h"
 
 #include "Network/Client/ClientSession.h"
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace engine

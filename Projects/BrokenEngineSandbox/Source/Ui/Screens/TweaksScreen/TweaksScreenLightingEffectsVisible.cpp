@@ -1,4 +1,4 @@
-#include "TweaksScreen.h"
+#include "Tweaks.h"
 
 #include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
 
@@ -45,7 +45,7 @@ const engine::TweaksSliderMapRegistrar gLightingEffectsVisibleRegistrar
 	{"Hit Flash Visible Intensity Two", &gHitFlashVisibleIntensityTwo},
 };
 
-void RenderLightingEffectsVisibleTab(engine::TweaksScreenBase& rScreen)
+void RenderLightingEffectsVisibleTab(engine::TweaksScreen& rScreen)
 {
 	int64_t iSection = engine::giTweakSectionLighting;
 

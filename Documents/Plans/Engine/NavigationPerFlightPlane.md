@@ -83,7 +83,7 @@ Current-tree evidence this design rests on:
   (`SpaceshipsNavigation.cpp:191`; Battleships copy it under ShipTypeSplit).
 - `TerrainUtils.cpp` compares sampled elevation (meters above sea level) with absolute constants that assume a ship on the lowest plane: `kfPreferredElevation = 0.2f` (`:8,38`), `kfHighElevationThreshold = 0.5f` (`:12,45`), `kfAvoidTerrainMinimum = 0.5f` and `kfAvoidTerrainMaximum = 2.5f` (`:71-72,109-111`).
 - The client debug nav render draws every cell's `navigationData` at the lowest height (`Engine/Source/Graphics/Render/MainUniforms.cpp:153-195`, client-only, outside the CRC).
-- Boot timers are logged by `ProfileManagerBase::BootLog` as `<name>: <ms> ms` when profiling is enabled (`Engine/Source/Profile/ProfileManagerBase.cpp:565-581`).
+- Boot timers are logged by `ProfileManager::BootLog` as `<name>: <ms> ms` when profiling is enabled (`Engine/Source/Profile/ProfileManager.cpp:565-581`).
 
 ## Decisions
 

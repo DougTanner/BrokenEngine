@@ -1,11 +1,11 @@
 # Profile - Runtime Performance Telemetry
 
-Engine CPU/GPU profiling, boot timing, overlays, and profile dumps. `ProfileManagerBase` supplies engine counters and timers; the game-derived `game::gpProfileManager` extends the same contiguous index space.
+Engine CPU/GPU profiling, boot timing, overlays, and profile dumps. `ProfileManager`, reached through `gpProfileManager`, is the only profile manager; the game's counters and timers extend its engine counters and timers in the same contiguous index space.
 
 ## Index and Lifetime Contracts
 
 - Game CPU counter and timer enums start at the matching engine count. Name tables preserve enum order and exact extent; compile-time checks enforce both contracts.
-- The base constructor stores pointers to derived arrays and tables but must not dereference them before derived construction completes.
+- The manager holds engine and game rows together in one CPU counter array and one CPU timer array, allocated in its constructor at the game counts.
 - Recording code compiles out through `if constexpr (kbProfiling)`. Shared CPU accessors and text formatters remain available to the server display even when profiling is disabled.
 
 ## CPU Timing

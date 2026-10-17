@@ -1,10 +1,10 @@
 #include "Pch.h"
 
-#include "ProfileManagerBase.h"
+#include "ProfileManager.h"
 
 #include "Memory/GlobalAllocator.h"
 
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace engine
@@ -22,23 +22,31 @@ constexpr std::chrono::seconds kProfileVisibilityInterval = 2s;
 constexpr std::chrono::seconds kProfileDumpInterval = 1s;
 #endif // BT_CLIENT
 
-ProfileManagerBase::ProfileManagerBase(std::span<CpuCounter> gameCpuCounters, std::span<CpuTimer> gameCpuTimers, std::span<const std::string_view> gameCpuCounterNames, std::span<const std::string_view> gameCpuTimerNames)
+ProfileManager::ProfileManager()
+: common::Singleton<ProfileManager>(gpProfileManager, this)
 {
-	mpGameCpuCounters = gameCpuCounters.data();
-	mpGameCpuTimers = gameCpuTimers.data();
-	mpGameCpuCounterNames = gameCpuCounterNames.data();
-	mpGameCpuTimerNames = gameCpuTimerNames.data();
-	miCpuCounterCount = kEngineCpuCounterCount + std::ssize(gameCpuCounters);
-	miCpuTimerCount = kEngineCpuTimerCount + std::ssize(gameCpuTimers);
+	miCpuCounterCount = game::kGameCpuCounterCount;
+	miCpuTimerCount = game::kGameCpuTimerCount;
+	mpCpuCounters = std::make_unique<CpuCounter[]>(static_cast<size_t>(miCpuCounterCount));
+	mpCpuTimers = std::make_unique<CpuTimer[]>(static_cast<size_t>(miCpuTimerCount));
 #if defined(BT_SERVER)
 	if constexpr (kbProfiling)
 	{
 		mpRawCpuTimers = std::make_unique<RawCpuTimerState[]>(static_cast<size_t>(miCpuTimerCount));
 	}
 #endif // BT_SERVER
+
+	if constexpr (kbProfiling)
+	{
+#if defined(BT_SERVER)
+		RegisterRawCpuTimer(game::kCpuTimerPostRenderUpdateNavigationQuery);
+#endif // BT_SERVER
+
+		BootStart(kBootTimerTotal);
+	}
 }
 
-void ProfileManagerBase::Create()
+void ProfileManager::Create()
 {
 	if constexpr (kbProfiling)
 	{
@@ -98,7 +106,7 @@ void ProfileManagerBase::Create()
 	}
 }
 
-void ProfileManagerBase::Destroy()
+void ProfileManager::Destroy()
 {
 	if constexpr (kbProfiling)
 	{
@@ -116,7 +124,7 @@ void ProfileManagerBase::Destroy()
 	}
 }
 
-bool ProfileManagerBase::TickVisibilityCadence()
+bool ProfileManager::TickVisibilityCadence()
 {
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 	bool bReevaluate = now - mLastVisibilityEvaluationTime >= kProfileVisibilityInterval;
@@ -128,7 +136,7 @@ bool ProfileManagerBase::TickVisibilityCadence()
 	return bReevaluate;
 }
 
-void ProfileManagerBase::ToggleProfileText()
+void ProfileManager::ToggleProfileText()
 {
 	if constexpr (kbProfiling)
 	{
@@ -146,7 +154,7 @@ void ProfileManagerBase::ToggleProfileText()
 	}
 }
 
-void ProfileManagerBase::CpuStart(int64_t iCpuTimer, int64_t iThreads)
+void ProfileManager::CpuStart(int64_t iCpuTimer, int64_t iThreads)
 {
 	if constexpr (kbProfiling)
 	{
@@ -173,7 +181,7 @@ void ProfileManagerBase::CpuStart(int64_t iCpuTimer, int64_t iThreads)
 	}
 }
 
-void ProfileManagerBase::CpuStop(int64_t iCpuTimer, CpuStopFlags_t flags)
+void ProfileManager::CpuStop(int64_t iCpuTimer, CpuStopFlags_t flags)
 {
 	if constexpr (kbProfiling)
 	{
@@ -242,7 +250,7 @@ void ProfileManagerBase::CpuStop(int64_t iCpuTimer, CpuStopFlags_t flags)
 }
 
 #if defined(BT_SERVER)
-void ProfileManagerBase::RegisterRawCpuTimer(int64_t iCpuTimer)
+void ProfileManager::RegisterRawCpuTimer(int64_t iCpuTimer)
 {
 	if constexpr (kbProfiling)
 	{
@@ -251,7 +259,7 @@ void ProfileManagerBase::RegisterRawCpuTimer(int64_t iCpuTimer)
 	}
 }
 
-void ProfileManagerBase::AddRawCpuTimerAuxiliaryCount(int64_t iCpuTimer, int64_t iCount)
+void ProfileManager::AddRawCpuTimerAuxiliaryCount(int64_t iCpuTimer, int64_t iCount)
 {
 	if constexpr (kbProfiling)
 	{
@@ -259,7 +267,7 @@ void ProfileManagerBase::AddRawCpuTimerAuxiliaryCount(int64_t iCpuTimer, int64_t
 	}
 }
 
-void ProfileManagerBase::LatchRawCpuTimers(bool bAccept)
+void ProfileManager::LatchRawCpuTimers(bool bAccept)
 {
 	if constexpr (kbProfiling)
 	{
@@ -288,7 +296,7 @@ void ProfileManagerBase::LatchRawCpuTimers(bool bAccept)
 #endif // BT_SERVER
 
 #if defined(BT_CLIENT)
-void ProfileManagerBase::ResetQueryPools(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, GpuTimers eStart, GpuTimers eEnd)
+void ProfileManager::ResetQueryPools(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, GpuTimers eStart, GpuTimers eEnd)
 {
 	if constexpr (kbProfiling)
 	{
@@ -305,7 +313,7 @@ void ProfileManagerBase::ResetQueryPools(int64_t iCommandBuffer, VkCommandBuffer
 #endif // BT_CLIENT
 
 #if defined(BT_CLIENT)
-void ProfileManagerBase::GpuStart(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, GpuTimers eGpuTimer)
+void ProfileManager::GpuStart(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, GpuTimers eGpuTimer)
 {
 	if constexpr (kbProfiling)
 	{
@@ -332,7 +340,7 @@ void ProfileManagerBase::GpuStart(int64_t iCommandBuffer, VkCommandBuffer vkComm
 	}
 }
 
-void ProfileManagerBase::GpuStop(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, GpuTimers eGpuTimer)
+void ProfileManager::GpuStop(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, GpuTimers eGpuTimer)
 {
 	if constexpr (kbProfiling)
 	{
@@ -351,7 +359,7 @@ void ProfileManagerBase::GpuStop(int64_t iCommandBuffer, VkCommandBuffer vkComma
 	}
 }
 
-void ProfileManagerBase::GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTimers eEnd, bool bLatchShadowSample)
+void ProfileManager::GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTimers eEnd, bool bLatchShadowSample)
 {
 	if constexpr (kbProfiling)
 	{
@@ -385,7 +393,7 @@ void ProfileManagerBase::GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTi
 	}
 }
 
-void ProfileManagerBase::SetClockCorrection(int64_t iOffset, int64_t iTargetBehind, int64_t iError)
+void ProfileManager::SetClockCorrection(int64_t iOffset, int64_t iTargetBehind, int64_t iError)
 {
 	mSmoothedClockOffset = iOffset;
 	mSmoothedClockTarget = iTargetBehind;
@@ -396,7 +404,7 @@ void ProfileManagerBase::SetClockCorrection(int64_t iOffset, int64_t iTargetBehi
 }
 #endif // BT_CLIENT
 
-void ProfileManagerBase::BootStart(BootTimers eBootTimer)
+void ProfileManager::BootStart(BootTimers eBootTimer)
 {
 	if constexpr (kbProfiling)
 	{
@@ -404,7 +412,7 @@ void ProfileManagerBase::BootStart(BootTimers eBootTimer)
 	}
 }
 
-void ProfileManagerBase::BootStop(BootTimers eBootTimer)
+void ProfileManager::BootStop(BootTimers eBootTimer)
 {
 	if constexpr (kbProfiling)
 	{
@@ -413,7 +421,7 @@ void ProfileManagerBase::BootStop(BootTimers eBootTimer)
 	}
 }
 
-void ProfileManagerBase::BootLog()
+void ProfileManager::BootLog()
 {
 	if constexpr (kbProfiling)
 	{
@@ -431,7 +439,7 @@ void ProfileManagerBase::BootLog()
 	}
 }
 
-void ProfileManagerBase::LogTimers()
+void ProfileManager::LogTimers()
 {
 	if constexpr (kbProfiling)
 	{
@@ -469,7 +477,7 @@ void ProfileManagerBase::LogTimers()
 }
 
 #if defined(BT_CLIENT)
-void ProfileManagerBase::DumpTimers()
+void ProfileManager::DumpTimers()
 {
 	if constexpr (kbProfiling && kbProfilingDump)
 	{
@@ -528,7 +536,7 @@ void ProfileManagerBase::DumpTimers()
 	}
 }
 
-void ProfileManagerBase::DiscardSkippedFrameSamples()
+void ProfileManager::DiscardSkippedFrameSamples()
 {
 	if constexpr (kbProfiling)
 	{
@@ -561,7 +569,7 @@ void ProfileManagerBase::DiscardSkippedFrameSamples()
 }
 #endif // BT_CLIENT
 
-void ProfileManagerBase::SmoothCpuTimers()
+void ProfileManager::SmoothCpuTimers()
 {
 	if constexpr (kbProfiling)
 	{
@@ -583,7 +591,7 @@ void ProfileManagerBase::SmoothCpuTimers()
 	}
 }
 
-void ProfileManagerBase::UpdateProfileText()
+void ProfileManager::UpdateProfileText()
 {
 	if constexpr (kbProfiling)
 	{
@@ -639,24 +647,24 @@ void ProfileManagerBase::UpdateProfileText()
 	}
 }
 
-CpuCounter& ProfileManagerBase::GetCpuCounter(int64_t iIndex)
+CpuCounter& ProfileManager::GetCpuCounter(int64_t iIndex)
 {
-	return iIndex < kEngineCpuCounterCount ? mEngineCpuCounters[iIndex] : mpGameCpuCounters[iIndex - kEngineCpuCounterCount];
+	return mpCpuCounters[static_cast<size_t>(iIndex)];
 }
 
-CpuTimer& ProfileManagerBase::GetCpuTimer(int64_t iIndex)
+CpuTimer& ProfileManager::GetCpuTimer(int64_t iIndex)
 {
-	return iIndex < kEngineCpuTimerCount ? mEngineCpuTimers[iIndex] : mpGameCpuTimers[iIndex - kEngineCpuTimerCount];
+	return mpCpuTimers[static_cast<size_t>(iIndex)];
 }
 
-std::string_view ProfileManagerBase::GetCpuCounterName(int64_t iIndex)
+std::string_view ProfileManager::GetCpuCounterName(int64_t iIndex)
 {
-	return iIndex < kEngineCpuCounterCount ? kEngineCpuCounterNames[iIndex] : mpGameCpuCounterNames[iIndex - kEngineCpuCounterCount];
+	return iIndex < kEngineCpuCounterCount ? kEngineCpuCounterNames[iIndex] : game::kGameCpuCounterNames[iIndex - kEngineCpuCounterCount];
 }
 
-std::string_view ProfileManagerBase::GetCpuTimerName(int64_t iIndex)
+std::string_view ProfileManager::GetCpuTimerName(int64_t iIndex)
 {
-	return iIndex < kEngineCpuTimerCount ? kEngineCpuTimerNames[iIndex] : mpGameCpuTimerNames[iIndex - kEngineCpuTimerCount];
+	return iIndex < kEngineCpuTimerCount ? kEngineCpuTimerNames[iIndex] : game::kGameCpuTimerNames[iIndex - kEngineCpuTimerCount];
 }
 
 ScopedBootTimer::ScopedBootTimer(BootTimers eBootTimer)

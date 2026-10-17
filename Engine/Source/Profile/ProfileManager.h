@@ -311,14 +311,11 @@ enum class CpuStopFlags : uint32_t
 };
 using CpuStopFlags_t = common::Flags<CpuStopFlags>;
 
-class ProfileManagerBase
+class ProfileManager : public common::Singleton<ProfileManager>
 {
 public:
 
-	// The derived arrays are not constructed until after this base constructor returns. Store their addresses only;
-	// no base-constructor path may dereference them.
-	ProfileManagerBase(std::span<CpuCounter> gameCpuCounters, std::span<CpuTimer> gameCpuTimers, std::span<const std::string_view> gameCpuCounterNames, std::span<const std::string_view> gameCpuTimerNames);
-	virtual ~ProfileManagerBase() = default;
+	ProfileManager();
 
 	void Create();
 	void Destroy();
@@ -387,16 +384,12 @@ protected:
 	void DumpTimers();
 #endif // BT_CLIENT
 
-	// Names live in the deduced-extent kXxx*Names tables above (static_assert-guarded); these arrays carry only the
-	// per-row runtime state and are indexed by the same enums.
-	CpuCounter mEngineCpuCounters[kEngineCpuCounterCount];
+	// Names live in the deduced-extent kXxx*Names tables (static_assert-guarded); these arrays carry only the per-row
+	// runtime state for engine and game indices together. They are sized at construction because this header cannot
+	// name the game counts.
+	std::unique_ptr<CpuCounter[]> mpCpuCounters;
 
-	CpuTimer mEngineCpuTimers[kEngineCpuTimerCount];
-
-	CpuCounter* mpGameCpuCounters = nullptr;
-	CpuTimer* mpGameCpuTimers = nullptr;
-	const std::string_view* mpGameCpuCounterNames = nullptr;
-	const std::string_view* mpGameCpuTimerNames = nullptr;
+	std::unique_ptr<CpuTimer[]> mpCpuTimers;
 public:
 	int64_t miCpuCounterCount = 0;
 
@@ -465,6 +458,8 @@ public:
 #endif // BT_CLIENT
 };
 
+inline ProfileManager* gpProfileManager = nullptr;
+
 class [[nodiscard]] ScopedBootTimer
 {
 public:
@@ -505,3 +500,5 @@ void RenderImPlotGraphs();
 #endif
 
 } // namespace engine
+
+using engine::gpProfileManager;

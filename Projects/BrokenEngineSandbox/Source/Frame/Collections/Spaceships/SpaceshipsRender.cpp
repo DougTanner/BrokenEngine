@@ -4,7 +4,7 @@
 
 #include "Data/Scene.h"
 
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 
 namespace game
 {

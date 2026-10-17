@@ -1,4 +1,4 @@
-#include "TweaksScreenBase.h"
+#include "TweaksScreen.h"
 
 #if defined(BT_CLIENT)
 
@@ -35,7 +35,7 @@ const TweaksSliderMapRegistrar gShadowRegistrar
 	{"Smoke Shadow Intensity", &gSmokeShadowIntensity},
 };
 
-void RenderShadowSection(TweaksScreenBase& rScreen)
+void RenderShadowSection(TweaksScreen& rScreen)
 {
 	int64_t iSection = giTweakSectionShadow;
 

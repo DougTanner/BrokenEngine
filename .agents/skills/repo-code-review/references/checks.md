@@ -200,9 +200,13 @@ ordering. Do not apply this check to semantic codecs or serialization adapters.
   half (`Documents/C++StyleGuide.txt`).
 - Flag a stored reference or pointer member, constructor argument, or
   function parameter of a game-instantiated `*Base` type (`GameBase`,
-  `ProfileManagerBase`) or its game type when the object is reachable through
-  its `gp*` global (the conventions reference). This is a hard flag, not a
+  `CameraBase`) or its game type when the object is reachable through its
+  `gp*` global (the conventions reference). This is a hard flag, not a
   suggestion.
+- Flag engine code that instantiates a `*Base` type, and an engine class
+  whose name ends in `Base` when no game type derives from it; that class
+  and its files must drop `Base` (the conventions reference). This is a hard
+  flag, not a suggestion.
 
 ### Style guide contracts
 

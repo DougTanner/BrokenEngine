@@ -9,7 +9,7 @@
 #include "StaticVoices.h"
 #include "StreamingVoices.h"
 
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace engine

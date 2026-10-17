@@ -348,10 +348,7 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSimulation.h">
       <Filter>Engine\Network</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManagerBase.h">
-      <Filter>Engine\Profile</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\Profile\ProfileManager.h">
+    <ClInclude Include="..\..\Source\Profile\ProfileRows.h">
       <Filter>Game\Profile</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Islands.h">
@@ -840,13 +837,10 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\Managers\ImGuiManager.h">
       <Filter>Engine\Graphics\Managers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenBase.h">
-      <Filter>Engine\Ui\Screens\TweaksScreen</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksSliderMap.h">
       <Filter>Engine\Ui\Screens\TweaksScreen</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreen.h">
+    <ClInclude Include="..\..\Source\Ui\Screens\TweaksScreen\Tweaks.h">
       <Filter>Game\Ui\Screens\TweaksScreen</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\GameSettingsScreen.h">
@@ -893,6 +887,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Graphics\AnimationData.h">
       <Filter>Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManager.h">
+      <Filter>Engine\Profile</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreen.h">
+      <Filter>Engine\Ui\Screens\TweaksScreen</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -1019,9 +1019,6 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Main.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManagerBase.cpp">
-      <Filter>Engine\Profile</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileScreens.cpp">
       <Filter>Engine\Profile</Filter>
     </ClCompile>
@@ -1030,9 +1027,6 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileNetworkScreen.cpp">
       <Filter>Engine\Profile</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Profile\ProfileManager.cpp">
-      <Filter>Game\Profile</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Islands.cpp">
       <Filter>Engine\Graphics</Filter>
@@ -1401,11 +1395,8 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Managers\ImGuiManager.cpp">
       <Filter>Engine\Graphics\Managers</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreen.cpp">
+    <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\Tweaks.cpp">
       <Filter>Game\Ui\Screens\TweaksScreen</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenBase.cpp">
-      <Filter>Engine\Ui\Screens\TweaksScreen</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksSliderMap.cpp">
       <Filter>Engine\Ui\Screens\TweaksScreen</Filter>
@@ -1577,6 +1568,12 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\AnimationData.cpp">
       <Filter>Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManager.cpp">
+      <Filter>Engine\Profile</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreen.cpp">
+      <Filter>Engine\Ui\Screens\TweaksScreen</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

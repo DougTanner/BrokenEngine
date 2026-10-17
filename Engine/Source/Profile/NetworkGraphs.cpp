@@ -3,9 +3,9 @@
 #if defined(BT_CLIENT)
 
 #include "Network/Client/Client.h"
-#include "ProfileManagerBase.h"
+#include "ProfileManager.h"
 
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 
 namespace engine
 {

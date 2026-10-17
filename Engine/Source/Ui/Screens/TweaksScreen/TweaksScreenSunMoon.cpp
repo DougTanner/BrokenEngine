@@ -1,4 +1,4 @@
-#include "TweaksScreenBase.h"
+#include "TweaksScreen.h"
 
 #if defined(BT_CLIENT)
 
@@ -39,7 +39,7 @@ const TweaksSliderMapRegistrar gSunMoonRegistrar
 	{"Shadow Sunrise End", &gSunMoonShadowSunriseEnd},
 };
 
-void RenderSunMoonSection(TweaksScreenBase& rScreen)
+void RenderSunMoonSection(TweaksScreen& rScreen)
 {
 	int64_t iSection = giTweakSectionSunMoon;
 

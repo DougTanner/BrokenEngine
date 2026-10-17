@@ -11,7 +11,7 @@
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Players/Players.h"
 #include "Frame/HealthDamage.h"
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 #include "Ui/ParticleWrappers.h"
 #include "Ui/WindDepositsWrappers.h"
 #if defined(BT_CLIENT)

@@ -1,4 +1,4 @@
-#include "TweaksScreen.h"
+#include "Tweaks.h"
 
 #include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
 
@@ -37,7 +37,7 @@ const engine::TweaksSliderMapRegistrar gSmokeDepositsRegistrar
 	{"Missile Trail Intensity", &gMissileTrailIntensity},
 };
 
-void RenderSmokeDepositsTab(engine::TweaksScreenBase& rScreen)
+void RenderSmokeDepositsTab(engine::TweaksScreen& rScreen)
 {
 	int64_t iSection = engine::giTweakSectionSmoke;
 

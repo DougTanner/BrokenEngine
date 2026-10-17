@@ -36,13 +36,18 @@ These are the C++ conventions every implementer and reviewer of C++ applies.
   files, types, and public functions only.
 - Game-instantiated objects: reach `Game` and every other object the game
   instantiates behind an engine `*Base` class through its `gp*` global
-  (`game::gpGame`, `gpProfileManager`). Never store a reference or pointer to it
-  (no `GameBase& mrGameBase;`), never pass it as a parameter (`GameBase&`,
-  `ProfileManagerBase&`), and never name the `*Base` type to reach it; the game
+  (`game::gpGame`, `engine::gpCamera`). Never store a reference or pointer to
+  it (no `GameBase& mrGameBase;`), never pass it as a parameter (`GameBase&`,
+  `CameraBase&`), and never name the `*Base` type to reach it; naming it to
+  read its static constants (`CameraBase::kf*`) is fine. The game
   instantiates the concrete type, and engine code may use game globals
-  (`Engine/Source/AGENTS.md` `## Hub Conventions`). A class's own members use
-  `this`; per-instance data bases such as `FrameInterpolateBase` are passed
-  normally.
+  (`Engine/Source/AGENTS.md` `## Hub Conventions`). Engine code never
+  instantiates a `*Base` type, and an engine class name ends in `Base` only
+  when a game type derives from it. When the `game::` derived type is removed
+  and the engine owns and creates the class, the class and its files drop
+  `Base`; for example, `ProfileManagerBase` became `engine::ProfileManager`
+  when `game::ProfileManager` was removed. A class's own members use `this`;
+  per-instance data bases such as `FrameInterpolateBase` are passed normally.
 - Workbuffer: Use `gpThreadLocal->mWorkbuffer` for temp allocations instead of local `std::vector`/`std::string`.
 - Allocation tracking: Heap allocations in the main loop trigger `DEBUG_BREAK()`. When unavoidable, wrap with `ScopedSuppressAllocationTracking` + `// Heap:` comment. See `Engine/Source/Memory/AGENTS.md`
 - LOG formatting: logging in allocation-tracked Game/Engine code must remain allocation-free; accepted formatters and wrappers: `Common/AGENTS.md` `## Logging and Threading Usage`

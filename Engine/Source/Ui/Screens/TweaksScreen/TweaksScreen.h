@@ -20,7 +20,7 @@ inline TweakSectionFlags SectionFlag(int64_t iSection)
 	return static_cast<TweakSectionFlags>(1ui32 << iSection);
 }
 
-class TweaksScreenBase;
+class TweaksScreen;
 
 struct TweakSectionDescription
 {
@@ -29,7 +29,7 @@ struct TweakSectionDescription
 	// Persisted identity, folded into the layout CRC. Kept distinct from displayName so relabeling a section
 	// does not discard saved layout.
 	std::string_view stableKey;
-	void (*pRender)(TweaksScreenBase& rScreen) = nullptr;
+	void (*pRender)(TweaksScreen& rScreen) = nullptr;
 };
 
 // Persisted section layout, embedded by value in the engine TweaksSettings struct so exactly one
@@ -49,7 +49,7 @@ struct TweakSectionState
 static_assert(std::is_trivially_copyable_v<TweakSectionState>);
 static_assert(sizeof(TweakSectionState) == 296, "TweaksSettings::kiVersion must be bumped with this layout");
 
-class TweaksScreenBase
+class TweaksScreen
 {
 public:
 
@@ -57,7 +57,7 @@ public:
 	inline static TweakSectionDescription msSectionDescriptions[kiMaxTweakSections] {};
 	inline static int64_t msiSectionCount = 0;
 
-	TweaksScreenBase();
+	TweaksScreen();
 
 	// RegisterEngineTweakSections and game::RegisterGameTweakSections register sections on one thread before the first UI frame; the registry is immutable during rendering.
 	static void RegisterSection(int64_t& riSection, const TweakSectionDescription& rDescription);
@@ -112,21 +112,21 @@ inline int64_t giTweakSectionSmoke = kiInvalidTweakSection;
 inline int64_t giTweakSectionWind = kiInvalidTweakSection;
 inline int64_t giTweakSectionHexShield = kiInvalidTweakSection;
 
-void RenderPhysicallyBasedRenderingSection(TweaksScreenBase& rScreen);
-void RenderTerrainSection(TweaksScreenBase& rScreen);
-void RenderWaterSection(TweaksScreenBase& rScreen);
-void RenderLightingSection(TweaksScreenBase& rScreen);
-void RenderShadowSection(TweaksScreenBase& rScreen);
-void RenderSunMoonSection(TweaksScreenBase& rScreen);
-void RenderMiscellaneousSection(TweaksScreenBase& rScreen);
-void RenderSoundSection(TweaksScreenBase& rScreen);
-void RenderSmokeSection(TweaksScreenBase& rScreen);
-void RenderWindSection(TweaksScreenBase& rScreen);
-void RenderHexShieldSection(TweaksScreenBase& rScreen);
+void RenderPhysicallyBasedRenderingSection(TweaksScreen& rScreen);
+void RenderTerrainSection(TweaksScreen& rScreen);
+void RenderWaterSection(TweaksScreen& rScreen);
+void RenderLightingSection(TweaksScreen& rScreen);
+void RenderShadowSection(TweaksScreen& rScreen);
+void RenderSunMoonSection(TweaksScreen& rScreen);
+void RenderMiscellaneousSection(TweaksScreen& rScreen);
+void RenderSoundSection(TweaksScreen& rScreen);
+void RenderSmokeSection(TweaksScreen& rScreen);
+void RenderWindSection(TweaksScreen& rScreen);
+void RenderHexShieldSection(TweaksScreen& rScreen);
 
 // Registers the engine's sections. Called from Main.cpp immediately before the Graphics ctor (which builds
-// ImGuiManager -> TweaksScreenBase) and therefore before LoadTweaksSettings(). Deliberately not in the
-// TweaksScreenBase ctor: device loss recreates Graphics in place and would double-register.
+// ImGuiManager -> TweaksScreen) and therefore before LoadTweaksSettings(). Deliberately not in the
+// TweaksScreen ctor: device loss recreates Graphics in place and would double-register.
 void RegisterEngineTweakSections();
 
 } // namespace engine

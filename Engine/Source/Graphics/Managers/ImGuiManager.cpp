@@ -4,7 +4,7 @@
 
 #include "Data/Raw.h"
 #include "File/PackChunks.h"
-#include "Ui/Screens/TweaksScreen/TweaksScreenBase.h"
+#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
 #include "Ui/Screens/ChatScreen.h"
 #include "Ui/Screens/GameSettingsScreen.h"
 #include "Ui/Screens/GraphicsMenuScreen.h"
@@ -14,7 +14,7 @@
 #include "Ui/Screens/SoundMenuScreen.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 #include "Ui/Screens/HudScreen.h"
 #include "Game.h"
 
@@ -163,7 +163,7 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 
 	ImGui::EndFrame();
 
-	mpTweaksScreen = std::make_unique<TweaksScreenBase>();
+	mpTweaksScreen = std::make_unique<TweaksScreen>();
 	mpMainMenuScreen = std::make_unique<MainMenuScreen>();
 	mpModalScreen = std::make_unique<ModalScreen>();
 	mpPauseMenuScreen = std::make_unique<PauseMenuScreen>();

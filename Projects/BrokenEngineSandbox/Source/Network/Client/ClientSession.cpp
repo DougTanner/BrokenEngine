@@ -6,7 +6,7 @@
 #include "Network/Client/ClientReconciler.h"
 #include "Network/GamePacketType.h"
 #include "Network/PlayerEvents.h"
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 #include "Fleet.h"
 #include "Game.h"
 

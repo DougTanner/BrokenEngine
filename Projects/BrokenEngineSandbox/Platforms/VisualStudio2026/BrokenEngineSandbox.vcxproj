@@ -460,11 +460,9 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSerialization.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSessionContract.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSimulation.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManagerBase.h" />
-    <ClInclude Include="..\..\Source\Profile\ProfileManager.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenBase.h" />
+    <ClInclude Include="..\..\Source\Profile\ProfileRows.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksSliderMap.h" />
-    <ClInclude Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreen.h" />
+    <ClInclude Include="..\..\Source\Ui\Screens\TweaksScreen\Tweaks.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\ChatLog.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\CurveData.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\CurveWidget.h" />
@@ -538,6 +536,8 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="$(GameDataDirectory)\Model.h" />
     <ClInclude Include="$(GameDataDirectory)\Shader.h" />
     <ClInclude Include="$(GameDataDirectory)\Texture.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManager.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreen.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Common\ErrorUtils.cpp" />
@@ -685,12 +685,9 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkDiscoveryScanner.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\NetworkSerialization.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManagerBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileScreens.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\NetworkGraphs.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileNetworkScreen.cpp" />
-    <ClCompile Include="..\..\Source\Profile\ProfileManager.cpp" />
-    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksSliderMap.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenPbr.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenTerrain.cpp" />
@@ -727,7 +724,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\HexShieldWrappersBase.cpp" />
     <ClCompile Include="..\..\Source\Ui\SoundWrappers.cpp" />
     <ClCompile Include="..\..\Source\Ui\WindDepositsWrappers.cpp" />
-    <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreen.cpp" />
+    <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\Tweaks.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreenHexShield.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenLightingEffectsVisible.cpp" />
     <ClCompile Include="..\..\Source\Ui\Screens\TweaksScreen\TweaksScreenLightingEffectsLighting.cpp" />
@@ -771,6 +768,8 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\SoundMenuScreen.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManager.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreen.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\AreaLight.frag" />

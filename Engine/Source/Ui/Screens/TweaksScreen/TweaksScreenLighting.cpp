@@ -1,4 +1,4 @@
-#include "TweaksScreenBase.h"
+#include "TweaksScreen.h"
 
 #if defined(BT_CLIENT)
 
@@ -6,7 +6,7 @@
 #include "Ui/LightingWrappersBase.h"
 #include "TweaksSliderMap.h"
 
-#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
+#include "Ui/Screens/TweaksScreen/Tweaks.h"
 
 namespace engine
 {
@@ -103,7 +103,7 @@ const TweaksSliderMapRegistrar gLightingRegistrar
 	{"Water Reflected Intensity", &gLightingWaterReflectedIntensity},
 };
 
-void RenderLightingSection(TweaksScreenBase& rScreen)
+void RenderLightingSection(TweaksScreen& rScreen)
 {
 	int64_t iSection = giTweakSectionLighting;
 

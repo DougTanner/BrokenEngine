@@ -589,7 +589,7 @@ with global ID 0.
   text), the comment sites in decision 20.
 - `Agent/`: `AgentCommandsServer.cpp`, `AgentCommandsServerQueries.h/.cpp`, `AgentScene.cpp`, `Commands/ServerFrameEdit.cpp`, `Commands/ServerSimulationHarnessRigs.cpp`, `Agent/AGENTS.md`, and `Projects/BrokenEngineSandbox/Documents/AgentHarness/*.md`.
 - `Ui/`: `Screens/HudScreen.cpp`, `LightingWrappers`, `SoundWrappers`, `WindDepositsWrappers`, the `TweaksScreen` files naming the wrappers.
-- `Profile/ProfileManager.h`, `Frame/ServerCellStats.h/.cpp`, `Frame/TerrainUtils.h`.
+- `Profile/ProfileRows.h`, `Frame/ServerCellStats.h/.cpp`, `Frame/TerrainUtils.h`.
 - Project membership and filters for the renamed and new files: `/update-vcxproj`.
 - `AGENTS.md`: `Frame/AGENTS.md` (explicit dispatch invariant, registry windows,
   ownership layer, counters), `Frame/Collections/AGENTS.md` and the four

@@ -6,7 +6,7 @@
 
 #include "Network/Server/Server.h"
 
-#include "Profile/ProfileManager.h"
+#include "Profile/ProfileRows.h"
 
 // Game headers stay outside Engine.h to keep game types out of the shared PCH.
 #include "Frame/ServerCellStats.h"
