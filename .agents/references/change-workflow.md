@@ -12,11 +12,11 @@ This file, `.agents/references/change-workflow.md`, carries the Change Workflow,
 
 ### Delegation roles
 
-This table is the authoritative spawned-agent routing policy; role definitions and the Codex TOMLs enforce it. Skills name a role and describe the work. Definitions: `.claude/agents/<role>.md` and `.opencode/agent/<role>.md`. Codex resolves a role through the Model column — `.codex/agents/` is model-named, and the ChatGPT Codex line below the table names any exception.
+This table is the authoritative spawned-agent routing policy; native role definitions and the Codex TOMLs are required enforcement mirrors of it. Skills name a role and describe the work. Definitions: `.claude/agents/<role>.md` and `.opencode/agent/<role>.md`. Codex resolves a role through the Model column — `.codex/agents/` is model-named, and the ChatGPT Codex line below the table names any exception.
 
 | `subagent_type` | Model | Effort | Work |
 | --- | --- | --- | --- |
-| `planner` | Fable | medium | Plans, design |
+| `planner` | Opus | medium | Plans, design |
 | `reviewer` | Opus | medium | Every independent findings-only review and audit except `/comment-review`; adversarial review that tries to disprove the change |
 | `implementer` | Opus | high | Preparation, implementation, propagation, docs, plans, harness, finalization |
 | `researcher` | Opus | medium | Research requiring judgment; approach options for /plan-alternatives |

@@ -105,9 +105,9 @@ actual assigned task before considering its role label: `planning/design`,
 `review/audit`, `implementation/propagation/documentation`,
 `judgment-heavy research`, `locate/build/mechanical`, or `unable to classify`.
 Map that concern to the appropriate workflow role, then evaluate the configured
-and actual model and effort against the mapping in `AGENTS.md`,
-`.agents/references/change-workflow.md`, and `.agents/references/risk-tiers.md`
-as they existed at that commit, not the requested role alone. When the assigned
+and actual model and effort against the mapping in
+`.agents/references/change-workflow.md` `### Delegation roles`
+as it existed at that commit, not the requested role alone. When the assigned
 task is unable to classify, or the governing mapping cannot be established, do
 not infer compliance.
 

@@ -66,7 +66,7 @@ param(
 
 	[Parameter(ParameterSetName = 'Launch')]
 	[Parameter(ParameterSetName = 'InternalRun')]
-	[ValidateSet('fable', 'opus', 'sol', 'sonnet')]
+	[ValidateSet('opus', 'sol', 'sonnet')]
 	[string] $Agent = 'sol',                              # .codex/agents preset used for model and effort
 
 	# The value rides the detached run's pre-quoted argument line, so a double quote is refused.

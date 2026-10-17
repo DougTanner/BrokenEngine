@@ -32,7 +32,7 @@ Step 1 — settle the open fact. Determine from the installed Codex CLI's own ag
 
 Step 2 — branch on that result; both outcomes are decided here, so no further approval round is needed:
 
-- Supported: keep `service_tier = "fast"` in `.codex/agents/sol.toml` only. Do not add it to `fable.toml`, `opus.toml`, or `sonnet.toml` — the 2.5x credit burn is accepted for the reviewer alone.
+- Supported: keep `service_tier = "fast"` in `.codex/agents/sol.toml` only. Do not add it to `opus.toml` or `sonnet.toml` — the 2.5x credit burn is accepted for the reviewer alone.
 - Not supported: revert `.codex/agents/sol.toml` to its current bytes and instead record the limitation in `README.md` next to the maintainer profile at `README.md:151`: Codex-hosted reviews run on whatever tier `~/.codex/config.toml` sets, and a maintainer who wants them fast sets that key machine-wide at the cost of every Codex worker burning fast-tier credit. A machine-wide `service_tier = "fast"` is rejected as this Plan's own change because it would also apply to the Luna worker roles.
 
 Nothing else changes. `.agents/skills/claude-to-codex/scripts/Invoke-Codex.ps1` already handles the Claude Code route correctly and is out of scope.
@@ -52,7 +52,7 @@ Nothing else changes. `.agents/skills/claude-to-codex/scripts/Invoke-Codex.ps1` 
 ## Out of scope
 
 - `.agents/skills/claude-to-codex/scripts/Invoke-Codex.ps1` and the Claude Code review route
-- `.codex/agents/fable.toml`, `opus.toml`, `sonnet.toml`, and any non-reviewer role
+- `.codex/agents/opus.toml`, `sonnet.toml`, and any non-reviewer role
 - Changing any user's `~/.codex/config.toml`, which is machine-local and untracked
 - Reasoning-effort, model selection, or any other role attribute
 
@@ -63,7 +63,7 @@ Expected Change Workflow Tier 2 — scoped tool behavior for the Codex review di
 ## Acceptance criteria
 
 - A Sol review dispatched from a Codex-hosted session either runs on the fast tier with no unknown-key or unadvertised-tier warning, or the tracked documentation states plainly that it does not and why
-- `.codex/agents/fable.toml`, `opus.toml`, and `sonnet.toml` are byte-unchanged
+- `.codex/agents/opus.toml` and `sonnet.toml` are byte-unchanged
 - `.agents/skills/claude-to-codex/scripts/Invoke-Codex.ps1` is byte-unchanged
 
 ## Notes

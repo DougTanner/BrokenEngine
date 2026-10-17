@@ -2,8 +2,8 @@
 name: codex-review
 description: >-
   Retained but inactive route that runs one delegated reviewer, auditor, or
-  researcher role on Codex headless using the selected Sol or Opus role
-  configuration. Not part of the Change Workflow. Use only when the user
+  researcher role on Codex headless using the preset policy in
+  claude-to-codex. Not part of the Change Workflow. Use only when the user
   explicitly asks to run a named review, audit, or /plan-alternatives
   researcher on Codex. Codex callers never invoke it.
 disable-model-invocation: true
@@ -15,8 +15,10 @@ allowed-tools: [Read, Bash, Agent, Skill]
 ## Purpose
 
 Runs one delegated reviewer, auditor, or `/plan-alternatives` researcher on
-Codex headless with the selected Sol or Opus role configuration and returns its
-handoff without the task evidence entering this session.
+Codex headless using the preset policy in
+[claude-to-codex](../claude-to-codex/SKILL.md)
+`## Headless presets` and returns its handoff without the task evidence
+entering this session.
 
 ## When to use
 
@@ -41,9 +43,10 @@ assigned skills' vocabulary. Codex callers never invoke this skill.
 - Repository root — the absolute toplevel of the session worktree, defaulting to
   the current one; a relative path is accepted and resolves against the current
   directory — and session baseline (a full 40-character commit SHA)
-- `-Agent` — optional `sol` or `opus`, default `sol`; use `opus` for an
-  explicitly requested `/plan-alternatives` researcher. The selection reads
-  the model and effort pins from the matching repository role configuration.
+- `-Agent` — optional; select the reviewer/auditor or explicitly requested
+  `/plan-alternatives` researcher preset and its native model/effort pins from
+  [claude-to-codex](../claude-to-codex/SKILL.md)
+  `## Headless presets`.
 
 `## Steps` owns prompt preparation and dispatch mechanics for both routes.
 
@@ -58,7 +61,7 @@ For that dispatch, do not run the review prompt builder or add its reviewer
 guardrails. The brief must instruct the researcher to return the normal axis
 handoff and then append a standalone final `PASS` line for the dispatch
 wrapper. Use that file as `<promptPath>`, then continue at step 9 with
-`-Agent opus`.
+`-Agent` set to the researcher preset selected by `## Inputs`.
 
 1. Write the judgment content yourself into `-ScopeFile`: the exact scope, the
    files and regions authorized for review, focus notes, and current residuals.
@@ -172,7 +175,7 @@ into the session.
 On genuine failure the handoff is `CODEX-UNAVAILABLE: <short reason>` with the
 unchanged target. A researcher failure has no substitute. Only explicit user
 authorization given in the current session unblocks a review or audit failure,
-by routing the same unchanged assignment to the Opus `reviewer` subagent. With
+by routing the same unchanged assignment to the `reviewer` subagent. With
 that authorization the brief names the assigned skill and states that the user
 authorized the fallback in this session; `.claude/agents/reviewer.md` owns what
 else it carries. `/claude-to-codex` `## Rules` defines genuine failure and the
@@ -196,7 +199,9 @@ For a review or audit, this is a blocking failure: never dispatch a substitute
 reviewer automatically. The user authorization that unblocks it, and its target,
 are in this file's `## Handoff`. If the `reviewer` subagent type
 is also unavailable, route at most once to `subagent_type: "general-purpose"`
-with `model: "opus"` and the reviewer or auditor role stated at the top of the
-prompt.
+with `model:` selected from the reviewer row in
+[change-workflow.md](../../references/change-workflow.md)
+`### Delegation roles` and the reviewer or auditor role stated at the top of
+the prompt, without locked-in effort.
 
 Add no other reviewer for consensus.

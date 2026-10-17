@@ -30,8 +30,8 @@ Codex callers never invoke it.
 - Prompt — the caller-written task in a fresh repo-relative file under `Temp/`.
 - Worktree — this session's worktree, and no other: the model check reads this
   checkout's `.codex/agents` pins, the launcher the worktree's.
-- `-Agent` — `fable`, `opus`, `sol`, or `sonnet`, default `sol`; selects the
-  model and reasoning effort pinned in `.codex/agents/<agent>.toml`.
+- `-Agent` — selection, default, and native TOML model/effort pins follow this
+  file's `## Headless presets`.
 - `-Model` and `-Effort` — only when the user names a model or an effort; each
   overrides the preset's value.
 - `-Sandbox` — `read-only` by default; `workspace-write` only when the task must
@@ -41,6 +41,14 @@ Codex callers never invoke it.
   the main repository's `.git`, or the machine-local lock storage under
   `%LOCALAPPDATA%`, and this launch restricts its network access. No sandbox
   mode reaches those resources.
+
+## Headless presets
+
+For the explicit-user headless route, `/codex-review` selects `sol` for reviewer
+or auditor work (default), or `opus` for a `/plan-alternatives` researcher.
+The launcher accepts `opus`, `sol`, or `sonnet`, defaults to `sol`, and reads
+the model and effort pins from `.codex/agents/<agent>.toml`; its selector
+enforces those available presets.
 
 ## Steps
 
