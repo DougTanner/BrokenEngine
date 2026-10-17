@@ -88,16 +88,26 @@ and never merges candidates into a hybrid; the user picks at most one:
   disqualified);
 - `Existing guarantees`: relies on what the code already guarantees instead of
   rebuilding it;
-- `Self-serving machinery`: adds none.
+- `Self-serving machinery`: adds none;
+- codebase improved beyond the objective: removes duplication or simplifies
+  the surrounding code.
 
-The scores inform main's recommendation and the costs stated beside each
-candidate — an objective not fully met, a rebuilt existing guarantee, or
-self-serving machinery among them; they are not a tally, and they never decide
-which candidates the user sees. An empty axis says nothing about whether
+The scores inform main's recommendation and the pros and cons stated beside
+each option — an objective not fully met, a rebuilt existing guarantee, or
+self-serving machinery among the cons; they are not a tally, and they never
+decide which candidates the user sees. An empty axis says nothing about whether
 candidate zero is the simplest approach; whether the drafted plan itself is
 over-built is the `/plan-simplicity-review` question.
 
 ### User presentation
+
+IMPORTANT: this step exists to widen the change when wider is better — a
+root-cause fix, a refactor that improves the codebase, or a better idea the
+draft missed — or to narrow it when a simpler alternative meets the objective.
+Scope limits what implementation may change once the user has picked an
+approach; the drafted plan's scope is never a reason to recommend it or to mark
+an alternative down unless the user set it
+([`authority-order.md`](../../references/authority-order.md)).
 
 When no researcher returned a candidate, the original stands and the turn's
 report carries one line:
@@ -109,9 +119,19 @@ Alternatives: original stands (<axes>)
 Otherwise, before the Plan review step — or, in a `/next-plan` run, as the
 `### Plan alternatives` section of that skill's `### Implementation approval`
 presentation — main presents every returned candidate beside the drafted
-approach in plain language per `### User Interaction` — the same criteria,
-what it adds and deletes, which invariant surfaces it touches, and when it pays
-off — with a recommendation, then asks verbatim:
+approach in plain language per `### User Interaction`, giving each option, the
+drafted plan included:
+
+- Unique advantages: what it offers that the other options do not, each named
+  with a short label, such as DRY (reuses an existing mechanism instead of
+  adding a second one), KISS/YAGNI (less code, state, or machinery), root-cause
+  fix (the `### Comparison` cause criterion), or codebase-improving refactor
+  (the `### Comparison` codebase criterion) — or `none`.
+- Pros and cons: the `### Comparison` criteria stated as pros and cons,
+  including what it adds and deletes, which invariant surfaces it touches, and
+  when it pays off.
+
+Main then gives a recommendation and asks verbatim:
 
 > Which approach should this change use: the drafted plan as written, or one of
 > the alternatives above?
