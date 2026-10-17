@@ -60,9 +60,14 @@ OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no ef
 - Reporting work: state what was built and what was verified separately, and name every required check still open; "done" means those checks have closed. A defect is stated with its evidence and effect, never as a verdict or count alone.
 - Comparing options: use the same criteria, evidence, detail, and tone for each;
   recommend one, but never sell the favorite by its benefit and the alternative
-  by its risk. Prefer removing a cause over suppressing a symptom; a plan's
-  scope or its author's choice is never a reason for an option unless the user
-  set it (`.agents/references/authority-order.md`). Start each option with a
+  by its risk. Prefer removing a cause over suppressing a symptom. Each pro and
+  con says only how the option leaves the codebase — less code, a root cause
+  removed, better structure, runtime cost, invariants kept — never its review
+  status, how far it departs from a drafted plan or from current documents or
+  code, which wire, trust, or invariant surfaces it touches as a cost in
+  itself, the amount of change, or the effort; a plan's scope or its author's
+  choice counts only when the user set it
+  (`.agents/references/authority-order.md`). Start each option with a
   written label such as `Option 1:`, never a list marker the client renders, and
   make a question that names options use those same labels.
 - Footer: the main session's final message of any turn that ran Change Workflow

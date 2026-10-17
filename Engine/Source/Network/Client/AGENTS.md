@@ -2,22 +2,36 @@
 
 ## Overview
 
-Client-only (`BT_CLIENT`) ENet peer and composed `ClientSessionRuntime`. The
-peer owns wire dispatch, slots, ACK/timing/bandwidth state, and receive buffers.
-The runtime owns connection and GUID persistence, discovery, the client active
-set and its visible-neighbor cache, the desired coordinates derived from them,
-the harness viewer pin, subscription and clock state, generic full-state and
-delta adoption, received-update buffering and confirmation, ordered receive
-draining, ACK/flush, and resets. This directory also owns replay and desync
-machinery. The game client session (the game project's own
-`Source/Network/Client/AGENTS.md`) owns static-data application, gameplay
-hydration and smoke continuity, reconciliation/desync policy, UI, and gameplay
-policy. Collection hydration rules are in the game collection detail (the game
-project's own `Source/Frame/Collections/AGENTS.md`).
+Client-only (`BT_CLIENT`) ENet peer, `ClientSessionRuntime`, and
+`ClientSessionBase`. The peer owns wire dispatch, slots, ACK/timing/bandwidth
+state, and receive buffers. The runtime owns connection and GUID persistence,
+discovery, the client active set and its visible-neighbor cache, the desired
+coordinates derived from them, the harness viewer pin, subscription and clock
+state, generic full-state and delta adoption, received-update buffering and
+confirmation, ordered receive draining, ACK/flush, and resets.
+`ClientSessionBase`, which the game client session inherits, holds the runtime
+and the desync core and owns static-data application, owned-entity event
+application, `Reconcile`, and the resync, disconnect, and server-load session
+resets. This directory also owns replay and desync machinery. The game client
+session (the game project's own `Source/Network/Client/AGENTS.md`) owns the
+reconciler, each owned-entity event's gameplay effect, gameplay hydration and
+smoke continuity, UI, and gameplay policy. Collection hydration rules are in
+the game collection detail (the game project's own
+`Source/Frame/Collections/AGENTS.md`).
 
 ## Receive Paths
 
-Server updates use separate delta, full-state, static-data, debug-frame, and load-notification buffers. `ClientSessionRuntime` drains static data, full states, then deltas, adopting generic state while the game session applies static data and hydrates gameplay. A delta at or below its coord's confirmed tick is skipped, and buffering is keyed by tick, so a repeat of an already buffered tick keeps the first arrival.
+Server updates use separate delta, full-state, static-data, debug-frame,
+owned-entity event, and load-notification buffers. `Client::Receive` decodes
+each owned-entity state into `mReceivedOwnedEntityEvents`, which `Client::Poll`
+entry and a load notification clear, so events received before a load in the
+same poll are discarded; `ClientSessionBase::ApplyOwnedEntityEvents` hands them
+to the game before the game's raw packets are processed. After both,
+`ClientSessionRuntime` drains static data, full states, then deltas, adopting
+generic state while `ClientSessionBase` applies static data and the game session
+hydrates gameplay. A delta at or below its coord's confirmed tick is skipped,
+and buffering is keyed by tick, so a repeat of an already buffered tick keeps
+the first arrival.
 
 ## Subscription Receive Invariants
 
@@ -66,11 +80,17 @@ are in [Network](../../../../Documents/Architecture/Network.md).
 This directory owns CRC fast-path, rollback/ring orchestration, replay, per-coord parallel dispatch, profiling merge, and first-in-slot-order unresolved mismatch selection. Each worker writes only its coord. The game supplies payloads, transfer materialization, and reconciliation/desync policy; see [Game Reconciliation](../../../../Documents/Architecture/GameReconciliation.md).
 
 - `ReconcileReplayTick.cpp` applies transfer `StatusChange`s after each replay tick in server Destroy/Spawn order and recomputes CRC after transfers; this ordering is required for the broadcast CRC ([server detail](../Server/AGENTS.md)).
-- `ReconcileReplay.h` and `ClientDesyncCore.h` deliberately name game types because their payloads are game-defined while their machinery is engine-owned. They stay out of `Engine.h`, and consumers include them directly, matching the exception in the [server detail](../Server/AGENTS.md).
+- `ReconcileReplay.h` and `ClientDesyncCore.h` deliberately name game types because their payloads are game-defined while their machinery is engine-owned; both stay out of `Engine.h`, and consumers include them directly, matching the exception in the [server detail](../Server/AGENTS.md). `ClientSessionBase.h` includes `ClientDesyncCore.h`.
 
 ## Other
 
-- `ClientDesyncCore` owns debug-frame correlation and repeated-desync escalation to disconnect. Real desync freezes ACK tracking and, only when `kbDesynchronizationDebugFrames` is enabled, clones the mismatching client frame for comparison and requests a debug frame; disabled builds do none of these. The game-side seam is documented in the game client-session leaf.
+- `ClientDesyncCore` owns debug-frame correlation and repeated-desync escalation
+  to disconnect. Real desync freezes ACK tracking and, only when
+  `kbDesynchronizationDebugFrames` is enabled, clones the mismatching client
+  frame for comparison and requests a debug frame; disabled builds do none of
+  these. `ClientSessionBase` holds the core, polls it each drain, and hands it
+  the desync record `Reconcile` gets back from the game reconciler; the
+  reconcile dispatch fills that record (`ReconcileDispatchResult::desync`).
 - Outside `Client::Poll`, `kConnectionAccepted` holds only while the peer is both connected and accepted: every path that clears `kConnected` clears it too, so a caller that needs an accepted connection tests it alone.
 - `GameBase::SetClientGridCoordinate()` is the single write path for the client's cell: on the client it invalidates the runtime's visible-neighbor cache and ignores every write while the harness viewer pin is set.
 - Network fast-forward skips the simulated delay and flushes pending packets. Load reset purges affected coord channels and preserves the control channel ([`ClientSessionRuntime::ResetForServerLoad`](ClientSessionRuntime.cpp)); an unsubscribed slot's older delayed packets are left to the epoch checks, because the server may reuse the slot before its unsubscribe ACK arrives. A delayed reliable rejection is delivered before ENet disconnect teardown ([`Client::Poll`](Client.cpp)).

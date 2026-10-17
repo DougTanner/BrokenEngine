@@ -16,8 +16,6 @@ class OwnedEntityRegistry
 public:
 
 	void Add(int64_t iClientId, GlobalId globalId, GridCoord coord);
-	void RemoveAt(int64_t iClientId, int64_t iIndex);
-	void UpdateCoord(int64_t iClientId, GlobalId globalId, GridCoord newCoord);
 	void Clear(int64_t iClientId);
 	void Reserve(int64_t iClientId, int64_t iCount);
 

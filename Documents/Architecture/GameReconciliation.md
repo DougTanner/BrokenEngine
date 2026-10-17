@@ -111,7 +111,7 @@ flowchart TD
         TICK["TickRealtime()<br/>compute iFullTicks"]:::physics
         PREPARE_ACTIVE["PrepareActiveSet()"]:::physics
         ADVANCE["Advance miTickCounter"]:::physics
-        RECONCILE_STEP["ClientSession::Reconcile()<br/>single pass: drops validated,<br/>replays mismatches,<br/>forward sims to target tick"]:::reconcile
+        RECONCILE_STEP["ClientSessionBase::Reconcile()<br/>single pass: drops validated,<br/>replays mismatches,<br/>forward sims to target tick"]:::reconcile
 
         STALL_CHECK -->|"No"| TICK --> PREPARE_ACTIVE --> ADVANCE --> RECONCILE_STEP
     end
@@ -161,38 +161,31 @@ sequenceDiagram
     end
 ```
 
-## Owned Entity Event Parsing
+## Owned-Entity Events
 
-Raw game packets are parsed into typed events. `kServerAssignOwnedEntity` maps directly to `kAssigned`; `kServerOwnedEntityState` packets carry an `OwnedEntityStateWireType` that maps to the remaining event types.
+The server reports each owned-entity change as one engine `kServerOwnedEntityState` packet carrying an `OwnedEntityState`. `Client::Receive` decodes it into a `ReceivedOwnedEntityEvent`, and `ClientSessionBase::ApplyOwnedEntityEvents` hands each event to the game's `ClientSession::ApplyOwnedEntityEvent`. `kSpawned` and `kChangedCell` first add the entity to the client's owned list when it is absent, then update its coordinate; `kDied` removes it.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
 flowchart LR
     classDef wire fill:#fef3c7,stroke:#d97706
-    classDef event fill:#dcfce7,stroke:#16a34a
     classDef func fill:#dbeafe,stroke:#3b82f6
 
-    RAW["Raw Game Packets<br/>from Client"]
-    PARSE["ParseOwnedEntityEvents()"]:::func
+    RAW["kServerOwnedEntityState<br/>from Server"]
+    DECODE["Client::Receive()<br/>mReceivedOwnedEntityEvents"]:::func
+    APPLY["ClientSessionBase::ApplyOwnedEntityEvents()"]:::func
+    HOOK["ClientSession::ApplyOwnedEntityEvent()"]:::func
 
-    RAW --> PARSE
+    RAW --> DECODE --> APPLY --> HOOK
 
-    subgraph wire_types ["OwnedEntityStateWireType"]
+    subgraph wire_states ["OwnedEntityState"]
         W0["kSpawned"]:::wire
         W1["kChangedCell"]:::wire
         W2["kDied"]:::wire
     end
 
-    subgraph event_types ["ReceivedOwnedEntityEvent"]
-        E0["kAssigned"]:::event
-        E1["kSpawned"]:::event
-        E2["kChangedCell"]:::event
-        E3["kDied"]:::event
-    end
-
-    PARSE -->|"kServerAssignOwnedEntity"| E0
-    PARSE -->|"kServerOwnedEntityState"| wire_types
-    W0 --> E1
-    W1 --> E2
-    W2 --> E3
+    HOOK --> wire_states
+    W0 -->|"add if absent,<br/>update coordinate"| OWNED["Owned-entity list"]
+    W1 -->|"add if absent,<br/>update coordinate"| OWNED
+    W2 -->|"remove"| OWNED
 ```

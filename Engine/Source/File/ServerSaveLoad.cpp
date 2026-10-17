@@ -52,7 +52,7 @@ void ServerSaveLoad::ServerReset()
 	game::gpGame->miNextGlobalId = 1;
 	game::gpGame->ResetSession();
 	// Fresh-game wipe of the game save state. A load leaves it populated by ReadGridSave;
-	// a fresh game has no save to restore from, so explicitly clear it before ResetClientsForLoad runs.
+	// a fresh game has no save to restore from, so explicitly clear it before ResetForLoad runs.
 	game::ResetSaveState();
 	game::OnStateReplaced();
 	game::gpServerSession->mpRuntime->ComputeActiveSet();

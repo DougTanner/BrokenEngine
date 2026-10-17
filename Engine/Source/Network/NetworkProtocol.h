@@ -32,6 +32,14 @@ enum class PacketType : uint8_t
 	kClientCrashReport,         // Client sends the leading bytes of its crash report while crashing, or on its next accepted connection while that report is unsent
 	kClientChat,                // Client sends one chat message to the server
 	kServerChat,                // Server relays a validated chat message to every handshaken client
+	kServerOwnedEntityState,    // Server reports one owned entity spawned, changed cell, or died
+	kClientSaveRequest,         // Client requests server quicksave (debug only)
+	kClientLoadRequest,         // Client requests server quickload (debug only)
+	kClientResetRequest,        // Client requests server reset (debug only)
+	kClientReplayRecordRequest, // Client requests server replay record start/stop (debug only)
+	kClientReplayPlaybackRequest, // Client requests server replay playback (debug only)
+	kClientPauseRequest,        // Client requests server pause/unpause (debug only)
+	kClientTimespeedRequest,    // Client requests timescale change (debug only)
 	kGamePacketStart,           // All values >= this are game-layer packets forwarded as raw bytes
 };
 
@@ -59,12 +67,20 @@ inline constexpr const char* PacketTypeName(PacketType eType)
 		case PacketType::kClientCrashReport:            return "kClientCrashReport";
 		case PacketType::kClientChat:                   return "kClientChat";
 		case PacketType::kServerChat:                   return "kServerChat";
+		case PacketType::kServerOwnedEntityState:       return "kServerOwnedEntityState";
+		case PacketType::kClientSaveRequest:            return "kClientSaveRequest";
+		case PacketType::kClientLoadRequest:            return "kClientLoadRequest";
+		case PacketType::kClientResetRequest:           return "kClientResetRequest";
+		case PacketType::kClientReplayRecordRequest:    return "kClientReplayRecordRequest";
+		case PacketType::kClientReplayPlaybackRequest:  return "kClientReplayPlaybackRequest";
+		case PacketType::kClientPauseRequest:           return "kClientPauseRequest";
+		case PacketType::kClientTimespeedRequest:       return "kClientTimespeedRequest";
 		case PacketType::kGamePacketStart:              return "kGamePacketStart";
 	}
 	return "Unknown";
 }
 
-inline constexpr int64_t kiProtocolVersion = 25;
+inline constexpr int64_t kiProtocolVersion = 26;
 inline constexpr int64_t kiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
 inline constexpr int64_t kiDefaultPort = 27'015;
 inline constexpr int64_t kiMaximumResendFrames = 8;
@@ -189,6 +205,40 @@ inline constexpr ClientPacketContract GetClientPacketContract(PacketType eType)
 		case PacketType::kClientResynchronizationRequest:     return {.iMinimumSize = NetworkMessages::ClientResyncRequestMessage::kiFixedSize, .iMaximumSize = NetworkMessages::ClientResyncRequestMessage::kiFixedSize, .iMaximumPerTick = 4};
 		case PacketType::kClientCrashReport:       return {.iMinimumSize = NetworkMessages::ClientCrashReportMessage::kiMinSize, .iMaximumSize = NetworkMessages::ClientCrashReportMessage::kiMaxSize, .iMaximumPerTick = 1};
 		case PacketType::kClientChat:              return {.iMinimumSize = NetworkMessages::ClientChatMessage::kiMinSize, .iMaximumSize = NetworkMessages::ClientChatMessage::kiMaxSize, .iMaximumPerTick = 8};
+
+		// With kbDebugInput false, debug-control requests return the non-sendable sentinel, preventing handshaken clients from resetting, pausing, or changing server speed.
+		case PacketType::kClientSaveRequest:
+		case PacketType::kClientLoadRequest:
+		case PacketType::kClientResetRequest:
+		case PacketType::kClientReplayRecordRequest:
+		case PacketType::kClientReplayPlaybackRequest:
+			if constexpr (kbDebugInput)
+			{
+				return {.iMinimumSize = NetworkMessages::kiPacketTypeSize, .iMaximumSize = NetworkMessages::kiPacketTypeSize, .iMaximumPerTick = 2};
+			}
+			else
+			{
+				return {};
+			}
+		case PacketType::kClientPauseRequest:
+			if constexpr (kbDebugInput)
+			{
+				return {.iMinimumSize = NetworkMessages::ClientPauseRequestMessage::kiFixedSize, .iMaximumSize = NetworkMessages::ClientPauseRequestMessage::kiFixedSize, .iMaximumPerTick = 4};
+			}
+			else
+			{
+				return {};
+			}
+		case PacketType::kClientTimespeedRequest:
+			if constexpr (kbDebugInput)
+			{
+				return {.iMinimumSize = NetworkMessages::ClientTimespeedRequestMessage::kiFixedSize, .iMaximumSize = NetworkMessages::ClientTimespeedRequestMessage::kiFixedSize, .iMaximumPerTick = 8};
+			}
+			else
+			{
+				return {};
+			}
+
 		default:                                   return {};
 	}
 }

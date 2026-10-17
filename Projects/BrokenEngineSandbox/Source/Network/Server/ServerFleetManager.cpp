@@ -498,7 +498,7 @@ void ServerFleetManager::DetectDisconnectedOwnedEntityDeaths()
 
 	for (auto& [rGuid, rFleets] : mFleets)
 	{
-		// Skip connected clients (handled by existing DetectOwnedEntityDeaths)
+		// Skip connected clients (handled by ServerSessionBase::RebuildOwnedEntities)
 		int64_t iClientId = FindClientIdForGuid(rGuid);
 		if (iClientId != 0)
 		{

@@ -1,59 +1,9 @@
 #pragma once
 
-#include "Network/OwnedEntityEvents.h"
 #include "Fleet.h"
 
 namespace game::GameMessages
 {
-
-struct AssignOwnedEntityMessage
-{
-	static constexpr int64_t kiSize = sizeof(int64_t) + engine::NetworkMessages::kiGridCoordSize;
-	static_assert(kiSize == 16);
-
-	int64_t iGlobalIdentifier = 0;
-	engine::GridCoord coordinate {};
-
-	template <typename TVISITOR>
-	static void Visit(TVISITOR& rVisitor, AssignOwnedEntityMessage& rMessage)
-	{
-		rVisitor.Field(rMessage.iGlobalIdentifier);
-		rVisitor.Field(rMessage.coordinate);
-	}
-};
-
-struct OwnedEntityStateMessage
-{
-	static constexpr int64_t kiSize = sizeof(uint8_t) + sizeof(int64_t) + engine::NetworkMessages::kiGridCoordSize;
-	static_assert(kiSize == 17);
-
-	uint8_t uiWireType = 0;
-	int64_t iGlobalIdentifier = 0;
-	engine::GridCoord coordinate {};
-
-	template <typename TVISITOR>
-	static void Visit(TVISITOR& rVisitor, OwnedEntityStateMessage& rMessage)
-	{
-		rVisitor.Field(rMessage.uiWireType);
-		rVisitor.Field(rMessage.iGlobalIdentifier);
-		rVisitor.Field(rMessage.coordinate);
-	}
-};
-
-struct OwnedEntityStateDescriptor
-{
-	OwnedEntityStateWireType eWireType {};
-	OwnedEntityEventType eEventType {};
-	const char* pcName = "";
-};
-
-inline constexpr OwnedEntityStateDescriptor kpOwnedEntityStateDescriptors[] =
-{
-	{.eWireType = OwnedEntityStateWireType::kSpawned, .eEventType = OwnedEntityEventType::kSpawned, .pcName = "Spawned"},
-	{.eWireType = OwnedEntityStateWireType::kChangedCell, .eEventType = OwnedEntityEventType::kChangedCell, .pcName = "ChangedCell"},
-	{.eWireType = OwnedEntityStateWireType::kDied, .eEventType = OwnedEntityEventType::kDied, .pcName = "Died"},
-};
-static_assert(std::size(kpOwnedEntityStateDescriptors) == static_cast<size_t>(OwnedEntityStateWireType::kCount));
 
 struct FleetSyncMessage
 {

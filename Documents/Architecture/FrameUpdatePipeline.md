@@ -58,10 +58,12 @@ precedes [`GameBase::ClientUpdate()`](../../Engine/Source/GameBase.cpp), then
 [`GameBase::Render()`](../../Engine/Source/GameBase.cpp), then audio update.
 [`ClientSessionRuntime.cpp`](../../Engine/Source/Network/Client/ClientSessionRuntime.cpp)
 owns engine network-cycle boundaries;
+[`ClientSessionBase.cpp`](../../Engine/Source/Network/Client/ClientSessionBase.cpp)
+owns reconcile sequencing, and the reconciler that
 [`ClientSession.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp)
-and
-[`ClientReconciler.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Client/ClientReconciler.cpp)
-own game reconciliation policy, while the replay/catch-up machinery they drive
+holds,
+[`ClientReconciler.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Client/ClientReconciler.cpp),
+owns game reconciliation policy, while the replay/catch-up machinery it drives
 is engine-owned in
 [`ReconcileReplayTick.cpp`](../../Engine/Source/Network/Client/ReconcileReplayTick.cpp).
 
@@ -88,8 +90,10 @@ boundaries for network intake, game tick preparation, shared frame simulation,
 and network completion.
 [`ServerSessionRuntime.cpp`](../../Engine/Source/Network/Server/ServerSessionRuntime.cpp)
 owns the engine network cycle;
+[`ServerSessionBase.cpp`](../../Engine/Source/Network/Server/ServerSessionBase.cpp)
+owns tick preparation, and
 [`ServerSession.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp)
-owns game session preparation. After the fixed-tick wait,
+builds the game frame inputs on advancing updates. After the fixed-tick wait,
 `ServerSessionRuntime::PollTickBoundary` polls a second time so commands that
 arrived during the wait enter the imminent tick.
 

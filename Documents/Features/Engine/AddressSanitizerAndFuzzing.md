@@ -81,21 +81,23 @@ Ranked by trust policy (root `AGENTS.md` `## Key Patterns`): the server fully va
   `ClientConnection`, a way to send replies and disconnects without an ENet
   host, and per-input reset of the per-tick budget counters so inputs are not
   simply rate-dropped.
-- **Game packets.** Game-range types queue into `Server::mReceivedGamePackets`
-  and are decoded by `ServerSession::ParseReceivedGamePackets`
-  (`Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp`) after
+- **Game packets.** Game-range types queue into `Server::mDeferredClientPackets`
+  and are decoded by `ServerSession::HandleGamePacket`
+  (`Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp`), which
+  `ServerSessionBase::DispatchDeferredClientPackets`
+  (`Engine/Source/Network/Server/ServerSessionBase.cpp`) calls after
   `Server::AdmitGamePacket` checks `GetGamePacketContract`. The handlers read
   with raw cursor reads (`engine::ReadInt64`, `engine::ReadFloat`,
   `ReadBooleanByte`) whose bounds rest entirely on the contract sizes, which is
   exactly the mismatch ASan would catch. **Seam needed:** the target needs
   `gpGame`, `gpServer`, and the session's `mpFleetManager` and `mpBroadcaster`.
-  Exclude the debug-control types (save, load, reset, replay, pause, timespeed):
-  in Debug, `kbDebugInput` is `true` (`Engine/Source/EngineSwitches.h`), so they
-  are client-sendable (in
-  Profile and Release `GetGamePacketContract` in
-  `Projects/BrokenEngineSandbox/Source/Network/GamePacketType.h` returns the
-  non-sendable sentinel for them), but they do file I/O or whole-state
-  replacement rather than parsing.
+  The debug-control requests (save, load, reset, replay, pause, timespeed) are
+  engine types that `Server::Receive` admits and queues into the same list; in
+  Debug, `kbDebugInput` is `true` (`Engine/Source/EngineSwitches.h`), so they
+  are client-sendable (in Profile and Release `GetClientPacketContract` in
+  `Engine/Source/Network/NetworkProtocol.h` returns the non-sendable sentinel
+  for them), but exclude their handlers from this target: they do file I/O or
+  whole-state replacement rather than parsing.
 - Not worth a target: `NetworkDiscoveryResponder::Poll` reads only a fixed-size magic value. ENet's own protocol parsing is ThirdParty, covered by ASan only (Phase 1, instrumented ThirdParty).
 
 ### 2. Grid save reading

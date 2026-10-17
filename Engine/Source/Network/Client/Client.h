@@ -103,8 +103,10 @@ public:
 	common::Flags<ClientStateFlags> mStateFlags;
 	char mpcRejectionReason[256] = {};
 
-	// Heap: raw game packet buffer grows on assign/owned-entity-state packets
+	// Heap: raw game packet buffer grows on game-range packets
 	std::vector<std::pair<int64_t, std::vector<uint8_t>>> mReceivedGamePackets;
+	// Heap: grows on owned-entity state packets
+	std::vector<ReceivedOwnedEntityEvent> mReceivedOwnedEntityEvents;
 	std::vector<std::vector<ReceivedCoordUpdate>> mReceivedCoordinateUpdates;
 	std::vector<ReceivedCoordFullState> mReceivedFullStates;
 	std::vector<ReceivedStaticData> mReceivedStaticData;
@@ -140,6 +142,7 @@ private:
 	void ServerLoadNotification(std::span<const uint8_t> packetData);
 	void ServerTimespeedUpdate(std::span<const uint8_t> packetData);
 	void ServerChat(std::span<const uint8_t> packetData);
+	void ServerOwnedEntityState(std::span<const uint8_t> packetData);
 	void SendHello();
 	void TrackReceivedTick(int64_t iSlot, int64_t iTick);
 

@@ -198,7 +198,7 @@ The server treats every inbound client packet as hostile/corruptible. A
 declarative per-packet contract is checked once at each dispatch choke point —
 engine types (`< kGamePacketStart`) at `Server::Receive` via
 `GetClientPacketContract` (`NetworkProtocol.h`); game types at
-`ServerSession::ParseReceivedGamePackets` via `GetGamePacketContract`
+`ServerSessionBase::DispatchDeferredClientPackets` via `GetGamePacketContract`
 (`GamePacketType.h`). Both return a
 `ClientPacketContract {iMinimumSize, iMaximumSize, iMaximumPerTick, bRequiresHandshake, bOverCapCountsViolation}`;
 sizes are the full packet including the type byte.
@@ -228,12 +228,12 @@ sizes are the full packet including the type byte.
   `[min, max]` → violation; (4) handshake gate → **silent drop, no count**
   (pre-Hello ack race, below); (5) per-type per-tick cap → drop, violation only
   if `bOverCapCountsViolation`. Game-range types skip gates 3–5 at `Receive`
-  (kept opaque) and take the same three checks at parse.
+  (kept opaque) and take the same three checks at the deferred drain.
 - **Per-update reset**: `Server::Poll` zeroes each client's `iTickPacketCount`/`iTickByteCount` and `uiTickTypeCounts`, but only in `ServerPollMode::kUpdateStart` — the tick-boundary poll continues the same window, so one budget window ≈ one tick window even though an update polls twice. `uiTickTypeCounts` is one 256-entry array shared by both dispatch points — engine and game type bytes are disjoint ranges, so sharing is coherent.
 - **Violation policy** (`Server::RecordContractViolation`): each violation is
   one of two kinds with its own count, and the counts never feed each
   other. **Corrupt data** — a sentinel row, a size outside the contract, a
-  dispatch catch, a game handler throw, or the ack-stream cross-check —
+  dispatch catch, a deferred-packet handler throw, or the ack-stream cross-check —
   increments a **lifetime** count (never reset) that disconnects at
   `kiCorruptViolationDisconnectCount = 4`. A datagram damaged in transit never
   reaches this count, because ENet's datagram checksum drops it before
@@ -256,11 +256,23 @@ sizes are the full packet including the type byte.
   times than its per-type cap, with the sends reaching the server within one
   update window (about 1 s at 1/32, or bunched by a server stall). Each dispatch
   `try/catch` records a corrupt-data violation (engine `Server::Receive` as
-  `"corrupt payload"`, game `ParseReceivedGamePackets` as
-  `"game packet handler threw"`).
+  `"corrupt payload"`, the deferred drain
+  `ServerSessionBase::DispatchDeferredClientPackets` as
+  `"deferred packet handler threw"`).
 - **Pre-handshake silent drop**: `Client::SendAcknowledgement` streams legitimately arrive before Hello completes, so a handshake-gated packet seen pre-handshake is dropped **without** counting a violation.
 - **Tick-rate-locked client ack cadence**: `Client::SendAcknowledgement` sends at most one ack per sim-tick interval (derived from `engine::kiTickRate`, not a hardcoded Hz), so ack packet rate is independent of render framerate; the 256-packet budget then only ever trips on hostile floods (a multi-second server-poll stall can still deliver many wall-seconds of tick-rate acks in one poll, which the budget tolerates).
-- **`kbDebugInput` gate**: debug-control game packets (save/load/reset/replay/pause/timespeed) contract-resolve to the sentinel on a server built with `kbDebugInput == false` → a violation, so no handshaken client can reset/pause/re-speed a non-debug server. The accepted `kServerConnectionResponse` carries the server's `kbDebugInput` as one byte (0 or 1) ahead of the optional GUID; a Debug client sends no debug-control request to a server that does not accept them.
+- **`kbDebugInput` gate**: the seven debug-control engine packets (save, load,
+  reset, replay record, replay playback, pause, timespeed) contract-resolve to
+  the sentinel at gate 3 on a server built with `kbDebugInput == false` → a
+  violation, so no handshaken client can reset/pause/re-speed a non-debug
+  server. Because gate 3 precedes the handshake gate, a pre-handshake
+  debug-control request that fails its row is a violation, not a silent drop.
+  `Server::Receive` checks the pause and timespeed byte before queuing and
+  appends every admitted debug-control request, type byte removed, to the same
+  deferred list as game packets, so both run in arrival order at the deferred
+  drain. The accepted `kServerConnectionResponse` carries the server's
+  `kbDebugInput` as one byte (0 or 1) ahead of the optional GUID; a Debug client
+  sends no debug-control request to a server that does not accept them.
 
 **Contract table** (sizes = full packet incl. type byte):
 
@@ -282,13 +294,16 @@ sizes are the full packet including the type byte.
 | `kClientSpawnIntoFleetRequest` | 17 | 17 | 8 | yes | violation | fleet-guid lookup; per-fleet member cap 16; spawn dedup on `{client, fleetGuid, member}` |
 | `kClientRespawnInFleetRequest` | 25 | 25 | 16 | yes | violation | fleet-guid lookup; member global-ID lookup; spawn dedup |
 | `kClientSaveRequest` / `LoadRequest` / `ResetRequest` / `ReplayRecordRequest` / `ReplayPlaybackRequest` | 1 | 1 | 2 | yes | violation | **`kbDebugInput`-gated** — sentinel (violation) on a non-debug server |
-| `kClientPauseRequest` | 2 | 2 | 4 | yes | violation | **`kbDebugInput`-gated**; pause byte other than 0 or 1 → corrupt |
-| `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt |
+| `kClientPauseRequest` | 2 | 2 | 4 | yes | violation | **`kbDebugInput`-gated**; pause byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
+| `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
-client-sendable). The current wire-protocol version is 25, which removes the
-frame clock from full-state frames and makes
-`ExplosionsInterpolate::pStartTimes` 64-bit integer nanoseconds; version 24
+client-sendable). The current wire-protocol version is 26, which moves the
+owned-entity state notification and the seven debug-control requests to engine
+packet types and folds the assign notification into each `Spawned` and
+`ChangedCell` state; version 25 removed the frame clock from full-state frames
+and made `ExplosionsInterpolate::pStartTimes` 64-bit integer nanoseconds;
+version 24
 dropped the per-frame main-menu flags from every full-state frame; version 23
 inserted the engine `kClientChat` and `kServerChat` types before
 `kGamePacketStart`; each
@@ -319,11 +334,28 @@ The desync diagnostic cooldown is handler-local and uses `steady_clock`, so paus
 
 ## Session Ownership and Phase Order
 
-`game::ClientSession` and `game::ServerSession` are game-policy wrappers over composed engine runtimes. `game::NetworkSessionContract` binds Frame/status/game packet types, version/tick/slot constants, and codecs at compile time; no virtual session base or runtime type erasure is involved.
+`game::ClientSession` and `game::ServerSession` inherit the non-virtual engine session bases `engine::ClientSessionBase` and `engine::ServerSessionBase`, which hold the engine runtimes and call game functions by name through `game::gpClientSession`/`game::gpServerSession`. `game::NetworkSessionContract` binds Frame/status/game packet types, version/tick/slot constants, and codecs at compile time; no virtual function or runtime type erasure is involved.
 
-- `ClientSessionRuntime` owns connection/GUID/discovery, subscription and clock state, transport polling, load reset, generic received full-state/delta adoption, received-update ring/buffer/confirmation mechanics, static→full-state→delta drain order, ACK, conditional flush, and applying clock correction. `game::ClientSession` owns static-data application, per-frame gameplay hydration and smoke continuity, reconciliation, desync policy, and UI transitions.
-- `ServerSessionRuntime` owns host/discovery/pacing lifetime and enforces poll, tick, paused, resend, and flush order. Hello acceptance always sends the engine-owned `kServerTimespeedUpdate` synchronously, carrying the server's current time ratio. Tick publication workbuffer-backed views are consumed synchronously by the runtime before the owning outer arena exits.
-- `gpClient`/`gpServer` expose safe queries and ordinary sends. Polling, receive drains, ACK/flush, buffering, resend, and persistent queue drains are runtime-only operations surfaced through the game wrapper only where gameplay managers require typed data.
+- `ClientSessionRuntime` owns connection/GUID/discovery, subscription and clock
+  state, transport polling, load reset, generic received full-state/delta
+  adoption, received-update ring/buffer/confirmation mechanics,
+  static→full-state→delta drain order, ACK, conditional flush, and applying
+  clock correction. `ClientSessionBase` owns the desync core, static-data
+  application, owned-entity event application, `Reconcile`, and the resync,
+  disconnect, and server-load session resets. `game::ClientSession` owns the
+  reconciler, each owned-entity event's gameplay effect, per-frame gameplay
+  hydration and smoke continuity, and UI transitions.
+- `ServerSessionRuntime` owns host/discovery/pacing lifetime and enforces poll,
+  tick, paused, resend, and flush order. `ServerSessionBase` owns the
+  owned-entity registry and its rebuild from the Frame ownership layers, tick
+  preparation, timescale stepping, the active set's ownership step, the load
+  reset, and the deferred client-packet drain with the debug-control request
+  handlers. `game::ServerSession` owns the client and fleet managers, the game
+  packet handlers, and the game half of the load reset. Hello acceptance always
+  sends the engine-owned `kServerTimespeedUpdate` synchronously, carrying the
+  server's current time ratio. Tick publication workbuffer-backed views are
+  consumed synchronously by the runtime before the owning outer arena exits.
+- `gpClient`/`gpServer` expose safe queries and ordinary sends. Polling, receive drains, ACK/flush, buffering, resend, and persistent queue drains are runtime-only operations surfaced through the session bases or game session only where gameplay managers require typed data.
 
 ## See Also
 

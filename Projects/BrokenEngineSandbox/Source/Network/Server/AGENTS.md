@@ -1,16 +1,23 @@
 # Network Server - Game Session and Managers
 
-Server-only game networking. `ServerSession` is the game-policy wrapper over `engine::ServerSessionRuntime`, which owns host/discovery/pacing and the fixed poll/tick/paused phase order. It owns the client and fleet managers and holds the engine-owned transfer and broadcast managers (`../../../../../Engine/Source/Network/Server/AGENTS.md`), supplying the game payloads and policy queues they work on; the game functions the engine calls mutate game state around the deterministic Frame tick.
+Server-only game networking. `ServerSession` inherits
+`engine::ServerSessionBase`, which holds the owned-entity registry, the
+engine-owned transfer and broadcast managers, and `engine::ServerSessionRuntime`,
+the owner of host/discovery/pacing and the fixed poll/tick/paused phase order
+(`../../../../../Engine/Source/Network/Server/AGENTS.md`). `ServerSession` owns
+the client and fleet managers and supplies the game payloads and policy queues
+the engine managers work on; the game functions the engine calls by name mutate
+game state around the deterministic Frame tick.
 
 ## State Ownership
 
-- `ServerSession` holds the engine-owned `engine::OwnedEntityRegistry` and owns the game relink policy that rebuilds it from Frame state. Game code uses those per-client global ID and coordinate records, not the engine-authoritative `authorizedCoordinates`, for owned-entity lookup.
+- The engine session base rebuilds the `engine::OwnedEntityRegistry` from the Frame ownership layers and reports each entity whose row is gone from every cell to `OnOwnedEntityDied`, which notifies the fleet manager. Game code uses those per-client global ID and coordinate records, not the engine-authoritative `authorizedCoordinates`, for owned-entity lookup.
 - Fleets are keyed by persistent `ClientGuid` so they survive disconnect: disconnect clears that GUID's client id and that client's queued fleet requests, never the fleet, and its ships keep running. A separate reap pass handles deaths in owner-gone fleets — marking members dead and shifting the flagship — because the connected-client death path skips them by design.
 - Fleet RNG is seeded once, serialized with fleet state, and consumes exactly two 64-bit draws per generated fleet identifier.
 - Fleet serialization supplies the game half of an engine grid save through the four entry points the engine reader requires (`../../../../../Engine/Source/File/AGENTS.md`) — write the fleet payload into the save stream, read it into an isolated staged value the engine carries uninspected, adopt that value into the live fleet manager, and reset fleet state for a fresh game.
 - A fleet's position within its client's list shifts on delete, so requests and queued work that outlive a poll carry the generated fleet identifier and re-resolve it at consumption.
 - A fleet member is identified by its ship's global ID, which a respawn keeps; stored member references — the flagship, a respawn request, a queued spawn, and client focus — carry that ID, never a list position.
-- Entities being re-attached are sorted by global ID before rebuilding client ownership; because a respawn keeps its ID, that order is each member's first-spawn order.
+- Each client's owned-entity records are in global-ID order; because a respawn keeps its ID, that order is each member's first-spawn order.
 - A dead fleet member respawns automatically after a countdown that drains only while its owner is connected.
 - The [game Agent](../../Agent/AGENTS.md#contracts) owns the session-bound harness rig slot and its clearing semantics; teardown detaches it before destroying the runtime.
 
@@ -21,15 +28,15 @@ Server-only game networking. `ServerSession` is the game-policy wrapper over `en
 
 ## Deterministic Tick Contracts
 
-- The engine runtime owns the active set and calls the game function `AddGameRequiredCoordinates` to contribute every coordinate holding at least one Omni. Retention after the departing-Frame handoff, and generation activation, belong to the [File Replay contract](../../../../../Engine/Source/File/AGENTS.md#replay-streams).
+- The engine owns the active set, which keeps every coordinate holding at least one Omni because the Omni rows form the ownership layer. Retention after the departing-Frame handoff, and generation activation, belong to the [File Replay contract](../../../../../Engine/Source/File/AGENTS.md#replay-streams).
 - Normal update prepares tick inputs; replay uses coordinates with live readers and consumes its recorded `FrameInput` order exactly, without sorting it again.
-- Apply transfer ownership relinks before death detection: a transferred owned entity updates its client/GUID ownership record before the tick's death pass, so a live handoff is never treated as a death. A replay transfer recorded in the post-dispatch channel at event tick `E` is applied and published after dispatch at `E`; the newly activated destination first dispatches at `E + 1`.
-- Spawn assignment completes on the advancing update that builds the spawn status change: the omni row is born owned by the requesting client's GUID carried in the spawn status change, and no pairing pass runs after the tick. That GUID is the persistent relink key.
+- A replay transfer recorded in the post-dispatch channel at event tick `E` is applied and published after dispatch at `E`; the newly activated destination first dispatches at `E + 1`.
+- A spawned omni row is born owned by the requesting client's GUID carried in the spawn status change the advancing update builds; the tick's owned-entity rebuild registers it and reports it `Spawned`, and no pairing pass runs. That GUID is the persistent ownership key.
 - Fleet navigation defers flagship updates through `StatusChange`s. Within
   `ServerSession::BuildAdvancingFrameInputs`, which the engine
   `ServerBroadcaster::BuildFrameInputs` calls after its frame-input reset,
   queued owned-entity updates, fleet timers and pending flagship updates, and
-  waiting-client spawn construction and assignment run once per update and only
+  waiting-client spawn construction run once per update and only
   on advancing updates, staying deferred through paused and other zero-tick
   updates. The agent status-change drain and the broadcast snapshot run in every
   normal-play tick's `PrepareTick`, after those once-per-update natural changes,
@@ -38,17 +45,23 @@ Server-only game networking. `ServerSession` is the game-policy wrapper over `en
 - Transfer validation, deterministic ordering, destination materialization and
   CRC recompute, and publication assembly are engine-owned
   ([engine Server contract](../../../../../Engine/Source/Network/Server/AGENTS.md#transfers-and-publication)).
-  The game half is the transfer payloads, the ownership relink above,
-  waiting-client spawn coordination, fleet notification, and pending
-  subscription updates; replay-transfer and injected-status harness rig state
+  The game half is the transfer payloads, waiting-client spawn coordination,
+  and fleet notification; replay-transfer and injected-status harness rig state
   follows the [game Agent contract](../../Agent/AGENTS.md#contracts).
 
 ## Trust and Lifecycle Boundaries
 
-- Engine `Server` owns packet admission and violation accounting, including handler throws; this layer supplies game contracts, dispatches admitted packets, and catches/logs handler failures. Side-specific bounds validate navigation timing, fleet sizes, and save/replay fleet data without partially applying a request.
-- Connect-time new-client processing, including its ownership relink, begins only after the engine accepts `ClientHello` and marks the handshake complete. After every eligible relink attempt, notify the fleet manager even when no owned entities were found, because a persistent fleet can outlive all its owned entities and still needs synchronization on reconnect.
-- A client is dead only after all owned entities are gone; skip death handling while an owned entity is mid-transfer.
-- Load reset advances the engine-owned debugging-load generation before notification, slot clearing, or transient reset. It then clears client, transfer, and broadcast transient state after restored fleet state is read; resetting the two engine managers clears their game Agent harness rig queues through the existing game functions they call, so no second clear belongs here. Do not erase restored fleet RNG or pending navigation updates.
+- Engine `Server` owns packet admission and violation accounting, and the engine session base drains admitted packets and records handler throws; this layer supplies game contracts and handles each admitted game packet in `HandleGamePacket`. Side-specific bounds validate navigation timing, fleet sizes, and save/replay fleet data without partially applying a request.
+- Connect-time new-client processing begins only after the engine accepts `ClientHello` and marks the handshake complete, and runs after the owned-entity rebuild has registered the client's surviving owned entities. Notify the fleet manager even when the client has no owned entities, because a persistent fleet can outlive all its owned entities and still needs synchronization on reconnect.
+- The engine load reset (`engine::ServerSessionBase::ResetForLoad`) advances
+  the debugging-load generation before notification, slot clearing, or
+  transient reset, and rebuilds client ownership before it calls
+  `OnResetForLoad`. That function clears pending flagship updates before any
+  fleet `OnResetForLoad`, then clears client and request transient state after
+  restored fleet state is read; the engine then resets its two managers, which
+  clears their game Agent harness rig queues through the existing game functions
+  they call, so no second clear belongs here. Do not erase restored fleet RNG or
+  the navigation updates fleet `OnResetForLoad` queues.
 
 ## See Also
 

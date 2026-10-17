@@ -5,7 +5,6 @@
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Network/Client/ClientReconciler.h"
 #include "Network/GamePacketType.h"
-#include "Network/OwnedEntityEvents.h"
 #include "Profile/ProfileRows.h"
 #include "Fleet.h"
 #include "Game.h"
@@ -35,9 +34,7 @@ const char* ToString(SubscriptionChangeReason eReason)
 ClientSession::ClientSession()
 : common::Singleton<ClientSession>(gpClientSession, this)
 {
-	mpDesynchronizationCore = std::make_unique<engine::ClientDesyncCore>();
 	mpReconciler = std::make_unique<ClientReconciler>();
-	mpRuntime = std::make_unique<engine::ClientSessionRuntime>();
 }
 
 ClientSession::~ClientSession()
@@ -45,34 +42,35 @@ ClientSession::~ClientSession()
 	mpRuntime.reset();
 }
 
+static bool ParseFleetSynchronization(std::vector<std::pair<int64_t, std::vector<uint8_t>>>& rRawPackets, std::vector<Fleet>& rOutputFleets)
+{
+	// A sync, including a zero-fleet sync, commits into rOutputFleets but leaves it empty when
+	// fleetCount == 0, so emptiness cannot tell the caller "applied" from "nothing arrived" — report it explicitly
+	bool bApplied = false;
+	for (auto it = rRawPackets.begin(); it != rRawPackets.end(); )
+	{
+		GamePacketType eType = static_cast<GamePacketType>(it->first);
+		if (eType != GamePacketType::kServerFleetSync)
+		{
+			++it;
+			continue;
+		}
+
+		// Each sync replaces the whole list, so parse into a fresh vector: fields the payload does not carry
+		// start at their defaults rather than inheriting an earlier sync's values
+		std::vector<Fleet> parsedFleets;
+		GameMessages::FleetSyncMessage::ReadPayload(it->second, parsedFleets);
+		rOutputFleets = std::move(parsedFleets);
+		bApplied = true;
+
+		it = rRawPackets.erase(it);
+	}
+
+	return bApplied;
+}
+
 void ClientSession::ProcessReceivedGamePackets()
 {
-
-	try
-	{
-		common::ScopedWorkbufferArena ownedEntityEventsArena = common::gpThreadLocal->mWorkbuffer.Push();
-		ParseOwnedEntityEvents(mpRuntime->mpClient->mReceivedGamePackets, ownedEntityEventsArena);
-		const ReceivedOwnedEntityEvent* pOwnedEntityEvents = ownedEntityEventsArena.mBuffer.Data<ReceivedOwnedEntityEvent>();
-		int64_t iOwnedEntityEventCount = ownedEntityEventsArena.mBuffer.Count<ReceivedOwnedEntityEvent>();
-		for (const ReceivedOwnedEntityEvent& rOwnedEntityEvent : std::span<const ReceivedOwnedEntityEvent>(pOwnedEntityEvents, static_cast<size_t>(iOwnedEntityEventCount)))
-		{
-			ApplyOwnedEntityEvent(rOwnedEntityEvent);
-		}
-	}
-	catch (const std::ios_base::failure& rException)
-	{
-		// The client trusts its server, so a shared reader throwing this type means server bytes the client cannot
-		// decode, and it cannot keep playing against them — assert so the process ends with a crash report naming the
-		// reader. The std::exception catch below is log-and-continue, so an ordinary local failure is never blamed on
-		// the peer.
-		LOG(kNetwork, kError, "ClientSession::ProcessReceivedGamePackets dropped corrupt owned-entity event packet: {}", rException.what());
-		ASSERT(false);
-	}
-	catch (const std::exception& rException)
-	{
-		LOG(kNetwork, kWarning, "ClientSession::ProcessReceivedGamePackets failed processing owned-entity events: {}", rException.what());
-	}
-
 	try
 	{
 		std::vector<Fleet> receivedFleets;
@@ -88,6 +86,10 @@ void ClientSession::ProcessReceivedGamePackets()
 	}
 	catch (const std::ios_base::failure& rException)
 	{
+		// The client trusts its server, so a shared reader throwing this type means server bytes the client cannot
+		// decode, and it cannot keep playing against them — assert so the process ends with a crash report naming the
+		// reader. The std::exception catch below is log-and-continue, so an ordinary local failure is never blamed on
+		// the peer.
 		LOG(kNetwork, kError, "ClientSession::ProcessReceivedGamePackets dropped corrupt packet (type {}): {}", static_cast<uint8_t>(GamePacketType::kServerFleetSync), rException.what());
 		ASSERT(false);
 	}
@@ -98,44 +100,34 @@ void ClientSession::ProcessReceivedGamePackets()
 
 }
 
-void ClientSession::ApplyOwnedEntityEvent(const ReceivedOwnedEntityEvent& rEvent)
+void ClientSession::ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent& rEvent)
 {
-	switch (rEvent.eType)
+	if (rEvent.eState == engine::OwnedEntityState::kDied)
 	{
-		case OwnedEntityEventType::kAssigned:
-			if (!((rEvent.globalId.iValue != 0) && std::ranges::contains(gpGame->mClientOwnedEntityIdentifiers, rEvent.globalId)))
-			{
-				LOG(kNetwork, kVerbose, "OwnedEntityEvent kAssigned NewGlobalId: {} NewCoord: ({},{}) FocusedGlobalId: {} FocusedCoord: ({},{})", rEvent.globalId, rEvent.coordinate.iX, rEvent.coordinate.iY, gpGame->ClientOwnedEntityIdentifier(), gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY);
-				gpGame->AddClientOwnedEntity(rEvent.globalId, rEvent.coordinate);
-			}
-			mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kAssigned));
-			break;
-		case OwnedEntityEventType::kSpawned:
-			UpdateOwnedEntityCoordinate(rEvent.globalId, rEvent.coordinate);
-			if (rEvent.globalId == gpGame->ClientOwnedEntityIdentifier())
-			{
-				gpGame->SetClientGridCoordinate(rEvent.coordinate);
-			}
-			mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kSpawned));
-			break;
-		case OwnedEntityEventType::kChangedCell:
-			UpdateOwnedEntityCoordinate(rEvent.globalId, rEvent.coordinate);
-			if (rEvent.globalId == gpGame->ClientOwnedEntityIdentifier())
-			{
-				gpGame->SetClientGridCoordinate(rEvent.coordinate);
-			}
-			mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kChangedCell));
-			break;
-		case OwnedEntityEventType::kDied:
-			gpGame->RemoveClientOwnedEntity(rEvent.globalId);
-			// A respawn keeps this ID and can come back in the weapon mode it had before a dropped request, which would never clear that pending toggle.
-			if (rEvent.globalId == gpGame->mFleetSelection.mFocusedMemberGlobalId)
-			{
-				gpGame->mWeaponModeToggle.Reset();
-			}
-			mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kDied));
-			break;
+		gpGame->RemoveClientOwnedEntity(rEvent.globalId);
+		// A respawn keeps this ID and can come back in the weapon mode it had before a dropped request, which would never clear that pending toggle.
+		if (rEvent.globalId == gpGame->mFleetSelection.mFocusedMemberGlobalId)
+		{
+			gpGame->mWeaponModeToggle.Reset();
+		}
+		mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kDied));
+		return;
 	}
+
+	// Spawned and ChangedCell each carry the assignment.
+	if (!((rEvent.globalId.iValue != 0) && std::ranges::contains(gpGame->mClientOwnedEntityIdentifiers, rEvent.globalId)))
+	{
+		LOG(kNetwork, kVerbose, "OwnedEntityEvent kAssigned NewGlobalId: {} NewCoord: ({},{}) FocusedGlobalId: {} FocusedCoord: ({},{})", rEvent.globalId, rEvent.coordinate.iX, rEvent.coordinate.iY, gpGame->ClientOwnedEntityIdentifier(), gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY);
+		gpGame->AddClientOwnedEntity(rEvent.globalId, rEvent.coordinate);
+	}
+	mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kAssigned));
+
+	UpdateOwnedEntityCoordinate(rEvent.globalId, rEvent.coordinate);
+	if (rEvent.globalId == gpGame->ClientOwnedEntityIdentifier())
+	{
+		gpGame->SetClientGridCoordinate(rEvent.coordinate);
+	}
+	mpRuntime->UpdateDesiredCoordinates(ToString(rEvent.eState == engine::OwnedEntityState::kSpawned ? SubscriptionChangeReason::kSpawned : SubscriptionChangeReason::kChangedCell));
 }
 
 void ClientSession::UpdateOwnedEntityCoordinate(engine::GlobalId globalId, engine::GridCoord coordinate)
@@ -148,31 +140,6 @@ void ClientSession::UpdateOwnedEntityCoordinate(engine::GlobalId globalId, engin
 			break;
 		}
 	}
-}
-
-void ClientSession::Reconcile()
-{
-	if (mpDesynchronizationCore->IsStalled())
-	{
-		return;
-	}
-
-	gpProfileManager->CpuStart(engine::kCpuTimerNetworkPollReconcile);
-	{
-		// Heap: reconciliation deserialization and map operations
-		ScopedSuppressAllocationTracking suppress;
-		int64_t iCurrentTick = gpGame->miTickCounter;
-		if (engine::gpClient != nullptr)
-		{
-			engine::ReconcileDesyncInfo desynchronizationInformation = mpReconciler->Run();
-			if (desynchronizationInformation.bDesync)
-			{
-				mpDesynchronizationCore->OnDesyncDetected(std::move(desynchronizationInformation));
-			}
-		}
-		mpRuntime->ApplyClockCorrection(iCurrentTick);
-	}
-	gpProfileManager->CpuStop(engine::kCpuTimerNetworkPollReconcile, engine::CpuStopFlags::kSmoothNow);
 }
 
 void ClientSession::ConnectToServer(std::string_view serverAddress)
@@ -205,12 +172,6 @@ void ClientSession::OnConnectionAccepted()
 	}
 }
 
-void ClientSession::PollDesynchronizationState()
-{
-	mpDesynchronizationCore->PollDebugFrameResponse();
-	mpDesynchronizationCore->PollDesyncTimeout();
-}
-
 void ClientSession::OnConnectionLost()
 {
 	gpGame->ChangeFrameToMainMenu();
@@ -225,12 +186,6 @@ void ClientSession::OnServerLoad()
 {
 	LOG(kDefault, kDebug, "ClientSession::OnServerLoad");
 
-	// Reset tick counter and time step — server tick resets to the saved value
-	gpGame->miTickCounter = 0;
-	gpGame->mTimeStep.mTickRemainderNanoseconds = 0ns;
-	gpGame->mTimeStep.mRealTime.Reset();
-	gpGame->ResetRenderClock();
-
 	// Clear owned-entity identity — server will reassign
 	gpGame->mClientOwnedEntityIdentifiers.clear();
 	gpGame->mClientOwnedEntityCoordinates.clear();
@@ -241,26 +196,6 @@ void ClientSession::OnServerLoad()
 
 	// Clear fleet state — server will re-sync
 	gpGame->mFleetSelection.Clear();
-
-	// Discard cells from the previous server state.
-	for (auto& [rCoordinate, rCell] : gpGame->mCells)
-	{
-		rCell.ResetClientState();
-	}
-	gpGame->mCells.clear();
-
-	mpReconciler->Reset();
-	mpDesynchronizationCore->Reset();
-}
-
-void ClientSession::OnRuntimeDisconnected()
-{
-	mpReconciler->Reset();
-	for (auto& [rCoordinate, rCell] : gpGame->mCells)
-	{
-		rCell.ResetClientState();
-	}
-	mpDesynchronizationCore->Reset();
 }
 
 void ClientSession::SendUpdateOwnedEntityRequest(int64_t iGlobalId, bool bUseMissiles, float fNavigationDelay)
@@ -311,28 +246,6 @@ void ClientSession::SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid,
 	}, rFleetGuid.uiHigh, rFleetGuid.uiLow, fDelay);
 }
 
-void ClientSession::ApplyReceivedStaticData()
-{
-	// Heap: try_emplace may insert new Cell, NavData vectors moved into staticData
-	ScopedSuppressAllocationTracking suppress;
-
-	std::vector<engine::ReceivedStaticData>& rStaticDataList = mpRuntime->mpClient->mReceivedStaticData;
-	for (engine::ReceivedStaticData& rReceived : rStaticDataList)
-	{
-		engine::Cell& rCell = gpGame->mCells.try_emplace(rReceived.coordinate).first->second;
-		rCell.staticData = std::move(rReceived.staticData);
-		rCell.staticData.coordinate = rReceived.coordinate;
-
-		// Subscription-driven island texture loading. AcquireTextureSlot is idempotent; duplicate
-		// CRCs across placements short-circuit on the hot path. Slot mint + chunk-load request
-		// happens here so the data is in-flight before UpdateActiveIslands references the slot.
-		for (const engine::IslandPlacement& rPlacement : rCell.staticData.islands)
-		{
-			engine::gpIslandTerrainResidency->AcquireTextureSlot(rPlacement.islandCrc);
-		}
-	}
-}
-
 void ClientSession::HydrateReceivedFullState(Frame& rReceived, const Frame* pRingTail)
 {
 	BlastersInterpolate::ClientInitializeAll(rReceived);
@@ -351,17 +264,6 @@ void ClientSession::HydrateReceivedFullState(Frame& rReceived, const Frame* pRin
 			std::memcpy(rNewSmokeTrails.pVecSmoothedPositions, rOldSmokeTrails.pVecSmoothedPositions, iCopyCount * sizeof(XMVECTOR));
 		}
 	}
-}
-
-void ClientSession::ResetCoordinateStatesForResynchronization()
-{
-	for (auto& [rCoordinate, rCell] : gpGame->mCells)
-	{
-		rCell.ResetClientState();
-	}
-
-	mpReconciler->Reset();
-	mpRuntime->mUnwantedTimestamps.clear();
 }
 
 #endif // BT_CLIENT

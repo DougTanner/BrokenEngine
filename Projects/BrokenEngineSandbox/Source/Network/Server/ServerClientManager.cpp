@@ -7,7 +7,6 @@
 #include "Frame/Collections/Omnis/Omnis.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
-#include "Network/OwnedEntityEvents.h"
 #include "Game.h"
 
 namespace game
@@ -17,10 +16,6 @@ namespace game
 
 void ServerClientManager::QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId)
 {
-	// A queued spawn revives the client: clear its dead/processed state unconditionally.
-	mDeadClientIds.erase(iClientId);
-	mProcessedClientIds.erase(iClientId);
-
 	// Dedup only the queue push on the full spawn identity so a client spamming spawn-into/respawn queues at most one spawn
 	// per (fleet guid, member). Skip duplicates without reordering — request order is the order spawn status changes enter
 	// the frame input, and therefore the simulation and the CRC.
@@ -47,17 +42,6 @@ void ServerClientManager::NewClients()
 			continue;
 		}
 
-		auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(rClient.iClientId);
-		if (ownedIt != gpServerSession->mClientOwnedEntities.mOwned.end() && !ownedIt->second.empty())
-		{
-			continue;
-		}
-
-		if (mDeadClientIds.contains(rClient.iClientId))
-		{
-			continue;
-		}
-
 		if (mProcessedClientIds.contains(rClient.iClientId))
 		{
 			continue;
@@ -70,16 +54,16 @@ void ServerClientManager::NewClients()
 
 		LogConnectingClientDiagnostic(rClient);
 
-		int64_t iRelinkedOwnedEntityCount = gpServerSession->RelinkFromFrames(rClient.iClientId, rClient.clientGuid, ServerSession::RelinkContext::kConnect);
+		// ServerSessionBase::RebuildOwnedEntities runs before this each poll, so the fleet refresh sees the client's surviving owned entities.
 		gpServerSession->mpFleetManager->OnClientConnected(rClient.iClientId, rClient.clientGuid);
-		if (iRelinkedOwnedEntityCount > 0)
-		{
-			continue;
-		}
+		mProcessedClientIds.insert(rClient.iClientId);
 
 		// Client connects with zero owned entities — spawns happen via fleet creation requests
-		mProcessedClientIds.insert(rClient.iClientId);
-		LOG(kNetwork, kVerbose, "ServerClientManager::NewClients Client: {} connected with no owned entities", rClient.iClientId);
+		auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(rClient.iClientId);
+		if (ownedIt == gpServerSession->mClientOwnedEntities.mOwned.end() || ownedIt->second.empty())
+		{
+			LOG(kNetwork, kVerbose, "ServerClientManager::NewClients Client: {} connected with no owned entities", rClient.iClientId);
+		}
 	}
 }
 
@@ -108,7 +92,7 @@ void ServerClientManager::LogConnectingClientDiagnostic(const engine::ClientConn
 
 void ServerClientManager::SpawnWaitingClients()
 {
-	// Heap: vector push_back for status changes and owned-entity records
+	// Heap: vector push_back for status changes and processed-client set inserts
 	ScopedSuppressAllocationTracking suppress;
 
 	for (const ClientSpawnInformation& rClientSpawnInformation : mClientsWaitingForSpawn)
@@ -134,11 +118,8 @@ void ServerClientManager::SpawnWaitingClients()
 		gpGame->mFrameInputs.try_emplace(engine::kOriginCoordinate).first->second.statusChanges.push_back(spawnChange);
 		LOG(kNetwork, kVerbose, "ServerClientManager::SpawnWaitingClients::kSpawnOmni Client: {} GlobalId: {} Coord: ({},{}) Flagship: {}", rClientSpawnInformation.iClientId, globalId.iValue, engine::kOriginCoordinate.iX, engine::kOriginCoordinate.iY, bIsFlagship);
 
-		// Assignment is keyed on this spawn's id, so it completes here rather than waiting for the row to exist.
-		// Client handles subscriptions — no full state sent here.
-		gpServerSession->SendAssignOwnedEntity(rClientSpawnInformation.iClientId, globalId, engine::kOriginCoordinate);
-		gpServerSession->SendOwnedEntityState(rClientSpawnInformation.iClientId, OwnedEntityStateWireType::kSpawned, globalId.iValue, engine::kOriginCoordinate);
-		gpServerSession->mClientOwnedEntities.Add(rClientSpawnInformation.iClientId, globalId, engine::kOriginCoordinate);
+		// A client spawning this update is not handled again by NewClients after another of its queued spawns drops.
+		mProcessedClientIds.insert(rClientSpawnInformation.iClientId);
 
 		gpServerSession->mpFleetManager->OnOwnedEntitySpawned(rClientSpawnInformation.iClientId, rClientSpawnInformation.clientGuid, rClientSpawnInformation, globalId);
 	}
@@ -156,7 +137,6 @@ void ServerClientManager::OnClientDisconnected(int64_t iClientId, const engine::
 		auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(iClientId);
 		return ownedIt != gpServerSession->mClientOwnedEntities.mOwned.end() ? std::ssize(ownedIt->second) : 0i64;
 	}());
-	mDeadClientIds.erase(iClientId);
 	mProcessedClientIds.erase(iClientId);
 
 	gpServerSession->mpFleetManager->OnClientDisconnected(iClientId, rClientGuid);
@@ -169,80 +149,15 @@ void ServerClientManager::OnClientDisconnected(int64_t iClientId, const engine::
 	gpServerSession->mClientOwnedEntities.mOwned.erase(iClientId);
 }
 
-void ServerClientManager::DetectOwnedEntityDeaths()
-{
-	std::vector<engine::ClientConnection>& rClients = engine::gpServer->mClients;
-	for (const engine::ClientConnection& rClient : rClients)
-	{
-		auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(rClient.iClientId);
-		std::span<const engine::OwnedEntity> ownedEntities = ownedIt != gpServerSession->mClientOwnedEntities.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
-
-		if (ownedEntities.empty())
-		{
-			continue;
-		}
-
-		if (mDeadClientIds.contains(rClient.iClientId))
-		{
-			continue;
-		}
-
-		// Skip clients mid-transfer (subscription update pending from HarvestTransfers)
-		if (std::ranges::contains(gpServerSession->mPendingSubscriptionUpdates, rClient.iClientId, &game::SubscriptionUpdate::iClientId))
-		{
-			continue;
-		}
-
-		// Heap: per-frame death scan may erase registry entries and authorized coords
-		ScopedSuppressAllocationTracking suppress;
-
-		// Check each owned entity for death (reverse iterate for safe removal)
-		for (int64_t i = std::ssize(ownedEntities) - 1; i >= 0; --i)
-		{
-			const engine::OwnedEntity& rOwnedEntity = ownedEntities[i];
-			engine::GlobalId globalId = rOwnedEntity.globalId;
-			engine::GridCoord coordinate = rOwnedEntity.coord;
-
-			if (!gpGame->mCells.contains(coordinate))
-			{
-				continue;
-			}
-
-			const OmnisPostRender& rOmnis = *(*gpGame->mCells.at(coordinate).pCurrent).postRender.pOmnis;
-			bool bFound = false;
-			for (const engine::GlobalId& rGlobalId : std::span<const engine::GlobalId>(rOmnis.pGlobalIds, static_cast<size_t>(rOmnis.iCount)))
-			{
-				if (rGlobalId == globalId)
-				{
-					bFound = true;
-					break;
-				}
-			}
-
-			if (!bFound)
-			{
-				gpServerSession->SendOwnedEntityState(rClient.iClientId, OwnedEntityStateWireType::kDied, globalId.iValue, coordinate);
-				LOG(kNetwork, kVerbose, "ServerClientManager::DetectOwnedEntityDeaths Client: {} GlobalId: {} Coord: ({},{})", rClient.iClientId, globalId, coordinate.iX, coordinate.iY);
-				gpServerSession->mClientOwnedEntities.RemoveAt(rClient.iClientId, i);
-
-				gpServerSession->mpFleetManager->OnOwnedEntityDeath(rClient.clientGuid, globalId);
-			}
-		}
-
-		// Mark client as dead only when ALL owned entities are dead
-		ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(rClient.iClientId);
-		if (ownedIt == gpServerSession->mClientOwnedEntities.mOwned.end() || ownedIt->second.empty())
-		{
-			mDeadClientIds.insert(rClient.iClientId);
-		}
-	}
-}
-
 void ServerClientManager::ResetState()
 {
 	mClientsWaitingForSpawn.clear();
-	mDeadClientIds.clear();
-	mProcessedClientIds.clear();
+	// Runs after the load rebuilt the registry: a client left with no owned entity is handled again by NewClients.
+	std::erase_if(mProcessedClientIds, [](int64_t iClientId)
+	{
+		auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(iClientId);
+		return ownedIt == gpServerSession->mClientOwnedEntities.mOwned.end() || ownedIt->second.empty();
+	});
 }
 
 #endif // BT_SERVER

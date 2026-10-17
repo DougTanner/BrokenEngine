@@ -225,40 +225,9 @@ void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferI
 			continue;
 		}
 
-		bool bFoundClient = false;
-		std::vector<engine::ClientConnection>& rClients = engine::gpServer->mClients;
-		for (const engine::ClientConnection& rClient : rClients)
-		{
-			auto ownedIt = game::gpServerSession->mClientOwnedEntities.mOwned.find(rClient.iClientId);
-			std::span<const engine::OwnedEntity> ownedEntities = ownedIt != game::gpServerSession->mClientOwnedEntities.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
-			for (const engine::OwnedEntity& rOwnedEntity : ownedEntities)
-			{
-				if (rOwnedEntity.globalId == rClientTransfer.globalId)
-				{
-					game::gpServerSession->mClientOwnedEntities.UpdateCoord(rClient.iClientId, rClientTransfer.globalId, rClientTransfer.destination);
-					game::gpServerSession->mPendingSubscriptionUpdates.push_back(
-					{
-						.iClientId = rClient.iClientId,
-						.newCoordinate = rClientTransfer.destination,
-						.globalId = rClientTransfer.globalId,
-					});
-
-					engine::AssignRegistryClientGuid(destinationLayer, rClientTransfer.globalId, rClient.clientGuid);
-
-					game::gpServerSession->OnOwnedEntityChangedCell(rClient.clientGuid, rClientTransfer.globalId, rClientTransfer.destination);
-
-					bFoundClient = true;
-					break;
-				}
-			}
-			if (bFoundClient)
-			{
-				break;
-			}
-		}
-
-		// Orphaned owned entities (client disconnected): preserve the GUID and report the cell change
-		if (!bFoundClient && (rClientTransfer.clientGuid.uiHigh != 0 || rClientTransfer.clientGuid.uiLow != 0))
+		// Connected or not, the owner keeps its GUID in the destination; ServerSessionBase::RebuildOwnedEntities reports
+		// the cell change to a connected owner.
+		if (rClientTransfer.clientGuid.uiHigh != 0 || rClientTransfer.clientGuid.uiLow != 0)
 		{
 			engine::AssignRegistryClientGuid(destinationLayer, rClientTransfer.globalId, rClientTransfer.clientGuid);
 			game::gpServerSession->OnOwnedEntityChangedCell(rClientTransfer.clientGuid, rClientTransfer.globalId, rClientTransfer.destination);
@@ -351,7 +320,6 @@ void ServerTransferManager::ResetState()
 {
 	mTransfers.clear();
 	game::ResetReplayTransferHarnessRigs(*game::gpServerSession);
-	game::gpServerSession->mPendingSubscriptionUpdates.clear();
 	miHarvestedTransferTotal = 0;
 }
 

@@ -9,10 +9,10 @@ Game implementation built on Engine and Common. `Game` owns the per-side session
 ## Ownership
 
 - `Fleet` is the shared data model and uses persistent identifiers assigned by the server. `FleetSelection` is client-only focus and navigation UI state; it also owns the HUD fleet panel's network-pending controls, so clearing it on game reset or server load resets pending marks the server can no longer resolve.
-- `ClientSession` and `ServerSession` are game-policy wrappers that compose engine-owned session runtimes. See `Network/AGENTS.md`.
+- `ClientSession` and `ServerSession` inherit the engine session bases, which own the reusable session mechanics, compose the engine-owned session runtimes through them, and add game policy. See `Network/AGENTS.md`.
 - Server save, load, reset, and autosave, like replay recording and playback, are engine-owned (`../../../Engine/Source/File/AGENTS.md`); the game half of those contracts and of the grid save lives in `Save/AGENTS.md`.
 - The server monitoring window is engine-owned (`../../../Engine/Source/Server/AGENTS.md`); the game reaches it only through the per-cell population snapshot in `Frame/AGENTS.md` and the profile counters it publishes for its own reasons.
-- Display input is engine-owned (`../../../Engine/Source/Input/AGENTS.md`). The game's only display-input entry point is `Game::ProcessGameMenuInput`, which `GameBase::ProcessInput` calls last, after engine menu policy: it polls its own keys through the borrowed `engine::InputPoll` and owns the game network transport for the generic save/replay/time/pause flags. Everything it does is `kbDebugInput`-only today.
+- Display input is engine-owned (`../../../Engine/Source/Input/AGENTS.md`). The game's only display-input entry point is `Game::ProcessGameMenuInput`, which `GameBase::ProcessInput` calls last, after engine menu policy and the engine's debug-control requests: it polls its own keys through the borrowed `engine::InputPoll`. Everything it does is `kbDebugInput`-only today.
 - Agent commands are game-dispatched, but transport, synthetic input, UI snapshots, the build-agnostic shared handlers, and the client-generic handlers are engine-owned; the dispatcher tries the engine shared handlers before its side-specific ones, and under `BT_CLIENT` tries the engine client-generic handler before its own client handlers. `Game` teardown clears any deferred agent response first, while its captured runtime dependencies are still live. See `Agent/AGENTS.md`.
 
 ## Architecture

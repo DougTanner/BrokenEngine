@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-16T13:05:00.441Z","dependsOn":["Documents/Plans/Engine/SharedSessionProtocol.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-16T13:05:00.441Z","dependsOn":[]} -->
 # Replace the `game::NetworkSessionContract` trait struct and its engine concept with direct names
 
 Tier 2 (`.agents/references/risk-tiers.md`): a behavior-preserving change to the

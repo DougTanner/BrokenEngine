@@ -4,6 +4,8 @@
 
 #if defined(BT_CLIENT)
 
+#include "Audio/StaticVoices.h"
+
 #include "Frame/Frame.h"
 #include "Game.h"
 
@@ -449,6 +451,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 	common::gpMultithreading->Dispatch(iCount, ProcessRange);
 
 	// Post-dispatch merge: profiling, desync (first-wins), bAnyFullReplay
+	CoordWork* pDesyncWork = nullptr;
 	for (CoordWork& rWork : activeWorks)
 	{
 		const CoordScratch& rScratch = rWork.scratch;
@@ -458,9 +461,9 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 		result.profiling.iStatusChangeReplayTicks += rScratch.profiling.iStatusChangeReplayTicks;
 		result.profiling.iKnockOnReplayTicks += rScratch.profiling.iKnockOnReplayTicks;
 
-		if (rScratch.iDesyncTick >= 0 && result.pDesyncWork == nullptr)
+		if (rScratch.iDesyncTick >= 0 && pDesyncWork == nullptr)
 		{
-			result.pDesyncWork = &rWork;
+			pDesyncWork = &rWork;
 		}
 
 		using enum ReconcileScratchFlags;
@@ -486,6 +489,41 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 				}
 			}
 		}
+	}
+
+	if (pDesyncWork != nullptr)
+	{
+		CoordScratch& rScratch = pDesyncWork->scratch;
+		char pcExpected[20] {}, pcActual[20] {};
+		common::ToHex(std::span<char, 20>(pcExpected), rScratch.desyncExpectedCrc);
+		common::ToHex(std::span<char, 20>(pcActual), rScratch.desyncActualCrc);
+		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesyncWork->coord.iX, pDesyncWork->coord.iY, rScratch.iDesyncTick, pcExpected, pcActual, rScratch.iReplayStackCount, rScratch.iNewConfirmedTick);
+
+		result.desync.bDesync = true;
+		result.desync.iDesyncTick = rScratch.iDesyncTick;
+		result.desync.desyncCoord = pDesyncWork->coord;
+		result.desync.desyncExpectedCrc = rScratch.desyncExpectedCrc;
+		result.desync.desyncActualCrc = rScratch.desyncActualCrc;
+		result.desync.pDesyncClientFrame = std::move(rScratch.pDesyncClientFrame);
+		return result;
+	}
+
+	gpProfileManager->mCrcValidatedTicksPerSecond.Set(result.profiling.iCrcValidatedFrameTicks);
+	gpProfileManager->mAssumedTicksPerSecond.Set(result.profiling.iAssumedFrameTicks);
+	gpProfileManager->mCrcFastPathEventsPerSecond.Set(result.profiling.iCrcFastPathEvents);
+	gpProfileManager->mStatusChangeReplayTicksPerSecond.Set(result.profiling.iStatusChangeReplayTicks);
+	gpProfileManager->mKnockOnReplayTicksPerSecond.Set(result.profiling.iKnockOnReplayTicks);
+
+	// Large single-frame re-sim bursts are frame-time spike candidates
+	int64_t iResimulationTicks = result.profiling.iStatusChangeReplayTicks + result.profiling.iKnockOnReplayTicks;
+	if (iResimulationTicks >= 8)
+	{
+		LOG(kNetwork, kVerbose, "Replay burst ReSimTicks: {} StatusChange: {} KnockOn: {} Assumed: {} CrcValidated: {} Coords: {}", iResimulationTicks, result.profiling.iStatusChangeReplayTicks, result.profiling.iKnockOnReplayTicks, result.profiling.iAssumedFrameTicks, result.profiling.iCrcValidatedFrameTicks, result.iActiveCount);
+	}
+
+	if (result.bAnyFullReplay)
+	{
+		gpAudioManager->mpStaticVoices->mbSkipNextInvalidation = true;
 	}
 
 	return result;

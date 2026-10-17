@@ -62,7 +62,7 @@ public:
 	void ResetGameState();
 
 #if defined(BT_CLIENT)
-	void ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engine::InputPoll& rInputPoll);
+	void ProcessGameMenuInput(const engine::InputPoll& rInputPoll);
 
 	// The standard menu screens read this every render pass, and again after any action that can
 	// change it, because an action's effect must be visible to later decisions in the same pass.

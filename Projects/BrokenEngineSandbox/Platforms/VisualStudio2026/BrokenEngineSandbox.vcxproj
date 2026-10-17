@@ -448,6 +448,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Input\RawInputManager.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\Client.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ClientDesyncCore.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ClientSessionBase.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ClientSessionRuntime.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ClientSubscriptions.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplay.h" />
@@ -505,7 +506,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\FleetSelection.h" />
     <ClInclude Include="..\..\Source\Network\Client\ClientSession.h" />
     <ClInclude Include="..\..\Source\Network\Client\ClientReconciler.h" />
-    <ClInclude Include="..\..\Source\Network\OwnedEntityEvents.h" />
     <ClInclude Include="..\..\Source\Network\StatusChangeCodec.h" />
     <ClInclude Include="..\..\Source\Network\GameMessages.h" />
     <ClInclude Include="..\..\Source\Network\GamePacketType.h" />
@@ -676,6 +676,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Main.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\Client.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientDesyncCore.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientSessionBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientSessionRuntime.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientSubscriptions.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ReconcileReplay.cpp" />
@@ -755,7 +756,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Network\Client\ClientSession.cpp" />
     <ClCompile Include="..\..\Source\Network\Client\ClientReconciler.cpp" />
     <ClCompile Include="..\..\Source\Network\Client\ReconcileReplayClientState.cpp" />
-    <ClCompile Include="..\..\Source\Network\OwnedEntityEvents.cpp" />
     <ClCompile Include="..\..\Source\Network\StatusChangeCodec.cpp" />
     <ClCompile Include="..\..\Source\Graphics\Camera.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\ChatScreen.cpp" />

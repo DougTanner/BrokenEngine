@@ -184,17 +184,17 @@ must prove.
    `result.effective`. Also send the server
    `set_log_level {"category":"Default","level":"Debug"}` so the step-8
    `ReadGrid` and `End replay` markers and the step-10
-   `ServerSession::ResetClientsForLoad` line emit. Then capture ordered
+   `ServerSessionBase::ResetForLoad` line emit. Then capture ordered
    client/server replay, CRC, checksum, desync, `ChangedCell`, subscribe, and
    publication log baselines. When Network is clamped to `Debug`, record that
    result and do not require unavailable kVerbose publication lines. Keep the
    client connected through recording and playback.
 2. Use `describe_ui`, click `[+]##Fleet`, then click `[+]##Omni`. Wait for the
-   fleet member and the ordinary `ServerSession::SendOwnedEntityState State: Spawned`
+   fleet member and the ordinary `ServerSessionBase::SendOwnedEntityState State: Spawned`
    line. Read `status.activeCoords`, query each current coordinate with
    `query_omnis`, and require exactly one Omni overall. Record its
    `globalId` and current `uuid`, then wait, injecting nothing, for its first
-   `ServerSession::SendOwnedEntityState State: ChangedCell ... GlobalId: <globalId>`
+   `ServerSessionBase::SendOwnedEntityState State: ChangedCell ... GlobalId: <globalId>`
    line; call that line's cell W. The server fleet timer moves a new flagship
    once within 60 s of spawn, and afterwards only while the flagship sits in W.
    Pick the unit step s along a nonzero axis of W that points away from origin,
@@ -211,7 +211,7 @@ must prove.
 4. Start recording and poll `status.recording:true`. Confirm A is subscribed, and keep the current client `describe_scene.subscribedCoords` plus newly appended `Server::ClientSubscribe` lines as the subscription baseline. The exact initial activation tick `A1` comes from the stopped manifest in step 11; a later status poll does not establish it.
 5. Move A→B using the fresh UUID rule. Require the same `globalId` at B and
    exactly one new
-   `ServerSession::SendOwnedEntityState State: ChangedCell ... GlobalId: <globalId> Grid: (<B>)`
+   `ServerSessionBase::SendOwnedEntityState State: ChangedCell ... GlobalId: <globalId> Grid: (<B>)`
    line; its log tick is `E1`. During recording only, send the client
    `set_client_grid_coord` once to a parking coordinate P whose 3x3 ring
    contains neither A, B, nor origin; the command pins the viewer at P, so
@@ -256,7 +256,7 @@ must prove.
     not `describe_scene.subscribedCoords`, which always lists the client's own
     cell. For each of at least two observed playback loops, require exactly one
     `Server::ClientSubscribe Client: <n> Coord: (<A>) Slot: <s>` line after that
-    loop's bare `ServerSession::ResetClientsForLoad` line and before its
+    loop's bare `ServerSessionBase::ResetForLoad` line and before its
     `(E1,B)` OwnedEntity `ChangedCell` line, and no `Server::ClientSubscribe` or
     `Server::ClientUnsubscribe` line for A from that `E1` line through its
     `(E4,A)` line. Between one loop's `E1` and `E2` lines, take one sample:

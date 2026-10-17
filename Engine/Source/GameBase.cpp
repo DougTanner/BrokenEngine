@@ -152,7 +152,7 @@ void GameBase::ProcessInput(bool bLostFocus)
 			gDebugTextureIndex.Set(fPrevious);
 		}
 
-		// Local pause state flips here so ProcessGameMenuInput's pause packet reports the state the client just entered.
+		// Local pause state flips here so the pause request sent below reports the state the client just entered.
 		if (menuInput.flags & MenuInputFlags::kTogglePauseFrame)
 		{
 			mGameFlags.Toggle(GameFlags::kPaused);
@@ -163,6 +163,46 @@ void GameBase::ProcessInput(bool bLostFocus)
 			else
 			{
 				gpImGuiManager->UpdateTextArea(kTextDebug, "");
+			}
+		}
+
+		// A server built without kbDebugInput strikes every debug-control request as corrupt data, so send
+		// them only to a server whose accepted connection response said it takes them.
+		if (gpClient != nullptr && (gpClient->mStateFlags & Client::ClientStateFlags::kServerDebugInput))
+		{
+			if (menuInput.flags & MenuInputFlags::kQuicksave)
+			{
+				gpClient->SendSimplePacket(PacketType::kClientSaveRequest, NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+			}
+			if (menuInput.flags & MenuInputFlags::kQuickload)
+			{
+				gpClient->SendSimplePacket(PacketType::kClientLoadRequest, NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+			}
+			if (menuInput.flags & MenuInputFlags::kSaveReplay)
+			{
+				gpClient->SendSimplePacket(PacketType::kClientReplayRecordRequest, NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+			}
+			if (menuInput.flags & MenuInputFlags::kLoadReplay)
+			{
+				gpClient->SendSimplePacket(PacketType::kClientReplayPlaybackRequest, NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+			}
+			if (inputPoll.KeyboardPressed(VK_BACK))
+			{
+				gpClient->SendSimplePacket(PacketType::kClientResetRequest, NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
+			}
+
+			if (menuInput.flags & MenuInputFlags::kSlowTime)
+			{
+				gpClient->SendSimplePacket(PacketType::kClientTimespeedRequest, NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE, 0ui8);
+			}
+			else if (menuInput.flags & MenuInputFlags::kSpeedUpTime)
+			{
+				gpClient->SendSimplePacket(PacketType::kClientTimespeedRequest, NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE, 1ui8);
+			}
+
+			if (menuInput.flags & MenuInputFlags::kTogglePauseFrame)
+			{
+				gpClient->SendSimplePacket(PacketType::kClientPauseRequest, NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>((mGameFlags & GameFlags::kPaused) ? 1 : 0));
 			}
 		}
 	}
@@ -184,7 +224,7 @@ void GameBase::ProcessInput(bool bLostFocus)
 		}
 	}
 
-	game::gpGame->ProcessGameMenuInput(menuInput, inputPoll);
+	game::gpGame->ProcessGameMenuInput(inputPoll);
 
 	// Runs after every edge consumer, including game::gpGame->ProcessGameMenuInput and the modal path that skips it;
 	// moving this earlier silently breaks edge detection for whatever still has to run.

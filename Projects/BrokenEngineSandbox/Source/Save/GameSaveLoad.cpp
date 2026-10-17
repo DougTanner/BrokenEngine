@@ -39,7 +39,7 @@ void OnReplayStreamsInvalidated()
 
 void OnStateReplaced()
 {
-	game::gpServerSession->ResetClientsForLoad();
+	game::gpServerSession->ResetForLoad();
 }
 
 } // namespace game

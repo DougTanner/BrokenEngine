@@ -63,16 +63,24 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
   default game port. The scanner pings loopback before broadcasting to the LAN
   so a same-machine server always wins the race, and `--loopback-only` stays
   symmetric — responder bound to loopback, scanner skipping the broadcast.
-- `NetworkMessages` owns engine packet field order, sizes, and paired encode/decode; evolve an engine packet through its shared layout rather than mirroring fields in client/server leaves.
+- `NetworkMessages` owns engine packet field order, sizes, and paired encode/decode; evolve an engine packet through its shared layout rather than mirroring fields in client/server leaves. Numeric `OwnedEntityState` values are serialized, so each `kpOwnedEntityStateDescriptors` row index equals its value; append a state and its row before `kCount`.
 - `ChatText` owns `IsValidChatText`, the one chat-text rule both sides apply: `Client::SendChat` sends only text that passes it, and the server rejects text that fails it as corrupt before relaying ([Client to Server Contract](../../../Documents/Architecture/Network.md#client--server-contract)).
 - Client and server leaves own the side-specific transport peers, receive buffers, contracts, slots, and packet handling.
-- `ClientSessionRuntime` and `ServerSessionRuntime` own the reusable session
-  mechanics and phase order that canonical game sessions compose with
-  synchronous game policy functions the runtimes call by name ([Network
+- `ClientSessionRuntime` and `ServerSessionRuntime` own transport, pacing, and
+  phase order. The non-virtual `ClientSessionBase` and `ServerSessionBase`,
+  which the game sessions inherit, hold the runtimes and own the reusable
+  session state and mechanics; bases and runtimes call synchronous game
+  functions by name through `game::gpClientSession`/`game::gpServerSession`
+  ([Network
   architecture](../../../Documents/Architecture/Network.md#session-ownership-and-phase-order)).
-  `game::NetworkSessionContract` supplies Frame/status types, protocol
-  constants, codecs, and game packet contracts at compile time; runtimes use no
-  virtual session base, runtime type erasure, or additional global manager.
+  Neither base header is in `Engine.h`; each game session header includes its
+  base directly. The bases' wire is engine packet types: the owned-entity state
+  notification `kServerOwnedEntityState` and the seven debug-control requests
+  (save, load, reset, replay record, replay playback, pause, timespeed), which
+  `GameBase::ProcessInput` sends. `game::NetworkSessionContract` supplies
+  Frame/status types, protocol constants, codecs, and game packet contracts at
+  compile time; the sessions use no virtual function, runtime type erasure, or
+  additional global manager.
 - `NetworkSerialization` owns the status-change batch codec: the per-type group
   envelope, the per-item size bound, and the LZ4 framing. Game Network owns the
   status-change type set and each type's payload read/write

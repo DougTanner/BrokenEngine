@@ -21,7 +21,7 @@ Answer one question before the Plan review step: is there a materially
 different way to do this? Main dispatches one to three blind `researcher` workers
 on fixed axes, compares their candidates against the drafted approach, and
 reports that the original stands or puts every returned candidate to the user,
-who picks at most one.
+who picks at most one option or combination.
 
 ## When to use
 
@@ -31,9 +31,7 @@ who picks at most one.
   [`../plan-simplicity-review/SKILL.md`](../plan-simplicity-review/SKILL.md)
   `## When to use` fires — minus that skill's `/save-plan` save-time dispatch.
 - From a `/next-plan` claim, after the preparation `implementer` verifies the
-  Plan and before the Plan review reviewers, whenever that same trigger fires;
-  its user presentation is then carried into that skill's approval
-  presentation.
+  Plan and before the Plan review reviewers, whenever that same trigger fires.
 - Not for a new Collection, manager, or subsystem API: `/external-design-interface`
   already produces three designs and replaces this skill for that case.
 - Not from a saved but unclaimed Plan; such a Plan gets this step when it is
@@ -77,18 +75,19 @@ comparison depends on, main dispatches one `locator` to settle that fact and
 scores from its returned rows instead of reading source itself.
 
 Main scores candidate zero from the rows of the preparation handoff's
-`Candidate zero` field when a preparation handoff returned that field's rows.
+`Candidate zero` field when a preparation handoff returned that field's rows,
+and a proposed combination from the rows of the candidates it combines.
 
-Main scores candidate zero and every returned candidate on the same criteria,
-and never merges candidates into a hybrid; the user picks at most one:
+Main scores candidate zero and every returned candidate on the same criteria:
 
 - objective fully met;
 - cause removed rather than symptom suppressed;
 - shape, read from `Mechanism` and `Adds/Deletes`: fixing a fact where it is
   created is simpler than carrying a transient key to reconcile it later;
-- net new code;
-- invariant surfaces touched (a candidate that raises the tier is noted, not
-  disqualified);
+- the code, state, and machinery the codebase is left with;
+- runtime cost;
+- invariants kept, read from `Invariant surfaces`: every invariant the change
+  must hold still holds on each surface listed;
 - `Existing guarantees`: relies on what the code already guarantees instead of
   rebuilding it;
 - `Self-serving machinery`: adds none;
@@ -108,9 +107,7 @@ IMPORTANT: this step exists to widen the change when wider is better — a
 root-cause fix, a refactor that improves the codebase, or a better idea the
 draft missed — or to narrow it when a simpler alternative meets the objective.
 Scope limits what implementation may change once the user has picked an
-approach; the drafted plan's scope is never a reason to recommend it or to mark
-an alternative down unless the user set it
-([`authority-order.md`](../../references/authority-order.md)).
+approach.
 
 When no researcher returned a candidate, the original stands and the turn's
 report carries one line:
@@ -119,11 +116,9 @@ report carries one line:
 Alternatives: original stands (<axes>)
 ```
 
-Otherwise, before the Plan review step — or, in a `/next-plan` run, as the
-`### Plan alternatives` section of that skill's `### Implementation approval`
-presentation — main presents every returned candidate beside the drafted
-approach in plain language per `### User Interaction`, giving each option, the
-drafted plan included:
+Otherwise, before the Plan review step on every route, main presents every
+returned candidate beside the drafted approach in plain language per
+`### User Interaction`, giving each option, the drafted plan included:
 
 - Unique advantages: what it offers that the other options do not, each named
   with a short label, such as DRY (reuses an existing mechanism instead of
@@ -131,15 +126,19 @@ drafted plan included:
   fix (the `### Comparison` cause criterion), or codebase-improving refactor
   (the `### Comparison` codebase criterion) — or `none`.
 - Pros and cons: the `### Comparison` criteria stated as pros and cons,
-  including what it adds and deletes, which invariant surfaces it touches, and
-  when it pays off.
+  including what it adds and deletes and when it pays off, worded by the
+  `### User Interaction` rule for comparing options.
+
+Main may also propose one combination of compatible parts of the options,
+presented as its own option with the same two entries.
 
 Main then gives a recommendation and asks verbatim:
 
 > Which approach should this change use: the drafted plan as written, or one of
-> the alternatives above?
+> the other options above?
 
-The user picks one, and main takes it down the route that matches the change:
+The user picks at most one option or combination, and main takes it down the
+route that matches the change:
 
 - Tier-2+ change that is not a claimed Plan: the choice goes back to
   `/prepare-change` as a fixed decision for a redraft, and the Plan review

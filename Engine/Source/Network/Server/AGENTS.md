@@ -6,11 +6,17 @@ violation accounting for engine and game packets, including handler throws.
 `ServerBufferedFrames`, a member of `Server`, owns the update rings and resend
 state. `ServerSessionRuntime` owns host lifetime, fixed-tick pacing, discovery,
 poll/tick/paused sequencing, queue servicing, broadcast consumption, resend,
-flush, and transport reset. `OwnedEntityRegistry` owns per-client owned-entity
-records and keeps their `authorizedCoordinates` mirror index-parallel. The game
-server session (the game project's own `Source/Network/Server/AGENTS.md`)
-supplies game packet contracts and dispatch, authorization, transfer payloads
-and classification, and the gameplay functions the engine calls by name.
+flush, and transport reset. `ServerSessionBase`, which the game server session
+inherits, holds the owned-entity registry, the transfer manager, the
+broadcaster, and the runtime, and owns tick preparation, timescale stepping,
+the active set's ownership step, the owned-entity rebuild and its state
+notifications, the load reset, and the deferred client-packet drain with the
+debug-control request handlers. `OwnedEntityRegistry` owns per-client
+owned-entity records and keeps their `authorizedCoordinates` mirror
+index-parallel. The game server session (the game project's own
+`Source/Network/Server/AGENTS.md`) supplies game packet contracts and handlers,
+authorization, transfer payloads and classification, and the gameplay functions
+the engine calls by name.
 
 ## Affinity and Lifetime
 
@@ -33,7 +39,7 @@ and classification, and the gameplay functions the engine calls by name.
   bootstrap and all load-scoped subscription traffic. It rejects a subscription
   request whose generation differs from the current world after finding the
   handshaken client and before coordinate lookup, slot allocation, or
-  publication. The game's load reset advances the generation before
+  publication. `ServerSessionBase::ResetForLoad` advances the generation before
   notification, slot clearing, or reset-state mutation. Wire width, exhaustion,
   and client behavior: [Network
   architecture](../../../../Documents/Architecture/Network.md#debug-load-generation).
@@ -52,7 +58,22 @@ and classification, and the gameplay functions the engine calls by name.
 - Each update polls twice, at update start and at the tick boundary after the fixed-tick wait, so commands that arrived during the wait enter the imminent tick. The boundary poll deliberately omits `BeforeNetworkPoll`, which clears the previous update's pending request queues, and continues the first poll's admission budget window: one budget window per update, not one per poll.
 - The fixed-tick wait consumes the carried tick remainder but does not maintain it; `TimeStep::TickRealtime`, which `GameBase` calls immediately after the wait, accumulates and wraps it. Preserve the `siTotalTicks`/`siOvershootTicks` counters and their profiling-gated verbose log when changing this path.
 - Poll-scoped requests drain each poll: the handler that processes a game request queue drains it, so a second poll in the same update cannot reprocess it. Deduplicate the new-subscription and resync requests that persist per [Timing and Polling](../AGENTS.md#timing-and-polling) while pending.
-- `ServerSessionRuntime` owns the active coordinate set — subscribed coordinates plus the coordinates the game session contributes, always including origin. It creates a Frame for each entering coordinate and hands ownership of each departing current Frame directly to the engine replay owner before erasing the coordinate storage (`../../File/AGENTS.md#replay-streams`).
+- `ServerSessionRuntime` owns the active coordinate set — subscribed coordinates plus every cell whose ownership layer is nonempty (`ServerSessionBase::AddOwnedEntityCoordinates`), always including origin. It creates a Frame for each entering coordinate and hands ownership of each departing current Frame directly to the engine replay owner before erasing the coordinate storage (`../../File/AGENTS.md#replay-streams`).
+- `ServerSessionBase::RebuildOwnedEntities` is the only writer of the owned-entity
+  registry apart from the disconnect erase and the load clear. For each
+  handshaken client it collects every row carrying the client's GUID in any
+  cell's ownership layer (`../../Frame/AGENTS.md`), sorted by global ID, and
+  reports the difference against the previous list on the reliable channel the
+  load notification also uses: first `Died` for each lost entity, in descending
+  global-ID order, each followed by the game's `OnOwnedEntityDied`; then, in
+  ascending order, `Spawned` for each new entity and `ChangedCell` for each one
+  that moved. It runs at every poll after the deferred client-packet drain and
+  before `AfterNetworkPoll`, so new-client handling sees the rebuilt list; in
+  `CompleteTick` after resync servicing and before the game's
+  `FinalizeTickClients`; and inside the load reset. Transfers land before
+  `CompleteTick` and carry the owner's GUID onto the destination row, so a live
+  handoff is reported as `ChangedCell`, never as a death. A disconnected owner's
+  rows match no handshaken client and register again when that GUID reconnects.
 - A subscription must be origin or adjacent to an authorized coordinate. Subscription, ACK, and resend-log bookkeeping stay together per slot; allocation stays within the client-supported count, and reuse increments rather than resets the epoch.
 - Answer every current-generation subscribe from a handshaken client exactly
   once on the control channel — a reject, a new slot, or, for a coordinate that
@@ -82,9 +103,8 @@ and classification, and the gameplay functions the engine calls by name.
   entity), `game::Frame::OwnershipLayer`, `game::SpawnTransfer`,
   `game::ServerSession::OnOwnedEntityChangedCell`, and
   `game::ServerSession::BuildAdvancingFrameInputs`.
-- Pending subscription updates stay on `game::ServerSession`; harness rig queues
-  come from the game Agent's session-bound state (the game project's own
-  `Source/Agent/AGENTS.md` `## Contracts`). The broadcaster drains injected
+- Harness rig queues come from the game Agent's session-bound state (the game
+  project's own `Source/Agent/AGENTS.md` `## Contracts`). The broadcaster drains injected
   changes and takes its snapshot once per normal-play tick, so an injected
   change can enter any tick of a multi-tick update, and the transfer manager
   drains harness rig transfers after natural collection and before deterministic

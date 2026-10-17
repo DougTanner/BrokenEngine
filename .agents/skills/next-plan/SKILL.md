@@ -1,6 +1,6 @@
 ---
 name: next-plan
-description: Validates and deterministically claims one Git-backed Documents/Plans Plan through WorktreeCli, resolves it against current code, and presents the execution card's summary, alternatives, and unresolved decisions for implementation approval. Use only when the latest user request explicitly asks to execute `/next-plan` or `$next-plan` and claim a Plan.
+description: Validates and deterministically claims one Git-backed Documents/Plans Plan through WorktreeCli, resolves it against current code, presents the `/plan-alternatives` candidates before the Plan reviews, and presents the execution card's summary, the Plan review changes, and unresolved decisions for implementation approval. Use only when the latest user request explicitly asks to execute `/next-plan` or `$next-plan` and claim a Plan.
 disable-model-invocation: true
 argument-hint: "[Documents/Plans/... | partial pattern]"
 allowed-tools: [Read, Write, Grep, Glob, Agent, Edit, PowerShell, AskUserQuestion]
@@ -128,14 +128,18 @@ The `argument-hint` value selects the Plan:
 
    After that preparation handoff, and before the Plan review reviewers, main
    runs `/plan-alternatives` when its trigger fires and presents per that
-   skill's `### User presentation`.
+   skill's `### User presentation`; step 5 runs only on the approach the user
+   picks, after the redraft a pick other than the drafted plan requires.
+   `/plan-alternatives` runs and is presented once per run: a re-entry of this
+   step keeps the earlier pick and does not present alternatives again.
 
    Done when the execution card carries every field of the card template in
    this file's `### Execution card presentation/template`, the preparation
    handoff cites that snapshot as one file path plus the `##` selectors this
-   step requires, and its `Decisive checks` row for that `Temp/` snapshot
+   step requires, its `Decisive checks` row for that `Temp/` snapshot
    reports `headings.inScopePresent` and `headings.outOfScopePresent` both
-   `true`.
+   `true`, and, when that presentation ran, the pick has arrived and any pick
+   other than the drafted plan has been redrafted or routed to rejection.
 5. Run the Plan review step in
    [change-workflow.md](../../references/change-workflow.md), after preparation and alternatives and
    before the final claim refresh. Tier 3 retains the additional route in
@@ -337,23 +341,23 @@ classified tier before the Plan review step.
 
 Preparation and claim do not require approval. Before implementation, present
 only the execution card's `### What does this plan do?` and
-`### Why this is good for the codebase` sections, plus a `### Plan alternatives`
-section when `/plan-alternatives` presents candidates (that skill's
-`### User presentation`), carrying that skill's comparison and question so it
-is clear that choosing one replaces the drafted plan, plus a
+`### Why this is good for the codebase` sections, plus a
+`### Plan review changes` section listing each change the Plan review step
+made to the approach being approved, or `none`, plus a
 `### User decisions needed` section when any decision is unresolved, listing
-each one with its options, trade-offs, and a recommendation; the rest of the
-resolved Plan and card stays in the snapshot for the reviews and is not
-presented. Deliver that presentation per the `### User Interaction` rules in
+each one with its options, trade-offs, and a recommendation; the alternatives
+the `/plan-alternatives` presentation already showed are not presented again,
+and the rest of the resolved Plan and card stays in the snapshot for the
+reviews and is not presented. Deliver that presentation per the `### User Interaction` rules in
 [`.agents/references/change-workflow.md`](../../references/change-workflow.md) —
 on Codex as exactly one complete `<proposed_plan>` block, then ending the turn
 without an approval question; on Claude Code, OpenCode, and every other host as
 rendered message text whose approval question is the last thing before the
 `Follow-up Plans created:` footer, after which the user's next message is the
-decision. An approval accepts the recommendation for every listed alternative
-or decision it leaves unanswered, except a recommendation to reject the Plan,
-which still needs an explicit answer. A chosen alternative returns the run to
-preparation and Plan review. When approval came with the choice, the redraft
+decision. An approval accepts the recommendation for every decision it leaves
+unanswered, except a recommendation to reject the Plan, which still needs an
+explicit answer. A different approach the user chooses at approval returns the
+run to preparation and Plan review. When approval came with the choice, the redraft
 goes to implementation unless those reviews add a user decision, widen scope
 beyond the choice, or raise the tier; in that case, and when the choice came
 without approval, main presents only the difference. When the approved presentation differs from the

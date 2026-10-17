@@ -64,6 +64,8 @@ void ServerSessionRuntime::Poll(const NetworkTimeState& rTimeState)
 	game::gpServerSession->BeforeNetworkPoll();
 	mpServer->Poll(rTimeState, ServerPollMode::kUpdateStart);
 	mpDiscoveryResponder->Poll();
+	game::gpServerSession->DispatchDeferredClientPackets();
+	game::gpServerSession->RebuildOwnedEntities();
 	game::gpServerSession->AfterNetworkPoll();
 	ResetOnLastClientLeave();
 }
@@ -78,6 +80,8 @@ void ServerSessionRuntime::PollTickBoundary(const NetworkTimeState& rTimeState)
 	// Heap: ENet polling and game request queues may grow
 	ScopedSuppressAllocationTracking suppress;
 	mpServer->Poll(rTimeState, ServerPollMode::kTickBoundary);
+	game::gpServerSession->DispatchDeferredClientPackets();
+	game::gpServerSession->RebuildOwnedEntities();
 	game::gpServerSession->AfterNetworkPoll();
 	ResetOnLastClientLeave();
 }
@@ -233,6 +237,7 @@ void ServerSessionRuntime::CompleteTick(int64_t iTick)
 	// Heap: client/resync/subscription bookkeeping and ENet sends outside publication construction
 	ScopedSuppressAllocationTracking suppress;
 	HandleResyncRequests();
+	game::gpServerSession->RebuildOwnedEntities();
 	game::gpServerSession->FinalizeTickClients();
 	{
 		ScopedResumeAllocationTracking resume;
@@ -240,7 +245,7 @@ void ServerSessionRuntime::CompleteTick(int64_t iTick)
 		game::gpServerSession->mpBroadcaster->BuildTickPublication(iTick, *this, publicationArena);
 	}
 	game::gpServerSession->mpBroadcaster->mBroadcastStatusChanges.clear();
-	game::gpServerSession->SubscriptionUpdates();
+	SendNewSubscriptionFullStates();
 	mpServer->Flush();
 }
 
@@ -333,7 +338,7 @@ void ServerSessionRuntime::ComputeActiveSet()
 
 	game::gpGame->mActiveCoordinates.clear();
 	AddSubscribedCoords();
-	game::gpServerSession->AddGameRequiredCoordinates();
+	game::gpServerSession->AddOwnedEntityCoordinates();
 
 	if (!std::ranges::contains(game::gpGame->mActiveCoordinates, engine::kOriginCoordinate))
 	{

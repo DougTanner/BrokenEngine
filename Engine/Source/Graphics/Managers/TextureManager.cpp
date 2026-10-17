@@ -215,7 +215,7 @@ TextureManager::TextureManager()
 	// placeholder until the four chunk-backed channels are ready. Without the reset, the initialization fan-out leaves islands on placeholders.
 	gpIslandTerrainResidency->ResetTextureSlots();
 
-	// Island textures load dynamically per ClientSession::ApplyReceivedStaticData. TextureDescriptors
+	// Island textures load dynamically per ClientSessionBase::ApplyReceivedStaticData. TextureDescriptors
 	// owns the slot writes; these fixed vectors keep the stable backing addresses it registers.
 	mTextureDescriptors.InitializeIslandSlots();
 

@@ -99,6 +99,7 @@ void Client::Poll(const NetworkTimeState& rTimeState)
 	mReceivedFullStates.clear();
 	mReceivedStaticData.clear();
 	mReceivedGamePackets.clear();
+	mReceivedOwnedEntityEvents.clear();
 
 	ENetEvent event {};
 	while (enet_host_service(mpHost, &event, 0) > 0)
@@ -229,6 +230,9 @@ void Client::Receive(std::span<const uint8_t> packetData)
 				break;
 			case PacketType::kServerChat:
 				ServerChat(packetData);
+				break;
+			case PacketType::kServerOwnedEntityState:
+				ServerOwnedEntityState(packetData);
 				break;
 			default:
 				if (static_cast<uint8_t>(eType) >= static_cast<uint8_t>(PacketType::kGamePacketStart))
@@ -794,6 +798,7 @@ void Client::ServerLoadNotification(std::span<const uint8_t> packetData)
 	}
 
 	mReceivedGamePackets.clear();
+	mReceivedOwnedEntityEvents.clear();
 	mStateFlags.Set(ClientStateFlags::kLoadNotificationReceived);
 }
 
@@ -825,6 +830,16 @@ void Client::ServerChat(std::span<const uint8_t> packetData)
 
 	game::gpGame->mChatLog.Append(message.iSenderId, message.text);
 	LOG(kNetwork, kInfo, "Client::ServerChat Player {}: {}", message.iSenderId, message.text);
+}
+
+void Client::ServerOwnedEntityState(std::span<const uint8_t> packetData)
+{
+	NetworkMessages::ServerOwnedEntityStateMessage message {};
+	NetworkMessages::Read(packetData, message);
+
+	// Heap: owned-entity event buffer grows on owned-entity state packets
+	ScopedSuppressAllocationTracking suppress;
+	mReceivedOwnedEntityEvents.push_back({.eState = static_cast<OwnedEntityState>(message.uiState), .globalId = GlobalId {.iValue = message.iGlobalId}, .coordinate = message.coordinate});
 }
 
 bool Client::SendAcknowledgement()

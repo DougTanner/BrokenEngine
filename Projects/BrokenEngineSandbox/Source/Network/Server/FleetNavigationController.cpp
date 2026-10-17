@@ -3,7 +3,6 @@
 #include "Network/Server/FleetNavigationController.h"
 
 #include "Frame/Collections/Omnis/Omnis.h"
-#include "Network/OwnedEntityEvents.h"
 #include "Game.h"
 
 namespace game

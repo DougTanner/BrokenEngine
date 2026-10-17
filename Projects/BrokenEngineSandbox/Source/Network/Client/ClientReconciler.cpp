@@ -1,6 +1,5 @@
 #include "Network/Client/ClientReconciler.h"
 
-#include "Audio/StaticVoices.h"
 #include "Network/Client/ReconcileReplay.h"
 
 #include "Frame/Collections/Omnis/Omnis.h"
@@ -92,22 +91,9 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 		return {};
 	}
 
-	if (dispatch.pDesyncWork != nullptr)
+	if (dispatch.desync.bDesync)
 	{
-		engine::CoordWork* pDesynchronizationWork = dispatch.pDesyncWork;
-		char pcExpected[20] {}, pcActual[20] {};
-		common::ToHex(std::span<char, 20>(pcExpected), pDesynchronizationWork->scratch.desyncExpectedCrc);
-		common::ToHex(std::span<char, 20>(pcActual), pDesynchronizationWork->scratch.desyncActualCrc);
-		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesynchronizationWork->coord.iX, pDesynchronizationWork->coord.iY, pDesynchronizationWork->scratch.iDesyncTick, pcExpected, pcActual, pDesynchronizationWork->scratch.iReplayStackCount, pDesynchronizationWork->scratch.iNewConfirmedTick);
-
-		engine::ReconcileDesyncInfo desynchronizationInformation;
-		desynchronizationInformation.bDesync = true;
-		desynchronizationInformation.iDesyncTick = pDesynchronizationWork->scratch.iDesyncTick;
-		desynchronizationInformation.desyncCoord = pDesynchronizationWork->coord;
-		desynchronizationInformation.desyncExpectedCrc = pDesynchronizationWork->scratch.desyncExpectedCrc;
-		desynchronizationInformation.desyncActualCrc = pDesynchronizationWork->scratch.desyncActualCrc;
-		desynchronizationInformation.pDesyncClientFrame = std::move(pDesynchronizationWork->scratch.pDesyncClientFrame);
-		return desynchronizationInformation;
+		return std::move(dispatch.desync);
 	}
 
 	// Owned-entity transfer migration updates previous client armor.
@@ -148,24 +134,6 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 
 	mConfirmedClientState = newConfirmedClientState;
 	gpGame->mfPreviousClientArmor = newConfirmedClientState.fPreviousClientArmor;
-
-	gpProfileManager->mCrcValidatedTicksPerSecond.Set(dispatch.profiling.iCrcValidatedFrameTicks);
-	gpProfileManager->mAssumedTicksPerSecond.Set(dispatch.profiling.iAssumedFrameTicks);
-	gpProfileManager->mCrcFastPathEventsPerSecond.Set(dispatch.profiling.iCrcFastPathEvents);
-	gpProfileManager->mStatusChangeReplayTicksPerSecond.Set(dispatch.profiling.iStatusChangeReplayTicks);
-	gpProfileManager->mKnockOnReplayTicksPerSecond.Set(dispatch.profiling.iKnockOnReplayTicks);
-
-	// Large single-frame re-sim bursts are frame-time spike candidates
-	int64_t iResimulationTicks = dispatch.profiling.iStatusChangeReplayTicks + dispatch.profiling.iKnockOnReplayTicks;
-	if (iResimulationTicks >= 8)
-	{
-		LOG(kNetwork, kVerbose, "Replay burst ReSimTicks: {} StatusChange: {} KnockOn: {} Assumed: {} CrcValidated: {} Coords: {}", iResimulationTicks, dispatch.profiling.iStatusChangeReplayTicks, dispatch.profiling.iKnockOnReplayTicks, dispatch.profiling.iAssumedFrameTicks, dispatch.profiling.iCrcValidatedFrameTicks, dispatch.iActiveCount);
-	}
-
-	if (dispatch.bAnyFullReplay && engine::gpAudioManager != nullptr)
-	{
-		engine::gpAudioManager->mpStaticVoices->mbSkipNextInvalidation = true;
-	}
 
 	return {};
 }

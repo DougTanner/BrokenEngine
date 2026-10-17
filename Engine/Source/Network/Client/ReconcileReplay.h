@@ -143,16 +143,6 @@ void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iMaxim
 void ReconcileCatchUpCoord(CoordWork& rWork, int64_t iTargetTick);
 void ReconcileFastPathCatchUp(CoordWork& rWork, int64_t iTargetTick);
 
-struct ReconcileDispatchResult
-{
-	int64_t iActiveCount = 0;
-	bool bAnyFullReplay = false;
-	ReconcileProfiling profiling;
-	// First coord in slot order whose reconcile ended in an unresolved CRC mismatch, or nullptr. It points
-	// into the dispatcher's work list, so it stays valid only until the next Run() or Reset().
-	CoordWork* pDesyncWork = nullptr;
-};
-
 struct ReconcileDesyncInfo
 {
 	bool bDesync = false;
@@ -161,6 +151,15 @@ struct ReconcileDesyncInfo
 	common::crc_t desyncExpectedCrc = 0;
 	common::crc_t desyncActualCrc = 0;
 	std::unique_ptr<game::Frame> pDesyncClientFrame;
+};
+
+struct ReconcileDispatchResult
+{
+	int64_t iActiveCount = 0;
+	bool bAnyFullReplay = false;
+	ReconcileProfiling profiling;
+	// The first coord in slot order whose reconcile ended in an unresolved CRC mismatch; bDesync is false when none did.
+	ReconcileDesyncInfo desync;
 };
 
 class ReconcileDispatcher

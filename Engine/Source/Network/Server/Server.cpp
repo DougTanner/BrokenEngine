@@ -79,7 +79,7 @@ void Server::Poll(const NetworkTimeState& rTimeState, ServerPollMode ePollMode)
 	// so a per-poll clear would drop a subscribe/resync accepted between servicings. They persist until the runtime
 	// consumers service and clear them. While paused or otherwise zero-tick (iFullTicks == 0),
 	// ServerSessionRuntime::CompleteUpdate services them each update instead, so a client can join before a tick advances.
-	mReceivedGamePackets.clear();
+	mDeferredClientPackets.clear();
 
 	// Reset the per-update (~ per-tick window) contract budgets before draining this update's packets. The
 	// tick-boundary poll skips the reset so both polls of an update share one admission budget window.
@@ -242,8 +242,8 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 		}
 	}
 
-	// Gates 3–5 apply only to engine types. Game-range types use the default branch's handshake gate
-	// and parse-time contract checks.
+	// Gates 3–5 apply only to engine types. Game-range types use the default branch's handshake gate;
+	// their contract checks run at admission in the deferred drain.
 	if (static_cast<uint8_t>(eType) < static_cast<uint8_t>(PacketType::kGamePacketStart))
 	{
 		ClientPacketContract contract = GetClientPacketContract(eType);
@@ -311,17 +311,41 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 			case PacketType::kClientChat:
 				ClientChat(packetData, *pClient);
 				break;
+			case PacketType::kClientPauseRequest:
+			{
+				NetworkMessages::ClientPauseRequestMessage message {};
+				NetworkMessages::Read(packetData, message);
+				if (message.uiPaused > 1)
+				{
+					NetworkMessages::ThrowCorruptStream("Server::ClientPauseRequest");
+				}
+				DeferClientPacket(packetData, iClientId);
+				break;
+			}
+			case PacketType::kClientTimespeedRequest:
+			{
+				NetworkMessages::ClientTimespeedRequestMessage message {};
+				NetworkMessages::Read(packetData, message);
+				if (message.uiFaster > 1)
+				{
+					NetworkMessages::ThrowCorruptStream("Server::ClientTimespeedRequest");
+				}
+				DeferClientPacket(packetData, iClientId);
+				break;
+			}
+			case PacketType::kClientSaveRequest:
+			case PacketType::kClientLoadRequest:
+			case PacketType::kClientResetRequest:
+			case PacketType::kClientReplayRecordRequest:
+			case PacketType::kClientReplayPlaybackRequest:
+				DeferClientPacket(packetData, iClientId);
+				break;
 			default:
 				// Only game-range types reach the default -- engine sentinel types are caught at gate 3.
 				// Game-range handshake gate stays here (silent drop pre-handshake).
+				if (pClient->bHandshakeComplete)
 				{
-					if (!pClient->bHandshakeComplete)
-					{
-						break;
-					}
-					ScopedSuppressAllocationTracking suppress;
-					// Heap: raw game packet buffer grows on game-specific packets
-					mReceivedGamePackets.push_back({.iClientId = iClientId, .iPacketType = packetData[0], .payload = std::vector<uint8_t>(packetData.begin() + 1, packetData.end())});
+					DeferClientPacket(packetData, iClientId);
 				}
 				break;
 		}
@@ -334,6 +358,13 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 		LOG(kNetwork, kDebug, "Server::Receive dropped corrupt packet (type {}) Client: {}: {}", static_cast<uint8_t>(eType), iClientId, rException.what());
 		RecordContractViolation(iClientId, ContractViolationKind::kCorrupt, "corrupt payload", packetData[0], static_cast<int64_t>(packetData.size()));
 	}
+}
+
+void Server::DeferClientPacket(std::span<const uint8_t> packetData, int64_t iClientId)
+{
+	// Heap: deferred client packet buffer grows on game and debug-control packets
+	ScopedSuppressAllocationTracking suppress;
+	mDeferredClientPackets.push_back({.iClientId = iClientId, .iPacketType = packetData[0], .payload = std::vector<uint8_t>(packetData.begin() + 1, packetData.end())});
 }
 
 void Server::RemoveClient(int64_t iClientId)
@@ -425,7 +456,7 @@ void Server::RecordContractViolation(int64_t iClientId, ContractViolationKind eK
 	}
 }
 
-bool Server::AdmitGamePacket(const ReceivedGamePacket& rPacket, const ClientPacketContract& rContract)
+bool Server::AdmitGamePacket(const DeferredClientPacket& rPacket, const ClientPacketContract& rContract)
 {
 	ClientConnection* pClient = FindClient(rPacket.iClientId);
 	if (pClient == nullptr)
@@ -437,7 +468,7 @@ bool Server::AdmitGamePacket(const ReceivedGamePacket& rPacket, const ClientPack
 	int64_t iFullSize = std::ssize(rPacket.payload) + 1; // + type byte (already stripped from payload)
 	if (rContract.iMaximumSize == 0)
 	{
-		// Sentinel: not client-sendable (server->client, unknown, or debug-control on a non-debug server).
+		// Sentinel: not client-sendable (server->client or unknown).
 		// RecordContractViolation may remove the client — do not touch pClient afterward.
 		RecordContractViolation(rPacket.iClientId, ContractViolationKind::kCorrupt, "game type not client-sendable", rPacket.iPacketType, iFullSize);
 		return false;

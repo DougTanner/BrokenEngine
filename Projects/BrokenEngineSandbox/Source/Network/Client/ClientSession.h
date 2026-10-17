@@ -3,7 +3,7 @@
 #if defined(BT_CLIENT)
 
 #include "Frame/GridCoord.h"
-#include "Network/Client/ClientDesyncCore.h"
+#include "Network/Client/ClientSessionBase.h"
 
 #include "Fleet.h"
 
@@ -21,7 +21,6 @@ namespace game
 
 class ClientReconciler;
 struct Frame;
-struct ReceivedOwnedEntityEvent;
 enum class GamePacketType : uint8_t;
 
 enum class SubscriptionChangeReason : uint8_t
@@ -39,7 +38,7 @@ enum class SubscriptionChangeReason : uint8_t
 
 const char* ToString(SubscriptionChangeReason eReason);
 
-class ClientSession : public common::Singleton<ClientSession>
+class ClientSession : public engine::ClientSessionBase, public common::Singleton<ClientSession>
 {
 public:
 
@@ -48,11 +47,6 @@ public:
 
 	void ConnectToServer(std::string_view serverAddress);
 
-	void Reconcile();
-
-
-	void ApplyReceivedStaticData();
-
 	void SendUpdateOwnedEntityRequest(int64_t iGlobalId, bool bUseMissiles, float fNavigationDelay);
 	void SendCreateFleetRequest();
 	void SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid);
@@ -60,27 +54,22 @@ public:
 	void SendDeleteFleetRequest(const FleetGuid& rFleetGuid);
 	void SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay);
 
-	// Game policy the engine desync core calls by name
-	void ResetCoordinateStatesForResynchronization();
-
-	std::unique_ptr<engine::ClientDesyncCore> mpDesynchronizationCore;
 	std::unique_ptr<ClientReconciler> mpReconciler;
-	std::unique_ptr<engine::ClientSessionRuntime> mpRuntime;
 
 private:
+	friend class engine::ClientSessionBase;
 	friend class engine::ClientSessionRuntime;
 
 	void OnConnectionRejected(std::string_view reason);
 	void OnConnectionFailed();
 	void OnConnectionAccepted();
-	void PollDesynchronizationState();
 	void OnConnectionLost();
 	void OnServerLoad();
-	void OnRuntimeDisconnected();
 	void ProcessReceivedGamePackets();
 	void HydrateReceivedFullState(Frame& rReceived, const Frame* pRingTail);
 
-	void ApplyOwnedEntityEvent(const ReceivedOwnedEntityEvent& rEvent);
+	// engine::ClientSessionBase calls this by name
+	void ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent& rEvent);
 	void UpdateOwnedEntityCoordinate(engine::GlobalId globalId, engine::GridCoord coordinate);
 
 };

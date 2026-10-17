@@ -198,9 +198,6 @@
     <ClInclude Include="..\..\Source\SpawnTransfer.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Network\OwnedEntityEvents.h">
-      <Filter>Game\Network</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\Network\StatusChangeCodec.h">
       <Filter>Game\Network</Filter>
     </ClInclude>
@@ -265,6 +262,9 @@
       <Filter>Engine\Network\Server</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionRuntime.h">
+      <Filter>Engine\Network\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionBase.h">
       <Filter>Engine\Network\Server</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\OwnedEntityRegistry.h">
@@ -647,9 +647,6 @@
     <ClCompile Include="..\..\Source\SpawnTransfer.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Network\OwnedEntityEvents.cpp">
-      <Filter>Game\Network</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Source\Network\StatusChangeCodec.cpp">
       <Filter>Game\Network</Filter>
     </ClCompile>
@@ -693,6 +690,9 @@
       <Filter>Engine\Network\Server</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionRuntime.cpp">
+      <Filter>Engine\Network\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\ServerSessionBase.cpp">
       <Filter>Engine\Network\Server</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Server\OwnedEntityRegistry.cpp">

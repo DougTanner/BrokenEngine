@@ -3,7 +3,6 @@
 #include "Input/Input.h"
 
 #include "Frame/Collections/Omnis/Omnis.h"
-#include "Network/GamePacketType.h"
 #include "Ui/Localization.h"
 
 namespace game
@@ -192,64 +191,12 @@ void Game::ApplyStandardMenuAction(engine::StandardMenuAction eAction)
 #endif // BT_CLIENT
 
 #if defined(BT_CLIENT)
-void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engine::InputPoll& rInputPoll)
+void Game::ProcessGameMenuInput(const engine::InputPoll& rInputPoll)
 {
 	if constexpr (kbDebugInput)
 	{
 		bool bReturnPressed = rInputPoll.KeyboardPressed(VK_RETURN);
 		bool bCycleMenuIslandPressed = rInputPoll.KeyboardPressed('E');
-
-		// A server built without kbDebugInput strikes every debug-control request as corrupt data, so send
-		// them only to a server whose accepted connection response said it takes them.
-		bool bServerTakesDebugControl = engine::gpClient != nullptr && (engine::gpClient->mStateFlags & engine::Client::ClientStateFlags::kServerDebugInput);
-
-		if (bServerTakesDebugControl)
-		{
-			if (rMenuInput.flags & engine::MenuInputFlags::kQuicksave)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientSaveRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
-			}
-			if (rMenuInput.flags & engine::MenuInputFlags::kQuickload)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientLoadRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
-			}
-			if (rMenuInput.flags & engine::MenuInputFlags::kSaveReplay)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientReplayRecordRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
-			}
-			if (rMenuInput.flags & engine::MenuInputFlags::kLoadReplay)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientReplayPlaybackRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
-			}
-			if (rInputPoll.KeyboardPressed(VK_BACK))
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientResetRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE);
-			}
-		}
-
-		if (rMenuInput.flags & engine::MenuInputFlags::kSlowTime)
-		{
-			if (bServerTakesDebugControl)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE, 0ui8);
-			}
-		}
-		else if (rMenuInput.flags & engine::MenuInputFlags::kSpeedUpTime)
-		{
-			if (bServerTakesDebugControl)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientTimespeedRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE, 1ui8);
-			}
-		}
-
-		// GameBase already flipped the local pause state, so this reports the state the client just entered.
-		if (rMenuInput.flags & engine::MenuInputFlags::kTogglePauseFrame)
-		{
-			if (bServerTakesDebugControl)
-			{
-				engine::gpClient->SendSimplePacket(GamePacketType::kClientPauseRequest, engine::NetworkManager::kiChannelReliable, ENET_PACKET_FLAG_RELIABLE, static_cast<uint8_t>((mGameFlags & engine::GameFlags::kPaused) ? 1 : 0));
-			}
-		}
 
 		if (bReturnPressed && (mGameFlags & engine::GameFlags::kMainMenu) && gpClientSession->mpRuntime->mpClient == nullptr)
 		{
@@ -274,7 +221,7 @@ void Game::ProcessGameMenuInput(const engine::MenuInput& rMenuInput, const engin
 			it->second.staticData.elevationGrid = {};
 			it->second.staticData.islandRenderQueries = {};
 
-			// Pre-mint the texture slot now (mirrors ClientSession::ApplyReceivedStaticData) so the
+			// Pre-mint the texture slot now (mirrors ClientSessionBase::ApplyReceivedStaticData) so the
 			// elevation upload and chunk loads are in-flight before UpdateActiveIslands references the
 			// slot this same frame. AcquireTextureSlot is idempotent (hot-path early return).
 			for (const engine::IslandPlacement& rPlacement : it->second.staticData.islands)

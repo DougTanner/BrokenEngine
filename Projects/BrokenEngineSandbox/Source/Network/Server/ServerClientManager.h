@@ -25,11 +25,9 @@ public:
 	void NewClients();
 	void SpawnWaitingClients();
 	void OnClientDisconnected(int64_t iClientId, const engine::ClientGuid& rClientGuid);
-	void DetectOwnedEntityDeaths();
 	void ResetState();
 
 	std::vector<ClientSpawnInformation> mClientsWaitingForSpawn;
-	std::unordered_set<int64_t> mDeadClientIds;
 	std::unordered_set<int64_t> mProcessedClientIds;
 
 private:

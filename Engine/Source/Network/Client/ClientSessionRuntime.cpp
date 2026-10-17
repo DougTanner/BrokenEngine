@@ -251,8 +251,9 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 	{
 		mpClient->miCommittedLoadGeneration = *optionalLoadGeneration;
 		ResetForServerLoad();
-		game::gpClientSession->OnServerLoad();
+		game::gpClientSession->ResetSessionForServerLoad();
 	}
+	game::gpClientSession->ApplyOwnedEntityEvents();
 	game::gpClientSession->ProcessReceivedGamePackets();
 	game::gpClientSession->ApplyReceivedStaticData();
 	ApplyReceivedFullStates();

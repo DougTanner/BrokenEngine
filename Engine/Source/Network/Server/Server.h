@@ -24,11 +24,12 @@ struct StatusChange;
 namespace engine
 {
 
-struct ReceivedGamePacket
+// A game packet or an engine debug-control request, held for the session drain after the network poll
+struct DeferredClientPacket
 {
 	int64_t iClientId = 0;
 	int64_t iPacketType = 0;
-	// Heap: raw game packet payload (type byte stripped)
+	// Heap: raw packet payload (type byte stripped)
 	std::vector<uint8_t> payload;
 };
 
@@ -155,9 +156,9 @@ public:
 	std::vector<ClientConnection> mClients;
 	std::vector<PendingNewSubscription> mPendingNewSubscriptions;
 	std::vector<int64_t> mPendingResynchronizationClientIds;
-	std::vector<ReceivedGamePacket> mReceivedGamePackets;
+	std::vector<DeferredClientPacket> mDeferredClientPackets;
 
-	bool AdmitGamePacket(const ReceivedGamePacket& rPacket, const ClientPacketContract& rContract);
+	bool AdmitGamePacket(const DeferredClientPacket& rPacket, const ClientPacketContract& rContract);
 
 	// Records a client->server contract violation against eKind's count; escalates to disconnect at
 	// kiCorruptViolationDisconnectCount corrupt or kiRateViolationDisconnectCount outstanding rate violations.
@@ -174,6 +175,7 @@ private:
 	void Disconnect(const ENetEvent& rEvent);
 	void DispatchIncoming(ENetEvent& rEvent, bool bFastForward);
 	void Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer);
+	void DeferClientPacket(std::span<const uint8_t> packetData, int64_t iClientId);
 
 	void ClientAcknowledgementStream(std::span<const uint8_t> packetData, ClientConnection& rClient);
 	void ClientDesynchronizationReport(std::span<const uint8_t> packetData, ClientConnection& rClient);

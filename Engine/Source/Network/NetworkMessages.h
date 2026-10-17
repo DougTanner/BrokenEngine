@@ -1,6 +1,44 @@
 #pragma once
 
+#include "Frame/Collections/CollectionId.h"
 #include "Network/NetworkCursor.h"
+
+namespace engine
+{
+
+// Serialized in kServerOwnedEntityState: append values before kCount, each with its descriptor row.
+enum class OwnedEntityState : uint8_t
+{
+	kSpawned,
+	kChangedCell,
+	kDied,
+
+	kCount,
+};
+
+struct OwnedEntityStateDescriptor
+{
+	OwnedEntityState eState = OwnedEntityState::kSpawned;
+	const char* pcName = "";
+};
+
+// Indexed by OwnedEntityState value.
+inline constexpr OwnedEntityStateDescriptor kpOwnedEntityStateDescriptors[] =
+{
+	{.eState = OwnedEntityState::kSpawned, .pcName = "Spawned"},
+	{.eState = OwnedEntityState::kChangedCell, .pcName = "ChangedCell"},
+	{.eState = OwnedEntityState::kDied, .pcName = "Died"},
+};
+static_assert(std::size(kpOwnedEntityStateDescriptors) == static_cast<size_t>(OwnedEntityState::kCount));
+
+struct ReceivedOwnedEntityEvent
+{
+	OwnedEntityState eState = OwnedEntityState::kSpawned;
+	GlobalId globalId {};
+	GridCoord coordinate {};
+};
+
+} // namespace engine
 
 namespace engine::NetworkMessages
 {
@@ -712,6 +750,56 @@ struct ServerChatMessage
 		rVisitor.Type(keType);
 		rVisitor.Field(rMessage.iSenderId);
 		rVisitor.NullTerminatedString(rMessage.text);
+	}
+};
+
+struct ServerOwnedEntityStateMessage
+{
+	static constexpr PacketType keType = PacketType::kServerOwnedEntityState;
+	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(int64_t) + kiGridCoordSize;
+	static_assert(kiFixedSize == 18);
+
+	uint8_t uiState = 0;
+	int64_t iGlobalId = 0;
+	GridCoord coordinate {};
+
+	template <typename TVISITOR>
+	static void Visit(TVISITOR& rVisitor, ServerOwnedEntityStateMessage& rMessage)
+	{
+		rVisitor.Type(keType);
+		rVisitor.Field(rMessage.uiState);
+		rVisitor.Field(rMessage.iGlobalId);
+		rVisitor.Field(rMessage.coordinate);
+	}
+};
+
+struct ClientPauseRequestMessage
+{
+	static constexpr PacketType keType = PacketType::kClientPauseRequest;
+	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(uint8_t);
+
+	uint8_t uiPaused = 0;
+
+	template <typename TVISITOR>
+	static void Visit(TVISITOR& rVisitor, ClientPauseRequestMessage& rMessage)
+	{
+		rVisitor.Type(keType);
+		rVisitor.Field(rMessage.uiPaused);
+	}
+};
+
+struct ClientTimespeedRequestMessage
+{
+	static constexpr PacketType keType = PacketType::kClientTimespeedRequest;
+	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(uint8_t);
+
+	uint8_t uiFaster = 0; // 0 = slower, 1 = faster
+
+	template <typename TVISITOR>
+	static void Visit(TVISITOR& rVisitor, ClientTimespeedRequestMessage& rMessage)
+	{
+		rVisitor.Type(keType);
+		rVisitor.Field(rMessage.uiFaster);
 	}
 };
 
