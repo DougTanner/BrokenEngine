@@ -14,7 +14,7 @@ using engine::SnapshotIndex;
 struct ConfirmedClientState
 {
 	engine::GridCoord clientGridCoordinate {};
-	engine::GlobalId clientGlobalPlayerIdentifier {};
+	engine::GlobalId clientGlobalIdentifier {};
 	float fPreviousClientArmor = 0.0f;
 };
 

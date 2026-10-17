@@ -37,7 +37,7 @@
   `Default/Debug` and loops; playback never ends by itself. Requires
   `kbDebugInput`.
 - `replay_transfer_capture`: no params. Returns
-  `{"firstWriterInputTick","writerInputCount","events":[{"recordingEventTick","playbackEventTick","playerCount","spaceshipCount","blasterCount","missileCount"}]}`.
+  `{"firstWriterInputTick","writerInputCount","events":[{"recordingEventTick","playbackEventTick","omniCount","spaceshipCount","blasterCount","missileCount"}]}`.
   `firstWriterInputTick` is `-1` until observed. `events` holds one entry per
   recording event tick in capture order, each entry's counts summed across the
   destinations of that tick; it holds every captured event of the recording and
@@ -76,8 +76,8 @@
   artifact hashing and manifest publication. Returns
   `{"stage","coord"?:[x,y],"armed":true}`; the response does not expose a
   generation selector. Requires `kbDebugInput`.
-- `query_frame`: `{"coord":[x,y]}` for a loaded, ready cell. Returns counts under `players`, `spaceships`, `missiles`, and `blasters`.
-- `query_players`: `{"coord":[x,y],"offset"?:0,"limit"?:256}`. A negative `offset` or `limit` is a parameter error. Returns `{"total","players":[{"index","uuid","globalId","local":[x,y,z],"dir":[x,y,z],"armor","shield","flags":int,"alignment"}]}`. Every row belongs to the requested cell, so `local` is meters from that cell's center and no row repeats the coordinate.
+- `query_frame`: `{"coord":[x,y]}` for a loaded, ready cell. Returns counts under `omnis`, `spaceships`, `missiles`, and `blasters`.
+- `query_omnis`: `{"coord":[x,y],"offset"?:0,"limit"?:256}`. A negative `offset` or `limit` is a parameter error. Returns `{"total","omnis":[{"index","uuid","globalId","local":[x,y,z],"dir":[x,y,z],"armor","shield","flags":int,"alignment"}]}`. Every row belongs to the requested cell, so `local` is meters from that cell's center and no row repeats the coordinate.
 - `query_collection`:
   `{"coord":[x,y],"collection":"spaceships"|"missiles"|"blasters","offset"?:0,"limit"?:256}`.
   A negative `offset` or `limit` is a parameter error. Returns
@@ -97,15 +97,15 @@
   keys. Overwrites chosen values in the cell's current frame, the frame
   `query_frame` reads, at the command drain, paused or not; the next tick
   simulates from the edited frame. Each edit is
-  `{"collection":"players"|"spaceships"|"missiles"|"blasters"|"explosions"|"pushers","index":int,"writes":{...}}`
+  `{"collection":"omnis"|"spaceships"|"missiles"|"blasters"|"explosions"|"pushers","index":int,"writes":{...}}`
   or `{"collection":"frame","writes":{...}}`, with no other keys. A collection
   edit's `index` is a row with `0 <= index < count`, the collection's row count
-  (`query_frame` reports it for players, spaceships, missiles, and blasters;
+  (`query_frame` reports it for omnis, spaceships, missiles, and blasters;
   `read_frame` reports it as `count`, and an out-of-range index fails with an
   error naming it), and its `writes` keys may name any column of that
   collection's Interpolate and PostRender structs; a `frame` edit takes no
   `index` and its keys are `fSpawnTimer`, `randomEngine`, `uiNextUuid`,
-  `uiFrameIdentifier`, `alignments`, `enemyAlignment`, and `playerAlignment`;
+  `uiFrameIdentifier`, `alignments`, `enemyAlignment`, and `omniAlignment`;
   `iTick` and `fDeltaTime` are named but refused as clock values. Collection
   keys are the C++ member names, verbatim, as listed in
   `Agent/Commands/ServerFrameEdit.cpp`; `frame` keys are each frame struct's
@@ -129,7 +129,7 @@
   an empty array clears it. Rows cannot be added or removed. Identity and handle
   columns (`engine::Id<T>`, such as `pIds` and `pPushers`) are refused.
 
-  `uiFrameIdentifier`, `pGlobalPlayerIds`, and `pClientGuids` are written unchecked: a value that duplicates another frame's or player's identity gives odd behavior but no assert. Positions are also unchecked and must stay inside the cell: an out-of-cell player position transfers at most one cell per axis per tick and then asserts in `PlayersPostRender::Spawn` ([Frame invariants](../../../../Engine/Source/Frame/AGENTS.md)).
+  `uiFrameIdentifier`, `pGlobalIds`, and `pClientGuids` are written unchecked: a value that duplicates another frame's or omni's identity gives odd behavior but no assert. Positions are also unchecked and must stay inside the cell: an out-of-cell omni position transfers at most one cell per axis per tick and then asserts in `OmnisPostRender::Spawn` ([Frame invariants](../../../../Engine/Source/Frame/AGENTS.md)).
 
   The edits apply to a staged copy of the frame, which is committed through the
   save reader's checks (pair count/capacity parity and ID maps, the
@@ -149,9 +149,9 @@
   `inject_payload` entry, and makes clients log `ClientSession::OnServerLoad`,
   drop their coordinate state, and resubscribe. So batch edits into one command.
   The resynchronization frees every subscription before clients resubscribe, so
-  the server's active set keeps only cells with a player and the origin: with a
-  handshaken client, an edit to a playerless cell other than the origin fails
-  before any write, and, as on `load`, every other playerless subscribed cell
+  the server's active set keeps only cells with an omni and the origin: with a
+  handshaken client, an edit to an omniless cell other than the origin fails
+  before any write, and, as on `load`, every other omniless subscribed cell
   resets after a successful edit. Once the budget is exhausted, the `ASSERT` in
   `Server::AdvanceLoadGeneration` throws after the edit is committed and the CRC
   recomputed: the response is `ok:false` over an applied edit, and clients are
@@ -193,7 +193,7 @@
   records. The client `query_profile` remains `{}`-only; its response is
   documented in `commands-client.md`.
 - `inject_payload`: `{"entries":[...],"pauseAfterWriterInput"?:bool}`; these are
-  the only top-level keys, and `entries` is a non-empty array. It queues player
+  the only top-level keys, and `entries` is a non-empty array. It queues omni
   status changes into a cell's tick input and cross-cell transfer arrivals into
   a cell's transfer harvest. The whole batch validates before anything is queued
   or any global id is minted, so a rejected batch changes no pending count and
@@ -211,44 +211,44 @@
 
   | `type` | Fields | Also requires |
   |--------|--------|---------------|
-  | `SpawnPlayer` | `fSpawnOffsetX`, `fSpawnOffsetY`, `bIsFlagship`, `fleetWantedCoordinate` | active `coord` |
-  | `DestroyPlayer` | `iPlayerUuid` (required) | active `coord` |
-  | `UpdatePlayer` | `iPlayerUuid` (required), `bUseMissiles`, `navigationDelaySeconds` | active `coord` |
-  | `UpdateFleet` | `iPlayerUuid` (required), `fleetWantedCoordinate` (required), `bIsFlagship` | active `coord` |
-  | `TransferPlayer` | `vecPosition`, `vecDirection`, `vecVelocity`, `fHealth`, `fShield`, `nextBlasterFireTimeSeconds`, `nextSecondarySpawnTimeSeconds`, `shieldCooldownSeconds`, `shieldDownSoundCooldownSeconds`, `animationTimeSeconds`, `navigationDelaySeconds`, `fleetWantedCoordinate` | `kbDebugInput`; creates a missing `coord` |
+  | `SpawnOmni` | `fSpawnOffsetX`, `fSpawnOffsetY`, `bIsFlagship`, `fleetWantedCoordinate` | active `coord` |
+  | `DestroyOmni` | `iOmniUuid` (required) | active `coord` |
+  | `UpdateOmni` | `iOmniUuid` (required), `bUseMissiles`, `navigationDelaySeconds` | active `coord` |
+  | `UpdateFleet` | `iOmniUuid` (required), `fleetWantedCoordinate` (required), `bIsFlagship` | active `coord` |
+  | `TransferOmni` | `vecPosition`, `vecDirection`, `vecVelocity`, `fHealth`, `fShield`, `nextBlasterFireTimeSeconds`, `nextSecondarySpawnTimeSeconds`, `shieldCooldownSeconds`, `shieldDownSoundCooldownSeconds`, `animationTimeSeconds`, `navigationDelaySeconds`, `fleetWantedCoordinate` | `kbDebugInput`; creates a missing `coord` |
   | `TransferSpaceship` | `vecPosition`, `vecDirection`, `vecVelocity`, `fHealth`, `nextBlasterSpawnTimeSeconds`, `fDeltaRotation` | `kbDebugInput`; live `coord` |
   | `TransferBlaster` | `vecPosition`, `vecVelocity`, `uiTypeIndex` | `kbDebugInput`; live `coord` |
   | `TransferMissile` | `vecPosition`, `vecDirection`, `vecVelocity`, `fAcceleration`, `deltaRotationDelaySeconds`, `timeSeconds`, `nextJitterSeconds`, `fDeltaRotation`, `fDeltaRotationMaximum`, `fPitch` | `kbDebugInput`; live `coord` |
 
-  `iPlayerUuid` is a `query_players` `uuid`, which changes when the player
-  crosses cells. A live `coord` holds a player or an active client subscription.
+  `iOmniUuid` is a `query_omnis` `uuid`, which changes when the omni
+  crosses cells. A live `coord` holds an omni or an active client subscription.
   An omitted field takes its payload struct default (`fSpawnOffsetX` 45,
   `fSpawnOffsetY` -12, `navigationDelaySeconds` 60), except that
   `fleetWantedCoordinate` defaults to `coord`, and a transfer's `vecPosition`
   defaults to the cell center, `vecDirection` and `vecVelocity` to `[1,0]`,
-  `fHealth` and `fShield` to 1, `uiTypeIndex` to the player blaster type, and
+  `fHealth` and `fShield` to 1, `uiTypeIndex` to the omni blaster type, and
   `fDeltaRotationMaximum` to 2. The server sets the rest: a minted global id for
-  `SpawnPlayer` and `TransferPlayer`, the player alignment, an empty client
-  GUID, zero player flags, and the pending countdown ticks. An injected player
-  is therefore synthetic AI and not an ownership harness rig. A spawned player
-  starts with `kUseMissiles` clear; an `UpdatePlayer` entry with
+  `SpawnOmni` and `TransferOmni`, the omni alignment, an empty client
+  GUID, zero omni flags, and the pending countdown ticks. An injected omni
+  is therefore synthetic AI and not an ownership harness rig. A spawned omni
+  starts with `kUseMissiles` clear; an `UpdateOmni` entry with
   `bUseMissiles:true` takes effect one second (`kiTickRate` ticks) after the
   tick it enters.
 
   The batch also fails during replay playback, on a transfer entry without
-  `kbDebugInput`, on a non-finite value, on a `SpawnPlayer` offset or a transfer
-  `vecPosition` outside the cell, on a `TransferPlayer` `vecVelocity` whose XY
-  length exceeds `kfPlayerMaximumSpeed` (33.33 m/s), on a
+  `kbDebugInput`, on a non-finite value, on a `SpawnOmni` offset or a transfer
+  `vecPosition` outside the cell, on a `TransferOmni` `vecVelocity` whose XY
+  length exceeds `kfOmniMaximumSpeed` (33.33 m/s), on a
   `navigationDelaySeconds` outside `[0,60]`, on a `nextBlasterFireTimeSeconds`
   outside `[0,kBlasterFireInterval]`, and on a `uiTypeIndex` that is not an
   adoptable blaster type. The command makes no terrain check; a blaster destroys
   itself on terrain contact, so a `TransferBlaster` that must survive needs a
   terrain-clear `vecPosition` (the probe in
-  [replay.md](replay.md#replay-transfer-capture-harness-rig)). To send a player
+  [replay.md](replay.md#replay-transfer-capture-harness-rig)). To send an omni
   out across a cell's east edge, queue
-  `{"coord":<cell>,"type":"TransferPlayer","vecPosition":[433.86,0],"vecVelocity":[33.33,0]}`: 433.86
+  `{"coord":<cell>,"type":"TransferOmni","vecPosition":[433.86,0],"vecVelocity":[33.33,0]}`: 433.86
   m is half the cell width (`cell_coordinate_probe` `area.width`) less 15.5
-  ticks of travel at `kfPlayerMaximumSpeed`, so the arrival coasts under its
+  ticks of travel at `kfOmniMaximumSpeed`, so the arrival coasts under its
   post-arrival transfer lock and crosses into the eastern neighbor about 16
   ticks after its harvest through the ordinary transfer producers. Terrain near
   that path can push the coast off its line; then pick another cell.
@@ -260,7 +260,7 @@
   and in catch-up bursts that run several ticks per update; a pause stops the
   clock, so entries wait. A status-change entry whose coordinate is inactive or
   whose frame is not ready at its target tick stays queued and applies on the
-  first later tick that can take it. A non-player transfer entry whose
+  first later tick that can take it. A non-omni transfer entry whose
   destination is no longer live at its target tick is dropped with a Network
   warning. An active recording captures released entries as it captures natural
   ones: status changes in their tick's input, transfers in the post-dispatch
@@ -278,7 +278,7 @@
   and pauses at `N + 1`, the writer input of the event tick whose post-dispatch
   record is written later in the same update.
 
-  The response is `{"injected":int,"globalIds":[...],"deferred":bool}`. `globalIds` lists the ids minted for `SpawnPlayer` and `TransferPlayer` entries in entry order, and `deferred` is true while the server is paused. A request carrying `pauseAfterWriterInput` adds its echo.
+  The response is `{"injected":int,"globalIds":[...],"deferred":bool}`. `globalIds` lists the ids minted for `SpawnOmni` and `TransferOmni` entries in entry order, and `deferred` is true while the server is paused. A request carrying `pauseAfterWriterInput` adds its echo.
 
 Every server `[x,y]` grid-coordinate parameter (`coord`, `fleetWantedCoordinate`) must hold two JSON integer literals, with no fraction or exponent, within the signed 32-bit range; any other component, including a whole-valued `1.0` or `1e0`, fails the command before that coordinate is looked up or used, before that entry mints an ID, and before anything is queued.
 
@@ -286,7 +286,7 @@ Every server `[x,y]` grid-coordinate parameter (`coord`, `fleetWantedCoordinate`
 
 Pause/timescale persist on an empty server. They reset only when the last connected client disconnects. A client may join a paused server and render frozen state, but spawning still needs an unpaused tick.
 
-Frame-read schemas/extractors (`query_frame`, `query_players`, `query_collection`) are owned by `AgentCommandsServerQueries.cpp`. CPU `query_profile`, simulation control, and server dispatch remain in `AgentCommandsServer.cpp`; replay and injection live in `Commands/ServerSimulationHarnessRigs.cpp`; frame edits and reads live in `Commands/ServerFrameEdit.cpp`.
+Frame-read schemas/extractors (`query_frame`, `query_omnis`, `query_collection`) are owned by `AgentCommandsServerQueries.cpp`. CPU `query_profile`, simulation control, and server dispatch remain in `AgentCommandsServer.cpp`; replay and injection live in `Commands/ServerSimulationHarnessRigs.cpp`; frame edits and reads live in `Commands/ServerFrameEdit.cpp`.
 
 ## Durable caveats
 

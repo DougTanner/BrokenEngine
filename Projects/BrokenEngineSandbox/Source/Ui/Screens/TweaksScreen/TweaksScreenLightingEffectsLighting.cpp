@@ -31,12 +31,12 @@ const engine::TweaksSliderMapRegistrar gLightingEffectsLightingRegistrar
 	{"Crater Lighting Intensity Two", &gCraterLightingIntensityTwo},
 	{"Crater Lighting Intensity Three", &gCraterLightingIntensityThree},
 	{"Crater Lighting Intensity Four", &gCraterLightingIntensityFour},
-	{"Player Area Light Lighting Size", &gPlayerBlasterLightingArea},
-	{"Player Area Light Lighting Intensity", &gPlayerBlasterLightingIntensity},
-	{"Player Impact Lighting Area One", &gPlayerImpactLightingAreaOne},
-	{"Player Impact Lighting Area Two", &gPlayerImpactLightingAreaTwo},
-	{"Player Impact Lighting Intensity One", &gPlayerImpactLightingIntensityOne},
-	{"Player Impact Lighting Intensity Two", &gPlayerImpactLightingIntensityTwo},
+	{"Omni Area Light Lighting Size", &gOmniBlasterLightingArea},
+	{"Omni Area Light Lighting Intensity", &gOmniBlasterLightingIntensity},
+	{"Omni Impact Lighting Area One", &gOmniImpactLightingAreaOne},
+	{"Omni Impact Lighting Area Two", &gOmniImpactLightingAreaTwo},
+	{"Omni Impact Lighting Intensity One", &gOmniImpactLightingIntensityOne},
+	{"Omni Impact Lighting Intensity Two", &gOmniImpactLightingIntensityTwo},
 	{"Hex Shield Lighting Intensity", &gHexShieldLightingIntensity},
 	{"Missile Exhaust Lighting Area", &gMissileExhaustLightingArea},
 	{"Missile Exhaust Lighting Intensity", &gMissileExhaustLightingIntensity},
@@ -84,17 +84,17 @@ void RenderLightingEffectsLightingTab(engine::TweaksScreen& rScreen)
 
 		ImGui::TableNextColumn();
 
-		rScreen.WrapperSeparatorText("Players - Area Light");
-		rScreen.WrapperSlider("Lighting Size", iSection, 1.0f, "Player Area Light Lighting Size");
-		rScreen.WrapperSlider("Lighting Intensity", iSection, 1.0f, "Player Area Light Lighting Intensity");
+		rScreen.WrapperSeparatorText("Omnis - Area Light");
+		rScreen.WrapperSlider("Lighting Size", iSection, 1.0f, "Omni Area Light Lighting Size");
+		rScreen.WrapperSlider("Lighting Intensity", iSection, 1.0f, "Omni Area Light Lighting Intensity");
 
-		rScreen.WrapperSeparatorText("Players - Impact Light");
-		rScreen.WrapperSlider("Lighting Area One", iSection, 1.0f, "Player Impact Lighting Area One");
-		rScreen.WrapperSlider("Lighting Area Two", iSection, 1.0f, "Player Impact Lighting Area Two");
-		rScreen.WrapperSlider("Lighting Int One", iSection, 1.0f, "Player Impact Lighting Intensity One");
-		rScreen.WrapperSlider("Lighting Int Two", iSection, 1.0f, "Player Impact Lighting Intensity Two");
+		rScreen.WrapperSeparatorText("Omnis - Impact Light");
+		rScreen.WrapperSlider("Lighting Area One", iSection, 1.0f, "Omni Impact Lighting Area One");
+		rScreen.WrapperSlider("Lighting Area Two", iSection, 1.0f, "Omni Impact Lighting Area Two");
+		rScreen.WrapperSlider("Lighting Int One", iSection, 1.0f, "Omni Impact Lighting Intensity One");
+		rScreen.WrapperSlider("Lighting Int Two", iSection, 1.0f, "Omni Impact Lighting Intensity Two");
 
-		rScreen.WrapperSeparatorText("Players - Hex Shield");
+		rScreen.WrapperSeparatorText("Omnis - Hex Shield");
 		rScreen.WrapperSlider("Lighting Intensity", iSection, 1.0f, "Hex Shield Lighting Intensity");
 
 		rScreen.WrapperSeparatorText("Missiles - Exhaust");

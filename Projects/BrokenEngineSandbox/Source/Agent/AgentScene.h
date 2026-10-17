@@ -5,12 +5,12 @@
 namespace game
 {
 
-// describe_scene: structured JSON view of the rendered scene — camera, UI/game state, visible player/spaceship/
+// describe_scene: structured JSON view of the rendered scene — camera, UI/game state, visible omni/spaceship/
 // blaster units ({coord, local} positions plus screen pixels from the rebased position via
 // engine::CameraBase::WorldToScreen; blaster rows also carry the
 // client-only wind-trail values), fleets, per-collection counts, island placements, and per-cell reconciliation
 // state (cellStates). Params
-// {"includeUnits"?:true,"maxUnits"?:200,"unitTypes"?:["player","spaceship","blaster"]}; an absent "unitTypes"
+// {"includeUnits"?:true,"maxUnits"?:200,"unitTypes"?:["omni","spaceship","blaster"]}; an absent "unitTypes"
 // emits every type. Throws std::runtime_error on bad params, caught by
 // AgentCommandServer::Drain().
 void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rResult);

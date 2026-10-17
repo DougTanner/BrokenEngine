@@ -33,14 +33,14 @@ firing direction, never a hull pitch); no backward compatibility.
 
 Current-tree evidence this design rests on:
 
-- `FrameInterpolate::IsVisible` tests X and Y only, ±65 by ±45 m (`Engine/Source/Frame/FrameBase.h:165-170`); the Omni blaster and missile target ranges are 3D distances of 120 and 160 m (`PlayersCombat.cpp:24-25,80,107`); the Fighter nearest-enemy search is a 3D distance (`Spaceships.cpp:95`); registry acquisition ranks by 3D radius and 3D angle (`Engine/Source/Frame/FrameRegistry.cpp:184-190`) and is a deterministic stream (`Frame/AGENTS.md`: never hoisted, cached, or parallelized).
-- Fighter steering is yaw-only (`Spaceships.cpp:283`); the Fighter fire cone is a 3D angle against the hull direction (`Spaceships.cpp:454-458`, `kfSpawnBlasterPlayerAngle = 0.1`), so a target above the ship is never in the cone; the blaster velocity is the hull direction times `kfBlastersSpeed` (`:464-465`), so it has Z = 0.
+- `FrameInterpolate::IsVisible` tests X and Y only, ±65 by ±45 m (`Engine/Source/Frame/FrameBase.h:165-170`); the Omni blaster and missile target ranges are 3D distances of 120 and 160 m (`OmnisCombat.cpp:24-25,80,107`); the Fighter nearest-enemy search is a 3D distance (`Spaceships.cpp:95`); registry acquisition ranks by 3D radius and 3D angle (`Engine/Source/Frame/FrameRegistry.cpp:184-190`) and is a deterministic stream (`Frame/AGENTS.md`: never hoisted, cached, or parallelized).
+- Fighter steering is yaw-only (`Spaceships.cpp:283`); the Fighter fire cone is a 3D angle against the hull direction (`Spaceships.cpp:454-458`, `kfSpawnBlasterOmniAngle = 0.1`), so a target above the ship is never in the cone; the blaster velocity is the hull direction times `kfBlastersSpeed` (`:464-465`), so it has Z = 0.
 - Omni `AcquireTarget` writes a 3D lead position through
-  `common::ComputeLeadPosition` (`PlayersCombat.cpp:124`, 3D solve at
+  `common::ComputeLeadPosition` (`OmnisCombat.cpp:124`, 3D solve at
   `Common/Math/MathUtils.cpp:88-119`); `UpdateFacing` stores its normalized 3D
   direction in `pVecWantedDirections` (`:147`); Interpolate Update feeds that
   column's horizontal projection to `common::RotateTowardsPercent`
-  (`Players.cpp:482`; FlightPlaneClimbing decision 16), so the hull stays
+  (`Omnis.cpp:482`; FlightPlaneClimbing decision 16), so the hull stays
   horizontal while the column keeps the 3D lead direction decision 3 pitches
   shots from. Omni blasters leave along the jittered hull direction (`:292-311`,
   jitter is a rotation about Z, `MathUtils.cpp:60-64`); left vectors come from a
@@ -60,7 +60,7 @@ Current-tree evidence this design rests on:
   decrements the held source's subscriber count
   (`Engine/Source/Frame/FrameRegistry.cpp:230-239`).
 - Omni missile launch: `AcquireTarget` sets `kFireMissile` for any target within
-  160 m in 3D (`PlayersCombat.cpp:134-136`); `SpawnMissiles` resets the spawn
+  160 m in 3D (`OmnisCombat.cpp:134-136`); `SpawnMissiles` resets the spawn
   interval and toggles the launch side (`:379-381`), aims with
   `common::DirectionTo` at the `FindTargetSpaceshipIndex` target or falls back
   to the hull direction (`:390-394`), and pre-moves and fires along the jittered
@@ -107,10 +107,10 @@ Each decision is recorded as made; the alternatives are not open.
 6. **Omnis launch missiles only on a plane, at a target in the band.**
    `SpawnMissiles` gains two skips beside its existing ones, before the
    spawn-interval reset and the side toggle (today's
-   `PlayersCombat.cpp:379-381`), so a skipped launch spends neither: (a) when
+   `OmnisCombat.cpp:379-381`), so a skipped launch spends neither: (a) when
    `FlightPlaneAtHeight(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i]))` is
    none (between planes, FlightPlaneClimbing decision 2); (b) when the aim
-   search (today's `FindTargetSpaceshipIndex`, `PlayersCombat.cpp:70-88`, called
+   search (today's `FindTargetSpaceshipIndex`, `OmnisCombat.cpp:70-88`, called
    at `:391`), which now skips a candidate whose `std::abs(zCandidate - zOmni)`
    exceeds `kfFlatFireHeightTolerance` before the distance compare, finds no
    target. The hull-direction fallback is removed. The aim direction is
@@ -170,7 +170,7 @@ inline constexpr float kfFlatFireHeightTolerance = 2.0f; // blaster collision ra
 
 Fighter and Battleship Spawn-phase fire (today's `Spaceships.cpp:443-466`): `FindNearestEnemyShip(rFrame, vecPosition, alignment, kfFlatFireHeightTolerance, vecNearestEnemy)`, `IsVisible` as today, cone against `XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecNearestEnemy, vecPosition), 0.0f))`, blaster spawn unchanged. Their PostRender Update steering and regeneration calls pass `std::numeric_limits<float>::max()`.
 
-Omni `SpawnBlasters` (today's `PlayersCombat.cpp:310-311`): after the jitter,
+Omni `SpawnBlasters` (today's `OmnisCombat.cpp:310-311`): after the jitter,
 `vecFireDirection` per decision 3,
 `vecBlasterVelocity = XMVectorScale(vecFireDirection, kfOmniBlastersSpeed)`; the
 pre-move at `:313` uses `vecFireDirection`. `SpawnMissiles` per decision 6: the

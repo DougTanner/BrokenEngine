@@ -10,7 +10,7 @@ class Camera final : public engine::CameraBase
 public:
 
 	// Origin-coord anchor used by main-menu camera math. Origin is sampled like any other cell,
-	// so this is just the (0, 0) cell center; the camera converges on the focused player anyway.
+	// so this is just the (0, 0) cell center; the camera converges on the focused owned entity anyway.
 	static constexpr XMVECTOR kVecMenuIslandCenter {0.0f, 0.0f, 0.0f, 1.0f};
 
 	// Main-menu XY offset from the menu island center is local to the origin cell.
@@ -22,7 +22,7 @@ public:
 
 	engine::CameraTarget PullTarget(const engine::FrameInterpolateBase& rFrameInterpolate);
 
-	engine::GlobalId mLastTrackedPlayerIdentifier {};
+	engine::GlobalId mLastTrackedOwnedEntityIdentifier {};
 
 };
 

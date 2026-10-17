@@ -3,27 +3,27 @@
 ## Context
 
 User-requested capability: a movement override that relocates an **existing** entity (the
-player at minimum) to a chosen point, without that displacement being interpreted as
+omni at minimum) to a chosen point, without that displacement being interpreted as
 ordinary swept travel. Two motivating uses: future ship teleport abilities, and AgentHarness
 tests that need an entity placed at a chosen point instead of being flown there.
 
 The engine has no such override today. Chosen-position *spawning* already exists via
-`SpawnPlayerData`'s offsets (added by `Documents/Plans/Agents/HarnessPlacementAndPusherOverflowObservability.md`,
+`SpawnOmniData`'s offsets (added by `Documents/Plans/Agents/HarnessPlacementAndPusherOverflowObservability.md`,
 landed separately); this feature is only about moving an entity that already exists.
 
 ### The collision-sweep hazard a naive teleport hits (verified at 774a1de)
 
-Writing a new position straight into the player's position array is not enough:
+Writing a new position straight into the omni's position array is not enough:
 
-- `Projects/BrokenEngineSandbox/Source/Frame/Collections/Players/Players.cpp:700-715` builds the
-  player collision layer with `pVecStartPositions` = the **previous** frame's positions and
+- `Projects/BrokenEngineSandbox/Source/Frame/Collections/Omnis/Omnis.cpp:700-715` builds the
+  omni collision layer with `pVecStartPositions` = the **previous** frame's positions and
   `pVecEndPositions` = the current ones.
 - `Engine/Source/Frame/Collision.cpp:156-161` builds swept AABBs from that start/end pair, and
   `:588-594` runs `SweptSphereTest` across the whole segment.
 - Blasters (`Collections/Blasters/BlastersUpdate.cpp:276`) and missiles
   (`Collections/Missiles/MissilesUpdate.cpp:356`) are the only layers setting `bSweptTest = true`.
 
-So a player moved a long distance inside a tick is swept against every blaster and missile
+So an omni moved a long distance inside a tick is swept against every blaster and missile
 lying along the jump path and collects hits it never flew through. The previous-frame start
 array is const shared history owned by the previous frame and cannot be rewritten to hide the
 jump.
@@ -33,14 +33,14 @@ jump.
 Phase 5, `game::FramePostRender::Spawn` (`Engine/Source/Frame/FrameBase.cpp:348-361`), runs
 **after** Collision and **before** the shared CRC stamp at `:361`, and receives the same
 published `FrameInput` on client and server. `ProcessSpawnStatusChanges`
-(`Collections/Players/Players.cpp:241`) already performs uuid to index lookups in that phase.
+(`Collections/Omnis/Omnis.cpp:241`) already performs uuid to index lookups in that phase.
 Applying the relocation there means the tick's collision work has already completed against
 the pre-teleport position, and the new position is still inside the CRC.
 
 ## Design (author's recommendation, not a settled decision)
 
-Recommended shape: a new append-only `StatusChangeType` (for example `kTeleportPlayer`) with a
-payload of `{ int64_t iPlayerUuid; }` plus the target position, applied in the Phase 5
+Recommended shape: a new append-only `StatusChangeType` (for example `kTeleportOmni`) with a
+payload of `{ int64_t iOmniUuid; }` plus the target position, applied in the Phase 5
 Spawn handler next to `ProcessSpawnStatusChanges`. Rationale: it reuses the existing
 uuid to index lookup and the already-proven post-Collision/pre-CRC window, and it keeps the
 override out of the Update and Collision phases entirely.
@@ -49,7 +49,7 @@ Deliberately left open for the implementing session to decide with the user:
 
 - Whether the payload carries an absolute world position or a cell-relative offset, and how it
   is expressed (the existing spawn path uses offsets).
-- Whether the override applies to players only, or is generalised to other collections. Players
+- Whether the override applies to omnis only, or is generalised to other collections. Omnis
   only is the smaller change and satisfies both stated uses.
 - What happens to velocity and orientation across the jump (preserved, zeroed, or specified in
   the payload).
@@ -83,7 +83,7 @@ transfer path.
 
 - `Projects/BrokenEngineSandbox/Source/Frame/StatusChange.h`
 - `Projects/BrokenEngineSandbox/Source/Frame/FrameInput.h` / `FrameInput.cpp`
-- `Projects/BrokenEngineSandbox/Source/Frame/Collections/Players/Players.cpp`
+- `Projects/BrokenEngineSandbox/Source/Frame/Collections/Omnis/Omnis.cpp`
   (`ProcessSpawnStatusChanges` and its Phase 5 caller)
 - `Engine/Source/Network/NetworkSerialization.cpp`
 - `Engine/Source/Network/NetworkProtocol.h` (`kiProtocolVersion`)
@@ -92,9 +92,9 @@ transfer path.
 
 ## In scope
 
-- One new append-only `StatusChangeType` and payload for relocating an existing player, with
+- One new append-only `StatusChangeType` and payload for relocating an existing omni, with
   its serialization and codec sites.
-- Applying the relocation in the Phase 5 Spawn handler in `Players.cpp`, after Collision and
+- Applying the relocation in the Phase 5 Spawn handler in `Omnis.cpp`, after Collision and
   before the shared CRC stamp.
 - Refusing an out-of-cell target.
 - The `FrameInput::kiVersion` and `engine::kiProtocolVersion` bumps the payload change forces.
@@ -105,7 +105,7 @@ transfer path.
 - Chosen-position *spawning* (already delivered by the separate harness placement work).
 - Cross-cell teleport and any change to the transfer path.
 - Ship teleport ability gameplay: cooldowns, costs, targeting UI, VFX.
-- Generalising the override to non-player collections.
+- Generalising the override to non-omni collections.
 - Backward compatibility with the pre-bump protocol or replay versions.
 
 ## Risk tier and invariants
@@ -120,8 +120,8 @@ after Collision and before the CRC stamp; entity positions stay inside their own
 
 ## Acceptance criteria
 
-- A teleport request relocates the target player to the requested in-cell point on the tick it
-  is consumed, and the player takes no blaster or missile hit that lies only along the jump
+- A teleport request relocates the target omni to the requested in-cell point on the tick it
+  is consumed, and the omni takes no blaster or missile hit that lies only along the jump
   path.
 - Client and server CRCs match across the teleport tick, and a replay of that tick reproduces
   bit-identically.

@@ -293,9 +293,9 @@ bool ExecuteAgentCommandServer(std::string_view command, const nlohmann::json& r
 		CommandQueryFrame(rParameters, rResult);
 		return true;
 	}
-	if (command == "query_players")
+	if (command == "query_omnis")
 	{
-		CommandQueryPlayers(rParameters, rResult);
+		CommandQueryOmnis(rParameters, rResult);
 		return true;
 	}
 	if (command == "query_collection")

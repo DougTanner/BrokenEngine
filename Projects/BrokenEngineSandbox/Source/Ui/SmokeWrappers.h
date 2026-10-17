@@ -31,10 +31,10 @@ extern engine::Wrapper gBlasterPuffAreaEnd;
 extern engine::Wrapper gBlasterPuffIntensityStart;
 extern engine::Wrapper gBlasterPuffIntensityEnd;
 
-extern engine::Wrapper gPlayerImpactPuffAreaOne;
-extern engine::Wrapper gPlayerImpactPuffAreaTwo;
-extern engine::Wrapper gPlayerImpactPuffIntensityOne;
-extern engine::Wrapper gPlayerImpactPuffIntensityTwo;
+extern engine::Wrapper gOmniImpactPuffAreaOne;
+extern engine::Wrapper gOmniImpactPuffAreaTwo;
+extern engine::Wrapper gOmniImpactPuffIntensityOne;
+extern engine::Wrapper gOmniImpactPuffIntensityTwo;
 
 extern engine::Wrapper gMissileTrailIntensity;
 

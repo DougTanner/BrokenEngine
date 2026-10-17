@@ -16,7 +16,7 @@ bool WriteReplayMetadata(const engine::FileFlags_t& rFlags, const std::filesyste
 	ReplayMeta metadata
 	{
 		.clientGridCoordinate = game::gpGame->mClientGridCoordinate,
-		.iClientPlayerIdentifierValue = game::gpGame->ClientPlayerIdentifier().iValue,
+		.iClientOwnedEntityIdentifierValue = game::gpGame->ClientOwnedEntityIdentifier().iValue,
 		.fPreviousClientArmor = game::gpGame->mfPreviousClientArmor,
 	};
 	return engine::WriteVersionedFile(rFlags, rFilename, metadata);

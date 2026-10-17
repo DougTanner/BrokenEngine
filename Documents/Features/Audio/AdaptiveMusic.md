@@ -6,15 +6,15 @@ Context
 Currently, music is selected sequentially from fixed playlists (menu vs game) via
 GetNextMusicTrack(). Track transitions only happen when a track ends (or nearly ends),
 using the existing crossfade infrastructure. The game has no awareness of combat
-intensity, player health, or enemy presence when choosing music.
+intensity, omni health, or enemy presence when choosing music.
 
 The game has 4 menu tracks (ambient/relaxed) and 4 game tracks with suggestive names:
 S31-OnPatrol (exploration), S31-TheGearsofProgress (building/ambient), S31-HighAlert
 (combat), S31-UnexpectedTrouble (intense combat). These naturally map to intensity tiers.
 
 AudioManager already supports mid-track transitions via PlayMusic() with crossfade.
-The game layer can query frame state: spaceship counts, player health/armor/shields,
-blaster/missile counts, and player proximity to enemies -- all available from the
+The game layer can query frame state: spaceship counts, omni health/armor/shields,
+blaster/missile counts, and omni proximity to enemies -- all available from the
 RenderFrame at the client's grid coord (`mClientGridCoordinate`).
 
 Why
@@ -23,7 +23,7 @@ Why
   breaks immersion
 - The existing track names already suggest intensity tiers (OnPatrol vs HighAlert)
 - The crossfade infrastructure already handles smooth transitions
-- Game state (enemy count, player health, projectile count) is readily accessible
+- Game state (enemy count, omni health, projectile count) is readily accessible
   from the render frame without touching deterministic frame logic
 
 Changes (3 files)
@@ -52,16 +52,16 @@ Changes (3 files)
 
    Update() evaluates game state each frame to compute a desired intensity:
    - Count alive spaceships (iCount minus those with kExploding flag) from
-     SpaceshipsPostRender in the flagship player's render frame
-   - Check flagship player armor/shields from PlayersPostRender
+     SpaceshipsPostRender in the flagship owned entity's render frame
+   - Check flagship owned entity armor/shields from OmnisPostRender
    - Count active blasters and missiles from the interpolate collections
-   - Compare player position to nearest spaceship positions for proximity
+   - Compare omni position to nearest spaceship positions for proximity
 
    Intensity thresholds (tunable constants in the .cpp):
    - kCalm: 0 alive enemies within range
    - kTension: 1+ alive enemies exist but no projectiles and health is high
-   - kCombat: projectiles in flight OR player recently took damage (armor decreased)
-   - kHighCombat: player armor below 40% AND 3+ enemies AND projectiles active
+   - kCombat: projectiles in flight OR omni recently took damage (armor decreased)
+   - kHighCombat: omni armor below 40% AND 3+ enemies AND projectiles active
 
    Hysteresis: intensity must persist for a minimum duration before triggering a
    transition (e.g., 3 seconds for escalation, 6 seconds for de-escalation). A
@@ -77,9 +77,9 @@ Changes (3 files)
    Implementation of AdaptiveMusic::Update() and GetTrack():
 
    Update():
-   - Early-out if the flagship player's frame is not available
+   - Early-out if the flagship owned entity's frame is not available
    - Get SpaceshipsPostRender from the frame, count alive enemies (skip kExploding)
-   - Get PlayersPostRender, find flagship player index, read armor and shields
+   - Get OmnisPostRender, find flagship owned entity index, read armor and shields
    - Get BlastersInterpolate and MissilesInterpolate counts for projectile activity
    - Use Game's mfPreviousClientArmor member field to detect recent damage (armor
      decreased) -- already maintained in Game.cpp (updated ~line 343, reset ~line 463,

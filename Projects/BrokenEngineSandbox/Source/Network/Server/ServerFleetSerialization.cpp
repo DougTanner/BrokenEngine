@@ -2,7 +2,7 @@
 
 #include "Network/Server/ServerFleetSerialization.h"
 
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
 #include "Network/GamePacketType.h"
@@ -33,7 +33,7 @@ static void WriteFleet(std::fstream& rFileStream, const Fleet& rFleet)
 	common::Write(rFileStream, rFleet.guid.uiLow);
 	int64_t iMemberCount = std::ssize(rFleet.members);
 	common::Write(rFileStream, iMemberCount);
-	common::Write(rFileStream, rFleet.flagshipGlobalPlayerId.iValue);
+	common::Write(rFileStream, rFleet.flagshipGlobalId.iValue);
 	common::Write(rFileStream, rFleet.wantedCoordinate.iX);
 	common::Write(rFileStream, rFleet.wantedCoordinate.iY);
 	common::Write(rFileStream, rFleet.uiPendingFleetWantedCoordinateTicks);
@@ -41,7 +41,7 @@ static void WriteFleet(std::fstream& rFileStream, const Fleet& rFleet)
 	common::Write(rFileStream, rFleet.cellChangeTimerSeconds.count());
 	for (const FleetMember& rMember : rFleet.members)
 	{
-		common::Write(rFileStream, rMember.globalPlayerId.iValue);
+		common::Write(rFileStream, rMember.globalId.iValue);
 		rMember.flags.Write(rFileStream);
 		common::Write(rFileStream, rMember.coordinate.iX);
 		common::Write(rFileStream, rMember.coordinate.iY);
@@ -58,7 +58,7 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	}
 	int64_t iMemberCount = 0;
 	common::Read(rFileStream, iMemberCount);
-	common::Read(rFileStream, rFleet.flagshipGlobalPlayerId.iValue);
+	common::Read(rFileStream, rFleet.flagshipGlobalId.iValue);
 	int32_t iWantedX = 0;
 	int32_t iWantedY = 0;
 	common::Read(rFileStream, iWantedX);
@@ -71,7 +71,7 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	// Trust boundary (save / replay file): the wire admits only [0, 60], so reject any other fleet delay. It
 	// resets cellChangeTimerSeconds, whose count > 0.0f test gates the fire: +Inf freezes fleet nav forever and NaN fires
 	// every tick; it also feeds a common::Random bound.
-	if (!PlayersPostRender::IsNavigationDelayInRange(rFleet.navigationDelaySeconds.count()))
+	if (!OmnisPostRender::IsNavigationDelayInRange(rFleet.navigationDelaySeconds.count()))
 	{
 		throw std::ios_base::failure("Fleet navigation delay");
 	}
@@ -90,8 +90,8 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	rFleet.members.resize(static_cast<size_t>(iMemberCount));
 	for (FleetMember& rMember : rFleet.members)
 	{
-		int64_t iGlobalPlayerId = 0;
-		common::Read(rFileStream, iGlobalPlayerId);
+		int64_t iGlobalId = 0;
+		common::Read(rFileStream, iGlobalId);
 		FleetMemberFlags_t flags {};
 		flags.Read(rFileStream);
 		// Trust boundary (save / replay file): kIsDead is the only member flag.
@@ -105,19 +105,19 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 		int32_t iCoordY = 0;
 		common::Read(rFileStream, iCoordX);
 		common::Read(rFileStream, iCoordY);
-		rMember = FleetMember {.globalPlayerId = engine::GlobalId {.iValue = iGlobalPlayerId}, .flags = flags, .coordinate = engine::GridCoord {.iX = iCoordX, .iY = iCoordY}};
+		rMember = FleetMember {.globalId = engine::GlobalId {.iValue = iGlobalId}, .flags = flags, .coordinate = engine::GridCoord {.iX = iCoordX, .iY = iCoordY}};
 	}
 	// Trust boundary (save / replay file): members and the flagship are looked up by global ID, so each member ID
 	// must be valid and unique within its fleet, and the flagship must name a member ({} only for an empty fleet).
 	for (int64_t k = 0; k < iMemberCount; ++k)
 	{
-		engine::GlobalId memberGlobalPlayerId = rFleet.members.at(static_cast<size_t>(k)).globalPlayerId;
-		if (!(memberGlobalPlayerId.iValue != 0) || std::ranges::contains(rFleet.members.begin(), rFleet.members.begin() + k, memberGlobalPlayerId, &FleetMember::globalPlayerId))
+		engine::GlobalId memberGlobalId = rFleet.members.at(static_cast<size_t>(k)).globalId;
+		if (!(memberGlobalId.iValue != 0) || std::ranges::contains(rFleet.members.begin(), rFleet.members.begin() + k, memberGlobalId, &FleetMember::globalId))
 		{
 			throw std::ios_base::failure("Fleet member global ID");
 		}
 	}
-	bool bFlagshipValid = rFleet.members.empty() ? !(rFleet.flagshipGlobalPlayerId.iValue != 0) : std::ranges::contains(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
+	bool bFlagshipValid = rFleet.members.empty() ? !(rFleet.flagshipGlobalId.iValue != 0) : std::ranges::contains(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId);
 	if (!bFlagshipValid)
 	{
 		throw std::ios_base::failure("Fleet flagship global ID");

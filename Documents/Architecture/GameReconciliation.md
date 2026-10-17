@@ -1,6 +1,6 @@
 # Architecture: Game Reconciliation
 
-> Maintained architecture reference for `Projects/BrokenEngineSandbox/Source/` and the reconciliation replay chain in `Engine/Source/Network/Client/`; update when depicted reconciliation flow, client-loop integration, desync handling, or player-event parsing changes.
+> Maintained architecture reference for `Projects/BrokenEngineSandbox/Source/` and the reconciliation replay chain in `Engine/Source/Network/Client/`; update when depicted reconciliation flow, client-loop integration, desync handling, or owned-entity event parsing changes.
 
 ## Reconciliation State Machine
 
@@ -161,9 +161,9 @@ sequenceDiagram
     end
 ```
 
-## Player Event Parsing
+## Owned Entity Event Parsing
 
-Raw game packets are parsed into typed events. `kServerAssignPlayer` maps directly to `kAssigned`; `kServerPlayerState` packets carry a `PlayerStateWireType` that maps to the remaining event types.
+Raw game packets are parsed into typed events. `kServerAssignOwnedEntity` maps directly to `kAssigned`; `kServerOwnedEntityState` packets carry an `OwnedEntityStateWireType` that maps to the remaining event types.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
@@ -173,25 +173,25 @@ flowchart LR
     classDef func fill:#dbeafe,stroke:#3b82f6
 
     RAW["Raw Game Packets<br/>from Client"]
-    PARSE["ParsePlayerEvents()"]:::func
+    PARSE["ParseOwnedEntityEvents()"]:::func
 
     RAW --> PARSE
 
-    subgraph wire_types ["PlayerStateWireType"]
+    subgraph wire_types ["OwnedEntityStateWireType"]
         W0["kSpawned"]:::wire
         W1["kChangedCell"]:::wire
         W2["kDied"]:::wire
     end
 
-    subgraph event_types ["ReceivedPlayerEvent"]
+    subgraph event_types ["ReceivedOwnedEntityEvent"]
         E0["kAssigned"]:::event
         E1["kSpawned"]:::event
         E2["kChangedCell"]:::event
         E3["kDied"]:::event
     end
 
-    PARSE -->|"kServerAssignPlayer"| E0
-    PARSE -->|"kServerPlayerState"| wire_types
+    PARSE -->|"kServerAssignOwnedEntity"| E0
+    PARSE -->|"kServerOwnedEntityState"| wire_types
     W0 --> E1
     W1 --> E2
     W2 --> E3

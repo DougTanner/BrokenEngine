@@ -5,13 +5,21 @@ Line numbers cite baseline `f1d140ae26d0a8684264c8a1fa4f55c1bec1f601`. The prere
 
 ## Context
 
-The user's direction, recorded by the dispatch that commissioned this Plan: a second game project will be created beside `Projects/BrokenEngineSandbox`. Engine code may call expected `game::` classes, globals, and members by name, but must not name Sandbox gameplay (`Blaster`, `Spaceship`, `Missile`, `Player`, `bUseMissiles`, `Fleet`). Fleets stay game-owned. Agent commands are an exempt developer channel (`Engine/Source/Agent/AGENTS.md` `## Architecture`), so no new validation is needed.
+The user's direction, recorded by the dispatch that commissioned this Plan: a second game project will be created beside `Projects/BrokenEngineSandbox`. Engine code may call expected `game::` classes, globals, and members by name, but must not name Sandbox gameplay (`Blaster`, `Spaceship`, `Missile`, `Omni`, `bUseMissiles`, `Fleet`). Fleets stay game-owned. Agent commands are an exempt developer channel (`Engine/Source/Agent/AGENTS.md` `## Architecture`), so no new validation is needed.
 
 The game Agent (`Projects/BrokenEngineSandbox/Source/Agent/`) holds commands and helpers that read only engine state, so a second game would have to copy them:
 
 - `audio_streaming_harness_rig` (`Commands/AgentCommandsAudioStreaming.cpp:1-398`) uses only `engine::AudioStreamingHarnessRig`, `gpAgentCommandServer`, and `gpAudioManager`.
 - `desync_probe` (`Commands/ClientDesyncProbe.cpp:16-153`) uses engine `Client`, `ClientDesyncCore`, `ReconcileDesyncInfo`, `GameBase` cells and `SnapshotIndex`. Its only game-owned reach is `gpClientSession->mpDesynchronizationCore` (`Network/Client/ClientSession.h:68`), which `Documents/Plans/Engine/SharedSessionProtocol.md` moves into engine ownership.
-- Server `status` core fields, `pause`, and `query_profile` (`AgentCommandsServer.cpp:82-106,113-122,179-227`) read only `GameBase`, `engine::gpReplay`, `engine::gpServer`, and `ProfileManager` members, except the status fields that read `game::gpServerSession` (`pendingFlagshipUpdateCount` `:107`, `harvestedTransferTotal` `:108`, and `pendingAgentStatusChangeCount` `:110` once `FrameEditRows.md` removes `pendingTransferHarnessRigCount` `:109`) and the `NavQuery` raw-row block at `:200-210`. `CoordinateFromParameter` (`:229-242`) is a wrapper over `engine::AgentGridCoordinateValue`.
+- Server `status` core fields, `pause`, and `query_profile`
+  (`AgentCommandsServer.cpp:82-106,113-122,179-227`) read only `GameBase`,
+  `engine::gpReplay`, `engine::gpServer`, and `ProfileManager` members, except
+  the status fields that read `game::gpServerSession`
+  (`pendingFlagshipUpdateCount` `:107`, `harvestedTransferTotal` `:108`, and
+  `pendingAgentStatusChangeCount` `:110` once `FrameEditRows.md` removes
+  `pendingTransferHarnessRigCount` `:109`) and the `NavQuery` raw-row block at
+  `:200-210`. `CoordinateFromParameter` (`:229-242`) is a wrapper over
+  `engine::AgentGridCoordinateValue`.
 - `replay_record`, `replay_play`, `replay_transfer_capture`, `replay_drop_retained_end_frame`, and `replay_inject_persistence_failure` (`Commands/ServerSimulationHarnessRigs.cpp:51-255`) touch only `engine::gpReplay`, `GameFlags`, `mbReplaying`, and `engine::ReplayHarnessRigs`, except the four count names at `:136-139` (the slot clear at `:86` goes with the replay-transfer queue `FrameEditRows.md` removes).
 - `describe_scene` (`AgentScene.cpp:185-375`): the camera, UI state, tick, client cell, `subscribedCoords`, `cellStates` (`:114-155`), islands (`:272-289`), and the visible-unit cull (`:157-183`) are engine state; units, fleets, flag names, and counts are game. The shared `.agents/skills/agent-harness/scripts/Wait-IslandSceneReady.ps1:347-389` requires `clientGridCoord` and `islands` from it.
 - Duplicates of engine code: `game::ClientGridCoordinateValue`
@@ -102,7 +110,7 @@ game types), so a game that omits one fails to link with the hook's name.
 - The five replay commands: `ServerSimulationHarnessRigs.cpp:51-255` verbatim,
   with one change: the `replay_transfer_capture` count lines call
   `game::AppendReplayTransferCaptureCounts(const game::ReplayTransferCaptureCounts& rCounts, nlohmann::json& rEvent)`,
-  which writes the game's count fields (`playerCount`, `spaceshipCount`,
+  which writes the game's count fields (`omniCount`, `spaceshipCount`,
   `blasterCount`, `missileCount`); `ReplayTransferCaptureCounts` is the game
   type `ReplayHarnessRigs::TransferCaptureEvent::transferCounts` already holds
   (`ReplayHarnessRigs.h:32`), forward-declared in the header.
@@ -142,7 +150,7 @@ game types), so a game that omits one fails to link with the hook's name.
   truncation flag. The template
   `engine::AppendVisibleUnits(AgentSceneUnits&, std::string_view type, const XMVECTOR* pVecPositions, int64_t iRowCount, GridCoord coordinate, BUILD_ROW&&)`
   is `:157-183`, making the `RenderBasis` (`:301`) itself. The game
-  `AgentScene.cpp` keeps `PlayerFlagNames`, `SpaceshipFlagNames`, `BuildFleets`,
+  `AgentScene.cpp` keeps `OmniFlagNames`, `SpaceshipFlagNames`, `BuildFleets`,
   the `unitTypes` parse (`:195-198,206-237`), and its own loop over cells with a
   snapshot for `counts` and unit rows (`:291-372`), and writes `fleets` and
   `counts`. The game dispatch row (`:123-127`) goes. The engine dispatches and
@@ -175,7 +183,7 @@ added that names no game collection, game `Spawn`, `gpGame`, or
 `FrameCollection` specialization instead. The game keeps the four column lists,
 their specializations (now of `engine::FrameCollection`), `FrameCollections`,
 `ApplyEdit`, `CommandEditFrame`, and `CommandReadFrame`. The command bodies stay
-game-side because the resynchronization refusal reads `pPlayers` (`:433`), the
+game-side because the resynchronization refusal reads `pOmnis` (`:433`), the
 commit calls the game `OnStateReplaced` (`:466`); moving them would need one
 hook per policy line.
 
@@ -248,7 +256,7 @@ Invariants:
 - Moved handlers keep running under `Drain`'s allocation suppression; `desync_probe` keeps its `ScopedSuppressAllocationTracking`.
 - New and moved files keep whole-file `BT_CLIENT`/`BT_SERVER` guards and matching project membership: `AgentCommandsServerGeneric.*` and `FrameEdit.h` in the server project only; `DescribeScene.*`, `ClientDesyncProbe.*`, and `AgentCommandsAudioStreaming.*` in the client project only.
 - Engine and game source roots share the include path, so no new engine file may share a project-relative path with a remaining game file.
-- No new or moved engine file names `Blaster`, `Spaceship`, `Missile`, `Player`, `bUseMissiles`, or `Fleet`.
+- No new or moved engine file names `Blaster`, `Spaceship`, `Missile`, `Omni`, `bUseMissiles`, or `Fleet`.
 
 ## Critical files
 
@@ -283,7 +291,13 @@ Invariants:
 
 ## Out of scope
 
-- `set_client_grid_coord`, `release_client_grid_coord`, `inject_payload` with its `Fields()`-table parser (its queue is the engine `ServerSpawnQueue`), `query_frame`/`query_players`/`query_collection` and their extractors (including `Vector3ToJson`, a direction writer, not a position), `timescale`, and the `save`/`load`/`reset` bodies with `BareFilenameParameter` (no engine consumer). `Documents/Plans/Engine/EngineOwnedSaveSettingsAndSwitches.md` renames the save calls in `AgentCommandsServer.cpp`.
+- `set_client_grid_coord`, `release_client_grid_coord`, `inject_payload` with
+  its `Fields()`-table parser (its queue is the engine `ServerSpawnQueue`),
+  `query_frame`/`query_omnis`/`query_collection` and their extractors (including
+  `Vector3ToJson`, a direction writer, not a position), `timescale`, and the
+  `save`/`load`/`reset` bodies with `BareFilenameParameter` (no engine
+  consumer). `Documents/Plans/Engine/EngineOwnedSaveSettingsAndSwitches.md`
+  renames the save calls in `AgentCommandsServer.cpp`.
 - The game dispatcher `game::ExecuteAgentCommand` beyond the one server row, and its declaration.
 - `ReplayHarnessRigs.*`, `game::ReplayTransferCaptureCounts`, and `CountCapturedReplayTransfers`, which `Documents/Plans/Engine/RemoveSandboxGameplayFromEngine.md` keeps as neutral hooks; `ClientDesyncCore` ownership (owned by `SharedSessionProtocol.md`).
 - `Invoke-HarnessClaim.ps1`, its hub parser, and any agent-harness script; the script and skill changes `Documents/Plans/ChangeWorkflow/ProjectAwareTooling.md` owns.
@@ -295,9 +309,9 @@ Invariants:
 | Criterion | Evidence |
 |---|---|
 | Builds | `/compile` builds the `BrokenEngineSandbox` client and server in Debug and Release x64 with no new warnings (Release compiles the `!kbDebugInput` branches of the moved replay and frame-edit handlers); `/update-vcxproj` validation passes |
-| No gameplay names in engine files | `git grep -n -E "Blaster|Spaceship|Missile|Player|bUseMissiles|Fleet"` over `AgentCommandsServerGeneric.*`, `Commands/DescribeScene.*`, `Commands/ClientDesyncProbe.*`, `Commands/AgentCommandsAudioStreaming.*`, and `Commands/FrameEdit.h` returns nothing |
+| No gameplay names in engine files | `git grep -n -E "Blaster|Spaceship|Missile|Omni|bUseMissiles|Fleet"` over `AgentCommandsServerGeneric.*`, `Commands/DescribeScene.*`, `Commands/ClientDesyncProbe.*`, `Commands/AgentCommandsAudioStreaming.*`, and `Commands/FrameEdit.h` returns nothing |
 | Duplicates gone | `git grep -n -E "ClientGridCoordinateValue|RequireHarnessRigClient|FiniteFloatFromValue"` returns nothing outside `Documents/` |
-| Same server fields | Debug server via `/agent-harness`, run once on a build of the claim's base commit and once on the changed build with the same sequence: `status`; `pause {"paused":true}`; `query_profile {}`; `pause {"paused":false}`; `replay_record {"start":true}` and poll `status.recording:true`; `replay_transfer_capture`; `replay_record {"start":false}`; `replay_drop_retained_end_frame {"coord":[0,0]}` with recording stopped; `replay_inject_persistence_failure {"stage":"bogus"}`; `read_frame {"coord":[0,0],"collection":"frame"}` and `{"coord":[0,0],"collection":"players","index":0}`; one `edit_frame` write of `pfArmors` on that row. Each success response's recursive `result` key set and value types match the baseline run; each failure text matches |
+| Same server fields | Debug server via `/agent-harness`, run once on a build of the claim's base commit and once on the changed build with the same sequence: `status`; `pause {"paused":true}`; `query_profile {}`; `pause {"paused":false}`; `replay_record {"start":true}` and poll `status.recording:true`; `replay_transfer_capture`; `replay_record {"start":false}`; `replay_drop_retained_end_frame {"coord":[0,0]}` with recording stopped; `replay_inject_persistence_failure {"stage":"bogus"}`; `read_frame {"coord":[0,0],"collection":"frame"}` and `{"coord":[0,0],"collection":"omnis","index":0}`; one `edit_frame` write of `pfArmors` on that row. Each success response's recursive `result` key set and value types match the baseline run; each failure text matches |
 | Same client fields | Same paired runs on the Debug client: `describe_scene {}` and `{"includeUnits":false,"maxUnits":0}`; `desync_probe {}`; `audio_streaming_harness_rig {"action":"inspect"}`; `set_client_grid_coord {"coord":[1.5,0]}` and `{"coord":[4294967296,0]}`. Key sets, value types, and failure texts match |
 | Island readiness | `Wait-IslandSceneReady.ps1` exits `0` with artifact `Code` `ready` on the changed build |
 | Replay determinism | The moved `references/replay.md` `### Replay determinism acceptance` passes on the changed Debug build |

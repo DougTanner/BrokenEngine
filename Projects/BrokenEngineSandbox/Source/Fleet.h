@@ -28,7 +28,7 @@ using FleetMemberFlags_t = common::Flags<FleetMemberFlags>;
 
 struct FleetMember
 {
-	engine::GlobalId globalPlayerId {};
+	engine::GlobalId globalId {};
 	FleetMemberFlags_t flags {};
 	engine::GridCoord coordinate {};
 	// Server-only automatic respawn countdown in seconds; read only while kIsDead is set, never saved or sent.
@@ -40,7 +40,7 @@ struct Fleet
 	FleetGuid guid {};
 	std::vector<FleetMember> members;
 	// Invalid {} only while the fleet has no members; otherwise names one of them.
-	engine::GlobalId flagshipGlobalPlayerId {};
+	engine::GlobalId flagshipGlobalId {};
 	engine::GridCoord wantedCoordinate {};
 	uint8_t uiPendingFleetWantedCoordinateTicks = 0;
 	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);

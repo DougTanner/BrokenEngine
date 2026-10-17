@@ -2,7 +2,7 @@
 
 ## Overview
 
-BrokenEngineSandbox is a tech demo that shows off and stress-tests engine features — not a game: there is no human player and no win condition. AI-driven spaceship fleets (a flagship plus its wingmen) fight continuously spawning enemies over the island ocean, so "the client player" always means a ship the AI drives, never one a person steers. All game code lives in the `game` namespace.
+BrokenEngineSandbox is a tech demo that shows off and stress-tests engine features — not a game: there is no human player and no win condition. AI-driven spaceship fleets (a flagship plus its wingmen) fight continuously spawning enemies over the island ocean, so a client's owned entities are ships the AI drives, never ones a person steers. All game code lives in the `game` namespace.
 
 Game implementation built on Engine and Common. `Game` owns the per-side sessions, each cell's frame contents, shared fleet data, client selection/settings, and the game half of server persistence. The awake-cell list itself and on-demand cell creation are engine-owned (`../../../Engine/Source/AGENTS.md`).
 
@@ -19,7 +19,7 @@ Game implementation built on Engine and Common. `Game` owns the per-side session
 
 - Client subscriptions cover the current cell plus visible neighbors within the authorized 3x3 ring; the engine client session runtime computes them (`../../../Engine/Source/Network/Client/AGENTS.md`). The client's cell is stored on `GameBase`, but game policy chooses it; its write path is engine-owned (`../../../Engine/Source/Network/Client/AGENTS.md` `## Other`).
 - Cross-cell transfers are serialized `StatusChange`s carrying spawn state; the machinery that moves them between cells is engine-owned (`../../../Engine/Source/Network/Server/AGENTS.md`). The client removes them from `FrameInput` before normal Spawn processing; server replay records them in the difference stream's post-dispatch channel, never inside `FrameInput`.
-- Player/enemy alignments are copied into each new `FramePostRender`; frame code reads the snapshot, not `gpGame`.
+- Omni/enemy alignments are copied into each new `FramePostRender`; frame code reads the snapshot, not `gpGame`.
 - The game-owned persisted client setting `ClientState.bin` is versioned POD
   written through the engine versioned-file helpers. `ClientState.bin` loads once at startup, the focused
   fleet and ship into an in-memory mirror that focus changes refresh and the

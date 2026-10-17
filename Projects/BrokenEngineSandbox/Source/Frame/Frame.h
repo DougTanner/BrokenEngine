@@ -13,8 +13,8 @@ namespace game
 {
 
 struct Frame;
-struct PlayersInterpolate;
-struct PlayersPostRender;
+struct OmnisInterpolate;
+struct OmnisPostRender;
 struct BlastersInterpolate;
 struct BlastersPostRender;
 struct MissilesInterpolate;
@@ -22,7 +22,7 @@ struct MissilesPostRender;
 struct SpaceshipsInterpolate;
 struct SpaceshipsPostRender;
 
-using player_t = engine::Id<PlayersInterpolate>;
+using omni_t = engine::Id<OmnisInterpolate>;
 
 struct FrameInterpolate : public engine::FrameInterpolateBase
 {
@@ -56,7 +56,7 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 
 	float fSpawnTimer = 0.0f;
 
-	std::unique_ptr<PlayersInterpolate> pPlayers;
+	std::unique_ptr<OmnisInterpolate> pOmnis;
 
 	std::unique_ptr<BlastersInterpolate> pBlasters;
 	std::unique_ptr<MissilesInterpolate> pMissiles;
@@ -100,9 +100,9 @@ struct FramePostRender : public engine::FramePostRenderBase
 	static void Spawn(Frame& __restrict rFrame, const FrameInput& __restrict rFrameInput, const engine::CellStaticData& rStaticData);
 
 	engine::AlignmentIdentifier enemyAlignment {};
-	engine::AlignmentIdentifier playerAlignment {};
+	engine::AlignmentIdentifier omniAlignment {};
 
-	std::unique_ptr<PlayersPostRender> pPlayers;
+	std::unique_ptr<OmnisPostRender> pOmnis;
 
 	std::unique_ptr<BlastersPostRender> pBlasters;
 	std::unique_ptr<MissilesPostRender> pMissiles;
@@ -111,7 +111,7 @@ struct FramePostRender : public engine::FramePostRenderBase
 	// The game frame-wide values Write, Read, and ServerRead serialize after the base values, in stream order.
 	static auto Values()
 	{
-		return engine::FrameColumnList<FRAME_COLUMN(FramePostRender, enemyAlignment), FRAME_COLUMN(FramePostRender, playerAlignment)> {};
+		return engine::FrameColumnList<FRAME_COLUMN(FramePostRender, enemyAlignment), FRAME_COLUMN(FramePostRender, omniAlignment)> {};
 	}
 
 	static common::crc_t Crcs(const FramePostRender& rCurrent);
@@ -140,7 +140,7 @@ struct Frame
 
 	static const int64_t kiVersion;
 
-	// Post-tick main-thread identity view over the player rows. Held by value by its caller for as long as it is
+	// Post-tick main-thread identity view over the omni rows. Held by value by its caller for as long as it is
 	// used, and never across a tick, a transfer, or a reallocation.
 	[[nodiscard]] static engine::RegistryOwnershipLayer OwnershipLayer(const Frame& rFrame);
 

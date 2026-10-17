@@ -78,15 +78,15 @@ static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nl
 
 	engine::GridCoord coordinate {.iX = static_cast<int32_t>(ClientGridCoordinateValue(rCoordinate.at(0), "set_client_grid_coord")), .iY = static_cast<int32_t>(ClientGridCoordinateValue(rCoordinate.at(1), "set_client_grid_coord"))};
 
-	// Before player assignment the subscription policy falls back to origin, so the requested cell would be dropped.
+	// Before owned-entity assignment the subscription policy falls back to origin, so the requested cell would be dropped.
 	RequireHarnessRigClient("set_client_grid_coord");
 	if ((gpGame->mGameFlags & engine::GameFlags::kMainMenu))
 	{
-		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned player");
+		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned owned entity");
 	}
-	if (!(gpGame->ClientPlayerIdentifier().iValue != 0))
+	if (!(gpGame->ClientOwnedEntityIdentifier().iValue != 0))
 	{
-		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned player");
+		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned owned entity");
 	}
 
 	// Order is an invariant: the setter clears the visible-neighbour cache keyed by the old cell.

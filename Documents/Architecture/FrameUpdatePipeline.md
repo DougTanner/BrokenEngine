@@ -25,10 +25,10 @@ columns: current positions, which acquisition ranks and range-checks against,
 and previous-frame positions, which a retained Missile homes on. Subscriber
 counts come from the previous frame's Missile handles. Still-active targetless
 Missiles are acquired after the loop and only home from the next tick. The
-Player-Spawn window is rebuilt in the Spawn phase, after Update, Transfer, and
+Omni-Spawn window is rebuilt in the Spawn phase, after Update, Transfer, and
 Destroy, from current Spaceship lifecycle state and fully initialized Missile
 handles; it binds no previous-frame positions, and is then reused across the
-whole player spawn loop.
+whole omni spawn loop.
 
 Each window makes one combined workbuffer reservation for its source rows,
 registry scratch, alignment padding, and layer descriptor. The pointer-derived
@@ -39,7 +39,7 @@ worker workbuffer's 64 KiB initial size remains a performance preallocation, not
 a hard bound: a grow while a context is live does not invalidate it (that same
 document). Under these rules acquisition batch rows and results come from
 fixed-size stack chunks in Missiles Update and from single-entry stack storage
-at player spawn. Subscriber accounting uses `uint16_t` storage and asserts
+at omni spawn. Subscriber accounting uses `uint16_t` storage and asserts
 before accepting the 65,536th subscription. No context outlives its phase. The
 ownership layer is not a window and is never built from a phase; its by-value
 lifetime and post-tick main-thread-only restriction are engine contracts in that
@@ -48,7 +48,7 @@ same document.
 ```mermaid
 %%{init: {'theme': 'default'}}%%
 flowchart LR
-    update["Update — Missile-Update window"] --> collision["Collision"] --> transfer["Transfer"] --> destroySpawn["Destroy / Spawn — Player-Spawn window"] --> ownership["Post-tick — ownership layer"]
+    update["Update — Missile-Update window"] --> collision["Collision"] --> transfer["Transfer"] --> destroySpawn["Destroy / Spawn — Omni-Spawn window"] --> ownership["Post-tick — ownership layer"]
 ```
 
 ## Client Main Loop

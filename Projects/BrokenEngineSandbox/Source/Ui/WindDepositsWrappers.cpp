@@ -3,17 +3,17 @@
 namespace game
 {
 
-engine::Wrapper gWindDepositPlayerWidth(3.0f, 0.1f, 5.0f);
-engine::Wrapper gWindDepositPlayerIntensity(0.03f, 0.0f, 0.1f);
-engine::Wrapper gWindDepositPlayerLengthMultiplier(5.0f, 0.5f, 10.0f);
+engine::Wrapper gWindDepositOmniWidth(3.0f, 0.1f, 5.0f);
+engine::Wrapper gWindDepositOmniIntensity(0.03f, 0.0f, 0.1f);
+engine::Wrapper gWindDepositOmniLengthMultiplier(5.0f, 0.5f, 10.0f);
 
 engine::Wrapper gWindDepositSpaceshipsWidth(2.0f, 0.1f, 5.0f);
 engine::Wrapper gWindDepositSpaceshipsIntensity(0.03f, 0.0f, 0.1f);
 engine::Wrapper gWindDepositSpaceshipsLengthMultiplier(3.0f, 0.5f, 5.0f);
 
-engine::Wrapper gWindDepositPlayerBlastersWidth(1.0f, 0.1f, 2.0f);
-engine::Wrapper gWindDepositPlayerBlastersIntensity(0.05f, 0.0f, 0.2f);
-engine::Wrapper gWindDepositPlayerBlastersLengthMultiplier(3.0f, 0.5f, 6.0f);
+engine::Wrapper gWindDepositOmniBlastersWidth(1.0f, 0.1f, 2.0f);
+engine::Wrapper gWindDepositOmniBlastersIntensity(0.05f, 0.0f, 0.2f);
+engine::Wrapper gWindDepositOmniBlastersLengthMultiplier(3.0f, 0.5f, 6.0f);
 
 engine::Wrapper gWindDepositSpaceshipsBlastersWidth(1.0f, 0.1f, 5.0f);
 engine::Wrapper gWindDepositSpaceshipsBlastersIntensity(0.05f, 0.0f, 0.1f);

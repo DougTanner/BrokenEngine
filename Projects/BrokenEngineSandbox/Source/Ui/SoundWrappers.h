@@ -7,9 +7,9 @@
 namespace game
 {
 
-extern engine::Wrapper gPlayerBlasterVolume;
-extern engine::Wrapper gPlayerBlasterPitchMinimum;
-extern engine::Wrapper gPlayerBlasterPitchRandom;
+extern engine::Wrapper gOmniBlasterVolume;
+extern engine::Wrapper gOmniBlasterPitchMinimum;
+extern engine::Wrapper gOmniBlasterPitchRandom;
 
 extern engine::Wrapper gEnemyBlasterVolume;
 extern engine::Wrapper gEnemyBlasterPitchMinimum;
@@ -25,12 +25,12 @@ extern engine::Wrapper gMissilePitchRandom;
 
 extern engine::Wrapper gExplosionVolume;
 
-// Players - Shield
+// Omnis - Shield
 extern engine::Wrapper gShieldHitVolumeBase;
 extern engine::Wrapper gShieldHitVolumeScale;
 extern engine::Wrapper gShieldDownVolume;
 
-// Players - Armor
+// Omnis - Armor
 extern engine::Wrapper gArmorHitVolumeBase;
 extern engine::Wrapper gArmorHitVolumeScale;
 

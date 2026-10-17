@@ -1,6 +1,6 @@
 #include "Network/Client/ReconcileReplay.h"
 
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Network/Client/ClientReconciler.h"
 #include "Game.h"
 
@@ -29,22 +29,22 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 				const Frame& rFrame = *rScratch.replayStack.at(static_cast<size_t>(i));
 				for (const TransferRequest& rRequest : rFrame.postRender.transferRequests)
 				{
-					if (rRequest.eType != StatusChangeType::kTransferPlayer)
+					if (rRequest.eType != StatusChangeType::kTransferOmni)
 					{
 						continue;
 					}
-					if (!(clientState.clientGlobalPlayerIdentifier.iValue != 0))
+					if (!(clientState.clientGlobalIdentifier.iValue != 0))
 					{
 						continue;
 					}
-					if (rRequest.data.globalId != clientState.clientGlobalPlayerIdentifier)
+					if (rRequest.data.globalId != clientState.clientGlobalIdentifier)
 					{
 						continue;
 					}
 
 					if (std::abs(rRequest.iDeltaX) > 1 || std::abs(rRequest.iDeltaY) > 1) [[unlikely]]
 					{
-						LOG(kDefault, kError, "ReconcileUpdateClientState Transfer delta spans more than one grid cell Tick: {} Source: ({},{}) Delta: ({},{}) GlobalPlayerId: {}", rFrame.interpolate.iTick, rWork.coord.iX, rWork.coord.iY, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), clientState.clientGlobalPlayerIdentifier);
+						LOG(kDefault, kError, "ReconcileUpdateClientState Transfer delta spans more than one grid cell Tick: {} Source: ({},{}) Delta: ({},{}) GlobalId: {}", rFrame.interpolate.iTick, rWork.coord.iX, rWork.coord.iY, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), clientState.clientGlobalIdentifier);
 						DEBUG_BREAK();
 					}
 					// Checked exactly like the server's transfer destination, so a cell at a numeric coordinate edge
@@ -54,7 +54,7 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 					{
 						continue;
 					}
-					LOG(kNetwork, kVerbose, "ReconcileUpdateClientState TransferPlayer GlobalPlayerId: {} Source: ({},{}) Dest: ({},{})", clientState.clientGlobalPlayerIdentifier, rWork.coord.iX, rWork.coord.iY, destination.iX, destination.iY);
+					LOG(kNetwork, kVerbose, "ReconcileUpdateClientState TransferOmni GlobalId: {} Source: ({},{}) Dest: ({},{})", clientState.clientGlobalIdentifier, rWork.coord.iX, rWork.coord.iY, destination.iX, destination.iY);
 					clientState.fPreviousClientArmor = rRequest.data.fHealth;
 				}
 			}

@@ -55,9 +55,9 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::G
 	SpawnSpaceshipExplosion(rFrame, emitterCoordinate, rCurrentInterpolate.pVecPositions[i], vecDirection, 1.0f);
 }
 
-void XM_CALLCONV SpaceshipsPostRender::RegenerateHealth(FXMVECTOR vecPosition, bool bPlayerAlive, FXMVECTOR vecNearestPlayer, SpaceshipFlags_t flags, std::chrono::duration<float> deltaTime, float& rfHealth)
+void XM_CALLCONV SpaceshipsPostRender::RegenerateHealth(FXMVECTOR vecPosition, bool bOmniAlive, FXMVECTOR vecNearestOmni, SpaceshipFlags_t flags, std::chrono::duration<float> deltaTime, float& rfHealth)
 {
-	if (!(flags & kExploding) && bPlayerAlive && common::Distance(vecPosition, vecNearestPlayer) > kfHealthRegenerationDistance) [[unlikely]]
+	if (!(flags & kExploding) && bOmniAlive && common::Distance(vecPosition, vecNearestOmni) > kfHealthRegenerationDistance) [[unlikely]]
 	{
 		rfHealth = std::min(rfHealth + deltaTime.count() * kfHealthRegeneration, kfSpaceshipHealth);
 	}
@@ -112,7 +112,7 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 			continue;
 		}
 
-		// Check collision results - spaceships take damage from player blasters only
+		// Check collision results - spaceships take damage from omni blasters only
 		// Note: Missile damage is handled via area damage system in AreaDamage phase
 		for (const engine::CollisionResult& rResult : engine::Collision::GetCollisions(siCollisionLayerIndex, i))
 		{

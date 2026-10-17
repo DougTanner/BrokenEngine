@@ -16,7 +16,7 @@ runtime contracts of the screens that remain here.
 - Screens gate themselves from authoritative game/UI state because `ImGuiManager` invokes main and modal surfaces independently of in-game screen gating.
 - Networked controls remain disabled through `NetworkUiControl` until authoritative state resolves the request.
 - The HUD is the only game UI that changes network subscription state: its fleet
-  and player focus controls tell the client session which cells it wants, tagged
+  and owned-entity focus controls tell the client session which cells it wants, tagged
   with an explicit reason. A rebuilt focus button that drops that call leaves
   the client drawing a cell it never subscribed to. Its nav-delay slider
   likewise sends one fleet request on a release that changes the value, not one

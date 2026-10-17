@@ -51,22 +51,22 @@ extern engine::Wrapper gCraterLightingIntensityTwo;
 extern engine::Wrapper gCraterLightingIntensityThree;
 extern engine::Wrapper gCraterLightingIntensityFour;
 
-// Players - Area light
-extern engine::Wrapper gPlayerAreaLightVisibleIntensity;
-extern engine::Wrapper gPlayerBlasterLightingArea;
-extern engine::Wrapper gPlayerBlasterLightingIntensity;
+// Omnis - Area light
+extern engine::Wrapper gOmniAreaLightVisibleIntensity;
+extern engine::Wrapper gOmniBlasterLightingArea;
+extern engine::Wrapper gOmniBlasterLightingIntensity;
 
-// Players - Impact point light
-extern engine::Wrapper gPlayerImpactVisibleAreaOne;
-extern engine::Wrapper gPlayerImpactVisibleAreaTwo;
-extern engine::Wrapper gPlayerImpactVisibleIntensityOne;
-extern engine::Wrapper gPlayerImpactVisibleIntensityTwo;
-extern engine::Wrapper gPlayerImpactLightingAreaOne;
-extern engine::Wrapper gPlayerImpactLightingAreaTwo;
-extern engine::Wrapper gPlayerImpactLightingIntensityOne;
-extern engine::Wrapper gPlayerImpactLightingIntensityTwo;
+// Omnis - Impact point light
+extern engine::Wrapper gOmniImpactVisibleAreaOne;
+extern engine::Wrapper gOmniImpactVisibleAreaTwo;
+extern engine::Wrapper gOmniImpactVisibleIntensityOne;
+extern engine::Wrapper gOmniImpactVisibleIntensityTwo;
+extern engine::Wrapper gOmniImpactLightingAreaOne;
+extern engine::Wrapper gOmniImpactLightingAreaTwo;
+extern engine::Wrapper gOmniImpactLightingIntensityOne;
+extern engine::Wrapper gOmniImpactLightingIntensityTwo;
 
-// Players - Hex shield
+// Omnis - Hex shield
 extern engine::Wrapper gHexShieldIntensityDecay;
 extern engine::Wrapper gHexShieldLightingIntensity;
 

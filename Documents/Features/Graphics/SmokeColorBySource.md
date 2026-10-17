@@ -13,8 +13,8 @@ Sources do not map one-to-one onto collections. Missiles
 and explosions
 (`Engine/Source/Frame/Collections/Explosions/ExplosionsSpawn.cpp`) both deposit
 through `SmokeTrails`, each under its own registered trail type; explosions,
-blaster terrain hits (`BlastersUpdate.cpp`), and player impacts
-(`PlayersCombat.cpp`) deposit through `Puffs`. A per-type color already exists
+blaster terrain hits (`BlastersUpdate.cpp`), and omni impacts
+(`OmnisCombat.cpp`) deposit through `Puffs`. A per-type color already exists
 but never reaches the field: `SmokeTrailsType::iColor` and `PuffsType::uiColor`,
 all registered as `0xFFFFFFFF`, are copied into each instance's `uiColor`
 (`QuadLayout`, `AxisAlignedQuadLayout`), but the deposit vertex shaders do not

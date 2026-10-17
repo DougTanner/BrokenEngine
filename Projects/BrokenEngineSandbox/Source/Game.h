@@ -30,7 +30,7 @@ struct ReplayMeta
 {
 	static constexpr int64_t kiVersion = 2;
 	engine::GridCoord clientGridCoordinate {};
-	int64_t iClientPlayerIdentifierValue = 0;
+	int64_t iClientOwnedEntityIdentifierValue = 0;
 	float fPreviousClientArmor = 0.0f;
 	uint8_t uiPadding[4] {};
 };
@@ -45,7 +45,7 @@ struct ReplayStagedMeta
 // The ship ID is part of the key so a pending request clears when focus moves to another ship, even one with the same mode.
 struct WeaponModeKey
 {
-	engine::GlobalId playerIdentifier {};
+	engine::GlobalId ownedEntityIdentifier {};
 	bool bUseMissiles = false;
 
 	bool operator==(const WeaponModeKey&) const = default;
@@ -80,12 +80,12 @@ public:
 	std::unique_ptr<ClientSession> mpClientSession;
 #endif
 
-	// Client player tracking (multi-player per client)
-	engine::GlobalId ClientPlayerIdentifier() const;
-	void AddClientPlayer(engine::GlobalId identifier, engine::GridCoord coordinate);
-	void RemoveClientPlayer(engine::GlobalId identifier);
+	// Client owned-entity tracking (several per client)
+	engine::GlobalId ClientOwnedEntityIdentifier() const;
+	void AddClientOwnedEntity(engine::GlobalId identifier, engine::GridCoord coordinate);
+	void RemoveClientOwnedEntity(engine::GlobalId identifier);
 	void RestoreReplayMetadata(const ReplayMeta& rMetadata);
-	std::optional<int64_t> ClientPlayerIndex(const PlayersPostRender& rPlayers) const;
+	std::optional<int64_t> ClientOwnedEntityIndex(const OmnisPostRender& rOmnis) const;
 
 #if defined(BT_CLIENT)
 	void CaptureClientState();
@@ -116,10 +116,10 @@ private:
 #endif
 
 public:
-	std::vector<engine::GlobalId> mClientPlayerIdentifiers;
-	std::vector<engine::GridCoord> mClientPlayerCoordinates;
+	std::vector<engine::GlobalId> mClientOwnedEntityIdentifiers;
+	std::vector<engine::GridCoord> mClientOwnedEntityCoordinates;
 	float mfPreviousClientArmor = 0.0f;
-	engine::AlignmentIdentifier mPlayerAlignment {};
+	engine::AlignmentIdentifier mOmniAlignment {};
 	engine::AlignmentIdentifier mEnemyAlignment {};
 	engine::Alignments mAlignments {};
 

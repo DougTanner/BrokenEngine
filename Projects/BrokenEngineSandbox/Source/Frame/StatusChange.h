@@ -9,13 +9,13 @@ namespace game
 // Underlying values are serialized wire/save bytes — enumerators are append-only; never reorder or insert.
 enum class StatusChangeType : uint8_t
 {
-	kSpawnPlayer,
-	kTransferPlayer,
+	kSpawnOmni,
+	kTransferOmni,
 	kTransferSpaceship,
 	kTransferBlaster,
 	kTransferMissile,
-	kDestroyPlayer,
-	kUpdatePlayer,
+	kDestroyOmni,
+	kUpdateOmni,
 	kUpdateFleet,
 
 	kCount,
@@ -30,32 +30,32 @@ inline constexpr bool IsKnownStatusChangeType(StatusChangeType eType)
 
 inline constexpr bool IsTransferType(StatusChangeType eType)
 {
-	return eType >= StatusChangeType::kTransferPlayer && eType <= StatusChangeType::kTransferMissile;
+	return eType >= StatusChangeType::kTransferOmni && eType <= StatusChangeType::kTransferMissile;
 }
 
-static_assert(static_cast<uint8_t>(StatusChangeType::kTransferSpaceship) == static_cast<uint8_t>(StatusChangeType::kTransferPlayer) + 1 && static_cast<uint8_t>(StatusChangeType::kTransferBlaster) == static_cast<uint8_t>(StatusChangeType::kTransferPlayer) + 2 && static_cast<uint8_t>(StatusChangeType::kTransferMissile) == static_cast<uint8_t>(StatusChangeType::kTransferPlayer) + 3, "IsTransferType assumes kTransferPlayer..kTransferMissile stay contiguous; inserting an enumerator between them breaks the range check.");
+static_assert(static_cast<uint8_t>(StatusChangeType::kTransferSpaceship) == static_cast<uint8_t>(StatusChangeType::kTransferOmni) + 1 && static_cast<uint8_t>(StatusChangeType::kTransferBlaster) == static_cast<uint8_t>(StatusChangeType::kTransferOmni) + 2 && static_cast<uint8_t>(StatusChangeType::kTransferMissile) == static_cast<uint8_t>(StatusChangeType::kTransferOmni) + 3, "IsTransferType assumes kTransferOmni..kTransferMissile stay contiguous; inserting an enumerator between them breaks the range check.");
 
 // The transfer type whose rows carry the owned-entity identity Frame::OwnershipLayer binds.
-inline constexpr StatusChangeType kOwnedEntityTransferType = StatusChangeType::kTransferPlayer;
+inline constexpr StatusChangeType kOwnedEntityTransferType = StatusChangeType::kTransferOmni;
 
 inline const char* StatusChangeTypeName(StatusChangeType eType)
 {
 	switch (eType)
 	{
-		case StatusChangeType::kSpawnPlayer:       return "SpawnPlayer";
-		case StatusChangeType::kTransferPlayer:    return "TransferPlayer";
+		case StatusChangeType::kSpawnOmni:         return "SpawnOmni";
+		case StatusChangeType::kTransferOmni:      return "TransferOmni";
 		case StatusChangeType::kTransferSpaceship: return "TransferSpaceship";
 		case StatusChangeType::kTransferBlaster:   return "TransferBlaster";
 		case StatusChangeType::kTransferMissile:   return "TransferMissile";
-		case StatusChangeType::kDestroyPlayer:     return "DestroyPlayer";
-		case StatusChangeType::kUpdatePlayer:      return "UpdatePlayer";
+		case StatusChangeType::kDestroyOmni:       return "DestroyOmni";
+		case StatusChangeType::kUpdateOmni:        return "UpdateOmni";
 		case StatusChangeType::kUpdateFleet:       return "UpdateFleet";
 		case StatusChangeType::kCount:             break;
 	}
 	return "Unknown";
 }
 
-struct SpawnPlayerData
+struct SpawnOmniData
 {
 	int64_t iGlobalId = 0;
 	bool bIsFlagship = false;
@@ -64,29 +64,29 @@ struct SpawnPlayerData
 	// Spawn point in meters from the target cell's center.
 	float fSpawnOffsetX = 45.0f;
 	float fSpawnOffsetY = -12.0f;
-	// Owning client GUID, so a requested player row is born owned (not serialized over network, like the transfer payload's GUID).
+	// Owning client GUID, so a requested omni row is born owned (not serialized over network, like the transfer payload's GUID).
 	engine::ClientGuid clientGuid {};
-	bool operator==(const SpawnPlayerData&) const = default;
+	bool operator==(const SpawnOmniData&) const = default;
 };
 
-struct DestroyPlayerData
+struct DestroyOmniData
 {
-	int64_t iPlayerUuid = 0;
-	bool operator==(const DestroyPlayerData&) const = default;
+	int64_t iOmniUuid = 0;
+	bool operator==(const DestroyOmniData&) const = default;
 };
 
-struct UpdatePlayerData
+struct UpdateOmniData
 {
-	int64_t iPlayerUuid = 0;
+	int64_t iOmniUuid = 0;
 	bool bUseMissiles = false;
 	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
 	uint8_t uiPendingWeaponModeTicks = 0;
-	bool operator==(const UpdatePlayerData&) const = default;
+	bool operator==(const UpdateOmniData&) const = default;
 };
 
 struct UpdateFleetData
 {
-	int64_t iPlayerUuid = 0;
+	int64_t iOmniUuid = 0;
 	bool bIsFlagship = false;
 	engine::GridCoord fleetWantedCoordinate {};
 	uint8_t uiPendingFleetWantedCoordinateTicks = 0;
@@ -97,7 +97,7 @@ struct TransferData
 {
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.vecPosition, rSelf.vecDirection, rSelf.vecVelocity, rSelf.alignment, rSelf.fHealth, rSelf.fShield, rSelf.uiTypeIndex, rSelf.fAcceleration, rSelf.nextBlasterFireTimeSeconds, rSelf.nextSecondarySpawnTimeSeconds, rSelf.shieldCooldownSeconds, rSelf.shieldDownSoundCooldownSeconds, rSelf.animationTimeSeconds, rSelf.uiPlayerFlags, rSelf.nextBlasterSpawnTimeSeconds, rSelf.navigationDelaySeconds, rSelf.deltaRotationDelaySeconds, rSelf.timeSeconds, rSelf.nextJitterSeconds, rSelf.fDeltaRotation, rSelf.fDeltaRotationMaximum, rSelf.fPitch, rSelf.globalId, rSelf.fleetWantedCoordinate, rSelf.uiPendingFleetWantedCoordinateTicks, rSelf.uiPendingWeaponModeTicks);
+		return std::tie(rSelf.vecPosition, rSelf.vecDirection, rSelf.vecVelocity, rSelf.alignment, rSelf.fHealth, rSelf.fShield, rSelf.uiTypeIndex, rSelf.fAcceleration, rSelf.nextBlasterFireTimeSeconds, rSelf.nextSecondarySpawnTimeSeconds, rSelf.shieldCooldownSeconds, rSelf.shieldDownSoundCooldownSeconds, rSelf.animationTimeSeconds, rSelf.uiOmniFlags, rSelf.nextBlasterSpawnTimeSeconds, rSelf.navigationDelaySeconds, rSelf.deltaRotationDelaySeconds, rSelf.timeSeconds, rSelf.nextJitterSeconds, rSelf.fDeltaRotation, rSelf.fDeltaRotationMaximum, rSelf.fPitch, rSelf.globalId, rSelf.fleetWantedCoordinate, rSelf.uiPendingFleetWantedCoordinateTicks, rSelf.uiPendingWeaponModeTicks);
 	}
 
 	bool operator==(const TransferData& rOther) const
@@ -114,20 +114,20 @@ struct TransferData
 	uint8_t uiTypeIndex = 0;
 	float fAcceleration = 0.0f;
 
-	// Player timers
+	// Omni timers
 	std::chrono::duration<float> nextBlasterFireTimeSeconds = std::chrono::duration<float>(0.0f);
 	std::chrono::duration<float> nextSecondarySpawnTimeSeconds = std::chrono::duration<float>(0.0f);
 	std::chrono::duration<float> shieldCooldownSeconds = std::chrono::duration<float>(0.0f);
 	std::chrono::duration<float> shieldDownSoundCooldownSeconds = std::chrono::duration<float>(0.0f);
 
-	// Player interpolate state
+	// Omni interpolate state
 	std::chrono::duration<float> animationTimeSeconds = std::chrono::duration<float>(0.0f);
-	uint16_t uiPlayerFlags = 0;
+	uint16_t uiOmniFlags = 0;
 
 	// Spaceship timers
 	std::chrono::duration<float> nextBlasterSpawnTimeSeconds = std::chrono::duration<float>(0.0f);
 
-	// Navigation delay (player transfers only)
+	// Navigation delay (omni transfers only)
 	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
 
 	// Missile timers
@@ -140,26 +140,26 @@ struct TransferData
 	float fDeltaRotationMaximum = 0.0f;
 	float fPitch = 0.0f;
 
-	// Global player ID (player transfers only)
+	// Global ID (omni transfers only)
 	engine::GlobalId globalId {};
 
-	// Fleet wanted coord (player transfers only)
+	// Fleet wanted coord (omni transfers only)
 	engine::GridCoord fleetWantedCoordinate {};
 
-	// Pending countdown ticks (player transfers only)
+	// Pending countdown ticks (omni transfers only)
 	uint8_t uiPendingFleetWantedCoordinateTicks = 0;
 	uint8_t uiPendingWeaponModeTicks = 0;
 
-	// Client GUID (player transfers only, not serialized over network)
+	// Client GUID (omni transfers only, not serialized over network)
 	uint64_t uiClientGuidHigh = 0;
 	uint64_t uiClientGuidLow = 0;
 };
 
 using StatusChangeData = std::variant<
-	SpawnPlayerData,           // kSpawnPlayer
+	SpawnOmniData,             // kSpawnOmni
 	TransferData,              // kTransfer* (all 4 types)
-	DestroyPlayerData,         // kDestroyPlayer
-	UpdatePlayerData,          // kUpdatePlayer
+	DestroyOmniData,           // kDestroyOmni
+	UpdateOmniData,            // kUpdateOmni
 	UpdateFleetData    // kUpdateFleet
 >;
 
@@ -167,9 +167,9 @@ inline StatusChangeData DefaultDataForType(StatusChangeType eType)
 {
 	switch (eType)
 	{
-		case StatusChangeType::kSpawnPlayer:      return SpawnPlayerData {};
-		case StatusChangeType::kDestroyPlayer:    return DestroyPlayerData {};
-		case StatusChangeType::kUpdatePlayer:      return UpdatePlayerData {};
+		case StatusChangeType::kSpawnOmni:        return SpawnOmniData {};
+		case StatusChangeType::kDestroyOmni:      return DestroyOmniData {};
+		case StatusChangeType::kUpdateOmni:        return UpdateOmniData {};
 		case StatusChangeType::kUpdateFleet:       return UpdateFleetData {};
 		default:                                      return TransferData {};
 	}

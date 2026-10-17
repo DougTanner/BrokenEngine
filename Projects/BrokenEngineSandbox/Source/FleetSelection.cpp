@@ -18,7 +18,7 @@ void FleetSelection::AutoSelectFirstAliveMember()
 		{
 			if (!(rMember.flags & FleetMemberFlags::kIsDead))
 			{
-				SelectPlayerInFleet(rMember.globalPlayerId);
+				SelectOwnedEntityInFleet(rMember.globalId);
 				return;
 			}
 		}
@@ -54,7 +54,7 @@ const Fleet* FleetSelection::FocusedFleet() const
 	return nullptr;
 }
 
-void FleetSelection::SelectPlayerInFleet(engine::GlobalId memberGlobalPlayerId)
+void FleetSelection::SelectOwnedEntityInFleet(engine::GlobalId memberGlobalId)
 {
 	const Fleet* pFleet = FocusedFleet();
 	if (pFleet == nullptr)
@@ -62,27 +62,27 @@ void FleetSelection::SelectPlayerInFleet(engine::GlobalId memberGlobalPlayerId)
 		return;
 	}
 
-	if (!(memberGlobalPlayerId.iValue != 0))
+	if (!(memberGlobalId.iValue != 0))
 	{
 		return;
 	}
-	auto memberIt = std::ranges::find(pFleet->members, memberGlobalPlayerId, &FleetMember::globalPlayerId);
+	auto memberIt = std::ranges::find(pFleet->members, memberGlobalId, &FleetMember::globalId);
 	if (memberIt == pFleet->members.end())
 	{
 		return;
 	}
 
-	mFocusedMemberGlobalId = memberGlobalPlayerId;
+	mFocusedMemberGlobalId = memberGlobalId;
 	gpGame->mWeaponModeToggle.Reset();
 
 	const FleetMember& rMember = *memberIt;
 	if (!(rMember.flags & FleetMemberFlags::kIsDead))
 	{
-		for (int64_t i = 0; i < std::ssize(gpGame->mClientPlayerIdentifiers); ++i)
+		for (int64_t i = 0; i < std::ssize(gpGame->mClientOwnedEntityIdentifiers); ++i)
 		{
-			if (gpGame->mClientPlayerIdentifiers.at(i) == rMember.globalPlayerId)
+			if (gpGame->mClientOwnedEntityIdentifiers.at(i) == rMember.globalId)
 			{
-				gpGame->SetClientGridCoordinate(gpGame->mClientPlayerCoordinates.at(i));
+				gpGame->SetClientGridCoordinate(gpGame->mClientOwnedEntityCoordinates.at(i));
 				break;
 			}
 		}
@@ -140,9 +140,9 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 			{
 				for (const FleetMember& rMember : rFleet.members)
 				{
-					if (rMember.globalPlayerId == gpGame->mRememberedFocusedShipIdentifier && !(rMember.flags & FleetMemberFlags::kIsDead))
+					if (rMember.globalId == gpGame->mRememberedFocusedShipIdentifier && !(rMember.flags & FleetMemberFlags::kIsDead))
 					{
-						mFocusedMemberGlobalId = rMember.globalPlayerId;
+						mFocusedMemberGlobalId = rMember.globalId;
 						break;
 					}
 				}
@@ -150,7 +150,7 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 			// The server's fleet invariant guarantees the flagship names a member, or is {} for an empty fleet.
 			if (!(mFocusedMemberGlobalId.iValue != 0))
 			{
-				mFocusedMemberGlobalId = rFleet.flagshipGlobalPlayerId;
+				mFocusedMemberGlobalId = rFleet.flagshipGlobalId;
 			}
 			// Suppress the auto-newest-fleet / auto-newest-member branches below.
 			iPreviousFocusedFleetMemberCount = std::ssize(rFleet.members);
@@ -184,21 +184,21 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 	const Fleet* pFleet = FocusedFleet();
 	if (pFleet != nullptr)
 	{
-		if (!std::ranges::contains(pFleet->members, mFocusedMemberGlobalId, &FleetMember::globalPlayerId))
+		if (!std::ranges::contains(pFleet->members, mFocusedMemberGlobalId, &FleetMember::globalId))
 		{
 			mFocusedMemberGlobalId = {};
 		}
 
 		if (std::ssize(pFleet->members) > iPreviousFocusedFleetMemberCount)
 		{
-			mFocusedMemberGlobalId = pFleet->members.back().globalPlayerId;
+			mFocusedMemberGlobalId = pFleet->members.back().globalId;
 		}
 		else if (!(mFocusedMemberGlobalId.iValue != 0) && !pFleet->members.empty())
 		{
-			mFocusedMemberGlobalId = pFleet->members.back().globalPlayerId;
+			mFocusedMemberGlobalId = pFleet->members.back().globalId;
 		}
 
-		auto focusedIt = std::ranges::find(pFleet->members, mFocusedMemberGlobalId, &FleetMember::globalPlayerId);
+		auto focusedIt = std::ranges::find(pFleet->members, mFocusedMemberGlobalId, &FleetMember::globalId);
 		if ((mFocusedMemberGlobalId.iValue != 0) && (focusedIt->flags & FleetMemberFlags::kIsDead))
 		{
 			mFocusedMemberGlobalId = {};
@@ -206,7 +206,7 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 			{
 				if (!(rMember.flags & FleetMemberFlags::kIsDead))
 				{
-					mFocusedMemberGlobalId = rMember.globalPlayerId;
+					mFocusedMemberGlobalId = rMember.globalId;
 					break;
 				}
 			}
@@ -218,15 +218,15 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 		mSpawnIntoFleetToggle.Reset();
 	}
 
-	engine::GlobalId focusedId = gpGame->ClientPlayerIdentifier();
+	engine::GlobalId focusedId = gpGame->ClientOwnedEntityIdentifier();
 	bool bGridCoordinateResolved = false;
 	if ((focusedId.iValue != 0))
 	{
-		for (int64_t i = 0; i < std::ssize(gpGame->mClientPlayerIdentifiers); ++i)
+		for (int64_t i = 0; i < std::ssize(gpGame->mClientOwnedEntityIdentifiers); ++i)
 		{
-			if (gpGame->mClientPlayerIdentifiers.at(i) == focusedId)
+			if (gpGame->mClientOwnedEntityIdentifiers.at(i) == focusedId)
 			{
-				gpGame->SetClientGridCoordinate(gpGame->mClientPlayerCoordinates.at(i));
+				gpGame->SetClientGridCoordinate(gpGame->mClientOwnedEntityCoordinates.at(i));
 				bGridCoordinateResolved = true;
 				break;
 			}

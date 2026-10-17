@@ -188,7 +188,7 @@
   tick, obsolete updates through that tick erased, and normal catch-up
   continuing from it. States already behind confirmed are discarded as stale
 - **`kRecalculated` frame flag**: set on each re-simulated tick (at or before the pre-reconcile ring tail) and cleared on first-time ticks, so that tick's PostRender audio and GPU-particle spawning are suppressed instead of repeated; replay CRC validation and catch-up clear it before render
-- **Visual error offset smoothing**: after a full replay, the flagship player's pre/post position delta is accumulated into the camera's visual-error offset (`CameraBase::AddVisualErrorOffset`) so the correction is spread over several render frames instead of snapping
+- **Visual error offset smoothing**: after a full replay, the flagship owned entity's pre/post position delta is accumulated into the camera's visual-error offset (`CameraBase::AddVisualErrorOffset`) so the correction is spread over several render frames instead of snapping
 - **Forward sim**: from the most recent Tick remaining, simulate empty-input ticks until the ring tail is less than one Tick behind the target time (`miTickCounter`, advanced by `TickRealtime()` before Reconcile runs). Forward-sim advances through ticks with pending server updates, folding their StatusChanges into the speculative state; the next frame's CRC fast path promotes matching updates without replay.
 - **Render**: the frame `kiRenderBehindTicks` behind the ring tail (`GameBase::RenderFrame`) is used as the base Frame; the render clock's sub-tick offset into that frame (`GameBase::AdvanceRenderClock`) is passed as `fDeltaTime` to each collection's `game::FrameInterpolate::Update(...)` (`GameBase::UpdateRenderInterpolation`), which does per-collection sub-tick smoothing (positions, orientations, animation state) rather than a single global velocity extrapolation
 
@@ -275,7 +275,7 @@ sizes are the full packet including the type byte.
 | `kClientDebugFrameRequest` | 17 | 17 | 8 | yes | violation | negative tick → corrupt, rejected before the cooldown in every build; independent per-client two-second wall-clock cooldown; otherwise a no-op when `kbDesynchronizationDebugFrames == false` |
 | `kClientCrashReport` | 6 | 1048581 | 1 | yes | violation | declared `int32` report size other than the remaining packet bytes → corrupt; one report per connection, a repeat counts a rate violation and is not stored; at most 32 stored per server run, further reports log `kWarning` and are not stored; payload written verbatim to `CrashReport-*.txt` in the app-data root, never parsed; the server sends no reply |
 | `kClientChat` | 3 | 258 | 8 | yes | violation | `IsValidChatText` on the text up to the first NUL (1–256 bytes of well-formed UTF-8 per Unicode Table 3-7, no C0, DEL, or C1 control) → corrupt, rejected before the token bucket; per-client token bucket (burst 5, refill 1 per `steady_clock` second) drops excess silently with no violation; only the validated text is re-encoded and relayed |
-| `kClientUpdatePlayerRequest` | 14 | 14 | 8 | yes | violation | use-missiles byte other than 0 or 1 → corrupt; nav delay non-finite or outside `[0,60]` → corrupt (`PlayersPostRender::IsNavigationDelayInRange`), never clamped |
+| `kClientUpdateOwnedEntityRequest` | 14 | 14 | 8 | yes | violation | use-missiles byte other than 0 or 1 → corrupt; nav delay non-finite or outside `[0,60]` → corrupt (`OmnisPostRender::IsNavigationDelayInRange`), never clamped |
 | `kClientFleetNavigationDelay` | 21 | 21 | 8 | yes | violation | fleet-guid lookup; nav delay non-finite or outside `[0,60]` → corrupt, never clamped |
 | `kClientCreateFleetRequest` | 1 | 1 | 4 | yes | violation | per-client fleet cap 16 (over-cap `kWarning`) |
 | `kClientDeleteFleetRequest` | 17 | 17 | 8 | yes | violation | fleet-guid lookup |
@@ -294,7 +294,7 @@ inserted the engine `kClientChat` and `kServerChat` types before
 `kGamePacketStart`; each
 FleetSync member carries a member flags byte whose `kIsDead` bit marks a dead
 member; the FleetSync flagship and the `kClientRespawnInFleetRequest` member
-name a fleet member by its global ID, not its list position; player and
+name a fleet member by its global ID, not its list position; omni and
 spaceship TransferData wire payloads exclude arrival grace. Protocol 16 is one
 deliberate generation break taken with cell-local geometry: `kiProtocolVersion`
 bumps together with the navigation-data version

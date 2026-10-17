@@ -23,17 +23,17 @@
   integer that does not fit in `int32` is rejected. Moves the client's grid cell
   and immediately refreshes its desired subscriptions, so automation can drive
   the cross-cell subscribe and full-state adoption path. Requires an accepted
-  connected client with a valid assigned player. Returns
+  connected client with a valid assigned owned entity. Returns
   `{"clientGridCoord":[x,y]}`. Any invalid input returns the normal
   `ok:false`/`error` envelope and changes no state. The command also pins the
-  coordinate: while pinned, the game's own writers — player events, fleet
+  coordinate: while pinned, the game's own writers — owned-entity events, fleet
   selection and synchronization, and the server-load clear — leave it unchanged,
   so a server load or replay loop restart keeps it. A repeated
   `set_client_grid_coord` moves the pin; only `release_client_grid_coord` or a
   game reset (main-menu connect or frame change, including connection loss)
   clears it. The pin is never persisted. The server remains the subscription
   authority — a non-adjacent cell is accepted locally and rejected on the wire.
-- `release_client_grid_coord`: no params (only an empty object is accepted). Requires a running game. Clears the `set_client_grid_coord` pin and returns the current `{"clientGridCoord":[x,y]}`. The viewer stays in that cell until the next game writer, such as a player event, moves it.
+- `release_client_grid_coord`: no params (only an empty object is accepted). Requires a running game. Clears the `set_client_grid_coord` pin and returns the current `{"clientGridCoord":[x,y]}`. The viewer stays in that cell until the next game writer, such as an owned-entity event, moves it.
 - `screenshot`: `{"path"?,"maxWidth"?:1568,"format"?:"jpg"|"png","quality"?:80}`. A `quality` outside `1..100` is a parameter error. A `maxWidth` value `<= 0` disables downscaling and preserves native framebuffer dimensions. Default path is `%TEMP%\Screenshots\agent_N.<ext>` using the process temp directory. Returns `{"path","width","height"}` — the saved file and its pixel dimensions, never image bytes. Requires `kbScreenshots`.
 - `renderdoc_capture`: `{"frames"?:1}`; `frames` is `1..8`. Triggers RenderDoc
   capture(s) of the next presented frame(s) and returns
@@ -144,7 +144,7 @@
   swapchain recreate deferred), only the RawInput overlay takes effect; `mouse`
   ImGui events sent then never reach ImGui.
 - `describe_scene`:
-  `{"includeUnits"?:true,"maxUnits"?:200,"unitTypes"?:["player","spaceship","blaster"]}`.
+  `{"includeUnits"?:true,"maxUnits"?:200,"unitTypes"?:["omni","spaceship","blaster"]}`.
   `unitTypes` is an array of those three strings; absent means every type, an
   empty array emits no unit rows, and any other value or unknown string is a
   parameter error. It applies only when `includeUnits` is true. A negative
@@ -155,7 +155,7 @@
   `cellStates[{coord,confirmedTick,confirmedOffset,highWaterValidatedTick,lastFullStateTick,snapshotHead,snapshotCount,lastRenderedTick,serverUpdateCount,lastReplayConfirmedTick,lastReplayServerUpdateCount,stuckFrameCount,pendingFullStateTick:int|null,firstServerUpdateTick:int|null,lastServerUpdateTick:int|null,tailTick}]`,
   `fleets[{index,focused,members?}]`,
   `units[{type,globalId?,coord,local,screen,armor?,shield?,health?,alignment,flags?,windTrailIntensity?,windTrailWidth?,windTrailLengthMultiplier?}]`,
-  ring-wide `counts{players,spaceships,missiles,blasters}` summed over every
+  ring-wide `counts{omnis,spaceships,missiles,blasters}` summed over every
   subscribed cell that has a snapshot,
   `islands[{coord,local,rotation,footprint?}]`, and `truncated`.
   `camera.basisCoord` is the cell the camera's own values are local to: `eye`
@@ -210,7 +210,7 @@ Client input/capture commands can defer across frames. The single channel remain
 
 Capture commands temporarily restore a minimized client without activation, wait for extent settlement, capture, then re-minimize. An already-visible client fails if swapchain recreation is deferred. `resize`/`fullscreen` reject minimized state; restore first. `click`, `hover`, `set_slider`, and `type_text` fail while the client is not rendering (minimized or swapchain recreate deferred); restore first. After resize/fullscreen/restore, call `describe_ui` or `screenshot` to remeasure.
 
-Only labeled visible ImGui items are addressable. Scroll a clipped container with `mouse` wheel, then retry. `describe_scene.units` are visible-area-filtered while counts span subscribed cells that have a snapshot; edge projection may lie slightly outside the framebuffer. Only players have global IDs, and only the focused fleet lists members. Each cell emits its blaster rows after its player and spaceship rows, while the `maxUnits` cap is shared across all subscribed cells.
+Only labeled visible ImGui items are addressable. Scroll a clipped container with `mouse` wheel, then retry. `describe_scene.units` are visible-area-filtered while counts span subscribed cells that have a snapshot; edge projection may lie slightly outside the framebuffer. Only omnis have global IDs, and only the focused fleet lists members. Each cell emits its blaster rows after its omni and spaceship rows, while the `maxUnits` cap is shared across all subscribed cells.
 
 Injected mouse position owns `io.MousePos`: a coordinate-carrying script such as
 `hover`, `click`, or coordinate-bearing `mouse move` pins an ImGui mouse

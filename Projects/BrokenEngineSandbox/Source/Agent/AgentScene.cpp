@@ -4,7 +4,7 @@
 
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Game.h"
 
@@ -18,44 +18,44 @@ static nlohmann::json Vector2ToJson(float fX, float fY)
 	return nlohmann::json::array({fX, fY});
 }
 
-// Boolean PlayerFlags only — the packed nav-direction (bits 8-10) and nav-waypoint (bits 12-13) ranges are
+// Boolean OmniFlags only — the packed nav-direction (bits 8-10) and nav-waypoint (bits 12-13) ranges are
 // excluded; iterating them as single bits would emit meaningless names.
-static nlohmann::json PlayerFlagNames(PlayerFlags_t flags)
+static nlohmann::json OmniFlagNames(OmniFlags_t flags)
 {
 	nlohmann::json names = nlohmann::json::array();
-	if (flags & PlayerFlags::kExploding)
+	if (flags & OmniFlags::kExploding)
 	{
 		names.push_back("kExploding");
 	}
-	if (flags & PlayerFlags::kFireBlaster)
+	if (flags & OmniFlags::kFireBlaster)
 	{
 		names.push_back("kFireBlaster");
 	}
-	if (flags & PlayerFlags::kBlasterSpawnLeft)
+	if (flags & OmniFlags::kBlasterSpawnLeft)
 	{
 		names.push_back("kBlasterSpawnLeft");
 	}
-	if (flags & PlayerFlags::kFireMissile)
+	if (flags & OmniFlags::kFireMissile)
 	{
 		names.push_back("kFireMissile");
 	}
-	if (flags & PlayerFlags::kMissileSpawnLeft)
+	if (flags & OmniFlags::kMissileSpawnLeft)
 	{
 		names.push_back("kMissileSpawnLeft");
 	}
-	if (flags & PlayerFlags::kTransfer)
+	if (flags & OmniFlags::kTransfer)
 	{
 		names.push_back("kTransfer");
 	}
-	if (flags & PlayerFlags::kUseMissiles)
+	if (flags & OmniFlags::kUseMissiles)
 	{
 		names.push_back("kUseMissiles");
 	}
-	if (flags & PlayerFlags::kIsFlagship)
+	if (flags & OmniFlags::kIsFlagship)
 	{
 		names.push_back("kIsFlagship");
 	}
-	if (flags & PlayerFlags::kPendingUseMissiles)
+	if (flags & OmniFlags::kPendingUseMissiles)
 	{
 		names.push_back("kPendingUseMissiles");
 	}
@@ -65,9 +65,9 @@ static nlohmann::json PlayerFlagNames(PlayerFlags_t flags)
 static nlohmann::json SpaceshipFlagNames(SpaceshipFlags_t flags)
 {
 	nlohmann::json names = nlohmann::json::array();
-	if (flags & SpaceshipFlags::kFleePlayer)
+	if (flags & SpaceshipFlags::kFleeOmni)
 	{
-		names.push_back("kFleePlayer");
+		names.push_back("kFleeOmni");
 	}
 	if (flags & SpaceshipFlags::kExploding)
 	{
@@ -102,7 +102,7 @@ static nlohmann::json BuildFleets()
 			nlohmann::json members = nlohmann::json::array();
 			for (const FleetMember& rMember : pFocused->members)
 			{
-				members.push_back({{"globalPlayerId", rMember.globalPlayerId.iValue}, {"alive", !(rMember.flags & FleetMemberFlags::kIsDead)}});
+				members.push_back({{"globalId", rMember.globalId.iValue}, {"alive", !(rMember.flags & FleetMemberFlags::kIsDead)}});
 			}
 			fleetJson["members"] = std::move(members);
 		}
@@ -204,7 +204,7 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 
 	// Absent 'unitTypes' means every type; a present list (including an empty one) selects exactly what it names.
 	bool bHasUnitTypes = rParameters.contains("unitTypes");
-	bool bIncludePlayers = !bHasUnitTypes;
+	bool bIncludeOmnis = !bHasUnitTypes;
 	bool bIncludeSpaceships = !bHasUnitTypes;
 	bool bIncludeBlasters = !bHasUnitTypes;
 	if (bHasUnitTypes)
@@ -216,9 +216,9 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 				throw std::runtime_error("describe_scene 'unitTypes' must be an array of strings");
 			}
 			std::string unitType = rUnitType.get<std::string>();
-			if (unitType == "player")
+			if (unitType == "omni")
 			{
-				bIncludePlayers = true;
+				bIncludeOmnis = true;
 			}
 			else if (unitType == "spaceship")
 			{
@@ -230,7 +230,7 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 			}
 			else
 			{
-				throw std::runtime_error("describe_scene 'unitTypes' entries must be 'player', 'spaceship', or 'blaster'");
+				throw std::runtime_error("describe_scene 'unitTypes' entries must be 'omni', 'spaceship', or 'blaster'");
 			}
 		}
 	}
@@ -256,7 +256,7 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 	nlohmann::json cellStates = nlohmann::json::array();
 	nlohmann::json units = nlohmann::json::array();
 	nlohmann::json islands = nlohmann::json::array();
-	int64_t iPlayerTotal = 0;
+	int64_t iOmniTotal = 0;
 	int64_t iSpaceshipTotal = 0;
 	int64_t iMissileTotal = 0;
 	int64_t iBlasterTotal = 0;
@@ -299,7 +299,7 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 		// unrebased local value.
 		engine::RenderBasis basis = engine::MakeRenderBasis(rCoordinate, engine::gpCamera->mBasisCoordinate);
 
-		iPlayerTotal += rFrame.postRender.pPlayers->iCount;
+		iOmniTotal += rFrame.postRender.pOmnis->iCount;
 		iSpaceshipTotal += rFrame.postRender.pSpaceships->iCount;
 		iMissileTotal += rFrame.postRender.pMissiles->iCount;
 		iBlasterTotal += rFrame.postRender.pBlasters->iCount;
@@ -309,19 +309,19 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 			continue;
 		}
 
-		if (bIncludePlayers)
+		if (bIncludeOmnis)
 		{
-			const PlayersInterpolate& rPlayersInterpolate = *rFrame.interpolate.pPlayers;
-			const PlayersPostRender& rPlayersPost = *rFrame.postRender.pPlayers;
-			AppendVisibleUnits("player", rPlayersInterpolate.pVecPositions, rPlayersPost.iCount, rCoordinate, basis, f4VisibleArea, iMaximumUnits, iUnitCount, bTruncated, units, [&](int64_t i) -> nlohmann::json
+			const OmnisInterpolate& rOmnisInterpolate = *rFrame.interpolate.pOmnis;
+			const OmnisPostRender& rOmnisPost = *rFrame.postRender.pOmnis;
+			AppendVisibleUnits("omni", rOmnisInterpolate.pVecPositions, rOmnisPost.iCount, rCoordinate, basis, f4VisibleArea, iMaximumUnits, iUnitCount, bTruncated, units, [&](int64_t i) -> nlohmann::json
 			{
 				return
 				{
-					{"globalId", rPlayersPost.pGlobalPlayerIds[i].iValue},
-					{"armor", rPlayersPost.pfArmors[i]},
-					{"shield", rPlayersPost.pfShields[i]},
-					{"alignment", rPlayersPost.pAlignments[i].uiValue},
-					{"flags", PlayerFlagNames(rPlayersPost.pFlags[i])},
+					{"globalId", rOmnisPost.pGlobalIds[i].iValue},
+					{"armor", rOmnisPost.pfArmors[i]},
+					{"shield", rOmnisPost.pfShields[i]},
+					{"alignment", rOmnisPost.pAlignments[i].uiValue},
+					{"flags", OmniFlagNames(rOmnisPost.pFlags[i])},
 				};
 			});
 		}
@@ -364,7 +364,7 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 	rResult["units"] = std::move(units);
 	rResult["counts"] =
 	{
-		{"players", iPlayerTotal},
+		{"omnis", iOmniTotal},
 		{"spaceships", iSpaceshipTotal},
 		{"missiles", iMissileTotal},
 		{"blasters", iBlasterTotal},

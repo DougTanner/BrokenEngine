@@ -10,7 +10,7 @@
 #include "Network/Server/ServerTransferManager.h"
 
 #include "Agent/AgentCommandsServerQueries.h"
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Network/Server/ServerSession.h"
 #include "Game.h"
 #include "SpawnTransfer.h"
@@ -133,7 +133,7 @@ static void CommandReplayTransferCapture([[maybe_unused]] const nlohmann::json& 
 			nlohmann::json eventJson;
 			eventJson["recordingEventTick"] = rEvent.iRecordingEventTick;
 			eventJson["playbackEventTick"] = rEvent.iPlaybackEventTick;
-			eventJson["playerCount"] = rEvent.transferCounts.iPlayerCount;
+			eventJson["omniCount"] = rEvent.transferCounts.iOmniCount;
 			eventJson["spaceshipCount"] = rEvent.transferCounts.iSpaceshipCount;
 			eventJson["blasterCount"] = rEvent.transferCounts.iBlasterCount;
 			eventJson["missileCount"] = rEvent.transferCounts.iMissileCount;
@@ -389,7 +389,7 @@ static StatusChangeType StatusChangeTypeFromEntry(const nlohmann::json& rEntry)
 			return static_cast<StatusChangeType>(i);
 		}
 	}
-	throw std::runtime_error("'type' must be SpawnPlayer|TransferPlayer|TransferSpaceship|TransferBlaster|TransferMissile|DestroyPlayer|UpdatePlayer|UpdateFleet");
+	throw std::runtime_error("'type' must be SpawnOmni|TransferOmni|TransferSpaceship|TransferBlaster|TransferMissile|DestroyOmni|UpdateOmni|UpdateFleet");
 }
 
 static void ValidateInjectedPosition(FXMVECTOR vecPosition)
@@ -430,7 +430,7 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 		{
 			throw std::runtime_error("transfer entries require kbDebugInput build");
 		}
-		if (eType != StatusChangeType::kTransferPlayer && !gpServerSession->mpTransferManager->IsDestinationLive(coordinate))
+		if (eType != StatusChangeType::kTransferOmni && !gpServerSession->mpTransferManager->IsDestinationLive(coordinate))
 		{
 			throw std::runtime_error("transfer entry 'coord' is not live for this type");
 		}
@@ -440,15 +440,15 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 		rData.vecPosition = XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 		rData.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 		rData.vecVelocity = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
-		rData.alignment = gpGame->mPlayerAlignment;
+		rData.alignment = gpGame->mOmniAlignment;
 		rData.fHealth = 1.0f;
 		rData.fShield = 1.0f;
-		rData.uiTypeIndex = static_cast<uint8_t>(PlayersInterpolate::siBlasterTypeIndex);
+		rData.uiTypeIndex = static_cast<uint8_t>(OmnisInterpolate::siBlasterTypeIndex);
 		rData.fDeltaRotationMaximum = eType == StatusChangeType::kTransferMissile ? 2.0f : 0.0f;
 		rData.fleetWantedCoordinate = coordinate;
 		switch (eType)
 		{
-			case StatusChangeType::kTransferPlayer:
+			case StatusChangeType::kTransferOmni:
 				ParseInjectedFields<
 					INJECTED_FIELD(TransferData, vecPosition),
 					INJECTED_FIELD(TransferData, vecDirection),
@@ -493,20 +493,20 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 				break;
 		}
 
-		// An out-of-cell arrival asserts at PlayersPostRender::Spawn and is silently dropped by the other transfer types'
+		// An out-of-cell arrival asserts at OmnisPostRender::Spawn and is silently dropped by the other transfer types'
 		// Spawn, so reject it here.
 		ValidateInjectedPosition(rData.vecPosition);
-		// An arriving player coasts under its transfer lock. A velocity that crosses a whole cell in one tick outruns the
+		// An arriving omni coasts under its transfer lock. A velocity that crosses a whole cell in one tick outruns the
 		// one-cell transfer delta and asserts at Spawn, so cap it at the speed navigation never exceeds.
-		if (eType == StatusChangeType::kTransferPlayer && !(XMVectorGetX(XMVector2LengthSq(rData.vecVelocity)) <= kfPlayerMaximumSpeed * kfPlayerMaximumSpeed))
+		if (eType == StatusChangeType::kTransferOmni && !(XMVectorGetX(XMVector2LengthSq(rData.vecVelocity)) <= kfOmniMaximumSpeed * kfOmniMaximumSpeed))
 		{
-			throw std::runtime_error(std::format("TransferPlayer '{}' must not exceed the maximum player speed", INJECTED_FIELD(TransferData, vecVelocity)::kName));
+			throw std::runtime_error(std::format("TransferOmni '{}' must not exceed the maximum omni speed", INJECTED_FIELD(TransferData, vecVelocity)::kName));
 		}
-		if (!PlayersPostRender::IsBlasterFireTimeInRange(rData.nextBlasterFireTimeSeconds.count()))
+		if (!OmnisPostRender::IsBlasterFireTimeInRange(rData.nextBlasterFireTimeSeconds.count()))
 		{
 			throw std::runtime_error(std::format("'{}' is out of range", INJECTED_FIELD(TransferData, nextBlasterFireTimeSeconds)::kName));
 		}
-		if (!PlayersPostRender::IsNavigationDelayInRange(rData.navigationDelaySeconds.count()))
+		if (!OmnisPostRender::IsNavigationDelayInRange(rData.navigationDelaySeconds.count()))
 		{
 			throw std::runtime_error(std::format("'{}' must be within [0,60]", INJECTED_FIELD(TransferData, navigationDelaySeconds)::kName));
 		}
@@ -524,34 +524,34 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 
 		switch (eType)
 		{
-			case StatusChangeType::kSpawnPlayer:
+			case StatusChangeType::kSpawnOmni:
 			{
-				SpawnPlayerData& rData = std::get<SpawnPlayerData>(scheduled.change.data);
+				SpawnOmniData& rData = std::get<SpawnOmniData>(scheduled.change.data);
 				rData.fleetWantedCoordinate = coordinate;
 				ParseInjectedFields<
-					INJECTED_FIELD(SpawnPlayerData, fSpawnOffsetX),
-					INJECTED_FIELD(SpawnPlayerData, fSpawnOffsetY),
-					INJECTED_FIELD(SpawnPlayerData, bIsFlagship),
-					INJECTED_FIELD(SpawnPlayerData, fleetWantedCoordinate)>(rEntry, rData);
+					INJECTED_FIELD(SpawnOmniData, fSpawnOffsetX),
+					INJECTED_FIELD(SpawnOmniData, fSpawnOffsetY),
+					INJECTED_FIELD(SpawnOmniData, bIsFlagship),
+					INJECTED_FIELD(SpawnOmniData, fleetWantedCoordinate)>(rEntry, rData);
 				// Spawn silently skips an out-of-cell offset, so reject it here.
 				ValidateInjectedPosition(XMVectorSet(rData.fSpawnOffsetX, rData.fSpawnOffsetY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f));
 				break;
 			}
-			case StatusChangeType::kDestroyPlayer:
-				ParseInjectedFields<INJECTED_FIELD(DestroyPlayerData, iPlayerUuid, true)>(rEntry, std::get<DestroyPlayerData>(scheduled.change.data));
+			case StatusChangeType::kDestroyOmni:
+				ParseInjectedFields<INJECTED_FIELD(DestroyOmniData, iOmniUuid, true)>(rEntry, std::get<DestroyOmniData>(scheduled.change.data));
 				break;
-			case StatusChangeType::kUpdatePlayer:
+			case StatusChangeType::kUpdateOmni:
 			{
-				UpdatePlayerData& rData = std::get<UpdatePlayerData>(scheduled.change.data);
+				UpdateOmniData& rData = std::get<UpdateOmniData>(scheduled.change.data);
 				rData.uiPendingWeaponModeTicks = static_cast<uint8_t>(engine::kiTickRate);
 				ParseInjectedFields<
-					INJECTED_FIELD(UpdatePlayerData, iPlayerUuid, true),
-					INJECTED_FIELD(UpdatePlayerData, bUseMissiles),
-					INJECTED_FIELD(UpdatePlayerData, navigationDelaySeconds)>(rEntry, rData);
-				// Rejects a delay the wire would reject, so an injected player never holds an out-of-range delay.
-				if (!PlayersPostRender::IsNavigationDelayInRange(rData.navigationDelaySeconds.count()))
+					INJECTED_FIELD(UpdateOmniData, iOmniUuid, true),
+					INJECTED_FIELD(UpdateOmniData, bUseMissiles),
+					INJECTED_FIELD(UpdateOmniData, navigationDelaySeconds)>(rEntry, rData);
+				// Rejects a delay the wire would reject, so an injected omni never holds an out-of-range delay.
+				if (!OmnisPostRender::IsNavigationDelayInRange(rData.navigationDelaySeconds.count()))
 				{
-					throw std::runtime_error(std::format("'{}' must be within [0,60]", INJECTED_FIELD(UpdatePlayerData, navigationDelaySeconds)::kName));
+					throw std::runtime_error(std::format("'{}' must be within [0,60]", INJECTED_FIELD(UpdateOmniData, navigationDelaySeconds)::kName));
 				}
 				break;
 			}
@@ -560,7 +560,7 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 				UpdateFleetData& rData = std::get<UpdateFleetData>(scheduled.change.data);
 				rData.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(engine::kiTickRate);
 				ParseInjectedFields<
-					INJECTED_FIELD(UpdateFleetData, iPlayerUuid, true),
+					INJECTED_FIELD(UpdateFleetData, iOmniUuid, true),
 					INJECTED_FIELD(UpdateFleetData, fleetWantedCoordinate, true),
 					INJECTED_FIELD(UpdateFleetData, bIsFlagship)>(rEntry, rData);
 				break;
@@ -654,13 +654,13 @@ static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::js
 	for (std::pair<engine::GridCoord, ScheduledStatusChange>& rBuiltEntry : built)
 	{
 		ScheduledStatusChange& rScheduled = rBuiltEntry.second;
-		if (rScheduled.change.eType == StatusChangeType::kSpawnPlayer)
+		if (rScheduled.change.eType == StatusChangeType::kSpawnOmni)
 		{
 			int64_t iGlobalId = iNextGlobalId++;
-			std::get<SpawnPlayerData>(rScheduled.change.data).iGlobalId = iGlobalId;
+			std::get<SpawnOmniData>(rScheduled.change.data).iGlobalId = iGlobalId;
 			globalIds.push_back(iGlobalId);
 		}
-		else if (rScheduled.change.eType == StatusChangeType::kTransferPlayer)
+		else if (rScheduled.change.eType == StatusChangeType::kTransferOmni)
 		{
 			int64_t iGlobalId = iNextGlobalId++;
 			std::get<TransferData>(rScheduled.change.data).globalId = engine::GlobalId {.iValue = iGlobalId};
@@ -832,8 +832,8 @@ void DrainReplayTransferHarnessRigs(const ServerSession& rSession, engine::Serve
 			{
 				continue;
 			}
-			// Mirrors CollectTransfers' organic drop: ApplyPreparedTransfers breaks on a non-player transfer to a non-live destination.
-			if (rScheduled.change.eType != StatusChangeType::kTransferPlayer && !rTransferManager.IsDestinationLive(rCoordinate))
+			// Mirrors CollectTransfers' organic drop: ApplyPreparedTransfers breaks on a non-omni transfer to a non-live destination.
+			if (rScheduled.change.eType != StatusChangeType::kTransferOmni && !rTransferManager.IsDestinationLive(rCoordinate))
 			{
 				LOG(kNetwork, kWarning, "Dropping injected transfer to non-live Frame Tick: {} Dest: ({},{}) Type: {}", iTick, rCoordinate.iX, rCoordinate.iY, StatusChangeTypeName(rScheduled.change.eType));
 				continue;
@@ -906,7 +906,7 @@ void CountCapturedReplayTransfers(std::span<const StatusChange> transfers, Repla
 	{
 		switch (rTransfer.eType)
 		{
-			case StatusChangeType::kTransferPlayer: ++rCounts.iPlayerCount; break;
+			case StatusChangeType::kTransferOmni: ++rCounts.iOmniCount; break;
 			case StatusChangeType::kTransferSpaceship: ++rCounts.iSpaceshipCount; break;
 			case StatusChangeType::kTransferBlaster: ++rCounts.iBlasterCount; break;
 			case StatusChangeType::kTransferMissile: ++rCounts.iMissileCount; break;

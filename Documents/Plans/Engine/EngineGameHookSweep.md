@@ -20,7 +20,7 @@ to have available." and, choosing to remove several hooks in the claimed Plan:
 "H2, but file a followup plan to sweep the codebase for other 'hooks' to clean
 up". Standing constraints relayed with them: engine code may name expected
 `game::` classes, globals, functions, and members; engine code must not name
-Sandbox gameplay (`Blaster`, `Spaceship`, `Missile`, `Player`, `bUseMissiles`,
+Sandbox gameplay (`Blaster`, `Spaceship`, `Missile`, `Omni`, `bUseMissiles`,
 `Fleet`); fleets stay game-owned; no backward compatibility; the server
 validates every grid save.
 
@@ -84,7 +84,7 @@ Run `/sweep` with the `cpp-adoption` type over the `## Sweep` targets. Each unit
 - Preserve behavior exactly: the call happens at the same point, in the same order, under the same `BT_CLIENT`/`BT_SERVER`, `if constexpr`, and lifetime guards. Where the indirection can actually be null at the call, the direct call keeps that guard (for example by testing the game global for `nullptr`).
 - Permitted forms, never findings: everything under `## Context` "Reviewed and kept", "Not game hooks", and "Already direct"; any mechanism with an engine-side implementation or more than one implementation; and data registries that carry data rather than calls.
 - Out of bound, record as deferred and leave unfixed:
-  - a fix that would name a Sandbox gameplay concept (`Blaster`, `Spaceship`, `Missile`, `Player`, `bUseMissiles`, `Fleet`) in engine code, or move fleet code into the engine;
+  - a fix that would name a Sandbox gameplay concept (`Blaster`, `Spaceship`, `Missile`, `Omni`, `bUseMissiles`, `Fleet`) in engine code, or move fleet code into the engine;
   - a fix that needs a choice the target form does not fix: new storage, a new header, an include-order change in `Pch.h` or `Engine.h`, a renamed class or file, or a decision between several game declarations;
   - a fix that changes any byte of a saved, replayed, wire, or `.pack` format, or anything a server trust check accepts.
 - Docs: propagation updates every `AGENTS.md` and `Documents/Architecture/` passage that names a removed mechanism, in the owning layer only.

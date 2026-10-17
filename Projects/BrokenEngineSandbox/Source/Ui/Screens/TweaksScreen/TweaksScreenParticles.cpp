@@ -25,20 +25,20 @@ const engine::TweaksSliderMapRegistrar gParticlesRegistrar
 	{"Missile Particle Intensity Spread", &gMissileExplosionParticleIntensitySpread},
 	{"Missile Particle Intensity Decay", &gMissileExplosionParticleIntensityDecay},
 	{"Missile Particle Intensity Power", &gMissileExplosionParticleIntensityPower},
-	{"Player Particle Width", &gPlayerExplosionParticleWidth},
-	{"Player Particle Length", &gPlayerExplosionParticleLength},
-	{"Player Particle Length Spread", &gPlayerExplosionParticleLengthSpread},
-	{"Player Particle Position Jitter", &gPlayerExplosionParticlePositionJitter},
-	{"Player Particle Velocity Base", &gPlayerExplosionParticleVelocityBase},
-	{"Player Particle Velocity Spread", &gPlayerExplosionParticleVelocitySpread},
-	{"Player Particle Vertical Velocity Base", &gPlayerExplosionParticleVerticalVelocityBase},
-	{"Player Particle Vertical Velocity Spread", &gPlayerExplosionParticleVerticalVelocitySpread},
-	{"Player Particle Velocity Decay", &gPlayerExplosionParticleVelocityDecay},
-	{"Player Particle Gravity", &gPlayerExplosionParticleGravity},
-	{"Player Particle Visible Intensity", &gPlayerExplosionParticleVisibleIntensity},
-	{"Player Particle Intensity Spread", &gPlayerExplosionParticleIntensitySpread},
-	{"Player Particle Intensity Decay", &gPlayerExplosionParticleIntensityDecay},
-	{"Player Particle Intensity Power", &gPlayerExplosionParticleIntensityPower},
+	{"Omni Particle Width", &gOmniExplosionParticleWidth},
+	{"Omni Particle Length", &gOmniExplosionParticleLength},
+	{"Omni Particle Length Spread", &gOmniExplosionParticleLengthSpread},
+	{"Omni Particle Position Jitter", &gOmniExplosionParticlePositionJitter},
+	{"Omni Particle Velocity Base", &gOmniExplosionParticleVelocityBase},
+	{"Omni Particle Velocity Spread", &gOmniExplosionParticleVelocitySpread},
+	{"Omni Particle Vertical Velocity Base", &gOmniExplosionParticleVerticalVelocityBase},
+	{"Omni Particle Vertical Velocity Spread", &gOmniExplosionParticleVerticalVelocitySpread},
+	{"Omni Particle Velocity Decay", &gOmniExplosionParticleVelocityDecay},
+	{"Omni Particle Gravity", &gOmniExplosionParticleGravity},
+	{"Omni Particle Visible Intensity", &gOmniExplosionParticleVisibleIntensity},
+	{"Omni Particle Intensity Spread", &gOmniExplosionParticleIntensitySpread},
+	{"Omni Particle Intensity Decay", &gOmniExplosionParticleIntensityDecay},
+	{"Omni Particle Intensity Power", &gOmniExplosionParticleIntensityPower},
 	{"Spaceship Particle Width", &gSpaceshipExplosionParticleWidth},
 	{"Spaceship Particle Length", &gSpaceshipExplosionParticleLength},
 	{"Spaceship Particle Length Spread", &gSpaceshipExplosionParticleLengthSpread},
@@ -86,27 +86,27 @@ void RenderParticlesSection(engine::TweaksScreen& rScreen)
 			ImGui::EndTabItem();
 		}
 
-		if (rScreen.BeginSubtab("Player", iSection, 1))
+		if (rScreen.BeginSubtab("Omni", iSection, 1))
 		{
 			rScreen.WrapperSeparatorText("Size");
-			rScreen.WrapperSlider("Width",           iSection, 1.0f, "Player Particle Width");
-			rScreen.WrapperSlider("Length",          iSection, 1.0f, "Player Particle Length");
-			rScreen.WrapperSlider("Length Spread",   iSection, 1.0f, "Player Particle Length Spread");
-			rScreen.WrapperSlider("Position Jitter", iSection, 1.0f, "Player Particle Position Jitter");
+			rScreen.WrapperSlider("Width",           iSection, 1.0f, "Omni Particle Width");
+			rScreen.WrapperSlider("Length",          iSection, 1.0f, "Omni Particle Length");
+			rScreen.WrapperSlider("Length Spread",   iSection, 1.0f, "Omni Particle Length Spread");
+			rScreen.WrapperSlider("Position Jitter", iSection, 1.0f, "Omni Particle Position Jitter");
 
 			rScreen.WrapperSeparatorText("Speed");
-			rScreen.WrapperSlider("Velocity Base",            iSection, 1.0f, "Player Particle Velocity Base");
-			rScreen.WrapperSlider("Velocity Spread",          iSection, 1.0f, "Player Particle Velocity Spread");
-			rScreen.WrapperSlider("Vertical Velocity Base",   iSection, 1.0f, "Player Particle Vertical Velocity Base");
-			rScreen.WrapperSlider("Vertical Velocity Spread", iSection, 1.0f, "Player Particle Vertical Velocity Spread");
-			rScreen.WrapperSlider("Velocity Decay",           iSection, 1.0f, "Player Particle Velocity Decay");
-			rScreen.WrapperSlider("Gravity",                  iSection, 1.0f, "Player Particle Gravity");
+			rScreen.WrapperSlider("Velocity Base",            iSection, 1.0f, "Omni Particle Velocity Base");
+			rScreen.WrapperSlider("Velocity Spread",          iSection, 1.0f, "Omni Particle Velocity Spread");
+			rScreen.WrapperSlider("Vertical Velocity Base",   iSection, 1.0f, "Omni Particle Vertical Velocity Base");
+			rScreen.WrapperSlider("Vertical Velocity Spread", iSection, 1.0f, "Omni Particle Vertical Velocity Spread");
+			rScreen.WrapperSlider("Velocity Decay",           iSection, 1.0f, "Omni Particle Velocity Decay");
+			rScreen.WrapperSlider("Gravity",                  iSection, 1.0f, "Omni Particle Gravity");
 
 			rScreen.WrapperSeparatorText("Visible");
-			rScreen.WrapperSlider("Visible Intensity", iSection, 1.0f, "Player Particle Visible Intensity");
-			rScreen.WrapperSlider("Intensity Spread",  iSection, 1.0f, "Player Particle Intensity Spread");
-			rScreen.WrapperSlider("Intensity Decay",   iSection, 1.0f, "Player Particle Intensity Decay");
-			rScreen.WrapperSlider("Intensity Power",   iSection, 1.0f, "Player Particle Intensity Power");
+			rScreen.WrapperSlider("Visible Intensity", iSection, 1.0f, "Omni Particle Visible Intensity");
+			rScreen.WrapperSlider("Intensity Spread",  iSection, 1.0f, "Omni Particle Intensity Spread");
+			rScreen.WrapperSlider("Intensity Decay",   iSection, 1.0f, "Omni Particle Intensity Decay");
+			rScreen.WrapperSlider("Intensity Power",   iSection, 1.0f, "Omni Particle Intensity Power");
 
 			ImGui::EndTabItem();
 		}

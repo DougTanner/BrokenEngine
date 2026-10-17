@@ -1,6 +1,6 @@
-# Players - Player Fleet Ships
+# Omnis - Omni Fleet Ships
 
-Players represent a flagship and AI-driven wingmen through one collection. Stable global IDs provide lookup and transfer identity; flagship status is a flag, never a privileged SOA index. Collision, terrain-push, and pusher sizing all derive from the shared player radius, so tuning size means changing that one constant.
+Omnis represent a flagship and AI-driven wingmen through one collection. Stable global IDs provide lookup and transfer identity; flagship status is a flag, never a privileged SOA index. Collision, terrain-push, and pusher sizing all derive from the shared omni radius, so tuning size means changing that one constant.
 
 ## Navigation Invariants
 
@@ -38,4 +38,4 @@ Players represent a flagship and AI-driven wingmen through one collection. Stabl
 - The simulation keeps `pNextBlasterFireTimes` in [0, `kBlasterFireInterval`], which `SpawnBlasters` asserts. `PostRead` rejects out-of-range rows on every Frame read.
 - `pNavigationDelays` stays within [0, 60] seconds, the range `IsNavigationDelayInRange` tests and every navigation-delay admission shares. `PostRead` also rejects a non-finite or out-of-range row on every Frame read.
 - The simulation keeps the Interpolate `pDestroyedTimes` in [0, `kDestroyTime`]. The Interpolate `PostRead` rejects out-of-range rows on every Frame read.
-- `PlayersPostRender::Spawn(SpawnInfo)` is the asserting overload of the engine bounds rule (`../../../../../../Engine/Source/Frame/AGENTS.md`): a human-controlled unit outside its cell is a bug, so it asserts instead of refusing and always reports success.
+- `OmnisPostRender::Spawn(SpawnInfo)` is the asserting overload of the engine bounds rule (`../../../../../../Engine/Source/Frame/AGENTS.md`): an omni outside its cell is a bug, so it asserts instead of refusing and always reports success.

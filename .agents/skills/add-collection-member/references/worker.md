@@ -145,7 +145,7 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
 
     - Current exposure lives in
       `/Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsServerQueries.cpp`
-      through `ExtractPlayers`, `ExtractSpaceships`, `ExtractMissiles`, and
+      through `ExtractOmnis`, `ExtractSpaceships`, `ExtractMissiles`, and
       `ExtractBlasters`.
     - Record an intentional exclusion when no scenario needs it.
     - A server-visible column joins its collection's `edit_frame` column list

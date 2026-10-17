@@ -9,13 +9,13 @@ Every entity-to-entity hit today is a sphere test with one radius per collision 
 - `CollisionLayer` (`Engine/Source/Frame/Collision.h`) carries a single `fRadius` shared by every object in the layer; there is no per-object radius and no facing.
 - The broad phase buckets objects into an 8x8 zone grid (`kiCollisionZonesX`/`kiCollisionZonesY`) padded by that radius (`Collision::CalculateZoneRange`, `Collision::CalculateObjectZoneRange`).
 - The narrow phase (`TestAndCollectPair` in `Engine/Source/Frame/Collision.cpp`) runs `SweptSphereTest` for swept pairs and otherwise a 3D distance check (`XMVector3LengthSq`) against the summed radii, then places the contact point along the center line.
-- Sandbox radii are constants: `kfPlayerRadius` (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Players/Players.h`), `kfSpaceshipRadius` (`Spaceships/Spaceships.h`), and the blaster and missile collision radii bound in `BlastersUpdate.cpp` and `MissilesUpdate.cpp`. Facing exists in frame state as `pVecDirections` on both Players and Spaceships.
+- Sandbox radii are constants: `kfOmniRadius` (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Omnis/Omnis.h`), `kfSpaceshipRadius` (`Spaceships/Spaceships.h`), and the blaster and missile collision radii bound in `BlastersUpdate.cpp` and `MissilesUpdate.cpp`. Facing exists in frame state as `pVecDirections` on both Omnis and Spaceships.
 
 Model data never reaches the simulation:
 
 - Models are glTF scenes. `ExportScene` writes a `SceneHeader` chunk and a generated `.MODEL` file that `ExportModel` packs under a `ModelHeader` chunk (`Common/DataFile.h`); both are eager, client-loaded types (`IsEagerChunk` in `Engine/Source/File/PackChunks.cpp`).
 - The server opens only the Islands pack (`IsServerChunk` and the `BT_SERVER` filter in `PackChunks::LoadPackFiles`), so it has no Scene or Model chunks loaded.
-- Which model an entity draws and its scale are client-only: `kPlayerModel` and `kfModelScale` live in `PlayersRender.cpp`, and `kuiSpaceshipModel` and its scale in `SpaceshipsRender.cpp`, both inside `BT_CLIENT`.
+- Which model an entity draws and its scale are client-only: `kOmniModel` and `kfModelScale` live in `OmnisRender.cpp`, and `kuiSpaceshipModel` and its scale in `SpaceshipsRender.cpp`, both inside `BT_CLIENT`.
 
 ## Design
 
@@ -35,7 +35,7 @@ Open choices a plan must decide:
 
 ## Out of scope
 
-- Terrain collision and navigation clearance (`ResolveDiscAgainstTerrain` in `Engine/Source/Frame/TerrainCollisionUtils.h`, and the navigation values `TerrainUtils.h` derives from `kfPlayerRadius`).
+- Terrain collision and navigation clearance (`ResolveDiscAgainstTerrain` in `Engine/Source/Frame/TerrainCollisionUtils.h`, and the navigation values `TerrainUtils.h` derives from `kfOmniRadius`).
 - Area damage (`Engine/Source/Frame/AreaDamage.cpp`), which measures distance to the entity center.
 - Concave or per-triangle mesh collision.
 

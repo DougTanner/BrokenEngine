@@ -1,4 +1,4 @@
-#include "Players.h"
+#include "Omnis.h"
 
 #include "Frame/Collections/Pushers/Pushers.h"
 #include "Frame/CellStaticData.h"
@@ -11,7 +11,7 @@
 namespace game
 {
 
-using enum PlayerFlags;
+using enum OmniFlags;
 
 // Terrain collision
 constexpr float kfTerrainPushVelocity = 15.0f;
@@ -21,7 +21,7 @@ constexpr float kfMaximumPushVelocity = 20.0f;
 constexpr float kfFlagshipFollowDistanceSquared = 50.0f * 50.0f;
 constexpr float kfFlagshipCloseDistanceSquared = 12.5f * 12.5f;
 
-// Cadence recomputations are staggered by persisted global player ID; mode changes, destination selection,
+// Cadence recomputations are staggered by persisted global ID; mode changes, destination selection,
 // direction reseeding, and blocked position/lookahead probes can force earlier recomputation.
 constexpr int64_t kiNavigationRecomputeInterval = 16;
 
@@ -56,7 +56,7 @@ static int64_t SelectIslandPlacement(const engine::CellStaticData& rStaticData, 
 	return iSelected;
 }
 
-static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFrame, const PlayersPostRender& rCurrent, const PlayersPostRender& rPrevious, const PlayersInterpolate& rPreviousInterpolate, int64_t i, FXMVECTOR vecPosition, const engine::CellStaticData& rStaticData, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer)
+static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFrame, const OmnisPostRender& rCurrent, const OmnisPostRender& rPrevious, const OmnisInterpolate& rPreviousInterpolate, int64_t i, FXMVECTOR vecPosition, const engine::CellStaticData& rStaticData, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, OmniFlags_t flags, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer)
 {
 	// Fleet navigation: navigate toward fleet's wanted coord after countdown expires
 	if (!(fleetWantedCoordinate == rStaticData.coordinate) && iPendingFleetWantedCoordinateTicks == 0)
@@ -97,7 +97,7 @@ static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFram
 				riNavigationDirection = iDeltaX > 0 ? 2 : 3;
 			}
 			rVecIslandDestination = XMVectorZero();
-			LOG(kNavData, kVerbose, "Player {} GlobalId: {} fleet override NavDir: {} WantedCoord: ({},{}) CellCoord: ({},{})", i, rCurrent.pGlobalPlayerIds[i], riNavigationDirection, fleetWantedCoordinate.iX, fleetWantedCoordinate.iY, rStaticData.coordinate.iX, rStaticData.coordinate.iY);
+			LOG(kNavData, kVerbose, "Omni {} GlobalId: {} fleet override NavDir: {} WantedCoord: ({},{}) CellCoord: ({},{})", i, rCurrent.pGlobalIds[i], riNavigationDirection, fleetWantedCoordinate.iX, fleetWantedCoordinate.iY, rStaticData.coordinate.iX, rStaticData.coordinate.iY);
 		}
 	}
 
@@ -153,18 +153,18 @@ static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFram
 	}
 }
 
-static bool ShouldRecomputeNavigation(const Frame& rFrame, const PlayersPostRender& rCurrent, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecArtificialIntelligenceDirection, int64_t iEntryNavigationDirection, bool bReseededDirection, int64_t iNavigationDirection, const engine::CellStaticData& rStaticData)
+static bool ShouldRecomputeNavigation(const Frame& rFrame, const OmnisPostRender& rCurrent, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecArtificialIntelligenceDirection, int64_t iEntryNavigationDirection, bool bReseededDirection, int64_t iNavigationDirection, const engine::CellStaticData& rStaticData)
 {
 	// Cadence, mode changes, direction reseeding, and blocked position/lookahead probes request pathfinding.
 	// Destination selection in mode 4 also forces it; otherwise cached steering is reused without NavQueryDirection.
 	// Random draws, arrival checks, and mode transitions remain unconditional.
 	bool bRecompute = bReseededDirection || (iNavigationDirection != iEntryNavigationDirection)
-	               || (((rFrame.interpolate.iTick + rCurrent.pGlobalPlayerIds[i].iValue) % kiNavigationRecomputeInterval) == 0);
+	               || (((rFrame.interpolate.iTick + rCurrent.pGlobalIds[i].iValue) % kiNavigationRecomputeInterval) == 0);
 
 	// The throttle carries the shared world-space bearing for up to kiNavigationRecomputeInterval ticks. Recompute when
 	// either the kfNavigationLookahead point or current position is inside a nav polygon: lookahead alone misses ships
 	// already stranded inside. NavigationThresholdElevation and ApplyTerrainPush use the lowest flight plane's height minus
-	// kfPlayerRadius and kfPushMargin; the nav polygon inflates that contour, leaving a no-nav band
+	// kfOmniRadius and kfPushMargin; the nav polygon inflates that contour, leaving a no-nav band
 	// with zero terrain push. rVecArtificialIntelligenceDirection, vecPosition, and server-built, wire-shipped navigationData match on
 	// client/server, and this check draws no RNG. Roam mode -1 is exempt because ComputeArtificialIntelligenceSteering re-steers
 	// every tick.
@@ -180,7 +180,7 @@ static bool ShouldRecomputeNavigation(const Frame& rFrame, const PlayersPostRend
 	return bRecompute;
 }
 
-static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] PlayersPostRender& rCurrent, [[maybe_unused]] int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecDestination, const engine::CellStaticData& rStaticData, XMVECTOR& rVecArtificialIntelligenceDirection)
+static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] OmnisPostRender& rCurrent, [[maybe_unused]] int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecDestination, const engine::CellStaticData& rStaticData, XMVECTOR& rVecArtificialIntelligenceDirection)
 {
 	XMVECTOR vecDebugWaypoint = XMVectorZero();
 	XMVECTOR vecNavigationDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, vecDebugWaypoint);
@@ -200,10 +200,10 @@ static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] PlayersPostRend
 #endif // BT_CLIENT
 }
 
-void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
+void OmnisPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
-	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
-	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
+	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
+	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 
 	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
 
@@ -217,7 +217,7 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		// Build transfer request
 		TransferRequest request
 		{
-			.eType = StatusChangeType::kTransferPlayer,
+			.eType = StatusChangeType::kTransferOmni,
 			.data =
 			{
 				.vecPosition = vecPosition,
@@ -231,11 +231,11 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 				.shieldCooldownSeconds = rCurrentPostRender.pShieldCooldowns[i],
 				.shieldDownSoundCooldownSeconds = rCurrentPostRender.pShieldDownSoundCooldowns[i],
 				.animationTimeSeconds = rCurrentInterpolate.pAnimationTimes[i],
-				.uiPlayerFlags = static_cast<uint16_t>(std::to_underlying(rCurrentPostRender.pFlags[i].meFlags) & ~std::to_underlying(kTransfer)),
+				.uiOmniFlags = static_cast<uint16_t>(std::to_underlying(rCurrentPostRender.pFlags[i].meFlags) & ~std::to_underlying(kTransfer)),
 				.navigationDelaySeconds = rCurrentPostRender.pNavigationDelays[i],
 			},
 		};
-		request.data.globalId = rCurrentPostRender.pGlobalPlayerIds[i];
+		request.data.globalId = rCurrentPostRender.pGlobalIds[i];
 		request.data.fleetWantedCoordinate = rCurrentPostRender.pFleetWantedCoordinates[i];
 		request.data.uiPendingFleetWantedCoordinateTicks = rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[i];
 		request.data.uiPendingWeaponModeTicks = rCurrentPostRender.puiPendingWeaponModeTicks[i];
@@ -243,25 +243,25 @@ void PlayersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[ma
 		request.data.uiClientGuidLow = rCurrentPostRender.pClientGuids[i].uiLow;
 		if (rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
 		{
-			LOG(kDefault, kError, "Player Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) GlobalPlayerId: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), rCurrentPostRender.pGlobalPlayerIds[i], rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
+			LOG(kDefault, kError, "Omni Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) GlobalId: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), rCurrentPostRender.pGlobalIds[i], rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
 		rFrame.postRender.PushTransferRequest(request);
 
 		engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.pPushers[i]);
 #if defined(BT_CLIENT)
-		PlayersInterpolate::RemoveOwnedVisuals(rFrame, rCurrentInterpolate, i);
+		OmnisInterpolate::RemoveOwnedVisuals(rFrame, rCurrentInterpolate, i);
 #endif // BT_CLIENT
 
 		engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, rCurrentPostRender.pIds[i], rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	});
 }
 
-void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, PlayerFlags_t flags, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer)
+void XM_CALLCONV OmnisPostRender::ComputeNavigation([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, OmniFlags_t flags, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer)
 {
-	PlayersPostRender& __restrict rCurrent = *rFrame.postRender.pPlayers;
-	const PlayersPostRender& rPrevious = *rPreviousFrame.postRender.pPlayers;
-	const PlayersInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pPlayers;
+	OmnisPostRender& __restrict rCurrent = *rFrame.postRender.pOmnis;
+	const OmnisPostRender& rPrevious = *rPreviousFrame.postRender.pOmnis;
+	const OmnisInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pOmnis;
 
 	// Throttle bookkeeping: capture mode before the fleet/flagship/timer blocks can change it, and note
 	// when the direction is re-seeded. Both force an immediate pathfind below (see bRecompute).
@@ -282,11 +282,11 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 
 	if (riNavigationDirection == 5)
 	{
-		// Missing flagships leave the proximity scan empty. OnPlayerDeath shifts the flagship after removal;
+		// Missing flagships leave the proximity scan empty. OnOwnedEntityDeath shifts the flagship after removal;
 		// ProcessFlagshipUpdates queues kUpdateFleet, whose Update handler writes kIsFlagship.
 		// Followers normally stall one tick before replacement or fleet override. A same-cell promoted flagship
 		// recovers on D+2 via mode 4, clearing its stale destination without advancing the rally timer.
-		// Agent-injected players have no Fleet updates. Mode 5 follows without arrival or missing-flagship fallback.
+		// Agent-injected omnis have no Fleet updates. Mode 5 follows without arrival or missing-flagship fallback.
 		// It consumes three draws (island pick, footprint X/Y) each tick with islands; mode 4 draws only when
 		// selecting a destination. Both skip draws without islands. Every Random call advances once regardless of bound.
 		if (!rStaticData.islands.empty())
@@ -336,7 +336,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 
 				// Snap to navigable area if inside an obstacle
 				rVecIslandDestination = engine::NavQuerySnapToNavigable(rVecIslandDestination, rStaticData.navigationData);
-				LOG(kNavData, kVerbose, "Player {} NavSwitch: island dest generated pos={} dest={}", i, common::WbV2(vecPosition, 1), common::WbV2(rVecIslandDestination, 1));
+				LOG(kNavData, kVerbose, "Omni {} NavSwitch: island dest generated pos={} dest={}", i, common::WbV2(vecPosition, 1), common::WbV2(rVecIslandDestination, 1));
 				bRecompute = true; // new destination -> path immediately
 			}
 		}
@@ -353,7 +353,7 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, rVecIslandDestination)));
 		if (fDistanceSquared < 100.0f)
 		{
-			LOG(kNavData, kVerbose, "Player {} NavSwitch: arrived at island dest pos={} dest={}", i, common::WbV2(vecPosition, 1), common::WbV2(rVecIslandDestination, 1));
+			LOG(kNavData, kVerbose, "Omni {} NavSwitch: arrived at island dest pos={} dest={}", i, common::WbV2(vecPosition, 1), common::WbV2(rVecIslandDestination, 1));
 			rVecIslandDestination = XMVectorZero();
 		}
 	}
@@ -399,18 +399,18 @@ void XM_CALLCONV PlayersPostRender::ComputeNavigation([[maybe_unused]] Frame& __
 	}
 }
 
-void XM_CALLCONV PlayersPostRender::ApplyMovement(int64_t iNavigationDirection, FXMVECTOR vecArtificialIntelligenceDirection, std::chrono::duration<float> deltaTime, float fAccelerationMultiplier, float fDecayMultiplier, XMVECTOR& rVecVelocity)
+void XM_CALLCONV OmnisPostRender::ApplyMovement(int64_t iNavigationDirection, FXMVECTOR vecArtificialIntelligenceDirection, std::chrono::duration<float> deltaTime, float fAccelerationMultiplier, float fDecayMultiplier, XMVECTOR& rVecVelocity)
 {
-	float fAcceleration = (iNavigationDirection == 5 ? kfPlayerCatchUpAcceleration : kfPlayerAcceleration) * fAccelerationMultiplier;
-	float fMaximumSpeed = iNavigationDirection == 5 ? kfPlayerCatchUpMaximumSpeed : kfPlayerMaximumSpeed;
-	rVecVelocity = engine::ApplyMovement(rVecVelocity, vecArtificialIntelligenceDirection, deltaTime.count(), fAcceleration, kfPlayerDrag * fDecayMultiplier, fMaximumSpeed);
+	float fAcceleration = (iNavigationDirection == 5 ? kfOmniCatchUpAcceleration : kfOmniAcceleration) * fAccelerationMultiplier;
+	float fMaximumSpeed = iNavigationDirection == 5 ? kfOmniCatchUpMaximumSpeed : kfOmniMaximumSpeed;
+	rVecVelocity = engine::ApplyMovement(rVecVelocity, vecArtificialIntelligenceDirection, deltaTime.count(), fAcceleration, kfOmniDrag * fDecayMultiplier, fMaximumSpeed);
 }
 
-void XM_CALLCONV PlayersPostRender::ApplyTerrainPush(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity)
+void XM_CALLCONV OmnisPostRender::ApplyTerrainPush(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity)
 {
 	// Terrain collision - add velocity away from terrain, gentle at first then ramping up
 	float fElevation = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition);
-	float fPushHeight = engine::gpFlightPlanes->Lowest().fHeightMeters - kfPlayerRadius - kfPushMargin;
+	float fPushHeight = engine::gpFlightPlanes->Lowest().fHeightMeters - kfOmniRadius - kfPushMargin;
 	if (fElevation >= fPushHeight) [[unlikely]]
 	{
 		XMVECTOR vecTerrainNormal = XMVector3Normalize(XMVectorSetZ(engine::gpIslandTerrain->CellNormal(rStaticData, vecPosition), 0.0f));
@@ -420,13 +420,13 @@ void XM_CALLCONV PlayersPostRender::ApplyTerrainPush(const engine::CellStaticDat
 	}
 }
 
-void XM_CALLCONV PlayersPostRender::ResolveTerrainContact(const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, XMVECTOR& rVecVelocity)
+void XM_CALLCONV OmnisPostRender::ResolveTerrainContact(const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, XMVECTOR& rVecVelocity)
 {
 	// Hard contact at the lowest flight plane's height; ApplyTerrainPush is the softer band in front of it.
-	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, vecPreviousPosition, rVecPosition, kfPlayerRadius, engine::gpFlightPlanes->Lowest().fHeightMeters, true);
+	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, vecPreviousPosition, rVecPosition, kfOmniRadius, engine::gpFlightPlanes->Lowest().fHeightMeters, true);
 	if (result.flags & engine::DiscTerrainFlags::kStartOverlap) [[unlikely]]
 	{
-		LOG(kDefault, kWarning, "Player terrain start overlap Cell: ({},{}) Index: {} Start: {} Moved: {}", rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPreviousPosition, 1), common::Wb(result.fStartOverlapDistance, 1));
+		LOG(kDefault, kWarning, "Omni terrain start overlap Cell: ({},{}) Index: {} Start: {} Moved: {}", rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPreviousPosition, 1), common::Wb(result.fStartOverlapDistance, 1));
 	}
 
 	rVecPosition = result.vecPosition;
@@ -437,17 +437,17 @@ void XM_CALLCONV PlayersPostRender::ResolveTerrainContact(const engine::CellStat
 	}
 }
 
-void XM_CALLCONV PlayersPostRender::ApplyPusherPush(const Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, int64_t i, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity)
+void XM_CALLCONV OmnisPostRender::ApplyPusherPush(const Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, int64_t i, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity)
 {
-	const PlayersInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pPlayers;
+	const OmnisInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pOmnis;
 
-	// Player-to-player push (prevents overlap)
+	// Omni-to-omni push (prevents overlap)
 	XMVECTOR vecPush = engine::PushersInterpolate::ApplyPush(rFrame.interpolate, vecPosition, rPreviousInterpolate.pPushers[i]);
 	float fPushLength = XMVectorGetX(XMVector3Length(vecPush));
 	if (fPushLength > 0.0f)
 	{
 		XMVECTOR vecPushDirection = XMVectorDivide(vecPush, XMVectorReplicate(fPushLength));
-		rVecVelocity = engine::ApplyClampedPush(rVecVelocity, vecPushDirection, fPushLength, kfPlayerMaximumPusherPushVelocity);
+		rVecVelocity = engine::ApplyClampedPush(rVecVelocity, vecPushDirection, fPushLength, kfOmniMaximumPusherPushVelocity);
 	}
 }
 

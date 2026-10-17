@@ -18,7 +18,7 @@ struct NavigationDelayKey
 	bool operator==(const NavigationDelayKey&) const = default;
 };
 
-// Fleet focus controls the camera cell; gpGame provides owned-player lists and client-state persistence.
+// Fleet focus controls the camera cell; gpGame provides owned-entity lists and client-state persistence.
 class FleetSelection
 {
 public:
@@ -26,7 +26,7 @@ public:
 	void FocusNextFleet();
 	void FocusPreviousFleet();
 	const Fleet* FocusedFleet() const;
-	void SelectPlayerInFleet(engine::GlobalId memberGlobalPlayerId);
+	void SelectOwnedEntityInFleet(engine::GlobalId memberGlobalId);
 	void SynchronizeFleets(std::vector<Fleet>&& rFleets);
 	void AutoSelectFirstAliveMember();
 	void Clear();

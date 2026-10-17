@@ -5,7 +5,7 @@ namespace game
 
 struct Fleet;
 
-enum class PlayerStateWireType : uint8_t
+enum class OwnedEntityStateWireType : uint8_t
 {
 	kSpawned,
 	kChangedCell,
@@ -14,7 +14,7 @@ enum class PlayerStateWireType : uint8_t
 	kCount,
 };
 
-enum class PlayerEventType : uint8_t
+enum class OwnedEntityEventType : uint8_t
 {
 	kAssigned,
 	kSpawned,
@@ -22,14 +22,14 @@ enum class PlayerEventType : uint8_t
 	kDied,
 };
 
-struct ReceivedPlayerEvent
+struct ReceivedOwnedEntityEvent
 {
-	PlayerEventType eType {};
-	engine::GlobalId globalPlayerId {};
+	OwnedEntityEventType eType {};
+	engine::GlobalId globalId {};
 	engine::GridCoord coordinate {};
 };
 
-void ParsePlayerEvents(const std::vector<std::pair<int64_t, std::vector<uint8_t>>>& rRawPackets, common::ScopedWorkbufferArena& rOutputEventsArena);
+void ParseOwnedEntityEvents(const std::vector<std::pair<int64_t, std::vector<uint8_t>>>& rRawPackets, common::ScopedWorkbufferArena& rOutputEventsArena);
 
 bool ParseFleetSynchronization(std::vector<std::pair<int64_t, std::vector<uint8_t>>>& rRawPackets, std::vector<Fleet>& rOutputFleets);
 

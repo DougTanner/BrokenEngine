@@ -2,7 +2,7 @@
 
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Frame/HealthDamage.h"
 #include "Ui/WindDepositsWrappers.h"
@@ -36,22 +36,22 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 				.iTypeIndex = rData.uiTypeIndex,
 				.alignment = rData.alignment,
 				// Wind-trail tuning is client-only visual debug state; reset to canonical defaults on server-authored transfer.
-				.fWindTrailIntensity = rData.alignment == rFrame.postRender.playerAlignment ? gWindDepositPlayerBlastersIntensity.mfDefault : gWindDepositSpaceshipsBlastersIntensity.mfDefault,
-				.fWindTrailWidth = rData.alignment == rFrame.postRender.playerAlignment ? gWindDepositPlayerBlastersWidth.mfDefault : gWindDepositSpaceshipsBlastersWidth.mfDefault,
-				.fWindTrailLengthMultiplier = rData.alignment == rFrame.postRender.playerAlignment ? gWindDepositPlayerBlastersLengthMultiplier.mfDefault : gWindDepositSpaceshipsBlastersLengthMultiplier.mfDefault,
+				.fWindTrailIntensity = rData.alignment == rFrame.postRender.omniAlignment ? gWindDepositOmniBlastersIntensity.mfDefault : gWindDepositSpaceshipsBlastersIntensity.mfDefault,
+				.fWindTrailWidth = rData.alignment == rFrame.postRender.omniAlignment ? gWindDepositOmniBlastersWidth.mfDefault : gWindDepositSpaceshipsBlastersWidth.mfDefault,
+				.fWindTrailLengthMultiplier = rData.alignment == rFrame.postRender.omniAlignment ? gWindDepositOmniBlastersLengthMultiplier.mfDefault : gWindDepositSpaceshipsBlastersLengthMultiplier.mfDefault,
 			});
 			break;
 
 		case StatusChangeType::kTransferMissile:
 		{
 			MissileFlags_t missileFlags;
-			if (rData.alignment == rFrame.postRender.playerAlignment)
+			if (rData.alignment == rFrame.postRender.omniAlignment)
 			{
 				missileFlags.Set(MissileFlags::kTargetEnemy);
 			}
 			else
 			{
-				missileFlags.Set(MissileFlags::kTargetPlayer);
+				missileFlags.Set(MissileFlags::kTargetOmni);
 			}
 
 			MissilesPostRender::Spawn(rFrame,
@@ -75,8 +75,8 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 			break;
 		}
 
-		case StatusChangeType::kTransferPlayer:
-			PlayersPostRender::Spawn(rFrame,
+		case StatusChangeType::kTransferOmni:
+			OmnisPostRender::Spawn(rFrame,
 			{
 				.vecPosition = rData.vecPosition,
 				.vecDirection = rData.vecDirection,
@@ -89,11 +89,11 @@ void SpawnTransfer(Frame& rFrame, StatusChangeType eType, const TransferData& rD
 				.shieldCooldown = rData.shieldCooldownSeconds,
 				.shieldDownSoundCooldown = rData.shieldDownSoundCooldownSeconds,
 				.animationTime = rData.animationTimeSeconds,
-				.flags = PlayerFlags_t {static_cast<PlayerFlags>(rData.uiPlayerFlags)},
+				.flags = OmniFlags_t {static_cast<OmniFlags>(rData.uiOmniFlags)},
 				.transferLockTimer = std::chrono::duration<float>(1.0f),
 				.arrivalGracePeriod = kArrivalGracePeriod,
 				.navigationDelay = rData.navigationDelaySeconds,
-				.globalPlayerId = rData.globalId,
+				.globalId = rData.globalId,
 				.fleetWantedCoordinate = rData.fleetWantedCoordinate,
 				.iPendingFleetWantedCoordinateTicks = rData.uiPendingFleetWantedCoordinateTicks,
 				.iPendingWeaponModeTicks = rData.uiPendingWeaponModeTicks,

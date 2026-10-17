@@ -2,8 +2,8 @@
 
 #include "Network/Server/FleetNavigationController.h"
 
-#include "Frame/Collections/Players/Players.h"
-#include "Network/PlayerEvents.h"
+#include "Frame/Collections/Omnis/Omnis.h"
+#include "Network/OwnedEntityEvents.h"
 #include "Game.h"
 
 namespace game
@@ -31,8 +31,8 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 	{
 		for (Fleet& rFleet : rFleetVector)
 		{
-			auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
-			if (!(rFleet.flagshipGlobalPlayerId.iValue != 0) || flagshipIt == rFleet.members.end())
+			auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId);
+			if (!(rFleet.flagshipGlobalId.iValue != 0) || flagshipIt == rFleet.members.end())
 			{
 				continue;
 			}
@@ -68,14 +68,14 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 				continue;
 			}
 
-			const PlayersPostRender& rPlayers = *(*gpGame->mCells.at(rFlagship.coordinate).pCurrent).postRender.pPlayers;
+			const OmnisPostRender& rOmnis = *(*gpGame->mCells.at(rFlagship.coordinate).pCurrent).postRender.pOmnis;
 			bool bFoundFlagship = false;
 			int64_t iFlagshipNavigationDirection = -1;
-			for (int64_t k = 0; k < rPlayers.iCount; ++k)
+			for (int64_t k = 0; k < rOmnis.iCount; ++k)
 			{
-				if (rPlayers.pGlobalPlayerIds[k] == rFlagship.globalPlayerId)
+				if (rOmnis.pGlobalIds[k] == rFlagship.globalId)
 				{
-					iFlagshipNavigationDirection = GetNavigationDirection(rPlayers.pFlags[k]);
+					iFlagshipNavigationDirection = GetNavigationDirection(rOmnis.pFlags[k]);
 					bFoundFlagship = true;
 					break;
 				}
@@ -129,7 +129,7 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 		}
 		const Fleet& rFleet = *matchIt;
 
-		if (!(rFleet.flagshipGlobalPlayerId.iValue != 0) || !std::ranges::contains(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId))
+		if (!(rFleet.flagshipGlobalId.iValue != 0) || !std::ranges::contains(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId))
 		{
 			continue;
 		}
@@ -143,7 +143,7 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 			}
 
 			engine::GridCoord memberCoordinate = rMember.coordinate;
-			bool bMemberIsFlagship = (rMember.globalPlayerId == rFleet.flagshipGlobalPlayerId);
+			bool bMemberIsFlagship = (rMember.globalId == rFleet.flagshipGlobalId);
 
 			auto frameInputIt = gpGame->mFrameInputs.find(memberCoordinate);
 			if (frameInputIt == gpGame->mFrameInputs.end())
@@ -155,18 +155,18 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 				continue;
 			}
 
-			const PlayersPostRender& rPlayers = *(*gpGame->mCells.at(memberCoordinate).pCurrent).postRender.pPlayers;
-			for (int64_t k = 0; k < rPlayers.iCount; ++k)
+			const OmnisPostRender& rOmnis = *(*gpGame->mCells.at(memberCoordinate).pCurrent).postRender.pOmnis;
+			for (int64_t k = 0; k < rOmnis.iCount; ++k)
 			{
-				if (rPlayers.pGlobalPlayerIds[k] == rMember.globalPlayerId)
+				if (rOmnis.pGlobalIds[k] == rMember.globalId)
 				{
-					int64_t iPlayerUuid = rPlayers.pIds[k].uuid.iValue;
+					int64_t iOmniUuid = rOmnis.pIds[k].uuid.iValue;
 					frameInputIt->second.statusChanges.push_back(
 					{
 						.eType = StatusChangeType::kUpdateFleet,
 						.data = UpdateFleetData
 						{
-							.iPlayerUuid = iPlayerUuid,
+							.iOmniUuid = iOmniUuid,
 							.bIsFlagship = bMemberIsFlagship,
 							.fleetWantedCoordinate = rUpdate.newWantedCoordinate,
 							.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(rUpdate.iPendingFleetWantedCoordinateTicks),
@@ -185,7 +185,7 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 void FleetNavigationController::ShiftFlagshipAfterDeath(const engine::ClientGuid& rGuid, Fleet& rFleet)
 {
 	// The flagship's list position is only the rotation start; every caller has already matched the flagship to a member.
-	int64_t iFlagshipPosition = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId) - rFleet.members.begin();
+	int64_t iFlagshipPosition = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId) - rFleet.members.begin();
 	int64_t iNewFlagship = -1;
 	for (int64_t k = 1; k < std::ssize(rFleet.members); ++k)
 	{
@@ -202,7 +202,7 @@ void FleetNavigationController::ShiftFlagshipAfterDeath(const engine::ClientGuid
 	}
 
 	const FleetMember& rNewFlagship = rFleet.members.at(static_cast<size_t>(iNewFlagship));
-	rFleet.flagshipGlobalPlayerId = rNewFlagship.globalPlayerId;
+	rFleet.flagshipGlobalId = rNewFlagship.globalId;
 	rFleet.wantedCoordinate = rNewFlagship.coordinate;
 	rFleet.cellChangeTimerSeconds = rFleet.navigationDelaySeconds;
 	mPendingFlagshipUpdates.push_back({.clientGuid = rGuid, .fleetGuid = rFleet.guid, .newWantedCoordinate = rFleet.wantedCoordinate});

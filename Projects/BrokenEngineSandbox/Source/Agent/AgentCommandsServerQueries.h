@@ -13,7 +13,7 @@ namespace game
 engine::GridCoord CoordinateFromParameter(const nlohmann::json& rParameters, std::string_view key = "coord");
 Frame& QueryFrame(const nlohmann::json& rParameters);
 void CommandQueryFrame(const nlohmann::json& rParameters, nlohmann::json& rResult);
-void CommandQueryPlayers(const nlohmann::json& rParameters, nlohmann::json& rResult);
+void CommandQueryOmnis(const nlohmann::json& rParameters, nlohmann::json& rResult);
 void CommandQueryCollection(const nlohmann::json& rParameters, nlohmann::json& rResult);
 
 } // namespace game

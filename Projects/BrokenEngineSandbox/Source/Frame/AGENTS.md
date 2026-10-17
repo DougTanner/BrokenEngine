@@ -9,12 +9,12 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
 ## Invariants
 
 - The tick phases implemented here are called by engine-owned `RunFrameTick` (`../../../../Engine/Source/Frame/AGENTS.md`). CRC-affecting fixed-tick decisions use `Frame`, `FrameInput`, `CellStaticData`, or explicit phase parameters, not `game::gpGame`, wall-clock time, or client render state; if required input is unavailable, stop and resolve ownership.
-- Players use explicit dispatch for player-specific logic; other game collections use the tuples in `FrameCollections.h`. Register new collections in the correct tuple and preserve deterministic ordering. `FrameInterpolate::Values()` and `FramePostRender::Values()` list the game frame-wide values under the engine `Values()` rule (`../../../../Engine/Source/Frame/AGENTS.md` `## Collection and Serialization Invariants`).
+- Omnis use explicit dispatch for omni-specific logic; other game collections use the tuples in `FrameCollections.h`. Register new collections in the correct tuple and preserve deterministic ordering. `FrameInterpolate::Values()` and `FramePostRender::Values()` list the game frame-wide values under the engine `Values()` rule (`../../../../Engine/Source/Frame/AGENTS.md` `## Collection and Serialization Invariants`).
 - `SharedCrcMembers()` is a subset of `SharedMembers()`. Full `Write()`/`Read()` is build-local; `ServerRead()` consumes the shared cross-build format. Both `Read()` and `ServerRead()` require exact Interpolate/PostRender count and capacity parity across every registered collection pair and rebuild ID maps (`../../../../Engine/Source/Frame/Collections/AGENTS.md`); build-local reads replace the destination only after the full frame passes that check.
 - `Frame::kiVersion` composes navigation and collection versions. Bump its base when CRC semantics change without a contributing version bump.
 - At save/replay read boundaries, reject a non-finite spaceship-spawn timer or one at or above the shared 0.5-second spawn interval as a corrupt stream, and leave smaller finite values unchanged before the loop that repeatedly subtracts the interval.
 - Navigation and elevation are deterministic derived data excluded from both the CRC and persisted frame payload. The game derives the clearance distance and elevation threshold for the engine's contour bake (`TerrainUtils.h`, server-only) and hands them to engine startup, the only way engine navigation gets them. It likewise hands engine startup its flight-plane table (`FlightPlaneTable.h`, both builds), whose lowest plane sets that elevation threshold.
-- Status changes are consumed here: `kUpdatePlayer` and `kUpdateFleet` in Update; spawn and destroy handling in Spawn. Their serialized tags and append-only wire rule are owned by game Network (`../Network/AGENTS.md`).
+- Status changes are consumed here: `kUpdateOmni` and `kUpdateFleet` in Update; spawn and destroy handling in Spawn. Their serialized tags and append-only wire rule are owned by game Network (`../Network/AGENTS.md`).
 - `FrameInput` — the per-tick deterministic unit, a versioned serializable list
   of `StatusChange`s — is declared here (`FrameInput.h/.cpp`) and serialized by
   the engine stream functions in `FrameBase.h`, compiles in both builds, and
@@ -31,11 +31,11 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
   `Crc()` serves the replay `DifferenceStream` (skipping identical consecutive
   differences) and diagnostics; reconciliation desync detection compares `Frame`
   CRCs, not `FrameInput::Crc()`.
-- Variant read: reading a `StatusChange` must seat the correct `std::variant` alternative (via `DefaultDataForType`) before `common::Read` runs — `std::visit` assumes the active alternative already matches the type tag. After each payload read the engine replay reader (`engine::ReadFrameInput`, `../../../../Engine/Source/Frame/AGENTS.md`) calls `AdmitFrameInputStatusChange`, which rejects a payload the game cannot adopt (an unregistered Blaster type index, or a `kSpawnPlayer` with global ID 0).
+- Variant read: reading a `StatusChange` must seat the correct `std::variant` alternative (via `DefaultDataForType`) before `common::Read` runs — `std::visit` assumes the active alternative already matches the type tag. After each payload read the engine replay reader (`engine::ReadFrameInput`, `../../../../Engine/Source/Frame/AGENTS.md`) calls `AdmitFrameInputStatusChange`, which rejects a payload the game cannot adopt (an unregistered Blaster type index, or a `kSpawnOmni` with global ID 0).
 - Delayed behavior updates use countdowns that transfer with the entity; transfer, spawn, and destroy status changes apply immediately.
-- Missile and player homing acquire through the engine frame registry (`../../../../Engine/Source/Frame/AGENTS.md` `## Frame Registry`). This scope builds its only two query windows — the Missile-Update window in Missiles Update and the Player-Spawn window at player spawn — as specified in Frame Registry Query Windows (`../../../../Documents/Architecture/FrameUpdatePipeline.md`).
+- Missile and omni homing acquire through the engine frame registry (`../../../../Engine/Source/Frame/AGENTS.md` `## Frame Registry`). This scope builds its only two query windows — the Missile-Update window in Missiles Update and the Omni-Spawn window at omni spawn — as specified in Frame Registry Query Windows (`../../../../Documents/Architecture/FrameUpdatePipeline.md`).
 - Acquiring a target writes the frame — it takes a subscription — so the order acquisitions happen in within a tick is part of the deterministic stream. Do not hoist one out of a loop, cache its result, or run it in parallel across entities.
-- `Frame::OwnershipLayer` maps the engine registry's ownership layer onto the `PlayersPostRender` columns.
+- `Frame::OwnershipLayer` maps the engine registry's ownership layer onto the `OmnisPostRender` columns.
 - Bounds helpers use the `vecArea` lane convention expected by `common::InsideArea`.
 - `GetServerCellStatistics` and its row labels `kServerEntityCountNames`
   (`ServerCellStats.h`, server-only) are the cell-statistics names the
@@ -45,7 +45,7 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
   as `entityCounts` rows indexed by `ServerEntityCount`. Keep it observational —
   no stored state, no display knowledge — and add fields here rather than
   opening a second display path into game collections.
-- `PublishServerEntityCounts` (same header) is the server's only writer of the Players, Spaceships, Blasters, and Missiles profile counters, which the client publishes from the render path instead. It runs once per advancing tick from the post-tick client-finalize hook (`../Network/Server/AGENTS.md`), so totals describe the tick that just finished; the monitoring window must not become a second writer.
+- `PublishServerEntityCounts` (same header) is the server's only writer of the Omnis, Spaceships, Blasters, and Missiles profile counters, which the client publishes from the render path instead. It runs once per advancing tick from the post-tick client-finalize hook (`../Network/Server/AGENTS.md`), so totals describe the tick that just finished; the monitoring window must not become a second writer.
 
 ## See Also
 

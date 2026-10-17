@@ -95,10 +95,10 @@ runner applies. The purpose and the triggers live in
       game `GameInterpolateTypes`/`GamePostRenderTypes` lists and the engine
       `ServerCollections()` lists, so the registration in step 11 or 12 adds
       both terms; add none by hand.
-    - An explicitly dispatched pair kept outside those lists, as Players
+    - An explicitly dispatched pair kept outside those lists, as Omnis
       is, adds its own `kiVersion` terms to the `game::Frame::kiVersion`
       definition in `Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp`, as
-      Players does.
+      Omnis does.
 
     Done when both declarations exist, plus those explicit terms for such a
     pair.
@@ -172,7 +172,7 @@ runner applies. The purpose and the triggers live in
   build-local Write/Read, shared ServerRead/CRC, and output merging in
   `LogDifferences`.
 - Reserve explicit per-collection Frame.cpp dispatch for a concrete special
-  contract such as Players; `CollectionFlags::kIdToIndex` alone is not one.
+  contract such as Omnis; `CollectionFlags::kIdToIndex` alone is not one.
   `engine::PushersInterpolate` proves that an indexable collection can use the
   normal tuples.
 - Pure client-only engine collections do not alter persisted shared layout and

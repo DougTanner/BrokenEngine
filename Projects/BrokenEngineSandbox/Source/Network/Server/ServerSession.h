@@ -2,7 +2,7 @@
 
 #if defined(BT_SERVER)
 
-#include "Network/PlayerEvents.h"
+#include "Network/OwnedEntityEvents.h"
 
 namespace engine
 {
@@ -27,7 +27,7 @@ struct SubscriptionUpdate
 	engine::GlobalId globalId {};
 };
 
-struct PendingUpdatePlayerRequest
+struct PendingUpdateOwnedEntityRequest
 {
 	int64_t iClientId = 0;
 	engine::GlobalId globalId {};
@@ -49,8 +49,8 @@ public:
 	~ServerSession();
 
 	void PrepareTick();
-	void SendAssignPlayer(int64_t iClientId, engine::GlobalId globalId, engine::GridCoord coordinate);
-	void SendPlayerState(int64_t iClientId, PlayerStateWireType eWireType, int64_t iGlobalPlayerId, engine::GridCoord coordinate);
+	void SendAssignOwnedEntity(int64_t iClientId, engine::GlobalId globalId, engine::GridCoord coordinate);
+	void SendOwnedEntityState(int64_t iClientId, OwnedEntityStateWireType eWireType, int64_t iGlobalId, engine::GridCoord coordinate);
 	void StepTimescale(bool bFaster); // step time scale one notch (faster/slower) and broadcast; shared by the packet handler and the agent command
 	void SubscriptionUpdates();
 	void ResetClientsForLoad();
@@ -67,7 +67,7 @@ public:
 	engine::OwnedEntityRegistry mClientOwnedEntities;
 
 	std::vector<SubscriptionUpdate> mPendingSubscriptionUpdates;
-	std::vector<PendingUpdatePlayerRequest> mPendingUpdatePlayerRequests;
+	std::vector<PendingUpdateOwnedEntityRequest> mPendingUpdateOwnedEntityRequests;
 
 	std::unique_ptr<ServerFleetManager> mpFleetManager;
 	std::unique_ptr<engine::ServerTransferManager> mpTransferManager;
@@ -82,7 +82,7 @@ private:
 	void AfterNetworkPoll();
 	void ParseReceivedGamePackets();
 	void FinalizeTickClients();
-	void ProcessUpdatePlayerRequests();
+	void ProcessUpdateOwnedEntityRequests();
 
 	// ServerSessionRuntime::ComputeActiveSet calls this by name
 	void AddGameRequiredCoordinates();

@@ -8,7 +8,7 @@ enum GameCpuCounters : int64_t
 	// The engine pins its contiguous engine->game counter index contract to this anchor by name; keep it first and keep the counter after it explicitly initialized from it.
 	kGameCpuCounterFirst = engine::kEngineCpuCounterCount,
 
-	kCpuCounterPlayers = kGameCpuCounterFirst,
+	kCpuCounterOmnis = kGameCpuCounterFirst,
 	kCpuCounterBlasters,
 		kCpuCounterBlastersRendered,
 	kCpuCounterMissiles,
@@ -40,7 +40,7 @@ enum GameCpuTimers : int64_t
 			kCpuTimerPostRenderSpawn,
 
 	kCpuTimerRender,
-		kCpuTimerRenderPlayer,
+		kCpuTimerRenderOmnis,
 		kCpuTimerRenderSpaceships,
 			kCpuTimerRenderSpaceshipsAnimate,
 
@@ -51,7 +51,7 @@ enum GameCpuTimers : int64_t
 // silently misalign the overlay rows). Mirrors the engine kXxx*Names tables — see engine ProfileManager.h.
 inline constexpr std::string_view kGameCpuCounterNames[]
 {
-	"Players",
+	"Omnis",
 	"Blasters",
 	"    Rendered",
 	"Missiles",
@@ -81,7 +81,7 @@ inline constexpr std::string_view kGameCpuTimerNames[]
 	"        Destroy",
 	"        Spawn",
 	"Render",
-	"    Player",
+	"    Omnis",
 	"    Spaceships",
 	"        Animate",
 };

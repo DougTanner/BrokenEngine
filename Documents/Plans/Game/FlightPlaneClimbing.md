@@ -29,7 +29,7 @@ Current-tree evidence this design rests on:
 
 - Positions and velocities are full `XMVECTOR`s with a Z lane, CRC'd and
   transferred. Omnis force Z to the lowest plane every Interpolate tick
-  (`Players.cpp:478`); Fighters glide Z toward `gBaseHeight` by at most
+  (`Omnis.cpp:478`); Fighters glide Z toward `gBaseHeight` by at most
   `kfSpaceshipMaxSpeed * fDeltaTime` right after their position integration,
   landing exactly on it (the target-height glide in
   `SpaceshipsInterpolate::Update`), and store velocity Z as 0 (the velocity-Z
@@ -37,26 +37,26 @@ Current-tree evidence this design rests on:
   Battleships copy both, because death knockback (`Spaceships.cpp:626`,
   `SpaceshipsCombat.cpp:161`) and pusher pushes otherwise drift Z. Missiles
   flatten their own velocity Z (`MissilesUpdate.cpp:209`); the Omni navigation
-  fallback flattens its direction (`PlayersNavigation.cpp:211,432`).
-- `engine::NavQuerySnapToNavigable` and `NavQueryDirection` assert the position and destination Z equal the lowest plane (`Engine/Source/Frame/NavQuery.cpp:574-575,608-610`); the four call sites are `PlayersNavigation.cpp:175,194/196,359,414/416`. The flagship-follow test uses the 3D distance to the flagship (`PlayersNavigation.cpp:120`).
+  fallback flattens its direction (`OmnisNavigation.cpp:211,432`).
+- `engine::NavQuerySnapToNavigable` and `NavQueryDirection` assert the position and destination Z equal the lowest plane (`Engine/Source/Frame/NavQuery.cpp:574-575,608-610`); the four call sites are `OmnisNavigation.cpp:175,194/196,359,414/416`. The flagship-follow test uses the 3D distance to the flagship (`OmnisNavigation.cpp:120`).
 - Heading rotations are yaw-only (`XMMatrixRotationZ` at `Spaceships.cpp:283`,
-  `PlayersCombat.cpp:397,459`); left vectors come from a cross with +Z
-  (`PlayersCombat.cpp:293,387`, `TerrainUtils.cpp:82`);
+  `OmnisCombat.cpp:397,459`); left vectors come from a cross with +Z
+  (`OmnisCombat.cpp:293,387`, `TerrainUtils.cpp:82`);
   `common::RotateTowardsPercent` mixes a 3D cross with
   `XMVector2AngleBetweenNormals` (`Common/Math/MathUtils.cpp:53-58`). Omni
-  `AcquireTarget` writes a 3D lead position (`PlayersCombat.cpp:124`) and
+  `AcquireTarget` writes a 3D lead position (`OmnisCombat.cpp:124`) and
   `UpdateFacing` stores its normalized 3D direction in `pVecWantedDirections`
   (`:147`), which Interpolate Update feeds to `RotateTowardsPercent`
-  (`Players.cpp:482`); once targets sit on other planes that direction has Z ≠
+  (`Omnis.cpp:482`); once targets sit on other planes that direction has Z ≠
   0, so decision 16 projects it horizontally. Every other direction fed to them
   keeps Z = 0 after this Plan, so none is changed.
 - Terrain contact: the Omni push band uses the lowest plane minus radius and
-  margin (`PlayersNavigation.cpp:468`). Both hard contacts call
+  margin (`OmnisNavigation.cpp:468`). Both hard contacts call
   `engine::ResolveDiscAgainstTerrain(rStaticData, vecStart, vecEnd, fRadius, fThresholdHeight, bSlide)`
   (`Engine/Source/Frame/IslandTerrain.h:203`, `90fa6c85`), where elevation at or
   above `fThresholdHeight` blocks, and both pass the lowest plane
   (FlightPlaneData's replacement of `gBaseHeight`): the Omni slide in
-  `ResolveTerrainContact` (`PlayersNavigation.cpp:481`, `90fa6c85`;
+  `ResolveTerrainContact` (`OmnisNavigation.cpp:481`, `90fa6c85`;
   ShipTypeSplit's shared `ResolveTerrainContact`) and the Fighter bounce in
   `ApplyTerrainBounce` (`SpaceshipsNavigation.cpp:140`, `90fa6c85`). The
   function snaps an overlapped start with its Z set to the lowest plane
@@ -64,7 +64,7 @@ Current-tree evidence this design rests on:
   assert holds whatever threshold the caller passes. `ComputeTerrainAvoidance`
   and `ComputeArtificialIntelligenceSteering` use absolute elevation thresholds
   (`TerrainUtils.cpp:8,12,71-72,109`) and are steering, not contact.
-- Spawns: the fleet spawn builds its position at the lowest plane (`Players.cpp:261`); the random group spawner samples terrain against the lowest plane minus `kfTerrainClearance` (`Frame.cpp:229,264,297,387`). The harness `inject_payload` forces Z to the lowest plane and parses `[x,y]` only (`ServerSimulationHarnessRigs.cpp:344-353,441,538`).
+- Spawns: the fleet spawn builds its position at the lowest plane (`Omnis.cpp:261`); the random group spawner samples terrain against the lowest plane minus `kfTerrainClearance` (`Frame.cpp:229,264,297,387`). The harness `inject_payload` forces Z to the lowest plane and parses `[x,y]` only (`ServerSimulationHarnessRigs.cpp:344-353,441,538`).
 - Fleet state: `Fleet` (`Projects/BrokenEngineSandbox/Source/Fleet.h:38-48`) is
   server-owned per client GUID, written and read by
   `ServerFleetSerialization.cpp:34-129` into the grid save, which
@@ -76,7 +76,7 @@ Current-tree evidence this design rests on:
   (`ServerSimulationHarnessRigs.cpp:405-571`) and are consumed at the first
   normal tick at or after their target tick (`Network/Server/AGENTS.md`), so
   they are recorded in `FrameInput` and replay.
-- `IsAdoptableStatusChange` (`Projects/BrokenEngineSandbox/Source/SpawnTransfer.cpp:109-117`) is the one payload gate the replay reader (`FrameInput.cpp:64`), `inject_payload` (`ServerSimulationHarnessRigs.cpp:514`), and transfer adoption share. `PostRead` (`Players.h:211-224`) is the per-collection grid-save row gate.
+- `IsAdoptableStatusChange` (`Projects/BrokenEngineSandbox/Source/SpawnTransfer.cpp:109-117`) is the one payload gate the replay reader (`FrameInput.cpp:64`), `inject_payload` (`ServerSimulationHarnessRigs.cpp:514`), and transfer adoption share. `PostRead` (`Omnis.h:211-224`) is the per-collection grid-save row gate.
 - The random-spawn RNG is `rFrame.postRender.randomEngine`; `common::Random(int64_t iMax, RandomEngine&)` draws an integer in [0, iMax] (`Common/Math/Random.h:66`).
 - Fighter render builds `scale * preRotate * roll * yaw * translation` with roll from `pfDeltaRotations` (`SpaceshipsRender.cpp:172-176`); forward is +X in the frame between `smatPreRotate` and `matYaw`, so pitch is a rotation about Y there.
 
@@ -102,7 +102,7 @@ Each decision is recorded as made; the alternatives are not open.
    shared path, so it is bit-deterministic under `/fp:strict`. It runs on
    exploding rows too (no branch). Each type's lowest-plane Z pin or glide is
    replaced by this call: the Omni `XMVectorSetZ(..., Lowest())`
-   (`Players.cpp:478`) and the Fighter glide toward `gBaseHeight` (the
+   (`Omnis.cpp:478`) and the Fighter glide toward `gBaseHeight` (the
    target-height glide in `SpaceshipsInterpolate::Update`), which Battleships
    copy.
 4. **Velocity Z is always zero.** Each type's PostRender Update writes
@@ -186,7 +186,7 @@ Each decision is recorded as made; the alternatives are not open.
     (`ShipBehaviours.cpp`) flattens both arguments with
     `XMVectorSetZ(v, gpFlightPlanes->Lowest().fHeightMeters)` immediately before
     each of the four `NavQuery*` calls
-    (`PlayersNavigation.cpp:175,194/196,359,414/416`), so the NavQuery asserts
+    (`OmnisNavigation.cpp:175,194/196,359,414/416`), so the NavQuery asserts
     hold; the returned direction has Z = 0 and the snapped island destination
     keeps the lowest plane's Z as today. `FollowFlagship` compares
     `XMVector2LengthSq` of the delta to the flagship, so a wingman on another
@@ -216,7 +216,7 @@ Each decision is recorded as made; the alternatives are not open.
 16. **The Omni wanted direction is projected horizontally before the yaw
     rotation.** `AcquireTarget` and `UpdateFacing` are unchanged:
     `pVecWantedDirections` keeps the unit 3D lead direction. The Omni
-    Interpolate Update (today's `Players.cpp:482`) feeds `RotateTowardsPercent`
+    Interpolate Update (today's `Omnis.cpp:482`) feeds `RotateTowardsPercent`
     the horizontal part, `XMVector3Normalize(XMVectorSetZ(vecWanted, 0.0f))`,
     and skips the rotation when that horizontal part has zero length (target
     exactly overhead), so the hull direction keeps Z = 0 and
@@ -254,7 +254,7 @@ as `fThresholdHeight`; each caller skips the call when
 
 `Frame/StatusChange.h`: `kUpdateFlightPlane` after `kUpdateFleet`; `UpdateFlightPlaneData`; `SpawnShipData::uiTargetFlightPlane` after `uiPendingFleetWantedCoordinateTicks`; `StatusChangeData` gains the alternative; `DefaultDataForType` and `StatusChangeTypeName` (`"UpdateFlightPlane"`) follow. `Engine/Source/Network/NetworkSerialization.cpp` writes and reads the three fields in declaration order and the new `SpawnShipData` byte after the pending-ticks byte.
 
-Omni Interpolate Update (today's `Players.cpp:482`), decision 16:
+Omni Interpolate Update (today's `Omnis.cpp:482`), decision 16:
 
 ```cpp
 XMVECTOR vecWantedHorizontal = XMVectorSetZ(rPreviousPostRender.pVecWantedDirections[i], 0.0f);
@@ -296,7 +296,7 @@ command, the kind, `fHeight`, `targetFlightPlane`.
 
 ## In scope
 
-- `ShipTypes.h`: the two target-plane accessors. `ShipBehaviours.h/.cpp`: the five functions above, the `FollowFlagship` horizontal distance, the four flattened `NavQuery*` arguments in `ComputeNavigation`, and the Z-threshold plus skip rule in `ApplyTerrainPush` (new `fHeight` parameter, decision 11), `ResolveTerrainContact` (`ShipBehaviours.h/.cpp`, ShipTypeSplit's home for today's `PlayersPostRender::ResolveTerrainContact`), and `ApplyTerrainBounce`.
+- `ShipTypes.h`: the two target-plane accessors. `ShipBehaviours.h/.cpp`: the five functions above, the `FollowFlagship` horizontal distance, the four flattened `NavQuery*` arguments in `ComputeNavigation`, and the Z-threshold plus skip rule in `ApplyTerrainPush` (new `fHeight` parameter, decision 11), `ResolveTerrainContact` (`ShipBehaviours.h/.cpp`, ShipTypeSplit's home for today's `OmnisPostRender::ResolveTerrainContact`), and `ApplyTerrainBounce`.
 - The three type headers: climb rate and highest-plane constants, `kiVersion` bumps, `PostRead` tests; `FightersInterpolate::pfClimbTilts` through `/add-collection-member`; `kfFighterClimbTilt`.
 - The three Interpolate `Update`s (climb call, Fighter tilt write, and the Omni horizontal projection of the wanted direction before `RotateTowardsPercent`, decision 16) and PostRender `Update`s (skip rule, velocity Z zero); `FightersRender.cpp` pitch matrix; hydration of `pfClimbTilts` in both Fighter `Spawn` overloads.
 - `StatusChange.h`, `ShipStatusChanges.cpp` (`kSpawnShip`, `kUpdateFlightPlane`), `SpawnTransfer.cpp` `IsAdoptableStatusChange`, `FrameInput.h` version, `NetworkSerialization.cpp`, `NetworkProtocol.h` version.

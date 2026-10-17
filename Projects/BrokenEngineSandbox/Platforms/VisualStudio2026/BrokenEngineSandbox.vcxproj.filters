@@ -124,7 +124,7 @@
     <Filter Include="Game\Frame\Collections">
       <UniqueIdentifier>{40783aaa-8ca0-45d5-bf06-250f0047f845}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Game\Frame\Collections\Players">
+    <Filter Include="Game\Frame\Collections\Omnis">
       <UniqueIdentifier>{a1b2c3d4-5678-9abc-def0-123456789abc}</UniqueIdentifier>
     </Filter>
     <Filter Include="Game\Frame\Collections\Missiles">
@@ -285,7 +285,7 @@
     <ClInclude Include="..\..\Source\Network\Client\ClientReconciler.h">
       <Filter>Game\Network\Client</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Network\PlayerEvents.h">
+    <ClInclude Include="..\..\Source\Network\OwnedEntityEvents.h">
       <Filter>Game\Network</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Network\StatusChangeCodec.h">
@@ -573,8 +573,8 @@
     <ClInclude Include="..\..\Source\Ui\Localization.h">
       <Filter>Game\Ui</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Frame\Collections\Players\Players.h">
-      <Filter>Game\Frame\Collections\Players</Filter>
+    <ClInclude Include="..\..\Source\Frame\Collections\Omnis\Omnis.h">
+      <Filter>Game\Frame\Collections\Omnis</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Frame\Collections\Spaceships\Spaceships.h">
       <Filter>Game\Frame\Collections\Spaceships</Filter>
@@ -965,7 +965,7 @@
     <ClCompile Include="..\..\Source\Network\Client\ReconcileReplayClientState.cpp">
       <Filter>Game\Network\Client</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Network\PlayerEvents.cpp">
+    <ClCompile Include="..\..\Source\Network\OwnedEntityEvents.cpp">
       <Filter>Game\Network</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Network\StatusChangeCodec.cpp">
@@ -1115,17 +1115,17 @@
     <ClCompile Include="..\..\..\..\Common\Math\MathUtils.cpp">
       <Filter>Common\Math</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Frame\Collections\Players\Players.cpp">
-      <Filter>Game\Frame\Collections\Players</Filter>
+    <ClCompile Include="..\..\Source\Frame\Collections\Omnis\Omnis.cpp">
+      <Filter>Game\Frame\Collections\Omnis</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Frame\Collections\Players\PlayersNavigation.cpp">
-      <Filter>Game\Frame\Collections\Players</Filter>
+    <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisNavigation.cpp">
+      <Filter>Game\Frame\Collections\Omnis</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Frame\Collections\Players\PlayersCombat.cpp">
-      <Filter>Game\Frame\Collections\Players</Filter>
+    <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisCombat.cpp">
+      <Filter>Game\Frame\Collections\Omnis</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Frame\Collections\Players\PlayersRender.cpp">
-      <Filter>Game\Frame\Collections\Players</Filter>
+    <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisRender.cpp">
+      <Filter>Game\Frame\Collections\Omnis</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Spaceships\Spaceships.cpp">
       <Filter>Game\Frame\Collections\Spaceships</Filter>

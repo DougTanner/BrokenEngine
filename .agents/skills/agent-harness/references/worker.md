@@ -590,7 +590,7 @@ and the handoff this run returns.
       scene/server queries, and `get_logs` close a criterion more cheaply than
       pixels; reach for a capture only when the criterion is genuinely about
       what was rendered.
-    - Stable counts such as players should agree exactly; allow bounded tick
+    - Stable counts such as omnis should agree exactly; allow bounded tick
       drift for collections whose entries are being added and removed rapidly.
     - Release through the lifecycle and release steps below.
 

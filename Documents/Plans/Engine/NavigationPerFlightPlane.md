@@ -73,7 +73,7 @@ Current-tree evidence this design rests on:
   position Z as `fThresholdHeight` and skip the call when `SkipsTerrainContact`
   holds.
 - Game call sites (post-ShipTypeSplit all in `ShipBehaviours.cpp`
-  `ComputeNavigation` and its static helpers; today `PlayersNavigation.cpp`):
+  `ComputeNavigation` and its static helpers; today `OmnisNavigation.cpp`):
   `ShouldRecomputeNavigation` (`:175`, two `NavQueryPointBlocked`),
   `RecomputeNavigationPath` (`:194/196`), the island destination built at the
   lowest height and snapped (`:356,359`), the mode 0-3 query (`:414/416`), the

@@ -31,17 +31,17 @@ engine::Wrapper gCraterLightingIntensityTwo(0.1f, 0.0f, 2.0f);
 engine::Wrapper gCraterLightingIntensityThree(0.05f, 0.0f, 2.0f);
 engine::Wrapper gCraterLightingIntensityFour(0.0f, 0.0f, 2.0f);
 
-// Players - Area light
-engine::Wrapper gPlayerBlasterLightingArea(3.0f, 1.0f, 8.0f);
-engine::Wrapper gPlayerBlasterLightingIntensity(2.5f, 0.0f, 6.0f);
+// Omnis - Area light
+engine::Wrapper gOmniBlasterLightingArea(3.0f, 1.0f, 8.0f);
+engine::Wrapper gOmniBlasterLightingIntensity(2.5f, 0.0f, 6.0f);
 
-// Players - Impact point light
-engine::Wrapper gPlayerImpactLightingAreaOne(2.0f, 1.0f, 4.0f);
-engine::Wrapper gPlayerImpactLightingAreaTwo(0.0f, 0.0f, 4.0f);
-engine::Wrapper gPlayerImpactLightingIntensityOne(0.0f, 0.0f, 2.0f);
-engine::Wrapper gPlayerImpactLightingIntensityTwo(0.0f, 0.0f, 2.0f);
+// Omnis - Impact point light
+engine::Wrapper gOmniImpactLightingAreaOne(2.0f, 1.0f, 4.0f);
+engine::Wrapper gOmniImpactLightingAreaTwo(0.0f, 0.0f, 4.0f);
+engine::Wrapper gOmniImpactLightingIntensityOne(0.0f, 0.0f, 2.0f);
+engine::Wrapper gOmniImpactLightingIntensityTwo(0.0f, 0.0f, 2.0f);
 
-// Players - Hex shield
+// Omnis - Hex shield
 engine::Wrapper gHexShieldLightingIntensity(4.0f, 0.0f, 8.0f);
 
 engine::Wrapper gMissileExhaustLightingArea(2.0f, 1.0f, 4.0f);
@@ -83,15 +83,15 @@ engine::Wrapper gCraterVisibleIntensityTwo(2.0f, 0.2f, 10.0f);
 engine::Wrapper gCraterVisibleIntensityThree(1.0f, 0.1f, 5.0f);
 engine::Wrapper gCraterVisibleIntensityFour(0.0f, 0.0f, 5.0f);
 
-engine::Wrapper gPlayerAreaLightVisibleIntensity(1.0f, 0.1f, 1.0f);
+engine::Wrapper gOmniAreaLightVisibleIntensity(1.0f, 0.1f, 1.0f);
 
-// Players - Impact point light
-engine::Wrapper gPlayerImpactVisibleAreaOne(0.675f, 0.07f, 3.5f);
-engine::Wrapper gPlayerImpactVisibleAreaTwo(0.0f, 0.0f, 3.5f);
-engine::Wrapper gPlayerImpactVisibleIntensityOne(1.0f, 0.1f, 5.0f);
-engine::Wrapper gPlayerImpactVisibleIntensityTwo(0.5f, 0.0f, 2.5f);
+// Omnis - Impact point light
+engine::Wrapper gOmniImpactVisibleAreaOne(0.675f, 0.07f, 3.5f);
+engine::Wrapper gOmniImpactVisibleAreaTwo(0.0f, 0.0f, 3.5f);
+engine::Wrapper gOmniImpactVisibleIntensityOne(1.0f, 0.1f, 5.0f);
+engine::Wrapper gOmniImpactVisibleIntensityTwo(0.5f, 0.0f, 2.5f);
 
-// Players - Hex shield
+// Omnis - Hex shield
 engine::Wrapper gHexShieldIntensityDecay(1.25f, 0.1f, 6.0f);
 
 engine::Wrapper gMissileExhaustVisibleIntensity(1.0f, 0.1f, 5.0f);

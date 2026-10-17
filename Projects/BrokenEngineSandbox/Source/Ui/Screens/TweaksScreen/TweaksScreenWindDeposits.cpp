@@ -11,15 +11,15 @@ namespace game
 
 const engine::TweaksSliderMapRegistrar gWindDepositsRegistrar
 {
-	{"Player Deposit Width", &gWindDepositPlayerWidth},
-	{"Player Deposit Intensity", &gWindDepositPlayerIntensity},
-	{"Player Deposit Length Multiplier", &gWindDepositPlayerLengthMultiplier},
+	{"Omni Deposit Width", &gWindDepositOmniWidth},
+	{"Omni Deposit Intensity", &gWindDepositOmniIntensity},
+	{"Omni Deposit Length Multiplier", &gWindDepositOmniLengthMultiplier},
 	{"Spaceships Deposit Width", &gWindDepositSpaceshipsWidth},
 	{"Spaceships Deposit Intensity", &gWindDepositSpaceshipsIntensity},
 	{"Spaceships Deposit Length Multiplier", &gWindDepositSpaceshipsLengthMultiplier},
-	{"Player Blasters Deposit Width", &gWindDepositPlayerBlastersWidth},
-	{"Player Blasters Deposit Intensity", &gWindDepositPlayerBlastersIntensity},
-	{"Blasters Deposit Length Multiplier", &gWindDepositPlayerBlastersLengthMultiplier},
+	{"Omni Blasters Deposit Width", &gWindDepositOmniBlastersWidth},
+	{"Omni Blasters Deposit Intensity", &gWindDepositOmniBlastersIntensity},
+	{"Blasters Deposit Length Multiplier", &gWindDepositOmniBlastersLengthMultiplier},
 	{"Spaceships Blasters Deposit Width", &gWindDepositSpaceshipsBlastersWidth},
 	{"Spaceships Blasters Deposit Intensity", &gWindDepositSpaceshipsBlastersIntensity},
 	{"Explosions Deposit Width", &gWindDepositExplosionsWidth},
@@ -30,19 +30,19 @@ void RenderWindDepositsTab(engine::TweaksScreen& rScreen)
 {
 	int64_t iSection = engine::giTweakSectionWind;
 
-	rScreen.WrapperSeparatorText("Player");
-	rScreen.WrapperSlider("Player Deposit Width", iSection);
-	rScreen.WrapperSlider("Player Deposit Intensity", iSection);
-	rScreen.WrapperSlider("Player Deposit Length Multiplier", iSection);
+	rScreen.WrapperSeparatorText("Omni");
+	rScreen.WrapperSlider("Omni Deposit Width", iSection);
+	rScreen.WrapperSlider("Omni Deposit Intensity", iSection);
+	rScreen.WrapperSlider("Omni Deposit Length Multiplier", iSection);
 
 	rScreen.WrapperSeparatorText("Spaceships");
 	rScreen.WrapperSlider("Spaceships Deposit Width", iSection);
 	rScreen.WrapperSlider("Spaceships Deposit Intensity", iSection);
 	rScreen.WrapperSlider("Spaceships Deposit Length Multiplier", iSection);
 
-	rScreen.WrapperSeparatorText("Player Blasters");
-	rScreen.WrapperSlider("Player Blasters Deposit Width", iSection);
-	rScreen.WrapperSlider("Player Blasters Deposit Intensity", iSection);
+	rScreen.WrapperSeparatorText("Omni Blasters");
+	rScreen.WrapperSlider("Omni Blasters Deposit Width", iSection);
+	rScreen.WrapperSlider("Omni Blasters Deposit Intensity", iSection);
 	rScreen.WrapperSlider("Blasters Deposit Length Multiplier", iSection);
 
 	rScreen.WrapperSeparatorText("Spaceships Blasters");

@@ -6,7 +6,7 @@ Context
 The engine renders terrain islands with elevation, color, normal, and AO
 textures but has no vegetation.  Trees and bushes would add visual depth
 and break up terrain flatness.  The existing ModelPipeline/DynamicPipelines
-pattern (used by Spaceships, Players, Missiles) supports instanced model
+pattern (used by Spaceships, Omnis, Missiles) supports instanced model
 rendering with per-instance storage buffers and indirect draw.  Islands
 already provide CPU heightmap data via IslandTerrain for elevation queries.
 
@@ -224,7 +224,7 @@ Notes
   state, no serialization, no CRC.  This keeps the server build
   completely unaffected
 - The TreeRenderer singleton pattern matches Islands (gpIslands) rather
-  than the collection pattern (Spaceships, Players) because trees are
+  than the collection pattern (Spaceships, Omnis) because trees are
   static world decoration, not dynamic game entities
 - The DataPacker placement phase uses a fixed random seed per island
   so tree positions are deterministic across builds

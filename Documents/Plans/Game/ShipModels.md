@@ -6,8 +6,8 @@ assets and their DataPacker intermediates, and rewires the client-only model
 selection, scale, and orientation constants in the three `*Render.cpp` files. No
 CRC'd state, wire format, save, or replay format changes; the server is
 untouched. Line numbers cite baseline `c1420821` where a file exists there;
-`Documents/Plans/Game/ShipTypeSplit.md` (prerequisite) renames `Players/` to
-`Omnis/` and `Spaceships/` to `Fighters/`, adds `Battleships/`, and introduces
+`Documents/Plans/Game/ShipTypeSplit.md` (prerequisite) renames `Spaceships/` to
+`Fighters/`, adds `Battleships/`, and introduces
 the per-controller model constants this Plan fills in, so carry its names
 forward. Where a statement here and the code disagree, the code wins; report the
 contradiction instead of matching one side to the other. Paths below `Frame/`
@@ -18,15 +18,15 @@ mean `Projects/BrokenEngineSandbox/Source/Frame/`; `Models/` means
 
 `ShipTypeSplit` decision 17 gives every ship type two render pipelines, one per
 `ShipController`, but fills both with placeholders: fleet rows draw
-`data::kModelsspaceship2scenegltfCrc` (today's Player model,
-`PlayersRender.cpp:19-20`, scale `0.3667f`) and random rows draw
+`data::kModelsspaceship2scenegltfCrc` (today's Omni model,
+`OmnisRender.cpp:19-20`, scale `0.3667f`) and random rows draw
 `data::kModelsSpaceshipscenegltfCrc` (today's Spaceship model,
 `SpaceshipsRender.cpp:15-16`, scale `0.00175f`), with Battleships at three times
 both scales. So a fleet Fighter, a fleet Omni, and a fleet Battleship all look
 alike apart from size, and so do the three random types.
 
 The user decided (this session, binding): each type gets two distinct models,
-one for human-fleet ships and one for random spawns, so the two are told apart
+one for client-fleet ships and one for random spawns, so the two are told apart
 at a glance. Sizes: Battleship large and battleship-like (lowest flight plane),
 Omni medium and omni-directional, Fighter small and including an airplane-like
 craft. The existing `spaceship2` (JCarvajal, CC-BY-4.0) is one of the two Omni
@@ -42,7 +42,7 @@ Pipeline facts the design rests on (verified at baseline):
 - At most 64 textures and 128 materials per scene (`Common/DataFile.h:93-94`); one node-referenced skin (`DataPacker/Source/ExportJobs/AGENTS.md` `## Scene and Model`).
 - Scene textures are encoded from the images tinygltf decodes (`ExportScene.cpp:498-503`), so `.png`, `.jpg`, and `.jpeg` references all work (`Models/aim-9_missile` uses `.jpeg`).
 - Pre-export writes tracked `scene.gltf.MODEL`, `scene.gltf.PreExport`, and `scene.gltf.Texture<N>.<FORMAT>` intermediates beside the source (`DataPacker/Source/ExportJobs/AGENTS.md` `## Scene and Model`); `.gitattributes` already marks every such suffix binary. The generated symbol is the relative path with non-alphanumerics dropped: `Models/Spaceship/scene.gltf` is `data::kModelsSpaceshipscenegltfCrc`.
-- Rendered size is `radius * kfModelScale` applied as a uniform scale to the model's native units (`SpaceshipsRender.cpp:162,172`; `PlayersRender.cpp:230,240`); orientation fixups are hard-coded per model (`SpaceshipsRender.cpp:94` `smatPreRotate = RotationX(PI/2) * RotationY(0) * RotationZ(PI/2)`; `PlayersRender.cpp:242-243` `RotationX(PI/2)`, `RotationY(0)`). Forward is `+X` before yaw (`common::RotationMatrixFromDirection(dir, {1,0,0,0})`, `SpaceshipsRender.cpp:174`).
+- Rendered size is `radius * kfModelScale` applied as a uniform scale to the model's native units (`SpaceshipsRender.cpp:162,172`; `OmnisRender.cpp:230,240`); orientation fixups are hard-coded per model (`SpaceshipsRender.cpp:94` `smatPreRotate = RotationX(PI/2) * RotationY(0) * RotationZ(PI/2)`; `OmnisRender.cpp:242-243` `RotationX(PI/2)`, `RotationY(0)`). Forward is `+X` before yaw (`common::RotationMatrixFromDirection(dir, {1,0,0,0})`, `SpaceshipsRender.cpp:174`).
 - Each existing model folder carries Sketchfab's `license.txt` sidecar (`Models/spaceship2/license.txt`); `Projects/BrokenEngineSandbox/Data/AGENTS.md` requires one per asset.
 - `Projects/BrokenEngineSandbox/Data` is inside the session worktree's sparse checkout (only `Engine/Data/Islands` and `Engine/Data/Textures` are excluded) and the repository has no Git LFS rules; the existing model folders already track 3-5 MB textures directly, so the new folders are tracked the same way.
 
@@ -62,8 +62,8 @@ Each decision is recorded as made; the alternatives are not open.
    | Battleship | `kRandomSpawn` | `LowPolyBattleship` (new) | Low poly battleship | `https://sketchfab.com/3d-models/low-poly-battleship-8d5e7633b6084c5f947f7134c495a59b` | minehffd (`https://sketchfab.com/minehffd`) | CC-BY-4.0 | 19.3k triangles |
 
    Fleet-versus-random assignment is the trivial choice: the two existing models
-   keep the controller they already draw (`spaceship2` was the human Player,
-   `Spaceship` the random Spaceship), the airplane goes to the human fleet
+   keep the controller they already draw (`spaceship2` was the client-owned Omni,
+   `Spaceship` the random Spaceship), the airplane goes to the client-owned fleet
    because it is the model the user named, and the Battleship with emissive
    detail goes to the fleet. No franchise-derived model (Star Wars, StarCraft)
    was chosen because the uploader's CC licence cannot clear the underlying IP.
@@ -146,7 +146,7 @@ Omnis mirror this with
 `kModelsLowPolyBattleshipscenegltfCrc` for `kRandomSpawn`, both scaled from
 `kfBattleshipRadius`. Inside each `Render`, the per-row `fSize` and pre-rotation
 come from the row's controller, the same branch that already selects the
-pipeline. The animation-clock lookup (`Players.cpp:516-518`,
+pipeline. The animation-clock lookup (`Omnis.cpp:516-518`,
 `Spaceships.cpp:263-265` at baseline, per-model after `ShipTypeSplit`) keeps
 using the row's own model CRC; none of the four new models carries an animation,
 so the clock stays inert for them.

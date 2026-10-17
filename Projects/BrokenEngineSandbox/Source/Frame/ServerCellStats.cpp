@@ -6,7 +6,7 @@
 
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Profile/ProfileRows.h"
 #include "Game.h"
@@ -22,7 +22,7 @@ ServerCellStats GetServerCellStatistics(const Frame& rFrame)
 		.durationCurrentTime = std::chrono::duration<float>(common::NanosecondsToFloatSeconds<float>(engine::TickToSimulationTime(rFrame.interpolate.iTick).time_since_epoch())),
 		.iExplosions = rFrame.interpolate.explosions.iCount,
 	};
-	cellStatistics.entityCounts[std::to_underlying(ServerEntityCount::kPlayers)] = rFrame.interpolate.pPlayers->iCount;
+	cellStatistics.entityCounts[std::to_underlying(ServerEntityCount::kOmnis)] = rFrame.interpolate.pOmnis->iCount;
 	cellStatistics.entityCounts[std::to_underlying(ServerEntityCount::kSpaceships)] = rFrame.interpolate.pSpaceships->iCount;
 	cellStatistics.entityCounts[std::to_underlying(ServerEntityCount::kBlasters)] = rFrame.interpolate.pBlasters->iCount;
 	cellStatistics.entityCounts[std::to_underlying(ServerEntityCount::kMissiles)] = rFrame.interpolate.pMissiles->iCount;
@@ -47,7 +47,7 @@ void PublishServerEntityCounts()
 		}
 	}
 
-	gpProfileManager->GetCpuCounter(kCpuCounterPlayers).iCount = totalEntityCounts[std::to_underlying(ServerEntityCount::kPlayers)];
+	gpProfileManager->GetCpuCounter(kCpuCounterOmnis).iCount = totalEntityCounts[std::to_underlying(ServerEntityCount::kOmnis)];
 	gpProfileManager->GetCpuCounter(kCpuCounterSpaceships).iCount = totalEntityCounts[std::to_underlying(ServerEntityCount::kSpaceships)];
 	gpProfileManager->GetCpuCounter(kCpuCounterBlasters).iCount = totalEntityCounts[std::to_underlying(ServerEntityCount::kBlasters)];
 	gpProfileManager->GetCpuCounter(kCpuCounterMissiles).iCount = totalEntityCounts[std::to_underlying(ServerEntityCount::kMissiles)];

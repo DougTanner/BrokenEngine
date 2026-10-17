@@ -7,17 +7,17 @@ Game-specific SOA collections built on the engine Collection framework (`../../.
 ## Game-Specific Rules
 
 - Transferable entity collections resolve collision/terrain outcomes before marking surviving out-of-bounds rows for Transfer.
-- Players and Spaceships stop at terrain in PostRender Update: each sweeps its
+- Omnis and Spaceships stop at terrain in PostRender Update: each sweeps its
   disc from the previous to the current Interpolate position against the cell's
   elevation grid, blocked at the lowest flight plane, and writes the resolved
-  position back to the current Interpolate row. On contact Players slide along
+  position back to the current Interpolate row. On contact Omnis slide along
   the terrain once and Spaceships bounce off it. A start already inside terrain
   logs a warning; spawn sites test at most the body's center against terrain, so
   a warning right after a spawn is expected.
-- Collections with client-owned visual/audio objects hydrate them after shared state arrives. Players instead recreate missing owned visuals during Update. Hydration is filling a newly allocated collection slot from transferred or loaded data.
-- Players and Spaceships receive a fresh one-second arrival grace timer after transfer. It suppresses targeting and behavior scans, not collision or damage.
+- Collections with client-owned visual/audio objects hydrate them after shared state arrives. Omnis instead recreate missing owned visuals during Update. Hydration is filling a newly allocated collection slot from transferred or loaded data.
+- Omnis and Spaceships receive a fresh one-second arrival grace timer after transfer. It suppresses targeting and behavior scans, not collision or damage.
 - A transfer arrival restores carried gameplay state verbatim except arrival
-  grace, which is an intentional fresh one-second arrival default, Players'
+  grace, which is an intentional fresh one-second arrival default, Omnis'
   navigation state, which resets to spawn defaults, Spaceships' previous-frame
   reaction flags, which restart from defaults, and client-only visual or debug
   tuning and shield animation state, which use canonical client defaults; other
@@ -43,7 +43,7 @@ Game-specific SOA collections built on the engine Collection framework (`../../.
 
 ## Collections
 
-- `Blasters/AGENTS.md`, `Missiles/AGENTS.md`, `Players/AGENTS.md`, `Spaceships/AGENTS.md`
+- `Blasters/AGENTS.md`, `Missiles/AGENTS.md`, `Omnis/AGENTS.md`, `Spaceships/AGENTS.md`
 
 ## See Also
 

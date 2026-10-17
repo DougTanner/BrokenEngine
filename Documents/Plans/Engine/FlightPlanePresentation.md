@@ -69,7 +69,7 @@ After `Documents/Plans/Game/FlightPlaneClimbing.md` a ship's position Z is a pla
   lighting field, which nothing else in the series adds.
 - Audio: the manual fade and culling measure 3D distance to the camera eye (`StaticVoices.cpp:113,326,701`); X3DAudio pan and Doppler use a listener on the lowest plane facing -Z (`:573-584`) and the emitter's full 3D position (`StaticVoices.cpp:664-679`). A ship 94 m above that plane is "behind" the listener's -Z front and its azimuth collapses toward centre.
 - Debug: the post-split home of `RenderNavigation` (today
-  `Frame/Collections/Players/PlayersRender.cpp:136-175`) flattens the waypoint
+  `Frame/Collections/Omnis/OmnisRender.cpp:136-175`) flattens the waypoint
   line end, the flagship circle, and the island destination circle to the lowest
   plane (`:155,165,172`), so a high ship's markers float 94 m below it. The
   cell-edge and island-boundary debug lines in

@@ -43,7 +43,7 @@ static void SerializeMissileTransfer(uint8_t*& rpCursor, const game::TransferDat
 	engine::WriteFloat(rpCursor, rData.fPitch);
 }
 
-static void SerializePlayerTransfer(uint8_t*& rpCursor, const game::TransferData& rData)
+static void SerializeOmniTransfer(uint8_t*& rpCursor, const game::TransferData& rData)
 {
 	engine::WriteVector4(rpCursor, rData.vecPosition);
 	engine::WriteVector4(rpCursor, rData.vecDirection);
@@ -56,7 +56,7 @@ static void SerializePlayerTransfer(uint8_t*& rpCursor, const game::TransferData
 	engine::WriteFloat(rpCursor, rData.shieldCooldownSeconds.count());
 	engine::WriteFloat(rpCursor, rData.shieldDownSoundCooldownSeconds.count());
 	engine::WriteFloat(rpCursor, rData.animationTimeSeconds.count());
-	engine::WriteUint16(rpCursor, rData.uiPlayerFlags);
+	engine::WriteUint16(rpCursor, rData.uiOmniFlags);
 	engine::WriteFloat(rpCursor, rData.navigationDelaySeconds.count());
 	engine::WriteInt64(rpCursor, rData.globalId.iValue);
 	engine::WriteGridCoord(rpCursor, rData.fleetWantedCoordinate);
@@ -98,7 +98,7 @@ static void DeserializeMissileTransfer(const uint8_t*& rpCursor, game::TransferD
 	rData.fPitch = engine::ReadFloat(rpCursor);
 }
 
-static void DeserializePlayerTransfer(const uint8_t*& rpCursor, game::TransferData& rData)
+static void DeserializeOmniTransfer(const uint8_t*& rpCursor, game::TransferData& rData)
 {
 	rData.vecPosition = engine::ReadVector4(rpCursor);
 	rData.vecDirection = engine::ReadVector4(rpCursor);
@@ -111,7 +111,7 @@ static void DeserializePlayerTransfer(const uint8_t*& rpCursor, game::TransferDa
 	rData.shieldCooldownSeconds = std::chrono::duration<float>(engine::ReadFloat(rpCursor));
 	rData.shieldDownSoundCooldownSeconds = std::chrono::duration<float>(engine::ReadFloat(rpCursor));
 	rData.animationTimeSeconds = std::chrono::duration<float>(engine::ReadFloat(rpCursor));
-	rData.uiPlayerFlags = engine::ReadUint16(rpCursor);
+	rData.uiOmniFlags = engine::ReadUint16(rpCursor);
 	rData.navigationDelaySeconds = std::chrono::duration<float>(engine::ReadFloat(rpCursor));
 	rData.globalId.iValue = engine::ReadInt64(rpCursor);
 	rData.fleetWantedCoordinate = engine::ReadGridCoord(rpCursor);
@@ -125,9 +125,9 @@ void WriteStatusChangePayload(uint8_t*& rpCursor, const StatusChange& rChange)
 
 	switch (rChange.eType)
 	{
-		case game::StatusChangeType::kSpawnPlayer:
+		case game::StatusChangeType::kSpawnOmni:
 		{
-			const game::SpawnPlayerData& rSpawn = std::get<game::SpawnPlayerData>(rData);
+			const game::SpawnOmniData& rSpawn = std::get<game::SpawnOmniData>(rData);
 			engine::WriteInt64(rpCursor, rSpawn.iGlobalId);
 			engine::WriteUint8(rpCursor, rSpawn.bIsFlagship ? 1 : 0);
 			engine::WriteGridCoord(rpCursor, rSpawn.fleetWantedCoordinate);
@@ -145,16 +145,16 @@ void WriteStatusChangePayload(uint8_t*& rpCursor, const StatusChange& rChange)
 		case game::StatusChangeType::kTransferMissile:
 			SerializeMissileTransfer(rpCursor, std::get<game::TransferData>(rData));
 			break;
-		case game::StatusChangeType::kTransferPlayer:
-			SerializePlayerTransfer(rpCursor, std::get<game::TransferData>(rData));
+		case game::StatusChangeType::kTransferOmni:
+			SerializeOmniTransfer(rpCursor, std::get<game::TransferData>(rData));
 			break;
-		case game::StatusChangeType::kDestroyPlayer:
-			engine::WriteInt64(rpCursor, std::get<game::DestroyPlayerData>(rData).iPlayerUuid);
+		case game::StatusChangeType::kDestroyOmni:
+			engine::WriteInt64(rpCursor, std::get<game::DestroyOmniData>(rData).iOmniUuid);
 			break;
-		case game::StatusChangeType::kUpdatePlayer:
+		case game::StatusChangeType::kUpdateOmni:
 		{
-			const game::UpdatePlayerData& rUpdate = std::get<game::UpdatePlayerData>(rData);
-			engine::WriteInt64(rpCursor, rUpdate.iPlayerUuid);
+			const game::UpdateOmniData& rUpdate = std::get<game::UpdateOmniData>(rData);
+			engine::WriteInt64(rpCursor, rUpdate.iOmniUuid);
 			engine::WriteUint8(rpCursor, rUpdate.bUseMissiles ? 1 : 0);
 			engine::WriteFloat(rpCursor, rUpdate.navigationDelaySeconds.count());
 			engine::WriteUint8(rpCursor, rUpdate.uiPendingWeaponModeTicks);
@@ -163,7 +163,7 @@ void WriteStatusChangePayload(uint8_t*& rpCursor, const StatusChange& rChange)
 		case game::StatusChangeType::kUpdateFleet:
 		{
 			const game::UpdateFleetData& rUpdate = std::get<game::UpdateFleetData>(rData);
-			engine::WriteInt64(rpCursor, rUpdate.iPlayerUuid);
+			engine::WriteInt64(rpCursor, rUpdate.iOmniUuid);
 			engine::WriteUint8(rpCursor, rUpdate.bIsFlagship ? 1 : 0);
 			engine::WriteGridCoord(rpCursor, rUpdate.fleetWantedCoordinate);
 			engine::WriteUint8(rpCursor, rUpdate.uiPendingFleetWantedCoordinateTicks);
@@ -178,9 +178,9 @@ void ReadStatusChangePayload(const uint8_t*& rpCursor, StatusChange& rChange)
 
 	switch (rChange.eType)
 	{
-		case game::StatusChangeType::kSpawnPlayer:
+		case game::StatusChangeType::kSpawnOmni:
 		{
-			game::SpawnPlayerData& rSpawn = std::get<game::SpawnPlayerData>(rChange.data);
+			game::SpawnOmniData& rSpawn = std::get<game::SpawnOmniData>(rChange.data);
 			rSpawn.iGlobalId = engine::ReadInt64(rpCursor);
 			rSpawn.bIsFlagship = engine::ReadUint8(rpCursor) != 0;
 			rSpawn.fleetWantedCoordinate = engine::ReadGridCoord(rpCursor);
@@ -198,16 +198,16 @@ void ReadStatusChangePayload(const uint8_t*& rpCursor, StatusChange& rChange)
 		case game::StatusChangeType::kTransferMissile:
 			DeserializeMissileTransfer(rpCursor, std::get<game::TransferData>(rChange.data));
 			break;
-		case game::StatusChangeType::kTransferPlayer:
-			DeserializePlayerTransfer(rpCursor, std::get<game::TransferData>(rChange.data));
+		case game::StatusChangeType::kTransferOmni:
+			DeserializeOmniTransfer(rpCursor, std::get<game::TransferData>(rChange.data));
 			break;
-		case game::StatusChangeType::kDestroyPlayer:
-			std::get<game::DestroyPlayerData>(rChange.data).iPlayerUuid = engine::ReadInt64(rpCursor);
+		case game::StatusChangeType::kDestroyOmni:
+			std::get<game::DestroyOmniData>(rChange.data).iOmniUuid = engine::ReadInt64(rpCursor);
 			break;
-		case game::StatusChangeType::kUpdatePlayer:
+		case game::StatusChangeType::kUpdateOmni:
 		{
-			game::UpdatePlayerData& rUpdate = std::get<game::UpdatePlayerData>(rChange.data);
-			rUpdate.iPlayerUuid = engine::ReadInt64(rpCursor);
+			game::UpdateOmniData& rUpdate = std::get<game::UpdateOmniData>(rChange.data);
+			rUpdate.iOmniUuid = engine::ReadInt64(rpCursor);
 			rUpdate.bUseMissiles = engine::ReadUint8(rpCursor) != 0;
 			rUpdate.navigationDelaySeconds = std::chrono::duration<float>(engine::ReadFloat(rpCursor));
 			rUpdate.uiPendingWeaponModeTicks = engine::ReadUint8(rpCursor);
@@ -216,7 +216,7 @@ void ReadStatusChangePayload(const uint8_t*& rpCursor, StatusChange& rChange)
 		case game::StatusChangeType::kUpdateFleet:
 		{
 			game::UpdateFleetData& rUpdate = std::get<game::UpdateFleetData>(rChange.data);
-			rUpdate.iPlayerUuid = engine::ReadInt64(rpCursor);
+			rUpdate.iOmniUuid = engine::ReadInt64(rpCursor);
 			rUpdate.bIsFlagship = engine::ReadUint8(rpCursor) != 0;
 			rUpdate.fleetWantedCoordinate = engine::ReadGridCoord(rpCursor);
 			rUpdate.uiPendingFleetWantedCoordinateTicks = engine::ReadUint8(rpCursor);

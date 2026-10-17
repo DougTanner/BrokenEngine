@@ -18,7 +18,7 @@ struct StatusChange;
 
 struct ReplayTransferCaptureCounts
 {
-	int64_t iPlayerCount = 0;
+	int64_t iOmniCount = 0;
 	int64_t iSpaceshipCount = 0;
 	int64_t iBlasterCount = 0;
 	int64_t iMissileCount = 0;

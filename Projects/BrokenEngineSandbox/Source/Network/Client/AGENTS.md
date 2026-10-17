@@ -6,7 +6,7 @@ Client-only game networking. `ClientSession` is the game-policy wrapper over `en
 
 - Engine-owned: connection/GUID/discovery, subscription and clock state, generic full-state/delta adoption, the received-update ring/buffer/confirmation mechanics and drain order, clock correction, the per-coordinate reconcile work list and its parallel dispatch, and the desync record's declaration, reported-desync selection, and remaining core.
 - `ClientSession` triggers desired-coordinate updates on game events, applies static data (also requesting matching terrain textures), hydrates gameplay state with smoke continuity, and owns reconciliation policy and resync reset sequencing.
-- `ClientReconciler` runs one engine reconcile dispatch per client update and owns what stays game-side: confirmed client-state tracking, filling in the engine-owned desync record handed back to the session, and the visual-error aggregation and cross-coordinate player-transfer migration it computes from the dispatch result.
+- `ClientReconciler` runs one engine reconcile dispatch per client update and owns what stays game-side: confirmed client-state tracking, filling in the engine-owned desync record handed back to the session, and the visual-error aggregation and cross-coordinate owned-entity transfer migration it computes from the dispatch result.
 
 ## Session Policy
 
@@ -20,7 +20,7 @@ Client-only game networking. `ClientSession` is the game-policy wrapper over `en
 
 - A server-validated tick is frozen and never simulated again; preserve render-behind history when advancing confirmed state. Replay and catch-up stay within the coordinate ring budget: the retained authoritative base holds one ring slot, so combined replay and catch-up writes are one less than the ring size and never wrap onto the base.
 - Server-load notification clears coord (kept while the harness viewer pin is set), clock, identity, fleet, subscription, and reconciler state before the client accepts post-load data.
-- Player-event and fleet-sync handlers have independent exception boundaries, each splitting corrupt data from an ordinary local failure under the hub's corrupt-input policy (`../../../../../Engine/Source/Network/AGENTS.md`). Static-data application and per-frame gameplay hydration remain outside those catches.
+- Owned-entity event and fleet-sync handlers have independent exception boundaries, each splitting corrupt data from an ordinary local failure under the hub's corrupt-input policy (`../../../../../Engine/Source/Network/AGENTS.md`). Static-data application and per-frame gameplay hydration remain outside those catches.
 - Desired subscriptions stay sticky to reduce visible churn. During a real debug-frame wait, transport polling and receive-buffer drains continue while subscription updates, simulation, and reconciliation remain stalled.
 
 Speculative and provisional CRC mismatches log at `kDebug`. Only a mismatch that

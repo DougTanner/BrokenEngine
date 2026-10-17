@@ -186,7 +186,7 @@ its two-column panel remains usable at the largest setting.
 
 The HUD panels are the canonical "hug content" example: their height auto-sizes
 to the fleet member list, capped at kfHudPanelMaximumHeightFraction of the screen
-(long lists scroll). The right FocusedPlayer panel then matches the left panel's
+(long lists scroll). The right FocusedOwnedEntity panel then matches the left panel's
 live height for symmetry rather than hugging its own smaller content.
 
 Files:
@@ -291,13 +291,13 @@ alignment, scale ratios, whitespace, and whether every visible element earns
 its space.
 
 Screen-specific commitments this contract makes, each verified visually:
-  - HUD: left and right panels are symmetric — the right FocusedPlayer panel
+  - HUD: left and right panels are symmetric — the right FocusedOwnedEntity panel
     matches the left Fleet panel's live size rather than hugging its own
     (smaller) content; symmetry beats content-hugging on the right.
   - HUD: the mouse-proximity activation zone is a fixed-extent strip
     (kfHudPanelMaximumHeightFraction of the screen at the anchor), decoupled from
     the live panel size, so hover behavior is unchanged as panels shrink.
-  - HUD: the focused-player weapon action is centered within the right panel's
+  - HUD: the focused owned-entity weapon action is centered within the right panel's
     live content area while the panel continues to match the left panel's size.
   - Pause: the title and uniform-width primary actions float directly over the
     full-screen dim; the transparent layout window has no decorative panel.

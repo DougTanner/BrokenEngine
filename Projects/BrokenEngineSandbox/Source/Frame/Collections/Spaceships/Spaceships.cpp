@@ -9,7 +9,7 @@
 #include "Ui/WrapperBase.h"
 
 #include "Frame/Collections/Blasters/Blasters.h"
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Frame/HealthDamage.h"
 #include "Profile/ProfileRows.h"
 #include "Ui/ParticleWrappers.h"
@@ -63,7 +63,7 @@ constexpr float kfSpaceshipExplosionParticleIntensityDecay = 2.4f;
 constexpr float kfSpaceshipExplosionTrailLengthRandom = kfSpaceshipRadius * 1.25f;
 constexpr int64_t kiSpaceshipExplosionSecondaryCount = 1;
 
-constexpr float kfSpawnBlasterPlayerAngle = 0.1f;
+constexpr float kfSpawnBlasterOmniAngle = 0.1f;
 constexpr float kfBlastersSpeed = 50.0f;
 constexpr std::chrono::duration<float> kBlastersSpawnCooldown = std::chrono::duration<float>(1.0f);
 
@@ -74,29 +74,29 @@ constexpr float kfEnemyBlasterSize = kfSpaceshipRadius * 0.15f;
 constexpr std::chrono::duration<float> kHitFlashDuration(0.3f);
 #endif // BT_CLIENT
 
-// Returns false when no player is both non-exploding and outside arrival grace.
-[[nodiscard]] bool XM_CALLCONV NearestAlivePlayerPosition(const PlayersInterpolate& rPlayers, const PlayersPostRender& rPlayersPostRender, FXMVECTOR vecFrom, XMVECTOR& rVecResult)
+// Returns false when no omni is both non-exploding and outside arrival grace.
+[[nodiscard]] bool XM_CALLCONV NearestAliveOmniPosition(const OmnisInterpolate& rOmnis, const OmnisPostRender& rOmnisPostRender, FXMVECTOR vecFrom, XMVECTOR& rVecResult)
 {
 	float fClosestDistanceSquared = std::numeric_limits<float>::max();
 	bool bFound = false;
 
-	for (int64_t i = 0; i < rPlayers.iCount; ++i)
+	for (int64_t i = 0; i < rOmnis.iCount; ++i)
 	{
-		if (rPlayersPostRender.pFlags[i] & PlayerFlags::kExploding)
+		if (rOmnisPostRender.pFlags[i] & OmniFlags::kExploding)
 		{
 			continue;
 		}
 
-		if (rPlayersPostRender.pArrivalGracePeriods[i] > std::chrono::duration<float>::zero())
+		if (rOmnisPostRender.pArrivalGracePeriods[i] > std::chrono::duration<float>::zero())
 		{
 			continue;
 		}
 
-		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(rPlayers.pVecPositions[i], vecFrom)));
+		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(rOmnis.pVecPositions[i], vecFrom)));
 		if (fDistanceSquared < fClosestDistanceSquared)
 		{
 			fClosestDistanceSquared = fDistanceSquared;
-			rVecResult = rPlayers.pVecPositions[i];
+			rVecResult = rOmnis.pVecPositions[i];
 			bFound = true;
 		}
 	}
@@ -413,8 +413,8 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
 
-	const PlayersInterpolate& rPlayers = *rFrame.interpolate.pPlayers;
-	const PlayersPostRender& rPlayersPostRender = *rFrame.postRender.pPlayers;
+	const OmnisInterpolate& rOmnis = *rFrame.interpolate.pOmnis;
+	const OmnisPostRender& rOmnisPostRender = *rFrame.postRender.pOmnis;
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
@@ -438,22 +438,22 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 			continue;
 		}
 
-		XMVECTOR vecNearestPlayer = XMVectorZero();
-		if (!NearestAlivePlayerPosition(rPlayers, rPlayersPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestPlayer))
+		XMVECTOR vecNearestOmni = XMVectorZero();
+		if (!NearestAliveOmniPosition(rOmnis, rOmnisPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestOmni))
 		{
 			continue;
 		}
 
-		if (!FrameInterpolate::IsVisible(vecNearestPlayer, rCurrentInterpolate.pVecPositions[i]))
+		if (!FrameInterpolate::IsVisible(vecNearestOmni, rCurrentInterpolate.pVecPositions[i]))
 		{
 			continue;
 		}
 
-		XMVECTOR vecToPlayer = XMVectorSubtract(vecNearestPlayer, rCurrentInterpolate.pVecPositions[i]);
-		XMVECTOR vecToPlayerNormal = XMVector3Normalize(vecToPlayer);
-		float fAngleToPlayer = XMVectorGetX(XMVector3AngleBetweenNormals(rCurrentInterpolate.pVecDirections[i], vecToPlayerNormal));
+		XMVECTOR vecToOmni = XMVectorSubtract(vecNearestOmni, rCurrentInterpolate.pVecPositions[i]);
+		XMVECTOR vecToOmniNormal = XMVector3Normalize(vecToOmni);
+		float fAngleToOmni = XMVectorGetX(XMVector3AngleBetweenNormals(rCurrentInterpolate.pVecDirections[i], vecToOmniNormal));
 
-		bool bSpawnBlaster = fAngleToPlayer <= kfSpawnBlasterPlayerAngle;
+		bool bSpawnBlaster = fAngleToOmni <= kfSpawnBlasterOmniAngle;
 
 		if (rCurrentPostRender.pNextBlasterSpawnTimes[i] < std::chrono::duration<float>::zero() && bSpawnBlaster)
 		{
@@ -571,9 +571,9 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	const SpaceshipsPostRender& rPrevious = *rPreviousFrame.postRender.pSpaceships;
 	const SpaceshipsInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pSpaceships;
-	// Steering and health regeneration use previous-frame players; AvoidTerrain and Spawn use current-frame players.
-	const PlayersInterpolate& rPlayers = *rPreviousFrame.interpolate.pPlayers;
-	const PlayersPostRender& rPlayersPostRender = *rPreviousFrame.postRender.pPlayers;
+	// Steering and health regeneration use previous-frame omnis; AvoidTerrain and Spawn use current-frame omnis.
+	const OmnisInterpolate& rOmnis = *rPreviousFrame.interpolate.pOmnis;
+	const OmnisPostRender& rOmnisPostRender = *rPreviousFrame.postRender.pOmnis;
 	std::chrono::duration<float> deltaTime(rFrame.interpolate.fDeltaTime);
 
 	// Island centers and base height are fixed for this cell's tick; the per-thread workbuffer shares candidates across ships.
@@ -606,19 +606,19 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 			}
 			else
 			{
-				XMVECTOR vecNearestPlayer = XMVectorZero();
-				bool bPlayerAlive = NearestAlivePlayerPosition(rPlayers, rPlayersPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestPlayer);
+				XMVECTOR vecNearestOmni = XMVectorZero();
+				bool bOmniAlive = NearestAliveOmniPosition(rOmnis, rOmnisPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestOmni);
 
-				RegenerateHealth(rCurrentInterpolate.pVecPositions[i], bPlayerAlive, vecNearestPlayer, flags, deltaTime, fHealth);
-				ComputeSteering(islandCandidates, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], bPlayerAlive, vecNearestPlayer, deltaTime, flags, fDeltaRotation);
+				RegenerateHealth(rCurrentInterpolate.pVecPositions[i], bOmniAlive, vecNearestOmni, flags, deltaTime, fHealth);
+				ComputeSteering(islandCandidates, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], bOmniAlive, vecNearestOmni, deltaTime, flags, fDeltaRotation);
 				ApplyMovement(rFrame, rCurrentInterpolate, i, flags, deltaTime, vecVelocity);
 			}
 		}
 		else
 		{
-			XMVECTOR vecNearestPlayer = XMVectorZero();
-			bool bPlayerAlive = NearestAlivePlayerPosition(rPlayers, rPlayersPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestPlayer);
-			RegenerateHealth(rCurrentInterpolate.pVecPositions[i], bPlayerAlive, vecNearestPlayer, flags, deltaTime, fHealth);
+			XMVECTOR vecNearestOmni = XMVectorZero();
+			bool bOmniAlive = NearestAliveOmniPosition(rOmnis, rOmnisPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestOmni);
+			RegenerateHealth(rCurrentInterpolate.pVecPositions[i], bOmniAlive, vecNearestOmni, flags, deltaTime, fHealth);
 			vecVelocity = XMVectorScale(XMVectorNegate(rPrevious.pVecDamageDirections[i]), kfDeathKnockbackSpeed);
 		}
 

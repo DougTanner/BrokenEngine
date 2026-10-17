@@ -25,7 +25,7 @@ orchestration for `inject_payload`, `replay_record`, `replay_play`,
   `../../../../Engine/Source/Network/Client/AGENTS.md`). The client Debug audio
   streaming handler owns that command's validation, action dispatch, result
   assembly, and deferred replies; the engine Agent owns its audio/File state and
-  hooks. Cell moves require a connected session whose player is already
+  hooks. Cell moves require a connected session whose owned entity is already
   assigned, because before assignment the client subscription policy falls back
   to origin and discards the requested cell.
 - Server handlers own simulation controls, status-change injection, frame and CPU profile queries, and save/replay operations. Their focused simulation-harness-rig module owns one state slot bound to the live `ServerSession`, including the coordinate-keyed status and transfer queues that `inject_payload` fills; replacing or destroying the bound session clears that state (`../../Documents/AgentHarness/commands-server.md`).
@@ -39,7 +39,7 @@ orchestration for `inject_payload`, `replay_record`, `replay_play`,
   is added to or removed from that collection's list; the list's `static_assert`
   against its pair's `Members()` fails until it is. A server-visible collection
   pair added to any frame tuple, or an explicitly dispatched pair added beside
-  `pPlayers` to the shared `FrameCollections` helper, fails the server build
+  `pOmnis` to the shared `FrameCollections` helper, fails the server build
   until a `FrameCollection` specialization names it and its column list, the
   only per-collection code; add its name to the `edit_frame` collection names of
   [`commands-server.md`](../../Documents/AgentHarness/commands-server.md). A new

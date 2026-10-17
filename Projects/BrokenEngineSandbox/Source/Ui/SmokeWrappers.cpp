@@ -29,10 +29,10 @@ engine::Wrapper gBlasterPuffAreaEnd(1.0f, 0.08f, 3.75f);
 engine::Wrapper gBlasterPuffIntensityStart(4.0f, 0.6f, 30.0f);
 engine::Wrapper gBlasterPuffIntensityEnd(1.0f, 0.05f, 2.5f);
 
-engine::Wrapper gPlayerImpactPuffAreaOne(0.135f, 0.01f, 0.7f);
-engine::Wrapper gPlayerImpactPuffAreaTwo(0.45f, 0.05f, 2.25f);
-engine::Wrapper gPlayerImpactPuffIntensityOne(4.0f, 0.4f, 20.0f);
-engine::Wrapper gPlayerImpactPuffIntensityTwo(0.0f, 0.0f, 20.0f);
+engine::Wrapper gOmniImpactPuffAreaOne(0.135f, 0.01f, 0.7f);
+engine::Wrapper gOmniImpactPuffAreaTwo(0.45f, 0.05f, 2.25f);
+engine::Wrapper gOmniImpactPuffIntensityOne(4.0f, 0.4f, 20.0f);
+engine::Wrapper gOmniImpactPuffIntensityTwo(0.0f, 0.0f, 20.0f);
 
 engine::Wrapper gMissileTrailIntensity(0.5f, 0.05f, 2.5f);
 

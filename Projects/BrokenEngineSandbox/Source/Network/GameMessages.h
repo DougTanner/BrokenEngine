@@ -1,59 +1,59 @@
 #pragma once
 
-#include "Network/PlayerEvents.h"
+#include "Network/OwnedEntityEvents.h"
 #include "Fleet.h"
 
 namespace game::GameMessages
 {
 
-struct AssignPlayerMessage
+struct AssignOwnedEntityMessage
 {
 	static constexpr int64_t kiSize = sizeof(int64_t) + engine::NetworkMessages::kiGridCoordSize;
 	static_assert(kiSize == 16);
 
-	int64_t iGlobalPlayerIdentifier = 0;
+	int64_t iGlobalIdentifier = 0;
 	engine::GridCoord coordinate {};
 
 	template <typename TVISITOR>
-	static void Visit(TVISITOR& rVisitor, AssignPlayerMessage& rMessage)
+	static void Visit(TVISITOR& rVisitor, AssignOwnedEntityMessage& rMessage)
 	{
-		rVisitor.Field(rMessage.iGlobalPlayerIdentifier);
+		rVisitor.Field(rMessage.iGlobalIdentifier);
 		rVisitor.Field(rMessage.coordinate);
 	}
 };
 
-struct PlayerStateMessage
+struct OwnedEntityStateMessage
 {
 	static constexpr int64_t kiSize = sizeof(uint8_t) + sizeof(int64_t) + engine::NetworkMessages::kiGridCoordSize;
 	static_assert(kiSize == 17);
 
 	uint8_t uiWireType = 0;
-	int64_t iGlobalPlayerIdentifier = 0;
+	int64_t iGlobalIdentifier = 0;
 	engine::GridCoord coordinate {};
 
 	template <typename TVISITOR>
-	static void Visit(TVISITOR& rVisitor, PlayerStateMessage& rMessage)
+	static void Visit(TVISITOR& rVisitor, OwnedEntityStateMessage& rMessage)
 	{
 		rVisitor.Field(rMessage.uiWireType);
-		rVisitor.Field(rMessage.iGlobalPlayerIdentifier);
+		rVisitor.Field(rMessage.iGlobalIdentifier);
 		rVisitor.Field(rMessage.coordinate);
 	}
 };
 
-struct PlayerStateDescriptor
+struct OwnedEntityStateDescriptor
 {
-	PlayerStateWireType eWireType {};
-	PlayerEventType eEventType {};
+	OwnedEntityStateWireType eWireType {};
+	OwnedEntityEventType eEventType {};
 	const char* pcName = "";
 };
 
-inline constexpr PlayerStateDescriptor kpPlayerStateDescriptors[] =
+inline constexpr OwnedEntityStateDescriptor kpOwnedEntityStateDescriptors[] =
 {
-	{.eWireType = PlayerStateWireType::kSpawned, .eEventType = PlayerEventType::kSpawned, .pcName = "Spawned"},
-	{.eWireType = PlayerStateWireType::kChangedCell, .eEventType = PlayerEventType::kChangedCell, .pcName = "ChangedCell"},
-	{.eWireType = PlayerStateWireType::kDied, .eEventType = PlayerEventType::kDied, .pcName = "Died"},
+	{.eWireType = OwnedEntityStateWireType::kSpawned, .eEventType = OwnedEntityEventType::kSpawned, .pcName = "Spawned"},
+	{.eWireType = OwnedEntityStateWireType::kChangedCell, .eEventType = OwnedEntityEventType::kChangedCell, .pcName = "ChangedCell"},
+	{.eWireType = OwnedEntityStateWireType::kDied, .eEventType = OwnedEntityEventType::kDied, .pcName = "Died"},
 };
-static_assert(std::size(kpPlayerStateDescriptors) == static_cast<size_t>(PlayerStateWireType::kCount));
+static_assert(std::size(kpOwnedEntityStateDescriptors) == static_cast<size_t>(OwnedEntityStateWireType::kCount));
 
 struct FleetSyncMessage
 {
@@ -71,7 +71,7 @@ struct FleetSyncMessage
 		rVisitor.Field(rFleet.guid.uiHigh);
 		rVisitor.Field(rFleet.guid.uiLow);
 		rVisitor.BoundedCount(riMemberCount, kiFleetMemberSize, sizeof(int64_t) + sizeof(float));
-		rVisitor.Field(rFleet.flagshipGlobalPlayerId.iValue);
+		rVisitor.Field(rFleet.flagshipGlobalId.iValue);
 		float fNavigationDelay = rFleet.navigationDelaySeconds.count();
 		rVisitor.Field(fNavigationDelay);
 		if constexpr (!std::is_const_v<TFLEET>)
@@ -83,7 +83,7 @@ struct FleetSyncMessage
 	template <typename TVISITOR, typename TFLEETMEMBER, typename TFLAGS>
 	static void VisitFleetMember(TVISITOR& rVisitor, TFLEETMEMBER& rMember, TFLAGS& rFlags)
 	{
-		rVisitor.Field(rMember.globalPlayerId.iValue);
+		rVisitor.Field(rMember.globalId.iValue);
 		rVisitor.Field(rFlags);
 	}
 

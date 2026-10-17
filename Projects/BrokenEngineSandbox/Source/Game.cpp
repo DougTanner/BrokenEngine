@@ -2,7 +2,7 @@
 
 #include "Input/Input.h"
 
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Network/GamePacketType.h"
 #include "Ui/Localization.h"
 
@@ -18,9 +18,9 @@ Game::Game()
 	InitializeLocalization();
 
 	int64_t iNextAlignment = 1;
-	mPlayerAlignment = engine::AlignmentIdentifier {iNextAlignment++};
+	mOmniAlignment = engine::AlignmentIdentifier {iNextAlignment++};
 	mEnemyAlignment = engine::AlignmentIdentifier {iNextAlignment++};
-	mAlignments.AddAlignment(mPlayerAlignment, mEnemyAlignment, engine::AlignmentFlags::kuiEnemies);
+	mAlignments.AddAlignment(mOmniAlignment, mEnemyAlignment, engine::AlignmentFlags::kuiEnemies);
 
 #if defined(BT_SERVER)
 	mpServerSession = std::make_unique<ServerSession>();
@@ -44,53 +44,53 @@ Game::Game()
 
 }
 
-engine::GlobalId Game::ClientPlayerIdentifier() const
+engine::GlobalId Game::ClientOwnedEntityIdentifier() const
 {
 #if defined(BT_CLIENT)
 	const Fleet* pFleet = mFleetSelection.FocusedFleet();
 	if (pFleet != nullptr)
 	{
 		engine::GlobalId focusedMemberGlobalIdentifier = mFleetSelection.mFocusedMemberGlobalId;
-		auto it = std::ranges::find(pFleet->members, focusedMemberGlobalIdentifier, &FleetMember::globalPlayerId);
+		auto it = std::ranges::find(pFleet->members, focusedMemberGlobalIdentifier, &FleetMember::globalId);
 		if ((focusedMemberGlobalIdentifier.iValue != 0) && it != pFleet->members.end() && !(it->flags & FleetMemberFlags::kIsDead))
 		{
-			return it->globalPlayerId;
+			return it->globalId;
 		}
 	}
 #endif
 	return {};
 }
 
-void Game::AddClientPlayer(engine::GlobalId identifier, engine::GridCoord coordinate)
+void Game::AddClientOwnedEntity(engine::GlobalId identifier, engine::GridCoord coordinate)
 {
-	// Heap: mClientPlayerIdentifiers / mClientPlayerCoordinates push_back may grow vectors
+	// Heap: mClientOwnedEntityIdentifiers / mClientOwnedEntityCoordinates push_back may grow vectors
 	ScopedSuppressAllocationTracking suppress;
-	mClientPlayerIdentifiers.push_back(identifier);
-	mClientPlayerCoordinates.push_back(coordinate);
+	mClientOwnedEntityIdentifiers.push_back(identifier);
+	mClientOwnedEntityCoordinates.push_back(coordinate);
 }
 
-void Game::RemoveClientPlayer(engine::GlobalId identifier)
+void Game::RemoveClientOwnedEntity(engine::GlobalId identifier)
 {
-	for (int64_t i = 0; i < std::ssize(mClientPlayerIdentifiers); ++i)
+	for (int64_t i = 0; i < std::ssize(mClientOwnedEntityIdentifiers); ++i)
 	{
-		if (mClientPlayerIdentifiers.at(i) == identifier)
+		if (mClientOwnedEntityIdentifiers.at(i) == identifier)
 		{
-			LOG(kNetwork, kVerbose, "RemoveClientPlayer GlobalPlayerId: {} Index: {} OldPlayerCount: {}", identifier, i, std::ssize(mClientPlayerIdentifiers));
-			mClientPlayerIdentifiers.erase(mClientPlayerIdentifiers.begin() + i);
-			mClientPlayerCoordinates.erase(mClientPlayerCoordinates.begin() + i);
+			LOG(kNetwork, kVerbose, "RemoveClientOwnedEntity GlobalId: {} Index: {} OldOwnedEntityCount: {}", identifier, i, std::ssize(mClientOwnedEntityIdentifiers));
+			mClientOwnedEntityIdentifiers.erase(mClientOwnedEntityIdentifiers.begin() + i);
+			mClientOwnedEntityCoordinates.erase(mClientOwnedEntityCoordinates.begin() + i);
 			return;
 		}
 	}
 }
 
-std::optional<int64_t> Game::ClientPlayerIndex(const PlayersPostRender& rPlayers) const
+std::optional<int64_t> Game::ClientOwnedEntityIndex(const OmnisPostRender& rOmnis) const
 {
-	engine::GlobalId focusedIdentifier = ClientPlayerIdentifier();
+	engine::GlobalId focusedIdentifier = ClientOwnedEntityIdentifier();
 	if ((focusedIdentifier.iValue != 0))
 	{
-		for (int64_t i = 0; i < rPlayers.iCount; ++i)
+		for (int64_t i = 0; i < rOmnis.iCount; ++i)
 		{
-			if (rPlayers.pGlobalPlayerIds[i] == focusedIdentifier)
+			if (rOmnis.pGlobalIds[i] == focusedIdentifier)
 			{
 				return i;
 			}
@@ -103,7 +103,7 @@ std::optional<int64_t> Game::ClientPlayerIndex(const PlayersPostRender& rPlayers
 #if defined(BT_CLIENT)
 bool Game::HasFocusedClientEntity() const
 {
-	return ClientPlayerIdentifier().iValue != 0;
+	return ClientOwnedEntityIdentifier().iValue != 0;
 }
 
 void Game::UpdateCameraShake()
@@ -111,15 +111,15 @@ void Game::UpdateCameraShake()
 	// Camera shake — read most recent ring frame
 	auto it = mCells.find(mClientGridCoordinate);
 	const Frame* pTailFrame = it != mCells.end() ? it->second.TailFrame() : nullptr;
-	if ((ClientPlayerIdentifier().iValue != 0) && pTailFrame != nullptr)
+	if ((ClientOwnedEntityIdentifier().iValue != 0) && pTailFrame != nullptr)
 	{
 		const Frame& rCurrentFrame = *pTailFrame;
-		const PlayersPostRender& rPlayersPostRender = *rCurrentFrame.postRender.pPlayers;
+		const OmnisPostRender& rOmnisPostRender = *rCurrentFrame.postRender.pOmnis;
 
-		std::optional<int64_t> playerIndex = ClientPlayerIndex(rPlayersPostRender);
-		if (playerIndex)
+		std::optional<int64_t> ownedEntityIndex = ClientOwnedEntityIndex(rOmnisPostRender);
+		if (ownedEntityIndex)
 		{
-			float fCurrentArmor = rPlayersPostRender.pfArmors[*playerIndex];
+			float fCurrentArmor = rOmnisPostRender.pfArmors[*ownedEntityIndex];
 			if (fCurrentArmor < mfPreviousClientArmor)
 			{
 				engine::gpCamera->mfShake = std::min(engine::gpCamera->mfShake + kfCameraShakeAdd, kfCameraShakeMax);
@@ -155,8 +155,8 @@ void Game::ResetGameState()
 #if defined(BT_CLIENT)
 	mWeaponModeToggle.Reset();
 #endif // BT_CLIENT
-	mClientPlayerIdentifiers.clear();
-	mClientPlayerCoordinates.clear();
+	mClientOwnedEntityIdentifiers.clear();
+	mClientOwnedEntityCoordinates.clear();
 #if defined(BT_CLIENT)
 	mFleetSelection.Clear();
 #endif
@@ -318,7 +318,7 @@ common::crc_t Game::GetNextMusicTrack()
 
 void Game::InitializeFramePostRender(Frame& rFrame)
 {
-	rFrame.postRender.playerAlignment = mPlayerAlignment;
+	rFrame.postRender.omniAlignment = mOmniAlignment;
 	rFrame.postRender.enemyAlignment = mEnemyAlignment;
 	rFrame.postRender.alignments = mAlignments;
 }
@@ -326,10 +326,10 @@ void Game::InitializeFramePostRender(Frame& rFrame)
 void Game::RestoreReplayMetadata(const ReplayMeta& rMetadata)
 {
 	SetClientGridCoordinate(rMetadata.clientGridCoordinate);
-	if (rMetadata.iClientPlayerIdentifierValue != 0)
+	if (rMetadata.iClientOwnedEntityIdentifierValue != 0)
 	{
-		engine::GlobalId globalIdentifier {.iValue = rMetadata.iClientPlayerIdentifierValue};
-		AddClientPlayer(globalIdentifier, rMetadata.clientGridCoordinate);
+		engine::GlobalId globalIdentifier {.iValue = rMetadata.iClientOwnedEntityIdentifierValue};
+		AddClientOwnedEntity(globalIdentifier, rMetadata.clientGridCoordinate);
 	}
 	mfPreviousClientArmor = rMetadata.fPreviousClientArmor;
 }

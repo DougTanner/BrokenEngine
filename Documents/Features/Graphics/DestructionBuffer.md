@@ -10,13 +10,13 @@ gl_InstanceIndex. The fragment shader outputs final color after
 combining BRDF, IBL, directional lighting, emissive, and smoke.
 
 Currently there is no visual indication of progressive damage on
-entities. Spaceships and players look pristine until they explode.
+entities. Spaceships and omnis look pristine until they explode.
 The only damage feedback is f4ColorAdd (a brief red/white freeze
 flash on hit) which fades instantly.
 
 Spaceships have pfHealths in SpaceshipsPostRender (deterministic,
-CRC-validated). Players have pfArmors and pfShields in
-PlayersPostRender. The Interpolate phase reads from the previous
+CRC-validated). Omnis have pfArmors and pfShields in
+OmnisPostRender. The Interpolate phase reads from the previous
 PostRender to produce render-visible data. The render phase fills
 ModelLayout storage buffers from Interpolate collections.
 
@@ -177,22 +177,22 @@ Changes (8 files)
    Add it to ClientMembers() tie.
 
 7. Projects/BrokenEngineSandbox/Source/Frame/Collections/
-   Players/PlayersRender.cpp
+   Omnis/OmnisRender.cpp
    In the render loop, after setting f4ColorAdd, compute
    fDamageFraction from armor:
 
-     float fMaxArmor = kfPlayerArmor;
-     rPlayerLayout.fDamageFraction = std::clamp(1.0f - (rCurrent.pfArmors[i] / fMaxArmor), 0.0f, 1.0f);
+     float fMaxArmor = kfOmniArmor;
+     rOmniLayout.fDamageFraction = std::clamp(1.0f - (rCurrent.pfArmors[i] / fMaxArmor), 0.0f, 1.0f);
 
-   PlayersPostRender fields are not directly available in Render.
+   OmnisPostRender fields are not directly available in Render.
    Same approach as spaceships: add a client-only
-   pfDamageFractions to PlayersInterpolate, compute in
-   PlayersInterpolate::Update from previous PostRender armor,
+   pfDamageFractions to OmnisInterpolate, compute in
+   OmnisInterpolate::Update from previous PostRender armor,
    read in Render.
 
 8. Projects/BrokenEngineSandbox/Source/Frame/Collections/
-   Players/Players.h
-   Add to PlayersInterpolate, inside the #if defined(BT_CLIENT)
+   Omnis/Omnis.h
+   Add to OmnisInterpolate, inside the #if defined(BT_CLIENT)
    block:
 
      float* __restrict pfDamageFractions = nullptr;
@@ -218,11 +218,11 @@ Notes
 - MainLayout destruction parameters should be wired to the
   existing settings/tuning UI so artists can adjust edge width,
   glow intensity, noise scale, and darken power at runtime
-- Players use armor (not shield) for damage fraction because
+- Omnis use armor (not shield) for damage fraction because
   shield regenerates and visual peeling should reflect permanent
   hull damage
 - The procedural noise scale should be tuned relative to model
-  size; spaceships and players may want different scales, which
+  size; spaceships and omnis may want different scales, which
   could be done via push constants or the ModelLayout struct if
   per-entity control is needed later
 - Performance impact is minimal: one hash + branch per fragment

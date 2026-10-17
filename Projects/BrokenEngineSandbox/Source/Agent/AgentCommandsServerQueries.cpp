@@ -4,7 +4,7 @@
 
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Game.h"
 
@@ -42,10 +42,10 @@ static void ClampWindow(int64_t iTotal, int64_t iOffset, int64_t iLimit, int64_t
 
 // Every row of one of these reports belongs to the cell the request named, so the position is the local
 // component alone; the caller's own 'coord' parameter identifies the cell.
-static nlohmann::json ExtractPlayers(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
+static nlohmann::json ExtractOmnis(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
 {
-	const PlayersInterpolate& rInterpolate = *rFrame.interpolate.pPlayers;
-	const PlayersPostRender& rPost = *rFrame.postRender.pPlayers;
+	const OmnisInterpolate& rInterpolate = *rFrame.interpolate.pOmnis;
+	const OmnisPostRender& rPost = *rFrame.postRender.pOmnis;
 	int64_t iBegin = 0;
 	int64_t iEnd = 0;
 	ClampWindow(rPost.iCount, iOffset, iLimit, iBegin, iEnd);
@@ -56,7 +56,7 @@ static nlohmann::json ExtractPlayers(const Frame& rFrame, int64_t iOffset, int64
 		{
 			{"index", i},
 			{"uuid", rPost.pIds[i].uuid.iValue},
-			{"globalId", rPost.pGlobalPlayerIds[i].iValue},
+			{"globalId", rPost.pGlobalIds[i].iValue},
 			{"local", engine::AgentLocalPositionJson(rInterpolate.pVecPositions[i])},
 			{"dir", Vector3ToJson(rInterpolate.pVecDirections[i])},
 			{"armor", rPost.pfArmors[i]},
@@ -157,19 +157,19 @@ Frame& QueryFrame(const nlohmann::json& rParameters)
 void CommandQueryFrame(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	const Frame& rFrame = QueryFrame(rParameters);
-	rResult["players"] = {{"count", rFrame.postRender.pPlayers->iCount}};
+	rResult["omnis"] = {{"count", rFrame.postRender.pOmnis->iCount}};
 	rResult["spaceships"] = {{"count", rFrame.postRender.pSpaceships->iCount}};
 	rResult["missiles"] = {{"count", rFrame.postRender.pMissiles->iCount}};
 	rResult["blasters"] = {{"count", rFrame.postRender.pBlasters->iCount}};
 }
 
-void CommandQueryPlayers(const nlohmann::json& rParameters, nlohmann::json& rResult)
+void CommandQueryOmnis(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	const Frame& rFrame = QueryFrame(rParameters);
 	int64_t iOffset = OptionalCount(rParameters, "offset", 0);
 	int64_t iLimit = OptionalCount(rParameters, "limit", 256);
-	rResult["total"] = rFrame.postRender.pPlayers->iCount;
-	rResult["players"] = ExtractPlayers(rFrame, iOffset, iLimit);
+	rResult["total"] = rFrame.postRender.pOmnis->iCount;
+	rResult["omnis"] = ExtractOmnis(rFrame, iOffset, iLimit);
 }
 
 void CommandQueryCollection(const nlohmann::json& rParameters, nlohmann::json& rResult)

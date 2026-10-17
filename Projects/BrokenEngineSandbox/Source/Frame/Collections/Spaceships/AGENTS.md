@@ -4,13 +4,13 @@ Enemy spaceships combine terrain-aware steering, health and damage, weapon fire,
 
 ## Behavior Invariants
 
-- When island candidates are available, steering prioritizes returning to an island, fleeing a nearby player, then chasing the nearest alive player. In a cell with no island candidates, it clears the return-to-island state and uses flee/chase steering for a live player or only decays the current turn otherwise. Return and flee transitions use distance hysteresis.
+- When island candidates are available, steering prioritizes returning to an island, fleeing a nearby omni, then chasing the nearest alive omni. In a cell with no island candidates, it clears the return-to-island state and uses flee/chase steering for a live omni or only decays the current turn otherwise. Return and flee transitions use distance hysteresis.
 - Steering turn rate crosses cell boundaries with the ship rather than restarting on arrival.
 - Direct blaster hits arrive through collision; missile splash damage arrives through the area-damage phase. Destruction applies horizontal knockback and a staged explosion sequence.
 - Interpolate Update owns a ship's height: each tick it moves position Z toward the ship's target height — the lowest flight plane's height for every ship — by at most the maximum flight speed times the tick delta, and lands exactly on it. PostRender Update stores velocity Z as 0 after every other velocity write, so pusher response, knockback, and terrain bounce move ships only horizontally. Change a ship's height through its target height, not its velocity.
 - Body, collision, effect, and model sizing derive from the shared spaceship radius.
 - The simulation keeps the Interpolate `pDestroyedTimes` at the -1 spawn sentinel or in [0, `kSpaceshipDestroyTime`]. The Interpolate `PostRead` rejects any other row on every Frame read.
-- `SpaceshipsPostRender::Update` reads previous-frame Players for steering, health regeneration, and targeting. `AvoidTerrain` and the Spawn-phase enemy-blaster targeting read current-frame Players after Players update. The split is intentional; changing the source frame shifts CRC-visible behavior by one tick.
+- `SpaceshipsPostRender::Update` reads previous-frame Omnis for steering, health regeneration, and targeting. `AvoidTerrain` and the Spawn-phase enemy-blaster targeting read current-frame Omnis after Omnis update. The split is intentional; changing the source frame shifts CRC-visible behavior by one tick.
 - Under the [shared arrival-grace contract](../AGENTS.md#game-specific-rules),
   arrival grace and the blaster cooldown count down unconditionally before
   behavior gating. While the decremented grace remains positive, a non-exploding

@@ -30,10 +30,10 @@ void AdmitFrameInputStatusChange(const StatusChange& rChange)
 		throw std::ios_base::failure("FrameInput StatusChange payload");
 	}
 	// Every legitimate spawn carries a real global ID; a zero ID would create an
-	// unaddressable Player row.
-	if (rChange.eType == StatusChangeType::kSpawnPlayer && std::get<SpawnPlayerData>(rChange.data).iGlobalId == 0)
+	// unaddressable Omni row.
+	if (rChange.eType == StatusChangeType::kSpawnOmni && std::get<SpawnOmniData>(rChange.data).iGlobalId == 0)
 	{
-		throw std::ios_base::failure("FrameInput SpawnPlayer global ID");
+		throw std::ios_base::failure("FrameInput SpawnOmni global ID");
 	}
 }
 

@@ -2,7 +2,7 @@
 
 #include "Network/Server/ServerFleetManager.h"
 
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetSerialization.h"
 #include "Network/Server/ServerSession.h"
@@ -160,14 +160,14 @@ void ServerFleetManager::ProcessRespawnInFleetRequests()
 		}
 
 		const Fleet& rFleet = it->second.at(static_cast<size_t>(iFleetIndex));
-		auto memberIt = std::ranges::find(rFleet.members, rRequest.memberGlobalPlayerId, &FleetMember::globalPlayerId);
-		if (!(rRequest.memberGlobalPlayerId.iValue != 0) || memberIt == rFleet.members.end() || !(memberIt->flags & FleetMemberFlags::kIsDead))
+		auto memberIt = std::ranges::find(rFleet.members, rRequest.memberGlobalId, &FleetMember::globalId);
+		if (!(rRequest.memberGlobalId.iValue != 0) || memberIt == rFleet.members.end() || !(memberIt->flags & FleetMemberFlags::kIsDead))
 		{
 			continue;
 		}
 
-		gpServerSession->mpClientManager->QueueSpawnForClient(rRequest.iClientId, guid, rRequest.fleetGuid, rRequest.memberGlobalPlayerId);
-		LOG(kNetwork, kDebug, "ServerFleetManager::ProcessRespawnInFleetRequests Client: {} FleetGuid: ({},{}) Member: {}", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow, rRequest.memberGlobalPlayerId.iValue);
+		gpServerSession->mpClientManager->QueueSpawnForClient(rRequest.iClientId, guid, rRequest.fleetGuid, rRequest.memberGlobalId);
+		LOG(kNetwork, kDebug, "ServerFleetManager::ProcessRespawnInFleetRequests Client: {} FleetGuid: ({},{}) Member: {}", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow, rRequest.memberGlobalId.iValue);
 	}
 
 	mPendingRespawnInFleetRequests.clear();
@@ -208,8 +208,8 @@ void ServerFleetManager::TickRespawnTimers()
 					continue;
 				}
 
-				gpServerSession->mpClientManager->QueueSpawnForClient(iClientId, rGuid, rFleet.guid, rMember.globalPlayerId);
-				LOG(kNetwork, kDebug, "ServerFleetManager::TickRespawnTimers Client: {} FleetGuid: ({},{}) Member: {}", iClientId, rFleet.guid.uiHigh, rFleet.guid.uiLow, rMember.globalPlayerId.iValue);
+				gpServerSession->mpClientManager->QueueSpawnForClient(iClientId, rGuid, rFleet.guid, rMember.globalId);
+				LOG(kNetwork, kDebug, "ServerFleetManager::TickRespawnTimers Client: {} FleetGuid: ({},{}) Member: {}", iClientId, rFleet.guid.uiHigh, rFleet.guid.uiLow, rMember.globalId.iValue);
 			}
 		}
 	}
@@ -244,7 +244,7 @@ void ServerFleetManager::ClearPendingRequests()
 	mPendingRespawnInFleetRequests.clear();
 }
 
-void ServerFleetManager::OnPlayerDeath(const engine::ClientGuid& rGuid, engine::GlobalId globalId)
+void ServerFleetManager::OnOwnedEntityDeath(const engine::ClientGuid& rGuid, engine::GlobalId globalId)
 {
 	auto fleetIt = mFleets.find(rGuid);
 	if (fleetIt == mFleets.end())
@@ -256,12 +256,12 @@ void ServerFleetManager::OnPlayerDeath(const engine::ClientGuid& rGuid, engine::
 	{
 		for (FleetMember& rMember : rFleet.members)
 		{
-			if (rMember.globalPlayerId == globalId && !(rMember.flags & FleetMemberFlags::kIsDead))
+			if (rMember.globalId == globalId && !(rMember.flags & FleetMemberFlags::kIsDead))
 			{
 				rMember.flags.Set(FleetMemberFlags::kIsDead);
 				rMember.respawnTimerSeconds = kRespawnDelay;
 
-				if (globalId == rFleet.flagshipGlobalPlayerId)
+				if (globalId == rFleet.flagshipGlobalId)
 				{
 					mNavigation.ShiftFlagshipAfterDeath(rGuid, rFleet);
 				}
@@ -277,7 +277,7 @@ void ServerFleetManager::OnPlayerDeath(const engine::ClientGuid& rGuid, engine::
 	}
 }
 
-void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::ClientGuid& rClientGuid, const ClientSpawnInformation& rSpawnInfo, engine::GlobalId globalPlayerId)
+void ServerFleetManager::OnOwnedEntitySpawned(int64_t iClientId, const engine::ClientGuid& rClientGuid, const ClientSpawnInformation& rSpawnInfo, engine::GlobalId globalId)
 {
 	if ((rSpawnInfo.fleetGuid.uiHigh == 0 && rSpawnInfo.fleetGuid.uiLow == 0))
 	{
@@ -295,10 +295,10 @@ void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::Client
 	}
 
 	Fleet& rFleet = rFleets.at(static_cast<size_t>(iFleetIndex));
-	if ((rSpawnInfo.memberGlobalPlayerId.iValue != 0))
+	if ((rSpawnInfo.memberGlobalId.iValue != 0))
 	{
 		// Respawn: revive the dead member in place; it keeps its global ID and list position
-		auto memberIt = std::ranges::find(rFleet.members, rSpawnInfo.memberGlobalPlayerId, &FleetMember::globalPlayerId);
+		auto memberIt = std::ranges::find(rFleet.members, rSpawnInfo.memberGlobalId, &FleetMember::globalId);
 		if (memberIt == rFleet.members.end())
 		{
 			return;
@@ -311,18 +311,18 @@ void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::Client
 		// The member cap bounds client-driven growth; rejection must precede flagship mutation to keep the flagship in the roster.
 		if (std::ssize(rFleet.members) >= kiMaximumFleetMembers)
 		{
-			LOG(kNetwork, kWarning, "ServerFleetManager::OnPlayerSpawned Client: {} FleetGuid: ({},{}) at member cap {}, ignoring spawn", iClientId, rFleet.guid.uiHigh, rFleet.guid.uiLow, kiMaximumFleetMembers);
+			LOG(kNetwork, kWarning, "ServerFleetManager::OnOwnedEntitySpawned Client: {} FleetGuid: ({},{}) at member cap {}, ignoring spawn", iClientId, rFleet.guid.uiHigh, rFleet.guid.uiLow, kiMaximumFleetMembers);
 			return;
 		}
-		rFleet.members.push_back(FleetMember {.globalPlayerId = globalPlayerId, .coordinate = engine::kOriginCoordinate});
+		rFleet.members.push_back(FleetMember {.globalId = globalId, .coordinate = engine::kOriginCoordinate});
 	}
 
-	auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
-	bool bHasAliveFlagship = (rFleet.flagshipGlobalPlayerId.iValue != 0) && flagshipIt != rFleet.members.end() && !(flagshipIt->flags & FleetMemberFlags::kIsDead)
-	                      && rFleet.flagshipGlobalPlayerId != globalPlayerId;
+	auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId);
+	bool bHasAliveFlagship = (rFleet.flagshipGlobalId.iValue != 0) && flagshipIt != rFleet.members.end()
+	                      && !(flagshipIt->flags & FleetMemberFlags::kIsDead) && rFleet.flagshipGlobalId != globalId;
 	if (!bHasAliveFlagship)
 	{
-		rFleet.flagshipGlobalPlayerId = globalPlayerId;
+		rFleet.flagshipGlobalId = globalId;
 		rFleet.wantedCoordinate = engine::kOriginCoordinate;
 		rFleet.cellChangeTimerSeconds = std::chrono::duration<float>(common::Random(rFleet.navigationDelaySeconds.count(), mRandomEngine));
 		mNavigation.mPendingFlagshipUpdates.push_back({.clientGuid = rClientGuid, .fleetGuid = rFleet.guid, .newWantedCoordinate = rFleet.wantedCoordinate});
@@ -332,7 +332,7 @@ void ServerFleetManager::OnPlayerSpawned(int64_t iClientId, const engine::Client
 	SendFleetSyncToClient(iClientId, rClientGuid);
 }
 
-void ServerFleetManager::OnPlayerTransferred(const engine::ClientGuid& rGuid, engine::GlobalId globalPlayerId, engine::GridCoord destination)
+void ServerFleetManager::OnOwnedEntityTransferred(const engine::ClientGuid& rGuid, engine::GlobalId globalId, engine::GridCoord destination)
 {
 	auto fleetIt = mFleets.find(rGuid);
 	if (fleetIt == mFleets.end())
@@ -344,7 +344,7 @@ void ServerFleetManager::OnPlayerTransferred(const engine::ClientGuid& rGuid, en
 	{
 		for (FleetMember& rMember : rFleet.members)
 		{
-			if (rMember.globalPlayerId == globalPlayerId)
+			if (rMember.globalId == globalId)
 			{
 				rMember.coordinate = destination;
 				return;
@@ -360,16 +360,16 @@ void ServerFleetManager::OnClientConnected(int64_t iClientId, const engine::Clie
 
 	mGuidToClientId.insert_or_assign(rClientGuid, iClientId);
 	auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(iClientId);
-	std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != gpServerSession->mClientOwnedEntities.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
+	std::span<const engine::OwnedEntity> ownedEntities = ownedIt != gpServerSession->mClientOwnedEntities.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
 
 	auto fleetIt = mFleets.find(rClientGuid);
 	if (fleetIt != mFleets.end())
 	{
 		for (Fleet& rFleet : fleetIt->second)
 		{
-			RefreshFleetMembers(rFleet, ownedPlayers);
-			auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
-			if ((rFleet.flagshipGlobalPlayerId.iValue != 0) && flagshipIt != rFleet.members.end() && (flagshipIt->flags & FleetMemberFlags::kIsDead))
+			RefreshFleetMembers(rFleet, ownedEntities);
+			auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId);
+			if ((rFleet.flagshipGlobalId.iValue != 0) && flagshipIt != rFleet.members.end() && (flagshipIt->flags & FleetMemberFlags::kIsDead))
 			{
 				mNavigation.ShiftFlagshipAfterDeath(rClientGuid, rFleet);
 			}
@@ -416,18 +416,18 @@ void ServerFleetManager::OnResetForLoad(int64_t iClientId, const engine::ClientG
 	SendFleetSyncToClient(iClientId, rClientGuid);
 }
 
-void ServerFleetManager::RefreshFleetMembers(Fleet& rFleet, std::span<const engine::OwnedEntity> ownedPlayers)
+void ServerFleetManager::RefreshFleetMembers(Fleet& rFleet, std::span<const engine::OwnedEntity> ownedEntities)
 {
 	for (FleetMember& rMember : rFleet.members)
 	{
 		rMember.flags.Set(FleetMemberFlags::kIsDead);
 		rMember.respawnTimerSeconds = kRespawnDelay;
-		for (const engine::OwnedEntity& rOwnedPlayer : ownedPlayers)
+		for (const engine::OwnedEntity& rOwnedEntity : ownedEntities)
 		{
-			if (rOwnedPlayer.globalId == rMember.globalPlayerId)
+			if (rOwnedEntity.globalId == rMember.globalId)
 			{
 				rMember.flags.Set(FleetMemberFlags::kIsDead, false);
-				rMember.coordinate = rOwnedPlayer.coord;
+				rMember.coordinate = rOwnedEntity.coord;
 				break;
 			}
 		}
@@ -437,11 +437,11 @@ void ServerFleetManager::RefreshFleetMembers(Fleet& rFleet, std::span<const engi
 void ServerFleetManager::ResetFleetForLoad(Fleet& rFleet, const engine::ClientGuid& rClientGuid)
 {
 	auto ownedIt = gpServerSession->mClientOwnedEntities.mOwned.find(FindClientIdForGuid(rClientGuid));
-	std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != gpServerSession->mClientOwnedEntities.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
-	RefreshFleetMembers(rFleet, ownedPlayers);
+	std::span<const engine::OwnedEntity> ownedEntities = ownedIt != gpServerSession->mClientOwnedEntities.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
+	RefreshFleetMembers(rFleet, ownedEntities);
 
-	auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalPlayerId, &FleetMember::globalPlayerId);
-	if (!(rFleet.flagshipGlobalPlayerId.iValue != 0) || flagshipIt == rFleet.members.end())
+	auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId);
+	if (!(rFleet.flagshipGlobalId.iValue != 0) || flagshipIt == rFleet.members.end())
 	{
 		return;
 	}
@@ -458,7 +458,7 @@ void ServerFleetManager::ResetFleetForLoad(Fleet& rFleet, const engine::ClientGu
 	}
 }
 
-ServerFleetManager::FleetLookupResult ServerFleetManager::LookupFleetWantedCoord(const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalPlayerId)
+ServerFleetManager::FleetLookupResult ServerFleetManager::LookupFleetWantedCoord(const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId)
 {
 	auto fleetIt = mFleets.find(rClientGuid);
 	if (fleetIt == mFleets.end())
@@ -474,16 +474,16 @@ ServerFleetManager::FleetLookupResult ServerFleetManager::LookupFleetWantedCoord
 
 	const Fleet& rFleet = fleetIt->second.at(static_cast<size_t>(iFleetIndex));
 	bool bIsFlagship = rFleet.members.empty();
-	if ((memberGlobalPlayerId.iValue != 0))
+	if ((memberGlobalId.iValue != 0))
 	{
 		// A respawn is still spawnable only while its member is dead; the broadcaster drops it otherwise, so a live
 		// global ID is never minted twice.
-		auto memberIt = std::ranges::find(rFleet.members, memberGlobalPlayerId, &FleetMember::globalPlayerId);
+		auto memberIt = std::ranges::find(rFleet.members, memberGlobalId, &FleetMember::globalId);
 		if (memberIt == rFleet.members.end() || !(memberIt->flags & FleetMemberFlags::kIsDead))
 		{
 			return {};
 		}
-		bIsFlagship = memberGlobalPlayerId == rFleet.flagshipGlobalPlayerId;
+		bIsFlagship = memberGlobalId == rFleet.flagshipGlobalId;
 	}
 
 	FleetLookupFlags_t flags {FleetLookupFlags::kFound};
@@ -491,14 +491,14 @@ ServerFleetManager::FleetLookupResult ServerFleetManager::LookupFleetWantedCoord
 	return {.flags = flags, .fleetWantedCoord = rFleet.wantedCoordinate, .iPendingFleetWantedCoordTicks = rFleet.uiPendingFleetWantedCoordinateTicks};
 }
 
-void ServerFleetManager::DetectDisconnectedPlayerDeaths()
+void ServerFleetManager::DetectDisconnectedOwnedEntityDeaths()
 {
 	// Heap: ShiftFlagshipAfterDeath may push pending-flagship-update entries
 	ScopedSuppressAllocationTracking suppress;
 
 	for (auto& [rGuid, rFleets] : mFleets)
 	{
-		// Skip connected clients (handled by existing DetectPlayerDeaths)
+		// Skip connected clients (handled by existing DetectOwnedEntityDeaths)
 		int64_t iClientId = FindClientIdForGuid(rGuid);
 		if (iClientId != 0)
 		{
@@ -519,11 +519,11 @@ void ServerFleetManager::DetectDisconnectedPlayerDeaths()
 					continue;
 				}
 
-				const PlayersPostRender& rPlayers = *(*gpGame->mCells.at(rMember.coordinate).pCurrent).postRender.pPlayers;
+				const OmnisPostRender& rOmnis = *(*gpGame->mCells.at(rMember.coordinate).pCurrent).postRender.pOmnis;
 				bool bFound = false;
-				for (int64_t k = 0; k < rPlayers.iCount; ++k)
+				for (int64_t k = 0; k < rOmnis.iCount; ++k)
 				{
-					if (rPlayers.pGlobalPlayerIds[k] == rMember.globalPlayerId)
+					if (rOmnis.pGlobalIds[k] == rMember.globalId)
 					{
 						bFound = true;
 						break;
@@ -533,7 +533,7 @@ void ServerFleetManager::DetectDisconnectedPlayerDeaths()
 				if (!bFound)
 				{
 					rMember.flags.Set(FleetMemberFlags::kIsDead);
-					if (rMember.globalPlayerId == rFleet.flagshipGlobalPlayerId)
+					if (rMember.globalId == rFleet.flagshipGlobalId)
 					{
 						mNavigation.ShiftFlagshipAfterDeath(rGuid, rFleet);
 					}

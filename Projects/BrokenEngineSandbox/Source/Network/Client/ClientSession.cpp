@@ -5,7 +5,7 @@
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Network/Client/ClientReconciler.h"
 #include "Network/GamePacketType.h"
-#include "Network/PlayerEvents.h"
+#include "Network/OwnedEntityEvents.h"
 #include "Profile/ProfileRows.h"
 #include "Fleet.h"
 #include "Game.h"
@@ -27,7 +27,7 @@ const char* ToString(SubscriptionChangeReason eReason)
 		case SubscriptionChangeReason::kPollTick:       return "kPollTick";
 		case SubscriptionChangeReason::kFocusNextFleet: return "kFocusNextFleet";
 		case SubscriptionChangeReason::kFocusPreviousFleet: return "kFocusPrevFleet";
-		case SubscriptionChangeReason::kSelectPlayer:   return "kSelectPlayer";
+		case SubscriptionChangeReason::kSelectOwnedEntity: return "kSelectOwnedEntity";
 	}
 	return "Unknown";
 }
@@ -50,13 +50,13 @@ void ClientSession::ProcessReceivedGamePackets()
 
 	try
 	{
-		common::ScopedWorkbufferArena playerEventsArena = common::gpThreadLocal->mWorkbuffer.Push();
-		ParsePlayerEvents(mpRuntime->mpClient->mReceivedGamePackets, playerEventsArena);
-		const ReceivedPlayerEvent* pPlayerEvents = playerEventsArena.mBuffer.Data<ReceivedPlayerEvent>();
-		int64_t iPlayerEventCount = playerEventsArena.mBuffer.Count<ReceivedPlayerEvent>();
-		for (const ReceivedPlayerEvent& rPlayerEvent : std::span<const ReceivedPlayerEvent>(pPlayerEvents, static_cast<size_t>(iPlayerEventCount)))
+		common::ScopedWorkbufferArena ownedEntityEventsArena = common::gpThreadLocal->mWorkbuffer.Push();
+		ParseOwnedEntityEvents(mpRuntime->mpClient->mReceivedGamePackets, ownedEntityEventsArena);
+		const ReceivedOwnedEntityEvent* pOwnedEntityEvents = ownedEntityEventsArena.mBuffer.Data<ReceivedOwnedEntityEvent>();
+		int64_t iOwnedEntityEventCount = ownedEntityEventsArena.mBuffer.Count<ReceivedOwnedEntityEvent>();
+		for (const ReceivedOwnedEntityEvent& rOwnedEntityEvent : std::span<const ReceivedOwnedEntityEvent>(pOwnedEntityEvents, static_cast<size_t>(iOwnedEntityEventCount)))
 		{
-			ApplyPlayerEvent(rPlayerEvent);
+			ApplyOwnedEntityEvent(rOwnedEntityEvent);
 		}
 	}
 	catch (const std::ios_base::failure& rException)
@@ -65,12 +65,12 @@ void ClientSession::ProcessReceivedGamePackets()
 		// decode, and it cannot keep playing against them — assert so the process ends with a crash report naming the
 		// reader. The std::exception catch below is log-and-continue, so an ordinary local failure is never blamed on
 		// the peer.
-		LOG(kNetwork, kError, "ClientSession::ProcessReceivedGamePackets dropped corrupt player-event packet: {}", rException.what());
+		LOG(kNetwork, kError, "ClientSession::ProcessReceivedGamePackets dropped corrupt owned-entity event packet: {}", rException.what());
 		ASSERT(false);
 	}
 	catch (const std::exception& rException)
 	{
-		LOG(kNetwork, kWarning, "ClientSession::ProcessReceivedGamePackets failed processing player events: {}", rException.what());
+		LOG(kNetwork, kWarning, "ClientSession::ProcessReceivedGamePackets failed processing owned-entity events: {}", rException.what());
 	}
 
 	try
@@ -98,38 +98,38 @@ void ClientSession::ProcessReceivedGamePackets()
 
 }
 
-void ClientSession::ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent)
+void ClientSession::ApplyOwnedEntityEvent(const ReceivedOwnedEntityEvent& rEvent)
 {
 	switch (rEvent.eType)
 	{
-		case PlayerEventType::kAssigned:
-			if (!((rEvent.globalPlayerId.iValue != 0) && std::ranges::contains(gpGame->mClientPlayerIdentifiers, rEvent.globalPlayerId)))
+		case OwnedEntityEventType::kAssigned:
+			if (!((rEvent.globalId.iValue != 0) && std::ranges::contains(gpGame->mClientOwnedEntityIdentifiers, rEvent.globalId)))
 			{
-				LOG(kNetwork, kVerbose, "PlayerEvent kAssigned NewGlobalPlayerId: {} NewCoord: ({},{}) FocusedGlobalPlayerId: {} FocusedCoord: ({},{})", rEvent.globalPlayerId, rEvent.coordinate.iX, rEvent.coordinate.iY, gpGame->ClientPlayerIdentifier(), gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY);
-				gpGame->AddClientPlayer(rEvent.globalPlayerId, rEvent.coordinate);
+				LOG(kNetwork, kVerbose, "OwnedEntityEvent kAssigned NewGlobalId: {} NewCoord: ({},{}) FocusedGlobalId: {} FocusedCoord: ({},{})", rEvent.globalId, rEvent.coordinate.iX, rEvent.coordinate.iY, gpGame->ClientOwnedEntityIdentifier(), gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY);
+				gpGame->AddClientOwnedEntity(rEvent.globalId, rEvent.coordinate);
 			}
 			mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kAssigned));
 			break;
-		case PlayerEventType::kSpawned:
-			UpdatePlayerCoordinate(rEvent.globalPlayerId, rEvent.coordinate);
-			if (rEvent.globalPlayerId == gpGame->ClientPlayerIdentifier())
+		case OwnedEntityEventType::kSpawned:
+			UpdateOwnedEntityCoordinate(rEvent.globalId, rEvent.coordinate);
+			if (rEvent.globalId == gpGame->ClientOwnedEntityIdentifier())
 			{
 				gpGame->SetClientGridCoordinate(rEvent.coordinate);
 			}
 			mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kSpawned));
 			break;
-		case PlayerEventType::kChangedCell:
-			UpdatePlayerCoordinate(rEvent.globalPlayerId, rEvent.coordinate);
-			if (rEvent.globalPlayerId == gpGame->ClientPlayerIdentifier())
+		case OwnedEntityEventType::kChangedCell:
+			UpdateOwnedEntityCoordinate(rEvent.globalId, rEvent.coordinate);
+			if (rEvent.globalId == gpGame->ClientOwnedEntityIdentifier())
 			{
 				gpGame->SetClientGridCoordinate(rEvent.coordinate);
 			}
 			mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kChangedCell));
 			break;
-		case PlayerEventType::kDied:
-			gpGame->RemoveClientPlayer(rEvent.globalPlayerId);
+		case OwnedEntityEventType::kDied:
+			gpGame->RemoveClientOwnedEntity(rEvent.globalId);
 			// A respawn keeps this ID and can come back in the weapon mode it had before a dropped request, which would never clear that pending toggle.
-			if (rEvent.globalPlayerId == gpGame->mFleetSelection.mFocusedMemberGlobalId)
+			if (rEvent.globalId == gpGame->mFleetSelection.mFocusedMemberGlobalId)
 			{
 				gpGame->mWeaponModeToggle.Reset();
 			}
@@ -138,13 +138,13 @@ void ClientSession::ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent)
 	}
 }
 
-void ClientSession::UpdatePlayerCoordinate(engine::GlobalId globalPlayerId, engine::GridCoord coordinate)
+void ClientSession::UpdateOwnedEntityCoordinate(engine::GlobalId globalId, engine::GridCoord coordinate)
 {
-	for (int64_t i = 0; i < std::ssize(gpGame->mClientPlayerIdentifiers); ++i)
+	for (int64_t i = 0; i < std::ssize(gpGame->mClientOwnedEntityIdentifiers); ++i)
 	{
-		if (gpGame->mClientPlayerIdentifiers.at(i) == globalPlayerId)
+		if (gpGame->mClientOwnedEntityIdentifiers.at(i) == globalId)
 		{
-			gpGame->mClientPlayerCoordinates.at(i) = coordinate;
+			gpGame->mClientOwnedEntityCoordinates.at(i) = coordinate;
 			break;
 		}
 	}
@@ -231,9 +231,9 @@ void ClientSession::OnServerLoad()
 	gpGame->mTimeStep.mRealTime.Reset();
 	gpGame->ResetRenderClock();
 
-	// Clear player identity — server will reassign
-	gpGame->mClientPlayerIdentifiers.clear();
-	gpGame->mClientPlayerCoordinates.clear();
+	// Clear owned-entity identity — server will reassign
+	gpGame->mClientOwnedEntityIdentifiers.clear();
+	gpGame->mClientOwnedEntityCoordinates.clear();
 	gpGame->SetClientGridCoordinate({});
 	gpGame->mfPreviousClientArmor = 0.0f;
 	engine::gpCamera->mVecVisualErrorOffset = {};
@@ -263,12 +263,12 @@ void ClientSession::OnRuntimeDisconnected()
 	mpDesynchronizationCore->Reset();
 }
 
-void ClientSession::SendUpdatePlayerRequest(int64_t iGlobalPlayerId, bool bUseMissiles, float fNavigationDelay)
+void ClientSession::SendUpdateOwnedEntityRequest(int64_t iGlobalId, bool bUseMissiles, float fNavigationDelay)
 {
-	mpRuntime->SendGameRequest(GamePacketType::kClientUpdatePlayerRequest, [&]
+	mpRuntime->SendGameRequest(GamePacketType::kClientUpdateOwnedEntityRequest, [&]
 	{
-		LOG(kNetwork, kVerbose, "ClientSession::SendUpdatePlayerRequest GlobalPlayer: {} Missiles: {} NavDelay: {}", iGlobalPlayerId, bUseMissiles, common::Wb(fNavigationDelay, 3));
-	}, iGlobalPlayerId, static_cast<uint8_t>(bUseMissiles ? 1 : 0), fNavigationDelay);
+		LOG(kNetwork, kVerbose, "ClientSession::SendUpdateOwnedEntityRequest GlobalId: {} Missiles: {} NavDelay: {}", iGlobalId, bUseMissiles, common::Wb(fNavigationDelay, 3));
+	}, iGlobalId, static_cast<uint8_t>(bUseMissiles ? 1 : 0), fNavigationDelay);
 }
 
 void ClientSession::SendCreateFleetRequest()
@@ -295,12 +295,12 @@ void ClientSession::SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid)
 	}, rFleetGuid.uiHigh, rFleetGuid.uiLow);
 }
 
-void ClientSession::SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalPlayerId)
+void ClientSession::SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId)
 {
 	mpRuntime->SendGameRequest(GamePacketType::kClientRespawnInFleetRequest, [&]
 	{
-		LOG(kNetwork, kDebug, "ClientSession::SendRespawnInFleetRequest Fleet: ({},{}) Member: {}", rFleetGuid.uiHigh, rFleetGuid.uiLow, memberGlobalPlayerId.iValue);
-	}, rFleetGuid.uiHigh, rFleetGuid.uiLow, memberGlobalPlayerId.iValue);
+		LOG(kNetwork, kDebug, "ClientSession::SendRespawnInFleetRequest Fleet: ({},{}) Member: {}", rFleetGuid.uiHigh, rFleetGuid.uiLow, memberGlobalId.iValue);
+	}, rFleetGuid.uiHigh, rFleetGuid.uiLow, memberGlobalId.iValue);
 }
 
 void ClientSession::SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay)

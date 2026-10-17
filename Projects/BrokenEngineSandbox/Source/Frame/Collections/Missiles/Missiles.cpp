@@ -61,7 +61,7 @@ constexpr float kfDeltaRotationLimitMinimum = 2.0f;
 constexpr float kfDeltaRotationLimitRandom = 2.0f;
 
 #if defined(BT_CLIENT)
-static int64_t siPlayerExhaustAreaLightTypeIndex = 0xFF;
+static int64_t siOmniExhaustAreaLightTypeIndex = 0xFF;
 static int64_t siEnemyExhaustAreaLightTypeIndex = 0xFF;
 
 static int64_t siSmokeTrailTypeIndex = 0xFF;
@@ -104,7 +104,7 @@ void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine:
 
 		engine::AreaLightsInterpolate::Sync(rFrameInterpolate, uiAreaLight,
 		{
-			.iTypeIndex = (flags & kTargetPlayer) ? siEnemyExhaustAreaLightTypeIndex : siPlayerExhaustAreaLightTypeIndex,
+			.iTypeIndex = (flags & kTargetOmni) ? siEnemyExhaustAreaLightTypeIndex : siOmniExhaustAreaLightTypeIndex,
 			.vecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
 			.fIntensityMultiplier = fIntensityMultiplier,
 		});
@@ -153,7 +153,7 @@ void MissilesInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 	}
 
 	int64_t iAreaLightType = (rPostRender.pFlags[iIndex] & kTargetEnemy)
-		? siPlayerExhaustAreaLightTypeIndex : siEnemyExhaustAreaLightTypeIndex;
+		? siOmniExhaustAreaLightTypeIndex : siEnemyExhaustAreaLightTypeIndex;
 	engine::AreaLightsPostRender::Add(rFrame, rMissiles.puiAreaLights[iIndex], iAreaLightType);
 
 	engine::SmokeTrailsPostRender::Add(rFrame, rMissiles.puiSmokeTrails[iIndex], siSmokeTrailTypeIndex);
@@ -180,7 +180,7 @@ void MissilesInterpolate::ClientInitializeAll(Frame& rFrame)
 void MissilesInterpolate::Register()
 {
 #if defined(BT_CLIENT)
-	engine::AreaLightsInterpolate::RegisterType(siPlayerExhaustAreaLightTypeIndex,
+	engine::AreaLightsInterpolate::RegisterType(siOmniExhaustAreaLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesMissilesBC73pngCrc,
 		.puiColors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},

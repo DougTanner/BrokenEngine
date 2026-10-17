@@ -11,9 +11,9 @@ namespace game
 
 const engine::TweaksSliderMapRegistrar gSoundEffectsRegistrar
 {
-	{"Player Blaster Volume", &gPlayerBlasterVolume},
-	{"Player Blaster Pitch Min", &gPlayerBlasterPitchMinimum},
-	{"Player Blaster Pitch Random", &gPlayerBlasterPitchRandom},
+	{"Omni Blaster Volume", &gOmniBlasterVolume},
+	{"Omni Blaster Pitch Min", &gOmniBlasterPitchMinimum},
+	{"Omni Blaster Pitch Random", &gOmniBlasterPitchRandom},
 	{"Enemy Blaster Volume", &gEnemyBlasterVolume},
 	{"Enemy Blaster Pitch Min", &gEnemyBlasterPitchMinimum},
 	{"Enemy Blaster Pitch Random", &gEnemyBlasterPitchRandom},
@@ -42,8 +42,8 @@ void RenderSoundEffects(engine::TweaksScreen& rScreen)
 	{
 		ImGui::TableNextColumn();
 
-		rScreen.WrapperSeparatorText("Blasters - Player");
-		rScreen.WrapperSlider("Volume", iSection, 1.0f, "Player Blaster Volume");
+		rScreen.WrapperSeparatorText("Blasters - Omni");
+		rScreen.WrapperSlider("Volume", iSection, 1.0f, "Omni Blaster Volume");
 
 		rScreen.WrapperSeparatorText("Blasters - Enemy");
 		rScreen.WrapperSlider("Volume", iSection, 1.0f, "Enemy Blaster Volume");
@@ -58,12 +58,12 @@ void RenderSoundEffects(engine::TweaksScreen& rScreen)
 		rScreen.WrapperSeparatorText("Explosions");
 		rScreen.WrapperSlider("Volume", iSection, 1.0f, "Explosion Volume");
 
-		rScreen.WrapperSeparatorText("Players - Shield");
+		rScreen.WrapperSeparatorText("Omnis - Shield");
 		rScreen.WrapperSlider("Hit Volume Base", iSection, 1.0f, "Shield Hit Volume Base");
 		rScreen.WrapperSlider("Hit Volume Scale", iSection, 1.0f, "Shield Hit Volume Scale");
 		rScreen.WrapperSlider("Down Volume", iSection, 1.0f, "Shield Down Volume");
 
-		rScreen.WrapperSeparatorText("Players - Armor");
+		rScreen.WrapperSeparatorText("Omnis - Armor");
 		rScreen.WrapperSlider("Hit Volume Base", iSection, 1.0f, "Armor Hit Volume Base");
 		rScreen.WrapperSlider("Hit Volume Scale", iSection, 1.0f, "Armor Hit Volume Scale");
 
@@ -73,9 +73,9 @@ void RenderSoundEffects(engine::TweaksScreen& rScreen)
 
 		ImGui::TableNextColumn();
 
-		rScreen.WrapperSeparatorText("Blasters - Player");
-		rScreen.WrapperSlider("Pitch Min", iSection, 1.0f, "Player Blaster Pitch Min");
-		rScreen.WrapperSlider("Pitch Random", iSection, 1.0f, "Player Blaster Pitch Random");
+		rScreen.WrapperSeparatorText("Blasters - Omni");
+		rScreen.WrapperSlider("Pitch Min", iSection, 1.0f, "Omni Blaster Pitch Min");
+		rScreen.WrapperSlider("Pitch Random", iSection, 1.0f, "Omni Blaster Pitch Random");
 
 		rScreen.WrapperSeparatorText("Blasters - Enemy");
 		rScreen.WrapperSlider("Pitch Min", iSection, 1.0f, "Enemy Blaster Pitch Min");

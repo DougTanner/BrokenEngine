@@ -28,7 +28,7 @@ inline constexpr float kfMissileExhaustLengthRandom = 1.0f;
 // draw must be deterministic across client/server. Runtime-tweakable launch-cue pitch lives in SoundWrappers.h.
 inline constexpr float kfMissilePitchMinimum = 0.75f;
 inline constexpr float kfMissilePitchRandom = 0.5f;
-// Radius of the homing-target acquisition query, for both re-acquisition during Update and the player spawn site.
+// Radius of the homing-target acquisition query, for both re-acquisition during Update and the omni spawn site.
 inline constexpr float kfMissileTargetAcquireRange = 45.0f;
 struct Frame;
 struct FrameInterpolate;
@@ -38,8 +38,8 @@ enum class MissileFlags : uint8_t
 	kTransfer  = 0x01,
 	kExploding = 0x02,
 	kDirectional = 0x04,
-	kTargetPlayer = 0x08,
-	kTargetEnemy  = 0x10,
+	kTargetOmni  = 0x08,
+	kTargetEnemy = 0x10,
 	kFalling       = 0x20,
 	kSilentDespawn = 0x40,
 };

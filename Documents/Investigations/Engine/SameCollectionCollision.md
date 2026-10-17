@@ -15,7 +15,7 @@ Ships are being split into the Fighters, Omnis, and Battleships Collections. Fle
 
 - A pusher is a radial field per entity, `(1 - d²/r²)^power * intensity`, measured in 3D and summed (`Engine/Source/Frame/Collections/Pushers/PushersUpdate.cpp:152-165`), on a 50x50 XY zone grid (`:6-7`). Pushers ignore alignment and collection and filter only by flags (`:134-144`).
 - The response is a velocity impulse capped by `ApplyClampedPush` (`Pushers.h:27-32`) at half the maximum speed (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.h:32`, `SpaceshipsNavigation.cpp:125-136`). It applies no position correction and produces no events or damage. The spaceship pusher radius of 2.25 (`Spaceships.h:29`) lies inside the 3.0 contact distance (`Spaceships.h:22`), so same-type ships can rest overlapping.
-- Collision produces events (`Collision.h:47-57`) that the game turns into damage (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Players/PlayersCombat.cpp:236-238`, `Spaceships/SpaceshipsCombat.cpp:147-149`), never separation. It runs after Update (`Engine/Source/Frame/FrameBase.cpp:248-252`).
+- Collision produces events (`Collision.h:47-57`) that the game turns into damage (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Omnis/OmnisCombat.cpp:236-238`, `Spaceships/SpaceshipsCombat.cpp:147-149`), never separation. It runs after Update (`Engine/Source/Frame/FrameBase.cpp:248-252`).
 
 ## Open question for the user
 

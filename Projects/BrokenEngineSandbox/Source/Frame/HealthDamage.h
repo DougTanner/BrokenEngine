@@ -19,11 +19,11 @@ inline constexpr float kppfDamages[kDamagesCount][3] =
 	{5.0f, 10.0f, 15.0f}, // kDamageSpaceshipCollision
 };
 
-inline constexpr float kfPlayerArmor = 50.0f;
-inline constexpr float kfPlayerShield = 100.0f;
-inline constexpr float kfPlayerShieldRegeneration = 5.0f;
+inline constexpr float kfOmniArmor = 50.0f;
+inline constexpr float kfOmniShield = 100.0f;
+inline constexpr float kfOmniShieldRegeneration = 5.0f;
 
-inline constexpr float kfPlayerEnergy = 25.0f;
+inline constexpr float kfOmniEnergy = 25.0f;
 
 inline constexpr float kfSpaceshipArmorShardChance = 0.1f;
 
@@ -42,25 +42,25 @@ inline constexpr float kfSpaceshipCollisionDamage = 5.0f;
 
 namespace CollisionCategory
 {
-	inline constexpr uint16_t kuiNone      = 0x0000;
-	inline constexpr uint16_t kuiBlaster   = 0x0001;
-	inline constexpr uint16_t kuiSpaceship = 0x0004;
-	inline constexpr uint16_t kuiPlayer    = 0x0008;
-	inline constexpr uint16_t kuiMissile   = 0x0010;
+inline constexpr uint16_t kuiNone      = 0x0000;
+inline constexpr uint16_t kuiBlaster   = 0x0001;
+inline constexpr uint16_t kuiSpaceship = 0x0004;
+inline constexpr uint16_t kuiOmni      = 0x0008;
+inline constexpr uint16_t kuiMissile   = 0x0010;
 } // namespace CollisionCategory
 
 namespace CollidesWith
 {
-	inline constexpr uint16_t kuiNone = CollisionCategory::kuiNone;
+inline constexpr uint16_t kuiNone = CollisionCategory::kuiNone;
 
-	// Alignment filters same-team collisions.
-	inline constexpr uint16_t kuiBlaster = CollisionCategory::kuiSpaceship | CollisionCategory::kuiPlayer;
+// Alignment filters same-team collisions.
+inline constexpr uint16_t kuiBlaster = CollisionCategory::kuiSpaceship | CollisionCategory::kuiOmni;
 
-	inline constexpr uint16_t kuiMissile = CollisionCategory::kuiSpaceship;
+inline constexpr uint16_t kuiMissile = CollisionCategory::kuiSpaceship;
 
-	inline constexpr uint16_t kuiSpaceship = CollisionCategory::kuiPlayer | CollisionCategory::kuiBlaster | CollisionCategory::kuiMissile;
+inline constexpr uint16_t kuiSpaceship = CollisionCategory::kuiOmni | CollisionCategory::kuiBlaster | CollisionCategory::kuiMissile;
 
-	inline constexpr uint16_t kuiPlayer = CollisionCategory::kuiSpaceship | CollisionCategory::kuiBlaster;
+inline constexpr uint16_t kuiOmni = CollisionCategory::kuiSpaceship | CollisionCategory::kuiBlaster;
 } // namespace CollidesWith
 
 } // namespace game

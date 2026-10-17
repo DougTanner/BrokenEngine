@@ -21,7 +21,7 @@ namespace game
 
 class ClientReconciler;
 struct Frame;
-struct ReceivedPlayerEvent;
+struct ReceivedOwnedEntityEvent;
 enum class GamePacketType : uint8_t;
 
 enum class SubscriptionChangeReason : uint8_t
@@ -34,7 +34,7 @@ enum class SubscriptionChangeReason : uint8_t
 	kPollTick,
 	kFocusNextFleet,
 	kFocusPreviousFleet,
-	kSelectPlayer,
+	kSelectOwnedEntity,
 };
 
 const char* ToString(SubscriptionChangeReason eReason);
@@ -53,10 +53,10 @@ public:
 
 	void ApplyReceivedStaticData();
 
-	void SendUpdatePlayerRequest(int64_t iGlobalPlayerId, bool bUseMissiles, float fNavigationDelay);
+	void SendUpdateOwnedEntityRequest(int64_t iGlobalId, bool bUseMissiles, float fNavigationDelay);
 	void SendCreateFleetRequest();
 	void SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid);
-	void SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalPlayerId);
+	void SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId);
 	void SendDeleteFleetRequest(const FleetGuid& rFleetGuid);
 	void SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay);
 
@@ -80,8 +80,8 @@ private:
 	void ProcessReceivedGamePackets();
 	void HydrateReceivedFullState(Frame& rReceived, const Frame* pRingTail);
 
-	void ApplyPlayerEvent(const ReceivedPlayerEvent& rEvent);
-	void UpdatePlayerCoordinate(engine::GlobalId globalPlayerId, engine::GridCoord coordinate);
+	void ApplyOwnedEntityEvent(const ReceivedOwnedEntityEvent& rEvent);
+	void UpdateOwnedEntityCoordinate(engine::GlobalId globalId, engine::GridCoord coordinate);
 
 };
 

@@ -4,7 +4,7 @@
 
 #include "Ui/MenuUtils.h"
 
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Fleet.h"
 #include "Game.h"
@@ -33,15 +33,15 @@ void HudScreen::Render()
 
 	// Force-open the fleet panel when the focused fleet has no presence in any subscribed cell.
 	// Iterating all subscribed cells (not just mClientGridCoordinate) tolerates cell-boundary crossings,
-	// where the player's snapshot has migrated to a neighbor before mClientGridCoordinate catches up.
+	// where the owned entity's snapshot has migrated to a neighbor before mClientGridCoordinate catches up.
 	bool bWantsForceOpen = false;
 	const char* pcWantReason = "fleet member present";
 	int64_t iSubscribedCellCount = 0;
 
-	if (!(gpGame->ClientPlayerIdentifier().iValue != 0))
+	if (!(gpGame->ClientOwnedEntityIdentifier().iValue != 0))
 	{
 		bWantsForceOpen = true;
-		pcWantReason = "ClientPlayerId invalid";
+		pcWantReason = "ClientOwnedEntityId invalid";
 	}
 	else if (const Fleet* pFleet = gpGame->mFleetSelection.FocusedFleet(); pFleet == nullptr)
 	{
@@ -58,13 +58,13 @@ void HudScreen::Render()
 				continue;
 			}
 			++iSubscribedCellCount;
-			const PlayersPostRender& rPlayers = *gpGame->RenderFrame(rCoordinate).postRender.pPlayers;
-			for (int64_t i = 0; i < rPlayers.iCount && !bFoundAny; ++i)
+			const OmnisPostRender& rOmnis = *gpGame->RenderFrame(rCoordinate).postRender.pOmnis;
+			for (int64_t i = 0; i < rOmnis.iCount && !bFoundAny; ++i)
 			{
-				engine::GlobalId globalPlayerId = rPlayers.pGlobalPlayerIds[i];
-				bFoundAny = std::ranges::any_of(pFleet->members, [globalPlayerId](const FleetMember& rMember)
+				engine::GlobalId globalId = rOmnis.pGlobalIds[i];
+				bFoundAny = std::ranges::any_of(pFleet->members, [globalId](const FleetMember& rMember)
 				{
-					return rMember.globalPlayerId == globalPlayerId;
+					return rMember.globalId == globalId;
 				});
 			}
 			if (bFoundAny)
@@ -82,7 +82,7 @@ void HudScreen::Render()
 	}
 
 	// Grace period: only force-open once the want-state has been sustained. Absorbs the brief gap during cell-boundary
-	// hand-offs when the player snapshot is momentarily absent from every subscribed cell, plus ClientPlayerIdentifier blips.
+	// hand-offs when the owned-entity snapshot is momentarily absent from every subscribed cell, plus ClientOwnedEntityIdentifier blips.
 	ImGuiIO& rInputOutput = ImGui::GetIO();
 	if (bWantsForceOpen)
 	{
@@ -102,18 +102,18 @@ void HudScreen::Render()
 	}
 	mbPreviousForceOpen = bForceOpen;
 
-	// Right panel content gate: it has nothing useful to show without a focused player in current snapshot.
-	std::optional<int64_t> oPlayerIndex;
+	// Right panel content gate: it has nothing useful to show without a focused owned entity in current snapshot.
+	std::optional<int64_t> oOwnedEntityIndex;
 	{
 		auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
 		if (it != gpGame->mCells.end() && it->second.iSnapshotCount > 0)
 		{
-			oPlayerIndex = gpGame->ClientPlayerIndex(*gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pPlayers);
+			oOwnedEntityIndex = gpGame->ClientOwnedEntityIndex(*gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pOmnis);
 		}
 	}
-	bool bRightHasContent = oPlayerIndex.has_value();
+	bool bRightHasContent = oOwnedEntityIndex.has_value();
 
-	// With focused-player content, mouse proximity to either anchor opens both panels together.
+	// With focused owned-entity content, mouse proximity to either anchor opens both panels together.
 	ImVec2 vLeftAnchor(rInputOutput.DisplaySize.x * kfHudEdgeMarginFraction, rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
 	ImVec2 vRightAnchor(rInputOutput.DisplaySize.x * (1.0f - kfHudEdgeMarginFraction), rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
 
@@ -137,7 +137,7 @@ void HudScreen::Render()
 	float fRightTarget = bRightHasContent ? std::max(fForceTarget, fMouseTarget) : 0.0f;
 
 	RenderFleetPanel(fLeftTarget);
-	RenderFocusedPlayerPanel(fRightTarget);
+	RenderFocusedOwnedEntityPanel(fRightTarget);
 }
 
 float HudScreen::PanelWidth()
@@ -258,14 +258,14 @@ void HudScreen::RenderFleetPanel(float fTarget)
 
 		for (const auto& [i, rMember] : std::views::enumerate(pFleet->members))
 		{
-			bool bSelected = (rMember.globalPlayerId.iValue != 0) && rMember.globalPlayerId == gpGame->mFleetSelection.mFocusedMemberGlobalId;
+			bool bSelected = (rMember.globalId.iValue != 0) && rMember.globalId == gpGame->mFleetSelection.mFocusedMemberGlobalId;
 
 			engine::GridCoord memberCoordinate {};
-			for (int64_t j = 0; j < std::ssize(gpGame->mClientPlayerIdentifiers); ++j)
+			for (int64_t j = 0; j < std::ssize(gpGame->mClientOwnedEntityIdentifiers); ++j)
 			{
-				if (gpGame->mClientPlayerIdentifiers.at(j) == rMember.globalPlayerId)
+				if (gpGame->mClientOwnedEntityIdentifiers.at(j) == rMember.globalId)
 				{
-					memberCoordinate = gpGame->mClientPlayerCoordinates.at(j);
+					memberCoordinate = gpGame->mClientOwnedEntityCoordinates.at(j);
 					break;
 				}
 			}
@@ -274,24 +274,24 @@ void HudScreen::RenderFleetPanel(float fTarget)
 			if (!(rMember.flags & FleetMemberFlags::kIsDead))
 			{
 				char pcLabel[64];
-				std::snprintf(pcLabel, sizeof(pcLabel), "Ship %lld (%d,%d) #%lld", i + 1, memberCoordinate.iX, memberCoordinate.iY, rMember.globalPlayerId.iValue);
+				std::snprintf(pcLabel, sizeof(pcLabel), "Ship %lld (%d,%d) #%lld", i + 1, memberCoordinate.iX, memberCoordinate.iY, rMember.globalId.iValue);
 				if (ImGui::Selectable(pcLabel, bSelected))
 				{
-					gpGame->mFleetSelection.SelectPlayerInFleet(rMember.globalPlayerId);
-					gpClientSession->mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kSelectPlayer));
+					gpGame->mFleetSelection.SelectOwnedEntityInFleet(rMember.globalId);
+					gpClientSession->mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kSelectOwnedEntity));
 				}
 			}
 			else
 			{
 				char pcLabel[64];
-				std::snprintf(pcLabel, sizeof(pcLabel), "Ship %lld [DEAD] #%lld", i + 1, rMember.globalPlayerId.iValue);
+				std::snprintf(pcLabel, sizeof(pcLabel), "Ship %lld [DEAD] #%lld", i + 1, rMember.globalId.iValue);
 				ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
 				if (ImGui::Selectable(pcLabel, false))
 				{
 					if (gpClientSession != nullptr)
 					{
-						gpClientSession->SendRespawnInFleetRequest(pFleet->guid, rMember.globalPlayerId);
-						LOG(kDefault, kVerbose, "HUD RespawnInFleet Fleet: ({},{}) Member: {}", pFleet->guid.uiHigh, pFleet->guid.uiLow, rMember.globalPlayerId.iValue);
+						gpClientSession->SendRespawnInFleetRequest(pFleet->guid, rMember.globalId);
+						LOG(kDefault, kVerbose, "HUD RespawnInFleet Fleet: ({},{}) Member: {}", pFleet->guid.uiHigh, pFleet->guid.uiLow, rMember.globalId.iValue);
 					}
 				}
 				ImGui::PopStyleColor();
@@ -300,7 +300,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 		}
 
 		ImGui::BeginDisabled((gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || std::ssize(pFleet->members) >= kiMaximumFleetMembers);
-		if (ImGui::Button("[+]##Player"))
+		if (ImGui::Button("[+]##Omni"))
 		{
 			if (gpClientSession != nullptr)
 			{
@@ -331,7 +331,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 		sbNavigationDelaySliderWasActive = ImGui::IsItemActive();
 		if (ImGui::IsItemDeactivatedAfterEdit())
 		{
-			if (!PlayersPostRender::IsNavigationDelayInRange(sfNavigationDelayEditValue))
+			if (!OmnisPostRender::IsNavigationDelayInRange(sfNavigationDelayEditValue))
 			{
 				sfNavigationDelayEditValue = pFleet->navigationDelaySeconds.count();
 			}
@@ -348,22 +348,22 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	ImGui::End();
 }
 
-void HudScreen::RenderFocusedPlayerPanel(float fTarget)
+void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 {
 	ImGuiIO& rInputOutput = ImGui::GetIO();
 	engine::ScopedMenuScale menuScale;
 
-	std::optional<int64_t> oPlayerIndex = std::nullopt;
+	std::optional<int64_t> oOwnedEntityIndex = std::nullopt;
 	{
 		auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
 		if (it != gpGame->mCells.end() && it->second.iSnapshotCount > 0)
 		{
-			oPlayerIndex = gpGame->ClientPlayerIndex(*gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pPlayers);
+			oOwnedEntityIndex = gpGame->ClientOwnedEntityIndex(*gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pOmnis);
 		}
 	}
 
 	ImVec2 vAnchor(rInputOutput.DisplaySize.x * (1.0f - kfHudEdgeMarginFraction), rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
-	float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFocusedPlayerSlide, vAnchor, 1.0f, fTarget);
+	float fEdgeX = engine::UpdateSlideAndGetEdgeX(mFocusedOwnedEntitySlide, vAnchor, 1.0f, fTarget);
 	int64_t iWindowFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 	engine::ScopedMenuFont menuFont;
 	// Match the left FleetPanel's size exactly (symmetry): same PanelWidth(), height forced to the left panel's live height
@@ -371,8 +371,8 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 	float fLeftHeight = (mFleetSlide.vLastSize.y > 0.0f) ? mFleetSlide.vLastSize.y : (rInputOutput.DisplaySize.y * kfHudPanelMaximumHeightFraction);
 	ImGui::SetNextWindowSize(ImVec2(PanelWidth(), fLeftHeight), ImGuiCond_Always);
 	ImGui::SetNextWindowPos(ImVec2(fEdgeX, vAnchor.y), ImGuiCond_Always, ImVec2(0.0f, 0.0f));
-	ImGui::Begin("FocusedPlayerPanel", nullptr, static_cast<ImGuiWindowFlags>(iWindowFlags));
-	mFocusedPlayerSlide.vLastSize = ImGui::GetWindowSize();
+	ImGui::Begin("FocusedOwnedEntityPanel", nullptr, static_cast<ImGuiWindowFlags>(iWindowFlags));
+	mFocusedOwnedEntitySlide.vLastSize = ImGui::GetWindowSize();
 	engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
 
 	// Border + accent strip only — the opaque themed WindowBg must stay intact for RegisterOpaqueRectangle occlusion
@@ -380,11 +380,11 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
 	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPosition, ImVec2(vPanelPosition.x + vPanelSize.x, vPanelPosition.y + vPanelSize.y));
 
-	if (oPlayerIndex.has_value())
+	if (oOwnedEntityIndex.has_value())
 	{
-		PlayersPostRender& rPlayers = *gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pPlayers;
-		bool bUseMissiles = static_cast<bool>(rPlayers.pFlags[*oPlayerIndex] & PlayerFlags::kUseMissiles);
-		gpGame->mWeaponModeToggle.Update(WeaponModeKey {.playerIdentifier = gpGame->ClientPlayerIdentifier(), .bUseMissiles = bUseMissiles});
+		OmnisPostRender& rOmnis = *gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pOmnis;
+		bool bUseMissiles = static_cast<bool>(rOmnis.pFlags[*oOwnedEntityIndex] & OmniFlags::kUseMissiles);
+		gpGame->mWeaponModeToggle.Update(WeaponModeKey {.ownedEntityIdentifier = gpGame->ClientOwnedEntityIdentifier(), .bUseMissiles = bUseMissiles});
 
 		const char* pcLabel = bUseMissiles ? "Missiles" : "Blasters";
 		const ImGuiStyle& rStyle = ImGui::GetStyle();
@@ -397,11 +397,11 @@ void HudScreen::RenderFocusedPlayerPanel(float fTarget)
 		ImGui::BeginDisabled((gpGame->mWeaponModeToggle.mFlags & engine::NetworkUiControlFlags::kPending));
 		if (ImGui::Button(pcLabel, vButtonSize))
 		{
-			if (gpClientSession != nullptr && (gpGame->ClientPlayerIdentifier().iValue != 0))
+			if (gpClientSession != nullptr && (gpGame->ClientOwnedEntityIdentifier().iValue != 0))
 			{
 				gpGame->mWeaponModeToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
-				float fNavigationDelay = rPlayers.pNavigationDelays[*oPlayerIndex].count();
-				gpClientSession->SendUpdatePlayerRequest(gpGame->ClientPlayerIdentifier().iValue, !bUseMissiles, fNavigationDelay);
+				float fNavigationDelay = rOmnis.pNavigationDelays[*oOwnedEntityIndex].count();
+				gpClientSession->SendUpdateOwnedEntityRequest(gpGame->ClientOwnedEntityIdentifier().iValue, !bUseMissiles, fNavigationDelay);
 			}
 		}
 		ImGui::EndDisabled();

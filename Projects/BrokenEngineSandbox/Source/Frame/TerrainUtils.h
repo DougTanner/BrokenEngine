@@ -1,7 +1,7 @@
 #pragma once
 
 #if defined(BT_SERVER)
-#include "Frame/Collections/Players/Players.h" // kfPlayerRadius/kfPushMargin, the inputs the constexpr navigation values below derive from.
+#include "Frame/Collections/Omnis/Omnis.h" // kfOmniRadius/kfPushMargin, the inputs the constexpr navigation values below derive from.
 #endif // BT_SERVER
 
 namespace engine
@@ -28,12 +28,12 @@ float XM_CALLCONV ComputeTerrainAvoidance(const engine::CellStaticData& rStaticD
 // Engine startup passes the game's runtime clearance and elevation threshold unchanged to the navigation bake.
 constexpr float NavigationClearanceMeters()
 {
-	return kfPlayerRadius + kfPushMargin;
+	return kfOmniRadius + kfPushMargin;
 }
 
 constexpr float NavigationThresholdElevation(float fBaseHeight)
 {
-	return fBaseHeight - kfPlayerRadius - kfPushMargin;
+	return fBaseHeight - kfOmniRadius - kfPushMargin;
 }
 
 #endif // BT_SERVER

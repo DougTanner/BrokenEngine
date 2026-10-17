@@ -3,7 +3,7 @@
 #include "Audio/StaticVoices.h"
 #include "Network/Client/ReconcileReplay.h"
 
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Profile/ProfileRows.h"
 #include "Game.h"
 
@@ -12,14 +12,14 @@ namespace game
 
 #if defined(BT_CLIENT)
 
-static bool GetClientPlayerPosition(const Frame& rFrame, XMVECTOR& rVecPosition)
+static bool GetClientOwnedEntityPosition(const Frame& rFrame, XMVECTOR& rVecPosition)
 {
-	std::optional<int64_t> oClientPlayerIndex = gpGame->ClientPlayerIndex(*rFrame.postRender.pPlayers);
-	if (!oClientPlayerIndex.has_value())
+	std::optional<int64_t> oClientOwnedEntityIndex = gpGame->ClientOwnedEntityIndex(*rFrame.postRender.pOmnis);
+	if (!oClientOwnedEntityIndex.has_value())
 	{
 		return false;
 	}
-	rVecPosition = rFrame.interpolate.pPlayers->pVecPositions[*oClientPlayerIndex];
+	rVecPosition = rFrame.interpolate.pOmnis->pVecPositions[*oClientOwnedEntityIndex];
 	return true;
 }
 
@@ -36,7 +36,7 @@ static bool GetClientSnapshotPosition(XMVECTOR& rVecPosition, int64_t& riTick)
 	}
 	const Frame& rFrame = gpGame->RenderFrame(gpGame->mClientGridCoordinate);
 	riTick = rFrame.interpolate.iTick;
-	return GetClientPlayerPosition(rFrame, rVecPosition);
+	return GetClientOwnedEntityPosition(rFrame, rVecPosition);
 }
 
 // A full replay can leave the ring without history before its confirmed frame, so the replayed timeline's frame at
@@ -55,7 +55,7 @@ static bool GetClientReplayedPosition(std::span<const engine::CoordWork> works, 
 			const Frame& rFrame = *rScratch.replayStack.at(static_cast<size_t>(i));
 			if (rFrame.interpolate.iTick == iTick)
 			{
-				return GetClientPlayerPosition(rFrame, rVecPosition);
+				return GetClientOwnedEntityPosition(rFrame, rVecPosition);
 			}
 		}
 		return false;
@@ -70,7 +70,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 
 	// Re-sync client identity from main thread
 	mConfirmedClientState.clientGridCoordinate = gpGame->mClientGridCoordinate;
-	mConfirmedClientState.clientGlobalPlayerIdentifier = gpGame->ClientPlayerIdentifier();
+	mConfirmedClientState.clientGlobalIdentifier = gpGame->ClientOwnedEntityIdentifier();
 	mConfirmedClientState.fPreviousClientArmor = gpGame->mfPreviousClientArmor;
 
 	engine::ReconcileInputs inputs;
@@ -110,7 +110,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 		return desynchronizationInformation;
 	}
 
-	// Player-transfer migration updates previous client armor.
+	// Owned-entity transfer migration updates previous client armor.
 	ConfirmedClientState newConfirmedClientState = mConfirmedClientState;
 	std::span<const engine::CoordWork> activeWorks(mDispatcher.mWorks.data(), static_cast<size_t>(mDispatcher.miActiveCount));
 	ReconcileUpdateClientState(activeWorks, dispatch.bAnyFullReplay, newConfirmedClientState);

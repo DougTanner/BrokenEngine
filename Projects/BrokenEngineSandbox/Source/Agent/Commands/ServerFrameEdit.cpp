@@ -7,7 +7,7 @@
 #include "Agent/AgentCommandsServerQueries.h"
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Frame/FrameCollections.h"
 #include "Save/GameSaveLoad.h"
@@ -32,7 +32,7 @@ template <typename OWNER, typename MEMBER> struct MemberOwner<MEMBER OWNER::*>
 	using Type = OWNER;
 };
 
-using PlayersFrameColumns = engine::FrameColumnList<FRAME_COLUMN(PlayersInterpolate, pVecPositions), FRAME_COLUMN(PlayersInterpolate, pVecDirections), FRAME_COLUMN(PlayersInterpolate, pDestroyedTimes), FRAME_COLUMN(PlayersInterpolate, pAnimationTimes), FRAME_COLUMN(PlayersInterpolate, pPushers), FRAME_COLUMN(PlayersPostRender, pIds), FRAME_COLUMN(PlayersPostRender, pFlags), FRAME_COLUMN(PlayersPostRender, pAlignments), FRAME_COLUMN(PlayersPostRender, pNextBlasterFireTimes), FRAME_COLUMN(PlayersPostRender, pNextSecondarySpawnTimes), FRAME_COLUMN(PlayersPostRender, pVecVelocities), FRAME_COLUMN(PlayersPostRender, pVecWantedDirections), FRAME_COLUMN(PlayersPostRender, pfArmors), FRAME_COLUMN(PlayersPostRender, pfShields), FRAME_COLUMN(PlayersPostRender, pShieldCooldowns), FRAME_COLUMN(PlayersPostRender, pDestroyedExplosionTimes), FRAME_COLUMN(PlayersPostRender, pShieldDownSoundCooldowns), FRAME_COLUMN(PlayersPostRender, pVecAiDirections), FRAME_COLUMN(PlayersPostRender, pTransferLockTimers), FRAME_COLUMN(PlayersPostRender, pArrivalGracePeriods), FRAME_COLUMN(PlayersPostRender, pCellChangeTimers), FRAME_COLUMN(PlayersPostRender, pVecIslandDestinations), FRAME_COLUMN(PlayersPostRender, pClientGuids), FRAME_COLUMN(PlayersPostRender, pGlobalPlayerIds), FRAME_COLUMN(PlayersPostRender, pNavigationDelays), FRAME_COLUMN(PlayersPostRender, pFleetWantedCoordinates), FRAME_COLUMN(PlayersPostRender, puiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(PlayersPostRender, puiPendingWeaponModeTicks)>;
+using OmnisFrameColumns = engine::FrameColumnList<FRAME_COLUMN(OmnisInterpolate, pVecPositions), FRAME_COLUMN(OmnisInterpolate, pVecDirections), FRAME_COLUMN(OmnisInterpolate, pDestroyedTimes), FRAME_COLUMN(OmnisInterpolate, pAnimationTimes), FRAME_COLUMN(OmnisInterpolate, pPushers), FRAME_COLUMN(OmnisPostRender, pIds), FRAME_COLUMN(OmnisPostRender, pFlags), FRAME_COLUMN(OmnisPostRender, pAlignments), FRAME_COLUMN(OmnisPostRender, pNextBlasterFireTimes), FRAME_COLUMN(OmnisPostRender, pNextSecondarySpawnTimes), FRAME_COLUMN(OmnisPostRender, pVecVelocities), FRAME_COLUMN(OmnisPostRender, pVecWantedDirections), FRAME_COLUMN(OmnisPostRender, pfArmors), FRAME_COLUMN(OmnisPostRender, pfShields), FRAME_COLUMN(OmnisPostRender, pShieldCooldowns), FRAME_COLUMN(OmnisPostRender, pDestroyedExplosionTimes), FRAME_COLUMN(OmnisPostRender, pShieldDownSoundCooldowns), FRAME_COLUMN(OmnisPostRender, pVecAiDirections), FRAME_COLUMN(OmnisPostRender, pTransferLockTimers), FRAME_COLUMN(OmnisPostRender, pArrivalGracePeriods), FRAME_COLUMN(OmnisPostRender, pCellChangeTimers), FRAME_COLUMN(OmnisPostRender, pVecIslandDestinations), FRAME_COLUMN(OmnisPostRender, pClientGuids), FRAME_COLUMN(OmnisPostRender, pGlobalIds), FRAME_COLUMN(OmnisPostRender, pNavigationDelays), FRAME_COLUMN(OmnisPostRender, pFleetWantedCoordinates), FRAME_COLUMN(OmnisPostRender, puiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(OmnisPostRender, puiPendingWeaponModeTicks)>;
 using SpaceshipsFrameColumns = engine::FrameColumnList<FRAME_COLUMN(SpaceshipsInterpolate, pVecPositions), FRAME_COLUMN(SpaceshipsInterpolate, pVecDirections), FRAME_COLUMN(SpaceshipsInterpolate, pDestroyedTimes), FRAME_COLUMN(SpaceshipsInterpolate, puiPushers), FRAME_COLUMN(SpaceshipsInterpolate, puiRegistryIds), FRAME_COLUMN(SpaceshipsInterpolate, pfDeltaRotations), FRAME_COLUMN(SpaceshipsPostRender, pFlags), FRAME_COLUMN(SpaceshipsPostRender, pVecVelocities), FRAME_COLUMN(SpaceshipsPostRender, pVecDamageDirections), FRAME_COLUMN(SpaceshipsPostRender, pfHealths), FRAME_COLUMN(SpaceshipsPostRender, pDestroyedExplosionTimes), FRAME_COLUMN(SpaceshipsPostRender, pNextBlasterSpawnTimes), FRAME_COLUMN(SpaceshipsPostRender, pAlignments), FRAME_COLUMN(SpaceshipsPostRender, pArrivalGracePeriods)>;
 using MissilesFrameColumns = engine::FrameColumnList<FRAME_COLUMN(MissilesInterpolate, pVecPositions), FRAME_COLUMN(MissilesInterpolate, pVecDirections), FRAME_COLUMN(MissilesInterpolate, pDestroyedTimes), FRAME_COLUMN(MissilesPostRender, pFlags), FRAME_COLUMN(MissilesPostRender, pVecVelocities), FRAME_COLUMN(MissilesPostRender, pVecExplosionDirections), FRAME_COLUMN(MissilesPostRender, pVecStoredDirections), FRAME_COLUMN(MissilesPostRender, puiRegistryTargets), FRAME_COLUMN(MissilesPostRender, pTimes), FRAME_COLUMN(MissilesPostRender, pDeltaRotationDelays), FRAME_COLUMN(MissilesPostRender, pfDeltaRotations), FRAME_COLUMN(MissilesPostRender, pNextJitter), FRAME_COLUMN(MissilesPostRender, pfDeltaRotationMaximum), FRAME_COLUMN(MissilesPostRender, pfAccelerations), FRAME_COLUMN(MissilesPostRender, pfPitches), FRAME_COLUMN(MissilesPostRender, pfExhaustLengths), FRAME_COLUMN(MissilesPostRender, pAlignments)>;
 using BlastersFrameColumns = engine::FrameColumnList<FRAME_COLUMN(BlastersInterpolate, puiTypeIndices), FRAME_COLUMN(BlastersInterpolate, pVecPositions), FRAME_COLUMN(BlastersInterpolate, pVecDirections), FRAME_COLUMN(BlastersPostRender, pFlags), FRAME_COLUMN(BlastersPostRender, pVecVelocities), FRAME_COLUMN(BlastersPostRender, pAlignments)>;
@@ -80,10 +80,10 @@ struct FrameCollection<engine::PushersInterpolate>
 };
 
 template <>
-struct FrameCollection<PlayersInterpolate>
+struct FrameCollection<OmnisInterpolate>
 {
-	static constexpr std::string_view kName = "players";
-	using Columns = PlayersFrameColumns;
+	static constexpr std::string_view kName = "omnis";
+	using Columns = OmnisFrameColumns;
 };
 
 template <>
@@ -362,7 +362,7 @@ using FrameCollectionAt = FrameCollection<std::remove_cvref_t<std::tuple_element
 template <typename FRAME>
 static auto FrameCollections(FRAME& rFrame)
 {
-	return std::pair(std::tuple_cat(rFrame.interpolate.ServerCollections(), std::tie(*rFrame.interpolate.pPlayers), GameInterpolateCollections(rFrame.interpolate)), std::tuple_cat(rFrame.postRender.ServerCollections(), std::tie(*rFrame.postRender.pPlayers), GamePostRenderCollections(rFrame.postRender)));
+	return std::pair(std::tuple_cat(rFrame.interpolate.ServerCollections(), std::tie(*rFrame.interpolate.pOmnis), GameInterpolateCollections(rFrame.interpolate)), std::tuple_cat(rFrame.postRender.ServerCollections(), std::tie(*rFrame.postRender.pOmnis), GamePostRenderCollections(rFrame.postRender)));
 }
 
 static int64_t ApplyEdit(Frame& rFrame, const nlohmann::json& rEdit)
@@ -436,11 +436,11 @@ void CommandEditFrame([[maybe_unused]] const nlohmann::json& rParameters, [[mayb
 		{
 			return rClient.bHandshakeComplete;
 		});
-		// The resynchronization frees every client subscription, so the same update's active set drops a playerless
+		// The resynchronization frees every client subscription, so the same update's active set drops an omniless
 		// cell other than the origin and would discard the edit.
-		if (iClientCount > 0 && rLiveFrame.postRender.pPlayers->iCount == 0 && CoordinateFromParameter(rParameters) != engine::kOriginCoordinate)
+		if (iClientCount > 0 && rLiveFrame.postRender.pOmnis->iCount == 0 && CoordinateFromParameter(rParameters) != engine::kOriginCoordinate)
 		{
-			throw std::runtime_error("edit_frame with a handshaken client requires a cell with a player or the origin cell");
+			throw std::runtime_error("edit_frame with a handshaken client requires a cell with an omni or the origin cell");
 		}
 		uint64_t uiPreviousNextUuid = rLiveFrame.postRender.uiNextUuid;
 

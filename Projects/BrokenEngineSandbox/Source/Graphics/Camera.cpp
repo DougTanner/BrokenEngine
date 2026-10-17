@@ -4,7 +4,7 @@
 
 #include "Ui/GraphicsSettingsWrappersBase.h"
 
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Frame/Frame.h"
 #include "Game.h"
 
@@ -20,36 +20,36 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 {
 	const FrameInterpolate& rGameInterpolate = static_cast<const FrameInterpolate&>(rFrameInterpolate);
 
-	// The main menu and an invalid client-player identity use the canonical menu pose to avoid retaining a stale gameplay target.
+	// The main menu and an invalid client owned-entity identity use the canonical menu pose to avoid retaining a stale gameplay target.
 	if (gpGame->mGameFlags & engine::GameFlags::kMainMenu)
 	{
 		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 0.0f)));
 	}
 
-	if (!(gpGame->ClientPlayerIdentifier().iValue != 0))
+	if (!(gpGame->ClientOwnedEntityIdentifier().iValue != 0))
 	{
 		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 0.0f)));
 	}
 
 	// The interpolate's own cell, not the client cell: its positions are local to that cell, and the camera works in
 	// that same frame, so a target taken from it needs no conversion. Reading the index from a different cell's
-	// players would pick a position a whole cell away.
+	// omnis would pick a position a whole cell away.
 	engine::GridCoord coordinate = rGameInterpolate.renderBasis.coordinate;
 	auto it = gpGame->mCells.find(coordinate);
 	bool bHasCoordinate = it != gpGame->mCells.end() && it->second.iSnapshotCount > 0;
-	std::optional<int64_t> oPlayerIndex = bHasCoordinate ? gpGame->ClientPlayerIndex(*gpGame->RenderFrame(coordinate).postRender.pPlayers) : std::nullopt;
-	if (oPlayerIndex)
+	std::optional<int64_t> oOwnedEntityIndex = bHasCoordinate ? gpGame->ClientOwnedEntityIndex(*gpGame->RenderFrame(coordinate).postRender.pOmnis) : std::nullopt;
+	if (oOwnedEntityIndex)
 	{
-		engine::GlobalId focusedPlayerIdentifier = gpGame->ClientPlayerIdentifier();
-		XMVECTOR vecPlayerPosition = rGameInterpolate.pPlayers->pVecPositions[*oPlayerIndex];
+		engine::GlobalId focusedOwnedEntityIdentifier = gpGame->ClientOwnedEntityIdentifier();
+		XMVECTOR vecOwnedEntityPosition = rGameInterpolate.pOmnis->pVecPositions[*oOwnedEntityIndex];
 
-		if (focusedPlayerIdentifier != mLastTrackedPlayerIdentifier)
+		if (focusedOwnedEntityIdentifier != mLastTrackedOwnedEntityIdentifier)
 		{
-			LOG(kGraphics, kVerbose, "Camera NowTracking GlobalPlayerId: {} Coord: ({},{}) Index: {}", focusedPlayerIdentifier, coordinate.iX, coordinate.iY, *oPlayerIndex);
-			mLastTrackedPlayerIdentifier = focusedPlayerIdentifier;
+			LOG(kGraphics, kVerbose, "Camera NowTracking GlobalId: {} Coord: ({},{}) Index: {}", focusedOwnedEntityIdentifier, coordinate.iX, coordinate.iY, *oOwnedEntityIndex);
+			mLastTrackedOwnedEntityIdentifier = focusedOwnedEntityIdentifier;
 		}
 
-		return engine::CameraTarget::Tracked(vecPlayerPosition, mVecVisualErrorOffset);
+		return engine::CameraTarget::Tracked(vecOwnedEntityPosition, mVecVisualErrorOffset);
 	}
 
 	static std::chrono::duration<float> sLastLogTime(-1.0f);
@@ -58,20 +58,20 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 		sLastLogTime = std::chrono::duration<float>(mfTime);
 		if (bHasCoordinate)
 		{
-			const PlayersPostRender& rPlayers = *gpGame->RenderFrame(coordinate).postRender.pPlayers;
-			LOG(kGraphics, kVerbose, "Camera PlayerNotFound FocusedGlobalId: {} Coord: ({},{}) PostRenderCount: {} InterpolateCount: {}", gpGame->ClientPlayerIdentifier(), coordinate.iX, coordinate.iY, rPlayers.iCount, rGameInterpolate.pPlayers->iCount);
-			for (int64_t i = 0; i < rPlayers.iCount; ++i)
+			const OmnisPostRender& rOmnis = *gpGame->RenderFrame(coordinate).postRender.pOmnis;
+			LOG(kGraphics, kVerbose, "Camera OwnedEntityNotFound FocusedGlobalId: {} Coord: ({},{}) PostRenderCount: {} InterpolateCount: {}", gpGame->ClientOwnedEntityIdentifier(), coordinate.iX, coordinate.iY, rOmnis.iCount, rGameInterpolate.pOmnis->iCount);
+			for (int64_t i = 0; i < rOmnis.iCount; ++i)
 			{
-				LOG(kGraphics, kVerbose, "  PostRender[{}] GlobalPlayerId: {}", i, rPlayers.pGlobalPlayerIds[i]);
+				LOG(kGraphics, kVerbose, "  PostRender[{}] GlobalId: {}", i, rOmnis.pGlobalIds[i]);
 			}
 		}
 		else
 		{
-			LOG(kGraphics, kVerbose, "Camera CoordNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientPlayerIdentifier(), coordinate.iX, coordinate.iY);
+			LOG(kGraphics, kVerbose, "Camera CoordNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientOwnedEntityIdentifier(), coordinate.iX, coordinate.iY);
 		}
 	}
 
-	// Player not found — extrapolate from last known position and velocity
+	// Owned entity not found — extrapolate from last known position and velocity
 	return engine::CameraTarget::Extrapolate();
 }
 

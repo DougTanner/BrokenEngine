@@ -16,12 +16,12 @@ public:
 private:
 
 	void RenderFleetPanel(float fTarget);
-	void RenderFocusedPlayerPanel(float fTarget);
+	void RenderFocusedOwnedEntityPanel(float fTarget);
 
 #if defined(BT_CLIENT)
 	static float PanelWidth();
 	engine::SlidePanelState mFleetSlide {};
-	engine::SlidePanelState mFocusedPlayerSlide {};
+	engine::SlidePanelState mFocusedOwnedEntitySlide {};
 	std::chrono::duration<float> mTimeWantingForceOpen = 0s;
 	bool mbPreviousForceOpen = false;
 #endif

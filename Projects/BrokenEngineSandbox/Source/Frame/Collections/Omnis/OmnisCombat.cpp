@@ -1,4 +1,4 @@
-#include "Players.h"
+#include "Omnis.h"
 
 #include "Data/Audio.h"
 #include "Frame/Collections/Explosions/Explosions.h"
@@ -19,7 +19,7 @@
 namespace game
 {
 
-using enum PlayerFlags;
+using enum OmniFlags;
 
 constexpr float kfBlasterTargetRange = 120.0f;
 constexpr float kfMissileTargetRange = 160.0f;
@@ -28,28 +28,28 @@ constexpr std::chrono::duration<float> kShieldCooldown(2.0f);
 constexpr std::chrono::duration<float> kShieldDownSoundCooldown(2.0f);
 constexpr float kfArmorHitSoundDamageThreshold = 3.0f;
 
-constexpr float kfBlastersSpawnBarrelOffset = kfPlayerRadius * 0.4667f;
+constexpr float kfBlastersSpawnBarrelOffset = kfOmniRadius * 0.4667f;
 constexpr float kfBlastersSpawnPreMove = 0.0f;
 constexpr float kfBlasterAngleJitter = 0.03f;
 
 constexpr std::chrono::duration<float> kMissileSpawnInterval(0.2f);
 constexpr float kfMissileInitialVelocity = 30.0f;
 constexpr float kfMissileAcceleration = 40.0f;
-constexpr float kfMissileSpawnBarrelOffset = kfPlayerRadius * 0.7333f;
-constexpr float kfMissileSpawnPreMove = kfPlayerRadius * 1.0f;
+constexpr float kfMissileSpawnBarrelOffset = kfOmniRadius * 0.7333f;
+constexpr float kfMissileSpawnPreMove = kfOmniRadius * 1.0f;
 constexpr float kfMissileSpawnAngle = XM_PIDIV16;
 constexpr float kfMissileAngleJitter = XM_PIDIV16;
 
-constexpr float kfExplosionsRadius = kfPlayerRadius * 20.0f;
+constexpr float kfExplosionsRadius = kfOmniRadius * 20.0f;
 constexpr float kfExplosionParticleCount = 16.0f;
-constexpr float kfExplosionSizeStart = kfPlayerRadius * 1.3333f;
-constexpr float kfExplosionSizeEnd = kfPlayerRadius * 0.3333f;
+constexpr float kfExplosionSizeStart = kfOmniRadius * 1.3333f;
+constexpr float kfExplosionSizeEnd = kfOmniRadius * 0.3333f;
 constexpr float kfExplosionSmoke = 0.25f;
 constexpr float kfDeathRadialPower = 0.3f;
 constexpr int64_t kiDeathTrailCount = 2;
 
 // Firing, look targets, and missile aim require a living, visible spaceship past arrival grace.
-static bool XM_CALLCONV IsAcquireCandidate(const SpaceshipsInterpolate& __restrict rSpaceshipsInterpolate, const SpaceshipsPostRender& __restrict rSpaceshipsPostRender, FXMVECTOR vecPlayerPosition, int64_t j)
+static bool XM_CALLCONV IsAcquireCandidate(const SpaceshipsInterpolate& __restrict rSpaceshipsInterpolate, const SpaceshipsPostRender& __restrict rSpaceshipsPostRender, FXMVECTOR vecOmniPosition, int64_t j)
 {
 	if (rSpaceshipsInterpolate.pDestroyedTimes[j] != std::chrono::duration<float>(-1.0f))
 	{
@@ -59,7 +59,7 @@ static bool XM_CALLCONV IsAcquireCandidate(const SpaceshipsInterpolate& __restri
 	{
 		return false;
 	}
-	if (!FrameInterpolate::IsVisible(vecPlayerPosition, rSpaceshipsInterpolate.pVecPositions[j]))
+	if (!FrameInterpolate::IsVisible(vecOmniPosition, rSpaceshipsInterpolate.pVecPositions[j]))
 	{
 		return false;
 	}
@@ -67,17 +67,17 @@ static bool XM_CALLCONV IsAcquireCandidate(const SpaceshipsInterpolate& __restri
 }
 
 // Missile aim searches current-frame data; AcquireTarget selects firing and look targets from previous-frame data.
-static int64_t XM_CALLCONV FindTargetSpaceshipIndex(const SpaceshipsInterpolate& __restrict rSpaceshipsInterpolate, const SpaceshipsPostRender& __restrict rSpaceshipsPostRender, FXMVECTOR vecPlayerPosition)
+static int64_t XM_CALLCONV FindTargetSpaceshipIndex(const SpaceshipsInterpolate& __restrict rSpaceshipsInterpolate, const SpaceshipsPostRender& __restrict rSpaceshipsPostRender, FXMVECTOR vecOmniPosition)
 {
 	float fClosestDistance = kfMissileTargetRange;
 	int64_t iClosestSpaceship = -1;
 	for (int64_t j = 0; j < rSpaceshipsPostRender.iCount; ++j)
 	{
-		if (!IsAcquireCandidate(rSpaceshipsInterpolate, rSpaceshipsPostRender, vecPlayerPosition, j))
+		if (!IsAcquireCandidate(rSpaceshipsInterpolate, rSpaceshipsPostRender, vecOmniPosition, j))
 		{
 			continue;
 		}
-		float fDistance = common::Distance(vecPlayerPosition, rSpaceshipsInterpolate.pVecPositions[j]);
+		float fDistance = common::Distance(vecOmniPosition, rSpaceshipsInterpolate.pVecPositions[j]);
 		if (fDistance < fClosestDistance)
 		{
 			fClosestDistance = fDistance;
@@ -88,7 +88,7 @@ static int64_t XM_CALLCONV FindTargetSpaceshipIndex(const SpaceshipsInterpolate&
 }
 
 
-void XM_CALLCONV PlayersPostRender::AcquireTarget(const Frame& __restrict rPreviousFrame, FXMVECTOR vecPosition, PlayerFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition)
+void XM_CALLCONV OmnisPostRender::AcquireTarget(const Frame& __restrict rPreviousFrame, FXMVECTOR vecPosition, OmniFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition)
 {
 	const SpaceshipsInterpolate& rSpaceshipsInterpolate = *rPreviousFrame.interpolate.pSpaceships;
 	const SpaceshipsPostRender& rSpaceshipsPostRender = *rPreviousFrame.postRender.pSpaceships;
@@ -121,7 +121,7 @@ void XM_CALLCONV PlayersPostRender::AcquireTarget(const Frame& __restrict rPrevi
 	rVecLookPosition = XMVectorZero();
 	if (iTargetInRange >= 0)
 	{
-		rVecLookPosition = common::ComputeLeadPosition(vecPosition, rSpaceshipsInterpolate.pVecPositions[iTargetInRange], rSpaceshipsPostRender.pVecVelocities[iTargetInRange], kfPlayerBlastersSpeed);
+		rVecLookPosition = common::ComputeLeadPosition(vecPosition, rSpaceshipsInterpolate.pVecPositions[iTargetInRange], rSpaceshipsPostRender.pVecVelocities[iTargetInRange], kfOmniBlastersSpeed);
 		rbLookTargetFound = true;
 	}
 	else if (iTargetForLook >= 0)
@@ -141,56 +141,56 @@ void XM_CALLCONV PlayersPostRender::AcquireTarget(const Frame& __restrict rPrevi
 	}
 }
 
-void XM_CALLCONV PlayersPostRender::UpdateFacing(FXMVECTOR vecPosition, FXMVECTOR vecLookPosition, XMVECTOR& rVecWantedDirection)
+void XM_CALLCONV OmnisPostRender::UpdateFacing(FXMVECTOR vecPosition, FXMVECTOR vecLookPosition, XMVECTOR& rVecWantedDirection)
 {
-	// The reticle uses this unsmoothed lead-intercept direction; PlayersInterpolate::Update smooths hull rotation with kfRotateTowardsSpeed.
+	// The reticle uses this unsmoothed lead-intercept direction; OmnisInterpolate::Update smooths hull rotation with kfRotateTowardsSpeed.
 	rVecWantedDirection = XMVector3Normalize(XMVectorSubtract(vecLookPosition, vecPosition));
 }
 
-void PlayersPostRender::RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::duration<float> shieldCooldown, float& rfShield)
+void OmnisPostRender::RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::duration<float> shieldCooldown, float& rfShield)
 {
 	if (shieldCooldown.count() <= 0.0f)
 	{
-		rfShield = std::min(rfShield + deltaTime.count() * kfPlayerShieldRegeneration, kfPlayerShield);
+		rfShield = std::min(rfShield + deltaTime.count() * kfOmniShieldRegeneration, kfOmniShield);
 	}
 }
 
 
-static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate, [[maybe_unused]] PlayersInterpolate& rPlayerInterpolate, PlayersPostRender& rPlayer, int64_t i, float fDamage, [[maybe_unused]] FXMVECTOR vecDamagePosition)
+static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate, [[maybe_unused]] OmnisInterpolate& rOmniInterpolate, OmnisPostRender& rOmni, int64_t i, float fDamage, [[maybe_unused]] FXMVECTOR vecDamagePosition)
 {
-	if (rPlayer.pfShields[i] > 0.0f)
+	if (rOmni.pfShields[i] > 0.0f)
 	{
 #if defined(BT_CLIENT)
-		engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioShieldArmor465540__steaq__scifishieldhitwavwavCrc, emitterCoordinate, vecDamagePosition, gShieldHitVolumeBase.mfCurrent + gShieldHitVolumeScale.mfCurrent * (1.0f - rPlayer.pfShields[i] / kfPlayerShield));
+		engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioShieldArmor465540__steaq__scifishieldhitwavwavCrc, emitterCoordinate, vecDamagePosition, gShieldHitVolumeBase.mfCurrent + gShieldHitVolumeScale.mfCurrent * (1.0f - rOmni.pfShields[i] / kfOmniShield));
 #endif
 
 #if defined(BT_CLIENT)
 		int64_t iLowestIntensityIndex = 0;
 		for (int64_t k = 1; k < shaders::kiHexShieldDirections; ++k)
 		{
-			if (rPlayerInterpolate.pHexShieldFragmentIntensities[i].data[k] < rPlayerInterpolate.pHexShieldFragmentIntensities[i].data[iLowestIntensityIndex])
+			if (rOmniInterpolate.pHexShieldFragmentIntensities[i].data[k] < rOmniInterpolate.pHexShieldFragmentIntensities[i].data[iLowestIntensityIndex])
 			{
 				iLowestIntensityIndex = k;
 			}
 		}
-		XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorSubtract(vecDamagePosition, rPlayerInterpolate.pVecPositions[i]));
-		XMStoreFloat4A(&rPlayerInterpolate.pHexShieldDirections[i].data[iLowestIntensityIndex], vecDamageDirection);
-		rPlayerInterpolate.pHexShieldVertexIntensities[i].data[iLowestIntensityIndex] = 1.0f;
-		rPlayerInterpolate.pHexShieldFragmentIntensities[i].data[iLowestIntensityIndex] = 1.0f;
+		XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorSubtract(vecDamagePosition, rOmniInterpolate.pVecPositions[i]));
+		XMStoreFloat4A(&rOmniInterpolate.pHexShieldDirections[i].data[iLowestIntensityIndex], vecDamageDirection);
+		rOmniInterpolate.pHexShieldVertexIntensities[i].data[iLowestIntensityIndex] = 1.0f;
+		rOmniInterpolate.pHexShieldFragmentIntensities[i].data[iLowestIntensityIndex] = 1.0f;
 #endif // BT_CLIENT
 
-		float fShieldDamage = std::min(rPlayer.pfShields[i], fDamage);
-		rPlayer.pfShields[i] -= fShieldDamage;
+		float fShieldDamage = std::min(rOmni.pfShields[i], fDamage);
+		rOmni.pfShields[i] -= fShieldDamage;
 		fDamage -= fShieldDamage;
 
-		if (rPlayer.pfShields[i] <= 0.0f)
+		if (rOmni.pfShields[i] <= 0.0f)
 		{
-			rPlayer.pShieldCooldowns[i] = kShieldCooldown;
+			rOmni.pShieldCooldowns[i] = kShieldCooldown;
 
 			// Play shield down sound with cooldown to prevent spam
-			if (rPlayer.pShieldDownSoundCooldowns[i].count() <= 0.0f)
+			if (rOmni.pShieldDownSoundCooldowns[i].count() <= 0.0f)
 			{
-				rPlayer.pShieldDownSoundCooldowns[i] = kShieldDownSoundCooldown;
+				rOmni.pShieldDownSoundCooldowns[i] = kShieldDownSoundCooldown;
 #if defined(BT_CLIENT)
 				engine::gpAudioManager->PlayOneShot(rFrame, data::kAudioShieldArmor570852__rafaelzimrp__magicshielddownwavCrc, gShieldDownVolume.mfCurrent);
 #endif
@@ -203,21 +203,21 @@ static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[mayb
 #if defined(BT_CLIENT)
 		if (fDamage > kfArmorHitSoundDamageThreshold)
 		{
-			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioShieldArmor330629__stormwaveaudio__scififorcefieldimpact15wavCrc, emitterCoordinate, vecDamagePosition, gArmorHitVolumeBase.mfCurrent + gArmorHitVolumeScale.mfCurrent * (1.0f - rPlayer.pfArmors[i] / kfPlayerArmor));
+			engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioShieldArmor330629__stormwaveaudio__scififorcefieldimpact15wavCrc, emitterCoordinate, vecDamagePosition, gArmorHitVolumeBase.mfCurrent + gArmorHitVolumeScale.mfCurrent * (1.0f - rOmni.pfArmors[i] / kfOmniArmor));
 		}
 #endif
 
 		if constexpr (!kbInvincibility)
 		{
-			rPlayer.pfArmors[i] -= fDamage;
+			rOmni.pfArmors[i] -= fDamage;
 		}
 	}
 }
 
-void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
+void OmnisPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
-	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
-	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
+	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
+	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 
 	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
 
@@ -239,8 +239,8 @@ void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame,
 				ApplyDamage(rFrame, rStaticData.coordinate, rCurrentInterpolate, rCurrentPostRender, i, rResult.fDamageReceived, rResult.vecContactPoint);
 
 #if defined(BT_CLIENT)
-				engine::PuffsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), PlayersInterpolate::siImpactPuffControllerTypeIndex, rResult.vecContactPoint);
-				engine::PointLightsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), PlayersInterpolate::siImpactPointLightControllerTypeIndex, rResult.vecContactPoint, 0.0f);
+				engine::PuffsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), OmnisInterpolate::siImpactPuffControllerTypeIndex, rResult.vecContactPoint);
+				engine::PointLightsPostRender::AddControlled(rFrame, engine::TickToSimulationTime(rFrame.interpolate.iTick), OmnisInterpolate::siImpactPointLightControllerTypeIndex, rResult.vecContactPoint, 0.0f);
 #endif
 			}
 		}
@@ -260,10 +260,10 @@ void PlayersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame,
 }
 
 
-void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate)
+void OmnisPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate)
 {
-	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
-	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
+	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
+	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 	std::chrono::duration<float> deltaTime(rFrame.interpolate.fDeltaTime);
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
@@ -279,7 +279,7 @@ void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]]
 			continue;
 		}
 
-		// Dying players stop firing blasters through the death-explosion animation (mirrors SpawnMissiles gate)
+		// Dying omnis stop firing blasters through the death-explosion animation (mirrors SpawnMissiles gate)
 		if (rCurrentPostRender.pFlags[i] & kExploding)
 		{
 			continue;
@@ -297,16 +297,16 @@ void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]]
 			// the elapsed time from the fire moment to the end of the tick (kfDeltaTime - fire_offset).
 			std::chrono::duration<float> interFrameTime = -rCurrentPostRender.pNextBlasterFireTimes[i];
 
-			// Rewind player to the fire-moment position (end-of-tick position minus elapsed time times velocity).
-			XMVECTOR vecPlayerPositionAtSpawn = XMVectorSubtract(rCurrentInterpolate.pVecPositions[i], XMVectorScale(rCurrentPostRender.pVecVelocities[i], interFrameTime.count()));
+			// Rewind omni to the fire-moment position (end-of-tick position minus elapsed time times velocity).
+			XMVECTOR vecOmniPositionAtSpawn = XMVectorSubtract(rCurrentInterpolate.pVecPositions[i], XMVectorScale(rCurrentPostRender.pVecVelocities[i], interFrameTime.count()));
 
 			rCurrentPostRender.pFlags[i].Toggle(kBlasterSpawnLeft);
 			float fBarrelOffset = (rCurrentPostRender.pFlags[i] & kBlasterSpawnLeft) ? kfBlastersSpawnBarrelOffset : -kfBlastersSpawnBarrelOffset;
 
 			XMVECTOR vecJitteredDirection = common::RandomAngleJitter(vecBaseDirection, kfBlasterAngleJitter, rFrame.postRender.randomEngine);
-			XMVECTOR vecBlasterVelocity = XMVectorScale(vecJitteredDirection, kfPlayerBlastersSpeed);
+			XMVECTOR vecBlasterVelocity = XMVectorScale(vecJitteredDirection, kfOmniBlastersSpeed);
 
-			XMVECTOR vecSpawnPosition = XMVectorAdd(XMVectorAdd(vecPlayerPositionAtSpawn, XMVectorScale(vecLeftNormal, fBarrelOffset)), XMVectorScale(vecJitteredDirection, kfBlastersSpawnPreMove));
+			XMVECTOR vecSpawnPosition = XMVectorAdd(XMVectorAdd(vecOmniPositionAtSpawn, XMVectorScale(vecLeftNormal, fBarrelOffset)), XMVectorScale(vecJitteredDirection, kfBlastersSpawnPreMove));
 
 			// Advance by the shot's age to store its position at the frame's reference time; sub-tick shots remain evenly spaced.
 			XMVECTOR vecFinalPosition = XMVectorAdd(vecSpawnPosition, XMVectorScale(vecBlasterVelocity, interFrameTime.count()));
@@ -315,17 +315,17 @@ void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]]
 			{
 				.vecPosition = vecFinalPosition,
 				.vecVelocity = vecBlasterVelocity,
-				.iTypeIndex = PlayersInterpolate::siBlasterTypeIndex,
+				.iTypeIndex = OmnisInterpolate::siBlasterTypeIndex,
 				.alignment = rCurrentPostRender.pAlignments[i],
-				.fWindTrailIntensity = game::gWindDepositPlayerBlastersIntensity.mfCurrent,
-				.fWindTrailWidth = game::gWindDepositPlayerBlastersWidth.mfCurrent,
-				.fWindTrailLengthMultiplier = game::gWindDepositPlayerBlastersLengthMultiplier.mfCurrent,
+				.fWindTrailIntensity = game::gWindDepositOmniBlastersIntensity.mfCurrent,
+				.fWindTrailWidth = game::gWindDepositOmniBlastersWidth.mfCurrent,
+				.fWindTrailLengthMultiplier = game::gWindDepositOmniBlastersLengthMultiplier.mfCurrent,
 			});
 
 #if defined(BT_CLIENT)
 			if (bSpawned)
 			{
-				engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, emitterCoordinate, vecFinalPosition, gPlayerBlasterVolume.mfCurrent, gPlayerBlasterPitchMinimum.mfCurrent, gPlayerBlasterPitchRandom.mfCurrent);
+				engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioBlaster514039__newlocknew__blastershot6sytrusrsmplmultiprcsngsinglewavCrc, emitterCoordinate, vecFinalPosition, gOmniBlasterVolume.mfCurrent, gOmniBlasterPitchMinimum.mfCurrent, gOmniBlasterPitchRandom.mfCurrent);
 			}
 #endif
 
@@ -334,10 +334,10 @@ void PlayersPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]]
 	}
 }
 
-void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate)
+void OmnisPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate)
 {
-	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
-	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
+	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
+	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 	std::chrono::duration<float> deltaTime(rFrame.interpolate.fDeltaTime);
 
 	// Built once for the whole spawn loop, after Update, Transfer, and Destroy have settled this tick's spaceship
@@ -403,7 +403,7 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 			continue;
 		}
 
-		// The one-row batch acquires the next-tick homing target from the missile spawn position, aim direction, and player alignment.
+		// The one-row batch acquires the next-tick homing target from the missile spawn position, aim direction, and omni alignment.
 		engine::registry_id_t registryTarget {};
 		int64_t iAcquireRow = 0;
 		engine::RegistryResult acquireResult {};
@@ -436,10 +436,10 @@ void PlayersPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame,
 	}
 }
 
-void PlayersPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict rFrame, engine::GridCoord emitterCoordinate)
+void OmnisPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict rFrame, engine::GridCoord emitterCoordinate)
 {
-	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
-	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
+	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
+	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
@@ -462,7 +462,7 @@ void PlayersPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict 
 
 		engine::ExplosionsPostRender::Spawn(rFrame, emitterCoordinate, engine::TickToSimulationTime(rFrame.interpolate.iTick),
 		{
-			.iTypeIndex = PlayersInterpolate::siExplosionTypeIndex,
+			.iTypeIndex = OmnisInterpolate::siExplosionTypeIndex,
 			.vecPosition = vecJitteredPosition,
 			.vecDirection = vecJitteredDirection,
 			.flags = {engine::ExplosionFlags::kDestroysSelf, engine::ExplosionFlags::kYellow},

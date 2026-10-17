@@ -1,6 +1,6 @@
 #include "Pch.h"
 
-#include "Network/PlayerEvents.h"
+#include "Network/OwnedEntityEvents.h"
 
 #include "Network/GamePacketType.h"
 #include "Fleet.h"
@@ -9,24 +9,24 @@
 namespace game
 {
 
-void ParsePlayerEvents(const std::vector<std::pair<int64_t, std::vector<uint8_t>>>& rRawPackets, common::ScopedWorkbufferArena& rOutputEventsArena)
+void ParseOwnedEntityEvents(const std::vector<std::pair<int64_t, std::vector<uint8_t>>>& rRawPackets, common::ScopedWorkbufferArena& rOutputEventsArena)
 {
 	for (const auto& [iPacketType, rPayload] : rRawPackets)
 	{
 		GamePacketType eType = static_cast<GamePacketType>(iPacketType);
 
-		if (eType == GamePacketType::kServerAssignPlayer)
+		if (eType == GamePacketType::kServerAssignOwnedEntity)
 		{
-			GameMessages::AssignPlayerMessage message {};
+			GameMessages::AssignOwnedEntityMessage message {};
 			engine::NetworkMessages::Read(rPayload, message);
-			rOutputEventsArena.mBuffer.PushBack(ReceivedPlayerEvent {.eType = PlayerEventType::kAssigned, .globalPlayerId = engine::GlobalId {.iValue = message.iGlobalPlayerIdentifier}, .coordinate = message.coordinate});
+			rOutputEventsArena.mBuffer.PushBack(ReceivedOwnedEntityEvent {.eType = OwnedEntityEventType::kAssigned, .globalId = engine::GlobalId {.iValue = message.iGlobalIdentifier}, .coordinate = message.coordinate});
 		}
-		else if (eType == GamePacketType::kServerPlayerState)
+		else if (eType == GamePacketType::kServerOwnedEntityState)
 		{
-			GameMessages::PlayerStateMessage message {};
+			GameMessages::OwnedEntityStateMessage message {};
 			engine::NetworkMessages::Read(rPayload, message);
-			const GameMessages::PlayerStateDescriptor& rDescriptor = GameMessages::kpPlayerStateDescriptors[static_cast<size_t>(static_cast<PlayerStateWireType>(message.uiWireType))];
-			rOutputEventsArena.mBuffer.PushBack(ReceivedPlayerEvent {.eType = rDescriptor.eEventType, .globalPlayerId = engine::GlobalId {.iValue = message.iGlobalPlayerIdentifier}, .coordinate = message.coordinate});
+			const GameMessages::OwnedEntityStateDescriptor& rDescriptor = GameMessages::kpOwnedEntityStateDescriptors[static_cast<size_t>(static_cast<OwnedEntityStateWireType>(message.uiWireType))];
+			rOutputEventsArena.mBuffer.PushBack(ReceivedOwnedEntityEvent {.eType = rDescriptor.eEventType, .globalId = engine::GlobalId {.iValue = message.iGlobalIdentifier}, .coordinate = message.coordinate});
 		}
 	}
 }

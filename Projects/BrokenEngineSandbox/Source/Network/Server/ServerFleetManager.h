@@ -38,7 +38,7 @@ struct PendingRespawnInFleetRequest
 {
 	int64_t iClientId = 0;
 	FleetGuid fleetGuid {};
-	engine::GlobalId memberGlobalPlayerId {};
+	engine::GlobalId memberGlobalId {};
 };
 
 class ServerFleetManager
@@ -58,9 +58,9 @@ public:
 
 	void ClearPendingRequests();
 
-	void OnPlayerDeath(const engine::ClientGuid& rGuid, engine::GlobalId globalId);
-	void OnPlayerSpawned(int64_t iClientId, const engine::ClientGuid& rClientGuid, const ClientSpawnInformation& rSpawnInfo, engine::GlobalId globalPlayerId);
-	void OnPlayerTransferred(const engine::ClientGuid& rGuid, engine::GlobalId globalPlayerId, engine::GridCoord destination);
+	void OnOwnedEntityDeath(const engine::ClientGuid& rGuid, engine::GlobalId globalId);
+	void OnOwnedEntitySpawned(int64_t iClientId, const engine::ClientGuid& rClientGuid, const ClientSpawnInformation& rSpawnInfo, engine::GlobalId globalId);
+	void OnOwnedEntityTransferred(const engine::ClientGuid& rGuid, engine::GlobalId globalId, engine::GridCoord destination);
 	void OnClientConnected(int64_t iClientId, const engine::ClientGuid& rClientGuid);
 	void OnClientDisconnected(int64_t iClientId, const engine::ClientGuid& rClientGuid);
 	void OnResetForLoad(int64_t iClientId, const engine::ClientGuid& rClientGuid);
@@ -78,11 +78,11 @@ public:
 		engine::GridCoord fleetWantedCoord {};
 		int64_t iPendingFleetWantedCoordTicks = 0;
 	};
-	FleetLookupResult LookupFleetWantedCoord(const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalPlayerId);
+	FleetLookupResult LookupFleetWantedCoord(const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId);
 
 	void UpdateFleetNavigationDelay(const engine::ClientGuid& rGuid, const FleetGuid& rFleetGuid, std::chrono::duration<float> navigationDelaySeconds);
 
-	void DetectDisconnectedPlayerDeaths();
+	void DetectDisconnectedOwnedEntityDeaths();
 
 	// Destructive wipe of all fleet state (mFleets, mGuidToClientId, pending requests).
 	// Use ONLY for fresh-game flows (ServerReset, including the client reset request it serves).
@@ -107,7 +107,7 @@ private:
 	int64_t FindFleetIndexByGuid(const std::vector<Fleet>& rFleets, const FleetGuid& rFleetGuid) const;
 
 	void TickRespawnTimers();
-	void RefreshFleetMembers(Fleet& rFleet, std::span<const engine::OwnedEntity> ownedPlayers);
+	void RefreshFleetMembers(Fleet& rFleet, std::span<const engine::OwnedEntity> ownedEntities);
 	void ResetFleetForLoad(Fleet& rFleet, const engine::ClientGuid& rClientGuid);
 
 public:

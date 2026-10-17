@@ -4,7 +4,7 @@
 #include "Frame/CellStaticData.h"
 #include "Frame/FlightPlanes.h"
 
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Frame/TerrainUtils.h"
 
 namespace game
@@ -33,35 +33,35 @@ constexpr float kfSpaceshipReturnedDistance = kfSpaceshipReturnDistance - 20.0f;
 constexpr float kfSpaceshipTerrainBounceRotation = 8.0f;
 constexpr float kfSpaceshipTerrainBounceVelocity = 4.0f;
 
-// Terrain avoidance (player-proximity skip constants; sampling constants in TerrainUtils.cpp)
-constexpr float kfSpaceshipAvoidTerrainPlayerAngle = 0.4f;
-constexpr float kfSpaceshipAvoidTerrainPlayerDistance = 40.0f;
+// Terrain avoidance (omni-proximity skip constants; sampling constants in TerrainUtils.cpp)
+constexpr float kfSpaceshipAvoidTerrainOmniAngle = 0.4f;
+constexpr float kfSpaceshipAvoidTerrainOmniDistance = 40.0f;
 
 // Forward declarations for shared helpers (defined in Spaceships.cpp)
-[[nodiscard]] bool XM_CALLCONV NearestAlivePlayerPosition(const PlayersInterpolate& rPlayers, const PlayersPostRender& rPlayersPostRender, FXMVECTOR vecFrom, XMVECTOR& rVecResult);
+[[nodiscard]] bool XM_CALLCONV NearestAliveOmniPosition(const OmnisInterpolate& rOmnis, const OmnisPostRender& rOmnisPostRender, FXMVECTOR vecFrom, XMVECTOR& rVecResult);
 
-void XM_CALLCONV SpaceshipsPostRender::ComputeSteering(std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, FXMVECTOR vecDirection, bool bPlayerAlive, FXMVECTOR vecNearestPlayer, std::chrono::duration<float> deltaTime, SpaceshipFlags_t& rFlags, float& rfDeltaRotation)
+void XM_CALLCONV SpaceshipsPostRender::ComputeSteering(std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, FXMVECTOR vecDirection, bool bOmniAlive, FXMVECTOR vecNearestOmni, std::chrono::duration<float> deltaTime, SpaceshipFlags_t& rFlags, float& rfDeltaRotation)
 {
-	XMVECTOR vecToPlayer = bPlayerAlive ? XMVectorSubtract(vecNearestPlayer, vecPosition) : XMVectorZero();
-	float fPlayerDistance = bPlayerAlive ? XMVectorGetX(XMVector3Length(vecToPlayer)) : kfSpaceshipFleeEndDistance + 1.0f;
-	if (fPlayerDistance < kfSpaceshipFleeStartDistance)
+	XMVECTOR vecToOmni = bOmniAlive ? XMVectorSubtract(vecNearestOmni, vecPosition) : XMVectorZero();
+	float fOmniDistance = bOmniAlive ? XMVectorGetX(XMVector3Length(vecToOmni)) : kfSpaceshipFleeEndDistance + 1.0f;
+	if (fOmniDistance < kfSpaceshipFleeStartDistance)
 	{
-		rFlags.Set(kFleePlayer);
+		rFlags.Set(kFleeOmni);
 	}
-	else if (fPlayerDistance > kfSpaceshipFleeEndDistance)
+	else if (fOmniDistance > kfSpaceshipFleeEndDistance)
 	{
-		rFlags.Set(kFleePlayer, false);
+		rFlags.Set(kFleeOmni, false);
 	}
 
 	if (islandCandidates.empty())
 	{
 		rFlags.Set(kReturnToIslandCenter, false);
-		if (bPlayerAlive)
+		if (bOmniAlive)
 		{
-			XMVECTOR vecToDestinationNormal = XMVector3Normalize(XMVectorSubtract(vecNearestPlayer, vecPosition));
+			XMVECTOR vecToDestinationNormal = XMVector3Normalize(XMVectorSubtract(vecNearestOmni, vecPosition));
 			float fDirectionDestinationCrossZ = XMVectorGetZ(XMVector3Cross(vecDirection, vecToDestinationNormal));
 			float fWantedDeltaRotation = fDirectionDestinationCrossZ > 0.0f ? kfSpaceshipChaseTurnRate : -kfSpaceshipChaseTurnRate;
-			if (rFlags & kFleePlayer)
+			if (rFlags & kFleeOmni)
 			{
 				fWantedDeltaRotation = fDirectionDestinationCrossZ > 0.0f ? -kfSpaceshipFleeTurnRate : kfSpaceshipFleeTurnRate;
 			}
@@ -96,7 +96,7 @@ void XM_CALLCONV SpaceshipsPostRender::ComputeSteering(std::span<const XMFLOAT4>
 		rFlags.Set(kReturnToIslandCenter, false);
 	}
 
-	XMVECTOR vecDestination = bPlayerAlive ? vecNearestPlayer : vecIslandCenter;
+	XMVECTOR vecDestination = bOmniAlive ? vecNearestOmni : vecIslandCenter;
 	if (rFlags & kReturnToIslandCenter)
 	{
 		vecDestination = vecIslandCenter;
@@ -104,7 +104,7 @@ void XM_CALLCONV SpaceshipsPostRender::ComputeSteering(std::span<const XMFLOAT4>
 	XMVECTOR vecToDestinationNormal = XMVector3Normalize(XMVectorSubtract(vecDestination, vecPosition));
 	float fDirectionDestinationCrossZ = XMVectorGetZ(XMVector3Cross(vecDirection, vecToDestinationNormal));
 	float fWantedDeltaRotation = fDirectionDestinationCrossZ > 0.0f ? kfSpaceshipChaseTurnRate : -kfSpaceshipChaseTurnRate;
-	if (!(rFlags & kReturnToIslandCenter) && rFlags & kFleePlayer)
+	if (!(rFlags & kReturnToIslandCenter) && rFlags & kFleeOmni)
 	{
 		fWantedDeltaRotation = fDirectionDestinationCrossZ > 0.0f ? -kfSpaceshipFleeTurnRate : kfSpaceshipFleeTurnRate;
 	}
@@ -116,7 +116,7 @@ void XM_CALLCONV SpaceshipsPostRender::ComputeSteering(std::span<const XMFLOAT4>
 void XM_CALLCONV SpaceshipsPostRender::ApplyMovement(const Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, SpaceshipFlags_t flags, std::chrono::duration<float> deltaTime, XMVECTOR& rVecVelocity)
 {
 	float fAcceleration = flags & kReturnToIslandCenter ? kfSpaceshipReturnAcceleration
-	                    : flags & kFleePlayer ? kfSpaceshipFleeAcceleration
+	                    : flags & kFleeOmni ? kfSpaceshipFleeAcceleration
 	                    : kfSpaceshipChaseAcceleration;
 	rVecVelocity = engine::ApplyMovement<true>(rVecVelocity, rCurrentInterpolate.pVecDirections[i], deltaTime.count(), fAcceleration, kfSpaceshipDrag, kfSpaceshipMaxSpeed, kfSpaceshipVelocityToDirection);
 	ApplyPusherResponse(rFrame, rCurrentInterpolate, i, rVecVelocity);
@@ -173,16 +173,16 @@ void SpaceshipsPostRender::AvoidTerrain([[maybe_unused]] Frame& __restrict rFram
 			continue;
 		}
 
-		XMVECTOR vecNearestPlayer = XMVectorZero();
-		if (NearestAlivePlayerPosition(*rFrame.interpolate.pPlayers, *rFrame.postRender.pPlayers, rCurrentInterpolate.pVecPositions[i], vecNearestPlayer))
+		XMVECTOR vecNearestOmni = XMVectorZero();
+		if (NearestAliveOmniPosition(*rFrame.interpolate.pOmnis, *rFrame.postRender.pOmnis, rCurrentInterpolate.pVecPositions[i], vecNearestOmni))
 		{
-			XMVECTOR vecToPlayer = XMVectorSubtract(vecNearestPlayer, rCurrentInterpolate.pVecPositions[i]);
-			float fDistanceToPlayer = XMVectorGetX(XMVector3Length(vecToPlayer));
-			if (fDistanceToPlayer < kfSpaceshipAvoidTerrainPlayerDistance)
+			XMVECTOR vecToOmni = XMVectorSubtract(vecNearestOmni, rCurrentInterpolate.pVecPositions[i]);
+			float fDistanceToOmni = XMVectorGetX(XMVector3Length(vecToOmni));
+			if (fDistanceToOmni < kfSpaceshipAvoidTerrainOmniDistance)
 			{
-				XMVECTOR vecToPlayerNormal = XMVector3Normalize(vecToPlayer);
-				float fAngleToPlayer = XMVectorGetX(XMVector3AngleBetweenNormals(rCurrentInterpolate.pVecDirections[i], vecToPlayerNormal));
-				if (fAngleToPlayer < kfSpaceshipAvoidTerrainPlayerAngle)
+				XMVECTOR vecToOmniNormal = XMVector3Normalize(vecToOmni);
+				float fAngleToOmni = XMVectorGetX(XMVector3AngleBetweenNormals(rCurrentInterpolate.pVecDirections[i], vecToOmniNormal));
+				if (fAngleToOmni < kfSpaceshipAvoidTerrainOmniAngle)
 				{
 					continue;
 				}

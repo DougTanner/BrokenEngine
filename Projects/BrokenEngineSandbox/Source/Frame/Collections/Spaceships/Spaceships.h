@@ -112,7 +112,7 @@ struct SpaceshipsInterpolate : public engine::Collection<SpaceshipsInterpolate>
 
 enum class SpaceshipFlags : uint8_t
 {
-	kFleePlayer           = 0x01,
+	kFleeOmni             = 0x01,
 	kExploding            = 0x02,
 	kReturnToIslandCenter = 0x04,
 	kTransfer             = 0x08,
@@ -145,13 +145,13 @@ struct SpaceshipsPostRender : public engine::Collection<SpaceshipsPostRender>
 
 private:
 	// Defined in SpaceshipsNavigation.cpp:
-	static void XM_CALLCONV ComputeSteering(std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, FXMVECTOR vecDirection, bool bPlayerAlive, FXMVECTOR vecNearestPlayer, std::chrono::duration<float> deltaTime, SpaceshipFlags_t& rFlags, float& rfDeltaRotation);
+	static void XM_CALLCONV ComputeSteering(std::span<const XMFLOAT4> islandCandidates, FXMVECTOR vecPosition, FXMVECTOR vecDirection, bool bOmniAlive, FXMVECTOR vecNearestOmni, std::chrono::duration<float> deltaTime, SpaceshipFlags_t& rFlags, float& rfDeltaRotation);
 	static void XM_CALLCONV ApplyMovement(const Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, SpaceshipFlags_t flags, std::chrono::duration<float> deltaTime, XMVECTOR& rVecVelocity);
 	static void XM_CALLCONV ApplyPusherResponse(const Frame& __restrict rFrame, const SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, XMVECTOR& rVecVelocity);
 	static void ApplyTerrainBounce(const engine::CellStaticData& rStaticData, const SpaceshipsInterpolate& rPreviousInterpolate, SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, std::chrono::duration<float> deltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity);
 
 	// Defined in SpaceshipsCombat.cpp:
-	static void XM_CALLCONV RegenerateHealth(FXMVECTOR vecPosition, bool bPlayerAlive, FXMVECTOR vecNearestPlayer, SpaceshipFlags_t flags, std::chrono::duration<float> deltaTime, float& rfHealth);
+	static void XM_CALLCONV RegenerateHealth(FXMVECTOR vecPosition, bool bOmniAlive, FXMVECTOR vecNearestOmni, SpaceshipFlags_t flags, std::chrono::duration<float> deltaTime, float& rfHealth);
 
 public:
 	SpaceshipFlags_t* __restrict pFlags = nullptr;

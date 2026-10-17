@@ -8,13 +8,13 @@
 #include "Network/NetworkCursor.h"
 
 #include "Agent/Commands/ServerSimulationHarnessRigs.h"
-#include "Frame/Collections/Players/Players.h"
+#include "Frame/Collections/Omnis/Omnis.h"
 #include "Frame/ServerCellStats.h"
 #include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerFleetSerialization.h"
 #include "Network/GamePacketType.h"
-#include "Network/PlayerEvents.h"
+#include "Network/OwnedEntityEvents.h"
 #include "Game.h"
 
 namespace game
@@ -66,7 +66,7 @@ void ServerSession::PrepareTick()
 // the delay resets the navigation timers, and a non-finite one would freeze them or fire them every tick.
 static float AdmitNavigationDelay(float fDelay)
 {
-	if (!PlayersPostRender::IsNavigationDelayInRange(fDelay))
+	if (!OmnisPostRender::IsNavigationDelayInRange(fDelay))
 	{
 		engine::NetworkMessages::ThrowCorruptStream("ServerSession navigation delay");
 	}
@@ -103,15 +103,15 @@ void ServerSession::ParseReceivedGamePackets()
 		{
 			switch (eType)
 			{
-				case GamePacketType::kClientUpdatePlayerRequest:
+				case GamePacketType::kClientUpdateOwnedEntityRequest:
 				{
-					// 8B global player ID + 1B bUseMissiles + 4B fNavigationDelay = 13 bytes (type byte already stripped)
+					// 8B global ID + 1B bUseMissiles + 4B fNavigationDelay = 13 bytes (type byte already stripped)
 					const uint8_t* pCursor = rPacket.payload.data();
 					engine::GlobalId globalId {};
 					globalId.iValue = engine::ReadInt64(pCursor);
 					bool bUseMissiles = ReadBooleanByte(pCursor);
 					float fNavigationDelay = AdmitNavigationDelay(engine::ReadFloat(pCursor));
-					mPendingUpdatePlayerRequests.push_back({.iClientId = rPacket.iClientId, .globalId = globalId, .bUseMissiles = bUseMissiles, .navigationDelaySeconds = std::chrono::duration<float>(fNavigationDelay)});
+					mPendingUpdateOwnedEntityRequests.push_back({.iClientId = rPacket.iClientId, .globalId = globalId, .bUseMissiles = bUseMissiles, .navigationDelaySeconds = std::chrono::duration<float>(fNavigationDelay)});
 					break;
 				}
 				case GamePacketType::kClientCreateFleetRequest:
@@ -146,8 +146,8 @@ void ServerSession::ParseReceivedGamePackets()
 					FleetGuid fleetGuid {};
 					fleetGuid.uiHigh = engine::ReadUint64(pCursor);
 					fleetGuid.uiLow = engine::ReadUint64(pCursor);
-					engine::GlobalId memberGlobalPlayerId {.iValue = engine::ReadInt64(pCursor)};
-					mpFleetManager->mPendingRespawnInFleetRequests.push_back({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid, .memberGlobalPlayerId = memberGlobalPlayerId});
+					engine::GlobalId memberGlobalId {.iValue = engine::ReadInt64(pCursor)};
+					mpFleetManager->mPendingRespawnInFleetRequests.push_back({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid, .memberGlobalId = memberGlobalId});
 					break;
 				}
 				case GamePacketType::kClientFleetNavigationDelay:
@@ -247,10 +247,10 @@ void ServerSession::ParseReceivedGamePackets()
 void ServerSession::BeforeNetworkPoll()
 {
 	// mfLastDeltaTime still describes the previous update here. A zero-delta update could not consume
-	// injected player requests, so retain them; a positive delta keeps their existing one-update lifetime.
+	// injected owned-entity requests, so retain them; a positive delta keeps their existing one-update lifetime.
 	if (gpGame->mfLastDeltaTime > 0.0f)
 	{
-		mPendingUpdatePlayerRequests.clear();
+		mPendingUpdateOwnedEntityRequests.clear();
 	}
 	// Fleet request queues drain inside their own Process*Requests, so there is nothing left to clear here.
 }
@@ -271,8 +271,8 @@ void ServerSession::AfterNetworkPoll()
 
 void ServerSession::FinalizeTickClients()
 {
-	mpClientManager->DetectPlayerDeaths();
-	mpFleetManager->DetectDisconnectedPlayerDeaths();
+	mpClientManager->DetectOwnedEntityDeaths();
+	mpFleetManager->DetectDisconnectedOwnedEntityDeaths();
 
 	// Post-swap, so the counters describe the tick that just finished, and once per advancing tick.
 	PublishServerEntityCounts();
@@ -282,7 +282,7 @@ void ServerSession::AddGameRequiredCoordinates()
 {
 	for (const auto& [rCoordinate, rCell] : gpGame->mCells)
 	{
-		if (rCell.pCurrent->postRender.pPlayers->iCount > 0)
+		if (rCell.pCurrent->postRender.pOmnis->iCount > 0)
 		{
 			if (!std::ranges::contains(gpGame->mActiveCoordinates, rCoordinate))
 			{
@@ -301,7 +301,7 @@ void ServerSession::BuildAdvancingFrameInputs()
 			return false;
 		}
 
-		game::ServerFleetManager::FleetLookupResult result = mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.memberGlobalPlayerId);
+		game::ServerFleetManager::FleetLookupResult result = mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.memberGlobalId);
 		if (result.flags & game::ServerFleetManager::FleetLookupFlags::kFound)
 		{
 			return false;
@@ -312,7 +312,7 @@ void ServerSession::BuildAdvancingFrameInputs()
 	});
 
 	// Inject weapon mode toggle StatusChanges
-	ProcessUpdatePlayerRequests();
+	ProcessUpdateOwnedEntityRequests();
 
 	// Tick fleet timers and inject fleet coord updates only when this update advances. Subtracting
 	// a zero delta does not make TickFleetTimers inert: an already-expired timer can still fire,
@@ -327,12 +327,12 @@ void ServerSession::BuildAdvancingFrameInputs()
 	mpClientManager->SpawnWaitingClients();
 }
 
-void ServerSession::ProcessUpdatePlayerRequests()
+void ServerSession::ProcessUpdateOwnedEntityRequests()
 {
-	// Heap: pending player-update requests may grow frame status changes
+	// Heap: pending owned-entity update requests may grow frame status changes
 	ScopedSuppressAllocationTracking suppress;
 
-	for (const PendingUpdatePlayerRequest& rRequest : mPendingUpdatePlayerRequests)
+	for (const PendingUpdateOwnedEntityRequest& rRequest : mPendingUpdateOwnedEntityRequests)
 	{
 		engine::ClientConnection* pClient = engine::gpServer->FindClient(rRequest.iClientId);
 		if (pClient == nullptr)
@@ -340,15 +340,15 @@ void ServerSession::ProcessUpdatePlayerRequests()
 			continue;
 		}
 		auto ownedIt = mClientOwnedEntities.mOwned.find(pClient->iClientId);
-		std::span<const engine::OwnedEntity> ownedPlayers = ownedIt != mClientOwnedEntities.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
+		std::span<const engine::OwnedEntity> ownedEntities = ownedIt != mClientOwnedEntities.mOwned.end() ? std::span<const engine::OwnedEntity>(ownedIt->second) : std::span<const engine::OwnedEntity>();
 
 		engine::GridCoord updateCoord {};
 		bool bFound = false;
-		for (const engine::OwnedEntity& rOwnedPlayer : ownedPlayers)
+		for (const engine::OwnedEntity& rOwnedEntity : ownedEntities)
 		{
-			if (rOwnedPlayer.globalId == rRequest.globalId)
+			if (rOwnedEntity.globalId == rRequest.globalId)
 			{
-				updateCoord = rOwnedPlayer.coord;
+				updateCoord = rOwnedEntity.coord;
 				bFound = true;
 				break;
 			}
@@ -364,51 +364,51 @@ void ServerSession::ProcessUpdatePlayerRequests()
 			continue;
 		}
 
-		int64_t iPlayerUuid = engine::RegistryUuidByGlobalId(game::Frame::OwnershipLayer((*game::gpGame->mCells.at(updateCoord).pCurrent)), rRequest.globalId).iValue;
-		if (iPlayerUuid == 0)
+		int64_t iOmniUuid = engine::RegistryUuidByGlobalId(game::Frame::OwnershipLayer((*game::gpGame->mCells.at(updateCoord).pCurrent)), rRequest.globalId).iValue;
+		if (iOmniUuid == 0)
 		{
 			continue;
 		}
 
 		int64_t iPendingWeaponModeTicks = engine::kiTickRate;
-		game::StatusChange updateChange {.eType = game::StatusChangeType::kUpdatePlayer, .data = game::UpdatePlayerData {.iPlayerUuid = iPlayerUuid, .bUseMissiles = rRequest.bUseMissiles, .navigationDelaySeconds = rRequest.navigationDelaySeconds, .uiPendingWeaponModeTicks = static_cast<uint8_t>(iPendingWeaponModeTicks)}};
+		game::StatusChange updateChange {.eType = game::StatusChangeType::kUpdateOmni, .data = game::UpdateOmniData {.iOmniUuid = iOmniUuid, .bUseMissiles = rRequest.bUseMissiles, .navigationDelaySeconds = rRequest.navigationDelaySeconds, .uiPendingWeaponModeTicks = static_cast<uint8_t>(iPendingWeaponModeTicks)}};
 		it->second.statusChanges.push_back(updateChange);
 
-		LOG(kNetwork, kDebug, "ServerSession::ProcessUpdatePlayerRequests Client: {} GlobalPlayer: {} PlayerUuid: {} Coord: ({},{}) Missiles: {} NavDelay: {}", rRequest.iClientId, rRequest.globalId, iPlayerUuid, updateCoord.iX, updateCoord.iY, rRequest.bUseMissiles, common::Wb(rRequest.navigationDelaySeconds.count(), 3));
+		LOG(kNetwork, kDebug, "ServerSession::ProcessUpdateOwnedEntityRequests Client: {} GlobalId: {} OmniUuid: {} Coord: ({},{}) Missiles: {} NavDelay: {}", rRequest.iClientId, rRequest.globalId, iOmniUuid, updateCoord.iX, updateCoord.iY, rRequest.bUseMissiles, common::Wb(rRequest.navigationDelaySeconds.count(), 3));
 	}
 }
 
 void ServerSession::OnOwnedEntityChangedCell(const engine::ClientGuid& rClientGuid, engine::GlobalId globalId, engine::GridCoord destination)
 {
-	mpFleetManager->OnPlayerTransferred(rClientGuid, globalId, destination);
+	mpFleetManager->OnOwnedEntityTransferred(rClientGuid, globalId, destination);
 }
 
-void ServerSession::SendAssignPlayer(int64_t iClientId, engine::GlobalId globalId, engine::GridCoord coordinate)
+void ServerSession::SendAssignOwnedEntity(int64_t iClientId, engine::GlobalId globalId, engine::GridCoord coordinate)
 {
 	engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientId);
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-	rWorkbuffer.PushBack<uint8_t>(static_cast<uint8_t>(GamePacketType::kServerAssignPlayer));
-	GameMessages::AssignPlayerMessage message {.iGlobalPlayerIdentifier = globalId.iValue, .coordinate = coordinate};
+	rWorkbuffer.PushBack<uint8_t>(static_cast<uint8_t>(GamePacketType::kServerAssignOwnedEntity));
+	GameMessages::AssignOwnedEntityMessage message {.iGlobalIdentifier = globalId.iValue, .coordinate = coordinate};
 	engine::NetworkMessages::Write(rWorkbuffer, message);
-	ASSERT(rWorkbuffer.Count<uint8_t>() == sizeof(uint8_t) + GameMessages::AssignPlayerMessage::kiSize);
+	ASSERT(rWorkbuffer.Count<uint8_t>() == sizeof(uint8_t) + GameMessages::AssignOwnedEntityMessage::kiSize);
 	engine::NetworkManager::SendPacket(pClient->pPeer, engine::NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
-void ServerSession::SendPlayerState(int64_t iClientId, PlayerStateWireType eWireType, int64_t iGlobalPlayerId, engine::GridCoord coordinate)
+void ServerSession::SendOwnedEntityState(int64_t iClientId, OwnedEntityStateWireType eWireType, int64_t iGlobalId, engine::GridCoord coordinate)
 {
 	engine::ClientConnection* pClient = engine::gpServer->FindClient(iClientId);
 
-	const GameMessages::PlayerStateDescriptor& rDescriptor = GameMessages::kpPlayerStateDescriptors[static_cast<size_t>(eWireType)];
-	LOG(kNetwork, kInfo, "ServerSession::SendPlayerState State: {} Client: {} GlobalPlayer: {} Grid: ({},{})", rDescriptor.pcName, iClientId, iGlobalPlayerId, coordinate.iX, coordinate.iY);
+	const GameMessages::OwnedEntityStateDescriptor& rDescriptor = GameMessages::kpOwnedEntityStateDescriptors[static_cast<size_t>(eWireType)];
+	LOG(kNetwork, kInfo, "ServerSession::SendOwnedEntityState State: {} Client: {} GlobalId: {} Grid: ({},{})", rDescriptor.pcName, iClientId, iGlobalId, coordinate.iX, coordinate.iY);
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-	rWorkbuffer.PushBack<uint8_t>(static_cast<uint8_t>(GamePacketType::kServerPlayerState));
-	GameMessages::PlayerStateMessage message {.uiWireType = static_cast<uint8_t>(eWireType), .iGlobalPlayerIdentifier = iGlobalPlayerId, .coordinate = coordinate};
+	rWorkbuffer.PushBack<uint8_t>(static_cast<uint8_t>(GamePacketType::kServerOwnedEntityState));
+	GameMessages::OwnedEntityStateMessage message {.uiWireType = static_cast<uint8_t>(eWireType), .iGlobalIdentifier = iGlobalId, .coordinate = coordinate};
 	engine::NetworkMessages::Write(rWorkbuffer, message);
-	ASSERT(rWorkbuffer.Count<uint8_t>() == sizeof(uint8_t) + GameMessages::PlayerStateMessage::kiSize);
+	ASSERT(rWorkbuffer.Count<uint8_t>() == sizeof(uint8_t) + GameMessages::OwnedEntityStateMessage::kiSize);
 	engine::NetworkManager::SendPacket(pClient->pPeer, engine::NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
@@ -435,11 +435,11 @@ void ServerSession::SubscriptionUpdates()
 		return;
 	}
 
-	// Clients update desired subscriptions from player assignments and cell-change notifications.
+	// Clients update desired subscriptions from owned-entity assignments and cell-change notifications.
 	for (const SubscriptionUpdate& rUpdate : rPendingUpdates)
 	{
-		SendAssignPlayer(rUpdate.iClientId, rUpdate.globalId, rUpdate.newCoordinate);
-		SendPlayerState(rUpdate.iClientId, PlayerStateWireType::kChangedCell, rUpdate.globalId.iValue, rUpdate.newCoordinate);
+		SendAssignOwnedEntity(rUpdate.iClientId, rUpdate.globalId, rUpdate.newCoordinate);
+		SendOwnedEntityState(rUpdate.iClientId, OwnedEntityStateWireType::kChangedCell, rUpdate.globalId.iValue, rUpdate.newCoordinate);
 	}
 
 	rPendingUpdates.clear();
@@ -479,7 +479,7 @@ void ServerSession::ResetClientsForLoad()
 	mpClientManager->ResetState();
 	mpTransferManager->ResetState();
 	mpBroadcaster->ResetState();
-	mPendingUpdatePlayerRequests.clear();
+	mPendingUpdateOwnedEntityRequests.clear();
 	// ReadFleetData restores mFleets and OnResetForLoad restores mGuidToClientId; preserve both while clearing pending requests.
 	mpFleetManager->ClearPendingRequests();
 	// OnResetForLoad queues flagship updates after the initial clear; retain those updates.
@@ -498,12 +498,12 @@ int64_t ServerSession::RelinkFromFrames(int64_t iClientId, const engine::ClientG
 	relinkEntries.reserve(gpGame->mCells.size());
 	for (const auto& [rCoordinate, rCell] : gpGame->mCells)
 	{
-		const PlayersPostRender& rPlayers = *rCell.pCurrent->postRender.pPlayers;
-		for (int64_t i = 0; i < rPlayers.iCount; ++i)
+		const OmnisPostRender& rOmnis = *rCell.pCurrent->postRender.pOmnis;
+		for (int64_t i = 0; i < rOmnis.iCount; ++i)
 		{
-			if (rPlayers.pClientGuids[i] == rGuid)
+			if (rOmnis.pClientGuids[i] == rGuid)
 			{
-				relinkEntries.push_back({.globalId = rPlayers.pGlobalPlayerIds[i], .coord = rCoordinate});
+				relinkEntries.push_back({.globalId = rOmnis.pGlobalIds[i], .coord = rCoordinate});
 			}
 		}
 	}
@@ -518,15 +518,15 @@ int64_t ServerSession::RelinkFromFrames(int64_t iClientId, const engine::ClientG
 	for (const engine::OwnedEntity& rEntry : relinkEntries)
 	{
 		mClientOwnedEntities.Add(iClientId, rEntry.globalId, rEntry.coord);
-		SendAssignPlayer(iClientId, rEntry.globalId, rEntry.coord);
-		SendPlayerState(iClientId, PlayerStateWireType::kSpawned, rEntry.globalId.iValue, rEntry.coord);
+		SendAssignOwnedEntity(iClientId, rEntry.globalId, rEntry.coord);
+		SendOwnedEntityState(iClientId, OwnedEntityStateWireType::kSpawned, rEntry.globalId.iValue, rEntry.coord);
 		if (eContext == RelinkContext::kConnect)
 		{
-			LOG(kNetwork, kVerbose, "ServerClientManager::NewClients Re-linked Client: {} GlobalPlayer: {} Coord: ({},{})", iClientId, rEntry.globalId, rEntry.coord.iX, rEntry.coord.iY);
+			LOG(kNetwork, kVerbose, "ServerClientManager::NewClients Re-linked Client: {} GlobalId: {} Coord: ({},{})", iClientId, rEntry.globalId, rEntry.coord.iX, rEntry.coord.iY);
 		}
 		else
 		{
-			LOG(kDefault, kDebug, "ServerSession::ResetClientsForLoad Re-linked Client: {} GlobalPlayer: {} Coord: ({},{})", iClientId, rEntry.globalId, rEntry.coord.iX, rEntry.coord.iY);
+			LOG(kDefault, kDebug, "ServerSession::ResetClientsForLoad Re-linked Client: {} GlobalId: {} Coord: ({},{})", iClientId, rEntry.globalId, rEntry.coord.iX, rEntry.coord.iY);
 		}
 	}
 

@@ -1,4 +1,4 @@
-#include "Players.h"
+#include "Omnis.h"
 
 #include "Data/Texture.h"
 #include "Frame/Collections/Explosions/Explosions.h"
@@ -20,17 +20,17 @@
 
 namespace engine
 {
-template struct Collection<game::PlayersInterpolate, CollectionFlags::kIdToIndex>;
-template struct Collection<game::PlayersPostRender>;
+template struct Collection<game::OmnisInterpolate, CollectionFlags::kIdToIndex>;
+template struct Collection<game::OmnisPostRender>;
 } // namespace engine
 
 namespace game
 {
 
-using enum PlayerFlags;
+using enum OmniFlags;
 
-constexpr float kfBlasterSizeX = kfPlayerRadius * 0.3333f;
-constexpr float kfBlasterSizeY = kfPlayerRadius * 1.0f;
+constexpr float kfBlasterSizeX = kfOmniRadius * 0.3333f;
+constexpr float kfBlasterSizeY = kfOmniRadius * 1.0f;
 
 
 constexpr int64_t kiExplosionBaseParticleCount = 16;
@@ -51,18 +51,18 @@ constexpr float kfRotateTowardsSpeed = 10.0f;
 constexpr float kfShieldShrinkSpeed = 1.5f;
 constexpr float kfShieldRotationSpeed = 4.0f;
 
-constexpr float kfHexShieldSizeScale = kfPlayerRadius * 0.0667f;
+constexpr float kfHexShieldSizeScale = kfOmniRadius * 0.0667f;
 constexpr float kfHexShieldColorMix = 0.85f;
 constexpr float kfHexShieldFadeThreshold = 0.25f;
 
-// Player model (defined in PlayersRender.cpp)
-extern const common::crc_t kPlayerModel;
+// Omni model (defined in OmnisRender.cpp)
+extern const common::crc_t kOmniModel;
 
 constexpr float kfRotationTiltFactor = 0.015f;
 constexpr float kfRotationTiltMaximum = 0.4f;
 #endif // BT_CLIENT
 
-void PlayersInterpolate::Register()
+void OmnisInterpolate::Register()
 {
 #if defined(BT_CLIENT)
 	engine::AreaLightsInterpolate::RegisterType(siAreaLightTypeIndex,
@@ -70,12 +70,12 @@ void PlayersInterpolate::Register()
 		.uiCrc = data::kTexturesBlasterBC74pngCrc,
 		.puiColors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
 		.pf2TextureCoordinates = {{1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 1.0f}},
-		.fVisibleIntensity = gPlayerAreaLightVisibleIntensity.mfCurrent,
-		.fLightingSize = gPlayerBlasterLightingArea.mfCurrent,
-		.fLightingIntensity = gPlayerBlasterLightingIntensity.mfCurrent,
-		.pVisibleIntensityWrapper = &gPlayerAreaLightVisibleIntensity,
-		.pLightingSizeWrapper = &gPlayerBlasterLightingArea,
-		.pLightingIntensityWrapper = &gPlayerBlasterLightingIntensity,
+		.fVisibleIntensity = gOmniAreaLightVisibleIntensity.mfCurrent,
+		.fLightingSize = gOmniBlasterLightingArea.mfCurrent,
+		.fLightingIntensity = gOmniBlasterLightingIntensity.mfCurrent,
+		.pVisibleIntensityWrapper = &gOmniAreaLightVisibleIntensity,
+		.pLightingSizeWrapper = &gOmniBlasterLightingArea,
+		.pLightingIntensityWrapper = &gOmniBlasterLightingIntensity,
 	});
 #endif // BT_CLIENT
 
@@ -94,20 +94,20 @@ void PlayersInterpolate::Register()
 		.fParticleVerticalVelocityMinimum = kfExplosionParticleVerticalVelocityMinimum,
 		.fParticleVerticalVelocityRandom = kfExplosionParticleVerticalVelocityRandom,
 		.fParticleIntensityDecay = kfExplosionParticleIntensityDecay,
-		.pParticleWidthScale = &gPlayerExplosionParticleWidth,
-		.pParticleLengthScale = &gPlayerExplosionParticleLength,
-		.pParticleLengthSpreadScale = &gPlayerExplosionParticleLengthSpread,
-		.pParticlePositionJitterScale = &gPlayerExplosionParticlePositionJitter,
-		.pParticleVelocityBaseScale = &gPlayerExplosionParticleVelocityBase,
-		.pParticleVelocitySpreadScale = &gPlayerExplosionParticleVelocitySpread,
-		.pParticleVerticalVelocityBaseScale = &gPlayerExplosionParticleVerticalVelocityBase,
-		.pParticleVerticalVelocitySpreadScale = &gPlayerExplosionParticleVerticalVelocitySpread,
-		.pParticleVelocityDecayScale = &gPlayerExplosionParticleVelocityDecay,
-		.pParticleGravityScale = &gPlayerExplosionParticleGravity,
-		.pParticleVisibleIntensityScale = &gPlayerExplosionParticleVisibleIntensity,
-		.pParticleIntensitySpreadScale = &gPlayerExplosionParticleIntensitySpread,
-		.pParticleIntensityDecayScale = &gPlayerExplosionParticleIntensityDecay,
-		.pParticleIntensityPowerScale = &gPlayerExplosionParticleIntensityPower,
+		.pParticleWidthScale = &gOmniExplosionParticleWidth,
+		.pParticleLengthScale = &gOmniExplosionParticleLength,
+		.pParticleLengthSpreadScale = &gOmniExplosionParticleLengthSpread,
+		.pParticlePositionJitterScale = &gOmniExplosionParticlePositionJitter,
+		.pParticleVelocityBaseScale = &gOmniExplosionParticleVelocityBase,
+		.pParticleVelocitySpreadScale = &gOmniExplosionParticleVelocitySpread,
+		.pParticleVerticalVelocityBaseScale = &gOmniExplosionParticleVerticalVelocityBase,
+		.pParticleVerticalVelocitySpreadScale = &gOmniExplosionParticleVerticalVelocitySpread,
+		.pParticleVelocityDecayScale = &gOmniExplosionParticleVelocityDecay,
+		.pParticleGravityScale = &gOmniExplosionParticleGravity,
+		.pParticleVisibleIntensityScale = &gOmniExplosionParticleVisibleIntensity,
+		.pParticleIntensitySpreadScale = &gOmniExplosionParticleIntensitySpread,
+		.pParticleIntensityDecayScale = &gOmniExplosionParticleIntensityDecay,
+		.pParticleIntensityPowerScale = &gOmniExplosionParticleIntensityPower,
 	});
 
 #if defined(BT_CLIENT)
@@ -131,10 +131,10 @@ void PlayersInterpolate::Register()
 			{},
 			{},
 		},
-		.ppVisibleAreaScales = {&gPlayerImpactVisibleAreaOne, &gPlayerImpactVisibleAreaTwo, nullptr, nullptr},
-		.ppVisibleIntensityScales = {&gPlayerImpactVisibleIntensityOne, &gPlayerImpactVisibleIntensityTwo, nullptr, nullptr},
-		.ppLightingAreaScales = {&gPlayerImpactLightingAreaOne, &gPlayerImpactLightingAreaTwo, nullptr, nullptr},
-		.ppLightingIntensityScales = {&gPlayerImpactLightingIntensityOne, &gPlayerImpactLightingIntensityTwo, nullptr, nullptr},
+		.ppVisibleAreaScales = {&gOmniImpactVisibleAreaOne, &gOmniImpactVisibleAreaTwo, nullptr, nullptr},
+		.ppVisibleIntensityScales = {&gOmniImpactVisibleIntensityOne, &gOmniImpactVisibleIntensityTwo, nullptr, nullptr},
+		.ppLightingAreaScales = {&gOmniImpactLightingAreaOne, &gOmniImpactLightingAreaTwo, nullptr, nullptr},
+		.ppLightingIntensityScales = {&gOmniImpactLightingIntensityOne, &gOmniImpactLightingIntensityTwo, nullptr, nullptr},
 	});
 
 	// Hits trigger the impact puff controller.
@@ -157,8 +157,8 @@ void PlayersInterpolate::Register()
 			{},
 			{},
 		},
-		.ppAreaScales = {&gPlayerImpactPuffAreaOne, &gPlayerImpactPuffAreaTwo, nullptr, nullptr},
-		.ppIntensityScales = {&gPlayerImpactPuffIntensityOne, &gPlayerImpactPuffIntensityTwo, nullptr, nullptr},
+		.ppAreaScales = {&gOmniImpactPuffAreaOne, &gOmniImpactPuffAreaTwo, nullptr, nullptr},
+		.ppIntensityScales = {&gOmniImpactPuffIntensityOne, &gOmniImpactPuffIntensityTwo, nullptr, nullptr},
 	});
 
 	engine::HexShieldsInterpolate::RegisterType(siHexShieldTypeIndex,
@@ -171,7 +171,7 @@ void PlayersInterpolate::Register()
 }
 
 #if defined(BT_CLIENT)
-void PlayersInterpolate::RemoveOwnedVisuals(Frame& rFrame, PlayersInterpolate& rCurrentInterpolate, int64_t i)
+void OmnisInterpolate::RemoveOwnedVisuals(Frame& rFrame, OmnisInterpolate& rCurrentInterpolate, int64_t i)
 {
 	if ((rCurrentInterpolate.pWindTrails[i].uuid.iValue != 0))
 	{
@@ -184,22 +184,22 @@ void PlayersInterpolate::RemoveOwnedVisuals(Frame& rFrame, PlayersInterpolate& r
 }
 #endif // BT_CLIENT
 
-void PlayersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
+void OmnisPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
-	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
-	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
+	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
+	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 #if defined(BT_CLIENT)
 		if (rCurrentPostRender.pFlags[i] & kExploding)
 		{
-			PlayersInterpolate::RemoveOwnedVisuals(rFrame, rCurrentInterpolate, i);
+			OmnisInterpolate::RemoveOwnedVisuals(rFrame, rCurrentInterpolate, i);
 		}
 #endif // BT_CLIENT
 	}
 
-	// Remove dead players (reverse iteration for swap-and-pop safety)
+	// Remove dead omnis (reverse iteration for swap-and-pop safety)
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
 		return (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pDestroyedTimes[i].count() <= 0.0f;
@@ -213,22 +213,22 @@ void PlayersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[may
 
 static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
-	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
-	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
+	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
+	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 
 	for (const StatusChange& rStatusChange : rFrameInput.statusChanges)
 	{
-		if (rStatusChange.eType == StatusChangeType::kDestroyPlayer)
+		if (rStatusChange.eType == StatusChangeType::kDestroyOmni)
 		{
-			int64_t iPlayerUuid = std::get<DestroyPlayerData>(rStatusChange.data).iPlayerUuid;
-			player_t destroyId {engine::Uuid {iPlayerUuid}};
+			int64_t iOmniUuid = std::get<DestroyOmniData>(rStatusChange.data).iOmniUuid;
+			omni_t destroyId {engine::Uuid {iOmniUuid}};
 
 			auto it = rCurrentInterpolate.idToIndexMap.find(destroyId);
 			if (it != rCurrentInterpolate.idToIndexMap.end())
 			{
 				engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.pPushers[it->second]);
 #if defined(BT_CLIENT)
-				PlayersInterpolate::RemoveOwnedVisuals(rFrame, rCurrentInterpolate, it->second);
+				OmnisInterpolate::RemoveOwnedVisuals(rFrame, rCurrentInterpolate, it->second);
 #endif // BT_CLIENT
 
 				engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, destroyId, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
@@ -236,10 +236,10 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 			continue;
 		}
 
-		if (rStatusChange.eType == StatusChangeType::kSpawnPlayer)
+		if (rStatusChange.eType == StatusChangeType::kSpawnOmni)
 		{
-			const SpawnPlayerData& rSpawnData = std::get<SpawnPlayerData>(rStatusChange.data);
-			PlayerFlags_t spawnFlags {PlayerFlags::kBlasterSpawnLeft};
+			const SpawnOmniData& rSpawnData = std::get<SpawnOmniData>(rStatusChange.data);
+			OmniFlags_t spawnFlags {OmniFlags::kBlasterSpawnLeft};
 			if (rSpawnData.bIsFlagship)
 			{
 				spawnFlags.Set(kIsFlagship);
@@ -255,15 +255,15 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 				continue;
 			}
 
-			PlayersPostRender::Spawn(rFrame,
+			OmnisPostRender::Spawn(rFrame,
 			{
 				.vecPosition = vecSpawnPosition,
 				.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f),
 				.vecVelocity = XMVectorZero(),
-				.alignment = rFrame.postRender.playerAlignment,
+				.alignment = rFrame.postRender.omniAlignment,
 				.flags = spawnFlags,
 				.arrivalGracePeriod = kArrivalGracePeriod,
-				.globalPlayerId = {.iValue = rSpawnData.iGlobalId},
+				.globalId = {.iValue = rSpawnData.iGlobalId},
 				// Empty unless the spawn request carries an owning client: agent-injected rows are born unowned.
 				.clientGuid = rSpawnData.clientGuid,
 				.fleetWantedCoordinate = rSpawnData.fleetWantedCoordinate,
@@ -273,10 +273,10 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 	}
 }
 
-void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
+void OmnisPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
-	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
-	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
+	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
+	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 
 	int64_t iUpdateFleetCount = 0;
 	engine::GridCoord updateFleetNewCoordinate {};
@@ -287,7 +287,7 @@ void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __res
 		if (rStatusChange.eType == StatusChangeType::kUpdateFleet)
 		{
 			const UpdateFleetData& rUpdate = std::get<UpdateFleetData>(rStatusChange.data);
-			player_t updateId {engine::Uuid {rUpdate.iPlayerUuid}};
+			omni_t updateId {engine::Uuid {rUpdate.iOmniUuid}};
 			auto it = rCurrentInterpolate.idToIndexMap.find(updateId);
 			if (it != rCurrentInterpolate.idToIndexMap.end())
 			{
@@ -295,7 +295,7 @@ void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __res
 				if (rUpdate.bIsFlagship)
 				{
 					rCurrentPostRender.pFlags[iIndex].Set(kIsFlagship);
-					iUpdateFleetFlagshipGlobalId = rCurrentPostRender.pGlobalPlayerIds[iIndex].iValue;
+					iUpdateFleetFlagshipGlobalId = rCurrentPostRender.pGlobalIds[iIndex].iValue;
 				}
 				else
 				{
@@ -309,10 +309,10 @@ void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __res
 			continue;
 		}
 
-		if (rStatusChange.eType == StatusChangeType::kUpdatePlayer)
+		if (rStatusChange.eType == StatusChangeType::kUpdateOmni)
 		{
-			const UpdatePlayerData& rUpdate = std::get<UpdatePlayerData>(rStatusChange.data);
-			player_t updateId {engine::Uuid {rUpdate.iPlayerUuid}};
+			const UpdateOmniData& rUpdate = std::get<UpdateOmniData>(rStatusChange.data);
+			omni_t updateId {engine::Uuid {rUpdate.iOmniUuid}};
 
 			auto it = rCurrentInterpolate.idToIndexMap.find(updateId);
 			if (it != rCurrentInterpolate.idToIndexMap.end())
@@ -326,7 +326,7 @@ void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __res
 			}
 			else
 			{
-				LOG(kNetwork, kWarning, "ProcessUpdateStatusChanges::kUpdatePlayer Uuid: {} NOT FOUND in idToIndexMap", rUpdate.iPlayerUuid);
+				LOG(kNetwork, kWarning, "ProcessUpdateStatusChanges::kUpdateOmni Uuid: {} NOT FOUND in idToIndexMap", rUpdate.iOmniUuid);
 			}
 			continue;
 		}
@@ -334,17 +334,17 @@ void PlayersPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __res
 
 	if (iUpdateFleetCount > 0)
 	{
-		LOG(kNetwork, kVerbose, "ProcessUpdateStatusChanges::kUpdateFleet Coord: ({},{}) NewWantedCoord: ({},{}) Players: {} Flagship: {}", rStaticData.coordinate.iX, rStaticData.coordinate.iY, updateFleetNewCoordinate.iX, updateFleetNewCoordinate.iY, iUpdateFleetCount, iUpdateFleetFlagshipGlobalId);
+		LOG(kNetwork, kVerbose, "ProcessUpdateStatusChanges::kUpdateFleet Coord: ({},{}) NewWantedCoord: ({},{}) Omnis: {} Flagship: {}", rStaticData.coordinate.iX, rStaticData.coordinate.iY, updateFleetNewCoordinate.iX, updateFleetNewCoordinate.iY, iUpdateFleetCount, iUpdateFleetFlagshipGlobalId);
 	}
 }
 
-void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
+void OmnisPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	ProcessSpawnStatusChanges(rFrame, rFrameInput, rStaticData);
 
 #if defined(BT_CLIENT)
-	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
-	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
+	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
+	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
@@ -353,15 +353,15 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 			engine::WindTrailsPostRender::Add(rFrame, rCurrentInterpolate.pWindTrails[i],
 			{
 				.vecPosition = rCurrentInterpolate.pVecPositions[i],
-				.fIntensity = game::gWindDepositPlayerIntensity.mfCurrent,
-				.fWidth = game::gWindDepositPlayerWidth.mfCurrent,
-				.fLengthMultiplier = game::gWindDepositPlayerLengthMultiplier.mfCurrent,
+				.fIntensity = game::gWindDepositOmniIntensity.mfCurrent,
+				.fWidth = game::gWindDepositOmniWidth.mfCurrent,
+				.fLengthMultiplier = game::gWindDepositOmniLengthMultiplier.mfCurrent,
 			});
 		}
 
 		if (!(rCurrentInterpolate.pHexShields[i].uuid.iValue != 0) && !(rCurrentPostRender.pFlags[i] & kExploding))
 		{
-			engine::HexShieldsPostRender::Add(rFrame, rCurrentInterpolate.pHexShields[i], PlayersInterpolate::siHexShieldTypeIndex);
+			engine::HexShieldsPostRender::Add(rFrame, rCurrentInterpolate.pHexShields[i], OmnisInterpolate::siHexShieldTypeIndex);
 		}
 	}
 #endif // BT_CLIENT
@@ -371,13 +371,13 @@ void PlayersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 	SpawnDeathExplosions(rFrame, rStaticData.coordinate);
 }
 
-bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
+bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 {
-	// A human-controlled unit outside its own cell is a bug, not gameplay.
+	// An omni outside its own cell is a bug, not gameplay.
 	ASSERT(common::InsideArea(rInfo.vecPosition, engine::LocalCellArea()));
 
-	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
-	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
+	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
+	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 
 	common::ValidateVector<true >(rInfo.vecPosition);
 	common::ValidateVector<false>(rInfo.vecDirection);
@@ -410,8 +410,8 @@ bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.pNextSecondarySpawnTimes[iIndex] = rInfo.nextSecondarySpawnTime;
 	rCurrentPostRender.pVecVelocities[iIndex] = rInfo.vecVelocity;
 	rCurrentPostRender.pVecWantedDirections[iIndex] = rInfo.vecDirection;
-	rCurrentPostRender.pfArmors[iIndex] = rInfo.bTransfer ? rInfo.fArmor : kfPlayerArmor;
-	rCurrentPostRender.pfShields[iIndex] = rInfo.bTransfer ? rInfo.fShield : kfPlayerShield;
+	rCurrentPostRender.pfArmors[iIndex] = rInfo.bTransfer ? rInfo.fArmor : kfOmniArmor;
+	rCurrentPostRender.pfShields[iIndex] = rInfo.bTransfer ? rInfo.fShield : kfOmniShield;
 	rCurrentPostRender.pShieldCooldowns[iIndex] = rInfo.shieldCooldown;
 	rCurrentPostRender.pDestroyedExplosionTimes[iIndex] = std::chrono::duration<float>::zero();
 	rCurrentPostRender.pShieldDownSoundCooldowns[iIndex] = rInfo.shieldDownSoundCooldown;
@@ -422,14 +422,14 @@ bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	// Entering a cell is a fresh spawn for navigation, cross-cell transfers included: the wanted direction comes from the
 	// hull direction, and the cached steering, island destination, navigation mode, and waypoint index reset here.
 	// Flagship navigates to island destination on enter; non-flagship starts roaming and follows flagship via proximity
-	PlayerFlags_t spawnFlags = rInfo.flags;
+	OmniFlags_t spawnFlags = rInfo.flags;
 	SetNavigationDirection(spawnFlags, (rInfo.flags & kIsFlagship) ? 4i64 : -1i64);
 	SetNavigationWaypointIndex(spawnFlags, 0);
 	rCurrentPostRender.pFlags[iIndex] = spawnFlags;
 	rCurrentPostRender.pNavigationDelays[iIndex] = rInfo.navigationDelay;
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
 	rCurrentPostRender.pClientGuids[iIndex] = rInfo.clientGuid;
-	rCurrentPostRender.pGlobalPlayerIds[iIndex] = rInfo.globalPlayerId;
+	rCurrentPostRender.pGlobalIds[iIndex] = rInfo.globalId;
 	rCurrentPostRender.pFleetWantedCoordinates[iIndex] = rInfo.fleetWantedCoordinate;
 	rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = static_cast<uint8_t>(rInfo.iPendingFleetWantedCoordinateTicks);
 	rCurrentPostRender.puiPendingWeaponModeTicks[iIndex] = static_cast<uint8_t>(rInfo.iPendingWeaponModeTicks);
@@ -441,11 +441,11 @@ bool PlayersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 }
 
 
-void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame)
+void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] const Frame& __restrict rPreviousFrame)
 {
-	PlayersInterpolate& rCurrent = *rFrameInterpolate.pPlayers;
-	const PlayersInterpolate& rPrevious = *rPreviousFrame.interpolate.pPlayers;
-	const PlayersPostRender& rPreviousPostRender = *rPreviousFrame.postRender.pPlayers;
+	OmnisInterpolate& rCurrent = *rFrameInterpolate.pOmnis;
+	const OmnisInterpolate& rPrevious = *rPreviousFrame.interpolate.pOmnis;
+	const OmnisPostRender& rPreviousPostRender = *rPreviousFrame.postRender.pOmnis;
 	std::chrono::duration<float> deltaTime(rFrameInterpolate.fDeltaTime);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -478,9 +478,9 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 		engine::PushersInterpolate::Sync(rFrameInterpolate, rCurrent.pPushers[i],
 		{
 			.vecPosition = vecPosition,
-			.fRadius = kfPlayerPusherRadius,
-			.fIntensity = kfPlayerPusherIntensity,
-			.fPower = kfPlayerPusherPower,
+			.fRadius = kfOmniPusherRadius,
+			.fIntensity = kfOmniPusherIntensity,
+			.fPower = kfOmniPusherPower,
 			.flags = {engine::PusherFlags::kTypeDefault},
 		});
 
@@ -497,9 +497,9 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 		rCurrent.pfShieldRotations[i] = fShieldRotation;
 		rCurrent.pfShieldShrinks[i] = fShieldShrink;
 
-		if (engine::gAnimationDataMap.contains(kPlayerModel))
+		if (engine::gAnimationDataMap.contains(kOmniModel))
 		{
-			animationTime = engine::gAnimationDataMap.at(kPlayerModel).AdvanceLoopingTime(animationTime, deltaTime);
+			animationTime = engine::gAnimationDataMap.at(kOmniModel).AdvanceLoopingTime(animationTime, deltaTime);
 			rCurrent.pAnimationTimes[i] = animationTime;
 		}
 
@@ -508,9 +508,9 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 			engine::WindTrailsInterpolate::Sync(rFrameInterpolate, rCurrent.pWindTrails[i],
 			{
 				.vecPosition = vecPosition,
-				.fIntensity = game::gWindDepositPlayerIntensity.mfCurrent,
-				.fWidth = game::gWindDepositPlayerWidth.mfCurrent,
-				.fLengthMultiplier = game::gWindDepositPlayerLengthMultiplier.mfCurrent,
+				.fIntensity = game::gWindDepositOmniIntensity.mfCurrent,
+				.fWidth = game::gWindDepositOmniWidth.mfCurrent,
+				.fLengthMultiplier = game::gWindDepositOmniLengthMultiplier.mfCurrent,
 			});
 		}
 
@@ -576,10 +576,10 @@ void PlayersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rF
 }
 
 
-void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
+void OmnisPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
-	PlayersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pPlayers;
-	PlayersPostRender& rCurrentPostRender = *rFrame.postRender.pPlayers;
+	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
+	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 
 	if (rCurrentInterpolate.iCount == 0)
 	{
@@ -588,14 +588,14 @@ void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, 
 
 	siCollisionLayerIndex = engine::Collision::AddLayer(
 	{
-		.pVecStartPositions = rPreviousFrame.interpolate.pPlayers->pVecPositions,
+		.pVecStartPositions = rPreviousFrame.interpolate.pOmnis->pVecPositions,
 		.pVecEndPositions = rCurrentInterpolate.pVecPositions,
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
-		.fRadius = kfPlayerRadius,
-		.fDamage = 0.0f, // Player doesn't deal collision damage
-		.uiCategory = CollisionCategory::kuiPlayer,
-		.uiCollidesWith = CollidesWith::kuiPlayer,
+		.fRadius = kfOmniRadius,
+		.fDamage = 0.0f, // Omni doesn't deal collision damage
+		.uiCategory = CollisionCategory::kuiOmni,
+		.uiCollidesWith = CollidesWith::kuiOmni,
 		.pAlignments = rCurrentPostRender.pAlignments,
 	});
 
@@ -606,13 +606,13 @@ void PlayersPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, 
 	}
 }
 
-// PlayersPostRender::Update orchestrates per-iteration helpers in PlayersNavigation.cpp and PlayersCombat.cpp.
+// OmnisPostRender::Update orchestrates per-iteration helpers in OmnisNavigation.cpp and OmnisCombat.cpp.
 
-void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
+void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
-	PlayersPostRender& __restrict rCurrent = *rFrame.postRender.pPlayers;
-	const PlayersPostRender& rPrevious = *rPreviousFrame.postRender.pPlayers;
-	const PlayersInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pPlayers;
+	OmnisPostRender& __restrict rCurrent = *rFrame.postRender.pOmnis;
+	const OmnisPostRender& rPrevious = *rPreviousFrame.postRender.pOmnis;
+	const OmnisInterpolate& rPreviousInterpolate = *rPreviousFrame.interpolate.pOmnis;
 	std::chrono::duration<float> deltaTime(rFrame.interpolate.fDeltaTime);
 
 	if (rCurrent.iCount == 0)
@@ -627,7 +627,7 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		PlayerFlags_t flags = rPrevious.pFlags[i];
+		OmniFlags_t flags = rPrevious.pFlags[i];
 		std::chrono::duration<float> nextBlasterFireTime = rPrevious.pNextBlasterFireTimes[i];
 		std::chrono::duration<float> nextSecondarySpawnTime = rPrevious.pNextSecondarySpawnTimes[i];
 		XMVECTOR vecVelocity = rPrevious.pVecVelocities[i];
@@ -694,8 +694,8 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 			XMVECTOR vecLookPosition = XMVectorZero();
 			AcquireTarget(rPreviousFrame, vecPosition, flags, bLookTargetFound, vecLookPosition);
 
-			float fAccelerationMultiplier = (1.0f - kfPlayerJitterRange * 0.5f) + common::Random<kfPlayerJitterRange>(rFrame.postRender.randomEngine);
-			float fDecayMultiplier = (1.0f - kfPlayerJitterRange * 0.5f) + common::Random<kfPlayerJitterRange>(rFrame.postRender.randomEngine);
+			float fAccelerationMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
+			float fDecayMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
 			ApplyMovement(iNavigationDirection, vecAiDirection, deltaTime, fAccelerationMultiplier, fDecayMultiplier, vecVelocity);
 
 			if (bLookTargetFound)
@@ -708,7 +708,7 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 		RegenerateShield(deltaTime, shieldCooldown, fShield);
 		ApplyTerrainPush(rStaticData, vecPosition, vecVelocity);
 		ApplyPusherPush(rFrame, rPreviousFrame, i, vecPosition, vecVelocity);
-		ResolveTerrainContact(rStaticData, i, vecPosition, rFrame.interpolate.pPlayers->pVecPositions[i], vecVelocity);
+		ResolveTerrainContact(rStaticData, i, vecPosition, rFrame.interpolate.pOmnis->pVecPositions[i], vecVelocity);
 
 		SetNavigationDirection(flags, iNavigationDirection);
 		SetNavigationWaypointIndex(flags, iNavigationWaypointIndex);
@@ -734,9 +734,9 @@ void PlayersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 	}
 }
 
-bool PlayersInterpolate::LogDifferences(const PlayersInterpolate& rOther) const
+bool OmnisInterpolate::LogDifferences(const OmnisInterpolate& rOther) const
 {
-	common::ScopedLogDifferenceContext context("PlayersInterpolate");
+	common::ScopedLogDifferenceContext context("OmnisInterpolate");
 	bool bEqual = true;
 	bEqual &= Collection::LogDifferences(rOther);
 
@@ -751,9 +751,9 @@ bool PlayersInterpolate::LogDifferences(const PlayersInterpolate& rOther) const
 	return bEqual;
 }
 
-bool PlayersPostRender::LogDifferences(const PlayersPostRender& rOther) const
+bool OmnisPostRender::LogDifferences(const OmnisPostRender& rOther) const
 {
-	common::ScopedLogDifferenceContext context("PlayersPostRender");
+	common::ScopedLogDifferenceContext context("OmnisPostRender");
 	bool bEqual = true;
 	bEqual &= Collection::LogDifferences(rOther);
 
@@ -779,7 +779,7 @@ bool PlayersPostRender::LogDifferences(const PlayersPostRender& rOther) const
 		bEqual &= common::LogDifference<"pVecIslandDestinations">(i, pVecIslandDestinations[i], rOther.pVecIslandDestinations[i]);
 		bEqual &= common::LogDifference<"pClientGuids.uiHigh">(i, pClientGuids[i].uiHigh, rOther.pClientGuids[i].uiHigh);
 		bEqual &= common::LogDifference<"pClientGuids.uiLow">(i, pClientGuids[i].uiLow, rOther.pClientGuids[i].uiLow);
-		bEqual &= common::LogDifference<"pGlobalPlayerIds">(i, pGlobalPlayerIds[i], rOther.pGlobalPlayerIds[i]);
+		bEqual &= common::LogDifference<"pGlobalIds">(i, pGlobalIds[i], rOther.pGlobalIds[i]);
 		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iX">(i, pFleetWantedCoordinates[i].iX, rOther.pFleetWantedCoordinates[i].iX);
 		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iY">(i, pFleetWantedCoordinates[i].iY, rOther.pFleetWantedCoordinates[i].iY);
 		bEqual &= common::LogDifference<"puiPendingFleetWantedCoordinateTicks">(i, puiPendingFleetWantedCoordinateTicks[i], rOther.puiPendingFleetWantedCoordinateTicks[i]);

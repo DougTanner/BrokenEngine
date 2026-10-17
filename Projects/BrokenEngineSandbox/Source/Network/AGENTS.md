@@ -7,7 +7,7 @@ Game-layer packet extensions, status-change payload formats and their per-type r
 - `GamePacketType` starts at `engine::PacketType::kGamePacketStart`; enumerator order is wire order and new values append. Every client-to-server type needs a game contract row and follows the engine validation and rate-limit checklist.
 - Debug-control requests are contract-gated by `kbDebugInput`; a non-debug server treats them as contract violations, so a Debug client sends them only to a server whose accepted connection response says it accepts them ([Client to Server Contract](../../../../Documents/Architecture/Network.md#client--server-contract)).
 - Drained game packets arrive with their type byte removed. A server-to-client fixed payload has no contract row, and the client trusts its size under the corrupt-input policy; client-to-server sizing follows `../../../../Engine/Source/Network/AGENTS.md` `## Transport Contracts`. Variable payloads decode through the engine-owned `NetworkMessages::MessageReader`, whose bounded-read rules are in that same section.
-- Player events append into workbuffer-backed output without consuming raw packets. Fleet synchronization consumes matching raw packets and replaces the whole destination with each decoded sync; an empty fleet list is still an applied result.
+- Owned-entity events append into workbuffer-backed output without consuming raw packets. Fleet synchronization consumes matching raw packets and replaces the whole destination with each decoded sync; an empty fleet list is still an applied result.
 
 ## Status-Change Wire Format
 
@@ -22,8 +22,8 @@ Game-layer packet extensions, status-change payload formats and their per-type r
   wire-sensitive event enums sit in the same descriptor table. Add or change a
   game payload there rather than hand-writing a write on one side and a matching
   read on the other, which is how the two sides drift apart. Local-only
-  synthesized states never enter the stream. Numeric `PlayerStateWireType`
-  values are serialized; each `kpPlayerStateDescriptors` array index and row
+  synthesized states never enter the stream. Numeric `OwnedEntityStateWireType`
+  values are serialized; each `kpOwnedEntityStateDescriptors` array index and row
   `eWireType` must match that numeric value; append enum values and matching
   descriptors before `kCount`.
 
