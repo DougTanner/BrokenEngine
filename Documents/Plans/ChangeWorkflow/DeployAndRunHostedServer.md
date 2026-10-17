@@ -5,7 +5,7 @@
 
 This is the last of four Plans that put the dedicated server on the internet. When this Plan is claimed, the earlier three have landed:
 
-- `Documents/Plans/Engine/HardenServerForUnattendedHosting.md` made the server save its world on `WM_ENDSESSION`, fail fast on a game-port bind failure, and drop peers that never handshake.
+- `Documents/Plans/Engine/HardenServerForUnattendedHosting.md` made the server save its world on `WM_ENDSESSION` and fail fast on a game-port bind failure.
 - `Documents/Plans/ChangeWorkflow/ProvisionAzureServerVm.md` created the `/deploy-server` skill, its `New-ServerVm.ps1`, and the deallocated VM `brokenengine-server` in `brokenengine-server-rg`. The VM has NSG rules for UDP 27015 (any source) and TCP 3389 and 22 (the user's IP only). `references/azure-facts.md` holds the prices and billing facts.
 - `Documents/Plans/Engine/ConnectClientToHostedServer.md` made Main Menu's Remote Server button connect to the VM's static IP (`kRemoteServerAddress`, `Projects/BrokenEngineSandbox/Source/Game.cpp`).
 
@@ -13,13 +13,13 @@ This Plan adds the scripts that configure the VM, copy the server to it, start a
 
 User decisions (this session, binding):
 
-- Server start is automatic on boot: Windows auto-logon plus a logon-triggered scheduled task runs the server launch. Starting the VM from Azure therefore brings the server up with no RDP. The server cannot run as a Windows service, because it needs an interactive desktop window (`Engine/Source/Main.cpp:192-235`).
+- Server start is automatic on boot: Windows auto-logon plus a logon-triggered scheduled task runs the server launch. Starting the VM from Azure therefore brings the server up with no RDP. The server cannot run as a Windows service, because it needs an interactive desktop window (`Engine/Source/Main.cpp:196-239`).
 
 Main-session decisions the user did not object to (these are not user decisions):
 
 - Deploy only the Release server, `BrokenEngineSandboxServer.exe`, never Debug. Debug exposes save, load, reset, pause, and time-speed controls to every client (gap G11; `Documents/Architecture/Network.md` `kbDebugInput` gate).
 - Visual Studio remote debugging is out of scope for this chain.
-- Unattended dialogs (gap G2) get no new flag. The deployed launch reuses `--agent-port <port>`, which already takes every no-dialog branch (`Main.cpp:76,854,899`, `Engine/Source/CrashReport.cpp:114-115`) and binds loopback only (`Engine/Source/Agent/AgentCommandServer.cpp:23`).
+- Unattended dialogs (gap G2) get no new flag. The server build shows no dialog (`Main.cpp:76-85,897-902,937-946`, `Engine/Source/CrashReport.cpp:169-192`). The deployed launch passes `--agent-port <port>`, which binds loopback only (`Engine/Source/Agent/AgentCommandServer.cpp:23`).
 - The operational scripts go in the `/deploy-server` skill.
 
 ## Design
@@ -42,8 +42,8 @@ What Microsoft documents:
 
 No Microsoft primary source states that deallocation or auto-shutdown delivers `WM_ENDSESSION` to the interactive session, or within what time. `WM_ENDSESSION` itself allows termination as soon as the handler returns (https://learn.microsoft.com/en-us/windows/win32/shutdown/wm-endsession). This Plan therefore does not rely on the guest shutdown for a scripted stop:
 
-- Scripted stop: `Stop-ServerVm.ps1` first sends the agent `quit` command over loopback on the VM. It waits for the server process to exit, which happens after its post-loop final autosave (`Main.cpp:489-494`, routed through `FinalAutosave()` by the hardening Plan). Only then does it deallocate.
-- Nightly auto-shutdown: no script runs. The server's `WM_ENDSESSION` handler saves if Windows delivers that message. Otherwise the loss is bounded by the hourly periodic autosave (`kAutosaveInterval`, `Projects/BrokenEngineSandbox/Source/Save/GameSaveLoad.h:28`). The acceptance below observes which case happens once, and records it.
+- Scripted stop: `Stop-ServerVm.ps1` first sends the agent `quit` command over loopback on the VM. It waits for the server process to exit, which happens after its post-loop final autosave (`Main.cpp:522-524`, routed through `FinalAutosave()` by the hardening Plan). Only then does it deallocate.
+- Nightly auto-shutdown: no script runs. The server's `WM_ENDSESSION` handler saves if Windows delivers that message. Otherwise the loss is bounded by the hourly periodic autosave (`kAutosaveInterval`, `Engine/Source/File/ServerSaveLoad.h:20`). The acceptance below observes which case happens once, and records it.
 
 Agent wire format, from `Engine/Source/Agent/AgentCommandServer.cpp`:
 
@@ -69,13 +69,13 @@ The deploy set is the exe plus `Data\Islands.manifest` and `Data\Islands.pack`, 
 
 `BrokenEngineSandboxServer.exe --data-directory C:\BrokenEngine\Server\Data --app-data-directory C:\BrokenEngine\State --log-file C:\BrokenEngine\Logs\server-<stamp>.log --agent-port 27100`
 
-`Start-Server.ps1` exits without waiting on the server process. Not waiting is the simplest consistent choice: the scheduled task then ends at once, so no task setting acts on the running server, and a repeated start reaches the server's own single-instance check, which exits without a dialog under `--agent-port` (`Main.cpp:847-858`).
+`Start-Server.ps1` exits without waiting on the server process. Not waiting is the simplest consistent choice: the scheduled task then ends at once, so no task setting acts on the running server, and a repeated start reaches the server's own single-instance check, which exits without a dialog under `--agent-port` (`Main.cpp:897-902`).
 
 - `--data-directory` and `--app-data-directory` must be absolute existing directories (`Engine/Source/LaunchOptions.cpp:68-140`). `Initialize-ServerHost.ps1` creates both.
-- `--loopback-only` is omitted, so the game port binds all IPv4 interfaces (`Engine/Source/Network/Server/Server.cpp:32`).
-- The game port is fixed at UDP 27015 (`kiDefaultPort`, `Engine/Source/Network/NetworkProtocol.h:63`).
+- `--loopback-only` is omitted, so the game port binds all IPv4 interfaces (`Engine/Source/Network/Server/Server.cpp:37`).
+- The game port is fixed at UDP 27015 (`kiDefaultPort`, `Engine/Source/Network/NetworkProtocol.h:69`).
 - This Plan chooses agent port 27100. `Start-Server.ps1` and `Stop-Server.ps1` each name it, and `SKILL.md` documents it.
-- The deployed launch keeps the `HIGH_PRIORITY_CLASS` the server sets on itself (`Main.cpp:865-866`), with no override.
+- The deployed launch keeps the `HIGH_PRIORITY_CLASS` the server sets on itself (`Main.cpp:905`), with no override.
 
 ### Accounts, auto-logon, and the scheduled task
 
@@ -216,7 +216,7 @@ Risk tier: Tier 2. This is tool behavior inside one skill. No repository runtime
 - A Debug or Profile server deployment, PDB deployment, and Visual Studio remote debugging.
 - Running the server as a Windows service. A non-interactive "run whether user is logged on or not" task. Re-asserting `DefaultUserName` after a console logon.
 - Minidumps (gap G10), pruning autosave backups (gap G6) or logs, and copying autosaves off the VM.
-- Deploying Local-mode (changed) island data. Changed islands invalidate the autosave, and the server then starts a fresh world (`Projects/BrokenEngineSandbox/Source/Game.cpp:42-47`).
+- Deploying Local-mode (changed) island data. Changed islands invalidate the autosave, and the server then starts a fresh world (`Projects/BrokenEngineSandbox/Source/Game.cpp:27-30`).
 - Installing PowerShell 7 on the VM, changing the Azure guest patch mode, IPv6, DNS names, Dev/Test pricing, Azure Bastion, and load testing.
 
 ## Acceptance criteria
@@ -238,7 +238,7 @@ Risk tier: Tier 2. This is tool behavior inside one skill. No repository runtime
    1. Read the current schedule time.
    2. Set `az vm auto-shutdown --time` to about 10 minutes ahead in UTC, with the server running.
    3. Poll `az vm get-instance-view` until the VM leaves `PowerState/running`, and record the final power state.
-   4. Start the VM with `Start-ServerVm.ps1`. Record whether `ServerAutosave.save`'s `LastWriteTimeUtc` falls within the shutdown window, and whether the previous log ends with `WM_ENDSESSION: final autosave`.
+   4. Start the VM with `Start-ServerVm.ps1`. Record whether `ServerAutosave.save`'s `LastWriteTimeUtc` falls within the shutdown window, and whether the previous log contains `WM_ENDSESSION: final autosave`.
    5. Write both findings in `references/azure-facts.md` `## Nightly auto-shutdown`. Either outcome is acceptable. The section states the resulting loss bound: none, or up to one `kAutosaveInterval`.
    6. Restore the schedule time read in step 1.
 10. The VM ends deallocated, by `Stop-ServerVm.ps1`.

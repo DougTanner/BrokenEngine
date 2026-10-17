@@ -125,8 +125,10 @@ simultaneous client gets its own root instead (see
 reports are always written under the `--app-data-directory` root when the
 complete identity fits the fixed path buffer:
 `<app-data-root>\<Game Name>\<Game-Name>-Crash-Report.txt`; otherwise the
-existing `%APPDATA%` per-user location remains. A Yes at the save-to-desktop
-prompt only adds a Desktop copy. These are the identities the process check
+existing `%APPDATA%` per-user location remains. A client Yes at the
+save-to-desktop prompt, which appears only in a launch without `--agent-port`,
+adds a Desktop copy; the server always adds one without asking, harness launches
+included. These are the identities the process check
 baselines, which is why its `-GameName` is the role's `<Game Name>`
 (`Broken Engine Sandbox Server` or `Broken Engine Sandbox`) and its
 `-ConfiguredAppDataRoot` is the same root this block launches with. A report the
@@ -286,7 +288,7 @@ takes physical input, its fullscreen state follows the order in
 user's own settings and saves apply. `--loopback-only` stays, as in every
 same-machine run.
 
-The server is single-instance per machine (a second one shows a modal and exits), so first check that no server started without `--agent-port` is running. A server carrying `--agent-port` belongs to another session's harness run, which the claim below waits out; a server whose command line cannot be read counts as started without it:
+The server is single-instance per machine (a second one logs an error and exits, with no modal), so first check that no server started without `--agent-port` is running. A server carrying `--agent-port` belongs to another session's harness run, which the claim below waits out; a server whose command line cannot be read counts as started without it:
 
 ```powershell
 Get-CimInstance Win32_Process -Filter "Name LIKE 'BrokenEngineSandboxServer%'" |

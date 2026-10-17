@@ -48,7 +48,7 @@ Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.
 
 - `LaunchOptions` owns command-line parsing. `--loopback-only` is independent of `--agent-port`; `--data-directory` and `--app-data-directory` must each resolve to an existing absolute directory; port values are validated before conversion. The `--log-file` sink opens in `ProcessMain` immediately after a successful parse, so `FileManager`-constructor diagnostics reach the file while parse rejections do not.
 - Agent launches stay minimized and suppress physical client input, except IME result characters on a focused agent window (`Input/AGENTS.md` `## Focus and Agent Input`), while preserving the close/Alt+F4 escape path. Synthetic input and command transport live in Agent (`Agent/AGENTS.md`).
-- `FileManager` directory-setup failures during construction and required-asset failures at eager-load completion log their full diagnostic at `kError`. At those two startup boundaries, a normal launch shows that same detail once, an agent launch shows no modal, and both return nonzero through ordinary cleanup without writing a crash report. Other exceptions are rethrown to an attached debugger and otherwise retain the crash-report path.
+- `FileManager` directory-setup failures during construction and required-asset failures at eager-load completion log their full diagnostic at `kError`. At those two startup boundaries, a normal client launch shows that same detail once, an agent launch shows no modal, and both return nonzero through ordinary cleanup without writing a crash report. Other exceptions are rethrown to an attached debugger and otherwise retain the crash-report path.
 - Client sound settings load before `Game` construction. A checked `Mute in background` setting suspends audio on focus loss and focus gain always resumes it; agent launches suspend audio before `Game` construction regardless of the setting so harness clients boot silent.
 - Effective fullscreen resolves in one fixed order: the agent runtime override wins, then `--windowed WxH` forces windowed, then the saved `gFullscreen` preference applies. None of the three writes the saved preference, so an agent command or launch flag never rewrites what the user chose.
 - Client startup waits for terrain elevation before renderer construction and for priority textures after it, before the first render, then renders once per framebuffer before showing the window; an iteration is skipped, not retried, while a swapchain recreate is pending.
@@ -69,14 +69,15 @@ Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.
 
 A crash runs in a fixed order: `HandleException` writes the report, a connected
 client uploads it, the main thread unwinds, and only then does
-`PromptCrashReportDesktopCopy` offer the Desktop copy. The write and the prompt
+`PromptCrashReportDesktopCopy` handle the Desktop copy. The write and the prompt
 use fixed buffers because they are reachable during heap corruption. Do not add
 allocator-dependent formatting or path construction there, and do not log from
 them. Nothing on them may allocate or follow a pointer the heap owns, so
 `--app-data-directory` reaches crash handling through a fixed buffer populated
 during startup rather than through the launch options' heap-owned path storage;
 reading an inline scalar of the statically allocated launch options, such as the
-agent port that suppresses the prompt in an agent launch, stays within the rule.
+agent port that suppresses the prompt in a client agent launch, stays within the
+rule.
 The override is used only when the complete report path fits the fixed path
 buffer; otherwise the existing per-user report location remains. Both report
 file paths — the Desktop one and the per-user one — are resolved once at startup
@@ -84,8 +85,10 @@ into fixed buffers, after launch options are parsed, by
 `ResolveCrashReportPaths`, which also creates the per-user report directory.
 `HandleException` always writes the per-user path, falling back to a fixed
 working-directory-relative file name when that buffer is empty because its
-startup resolution failed. The prompt never shows in an agent launch or when the
-Desktop buffer is empty; Yes copies the written report to the Desktop path.
+startup resolution failed. Nothing is copied when the Desktop buffer is empty.
+The server never asks and always copies the written report to the Desktop path,
+even in an agent launch. The client's prompt never shows in an agent launch; Yes
+copies the report.
 
 Only the client main-loop catch, when no debugger is attached, and the agent
 crash-report harness rig call `TryUploadCrashReport`, on the main thread after

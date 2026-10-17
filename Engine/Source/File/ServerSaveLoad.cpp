@@ -96,6 +96,20 @@ void ServerSaveLoad::TickAutosave()
 	}
 }
 
+void ServerSaveLoad::FinalAutosave()
+{
+	if (mbFinalAutosaveDone)
+	{
+		return;
+	}
+
+	mbFinalAutosaveDone = true;
+	if (!Autosave())
+	{
+		LOG(kDefault, kError, "Final autosave failed during shutdown");
+	}
+}
+
 bool ServerSaveLoad::Autoload()
 {
 	ScopedSuppressAllocationTracking suppress;

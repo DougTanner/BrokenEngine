@@ -42,8 +42,9 @@ Server::Server(int64_t iPort)
 	mpHost = enet_host_create(&address, 64, static_cast<size_t>(NetworkManager::kiChannelCount), 0, 0);
 	if (mpHost == nullptr)
 	{
-		LOG(kNetwork, kWarning, "Server::Server enet_host_create failed");
-		return;
+		std::string message = std::format("Server::Server enet_host_create failed to bind UDP port {}", iPort);
+		LOG(kNetwork, kError, "{}", message);
+		throw std::runtime_error(message);
 	}
 	mpHost->checksum = enet_crc32;
 	// 1MB send/receive buffers to handle bursty packet dispatches
@@ -53,12 +54,9 @@ Server::Server(int64_t iPort)
 
 Server::~Server()
 {
-	if (mpHost != nullptr)
-	{
-		// Heap: ENet destroys host data internally
-		ScopedSuppressAllocationTracking suppress;
-		enet_host_destroy(mpHost);
-	}
+	// Heap: ENet destroys host data internally
+	ScopedSuppressAllocationTracking suppress;
+	enet_host_destroy(mpHost);
 }
 
 void Server::AdvanceLoadGeneration()
@@ -69,21 +67,12 @@ void Server::AdvanceLoadGeneration()
 
 void Server::Flush()
 {
-	if (mpHost == nullptr)
-	{
-		return;
-	}
 	enet_host_flush(mpHost);
 }
 
 void Server::Poll(const NetworkTimeState& rTimeState, ServerPollMode ePollMode)
 {
 	ASSERT(common::gpMultithreading->IsMainThread());
-
-	if (mpHost == nullptr)
-	{
-		return;
-	}
 
 	// mPendingNewSubscriptions / mPendingResynchronizationClientIds are intentionally NOT cleared here. Their consumers
 	// (ServerSessionRuntime::SendNewSubscriptionFullStates / ServerSessionRuntime::HandleResyncRequests) run post-tick,

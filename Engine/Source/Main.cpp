@@ -73,12 +73,14 @@ static int64_t HandleEagerLoadCompletion()
 	{
 		throw;
 	}
-	catch (const std::runtime_error& rException)
+	catch ([[maybe_unused]] const std::runtime_error& rException)
 	{
+#if defined(BT_CLIENT)
 		if ((gLaunchOptions.iAgentPort == 0))
 		{
 			MessageBox(nullptr, rException.what(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 		}
+#endif
 		return 1;
 	}
 
@@ -518,10 +520,7 @@ static int64_t MainThread(HINSTANCE hInstance)
 	gbAllocationTrackingReady.store(false, std::memory_order_relaxed);
 
 #if defined(BT_SERVER)
-	if (!pGame->mServerSaveLoad.Autosave())
-	{
-		LOG(kDefault, kError, "Final autosave failed during shutdown");
-	}
+	pGame->mServerSaveLoad.FinalAutosave();
 #endif
 
 #if defined(BT_CLIENT)
@@ -745,6 +744,22 @@ static LRESULT CALLBACK WindowProcedure(HWND hWindow, UINT uiMessage, WPARAM uiW
 			InvalidateRect(hWindow, nullptr, FALSE);
 			return 0;
 		}
+
+		case WM_ENDSESSION:
+		{
+			// The session may end when this returns, so the final autosave must finish here.
+			if (uiWordParameter != 0)
+			{
+				LOG(kDefault, kInfo, "WM_ENDSESSION: final autosave");
+				gbQuit = true;
+				// The destroyWindow teardown drain dispatches messages after the game object is gone.
+				if (game::gpGame != nullptr)
+				{
+					game::gpGame->mServerSaveLoad.FinalAutosave();
+				}
+			}
+			return 0;
+		}
 #endif // BT_SERVER
 
 		case WM_SYSCOMMAND:
@@ -881,14 +896,8 @@ static int64_t ProcessMain(HINSTANCE hInstance)
 		pMutex.reset(hMutex);
 		if (GetLastError() == ERROR_ALREADY_EXISTS)
 		{
-			// An agent-launched instance must never block on a modal dialog — fail fast so AgentHarness sees the exit.
-			if ((engine::gLaunchOptions.iAgentPort != 0))
-			{
-				LOG(kDefault, kError, "Another instance is already running; --agent-port launch aborting");
-				return 0;
-			}
-
-			MessageBox(nullptr, "Server is already running.", game::kGameName.data(), MB_OK | MB_SYSTEMMODAL);
+			// The server shows no dialog and fails fast, so a supervisor or AgentHarness sees the exit.
+			LOG(kDefault, kError, "Another instance is already running");
 			return 0;
 		}
 	}
@@ -925,12 +934,14 @@ static int64_t ProcessMain(HINSTANCE hInstance)
 		{
 			throw;
 		}
-		catch (const std::runtime_error& rException)
+		catch ([[maybe_unused]] const std::runtime_error& rException)
 		{
+#if defined(BT_CLIENT)
 			if ((engine::gLaunchOptions.iAgentPort == 0))
 			{
 				MessageBox(nullptr, rException.what(), game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 			}
+#endif
 			iResult = 1;
 		}
 

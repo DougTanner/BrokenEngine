@@ -168,22 +168,27 @@ void HandleException(std::optional<const std::exception*> pException)
 
 void PromptCrashReportDesktopCopy()
 {
-	// An agent-launched instance must never block on a modal dialog, and an empty Desktop path leaves no copy target.
-	if (gLaunchOptions.iAgentPort != 0)
-	{
-		return;
-	}
-
+	// An empty Desktop path leaves no copy target. A client agent launch must never block on a modal dialog; the server
+	// has no user to ask, so it always copies.
 	if (spcDesktopReportPath[0] == L'\0')
 	{
 		return;
 	}
 
-	if (MessageBox(nullptr, "Save crash report to desktop?", game::kGameName.data(), MB_YESNO | MB_SYSTEMMODAL) == IDYES)
+#if defined(BT_CLIENT)
+	if (gLaunchOptions.iAgentPort != 0)
 	{
-		// Nothing on the crash path may recover or log a failed copy.
-		CopyFileW(ReportPath(), spcDesktopReportPath, FALSE);
+		return;
 	}
+
+	if (MessageBox(nullptr, "Save crash report to desktop?", game::kGameName.data(), MB_YESNO | MB_SYSTEMMODAL) != IDYES)
+	{
+		return;
+	}
+#endif
+
+	// Nothing on the crash path may recover or log a failed copy.
+	CopyFileW(ReportPath(), spcDesktopReportPath, FALSE);
 }
 
 #if defined(BT_CLIENT)

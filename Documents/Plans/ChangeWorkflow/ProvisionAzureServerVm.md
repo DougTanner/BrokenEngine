@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-12T22:41:30.813Z","dependsOn":["Documents/Plans/Engine/HardenServerForUnattendedHosting.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-12T22:41:30.813Z","dependsOn":[]} -->
 # Provision the Azure server VM and create the /deploy-server skill
 
 ## Context

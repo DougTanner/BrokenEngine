@@ -14,10 +14,12 @@ public:
 	void ServerReset();
 	bool Autosave();
 	void TickAutosave();
+	void FinalAutosave();
 	bool Autoload();
 
 	static constexpr std::chrono::seconds kAutosaveInterval = 3'600s;
 	common::Timer mAutosaveTimer;
+	bool mbFinalAutosaveDone = false;
 };
 
 } // namespace engine
