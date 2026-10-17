@@ -71,16 +71,18 @@ worker never dispatches another worker.
 7. Give it the brief, the exact repository scope, and the pattern list to
    identify: similar live systems, dominant caller patterns, naming and
    parameter conventions, manager access, workbuffer usage, and relevant
-   collection shapes. Done when the brief is sent.
+   collection shapes. Also give it the pattern-evidence file path `## Handoff`
+   names. Done when the brief is sent.
 8. Wait for its evidence before continuing. Done when the researcher extension
-   and its complete shared handoff have returned with concise paths and symbols.
+   and its complete shared handoff have returned, with `Evidence` citing the
+   pattern-evidence file as path plus selector.
 
 ### Generate Three Designs
 
 9. After research completes, dispatch exactly three `planner` workers
-   concurrently from the main context. Give each worker the same brief,
-   repository evidence, applicable collection constraints, and one unsoftened
-   axis:
+   concurrently from the main context. Give each worker the same brief, the
+   researcher's pattern-evidence file as the path plus selector `## Handoff`
+   names, applicable collection constraints, and one unsoftened axis:
 
    1. Minimal surface: 1–3 entry points, opaque internals, deep module.
    2. Data locality: contiguous SOA iteration, batching, and workbuffer use.
@@ -117,7 +119,7 @@ with `Residuals` last. Add these domain fields before the shared fields:
 
 ```text
 Researcher extension:
-Pattern evidence: <similar systems, caller patterns, conventions, manager/workbuffer use, and collection shapes with file:line or symbol>
+Pattern evidence: <one line: the dominant caller pattern and the closest live system, by symbol>
 
 Planner extension:
 Design axis: Minimal surface | Data locality | Caller ergonomics
@@ -129,8 +131,14 @@ Collections and members: <each proposed Collection or SOA member, or none>
 Trade-offs: <interface depth, SOA fit, dispatch safety, and costs>
 ```
 
-This read-only workflow changes no file and requires no build, so both workers
-return `Changed files: none` and `Build required: none`.
+The full pattern evidence does not travel inline. The researcher writes it,
+covering every step 7 pattern-list item with its `file:line` or symbol
+citations, to gitignored `Temp/design-interface-pattern-evidence.md` under one
+`## Pattern evidence` heading, and cites that path plus its `##` selector under
+`Evidence`.
+
+`Changed files` and `Build required` are `none` for both workers because this
+workflow edits no tracked file and requires no build.
 
 The researcher uses only the researcher extension; each planner uses only the
 planner extension. Main consumes those child handoffs, then owns the comparison
@@ -158,7 +166,8 @@ choose a public interface when multiple meaningfully different shapes remain.
 
 - The manager, researcher, and planners may inspect the repository, but they do
   not create, edit, or remove scratch source, build output, branches, or
-  worktrees, and they do not compile candidates.
+  worktrees, and they do not compile candidates. The one exception: the
+  researcher writes its one gitignored `Temp/` pattern-evidence file.
 - The workflow ends at the decision and plan gate; do not begin implementation
   from this skill. Follow `.agents/references/change-workflow.md` for
   delegation, plan, review, and landing mechanics rather than restating them
