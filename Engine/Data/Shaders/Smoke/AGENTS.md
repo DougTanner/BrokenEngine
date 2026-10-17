@@ -1,6 +1,6 @@
 # Smoke Shaders - Sparse Camera-Following Simulation
 
-Smoke is a client-only 2D density field over a camera-following world rectangle. Objects deposit into the field, two compute passes advect and diffuse it, and world shaders sample the result through shared smoke helpers.
+Smoke is a client-only 2D density field per flight plane; every plane's field covers the same camera-following world rectangle and refreshes on the same cadence. Objects deposit into the fields, two compute passes advect and diffuse each plane's field, and world shaders sample every plane, lowest first, through shared smoke helpers.
 
 ## Frame and Remap Contract
 
@@ -16,7 +16,8 @@ The asymmetric remap requires matching occupancy dilation: B uses direct tile lo
 - Outputs must converge to exact zero after storage-format quantization. Decay and threshold choices must not create positive steady states — values the simulation settles toward instead of reaching zero; occupancy is rebuilt from nonzero output, so residual values keep tiles active forever.
 - The two spread passes are not interchangeable. Both call the shared
   `SmokeSpread` helper, with different noise scales, but only pass B adds the
-  terms that kill off faint smoke: extra decay over raised terrain, a fade
+  terms that kill off faint smoke: extra decay where terrain rises more than
+  the plane's height above the lowest plane, a fade
   toward the edge of the simulation area, and the final step-down walk with
   threshold zeroing that satisfies the exact-zero rule above. Copying those
   terms into pass A for symmetry doubles the extinction rate and visibly

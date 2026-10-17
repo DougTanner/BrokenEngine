@@ -478,6 +478,7 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 	const RequiredFeature pRequiredFeatures[]
 	{
 		{.pVkFeature = &mVkPhysicalDeviceFeatures2.features.shaderStorageImageExtendedFormats, .pcName = "shaderStorageImageExtendedFormats", .pcReason = "R16_SFLOAT smoke storage images"},
+		{.pVkFeature = &mVkPhysicalDeviceFeatures2.features.shaderSampledImageArrayDynamicIndexing, .pcName = "shaderSampledImageArrayDynamicIndexing", .pcReason = "dynamically uniform smoke and water-normal sampler-array indexing"},
 		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.descriptorBindingStorageBufferUpdateAfterBind, .pcName = "descriptorBindingStorageBufferUpdateAfterBind", .pcReason = "VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT"},
 		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.shaderSampledImageArrayNonUniformIndexing, .pcName = "shaderSampledImageArrayNonUniformIndexing", .pcReason = "non-uniform descriptor indexing"},
 		{.pVkFeature = &mVkPhysicalDeviceVulkan12Features.descriptorBindingSampledImageUpdateAfterBind, .pcName = "descriptorBindingSampledImageUpdateAfterBind", .pcReason = "texture streaming"},

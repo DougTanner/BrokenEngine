@@ -38,7 +38,8 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 
 			// The smoke sampler (kSamplerSmoke) uses LINEAR filtering for R16_SFLOAT smoke ping-pong textures. Same CLAMP_TO_BORDER + INT_TRANSPARENT_BLACK as the border sampler; aniso/lodbias are no-ops at mipLevels = 1.
 			pipelineInfo.descriptorInfos.at(i + 3).flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerSmoke};
-			pipelineInfo.descriptorInfos.at(i + 3).pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeTextureOne;
+			pipelineInfo.descriptorInfos.at(i + 3).iCount = shaders::kiMaxFlightPlanes;
+			pipelineInfo.descriptorInfos.at(i + 3).ppTextures = gpTextureManager->mRenderTargetTextures.mppSmokeTexturesOne;
 
 			// Binding 15: Per-mesh data (matrix, normal matrix, joint count/offset)
 			pipelineInfo.descriptorInfos.at(i + 4).flags = DescriptorFlags::kPerCommandBufferStorageBuffers;

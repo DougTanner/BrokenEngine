@@ -16,7 +16,7 @@ layout (scalar, set = 1, binding = 2) buffer readonly renderUniform
 	ParticlesLayout render;
 };
 
-layout (set = 1, binding = 3) uniform sampler2D smokeSampler;
+layout (set = 1, binding = 3) uniform sampler2D pSmokeSamplers[kiMaxFlightPlanes];
 
 layout (set = 0, binding = kiGlobalBindingSamplerClamp) uniform sampler particleSampler;
 layout (set = 0, binding = kiGlobalBindingBindlessTextures) uniform texture2D pTextures[];
@@ -52,7 +52,5 @@ void main()
 	// Output alpha = 0 is correct under kAdd blend (VK_BLEND_FACTOR_ONE/ONE — alpha contribution discarded by additive sum)
 	f4OutColor = vec4(fCookie * fIntensity * f4Color.w * f4Color.xyz, 0.0f);
 
-	float fHeightFraction = clamp((f3InWorldPosition.z - globalLayout.fBaseHeight) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
-	float fSmokeFade = 1.0f - fHeightFraction * fHeightFraction;
-	f4OutColor.xyz *= SmokeShadow(globalLayout, f3InWorldPosition, smokeSampler, fSmokeFade);
+	f4OutColor.xyz *= SmokeShadowFaded(globalLayout, f3InWorldPosition, pSmokeSamplers);
 }

@@ -47,12 +47,18 @@ vec4 ShadowStretchProjection(GlobalLayout globalLayout, vec3 f3WorldPosition, ve
 	return vec4(2.0f * f2VisibleAreaUV.x - 1.0f, 1.0f - 2.0f * f2VisibleAreaUV.y, 0.0f, 1.0f);
 }
 
-vec2 BaseHeightPosition(GlobalLayout globalLayout, MainLayout mainLayout, vec3 f3InPosition)
+// The fragment-to-eye ray's XY at flight plane iPlane's height; a fragment above the plane reads at its own XY.
+vec2 FlightPlanePosition(GlobalLayout globalLayout, MainLayout mainLayout, vec3 f3InPosition, int iPlane)
 {
 	vec3 f3ToEyeNormal = normalize(mainLayout.f4EyePosition.xyz - f3InPosition);
-	const float fBaseHeight = globalLayout.fBaseHeight;
-	float fMult = (fBaseHeight - f3InPosition.z) / f3ToEyeNormal.z;
+	const float fPlaneHeight = globalLayout.pfFlightPlaneHeights[iPlane];
+	float fMult = (fPlaneHeight - f3InPosition.z) / f3ToEyeNormal.z;
 	return (f3InPosition + max(fMult, 0.0f) * f3ToEyeNormal).xy;
+}
+
+vec2 BaseHeightPosition(GlobalLayout globalLayout, MainLayout mainLayout, vec3 f3InPosition)
+{
+	return FlightPlanePosition(globalLayout, mainLayout, f3InPosition, 0);
 }
 
 vec3 SampleNormal(GlobalLayout globalLayout, sampler2D normalSampler, vec2 f2Position, float fSize, float fSpeed, vec2 f2Offset, vec2 f2PositionGradX, vec2 f2PositionGradY)
@@ -221,12 +227,36 @@ float SampleTerrainShadow(sampler2D shadowTextureSampler, vec2 f2Uv)
 	return textureLod(shadowTextureSampler, f2Uv, 0.0f).x;
 }
 
-float SmokeShadow(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D smokeSampler, float fMulti)
+// Vertical, sun-independent attenuation at the fragment XY: the product of every flight plane's factor, each in
+// [0, 1], so overlapping planes never shade lighter than either alone and an empty plane multiplies by exactly 1.
+float SmokeShadow(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D pSmokeSamplers[kiMaxFlightPlanes], float fMulti)
 {
 	vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.f4SmokeArea, f3InPosition.xy);
-	float fSmokeShadow = globalLayout.fSmokeMax * texture(smokeSampler, f2SmokeTexcoord).x;
-	fSmokeShadow = clamp(pow(fSmokeShadow, globalLayout.fSmokePower), 0.0f, 1.0f);
-	return 1.0f - fMulti * fSmokeShadow;
+	float fShadow = 1.0f;
+	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
+	{
+		float fSmokeShadow = globalLayout.fSmokeMax * texture(pSmokeSamplers[iPlane], f2SmokeTexcoord).x;
+		fSmokeShadow = clamp(pow(fSmokeShadow, globalLayout.fSmokePower), 0.0f, 1.0f);
+		fShadow *= 1.0f - fMulti * fSmokeShadow;
+	}
+	return fShadow;
+}
+
+// SmokeShadow with each plane's factor faded by the fragment's height above that plane: full for planes above the
+// fragment, zero once the fragment is 1 / fSmokeObjectHeightInverse above the plane.
+float SmokeShadowFaded(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D pSmokeSamplers[kiMaxFlightPlanes])
+{
+	vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.f4SmokeArea, f3InPosition.xy);
+	float fShadow = 1.0f;
+	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
+	{
+		float fHeightFraction = clamp((f3InPosition.z - globalLayout.pfFlightPlaneHeights[iPlane]) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
+		float fSmokeFade = 1.0f - fHeightFraction * fHeightFraction;
+		float fSmokeShadow = globalLayout.fSmokeMax * texture(pSmokeSamplers[iPlane], f2SmokeTexcoord).x;
+		fSmokeShadow = clamp(pow(fSmokeShadow, globalLayout.fSmokePower), 0.0f, 1.0f);
+		fShadow *= 1.0f - fSmokeFade * fSmokeShadow;
+	}
+	return fShadow;
 }
 
 vec3 AddSmoke(GlobalLayout globalLayout, vec3 f3InColor, vec2 f2InPosition, sampler2D smokeSampler, float fInMax, vec4 pf4Lighting[3])

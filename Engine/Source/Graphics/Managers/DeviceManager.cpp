@@ -190,6 +190,7 @@ DeviceManager::DeviceManager()
 		.samplerAnisotropy = VK_TRUE,
 		.textureCompressionBC = VK_TRUE,
 		.shaderStorageImageExtendedFormats = VK_TRUE,
+		.shaderSampledImageArrayDynamicIndexing = VK_TRUE,
 		.shaderInt64 = kbShaderRealtimeClock ? VK_TRUE : VK_FALSE,
 	};
 	vkPhysicalDeviceFeatures.fragmentStoresAndAtomics = VK_TRUE;

@@ -76,8 +76,9 @@ All GPU buffers: vertex (terrain, water, models), uniform (per-framebuffer view/
   the grow repoints.
 - Smoke and wind share one occupancy + active-tile-list pattern for hierarchical
   indirect dispatch. Smoke pairs one bit-packed occupancy buffer with each
-  ping-pong texture and shares one active-tile list between both spread halves:
-  deposits mark the first texture's occupancy; each spread's dilate reads its
+  flight plane's ping-pong textures and shares one active-tile list across
+  every plane's spread halves: each plane's deposits mark its first texture's
+  occupancy; each spread's dilate reads its
   input occupancy and read-and-clears its output texture's prior occupancy as a
   stale-storage union term, then the spread re-marks nonzero output. Smoke
   dilates dispatch through per-framebuffer host-visible indirect commands so a
@@ -90,9 +91,9 @@ All GPU buffers: vertex (terrain, water, models), uniform (per-framebuffer view/
   which zero-fill its occupancy, so it survives pipeline-only rebuilds together
   with the retained texture contents; smoke hierarchy storage is pipeline-owned.
   Replacing smoke hierarchy storage also re-arms the one-frame smoke clear:
-  Global first observes the zeroed occupancy, Main then clears both retained
-  ping-pong images, and fresh `SmokeOne` deposits after that clear must mark
-  occupancy A.
+  Global first observes the zeroed occupancy, Main then clears every plane's
+  retained ping-pong images, and fresh `SmokeOne` deposits after that clear
+  must mark their plane's occupancy A.
 - Swapchain recreation tears down and rebuilds only per-framebuffer buffers, preserving static geometry.
 
 ### TextureManager

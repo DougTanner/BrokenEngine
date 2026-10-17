@@ -209,7 +209,7 @@ static int64_t CheckDumpIndex(int64_t iIndex, int64_t iCount, std::string_view n
 }
 
 constexpr const char* kpcValidDumpNames =
-	"Log, TerrainElevation, SmokeGradient, SmokeOne, SmokeTwo, WindOne, WindTwo, "
+	"Log, TerrainElevation, SmokeGradient, SmokeOne[0-N], SmokeTwo[0-N], WindOne, WindTwo, "
 	"Lighting[0-2], Combine[0-2], AmbientCombine, LightingHistory[0-2], AmbientHistory, "
 	"Spread[0-N][0-2], SpreadOnly[0-N][0-2], "
 	"ShadowElevation, Shadow, ShadowBlur, ShadowBlurIntermediate, ShadowHistory, "
@@ -235,11 +235,11 @@ static Texture* ResolveRenderTarget(std::string_view name, int64_t iIndex, int64
 	}
 	if (name == "SmokeOne")
 	{
-		return &rRenderTargetTextures.mSmokeTextureOne;
+		return &rRenderTargetTextures.mSmokeTexturesOne[CheckDumpIndex(iIndex, gpFlightPlanes->Count(), name)];
 	}
 	if (name == "SmokeTwo")
 	{
-		return &rRenderTargetTextures.mSmokeTextureTwo;
+		return &rRenderTargetTextures.mSmokeTexturesTwo[CheckDumpIndex(iIndex, gpFlightPlanes->Count(), name)];
 	}
 	if (name == "WindOne")
 	{

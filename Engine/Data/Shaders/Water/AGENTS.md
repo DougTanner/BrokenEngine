@@ -29,6 +29,6 @@ Water renders a visible-area ocean grid. Medium and High quality run a compute p
 - Analytic specular antialiasing is selected by `WATER_SPEC_AA_MODE`. How it passes the per-mip variance from one stage to the next is selected by `WATER_SPEC_AA_MIP_HANDOFF`, which consumes DataPacker's BC5 per-mip variance tables. Changes to either switch require shader repacking; keep analytic LOD and water-normal sampler bias aligned.
 - Shoreline skybox-lobe reductions are applied once before every specular antialiasing branch: zero preserves a lobe, one removes it at the shoreline, and deep water remains unchanged.
 - Specular beach-lobe reduction uses `Break End Depth` as its depth threshold; it does not use the displacement blend interval or `Medium Shore Softness`.
-- Lighting and smoke sample at a base-height projection derived from the undisplaced world position, keeping them stable under wave animation.
+- Lighting samples at a base-height projection and smoke at each flight plane's projection, both derived from the undisplaced world position, keeping them stable under wave animation.
 - Sun-driven energy and skybox sun/moon specular use full effective shadow. Sky ambient uses the separately controlled ambient-shadow mix; EWNS (defined in the shader hub) and ambient emitter deposits remain unshadowed.
 - Terrain ray-march shadow attenuates the sun component but not moon light. Object shadow and smoke attenuation apply to both.

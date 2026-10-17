@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:01:51.106Z","dependsOn":["Documents/Plans/Engine/SmokePerFlightPlane.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:01:51.106Z","dependsOn":[]} -->
 # Dim each light's 2D lighting deposit by its height above the surface under it
 
 Tier 2: client-only render behaviour of the lighting deposit stage (three CPU

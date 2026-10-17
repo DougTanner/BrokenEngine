@@ -25,7 +25,7 @@ layout (set = 1, binding = 5) uniform sampler2D elevationTextureSampler;
 layout (set = 1, binding = 6) uniform sampler2D colorTextureSamplers[kiMaxIslands];
 layout (set = 1, binding = 7) uniform sampler2D normalTextureSamplers[kiMaxIslands];
 layout (set = 1, binding = 8) uniform sampler2D ambientOcclusionTextureSamplers[kiMaxIslands];
-layout (set = 1, binding = 9) uniform sampler2D smokeSampler;
+layout (set = 1, binding = 9) uniform sampler2D pSmokeSamplers[kiMaxFlightPlanes];
 layout (set = 1, binding = 10) uniform sampler2D rockSampler;
 layout (set = 1, binding = 11) uniform sampler2D sandNormalsSampler0;
 layout (set = 1, binding = 12) uniform sampler2D sandNormalsSampler1;
@@ -141,7 +141,7 @@ void main()
 
 	// Shadow with smoke at world position. Moon bypasses the terrain ray-march shadow only;
 	// object shadows and smoke volumetric attenuation still apply to both lights.
-	float fShadowMoon = SmokeShadow(globalLayout, f3InPosition, smokeSampler, mainLayout.fSmokeShadowIntensity) * texture(objectShadowsTextureSampler, f2InVisibleAreaTexcoord).x;
+	float fShadowMoon = SmokeShadow(globalLayout, f3InPosition, pSmokeSamplers, mainLayout.fSmokeShadowIntensity) * texture(objectShadowsTextureSampler, f2InVisibleAreaTexcoord).x;
 	float fShadowSun  = fShadowMoon * SampleTerrainShadow(shadowTextureSampler, WorldToVisibleArea(f3InPosition, globalLayout.f4ShadowArea));
 	// AO: sample the per-island occlusion and fold `fIslandAmbientOcclusion` into the SunLighting
 	// occlusion factor below.
@@ -151,11 +151,15 @@ void main()
 	f4OutColor = vec4(SunLighting(f3Color, globalLayout, vec4(f3InPosition, 1.0f), f3SunNormal, fShadowSun, fShadowMoon, fAmbientOcclusionFactor), 1.0f);
 	f4OutColor.xyz += f3Lighting * mix(f3Color, vec3(1.0f), globalLayout.fLightingAddTerrain);
 
-	// Sample smoke at base-height projected position, affected by lighting at base-height projected position
-	vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.f4SmokeArea, f2PositionAtBaseHeight);
-	float fSmokeRaw = globalLayout.fSmokeMax * texture(smokeSampler, f2SmokeTexcoord).x;
-	float fSmokePow = clamp(pow(fSmokeRaw, globalLayout.fSmokePower), 0.0f, 1.0f);
-	// The 4.0f un-averages the ambient target: Lighting/LightCombine.comp stores 0.25 * (E+W+N+S) and
-	// BlendSmokePrecomputed expects the un-averaged sum. Water/Water.frag carries the identical scale.
-	f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3AmbientSum, globalLayout);
+	// Sample each flight plane's smoke at that plane's eye-ray projected position, lowest first so the plane nearest the
+	// eye blends last; every plane is lit by the lighting at the base-height projected position.
+	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
+	{
+		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.f4SmokeArea, FlightPlanePosition(globalLayout, mainLayout, f3InPosition, iPlane));
+		float fSmokeRaw = globalLayout.fSmokeMax * texture(pSmokeSamplers[iPlane], f2SmokeTexcoord).x;
+		float fSmokePow = clamp(pow(fSmokeRaw, globalLayout.fSmokePower), 0.0f, 1.0f);
+		// The 4.0f un-averages the ambient target: Lighting/LightCombine.comp stores 0.25 * (E+W+N+S) and
+		// BlendSmokePrecomputed expects the un-averaged sum. Water/Water.frag carries the identical scale.
+		f4OutColor.xyz = BlendSmokePrecomputed(f4OutColor.xyz, fSmokePow, 4.0f * f3AmbientSum, globalLayout);
+	}
 }

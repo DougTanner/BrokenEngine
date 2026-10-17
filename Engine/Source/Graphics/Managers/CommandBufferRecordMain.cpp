@@ -216,24 +216,38 @@ void CommandBufferRecordMain::RecordSmokeEmit(VkCommandBuffer vkCommandBuffer, i
 {
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerSmokeEmit);
 
-	// Force-clear TextureTwo on the Smoke enabled/recreate edge. Global spread runs before Main, so any stale
-	// occupancy describing this cleared texture is consumed and drained by the next frame's spread.
-	gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.RecordBeginRenderPass(vkCommandBuffer);
-	gpPipelineManager->mpPipelines[kPipelineSmokeClearB].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f});
-	vkCmdEndRenderPass(vkCommandBuffer);
+	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
+	{
+		Texture& rSmokeTextureOne = gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[i];
+		Texture& rSmokeTextureTwo = gpTextureManager->mRenderTargetTextures.mSmokeTexturesTwo[i];
 
-	gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kColorAttachment);
-	gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.RecordBeginRenderPass(vkCommandBuffer);
-	gpPipelineManager->mpPipelines[kPipelineSmokeClearA].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f});
-	for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmokeAxisAligned])
-	{
-		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {2.0f, 0.0f, 0.0f, 0.0f});
+		// Force-clear TextureTwo on the Smoke enabled/recreate edge. Global spread runs before Main, so any stale
+		// occupancy describing this cleared texture is consumed and drained by the next frame's spread. The shared
+		// clear pipelines draw in every plane's render passes, which stay compatible with plane 0's.
+		rSmokeTextureTwo.RecordBeginRenderPass(vkCommandBuffer);
+		gpPipelineManager->mpPipelines[kPipelineSmokeClearB].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f});
+		vkCmdEndRenderPass(vkCommandBuffer);
+
+		rSmokeTextureOne.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kColorAttachment);
+		rSmokeTextureOne.RecordBeginRenderPass(vkCommandBuffer);
+		gpPipelineManager->mpPipelines[kPipelineSmokeClearA].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f});
+		// The deposit maps hold one pipeline per (collection, plane); each targets its own plane's render pass.
+		for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmokeAxisAligned])
+		{
+			if (pPipeline->mInfo.vkTargetRenderPass == rSmokeTextureOne.mVkRenderPass)
+			{
+				pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {2.0f, 0.0f, 0.0f, 0.0f});
+			}
+		}
+		for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmoke])
+		{
+			if (pPipeline->mInfo.vkTargetRenderPass == rSmokeTextureOne.mVkRenderPass)
+			{
+				pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {2.0f, 0.0f, 0.0f, 0.0f});
+			}
+		}
+		vkCmdEndRenderPass(vkCommandBuffer);
 	}
-	for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmoke])
-	{
-		pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {2.0f, 0.0f, 0.0f, 0.0f});
-	}
-	vkCmdEndRenderPass(vkCommandBuffer);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerSmokeEmit);
 }
 

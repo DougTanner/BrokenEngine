@@ -62,6 +62,8 @@ public:
 
 	void CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, int64_t iBufferSize, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, DescriptorFlags eSamplerFlag);
 	void CreateDepositPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, const Texture& rTargetTexture, const DescriptorInfo& rTextureDescriptor, VkBuffer* pVkOccupancyBuffer, int64_t iBufferSize);
+	// Pipeline-map and dynamic-buffer key of one smoke collection's deposit into flight plane iPlane.
+	static common::crc_t SmokeDepositKey(common::crc_t crc, int64_t iPlane);
 
 private:
 

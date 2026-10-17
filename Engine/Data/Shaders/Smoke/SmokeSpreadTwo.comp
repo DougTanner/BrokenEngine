@@ -12,6 +12,12 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 	GlobalLayout globalLayout;
 };
 
+// f4Pipeline.x is this dispatch's flight-plane index
+layout(push_constant) uniform pushConstants
+{
+	PushConstantsLayout pushConstantsLayout;
+};
+
 layout (set = 1, binding = 1) uniform sampler2D textureSampler;
 layout (set = 1, binding = 2) uniform sampler2D noiseTextureSampler;
 layout (set = 1, binding = 3) uniform sampler2D elevationTextureSampler;
@@ -72,11 +78,13 @@ void main()
 		vec2 f2CurlOffset = SmokeCurlOffset(globalLayout, noiseTextureSampler, f2WorldPosition, length(f2WindSample));
 		f4Result = SmokeSpread(globalLayout, textureSampler, noiseTextureSampler, f2Texcoord + globalLayout.fSmokeStepCount * f2CurlOffset, f2WorldPosition, f2WindSample, globalLayout.fSmokeNoiseScaleTwo);
 
-		// Extra decay over terrain
-		if (fElevation > 0.0f)
+		// Extra decay over terrain, measured from this plane's height above the lowest plane so plane 0 subtracts exactly 0
+		int iPlane = int(pushConstantsLayout.f4Pipeline.x);
+		float fRelativeElevation = fElevation - (globalLayout.pfFlightPlaneHeights[iPlane] - globalLayout.pfFlightPlaneHeights[0]);
+		if (fRelativeElevation > 0.0f)
 		{
 			// gSmokeDecay slider min 0.990 keeps pow() base > 0 -> always defined.
-			f4Result.x *= pow(globalLayout.fSmokeDecay, max(1.0f, fElevation - 5.0f));
+			f4Result.x *= pow(globalLayout.fSmokeDecay, max(1.0f, fRelativeElevation - 5.0f));
 		}
 
 		// Extra decay at edge of simulation area, applied once per frame since the previous refresh. Repeated

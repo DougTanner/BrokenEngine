@@ -167,6 +167,9 @@ CONSTEXPR int kiShadowTextureExecutionSize = 64;
 CONSTEXPR int kiShadowBlurRadius = 5;
 
 CONSTEXPR int kiComputeTileSize = 8;
+// Sizes the per-flight-plane smoke sampler arrays and GlobalLayout plane heights. Must equal engine::kiMaxFlightPlanes
+// (static_assert in RenderTargetTextures.cpp).
+CONSTEXPR int kiMaxFlightPlanes = 8;
 CONSTEXPR int kiOccupancyDilateGroupSize = 256;
 CONSTEXPR int kiParticleUpdateGroupSize = 32;
 

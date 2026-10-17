@@ -13,16 +13,20 @@ namespace engine
 
 void PuffsInterpolate::GraphicsResources()
 {
-	gpBufferManager->CreateDynamicBuffer(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineSmokeAxisAligned, kCrc, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesSmokeBC44jpgCrc}, &gpBufferManager->mSmokeOccupancyVkBuffers[0], sizeof(shaders::AxisAlignedQuadLayout));
+	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
+	{
+		common::crc_t uiDepositKey = DynamicPipelines::SmokeDepositKey(kCrc, i);
+		gpBufferManager->CreateDynamicBuffer(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout));
+		gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineSmokeAxisAligned, uiDepositKey, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[i], {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesSmokeBC44jpgCrc}, &gpBufferManager->mSmokeOccupancyVkBuffers[i][0], sizeof(shaders::AxisAlignedQuadLayout));
+	}
 }
 
-static int64_t siRendered = 0;
+static int64_t spiRendered[shaders::kiMaxFlightPlanes] {};
 static int64_t siTotalCount = 0;
 
 void PuffsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
 {
-	siRendered = 0;
+	std::ranges::fill(spiRendered, 0);
 	siTotalCount = 0;
 
 	int64_t iTotalCapacity = AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const PuffsInterpolate&
@@ -35,9 +39,14 @@ void PuffsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, cons
 		return;
 	}
 
-	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
+	// Each puff adds at most one quad per plane, so every plane's buffer takes the full capacity.
+	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmokeAxisAligned].at(kCrc), iCommandBuffer, 1, pBuffer);
+		common::crc_t uiDepositKey = DynamicPipelines::SmokeDepositKey(kCrc, i);
+		if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
+		{
+			PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmokeAxisAligned].at(uiDepositKey), iCommandBuffer, 1, pBuffer);
+		}
 	}
 }
 
@@ -52,8 +61,13 @@ void PuffsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __r
 		return;
 	}
 
-	auto [pPuffsLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::AxisAlignedQuadLayout>(kCrc, kBufferMain, iCommandBuffer);
-	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
+	shaders::AxisAlignedQuadLayout* ppPuffsLayouts[shaders::kiMaxFlightPlanes] {};
+	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
+	{
+		auto [pPuffsLayouts, iBufferCapacity] = gpBufferManager->GetDynamicStorageBuffer<shaders::AxisAlignedQuadLayout>(DynamicPipelines::SmokeDepositKey(kCrc, i), kBufferMain, iCommandBuffer);
+		ASSERT(spiRendered[i] + rCurrent.iCount <= iBufferCapacity);
+		ppPuffsLayouts[i] = pPuffsLayouts;
+	}
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -70,15 +84,26 @@ void PuffsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate& __r
 			continue;
 		}
 
-		XMStoreFloat4A(&f4Position, ProjectToBaseHeight(vecLocalPosition, rBasis));
+		SmokePlaneWeights planeWeights = ComputeSmokePlaneWeights(XMVectorGetZ(vecLocalPosition));
+		float pfPlaneWeights[] = {1.0f - planeWeights.fUpperWeight, planeWeights.fUpperWeight};
+		for (int64_t j = 0; j < std::ssize(pfPlaneWeights); ++j)
+		{
+			if (pfPlaneWeights[j] == 0.0f)
+			{
+				continue;
+			}
+			int64_t iPlane = planeWeights.iLowerPlane + j;
 
-		XMFLOAT4A f4Parameters {};
-		f4Parameters.x = fIntensity;  // Smoke.frag uses this as intensity multiplier
-		f4Parameters.y = fIntensity;  // Smoke.frag uses pow(max(0.0f, f4InParams.y), globalLayout.fSmokeIntensityFalloff).
-		f4Parameters.w = fRotation;   // Smoke.frag uses this for Rotate()
-		BuildAxisAlignedQuad(pPuffsLayouts[siRendered], f4Position, fArea, f4Parameters, rType.uiColor);
+			XMStoreFloat4A(&f4Position, ProjectToFlightPlane(vecLocalPosition, rBasis, iPlane));
 
-		++siRendered;
+			XMFLOAT4A f4Parameters {};
+			f4Parameters.x = fIntensity * pfPlaneWeights[j];  // Smoke.frag uses this as intensity multiplier
+			f4Parameters.y = fIntensity;  // Smoke.frag uses pow(max(0.0f, f4InParams.y), globalLayout.fSmokeIntensityFalloff).
+			f4Parameters.w = fRotation;   // Smoke.frag uses this for Rotate()
+			BuildAxisAlignedQuad(ppPuffsLayouts[iPlane][spiRendered[iPlane]], f4Position, fArea, f4Parameters, rType.uiColor);
+
+			++spiRendered[iPlane];
+		}
 	}
 }
 
@@ -90,9 +115,12 @@ void PuffsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	}
 	if constexpr (kbProfiling)
 	{
-		gpProfileManager->GetCpuCounter(kCpuCounterPuffsRendered).iCount = siRendered;
+		gpProfileManager->GetCpuCounter(kCpuCounterPuffsRendered).iCount = std::ranges::fold_left(spiRendered, 0i64, std::plus {});
 	}
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmokeAxisAligned].at(kCrc)->WriteIndirectBuffer(iCommandBuffer, gSmokeEnabled.Get<bool>() ? siRendered : 0);
+	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
+	{
+		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmokeAxisAligned].at(DynamicPipelines::SmokeDepositKey(kCrc, i))->WriteIndirectBuffer(iCommandBuffer, gSmokeEnabled.Get<bool>() ? spiRendered[i] : 0);
+	}
 }
 
 } // namespace engine

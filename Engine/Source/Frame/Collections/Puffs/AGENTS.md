@@ -8,4 +8,4 @@ Client-only stationary smoke puffs are fire-and-forget controlled quads. Consume
 - Area and intensity wrappers are read during every controller update, so wrapper changes affect existing puffs. Rotation is not wrapper-scaled.
 - `PersistentMembers()` copies type/controller/start-time metadata between frames, while animated values are derived again and position is carried forward unchanged.
 - A future start time holds the puff at its first keyframe, supporting delayed secondary effects.
-- Rendered puffs are culled and projected to base height before depositing smoke.
+- Rendered puffs are culled, weighted between the flight planes bracketing their height, and projected to each weighted plane before depositing smoke.

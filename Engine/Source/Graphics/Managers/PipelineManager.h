@@ -8,6 +8,17 @@
 namespace engine
 {
 
+// Per-plane smoke pipelines; PipelineManager::SmokePipeline maps (plane, kind) into the Pipelines smoke range.
+enum SmokePipelineKind : int64_t
+{
+	kSmokeOccupancyDilate,
+	kSmokeOccupancyDilateRemap,
+	kSmokeSpreadComputeB,
+	kSmokeSpreadComputeA,
+
+	kSmokePipelineKindCount,
+};
+
 enum Pipelines
 {
 	kPipelineLog,
@@ -29,10 +40,8 @@ enum Pipelines
 
 	kPipelineSmokeClearA,
 	kPipelineSmokeClearB,
-	kPipelineSmokeSpreadComputeA,
-	kPipelineSmokeSpreadComputeB,
-	kPipelineSmokeOccupancyDilate,
-	kPipelineSmokeOccupancyDilateRemap,
+	kPipelineSmokeFirst,
+	kPipelineSmokeLast = kPipelineSmokeFirst + kSmokePipelineKindCount * shaders::kiMaxFlightPlanes - 1,
 
 	kPipelineWindOccupancyDilateA,
 	kPipelineWindOccupancyDilateB,
@@ -75,6 +84,8 @@ public:
 	void CreateSmokeWindPipelines();
 	void CreateParticlePipelines();
 	void CreateDebugRenderPipelines();
+
+	Pipeline& SmokePipeline(int64_t iPlane, SmokePipelineKind eKind);
 
 	Pipeline mpPipelines[kPipelineCount];
 

@@ -39,8 +39,11 @@ static void PublishSmokeStep(shaders::GlobalLayout& rGlobalLayout, int64_t iStep
 // A zero Z group count skips both dilates and leaves the active-tile list at its reset, so neither spread runs.
 static void WriteSmokeDilateDispatch(int64_t iCommandBuffer, int64_t iDilateGroups, int64_t iGroupCountZ)
 {
-	gpPipelineManager->mpPipelines[kPipelineSmokeOccupancyDilate].WriteIndirectComputeBuffer(iCommandBuffer, iDilateGroups, 1, iGroupCountZ);
-	gpPipelineManager->mpPipelines[kPipelineSmokeOccupancyDilateRemap].WriteIndirectComputeBuffer(iCommandBuffer, iDilateGroups, 1, iGroupCountZ);
+	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
+	{
+		gpPipelineManager->SmokePipeline(i, kSmokeOccupancyDilate).WriteIndirectComputeBuffer(iCommandBuffer, iDilateGroups, 1, iGroupCountZ);
+		gpPipelineManager->SmokePipeline(i, kSmokeOccupancyDilateRemap).WriteIndirectComputeBuffer(iCommandBuffer, iDilateGroups, 1, iGroupCountZ);
+	}
 }
 
 void RenderSmokeGlobal(int64_t iCommandBuffer)
@@ -64,10 +67,11 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	rGlobalLayout.fSmokeObjectHeightInverse = 1.0f / gSmokeObjectHeight.mfCurrent;
 	rGlobalLayout.fSmokeEdgeDecayDistanceInverse = 1.0f / gSmokeEdgeDecayDistance.mfCurrent;
 
-	int64_t iTextureOneWidth = gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.width;
-	int64_t iTextureOneHeight = gpTextureManager->mRenderTargetTextures.mSmokeTextureOne.mInfo.vkExtent3D.height;
-	int64_t iMaxWidth = std::max(iTextureOneWidth, static_cast<int64_t>(gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.vkExtent3D.width));
-	int64_t iMaxHeight = std::max(iTextureOneHeight, static_cast<int64_t>(gpTextureManager->mRenderTargetTextures.mSmokeTextureTwo.mInfo.vkExtent3D.height));
+	// Every plane's smoke textures share plane 0's extent, so its tile counts serve every plane.
+	int64_t iTextureOneWidth = gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[0].mInfo.vkExtent3D.width;
+	int64_t iTextureOneHeight = gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[0].mInfo.vkExtent3D.height;
+	int64_t iMaxWidth = std::max(iTextureOneWidth, static_cast<int64_t>(gpTextureManager->mRenderTargetTextures.mSmokeTexturesTwo[0].mInfo.vkExtent3D.width));
+	int64_t iMaxHeight = std::max(iTextureOneHeight, static_cast<int64_t>(gpTextureManager->mRenderTargetTextures.mSmokeTexturesTwo[0].mInfo.vkExtent3D.height));
 	int64_t iSmokeTilesX = TileCount(iMaxWidth);
 	int64_t iSmokeTilesY = TileCount(iMaxHeight);
 	rGlobalLayout.uiSmokeTilesX = static_cast<uint32_t>(iSmokeTilesX);

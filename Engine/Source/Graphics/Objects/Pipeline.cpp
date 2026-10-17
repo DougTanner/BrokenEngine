@@ -282,24 +282,24 @@ void Pipeline::RecordComputeIndirect(int64_t iCommandBuffer, VkCommandBuffer vkC
 {
 	ASSERT((mInfo.flags & kIndirectHostVisible || mInfo.flags & kIndirectDeviceLocal) && mInfo.flags & kCompute);
 
-	if (mInfo.flags & kPushConstants)
-	{
-		ASSERT(mInfo.iPushConstantBytes == 0);
-		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, rf4PushConstants);
-	}
-
 	// Host-visible indexes per-framebuffer; device-local reads slot 0
 	int64_t iIndirectSlot = mInfo.flags & kIndirectHostVisible ? iCommandBuffer : 0;
 	int64_t iDispatchOffset = iIndirectSlot * static_cast<int64_t>(sizeof(VkDispatchIndirectCommand));
 
 	ASSERT(iIndirectSlot < miIndirectSlotCount);
 
-	RecordComputeIndirectFrom(iCommandBuffer, vkCommandBuffer, mIndirectVkBuffer, iDispatchOffset);
+	RecordComputeIndirectFrom(iCommandBuffer, vkCommandBuffer, mIndirectVkBuffer, iDispatchOffset, rf4PushConstants);
 }
 
-void Pipeline::RecordComputeIndirectFrom(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, VkBuffer vkIndirectBuffer, int64_t iIndirectOffset)
+void Pipeline::RecordComputeIndirectFrom(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, VkBuffer vkIndirectBuffer, int64_t iIndirectOffset, const XMFLOAT4& rf4PushConstants)
 {
 	ASSERT(mInfo.flags & kCompute);
+
+	if (mInfo.flags & kPushConstants)
+	{
+		ASSERT(mInfo.iPushConstantBytes == 0);
+		RecordPushConstants(vkCommandBuffer, mVkPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, rf4PushConstants);
+	}
 
 	int64_t iDescriptorSetIndex = mbPerCommandBuffer ? iCommandBuffer : 0;
 	vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mVkPipeline);

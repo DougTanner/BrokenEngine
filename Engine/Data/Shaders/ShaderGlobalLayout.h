@@ -10,6 +10,8 @@ struct GlobalLayout
 	float fElapsedTime INIT;
 	float fBaseHeight INIT;
 	float fBaseHeightInverse INIT; // 1 / max(fBaseHeight, 0.001) (Terrain.frag below-base height ratio)
+	float pfFlightPlaneHeights[kiMaxFlightPlanes] INIT; // Ascending flight-plane heights in meters; [0] == fBaseHeight (smoke per-plane projection and terrain decay)
+	uint32_t uiFlightPlaneCount INIT; // Live plane count, at most kiMaxFlightPlanes; shaders never read a plane at or beyond it
 	float fAspectRatioInverse INIT; // 1 / aspect ratio (Billboards.vert screen-space width divide, folded CPU-side)
 
 	vec2 f2CameraPosition INIT;

@@ -101,12 +101,36 @@ bool IsPointVisible(XMVECTOR vecPosition, XMFLOAT4A& rf4OutPosition)
 	return rf4OutPosition.x >= engine::gpCamera->mf4RenderVisibleArea.x && rf4OutPosition.x <= engine::gpCamera->mf4RenderVisibleArea.z && rf4OutPosition.y <= engine::gpCamera->mf4RenderVisibleArea.y && rf4OutPosition.y >= engine::gpCamera->mf4RenderVisibleArea.w;
 }
 
-XMVECTOR ProjectToBaseHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasis)
+SmokePlaneWeights ComputeSmokePlaneWeights(float fZ)
+{
+	if (fZ < gpFlightPlanes->Lowest().fHeightMeters)
+	{
+		return {};
+	}
+
+	for (int64_t i = 0; i + 1 < gpFlightPlanes->Count(); ++i)
+	{
+		float fLowerHeight = gpFlightPlanes->Plane(i).fHeightMeters;
+		float fUpperHeight = gpFlightPlanes->Plane(i + 1).fHeightMeters;
+		if (fZ < fUpperHeight)
+		{
+			return {.iLowerPlane = i, .fUpperWeight = (fZ - fLowerHeight) / (fUpperHeight - fLowerHeight)};
+		}
+	}
+	return {.iLowerPlane = gpFlightPlanes->Count() - 1, .fUpperWeight = 0.0f};
+}
+
+XMVECTOR ProjectToFlightPlane(XMVECTOR vecLocalPosition, const RenderBasis& rBasis, int64_t iPlane)
 {
 	// The elevation query is answered in the emitter's own cell, from the coordinate the basis carries; the
 	// projection toward the eye is the conversion point, so the rebase happens exactly once here.
 	float fElevation = gpIslandTerrain->GlobalElevation(rBasis.coordinate, vecLocalPosition);
-	return common::ToBaseHeight(Rebase(rBasis, vecLocalPosition), engine::gpCamera->mVecEyePosition, std::max(fElevation, gpFlightPlanes->Lowest().fHeightMeters));
+	return common::ToBaseHeight(Rebase(rBasis, vecLocalPosition), engine::gpCamera->mVecEyePosition, std::max(fElevation, gpFlightPlanes->Plane(iPlane).fHeightMeters));
+}
+
+XMVECTOR ProjectToBaseHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasis)
+{
+	return ProjectToFlightPlane(vecLocalPosition, rBasis, 0);
 }
 
 void BuildAxisAlignedQuad(shaders::AxisAlignedQuadLayout& rLayout, const XMFLOAT4A& rf4Position, float fArea, const XMFLOAT4A& rf4Parameters, uint32_t uiColor)

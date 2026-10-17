@@ -61,7 +61,7 @@ layout (scalar, set = 2, binding = 8) buffer readonly pbrMaterialsUniform
 // Engine-specific textures
 layout (set = 1, binding = 9) uniform sampler2D pLightingSamplers[3];
 layout (set = 1, binding = 10) uniform sampler2D shadowTextureSampler;
-layout (set = 1, binding = 11) uniform sampler2D smokeSampler;
+layout (set = 1, binding = 11) uniform sampler2D pSmokeSamplers[kiMaxFlightPlanes];
 
 // Vertex inputs
 layout (location = 0) in vec3 f3InWorldPosition;
@@ -369,12 +369,16 @@ void main()
 	color += mainLayout.fPhysicallyBasedRenderingEmissive * emissive;
 #endif
 
-	// Apply smoke/fog (project position to base height plane, fade with height)
+	// Apply smoke/fog per flight plane, lowest first (project position to the plane, fade with height above it; planes
+	// above the fragment apply in full)
 #if ENABLE_SMOKE
-	vec2 f2PositionAtBaseHeight = BaseHeightPosition(globalLayout, mainLayout, f3InWorldPosition);
-	float fHeightFraction = clamp((f3InWorldPosition.z - globalLayout.fBaseHeight) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
-	float fSmokeFade = 1.0f - fHeightFraction * fHeightFraction;
-	color = AddSmoke(globalLayout, color, f2PositionAtBaseHeight, smokeSampler, fSmokeFade * mainLayout.fPhysicallyBasedRenderingSmoke, pf4Lighting);
+	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
+	{
+		vec2 f2PositionAtPlane = FlightPlanePosition(globalLayout, mainLayout, f3InWorldPosition, iPlane);
+		float fHeightFraction = clamp((f3InWorldPosition.z - globalLayout.pfFlightPlaneHeights[iPlane]) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
+		float fSmokeFade = 1.0f - fHeightFraction * fHeightFraction;
+		color = AddSmoke(globalLayout, color, f2PositionAtPlane, pSmokeSamplers[iPlane], fSmokeFade * mainLayout.fPhysicallyBasedRenderingSmoke, pf4Lighting);
+	}
 #endif
 
 	// Output color

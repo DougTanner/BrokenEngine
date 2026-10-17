@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:18:59.221Z","dependsOn":["Documents/Plans/Engine/LightingHeightFalloff.md","Documents/Plans/Engine/NavigationPerFlightPlane.md","Documents/Plans/Engine/SmokePerFlightPlane.md","Documents/Plans/Game/FlightPlaneClimbing.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:18:59.221Z","dependsOn":["Documents/Plans/Engine/LightingHeightFalloff.md","Documents/Plans/Engine/NavigationPerFlightPlane.md","Documents/Plans/Game/FlightPlaneClimbing.md"]} -->
 # Present ships on higher flight planes correctly: camera, shadows, lighting samples, audio panning, debug markers
 
 Tier 3 (`.agents/references/risk-tiers.md`): client-only render and audio

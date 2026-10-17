@@ -519,6 +519,11 @@ void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> curr
 	float fBaseHeight = gpFlightPlanes->Lowest().fHeightMeters;
 	rGlobalLayout.fBaseHeight = fBaseHeight;
 	rGlobalLayout.fBaseHeightInverse = 1.0f / std::max(fBaseHeight, 0.001f);
+	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
+	{
+		rGlobalLayout.pfFlightPlaneHeights[i] = gpFlightPlanes->Plane(i).fHeightMeters;
+	}
+	rGlobalLayout.uiFlightPlaneCount = static_cast<uint32_t>(gpFlightPlanes->Count());
 	rGlobalLayout.fAspectRatioInverse = 1.0f / gpSwapchainManager->mfAspectRatio;
 
 	XMFLOAT4A f4CameraPositionGlobal {};

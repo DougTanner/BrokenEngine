@@ -25,8 +25,10 @@ public:
 	Texture mTerrainElevationTexture;
 
 	Texture mSmokeGradientTexture;
-	Texture mSmokeTextureOne;
-	Texture mSmokeTextureTwo;
+	// One ping-pong pair per flight plane; only the first gpFlightPlanes->Count() of each are created.
+	std::array<Texture, shaders::kiMaxFlightPlanes> mSmokeTexturesOne;
+	std::array<Texture, shaders::kiMaxFlightPlanes> mSmokeTexturesTwo;
+	Texture* mppSmokeTexturesOne[shaders::kiMaxFlightPlanes] {}; // Sampler-array binding; slots >= plane count alias plane 0 (never sampled)
 
 	Texture mWindTextureOne;
 	Texture mWindTextureTwo;

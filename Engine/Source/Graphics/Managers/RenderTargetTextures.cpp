@@ -9,6 +9,13 @@
 namespace engine
 {
 
+static_assert(shaders::kiMaxFlightPlanes == kiMaxFlightPlanes);
+
+// TextureInfo keeps the name view and Vulkan object naming reads its data(), so per-plane names need static storage.
+constexpr std::string_view kSmokeOneNames[] = {"SmokeOne0", "SmokeOne1", "SmokeOne2", "SmokeOne3", "SmokeOne4", "SmokeOne5", "SmokeOne6", "SmokeOne7"};
+constexpr std::string_view kSmokeTwoNames[] = {"SmokeTwo0", "SmokeTwo1", "SmokeTwo2", "SmokeTwo3", "SmokeTwo4", "SmokeTwo5", "SmokeTwo6", "SmokeTwo7"};
+static_assert(std::ssize(kSmokeOneNames) == shaders::kiMaxFlightPlanes && std::ssize(kSmokeTwoNames) == shaders::kiMaxFlightPlanes);
+
 void RenderTargetTextures::Create()
 {
 	CreateLightingTextures();
@@ -199,10 +206,12 @@ void RenderTargetTextures::CreateSmokeTextures()
 		}
 	});
 
+	ASSERT(gpFlightPlanes->Count() <= shaders::kiMaxFlightPlanes);
+
 	TextureInfo smokeTextureInfo
 	{
 		.textureFlags = {TextureFlags::kRenderPass},
-		.name = "SmokeOne",
+		.name = kSmokeOneNames[0],
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatSmoke,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(SmokeSimulationPixels()), .height = static_cast<uint32_t>(SmokeSimulationPixelsY()), .depth = 1},
@@ -217,20 +226,34 @@ void RenderTargetTextures::CreateSmokeTextures()
 		.vkRenderPassFinalImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	};
-	mSmokeTextureOne.Create(smokeTextureInfo);
-	smokeTextureInfo.name = "SmokeTwo";
-	smokeTextureInfo.vkRenderPassInitialImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	mSmokeTextureTwo.Create(smokeTextureInfo);
+	// Every plane's pair comes from this one TextureInfo with only the name changed, so each plane's render passes
+	// stay compatible with the shared smoke clear pipelines created against plane 0.
+	TextureInfo smokeTextureTwoInfo = smokeTextureInfo;
+	smokeTextureTwoInfo.vkRenderPassInitialImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
+	{
+		smokeTextureInfo.name = kSmokeOneNames[i];
+		mSmokeTexturesOne[i].Create(smokeTextureInfo);
+		smokeTextureTwoInfo.name = kSmokeTwoNames[i];
+		mSmokeTexturesTwo[i].Create(smokeTextureTwoInfo);
+	}
+	for (int64_t i = 0; i < shaders::kiMaxFlightPlanes; ++i)
+	{
+		mppSmokeTexturesOne[i] = &mSmokeTexturesOne[i < gpFlightPlanes->Count() ? i : 0];
+	}
 
-	// Smoke spread only rewrites occupancy-active tiles, so both ping-pong textures must start at zero.
+	// Smoke spread only rewrites occupancy-active tiles, so every ping-pong texture must start at zero.
 	OneShotCommandBuffer oneShotCommandBuffer;
 	VkClearColorValue vkSmokeClearColor {{0.0f, 0.0f, 0.0f, 0.0f}};
 	VkImageSubresourceRange vkSmokeSubresource {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
-	for (Texture* pSmokeTexture : {&mSmokeTextureOne, &mSmokeTextureTwo})
+	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
-		pSmokeTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kTransferDestination);
-		vkCmdClearColorImage(oneShotCommandBuffer.mVkCommandBuffer, pSmokeTexture->mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &vkSmokeClearColor, 1, &vkSmokeSubresource);
-		pSmokeTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, TextureLayout::kTransferDestination, TextureLayout::kShaderReadOnly);
+		for (Texture* pSmokeTexture : {&mSmokeTexturesOne[i], &mSmokeTexturesTwo[i]})
+		{
+			pSmokeTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kTransferDestination);
+			vkCmdClearColorImage(oneShotCommandBuffer.mVkCommandBuffer, pSmokeTexture->mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &vkSmokeClearColor, 1, &vkSmokeSubresource);
+			pSmokeTexture->TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, TextureLayout::kTransferDestination, TextureLayout::kShaderReadOnly);
+		}
 	}
 	oneShotCommandBuffer.Execute();
 }

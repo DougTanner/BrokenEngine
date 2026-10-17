@@ -10,7 +10,7 @@ Vulkan 1.2 GLSL compiled to SPIR-V by DataPacker. The project `ShaderLayouts.h` 
 - Uniform blocks inherit scalar layout from `ShaderLayoutsBase.h`; storage blocks declare it explicitly where the CPU/GLSL contract requires it. Preserve CPU/GLSL field types, alignment, and order together; plain scalar arrays in scalar-layout blocks retain scalar stride.
 - Uniform-only terms — products, reciprocals, and pre-normalized vectors whose every operand is invocation-invariant — are merged CPU-side into precomputed layout fields by the Render populators (`../../Source/Graphics/Render/AGENTS.md`); shaders read the finished field rather than recomputing it per invocation. Route new such math to the populator, not the shader; shared layout field comments own the reason each term was merged CPU-side and the operands deliberately left raw.
 - Descriptor ownership is semantic: Set 0 is global, Set 1 is per-pipeline, and Set 2 is per-material. Binding constants live in the shared layout header and must match C++ layout/writes.
-- Bindless texture indices require `nonuniformEXT()`. Push constants select projection/render modes where command buffers are recorded once.
+- Bindless texture indices require `nonuniformEXT()`. A fixed-size sampler array indexed by a dynamically uniform value, such as a loop counter bounded by a uniform, relies instead on the required `shaderSampledImageArrayDynamicIndexing` device feature. Push constants select projection/render modes where command buffers are recorded once.
 - `ShaderFunctions.h` owns shared transforms, projection, normal mapping, smoke blending, wind magnitude factor, and lighting helpers. `ShaderRandom.h` mirrors the engine's 32-bit RNG family.
 
 ## Lighting and Vector Invariants
