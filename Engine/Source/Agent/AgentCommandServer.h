@@ -62,7 +62,7 @@ private:
 	void ListenerLoop(std::stop_token stopToken);
 	void ServeConnection(SOCKET uiClientSocket, const std::stop_token& rStopToken);
 
-	// Serialize, cap, and hand a response envelope to the listener thread (stores mPendingResponse + notifies). A
+	// Serialize, cap, and hand a response envelope to the listener thread (stores mOptionalPendingResponse + notifies). A
 	// response whose request generation is no longer the live connection's is dropped without storing or notifying.
 	void PublishResponse(nlohmann::json response);
 
@@ -77,8 +77,8 @@ private:
 
 	std::mutex mMutex;
 	std::condition_variable mResponseReady;
-	std::optional<PendingRequest> mPendingRequest; // listener -> main
-	std::optional<std::string> mPendingResponse; // main -> listener
+	std::optional<PendingRequest> mOptionalPendingRequest; // listener -> main
+	std::optional<std::string> mOptionalPendingResponse; // main -> listener
 	int64_t miConnectionGeneration = 0; // mMutex-guarded; bumped on each connection teardown
 
 	// Deferred-response state — touched only on the main thread (Drain and the handlers it calls), so no lock.

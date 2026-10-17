@@ -61,7 +61,7 @@ bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper);
 // theme share this enum/index mapping; exact discrete float equality selects the checked option, and a click writes
 // its value. Wrapper-address ID scopes keep repeated labels distinct. Header/button labels are the harness API and
 // must stay stable; return true on the click frame.
-bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, std::initializer_list<std::pair<const char*, float>> aOptions);
+bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, std::initializer_list<std::pair<const char*, float>> options);
 
 #if defined(BT_CLIENT)
 
@@ -89,7 +89,7 @@ public:
 // Call inside the window with the menu font pushed; TranslatedString(...) supplies UTF-32 label views.
 // Labels are UTF-8 encoded through the Workbuffer and measured with CalcTextSize, with FramePadding.x * 4 added.
 // Main-menu, pause, and modal callers clamp the width to their minimum-width pixel constant multiplied by UiScale().
-float MenuButtonsWidth(std::initializer_list<std::u32string_view> aLabels);
+float MenuButtonsWidth(std::initializer_list<std::u32string_view> labels);
 
 // One menu/panel heading: pushes the heading font (kfMenuUiScale * fHeadingScale), emits pcLabel, then a
 // standard kfHeadingGapPixels * UiScale() gap below it. Screens override the scale when their hierarchy requires it.

@@ -37,15 +37,15 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 	engine::GridCoord coordinate = rGameInterpolate.renderBasis.coordinate;
 	auto it = gpGame->mCells.find(coordinate);
 	bool bHasCoordinate = it != gpGame->mCells.end() && it->second.iSnapshotCount > 0;
-	std::optional<int64_t> oOwnedEntityIndex = bHasCoordinate ? gpGame->ClientOwnedEntityIndex(*gpGame->RenderFrame(coordinate).postRender.pOmnis) : std::nullopt;
-	if (oOwnedEntityIndex)
+	std::optional<int64_t> optionalOwnedEntityIndex = bHasCoordinate ? gpGame->ClientOwnedEntityIndex(*gpGame->RenderFrame(coordinate).postRender.pOmnis) : std::nullopt;
+	if (optionalOwnedEntityIndex)
 	{
 		engine::GlobalId focusedOwnedEntityIdentifier = gpGame->ClientOwnedEntityIdentifier();
-		XMVECTOR vecOwnedEntityPosition = rGameInterpolate.pOmnis->pVecPositions[*oOwnedEntityIndex];
+		XMVECTOR vecOwnedEntityPosition = rGameInterpolate.pOmnis->pVecPositions[*optionalOwnedEntityIndex];
 
 		if (focusedOwnedEntityIdentifier != mLastTrackedOwnedEntityIdentifier)
 		{
-			LOG(kGraphics, kVerbose, "Camera NowTracking GlobalId: {} Coord: ({},{}) Index: {}", focusedOwnedEntityIdentifier, coordinate.iX, coordinate.iY, *oOwnedEntityIndex);
+			LOG(kGraphics, kVerbose, "Camera NowTracking GlobalId: {} Coord: ({},{}) Index: {}", focusedOwnedEntityIdentifier, coordinate.iX, coordinate.iY, *optionalOwnedEntityIndex);
 			mLastTrackedOwnedEntityIdentifier = focusedOwnedEntityIdentifier;
 		}
 

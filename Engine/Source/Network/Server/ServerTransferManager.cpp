@@ -167,12 +167,12 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 			common::crc_t uiPreCrc = preCrcsArena.mBuffer.Span<const common::crc_t>()[i++];
 			rDestinationFrame.postRender.uiSharedCrc = rDestinationFrame.Crc();
 
-			char acCrcPre[20] {}, acCrcPost[20] {};
-			common::ToHex(std::span<char, 20>(acCrcPre), uiPreCrc);
-			common::ToHex(std::span<char, 20>(acCrcPost), rDestinationFrame.postRender.uiSharedCrc);
+			char pcCrcPre[20] {}, pcCrcPost[20] {};
+			common::ToHex(std::span<char, 20>(pcCrcPre), uiPreCrc);
+			common::ToHex(std::span<char, 20>(pcCrcPost), rDestinationFrame.postRender.uiSharedCrc);
 
-			char acOwnedIds[192] {};
-			char* pOwnedIdsWrite = acOwnedIds;
+			char pcOwnedIds[192] {};
+			char* pOwnedIdsWrite = pcOwnedIds;
 			int64_t iOwnedIdCount = 0;
 			for (const game::StatusChange& rTransfer : rTransfers)
 			{
@@ -187,13 +187,13 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 				}
 
 				// The final byte stays the zero terminator.
-				pOwnedIdsWrite = std::format_to_n(pOwnedIdsWrite, acOwnedIds + std::ssize(acOwnedIds) - 1 - pOwnedIdsWrite, "{}{}", iOwnedIdCount > 0 ? ", " : "", std::get<game::TransferData>(rTransfer.data).globalId.iValue).out;
+				pOwnedIdsWrite = std::format_to_n(pOwnedIdsWrite, pcOwnedIds + std::ssize(pcOwnedIds) - 1 - pOwnedIdsWrite, "{}{}", iOwnedIdCount > 0 ? ", " : "", std::get<game::TransferData>(rTransfer.data).globalId.iValue).out;
 				++iOwnedIdCount;
 			}
 
 			if (iOwnedIdCount > 0)
 			{
-				LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {} OwnedIds: [{}]", rCoord.iX, rCoord.iY, std::ssize(rTransfers), (game::Frame::OwnershipLayer(rDestinationFrame)).iCount, acCrcPre, acCrcPost, acOwnedIds);
+				LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {} OwnedIds: [{}]", rCoord.iX, rCoord.iY, std::ssize(rTransfers), (game::Frame::OwnershipLayer(rDestinationFrame)).iCount, pcCrcPre, pcCrcPost, pcOwnedIds);
 			}
 			else
 			{
@@ -203,7 +203,7 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 				});
 				if (bAnySubscribed)
 				{
-					LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {}", rCoord.iX, rCoord.iY, std::ssize(rTransfers), (game::Frame::OwnershipLayer(rDestinationFrame)).iCount, acCrcPre, acCrcPost);
+					LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {}", rCoord.iX, rCoord.iY, std::ssize(rTransfers), (game::Frame::OwnershipLayer(rDestinationFrame)).iCount, pcCrcPre, pcCrcPost);
 				}
 			}
 		}

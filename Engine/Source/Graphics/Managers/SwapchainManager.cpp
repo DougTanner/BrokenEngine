@@ -254,7 +254,7 @@ void SwapchainManager::CreateSwapchain(VkSwapchainKHR vkOldSwapchain)
 
 	// The swap extent is the resolution of the swap chain images and it's almost always exactly equal to the resolution of the window that we're drawing to
 	RECT clientRect {};
-	GetClientRect(gpGraphics->mWindowHandle, &clientRect);
+	GetClientRect(gpGraphics->mHwnd, &clientRect);
 	LOG(kGraphics, kDebug, "Swapchain extent resolution: currentExtent {} x {}, minImageExtent {} x {}, maxImageExtent {} x {}, client rect {} x {}", vkSurfaceCapabilitiesKHR.currentExtent.width, vkSurfaceCapabilitiesKHR.currentExtent.height, vkSurfaceCapabilitiesKHR.minImageExtent.width, vkSurfaceCapabilitiesKHR.minImageExtent.height, vkSurfaceCapabilitiesKHR.maxImageExtent.width, vkSurfaceCapabilitiesKHR.maxImageExtent.height, clientRect.right - clientRect.left, clientRect.bottom - clientRect.top);
 
 	if (vkSurfaceCapabilitiesKHR.currentExtent.width == 0xFFFFFFFF)

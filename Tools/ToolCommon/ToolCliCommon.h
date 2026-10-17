@@ -29,7 +29,7 @@ namespace toolcli
 	{
 	public:
 		Handle() = default;
-		explicit Handle(HANDLE hHandle);
+		explicit Handle(HANDLE handle);
 		~Handle();
 
 		Handle(const Handle&) = delete;
@@ -40,10 +40,10 @@ namespace toolcli
 		[[nodiscard]] HANDLE Get() const;
 		[[nodiscard]] bool IsValid() const;
 		HANDLE Release();
-		void Reset(HANDLE hHandle = INVALID_HANDLE_VALUE);
+		void Reset(HANDLE handle = INVALID_HANDLE_VALUE);
 
 	private:
-		HANDLE mhHandle = INVALID_HANDLE_VALUE;
+		HANDLE mHandle = INVALID_HANDLE_VALUE;
 	};
 
 	struct ProcessResult

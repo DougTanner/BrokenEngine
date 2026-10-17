@@ -247,9 +247,9 @@ void ClientSessionRuntime::PollAndDrain(const NetworkTimeState& rTimeState)
 		}
 		return;
 	}
-	if (std::optional<int64_t> iLoadGeneration = mpClient->DrainLoadNotification(); iLoadGeneration.has_value())
+	if (std::optional<int64_t> optionalLoadGeneration = mpClient->DrainLoadNotification(); optionalLoadGeneration.has_value())
 	{
-		mpClient->miCommittedLoadGeneration = *iLoadGeneration;
+		mpClient->miCommittedLoadGeneration = *optionalLoadGeneration;
 		ResetForServerLoad();
 		game::gpClientSession->OnServerLoad();
 	}
@@ -318,7 +318,7 @@ void ClientSessionRuntime::ApplyReceivedFullStates()
 			}
 
 			// Coord already has confirmed state: store as pending for reconcile injection
-			rCell.pendingFullState = Cell::PendingFullState
+			rCell.optionalPendingFullState = Cell::PendingFullState
 			{
 				.iTick = iTick,
 				.pFrame = std::move(rFullState.pFrame),

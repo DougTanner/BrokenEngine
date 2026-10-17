@@ -119,7 +119,7 @@ public:
 	void ResetSkinningAllocations(int64_t iCommandBuffer);
 
 	std::unordered_map<common::crc_t, std::vector<Buffer>> mDynamicStorageBuffers[kBufferTypeCount];
-	std::optional<Buffer> mPreviousBuffer;
+	std::optional<Buffer> mOptionalPreviousBuffer;
 
 	void InitializePerCommandBufferBuffers(int64_t iCommandBufferCount);
 
@@ -136,8 +136,8 @@ private:
 	int64_t miJointMatrixCapacity[kiMaxFramebuffers] {};
 	// Skinning buffers remain parked until the next ResetSkinningAllocations call;
 	// a second grow in the frame overwrites its framebuffer's slot.
-	std::optional<Buffer> mPreviousMeshDataBuffer[kiMaxFramebuffers];
-	std::optional<Buffer> mPreviousJointMatrixBuffer[kiMaxFramebuffers];
+	std::optional<Buffer> mpOptionalPreviousMeshDataBuffer[kiMaxFramebuffers];
+	std::optional<Buffer> mpOptionalPreviousJointMatrixBuffer[kiMaxFramebuffers];
 };
 
 inline BufferManager* gpBufferManager = nullptr;

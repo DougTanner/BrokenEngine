@@ -103,7 +103,7 @@ struct Cell
 		int64_t iTick = -1;
 		std::unique_ptr<game::Frame> pFrame;
 	};
-	std::optional<PendingFullState> pendingFullState;
+	std::optional<PendingFullState> optionalPendingFullState;
 	int64_t iLastFullStateTick = -1;
 
 	// Log deduplication: suppress repeated mismatch logging when reconcile is stuck on same desync
@@ -141,7 +141,7 @@ struct Cell
 		iSnapshotHead = 0;
 		iSnapshotCount = 0;
 		serverUpdates.clear();
-		pendingFullState.reset();
+		optionalPendingFullState.reset();
 		iLastFullStateTick = -1;
 		iLastLoggedConfirmedTick = -1;
 		iLastLoggedFirstMismatch = -1;
@@ -320,10 +320,10 @@ protected:
 	// Minimized-render-loop throttle (HandleDeferredSwapchain()'s swapchain-recreate-deferred skip branch). While the
 	// recreate stays deferred the branch early-returns past vkQueuePresentKHR — the client loop's only
 	// vsync throttle — so a high-resolution waitable timer paces the skip loop to one sim tick's cadence.
-	// Lazily created on first use, closed in ~GameBase. mMinimizedThrottleLast is the previous skip-branch
+	// Lazily created on first use, closed in ~GameBase. mOptionalMinimizedThrottleLast is the previous skip-branch
 	// timestamp (empty = first iteration after normal rendering resumed → wait skipped).
-	HANDLE mMinimizedThrottleTimer = nullptr;
-	std::optional<std::chrono::steady_clock::time_point> mMinimizedThrottleLast;
+	HANDLE mHandleMinimizedThrottleTimer = nullptr;
+	std::optional<std::chrono::steady_clock::time_point> mOptionalMinimizedThrottleLast;
 #endif // BT_CLIENT
 
 private:

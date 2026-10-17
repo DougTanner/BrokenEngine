@@ -244,7 +244,7 @@ static void RunGaeaExport(const IslandBakeContext& rContext, const RouteSubdivis
 	// dims / seeds / Mesher resolution. PatchedArchetype.terrain doubles as a debug artifact (open
 	// in Gaea to inspect exactly what was baked, including the patched Route Choice).
 	std::filesystem::copy_file(rContext.rArchetypeFile, rPatchedArchetypeFile, std::filesystem::copy_options::overwrite_existing);
-	PatchArchetype(rPatchedArchetypeFile, rContext.rDimensions, rContext.iSeed, rContext.oiMeshResolution, rRoute.iGaeaChoice);
+	PatchArchetype(rPatchedArchetypeFile, rContext.rDimensions, rContext.iSeed, rContext.optionalMeshResolution, rRoute.iGaeaChoice);
 
 	// Gaea.Swarm.exe requires a real console for stdin/stdout/stderr — invoke via the new-console
 	// helper. argv[0] is the executable's own path. --seed is dropped (per-node seeds were patched

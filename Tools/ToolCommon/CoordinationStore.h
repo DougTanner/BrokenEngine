@@ -35,7 +35,7 @@ namespace toolcli::coordination
 		bool mbValid = false;
 
 	private:
-		Handle mhFile;
+		Handle mHandleFile;
 		std::filesystem::path mPath;
 	};
 

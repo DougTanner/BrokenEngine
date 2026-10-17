@@ -125,11 +125,11 @@ struct CrcFastPathCoordResult
 
 inline engine::Cell::PendingFullState* FindDuePendingFullState(engine::Cell& rCell, int64_t iTargetTick)
 {
-	if (!rCell.pendingFullState || rCell.pendingFullState->iTick > iTargetTick)
+	if (!rCell.optionalPendingFullState || rCell.optionalPendingFullState->iTick > iTargetTick)
 	{
 		return nullptr;
 	}
-	return &*rCell.pendingFullState;
+	return &*rCell.optionalPendingFullState;
 }
 
 CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTargetTick);

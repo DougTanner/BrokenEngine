@@ -20,10 +20,10 @@ RawInputManager::RawInputManager()
 	}
 }
 
-void RawInputManager::UpdateFocus(bool bHasFocus, HWND hWindow)
+void RawInputManager::UpdateFocus(bool bHasFocus, HWND hwnd)
 {
 	mStateFlags.Set(RawInputStateFlags::kHasFocus, bHasFocus);
-	mhWindow = hWindow;
+	mHwnd = hwnd;
 
 	// Keyboard HID (usage page 0x01, usage 0x06). Register and unregister share the same device struct and
 	// differ only in dwFlags: 0 adds the HID keyboard and keeps the legacy keyboard messages ImGui text entry
@@ -86,15 +86,15 @@ void RawInputManager::TrapCursor(bool bTrap)
 	if (bTrap)
 	{
 		RECT rectangle {};
-		GetClientRect(mhWindow, &rectangle);
+		GetClientRect(mHwnd, &rectangle);
 		POINT pointUpperLeft {};
 		pointUpperLeft.x = rectangle.left;
 		pointUpperLeft.y = rectangle.top;
 		POINT pointLowerRight {};
 		pointLowerRight.x = rectangle.right;
 		pointLowerRight.y = rectangle.bottom;
-		MapWindowPoints(mhWindow, nullptr, &pointUpperLeft, 1);
-		MapWindowPoints(mhWindow, nullptr, &pointLowerRight, 1);
+		MapWindowPoints(mHwnd, nullptr, &pointUpperLeft, 1);
+		MapWindowPoints(mHwnd, nullptr, &pointLowerRight, 1);
 		rectangle.left = pointUpperLeft.x;
 		rectangle.top = pointUpperLeft.y;
 		rectangle.right = pointLowerRight.x;
@@ -216,12 +216,12 @@ void RawInputManager::Update(bool bLostFocus)
 
 void RawInputManager::HandleRawInput(LPARAM iMessageParameter)
 {
-	HRAWINPUT hRawInput = reinterpret_cast<HRAWINPUT>(iMessageParameter);
+	HRAWINPUT hrawinput = reinterpret_cast<HRAWINPUT>(iMessageParameter);
 
 	// Only the fixed-size keyboard usage is registered (UpdateFocus), never variable-length RAWHID, so sizeof(RAWINPUT) bounds every packet
 	RAWINPUT rawInput {};
 	UINT uiRawInputBytes = sizeof(rawInput);
-	if (GetRawInputData(hRawInput, RID_INPUT, &rawInput, &uiRawInputBytes, sizeof(RAWINPUTHEADER)) == static_cast<UINT>(-1))
+	if (GetRawInputData(hrawinput, RID_INPUT, &rawInput, &uiRawInputBytes, sizeof(RAWINPUTHEADER)) == static_cast<UINT>(-1))
 	{
 		// Heap: common::LastErrorString() returns a std::string by value (exceeds SSO), and this LOG sits in the allocation-tracked main loop
 		ScopedSuppressAllocationTracking suppress;

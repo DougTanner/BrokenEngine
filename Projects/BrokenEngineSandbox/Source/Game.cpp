@@ -116,10 +116,10 @@ void Game::UpdateCameraShake()
 		const Frame& rCurrentFrame = *pTailFrame;
 		const OmnisPostRender& rOmnisPostRender = *rCurrentFrame.postRender.pOmnis;
 
-		std::optional<int64_t> ownedEntityIndex = ClientOwnedEntityIndex(rOmnisPostRender);
-		if (ownedEntityIndex)
+		std::optional<int64_t> optionalOwnedEntityIndex = ClientOwnedEntityIndex(rOmnisPostRender);
+		if (optionalOwnedEntityIndex)
 		{
-			float fCurrentArmor = rOmnisPostRender.pfArmors[*ownedEntityIndex];
+			float fCurrentArmor = rOmnisPostRender.pfArmors[*optionalOwnedEntityIndex];
 			if (fCurrentArmor < mfPreviousClientArmor)
 			{
 				engine::gpCamera->mfShake = std::min(engine::gpCamera->mfShake + kfCameraShakeAdd, kfCameraShakeMax);

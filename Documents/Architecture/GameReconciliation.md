@@ -70,7 +70,7 @@ Full states arrive during initial subscription and active-slot resync flows. A s
 flowchart LR
     classDef injection fill:#dcfce7,stroke:#16a34a
 
-    PFS["Cell::pendingFullState"]
+    PFS["Cell::optionalPendingFullState"]
 
     PRE["ReconcileRollbackCoord()<br/>at confirmed frame"]:::injection
     MAIN["ReconcileReplayCoord()<br/>at matching replay tick"]:::injection

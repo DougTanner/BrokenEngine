@@ -81,11 +81,11 @@ float SmokeSimulationPixelsY()
 	return std::floor(fY / static_cast<float>(shaders::kiComputeTileSize)) * static_cast<float>(shaders::kiComputeTileSize);
 }
 
-Graphics::Graphics(HINSTANCE instanceHandle, HWND windowHandle)
+Graphics::Graphics(HINSTANCE hinstance, HWND hwnd)
 : common::Singleton<Graphics>(gpGraphics, this)
 {
-	mInstanceHandle = instanceHandle;
-	mWindowHandle = windowHandle;
+	mHinstance = hinstance;
+	mHwnd = hwnd;
 
 	CHECK_VK(volkInitialize());
 
@@ -212,16 +212,16 @@ void Graphics::RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unord
 	// Screenshot capture incurs a full GPU synchronization and is dev-only.
 	if constexpr (kbScreenshots)
 	{
-		if (mScreenshotRequest)
+		if (mOptionalScreenshotRequest)
 		{
-			SaveScreenshot(iCommandBuffer, *mScreenshotRequest);
-			mScreenshotRequest.reset();
+			SaveScreenshot(iCommandBuffer, *mOptionalScreenshotRequest);
+			mOptionalScreenshotRequest.reset();
 		}
 
-		if (mDumpRenderTargetRequest)
+		if (mOptionalDumpRenderTargetRequest)
 		{
-			DumpRenderTarget(iCommandBuffer, *mDumpRenderTargetRequest);
-			mDumpRenderTargetRequest.reset();
+			DumpRenderTarget(iCommandBuffer, *mOptionalDumpRenderTargetRequest);
+			mOptionalDumpRenderTargetRequest.reset();
 		}
 	}
 
@@ -336,7 +336,7 @@ void Graphics::Create()
 
 	if (mpInstanceManager == nullptr)
 	{
-		mpInstanceManager = std::make_unique<InstanceManager>(mInstanceHandle, mWindowHandle);
+		mpInstanceManager = std::make_unique<InstanceManager>(mHinstance, mHwnd);
 	}
 	if (mpDeviceManager == nullptr)
 	{
@@ -434,7 +434,7 @@ void Graphics::Create()
 	}
 	if (mpImGuiManager == nullptr)
 	{
-		mpImGuiManager = std::make_unique<ImGuiManager>(mWindowHandle);
+		mpImGuiManager = std::make_unique<ImGuiManager>(mHwnd);
 
 		if constexpr (kbDebugInput)
 		{
@@ -453,7 +453,7 @@ void Graphics::Create()
 }
 
 template <typename T>
-void Graphics::PollSetting(Wrapper& rWrapper, const char* pcLabel, DestroyType eTier, std::optional<DestroyFlags> oeFlag, bool bGate)
+void Graphics::PollSetting(Wrapper& rWrapper, const char* pcLabel, DestroyType eTier, std::optional<DestroyFlags> optionalFlag, bool bGate)
 {
 	auto [vCurrent, vPrevious, bChanged] = rWrapper.Changed<T>();
 	if (bChanged && bGate) [[unlikely]]
@@ -474,9 +474,9 @@ void Graphics::PollSetting(Wrapper& rWrapper, const char* pcLabel, DestroyType e
 			}
 		}
 
-		if (oeFlag.has_value())
+		if (optionalFlag.has_value())
 		{
-			mDestroyFlags.Set(oeFlag.value());
+			mDestroyFlags.Set(optionalFlag.value());
 		}
 
 		meDestroyType = std::max(eTier, meDestroyType);

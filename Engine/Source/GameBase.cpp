@@ -37,9 +37,9 @@ GameBase::GameBase()
 GameBase::~GameBase()
 {
 #if defined(BT_CLIENT)
-	if (mMinimizedThrottleTimer != nullptr)
+	if (mHandleMinimizedThrottleTimer != nullptr)
 	{
-		CloseHandle(mMinimizedThrottleTimer);
+		CloseHandle(mHandleMinimizedThrottleTimer);
 	}
 #endif // BT_CLIENT
 }
@@ -176,11 +176,11 @@ void GameBase::ProcessInput(bool bLostFocus)
 		{
 			sbContinuousScreenshots = !sbContinuousScreenshots;
 		}
-		if (sbContinuousScreenshots && !gpGraphics->mScreenshotRequest)
+		if (sbContinuousScreenshots && !gpGraphics->mOptionalScreenshotRequest)
 		{
 			// Fill only when empty so the per-frame F9 default request can't overwrite an agent-issued request's
 			// parameters (path / maxWidth / bPublishResult) before the capture site consumes it.
-			gpGraphics->mScreenshotRequest = ScreenshotRequest {};
+			gpGraphics->mOptionalScreenshotRequest = ScreenshotRequest {};
 		}
 	}
 
@@ -833,7 +833,7 @@ bool GameBase::HandleDeferredSwapchain()
 	{
 		gpProfileManager->DiscardSkippedFrameSamples();
 		gpSwapchainManager->AcquireNextImage();
-		mMinimizedThrottleLast.reset(); // Recreate resumed: drop the throttle timestamp so a fresh minimize starts clean.
+		mOptionalMinimizedThrottleLast.reset(); // Recreate resumed: drop the throttle timestamp so a fresh minimize starts clean.
 		gpGraphics->mRenderFrameTimer.Reset(); // The next frame delta steps wind, so it must not span the skipped interval.
 	}
 	else
@@ -844,23 +844,23 @@ bool GameBase::HandleDeferredSwapchain()
 		// vkGetPhysicalDeviceSurfaceCapabilitiesKHR per spin, and slow ones cannot stall the next iteration's message pump
 		// and agent command drain. Mirrors ServerSessionRuntime::WaitForTick's high-resolution
 		// waitable timer minus its precision spin (nothing minimized needs sub-ms accuracy).
-		if (mMinimizedThrottleTimer == nullptr)
+		if (mHandleMinimizedThrottleTimer == nullptr)
 		{
-			mMinimizedThrottleTimer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+			mHandleMinimizedThrottleTimer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
 		}
 
-		if (mMinimizedThrottleLast.has_value())
+		if (mOptionalMinimizedThrottleLast.has_value())
 		{
 			static constexpr std::chrono::nanoseconds kMinimumThrottleNanoseconds = 1'000'000ns;
-			std::chrono::nanoseconds elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - *mMinimizedThrottleLast);
+			std::chrono::nanoseconds elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - *mOptionalMinimizedThrottleLast);
 			std::chrono::nanoseconds budgetNanoseconds = std::clamp(mTimeStep.SimulationToWall(kTickNanoseconds), kMinimumThrottleNanoseconds, kTickNanoseconds);
 			std::chrono::nanoseconds remainingNanoseconds = budgetNanoseconds - elapsedNanoseconds;
 			if (remainingNanoseconds > 0ns)
 			{
 				LARGE_INTEGER dueTime {.QuadPart = -(remainingNanoseconds.count() / 100),}; // Negative = relative, 100ns units.
-				if (mMinimizedThrottleTimer != nullptr && SetWaitableTimerEx(mMinimizedThrottleTimer, &dueTime, 0, nullptr, nullptr, nullptr, 0) != 0)
+				if (mHandleMinimizedThrottleTimer != nullptr && SetWaitableTimerEx(mHandleMinimizedThrottleTimer, &dueTime, 0, nullptr, nullptr, nullptr, 0) != 0)
 				{
-					WaitForSingleObject(mMinimizedThrottleTimer, INFINITE);
+					WaitForSingleObject(mHandleMinimizedThrottleTimer, INFINITE);
 				}
 				else
 				{
@@ -872,7 +872,7 @@ bool GameBase::HandleDeferredSwapchain()
 		}
 
 		// Timestamp AFTER the wait so the next iteration's remainder measures one full loop.
-		mMinimizedThrottleLast = std::chrono::steady_clock::now();
+		mOptionalMinimizedThrottleLast = std::chrono::steady_clock::now();
 	}
 	return true;
 }

@@ -52,7 +52,7 @@ std::tuple<int64_t, int64_t> WaterFullDetail();
 float SmokeSimulationPixels();
 float SmokeSimulationPixelsY();
 
-// Agent/dev screenshot request queued into Graphics::mScreenshotRequest; consumed once at the capture site in
+// Agent/dev screenshot request queued into Graphics::mOptionalScreenshotRequest; consumed once at the capture site in
 // RenderMainPresentAcquire. Empty path -> default %TEMP%\Screenshots\agent_{N}.{jpg|png}. iMaxWidth <= 0 disables
 // downscale; the image is downscaled preserving aspect when wider than iMaxWidth.
 struct ScreenshotRequest
@@ -69,7 +69,7 @@ struct ScreenshotRequest
 	int64_t iCaptureToken = 0;
 };
 
-// Agent render-target dump request queued into Graphics::mDumpRenderTargetRequest; consumed at the same capture
+// Agent render-target dump request queued into Graphics::mOptionalDumpRenderTargetRequest; consumed at the same capture
 // site. name selects a RenderTargetTextures member (validated at request time); iIndex/iChannel index the array
 // members. Empty path -> default %TEMP%\Screenshots\dump_{name}_{N}. bRaw additionally writes the raw texel .bin.
 struct DumpRenderTargetRequest
@@ -91,7 +91,7 @@ class Graphics : public common::Singleton<Graphics>
 {
 public:
 
-	Graphics(HINSTANCE instanceHandle, HWND windowHandle);
+	Graphics(HINSTANCE hinstance, HWND hwnd);
 	~Graphics();
 
 	Graphics() = delete;
@@ -109,8 +109,8 @@ public:
 	// Refresh copies the wanted extent before recreation can defer, and a failed acquire/present can leave a teardown pending.
 	bool ExtentSettled() const;
 
-	HINSTANCE mInstanceHandle = nullptr;
-	HWND mWindowHandle = nullptr;
+	HINSTANCE mHinstance = nullptr;
+	HWND mHwnd = nullptr;
 	int64_t miMonitorRefreshRate = 60;
 	int64_t miFrameCounter = 0;
 	VkExtent2D mFramebufferVkExtent2D = gVkWantedFramebufferExtent2D;
@@ -140,8 +140,8 @@ public:
 
 	// One-shot capture mailboxes filled off the render path (agent Drain / F9 toggle), consumed once at the
 	// RenderMainPresentAcquire capture site (between the UI submit and Present — see the deadlock note there).
-	std::optional<ScreenshotRequest> mScreenshotRequest;
-	std::optional<DumpRenderTargetRequest> mDumpRenderTargetRequest;
+	std::optional<ScreenshotRequest> mOptionalScreenshotRequest;
+	std::optional<DumpRenderTargetRequest> mOptionalDumpRenderTargetRequest;
 
 	std::unordered_set<std::string> mDebugNames;
 
@@ -153,7 +153,7 @@ private:
 	bool SurfaceExtentZeroArea(VkSurfaceCapabilitiesKHR& rVkSurfaceCapabilitiesKHR);
 
 	template <typename T>
-	void PollSetting(Wrapper& rWrapper, const char* pcLabel, DestroyType eTier, std::optional<DestroyFlags> oeFlag = std::nullopt, bool bGate = true);
+	void PollSetting(Wrapper& rWrapper, const char* pcLabel, DestroyType eTier, std::optional<DestroyFlags> optionalFlag = std::nullopt, bool bGate = true);
 };
 
 inline Graphics* gpGraphics = nullptr;

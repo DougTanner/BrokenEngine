@@ -204,14 +204,14 @@ static void TryLoadRenderDocDll()
 		if (GetModuleHandle("renderdoc.dll") == nullptr)
 		{
 			// Default RenderDoc installer doesn't add itself to PATH, so plain LoadLibrary("renderdoc.dll") fails. Read the install dir from the Vulkan loader's implicit-layer JSON registration — renderdoc.dll lives in the same folder.
-			HKEY hKey = nullptr;
-			if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, R"(SOFTWARE\Khronos\Vulkan\ImplicitLayers)", 0, KEY_READ, &hKey) == ERROR_SUCCESS)
+			HKEY hkey = nullptr;
+			if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, R"(SOFTWARE\Khronos\Vulkan\ImplicitLayers)", 0, KEY_READ, &hkey) == ERROR_SUCCESS)
 			{
 				char pcValueName[MAX_PATH] {};
 				for (int64_t i = 0; ; ++i)
 				{
 					DWORD uiValueNameCharacterCount = MAX_PATH;
-					if (RegEnumValue(hKey, static_cast<DWORD>(i), pcValueName, &uiValueNameCharacterCount, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS)
+					if (RegEnumValue(hkey, static_cast<DWORD>(i), pcValueName, &uiValueNameCharacterCount, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS)
 					{
 						break;
 					}
@@ -226,7 +226,7 @@ static void TryLoadRenderDocDll()
 						break;
 					}
 				}
-				RegCloseKey(hKey);
+				RegCloseKey(hkey);
 			}
 
 			// PATH-relative fallback for users who manually added RenderDoc to PATH
@@ -243,7 +243,7 @@ static void TryLoadRenderDocDll()
 	}
 }
 
-InstanceManager::InstanceManager(HINSTANCE hInstance, HWND hWindow)
+InstanceManager::InstanceManager(HINSTANCE hinstance, HWND hwnd)
 : common::Singleton<InstanceManager>(gpInstanceManager, this)
 {
 	ScopedBootTimer scopedBootTimer(kBootTimerInstanceManager);
@@ -287,10 +287,10 @@ InstanceManager::InstanceManager(HINSTANCE hInstance, HWND hWindow)
 
 	TryLoadRenderDocDll();
 
-	HMODULE hRenderDocModule = GetModuleHandle("renderdoc.dll");
-	if (hRenderDocModule != nullptr)
+	HMODULE hmoduleRenderDoc = GetModuleHandle("renderdoc.dll");
+	if (hmoduleRenderDoc != nullptr)
 	{
-		LOG(kGraphics, kInfo, "renderDocHmodule: {}", reinterpret_cast<uint64_t>(hRenderDocModule));
+		LOG(kGraphics, kInfo, "renderDocHmodule: {}", reinterpret_cast<uint64_t>(hmoduleRenderDoc));
 
 		// RenderDoc doesn't ship VK_LAYER_KHRONOS_validation, so VK_EXT_layer_settings is unavailable. Keep first 4 entries of kppcInstanceExtensionNames (surface, win32 surface, portability enumeration, debug utils). pNext must be cleared because VkLayerSettingsCreateInfoEXT requires the layer settings extension we just dropped. VUID-VkInstanceCreateInfo-flags-06559 holds because VK_KHR_portability_enumeration is retained.
 		vkInstanceCreateInfo.pNext = nullptr;
@@ -300,7 +300,7 @@ InstanceManager::InstanceManager(HINSTANCE hInstance, HWND hWindow)
 
 		if constexpr (kbRenderDoc)
 		{
-			auto pGetRenderDocApi = reinterpret_cast<pRENDERDOC_GetAPI>(GetProcAddress(hRenderDocModule, "RENDERDOC_GetAPI"));
+			auto pGetRenderDocApi = reinterpret_cast<pRENDERDOC_GetAPI>(GetProcAddress(hmoduleRenderDoc, "RENDERDOC_GetAPI"));
 			if (pGetRenderDocApi != nullptr)
 			{
 				pGetRenderDocApi(eRENDERDOC_API_Version_1_6_0, reinterpret_cast<void**>(&mpRenderDocApi));
@@ -372,8 +372,8 @@ InstanceManager::InstanceManager(HINSTANCE hInstance, HWND hWindow)
 		.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
 		.pNext = nullptr,
 		.flags = 0,
-		.hinstance = hInstance,
-		.hwnd = hWindow,
+		.hinstance = hinstance,
+		.hwnd = hwnd,
 	};
 	CHECK_VK(vkCreateWin32SurfaceKHR(mVkInstance, &vkWin32SurfaceCreateInfoKHR, nullptr, &mVkSurfaceKHR));
 

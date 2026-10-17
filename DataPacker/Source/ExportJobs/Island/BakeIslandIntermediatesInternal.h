@@ -65,7 +65,7 @@ struct IslandBakeContext
 	const WorldDimensions& rDimensions;
 	int64_t iSeed = 0;
 	int64_t iTexturePixels = 0;
-	std::optional<int64_t> oiMeshResolution;
+	std::optional<int64_t> optionalMeshResolution;
 };
 
 // Per-region bounds passed to ProcessBakedRegion. Half-open ranges in full-bake pixel coords.

@@ -59,10 +59,10 @@ static std::string BuildModalText(const Record& rRecord)
 			text.append("\n\n");
 		}
 		const ExportFailure& rFailure = rRecord.exportFailures.at(static_cast<size_t>(i));
-		if (rFailure.assetPath)
+		if (rFailure.optionalAssetPath)
 		{
 			text.append("Asset: ");
-			text.append(PathToUtf8(*rFailure.assetPath));
+			text.append(PathToUtf8(*rFailure.optionalAssetPath));
 			text.append("\n\n");
 		}
 		text.append(NormalizeUtf8(rFailure.message));

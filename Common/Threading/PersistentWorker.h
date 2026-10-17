@@ -10,7 +10,7 @@ class PersistentWorker
 {
 public:
 
-	PersistentWorker(std::optional<int64_t> iThreadId, int64_t iWorkbufferSize);
+	PersistentWorker(std::optional<int64_t> optionalThreadId, int64_t iWorkbufferSize);
 	~PersistentWorker();
 
 	PersistentWorker(const PersistentWorker&) = delete;

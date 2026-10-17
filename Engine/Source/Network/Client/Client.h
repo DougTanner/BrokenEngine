@@ -172,7 +172,7 @@ public:
 	int64_t miCommittedLoadGeneration = 0;
 
 private:
-	std::optional<int64_t> miPendingLoadGeneration;
+	std::optional<int64_t> mOptionalPendingLoadGeneration;
 };
 
 inline Client* gpClient = nullptr;

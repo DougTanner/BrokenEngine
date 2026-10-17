@@ -103,15 +103,15 @@ void HudScreen::Render()
 	mbPreviousForceOpen = bForceOpen;
 
 	// Right panel content gate: it has nothing useful to show without a focused owned entity in current snapshot.
-	std::optional<int64_t> oOwnedEntityIndex;
+	std::optional<int64_t> optionalOwnedEntityIndex;
 	{
 		auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
 		if (it != gpGame->mCells.end() && it->second.iSnapshotCount > 0)
 		{
-			oOwnedEntityIndex = gpGame->ClientOwnedEntityIndex(*gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pOmnis);
+			optionalOwnedEntityIndex = gpGame->ClientOwnedEntityIndex(*gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pOmnis);
 		}
 	}
-	bool bRightHasContent = oOwnedEntityIndex.has_value();
+	bool bRightHasContent = optionalOwnedEntityIndex.has_value();
 
 	// With focused owned-entity content, mouse proximity to either anchor opens both panels together.
 	ImVec2 vLeftAnchor(rInputOutput.DisplaySize.x * kfHudEdgeMarginFraction, rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
@@ -353,12 +353,12 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 	ImGuiIO& rInputOutput = ImGui::GetIO();
 	engine::ScopedMenuScale menuScale;
 
-	std::optional<int64_t> oOwnedEntityIndex = std::nullopt;
+	std::optional<int64_t> optionalOwnedEntityIndex = std::nullopt;
 	{
 		auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
 		if (it != gpGame->mCells.end() && it->second.iSnapshotCount > 0)
 		{
-			oOwnedEntityIndex = gpGame->ClientOwnedEntityIndex(*gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pOmnis);
+			optionalOwnedEntityIndex = gpGame->ClientOwnedEntityIndex(*gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pOmnis);
 		}
 	}
 
@@ -380,10 +380,10 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
 	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPosition, ImVec2(vPanelPosition.x + vPanelSize.x, vPanelPosition.y + vPanelSize.y));
 
-	if (oOwnedEntityIndex.has_value())
+	if (optionalOwnedEntityIndex.has_value())
 	{
 		OmnisPostRender& rOmnis = *gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pOmnis;
-		bool bUseMissiles = static_cast<bool>(rOmnis.pFlags[*oOwnedEntityIndex] & OmniFlags::kUseMissiles);
+		bool bUseMissiles = static_cast<bool>(rOmnis.pFlags[*optionalOwnedEntityIndex] & OmniFlags::kUseMissiles);
 		gpGame->mWeaponModeToggle.Update(WeaponModeKey {.ownedEntityIdentifier = gpGame->ClientOwnedEntityIdentifier(), .bUseMissiles = bUseMissiles});
 
 		const char* pcLabel = bUseMissiles ? "Missiles" : "Blasters";
@@ -400,7 +400,7 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 			if (gpClientSession != nullptr && (gpGame->ClientOwnedEntityIdentifier().iValue != 0))
 			{
 				gpGame->mWeaponModeToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
-				float fNavigationDelay = rOmnis.pNavigationDelays[*oOwnedEntityIndex].count();
+				float fNavigationDelay = rOmnis.pNavigationDelays[*optionalOwnedEntityIndex].count();
 				gpClientSession->SendUpdateOwnedEntityRequest(gpGame->ClientOwnedEntityIdentifier().iValue, !bUseMissiles, fNavigationDelay);
 			}
 		}

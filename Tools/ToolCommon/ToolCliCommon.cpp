@@ -17,8 +17,8 @@ namespace toolcli
 		}
 	}
 
-	Handle::Handle(HANDLE hHandle) :
-		mhHandle(hHandle)
+	Handle::Handle(HANDLE handle) :
+		mHandle(handle)
 	{
 	}
 
@@ -28,7 +28,7 @@ namespace toolcli
 	}
 
 	Handle::Handle(Handle&& rOther) noexcept :
-		mhHandle(rOther.Release())
+		mHandle(rOther.Release())
 	{
 	}
 
@@ -43,44 +43,44 @@ namespace toolcli
 
 	HANDLE Handle::Get() const
 	{
-		return mhHandle;
+		return mHandle;
 	}
 
 	bool Handle::IsValid() const
 	{
-		return mhHandle != nullptr && mhHandle != INVALID_HANDLE_VALUE;
+		return mHandle != nullptr && mHandle != INVALID_HANDLE_VALUE;
 	}
 
 	HANDLE Handle::Release()
 	{
-		HANDLE hHandle = mhHandle;
-		mhHandle = INVALID_HANDLE_VALUE;
-		return hHandle;
+		HANDLE handle = mHandle;
+		mHandle = INVALID_HANDLE_VALUE;
+		return handle;
 	}
 
-	void Handle::Reset(HANDLE hHandle)
+	void Handle::Reset(HANDLE handle)
 	{
 		if (IsValid())
 		{
-			::CloseHandle(mhHandle);
+			::CloseHandle(mHandle);
 		}
-		mhHandle = hHandle;
+		mHandle = handle;
 	}
 
 	std::optional<ProcessResult> RunProcess(const std::filesystem::path* pExecutable, const std::vector<std::wstring>& rArguments, const RunProcessOptions& rOptions)
 	{
-		Handle hJob;
+		Handle handleJob;
 		if (rOptions.bKillOnJobClose)
 		{
-			hJob.Reset(::CreateJobObjectW(nullptr, nullptr));
-			if (!hJob.IsValid())
+			handleJob.Reset(::CreateJobObjectW(nullptr, nullptr));
+			if (!handleJob.IsValid())
 			{
 				ReportProcessFailure(rOptions, "create process job");
 				return std::nullopt;
 			}
 			JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInformation {};
 			jobInformation.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-			if (::SetInformationJobObject(hJob.Get(), JobObjectExtendedLimitInformation, &jobInformation, sizeof(jobInformation)) == FALSE)
+			if (::SetInformationJobObject(handleJob.Get(), JobObjectExtendedLimitInformation, &jobInformation, sizeof(jobInformation)) == FALSE)
 			{
 				ReportProcessFailure(rOptions, "configure process job");
 				return std::nullopt;
@@ -93,16 +93,16 @@ namespace toolcli
 			.lpSecurityDescriptor = nullptr,
 			.bInheritHandle = TRUE,
 		};
-		HANDLE hRawRead = INVALID_HANDLE_VALUE;
-		HANDLE hRawWrite = INVALID_HANDLE_VALUE;
-		if (::CreatePipe(&hRawRead, &hRawWrite, &pipeAttributes, 0) == FALSE)
+		HANDLE handleRawRead = INVALID_HANDLE_VALUE;
+		HANDLE handleRawWrite = INVALID_HANDLE_VALUE;
+		if (::CreatePipe(&handleRawRead, &handleRawWrite, &pipeAttributes, 0) == FALSE)
 		{
 			ReportProcessFailure(rOptions, "create output pipe");
 			return std::nullopt;
 		}
-		Handle hPipeRead(hRawRead);
-		Handle hPipeWrite(hRawWrite);
-		if (::SetHandleInformation(hPipeRead.Get(), HANDLE_FLAG_INHERIT, 0) == FALSE)
+		Handle handlePipeRead(handleRawRead);
+		Handle handlePipeWrite(handleRawWrite);
+		if (::SetHandleInformation(handlePipeRead.Get(), HANDLE_FLAG_INHERIT, 0) == FALSE)
 		{
 			ReportProcessFailure(rOptions, "configure output pipe");
 			return std::nullopt;
@@ -112,8 +112,8 @@ namespace toolcli
 		startupInfo.cb = sizeof(startupInfo);
 		startupInfo.dwFlags = STARTF_USESTDHANDLES;
 		startupInfo.hStdInput = ::GetStdHandle(STD_INPUT_HANDLE);
-		startupInfo.hStdOutput = hPipeWrite.Get();
-		startupInfo.hStdError = rOptions.bMergeStdError ? hPipeWrite.Get() : ::GetStdHandle(STD_ERROR_HANDLE);
+		startupInfo.hStdOutput = handlePipeWrite.Get();
+		startupInfo.hStdError = rOptions.bMergeStdError ? handlePipeWrite.Get() : ::GetStdHandle(STD_ERROR_HANDLE);
 		PROCESS_INFORMATION processInformation {};
 		std::wstring commandLine = BuildCommandLine(rArguments);
 		DWORD uiCreationFlags = (rOptions.bNoWindow ? CREATE_NO_WINDOW : 0) | (rOptions.bKillOnJobClose ? CREATE_SUSPENDED : 0);
@@ -122,31 +122,31 @@ namespace toolcli
 			ReportProcessFailure(rOptions, "launch process");
 			return std::nullopt;
 		}
-		Handle hProcess(processInformation.hProcess);
-		Handle hThread(processInformation.hThread);
+		Handle handleProcess(processInformation.hProcess);
+		Handle handleThread(processInformation.hThread);
 		if (rOptions.bKillOnJobClose)
 		{
-			if (::AssignProcessToJobObject(hJob.Get(), hProcess.Get()) == FALSE)
+			if (::AssignProcessToJobObject(handleJob.Get(), handleProcess.Get()) == FALSE)
 			{
 				ReportProcessFailure(rOptions, "assign process to job");
-				::TerminateProcess(hProcess.Get(), ERROR_PROCESS_ABORTED);
+				::TerminateProcess(handleProcess.Get(), ERROR_PROCESS_ABORTED);
 				return std::nullopt;
 			}
-			if (::ResumeThread(hThread.Get()) == static_cast<DWORD>(-1))
+			if (::ResumeThread(handleThread.Get()) == static_cast<DWORD>(-1))
 			{
 				ReportProcessFailure(rOptions, "start process");
-				::TerminateProcess(hProcess.Get(), ERROR_PROCESS_ABORTED);
+				::TerminateProcess(handleProcess.Get(), ERROR_PROCESS_ABORTED);
 				return std::nullopt;
 			}
 		}
-		hThread.Reset();
-		hPipeWrite.Reset();
+		handleThread.Reset();
+		handlePipeWrite.Reset();
 
 		ProcessResult result;
 		char pBuffer[65'536] {};
 		DWORD uiRead = 0;
 		// A zero-byte write by the child completes ReadFile with TRUE/0; only a broken pipe is EOF.
-		while (::ReadFile(hPipeRead.Get(), pBuffer, sizeof(pBuffer), &uiRead, nullptr) != FALSE)
+		while (::ReadFile(handlePipeRead.Get(), pBuffer, sizeof(pBuffer), &uiRead, nullptr) != FALSE)
 		{
 			int64_t iRead = uiRead;
 			if (iRead == 0)
@@ -166,16 +166,16 @@ namespace toolcli
 		if (iReadError != ERROR_BROKEN_PIPE)
 		{
 			ReportProcessFailure(rOptions, "read process output");
-			hPipeRead.Reset();
-			::WaitForSingleObject(hProcess.Get(), INFINITE);
+			handlePipeRead.Reset();
+			::WaitForSingleObject(handleProcess.Get(), INFINITE);
 			return std::nullopt;
 		}
-		if (::WaitForSingleObject(hProcess.Get(), INFINITE) != WAIT_OBJECT_0)
+		if (::WaitForSingleObject(handleProcess.Get(), INFINITE) != WAIT_OBJECT_0)
 		{
 			ReportProcessFailure(rOptions, "wait for process");
 			return std::nullopt;
 		}
-		if (::GetExitCodeProcess(hProcess.Get(), &result.uiExitCode) == FALSE)
+		if (::GetExitCodeProcess(handleProcess.Get(), &result.uiExitCode) == FALSE)
 		{
 			ReportProcessFailure(rOptions, "read process exit code");
 			return std::nullopt;
@@ -190,17 +190,17 @@ namespace toolcli
 		RunProcessOptions options;
 		options.bMergeStdError = true;
 		options.bNoWindow = true;
-		std::optional<ProcessResult> result = RunProcess(nullptr, arguments, options);
-		if (!result)
+		std::optional<ProcessResult> optionalResult = RunProcess(nullptr, arguments, options);
+		if (!optionalResult)
 		{
 			return std::nullopt;
 		}
-		int64_t iExitCode = result->uiExitCode;
+		int64_t iExitCode = optionalResult->uiExitCode;
 		if (iExitCode != 0)
 		{
 			return std::nullopt;
 		}
-		return std::move(result->output);
+		return std::move(optionalResult->output);
 	}
 
 	void SetToolName(std::string_view name)

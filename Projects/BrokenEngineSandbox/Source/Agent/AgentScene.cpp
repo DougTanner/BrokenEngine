@@ -128,9 +128,9 @@ static nlohmann::json BuildCellState(engine::GridCoord coordinate, const engine:
 	result["stuckFrameCount"] = rCell.iStuckFrameCount;
 
 	result["pendingFullStateTick"] = nullptr;
-	if (rCell.pendingFullState.has_value())
+	if (rCell.optionalPendingFullState.has_value())
 	{
-		result["pendingFullStateTick"] = rCell.pendingFullState->iTick;
+		result["pendingFullStateTick"] = rCell.optionalPendingFullState->iTick;
 	}
 
 	result["firstServerUpdateTick"] = nullptr;

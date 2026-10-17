@@ -69,7 +69,7 @@ PackChunks::~PackChunks()
 
 	mLoader.Stop();
 
-	for (HANDLE& rHandle : mLazyPackFileHandles)
+	for (HANDLE& rHandle : mpHandleLazyPackFile)
 	{
 		if (rHandle != nullptr && rHandle != INVALID_HANDLE_VALUE)
 		{
@@ -320,22 +320,22 @@ void PackChunks::LoadPackFiles()
 		}
 
 		// Opened before the size and header reads, which go through a handle reopened from it, so its share-read-only lock keeps the validated file unchanged until shutdown.
-		mLazyPackFileHandles[i] = CreateFileW(mPackFilePaths[i].c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+		mpHandleLazyPackFile[i] = CreateFileW(mPackFilePaths[i].c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
 		// Trust boundary: a missing required .pack yields INVALID_HANDLE_VALUE, fatal like a missing manifest.
-		if (mLazyPackFileHandles[i] == INVALID_HANDLE_VALUE)
+		if (mpHandleLazyPackFile[i] == INVALID_HANDLE_VALUE)
 		{
 			FailMissingRequiredAsset(mPackFilePaths[i], "pack file could not be opened for loading");
 		}
 
-		HANDLE hPackValidation = ReOpenFile(mLazyPackFileHandles[i], GENERIC_READ, FILE_SHARE_READ, 0);
+		HANDLE handlePackValidation = ReOpenFile(mpHandleLazyPackFile[i], GENERIC_READ, FILE_SHARE_READ, 0);
 		// Trust boundary: a failed reopen leaves no handle to read the headers through; reading them would build
 		// the lazy map (and pool layout) from garbage. A required pack is as fatal as a missing manifest.
-		if (hPackValidation == INVALID_HANDLE_VALUE)
+		if (handlePackValidation == INVALID_HANDLE_VALUE)
 		{
 			FailMissingRequiredAsset(mPackFilePaths[i], "pack file missing or unreadable");
 		}
 		LARGE_INTEGER packFileSize {};
-		if (GetFileSizeEx(hPackValidation, &packFileSize) == FALSE)
+		if (GetFileSizeEx(handlePackValidation, &packFileSize) == FALSE)
 		{
 			FailMissingRequiredAsset(mPackFilePaths[i], "pack file size unreadable");
 		}
@@ -351,7 +351,7 @@ void PackChunks::LoadPackFiles()
 			overlapped.Offset = static_cast<DWORD>(rChunkLocation.uiOffset & 0xffffffff);
 			overlapped.OffsetHigh = static_cast<DWORD>(rChunkLocation.uiOffset >> 32);
 			DWORD uiBytesRead = 0;
-			if (ReadFile(hPackValidation, &chunkHeader, static_cast<DWORD>(sizeof(chunkHeader)), &uiBytesRead, &overlapped) == FALSE || uiBytesRead != sizeof(chunkHeader))
+			if (ReadFile(handlePackValidation, &chunkHeader, static_cast<DWORD>(sizeof(chunkHeader)), &uiBytesRead, &overlapped) == FALSE || uiBytesRead != sizeof(chunkHeader))
 			{
 				FailMissingRequiredAsset(mPackFilePaths[i], "pack header table truncated");
 			}
@@ -373,7 +373,7 @@ void PackChunks::LoadPackFiles()
 				miDecompressScratchSize = iOnDiskSize;
 			}
 		}
-		CloseHandle(hPackValidation);
+		CloseHandle(handlePackValidation);
 	}
 
 	// Pre-allocate memory pool for all lazy chunk data (eliminates heap lock contention during background loading)
@@ -845,7 +845,7 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 
 	const LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
 	data::DataTypes eDataType = DataTypeFromFlags(rLazyChunk.header.flags);
-	HANDLE hFile = mLazyPackFileHandles[eDataType];
+	HANDLE handleFile = mpHandleLazyPackFile[eDataType];
 
 	uint64_t uiOffset = static_cast<uint64_t>(iOffset);
 	uint64_t uiLength = static_cast<uint64_t>(iLength);
@@ -860,7 +860,7 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 	overlapped.Offset = static_cast<DWORD>(uiAlignedOffset & 0xffffffff);
 	overlapped.OffsetHigh = static_cast<DWORD>(uiAlignedOffset >> 32);
 	DWORD uiBytesRead = 0;
-	BOOL bRead = ReadFile(hFile, mpReadBuffers[iThreadIndex], static_cast<DWORD>(uiPhysicalSize), &uiBytesRead, &overlapped);
+	BOOL bRead = ReadFile(handleFile, mpReadBuffers[iThreadIndex], static_cast<DWORD>(uiPhysicalSize), &uiBytesRead, &overlapped);
 	if (bRead == FALSE)
 	{
 		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range read was incomplete");

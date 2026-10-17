@@ -199,8 +199,8 @@ bool ExportJob::CheckDirty([[maybe_unused]] const std::filesystem::path& rPackFi
 	}
 
 	std::string inputFingerprint = GetInputFingerprint();
-	std::optional<std::string> cachedFingerprint = ReadFingerprintMetadata(mCacheMetadataFile);
-	if (!cachedFingerprint.has_value() || cachedFingerprint.value() != inputFingerprint)
+	std::optional<std::string> optionalCachedFingerprint = ReadFingerprintMetadata(mCacheMetadataFile);
+	if (!optionalCachedFingerprint.has_value() || optionalCachedFingerprint.value() != inputFingerprint)
 	{
 		LOG(kDefault, kDebug, "Input fingerprint changed for \"{}\"", mInputPath.string());
 		mbDirty = true;

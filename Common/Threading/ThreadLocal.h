@@ -44,13 +44,13 @@ public:
 	// process entry), builds that thread's ThreadLocal and then invokes function with the callable's arguments.
 	// The requires-clause keeps std::jthread's stop_token detection working; decltype(auto) keeps reference results.
 	template <typename FUNCTION>
-	static ThreadLocalEntry<std::decay_t<FUNCTION>> Entry(FUNCTION&& function, int64_t iWorkbufferSize, std::optional<int64_t> iThreadId = std::nullopt, bool bSetupExceptionHandling = true)
+	static ThreadLocalEntry<std::decay_t<FUNCTION>> Entry(FUNCTION&& function, int64_t iWorkbufferSize, std::optional<int64_t> optionalThreadId = std::nullopt, bool bSetupExceptionHandling = true)
 	{
 		return
 		{
 			.function = std::forward<FUNCTION>(function),
 			.iWorkbufferSize = iWorkbufferSize,
-			.iThreadId = iThreadId,
+			.optionalThreadId = optionalThreadId,
 			.bSetupExceptionHandling = bSetupExceptionHandling,
 		};
 	}
@@ -61,7 +61,7 @@ public:
 	ThreadLocal(ThreadLocal&&) = delete;
 	ThreadLocal& operator=(ThreadLocal&&) = delete;
 
-	std::optional<int64_t> miThreadId;
+	std::optional<int64_t> mOptionalThreadId;
 	int64_t miLogIndent = 0;
 	int64_t miLogTickCounter = -1;
 	// True while this thread is executing a deterministic frame tick (set by FrameTickScope at the top
@@ -74,7 +74,7 @@ private:
 
 	// The workbuffer reserve is 64x the initial size, with that size floored at 64 KiB first, so a thread constructed
 	// with a small initial workbuffer still has room to grow into.
-	ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> iThreadId = std::nullopt, bool bSetupExceptionHandling = true);
+	ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> optionalThreadId = std::nullopt, bool bSetupExceptionHandling = true);
 
 	// Must precede mpLogBuffer/mWorkbuffer below: those alias this storage (ctor member-init order depends on it).
 	std::vector<char> mLogBufferMemory = std::vector<char>(kiLogBufferSize);
@@ -91,13 +91,13 @@ struct ThreadLocalEntry
 {
 	FUNCTION function;
 	int64_t iWorkbufferSize = 0;
-	std::optional<int64_t> iThreadId;
+	std::optional<int64_t> optionalThreadId;
 	bool bSetupExceptionHandling = true;
 
 	template <typename... ARGS> requires std::invocable<FUNCTION&, ARGS...>
 	decltype(auto) operator()(ARGS&&... arguments)
 	{
-		ThreadLocal threadLocal(iWorkbufferSize, iThreadId, bSetupExceptionHandling);
+		ThreadLocal threadLocal(iWorkbufferSize, optionalThreadId, bSetupExceptionHandling);
 		return std::invoke(function, std::forward<ARGS>(arguments)...);
 	}
 };

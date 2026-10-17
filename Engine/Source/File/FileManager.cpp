@@ -46,19 +46,19 @@ class FileHandle
 {
 public:
 
-	explicit FileHandle(HANDLE pFile)
-		: mpFile(pFile)
+	explicit FileHandle(HANDLE handleFile)
+		: mHandleFile(handleFile)
 	{
 	}
 	~FileHandle()
 	{
-		if (mpFile != INVALID_HANDLE_VALUE)
+		if (mHandleFile != INVALID_HANDLE_VALUE)
 		{
-			::CloseHandle(mpFile);
+			::CloseHandle(mHandleFile);
 		}
 	}
 
-	HANDLE mpFile = INVALID_HANDLE_VALUE;
+	HANDLE mHandleFile = INVALID_HANDLE_VALUE;
 };
 
 FileManager::FileManager()
@@ -240,13 +240,13 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 	}
 
 	FileHandle file(::CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_SEQUENTIAL_SCAN, nullptr));
-	if (file.mpFile == INVALID_HANDLE_VALUE)
+	if (file.mHandleFile == INVALID_HANDLE_VALUE)
 	{
 		return false;
 	}
 
 	BY_HANDLE_FILE_INFORMATION information {};
-	if (::GetFileInformationByHandle(file.mpFile, &information) == FALSE)
+	if (::GetFileInformationByHandle(file.mHandleFile, &information) == FALSE)
 	{
 		return false;
 	}
@@ -262,7 +262,7 @@ bool FileManager::ComputeOrdinaryFileSha256(const FileFlags_t& rFlags, const std
 	for (;;)
 	{
 		DWORD uiBytesRead = 0;
-		if (::ReadFile(file.mpFile, buffer.data(), static_cast<DWORD>(buffer.size()), &uiBytesRead, nullptr) == FALSE)
+		if (::ReadFile(file.mHandleFile, buffer.data(), static_cast<DWORD>(buffer.size()), &uiBytesRead, nullptr) == FALSE)
 		{
 			return false;
 		}

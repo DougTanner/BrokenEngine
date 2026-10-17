@@ -50,8 +50,8 @@ namespace toolcli::landing
 		{
 			return std::nullopt;
 		}
-		std::optional<int64_t> durationSeconds = JsonInt64(rMetadata["leaseDurationSeconds"]);
-		if (!durationSeconds || !IsValidLeaseDuration(std::chrono::seconds(*durationSeconds)))
+		std::optional<int64_t> optionalDurationSeconds = JsonInt64(rMetadata["leaseDurationSeconds"]);
+		if (!optionalDurationSeconds || !IsValidLeaseDuration(std::chrono::seconds(*optionalDurationSeconds)))
 		{
 			return std::nullopt;
 		}
@@ -60,7 +60,7 @@ namespace toolcli::landing
 		lease.claimedAt = rMetadata["claimedAt"].get<std::string>();
 		lease.heartbeatAt = rMetadata["heartbeatAt"].get<std::string>();
 		lease.expiresAt = rMetadata["expiresAt"].get<std::string>();
-		lease.duration = std::chrono::seconds(*durationSeconds);
+		lease.duration = std::chrono::seconds(*optionalDurationSeconds);
 		// The envelope already proved claimedAt and heartbeatAt parse and are ordered; these calls exist to fill the lease ticks.
 		ParseUtcTimestamp(lease.claimedAt, lease.iClaimedTicks);
 		ParseUtcTimestamp(lease.heartbeatAt, lease.iHeartbeatTicks);
@@ -98,32 +98,32 @@ namespace toolcli::landing
 			}
 		}
 		int64_t iCurrentTicks = static_cast<int64_t>(CurrentUtcTicks());
-		std::optional<LandingLease> lease = ValidateLandingLease(rMetadata, rLocator, iCurrentTicks);
-		if (lease)
+		std::optional<LandingLease> optionalLease = ValidateLandingLease(rMetadata, rLocator, iCurrentTicks);
+		if (optionalLease)
 		{
-			status["leaseState"] = iCurrentTicks < lease->iExpiresTicks ? "live" : "expired";
+			status["leaseState"] = iCurrentTicks < optionalLease->iExpiresTicks ? "live" : "expired";
 		}
 		return status;
 	}
 
 	bool AllRegisteredWorktreesClear(const Locator& rLocator)
 	{
-		std::optional<std::string> listing = RunGit({ L"--git-dir", rLocator.logicalKey, L"worktree", L"list", L"--porcelain", L"-z" });
-		if (!listing)
+		std::optional<std::string> optionalListing = RunGit({ L"--git-dir", rLocator.logicalKey, L"worktree", L"list", L"--porcelain", L"-z" });
+		if (!optionalListing)
 		{
 			return false;
 		}
 		std::vector<std::wstring> worktrees;
 		std::wstring currentWorktree;
 		bool bInvalidEntry = false;
-		for (int64_t i = 0; i < std::ssize(*listing);)
+		for (int64_t i = 0; i < std::ssize(*optionalListing);)
 		{
-			int64_t iEnd = static_cast<int64_t>(listing->find('\0', static_cast<std::string::size_type>(i)));
+			int64_t iEnd = static_cast<int64_t>(optionalListing->find('\0', static_cast<std::string::size_type>(i)));
 			if (iEnd == static_cast<int64_t>(std::string::npos))
 			{
-				iEnd = std::ssize(*listing);
+				iEnd = std::ssize(*optionalListing);
 			}
-			std::string_view field(listing->data() + i, static_cast<std::string_view::size_type>(iEnd - i));
+			std::string_view field(optionalListing->data() + i, static_cast<std::string_view::size_type>(iEnd - i));
 			if (field.empty())
 			{
 				if (currentWorktree.empty())
@@ -168,16 +168,16 @@ namespace toolcli::landing
 			{
 				return false;
 			}
-			std::optional<std::string> gitDirectoryText = RunGit({ L"-C", rWorktree, L"rev-parse", L"--path-format=absolute", L"--git-dir" });
-			if (!gitDirectoryText)
+			std::optional<std::string> optionalGitDirectoryText = RunGit({ L"-C", rWorktree, L"rev-parse", L"--path-format=absolute", L"--git-dir" });
+			if (!optionalGitDirectoryText)
 			{
 				return false;
 			}
-			while (!gitDirectoryText->empty() && (gitDirectoryText->back() == '\r' || gitDirectoryText->back() == '\n'))
+			while (!optionalGitDirectoryText->empty() && (optionalGitDirectoryText->back() == '\r' || optionalGitDirectoryText->back() == '\n'))
 			{
-				gitDirectoryText->pop_back();
+				optionalGitDirectoryText->pop_back();
 			}
-			std::filesystem::path gitDirectory = Utf8ToWide(*gitDirectoryText);
+			std::filesystem::path gitDirectory = Utf8ToWide(*optionalGitDirectoryText);
 			std::filesystem::path extendedGitDirectory = ExtendedLengthPath(std::move(gitDirectory));
 			if (!std::filesystem::is_directory(extendedGitDirectory, error))
 			{

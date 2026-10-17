@@ -9,7 +9,7 @@ class InstanceManager : public common::Singleton<InstanceManager>
 {
 public:
 
-	InstanceManager(HINSTANCE hInstance, HWND hWindow);
+	InstanceManager(HINSTANCE hinstance, HWND hwnd);
 	~InstanceManager();
 
 	InstanceManager() = delete;

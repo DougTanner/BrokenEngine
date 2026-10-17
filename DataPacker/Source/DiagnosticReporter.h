@@ -30,7 +30,7 @@ enum class ButtonResult
 
 struct ExportFailure
 {
-	std::optional<std::filesystem::path> assetPath;
+	std::optional<std::filesystem::path> optionalAssetPath;
 	std::string message;
 };
 

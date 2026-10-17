@@ -15,11 +15,11 @@ void ReconcileInjectPendingFullState(CoordWork& rWork)
 	engine::Cell& rCell = *rWork.pCell;
 	CoordScratch& rScratch = rWork.scratch;
 
-	if (!rCell.pendingFullState)
+	if (!rCell.optionalPendingFullState)
 	{
 		return;
 	}
-	engine::Cell::PendingFullState& rPending = *rCell.pendingFullState;
+	engine::Cell::PendingFullState& rPending = *rCell.optionalPendingFullState;
 	ASSERT(rPending.pFrame->interpolate.iTick == rPending.iTick);
 	int64_t iSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
 	rPending.pFrame->postRender.uiSharedCrc = rPending.pFrame->Crc();
@@ -33,7 +33,7 @@ void ReconcileInjectPendingFullState(CoordWork& rWork)
 	// Full state replaces the timeline; a prior higher high-water mark was against a discarded timeline.
 	rCell.iHighWaterValidatedTick = rPending.iTick;
 	rCell.iLastFullStateTick = rPending.iTick;
-	rCell.pendingFullState.reset();
+	rCell.optionalPendingFullState.reset();
 }
 
 // Writeback stays in the dispatch worker because reconciliation already mutates rCell.
@@ -82,7 +82,7 @@ static void AdoptUnreachablePendingFullState(CoordWork& rWork, engine::Cell::Pen
 
 	rCell.iHighWaterValidatedTick = iAdoptedTick;
 	rCell.iLastFullStateTick = iAdoptedTick;
-	rCell.pendingFullState.reset();
+	rCell.optionalPendingFullState.reset();
 	std::erase_if(rCell.serverUpdates, [iAdoptedTick](const auto& rEntry) { return rEntry.first <= iAdoptedTick; });
 	rCell.iLastReplayConfirmedTick = -1;
 	rCell.iLastReplayServerUpdateCount = -1;
@@ -230,7 +230,7 @@ static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const Ri
 	else if (eMode == ReplayMode::kPrimary && pDuePendingFullState != nullptr && pDuePendingFullState->iTick < rCell.iConfirmedTick)
 	{
 		LOG(kNetwork, kVerbose, "ReconcileCoord Discarded stale pending full state Coord: ({},{}) FullStateTick: {} ConfirmedTick: {}", rWork.coord.iX, rWork.coord.iY, pDuePendingFullState->iTick, rCell.iConfirmedTick);
-		rCell.pendingFullState.reset();
+		rCell.optionalPendingFullState.reset();
 	}
 
 	riReplayStart = riRollbackTick + 1;

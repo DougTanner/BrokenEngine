@@ -41,44 +41,44 @@ static std::array<int64_t, std::size(game::kServerEntityCountNames)> sTotalEntit
 // paint and the bitmap is recreated only when the client size changes; the palette brushes/pens are a fixed
 // RGB set created once instead of per-cell per-paint. Nothing is explicitly destroyed — process teardown
 // reclaims GDI objects.
-static HDC shDeviceContextBuffer = nullptr;
-static HBITMAP shBitmapBuffer = nullptr;
+static HDC sHdcBuffer = nullptr;
+static HBITMAP sHbitmapBuffer = nullptr;
 static int64_t siBufferWidth = 0;
 static int64_t siBufferHeight = 0;
-static HFONT shFont = nullptr;
+static HFONT sHfont = nullptr;
 
-static HBRUSH shBrushBackground = nullptr;  // RGB(30, 30, 30) — window / content background
-static HBRUSH shBrushCellClient = nullptr;  // RGB(40, 60, 140) — client-authorized cell
-static HBRUSH shBrushCellActive = nullptr;  // RGB(30, 100, 30) — active cell
-static HBRUSH shBrushGrayFill = nullptr;    // RGB(50, 50, 50) — idle cell / copy button
-static HBRUSH shBrushTabActive = nullptr;   // RGB(60, 60, 60) — active tab
-static HBRUSH shBrushTabInactive = nullptr; // RGB(40, 40, 40) — inactive tab
+static HBRUSH sHbrushBackground = nullptr;  // RGB(30, 30, 30) — window / content background
+static HBRUSH sHbrushCellClient = nullptr;  // RGB(40, 60, 140) — client-authorized cell
+static HBRUSH sHbrushCellActive = nullptr;  // RGB(30, 100, 30) — active cell
+static HBRUSH sHbrushGrayFill = nullptr;    // RGB(50, 50, 50) — idle cell / copy button
+static HBRUSH sHbrushTabActive = nullptr;   // RGB(60, 60, 60) — active tab
+static HBRUSH sHbrushTabInactive = nullptr; // RGB(40, 40, 40) — inactive tab
 
-static HPEN shPenCellBorderClient = nullptr; // RGB(100, 140, 255) — client cell border
-static HPEN shPenGray = nullptr;             // RGB(80, 80, 80) — normal borders / tab bottom line
-static HPEN shPenRed = nullptr;              // RGB(220, 40, 40) — subscribed-cell interior border
-static HPEN shPenBlue = nullptr;             // RGB(100, 180, 255) — active tab border / copy button border
+static HPEN sHpenCellBorderClient = nullptr; // RGB(100, 140, 255) — client cell border
+static HPEN sHpenGray = nullptr;             // RGB(80, 80, 80) — normal borders / tab bottom line
+static HPEN sHpenRed = nullptr;              // RGB(220, 40, 40) — subscribed-cell interior border
+static HPEN sHpenBlue = nullptr;             // RGB(100, 180, 255) — active tab border / copy button border
 
 static void EnsureCachedGraphicsDeviceInterfaceObjects()
 {
-	if (shFont != nullptr)
+	if (sHfont != nullptr)
 	{
 		return;
 	}
 
-	shFont = CreateFont(28, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, FIXED_PITCH | FF_MODERN, "Consolas");
+	sHfont = CreateFont(28, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, FIXED_PITCH | FF_MODERN, "Consolas");
 
-	shBrushBackground = CreateSolidBrush(RGB(30, 30, 30));
-	shBrushCellClient = CreateSolidBrush(RGB(40, 60, 140));
-	shBrushCellActive = CreateSolidBrush(RGB(30, 100, 30));
-	shBrushGrayFill = CreateSolidBrush(RGB(50, 50, 50));
-	shBrushTabActive = CreateSolidBrush(RGB(60, 60, 60));
-	shBrushTabInactive = CreateSolidBrush(RGB(40, 40, 40));
+	sHbrushBackground = CreateSolidBrush(RGB(30, 30, 30));
+	sHbrushCellClient = CreateSolidBrush(RGB(40, 60, 140));
+	sHbrushCellActive = CreateSolidBrush(RGB(30, 100, 30));
+	sHbrushGrayFill = CreateSolidBrush(RGB(50, 50, 50));
+	sHbrushTabActive = CreateSolidBrush(RGB(60, 60, 60));
+	sHbrushTabInactive = CreateSolidBrush(RGB(40, 40, 40));
 
-	shPenCellBorderClient = CreatePen(PS_SOLID, 1, RGB(100, 140, 255));
-	shPenGray = CreatePen(PS_SOLID, 1, RGB(80, 80, 80));
-	shPenRed = CreatePen(PS_SOLID, 1, RGB(220, 40, 40));
-	shPenBlue = CreatePen(PS_SOLID, 1, RGB(100, 180, 255));
+	sHpenCellBorderClient = CreatePen(PS_SOLID, 1, RGB(100, 140, 255));
+	sHpenGray = CreatePen(PS_SOLID, 1, RGB(80, 80, 80));
+	sHpenRed = CreatePen(PS_SOLID, 1, RGB(220, 40, 40));
+	sHpenBlue = CreatePen(PS_SOLID, 1, RGB(100, 180, 255));
 }
 
 void ServerUpdateDisplayStatistics()
@@ -185,7 +185,7 @@ bool ServerDisplayContentChanged()
 	return true;
 }
 
-static void PaintGridMap(HDC hDeviceContextBuffer, std::span<char> buffer, int64_t iMapLeft, int64_t iMapTop, int64_t iMapWidth, int64_t iMapHeight, const std::vector<ClientConnection>& rClients)
+static void PaintGridMap(HDC hdcBuffer, std::span<char> buffer, int64_t iMapLeft, int64_t iMapTop, int64_t iMapWidth, int64_t iMapHeight, const std::vector<ClientConnection>& rClients)
 {
 	if (game::gpGame->mActiveCoordinates.empty())
 	{
@@ -260,35 +260,35 @@ static void PaintGridMap(HDC hDeviceContextBuffer, std::span<char> buffer, int64
 				}
 			}
 
-			HBRUSH hBrushCell = shBrushGrayFill;
+			HBRUSH hbrushCell = sHbrushGrayFill;
 			if (iClientsInCell > 0)
 			{
-				hBrushCell = shBrushCellClient;
+				hbrushCell = sHbrushCellClient;
 			}
 			else if (bIsActive)
 			{
-				hBrushCell = shBrushCellActive;
+				hbrushCell = sHbrushCellActive;
 			}
-			FillRect(hDeviceContextBuffer, &cellRectangle, hBrushCell);
+			FillRect(hdcBuffer, &cellRectangle, hbrushCell);
 
-			HPEN hPen = (iClientsInCell > 0) ? shPenCellBorderClient : shPenGray;
-			HPEN hOldPen = static_cast<HPEN>(SelectObject(hDeviceContextBuffer, hPen));
-			MoveToEx(hDeviceContextBuffer, static_cast<int>(iCellLeft), static_cast<int>(iCellTop), nullptr);
-			LineTo(hDeviceContextBuffer, static_cast<int>(iCellLeft + iCellSize), static_cast<int>(iCellTop));
-			LineTo(hDeviceContextBuffer, static_cast<int>(iCellLeft + iCellSize), static_cast<int>(iCellTop + iCellSize));
-			LineTo(hDeviceContextBuffer, static_cast<int>(iCellLeft), static_cast<int>(iCellTop + iCellSize));
-			LineTo(hDeviceContextBuffer, static_cast<int>(iCellLeft), static_cast<int>(iCellTop));
-			SelectObject(hDeviceContextBuffer, hOldPen);
+			HPEN hpen = (iClientsInCell > 0) ? sHpenCellBorderClient : sHpenGray;
+			HPEN hpenOld = static_cast<HPEN>(SelectObject(hdcBuffer, hpen));
+			MoveToEx(hdcBuffer, static_cast<int>(iCellLeft), static_cast<int>(iCellTop), nullptr);
+			LineTo(hdcBuffer, static_cast<int>(iCellLeft + iCellSize), static_cast<int>(iCellTop));
+			LineTo(hdcBuffer, static_cast<int>(iCellLeft + iCellSize), static_cast<int>(iCellTop + iCellSize));
+			LineTo(hdcBuffer, static_cast<int>(iCellLeft), static_cast<int>(iCellTop + iCellSize));
+			LineTo(hdcBuffer, static_cast<int>(iCellLeft), static_cast<int>(iCellTop));
+			SelectObject(hdcBuffer, hpenOld);
 
 			// Red interior border for subscribed cells
 			if (bIsSubscribed && iCellSize >= 20)
 			{
 				static constexpr int64_t kiInset = 2;
-				HPEN hOldPen2 = static_cast<HPEN>(SelectObject(hDeviceContextBuffer, shPenRed));
-				HBRUSH hOldBrush = static_cast<HBRUSH>(SelectObject(hDeviceContextBuffer, GetStockObject(NULL_BRUSH)));
-				Rectangle(hDeviceContextBuffer, static_cast<int>(iCellLeft + kiInset), static_cast<int>(iCellTop + kiInset), static_cast<int>(iCellLeft + iCellSize - kiInset + 1), static_cast<int>(iCellTop + iCellSize - kiInset + 1));
-				SelectObject(hDeviceContextBuffer, hOldBrush);
-				SelectObject(hDeviceContextBuffer, hOldPen2);
+				HPEN hpenOld2 = static_cast<HPEN>(SelectObject(hdcBuffer, sHpenRed));
+				HBRUSH hbrushOld = static_cast<HBRUSH>(SelectObject(hdcBuffer, GetStockObject(NULL_BRUSH)));
+				Rectangle(hdcBuffer, static_cast<int>(iCellLeft + kiInset), static_cast<int>(iCellTop + kiInset), static_cast<int>(iCellLeft + iCellSize - kiInset + 1), static_cast<int>(iCellTop + iCellSize - kiInset + 1));
+				SelectObject(hdcBuffer, hbrushOld);
+				SelectObject(hdcBuffer, hpenOld2);
 			}
 
 			// Cell labels for active cells
@@ -297,26 +297,26 @@ static void PaintGridMap(HDC hDeviceContextBuffer, std::span<char> buffer, int64
 				game::ServerCellStats cellStatistics = game::GetServerCellStatistics((*game::gpGame->mCells.at(coordinate).pCurrent));
 				int64_t iEntityCount = std::ranges::fold_left(cellStatistics.entityCounts, cellStatistics.iExplosions, std::plus {});
 
-				SetTextColor(hDeviceContextBuffer, RGB(220, 220, 220));
+				SetTextColor(hdcBuffer, RGB(220, 220, 220));
 
 				int64_t iLineLength = std::min<int64_t>(std::snprintf(buffer.data(), buffer.size(), "(%d,%d)", static_cast<int>(j), static_cast<int>(i)), static_cast<int64_t>(buffer.size()) - 1);
-				TextOutA(hDeviceContextBuffer, static_cast<int>(iCellLeft + 2), static_cast<int>(iCellTop + 2), buffer.data(), static_cast<int>(iLineLength));
+				TextOutA(hdcBuffer, static_cast<int>(iCellLeft + 2), static_cast<int>(iCellTop + 2), buffer.data(), static_cast<int>(iLineLength));
 
 				iLineLength = std::min<int64_t>(std::snprintf(buffer.data(), buffer.size(), "%lld", iEntityCount), static_cast<int64_t>(buffer.size()) - 1);
-				TextOutA(hDeviceContextBuffer, static_cast<int>(iCellLeft + 2), static_cast<int>(iCellTop + 28), buffer.data(), static_cast<int>(iLineLength));
+				TextOutA(hdcBuffer, static_cast<int>(iCellLeft + 2), static_cast<int>(iCellTop + 28), buffer.data(), static_cast<int>(iLineLength));
 
 				if (iClientsInCell > 0)
 				{
-					SetTextColor(hDeviceContextBuffer, RGB(150, 200, 255));
+					SetTextColor(hdcBuffer, RGB(150, 200, 255));
 					iLineLength = std::min<int64_t>(std::snprintf(buffer.data(), buffer.size(), "%lld", iClientsInCell), static_cast<int64_t>(buffer.size()) - 1);
-					TextOutA(hDeviceContextBuffer, static_cast<int>(iCellLeft + iCellSize - 20), static_cast<int>(iCellTop + 2), buffer.data(), static_cast<int>(iLineLength));
+					TextOutA(hdcBuffer, static_cast<int>(iCellLeft + iCellSize - 20), static_cast<int>(iCellTop + 2), buffer.data(), static_cast<int>(iLineLength));
 				}
 			}
 		}
 	}
 }
 
-static void PaintWorkbufferText(HDC hDeviceContextBuffer, std::string_view text, int64_t iX, int64_t& riY, int64_t iLineHeight)
+static void PaintWorkbufferText(HDC hdcBuffer, std::string_view text, int64_t iX, int64_t& riY, int64_t iLineHeight)
 {
 	int64_t iStart = 0;
 	while (iStart < static_cast<int64_t>(text.size()))
@@ -330,46 +330,46 @@ static void PaintWorkbufferText(HDC hDeviceContextBuffer, std::string_view text,
 		std::string_view line = text.substr(static_cast<size_t>(iStart), static_cast<size_t>(iEnd - iStart));
 		if (!line.empty())
 		{
-			TextOutA(hDeviceContextBuffer, static_cast<int>(iX), static_cast<int>(riY), line.data(), static_cast<int>(line.size()));
+			TextOutA(hdcBuffer, static_cast<int>(iX), static_cast<int>(riY), line.data(), static_cast<int>(line.size()));
 		}
 		riY += iLineHeight;
 		iStart = iEnd + 1;
 	}
 }
 
-static void CopyProfileToClipboard(HWND hWindow)
+static void CopyProfileToClipboard(HWND hwnd)
 {
 	if (sProfileText.empty())
 	{
 		return;
 	}
 
-	if (OpenClipboard(hWindow) == 0)
+	if (OpenClipboard(hwnd) == 0)
 	{
 		return;
 	}
 
 	EmptyClipboard();
-	HGLOBAL hMemory = GlobalAlloc(GMEM_MOVEABLE, sProfileText.size() + 1);
-	if (hMemory != nullptr)
+	HGLOBAL hglobalMemory = GlobalAlloc(GMEM_MOVEABLE, sProfileText.size() + 1);
+	if (hglobalMemory != nullptr)
 	{
-		char* pcDestination = static_cast<char*>(GlobalLock(hMemory));
+		char* pcDestination = static_cast<char*>(GlobalLock(hglobalMemory));
 		if (pcDestination != nullptr)
 		{
 			std::memcpy(pcDestination, sProfileText.data(), sProfileText.size());
 			pcDestination[sProfileText.size()] = '\0';
-			GlobalUnlock(hMemory);
-			SetClipboardData(CF_TEXT, hMemory);
+			GlobalUnlock(hglobalMemory);
+			SetClipboardData(CF_TEXT, hglobalMemory);
 		}
 		else
 		{
-			GlobalFree(hMemory);
+			GlobalFree(hglobalMemory);
 		}
 	}
 	CloseClipboard();
 }
 
-void HandleServerClick(HWND hWindow, int64_t iX, int64_t iY)
+void HandleServerClick(HWND hwnd, int64_t iX, int64_t iY)
 {
 	if (iY <= kiTabHeight && iX >= kiTabBarLeft)
 	{
@@ -390,12 +390,12 @@ void HandleServerClick(HWND hWindow, int64_t iX, int64_t iY)
 		POINT point {.x = static_cast<LONG>(iX), .y = static_cast<LONG>(iY)};
 		if (PtInRect(&sCopyButtonRectangle, point) != 0)
 		{
-			CopyProfileToClipboard(hWindow);
+			CopyProfileToClipboard(hwnd);
 		}
 	}
 }
 
-static void PaintProfilePanel(HDC hDeviceContextBuffer, int64_t iLeft, int64_t iTop, [[maybe_unused]] int64_t iWidth, int64_t iHeight)
+static void PaintProfilePanel(HDC hdcBuffer, int64_t iLeft, int64_t iTop, [[maybe_unused]] int64_t iWidth, int64_t iHeight)
 {
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	int64_t iTextX = iLeft + 10;
@@ -408,8 +408,8 @@ static void PaintProfilePanel(HDC hDeviceContextBuffer, int64_t iLeft, int64_t i
 
 	char pcLine[256] {};
 	int64_t iLineLength = std::min<int64_t>(std::snprintf(pcLine, sizeof(pcLine), "FPS: %lld  Potential: %lld", gpProfileManager->mFullUpdatesInTheLastSecond.Get(), gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average() > 0 ? 1'000'000 / gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average() : 0i64), static_cast<int64_t>(sizeof(pcLine)) - 1);
-	SetTextColor(hDeviceContextBuffer, RGB(100, 180, 255));
-	TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iLineLength));
+	SetTextColor(hdcBuffer, RGB(100, 180, 255));
+	TextOutA(hdcBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iLineLength));
 	sProfileText += pcLine;
 	sProfileText += "\n";
 	iTextY += iLineHeight + 4;
@@ -421,8 +421,8 @@ static void PaintProfilePanel(HDC hDeviceContextBuffer, int64_t iLeft, int64_t i
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 		FormatCpuTimersText(rWorkbuffer, bReevaluate);
 		std::string_view timers = rWorkbuffer.View();
-		SetTextColor(hDeviceContextBuffer, RGB(220, 220, 220));
-		PaintWorkbufferText(hDeviceContextBuffer, timers, iTextX, iTextY, iLineHeight);
+		SetTextColor(hdcBuffer, RGB(220, 220, 220));
+		PaintWorkbufferText(hdcBuffer, timers, iTextX, iTextY, iLineHeight);
 		sProfileText += timers;
 	}
 
@@ -432,19 +432,19 @@ static void PaintProfilePanel(HDC hDeviceContextBuffer, int64_t iLeft, int64_t i
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 		FormatCpuCountersText(rWorkbuffer, bReevaluate);
 		std::string_view counters = rWorkbuffer.View();
-		SetTextColor(hDeviceContextBuffer, RGB(150, 220, 150));
-		PaintWorkbufferText(hDeviceContextBuffer, counters, iTextX, iTextY, iLineHeight);
+		SetTextColor(hdcBuffer, RGB(150, 220, 150));
+		PaintWorkbufferText(hdcBuffer, counters, iTextX, iTextY, iLineHeight);
 		sProfileText += counters;
 	}
 
 #if !defined(ENABLE_CRT_DEBUG_HEAP)
 	iTextY += 4;
-	SetTextColor(hDeviceContextBuffer, RGB(220, 180, 100));
+	SetTextColor(hdcBuffer, RGB(220, 180, 100));
 
 	auto MemoryLine = [&](const char* pcFormat, int64_t iValue)
 	{
 		int64_t iMemoryLineLength = std::min<int64_t>(std::snprintf(pcLine, sizeof(pcLine), pcFormat, iValue), static_cast<int64_t>(sizeof(pcLine)) - 1);
-		TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iMemoryLineLength));
+		TextOutA(hdcBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iMemoryLineLength));
 		sProfileText += pcLine;
 		sProfileText += "\n";
 		iTextY += iLineHeight;
@@ -460,21 +460,21 @@ static void PaintProfilePanel(HDC hDeviceContextBuffer, int64_t iLeft, int64_t i
 	int64_t iButtonTop = iTop + iHeight - kiCopyButtonHeight - kiCopyButtonMargin;
 	sCopyButtonRectangle = {.left = static_cast<int>(iButtonLeft), .top = static_cast<int>(iButtonTop), .right = static_cast<int>(iButtonLeft + kiCopyButtonWidth), .bottom = static_cast<int>(iButtonTop + kiCopyButtonHeight)};
 
-	FillRect(hDeviceContextBuffer, &sCopyButtonRectangle, shBrushGrayFill);
+	FillRect(hdcBuffer, &sCopyButtonRectangle, sHbrushGrayFill);
 
-	HPEN hOldPen = static_cast<HPEN>(SelectObject(hDeviceContextBuffer, shPenBlue));
-	MoveToEx(hDeviceContextBuffer, sCopyButtonRectangle.left, sCopyButtonRectangle.top, nullptr);
-	LineTo(hDeviceContextBuffer, sCopyButtonRectangle.right, sCopyButtonRectangle.top);
-	LineTo(hDeviceContextBuffer, sCopyButtonRectangle.right, sCopyButtonRectangle.bottom);
-	LineTo(hDeviceContextBuffer, sCopyButtonRectangle.left, sCopyButtonRectangle.bottom);
-	LineTo(hDeviceContextBuffer, sCopyButtonRectangle.left, sCopyButtonRectangle.top);
-	SelectObject(hDeviceContextBuffer, hOldPen);
+	HPEN hpenOld = static_cast<HPEN>(SelectObject(hdcBuffer, sHpenBlue));
+	MoveToEx(hdcBuffer, sCopyButtonRectangle.left, sCopyButtonRectangle.top, nullptr);
+	LineTo(hdcBuffer, sCopyButtonRectangle.right, sCopyButtonRectangle.top);
+	LineTo(hdcBuffer, sCopyButtonRectangle.right, sCopyButtonRectangle.bottom);
+	LineTo(hdcBuffer, sCopyButtonRectangle.left, sCopyButtonRectangle.bottom);
+	LineTo(hdcBuffer, sCopyButtonRectangle.left, sCopyButtonRectangle.top);
+	SelectObject(hdcBuffer, hpenOld);
 
-	SetTextColor(hDeviceContextBuffer, RGB(200, 200, 200));
-	TextOutA(hDeviceContextBuffer, sCopyButtonRectangle.left + 14, sCopyButtonRectangle.top + 2, "Copy", 4);
+	SetTextColor(hdcBuffer, RGB(200, 200, 200));
+	TextOutA(hdcBuffer, sCopyButtonRectangle.left + 14, sCopyButtonRectangle.top + 2, "Copy", 4);
 }
 
-static void PaintTabBar(HDC hDeviceContextBuffer, int64_t iWidth)
+static void PaintTabBar(HDC hdcBuffer, int64_t iWidth)
 {
 	// Bind each tab name by value: std::views::enumerate over kTabNames yields a const std::string_view&, which PREfast C26445 (gsl.view) rejects.
 	for (int64_t i = 0; std::string_view tabName : kTabNames)
@@ -483,68 +483,68 @@ static void PaintTabBar(HDC hDeviceContextBuffer, int64_t iWidth)
 		RECT tabRectangle {.left = static_cast<LONG>(iTabLeft), .top = 0, .right = static_cast<int>(iTabLeft + kiTabWidth), .bottom = static_cast<int>(kiTabHeight)};
 
 		bool bActive = (i == static_cast<int64_t>(seActiveTab));
-		HBRUSH hBrush = bActive ? shBrushTabActive : shBrushTabInactive;
-		FillRect(hDeviceContextBuffer, &tabRectangle, hBrush);
+		HBRUSH hbrush = bActive ? sHbrushTabActive : sHbrushTabInactive;
+		FillRect(hdcBuffer, &tabRectangle, hbrush);
 
-		HPEN hPen = bActive ? shPenBlue : shPenGray;
-		HPEN hOldPen = static_cast<HPEN>(SelectObject(hDeviceContextBuffer, hPen));
-		MoveToEx(hDeviceContextBuffer, static_cast<int>(iTabLeft), static_cast<int>(kiTabHeight), nullptr);
-		LineTo(hDeviceContextBuffer, static_cast<int>(iTabLeft), 0);
-		LineTo(hDeviceContextBuffer, static_cast<int>(iTabLeft + kiTabWidth), 0);
-		LineTo(hDeviceContextBuffer, static_cast<int>(iTabLeft + kiTabWidth), static_cast<int>(kiTabHeight));
+		HPEN hpen = bActive ? sHpenBlue : sHpenGray;
+		HPEN hpenOld = static_cast<HPEN>(SelectObject(hdcBuffer, hpen));
+		MoveToEx(hdcBuffer, static_cast<int>(iTabLeft), static_cast<int>(kiTabHeight), nullptr);
+		LineTo(hdcBuffer, static_cast<int>(iTabLeft), 0);
+		LineTo(hdcBuffer, static_cast<int>(iTabLeft + kiTabWidth), 0);
+		LineTo(hdcBuffer, static_cast<int>(iTabLeft + kiTabWidth), static_cast<int>(kiTabHeight));
 		if (!bActive)
 		{
-			LineTo(hDeviceContextBuffer, static_cast<int>(iTabLeft), static_cast<int>(kiTabHeight));
+			LineTo(hdcBuffer, static_cast<int>(iTabLeft), static_cast<int>(kiTabHeight));
 		}
-		SelectObject(hDeviceContextBuffer, hOldPen);
+		SelectObject(hdcBuffer, hpenOld);
 
-		SetTextColor(hDeviceContextBuffer, bActive ? RGB(255, 255, 255) : RGB(160, 160, 160));
-		TextOutA(hDeviceContextBuffer, static_cast<int>(iTabLeft + 12), 4, tabName.data(), static_cast<int>(tabName.size()));
+		SetTextColor(hdcBuffer, bActive ? RGB(255, 255, 255) : RGB(160, 160, 160));
+		TextOutA(hdcBuffer, static_cast<int>(iTabLeft + 12), 4, tabName.data(), static_cast<int>(tabName.size()));
 		++i;
 	}
 
 	// Bottom line across non-tab area
-	HPEN hOldPen = static_cast<HPEN>(SelectObject(hDeviceContextBuffer, shPenGray));
+	HPEN hpenOld = static_cast<HPEN>(SelectObject(hdcBuffer, sHpenGray));
 	int64_t iTabsEnd = kiTabBarLeft + kiTabCount * kiTabWidth;
-	MoveToEx(hDeviceContextBuffer, static_cast<int>(iTabsEnd), kiTabHeight, nullptr);
-	LineTo(hDeviceContextBuffer, static_cast<int>(iWidth), kiTabHeight);
-	SelectObject(hDeviceContextBuffer, hOldPen);
+	MoveToEx(hdcBuffer, static_cast<int>(iTabsEnd), kiTabHeight, nullptr);
+	LineTo(hdcBuffer, static_cast<int>(iWidth), kiTabHeight);
+	SelectObject(hdcBuffer, hpenOld);
 }
 
-void PaintServerDisplay(HWND hWindow)
+void PaintServerDisplay(HWND hwnd)
 {
 	PAINTSTRUCT paintStructure {};
-	HDC hDeviceContext = BeginPaint(hWindow, &paintStructure);
+	HDC hdc = BeginPaint(hwnd, &paintStructure);
 
 	RECT clientRectangle {};
-	GetClientRect(hWindow, &clientRectangle);
+	GetClientRect(hwnd, &clientRectangle);
 	int64_t iWidth = static_cast<int64_t>(clientRectangle.right) - clientRectangle.left;
 	int64_t iHeight = static_cast<int64_t>(clientRectangle.bottom) - clientRectangle.top;
 
 	EnsureCachedGraphicsDeviceInterfaceObjects();
 
-	if (shDeviceContextBuffer == nullptr)
+	if (sHdcBuffer == nullptr)
 	{
-		shDeviceContextBuffer = CreateCompatibleDC(hDeviceContext);
+		sHdcBuffer = CreateCompatibleDC(hdc);
 	}
-	if (shBitmapBuffer == nullptr || iWidth != siBufferWidth || iHeight != siBufferHeight)
+	if (sHbitmapBuffer == nullptr || iWidth != siBufferWidth || iHeight != siBufferHeight)
 	{
-		HBITMAP hBitmapNew = CreateCompatibleBitmap(hDeviceContext, static_cast<int>(iWidth), static_cast<int>(iHeight));
-		SelectObject(shDeviceContextBuffer, hBitmapNew); // deselects the previous bitmap (or the DC's default stock bitmap on first paint)
-		if (shBitmapBuffer != nullptr)
+		HBITMAP hbitmapNew = CreateCompatibleBitmap(hdc, static_cast<int>(iWidth), static_cast<int>(iHeight));
+		SelectObject(sHdcBuffer, hbitmapNew); // deselects the previous bitmap (or the DC's default stock bitmap on first paint)
+		if (sHbitmapBuffer != nullptr)
 		{
-			DeleteObject(shBitmapBuffer);
+			DeleteObject(sHbitmapBuffer);
 		}
-		shBitmapBuffer = hBitmapNew;
+		sHbitmapBuffer = hbitmapNew;
 		siBufferWidth = iWidth;
 		siBufferHeight = iHeight;
 	}
-	HDC hDeviceContextBuffer = shDeviceContextBuffer;
+	HDC hdcBuffer = sHdcBuffer;
 
-	FillRect(hDeviceContextBuffer, &clientRectangle, shBrushBackground);
+	FillRect(hdcBuffer, &clientRectangle, sHbrushBackground);
 
-	SelectObject(hDeviceContextBuffer, shFont);
-	SetBkMode(hDeviceContextBuffer, TRANSPARENT);
+	SelectObject(hdcBuffer, sHfont);
+	SetBkMode(hdcBuffer, TRANSPARENT);
 
 	game::ServerCellStats originStatistics = game::GetServerCellStatistics((*game::gpGame->mCells.at(kOriginCoordinate).pCurrent));
 	int64_t iTick = originStatistics.iTick;
@@ -564,47 +564,47 @@ void PaintServerDisplay(HWND hWindow)
 	auto TextLine = [&](const char* pcFormat, auto... arguments)
 	{
 		int64_t iTextLength = std::min<int64_t>(std::snprintf(pcLine, sizeof(pcLine), pcFormat, arguments...), static_cast<int64_t>(sizeof(pcLine)) - 1);
-		TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iTextLength));
+		TextOutA(hdcBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iTextLength));
 		iTextY += iLineHeight;
 	};
 
-	SetTextColor(hDeviceContextBuffer, RGB(100, 180, 255));
+	SetTextColor(hdcBuffer, RGB(100, 180, 255));
 	TextLine("FPS: %lld", gpProfileManager->mFullUpdatesInTheLastSecond.Get());
 	int64_t iFrameUpdateMicroseconds = gpProfileManager->GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.Average();
 	int64_t iPotentialFramesPerSecond = iFrameUpdateMicroseconds > 0 ? 1'000'000 / iFrameUpdateMicroseconds : 0;
 	TextLine("Potential: %lld", iPotentialFramesPerSecond);
 	iTextY += iLineHeight;
 
-	SetTextColor(hDeviceContextBuffer, RGB(200, 200, 200));
+	SetTextColor(hdcBuffer, RGB(200, 200, 200));
 
 	TextLine("Tick: %lld", iTick);
 	TextLine("Time: %.2f s", static_cast<double>(fCurrentTime));
 	TextLine("Active cells: %lld", iActiveCells);
 	int64_t iTextLength = std::min<int64_t>(std::snprintf(pcLine, sizeof(pcLine), "Clients: %lld", iClientCount), static_cast<int64_t>(sizeof(pcLine)) - 1);
-	TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iTextLength));
+	TextOutA(hdcBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iTextLength));
 	iTextY += iLineHeight;
 
-	SetTextColor(hDeviceContextBuffer, RGB(150, 220, 150));
+	SetTextColor(hdcBuffer, RGB(150, 220, 150));
 
 	for (int64_t i = 0; i < std::ssize(sTotalEntityCounts); ++i)
 	{
 		TextLine("%s: %lld", game::kServerEntityCountNames[i], sTotalEntityCounts[i]);
 	}
 	iTextLength = std::min<int64_t>(std::snprintf(pcLine, sizeof(pcLine), "Explosions: %lld", gpProfileManager->GetCpuCounter(kCpuCounterExplosions).iCount), static_cast<int64_t>(sizeof(pcLine)) - 1);
-	TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iTextLength));
+	TextOutA(hdcBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iTextLength));
 
 #if !defined(ENABLE_CRT_DEBUG_HEAP)
 	iTextY += iLineHeight * 2;
-	SetTextColor(hDeviceContextBuffer, RGB(220, 180, 100));
+	SetTextColor(hdcBuffer, RGB(220, 180, 100));
 
 	TextLine("Committed: %lld MiB", gpProfileManager->miMimallocCommittedMebibytes);
 	TextLine("Peak cmtd: %lld MiB", gpProfileManager->miMimallocPeakCommittedMebibytes);
 	TextLine("Heap used: %lld MiB", gpProfileManager->miMimallocHeapUsedMebibytes);
 	iTextLength = std::min<int64_t>(std::snprintf(pcLine, sizeof(pcLine), "Peak heap: %lld MiB", gpProfileManager->miMimallocPeakHeapUsedMebibytes), static_cast<int64_t>(sizeof(pcLine)) - 1);
-	TextOutA(hDeviceContextBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iTextLength));
+	TextOutA(hdcBuffer, static_cast<int>(iTextX), static_cast<int>(iTextY), pcLine, static_cast<int>(iTextLength));
 #endif
 
-	PaintTabBar(hDeviceContextBuffer, iWidth);
+	PaintTabBar(hdcBuffer, iWidth);
 
 	// Right side content area (below tab bar)
 	int64_t iContentLeft = kiTabBarLeft;
@@ -614,16 +614,16 @@ void PaintServerDisplay(HWND hWindow)
 
 	if (seActiveTab == ServerTab::kMap)
 	{
-		PaintGridMap(hDeviceContextBuffer, pcLine, iContentLeft, iContentTop, iContentWidth, iContentHeight, rClients);
+		PaintGridMap(hdcBuffer, pcLine, iContentLeft, iContentTop, iContentWidth, iContentHeight, rClients);
 	}
 	else if (seActiveTab == ServerTab::kProfile)
 	{
-		PaintProfilePanel(hDeviceContextBuffer, iContentLeft, iContentTop, iContentWidth, iContentHeight);
+		PaintProfilePanel(hdcBuffer, iContentLeft, iContentTop, iContentWidth, iContentHeight);
 	}
 
-	BitBlt(hDeviceContext, 0, 0, static_cast<int>(iWidth), static_cast<int>(iHeight), hDeviceContextBuffer, 0, 0, SRCCOPY);
+	BitBlt(hdc, 0, 0, static_cast<int>(iWidth), static_cast<int>(iHeight), hdcBuffer, 0, 0, SRCCOPY);
 
-	EndPaint(hWindow, &paintStructure);
+	EndPaint(hwnd, &paintStructure);
 }
 
 } // namespace engine

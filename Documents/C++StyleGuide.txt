@@ -29,7 +29,7 @@ Use the following rules for C++ code
 	Global - g: inline Graphics* gpGraphics = nullptr;
 	Member of a class - m (classes only, not structs): bool mbQuit = false;
 
-	Pointer - p: IXAudio2SourceVoice* pVoice = nullptr;
+	Pointer or C array - p: IXAudio2SourceVoice* pVoice = nullptr; char pcHex[20] {};
 	Reference - r: const game::MenuInput& rMenuInput
 
 	character - c: char cChar = 'a';
@@ -38,12 +38,16 @@ Use the following rules for C++ code
 	boolean - b: bool bEnabled = true;
 	enum variable - e: CpuCounters eCpuCounter
 	Vulkan type (any Vk* type, including Vulkan enums, which take vk instead of e, and integer typedefs such as VkDeviceSize and VkBool32; after another prefix it is written Vk, and class members follow rule 54) - vk: VkBuffer vkBuffer; VkResult vkResult; VkBuffer& rVkBuffer; VkImage* pVkImage; inline constexpr VkFormat kVkFormatDepth
+	Windows handle (HANDLE and every H* handle type such as HWND, HDC, HINSTANCE, HPEN; words that restate the type are dropped; after another prefix its first letter is capitalized, as with Vk) - the type name in lowercase: HWND hwnd; HANDLE handle; HANDLE handleFile; HDC hdcBuffer; HANDLE mHandle
 	float, double - f: float fVolume = 1.0f;
 	XMFLOAT[2/3/4] - [f2/f3/f4]: XMFLOAT2 f2MousePosition {};
 	XMVector - vec: XMVECTOR vecPosition {};
 	XMMatrix - mat: XMMATRIX matWorld {};
+	std::optional (in place of the held type's prefix; after another prefix it is written Optional) - optional: std::optional<int64_t> optionalPlayerIndex; std::optional<Request> mOptionalPendingRequest
 
 	std::string and std::string_view - no hungarian prefix
+
+	Use only the prefixes listed in this rule; never invent a new one (such as o for optional or a for array).
 	
 4. Use "#pragma once" for header guards: #pragma once
 
@@ -61,9 +65,9 @@ Use the following rules for C++ code
 
 	A std::unique_ptr custom deleter is a captureless lambda type, constructed from the handle alone. Keep it to .cpp files and function scope, because each translation unit gets a distinct closure type:
 
-	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE hHandle) noexcept
+	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
 	{
-		CloseHandle(hHandle);
+		CloseHandle(handle);
 	})>;
 	ScopedHandle pProcess(processInformation.hProcess);
 
@@ -375,7 +379,7 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`. `
 		kPipelineCount
 	};
 
-56. Use complete words in all variable and function names. Do not abbreviate (e.g., `rReconcileContext` not `ctx`, `bufferIt` not `bufIt`, `rCommandBuffer` not `cmdBuf`). Exception: loop counters `i`/`j`/`k` and iterators `it` (per rule 8).
+56. Use complete words in all variable and function names. Do not abbreviate (e.g., `rReconcileContext` not `ctx`, `bufferIt` not `bufIt`, `rCommandBuffer` not `cmdBuf`). Exception: loop counters `i`/`j`/`k` and iterators `it` (per rule 8), and Windows handle prefixes such as `hwnd`/`hdc` (per rule 3).
 
 57. Do not use "Impl", "Internal", or similar non-word suffixes on function names. If a function reconciles, name it `Reconcile()`, not `ReconcileImpl()`. Use scope (a private member, or a `static` file-local function) to distinguish internal from public versions.
 

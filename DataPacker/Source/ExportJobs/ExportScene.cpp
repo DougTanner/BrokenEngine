@@ -40,9 +40,9 @@ bool ExportScene::CheckDirty(const std::filesystem::path& rPackFile)
 		// deleted, reverted, or edited one leaves the chunk cache clean while the scene's published path CRCs name
 		// files that no longer exist or no longer match. The marker records exactly those outputs, so any difference
 		// - including a missing or unreadable marker - re-runs pre-export before the scene is published again.
-		std::optional<std::string> storedFingerprint = ReadMarkerFile(GetPreExportMarkerPath());
-		std::optional<std::string> currentFingerprint = GetPreExportFingerprint();
-		if (!storedFingerprint.has_value() || !currentFingerprint.has_value() || storedFingerprint.value() != currentFingerprint.value())
+		std::optional<std::string> optionalStoredFingerprint = ReadMarkerFile(GetPreExportMarkerPath());
+		std::optional<std::string> optionalCurrentFingerprint = GetPreExportFingerprint();
+		if (!optionalStoredFingerprint.has_value() || !optionalCurrentFingerprint.has_value() || optionalStoredFingerprint.value() != optionalCurrentFingerprint.value())
 		{
 			LOG(kDefault, kDebug, "Pre-export outputs stale for \"{}\", forcing pre-export", mInputPath.string());
 			mbDirty = true;
@@ -1036,13 +1036,13 @@ void ExportScene::UpdateCacheMetadata()
 {
 	// RunExport calls this only after Export() and the chunk write both succeeded, so the marker can only ever
 	// record a complete generated set. A run that reused the existing outputs rewrites the same fingerprint.
-	std::optional<std::string> fingerprint = GetPreExportFingerprint();
-	if (!fingerprint.has_value())
+	std::optional<std::string> optionalFingerprint = GetPreExportFingerprint();
+	if (!optionalFingerprint.has_value())
 	{
 		LOG(kDefault, kWarning, "Could not read generated outputs for \"{}\"; leaving no pre-export marker, so the next run re-runs pre-export", mInputPath.string());
 		return;
 	}
-	WriteMarkerFile(GetPreExportMarkerPath(), fingerprint.value());
+	WriteMarkerFile(GetPreExportMarkerPath(), optionalFingerprint.value());
 }
 
 void ExportScene::CleanupOnFailure()

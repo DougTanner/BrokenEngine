@@ -348,16 +348,16 @@ std::string InputFingerprintCache::GetDirectory(const std::filesystem::path& rPa
 
 InputFingerprintCache::FileSnapshot InputFingerprintCache::Snapshot(const std::filesystem::path& rPath)
 {
-	HANDLE hFile = CreateFileW(rPath.native().c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-	if (hFile == INVALID_HANDLE_VALUE)
+	HANDLE handleFile = CreateFileW(rPath.native().c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (handleFile == INVALID_HANDLE_VALUE)
 	{
 		throw std::system_error(static_cast<int>(GetLastError()), std::system_category(), std::format("Failed to open \"{}\" for fingerprinting", rPath.string()));
 	}
-	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE hHandle) noexcept
+	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
 	{
-		CloseHandle(hHandle);
+		CloseHandle(handle);
 	})>;
-	ScopedHandle fileHandle(hFile);
+	ScopedHandle fileHandle(handleFile);
 	FILE_BASIC_INFO basicInfo {};
 	BY_HANDLE_FILE_INFORMATION fileInfo {};
 	if (GetFileInformationByHandleEx(fileHandle.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo)) == FALSE

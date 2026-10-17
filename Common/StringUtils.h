@@ -9,13 +9,13 @@ template<std::unsigned_integral T, size_t N>
 char* ToHex(std::span<char, N> pcBuffer, T uiValue)
 {
 	static_assert(N >= 2 + sizeof(T) * 2 + 1, "Buffer too small for ToHex output");
-	static constexpr char kacDigits[] = "0123456789ABCDEF";
+	static constexpr char kpcDigits[] = "0123456789ABCDEF";
 	pcBuffer[0] = '0';
 	pcBuffer[1] = 'x';
 	static constexpr int64_t kiDigits = sizeof(T) * 2;
 	for (int64_t i = kiDigits - 1; i >= 0; --i)
 	{
-		pcBuffer[2 + i] = kacDigits[uiValue & 0xF];
+		pcBuffer[2 + i] = kpcDigits[uiValue & 0xF];
 		uiValue >>= 4;
 	}
 	pcBuffer[2 + kiDigits] = '\0';

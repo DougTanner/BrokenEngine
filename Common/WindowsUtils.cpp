@@ -19,16 +19,16 @@ static std::string_view TrimSystemMessage(std::span<char> buffer)
 
 std::string LastErrorString()
 {
-	char acReturn[MAX_PATH] {};
-	int64_t iLength = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), acReturn, static_cast<DWORD>(std::size(acReturn)) - 1, nullptr);
-	return std::string(TrimSystemMessage(std::span<char>(acReturn, static_cast<size_t>(iLength + 1))));
+	char pcReturn[MAX_PATH] {};
+	int64_t iLength = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), pcReturn, static_cast<DWORD>(std::size(pcReturn)) - 1, nullptr);
+	return std::string(TrimSystemMessage(std::span<char>(pcReturn, static_cast<size_t>(iLength + 1))));
 }
 
 std::string HresultToString(HRESULT hresult)
 {
-	char acReturn[MAX_PATH] {};
-	int64_t iLength = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, static_cast<DWORD>(hresult), 0, acReturn, static_cast<DWORD>(std::size(acReturn) - 1), nullptr);
-	return std::string(TrimSystemMessage(std::span<char>(acReturn, static_cast<size_t>(iLength + 1))));
+	char pcReturn[MAX_PATH] {};
+	int64_t iLength = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, static_cast<DWORD>(hresult), 0, pcReturn, static_cast<DWORD>(std::size(pcReturn) - 1), nullptr);
+	return std::string(TrimSystemMessage(std::span<char>(pcReturn, static_cast<size_t>(iLength + 1))));
 }
 
 int64_t LogicalCoreCount()
@@ -130,9 +130,9 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 {
 	// RAII so each launch-failure early return below releases the handles / attribute list already acquired. Pipe and
 	// process handles use a nullptr sentinel, so unique_ptr<void> (which skips the deleter on nullptr) fits.
-	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE hHandle) noexcept
+	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
 	{
-		CloseHandle(hHandle);
+		CloseHandle(handle);
 	})>;
 
 	SECURITY_ATTRIBUTES securityAttributes
@@ -142,31 +142,31 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 		.bInheritHandle = TRUE,
 	};
 
-	HANDLE hStandardInputPipeRead = nullptr;
-	HANDLE hStandardInputPipeWrite = nullptr;
-	if (CreatePipe(&hStandardInputPipeRead, &hStandardInputPipeWrite, &securityAttributes, 0) == FALSE)
+	HANDLE handleStandardInputPipeRead = nullptr;
+	HANDLE handleStandardInputPipeWrite = nullptr;
+	if (CreatePipe(&handleStandardInputPipeRead, &handleStandardInputPipeWrite, &securityAttributes, 0) == FALSE)
 	{
 		return std::nullopt;
 	}
-	ScopedHandle pStandardInputPipeRead(hStandardInputPipeRead);
-	ScopedHandle pStandardInputPipeWrite(hStandardInputPipeWrite);
+	ScopedHandle pStandardInputPipeRead(handleStandardInputPipeRead);
+	ScopedHandle pStandardInputPipeWrite(handleStandardInputPipeWrite);
 
-	HANDLE hStandardOutputPipeRead = nullptr;
-	HANDLE hStandardOutputPipeWrite = nullptr;
-	if (CreatePipe(&hStandardOutputPipeRead, &hStandardOutputPipeWrite, &securityAttributes, 0) == FALSE)
+	HANDLE handleStandardOutputPipeRead = nullptr;
+	HANDLE handleStandardOutputPipeWrite = nullptr;
+	if (CreatePipe(&handleStandardOutputPipeRead, &handleStandardOutputPipeWrite, &securityAttributes, 0) == FALSE)
 	{
 		return std::nullopt;
 	}
-	ScopedHandle pStandardOutputPipeRead(hStandardOutputPipeRead);
-	ScopedHandle pStandardOutputPipeWrite(hStandardOutputPipeWrite);
+	ScopedHandle pStandardOutputPipeRead(handleStandardOutputPipeRead);
+	ScopedHandle pStandardOutputPipeWrite(handleStandardOutputPipeWrite);
 
 	// Strip inheritance from parent-side pipe ends; the attribute list below only applies to the child-side two.
-	if (SetHandleInformation(hStandardInputPipeWrite, HANDLE_FLAG_INHERIT, 0) == FALSE)
+	if (SetHandleInformation(handleStandardInputPipeWrite, HANDLE_FLAG_INHERIT, 0) == FALSE)
 	{
 		return std::nullopt;
 	}
 
-	if (SetHandleInformation(hStandardOutputPipeRead, HANDLE_FLAG_INHERIT, 0) == FALSE)
+	if (SetHandleInformation(handleStandardOutputPipeRead, HANDLE_FLAG_INHERIT, 0) == FALSE)
 	{
 		return std::nullopt;
 	}
@@ -189,8 +189,8 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 	{
 		DeleteProcThreadAttributeList(pAttributeList);
 	});
-	HANDLE ahHandlesToInherit[] = { hStandardInputPipeRead, hStandardOutputPipeWrite };
-	if (UpdateProcThreadAttribute(pAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, ahHandlesToInherit, sizeof(ahHandlesToInherit), nullptr, nullptr) == FALSE)
+	HANDLE pHandleToInherit[] = { handleStandardInputPipeRead, handleStandardOutputPipeWrite };
+	if (UpdateProcThreadAttribute(pAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, pHandleToInherit, sizeof(pHandleToInherit), nullptr, nullptr) == FALSE)
 	{
 		return std::nullopt;
 	}
@@ -198,9 +198,9 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 	STARTUPINFOEXW extendedStartupInfo {};
 	extendedStartupInfo.StartupInfo.cb = sizeof(STARTUPINFOEXW);
 	extendedStartupInfo.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
-	extendedStartupInfo.StartupInfo.hStdInput = hStandardInputPipeRead;
-	extendedStartupInfo.StartupInfo.hStdOutput = hStandardOutputPipeWrite;
-	extendedStartupInfo.StartupInfo.hStdError = hStandardOutputPipeWrite;
+	extendedStartupInfo.StartupInfo.hStdInput = handleStandardInputPipeRead;
+	extendedStartupInfo.StartupInfo.hStdOutput = handleStandardOutputPipeWrite;
+	extendedStartupInfo.StartupInfo.hStdError = handleStandardOutputPipeWrite;
 	extendedStartupInfo.lpAttributeList = pAttributeList;
 
 	PROCESS_INFORMATION processInformation {};
@@ -219,7 +219,7 @@ std::optional<ExecutableResult> RunExecutable(const std::filesystem::path& rExec
 	std::string output;
 	char pcPipeOutput[1'024] {};
 	DWORD uiBytesRead = 0;
-	while (ReadFile(hStandardOutputPipeRead, pcPipeOutput, static_cast<DWORD>(sizeof(pcPipeOutput) - 1), &uiBytesRead, nullptr) == TRUE)
+	while (ReadFile(handleStandardOutputPipeRead, pcPipeOutput, static_cast<DWORD>(sizeof(pcPipeOutput) - 1), &uiBytesRead, nullptr) == TRUE)
 	{
 		int64_t iBytesRead = uiBytesRead;
 		pcPipeOutput[iBytesRead] = 0;

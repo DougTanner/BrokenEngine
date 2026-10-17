@@ -13,7 +13,7 @@ namespace engine
 // may overlap because their independent futures outlive timeout/disconnect. The active token rejects their late
 // publications so they cannot replace the newer request's result.
 static std::mutex sCaptureResultMutex;
-static std::optional<nlohmann::json> sCaptureResult;
+static std::optional<nlohmann::json> sOptionalCaptureResult;
 static int64_t siCaptureTokenNext = 0; // monotonic mint (guarded by sCaptureResultMutex)
 static int64_t siCaptureTokenActive = 0; // current request token (guarded by sCaptureResultMutex)
 
@@ -39,7 +39,7 @@ static constexpr bool IsBlueGreenRedAlpha(VkFormat vkFormat);
 int64_t ResetCaptureResult()
 {
 	std::unique_lock lock(sCaptureResultMutex);
-	sCaptureResult.reset();
+	sOptionalCaptureResult.reset();
 	siCaptureTokenActive = ++siCaptureTokenNext;
 	return siCaptureTokenActive;
 }
@@ -51,19 +51,19 @@ void SetCaptureResult(int64_t iCaptureToken, nlohmann::json result)
 	{
 		return;
 	}
-	sCaptureResult = std::move(result);
+	sOptionalCaptureResult = std::move(result);
 }
 
 std::optional<nlohmann::json> TakeCaptureResult(int64_t iCaptureToken)
 {
 	std::unique_lock lock(sCaptureResultMutex);
-	if (iCaptureToken != siCaptureTokenActive || !sCaptureResult.has_value())
+	if (iCaptureToken != siCaptureTokenActive || !sOptionalCaptureResult.has_value())
 	{
 		return std::nullopt;
 	}
-	std::optional<nlohmann::json> result = std::move(sCaptureResult);
-	sCaptureResult.reset();
-	return result;
+	std::optional<nlohmann::json> optionalResult = std::move(sOptionalCaptureResult);
+	sOptionalCaptureResult.reset();
+	return optionalResult;
 }
 
 void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest)

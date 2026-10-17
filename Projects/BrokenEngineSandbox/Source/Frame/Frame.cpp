@@ -259,24 +259,24 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::CellStat
 	float fPitchY = (f4Area.y - f4Area.w) / static_cast<float>(kiGridDimension);
 
 	// Step 1: rasterize cell into a validity grid sampled at cell centers
-	bool aValidGrid[kiGridDimension * kiGridDimension] {};
+	bool pbValidGrid[kiGridDimension * kiGridDimension] {};
 	for (int64_t i = 0; i < kiGridDimension; ++i)
 	{
 		for (int64_t j = 0; j < kiGridDimension; ++j)
 		{
 			auto vecGridCell = XMVectorSet(fAreaMinimumX + (static_cast<float>(j) + 0.5f) * fPitchX, fAreaMinimumY + (static_cast<float>(i) + 0.5f) * fPitchY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
-			aValidGrid[i * kiGridDimension + j] = IsSpawnPositionValid(vecGridCell);
+			pbValidGrid[i * kiGridDimension + j] = IsSpawnPositionValid(vecGridCell);
 		}
 	}
 
 	// Step 2: chevron template — anchor at front, ships fan back-and-side in local frame (forward = +x)
 	float fCenterOffset = static_cast<float>(iShipCount - 1) * 0.5f;
-	XMFLOAT2 aLocalOffsets[kiMaximumFleetSize] {};
+	XMFLOAT2 pf2LocalOffsets[kiMaximumFleetSize] {};
 	for (int64_t i = 0; i < iShipCount; ++i)
 	{
 		float fOffset = static_cast<float>(i) - fCenterOffset;
-		aLocalOffsets[i].x = -std::abs(fOffset) * kfChevronStagger;
-		aLocalOffsets[i].y = fOffset * kfShipSideSpacing;
+		pf2LocalOffsets[i].x = -std::abs(fOffset) * kfChevronStagger;
+		pf2LocalOffsets[i].y = fOffset * kfShipSideSpacing;
 	}
 
 	// Step 3: score every grid cell as a candidate anchor; pick best-fit
@@ -307,8 +307,8 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::CellStat
 			int64_t iScore = 0;
 			for (int64_t k = 0; k < iShipCount; ++k)
 			{
-				float fLocalForward = aLocalOffsets[k].x;
-				float fLocalSide = aLocalOffsets[k].y;
+				float fLocalForward = pf2LocalOffsets[k].x;
+				float fLocalSide = pf2LocalOffsets[k].y;
 				float fWorldX = fAnchorX + fFacingCosine * fLocalForward - fFacingSine * fLocalSide;
 				float fWorldY = fAnchorY + fFacingSine * fLocalForward + fFacingCosine * fLocalSide;
 				int64_t iShipGridX = static_cast<int64_t>(std::floor((fWorldX - fAreaMinimumX) / fPitchX));
@@ -317,7 +317,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::CellStat
 				{
 					continue;
 				}
-				if (aValidGrid[iShipGridY * kiGridDimension + iShipGridX])
+				if (pbValidGrid[iShipGridY * kiGridDimension + iShipGridX])
 				{
 					++iScore;
 				}
@@ -350,8 +350,8 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::CellStat
 	float fBestAnchorY = fAreaMinimumY + (static_cast<float>(iBestGridY) + 0.5f) * fPitchY;
 	for (int64_t i = 0; i < iShipCount; ++i)
 	{
-		float fLocalForward = aLocalOffsets[i].x;
-		float fLocalSide = aLocalOffsets[i].y;
+		float fLocalForward = pf2LocalOffsets[i].x;
+		float fLocalSide = pf2LocalOffsets[i].y;
 		float fWorldX = fBestAnchorX + fBestFacingCosine * fLocalForward - fBestFacingSine * fLocalSide;
 		float fWorldY = fBestAnchorY + fBestFacingSine * fLocalForward + fBestFacingCosine * fLocalSide;
 		auto vecSpawnPosition = XMVectorSet(fWorldX, fWorldY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);

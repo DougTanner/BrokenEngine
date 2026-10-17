@@ -49,28 +49,28 @@ static void LogTransferSummary(const CoordWork& rWork, int64_t iTick, int64_t iT
 {
 	if (iOwnedTransferCount > 0)
 	{
-		char acOwnedIds[192] {};
+		char pcOwnedIds[192] {};
 		int64_t iPosition = 0;
 		for (int64_t i = 0; i < std::ssize(ownedIds); ++i)
 		{
 			static constexpr int64_t kiReserve = 24;
-			if (iPosition + kiReserve > std::ssize(acOwnedIds))
+			if (iPosition + kiReserve > std::ssize(pcOwnedIds))
 			{
 				break;
 			}
 			if (i > 0)
 			{
-				acOwnedIds[iPosition++] = ',';
-				acOwnedIds[iPosition++] = ' ';
+				pcOwnedIds[iPosition++] = ',';
+				pcOwnedIds[iPosition++] = ' ';
 			}
-			int64_t iWritten = std::snprintf(acOwnedIds + iPosition, static_cast<size_t>(std::ssize(acOwnedIds) - iPosition), "%lld", ownedIds[i].iValue);
+			int64_t iWritten = std::snprintf(pcOwnedIds + iPosition, static_cast<size_t>(std::ssize(pcOwnedIds) - iPosition), "%lld", ownedIds[i].iValue);
 			if (iWritten <= 0)
 			{
 				break;
 			}
 			iPosition += iWritten;
 		}
-		LOG(kNetwork, kVerbose, "ReconcileRunTickCoord SpawnTransfers Coord: ({},{}) ForTick: {} TransferCount: {} OwnedCount: {} OwnedIds: [{}]", rWork.coord.iX, rWork.coord.iY, iTick, iTransferCount, iOwnedTransferCount, acOwnedIds);
+		LOG(kNetwork, kVerbose, "ReconcileRunTickCoord SpawnTransfers Coord: ({},{}) ForTick: {} TransferCount: {} OwnedCount: {} OwnedIds: [{}]", rWork.coord.iX, rWork.coord.iY, iTick, iTransferCount, iOwnedTransferCount, pcOwnedIds);
 	}
 	else
 	{
@@ -174,10 +174,10 @@ static bool ReconcileValidateCrcCoord(CoordWork& rWork, int64_t iTick, const eng
 	{
 		if (!(rScratch.flags & ReconcileScratchFlags::kSuppressRepeatLogs))
 		{
-			char acSharedCrc[20] {}, acClientCrc[20] {};
-			common::ToHex(std::span<char, 20>(acSharedCrc), rUpdate.uiSharedCrc);
-			common::ToHex(std::span<char, 20>(acClientCrc), uiClientCrc);
-			LOG(kNetwork, kDebug, "ReconcileValidateCrcCoord Replay CRC mismatch; reconciliation outcome pending Coord: ({},{}) ForTick: {} ServerCrc: {} ClientCrc: {} ServerStatusChanges: {} ClientStatusChanges: {}", rWork.coord.iX, rWork.coord.iY, iTick, acSharedCrc, acClientCrc, std::ssize(rUpdate.statusChanges), std::ssize(rFrameInput.statusChanges));
+			char pcSharedCrc[20] {}, pcClientCrc[20] {};
+			common::ToHex(std::span<char, 20>(pcSharedCrc), rUpdate.uiSharedCrc);
+			common::ToHex(std::span<char, 20>(pcClientCrc), uiClientCrc);
+			LOG(kNetwork, kDebug, "ReconcileValidateCrcCoord Replay CRC mismatch; reconciliation outcome pending Coord: ({},{}) ForTick: {} ServerCrc: {} ClientCrc: {} ServerStatusChanges: {} ClientStatusChanges: {}", rWork.coord.iX, rWork.coord.iY, iTick, pcSharedCrc, pcClientCrc, std::ssize(rUpdate.statusChanges), std::ssize(rFrameInput.statusChanges));
 		}
 
 		rScratch.iDesyncTick = iTick;
@@ -225,7 +225,7 @@ void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iMaxim
 		}
 
 		// The replay range is target-capped, so a matching pending full state is necessarily due.
-		if (rCell.pendingFullState.has_value() && rCell.pendingFullState->iTick == i)
+		if (rCell.optionalPendingFullState.has_value() && rCell.optionalPendingFullState->iTick == i)
 		{
 			ReconcileInjectPendingFullState(rWork);
 			LOG(kNetwork, kVerbose, "ReconcileReplayCoord Injected pending full state Coord: ({},{}) ForTick: {}", rWork.coord.iX, rWork.coord.iY, i);

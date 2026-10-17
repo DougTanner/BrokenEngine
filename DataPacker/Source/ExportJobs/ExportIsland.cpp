@@ -553,8 +553,8 @@ bool ExportIsland::AreTexturesFresh() const
 		return false;
 	}
 
-	std::optional<std::string> markerFingerprint = ReadMarkerFile(GetTextureMarkerPath());
-	return markerFingerprint.has_value() && markerFingerprint.value() == GetTextureFingerprint();
+	std::optional<std::string> optionalMarkerFingerprint = ReadMarkerFile(GetTextureMarkerPath());
+	return optionalMarkerFingerprint.has_value() && optionalMarkerFingerprint.value() == GetTextureFingerprint();
 }
 
 bool ExportIsland::CheckDirty(const std::filesystem::path& rPackFile)

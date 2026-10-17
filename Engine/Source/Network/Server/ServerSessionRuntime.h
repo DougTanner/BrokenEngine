@@ -35,7 +35,7 @@ public:
 
 	std::unique_ptr<Server> mpServer;
 	std::unique_ptr<NetworkDiscoveryResponder> mpDiscoveryResponder;
-	HANDLE mTimerHandle = nullptr;
+	HANDLE mHandleTimer = nullptr;
 
 private:
 

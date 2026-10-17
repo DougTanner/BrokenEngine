@@ -23,19 +23,19 @@ namespace toolcli
 
 	static std::optional<Locator> MakeHarnessLocator(std::wstring_view key)
 	{
-		std::optional<std::wstring> logicalKey = coordination::NormalizeRelativeKey(key);
-		if (!logicalKey)
+		std::optional<std::wstring> optionalLogicalKey = coordination::NormalizeRelativeKey(key);
+		if (!optionalLogicalKey)
 		{
 			Fail("invalid harness lock key");
 			return std::nullopt;
 		}
 
-		std::optional<Locator> locator = coordination::MakeLocator(L"harness", *logicalKey);
-		if (!locator)
+		std::optional<Locator> optionalLocator = coordination::MakeLocator(L"harness", *optionalLogicalKey);
+		if (!optionalLocator)
 		{
 			Fail("could not resolve harness lock storage");
 		}
-		return locator;
+		return optionalLocator;
 	}
 
 	static std::optional<Locator> ParseLocator(std::span<const wchar_t* const> argumentValues, int64_t iStartIndex, std::wstring& rOwner, std::wstring& rExpectedOwner, std::wstring& rSession, std::wstring& rWorktree)
@@ -131,8 +131,8 @@ namespace toolcli
 		std::wstring expectedOwner;
 		std::wstring session;
 		std::wstring worktree;
-		std::optional<Locator> locator = ParseLocator(argumentValues, 3, owner, expectedOwner, session, worktree);
-		if (!locator)
+		std::optional<Locator> optionalLocator = ParseLocator(argumentValues, 3, owner, expectedOwner, session, worktree);
+		if (!optionalLocator)
 		{
 			return kiExitFailure;
 		}
@@ -152,14 +152,14 @@ namespace toolcli
 			return kiExitFailure;
 		}
 
-		if (!coordination::EnsureParentDirectory(locator->path))
+		if (!coordination::EnsureParentDirectory(optionalLocator->path))
 		{
 			Fail("could not create lock directory");
 			return kiExitFailure;
 		}
 		bool bContentionObserved = false;
 		std::string failureReason;
-		Guard guard(locator->path.wstring() + L".guard", bContentionObserved, failureReason);
+		Guard guard(optionalLocator->path.wstring() + L".guard", bContentionObserved, failureReason);
 		if (!guard.mbValid)
 		{
 			Fail("could not acquire lock transition guard (" + failureReason + ")");
@@ -168,18 +168,18 @@ namespace toolcli
 
 		std::error_code error;
 		nlohmann::json metadata;
-		bool bExists = std::filesystem::exists(ExtendedLengthPath(locator->path), error);
+		bool bExists = std::filesystem::exists(ExtendedLengthPath(optionalLocator->path), error);
 		if (error)
 		{
 			Fail("could not inspect lock");
 			return kiExitFailure;
 		}
-		if (bExists && !ReadMetadata(locator->path, metadata))
+		if (bExists && !ReadMetadata(optionalLocator->path, metadata))
 		{
 			Fail("lock metadata is unreadable");
 			return kiExitFailure;
 		}
-		if (bExists && !ValidateMetadataEnvelope(metadata, *locator, coordination::kiSchemaVersion))
+		if (bExists && !ValidateMetadataEnvelope(metadata, *optionalLocator, coordination::kiSchemaVersion))
 		{
 			Fail("lock metadata envelope is invalid");
 			return kiExitFailure;
@@ -202,8 +202,8 @@ namespace toolcli
 				PrintMetadata(metadata);
 				return kiExitStateConflict;
 			}
-			metadata = NewMetadata(*locator, owner, session, worktree);
-			if (!WriteMetadataAtomic(locator->path, metadata))
+			metadata = NewMetadata(*optionalLocator, owner, session, worktree);
+			if (!WriteMetadataAtomic(optionalLocator->path, metadata))
 			{
 				FailWindows("write lock metadata");
 				return kiExitFailure;
@@ -228,7 +228,7 @@ namespace toolcli
 		}
 		if (verb == L"release")
 		{
-			if (::DeleteFileW(ExtendedLengthPath(locator->path).c_str()) == FALSE)
+			if (::DeleteFileW(ExtendedLengthPath(optionalLocator->path).c_str()) == FALSE)
 			{
 				FailWindows("release lock");
 				return kiExitFailure;
@@ -237,7 +237,7 @@ namespace toolcli
 		}
 		if (verb == L"heartbeat")
 		{
-			if (!StampHarnessHeartbeat(locator->path, metadata))
+			if (!StampHarnessHeartbeat(optionalLocator->path, metadata))
 			{
 				FailWindows("write lock metadata");
 				return kiExitFailure;
@@ -246,8 +246,8 @@ namespace toolcli
 			return kiExitOk;
 		}
 
-		metadata = NewMetadata(*locator, owner, session, worktree);
-		if (!WriteMetadataAtomic(locator->path, metadata))
+		metadata = NewMetadata(*optionalLocator, owner, session, worktree);
+		if (!WriteMetadataAtomic(optionalLocator->path, metadata))
 		{
 			FailWindows("replace lock metadata");
 			return kiExitFailure;
@@ -258,23 +258,23 @@ namespace toolcli
 
 	bool RefreshHarnessHeartbeat(std::wstring_view owner, int64_t iMaximumWaitMilliseconds)
 	{
-		std::optional<Locator> locator = MakeHarnessLocator(L"default");
-		if (!locator)
+		std::optional<Locator> optionalLocator = MakeHarnessLocator(L"default");
+		if (!optionalLocator)
 		{
 			return false;
 		}
 		bool bContentionObserved = false;
 		std::string failureReason;
-		Guard guard(locator->path.wstring() + L".guard", bContentionObserved, failureReason, iMaximumWaitMilliseconds);
+		Guard guard(optionalLocator->path.wstring() + L".guard", bContentionObserved, failureReason, iMaximumWaitMilliseconds);
 		if (!guard.mbValid)
 		{
 			return false;
 		}
 		nlohmann::json metadata;
-		if (!ReadMetadata(locator->path, metadata) || !ValidateMetadataEnvelope(metadata, *locator, coordination::kiSchemaVersion) || !HasOwner(metadata, owner))
+		if (!ReadMetadata(optionalLocator->path, metadata) || !ValidateMetadataEnvelope(metadata, *optionalLocator, coordination::kiSchemaVersion) || !HasOwner(metadata, owner))
 		{
 			return false;
 		}
-		return StampHarnessHeartbeat(locator->path, metadata);
+		return StampHarnessHeartbeat(optionalLocator->path, metadata);
 	}
 }

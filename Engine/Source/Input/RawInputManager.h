@@ -50,7 +50,7 @@ public:
 	RawInputManager();
 
 	void HandleRawInput(LPARAM iMessageParameter);
-	void UpdateFocus(bool bHasFocus, HWND hWindow);
+	void UpdateFocus(bool bHasFocus, HWND hwnd);
 	bool SetVibration(float fLeftMotor, float fRightMotor);
 
 	void Update(bool bLostFocus);
@@ -67,7 +67,7 @@ private:
 
 	void TrapCursor(bool bTrap);
 
-	HWND mhWindow = nullptr;
+	HWND mHwnd = nullptr;
 
 	bool mpbKeyboardKeysDown[kiKeyboardKeyCount] {};
 	Mouse mMouse;

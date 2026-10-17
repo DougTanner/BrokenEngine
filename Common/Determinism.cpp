@@ -139,7 +139,7 @@ void SetupExceptionHandling()
 					char pcHex[20] {};
 					LOG(kDefault, kError, "Vectored exception: {}", ToHex(std::span(pcHex), static_cast<DWORD>(iExceptionCode)));
 
-					bool bDxDiagThread = gpThreadLocal != nullptr && gpThreadLocal->miThreadId.has_value() && gpThreadLocal->miThreadId.value() == kThreadDxDiag;
+					bool bDxDiagThread = gpThreadLocal != nullptr && gpThreadLocal->mOptionalThreadId.has_value() && gpThreadLocal->mOptionalThreadId.value() == kThreadDxDiag;
 					if (bDxDiagThread)
 					{
 						LOG(kDefault, kError, "  bDxDiagThread");

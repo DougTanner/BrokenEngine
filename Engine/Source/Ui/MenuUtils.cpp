@@ -77,7 +77,7 @@ bool WrapperSlider(std::string_view label, engine::Wrapper* pWrapper, std::strin
 	return bChanged;
 }
 
-bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, std::initializer_list<std::pair<const char*, float>> aOptions)
+bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, std::initializer_list<std::pair<const char*, float>> options)
 {
 	if (pcHeader != nullptr)
 	{
@@ -90,7 +90,7 @@ bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, s
 
 	bool bChanged = false;
 	bool bFirst = true;
-	for (const std::pair<const char*, float>& rOption : aOptions)
+	for (const std::pair<const char*, float>& rOption : options)
 	{
 		if (!bFirst)
 		{
@@ -115,7 +115,7 @@ bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, s
 	if (gpAgentUiRegistry != nullptr)
 	{
 		float fFinal = pWrapper->mfCurrent;
-		for (const std::pair<const char*, float>& rOption : aOptions)
+		for (const std::pair<const char*, float>& rOption : options)
 		{
 			gpAgentUiRegistry->RecordItemChecked(ImGui::GetID(rOption.first), fFinal == rOption.second);
 		}
@@ -276,12 +276,12 @@ ScopedMenuFont::~ScopedMenuFont()
 	ImGui::PopFont();
 }
 
-float MenuButtonsWidth(std::initializer_list<std::u32string_view> aLabels)
+float MenuButtonsWidth(std::initializer_list<std::u32string_view> labels)
 {
 	// Each AppendUtf8 handle must remain alive through its CalcTextSize call.
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	float fWidth = 0.0f;
-	for (std::u32string_view u32Label : aLabels)
+	for (std::u32string_view u32Label : labels)
 	{
 		fWidth = std::max(fWidth, ImGui::CalcTextSize(AppendUtf8(rWorkbuffer, u32Label).mpData).x);
 	}

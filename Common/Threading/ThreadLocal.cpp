@@ -3,9 +3,9 @@
 namespace common
 {
 
-ThreadLocal::ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> iThreadId, bool bSetupExceptionHandling)
+ThreadLocal::ThreadLocal(int64_t iWorkbufferSize, std::optional<int64_t> optionalThreadId, bool bSetupExceptionHandling)
 : common::Singleton<ThreadLocal>(gpThreadLocal, nullptr)
-, miThreadId(iThreadId)
+, mOptionalThreadId(optionalThreadId)
 , mWorkbufferMemory(64 * std::max(iWorkbufferSize, 64i64 * 1'024i64))
 , mpLogBuffer(mLogBufferMemory.data())
 , mWorkbuffer(mWorkbufferMemory)

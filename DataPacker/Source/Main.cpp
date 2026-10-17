@@ -126,9 +126,9 @@ static bool PublishManifestAndPack(const std::filesystem::path& rTemporaryManife
 	bool bManifestPublished = false;
 	// Empty means no prompt is pending; otherwise it is the sentence describing why publishing failed
 	std::string pendingFailure;
-	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE hHandle) noexcept
+	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
 	{
-		CloseHandle(hHandle);
+		CloseHandle(handle);
 	})>;
 	while (true)
 	{
@@ -137,10 +137,10 @@ static bool PublishManifestAndPack(const std::filesystem::path& rTemporaryManife
 		ScopedHandle pProbe(nullptr);
 		if (pendingFailure.empty() && std::filesystem::exists(rPackFile))
 		{
-			HANDLE hProbe = CreateFileW(rPackFile.native().c_str(), DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr);
-			if (hProbe != INVALID_HANDLE_VALUE)
+			HANDLE handleProbe = CreateFileW(rPackFile.native().c_str(), DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr);
+			if (handleProbe != INVALID_HANDLE_VALUE)
 			{
-				pProbe.reset(hProbe);
+				pProbe.reset(handleProbe);
 			}
 			else if (IsFileLockedError(GetLastError()))
 			{
@@ -471,7 +471,7 @@ static std::vector<diagnostic::ExportFailure> WriteTemporaryExportFiles(const st
 		catch (const std::exception& rException)
 		{
 			++rRunSummary.iFailedJobs;
-			failures.push_back({.assetPath = rpExportJob->mInputPath, .message = rException.what()});
+			failures.push_back({.optionalAssetPath = rpExportJob->mInputPath, .message = rException.what()});
 		}
 	}
 
@@ -930,8 +930,8 @@ static bool RunCommandWithExceptionHandling(int64_t iArgumentCount, char* ppcArg
 
 static int64_t ProcessMain(int64_t iArgumentCount, char* ppcArguments[])
 {
-	HANDLE hMutex = CreateMutex(nullptr, TRUE, "BrokenEngineDataPacker");
-	if (hMutex == nullptr)
+	HANDLE handleMutex = CreateMutex(nullptr, TRUE, "BrokenEngineDataPacker");
+	if (handleMutex == nullptr)
 	{
 		int64_t iError = GetLastError();
 		diagnostic::Record record
@@ -956,13 +956,13 @@ static int64_t ProcessMain(int64_t iArgumentCount, char* ppcArguments[])
 		}
 		CloseHandle(pHandle);
 	};
-	std::unique_ptr<void, decltype(MutexDeleter)> pMutex(hMutex, MutexDeleter);
+	std::unique_ptr<void, decltype(MutexDeleter)> pMutex(handleMutex, MutexDeleter);
 	if (GetLastError() == ERROR_ALREADY_EXISTS)
 	{
 		bOwnsMutex = false;
 		std::printf("DataPacker is already running, waiting...\n");
 		// Windows mutex waits by the owning thread acquire recursively; every acquisition requires a matching release.
-		int64_t iWaitResult = WaitForSingleObject(hMutex, INFINITE);
+		int64_t iWaitResult = WaitForSingleObject(handleMutex, INFINITE);
 		if (iWaitResult == WAIT_FAILED)
 		{
 			int64_t iError = GetLastError();

@@ -51,17 +51,17 @@ static std::string TrimLine(std::string value)
 static std::optional<std::filesystem::path> RunGit(const std::filesystem::path& rGit, const std::filesystem::path& rRoot, const wchar_t* pcArguments)
 {
 	std::wstring parameters = L" -C \"" + rRoot.native() + L"\" " + pcArguments;
-	std::optional<common::ExecutableResult> result = common::RunExecutable(rGit, parameters);
-	if (!result)
+	std::optional<common::ExecutableResult> optionalResult = common::RunExecutable(rGit, parameters);
+	if (!optionalResult)
 	{
 		return std::nullopt;
 	}
 
-	if (result->iExitCode != 0)
+	if (optionalResult->iExitCode != 0)
 	{
 		return std::nullopt;
 	}
-	std::string output = TrimLine(std::move(result->output));
+	std::string output = TrimLine(std::move(optionalResult->output));
 	if (output.empty())
 	{
 		return std::nullopt;
@@ -104,9 +104,9 @@ static void EstablishOutputDestinationParent(const std::filesystem::path& rDesti
 
 static bool IsRecognizedLinkRaw(const std::filesystem::path& rLink, const std::filesystem::path& rExpected)
 {
-	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE hHandle) noexcept
+	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
 	{
-		CloseHandle(hHandle);
+		CloseHandle(handle);
 	})>;
 	ScopedHandle link(CreateFileW(rLink.native().c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr));
 	if (link.get() == nullptr || link.get() == INVALID_HANDLE_VALUE)
@@ -157,39 +157,39 @@ struct LinkedWorktreeIdentity
 template <typename TREJECT>
 static std::optional<LinkedWorktreeIdentity> DiscoverLinkedWorktreeIdentity(const std::filesystem::path& rRepositoryRoot, std::string_view projectName, const std::filesystem::path& rOutputDirectory, const TREJECT& rReject)
 {
-	std::optional<std::filesystem::path> git = FindExecutableOnPath(L"git.exe");
-	if (!git)
+	std::optional<std::filesystem::path> optionalGit = FindExecutableOnPath(L"git.exe");
+	if (!optionalGit)
 	{
 		rReject();
 		LOG(kDefault, kWarning, "Git unavailable; worktree output linking disabled");
 		return std::nullopt;
 	}
-	std::optional<std::filesystem::path> gitDirectory = RunGit(*git, rRepositoryRoot, L"rev-parse --path-format=absolute --git-dir");
-	std::optional<std::filesystem::path> commonDirectory = RunGit(*git, rRepositoryRoot, L"rev-parse --path-format=absolute --git-common-dir");
-	if (!gitDirectory || !commonDirectory || PathEqual(*gitDirectory, *commonDirectory))
+	std::optional<std::filesystem::path> optionalGitDirectory = RunGit(*optionalGit, rRepositoryRoot, L"rev-parse --path-format=absolute --git-dir");
+	std::optional<std::filesystem::path> optionalCommonDirectory = RunGit(*optionalGit, rRepositoryRoot, L"rev-parse --path-format=absolute --git-common-dir");
+	if (!optionalGitDirectory || !optionalCommonDirectory || PathEqual(*optionalGitDirectory, *optionalCommonDirectory))
 	{
 		rReject();
 		return std::nullopt;
 	}
 
 	std::wstring parameters = L" -C \"" + rRepositoryRoot.native() + L"\" worktree list --porcelain -z";
-	std::optional<common::ExecutableResult> result = common::RunExecutable(*git, parameters);
-	if (!result)
+	std::optional<common::ExecutableResult> optionalResult = common::RunExecutable(*optionalGit, parameters);
+	if (!optionalResult)
 	{
 		rReject();
 		LOG(kDefault, kWarning, "Git worktree discovery failed; output linking disabled");
 		return std::nullopt;
 	}
-	if (result->iExitCode != 0 || result->output.rfind("worktree ", 0) != 0)
+	if (optionalResult->iExitCode != 0 || optionalResult->output.rfind("worktree ", 0) != 0)
 	{
 		rReject();
 		LOG(kDefault, kWarning, "Malformed Git worktree metadata; output linking disabled");
 		return std::nullopt;
 	}
-	int64_t iEnd = static_cast<int64_t>(result->output.find('\0'));
-	std::filesystem::path primaryRoot = PathFromUtf8(result->output.substr(9, static_cast<size_t>(iEnd - 9)));
-	std::optional<std::filesystem::path> primaryCommon = RunGit(*git, primaryRoot, L"rev-parse --path-format=absolute --git-common-dir");
-	if (!primaryCommon || !PathEqual(*primaryCommon, *commonDirectory))
+	int64_t iEnd = static_cast<int64_t>(optionalResult->output.find('\0'));
+	std::filesystem::path primaryRoot = PathFromUtf8(optionalResult->output.substr(9, static_cast<size_t>(iEnd - 9)));
+	std::optional<std::filesystem::path> optionalPrimaryCommon = RunGit(*optionalGit, primaryRoot, L"rev-parse --path-format=absolute --git-common-dir");
+	if (!optionalPrimaryCommon || !PathEqual(*optionalPrimaryCommon, *optionalCommonDirectory))
 	{
 		rReject();
 		LOG(kDefault, kWarning, "Inconsistent Git worktree metadata; output linking disabled");
@@ -414,23 +414,23 @@ FileManager::EnsureLocalResult FileManager::InitializeWorktreeOutputs(Initializa
 	};
 
 	std::filesystem::path repositoryRoot = mpInputDirectories[0].parent_path().parent_path();
-	std::optional<LinkedWorktreeIdentity> identity = DiscoverLinkedWorktreeIdentity(repositoryRoot, mProjectName, mOutputDirectory, RejectUnvalidatedReparse);
-	if (!identity)
+	std::optional<LinkedWorktreeIdentity> optionalIdentity = DiscoverLinkedWorktreeIdentity(repositoryRoot, mProjectName, mOutputDirectory, RejectUnvalidatedReparse);
+	if (!optionalIdentity)
 	{
 		return EnsureLocalResult::kAlreadyLocal;
 	}
 	diagnostic::MarkValidatedLinkedWorktree();
-	std::filesystem::path primaryThirdPartyDirectory = identity->primaryRoot / "ThirdParty";
+	std::filesystem::path primaryThirdPartyDirectory = optionalIdentity->primaryRoot / "ThirdParty";
 	if (!IsOrdinaryDirectory(primaryThirdPartyDirectory))
 	{
 		throw std::runtime_error(std::format("Primary ThirdParty source must be an ordinary non-reparse directory: {}", primaryThirdPartyDirectory.string()));
 	}
 	mThirdPartyDirectory = std::move(primaryThirdPartyDirectory);
-	mDataOutput.source = identity->primaryRoot / identity->expectedOutput.lexically_relative(repositoryRoot);
+	mDataOutput.source = optionalIdentity->primaryRoot / optionalIdentity->expectedOutput.lexically_relative(repositoryRoot);
 	if (eMode == InitializationMode::kFull)
 	{
-		std::filesystem::path expectedAttribution = identity->expectedOutput.parent_path() / "Attribution";
-		mAttributionOutput.source = identity->primaryRoot / expectedAttribution.lexically_relative(repositoryRoot);
+		std::filesystem::path expectedAttribution = optionalIdentity->expectedOutput.parent_path() / "Attribution";
+		mAttributionOutput.source = optionalIdentity->primaryRoot / expectedAttribution.lexically_relative(repositoryRoot);
 	}
 	EnsureLocalResult eInitializationResult = EnsureLocalResult::kAlreadyLocal;
 	for (OutputRootInfo* pRoot : outputRoots)

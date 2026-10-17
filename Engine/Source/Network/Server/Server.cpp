@@ -811,22 +811,22 @@ void Server::ClientCrashReport(std::span<const uint8_t> packetData, ClientConnec
 
 	ScopedSuppressAllocationTracking suppress;
 	// Heap: timestamp formatting, the file path, and the file stream allocate
-	char acFilename[96] {};
+	char pcFilename[96] {};
 	std::chrono::sys_seconds now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
-	std::format_to_n(acFilename, std::ssize(acFilename) - 1, "CrashReport-{:%Y%m%dT%H%M%SZ}-{}-{:016X}{:016X}.txt", now, miStoredCrashReportCount, rClient.clientGuid.uiHigh, rClient.clientGuid.uiLow);
+	std::format_to_n(pcFilename, std::ssize(pcFilename) - 1, "CrashReport-{:%Y%m%dT%H%M%SZ}-{}-{:016X}{:016X}.txt", now, miStoredCrashReportCount, rClient.clientGuid.uiHigh, rClient.clientGuid.uiLow);
 
-	bool bWritten = gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, std::filesystem::path(acFilename), [&message](std::fstream& rStream)
+	bool bWritten = gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, std::filesystem::path(pcFilename), [&message](std::fstream& rStream)
 	{
 		rStream.write(reinterpret_cast<const char*>(message.report.puiData), message.report.iSize);
 	});
 	if (!bWritten)
 	{
-		LOG(kNetwork, kWarning, "Server::ClientCrashReport Write failed Client: {} File: {}", rClient.iClientId, acFilename);
+		LOG(kNetwork, kWarning, "Server::ClientCrashReport Write failed Client: {} File: {}", rClient.iClientId, pcFilename);
 		return;
 	}
 
 	++miStoredCrashReportCount;
-	LOG(kNetwork, kInfo, "Server::ClientCrashReport Stored Client: {} File: {}", rClient.iClientId, acFilename);
+	LOG(kNetwork, kInfo, "Server::ClientCrashReport Stored Client: {} File: {}", rClient.iClientId, pcFilename);
 }
 
 void Server::SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char* pcMessage, const ClientGuid* pGloballyUniqueIdentifier)

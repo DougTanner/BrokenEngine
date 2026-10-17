@@ -64,10 +64,10 @@ void ParticleManager::RenderGlobal(int64_t iCommandBuffer)
 	// them in the update pass; a larger step leaves nothing worth keeping, so it clears the pool. Written every call
 	// because each command buffer has its own global uniform.
 	static RetainedAreaBasis sRetainedAreaBasis {};
-	if (std::optional<XMFLOAT2> of2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
+	if (std::optional<XMFLOAT2> optionalShift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
 	{
-		rGlobalLayout.f2ParticlesBasisShift.x = of2Shift->x;
-		rGlobalLayout.f2ParticlesBasisShift.y = of2Shift->y;
+		rGlobalLayout.f2ParticlesBasisShift.x = optionalShift->x;
+		rGlobalLayout.f2ParticlesBasisShift.y = optionalShift->y;
 	}
 	else
 	{

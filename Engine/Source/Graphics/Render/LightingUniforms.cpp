@@ -45,11 +45,11 @@ static void PopulateLightingParameters(shaders::GlobalLayout& rGlobalLayout, boo
 	// Every rectangle retained across frames here is in the camera cell's frame; follow a camera cell change before
 	// the refresh test compares them with this frame's areas, and let a multi-cell jump take the existing reset.
 	static RetainedAreaBasis sRetainedAreaBasis {};
-	if (std::optional<XMFLOAT2> of2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
+	if (std::optional<XMFLOAT2> optionalShift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
 	{
-		ShiftArea(sTemporalAreaLatch.f4CurrentArea, *of2Shift);
-		ShiftArea(sTemporalAreaLatch.f4PreviousArea, *of2Shift);
-		ShiftArea(sf4HeldVisibleArea, *of2Shift);
+		ShiftArea(sTemporalAreaLatch.f4CurrentArea, *optionalShift);
+		ShiftArea(sTemporalAreaLatch.f4PreviousArea, *optionalShift);
+		ShiftArea(sf4HeldVisibleArea, *optionalShift);
 	}
 	else
 	{

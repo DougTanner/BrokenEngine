@@ -110,9 +110,9 @@ char* LogPrefix(char* pLogBuffer, char* pEnd)
 			Put(' ');
 		}
 
-		if (gpThreadLocal->miThreadId.has_value())
+		if (gpThreadLocal->mOptionalThreadId.has_value())
 		{
-			std::to_chars_result threadIdResult = std::to_chars(pWrite, pEnd, gpThreadLocal->miThreadId.value());
+			std::to_chars_result threadIdResult = std::to_chars(pWrite, pEnd, gpThreadLocal->mOptionalThreadId.value());
 			pWrite = threadIdResult.ptr;
 
 			Put(':');

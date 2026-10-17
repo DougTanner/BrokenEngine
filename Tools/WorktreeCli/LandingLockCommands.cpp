@@ -39,20 +39,20 @@ namespace toolcli
 			return std::nullopt;
 		}
 
-		std::optional<std::wstring> logicalKey = coordination::CanonicalizeDirectoryPath(repository);
-		if (!logicalKey)
+		std::optional<std::wstring> optionalLogicalKey = coordination::CanonicalizeDirectoryPath(repository);
+		if (!optionalLogicalKey)
 		{
 			Fail("invalid lock logical key");
 			return std::nullopt;
 		}
 
-		std::optional<Locator> locator = coordination::MakeLocator(L"landing", *logicalKey);
-		if (!locator)
+		std::optional<Locator> optionalLocator = coordination::MakeLocator(L"landing", *optionalLogicalKey);
+		if (!optionalLocator)
 		{
 			Fail("could not resolve lock storage");
 			return std::nullopt;
 		}
-		return locator;
+		return optionalLocator;
 	}
 
 	static std::optional<Locator> ParseLocator(std::span<const wchar_t* const> argumentValues, int64_t iStartIndex, std::wstring& rOwner, std::wstring& rExpectedOwner, std::wstring& rSession, std::wstring& rWorktree, int64_t& riLeaseSeconds, int64_t& riWaitSeconds, int64_t& riPollMilliseconds)
@@ -164,28 +164,28 @@ namespace toolcli
 	static int64_t HandleRefresh(const Locator& rLocator, nlohmann::json& rMetadata, bool bExists, std::wstring_view owner)
 	{
 		int64_t iCurrentTicks = static_cast<int64_t>(CurrentUtcTicks());
-		std::optional<landing::LandingLease> lease = bExists ? landing::ValidateLandingLease(rMetadata, rLocator, iCurrentTicks) : std::nullopt;
-		if (!lease)
+		std::optional<landing::LandingLease> optionalLease = bExists ? landing::ValidateLandingLease(rMetadata, rLocator, iCurrentTicks) : std::nullopt;
+		if (!optionalLease)
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 		}
-		if (lease->owner != WideToUtf8(owner))
+		if (optionalLease->owner != WideToUtf8(owner))
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 		}
-		if (iCurrentTicks >= lease->iExpiresTicks)
+		if (iCurrentTicks >= optionalLease->iExpiresTicks)
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 		}
 		std::string timestamp = CurrentUtcTimestamp();
 		int64_t iHeartbeatTicks = 0;
 		ParseUtcTimestamp(timestamp, iHeartbeatTicks);
-		if (iHeartbeatTicks < lease->iHeartbeatTicks)
+		if (iHeartbeatTicks < optionalLease->iHeartbeatTicks)
 		{
 			return EmitLandingConflict(rLocator, rMetadata, LandingRecordState::kReadable);
 		}
 		rMetadata["heartbeatAt"] = std::move(timestamp);
-		rMetadata["expiresAt"] = FormatUtcTimestamp(static_cast<uint64_t>(iHeartbeatTicks + lease->duration.count() * 10'000'000i64));
+		rMetadata["expiresAt"] = FormatUtcTimestamp(static_cast<uint64_t>(iHeartbeatTicks + optionalLease->duration.count() * 10'000'000i64));
 		if (!WriteMetadataAtomic(rLocator.path, rMetadata))
 		{
 			FailWindows("refresh lock metadata");
@@ -198,16 +198,16 @@ namespace toolcli
 	static int64_t HandleRecover(const Locator& rLocator, nlohmann::json& rMetadata, bool bExists, std::wstring_view owner, std::wstring_view expectedOwner, std::wstring_view session, std::wstring_view worktree, int64_t iLeaseSeconds)
 	{
 		int64_t iNow = static_cast<int64_t>(CurrentUtcTicks());
-		std::optional<landing::LandingLease> lease = bExists ? landing::ValidateLandingLease(rMetadata, rLocator, iNow) : std::nullopt;
-		if (!lease)
+		std::optional<landing::LandingLease> optionalLease = bExists ? landing::ValidateLandingLease(rMetadata, rLocator, iNow) : std::nullopt;
+		if (!optionalLease)
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 		}
-		if (lease->owner != WideToUtf8(expectedOwner))
+		if (optionalLease->owner != WideToUtf8(expectedOwner))
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 		}
-		if (iNow < lease->iExpiresTicks)
+		if (iNow < optionalLease->iExpiresTicks)
 		{
 			return EmitLandingConflict(rLocator, rMetadata, bExists ? LandingRecordState::kReadable : LandingRecordState::kAbsent);
 		}
@@ -296,13 +296,13 @@ namespace toolcli
 				}
 
 				int64_t iNow = static_cast<int64_t>(CurrentUtcTicks());
-				std::optional<landing::LandingLease> lease = landing::ValidateLandingLease(metadata, rLocator, iNow);
-				if (!lease)
+				std::optional<landing::LandingLease> optionalLease = landing::ValidateLandingLease(metadata, rLocator, iNow);
+				if (!optionalLease)
 				{
 					// Unverifiable metadata is never repaired by a waiter; taking it over needs user authority.
 					return EmitLandingConflict(rLocator, metadata, LandingRecordState::kReadable);
 				}
-				if (iNow >= lease->iExpiresTicks)
+				if (iNow >= optionalLease->iExpiresTicks)
 				{
 					// A refused recovery (a registered worktree is mid Git operation) is not final: keep waiting.
 					if (landing::AllRegisteredWorktreesClear(rLocator))
@@ -323,7 +323,7 @@ namespace toolcli
 						return kiExitOk;
 					}
 				}
-				else if (lease->owner == WideToUtf8(owner) && metadata["session"].get<std::string>() == WideToUtf8(session) && metadata["worktree"].get<std::string>() == WideToUtf8(worktree))
+				else if (optionalLease->owner == WideToUtf8(owner) && metadata["session"].get<std::string>() == WideToUtf8(session) && metadata["worktree"].get<std::string>() == WideToUtf8(worktree))
 				{
 					// A live lease this requester already holds is reported at once, never waited on or refreshed.
 					return EmitLandingConflict(rLocator, metadata, LandingRecordState::kReadable);
@@ -331,7 +331,7 @@ namespace toolcli
 				else
 				{
 					// Wake just after the foreign lease expires when that comes first.
-					iSleepMilliseconds = std::min<int64_t>(iSleepMilliseconds, (lease->iExpiresTicks - iNow) / 10'000i64 + 1);
+					iSleepMilliseconds = std::min<int64_t>(iSleepMilliseconds, (optionalLease->iExpiresTicks - iNow) / 10'000i64 + 1);
 				}
 			}
 
@@ -368,8 +368,8 @@ namespace toolcli
 		int64_t iLeaseSeconds = 0;
 		int64_t iWaitSeconds = 0;
 		int64_t iPollMilliseconds = kiDefaultPollMilliseconds;
-		std::optional<Locator> locator = ParseLocator(argumentValues, 3, owner, expectedOwner, session, worktree, iLeaseSeconds, iWaitSeconds, iPollMilliseconds);
-		if (!locator)
+		std::optional<Locator> optionalLocator = ParseLocator(argumentValues, 3, owner, expectedOwner, session, worktree, iLeaseSeconds, iWaitSeconds, iPollMilliseconds);
+		if (!optionalLocator)
 		{
 			return kiExitFailure;
 		}
@@ -405,7 +405,7 @@ namespace toolcli
 		}
 
 		std::error_code error;
-		if (!coordination::EnsureParentDirectory(locator->path))
+		if (!coordination::EnsureParentDirectory(optionalLocator->path))
 		{
 			Fail("could not create lock directory");
 			return kiExitFailure;
@@ -413,11 +413,11 @@ namespace toolcli
 		// A positive wait owns its own per-attempt guard scopes; every other invocation keeps the single-guard shape.
 		if (verb == L"claim" && iWaitSeconds > 0)
 		{
-			return WaitForLandingClaim(*locator, owner, session, worktree, iLeaseSeconds, iWaitSeconds, iPollMilliseconds);
+			return WaitForLandingClaim(*optionalLocator, owner, session, worktree, iLeaseSeconds, iWaitSeconds, iPollMilliseconds);
 		}
 		bool bContentionObserved = false;
 		std::string failureReason;
-		Guard guard(locator->path.wstring() + L".guard", bContentionObserved, failureReason);
+		Guard guard(optionalLocator->path.wstring() + L".guard", bContentionObserved, failureReason);
 		if (!guard.mbValid)
 		{
 			Fail("could not acquire lock transition guard (" + failureReason + ")");
@@ -425,13 +425,13 @@ namespace toolcli
 		}
 
 		nlohmann::json metadata;
-		bool bExists = std::filesystem::exists(ExtendedLengthPath(locator->path), error);
+		bool bExists = std::filesystem::exists(ExtendedLengthPath(optionalLocator->path), error);
 		if (error)
 		{
 			Fail("could not inspect lock");
 			return kiExitFailure;
 		}
-		bool bReadable = !bExists || ReadMetadata(locator->path, metadata);
+		bool bReadable = !bExists || ReadMetadata(optionalLocator->path, metadata);
 		if (bExists && !bReadable && verb != L"status")
 		{
 			Fail("lock metadata is unreadable");
@@ -442,28 +442,28 @@ namespace toolcli
 		{
 			if (!bExists)
 			{
-				return EmitLandingConflict(*locator, metadata, LandingRecordState::kAbsent);
+				return EmitLandingConflict(*optionalLocator, metadata, LandingRecordState::kAbsent);
 			}
-			PrintMetadata(landing::LandingStatus(metadata, *locator));
+			PrintMetadata(landing::LandingStatus(metadata, *optionalLocator));
 			return kiExitOk;
 		}
 
 		if (verb == L"claim")
 		{
-			return HandleClaim(*locator, metadata, bExists, owner, session, worktree, iLeaseSeconds);
+			return HandleClaim(*optionalLocator, metadata, bExists, owner, session, worktree, iLeaseSeconds);
 		}
 
 		if (verb == L"refresh")
 		{
-			return HandleRefresh(*locator, metadata, bExists, owner);
+			return HandleRefresh(*optionalLocator, metadata, bExists, owner);
 		}
 
 		if (verb == L"recover")
 		{
-			return HandleRecover(*locator, metadata, bExists, owner, expectedOwner, session, worktree, iLeaseSeconds);
+			return HandleRecover(*optionalLocator, metadata, bExists, owner, expectedOwner, session, worktree, iLeaseSeconds);
 		}
 
-		return HandleRelease(*locator, metadata, bExists, owner);
+		return HandleRelease(*optionalLocator, metadata, bExists, owner);
 	}
 
 } // namespace toolcli

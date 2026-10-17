@@ -325,7 +325,7 @@ bool GenerateIrradianceCubemaps()
 				}
 				catch (const std::exception& rException)
 				{
-					failures.push_back({.assetPath = rDirectoryEntry.path(), .message = rException.what()});
+					failures.push_back({.optionalAssetPath = rDirectoryEntry.path(), .message = rException.what()});
 				}
 			}
 		}
@@ -462,7 +462,7 @@ static bool ProcessKtxCubemaps(int64_t iCpuThreads, cmft::ClContext* pClContext,
 				}
 				catch (const std::exception& rException)
 				{
-					rFailures.push_back({.assetPath = rDirectoryEntry.path(), .message = rException.what()});
+					rFailures.push_back({.optionalAssetPath = rDirectoryEntry.path(), .message = rException.what()});
 				}
 			}
 		}
@@ -574,7 +574,7 @@ static bool ProcessFaceImageCubemaps(int64_t iCpuThreads, cmft::ClContext* pClCo
 				}
 				catch (const std::exception& rException)
 				{
-					rFailures.push_back({.assetPath = rDirectoryEntry.path(), .message = rException.what()});
+					rFailures.push_back({.optionalAssetPath = rDirectoryEntry.path(), .message = rException.what()});
 				}
 			}
 		}

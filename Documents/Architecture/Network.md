@@ -163,7 +163,7 @@
 - **Mismatch path (rollback + replay)**: when the oldest un-confirmed Tick's `sharedCrc` disagrees with the server's:
   1. Rollback — by default to the tick *before* the mismatch (**shrunk rollback**), not all the way to `iConfirmedTick`, to minimize re-sim cost. Full rollback to `iConfirmedTick` is used instead when any of the following hold (see `ReconcileReplay.cpp` rollback-base selection):
      - `iLowestUnresolvedMismatch <= iConfirmedTick + 1` — the mismatch sits immediately above the confirmed floor, so no intermediate speculative frame exists to shrink to
-     - A `pendingFullState` is due at or before `iTargetTick` — matching-tick injection or authoritative gap adoption requires the confirmed rollback base. A future pending state remains queued and does not disable shrunk rollback for current work
+     - An `optionalPendingFullState` is due at or before `iTargetTick` — matching-tick injection or authoritative gap adoption requires the confirmed rollback base. A future pending state remains queued and does not disable shrunk rollback for current work
      - No speculative snapshot exists in the ring at `iShrunkTick` (pruned or never captured)
      - Shrunk rollback was attempted but desynced at its very first replay tick — interpreted as the speculative starting state being bad. The two-tier fallback clears desync state, resets replay, and retries from `iConfirmedTick`
      - Note: the `Replayed: true` field in `Reconcile post-replay` log lines means "rollback-and-replay pipeline ran" (non-fast-path), *not* "full rollback was used" — the `ShrunkRollback:` field distinguishes shrunk vs full rollback

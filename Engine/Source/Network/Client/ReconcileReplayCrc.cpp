@@ -84,9 +84,9 @@ static CrcValidateResult CrcValidateLoop(const CoordWork& rWork, int64_t iTarget
 		{
 			if (!bSuppressRepeatLogs && iMismatchCount == 0)
 			{
-				char acSharedCrc[20] {}, acClientCrc[20] {};
-				common::ToHex(std::span<char, 20>(acSharedCrc), it->second.uiSharedCrc);
-				common::ToHex(std::span<char, 20>(acClientCrc), rClientFrame.postRender.uiSharedCrc);
+				char pcSharedCrc[20] {}, pcClientCrc[20] {};
+				common::ToHex(std::span<char, 20>(pcSharedCrc), it->second.uiSharedCrc);
+				common::ToHex(std::span<char, 20>(pcClientCrc), rClientFrame.postRender.uiSharedCrc);
 
 				common::ScopedWorkbufferArena builder = common::gpThreadLocal->mWorkbuffer.Push();
 				if (!it->second.statusChanges.empty())
@@ -116,7 +116,7 @@ static CrcValidateResult CrcValidateLoop(const CoordWork& rWork, int64_t iTarget
 					}
 				}
 
-				LOG(kNetwork, kDebug, "CrcValidateLoop Speculative CRC mismatch; reconciliation pending Coord: ({},{}) ForTick: {} ServerCrc: {} ClientCrc: {} StatusChanges: {} [{}] TicksSinceFullState: {}", rWork.coord.iX, rWork.coord.iY, iTick, acSharedCrc, acClientCrc, std::ssize(it->second.statusChanges), builder.mBuffer.View(), (rCell.iLastFullStateTick >= 0) ? (iTick - rCell.iLastFullStateTick) : -1i64);
+				LOG(kNetwork, kDebug, "CrcValidateLoop Speculative CRC mismatch; reconciliation pending Coord: ({},{}) ForTick: {} ServerCrc: {} ClientCrc: {} StatusChanges: {} [{}] TicksSinceFullState: {}", rWork.coord.iX, rWork.coord.iY, iTick, pcSharedCrc, pcClientCrc, std::ssize(it->second.statusChanges), builder.mBuffer.View(), (rCell.iLastFullStateTick >= 0) ? (iTick - rCell.iLastFullStateTick) : -1i64);
 			}
 			++iMismatchCount;
 			if (iMismatchCount > 1)

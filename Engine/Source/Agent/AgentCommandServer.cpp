@@ -178,7 +178,7 @@ void AgentCommandServer::ListenerLoop(std::stop_token stopToken)
 		{
 			std::unique_lock lock(mMutex);
 			++miConnectionGeneration;
-			mPendingResponse.reset();
+			mOptionalPendingResponse.reset();
 			closesocket(uiClientSocket);
 		}
 	}
@@ -228,7 +228,7 @@ void AgentCommandServer::ServeConnection(SOCKET uiClientSocket, const std::stop_
 				return; // stop can race the completed read; do not publish a request after shutdown begins
 			}
 			request.iGeneration = miConnectionGeneration;
-			mPendingRequest = std::move(request);
+			mOptionalPendingRequest = std::move(request);
 		}
 
 		// Wait for the main thread's Drain() to publish the serialized response. Between timed waits, peek the socket
@@ -239,7 +239,7 @@ void AgentCommandServer::ServeConnection(SOCKET uiClientSocket, const std::stop_
 			std::unique_lock lock(mMutex);
 			while (!mResponseReady.wait_for(lock, kListenerRetryInterval, [this, &rStopToken]()
 			{
-				return mPendingResponse.has_value() || rStopToken.stop_requested();
+				return mOptionalPendingResponse.has_value() || rStopToken.stop_requested();
 			}))
 			{
 				lock.unlock();
@@ -251,12 +251,12 @@ void AgentCommandServer::ServeConnection(SOCKET uiClientSocket, const std::stop_
 				}
 				lock.lock();
 			}
-			if (!mPendingResponse.has_value())
+			if (!mOptionalPendingResponse.has_value())
 			{
 				return; // stop requested during shutdown
 			}
-			response = std::move(*mPendingResponse);
-			mPendingResponse.reset();
+			response = std::move(*mOptionalPendingResponse);
+			mOptionalPendingResponse.reset();
 		}
 
 		if (!SendFrame(uiClientSocket, response))
@@ -273,7 +273,7 @@ void AgentCommandServer::Drain()
 
 	// An in-flight deferred response (async screenshot / dump capture) takes precedence: poll it before accepting a
 	// new request. While its connection is live, the listener waits on mResponseReady until the poll yields a result,
-	// so no new request arrives. If that peer closes, a later connection's request can wait in mPendingRequest; the
+	// so no new request arrives. If that peer closes, a later connection's request can wait in mOptionalPendingRequest; the
 	// stale poll is discarded below on the next Drain before that request is taken.
 	if (mDeferredPoll)
 	{
@@ -310,13 +310,13 @@ void AgentCommandServer::Drain()
 		try
 		{
 			common::ScopedExpectedThrows scopedExpectedThrows; // validation throws here are a designed error path — keep them off the VEH crash-diagnostic walk
-			std::optional<nlohmann::json> result = mDeferredPoll();
-			if (!result.has_value())
+			std::optional<nlohmann::json> optionalResult = mDeferredPoll();
+			if (!optionalResult.has_value())
 			{
 				return; // still pending — do not accept a new request
 			}
 			response["ok"] = true;
-			response["result"] = std::move(*result);
+			response["result"] = std::move(*optionalResult);
 		}
 		catch (const std::exception& rException)
 		{
@@ -331,12 +331,12 @@ void AgentCommandServer::Drain()
 	PendingRequest request;
 	{
 		std::unique_lock lock(mMutex);
-		if (!mPendingRequest.has_value())
+		if (!mOptionalPendingRequest.has_value())
 		{
 			return;
 		}
-		request = std::move(*mPendingRequest);
-		mPendingRequest.reset();
+		request = std::move(*mOptionalPendingRequest);
+		mOptionalPendingRequest.reset();
 	}
 	// Every response to this request, synchronous or deferred, publishes only while its handoff generation is live.
 	miDeferredGeneration = request.iGeneration;
@@ -439,7 +439,7 @@ void AgentCommandServer::PublishResponse(nlohmann::json response)
 		{
 			return; // the request's connection was torn down; a later connection must never receive this response
 		}
-		mPendingResponse = std::move(responseString);
+		mOptionalPendingResponse = std::move(responseString);
 	}
 	mResponseReady.notify_one();
 }

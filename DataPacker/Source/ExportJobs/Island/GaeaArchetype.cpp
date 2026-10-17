@@ -150,7 +150,7 @@ float ReadArchetypeSeaLevel(const std::filesystem::path& rTerrainFile)
 	throw std::runtime_error("Archetype has no Sea node — DataPacker reads its Level to derive the per-island beach offset. Add a Sea node to the graph or extend BakeIslandIntermediates to handle sea-less archetypes.");
 }
 
-void PatchArchetype(const std::filesystem::path& rTerrainFile, const WorldDimensions& rDimensions, int64_t iSeed, std::optional<int64_t> oiMeshResolution, int64_t iGaeaRouteChoice)
+void PatchArchetype(const std::filesystem::path& rTerrainFile, const WorldDimensions& rDimensions, int64_t iSeed, std::optional<int64_t> optionalMeshResolution, int64_t iGaeaRouteChoice)
 {
 	std::ifstream readStream(rTerrainFile);
 	nlohmann::json terrainJson = nlohmann::json::parse(readStream);
@@ -173,9 +173,9 @@ void PatchArchetype(const std::filesystem::path& rTerrainFile, const WorldDimens
 		PatchArchetypeSeeds(terrainJson, iSeed);
 	}
 
-	if (oiMeshResolution.has_value())
+	if (optionalMeshResolution.has_value())
 	{
-		PatchArchetypeMesherResolution(terrainJson, *oiMeshResolution);
+		PatchArchetypeMesherResolution(terrainJson, *optionalMeshResolution);
 	}
 
 	WriteEntireFile(rTerrainFile, terrainJson.dump(2));

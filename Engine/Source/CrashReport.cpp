@@ -113,7 +113,7 @@ void ResolveCrashReportPaths()
 	}
 }
 
-void HandleException(std::optional<const std::exception*> pException)
+void HandleException(std::optional<const std::exception*> optionalException)
 {
 	// The first writer owns the report: ProcessMain's catch after the main-loop catch, or a SIGABRT during the upload
 	// or unwinding, must not rewrite the report that may already be uploaded.
@@ -139,9 +139,9 @@ void HandleException(std::optional<const std::exception*> pException)
 	writer.Write(pcLine);
 
 	writer.Write("\n\n\n");
-	if (pException.has_value())
+	if (optionalException.has_value())
 	{
-		writer.Write(pException.value()->what());
+		writer.Write(optionalException.value()->what());
 	}
 	else
 	{

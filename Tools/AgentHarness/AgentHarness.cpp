@@ -132,15 +132,15 @@ namespace toolcli
 		return true;
 	}
 
-	static bool RefreshHeartbeatIfDue(std::wstring_view owner, std::chrono::steady_clock::time_point& rNextHeartbeatDue, std::optional<std::chrono::steady_clock::time_point> operationDeadline = std::nullopt)
+	static bool RefreshHeartbeatIfDue(std::wstring_view owner, std::chrono::steady_clock::time_point& rNextHeartbeatDue, std::optional<std::chrono::steady_clock::time_point> optionalOperationDeadline = std::nullopt)
 	{
 		if (std::chrono::steady_clock::now() < rNextHeartbeatDue)
 		{
 			return true;
 		}
-		if (operationDeadline)
+		if (optionalOperationDeadline)
 		{
-			int64_t iRemainingMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(*operationDeadline - std::chrono::steady_clock::now()).count();
+			int64_t iRemainingMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(*optionalOperationDeadline - std::chrono::steady_clock::now()).count();
 			if (!RefreshHarnessHeartbeat(owner, iRemainingMilliseconds > 0 ? iRemainingMilliseconds : 0))
 			{
 				return false;
@@ -664,8 +664,8 @@ namespace toolcli
 				return kiExitFailure;
 			}
 			ScopedSocket socket;
-			std::optional<std::string> response = ExchangeFramedSocketCommand(socket, arguments, request, nextHeartbeatDue);
-			if (!response)
+			std::optional<std::string> optionalResponse = ExchangeFramedSocketCommand(socket, arguments, request, nextHeartbeatDue);
+			if (!optionalResponse)
 			{
 				return kiExitFailure;
 			}
@@ -674,7 +674,7 @@ namespace toolcli
 				Fail("harness heartbeat refresh failed");
 				return kiExitFailure;
 			}
-			return PrintResponseAndInterpretExitCode(*response);
+			return PrintResponseAndInterpretExitCode(*optionalResponse);
 		}
 		catch (const std::exception&)
 		{

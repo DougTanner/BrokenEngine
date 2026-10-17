@@ -14,12 +14,12 @@ namespace game
 
 static bool GetClientOwnedEntityPosition(const Frame& rFrame, XMVECTOR& rVecPosition)
 {
-	std::optional<int64_t> oClientOwnedEntityIndex = gpGame->ClientOwnedEntityIndex(*rFrame.postRender.pOmnis);
-	if (!oClientOwnedEntityIndex.has_value())
+	std::optional<int64_t> optionalClientOwnedEntityIndex = gpGame->ClientOwnedEntityIndex(*rFrame.postRender.pOmnis);
+	if (!optionalClientOwnedEntityIndex.has_value())
 	{
 		return false;
 	}
-	rVecPosition = rFrame.interpolate.pOmnis->pVecPositions[*oClientOwnedEntityIndex];
+	rVecPosition = rFrame.interpolate.pOmnis->pVecPositions[*optionalClientOwnedEntityIndex];
 	return true;
 }
 
@@ -95,10 +95,10 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 	if (dispatch.pDesyncWork != nullptr)
 	{
 		engine::CoordWork* pDesynchronizationWork = dispatch.pDesyncWork;
-		char acExpected[20] {}, acActual[20] {};
-		common::ToHex(std::span<char, 20>(acExpected), pDesynchronizationWork->scratch.desyncExpectedCrc);
-		common::ToHex(std::span<char, 20>(acActual), pDesynchronizationWork->scratch.desyncActualCrc);
-		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesynchronizationWork->coord.iX, pDesynchronizationWork->coord.iY, pDesynchronizationWork->scratch.iDesyncTick, acExpected, acActual, pDesynchronizationWork->scratch.iReplayStackCount, pDesynchronizationWork->scratch.iNewConfirmedTick);
+		char pcExpected[20] {}, pcActual[20] {};
+		common::ToHex(std::span<char, 20>(pcExpected), pDesynchronizationWork->scratch.desyncExpectedCrc);
+		common::ToHex(std::span<char, 20>(pcActual), pDesynchronizationWork->scratch.desyncActualCrc);
+		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesynchronizationWork->coord.iX, pDesynchronizationWork->coord.iY, pDesynchronizationWork->scratch.iDesyncTick, pcExpected, pcActual, pDesynchronizationWork->scratch.iReplayStackCount, pDesynchronizationWork->scratch.iNewConfirmedTick);
 
 		engine::ReconcileDesyncInfo desynchronizationInformation;
 		desynchronizationInformation.bDesync = true;

@@ -137,22 +137,22 @@ namespace toolcli
 		{
 			return std::nullopt;
 		}
-		std::optional<std::string> hash = coordination::HashSha256(WideToUtf8(repository));
-		if (!hash)
+		std::optional<std::string> optionalHash = coordination::HashSha256(WideToUtf8(repository));
+		if (!optionalHash)
 		{
 			return std::nullopt;
 		}
-		return localApplicationData / L"BrokenEngineLocks" / L"plan-scheduler" / Utf8ToWide(*hash);
+		return localApplicationData / L"BrokenEngineLocks" / L"plan-scheduler" / Utf8ToWide(*optionalHash);
 	}
 
 	static std::optional<std::filesystem::path> ClaimPath(const std::filesystem::path& rRoot, std::wstring_view plan)
 	{
-		std::optional<std::string> hash = coordination::HashSha256(WideToUtf8(plan));
-		if (!hash)
+		std::optional<std::string> optionalHash = coordination::HashSha256(WideToUtf8(plan));
+		if (!optionalHash)
 		{
 			return std::nullopt;
 		}
-		return rRoot / L"claims" / Utf8ToWide(*hash + ".json");
+		return rRoot / L"claims" / Utf8ToWide(*optionalHash + ".json");
 	}
 
 	static bool ValidateClaim(const nlohmann::json& rClaim, std::wstring_view repository, std::wstring_view plan)
@@ -235,12 +235,12 @@ namespace toolcli
 			bool bRemove = !ReadClaim(it->path(), claim) || !claim.json.contains("plan") || !claim.json["plan"].is_string() || !NormalizePlanPath(Utf8ToWide(claim.json["plan"].get<std::string>()), path) || !ValidateClaim(claim.json, repository, path);
 			if (!bRemove)
 			{
-				std::optional<std::filesystem::path> claimPath = ClaimPath(rRoot, path);
-				if (!claimPath)
+				std::optional<std::filesystem::path> optionalClaimPath = ClaimPath(rRoot, path);
+				if (!optionalClaimPath)
 				{
 					return false;
 				}
-				bRemove = it->path().filename() != claimPath->filename();
+				bRemove = it->path().filename() != optionalClaimPath->filename();
 			}
 			if (!bRemove && !ClaimIsLive(claim))
 			{
@@ -271,131 +271,131 @@ namespace toolcli
 
 	static std::optional<std::wstring> ResolveGitCommonDirectory(const std::filesystem::path& rWorktree)
 	{
-		std::optional<std::string> commonDirectory = RunGit({ L"-C", rWorktree.wstring(), L"rev-parse", L"--path-format=absolute", L"--git-common-dir" });
-		if (!commonDirectory)
+		std::optional<std::string> optionalCommonDirectory = RunGit({ L"-C", rWorktree.wstring(), L"rev-parse", L"--path-format=absolute", L"--git-common-dir" });
+		if (!optionalCommonDirectory)
 		{
 			return std::nullopt;
 		}
-		TrimLineEnding(*commonDirectory);
-		return coordination::CanonicalizeDirectoryPath(Utf8ToWide(*commonDirectory));
+		TrimLineEnding(*optionalCommonDirectory);
+		return coordination::CanonicalizeDirectoryPath(Utf8ToWide(*optionalCommonDirectory));
 	}
 
 	static std::optional<std::string> ResolveGitBranch(const std::filesystem::path& rWorktree)
 	{
-		std::optional<std::string> branch = RunGit({ L"-C", rWorktree.wstring(), L"symbolic-ref", L"--quiet", L"--short", L"HEAD" });
-		if (!branch)
+		std::optional<std::string> optionalBranch = RunGit({ L"-C", rWorktree.wstring(), L"symbolic-ref", L"--quiet", L"--short", L"HEAD" });
+		if (!optionalBranch)
 		{
 			return std::nullopt;
 		}
-		TrimLineEnding(*branch);
-		if (branch->empty())
+		TrimLineEnding(*optionalBranch);
+		if (optionalBranch->empty())
 		{
 			return std::nullopt;
 		}
-		return branch;
+		return optionalBranch;
 	}
 
 	static std::optional<std::string> ResolvePrimaryBranch(std::wstring_view repository)
 	{
-		std::optional<std::string> branch = RunGit({ L"--git-dir", std::wstring(repository), L"symbolic-ref", L"--quiet", L"--short", L"HEAD" });
-		if (!branch)
+		std::optional<std::string> optionalBranch = RunGit({ L"--git-dir", std::wstring(repository), L"symbolic-ref", L"--quiet", L"--short", L"HEAD" });
+		if (!optionalBranch)
 		{
 			return std::nullopt;
 		}
-		TrimLineEnding(*branch);
-		if (branch->empty())
+		TrimLineEnding(*optionalBranch);
+		if (optionalBranch->empty())
 		{
 			return std::nullopt;
 		}
-		return branch;
+		return optionalBranch;
 	}
 
 	static std::optional<std::string> ResolvePrimaryReference(std::wstring_view repository)
 	{
-		std::optional<std::string> reference = RunGit({ L"--git-dir", std::wstring(repository), L"symbolic-ref", L"--quiet", L"HEAD" });
-		if (!reference)
+		std::optional<std::string> optionalReference = RunGit({ L"--git-dir", std::wstring(repository), L"symbolic-ref", L"--quiet", L"HEAD" });
+		if (!optionalReference)
 		{
 			return std::nullopt;
 		}
-		TrimLineEnding(*reference);
-		if (!reference->starts_with("refs/heads/") || reference->size() == std::string_view("refs/heads/").size())
+		TrimLineEnding(*optionalReference);
+		if (!optionalReference->starts_with("refs/heads/") || optionalReference->size() == std::string_view("refs/heads/").size())
 		{
 			return std::nullopt;
 		}
-		return reference;
+		return optionalReference;
 	}
 
 	static std::optional<std::string> ResolveCommit(const std::filesystem::path& rWorktree, std::wstring_view revision)
 	{
-		std::optional<std::string> commit = RunGit({ L"-C", rWorktree.wstring(), L"rev-parse", L"--verify", std::wstring(revision) + L"^{commit}" });
-		if (!commit)
+		std::optional<std::string> optionalCommit = RunGit({ L"-C", rWorktree.wstring(), L"rev-parse", L"--verify", std::wstring(revision) + L"^{commit}" });
+		if (!optionalCommit)
 		{
 			return std::nullopt;
 		}
-		TrimLineEnding(*commit);
-		return IsLowerHex(*commit, 40) ? commit : std::nullopt;
+		TrimLineEnding(*optionalCommit);
+		return IsLowerHex(*optionalCommit, 40) ? optionalCommit : std::nullopt;
 	}
 
 	static std::optional<std::string> ResolveRepositoryCommit(std::wstring_view repository, std::wstring_view revision)
 	{
-		std::optional<std::string> commit = RunGit({ L"--git-dir", std::wstring(repository), L"rev-parse", L"--verify", std::wstring(revision) + L"^{commit}" });
-		if (!commit)
+		std::optional<std::string> optionalCommit = RunGit({ L"--git-dir", std::wstring(repository), L"rev-parse", L"--verify", std::wstring(revision) + L"^{commit}" });
+		if (!optionalCommit)
 		{
 			return std::nullopt;
 		}
-		TrimLineEnding(*commit);
-		return IsLowerHex(*commit, 40) ? commit : std::nullopt;
+		TrimLineEnding(*optionalCommit);
+		return IsLowerHex(*optionalCommit, 40) ? optionalCommit : std::nullopt;
 	}
 
 	// Healing classifies against the primary tip rather than the caller's tree, so a session that has already
 	// deleted its own terminal target never heals its own live claim.
 	static bool BuildPrimaryTipPlans(std::wstring_view repository, const std::filesystem::path& rWorktree, std::unordered_map<std::wstring, Plan>& rPlans)
 	{
-		std::optional<std::string> reference = ResolvePrimaryReference(repository);
-		std::optional<std::string> tip = reference ? ResolveRepositoryCommit(repository, Utf8ToWide(*reference)) : std::nullopt;
-		if (!tip)
+		std::optional<std::string> optionalReference = ResolvePrimaryReference(repository);
+		std::optional<std::string> optionalTip = optionalReference ? ResolveRepositoryCommit(repository, Utf8ToWide(*optionalReference)) : std::nullopt;
+		if (!optionalTip)
 		{
 			return false;
 		}
 		nlohmann::json ignored = nlohmann::json::array();
-		return BuildPlansAtCommit(rWorktree, Utf8ToWide(*tip), rPlans, ignored);
+		return BuildPlansAtCommit(rWorktree, Utf8ToWide(*optionalTip), rPlans, ignored);
 	}
 
 	static bool ResolveContext(const Arguments& rArguments, std::wstring& rRepository, std::filesystem::path& rWorktree)
 	{
-		std::optional<std::wstring> repository = coordination::CanonicalizeDirectoryPath(rArguments.repository);
-		std::optional<std::wstring> worktree = coordination::CanonicalizeDirectoryPath(rArguments.worktree);
-		if (!repository || !worktree || ResolveGitCommonDirectory(*worktree) != repository)
+		std::optional<std::wstring> optionalRepository = coordination::CanonicalizeDirectoryPath(rArguments.repository);
+		std::optional<std::wstring> optionalWorktree = coordination::CanonicalizeDirectoryPath(rArguments.worktree);
+		if (!optionalRepository || !optionalWorktree || ResolveGitCommonDirectory(*optionalWorktree) != optionalRepository)
 		{
 			return false;
 		}
-		rRepository = std::move(*repository); rWorktree = std::move(*worktree);
+		rRepository = std::move(*optionalRepository); rWorktree = std::move(*optionalWorktree);
 		return true;
 	}
 
 	static bool ResolveWorktreeContext(const Arguments& rArguments, std::wstring& rRepository, std::filesystem::path& rWorktree)
 	{
-		std::optional<std::wstring> worktree = coordination::CanonicalizeDirectoryPath(rArguments.worktree);
-		if (!worktree)
+		std::optional<std::wstring> optionalWorktree = coordination::CanonicalizeDirectoryPath(rArguments.worktree);
+		if (!optionalWorktree)
 		{
 			return false;
 		}
-		std::optional<std::wstring> commonDirectory = ResolveGitCommonDirectory(*worktree);
-		if (!commonDirectory)
+		std::optional<std::wstring> optionalCommonDirectory = ResolveGitCommonDirectory(*optionalWorktree);
+		if (!optionalCommonDirectory)
 		{
 			return false;
 		}
-		std::optional<std::wstring> repository = commonDirectory;
+		std::optional<std::wstring> optionalRepository = optionalCommonDirectory;
 		if (!rArguments.repository.empty())
 		{
-			repository = coordination::CanonicalizeDirectoryPath(rArguments.repository);
+			optionalRepository = coordination::CanonicalizeDirectoryPath(rArguments.repository);
 		}
-		if (!repository || repository != commonDirectory)
+		if (!optionalRepository || optionalRepository != optionalCommonDirectory)
 		{
 			return false;
 		}
-		rRepository = std::move(*repository);
-		rWorktree = std::move(*worktree);
+		rRepository = std::move(*optionalRepository);
+		rWorktree = std::move(*optionalWorktree);
 		return true;
 	}
 
@@ -462,12 +462,12 @@ namespace toolcli
 		nlohmann::json healed = nlohmann::json::array();
 		if (!rArguments.bLintOnly)
 		{
-			std::optional<std::filesystem::path> schedulerRoot = SchedulerRoot(repository);
-			if (!schedulerRoot)
+			std::optional<std::filesystem::path> optionalSchedulerRoot = SchedulerRoot(repository);
+			if (!optionalSchedulerRoot)
 			{
 				return Failure("local-app-data-unavailable");
 			}
-			std::filesystem::path guardPath = *schedulerRoot / L"scheduler.guard";
+			std::filesystem::path guardPath = *optionalSchedulerRoot / L"scheduler.guard";
 			if (!coordination::EnsureParentDirectory(guardPath))
 			{
 				return Failure("storage-failed");
@@ -488,7 +488,7 @@ namespace toolcli
 				// working tree.
 				nlohmann::json primaryDiagnostics = nlohmann::json::array();
 				MarkCycles(primaryPlans, primaryDiagnostics);
-				if (!HealClaims(*schedulerRoot, repository, primaryPlans, healed))
+				if (!HealClaims(*optionalSchedulerRoot, repository, primaryPlans, healed))
 				{
 					return Failure("local-app-data-unavailable");
 				}
@@ -548,16 +548,16 @@ namespace toolcli
 		{
 			return Failure("invalid-context");
 		}
-		std::optional<std::string> primaryReference = ResolvePrimaryReference(repository);
-		std::optional<std::string> primaryCommit = primaryReference ? ResolveRepositoryCommit(repository, Utf8ToWide(*primaryReference)) : std::nullopt;
-		if (!primaryCommit)
+		std::optional<std::string> optionalPrimaryReference = ResolvePrimaryReference(repository);
+		std::optional<std::string> optionalPrimaryCommit = optionalPrimaryReference ? ResolveRepositoryCommit(repository, Utf8ToWide(*optionalPrimaryReference)) : std::nullopt;
+		if (!optionalPrimaryCommit)
 		{
 			return Failure("primary-revision-failed");
 		}
 		// Listing reads only committed trees, so any session on the primary line is a legitimate view: behind the
 		// primary tip, or ahead of it after landing preparation rebased the session onto the current tip.
-		std::optional<std::string> sessionCommit = ResolveCommit(worktree, L"HEAD");
-		if (!sessionCommit || (!RunGit({ L"--git-dir", repository, L"merge-base", L"--is-ancestor", Utf8ToWide(*sessionCommit), Utf8ToWide(*primaryCommit) }) && !RunGit({ L"--git-dir", repository, L"merge-base", L"--is-ancestor", Utf8ToWide(*primaryCommit), Utf8ToWide(*sessionCommit) })))
+		std::optional<std::string> optionalSessionCommit = ResolveCommit(worktree, L"HEAD");
+		if (!optionalSessionCommit || (!RunGit({ L"--git-dir", repository, L"merge-base", L"--is-ancestor", Utf8ToWide(*optionalSessionCommit), Utf8ToWide(*optionalPrimaryCommit) }) && !RunGit({ L"--git-dir", repository, L"merge-base", L"--is-ancestor", Utf8ToWide(*optionalPrimaryCommit), Utf8ToWide(*optionalSessionCommit) })))
 		{
 			return Failure("git-identity-mismatch");
 		}
@@ -565,7 +565,7 @@ namespace toolcli
 		// rows and their marker bytes.  Metadata that never parsed cannot fill a row, so it stays in the diagnostics.
 		std::unordered_map<std::wstring, Plan> primaryPlans; nlohmann::json primaryDiagnostics = nlohmann::json::array();
 		std::unordered_map<std::wstring, Plan> sessionPlans; nlohmann::json diagnostics = nlohmann::json::array();
-		if (!BuildPlansAtCommit(worktree, Utf8ToWide(*primaryCommit), primaryPlans, primaryDiagnostics) || !BuildPlansAtCommit(worktree, Utf8ToWide(*sessionCommit), sessionPlans, diagnostics))
+		if (!BuildPlansAtCommit(worktree, Utf8ToWide(*optionalPrimaryCommit), primaryPlans, primaryDiagnostics) || !BuildPlansAtCommit(worktree, Utf8ToWide(*optionalSessionCommit), sessionPlans, diagnostics))
 		{
 			return Failure("scan-failed");
 		}
@@ -582,12 +582,12 @@ namespace toolcli
 		{
 			return pLeft->createdUtc != pRight->createdUtc ? pLeft->createdUtc > pRight->createdUtc : Utf8PathLess(pLeft->path, pRight->path);
 		});
-		std::optional<std::filesystem::path> schedulerRoot = SchedulerRoot(repository);
-		if (!schedulerRoot)
+		std::optional<std::filesystem::path> optionalSchedulerRoot = SchedulerRoot(repository);
+		if (!optionalSchedulerRoot)
 		{
 			return Failure("local-app-data-unavailable");
 		}
-		const std::filesystem::path& root = *schedulerRoot;
+		const std::filesystem::path& root = *optionalSchedulerRoot;
 		nlohmann::json output = { { "operation", "list" }, { "status", "ok" }, { "code", "ok" }, { "diagnostics", std::move(diagnostics) }, { "plans", nlohmann::json::array() } };
 		for (const Plan* pPlan : rows)
 		{
@@ -598,12 +598,12 @@ namespace toolcli
 			}
 			nlohmann::json row = { { "path", WideToUtf8(pPlan->path) }, { "createdUtc", pPlan->createdUtc }, { "dependsOn", std::move(dependencies) } };
 			Claim claim;
-			std::optional<std::filesystem::path> claimPath = ClaimPath(root, pPlan->path);
-			if (!claimPath)
+			std::optional<std::filesystem::path> optionalClaimPath = ClaimPath(root, pPlan->path);
+			if (!optionalClaimPath)
 			{
 				return Failure("local-app-data-unavailable");
 			}
-			bool bClaimed = ReadClaim(*claimPath, claim) && ValidateClaim(claim.json, repository, pPlan->path) && ClaimIsLive(claim) && coordination::CanonicalizeDirectoryPath(Utf8ToWide(claim.json["worktree"].get<std::string>())).has_value();
+			bool bClaimed = ReadClaim(*optionalClaimPath, claim) && ValidateClaim(claim.json, repository, pPlan->path) && ClaimIsLive(claim) && coordination::CanonicalizeDirectoryPath(Utf8ToWide(claim.json["worktree"].get<std::string>())).has_value();
 			if (bClaimed)
 			{
 				row["claim"] = { { "session", claim.json["session"] }, { "worktree", claim.json["worktree"] }, { "expiresAt", claim.json["expiresAt"] } };
@@ -658,12 +658,12 @@ namespace toolcli
 		{
 			return Failure("invalid-context");
 		}
-		std::optional<std::filesystem::path> schedulerRoot = SchedulerRoot(repository);
-		if (!schedulerRoot)
+		std::optional<std::filesystem::path> optionalSchedulerRoot = SchedulerRoot(repository);
+		if (!optionalSchedulerRoot)
 		{
 			return Failure("local-app-data-unavailable");
 		}
-		const std::filesystem::path& root = *schedulerRoot;
+		const std::filesystem::path& root = *optionalSchedulerRoot;
 		std::filesystem::path guardPath = root / L"scheduler.guard";
 		if (!coordination::EnsureParentDirectory(guardPath))
 		{
@@ -677,18 +677,18 @@ namespace toolcli
 			// Only contention is a state conflict; anything else means the lock file itself is unusable.
 			return bContentionObserved ? Failure("busy", kiExitStateConflict) : Failure("guard-unavailable");
 		}
-		std::optional<std::wstring> primaryWorktree = coordination::CanonicalizeDirectoryPath(rArguments.primaryWorktree);
-		std::optional<std::string> worktreeBranch = ResolveGitBranch(worktree);
-		std::optional<std::string> primaryBranch = ResolvePrimaryBranch(repository);
-		if (!primaryWorktree || ResolveGitCommonDirectory(*primaryWorktree) != std::optional<std::wstring>(repository))
+		std::optional<std::wstring> optionalPrimaryWorktree = coordination::CanonicalizeDirectoryPath(rArguments.primaryWorktree);
+		std::optional<std::string> optionalWorktreeBranch = ResolveGitBranch(worktree);
+		std::optional<std::string> optionalPrimaryBranch = ResolvePrimaryBranch(repository);
+		if (!optionalPrimaryWorktree || ResolveGitCommonDirectory(*optionalPrimaryWorktree) != std::optional<std::wstring>(repository))
 		{
 			return Failure("git-identity-mismatch");
 		}
-		if (!worktreeBranch || *worktreeBranch != WideToUtf8(rArguments.branch))
+		if (!optionalWorktreeBranch || *optionalWorktreeBranch != WideToUtf8(rArguments.branch))
 		{
 			return Failure("git-identity-mismatch");
 		}
-		if (!primaryBranch || ResolveGitBranch(*primaryWorktree) != primaryBranch)
+		if (!optionalPrimaryBranch || ResolveGitBranch(*optionalPrimaryWorktree) != optionalPrimaryBranch)
 		{
 			return Failure("git-identity-mismatch");
 		}
@@ -697,13 +697,13 @@ namespace toolcli
 		{
 			return Failure("invalid-plan");
 		}
-		std::optional<std::string> primaryCommit = ResolveCommit(*primaryWorktree, L"HEAD");
-		if (!primaryCommit)
+		std::optional<std::string> optionalPrimaryCommit = ResolveCommit(*optionalPrimaryWorktree, L"HEAD");
+		if (!optionalPrimaryCommit)
 		{
 			return Failure("primary-revision-failed");
 		}
-		std::optional<std::string> sessionCommit = ResolveCommit(worktree, L"HEAD");
-		if (!sessionCommit || !RunGit({ L"--git-dir", repository, L"merge-base", L"--is-ancestor", Utf8ToWide(*sessionCommit), Utf8ToWide(*primaryCommit) }))
+		std::optional<std::string> optionalSessionCommit = ResolveCommit(worktree, L"HEAD");
+		if (!optionalSessionCommit || !RunGit({ L"--git-dir", repository, L"merge-base", L"--is-ancestor", Utf8ToWide(*optionalSessionCommit), Utf8ToWide(*optionalPrimaryCommit) }))
 		{
 			return Failure("git-identity-mismatch");
 		}
@@ -711,7 +711,7 @@ namespace toolcli
 		// session neither heals a peer's claim on a plan present only at primary nor claims past a dependency edge
 		// landed after its baseline; the session tree drives selection bytes and its own dependency evaluation.
 		std::unordered_map<std::wstring, Plan> plans; nlohmann::json diagnostics = nlohmann::json::array();
-		if (!BuildPlansAtCommit(*primaryWorktree, Utf8ToWide(*primaryCommit), plans, diagnostics))
+		if (!BuildPlansAtCommit(*optionalPrimaryWorktree, Utf8ToWide(*optionalPrimaryCommit), plans, diagnostics))
 		{
 			return Failure("scan-failed");
 		}
@@ -722,7 +722,7 @@ namespace toolcli
 			return Failure("local-app-data-unavailable");
 		}
 		std::unordered_map<std::wstring, Plan> sessionPlans; nlohmann::json sessionDiagnostics = nlohmann::json::array();
-		if (!BuildPlansAtCommit(worktree, Utf8ToWide(*sessionCommit), sessionPlans, sessionDiagnostics))
+		if (!BuildPlansAtCommit(worktree, Utf8ToWide(*optionalSessionCommit), sessionPlans, sessionDiagnostics))
 		{
 			return Failure("scan-failed");
 		}
@@ -773,23 +773,23 @@ namespace toolcli
 		});
 		for (const Plan* pPlan : candidates)
 		{
-			std::optional<std::filesystem::path> claimPath = ClaimPath(root, pPlan->path);
-			if (!claimPath)
+			std::optional<std::filesystem::path> optionalClaimPath = ClaimPath(root, pPlan->path);
+			if (!optionalClaimPath)
 			{
 				return Failure("local-app-data-unavailable");
 			}
 			Claim occupied;
-			if (ReadClaim(*claimPath, occupied))
+			if (ReadClaim(*optionalClaimPath, occupied))
 			{
 				continue; // claimed by another session, or an unhealable record
 			}
 			int64_t iClaimedAt = static_cast<int64_t>(coordination::CurrentUtcTicks());
 			nlohmann::json claim = { { "schemaVersion", 2 }, { "repository", WideToUtf8(repository) }, { "plan", WideToUtf8(pPlan->path) }, { "owner", WideToUtf8(rArguments.owner) }, { "session", WideToUtf8(rArguments.session) }, { "worktree", WideToUtf8(worktree.wstring()) }, { "branch", WideToUtf8(rArguments.branch) }, { "claimedAt", coordination::FormatUtcTimestamp(static_cast<uint64_t>(iClaimedAt)) }, { "expiresAt", coordination::FormatUtcTimestamp(static_cast<uint64_t>(iClaimedAt + kiClaimLifetimeTicks)) } };
-			if (!coordination::EnsureParentDirectory(*claimPath))
+			if (!coordination::EnsureParentDirectory(*optionalClaimPath))
 			{
 				return Failure("claim-write-failed");
 			}
-			if (!coordination::WriteMetadataAtomic(*claimPath, claim))
+			if (!coordination::WriteMetadataAtomic(*optionalClaimPath, claim))
 			{
 				return Failure("claim-write-failed");
 			}
@@ -807,12 +807,12 @@ namespace toolcli
 		{
 			return Failure("invalid-context");
 		}
-		std::optional<std::filesystem::path> schedulerRoot = SchedulerRoot(repository);
-		if (!schedulerRoot)
+		std::optional<std::filesystem::path> optionalSchedulerRoot = SchedulerRoot(repository);
+		if (!optionalSchedulerRoot)
 		{
 			return Failure("local-app-data-unavailable");
 		}
-		const std::filesystem::path& root = *schedulerRoot;
+		const std::filesystem::path& root = *optionalSchedulerRoot;
 		std::filesystem::path guardPath = root / L"scheduler.guard";
 		if (!coordination::EnsureParentDirectory(guardPath))
 		{
@@ -857,12 +857,12 @@ namespace toolcli
 		{
 			return Failure("invalid-context");
 		}
-		std::optional<std::filesystem::path> schedulerRoot = SchedulerRoot(repository);
-		if (!schedulerRoot)
+		std::optional<std::filesystem::path> optionalSchedulerRoot = SchedulerRoot(repository);
+		if (!optionalSchedulerRoot)
 		{
 			return Failure("local-app-data-unavailable");
 		}
-		const std::filesystem::path& root = *schedulerRoot;
+		const std::filesystem::path& root = *optionalSchedulerRoot;
 		std::filesystem::path guardPath = root / L"scheduler.guard";
 		if (!coordination::EnsureParentDirectory(guardPath))
 		{
@@ -910,13 +910,13 @@ namespace toolcli
 
 	static bool WritePlanBytes(const std::filesystem::path& rPath, std::string_view contents)
 	{
-		Handle hFile(::CreateFileW(ExtendedLengthPath(rPath).c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
-		if (!hFile.IsValid())
+		Handle handleFile(::CreateFileW(ExtendedLengthPath(rPath).c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+		if (!handleFile.IsValid())
 		{
 			return false;
 		}
 		DWORD uiWritten = 0;
-		bool bSucceeded = ::WriteFile(hFile.Get(), contents.data(), static_cast<DWORD>(contents.size()), &uiWritten, nullptr) != FALSE;
+		bool bSucceeded = ::WriteFile(handleFile.Get(), contents.data(), static_cast<DWORD>(contents.size()), &uiWritten, nullptr) != FALSE;
 		int64_t iWritten = uiWritten;
 		return bSucceeded && std::cmp_equal(iWritten, contents.size());
 	}
@@ -934,12 +934,12 @@ namespace toolcli
 		{
 			return Failure("invalid-context");
 		}
-		std::optional<std::filesystem::path> schedulerRoot = SchedulerRoot(repository);
-		if (!schedulerRoot)
+		std::optional<std::filesystem::path> optionalSchedulerRoot = SchedulerRoot(repository);
+		if (!optionalSchedulerRoot)
 		{
 			return Failure("local-app-data-unavailable");
 		}
-		const std::filesystem::path& root = *schedulerRoot;
+		const std::filesystem::path& root = *optionalSchedulerRoot;
 		std::filesystem::path guardPath = root / L"scheduler.guard";
 		if (!coordination::EnsureParentDirectory(guardPath))
 		{

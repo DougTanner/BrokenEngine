@@ -19,14 +19,14 @@ ServerSessionRuntime::ServerSessionRuntime(int64_t iPort)
 {
 	mpDiscoveryResponder = std::make_unique<NetworkDiscoveryResponder>();
 	timeBeginPeriod(1);
-	mTimerHandle = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+	mHandleTimer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
 	try
 	{
 		mpServer = std::make_unique<Server>(iPort);
 	}
 	catch (...)
 	{
-		CloseHandle(mTimerHandle);
+		CloseHandle(mHandleTimer);
 		timeEndPeriod(1);
 		throw;
 	}
@@ -35,7 +35,7 @@ ServerSessionRuntime::ServerSessionRuntime(int64_t iPort)
 ServerSessionRuntime::~ServerSessionRuntime()
 {
 	mpServer.reset();
-	CloseHandle(mTimerHandle);
+	CloseHandle(mHandleTimer);
 	timeEndPeriod(1);
 }
 
@@ -92,8 +92,8 @@ void ServerSessionRuntime::WaitForTick(TimeStep& rTimeStep)
 	if (sleepNanoseconds > 0ns)
 	{
 		LARGE_INTEGER dueTime {.QuadPart = -(sleepNanoseconds.count() / 100),};
-		SetWaitableTimerEx(mTimerHandle, &dueTime, 0, nullptr, nullptr, nullptr, 0);
-		WaitForSingleObject(mTimerHandle, INFINITE);
+		SetWaitableTimerEx(mHandleTimer, &dueTime, 0, nullptr, nullptr, nullptr, 0);
+		WaitForSingleObject(mHandleTimer, INFINITE);
 	}
 	while (rTimeStep.mRealTime.GetDeltaNs() + tickRemainderWallNanoseconds < tickNanoseconds)
 	{

@@ -199,21 +199,21 @@ namespace toolcli
 
 	bool BuildPlans(const std::filesystem::path& rWorktree, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
 	{
-		std::optional<std::string> listing = RunGit({ L"-C", rWorktree.wstring(), L"ls-files", L"-z", L"--", L"Documents/Plans" });
-		if (!listing)
+		std::optional<std::string> optionalListing = RunGit({ L"-C", rWorktree.wstring(), L"ls-files", L"-z", L"--", L"Documents/Plans" });
+		if (!optionalListing)
 		{
 			return false;
 		}
 		int64_t iOffset = 0;
-		while (iOffset < std::ssize(*listing))
+		while (iOffset < std::ssize(*optionalListing))
 		{
-			int64_t iEnd = static_cast<int64_t>(listing->find('\0', static_cast<size_t>(iOffset)));
+			int64_t iEnd = static_cast<int64_t>(optionalListing->find('\0', static_cast<size_t>(iOffset)));
 			if (iEnd == -1)
 			{
 				return false;
 			}
 			std::wstring path;
-			if (!NormalizePlanPath(Utf8ToWide(std::string_view(listing->data() + iOffset, static_cast<size_t>(iEnd - iOffset))), path))
+			if (!NormalizePlanPath(Utf8ToWide(std::string_view(optionalListing->data() + iOffset, static_cast<size_t>(iEnd - iOffset))), path))
 			{
 				iOffset = iEnd + 1;
 				continue;
@@ -236,20 +236,20 @@ namespace toolcli
 	bool BuildPlansAtCommit(const std::filesystem::path& rWorktree, std::wstring_view commit, std::unordered_map<std::wstring, Plan>& rPlans, nlohmann::json& rDiagnostics)
 	{
 		// -z keeps paths unambiguous.  Every path still passes the scheduler's stricter canonical check.
-		std::optional<std::string> listing = RunGit({ L"-C", rWorktree.wstring(), L"ls-tree", L"-rz", L"--full-tree", std::wstring(commit), L"--", L"Documents/Plans" });
-		if (!listing)
+		std::optional<std::string> optionalListing = RunGit({ L"-C", rWorktree.wstring(), L"ls-tree", L"-rz", L"--full-tree", std::wstring(commit), L"--", L"Documents/Plans" });
+		if (!optionalListing)
 		{
 			return false;
 		}
 		int64_t iOffset = 0;
-		while (iOffset < std::ssize(*listing))
+		while (iOffset < std::ssize(*optionalListing))
 		{
-			int64_t iEnd = static_cast<int64_t>(listing->find('\0', static_cast<size_t>(iOffset)));
+			int64_t iEnd = static_cast<int64_t>(optionalListing->find('\0', static_cast<size_t>(iOffset)));
 			if (iEnd == -1)
 			{
 				return false;
 			}
-			std::string_view entry(listing->data() + iOffset, static_cast<size_t>(iEnd - iOffset));
+			std::string_view entry(optionalListing->data() + iOffset, static_cast<size_t>(iEnd - iOffset));
 			iOffset = iEnd + 1;
 			int64_t iTab = static_cast<int64_t>(entry.find('\t'));
 			if (iTab == -1)
@@ -267,14 +267,14 @@ namespace toolcli
 			{
 				continue;
 			}
-			std::optional<std::string> bytes = RunGit({ L"-C", rWorktree.wstring(), L"show", std::wstring(commit) + L":" + path });
-			if (!bytes)
+			std::optional<std::string> optionalBytes = RunGit({ L"-C", rWorktree.wstring(), L"show", std::wstring(commit) + L":" + path });
+			if (!optionalBytes)
 			{
 				return false;
 			}
 			Plan plan {};
 			plan.path = path;
-			plan.bytes = std::move(*bytes);
+			plan.bytes = std::move(*optionalBytes);
 			ParsePlanBytes(plan);
 			ClassifyDirectoryGuidance(plan);
 			if (!plan.bValid)

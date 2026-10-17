@@ -192,10 +192,10 @@ static void BakeOne(const std::filesystem::path& rIslandFolder)
 	// Optional: override the Mesher's VerticesPerSide (per-island mesh density). When absent, leave
 	// whatever value the archetype's Mesher node already has. Stripped from variablesJson so it doesn't
 	// reach Gaea as a graph variable.
-	std::optional<int64_t> oiMeshResolution;
+	std::optional<int64_t> optionalMeshResolution;
 	if (islandJson.contains("meshResolution"))
 	{
-		oiMeshResolution = islandJson.at("meshResolution").get<int64_t>();
+		optionalMeshResolution = islandJson.at("meshResolution").get<int64_t>();
 	}
 
 	// texturePixels must be >= and a multiple of kiCropAlignment so the per-axis auto-crop dims
@@ -280,7 +280,7 @@ static void BakeOne(const std::filesystem::path& rIslandFolder)
 		.rDimensions = dimensions,
 		.iSeed = iSeed,
 		.iTexturePixels = iTexturePixels,
-		.oiMeshResolution = oiMeshResolution,
+		.optionalMeshResolution = optionalMeshResolution,
 	};
 	for (const RouteSubdivision* pRoute : routes)
 	{

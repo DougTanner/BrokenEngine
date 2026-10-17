@@ -123,9 +123,9 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	// follow a camera cell change before it is published beside this frame's area. A one-cell step keeps the smoke
 	// and wind textures usable; a larger step leaves no overlap, so it takes the existing clear below.
 	static RetainedAreaBasis sRetainedAreaBasis {};
-	if (std::optional<XMFLOAT2> of2Shift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
+	if (std::optional<XMFLOAT2> optionalShift = sRetainedAreaBasis.Advance(engine::gpCamera->mBasisCoordinate))
 	{
-		ShiftArea(sf4PreviousSmokeArea, *of2Shift);
+		ShiftArea(sf4PreviousSmokeArea, *optionalShift);
 	}
 	else
 	{

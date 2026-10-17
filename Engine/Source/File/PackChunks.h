@@ -132,7 +132,7 @@ private:
 	std::atomic<bool> mbEagerLoadComplete {false};
 
 	// Persistent pack file handles for lazy loading (opened with FILE_FLAG_NO_BUFFERING)
-	HANDLE mLazyPackFileHandles[data::kDataTypeCount] {};
+	HANDLE mpHandleLazyPackFile[data::kDataTypeCount] {};
 
 	// Per-loading-thread sector-aligned read buffers (one per thread, indexed by thread index; reused across that
 	// thread's chunk reads). Size is shared — identical for every thread.

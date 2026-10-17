@@ -272,14 +272,14 @@ void BufferManager::DestroySwapchainDependentBuffers()
 		rMap.clear();
 	}
 
-	mPreviousBuffer.reset();
-	for (std::optional<Buffer>& rPrevious : mPreviousMeshDataBuffer)
+	mOptionalPreviousBuffer.reset();
+	for (std::optional<Buffer>& rOptionalPrevious : mpOptionalPreviousMeshDataBuffer)
 	{
-		rPrevious.reset();
+		rOptionalPrevious.reset();
 	}
-	for (std::optional<Buffer>& rPrevious : mPreviousJointMatrixBuffer)
+	for (std::optional<Buffer>& rOptionalPrevious : mpOptionalPreviousJointMatrixBuffer)
 	{
-		rPrevious.reset();
+		rOptionalPrevious.reset();
 	}
 
 	for (int64_t i = 0; i < kiMaxFramebuffers; ++i)
@@ -446,12 +446,12 @@ void BufferManager::ResizeDynamicBuffer(common::crc_t crc, DynamicBufferType eTy
 	// and callers immediately repoint its descriptors before submission; recorded commands reference buffers only through those descriptors. A
 	// second same-frame resize frees the prior stash immediately. GrowMeshDataBuffer and GrowJointMatrixBuffer use the same ordering for their
 	// per-framebuffer stash arrays, where a second grow overwrites the slot.
-	mPreviousBuffer.reset();
+	mOptionalPreviousBuffer.reset();
 
 	std::unordered_map<common::crc_t, std::vector<Buffer>>& rMap = mDynamicStorageBuffers[eType];
 	Buffer& rOldBuffer = rMap.at(crc).at(iFramebuffer);
 	int64_t iElementSize = rOldBuffer.mInfo.iElementSize;
-	mPreviousBuffer = std::move(rOldBuffer);
+	mOptionalPreviousBuffer = std::move(rOldBuffer);
 
 	Buffer& rBuffer = rMap.at(crc).at(iFramebuffer);
 	rBuffer.Create(
@@ -501,8 +501,8 @@ void BufferManager::ResetSkinningAllocations(int64_t iCommandBuffer)
 {
 	miMeshDataOffset[iCommandBuffer] = 0;
 	miJointMatrixOffset[iCommandBuffer] = 0;
-	mPreviousMeshDataBuffer[iCommandBuffer].reset();
-	mPreviousJointMatrixBuffer[iCommandBuffer].reset();
+	mpOptionalPreviousMeshDataBuffer[iCommandBuffer].reset();
+	mpOptionalPreviousJointMatrixBuffer[iCommandBuffer].reset();
 }
 
 void BufferManager::GrowMeshDataBuffer(int64_t iCommandBuffer, int64_t iValidCount)
@@ -518,7 +518,7 @@ void BufferManager::GrowMeshDataBuffer(int64_t iCommandBuffer, int64_t iValidCou
 	// drains that framebuffer's prior submission; the descriptor repoint below makes the not-yet-submitted recorded commands read the new
 	// buffer. A second same-frame grow frees the earlier stash immediately. ResetSkinningAllocations releases the final grow's stash once per
 	// frame.
-	mPreviousMeshDataBuffer[iCommandBuffer] = std::move(mMeshDataStorageBuffers.at(iCommandBuffer));
+	mpOptionalPreviousMeshDataBuffer[iCommandBuffer] = std::move(mMeshDataStorageBuffers.at(iCommandBuffer));
 
 	mMeshDataStorageBuffers.at(iCommandBuffer).Create(
 	{
@@ -545,7 +545,7 @@ void BufferManager::GrowJointMatrixBuffer(int64_t iCommandBuffer, int64_t iValid
 
 	// Growth follows this framebuffer's RenderGlobal fence wait; descriptors are repointed before submission.
 	// A second grow in the frame releases the earlier stash; ResetSkinningAllocations releases the final stash.
-	mPreviousJointMatrixBuffer[iCommandBuffer] = std::move(mJointMatrixStorageBuffers.at(iCommandBuffer));
+	mpOptionalPreviousJointMatrixBuffer[iCommandBuffer] = std::move(mJointMatrixStorageBuffers.at(iCommandBuffer));
 
 	mJointMatrixStorageBuffers.at(iCommandBuffer).Create(
 	{

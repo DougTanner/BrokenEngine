@@ -39,7 +39,7 @@ inline bool PhysicalInputSuppressed()
 
 #if defined(BT_CLIENT)
 // std::nullopt keeps launch behavior; a set value overrides --windowed and the saved fullscreen preference without changing it.
-inline std::optional<bool> gAgentFullscreenOverride = std::nullopt;
+inline std::optional<bool> gOptionalAgentFullscreenOverride = std::nullopt;
 #endif
 
 } // namespace engine

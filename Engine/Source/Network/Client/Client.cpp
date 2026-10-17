@@ -399,9 +399,9 @@ std::optional<int64_t> Client::DrainLoadNotification()
 		return std::nullopt;
 	}
 	mStateFlags.Set(ClientStateFlags::kLoadNotificationReceived, false);
-	std::optional<int64_t> iLoadGeneration = miPendingLoadGeneration;
-	miPendingLoadGeneration.reset();
-	return iLoadGeneration;
+	std::optional<int64_t> optionalLoadGeneration = mOptionalPendingLoadGeneration;
+	mOptionalPendingLoadGeneration.reset();
+	return optionalLoadGeneration;
 }
 
 void Client::ServerCoordinateFullState(std::span<const uint8_t> packetData)
@@ -788,9 +788,9 @@ void Client::ServerLoadNotification(std::span<const uint8_t> packetData)
 		return;
 	}
 
-	if (!miPendingLoadGeneration.has_value() || message.uiLoadGeneration > *miPendingLoadGeneration)
+	if (!mOptionalPendingLoadGeneration.has_value() || message.uiLoadGeneration > *mOptionalPendingLoadGeneration)
 	{
-		miPendingLoadGeneration = message.uiLoadGeneration;
+		mOptionalPendingLoadGeneration = message.uiLoadGeneration;
 	}
 
 	mReceivedGamePackets.clear();

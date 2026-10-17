@@ -67,17 +67,17 @@ struct CaptureCommandState
 	{
 		// Deferred-response timeout/discard does not poll again. Restore the original minimized state when the
 		// state object is released so every failure path cleans up before AgentCommandServer publishes or exits.
-		if (bRestoreMinimized && ePhase != CaptureCommandPhase::kDone && IsWindow(windowHandle) != FALSE && IsIconic(windowHandle) == FALSE)
+		if (bRestoreMinimized && ePhase != CaptureCommandPhase::kDone && IsWindow(hwnd) != FALSE && IsIconic(hwnd) == FALSE)
 		{
-			ShowWindow(windowHandle, SW_SHOWMINNOACTIVE);
+			ShowWindow(hwnd, SW_SHOWMINNOACTIVE);
 		}
 	}
 
-	HWND windowHandle = nullptr;
+	HWND hwnd = nullptr;
 	CaptureCommandPhase ePhase = CaptureCommandPhase::kAwaitResult;
 	bool bRestoreMinimized = false;
 	int64_t iCaptureToken = 0;
-	std::optional<nlohmann::json> result;
+	std::optional<nlohmann::json> optionalResult;
 };
 
 enum class RenderDocCapturePhase : uint8_t
@@ -94,13 +94,13 @@ struct RenderDocCaptureState
 	{
 		// Mirror CaptureCommandState: the deferred-response timeout/discard does not poll again, so restore the
 		// original minimized state on release, cleaning up before AgentCommandServer publishes or exits.
-		if (bRestoreMinimized && ePhase != RenderDocCapturePhase::kDone && IsWindow(windowHandle) != FALSE && IsIconic(windowHandle) == FALSE)
+		if (bRestoreMinimized && ePhase != RenderDocCapturePhase::kDone && IsWindow(hwnd) != FALSE && IsIconic(hwnd) == FALSE)
 		{
-			ShowWindow(windowHandle, SW_SHOWMINNOACTIVE);
+			ShowWindow(hwnd, SW_SHOWMINNOACTIVE);
 		}
 	}
 
-	HWND windowHandle = nullptr;
+	HWND hwnd = nullptr;
 	RenderDocCapturePhase ePhase = RenderDocCapturePhase::kAwaitCaptures;
 	bool bRestoreMinimized = false;
 	int64_t iBaselineCaptures = 0;
@@ -110,8 +110,8 @@ struct RenderDocCaptureState
 template <typename QUEUE_CAPTURE>
 static void BeginCaptureAndDefer(QUEUE_CAPTURE QueueCapture)
 {
-	HWND windowHandle = engine::gpGraphics->mWindowHandle;
-	bool bRestoreMinimized = IsIconic(windowHandle) != FALSE;
+	HWND hwnd = engine::gpGraphics->mHwnd;
+	bool bRestoreMinimized = IsIconic(hwnd) != FALSE;
 	if (!bRestoreMinimized && engine::gpGraphics->mbSwapchainRecreateDeferred)
 	{
 		// A non-minimized window with deferred swapchain recreation has no live capture target.
@@ -119,12 +119,12 @@ static void BeginCaptureAndDefer(QUEUE_CAPTURE QueueCapture)
 	}
 
 	std::unique_ptr<CaptureCommandState> pState = std::make_unique<CaptureCommandState>();
-	pState->windowHandle = windowHandle;
+	pState->hwnd = hwnd;
 	pState->bRestoreMinimized = bRestoreMinimized;
 	if (bRestoreMinimized)
 	{
 		pState->ePhase = CaptureCommandPhase::kAwaitRestore;
-		ShowWindow(windowHandle, SW_SHOWNOACTIVATE);
+		ShowWindow(hwnd, SW_SHOWNOACTIVATE);
 	}
 	else
 	{
@@ -136,7 +136,7 @@ static void BeginCaptureAndDefer(QUEUE_CAPTURE QueueCapture)
 	{
 		if (pState->ePhase == CaptureCommandPhase::kAwaitRestore)
 		{
-			if (IsIconic(pState->windowHandle) == FALSE && engine::gpGraphics->ExtentSettled())
+			if (IsIconic(pState->hwnd) == FALSE && engine::gpGraphics->ExtentSettled())
 			{
 				pState->iCaptureToken = engine::ResetCaptureResult();
 				QueueCapture(pState->iCaptureToken);
@@ -146,8 +146,8 @@ static void BeginCaptureAndDefer(QUEUE_CAPTURE QueueCapture)
 
 		if (pState->ePhase == CaptureCommandPhase::kAwaitResult)
 		{
-			pState->result = engine::TakeCaptureResult(pState->iCaptureToken);
-			if (pState->result.has_value())
+			pState->optionalResult = engine::TakeCaptureResult(pState->iCaptureToken);
+			if (pState->optionalResult.has_value())
 			{
 				if (!pState->bRestoreMinimized)
 				{
@@ -155,7 +155,7 @@ static void BeginCaptureAndDefer(QUEUE_CAPTURE QueueCapture)
 				}
 				else
 				{
-					ShowWindow(pState->windowHandle, SW_SHOWMINNOACTIVE);
+					ShowWindow(pState->hwnd, SW_SHOWMINNOACTIVE);
 					pState->ePhase = CaptureCommandPhase::kAwaitMinimize;
 				}
 			}
@@ -163,7 +163,7 @@ static void BeginCaptureAndDefer(QUEUE_CAPTURE QueueCapture)
 
 		if (pState->ePhase == CaptureCommandPhase::kAwaitMinimize)
 		{
-			if (IsIconic(pState->windowHandle) == FALSE)
+			if (IsIconic(pState->hwnd) == FALSE)
 			{
 				return std::nullopt;
 			}
@@ -175,8 +175,8 @@ static void BeginCaptureAndDefer(QUEUE_CAPTURE QueueCapture)
 			return std::nullopt;
 		}
 
-		nlohmann::json result = std::move(*pState->result);
-		pState->result.reset();
+		nlohmann::json result = std::move(*pState->optionalResult);
+		pState->optionalResult.reset();
 		// A failed async save publishes an {"error":...} result; rethrow it so Drain's poll-exception path emits a
 		// proper {"ok":false,"error"} envelope instead of wrapping the error JSON as ok:true.
 		if (result.contains("error"))
@@ -239,7 +239,7 @@ static void CommandScreenshot(const nlohmann::json& rParameters, [[maybe_unused]
 	BeginCaptureAndDefer([request = std::move(request)](int64_t iCaptureToken) mutable
 	{
 		request.iCaptureToken = iCaptureToken;
-		engine::gpGraphics->mScreenshotRequest = std::move(request);
+		engine::gpGraphics->mOptionalScreenshotRequest = std::move(request);
 	});
 }
 
@@ -270,8 +270,8 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 		}
 	}
 
-	HWND windowHandle = engine::gpGraphics->mWindowHandle;
-	bool bRestoreMinimized = IsIconic(windowHandle) != FALSE;
+	HWND hwnd = engine::gpGraphics->mHwnd;
+	bool bRestoreMinimized = IsIconic(hwnd) != FALSE;
 	if (!bRestoreMinimized && engine::gpGraphics->mbSwapchainRecreateDeferred)
 	{
 		// Mirror BeginCaptureAndDefer's fast-fail: a deferred swapchain recreate skips present, so a trigger on a
@@ -280,13 +280,13 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 	}
 
 	std::unique_ptr<RenderDocCaptureState> pState = std::make_unique<RenderDocCaptureState>();
-	pState->windowHandle = windowHandle;
+	pState->hwnd = hwnd;
 	pState->bRestoreMinimized = bRestoreMinimized;
 	pState->iFrames = iFrames;
 	if (bRestoreMinimized)
 	{
 		pState->ePhase = RenderDocCapturePhase::kAwaitRestore;
-		ShowWindow(windowHandle, SW_SHOWNOACTIVATE);
+		ShowWindow(hwnd, SW_SHOWNOACTIVATE);
 	}
 	else
 	{
@@ -305,7 +305,7 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 	{
 		if (pState->ePhase == RenderDocCapturePhase::kAwaitRestore)
 		{
-			if (IsIconic(pState->windowHandle) == FALSE && engine::gpGraphics->ExtentSettled())
+			if (IsIconic(pState->hwnd) == FALSE && engine::gpGraphics->ExtentSettled())
 			{
 				pState->iBaselineCaptures = static_cast<int64_t>(pRenderDocApi->GetNumCaptures());
 				if (pState->iFrames == 1)
@@ -330,7 +330,7 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 			}
 			if (pState->bRestoreMinimized)
 			{
-				ShowWindow(pState->windowHandle, SW_SHOWMINNOACTIVE);
+				ShowWindow(pState->hwnd, SW_SHOWMINNOACTIVE);
 				pState->ePhase = RenderDocCapturePhase::kAwaitMinimize;
 			}
 			else
@@ -341,7 +341,7 @@ static void CommandRenderDocCapture(const nlohmann::json& rParameters, [[maybe_u
 
 		if (pState->ePhase == RenderDocCapturePhase::kAwaitMinimize)
 		{
-			if (IsIconic(pState->windowHandle) == FALSE)
+			if (IsIconic(pState->hwnd) == FALSE)
 			{
 				return std::nullopt;
 			}
@@ -405,15 +405,15 @@ static void CommandResize(const nlohmann::json& rParameters, nlohmann::json& rRe
 	int64_t iClientHeight = common::RoundUp<int64_t, 8>(iHeight);
 
 	// Reject while minimized: WM_SIZE never fires for a minimized window, so the deferred poll can't converge.
-	if (IsIconic(engine::gpGraphics->mWindowHandle) != FALSE)
+	if (IsIconic(engine::gpGraphics->mHwnd) != FALSE)
 	{
 		throw std::runtime_error("window is minimized");
 	}
 
 	// Style-aware client -> outer conversion: WS_OVERLAPPEDWINDOW grows the client rect by the frame via
 	// AdjustWindowRect; WS_POPUP (borderless windowed-fullscreen) has no frame, so client size is the outer size.
-	HWND windowHandle = engine::gpGraphics->mWindowHandle;
-	int64_t iStyle = GetWindowLongPtr(windowHandle, GWL_STYLE);
+	HWND hwnd = engine::gpGraphics->mHwnd;
+	int64_t iStyle = GetWindowLongPtr(hwnd, GWL_STYLE);
 	RECT outerRect {.left = 0, .top = 0, .right = static_cast<LONG>(iClientWidth), .bottom = static_cast<LONG>(iClientHeight)};
 	if ((iStyle & WS_OVERLAPPEDWINDOW) != 0)
 	{
@@ -425,13 +425,13 @@ static void CommandResize(const nlohmann::json& rParameters, nlohmann::json& rRe
 	// On-screen clamping: a fixed top-left with a growing size can push the bottom/right edges off screen. Query
 	// the window's current monitor (mirrors SetupWindow) and keep the outer rect fully within rcMonitor.
 	RECT currentRect {};
-	GetWindowRect(windowHandle, &currentRect);
+	GetWindowRect(hwnd, &currentRect);
 	int64_t iPositionX = currentRect.left;
 	int64_t iPositionY = currentRect.top;
 
 	MONITORINFO monitorInfo = {};
 	monitorInfo.cbSize = sizeof(monitorInfo);
-	GetMonitorInfo(MonitorFromWindow(windowHandle, MONITOR_DEFAULTTONEAREST), &monitorInfo);
+	GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &monitorInfo);
 	const RECT& rMonitor = monitorInfo.rcMonitor;
 
 	if (iClientWidth == rMonitor.right - rMonitor.left && iClientHeight == rMonitor.bottom - rMonitor.top)
@@ -464,7 +464,7 @@ static void CommandResize(const nlohmann::json& rParameters, nlohmann::json& rRe
 
 	// Drain() runs on the WindowProcedure thread, so this SetWindowPos's WM_SIZE fires synchronously and writes
 	// gVkWantedFramebufferExtent2D exactly as a human drag does. No z-order / activation change.
-	SetWindowPos(windowHandle, nullptr, static_cast<int>(iPositionX), static_cast<int>(iPositionY), static_cast<int>(iOuterWidth), static_cast<int>(iOuterHeight), SWP_NOZORDER | SWP_NOACTIVATE);
+	SetWindowPos(hwnd, nullptr, static_cast<int>(iPositionX), static_cast<int>(iPositionY), static_cast<int>(iOuterWidth), static_cast<int>(iOuterHeight), SWP_NOZORDER | SWP_NOACTIVATE);
 
 	// Fast path: if the swapchain already sits at the requested (rounded) extent, answer synchronously.
 	if (engine::gpGraphics->mFramebufferVkExtent2D.width == static_cast<uint32_t>(iClientWidth) && engine::gpGraphics->mFramebufferVkExtent2D.height == static_cast<uint32_t>(iClientHeight))
@@ -509,14 +509,14 @@ static void CommandFullscreen(const nlohmann::json& rParameters, nlohmann::json&
 
 	// Reject while minimized: the style toggle drives a swapchain recreate that can't converge off-screen, so the
 	// deferred poll would never settle (mirrors resize).
-	if (IsIconic(engine::gpGraphics->mWindowHandle) != FALSE)
+	if (IsIconic(engine::gpGraphics->mHwnd) != FALSE)
 	{
 		throw std::runtime_error("window is minimized");
 	}
 
 	// Live style read: WS_POPUP set == borderless windowed-fullscreen; WS_OVERLAPPEDWINDOW == windowed.
-	HWND windowHandle = engine::gpGraphics->mWindowHandle;
-	bool bIsFullscreen = (GetWindowLongPtr(windowHandle, GWL_STYLE) & WS_POPUP) != 0;
+	HWND hwnd = engine::gpGraphics->mHwnd;
+	bool bIsFullscreen = (GetWindowLongPtr(hwnd, GWL_STYLE) & WS_POPUP) != 0;
 
 	// Fast path: already in the requested mode — report the current extent synchronously (idempotence).
 	if (bIsFullscreen == bOn)
@@ -529,14 +529,14 @@ static void CommandFullscreen(const nlohmann::json& rParameters, nlohmann::json&
 
 	// Install the override; the per-frame main-loop reconciliation (in MainThread, just after ProcessMessages()) picks it
 	// up and performs the style swap + SetupWindow + swapchain recreate. The command completes via the deferred-response mechanism once it lands.
-	engine::gAgentFullscreenOverride = bOn;
+	engine::gOptionalAgentFullscreenOverride = bOn;
 
 	engine::gpAgentCommandServer->DeferResponse([bOn]() -> std::optional<nlohmann::json>
 	{
 		// Poll until BOTH the live WS_POPUP bit matches the request AND the extent has settled. ExtentSettled() folds
 		// extent equality with !mbSwapchainRecreateDeferred, so it can't report a false success while a recreate is
 		// still deferred (the style flips a frame before the swapchain finishes). Then report the applied state.
-		bool bNowFullscreen = (GetWindowLongPtr(engine::gpGraphics->mWindowHandle, GWL_STYLE) & WS_POPUP) != 0;
+		bool bNowFullscreen = (GetWindowLongPtr(engine::gpGraphics->mHwnd, GWL_STYLE) & WS_POPUP) != 0;
 		if (bNowFullscreen != bOn || !engine::gpGraphics->ExtentSettled())
 		{
 			return std::nullopt;
@@ -565,11 +565,11 @@ static void CommandWindowState(const nlohmann::json& rParameters, nlohmann::json
 
 	bool bMinimized = rParameters.at("minimized").get<bool>();
 
-	HWND windowHandle = engine::gpGraphics->mWindowHandle;
+	HWND hwnd = engine::gpGraphics->mHwnd;
 
 	// Fast path: already in the requested state — report it synchronously (idempotence), including the current extent
 	// on restore (matches resize/fullscreen).
-	if ((IsIconic(windowHandle) != FALSE) == bMinimized)
+	if ((IsIconic(hwnd) != FALSE) == bMinimized)
 	{
 		rResult["minimized"] = bMinimized;
 		if (!bMinimized)
@@ -583,10 +583,10 @@ static void CommandWindowState(const nlohmann::json& rParameters, nlohmann::json
 	if (bMinimized)
 	{
 		// Minimize, then poll until the window reports iconic.
-		ShowWindow(windowHandle, SW_MINIMIZE);
+		ShowWindow(hwnd, SW_MINIMIZE);
 		engine::gpAgentCommandServer->DeferResponse([]() -> std::optional<nlohmann::json>
 		{
-			if (IsIconic(engine::gpGraphics->mWindowHandle) == FALSE)
+			if (IsIconic(engine::gpGraphics->mHwnd) == FALSE)
 			{
 				return std::nullopt;
 			}
@@ -600,10 +600,10 @@ static void CommandWindowState(const nlohmann::json& rParameters, nlohmann::json
 	// No-activate restore (never steal foreground focus, per Main.cpp's agent-mode convention). Poll until the window
 	// is no longer iconic AND the extent has settled — a bare !IsIconic restore would report success before the deferred
 	// swapchain recreate lands, the false-success class the sibling polls already guard against.
-	ShowWindow(windowHandle, SW_SHOWNOACTIVATE);
+	ShowWindow(hwnd, SW_SHOWNOACTIVATE);
 	engine::gpAgentCommandServer->DeferResponse([]() -> std::optional<nlohmann::json>
 	{
-		if (IsIconic(engine::gpGraphics->mWindowHandle) != FALSE || !engine::gpGraphics->ExtentSettled())
+		if (IsIconic(engine::gpGraphics->mHwnd) != FALSE || !engine::gpGraphics->ExtentSettled())
 		{
 			return std::nullopt;
 		}
@@ -665,7 +665,7 @@ static void CommandDumpRenderTarget(const nlohmann::json& rParameters, [[maybe_u
 	BeginCaptureAndDefer([request = std::move(request)](int64_t iCaptureToken) mutable
 	{
 		request.iCaptureToken = iCaptureToken;
-		engine::gpGraphics->mDumpRenderTargetRequest = std::move(request);
+		engine::gpGraphics->mOptionalDumpRenderTargetRequest = std::move(request);
 	});
 }
 
@@ -890,7 +890,7 @@ static void BeginScriptAndDefer(const engine::AgentScript& rScript, bool bDescri
 // so they would settle on a frozen snapshot and report success for input ImGui never received.
 static void ThrowIfClientNotRendering()
 {
-	if (IsIconic(engine::gpGraphics->mWindowHandle) != FALSE || engine::gpGraphics->mbSwapchainRecreateDeferred)
+	if (IsIconic(engine::gpGraphics->mHwnd) != FALSE || engine::gpGraphics->mbSwapchainRecreateDeferred)
 	{
 		throw std::runtime_error("client is not rendering (minimized or swapchain recreate deferred); restore with window_state {\"minimized\":false}");
 	}

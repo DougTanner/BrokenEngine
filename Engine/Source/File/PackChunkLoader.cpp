@@ -406,7 +406,7 @@ void PackChunkLoader::ReadChunkRange(const LazyChunk& rLazyChunk, int64_t iChunk
 	data::DataTypes eDataType = DataTypeFromFlags(rLazyChunk.header.flags);
 
 	// Bound each disk read to kiSubReadSize plus sector-alignment padding.
-	HANDLE hFile = mrPackChunks.mLazyPackFileHandles[eDataType];
+	HANDLE handleFile = mrPackChunks.mpHandleLazyPackFile[eDataType];
 	int64_t iFilePosition = iAlignedOffset;
 	int64_t iDataCopied = 0;
 
@@ -425,7 +425,7 @@ void PackChunkLoader::ReadChunkRange(const LazyChunk& rLazyChunk, int64_t iChunk
 		overlapped.Offset = static_cast<DWORD>(iFilePosition & 0xFFFFFFFF);
 		overlapped.OffsetHigh = static_cast<DWORD>((iFilePosition >> 32) & 0xFFFFFFFF);
 		DWORD uiBytesRead = 0;
-		std::ignore = ReadFile(hFile, pReadBuffer, static_cast<DWORD>(iReadSize), &uiBytesRead, &overlapped);
+		std::ignore = ReadFile(handleFile, pReadBuffer, static_cast<DWORD>(iReadSize), &uiBytesRead, &overlapped);
 
 		int64_t iCopySize = std::min(static_cast<int64_t>(uiBytesRead) - iSourceOffset, iSize - iDataCopied);
 		// A truncated .pack returns a 0-byte read that never advances iDataCopied; halt rather than spin.

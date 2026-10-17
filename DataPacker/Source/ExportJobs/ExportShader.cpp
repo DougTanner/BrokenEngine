@@ -92,12 +92,12 @@ void ExportShader::Export()
 
 std::filesystem::path ExportShader::RunVulkanTool(const std::filesystem::path& rExecutable, std::wstring& rParameters, const std::filesystem::path& rOutputFile, bool bThrowOnAnyOutput)
 {
-	LOG(kDefault, kVerbose, "{}: {}{}", common::gpThreadLocal->miThreadId.value_or(0), rExecutable, rParameters);
+	LOG(kDefault, kVerbose, "{}: {}{}", common::gpThreadLocal->mOptionalThreadId.value_or(0), rExecutable, rParameters);
 
-	std::optional<common::ExecutableResult> result = common::RunExecutable(rExecutable, rParameters);
+	std::optional<common::ExecutableResult> optionalResult = common::RunExecutable(rExecutable, rParameters);
 
 	std::string toolName = rExecutable.filename().string();
-	if (!result)
+	if (!optionalResult)
 	{
 		throw std::runtime_error(std::format("{} could not be started", toolName));
 	}
@@ -106,14 +106,14 @@ std::filesystem::path ExportShader::RunVulkanTool(const std::filesystem::path& r
 	// stdout as fatal; glslangValidator / spirv-opt key on the exit code and only warn on non-empty stdout.
 	if (bThrowOnAnyOutput)
 	{
-		if (!result->output.empty())
+		if (!optionalResult->output.empty())
 		{
-			throw std::runtime_error(std::format("{} error: {}", toolName, result->output));
+			throw std::runtime_error(std::format("{} error: {}", toolName, optionalResult->output));
 		}
 	}
-	else if (result->iExitCode != 0)
+	else if (optionalResult->iExitCode != 0)
 	{
-		throw std::runtime_error(std::format("{} error: {}", toolName, result->output));
+		throw std::runtime_error(std::format("{} error: {}", toolName, optionalResult->output));
 	}
 
 	if (!std::filesystem::exists(rOutputFile))
@@ -121,9 +121,9 @@ std::filesystem::path ExportShader::RunVulkanTool(const std::filesystem::path& r
 		throw std::runtime_error(std::format("{} did not produce \"{}\"", toolName, rOutputFile.string()));
 	}
 
-	if (!bThrowOnAnyOutput && !result->output.empty())
+	if (!bThrowOnAnyOutput && !optionalResult->output.empty())
 	{
-		LOG(kDefault, kWarning, "{} output: {}", toolName, result->output);
+		LOG(kDefault, kWarning, "{} output: {}", toolName, optionalResult->output);
 	}
 
 	mIntermediateFiles.push_back(rOutputFile);
@@ -558,14 +558,14 @@ bool ExportShader::CheckDirty(const std::filesystem::path& rPackFile)
 		return true;
 	}
 
-	std::optional<std::vector<CachedDependencyFingerprint>> dependencies = ReadDependencyMetadata(mDependencyMetadataFile);
-	if (!dependencies.has_value())
+	std::optional<std::vector<CachedDependencyFingerprint>> optionalDependencies = ReadDependencyMetadata(mDependencyMetadataFile);
+	if (!optionalDependencies.has_value())
 	{
 		mbDirty = true;
 		return true;
 	}
 
-	for (const CachedDependencyFingerprint& rDependency : dependencies.value())
+	for (const CachedDependencyFingerprint& rDependency : optionalDependencies.value())
 	{
 		std::filesystem::path dependencyPath = gpFileManager->mpInputDirectories[rDependency.iInputRoot] / rDependency.relativePath;
 		if (!std::filesystem::exists(dependencyPath))

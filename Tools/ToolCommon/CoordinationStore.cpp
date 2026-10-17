@@ -30,11 +30,11 @@ namespace toolcli::coordination
 			return;
 		}
 		std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now() + maximumWait;
-		std::optional<std::chrono::steady_clock::time_point> deniedRunStart;
+		std::optional<std::chrono::steady_clock::time_point> optionalDeniedRunStart;
 		do
 		{
-			mhFile.Reset(::CreateFileW(mPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_HIDDEN, nullptr));
-			if (mhFile.IsValid())
+			mHandleFile.Reset(::CreateFileW(mPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_HIDDEN, nullptr));
+			if (mHandleFile.IsValid())
 			{
 				mbValid = true;
 				return;
@@ -51,18 +51,18 @@ namespace toolcli::coordination
 			// The denied-access budget covers the current consecutive run only: a sharing or lock violation proves a live holder rather than a stuck delete-pending window, so the next denied observation starts a fresh budget.
 			if (iLastError == ERROR_ACCESS_DENIED)
 			{
-				if (!deniedRunStart)
+				if (!optionalDeniedRunStart)
 				{
-					deniedRunStart = now;
+					optionalDeniedRunStart = now;
 				}
-				if (std::chrono::duration_cast<std::chrono::milliseconds>(now - *deniedRunStart).count() >= iMaximumDeniedAccessMilliseconds)
+				if (std::chrono::duration_cast<std::chrono::milliseconds>(now - *optionalDeniedRunStart).count() >= iMaximumDeniedAccessMilliseconds)
 				{
 					return;
 				}
 			}
 			else
 			{
-				deniedRunStart.reset();
+				optionalDeniedRunStart.reset();
 			}
 			std::chrono::milliseconds remainingWait = (std::max)(std::chrono::milliseconds::zero(), std::chrono::duration_cast<std::chrono::milliseconds>(endTime - now));
 			if (remainingWait == std::chrono::milliseconds::zero())
@@ -76,9 +76,9 @@ namespace toolcli::coordination
 
 	Guard::~Guard()
 	{
-		if (mhFile.IsValid())
+		if (mHandleFile.IsValid())
 		{
-			mhFile.Reset();
+			mHandleFile.Reset();
 			// Best effort: a waiter that reopened the guard first keeps it alive and deletes it on its own release.
 			::DeleteFileW(mPath.c_str());
 		}
@@ -174,13 +174,13 @@ namespace toolcli::coordination
 		{
 			return std::nullopt;
 		}
-		Handle hDirectory(::CreateFileW(osPath.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr));
-		if (!hDirectory.IsValid())
+		Handle handleDirectory(::CreateFileW(osPath.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr));
+		if (!handleDirectory.IsValid())
 		{
 			return std::nullopt;
 		}
 		std::wstring finalPath(32'768, L'\0');
-		int64_t iWritten = ::GetFinalPathNameByHandleW(hDirectory.Get(), finalPath.data(), static_cast<DWORD>(finalPath.size()), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+		int64_t iWritten = ::GetFinalPathNameByHandleW(handleDirectory.Get(), finalPath.data(), static_cast<DWORD>(finalPath.size()), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
 		if (iWritten == 0 || std::cmp_greater_equal(iWritten, finalPath.size()))
 		{
 			return std::nullopt;
@@ -251,9 +251,9 @@ namespace toolcli::coordination
 
 	std::optional<Locator> MakeLocator(std::wstring_view domain, std::wstring_view logicalKey)
 	{
-		std::optional<std::string> hash = HashSha256(WideToUtf8(logicalKey));
+		std::optional<std::string> optionalHash = HashSha256(WideToUtf8(logicalKey));
 		std::filesystem::path localApplicationData = GetLocalApplicationDataPath();
-		if (!hash)
+		if (!optionalHash)
 		{
 			return std::nullopt;
 		}
@@ -265,7 +265,7 @@ namespace toolcli::coordination
 		{
 			.domain = std::wstring(domain),
 			.logicalKey = std::wstring(logicalKey),
-			.path = localApplicationData / L"BrokenEngineLocks" / domain / Utf8ToWide(*hash + ".lock"),
+			.path = localApplicationData / L"BrokenEngineLocks" / domain / Utf8ToWide(*optionalHash + ".lock"),
 		};
 	}
 
@@ -304,16 +304,16 @@ namespace toolcli::coordination
 		std::filesystem::path targetPath = ExtendedLengthPath(rPath);
 		std::filesystem::path temporaryPath = targetPath;
 		temporaryPath += L".tmp." + std::to_wstring(::GetCurrentProcessId());
-		Handle hFile(::CreateFileW(temporaryPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_TEMPORARY, nullptr));
-		if (!hFile.IsValid())
+		Handle handleFile(::CreateFileW(temporaryPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_TEMPORARY, nullptr));
+		if (!handleFile.IsValid())
 		{
 			return false;
 		}
 		DWORD uiWritten = 0;
-		bool bSucceeded = ::WriteFile(hFile.Get(), contents.data(), static_cast<DWORD>(contents.size()), &uiWritten, nullptr) != FALSE;
+		bool bSucceeded = ::WriteFile(handleFile.Get(), contents.data(), static_cast<DWORD>(contents.size()), &uiWritten, nullptr) != FALSE;
 		int64_t iWritten = uiWritten;
 		bSucceeded = bSucceeded && std::cmp_equal(iWritten, contents.size());
-		hFile.Reset();
+		handleFile.Reset();
 		if (bSucceeded && ::MoveFileExW(temporaryPath.c_str(), targetPath.c_str(), MOVEFILE_REPLACE_EXISTING) != FALSE)
 		{
 			return true;
@@ -363,12 +363,12 @@ namespace toolcli::coordination
 		}
 		int64_t iClaimedTicks = 0;
 		int64_t iHeartbeatTicks = 0;
-		std::optional<int64_t> claimantPid = rMetadata.contains("claimantPid") ? JsonInt64(rMetadata["claimantPid"]) : std::nullopt;
+		std::optional<int64_t> optionalClaimantPid = rMetadata.contains("claimantPid") ? JsonInt64(rMetadata["claimantPid"]) : std::nullopt;
 		bool bValidMetadata = rMetadata.contains("schemaVersion") && JsonIntegerEquals(rMetadata["schemaVersion"], iExpectedSchemaVersion)
 		    && rMetadata.contains("domain") && rMetadata["domain"].is_string()
 		    && rMetadata["domain"].get<std::string>() == WideToUtf8(rLocator.domain) && rMetadata.contains("logicalKey")
 		    && rMetadata["logicalKey"].is_string() && rMetadata["logicalKey"].get<std::string>() == WideToUtf8(rLocator.logicalKey)
-		    && claimantPid && std::in_range<uint32_t>(*claimantPid)
+		    && optionalClaimantPid && std::in_range<uint32_t>(*optionalClaimantPid)
 		    && ParseUtcTimestamp(rMetadata["claimedAt"].get<std::string>(), iClaimedTicks)
 		    && ParseUtcTimestamp(rMetadata["heartbeatAt"].get<std::string>(), iHeartbeatTicks);
 		return bValidMetadata && iClaimedTicks <= iHeartbeatTicks;
