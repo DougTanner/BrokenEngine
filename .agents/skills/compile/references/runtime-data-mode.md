@@ -120,10 +120,28 @@ to exit, and skips the runs with a warning only if one is still alive when that
 budget expires. A peer session starting mid-session can therefore move primary
 Data under this session, and a regenerated header can force a recompile here.
 
+The same refresh also runs on demand, from the session worktree root, as
+`pwsh -NoProfile -File .agents/scripts/Bootstrap-AgentTools.ps1 -RepositoryRoot '<primary checkout>' -SharedDataOnly`.
+It skips the AgentTools and ThirdParty builds, keeps the DataPacker prebuild,
+the bootstrap mutex, the game wait, and the stamp rules, and skips the prebuild
+and the refresh, with a warning naming a wrapper session start, when primary
+ThirdParty changed since the last prebuild or the DataPacker prebuild stamp is
+missing or unreadable. Every skip exits 0, so its
+`Refreshed primary data at` line is the only sign the refresh ran. It runs this
+worktree's copies of the bootstrap scripts against the primary checkout, so a
+session runs it without asking the user unless this worktree's own committed
+or uncommitted changes, measured from its merge base with primary main, touch
+`.agents/scripts/`; then it asks the user first. One run can outlast a tool-call timeout, up to
+`-WaitSeconds` each for the bootstrap mutex and the game wait, then the
+DataPacker prebuild and the export, so it runs where a tool-call timeout cannot
+kill it, for example with the host's background-execution parameter such as
+`run_in_background`; a killed shell
+stops the export midway and leaves the primary data unstamped.
+
 Each game's refresh also records shader provenance in
 `SharedDataShaderStamp.txt`, beside that game's primary `Output\Data`
-directory: before its export it deletes the stamp, aborting session start if
-the delete fails, and after a successful export it writes the shader-source
+directory: before its export it deletes the stamp, aborting the bootstrap run
+if the delete fails, and after a successful export it writes the shader-source
 fingerprint of `HEAD` only when both shader trees, `AGENTS.md` files aside,
 were clean and unchanged across the export. The shader-source fingerprint is
 one SHA-256 over the `HEAD` file listing of `Engine/Data/Shaders` and the
@@ -138,30 +156,33 @@ because the client compiles the shader layout headers from the worktree but
 loads the primary `Shader.pack`; Server builds load no shaders and are not
 checked. The block names its case's cheaper remedy, when one exists, selected
 from the stamp and from the shader-source fingerprints of primary main's and
-the worktree's `HEAD`: a new session start, whose refresh re-exports primary
-main, when the worktree's `HEAD` already matches primary main; none when the
+the worktree's `HEAD`: the on-demand refresh, which re-exports primary main,
+when the worktree's `HEAD` already matches primary main; none when the
 worktree's fingerprint changed since its session baseline, because neither a
 refresh nor a rebase puts that change into the primary `Shader.pack`;
 otherwise a rebase onto primary main when the stamp matches primary main;
-otherwise a new session start followed by that rebase. Every block then names
+otherwise that rebase followed by the on-demand refresh. A block naming the
+on-demand refresh states the ask-first rule and the `Refreshed primary data at`
+line above. Every block then names
 Local generation authorization (`-DataBuildMode Local -RunDataPacker`), which
 always clears it because the check runs only for a Shared build, with its
-cost: up to about 1 GB of restored and generated data, and, unlike a session
-start or a rebase, it clears the block only for builds that pass
+cost: up to about 1 GB of restored and generated data, and, unlike a refresh
+or a rebase, it clears the block only for builds that pass
 `-DataBuildMode Local`, because each `/compile` derives the data mode from the
 changed paths, so every later game build (client and server) in the session
-must also pass it. When the block names a new session start, a missing stamp
-can also mean a peer's session-start refresh is exporting right now: retry
-after it finishes, then rebase when the block also names a rebase. In that
-case a missing stamp that persists across session starts can mean the primary
-checkout's shader sources are uncommitted or changing: commit or discard those
-changes, then start a new session, or use Local generation authorization. The
+must also pass it. When the block names the on-demand refresh, a missing stamp
+can also mean a refresh, at a session start or on demand, is exporting right
+now: retry after it finishes, then rebase when the block also names a rebase.
+In that case a missing stamp that persists across refreshes can mean the
+primary checkout's shader sources are uncommitted or changing: commit or
+discard those changes, then run the refresh again, or use Local generation
+authorization. The
 check runs only at build time, so rerun `/compile` before a launch to check
 again after a peer refresh. A committed shader deletion built under the
 deletion-only exception mismatches and blocks; its remedy is Local generation
 authorization. A primary DataPacker run outside the bootstrap, such as a
 Visual Studio build in the primary checkout, rewrites Shared data without
-updating the stamp; the next session start stamps it again.
+updating the stamp; the next refresh stamps it again.
 
 Ordinary Shared work otherwise remains unchanged: primary Data, no `RunDataPacker`, and no materialization or export.
 

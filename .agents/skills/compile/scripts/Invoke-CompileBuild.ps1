@@ -330,25 +330,28 @@ try {
 				$sessionBaseline = [string]$context.baseline
 				$baselineShaderFingerprint = Get-AgentShaderSourceFingerprint $script:Root $sessionBaseline $gameProject
 				$localRemedy = "Local generation authorization (-DataBuildMode Local -RunDataPacker) clears this in every case, because this check runs only for a Shared build. Cost: up to about 1 GB, from restoring the sparse-skipped Engine/Data art trees and generating this worktree's own Data output; and each /compile derives the data mode from this worktree's changed paths, so every later game build (client and server) in this session must also pass -DataBuildMode Local; a Client build without it blocks here again."
+				$refreshCommand = "with this session's game closed, run the on-demand Shared-data refresh from this worktree's root: pwsh -NoProfile -File .agents/scripts/Bootstrap-AgentTools.ps1 -RepositoryRoot '$primary' -SharedDataOnly. It re-exports the Shared data from primary main; every skip exits 0, so only its 'Refreshed primary data at' line shows the refresh ran."
+				$refreshCommand += " Run it without asking the user unless this worktree's own committed or uncommitted changes, measured from its merge base with primary main, touch .agents/scripts/; then ask the user first."
+				$refreshCommand += " One run can outlast a tool-call timeout (up to -WaitSeconds each for the bootstrap mutex and a running game, then the DataPacker prebuild and data export), so run it where a tool-call timeout cannot kill it, for example with the host's background-execution parameter such as run_in_background; a killed shell stops the export midway and leaves the primary data unstamped."
 				$retryLead = $null
 				if ($worktreeShaderFingerprint -ceq $primaryShaderFingerprint) {
-					$remedy = "With this session's game closed, any wrapper session start, a peer's included, refreshes the Shared data: its bootstrap re-exports it from primary main, whose shader trees already match this worktree's HEAD; after it, rerun /compile in this session. Cost: one session start; this session keeps running, and no rebase is needed."
+					$remedy = "Primary main's shader trees already match this worktree's HEAD, so $refreshCommand Then rerun /compile in this session. Cost: one DataPacker prebuild and data export; this session keeps running, and no rebase is needed."
 					$retryLead = 'retry after a running refresh finishes.'
 				}
 				elseif ($worktreeShaderFingerprint -cne $baselineShaderFingerprint) {
-					$remedy = "This worktree's commits change the shader trees since its session baseline $($sessionBaseline.Substring(0, 8)), so neither a session-start refresh nor a rebase puts those changes into the primary Shader.pack."
+					$remedy = "This worktree's commits change the shader trees since its session baseline $($sessionBaseline.Substring(0, 8)), so neither a refresh nor a rebase puts those changes into the primary Shader.pack."
 				}
 				elseif ($shaderStamp -ceq $primaryShaderFingerprint) {
 					$remedy = "Rebase onto primary main: the Shared data was exported from primary main's shader trees, and this worktree's commits leave its shader trees unchanged since its session baseline, so a rebase makes them match. Cost: commit or set aside uncommitted work first; no data is regenerated."
 				}
 				else {
-					$remedy = "With this session's game closed, any wrapper session start, a peer's included, refreshes the Shared data from primary main; after it, rebase onto primary main, then rerun /compile in this session: the Shared data predates primary main and this worktree is behind it, so neither step alone clears this. Cost: one session start and a rebase; this session keeps running."
+					$remedy = "The Shared data predates primary main and this worktree is behind it, so neither a rebase nor a refresh alone clears this. Rebase onto primary main first; then, $refreshCommand Then rerun /compile in this session. Cost: a rebase plus one DataPacker prebuild and data export; this session keeps running."
 					$retryLead = 'if one is running, wait for it to finish, then rebase onto primary main, because this worktree is behind primary main and a retry alone blocks again.'
 				}
 				if ($null -eq $shaderStamp) {
-					# A finished refresh stamps primary main's fingerprint, so only a new-session remedy keeps the
-					# retry lead and the uncommitted-primary condition.
-					$missingStampRemedy = if ($null -eq $retryLead) { $remedy } else { "A session-start refresh deletes the stamp while it exports: $retryLead If no refresh is running: $remedy The refresh writes no stamp while the primary checkout's shader sources are uncommitted or changing, so commit or discard those changes before the next session start." }
+					# A finished refresh stamps primary main's fingerprint, so only a refresh remedy keeps the retry
+					# lead and the uncommitted-primary condition.
+					$missingStampRemedy = if ($null -eq $retryLead) { $remedy } else { "A refresh, at a session start or on demand, deletes the stamp while it exports: $retryLead If no refresh is running: $remedy The refresh writes no stamp while the primary checkout's shader sources are uncommitted or changing, so commit or discard those changes before the next refresh." }
 					Stop-CompileInvoke 'data-mode.shared-shader-unverified' "The Shared data at '$sharedDataDirectory' has no shader provenance stamp ('$shaderStampPath'), so its Shader.pack cannot be matched to this worktree's shader sources. $missingStampRemedy $localRemedy"
 				}
 				Stop-CompileInvoke 'data-mode.shared-shader-unverified' "The Shared data at '$sharedDataDirectory' was exported from shader-source fingerprint $shaderStamp, but this worktree's HEAD has $worktreeShaderFingerprint, so its Shader.pack does not match the shader layouts this build compiles. $remedy $localRemedy"

@@ -2,7 +2,8 @@
 param(
 	[Parameter(Mandatory = $true)]
 	[string] $RepositoryRoot,
-	[int] $WaitSeconds = 500
+	[int] $WaitSeconds = 500,
+	[switch] $SharedDataOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -121,14 +122,19 @@ try {
 		try { $held = $mutex.WaitOne([int]$milliseconds) } catch [Threading.AbandonedMutexException] { $held = $true }
 		if (-not $held) { throw "Timed out after $WaitSeconds seconds waiting for the AgentTools bootstrap mutex. If another live worktree session is holding these executables, wrap up active worktree sessions and retry." }
 
-		Invoke-BootstrapBuild $worktreeCliSolution 'Release' $worktreeCli
-		Invoke-BootstrapBuild $agentHarnessSolution 'Release' $agentHarness
-		& $capabilityScript -WorktreeCliExecutable $worktreeCli -AgentHarnessExecutable $agentHarness | Out-Null
-		$builtStamp = Get-AgentToolsSourceStamp
-		if ($null -ne $builtStamp) { [IO.File]::WriteAllText($stampPath, $builtStamp + "`n") }
+		# -SharedDataOnly refreshes Shared data mid-session, so it skips the shared AgentTools and ThirdParty
+		# builds, which only a wrapper session start or explicit primary maintenance runs in place.
+		if (-not $SharedDataOnly) {
+			Invoke-BootstrapBuild $worktreeCliSolution 'Release' $worktreeCli
+			Invoke-BootstrapBuild $agentHarnessSolution 'Release' $agentHarness
+			& $capabilityScript -WorktreeCliExecutable $worktreeCli -AgentHarnessExecutable $agentHarness | Out-Null
+			$builtStamp = Get-AgentToolsSourceStamp
+			if ($null -ne $builtStamp) { [IO.File]::WriteAllText($stampPath, $builtStamp + "`n") }
+		}
 		# Snapshot DataPacker's build inputs before the ThirdParty Release lib it links is (re)built just
-		# below, so the post-build re-check covers a landing or user VS build that advances any consumed
-		# input during the prebuild. Best-effort like the prebuild: a snapshot failure disables it.
+		# below (skipped under -SharedDataOnly, where the stamp's ThirdParty tree must match instead), so the
+		# post-build re-check covers a landing or user VS build that advances any consumed input during the
+		# prebuild. Best-effort like the prebuild: a snapshot failure disables it.
 		$dataPackerPreTrees = $null
 		$dataPackerPrebuiltClean = $false
 		try {
@@ -136,21 +142,32 @@ try {
 			$dataPackerPreDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'DataPacker', 'Common', 'ThirdParty'))
 		}
 		catch { Write-Warning "Could not snapshot DataPacker prebuild inputs, so the prebuild was skipped: $($_.Exception.Message)"; $dataPackerPreTrees = $null }
-		foreach ($configuration in @('Debug', 'Profile', 'Release')) { Invoke-BootstrapBuild $thirdPartySolution $configuration }
+		if ($SharedDataOnly -and $null -ne $dataPackerPreTrees) {
+			# The prebuild links the existing ThirdParty Release lib, built from the ThirdParty tree on the
+			# existing stamp's third line, so a new stamp must not record a different tree.
+			$stampThirdPartyTree = $null
+			try { $stampThirdPartyTree = @([IO.File]::ReadAllLines($dataPackerStampPath))[2] } catch { }
+			if ($stampThirdPartyTree -cne $dataPackerPreTrees[2]) {
+				Write-Warning "Primary ThirdParty changed since the last DataPacker prebuild, or its stamp '$dataPackerStampPath' is missing or unreadable, so the DataPacker prebuild and the primary data refresh were skipped. A wrapper session start is needed to rebuild ThirdParty and refresh the data."
+				$dataPackerPreTrees = $null
+			}
+		}
+		if (-not $SharedDataOnly) { foreach ($configuration in @('Debug', 'Profile', 'Release')) { Invoke-BootstrapBuild $thirdPartySolution $configuration } }
 		foreach ($configuration in @('Debug', 'Profile', 'Release')) {
 			$library = Join-Path $thirdPartyOutput "ThirdParty.$configuration.lib"
 			if (-not (Test-Path -LiteralPath $library -PathType Leaf) -or (Get-Item -LiteralPath $library).Length -eq 0) { throw "Required primary ThirdParty library is missing or empty after bootstrap: '$library'." }
 		}
 		# Best-effort DataPacker Release prebuild so a new session worktree seeds its Output\DataPacker.exe
 		# by verified copy (Build-WorktreeDataPacker.ps1) instead of compiling from scratch. It links the
-		# ThirdParty Release lib built just above, and runs inside this mutex so the exe and its stamp stay
+		# primary ThirdParty Release lib, built just above, or under -SharedDataOnly matched to the existing
+		# stamp's ThirdParty tree, and runs inside this mutex so the exe and its stamp stay
 		# atomic against peer bootstraps. Unlike the hard-fail AgentTools builds it only warns on failure:
 		# the worktree-local fallback reproduces any real failure. The mutex excludes peer bootstraps but
 		# not a landing or user VS build, so the stamp is written only when the before and after snapshots
 		# (the three DataPacker/Common/ThirdParty tree hashes plus a clean DataPacker/Common/ThirdParty
 		# state) are identical. The pre-snapshot is captured above, before the ThirdParty lib build, so it
 		# covers every input DataPacker consumes; the pre-mutex Tools/, ThirdParty/, and Common/Sha256Hasher.h
-		# dirty early-return (lines 49-58) plus this scoped gate keep the normal path clean.
+		# dirty early-return (lines 50-59) plus this scoped gate keep the normal path clean.
 		try {
 			if ($null -ne $dataPackerPreTrees -and $dataPackerPreDirty.Count -eq 0) {
 				Invoke-BootstrapBuild $dataPackerSolution 'Release' $dataPackerExe
@@ -268,7 +285,7 @@ try {
 			}
 		}
 		Write-Host ''
-		Write-Host "Built primary AgentTools and ThirdParty at '$worktreeCliOutput', '$agentHarnessOutput', and '$thirdPartyOutput'."
+		if (-not $SharedDataOnly) { Write-Host "Built primary AgentTools and ThirdParty at '$worktreeCliOutput', '$agentHarnessOutput', and '$thirdPartyOutput'." }
 		foreach ($refreshedDataDirectory in $refreshedDataDirectories) { Write-Host "Refreshed primary data at '$refreshedDataDirectory'." }
 	}
 	finally { if ($held) { $mutex.ReleaseMutex() }; $mutex.Dispose() }
