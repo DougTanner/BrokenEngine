@@ -181,6 +181,7 @@ void FrameInterpolateBase::AllocateAndCopy([[maybe_unused]] game::FrameInterpola
 	FrameInterpolateBase& rCurrentBase = rCurrent;
 	const FrameInterpolateBase& rPreviousBase = rPrevious;
 	AllocateAndCopyCollections(rCurrentBase.Collections(), rPreviousBase.Collections(), std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<decltype(rCurrentBase.Collections())>)> {});
+	rCurrentBase.iTick = rPreviousBase.iTick;
 }
 
 void FrameInterpolateBase::Update([[maybe_unused]] game::FrameInterpolate& __restrict rCurrent, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame, [[maybe_unused]] float fDeltaTime)
