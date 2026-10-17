@@ -152,18 +152,26 @@ try {
 		# foreign copy costs nothing and needs no verification here. Seeding is a speed-up only, so any
 		# failure is reported and ignored rather than allowed to block session setup.
 		try {
-			$cacheDirectory = 'AppData\Broken Engine Sandbox'
-			$cacheSources = @()
-			foreach ($cacheName in @('pipeline.cache', 'BrdfLut.cache')) {
-				$primaryCache = Join-Path $root "Temp\$cacheDirectory\$cacheName"
-				$userCache = Join-Path $env:APPDATA "Broken Engine Sandbox\$cacheName"
-				if (Test-Path -LiteralPath $primaryCache -PathType Leaf) { $cacheSources += $primaryCache }
-				elseif (Test-Path -LiteralPath $userCache -PathType Leaf) { $cacheSources += $userCache }
-			}
-			if ($cacheSources.Count -ne 0) {
-				$cacheTarget = Join-Path $sidecarDirectory $cacheDirectory
-				New-Item -ItemType Directory -Path $cacheTarget -Force | Out-Null
-				foreach ($cacheSource in $cacheSources) { Copy-Item -LiteralPath $cacheSource -Destination $cacheTarget -Force }
+			# Only client processes write BrdfLut.cache, so holding it selects each client game's folder
+			# without naming any game.
+			$cacheRoots = @((Join-Path $root 'Temp\AppData'), $env:APPDATA)
+			$gameFolders = @($cacheRoots | Where-Object { Test-Path -LiteralPath $_ -PathType Container } |
+				ForEach-Object { Get-ChildItem -LiteralPath $_ -Directory } |
+				Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'BrdfLut.cache') -PathType Leaf } |
+				ForEach-Object Name | Sort-Object -Unique)
+			foreach ($gameFolder in $gameFolders) {
+				$cacheSources = @()
+				foreach ($cacheName in @('pipeline.cache', 'BrdfLut.cache')) {
+					$primaryCache = Join-Path $root "Temp\AppData\$gameFolder\$cacheName"
+					$userCache = Join-Path $env:APPDATA "$gameFolder\$cacheName"
+					if (Test-Path -LiteralPath $primaryCache -PathType Leaf) { $cacheSources += $primaryCache }
+					elseif (Test-Path -LiteralPath $userCache -PathType Leaf) { $cacheSources += $userCache }
+				}
+				if ($cacheSources.Count -ne 0) {
+					$cacheTarget = Join-Path $sidecarDirectory "AppData\$gameFolder"
+					New-Item -ItemType Directory -Path $cacheTarget -Force | Out-Null
+					foreach ($cacheSource in $cacheSources) { Copy-Item -LiteralPath $cacheSource -Destination $cacheTarget -Force }
+				}
 			}
 		}
 		catch { Write-Warning "Seeding the worktree shader caches failed, so the first launch rebuilds them: $($_.Exception.Message)" }
