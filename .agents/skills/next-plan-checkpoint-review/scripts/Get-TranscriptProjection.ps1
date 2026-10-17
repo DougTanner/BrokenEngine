@@ -17,7 +17,8 @@
 # `<line> result <tool_use_id> len <chars> error` — only when `is_error` is true.
 # `<line> assistant-text len <chars> <text>` — original text length; whitespace collapsed and payload capped at 160 chars.
 # `<line> <record type> text len <chars>` — a string-content record: a task-notification handoff or an `attachment` record's prompt.
-# `<line>` is the 1-based transcript line; sidechain records and blank lines print nothing.
+# `<line>` is the 1-based transcript line; only `assistant`, `user`, and `attachment` records print, and sidechain
+# records and blank lines print nothing.
 
 [CmdletBinding()]
 param(
@@ -37,7 +38,8 @@ $n = 0
 foreach ($line in [IO.File]::ReadLines($TranscriptPath)) {
 	$n++
 	$record = $line | ConvertFrom-Json
-	if ($record.isSidechain -eq $true) { continue }
+	# Only these types carry the conversation; others, such as request copies, repeat it or carry none.
+	if ($record.isSidechain -eq $true -or $record.type -notin @('assistant', 'user', 'attachment')) { continue }
 	$content = $record.message.content
 	if ($record.type -eq 'attachment') { $content = $record.attachment.prompt }
 	if ($content -is [string]) { '{0} {1} text len {2}' -f $n, $record.type, $content.Length; continue }
