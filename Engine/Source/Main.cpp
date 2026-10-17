@@ -193,6 +193,19 @@ static int64_t MainThread(HINSTANCE hinstance)
 		}
 	}
 
+#if defined(BT_SERVER)
+	// Construct the game before the window, so the window is destroyed while the game object the server WindowProcedure reads still exists.
+	auto pIslandTerrain = std::make_unique<IslandTerrain>();
+	auto pFlightPlanes = std::make_unique<FlightPlanes>(game::kFlightPlanes);
+	if (HandleEagerLoadCompletion() != 0)
+	{
+		return 1;
+	}
+	gpIslandTerrain->WaitForElevationMaps(game::NavigationThresholdElevation(gpFlightPlanes->Lowest().fHeightMeters), game::NavigationClearanceMeters());
+
+	auto pGame = std::make_unique<game::Game>();
+#endif
+
 	WNDCLASSEX windowClassExtended
 	{
 		.cbSize = sizeof(windowClassExtended),
@@ -239,20 +252,6 @@ static int64_t MainThread(HINSTANCE hinstance)
 	}
 	common::ScopedLambda destroyWindow([]()
 	{
-#if defined(BT_SERVER)
-		// Set the shutdown flag before the teardown message drain, including exception unwinding, so clicks cannot request a repaint.
-		gbQuit = true;
-
-		// Drop any paint region an external event (uncover, resize, DPI change) added after the main loop's final
-		// drain: the server display reads game state, and by here the game object is already gone. ValidateRect
-		// leaves nothing for this drain to dispatch WM_PAINT for, and nothing invalidates the window afterwards.
-		// ValidateRect(nullptr) redraws every window in the system.
-		if (sHwnd != nullptr)
-		{
-			ValidateRect(sHwnd, nullptr);
-		}
-		ProcessMessages();
-#endif
 		// No client pump here: Game, Graphics/ImGui, and Input are already destroyed, and the client WindowProcedure
 		// dereferences game::gpGame on WM_SETFOCUS.
 
@@ -340,16 +339,6 @@ static int64_t MainThread(HINSTANCE hinstance)
 	// Agent-mode launch stays minimized and must not steal focus from the user's active app
 	ShowWindow(sHwnd, gLaunchOptions.iAgentPort != 0 ? SW_SHOWMINNOACTIVE : SW_SHOWDEFAULT);
 #else
-	auto pIslandTerrain = std::make_unique<IslandTerrain>();
-	auto pFlightPlanes = std::make_unique<FlightPlanes>(game::kFlightPlanes);
-	if (HandleEagerLoadCompletion() != 0)
-	{
-		return 1;
-	}
-	gpIslandTerrain->WaitForElevationMaps(game::NavigationThresholdElevation(gpFlightPlanes->Lowest().fHeightMeters), game::NavigationClearanceMeters());
-
-	auto pGame = std::make_unique<game::Game>();
-
 	ShowWindow(sHwnd, gLaunchOptions.iAgentPort != 0 ? SW_SHOWMINNOACTIVE : SW_SHOWNOACTIVATE);
 #endif // BT_CLIENT
 	common::ScopedLambda hideWindow([]()
@@ -733,13 +722,6 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 
 		case WM_LBUTTONDOWN:
 		{
-			// Once shutdown has begun, ignore the click instead of invalidating: the teardown drain after the game
-			// object is gone would dispatch the resulting WM_PAINT into the game-state-reading server display.
-			if (gbQuit)
-			{
-				return 0;
-			}
-
 			HandleServerClick(hwnd, LOWORD(iLongParameter), HIWORD(iLongParameter));
 			InvalidateRect(hwnd, nullptr, FALSE);
 			return 0;
@@ -752,11 +734,7 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 			{
 				LOG(kDefault, kInfo, "WM_ENDSESSION: final autosave");
 				gbQuit = true;
-				// The destroyWindow teardown drain dispatches messages after the game object is gone.
-				if (game::gpGame != nullptr)
-				{
-					game::gpGame->mServerSaveLoad.FinalAutosave();
-				}
+				game::gpGame->mServerSaveLoad.FinalAutosave();
 			}
 			return 0;
 		}
