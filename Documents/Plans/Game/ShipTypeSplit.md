@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-08T23:54:23.561Z","dependsOn":["Documents/Plans/Game/FrameEditRows.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-08T23:54:23.561Z","dependsOn":["Documents/Plans/Game/FrameEditRowRemoval.md","Documents/Plans/Game/FrameEditRows.md"]} -->
 # Replace Players and Spaceships with the Fighters, Omnis, and Battleships ship types
 
 Tier 3 (`.agents/references/risk-tiers.md`): the change alters CRC'd gameplay
@@ -635,8 +635,10 @@ One Plan, one landing; the stages order the work so each builds and runs.
   type, the typed spawn request and HUD buttons, the engine seams, the collision
   categories and symmetric ship collision damage, the per-controller models with
   placeholder assets, the alignment and network vocabulary renames, the harness
-  commands and their documents, profile counters and cell statistics, UI wrapper
-  names, the version bumps, and the `AGENTS.md` and `Documents/Architecture`
+  commands and their documents (including the `edit_frame` kill-state table and
+  Agent contract clause that `FrameEditRowRemoval.md` adds, per
+  `## Coordination`), profile counters and cell statistics, UI wrapper names,
+  the version bumps, and the `AGENTS.md` and `Documents/Architecture`
   lines `/update-claude-docs` finds stale, including the wire-rule rewording of
   decision 22.
 - The decision 8 change of Fighters' `AvoidTerrain` and steering reads to the previous frame.
@@ -712,3 +714,5 @@ One Plan, one landing; the stages order the work so each builds and runs.
   edge.
 - `Documents/Plans/Game/SandboxSmallCleanups.md` edits the same `Players/` and `Spaceships/` files (the forwarding `AllocateAndCopy`, `ComputeNavigation`'s neighbouring-cell branch in `PlayersNavigation.cpp`, the `LogDifferences` labels). Whichever lands second rebases onto the other's edits; if this Plan lands first, that Plan's items apply to the Fighters, Omnis, and Battleships successors and `Ships/ShipBehaviours.cpp`.
 - `Documents/Plans/Game/FrameEditCellPins.md` also increments the `Frame::kiVersion` base literal (decision 22); the second to land increments the then-current literal again.
+- `Documents/Plans/Game/FrameEditRows.md` lands first and replaces the status-change family this Plan was written against: `SpawnPlayerData`, `TransferData`, and `Projects/BrokenEngineSandbox/Source/SpawnTransfer.h/.cpp` are gone; each spawnable collection's own `SpawnInfo` is the payload of a `kSpawn<Collection>` tick-input tag and a `kTransfer<Collection>` arrival tag (`SpawnTraits`, `MakeSpawn`/`MakeTransfer`, per-`SpawnInfo` `Fields()` tables driving `StatusChangeCodec.cpp` and the `inject_payload` parser); out-of-tick spawns queue through `engine::ServerSpawnQueue`; `inject_payload` takes `Spawn*` entries keyed by `Fields()` member tokens and has no `Transfer*` entries. Decisions 9, 10, 11, 13 (its spawns go through `mpSpawnQueue->Spawn` with the type's `SpawnInfo` instead of a direct `kSpawnShip` push), and 21, `### Status changes and spawning`, the `TransferData` and `SpawnTransfer` names in `## Context`, `### Integration sites`, `### Stages`, `## Critical files`, and `## In scope`, and the acceptance rows that inject `SpawnShip` or `Transfer*` entries are re-derived on that family at claim.
+- `Documents/Plans/Game/FrameEditRowRemoval.md` lands first and adds the `edit_frame` kill-state table to `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md` and the row-removal clause to the `edit_frame` bullet of `Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md` `## Contracts`. This Plan rewrites that table's `players` and `spaceships` rows as `omnis`, `fighters`, and `battleships` rows (decision 21) with decision 2's column names and decision 4's `ShipFlags` values (`kExploding` is `0x0001` for all three types, where today's Spaceships use 2), and keeps the clause true of the three ship collections.
