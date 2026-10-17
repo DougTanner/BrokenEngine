@@ -6,7 +6,7 @@
 // Uniforms
 layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 {
-    GlobalLayout globalLayout;
+	GlobalLayout globalLayout;
 };
 
 layout (set = 1, binding = 2) uniform sampler2D textureSampler;
@@ -27,20 +27,20 @@ const float kfSmokeDepositNormPerFrame = 1.0f / 60.0f;
 
 void main()
 {
-    // This is here because in a very rare case the interpolater can send us a very small negative ex: -0.000000050728
-    float fMiscY = max(0.0f, f4InParams.y);
+	// This is here because in a very rare case the interpolater can send us a very small negative ex: -0.000000050728
+	float fMiscY = max(0.0f, f4InParams.y);
 
-    vec2 f2Center = vec2(0.5f, 0.5f);
-    float fTexture = texture(textureSampler, f2Center + Rotate(f2InTexcoord - f2Center, f4InParams.w)).x;
+	vec2 f2Center = vec2(0.5f, 0.5f);
+	float fTexture = texture(textureSampler, f2Center + Rotate(f2InTexcoord - f2Center, f4InParams.w)).x;
 
-    // gSmokeIntensityFalloff slider min 0.1 keeps pow() base >= 0 -> always defined.
-    fOutColor = fTexture * vec4(f4InParams.x * pow(fMiscY, globalLayout.fSmokeIntensityFalloff) * kfSmokeDepositNormPerFrame, 0.0f, 0.0f, 1.0f);
+	// Base fMiscY >= 0 and exponent > 0 (gSmokeIntensityFalloff slider min 0.1) keep pow() defined.
+	fOutColor = fTexture * vec4(f4InParams.x * pow(fMiscY, globalLayout.fSmokeIntensityFalloff) * kfSmokeDepositNormPerFrame, 0.0f, 0.0f, 1.0f);
 
-    // Mark occupancy for deposited tiles (seeds hierarchical dispatch)
-    if (fOutColor.x > 0.0f)
-    {
-        ivec2 i2TileCoord = ivec2(gl_FragCoord.xy * globalLayout.fSmokeDepositTileScale) / kiComputeTileSize;
-        uint uiTileIndex = i2TileCoord.y * globalLayout.uiSmokeTilesX + i2TileCoord.x;
-        atomicOr(occupancy[uiTileIndex >> 5], 1u << (uiTileIndex & 31));
-    }
+	// Mark occupancy for deposited tiles (seeds hierarchical dispatch)
+	if (fOutColor.x > 0.0f)
+	{
+		ivec2 i2TileCoord = ivec2(gl_FragCoord.xy) / kiComputeTileSize;
+		uint uiTileIndex = i2TileCoord.y * globalLayout.uiSmokeTilesX + i2TileCoord.x;
+		atomicOr(occupancy[uiTileIndex >> 5], 1u << (uiTileIndex & 31));
+	}
 }

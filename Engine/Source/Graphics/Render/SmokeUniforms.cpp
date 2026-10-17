@@ -70,14 +70,11 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 	// Every plane's smoke textures share plane 0's extent, so its tile counts serve every plane.
 	int64_t iTextureOneWidth = gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[0].mInfo.vkExtent3D.width;
 	int64_t iTextureOneHeight = gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[0].mInfo.vkExtent3D.height;
-	int64_t iMaxWidth = std::max(iTextureOneWidth, static_cast<int64_t>(gpTextureManager->mRenderTargetTextures.mSmokeTexturesTwo[0].mInfo.vkExtent3D.width));
-	int64_t iMaxHeight = std::max(iTextureOneHeight, static_cast<int64_t>(gpTextureManager->mRenderTargetTextures.mSmokeTexturesTwo[0].mInfo.vkExtent3D.height));
-	int64_t iSmokeTilesX = TileCount(iMaxWidth);
-	int64_t iSmokeTilesY = TileCount(iMaxHeight);
+	int64_t iSmokeTilesX = TileCount(iTextureOneWidth);
+	int64_t iSmokeTilesY = TileCount(iTextureOneHeight);
 	rGlobalLayout.uiSmokeTilesX = static_cast<uint32_t>(iSmokeTilesX);
 	rGlobalLayout.uiSmokeTilesY = static_cast<uint32_t>(iSmokeTilesY);
 	int64_t iDilateGroups = (iSmokeTilesX * iSmokeTilesY + shaders::kiOccupancyDilateGroupSize - 1) / shaders::kiOccupancyDilateGroupSize;
-	rGlobalLayout.fSmokeDepositTileScale = static_cast<float>(iMaxWidth) / static_cast<float>(iTextureOneWidth);
 
 	// World-area follows the visible area each frame: aspect inherits from the framebuffer,
 	// size grows with camera zoom-out. gSmokeSimulationArea acts as a margin multiplier.
