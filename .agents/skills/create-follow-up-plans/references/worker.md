@@ -73,6 +73,23 @@ Done when exactly one row's route was taken for each proposal.
 
 - This skill owns the decision on each proposed follow-up, grouping, duplicate detection, area and filename placement, collision handling, dependencies, metadata, and Coordination decisions; callers supply evidence, not those decisions.
 - Inspect missing facts; never invent evidence or behavior.
+- Never cite a `Temp/` file in a Plan body you write or edit — a new Plan, a
+  tooling-friction body, or a prose edit to an existing Plan: a session that
+  claims the Plan works in another worktree and cannot read this session's
+  gitignored scratch files. Restate such evidence as the durable facts it
+  holds — tracked `path:line`, symbol, and observed behavior.
+- When the Plan needs the file itself, copy it into the Plan's support folder
+  under [`Documents/Plans/AGENTS.md`](../../../../Documents/Plans/AGENTS.md)
+  `## Plan files`, stage the copy with `git add --`, which refuses an ignored
+  path, and cite the copy. The copy meets each of these conditions:
+  - it carries no absolute path;
+  - it carries no transcript path or transcript text;
+  - its relative links resolve from the support folder;
+  - a text copy ends with a newline;
+  - a text copy carries no trailing whitespace.
+
+  Content that breaks a condition is not copied: restate it in the Plan body as
+  tracked facts instead.
 - Read `Documents/AGENTS.md` and `Documents/Plans/AGENTS.md` completely. Their current Plan shape, metadata, dependency, and Coordination rules override this skill. This skill creates debt Plans only. Report a capability addition for main-agent routing by the deciding test in `Documents/AGENTS.md` `## Planning Trees`; do not disguise it as debt.
 - Reject each proposal class [`../SKILL.md`](../SKILL.md) `## When to use` excludes, stating why.
 - Tooling friction observed during a `/next-plan` run is a separate category.

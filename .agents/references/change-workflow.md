@@ -268,10 +268,12 @@ footer marks a follow-up Plan `unlanded in worktree` as `do now: yes` and the
 user directs it before the landing confirmation, main executes that Plan as
 approved scope of the current change regardless of the current change's tier,
 with the same recording, reclassification, and triggered steps; its Plan file is
-deleted from the worktree instead of landing, so nothing is claimed or
-completed. Every other proven out-of-scope leftover, including one the user
-directs to defer, goes through `/create-follow-up-plans`. One proven before the
-Step 6 dispatch is authored first, with the Plan path recorded as approved
+deleted from the worktree, and its support folder through
+`Remove-PlanSupportFolder.ps1` (`Documents/Plans/AGENTS.md` `## Plan files`),
+instead of landing, so nothing is claimed or completed. Every other proven
+out-of-scope leftover, including one the user directs to defer, goes through
+`/create-follow-up-plans`. One proven before the Step 6 dispatch is authored
+first, with the Plan path and its support-folder files recorded as approved
 scope, so that round's reviews cover it; one proven later routes here unchanged.
 
 #### Step 9 — Verify and land

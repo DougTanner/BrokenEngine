@@ -56,6 +56,16 @@ primary lacks, names the repair-script recovery route for a session whose
 primary branch was rewritten under it, and it may also carry the `retained`
 projection under `-ResumeRetained` or for that held-claim run.
 
+A claim run that passes validation also carries an `integrity` object:
+`totalCount` violations of the
+[`Documents/Plans/AGENTS.md`](../../../../Documents/Plans/AGENTS.md)
+`## Plan files` layout rules in the session tree, the first 16 as
+`rule`/`path` items, and `truncated`. Any violation, or any `validation`
+diagnostic with code `invalid-metadata`, stops the run as
+`claim.plans-integrity`, exit 2, with `status: blocked` and
+`nextAction: stop-report-to-user`, before any Plan is claimed. Main reports
+each listed item and diagnostic to the user in its next message.
+
 ## Reading the queue listing
 
 `Get-NextPlanList.ps1` runs only when [the `/next-plan` steps](../SKILL.md#steps) step 2 calls for
@@ -94,7 +104,7 @@ Plans yields `plan-name-ambiguous`, whose `message` names no match; the matching
 Plan paths are in the result's `candidates` array.
 
 If an exact or resolved request differs from the Plan the session already
-holds, the `/v8` claim envelope returns
+holds, the `/v9` claim envelope returns
 `claim.plan-mismatch` with `status: blocked`, exit 2, and
 `nextAction: stop-report-to-user`. Its `conflict` object carries the normalized
 `requestedPlan` and `heldPlan`; WorktreeCli makes the comparison and the wrapper
@@ -102,9 +112,9 @@ only projects those paths. The existing claim remains unchanged.
 
 ## Claim-exit result fields
 
-`Complete-NextPlan.ps1` reports the changed paths the landing commit must
-contain as `changes.items[].path`, counted by `changes.totalCount`, with
-`changes.truncated` flagging more paths than the listed items, and returns
+`Complete-NextPlan.ps1` writes every changed path the landing commit must
+contain, one per line, to the `Temp/` file its result names as
+`changes.path`, counted by `changes.totalCount`, and returns
 `nextAction: finalize-changes` only on the `ok` result and
 `checkpoint-followup-gate` on the `no-claim` result; every other completion
 result returns `stop-report-to-user`.

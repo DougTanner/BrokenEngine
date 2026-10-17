@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param([string] $Plan,[switch] $ResumeRetained,[switch] $UserAuthorizedTakeover)
 $ErrorActionPreference='Stop'; Set-StrictMode -Version Latest
-$result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v8';status='error';code='internal.error';message='Claim did not run.';nextAction='stop-report-to-user';claim=$null}
+$result=[ordered]@{schemaVersion='broken-engine-next-plan-claim-result/v9';status='error';code='internal.error';message='Claim did not run.';nextAction='stop-report-to-user';claim=$null}
 function Complete-Claim([int]$ExitCode,[string]$Status,[string]$Code,[string]$Message,[string]$NextAction){$result.status=$Status;$result.code=$Code;$result.message=$Message;$result.nextAction=$NextAction;[Console]::Out.Write(($result|ConvertTo-Json -Depth 100 -Compress));exit $ExitCode}
 # NUL-delimited porcelain v1 emits raw paths, so a path containing a space or a quotable character is never C-quoted;
 # a rename or copy record is followed by one extra field holding the original path, and both sides matter because both
@@ -39,6 +39,8 @@ function Get-TargetedNoneMessage($Context,[string]$RequestedPlan){
 	} catch {return $fallback}
 }
 try {
+ $sharedScripts=Join-Path $PSScriptRoot '..\..\..\scripts';if(-not (Test-Path -LiteralPath (Join-Path $sharedScripts 'AgentScriptCommon.psm1'))){$sharedScripts=Join-Path $PSScriptRoot '..\..\..\..\.agents\scripts'}
+ Import-Module (Join-Path $sharedScripts 'AgentScriptCommon.psm1') -Force -DisableNameChecking
  Import-Module (Join-Path $PSScriptRoot 'NextPlanWorkflowCommon.psm1') -Force -DisableNameChecking
  $targeted=-not [string]::IsNullOrWhiteSpace($Plan)
  if($ResumeRetained -and -not $targeted){Complete-Claim 2 'blocked' 'claim.usage-error' '-ResumeRetained is valid only with -Plan, because only a named Plan can carry work retained by an earlier deferral; no Plan was claimed and the worktree was not touched.' 'stop-report-to-user'}
@@ -109,6 +111,11 @@ try {
  if($validate.ExitCode -eq 2 -and [string]$projection['code'] -ceq 'busy'){Complete-Claim 2 'blocked' 'scheduler.busy' 'Another session held the plan scheduler for the full wait; no Plan was claimed. Tell the user and retry later.' 'retry-later'}
  if($validate.ExitCode -eq 1 -and [string]$projection['code'] -ceq 'guard-unavailable'){Complete-Claim 1 'error' 'scheduler.guard-unavailable' 'The plan scheduler lock storage is unusable; no Plan was claimed. Tell the user - this is not a Plan metadata problem.' 'stop-report-to-user'}
  if($validate.ExitCode -ne 0){$exit=if($validate.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'plan.validation-failed' 'Plan validation failed.' 'stop-report-to-user'}
+ # WorktreeCli reads every .md under Documents/Plans/ as a plan document, and one without valid metadata can fail every
+ # plan complete|reject, so a layout violation or an invalid-metadata diagnostic stops the run before any claim.
+ $violations=@(Get-AgentPlansLayoutViolation -RepositoryRoot $context.Worktree);$result.integrity=[ordered]@{totalCount=$violations.Count;items=@($violations|Select-Object -First 16);truncated=($violations.Count -gt 16)}
+ $invalidMetadata=@(@($projection['diagnostics'])|Where-Object{$null -ne $_ -and $_.PSObject.Properties.Name -ccontains 'code' -and [string]$_.code -ceq 'invalid-metadata'})
+ if($violations.Count -ne 0 -or $invalidMetadata.Count -ne 0){$firstViolation=if($violations.Count -ne 0){" (first: $($violations[0].rule) '$($violations[0].path)')"}else{''};$firstInvalid=if($invalidMetadata.Count -ne 0 -and $invalidMetadata[0].PSObject.Properties.Name -ccontains 'plan'){" (first: '$([string]$invalidMetadata[0].plan)')"}else{''};Complete-Claim 2 'blocked' 'claim.plans-integrity' "Documents/Plans/ holds $($violations.Count) layout violation(s)$firstViolation and $($invalidMetadata.Count) invalid-metadata diagnostic(s)$firstInvalid; no Plan was claimed. Report each listed integrity item and diagnostic to the user." 'stop-report-to-user'}
  if($null -ne $pattern){
   $candidates=[Collections.Generic.List[string]]::new()
   foreach($executablePlan in @($validation.plans)){

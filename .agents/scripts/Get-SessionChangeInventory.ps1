@@ -227,6 +227,8 @@ function Get-PathClass([string] $Path, [string] $Mode, [bool] $IsBinary) {
 	$leaf = $Path.Substring($Path.LastIndexOf('/') + 1)
 	$extension = if ($leaf.Contains('.')) { $leaf.Substring($leaf.LastIndexOf('.')).ToLowerInvariant() } else { '' }
 	$components = $Path -split '/'
+	# A text file in a Plan's support folder (Documents/Plans/<Area>/<Name>/) is Plan content whatever its extension.
+	if (-not $IsBinary -and $components.Count -gt 4 -and $components[0] -ceq 'Documents' -and $components[1] -ceq 'Plans') { return 'plan' }
 	if ($script:DualLanguageHeaders -ccontains $leaf.ToLowerInvariant()) { return 'dual-language-header' }
 	$underShaders = $false
 	for ($i = 0; $i -lt $components.Count - 2; $i++) {
@@ -539,8 +541,9 @@ function Get-RegionTable([string] $BaselineSha, [string] $HeadSha, [object[]] $U
 		# unindented line, usually the enclosing declaration), never the region's own text, so it is emitted
 		# only for the $script:SourceMembershipClasses classes; that set picks which regions carry one.
 		# The fixed ordinary-file mode and $false are safe: Get-PathClass uses the mode only to divert a
-		# gitlink, whose hunk header carries no context text, and the flag only to relabel 'other', while a
-		# binary path emits no @@ header at all.
+		# gitlink, whose hunk header carries no context text, and the flag only to relabel 'other' as
+		# 'binary' and to send a Plan support-folder file past the support-folder 'plan' rule to the
+		# extension rules, while a binary path emits no @@ header at all.
 		$regionPath = if ($null -ne $newPath) { $newPath } else { $oldPath }
 		$carriesSymbol = $script:SourceMembershipClasses -ccontains (Get-PathClass $regionPath '100644' $false)
 		$regions.Add([ordered]@{

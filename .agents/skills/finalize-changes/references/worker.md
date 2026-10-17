@@ -51,16 +51,17 @@ plus selector.
 Every preparation dispatch recovers `primary.path-overlap` itself under
 `## Recovery`.
 
-1. Run final preparation first when a claimed Plan finished.
-   - Run `plan complete`, or `plan reject --user-authorized-rejection` after
-     explicit user-authorized rejection.
-   - It rewrites direct dependency-children markers and deletes the target Plan
-     in the worktree, and returns the changed paths the landing commit must
-     contain, which the `/next-plan` claim-exit script reports as
-     `changes.items[].path`.
+1. Take the final preparation result first when a claimed Plan finished.
+   - Take the `/next-plan` step-10 `Complete-NextPlan.ps1` result the brief
+     supplies. When a Plan completion or rejection belongs to the landing and
+     the brief carries no such result, stop and report the missing input.
+   - Add each changed path listed in the file that result's `changes.path`
+     names to the landing set; its fields are in
+     [`claim-results.md`](../../next-plan/references/claim-results.md)
+     `## Claim-exit result fields`.
    - The claim stays held. Final preparation is not completion.
-   - Done when that command has returned those changed paths, or when no claimed
-     Plan finished.
+   - Done when a completion result and the changed-path file its
+     `changes.path` names are in hand, or when no claimed Plan finished.
 2. Create the authorized source landing commit, then squash it onto the
    session's merge-base with primary.
    - Reconciliation never advances primary.

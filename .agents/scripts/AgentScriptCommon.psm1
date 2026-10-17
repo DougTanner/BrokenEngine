@@ -199,4 +199,54 @@ function Get-AgentShaderSourceFingerprint([string] $Root, [string] $Revision, [s
 	return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.UTF8Encoding]::new($false).GetBytes($listing -join "`n"))).ToLowerInvariant()
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentShaderSourceFingerprint
+# The Documents/Plans/AGENTS.md `## Plan files` layout violations in the index and working tree, as {rule, path} rows
+# sorted ordinally. The index stands for presence, so a staged Plan and its staged support files count as present.
+# Every path deeper than <Area>/<Name>.md lies in the support folder <Area>/<Name>/, a nested Plan included. With
+# -Folder (a support-folder path), only the support-markdown and support-uncommitted rules apply, over that folder.
+function Get-AgentPlansLayoutViolation([string] $RepositoryRoot, [string] $Folder) {
+	$root = [IO.Path]::GetFullPath($RepositoryRoot, (Get-Location).ProviderPath)
+	$scope = if ($Folder) { ':(literal)' + $Folder + '/' } else { 'Documents/Plans' }
+	$listing = Invoke-AgentProcess 'git' @('-C', $root, 'ls-files', '-z', '--', $scope) $root
+	if ($listing.ExitCode -ne 0) { throw "git ls-files failed for '$scope': $($listing.Stderr.Trim())" }
+	$status = Invoke-AgentProcess 'git' @('-C', $root, 'status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignored=matching', '--', $scope) $root
+	if ($status.ExitCode -ne 0) { throw "git status failed for '$scope': $($status.Stderr.Trim())" }
+
+	$indexed = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+	foreach ($path in ($listing.Stdout -split "`0")) { if ($path.Length -ne 0) { [void] $indexed.Add($path) } }
+	$paths = [Collections.Generic.HashSet[string]]::new($indexed, [StringComparer]::Ordinal)
+	$uncommitted = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+	$fields = @($status.Stdout -split "`0")
+	for ($index = 0; $index -lt $fields.Count; $index++) {
+		$record = $fields[$index]
+		if ($record.Length -lt 4) { continue }
+		$state = $record.Substring(0, 2)
+		$path = $record.Substring(3)
+		[void] $paths.Add($path)
+		if ($state -ceq '??' -or $state -ceq '!!' -or $state[1] -ne ' ') { [void] $uncommitted.Add($path) }
+		# A rename or copy record carries one extra field, its original path.
+		if ($state.Contains('R') -or $state.Contains('C')) { $index++ }
+	}
+
+	$keys = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+	foreach ($path in $paths) {
+		$segments = $path.Substring('Documents/Plans/'.Length).Split('/')
+		if ($segments.Count -eq 1) {
+			if (-not $Folder -and $segments[0] -cne 'AGENTS.md') { [void] $keys.Add("$path`0root-file") }
+			continue
+		}
+		if ($segments.Count -eq 2) {
+			if (-not $Folder -and -not $segments[1].EndsWith('.md', [StringComparison]::Ordinal)) { [void] $keys.Add("$path`0area-file") }
+			continue
+		}
+		$supportFolder = "Documents/Plans/$($segments[0])/$($segments[1])"
+		if ($path.EndsWith('.md', [StringComparison]::Ordinal)) { [void] $keys.Add("$path`0support-markdown") }
+		if ($uncommitted.Contains($path)) { [void] $keys.Add("$path`0support-uncommitted") }
+		if (-not $Folder -and -not $indexed.Contains("$supportFolder.md")) { [void] $keys.Add("$supportFolder`0support-orphan") }
+	}
+	# NUL sorts below every path character, so sorting the keys orders the rows by path, then rule.
+	[string[]] $sorted = @($keys)
+	[Array]::Sort($sorted, [StringComparer]::Ordinal)
+	return @($sorted | ForEach-Object { $parts = $_.Split("`0"); [pscustomobject] @{ rule = $parts[1]; path = $parts[0] } })
+}
+
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentShaderSourceFingerprint, Get-AgentPlansLayoutViolation

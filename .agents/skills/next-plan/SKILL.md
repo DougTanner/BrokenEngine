@@ -208,11 +208,14 @@ The `argument-hint` value selects the Plan:
    user-authorized rejection.
 
    Success removes only direct-child dependency edges, deletes the selected Plan
-   in the worktree, reports the changed paths the landing commit must contain,
-   and returns `nextAction: finalize-changes`. That deletion is not reviewed
-   before the landing gate, per the
+   and its support folder in the worktree, reports the changed paths the landing
+   commit must contain, and returns `nextAction: finalize-changes`. That
+   deletion is not reviewed before the landing gate, per the
    [landing acceptance table](../finalize-changes/references/landing-acceptance-table.md)
    `## Acceptance table`.
+   Main passes that result verbatim into every `/finalize-changes` brief the run
+   dispatches, after acceptance, after rejection, and after changes are
+   requested at the landing confirmation.
    Done when that result is in hand; the claim stays held until landing
    succeeds, and `/finalize-changes` deletes it after primary advances.
 11. End the run per this file's `### IMPORTANT: Session-complete marker`: print
@@ -225,7 +228,7 @@ The `argument-hint` value selects the Plan:
 | Run outcome | Claim disposition | Next action |
 | --- | --- | --- |
 | implementation accepted and verified | held | run `Complete-NextPlan.ps1`, then the landing gate |
-| changes requested at the `/finalize-changes` landing confirmation | held | prepare only the difference at step 4, whose brief cites the existing preparation snapshot, with its `## In scope` and `## Out of scope`, in place of the deleted claimed Plan; run step 5, then step 8 on top of the unlanded candidate commit, because the request is a choice that came with approval under `### Implementation approval`, so step 7 presents only the difference when step 5 adds a user decision, widens scope, or raises the tier; skip steps 6, 9, and 10, which already ran, and skip the checkpoint for every later outcome of the run; then dispatch a fresh `/finalize-changes` preparation whose brief records that the claim exit already ran |
+| changes requested at the `/finalize-changes` landing confirmation | held | prepare only the difference at step 4, whose brief cites the existing preparation snapshot, with its `## In scope` and `## Out of scope`, in place of the deleted claimed Plan; run step 5, then step 8 on top of the unlanded candidate commit, because the request is a choice that came with approval under `### Implementation approval`, so step 7 presents only the difference when step 5 adds a user decision, widens scope, or raises the tier; skip steps 6, 9, and 10, which already ran, and skip the checkpoint for every later outcome of the run; then dispatch a fresh `/finalize-changes` preparation with the step-10 result, because the claim exit already ran |
 | user explicitly authorizes rejection | held | run `Complete-NextPlan.ps1 -Reject`, then the landing gate |
 | claim wrapper returns `claim.plan-mismatch` | held, identified only by `conflict.heldPlan` | run the checkpoint once, retain the held claim and all work, report requested and held Plans, and stop; never complete, reject, or defer implicitly |
 | approval refused, or a blocker whose authoritative result explicitly reports a held claim, with no separate defer instruction | held | run the checkpoint once, retain the claim and all work, report and stop; never complete, reject, or defer implicitly, and any checkpoint work created stays with the retained session |

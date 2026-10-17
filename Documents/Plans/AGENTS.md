@@ -42,6 +42,20 @@ Plans live in area subdirectories, never directly at `Plans/`. The area is decid
 
 A plan spanning areas goes to the area owning most of its named files; a tie stays in `Engine/`.
 
+Every Plan sits exactly at `Documents/Plans/<Area>/<Name>.md` and may own a
+support folder named after its file without `.md`
+(`Documents/Plans/<Area>/<Name>/`), holding the files the Plan needs, every
+one committed with the Plan. Each file keeps its real format and extension,
+except that a Markdown file is saved as `.txt`: the scheduler reads every
+`.md` under this tree as a plan document, so no `.md` file lives in a support
+folder. No support file's name contains a comma: the landing splits its owned
+paths on commas. Every support folder has its Plan beside it, and an area holds only
+Plans, their support folders, and `AGENTS.md`. Delete a support folder only
+with `pwsh -NoProfile -File .agents/scripts/Remove-PlanSupportFolder.ps1 -Plan '<Plan path>'`,
+never with a deletion command of your own; `/next-plan`'s claim exit runs it
+for every Plan it completes or rejects, and a Plan removed by hand takes its
+folder through it too.
+
 An executable plan provides metadata, `# Title`, context, design, critical files, a required `## In scope` section naming the specific functions, members, or regions to change, required `## Out of scope` boundaries, risk triggers/invariants, and observable acceptance criteria when a diff is not decisive. Put directional prerequisites in metadata, not prose.
 
 The two scope sections are the control the finished change is measured against (`.agents/references/scope-authorization.md`), so write each boundary precisely enough to enforce.

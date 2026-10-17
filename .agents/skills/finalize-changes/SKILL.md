@@ -32,6 +32,8 @@ included — so a re-preparation dispatch passes it unchanged rather than trimmi
 it to what is still dirty. The finalizer produces the landing acceptance table
 itself, inside the workflow in `references/worker.md`, from the prepared diff
 final preparation and reconciliation produced — do not reuse an earlier table.
+When a Plan completion or rejection belongs to the landing, the brief also
+carries the `/next-plan` step-10 `Complete-NextPlan.ps1` result verbatim.
 
 The brief also carries the typed review and hygiene handoffs the dispatching
 session holds for the rows that table cites, either verbatim or as a `Temp/`

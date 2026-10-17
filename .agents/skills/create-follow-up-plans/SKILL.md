@@ -48,12 +48,13 @@ Return the shared handoff from `.agents/references/subagent-handoff.md`
 `## Handoffs`, including every proposal exactly once. The shared `Findings`
 value is `none`. Each shared `Changed files` row names a created Plan with its
 path, gap, and metadata, or an updated existing Plan with its path and whether
-the update is prose-only or a dependency update. Each shared `Decisive checks`
-row names a duplicate mapping from proposal to existing Plan path, a Plan's
-Change Workflow tier and trigger plus its dependencies and Coordination, the
-plan validate result, or the required verification/finalization route. The
-shared `Build required` value is `none`. Each shared `Residuals` row names an
-unrecorded item, conflict, or blocker and reason; use `none` when absent.
+the update is prose-only or a dependency update, or a support-folder file with
+its Plan's path. Each shared `Decisive checks` row names a duplicate mapping
+from proposal to existing Plan path, a Plan's Change Workflow tier and trigger
+plus its dependencies and Coordination, the plan validate result, or the
+required verification/finalization route. The shared `Build required` value
+is `none`. Each shared `Residuals` row names an unrecorded item, conflict, or
+blocker and reason; use `none` when absent.
 
 ## References
 
