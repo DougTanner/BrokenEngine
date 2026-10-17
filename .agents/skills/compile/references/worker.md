@@ -197,13 +197,17 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
      worktree.
    - Write every build's captured `broken-engine-build-result/v1` envelope
      verbatim into one Markdown file there, unique to this dispatch and named
-     `compile-<UTC yyyyMMddTHHmmssfffZ>-<process id>.md`.
+     `compile-<UTC yyyyMMddTHHmmssfffZ>-<process id>.md` from the first build
+     call's own UTC time and process id.
    - The file carries a single `##` heading for the dispatch, with one fenced
      block per build.
-   - The first build's own PowerShell call creates the file and the heading,
-     and each later build's own call appends its block to the same file. Each
-     block is written from that call's own captured output — never a new
-     script, never a retyped envelope.
+   - The first build's own PowerShell call creates the file and the heading and
+     prints the file's repo-relative path. Each later build's own call appends
+     its block to that exact path, written as a literal in the command text;
+     never find the file by name pattern, process id, or modification time,
+     because other dispatches' files share the directory. Each block is written
+     from that call's own captured output — never a new script, never a
+     retyped envelope.
    - Give the call the maximum available execution timeout so the 500-second
      target-lock wait is not preempted. Never use `Start-Job`, a trailing `&`, a
      fire-and-forget watcher, or a host background-execution parameter such as

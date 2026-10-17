@@ -290,13 +290,19 @@ Execution card:
 - Acceptance checks: <check and expected observation; a criterion for new or
   fixed behavior names a check the unedited tree could not pass, and a bug-fix
   criterion (one stating a defect no longer occurs) also names its pre-change
-  red run: an /external-diagnose-bug Reproducing signal, or a run on a build of
-  the unedited tree; a criterion compared against the unedited tree, such as a
-  result that must stay unchanged, names that pre-change baseline run; the card
-  marks each red run on a build of the unedited tree and each pre-change
-  baseline run `before the first edit`, the literal text the Change Workflow
+  red run: an /external-diagnose-bug Reproducing signal, a run on a build of
+  the unedited tree, or, for a defect in the instruction prose
+  /progressive-disclosure-review reviews, a read at the session baseline commit
+  that shows the defect unambiguously, citing the defective rule by path and
+  line and the case it mishandles; a criterion compared against the unedited
+  tree, such as a result that must stay unchanged, names that pre-change
+  baseline run, which for that instruction prose may be a read at the session
+  baseline commit; the card marks each red run on a build of the unedited tree
+  and each pre-change baseline run other than a read at the session baseline
+  commit `before the first edit`, the literal text the Change Workflow
   Implement and propagate step's pre-edit bullets key on to record that run
-  before the first slice, and cites a Reproducing signal as-is, unmarked; when
+  before the first slice, and cites a Reproducing signal or a read at the
+  session baseline commit as-is, unmarked; when
   the proven cause is a general rule, the bug-fix check also covers one input
   beyond the reported case that a patch for only that case would still fail,
   settled by a code read of the general fix when the agent settling it is
