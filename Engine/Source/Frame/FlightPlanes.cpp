@@ -27,7 +27,7 @@ FlightPlanes::FlightPlanes(std::span<const FlightPlane> planes)
 	}
 }
 
-int64_t FlightPlanes::Count() const
+_Ret_range_(1, kiMaxFlightPlanes) int64_t FlightPlanes::Count() const
 {
 	return std::ssize(mPlanes);
 }

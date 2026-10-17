@@ -189,7 +189,8 @@
   render frame sent. Returns
   `{"publishedFrames":int,"basisCoord":[x,y],"water":{"origin":[x,y],"reducedNoiseOrigin":[x,y],"noiseFrequency":float}}`
   plus a `shadow`, `lighting`, and `smoke` object each shaped
-  `{"currentArea":[x,y,z,w],"previousArea":[x,y,z,w],"historyResets":int}`. Take
+  `{"currentArea":[x,y,z,w],"previousArea":[x,y,z,w],"historyResets":int}`;
+  `smoke` reports flight plane 0's area pair, the pair wind reads. Take
   every sample with the client restored (`window_state {"minimized":false}`): a
   minimized client defers swapchain recreation, publishes no frame, and leaves
   the whole snapshot standing still. `publishedFrames` counts publications, so

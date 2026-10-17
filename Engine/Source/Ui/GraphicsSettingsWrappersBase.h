@@ -32,6 +32,7 @@ extern Wrapper gUiOpacity;
 extern Wrapper gUiFontScale;
 extern Wrapper gUiTheme;
 extern Wrapper gSmokeEnabled;
+extern Wrapper gSmokeLayerStagger;
 extern Wrapper gWindEnabled;
 extern Wrapper gLightingEnabled;
 extern Wrapper gSunAngleOverride;

@@ -42,12 +42,13 @@ void main()
 	// tile grid so the dilation finds the cells where wind actually was last frame.
 	// f2WindTilesInverse = (1/uiWindTilesX, 1/uiWindTilesY) folded CPU-side (WindUniforms.cpp).
 	vec2 f2OutputUV = (vec2(uiTileX, uiTileY) + vec2(0.5f)) * globalLayout.f2WindTilesInverse;
-	vec2 f2WorldPosition = VisibleAreaToWorld(f2OutputUV, globalLayout.f4SmokeArea);
-	vec4 f4Prev = globalLayout.f4PreviousSmokeArea;
-	// f2PreviousSmokeAreaSizeInverse = (1/(z-x), 1/(w-y)) folded CPU-side (SmokeUniforms.cpp), preserving component order.
+	// Wind lies in smoke plane 0's area pair.
+	vec2 f2WorldPosition = VisibleAreaToWorld(f2OutputUV, globalLayout.pf4SmokeAreas[0]);
+	vec4 f4Prev = globalLayout.pf4PreviousSmokeAreas[0];
+	// pf2PreviousSmokeAreaSizeInverses = (1/(z-x), 1/(w-y)) folded CPU-side (SmokeUniforms.cpp), preserving component order.
 	vec2 f2PrevUV = vec2(
-		(f2WorldPosition.x - f4Prev.x) * globalLayout.f2PreviousSmokeAreaSizeInverse.x,
-		(f2WorldPosition.y - f4Prev.y) * globalLayout.f2PreviousSmokeAreaSizeInverse.y);
+		(f2WorldPosition.x - f4Prev.x) * globalLayout.pf2PreviousSmokeAreaSizeInverses[0].x,
+		(f2WorldPosition.y - f4Prev.y) * globalLayout.pf2PreviousSmokeAreaSizeInverses[0].y);
 	int iPrevTileX = int(floor(f2PrevUV.x * float(uiTilesX)));
 	int iPrevTileY = int(floor(f2PrevUV.y * float(uiTilesY)));
 

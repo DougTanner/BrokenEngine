@@ -377,7 +377,7 @@ void main()
 		vec2 f2PositionAtPlane = FlightPlanePosition(globalLayout, mainLayout, f3InWorldPosition, iPlane);
 		float fHeightFraction = clamp((f3InWorldPosition.z - globalLayout.pfFlightPlaneHeights[iPlane]) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
 		float fSmokeFade = 1.0f - fHeightFraction * fHeightFraction;
-		color = AddSmoke(globalLayout, color, f2PositionAtPlane, pSmokeSamplers[iPlane], fSmokeFade * mainLayout.fPhysicallyBasedRenderingSmoke, pf4Lighting);
+		color = AddSmoke(globalLayout, color, f2PositionAtPlane, pSmokeSamplers[iPlane], iPlane, fSmokeFade * mainLayout.fPhysicallyBasedRenderingSmoke, pf4Lighting);
 	}
 #endif
 

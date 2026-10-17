@@ -231,19 +231,21 @@ void CommandBufferRecordMain::RecordSmokeEmit(VkCommandBuffer vkCommandBuffer, i
 		rSmokeTextureOne.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kColorAttachment);
 		rSmokeTextureOne.RecordBeginRenderPass(vkCommandBuffer);
 		gpPipelineManager->mpPipelines[kPipelineSmokeClearA].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f});
-		// The deposit maps hold one pipeline per (collection, plane); each targets its own plane's render pass.
+		// The deposit maps hold one pipeline per (collection, plane); each targets its own plane's render pass. Push
+		// constant x 2 selects the smoke area and y the plane, so each plane deposits through its own published area.
+		XMFLOAT4 f4DepositPushConstants {2.0f, static_cast<float>(i), 0.0f, 0.0f};
 		for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmokeAxisAligned])
 		{
 			if (pPipeline->mInfo.vkTargetRenderPass == rSmokeTextureOne.mVkRenderPass)
 			{
-				pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {2.0f, 0.0f, 0.0f, 0.0f});
+				pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, f4DepositPushConstants);
 			}
 		}
 		for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmoke])
 		{
 			if (pPipeline->mInfo.vkTargetRenderPass == rSmokeTextureOne.mVkRenderPass)
 			{
-				pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {2.0f, 0.0f, 0.0f, 0.0f});
+				pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, f4DepositPushConstants);
 			}
 		}
 		vkCmdEndRenderPass(vkCommandBuffer);

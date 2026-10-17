@@ -12,6 +12,12 @@ layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 	GlobalLayout globalLayout;
 };
 
+// f4Pipeline.x is this dispatch's flight-plane index
+layout(push_constant) uniform pushConstants
+{
+	PushConstantsLayout pushConstantsLayout;
+};
+
 layout (set = 1, binding = 1) uniform sampler2D textureSampler;
 layout (set = 1, binding = 2) uniform sampler2D noiseTextureSampler;
 layout (set = 1, binding = 3) uniform sampler2D windTextureSamplerOne;
@@ -49,9 +55,10 @@ void main()
 
 	// Output texcoord (current-area UV) -> world position -> input texcoord (previous-area UV).
 	// Scale-aware: handles both translation AND zoom-driven area-size change.
+	int iPlane = int(pushConstantsLayout.f4Pipeline.x);
 	vec2 f2OutputTexcoord = (vec2(uiX, uiY) + vec2(0.5f)) / vec2(i2Size);
-	vec2 f2WorldPosition  = VisibleAreaToWorld(f2OutputTexcoord, globalLayout.f4SmokeArea);
-	vec2 f2InputTexcoord  = WorldToSmokeTexcoord(globalLayout.f4PreviousSmokeArea, f2WorldPosition);
+	vec2 f2WorldPosition  = VisibleAreaToWorld(f2OutputTexcoord, globalLayout.pf4SmokeAreas[iPlane]);
+	vec2 f2InputTexcoord  = WorldToSmokeTexcoord(globalLayout.pf4PreviousSmokeAreas[iPlane], f2WorldPosition);
 
 	if (gl_LocalInvocationIndex == 0)
 		suHasSmoke = 0;
@@ -60,8 +67,10 @@ void main()
 	vec4 f4Result = vec4(0.0f);
 	if (bInBounds)
 	{
-		vec2 f2WindSample = SmokeWindSample(globalLayout, windTextureSamplerOne, windTextureSamplerTwo, f2OutputTexcoord);
-		f4Result = SmokeSpread(globalLayout, textureSampler, noiseTextureSampler, f2InputTexcoord, f2WorldPosition, f2WindSample, globalLayout.fSmokeNoiseScaleOne);
+		// Wind lies in plane 0's current area, not necessarily this plane's, so sample it at this world position there.
+		vec2 f2WindTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[0], f2WorldPosition);
+		vec2 f2WindSample = SmokeWindSample(globalLayout, windTextureSamplerOne, windTextureSamplerTwo, f2WindTexcoord);
+		f4Result = SmokeSpread(globalLayout, textureSampler, noiseTextureSampler, f2InputTexcoord, f2WorldPosition, f2WindSample, globalLayout.fSmokeNoiseScaleOne, iPlane);
 		imageStore(outputImage, ivec2(uiX, uiY), f4Result);
 	}
 

@@ -20,6 +20,7 @@ Wrapper gUiOpacity(0.5f, 0.0f, 1.0f);
 Wrapper gUiFontScale(1.0f, 0.5f, 3.0f);
 Wrapper gUiTheme(UiTheme::kNavalSteel, std::vector<UiTheme> {UiTheme::kNavalSteel, UiTheme::kDarkAmber, UiTheme::kMidnightMauve});
 Wrapper gSmokeEnabled(true);
+Wrapper gSmokeLayerStagger(true);
 Wrapper gWindEnabled(true);
 Wrapper gLightingEnabled(true);
 Wrapper gSunAngleOverride(1.15f, 0.0f, XM_2PI);

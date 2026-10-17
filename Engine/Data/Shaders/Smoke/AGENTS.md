@@ -1,12 +1,18 @@
 # Smoke Shaders - Sparse Camera-Following Simulation
 
-Smoke is a client-only 2D density field per flight plane; every plane's field covers the same camera-following world rectangle and refreshes on the same cadence. Objects deposit into the fields, two compute passes advect and diffuse each plane's field, and world shaders sample every plane, lowest first, through shared smoke helpers.
+Smoke is a client-only 2D density field per flight plane; each plane's field follows the camera on its own held world rectangle and refreshes on its own frames. Objects deposit into the fields, two compute passes advect and diffuse each plane's field, and world shaders sample every plane, lowest first, through shared smoke helpers.
 
 ## Frame and Remap Contract
 
-Each refresh runs pass B, pass A, then deposit. Pass B reads the previous refresh's pass-A output in previous-area coordinates without remapping. Pass A performs the single previous-area-to-current-area remap. Fresh deposits then enter pass A's output so consumers see them in the same frame. At Smoke Update Cadence 1 every frame refreshes.
+Each refresh runs pass B, pass A, then deposit. Pass B reads the previous refresh's pass-A output in previous-area coordinates without remapping. Pass A performs the single previous-area-to-current-area remap. Fresh deposits then enter pass A's output so consumers see them in the same frame.
 
-A frame between refreshes runs no spread, and every reader samples the texture where it lies; deposits keep landing in it. The area publication for those frames is owned by Render (`../../../Source/Graphics/Render/AGENTS.md` `## Precision and History`). The dilate radius stays 2 tiles at every cadence, so smoke whose per-refresh gather offset passes that radius-2 halo has no active output tile and is deleted, and strong-wind plume fronts thin at higher cadence.
+A frame between a plane's refreshes runs no spread for that plane, and every
+reader samples its texture where it lies; deposits keep landing in it. The
+refresh schedule and the area publication for those frames are owned by Render
+(`../../../Source/Graphics/Render/AGENTS.md` `## Precision and History`). The
+dilate radius stays 2 tiles at every step count, so smoke whose per-refresh
+gather offset passes that radius-2 halo has no active output tile and is
+deleted, and strong-wind plume fronts thin at higher step counts.
 
 The asymmetric remap requires matching occupancy dilation: B uses direct tile lookup, while A remaps output-tile centers into the previous grid before lookup. Both variants union input activity with existing output occupancy so texels left behind by camera movement are revisited and cleared.
 
@@ -27,4 +33,4 @@ The asymmetric remap requires matching occupancy dilation: B uses direct tile lo
 - Enable, disable, and recreation use indirect fullscreen clears. Texture occupancy then drains through the following spread frame.
 - Wind is sampled in its own area. The UV conversion deliberately negates rescaled X while inverted UV Y cancels the world-to-texture Y sign; changing one sign independently reverses advection.
 
-Wind (`../Wind/AGENTS.md`) owns the velocity field and consumes smoke's populated world-area uniforms.
+Wind (`../Wind/AGENTS.md`) owns the velocity field and how it reads the smoke area arrays.

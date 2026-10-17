@@ -58,13 +58,13 @@ struct GlobalLayout
 	vec4 f4PhysicallyBasedRenderingSunColorObjectsImageBasedLighting INIT;  // (dot(f4SunColor.rgb, kRec709) / fPhysicallyBasedRenderingDayBrightness) * f4PhysicallyBasedRenderingSunColorObjects (Model.frag IBL specular sun term)
 	vec4 f4PhysicallyBasedRenderingMoonColorObjectsImageBasedLighting INIT; // (dot(f4MoonColor.rgb, kRec709) / fPhysicallyBasedRenderingDayBrightness) * f4PhysicallyBasedRenderingMoonColorObjects (Model.frag IBL specular moon term)
 
-	vec4 f4SmokeArea INIT;
-	vec4 f4PreviousSmokeArea INIT;
-	vec2 f2PreviousSmokeAreaSizeInverse INIT; // (1/(z-x), 1/(w-y)) of f4PreviousSmokeArea (Smoke/Wind OccupancyDilate previous-area remap)
+	vec4 pf4SmokeAreas[kiMaxFlightPlanes] INIT; // Per flight plane: the world area its smoke texture lies in this frame; wind reads [0]
+	vec4 pf4PreviousSmokeAreas[kiMaxFlightPlanes] INIT; // Per flight plane: the area held before this frame's refresh, equal to pf4SmokeAreas on a skip; wind reads [0]
+	vec2 pf2PreviousSmokeAreaSizeInverses[kiMaxFlightPlanes] INIT; // (1/(z-x), 1/(w-y)) of each pf4PreviousSmokeAreas entry (Smoke/Wind OccupancyDilate previous-area remap)
 	float fSmokeMax INIT;
 	float fSmokePower INIT;
-	float fSmokeDecay INIT; // gSmokeDecay^fSmokeStepCount: one refresh decays for every frame since the previous refresh
-	float fSmokeStepCount INIT; // Frames since the previous smoke refresh; scales spread offsets and edge decay
+	float pfSmokeDecays[kiMaxFlightPlanes] INIT; // Per flight plane: gSmokeDecay^pfSmokeStepCounts: one refresh decays for every frame since that plane's previous refresh
+	float pfSmokeStepCounts[kiMaxFlightPlanes] INIT; // Per flight plane: frames since its previous smoke refresh; scales spread offsets and edge decay
 	float fSmokeColorMin INIT;
 	float fSmokeColorMultiplier INIT;
 	float fSmokeLightingMultiplier INIT;
@@ -76,7 +76,7 @@ struct GlobalLayout
 	float fSmokeNoiseScaleTwo INIT;
 	float fSmokeCurlScale INIT; // Noise UV per world meter (SmokeCurlOffset); left raw because it multiplies the per-invocation world position
 	vec2 f2SmokeCurlTimeOffset INIT; // gSmokeCurlSpeed-scaled circular time offset in noise UV, from fElapsedTime only (SmokeCurlOffset)
-	vec2 f2SmokeCurlOffsetScale INIT; // Finer smoke texel in meters / signed f4SmokeArea extents: smoke UV per unit curl per unit strength per step; 0 (both curl strengths 0) disables (SmokeCurlOffset)
+	vec2 f2SmokeCurlOffsetScale INIT; // Finer smoke texel in meters / signed extents of any pf4SmokeAreas entry (all share one construction, so the size cancels): smoke UV per unit curl per unit strength per step; 0 (both curl strengths 0) disables (SmokeCurlOffset)
 	float fSmokeCurlStrengthLow INIT; // Calm-wind curl strength; left raw because SmokeCurlOffset blends it toward High by the per-invocation wind factor
 	float fSmokeCurlStrengthHigh INIT; // Strong-wind curl strength; left raw for the same per-invocation blend
 	float fSmokeObjectHeightInverse INIT;

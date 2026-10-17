@@ -241,12 +241,14 @@ void PipelineManager::CreateSmokeWindPipelines()
 			{.eKind = kSmokeOccupancyDilate, .name = "SmokeOccupancyDilate", .shaderCrc = data::kShadersSmokeSmokeOccupancyDilatecompCrc, .pVkSourceOccupancyBuffer = &pVkOccupancyBuffers[0], .pVkActiveTileBuffer = &gpBufferManager->mSmokeActiveTileVkBuffer, .pVkDestinationOccupancyBuffer = &pVkOccupancyBuffers[1]},
 			{.eKind = kSmokeOccupancyDilateRemap, .name = "SmokeOccupancyDilateRemap", .shaderCrc = data::kShadersSmokeSmokeOccupancyDilateRemapcompCrc, .pVkSourceOccupancyBuffer = &pVkOccupancyBuffers[1], .pVkActiveTileBuffer = &gpBufferManager->mSmokeActiveTileVkBuffer, .pVkDestinationOccupancyBuffer = &pVkOccupancyBuffers[0]},
 		};
+		// The remap dilate reads its plane index from push constant x for the plane's area pair; the plain dilate shares
+		// this description, declares no push-constant block, and ignores it.
 		for (const SmokeOccupancyPipelineDescription& rDescription : pSmokeOccupancyPipelineDescriptions)
 		{
 			SmokePipeline(i, rDescription.eKind).Create(
 			{
 				.name = rDescription.name,
-				.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible},
+				.flags = {PipelineFlags::kCompute, PipelineFlags::kIndirectHostVisible, PipelineFlags::kPushConstants},
 				.ppShaders = {&mShaders.at(rDescription.shaderCrc)},
 				.descriptorInfos =
 				{
@@ -281,7 +283,7 @@ void PipelineManager::CreateSmokeWindPipelines()
 		SmokePipeline(i, kSmokeSpreadComputeA).Create(
 		{
 			.name = "SmokeSpreadComputeA",
-			.flags = {PipelineFlags::kCompute, PipelineFlags::kUpdateAfterBind},
+			.flags = {PipelineFlags::kCompute, PipelineFlags::kUpdateAfterBind, PipelineFlags::kPushConstants},
 			.ppShaders = {&mShaders.at(data::kShadersSmokeSmokeSpreadOnecompCrc)},
 			.descriptorInfos =
 			{

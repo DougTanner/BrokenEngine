@@ -314,11 +314,10 @@ static void PopulateShadowArea(int64_t iCommandBuffer, shaders::GlobalLayout& rG
 		++gPresentationContinuity.shadow.iHistoryResets;
 	}
 
-	// Refresh on schedule, or early once the live visible area leaves the held area (crop safety).
-	static int64_t siShadowRenderFrame = 0;
-	++siShadowRenderFrame;
+	// Refresh on schedule, or early once the live visible area leaves the held area (crop safety). Shadow phase 1
+	// against lighting's phase 0 keeps the two refreshes off the same frame whenever their cadences share a factor.
 	bool bShadowRefreshFrame = gbShadowTemporalReset || !sTemporalAreaLatch.bInitialized
-	                        || siShadowRenderFrame % gShadowUpdateCadence.Get<int64_t>() == 0
+	                        || (gpGraphics->miFrameCounter + 1) % gShadowUpdateCadence.Get<int64_t>() == 0
 	                        || !IsVisibleAreaInsideHeldArea(engine::gpCamera->mf4RenderVisibleArea, sTemporalAreaLatch.f4CurrentArea);
 	if (bShadowRefreshFrame)
 	{

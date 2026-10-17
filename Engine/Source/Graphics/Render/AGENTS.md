@@ -24,6 +24,12 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
   indirect work from `RenderFrameGlobal`. A skipped frame republishes the held
   area pair and blend and writes zero indirect work; the elevation render-pass
   clear and every layout transition still run.
+- The lighting and terrain shadow schedules and the smoke layer stagger read
+  `Graphics::miFrameCounter`, which `Graphics::RenderGlobal` advances once
+  before `RenderFrameGlobal`. Lighting refreshes on schedule when
+  `miFrameCounter % lightingCadence == 0`, terrain shadows when
+  `(miFrameCounter + 1) % shadowCadence == 0`. Forced refreshes — resets, first
+  use, and crop safety — stay outside the schedule.
 - Disabling player-facing Lighting zeroes area-, point-, and shield-light deposit draws without hiding their visible sprites or shield geometry. The disable edge forces one reset refresh: spread draws stay off, their unconditional attachment clears feed a black combine/temporal/history publication, and later cadence or crop refreshes remain suppressed until Lighting is enabled again.
 - Downstream thresholds that the amplitude must cross before the effect applies may clear an upstream count only when they also skip the corresponding array write. Keep count and data publication paired.
 - Write-combined mapped layouts are write-only. Compute dependent values in CPU staging state and copy each populated region once.
@@ -39,7 +45,16 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
 - Lighting snaps its footprint to the light-deposit grid; shadow snaps to its own world-sized texel grid. Both publish current and previous areas for temporal sampling, and recreation reseeds history from the current area for one frame.
 - Each frame that publishes also copies what it published — camera basis, water origins, and each owner's area pair and history-reset count — into the `gPresentationContinuity` snapshot in `Render.h`, which only the agent probe reads (`../../Agent/AGENTS.md`). A new retained or reduced value that a continuity guarantee covers joins it; a frame that skips rendering leaves it untouched.
 - Smoke and wind spread remap through current and previous world areas. Their enable, disable, recreate, and occupancy paths must clear or drain stale tiles without relying on command-buffer re-recording.
-- Smoke refreshes on its update cadence, or earlier once the live visible area leaves the held smoke area (crop safety, no margin). A skipped frame publishes the held area as both current and previous and zeroes the dilate dispatch, so wind's remap is the identity that frame and the next refresh remaps held to current for both.
+- Each flight plane's smoke keeps its own held area, step count, and decay.
+  With `gSmokeLayerStagger` on, a frame without a forced refresh refreshes only
+  plane `miFrameCounter % gpFlightPlanes->Count()`, which steps by its frames
+  since its last refresh; off, every live plane refreshes every frame. A smoke
+  clear and the disabled path refresh every plane, and crop safety refreshes
+  plane k early once the live visible area leaves plane k's held area (no
+  margin). A skipped plane publishes its held area as both current and previous
+  and zeroes its dilate dispatch, so its next refresh remaps held to current.
+  Wind and wind deposits read plane 0's area pair, so wind's remap is the
+  identity on frames plane 0 skips.
 
 ## Area Roles
 

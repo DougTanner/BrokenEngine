@@ -30,7 +30,7 @@ layout (scalar, set = 1, binding = 3) buffer ownOccupancyBuffer
 };
 
 // Before SmokeSpreadComputeB, TextureOne is sampled at the output tile UV without cross-frame remapping, so use a
-// direct Chebyshev tile lookup of radius 2 at every Smoke Update Cadence. Union TextureTwo occupancy at the output
+// direct Chebyshev tile lookup of radius 2 at every step count. Union TextureTwo occupancy at the output
 // index to rewrite stale storage, clearing it so the spread re-marks only nonzero output.
 // SmokeSpreadComputeA samples TextureTwo with the separate scale-aware SmokeOccupancyDilateRemap pass.
 void main()

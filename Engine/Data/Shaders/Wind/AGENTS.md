@@ -25,4 +25,4 @@ curl strength Low/High, so retuning the thresholds also changes smoke swirl.
 - Occupancy is rebuilt from nonzero output, so decay must reach exact zero. Residual values prevent active tiles from retiring and turn sparse work into persistent work.
 - Stored velocity is world-oriented with +Y north. Every conversion between world velocity and texture UV flips Y, including advection and radial deposits.
 
-Smoke populates current and previous area uniforms before wind reads them. Record-once command buffers submit both ping-pong variants; runtime texture selection, occupancy, and GPU-written active lists determine which work executes.
+Smoke populates its per-plane current and previous area arrays before wind reads plane 0's slot of each. Record-once command buffers submit both ping-pong variants; runtime texture selection, occupancy, and GPU-written active lists determine which work executes.

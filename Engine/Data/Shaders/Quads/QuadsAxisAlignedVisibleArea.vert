@@ -51,7 +51,7 @@ void main()
 	}
 	else if (int(pushConstantsLayout.f4Pipeline.x) == 2)
 	{
-		f4VisibleArea = globalLayout.f4SmokeArea;
+		f4VisibleArea = globalLayout.pf4SmokeAreas[int(pushConstantsLayout.f4Pipeline.y)];
 	}
 	else
 	{

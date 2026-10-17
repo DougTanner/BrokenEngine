@@ -25,7 +25,7 @@ public:
 
 	explicit FlightPlanes(std::span<const FlightPlane> planes);
 
-	[[nodiscard]] int64_t Count() const;
+	[[nodiscard]] _Ret_range_(1, kiMaxFlightPlanes) int64_t Count() const;
 	[[nodiscard]] const FlightPlane& Plane(int64_t iIndex) const;
 	[[nodiscard]] const FlightPlane& Lowest() const;
 	[[nodiscard]] const FlightPlane& Highest() const;

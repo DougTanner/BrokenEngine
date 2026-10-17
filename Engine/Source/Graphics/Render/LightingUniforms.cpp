@@ -101,10 +101,8 @@ void RenderLightingGlobal(int64_t iCommandBuffer)
 		gbLightingTemporalReset = true;
 	}
 
-	static int64_t siLightingRefreshFrame = 0;
 	int64_t iLightingUpdateCadence = gLightingUpdateCadence.Get<int64_t>();
-	++siLightingRefreshFrame;
-	bool bScheduledLightingRefresh = gbLightingTemporalReset || (bLightingEnabled && siLightingRefreshFrame % iLightingUpdateCadence == 0);
+	bool bScheduledLightingRefresh = gbLightingTemporalReset || (bLightingEnabled && gpGraphics->miFrameCounter % iLightingUpdateCadence == 0);
 
 	// Generate run-unique seed once and reuse every frame: stable noise pattern across the run, no temporal flicker.
 	static const uint32_t suiRandomSeed = []

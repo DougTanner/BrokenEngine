@@ -82,7 +82,8 @@ All GPU buffers: vertex (terrain, water, models), uniform (per-framebuffer view/
   input occupancy and read-and-clears its output texture's prior occupancy as a
   stale-storage union term, then the spread re-marks nonzero output. Smoke
   dilates dispatch through per-framebuffer host-visible indirect commands so a
-  smoke skip frame dispatches nothing and leaves occupancy intact; wind still
+  frame that skips a plane dispatches nothing for it and leaves its occupancy
+  intact; wind still
   resets its occupancy with a fill. Wind keeps a separate occupancy and
   active-tile-list pair per ping-pong texture, with both spread variants
   recorded and runtime state plus indirect dispatch selecting useful work.

@@ -58,8 +58,8 @@ void RenderWindGlobal(int64_t iCommandBuffer)
 
 	rGlobalLayout.fWindTextureIndex = static_cast<float>(giWindTextureIndex);
 
-	// Wind shares smoke's f4SmokeArea / f4PreviousSmokeArea (already populated by RenderSmokeGlobal earlier in
-	// the frame per the global-pass ordering contract); RenderWindGlobal does not write them.
+	// Wind reads smoke plane 0's area pair, pf4SmokeAreas[0] / pf4PreviousSmokeAreas[0] (already populated by
+	// RenderSmokeGlobal earlier in the frame per the global-pass ordering contract); RenderWindGlobal does not write it.
 }
 
 } // namespace engine

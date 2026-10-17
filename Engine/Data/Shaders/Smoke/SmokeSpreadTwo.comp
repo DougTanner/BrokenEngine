@@ -66,32 +66,33 @@ void main()
 		// Pass-Two reads the previous refresh's Pass-One output (plus deposits) at the same UV, still in
 		// previous-area coords — the frame's single previous→current remap is Pass-One's job
 		// — so input texcoord == output texcoord. The world position driving elevation, curl, and noise
-		// therefore comes from the previous area the texel lies in; wind, already remapped this frame, is
-		// re-sampled at that world position in the current area.
-		vec2 f2WorldPosition = VisibleAreaToWorld(f2Texcoord, globalLayout.f4PreviousSmokeArea);
+		// therefore comes from this plane's previous area the texel lies in; wind, already remapped this frame, is
+		// re-sampled at that world position in plane 0's current area, where the wind texture lies.
+		int iPlane = int(pushConstantsLayout.f4Pipeline.x);
+		vec2 f2WorldPosition = VisibleAreaToWorld(f2Texcoord, globalLayout.pf4PreviousSmokeAreas[iPlane]);
 		vec2 f2VisibleAreaTexcoord = WorldToVisibleArea(vec3(f2WorldPosition, 0.0f), globalLayout.f4VisibleArea);
 		float fElevation = textureLod(elevationTextureSampler, f2VisibleAreaTexcoord, 0.0f).x;
 
-		vec2 f2WindTexcoord = WorldToSmokeTexcoord(globalLayout.f4SmokeArea, f2WorldPosition);
+		vec2 f2WindTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[0], f2WorldPosition);
 		vec2 f2WindSample = SmokeWindSample(globalLayout, windTextureSamplerOne, windTextureSamplerTwo, f2WindTexcoord);
-		// The curl offset joins the swirl noise: SmokeSpread adds fSmokeStepCount * f2Noise to this same input coordinate
+		// The curl offset joins the swirl noise: SmokeSpread adds the plane's step count * f2Noise to this same input coordinate
+		float fStepCount = globalLayout.pfSmokeStepCounts[iPlane];
 		vec2 f2CurlOffset = SmokeCurlOffset(globalLayout, noiseTextureSampler, f2WorldPosition, length(f2WindSample));
-		f4Result = SmokeSpread(globalLayout, textureSampler, noiseTextureSampler, f2Texcoord + globalLayout.fSmokeStepCount * f2CurlOffset, f2WorldPosition, f2WindSample, globalLayout.fSmokeNoiseScaleTwo);
+		f4Result = SmokeSpread(globalLayout, textureSampler, noiseTextureSampler, f2Texcoord + fStepCount * f2CurlOffset, f2WorldPosition, f2WindSample, globalLayout.fSmokeNoiseScaleTwo, iPlane);
 
 		// Extra decay over terrain, measured from this plane's height above the lowest plane so plane 0 subtracts exactly 0
-		int iPlane = int(pushConstantsLayout.f4Pipeline.x);
 		float fRelativeElevation = fElevation - (globalLayout.pfFlightPlaneHeights[iPlane] - globalLayout.pfFlightPlaneHeights[0]);
 		if (fRelativeElevation > 0.0f)
 		{
 			// gSmokeDecay slider min 0.990 keeps pow() base > 0 -> always defined.
-			f4Result.x *= pow(globalLayout.fSmokeDecay, max(1.0f, fRelativeElevation - 5.0f));
+			f4Result.x *= pow(globalLayout.pfSmokeDecays[iPlane], max(1.0f, fRelativeElevation - 5.0f));
 		}
 
 		// Extra decay at edge of simulation area, applied once per frame since the previous refresh. Repeated
 		// multiplication instead of pow() keeps a single step exact.
 		// f2Texcoord is in [0, 1] by construction (texel center / imageSize) so the inner min(...) is non-negative; outer min clamps to 1.
 		float fEdgeDecay = min(1.0f, globalLayout.fSmokeEdgeDecayDistanceInverse * min(f2Texcoord.x, min(1.0f - f2Texcoord.x, min(f2Texcoord.y, 1.0f - f2Texcoord.y))));
-		for (int iStep = 0; iStep < int(globalLayout.fSmokeStepCount); ++iStep)
+		for (int iStep = 0; iStep < int(fStepCount); ++iStep)
 		{
 			f4Result.x *= fEdgeDecay;
 		}
@@ -103,7 +104,7 @@ void main()
 		// These exact half-grid identities split the progress proof: the slow-decay branch steps one
 		// positive half encoding, while the faster branch subtracts one minimum half quantum, so the
 		// next R16 store is lower for every positive finite half input.
-		if (globalLayout.fSmokeDecay >= kfSmokeHalfFixedPointDecay)
+		if (globalLayout.pfSmokeDecays[iPlane] >= kfSmokeHalfFixedPointDecay)
 		{
 			uint uiHalf = packHalf2x16(vec2(max(0.0f, f4Result.x), 0.0f)) & 0xffffu;
 			uiHalf -= min(uiHalf, 1u);

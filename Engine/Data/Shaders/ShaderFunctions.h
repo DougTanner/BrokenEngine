@@ -231,10 +231,10 @@ float SampleTerrainShadow(sampler2D shadowTextureSampler, vec2 f2Uv)
 // [0, 1], so overlapping planes never shade lighter than either alone and an empty plane multiplies by exactly 1.
 float SmokeShadow(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D pSmokeSamplers[kiMaxFlightPlanes], float fMulti)
 {
-	vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.f4SmokeArea, f3InPosition.xy);
 	float fShadow = 1.0f;
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
+		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], f3InPosition.xy);
 		float fSmokeShadow = globalLayout.fSmokeMax * texture(pSmokeSamplers[iPlane], f2SmokeTexcoord).x;
 		fSmokeShadow = clamp(pow(fSmokeShadow, globalLayout.fSmokePower), 0.0f, 1.0f);
 		fShadow *= 1.0f - fMulti * fSmokeShadow;
@@ -246,10 +246,10 @@ float SmokeShadow(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D pSmoke
 // fragment, zero once the fragment is 1 / fSmokeObjectHeightInverse above the plane.
 float SmokeShadowFaded(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D pSmokeSamplers[kiMaxFlightPlanes])
 {
-	vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.f4SmokeArea, f3InPosition.xy);
 	float fShadow = 1.0f;
 	for (int iPlane = 0; iPlane < int(globalLayout.uiFlightPlaneCount); ++iPlane)
 	{
+		vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], f3InPosition.xy);
 		float fHeightFraction = clamp((f3InPosition.z - globalLayout.pfFlightPlaneHeights[iPlane]) * globalLayout.fSmokeObjectHeightInverse, 0.0f, 1.0f);
 		float fSmokeFade = 1.0f - fHeightFraction * fHeightFraction;
 		float fSmokeShadow = globalLayout.fSmokeMax * texture(pSmokeSamplers[iPlane], f2SmokeTexcoord).x;
@@ -259,9 +259,9 @@ float SmokeShadowFaded(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D p
 	return fShadow;
 }
 
-vec3 AddSmoke(GlobalLayout globalLayout, vec3 f3InColor, vec2 f2InPosition, sampler2D smokeSampler, float fInMax, vec4 pf4Lighting[3])
+vec3 AddSmoke(GlobalLayout globalLayout, vec3 f3InColor, vec2 f2InPosition, sampler2D smokeSampler, int iPlane, float fInMax, vec4 pf4Lighting[3])
 {
-	vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.f4SmokeArea, f2InPosition);
+	vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], f2InPosition);
 	float fSmoke = globalLayout.fSmokeMax * texture(smokeSampler, f2SmokeTexcoord).x;
 	fSmoke = clamp(pow(fSmoke, globalLayout.fSmokePower), 0.0f, 1.0f);
 	float fDensity = globalLayout.fSmokeColorMin + globalLayout.fSmokeColorMultiplier * fSmoke;
