@@ -171,8 +171,12 @@ The `argument-hint` value selects the Plan:
    object or no row reports a touch.
 7. Present for approval per this file's `### Implementation approval`. Done
    when the user's decision arrives.
-8. Implement the approved change. After the pre-edit acceptance checks the
-   Change Workflow Implement and propagate step in
+8. Implement the approved change. A pre-edit acceptance check whose brief
+   `Baseline:` differs from the recorded session baseline
+   ([claim-results.md](references/claim-results.md)
+   `## Session baseline and the sync object`) is stale and runs again under the
+   changed-inputs re-run rule `/verify-acceptance` applies. After the pre-edit
+   acceptance checks the Change Workflow Implement and propagate step in
    [change-workflow.md](../../references/change-workflow.md) orders, main
    dispatches one `/implement-plan` `implementer` per `Slices` row of the
    latest handoff that returned that field, each brief citing as the approved
