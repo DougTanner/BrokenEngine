@@ -76,6 +76,9 @@ When researcher handoffs contradict each other on a repository fact a
 comparison depends on, main dispatches one `locator` to settle that fact and
 scores from its returned rows instead of reading source itself.
 
+Main scores candidate zero from the rows of the preparation handoff's
+`Candidate zero` field when a preparation handoff returned that field's rows.
+
 Main scores candidate zero and every returned candidate on the same criteria,
 and never merges candidates into a hybrid; the user picks at most one:
 

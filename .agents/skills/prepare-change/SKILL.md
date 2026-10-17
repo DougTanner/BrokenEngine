@@ -55,7 +55,7 @@ extended with these fields:
 Prepared plan: <path readable from the worktree root, carrying `## In scope` and `## Out of scope` verbatim; `none` when the dispatch prepared no plan>
 Classification: Tier 1 | Tier 2 | Tier 3 — trigger, with repository-path:line evidence
 Execution card: <heading inside the prepared plan file, headed as `/plan-audit` `## Inputs` requires; `none` when the dispatch prepared no plan>
-Candidate zero: <one line naming the drafted mechanism, written to satisfy the brief exclusions of the `/plan-alternatives` bullet in `.agents/references/change-workflow.md` `#### Step 2 — Prepare and explore alternatives` and naming no prepared-plan path; `none` when the dispatch prepared no plan>
+Candidate zero: <the drafted mechanism as the `Mechanism` through `Pays off when` rows exactly as `.agents/skills/plan-alternatives/SKILL.md` `## Handoff` declares them, required inline in the handoff; `Mechanism` is written to satisfy the brief exclusions of the `/plan-alternatives` bullet in `.agents/references/change-workflow.md` `#### Step 2 — Prepare and explore alternatives` and names no prepared-plan path; `none` when the dispatch prepared no plan>
 Unresolved decisions: <one row each, decision and the options main chooses between, or none>
 ```
 
