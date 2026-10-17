@@ -30,17 +30,28 @@ a new Collection, manager, or subsystem API.
 
 ## Inputs
 
-Use the supplied system description, or ask for one when absent.
+Use the supplied system description, or ask for one when absent. The
+description may be a source document, which main passes as its path and never
+reads.
 
 Main runs this orchestration. Supply every child the authoritative shared task
-brief, the design brief and fixed scope/compatibility constraints. A delegated
-worker never dispatches another worker.
+brief and the fixed scope/compatibility constraints. Supply the brief-writing
+`implementer` the system description (a document as its path); supply the
+researcher and every planner the design brief as the brief file's path plus
+`##` selectors
+([`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
+`## Handoffs`), never its text. A delegated worker never dispatches another
+worker.
 
 ## Steps
 
 ### Establish the Design Brief
 
-1. Inspect the repository before asking about gaps. Record:
+1. Dispatch one `implementer` that receives the system description (a document
+   as its path) and any user answers already recorded. It inspects the
+   repository before main asks the user about gaps, records the items below, and
+   writes the brief to one gitignored `Temp/` file in the `Temp/` file form of
+   [`subagent-handoff.md`](../../references/subagent-handoff.md) `## Handoffs`:
 
    - problem, callers, operations, ownership, and existing interfaces;
    - allocation tracking, SOA layout, threading, build affinity, and frame
@@ -48,26 +59,35 @@ worker never dispatches another worker.
    - bit-deterministic, CRC-checked PostRender state versus non-deterministic
      Interpolate/render state and client-only visuals.
 
-   Done when each recorded item is in the brief.
-2. Sort the recorded material into essential invariants the repository actually
-   requires and accidental seams a current caller happens to expose, such as its
+   Its shared handoff is the receipt main reads in place of the source:
+   `Evidence` cites the brief file in that form; `Residuals` names each gap the
+   repository cannot answer; one `Decisive checks` row states, from the
+   repository read, whether the requested system or a viable design could add a
+   `Collection<T>` type or SOA member pointer. Done when the receipt has
+   returned with each recorded item in the brief and sorted per step 2.
+2. Before returning, the same `implementer` sorts the recorded material, inside
+   the brief file, into essential invariants the repository actually requires
+   and accidental seams a current caller happens to expose, such as its
    parameter shape or call order; a design may discard an accidental seam, so
    never carry one forward as if it were a contract. Done when every recorded
    item is sorted.
-3. Keep passing the scope and compatibility constraints into every design. Done
-   when those constraints reach each design.
-4. Before any delegation, decide whether the requested system or a viable design
-   could add a `Collection<T>` type or SOA member pointer. Done when that
-   decision is made.
+3. Ask the user about each gap the receipt names under `Residuals`, then pass
+   the scope and compatibility constraints, plus each answer, to the researcher
+   and every planner beside the brief path as fixed constraints. Done when those
+   constraints and answers reach each design.
+4. Before dispatching the researcher, decide from the receipt's
+   `Decisive checks` row whether the requested system or a viable design could
+   add a `Collection<T>` type or SOA member pointer. Done when that decision is
+   made.
 5. When it could, read `/add-collection` and `/add-collection-member` and pass
    their applicable layout, lifecycle, persistence, CRC, version, and
-   registration constraints to every worker. Done when any applicable
-   constraints are attached.
+   registration constraints to the researcher and every planner. Done when any
+   applicable constraints are attached.
 
 ### Research Existing Patterns
 
-6. Dispatch one `researcher` from the main context before any other worker.
-   Done when it is running.
+6. Dispatch one `researcher` from the main context after the receipt returns
+   and before any planner. Done when it is running.
 7. Give it the brief, the exact repository scope, and the pattern list to
    identify: similar live systems, dominant caller patterns, naming and
    parameter conventions, manager access, workbuffer usage, and relevant
@@ -113,7 +133,7 @@ worker never dispatches another worker.
 
 ## Handoff
 
-Each researcher and planner returns the complete shared handoff from
+Each worker returns the complete shared handoff from
 [`../../references/subagent-handoff.md`](../../references/subagent-handoff.md),
 with `Residuals` last. Add these domain fields before the shared fields:
 
@@ -137,11 +157,13 @@ citations, to gitignored `Temp/design-interface-pattern-evidence.md` under one
 `## Pattern evidence` heading, and cites that path plus its `##` selector under
 `Evidence`.
 
-`Changed files` and `Build required` are `none` for both workers because this
-workflow edits no tracked file and requires no build.
+`Changed files` and `Build required` are `none` for every worker because this
+workflow edits no tracked file and requires no build; the brief-writing
+`implementer` cites its one gitignored `Temp/` brief file under `Evidence`.
 
 The researcher uses only the researcher extension; each planner uses only the
-planner extension. Main consumes those child handoffs, then owns the comparison
+planner extension; the brief-writing `implementer` adds none. Main consumes
+those child handoffs, then owns the comparison
 packet and user-facing decision below; that presentation is outside the child
 envelopes.
 
@@ -164,10 +186,12 @@ choose a public interface when multiple meaningfully different shapes remain.
 
 ## Rules
 
-- The manager, researcher, and planners may inspect the repository, but they do
-  not create, edit, or remove scratch source, build output, branches, or
-  worktrees, and they do not compile candidates. The one exception: the
-  researcher writes its one gitignored `Temp/` pattern-evidence file.
+- The manager, the brief-writing `implementer`, the researcher, and the planners
+  may inspect the repository, but they do not create, edit, or remove scratch
+  source, build output, branches, or worktrees, and they do not compile
+  candidates. The two exceptions: the `implementer` writes its one gitignored
+  `Temp/` brief file, and the researcher writes its one gitignored `Temp/`
+  pattern-evidence file.
 - The workflow ends at the decision and plan gate; do not begin implementation
   from this skill. Follow `.agents/references/change-workflow.md` for
   delegation, plan, review, and landing mechanics rather than restating them
