@@ -127,7 +127,7 @@ static void FormatGpuGraphicsInfo(common::Workbuffer& rWorkbuffer)
 
 static void FormatGpuTimerRows(common::Workbuffer& rWorkbuffer, bool bReevaluate)
 {
-	GpuTimer* pGpuTimers = gpProfileManager->mGpuTimers;
+	GpuTimer* pGpuTimers = gpProfileManager->mpGpuTimers;
 
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 	rWorkbuffer.Append("\n\n");
@@ -135,7 +135,7 @@ static void FormatGpuTimerRows(common::Workbuffer& rWorkbuffer, bool bReevaluate
 	// Active visible-area LOD vertex grid (quads + 1), shared by the water displacement compute pre-pass
 	// (writes the top-left rectangle) and the water mesh draw. Mirrors the LOD pick in RenderFrameMain.
 	int64_t iWaterLevelOfDetail = std::clamp<int64_t>(engine::gpCamera->miVisibleAreaLevelOfDetail, 0, BufferManager::kiVisibleAreaLodCount - 1);
-	const BufferManager::VisibleAreaMeshLod& rWaterLevelOfDetail = gpBufferManager->mWaterMeshLods[iWaterLevelOfDetail];
+	const BufferManager::VisibleAreaMeshLod& rWaterLevelOfDetail = gpBufferManager->mpWaterMeshLods[iWaterLevelOfDetail];
 	int64_t iWaterGridX = rWaterLevelOfDetail.iQuadCountX + 1;
 	int64_t iWaterGridY = rWaterLevelOfDetail.iQuadCountY + 1;
 
@@ -153,7 +153,7 @@ static void FormatGpuTimerRows(common::Workbuffer& rWorkbuffer, bool bReevaluate
 			continue;
 		}
 
-		rWorkbuffer.Append(kGpuTimerNames[i]);
+		rWorkbuffer.Append(kpGpuTimerNames[i]);
 		rWorkbuffer.Append(": ");
 		rWorkbuffer.Append(elapsedMicroseconds.count());
 		rWorkbuffer.Append(" us");
@@ -232,8 +232,8 @@ static void FormatGpuMemoryStatistics(common::Workbuffer& rWorkbuffer)
 	if (gpDeviceManager->mCapabilities & DeviceCapabilityFlags::kMemoryBudgetAvailable)
 	{
 		int64_t iHeapCount = gpInstanceManager->mVkPhysicalDeviceMemoryProperties.memoryHeapCount;
-		VmaBudget budgets[VK_MAX_MEMORY_HEAPS] {};
-		vmaGetHeapBudgets(gpDeviceManager->mpAllocator, budgets);
+		VmaBudget pBudgets[VK_MAX_MEMORY_HEAPS] {};
+		vmaGetHeapBudgets(gpDeviceManager->mpAllocator, pBudgets);
 
 		for (int64_t i = 0; i < iHeapCount; ++i)
 		{
@@ -245,14 +245,14 @@ static void FormatGpuMemoryStatistics(common::Workbuffer& rWorkbuffer)
 			rWorkbuffer.Append(bDeviceLocal ? " (Device Local)\n" : " (Host)\n");
 
 			rWorkbuffer.Append("  Budget: ");
-			rWorkbuffer.AppendFloat(static_cast<float>(budgets[i].budget) / (1'024.0f * 1'024.0f), 1);
+			rWorkbuffer.AppendFloat(static_cast<float>(pBudgets[i].budget) / (1'024.0f * 1'024.0f), 1);
 			rWorkbuffer.Append(" MB  Usage: ");
-			rWorkbuffer.AppendFloat(static_cast<float>(budgets[i].usage) / (1'024.0f * 1'024.0f), 1);
+			rWorkbuffer.AppendFloat(static_cast<float>(pBudgets[i].usage) / (1'024.0f * 1'024.0f), 1);
 			rWorkbuffer.Append(" MB");
 
-			if (budgets[i].budget > 0)
+			if (pBudgets[i].budget > 0)
 			{
-				float fPercent = static_cast<float>(static_cast<double>(budgets[i].usage) / static_cast<double>(budgets[i].budget)) * 100.0f;
+				float fPercent = static_cast<float>(static_cast<double>(pBudgets[i].usage) / static_cast<double>(pBudgets[i].budget)) * 100.0f;
 				rWorkbuffer.Append(" (");
 				rWorkbuffer.AppendFloat(fPercent, 1);
 				rWorkbuffer.Append("%)");
@@ -283,7 +283,7 @@ void FormatFramesPerSecondHeader(common::Workbuffer& rWorkbuffer, std::chrono::m
 		rWorkbuffer.Append(" (Cpu: >9000 fps, ");
 	}
 
-	GpuTimer* pGpuTimers = gpProfileManager->mGpuTimers;
+	GpuTimer* pGpuTimers = gpProfileManager->mpGpuTimers;
 	std::chrono::microseconds elapsedGpuTime(pGpuTimers[kGpuTimerGlobal].smoothedMicroseconds.mSmoothedValue + pGpuTimers[kGpuTimerMain].smoothedMicroseconds.mSmoothedValue + pGpuTimers[kGpuTimerImage].smoothedMicroseconds.mSmoothedValue);
 	if (elapsedGpuTime > std::chrono::microseconds::zero())
 	{

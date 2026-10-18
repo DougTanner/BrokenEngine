@@ -68,10 +68,10 @@ public:
 	static constexpr int64_t kiMaxWindows = 64;
 	static constexpr int64_t kiMaxPendingLabels = 256;
 
-	AgentUiItem mItems[2][kiMaxItems];
-	int64_t miItemCount[2] {};
-	AgentUiWindow mWindows[2][kiMaxWindows];
-	int64_t miWindowCount[2] {};
+	AgentUiItem mpItems[2][kiMaxItems];
+	int64_t mpiItemCount[2] {};
+	AgentUiWindow mpWindows[2][kiMaxWindows];
+	int64_t mpiWindowCount[2] {};
 	int64_t miRead = 1;
 
 private:
@@ -79,7 +79,7 @@ private:
 	int64_t FindPendingLabel(ImGuiID uiIdentifier) const;
 	void RemovePendingLabel(int64_t iIndex);
 
-	AgentUiPendingLabel mPendingLabels[kiMaxPendingLabels];
+	AgentUiPendingLabel mpPendingLabels[kiMaxPendingLabels];
 	int64_t miPendingLabelCount = 0;
 
 	int64_t miWrite = 0;

@@ -42,7 +42,7 @@ inline constexpr const char* kpcRequiredIslandJsonKeys[] = {"archetype", "seed",
 
 // Route subdivision descriptor. `pcLabel` is BOTH the Island.json "routes" value AND the per-route
 // sub-folder name; `iGaeaChoice` is the 0-based Gaea Route node input-port index; `iColumns` /
-// `iRows` split the full square bake along X (east-west) / Y (north-south). See the kRouteSubdivisions
+// `iRows` split the full square bake along X (east-west) / Y (north-south). See the kpRouteSubdivisions
 // table in BakeIslandIntermediates.cpp for the full routing semantics.
 struct RouteSubdivision
 {

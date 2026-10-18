@@ -95,10 +95,10 @@ private:
 	VkDrawIndirectCommand* mpUiPrepassIndirectMappedVkDrawIndirectCommand = nullptr;
 
 	int64_t miOpaqueRectangleCount = 0;
-	XMFLOAT4 mf4OpaqueRectangles[kiMaxUiRectangles] {};
+	XMFLOAT4 mpf4OpaqueRectangles[kiMaxUiRectangles] {};
 
 	static constexpr float kfTextEdge = 0.025f;
-	TextArea mTextAreas[kTextAreasCount]
+	TextArea mpTextAreas[kTextAreasCount]
 	{
 		{ .fX = 0.45f, .fY = 1.0f - 2.0f * kfTextEdge },
 		{ .fX = 0.875f, .fY = kfTextEdge },

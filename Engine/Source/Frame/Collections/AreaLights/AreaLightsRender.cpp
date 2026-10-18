@@ -41,11 +41,11 @@ void AreaLightsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::QuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineLighting].at(kuiCrc), iCommandBuffer, 1, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineLighting].at(kuiCrc), iCommandBuffer, 1, pBuffer);
 	}
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferVisibleLights, kpcName, sizeof(shaders::VisibleLightQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineVisibleLights].at(kuiCrc), iCommandBuffer, 2, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineVisibleLights].at(kuiCrc), iCommandBuffer, 2, pBuffer);
 	}
 }
 
@@ -164,8 +164,8 @@ void AreaLightsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	{
 		gpProfileManager->GetCpuCounter(kCpuCounterAreaLightsRendered).iCount = siRendered;
 	}
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineLighting].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() ? siRendered : 0);
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineVisibleLights].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineLighting].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() ? siRendered : 0);
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineVisibleLights].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 }
 
 } // namespace engine

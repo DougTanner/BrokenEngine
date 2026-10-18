@@ -20,7 +20,7 @@ template <auto MEMBER, common::FixedString NAME>
 struct FrameColumn
 {
 	static constexpr auto kpMember = MEMBER;
-	static constexpr std::string_view kName = NAME.data;
+	static constexpr std::string_view kName = NAME.pcData;
 };
 
 // The edit_frame key is the column's own member token.

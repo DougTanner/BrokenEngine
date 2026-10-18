@@ -13,7 +13,7 @@ constinit std::atomic<int64_t> giMyOutputDebugString = 0;
 static_assert(decltype(giMyOutputDebugString)::is_always_lock_free);
 std::mutex gLogMutex;
 
-LogRingBuffer gLogRingBuffers[kiLogCategoryCount];
+LogRingBuffer gpLogRingBuffers[kiLogCategoryCount];
 LogGlobalBuffer gLogGlobalBuffer;
 LogAgentBuffer gLogAgentBuffer;
 
@@ -22,13 +22,13 @@ constexpr LogLevel keLogRuntimeDefault = kVerbose; // Offline tool: no agent / s
 #else
 constexpr LogLevel keLogRuntimeDefault = kInfo; // Documented out-of-box threshold; the agent lowers it live via set_log_level
 #endif
-constinit std::atomic<LogLevel> gLogRuntimeLevels[kiLogCategoryCount]
+constinit std::atomic<LogLevel> gpeLogRuntimeLevels[kiLogCategoryCount]
 {
 	keLogRuntimeDefault, kVerbose, // [1] kTemp: transient agent/dev diagnostics — always emit (compile floor keLogLevelTemporary = kVerbose)
 	keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault, keLogRuntimeDefault,
 	keLogRuntimeDefault, // [8] kReplay: compiled in at kVerbose but silent by default — the agent lowers this category alone to scrape per-tick checksums
 };
-static_assert(std::size(gLogRuntimeLevels) == kiLogCategoryCount, "gLogRuntimeLevels out of sync with LogCategory");
+static_assert(std::size(gpeLogRuntimeLevels) == kiLogCategoryCount, "gpeLogRuntimeLevels out of sync with LogCategory");
 
 // Constant-initialized, so it reads false before this TU's dynamic initialization and after its destruction.
 static constinit std::atomic<bool> sbLogAlive = false;
@@ -58,7 +58,7 @@ static LogAliveGuard sLogAliveGuard;
 
 void SetLogRuntimeLevel(LogCategory eCategory, LogLevel eLevel)
 {
-	gLogRuntimeLevels[static_cast<int64_t>(eCategory)].store(eLevel, std::memory_order_relaxed);
+	gpeLogRuntimeLevels[static_cast<int64_t>(eCategory)].store(eLevel, std::memory_order_relaxed);
 }
 
 void EnableLogFile(const std::filesystem::path& rPath)
@@ -188,7 +188,7 @@ void LogWriteRingBuffers(std::string_view logBuffer, LogCategory eCategory)
 		std::memcpy(pLine, logBuffer.data(), logBuffer.size());
 	};
 
-	CopyToLine(gLogRingBuffers[static_cast<int64_t>(eCategory)].AcquireLine());
+	CopyToLine(gpLogRingBuffers[static_cast<int64_t>(eCategory)].AcquireLine());
 	CopyToLine(gLogGlobalBuffer.AcquireLine());
 	CopyToLine(gLogAgentBuffer.AcquireLine());
 }
@@ -204,7 +204,7 @@ void LogDumpBuffers(CrashFileWriter& rWriter)
 		rWriter.Write("\n\n\n<Begin ");
 		rWriter.Write(kpcLogCategoryNames[i]);
 		rWriter.Write(" Log>\n");
-		gLogRingBuffers[i].Dump(rWriter);
+		gpLogRingBuffers[i].Dump(rWriter);
 		rWriter.Write("<End ");
 		rWriter.Write(kpcLogCategoryNames[i]);
 		rWriter.Write(" Log>\n");

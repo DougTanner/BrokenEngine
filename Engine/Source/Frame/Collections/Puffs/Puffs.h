@@ -40,8 +40,8 @@ struct PuffControllerType
 	int64_t iBaseTypeIndex = 0;
 	int64_t iKeyframeCount = 2;
 	bool bDestroysSelf = true;
-	std::chrono::duration<float> times[kiMaximumControllerKeyframes] {};
-	PuffKeyframe keyframes[kiMaximumControllerKeyframes] {};
+	std::chrono::duration<float> pTimes[kiMaximumControllerKeyframes] {};
+	PuffKeyframe pKeyframes[kiMaximumControllerKeyframes] {};
 
 	// Per-keyframe wrapper scaling: keyframe values are multiplied by wrapper.mfCurrent at interpolation time
 	Wrapper* ppAreaScales[kiMaximumControllerKeyframes] {};

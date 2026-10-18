@@ -139,12 +139,12 @@ void Islands::UploadMesh(int64_t iIndexOffset, std::span<const std::byte> indexD
 {
 	ASSERT(iIndexOffset >= 0 && iIndexOffset <= kiIslandMeshArenaBytes && std::ssize(indexData) <= kiIslandMeshArenaBytes - iIndexOffset);
 	ASSERT(iVertexOffset >= 0 && iVertexOffset <= kiIslandMeshArenaBytes && std::ssize(vertexData) <= kiIslandMeshArenaBytes - iVertexOffset);
-	DeviceLocalBufferUpload uploads[]
+	DeviceLocalBufferUpload pUploads[]
 	{
 		{.pData = indexData.data(), .iDestinationOffset = iIndexOffset, .iSize = std::ssize(indexData)},
 		{.pData = vertexData.data(), .iDestinationOffset = iVertexOffset, .iSize = std::ssize(vertexData)},
 	};
-	Buffer::UploadToDeviceLocal(mIslandMeshArena.mDeviceLocalVkBuffer, uploads);
+	Buffer::UploadToDeviceLocal(mIslandMeshArena.mDeviceLocalVkBuffer, pUploads);
 }
 
 void Islands::WriteMeshIndirect(int64_t iTemplate, int64_t iIndexOffset, int64_t iVertexOffset, int64_t iIndexCount)

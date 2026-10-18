@@ -15,10 +15,10 @@ void AreaLightsInterpolate::Sync(game::FrameInterpolate& rFrameInterpolate, id_t
 	int64_t iIndex = rAreaLights.idToIndexMap.at(id);
 
 	rAreaLights.puiTypeIndices[iIndex] = static_cast<uint8_t>(rData.iTypeIndex);
-	rAreaLights.pVecVisiblePositions[0][iIndex] = rData.vecVisiblePositions[0];
-	rAreaLights.pVecVisiblePositions[1][iIndex] = rData.vecVisiblePositions[1];
-	rAreaLights.pVecVisiblePositions[2][iIndex] = rData.vecVisiblePositions[2];
-	rAreaLights.pVecVisiblePositions[3][iIndex] = rData.vecVisiblePositions[3];
+	rAreaLights.pVecVisiblePositions[0][iIndex] = rData.pVecVisiblePositions[0];
+	rAreaLights.pVecVisiblePositions[1][iIndex] = rData.pVecVisiblePositions[1];
+	rAreaLights.pVecVisiblePositions[2][iIndex] = rData.pVecVisiblePositions[2];
+	rAreaLights.pVecVisiblePositions[3][iIndex] = rData.pVecVisiblePositions[3];
 	rAreaLights.pfIntensityMultipliers[iIndex] = rData.fIntensityMultiplier;
 
 }

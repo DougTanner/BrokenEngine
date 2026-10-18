@@ -609,8 +609,8 @@ game::Frame& GameBase::RenderFrame(GridCoord coordinate) const
 	int64_t iDesiredLogical = rCell.iSnapshotCount - 1 - kiRenderBehindTicks;
 	int64_t iLogical = std::max<int64_t>(0, iDesiredLogical);
 	int64_t iPhysical = SnapshotIndex(rCell.iSnapshotHead, iLogical);
-	ASSERT(rCell.snapshots[iPhysical] != nullptr);
-	return *rCell.snapshots[iPhysical];
+	ASSERT(rCell.ppSnapshots[iPhysical] != nullptr);
+	return *rCell.ppSnapshots[iPhysical];
 }
 
 void GameBase::ResetRenderClock()
@@ -981,8 +981,8 @@ game::Frame& GameBase::CreateCellFrame(Cell& rCell, GridCoord coordinate)
 	// Client uses snapshot ring as the source of truth — seed slot 0.
 	rCell.iSnapshotHead = 0;
 	rCell.iSnapshotCount = 1;
-	rCell.snapshots[0] = std::make_unique<game::Frame>();
-	game::Frame& rFrame = *rCell.snapshots[0];
+	rCell.ppSnapshots[0] = std::make_unique<game::Frame>();
+	game::Frame& rFrame = *rCell.ppSnapshots[0];
 #else
 	rCell.pCurrent = std::make_unique<game::Frame>();
 	game::Frame& rFrame = *rCell.pCurrent;

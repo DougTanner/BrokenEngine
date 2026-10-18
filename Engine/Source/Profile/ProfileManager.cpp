@@ -332,7 +332,7 @@ void ProfileManager::GpuStart(int64_t iCommandBuffer, VkCommandBuffer vkCommandB
 			VkDebugUtilsLabelEXT vkDebugUtilsLabelEXT =
 			{
 				.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
-				.pLabelName = kGpuTimerNames[eGpuTimer].data(),
+				.pLabelName = kpGpuTimerNames[eGpuTimer].data(),
 				.color = {fColor, fColor, fColor, fColor},
 			};
 			vkCmdBeginDebugUtilsLabelEXT(vkCommandBuffer, &vkDebugUtilsLabelEXT);
@@ -382,7 +382,7 @@ void ProfileManager::GpuRead(int64_t iCommandBuffer, GpuTimers eStart, GpuTimers
 			CHECK_VK(vkResultGetQueryPoolResults);
 
 			int64_t iCurrentMicroseconds = static_cast<int64_t>(static_cast<float>(puiResults[1] - puiResults[0]) * gpInstanceManager->mVkPhysicalDeviceProperties.limits.timestampPeriod / 1'000.0f);
-			mGpuTimers[eGpuTimer].smoothedMicroseconds = iCurrentMicroseconds;
+			mpGpuTimers[eGpuTimer].smoothedMicroseconds = iCurrentMicroseconds;
 
 			if (bLatchShadowSample && eGpuTimer == kGpuTimerShadow)
 			{
@@ -408,7 +408,7 @@ void ProfileManager::BootStart(BootTimers eBootTimer)
 {
 	if constexpr (kbProfiling)
 	{
-		mBootTimers[eBootTimer].startTimePoint = std::chrono::steady_clock::now();
+		mpBootTimers[eBootTimer].startTimePoint = std::chrono::steady_clock::now();
 	}
 }
 
@@ -416,7 +416,7 @@ void ProfileManager::BootStop(BootTimers eBootTimer)
 {
 	if constexpr (kbProfiling)
 	{
-		BootTimer& rBootTimer = mBootTimers[eBootTimer];
+		BootTimer& rBootTimer = mpBootTimers[eBootTimer];
 		rBootTimer.timeNanoseconds += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - rBootTimer.startTimePoint);
 	}
 }
@@ -429,10 +429,10 @@ void ProfileManager::BootLog()
 
 		for (int64_t i = 0; i < kBootTimerCount; ++i)
 		{
-			std::chrono::milliseconds durationMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(mBootTimers[i].timeNanoseconds);
+			std::chrono::milliseconds durationMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(mpBootTimers[i].timeNanoseconds);
 			if (durationMilliseconds.count() > 10)
 			{
-				LOG(kDefault, kDebug, "{}: {} ms", kBootTimerNames[i], durationMilliseconds.count());
+				LOG(kDefault, kDebug, "{}: {} ms", kpBootTimerNames[i], durationMilliseconds.count());
 			}
 		}
 		LOG(kDefault, kDebug, "\n");
@@ -467,8 +467,8 @@ void ProfileManager::LogTimers()
 
 		for (int64_t i = 0; i < kGpuTimerCount; ++i)
 		{
-			GpuTimer& rGpuTimer = mGpuTimers[i];
-			LOG(kDefault, kDebug, "{}: {} ({}, {})", kGpuTimerNames[i], rGpuTimer.smoothedMicroseconds.Current(), rGpuTimer.smoothedMicroseconds.Average(), rGpuTimer.smoothedMicroseconds.Maximum());
+			GpuTimer& rGpuTimer = mpGpuTimers[i];
+			LOG(kDefault, kDebug, "{}: {} ({}, {})", kpGpuTimerNames[i], rGpuTimer.smoothedMicroseconds.Current(), rGpuTimer.smoothedMicroseconds.Average(), rGpuTimer.smoothedMicroseconds.Maximum());
 		}
 
 		LOG(kDefault, kDebug, "");
@@ -501,8 +501,8 @@ void ProfileManager::DumpTimers()
 
 		for (int64_t i = 0; i < kGpuTimerCount; ++i)
 		{
-			common::Smoothed<int64_t>& rMicroseconds = mGpuTimers[i].smoothedMicroseconds;
-			mpDumpLog->Write("{},gpu,{},{},{},{},{},", iMilliseconds, i, kGpuTimerNames[i], rMicroseconds.Current(), rMicroseconds.Average(), rMicroseconds.Maximum());
+			common::Smoothed<int64_t>& rMicroseconds = mpGpuTimers[i].smoothedMicroseconds;
+			mpDumpLog->Write("{},gpu,{},{},{},{},{},", iMilliseconds, i, kpGpuTimerNames[i], rMicroseconds.Current(), rMicroseconds.Average(), rMicroseconds.Maximum());
 		}
 
 		// Snapshot under the lock, write after: DiagnosticLog flushes per line, and dozens of flushed lines under mCpuTimerMutex would block dispatch/submit/network CpuStart/CpuStop once per second, distorting the timers being measured.
@@ -603,7 +603,7 @@ void ProfileManager::UpdateProfileText()
 		mSmoothedAllocations.Update();
 
 #if defined(BT_CLIENT)
-		for (GpuTimer& rGpuTimer : mGpuTimers)
+		for (GpuTimer& rGpuTimer : mpGpuTimers)
 		{
 			rGpuTimer.smoothedMicroseconds.Update();
 		}
@@ -659,12 +659,12 @@ CpuTimer& ProfileManager::GetCpuTimer(int64_t iIndex)
 
 std::string_view ProfileManager::GetCpuCounterName(int64_t iIndex)
 {
-	return iIndex < kEngineCpuCounterCount ? kEngineCpuCounterNames[iIndex] : game::kGameCpuCounterNames[iIndex - kEngineCpuCounterCount];
+	return iIndex < kEngineCpuCounterCount ? kpEngineCpuCounterNames[iIndex] : game::kpGameCpuCounterNames[iIndex - kEngineCpuCounterCount];
 }
 
 std::string_view ProfileManager::GetCpuTimerName(int64_t iIndex)
 {
-	return iIndex < kEngineCpuTimerCount ? kEngineCpuTimerNames[iIndex] : game::kGameCpuTimerNames[iIndex - kEngineCpuTimerCount];
+	return iIndex < kEngineCpuTimerCount ? kpEngineCpuTimerNames[iIndex] : game::kpGameCpuTimerNames[iIndex - kEngineCpuTimerCount];
 }
 
 ScopedBootTimer::ScopedBootTimer(BootTimers eBootTimer)

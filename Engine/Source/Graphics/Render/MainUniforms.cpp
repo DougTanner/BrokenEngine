@@ -506,7 +506,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	// hysteresis bands; mesh density and snap-grid are in lockstep. Terrain draws via one
 	// vkCmdDrawIndexedIndirect per island template in CommandBufferRecordMain.cpp.
 	int64_t iLevelOfDetail = engine::gpCamera->miVisibleAreaLevelOfDetail;
-	const BufferManager::VisibleAreaMeshLod& rWaterLevelOfDetail = gpBufferManager->mWaterMeshLods[iLevelOfDetail];
+	const BufferManager::VisibleAreaMeshLod& rWaterLevelOfDetail = gpBufferManager->mpWaterMeshLods[iLevelOfDetail];
 	gpPipelineManager->mpPipelines[kPipelineWater].WriteIndirectBuffer(iCommandBuffer, 1, rWaterLevelOfDetail.iIndexCount, rWaterLevelOfDetail.iIndexOffset, rWaterLevelOfDetail.iVertexOffset);
 
 	// Active LOD's vertex-grid dims (iQuadCount* == iMeshX/Y - 1). Read by:

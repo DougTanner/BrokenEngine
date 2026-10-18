@@ -74,7 +74,7 @@ void BlastersInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 		engine::AreaLightsInterpolate::Sync(rFrame.interpolate, rBlasters.pAreaLights[iIndex],
 		{
 			.iTypeIndex = rType.iAreaLightTypeIndex,
-			.vecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
+			.pVecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
 		});
 	}
 }

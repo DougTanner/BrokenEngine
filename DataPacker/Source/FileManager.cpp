@@ -13,7 +13,7 @@ struct SymbolicLinkReparseDataBuffer
 	USHORT uiPrintNameOffset;
 	USHORT uiPrintNameLength;
 	ULONG uiFlags;
-	WCHAR cPathBuffer[1];
+	WCHAR pcPathBuffer[1];
 };
 
 static std::filesystem::path PathFromUtf8(std::string_view utf8Value)
@@ -124,7 +124,7 @@ static bool IsRecognizedLinkRaw(const std::filesystem::path& rLink, const std::f
 	{
 		return false;
 	}
-	std::wstring target(pData->cPathBuffer + pData->uiSubstituteNameOffset / sizeof(wchar_t), pData->uiSubstituteNameLength / sizeof(wchar_t));
+	std::wstring target(pData->pcPathBuffer + pData->uiSubstituteNameOffset / sizeof(wchar_t), pData->uiSubstituteNameLength / sizeof(wchar_t));
 	if (target.rfind(LR"(\??\)", 0) == 0)
 	{
 		target.erase(0, 4);

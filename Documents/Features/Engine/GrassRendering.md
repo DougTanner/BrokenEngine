@@ -138,7 +138,7 @@ Changes (13 files)
      (binding 1 set 1), terrain elevation sampler (binding 2 set 1),
      wind sampler (binding 3 set 1), terrain color sampler (binding 4
      set 1)
-   - Register in mPipelineMaps[kDynamicPipelineGrass]
+   - Register in mpPipelineMaps[kDynamicPipelineGrass]
 
 8. Engine/Source/Graphics/Managers/CommandBufferManager.cpp
    In RecordMainCommandBuffer image pass, add grass rendering after
@@ -146,7 +146,7 @@ Changes (13 files)
    Insert after the kGpuTimerTerrain block, before kGpuTimerWater:
 
      gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerGrass);
-     for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineGrass])
+     for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineGrass])
      {
          pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer);
      }
@@ -155,7 +155,7 @@ Changes (13 files)
 9. Engine/Source/Profile/ProfileManagerBase.h
    - Add kGpuTimerGrass to GpuTimers enum (after kGpuTimerTerrain,
      before kGpuTimerWater)
-   - Add corresponding entry in mGpuTimers initializer:
+   - Add corresponding entry in mpGpuTimers initializer:
      {.name = "    Grass"}
 
 10. Engine/Source/Graphics/Graphics.cpp

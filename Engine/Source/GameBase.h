@@ -75,7 +75,7 @@ struct Cell
 #endif
 
 #if defined(BT_CLIENT)
-	std::unique_ptr<game::Frame> snapshots[kiNetworkBufferSize] {};
+	std::unique_ptr<game::Frame> ppSnapshots[kiNetworkBufferSize] {};
 	int64_t iSnapshotHead = 0;       // physical index of oldest entry
 	int64_t iSnapshotCount = 0;      // number of valid entries in ring
 
@@ -129,7 +129,7 @@ struct Cell
 		{
 			return nullptr;
 		}
-		return snapshots[SnapshotIndex(iSnapshotHead, iSnapshotCount - 1)].get();
+		return ppSnapshots[SnapshotIndex(iSnapshotHead, iSnapshotCount - 1)].get();
 	}
 
 	void ResetClientState()
@@ -223,7 +223,7 @@ public:
 
 	GameFlags_t mGameFlags;
 	UiState meUiState = UiState::kPause;
-	char mModalMessage[256] = {};
+	char mpcModalMessage[256] = {};
 	bool mbShowImGui = false;
 #if defined(BT_CLIENT)
 	// Stored here rather than in ChatScreen so an ImGuiManager recreation keeps the history and an open input box.

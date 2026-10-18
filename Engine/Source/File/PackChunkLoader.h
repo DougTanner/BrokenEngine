@@ -63,7 +63,7 @@ private:
 	// Count is deliberately small: each thread doubles the read-buffer + decompress-scratch memory footprint.
 	static constexpr int64_t kiLoadingThreadCount = 2;
 	PackChunks& mrPackChunks;
-	std::thread mLoadingThreads[kiLoadingThreadCount];
+	std::thread mpLoadingThreads[kiLoadingThreadCount];
 	std::atomic<uint64_t> mWakeSequence = 0;
 	std::condition_variable mCompletionCondition;
 #if defined(BT_CLIENT) && defined(BT_DEBUG)

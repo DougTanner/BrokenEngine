@@ -37,7 +37,7 @@ void BillboardsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::BillboardLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineBillboards].at(kuiCrc), iCommandBuffer, 2, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineBillboards].at(kuiCrc), iCommandBuffer, 2, pBuffer);
 	}
 }
 
@@ -116,7 +116,7 @@ void BillboardsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 		gpProfileManager->GetCpuCounter(kCpuCounterBillboardsRendered).iCount = siRendered;
 	}
 
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineBillboards].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineBillboards].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
 }
 
 } // namespace engine

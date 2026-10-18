@@ -37,7 +37,7 @@ struct ThemePalette
 	ImVec4 f4Border;
 };
 
-constexpr ThemePalette kThemePalettes[]
+constexpr ThemePalette kpThemePalettes[]
 {
 	// kNavalSteel: near-black blue-grey, steel borders, cyan/teal accent
 	{
@@ -73,7 +73,7 @@ constexpr ThemePalette kThemePalettes[]
 		.f4Border = ImVec4(0.27f, 0.28f, 0.35f, 1.0f),
 	},
 };
-static_assert(std::size(kThemePalettes) == static_cast<size_t>(UiTheme::kCount));
+static_assert(std::size(kpThemePalettes) == static_cast<size_t>(UiTheme::kCount));
 
 static ImVec4 WithAlpha(const ImVec4& rf4Color, float fAlpha)
 {
@@ -207,7 +207,7 @@ void ImGuiManager::SetupThemeGeometry(float fUiScale)
 
 void ImGuiManager::ApplyThemeColors(UiTheme eTheme)
 {
-	const ThemePalette& rPalette = kThemePalettes[static_cast<size_t>(eTheme)];
+	const ThemePalette& rPalette = kpThemePalettes[static_cast<size_t>(eTheme)];
 	ImVec4* pColors = ImGui::GetStyle().Colors;
 
 	// Window backgrounds carry the user-controlled opacity; Prepare() rewrites only their .w on opacity changes
@@ -516,7 +516,7 @@ void ImGuiManager::UpdateTextArea(TextAreas eTextArea, std::string_view characte
 	ASSERT(common::gpMultithreading->IsMainThread());
 	ASSERT(characters.size() < TextArea::kiMaxCharacters);
 
-	TextArea& rTextArea = mTextAreas[eTextArea];
+	TextArea& rTextArea = mpTextAreas[eTextArea];
 	rTextArea.iCharacterCount = static_cast<int64_t>(characters.size());
 	std::memcpy(rTextArea.pcText, characters.data(), rTextArea.iCharacterCount);
 }
@@ -527,7 +527,7 @@ void ImGuiManager::RenderTextAreas()
 	ImDrawList* pDrawList = ImGui::GetBackgroundDrawList();
 	ImFont* pFont = ImGui::GetFont();
 
-	for (const TextArea& rTextArea : mTextAreas)
+	for (const TextArea& rTextArea : mpTextAreas)
 	{
 		if (rTextArea.iCharacterCount == 0)
 		{
@@ -567,7 +567,7 @@ void ImGuiManager::RegisterOpaqueRectangle(const ImVec2& rPosition, const ImVec2
 	float fMinY = 1.0f - 2.0f * (rPosition.y + rSize.y) / fHeight;
 	float fMaxY = 1.0f - 2.0f * rPosition.y / fHeight;
 
-	mf4OpaqueRectangles[miOpaqueRectangleCount] = {fMinX, fMinY, fMaxX, fMaxY};
+	mpf4OpaqueRectangles[miOpaqueRectangleCount] = {fMinX, fMinY, fMaxX, fMaxY};
 	++miOpaqueRectangleCount;
 }
 
@@ -577,7 +577,7 @@ void ImGuiManager::UpdateUiRectangleBuffers(int64_t iFramebuffer)
 	{
 		Buffer& rStorageBuffer = gpBufferManager->mUiRectangleStorageBuffers.at(iFramebuffer);
 		XMFLOAT4* pf4Rectangles = reinterpret_cast<XMFLOAT4*>(rStorageBuffer.mpMappedMemory);
-		std::memcpy(pf4Rectangles, mf4OpaqueRectangles, static_cast<size_t>(miOpaqueRectangleCount) * sizeof(XMFLOAT4));
+		std::memcpy(pf4Rectangles, mpf4OpaqueRectangles, static_cast<size_t>(miOpaqueRectangleCount) * sizeof(XMFLOAT4));
 	}
 
 	mpUiPrepassIndirectMappedVkDrawIndirectCommand[iFramebuffer] = {.vertexCount = 6, .instanceCount = static_cast<uint32_t>(miOpaqueRectangleCount), .firstVertex = 0, .firstInstance = 0};

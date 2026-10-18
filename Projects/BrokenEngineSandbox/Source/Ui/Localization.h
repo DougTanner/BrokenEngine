@@ -13,6 +13,6 @@ using engine::TranslatedString;
 using engine::InitializeLocalization;
 using engine::geLanguage;
 using engine::kiLanguageCount;
-using engine::kLanguageOptions;
+using engine::kpLanguageOptions;
 
 } // namespace game

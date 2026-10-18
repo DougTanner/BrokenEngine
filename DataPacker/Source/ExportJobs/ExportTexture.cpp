@@ -10,9 +10,9 @@ std::optional<common::ChunkFlags_t> ExportTexture::Handles(const std::filesystem
 		return common::ChunkFlags_t({common::ChunkFlags::kTexture, common::ChunkFlags::kCubemap});
 	}
 
-	static constexpr std::string_view kExtensions[] = {".png", ".tga", ".jpg", ".ktx", TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK), TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK), TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK), TextureIntermediateSuffix(VK_FORMAT_R16_UNORM), TextureIntermediateSuffix(VK_FORMAT_R16G16B16A16_SFLOAT)};
+	static constexpr std::string_view kpExtensions[] = {".png", ".tga", ".jpg", ".ktx", TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK), TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK), TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK), TextureIntermediateSuffix(VK_FORMAT_R16_UNORM), TextureIntermediateSuffix(VK_FORMAT_R16G16B16A16_SFLOAT)};
 	std::string extension = rDirectoryEntry.path().extension().string();
-	return std::ranges::contains(kExtensions, extension) ? std::optional<common::ChunkFlags_t>(common::ChunkFlags::kTexture) : std::nullopt;
+	return std::ranges::contains(kpExtensions, extension) ? std::optional<common::ChunkFlags_t>(common::ChunkFlags::kTexture) : std::nullopt;
 }
 
 static int64_t ComputeUncompressedTextureSize(VkFormat vkFormat, int64_t iWidth, int64_t iHeight, int64_t iMipLevels)

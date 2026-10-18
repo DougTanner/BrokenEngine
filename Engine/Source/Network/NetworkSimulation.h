@@ -86,9 +86,9 @@ struct NetworkSimulationState
 {
 	static constexpr uint32_t kuiSeed = 0x9E3779B9ui32; // Constant seed keeps simulated latency and loss reproducible across runs.
 	uint32_t uiRandomState = kuiSeed;
-	int64_t iConsecutiveDrops[NetworkManager::kiChannelCount] {};
-	std::chrono::steady_clock::time_point channelReleaseTimes[NetworkManager::kiChannelCount] {};
-	int64_t iCoordinateDropCounts[NetworkManager::kiMaximumEnetCoordinateSlots] {};
+	int64_t piConsecutiveDrops[NetworkManager::kiChannelCount] {};
+	std::chrono::steady_clock::time_point pChannelReleaseTimes[NetworkManager::kiChannelCount] {};
+	int64_t piCoordinateDropCounts[NetworkManager::kiMaximumEnetCoordinateSlots] {};
 	int64_t iControlDropCount = 0;
 };
 
@@ -119,7 +119,7 @@ inline DropResult ShouldDrop(NetworkSimulationState& rState, const NetworkSimula
 {
 	static constexpr int64_t kiMaxConsecutiveDrops = kiNetworkBufferSize / 2;
 
-	int64_t& riDrops = rState.iConsecutiveDrops[iChannel];
+	int64_t& riDrops = rState.piConsecutiveDrops[iChannel];
 	bool bDrop = false;
 	if (riDrops > 0)
 	{
@@ -167,8 +167,8 @@ inline void EnqueueOrDrop(std::deque<DelayedPacket>& rDelayedPackets, NetworkSim
 				int64_t iSlot = NetworkManager::ChannelToSlot(rEvent.channelID);
 				int64_t iPacketType = (rEvent.packet->dataLength > 0) ? rEvent.packet->data[0] : 0;
 				int64_t iTick = NetworkMessages::GetCoordUpdateTickOrZero(std::span<const uint8_t>(rEvent.packet->data, rEvent.packet->dataLength));
-				++rState.iCoordinateDropCounts[iSlot];
-				LOG(kNetwork, kVerbose, "NetworkSimulation::Dropped Coord Slot: {} Tick: {} Type: {} Size: {} TotalDrops: {} Consecutive: {}", iSlot, iTick, PacketTypeName(static_cast<PacketType>(iPacketType)), rEvent.packet->dataLength, rState.iCoordinateDropCounts[iSlot], dropResult.iConsecutive);
+				++rState.piCoordinateDropCounts[iSlot];
+				LOG(kNetwork, kVerbose, "NetworkSimulation::Dropped Coord Slot: {} Tick: {} Type: {} Size: {} TotalDrops: {} Consecutive: {}", iSlot, iTick, PacketTypeName(static_cast<PacketType>(iPacketType)), rEvent.packet->dataLength, rState.piCoordinateDropCounts[iSlot], dropResult.iConsecutive);
 			}
 			else
 			{
@@ -182,8 +182,8 @@ inline void EnqueueOrDrop(std::deque<DelayedPacket>& rDelayedPackets, NetworkSim
 	}
 	else
 	{
-		std::chrono::steady_clock::time_point releaseTime = std::max(std::chrono::steady_clock::now() + RandomOneWayDelay(rState, rSimulationConfiguration), rState.channelReleaseTimes[rEvent.channelID]);
-		rState.channelReleaseTimes[rEvent.channelID] = releaseTime;
+		std::chrono::steady_clock::time_point releaseTime = std::max(std::chrono::steady_clock::now() + RandomOneWayDelay(rState, rSimulationConfiguration), rState.pChannelReleaseTimes[rEvent.channelID]);
+		rState.pChannelReleaseTimes[rEvent.channelID] = releaseTime;
 		EnqueueDelayed(rDelayedPackets, rEvent, releaseTime);
 	}
 }

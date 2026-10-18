@@ -56,8 +56,8 @@ public:
 
 	std::vector<std::unique_ptr<Pipeline>> mPipelines;
 	std::vector<std::unique_ptr<ModelPipeline>> mModelPipelines;
-	std::unordered_map<common::crc_t, Pipeline*> mPipelineMaps[kDynamicPipelineCount];
-	std::unordered_map<common::crc_t, ModelPipeline*> mModelPipelineMaps[kDynamicModelPipelineCount];
+	std::unordered_map<common::crc_t, Pipeline*> mpPipelineMaps[kDynamicPipelineCount];
+	std::unordered_map<common::crc_t, ModelPipeline*> mpModelPipelineMaps[kDynamicModelPipelineCount];
 	std::unordered_map<common::crc_t, std::string> mShadowPipelineNames; // Owns shadow pipeline name strings
 
 	void CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, int64_t iBufferSize, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, DescriptorFlags eSamplerFlag);

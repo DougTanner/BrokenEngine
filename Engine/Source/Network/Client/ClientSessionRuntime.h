@@ -94,7 +94,7 @@ public:
 	std::unique_ptr<Client> mpClient;
 	std::unique_ptr<NetworkDiscoveryScanner> mpDiscoveryScanner;
 	common::Flags<ClientSessionStateFlags> mStateFlags;
-	char mcDiscoveredAddress[16] {};
+	char mpcDiscoveredAddress[16] {};
 	int64_t miLatestServerTick = -1;
 	// Arrival time of miLatestServerTick, backdated by the estimate's lead over that tick when it arrived.
 	std::chrono::steady_clock::time_point mLatestServerTickArrival {};
@@ -105,7 +105,7 @@ public:
 	std::vector<GridCoord> mDesiredCoordinates;
 	std::vector<GridCoord> mSubscriptionQueue;
 	std::unordered_map<GridCoord, std::chrono::steady_clock::time_point> mUnwantedTimestamps;
-	GridCoord mVisibleNeighbors[8] {};
+	GridCoord mpVisibleNeighbors[8] {};
 	int64_t miVisibleNeighborCount = 0;
 
 private:

@@ -43,20 +43,20 @@ inline constexpr float kfOmniMaximumPusherPushVelocity = kfOmniMaximumSpeed * 0.
 #if defined(BT_CLIENT)
 struct HexShieldDirections
 {
-	XMFLOAT4A data[shaders::kiHexShieldDirections] {};
+	XMFLOAT4A pf4Data[shaders::kiHexShieldDirections] {};
 };
 
 struct HexShieldIntensities
 {
-	float data[shaders::kiHexShieldDirections] {};
+	float pfData[shaders::kiHexShieldDirections] {};
 };
 #endif // BT_CLIENT
 
 struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::CollectionFlags::kIdToIndex>
 {
 	static constexpr int64_t kiVersion = 13;
-	static constexpr char kName[] = "Omni";
-	static constexpr common::crc_t kCrc = common::CrcConsteval(kName);
+	static constexpr char kpcName[] = "Omni";
+	static constexpr common::crc_t kCrc = common::CrcConsteval(kpcName);
 
 	static void Register();
 

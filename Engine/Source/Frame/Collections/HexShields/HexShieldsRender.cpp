@@ -39,8 +39,8 @@ void HexShieldsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::HexShieldLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineHexShields].at(kuiCrc), iCommandBuffer, 2, pBuffer);
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineHexShieldsLighting].at(kuiCrc), iCommandBuffer, 2, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShields].at(kuiCrc), iCommandBuffer, 2, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShieldsLighting].at(kuiCrc), iCommandBuffer, 2, pBuffer);
 	}
 }
 
@@ -119,8 +119,8 @@ void HexShieldsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	{
 		gpProfileManager->GetCpuCounter(kCpuCounterHexShieldsRendered).iCount = siRendered;
 	}
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineHexShields].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineHexShieldsLighting].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() ? siRendered : 0);
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShields].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, siRendered);
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineHexShieldsLighting].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, gLightingEnabled.Get<bool>() ? siRendered : 0);
 }
 
 } // namespace engine

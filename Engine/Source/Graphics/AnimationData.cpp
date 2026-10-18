@@ -432,9 +432,9 @@ void AnimationData::EvaluateMaterial(int64_t iMaterialIndex, const XMMATRIX* pma
 
 	// Compute normal matrix: transpose(inverse(mat3(meshWorld)))
 	XMMATRIX matNormal = XMMatrixTranspose(XMMatrixInverse(nullptr, matMeshWorld));
-	XMStoreFloat4(&pMeshData->normalMatrix[0], matNormal.r[0]);
-	XMStoreFloat4(&pMeshData->normalMatrix[1], matNormal.r[1]);
-	XMStoreFloat4(&pMeshData->normalMatrix[2], matNormal.r[2]);
+	XMStoreFloat4(&pMeshData->pf4NormalMatrix[0], matNormal.r[0]);
+	XMStoreFloat4(&pMeshData->pf4NormalMatrix[1], matNormal.r[1]);
+	XMStoreFloat4(&pMeshData->pf4NormalMatrix[2], matNormal.r[2]);
 
 	if (rMaterialInfo.flags & common::MaterialFlags::kSkinned)
 	{
@@ -447,14 +447,14 @@ void AnimationData::EvaluateMaterial(int64_t iMaterialIndex, const XMMATRIX* pma
 			XMMATRIX matJoint = matInverseBind * pmatWorldMatrices[iNodeIndex] * matMeshWorldInverse;
 			// Store 3 rows with translation packed into .w components:
 			// r[0].w=0 -> Tx, r[1].w=0 -> Ty, r[2].w=0 -> Tz
-			XMStoreFloat4(&pJointMatrices[iJointMatrixOffset + i].rows[0], matJoint.r[0]);
-			XMStoreFloat4(&pJointMatrices[iJointMatrixOffset + i].rows[1], matJoint.r[1]);
-			XMStoreFloat4(&pJointMatrices[iJointMatrixOffset + i].rows[2], matJoint.r[2]);
+			XMStoreFloat4(&pJointMatrices[iJointMatrixOffset + i].pf4Rows[0], matJoint.r[0]);
+			XMStoreFloat4(&pJointMatrices[iJointMatrixOffset + i].pf4Rows[1], matJoint.r[1]);
+			XMStoreFloat4(&pJointMatrices[iJointMatrixOffset + i].pf4Rows[2], matJoint.r[2]);
 			XMFLOAT4 f4Translation {};
 			XMStoreFloat4(&f4Translation, matJoint.r[3]);
-			pJointMatrices[iJointMatrixOffset + i].rows[0].w = f4Translation.x;
-			pJointMatrices[iJointMatrixOffset + i].rows[1].w = f4Translation.y;
-			pJointMatrices[iJointMatrixOffset + i].rows[2].w = f4Translation.z;
+			pJointMatrices[iJointMatrixOffset + i].pf4Rows[0].w = f4Translation.x;
+			pJointMatrices[iJointMatrixOffset + i].pf4Rows[1].w = f4Translation.y;
+			pJointMatrices[iJointMatrixOffset + i].pf4Rows[2].w = f4Translation.z;
 		}
 	}
 }

@@ -148,7 +148,7 @@ static nlohmann::json BuildCellState(engine::GridCoord coordinate, const engine:
 	result["tailTick"] = -1;
 	if (rCell.iSnapshotCount > 0)
 	{
-		result["tailTick"] = rCell.snapshots[engine::SnapshotIndex(rCell.iSnapshotHead, rCell.iSnapshotCount - 1)]->interpolate.iTick;
+		result["tailTick"] = rCell.ppSnapshots[engine::SnapshotIndex(rCell.iSnapshotHead, rCell.iSnapshotCount - 1)]->interpolate.iTick;
 	}
 	return result;
 }

@@ -87,7 +87,7 @@ enum EngineCpuCounters : int64_t
 // One entry per EngineCpuCounters enumerator, in order. The static_assert catches a dropped/extra name — a missing
 // initializer would otherwise silently misalign every later overlay row (member arrays can't deduce extent, so the
 // names live here as a deduced-extent table).
-inline constexpr std::string_view kEngineCpuCounterNames[]
+inline constexpr std::string_view kpEngineCpuCounterNames[]
 {
 	"Billboards",
 	"    Rendered",
@@ -106,7 +106,7 @@ inline constexpr std::string_view kEngineCpuCounterNames[]
 	"Sounds",
 	"Streams",
 };
-static_assert(std::size(kEngineCpuCounterNames) == static_cast<size_t>(kEngineCpuCounterCount));
+static_assert(std::size(kpEngineCpuCounterNames) == static_cast<size_t>(kEngineCpuCounterCount));
 
 enum EngineCpuTimers : int64_t
 {
@@ -130,8 +130,8 @@ enum EngineCpuTimers : int64_t
 	kEngineCpuTimerCount
 };
 
-// One entry per EngineCpuTimers enumerator, in order; static_assert guards against drift (see kEngineCpuCounterNames).
-inline constexpr std::string_view kEngineCpuTimerNames[]
+// One entry per EngineCpuTimers enumerator, in order; static_assert guards against drift (see kpEngineCpuCounterNames).
+inline constexpr std::string_view kpEngineCpuTimerNames[]
 {
 	"Acquire to global",
 	"Render global",
@@ -150,7 +150,7 @@ inline constexpr std::string_view kEngineCpuTimerNames[]
 	"Network poll+reconcile",
 	"Network send",
 };
-static_assert(std::size(kEngineCpuTimerNames) == static_cast<size_t>(kEngineCpuTimerCount));
+static_assert(std::size(kpEngineCpuTimerNames) == static_cast<size_t>(kEngineCpuTimerCount));
 
 #if defined(BT_CLIENT)
 enum GpuTimers : int64_t
@@ -194,8 +194,8 @@ enum GpuTimers : int64_t
 	kGpuTimerCount
 };
 
-// One entry per GpuTimers enumerator, in order; static_assert guards against drift (see kEngineCpuCounterNames).
-inline constexpr std::string_view kGpuTimerNames[]
+// One entry per GpuTimers enumerator, in order; static_assert guards against drift (see kpEngineCpuCounterNames).
+inline constexpr std::string_view kpGpuTimerNames[]
 {
 	"Global render",
 	"    Uniform Copy",
@@ -233,7 +233,7 @@ inline constexpr std::string_view kGpuTimerNames[]
 	"    HDR Resolve",
 	"Ui Render",
 };
-static_assert(std::size(kGpuTimerNames) == static_cast<size_t>(kGpuTimerCount));
+static_assert(std::size(kpGpuTimerNames) == static_cast<size_t>(kGpuTimerCount));
 
 struct GpuTimer
 {
@@ -273,8 +273,8 @@ enum BootTimers : int64_t
 	kBootTimerCount
 };
 
-// One entry per BootTimers enumerator, in order; static_assert guards against drift (see kEngineCpuCounterNames).
-inline constexpr std::string_view kBootTimerNames[]
+// One entry per BootTimers enumerator, in order; static_assert guards against drift (see kpEngineCpuCounterNames).
+inline constexpr std::string_view kpBootTimerNames[]
 {
 	"Total",
 	"    Wait for data file",
@@ -296,7 +296,7 @@ inline constexpr std::string_view kBootTimerNames[]
 	"      Record command buffers",
 	"      Render present",
 };
-static_assert(std::size(kBootTimerNames) == static_cast<size_t>(kBootTimerCount));
+static_assert(std::size(kpBootTimerNames) == static_cast<size_t>(kBootTimerCount));
 
 struct BootTimer
 {
@@ -398,11 +398,11 @@ protected:
 
 #if defined(BT_CLIENT)
 public:
-	GpuTimer mGpuTimers[kGpuTimerCount];
+	GpuTimer mpGpuTimers[kGpuTimerCount];
 protected:
 #endif // BT_CLIENT
 
-	BootTimer mBootTimers[kBootTimerCount];
+	BootTimer mpBootTimers[kBootTimerCount];
 
 	std::chrono::steady_clock::time_point mLastVisibilityEvaluationTime = std::chrono::steady_clock::time_point();
 

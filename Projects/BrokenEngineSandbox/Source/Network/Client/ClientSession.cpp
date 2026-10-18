@@ -144,19 +144,19 @@ void ClientSession::UpdateOwnedEntityCoordinate(engine::GlobalId globalId, engin
 
 void ClientSession::ConnectToServer(std::string_view serverAddress)
 {
-	gpGame->mModalMessage[0] = '\0';
+	gpGame->mpcModalMessage[0] = '\0';
 	mpRuntime->Connect(serverAddress, engine::kiDefaultPort, NetworkSessionContract::kiCoordinateSlots);
 }
 
 void ClientSession::OnConnectionRejected(std::string_view reason)
 {
-	std::snprintf(gpGame->mModalMessage, sizeof(gpGame->mModalMessage), "%.*s", static_cast<int>(reason.size()), reason.data());
+	std::snprintf(gpGame->mpcModalMessage, sizeof(gpGame->mpcModalMessage), "%.*s", static_cast<int>(reason.size()), reason.data());
 	gpGame->meUiState = engine::UiState::kModal;
 }
 
 void ClientSession::OnConnectionFailed()
 {
-	std::snprintf(gpGame->mModalMessage, sizeof(gpGame->mModalMessage), "Connection failed");
+	std::snprintf(gpGame->mpcModalMessage, sizeof(gpGame->mpcModalMessage), "Connection failed");
 	gpGame->meUiState = engine::UiState::kModal;
 }
 
@@ -175,9 +175,9 @@ void ClientSession::OnConnectionAccepted()
 void ClientSession::OnConnectionLost()
 {
 	gpGame->ChangeFrameToMainMenu();
-	if (gpGame->mModalMessage[0] == '\0')
+	if (gpGame->mpcModalMessage[0] == '\0')
 	{
-		std::snprintf(gpGame->mModalMessage, sizeof(gpGame->mModalMessage), "Connection lost");
+		std::snprintf(gpGame->mpcModalMessage, sizeof(gpGame->mpcModalMessage), "Connection lost");
 	}
 	gpGame->meUiState = engine::UiState::kModal;
 }

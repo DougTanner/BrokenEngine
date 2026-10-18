@@ -34,7 +34,7 @@ struct AreaLightsInterpolate : public Collection<AreaLightsInterpolate, Collecti
 	struct SyncData
 	{
 		int64_t iTypeIndex = 0;
-		XMVECTOR vecVisiblePositions[4] {};
+		XMVECTOR pVecVisiblePositions[4] {};
 		float fIntensityMultiplier = 1.0f;
 	};
 

@@ -39,7 +39,7 @@ void ModalScreen::Render()
 
 	{
 		ScopedMenuFont messageFont(kfMenuUiScale * kfModalMessageFontScale);
-		ImGui::TextWrapped("%s", game::gpGame->mModalMessage);
+		ImGui::TextWrapped("%s", game::gpGame->mpcModalMessage);
 	}
 
 	ImGui::Dummy(ImVec2(0.0f, kfModalMessageActionGapPixels * UiScale()));
@@ -49,7 +49,7 @@ void ModalScreen::Render()
 	if (MenuButton("OK", ImVec2(fButtonWidth, 0.0f), mfOkHoverAnimation))
 	{
 		game::gpGame->meUiState = UiState::kPause;
-		game::gpGame->mModalMessage[0] = '\0';
+		game::gpGame->mpcModalMessage[0] = '\0';
 	}
 
 	ImGui::End();

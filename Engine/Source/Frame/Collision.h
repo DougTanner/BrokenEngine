@@ -138,7 +138,7 @@ private:
 	// Each result and generation buffer has a fixed 64 MiB reservation ceiling; live counts determine committed storage.
 	static inline thread_local common::StableVector<CollisionResult> sResultEntries = common::StableVector<CollisionResult>(kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(CollisionResult)));
 	static inline thread_local common::StableVector<CollisionResultSpan> sResultSpans = common::StableVector<CollisionResultSpan>(kiRowReserveCount);
-	static inline thread_local int64_t sLayerBaseOffsets[kiCollisionLayerPreallocate] {};
+	static inline thread_local int64_t spiLayerBaseOffsets[kiCollisionLayerPreallocate] {};
 	static inline thread_local int64_t siResultSpanCount = 0;
 	static inline thread_local common::StableVector<uint32_t> sTestedBGeneration = common::StableVector<uint32_t>(kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(uint32_t)));
 	static inline thread_local uint32_t suiTestedBCurrentGeneration = 0;

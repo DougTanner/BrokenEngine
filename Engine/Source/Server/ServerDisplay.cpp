@@ -22,7 +22,7 @@ constexpr int64_t kiTabBarLeft = 250;
 constexpr int64_t kiTabHeight = 32;
 constexpr int64_t kiTabWidth = 100;
 constexpr int64_t kiTabCount = 2;
-constexpr std::string_view kTabNames[] = {"Map", "Profile"};
+constexpr std::string_view kpTabNames[] = {"Map", "Profile"};
 
 constexpr int64_t kiCopyButtonWidth = 80;
 constexpr int64_t kiCopyButtonHeight = 28;
@@ -476,8 +476,8 @@ static void PaintProfilePanel(HDC hdcBuffer, int64_t iLeft, int64_t iTop, [[mayb
 
 static void PaintTabBar(HDC hdcBuffer, int64_t iWidth)
 {
-	// Bind each tab name by value: std::views::enumerate over kTabNames yields a const std::string_view&, which PREfast C26445 (gsl.view) rejects.
-	for (int64_t i = 0; std::string_view tabName : kTabNames)
+	// Bind each tab name by value: std::views::enumerate over kpTabNames yields a const std::string_view&, which PREfast C26445 (gsl.view) rejects.
+	for (int64_t i = 0; std::string_view tabName : kpTabNames)
 	{
 		int64_t iTabLeft = kiTabBarLeft + i * kiTabWidth;
 		RECT tabRectangle {.left = static_cast<LONG>(iTabLeft), .top = 0, .right = static_cast<int>(iTabLeft + kiTabWidth), .bottom = static_cast<int>(kiTabHeight)};

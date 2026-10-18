@@ -14,7 +14,7 @@ public:
 	// Resume / Graphics / Audio / Game Settings / Main Menu / Quit
 	static constexpr int64_t kiMenuButtonCount = 6;
 
-	float mfButtonHoverAnimations[kiMenuButtonCount] {};
+	float mpfButtonHoverAnimations[kiMenuButtonCount] {};
 };
 
 } // namespace engine

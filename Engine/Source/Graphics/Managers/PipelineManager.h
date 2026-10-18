@@ -94,10 +94,10 @@ public:
 	Texture* mppWaterNormalTextures[shaders::kiWaterNormalCount] {};
 
 	// Spread pipelines [pass]: radial directional spread, fragment shader with MRT
-	Pipeline mSpreadPipelines[shaders::kiMaxSpreadPasses];
+	Pipeline mpSpreadPipelines[shaders::kiMaxSpreadPasses];
 	// Owns the spread pipeline name strings (PipelineInfo::name is a string_view that must outlive the Create call;
 	// mirrors mShadowPipelineNames in DynamicPipelines)
-	std::string mSpreadPipelineNames[shaders::kiMaxSpreadPasses];
+	std::string mpSpreadPipelineNames[shaders::kiMaxSpreadPasses];
 
 	// Combine pipeline (tone map accumulate → UNORM, all 3 colors in one dispatch)
 	Pipeline mCombinePipeline;
@@ -110,7 +110,7 @@ public:
 
 	DynamicPipelines mDynamicPipelines = DynamicPipelines(mShaders);
 
-	WorldLightingShadowPipelines mWorldLightingShadowPipelines = WorldLightingShadowPipelines(mShaders, mpPipelines, mSpreadPipelines, mSpreadPipelineNames, mCombinePipeline, mLightingTemporalPipeline, mLightingHistoryCopyPipeline, mppWaterNormalTextures);
+	WorldLightingShadowPipelines mWorldLightingShadowPipelines = WorldLightingShadowPipelines(mShaders, mpPipelines, mpSpreadPipelines, mpSpreadPipelineNames, mCombinePipeline, mLightingTemporalPipeline, mLightingHistoryCopyPipeline, mppWaterNormalTextures);
 };
 
 inline PipelineManager* gpPipelineManager = nullptr;

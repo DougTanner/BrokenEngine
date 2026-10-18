@@ -25,9 +25,9 @@ void ReconcileInjectPendingFullState(CoordWork& rWork)
 	ASSERT(rPending.pFrame->interpolate.iTick == rPending.iTick);
 	int64_t iSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
 	rPending.pFrame->postRender.uiSharedCrc = rPending.pFrame->Crc();
-	rCell.snapshots[iSlot] = std::move(rPending.pFrame);
+	rCell.ppSnapshots[iSlot] = std::move(rPending.pFrame);
 	rScratch.replayStack.clear();
-	rScratch.replayStack.push_back(rCell.snapshots[iSlot].get());
+	rScratch.replayStack.push_back(rCell.ppSnapshots[iSlot].get());
 	rScratch.iReplayStackCount = 1;
 	rScratch.iReplayWriteHead = SnapshotIndex(iSlot, 1);
 	rScratch.iReplayWriteCount = 0;
@@ -66,10 +66,10 @@ static void AdoptUnreachablePendingFullState(CoordWork& rWork, engine::Cell::Pen
 	int64_t iAdoptedTick = rPending.iTick;
 	int64_t iAdoptedSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
 	rPending.pFrame->postRender.uiSharedCrc = rPending.pFrame->Crc();
-	rCell.snapshots[iAdoptedSlot] = std::move(rPending.pFrame);
+	rCell.ppSnapshots[iAdoptedSlot] = std::move(rPending.pFrame);
 
 	rScratch.replayStack.clear();
-	rScratch.replayStack.push_back(rCell.snapshots[iAdoptedSlot].get());
+	rScratch.replayStack.push_back(rCell.ppSnapshots[iAdoptedSlot].get());
 	rScratch.iReplayStackCount = 1;
 	rScratch.iReplayWriteHead = SnapshotIndex(iAdoptedSlot, 1);
 	rScratch.iReplayWriteCount = 0;
@@ -168,7 +168,7 @@ static void DetermineRollbackBase(CoordWork& rWork, const ReconcileInputs& rInpu
 			for (int64_t i = 0; i < rCell.iSnapshotCount; ++i)
 			{
 				int64_t iPhysical = SnapshotIndex(rCell.iSnapshotHead, i);
-				if (rCell.snapshots[iPhysical] != nullptr && rCell.snapshots[iPhysical]->interpolate.iTick == iShrunkTick)
+				if (rCell.ppSnapshots[iPhysical] != nullptr && rCell.ppSnapshots[iPhysical]->interpolate.iTick == iShrunkTick)
 				{
 					iShrunkIndex = i;
 					break;

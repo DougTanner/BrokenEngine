@@ -362,7 +362,7 @@ void RenderLightingSpreadIndirect(int64_t iCommandBuffer)
 	// Update all kiMaxSpreadPasses pipelines because the recorded Main command buffer selects the active passes.
 	// CreateHostVisibleIndirectBuffer zeroes slots during pipeline recreation, so recorded passes need their instance counts restored.
 	// Write only iCommandBuffer's framebuffer slot; the other slots may still be in use by the GPU.
-	for (Pipeline& rPipeline : gpPipelineManager->mSpreadPipelines)
+	for (Pipeline& rPipeline : gpPipelineManager->mpSpreadPipelines)
 	{
 		rPipeline.WriteIndirectBuffer(iCommandBuffer, iInstanceCount);
 	}

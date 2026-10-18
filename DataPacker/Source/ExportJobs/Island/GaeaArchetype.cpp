@@ -70,7 +70,7 @@ static void PatchArchetypeMesherResolution(nlohmann::json& rJson, int64_t iVerti
 }
 
 // Recursive walker: finds the single node whose $type names a Gaea Route node and sets its
-// "Choice" (0 = 1x1 single landmass, 1 = 2x1 dual band, 2 = 2x2 quad grid — see kRouteSubdivisions
+// "Choice" (0 = 1x1 single landmass, 1 = 2x1 dual band, 2 = 2x2 quad grid — see kpRouteSubdivisions
 // in BakeIslandIntermediates.cpp). The on-disk
 // archetype authors Choice at whatever the editor was last saved at; DataPacker always patches it
 // per route so the bake is deterministic. riRouteNodeCount accumulates matches so the caller can

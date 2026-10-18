@@ -36,7 +36,7 @@ enum class TextureLayout
 	kTransferSource,
 };
 
-// Steady-state VkImageLayout a TextureLayout maps to (single-sources the kLayoutMappings table in Texture.cpp).
+// Steady-state VkImageLayout a TextureLayout maps to (single-sources the kpLayoutMappings table in Texture.cpp).
 // Used by CopyImageToHostMemory callers to supply a readback source's parked layout (e.g. agent dump_render_target).
 VkImageLayout ToVkImageLayout(TextureLayout eLayout);
 

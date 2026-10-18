@@ -26,8 +26,8 @@ struct BlastersType
 struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>, public engine::TypeRegistry<BlastersType>
 {
 	static constexpr int64_t kiVersion = 1;
-	static constexpr char kName[] = "Blasters";
-	static constexpr common::crc_t kCrc = common::CrcConsteval(kName);
+	static constexpr char kpcName[] = "Blasters";
+	static constexpr common::crc_t kCrc = common::CrcConsteval(kpcName);
 
 	static void Register();
 

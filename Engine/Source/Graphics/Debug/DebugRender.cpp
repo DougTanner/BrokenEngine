@@ -14,11 +14,11 @@ struct DebugRenderType
 	common::crc_t crc = 0;
 	Pipelines ePipeline = kPipelineCount;
 	int64_t iCount = 0;
-	// Each sTypes entry relies on this default member initializer for its reservation limit.
+	// Each spTypes entry relies on this default member initializer for its reservation limit.
 	common::StableVector<shaders::DebugRenderLayout> layouts = common::StableVector<shaders::DebugRenderLayout>(64 * kiInitialDebugRender);
 };
 
-static DebugRenderType sTypes[]
+static DebugRenderType spTypes[]
 {
 	{.crc = common::CrcConsteval("DebugBox"), .ePipeline = kPipelineDebugBox, .iCount = 0},
 	{.crc = common::CrcConsteval("DebugSphere"), .ePipeline = kPipelineDebugSphere, .iCount = 0},
@@ -35,7 +35,7 @@ static void AddLayout(int64_t iType, const XMFLOAT4A& rf4Row0, const XMFLOAT4A& 
 {
 	if constexpr (kbDebugRender)
 	{
-		DebugRenderType& rType = sTypes[iType];
+		DebugRenderType& rType = spTypes[iType];
 
 		if (rType.layouts.Size() == 0)
 		{
@@ -116,7 +116,7 @@ void DebugRender::BeginRender(int64_t iCommandBuffer)
 {
 	if constexpr (kbDebugRender)
 	{
-		for (const DebugRenderType& rType : sTypes)
+		for (const DebugRenderType& rType : spTypes)
 		{
 			if (rType.iCount == 0)
 			{
@@ -138,7 +138,7 @@ void DebugRender::EndRender(int64_t iCommandBuffer)
 {
 	if constexpr (kbDebugRender)
 	{
-		for (DebugRenderType& rType : sTypes)
+		for (DebugRenderType& rType : spTypes)
 		{
 			gpPipelineManager->mpPipelines[rType.ePipeline].WriteIndirectBuffer(iCommandBuffer, rType.iCount);
 			rType.iCount = 0;

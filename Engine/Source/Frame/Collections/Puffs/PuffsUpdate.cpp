@@ -32,11 +32,11 @@ void PuffsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restric
 			{
 				if (rOriginalController.ppAreaScales[j] != nullptr)
 				{
-					rScaledController.keyframes[j].fArea *= rOriginalController.ppAreaScales[j]->mfCurrent;
+					rScaledController.pKeyframes[j].fArea *= rOriginalController.ppAreaScales[j]->mfCurrent;
 				}
 				if (rOriginalController.ppIntensityScales[j] != nullptr)
 				{
-					rScaledController.keyframes[j].fIntensity *= rOriginalController.ppIntensityScales[j]->mfCurrent;
+					rScaledController.pKeyframes[j].fIntensity *= rOriginalController.ppIntensityScales[j]->mfCurrent;
 				}
 			});
 
@@ -72,9 +72,9 @@ void XM_CALLCONV PuffsPostRender::AddControlled(game::Frame& __restrict rFrame, 
 	}, [&rInterpolate, &rController](int64_t iSpawnIndex)
 	{
 		rInterpolate.puiTypeIndices[iSpawnIndex] = static_cast<uint8_t>(rController.iBaseTypeIndex);
-		rInterpolate.pfAreas[iSpawnIndex] = rController.keyframes[0].fArea * (rController.ppAreaScales[0] != nullptr ? rController.ppAreaScales[0]->mfCurrent : 1.0f);
-		rInterpolate.pfIntensities[iSpawnIndex] = rController.keyframes[0].fIntensity * (rController.ppIntensityScales[0] != nullptr ? rController.ppIntensityScales[0]->mfCurrent : 1.0f);
-		rInterpolate.pfRotations[iSpawnIndex] = rController.keyframes[0].fRotation;
+		rInterpolate.pfAreas[iSpawnIndex] = rController.pKeyframes[0].fArea * (rController.ppAreaScales[0] != nullptr ? rController.ppAreaScales[0]->mfCurrent : 1.0f);
+		rInterpolate.pfIntensities[iSpawnIndex] = rController.pKeyframes[0].fIntensity * (rController.ppIntensityScales[0] != nullptr ? rController.ppIntensityScales[0]->mfCurrent : 1.0f);
+		rInterpolate.pfRotations[iSpawnIndex] = rController.pKeyframes[0].fRotation;
 	});
 }
 

@@ -105,7 +105,7 @@ void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine:
 		engine::AreaLightsInterpolate::Sync(rFrameInterpolate, uiAreaLight,
 		{
 			.iTypeIndex = (flags & kTargetOmni) ? siEnemyExhaustAreaLightTypeIndex : siOmniExhaustAreaLightTypeIndex,
-			.vecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
+			.pVecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
 			.fIntensityMultiplier = fIntensityMultiplier,
 		});
 	}
@@ -243,8 +243,8 @@ void MissilesInterpolate::Register()
 
 static void SpawnMissileExplosion(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate, float fPercent, XMVECTOR vecPosition, XMVECTOR vecDirection, MissileFlags_t flags)
 {
-	static constexpr float kfSizeMultipliers[] = {1.0f, 0.5f, 0.25f,};
-	for (int64_t j = 0; float fSizeMultiplier : kfSizeMultipliers)
+	static constexpr float kpfSizeMultipliers[] = {1.0f, 0.5f, 0.25f,};
+	for (int64_t j = 0; float fSizeMultiplier : kpfSizeMultipliers)
 	{
 		float fScaledPercent = fPercent * fSizeMultiplier;
 		XMVECTOR vecExplosionPosition = vecPosition;

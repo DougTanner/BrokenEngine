@@ -15,7 +15,7 @@ struct SoundSettings
 	float fMusicVolume = 0.0f;
 	float fSoundVolume = 0.0f;
 	uint8_t uiMuteInBackground = 0;
-	uint8_t uiPadding[3] {};
+	uint8_t puiPadding[3] {};
 };
 static_assert(std::is_trivially_copyable_v<SoundSettings>, "SoundSettings must stay trivially copyable — WriteVersionedFile stamps sizeof");
 static_assert(std::is_standard_layout_v<SoundSettings>, "SoundSettings must stay standard-layout — BT_OFFSETOF above is only well-defined for standard-layout types");
@@ -23,7 +23,7 @@ static_assert(BT_OFFSETOF(SoundSettings, fMasterVolume) == 0, "SoundSettings::fM
 static_assert(BT_OFFSETOF(SoundSettings, fMusicVolume) == 4, "SoundSettings::fMusicVolume offset changed — existing volume bytes move");
 static_assert(BT_OFFSETOF(SoundSettings, fSoundVolume) == 8, "SoundSettings::fSoundVolume offset changed — existing volume bytes move");
 static_assert(BT_OFFSETOF(SoundSettings, uiMuteInBackground) == 12, "SoundSettings::uiMuteInBackground offset changed — mute byte is appended after volumes");
-static_assert(BT_OFFSETOF(SoundSettings, uiPadding) == 13, "SoundSettings padding changed — SoundSettings must remain 16 bytes");
+static_assert(BT_OFFSETOF(SoundSettings, puiPadding) == 13, "SoundSettings padding changed — SoundSettings must remain 16 bytes");
 static_assert(sizeof(SoundSettings) == 16, "SoundSettings::kiVersion must be bumped with this layout");
 constexpr char kpcSoundSettingsPath[] = "SoundSettings.bin";
 

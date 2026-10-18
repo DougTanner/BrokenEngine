@@ -44,7 +44,7 @@ static std::filesystem::path IslandRelativePath(const std::filesystem::path& rSo
 // valid: ProcessBakedRegion borrows neighboring pixels to meet crop alignment, including three-way
 // splits of power-of-two bakes. Column/row changes bump kiSplitVersion, reuse raw Gaea output, and rerun
 // only the split.
-constexpr RouteSubdivision kRouteSubdivisions[] =
+constexpr RouteSubdivision kpRouteSubdivisions[] =
 {
 	{ .pcLabel = "1x1", .iGaeaChoice = 0, .iColumns = 1, .iRows = 1, },
 	{ .pcLabel = "2x1", .iGaeaChoice = 1, .iColumns = 1, .iRows = 2, },
@@ -60,7 +60,7 @@ constexpr RouteSubdivision kRouteSubdivisions[] =
 
 static const RouteSubdivision& LookupRouteSubdivision(std::string_view label, const std::filesystem::path& rIslandJsonFile)
 {
-	for (const RouteSubdivision& rRoute : kRouteSubdivisions)
+	for (const RouteSubdivision& rRoute : kpRouteSubdivisions)
 	{
 		if (label == rRoute.pcLabel)
 		{
@@ -69,7 +69,7 @@ static const RouteSubdivision& LookupRouteSubdivision(std::string_view label, co
 	}
 
 	std::string validLabels;
-	for (const RouteSubdivision& rRoute : kRouteSubdivisions)
+	for (const RouteSubdivision& rRoute : kpRouteSubdivisions)
 	{
 		if (!validLabels.empty())
 		{
@@ -206,7 +206,7 @@ static void BakeOne(const std::filesystem::path& rIslandFolder)
 		throw std::runtime_error(std::format("\"{}\" texturePixels {} is invalid: must be >= {} and a multiple of {} so the auto-crop dims stay BC-block- and Vulkan-transfer-granularity-aligned.", islandJsonFile.string(), iTexturePixels, kiCropAlignment, kiCropAlignment));
 	}
 
-	// Resolve the routes list (one or many labels). Each must exist in kRouteSubdivisions; a split
+	// Resolve the routes list (one or many labels). Each must exist in kpRouteSubdivisions; a split
 	// route additionally requires every per-column / per-row pixel span stay >= the crop alignment.
 	const nlohmann::json& rRoutesJson = islandJson.at("routes");
 	if (!rRoutesJson.is_array() || rRoutesJson.empty())

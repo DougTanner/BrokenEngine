@@ -12,12 +12,12 @@ namespace engine
 // reordering, a rename, or a count change all produce a different value.
 static common::crc_t ComputeLayoutCrc()
 {
-	common::crc_t crcKeys[kiMaxTweakSections] {};
+	common::crc_t pCrcKeys[kiMaxTweakSections] {};
 	for (int64_t i = 0; i < TweaksScreen::msiSectionCount; ++i)
 	{
-		crcKeys[i] = common::Crc(TweaksScreen::msSectionDescriptions[i].stableKey);
+		pCrcKeys[i] = common::Crc(TweaksScreen::mspSectionDescriptions[i].stableKey);
 	}
-	return common::Crc(std::span<const common::crc_t>(crcKeys, static_cast<size_t>(TweaksScreen::msiSectionCount)));
+	return common::Crc(std::span<const common::crc_t>(pCrcKeys, static_cast<size_t>(TweaksScreen::msiSectionCount)));
 }
 
 constexpr float kfUiScale = 1.5f;
@@ -27,7 +27,7 @@ void TweaksScreen::RegisterSection(int64_t& riSection, const TweakSectionDescrip
 	ASSERT(riSection == kiInvalidTweakSection);
 	ASSERT(msiSectionCount < kiMaxTweakSections);
 	riSection = msiSectionCount;
-	msSectionDescriptions[msiSectionCount] = rDescription;
+	mspSectionDescriptions[msiSectionCount] = rDescription;
 	++msiSectionCount;
 }
 
@@ -64,7 +64,7 @@ TweaksScreen::TweaksScreen()
 
 	for (int64_t i = 0; i < msiSectionCount; ++i)
 	{
-		mWindowPositions[i] = ImVec2((kfStartX + static_cast<float>(i) * kfOffsetX) * fUiScale, 0.0f);
+		mpWindowPositions[i] = ImVec2((kfStartX + static_cast<float>(i) * kfOffsetX) * fUiScale, 0.0f);
 	}
 }
 
@@ -126,7 +126,7 @@ void TweaksScreen::ChevronIndexSelector(std::string_view label, Wrapper& rWrappe
 
 bool TweaksScreen::BeginSubtab(const char* pcLabel, int64_t iSection, int64_t iTab)
 {
-	bool bApplySavedSubtab = (mApplySubtab & SectionFlag(iSection)) && miActiveSubtab[iSection] == iTab;
+	bool bApplySavedSubtab = (mApplySubtab & SectionFlag(iSection)) && mpiActiveSubtab[iSection] == iTab;
 	if (!ImGui::BeginTabItem(pcLabel, nullptr, bApplySavedSubtab ? ImGuiTabItemFlags_SetSelected : 0))
 	{
 		return false;
@@ -138,7 +138,7 @@ bool TweaksScreen::BeginSubtab(const char* pcLabel, int64_t iSection, int64_t iT
 	}
 	if (!(mApplySubtab & SectionFlag(iSection)))
 	{
-		miActiveSubtab[iSection] = static_cast<int8_t>(iTab);
+		mpiActiveSubtab[iSection] = static_cast<int8_t>(iTab);
 	}
 	return true;
 }
@@ -294,7 +294,7 @@ void TweaksScreen::RenderToggleBar()
 		{
 			ImGui::SameLine();
 		}
-		if (ImGui::Selectable(msSectionDescriptions[i].displayName.data(), mSectionVisible & SectionFlag(i), 0, ImVec2(fButtonWidth, 0.0f)))
+		if (ImGui::Selectable(mspSectionDescriptions[i].displayName.data(), mSectionVisible & SectionFlag(i), 0, ImVec2(fButtonWidth, 0.0f)))
 		{
 			mSectionVisible.Toggle(SectionFlag(i));
 		}
@@ -343,17 +343,17 @@ void TweaksScreen::WrapperSeparatorText(std::string_view label)
 
 void TweaksScreen::SaveState(TweakSectionState& rState) const
 {
-	// Clear first so unregistered slots and uiPadding are written as zeros: two saves of unchanged settings must be byte-identical.
+	// Clear first so unregistered slots and puiPadding are written as zeros: two saves of unchanged settings must be byte-identical.
 	rState = {};
 
 	rState.visible = mSectionVisible;
 	rState.collapsed = mSectionCollapsed;
 	for (int64_t i = 0; i < kiMaxTweakSections; ++i)
 	{
-		rState.fWindowPositionX[i] = mWindowPositions[i].x;
-		rState.fWindowPositionY[i] = mWindowPositions[i].y;
+		rState.pfWindowPositionX[i] = mpWindowPositions[i].x;
+		rState.pfWindowPositionY[i] = mpWindowPositions[i].y;
 	}
-	std::copy(std::begin(miActiveSubtab), std::end(miActiveSubtab), std::begin(rState.iActiveSubtab));
+	std::copy(std::begin(mpiActiveSubtab), std::end(mpiActiveSubtab), std::begin(rState.piActiveSubtab));
 	rState.crcLayout = ComputeLayoutCrc();
 }
 
@@ -371,9 +371,9 @@ void TweaksScreen::LoadState(const TweakSectionState& rState)
 	mSectionCollapsed = rState.collapsed;
 	for (int64_t i = 0; i < kiMaxTweakSections; ++i)
 	{
-		mWindowPositions[i] = ImVec2(rState.fWindowPositionX[i], rState.fWindowPositionY[i]);
+		mpWindowPositions[i] = ImVec2(rState.pfWindowPositionX[i], rState.pfWindowPositionY[i]);
 	}
-	std::copy(std::begin(rState.iActiveSubtab), std::end(rState.iActiveSubtab), std::begin(miActiveSubtab));
+	std::copy(std::begin(rState.piActiveSubtab), std::end(rState.piActiveSubtab), std::begin(mpiActiveSubtab));
 	mApplySubtab = AllSectionFlags();
 }
 
@@ -390,20 +390,20 @@ void TweaksScreen::RenderSectionWindow(int64_t iSection)
 	}
 
 	static constexpr float kfStartX = 10.0f;
-	ImVec2 f2InitialPosition = (mWindowPositions[iSection].y > 0.0f) ? mWindowPositions[iSection] : ImVec2 {kfStartX * UiScale(), mfToggleBarBottom};
+	ImVec2 f2InitialPosition = (mpWindowPositions[iSection].y > 0.0f) ? mpWindowPositions[iSection] : ImVec2 {kfStartX * UiScale(), mfToggleBarBottom};
 	ImGui::SetNextWindowPos(f2InitialPosition, ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowCollapsed(mSectionCollapsed & SectionFlag(iSection), ImGuiCond_FirstUseEver);
 	bool bSectionVisible = (mSectionVisible & SectionFlag(iSection)); // ImGui::Begin writes the close-button [x] state back through this bool*
-	ImGui::Begin(msSectionDescriptions[iSection].displayName.data(), bHasActiveSlider ? nullptr : &bSectionVisible, ImGuiWindowFlags_AlwaysAutoResize);
+	ImGui::Begin(mspSectionDescriptions[iSection].displayName.data(), bHasActiveSlider ? nullptr : &bSectionVisible, ImGuiWindowFlags_AlwaysAutoResize);
 	ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * kfUiScale);
-	mWindowPositions[iSection] = ImGui::GetWindowPos();
+	mpWindowPositions[iSection] = ImGui::GetWindowPos();
 	mSectionCollapsed.Set(SectionFlag(iSection), ImGui::IsWindowCollapsed());
 	if (!bHasActiveSlider)
 	{
 		mSectionVisible.Set(SectionFlag(iSection), bSectionVisible);
 	}
 
-	msSectionDescriptions[iSection].pRender(*this);
+	mspSectionDescriptions[iSection].pRender(*this);
 
 	ImGui::PopFont();
 	ImGui::End();
@@ -423,7 +423,7 @@ void TweaksScreen::RunSliderAuditFrame()
 
 		if (miAuditFrame == 0)
 		{
-			std::copy(std::begin(miActiveSubtab), std::end(miActiveSubtab), std::begin(miPreAuditSubtab));
+			std::copy(std::begin(mpiActiveSubtab), std::end(mpiActiveSubtab), std::begin(mpiPreAuditSubtab));
 			ScopedSuppressAllocationTracking suppress;
 			int64_t iSliderCount = std::ssize(TweaksSliderMap::Get());
 			mAuditTouched.reserve(static_cast<size_t>(iSliderCount));
@@ -432,7 +432,7 @@ void TweaksScreen::RunSliderAuditFrame()
 
 		for (int64_t i = 0; i < msiSectionCount; ++i)
 		{
-			miActiveSubtab[i] = static_cast<int8_t>(miAuditFrame);
+			mpiActiveSubtab[i] = static_cast<int8_t>(miAuditFrame);
 			mApplySubtab.Set(SectionFlag(i));
 		}
 
@@ -446,7 +446,7 @@ void TweaksScreen::RunSliderAuditFrame()
 		{
 			for (int64_t i = 0; i < msiSectionCount; ++i)
 			{
-				msSectionDescriptions[i].pRender(*this);
+				mspSectionDescriptions[i].pRender(*this);
 			}
 		}
 		ImGui::End();
@@ -454,7 +454,7 @@ void TweaksScreen::RunSliderAuditFrame()
 		mbAuditMode = false;
 
 		// Restore EVERY frame (not just on completion): the actual UI render later in the same Render() call must draw the user's saved tab, not the audit-cycled one.
-		std::copy(std::begin(miPreAuditSubtab), std::end(miPreAuditSubtab), std::begin(miActiveSubtab));
+		std::copy(std::begin(mpiPreAuditSubtab), std::end(mpiPreAuditSubtab), std::begin(mpiActiveSubtab));
 		mApplySubtab = AllSectionFlags();
 
 		++miAuditFrame;

@@ -12,9 +12,9 @@ namespace engine
 static_assert(shaders::kiMaxFlightPlanes == kiMaxFlightPlanes);
 
 // TextureInfo keeps the name view and Vulkan object naming reads its data(), so per-plane names need static storage.
-constexpr std::string_view kSmokeOneNames[] = {"SmokeOne0", "SmokeOne1", "SmokeOne2", "SmokeOne3", "SmokeOne4", "SmokeOne5", "SmokeOne6", "SmokeOne7"};
-constexpr std::string_view kSmokeTwoNames[] = {"SmokeTwo0", "SmokeTwo1", "SmokeTwo2", "SmokeTwo3", "SmokeTwo4", "SmokeTwo5", "SmokeTwo6", "SmokeTwo7"};
-static_assert(std::ssize(kSmokeOneNames) == shaders::kiMaxFlightPlanes && std::ssize(kSmokeTwoNames) == shaders::kiMaxFlightPlanes);
+constexpr std::string_view kpSmokeOneNames[] = {"SmokeOne0", "SmokeOne1", "SmokeOne2", "SmokeOne3", "SmokeOne4", "SmokeOne5", "SmokeOne6", "SmokeOne7"};
+constexpr std::string_view kpSmokeTwoNames[] = {"SmokeTwo0", "SmokeTwo1", "SmokeTwo2", "SmokeTwo3", "SmokeTwo4", "SmokeTwo5", "SmokeTwo6", "SmokeTwo7"};
+static_assert(std::ssize(kpSmokeOneNames) == shaders::kiMaxFlightPlanes && std::ssize(kpSmokeTwoNames) == shaders::kiMaxFlightPlanes);
 
 void RenderTargetTextures::Create()
 {
@@ -211,7 +211,7 @@ void RenderTargetTextures::CreateSmokeTextures()
 	TextureInfo smokeTextureInfo
 	{
 		.textureFlags = {TextureFlags::kRenderPass},
-		.name = kSmokeOneNames[0],
+		.name = kpSmokeOneNames[0],
 		.vkImageCreateFlags = 0,
 		.vkFormat = shaders::kVkFormatSmoke,
 		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(SmokeSimulationPixels()), .height = static_cast<uint32_t>(SmokeSimulationPixelsY()), .depth = 1},
@@ -232,9 +232,9 @@ void RenderTargetTextures::CreateSmokeTextures()
 	smokeTextureTwoInfo.vkRenderPassInitialImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
-		smokeTextureInfo.name = kSmokeOneNames[i];
+		smokeTextureInfo.name = kpSmokeOneNames[i];
 		mSmokeTexturesOne[i].Create(smokeTextureInfo);
-		smokeTextureTwoInfo.name = kSmokeTwoNames[i];
+		smokeTextureTwoInfo.name = kpSmokeTwoNames[i];
 		mSmokeTexturesTwo[i].Create(smokeTextureTwoInfo);
 	}
 	for (int64_t i = 0; i < shaders::kiMaxFlightPlanes; ++i)
@@ -317,7 +317,7 @@ void RenderTargetTextures::CreateWindTextures()
 	VkBufferMemoryBarrier pVkWindOccupancyInitializationBarriers[2] {};
 	for (int64_t i = 0; i < 2; ++i)
 	{
-		vkCmdFillBuffer(oneShotCommandBuffer.mVkCommandBuffer, gpBufferManager->mWindOccupancyVkBuffers[i], 0, static_cast<VkDeviceSize>(gpBufferManager->miWindOccupancyBufferSize), 0);
+		vkCmdFillBuffer(oneShotCommandBuffer.mVkCommandBuffer, gpBufferManager->mpWindOccupancyVkBuffers[i], 0, static_cast<VkDeviceSize>(gpBufferManager->miWindOccupancyBufferSize), 0);
 		pVkWindOccupancyInitializationBarriers[i] =
 		{
 			.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
@@ -326,7 +326,7 @@ void RenderTargetTextures::CreateWindTextures()
 			.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.buffer = gpBufferManager->mWindOccupancyVkBuffers[i],
+			.buffer = gpBufferManager->mpWindOccupancyVkBuffers[i],
 			.offset = 0,
 			.size = VK_WHOLE_SIZE,
 		};

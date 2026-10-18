@@ -128,7 +128,7 @@ Changes (11 files)
    - Reference new Flipbooks.vert/frag shader CRCs
    - Quad vertex buffer, global+main uniform buffers, storage buffer,
      sampler, bindless textures
-   - Register in mPipelineMaps[kDynamicPipelineFlipbooks]
+   - Register in mpPipelineMaps[kDynamicPipelineFlipbooks]
 
 10. Engine/Source/Graphics/Managers/CommandBufferManager.cpp
     Add flipbook draw recording in the main render pass, after the
@@ -137,7 +137,7 @@ Changes (11 files)
                                   kGpuTimerFlipbooks);
       for (const auto& [rCrc, pPipeline] :
            gpPipelineManager->mDynamicPipelines
-               .mPipelineMaps[kDynamicPipelineFlipbooks])
+               .mpPipelineMaps[kDynamicPipelineFlipbooks])
       {
           pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer);
       }

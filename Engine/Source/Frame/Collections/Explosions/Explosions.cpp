@@ -83,8 +83,8 @@ void ExplosionsInterpolate::Register()
 		.iBaseTypeIndex = siExplosionPointLightTypeIndex,
 		.iKeyframeCount = 3,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>(0.0f), 0.4f * kPrimaryTime, 3.0f * kPrimaryTime, std::chrono::duration<float>(0.0f)},
-		.keyframes =
+		.pTimes = {std::chrono::duration<float>(0.0f), 0.4f * kPrimaryTime, 3.0f * kPrimaryTime, std::chrono::duration<float>(0.0f)},
+		.pKeyframes =
 		{
 			{.fVisibleArea = 0.3f, .fVisibleIntensity = 0.25f, .fLightingArea = 0.6f, .fLightingIntensity = 0.25f, .fRotation = 0.0f},
 			{.fVisibleArea = 0.6f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.5f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
@@ -102,8 +102,8 @@ void ExplosionsInterpolate::Register()
 		.iBaseTypeIndex = siExplosionPointLightTypeIndex,
 		.iKeyframeCount = 3,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>(0.0f), 1.0f * kPrimaryTime, 3.0f * kPrimaryTime, std::chrono::duration<float>(0.0f)},
-		.keyframes =
+		.pTimes = {std::chrono::duration<float>(0.0f), 1.0f * kPrimaryTime, 3.0f * kPrimaryTime, std::chrono::duration<float>(0.0f)},
+		.pKeyframes =
 		{
 			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
 			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 2.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
@@ -127,8 +127,8 @@ void ExplosionsInterpolate::Register()
 		.iBaseTypeIndex = siExplosionPuffTypeIndex,
 		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.times = {kPrimaryPuffStartTime, kPrimaryPuffEndTime, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
-		.keyframes =
+		.pTimes = {kPrimaryPuffStartTime, kPrimaryPuffEndTime, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
+		.pKeyframes =
 		{
 			{.fArea = 1.0f, .fIntensity = 1.0f, .fRotation = 0.0f},
 			{.fArea = 1.0f, .fIntensity = 1.0f, .fRotation = 0.0f},
@@ -144,8 +144,8 @@ void ExplosionsInterpolate::Register()
 		.iBaseTypeIndex = siExplosionPuffTypeIndex,
 		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>(0.0f), kSecondaryPuffTimes, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
-		.keyframes =
+		.pTimes = {std::chrono::duration<float>(0.0f), kSecondaryPuffTimes, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
+		.pKeyframes =
 		{
 			{.fArea = 1.0f, .fIntensity = 1.0f, .fRotation = 0.0f},
 			{.fArea = 1.0f, .fIntensity = 1.0f, .fRotation = 0.0f},
@@ -167,8 +167,8 @@ void ExplosionsInterpolate::Register()
 	{
 		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>(0.0f), kWindDepositDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
-		.keyframes = {{.fIntensity = 1.0f, .fSize = 1.0f}, {.fIntensity = 0.0f, .fSize = 1.0f}, {}, {}},
+		.pTimes = {std::chrono::duration<float>(0.0f), kWindDepositDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
+		.pKeyframes = {{.fIntensity = 1.0f, .fSize = 1.0f}, {.fIntensity = 0.0f, .fSize = 1.0f}, {}, {}},
 	});
 #endif // BT_CLIENT
 }

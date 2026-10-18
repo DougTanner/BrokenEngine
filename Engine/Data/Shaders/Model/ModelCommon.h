@@ -47,7 +47,7 @@ layout (scalar, set = 1, binding = 2) buffer readonly modelsUniform
 struct MeshData
 {
 	mat4 matrix;              // Mesh world matrix
-	vec4 normalMatrix[3];     // Normal matrix: transpose(inverse(mat3(matrix))), stored as 3 vec4s
+	vec4 pf4NormalMatrix[3];  // Normal matrix: transpose(inverse(mat3(matrix))), stored as 3 vec4s
 	uint jointCount;          // 0 for non-skinned meshes
 	uint jointMatrixOffset;   // Index into jointMatrices[] buffer
 };
@@ -55,7 +55,7 @@ struct MeshData
 // Extract mat3 normal matrix from the 3 vec4 storage format
 mat3 GetNormalMatrix(MeshData data)
 {
-	return mat3(data.normalMatrix[0].xyz, data.normalMatrix[1].xyz, data.normalMatrix[2].xyz);
+	return mat3(data.pf4NormalMatrix[0].xyz, data.pf4NormalMatrix[1].xyz, data.pf4NormalMatrix[2].xyz);
 }
 
 // Binding 15: Per-mesh data (small, fixed size per mesh)
@@ -65,10 +65,10 @@ layout (scalar, set = 1, binding = kiModelBindingMeshData) buffer readonly meshD
 };
 
 // Joint matrix: 3 vec4s (48 bytes) instead of full mat4 (64 bytes)
-// rows[i].xyz = rotation row i, rows[i].w = translation component (Tx, Ty, Tz)
+// pf4Rows[i].xyz = rotation row i, pf4Rows[i].w = translation component (Tx, Ty, Tz)
 struct JointMatrix
 {
-	vec4 rows[3];
+	vec4 pf4Rows[3];
 };
 
 // Binding 16: Joint matrices (dynamically sized, separate from mesh data)

@@ -42,43 +42,43 @@ static std::vector<uint8_t> DecodeBcnMip0ToRgba8(const std::byte* puiEncoded, in
 		for (int64_t iBlockX = 0; iBlockX < iBlocksX; ++iBlockX)
 		{
 			const std::byte* puiBlock = puiEncoded + (iBlockY * iBlocksX + iBlockX) * iBlockSizeBytes;
-			int64_t iBlockRgba[16 * 4] = {};
+			int64_t piBlockRgba[16 * 4] = {};
 
 			switch (vkFormat)
 			{
 				case VK_FORMAT_BC4_UNORM_BLOCK:
 				{
-					uint8_t uiBc4Pixels[16] = {};
-					rgbcx::unpack_bc4(puiBlock, uiBc4Pixels, 1);
+					uint8_t puiBc4Pixels[16] = {};
+					rgbcx::unpack_bc4(puiBlock, puiBc4Pixels, 1);
 					for (int64_t i = 0; i < 16; ++i)
 					{
-						iBlockRgba[i * 4 + 0] = uiBc4Pixels[i];
-						iBlockRgba[i * 4 + 3] = 255;
+						piBlockRgba[i * 4 + 0] = puiBc4Pixels[i];
+						piBlockRgba[i * 4 + 3] = 255;
 					}
 					break;
 				}
 				case VK_FORMAT_BC5_UNORM_BLOCK:
 				{
-					uint8_t uiBc5Pixels[16 * 2] = {};
-					rgbcx::unpack_bc5(puiBlock, uiBc5Pixels, 0, 1, 2);
+					uint8_t puiBc5Pixels[16 * 2] = {};
+					rgbcx::unpack_bc5(puiBlock, puiBc5Pixels, 0, 1, 2);
 					for (int64_t i = 0; i < 16; ++i)
 					{
-						iBlockRgba[i * 4 + 0] = uiBc5Pixels[i * 2 + 0];
-						iBlockRgba[i * 4 + 1] = uiBc5Pixels[i * 2 + 1];
-						iBlockRgba[i * 4 + 3] = 255;
+						piBlockRgba[i * 4 + 0] = puiBc5Pixels[i * 2 + 0];
+						piBlockRgba[i * 4 + 1] = puiBc5Pixels[i * 2 + 1];
+						piBlockRgba[i * 4 + 3] = 255;
 					}
 					break;
 				}
 				case VK_FORMAT_BC7_UNORM_BLOCK:
 				{
-					bc7decomp::color_rgba bc7Pixels[16] = {};
-					bc7decomp::unpack_bc7(puiBlock, bc7Pixels);
+					bc7decomp::color_rgba pBc7Pixels[16] = {};
+					bc7decomp::unpack_bc7(puiBlock, pBc7Pixels);
 					for (int64_t i = 0; i < 16; ++i)
 					{
-						iBlockRgba[i * 4 + 0] = bc7Pixels[i].r;
-						iBlockRgba[i * 4 + 1] = bc7Pixels[i].g;
-						iBlockRgba[i * 4 + 2] = bc7Pixels[i].b;
-						iBlockRgba[i * 4 + 3] = bc7Pixels[i].a;
+						piBlockRgba[i * 4 + 0] = pBc7Pixels[i].r;
+						piBlockRgba[i * 4 + 1] = pBc7Pixels[i].g;
+						piBlockRgba[i * 4 + 2] = pBc7Pixels[i].b;
+						piBlockRgba[i * 4 + 3] = pBc7Pixels[i].a;
 					}
 					break;
 				}
@@ -99,10 +99,10 @@ static std::vector<uint8_t> DecodeBcnMip0ToRgba8(const std::byte* puiEncoded, in
 					}
 					int64_t iDestIndex = (iY * iWidth + iX) * 4;
 					int64_t iBlockIndex = (i * 4 + j) * 4;
-					rgba8.at(iDestIndex + 0) = static_cast<uint8_t>(iBlockRgba[iBlockIndex + 0]);
-					rgba8.at(iDestIndex + 1) = static_cast<uint8_t>(iBlockRgba[iBlockIndex + 1]);
-					rgba8.at(iDestIndex + 2) = static_cast<uint8_t>(iBlockRgba[iBlockIndex + 2]);
-					rgba8.at(iDestIndex + 3) = static_cast<uint8_t>(iBlockRgba[iBlockIndex + 3]);
+					rgba8.at(iDestIndex + 0) = static_cast<uint8_t>(piBlockRgba[iBlockIndex + 0]);
+					rgba8.at(iDestIndex + 1) = static_cast<uint8_t>(piBlockRgba[iBlockIndex + 1]);
+					rgba8.at(iDestIndex + 2) = static_cast<uint8_t>(piBlockRgba[iBlockIndex + 2]);
+					rgba8.at(iDestIndex + 3) = static_cast<uint8_t>(piBlockRgba[iBlockIndex + 3]);
 				}
 			}
 		}
@@ -138,13 +138,13 @@ static void MigrateLegacyIntermediate(const std::filesystem::path& rPath)
 	{
 		return;
 	}
-	std::byte uiHeaderBytes[4 * sizeof(int64_t)] = {};
-	fileStream.read(reinterpret_cast<char*>(uiHeaderBytes), sizeof(uiHeaderBytes));
-	if (!fileStream || fileStream.gcount() != static_cast<std::streamsize>(sizeof(uiHeaderBytes)))
+	std::byte puiHeaderBytes[4 * sizeof(int64_t)] = {};
+	fileStream.read(reinterpret_cast<char*>(puiHeaderBytes), sizeof(puiHeaderBytes));
+	if (!fileStream || fileStream.gcount() != static_cast<std::streamsize>(sizeof(puiHeaderBytes)))
 	{
 		return;
 	}
-	TextureIntermediateHeader header = ReadTextureIntermediateHeader(uiHeaderBytes);
+	TextureIntermediateHeader header = ReadTextureIntermediateHeader(puiHeaderBytes);
 	if (header.bHadMagic)
 	{
 		return;

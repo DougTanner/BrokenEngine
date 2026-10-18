@@ -122,7 +122,7 @@ public:
 	struct IslandSlot
 	{
 		common::crc_t islandCrc = 0;
-		common::crc_t textureCrcs[4] {};
+		common::crc_t pTextureCrcs[4] {};
 		Texture* pElevationTexture = nullptr;
 	};
 

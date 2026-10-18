@@ -360,8 +360,8 @@ static constexpr int64_t kiPreFilteredMipCount = 11; // log2(1024) + 1
 // TextureUploadManager iteration order) and writes the [width][height][mipcount][pixels] intermediate.
 static void WriteFilteredCubemap(cmft::Image& rDestinationImage, const std::filesystem::path& rOutputPath)
 {
-	uint32_t offsets[CUBE_FACE_NUM][MAX_MIP_NUM] {};
-	cmft::imageGetMipOffsets(offsets, rDestinationImage);
+	uint32_t puiOffsets[CUBE_FACE_NUM][MAX_MIP_NUM] {};
+	cmft::imageGetMipOffsets(puiOffsets, rDestinationImage);
 
 	int64_t iTotalHalfFloats = 0;
 	int64_t iMipSize = kiPreFilteredFaceSize;
@@ -380,7 +380,7 @@ static void WriteFilteredCubemap(cmft::Image& rDestinationImage, const std::file
 		for (int64_t j = 0; j < kiPreFilteredMipCount; ++j, iMipSize /= 2)
 		{
 			int64_t iMipPixels = iMipSize * iMipSize;
-			const float* pSourceFloat = reinterpret_cast<const float*>(static_cast<uint8_t*>(rDestinationImage.m_data) + offsets[i][j]);
+			const float* pSourceFloat = reinterpret_cast<const float*>(static_cast<uint8_t*>(rDestinationImage.m_data) + puiOffsets[i][j]);
 			DirectX::PackedVector::XMConvertFloatToHalfStream(halfData.data() + iHalfOffset, sizeof(uint16_t), pSourceFloat, sizeof(float), iMipPixels * 4);
 			iHalfOffset += iMipPixels * 4;
 		}
@@ -531,14 +531,14 @@ static bool ProcessFaceImageCubemaps(int64_t iCpuThreads, cmft::ClContext* pClCo
 						"nz.png",
 					};
 					const char* const* pFaceNames = bHasJpgFaces ? kpcJpgFaceNames : kpcPngFaceNames;
-					std::filesystem::path legacyInputs[6];
+					std::filesystem::path pLegacyInputs[6];
 					for (int64_t j = 0; j < 6; ++j)
 					{
-						legacyInputs[j] = rDirectoryEntry.path() / pFaceNames[j];
+						pLegacyInputs[j] = rDirectoryEntry.path() / pFaceNames[j];
 					}
 					std::string fingerprint = GetFaceCubemapFingerprint("prefiltered", rDirectoryEntry.path(), pFaceNames);
 					std::filesystem::path metadataPath = GetFingerprintMetadataPath(outputPath, i);
-					if (IsOutputCurrent(outputPath, metadataPath, fingerprint, legacyInputs))
+					if (IsOutputCurrent(outputPath, metadataPath, fingerprint, pLegacyInputs))
 					{
 						continue;
 					}
@@ -546,12 +546,12 @@ static bool ProcessFaceImageCubemaps(int64_t iCpuThreads, cmft::ClContext* pClCo
 
 					LOG(kDefault, kDebug, "Generating pre-filtered cubemap for \"{}\"", rDirectoryEntry.path().filename().string());
 
-					cmft::Image faceImages[6];
+					cmft::Image pFaceImages[6];
 					cmft::Image sourceImage;
 					cmft::Image destinationImage;
 					common::ScopedLambda imageCleanup([&]()
 					{
-						for (cmft::Image& rFaceImage : faceImages)
+						for (cmft::Image& rFaceImage : pFaceImages)
 						{
 							cmft::imageUnload(rFaceImage);
 						}
@@ -562,10 +562,10 @@ static bool ProcessFaceImageCubemaps(int64_t iCpuThreads, cmft::ClContext* pClCo
 					{
 						// stb link-resolves to the shared first-party STBI_WINDOWS_UTF8 build (cmft's vendored stb is not compiled), so imageLoadStb decodes this UTF-8 path correctly.
 						std::u8string facePath = (rDirectoryEntry.path() / pFaceNames[j]).u8string();
-						cmft::imageLoadStb(faceImages[j], reinterpret_cast<const char*>(facePath.c_str()), cmft::TextureFormat::RGBA32F);
+						cmft::imageLoadStb(pFaceImages[j], reinterpret_cast<const char*>(facePath.c_str()), cmft::TextureFormat::RGBA32F);
 					}
 
-					cmft::imageCubemapFromFaceList(sourceImage, faceImages);
+					cmft::imageCubemapFromFaceList(sourceImage, pFaceImages);
 
 					cmft::imageRadianceFilter(destinationImage, static_cast<uint32_t>(kiPreFilteredFaceSize), cmft::LightingModel::BlinnBrdf, false, static_cast<uint8_t>(kiPreFilteredMipCount), 14, 4, sourceImage, cmft::EdgeFixup::None, static_cast<uint8_t>(iCpuThreads), pClContext);
 

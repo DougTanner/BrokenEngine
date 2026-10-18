@@ -28,7 +28,7 @@ struct GraphicsSettings
 	static constexpr int64_t kiVersion = 18;
 
 	common::Flags<GraphicsSettingsFlags> flags {};
-	uint8_t uiPadding[3] {};
+	uint8_t puiPadding[3] {};
 	VkPresentModeKHR vkPresentMode = VK_PRESENT_MODE_FIFO_KHR;
 	VkSampleCountFlagBits vkSampleCount = VK_SAMPLE_COUNT_4_BIT;
 	float fMaximumAnisotropy = 0.0f;
@@ -45,12 +45,12 @@ struct GraphicsSettings
 	uint8_t uiObjectShadowsLevel = 0;
 	uint8_t uiLightingLevel = 0;
 	uint8_t uiSmokeDetailLevel = 0;
-	uint8_t uiQualityPadding[3] {};
+	uint8_t puiQualityPadding[3] {};
 };
 static_assert(std::is_trivially_copyable_v<GraphicsSettings>, "GraphicsSettings must stay trivially copyable — WriteVersionedFile stamps sizeof");
 static_assert(std::is_standard_layout_v<GraphicsSettings>, "GraphicsSettings must stay standard-layout — BT_OFFSETOF below is only well-defined for standard-layout types");
 static_assert(BT_OFFSETOF(GraphicsSettings, flags) == 0, "GraphicsSettings::flags offset changed — the flag byte leads the file");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiPadding) == 1, "GraphicsSettings padding changed — common::Flags must stay one byte");
+static_assert(BT_OFFSETOF(GraphicsSettings, puiPadding) == 1, "GraphicsSettings padding changed — common::Flags must stay one byte");
 static_assert(BT_OFFSETOF(GraphicsSettings, vkPresentMode) == 4, "GraphicsSettings::vkPresentMode offset changed — existing setting bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, vkSampleCount) == 8, "GraphicsSettings::vkSampleCount offset changed — VkPresentModeKHR must stay four bytes");
 static_assert(BT_OFFSETOF(GraphicsSettings, fMaximumAnisotropy) == 12, "GraphicsSettings::fMaximumAnisotropy offset changed — VkSampleCountFlagBits must stay four bytes");
@@ -65,7 +65,7 @@ static_assert(BT_OFFSETOF(GraphicsSettings, uiTerrainShadowsLevel) == 41, "Graph
 static_assert(BT_OFFSETOF(GraphicsSettings, uiObjectShadowsLevel) == 42, "GraphicsSettings::uiObjectShadowsLevel offset changed — existing quality bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, uiLightingLevel) == 43, "GraphicsSettings::uiLightingLevel offset changed — existing quality bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, uiSmokeDetailLevel) == 44, "GraphicsSettings::uiSmokeDetailLevel offset changed — existing quality bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, uiQualityPadding) == 45, "GraphicsSettings padding changed — GraphicsSettings must remain 48 bytes");
+static_assert(BT_OFFSETOF(GraphicsSettings, puiQualityPadding) == 45, "GraphicsSettings padding changed — GraphicsSettings must remain 48 bytes");
 static_assert(sizeof(GraphicsSettings) == 48, "GraphicsSettings::kiVersion must be bumped with this layout");
 constexpr char kpcGraphicsSettingsPath[] = "GraphicsSettings.bin";
 

@@ -60,7 +60,7 @@ int64_t AgentUiRegistry::FindPendingLabel(ImGuiID uiIdentifier) const
 {
 	for (int64_t i = 0; i < miPendingLabelCount; ++i)
 	{
-		if (mPendingLabels[i].uiIdentifier == uiIdentifier)
+		if (mpPendingLabels[i].uiIdentifier == uiIdentifier)
 		{
 			return i;
 		}
@@ -73,9 +73,9 @@ void AgentUiRegistry::RemovePendingLabel(int64_t iIndex)
 	--miPendingLabelCount;
 	if (iIndex != miPendingLabelCount)
 	{
-		mPendingLabels[iIndex] = mPendingLabels[miPendingLabelCount];
+		mpPendingLabels[iIndex] = mpPendingLabels[miPendingLabelCount];
 	}
-	mPendingLabels[miPendingLabelCount] = {};
+	mpPendingLabels[miPendingLabelCount] = {};
 }
 
 void AgentUiRegistry::HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Rectangle, const char* pcWindow, bool bDisabled, bool bVisible)
@@ -88,12 +88,12 @@ void AgentUiRegistry::HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Recta
 		return;
 	}
 
-	int64_t& riCount = miItemCount[miWrite];
+	int64_t& riCount = mpiItemCount[miWrite];
 	if (riCount >= kiMaxItems)
 	{
 		return; // capacity bound — silently drop overflow (registry is best-effort snapshot)
 	}
-	AgentUiItem& rItem = mItems[miWrite][riCount];
+	AgentUiItem& rItem = mpItems[miWrite][riCount];
 	rItem.uiIdentifier = uiIdentifier;
 	rItem.f4Rectangle = rf4Rectangle;
 	rItem.iStatusFlags = bVisible ? static_cast<int64_t>(ImGuiItemStatusFlags_Visible) : 0;
@@ -103,7 +103,7 @@ void AgentUiRegistry::HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Recta
 	CopyTruncate(rItem.pcWindow, pcWindow);
 	if (iPendingLabel >= 0)
 	{
-		CopyTruncate(rItem.pcLabel, mPendingLabels[iPendingLabel].pcLabel);
+		CopyTruncate(rItem.pcLabel, mpPendingLabels[iPendingLabel].pcLabel);
 		RemovePendingLabel(iPendingLabel);
 	}
 	++riCount;
@@ -112,10 +112,10 @@ void AgentUiRegistry::HookItemAdd(ImGuiID uiIdentifier, const XMFLOAT4& rf4Recta
 void AgentUiRegistry::HookItemInfo(ImGuiID uiIdentifier, const char* pcLabel, int64_t iStatusFlags)
 {
 	// Search newest records first; tabs can emit ItemInfo before their ItemAdd.
-	int64_t iCount = miItemCount[miWrite];
+	int64_t iCount = mpiItemCount[miWrite];
 	for (int64_t i = iCount - 1; i >= 0; --i)
 	{
-		AgentUiItem& rItem = mItems[miWrite][i];
+		AgentUiItem& rItem = mpItems[miWrite][i];
 		if (rItem.uiIdentifier == uiIdentifier)
 		{
 			if (pcLabel != nullptr && pcLabel[0] != '\0')
@@ -140,18 +140,18 @@ void AgentUiRegistry::HookItemInfo(ImGuiID uiIdentifier, const char* pcLabel, in
 			return; // capacity bound — silently drop overflow (registry is best-effort snapshot)
 		}
 		iPendingLabel = miPendingLabelCount++;
-		mPendingLabels[iPendingLabel].uiIdentifier = uiIdentifier;
+		mpPendingLabels[iPendingLabel].uiIdentifier = uiIdentifier;
 	}
 	// The pre-ItemAdd status belongs to the prior item for tabs; only the label crosses into pending state.
-	CopyTruncate(mPendingLabels[iPendingLabel].pcLabel, pcLabel);
+	CopyTruncate(mpPendingLabels[iPendingLabel].pcLabel, pcLabel);
 }
 
 void AgentUiRegistry::RecordItemValue(ImGuiID uiIdentifier, const char* pcValue)
 {
-	int64_t iCount = miItemCount[miWrite];
+	int64_t iCount = mpiItemCount[miWrite];
 	for (int64_t i = iCount - 1; i >= 0; --i)
 	{
-		AgentUiItem& rItem = mItems[miWrite][i];
+		AgentUiItem& rItem = mpItems[miWrite][i];
 		if (rItem.uiIdentifier == uiIdentifier)
 		{
 			CopyTruncate(rItem.pcValue, pcValue);
@@ -162,10 +162,10 @@ void AgentUiRegistry::RecordItemValue(ImGuiID uiIdentifier, const char* pcValue)
 
 void AgentUiRegistry::RecordItemChecked(ImGuiID uiIdentifier, bool bChecked)
 {
-	int64_t iCount = miItemCount[miWrite];
+	int64_t iCount = mpiItemCount[miWrite];
 	for (int64_t i = iCount - 1; i >= 0; --i)
 	{
-		AgentUiItem& rItem = mItems[miWrite][i];
+		AgentUiItem& rItem = mpItems[miWrite][i];
 		if (rItem.uiIdentifier == uiIdentifier)
 		{
 			rItem.iStatusFlags |= static_cast<int64_t>(ImGuiItemStatusFlags_Checkable);
@@ -186,7 +186,7 @@ void AgentUiRegistry::Swap()
 {
 	// Snapshot the window list of the just-completed frame into the write buffer before flipping.
 	ImGuiContext* pContext = ImGui::GetCurrentContext();
-	int64_t& riWindowCount = miWindowCount[miWrite];
+	int64_t& riWindowCount = mpiWindowCount[miWrite];
 	riWindowCount = 0;
 	for (ImGuiWindow* pWindow : pContext->Windows)
 	{
@@ -198,7 +198,7 @@ void AgentUiRegistry::Swap()
 		{
 			break;
 		}
-		AgentUiWindow& rWindow = mWindows[miWrite][riWindowCount];
+		AgentUiWindow& rWindow = mpWindows[miWrite][riWindowCount];
 		CopyTruncate(rWindow.pcName, pWindow->Name);
 		rWindow.f4Rectangle = XMFLOAT4(pWindow->Pos.x, pWindow->Pos.y, pWindow->Pos.x + pWindow->Size.x, pWindow->Pos.y + pWindow->Size.y);
 		rWindow.bFocused = (pContext->NavWindow == pWindow);
@@ -207,17 +207,17 @@ void AgentUiRegistry::Swap()
 
 	// Publish: the write buffer becomes the read buffer; reset the new write buffer's item count for the next frame.
 	std::swap(miWrite, miRead);
-	miItemCount[miWrite] = 0;
+	mpiItemCount[miWrite] = 0;
 	for (int64_t i = 0; i < miPendingLabelCount; ++i)
 	{
-		mPendingLabels[i] = {};
+		mpPendingLabels[i] = {};
 	}
 	miPendingLabelCount = 0;
 }
 
 int64_t AgentUiRegistry::ResolveLabel(const char* pcLabel, const char* pcWindow) const
 {
-	int64_t iCount = miItemCount[miRead];
+	int64_t iCount = mpiItemCount[miRead];
 	int64_t iNeedleDisplay = DisplayLength(pcLabel);
 
 	// Three resolution tiers, tried in order; the first tier with any match decides (single -> hit, multiple -> ambiguous).
@@ -227,7 +227,7 @@ int64_t AgentUiRegistry::ResolveLabel(const char* pcLabel, const char* pcWindow)
 		int64_t iMatches = 0;
 		for (int64_t i = 0; i < iCount; ++i)
 		{
-			const AgentUiItem& rItem = mItems[miRead][i];
+			const AgentUiItem& rItem = mpItems[miRead][i];
 			if (pcWindow != nullptr && std::strcmp(rItem.pcWindow, pcWindow) != 0)
 			{
 				continue;

@@ -14,7 +14,7 @@ public:
 
 private:
 
-	std::pair<std::chrono::steady_clock::time_point, int64_t> mFramesInTheLastSecond[kiCapacity] {};
+	std::pair<std::chrono::steady_clock::time_point, int64_t> mpFramesInTheLastSecond[kiCapacity] {};
 	int64_t miHead = 0;
 	int64_t miCount = 0;
 };

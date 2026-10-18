@@ -30,7 +30,7 @@ struct DataPackerRunSummary
 // Source of truth for the data-type enum, display names, and per-type CRC header
 // includes. The order here defines the integer values of the generated DataTypes
 // enum and is consumed by the runtime via `kpcDataTypeNames[kDataType...]`.
-static constexpr DataTypeEntry kDataTypes[] =
+static constexpr DataTypeEntry kpDataTypes[] =
 {
 	{.enumSuffix = "Audio",   .displayName = "Audio",   .headerFile = "Audio.h"},
 	{.enumSuffix = "Scene",   .displayName = "Scene",   .headerFile = "Scene.h"},
@@ -40,7 +40,7 @@ static constexpr DataTypeEntry kDataTypes[] =
 	{.enumSuffix = "Texture", .displayName = "Texture", .headerFile = "Texture.h"},
 	{.enumSuffix = "Raw",     .displayName = "Raw",     .headerFile = "Raw.h"},
 };
-static constexpr int64_t kiDataTypeCount = std::ssize(kDataTypes);
+static constexpr int64_t kiDataTypeCount = std::ssize(kpDataTypes);
 
 static bool WriteIfChanged(std::string_view content, const std::filesystem::path& rPath, std::string_view logName)
 {
@@ -650,7 +650,7 @@ static bool GenerateDataTypesHeader(const std::filesystem::path& rOutPath)
 	content << std::endl;
 	content << "enum DataTypes" << std::endl;
 	content << "{" << std::endl;
-	for (const DataTypeEntry& rEntry : kDataTypes)
+	for (const DataTypeEntry& rEntry : kpDataTypes)
 	{
 		content << "\tkDataType" << rEntry.enumSuffix << "," << std::endl;
 	}
@@ -662,7 +662,7 @@ static bool GenerateDataTypesHeader(const std::filesystem::path& rOutPath)
 	content << "{" << std::endl;
 	for (int64_t i = 0; i < kiDataTypeCount; ++i)
 	{
-		content << "\t\"" << kDataTypes[i].displayName << "\"";
+		content << "\t\"" << kpDataTypes[i].displayName << "\"";
 		if (i + 1 < kiDataTypeCount)
 		{
 			content << ",";
@@ -685,7 +685,7 @@ static bool GenerateDataHeader(const std::filesystem::path& rOutPath)
 	content << std::endl;
 	content << "#include \"DataTypes.h\"" << std::endl;
 	content << std::endl;
-	for (const DataTypeEntry& rEntry : kDataTypes)
+	for (const DataTypeEntry& rEntry : kpDataTypes)
 	{
 		content << "#include \"" << rEntry.headerFile << "\"" << std::endl;
 	}

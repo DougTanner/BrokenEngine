@@ -106,13 +106,13 @@ private:
 #if defined(BT_DEBUG)
 public:
 #endif
-	SlotState mSlotStates[kiBufferCount] {};
+	SlotState mpeSlotStates[kiBufferCount] {};
 private:
-	ChunkReadRequest mReadRequests[kiBufferCount];
-	int64_t mSlotOffsets[kiBufferCount] {};
-	int64_t mSlotBytesRead[kiBufferCount] {};
-	bool mbSlotLastBuffer[kiBufferCount] {};
-	uint8_t mBuffers[kiBufferCount][kiBufferSize] {};
+	ChunkReadRequest mpReadRequests[kiBufferCount];
+	int64_t mpiSlotOffsets[kiBufferCount] {};
+	int64_t mpiSlotBytesRead[kiBufferCount] {};
+	bool mpbSlotLastBuffer[kiBufferCount] {};
+	uint8_t mpuiBuffers[kiBufferCount][kiBufferSize] {};
 public:
 	IXAudio2SourceVoice* mpVoice = nullptr;
 private:

@@ -62,8 +62,8 @@ void XM_CALLCONV WindRadialsPostRender::AddControlled(game::Frame& __restrict rF
 		return AddElement(rInterpolate, rPostRender);
 	}, [&rInterpolate, &rController, fBaseIntensity, fBaseSize](int64_t iSpawnIndex)
 	{
-		rInterpolate.pfIntensities[iSpawnIndex] = fBaseIntensity * rController.keyframes[0].fIntensity;
-		rInterpolate.pfSizes[iSpawnIndex] = fBaseSize * rController.keyframes[0].fSize;
+		rInterpolate.pfIntensities[iSpawnIndex] = fBaseIntensity * rController.pKeyframes[0].fIntensity;
+		rInterpolate.pfSizes[iSpawnIndex] = fBaseSize * rController.pKeyframes[0].fSize;
 		rInterpolate.pfBaseIntensities[iSpawnIndex] = fBaseIntensity;
 		rInterpolate.pfBaseSizes[iSpawnIndex] = fBaseSize;
 	});

@@ -270,7 +270,7 @@ void PackChunks::LoadPackFiles()
 		}
 #endif
 
-		mPackFilePaths[i] = GetDataFilePath(static_cast<data::DataTypes>(i), ".pack");
+		mpPackFilePaths[i] = GetDataFilePath(static_cast<data::DataTypes>(i), ".pack");
 		std::filesystem::path manifestPath = GetDataFilePath(static_cast<data::DataTypes>(i), ".manifest");
 		std::fstream manifestStream(manifestPath, std::ios::in | std::ios::binary);
 		common::DataHeader dataHeader {};
@@ -294,13 +294,13 @@ void PackChunks::LoadPackFiles()
 		}
 
 		manifestStream.seekg(kiChunkTableOffset);
-		mChunkLocations[i].resize(dataHeader.iChunkCount);
-		manifestStream.read(reinterpret_cast<char*>(mChunkLocations[i].data()), dataHeader.iChunkCount * sizeof(common::ChunkLocation));
+		mpChunkLocations[i].resize(dataHeader.iChunkCount);
+		manifestStream.read(reinterpret_cast<char*>(mpChunkLocations[i].data()), dataHeader.iChunkCount * sizeof(common::ChunkLocation));
 		if (!manifestStream)
 		{
 			FailMissingRequiredAsset(manifestPath, "manifest chunk table truncated");
 		}
-		for (const common::ChunkLocation& rChunkLocation : mChunkLocations[i])
+		for (const common::ChunkLocation& rChunkLocation : mpChunkLocations[i])
 		{
 			if (!seenChunkCrcs.insert(rChunkLocation.crc).second)
 			{
@@ -309,7 +309,7 @@ void PackChunks::LoadPackFiles()
 		}
 		if (static_cast<data::DataTypes>(i) == data::kDataTypeIslands)
 		{
-			const std::vector<common::ChunkLocation>& rChunkLocations = mChunkLocations[i];
+			const std::vector<common::ChunkLocation>& rChunkLocations = mpChunkLocations[i];
 			mPackIntegrityToken = rChunkLocations.empty() ? common::kCrcSeed : common::Crc(std::span<const common::ChunkLocation>(rChunkLocations.data(), rChunkLocations.size()));
 		}
 		manifestStream.close();
@@ -320,11 +320,11 @@ void PackChunks::LoadPackFiles()
 		}
 
 		// Opened before the size and header reads, which go through a handle reopened from it, so its share-read-only lock keeps the validated file unchanged until shutdown.
-		mpHandleLazyPackFile[i] = CreateFileW(mPackFilePaths[i].c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+		mpHandleLazyPackFile[i] = CreateFileW(mpPackFilePaths[i].c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
 		// Trust boundary: a missing required .pack yields INVALID_HANDLE_VALUE, fatal like a missing manifest.
 		if (mpHandleLazyPackFile[i] == INVALID_HANDLE_VALUE)
 		{
-			FailMissingRequiredAsset(mPackFilePaths[i], "pack file could not be opened for loading");
+			FailMissingRequiredAsset(mpPackFilePaths[i], "pack file could not be opened for loading");
 		}
 
 		HANDLE handlePackValidation = ReOpenFile(mpHandleLazyPackFile[i], GENERIC_READ, FILE_SHARE_READ, 0);
@@ -332,19 +332,19 @@ void PackChunks::LoadPackFiles()
 		// the lazy map (and pool layout) from garbage. A required pack is as fatal as a missing manifest.
 		if (handlePackValidation == INVALID_HANDLE_VALUE)
 		{
-			FailMissingRequiredAsset(mPackFilePaths[i], "pack file missing or unreadable");
+			FailMissingRequiredAsset(mpPackFilePaths[i], "pack file missing or unreadable");
 		}
 		LARGE_INTEGER packFileSize {};
 		if (GetFileSizeEx(handlePackValidation, &packFileSize) == FALSE)
 		{
-			FailMissingRequiredAsset(mPackFilePaths[i], "pack file size unreadable");
+			FailMissingRequiredAsset(mpPackFilePaths[i], "pack file size unreadable");
 		}
 		int64_t iPackFileSize = packFileSize.QuadPart;
-		for (const common::ChunkLocation& rChunkLocation : mChunkLocations[i])
+		for (const common::ChunkLocation& rChunkLocation : mpChunkLocations[i])
 		{
 			if (const char* pcReason = ValidateChunkLocation(iPackFileSize, rChunkLocation); pcReason != nullptr)
 			{
-				FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
+				FailMissingRequiredAsset(mpPackFilePaths[i], pcReason);
 			}
 			common::ChunkHeader chunkHeader {};
 			OVERLAPPED overlapped {};
@@ -353,11 +353,11 @@ void PackChunks::LoadPackFiles()
 			DWORD uiBytesRead = 0;
 			if (ReadFile(handlePackValidation, &chunkHeader, static_cast<DWORD>(sizeof(chunkHeader)), &uiBytesRead, &overlapped) == FALSE || uiBytesRead != sizeof(chunkHeader))
 			{
-				FailMissingRequiredAsset(mPackFilePaths[i], "pack header table truncated");
+				FailMissingRequiredAsset(mpPackFilePaths[i], "pack header table truncated");
 			}
 			if (const char* pcReason = ValidateChunkHeader(static_cast<data::DataTypes>(i), rChunkLocation, chunkHeader); pcReason != nullptr)
 			{
-				FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
+				FailMissingRequiredAsset(mpPackFilePaths[i], pcReason);
 			}
 
 			// Add to lazy chunk map. iDataSize is the size of the data in pData after any decompression
@@ -441,38 +441,38 @@ void PackChunks::LoadPackFiles()
 				continue;
 			}
 
-			std::vector<std::byte>& rPackBytes = mPackFileData[i];
+			std::vector<std::byte>& rPackBytes = mpPackFileData[i];
 
 			std::error_code packFileSizeError;
-			int64_t iPackFileSize = static_cast<int64_t>(std::filesystem::file_size(mPackFilePaths[i], packFileSizeError));
+			int64_t iPackFileSize = static_cast<int64_t>(std::filesystem::file_size(mpPackFilePaths[i], packFileSizeError));
 			if (packFileSizeError)
 			{
-				FailMissingRequiredAsset(mPackFilePaths[i], "pack file size unreadable");
+				FailMissingRequiredAsset(mpPackFilePaths[i], "pack file size unreadable");
 			}
 			rPackBytes.resize(static_cast<size_t>(iPackFileSize));
-			std::fstream packStream(mPackFilePaths[i], std::ios::in | std::ios::binary);
+			std::fstream packStream(mpPackFilePaths[i], std::ios::in | std::ios::binary);
 			if (!packStream)
 			{
-				FailMissingRequiredAsset(mPackFilePaths[i], "pack file could not be opened for eager loading");
+				FailMissingRequiredAsset(mpPackFilePaths[i], "pack file could not be opened for eager loading");
 			}
 			packStream.read(reinterpret_cast<char*>(rPackBytes.data()), static_cast<std::streamsize>(std::ssize(rPackBytes)));
 			if (!packStream || packStream.gcount() != static_cast<std::streamsize>(std::ssize(rPackBytes)))
 			{
-				FailMissingRequiredAsset(mPackFilePaths[i], "pack file truncated during eager loading");
+				FailMissingRequiredAsset(mpPackFilePaths[i], "pack file truncated during eager loading");
 			}
 			packStream.close();
 
 			iPackFileSize = std::ssize(rPackBytes);
-			for (const common::ChunkLocation& rChunkLocation : mChunkLocations[i])
+			for (const common::ChunkLocation& rChunkLocation : mpChunkLocations[i])
 			{
 				if (const char* pcReason = ValidateChunkLocation(iPackFileSize, rChunkLocation); pcReason != nullptr)
 				{
-					FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
+					FailMissingRequiredAsset(mpPackFilePaths[i], pcReason);
 				}
 				common::ChunkHeader* pChunkHeader = reinterpret_cast<common::ChunkHeader*>(rPackBytes.data() + rChunkLocation.uiOffset);
 				if (const char* pcReason = ValidateChunkHeader(static_cast<data::DataTypes>(i), rChunkLocation, *pChunkHeader); pcReason != nullptr)
 				{
-					FailMissingRequiredAsset(mPackFilePaths[i], pcReason);
+					FailMissingRequiredAsset(mpPackFilePaths[i], pcReason);
 				}
 				int64_t iDataOffset = static_cast<int64_t>(rChunkLocation.uiOffset + common::kiChunkDataOffset);
 
@@ -863,11 +863,11 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 	BOOL bRead = ReadFile(handleFile, mpReadBuffers[iThreadIndex], static_cast<DWORD>(uiPhysicalSize), &uiBytesRead, &overlapped);
 	if (bRead == FALSE)
 	{
-		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range read was incomplete");
+		FailMissingRequiredAsset(mpPackFilePaths[eDataType], "audio range read was incomplete");
 	}
 	if (uiBytesRead < uiPrefix + uiLength)
 	{
-		FailMissingRequiredAsset(mPackFilePaths[eDataType], "audio range read was incomplete");
+		FailMissingRequiredAsset(mpPackFilePaths[eDataType], "audio range read was incomplete");
 	}
 	std::memcpy(rEntry.data.data(), mpReadBuffers[iThreadIndex] + uiPrefix, uiLength);
 
@@ -950,7 +950,7 @@ bool PackChunks::RecommitChunkRange(common::crc_t crc, const LazyChunk& rLazyChu
 MemoryStats PackChunks::GetEagerStatistics() const
 {
 	MemoryStats statistics;
-	// mPackFileData / mEagerChunkMap are async-populated; report nothing until the eager load publishes.
+	// mpPackFileData / mEagerChunkMap are async-populated; report nothing until the eager load publishes.
 	if (!mbEagerLoadComplete.load(std::memory_order_acquire))
 	{
 		return statistics;
@@ -959,7 +959,7 @@ MemoryStats PackChunks::GetEagerStatistics() const
 	{
 		if (IsEagerChunk(static_cast<data::DataTypes>(i)))
 		{
-			statistics.iBytes += std::ssize(mPackFileData[i]);
+			statistics.iBytes += std::ssize(mpPackFileData[i]);
 		}
 	}
 	statistics.iCount = static_cast<int64_t>(mEagerChunkMap.size());
@@ -996,10 +996,10 @@ MemoryStats PackChunks::GetMemoryStatistics(data::DataTypes eDataType) const
 
 	if (IsEagerChunk(eDataType))
 	{
-		// mPackFileData is async-populated; report 0 resident bytes until published. mChunkLocations is set
+		// mpPackFileData is async-populated; report 0 resident bytes until published. mpChunkLocations is set
 		// synchronously in LoadPackFiles, so the chunk count is always safe to read.
-		statistics.iBytes = mbEagerLoadComplete.load(std::memory_order_acquire) ? std::ssize(mPackFileData[eDataType]) : 0;
-		statistics.iCount = std::ssize(mChunkLocations[eDataType]);
+		statistics.iBytes = mbEagerLoadComplete.load(std::memory_order_acquire) ? std::ssize(mpPackFileData[eDataType]) : 0;
+		statistics.iCount = std::ssize(mpChunkLocations[eDataType]);
 	}
 	else
 	{

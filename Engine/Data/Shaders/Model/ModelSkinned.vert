@@ -26,9 +26,9 @@ void main()
 
 		// Weighted blend of 3-row matrices, then reconstruct mat4
 		// Each row stores rotation in .xyz and translation component in .w
-		vec4 row0 = f4Weight0.x * jm0.rows[0] + f4Weight0.y * jm1.rows[0] + f4Weight0.z * jm2.rows[0] + f4Weight0.w * jm3.rows[0];
-		vec4 row1 = f4Weight0.x * jm0.rows[1] + f4Weight0.y * jm1.rows[1] + f4Weight0.z * jm2.rows[1] + f4Weight0.w * jm3.rows[1];
-		vec4 row2 = f4Weight0.x * jm0.rows[2] + f4Weight0.y * jm1.rows[2] + f4Weight0.z * jm2.rows[2] + f4Weight0.w * jm3.rows[2];
+		vec4 row0 = f4Weight0.x * jm0.pf4Rows[0] + f4Weight0.y * jm1.pf4Rows[0] + f4Weight0.z * jm2.pf4Rows[0] + f4Weight0.w * jm3.pf4Rows[0];
+		vec4 row1 = f4Weight0.x * jm0.pf4Rows[1] + f4Weight0.y * jm1.pf4Rows[1] + f4Weight0.z * jm2.pf4Rows[1] + f4Weight0.w * jm3.pf4Rows[1];
+		vec4 row2 = f4Weight0.x * jm0.pf4Rows[2] + f4Weight0.y * jm1.pf4Rows[2] + f4Weight0.z * jm2.pf4Rows[2] + f4Weight0.w * jm3.pf4Rows[2];
 
 		// Unpack each blended row with rotation in .xyz and translation in .w.
 		mat4 skinMatrix = mat4(vec4(row0.xyz, 0.0), vec4(row1.xyz, 0.0), vec4(row2.xyz, 0.0), vec4(row0.w, row1.w, row2.w, 1.0));

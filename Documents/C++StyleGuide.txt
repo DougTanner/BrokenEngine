@@ -404,7 +404,7 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`. `
 
 	A same-type array copy uses std::copy; memcpy remains for byte copies:
 
-	std::copy(std::begin(miActiveSubtab), std::end(miActiveSubtab), std::begin(rState.iActiveSubtab));
+	std::copy(std::begin(mpiActiveSubtab), std::end(mpiActiveSubtab), std::begin(rState.piActiveSubtab));
 
 61. "if" and "else" bodies always use curly braces, even for a single statement (braces per rule 2):
 

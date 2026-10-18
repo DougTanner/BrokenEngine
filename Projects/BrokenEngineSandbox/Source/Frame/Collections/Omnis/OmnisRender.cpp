@@ -44,8 +44,8 @@ constexpr float kfDeathShrinkPower = 2.0f;
 
 void OmnisInterpolate::GraphicsResources()
 {
-	engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kCrc, engine::kBufferMain, kName, sizeof(shaders::ModelLayout));
-	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(kCrc, kName, kOmniModel, pStorageBuffers);
+	engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kCrc, engine::kBufferMain, kpcName, sizeof(shaders::ModelLayout));
+	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(kCrc, kpcName, kOmniModel, pStorageBuffers);
 }
 
 static int64_t siRendered = 0;
@@ -186,7 +186,7 @@ void OmnisInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, cons
 		return;
 	}
 
-	if (engine::Buffer* pBuffer = engine::gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, engine::kBufferMain, kName, sizeof(shaders::ModelLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
+	if (engine::Buffer* pBuffer = engine::gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, engine::kBufferMain, kpcName, sizeof(shaders::ModelLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
 		engine::gpPipelineManager->mDynamicPipelines.UpdateModelPipelineDescriptors(kCrc, iCommandBuffer, 2, pBuffer);
 	}

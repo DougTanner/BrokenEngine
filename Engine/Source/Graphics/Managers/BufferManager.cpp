@@ -267,7 +267,7 @@ void BufferManager::DestroySwapchainDependentBuffers()
 	mMeshDataStorageBuffers.clear();
 	mJointMatrixStorageBuffers.clear();
 
-	for (std::unordered_map<common::crc_t, std::vector<Buffer>>& rMap : mDynamicStorageBuffers)
+	for (std::unordered_map<common::crc_t, std::vector<Buffer>>& rMap : mpDynamicStorageBuffers)
 	{
 		rMap.clear();
 	}
@@ -284,10 +284,10 @@ void BufferManager::DestroySwapchainDependentBuffers()
 
 	for (int64_t i = 0; i < kiMaxFramebuffers; ++i)
 	{
-		miMeshDataOffset[i] = 0;
-		miJointMatrixOffset[i] = 0;
-		miMeshDataCapacity[i] = 0;
-		miJointMatrixCapacity[i] = 0;
+		mpiMeshDataOffset[i] = 0;
+		mpiJointMatrixOffset[i] = 0;
+		mpiMeshDataCapacity[i] = 0;
+		mpiJointMatrixCapacity[i] = 0;
 	}
 }
 
@@ -366,9 +366,9 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 			for (int64_t j = 0; j < common::MeshData::kiMaxMeshes; ++j)
 			{
 				pMeshData[j].matrix = identity;
-				pMeshData[j].normalMatrix[0] = {1.0f, 0.0f, 0.0f, 0.0f};
-				pMeshData[j].normalMatrix[1] = {0.0f, 1.0f, 0.0f, 0.0f};
-				pMeshData[j].normalMatrix[2] = {0.0f, 0.0f, 1.0f, 0.0f};
+				pMeshData[j].pf4NormalMatrix[0] = {1.0f, 0.0f, 0.0f, 0.0f};
+				pMeshData[j].pf4NormalMatrix[1] = {0.0f, 1.0f, 0.0f, 0.0f};
+				pMeshData[j].pf4NormalMatrix[2] = {0.0f, 0.0f, 1.0f, 0.0f};
 				pMeshData[j].uiJointCount = 0;
 				pMeshData[j].uiJointMatrixOffset = 0;
 			}
@@ -392,7 +392,7 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 
 			common::JointMatrix identity
 			{
-				.rows =
+				.pf4Rows =
 				{
 					{1.0f, 0.0f, 0.0f, 0.0f},
 					{0.0f, 1.0f, 0.0f, 0.0f},
@@ -409,14 +409,14 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 
 	for (int64_t i = 0; i < iCommandBufferCount; ++i)
 	{
-		miMeshDataCapacity[i] = common::MeshData::kiMaxMeshes;
-		miJointMatrixCapacity[i] = common::kiInitialJointMatrixCapacity;
+		mpiMeshDataCapacity[i] = common::MeshData::kiMaxMeshes;
+		mpiJointMatrixCapacity[i] = common::kiInitialJointMatrixCapacity;
 	}
 }
 
 Buffer* BufferManager::CreateDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, int64_t iElementSize)
 {
-	std::unordered_map<common::crc_t, std::vector<Buffer>>& rMap = mDynamicStorageBuffers[eType];
+	std::unordered_map<common::crc_t, std::vector<Buffer>>& rMap = mpDynamicStorageBuffers[eType];
 	auto [it, bInserted] = rMap.try_emplace(crc);
 	std::vector<Buffer>& rBuffers = it->second;
 	if (!bInserted)
@@ -448,7 +448,7 @@ void BufferManager::ResizeDynamicBuffer(common::crc_t crc, DynamicBufferType eTy
 	// per-framebuffer stash arrays, where a second grow overwrites the slot.
 	mOptionalPreviousBuffer.reset();
 
-	std::unordered_map<common::crc_t, std::vector<Buffer>>& rMap = mDynamicStorageBuffers[eType];
+	std::unordered_map<common::crc_t, std::vector<Buffer>>& rMap = mpDynamicStorageBuffers[eType];
 	Buffer& rOldBuffer = rMap.at(crc).at(iFramebuffer);
 	int64_t iElementSize = rOldBuffer.mInfo.iElementSize;
 	mOptionalPreviousBuffer = std::move(rOldBuffer);
@@ -466,7 +466,7 @@ void BufferManager::ResizeDynamicBuffer(common::crc_t crc, DynamicBufferType eTy
 Buffer* BufferManager::ResizeDynamicBufferIfNeeded(common::crc_t crc, DynamicBufferType eType, std::string_view name, int64_t iLayoutSize, int64_t iCapacity, int64_t iCommandBuffer)
 {
 	int64_t iRequiredSize = iLayoutSize * iCapacity;
-	Buffer& rBuffer = mDynamicStorageBuffers[eType].at(crc).at(iCommandBuffer);
+	Buffer& rBuffer = mpDynamicStorageBuffers[eType].at(crc).at(iCommandBuffer);
 	if (rBuffer.mInfo.iDataSize >= iRequiredSize)
 	{
 		return nullptr;
@@ -477,9 +477,9 @@ Buffer* BufferManager::ResizeDynamicBufferIfNeeded(common::crc_t crc, DynamicBuf
 
 int64_t BufferManager::AllocateMeshData(int64_t iCommandBuffer, int64_t iCount)
 {
-	int64_t iOffset = miMeshDataOffset[iCommandBuffer];
-	miMeshDataOffset[iCommandBuffer] += iCount;
-	if (miMeshDataOffset[iCommandBuffer] > miMeshDataCapacity[iCommandBuffer])
+	int64_t iOffset = mpiMeshDataOffset[iCommandBuffer];
+	mpiMeshDataOffset[iCommandBuffer] += iCount;
+	if (mpiMeshDataOffset[iCommandBuffer] > mpiMeshDataCapacity[iCommandBuffer])
 	{
 		GrowMeshDataBuffer(iCommandBuffer, iOffset);
 	}
@@ -488,9 +488,9 @@ int64_t BufferManager::AllocateMeshData(int64_t iCommandBuffer, int64_t iCount)
 
 int64_t BufferManager::AllocateJointMatrices(int64_t iCommandBuffer, int64_t iCount)
 {
-	int64_t iOffset = miJointMatrixOffset[iCommandBuffer];
-	miJointMatrixOffset[iCommandBuffer] += iCount;
-	if (miJointMatrixOffset[iCommandBuffer] > miJointMatrixCapacity[iCommandBuffer])
+	int64_t iOffset = mpiJointMatrixOffset[iCommandBuffer];
+	mpiJointMatrixOffset[iCommandBuffer] += iCount;
+	if (mpiJointMatrixOffset[iCommandBuffer] > mpiJointMatrixCapacity[iCommandBuffer])
 	{
 		GrowJointMatrixBuffer(iCommandBuffer, iOffset);
 	}
@@ -499,17 +499,17 @@ int64_t BufferManager::AllocateJointMatrices(int64_t iCommandBuffer, int64_t iCo
 
 void BufferManager::ResetSkinningAllocations(int64_t iCommandBuffer)
 {
-	miMeshDataOffset[iCommandBuffer] = 0;
-	miJointMatrixOffset[iCommandBuffer] = 0;
+	mpiMeshDataOffset[iCommandBuffer] = 0;
+	mpiJointMatrixOffset[iCommandBuffer] = 0;
 	mpOptionalPreviousMeshDataBuffer[iCommandBuffer].reset();
 	mpOptionalPreviousJointMatrixBuffer[iCommandBuffer].reset();
 }
 
 void BufferManager::GrowMeshDataBuffer(int64_t iCommandBuffer, int64_t iValidCount)
 {
-	while (miMeshDataCapacity[iCommandBuffer] < miMeshDataOffset[iCommandBuffer])
+	while (mpiMeshDataCapacity[iCommandBuffer] < mpiMeshDataOffset[iCommandBuffer])
 	{
-		miMeshDataCapacity[iCommandBuffer] *= 2;
+		mpiMeshDataCapacity[iCommandBuffer] *= 2;
 	}
 
 	void* pOldData = mMeshDataStorageBuffers.at(iCommandBuffer).mpMappedMemory;
@@ -524,7 +524,7 @@ void BufferManager::GrowMeshDataBuffer(int64_t iCommandBuffer, int64_t iValidCou
 	{
 		.name = "MeshData",
 		.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
-		.iDataSize = miMeshDataCapacity[iCommandBuffer] * static_cast<int64_t>(sizeof(common::MeshData)),
+		.iDataSize = mpiMeshDataCapacity[iCommandBuffer] * static_cast<int64_t>(sizeof(common::MeshData)),
 	});
 
 	// Copy only the iValidCount elements written before this allocation; the old buffer holds nothing past them
@@ -536,9 +536,9 @@ void BufferManager::GrowMeshDataBuffer(int64_t iCommandBuffer, int64_t iValidCou
 
 void BufferManager::GrowJointMatrixBuffer(int64_t iCommandBuffer, int64_t iValidCount)
 {
-	while (miJointMatrixCapacity[iCommandBuffer] < miJointMatrixOffset[iCommandBuffer])
+	while (mpiJointMatrixCapacity[iCommandBuffer] < mpiJointMatrixOffset[iCommandBuffer])
 	{
-		miJointMatrixCapacity[iCommandBuffer] *= 2;
+		mpiJointMatrixCapacity[iCommandBuffer] *= 2;
 	}
 
 	void* pOldData = mJointMatrixStorageBuffers.at(iCommandBuffer).mpMappedMemory;
@@ -551,7 +551,7 @@ void BufferManager::GrowJointMatrixBuffer(int64_t iCommandBuffer, int64_t iValid
 	{
 		.name = "JointMatrices",
 		.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
-		.iDataSize = miJointMatrixCapacity[iCommandBuffer] * static_cast<int64_t>(sizeof(common::JointMatrix)),
+		.iDataSize = mpiJointMatrixCapacity[iCommandBuffer] * static_cast<int64_t>(sizeof(common::JointMatrix)),
 	});
 
 	// Copy only the iValidCount elements written before this allocation; the old buffer holds nothing past them
@@ -580,7 +580,7 @@ void BufferManager::CreateSmokeHierarchicalBuffers()
 	{
 		for (int64_t j = 0; j < 2; ++j)
 		{
-			Buffer::CreateBuffer(j == 0 ? "SmokeOccupancyA" : "SmokeOccupancyB", miSmokeOccupancyBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mSmokeOccupancyVkBuffers[i][j], mSmokeOccupancyVmaAllocations[i][j]);
+			Buffer::CreateBuffer(j == 0 ? "SmokeOccupancyA" : "SmokeOccupancyB", miSmokeOccupancyBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mpSmokeOccupancyVkBuffers[i][j], mpSmokeOccupancyVmaAllocations[i][j]);
 		}
 	}
 
@@ -592,7 +592,7 @@ void BufferManager::CreateSmokeHierarchicalBuffers()
 	{
 		for (int64_t j = 0; j < 2; ++j)
 		{
-			vkCmdFillBuffer(oneShotCommandBuffer.mVkCommandBuffer, mSmokeOccupancyVkBuffers[i][j], 0, static_cast<VkDeviceSize>(miSmokeOccupancyBufferSize), 0);
+			vkCmdFillBuffer(oneShotCommandBuffer.mVkCommandBuffer, mpSmokeOccupancyVkBuffers[i][j], 0, static_cast<VkDeviceSize>(miSmokeOccupancyBufferSize), 0);
 			pVkSmokeOccupancyInitializationBarriers[i * 2 + j] =
 			{
 				.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
@@ -601,7 +601,7 @@ void BufferManager::CreateSmokeHierarchicalBuffers()
 				.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-				.buffer = mSmokeOccupancyVkBuffers[i][j],
+				.buffer = mpSmokeOccupancyVkBuffers[i][j],
 				.offset = 0,
 				.size = VK_WHOLE_SIZE,
 			};
@@ -622,11 +622,11 @@ void BufferManager::DestroySmokeHierarchicalBuffers()
 	{
 		for (int64_t j = 0; j < 2; ++j)
 		{
-			if (mSmokeOccupancyVkBuffers[i][j] != VK_NULL_HANDLE)
+			if (mpSmokeOccupancyVkBuffers[i][j] != VK_NULL_HANDLE)
 			{
-				vmaDestroyBuffer(gpDeviceManager->mpAllocator, mSmokeOccupancyVkBuffers[i][j], mSmokeOccupancyVmaAllocations[i][j]);
-				mSmokeOccupancyVkBuffers[i][j] = VK_NULL_HANDLE;
-				mSmokeOccupancyVmaAllocations[i][j] = VK_NULL_HANDLE;
+				vmaDestroyBuffer(gpDeviceManager->mpAllocator, mpSmokeOccupancyVkBuffers[i][j], mpSmokeOccupancyVmaAllocations[i][j]);
+				mpSmokeOccupancyVkBuffers[i][j] = VK_NULL_HANDLE;
+				mpSmokeOccupancyVmaAllocations[i][j] = VK_NULL_HANDLE;
 			}
 		}
 	}
@@ -659,9 +659,9 @@ void BufferManager::CreateWindHierarchicalBuffers()
 
 	for (int64_t i = 0; i < 2; ++i)
 	{
-		Buffer::CreateBuffer(i == 0 ? "WindOccupancyA" : "WindOccupancyB", miWindOccupancyBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mWindOccupancyVkBuffers[i], mWindOccupancyVmaAllocations[i]);
+		Buffer::CreateBuffer(i == 0 ? "WindOccupancyA" : "WindOccupancyB", miWindOccupancyBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mpWindOccupancyVkBuffers[i], mpWindOccupancyVmaAllocations[i]);
 
-		Buffer::CreateBuffer(i == 0 ? "WindActiveTileA" : "WindActiveTileB", miWindActiveTileBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mWindActiveTileVkBuffers[i], mWindActiveTileVmaAllocations[i]);
+		Buffer::CreateBuffer(i == 0 ? "WindActiveTileA" : "WindActiveTileB", miWindActiveTileBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mpWindActiveTileVkBuffers[i], mpWindActiveTileVmaAllocations[i]);
 	}
 }
 
@@ -669,17 +669,17 @@ void BufferManager::DestroyWindHierarchicalBuffers()
 {
 	for (int64_t i = 0; i < 2; ++i)
 	{
-		if (mWindOccupancyVkBuffers[i] != VK_NULL_HANDLE)
+		if (mpWindOccupancyVkBuffers[i] != VK_NULL_HANDLE)
 		{
-			vmaDestroyBuffer(gpDeviceManager->mpAllocator, mWindOccupancyVkBuffers[i], mWindOccupancyVmaAllocations[i]);
-			mWindOccupancyVkBuffers[i] = VK_NULL_HANDLE;
-			mWindOccupancyVmaAllocations[i] = VK_NULL_HANDLE;
+			vmaDestroyBuffer(gpDeviceManager->mpAllocator, mpWindOccupancyVkBuffers[i], mpWindOccupancyVmaAllocations[i]);
+			mpWindOccupancyVkBuffers[i] = VK_NULL_HANDLE;
+			mpWindOccupancyVmaAllocations[i] = VK_NULL_HANDLE;
 		}
-		if (mWindActiveTileVkBuffers[i] != VK_NULL_HANDLE)
+		if (mpWindActiveTileVkBuffers[i] != VK_NULL_HANDLE)
 		{
-			vmaDestroyBuffer(gpDeviceManager->mpAllocator, mWindActiveTileVkBuffers[i], mWindActiveTileVmaAllocations[i]);
-			mWindActiveTileVkBuffers[i] = VK_NULL_HANDLE;
-			mWindActiveTileVmaAllocations[i] = VK_NULL_HANDLE;
+			vmaDestroyBuffer(gpDeviceManager->mpAllocator, mpWindActiveTileVkBuffers[i], mpWindActiveTileVmaAllocations[i]);
+			mpWindActiveTileVkBuffers[i] = VK_NULL_HANDLE;
+			mpWindActiveTileVmaAllocations[i] = VK_NULL_HANDLE;
 		}
 	}
 	miWindOccupancyBufferSize = 0;
@@ -769,7 +769,7 @@ void BufferManager::CreateWaterMesh()
 
 	std::vector<uint32_t> indices;
 	std::vector<std::byte> vertices;
-	BuildLodConcatenatedMesh(iLod0QuadX, iLod0QuadY, mWaterMeshLods, indices, vertices);
+	BuildLodConcatenatedMesh(iLod0QuadX, iLod0QuadY, mpWaterMeshLods, indices, vertices);
 
 	mWaterMeshBuffer.Create(
 	{

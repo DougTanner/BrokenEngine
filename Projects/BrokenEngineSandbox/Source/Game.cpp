@@ -252,13 +252,13 @@ common::crc_t Game::GetNextMusicTrack()
 {
 	if ((mGameFlags & engine::GameFlags::kMainMenu))
 	{
-		miMenuMusicIndex = (miMenuMusicIndex + 1) % static_cast<int64_t>(std::size(kMenuMusicPlaylist));
-		return kMenuMusicPlaylist[miMenuMusicIndex];
+		miMenuMusicIndex = (miMenuMusicIndex + 1) % static_cast<int64_t>(std::size(kpMenuMusicPlaylist));
+		return kpMenuMusicPlaylist[miMenuMusicIndex];
 	}
 	else
 	{
-		miGameMusicIndex = (miGameMusicIndex + 1) % static_cast<int64_t>(std::size(kGameMusicPlaylist));
-		return kGameMusicPlaylist[miGameMusicIndex];
+		miGameMusicIndex = (miGameMusicIndex + 1) % static_cast<int64_t>(std::size(kpGameMusicPlaylist));
+		return kpGameMusicPlaylist[miGameMusicIndex];
 	}
 }
 #endif // BT_CLIENT

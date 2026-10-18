@@ -62,13 +62,13 @@ static CrcValidateResult CrcValidateLoop(const CoordWork& rWork, int64_t iTarget
 	for (int64_t iTick : ticks)
 	{
 		auto it = rCell.serverUpdates.find(iTick);
-		int64_t iIndex = FindSnapshotIndex(rCell.snapshots, rCell.iSnapshotHead, rCell.iSnapshotCount, iTick);
+		int64_t iIndex = FindSnapshotIndex(rCell.ppSnapshots, rCell.iSnapshotHead, rCell.iSnapshotCount, iTick);
 		if (iIndex < 0)
 		{
 			continue;
 		}
 		int64_t iPhysical = SnapshotIndex(rCell.iSnapshotHead, iIndex);
-		const game::Frame& rClientFrame = *rCell.snapshots[iPhysical];
+		const game::Frame& rClientFrame = *rCell.ppSnapshots[iPhysical];
 
 		if (rClientFrame.postRender.uiSharedCrc == it->second.uiSharedCrc)
 		{
@@ -91,25 +91,25 @@ static CrcValidateResult CrcValidateLoop(const CoordWork& rWork, int64_t iTarget
 				common::ScopedWorkbufferArena builder = common::gpThreadLocal->mWorkbuffer.Push();
 				if (!it->second.statusChanges.empty())
 				{
-					int64_t iCounts[static_cast<int64_t>(game::StatusChangeType::kCount)] {};
+					int64_t piCounts[static_cast<int64_t>(game::StatusChangeType::kCount)] {};
 					for (const game::StatusChange& rStatusChange : it->second.statusChanges)
 					{
-						++iCounts[static_cast<int64_t>(rStatusChange.eType)];
+						++piCounts[static_cast<int64_t>(rStatusChange.eType)];
 					}
 					bool bFirst = true;
 					for (int64_t i = 0; i < static_cast<int64_t>(game::StatusChangeType::kCount); ++i)
 					{
-						if (iCounts[i] > 0)
+						if (piCounts[i] > 0)
 						{
 							if (!bFirst)
 							{
 								builder.mBuffer.Append(", ");
 							}
 							builder.mBuffer.Append(game::StatusChangeTypeName(static_cast<game::StatusChangeType>(i)));
-							if (iCounts[i] > 1)
+							if (piCounts[i] > 1)
 							{
 								builder.mBuffer.Append("x");
-								builder.mBuffer.Append(iCounts[i]);
+								builder.mBuffer.Append(piCounts[i]);
 							}
 							bFirst = false;
 						}

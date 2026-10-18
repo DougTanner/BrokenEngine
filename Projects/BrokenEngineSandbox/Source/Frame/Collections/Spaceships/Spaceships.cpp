@@ -191,8 +191,8 @@ static void RegisterSpaceshipHitFlashEffect()
 		.iBaseTypeIndex = siSpaceshipHitFlashTypeIndex,
 		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>(0.0f), kHitFlashDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
-		.keyframes =
+		.pTimes = {std::chrono::duration<float>(0.0f), kHitFlashDuration, std::chrono::duration<float>(0.0f), std::chrono::duration<float>(0.0f)},
+		.pKeyframes =
 		{
 			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
 			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},

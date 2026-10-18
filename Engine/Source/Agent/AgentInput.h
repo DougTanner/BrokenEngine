@@ -62,7 +62,7 @@ struct AgentScript
 	int64_t iImGuiMouseButton = 0; // 0 left / 1 right / 2 middle (ImGui IO button index)
 	uint32_t uiOverlayMouseButtonBit = 0; // engine::MouseButtons bit for the RawInput overlay
 	int64_t iWheelNotches = 0;
-	float f2CoordinatePixels[2] {}; // mouse command raw pixel coords
+	float pfCoordinatePixels[2] {}; // mouse command raw pixel coords
 	bool bHasCoordinate = false;
 };
 
@@ -135,15 +135,15 @@ private:
 	bool mbHaveLastRectangle = false;
 
 	int64_t miResolvedStatusFlags = 0; // resolved target's ImGuiItemStatusFlags (set_slider Inputable pre-validation)
-	float mf2TargetCenter[2] {}; // resolved rect center, re-pinned into ImGui each frame
+	float mpfTargetCenter[2] {}; // resolved rect center, re-pinned into ImGui each frame
 
 	// Persistent synthetic state read by Overlay() (game-binding sink).
 	bool mpbSyntheticKeys[0xFF] {};
 	uint32_t muiSyntheticMouseButtons = 0;
 	bool mbSyntheticMousePosValid = false;
-	float mf2SyntheticMousePixels[2] {};
+	float mpfSyntheticMousePixels[2] {};
 
-	float mf2ImGuiPinnedPixels[2] {};
+	float mpfImGuiPinnedPixels[2] {};
 };
 
 inline AgentInput* gpAgentInput = nullptr;

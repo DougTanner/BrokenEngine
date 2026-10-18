@@ -53,13 +53,13 @@ void GameSettingsScreen::Render()
 		// Uniform text-driven width = max CalcTextSize over the 6 labels under the shared Latin/CJK font,
 		// plus frame padding to match the button chrome. Buttons share one row via SameLine (default spacing).
 		float fLanguageButtonWidth = 0.0f;
-		for (const LanguageOption& rLanguageOption : kLanguageOptions)
+		for (const LanguageOption& rLanguageOption : kpLanguageOptions)
 		{
 			fLanguageButtonWidth = std::max(fLanguageButtonWidth, ImGui::CalcTextSize(rLanguageOption.pcLabel).x);
 		}
 		fLanguageButtonWidth += ImGui::GetStyle().FramePadding.x * 4.0f;
 
-		for (int64_t i = 0; const LanguageOption& rLanguageOption : kLanguageOptions)
+		for (int64_t i = 0; const LanguageOption& rLanguageOption : kpLanguageOptions)
 		{
 			if (i > 0)
 			{
@@ -68,7 +68,7 @@ void GameSettingsScreen::Render()
 
 			bool bSelected = (geLanguage == rLanguageOption.eLanguage);
 
-			if (MenuButton(rLanguageOption.pcLabel, ImVec2(fLanguageButtonWidth, 0.0f), mfLanguageHoverAnimations[i], bSelected))
+			if (MenuButton(rLanguageOption.pcLabel, ImVec2(fLanguageButtonWidth, 0.0f), mpfLanguageHoverAnimations[i], bSelected))
 			{
 				geLanguage = rLanguageOption.eLanguage;
 			}

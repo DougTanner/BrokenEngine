@@ -235,7 +235,7 @@ void PipelineManager::CreateSmokeWindPipelines()
 	};
 	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
-		VkBuffer* pVkOccupancyBuffers = gpBufferManager->mSmokeOccupancyVkBuffers[i];
+		VkBuffer* pVkOccupancyBuffers = gpBufferManager->mpSmokeOccupancyVkBuffers[i];
 		SmokeOccupancyPipelineDescription pSmokeOccupancyPipelineDescriptions[]
 		{
 			{.eKind = kSmokeOccupancyDilate, .name = "SmokeOccupancyDilate", .shaderCrc = data::kShadersSmokeSmokeOccupancyDilatecompCrc, .pVkSourceOccupancyBuffer = &pVkOccupancyBuffers[0], .pVkActiveTileBuffer = &gpBufferManager->mSmokeActiveTileVkBuffer, .pVkDestinationOccupancyBuffer = &pVkOccupancyBuffers[1]},
@@ -308,8 +308,8 @@ void PipelineManager::CreateSmokeWindPipelines()
 	};
 	WindOccupancyPipelineDescription pWindOccupancyPipelineDescriptions[]
 	{
-		{.ePipeline = kPipelineWindOccupancyDilateA, .name = "WindOccupancyDilateA", .pVkSourceOccupancyBuffer = &gpBufferManager->mWindOccupancyVkBuffers[1], .pVkActiveTileBuffer = &gpBufferManager->mWindActiveTileVkBuffers[0]},
-		{.ePipeline = kPipelineWindOccupancyDilateB, .name = "WindOccupancyDilateB", .pVkSourceOccupancyBuffer = &gpBufferManager->mWindOccupancyVkBuffers[0], .pVkActiveTileBuffer = &gpBufferManager->mWindActiveTileVkBuffers[1]},
+		{.ePipeline = kPipelineWindOccupancyDilateA, .name = "WindOccupancyDilateA", .pVkSourceOccupancyBuffer = &gpBufferManager->mpWindOccupancyVkBuffers[1], .pVkActiveTileBuffer = &gpBufferManager->mpWindActiveTileVkBuffers[0]},
+		{.ePipeline = kPipelineWindOccupancyDilateB, .name = "WindOccupancyDilateB", .pVkSourceOccupancyBuffer = &gpBufferManager->mpWindOccupancyVkBuffers[0], .pVkActiveTileBuffer = &gpBufferManager->mpWindActiveTileVkBuffers[1]},
 	};
 	for (const WindOccupancyPipelineDescription& rDescription : pWindOccupancyPipelineDescriptions)
 	{
@@ -339,8 +339,8 @@ void PipelineManager::CreateSmokeWindPipelines()
 	};
 	WindSpreadPipelineDescription pWindSpreadPipelineDescriptions[]
 	{
-		{.ePipeline = kPipelineWindSpreadComputeA, .name = "WindSpreadComputeA", .shaderCrc = data::kShadersWindWindSpreadOnecompCrc, .pSourceTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureTwo, .pDestinationTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureOne, .pVkActiveTileBuffer = &gpBufferManager->mWindActiveTileVkBuffers[0], .pVkOccupancyBuffer = &gpBufferManager->mWindOccupancyVkBuffers[0]},
-		{.ePipeline = kPipelineWindSpreadComputeB, .name = "WindSpreadComputeB", .shaderCrc = data::kShadersWindWindSpreadTwocompCrc, .pSourceTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureOne, .pDestinationTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureTwo, .pVkActiveTileBuffer = &gpBufferManager->mWindActiveTileVkBuffers[1], .pVkOccupancyBuffer = &gpBufferManager->mWindOccupancyVkBuffers[1]},
+		{.ePipeline = kPipelineWindSpreadComputeA, .name = "WindSpreadComputeA", .shaderCrc = data::kShadersWindWindSpreadOnecompCrc, .pSourceTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureTwo, .pDestinationTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureOne, .pVkActiveTileBuffer = &gpBufferManager->mpWindActiveTileVkBuffers[0], .pVkOccupancyBuffer = &gpBufferManager->mpWindOccupancyVkBuffers[0]},
+		{.ePipeline = kPipelineWindSpreadComputeB, .name = "WindSpreadComputeB", .shaderCrc = data::kShadersWindWindSpreadTwocompCrc, .pSourceTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureOne, .pDestinationTexture = &gpTextureManager->mRenderTargetTextures.mWindTextureTwo, .pVkActiveTileBuffer = &gpBufferManager->mpWindActiveTileVkBuffers[1], .pVkOccupancyBuffer = &gpBufferManager->mpWindOccupancyVkBuffers[1]},
 	};
 	for (const WindSpreadPipelineDescription& rDescription : pWindSpreadPipelineDescriptions)
 	{
@@ -468,7 +468,7 @@ void PipelineManager::CreateDebugRenderPipelines()
 			{
 				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 				{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
-				{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mDynamicStorageBuffers[kBufferMain].at(rEntry.crc).data()},
+				{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mpDynamicStorageBuffers[kBufferMain].at(rEntry.crc).data()},
 			},
 		});
 	}

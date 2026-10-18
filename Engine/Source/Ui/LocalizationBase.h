@@ -23,7 +23,7 @@ struct LanguageOption
 };
 
 // Each label stays in its own language, so it is never routed through the translation table.
-inline constexpr LanguageOption kLanguageOptions[]
+inline constexpr LanguageOption kpLanguageOptions[]
 {
 	{.eLanguage = Language::kEnglish, .pcLabel = "ENGLISH"},
 	{.eLanguage = Language::kChinese, .pcLabel = "中文"},
@@ -32,7 +32,7 @@ inline constexpr LanguageOption kLanguageOptions[]
 	{.eLanguage = Language::kFrench, .pcLabel = "FRANCAIS"},
 	{.eLanguage = Language::kGerman, .pcLabel = "DEUTSCH"},
 };
-static_assert(std::size(kLanguageOptions) == static_cast<size_t>(kiLanguageCount));
+static_assert(std::size(kpLanguageOptions) == static_cast<size_t>(kiLanguageCount));
 
 inline Language geLanguage = Language::kEnglish;
 

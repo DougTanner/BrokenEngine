@@ -75,11 +75,11 @@ struct LayerPairZones
 {
 	int64_t iLayerA = 0;
 	int64_t iLayerB = 0;
-	ZonePair zones[kiCollisionZonesY][kiCollisionZonesX];
+	ZonePair pZones[kiCollisionZonesY][kiCollisionZonesX];
 
 	LayerPairZones()
 	{
-		for (ZonePair (&rRow)[kiCollisionZonesX] : zones)
+		for (ZonePair (&rRow)[kiCollisionZonesX] : pZones)
 		{
 			for (ZonePair& rZonePair : rRow)
 			{
@@ -108,7 +108,7 @@ int64_t Collision::AddLayer(const CollisionLayer& rLayer)
 	}
 
 	int64_t iLayerIndex = siLayerCount;
-	// Growing past the pre-allocation would overrun the fixed sLayerBaseOffsets array; layer count is
+	// Growing past the pre-allocation would overrun the fixed spiLayerBaseOffsets array; layer count is
 	// compile-time-determined by the registering collections, so overflow is a developer error — fail loud
 	if (siLayerCount >= std::ssize(sLayers))
 	{
@@ -116,7 +116,7 @@ int64_t Collision::AddLayer(const CollisionLayer& rLayer)
 		ASSERT(false);
 	}
 
-	// The same base AllocateResultStorage later writes to sLayerBaseOffsets
+	// The same base AllocateResultStorage later writes to spiLayerBaseOffsets
 	int64_t iBase = 0;
 	for (int64_t i = 0; i < iLayerIndex; ++i)
 	{
@@ -214,7 +214,7 @@ void Collision::InsertObjectIntoZones(LayerPairZones& rPairZones, int64_t iIndex
 	{
 		for (int64_t j = rRange.iStartX; j <= rRange.iEndX; ++j)
 		{
-			ZonePair& rZonePair = rPairZones.zones[i][j];
+			ZonePair& rZonePair = rPairZones.pZones[i][j];
 			common::StableVector<int64_t>& rIndices = bIsLayerA ? rZonePair.indicesA : rZonePair.indicesB;
 			int64_t& riCount = bIsLayerA ? rZonePair.iCountA : rZonePair.iCountB;
 			if (riCount >= rIndices.Size())
@@ -308,7 +308,7 @@ void Collision::SetupZones(FXMVECTOR vecArea)
 	for (int64_t i = 0; i < siLayerPairCount; ++i)
 	{
 		LayerPairZones& rPairZones = sLayerPairZones[i];
-		for (ZonePair (&rRow)[kiCollisionZonesX] : rPairZones.zones)
+		for (ZonePair (&rRow)[kiCollisionZonesX] : rPairZones.pZones)
 		{
 			for (ZonePair& rZonePair : rRow)
 			{
@@ -405,7 +405,7 @@ void Collision::Collide(const Alignments& rAlignments, FXMVECTOR vecArea)
 	for (int64_t i = 0; i < rScratch.iPendingResultCount; ++i)
 	{
 		const PendingCollisionResult& rPending = rScratch.pendingResults[i];
-		int64_t iSpanIndex = sLayerBaseOffsets[static_cast<size_t>(rPending.iLayerIndex)] + rPending.iObjectIndex;
+		int64_t iSpanIndex = spiLayerBaseOffsets[static_cast<size_t>(rPending.iLayerIndex)] + rPending.iObjectIndex;
 		++sResultSpans[iSpanIndex].iCount;
 	}
 
@@ -436,7 +436,7 @@ void Collision::Collide(const Alignments& rAlignments, FXMVECTOR vecArea)
 	for (int64_t i = 0; i < rScratch.iPendingResultCount; ++i)
 	{
 		const PendingCollisionResult& rPending = rScratch.pendingResults[i];
-		int64_t iSpanIndex = sLayerBaseOffsets[static_cast<size_t>(rPending.iLayerIndex)] + rPending.iObjectIndex;
+		int64_t iSpanIndex = spiLayerBaseOffsets[static_cast<size_t>(rPending.iLayerIndex)] + rPending.iObjectIndex;
 		CollisionResultSpan& rSpan = sResultSpans[iSpanIndex];
 		sResultEntries[rSpan.iOffset + rSpan.iCount] = rPending.result;
 		++rSpan.iCount;
@@ -449,7 +449,7 @@ void Collision::AllocateResultStorage()
 	int64_t iTotal = 0;
 	for (int64_t i = 0; i < siLayerCount; ++i)
 	{
-		sLayerBaseOffsets[static_cast<size_t>(i)] = iTotal;
+		spiLayerBaseOffsets[static_cast<size_t>(i)] = iTotal;
 		iTotal += sLayers.at(static_cast<size_t>(i)).iCount;
 	}
 	siResultSpanCount = iTotal;
@@ -654,7 +654,7 @@ void Collision::CollideLayerPair(const Alignments& rAlignments, const LayerPairZ
 		{
 			for (int64_t k = range.iStartX; k <= range.iEndX; ++k)
 			{
-				const ZonePair& rZonePair = rPairZones.zones[j][k];
+				const ZonePair& rZonePair = rPairZones.pZones[j][k];
 				if (rZonePair.iCountB == 0)
 				{
 					continue;
@@ -678,7 +678,7 @@ void Collision::CollideLayerPair(const Alignments& rAlignments, const LayerPairZ
 
 std::span<const CollisionResult> Collision::GetCollisions(int64_t iLayerIndex, int64_t iIndex)
 {
-	const CollisionResultSpan& rSpan = sResultSpans[sLayerBaseOffsets[iLayerIndex] + iIndex];
+	const CollisionResultSpan& rSpan = sResultSpans[spiLayerBaseOffsets[iLayerIndex] + iIndex];
 	if (rSpan.iCount > 0)
 	{
 		return {sResultEntries.Data() + rSpan.iOffset, static_cast<size_t>(rSpan.iCount)};
@@ -693,7 +693,7 @@ CollisionOutcome Collision::GetOutcome(int64_t iLayerIndex, int64_t iIndex)
 		return {.eType = CollisionOutcomeType::kEntity};
 	}
 
-	int64_t iRow = sLayerBaseOffsets[iLayerIndex] + iIndex;
+	int64_t iRow = spiLayerBaseOffsets[iLayerIndex] + iIndex;
 	const SegmentHit& rTerrainHit = sTerrainHits[iRow];
 	const SegmentHit& rBoundaryHit = sBoundaryHits[iRow];
 	if (rTerrainHit.bHit && (!rBoundaryHit.bHit || rTerrainHit.fTime <= rBoundaryHit.fTime))

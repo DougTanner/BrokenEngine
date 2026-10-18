@@ -510,7 +510,7 @@ void Resample(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSourceR
 		int64_t iFirstTap = static_cast<int64_t>(std::ceil(fCenter - fHalfWidth));
 		int64_t iLastTap = static_cast<int64_t>(std::floor(fCenter + fHalfWidth));
 
-		double fAccumulator[2] = {0.0, 0.0}; // caller asserts iChannels <= 2
+		double pfAccumulator[2] = {0.0, 0.0}; // caller asserts iChannels <= 2
 		double fWeightSum = 0.0;
 		for (int64_t j = iFirstTap; j <= iLastTap; ++j)
 		{
@@ -525,7 +525,7 @@ void Resample(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSourceR
 			int64_t iClampedTap = std::clamp(j, 0i64, iSourceFrames - 1); // repeat edges
 			for (int64_t k = 0; k < iChannels; ++k)
 			{
-				fAccumulator[k] += static_cast<double>(rfSamples[iClampedTap * iChannels + k]) * fWeight;
+				pfAccumulator[k] += static_cast<double>(rfSamples[iClampedTap * iChannels + k]) * fWeight;
 			}
 			fWeightSum += fWeight;
 		}
@@ -533,7 +533,7 @@ void Resample(std::vector<float>& rfSamples, int64_t iChannels, int64_t iSourceR
 		double fInverseWeightSum = (fWeightSum != 0.0) ? 1.0 / fWeightSum : 0.0;
 		for (int64_t j = 0; j < iChannels; ++j)
 		{
-			fResampled[i * iChannels + j] = static_cast<float>(fAccumulator[j] * fInverseWeightSum);
+			fResampled[i * iChannels + j] = static_cast<float>(pfAccumulator[j] * fInverseWeightSum);
 		}
 	}
 

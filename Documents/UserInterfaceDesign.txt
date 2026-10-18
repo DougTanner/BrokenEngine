@@ -7,7 +7,7 @@ UI stays visually consistent as screens are added or localized. It is the
 layout counterpart to Documents/FloatingPointDeterminism.txt — a numbered
 engineering contract, not a style guide. Colors and chrome are out of scope
 here; they are owned by the theme tables in ImGuiManager (engine
-ThemePalettes) and engine MenuUtils (kMenuChromes). This contract covers only
+ThemePalettes) and engine MenuUtils (kpMenuChromes). This contract covers only
 layout: scale, sizing, placement, rhythm, and primitives.
 
 Scope: the player-facing screens — MainMenu, Pause, Graphics, Audio, Game
@@ -28,7 +28,7 @@ Files:
   Engine/Source/Ui/Screens/                                (standard player menus)
   Projects/BrokenEngineSandbox/Source/Ui/Screens/          (HUD)
   Engine/Source/Graphics/Managers/ImGuiManager.cpp         (ThemePalettes — colors)
-  Engine/Source/Ui/MenuUtils.cpp                         (kMenuChromes — colors)
+  Engine/Source/Ui/MenuUtils.cpp                         (kpMenuChromes — colors)
 
 
 2. One Scale System

@@ -31,8 +31,8 @@ struct WindRadialControllerType
 {
 	int64_t iKeyframeCount = 2;
 	bool bDestroysSelf = true;
-	std::chrono::duration<float> times[kiMaximumControllerKeyframes] {};
-	WindRadialKeyframe keyframes[kiMaximumControllerKeyframes] {};
+	std::chrono::duration<float> pTimes[kiMaximumControllerKeyframes] {};
+	WindRadialKeyframe pKeyframes[kiMaximumControllerKeyframes] {};
 
 	bool operator==(const WindRadialControllerType& rOther) const = default;
 };

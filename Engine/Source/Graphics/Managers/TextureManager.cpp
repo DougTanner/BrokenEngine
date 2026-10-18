@@ -462,7 +462,7 @@ VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
 		DescriptorFlags eFlag;
 		SamplerSlot eSlot;
 	};
-	static constexpr FlagToSlotEntry kFlagToSlot[]
+	static constexpr FlagToSlotEntry kpFlagToSlot[]
 	{
 		{.eFlag = DescriptorFlags::kSamplerElevation, .eSlot = kSamplerSlotElevation},
 		{.eFlag = DescriptorFlags::kSamplerClamp, .eSlot = kSamplerSlotClamp},
@@ -479,13 +479,13 @@ VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
 	};
 
 	int64_t iSamplerFlagCount = 0;
-	for (const FlagToSlotEntry& rEntry : kFlagToSlot)
+	for (const FlagToSlotEntry& rEntry : kpFlagToSlot)
 	{
 		iSamplerFlagCount += (flags & rEntry.eFlag ? 1 : 0);
 	}
 	ASSERT(iSamplerFlagCount <= 1);
 
-	for (const FlagToSlotEntry& rEntry : kFlagToSlot)
+	for (const FlagToSlotEntry& rEntry : kpFlagToSlot)
 	{
 		if (flags & rEntry.eFlag)
 		{

@@ -259,7 +259,7 @@ struct InjectedField
 {
 	static constexpr auto kpMember = MEMBER;
 	static constexpr bool kbIsRequired = REQUIRED;
-	static constexpr std::string_view kName = NAME.data;
+	static constexpr std::string_view kName = NAME.pcData;
 };
 
 // The JSON key is the payload member's own token.

@@ -15,7 +15,7 @@ struct LayoutMapping
 	VkPipelineStageFlags vkPipelineStageFlags = 0;
 };
 
-constexpr LayoutMapping kLayoutMappings[]
+constexpr LayoutMapping kpLayoutMappings[]
 {
 	// kUndefined
 	{.vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED, .vkAccessFlags = VK_ACCESS_NONE_KHR, .vkPipelineStageFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT},
@@ -36,11 +36,11 @@ constexpr LayoutMapping kLayoutMappings[]
 	// kTransferSource
 	{.vkImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, .vkAccessFlags = VK_ACCESS_TRANSFER_READ_BIT, .vkPipelineStageFlags = VK_PIPELINE_STAGE_TRANSFER_BIT},
 };
-static_assert(std::size(kLayoutMappings) == static_cast<size_t>(TextureLayout::kTransferSource) + 1);
+static_assert(std::size(kpLayoutMappings) == static_cast<size_t>(TextureLayout::kTransferSource) + 1);
 
 VkImageLayout ToVkImageLayout(TextureLayout eLayout)
 {
-	return kLayoutMappings[static_cast<int>(eLayout)].vkImageLayout;
+	return kpLayoutMappings[static_cast<int>(eLayout)].vkImageLayout;
 }
 
 static void CreateImageView(VkImage vkImage, const TextureInfo& rInfo, bool bCheckRenderPass, VkImageView& rVkImageView)
@@ -366,8 +366,8 @@ void Texture::Destroy() noexcept
 
 void Texture::TransitionImageLayout(VkCommandBuffer vkCommandBuffer, TextureLayout eOldLayout, TextureLayout eNewLayout)
 {
-	const LayoutMapping& rSource = kLayoutMappings[static_cast<int>(eOldLayout)];
-	const LayoutMapping& rDestination = kLayoutMappings[static_cast<int>(eNewLayout)];
+	const LayoutMapping& rSource = kpLayoutMappings[static_cast<int>(eOldLayout)];
+	const LayoutMapping& rDestination = kpLayoutMappings[static_cast<int>(eNewLayout)];
 
 	VkImageMemoryBarrier vkImageMemoryBarrier
 	{

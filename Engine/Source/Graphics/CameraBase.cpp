@@ -398,7 +398,7 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 		float fScreenY = 0.0f;
 		XMFLOAT4* pTarget = nullptr;
 	};
-	const VisibleCorner corners[] =
+	const VisibleCorner pCorners[] =
 	{
 		{ .fScreenX = 0.0f, .fScreenY = 0.0f, .pTarget = &mf4VisibleTopLeft },
 		{ .fScreenX = fViewportWidth, .fScreenY = 0.0f, .pTarget = &mf4VisibleTopRight },
@@ -406,7 +406,7 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 		{ .fScreenX = fViewportWidth, .fScreenY = fViewportHeight, .pTarget = &mf4VisibleBottomRight },
 	};
 
-	for (const VisibleCorner& rCorner : corners)
+	for (const VisibleCorner& rCorner : pCorners)
 	{
 		f3ScreenPosition.x = rCorner.fScreenX;
 		f3ScreenPosition.y = rCorner.fScreenY;
@@ -472,7 +472,7 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 
 	// Visible-area snapping uses the water LOD table's concatenated quad grid. The composite G-buffer render targets use that snapped area even
 	// though terrain uses per-island Gaea2 meshes.
-	const BufferManager::VisibleAreaMeshLod& rLevelOfDetailMesh = gpBufferManager->mWaterMeshLods[iLevelOfDetail];
+	const BufferManager::VisibleAreaMeshLod& rLevelOfDetailMesh = gpBufferManager->mpWaterMeshLods[iLevelOfDetail];
 	float fQuadsX = static_cast<float>(rLevelOfDetailMesh.iQuadCountX);
 	float fQuadsY = static_cast<float>(rLevelOfDetailMesh.iQuadCountY);
 

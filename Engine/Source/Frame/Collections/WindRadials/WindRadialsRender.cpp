@@ -13,8 +13,8 @@ namespace engine
 void WindRadialsInterpolate::GraphicsResources()
 {
 	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositAxisAlignedA, kuiCrc, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesParticlesBC4Square24pngCrc}, &gpBufferManager->mWindOccupancyVkBuffers[0], sizeof(shaders::AxisAlignedQuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositAxisAlignedB, kuiCrc, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureTwo, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesParticlesBC4Square24pngCrc}, &gpBufferManager->mWindOccupancyVkBuffers[1], 0);
+	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositAxisAlignedA, kuiCrc, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesParticlesBC4Square24pngCrc}, &gpBufferManager->mpWindOccupancyVkBuffers[0], sizeof(shaders::AxisAlignedQuadLayout));
+	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositAxisAlignedB, kuiCrc, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureTwo, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesParticlesBC4Square24pngCrc}, &gpBufferManager->mpWindOccupancyVkBuffers[1], 0);
 }
 
 static int64_t siRendered = 0;
@@ -40,8 +40,8 @@ void WindRadialsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositAxisAlignedA].at(kuiCrc), iCommandBuffer, 1, pBuffer);
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositAxisAlignedB].at(kuiCrc), iCommandBuffer, 1, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositAxisAlignedA].at(kuiCrc), iCommandBuffer, 1, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositAxisAlignedB].at(kuiCrc), iCommandBuffer, 1, pBuffer);
 	}
 }
 
@@ -89,8 +89,8 @@ void WindRadialsInterpolate::Render([[maybe_unused]] const game::FrameInterpolat
 
 void WindRadialsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositAxisAlignedA].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 0 ? siRendered : 0);
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositAxisAlignedB].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 1 ? siRendered : 0);
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositAxisAlignedA].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 0 ? siRendered : 0);
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositAxisAlignedB].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 1 ? siRendered : 0);
 }
 
 } // namespace engine

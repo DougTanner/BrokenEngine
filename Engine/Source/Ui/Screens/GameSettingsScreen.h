@@ -13,7 +13,7 @@ public:
 
 	void Render();
 
-	float mfLanguageHoverAnimations[kiLanguageCount] {};
+	float mpfLanguageHoverAnimations[kiLanguageCount] {};
 	float mfDefaultsHoverAnimation = 0.0f;
 	float mfBackHoverAnimation = 0.0f;
 };

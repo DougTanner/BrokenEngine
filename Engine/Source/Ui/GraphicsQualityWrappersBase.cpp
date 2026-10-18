@@ -18,9 +18,9 @@ engine::Wrapper gSmokeDetailLevel(1i64, std::vector<int64_t> {0, 1, 2});
 
 constexpr int64_t kiLevelCount = static_cast<int64_t>(GraphicsQualityLevel::kCount);
 
-constexpr float kfTerrainShadowsRenderMultipliers[kiLevelCount] {0.05f, 0.1f, 0.2f};
+constexpr float kpfTerrainShadowsRenderMultipliers[kiLevelCount] {0.05f, 0.1f, 0.2f};
 
-constexpr float kfObjectShadowsRenderMultipliers[kiLevelCount] {0.5f, 1.0f, 2.0f};
+constexpr float kpfObjectShadowsRenderMultipliers[kiLevelCount] {0.5f, 1.0f, 2.0f};
 
 struct LightingLevelValues
 {
@@ -31,14 +31,14 @@ struct LightingLevelValues
 	float fBlurSampleCount = 0.0f;
 };
 
-constexpr LightingLevelValues kLightingLevels[kiLevelCount]
+constexpr LightingLevelValues kpLightingLevels[kiLevelCount]
 {
 	{.fDepositTextureMultiplier = 0.3f, .fSpreadTextureMultiplierStart = 0.03f, .fSpreadTextureMultiplierEnd = 0.0075f, .fSpreadPassCount = 26.0f, .fBlurSampleCount = 132.0f, },
 	{.fDepositTextureMultiplier = 0.4f, .fSpreadTextureMultiplierStart = 0.05f, .fSpreadTextureMultiplierEnd = 0.01f, .fSpreadPassCount = 40.0f, .fBlurSampleCount = 200.0f, },
 	{.fDepositTextureMultiplier = 0.6f, .fSpreadTextureMultiplierStart = 0.075f, .fSpreadTextureMultiplierEnd = 0.015f, .fSpreadPassCount = 40.0f, .fBlurSampleCount = 300.0f, },
 };
 
-constexpr float kfSmokeSimulationPixels[kiLevelCount] {0.75f, 1.0f, 1.5f};
+constexpr float kpfSmokeSimulationPixels[kiLevelCount] {0.75f, 1.0f, 1.5f};
 
 static int64_t LevelIndex(const engine::Wrapper& rWrapper)
 {
@@ -47,17 +47,17 @@ static int64_t LevelIndex(const engine::Wrapper& rWrapper)
 
 void ApplyTerrainShadowsLevel()
 {
-	engine::gShadowRenderMultiplier.Set(kfTerrainShadowsRenderMultipliers[LevelIndex(gTerrainShadowsLevel)]);
+	engine::gShadowRenderMultiplier.Set(kpfTerrainShadowsRenderMultipliers[LevelIndex(gTerrainShadowsLevel)]);
 }
 
 void ApplyObjectShadowsLevel()
 {
-	engine::gObjectShadowsRenderMultiplier.Set(kfObjectShadowsRenderMultipliers[LevelIndex(gObjectShadowsLevel)]);
+	engine::gObjectShadowsRenderMultiplier.Set(kpfObjectShadowsRenderMultipliers[LevelIndex(gObjectShadowsLevel)]);
 }
 
 void ApplyLightingLevel()
 {
-	const LightingLevelValues& rValues = kLightingLevels[LevelIndex(gLightingLevel)];
+	const LightingLevelValues& rValues = kpLightingLevels[LevelIndex(gLightingLevel)];
 	engine::gLightingDepositTextureMultiplier.Set(rValues.fDepositTextureMultiplier);
 	engine::gSpreadTextureMultiplierStart.Set(rValues.fSpreadTextureMultiplierStart);
 	engine::gSpreadTextureMultiplierEnd.Set(rValues.fSpreadTextureMultiplierEnd);
@@ -67,7 +67,7 @@ void ApplyLightingLevel()
 
 void ApplySmokeDetailLevel()
 {
-	engine::gSmokeSimulationPixels.Set(kfSmokeSimulationPixels[LevelIndex(gSmokeDetailLevel)]);
+	engine::gSmokeSimulationPixels.Set(kpfSmokeSimulationPixels[LevelIndex(gSmokeDetailLevel)]);
 }
 
 void ApplyAllGraphicsQualityLevels()

@@ -144,7 +144,7 @@ Changes (15 files)
    - Descriptors: global uniform (binding 0), main uniform (binding 1),
      storage buffer (binding 2), terrain elevation sampler (binding 3),
      sampler + bindless textures
-   - Register in mPipelineMaps[kDynamicPipelineDecals]
+   - Register in mpPipelineMaps[kDynamicPipelineDecals]
 
 10. Engine/Source/Graphics/Managers/CommandBufferManager.cpp
     In RecordMainCommandBuffer, add decal rendering after terrain
@@ -153,7 +153,7 @@ Changes (15 files)
     anchors are stale):
 
       gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerDecals);
-      for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineDecals])
+      for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineDecals])
       {
           pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer);
       }

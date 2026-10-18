@@ -123,8 +123,8 @@ void OmnisInterpolate::Register()
 		.iBaseTypeIndex = iImpactPointLightTypeIndex,
 		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>::zero(), kImpactPointLightDuration, std::chrono::duration<float>::zero(), std::chrono::duration<float>::zero()},
-		.keyframes =
+		.pTimes = {std::chrono::duration<float>::zero(), kImpactPointLightDuration, std::chrono::duration<float>::zero(), std::chrono::duration<float>::zero()},
+		.pKeyframes =
 		{
 			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
 			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
@@ -149,8 +149,8 @@ void OmnisInterpolate::Register()
 		.iBaseTypeIndex = iImpactPuffTypeIndex,
 		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.times = {std::chrono::duration<float>::zero(), kImpactPuffDuration, std::chrono::duration<float>::zero(), std::chrono::duration<float>::zero()},
-		.keyframes =
+		.pTimes = {std::chrono::duration<float>::zero(), kImpactPuffDuration, std::chrono::duration<float>::zero(), std::chrono::duration<float>::zero()},
+		.pKeyframes =
 		{
 			{.fArea = 1.0f, .fIntensity = 1.0f, .fRotation = 0.0f},
 			{.fArea = 1.0f, .fIntensity = 1.0f, .fRotation = 0.0f},
@@ -519,8 +519,8 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 		HexShieldIntensities hexShieldFragmentIntensities {};
 		for (int64_t j = 0; j < shaders::kiHexShieldDirections; ++j)
 		{
-			hexShieldVertexIntensities.data[j] = std::max(rPrevious.pHexShieldVertexIntensities[i].data[j] - gHexShieldIntensityDecay.mfCurrent * deltaTime.count(), 0.0f);
-			hexShieldFragmentIntensities.data[j] = std::max(rPrevious.pHexShieldFragmentIntensities[i].data[j] - gHexShieldIntensityDecay.mfCurrent * deltaTime.count(), 0.0f);
+			hexShieldVertexIntensities.pfData[j] = std::max(rPrevious.pHexShieldVertexIntensities[i].pfData[j] - gHexShieldIntensityDecay.mfCurrent * deltaTime.count(), 0.0f);
+			hexShieldFragmentIntensities.pfData[j] = std::max(rPrevious.pHexShieldFragmentIntensities[i].pfData[j] - gHexShieldIntensityDecay.mfCurrent * deltaTime.count(), 0.0f);
 		}
 		rCurrent.pHexShieldDirections[i] = hexShieldDirections;
 		rCurrent.pHexShieldVertexIntensities[i] = hexShieldVertexIntensities;
@@ -560,11 +560,11 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 			// Copy direction arrays (per-slot smoothstep tail so fade-out eases to zero)
 			for (int64_t j = 0; j < shaders::kiHexShieldDirections; ++j)
 			{
-				float fFragmentIntensity = rCurrent.pHexShieldFragmentIntensities[i].data[j];
+				float fFragmentIntensity = rCurrent.pHexShieldFragmentIntensities[i].pfData[j];
 				float fFade = std::clamp(fFragmentIntensity / kfHexShieldFadeThreshold, 0.0f, 1.0f);
 				float fSmoothFade = fFade * fFade * (3.0f - 2.0f * fFade);
-				syncData.pf4Directions[j] = rCurrent.pHexShieldDirections[i].data[j];
-				syncData.pfVertexIntensities[j] = rCurrent.pHexShieldVertexIntensities[i].data[j] * fSmoothFade;
+				syncData.pf4Directions[j] = rCurrent.pHexShieldDirections[i].pf4Data[j];
+				syncData.pfVertexIntensities[j] = rCurrent.pHexShieldVertexIntensities[i].pfData[j] * fSmoothFade;
 				syncData.pfFragmentIntensities[j] = fFragmentIntensity * fSmoothFade;
 			}
 

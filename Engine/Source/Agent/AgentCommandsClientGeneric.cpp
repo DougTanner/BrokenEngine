@@ -684,14 +684,14 @@ static nlohmann::json BuildDescribeUi()
 
 	nlohmann::json windows = nlohmann::json::array();
 	nlohmann::json items = nlohmann::json::array();
-	for (int64_t i = 0; i < engine::gpAgentUiRegistry->miWindowCount[engine::gpAgentUiRegistry->miRead]; ++i)
+	for (int64_t i = 0; i < engine::gpAgentUiRegistry->mpiWindowCount[engine::gpAgentUiRegistry->miRead]; ++i)
 	{
-		const engine::AgentUiWindow& rWindow = engine::gpAgentUiRegistry->mWindows[engine::gpAgentUiRegistry->miRead][i];
+		const engine::AgentUiWindow& rWindow = engine::gpAgentUiRegistry->mpWindows[engine::gpAgentUiRegistry->miRead][i];
 		windows.push_back({{"name", rWindow.pcName}, {"rect", {rWindow.f4Rectangle.x, rWindow.f4Rectangle.y, rWindow.f4Rectangle.z, rWindow.f4Rectangle.w}}, {"focused", rWindow.bFocused}});
 	}
-	for (int64_t i = 0; i < engine::gpAgentUiRegistry->miItemCount[engine::gpAgentUiRegistry->miRead]; ++i)
+	for (int64_t i = 0; i < engine::gpAgentUiRegistry->mpiItemCount[engine::gpAgentUiRegistry->miRead]; ++i)
 	{
-		const engine::AgentUiItem& rItem = engine::gpAgentUiRegistry->mItems[engine::gpAgentUiRegistry->miRead][i];
+		const engine::AgentUiItem& rItem = engine::gpAgentUiRegistry->mpItems[engine::gpAgentUiRegistry->miRead][i];
 		if (rItem.pcLabel[0] == '\0')
 		{
 			continue; // no label recorded (invisible / no ItemInfo) — not addressable, omit
@@ -722,9 +722,9 @@ static nlohmann::json BuildDescribeUi()
 static std::string CandidateLabels(const char* pcWindow)
 {
 	std::string candidates;
-	for (int64_t i = 0; i < engine::gpAgentUiRegistry->miItemCount[engine::gpAgentUiRegistry->miRead]; ++i)
+	for (int64_t i = 0; i < engine::gpAgentUiRegistry->mpiItemCount[engine::gpAgentUiRegistry->miRead]; ++i)
 	{
-		const engine::AgentUiItem& rItem = engine::gpAgentUiRegistry->mItems[engine::gpAgentUiRegistry->miRead][i];
+		const engine::AgentUiItem& rItem = engine::gpAgentUiRegistry->mpItems[engine::gpAgentUiRegistry->miRead][i];
 		if (rItem.pcLabel[0] == '\0')
 		{
 			continue;
@@ -1076,8 +1076,8 @@ static void CommandMouse(const nlohmann::json& rParameters, [[maybe_unused]] nlo
 		}
 		if (bHasX)
 		{
-			script.f2CoordinatePixels[0] = static_cast<float>(rParameters.at("x").get<double>());
-			script.f2CoordinatePixels[1] = static_cast<float>(rParameters.at("y").get<double>());
+			script.pfCoordinatePixels[0] = static_cast<float>(rParameters.at("x").get<double>());
+			script.pfCoordinatePixels[1] = static_cast<float>(rParameters.at("y").get<double>());
 			script.bHasCoordinate = true;
 		}
 	}
@@ -1087,8 +1087,8 @@ static void CommandMouse(const nlohmann::json& rParameters, [[maybe_unused]] nlo
 		{
 			throw std::runtime_error("mouse requires 'x' and 'y'");
 		}
-		script.f2CoordinatePixels[0] = static_cast<float>(rParameters.at("x").get<double>());
-		script.f2CoordinatePixels[1] = static_cast<float>(rParameters.at("y").get<double>());
+		script.pfCoordinatePixels[0] = static_cast<float>(rParameters.at("x").get<double>());
+		script.pfCoordinatePixels[1] = static_cast<float>(rParameters.at("y").get<double>());
 		script.bHasCoordinate = true;
 
 		std::string button = rParameters.contains("button") ? rParameters.at("button").get<std::string>() : "left";
@@ -1123,14 +1123,14 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 		throw std::runtime_error("query_profile requires empty params");
 	}
 
-	engine::GpuTimer* pGpuTimers = gpProfileManager->mGpuTimers;
+	engine::GpuTimer* pGpuTimers = gpProfileManager->mpGpuTimers;
 	nlohmann::json gpuTimers = nlohmann::json::array();
 	for (int64_t i = 0; i < engine::kGpuTimerCount; ++i)
 	{
 		engine::GpuTimer& rGpuTimer = pGpuTimers[i];
 		nlohmann::json gpuTimer;
 		gpuTimer["index"] = i;
-		gpuTimer["name"] = std::string(engine::kGpuTimerNames[i]);
+		gpuTimer["name"] = std::string(engine::kpGpuTimerNames[i]);
 		gpuTimer["currentUs"] = rGpuTimer.smoothedMicroseconds.Current();
 		gpuTimer["averageUs"] = rGpuTimer.smoothedMicroseconds.Average();
 		gpuTimer["maxUs"] = rGpuTimer.smoothedMicroseconds.Maximum();

@@ -33,16 +33,16 @@ struct TweakSectionDescription
 };
 
 // Persisted section layout, embedded by value in the engine TweaksSettings struct so exactly one
-// array bound and one sizeof exist in the program. Padding is explicit (uiPadding) because the whole object is
+// array bound and one sizeof exist in the program. Padding is explicit (puiPadding) because the whole object is
 // written verbatim and repeated saves of unchanged settings must be byte-identical.
 struct TweakSectionState
 {
 	common::Flags<TweakSectionFlags> visible {};
 	common::Flags<TweakSectionFlags> collapsed {};
-	float fWindowPositionX[kiMaxTweakSections] {};
-	float fWindowPositionY[kiMaxTweakSections] {};
-	int8_t iActiveSubtab[kiMaxTweakSections] {};
-	uint8_t uiPadding[1] {};
+	float pfWindowPositionX[kiMaxTweakSections] {};
+	float pfWindowPositionY[kiMaxTweakSections] {};
+	int8_t piActiveSubtab[kiMaxTweakSections] {};
+	uint8_t puiPadding[1] {};
 	// CRC of stable keys in registration order; on mismatch LoadState ignores saved layout and keeps defaults.
 	common::crc_t crcLayout = 0;
 };
@@ -54,7 +54,7 @@ class TweaksScreen
 public:
 
 	// Registry storage. Startup-only writes, immutable during rendering, and fixed-size so registration never allocates.
-	inline static TweakSectionDescription msSectionDescriptions[kiMaxTweakSections] {};
+	inline static TweakSectionDescription mspSectionDescriptions[kiMaxTweakSections] {};
 	inline static int64_t msiSectionCount = 0;
 
 	TweaksScreen();
@@ -84,17 +84,17 @@ public:
 	int64_t miActiveSliderSection = -1; // -1 for toggle bar, 0+ for sections
 
 	common::Flags<TweakSectionFlags> mSectionVisible {};
-	ImVec2 mWindowPositions[kiMaxTweakSections] {};
-	int8_t miActiveSubtab[kiMaxTweakSections] {};
+	ImVec2 mpWindowPositions[kiMaxTweakSections] {};
+	int8_t mpiActiveSubtab[kiMaxTweakSections] {};
 	common::Flags<TweakSectionFlags> mApplySubtab {};
 	common::Flags<TweakSectionFlags> mSectionCollapsed {};
 	float mfToggleBarBottom = 0.0f;
 
-	// Slider-map drift audit runs once per TweaksScreen lifetime and is re-armed by graphics reconstruction. Cycles miActiveSubtab[] across 6 frames: frames 0-4 queue tabs and frame 5 settles the final selection.
+	// Slider-map drift audit runs once per TweaksScreen lifetime and is re-armed by graphics reconstruction. Cycles mpiActiveSubtab[] across 6 frames: frames 0-4 queue tabs and frame 5 settles the final selection.
 	// miAuditFrame: 0..(kiAuditFrameCount-1) = audit running, -1 = audit complete.
 	std::unordered_set<std::string_view> mAuditTouched;
 	std::unordered_set<std::string_view> mAuditMissed;
-	int8_t miPreAuditSubtab[kiMaxTweakSections] {};
+	int8_t mpiPreAuditSubtab[kiMaxTweakSections] {};
 	int64_t miAuditFrame = 0;
 	bool mbAuditMode = false;
 };

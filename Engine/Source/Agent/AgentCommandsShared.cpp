@@ -136,7 +136,7 @@ static void CommandGetLogs(const nlohmann::json& rParameters, nlohmann::json& rR
 	if (rParameters.contains("category"))
 	{
 		common::LogCategory eCategory = ParseLogCategory(rParameters.at("category").get<std::string>());
-		CollectLogLines(common::gLogRingBuffers[static_cast<int64_t>(eCategory)], iCount, bPattern, pattern, lines);
+		CollectLogLines(common::gpLogRingBuffers[static_cast<int64_t>(eCategory)], iCount, bPattern, pattern, lines);
 	}
 	else
 	{
@@ -157,11 +157,11 @@ static void CommandSetLogLevel(const nlohmann::json& rParameters, nlohmann::json
 
 	rResult = nlohmann::json::object();
 
-	// LOG() compile-eliminates any line below a category's compile-time floor (keLogLevels), so storing a runtime
+	// LOG() compile-eliminates any line below a category's compile-time floor (kpeLogLevels), so storing a runtime
 	// level below that floor can never actually emit. Clamp to the floor and report the effective level(s) back.
 	auto ApplyClamped = [eLevel](common::LogCategory eCategory) -> common::LogLevel
 	{
-		common::LogLevel eFloor = keLogLevels[static_cast<int64_t>(eCategory)];
+		common::LogLevel eFloor = kpeLogLevels[static_cast<int64_t>(eCategory)];
 		common::LogLevel eEffective = eLevel < eFloor ? eFloor : eLevel;
 		common::SetLogRuntimeLevel(eCategory, eEffective);
 		return eEffective;

@@ -17,7 +17,7 @@ The BrokenEngineSandbox server monitor is a project-owned GDI window, not a prot
   `{"level":"Verbose|Debug|Info|Warning|Error","category"?:name}`. Returns one
   effective level or a category map. Each category has a compile-time floor, set
   by the `keLogLevel*` constants in `Engine/Source/EngineSwitches.h` (the
-  `keLogLevels` table in `Common/Log/Log.h`; mechanism:
+  `kpeLogLevels` table in `Common/Log/Log.h`; mechanism:
   [`Common/Log/AGENTS.md`](../../../../Common/Log/AGENTS.md)); a request below
   that floor clamps up to it. An effective level above the requested one
   therefore means the lines below it are compiled out of that build, not

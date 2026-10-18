@@ -21,7 +21,7 @@ void SmokeTrailsInterpolate::GraphicsResources()
 	{
 		common::crc_t uiDepositKey = DynamicPipelines::SmokeDepositKey(kuiCrc, i);
 		gpBufferManager->CreateDynamicBuffer(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::QuadLayout));
-		gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineSmoke, uiDepositKey, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[i], {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeGradientTexture}, &gpBufferManager->mSmokeOccupancyVkBuffers[i][0], sizeof(shaders::QuadLayout));
+		gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineSmoke, uiDepositKey, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[i], {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeGradientTexture}, &gpBufferManager->mpSmokeOccupancyVkBuffers[i][0], sizeof(shaders::QuadLayout));
 	}
 }
 
@@ -46,7 +46,7 @@ void SmokeTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 		common::crc_t uiDepositKey = DynamicPipelines::SmokeDepositKey(kuiCrc, i);
 		if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::QuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 		{
-			PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmoke].at(uiDepositKey), iCommandBuffer, 1, pBuffer);
+			PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmoke].at(uiDepositKey), iCommandBuffer, 1, pBuffer);
 		}
 	}
 }
@@ -163,7 +163,7 @@ void SmokeTrailsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	}
 	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
-		gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineSmoke].at(DynamicPipelines::SmokeDepositKey(kuiCrc, i))->WriteIndirectBuffer(iCommandBuffer, gSmokeEnabled.Get<bool>() ? spiRendered[i] : 0);
+		gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineSmoke].at(DynamicPipelines::SmokeDepositKey(kuiCrc, i))->WriteIndirectBuffer(iCommandBuffer, gSmokeEnabled.Get<bool>() ? spiRendered[i] : 0);
 	}
 }
 

@@ -101,7 +101,7 @@ void CommandDesynchronizationProbe(const nlohmann::json& rParameters, nlohmann::
 		throw std::runtime_error("desync_probe requires a current client frame");
 	}
 	int64_t iSnapshotIndex = engine::SnapshotIndex(it->second.iSnapshotHead, it->second.iSnapshotCount - 1);
-	const std::unique_ptr<Frame>& rpCurrentFrame = it->second.snapshots[iSnapshotIndex];
+	const std::unique_ptr<Frame>& rpCurrentFrame = it->second.ppSnapshots[iSnapshotIndex];
 	if (rpCurrentFrame == nullptr)
 	{
 		throw std::runtime_error("desync_probe requires a current client frame");

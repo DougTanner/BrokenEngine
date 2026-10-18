@@ -32,7 +32,7 @@ struct ReplayMeta
 	engine::GridCoord clientGridCoordinate {};
 	int64_t iClientOwnedEntityIdentifierValue = 0;
 	float fPreviousClientArmor = 0.0f;
-	uint8_t uiPadding[4] {};
+	uint8_t puiPadding[4] {};
 };
 
 // Isolated replay metadata: staged by ReadReplayMetadata, applied only once the whole replay generation validates.
@@ -108,8 +108,8 @@ public:
 private:
 
 #if defined(BT_CLIENT)
-	static constexpr common::crc_t kMenuMusicPlaylist[4] {data::kAudioMusicdoodlewavCrc, data::kAudioMusicMandatoryOvertimewavCrc, data::kAudioMusicsong18wavCrc, data::kAudioMusicTyhosibzzzzwavCrc};
-	static constexpr common::crc_t kGameMusicPlaylist[4] {data::kAudioMusicS31UnexpectedTroublewavCrc, data::kAudioMusicS31HighAlertwavCrc, data::kAudioMusicS31OnPatrolwavCrc, data::kAudioMusicS31TheGearsofProgresswavCrc};
+	static constexpr common::crc_t kpMenuMusicPlaylist[4] {data::kAudioMusicdoodlewavCrc, data::kAudioMusicMandatoryOvertimewavCrc, data::kAudioMusicsong18wavCrc, data::kAudioMusicTyhosibzzzzwavCrc};
+	static constexpr common::crc_t kpGameMusicPlaylist[4] {data::kAudioMusicS31UnexpectedTroublewavCrc, data::kAudioMusicS31HighAlertwavCrc, data::kAudioMusicS31OnPatrolwavCrc, data::kAudioMusicS31TheGearsofProgresswavCrc};
 
 	int64_t miMenuMusicIndex = 0;
 	int64_t miGameMusicIndex = 0;
@@ -127,13 +127,13 @@ public:
 	void StartMenuMusic()
 	{
 		miMenuMusicIndex = 0;
-		engine::gpAudioManager->PlayMusic(kMenuMusicPlaylist[0]);
+		engine::gpAudioManager->PlayMusic(kpMenuMusicPlaylist[0]);
 	}
 
 	void StartGameMusic()
 	{
 		miGameMusicIndex = 0;
-		engine::gpAudioManager->PlayMusic(kGameMusicPlaylist[0]);
+		engine::gpAudioManager->PlayMusic(kpGameMusicPlaylist[0]);
 	}
 #endif
 

@@ -84,8 +84,8 @@ void AgentInput::IssueImGuiMousePosition(float fX, float fY)
 {
 	// Remember the pos + pin it so ImGuiManager::Prepare can re-issue it after the Win32 backend (last-writer-wins).
 	mbImGuiMousePositionPinned = true;
-	mf2ImGuiPinnedPixels[0] = fX;
-	mf2ImGuiPinnedPixels[1] = fY;
+	mpfImGuiPinnedPixels[0] = fX;
+	mpfImGuiPinnedPixels[1] = fY;
 	if (ImGui::GetCurrentContext() != nullptr)
 	{
 		ImGui::GetIO().AddMousePosEvent(fX, fY);
@@ -96,7 +96,7 @@ void AgentInput::ReissueImGuiMousePosition()
 {
 	if (mbImGuiMousePositionPinned && ImGui::GetCurrentContext() != nullptr)
 	{
-		ImGui::GetIO().AddMousePosEvent(mf2ImGuiPinnedPixels[0], mf2ImGuiPinnedPixels[1]);
+		ImGui::GetIO().AddMousePosEvent(mpfImGuiPinnedPixels[0], mpfImGuiPinnedPixels[1]);
 	}
 }
 
@@ -114,11 +114,11 @@ bool AgentInput::StabilizeTarget()
 		return false;
 	}
 
-	const AgentUiItem& rItem = gpAgentUiRegistry->mItems[gpAgentUiRegistry->miRead][iIndex];
+	const AgentUiItem& rItem = gpAgentUiRegistry->mpItems[gpAgentUiRegistry->miRead][iIndex];
 	XMFLOAT4 f4Rectangle = rItem.f4Rectangle;
-	mf2TargetCenter[0] = 0.5f * (f4Rectangle.x + f4Rectangle.z);
-	mf2TargetCenter[1] = 0.5f * (f4Rectangle.y + f4Rectangle.w);
-	IssueImGuiMousePosition(mf2TargetCenter[0], mf2TargetCenter[1]);
+	mpfTargetCenter[0] = 0.5f * (f4Rectangle.x + f4Rectangle.z);
+	mpfTargetCenter[1] = 0.5f * (f4Rectangle.y + f4Rectangle.w);
+	IssueImGuiMousePosition(mpfTargetCenter[0], mpfTargetCenter[1]);
 
 	if (mbHaveLastRectangle && MaximumCornerDelta(f4Rectangle, mf4LastRectangle) < kfRectangleStablePixels)
 	{
@@ -190,7 +190,7 @@ void AgentInput::AdvanceFrame()
 				miPhaseFrame = 0;
 				return;
 			}
-			IssueImGuiMousePosition(mf2TargetCenter[0], mf2TargetCenter[1]);
+			IssueImGuiMousePosition(mpfTargetCenter[0], mpfTargetCenter[1]);
 			if (miPhase == 1)
 			{
 				if (pInputOutput != nullptr)
@@ -229,7 +229,7 @@ void AgentInput::AdvanceFrame()
 				miPhaseFrame = 0;
 				return;
 			}
-			IssueImGuiMousePosition(mf2TargetCenter[0], mf2TargetCenter[1]);
+			IssueImGuiMousePosition(mpfTargetCenter[0], mpfTargetCenter[1]);
 			if (++miPhaseFrame >= mScript.iHoldFrames)
 			{
 				Finish(AgentScriptStatus::kDone);
@@ -255,7 +255,7 @@ void AgentInput::AdvanceFrame()
 				miPhaseFrame = 0;
 				return;
 			}
-			IssueImGuiMousePosition(mf2TargetCenter[0], mf2TargetCenter[1]);
+			IssueImGuiMousePosition(mpfTargetCenter[0], mpfTargetCenter[1]);
 			// Ctrl+Click opens ImGui's temp text-input on the slider (value pre-selected); type the value; Enter commits.
 			if (miPhase == 1)
 			{
@@ -351,9 +351,9 @@ void AgentInput::AdvanceFrame()
 			if (mScript.bHasCoordinate)
 			{
 				mbSyntheticMousePosValid = true;
-				mf2SyntheticMousePixels[0] = mScript.f2CoordinatePixels[0];
-				mf2SyntheticMousePixels[1] = mScript.f2CoordinatePixels[1];
-				IssueImGuiMousePosition(mScript.f2CoordinatePixels[0], mScript.f2CoordinatePixels[1]);
+				mpfSyntheticMousePixels[0] = mScript.pfCoordinatePixels[0];
+				mpfSyntheticMousePixels[1] = mScript.pfCoordinatePixels[1];
+				IssueImGuiMousePosition(mScript.pfCoordinatePixels[0], mScript.pfCoordinatePixels[1]);
 			}
 
 			switch (mScript.eMouseAction)
@@ -522,8 +522,8 @@ void AgentInput::Overlay(RawInput& rRawInput)
 	// Overwrite mouse position with the synthetic pixel pos (normalized as the hardware path does).
 	if (mbSyntheticMousePosValid)
 	{
-		rRawInput.f2MousePosition.x = mf2SyntheticMousePixels[0] / static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
-		rRawInput.f2MousePosition.y = mf2SyntheticMousePixels[1] / static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
+		rRawInput.f2MousePosition.x = mpfSyntheticMousePixels[0] / static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
+		rRawInput.f2MousePosition.y = mpfSyntheticMousePixels[1] / static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	}
 
 	// NOTE: the synthetic scroll accumulator is deliberately NOT added here. iScrollWheelValue is a lifetime

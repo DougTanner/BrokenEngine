@@ -317,19 +317,19 @@ void TextureDescriptors::RegisterBindlessArrayConsumer(std::span<Texture*> textu
 		}
 		else if (textures.data() == rTargets.mColorTextures.data())
 		{
-			bindingKey = rSlot.textureCrcs[0];
+			bindingKey = rSlot.pTextureCrcs[0];
 		}
 		else if (textures.data() == rTargets.mNormalsTextures.data())
 		{
-			bindingKey = rSlot.textureCrcs[1];
+			bindingKey = rSlot.pTextureCrcs[1];
 		}
 		else if (textures.data() == rTargets.mAmbientOcclusionTextures.data())
 		{
-			bindingKey = rSlot.textureCrcs[2];
+			bindingKey = rSlot.pTextureCrcs[2];
 		}
 		else if (textures.data() == rTargets.mMasksTextures.data())
 		{
-			bindingKey = rSlot.textureCrcs[3];
+			bindingKey = rSlot.pTextureCrcs[3];
 		}
 		else
 		{
@@ -381,7 +381,7 @@ void TextureDescriptors::MintIslandSlot(int64_t iSlot, common::crc_t islandCrc, 
 	IslandSlot islandSlot;
 	islandSlot.islandCrc = islandCrc;
 	islandSlot.pElevationTexture = &rElevationTexture;
-	std::copy(std::begin(textureCrcs), std::end(textureCrcs), std::begin(islandSlot.textureCrcs));
+	std::copy(std::begin(textureCrcs), std::end(textureCrcs), std::begin(islandSlot.pTextureCrcs));
 	mIslandSlots.emplace(iSlot, islandSlot);
 	RegisterIslandSlotBindings(islandCrc, rTargets.mElevationTextures.data(), iSlot);
 	RegisterIslandSlotBindings(textureCrcs[0], rTargets.mColorTextures.data(), iSlot);

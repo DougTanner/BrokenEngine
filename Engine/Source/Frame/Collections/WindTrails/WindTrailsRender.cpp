@@ -15,8 +15,8 @@ static int64_t siRendered = 0;
 void WindTrailsInterpolate::GraphicsResources()
 {
 	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::QuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositA, kuiCrc, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc}, &gpBufferManager->mWindOccupancyVkBuffers[0], sizeof(shaders::QuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositB, kuiCrc, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureTwo, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc}, &gpBufferManager->mWindOccupancyVkBuffers[1], 0);
+	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositA, kuiCrc, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc}, &gpBufferManager->mpWindOccupancyVkBuffers[0], sizeof(shaders::QuadLayout));
+	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositB, kuiCrc, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureTwo, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc}, &gpBufferManager->mpWindOccupancyVkBuffers[1], 0);
 }
 
 void WindTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)
@@ -45,8 +45,8 @@ void WindTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer,
 
 	if (Buffer* pBuffer = gpBufferManager->ResizeDynamicBufferIfNeeded(kuiCrc, kBufferMain, kpcName, sizeof(shaders::QuadLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
 	{
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositA].at(kuiCrc), iCommandBuffer, 1, pBuffer);
-		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositB].at(kuiCrc), iCommandBuffer, 1, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositA].at(kuiCrc), iCommandBuffer, 1, pBuffer);
+		PipelineDescriptorWriter::UpdateStorageBuffer(*gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositB].at(kuiCrc), iCommandBuffer, 1, pBuffer);
 	}
 }
 
@@ -154,8 +154,8 @@ void WindTrailsInterpolate::Render([[maybe_unused]] const game::FrameInterpolate
 
 void WindTrailsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositA].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 0 ? siRendered : 0);
-	gpPipelineManager->mDynamicPipelines.mPipelineMaps[kDynamicPipelineWindDepositB].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 1 ? siRendered : 0);
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositA].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 0 ? siRendered : 0);
+	gpPipelineManager->mDynamicPipelines.mpPipelineMaps[kDynamicPipelineWindDepositB].at(kuiCrc)->WriteIndirectBuffer(iCommandBuffer, giWindTextureIndex == 1 ? siRendered : 0);
 }
 
 } // namespace engine

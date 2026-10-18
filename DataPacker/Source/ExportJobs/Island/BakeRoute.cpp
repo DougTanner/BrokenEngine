@@ -121,7 +121,7 @@ static bool IsGaeaRawDirty(const std::filesystem::path& rIntermediatesDirectory,
 
 // True if any chunk leaf's derived split outputs are missing or stale — forces a re-split from the
 // (assumed fresh) raw Gaea output, NOT a Gaea re-export. Checks the split-version sentinel (catches
-// a kRouteSubdivisions columns/rows or ProcessBakedRegion change) and every leaf's per-region files.
+// a kpRouteSubdivisions columns/rows or ProcessBakedRegion change) and every leaf's per-region files.
 static bool AreLeavesDirty(const std::filesystem::path& rRouteDirectory, const std::filesystem::path& rCacheRouteDirectory, int64_t iLeafCount, std::string_view expectedFingerprint)
 {
 	std::filesystem::path splitVersionFile = rCacheRouteDirectory / kpcSplitVersionFile;
@@ -566,7 +566,7 @@ void BakeRoute(const IslandBakeContext& rContext, const RouteSubdivision& rRoute
 	std::string splitFingerprint = SplitFingerprint(rRoute);
 
 	// Sweep leaf folders orphaned by a route leaf-count shrink before anything else: this must run even
-	// on the otherwise-clean early-return path, since a kRouteSubdivisions edit need not bump kiSplitVersion.
+	// on the otherwise-clean early-return path, since a kpRouteSubdivisions edit need not bump kiSplitVersion.
 	RemoveOrphanedLeafFolders(routeDirectory, iLeafCount);
 	RemoveOrphanedLeafFolders(intermediatesDirectory, iLeafCount);
 	RemoveOrphanedLeafFolders(GetIslandDiagnosticsPath(routeDirectory), iLeafCount);

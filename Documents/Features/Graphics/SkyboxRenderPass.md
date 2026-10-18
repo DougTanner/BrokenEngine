@@ -172,7 +172,7 @@ Changes (11 files)
 
      kGpuTimerSkybox,
 
-   Add the corresponding name in the mGpuTimers initializer list.
+   Add the corresponding name in the mpGpuTimers initializer list.
    After line 283 ({.name = "Image render"},), before
    line 284 ({.name = "    Objects"},), add:
 
@@ -232,6 +232,6 @@ HDR resolve landed (HdrResolveAndColorGrading)
   code no longer exists in Model.frag (the resolve pass owns final
   tone mapping).
 - This plan's CommandBufferManager.cpp / WrapperBase / TweaksSliderMap
-  / mGpuTimers citations carry the same line-number drift corrected in
+  / mpGpuTimers citations carry the same line-number drift corrected in
   HdrResolveAndColorGrading.txt; re-verify anchors against current code
   before editing.

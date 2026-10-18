@@ -49,7 +49,7 @@ enum GameCpuTimers : int64_t
 
 // One entry per game enumerator, in order; static_assert guards a dropped/extra name (which would otherwise
 // silently misalign the overlay rows). Mirrors the engine kXxx*Names tables — see engine ProfileManager.h.
-inline constexpr std::string_view kGameCpuCounterNames[]
+inline constexpr std::string_view kpGameCpuCounterNames[]
 {
 	"Omnis",
 	"Blasters",
@@ -59,9 +59,9 @@ inline constexpr std::string_view kGameCpuCounterNames[]
 	"Spaceships",
 	"    Rendered",
 };
-static_assert(std::size(kGameCpuCounterNames) == static_cast<size_t>(kGameCpuCounterCount) - static_cast<size_t>(engine::kEngineCpuCounterCount));
+static_assert(std::size(kpGameCpuCounterNames) == static_cast<size_t>(kGameCpuCounterCount) - static_cast<size_t>(engine::kEngineCpuCounterCount));
 
-inline constexpr std::string_view kGameCpuTimerNames[]
+inline constexpr std::string_view kpGameCpuTimerNames[]
 {
 	"Frame update",
 	"    Interpolate",
@@ -85,6 +85,6 @@ inline constexpr std::string_view kGameCpuTimerNames[]
 	"    Spaceships",
 	"        Animate",
 };
-static_assert(std::size(kGameCpuTimerNames) == static_cast<size_t>(kGameCpuTimerCount) - static_cast<size_t>(engine::kEngineCpuTimerCount));
+static_assert(std::size(kpGameCpuTimerNames) == static_cast<size_t>(kGameCpuTimerCount) - static_cast<size_t>(engine::kEngineCpuTimerCount));
 
 } // namespace game

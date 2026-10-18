@@ -96,8 +96,8 @@ struct SceneHeader
 	uint32_t uiTextureCount = 0;
 	uint32_t uiMaterialCount = 0;
 	bool bHasAnimation = false;
-	uint8_t uiPad[3] {};
-	uint8_t uiPad2[4] {};  // Explicit: fills the compiler gap that 8-byte-aligns modelCrc to offset 16
+	uint8_t puiPad[3] {};
+	uint8_t puiPad2[4] {};  // Explicit: fills the compiler gap that 8-byte-aligns modelCrc to offset 16
 	crc_t modelCrc = 0;  // CRC of the .MODEL vertex/index chunk
 	// Texture CRCs and index starts are stored in the chunk data payload.
 
@@ -171,7 +171,7 @@ static_assert(sizeof(AnimationClip) == 76, "AnimationClip layout changed — bum
 struct ModelNode
 {
 	int16_t iParentIndex = -1;  // -1 for root (node index, not joint index)
-	uint8_t uiPad[2] {};
+	uint8_t puiPad[2] {};
 	XMFLOAT4X4 f4x4BindMatrix {};  // Node matrix property (identity if not present)
 	XMFLOAT4 f4BindTranslation {};
 	XMFLOAT4 f4BindRotation {};    // Quaternion (x, y, z, w)
@@ -201,7 +201,7 @@ struct MaterialInfo
 	int16_t iParentNodeIndex = -1;  // Node index for mesh world matrix computation (-1 = identity mesh world)
 	int16_t iOriginalMaterialIndex = -1;  // Original glTF material index for split materials (-1 = not split)
 	MaterialFlags_t flags;  // kSkinned: the material deforms by Skeleton::uiSkinJointCount joints
-	uint8_t uiPad[3] {};
+	uint8_t puiPad[3] {};
 	XMFLOAT4X4 f4x4RelativeTransform {};  // Identity for skinned meshes, meshWorldBind * inverse(ancestorWorldBind) for non-skinned
 };
 static_assert(sizeof(MaterialInfo) == 72, "MaterialInfo layout changed — bump DataHeader::kiVersion; same-size reorder also bumps ExportScene/ExportModel kiVersion raw versions (sizeof fold catches size changes only)");
@@ -214,17 +214,17 @@ struct MeshData
 {
 	static constexpr int64_t kiMaxMeshes = 512;  // This constant sets the buffer capacity.
 	XMFLOAT4X4 matrix {};                    // Mesh world matrix
-	XMFLOAT4 normalMatrix[3] {};             // Normal matrix: transpose(inverse(mat3(matrix))), stored as 3 vec4s
+	XMFLOAT4 pf4NormalMatrix[3] {};             // Normal matrix: transpose(inverse(mat3(matrix))), stored as 3 vec4s
 	uint32_t uiJointCount = 0;               // 0 for non-skinned meshes
 	uint32_t uiJointMatrixOffset = 0;        // Index into joint matrix buffer
 };
 static_assert(MeshData::kiMaxMeshes >= 2 * SceneHeader::kiMaxMaterials, "MeshData::kiMaxMeshes must cover 2x SceneHeader::kiMaxMaterials");
 
-// A joint matrix stores three vec4s (48 bytes); rows[i].xyz is rotation row i and rows[i].w is its
+// A joint matrix stores three vec4s (48 bytes); pf4Rows[i].xyz is rotation row i and pf4Rows[i].w is its
 // translation component.
 struct JointMatrix
 {
-	XMFLOAT4 rows[3] {};
+	XMFLOAT4 pf4Rows[3] {};
 };
 
 inline constexpr int64_t kiInitialJointMatrixCapacity = 8'192;  // Room for multiple skinned model instances
@@ -249,7 +249,7 @@ struct MaterialShaderData
 	uint8_t uiNormalTextureIndex = 0;
 	uint8_t uiOcclusionTextureIndex = 0;
 	uint8_t uiEmissiveTextureIndex = 0;
-	uint8_t uiPad[3] {};
+	uint8_t puiPad[3] {};
 
 	// Shader material (must exactly match PbrMaterialLayout in engine)
 	// PBR material properties per glTF 2.0 metallic-roughness specification

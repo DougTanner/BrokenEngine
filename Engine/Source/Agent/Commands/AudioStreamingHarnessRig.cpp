@@ -70,7 +70,7 @@ static AudioStreamingHarnessRigVoiceSummary InspectVoice(const StreamingVoice& r
 	summary.flags.Set(AudioStreamingHarnessRigVoiceFlags::kPresent);
 	summary.flags.Set(AudioStreamingHarnessRigVoiceFlags::kFadingIn, rVoice.mFlags & StreamingVoiceFlags::kFadingIn);
 	summary.flags.Set(AudioStreamingHarnessRigVoiceFlags::kFadingOut, rVoice.mFlags & StreamingVoiceFlags::kFadingOut);
-	for (SlotState eState : rVoice.mSlotStates)
+	for (SlotState eState : rVoice.mpeSlotStates)
 	{
 		summary.iPendingSlots += eState == SlotState::kPending ? 1 : 0;
 	}
@@ -81,7 +81,7 @@ static AudioStreamingHarnessRigVoiceSummary InspectVoice(const StreamingVoice& r
 		rVoice.mpVoice->GetState(&voiceState, XAUDIO2_VOICE_NOSAMPLESPLAYED);
 	}
 	summary.iBuffersQueued = static_cast<int64_t>(voiceState.BuffersQueued);
-	summary.flags.Set(AudioStreamingHarnessRigVoiceFlags::kUnderrunning, !(rVoice.mFlags & StreamingVoiceFlags::kLastBufferSubmitted) && voiceState.BuffersQueued == 0 && rVoice.mSlotStates[rVoice.miNextSubmit] != SlotState::kReady);
+	summary.flags.Set(AudioStreamingHarnessRigVoiceFlags::kUnderrunning, !(rVoice.mFlags & StreamingVoiceFlags::kLastBufferSubmitted) && voiceState.BuffersQueued == 0 && rVoice.mpeSlotStates[rVoice.miNextSubmit] != SlotState::kReady);
 	return summary;
 }
 

@@ -40,8 +40,8 @@ struct ControllerType
 	int64_t iBaseTypeIndex = 0;                                // Base Type for color/texture
 	int64_t iKeyframeCount = 2;                                // Actual keyframes used (2-4)
 	bool bDestroysSelf = true;                                  // Auto-remove when animation ends
-	std::chrono::duration<float> times[kiMaximumControllerKeyframes] {};                  // Keyframe times (relative to start)
-	ControllerKeyframe keyframes[kiMaximumControllerKeyframes] {};   // Keyframe states (normalized when wrappers present)
+	std::chrono::duration<float> pTimes[kiMaximumControllerKeyframes] {};                  // Keyframe times (relative to start)
+	ControllerKeyframe pKeyframes[kiMaximumControllerKeyframes] {};   // Keyframe states (normalized when wrappers present)
 
 #if defined(BT_CLIENT)
 	// Per-keyframe wrapper scaling: keyframe values are multiplied by wrapper.mfCurrent at interpolation time
@@ -55,35 +55,35 @@ struct ControllerType
 };
 
 template <typename CONTROLLER_TYPE>
-inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateKeyframes(const CONTROLLER_TYPE& rController, std::chrono::duration<float> elapsedTime)
+inline std::remove_extent_t<decltype(CONTROLLER_TYPE::pKeyframes)> InterpolateKeyframes(const CONTROLLER_TYPE& rController, std::chrono::duration<float> elapsedTime)
 {
-	using KeyframeType = std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)>;
+	using KeyframeType = std::remove_extent_t<decltype(CONTROLLER_TYPE::pKeyframes)>;
 	int64_t iKeyframeCount = rController.iKeyframeCount;
 
-	if (elapsedTime.count() <= rController.times[0].count())
+	if (elapsedTime.count() <= rController.pTimes[0].count())
 	{
-		return rController.keyframes[0];
+		return rController.pKeyframes[0];
 	}
-	if (elapsedTime.count() >= rController.times[iKeyframeCount - 1].count())
+	if (elapsedTime.count() >= rController.pTimes[iKeyframeCount - 1].count())
 	{
-		return rController.keyframes[iKeyframeCount - 1];
+		return rController.pKeyframes[iKeyframeCount - 1];
 	}
 
 	for (int64_t j = 1; j < iKeyframeCount; ++j)
 	{
-		if (elapsedTime < rController.times[j])
+		if (elapsedTime < rController.pTimes[j])
 		{
-			std::chrono::duration<float> previousTime = rController.times[j - 1];
-			float fPercent = (elapsedTime - previousTime) / (rController.times[j] - previousTime);
-			return KeyframeType::Interpolate(rController.keyframes[j - 1], rController.keyframes[j], fPercent);
+			std::chrono::duration<float> previousTime = rController.pTimes[j - 1];
+			float fPercent = (elapsedTime - previousTime) / (rController.pTimes[j] - previousTime);
+			return KeyframeType::Interpolate(rController.pKeyframes[j - 1], rController.pKeyframes[j], fPercent);
 		}
 	}
 
-	return rController.keyframes[iKeyframeCount - 1];
+	return rController.pKeyframes[iKeyframeCount - 1];
 }
 
 template <typename CONTROLLER_TYPE, typename SCALE_FUNCTION>
-inline std::remove_extent_t<decltype(CONTROLLER_TYPE::keyframes)> InterpolateScaledKeyframes(const CONTROLLER_TYPE& rController, std::chrono::duration<float> elapsedTime, SCALE_FUNCTION ScaleFunction)
+inline std::remove_extent_t<decltype(CONTROLLER_TYPE::pKeyframes)> InterpolateScaledKeyframes(const CONTROLLER_TYPE& rController, std::chrono::duration<float> elapsedTime, SCALE_FUNCTION ScaleFunction)
 {
 	CONTROLLER_TYPE scaledController = rController;
 	for (int64_t j = 0; j < rController.iKeyframeCount; ++j)
@@ -121,7 +121,7 @@ struct ControllerTypeRegistry
 		ASSERT(rType.iKeyframeCount <= kiMaximumControllerKeyframes);
 		for (int64_t i = 1; i < rType.iKeyframeCount; ++i)
 		{
-			ASSERT(rType.times[i] >= rType.times[i - 1]);
+			ASSERT(rType.pTimes[i] >= rType.pTimes[i - 1]);
 		}
 		riIndex = std::ssize(sControllerTypes);
 		sControllerTypes.push_back(rType);
@@ -148,7 +148,7 @@ void DestroyExpiredControlled(INTERPOLATE& rInterpolate, POST_RENDER& rPostRende
 		}
 
 		std::chrono::nanoseconds elapsedTime = currentTime - rInterpolate.pStartTimes[i];
-		if (elapsedTime > common::FloatSecondsToNanoseconds(rController.times[rController.iKeyframeCount - 1])) [[unlikely]]
+		if (elapsedTime > common::FloatSecondsToNanoseconds(rController.pTimes[rController.iKeyframeCount - 1])) [[unlikely]]
 		{
 			RemoveFunction(rInterpolate, rPostRender, i);
 		}

@@ -22,7 +22,7 @@ void ReconcileRollbackCoord(CoordWork& rWork, int64_t iRollbackOffset)
 	ASSERT(iRollbackOffset >= 0);
 	int64_t iRollbackPhysical = SnapshotIndex(rCell.iSnapshotHead, iRollbackOffset);
 	rScratch.replayStack.clear();
-	rScratch.replayStack.push_back(rCell.snapshots[iRollbackPhysical].get());
+	rScratch.replayStack.push_back(rCell.ppSnapshots[iRollbackPhysical].get());
 	rScratch.iReplayStackCount = 1;
 	rScratch.iReplayWriteHead = SnapshotIndex(rCell.iSnapshotHead, iRollbackOffset + 1);
 	rScratch.iReplayWriteCount = 0;
@@ -98,13 +98,13 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, game::FrameIn
 	}
 
 	int64_t iNextSlot = SnapshotIndex(rScratch.iReplayWriteHead, rScratch.iReplayWriteCount);
-	if (rCell.snapshots[iNextSlot] == nullptr)
+	if (rCell.ppSnapshots[iNextSlot] == nullptr)
 	{
-		rCell.snapshots[iNextSlot] = std::make_unique<game::Frame>();
+		rCell.ppSnapshots[iNextSlot] = std::make_unique<game::Frame>();
 	}
 
 	game::Frame* pCurrent = rScratch.replayStack.at(rScratch.iReplayStackCount - 1);
-	game::Frame* pNext = rCell.snapshots[iNextSlot].get();
+	game::Frame* pNext = rCell.ppSnapshots[iNextSlot].get();
 
 	pNext->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, iTick <= rScratch.iPreReconcileTailTick);
 
@@ -120,7 +120,7 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, game::FrameIn
 	// Apply transfer StatusChanges (runs after Destroy/Spawn to match server ordering)
 	int64_t iTransferCount = 0;
 	int64_t iOwnedTransferCount = 0;
-	engine::GlobalId ownedIds[8] {};
+	engine::GlobalId pOwnedIds[8] {};
 	for (const game::StatusChange& rStatusChange : rFrameInput.statusChanges)
 	{
 		if (game::IsTransferType(rStatusChange.eType))
@@ -133,7 +133,7 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, game::FrameIn
 			{
 				if (iOwnedTransferCount < 8)
 				{
-					ownedIds[iOwnedTransferCount] = rData.globalId;
+					pOwnedIds[iOwnedTransferCount] = rData.globalId;
 				}
 				++iOwnedTransferCount;
 			}
@@ -142,7 +142,7 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, game::FrameIn
 	if (iTransferCount > 0 && !bIsReplay && iTick > rWork.pCell->iLastSpawnTransferLogTick)
 	{
 		rWork.pCell->iLastSpawnTransferLogTick = iTick;
-		LogTransferSummary(rWork, iTick, iTransferCount, iOwnedTransferCount, std::span<const engine::GlobalId>(ownedIds, static_cast<size_t>(std::min<int64_t>(iOwnedTransferCount, 8))));
+		LogTransferSummary(rWork, iTick, iTransferCount, iOwnedTransferCount, std::span<const engine::GlobalId>(pOwnedIds, static_cast<size_t>(std::min<int64_t>(iOwnedTransferCount, 8))));
 	}
 	std::erase_if(rFrameInput.statusChanges, [](const game::StatusChange& rStatusChange)
 	{
@@ -297,7 +297,7 @@ void ReconcileCatchUpCoord(CoordWork& rWork, int64_t iTargetTick)
 	for (int64_t i = iStartWriteCount; i < rScratch.iReplayWriteCount; ++i)
 	{
 		int64_t iSlot = SnapshotIndex(rScratch.iReplayWriteHead, i);
-		rCell.snapshots[iSlot]->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, false);
+		rCell.ppSnapshots[iSlot]->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, false);
 	}
 }
 
@@ -315,7 +315,7 @@ void ReconcileFastPathCatchUp(CoordWork& rWork, int64_t iTargetTick)
 
 	int64_t iTailOffset = rCell.iSnapshotCount - 1;
 	int64_t iTailPhysical = SnapshotIndex(rCell.iSnapshotHead, iTailOffset);
-	game::Frame* pTail = rCell.snapshots[iTailPhysical].get();
+	game::Frame* pTail = rCell.ppSnapshots[iTailPhysical].get();
 	if (pTail == nullptr)
 	{
 		return;
@@ -349,7 +349,7 @@ void ReconcileFastPathCatchUp(CoordWork& rWork, int64_t iTargetTick)
 	for (int64_t i = 0; i < rScratch.iReplayWriteCount; ++i)
 	{
 		int64_t iSlot = SnapshotIndex(rScratch.iReplayWriteHead, i);
-		rCell.snapshots[iSlot]->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, false);
+		rCell.ppSnapshots[iSlot]->interpolate.frameFlags.Set(engine::FrameFlags::kRecalculated, false);
 	}
 
 	rCell.iSnapshotCount = iStartCount + rScratch.iReplayWriteCount;

@@ -48,24 +48,24 @@ void StreamingVoice::UpdateRequests(bool bAllowRequests)
 {
 	for (int64_t i = 0; i < kiBufferCount; ++i)
 	{
-		if (mSlotStates[i] != SlotState::kPending)
+		if (mpeSlotStates[i] != SlotState::kPending)
 		{
 			continue;
 		}
 
-		std::span<std::byte> destination(reinterpret_cast<std::byte*>(mBuffers[i]), mSlotBytesRead[i]);
-		ChunkReadResult eResult = gpFileManager->mpPackChunks->TryReadChunkData(mReadRequests[i], mpLazyChunk->location.crc, mSlotOffsets[i], destination);
+		std::span<std::byte> destination(reinterpret_cast<std::byte*>(mpuiBuffers[i]), mpiSlotBytesRead[i]);
+		ChunkReadResult eResult = gpFileManager->mpPackChunks->TryReadChunkData(mpReadRequests[i], mpLazyChunk->location.crc, mpiSlotOffsets[i], destination);
 		if (eResult == ChunkReadResult::kReady)
 		{
-			mSlotStates[i] = SlotState::kReady;
+			mpeSlotStates[i] = SlotState::kReady;
 		}
 		else if (eResult == ChunkReadResult::kFailed)
 		{
-			mSlotBytesRead[i] = 0;
-			mbSlotLastBuffer[i] = true;
+			mpiSlotBytesRead[i] = 0;
+			mpbSlotLastBuffer[i] = true;
 			mbReadDone = true;
-			mSlotStates[i] = SlotState::kReady;
-			LOG(kAudio, kWarning, "Music streaming: Failed to read chunk data at position {}", mSlotOffsets[i]);
+			mpeSlotStates[i] = SlotState::kReady;
+			LOG(kAudio, kWarning, "Music streaming: Failed to read chunk data at position {}", mpiSlotOffsets[i]);
 		}
 	}
 
@@ -78,46 +78,46 @@ void StreamingVoice::UpdateRequests(bool bAllowRequests)
 		return;
 	}
 
-	while (mSlotStates[miNextRequest] == SlotState::kEmpty)
+	while (mpeSlotStates[miNextRequest] == SlotState::kEmpty)
 	{
 		int64_t iSlot = miNextRequest;
 		int64_t iRemainingData = mpLazyChunk->header.iSize - miNextReadOffset;
 		if (iRemainingData == 0)
 		{
-			mSlotBytesRead[iSlot] = 0;
-			mSlotOffsets[iSlot] = miNextReadOffset;
-			mbSlotLastBuffer[iSlot] = true;
+			mpiSlotBytesRead[iSlot] = 0;
+			mpiSlotOffsets[iSlot] = miNextReadOffset;
+			mpbSlotLastBuffer[iSlot] = true;
 			mbReadDone = true;
-			mSlotStates[iSlot] = SlotState::kReady;
+			mpeSlotStates[iSlot] = SlotState::kReady;
 			LOG(kAudio, kDebug, "Music streaming: No remaining data to read, position: {}/{}", miNextReadOffset, mpLazyChunk->header.iSize);
 			return;
 		}
 
 		int64_t iBytesToRead = std::min(iRemainingData, kiBufferSize);
-		std::span<std::byte> destination(reinterpret_cast<std::byte*>(mBuffers[iSlot]), iBytesToRead);
-		ChunkReadResult eResult = gpFileManager->mpPackChunks->TryReadChunkData(mReadRequests[iSlot], mpLazyChunk->location.crc, miNextReadOffset, destination);
+		std::span<std::byte> destination(reinterpret_cast<std::byte*>(mpuiBuffers[iSlot]), iBytesToRead);
+		ChunkReadResult eResult = gpFileManager->mpPackChunks->TryReadChunkData(mpReadRequests[iSlot], mpLazyChunk->location.crc, miNextReadOffset, destination);
 		if (eResult == ChunkReadResult::kRetry)
 		{
 			return;
 		}
 		if (eResult == ChunkReadResult::kFailed)
 		{
-			mSlotBytesRead[iSlot] = 0;
-			mSlotOffsets[iSlot] = miNextReadOffset;
-			mbSlotLastBuffer[iSlot] = true;
+			mpiSlotBytesRead[iSlot] = 0;
+			mpiSlotOffsets[iSlot] = miNextReadOffset;
+			mpbSlotLastBuffer[iSlot] = true;
 			mbReadDone = true;
-			mSlotStates[iSlot] = SlotState::kReady;
+			mpeSlotStates[iSlot] = SlotState::kReady;
 			LOG(kAudio, kWarning, "Music streaming: Failed to read chunk data at position {}", miNextReadOffset);
 			return;
 		}
 
-		mSlotBytesRead[iSlot] = iBytesToRead;
-		mSlotOffsets[iSlot] = miNextReadOffset;
+		mpiSlotBytesRead[iSlot] = iBytesToRead;
+		mpiSlotOffsets[iSlot] = miNextReadOffset;
 		miNextReadOffset += iBytesToRead;
-		mbSlotLastBuffer[iSlot] = miNextReadOffset >= mpLazyChunk->header.iSize;
-		mSlotStates[iSlot] = eResult == ChunkReadResult::kReady ? SlotState::kReady : SlotState::kPending;
+		mpbSlotLastBuffer[iSlot] = miNextReadOffset >= mpLazyChunk->header.iSize;
+		mpeSlotStates[iSlot] = eResult == ChunkReadResult::kReady ? SlotState::kReady : SlotState::kPending;
 		miNextRequest = (miNextRequest + 1) % kiBufferCount;
-		if (mbSlotLastBuffer[iSlot])
+		if (mpbSlotLastBuffer[iSlot])
 		{
 			mbReadDone = true;
 			LOG(kAudio, kDebug, "Music streaming last buffer: Read {} bytes at position {}/{}", iBytesToRead, miNextReadOffset, mpLazyChunk->header.iSize);
@@ -131,25 +131,25 @@ void StreamingVoice::DrainConsumedAndSubmitReady()
 	int64_t iConsumed = miBuffersConsumed.exchange(0, std::memory_order_acquire);
 	for (int64_t i = 0; i < iConsumed; ++i)
 	{
-		mSlotStates[miNextConsume] = SlotState::kEmpty;
+		mpeSlotStates[miNextConsume] = SlotState::kEmpty;
 		miNextConsume = (miNextConsume + 1) % kiBufferCount;
 	}
 
 	while (!(mFlags & kLastBufferSubmitted))
 	{
-		if (mSlotStates[miNextSubmit] != SlotState::kReady)
+		if (mpeSlotStates[miNextSubmit] != SlotState::kReady)
 		{
 			break;
 		}
 
-		int64_t iBytesRead = mSlotBytesRead[miNextSubmit];
-		bool bLastBuffer = mbSlotLastBuffer[miNextSubmit];
+		int64_t iBytesRead = mpiSlotBytesRead[miNextSubmit];
+		bool bLastBuffer = mpbSlotLastBuffer[miNextSubmit];
 
 		if (iBytesRead == 0)
 		{
 			// An empty slot represents end of stream or a read failure.
 			mFlags.Set(kLastBufferSubmitted);
-			mSlotStates[miNextSubmit] = SlotState::kEmpty;
+			mpeSlotStates[miNextSubmit] = SlotState::kEmpty;
 			miNextSubmit = (miNextSubmit + 1) % kiBufferCount;
 			break;
 		}
@@ -158,7 +158,7 @@ void StreamingVoice::DrainConsumedAndSubmitReady()
 		{
 			.Flags = bLastBuffer ? XAUDIO2_END_OF_STREAM : 0ui32,
 			.AudioBytes = static_cast<UINT32>(iBytesRead),
-			.pAudioData = mBuffers[miNextSubmit],
+			.pAudioData = mpuiBuffers[miNextSubmit],
 			.PlayBegin = 0,
 			.PlayLength = 0,
 			.LoopBegin = 0,
@@ -175,7 +175,7 @@ void StreamingVoice::DrainConsumedAndSubmitReady()
 			break;
 		}
 
-		mSlotStates[miNextSubmit] = SlotState::kSubmitted;
+		mpeSlotStates[miNextSubmit] = SlotState::kSubmitted;
 		miNextSubmit = (miNextSubmit + 1) % kiBufferCount;
 
 		if (!mbStarted)
@@ -196,10 +196,10 @@ void StreamingVoice::CancelPendingReads()
 {
 	for (int64_t i = 0; i < kiBufferCount; ++i)
 	{
-		mReadRequests[i].Reset();
-		if (mSlotStates[i] == SlotState::kPending)
+		mpReadRequests[i].Reset();
+		if (mpeSlotStates[i] == SlotState::kPending)
 		{
-			mSlotStates[i] = SlotState::kEmpty;
+			mpeSlotStates[i] = SlotState::kEmpty;
 		}
 	}
 }

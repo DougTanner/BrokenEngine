@@ -45,7 +45,7 @@ void DynamicPipelines::AddPipeline(DynamicPipelineType eType, common::crc_t crc,
 {
 	Pipeline* pPipeline = mPipelines.emplace_back(std::make_unique<Pipeline>()).get();
 	pPipeline->Create(rPipelineInfo);
-	mPipelineMaps[eType].insert_or_assign(crc, pPipeline);
+	mpPipelineMaps[eType].insert_or_assign(crc, pPipeline);
 }
 
 ModelPipeline* DynamicPipelines::CreateModelPipeline(const ModelPipelineSpec& rModelPipelineSpec)
@@ -67,19 +67,19 @@ void DynamicPipelines::CreateModelPipelines(common::crc_t crc, std::string_view 
 
 void DynamicPipelines::UpdateModelPipelineDescriptors(common::crc_t crc, int64_t iCommandBuffer, int64_t iBinding, Buffer* pBuffer)
 {
-	mModelPipelineMaps[kDynamicModelPipelineModel].at(crc)->UpdateStorageBufferDescriptors(iCommandBuffer, iBinding, pBuffer);
-	mModelPipelineMaps[kDynamicModelPipelineModelShadow].at(crc)->UpdateStorageBufferDescriptors(iCommandBuffer, iBinding, pBuffer);
+	mpModelPipelineMaps[kDynamicModelPipelineModel].at(crc)->UpdateStorageBufferDescriptors(iCommandBuffer, iBinding, pBuffer);
+	mpModelPipelineMaps[kDynamicModelPipelineModelShadow].at(crc)->UpdateStorageBufferDescriptors(iCommandBuffer, iBinding, pBuffer);
 }
 
 void DynamicPipelines::WriteModelPipelineIndirectBuffers(common::crc_t crc, int64_t iCommandBuffer, int64_t iCount)
 {
-	mModelPipelineMaps[kDynamicModelPipelineModel].at(crc)->WriteIndirectBuffer(iCommandBuffer, iCount);
-	mModelPipelineMaps[kDynamicModelPipelineModelShadow].at(crc)->WriteIndirectBuffer(iCommandBuffer, iCount);
+	mpModelPipelineMaps[kDynamicModelPipelineModel].at(crc)->WriteIndirectBuffer(iCommandBuffer, iCount);
+	mpModelPipelineMaps[kDynamicModelPipelineModelShadow].at(crc)->WriteIndirectBuffer(iCommandBuffer, iCount);
 }
 
 void DynamicPipelines::CreateMainModelPipeline(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers)
 {
-	if (mModelPipelineMaps[kDynamicModelPipelineModel].contains(crc))
+	if (mpModelPipelineMaps[kDynamicModelPipelineModel].contains(crc))
 	{
 		return;
 	}
@@ -113,7 +113,7 @@ void DynamicPipelines::CreateMainModelPipeline(common::crc_t crc, std::string_vi
 			.bIsPipelineShadow = false,
 		});
 
-		mModelPipelineMaps[kDynamicModelPipelineModel].insert_or_assign(crc, pPipeline);
+		mpModelPipelineMaps[kDynamicModelPipelineModel].insert_or_assign(crc, pPipeline);
 	}
 	catch (const std::ios_base::failure& rException)
 	{
@@ -125,7 +125,7 @@ void DynamicPipelines::CreateMainModelPipeline(common::crc_t crc, std::string_vi
 
 void DynamicPipelines::CreateShadowModelPipeline(common::crc_t crc, std::string_view name, common::crc_t sceneCrc, Buffer* pStorageBuffers)
 {
-	if (mModelPipelineMaps[kDynamicModelPipelineModelShadow].contains(crc))
+	if (mpModelPipelineMaps[kDynamicModelPipelineModelShadow].contains(crc))
 	{
 		return;
 	}
@@ -166,7 +166,7 @@ void DynamicPipelines::CreateShadowModelPipeline(common::crc_t crc, std::string_
 			.bIsPipelineShadow = true,
 		});
 
-		mModelPipelineMaps[kDynamicModelPipelineModelShadow].insert_or_assign(crc, pPipelineShadow);
+		mpModelPipelineMaps[kDynamicModelPipelineModelShadow].insert_or_assign(crc, pPipelineShadow);
 	}
 	catch (const std::ios_base::failure& rException)
 	{
@@ -178,7 +178,7 @@ void DynamicPipelines::CreateShadowModelPipeline(common::crc_t crc, std::string_
 
 void DynamicPipelines::CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, int64_t iBufferSize, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, DescriptorFlags eSamplerFlag)
 {
-	if (mPipelineMaps[eType].contains(crc))
+	if (mpPipelineMaps[eType].contains(crc))
 	{
 		return;
 	}
@@ -196,7 +196,7 @@ void DynamicPipelines::CreateAreaLightingPipeline(DynamicPipelineType eType, com
 		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mDynamicStorageBuffers[kBufferMain].at(crc).data()},
+			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mpDynamicStorageBuffers[kBufferMain].at(crc).data()},
 			{.flags = eSamplerFlag},
 			{.flags = DescriptorFlags::kTextures},
 		},
@@ -205,7 +205,7 @@ void DynamicPipelines::CreateAreaLightingPipeline(DynamicPipelineType eType, com
 
 void DynamicPipelines::CreatePipelineVisibleLights(common::crc_t crc, std::string_view name, Buffer* pStorageBuffers)
 {
-	if (mPipelineMaps[kDynamicPipelineVisibleLights].contains(crc))
+	if (mpPipelineMaps[kDynamicPipelineVisibleLights].contains(crc))
 	{
 		return;
 	}
@@ -230,7 +230,7 @@ void DynamicPipelines::CreatePipelineVisibleLights(common::crc_t crc, std::strin
 
 void DynamicPipelines::CreatePipelineBillboards(common::crc_t crc, std::string_view name, int64_t iBufferSize)
 {
-	if (mPipelineMaps[kDynamicPipelineBillboards].contains(crc))
+	if (mpPipelineMaps[kDynamicPipelineBillboards].contains(crc))
 	{
 		return;
 	}
@@ -247,7 +247,7 @@ void DynamicPipelines::CreatePipelineBillboards(common::crc_t crc, std::string_v
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
-			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mDynamicStorageBuffers[kBufferMain].at(crc).data()},
+			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mpDynamicStorageBuffers[kBufferMain].at(crc).data()},
 			{.flags = DescriptorFlags::kSamplerClamp},
 			{.flags = DescriptorFlags::kTextures},
 		},
@@ -256,7 +256,7 @@ void DynamicPipelines::CreatePipelineBillboards(common::crc_t crc, std::string_v
 
 void DynamicPipelines::CreateDepositPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, const Texture& rTargetTexture, const DescriptorInfo& rTextureDescriptor, VkBuffer* pVkOccupancyBuffer, int64_t iBufferSize)
 {
-	if (mPipelineMaps[eType].contains(crc))
+	if (mpPipelineMaps[eType].contains(crc))
 	{
 		return;
 	}
@@ -277,7 +277,7 @@ void DynamicPipelines::CreateDepositPipeline(DynamicPipelineType eType, common::
 		.descriptorInfos =
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mDynamicStorageBuffers[kBufferMain].at(crc).data()},
+			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mpDynamicStorageBuffers[kBufferMain].at(crc).data()},
 			rTextureDescriptor,
 			{.flags = DescriptorFlags::kStorageBuffer, .pVkBuffers = pVkOccupancyBuffer},
 		},
@@ -292,7 +292,7 @@ common::crc_t DynamicPipelines::SmokeDepositKey(common::crc_t crc, int64_t iPlan
 
 void DynamicPipelines::CreatePipelineHexShields(common::crc_t crc, std::string_view name, int64_t iBufferSize)
 {
-	if (mPipelineMaps[kDynamicPipelineHexShields].contains(crc))
+	if (mpPipelineMaps[kDynamicPipelineHexShields].contains(crc))
 	{
 		return;
 	}
@@ -309,7 +309,7 @@ void DynamicPipelines::CreatePipelineHexShields(common::crc_t crc, std::string_v
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
-			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mDynamicStorageBuffers[kBufferMain].at(crc).data()},
+			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mpDynamicStorageBuffers[kBufferMain].at(crc).data()},
 			{.flags = DescriptorFlags::kCombinedSamplers, .textureCrc = data::kTexturesCSkyboxCrc},
 		},
 	});
@@ -317,7 +317,7 @@ void DynamicPipelines::CreatePipelineHexShields(common::crc_t crc, std::string_v
 
 void DynamicPipelines::CreatePipelineHexShieldsLighting(common::crc_t crc, std::string_view name)
 {
-	if (mPipelineMaps[kDynamicPipelineHexShieldsLighting].contains(crc))
+	if (mpPipelineMaps[kDynamicPipelineHexShieldsLighting].contains(crc))
 	{
 		return;
 	}
@@ -335,18 +335,18 @@ void DynamicPipelines::CreatePipelineHexShieldsLighting(common::crc_t crc, std::
 		{
 			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
-			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mDynamicStorageBuffers[kBufferMain].at(crc).data()},
+			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mpDynamicStorageBuffers[kBufferMain].at(crc).data()},
 		},
 	});
 }
 
 void DynamicPipelines::UpdateAllModelPipelineDescriptors(int64_t iCommandBuffer, int64_t iBinding, Buffer* pBuffer)
 {
-	for (const auto& [rCrc, rpPipeline] : mModelPipelineMaps[kDynamicModelPipelineModel])
+	for (const auto& [rCrc, rpPipeline] : mpModelPipelineMaps[kDynamicModelPipelineModel])
 	{
 		rpPipeline->UpdateStorageBufferDescriptors(iCommandBuffer, iBinding, pBuffer);
 	}
-	for (const auto& [rCrc, rpPipeline] : mModelPipelineMaps[kDynamicModelPipelineModelShadow])
+	for (const auto& [rCrc, rpPipeline] : mpModelPipelineMaps[kDynamicModelPipelineModelShadow])
 	{
 		rpPipeline->UpdateStorageBufferDescriptors(iCommandBuffer, iBinding, pBuffer);
 	}

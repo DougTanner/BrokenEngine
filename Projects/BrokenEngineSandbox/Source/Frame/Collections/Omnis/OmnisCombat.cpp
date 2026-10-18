@@ -168,15 +168,15 @@ static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[mayb
 		int64_t iLowestIntensityIndex = 0;
 		for (int64_t k = 1; k < shaders::kiHexShieldDirections; ++k)
 		{
-			if (rOmniInterpolate.pHexShieldFragmentIntensities[i].data[k] < rOmniInterpolate.pHexShieldFragmentIntensities[i].data[iLowestIntensityIndex])
+			if (rOmniInterpolate.pHexShieldFragmentIntensities[i].pfData[k] < rOmniInterpolate.pHexShieldFragmentIntensities[i].pfData[iLowestIntensityIndex])
 			{
 				iLowestIntensityIndex = k;
 			}
 		}
 		XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorSubtract(vecDamagePosition, rOmniInterpolate.pVecPositions[i]));
-		XMStoreFloat4A(&rOmniInterpolate.pHexShieldDirections[i].data[iLowestIntensityIndex], vecDamageDirection);
-		rOmniInterpolate.pHexShieldVertexIntensities[i].data[iLowestIntensityIndex] = 1.0f;
-		rOmniInterpolate.pHexShieldFragmentIntensities[i].data[iLowestIntensityIndex] = 1.0f;
+		XMStoreFloat4A(&rOmniInterpolate.pHexShieldDirections[i].pf4Data[iLowestIntensityIndex], vecDamageDirection);
+		rOmniInterpolate.pHexShieldVertexIntensities[i].pfData[iLowestIntensityIndex] = 1.0f;
+		rOmniInterpolate.pHexShieldFragmentIntensities[i].pfData[iLowestIntensityIndex] = 1.0f;
 #endif // BT_CLIENT
 
 		float fShieldDamage = std::min(rOmni.pfShields[i], fDamage);

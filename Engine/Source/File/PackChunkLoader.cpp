@@ -28,7 +28,7 @@ void PackChunkLoader::Start()
 	for (int64_t i = 0; i < kiLoadingThreadCount; ++i)
 	{
 		// kThreadLazyLoad tags log lines and participates in the DxDiag-thread check; shared state does not use it.
-		mLoadingThreads[i] = std::thread(common::ThreadLocal::Entry(&PackChunkLoader::LoadingThread, common::kiMinWorkbufferSize, common::kThreadLazyLoad), this, i);
+		mpLoadingThreads[i] = std::thread(common::ThreadLocal::Entry(&PackChunkLoader::LoadingThread, common::kiMinWorkbufferSize, common::kThreadLazyLoad), this, i);
 	}
 }
 
@@ -46,7 +46,7 @@ void PackChunkLoader::Stop()
 	}
 	PublishWake();
 	// joinable() is false only if the eager-load task threw before assigning the threads (catch in ~PackChunks).
-	for (std::thread& rLoadingThread : mLoadingThreads)
+	for (std::thread& rLoadingThread : mpLoadingThreads)
 	{
 		if (rLoadingThread.joinable())
 		{

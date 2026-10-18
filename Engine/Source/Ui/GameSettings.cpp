@@ -19,7 +19,7 @@ struct GameSettings
 	// uint8_t, not bool: the file is opaque input and a non-0/1 byte read into a bool is an invalid object representation
 	uint8_t uiOpaqueUi = 0;
 	UiTheme eUiTheme = UiTheme::kNavalSteel;
-	uint8_t uiPad[2] {};
+	uint8_t puiPad[2] {};
 };
 static_assert(std::is_trivially_copyable_v<GameSettings>, "GameSettings must stay trivially copyable — WriteVersionedFile stamps sizeof");
 static_assert(std::is_standard_layout_v<GameSettings>, "GameSettings must stay standard-layout — BT_OFFSETOF below is only well-defined for standard-layout types");
@@ -28,7 +28,7 @@ static_assert(BT_OFFSETOF(GameSettings, fUiFontScale) == 4, "GameSettings::fUiFo
 static_assert(BT_OFFSETOF(GameSettings, fUiOpacity) == 8, "GameSettings::fUiOpacity offset changed — existing opacity bytes move");
 static_assert(BT_OFFSETOF(GameSettings, uiOpaqueUi) == 12, "GameSettings::uiOpaqueUi offset changed — the opaque-UI byte is appended after the floats");
 static_assert(BT_OFFSETOF(GameSettings, eUiTheme) == 13, "GameSettings::eUiTheme offset changed — the theme byte follows the opaque-UI byte");
-static_assert(BT_OFFSETOF(GameSettings, uiPad) == 14, "GameSettings padding changed — GameSettings must remain 16 bytes");
+static_assert(BT_OFFSETOF(GameSettings, puiPad) == 14, "GameSettings padding changed — GameSettings must remain 16 bytes");
 static_assert(sizeof(GameSettings) == 16, "GameSettings::kiVersion must be bumped with this layout");
 constexpr char kpcGameSettingsPath[] = "GameSettings.bin";
 

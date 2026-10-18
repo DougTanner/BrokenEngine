@@ -8,16 +8,16 @@ using crc_t = uint64_t;
 template<int64_t N>
 struct FixedString
 {
-	char data[N] {};
+	char pcData[N] {};
 
 	constexpr FixedString(const char (&str)[N])
 	{
-		std::copy(std::begin(str), std::end(str), std::begin(data));
+		std::copy(std::begin(str), std::end(str), std::begin(pcData));
 	}
 
 	constexpr operator const char*() const
 	{
-		return data;
+		return pcData;
 	}
 };
 
@@ -115,19 +115,19 @@ template<int64_t SIZE>
 struct ConstexprCrcArray
 {
 	int64_t iCount = SIZE;
-	crc_t array[SIZE] {};
+	crc_t pArray[SIZE] {};
 
 	consteval ConstexprCrcArray(std::string_view prefix, std::string_view suffix)
 	{
 		for (int64_t i = 0; i < SIZE; ++i)
 		{
-			array[i] = CrcConsteval(std::string(prefix) + IntToString(i) + std::string(suffix));
+			pArray[i] = CrcConsteval(std::string(prefix) + IntToString(i) + std::string(suffix));
 		}
 	}
 
 	crc_t operator[](int64_t i) const
 	{
-		return array[i];
+		return pArray[i];
 	}
 };
 

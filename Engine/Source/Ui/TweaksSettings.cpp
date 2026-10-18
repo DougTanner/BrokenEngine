@@ -16,7 +16,7 @@ struct TweaksSettings
 
 	// uint8_t, not bool: the file is opaque input and a non-0/1 byte read into a bool is an invalid object representation
 	uint8_t uiShowImGui = 0;
-	uint8_t uiPadding[3] {};
+	uint8_t puiPadding[3] {};
 	float fSunAngle = 1.15f;
 	// Engine-owned layout POD, embedded by value: one array bound and one sizeof for the whole program.
 	TweakSectionState sectionState {};

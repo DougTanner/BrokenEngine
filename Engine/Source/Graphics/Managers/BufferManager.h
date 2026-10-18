@@ -45,7 +45,7 @@ public:
 	DynamicStorageBufferResult<T> GetDynamicStorageBuffer(common::crc_t crc, DynamicBufferType eType, int64_t iCommandBuffer)
 	{
 		static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable");
-		Buffer& rBuffer = mDynamicStorageBuffers[eType].at(crc).at(iCommandBuffer);
+		Buffer& rBuffer = mpDynamicStorageBuffers[eType].at(crc).at(iCommandBuffer);
 		// CreateDynamicBuffer() stores its size argument as iElementSize; pass sizeof(T) so ResizeDynamicBuffer preserves the element size.
 		ASSERT(static_cast<int64_t>(sizeof(T)) == rBuffer.mInfo.iElementSize);
 		return
@@ -63,8 +63,8 @@ public:
 	std::vector<Buffer> mUiRectangleStorageBuffers;
 
 	// Smoke hierarchical dispatch buffers (per-plane, per-texture occupancy; one active tile list shared by every plane)
-	VkBuffer mSmokeOccupancyVkBuffers[shaders::kiMaxFlightPlanes][2] {};
-	VmaAllocation mSmokeOccupancyVmaAllocations[shaders::kiMaxFlightPlanes][2] {};
+	VkBuffer mpSmokeOccupancyVkBuffers[shaders::kiMaxFlightPlanes][2] {};
+	VmaAllocation mpSmokeOccupancyVmaAllocations[shaders::kiMaxFlightPlanes][2] {};
 	int64_t miSmokeOccupancyBufferSize = 0;
 	VkBuffer mSmokeActiveTileVkBuffer = VK_NULL_HANDLE;
 	VmaAllocation mSmokeActiveTileVmaAllocation = VK_NULL_HANDLE;
@@ -73,11 +73,11 @@ public:
 	void DestroySmokeHierarchicalBuffers();
 
 	// Wind hierarchical dispatch buffers (two pairs: A for TextureOne, B for TextureTwo)
-	VkBuffer mWindOccupancyVkBuffers[2] = {};
-	VmaAllocation mWindOccupancyVmaAllocations[2] = {};
+	VkBuffer mpWindOccupancyVkBuffers[2] = {};
+	VmaAllocation mpWindOccupancyVmaAllocations[2] = {};
 	int64_t miWindOccupancyBufferSize = 0;
-	VkBuffer mWindActiveTileVkBuffers[2] = {};
-	VmaAllocation mWindActiveTileVmaAllocations[2] = {};
+	VkBuffer mpWindActiveTileVkBuffers[2] = {};
+	VmaAllocation mpWindActiveTileVmaAllocations[2] = {};
 	int64_t miWindActiveTileBufferSize = 0;
 	void CreateWindHierarchicalBuffers();
 	void DestroyWindHierarchicalBuffers();
@@ -97,7 +97,7 @@ public:
 		int64_t iQuadCountX = 0;    // For visible-area snap math
 		int64_t iQuadCountY = 0;
 	};
-	VisibleAreaMeshLod mWaterMeshLods[kiVisibleAreaLodCount] {};
+	VisibleAreaMeshLod mpWaterMeshLods[kiVisibleAreaLodCount] {};
 	Buffer mWaterMeshBuffer;
 
 	Buffer mDebugBoxVertexBuffer;
@@ -118,7 +118,7 @@ public:
 	int64_t AllocateJointMatrices(int64_t iCommandBuffer, int64_t iCount);
 	void ResetSkinningAllocations(int64_t iCommandBuffer);
 
-	std::unordered_map<common::crc_t, std::vector<Buffer>> mDynamicStorageBuffers[kBufferTypeCount];
+	std::unordered_map<common::crc_t, std::vector<Buffer>> mpDynamicStorageBuffers[kBufferTypeCount];
 	std::optional<Buffer> mOptionalPreviousBuffer;
 
 	void InitializePerCommandBufferBuffers(int64_t iCommandBufferCount);
@@ -130,10 +130,10 @@ private:
 	void GrowMeshDataBuffer(int64_t iCommandBuffer, int64_t iValidCount);
 	void GrowJointMatrixBuffer(int64_t iCommandBuffer, int64_t iValidCount);
 
-	int64_t miMeshDataOffset[kiMaxFramebuffers] {};
-	int64_t miJointMatrixOffset[kiMaxFramebuffers] {};
-	int64_t miMeshDataCapacity[kiMaxFramebuffers] {};
-	int64_t miJointMatrixCapacity[kiMaxFramebuffers] {};
+	int64_t mpiMeshDataOffset[kiMaxFramebuffers] {};
+	int64_t mpiJointMatrixOffset[kiMaxFramebuffers] {};
+	int64_t mpiMeshDataCapacity[kiMaxFramebuffers] {};
+	int64_t mpiJointMatrixCapacity[kiMaxFramebuffers] {};
 	// Skinning buffers remain parked until the next ResetSkinningAllocations call;
 	// a second grow in the frame overwrites its framebuffer's slot.
 	std::optional<Buffer> mpOptionalPreviousMeshDataBuffer[kiMaxFramebuffers];

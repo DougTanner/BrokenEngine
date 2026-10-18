@@ -101,7 +101,7 @@ using LogRingBuffer = LogBuffer<kiRingBufferLineCount, true>;
 using LogGlobalBuffer = LogBuffer<kiGlobalBufferLineCount, false>;
 using LogAgentBuffer = LogBuffer<kiAgentBufferLineCount, true>;
 
-extern LogRingBuffer gLogRingBuffers[kiLogCategoryCount];
+extern LogRingBuffer gpLogRingBuffers[kiLogCategoryCount];
 extern LogGlobalBuffer gLogGlobalBuffer; // Non-wrapping; freezes after kiGlobalBufferLineCount lines — feeds the crash-dump path (do not repurpose).
 extern LogAgentBuffer gLogAgentBuffer; // Wrapping; always holds the most recent lines across all categories for the agent get_logs default.
 
@@ -109,7 +109,7 @@ extern LogAgentBuffer gLogAgentBuffer; // Wrapping; always holds the most recent
 // formatting, so a suppressed line costs one relaxed atomic load plus a branch. Default kInfo (the documented
 // out-of-box threshold); the agent lowers it live via set_log_level. Written from the main-thread agent Drain,
 // read from every logging thread.
-extern std::atomic<LogLevel> gLogRuntimeLevels[kiLogCategoryCount];
+extern std::atomic<LogLevel> gpeLogRuntimeLevels[kiLogCategoryCount];
 void SetLogRuntimeLevel(LogCategory eCategory, LogLevel eLevel);
 
 // Whole-stream log-file sink — opened once from startup (--log-file). LogWrite tees each emitted line here under
@@ -189,20 +189,20 @@ using common::LogIndent;
 using common::ScopedLogIndent;
 
 // Per-category compile-time thresholds (keLogLevel* defined before Common.h by each project's Pch.h; the game's come from Engine/Source/EngineSwitches.h, which its Pch.h includes)
-inline constexpr LogLevel keLogLevels[]
+inline constexpr LogLevel kpeLogLevels[]
 {
 	keLogLevelDefault, keLogLevelTemporary,
 	keLogLevelAudio, keLogLevelGraphics, keLogLevelLoading, keLogLevelNavigationData, keLogLevelNetwork, keLogLevelInput, keLogLevelReplay,
 };
-static_assert(std::size(keLogLevels) == common::kiLogCategoryCount, "keLogLevels out of sync with LogCategory");
+static_assert(std::size(kpeLogLevels) == common::kiLogCategoryCount, "kpeLogLevels out of sync with LogCategory");
 
 // Log.cpp initializes in the library phase for ordinary static initializers and destructors; LogWrite
 // handles calls outside its lifetime without gLogMutex or the file sink.
 #define LOG(category, level, format, ...) \
 do { \
-	if constexpr (kbLogging && (level) >= keLogLevels[static_cast<int64_t>(category)]) \
+	if constexpr (kbLogging && (level) >= kpeLogLevels[static_cast<int64_t>(category)]) \
 	{ \
-		if ((level) >= common::gLogRuntimeLevels[static_cast<int64_t>(category)].load(std::memory_order_relaxed)) \
+		if ((level) >= common::gpeLogRuntimeLevels[static_cast<int64_t>(category)].load(std::memory_order_relaxed)) \
 		{ \
 			common::Log((category), format __VA_OPT__(,) __VA_ARGS__); \
 		} \

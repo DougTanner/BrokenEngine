@@ -160,7 +160,7 @@ namespace toolcli::landing
 		{
 			return false;
 		}
-		const std::filesystem::path markers[] = { L"MERGE_HEAD", L"rebase-merge", L"rebase-apply", L"CHERRY_PICK_HEAD", L"REVERT_HEAD", L"BISECT_LOG", L"sequencer" };
+		const std::filesystem::path pMarkers[] = { L"MERGE_HEAD", L"rebase-merge", L"rebase-apply", L"CHERRY_PICK_HEAD", L"REVERT_HEAD", L"BISECT_LOG", L"sequencer" };
 		for (const std::wstring& rWorktree : worktrees)
 		{
 			std::error_code error;
@@ -183,7 +183,7 @@ namespace toolcli::landing
 			{
 				return false;
 			}
-			for (const std::filesystem::path& rMarker : markers)
+			for (const std::filesystem::path& rMarker : pMarkers)
 			{
 				if (std::filesystem::exists(extendedGitDirectory / rMarker, error) || error)
 				{

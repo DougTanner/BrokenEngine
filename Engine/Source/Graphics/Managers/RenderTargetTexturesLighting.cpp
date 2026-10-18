@@ -173,7 +173,7 @@ void RenderTargetTextures::CreateLightingTextures()
 	float fSpreadMultiplierStart = gSpreadTextureMultiplierStart.mfCurrent;
 	float fSpreadMultiplierEnd = gSpreadTextureMultiplierEnd.mfCurrent;
 	int64_t iPassCount = static_cast<int64_t>(gSpreadPassCount.mfCurrent);
-	static constexpr std::string_view kColorNames[3] {"Red", "Green", "Blue"};
+	static constexpr std::string_view kpColorNames[3] {"Red", "Green", "Blue"};
 	for (int64_t i = 0; i < shaders::kiMaxSpreadPasses; ++i)
 	{
 		float fInterpolationFraction = (iPassCount > 1) ? static_cast<float>(i) / static_cast<float>(iPassCount - 1) : 0.0f;
@@ -181,7 +181,7 @@ void RenderTargetTextures::CreateLightingTextures()
 		auto [iPassX, iPassY] = TextureManager::LightingDetailTextureSize(fMultiplier);
 		for (int64_t j = 0; j < 3; ++j)
 		{
-			std::string spreadName = std::format("Spread{}_{}", kColorNames[j], i);
+			std::string spreadName = std::format("Spread{}_{}", kpColorNames[j], i);
 			mpSpreadTextures[i][j].Create(TextureInfo
 			{
 				.textureFlags = {},
@@ -197,7 +197,7 @@ void RenderTargetTextures::CreateLightingTextures()
 				.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 				.eTextureLayout = TextureLayout::kShaderReadOnly,
 			});
-			std::string spreadOnlyName = std::format("SpreadOnly{}_{}", kColorNames[j], i);
+			std::string spreadOnlyName = std::format("SpreadOnly{}_{}", kpColorNames[j], i);
 			mpSpreadOnlyTextures[i][j].Create(TextureInfo
 			{
 				.textureFlags = {},
@@ -316,13 +316,13 @@ void RenderTargetTextures::CreateLightingTextures()
 	// Create combine textures (UNORM tone-mapped output, sized to max of start/end). LightingTemporal.comp blends the
 	// last-refresh history into these in place; LightingHistoryCopy.comp publishes the result to history.
 	auto [iCombineX, iCombineY] = TextureManager::LightingDetailTextureSize(std::max(fSpreadMultiplierStart, fSpreadMultiplierEnd));
-	static constexpr std::string_view kCombineNames[3] {"CombineRed", "CombineGreen", "CombineBlue"};
+	static constexpr std::string_view kpCombineNames[3] {"CombineRed", "CombineGreen", "CombineBlue"};
 	for (int64_t i = 0; i < 3; ++i)
 	{
 		mpCombineTextures[i].Create(TextureInfo
 		{
 			.textureFlags = {},
-			.name = kCombineNames[i],
+			.name = kpCombineNames[i],
 			.vkImageCreateFlags = 0,
 			.vkFormat = shaders::kVkFormatCombine,
 			.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iCombineX), .height = static_cast<uint32_t>(iCombineY), .depth = 1},
@@ -354,13 +354,13 @@ void RenderTargetTextures::CreateLightingTextures()
 	// History textures: last-refresh combine outputs reprojected + EMA-blended by LightingTemporal.comp.
 	// Clones of the combine textures (same bumped extent, RGBA8 UNORM); SAMPLED (read as history), STORAGE
 	// (descriptor-set compatibility with combine bindings) so LightingHistoryCopy.comp can refresh them in-place.
-	static constexpr std::string_view kHistoryNames[3] {"LightingHistoryRed", "LightingHistoryGreen", "LightingHistoryBlue"};
+	static constexpr std::string_view kpHistoryNames[3] {"LightingHistoryRed", "LightingHistoryGreen", "LightingHistoryBlue"};
 	for (int64_t i = 0; i < 3; ++i)
 	{
 		mpLightingHistoryTextures[i].Create(TextureInfo
 		{
 			.textureFlags = {},
-			.name = kHistoryNames[i],
+			.name = kpHistoryNames[i],
 			.vkImageCreateFlags = 0,
 			.vkFormat = shaders::kVkFormatCombine,
 			.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iCombineX), .height = static_cast<uint32_t>(iCombineY), .depth = 1},

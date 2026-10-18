@@ -184,7 +184,7 @@ struct MenuChrome
 	ImVec4 f4BackdropDim;
 };
 
-constexpr MenuChrome kMenuChromes[]
+constexpr MenuChrome kpMenuChromes[]
 {
 	// kNavalSteel
 	{
@@ -214,7 +214,7 @@ constexpr MenuChrome kMenuChromes[]
 		.f4BackdropDim = ImVec4(0.0f, 0.0f, 0.0f, 0.55f),
 	},
 };
-static_assert(std::size(kMenuChromes) == static_cast<size_t>(engine::UiTheme::kCount));
+static_assert(std::size(kpMenuChromes) == static_cast<size_t>(engine::UiTheme::kCount));
 
 static ImVec4 InterpolateColor(const ImVec4& rf4FirstColor, const ImVec4& rf4SecondColor, float fInterpolationFactor)
 {
@@ -299,12 +299,12 @@ void MenuHeading(const char* pcLabel, float fHeadingScale)
 
 void DrawFullScreenDim()
 {
-	ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0.0f, 0.0f), ImGui::GetIO().DisplaySize, ChromeColor(kMenuChromes[static_cast<size_t>(engine::GetUiTheme())].f4BackdropDim));
+	ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0.0f, 0.0f), ImGui::GetIO().DisplaySize, ChromeColor(kpMenuChromes[static_cast<size_t>(engine::GetUiTheme())].f4BackdropDim));
 }
 
 void DrawPanelAccents(ImDrawList* pDrawList, const ImVec2& rvMinimum, const ImVec2& rvMaximum)
 {
-	const MenuChrome& rChrome = kMenuChromes[static_cast<size_t>(engine::GetUiTheme())];
+	const MenuChrome& rChrome = kpMenuChromes[static_cast<size_t>(engine::GetUiTheme())];
 	float fUiScale = engine::UiScale();
 	float fPanelRounding = kfPanelRounding * fUiScale;
 	pDrawList->AddRect(rvMinimum, rvMaximum, ChromeColor(rChrome.f4PanelBorder), fPanelRounding, kfPanelBorderThickness * fUiScale);
@@ -327,7 +327,7 @@ bool MenuButton(const char* pcLabel, const ImVec2& rvSize, float& rfHoverAnimati
 	// io.DeltaTime is uncapped wall-clock time; a long UI hitch pushes the interpolant past 1 and overshoots.
 	rfHoverAnimation += ((bHovered ? 1.0f : 0.0f) - rfHoverAnimation) * std::min(common::ExponentialInterpolant(kfHoverAnimationRate, ImGui::GetIO().DeltaTime), 1.0f);
 
-	const MenuChrome& rChrome = kMenuChromes[static_cast<size_t>(engine::GetUiTheme())];
+	const MenuChrome& rChrome = kpMenuChromes[static_cast<size_t>(engine::GetUiTheme())];
 	ImVec2 vMinimum = ImGui::GetItemRectMin();
 	ImVec2 vMaximum = ImGui::GetItemRectMax();
 	ImDrawList* pDrawList = ImGui::GetWindowDrawList();

@@ -131,18 +131,18 @@ void CommandBufferManager::SubmitMainToQueue(int64_t iFramebufferIndex)
 {
 	CommandBuffers& rCommandBuffers = mPerFramebufferCommandBuffers.at(iFramebufferIndex);
 
-	VkSemaphore vkSemaphores[]
+	VkSemaphore pVkSemaphores[]
 	{
 		rCommandBuffers.mGlobalFinishedVkSemaphore,
 		gpSwapchainManager->mImageAvailableVkSemaphore,
 	};
-	VkPipelineStageFlags vkPipelineStageFlags[]
+	VkPipelineStageFlags pVkPipelineStageFlags[]
 	{
 		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 	};
 
-	VkSemaphore vkSignalSemaphores[]
+	VkSemaphore pVkSignalSemaphores[]
 	{
 		rCommandBuffers.mMainFinishedVkSemaphore,
 		mParticleSyncVkSemaphore,
@@ -152,13 +152,13 @@ void CommandBufferManager::SubmitMainToQueue(int64_t iFramebufferIndex)
 	{
 		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.pNext = nullptr,
-		.waitSemaphoreCount = static_cast<uint32_t>(std::size(vkSemaphores)),
-		.pWaitSemaphores = vkSemaphores,
-		.pWaitDstStageMask = vkPipelineStageFlags,
+		.waitSemaphoreCount = static_cast<uint32_t>(std::size(pVkSemaphores)),
+		.pWaitSemaphores = pVkSemaphores,
+		.pWaitDstStageMask = pVkPipelineStageFlags,
 		.commandBufferCount = 1,
 		.pCommandBuffers = &rCommandBuffers.mMainVkCommandBuffer,
-		.signalSemaphoreCount = static_cast<uint32_t>(std::size(vkSignalSemaphores)),
-		.pSignalSemaphores = vkSignalSemaphores,
+		.signalSemaphoreCount = static_cast<uint32_t>(std::size(pVkSignalSemaphores)),
+		.pSignalSemaphores = pVkSignalSemaphores,
 	};
 	gpProfileManager->CpuStart(kCpuTimerSubmitImage);
 	// SubmitMainCommandBuffer resets mVkFence without signaling it; Graphics.cpp must follow it with
@@ -167,7 +167,7 @@ void CommandBufferManager::SubmitMainToQueue(int64_t iFramebufferIndex)
 	CHECK_VK(vkQueueSubmit(gpDeviceManager->mGraphicsVkQueue, 1, &vkSubmitInfo, VK_NULL_HANDLE));
 	gpProfileManager->CpuStop(kCpuTimerSubmitImage);
 
-	// mParticleSyncVkSemaphore (signaled above via vkSignalSemaphores) is waited by the NEXT frame's
+	// mParticleSyncVkSemaphore (signaled above via pVkSignalSemaphores) is waited by the NEXT frame's
 	// SubmitGlobalToQueue, gated on mbParticleSemaphoreSignaled — a cross-frame, cross-method pairing that
 	// holds only because a Main submit always precedes the next Global submit. Same "plain member published across
 	// a PersistentWorker Wake/Wait edge" family as SwapchainManager::PresentToQueue (meDestroyType) and CommandBuffers.h

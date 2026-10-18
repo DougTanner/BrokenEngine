@@ -126,7 +126,7 @@ void ClientSessionRuntime::Connect(std::string_view serverAddress, int64_t iPort
 void ClientSessionRuntime::ConnectToDiscoveredServer(int64_t iPort, int64_t iCoordinateSlots)
 {
 	mStateFlags.Set(ClientSessionStateFlags::kServerDiscovered, false);
-	Connect(mcDiscoveredAddress, iPort, iCoordinateSlots);
+	Connect(mpcDiscoveredAddress, iPort, iCoordinateSlots);
 }
 
 void ClientSessionRuntime::Disconnect()
@@ -161,7 +161,7 @@ void ClientSessionRuntime::PollDiscovery()
 	mpDiscoveryScanner->Poll();
 	if ((mpDiscoveryScanner->mFlags & NetworkDiscoveryScanner::DiscoveryScannerFlags::kFound))
 	{
-		std::snprintf(mcDiscoveredAddress, sizeof(mcDiscoveredAddress), "%s", mpDiscoveryScanner->mpcFoundAddress);
+		std::snprintf(mpcDiscoveredAddress, sizeof(mpcDiscoveredAddress), "%s", mpDiscoveryScanner->mpcFoundAddress);
 		mpDiscoveryScanner.reset();
 		mStateFlags.Set(ClientSessionStateFlags::kServerDiscovered);
 	}
@@ -287,8 +287,8 @@ void ClientSessionRuntime::ApplyReceivedFullStates()
 			bool bInitialSetup = (GetConfirmedTick() < 0);
 
 			rCell.iSnapshotHead = 0;
-			rCell.snapshots[0] = std::move(rFullState.pFrame);
-			rCell.snapshots[0]->postRender.uiSharedCrc = rCell.snapshots[0]->Crc();
+			rCell.ppSnapshots[0] = std::move(rFullState.pFrame);
+			rCell.ppSnapshots[0]->postRender.uiSharedCrc = rCell.ppSnapshots[0]->Crc();
 			rCell.iSnapshotCount = 1;
 			rCell.iConfirmedTick = iTick;
 			rCell.iLastFullStateTick = iTick;
@@ -507,18 +507,18 @@ void ClientSessionRuntime::UpdateDesiredCoordinates(std::string_view reason)
 	InitializeLogTickScope(optionalTickScope);
 
 	static constexpr int64_t kiMaximumDesiredCoordinates = 9;
-	GridCoord desiredCoordinates[kiMaximumDesiredCoordinates] {};
+	GridCoord pDesiredCoordinates[kiMaximumDesiredCoordinates] {};
 	int64_t iDesiredCount = 0;
 	auto PushCoordinate = [&](GridCoord coordinate)
 	{
 		ASSERT(iDesiredCount < kiMaximumDesiredCoordinates);
-		desiredCoordinates[iDesiredCount++] = coordinate;
+		pDesiredCoordinates[iDesiredCount++] = coordinate;
 	};
 
 	if (game::gpGame->HasFocusedClientEntity())
 	{
 		PushCoordinate(game::gpGame->mClientGridCoordinate);
-		for (const GridCoord& rCoordinate : std::span<const GridCoord>(mVisibleNeighbors, static_cast<size_t>(miVisibleNeighborCount)))
+		for (const GridCoord& rCoordinate : std::span<const GridCoord>(mpVisibleNeighbors, static_cast<size_t>(miVisibleNeighborCount)))
 		{
 			PushCoordinate(rCoordinate);
 		}
@@ -528,7 +528,7 @@ void ClientSessionRuntime::UpdateDesiredCoordinates(std::string_view reason)
 		PushCoordinate(kOriginCoordinate);
 	}
 
-	SetDesiredCoordinates(std::span<const GridCoord>(desiredCoordinates, static_cast<size_t>(iDesiredCount)), reason, game::gpGame->miTickCounter);
+	SetDesiredCoordinates(std::span<const GridCoord>(pDesiredCoordinates, static_cast<size_t>(iDesiredCount)), reason, game::gpGame->miTickCounter);
 }
 
 void ClientSessionRuntime::SynchronizeSubscriptions()
@@ -725,7 +725,7 @@ void ClientSessionRuntime::ComputeActiveSet()
 					if (rf4Visible.x < fNeighborMaxX && rf4Visible.z > fNeighborMinX && rf4Visible.w < fNeighborMaxY
 					 && rf4Visible.y > fNeighborMinY)
 					{
-						mVisibleNeighbors[miVisibleNeighborCount++] = neighbor;
+						mpVisibleNeighbors[miVisibleNeighborCount++] = neighbor;
 						EnsureNeighbor(neighbor);
 					}
 				}

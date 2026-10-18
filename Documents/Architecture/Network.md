@@ -229,7 +229,7 @@ sizes are the full packet including the type byte.
   (pre-Hello ack race, below); (5) per-type per-tick cap → drop, violation only
   if `bOverCapCountsViolation`. Game-range types skip gates 3–5 at `Receive`
   (kept opaque) and take the same three checks at the deferred drain.
-- **Per-update reset**: `Server::Poll` zeroes each client's `iTickPacketCount`/`iTickByteCount` and `uiTickTypeCounts`, but only in `ServerPollMode::kUpdateStart` — the tick-boundary poll continues the same window, so one budget window ≈ one tick window even though an update polls twice. `uiTickTypeCounts` is one 256-entry array shared by both dispatch points — engine and game type bytes are disjoint ranges, so sharing is coherent.
+- **Per-update reset**: `Server::Poll` zeroes each client's `iTickPacketCount`/`iTickByteCount` and `puiTickTypeCounts`, but only in `ServerPollMode::kUpdateStart` — the tick-boundary poll continues the same window, so one budget window ≈ one tick window even though an update polls twice. `puiTickTypeCounts` is one 256-entry array shared by both dispatch points — engine and game type bytes are disjoint ranges, so sharing is coherent.
 - **Violation policy** (`Server::RecordContractViolation`): each violation is
   one of two kinds with its own count, and the counts never feed each
   other. **Corrupt data** — a sentinel row, a size outside the contract, a

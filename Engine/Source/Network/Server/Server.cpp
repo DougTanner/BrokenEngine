@@ -89,7 +89,7 @@ void Server::Poll(const NetworkTimeState& rTimeState, ServerPollMode ePollMode)
 		{
 			rClient.iTickPacketCount = 0;
 			rClient.iTickByteCount = 0;
-			std::memset(rClient.uiTickTypeCounts, 0, sizeof(rClient.uiTickTypeCounts));
+			std::memset(rClient.puiTickTypeCounts, 0, sizeof(rClient.puiTickTypeCounts));
 		}
 	}
 
@@ -270,7 +270,7 @@ void Server::Receive(std::span<const uint8_t> packetData, ENetPeer* pPeer)
 		}
 
 		// Gate 5: per-type per-tick cap -- drop; violation only if the contract counts over-cap.
-		if (++pClient->uiTickTypeCounts[packetData[0]] > contract.iMaximumPerTick)
+		if (++pClient->puiTickTypeCounts[packetData[0]] > contract.iMaximumPerTick)
 		{
 			if (contract.bOverCapCountsViolation)
 			{
@@ -478,10 +478,10 @@ bool Server::AdmitGamePacket(const DeferredClientPacket& rPacket, const ClientPa
 		RecordContractViolation(rPacket.iClientId, ContractViolationKind::kCorrupt, "game packet size out of range", rPacket.iPacketType, iFullSize);
 		return false;
 	}
-	// Per-type per-tick cap. uiTickTypeCounts is reset once per update by the engine (both of the update's polls
+	// Per-type per-tick cap. puiTickTypeCounts is reset once per update by the engine (both of the update's polls
 	// share the window); engine and game types occupy disjoint type-byte ranges, so sharing one array across
 	// both dispatch points is coherent within that window.
-	if (++pClient->uiTickTypeCounts[rPacket.iPacketType] > rContract.iMaximumPerTick)
+	if (++pClient->puiTickTypeCounts[rPacket.iPacketType] > rContract.iMaximumPerTick)
 	{
 		if (rContract.bOverCapCountsViolation)
 		{
@@ -495,10 +495,10 @@ bool Server::AdmitGamePacket(const DeferredClientPacket& rPacket, const ClientPa
 
 void Server::ClientAcknowledgementStream(std::span<const uint8_t> packetData, ClientConnection& rClient)
 {
-	NetworkMessages::AckStreamEntry entries[NetworkManager::kiMaximumEnetCoordinateSlots] {};
+	NetworkMessages::AckStreamEntry pEntries[NetworkManager::kiMaximumEnetCoordinateSlots] {};
 	NetworkMessages::ClientAckStreamMessage message
 	{
-		.pEntries = entries,
+		.pEntries = pEntries,
 		.iEntryCapacity = NetworkManager::kiMaximumEnetCoordinateSlots,
 	};
 	NetworkMessages::Read(packetData, message);

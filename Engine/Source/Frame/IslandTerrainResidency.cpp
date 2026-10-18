@@ -41,14 +41,14 @@ static bool IsTextureRestorationPending(common::crc_t uiIslandCrc, const IslandT
 		return false;
 	}
 	const LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(uiIslandCrc);
-	common::crc_t residencyCrcs[4] =
+	common::crc_t pResidencyCrcs[4] =
 	{
 		rLazyChunk.header.islandHeader.colorsCrc,
 		rLazyChunk.header.islandHeader.normalsCrc,
 		rLazyChunk.header.islandHeader.ambientOcclusionCrc,
 		rLazyChunk.header.islandHeader.masksCrc,
 	};
-	return std::ranges::all_of(residencyCrcs, [](const common::crc_t& rTextureCrc)
+	return std::ranges::all_of(pResidencyCrcs, [](const common::crc_t& rTextureCrc)
 	{
 		return gpFileManager->mpPackChunks->IsChunkReady(rTextureCrc);
 	});
@@ -141,7 +141,7 @@ int64_t IslandTerrainResidency::AcquireTextureSlot(common::crc_t uiIslandCrc)
 
 	// Color / Normals / AO / Masks ship as standalone lazy-texture chunks. Elevation lives on the template
 	// (elevationTexture) and is uploaded directly from the in-memory heightmap — no chunk, no CRC.
-	common::crc_t textureCrcs[4] =
+	common::crc_t pTextureCrcs[4] =
 	{
 		rLazyChunk.header.islandHeader.colorsCrc,
 		rLazyChunk.header.islandHeader.normalsCrc,
@@ -151,13 +151,13 @@ int64_t IslandTerrainResidency::AcquireTextureSlot(common::crc_t uiIslandCrc)
 
 	if (rTemplate.iTextureSlot < 0)
 	{
-		return FirstMintTextureSlot(uiIslandCrc, rTemplate, textureCrcs, rLazyChunk.header.pcPath);
+		return FirstMintTextureSlot(uiIslandCrc, rTemplate, pTextureCrcs, rLazyChunk.header.pcPath);
 	}
 
 	// A freshly minted slot stays in slot-0 fallback while chunks load, until RestorationSweep patches it.
 	// Eviction and device-loss ResetTextureSlots set iTextureSlot negative, so the next use re-enters
 	// first mint and recreates elevationTexture.
-	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(textureCrcs, LoadPriority::kRealtime);
+	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(pTextureCrcs, LoadPriority::kRealtime);
 	LOG(kLoading, kVerbose, "Re-acquire islandCrc={} slot={}, requesting chunk loads", uiIslandCrc, rTemplate.iTextureSlot);
 	return rTemplate.iTextureSlot;
 }
@@ -239,7 +239,7 @@ bool IslandTerrainResidency::EvictTemplate(common::crc_t uiIslandCrc, IslandTemp
 	const LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(uiIslandCrc);
 	// The 4 chunk-backed channels (color/normals/AO/masks). Elevation is template-owned (no chunk
 	// CRC) and is evicted separately below, via the template's own image rather than the chunk pool.
-	common::crc_t evictCrcs[4] =
+	common::crc_t pEvictCrcs[4] =
 	{
 		rLazyChunk.header.islandHeader.colorsCrc,
 		rLazyChunk.header.islandHeader.normalsCrc,
@@ -252,9 +252,9 @@ bool IslandTerrainResidency::EvictTemplate(common::crc_t uiIslandCrc, IslandTemp
 	int64_t iSlot = rTemplate.iTextureSlot;
 	// Redirect every live descriptor to placeholders and retire its five generation records before
 	// freeing any image view. A recycled slot cannot observe a destroyed prior occupant this way.
-	gpTextureManager->mTextureDescriptors.EvictIslandSlot(iSlot, uiIslandCrc, evictCrcs);
+	gpTextureManager->mTextureDescriptors.EvictIslandSlot(iSlot, uiIslandCrc, pEvictCrcs);
 
-	for (common::crc_t uiTextureCrc : evictCrcs)
+	for (common::crc_t uiTextureCrc : pEvictCrcs)
 	{
 		gpTextureManager->mTextureMap.at(uiTextureCrc).Destroy();
 	}
@@ -295,10 +295,10 @@ bool IslandTerrainResidency::EvictTemplate(common::crc_t uiIslandCrc, IslandTemp
 	}
 	rTemplate.iTextureSlot = -1;
 
-	gpFileManager->mpPackChunks->ResetTextureChunkStates(evictCrcs);
+	gpFileManager->mpPackChunks->ResetTextureChunkStates(pEvictCrcs);
 	rTemplate.bGpuResident = false;
 
-	LOG(kLoading, kVerbose, "Reset chunk states for evicted islandCrc={} evictCrcs=[{},{},{},{}]", uiIslandCrc, evictCrcs[0], evictCrcs[1], evictCrcs[2], evictCrcs[3]);
+	LOG(kLoading, kVerbose, "Reset chunk states for evicted islandCrc={} evictCrcs=[{},{},{},{}]", uiIslandCrc, pEvictCrcs[0], pEvictCrcs[1], pEvictCrcs[2], pEvictCrcs[3]);
 	return true;
 }
 

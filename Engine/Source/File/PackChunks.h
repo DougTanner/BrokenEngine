@@ -106,13 +106,13 @@ private:
 	std::filesystem::path mDataDirectory;
 
 	// Cached pack file paths (initialized once in LoadPackFiles)
-	std::filesystem::path mPackFilePaths[data::kDataTypeCount];
+	std::filesystem::path mpPackFilePaths[data::kDataTypeCount];
 
 	// Only available for eager pack files
-	std::vector<std::byte> mPackFileData[data::kDataTypeCount];
+	std::vector<std::byte> mpPackFileData[data::kDataTypeCount];
 
 	// Per-data-type chunk-location tables (offset/size/path CRC/content CRC), read from each manifest in LoadPackFiles
-	std::vector<common::ChunkLocation> mChunkLocations[data::kDataTypeCount];
+	std::vector<common::ChunkLocation> mpChunkLocations[data::kDataTypeCount];
 public:
 	common::crc_t mPackIntegrityToken = common::kCrcSeed;
 private:
@@ -127,7 +127,7 @@ private:
 	mutable std::future<void> mLoadingFuture;
 
 	// Published (release) at the end of the async eager-load task; eager-map readers (IsChunkReady, the
-	// memory-stats getters) acquire it before touching mEagerChunkMap / mPackFileData, which the task populates.
+	// memory-stats getters) acquire it before touching mEagerChunkMap / mpPackFileData, which the task populates.
 	// Gates the boot window only — always true once the first frame runs.
 	std::atomic<bool> mbEagerLoadComplete {false};
 

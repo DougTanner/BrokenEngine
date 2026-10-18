@@ -373,7 +373,7 @@ Changes (12 files)
 
       kGpuTimerDistortion,
 
-    In the mGpuTimers initializer list, after
+    In the mpGpuTimers initializer list, after
     {.name = "    Billboards"} (line 293), add:
 
       {.name = "    Distortion"},

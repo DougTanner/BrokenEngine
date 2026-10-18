@@ -86,7 +86,7 @@ struct ClientConnection
 	std::chrono::steady_clock::time_point rateViolationDecayStart {}; // start of the rate decay interval in progress
 	int64_t iTickPacketCount = 0;              // reset per update window (Server::Poll, kUpdateStart only)
 	int64_t iTickByteCount = 0;                 // reset per update window (Server::Poll, kUpdateStart only)
-	uint16_t uiTickTypeCounts[256] {}; // per-type count this update window, indexed by raw type byte; reset in Poll (kUpdateStart only)
+	uint16_t puiTickTypeCounts[256] {}; // per-type count this update window, indexed by raw type byte; reset in Poll (kUpdateStart only)
 
 	int64_t FindSlotForCoordinate(GridCoord coordinate) const
 	{

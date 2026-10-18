@@ -60,8 +60,8 @@ void BlastersInterpolate::Register()
 		.iBaseTypeIndex = siTerrainCraterTypeIndex,
 		.iKeyframeCount = 4,
 		.bDestroysSelf = true,
-		.times = {0s, kTerrainCraterTimeOne, kTerrainCraterTimeTwo, kTerrainCraterTimeThree},
-		.keyframes =
+		.pTimes = {0s, kTerrainCraterTimeOne, kTerrainCraterTimeTwo, kTerrainCraterTimeThree},
+		.pKeyframes =
 		{
 			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
 			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
@@ -85,8 +85,8 @@ void BlastersInterpolate::Register()
 		.iBaseTypeIndex = siTerrainPuffTypeIndex,
 		.iKeyframeCount = 2,
 		.bDestroysSelf = true,
-		.times = {0s, kTerrainPuffTime, 0s, 0s},
-		.keyframes =
+		.pTimes = {0s, kTerrainPuffTime, 0s, 0s},
+		.pKeyframes =
 		{
 			{.fArea = 1.0f, .fIntensity = 1.0f, .fRotation = 0.0f},
 			{.fArea = 1.0f, .fIntensity = 1.0f, .fRotation = kfTerrainPuffRotationEnd},
@@ -123,7 +123,7 @@ static void XM_CALLCONV SynchronizeBlaster(FrameInterpolate& rFrameInterpolate, 
 		engine::AreaLightsInterpolate::Sync(rFrameInterpolate, areaLight,
 		{
 			.iTypeIndex = rType.iAreaLightTypeIndex,
-			.vecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
+			.pVecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
 		});
 	}
 }
