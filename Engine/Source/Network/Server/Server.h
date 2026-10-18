@@ -158,12 +158,14 @@ public:
 	std::vector<int64_t> mPendingResynchronizationClientIds;
 	std::vector<DeferredClientPacket> mDeferredClientPackets;
 
-	bool AdmitGamePacket(const DeferredClientPacket& rPacket, const ClientPacketContract& rContract);
+	bool AdmitGamePacket(ClientConnection& rClient, const DeferredClientPacket& rPacket, const ClientPacketContract& rContract);
+	// Runs once after the deferred client-packet drain, so no ClientConnection is removed while the drain holds one.
+	void RemoveDisconnectedClients();
 
-	// Records a client->server contract violation against eKind's count; escalates to disconnect at
+	// Records a client->server contract violation against eKind's count; disconnects the peer at
 	// kiCorruptViolationDisconnectCount corrupt or kiRateViolationDisconnectCount outstanding rate violations.
-	// Callers MUST NOT touch their ClientConnection* afterward -- the client may have been removed.
-	void RecordContractViolation(int64_t iClientId, ContractViolationKind eKind, std::string_view reason, int64_t iPacketType, int64_t iSize);
+	// It never removes the record, so callers may keep using their ClientConnection.
+	void RecordContractViolation(ClientConnection& rClient, ContractViolationKind eKind, std::string_view reason, int64_t iPacketType, int64_t iSize);
 
 private:
 	friend class ServerBufferedFrames;

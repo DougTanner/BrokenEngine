@@ -65,21 +65,23 @@ void ServerSessionBase::DispatchDeferredClientPackets()
 {
 	for (const DeferredClientPacket& rPacket : mpRuntime->mpServer->mDeferredClientPackets)
 	{
+		// Server::RemoveClient purges a removed client's deferred packets, and no client is removed inside this loop.
+		ClientConnection& rClient = *gpServer->FindClient(rPacket.iClientId);
+		if (rClient.pPeer->state != ENET_PEER_STATE_CONNECTED)
+		{
+			continue;
+		}
+
 		bool bGamePacket = rPacket.iPacketType >= static_cast<int64_t>(PacketType::kGamePacketStart);
 		if (bGamePacket)
 		{
 			// Contract gate (trust boundary): Server::Receive gates engine types, so each game-range packet is
 			// validated once here before dispatch (drop -> count -> escalate).
 			ClientPacketContract contract = game::GetGamePacketContract(static_cast<game::NetworkSessionContract::GamePacket>(rPacket.iPacketType));
-			if (!gpServer->AdmitGamePacket(rPacket, contract))
+			if (!gpServer->AdmitGamePacket(rClient, rPacket, contract))
 			{
 				continue;
 			}
-		}
-		else if (gpServer->FindClient(rPacket.iClientId) == nullptr)
-		{
-			// Client removed mid-drain (an earlier violation disconnect purged it).
-			continue;
 		}
 
 		try
@@ -100,9 +102,11 @@ void ServerSessionBase::DispatchDeferredClientPackets()
 			// uncaught throw would tear down ServerUpdate. Drop the single packet and continue, parity with
 			// Server::Receive/Client::Receive.
 			LOG(kNetwork, kDebug, "ServerSessionBase::DispatchDeferredClientPackets dropped corrupt packet (type {}) Client: {}: {}", rPacket.iPacketType, rPacket.iClientId, rException.what());
-			gpServer->RecordContractViolation(rPacket.iClientId, ContractViolationKind::kCorrupt, "deferred packet handler threw", rPacket.iPacketType, std::ssize(rPacket.payload) + 1);
+			gpServer->RecordContractViolation(rClient, ContractViolationKind::kCorrupt, "deferred packet handler threw", rPacket.iPacketType, std::ssize(rPacket.payload) + 1);
 		}
 	}
+
+	gpServer->RemoveDisconnectedClients();
 }
 
 // Server::Receive validated the payload, including the pause and timespeed byte, before deferring it.

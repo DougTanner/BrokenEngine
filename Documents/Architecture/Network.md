@@ -204,9 +204,10 @@ engine types (`< kGamePacketStart`) at `Server::Receive` via
 sizes are the full packet including the type byte.
 
 **Enforcement model** — drop + count + escalate:
-- **Gates (in order at `Server::Receive`)**: (1) unknown client id → silent
-  drop; (2) global per-update budget `kiMaximumClientPacketsPerTick = 256`
-  packets / `kiMaximumClientInboundBytesPerTick = 64 KiB` (all types incl.
+- **Gates (in order at `Server::Receive`)**: (1) unknown client id, or a
+  client whose peer is no longer connected → silent drop; (2) global per-update
+  budget `kiMaximumClientPacketsPerTick = 256` packets /
+  `kiMaximumClientInboundBytesPerTick = 64 KiB` (all types incl.
   game-range, except a handshaken client's
   `kClientSubscribe`/`kClientUnsubscribe`, which skip it and neither count
   toward nor drop at it because they are reliable with no client retry, and a
@@ -246,11 +247,15 @@ sizes are the full packet including the type byte.
   `kWarning` lines naming it (`Kind: corrupt` or `Kind: rate`), with no
   per-packet spam: one `First` line each time its count reaches 1 (for the
   too-fast count, again after it decays to zero) and one `Disconnecting` line at
-  its limit. At either limit the server calls `enet_peer_disconnect` +
-  `RemoveClient`, and `RemoveClient` notifies the game client manager
-  synchronously (so fleet state persists); the later ENet DISCONNECT event is a
-  safe no-op. Legitimate clients produce zero corrupt-data strikes, and their
-  automatic traffic zero too-fast strikes at every allowed timescale. The honest
+  its limit. At either limit the server calls `enet_peer_disconnect` and keeps
+  the client record; the client's remaining queued packets drop uncounted, and
+  after the deferred drain `Server::RemoveDisconnectedClients` removes every
+  record whose peer is no longer connected, each through `RemoveClient`, which
+  notifies the game client manager synchronously (so fleet state persists). An
+  ENet DISCONNECT event that arrives before that sweep removes the record
+  through the same `RemoveClient`; a later one is a safe no-op. Legitimate
+  clients produce zero corrupt-data strikes, and their automatic traffic zero
+  too-fast strikes at every allowed timescale. The honest
   sources of too-fast strikes: a person sending more chat messages than the
   `kClientChat` per-type cap, or on a Debug server pressing one debug key more
   times than its per-type cap, with the sends reaching the server within one

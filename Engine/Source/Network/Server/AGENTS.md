@@ -44,14 +44,14 @@ the engine calls by name.
   and client behavior: [Network
   architecture](../../../../Documents/Architecture/Network.md#debug-load-generation).
 - Run the client-to-server contract gate before dispatch for engine and game packets. Variable payload handlers parse into bounded local state before mutation; contract violations, including game handler throws, use the central accounting/disconnect path.
-- `RecordContractViolation` can destroy the client record: when the recorded
-  kind's count reaches its limit, `kiCorruptViolationDisconnectCount` or
-  `kiRateViolationDisconnectCount`
-  ([Client to Server Contract](../../../../Documents/Architecture/Network.md#client--server-contract)),
-  it disconnects the peer and removes the record, which notifies the game layer.
-  Treat the call as the last use of that client's `ClientConnection` — read what
-  you still need before it and return immediately after, or the next line reads
-  freed memory on a path hostile client input can reach.
+- `RecordContractViolation` never removes the client record: when the recorded
+  kind's count reaches its limit, it disconnects the peer and keeps the record,
+  so callers may keep using their `ClientConnection` after the call. No record
+  is removed inside the deferred client-packet drain:
+  `Server::RemoveDisconnectedClients` runs at every poll before
+  `RebuildOwnedEntities`, and `RemoveClient` purges the removed client's
+  deferred packets. Limits, gates, and the drop and removal mechanics:
+  [Client to Server Contract](../../../../Documents/Architecture/Network.md#client--server-contract).
 - Each client admits one desync report and one debug-frame request per two seconds of `steady_clock` time after contract validation; immediate repeats within the per-update cap are silent, and over-cap traffic keeps the contract-violation policy. A disabled-build debug-frame request with a valid tick starts its cooldown, then returns without logging, lookup, compression, or sending.
 - A stored client crash report is written atomically, and a report dropped by the cap or a failed write shows only in the server log. Per-connection and per-run limits, storage, and the absence of a reply: the `kClientCrashReport` row of [Client to Server Contract](../../../../Documents/Architecture/Network.md#client--server-contract).
 - After each complete `AfterNetworkPoll()`, `ServerSessionRuntime` samples the engine client set and updates its presence tracker unconditionally; it clears network-driven pause and writes 1:1 timescale only on the sampled nonempty-to-empty transition and only when the ratio differs, so an already-empty server keeps its commanded pause/timescale.
