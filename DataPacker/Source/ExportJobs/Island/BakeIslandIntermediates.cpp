@@ -320,6 +320,34 @@ BakedDimensions ReadBakedDimensions(const std::filesystem::path& rLeafFolder)
 	};
 }
 
+std::string GetBakedDimensionsFingerprint(const std::filesystem::path& rLeafFolder)
+{
+	BakedDimensions dimensions = ReadBakedDimensions(rLeafFolder);
+	nlohmann::json dimensionsJson;
+	dimensionsJson["widthMeters"] = dimensions.fWidthMeters;
+	dimensionsJson["heightMeters"] = dimensions.fHeightMeters;
+	dimensionsJson["elevationMeters"] = dimensions.fElevationMeters;
+	dimensionsJson["cropX"] = dimensions.iCropX;
+	dimensionsJson["cropY"] = dimensions.iCropY;
+	dimensionsJson["cropWidth"] = dimensions.iCropWidth;
+	dimensionsJson["cropHeight"] = dimensions.iCropHeight;
+	dimensionsJson["fullTexturePixels"] = dimensions.iFullTexturePixels;
+	std::string canonical = dimensionsJson.dump();
+	common::Sha256Hasher hasher;
+	hasher.Update(std::as_writable_bytes(std::span(canonical)));
+	std::array<uint8_t, 32> digest {};
+	if (!hasher.Finish(digest))
+	{
+		throw std::runtime_error("Unable to hash baked island dimensions");
+	}
+	std::string fingerprint;
+	for (uint8_t uiByte : digest)
+	{
+		fingerprint += std::format("{:02x}", uiByte);
+	}
+	return fingerprint;
+}
+
 void BakeIslandIntermediates()
 {
 	ResetPublishedIslandBakes();

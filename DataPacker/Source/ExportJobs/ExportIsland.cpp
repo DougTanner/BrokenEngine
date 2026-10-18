@@ -479,7 +479,7 @@ std::string ExportIsland::GetInputFingerprint() const
 	nlohmann::json fingerprint;
 	for (const char* pcFile : {"BakedDimensions.json", "Elevation.r32", "MeshProcessed.bin"})
 	{
-		fingerprint[pcFile] = gpFileManager->mpInputFingerprintCache->Get(mInputPath / pcFile);
+		fingerprint[pcFile] = std::string_view(pcFile) == kpcBakedDimensionsFile ? GetBakedDimensionsFingerprint(mInputPath) : gpFileManager->mpInputFingerprintCache->Get(mInputPath / pcFile);
 	}
 	return fingerprint.dump();
 }
@@ -527,7 +527,7 @@ std::string ExportIsland::GetTextureFingerprint() const
 	fingerprint["textureVersion"] = kiTextureVersion;
 	for (const char* pcFile : kpcLeafInputs)
 	{
-		fingerprint["leaf"][pcFile] = gpFileManager->mpInputFingerprintCache->GetPersistent(cacheLeafDirectory / pcFile);
+		fingerprint["leaf"][pcFile] = std::string_view(pcFile) == kpcBakedDimensionsFile ? GetBakedDimensionsFingerprint(cacheLeafDirectory) : gpFileManager->mpInputFingerprintCache->GetPersistent(cacheLeafDirectory / pcFile);
 	}
 	for (const char* pcFile : kpcRouteInputs)
 	{

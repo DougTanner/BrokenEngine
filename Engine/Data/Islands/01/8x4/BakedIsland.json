@@ -1,0 +1,231 @@
+{
+  "archetype": "91f3e2f6c905ef92e2532ea8d5b49dabcf9acc7e999326674f8cfa3327ae4883",
+  "bakeVersion": 28,
+  "choice": 7,
+  "columns": 4,
+  "island": "2ef27aa3246a50257ee65cea1a25acfe89a8bb39ee4d384816e252f5a037bbd6",
+  "leaves": [
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "b2bb02b09950b426f652a80a6601fcb50a9927d13be0131cc196eb7a3d28e6f1",
+        "BakedDimensions.json": "ead4148b71a40467be142563f4fa79062d5cda4475d45bec5751e18aa3f1e0e8",
+        "Color.BC7_UNORM_BLOCK": "4e50b893b9750d1683377de503bfd64711e8dad2cda044c5c2be4fcbdcb2ea45",
+        "Elevation.r32": "847ad5230b3792b98101ec99a8067b217fe28c119df2934a55c4e4f1c92851f9",
+        "Masks.BC7_UNORM_BLOCK": "319f8b75149e363de1045657ae556c1f354051ef11a1a94fd4de493e87545fa8",
+        "MeshProcessed.bin": "5abe358d5b3057e31c9415ef47359f75d34d15d51a85563057e87de346ff5cad",
+        "Normals.BC5_UNORM_BLOCK": "07e75ce7c8eb6b80d51ec4ab680ccdf0c8e3dc82ca3450b6128abc1491b249cd"
+      },
+      "index": 3
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "aa4a4251690076ba2c5539ec7509c59b23673c526f9496c75bab7b5a902a3075",
+        "BakedDimensions.json": "11fb9b93c8c666ee006168a51168aa2dc144a80cef2500b9cfa82b1eafc725da",
+        "Color.BC7_UNORM_BLOCK": "f6f497a6afc8c787bdbad481846cd47fdebeef48e69f74f48b90e14aa4dd5809",
+        "Elevation.r32": "cb61cda4daa694c8c5855e15eb7efa3f906fbe8704823ec296e8d223ad2c0f9d",
+        "Masks.BC7_UNORM_BLOCK": "d68992ced854e1ce63d364b044fa10d5e6267e92d72743040072821ee292f570",
+        "MeshProcessed.bin": "00a937f78a398dd77823d22df300afb9a6f99180bde6884cb268a65ced8ee52c",
+        "Normals.BC5_UNORM_BLOCK": "c2198e6af3c958b86775f6ecbca1bb5b7eec1568de1c19c06f8062e3887d9f08"
+      },
+      "index": 4
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "479de536dd0b1b50c2e1bfcbdf9d75ae5cf9fe4937a127e96f3d273005c345f5",
+        "BakedDimensions.json": "20dd53e8ac53b9177dd3fff56182ac29013962a8798da0f2077cdb1e691700da",
+        "Color.BC7_UNORM_BLOCK": "e77bdfaf719b5f38851d2f93cc16df4696e728e3076a2f7c81f168de522b8ba1",
+        "Elevation.r32": "1c4f7987fddb09ef4a614c8e6acc8856b8328570b6b5305e4cde5429f2b9f23d",
+        "Masks.BC7_UNORM_BLOCK": "c122936358387581ecdc8d273c0d2443b0bad0fb609950399595a9cda91ff99f",
+        "MeshProcessed.bin": "94b50eeb01f6bfd6fe73f612bc728ed2415fe5180bf99e3a97da3e0488ecad10",
+        "Normals.BC5_UNORM_BLOCK": "b7a8e0f56766deb0fb810220bb531c899065b11aca58f33c2b205750112d4e0a"
+      },
+      "index": 5
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "77dd7aa2179c5f75d5d50a8f8def36602f37cf31a41862aa0cd70fd9ec6b4667",
+        "BakedDimensions.json": "a47701f3291c9909a607596f2fc504d0b4b3128e7fd603a872aa05b121503488",
+        "Color.BC7_UNORM_BLOCK": "f2f0d65466a1b613829b458c1c7464f7aaa256b8a38af7f10fe82c575dc251e5",
+        "Elevation.r32": "c01ebaa3e05529ee96dca6b907a0fd88bf2788113e41fa0a1cd12d488b911e1f",
+        "Masks.BC7_UNORM_BLOCK": "1d2d935206586ceb5d979a306c798c123f74caa1cec1096fa78d6ea2a4933677",
+        "MeshProcessed.bin": "69a49c0a1881d0ec299e1b43a5ac12cb5bfe3bb97463eb74c3ca8d3c1294fb0d",
+        "Normals.BC5_UNORM_BLOCK": "d32898c99828d61d69c603634f318f0d028ed453df363ab72b7378fb4bd267a3"
+      },
+      "index": 6
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "7b12a24d82c27ffd9145985f762f23c1d268afbf317026ea192297585c0bf559",
+        "BakedDimensions.json": "6c1794926e30912fce042d5e76cacaf60789b4324661ff29d26dd24223639d29",
+        "Color.BC7_UNORM_BLOCK": "ea94bd8140f4d51a2206fe74c393e2ee060854499bc360c0c76e39360e557e37",
+        "Elevation.r32": "ad40f8847736449ad2db55c8e6f7c91c72ad2ffefd75c463e83809013625ea03",
+        "Masks.BC7_UNORM_BLOCK": "3837819fa01689f4b855951f795e074c5377137e6aca52c0108f1d756a4c9876",
+        "MeshProcessed.bin": "a81f9bfc6b5e478f40136a2095bdb9361f535ecd82e298714c2709ef732af54c",
+        "Normals.BC5_UNORM_BLOCK": "431629c4e01df73d54467c2a069110bcf999b8fb8ebc77e1859f850f569e2b36"
+      },
+      "index": 9
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "73aa83a6c8734097844e7a6e6d3e37869c0b2a09bca66727d4b1d608c99b0a86",
+        "BakedDimensions.json": "3e81c29d9e7b7655c8620f8518cbb9c0cf5a0c5d4d2f138cc4cd43150a81f692",
+        "Color.BC7_UNORM_BLOCK": "3a47866ec734c400fbd43c1c2ec5d1c4951e3386483c4eb42e8fb4f168db7eb5",
+        "Elevation.r32": "90f16d9adc28c1bf1c46baed48cfbc35f681fd7849b09c769e8fc0dd558717c4",
+        "Masks.BC7_UNORM_BLOCK": "cf4f1142dcd3d6dde775b9e78c15053b5a7c073729de6c3b9543f894e96e2729",
+        "MeshProcessed.bin": "b1cf5d470e085a4ec54b82a5178350a69607bd74984da6acb8435ba4ac698f3b",
+        "Normals.BC5_UNORM_BLOCK": "9cebc88f065044163cdf559f9a1bc975f04ea30d4e6c0166dbb6c2591513ea71"
+      },
+      "index": 10
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "3daf6492a78267d3adbc8c1d59422a10231c0d83e638f0604fa30a5f2b590c93",
+        "BakedDimensions.json": "f511af82024b53b858d5db258ce3fcc284e3ae88fbb7719b89194395df569271",
+        "Color.BC7_UNORM_BLOCK": "64d831ddac3f7a3d6b6399792d0f8b2b2ceace4064c22b67f1067ebe71a31b60",
+        "Elevation.r32": "7165cd901c7f50d0ef73a0c0fedf65a9a8d2fda7c0e2fb409e0441bd5cf8a66f",
+        "Masks.BC7_UNORM_BLOCK": "77848dca87df7f980860157f5bbf002f1d5c288d17bc19a8830b81825126c336",
+        "MeshProcessed.bin": "9f04f69b1ea9e0e120597aac485e1be3f5f0ab9dc263504bb8741cf5b2a7e985",
+        "Normals.BC5_UNORM_BLOCK": "2a7a374b56210b8217bdeb35ab4d23d6861b25fc532e76c1d887109f423626be"
+      },
+      "index": 11
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "52407eaf8fb9f2f9bb55ce39c441a6a7252671b96dfd11ab6da10bd9208fc4fa",
+        "BakedDimensions.json": "15ab97fa24092861dff424796d9a95632e356ad01ebecd8258606407bbcc0c38",
+        "Color.BC7_UNORM_BLOCK": "4686b56ea13e0136592749df5e56cec9ddc60b14e955d6ac5d414fa9c8256380",
+        "Elevation.r32": "24ce670851e63ad13ece87ed381f2ffd5d0b77280cf3af55ebf4e8c6afd4cab7",
+        "Masks.BC7_UNORM_BLOCK": "488ec51647e7175886be55ead5c0075011c9d236ab73d2e83f481008c3817a74",
+        "MeshProcessed.bin": "c284d31748ceae8c25f859c23b9118e9d5cf95f80df578f4d499d9c548015bf3",
+        "Normals.BC5_UNORM_BLOCK": "294267a4a8f4c9aa5ffb00e10e98b3349562d04f5e0ec819d7a1b67c2a71fc9c"
+      },
+      "index": 12
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "8c0d5086889871ed479b5cd99af95665c8cc6d04681c18f6861127a48da58b9b",
+        "BakedDimensions.json": "49f3ca18abe81ee5ba6243bb62c22ea4d445e3f960d41b167e4b27f4e5bf39bd",
+        "Color.BC7_UNORM_BLOCK": "53ea4a9c80074763199719f735539470f61df32d26c05663f39f981c5de750a2",
+        "Elevation.r32": "a1aa2ac9b43cd99e7548ea76ad12eb16571ca3b6a2f81f708e973fdb87d8b84e",
+        "Masks.BC7_UNORM_BLOCK": "d902b87e001e391feb0d5893f50de72096bd43c8bc925bf09802ecc84dc89c74",
+        "MeshProcessed.bin": "80a7b005d07a0faa124e75965d27badeaf91c564d9be9ff1424373c02a825350",
+        "Normals.BC5_UNORM_BLOCK": "656d85341f26893340784da7b91ebca48a7d789baa0cc43b759b7b676a030985"
+      },
+      "index": 13
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "98fbe63bbaa96d640ecc3ba6e81858090f0a72d947d6a57be7118a6d18693f4c",
+        "BakedDimensions.json": "a7872181511048b71f1af0cc1dc9a7b7e3d1983cb1b736e88b7387cce9fa687a",
+        "Color.BC7_UNORM_BLOCK": "dbe1be51b4ecde09a65efdc3aaa7d14096e81c54a0cb89fb7fd34ee4d3919b96",
+        "Elevation.r32": "7399c74b7969c034fc58d6af8ce387b9a04dcf49259beff316ddee56c6b5c8c7",
+        "Masks.BC7_UNORM_BLOCK": "79fb24dae4722ec16fe512a11225af1ebb7fbe52a6a68d40931b99bf5806a046",
+        "MeshProcessed.bin": "87d8baa5d2f2f77bdd3141088002c7c12a3ec851bb16048cbf9c813501d0b896",
+        "Normals.BC5_UNORM_BLOCK": "91b89eda83be142e215e933949173feecf525d04f97286ef17ee3da04803e2bf"
+      },
+      "index": 14
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "601b2793f40dee015da407d84c954e8f2596225a13aa7adcd51cc8cd53be6ddb",
+        "BakedDimensions.json": "976b9001eafd079d469dcb0a7ba7d68e7660fb3e6189694facf35f183a074e5e",
+        "Color.BC7_UNORM_BLOCK": "b12f31c675271f71c422e9dabe3ac1058e77319f080c894be90e4328970e94d4",
+        "Elevation.r32": "17ea800da88bc7d806e8b605dfc0558677554207945dc17d9aa741dd371a3cf5",
+        "Masks.BC7_UNORM_BLOCK": "ace38124ab065ec43e15ac97d1f5dec11cb269015eda7567e5cf03a77294bafc",
+        "MeshProcessed.bin": "4cd15afbdc329439f8f1cb7e5b629a076109a191ff7d1c18e629dff77a3911b6",
+        "Normals.BC5_UNORM_BLOCK": "af4bb803382f4ca5c1a48de7edcd25bf8956eb5f082567fd1ba5b5bf2b7810db"
+      },
+      "index": 17
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "01bf43aab1d5daf436f9e903c33f80fe790dfa25667931c5a14a3728e147a7f7",
+        "BakedDimensions.json": "ca6ed707b690d12d3eeb12baccd869538b0ecd6b3a6001be0e06643f67f4c148",
+        "Color.BC7_UNORM_BLOCK": "cec10024b482b30836de6e8027bbba76d6b024a3d3b5eadc05a741a62db4093d",
+        "Elevation.r32": "caf7a6bdd051acd4c43b11b670a761565a2a578b05a40c76042fad16f984dd8d",
+        "Masks.BC7_UNORM_BLOCK": "35ba97f30578058b36f7e60a1837f26afacfd9ea74f5b0af828d76860adb511e",
+        "MeshProcessed.bin": "fe3e5f563a3d6ce70b136224eae986fea56c3a2b7eaf0d39ff8e5919ffdb7b8f",
+        "Normals.BC5_UNORM_BLOCK": "4b3268ab8d49700eb192bc366930759ad56de02117f08d6e8f597c40a9d3ccaf"
+      },
+      "index": 18
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "6e5c86362e3cd5d1aec164a758b4dbdbedb37a56842ad5cd182cf7cb1ea5df9f",
+        "BakedDimensions.json": "1413900303389f59818f48b1056bfb6c65489b5347d25ef23896486473fb9f4a",
+        "Color.BC7_UNORM_BLOCK": "bc0c0d3f1b85872760c0d5c0aa2e89cc96915b696546f5f48a74d9d0ed468ad3",
+        "Elevation.r32": "d3a1cc7b71f403c956478b90eafde6c634cd68e7529e14e38a08294ab2f763ef",
+        "Masks.BC7_UNORM_BLOCK": "1cfa7777cf219db11afac09ca1d0669be354a0cef49ebe3ed0a817d7c2822890",
+        "MeshProcessed.bin": "5f40d715a3f9fbabfd96295d4b9a70763f533e7ebfa8868844a4bf51581e246a",
+        "Normals.BC5_UNORM_BLOCK": "642c18156523cf25b3cbd3680df2406453686b1b54f47929e59794462efb93a6"
+      },
+      "index": 19
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "53b7d43e58c7b2937063fdd06b6ea1683525d3d5d8efdc5c27f9be9a7cd0b3d9",
+        "BakedDimensions.json": "7a9c67a1cabd13a97d6390b9c03f0292e15922fcc23594b0d9261ad89a05121f",
+        "Color.BC7_UNORM_BLOCK": "6470c6fe082fc7e7b4be901f5433f2c4913cea885d68bb6d4e5a4897fb8e63c3",
+        "Elevation.r32": "9ef68530ce9ff792c976dd20af62e95e67e4327d950f6c7a1be6054a7c02f909",
+        "Masks.BC7_UNORM_BLOCK": "4109777a34fc355104dc1e47fd6ec4774834dff8440ef9c48596e6cb229d7811",
+        "MeshProcessed.bin": "3bfe92de3a7c0d3e1fda1a334fa9de2575cb10e4f853a2f44791a1c9d8b36921",
+        "Normals.BC5_UNORM_BLOCK": "a5a484b38fe4ce93eb4c1e84f35f6c44fab344e30d08554a9c724cce2af091ae"
+      },
+      "index": 22
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "3007ea5d1fd35139cea8a8413221af7ed7a2a730f0dff1556707910f604c5ad2",
+        "BakedDimensions.json": "9b56e0122a081d7a2db7f6d926db65633b0e97f7286f203b4aba940c241b780e",
+        "Color.BC7_UNORM_BLOCK": "02bbf0e3e59fe86f9c2c5b42f556a92d70a3c0f57544d894793295b0d84c849d",
+        "Elevation.r32": "05729fa296ed594fadb634c0d831e9c6e644563ddaf26bc352402f7441aa66b6",
+        "Masks.BC7_UNORM_BLOCK": "6129079cd5a21750c7a036f1329a13374a33c4cccc0b39f272a9430c0a62c1ea",
+        "MeshProcessed.bin": "a5dc30644c7684b418d0ffe7412a4b0ebac99acd2782474b55b49ec0da83a084",
+        "Normals.BC5_UNORM_BLOCK": "311f4a29dcf194071b6fcb8971c4e27e625ffbb374c396458030c4ec2437a693"
+      },
+      "index": 25
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "e4992b9a3c2633262b311e4e4ac425d56ff9b5b879086a553b76d26f6f5bf199",
+        "BakedDimensions.json": "3fe779a636d4b0be791eb8a67e69da13437ef8fb25f9c22eea9f681a89e6b466",
+        "Color.BC7_UNORM_BLOCK": "dc9519588e7f402da34cc1855db921a98770c6602f4817ae19312b568c9c9126",
+        "Elevation.r32": "bf2b748311424e24c34da96df804dc9623360bdc4dffa0a4a6d09f0e9ed56ca6",
+        "Masks.BC7_UNORM_BLOCK": "43948718d89636dd2635cda68a7e8a3f38f1df3d4d2a9ae260921fb2e5330c6c",
+        "MeshProcessed.bin": "76d27bc7d07a8d1b9f4bcecfbd58a99701b4c8a77a9024d5a85d8446f07754ca",
+        "Normals.BC5_UNORM_BLOCK": "87920f0922c97c602325df6b7b0e19e3cef9a515715d839403635de1ba2188b7"
+      },
+      "index": 26
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "aa9548ded9138230770f4ba53044875631369c44699a6ca6f11039e510f1a785",
+        "BakedDimensions.json": "497494abaad651c5b444af4747732d5e7b865ba19d9f7171fc08fcbe3cf0926d",
+        "Color.BC7_UNORM_BLOCK": "4f2ce7ad800ae1c90491393f1e0748bfb53d724f0d8cfe6f7a5bdd2f3f87b30e",
+        "Elevation.r32": "21096f14843521ee9298a94326e0baf0d1536d349fb8cff2530a47ae99497f71",
+        "Masks.BC7_UNORM_BLOCK": "9baadfdff67e97e4e3360e17a909d1f39f22e97f06d3d71db2515fd3ef2b188e",
+        "MeshProcessed.bin": "7fa5af6b6cf94707035b30def7c57a9954a859f3af6cc2f34d0ab10dd348f844",
+        "Normals.BC5_UNORM_BLOCK": "41ad83ff68ac95523d45e9a66fcb4faca3c80b2d74dc1f9cf288545a7c77e34e"
+      },
+      "index": 27
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "999c7782ba4d9f2516319a5708f0c2516c7e560f6f244788d566e0784e02d615",
+        "BakedDimensions.json": "c5fd8b978c6c06388f83b56536e01314294d80a61f88e8c15d3baed6e09947f9",
+        "Color.BC7_UNORM_BLOCK": "0dbba6f375157b26d1e5a312fd826f6e55c7c083c251fda0c20955849ad45cb9",
+        "Elevation.r32": "c7c8f6484211ba0ba3d05acf34773f0d25aefa1acd771e59d71e2460fe2638f4",
+        "Masks.BC7_UNORM_BLOCK": "3aeb53896d5334a00a914d0d90cd1645d2d36ac645d0f2367cd49ec99d0414bd",
+        "MeshProcessed.bin": "148d23c09dddbb0435cc182e49f1c6eed72fb672fbbf7dbdf37134b159e0cd7d",
+        "Normals.BC5_UNORM_BLOCK": "f3751f8f5c5352724dc0beb30bf22928844d06711168ce833df7ed544d5f4b27"
+      },
+      "index": 28
+    }
+  ],
+  "magic": "BrokenEngineIslandBake",
+  "route": "8x4",
+  "rows": 8,
+  "splitVersion": 8,
+  "textureVersion": 2,
+  "version": 2
+}

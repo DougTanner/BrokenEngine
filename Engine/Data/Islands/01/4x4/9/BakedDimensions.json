@@ -1,0 +1,10 @@
+{
+    "cropHeight": 2048,
+    "cropWidth": 2048,
+    "cropX": 4096,
+    "cropY": 2048,
+    "elevationMeters": 100.0,
+    "fullTexturePixels": 8192,
+    "heightMeters": 100.0,
+    "widthMeters": 100.0
+}

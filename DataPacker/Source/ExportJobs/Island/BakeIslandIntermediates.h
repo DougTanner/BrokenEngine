@@ -33,6 +33,7 @@ inline constexpr char kpcBakedDimensionsFile[] = "BakedDimensions.json";
 
 // Reads the canonical source leaf dimensions after route validation; throws if missing or malformed.
 BakedDimensions ReadBakedDimensions(const std::filesystem::path& rLeafFolder);
+std::string GetBakedDimensionsFingerprint(const std::filesystem::path& rLeafFolder);
 
 // Maps a source-tree island path (`.../Islands/<island>/...`) into the single mutable Gaea cache.
 // Raw and author split intermediates live in the cache; delivered geometry lives in the source tree.

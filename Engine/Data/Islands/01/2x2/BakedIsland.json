@@ -1,0 +1,63 @@
+{
+  "archetype": "2b1ebf671eb43002fe3abeab982b8fc42c42088a0ba4171fcad4dc7e6a3f057e",
+  "bakeVersion": 28,
+  "choice": 2,
+  "columns": 2,
+  "island": "2ef27aa3246a50257ee65cea1a25acfe89a8bb39ee4d384816e252f5a037bbd6",
+  "leaves": [
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "37deb21e39ee5f9999af24d6bb9884a1cf0b82170db7785755d68973a2f3e47b",
+        "BakedDimensions.json": "b5ca6d88b7091ded2705aa01af63f1930039fb34f15934dce1fedbd03c0767a6",
+        "Color.BC7_UNORM_BLOCK": "cee814290ba75ccd024c5635214e880bb33818e31c2ce6e9c501c28024d2ca5f",
+        "Elevation.r32": "4ae88190c83782ab16b316ebae5ac44005149fe887cc9b2b5113c22f6ebb79ad",
+        "Masks.BC7_UNORM_BLOCK": "b629471141d30842faa088f5a3069a9096449aa1f330dbe36c6ebe694a5572c0",
+        "MeshProcessed.bin": "77a6cceebdbd4ae281f8a13371ca37188bced3202515f137d83b0722cd786ba8",
+        "Normals.BC5_UNORM_BLOCK": "a14a5701aceb87992c9f4f8a6b50627952eb11fabb3be956fe9281c2e9647d0d"
+      },
+      "index": 0
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "f17b70d848054ca47f6c20896d309483b99221f36eb7cf0a54d7d314b5d2f893",
+        "BakedDimensions.json": "35147d68cb4c0d191388de98289749a71ff92d8570ca2ee30eec77fdd2f67c51",
+        "Color.BC7_UNORM_BLOCK": "0b9d44e6d00d5cc44cbd3f2272a4428d28ea8878d7c64df9a93d14d2fa5ae170",
+        "Elevation.r32": "b280b02c908c014abaccd2cf9d55847921e304b7f1932735a8d182d99b089c48",
+        "Masks.BC7_UNORM_BLOCK": "5bf04626d88637ada2cdea5de2157c5535fbbc97d848bd2ca098aff87226ec49",
+        "MeshProcessed.bin": "2c8a0b7e145fbc40e5989f83cfa1f3aaead9e3fa3873a3a249b8baf81ca9d4f0",
+        "Normals.BC5_UNORM_BLOCK": "a8c113256dd124ac946bbcc4f430be9447a6b5b8947e1a47cedde67677e367bc"
+      },
+      "index": 1
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "4a6ce06b09d90e67d70ba5224c52645a9562fa4cc9b76df243025437f15a3b4b",
+        "BakedDimensions.json": "71eca9be0fe44a8bd91bfe930cd412dc02b5c1f60cc8d9d7b429ffdbec9cb562",
+        "Color.BC7_UNORM_BLOCK": "ca8c6b8099853da90659992303f68cc28a27cf3b810cb23ba0eebb80eeddce2d",
+        "Elevation.r32": "d8e2e2dbc27d0c63b3564b433909af833b81ffcab35301245c0082de39171f6d",
+        "Masks.BC7_UNORM_BLOCK": "7036558f0c7fbbf32439d2d27747019c1bce1444ae2c22a734256355f18db741",
+        "MeshProcessed.bin": "81df79445b6b23233f12a5f277ccfd0723c4f3a5cafb965e225f2821a8401ee8",
+        "Normals.BC5_UNORM_BLOCK": "c9c1e60505249c25f60e736d2851e433591fa273276c93878e385c8cc2b7d99c"
+      },
+      "index": 2
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "660237848434f729a7ccfdd6f1398937f96c7a9eb58d881b82551f2f36a5d126",
+        "BakedDimensions.json": "8954788a4b3a6ec3ad33aee6a9056ccfc7425f0fffc7765e7381d6a0f4dba689",
+        "Color.BC7_UNORM_BLOCK": "a8eb3a89901a0d3a71a31377e7dde35da683bc7d6817ec73f502be1d0d76157d",
+        "Elevation.r32": "f4a16e4671e791d5d057c3535123367f0dfe961e69bfe791681e6646a77c6563",
+        "Masks.BC7_UNORM_BLOCK": "059e45397e71b30a56eb0361a90d55bfec1574a3f975d3275b071e316bc898dc",
+        "MeshProcessed.bin": "fe1ca91672c817021a85ce0c9e845324e8371603b5b94e4f3a70191c97eb0ce9",
+        "Normals.BC5_UNORM_BLOCK": "6c1ede604ba5f4ff475d654a6aada9fa2dd005b9234e5558ec64f55b749cd852"
+      },
+      "index": 3
+    }
+  ],
+  "magic": "BrokenEngineIslandBake",
+  "route": "2x2",
+  "rows": 2,
+  "splitVersion": 8,
+  "textureVersion": 2,
+  "version": 2
+}

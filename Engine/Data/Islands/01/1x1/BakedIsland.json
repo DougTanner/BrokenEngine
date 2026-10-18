@@ -1,0 +1,27 @@
+{
+  "archetype": "3fd87bb73408c4e7e049aa3277cf1fe9d88686ebc64bf52b8437005920bda7bb",
+  "bakeVersion": 28,
+  "choice": 0,
+  "columns": 1,
+  "island": "2ef27aa3246a50257ee65cea1a25acfe89a8bb39ee4d384816e252f5a037bbd6",
+  "leaves": [
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "e1717bc65c4c4c3bad2bb8c0ee8251282aaffc62adc233b3ec0650813d110785",
+        "BakedDimensions.json": "5ca8e243a2980d085df6eb870ac1dfd75d3d1efcb0cc3e3177fde6b959d3af44",
+        "Color.BC7_UNORM_BLOCK": "36d8ecbaab3390ec42ea9ad857d762a572fe352a80f75b552f0a16d8d52bcd18",
+        "Elevation.r32": "3a8e01df804a41c1ec10c1813decaf45c7c69ade47141cbc52e07133efa3ddbf",
+        "Masks.BC7_UNORM_BLOCK": "bf55a78e72ccd51a6ebe29b56fd8d6a3cb7e54c1f34fa6b51eab779d4e70104b",
+        "MeshProcessed.bin": "5b3f6b1d510001a92c17ec15a2ddb0bc7dde3c10e494cee65358a10acf804882",
+        "Normals.BC5_UNORM_BLOCK": "2743c6f41031e3e2c34f523de59838c7622b0bdf5a2b469930c04d4a0c41ffb8"
+      },
+      "index": 0
+    }
+  ],
+  "magic": "BrokenEngineIslandBake",
+  "route": "1x1",
+  "rows": 1,
+  "splitVersion": 8,
+  "textureVersion": 2,
+  "version": 2
+}

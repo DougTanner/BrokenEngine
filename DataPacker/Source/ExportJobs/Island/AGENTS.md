@@ -6,15 +6,18 @@ Gaea route baking, archetype patching, region splitting, and island intermediate
 
 Each delivered route owns `BakedIsland.json`, a versioned completion declaration binding the current
 island configuration, effective patched terrain, stage versions and complete accepted leaf set to
-seven delivered-file hashes per leaf. The three source geometry inputs (`BakedDimensions.json`,
-`Elevation.r32`, `MeshProcessed.bin`) sit beside the four BC textures and are canonical for
-discovery and chunk export. A validated publication needs neither Gaea nor raw cache files. Invalid
-publications fail ordinary runs rather than silently regenerating.
+seven identities per leaf: a hash of the eight parsed `BakedDimensions.json` values and exact-byte
+hashes of the six binary files. Publication validation, chunk caching and author texture-input proofs
+share the parsed dimensions identity, so JSON formatting and key order do not affect it. The three
+source geometry inputs (`BakedDimensions.json`, `Elevation.r32`, `MeshProcessed.bin`) sit beside the
+four BC textures and are canonical for discovery and chunk export. A validated publication needs
+neither Gaea nor raw cache files. Invalid publications fail ordinary runs rather than silently
+regenerating.
 
 Without a declaration, an ordinary run may adopt the known-good original author cache only when bake
 provenance, normalized patched terrain, complete split outputs and existing texture-input freshness
 markers all agree. The legacy texture marker has no historical BC output hashes: initial adoption
-trusts those known-good bytes and records the seven hashes for later mismatch detection. Geometry
+trusts those known-good bytes and records these identities for later mismatch detection. Geometry
 copies use staged sibling renames; the declaration is published last. Normal adoption never rewrites
 BC files or invokes Git.
 
@@ -67,9 +70,9 @@ Large shared route inputs use persistent fingerprints rather than repeated conte
 
 ## Versioning
 
-The publication schema has its own version, independent of the four calculated stages; bump only the
-owner of changed bytes or contracts. The bake version covers raw Gaea output; the split version
-covers post-bake crop, split, leaf-output, or completion rules. `ExportIsland::kiTextureVersion`
+The publication schema owns delivered file identity rules and has its own version, independent of
+the four calculated stages; bump only the owner of changed bytes or contracts. The bake version covers
+raw Gaea output; the split version covers post-bake crop, split, leaf-output, or completion rules. `ExportIsland::kiTextureVersion`
 covers the BC texture encode alone, and `ExportIsland::kiVersion` covers the chunk payload —
 quantized elevation, mesh, indices, hull, and `IslandHeader` layout — which may also require the
 shared data-format version.

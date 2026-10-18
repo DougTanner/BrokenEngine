@@ -1,0 +1,75 @@
+{
+  "archetype": "32058fdc13d5b18045f7d086d1ce298fe9c2934e06398b707b8e948157218398",
+  "bakeVersion": 28,
+  "choice": 8,
+  "columns": 2,
+  "island": "2ef27aa3246a50257ee65cea1a25acfe89a8bb39ee4d384816e252f5a037bbd6",
+  "leaves": [
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "863521fdddeac5187c467c354409b20cf5648f64647c79d0d50cf4e5e0f04f91",
+        "BakedDimensions.json": "997899cda7ecde631f83c4f6137a8b7a14c348a531ceb1c92fc8debcd3155814",
+        "Color.BC7_UNORM_BLOCK": "d84d76ddeb566195efbf91310ed47912647205f670d359691f8d0bb2cf8a774d",
+        "Elevation.r32": "c63a9c56ea36761bc0e8ce0f363201462fdbebc5c3ef4080896779f94438506f",
+        "Masks.BC7_UNORM_BLOCK": "2dbc706e67821d63b9d55e4ed86887b7e5f2e8f15d5a91255fbebe77576da999",
+        "MeshProcessed.bin": "318b9e0c1a337e410dae83d2c125008a3afe5aefd3ceaed3f0f19454f50d40ac",
+        "Normals.BC5_UNORM_BLOCK": "cd4fc4566931193e53a189eaf35ff9464ce67e4c58d99da828ec43748a63b7ad"
+      },
+      "index": 0
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "be5d6d1725e6c76d686d81a0d375ba7d7a8e0f76fa32fe18bd98430617da3d65",
+        "BakedDimensions.json": "be6792c2f5c75e21b3c735f0df1917fa48a118a9c38841d2d40ade166e5c1057",
+        "Color.BC7_UNORM_BLOCK": "556b04c35e31d5cd9bf413ea32a7cac774786b2ab1338aa7f61a10c5730ef532",
+        "Elevation.r32": "d86d59cc001222cd4956430d27dfaade07e821c8107dfb845b0083b1d921575b",
+        "Masks.BC7_UNORM_BLOCK": "c08e861540f89f3fcef5891a789c8633bc1a61ff4047904d47a6ae177370084f",
+        "MeshProcessed.bin": "682ac70a7e1645efb5a363dda05a89327b6f8c0eac714690f5f808377bfdd972",
+        "Normals.BC5_UNORM_BLOCK": "69f66a08eb5fd0cf9044d417827c5263213b52c810eecd108a86fb508a27a4e8"
+      },
+      "index": 1
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "787752e6a24ad3e0d66bf864e1cffb49e10e80c4a8f3e3a7fc7ef5de7500feb0",
+        "BakedDimensions.json": "e4d7dc60434e62b7096603441cbbeabdfd6ea7eb240dd957d61627b140b1fc12",
+        "Color.BC7_UNORM_BLOCK": "4a43b4b0a45cc82e571c8422e34ce22004a1cafbe764a2cc333c8aa8dd31d849",
+        "Elevation.r32": "fc54d5668bf88c846c0c857c2e0a3118a8cc52341a56e4bfa895193576b6cd63",
+        "Masks.BC7_UNORM_BLOCK": "193e2b19cb712e9551e04da170c4351fda80f8fc93239666f1729b4254281e1b",
+        "MeshProcessed.bin": "dadcf63fd4d0157c91e6b57699adc02fda94c4b7e21394a4365044d6ab686c2d",
+        "Normals.BC5_UNORM_BLOCK": "c8b2506b2f86483b455367b65cafbc62fa64645750c5ff03216bb7ea75bd50d0"
+      },
+      "index": 2
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "6377ae63c3227877a9fa98fa74c52f0778ddece35979fc32f45bfe2331ecdd65",
+        "BakedDimensions.json": "a71606b39b8c137304bff09592aaeef47f182862935f9236cfe54f118e7050d3",
+        "Color.BC7_UNORM_BLOCK": "145581e64f21b93f3ad7c40712942d2d0e474f3c4239643d3f0961fc2fb8c250",
+        "Elevation.r32": "5893b02301400feb247916c3b5b2063bd04ed195b2d74afe5d75589c7adc38fb",
+        "Masks.BC7_UNORM_BLOCK": "aa9c84e03b90a163b8417baabe69f22cc4c2b39111a4bd35d460b8f7ade8e263",
+        "MeshProcessed.bin": "b647009c118a523e580c613b845ae2264933c2c9b2d58b6d1b6b2b989abbc6fc",
+        "Normals.BC5_UNORM_BLOCK": "5376bf23753a90e6ca95df52c53a7a6975482a3a9058c5f689bc9285d575f1ab"
+      },
+      "index": 3
+    },
+    {
+      "files": {
+        "AmbientOcclusion.BC4_UNORM_BLOCK": "bf81d23118c69fb6001631c0d7702cae8ae5647412d1acfa8fc6c51c7d79f083",
+        "BakedDimensions.json": "86bda1c0e1847ea47f5b25d49898c46f0659589462afa5d246cb44e45048ae06",
+        "Color.BC7_UNORM_BLOCK": "e314dd7431ea05b6510e7b64e021f282e4d39f49d385111797f8085d716b8a7a",
+        "Elevation.r32": "701f34f7d5dfbad913ca3ffa436890b0864205043db74710452dffe69d241a9e",
+        "Masks.BC7_UNORM_BLOCK": "859b048d7e5196b03a4926ce828a3f2de183e7876193673db4d4a6bea3791691",
+        "MeshProcessed.bin": "a7e7b76e19f3827137c684a25a67e90e56b11eda13b74850e1f8f93efee76550",
+        "Normals.BC5_UNORM_BLOCK": "7f681b12fb3ea18747d66a81c1b404900d251dcebf1625c6726db70c5d16be26"
+      },
+      "index": 5
+    }
+  ],
+  "magic": "BrokenEngineIslandBake",
+  "route": "4x2",
+  "rows": 4,
+  "splitVersion": 8,
+  "textureVersion": 2,
+  "version": 2
+}

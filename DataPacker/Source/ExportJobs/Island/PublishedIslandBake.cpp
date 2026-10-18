@@ -20,7 +20,7 @@ static nlohmann::json PublicationIdentity(const IslandBakeContext& rContext, con
 {
 	nlohmann::json identity;
 	identity["magic"] = "BrokenEngineIslandBake";
-	identity["version"] = 1;
+	identity["version"] = 2;
 	identity["bakeVersion"] = iBakeVersion;
 	identity["splitVersion"] = iSplitVersion;
 	identity["textureVersion"] = ExportIsland::kiTextureVersion;
@@ -74,7 +74,7 @@ static nlohmann::json DeliveredHashes(const std::filesystem::path& rLeaf)
 		{
 			throw std::runtime_error("Missing delivered island file: " + (rLeaf / pcFile).string());
 		}
-		hashes[pcFile] = gpFileManager->mpInputFingerprintCache->Get(rLeaf / pcFile);
+		hashes[pcFile] = std::string_view(pcFile) == kpcBakedDimensionsFile ? GetBakedDimensionsFingerprint(rLeaf) : gpFileManager->mpInputFingerprintCache->Get(rLeaf / pcFile);
 	}
 	return hashes;
 }
