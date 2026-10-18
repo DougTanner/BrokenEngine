@@ -1,6 +1,7 @@
 #include "BakeIslandIntermediatesInternal.h"
 #include "FileManager.h"
 #include "GaeaArchetype.h"
+#include "PublishedIslandBake.h"
 #include "SubdivideBeachBand.h"
 
 
@@ -97,7 +98,7 @@ static std::string SplitFingerprint(const RouteSubdivision& rRoute)
 // metadata matches the content fingerprints of Island.json / the archetype and the route identity.
 // The post-Gaea split is checked separately
 // by AreLeavesDirty so a split-only change never trips this.
-static bool IsGaeaRawDirty(const std::filesystem::path& rIntermediatesDirectory, std::string_view expectedFingerprint)
+static bool IsGaeaRawDirty(const std::filesystem::path& rIntermediatesDirectory, const IslandBakeContext& rContext, const RouteSubdivision& rRoute, const std::string& rExpectedFingerprint)
 {
 	if (std::ranges::any_of(kpcIntermediateFiles, [&rIntermediatesDirectory](const char* const& pcFile)
 	{
@@ -116,7 +117,19 @@ static bool IsGaeaRawDirty(const std::filesystem::path& rIntermediatesDirectory,
 	{
 		return true;
 	}
-	return ReadTextFile(versionFile) != expectedFingerprint;
+	try
+	{
+		nlohmann::json metadata = nlohmann::json::parse(ReadTextFile(versionFile));
+		nlohmann::json expected = nlohmann::json::parse(rExpectedFingerprint);
+		metadata.at("archetype") = expected.at("archetype");
+		return metadata != expected
+		 || GetArchetypeIdentity(rIntermediatesDirectory / kpcPatchedArchetypeFile)
+		 != GetArchetypeIdentity(rContext.rArchetypeFile, rContext.rDimensions, rContext.iSeed, rContext.optionalMeshResolution, rRoute.iGaeaChoice);
+	}
+	catch (const std::exception&)
+	{
+		return true;
+	}
 }
 
 // True if any chunk leaf's derived split outputs are missing or stale — forces a re-split from the
@@ -564,17 +577,41 @@ void BakeRoute(const IslandBakeContext& rContext, const RouteSubdivision& rRoute
 	int64_t iLeafCount = rRoute.iColumns * rRoute.iRows;
 	std::string bakeFingerprint = BakeFingerprint(rContext, rRoute);
 	std::string splitFingerprint = SplitFingerprint(rRoute);
+	if (UsePublishedIslandBake(rContext, rRoute, kiBakeVersion, kiSplitVersion))
+	{
+		return;
+	}
 
-	// Sweep leaf folders orphaned by a route leaf-count shrink before anything else: this must run even
-	// on the otherwise-clean early-return path, since a kpRouteSubdivisions edit need not bump kiSplitVersion.
-	RemoveOrphanedLeafFolders(routeDirectory, iLeafCount);
-	RemoveOrphanedLeafFolders(intermediatesDirectory, iLeafCount);
-	RemoveOrphanedLeafFolders(GetIslandDiagnosticsPath(routeDirectory), iLeafCount);
+	// Authoring prunes leaves before checking stage dirtiness; ordinary publication rejects unexpected leaves.
+	if (gpFileManager->mExportFlags & FileManager::ExportFlags::kAllowGaeaExport)
+	{
+		RemoveOrphanedLeafFolders(routeDirectory, iLeafCount);
+		RemoveOrphanedLeafFolders(intermediatesDirectory, iLeafCount);
+		RemoveOrphanedLeafFolders(GetIslandDiagnosticsPath(routeDirectory), iLeafCount);
+	}
 
-	bool bGaeaDirty = IsGaeaRawDirty(intermediatesDirectory, bakeFingerprint);
+	bool bGaeaDirty = IsGaeaRawDirty(intermediatesDirectory, rContext, rRoute, bakeFingerprint);
 	bool bLeavesDirty = AreLeavesDirty(routeDirectory, intermediatesDirectory, iLeafCount, splitFingerprint);
+	bool bTextureProof = true;
+	for (int64_t i = 0; i < iLeafCount; ++i)
+	{
+		std::filesystem::path leaf = routeDirectory / std::to_string(i);
+		if (std::filesystem::exists(leaf))
+		{
+			bTextureProof &= ExportIsland::HasAuthorTextureProof(leaf);
+		}
+	}
+	if (!(gpFileManager->mExportFlags & FileManager::ExportFlags::kAllowGaeaExport) && (bGaeaDirty || bLeavesDirty || !bTextureProof))
+	{
+		throw std::runtime_error(std::format("Cannot publish island route \"{}\": author bake provenance {}, split completion {}, texture proof {}. Restore the complete original cache or explicitly authorize authoring with BT_DATAPACKER_ALLOW_GAEA_EXPORT=1.", routeDirectory.string(), !bGaeaDirty, !bLeavesDirty, bTextureProof));
+	}
 	if (!bGaeaDirty && !bLeavesDirty)
 	{
+		CopyIslandBakeGeometry(routeDirectory, iLeafCount);
+		if (bTextureProof)
+		{
+			PublishIslandBake(rContext, rRoute, kiBakeVersion, kiSplitVersion);
+		}
 		return;
 	}
 
@@ -691,4 +728,5 @@ void BakeRoute(const IslandBakeContext& rContext, const RouteSubdivision& rRoute
 	}
 
 	LOG(kDefault, kDebug, "Island route \"{}\" ready ({} of {} chunk(s) written, {} rejected as too low{})", routeDirectory.string(), iWrittenLeaves, iLeafCount, iLeafCount - iWrittenLeaves, bGaeaDirty ? ", Gaea re-baked" : ", split-only reuse");
+	CopyIslandBakeGeometry(routeDirectory, iLeafCount);
 }

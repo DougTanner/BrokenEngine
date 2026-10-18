@@ -57,6 +57,9 @@
     <ClCompile Include="..\..\Source\ExportJobs\Island\GaeaArchetype.cpp">
       <Filter>DataPacker\ExportJobs\Island</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\ExportJobs\Island\PublishedIslandBake.cpp">
+      <Filter>DataPacker\ExportJobs\Island</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\ExportJobs\Island\SubdivideBeachBand.cpp">
       <Filter>DataPacker\ExportJobs\Island</Filter>
     </ClCompile>
@@ -168,6 +171,9 @@
       <Filter>DataPacker\ExportJobs\Island</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\ExportJobs\Island\GaeaArchetype.h">
+      <Filter>DataPacker\ExportJobs\Island</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\ExportJobs\Island\PublishedIslandBake.h">
       <Filter>DataPacker\ExportJobs\Island</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\ExportJobs\Island\SubdivideBeachBand.h">

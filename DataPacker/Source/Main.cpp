@@ -1,4 +1,5 @@
 #include "ExportJobs/Island/BakeIslandIntermediates.h"
+#include "ExportJobs/Island/PublishedIslandBake.h"
 #include "ExportJobs/Texture/MigrateLegacyIntermediates.h"
 #include "ExportJobs/Texture/Texture.h"
 #include "ExportJobs/ExportAudio.h"
@@ -731,6 +732,11 @@ bool MainThread(int64_t iArgumentCount, char* ppcArguments[], DataPackerRunSumma
 		return false;
 	}
 	bSuccess &= *exportResult;
+
+	if (*exportResult)
+	{
+		FinalizePublishedIslandBakes();
+	}
 
 	// Contained IBL failures, so the second pass and every later export still run.
 	bSuccess &= GenerateIrradianceCubemaps();

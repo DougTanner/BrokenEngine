@@ -6,7 +6,7 @@ The vcxproj provisions ThirdParty before linking and requires the prebuilt confi
 
 ## Architecture
 
-`Main.cpp` orchestrates legacy-intermediate migration, Scene and Island pre-export (including Gaea baking), IBL cubemap convolution, the remaining asset exports, generated headers, and ThirdParty attribution collection. Every asset type and each IBL cubemap pre-pass runs even after an earlier failure, and each type's job failures become one structured aggregate diagnostic.
+`Main.cpp` orchestrates legacy-intermediate migration, Scene and Island pre-export (including explicitly authorized Gaea baking), IBL cubemap convolution, the remaining asset exports, generated headers, and ThirdParty attribution collection. Every asset type and each IBL cubemap pre-pass runs even after an earlier failure, and each type's job failures become one structured aggregate diagnostic.
 
 Each normal command emits a `kInfo` run summary after the single-instance mutex
 is acquired, counting jobs across every export type; a zero-argument command
@@ -55,10 +55,7 @@ output changes.
 Set `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1` for verification runs that must
 stop before expensive export work; `ExportJobs/AGENTS.md` owns where the guard
 stops each job. `BT_DATAPACKER_FORBID_GAEA_EXPORT=1` independently blocks only
-immediately before a Gaea process launch. The wrapper bootstrap's primary
-DataPacker run at session start is the one deliberate caller that sets neither
-guard, so a full multi-hour island bake is permitted there, and can hold session
-start, unless the launching environment already forbids it.
+immediately before a Gaea process launch. Gaea authoring additionally requires `BT_DATAPACKER_ALLOW_GAEA_EXPORT=1`; absence of a forbid guard grants no authoring permission. Caller-provided forbid guards remain stronger vetoes. Normal island publication and packing use the portable inputs described in `ExportJobs/Island/AGENTS.md`.
 
 `FileManager` (`gpFileManager`) owns input/output/cache paths, ThirdParty
 resolution, CLI parsing, and worktree output copy-on-write. An eligible linked

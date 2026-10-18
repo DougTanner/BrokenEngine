@@ -47,6 +47,7 @@ $script:GameTargets = @('Client', 'Server')
 $script:ReleaseOnlyTargets = @('DataPacker', 'WorktreeCli', 'AgentHarness')
 $script:AgentToolsTargets = @('WorktreeCli', 'AgentHarness')
 $script:GaeaGuardVariable = 'BT_DATAPACKER_FORBID_GAEA_EXPORT'
+$script:GaeaAllowVariable = 'BT_DATAPACKER_ALLOW_GAEA_EXPORT'
 $script:ExpensiveExportGuardVariable = 'BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT'
 # The Client and Server entries, the selective targets, and the data output suffix derive from the
 # resolved game project.
@@ -391,6 +392,8 @@ try {
 	$generationProperties = @($dataProperties) + "/p:DevEnvDir=$($context.devEnvDir)"
 	$hadGaeaGuard = Test-Path "Env:$($script:GaeaGuardVariable)"
 	$previousGaeaGuard = [Environment]::GetEnvironmentVariable($script:GaeaGuardVariable)
+	$hadGaeaAllow = Test-Path "Env:$($script:GaeaAllowVariable)"
+	$previousGaeaAllow = [Environment]::GetEnvironmentVariable($script:GaeaAllowVariable)
 	if ($ForbidExpensiveExport) {
 		$hadExpensiveExportGuard = Test-Path "Env:$($script:ExpensiveExportGuardVariable)"
 		$previousExpensiveExportGuard = [Environment]::GetEnvironmentVariable($script:ExpensiveExportGuardVariable)
@@ -400,7 +403,10 @@ try {
 			[Environment]::SetEnvironmentVariable($script:GaeaGuardVariable, '1')
 			$script:Summary.Add("Gaea guard applied: $($script:GaeaGuardVariable)=1 for the generation build.")
 		}
-		else { $script:Summary.Add('Gaea guard omitted under explicit -AllowGaeaExport authorization.') }
+		else {
+			[Environment]::SetEnvironmentVariable($script:GaeaAllowVariable, '1')
+			$script:Summary.Add('Gaea authoring enabled under explicit -AllowGaeaExport authorization; caller forbid guards remain effective.')
+		}
 		if ($ForbidExpensiveExport) {
 			[Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, '1')
 			$script:Summary.Add("Expensive-export guard applied: $($script:ExpensiveExportGuardVariable)=1 for the generation build.")
@@ -411,6 +417,10 @@ try {
 		if (-not $AllowGaeaExport) {
 			if ($hadGaeaGuard) { [Environment]::SetEnvironmentVariable($script:GaeaGuardVariable, $previousGaeaGuard) }
 			else { [Environment]::SetEnvironmentVariable($script:GaeaGuardVariable, $null) }
+		}
+		if ($AllowGaeaExport) {
+			if ($hadGaeaAllow) { [Environment]::SetEnvironmentVariable($script:GaeaAllowVariable, $previousGaeaAllow) }
+			else { [Environment]::SetEnvironmentVariable($script:GaeaAllowVariable, $null) }
 		}
 		if ($ForbidExpensiveExport) {
 			if ($hadExpensiveExportGuard) { [Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, $previousExpensiveExportGuard) }

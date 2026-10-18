@@ -22,7 +22,11 @@ static int64_t ComputeUncompressedTextureSize(VkFormat vkFormat, int64_t iWidth,
 
 void ExportTexture::Export()
 {
-	if (gpFileManager->mbForbidExpensiveExport)
+	std::string inputExtension = mInputPath.extension().string();
+	bool bCompressedPassthrough = inputExtension == TextureIntermediateSuffix(VK_FORMAT_BC4_UNORM_BLOCK)
+	 || inputExtension == TextureIntermediateSuffix(VK_FORMAT_BC5_UNORM_BLOCK)
+	 || inputExtension == TextureIntermediateSuffix(VK_FORMAT_BC7_UNORM_BLOCK);
+	if (gpFileManager->mbForbidExpensiveExport && !bCompressedPassthrough)
 	{
 		throw std::runtime_error("Texture export blocked by BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1");
 	}

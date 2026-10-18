@@ -25,6 +25,11 @@ public:
 		kDataOnly,
 	};
 
+	enum class ExportFlags : uint8_t
+	{
+		kAllowGaeaExport = 0x01,
+	};
+
 	FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitializationResult, InitializationMode eMode = InitializationMode::kFull);
 
 	std::filesystem::path mpInputDirectories[2];
@@ -37,6 +42,7 @@ public:
 
 	bool mbForbidExpensiveExport = false;
 	bool mbForbidGaeaExport = false;
+	common::Flags<ExportFlags> mExportFlags;
 
 	EnsureLocalResult EnsureLocal(OutputRoot eRoot);
 

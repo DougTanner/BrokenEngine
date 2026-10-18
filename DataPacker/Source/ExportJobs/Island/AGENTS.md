@@ -4,17 +4,27 @@ Gaea route baking, archetype patching, region splitting, and island intermediate
 
 ## Cache Lifecycle
 
-Route-level raw Gaea output and leaf geometry live under `%LOCALAPPDATA%/BrokenEngine/DataPackerCache/<project>/Gaea/Islands/`. `BakeVersion.meta` fingerprints the island configuration, resolved terrain, route identity, and the agreed inputs, outputs, and ordering of the bake step. `SplitVersion.meta` separately fingerprints region splitting, so a split-only change reuses the expensive raw bake.
+Each delivered route owns `BakedIsland.json`, a versioned completion declaration binding the current
+island configuration, effective patched terrain, stage versions and complete accepted leaf set to
+seven delivered-file hashes per leaf. The three source geometry inputs (`BakedDimensions.json`,
+`Elevation.r32`, `MeshProcessed.bin`) sit beside the four BC textures and are canonical for
+discovery and chunk export. A validated publication needs neither Gaea nor raw cache files. Invalid
+publications fail ordinary runs rather than silently regenerating.
 
-`BakedDimensions.json` is written last in each accepted leaf and is the
-completion marker consumed by `ExportIsland::Handles()`. Rejected or incomplete
-leaves must not retain it. `BakeRoute` deletes stale higher-index leaf
-directories itself, unconditionally and before its dirty early-return, so
-shrinking a route's subdivision count cannot leave old markers producing chunks;
-kept leaves and non-numeric route metadata are untouched. Do not add a second,
-manual prune. The island pre-pass separately removes every route sub-folder of
-an island folder whose `Island.json` is gone, so a deleted island's surviving
-leaves cannot be claimed as chunks.
+Without a declaration, an ordinary run may adopt the known-good original author cache only when bake
+provenance, normalized patched terrain, complete split outputs and existing texture-input freshness
+markers all agree. The legacy texture marker has no historical BC output hashes: initial adoption
+trusts those known-good bytes and records the seven hashes for later mismatch detection. Geometry
+copies use staged sibling renames; the declaration is published last. Normal adoption never rewrites
+BC files or invokes Git.
+
+Raw Gaea and split outputs remain under
+`%LOCALAPPDATA%/BrokenEngine/DataPackerCache/<project>/Gaea/Islands/`. `BakeVersion.meta` and
+`SplitVersion.meta` independently own raw and split completion. `BakedDimensions.json` is written
+last in accepted cache leaves; rejected leaves retain no completion marker. Explicit authoring
+invalidates a route publication before changing delivered inputs, prunes stale numeric leaves, and
+publishes a new declaration only after all island jobs succeed. Source routes for removed island
+configurations are pruned by the prepass.
 
 Splitting also densifies the mesh: after the raw Gaea Mesher output is loaded,
 `SubdivideBeachBand` recursively splits triangles whose height range overlaps
@@ -34,9 +44,9 @@ water is preserved almost unchanged so the taper cannot amputate a leaf's
 visible sand apron. It is a split-stage step in `ProcessBakedRegion`, so a
 change here bumps the split version.
 
-With `BT_DATAPACKER_FORBID_EXPENSIVE_EXPORT=1`, a dirty route fails before launching Gaea. Clean route caches remain usable.
+Both forbid guards still stop a dirty Gaea export. Published BC intermediates pass through packing under the expensive-export guard because they require no encoding.
 
-Island discovery, route cache inspection, clean early returns, and split-only re-splits must all succeed with Gaea uninstalled. A route whose raw bake is dirty fails with Gaea uninstalled, before any of its dirty-stage work begins.
+Published packing, cache adoption and authorized split-only work succeed with Gaea uninstalled. An authorized dirty raw bake resolves Gaea before its dirty-stage work begins.
 
 ## Island Outputs
 
@@ -57,7 +67,12 @@ Large shared route inputs use persistent fingerprints rather than repeated conte
 
 ## Versioning
 
-Four stages are versioned and cached independently, so bump only the one whose behavior changed. The bake version covers raw Gaea output; the split version covers post-bake crop, split, leaf-output, or completion rules. `ExportIsland::kiTextureVersion` covers the BC texture encode alone, and `ExportIsland::kiVersion` covers the chunk payload — quantized elevation, mesh, indices, hull, and `IslandHeader` layout — which may also require the shared data-format version.
+The publication schema has its own version, independent of the four calculated stages; bump only the
+owner of changed bytes or contracts. The bake version covers raw Gaea output; the split version
+covers post-bake crop, split, leaf-output, or completion rules. `ExportIsland::kiTextureVersion`
+covers the BC texture encode alone, and `ExportIsland::kiVersion` covers the chunk payload —
+quantized elevation, mesh, indices, hull, and `IslandHeader` layout — which may also require the
+shared data-format version.
 
 The BC outputs are tracked in the checkout, which shapes the texture stage: its version stays a plain `int64_t` outside `ExportJob::Version(...)`, so a chunk-header layout change cannot rewrite hundreds of megabytes of tracked textures for byte-identical output. Its marker fingerprints only the encode's own inputs; the processed mesh is deliberately excluded so a mesh-only rebake re-packs the chunk without touching the textures.
 

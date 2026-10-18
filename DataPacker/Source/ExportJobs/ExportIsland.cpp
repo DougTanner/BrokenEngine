@@ -1,6 +1,7 @@
 #include "ExportIsland.h"
 
 #include "Island/BakeIslandIntermediates.h"
+#include "Island/PublishedIslandBake.h"
 #include "Texture/Texture.h"
 #include "FileManager.h"
 
@@ -331,13 +332,7 @@ static void ReadProcessedMesh(const std::filesystem::path& rIntermediatesDir, Ex
 // and runs unconditionally, so a texture reuse still produces a complete ExportedIsland.
 static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIsland& rOut, bool bEncodeTextures)
 {
-	// rInputPath is the chunk leaf folder (<island>/<route>/<index>). Per-chunk cropped geometry
-	// (Elevation.r32, AmbientOcclusion.r16, MeshProcessed.bin, BakedDimensions.json) lives in the
-	// leaf's Gaea cache folder; the route's chunks SHARE the full-res Color (PNG8 sRGB) /
-	// Normals (EXR) / mask PNG sources in the parent route cache, cropped in-memory below via this
-	// leaf's crop rect so each chunk's outputs and diagnostic JPEGs use its own crop dims. BakedDimensions.json
-	// drives every downstream size; it is written last per leaf, so its presence is guaranteed if the
-	// bake succeeded. The committed BC outputs are saved to the leaf root (not Intermediates).
+	// Source geometry is canonical; raw cache textures are read only for an authorized encode.
 	BakedDimensions baked = ReadBakedDimensions(rInputPath);
 	if (baked.iFullTexturePixels <= 0 || !std::in_range<int32_t>(baked.iFullTexturePixels) || baked.iCropX < 0
 	 || baked.iCropY < 0 || baked.iCropWidth <= 0 || baked.iCropHeight <= 0 || !std::in_range<int32_t>(baked.iCropWidth)
@@ -373,7 +368,7 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	// Read the downsampled engine-meter elevation up front so it can drive both the per-texture
 	// underwater mask (below) and the chunk payload heightmap (further down). Same buffer, single
 	// read.
-	std::filesystem::path elevationFile = intermediatesDirectory / "Elevation.r32";
+	std::filesystem::path elevationFile = rInputPath / "Elevation.r32";
 	std::ifstream rawStream(elevationFile, std::ios::in | std::ios::binary);
 	if (!rawStream)
 	{
@@ -408,7 +403,7 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 	// heightmap halfs (see Export() and IslandHeader in DataFile.h). Read it before any texture encode
 	// writes a derived intermediate, so a malformed mesh cannot leave new BC outputs behind while the
 	// owning job is failing.
-	ReadProcessedMesh(intermediatesDirectory, rOut);
+	ReadProcessedMesh(rInputPath, rOut);
 	std::filesystem::create_directories(diagnosticsDirectory);
 
 	// Encode each intermediate as a BC-compressed mip chain in turn (MakeMipmaps walks down to the
@@ -457,11 +452,7 @@ static void ExportIslandData(const std::filesystem::path& rInputPath, ExportedIs
 
 std::optional<common::ChunkFlags_t> ExportIsland::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
 {
-	// A chunk leaf is <Islands>/<island>/<route>/<index>: its cache carries BakedDimensions.json
-	// (written last per leaf by the bake). The route cache holds the raw Gaea bake but no dimensions,
-	// so gating on that file claims exactly the leaves (one kIsland
-	// chunk each). The "Islands" ancestor guard keeps a stray match elsewhere from being mistaken for
-	// a chunk.
+	// The prepass validates each route before source dimensions can identify its accepted leaves.
 	if (!rDirectoryEntry.is_directory())
 	{
 		return std::nullopt;
@@ -476,7 +467,7 @@ std::optional<common::ChunkFlags_t> ExportIsland::Handles(const std::filesystem:
 	{
 		return std::nullopt;
 	}
-	if (!std::filesystem::exists(GetIslandCachePath(rDirectoryEntry.path()) / kpcBakedDimensionsFile))
+	if (!std::filesystem::exists(rDirectoryEntry.path() / kpcBakedDimensionsFile))
 	{
 		return std::nullopt;
 	}
@@ -485,20 +476,30 @@ std::optional<common::ChunkFlags_t> ExportIsland::Handles(const std::filesystem:
 
 std::string ExportIsland::GetInputFingerprint() const
 {
-	std::filesystem::path cacheLeafDirectory = GetIslandCachePath(mInputPath);
-	std::filesystem::path cacheRouteDirectory = cacheLeafDirectory.parent_path();
-	static constexpr const char* kpcLeafInputs[] = {"AmbientOcclusion.r16", "BakedDimensions.json", "Elevation.r32", "MeshProcessed.bin"};
-	static constexpr const char* kpcRouteInputs[] = {"Color.png", "Flow.png", "Normals.exr", "Rock.png", "Sand.png", "Snow.png"};
 	nlohmann::json fingerprint;
-	for (const char* pcFile : kpcLeafInputs)
+	for (const char* pcFile : {"BakedDimensions.json", "Elevation.r32", "MeshProcessed.bin"})
 	{
-		fingerprint["leaf"][pcFile] = gpFileManager->mpInputFingerprintCache->GetPersistent(cacheLeafDirectory / pcFile);
-	}
-	for (const char* pcFile : kpcRouteInputs)
-	{
-		fingerprint["route"][pcFile] = gpFileManager->mpInputFingerprintCache->GetPersistent(cacheRouteDirectory / pcFile);
+		fingerprint[pcFile] = gpFileManager->mpInputFingerprintCache->Get(mInputPath / pcFile);
 	}
 	return fingerprint.dump();
+}
+
+bool ExportIsland::HasAuthorTextureProof(const std::filesystem::path& rLeaf)
+{
+	try
+	{
+		ExportIsland island(common::ChunkFlags::kIsland, rLeaf);
+		if (!island.AreTextureOutputsPresent())
+		{
+			return false;
+		}
+		std::optional<std::string> marker = ReadMarkerFile(island.GetTextureMarkerPath());
+		return marker && *marker == island.GetTextureFingerprint();
+	}
+	catch (const std::exception&)
+	{
+		return false;
+	}
 }
 
 std::filesystem::path ExportIsland::GetTextureMarkerPath() const
@@ -540,12 +541,17 @@ bool ExportIsland::AreTextureOutputsPresent() const
 	static constexpr const char* kpcOutputs[] = {kpcIslandAmbientOcclusion, kpcIslandColor, kpcIslandMasks, kpcIslandNormals};
 	return std::ranges::all_of(kpcOutputs, [this](const char* const& pcOutput)
 	{
-		return std::filesystem::exists(mInputPath / pcOutput);
+		return std::filesystem::is_regular_file(mInputPath / pcOutput);
 	});
 }
 
 bool ExportIsland::AreTexturesFresh() const
 {
+	if (IsPublishedIslandLeaf(mInputPath))
+	{
+		return true;
+	}
+
 	// The BC outputs are tracked in Git, but a deleted or restored-from-elsewhere one leaves the marker
 	// intact, so existence is checked independently of the fingerprint.
 	if (!AreTextureOutputsPresent())
@@ -569,7 +575,7 @@ bool ExportIsland::CheckDirty(const std::filesystem::path& rPackFile)
 	}
 
 	// A clean chunk cache proves these committed textures match the current inputs, so seeding the marker avoids a byte-identical rewrite.
-	if (!std::filesystem::exists(GetTextureMarkerPath()) && AreTextureOutputsPresent())
+	if (!IsPublishedIslandLeaf(mInputPath) && !std::filesystem::exists(GetTextureMarkerPath()) && AreTextureOutputsPresent())
 	{
 		WriteMarkerFile(GetTextureMarkerPath(), GetTextureFingerprint());
 	}
@@ -582,7 +588,10 @@ void ExportIsland::UpdateCacheMetadata()
 {
 	// RunExport calls this only after Export() and the chunk write both succeeded, so the marker can only
 	// ever record a complete encode. A run that reused the textures rewrites the same fingerprint.
-	WriteMarkerFile(GetTextureMarkerPath(), GetTextureFingerprint());
+	if (!IsPublishedIslandLeaf(mInputPath))
+	{
+		WriteMarkerFile(GetTextureMarkerPath(), GetTextureFingerprint());
+	}
 }
 
 void ExportIsland::CleanupOnFailure()

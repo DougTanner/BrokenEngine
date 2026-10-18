@@ -25,3 +25,7 @@ float ReadArchetypeSeaLevel(const std::filesystem::path& rTerrainFile);
 // surface position. Each route works on its own cached PatchedArchetype.terrain copy, so the
 // on-disk source archetype is never mutated.
 void PatchArchetype(const std::filesystem::path& rTerrainFile, const WorldDimensions& rDimensions, int64_t iSeed, std::optional<int64_t> optionalMeshResolution, int64_t iGaeaRouteChoice);
+
+std::string GetArchetypeIdentity(const std::filesystem::path& rTerrainFile, const WorldDimensions& rDimensions, int64_t iSeed, std::optional<int64_t> optionalMeshResolution, int64_t iGaeaRouteChoice);
+
+std::string GetArchetypeIdentity(const std::filesystem::path& rPatchedTerrainFile);

@@ -1,12 +1,7 @@
 #pragma once
 
-// Pre-pass invoked from Main.cpp between ExportScene and ExportIsland.
-// Drives Gaea 2 (Gaea.Swarm.exe) to bake per-island heightmap / color / AO / normal intermediates
-// from `Island.json` + a resolved `.terrain` archetype, writing .r32 (elevation) / .r16 (AO) /
-// .png (sRGB color) / .exr (normals) files to the shared Gaea cache that ExportIsland consumes.
-// Throws on any failure (caught by main()'s try/catch).
-// Gaea 2 executable resolution, archetype patching, and Sea-level reads live in GaeaArchetype.{h,cpp};
-// this translation unit owns version-agnostic bake/split orchestration.
+// Prepass validates published source geometry or publishes a proven author cache.
+// Explicit authoring may run dirty Gaea/split stages. Throws on failure.
 void BakeIslandIntermediates();
 
 struct WorldDimensions
@@ -36,13 +31,11 @@ struct BakedDimensions
 
 inline constexpr char kpcBakedDimensionsFile[] = "BakedDimensions.json";
 
-// Reads a chunk leaf's BakedDimensions.json written by the Gaea bake. Throws if missing or
-// malformed; the route-level bake-version sentinel is stamped only after every leaf's JSON is
-// written so a clean route dirty-check implies the JSON exists.
+// Reads the canonical source leaf dimensions after route validation; throws if missing or malformed.
 BakedDimensions ReadBakedDimensions(const std::filesystem::path& rLeafFolder);
 
 // Maps a source-tree island path (`.../Islands/<island>/...`) into the single mutable Gaea cache.
-// The source path remains the canonical chunk identity; only bake intermediates live in the cache.
+// Raw and author split intermediates live in the cache; delivered geometry lives in the source tree.
 std::filesystem::path GetIslandCachePath(const std::filesystem::path& rSourcePath);
 
 // Maps a source-tree island path into the parallel diagnostics tree used for JPEG sidecars.

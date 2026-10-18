@@ -2,6 +2,7 @@
 
 #include "BakeIslandIntermediatesInternal.h"
 #include "FileManager.h"
+#include "PublishedIslandBake.h"
 
 
 static std::filesystem::path IslandRelativePath(const std::filesystem::path& rSourcePath)
@@ -301,7 +302,7 @@ std::filesystem::path GetIslandDiagnosticsPath(const std::filesystem::path& rSou
 
 BakedDimensions ReadBakedDimensions(const std::filesystem::path& rLeafFolder)
 {
-	std::filesystem::path bakedJsonFile = GetIslandCachePath(rLeafFolder) / kpcBakedDimensionsFile;
+	std::filesystem::path bakedJsonFile = rLeafFolder / kpcBakedDimensionsFile;
 	std::ifstream bakedStream(bakedJsonFile);
 	nlohmann::json bakedJson = nlohmann::json::parse(bakedStream);
 	bakedStream.close();
@@ -321,6 +322,7 @@ BakedDimensions ReadBakedDimensions(const std::filesystem::path& rLeafFolder)
 
 void BakeIslandIntermediates()
 {
+	ResetPublishedIslandBakes();
 	std::vector<std::filesystem::path> islandFolders;
 	for (const std::filesystem::path& rInputDirectory : gpFileManager->mpInputDirectories)
 	{

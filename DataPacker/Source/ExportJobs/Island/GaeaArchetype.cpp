@@ -150,7 +150,7 @@ float ReadArchetypeSeaLevel(const std::filesystem::path& rTerrainFile)
 	throw std::runtime_error("Archetype has no Sea node — DataPacker reads its Level to derive the per-island beach offset. Add a Sea node to the graph or extend BakeIslandIntermediates to handle sea-less archetypes.");
 }
 
-void PatchArchetype(const std::filesystem::path& rTerrainFile, const WorldDimensions& rDimensions, int64_t iSeed, std::optional<int64_t> optionalMeshResolution, int64_t iGaeaRouteChoice)
+static nlohmann::json PatchedArchetype(const std::filesystem::path& rTerrainFile, const WorldDimensions& rDimensions, int64_t iSeed, std::optional<int64_t> optionalMeshResolution, int64_t iGaeaRouteChoice)
 {
 	std::ifstream readStream(rTerrainFile);
 	nlohmann::json terrainJson = nlohmann::json::parse(readStream);
@@ -178,5 +178,56 @@ void PatchArchetype(const std::filesystem::path& rTerrainFile, const WorldDimens
 		PatchArchetypeMesherResolution(terrainJson, *optionalMeshResolution);
 	}
 
-	WriteEntireFile(rTerrainFile, terrainJson.dump(2));
+	return terrainJson;
+}
+
+void PatchArchetype(const std::filesystem::path& rTerrainFile, const WorldDimensions& rDimensions, int64_t iSeed, std::optional<int64_t> optionalMeshResolution, int64_t iGaeaRouteChoice)
+{
+	WriteEntireFile(rTerrainFile, PatchedArchetype(rTerrainFile, rDimensions, iSeed, optionalMeshResolution, iGaeaRouteChoice).dump(2));
+}
+
+static std::string ArchetypeIdentity(nlohmann::json terrainJson)
+{
+	nlohmann::json& rAsset = terrainJson.at("Assets").at("$values").at(0);
+	if (rAsset.at("Terrain").contains("GraphTabs"))
+	{
+		for (nlohmann::json& rTab : rAsset.at("Terrain").at("GraphTabs").at("$values"))
+		{
+			rTab.erase("ViewportLocation");
+		}
+	}
+	if (rAsset.contains("State"))
+	{
+		rAsset.at("State").erase("SelectedNode");
+	}
+	if (terrainJson.contains("Metadata"))
+	{
+		terrainJson.at("Metadata").erase("DateLastSaved");
+		terrainJson.at("Metadata").erase("ModifiedVersion");
+	}
+	std::string canonical = terrainJson.dump();
+	common::Sha256Hasher hasher;
+	hasher.Update(std::as_writable_bytes(std::span(canonical)));
+	std::array<uint8_t, 32> digest {};
+	if (!hasher.Finish(digest))
+	{
+		throw std::runtime_error("Unable to hash effective island archetype");
+	}
+	std::string identity;
+	for (uint8_t uiByte : digest)
+	{
+		identity += std::format("{:02x}", uiByte);
+	}
+	return identity;
+}
+
+std::string GetArchetypeIdentity(const std::filesystem::path& rTerrainFile, const WorldDimensions& rDimensions, int64_t iSeed, std::optional<int64_t> optionalMeshResolution, int64_t iGaeaRouteChoice)
+{
+	return ArchetypeIdentity(PatchedArchetype(rTerrainFile, rDimensions, iSeed, optionalMeshResolution, iGaeaRouteChoice));
+}
+
+std::string GetArchetypeIdentity(const std::filesystem::path& rPatchedTerrainFile)
+{
+	std::ifstream stream(rPatchedTerrainFile);
+	return ArchetypeIdentity(nlohmann::json::parse(stream));
 }

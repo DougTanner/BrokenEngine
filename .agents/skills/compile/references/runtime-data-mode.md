@@ -168,7 +168,7 @@ into its own Local Data directory.
 Local generation forbids Gaea unless `-AllowGaeaExport` is passed: the
 invocation scopes `BT_DATAPACKER_FORBID_GAEA_EXPORT=1` around the whole
 generation build and restores the caller's prior environment exactly.
-`-AllowGaeaExport` omits that guard, and only an explicit user-approved plan
+`-AllowGaeaExport` sets `BT_DATAPACKER_ALLOW_GAEA_EXPORT=1` for that build and restores its prior value in `finally`; it omits the default negative guard while preserving any caller-provided forbid guard. Only an explicit user-approved plan
 or acceptance criterion requiring an island re-bake authorizes it; the
 automatic rule never omits the guard, and changed island inputs, DataPacker
 code, fingerprints, or cache state alone never authorize a Gaea run. A

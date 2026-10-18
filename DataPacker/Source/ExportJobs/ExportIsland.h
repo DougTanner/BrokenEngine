@@ -39,6 +39,7 @@ public:
 	static constexpr int64_t kiTextureVersion = 2;
 
 	bool CheckDirty(const std::filesystem::path& rPackFile) override;
+	static bool HasAuthorTextureProof(const std::filesystem::path& rLeaf);
 
 protected:
 

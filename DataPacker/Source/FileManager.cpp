@@ -324,6 +324,10 @@ FileManager::FileManager(std::span<char*> argvSpan, EnsureLocalResult& reInitial
 	int64_t iForbidGaeaExportLength = GetEnvironmentVariableW(L"BT_DATAPACKER_FORBID_GAEA_EXPORT", pcForbidGaeaExport, static_cast<DWORD>(std::size(pcForbidGaeaExport)));
 	mbForbidGaeaExport = iForbidGaeaExportLength == 1 && pcForbidGaeaExport[0] == L'1';
 
+	wchar_t pcAllowGaeaExport[2] {};
+	int64_t iAllowGaeaExportLength = GetEnvironmentVariableW(L"BT_DATAPACKER_ALLOW_GAEA_EXPORT", pcAllowGaeaExport, static_cast<DWORD>(std::size(pcAllowGaeaExport)));
+	mExportFlags.Set(ExportFlags::kAllowGaeaExport, iAllowGaeaExportLength == 1 && pcAllowGaeaExport[0] == L'1');
+
 	ASSERT(argvSpan.size() == 4);
 	mpInputDirectories[0] = argvSpan[1];
 	mpInputDirectories[1] = argvSpan[2];
