@@ -137,7 +137,6 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			auto pFrame = std::make_unique<game::Frame>();
 			fileStream >> *pFrame;
 			rCell.pCurrent = std::move(pFrame);
-			rCell.pNext = std::make_unique<game::Frame>();
 
 			int64_t iTick = rCell.pCurrent->interpolate.iTick;
 			if (!bHasLoadedClock)

@@ -461,7 +461,6 @@ void GameBase::ServerUpdate()
 					mfLastDeltaTime = static_cast<float>(iFinalizedTicks) * kfDeltaTime;
 					// Rebuild only active frames; normal input/manager progression resumes on the next server update.
 					game::gpServerSession->mpRuntime->ComputeActiveSet();
-					EnsureNextFrames();
 				}
 				break;
 			}
@@ -954,18 +953,13 @@ bool GameBase::ShouldUseCrosshair() const
 void GameBase::RefreshReplayActiveSet()
 {
 	// During replay, all coords with live readers are active; SyncReplayTick retires ended readers before dispatch.
-	// Heap: vector clear/push_back + make_unique<Frame>
+	// Heap: vector clear/reserve/push_back
 	ScopedSuppressAllocationTracking suppress;
 	mActiveCoordinates.clear();
 	mActiveCoordinates.reserve(gpReplay->mReplayReaders.size());
 	for (const auto& [rCoordinate, rpReader] : gpReplay->mReplayReaders)
 	{
 		mActiveCoordinates.push_back(rCoordinate);
-		Cell& rCell = mCells.at(rCoordinate);
-		if (rCell.pNext == nullptr)
-		{
-			rCell.pNext = std::make_unique<game::Frame>();
-		}
 	}
 }
 #endif // BT_SERVER
@@ -1029,10 +1023,6 @@ void GameBase::CreateNewFrame()
 		GenerateIslandChain(kOriginCoordinate, rCell.staticData.islands);
 	}
 	// navigationData stays empty; RunFrameTick builds it lazily on the per-coord dispatch thread.
-
-#if defined(BT_SERVER)
-	rCell.pNext = std::make_unique<game::Frame>();
-#endif
 }
 
 // Debug-only main-menu island browser: build the origin cell as a single island centered at (0,0),
@@ -1079,7 +1069,6 @@ void GameBase::PrepareActiveSet()
 	}
 
 	game::gpServerSession->mpRuntime->ComputeActiveSet();
-	EnsureNextFrames();
 	game::gpServerSession->mpBroadcaster->BuildFrameInputs();
 #else
 	game::gpClientSession->mpRuntime->ComputeActiveSet();
@@ -1128,22 +1117,6 @@ void GameBase::ResetSession()
 	mActiveCoordinates.clear();
 	mActiveCoordinates.push_back(mClientGridCoordinate);
 }
-
-#if defined(BT_SERVER)
-void GameBase::EnsureNextFrames()
-{
-	// Heap: next frames persist across ticks.
-	ScopedSuppressAllocationTracking suppress;
-
-	for (const GridCoord& rCoordinate : mActiveCoordinates)
-	{
-		if (mCells.at(rCoordinate).pNext == nullptr)
-		{
-			mCells.at(rCoordinate).pNext = std::make_unique<game::Frame>();
-		}
-	}
-}
-#endif // BT_SERVER
 
 #if defined(BT_CLIENT)
 void GameBase::UpdateActiveIslands()

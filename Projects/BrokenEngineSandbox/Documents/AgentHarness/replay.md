@@ -399,7 +399,7 @@ These checks combine harness observations with a static phase trace because the 
    cleared, normal ticking resumed, and no second reload occurred. The static
    Replay/GameBase trace independently proves the remaining per-iteration facts
    the command surface cannot expose: `kStopBeforeDispatch`, no load flag,
-   pre-tick tick/time rollback, normal active/next-frame rebuild, and the loop
+   pre-tick tick/time rollback, normal active-set rebuild, and the loop
    break before dispatch.
 2. For normal loop completion, play an unmodified v5 recording through its final
    terminal reader. Require `End replay <tick>, looping`, continued

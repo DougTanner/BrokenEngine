@@ -128,7 +128,7 @@ reader owns a coordinate at a time.
 `kStopBeforeDispatch` always runs `SaveLoadReplay` and breaks the current
 fixed-tick iteration before frame dispatch. A corrupt replay abort has no load
 flag, so `SaveLoadReplay` does not reload and the server rolls its tick/time
-back and rebuilds normal active/next-frame state before the break. When the last
+back and rebuilds the normal active set before the break. When the last
 reader retires, Replay arms `kLoadReplay` before returning the same stop
 decision; `SaveLoadReplay` reloads the initial replay state, and its first
 dispatch occurs in a later fixed-tick iteration.

@@ -35,11 +35,10 @@ void ServerSessionBase::PrepareTick()
 
 	// Recompute active set each tick so new client subscriptions
 	// (requested by the client after the previous frame's assignment) are picked up immediately
-	// Heap: ComputeActiveSet/EnsureNextFrames may grow mActiveCoordinates and Cell maps
+	// Heap: mFrameInputs.try_emplace grows the map for coordinates entering the active set
 	ScopedSuppressAllocationTracking suppress;
 
 	mpRuntime->ComputeActiveSet();
-	game::gpGame->EnsureNextFrames();
 
 	for (const GridCoord& rCoordinate : game::gpGame->mActiveCoordinates)
 	{

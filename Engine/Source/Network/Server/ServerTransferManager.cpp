@@ -78,7 +78,6 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 			{
 				game::gpGame->CreateCellAtCoordinate(destination);
 				engine::Cell& rCell = game::gpGame->mCells.at(destination);
-				rCell.pNext = std::make_unique<game::Frame>();
 				std::swap(rCell.pCurrent, rCell.pNext);
 				it = game::gpGame->mCells.find(destination);
 			}
