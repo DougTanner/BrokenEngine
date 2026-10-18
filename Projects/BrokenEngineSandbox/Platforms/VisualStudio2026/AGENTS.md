@@ -29,11 +29,13 @@ Both use `$(ProjectName)` in `IntDir`, so client and server builds can run simul
   true permits deliberate worktree generation; Shared requires false.
   `GameDataDirectory` defaults to `$(ProjectDir)Output\Data` in Local and must
   be absolute in Shared. `GeneratedDataIncludeRoot` is its parent, matching
-  `#include "Data/..."`. Agent builds pass all four properties identically with
-  `RunDataPacker=false`.
-- PreBuildEvent: Every configuration first provisions ThirdParty and requires its prebuilt configuration library; consumers never build ThirdParty recursively. Local `RunDataPacker=true` incrementally rebuilds Release DataPacker before linked-worktree export. Primary Local preserves missing-executable-only DataPacker bootstrap; Shared and agent builds skip it. See `../../../../ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md`.
+  `#include "Data/..."`. Agent builds pass all four properties identically;
+  the values they pass are in
+  `.agents/skills/compile/references/runtime-data-mode.md`
+  `## Build invocation and derived properties`.
+- PreBuildEvent: Every configuration first provisions ThirdParty and requires its prebuilt configuration library; consumers never build ThirdParty recursively. Local `RunDataPacker=true` incrementally rebuilds Release DataPacker before linked-worktree export. Primary Local preserves missing-executable-only DataPacker bootstrap; Shared builds skip it. See `../../../../ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md`.
 	- Provisioning steps invoke `powershell.exe` (Windows PowerShell 5.1), never `pwsh.exe`. 5.1 ships with every Windows install, so an unassisted vcxproj or IDE build succeeds on a machine that has no PowerShell 7. This is the deliberate exception to the repository's PowerShell 7 standard, which governs agent-invoked helpers rather than the build itself; it binds all three consuming projects — client, server, and DataPacker. Keep the invoked `.ps1` scripts 5.1-compatible.
-- CustomBuildStep: DataPacker export runs only for Local with `RunDataPacker=true`. Primary Local Visual Studio builds preserve automatic export; linked worktrees default off and require explicit opt-in. The build step does not pre-create `GameDataDirectory`; DataPacker must observe an absent final output directory so it can establish or materialize its worktree copy-on-write output. Agent Local builds with `RunDataPacker=false` require already-readable selected output.
+- CustomBuildStep: DataPacker export runs only for Local with `RunDataPacker=true`. Primary Local Visual Studio builds preserve automatic export; linked worktrees default off and require explicit opt-in. The build step does not pre-create `GameDataDirectory`; DataPacker must observe an absent final output directory so it can establish or materialize its worktree copy-on-write output.
 - Microsoft code analysis: Release-only, with two paths selected by the toolchain's `RunMsvcAnalysis`, which is on when `RunCodeAnalysis=true` and `EnableMicrosoftCodeAnalysis` is not `false`. Both fail the build on a diagnostic; they differ in which set of rules applies and in what does the failing.
   - `RunMsvcAnalysis` on — `RunCodeAnalysis=true` is the Release project
     default, so Visual Studio Release builds take this path, as does the

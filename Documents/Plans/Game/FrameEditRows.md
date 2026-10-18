@@ -661,7 +661,7 @@ one `inject_payload` path to build any deterministic, recordable scene.
   - Cleanup: `mechanic` `/update-vcxproj` (files added and removed); `implementer` `/update-claude-docs`; fresh `reviewer` `/progressive-disclosure-review` (AGENTS.md and a skill reference change); fresh `reviewer` `/external-skill-creator` validate mode (`.agents/skills/add-collection-member/references/worker.md` changes).
   - Runtime: `implementer` drives `/agent-harness` for checks 1-7.
   - Landing: `implementer` `/finalize-changes`.
-- Data mode: Shared; no `runtime-data-mode.md` Local trigger.
+- Data mode: resolved by the build (`.agents/skills/compile/references/runtime-data-mode.md` `## Mode selection`).
 - Leftovers: L1 (`FloatingPointDeterminism.txt` section 7 citations, Tier 1) is in the documentation slice. The per-cell cap hazard goes to `Documents/Plans/Game/InjectPayloadPendingBound.md` (`## Out of scope`).
 
 ## Unresolved decisions

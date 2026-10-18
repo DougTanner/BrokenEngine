@@ -191,12 +191,34 @@ function Get-AgentGameProjects([string] $Root) {
 	return $names
 }
 
-# The Shared-data shader stamp value: SHA-256 over the revision's file listing of the engine's and the project's
-# shader trees. AGENTS.md files never reach Shader.pack, so they are left out at every depth.
-function Get-AgentShaderSourceFingerprint([string] $Root, [string] $Revision, [string] $Project) {
-	$listing = @(Invoke-AgentGit @('-C', $Root, 'ls-tree', '-r', $Revision, '--', 'Engine/Data/Shaders', "Projects/$Project/Data/Shaders") |
-		Where-Object { -not [IO.Path]::GetFileName(($_ -split "`t", 2)[1]).Equals('AGENTS.md', [StringComparison]::OrdinalIgnoreCase) })
-	return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.UTF8Encoding]::new($false).GetBytes($listing -join "`n"))).ToLowerInvariant()
+# The data inputs under Root that differ from commit Base, committed, staged, unstaged, or untracked: paths under
+# DataPacker, Engine/Data, and Projects/<Project>/Data, plus Common/DataFile.h, '/'-separated, unique, in ordinal order.
+# Repository agent documentation is never a data-pipeline input, so an AGENTS.md leaf is dropped. The Raw carve-out
+# mirrors ExportRaw, which packs any file under a directory segment named Raw whatever its extension.
+function Get-AgentDataInputChanges([string] $Root, [string] $Base, [string] $Project) {
+	[string[]] $inputs = @('DataPacker', 'Engine/Data', "Projects/$Project/Data", 'Common/DataFile.h')
+	$paths = [Collections.Generic.SortedSet[string]]::new([StringComparer]::Ordinal)
+	foreach ($arguments in @(
+		[string[]](@('-c', 'core.quotepath=false', '-C', $Root, 'diff', '--name-only', $Base, '--') + $inputs),
+		[string[]](@('-c', 'core.quotepath=false', '-C', $Root, 'ls-files', '--others', '--exclude-standard', '--') + $inputs))) {
+		# Stdout only: a git warning on stderr, such as a line-ending notice, must never read as a path.
+		$run = Invoke-AgentProcess 'git' $arguments $Root
+		if ($run.ExitCode -ne 0) { throw "git $($arguments -join ' ') failed with exit $($run.ExitCode): $($run.Stderr.Trim())" }
+		foreach ($line in ($run.Stdout -split "`n")) {
+			$path = $line.Trim().Replace('\', '/')
+			if ($path.Length -eq 0) { continue }
+			$segments = $path.Split('/')
+			if ($segments[-1].Equals('AGENTS.md', [StringComparison]::OrdinalIgnoreCase) -and
+				@($segments | Select-Object -SkipLast 1 | Where-Object { $_.Equals('Raw', [StringComparison]::OrdinalIgnoreCase) }).Count -eq 0) { continue }
+			[void] $paths.Add($path)
+		}
+	}
+	return [string[]]@($paths)
+}
+
+# The commit the bootstrap Shared-data refresh last exported the Project's data from, beside its Output\Data under Root.
+function Get-AgentSharedDataStampPath([string] $Root, [string] $Project) {
+	return Join-Path $Root "Projects\$Project\Platforms\VisualStudio2026\Output\SharedDataStamp.txt"
 }
 
 # The record every successful, non-selective game build of Target and Configuration writes: the format marker, the
@@ -356,4 +378,4 @@ function Get-AgentPlansLayoutViolation([string] $RepositoryRoot, [string] $Folde
 	return @($sorted | ForEach-Object { $parts = $_.Split("`0"); [pscustomobject] @{ rule = $parts[1]; path = $parts[0] } })
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentShaderSourceFingerprint, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation

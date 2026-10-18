@@ -133,7 +133,7 @@ Agents need to take ships, shots, and effects out of a scene without bypassing t
   - Runtime: `implementer` drives `/agent-harness` for D1-D4 on a build of the tree with Stage 1 landed.
   - Cleanup: `implementer` `/update-claude-docs` not triggered (no C++ change); the Tier-1 combined pass carries `/progressive-disclosure-review` for the AGENTS.md clause.
   - Landing: `implementer` `/finalize-changes`.
-- Data mode: Shared; no Local trigger.
+- Data mode: resolved by the build (`.agents/skills/compile/references/runtime-data-mode.md` `## Mode selection`).
 - Leftovers: none.
 
 ## Unresolved decisions

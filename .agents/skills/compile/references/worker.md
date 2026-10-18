@@ -8,7 +8,7 @@ and the handoff this run returns.
 
 1. Resolve identities, the changed-path set, and the data-mode directories by
    running the repository-owned read-only script. Done when exactly one
-   `broken-engine-compile-context/v1` JSON object is captured from its stdout;
+   `broken-engine-compile-context/v2` JSON object is captured from its stdout;
    human diagnostics go to stderr.
 
 ```powershell
@@ -21,11 +21,11 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      Pass the same explicitly supplied values to the build invocation.
    - Append `-Project <Name>` only as step 3's game selection directs.
    - `-IncludeDevEnvDir` is not an agent-run option: the build entry point
-     requests DevEnvDir itself for an authorized Local generation build.
+     requests DevEnvDir itself for every game build.
 
-2. Read that result as judgment evidence — which targets to build, and whether
-   your own judgment overrides the reported data mode. Done when every field
-   below has been read and no blocking condition is present.
+2. Read that result as evidence of which targets to build and which data mode
+   each game build uses. Done when every field below has been read and no
+   blocking condition is present.
 
    - `status`/`code`/`message` with exit `0` pass, `2` structured blocked, `1`
      internal error. Any nonzero exit stops the build: report the exact `code`
@@ -43,18 +43,16 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      name that is not among them blocks under `project.not-found`.
    - `changedPaths`/`changedPathCount` — the complete changed-path set: the
      single baseline diff (committed, staged, and unstaged tracked changes) plus
-     untracked files, separator-normalized. `changedPathsTruncated`,
-     `triggerMatchesTruncated`, `deletionOnlyCandidatesTruncated`, and code
+     untracked files, separator-normalized. `changedPathsTruncated` and code
      `output.capacity-exceeded` are blocking conditions, never a partial answer
      to work from.
-   - `triggerMatches` — each changed path with the Local path trigger it
-     matched.
-   - `deletionOnlyCandidates` — trigger-matching changed paths whose baseline
-     diff status is a deletion, with rename sides excluded. Evidence for the
-     deletion-only exception in [runtime-data-mode.md](runtime-data-mode.md),
-     never its decision.
-   - `dataBuildMode` with `dataBuildModeDerivation` `path-rules-only`, plus
-     `gameDataDirectory` and `generatedDataIncludeRoot`.
+   - `dataBuildMode` and `dataBuildModeReason` — the data mode every game build
+     uses and why, decided by the rule in
+     [runtime-data-mode.md](runtime-data-mode.md) `## Mode selection`;
+     `sharedDataStamp` — the data stamp's commit, or `null`;
+     `dataInputChanges` (the first 20) and `dataInputChangeCount` — the
+     differing data inputs. Plus `gameDataDirectory` and
+     `generatedDataIncludeRoot`.
    - `recommendedTargets` — advisory `{project, configuration, reason}` rows
      derived from the changed paths.
 
@@ -108,10 +106,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      (`/agent-harness`, Ownership and takeover). Do not discover this as a link
      error.
 
-5. Select the runtime data mode for every build targeting a game project. Done
-   when [runtime-data-mode.md](runtime-data-mode.md) has been read and its
-   modes and authorization rules are mapped onto the build invocation's
-   parameters.
+5. Read [runtime-data-mode.md](runtime-data-mode.md) for every build targeting
+   a game project. Done when it has been read; the build invocation resolves
+   the data mode itself, and you do not select it.
 
    - Client or server, full or selective, whichever source files a selective
      compile lists.
@@ -157,10 +154,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
      [`../SKILL.md`](../SKILL.md) `## Inputs` names; an explicit non-Release
      value on those targets is a typed block.
    - `-Files` — selective compile, Client/Server only; see step 8.
-   - `-DataBuildMode`, `-RunDataPacker`, `-AllowGaeaExport`,
-     `-ForbidExpensiveExport`, `-AcceptDeletionOnlyException` — Client/Server
-     only; [runtime-data-mode.md](runtime-data-mode.md) owns when each one is
-     authorized.
+   - `-AllowGaeaExport`, `-ForbidExpensiveExport` — Client/Server only;
+     [runtime-data-mode.md](runtime-data-mode.md) `## Local generation` owns
+     when each applies.
    - `-Project` — Client/Server only; the game project per step 3.
    - `-Prefast` — Client/Server Release only; see
      [prefast-mode.md](prefast-mode.md).
@@ -182,9 +178,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
    - Only `.cpp` inputs already present in the target project are valid.
    - After a header edit, list the affected project-member `.cpp` files.
    - Add new files to the vcxproj/filters before compiling.
-   - Shader changes require Local output generated through the authorized
-     first-build path in [runtime-data-mode.md](runtime-data-mode.md) or
-     prepared explicitly before the client build.
+   - A shader source change is a data-input change, so the build resolves
+     Local and generates its own output
+     ([runtime-data-mode.md](runtime-data-mode.md) `## Mode selection`).
 
 9. Run each build invocation synchronously in the foreground and remain in-turn
    until its process exit code and single JSON result are captured. Done when
@@ -214,10 +210,10 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
      `run_in_background`, and never end a delegated turn while a build is
      running — a background task's completion notification cannot resume a
      worker whose turn has ended.
-   - If the host call times out while a build without `-RunDataPacker`
+   - If the host call times out while a build that is not a Local game build
      continues, re-invoke the identical command; target serialization and
      incremental tlogs carry it to completion.
-   - A `-RunDataPacker` invocation materializes Local data before it reaches
+   - A Local game build materializes Local data before it reaches
      that serialization, so first confirm the prior invocation's process has
      ended — its shell call returned, or the process is provably gone — and only
      then re-invoke the identical command, which regenerates rather than reusing
@@ -255,7 +251,7 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
     - `broken-engine-compile-invoke-result/v1` — the build never ran.
       `status`/`code`/`message` name the block; exit `2` is a structured block
       (parameter contract, context, provisioning, missing AgentTools or target,
-      data-mode authorization, ThirdParty output ownership, stale process
+      ThirdParty output ownership, stale process
       Vulkan SDK as `vulkan-sdk.stale-environment`) and exit `1` is an
       internal error. Report the exact `code` and `message` and stop — inside
       step 3's several-games loop, stop only that game's invocations; never
@@ -264,8 +260,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
     - Both envelopes are guaranteed only from successful parameter binding
       onward.
     - A value the parameter contract rejects at binding time — an unlisted
-      `-Target`, `-Configuration`, or `-DataBuildMode` value — fails before the
-      script runs, so PowerShell's own parameter error goes to stderr with a
+      `-Target` or `-Configuration` value, or an unknown parameter — fails
+      before the script runs, so PowerShell's own parameter error goes to stderr with a
       nonzero exit and stdout stays empty; fix the invocation rather than
       looking for a typed `code`.
 
@@ -286,8 +282,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
   after it finishes; never delete `.claude/build-locks/` manually.
 - A prior killed build's `unsuccessfulbuild` marker clears on the next
   successful run; rerun instead of deleting tlogs.
-- Every invocation that clears the parameter, context, ThirdParty
-  output-ownership, and data-mode authorization guards runs
+- Every invocation that clears the parameter, context, and ThirdParty
+  output-ownership guards runs
   `.agents/scripts/Provision-WorktreeThirdParty.ps1` against the derived root
   and then requires both executables before anything else happens; a nonzero
   provisioning exit is the typed block `provisioning.failed`, and a missing
@@ -348,9 +344,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
   Other `LNK1104`, `LNK1168`, or EXE `LNK2019` failures can mean a live target
   process still holds the executable; report them rather than diagnosing unless
   asked.
-- Ordinary builds do not run DataPacker, Gaea, or texture export; the authorized
-  Local-generation path and the wrapper bootstrap's primary run are the only
-  exceptions. Every invocation passes `EnableClangTidyCodeAnalysis=false` and
+- Builds do not run DataPacker, Gaea, or texture export; the Local generation
+  build ([runtime-data-mode.md](runtime-data-mode.md) `## Local generation`)
+  and the wrapper bootstrap's primary run are the only exceptions. Every invocation passes `EnableClangTidyCodeAnalysis=false` and
   `RunCodeAnalysis=false`; `-Prefast` and `-ClangTidy` are the only exceptions,
   and `-ClangTidy` keeps the rule-set path off. `RunCodeAnalysis=false` still
   leaves cl `/analyze` running with the compiler's default rules on every

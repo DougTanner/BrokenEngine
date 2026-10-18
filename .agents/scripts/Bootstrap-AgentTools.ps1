@@ -239,20 +239,16 @@ try {
 			else {
 				foreach ($gameProject in $gameProjects) {
 					$gameDataDirectory = Join-Path $root "Projects\$gameProject\Platforms\VisualStudio2026\Output\Data"
-					$shaderPathspec = "Projects/$gameProject/Data/Shaders"
-					# Shared Client builds compare this stamp with the shader-source fingerprint of their own HEAD.
-					# The old stamp goes before the export, and a failed delete aborts here, so data exported from
-					# sources the stamp does not describe is never vouched for. It sits beside Data, not inside it,
-					# to keep the Data inventory.
-					$shaderStampPath = Join-Path (Split-Path -Parent $gameDataDirectory) 'SharedDataShaderStamp.txt'
-					if (Test-Path -LiteralPath $shaderStampPath -PathType Leaf) { [IO.File]::Delete($shaderStampPath) }
+					# The data stamp holds the primary commit this export ran from; a worktree game build uses this
+					# Shared data only when its data inputs equal that commit's. The old stamp goes before the export,
+					# and a failed delete aborts here, so data exported from inputs the stamp does not describe is never
+					# vouched for. It sits beside Data, not inside it, to keep the Data inventory.
+					$dataStampPath = Get-AgentSharedDataStampPath $root $gameProject
+					if (Test-Path -LiteralPath $dataStampPath -PathType Leaf) { [IO.File]::Delete($dataStampPath) }
 					# Best-effort like the DataPacker prebuild snapshots: a failure leaves the data unstamped.
-					$shaderPreFingerprint = $null
-					try {
-						$shaderPreFingerprint = Get-AgentShaderSourceFingerprint $root 'HEAD' $gameProject
-						$shaderPreDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Engine/Data/Shaders', $shaderPathspec, ':(exclude,glob,icase)**/AGENTS.md'))
-					}
-					catch { Write-Warning "Could not snapshot the primary shader sources, so the Shared-data shader stamp will not be written: $($_.Exception.Message)"; $shaderPreFingerprint = $null }
+					$stampCommit = $null
+					try { $stampCommit = ([string](Invoke-AgentGit @('-C', $root, 'rev-parse', 'HEAD'))).Trim() }
+					catch { Write-Warning "Could not read the primary HEAD commit, so the Shared data stamp will not be written: $($_.Exception.Message)"; $stampCommit = $null }
 					$hadNoninteractive = Test-Path Env:BT_DATAPACKER_NONINTERACTIVE
 					$previousNoninteractive = [Environment]::GetEnvironmentVariable('BT_DATAPACKER_NONINTERACTIVE', 'Process')
 					try {
@@ -268,18 +264,18 @@ try {
 					if ($dataPackerExitCode -ne 0) { throw "The primary DataPacker run failed with exit code $dataPackerExitCode, so '$gameDataDirectory' may be incomplete. Fix the offending asset in the primary checkout outside an agent session (or run DataPacker there directly), then retry." }
 					$refreshedDataDirectories.Add($gameDataDirectory)
 					# The mutex excludes peer bootstraps but not a landing or user edit during the export, so the
-					# stamp is written only when the shader sources, AGENTS.md files aside, were clean and unchanged
-					# across it.
-					if ($null -ne $shaderPreFingerprint) {
+					# stamp is written only when the data inputs show no committed or uncommitted difference from the
+					# commit captured before it.
+					if ($null -ne $stampCommit) {
 						try {
-							$shaderPostFingerprint = Get-AgentShaderSourceFingerprint $root 'HEAD' $gameProject
-							$shaderPostDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'Engine/Data/Shaders', $shaderPathspec, ':(exclude,glob,icase)**/AGENTS.md'))
-							if ($shaderPreFingerprint -cne $shaderPostFingerprint -or $shaderPreDirty.Count -ne 0 -or $shaderPostDirty.Count -ne 0) {
-								Write-Warning "Primary shader sources were uncommitted or changed during the data refresh, so the Shared-data shader stamp was not written; Shared Client builds will block until a clean refresh."
+							[string[]] $dataInputChanges = @(Get-AgentDataInputChanges $root $stampCommit $gameProject)
+							if ($dataInputChanges.Count -eq 0) { [IO.File]::WriteAllText($dataStampPath, $stampCommit + "`n") }
+							else {
+								Write-Warning ("Primary data inputs differ from commit $stampCommit after the data refresh, so the Shared data stamp was not written and worktree game builds resolve Local until a clean refresh: $($dataInputChanges -join '; '). " +
+									'When the export itself rewrote tracked data inputs (island BC textures, scene .PreExport markers), committing them in the primary restores Shared at the next refresh.')
 							}
-							else { [IO.File]::WriteAllText($shaderStampPath, $shaderPreFingerprint + "`n") }
 						}
-						catch { Write-Warning "Could not write the Shared-data shader stamp, so Shared Client builds will block until a clean refresh: $($_.Exception.Message)" }
+						catch { Write-Warning "Could not compare the primary data inputs after the data refresh, so the Shared data stamp was not written and worktree game builds resolve Local until a clean refresh: $($_.Exception.Message)" }
 					}
 				}
 			}

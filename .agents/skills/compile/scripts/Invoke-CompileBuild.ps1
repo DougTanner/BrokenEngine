@@ -14,11 +14,8 @@ param(
 	[Parameter(Mandatory)][ValidateSet('ThirdParty', 'DataPacker', 'Client', 'Server', 'WorktreeCli', 'AgentHarness')][string] $Target,
 	[ValidateSet('Debug', 'Profile', 'Release')][string] $Configuration,
 	[string[]] $Files,
-	[ValidateSet('Shared', 'Local')][string] $DataBuildMode,
-	[switch] $RunDataPacker,
 	[switch] $AllowGaeaExport,
 	[switch] $ForbidExpensiveExport,
-	[switch] $AcceptDeletionOnlyException,
 	[switch] $Prefast,
 	[switch] $ClangTidy,
 	[string] $Project,
@@ -37,7 +34,7 @@ Import-Module (Join-Path $sharedScripts 'AgentScriptCommon.psm1') -Force
 
 # ValidateSet binds any casing, while every routing comparison below is case-sensitive, so each
 # bound value is normalized once to the exact spelling its own ValidateSet declares.
-foreach ($parameterName in @('Target', 'Configuration', 'DataBuildMode')) {
+foreach ($parameterName in @('Target', 'Configuration')) {
 	$boundValue = [string](Get-Variable -Name $parameterName -ValueOnly)
 	if ([string]::IsNullOrWhiteSpace($boundValue)) { continue }
 	$declared = @($PSCmdlet.MyInvocation.MyCommand.Parameters[$parameterName].Attributes |
@@ -213,20 +210,11 @@ try {
 	if (-not $isGameTarget) {
 		foreach ($pair in @(
 			@{ Set = $null -ne $Files -and $Files.Count -gt 0; Name = '-Files' },
-			@{ Set = -not [string]::IsNullOrWhiteSpace($DataBuildMode); Name = '-DataBuildMode' },
-			@{ Set = [bool]$RunDataPacker; Name = '-RunDataPacker' },
 			@{ Set = [bool]$AllowGaeaExport; Name = '-AllowGaeaExport' },
 			@{ Set = [bool]$ForbidExpensiveExport; Name = '-ForbidExpensiveExport' },
-			@{ Set = [bool]$AcceptDeletionOnlyException; Name = '-AcceptDeletionOnlyException' },
 			@{ Set = -not [string]::IsNullOrWhiteSpace($Project); Name = '-Project' })) {
 			if ($pair.Set) { Stop-CompileInvoke 'parameter.game-only' "$($pair.Name) applies to Client or Server builds only." }
 		}
-	}
-	if ($AllowGaeaExport -and -not $RunDataPacker) {
-		Stop-CompileInvoke 'parameter.gaea-invalid' '-AllowGaeaExport applies only to the authorized -RunDataPacker generation build.'
-	}
-	if ($ForbidExpensiveExport -and -not $RunDataPacker) {
-		Stop-CompileInvoke 'parameter.expensive-export-invalid' '-ForbidExpensiveExport applies only to the authorized -RunDataPacker generation build.'
 	}
 	if ($null -ne $Files) {
 		# Elements split on ',' so the single-argument -File form carries a whole list.
@@ -239,7 +227,7 @@ try {
 	if (-not [string]::IsNullOrWhiteSpace($PrimaryCheckout)) { $contextArguments.AddRange([string[]]@('-PrimaryCheckout', $PrimaryCheckout)) }
 	if (-not [string]::IsNullOrWhiteSpace($Baseline)) { $contextArguments.AddRange([string[]]@('-Baseline', $Baseline)) }
 	if (-not [string]::IsNullOrWhiteSpace($Project)) { $contextArguments.AddRange([string[]]@('-Project', $Project)) }
-	if ($RunDataPacker) { $contextArguments.Add('-IncludeDevEnvDir') }
+	if ($isGameTarget) { $contextArguments.Add('-IncludeDevEnvDir') }
 	$contextResponse = Invoke-CompileScript 'Resolve-CompileContext.ps1' $contextArguments.ToArray()
 	$context = ConvertFrom-ChildJson $contextResponse.Stdout 'Resolve-CompileContext.ps1'
 	if ($contextResponse.ExitCode -ne 0) {
@@ -258,8 +246,8 @@ try {
 		}
 	}
 
-	# The effective data mode decides which authorizations hold, so it resolves from the read-only
-	# context alone and its guards block before provisioning or any other side effect can run.
+	# The data mode resolves from the read-only context alone, before provisioning or any other side
+	# effect can run.
 	if ($isGameTarget) {
 		# One run builds one game; with several game projects the caller names one per run.
 		if ($null -eq $context.project) {
@@ -273,90 +261,7 @@ try {
 		$script:SelectiveTargetFiles.Client = "$projectDirectory\$gameProject.vcxproj"
 		$script:SelectiveTargetFiles.Server = "$projectDirectory\$($gameProject)Server.vcxproj"
 		$script:DataOutputSuffix = "$projectDirectory\Output\Data"
-		$reportedMode = [string]$context.dataBuildMode
-		$selectedMode = if ([string]::IsNullOrWhiteSpace($DataBuildMode)) { $reportedMode } else { $DataBuildMode }
-		# The effective mode decides this, not the override alone: a derived Shared mode would otherwise
-		# let generation write into the primary Shared data directory.
-		if ($RunDataPacker -and $selectedMode -cne 'Local') {
-			Stop-CompileInvoke 'data-mode.rundatapacker-requires-local' "-RunDataPacker requires an effective Local mode; the effective mode is $selectedMode, and generation is a Local-mode operation."
-		}
-		if ($selectedMode -ceq 'Shared' -and $reportedMode -ceq 'Local') {
-			$triggerPaths = @($context.triggerMatches | ForEach-Object { [string]$_.path })
-			$deletionOnly = @($context.deletionOnlyCandidates | ForEach-Object { [string]$_ })
-			$nonDeletion = @($triggerPaths | Where-Object { $_ -cnotin $deletionOnly })
-			# The exception covers source assets only. The trigger label carries the context's own
-			# separator and case normalization, so it is matched instead of the raw path.
-			$nonAsset = @($context.triggerMatches | Where-Object { [string]$_.trigger -cnotin @('Engine/Data/**', "Projects/$gameProject/Data/**") } | ForEach-Object { [string]$_.path })
-			if (-not $AcceptDeletionOnlyException) {
-				Stop-CompileInvoke 'data-mode.shared-over-local' "Shared was requested over a Local path trigger ($($triggerPaths -join ', ')). Only the deletion-only exception permits this, through -AcceptDeletionOnlyException with its recorded reference-search evidence."
-			}
-			if ($nonDeletion.Count -gt 0) {
-				Stop-CompileInvoke 'deletion-only.unsupported' "The deletion-only exception does not cover these changed paths, which are not baseline deletions: $($nonDeletion -join ', ')."
-			}
-			if ($nonAsset.Count -gt 0) {
-				Stop-CompileInvoke 'deletion-only.unsupported' "The deletion-only exception covers source assets under Engine/Data/** and Projects/$gameProject/Data/** only; these changed paths are outside it: $($nonAsset -join ', ')."
-			}
-		}
-		# Only an authorized generation build creates the Local Data directory; without it MSBuild
-		# would fail on the missing generated headers.
-		$localDataDirectory = Join-Path $script:Root $script:DataOutputSuffix
-		if ($selectedMode -ceq 'Local' -and -not $RunDataPacker -and -not (Test-Path -LiteralPath $localDataDirectory -PathType Container)) {
-			$reason = if ($reportedMode -ceq 'Local') {
-				"Local was selected by these changed paths: $(@($context.triggerMatches | ForEach-Object { [string]$_.path }) -join ', '). Rerun with generation authorization (-RunDataPacker)."
-			}
-			else {
-				'Local was forced by -DataBuildMode Local. Rerun with generation authorization (-RunDataPacker), or drop -DataBuildMode Local only when no changed file can affect generated bytes.'
-			}
-			Stop-CompileInvoke 'data-mode.local-output-missing' "Local data mode has no generated output at '$localDataDirectory' and -RunDataPacker is absent, so the build would fail on missing generated headers. $reason"
-		}
-		# The client compiles the shader layout headers from this worktree but loads the primary's
-		# Shader.pack, so a Shared Client build needs the stamp the bootstrap refresh writes to name the
-		# same shader-source fingerprint; a mismatch crashes the client at startup. The server loads no
-		# shaders.
-		if ($Target -ceq 'Client' -and $selectedMode -ceq 'Shared') {
-			$sharedDataDirectory = Join-Path $primary $script:DataOutputSuffix
-			$shaderStampPath = Join-Path (Split-Path -Parent $sharedDataDirectory) 'SharedDataShaderStamp.txt'
-			$worktreeShaderFingerprint = Get-AgentShaderSourceFingerprint $script:Root 'HEAD' $gameProject
-			$shaderStamp = $null
-			try { $shaderStamp = [IO.File]::ReadAllText($shaderStampPath).Trim() }
-			catch [IO.FileNotFoundException], [IO.DirectoryNotFoundException] { }
-			if ($null -eq $shaderStamp -or $shaderStamp -cne $worktreeShaderFingerprint) {
-				# The block names its case's cheaper remedy, when one exists, plus Local generation
-				# authorization, which always clears it because this check runs only for a Shared build.
-				# Primary main's fingerprint is read with the stamp writer's own function; the worktree's own
-				# shader change is measured from its session baseline, because a merge base with primary main
-				# does not survive a primary history squash.
-				$primaryShaderFingerprint = Get-AgentShaderSourceFingerprint $primary 'HEAD' $gameProject
-				$sessionBaseline = [string]$context.baseline
-				$baselineShaderFingerprint = Get-AgentShaderSourceFingerprint $script:Root $sessionBaseline $gameProject
-				$localRemedy = "Local generation authorization (-DataBuildMode Local -RunDataPacker) clears this in every case, because this check runs only for a Shared build. Cost: up to about 1 GB, from restoring the sparse-skipped Engine/Data art trees and generating this worktree's own Data output; and each /compile derives the data mode from this worktree's changed paths, so every later game build (client and server) in this session must also pass -DataBuildMode Local; a Client build without it blocks here again."
-				$refreshCommand = "with this session's game closed, run the on-demand Shared-data refresh from this worktree's root: pwsh -NoProfile -File .agents/scripts/Bootstrap-AgentTools.ps1 -RepositoryRoot '$primary' -SharedDataOnly. It re-exports the Shared data from primary main; every skip exits 0, so only its 'Refreshed primary data at' line shows the refresh ran."
-				$refreshCommand += " Run it without asking the user unless this worktree's own committed or uncommitted changes, measured from its merge base with primary main, touch .agents/scripts/; then ask the user first."
-				$refreshCommand += " One run can outlast a tool-call timeout (up to -WaitSeconds each for the bootstrap mutex and a running game, then the DataPacker prebuild and data export), so run it where a tool-call timeout cannot kill it, for example with the host's background-execution parameter such as run_in_background; a killed shell stops the export midway and leaves the primary data unstamped."
-				$retryLead = $null
-				if ($worktreeShaderFingerprint -ceq $primaryShaderFingerprint) {
-					$remedy = "Primary main's shader trees already match this worktree's HEAD, so $refreshCommand Then rerun /compile in this session. Cost: one DataPacker prebuild and data export; this session keeps running, and no rebase is needed."
-					$retryLead = 'retry after a running refresh finishes.'
-				}
-				elseif ($worktreeShaderFingerprint -cne $baselineShaderFingerprint) {
-					$remedy = "This worktree's commits change the shader trees since its session baseline $($sessionBaseline.Substring(0, 8)), so neither a refresh nor a rebase puts those changes into the primary Shader.pack."
-				}
-				elseif ($shaderStamp -ceq $primaryShaderFingerprint) {
-					$remedy = "Rebase onto primary main: the Shared data was exported from primary main's shader trees, and this worktree's commits leave its shader trees unchanged since its session baseline, so a rebase makes them match. Cost: commit or set aside uncommitted work first; no data is regenerated."
-				}
-				else {
-					$remedy = "The Shared data predates primary main and this worktree is behind it, so neither a rebase nor a refresh alone clears this. Rebase onto primary main first; then, $refreshCommand Then rerun /compile in this session. Cost: a rebase plus one DataPacker prebuild and data export; this session keeps running."
-					$retryLead = 'if one is running, wait for it to finish, then rebase onto primary main, because this worktree is behind primary main and a retry alone blocks again.'
-				}
-				if ($null -eq $shaderStamp) {
-					# A finished refresh stamps primary main's fingerprint, so only a refresh remedy keeps the retry
-					# lead and the uncommitted-primary condition.
-					$missingStampRemedy = if ($null -eq $retryLead) { $remedy } else { "A refresh, at a session start or on demand, deletes the stamp while it exports: $retryLead If no refresh is running: $remedy The refresh writes no stamp while the primary checkout's shader sources are uncommitted or changing, so commit or discard those changes before the next refresh." }
-					Stop-CompileInvoke 'data-mode.shared-shader-unverified' "The Shared data at '$sharedDataDirectory' has no shader provenance stamp ('$shaderStampPath'), so its Shader.pack cannot be matched to this worktree's shader sources. $missingStampRemedy $localRemedy"
-				}
-				Stop-CompileInvoke 'data-mode.shared-shader-unverified' "The Shared data at '$sharedDataDirectory' was exported from shader-source fingerprint $shaderStamp, but this worktree's HEAD has $worktreeShaderFingerprint, so its Shader.pack does not match the shader layouts this build compiles. $remedy $localRemedy"
-			}
-		}
+		$dataBuildMode = [string]$context.dataBuildMode
 	}
 
 	$provisionResponse = Invoke-SharedScript 'Provision-WorktreeThirdParty.ps1' @('-RepositoryRoot', $script:Root)
@@ -407,24 +312,19 @@ try {
 		Complete-CompileBuild (Invoke-WorktreeCliBuild @())
 	}
 
-	# Game target: the effective data mode is already resolved and guarded, so this runs the
-	# mode's directories.
-	if ($selectedMode -ceq $reportedMode) {
-		$gameDataDirectory = [string]$context.gameDataDirectory
-		$generatedDataIncludeRoot = [string]$context.generatedDataIncludeRoot
+	# Game target: the data mode is already resolved, so this runs the mode's directories.
+	$gameDataDirectory = [string]$context.gameDataDirectory
+	$generatedDataIncludeRoot = [string]$context.generatedDataIncludeRoot
+	$modeReason = [string]$context.dataBuildModeReason
+	if ($modeReason -ceq 'inputs-differ') {
+		$modeReason += ": $($context.dataInputChangeCount) data input(s) differ from Shared data stamp $($context.sharedDataStamp), reported: $(@($context.dataInputChanges | ForEach-Object { [string]$_ }) -join ', ')"
 	}
-	else {
-		# Mode and directories always move together, so an overridden mode re-derives both.
-		$owner = if ($selectedMode -ceq 'Local') { $script:Root } else { $primary }
-		$gameDataDirectory = Get-AgentCanonicalPath (Join-Path $owner $script:DataOutputSuffix)
-		$generatedDataIncludeRoot = Get-AgentCanonicalPath ([IO.Path]::GetDirectoryName($gameDataDirectory))
-	}
-	$script:Summary.Add("DataBuildMode=$selectedMode (path rules reported $reportedMode) GameDataDirectory=$gameDataDirectory GeneratedDataIncludeRoot=$generatedDataIncludeRoot")
+	$script:Summary.Add("DataBuildMode=$dataBuildMode ($modeReason) GameDataDirectory=$gameDataDirectory GeneratedDataIncludeRoot=$generatedDataIncludeRoot")
 
-	$runGeneration = [bool]$RunDataPacker
+	$runGeneration = $dataBuildMode -ceq 'Local'
 
 	$dataProperties = @(
-		"/p:DataBuildMode=$selectedMode",
+		"/p:DataBuildMode=$dataBuildMode",
 		"/p:RunDataPacker=$(if ($runGeneration) { 'true' } else { 'false' })",
 		"/p:GameDataDirectory=$gameDataDirectory",
 		"/p:GeneratedDataIncludeRoot=$generatedDataIncludeRoot"
@@ -436,7 +336,7 @@ try {
 		# Shared data directory against its listing. The listing is taken before MSBuild runs, so a refresh
 		# during the build differs at the next comparison, and a failed build keeps the previous record.
 		[string[]] $sharedDataListing = @()
-		if ($selectedMode -ceq 'Shared' -and $script:SelectedFiles.Count -eq 0) {
+		if ($dataBuildMode -ceq 'Shared' -and $script:SelectedFiles.Count -eq 0) {
 			$sharedDataListing = [string[]]@(Get-AgentDataListing $gameDataDirectory)
 		}
 		$buildExitCode = Invoke-WorktreeCliBuild $dataProperties
@@ -446,8 +346,9 @@ try {
 		Complete-CompileBuild $buildExitCode
 	}
 
-	# Authorized Local generation: materialize, then run the one RunDataPacker=true build under the
-	# Gaea guard and, when requested, the optional expensive-export guard.
+	# Local generation: materialize, then run the one RunDataPacker=true build under the Gaea guard
+	# unless -AllowGaeaExport is passed, and under the expensive-export guard when
+	# -ForbidExpensiveExport is passed.
 	if (-not (Test-JsonProperty $context 'devEnvDir') -or [string]::IsNullOrWhiteSpace($context.devEnvDir)) {
 		Stop-CompileInvoke 'dev-env-dir.unresolved' 'The generation build requires DevEnvDir, which the compile context did not report.'
 	}
@@ -467,6 +368,13 @@ try {
 	$dataPacker = Join-Path $script:Root 'DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe'
 	if (-not (Test-Path -LiteralPath $dataPacker -PathType Leaf)) {
 		Stop-CompileInvoke 'datapacker.missing' "The worktree DataPacker is missing: '$dataPacker'. Build -Target DataPacker first."
+	}
+	# In the primary checkout the Local data directory is the Shared one, so this export rewrites the
+	# Shared data, which the stamp may only vouch for as exported from its own commit. A failed delete
+	# throws here, before any data is written.
+	if ($script:Root.Equals($primary, [StringComparison]::OrdinalIgnoreCase)) {
+		$primaryStampPath = Get-AgentSharedDataStampPath $primary $gameProject
+		if (Test-Path -LiteralPath $primaryStampPath -PathType Leaf) { [IO.File]::Delete($primaryStampPath) }
 	}
 	# DataPacker writes progress and mutex-wait notices to stdout, which is reserved for the single
 	# JSON envelope, so its output is captured and forwarded as a diagnostic instead.
@@ -508,6 +416,9 @@ try {
 			if ($hadExpensiveExportGuard) { [Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, $previousExpensiveExportGuard) }
 			else { [Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, $null) }
 		}
+	}
+	if ($buildExitCode -ne 0 -and -not $AllowGaeaExport) {
+		$script:Summary.Add("A failure reporting 'Gaea.Swarm export blocked by $($script:GaeaGuardVariable)=1' means this worktree's island inputs differ from the shared Gaea bake. When this worktree is behind primary main, rebase onto it. A change to this worktree's own island inputs exports only through -AllowGaeaExport, which only an approved plan or acceptance criterion requiring that island re-bake authorizes.")
 	}
 	# Local output needs no listing: the comparison skips data directories under the worktree root.
 	if ($buildExitCode -eq 0 -and $script:SelectedFiles.Count -eq 0) {

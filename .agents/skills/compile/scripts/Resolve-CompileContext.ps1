@@ -1,15 +1,12 @@
 # Resolves the deterministic build context /compile needs before any build command runs:
 # repository identities, the game project (the -Project name, else the only game project
-# discovered), the changed-path set, the path-rule-derived data mode and its directories, and
-# optionally DevEnvDir. Read-only: it launches no writing command and emits nothing but stdout
-# JSON and stderr diagnostics.
+# discovered), the changed-path set, the data mode and its directories, and optionally DevEnvDir.
+# Read-only: it launches no writing command and emits nothing but stdout JSON and stderr
+# diagnostics.
 #
-# dataBuildMode is derived from path rules alone, except that a modified DataPacker .h/.cpp
-# whose baseline and current token text match is not a trigger. The semantic Local triggers
-# (generated-header logic, exporter versions/fingerprints, compression, chunk layout,
-# pack/manifest contracts), the "may affect generated or serialized bytes" catch-all,
-# Local-generation authorization, and the deletion-only exception all remain agent
-# judgments this script cannot make.
+# dataBuildMode is decided here from the primary's Shared data stamp alone, and no agent judgment
+# remains: Shared when this worktree's data inputs equal those of the stamp's commit, otherwise
+# Local, including a missing or unresolvable stamp.
 [CmdletBinding()]
 param(
 	[string] $RepositoryRoot,
@@ -30,17 +27,11 @@ Import-Module (Join-Path $sharedScripts 'FinalizeWorkflowCommon.psm1') -Force
 
 $script:MaximumReportedPaths = 512
 $script:MaximumOutputBytes = 65536
-# The path-matchable Local triggers stated in references/runtime-data-mode.md ## Mode selection; a
-# resolved project appends its own Projects/<Project>/Data/** row.
-$script:PathTriggers = @(
-	[pscustomobject]@{ trigger = 'DataPacker/**'; prefix = 'DataPacker/'; exact = $null }
-	[pscustomobject]@{ trigger = 'Engine/Data/**'; prefix = 'Engine/Data/'; exact = $null }
-	[pscustomobject]@{ trigger = 'Common/DataFile.h'; prefix = $null; exact = 'Common/DataFile.h' }
-)
+$script:MaximumReportedDataInputChanges = 20
 
 $script:BlockedCode = $null
 $script:Result = [ordered]@{
-	schemaVersion = 'broken-engine-compile-context/v1'
+	schemaVersion = 'broken-engine-compile-context/v2'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Compile context resolution did not run.'
@@ -52,14 +43,11 @@ $script:Result = [ordered]@{
 	changedPaths = @()
 	changedPathCount = 0
 	changedPathsTruncated = $false
-	triggerMatches = @()
-	triggerMatchCount = 0
-	triggerMatchesTruncated = $false
-	deletionOnlyCandidates = @()
-	deletionOnlyCandidateCount = 0
-	deletionOnlyCandidatesTruncated = $false
 	dataBuildMode = $null
-	dataBuildModeDerivation = 'path-rules-only'
+	dataBuildModeReason = $null
+	sharedDataStamp = $null
+	dataInputChanges = @()
+	dataInputChangeCount = 0
 	gameDataDirectory = $null
 	generatedDataIncludeRoot = $null
 	recommendedTargets = @()
@@ -75,10 +63,6 @@ function Complete-CompileContext([int] $ExitCode, [string] $Status, [string] $Co
 		# Never elide reported paths silently: drop the lists, flag them, and block.
 		$script:Result.changedPaths = @()
 		$script:Result.changedPathsTruncated = $true
-		$script:Result.triggerMatches = @()
-		$script:Result.triggerMatchesTruncated = $true
-		$script:Result.deletionOnlyCandidates = @()
-		$script:Result.deletionOnlyCandidatesTruncated = $true
 		$script:Result.recommendedTargets = @()
 		$script:Result.status = 'blocked'
 		$script:Result.code = 'output.capacity-exceeded'
@@ -126,60 +110,6 @@ function Get-ContextNormalizedPaths([string] $Text) {
 		$paths.Add($value.Replace('\', '/'))
 	}
 	return $paths
-}
-
-function Get-ContextTrigger([string] $Path) {
-	# Repository agent documentation is never a data-pipeline input, so it never counts as a path
-	# trigger. The Raw carve-out mirrors ExportRaw, which packs any file under a directory segment
-	# named Raw whatever its extension.
-	$segments = $Path.Split('/')
-	$leaf = $segments[$segments.Length - 1]
-	if ($leaf.Equals('AGENTS.md', [StringComparison]::OrdinalIgnoreCase)) {
-		$rawDirectories = @($segments | Select-Object -SkipLast 1 | Where-Object { $_.Equals('Raw', [StringComparison]::OrdinalIgnoreCase) })
-		if ($rawDirectories.Count -eq 0) { return $null }
-	}
-	foreach ($trigger in $script:PathTriggers) {
-		if ($null -ne $trigger.exact -and $Path.Equals($trigger.exact, [StringComparison]::OrdinalIgnoreCase)) { return $trigger.trigger }
-		if ($null -ne $trigger.prefix -and $Path.StartsWith($trigger.prefix, [StringComparison]::OrdinalIgnoreCase)) { return $trigger.trigger }
-	}
-	return $null
-}
-
-# Directives, comments, and string/character literals stay verbatim (backslash-newline continues a
-# directive or // comment); the pp-number alternative precedes the character literal so a digit
-# separator such as 1'000 never opens one. Raw string literals are not handled; DataPacker has none.
-$script:TokenPattern = [regex]::new(
-	'(?<v>^[ \t]*#(?:\\\r?\n|[^\r\n])*(?:\r?\n)?)' +
-	'|(?<v>//(?:\\\r?\n|[^\r\n])*(?:\r?\n)?)' +
-	'|(?<v>/\*[\s\S]*?\*/)' +
-	'|(?<c>\.?\d(?:''?[\w.]|[eEpP][+-])*)' +
-	'|(?<v>"(?:\\[\s\S]|[^"\\\r\n])*")' +
-	'|(?<v>''(?:\\[\s\S]|[^''\\\r\n])*'')' +
-	'|(?<c>\w+|[\s\S])',
-	[Text.RegularExpressions.RegexOptions]::Multiline)
-
-function Get-ContextTokenText([string] $Text) {
-	# In code segments each whitespace run becomes one space, dropped beside ( ) [ ] { } , ; a comment,
-	# a directive, or the file edge, none of which can join a neighbor into a longer token. Otherwise a
-	# run beside a string or character literal stays, because it separates an encoding prefix or suffix.
-	$segments = [Collections.Generic.List[string]]::new()
-	$code = [Text.StringBuilder]::new()
-	$flush = {
-		param([string] $Next)
-		$normalized = [regex]::Replace($code.ToString(), '\s+', ' ')
-		$normalized = [regex]::Replace($normalized, ' ?([()\[\]{},;]) ?', '$1')
-		$previous = if ($segments.Count -gt 0) { $segments[$segments.Count - 1] } else { '' }
-		if ($previous -notmatch '^["'']') { $normalized = $normalized.TrimStart() }
-		if ($Next -notmatch '^["'']') { $normalized = $normalized.TrimEnd() }
-		if ($normalized.Length -gt 0) { $segments.Add($normalized) }
-		[void] $code.Clear()
-	}
-	foreach ($match in $script:TokenPattern.Matches($Text)) {
-		if ($match.Groups['v'].Success) { & $flush $match.Value; $segments.Add($match.Value) }
-		else { [void] $code.Append($match.Value) }
-	}
-	& $flush ''
-	return $segments -join "`0"
 }
 
 function Get-ContextRecommendedTargets([string[]] $Paths, [string] $Project) {
@@ -242,9 +172,6 @@ try {
 		$script:Result.project = $projectInput
 	}
 	elseif ($projects.Count -eq 1) { $script:Result.project = $projects[0] }
-	if ($null -ne $script:Result.project) {
-		$script:PathTriggers += [pscustomobject]@{ trigger = "Projects/$($script:Result.project)/Data/**"; prefix = "Projects/$($script:Result.project)/Data/"; exact = $null }
-	}
 
 	$primaryInput = if ([string]::IsNullOrWhiteSpace($PrimaryCheckout)) { $null } else { $PrimaryCheckout.Trim() }
 	if ($null -eq $primaryInput) {
@@ -292,53 +219,31 @@ try {
 	foreach ($path in (Get-ContextNormalizedPaths $diffText)) { [void] $changed.Add($path) }
 	foreach ($path in (Get-ContextNormalizedPaths $untrackedText)) { [void] $changed.Add($path) }
 
-	$triggerMatches = [Collections.Generic.List[object]]::new()
-	foreach ($path in $changed) {
-		$trigger = Get-ContextTrigger $path
-		if ($null -eq $trigger) { continue }
-		if ($trigger -ceq 'DataPacker/**' -and ($path.EndsWith('.h', [StringComparison]::OrdinalIgnoreCase) -or $path.EndsWith('.cpp', [StringComparison]::OrdinalIgnoreCase))) {
-			# A baseline blob plus a working file is a modification; a token-identical one is not a
-			# trigger. Any read or decode failure keeps the path a trigger.
-			try {
-				$workingFile = Join-Path $root $path
-				$baselineBlob = Invoke-ContextGit @('-C', $root, 'cat-file', 'blob', "$($resolvedBaseline):$path")
-				if ($baselineBlob.ExitCode -eq 0 -and (Test-Path -LiteralPath $workingFile -PathType Leaf)) {
-					$workingText = [IO.File]::ReadAllText($workingFile, [Text.UTF8Encoding]::new($false, $true))
-					if ([string]::Equals((Get-ContextTokenText $baselineBlob.Stdout), (Get-ContextTokenText $workingText), [StringComparison]::Ordinal)) { continue }
-				}
-			}
-			catch {
-				[Console]::Error.WriteLine("compile-context: token comparison failed for '$path'; keeping it a trigger: $($_.Exception.Message)")
-			}
-		}
-		$triggerMatches.Add([pscustomobject][ordered]@{ path = $path; trigger = $trigger })
-	}
-
-	# Deletion-only evidence: baseline diff status 'D' only. Rename sides (R*), additions, and
-	# modifications are excluded. Resolving the deletion-only exception remains an agent decision.
-	$statusText = Get-ContextGitText @('-c', 'core.quotepath=false', '-C', $root, 'diff', '--name-status', $resolvedBaseline, '--') 'changed-paths.unavailable' 'Could not list changed-path statuses:'
-	$deletions = [Collections.Generic.SortedSet[string]]::new([StringComparer]::Ordinal)
-	foreach ($line in ($statusText -split "`n")) {
-		$fields = $line.TrimEnd("`r").Split("`t")
-		if ($fields.Count -lt 2) { continue }
-		$status = $fields[0].Trim()
-		if ($status.Length -eq 0 -or $status[0] -ne 'D') { continue }
-		$path = $fields[1].Trim().Replace('\', '/')
-		if ($path.Length -gt 0 -and $null -ne (Get-ContextTrigger $path)) { [void] $deletions.Add($path) }
-	}
-
 	$script:Result.changedPathCount = $changed.Count
 	$script:Result.changedPathsTruncated = $changed.Count -gt $script:MaximumReportedPaths
 	$script:Result.changedPaths = @(@($changed) | Select-Object -First $script:MaximumReportedPaths)
-	$script:Result.triggerMatchCount = $triggerMatches.Count
-	$script:Result.triggerMatchesTruncated = $triggerMatches.Count -gt $script:MaximumReportedPaths
-	$script:Result.triggerMatches = @($triggerMatches | Select-Object -First $script:MaximumReportedPaths)
-	$script:Result.deletionOnlyCandidateCount = $deletions.Count
-	$script:Result.deletionOnlyCandidatesTruncated = $deletions.Count -gt $script:MaximumReportedPaths
-	$script:Result.deletionOnlyCandidates = @(@($deletions) | Select-Object -First $script:MaximumReportedPaths)
 
-	$script:Result.dataBuildMode = if ($triggerMatches.Count -gt 0) { 'Local' } else { 'Shared' }
 	if ($null -ne $script:Result.project) {
+		# The stamp vouches for the Shared data only as exported from its own commit, so Shared needs this
+		# worktree's data inputs to equal that commit's; every other case resolves Local.
+		$stamp = $null
+		try { $stamp = [IO.File]::ReadAllText((Get-AgentSharedDataStampPath $primary $script:Result.project)).Trim() }
+		catch [IO.FileNotFoundException], [IO.DirectoryNotFoundException] { }
+		$script:Result.sharedDataStamp = $stamp
+		if ($null -eq $stamp) { $reason = 'stamp-missing' }
+		else {
+			$stampResponse = Invoke-ContextGit @('-C', $root, 'rev-parse', '--verify', '--quiet', '--end-of-options', "$stamp^{commit}")
+			$stampCommit = $stampResponse.Stdout.Trim()
+			if ($stampResponse.ExitCode -ne 0 -or $stampCommit -cnotmatch '^[0-9a-f]{40}$') { $reason = 'stamp-unresolvable' }
+			else {
+				[string[]] $dataInputChanges = @(Get-AgentDataInputChanges $root $stampCommit $script:Result.project)
+				$script:Result.dataInputChangeCount = $dataInputChanges.Count
+				$script:Result.dataInputChanges = @($dataInputChanges | Select-Object -First $script:MaximumReportedDataInputChanges)
+				$reason = if ($dataInputChanges.Count -eq 0) { 'stamp-match' } else { 'inputs-differ' }
+			}
+		}
+		$script:Result.dataBuildModeReason = $reason
+		$script:Result.dataBuildMode = if ($reason -ceq 'stamp-match') { 'Shared' } else { 'Local' }
 		$dataOwner = if ($script:Result.dataBuildMode -ceq 'Local') { $root } else { $primary }
 		$gameDataDirectory = Get-AgentCanonicalPath (Join-Path $dataOwner "Projects\$($script:Result.project)\Platforms\VisualStudio2026\Output\Data")
 		$script:Result.gameDataDirectory = $gameDataDirectory
@@ -347,12 +252,13 @@ try {
 
 	if ($IncludeDevEnvDir) { $script:Result.devEnvDir = Get-ContextDevEnvDirectory }
 
-	if ($script:Result.changedPathsTruncated -or $script:Result.triggerMatchesTruncated -or $script:Result.deletionOnlyCandidatesTruncated) {
+	if ($script:Result.changedPathsTruncated) {
 		Complete-CompileContext 2 'blocked' 'changed-paths.capacity-exceeded' "The changed-path evidence exceeds the $($script:MaximumReportedPaths)-entry report cap and cannot be reported completely."
 	}
 
 	$script:Result.recommendedTargets = @(Get-ContextRecommendedTargets @($changed) $script:Result.project)
-	Complete-CompileContext 0 'pass' 'ok' "Compile context resolved; data mode $($script:Result.dataBuildMode) from path rules."
+	$modeText = if ($null -eq $script:Result.dataBuildMode) { 'unresolved without a game project' } else { "$($script:Result.dataBuildMode) ($($script:Result.dataBuildModeReason))" }
+	Complete-CompileContext 0 'pass' 'ok' "Compile context resolved; data mode $modeText."
 }
 catch {
 	if ($null -ne $script:BlockedCode) { Complete-CompileContext 2 'blocked' $script:BlockedCode $_.Exception.Message }

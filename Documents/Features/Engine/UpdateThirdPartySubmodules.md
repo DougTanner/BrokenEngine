@@ -146,10 +146,11 @@ The executing session classifies the change Tier 3 and follows `.agents/referenc
    itself returns early in primary.
 7. Port. Change our code and `Documents/FreshMachineSetup.md` as `## In scope` lists, using `## API-break inventory`.
 8. Build ThirdParty, then AgentTools. Through `/compile`, build ThirdParty Debug, Profile, and Release in place in primary; ThirdParty builds are allowed there. Then build WorktreeCli and AgentHarness, which are Release-only candidates under `Temp`. Compile errors in our wrappers or consumers are ported in our code only. If implot fails against imgui `master`, stop and ask the user.
-9. Build DataPacker and the game. Build DataPacker Release; the build script refuses any other DataPacker configuration (`.agents/skills/compile/SKILL.md` `## Inputs`). Then build Client and Server in Debug, Profile, and Release, in the data mode `Resolve-CompileContext.ps1` reports. In primary, Local and Shared both resolve to primary's `Output/Data` (`runtime-data-mode.md` `## Mode selection`).
+9. Build DataPacker and the game. Build DataPacker Release; the build script refuses any other DataPacker configuration (`.agents/skills/compile/SKILL.md` `## Inputs`). Then build Client and Server in Debug, Profile, and Release, in the data mode `Resolve-CompileContext.ps1` reports.
+   In primary, Local and Shared both use primary's `Output/Data`; a Local build there also re-exports into it under the Gaea guard and deletes the primary data stamp, which step 19's refresh writes again (`runtime-data-mode.md` `## Mode selection`).
 10. Propagate and check. Run `/update-affected-code`, then `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<primary>' -Baseline <start>`.
 11. Review. Run the `## Review roles` passes, resolve accepted findings, and rebuild what they touch.
-12. Forced re-export, with Local generation authorized by this plan and Gaea forbidden (no `-AllowGaeaExport` and no `-ForbidExpensiveExport`).
+12. Forced re-export in Local mode (the version bumps below make `Resolve-CompileContext.ps1` report Local), with Gaea forbidden (no `-AllowGaeaExport` and no `-ForbidExpensiveExport`).
     - Add `1'000'000` to the base literal of each of these (e.g. `Version(31)`
       becomes `Version(1'000'031)`): `ExportAudio::kiVersion`
       (`DataPacker/Source/ExportJobs/ExportAudio.h:13`),
@@ -161,13 +162,13 @@ The executing session classifies the change Tier 3 and follows `.agents/referenc
       (`Island/BakeRoute.cpp:38`), and `kiCubemapIblFingerprintVersion`
       (`ExportCubemapIbl.cpp:8`).
     - Leave alone `kiBakeVersion` (`BakeRoute.cpp:37`, Gaea) and the cache-bookkeeping versions (`ExportJob.cpp:9`, `ExportShader.cpp:319`, `InputFingerprint.cpp:86,90`).
-    - Run `/compile -Target Client -Configuration Release -DataBuildMode Local -RunDataPacker`. If the Gaea guard blocks a route, stop and report it.
+    - Run `/compile -Target Client -Configuration Release`, whose envelope reports `/p:DataBuildMode=Local` and `/p:RunDataPacker=true`. If the Gaea guard blocks a route, stop and report it.
     - Byte-compare all 23 `Output/Data` files with `Temp/ThirdPartyUpdate/BaselineData/`, and confirm `git status` shows no tracked change under `Engine/Data` or `Projects/BrokenEngineSandbox/Data` other than the four `.PreExport` markers.
     - Report any difference to the user before the commit, with the owning version bump (`DataPacker/Source/ExportJobs/AGENTS.md` `## Shared Pipeline`, `Island/AGENTS.md` `## Versioning`). Nothing differing lands without the user's approval.
 13. Revert the re-export.
     - Revert every bump and `git restore` the four `.PreExport` markers.
     - Delete the cache entries that carry the temporary versions under `%LOCALAPPDATA%\BrokenEngine\DataPackerCache\<project>`: `*.v<temp>.chunk`, `*.v<temp>.meta`, and `*.v<temp>.deps.meta` (`ExportJob.cpp:148,153`, `ExportShader.cpp:167`), plus `*.t<temp>.textures` (`ExportIsland.cpp:510`).
-    - Re-run the step-12 generation build at the real versions. It re-splits and re-convolves once, because `SplitVersion.meta` and the IBL `.meta` files are not named by version, and its outputs must still equal the snapshot.
+    - Re-run the step-12 generation build at the real versions only while `Resolve-CompileContext.ps1` reports Local. It re-splits and re-convolves once, because `SplitVersion.meta` and the IBL `.meta` files are not named by version, and its outputs must still equal the snapshot.
 14. Harness. Through `/agent-harness`, run a smoke run and a replay determinism check against primary's executables.
 15. Pre-commit checks. Confirm the following, then fill the acceptance table from `## Acceptance criteria`:
     - `git -C ThirdParty/<lib> status --porcelain` is empty for all 22 submodules.
@@ -179,7 +180,7 @@ The executing session classifies the change Tier 3 and follows `.agents/referenc
     - Re-run `Wait-AgentToolsQuiescence.ps1` as in step 1.
     - Build WorktreeCli and AgentHarness Release candidates from the commit through `/compile`.
     - Run `pwsh -NoProfile -File .agents/skills/finalize-changes/scripts/Invoke-AgentToolsPromotion.ps1 -PrimaryRoot '<primary>' -WorktreeCliCandidate '<candidate>' -AgentHarnessCandidate '<candidate>' -LandedCommit '<commit>'`.
-19. Primary refresh. Run `Bootstrap-AgentTools.ps1 -RepositoryRoot '<primary>'` once more, on the now-clean primary. It rebuilds ThirdParty Debug/Profile/Release, the DataPacker prebuild and its stamp, and the Shared data with its shader stamp, all from the commit. Then confirm `git status --porcelain` is empty, and tell the user that other sessions may resume: each worktree rebases onto the new primary tip and ports its own code if needed, for example imgui `AddRect` order or the json include.
+19. Primary refresh. Run `Bootstrap-AgentTools.ps1 -RepositoryRoot '<primary>'` once more, on the now-clean primary. It rebuilds ThirdParty Debug/Profile/Release, the DataPacker prebuild and its stamp, and the Shared data with its data stamp, all from the commit. Then confirm `git status --porcelain` is empty, and tell the user that other sessions may resume: each worktree rebases onto the new primary tip and ports its own code if needed, for example imgui `AddRect` order or the json include.
 
 ## API-break inventory
 

@@ -169,11 +169,7 @@ fixes applied, deferred entries, and the deferred-fixes record path the type's
   single landing confirmation.
 - Out-of-bound findings reach the deferred-fixes record for the user to decide
   on; the sweep creates no follow-up Plans on its own.
-- Running a sweep authorizes Local generation (`-RunDataPacker`, Gaea export
-  still forbidden) for any build whose changes trigger Local data mode, such as
-  `DataPacker/**` or `Common/DataFile.h`
-  (`.agents/skills/compile/references/runtime-data-mode.md` `## Mode selection`).
-  `Tools/` changes to WorktreeCli or AgentHarness, or a `Common/Sha256Hasher.h`
+- `Tools/` changes to WorktreeCli or AgentHarness, or a `Common/Sha256Hasher.h`
   change, follow `/compile`'s AgentTools policy.
 - A finding whose fix needs an `.agents/` edit is declined and reaches the
   deferred-fixes record. A Codex git warning that it cannot read the user's

@@ -90,8 +90,8 @@ A newly created worktree skips the `Engine/Data/Islands` and
 `Engine/Data/Textures` source trees (~989 MB) through Git sparse checkout, so
 those paths are simply absent from disk; Git treats them as unchanged rather
 than deleted. Run `git sparse-checkout disable` in that worktree to bring them
-back before editing or adding an asset under either tree — an authorized Local
-generation build restores them on its own. Reattaching changes nothing here: an
+back before editing or adding an asset under either tree — a Local generation
+build restores them on its own. Reattaching changes nothing here: an
 existing worktree is never sparsified after creation.
 
 The export runs at any start that does not skip it (step 5), new session or

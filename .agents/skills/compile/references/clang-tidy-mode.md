@@ -15,8 +15,6 @@ data-mode selection with the authoritative data properties from
 analysis switches and the log verbosity and, on a full build, forces a rebuild.
 Do not invoke MSBuild or clang-tidy outside WorktreeCli.
 
-Do not combine `-ClangTidy` with `-RunDataPacker`, although the script does not block it: when Local generation is authorized, run the generation build as an ordinary build first, then run each `-ClangTidy` build without `-RunDataPacker` against the existing Local output, so a forced rebuild never repeats an export.
-
 ## Invocation and coverage
 
 `-ClangTidy` is accepted for Client and Server Debug and Release builds and for DataPacker, which builds Release only. Profile, every other target, and the combination with `-Prefast` block before any child process runs, under `parameter.clangtidy-invalid` — except that `-Prefast` invalid for the target or configuration on its own blocks first under `parameter.prefast-invalid`.

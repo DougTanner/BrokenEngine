@@ -115,7 +115,7 @@ try {
 		if ($LASTEXITCODE -ne 0) { throw "Failed to create worktree '$worktree'." }
 		$worktreeCreated = $true
 		# Check out everything except the tracked Engine/Data subtrees over ~100 MB that no ordinary build
-		# reads - only the authorized Local generation build does, and it restores them itself. That
+		# reads - only the Local generation build does, and it restores them itself. That
 		# criterion, not these two names, is what the list expresses. The worktree is created empty so the
 		# skipped bytes are never written at all. Any failure of the sparse step falls back to today's full
 		# checkout, and the assertion below then holds on both paths. If the fallback itself fails, session

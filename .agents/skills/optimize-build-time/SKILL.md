@@ -59,10 +59,18 @@ percent.
 2. Measure into `baseline/` with this measure sequence. Done when
    `baseline/summary.json` exists from a `Measure-BuildTrace.ps1` exit 0, or
    the skill has stopped with a report.
-   1. Warm up: dispatch a `builder` with sub-step 4's brief, untraced and with
-      no intermediate deletion, so one-time work outside C++ compile time
-      settles before the trace. On its failure, report the builder's failing
-      row and end; no trace is running, so no Stop follows.
+   1. Warm up. First run
+      `pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1`;
+      it must report `dataBuildMode` `Shared`. When it reports `Local` in the
+      baseline measure, rebase onto primary main and run it again; the after
+      measure skips this rebase, which its uncommitted fixes would refuse or
+      change. When it then reports `Local`, report its `dataBuildModeReason`
+      and `dataInputChanges` and end, because
+      a Local game build re-exports data and both measures must build in
+      Shared mode. Then dispatch a `builder` with sub-step 4's brief, untraced
+      and with no intermediate deletion, so one-time work outside C++ compile
+      time settles before the trace. On its failure, report the builder's
+      failing row and end; no trace is running, so no Stop follows.
    2. Start the trace: `### vcperf calls` Start, with its fallbacks.
    3. Delete every target's intermediate directory from the worktree root, so
       MSBuild recompiles every translation unit, `Pch.cpp` included, and
@@ -74,7 +82,7 @@ percent.
 
    4. Dispatch one `builder` running `/compile` for Client then Server at the
       configuration, then DataPacker in Release, stating no agent-harness
-      scenario and Shared data mode because no Local trigger path changed. Its
+      scenario. Its
       `Evidence` row for the one envelope file is the summary's
       `-BuildEnvelope` input.
    5. Stop the trace into the phase directory: `### vcperf calls` Stop, with
@@ -94,7 +102,7 @@ percent.
    - Applicable: `Pch.h` contents, unused includes, forward declarations, and
      moving includes or bodies out of headers.
    - Recommendation only: compiler, linker, and `.vcxproj` option changes, and
-     any change to a `/compile` Local trigger path, such as
+     any change to a `/compile` data input, such as
      `Common/DataFile.h` or `DataPacker/**`
      ([`runtime-data-mode.md`](../compile/references/runtime-data-mode.md)
      `## Mode selection`).
@@ -191,7 +199,7 @@ path of the phase directory's `build.json`.
   static check still runs, and so does the `/finalize-changes` landing
   confirmation.
 - Apply only the categories step 3 marks applicable, and report every other
-  proposal as a recommendation; a Local trigger path change stays a
+  proposal as a recommendation; a data input change stays a
   recommendation because both measures must build in Shared mode.
 - Keep the two measures like for like: the same targets, configurations,
   warm-up, full rebuild, and machine.
@@ -206,4 +214,4 @@ path of the phase directory's `build.json`.
   summary and before/after comparison; its header owns the output schema and
   exit codes.
 - [`../compile/references/runtime-data-mode.md`](../compile/references/runtime-data-mode.md)
-  — the `/compile` Local trigger paths.
+  — the `/compile` data inputs.

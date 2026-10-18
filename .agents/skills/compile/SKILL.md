@@ -56,19 +56,11 @@ skill-specific inputs:
   counting any acceptance criterion or check settled by running `/agent-harness`
   as such a scenario. An included agent-harness scenario adds the client and
   the server of every game built to the targets, so name both;
-- for a game build, the Local generation authorization a
-  user-approved plan or acceptance criterion grants, the deletion-only
-  reference-search evidence — a basis only when every trigger-matching
-  changed path is a whole-file deletion of a source asset (baseline diff
-  status `D`), never an in-file modification — or the stated basis for
-  Shared, plus any Gaea authorization the same plan or criterion grants, and
-  any Local mode the user forced; the worker resolves and selects the mode
-  itself —
+- for a game build, any Gaea authorization (`-AllowGaeaExport`) that a
+  user-approved plan or acceptance criterion requiring an island re-bake
+  grants; the build resolves the data mode itself —
   [references/runtime-data-mode.md](references/runtime-data-mode.md)
-  `## Mode selection` and `## Local generation` own which authorizations are
-  valid, and a change hitting any `## Mode selection` Local trigger makes
-  Local mandatory, so request the Local generation authorization at plan
-  approval, before the first game build;
+  `## Mode selection` and `## Local generation`;
 - whether an approved plan explicitly requires PREfast verification —
   [references/prefast-mode.md](references/prefast-mode.md)
   `## Authorization and when to use`;
@@ -90,8 +82,7 @@ the execution and result discipline in
   `file`.
 - `Decisive checks` — for a game build, one row naming the game and the
   envelope's `/p:DataBuildMode`, `/p:RunDataPacker`, and `/p:GameDataDirectory`
-  switch values, plus your reason whenever your own judgment overrode the
-  `dataBuildMode` that `Resolve-CompileContext.ps1` reported.
+  switch values.
 - `Decisive checks` — for a `-ClangTidy` build, one row naming whether analysis
   executed, the de-duplicated warning count, and the `clang-diagnostic-error`
   parse-error count with the first unparsable file.
