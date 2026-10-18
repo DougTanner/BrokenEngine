@@ -181,7 +181,7 @@ void Game::ApplyStandardMenuAction(engine::StandardMenuAction eAction)
 			gpClientSession->mpRuntime->StartDiscovery();
 			break;
 		case engine::StandardMenuAction::kConnectToDiscoveredServer:
-			gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kiDefaultPort, NetworkSessionContract::kiCoordinateSlots);
+			gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kiDefaultPort);
 			break;
 		case engine::StandardMenuAction::kChangeFrameToMainMenu:
 			ChangeFrameToMainMenu();
@@ -202,7 +202,7 @@ void Game::ProcessGameMenuInput(const engine::InputPoll& rInputPoll)
 		{
 			if (gpClientSession->mpRuntime->mStateFlags & engine::ClientSessionStateFlags::kServerDiscovered)
 			{
-				gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kiDefaultPort, NetworkSessionContract::kiCoordinateSlots);
+				gpClientSession->mpRuntime->ConnectToDiscoveredServer(engine::kiDefaultPort);
 			}
 			else
 			{

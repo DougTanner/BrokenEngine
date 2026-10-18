@@ -145,7 +145,7 @@ void ClientSession::UpdateOwnedEntityCoordinate(engine::GlobalId globalId, engin
 void ClientSession::ConnectToServer(std::string_view serverAddress)
 {
 	gpGame->mpcModalMessage[0] = '\0';
-	mpRuntime->Connect(serverAddress, engine::kiDefaultPort, NetworkSessionContract::kiCoordinateSlots);
+	mpRuntime->Connect(serverAddress, engine::kiDefaultPort);
 }
 
 void ClientSession::OnConnectionRejected(std::string_view reason)

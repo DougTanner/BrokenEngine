@@ -77,15 +77,16 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
   base directly. The bases' wire is engine packet types: the owned-entity state
   notification `kServerOwnedEntityState` and the seven debug-control requests
   (save, load, reset, replay record, replay playback, pause, timespeed), which
-  `GameBase::ProcessInput` sends. `game::NetworkSessionContract` supplies
-  Frame/status types, protocol constants, codecs, and game packet contracts at
-  compile time; the sessions use no virtual function, runtime type erasure, or
-  additional global manager.
+  `GameBase::ProcessInput` sends. Engine Network code names `game::Frame`,
+  `game::StatusChange`, the frame version `game::Frame::kiVersion`, the frame
+  codec (`game::Frame::ServerRead`, `game::operator<<`), `game::GamePacketType`,
+  and `game::GetGamePacketContract` directly; the sessions use no virtual
+  function, runtime type erasure, or additional global manager.
 - `NetworkSerialization` owns the status-change batch codec: the per-type group
   envelope, the per-item size bound, and the LZ4 framing. Game Network owns the
   status-change type set and each type's payload read/write
   (`game::WriteStatusChangePayload`/`game::ReadStatusChangePayload`), which the
-  codec calls directly per item; `game::NetworkSessionContract` wraps the codec.
+  codec calls directly per item.
   Batches emit non-empty type groups in ascending `StatusChangeType` order,
   preserving input order within each type; published server tick inputs use that
   sequence because clients apply the wire order, so changing it can alter

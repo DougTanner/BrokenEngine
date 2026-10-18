@@ -20,6 +20,5 @@ inline constexpr bool kbAutoConnect = false;
 #include "Common.h"
 #include "Shaders/ShaderLayouts.h"
 #include "Frame/Frame.h"
-#include "Network/NetworkSessionContract.h"
 #include "Engine.h"
 #include "Network/GameMessages.h"

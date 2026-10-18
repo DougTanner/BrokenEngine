@@ -38,8 +38,8 @@ public:
 	ClientSessionRuntime();
 	~ClientSessionRuntime();
 
-	void Connect(std::string_view serverAddress, int64_t iPort, int64_t iCoordinateSlots);
-	void ConnectToDiscoveredServer(int64_t iPort, int64_t iCoordinateSlots);
+	void Connect(std::string_view serverAddress, int64_t iPort);
+	void ConnectToDiscoveredServer(int64_t iPort);
 	void Disconnect();
 	void StartDiscovery();
 	void PollDiscovery();

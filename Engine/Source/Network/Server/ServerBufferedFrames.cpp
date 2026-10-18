@@ -59,7 +59,7 @@ void ServerBufferedFrames::BufferFrame(int64_t iTick, std::span<const std::pair<
 			}
 			else
 			{
-				int64_t iCompressedSize = game::NetworkSessionContract::CompressStatusChanges(std::span<const game::StatusChange>(rUpdateData.statusChanges.data(), static_cast<size_t>(iStatusChangeCount)), std::span<uint8_t>(mCompressionBuffer));
+				int64_t iCompressedSize = CompressStatusChangeBatch(std::span<const game::StatusChange>(rUpdateData.statusChanges.data(), static_cast<size_t>(iStatusChangeCount)), std::span<uint8_t>(mCompressionBuffer));
 				buffered.compressedData.assign(mCompressionBuffer.begin(), mCompressionBuffer.begin() + iCompressedSize);
 			}
 		}
@@ -109,7 +109,7 @@ void ServerBufferedFrames::BufferFullFrame(int64_t iTick, std::span<const std::p
 		serialized.clear();
 
 		mFrameStreamBuffer.mpTarget = &serialized;
-		game::NetworkSessionContract::WriteFrame(mFrameStream, *rFrame.second);
+		mFrameStream << *rFrame.second;
 
 		buffered.serializedFrames.insert_or_assign(rFrame.first, std::move(serialized));
 	}
@@ -177,7 +177,7 @@ void ServerBufferedFrames::SendCoordinateFullState(int64_t iClientIdentifier, in
 	// Heap: scratch grows until steady state
 	mSendScratch.clear();
 	mFrameStreamBuffer.mpTarget = &mSendScratch;
-	game::NetworkSessionContract::WriteFrame(mFrameStream, *pFrame);
+	mFrameStream << *pFrame;
 
 	// LZ4 compress
 	int64_t iCompressedSize = CompressToBuffer(std::span<const char>(mSendScratch.data(), mSendScratch.size()));
@@ -500,7 +500,7 @@ void ServerBufferedFrames::ApplyAckStream(ClientConnection& rClient, const Netwo
 
 void ServerBufferedFrames::SendDebugFrame(ENetPeer* pPeer, int64_t iTick, GridCoord coordinate)
 {
-	if constexpr (game::NetworkSessionContract::kbDebugFrames)
+	if constexpr (kbDesynchronizationDebugFrames)
 	{
 		LOG(kNetwork, kError, "Server::ClientDebugFrameRequest Frame: {} Grid: ({},{})", iTick, coordinate.iX, coordinate.iY);
 		ScopedLogIndent scopedLogIndent;

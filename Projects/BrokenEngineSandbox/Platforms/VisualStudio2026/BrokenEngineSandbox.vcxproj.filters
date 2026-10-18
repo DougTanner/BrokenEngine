@@ -294,9 +294,6 @@
     <ClInclude Include="..\..\Source\Network\GamePacketType.h">
       <Filter>Game\Network</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Network\NetworkSessionContract.h">
-      <Filter>Game\Network</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Input\Input.h">
       <Filter>Engine\Input</Filter>
     </ClInclude>
@@ -340,9 +337,6 @@
       <Filter>Engine\Network</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSerialization.h">
-      <Filter>Engine\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSessionContract.h">
       <Filter>Engine\Network</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSimulation.h">

@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-16T13:05:05.556Z","dependsOn":["Documents/Plans/Engine/AgentHarnessIntoEngine.md","Documents/Plans/Engine/RemoveNetworkSessionContractStruct.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-16T13:05:05.556Z","dependsOn":["Documents/Plans/Engine/AgentHarnessIntoEngine.md"]} -->
 # Sweep `Engine/` and `Common/` for remaining engine-to-game hooks
 
 Tier 3 (`.agents/references/risk-tiers.md`): fixes may land in any engine

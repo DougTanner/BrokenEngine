@@ -74,7 +74,7 @@ the engine calls by name.
   `CompleteTick` and carry the owner's GUID onto the destination row, so a live
   handoff is reported as `ChangedCell`, never as a death. A disconnected owner's
   rows match no handshaken client and register again when that GUID reconnects.
-- A subscription must be origin or adjacent to an authorized coordinate. Subscription, ACK, and resend-log bookkeeping stay together per slot; allocation stays within the client-supported count, and reuse increments rather than resets the epoch.
+- A subscription must be origin or adjacent to an authorized coordinate. Subscription, ACK, and resend-log bookkeeping stay together per slot; allocation stays within `kiCoordinateSlots`, the slot count the client's pool also uses, and reuse increments rather than resets the epoch.
 - Answer every current-generation subscribe from a handshaken client exactly
   once on the control channel — a reject, a new slot, or, for a coordinate that
   already holds an active slot, that existing slot — because the client matches

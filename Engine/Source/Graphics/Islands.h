@@ -15,7 +15,7 @@ struct GridCoord;
 // with mesh-visible placements first. Resident allocation is kiMaxFramebuffers × kiMaxActivePlacements ×
 // sizeof(AxisAlignedQuadLayout): with kiCoordinateSlots = 16 and kiMaximumIslandsPerCell = 107 this is 436,560 bytes
 // (426.33 KiB), independent of the number of island templates.
-inline constexpr int64_t kiMaxActivePlacements = (game::NetworkSessionContract::kiCoordinateSlots + 1) * kiMaximumIslandsPerCell;
+inline constexpr int64_t kiMaxActivePlacements = (kiCoordinateSlots + 1) * kiMaximumIslandsPerCell;
 // Sized for every island template mesh resident at once.
 inline constexpr int64_t kiIslandMeshArenaBytes = 128i64 * 1'024i64 * 1'024i64;
 

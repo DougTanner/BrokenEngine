@@ -18,6 +18,7 @@ namespace engine
 // slot ceiling here so a transport slot change trips this assertion.
 static_assert(NetworkMessages::ClientAckStreamMessage::kiMaxSlotCount == NetworkManager::kiMaximumEnetCoordinateSlots, "ack-stream codec cardinality must match the transport slot ceiling");
 static_assert(kiMaximumAcknowledgmentStreamPacketSize == NetworkMessages::ClientAckStreamMessage::GetSize(NetworkManager::kiMaximumEnetCoordinateSlots), "kiMaxAckStreamPacketSize must match the ack-stream wire layout sized by kiMaxEnetCoordSlots");
+static_assert(kiCoordinateSlots <= NetworkManager::kiMaximumEnetCoordinateSlots, "kiCoordinateSlots must fit the transport slot ceiling");
 
 // Both the unscheduled poll gap that opens the budget stall grace and the grace length, each on top of the
 // scheduled update interval. Every stall long enough to queue a budget-crossing ack backlog (~4.6 s at 1:1)
@@ -625,10 +626,10 @@ void Server::ClientHello(std::span<const uint8_t> packetData, ClientConnection& 
 	}
 
 	int64_t iClientFrameVersion = message.iFrameVersion;
-	if (iClientFrameVersion != game::NetworkSessionContract::Frame::kiVersion)
+	if (iClientFrameVersion != game::Frame::kiVersion)
 	{
 		char pcMessage[256] {};
-		std::snprintf(pcMessage, sizeof(pcMessage), "Frame version mismatch: server is %lld, client is %lld", game::NetworkSessionContract::Frame::kiVersion, iClientFrameVersion);
+		std::snprintf(pcMessage, sizeof(pcMessage), "Frame version mismatch: server is %lld, client is %lld", game::Frame::kiVersion, iClientFrameVersion);
 		LOG(kNetwork, kWarning, "Server::ClientHello Rejecting Client: {} Reason: {}", rClient.iClientId, pcMessage);
 
 		RejectHello(rClient, pcMessage);
@@ -749,7 +750,7 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, ClientConnecti
 		return;
 	}
 
-	int64_t iSlot = rClient.AllocateSlot(game::NetworkSessionContract::kiCoordinateSlots);
+	int64_t iSlot = rClient.AllocateSlot();
 	if (iSlot < 0)
 	{
 		LOG(kNetwork, kWarning, "Server::ClientSubscribe No free slot Client: {} Coord: ({},{})", rClient.iClientId, coordinate.iX, coordinate.iY);

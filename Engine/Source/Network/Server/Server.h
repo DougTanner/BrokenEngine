@@ -100,10 +100,9 @@ struct ClientConnection
 		return -1;
 	}
 
-	int64_t AllocateSlot(int64_t iMaxSlots)
+	int64_t AllocateSlot()
 	{
-		int64_t iLimit = std::min(iMaxSlots, std::ssize(slots));
-		for (int64_t i = 0; i < iLimit; ++i)
+		for (int64_t i = 0; i < kiCoordinateSlots; ++i)
 		{
 			if (!(slots.at(i).subscription.flags & SubscriptionFlags::kActive))
 			{

@@ -56,7 +56,7 @@ public:
 
 	using GuidAssignedCallback = void (*)(const ClientGuid&);
 
-	Client(const char* pcServerAddress, int64_t iPort, int64_t iCoordinateSlotCount, const ClientGuid& rGuid, GuidAssignedCallback pGuidAssignedCallback);
+	Client(const char* pcServerAddress, int64_t iPort, const ClientGuid& rGuid, GuidAssignedCallback pGuidAssignedCallback);
 	~Client();
 
 	template <typename TTYPE, typename... TARGS>

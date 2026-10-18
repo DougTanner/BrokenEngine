@@ -283,9 +283,9 @@ sizes are the full packet including the type byte.
 
 | Packet | Min | Max | /tick | Handshake | Over-cap | Residual semantic validation |
 |--------|----|----|------|-----------|----------|------------------------------|
-| `kClientHello` | 21 | 101 | 4 | no | violation | `kiProtocolVersion` (every incompatible `StatusChange`/`TransferData` layout change requires its author to increment the then-current literal; no automatic signature) → `game::NetworkSessionContract::Frame::kiVersion` (bound to `game::Frame::kiVersion`) → ordered `Islands.manifest` chunk-table integrity-token gates (any mismatch rejects+disconnects); build-config warn; idempotent re-Hello; duplicate live nonempty GUID rejects+disconnects |
+| `kClientHello` | 21 | 101 | 4 | no | violation | `kiProtocolVersion` (every incompatible `StatusChange`/`TransferData` layout change requires its author to increment the then-current literal; no automatic signature) → `game::Frame::kiVersion` → ordered `Islands.manifest` chunk-table integrity-token gates (any mismatch rejects+disconnects); build-config warn; idempotent re-Hello; duplicate live nonempty GUID rejects+disconnects |
 | `kClientAcknowledgmentStream` | 10 | 1738 | 128 | yes | **silent** | exact size `2 + count*27 + 8` (`BoundedCursor`); per-slot epoch match; floor clamped ≤ latest buffered tick; floor must advance, except the one backward floor a client's coord-full-state adoption produces, admitted no lower than that full state's own tick; timestamp echo monotonic |
-| `kClientSubscribe` | 10 | 10 | 64 | yes | violation | load generation must match the server's current generation before mutation; a coord already holding an active slot is answered with that slot's accept and not queued again (every in-generation subscribe gets exactly one reliable answer); 3×3 adjacency of an authorized coord (`kOriginCoordinate` always allowed); slot clamped to `game::NetworkSessionContract::kiCoordinateSlots` (bound to `game::kiDesiredCoordinateSlots`) |
+| `kClientSubscribe` | 10 | 10 | 64 | yes | violation | load generation must match the server's current generation before mutation; a coord already holding an active slot is answered with that slot's accept and not queued again (every in-generation subscribe gets exactly one reliable answer); 3×3 adjacency of an authorized coord (`kOriginCoordinate` always allowed); slot clamped to `kiCoordinateSlots` |
 | `kClientUnsubscribe` | 4 | 4 | 64 | yes | violation | slot index + epoch; after existing-client lookup, ACK every syntactically valid request; free only an in-range active slot with matching epoch |
 | `kClientResynchronizationRequest` | 1 | 1 | 4 | yes | violation | — |
 | `kClientDesynchronizationReport` | 33 | 33 | 8 | yes | violation | negative tick → corrupt, rejected before the cooldown; independent per-client two-second wall-clock cooldown after contract validation; immediate repeats silently drop |
@@ -339,7 +339,7 @@ The desync diagnostic cooldown is handler-local and uses `steady_clock`, so paus
 
 ## Session Ownership and Phase Order
 
-`game::ClientSession` and `game::ServerSession` inherit the non-virtual engine session bases `engine::ClientSessionBase` and `engine::ServerSessionBase`, which hold the engine runtimes and call game functions by name through `game::gpClientSession`/`game::gpServerSession`. `game::NetworkSessionContract` binds Frame/status/game packet types, version/tick/slot constants, and codecs at compile time; no virtual function or runtime type erasure is involved.
+`game::ClientSession` and `game::ServerSession` inherit the non-virtual engine session bases `engine::ClientSessionBase` and `engine::ServerSessionBase`, which hold the engine runtimes and call game functions by name through `game::gpClientSession`/`game::gpServerSession`. The engine names the game Frame/status/game packet types, the frame version, and the frame codec directly; no virtual function or runtime type erasure is involved.
 
 - `ClientSessionRuntime` owns connection/GUID/discovery, subscription and clock
   state, transport polling, load reset, generic received full-state/delta

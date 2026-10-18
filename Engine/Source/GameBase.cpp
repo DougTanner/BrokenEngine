@@ -243,7 +243,7 @@ void GameBase::ClientUpdate()
 		NetworkTimeState networkTimeState
 		{
 			.bFastForward = mTimeStep.miTimeMultiply > 1,
-			.iExpectedUpdateIntervalMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(mTimeStep.SimulationToWall(game::NetworkSessionContract::kTickDuration)).count(),
+			.iExpectedUpdateIntervalMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(mTimeStep.SimulationToWall(kTickNanoseconds)).count(),
 			.iExpectedUpdatesPerSecond = kiTickRate * mTimeStep.miTimeMultiply / mTimeStep.miTimeDivide,
 		};
 		game::gpClientSession->mpRuntime->PollAndDrain(networkTimeState);
@@ -368,7 +368,7 @@ void GameBase::ServerUpdate()
 	NetworkTimeState networkTimeState
 	{
 		.bFastForward = mTimeStep.miTimeMultiply > 1,
-		.iExpectedUpdateIntervalMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(mTimeStep.SimulationToWall(game::NetworkSessionContract::kTickDuration)).count(),
+		.iExpectedUpdateIntervalMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(mTimeStep.SimulationToWall(kTickNanoseconds)).count(),
 		.iExpectedUpdatesPerSecond = kiTickRate * mTimeStep.miTimeMultiply / mTimeStep.miTimeDivide,
 	};
 	game::gpServerSession->mpRuntime->Poll(networkTimeState);

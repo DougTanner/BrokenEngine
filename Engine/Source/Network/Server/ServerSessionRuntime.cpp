@@ -88,7 +88,7 @@ void ServerSessionRuntime::PollTickBoundary(const NetworkTimeState& rTimeState)
 
 void ServerSessionRuntime::WaitForTick(TimeStep& rTimeStep)
 {
-	std::chrono::nanoseconds tickNanoseconds = rTimeStep.SimulationToWall(game::NetworkSessionContract::kTickDuration);
+	std::chrono::nanoseconds tickNanoseconds = rTimeStep.SimulationToWall(kTickNanoseconds);
 	std::chrono::nanoseconds tickRemainderWallNanoseconds = rTimeStep.SimulationToWall(rTimeStep.mTickRemainderNanoseconds);
 	static constexpr std::chrono::nanoseconds kSpinMarginNanoseconds = 500'000ns;
 	std::chrono::nanoseconds remainingNanoseconds = tickNanoseconds - tickRemainderWallNanoseconds - rTimeStep.mRealTime.GetDeltaNs();

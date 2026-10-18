@@ -108,14 +108,14 @@ void ClientSessionRuntime::ResetForConnect()
 	mStateFlags.Set(ClientSessionStateFlags::kConnectionWasAccepted, false);
 }
 
-void ClientSessionRuntime::Connect(std::string_view serverAddress, int64_t iPort, int64_t iCoordinateSlots)
+void ClientSessionRuntime::Connect(std::string_view serverAddress, int64_t iPort)
 {
 	// Heap: address copy, GUID file I/O, and Client/ENet construction
 	ScopedSuppressAllocationTracking suppress;
 	ResetForConnect();
 	std::string serverAddressString(serverAddress);
 	ClientGuid clientGuid = LoadClientGuidFromDisk();
-	mpClient = std::make_unique<Client>(serverAddressString.c_str(), iPort, iCoordinateSlots, clientGuid, &PersistClientGuidToDisk);
+	mpClient = std::make_unique<Client>(serverAddressString.c_str(), iPort, clientGuid, &PersistClientGuidToDisk);
 	if (mpClient->mpHost == nullptr)
 	{
 		game::gpClientSession->OnConnectionFailed();
@@ -123,10 +123,10 @@ void ClientSessionRuntime::Connect(std::string_view serverAddress, int64_t iPort
 	}
 }
 
-void ClientSessionRuntime::ConnectToDiscoveredServer(int64_t iPort, int64_t iCoordinateSlots)
+void ClientSessionRuntime::ConnectToDiscoveredServer(int64_t iPort)
 {
 	mStateFlags.Set(ClientSessionStateFlags::kServerDiscovered, false);
-	Connect(mpcDiscoveredAddress, iPort, iCoordinateSlots);
+	Connect(mpcDiscoveredAddress, iPort);
 }
 
 void ClientSessionRuntime::Disconnect()
@@ -853,7 +853,7 @@ std::chrono::nanoseconds ClientSessionRuntime::EvaluateClock(int64_t iPreReconci
 	}
 	int64_t iSteps = std::clamp(miClockError, -4i64, 4i64);
 	int64_t iDivisor = std::abs(miClockError) >= 4 ? 8 : 64;
-	return std::chrono::nanoseconds(-iSteps * game::NetworkSessionContract::kTickDuration.count() / iDivisor);
+	return std::chrono::nanoseconds(-iSteps * kTickNanoseconds.count() / iDivisor);
 }
 
 void ClientSessionRuntime::ApplyClockCorrection(int64_t iPreReconcileTick)

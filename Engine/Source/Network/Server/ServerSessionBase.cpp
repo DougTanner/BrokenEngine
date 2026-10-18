@@ -10,6 +10,7 @@
 #include "Network/Server/ServerTransferManager.h"
 
 #include "Network/Server/ServerSession.h"
+#include "Network/GamePacketType.h"
 #include "Game.h"
 
 namespace engine
@@ -77,7 +78,7 @@ void ServerSessionBase::DispatchDeferredClientPackets()
 		{
 			// Contract gate (trust boundary): Server::Receive gates engine types, so each game-range packet is
 			// validated once here before dispatch (drop -> count -> escalate).
-			ClientPacketContract contract = game::GetGamePacketContract(static_cast<game::NetworkSessionContract::GamePacket>(rPacket.iPacketType));
+			ClientPacketContract contract = game::GetGamePacketContract(static_cast<game::GamePacketType>(rPacket.iPacketType));
 			if (!gpServer->AdmitGamePacket(rClient, rPacket, contract))
 			{
 				continue;

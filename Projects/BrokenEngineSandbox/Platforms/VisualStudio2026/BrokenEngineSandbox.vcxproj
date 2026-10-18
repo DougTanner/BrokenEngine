@@ -459,7 +459,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkMessages.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkProtocol.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSerialization.h" />
-    <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSessionContract.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSimulation.h" />
     <ClInclude Include="..\..\Source\Profile\ProfileRows.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksSliderMap.h" />
@@ -509,7 +508,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Network\StatusChangeCodec.h" />
     <ClInclude Include="..\..\Source\Network\GameMessages.h" />
     <ClInclude Include="..\..\Source\Network\GamePacketType.h" />
-    <ClInclude Include="..\..\Source\Network\NetworkSessionContract.h" />
     <ClInclude Include="..\..\Source\Graphics\Camera.h" />
     <ClInclude Include="..\..\Source\Pch.h" />
     <ClInclude Include="..\..\Source\Ui\Localization.h" />

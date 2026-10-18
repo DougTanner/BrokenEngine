@@ -13,7 +13,7 @@
 namespace engine
 {
 
-Client::Client(const char* pcServerAddress, int64_t iPort, int64_t iCoordinateSlotCount, const ClientGuid& rGuid, GuidAssignedCallback pGuidAssignedCallback)
+Client::Client(const char* pcServerAddress, int64_t iPort, const ClientGuid& rGuid, GuidAssignedCallback pGuidAssignedCallback)
 : common::Singleton<Client>(gpClient, this)
 {
 	mClientGuid = rGuid;
@@ -21,8 +21,8 @@ Client::Client(const char* pcServerAddress, int64_t iPort, int64_t iCoordinateSl
 
 	ScopedSuppressAllocationTracking suppress;
 
-	mReceivedCoordinateUpdates.resize(iCoordinateSlotCount);
-	mSubscriptions.mCoordinateSlots.resize(iCoordinateSlotCount);
+	mReceivedCoordinateUpdates.resize(kiCoordinateSlots);
+	mSubscriptions.mCoordinateSlots.resize(kiCoordinateSlots);
 	mStatusChangeScratch.resize(kiMaximumStatusChangesPerCell);
 	ENetAddress localAddress {};
 	localAddress.host = htonl(INADDR_LOOPBACK);
@@ -392,7 +392,7 @@ static std::unique_ptr<game::Frame> DecompressAndReadFrame(int64_t iUncompressed
 
 	std::istringstream frameStream(std::move(decompressed), std::ios::binary);
 	std::unique_ptr<game::Frame> pFrame = std::make_unique<game::Frame>();
-	game::NetworkSessionContract::ReadFrame(frameStream, *pFrame);
+	pFrame->ServerRead(frameStream);
 	return pFrame;
 }
 
@@ -584,7 +584,7 @@ void Client::ServerCoordinateUpdateOrResend(std::span<const uint8_t> packetData,
 
 		if (rMessage.compressedPayload.iSize > 0)
 		{
-			int64_t iCount = game::NetworkSessionContract::DecompressStatusChanges(std::span<const uint8_t>(rMessage.compressedPayload.puiData, static_cast<size_t>(rMessage.compressedPayload.iSize)), mStatusChangeScratch.data());
+			int64_t iCount = DecompressStatusChangeBatch(std::span<const uint8_t>(rMessage.compressedPayload.puiData, static_cast<size_t>(rMessage.compressedPayload.iSize)), mStatusChangeScratch.data());
 			// Heap: exact-size copy out of the reused 1024-cap decode scratch, so the buffered update carries no capacity slack
 			update.statusChanges.assign(mStatusChangeScratch.begin(), mStatusChangeScratch.begin() + iCount);
 		}
@@ -1033,7 +1033,7 @@ void Client::SendHello()
 	NetworkMessages::ClientHelloMessage message
 	{
 		.uiProtocolVersion = static_cast<uint32_t>(kiProtocolVersion),
-		.iFrameVersion = game::NetworkSessionContract::Frame::kiVersion,
+		.iFrameVersion = game::Frame::kiVersion,
 		.uiPackIntegrityToken = gpFileManager->mpPackChunks->mPackIntegrityToken,
 		.buildConfiguration = kpcBuildConfigurationName,
 		.guid = mClientGuid,
