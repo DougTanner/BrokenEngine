@@ -9331,8 +9331,8 @@
                 "ZoomFactor": 0.1574901312368593,
                 "ViewportLocation": {
                   "$id": "1274",
-                  "X": 15708.87,
-                  "Y": 21534.6
+                  "X": 18594.623,
+                  "Y": 24479.215
                 }
               }
             ]
@@ -9380,7 +9380,7 @@
           "BakeResolution": 2048,
           "PreviewResolution": 2048,
           "HDResolution": 4096,
-          "SelectedNode": 410,
+          "SelectedNode": -1,
           "NodeBookmarks": {
             "$id": "1282",
             "$values": []
@@ -9415,10 +9415,10 @@
     "$id": "1288",
     "DateCreated": "",
     "DateLastBuilt": "",
-    "DateLastSaved": "2026-05-27 16:05:58Z",
+    "DateLastSaved": "2026-10-18 11:02:44Z",
     "Description": "",
     "Edition": "Professional",
-    "ModifiedVersion": "2.3.0.1",
+    "ModifiedVersion": "2.3.1.0",
     "Name": "",
     "Owner": "",
     "Version": ""
