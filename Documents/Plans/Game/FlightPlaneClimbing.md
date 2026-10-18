@@ -3,7 +3,7 @@
 
 Tier 3 (`.agents/references/risk-tiers.md`): the change alters CRC'd Interpolate
 and PostRender state, adds a status-change type to the wire, save, and replay
-formats, and spans the game Frame, Network, Agent, and the engine codec. Line
+formats, and spans the game Frame, Network, Agent, and the engine protocol version. Line
 numbers cite baseline `c1420821` unless marked `90fa6c85`; the prerequisite
 Plans rename the files, columns, and status changes named below, so the
 post-Plan names are used throughout and each citation names the current-tree
@@ -15,7 +15,7 @@ repository-relative. Flight-plane series; the term is "flight plane".
 
 ## Context
 
-`Documents/Plans/Engine/FlightPlaneData.md` loads the three planes (low 6 m and
+The engine loads the game's three planes (low 6 m and
 medium 50 m with `engine::FlightPlaneFlags::kTerrainCollision`, high 100 m
 without it) into `engine::gpFlightPlanes` (`Count()`, `Plane(i)`, `Lowest()`,
 `Highest()`), and every ship still flies on `Lowest()`.
@@ -252,7 +252,14 @@ as `fThresholdHeight`; each caller skips the call when
 `SkipsTerrainContact(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i]))`
 (decision 11).
 
-`Frame/StatusChange.h`: `kUpdateFlightPlane` after `kUpdateFleet`; `UpdateFlightPlaneData`; `SpawnShipData::uiTargetFlightPlane` after `uiPendingFleetWantedCoordinateTicks`; `StatusChangeData` gains the alternative; `DefaultDataForType` and `StatusChangeTypeName` (`"UpdateFlightPlane"`) follow. `Engine/Source/Network/NetworkSerialization.cpp` writes and reads the three fields in declaration order and the new `SpawnShipData` byte after the pending-ticks byte.
+`Frame/StatusChange.h`: `kUpdateFlightPlane` after `kUpdateFleet`;
+`UpdateFlightPlaneData`; `SpawnShipData::uiTargetFlightPlane` after
+`uiPendingFleetWantedCoordinateTicks`; `StatusChangeData` gains the alternative;
+`DefaultDataForType` and `StatusChangeTypeName` (`"UpdateFlightPlane"`) follow.
+The `UpdateFlightPlaneData` and `SpawnShipData` `Fields()` tables list the three
+fields in declaration order and the new `SpawnShipData` byte after the
+pending-ticks byte; the game's `Network/StatusChangeCodec.cpp` writes those
+tables generically.
 
 Omni Interpolate Update (today's `Omnis.cpp:482`), decision 16:
 
@@ -292,14 +299,14 @@ command, the kind, `fHeight`, `targetFlightPlane`.
 - `Projects/BrokenEngineSandbox/Source/Fleet.h`, `SpawnTransfer.cpp`
 - `Projects/BrokenEngineSandbox/Source/Network/Server/ServerFleetSerialization.cpp`, `ServerFleetManager.h/.cpp`, `ServerClientManager.cpp`
 - `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerSimulationHarnessRigs.cpp`, `Agent/AgentCommandsServerQueries.cpp`
-- `Engine/Source/Network/NetworkSerialization.cpp`, `Engine/Source/Network/NetworkProtocol.h`
+- `Engine/Source/Network/NetworkProtocol.h`
 
 ## In scope
 
 - `ShipTypes.h`: the two target-plane accessors. `ShipBehaviours.h/.cpp`: the five functions above, the `FollowFlagship` horizontal distance, the four flattened `NavQuery*` arguments in `ComputeNavigation`, and the Z-threshold plus skip rule in `ApplyTerrainPush` (new `fHeight` parameter, decision 11), `ResolveTerrainContact` (`ShipBehaviours.h/.cpp`, ShipTypeSplit's home for today's `OmnisPostRender::ResolveTerrainContact`), and `ApplyTerrainBounce`.
 - The three type headers: climb rate and highest-plane constants, `kiVersion` bumps, `PostRead` tests; `FightersInterpolate::pfClimbTilts` through `/add-collection-member`; `kfFighterClimbTilt`.
 - The three Interpolate `Update`s (climb call, Fighter tilt write, and the Omni horizontal projection of the wanted direction before `RotateTowardsPercent`, decision 16) and PostRender `Update`s (skip rule, velocity Z zero); `FightersRender.cpp` pitch matrix; hydration of `pfClimbTilts` in both Fighter `Spawn` overloads.
-- `StatusChange.h`, `ShipStatusChanges.cpp` (`kSpawnShip`, `kUpdateFlightPlane`), `SpawnTransfer.cpp` `IsAdoptableStatusChange`, `FrameInput.h` version, `NetworkSerialization.cpp`, `NetworkProtocol.h` version.
+- `StatusChange.h`, `ShipStatusChanges.cpp` (`kSpawnShip`, `kUpdateFlightPlane`), `SpawnTransfer.cpp` `IsAdoptableStatusChange`, `FrameInput.h` version, `NetworkProtocol.h` version.
 - `Frame.cpp` `SpawnRandomShipGroup` (decision 7).
 - `Fleet.h`, `ServerFleetSerialization.cpp`, `ServerFleetManager.h/.cpp`, `ServerClientManager.cpp` (decision 8).
 - `ServerSimulationHarnessRigs.cpp` (decision 10 and the position parsing), `AgentCommandsServerQueries.cpp`, `commands-server.md`.
@@ -326,7 +333,7 @@ command, the kind, `fHeight`, `targetFlightPlane`.
 - The harness command queues through the existing scheduled queue, so its status changes are recorded in `FrameInput` and replay like every injected change (`Agent/AGENTS.md`).
 - The sim never reads `gpGame`; plane heights come from `gpFlightPlanes`, immutable after boot.
 - Terrain outcomes resolve before `kTransfer` as today; the skip rule only removes a contact call.
-- Engine code names `game::UpdateFlightPlaneData` only inside the codec, the documented exception site.
+- Engine code does not name `game::UpdateFlightPlaneData`.
 
 ## Acceptance
 
@@ -341,14 +348,3 @@ command, the kind, `fHeight`, `targetFlightPlane`.
 | Random spawns use planes | Over several random groups, `query_collection fighters` rows with `controller` `kRandomSpawn` appear with `local[2]` in {6.0, 50.0, 100.0} and matching `targetFlightPlane` | `/agent-harness` `query_collection` |
 | Mixed-plane fleet follows | With a Battleship flagship on plane 0 and Fighter wingmen on plane 2, after 10 s the wingmen's horizontal distance to the flagship is within the follow distance and they are not stuck in catch-up (nav direction not 5) | `/agent-harness` `query_collection` `flags` and `local` samples |
 | Repeated-run replay determinism | No `LogDifferences CRC` mismatch across repeated playback loops of a recording containing climbs, a mid-climb transfer, and random spawns on three planes | `/agent-harness` replay (`replay.md`) |
-
-## Coordination
-
-- `Documents/Plans/Engine/RemoveSandboxGameplayFromEngine.md` moves the per-type
-  status-change codec switch and writers out of
-  `Engine/Source/Network/NetworkSerialization.cpp` into the game's new
-  `Network/StatusChangeCodec.cpp`. Whichever lands second rebases onto the
-  other's edits. If that Plan lands first, this Plan's `UpdateFlightPlaneData`
-  fields and the new `SpawnShipData` byte are written and read in
-  `StatusChangeCodec.cpp`, and the risk line about the codec as the engine's
-  only `game::UpdateFlightPlaneData` site becomes: engine code does not name it.

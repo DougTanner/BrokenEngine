@@ -53,7 +53,7 @@ Evidence the design rests on:
 - Render model selection is a set of `#if` blocks (`OmnisRender.cpp:17-41`, `SpaceshipsRender.cpp:13-21`), one model per collection.
 - Spaceships read previous-frame Omnis in Update but current-frame Omnis in `AvoidTerrain` and in the Spawn-phase blaster fire (`Spaceships.cpp:578-580,643`, `Frame/Collections/Spaceships/AGENTS.md:11`). Update order is Omnis, then Blasters, Missiles, Spaceships (`Frame.cpp:197-200`, `FrameCollections.h:11-19`).
 - Same-type collision is unsupported by the engine (`Documents/Investigations/Engine/SameCollectionCollision.md`); Pushers keep same-type ships apart.
-- `Documents/Plans/Engine/FlightPlaneData.md` (prerequisite, written in parallel) replaces `gBaseHeight`; this Plan leaves room for flight planes but adds none.
+- The game's flight-plane table (`game::kFlightPlanes`, read through `engine::gpFlightPlanes`) has replaced `gBaseHeight`; this Plan leaves room for flight planes but adds none.
 - Terrain contact already goes through the engine:
   `OmnisPostRender::ResolveTerrainContact` (`Omnis.h:245`,
   `OmnisNavigation.cpp:478-493`, both `90fa6c85`) slides and
@@ -264,6 +264,12 @@ Each decision is recorded as made; the alternatives are not open. The design is 
     sites; `Engine/Source/Network/Server/AGENTS.md`
     `## Transfers and Publication` names `OwnedShipCount`, `IsOwnedTransfer`,
     `ShipUuidByGlobalId`, and the typed `OwnershipLayer` as the seam.
+    The engine seam sites already name no ship types: the renames above at
+    engine sites, and the matching decision 19 and 20 edits, apply instead to
+    the game sides `kOwnedEntityTransferType` (`Frame/StatusChange.h`, the
+    game's owned-transfer test), `ServerSession::ProcessUpdateOwnedEntityRequests`,
+    `kServerEntityCountNames` (`Frame/ServerCellStats.h`), and
+    `FrameInterpolate::DebugRender`, and engine files need no ship names.
 15. **Alignments.** `FramePostRender::omniAlignment`/`enemyAlignment` become `fleetAlignment`/`randomAlignment`; `Game::mOmniAlignment`/`mEnemyAlignment` become `mFleetAlignment`/`mRandomAlignment`. `MissileFlags::kTargetOmni`/`kTargetEnemy` become `kTargetFleet`/`kTargetRandom`.
 16. **Collision.** `CollisionCategory` becomes `kuiBlaster 0x0001`,
     `kuiFighter 0x0002`, `kuiOmni 0x0004`, `kuiBattleship 0x0008`,
@@ -296,10 +302,11 @@ Each decision is recorded as made; the alternatives are not open. The design is 
     `ServerSession`, `ServerClientManager`, `ServerFleetManager`, and
     `ClientSession` OwnedEntity functions and members) are not ship names and
     stay; `iOmniUuid` → `iUuid`. Engine
-    identifier names that are not ship concepts (`CameraBase`'s
-    last-known-target members, `RawInputManager`,
+    identifier names that are not ship concepts (`RawInputManager`,
     `Engine/Source/Ui/Screens/AGENTS.md` "Players see the audio menu") are not
-    ship names and stay.
+    ship names and stay; `CameraBase`'s last-known-target members are already
+    `mVecLastKnownTargetPosition`/`mVecLastKnownTargetVelocity` and
+    `mfLastKnownTargetTime`.
 20. **Other renames.** Profile:
     `kCpuCounterSpaceships(Rendered)` → `kCpuCounterFighters(Rendered)`, add
     `kCpuCounterBattleships(Rendered)`; timers `…Spaceships` → `…Fighters` and
@@ -336,7 +343,8 @@ Each decision is recorded as made; the alternatives are not open. The design is 
     `TransferFighter`, `TransferOmni`, `TransferBattleship`, `TransferBlaster`,
     `TransferMissile`; `eType` is the enumerator name without `k` (`Fighter`,
     `Omni`, `Battleship`). `describe_scene` `unitTypes` are `fighter`, `omni`,
-    `battleship`, `blaster`; flag names come from `ShipOrders` and `ShipFlags`.
+    `battleship`, `blaster`; each ship type is one `AppendVisibleUnits` call in
+    `AgentScene.cpp`; flag names come from `ShipOrders` and `ShipFlags`.
     `replay_transfer_capture` counts gain `battleshipCount` and rename the other
     two. The docs under `Projects/BrokenEngineSandbox/Documents/AgentHarness/`
     follow.
@@ -669,33 +677,7 @@ One Plan, one landing; the stages order the work so each builds and runs.
 
 ## Coordination
 
-- `Documents/Plans/Game/DeduplicateDescribeSceneUnitLoops.md` replaces the three `describe_scene` unit loops in `CommandDescribeScene` (`AgentScene.cpp:240-338`) with one file-static `AppendVisibleUnits` template. Whichever lands second rebases onto the other's edits; landed after it, each ship type is one `AppendVisibleUnits` call.
-- `Documents/Plans/Engine/RemoveSandboxGameplayFromEngine.md` edits the same
-  engine seam sites: the engine codec switch (`NetworkSerialization.cpp`), the
-  `kTransferOmni` tests, `ServerBroadcaster`'s update-request path, the
-  transfer logs, `ServerDisplay`, `MainUniforms`' `DebugRender` call, the
-  `CameraBase` last-known members, and the engine comments decision 20 rewords.
-  Whichever lands second rebases onto the other's edits. If that Plan lands
-  first, it supersedes decision 14's renames at engine seam sites and the
-  matching decision 19 and 20 edits: they apply to the game sides it introduces
-  instead (`StatusChangeCodec.cpp`, `kOwnedEntityTransferType` as the game's
-  owned-transfer test, `ServerSession::ProcessUpdateOwnedEntityRequests`,
-  `kServerEntityCountNames`, `FrameInterpolate::DebugRender`), and engine files
-  then need no ship names. It also supersedes decision 19's statement that
-  `CameraBase`'s last-known-target members stay, because that Plan renames them
-  to `mVecLastKnownTargetPosition/Velocity` and `mfLastKnownTargetTime`.
-- `Documents/Plans/Engine/GameShellIntoGameBase.md` rewrites `Frame.cpp`, `FrameInput.cpp`, `Game.*`, and the transfer producers this Plan renames, and also increments the `Frame::kiVersion` base literal (decision 22). Whichever lands second rebases onto the other's edits and increments the then-current literal again.
-- `Documents/Plans/Engine/SharedCollectionHelpers.md` replaces the
-  per-collection model render, collision setup, and transfer sweep copies in
-  `Omnis/` and `Spaceships/` with shared helpers such as `ModelInstances`;
-  decision 17 doubles the model pipelines per ship type. Whichever lands second
-  rebases onto the other's edits. The author recommends landing that Plan first,
-  so the three ship types instantiate `ModelInstances` and the collision helpers
-  instead of tripling the copies; this is a recommendation, not a `dependsOn`
-  edge.
-- `Documents/Plans/Game/SandboxSmallCleanups.md` edits the same `Omnis/` and `Spaceships/` files (the forwarding `AllocateAndCopy`, `ComputeNavigation`'s neighbouring-cell branch in `OmnisNavigation.cpp`, the `LogDifferences` labels). Whichever lands second rebases onto the other's edits; if this Plan lands first, that Plan's items apply to the Fighters, Omnis, and Battleships successors and `Ships/ShipBehaviours.cpp`.
-- `Documents/Plans/Game/FrameEditRows.md` lands first and replaces the
-  status-change family this Plan was written against: `SpawnOmniData`,
+- The status-change family this Plan was written against has been replaced: `SpawnOmniData`,
   `TransferData`, and `Projects/BrokenEngineSandbox/Source/SpawnTransfer.h/.cpp`
   are gone; each spawnable collection's own `SpawnInfo` is the payload of a
   `kSpawn<Collection>` spawn tag and a `kTransfer<Collection>` arrival tag, both

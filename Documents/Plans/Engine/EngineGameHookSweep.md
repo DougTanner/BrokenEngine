@@ -28,7 +28,7 @@ A hook here means engine-to-game indirection that exists only so the engine can 
 
 A read-only survey at the baseline covered `Engine/`, `Common/`, and `Projects/BrokenEngineSandbox/`. Its findings, which this sweep must not redo:
 
-- Removed by `EngineOwnedSaveSettingsAndSwitches.md`, the claimed Plan above,
+- Removed by the claimed Plan above,
   which has landed: the Tweaks extension table
   `TweakExtensionHook`/`kTweakExtensionHooks` and its walkers
   (`Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenBase.h:35-42`,
@@ -40,7 +40,7 @@ A read-only survey at the baseline covered `Engine/`, `Common/`, and `Projects/B
   `IsMainMenuFrame`, `PullTarget`, and its virtual destructor
   (`Engine/Source/Graphics/CameraBase.h:162-191`);
   `StreamingVoices::mGetNextTrack` (`Engine/Source/Audio/StreamingVoices.h:50`).
-- Removed by prerequisite Plans written alongside this one: the `ProfileManagerBase` span constructor and game `ProfileManager` subclass (`Documents/Plans/Engine/EngineOwnedProfileManager.md`); the `game::NetworkSessionContract` trait struct and `engine::NetworkSessionContractType` concept (`Documents/Plans/Engine/RemoveNetworkSessionContractStruct.md`).
+- Removed by prerequisite Plans written alongside this one, which have landed: the `ProfileManagerBase` span constructor and game `ProfileManager` subclass; the `game::NetworkSessionContract` trait struct and `engine::NetworkSessionContractType` concept.
 - Reviewed and kept, with the reason:
   - Tweaks section registry `TweakSectionDescription::pRender` and `RegisterSection` (`TweaksScreen.h:25-33,66,73`), reached from the direct call `game::RegisterGameTweakSections`: a dense startup-assigned index space shared by engine and game sections and iterated generically (toggle bar, windows, slider audit), whose game-controlled count and order fold into the persisted `crcLayout`; a constexpr game table would change only its shape.
   - `TweaksSliderMapRegistrar` static-initialization registry (`Engine/Source/Ui/TweaksSliderMap.h:17-20`, `TweaksSliderMap.cpp:18`): a data registry co-located with each slider; it carries data, not calls into the game.
@@ -101,7 +101,7 @@ Run `/sweep` with the `cpp-adoption` type over the `## Sweep` targets. Each unit
 ## Out of scope
 
 - Every mechanism `## Context` lists as removed, kept, not a hook, or already direct.
-- Removing Sandbox gameplay names from the engine and moving game code into the engine (`SharedSessionProtocol.md`, `AgentHarnessIntoEngine.md`, `SharedCollectionHelpers.md`, and the landed GameShellIntoGameBase change).
+- Removing Sandbox gameplay names from the engine and moving game code into the engine (`AgentHarnessIntoEngine.md`, and the landed session-protocol and GameShellIntoGameBase changes).
 - `Engine/Data/` shader-layout headers, `DataPacker/`, `Tools/`, and `ThirdParty/`.
 - Any format, version, or protocol change.
 
@@ -113,5 +113,5 @@ Run `/sweep` with the `cpp-adoption` type over the `## Sweep` targets. Each unit
 
 ## Notes
 
-- Depends on the two hook Plans above, `AgentHarnessIntoEngine.md` (which itself follows `SharedSessionProtocol.md`), and `SharedCollectionHelpers.md`: each changes the engine/game boundary this sweep reviews, so sweeping earlier would review code they replace. The GameShellIntoGameBase change that also moved that boundary has already landed.
+- Depends on `AgentHarnessIntoEngine.md`, which changes the engine/game boundary this sweep reviews, so sweeping earlier would review code it replaces. The two hook Plans above and the session-protocol and GameShellIntoGameBase changes that also moved that boundary have already landed.
 - The sweep creates no follow-up Plans itself (`/sweep` `## Rules`); the user decides on the deferred entries.

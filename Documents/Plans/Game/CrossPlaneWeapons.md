@@ -45,7 +45,7 @@ Current-tree evidence this design rests on:
   shots from. Omni blasters leave along the jittered hull direction (`:292-311`,
   jitter is a rotation about Z, `MathUtils.cpp:60-64`); left vectors come from a
   cross with +Z (`:293,387`).
-- Blasters integrate a 3D velocity (`BlastersUpdate.cpp:164`), take their direction from it (`:168`), sweep 3D spheres (`:233-247`, `Engine/Source/Frame/Collision.cpp:210-214,539`), and trace terrain in 3D (`:219`); the transfer payload carries the full velocity (`Engine/Source/Network/NetworkSerialization.cpp` blaster serializer); the client area light is built from the 3D direction (`:139-140`). Nothing in a blaster's flight is planar.
+- Blasters integrate a 3D velocity (`BlastersUpdate.cpp:164`), take their direction from it (`:168`), sweep 3D spheres (`:233-247`, `Engine/Source/Frame/Collision.cpp:210-214,539`), and trace terrain in 3D (`:219`); the transfer payload carries the full velocity (`BlastersPostRender::SpawnInfo::vecVelocity`, in the `Fields()` table the game's `Network/StatusChangeCodec.cpp` writes); the client area light is built from the 3D direction (`:139-140`). Nothing in a blaster's flight is planar.
 - Missiles: powered flight zeroes velocity Z every tick
   (`MissilesUpdate.cpp:209`), falling flight applies gravity to Z (`:213`,
   `Missiles.cpp:449`); homing is yaw-only through the cross-product Z sign
@@ -247,13 +247,3 @@ no longer the only release site while the window is live. `Frame/Frame.cpp`: the
 | Battleship fires flat | A fleet Battleship on plane 0 with an enemy on plane 0 ahead produces blasters with `dir[2]` 0 at `local[2]` 6.0; with the enemy overhead on plane 1 it produces none | `/agent-harness`: `edit_frame`, `query_collection` |
 | Area damage crosses planes only by 3D distance | A missile exploding on a plane-1 target leaves a plane-0 Fighter under it at full `health`; `AreaDamage::Get` is unchanged | `/agent-harness` `query_collection`; code reading |
 | Repeated-run replay determinism | No `LogDifferences CRC` mismatch across repeated playback loops of a recording with Omni cross-plane blasters, same-plane missiles on two planes, skipped missile launches, and flat Fighter and Battleship fire | `/agent-harness` replay (`replay.md`) |
-
-## Coordination
-
-- `Documents/Plans/Engine/RemoveSandboxGameplayFromEngine.md` moves the engine
-  codec, including the blaster transfer serializer this Plan's Context cites in
-  `Engine/Source/Network/NetworkSerialization.cpp`, into the game's new
-  `Network/StatusChangeCodec.cpp`, and changes the engine seam sites the
-  prerequisite `Game/ShipTypeSplit.md` renames. This Plan edits none of that
-  Plan's sites. Whichever lands second rebases onto the other's file layout;
-  landed after that Plan, the serializer citation names `StatusChangeCodec.cpp`.

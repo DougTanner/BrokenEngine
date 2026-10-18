@@ -113,7 +113,19 @@ The `argument-hint` value selects the Plan:
    it proves, such as the same defect at a sibling site: each small one goes on
    the snapshot's execution card as approved scope, named in the card's
    `### What does this plan do?`, and into `Slices`, so the Plan review step
-   reviews it, and every other one returns under `Residuals`.
+   reviews it, and every other one returns under `Residuals`. The brief also
+   has that `implementer` find every live Plan other than the claimed one that
+   names the claimed Plan's file name after its metadata line, and put
+   rewriting each such line on the card as approved scope by this rule, judging
+   "landed" against the tree after the change, so the claimed Plan's own change
+   counts as landed on completion and as not landed on rejection: a pending
+   claim becomes the present-tense fact with its current `path:line` or symbol
+   when the work landed, and is removed when it did not; a `## Coordination`
+   bullet that only orders against the claimed Plan is removed, and a
+   conditional in it resolves to the branch that tree shows, updating the
+   citing Plan's affected decisions to match; a past-tense record keeps its
+   fact and drops the file name; and a conditional neither branch of which that
+   tree settles returns to main as a user decision.
 
    After that preparation handoff, and before the Plan review reviewers, main
    runs `/plan-alternatives` when its trigger fires and presents per that
@@ -209,7 +221,10 @@ The `argument-hint` value selects the Plan:
    Main passes that result verbatim into every `/finalize-changes` brief the run
    dispatches, after acceptance, after rejection, and after changes are
    requested at the landing confirmation.
-   Done when that result is in hand; the claim stays held until landing
+   While another live Plan still names the held Plan's file name after its
+   metadata line, the script changes nothing and refuses with
+   `completion.plan-cited`.
+   Done when the success result is in hand; the claim stays held until landing
    succeeds, and `/finalize-changes` deletes it after primary advances.
 11. End the run per this file's `### IMPORTANT: Session-complete marker`: print
    `SESSION COMPLETE` as the last line only

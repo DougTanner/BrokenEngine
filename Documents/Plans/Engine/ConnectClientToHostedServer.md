@@ -75,7 +75,3 @@ Risk tier: Tier 2. This is client-only menu behavior through the engine-owned st
   - `describe_ui` lists `REMOTE SERVER` as an enabled item while no client exists.
   - The Local Server entry still connects to the local server as before.
   - After returning to the main menu, clicking `REMOTE SERVER` disables the entry while the attempt runs. The VM is only provisioned at this point, with no server deployed (running or deallocated by its daily schedule) (`DeployAndRunHostedServer.md` deploys it), so nothing answers the address, and the attempt ends in the `Connection failed` modal.
-
-## Coordination
-
-- `Documents/Plans/Engine/GameShellIntoGameBase.md` changes only the `.state` line of `Game::GetStandardMenuModel`, in the same `Game.cpp` `BT_CLIENT` region that holds `Game::ApplyStandardMenuAction`, and leaves `StandardMenuAction`, `ApplyStandardMenuAction`, and `MainMenuScreen` unchanged. Either order works; whichever lands second rebases onto the other's `Game.cpp` text.

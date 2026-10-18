@@ -16,7 +16,7 @@ repository-relative. Flight-plane series; the term is "flight plane".
 
 ## Context
 
-`Documents/Plans/Engine/FlightPlaneData.md` hands the engine the game's
+The game hands the engine its
 flight-plane table at startup (`engine::gpFlightPlanes`: `Count()`, `Plane(i)`,
 `Lowest()`, `Highest()`, `FlightPlaneFlags::kTerrainCollision`; low 6 m and
 medium 50 m collide with terrain, high 100 m does not).
@@ -62,10 +62,9 @@ Current-tree evidence this design rests on:
 - `engine::ResolveDiscAgainstTerrain` resolves an overlapped start with
   `NavQuerySnapToNavigable(XMVectorSetZ(vecStart, <lowest height>), rStaticData.navigationData)`,
   using only the snapped XY (`IslandTerrain.cpp:943`, `90fa6c85`;
-  `Documents/Plans/Engine/SplitIslandTerrainCollision.md`, a prerequisite of
-  FlightPlaneData, moves the body unchanged into
-  `Engine/Source/Frame/TerrainCollisionUtils.cpp` and the declaration from
-  `IslandTerrain.h:203` into `TerrainCollisionUtils.h`). Its two callers after
+  the body and the declaration now live in
+  `Engine/Source/Frame/TerrainCollisionUtils.cpp` and
+  `TerrainCollisionUtils.h`). Its two callers after
   ShipTypeSplit are the shared `ResolveTerrainContact` (the Omni slide, from
   `OmnisPostRender::Update`) and `ApplyTerrainBounce` (from
   `FightersPostRender::Update` and `BattleshipsPostRender::Update`) in

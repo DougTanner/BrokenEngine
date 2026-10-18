@@ -25,6 +25,18 @@ try {
  if($earlierDeletion){Add-Diagnostic 'Get-AgentPlansLayoutViolation' ([string]$folderViolations[0].rule) ([string]$folderViolations[0].path) "$($folderViolations.Count) committed file(s) of the support folder '$supportFolder' are deleted in the worktree."
   Complete-Workflow 2 'blocked' 'completion.already-prepared' "An earlier run already prepared the claim exit and deleted the support folder '$supportFolder'; nothing was changed. To run it again, restore the session's changed Plan files and that folder with Git, then rerun." 'stop-report-to-user'}
  if($folderViolations.Count -ne 0){Add-Diagnostic 'Get-AgentPlansLayoutViolation' ([string]$folderViolations[0].rule) ([string]$folderViolations[0].path) "$($folderViolations.Count) layout violation(s) in the support folder '$supportFolder'.";Complete-Workflow 2 'blocked' 'completion.support-folder-invalid' "The held Plan's support folder breaks the Documents/Plans/AGENTS.md layout rules; nothing was changed." 'stop-report-to-user'}
+ # Another live Plan naming the held Plan's file name after its metadata line would cite a deleted Plan once this exit runs, so it refuses before any change.
+ $heldName=[IO.Path]::GetFileName($heldPlan);$citation=[regex]::new('(?<![A-Za-z0-9])'+[regex]::Escape($heldName));$citingCount=0;$firstCiting=$null
+ $listing=Invoke-AgentProcess 'git' @('-C',$context.Worktree,'ls-files','-z','--','Documents/Plans') $context.Worktree
+ if($listing.ExitCode -ne 0){throw "git ls-files failed for 'Documents/Plans': $($listing.Stderr.Trim())"}
+ foreach($path in ($listing.Stdout -split "`0")){
+  if(-not $path.EndsWith('.md',[StringComparison]::Ordinal) -or [IO.Path]::GetFileName($path) -ceq 'AGENTS.md' -or $path -ceq $heldPlan){continue}
+  # A Plan deleted in the worktree is still listed until the deletion is staged.
+  $file=Join-Path $context.Worktree $path;if(-not (Test-Path -LiteralPath $file -PathType Leaf)){continue}
+  $lines=[IO.File]::ReadAllLines($file)
+  for($index=1;$index -lt $lines.Count;$index++){if($citation.IsMatch($lines[$index])){$citingCount++;if($null -eq $firstCiting){$firstCiting=[pscustomobject]@{Path=$path;Line=$index+1}}}}
+ }
+ if($citingCount -ne 0){Add-Diagnostic 'Complete-NextPlan' 'completion.plan-cited' $firstCiting.Path "Line $($firstCiting.Line) names '$heldName'.";Complete-Workflow 2 'blocked' 'completion.plan-cited' "$citingCount line(s) in other live Plans name '$heldName'; nothing was changed. Rewrite each line by the citation rule in .agents/skills/next-plan/SKILL.md step 4, then rerun." 'stop-report-to-user'}
  $operation=if($Reject){'reject'}else{'complete'}
  $expectedDisposition=if($Reject){'rejected'}else{'completed'}
  $arguments=@('plan',$operation)+$claimArguments

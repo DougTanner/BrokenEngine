@@ -5,8 +5,8 @@
 
 This is the last of five Plans that put the dedicated server on the internet. When this Plan is claimed, the earlier four have landed:
 
-- `Documents/Plans/Engine/HardenServerForUnattendedHosting.md` made the server save its world on `WM_ENDSESSION` and fail fast on a game-port bind failure.
-- `Documents/Plans/ChangeWorkflow/ProvisionAzureServerVm.md` created the `/deploy-server` skill and its provisioning template under `assets/`; `Documents/Plans/ChangeWorkflow/CreateAzureServerVm.md` used them to create the VM `brokenengine-server` in `brokenengine-server-rg` (running or deallocated by its daily schedule). The VM has NSG rules for UDP 27015 (any source) and TCP 3389 and 22 (the user's IP only). `references/azure-facts.md` holds the prices and billing facts.
+- An earlier landing made the server save its world on `WM_ENDSESSION` and fail fast on a game-port bind failure.
+- An earlier landing created the `/deploy-server` skill and its provisioning template under `assets/`; `Documents/Plans/ChangeWorkflow/CreateAzureServerVm.md` used them to create the VM `brokenengine-server` in `brokenengine-server-rg` (running or deallocated by its daily schedule). The VM has NSG rules for UDP 27015 (any source) and TCP 3389 and 22 (the user's IP only). `references/azure-facts.md` holds the prices and billing facts.
 - `Documents/Plans/Engine/ConnectClientToHostedServer.md` made Main Menu's Remote Server button connect to the VM's static IP (`kRemoteServerAddress`, `Projects/BrokenEngineSandbox/Source/Game.cpp`).
 
 This Plan adds the scripts that configure the VM, copy the server to it, start and stop it, and prove the whole path end to end.

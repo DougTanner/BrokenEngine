@@ -10,17 +10,17 @@ The user's direction, recorded by the dispatch that commissioned this Plan: a se
 The game Agent (`Projects/BrokenEngineSandbox/Source/Agent/`) holds commands and helpers that read only engine state, so a second game would have to copy them:
 
 - `audio_streaming_harness_rig` (`Commands/AgentCommandsAudioStreaming.cpp:1-398`) uses only `engine::AudioStreamingHarnessRig`, `gpAgentCommandServer`, and `gpAudioManager`.
-- `desync_probe` (`Commands/ClientDesyncProbe.cpp:16-153`) uses engine `Client`, `ClientDesyncCore`, `ReconcileDesyncInfo`, `GameBase` cells and `SnapshotIndex`. Its only game-owned reach is `gpClientSession->mpDesynchronizationCore` (`Network/Client/ClientSession.h:68`), which `Documents/Plans/Engine/SharedSessionProtocol.md` moves into engine ownership.
+- `desync_probe` (`Commands/ClientDesyncProbe.cpp:16-153`) uses engine `Client`, `ClientDesyncCore`, `ReconcileDesyncInfo`, `GameBase` cells and `SnapshotIndex`. Its only game-owned reach is the game global `gpClientSession`, through which it reads the engine-owned `engine::ClientSessionBase::mpDesynchronizationCore` (`Engine/Source/Network/Client/ClientSessionBase.h`).
 - Server `status` core fields, `pause`, and `query_profile`
   (`AgentCommandsServer.cpp:82-106,113-122,179-227`) read only `GameBase`,
   `engine::gpReplay`, `engine::gpServer`, and `ProfileManager` members, except
   the status fields that read `game::gpServerSession`
   (`pendingFlagshipUpdateCount` `:107`, `harvestedTransferTotal` `:108`, and
-  `pendingAgentStatusChangeCount` `:110` once `FrameEditRows.md` removes
-  `pendingTransferHarnessRigCount` `:109`) and the `NavQuery` raw-row block at
+  `pendingAgentStatusChangeCount` `:110`; the baseline's
+  `pendingTransferHarnessRigCount` `:109` is gone) and the `NavQuery` raw-row block at
   `:200-210`. `CoordinateFromParameter` (`:229-242`) is a wrapper over
   `engine::AgentGridCoordinateValue`.
-- `replay_record`, `replay_play`, `replay_transfer_capture`, `replay_drop_retained_end_frame`, and `replay_inject_persistence_failure` (`Commands/ServerSimulationHarnessRigs.cpp:51-255`) touch only `engine::gpReplay`, `GameFlags`, `mbReplaying`, and `engine::ReplayHarnessRigs`, except the four count names at `:136-139` (the slot clear at `:86` goes with the replay-transfer queue `FrameEditRows.md` removes).
+- `replay_record`, `replay_play`, `replay_transfer_capture`, `replay_drop_retained_end_frame`, and `replay_inject_persistence_failure` (`Commands/ServerSimulationHarnessRigs.cpp:51-255`) touch only `engine::gpReplay`, `GameFlags`, `mbReplaying`, and `engine::ReplayHarnessRigs`, except the four count names at `:136-139` (the replay-transfer queue and its slot clear at `:86` are gone).
 - `describe_scene` (`AgentScene.cpp:185-375`): the camera, UI state, tick, client cell, `subscribedCoords`, `cellStates` (`:114-155`), islands (`:272-289`), and the visible-unit cull (`:157-183`) are engine state; units, fleets, flag names, and counts are game. The shared `.agents/skills/agent-harness/scripts/Wait-IslandSceneReady.ps1:347-389` requires `clientGridCoord` and `islands` from it.
 - Duplicates of engine code: `game::ClientGridCoordinateValue`
   (`AgentCommandsClient.cpp:18-44`) repeats `engine::AgentGridCoordinateValue`
@@ -55,8 +55,7 @@ values. `Engine/Source/Agent/Commands/ReplayHarnessRigs.h:5` includes the game
 header `Agent/Commands/ServerSimulationHarnessRigs.h`, and
 `Engine/Source/Agent/AGENTS.md:5,13,15` link Sandbox files as the contract, so
 no document says what a game must provide.
-`Documents/Plans/ChangeWorkflow/ProjectAwareTooling.md` `## Out of scope` hands
-the agent-harness routing links (`SKILL.md:27,42`,
+The landed project-selection change left the agent-harness routing links (`SKILL.md:27,42`,
 `references/worker.md:13,502,563-567`, `references/renderdoc.md:17`,
 `references/command-reference.md:3,7,9`) to this Plan.
 
@@ -97,7 +96,7 @@ client-generic include (`Engine.h:92-95`) and declares the game hooks it calls
 in a `namespace game` block (the form `Engine/Source/GameBase.h:13-20` uses for
 game types), so a game that omits one fails to link with the hook's name.
 
-- `status`: `:84-106` verbatim, then `game::AppendAgentServerStatus(nlohmann::json& rResult)`; the game defines it with the three fields at `:107`, `:108`, and `:110` (`FrameEditRows.md` removed `pendingTransferHarnessRigCount` and made `pendingAgentStatusChangeCount` read `CountPendingAgentStatusChanges(*gpServerSession) + gpServerSession->mpTransferManager->PendingSpawnCount()`).
+- `status`: `:84-106` verbatim, then `game::AppendAgentServerStatus(nlohmann::json& rResult)`; the game defines it with the three fields at `:107`, `:108`, and `:110` (`pendingTransferHarnessRigCount` is gone, and `pendingAgentStatusChangeCount` reads `CountPendingAgentStatusChanges(*gpServerSession) + gpServerSession->mpTransferManager->PendingSpawnCount()`).
 - `pause`: `:113-122` verbatim.
 - `query_profile`: `:179-227`, with the `if constexpr (kbProfiling)` block at
   `:200-210` replaced by
@@ -105,7 +104,7 @@ game types), so a game that omits one fails to link with the hook's name.
   called for every timer inside the timer lock; the game defines it with that
   block. The engine names `gpProfileManager`, as the client handler
   already does (`AgentCommandsClientGeneric.cpp:1126`).
-  `EngineOwnedSaveSettingsAndSwitches.md` leaves the CPU timer enum game-owned,
+  The CPU timer enum stays game-owned (`game::GameCpuTimers`, `Profile/ProfileRows.h`),
   which is why the `NavQuery` fields need the hook.
 - The five replay commands: `ServerSimulationHarnessRigs.cpp:51-255` verbatim,
   with one change: the `replay_transfer_capture` count lines call
@@ -114,7 +113,7 @@ game types), so a game that omits one fails to link with the hook's name.
   `blasterCount`, `missileCount`); `ReplayTransferCaptureCounts` is the game
   type `ReplayHarnessRigs::TransferCaptureEvent::transferCounts` already holds
   (`ReplayHarnessRigs.h:32`), forward-declared in the header.
-  `FrameEditRows.md` removed the replay-transfer queue; the harness state slot,
+  The replay-transfer queue is gone; the harness state slot,
   `Bind`, and the tick-input queue stay game-side with `inject_payload`, so
   nothing else game-side is carried over.
 - `ExecuteServerSimulationHarnessRigCommand` handles only `inject_payload`.
@@ -125,13 +124,12 @@ game types), so a game that omits one fails to link with the hook's name.
 - `audio_streaming_harness_rig`: `Commands/AgentCommandsAudioStreaming.h/.cpp` move to `Engine/Source/Agent/Commands/` under the same names, `namespace engine`, body unchanged; `ExecuteClientAgentCommand` dispatches it; the game dispatch row (`AgentCommandsClient.cpp:118-122`) goes.
 - `desync_probe`: `Commands/ClientDesyncProbe.h/.cpp` move to
   `Engine/Source/Agent/Commands/`, `namespace engine`. The client comes from
-  `RequireAcceptedClient`, the desync core from the engine owner
-  `SharedSessionProtocol.md` establishes, and cells and frames from
+  `RequireAcceptedClient`, the desync core through `game::gpClientSession` from
+  its engine owner `engine::ClientSessionBase`, and cells and frames from
   `game::gpGame` (including `Game.h` as `AgentCommandsClientGeneric.cpp:12`
   does). Its current-frame lookup (`ClientDesyncProbe.cpp:99-108`) uses
-  `engine::Cell::TailFrame()`, which
-  `Documents/Plans/Engine/GameShellIntoGameBase.md` adds and leaves this site to
-  this Plan; the `nullptr` result keeps the one
+  `engine::Cell::TailFrame()` (`Engine/Source/GameBase.h`), which this site
+  does not call yet; the `nullptr` result keeps the one
   `desync_probe requires a current client frame` text.
   `ExecuteClientAgentCommand` dispatches it; the game row (`:128-132`) goes.
 - `describe_scene`: new `Engine/Source/Agent/Commands/DescribeScene.h/.cpp`,
@@ -296,11 +294,11 @@ Invariants:
   `query_frame`/`query_omnis`/`query_collection` and their extractors (including
   `Vector3ToJson`, a direction writer, not a position), `timescale`, and the
   `save`/`load`/`reset` bodies with `BareFilenameParameter` (no engine
-  consumer). `Documents/Plans/Engine/EngineOwnedSaveSettingsAndSwitches.md`
-  renames the save calls in `AgentCommandsServer.cpp`.
+  consumer). Those bodies already call
+  `gpGame->mServerSaveLoad`.
 - The game dispatcher `game::ExecuteAgentCommand` beyond the one server row, and its declaration.
-- `ReplayHarnessRigs.*`, `game::ReplayTransferCaptureCounts`, and `CountCapturedReplayTransfers`, which `Documents/Plans/Engine/RemoveSandboxGameplayFromEngine.md` keeps as neutral hooks; `ClientDesyncCore` ownership (owned by `SharedSessionProtocol.md`).
-- `Invoke-HarnessClaim.ps1`, its hub parser, and any agent-harness script; the script and skill changes `Documents/Plans/ChangeWorkflow/ProjectAwareTooling.md` owns.
+- `ReplayHarnessRigs.*`, `game::ReplayTransferCaptureCounts`, and `CountCapturedReplayTransfers`, which are already neutral hooks; `ClientDesyncCore` ownership (already `engine::ClientSessionBase`).
+- `Invoke-HarnessClaim.ps1`, its hub parser, and any agent-harness script; the landed project selection in repository scripts and skills.
 - `verification.md`, `cross-cell.md`, the game entries of `commands-server.md`/`commands-client.md`, and the project durable caveats.
 - Any change to a command's success fields, any new command, parameter, or validation, and any compatibility shim for old names or paths.
 
@@ -338,4 +336,3 @@ Invariants:
 ## Notes
 
 - `dc298984` added the `create_cell` command and the `edit_frame` `uiPinned` handling to `ServerFrameEdit.cpp`, so Stage 4 splits their final shape.
-- `Documents/Plans/Engine/SharedEngineProjectFiles.md` may change where engine files are listed; `/update-vcxproj` puts this Plan's files into whatever layout is current at claim time.
