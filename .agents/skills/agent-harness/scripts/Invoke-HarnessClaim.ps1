@@ -1,5 +1,5 @@
-# Require the project executables, provision the checkout, resolve AgentHarness, mint an owner
-# token, and claim the harness lock.
+# Read the game data directory from the project's build records, require the project executables,
+# provision the checkout, resolve AgentHarness, mint an owner token, and claim the harness lock.
 # A foreign owner is waited out, not stolen from: provisioning runs once and only the claim attempt
 # repeats, until the lock is acquired or the holder's own heartbeat reaches the staleness point, and
 # nothing touches the holder's processes, heartbeat, or claim. A holder that keeps refreshing its
@@ -12,11 +12,9 @@
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
 	[Parameter(Mandatory)][string] $Session,
-	# The packed data the launch will read. Pass the latest /compile result's normalized
-	# GameDataDirectory verbatim, so the pairing check judges the same data the game will be given.
-	# Its Projects\<Name>\Platforms\VisualStudio2026\Output\Data suffix names the game project whose
-	# executables are checked, so they can never belong to a different game than the data.
-	[Parameter(Mandatory)][string] $GameDataDirectory,
+	# The game project. Its build records hold the GameDataDirectory each build passed to MSBuild,
+	# which the claim reads instead of taking a data directory from the caller.
+	[Parameter(Mandatory)][string] $Project,
 	[string] $Key = 'default',
 	[string] $Configuration = 'Debug',
 	# The caller declares that this session's scenario launches only the server, which narrows the
@@ -41,7 +39,7 @@ $result = [ordered]@{
 	repositoryRoot = $RepositoryRoot
 	session = $Session
 	key = $Key
-	gameDataDirectory = $GameDataDirectory
+	gameDataDirectory = $null
 	project = $null
 	owner = $null
 	agentHarness = $null
@@ -233,7 +231,6 @@ try {
 	if ([string]::IsNullOrWhiteSpace($Session)) { throw 'Session must not be empty.' }
 	if ([string]::IsNullOrWhiteSpace($Key)) { throw 'Key must not be empty.' }
 	if ([string]::IsNullOrWhiteSpace($Configuration)) { throw 'Configuration must not be empty.' }
-	if (-not [IO.Path]::IsPathRooted($GameDataDirectory)) { throw "GameDataDirectory must be absolute: '$GameDataDirectory'." }
 
 	$sharedScripts = Join-Path $PSScriptRoot '..\..\..\scripts'
 	if (-not (Test-Path -LiteralPath (Join-Path $sharedScripts 'AgentScriptCommon.psm1'))) {
@@ -251,8 +248,27 @@ try {
 		Complete-HarnessClaim 1 'error' 'claim.provisioner-missing' "Provisioning script is missing: '$provisioner'."
 	}
 
-	$dataDirectory = Get-AgentCanonicalPath $GameDataDirectory
-	$result.gameDataDirectory = $dataDirectory
+	# The data directory is the one each build passed to MSBuild, so it is read from the build records
+	# here, before provisioning and before the lock. Server and Client executables built against
+	# different directories cannot share one launch.
+	$recordTargets = @('Server')
+	if (-not $ServerOnly) { $recordTargets += 'Client' }
+	$dataDirectory = $null
+	foreach ($recordTarget in $recordTargets) {
+		$dataRecord = Get-AgentSharedDataRecord $root $Project $recordTarget $Configuration
+		if ($null -eq $dataRecord) {
+			Complete-HarnessClaim 2 'blocked' 'shared-data.record-missing' `
+				"No current-format data record exists for $Project $recordTarget $Configuration; /compile of $recordTarget $Configuration writes it."
+		}
+		if ($null -eq $dataDirectory) {
+			$dataDirectory = $dataRecord.GameDataDirectory
+			$result.gameDataDirectory = $dataDirectory
+		}
+		elseif (-not [string]::Equals($dataDirectory, $dataRecord.GameDataDirectory, [StringComparison]::OrdinalIgnoreCase)) {
+			Complete-HarnessClaim 2 'blocked' 'claim.data-directory-mismatch' ("The Server and Client $Configuration builds used different " +
+				"data directories; /compile both in one data mode. Server: '$dataDirectory'; Client: '$($dataRecord.GameDataDirectory)'.")
+		}
+	}
 	$launch = Get-AgentHarnessLaunchConfiguration $root $dataDirectory $Configuration
 	$result.project = $launch.Project
 	if ($launch.Failure -ceq 'project-underivable') { Complete-HarnessClaim 2 'blocked' 'claim.project-underivable' $launch.Message }
@@ -274,8 +290,6 @@ try {
 	# The Shared data directory belongs to the primary checkout, so a later refresh or export can
 	# change it after this worktree's build. Refusing here, before provisioning and before the
 	# unbounded wait on a foreign lock holder, brings that stop to the caller at once.
-	$recordTargets = @('Server')
-	if (-not $ServerOnly) { $recordTargets += 'Client' }
 	foreach ($recordTarget in $recordTargets) {
 		$dataChange = Compare-AgentSharedDataRecord $root $dataDirectory $project $recordTarget $Configuration
 		if ($null -ne $dataChange) { Complete-HarnessClaim 2 'blocked' $dataChange.Code $dataChange.Message }
@@ -285,7 +299,7 @@ try {
 	# the runtime manifest trust boundary, exiting before the harness ping: reported as an unexpected
 	# process exit when process checking is active, otherwise only as a ping timeout. Proving the
 	# pairing here — before provisioning and before the lock — blocks with no owner token or claim left
-	# behind, and the caller supplies the same data directory the launch will pass to the game.
+	# behind, and the launch passes the game this same recorded data directory.
 	$expectedVersion = Get-ExpectedPackVersion (Join-Path $root 'Common\DataFile.h')
 	if ($null -eq $expectedVersion.Version) {
 		Complete-HarnessClaim 1 'error' 'claim.pack-version-underivable' `

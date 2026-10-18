@@ -100,12 +100,16 @@ the selected Data directory's inventory or contents, so a malformed, partial,
 or stale directory is not detected as such — it surfaces only as an ordinary
 compile or runtime failure. Two exceptions cover Shared data provenance. A
 Shared Client build checks the primary's shader stamp, described in
-`## Wrapper bootstrap Shared-data refresh`. And a successful Shared game build
-that is not a selective `-Files` compile records the listing of the directory
-it compiled against — each file's relative path, size, and last-write time —
-in `SharedDataRecord.<Target>.<Configuration>.txt` beside its executables,
-which the `/agent-harness` claim and launch scripts compare with the directory;
-`/agent-harness` worker steps 7 and 21 own the refusal codes and their routing.
+`## Wrapper bootstrap Shared-data refresh`. And the `/agent-harness` claim and
+launch scripts compare a Shared directory with the listing in its build's
+record. Every successful game build that is not a selective `-Files` compile,
+in either data mode and including the authorized generation build, writes that
+record as `SharedDataRecord.<Target>.<Configuration>.txt` beside its
+executables: a format marker, the `GameDataDirectory` it passed to MSBuild,
+and, for a Shared build only, the listing of that directory — each file's
+relative path, size, and last-write time. The `/agent-harness` claim reads its
+data directory from that record; `/agent-harness` worker steps 7 and 21 own the
+refusal codes and their routing.
 
 ## Wrapper bootstrap Shared-data refresh
 

@@ -9,7 +9,8 @@
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
 	[Parameter(Mandatory)][ValidateSet('server', 'client', 'client-b')][string] $Role,
-	# The same normalized GameDataDirectory the claim was given.
+	# The claim result's gameDataDirectory, or the derived Temp copy of it that agent-harness worker.md
+	# step 5 permits.
 	[Parameter(Mandatory)][string] $GameDataDirectory,
 	[Parameter(Mandatory)][string] $AgentHarness,
 	[Parameter(Mandatory)][string] $Owner,

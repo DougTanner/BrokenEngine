@@ -199,10 +199,27 @@ function Get-AgentShaderSourceFingerprint([string] $Root, [string] $Revision, [s
 	return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.UTF8Encoding]::new($false).GetBytes($listing -join "`n"))).ToLowerInvariant()
 }
 
-# The listing a successful, non-selective Shared game build of Target and Configuration records for the Shared data
-# directory it compiled against. It sits under the gitignored per-worktree game Output.
+# The record every successful, non-selective game build of Target and Configuration writes: the format marker, the
+# GameDataDirectory it passed to MSBuild, and, for a Shared build only, that directory's listing. It sits under the
+# gitignored per-worktree game Output.
 function Get-AgentSharedDataRecordPath([string] $Root, [string] $Project, [string] $Target, [string] $Configuration) {
 	return Join-Path $Root "Projects\$Project\Platforms\VisualStudio2026\Output\SharedDataRecord.$Target.$Configuration.txt"
+}
+
+# A record written before the marker existed starts with a listing line instead, so it reads as missing.
+$SharedDataRecordFormat = 'broken-engine-shared-data-record/v2'
+
+function Write-AgentSharedDataRecord([string] $Root, [string] $Project, [string] $Target, [string] $Configuration, [string] $GameDataDirectory, [string[]] $Listing) {
+	[IO.File]::WriteAllLines((Get-AgentSharedDataRecordPath $Root $Project $Target $Configuration), [string[]]@($SharedDataRecordFormat, $GameDataDirectory) + $Listing)
+}
+
+# The record's GameDataDirectory and Listing, or nothing when the record is missing or not in the current format.
+function Get-AgentSharedDataRecord([string] $Root, [string] $Project, [string] $Target, [string] $Configuration) {
+	$recordPath = Get-AgentSharedDataRecordPath $Root $Project $Target $Configuration
+	if (-not [IO.File]::Exists($recordPath)) { return }
+	[string[]] $lines = [IO.File]::ReadAllLines($recordPath)
+	if ($lines.Count -lt 2 -or $lines[0] -cne $SharedDataRecordFormat) { return }
+	return [pscustomobject] @{ GameDataDirectory = $lines[1]; Listing = [string[]]@($lines | Select-Object -Skip 2) }
 }
 
 # One line per file at any depth, hidden included: relative path, size, and last-write time in UTC ticks, tab-separated
@@ -221,19 +238,19 @@ function Get-AgentDataListing([string] $Directory) {
 	return $lines
 }
 
-# The one Shared data comparison the harness claim and launch scripts run, against the Target and Configuration record.
-# Nothing when the data directory is under the worktree root (Local output, or a derived copy under Temp, which the
-# worktree owns) or the record equals the current listing; otherwise a Code and Message result.
+# The one Shared data comparison the harness claim and launch scripts run, against the listing in the Target and
+# Configuration record. Nothing when the data directory is under the worktree root (Local output, or a derived copy under
+# Temp, which the worktree owns) or the record's listing equals the current listing; otherwise a Code and Message result.
 function Compare-AgentSharedDataRecord([string] $Root, [string] $DataDirectory, [string] $Project, [string] $Target, [string] $Configuration) {
 	if ((Get-AgentCanonicalPath $DataDirectory).StartsWith((Get-AgentCanonicalPath $Root) + '\', [StringComparison]::OrdinalIgnoreCase)) { return }
-	$recordPath = Get-AgentSharedDataRecordPath $Root $Project $Target $Configuration
-	if (-not [IO.File]::Exists($recordPath)) {
+	$dataRecord = Get-AgentSharedDataRecord $Root $Project $Target $Configuration
+	if ($null -eq $dataRecord) {
 		return [pscustomobject] @{
 			Code = 'shared-data.record-missing'
-			Message = "No Shared data record exists for $Target $Configuration; /compile of $Target $Configuration writes it."
+			Message = "No current-format data record exists for $Target $Configuration; /compile of $Target $Configuration writes it."
 		}
 	}
-	$record = [Collections.Generic.HashSet[string]]::new([IO.File]::ReadAllLines($recordPath), [StringComparer]::Ordinal)
+	$record = [Collections.Generic.HashSet[string]]::new($dataRecord.Listing, [StringComparer]::Ordinal)
 	$listing = [Collections.Generic.HashSet[string]]::new([string[]]@(Get-AgentDataListing $DataDirectory), [StringComparer]::Ordinal)
 	[string[]] $differing = @(@($record | Where-Object { -not $listing.Contains($_) }) + @($listing | Where-Object { -not $record.Contains($_) }))
 	if ($differing.Count -eq 0) { return }
@@ -339,4 +356,4 @@ function Get-AgentPlansLayoutViolation([string] $RepositoryRoot, [string] $Folde
 	return @($sorted | ForEach-Object { $parts = $_.Split("`0"); [pscustomobject] @{ rule = $parts[1]; path = $parts[0] } })
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentShaderSourceFingerprint, Get-AgentSharedDataRecordPath, Get-AgentDataListing, Compare-AgentSharedDataRecord, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentShaderSourceFingerprint, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation

@@ -57,13 +57,14 @@ and the handoff this run returns.
    worktree root. Done when that single invocation has returned its JSON object:
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot '<absolute adopted worktree>' -Session '<short task label>' -GameDataDirectory '<normalized Data path>'
+   pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot '<absolute adopted worktree>' -Session '<short task label>' -Project '<Project>'
    ```
 
-   - It takes the project from the
-     `Projects\<Name>\Platforms\VisualStudio2026\Output\Data` suffix of
-     `-GameDataDirectory`, so the data path selects the game. It requires that
-     project's server and client executables (reading
+   - It takes the game project from `-Project`, the project step 3 named, and
+     the data directory from that project's build records, which `/compile`
+     writes ([`runtime-data-mode.md`](../../compile/references/runtime-data-mode.md)
+     `## Generated Data directory inventory`), so no data path is passed. It
+     requires that project's server and client executables (reading
      their names and `Output` directory from the project's root
      `## Machine-readable launch configuration`, not from the human `launch.md`
      recipe) unless you pass `-ServerOnly` to declare a server-only session,
@@ -75,7 +76,7 @@ and the handoff this run returns.
    - It also compares a Shared data directory with this worktree's record of
      what each required executable's build compiled against, proves that the
      pack version this worktree's source expects matches the version the
-     supplied data directory's `.manifest` files carry, provisions the
+     recorded data directory's `.manifest` files carry, provisions the
      checkout, requires the resolved `AgentHarness.exe`, mints the owner token,
      and claims the lock, printing one compact `broken-engine-harness-claim/v1`
      JSON object.
@@ -96,15 +97,15 @@ and the handoff this run returns.
      resume a worker whose turn has ended.
    - If the host call times out, re-invoke the identical command; it resumes the
      same wait.
-   - Pass the selected game's normalized `GameDataDirectory` from the latest
-     `/compile` result verbatim as `-GameDataDirectory` — the same packed data
-     the launch script below selects with its own `-GameDataDirectory`. Only
-     when the approved acceptance needs derived data, such as a deliberately
-     corrupted pack, pass instead a real byte copy of that directory that keeps
-     every `.manifest` unchanged, never links to it, under
-     `<absolute adopted worktree>\Temp` with the layout suffix kept, such as
+   - The launch-script calls below pass the claim result's `gameDataDirectory`
+     as their `-GameDataDirectory`. Only when the approved acceptance needs
+     derived data, such as a deliberately corrupted pack, make a real byte copy
+     of that `gameDataDirectory` after the claim that keeps every `.manifest`
+     unchanged, never links to it, under `<absolute adopted worktree>\Temp`
+     with the layout suffix kept, because the launch script derives the project
+     from it, such as
      `<absolute adopted worktree>\Temp\<label>\Projects\<Name>\Platforms\VisualStudio2026\Output\Data`,
-     as the `-GameDataDirectory` of both the claim and the launch script; the
+     and pass the copy only as the launch calls' `-GameDataDirectory`; the
      scenario derives the copy. Delete the copy's `Temp\<label>` directory when
      the run ends with nothing launched or once its last release (step 39)
      returns exit `0`; otherwise name its path under `Evidence`.
@@ -123,24 +124,24 @@ and the handoff this run returns.
      shell state and substitute them as literal `<owner token>` and
      `<absolute AgentHarness path>` values in later calls, then report the claim
      metadata verbatim.
-   - Every result — pass, blocked, or error — echoes the supplied data path as
-     `gameDataDirectory`, canonicalized once the claim reaches the project
-     derivation; carries `project`, the derived game project, `null` until
-     derived; and carries a `packVersion` field that is `null` except on the
-     `claim.pack-version-mismatch` block below.
-   - Exit `2` (`status` `blocked`) carries one of six codes. A
+   - Every result — pass, blocked, or error — carries `gameDataDirectory`, the
+     data directory read from the Server build record, `null` when the claim
+     ends before reading it; carries `project`, the derived game project,
+     `null` until derived; and carries a `packVersion` field that is `null`
+     except on the `claim.pack-version-mismatch` block below.
+   - Exit `2` (`status` `blocked`) carries one of seven codes. A
      `claim.foreign-owner` reports a holder the script judged stale and
      continues into the takeover steps, which reconfirm that under step 11,
      while `claim.project-underivable`, `claim.executable-missing`,
-     `shared-data.changed`, `shared-data.record-missing`, and
-     `claim.pack-version-mismatch` end the attempt here; for every exit `2` the
+     `claim.data-directory-mismatch`, `shared-data.changed`,
+     `shared-data.record-missing`, and `claim.pack-version-mismatch` end the
+     attempt here; for every exit `2` the
      script never launches the game, so the Launch and ping-wait steps below are
      not performed and their absence is not a further failure to diagnose.
-   - `claim.project-underivable` means `-GameDataDirectory` lacks the
+   - `claim.project-underivable` means the recorded data directory lacks the
      `Projects\<Name>\Platforms\VisualStudio2026\Output\Data` suffix: nothing
-     was provisioned and no owner token or lock was taken, so re-enter passing
-     the selected game's latest `/compile` `GameDataDirectory`, or a derived
-     copy that keeps the suffix (step 5).
+     was provisioned and no owner token or lock was taken, so route `/compile`
+     of that project and re-enter.
    - `claim.executable-missing` means a required project executable is absent
      for the requested configuration: no provisioning ran and no lock was taken,
      so route `/compile` for the named executables and re-enter; when only the
@@ -152,9 +153,14 @@ and the handoff this run returns.
      attempt `BLOCKED` with one `Residuals` row carrying the code and message,
      and never rebuild, refresh, rebase, switch data, or edit or delete a record
      to clear it.
-   - `shared-data.record-missing` means no record exists for that target and
-     configuration: nothing was provisioned and no lock was taken, so route
-     `/compile` for the named target and re-enter; it is not a user stop.
+   - `shared-data.record-missing` means no current-format record exists for
+     that target and configuration, either none or only an old-format one:
+     nothing was provisioned and no lock was taken, so route `/compile` for the
+     named target and re-enter; it is not a user stop.
+   - `claim.data-directory-mismatch` means the Server and Client records name
+     different data directories: nothing was provisioned and no lock was taken,
+     so route `/compile` of both targets in one data mode and re-enter; it is
+     not a user stop.
    - `claim.pack-version-mismatch` means the pack version derived from this
      worktree's source is not the version the data carries; nothing was
      provisioned and no lock was taken.
@@ -356,9 +362,10 @@ and the handoff this run returns.
       differs from this worktree's record for the role's target, and nothing
       started. End the attempt through release (step 39) with the `pid` of each
       role still running; the rest is step 7's `shared-data.changed` user stop.
-    - `shared-data.record-missing` (exit `2`) means no record exists for the
-      role's target and configuration, and nothing started; end the attempt the
-      same way and route `/compile` for the named target, with no user stop.
+    - `shared-data.record-missing` (exit `2`) means no current-format record
+      exists for the role's target and configuration, and nothing started; end
+      the attempt the same way and route `/compile` for the named target, with
+      no user stop.
     - `launch.server-running` (exit `2`) means a server process was already
       running, and nothing started; follow the running-server route in the
       project `launch.md`.

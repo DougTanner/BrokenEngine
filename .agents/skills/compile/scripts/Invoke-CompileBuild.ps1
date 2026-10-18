@@ -432,16 +432,16 @@ try {
 	$script:Summary.Add("RunDataPacker=$(if ($runGeneration) { 'true' } else { 'false' })")
 
 	if (-not $runGeneration) {
-		# The harness claim and launch compare the Shared data directory against this record. It is
-		# listed before MSBuild runs, so a refresh during the build differs at the next comparison, and a
-		# failed build keeps the previous record.
-		$sharedDataListing = $null
+		# The harness claim reads its data directory from this record, and the claim and launch compare the
+		# Shared data directory against its listing. The listing is taken before MSBuild runs, so a refresh
+		# during the build differs at the next comparison, and a failed build keeps the previous record.
+		[string[]] $sharedDataListing = @()
 		if ($selectedMode -ceq 'Shared' -and $script:SelectedFiles.Count -eq 0) {
 			$sharedDataListing = [string[]]@(Get-AgentDataListing $gameDataDirectory)
 		}
 		$buildExitCode = Invoke-WorktreeCliBuild $dataProperties
-		if ($buildExitCode -eq 0 -and $null -ne $sharedDataListing) {
-			[IO.File]::WriteAllLines((Get-AgentSharedDataRecordPath $script:Root $gameProject $Target $script:ResolvedConfiguration), $sharedDataListing)
+		if ($buildExitCode -eq 0 -and $script:SelectedFiles.Count -eq 0) {
+			Write-AgentSharedDataRecord $script:Root $gameProject $Target $script:ResolvedConfiguration $gameDataDirectory $sharedDataListing
 		}
 		Complete-CompileBuild $buildExitCode
 	}
@@ -508,6 +508,10 @@ try {
 			if ($hadExpensiveExportGuard) { [Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, $previousExpensiveExportGuard) }
 			else { [Environment]::SetEnvironmentVariable($script:ExpensiveExportGuardVariable, $null) }
 		}
+	}
+	# Local output needs no listing: the comparison skips data directories under the worktree root.
+	if ($buildExitCode -eq 0 -and $script:SelectedFiles.Count -eq 0) {
+		Write-AgentSharedDataRecord $script:Root $gameProject $Target $script:ResolvedConfiguration $gameDataDirectory @()
 	}
 
 	Complete-CompileBuild $buildExitCode

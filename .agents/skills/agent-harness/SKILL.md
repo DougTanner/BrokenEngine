@@ -39,11 +39,11 @@ length-prefixed JSON.
 
 ## Inputs
 
-Require the latest `/compile` result's `DataBuildMode`, `RunDataPacker=false`,
-and normalized `GameDataDirectory` for the game the scenario targets, which the
-brief names when that `/compile` built several. That result must also include
-the server executable, and the client executable unless the scenario launches
-only the server, for the requested configuration; request that build by
+Require the latest `/compile` result for the game project the scenario targets,
+which the brief names when that `/compile` built several; the claim reads that
+project's data directory from the build's own record. That result must also
+include the server executable, and the client executable unless the scenario
+launches only the server, for the requested configuration; request that build by
 stating the agent-harness scenario trigger in
 [`/compile`](../compile/SKILL.md) `## Inputs`.
 A release-only recovery (`## When to use`) needs no `/compile` result; its
@@ -107,8 +107,10 @@ A `shared-data.changed` residual from the claim or a launch is a mandatory user
 stop: main tells the user the Shared data MUST be re-exported, never
 redispatches or applies a fix itself, and after the user confirms runs
 `/compile` for the claimed targets, the record's only writer, before the next
-harness dispatch; a `shared-data.record-missing` residual instead routes
-`/compile` for the named target, with no user stop.
+harness dispatch. A `shared-data.record-missing` residual instead routes
+`/compile` for the named target, and a `claim.data-directory-mismatch` residual
+routes `/compile` of both the Server and the Client target in one data mode,
+each with no user stop.
 
 Each exception row cites the handoff row or path plus selector that holds its
 settling evidence and never restates it:

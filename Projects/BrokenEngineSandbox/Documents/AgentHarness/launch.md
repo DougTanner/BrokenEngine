@@ -39,7 +39,7 @@ $LaunchPaths | ConvertTo-Json -Compress
 
 Retain that record outside shell state. Every process-check action, wait helper, and release call of this run uses that one `processCheckStatePath`, and no later run reuses it; a per-scenario run that uses its own AppData root generates its own state path the same way.
 
-Launch the server, then the client, each with one call that returns once its port answers ping. Each call passes the claim's normalized Data path, the recorded `appDataRoot` and `processCheckStatePath`, the role's log path from that record, and the role's crash-report game name:
+Launch the server, then the client, each with one call that returns once its port answers ping. Each call passes the claim result's `gameDataDirectory` (or the derived copy worker step 5 permits), the recorded `appDataRoot` and `processCheckStatePath`, the role's log path from that record, and the role's crash-report game name:
 
 ```powershell
 pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessLaunch.ps1 -RepositoryRoot '<absolute adopted worktree>' -Role 'server' -GameDataDirectory '<normalized Data path>' -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ProcessCheckStatePath '<absolute process-check state path>' -AppDataDirectory '<absolute app-data root>' -LogFile '<absolute server log path>' -GameName 'Broken Engine Sandbox Server'
@@ -199,21 +199,28 @@ Get-CimInstance Win32_Process -Filter "Name LIKE 'BrokenEngineSandboxServer%'" |
 	Select-Object ProcessId, Name
 ```
 
-If that lists a process, report it to the user instead of stopping it; take no lock and launch nothing. Otherwise claim the harness lock in the form worker step 5 shows, under that step's run rules (foreground, maximum host timeout, identical re-invocation after a host timeout, never backgrounded), passing the same normalized Data path the launch passes to `--data-directory`, and `-Configuration <name>` only for a build other than `Debug`:
+If that lists a process, report it to the user instead of stopping it; take no lock and launch nothing. Otherwise claim the harness lock in the form worker step 5 shows, under that step's run rules (foreground, maximum host timeout, identical re-invocation after a host timeout, never backgrounded), adding `-Configuration <name>` only for a build other than `Debug`:
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot '<absolute adopted worktree>' -Session 'normal-launch' -GameDataDirectory '<normalized Data path>'
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.ps1 -RepositoryRoot '<absolute adopted worktree>' -Session 'normal-launch' -Project 'BrokenEngineSandbox'
 ```
 
-- Exit `0`: launch below. Do not keep the claim's owner token.
-- `claim.foreign-owner`: follow worker step 7's `claim.foreign-owner` bullet. When step 11 classifies the holder fresh, re-invoke the claim; when stale, run steps 11-15 with session label `normal-launch`, using step 1's fixed ports (`27100`, `27101`, and `27102`) and the expected executables from the project hub step 4 reads. A completed steal continues to the launch below, and its new owner token is not kept either; a `BLOCKED` takeover is reported to the user with nothing launched.
+- Exit `0`: launch below. Do not keep the claim's owner token; keep its result's `gameDataDirectory`.
+- `claim.foreign-owner`: follow worker step 7's `claim.foreign-owner` bullet.
+  When step 11 classifies the holder fresh, re-invoke the claim; when stale, run
+  steps 11-15 with session label `normal-launch`, using step 1's fixed ports
+  (`27100`, `27101`, and `27102`) and the expected executables from the project
+  hub step 4 reads. A completed steal continues to the launch below with the
+  `claim.foreign-owner` result's `gameDataDirectory`, and its new owner token is
+  not kept either; a `BLOCKED` takeover is reported to the user with nothing
+  launched.
 - Any other non-zero exit: report the claim result to the user and launch nothing.
 
 Then launch both. The `$ServerExe` and `$ClientExe` names below are the Debug ones: under a Profile or Release claim substitute the `.Profile.exe` or the unsuffixed `.exe` names:
 
 ```powershell
 $ROOT = '<absolute adopted worktree>'
-$GameDataDirectory = '<normalized Data path>'
+$GameDataDirectory = '<claim result gameDataDirectory>'
 $Output = Join-Path $ROOT 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output'
 $ServerExe = Join-Path $Output 'BrokenEngineSandboxServer.Debug.exe'
 $ClientExe = Join-Path $Output 'BrokenEngineSandbox.Debug.exe'
