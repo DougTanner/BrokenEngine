@@ -659,9 +659,82 @@ and the handoff this run returns.
       failure or a Vulkan validation message. A match is a note for main and
       never changes a criterion result, `Status`, or a retry.
 
+#### Release-only recovery
+
+Only a release-only recovery ([`../SKILL.md`](../SKILL.md) `## When to use`)
+runs steps 48 through 51, after steps 1-2 and in place of steps 3-47; every
+other run skips them. Step 50 runs steps 3-4 itself. The recovery frees only a
+lock whose record `worktree` is the adopted worktree and whose `session` is not
+`normal-launch`: that holder is this session's own stopped worker at any
+heartbeat age, so step 11's fresh-owner rule, which protects foreign owners,
+does not apply to it, and any other holder, including the never-released lock
+of a Normal launch from this worktree, is foreign and left untouched. Compare
+worktree paths as the claim records them, each canonicalized by
+`Get-AgentCanonicalPath` (`.agents/scripts/AgentScriptCommon.psm1`), ignoring
+case.
+
+48. Before reading the lock record, stop every orphaned claim script: each
+    `Win32_Process` whose `CommandLine` names `Invoke-HarnessClaim.ps1` and a
+    `-RepositoryRoot` equal to the adopted worktree. Done when each such exact
+    PID is stopped with `Stop-Process -Id` and reported as one
+    `Decisive checks` row, or none exists.
+
+    - A stopped worker's synchronous step-5 claim can outlive the host stop and
+      keeps retrying the claim, so left running it would take the lock after
+      this run released it or saw a foreign holder.
+
+49. Read the lock record. Done when the record's `owner` is retained for a
+    holder whose `worktree` is the adopted worktree and whose `session` is not
+    `normal-launch`, or the run has ended at an early exit.
+
+    - An early exit sends no `quit`, releases nothing, and ends the run,
+      returning `Status: PASS` with one `Decisive checks` row stating that
+      nothing of this session's was recovered and why.
+    - Take `<absolute AgentHarness path>` as the AgentHarness executable path
+      [`Tools/AgentHarness/AGENTS.md`](../../../../Tools/AgentHarness/AGENTS.md)
+      names, under the adopted worktree. When that executable is missing, that
+      is an early exit: no claim from this worktree can have taken the lock
+      without it.
+    - Otherwise run `lock status` with that executable:
+
+      ```powershell
+      & '<absolute AgentHarness path>' lock status --key default
+      ```
+
+    - `{"held":false}` (exit `2`), a `worktree` other than the adopted
+      worktree, or a `session` of `normal-launch` is an early exit.
+
+50. Shut down the stopped worker's game processes. Done when every validated
+    PID is gone, or step 13 has returned `BLOCKED` on an unprovable listener.
+
+    - Run steps 3-4 for the brief's game, and take the expected server and
+      client executable names for the brief's configuration from the hub's
+      Debug names, mapped to that configuration as the hub states.
+    - Run steps 12-14 with the record's `owner` as the old owner token,
+      whatever its heartbeat age.
+    - Beyond the step-12 listeners, also find each `Win32_Process` whose
+      normalized `ExecutablePath` is that expected server or client executable
+      inside the adopted worktree and whose `CommandLine` carries
+      `--agent-port`: a game process that started but is not yet listening, or
+      hung before listening, which step 12 cannot see and which blocks the next
+      launch. No quit reaches it, so after the step-14 quits wait on it with the
+      listener PIDs and stop it by exact PID under step 14's rule.
+
+51. Release through step 44 with the record's `owner`, no
+    `-ServerPid`/`-ClientPid`, and no `-ProcessCheckStatePath`, then classify the
+    result per step 47 without its log search. Done when the release result is
+    reported as a `Decisive checks` row.
+
+    - Step 50 already confirmed every validated PID gone, listening or not.
+    - The stopped run's process-check state path lives only in its scratch
+      files, and a recovery verifies no criterion.
+    - This run started no process, so it has no log to search.
+    - A non-zero exit returns `Status: BLOCKED` with its code named in
+      `Residuals`.
+
 ### Process verification report
 
-48. Run plan-provided runtime steps when present; otherwise derive the smallest
+52. Run plan-provided runtime steps when present; otherwise derive the smallest
     live checks for runtime-observable criteria only. Done when every
     runtime-observable criterion has been exercised and the handoff in
     [`../SKILL.md`](../SKILL.md) is returned.

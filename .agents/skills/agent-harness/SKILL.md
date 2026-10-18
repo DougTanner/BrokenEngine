@@ -29,6 +29,13 @@ length-prefixed JSON.
   steps it cites, leave both processes running for the user, and return
   `Criterion results: 0/0 passed` with the launch command and both PIDs as
   `Decisive checks` rows.
+- After the dispatching session stops a harness worker before its handoff
+  arrives: its next harness dispatch is a release-only recovery run; while
+  another harness worker of this session is still running, send it only after
+  that worker returns. The run returns `Criterion results: 0/0 passed` with the
+  release result, or why nothing was recovered, as a `Decisive checks` row.
+  Never probe the stopped worker's processes or read its `Temp/` scratch files
+  from the dispatching session.
 
 ## Inputs
 
@@ -39,6 +46,8 @@ the server executable, and the client executable unless the scenario launches
 only the server, for the requested configuration; request that build by
 stating the agent-harness scenario trigger in
 [`/compile`](../compile/SKILL.md) `## Inputs`.
+A release-only recovery (`## When to use`) needs no `/compile` result; its
+brief names the stopped dispatch's game and configuration instead.
 A replay determinism check needs a `kbDebugInput` build, so request `Debug` for
 it;
 [`replay.md`](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/replay.md)

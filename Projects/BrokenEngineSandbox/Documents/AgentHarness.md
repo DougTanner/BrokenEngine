@@ -36,7 +36,7 @@ $ServerExe = Join-Path $Output 'BrokenEngineSandboxServer.Debug.exe'
 $ClientExe = Join-Path $Output 'BrokenEngineSandbox.Debug.exe'
 ```
 
-Only the claim script maps these Debug names to the requested configuration — `.Profile.exe` for Profile, and the unsuffixed `.exe` for Release; do not edit this hub for another build.
+The claim script and the `/agent-harness` release-only recovery map these Debug names to the requested configuration — `.Profile.exe` for Profile, and the unsuffixed `.exe` for Release; do not edit this hub for another build.
 
 ## Focused references
 
