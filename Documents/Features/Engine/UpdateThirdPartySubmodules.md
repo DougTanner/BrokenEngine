@@ -148,7 +148,7 @@ The executing session classifies the change Tier 3 and follows `.agents/referenc
 8. Build ThirdParty, then AgentTools. Through `/compile`, build ThirdParty Debug, Profile, and Release in place in primary; ThirdParty builds are allowed there. Then build WorktreeCli and AgentHarness, which are Release-only candidates under `Temp`. Compile errors in our wrappers or consumers are ported in our code only. If implot fails against imgui `master`, stop and ask the user.
 9. Build DataPacker and the game. Build DataPacker Release; the build script refuses any other DataPacker configuration (`.agents/skills/compile/SKILL.md` `## Inputs`). Then build Client and Server in Debug, Profile, and Release, in the data mode `Resolve-CompileContext.ps1` reports.
    In primary, Local and Shared both use primary's `Output/Data`; a Local build there also re-exports into it under the Gaea guard and deletes the primary data stamp, which step 19's refresh writes again (`runtime-data-mode.md` `## Mode selection`).
-10. Propagate and check. Run `/update-affected-code`, then `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<primary>' -Baseline <start>`.
+10. Propagate and check. Run `/update-affected-code`, then `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<primary>' -Baseline <start> -IncludeUntracked`.
 11. Review. Run the `## Review roles` passes, resolve accepted findings, and rebuild what they touch.
 12. Forced re-export in Local mode (the version bumps below make `Resolve-CompileContext.ps1` report Local), with Gaea forbidden (no `-AllowGaeaExport` and no `-ForbidExpensiveExport`).
     - Add `1'000'000` to the base literal of each of these (e.g. `Version(31)`

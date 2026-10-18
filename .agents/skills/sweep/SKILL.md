@@ -126,7 +126,7 @@ commit before landing.
 9. Run the static checks:
 
    ```powershell
-   pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<worktree root>' -Baseline <baseline>
+   pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<worktree root>' -Baseline <baseline> -IncludeUntracked
    ```
 
    Done when they pass.
