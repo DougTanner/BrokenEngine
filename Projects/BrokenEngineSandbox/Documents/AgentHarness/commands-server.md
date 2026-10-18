@@ -15,7 +15,17 @@
   queued `inject_payload` entry, spawn entries and destroy and update entries
   alike, including entries scheduled for a later `tick` until a drain releases
   them.
-- `pause`: `{"paused":bool}`. Returns the applied `paused` value.
+- `pause`: `{"paused":bool}`. Returns the applied `paused` value. To advance a
+  paused server by exactly one tick, send `timescale {"faster":false}` until it
+  returns `denominator` 32, then send `pause {"paused":false}` and
+  `pause {"paused":true}` back to back, with no wait or other command between
+  them, and confirm that `status.tick` rose by 1. The server takes one agent
+  request at the start of each update, before that update's tick wait: the
+  unpause lets the tick ending that update run, and the pause stops the next
+  tick only if it arrives before the next update starts. That window is one
+  update interval, about 1 s at 1/32 but 31 ms at 1/1, shorter than one
+  AgentHarness call, so a wait between the two commands, or a faster timescale,
+  lets extra ticks run.
 - `timescale`: `{"faster":bool}`. Steps the shared timescale and returns `{"numerator","denominator"}`. The slowest step is 1/32; `{"faster":false}` there changes nothing and still succeeds.
 - `save`: `{"file"?:"bare filename"}`; defaults to quicksave. `file` (also `load`'s) is an appdata-relative bare filename; empty names, NUL, separators, `..`, `:`, and Windows device basenames are rejected. Every loaded cell is saved with its frame, so pinned cells (`create_cell`) stay pinned. Returns `{"file"}`.
 - `load`: `{"file"?:"bare filename","pauseAfterLoad"?:false}`. `pauseAfterLoad`
@@ -132,8 +142,11 @@
   `uint64_t`; `alignments` an array of `{"a","b","flags"}` objects (`a` and `b`
   integers within `uint32_t`, `flags` an integer within `uint8_t`: 1 enemies, 2
   allies, 3 both) that replaces the alignment table, rebuilt in sorted order, so
-  an empty array clears it. Rows cannot be added or removed. Identity and handle
-  columns (`engine::Id<T>`, such as `pIds` and `pPushers`) are refused.
+  an empty array clears it. `edit_frame` never adds or removes a row itself: an
+  agent adds rows through `inject_payload` spawn entries and removes one by
+  writing its kill state (below), or for an omni by an `inject_payload`
+  `DestroyOmni` entry. Identity and handle columns (`engine::Id<T>`, such as
+  `pIds` and `pPushers`) are refused.
 
   `uiFrameIdentifier`, `pGlobalIds`, and `pClientGuids` are written unchecked: a value that duplicates another frame's or omni's identity gives odd behavior but no assert. Positions are also unchecked and must stay inside the cell: an out-of-cell omni position transfers at most one cell per axis per tick and then asserts in `OmnisPostRender::Spawn` ([Frame invariants](../../../../Engine/Source/Frame/AGENTS.md)).
 
@@ -147,6 +160,29 @@
   transition is pending; queued `inject_payload` entries do not block it.
   Returns `{"edited":int,"resynchronizedClients":int}`, `edited` counting the
   written keys.
+
+  Removing rows: write a row's kill state and the next unpaused tick's Destroy
+  phase removes it through the collection's own hook, exactly as a natural death
+  ends; an omni's or spaceship's pusher goes with it. Removal is swap-and-pop, so
+  another row may move into the removed slot: read indices again after the tick.
+
+  | Collection | Writes that remove the row at the next tick | Normal staged death instead |
+  |---|---|---|
+  | `omnis` | `pFlags:1` (`kExploding`; `pDestroyedTimes` is already 0 on a live omni) | `pfArmors:0`: PostCollision starts the 0.7 s death sequence with its explosions |
+  | `spaceships` | `pFlags:2` (`kExploding`; the live sentinel `pDestroyedTimes` -1 is not positive) | `pFlags:2`, `pDestroyedTimes:0.25`, `pDestroyedExplosionTimes:0.024`: the 0.25 s staged explosions, without the first full-size explosion and death sound a killing hit adds; missiles keep homing until removal. `pfHealths:0` alone changes nothing until the next hit, and health regenerates while a live omni is more than 60 m away |
+  | `missiles` | `pFlags:64` (`kSilentDespawn`) | none: `pFlags:2`, `pDestroyedTimes:0.35` only holds the missile still and shrinks it for 0.35 s before removal; its explosion and area damage come only from a hit |
+  | `blasters` | `pFlags:1` (`kDestroy`) | none |
+  | `explosions` | `pFlags:1` (`kDestroysSelf`) on a row without trails (`piTrailCounts` 0, the `SpawnExplosion` `iTrailCount` default) | `pFlags:1` on a row with trails: the row goes when its last trail ends. A row without `kDestroysSelf`, such as a `SpawnExplosion` injected without `flags`, is never removed |
+  | `pushers` | removed with their owning omni or spaceship only | |
+
+  - A `pFlags` write replaces the whole mask, so include any bit the scenario
+    still needs (for omnis, Update rebuilds the navigation bits).
+  - With a handshaken client the commit resynchronizes clients before the tick,
+    as every `edit_frame` does. A fleet-owned omni removed this way is detected
+    as a death after that tick (`ServerSessionBase::RebuildOwnedEntities`). Its
+    fleet then respawns it under the same global id after the 1 s delay
+    (`ServerFleetManager::OnOwnedEntityDeath`, `TickRespawnTimers`), the
+    ordinary death path.
 
   With a handshaken client, each successful edit runs the load-time
   resynchronization (`resynchronizedClients` counts those clients): it advances

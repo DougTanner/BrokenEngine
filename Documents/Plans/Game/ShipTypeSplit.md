@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-08T23:54:23.561Z","dependsOn":["Documents/Plans/Game/FrameEditRowRemoval.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-08T23:54:23.561Z","dependsOn":[]} -->
 # Split Omnis and Spaceships into the Fighters, Omnis, and Battleships ship types
 
 Tier 3 (`.agents/references/risk-tiers.md`): the change alters CRC'd gameplay
@@ -618,8 +618,7 @@ One Plan, one landing; the stages order the work so each builds and runs.
   categories and symmetric ship collision damage, the per-controller models with
   placeholder assets, the alignment renames, the harness
   commands and their documents (including the `edit_frame` kill-state table and
-  Agent contract clause that `FrameEditRowRemoval.md` adds, per
-  `## Coordination`), profile counters and cell statistics, UI wrapper names,
+  Agent contract row-removal clause named in `## Coordination`), profile counters and cell statistics, UI wrapper names,
   the version bumps, and the `AGENTS.md` and `Documents/Architecture`
   lines `/update-claude-docs` finds stale, including the wire-rule rewording of
   decision 22.
@@ -695,7 +694,6 @@ One Plan, one landing; the stages order the work so each builds and runs.
   instead of tripling the copies; this is a recommendation, not a `dependsOn`
   edge.
 - `Documents/Plans/Game/SandboxSmallCleanups.md` edits the same `Omnis/` and `Spaceships/` files (the forwarding `AllocateAndCopy`, `ComputeNavigation`'s neighbouring-cell branch in `OmnisNavigation.cpp`, the `LogDifferences` labels). Whichever lands second rebases onto the other's edits; if this Plan lands first, that Plan's items apply to the Fighters, Omnis, and Battleships successors and `Ships/ShipBehaviours.cpp`.
-- `Documents/Plans/Game/FrameEditCellPins.md` also increments the `Frame::kiVersion` base literal (decision 22); the second to land increments the then-current literal again.
 - `Documents/Plans/Game/FrameEditRows.md` lands first and replaces the
   status-change family this Plan was written against: `SpawnOmniData`,
   `TransferData`, and `Projects/BrokenEngineSandbox/Source/SpawnTransfer.h/.cpp`
@@ -714,13 +712,31 @@ One Plan, one landing; the stages order the work so each builds and runs.
   names in `## Context`, `### Integration sites`, `### Stages`,
   `## Critical files`, and `## In scope`, and the acceptance rows that inject
   `SpawnShip` or `Transfer*` entries are re-derived on that family at claim.
-- `Documents/Plans/Game/FrameEditRowRemoval.md` lands first and adds the
-  `edit_frame` kill-state table to
-  `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md` and
-  the row-removal clause to the `edit_frame` bullet of
-  `Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md` `## Contracts`. This
+- The `edit_frame` entry of
+  `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md`
+  carries the kill-state table, and the `edit_frame` bullet of
+  `Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md` `## Contracts` the
+  row-removal clause. This
   Plan rewrites that table's `omnis` and `spaceships` rows as `omnis`,
   `fighters`, and `battleships` rows (decision 21) with decision 2's column
   names and decision 4's `ShipFlags` values (`kExploding` is `0x0001` for all
   three types, where today's Spaceships use 2), and keeps the clause true of the
   three ship collections.
+- `Documents/Plans/Engine/CollectionLifecycleFlags.md` moves the Omnis and
+  Spaceships `kExploding` and `kTransfer` bits out of `pFlags` into one shared
+  engine `pLifecycleFlags` column (`engine::LifecycleFlags_t`), renaming
+  `kExploding` to `kDying`, turns their pusher and wind-trail removals and the
+  Omnis hex-shield removals into releases through `engine::ReleaseIndexableElementAndClearHandle`
+  that the owned collection's next Destroy completes, and rewrites the Omnis and
+  Spaceships `edit_frame` kill-state rows. Decision 4 puts those two bits in
+  `ShipFlags`. Whichever lands second re-derives: if that Plan lands first,
+  `ShipFlags` drops `kExploding` and `kTransfer`, the Fighters, Omnis, and
+  Battleships each carry `pLifecycleFlags` and release their owned rows, and
+  this Plan's kill-state rows write `pLifecycleFlags` instead of `pFlags`; if
+  this Plan lands first, that Plan's Omnis and Spaceships rows apply to the
+  Fighters, Omnis, and Battleships.
+- `Documents/Plans/Game/GridSavePusherOwners.md` adds a frame-read check that
+  every Omnis and Spaceships pusher handle names its own Pushers row and that
+  the Pushers count equals the owner counts. Whichever lands second makes the
+  check cover every ship collection's pusher column and count: the Fighters,
+  Omnis, and Battleships pusher handles.

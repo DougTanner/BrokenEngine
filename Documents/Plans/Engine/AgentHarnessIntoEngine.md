@@ -163,10 +163,8 @@ game types), so a game that omits one fails to link with the hook's name.
 
 ### Stage 4: frame-edit machinery
 
-Runs after `Documents/Plans/Game/FrameEditCellPins.md` has changed
-`ServerFrameEdit.cpp`. New
-`Engine/Source/Agent/Commands/FrameEdit.h`, whole-file `BT_SERVER`, outside the
-`Engine.h` aggregation, included only by the game `ServerFrameEdit.cpp`. It
+New `Engine/Source/Agent/Commands/FrameEdit.h`, whole-file `BT_SERVER`, outside
+the `Engine.h` aggregation, included only by the game `ServerFrameEdit.cpp`. It
 names `game::FrameInterpolate`/`FramePostRender` (for `FrameValueColumns`), a
 game-type ownership `Engine/Source/Agent/AGENTS.md` records as the Engine hub
 (`Engine/Source/AGENTS.md` `## Hub Conventions`) requires. It takes, in
@@ -178,12 +176,12 @@ specializations, `ColumnReference`, `MatchesServerMembers`, `AreDistinct`,
 `HasDistinctNames`, the two `static_assert`s, `IntegerFromValue`, `ReadElement`
 (calling `AgentFloatValue` and `CoordinateFromParameter`), `WriteMember`,
 `WriteKeys`, `WritesFromEdit`, `WriteRow`, `FrameCollectionAt`, `WriteElement`,
-`ReadMember`, `ReadKeys`, and `ReadRow`, plus any helper the prerequisite Plans
-added that names no game collection, game `Spawn`, `gpGame`, or
-`OnStateReplaced`. `static_assert` texts that say "in this file" name the game
-`FrameCollection` specialization instead. The game keeps the four column lists,
-their specializations (now of `engine::FrameCollection`), `FrameCollections`,
-`ApplyEdit`, `CommandEditFrame`, and `CommandReadFrame`. The command bodies stay
+`ReadMember`, `ReadKeys`, and `ReadRow`. `static_assert` texts that say "in this
+file" name the game `FrameCollection` specialization instead. The game keeps the
+four column lists, their specializations (now of `engine::FrameCollection`),
+`FrameCollections`, `ApplyEdit`, `CommandEditFrame`, `CommandReadFrame`, and the
+two functions `dc298984` added, `RefuseDuringReplay` and `CommandCreateCell`,
+which both read `gpGame`. The command bodies stay
 game-side because the resynchronization refusal reads `pOmnis` (`:433`), the
 commit calls the game `OnStateReplaced` (`:466`); moving them would need one
 hook per policy line.
@@ -319,7 +317,25 @@ Invariants:
 | Replay determinism | The moved `references/replay.md` `### Replay determinism acceptance` passes on the changed Debug build |
 | Documentation | `git grep -n "BrokenEngineSandbox/Documents/AgentHarness" -- .agents Engine` returns nothing; every command name dispatched by `ExecuteSharedAgentCommand`, `ExecuteClientAgentCommand`, and `ExecuteServerAgentCommand` has exactly one schema entry, in `command-reference.md`, and none in the project `commands-*.md`; `command-reference.md` calls the server window engine-owned; `Engine/Source/Agent/AGENTS.md` `## Game contract` lists every `game::` name the `git grep` in Stage 5 finds |
 
+## Coordination
+
+- `Documents/Plans/Engine/CollectionLifecycleFlags.md` adds `pLifecycleFlags` to
+  the six `edit_frame` column lists in `Commands/ServerFrameEdit.cpp`, two of
+  them `ExplosionsFrameColumns` and `PushersFrameColumns`, which Stage 4 moves
+  to `Engine/Source/Agent/Commands/FrameEdit.h`, and makes `OmniFlagNames` and
+  `SpaceshipFlagNames` in `AgentScene.cpp` emit lifecycle flag names, a region
+  Stage 3 keeps game-side. Whichever lands second applies its edits at the
+  other's locations.
+- `Documents/Plans/Engine/CollectionLifecycleFlags.md` (the owned-row release
+  acceptance row) cites the single-tick step in the `pause` entry of
+  `commands-server.md`, which Stage 5 moves to `command-reference.md`
+  `## Server commands`; the moved `pause` text names `timescale`, which stays
+  game-owned in `commands-server.md`. Stage 5's `commands-server.md:8` citation
+  for `pause` is stale, and the Documentation criterion's `git grep` covers
+  only `.agents Engine`, so neither finds that Plan citation. Whichever lands
+  second points it at the entry's location then.
+
 ## Notes
 
-- `dependsOn`: `SharedSessionProtocol.md` gives `desync_probe` an engine-owned desync core; `GameShellIntoGameBase.md` adds `engine::Cell::TailFrame()` and leaves the two agent ring-tail sites to this Plan; `FrameEditRows.md` rewrites `ServerSimulationHarnessRigs.cpp` and the `status` fields Stage 2 moves, and `FrameEditCellPins.md` rewrites `ServerFrameEdit.cpp` and adds server commands beside them, so Stage 4 splits their final shape.
+- `dc298984` added the `create_cell` command and the `edit_frame` `uiPinned` handling to `ServerFrameEdit.cpp`, so Stage 4 splits their final shape.
 - `Documents/Plans/Engine/SharedEngineProjectFiles.md` may change where engine files are listed; `/update-vcxproj` puts this Plan's files into whatever layout is current at claim time.
