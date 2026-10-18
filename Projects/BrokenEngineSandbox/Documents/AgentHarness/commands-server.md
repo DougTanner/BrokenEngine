@@ -152,8 +152,9 @@
 
   The edits apply to a staged copy of the frame, which is committed through the
   save reader's checks (pair count/capacity parity and ID maps, the
-  `puiTypeIndices` bound, the `PostRead` hooks, and the spawn-timer bound) plus
-  one more refusal: a changed `uiNextUuid` must lie within `[current, 2^47]`.
+  `puiTypeIndices` bound, the `PostRead` hooks, the spawn-timer bound, and the
+  one-to-one pairing of omni and spaceship pusher handles with Pushers rows)
+  plus one more refusal: a changed `uiNextUuid` must lie within `[current, 2^47]`.
   Any failure before the commit returns `ok:false` with the frame unchanged. On
   success the frame CRC is recomputed. The command fails without `kbDebugInput`,
   while recording, during playback, and while a `replay_record` or `replay_play`

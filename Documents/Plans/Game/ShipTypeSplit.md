@@ -554,7 +554,7 @@ with global ID 0.
 
 ### Integration sites
 
-- `Frame/Frame.h/.cpp`: collection members `pFighters`, `pOmnis`, `pBattleships`; `fleetAlignment`/`randomAlignment`; `OwnershipLayer(const Frame&, ShipType)`; `kiVersion`; the two status-change calls; `SpawnRandomShipGroup`; profile counter publication; `BuildShipRegistryWindow` moves to `ShipQueries.cpp`; `Values()` renames.
+- `Frame/Frame.h/.cpp`: collection members `pFighters`, `pOmnis`, `pBattleships`; `fleetAlignment`/`randomAlignment`; `OwnershipLayer(const Frame&, ShipType)`; `kiVersion`; the two status-change calls; `SpawnRandomShipGroup`; `ValidatePusherOwners` (`## Coordination`); profile counter publication; `BuildShipRegistryWindow` moves to `ShipQueries.cpp`; `Values()` renames.
 - `Frame/FrameCollections.h`: tuples in decision 10's order.
 - `Frame/HealthDamage.h`: decision 16 masks, `kfOmniArmor`/`kfOmniShield`/`kfOmniShieldRegeneration`, `kfFighterHealth`, `kfBattleshipHealth`, `kfShipCollisionDamage`.
 - `Frame/Collections/Missiles/`: `kTargetFleet`/`kTargetRandom`, the Missile-Update window call, collision mask.
@@ -717,8 +717,8 @@ One Plan, one landing; the stages order the work so each builds and runs.
   this Plan's kill-state rows write `pLifecycleFlags` instead of `pFlags`; if
   this Plan lands first, that Plan's Omnis and Spaceships rows apply to the
   Fighters, Omnis, and Battleships.
-- `Documents/Plans/Game/GridSavePusherOwners.md` adds a frame-read check that
-  every Omnis and Spaceships pusher handle names its own Pushers row and that
-  the Pushers count equals the owner counts. Whichever lands second makes the
-  check cover every ship collection's pusher column and count: the Fighters,
-  Omnis, and Battleships pusher handles.
+- The game `Frame` read checks that every Omnis and Spaceships pusher handle
+  names its own Pushers row and that the Pushers count equals the owner counts
+  (`Frame/Frame.cpp` `ValidatePusherOwners`). This Plan makes the check cover
+  every ship collection's pusher column and count: the Fighters, Omnis, and
+  Battleships pusher handles.

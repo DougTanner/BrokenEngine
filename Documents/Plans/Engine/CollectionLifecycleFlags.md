@@ -422,6 +422,9 @@ No older file is accepted (root `AGENTS.md`):
   (`:129-145`), `Spawn`, `Transfer`, `Destroy`, `LogDifferences`;
   `BlastersUpdate.cpp:221-248`; `kiVersion`.
 - `Frame/Frame.cpp:211,240`: the Omnis `kExploding` reads become `kDying`.
+- `Frame/Frame.cpp` `ValidatePusherOwners`: the re-derived check in
+  `## Coordination`; `Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md`
+  `## Invariants`: the pusher pairing bullet is rewritten to state it.
 - `Frame/FrameInput.h:10` and `NetworkProtocol.h:83`: the two bumps. If the
   status-change per-item maximum no longer covers the Explosions payload, it
   is raised.
@@ -465,11 +468,12 @@ No older file is accepted (root `AGENTS.md`):
   tick. Its owned rows are released like every other owner's.
 - `RemoveIndexableElement` removals of a collection's own rows (Omnis'
   sweeps, `DestroyExpiredControlled` callers), which consume no owner handle.
-- Checking owner handle columns against the owned collection's id map when a
-  grid save is read: no such check exists today (`Omnis.h:74,226` and
-  `Spaceships.h:47,128` `PostRead` read no handle), so a save can already name
-  a missing pusher; a saved `kDestroy` or `kDying` on a pusher a live owner
-  still holds is one more value of that unchecked class.
+- Checking owner handle columns other than the pusher handles against the
+  owned collection's id map when a grid save is read: no such check exists
+  today (`Omnis.h:74,226` and `Spaceships.h:47,128` `PostRead` read no handle),
+  so a save can already name a missing owned row; a saved `kDestroy` or
+  `kDying` on a row a live owner still holds is one more value of that
+  unchecked class.
 - Controller-type `bDestroysSelf` (`CollectionController.h:42`) stays a type
   field.
 - `kDestroy` handling in Explosions; any change to the staged countdown tests,
@@ -521,11 +525,11 @@ No older file is accepted (root `AGENTS.md`):
   `## Server commands`, while `timescale`, which that recipe sends, stays in
   `commands-server.md`; whichever lands second points that citation at the
   entry's location then.
-- `Documents/Plans/Game/GridSavePusherOwners.md` makes the game `Frame` read
-  reject a frame whose Omnis and Spaceships pusher handles do not pair
-  one-to-one with its Pushers rows. A pusher this Plan releases stays ownerless
-  until the next tick's Destroy, so it can be in a grid save. Whichever lands
-  second re-derives that check: an unowned Pushers row is valid only with
+- The game `Frame` read rejects a frame whose Omnis and Spaceships pusher
+  handles do not pair one-to-one with its Pushers rows
+  (`Frame/Frame.cpp` `ValidatePusherOwners`). A pusher this Plan releases stays
+  ownerless until the next tick's Destroy, so it can be in a grid save. This
+  Plan re-derives that check: an unowned Pushers row is valid only with
   `kDying` set, the count compares only rows without it, and an owned row with
   a nonzero `pLifecycleFlags` is rejected.
 

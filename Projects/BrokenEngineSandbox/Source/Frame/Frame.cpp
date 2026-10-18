@@ -21,6 +21,36 @@ static float AdmitSpawnTimer(float fSpawnTimer)
 	return fSpawnTimer;
 }
 
+// Requires the Pushers id map already rebuilt from the read ids; that rebuild rejects id 0, so the map lookup also
+// rejects a zero handle.
+static void ValidatePusherOwners(const Frame& rFrame)
+{
+	const FrameInterpolate& rInterpolate = rFrame.interpolate;
+	const engine::PushersInterpolate& rPushers = rInterpolate.pushers;
+	if (rPushers.iCount != rInterpolate.pOmnis->iCount + rInterpolate.pSpaceships->iCount)
+	{
+		throw std::ios_base::failure("Frame pusher owners");
+	}
+
+	auto seenAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<bool*>(rPushers.iCount * static_cast<int64_t>(sizeof(bool)));
+	bool* pbSeen = seenAllocation.mpData;
+	std::fill_n(pbSeen, rPushers.iCount, false);
+	auto ClaimPushers = [&](std::span<const engine::pusher_t> ownerPushers)
+	{
+		for (engine::pusher_t pusher : ownerPushers)
+		{
+			auto it = rPushers.idToIndexMap.find(pusher);
+			if (it == rPushers.idToIndexMap.end() || pbSeen[it->second])
+			{
+				throw std::ios_base::failure("Frame pusher owners");
+			}
+			pbSeen[it->second] = true;
+		}
+	};
+	ClaimPushers(std::span<const engine::pusher_t>(rInterpolate.pOmnis->pPushers, static_cast<size_t>(rInterpolate.pOmnis->iCount)));
+	ClaimPushers(std::span<const engine::pusher_t>(rInterpolate.pSpaceships->puiPushers, static_cast<size_t>(rInterpolate.pSpaceships->iCount)));
+}
+
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
@@ -740,6 +770,7 @@ std::istream& operator>>(std::istream& rStream, Frame& rCurrent)
 	engine::ValidateBaseCollectionPairs(loadedFrame.interpolate, loadedFrame.postRender);
 	engine::ValidateCollectionPair(*loadedFrame.interpolate.pOmnis, *loadedFrame.postRender.pOmnis);
 	engine::ValidateCollectionPairs(GameInterpolateCollections(loadedFrame.interpolate), GamePostRenderCollections(loadedFrame.postRender));
+	ValidatePusherOwners(loadedFrame);
 	rCurrent = std::move(loadedFrame);
 	return rStream;
 }
