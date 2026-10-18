@@ -406,6 +406,15 @@ static int64_t ApplyEdit(Frame& rFrame, const nlohmann::json& rEdit)
 	}(std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<Interpolates>)> {});
 }
 
+// No replay records the command's change, so a recording or playback would diverge from the live frame.
+static void RefuseDuringReplay(std::string_view command)
+{
+	if (!engine::gpReplay->mReplayWriters.empty() || gpGame->mbReplaying || (gpGame->mGameFlags & engine::GameFlags::kSaveReplay) || (gpGame->mGameFlags & engine::GameFlags::kLoadReplay))
+	{
+		throw std::runtime_error(std::format("{} is refused while recording, during playback, or with a replay_record or replay_play transition pending", command));
+	}
+}
+
 void CommandEditFrame([[maybe_unused]] const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	if constexpr (!kbDebugInput)
@@ -414,11 +423,7 @@ void CommandEditFrame([[maybe_unused]] const nlohmann::json& rParameters, [[mayb
 	}
 	else
 	{
-		// No replay records the edit, so a recording or playback would diverge from the live frame.
-		if (!engine::gpReplay->mReplayWriters.empty() || gpGame->mbReplaying || (gpGame->mGameFlags & engine::GameFlags::kSaveReplay) || (gpGame->mGameFlags & engine::GameFlags::kLoadReplay))
-		{
-			throw std::runtime_error("edit_frame is refused while recording, during playback, or with a replay_record or replay_play transition pending");
-		}
+		RefuseDuringReplay("edit_frame");
 		for (const auto& [rKey, rValue] : rParameters.items())
 		{
 			if (rKey != "coord" && rKey != "edits")
@@ -432,16 +437,6 @@ void CommandEditFrame([[maybe_unused]] const nlohmann::json& rParameters, [[mayb
 		}
 
 		Frame& rLiveFrame = QueryFrame(rParameters);
-		int64_t iClientCount = std::ranges::count_if(engine::gpServer->mClients, [](const engine::ClientConnection& rClient)
-		{
-			return rClient.bHandshakeComplete;
-		});
-		// The resynchronization frees every client subscription, so the same update's active set drops an omniless
-		// cell other than the origin and would discard the edit.
-		if (iClientCount > 0 && rLiveFrame.postRender.pOmnis->iCount == 0 && CoordinateFromParameter(rParameters) != engine::kOriginCoordinate)
-		{
-			throw std::runtime_error("edit_frame with a handshaken client requires a cell with an omni or the origin cell");
-		}
 		uint64_t uiPreviousNextUuid = rLiveFrame.postRender.uiNextUuid;
 
 		// Every write lands in this staged copy; the live frame changes only through the commit below.
@@ -452,6 +447,18 @@ void CommandEditFrame([[maybe_unused]] const nlohmann::json& rParameters, [[mayb
 		for (const nlohmann::json& rEdit : rParameters.at("edits"))
 		{
 			iEdited += ApplyEdit(stagedFrame, rEdit);
+		}
+
+		int64_t iClientCount = std::ranges::count_if(engine::gpServer->mClients, [](const engine::ClientConnection& rClient)
+		{
+			return rClient.bHandshakeComplete;
+		});
+		// The resynchronization frees every client subscription, so the same update's active set drops an omniless
+		// cell that is neither pinned nor the origin and would discard the edit. The staged pin admits a pin edit and
+		// the live pin admits a release; edits never add or remove rows, so both frames hold the same omni count.
+		if (iClientCount > 0 && rLiveFrame.postRender.pOmnis->iCount == 0 && rLiveFrame.postRender.uiPinned == 0 && stagedFrame.postRender.uiPinned == 0 && CoordinateFromParameter(rParameters) != engine::kOriginCoordinate)
+		{
+			throw std::runtime_error("edit_frame with a handshaken client requires a cell with an omni, a pinned cell, or the origin cell");
 		}
 
 		// The save reader does not check the counter: a lower one re-mints a uuid a live row holds.
@@ -475,6 +482,34 @@ void CommandEditFrame([[maybe_unused]] const nlohmann::json& rParameters, [[mayb
 		}
 		rResult["edited"] = iEdited;
 		rResult["resynchronizedClients"] = iClientCount;
+	}
+}
+
+void CommandCreateCell([[maybe_unused]] const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
+{
+	if constexpr (!kbDebugInput)
+	{
+		throw std::runtime_error("create_cell requires kbDebugInput build");
+	}
+	else
+	{
+		RefuseDuringReplay("create_cell");
+		for ([[maybe_unused]] const auto& [rKey, rValue] : rParameters.items())
+		{
+			if (rKey != "coord")
+			{
+				throw std::runtime_error("create_cell unknown parameter '" + rKey + "'");
+			}
+		}
+		engine::GridCoord coordinate = CoordinateFromParameter(rParameters);
+		// CreateCellAtCoordinate replaces a present cell's frame, which would discard its state.
+		if (gpGame->mCells.contains(coordinate))
+		{
+			throw std::runtime_error("coord already has a cell; pin it with edit_frame");
+		}
+		gpGame->CreateCellAtCoordinate(coordinate);
+		gpGame->mCells.at(coordinate).pCurrent->postRender.uiPinned = 1;
+		rResult["coord"] = nlohmann::json::array({coordinate.iX, coordinate.iY});
 	}
 }
 

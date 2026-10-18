@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-15T23:39:11.135Z","dependsOn":["Documents/Plans/Game/FrameEditCellPins.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-15T23:39:11.135Z","dependsOn":[]} -->
 # Move the game-agnostic agent commands into `Engine/Source/Agent` and the engine-generic harness documentation into the agent-harness skill
 
 Line numbers cite baseline `f1d140ae26d0a8684264c8a1fa4f55c1bec1f601`. The prerequisite Plans edit several of these files first, so locate each region by the symbol named beside it. Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other.

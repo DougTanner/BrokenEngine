@@ -17,13 +17,15 @@
   them.
 - `pause`: `{"paused":bool}`. Returns the applied `paused` value.
 - `timescale`: `{"faster":bool}`. Steps the shared timescale and returns `{"numerator","denominator"}`. The slowest step is 1/32; `{"faster":false}` there changes nothing and still succeeds.
-- `save`: `{"file"?:"bare filename"}`; defaults to quicksave. `file` (also `load`'s) is an appdata-relative bare filename; empty names, NUL, separators, `..`, `:`, and Windows device basenames are rejected. Returns `{"file"}`.
+- `save`: `{"file"?:"bare filename"}`; defaults to quicksave. `file` (also `load`'s) is an appdata-relative bare filename; empty names, NUL, separators, `..`, `:`, and Windows device basenames are rejected. Every loaded cell is saved with its frame, so pinned cells (`create_cell`) stay pinned. Returns `{"file"}`.
 - `load`: `{"file"?:"bare filename","pauseAfterLoad"?:false}`. `pauseAfterLoad`
   must be Boolean when present; invalid parameters fail before loading or
   resetting and do not change pause state. Missing/corrupt/truncated data resets
-  fresh while returning success. Absent/false leaves the normal post-load state
-  unpaused; true atomically pauses after a successful load or completed fresh
-  fallback, before frame inputs can be constructed. Returns
+  fresh while returning success, as does a save written under another
+  `Frame::kiVersion`, such as an older build's (`resetToFresh:true`).
+  Absent/false leaves the normal post-load state unpaused; true atomically
+  pauses after a successful load or completed fresh fallback, before frame
+  inputs can be constructed. Returns
   `{"file","resetToFresh":bool,"paused":bool,"pendingFlagshipUpdateCount":int}`.
 - `reset`: no params. Resets the fresh game and fleet manager. Returns `{}`.
 - `replay_record`: `{"start":bool}`. Schedules or cancels an idempotent recording transition and returns `{"pending":bool}`. Poll `status.recording` for the effective transition. `{"start":true}` fails while playback is active or pending. Requires `kbDebugInput`.
@@ -107,7 +109,9 @@
   error naming it), and its `writes` keys may name any column of that
   collection's Interpolate and PostRender structs; a `frame` edit takes no
   `index` and its keys are `fSpawnTimer`, `randomEngine`, `uiNextUuid`,
-  `uiFrameIdentifier`, `alignments`, `enemyAlignment`, and `omniAlignment`;
+  `uiFrameIdentifier`, `uiPinned`, `alignments`, `enemyAlignment`, and
+  `omniAlignment` (`uiPinned` nonzero pins the cell and 0 releases it, as
+  `create_cell` describes);
   `iTick` and `fDeltaTime` are named but refused as clock values. Collection
   keys are the C++ member names, verbatim, as listed in
   `Agent/Commands/ServerFrameEdit.cpp`; `frame` keys are each frame struct's
@@ -151,16 +155,19 @@
   `inject_payload` entry, and makes clients log `ClientSession::OnServerLoad`,
   drop their coordinate state, and resubscribe. So batch edits into one command.
   The resynchronization frees every subscription before clients resubscribe, so
-  the server's active set keeps only cells with an omni and the origin: with a
-  handshaken client, an edit to an omniless cell other than the origin fails
-  before any write, and, as on `load`, every other omniless subscribed cell
-  resets after a successful edit. Once the budget is exhausted, the `ASSERT` in
-  `Server::AdvanceLoadGeneration` throws after the edit is committed and the CRC
-  recomputed: the response is `ok:false` over an applied edit, and clients are
-  not resynchronized. Without a client nothing is resynchronized and queued
+  the server's active set keeps only cells with an omni, pinned cells, and the
+  origin: with a handshaken client, an edit to an omniless cell that is neither
+  the origin nor pinned in its current frame or staged copy fails before the
+  commit, with the frame unchanged, and, as on `load`, every other omniless
+  unpinned subscribed cell resets after a successful edit. So an edit that
+  releases an omniless cell's pin with a client connected drops that cell unless
+  a client resubscribes to it first. Once the budget is exhausted, the `ASSERT`
+  in `Server::AdvanceLoadGeneration` throws after the edit is committed and the
+  CRC recomputed: the response is `ok:false` over an applied edit, and clients
+  are not resynchronized. Without a client nothing is resynchronized and queued
   entries survive.
 
-  Recipe: `load {"pauseAfterLoad":true}` or `pause {"paused":true}`, then `edit_frame`, then `pause {"paused":false}`; edit before `inject_payload`, because with a handshaken client the resynchronization drops queued entries, as `load` and `reset` do. Edits are never recorded into a replay; recording an edit into the replay stream could be built if an agent needs edits inside a recorded scenario.
+  Recipe: `load {"pauseAfterLoad":true}` or `pause {"paused":true}`, then `create_cell` when the scenario needs an isolated empty cell, then `edit_frame`, then `pause {"paused":false}`; edit before `inject_payload`, because with a handshaken client the resynchronization drops queued entries, as `load` and `reset` do. Edits are never recorded into a replay; recording an edit into the replay stream could be built if an agent needs edits inside a recorded scenario.
 - `read_frame`: `{"coord":[x,y],"collection":<name>,"index"?:int}`; these are
   the only top-level keys. Reads one row or the frame-wide values of the cell's
   current frame, the frame `query_frame` reads, and changes nothing.
@@ -178,6 +185,21 @@
   sorted order with `a <= b` in each pair. The command fails without
   `kbDebugInput`; recording, playback, and a pending `replay_record` or
   `replay_play` transition do not refuse it.
+- `create_cell`: `{"coord":[x,y]}`; `coord` is the only key. Creates a fresh
+  cell at a coordinate that has none, sets its frame value `uiPinned` to 1, and
+  returns `{"coord":[x,y]}`. A pinned cell stays in `status.activeCoords` across
+  updates, paused or not, with no omni or subscription, until an `edit_frame`
+  `frame` write of `uiPinned` 0 releases it; `edit_frame` pins an existing cell
+  with a nonzero `uiPinned`. The value lives in the frame, so `save` and `load`
+  keep it and a server relaunch restores it through the exit autosave; `reset`
+  leaves no pinned cell. A pinned cell is still not a live transfer
+  destination: a non-owned transfer into an omniless neighbour that no client
+  watches is dropped, pinned or not. Fails without `kbDebugInput`, while
+  recording, during playback, and while a `replay_record` or `replay_play`
+  transition is pending (`create_cell is refused while recording, during
+  playback, or with a replay_record or replay_play transition pending`), and on
+  a coordinate that already has a cell (`coord already has a cell; pin it with
+  edit_frame`).
 - `query_profile`: server-only CPU profile query. `params` must be `{}`; any
   other value fails before any profile read. It returns raw
   `timers[{index,name,currentUs,averageUs,maxUs,allocations,threads}]` and
@@ -317,7 +339,7 @@ Every server `[x,y]` grid-coordinate parameter (`coord`, `fleetWantedCoordinate`
 
 Pause/timescale persist on an empty server. They reset only when the last connected client disconnects. A client may join a paused server and render frozen state, but spawning still needs an unpaused tick.
 
-Frame-read schemas/extractors (`query_frame`, `query_omnis`, `query_collection`) are owned by `AgentCommandsServerQueries.cpp`. CPU `query_profile`, simulation control, and server dispatch remain in `AgentCommandsServer.cpp`; replay and injection live in `Commands/ServerSimulationHarnessRigs.cpp`; frame edits and reads live in `Commands/ServerFrameEdit.cpp`.
+Frame-read schemas/extractors (`query_frame`, `query_omnis`, `query_collection`) are owned by `AgentCommandsServerQueries.cpp`. CPU `query_profile`, simulation control, and server dispatch remain in `AgentCommandsServer.cpp`; replay and injection live in `Commands/ServerSimulationHarnessRigs.cpp`; frame edits and reads and `create_cell` live in `Commands/ServerFrameEdit.cpp`.
 
 ## Durable caveats
 

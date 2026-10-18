@@ -12,7 +12,7 @@ simulation-harness-rig module owns the parsing, result assembly, and
 orchestration for `inject_payload`, `replay_record`, `replay_play`,
 `replay_transfer_capture`, `replay_drop_retained_end_frame`, and
 `replay_inject_persistence_failure`; the focused server frame-edit module owns
-`edit_frame` and `read_frame`.
+`edit_frame`, `read_frame`, and `create_cell`.
 
 ## Contracts
 
@@ -52,6 +52,7 @@ orchestration for `inject_payload`, `replay_record`, `replay_play`,
   `Values()` entry becomes writable unless `kRefusedFrameValues` names it; the
   `frame` key list of `commands-server.md` changes with it.
 - `edit_frame` writes a cell's current CRC'd frame state directly, outside the tick input, so it is refused while recording, during playback, or with a pending replay transition, because no replay records the edit. Connected clients resynchronize through the Save entry point (`../Save/AGENTS.md`). Command contract: `../../Documents/AgentHarness/commands-server.md`.
+- `create_cell` and `edit_frame` are the only writers of the engine pinned frame value `uiPinned` (what it keeps loaded: the active-set bullet of `../../../../Engine/Source/Network/Server/AGENTS.md` `## Session Invariants`).
 - Commands that wait for a later frame, for the queue where messages wait for the renderer to pick them up, or for an input script use the engine deferred-response path. Ensure every deferred operation can resolve or fail without blocking the single in-flight channel.
 - Scene queries are client-only and read render-visible state; `describe_scene` `cellStates` also reports each local cell's reconciliation state. Server frame queries read deterministic simulation state and must preserve collection/type validation.
 - The frame registry keeps no rows, so nothing about it is enumerable or countable through a query. Its state reaches the harness only as the handle columns the collections themselves own.

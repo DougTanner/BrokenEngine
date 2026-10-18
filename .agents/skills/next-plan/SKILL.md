@@ -267,7 +267,8 @@ per-statement enumeration of unaffected results.
   [`../../references/change-workflow.md`](../../references/change-workflow.md)
   `#### Step 2 — Prepare and explore alternatives` and names neither the plan
   file nor its `Temp/` snapshot;
-  `none` for an empty realized change.
+  `none` for an empty realized change and for every preparation handoff after
+  the `/plan-alternatives` pick.
 
 ### Execution card presentation/template
 

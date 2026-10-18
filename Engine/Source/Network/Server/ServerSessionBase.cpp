@@ -256,7 +256,7 @@ void ServerSessionBase::AddOwnedEntityCoordinates()
 {
 	for (const auto& [rCoordinate, rCell] : game::gpGame->mCells)
 	{
-		if (game::Frame::OwnershipLayer(*rCell.pCurrent).iCount > 0 && !std::ranges::contains(game::gpGame->mActiveCoordinates, rCoordinate))
+		if ((game::Frame::OwnershipLayer(*rCell.pCurrent).iCount > 0 || rCell.pCurrent->postRender.uiPinned != 0) && !std::ranges::contains(game::gpGame->mActiveCoordinates, rCoordinate))
 		{
 			game::gpGame->mActiveCoordinates.push_back(rCoordinate);
 		}

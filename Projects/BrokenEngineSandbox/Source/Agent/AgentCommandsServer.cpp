@@ -283,6 +283,11 @@ bool ExecuteAgentCommandServer(std::string_view command, const nlohmann::json& r
 		CommandReadFrame(rParameters, rResult);
 		return true;
 	}
+	if (command == "create_cell")
+	{
+		CommandCreateCell(rParameters, rResult);
+		return true;
+	}
 	if (ExecuteServerSimulationHarnessRigCommand(command, rParameters, rResult))
 	{
 		return true;

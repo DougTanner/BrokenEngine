@@ -76,6 +76,7 @@ common::crc_t FramePostRenderBase::Crcs() const
 	uiCrc = (uiCrc ^ randomEngine.Crc()) * common::kCrcMultiplier;
 	uiCrc = (uiCrc ^ common::Crc(uiNextUuid)) * common::kCrcMultiplier;
 	uiCrc = (uiCrc ^ common::Crc(uiFrameIdentifier)) * common::kCrcMultiplier;
+	uiCrc = (uiCrc ^ common::Crc(uiPinned)) * common::kCrcMultiplier;
 	uiCrc = (uiCrc ^ alignments.Crc()) * common::kCrcMultiplier;
 
 	std::apply([&](const auto&... rCollections)
@@ -94,6 +95,7 @@ bool FramePostRenderBase::LogDifferences(const FramePostRenderBase& rOther) cons
 	bEqual &= common::LogDifference<"uiNextUuid">(uiNextUuid, rOther.uiNextUuid);
 	// Skip uiNextSoundUuid and uiNextVisualUuid (client-only)
 	bEqual &= common::LogDifference<"uiFrameIdentifier">(uiFrameIdentifier, rOther.uiFrameIdentifier);
+	bEqual &= common::LogDifference<"uiPinned">(uiPinned, rOther.uiPinned);
 	if (!(alignments == rOther.alignments))
 	{
 		bEqual = false;
@@ -223,6 +225,7 @@ void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame
 	rCurrent.uiNextVisualUuid = rPrevious.uiNextVisualUuid;
 #endif
 	rCurrent.uiFrameIdentifier = rPrevious.uiFrameIdentifier;
+	rCurrent.uiPinned = rPrevious.uiPinned;
 	rCurrent.alignments.CopyFrom(rPrevious.alignments);
 
 	ForEachPostRenderUpdate(PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);

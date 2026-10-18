@@ -207,6 +207,7 @@ struct FramePostRenderBase
 	uint64_t uiNextVisualUuid = 1;
 #endif
 	uint16_t uiFrameIdentifier = 0;
+	uint8_t uiPinned = 0; // Nonzero keeps the cell in the server's active set; only Debug agent commands set it
 
 	common::crc_t uiSharedCrc = 0;        // Shared CRC excluding client-only and server-only fields
 
@@ -277,6 +278,7 @@ struct FramePostRenderBase
 			FRAME_COLUMN(FramePostRenderBase, uiNextVisualUuid),
 #endif
 			FRAME_COLUMN(FramePostRenderBase, uiFrameIdentifier),
+			FRAME_COLUMN(FramePostRenderBase, uiPinned),
 			FRAME_COLUMN(FramePostRenderBase, alignments)> {};
 	}
 
