@@ -18,32 +18,38 @@ namespace engine
 // codec's SerializeGroup per-item ASSERT and the engine Server's compression-scratch sizing reference one source.
 inline constexpr int64_t kiMaxStatusChangeBytesPerItem = 120;
 
-// Worst-case serialized bytes for a full kiMaximumStatusChangesPerCell batch: every item at its max size plus a
+// Worst-case serialized bytes for a batch of that many status changes: every item at its max size plus a
 // conservative 3-byte group header charged per item (over-bounds the real per-type group headers so this stays
 // free of the game enum's type count).
-inline constexpr int64_t kiMaxSerializedStatusChangeBatchBytes = kiMaximumStatusChangesPerCell * (kiMaxStatusChangeBytesPerItem + 3);
+constexpr int64_t MaxSerializedStatusChangeBatchBytes(int64_t iStatusChangeCount)
+{
+	return iStatusChangeCount * (kiMaxStatusChangeBytesPerItem + 3);
+}
 
-// Maximum nested Workbuffer high-water while CompressStatusChangeBatch consumes its input: serialized bytes,
-// worst-case alignment before the sorted-index reservation, and one int64_t index per status change.
-inline constexpr int64_t kiMaxCompressStatusChangeWorkbufferBytes = kiMaxSerializedStatusChangeBatchBytes + 15 + kiMaximumStatusChangesPerCell * static_cast<int64_t>(sizeof(int64_t));
+// Maximum nested Workbuffer high-water while CompressStatusChangeBatch consumes a kiMaximumStatusChangesPerCell batch:
+// serialized bytes, worst-case alignment before the sorted-index reservation, and one int64_t index per status change.
+inline constexpr int64_t kiMaxCompressStatusChangeWorkbufferBytes = MaxSerializedStatusChangeBatchBytes(kiMaximumStatusChangesPerCell) + 15 + kiMaximumStatusChangesPerCell * static_cast<int64_t>(sizeof(int64_t));
 
-// Worst-case bytes CompressStatusChangeBatch can emit for a valid capped batch (4-byte uncompressed-size prefix +
-// LZ4 payload). Sizes the server's reused compression scratch so any valid batch always fits; the codec asserts the
-// LZ4 return.
-inline constexpr int64_t kiMaxCompressedStatusChangeBatchBytes = static_cast<int64_t>(sizeof(int32_t)) + LZ4_COMPRESSBOUND(kiMaxSerializedStatusChangeBatchBytes);
+// Worst-case bytes CompressStatusChangeBatch can emit for a batch of that many status changes (4-byte
+// uncompressed-size prefix + LZ4 payload). Sizes the server's reused compression scratch so the batch always fits;
+// the codec asserts the LZ4 return.
+constexpr int64_t MaxCompressedStatusChangeBatchBytes(int64_t iStatusChangeCount)
+{
+	return static_cast<int64_t>(sizeof(int32_t)) + LZ4_COMPRESSBOUND(MaxSerializedStatusChangeBatchBytes(iStatusChangeCount));
+}
 
 // Type-specific serialization (no compression)
 // Returns bytes written to pDestination
 int64_t SerializeStatusChangeBatch(std::span<const game::StatusChange> changes, void* pDestination);
 
-// Returns number of StatusChanges written to pDestination
-int64_t DeserializeStatusChangeBatch(std::span<const uint8_t> source, game::StatusChange* pDestination);
+// Returns number of StatusChanges written to rDestination, which grows when the batch exceeds its size
+int64_t DeserializeStatusChangeBatch(std::span<const uint8_t> source, std::vector<game::StatusChange>& rDestination);
 
 // Serialization + LZ4 compression
 // Returns bytes written to destination (4-byte uncompressed size prefix + compressed data)
 int64_t CompressStatusChangeBatch(std::span<const game::StatusChange> changes, std::span<uint8_t> destination);
 
-// Returns number of StatusChanges written to pDestination
-int64_t DecompressStatusChangeBatch(std::span<const uint8_t> source, game::StatusChange* pDestination);
+// Returns number of StatusChanges written to rDestination, which grows when the batch exceeds its size
+int64_t DecompressStatusChangeBatch(std::span<const uint8_t> source, std::vector<game::StatusChange>& rDestination);
 
 } // namespace engine

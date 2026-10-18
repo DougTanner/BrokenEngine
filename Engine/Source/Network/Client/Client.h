@@ -149,7 +149,8 @@ private:
 	ENetHost* mpHost = nullptr;
 
 	// Reused status-change decode scratch (same reused-buffer + exact-size-assign pattern as ServerBufferedFrames::mCompressionBuffer):
-	// decompress into this 1024-cap buffer, then assign() the exact count into each ReceivedCoordUpdate so buffered updates carry no slack
+	// decompress into this buffer, which starts at kiMaximumStatusChangesPerCell and grows past it, then assign() the exact count into
+	// each ReceivedCoordUpdate so buffered updates carry no slack
 	std::vector<game::StatusChange> mStatusChangeScratch;
 
 	// Pipeline RTT (timestamp echo)

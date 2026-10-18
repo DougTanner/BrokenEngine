@@ -304,11 +304,13 @@ sizes are the full packet including the type byte.
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
-client-sendable). The current wire-protocol version is 27, which replaces the
-`StatusChangeType` tag set with spawn, transfer, and tick-input tags and makes
-each spawn and transfer payload its collection's `SpawnInfo` `Fields()` list;
-version 26 moved the owned-entity state notification and the seven
-debug-control requests to engine packet types and folded the assign
+client-sendable). The current wire-protocol version is 28, which lets one
+cell's per-tick status-change batch exceed `kiMaximumStatusChangesPerCell`: the
+server sends it whole and the client's decode scratch grows to fit; version 27
+replaced the `StatusChangeType` tag set with spawn, transfer, and tick-input
+tags and made each spawn and transfer payload its collection's `SpawnInfo`
+`Fields()` list; version 26 moved the owned-entity state notification and the
+seven debug-control requests to engine packet types and folded the assign
 notification into each `Spawned` and `ChangedCell` state; version 25 removed the frame clock from full-state frames
 and made `ExplosionsInterpolate::pStartTimes` 64-bit integer nanoseconds;
 version 24

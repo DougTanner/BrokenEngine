@@ -97,7 +97,14 @@ the engine calls by name.
   snapshot of a tick's status changes, the drain of agent-injected changes held
   for a later tick, and the per-coordinate publication `ServerSessionRuntime`
   hands to the delta resend ring at tick completion.
-- Keep every workbuffer-backed publication view valid until synchronous delta and optional full-frame buffering have consumed it. Preflight capacity for the complete publication block before forming any view, including the codec-owned maximum nested compression scratch; update that maximum whenever status compression adds or enlarges workbuffer reservations.
+- Keep every workbuffer-backed publication view valid until synchronous delta
+  and optional full-frame buffering have consumed it. Preflight capacity for the
+  complete publication block before forming any view, including the codec's
+  nested compression scratch bound, `kiMaxCompressStatusChangeWorkbufferBytes`,
+  which is sized at `kiMaximumStatusChangesPerCell`; a batch above that constant
+  grows the workbuffer in place through `Workbuffer::Grow`, which keeps every
+  view valid. Update that bound whenever status compression adds or enlarges
+  workbuffer reservations.
 - A transfer destination must be adjacent. A non-owned transfer requires a destination that is already live; an owned-entity transfer makes its destination live.
 - Recompute each destination Frame's `uiSharedCrc` after applying its post-tick batch (arrived transfers and queued spawns): the frame tick computes it before that batch lands, and clients check their own simulated frame against the broadcast CRC for that tick, so skipping the recompute desyncs every client receiving a transfer or spawn. This is not defensive recomputation and must not be optimized away as redundant.
 - Both classes name `game::StatusChange` and read, create, and pass whole game

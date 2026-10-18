@@ -20,6 +20,7 @@ static void SerializeGroup(uint8_t*& rpCursor, game::StatusChangeType eType, con
 		return;
 	}
 
+	ASSERT(iGroupCount <= std::numeric_limits<uint16_t>::max());
 	WriteUint8(rpCursor, static_cast<uint8_t>(eType));
 	WriteUint16(rpCursor, static_cast<uint16_t>(iGroupCount));
 
@@ -86,12 +87,12 @@ int64_t SerializeStatusChangeBatch(std::span<const game::StatusChange> changes, 
 	return pCursor - static_cast<uint8_t*>(pDestination);
 }
 
-int64_t DeserializeStatusChangeBatch(std::span<const uint8_t> source, game::StatusChange* pDestination)
+int64_t DeserializeStatusChangeBatch(std::span<const uint8_t> source, std::vector<game::StatusChange>& rDestination)
 {
 	int64_t iSourceSize = static_cast<int64_t>(source.size());
 
 	// Only the client decodes a batch, and it trusts its server's bytes, so the cursor only drives the loop to the end of
-	// the batch; nothing is checked per group or item.
+	// the batch; nothing is checked per group or item. A group count only sizes rDestination and rejects nothing.
 	BoundedCursor cursor {.pCursor = source.data(), .pEnd = source.data() + iSourceSize};
 	int64_t iOutputCount = 0;
 
@@ -100,11 +101,20 @@ int64_t DeserializeStatusChangeBatch(std::span<const uint8_t> source, game::Stat
 		uint8_t uiType = ReadUint8(cursor.pCursor);
 		uint16_t uiGroupCount = ReadUint16(cursor.pCursor);
 
+		int64_t iNeededCount = iOutputCount + uiGroupCount;
+		if (iNeededCount > std::ssize(rDestination))
+		{
+			LOG(kNetwork, kWarning, "DeserializeStatusChangeBatch: status change scratch overflow (count: {}, capacity: {}). Increase kiMaximumStatusChangesPerCell in NetworkProtocol.h", iNeededCount, std::ssize(rDestination));
+			DEBUG_BREAK();
+			// Heap: grows the caller's reused decode scratch past its initial kiMaximumStatusChangesPerCell size
+			rDestination.resize(static_cast<size_t>(iNeededCount * 2));
+		}
+
 		game::StatusChangeType eType = static_cast<game::StatusChangeType>(uiType);
 
 		for (int64_t i = 0; i < uiGroupCount; ++i)
 		{
-			game::StatusChange& rChange = pDestination[iOutputCount++];
+			game::StatusChange& rChange = rDestination.at(static_cast<size_t>(iOutputCount++));
 			rChange = {};
 			rChange.eType = eType;
 
@@ -146,7 +156,7 @@ int64_t CompressStatusChangeBatch(std::span<const game::StatusChange> changes, s
 	return static_cast<int64_t>(sizeof(int32_t)) + iCompressedSize;
 }
 
-int64_t DecompressStatusChangeBatch(std::span<const uint8_t> source, game::StatusChange* pDestination)
+int64_t DecompressStatusChangeBatch(std::span<const uint8_t> source, std::vector<game::StatusChange>& rDestination)
 {
 	int64_t iSourceSize = std::ssize(source);
 	const uint8_t* pInput = source.data();
@@ -160,7 +170,7 @@ int64_t DecompressStatusChangeBatch(std::span<const uint8_t> source, game::Statu
 
 	int64_t iResult = LZ4_decompress_safe(reinterpret_cast<const char*>(pInput + sizeof(int32_t)), reinterpret_cast<char*>(pDecompressed), static_cast<int>(iSourceSize - sizeof(int32_t)), iUncompressedSize);
 
-	int64_t iCount = DeserializeStatusChangeBatch(std::span<const uint8_t>(pDecompressed, static_cast<size_t>(iResult)), pDestination);
+	int64_t iCount = DeserializeStatusChangeBatch(std::span<const uint8_t>(pDecompressed, static_cast<size_t>(iResult)), rDestination);
 
 	return iCount;
 }

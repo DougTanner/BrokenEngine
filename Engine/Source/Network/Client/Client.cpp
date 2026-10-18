@@ -584,8 +584,9 @@ void Client::ServerCoordinateUpdateOrResend(std::span<const uint8_t> packetData,
 
 		if (rMessage.compressedPayload.iSize > 0)
 		{
-			int64_t iCount = DecompressStatusChangeBatch(std::span<const uint8_t>(rMessage.compressedPayload.puiData, static_cast<size_t>(rMessage.compressedPayload.iSize)), mStatusChangeScratch.data());
-			// Heap: exact-size copy out of the reused 1024-cap decode scratch, so the buffered update carries no capacity slack
+			int64_t iCount = DecompressStatusChangeBatch(std::span<const uint8_t>(rMessage.compressedPayload.puiData, static_cast<size_t>(rMessage.compressedPayload.iSize)), mStatusChangeScratch);
+			// Heap: exact-size copy out of the reused decode scratch (starts at kiMaximumStatusChangesPerCell, grows past it), so the
+			// buffered update carries no capacity slack
 			update.statusChanges.assign(mStatusChangeScratch.begin(), mStatusChangeScratch.begin() + iCount);
 		}
 

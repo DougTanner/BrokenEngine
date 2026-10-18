@@ -264,10 +264,13 @@
   survive needs a terrain-clear `vecPosition` (the probe in
   [replay.md](replay.md#replay-transfer-capture-harness-rig)). It also puts no
   bound on how many entries one cell's tick receives: every due entry of a
-  coordinate joins that tick's one published batch, which the protocol caps at
-  1,024 status changes per cell tick (`engine::kiMaximumStatusChangesPerCell`),
-  and an over-cap batch hits the server's debug break and resynchronizes every
-  subscribed client, so keep one cell's entries for one tick well below the cap.
+  coordinate joins that tick's one published batch. A batch over 1,024 status
+  changes per cell tick (`engine::kiMaximumStatusChangesPerCell`) is still
+  published and applied whole, but the server and every subscribed client log a
+  warning and hit a debug break as their status-change buffers grow past that
+  size, so keep one cell's entries for one tick at or below 1,024. The one hard
+  limit is 65,535 entries of a single status-change type in one cell's tick,
+  which the server's batch encoder asserts.
 
   Edge coast: to send an omni out across a cell's east edge, queue
   `{"coord":<cell>,"type":"SpawnOmni","vecPosition":[433.86,0],"vecVelocity":[33.33,0],"transferLockTimer":1}`:

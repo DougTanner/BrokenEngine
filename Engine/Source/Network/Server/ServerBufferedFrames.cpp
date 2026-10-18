@@ -22,9 +22,9 @@ ServerBufferedFrames::ServerBufferedFrames(Server& rServer)
 :	mrServer(rServer)
 {
 	ScopedSuppressAllocationTracking suppress;
-	// Heap: one-time compression scratch buffer, sized so any valid capped StatusChange batch always fits
-	// (CompressToBuffer grows it further on demand for full debug frames)
-	mCompressionBuffer.resize(kiMaxCompressedStatusChangeBatchBytes);
+	// Heap: one-time compression scratch buffer, sized so a kiMaximumStatusChangesPerCell StatusChange batch always fits
+	// (BufferFrame grows it for a larger batch, CompressToBuffer for full debug frames)
+	mCompressionBuffer.resize(static_cast<size_t>(MaxCompressedStatusChangeBatchBytes(kiMaximumStatusChangesPerCell)));
 }
 
 void ServerBufferedFrames::BufferFrame(int64_t iTick, std::span<const std::pair<GridCoord, GridUpdateData>> gridUpdates)
@@ -50,18 +50,20 @@ void ServerBufferedFrames::BufferFrame(int64_t iTick, std::span<const std::pair<
 			int64_t iStatusChangeCount = std::ssize(rUpdateData.statusChanges);
 			if (iStatusChangeCount > kiMaximumStatusChangesPerCell)
 			{
-				// Should never happen: the sim must not exceed the protocol's per-cell cap (also the client decode
-				// scratch size and the compression-scratch sizing basis). Alert in debug, then drop the payload rather
-				// than overflow the scratch. The frame is still buffered (ring contiguity) with its uiSharedCrc, so the
-				// client CRC-mismatches and resyncs instead of applying a truncated batch.
+				// Breaks on every over-constant batch, not only on growth: full-frame compression may already have grown
+				// mCompressionBuffer past the bound, and the break is what signals that the constant should be raised.
+				LOG(kNetwork, kWarning, "Server::BufferFrame status change count {} exceeds capacity {}. Increase kiMaximumStatusChangesPerCell in NetworkProtocol.h Coord: ({},{}) Frame: {}", iStatusChangeCount, kiMaximumStatusChangesPerCell, rCoordinate.iX, rCoordinate.iY, iTick);
 				DEBUG_BREAK();
-				LOG(kNetwork, kError, "Server::BufferFrame status change count {} exceeds cap {}, dropping payload Coord: ({},{}) Frame: {}", iStatusChangeCount, kiMaximumStatusChangesPerCell, rCoordinate.iX, rCoordinate.iY, iTick);
+				int64_t iCompressedBound = MaxCompressedStatusChangeBatchBytes(iStatusChangeCount);
+				if (std::ssize(mCompressionBuffer) < iCompressedBound)
+				{
+					// Heap: grows the reused compression scratch to fit a batch above kiMaximumStatusChangesPerCell
+					mCompressionBuffer.resize(static_cast<size_t>(iCompressedBound));
+				}
 			}
-			else
-			{
-				int64_t iCompressedSize = CompressStatusChangeBatch(std::span<const game::StatusChange>(rUpdateData.statusChanges.data(), static_cast<size_t>(iStatusChangeCount)), std::span<uint8_t>(mCompressionBuffer));
-				buffered.compressedData.assign(mCompressionBuffer.begin(), mCompressionBuffer.begin() + iCompressedSize);
-			}
+
+			int64_t iCompressedSize = CompressStatusChangeBatch(std::span<const game::StatusChange>(rUpdateData.statusChanges.data(), static_cast<size_t>(iStatusChangeCount)), std::span<uint8_t>(mCompressionBuffer));
+			buffered.compressedData.assign(mCompressionBuffer.begin(), mCompressionBuffer.begin() + iCompressedSize);
 		}
 
 		std::deque<PerCoordBufferedFrame>& rCoordinateBuffer = mPerCoordinateBufferedFrames.try_emplace(rCoordinate).first->second;

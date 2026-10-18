@@ -94,7 +94,11 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
   sequence because clients apply the wire order, so changing it can alter
   index-sensitive state and the CRC.
 - `ServerTransferManager` and `ServerBroadcaster` own cross-cell transfer handling and per-cell publication assembly. They name `game::StatusChange`, whole game Frames, and the game functions and members listed in `Server/AGENTS.md`, which they call directly by name, never game entity types.
-- A status-change batch is all-or-nothing: the server drops a whole over-cap batch rather than send part of one, and the client decodes the batch it receives without checks under the corrupt-input policy above. Applying part of a batch would silently desync the cell.
+- A status-change batch is all-or-nothing: the server publishes every batch
+  whole, growing past `kiMaximumStatusChangesPerCell` with a debug break, and
+  the client decodes the batch it receives without checks under the
+  corrupt-input policy above. Applying part of a batch would silently desync the
+  cell.
 
 ## See Also
 

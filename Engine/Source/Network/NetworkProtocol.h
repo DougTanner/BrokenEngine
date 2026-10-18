@@ -80,7 +80,7 @@ inline constexpr const char* PacketTypeName(PacketType eType)
 	return "Unknown";
 }
 
-inline constexpr int64_t kiProtocolVersion = 27;
+inline constexpr int64_t kiProtocolVersion = 28;
 inline constexpr int64_t kiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
 inline constexpr int64_t kiDefaultPort = 27'015;
 inline constexpr int64_t kiCoordinateSlots = 16; // 9 visible subscriptions + 6 sticky + 1 spare
@@ -108,6 +108,7 @@ inline constexpr int64_t kiMaximumEstimatedServerTickLead = 16;
 inline constexpr int64_t kiMaximumPacketSize = 64 * 1'024;
 // The report's header, exception text, and callstack lead the file; the log dump after them can reach tens of MiB.
 inline constexpr int64_t kiMaximumCrashReportSize = 1'024 * 1'024;
+// Initial per-cell status-change batch capacity; server and client buffers grow past it with a debug break, which means raise it.
 inline constexpr int64_t kiMaximumStatusChangesPerCell = 1'024;
 
 // Tag-distinct 128-bit identifier. TAG only separates instantiations at compile time and contributes no
