@@ -95,13 +95,17 @@ The build invocation derives the mode, both directories, and the four `DataBuild
 
 A correctly generated Data directory holds 23 files: `Data.h`, `DataTypes.h`,
 and one nonempty header, manifest, and pack for each of `Audio`, `Scene`,
-`Islands`, `Model`, `Shader`, `Texture`, and `Raw`. The build does not inspect
+`Islands`, `Model`, `Shader`, `Texture`, and `Raw`. The build does not validate
 the selected Data directory's inventory or contents, so a malformed, partial,
 or stale directory is not detected as such — it surfaces only as an ordinary
-compile or runtime failure. The one exception is Shared shader provenance: a
+compile or runtime failure. Two exceptions cover Shared data provenance. A
 Shared Client build checks the primary's shader stamp, described in
-`## Wrapper bootstrap Shared-data refresh`; every other kind of staleness is
-still undetected.
+`## Wrapper bootstrap Shared-data refresh`. And a successful Shared game build
+that is not a selective `-Files` compile records the listing of the directory
+it compiled against — each file's relative path, size, and last-write time —
+in `SharedDataRecord.<Target>.<Configuration>.txt` beside its executables,
+which the `/agent-harness` claim and launch scripts compare with the directory;
+`/agent-harness` worker steps 7 and 21 own the refusal codes and their routing.
 
 ## Wrapper bootstrap Shared-data refresh
 
@@ -176,12 +180,12 @@ now: retry after it finishes, then rebase when the block also names a rebase.
 In that case a missing stamp that persists across refreshes can mean the
 primary checkout's shader sources are uncommitted or changing: commit or
 discard those changes, then run the refresh again, or use Local generation
-authorization. The
-check runs only at build time, so rerun `/compile` before a launch to check
-again after a peer refresh. A committed shader deletion built under the
-deletion-only exception mismatches and blocks; its remedy is Local generation
-authorization. A primary DataPacker run outside the bootstrap, such as a
-Visual Studio build in the primary checkout, rewrites Shared data without
+authorization. The check runs only at build time, and the harness claim and
+launch refuse a later peer refresh against the build's Shared data record
+(`## Generated Data directory inventory`). A committed shader deletion built
+under the deletion-only exception mismatches and blocks; its remedy is Local
+generation authorization. A primary DataPacker run outside the bootstrap, such
+as a Visual Studio build in the primary checkout, rewrites Shared data without
 updating the stamp; the next refresh stamps it again.
 
 Ordinary Shared work otherwise remains unchanged: primary Data, no `RunDataPacker`, and no materialization or export.

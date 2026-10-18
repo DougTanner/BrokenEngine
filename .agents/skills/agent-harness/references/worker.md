@@ -29,8 +29,9 @@ and the handoff this run returns.
      Ordinary same-machine runs stay loopback-only and never inspect or change
      firewall state.
    - Read the RenderDoc capture reference (`renderdoc.md`) only for a GPU
-     frame-capture or capture-analysis scenario; it owns the `--renderdoc`
-     launch, `renderdoc_capture`, and the headless `rdc_*` analysis scripts.
+     frame-capture or capture-analysis scenario; it owns the launch script's
+     `-RenderDoc` switch, `renderdoc_capture`, and the headless `rdc_*`
+     analysis scripts.
 
 ### Select the project
 
@@ -44,8 +45,9 @@ and the handoff this run returns.
    hub before launching. Done when that hub has been read.
 
    - Its machine-readable launch configuration owns the executable names and
-     output directory, while its linked `launch.md` owns the executable launch
-     recipe and project launch arguments.
+     output directory, `../scripts/Invoke-HarnessLaunch.ps1` owns the launch
+     sequence and the game argument set, and the hub's linked `launch.md` owns
+     the concrete values of each launch-script call.
    - The root hub routes project command schemas and verification scenarios to
      focused children.
 
@@ -70,11 +72,13 @@ and the handoff this run returns.
      the whole claimed session, so a `-ServerOnly` session must not launch a
      client under that claim, and it is never inferred from the project's server
      command document, which is not uniformly client-free.
-   - It also proves that the pack version this worktree's source expects matches
-     the version the supplied data directory's `.manifest` files carry,
-     provisions the checkout, requires the resolved `AgentHarness.exe`, mints
-     the owner token, and claims the lock, printing one compact
-     `broken-engine-harness-claim/v1` JSON object.
+   - It also compares a Shared data directory with this worktree's record of
+     what each required executable's build compiled against, proves that the
+     pack version this worktree's source expects matches the version the
+     supplied data directory's `.manifest` files carry, provisions the
+     checkout, requires the resolved `AgentHarness.exe`, mints the owner token,
+     and claims the lock, printing one compact `broken-engine-harness-claim/v1`
+     JSON object.
    - When another session holds the lock, it provisions once and then retries
      only the claim until it succeeds or the holder becomes stale under step 11,
      so the invocation above is itself the wait and has no budget of its own —
@@ -94,15 +98,15 @@ and the handoff this run returns.
      same wait.
    - Pass the selected game's normalized `GameDataDirectory` from the latest
      `/compile` result verbatim as `-GameDataDirectory` — the same packed data
-     the launch below selects with `--data-directory`. Only when the approved
-     acceptance needs derived data, such as a deliberately corrupted pack, pass
-     instead a real byte copy of that directory that keeps every `.manifest`
-     unchanged, never links to it, under `<absolute adopted worktree>\Temp` with
-     the layout suffix kept, such as
+     the launch script below selects with its own `-GameDataDirectory`. Only
+     when the approved acceptance needs derived data, such as a deliberately
+     corrupted pack, pass instead a real byte copy of that directory that keeps
+     every `.manifest` unchanged, never links to it, under
+     `<absolute adopted worktree>\Temp` with the layout suffix kept, such as
      `<absolute adopted worktree>\Temp\<label>\Projects\<Name>\Platforms\VisualStudio2026\Output\Data`,
-     as both `-GameDataDirectory` and `--data-directory`; the scenario derives
-     the copy. Delete the copy's `Temp\<label>` directory when
-     the run ends with nothing launched or once its last release (step 44)
+     as the `-GameDataDirectory` of both the claim and the launch script; the
+     scenario derives the copy. Delete the copy's `Temp\<label>` directory when
+     the run ends with nothing launched or once its last release (step 39)
      returns exit `0`; otherwise name its path under `Evidence`.
    - Add `-Configuration <name>` only for a build other than `Debug`.
 
@@ -124,10 +128,11 @@ and the handoff this run returns.
      derivation; carries `project`, the derived game project, `null` until
      derived; and carries a `packVersion` field that is `null` except on the
      `claim.pack-version-mismatch` block below.
-   - Exit `2` (`status` `blocked`) carries one of four codes. A
+   - Exit `2` (`status` `blocked`) carries one of six codes. A
      `claim.foreign-owner` reports a holder the script judged stale and
      continues into the takeover steps, which reconfirm that under step 11,
-     while `claim.project-underivable`, `claim.executable-missing`, and
+     while `claim.project-underivable`, `claim.executable-missing`,
+     `shared-data.changed`, `shared-data.record-missing`, and
      `claim.pack-version-mismatch` end the attempt here; for every exit `2` the
      script never launches the game, so the Launch and ping-wait steps below are
      not performed and their absence is not a further failure to diagnose.
@@ -141,6 +146,15 @@ and the handoff this run returns.
      so route `/compile` for the named executables and re-enter; when only the
      client executable is named and this session's scenario launches only the
      server, re-enter with `-ServerOnly` instead of building the client.
+   - `shared-data.changed` means the Shared data directory's listing differs
+     from this worktree's record for a required target: nothing was
+     provisioned and no lock was taken. It is a mandatory user stop: end the
+     attempt `BLOCKED` with one `Residuals` row carrying the code and message,
+     and never rebuild, refresh, rebase, switch data, or edit or delete a record
+     to clear it.
+   - `shared-data.record-missing` means no record exists for that target and
+     configuration: nothing was provisioned and no lock was taken, so route
+     `/compile` for the named target and re-enter; it is not a user stop.
    - `claim.pack-version-mismatch` means the pack version derived from this
      worktree's source is not the version the data carries; nothing was
      provisioned and no lock was taken.
@@ -178,9 +192,10 @@ and the handoff this run returns.
    - Ownership loss stops local response handling with exit `1`; game work
      already dispatched cannot be retracted.
 
-9. After the first command, compare `lock status` before/after and require
-   `heartbeatAt` to advance. Done when that comparison shows `heartbeatAt`
-   advanced.
+9. Read `lock status` after the claim and before the first launch-script call
+   (step 21), read it again after the first launch or command, and require
+   `heartbeatAt` to advance between them. Done when that comparison shows
+   `heartbeatAt` advanced.
 
    - `lock status` prints ordinary pretty-printed JSON; the backslashes in its
      `worktree` field are standard JSON escaping of the Windows path, not nested
@@ -242,31 +257,28 @@ and the handoff this run returns.
 
 ### Launch
 
-16. Fix this launch's configuration and directory arguments. Done when the
-    executable names, `--loopback-only`, the log parents, and both directory
-    overrides are fixed for this launch.
+16. Fix this launch's paths. Done when the app-data root, the log paths, and
+    the process-check state path (step 20) are fixed for this launch.
 
-    - Use the executable names the project launch recipe states for the compiled
-      configuration.
-    - Ordinary same-machine runs pass `--loopback-only`.
+    - The launch script reads the executable names from the hub (step 4) and
+      owns the game argument set, so the run fixes only these paths.
     - Create log parents under `<absolute adopted worktree>\Temp`.
-    - Do not change process working directories; `--data-directory` is the only
-      override selecting packed assets, and `--app-data-directory` is the only
-      override selecting where saves, settings, caches, and replays are written.
+    - Do not change process working directories; the launch script's
+      `-GameDataDirectory` is the only override selecting packed assets, and its
+      `-AppDataDirectory` is the only override selecting where saves, settings,
+      caches, and replays are written.
 
-17. Take the concrete launch block from the selected project's documents. Done
-    when this run's launch block comes from that recipe with the fixed ports
-    above.
+17. Take the launch-script calls from the selected project's documents. Done
+    when this run's launch-script calls come from that project's `launch.md`.
 
     - The selected project's hub owns the machine-readable executable paths,
-      while its linked `launch.md` owns the concrete launch block — extra
-      project launch arguments, game-specific connect notes, and fresh-state
-      choices.
+      while its linked `launch.md` owns the concrete values of each
+      launch-script call, game-specific connect notes, and fresh-state choices.
     - A server-side reset command resets server state only, so a comparison
       requiring fresh client state must launch under an app-data directory that
       did not exist before that launch; use the `launch.md` recipe.
-    - The `--agent-port` values are the fixed ports above and are embedded in
-      that recipe.
+    - The launch script derives each role's agent port from the fixed ports
+      above.
 
 18. Hold window state deliberately. Done when window state and these optional
     arguments match what the criterion requires.
@@ -279,21 +291,33 @@ and the handoff this run returns.
       and re-minimizes it, so a capture taken mid-scenario silently returns the
       client to the non-rendering state. Use `window_state` to hold visibility
       across such a scenario.
-    - Omit `--windowed` only when native-resolution UI sizing/readability is
+    - Pass the launch script's client-only `-NativeResolution` switch, which
+      omits `--windowed`, only when native-resolution UI sizing/readability is
       part of acceptance.
-    - Add the optional `--renderdoc` client argument only for GPU frame capture;
-      it force-loads renderdoc.dll and drops the Vulkan validation layer, so
-      keep it off ordinary runs (see the RenderDoc capture reference
-      `renderdoc.md`).
+    - Pass its optional client-only `-RenderDoc` switch, which adds
+      `--renderdoc`, only for GPU frame capture; it force-loads renderdoc.dll
+      and drops the Vulkan validation layer, so keep it off ordinary runs (see
+      the RenderDoc capture reference `renderdoc.md`).
 
 19. Process-check every launch on every host through
     `../scripts/Invoke-AgentHarnessProcessCheck.ps1`. Done when its `Baseline`,
     `Register`, and `Check` actions are the only way this run checks process
     identity.
 
-    - Run each action directly, as its own
-      `pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 ...`
-      shell call in the form shown below.
+    - The launch script runs `Baseline`, `Register`, and the immediate `Check`
+      for every launch. Run an action directly only for step 29's fresh
+      `Baseline` and step 33's transport-failure `Check`, each as its own shell
+      call in the form shown below, with the role's game name and app-data root
+      from the project harness doc:
+
+      ```powershell
+      pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Baseline -StatePath '<absolute process-check state path>' -Role '<role>' -GameName '<Game Name>' -ConfiguredAppDataRoot '<absolute app-data root>'
+      ```
+
+      ```powershell
+      pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Check -StatePath '<absolute process-check state path>'
+      ```
+
     - The wait helpers and `../scripts/Invoke-HarnessRelease.ps1` run the
       checker themselves from the `-ProcessCheckStatePath` you pass them, so
       never invoke it yourself mid-wait.
@@ -306,43 +330,55 @@ and the handoff this run returns.
     - An unused path makes the run start with no state file, so it inherits no
       earlier run's registrations.
 
-21. Per role, before its `Start-Process`, run
-    `-Action Baseline -StatePath '<absolute process-check state path>' -Role '<role>' -GameName '<Game Name>'`.
-    Done when every role has a baseline.
+21. On every host, launch and relaunch each role through
+    `../scripts/Invoke-HarnessLaunch.ps1`, one call per role in the form the
+    project `launch.md` shows, server first. Never run `Start-Process` on a game
+    executable. Done when every role this run launches has returned its launch
+    result.
 
-    - Add `-ConfiguredAppDataRoot '<path>'` whenever that launch passes
-      `--app-data-directory`.
-    - The project harness doc owns the role names, game names, and concrete
-      paths.
+    - `-Role` is `server`, `client`, or `client-b`. Add `-Configuration <name>`
+      only for a build other than `Debug`, matching the claim, the
+      client-only switches only as step 18 states, and `-CrossMachine` only as
+      `private-lan-firewall.md` states.
+    - Run it synchronously in the foreground and remain in-turn until its exit
+      code and JSON result are captured, giving the call the maximum available
+      execution timeout; it returns after its port answers ping or the
+      readiness wait ends (step 23).
+    - It prints one compact `broken-engine-harness-launch/v1` JSON object with
+      `status`, `code`, `message`, `role`, `port`, `project`,
+      `gameDataDirectory`, `pid`, `startTimeUtc`, `tick`, and the
+      `processCheck` and `ping` payloads. Retain each role's latest result
+      outside shell state; its `pid`, `null` when no process started, is the
+      only PID lifecycle checks, quits, and release use for that role.
+    - Exit `0` (code `ok`) means the role started, holds its registered
+      identity, and its port answered ping.
+    - `shared-data.changed` (exit `2`) means the Shared data directory's listing
+      differs from this worktree's record for the role's target, and nothing
+      started. End the attempt through release (step 39) with the `pid` of each
+      role still running; the rest is step 7's `shared-data.changed` user stop.
+    - `shared-data.record-missing` (exit `2`) means no record exists for the
+      role's target and configuration, and nothing started; end the attempt the
+      same way and route `/compile` for the named target, with no user stop.
+    - `launch.server-running` (exit `2`) means a server process was already
+      running, and nothing started; follow the running-server route in the
+      project `launch.md`.
+    - The passed-through `check.unexpected-exit` (exit `2`, from the immediate
+      `Check`) keeps its step 22 meaning, and `process.unexpected-exit` and
+      `ping.timeout` (exit `2`, from the readiness wait) keep their step 23
+      meanings.
+    - Exit `1` is a failure naming its step (`launch.repository-missing`,
+      `launch.project-underivable`, `launch.launch-doc-unreadable`,
+      `launch.baseline-failed`, `launch.register-failed`,
+      `launch.check-failed`, `launch.start-failed`, `launch.ping-failed`, or
+      `internal.error`); stop and report it.
+    - `Register` starts a background watcher on the registered PID so `Check`
+      can report that process's exit code, and reports in its `message` and its
+      `watcherBound` result field whether the watcher bound; no extra step is
+      required from you either way.
 
-22. On every host, launch each role with hidden `Start-Process -PassThru`. Done
-    when the launch snapshot holds every launched process's exact PID and
-    start-time identity.
-
-    - Retain the returned exact non-null numeric PID and its
-      `StartTime.ToUniversalTime().ToString('o')` identity in the launch
-      snapshot, and use only those PIDs for lifecycle checks.
-    - Quote path-valued arguments because `Start-Process` joins `ArgumentList`
-      items.
-
-23. Capture the `-PassThru` result's `.Id` and start-time identity and run
-    `-Action Register -StatePath '<absolute process-check state path>' -Role '<role>' -ProcessId <PID> -StartTimeUtc '<start time UTC>'`
-    immediately. Done when every role has a registration.
-
-    - `Register` also starts a background watcher on the registered PID so
-      `Check` can report that process's exit code, and reports in its `message`
-      and its `watcherBound` result field whether the watcher bound; no extra
-      step is required from you either way.
-
-24. Run `-Action Check` immediately after that registration, before any
-    readiness wait. Done when every registration has its immediate check:
-
-    ```powershell
-    pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Check -StatePath '<absolute process-check state path>'
-    ```
-
-25. Read each process-check result from its JSON object. Done when every action
-    of this run is classified from that object.
+22. Read each process-check result from its JSON object, including each launch
+    result's `processCheck` payload, which holds the last action that launch
+    ran. Done when every action of this run is classified from that object.
 
     - Every action prints one compact
       `broken-engine-harness-process-check/v1` JSON object with `status`,
@@ -371,27 +407,21 @@ and the handoff this run returns.
     - The checker reports only through the command, poll, or check that is
       already active and never promises out-of-band notification while none is.
 
-26. After launching either executable, wait for readiness with
-    `../scripts/Wait-HarnessPing.ps1` before the first real command. It handles
-    one port per call, so launch order stays with you. Done when every launched
-    port has returned a readiness result:
+23. Each launch call waits for its port's readiness through
+    `../scripts/Wait-HarnessPing.ps1` before returning, so the first real
+    command follows a passing launch result and the server's wait precedes the
+    client's; never run that helper yourself. Done when every launched port's
+    readiness result has been read from its launch result's `ping` payload.
 
-    ```powershell
-    pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Wait-HarnessPing.ps1 -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -Port 27100 -TimeoutSeconds 120 -ProcessCheckStatePath '<absolute process-check state path>'
-    ```
-
-    - The script polls until the port answers `ok:true`, tolerating the
+    - The helper polls until the port answers `ok:true`, tolerating the
       individual timeouts long client startup (terrain elevation and
       priority-texture waits) produces after connect already succeeded.
-    - Exit `0` (`status` `pass`) reports the observed `tick`; `tick` of `-1`
-      means the listener is up but the game is not yet created (see the command
-      reference `command-reference.md` for `ping`). Exit `2` (`status`
-      `blocked`, code `ping.timeout`) reports the attempt count and elapsed
-      time, and blocks the first real command. Exit `1` is a setup failure.
+    - A passing wait reports the observed `tick`, which the launch result also
+      carries; `tick` of `-1` means the listener is up but the game is not yet
+      created (see the command reference `command-reference.md` for `ping`). A
+      `ping.timeout` reports the attempt count and elapsed time, and blocks the
+      first real command. A wait that failed to run is `launch.ping-failed`.
     - Never hand-write a ping loop or invent a sleep window in its place.
-    - The optional `-ProcessCheckStatePath` is this run's process-check state
-      path; supply it whenever the roles are registered, which the launch
-      sequence above makes the ordinary case.
     - While the wait is still unsatisfied, the helper checks the registered
       roles before each retry and sleep, so a dead process ends the wait early
       instead of consuming the remaining timeout: exit `2` (`status` `blocked`)
@@ -404,7 +434,7 @@ and the handoff this run returns.
       `processCheckWarning` and polling continues. Every existing exit-code
       meaning is unchanged.
 
-27. Invoke `../scripts/Wait-IslandSceneReady.ps1` only after launch and only
+24. Invoke `../scripts/Wait-IslandSceneReady.ps1` only after launch and only
     when an approved criterion depends on island footprints or rendered islands.
     Done when that criterion has a readiness artifact, or the criterion does not
     depend on islands and the helper is not run:
@@ -438,9 +468,12 @@ and the handoff this run returns.
     - The selected project document owns the concrete argument values and the
       evidence check around this call.
 
-28. Before relinking or relaunching, send `quit` and wait for the exact numeric
-    PID from the latest launch snapshot. Done when that PID is gone.
+25. Before relinking or relaunching, send `quit` and wait for the exact numeric
+    `pid` from the role's latest launch result. Done when that PID is gone.
 
+    - Use the quit and exit-wait form of the project's
+      [Additional simultaneous client](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/launch.md#additional-simultaneous-client)
+      shutdown, with the role's own port and `pid`.
     - A live executable locks its image.
     - Do not launch a duplicate to displace it — with `SO_REUSEADDR`, a
       duplicate on the same port binds alongside the live listener instead of
@@ -451,15 +484,16 @@ and the handoff this run returns.
       exited and rely on the ping poll for readiness — never invent a sleep
       window.
 
-29. Run a fresh `Baseline` and `Register` for the new process, in that order
-    around its `Start-Process`. Done when the replacement process is registered.
+26. Relaunch the role with its launch call (step 21), which baselines the role
+    before it registers the new process. Done when the replacement process's
+    launch result has returned.
 
     - Between that deliberate quit and re-registration the role is not checked,
       so run no process check in that window.
 
 #### Additional simultaneous client
 
-30. Launch an additional client for a criterion that needs two clients connected
+27. Launch an additional client for a criterion that needs two clients connected
     at once — a late joiner beside a client that must stay connected — after the
     standard pair. Done when that criterion either has its additional client or
     provably needs none.
@@ -467,29 +501,19 @@ and the handoff this run returns.
     - Disconnecting and reconnecting the one client is not a substitute when the
       criterion depends on state the server drops when its last client leaves.
 
-31. Build the additional client as the documented client launch with three
-    changes: its own fixed agent port above, its own `--app-data-directory`
-    root, and its own `--log-file`. Done when the additional client is launched
-    from the project `launch.md` block with those three changes.
+28. Launch the additional client after the standard pair with the client
+    launch call (step 21) changed three ways: `-Role client-b`, its own
+    `-AppDataDirectory` root, and its own `-LogFile`; the call registers,
+    checks, and waits on port `27102` in this run's state path. Done when its
+    launch result has returned.
 
-    - Every other argument is unchanged, including the same `--data-directory` —
+    - Every other value is unchanged, including the same `-GameDataDirectory` —
       all processes of one run must select the same asset data root.
     - Each additional client needs its own app-data root because of how one root
       separates client and server state (`Engine/Source/File/AGENTS.md`).
-    - The project `launch.md` owns the concrete launch block.
+    - The project `launch.md` owns the concrete call.
 
-32. Join it to this run's process-identity flow as its own role in the same
-    state path, exactly as for the first client. Done when its role is
-    registered and checked.
-
-    - Run `Baseline` with its own `-ConfiguredAppDataRoot` and the client
-      `-GameName`, then `Register` and the immediate `Check`.
-
-33. Wait for its readiness with `Wait-HarnessPing.ps1 -Port 27102` after the
-    standard `27100` then `27101` waits. Done when port `27102` has returned a
-    readiness result.
-
-34. Quit the additional client before the release call, then run one fresh
+29. Quit the additional client before the release call, then run one fresh
     `Baseline` for its role alone. Done when its PID is gone and its role is
     baselined again.
 
@@ -505,19 +529,19 @@ and the handoff this run returns.
 
 ### Invoke commands
 
-35. Prefer stdin JSON and always capture stdout even when exit is nonzero. Done
+30. Prefer stdin JSON and always capture stdout even when exit is nonzero. Done
     when every command of this run is sent that way:
 
     ```powershell
     '{"cmd":"ping"}' | & '<absolute AgentHarness path>' --owner '<owner token>' --port 27100 -
     ```
 
-36. For server-window verification, read the project-owned
+31. For server-window verification, read the project-owned
     [server-window recipe](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/server-window.md#server-gdi-monitoring-window-capture-and-click).
     Done when that recipe has been read, or the scenario needs no server-window
     verification.
 
-37. Use `--timeout-ms N` for a deferred client command; default is 15000 and
+32. Use `--timeout-ms N` for a deferred client command; default is 15000 and
     maximum is 600000. Done when each deferred command carries a timeout matched
     to it.
 
@@ -528,7 +552,7 @@ and the handoff this run returns.
     - Exit `0` means parsed `ok:true`, exit `2` means parsed `ok:false`, and
       exit `1` means transport, usage, or OS failure.
 
-38. After a transport failure, run the process check's `-Action Check` (Launch
+33. After a transport failure, run the process check's `-Action Check` (Launch
     steps above) once before any retry and report its result through this same
     command. Done when every transport failure has that check's result reported
     before any retry.
@@ -542,7 +566,7 @@ and the handoff this run returns.
     - A check exit of `0` leaves the transport failure an ordinary one and the
       retry proceeds.
 
-39. Keep every request on the envelope. Done when every request matches that
+34. Keep every request on the envelope. Done when every request matches that
     envelope.
 
     - Request envelope: `{"cmd":"<name>","params":{...},"id":<optional JSON>}`.
@@ -555,11 +579,11 @@ and the handoff this run returns.
     - Parameters are an external trust boundary and invalid values must produce
       the error envelope.
 
-40. The channel permits one request still in progress. Client deferred commands
+35. The channel permits one request still in progress. Client deferred commands
     occupy it until completion; another AgentHarness call waits rather than
     bypassing it. Do not overlap calls. Done when no two calls overlap.
 
-41. Write any multi-line PowerShell driver — anything with `function`
+36. Write any multi-line PowerShell driver — anything with `function`
     definitions, loops, or more than a few statements — to a script file under
     `<absolute adopted worktree>\Temp` and run it with `pwsh -File`. Done when
     every such driver runs from its own script file.
@@ -570,7 +594,7 @@ and the handoff this run returns.
 
 ### Authoritative verification
 
-42. Take the concrete setup recipe from the selected project's hub, including
+37. Take the concrete setup recipe from the selected project's hub, including
     the commands that seed server state, confirm client connection, and address
     UI. Done when this run's setup recipe comes from that hub:
 
@@ -581,7 +605,7 @@ and the handoff this run returns.
       or [cross-cell](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/cross-cell.md)
       scenario material.
 
-43. Regardless of project, hold these verification-evidence principles. Done
+38. Regardless of project, hold these verification-evidence principles. Done
     when each principle holds for every criterion this run verifies:
 
     - Verify with the narrowest observable combination of the project's scene,
@@ -596,7 +620,7 @@ and the handoff this run returns.
 
 ### Lifecycle and release
 
-44. After every successful, failed, crashed, or abandoned launch attempt,
+39. After every successful, failed, crashed, or abandoned launch attempt,
     release through `../scripts/Invoke-HarnessRelease.ps1`. One call performs
     the whole sequence, and it is safe after a crashed run whose PIDs are
     already gone. Done when that one call has returned:
@@ -605,13 +629,13 @@ and the handoff this run returns.
     pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessRelease.ps1 -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ServerPid <server PID> -ClientPid <client PID> -ProcessCheckStatePath '<absolute process-check state path>'
     ```
 
-45. Pass only exact non-null numeric `serverPid`/`clientPid` values retained
-    from the latest launch snapshot; replace the numeric placeholders and omit
-    either argument for a process that never started. Done when the call carries
-    exactly those retained PIDs.
+40. Pass only exact non-null numeric `serverPid`/`clientPid` values retained
+    from the latest launch results' `pid`; replace the numeric placeholders and
+    omit either argument for a process that never started. Done when the call
+    carries exactly those retained PIDs.
 
-    - The latest snapshot is authoritative, including after a partial launch
-      failure.
+    - The latest launch results are authoritative, including after a partial
+      launch failure.
     - The script quits both ports with the owner (server quit autosaves), waits
       for those exact PIDs, stops only a supplied exact PID that survived the
       quit, and runs `lock release` only once every supplied PID is confirmed
@@ -620,7 +644,7 @@ and the handoff this run returns.
     - An additional client is outside those two ports, so Additional
       simultaneous client above governs its shutdown before this call.
 
-46. Supply the optional `-ProcessCheckStatePath` whenever the roles are
+41. Supply the optional `-ProcessCheckStatePath` whenever the roles are
     registered, which the launch sequence above makes the ordinary case. Done
     when the registered run's release call carries that state path.
 
@@ -636,9 +660,9 @@ and the handoff this run returns.
       failed: cleanup succeeded and the lock was released, but a registered role
       had exited unexpectedly.
 
-47. Read the release result, then search for `DEBUG_BREAK at` in the
+42. Read the release result, then search for `DEBUG_BREAK at` in the
     `--log-file` of each process this run started: the server and client log
-    paths from the project harness doc's launch, for each PID step 45 retains,
+    paths from the project harness doc's launch, for each PID step 40 retains,
     and each additional client's. A log no process of this run opened still holds an
     earlier run's lines and is never searched. Done when the release outcome is
     classified and reported and every such log has been searched.
@@ -662,8 +686,8 @@ and the handoff this run returns.
 #### Release-only recovery
 
 Only a release-only recovery ([`../SKILL.md`](../SKILL.md) `## When to use`)
-runs steps 48 through 51, after steps 1-2 and in place of steps 3-47; every
-other run skips them. Step 50 runs steps 3-4 itself. The recovery frees only a
+runs steps 43 through 46, after steps 1-2 and in place of steps 3-42; every
+other run skips them. Step 45 runs steps 3-4 itself. The recovery frees only a
 lock whose record `worktree` is the adopted worktree and whose `session` is not
 `normal-launch`: that holder is this session's own stopped worker at any
 heartbeat age, so step 11's fresh-owner rule, which protects foreign owners,
@@ -673,7 +697,7 @@ worktree paths as the claim records them, each canonicalized by
 `Get-AgentCanonicalPath` (`.agents/scripts/AgentScriptCommon.psm1`), ignoring
 case.
 
-48. Before reading the lock record, stop every orphaned claim script: each
+43. Before reading the lock record, stop every orphaned claim script: each
     `Win32_Process` whose `CommandLine` names `Invoke-HarnessClaim.ps1` and a
     `-RepositoryRoot` equal to the adopted worktree. Done when each such exact
     PID is stopped with `Stop-Process -Id` and reported as one
@@ -683,7 +707,7 @@ case.
       keeps retrying the claim, so left running it would take the lock after
       this run released it or saw a foreign holder.
 
-49. Read the lock record. Done when the record's `owner` is retained for a
+44. Read the lock record. Done when the record's `owner` is retained for a
     holder whose `worktree` is the adopted worktree and whose `session` is not
     `normal-launch`, or the run has ended at an early exit.
 
@@ -704,7 +728,7 @@ case.
     - `{"held":false}` (exit `2`), a `worktree` other than the adopted
       worktree, or a `session` of `normal-launch` is an early exit.
 
-50. Shut down the stopped worker's game processes. Done when every validated
+45. Shut down the stopped worker's game processes. Done when every validated
     PID is gone, or step 13 has returned `BLOCKED` on an unprovable listener.
 
     - Run steps 3-4 for the brief's game, and take the expected server and
@@ -720,12 +744,12 @@ case.
       launch. No quit reaches it, so after the step-14 quits wait on it with the
       listener PIDs and stop it by exact PID under step 14's rule.
 
-51. Release through step 44 with the record's `owner`, no
+46. Release through step 39 with the record's `owner`, no
     `-ServerPid`/`-ClientPid`, and no `-ProcessCheckStatePath`, then classify the
-    result per step 47 without its log search. Done when the release result is
+    result per step 42 without its log search. Done when the release result is
     reported as a `Decisive checks` row.
 
-    - Step 50 already confirmed every validated PID gone, listening or not.
+    - Step 45 already confirmed every validated PID gone, listening or not.
     - The stopped run's process-check state path lives only in its scratch
       files, and a recovery verifies no criterion.
     - This run started no process, so it has no log to search.
@@ -734,7 +758,7 @@ case.
 
 ### Process verification report
 
-52. Run plan-provided runtime steps when present; otherwise derive the smallest
+47. Run plan-provided runtime steps when present; otherwise derive the smallest
     live checks for runtime-observable criteria only. Done when every
     runtime-observable criterion has been exercised and the handoff in
     [`../SKILL.md`](../SKILL.md) is returned.

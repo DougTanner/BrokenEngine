@@ -4,23 +4,20 @@
 
 ## Launch
 
-Follow the skill's generic launch requirements (`--loopback-only`, log parents under the absolute adopted worktree's `Temp`, `Start-Process -PassThru` PID retention, and the per-role process-check sequence), then launch these executables. Every fence below is its own independent shell call and they run in the order shown; assign each fence's path values locally and substitute values retained from an earlier fence as literals.
+Launch each role through the skill's launch script, `Invoke-HarnessLaunch.ps1`, which owns the generic launch requirements, the game argument set, the process-check sequence, and the readiness wait; this document supplies only each call's values. Every fence below is its own independent shell call and they run in the order shown; assign each fence's path values locally and substitute values retained from an earlier fence as literals.
 
-Start each launch sequence, after the claim (worker step 5) and before directory setup, by checking that no server is already running. The server is single-instance per machine, so a harness server started while any `BrokenEngineSandboxServer*` process runs exits at once. A relaunch under worker steps 28-29 skips this check, because this run's own server may still be alive; each fresh claim followed by a new launch sequence runs it again:
+The server is single-instance per machine, so a harness server started while any `BrokenEngineSandboxServer*` process runs exits at once. Every server launch call therefore refuses with `launch.server-running`, starting nothing, while such a process runs; that includes a relaunch under worker steps 25-26, which first waits for this run's own server PID to exit.
 
-```powershell
-Get-Process -Name 'BrokenEngineSandboxServer*' -ErrorAction SilentlyContinue | Select-Object Id, ProcessName
-```
-
-If that lists a process, launch nothing and run no `Baseline`, `Register`, or
-`Check`. Release the just-taken lock through `Invoke-HarnessRelease.ps1` (worker
-step 44) with no `-ServerPid`/`-ClientPid` and no `-ProcessCheckStatePath`,
-because no process started and no role is registered. Return `BLOCKED` with one
-`Residuals` row naming each listed PID and process name as a running server
+On that result launch nothing more. Release the claimed lock through
+`Invoke-HarnessRelease.ps1` (worker step 39) with the `pid` of each role of this
+run still running and, only when one of them is registered,
+`-ProcessCheckStatePath`; on the run's first launch that is no
+`-ServerPid`/`-ClientPid` and no `-ProcessCheckStatePath`, because no process
+started and no role is registered. Return `BLOCKED` with one `Residuals` row
+naming each PID and process name the result's message lists as a running server
 blocking the harness server, mark every criterion `BLOCKED` citing that row, and
 add no `HARNESS-F` finding. Never stop, quit, or signal a listed process; it
-belongs to the user. If it lists nothing, continue with the sequence below
-unchanged.
+belongs to the user.
 
 Next create the directories and fix this run's single process-check state path. The timestamp makes that path new for every run, so no earlier run's registrations are ever inherited:
 
@@ -42,79 +39,17 @@ $LaunchPaths | ConvertTo-Json -Compress
 
 Retain that record outside shell state. Every process-check action, wait helper, and release call of this run uses that one `processCheckStatePath`, and no later run reuses it; a per-scenario run that uses its own AppData root generates its own state path the same way.
 
-Baseline the server's crash-report candidates before starting it. This launch block passes `--app-data-directory`, so pass the same root as `-ConfiguredAppDataRoot`:
+Launch the server, then the client, each with one call that returns once its port answers ping. Each call passes the claim's normalized Data path, the recorded `appDataRoot` and `processCheckStatePath`, the role's log path from that record, and the role's crash-report game name:
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Baseline -StatePath '<absolute process-check state path>' -Role 'server' -GameName 'Broken Engine Sandbox Server' -ConfiguredAppDataRoot '<absolute app-data root>'
-```
-
-Then launch the server and retain its exact PID and process-start identity. The `$ServerExe` and `$ClientExe` names below are the Debug ones: under a Profile or Release claim substitute the `.Profile.exe` or the unsuffixed `.exe` names in every such assignment in this recipe.
-
-```powershell
-$ROOT = '<absolute adopted worktree>'
-$GameDataDirectory = '<normalized Data path>'
-$Output = Join-Path $ROOT 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output'
-$ServerExe = Join-Path $Output 'BrokenEngineSandboxServer.Debug.exe'
-$QuotedData = '"' + $GameDataDirectory + '"'
-$QuotedAppData = '"' + '<absolute app-data root>' + '"'
-$QuotedServerLog = '"' + '<absolute server log path>' + '"'
-$ServerProcess = Start-Process -FilePath $ServerExe -ArgumentList @(
-	'--agent-port', '27100', '--loopback-only', '--data-directory', $QuotedData,
-	'--app-data-directory', $QuotedAppData,
-	'--log-file', $QuotedServerLog) -WindowStyle Hidden -PassThru -ErrorAction Stop
-$LifecycleRecord = [ordered]@{
-	serverPid = $ServerProcess.Id
-	serverStartTimeUtc = $ServerProcess.StartTime.ToUniversalTime().ToString('o')
-	clientPid = $null
-	clientStartTimeUtc = $null
-	appDataRoot = '<absolute app-data root>'
-	processCheckStatePath = '<absolute process-check state path>'
-}
-$LifecycleRecord | ConvertTo-Json -Compress
-```
-
-Register that exact identity immediately, substituting the snapshot's `serverPid` and `serverStartTimeUtc`:
-
-```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Register -StatePath '<absolute process-check state path>' -Role 'server' -ProcessId <server PID> -StartTimeUtc '<server start time UTC>'
-```
-
-Then check immediately, before any readiness wait, so a server that already died during startup is caught against its true pre-launch baseline:
-
-```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Check -StatePath '<absolute process-check state path>'
-```
-
-Run the same four-call sequence for the client. Its baseline uses the client's own game name:
-
-```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Baseline -StatePath '<absolute process-check state path>' -Role 'client' -GameName 'Broken Engine Sandbox' -ConfiguredAppDataRoot '<absolute app-data root>'
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessLaunch.ps1 -RepositoryRoot '<absolute adopted worktree>' -Role 'server' -GameDataDirectory '<normalized Data path>' -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ProcessCheckStatePath '<absolute process-check state path>' -AppDataDirectory '<absolute app-data root>' -LogFile '<absolute server log path>' -GameName 'Broken Engine Sandbox Server'
 ```
 
 ```powershell
-$ROOT = '<absolute adopted worktree>'
-$GameDataDirectory = '<normalized Data path>'
-$Output = Join-Path $ROOT 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output'
-$ClientExe = Join-Path $Output 'BrokenEngineSandbox.Debug.exe'
-$QuotedData = '"' + $GameDataDirectory + '"'
-$QuotedAppData = '"' + '<absolute app-data root>' + '"'
-$QuotedClientLog = '"' + '<absolute client log path>' + '"'
-$ClientProcess = Start-Process -FilePath $ClientExe -ArgumentList @(
-	'--agent-port', '27101', '--loopback-only', '--data-directory', $QuotedData,
-	'--app-data-directory', $QuotedAppData,
-	'--windowed', '1600x900', '--log-file', $QuotedClientLog) -WindowStyle Hidden -PassThru -ErrorAction Stop
-$LifecycleRecord = [ordered]@{
-	serverPid = <server PID>
-	serverStartTimeUtc = '<server start time UTC>'
-	clientPid = $ClientProcess.Id
-	clientStartTimeUtc = $ClientProcess.StartTime.ToUniversalTime().ToString('o')
-	appDataRoot = '<absolute app-data root>'
-	processCheckStatePath = '<absolute process-check state path>'
-}
-$LifecycleRecord | ConvertTo-Json -Compress
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessLaunch.ps1 -RepositoryRoot '<absolute adopted worktree>' -Role 'client' -GameDataDirectory '<normalized Data path>' -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ProcessCheckStatePath '<absolute process-check state path>' -AppDataDirectory '<absolute app-data root>' -LogFile '<absolute client log path>' -GameName 'Broken Engine Sandbox'
 ```
 
-Then `Register` the client with `-Role 'client'` and the snapshot's `clientPid`/`clientStartTimeUtc`, and run the same immediate `Check`. The skill owns the process-check result shape and exit codes: exit `0` healthy, exit `2` an unexpected exit whose findings name the role, report path, exception headline, and retained evidence location, exit `1` a setup or state failure.
+The skill's launch step owns the launch result's shape and codes.
 
 Both processes share the absolute app-data root recorded as `appDataRoot`, so
 saves, settings, caches, and replay artifacts land under this worktree instead
@@ -143,14 +78,8 @@ neither source so that file stays cold, so the cold-cache cost applies mainly to
 per-scenario roots. The stopped-server AppData recipe below reads and backs up
 from `<absolute app-data root>\Broken Engine Sandbox Server`, not `%APPDATA%`.
 
-The latest compact JSON snapshot is authoritative. Retain each snapshot outside
-shell state; its `serverStartTimeUtc`/`clientStartTimeUtc` values are only for
-the matching `Register` call, and its `processCheckStatePath` is the value every
-later process check, wait helper, and release call uses. If the client launch
-fails, use the earlier snapshot and release only its non-null `serverPid`; do
-not invent a client PID. If the server launch fails, no PID argument exists.
-After both launches, release with both exact non-null numeric PIDs. `reset` is
-server-scoped and never clears the client's own persisted state: the client
+Retain each role's launch result and its `pid` as worker step 21 states. `reset`
+is server-scoped and never clears the client's own persisted state: the client
 writes `ClientState.bin` once during normal orderly shutdown under
 `<absolute app-data root>\Broken Engine Sandbox`; focus/zoom changes made during
 play remain in memory and may be lost on exception, crash, or hard kill. A
@@ -208,36 +137,10 @@ New-Item -ItemType Directory -Path $SecondAppDataRoot | Out-Null
 } | ConvertTo-Json -Compress
 ```
 
-Baseline its own role against its own root, using this run's single process-check state path:
+Then launch it with the client call changed only in its role, its app-data root, and its log file, keeping the same Data path and this run's single process-check state path; it returns once port `27102` answers ping. Retain its result's `pid` as `<second client PID>`:
 
 ```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Baseline -StatePath '<absolute process-check state path>' -Role 'client-b' -GameName 'Broken Engine Sandbox' -ConfiguredAppDataRoot '<absolute second app-data root>'
-```
-
-Then launch the same client executable with the same `--data-directory`, changing only the agent port, the app-data root, and the log file:
-
-```powershell
-$ROOT = '<absolute adopted worktree>'
-$GameDataDirectory = '<normalized Data path>'
-$Output = Join-Path $ROOT 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output'
-$ClientExe = Join-Path $Output 'BrokenEngineSandbox.Debug.exe'
-$QuotedData = '"' + $GameDataDirectory + '"'
-$QuotedAppData = '"' + '<absolute second app-data root>' + '"'
-$QuotedClientLog = '"' + '<absolute second client log path>' + '"'
-$SecondClientProcess = Start-Process -FilePath $ClientExe -ArgumentList @(
-	'--agent-port', '27102', '--loopback-only', '--data-directory', $QuotedData,
-	'--app-data-directory', $QuotedAppData,
-	'--windowed', '1600x900', '--log-file', $QuotedClientLog) -WindowStyle Hidden -PassThru -ErrorAction Stop
-[ordered]@{
-	secondClientPid = $SecondClientProcess.Id
-	secondClientStartTimeUtc = $SecondClientProcess.StartTime.ToUniversalTime().ToString('o')
-} | ConvertTo-Json -Compress
-```
-
-`Register` that exact identity with `-Role 'client-b'`, run the same immediate `Check`, then wait for its port after the `27100` and `27101` waits:
-
-```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Wait-HarnessPing.ps1 -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -Port 27102 -TimeoutSeconds 120 -ProcessCheckStatePath '<absolute process-check state path>'
+pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessLaunch.ps1 -RepositoryRoot '<absolute adopted worktree>' -Role 'client-b' -GameDataDirectory '<normalized Data path>' -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ProcessCheckStatePath '<absolute process-check state path>' -AppDataDirectory '<absolute second app-data root>' -LogFile '<absolute second client log path>' -GameName 'Broken Engine Sandbox'
 ```
 
 Address it like the first client, on port `27102`. It auto-connects the same way, and `status.clientCount` counts both.
@@ -254,7 +157,7 @@ if (Get-Process -Id <second client PID> -ErrorAction SilentlyContinue) { throw '
 
 Once the exit is confirmed, run one fresh `Baseline` for `-Role 'client-b'` with the same game name and root, clearing its registration so the intended quit is not reported as an unexpected exit, and release with the server and first-client PIDs as usual.
 
-For an approved island-footprint or island-render criterion only, run the readiness helper after both processes launch as its own independent call. Retain the latest lifecycle snapshot and absolute artifact path outside shell state when checking the result:
+For an approved island-footprint or island-render criterion only, run the readiness helper after both processes launch as its own independent call. Retain the absolute artifact path outside shell state when checking the result:
 
 ```powershell
 pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Wait-IslandSceneReady.ps1 -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ClientPort 27101 -TimeoutSeconds 120 -ArtifactPath '<absolute artifact path>' -ProcessCheckStatePath '<absolute process-check state path>'
@@ -306,7 +209,7 @@ pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.p
 - `claim.foreign-owner`: follow worker step 7's `claim.foreign-owner` bullet. When step 11 classifies the holder fresh, re-invoke the claim; when stale, run steps 11-15 with session label `normal-launch`, using step 1's fixed ports (`27100`, `27101`, and `27102`) and the expected executables from the project hub step 4 reads. A completed steal continues to the launch below, and its new owner token is not kept either; a `BLOCKED` takeover is reported to the user with nothing launched.
 - Any other non-zero exit: report the claim result to the user and launch nothing.
 
-Then launch both, substituting the executable names for the compiled configuration as `## Launch` states:
+Then launch both. The `$ServerExe` and `$ClientExe` names below are the Debug ones: under a Profile or Release claim substitute the `.Profile.exe` or the unsuffixed `.exe` names:
 
 ```powershell
 $ROOT = '<absolute adopted worktree>'

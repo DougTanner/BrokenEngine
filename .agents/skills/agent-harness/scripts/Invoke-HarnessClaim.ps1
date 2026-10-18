@@ -253,50 +253,32 @@ try {
 
 	$dataDirectory = Get-AgentCanonicalPath $GameDataDirectory
 	$result.gameDataDirectory = $dataDirectory
-	$segments = $dataDirectory.Split('\')
-	if ($segments.Count -lt 6 -or $segments[-6] -cne 'Projects' -or $segments[-4] -cne 'Platforms' -or
-		$segments[-3] -cne 'VisualStudio2026' -or $segments[-2] -cne 'Output' -or $segments[-1] -cne 'Data') {
-		Complete-HarnessClaim 2 'blocked' 'claim.project-underivable' ("GameDataDirectory '$dataDirectory' does not end in " +
-			'Projects\<Name>\Platforms\VisualStudio2026\Output\Data, so its game project cannot be derived.')
-	}
-	$project = $segments[-5]
-	$result.project = $project
+	$launch = Get-AgentHarnessLaunchConfiguration $root $dataDirectory $Configuration
+	$result.project = $launch.Project
+	if ($launch.Failure -ceq 'project-underivable') { Complete-HarnessClaim 2 'blocked' 'claim.project-underivable' $launch.Message }
+	if ($launch.Failure -ceq 'launch-doc-unreadable') { Complete-HarnessClaim 1 'error' 'claim.launch-doc-unreadable' $launch.Message }
+	$project = $launch.Project
+	$serverBaseName = $launch.ServerBaseName
 
-	# The project harness doc owns the executable names and their Output directory, so the launch
-	# block stays the single source of truth: only those three assignments are read, and the doc's
-	# hardcoded Debug suffix becomes the requested configuration's suffix — none for Release, whose
-	# TargetName is the bare project name. Missing executables block here, before provisioning and
-	# before the lock, so a build routes through /compile and re-enters.
-	$harnessDocument = Join-Path $root "Projects\$project\Documents\AgentHarness.md"
-	$launchText = ''
-	if (Test-Path -LiteralPath $harnessDocument -PathType Leaf) {
-		# A read failure leaves the text empty so it reports the same unreadable-doc code as a parse failure.
-		$launchText = [string](Get-Content -LiteralPath $harnessDocument -Raw -ErrorAction SilentlyContinue)
-	}
-	$outputMatch = [regex]::Match($launchText, '(?m)^\s*\$Output\s*=\s*Join-Path \$ROOT ''([^'']+)''\s*$')
-	$serverMatch = [regex]::Match($launchText, '(?m)^\s*\$ServerExe\s*=\s*Join-Path \$Output ''([^'']+)''\s*$')
-	$clientMatch = [regex]::Match($launchText, '(?m)^\s*\$ClientExe\s*=\s*Join-Path \$Output ''([^'']+)''\s*$')
-	if (-not $outputMatch.Success -or -not $serverMatch.Success -or -not $clientMatch.Success) {
-		Complete-HarnessClaim 1 'error' 'claim.launch-doc-unreadable' `
-			"Output, ServerExe, and ClientExe could not be read from '$harnessDocument'."
-	}
-	$outputRelative = $outputMatch.Groups[1].Value
-	$outputDirectory = Join-Path $root $outputRelative
-	# The wait loop's running-server probe matches this base name, so it covers every configuration.
-	$serverBaseName = [regex]::Replace($serverMatch.Groups[1].Value, '\.Debug\.exe$', '')
-	$requiredExecutables = @($serverMatch.Groups[1].Value)
-	if (-not $ServerOnly) { $requiredExecutables += $clientMatch.Groups[1].Value }
-	$missingExecutables = @()
-	$suffix = if ($Configuration -ieq 'Release') { '' } else { ".$Configuration" }
-	foreach ($executable in $requiredExecutables) {
-		$configured = [regex]::Replace($executable, '\.Debug\.exe$', "$suffix.exe")
-		if (-not (Test-Path -LiteralPath (Join-Path $outputDirectory $configured) -PathType Leaf)) {
-			$missingExecutables += $configured
-		}
-	}
+	# Missing executables block here, before provisioning and before the lock, so a build routes
+	# through /compile and re-enters.
+	$requiredExecutables = @($launch.ServerExe)
+	if (-not $ServerOnly) { $requiredExecutables += $launch.ClientExe }
+	$missingExecutables = @($requiredExecutables | Where-Object {
+		-not (Test-Path -LiteralPath (Join-Path $launch.OutputDirectory $_) -PathType Leaf) })
 	if ($missingExecutables.Count -gt 0) {
 		Complete-HarnessClaim 2 'blocked' 'claim.executable-missing' `
-			"Missing executables in '$outputRelative': $($missingExecutables -join ', ')."
+			"Missing executables in '$($launch.OutputRelative)': $($missingExecutables -join ', ')."
+	}
+
+	# The Shared data directory belongs to the primary checkout, so a later refresh or export can
+	# change it after this worktree's build. Refusing here, before provisioning and before the
+	# unbounded wait on a foreign lock holder, brings that stop to the caller at once.
+	$recordTargets = @('Server')
+	if (-not $ServerOnly) { $recordTargets += 'Client' }
+	foreach ($recordTarget in $recordTargets) {
+		$dataChange = Compare-AgentSharedDataRecord $root $dataDirectory $project $recordTarget $Configuration
+		if ($null -ne $dataChange) { Complete-HarnessClaim 2 'blocked' $dataChange.Code $dataChange.Message }
 	}
 
 	# Executables expecting one pack version and data carrying another fail deep inside the launch, at

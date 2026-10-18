@@ -1,6 +1,6 @@
 # RenderDoc Capture
 
-Read this reference only for a GPU frame-capture or capture-analysis scenario — an agent needs the action tree, bound pipeline state, or a render-target dump that a `screenshot` cannot supply. It owns the `--renderdoc` launch, the `renderdoc_capture` command, and the headless `rdc_*` analysis scripts. Ordinary runs never pass `--renderdoc`.
+Read this reference only for a GPU frame-capture or capture-analysis scenario — an agent needs the action tree, bound pipeline state, or a render-target dump that a `screenshot` cannot supply. It owns the launch script's `-RenderDoc` switch, the `renderdoc_capture` command, and the headless `rdc_*` analysis scripts. Ordinary runs never pass `-RenderDoc`.
 
 Caveat — capture runs drop Vulkan validation. With `renderdoc.dll` loaded (which `--renderdoc` forces), `InstanceManager` omits `VK_LAYER_KHRONOS_validation` because RenderDoc does not ship it; this is existing behavior. Never combine a validation-dependent acceptance criterion with a capture run. Run validation checks on a plain launch and capture checks on a separate `--renderdoc` launch.
 
@@ -12,7 +12,7 @@ Caveat — capture runs drop Vulkan validation. With `renderdoc.dll` loaded (whi
 
 ## Launch, capture, analyze
 
-Launch with the selected project's focused `launch.md` recipe (`Projects/<Project>/Documents/AgentHarness/launch.md`), adding `--renderdoc` to the client arguments only. Confirm the API attached with `get_logs {"pattern":"renderDocHmodule|RenderDoc API"}` — expect a nonzero `renderDocHmodule` and a nonzero `RenderDoc API` pointer.
+Launch with the selected project's focused `launch.md` recipe (`Projects/<Project>/Documents/AgentHarness/launch.md`), adding the launch script's `-RenderDoc` switch, which passes `--renderdoc`, to the client call only. Confirm the API attached with `get_logs {"pattern":"renderDocHmodule|RenderDoc API"}` — expect a nonzero `renderDocHmodule` and a nonzero `RenderDoc API` pointer.
 
 Capture with `renderdoc_capture` (schema in the project's [client commands](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-client.md)). Size `--timeout-ms` for the drain-count progress bound, not wall-clock. The default agent client is minimized, so the command restores it without activation, captures, and re-minimizes.
 

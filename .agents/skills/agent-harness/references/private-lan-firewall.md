@@ -1,6 +1,6 @@
 # Private-LAN Firewall
 
-Read this reference only when a requested scenario explicitly needs a client on another machine or private Wi-Fi to reach the server UDP game listener `27015` and discovery listener `27016`. Cross-machine launches omit `--loopback-only`. Agent command channels remain on `127.0.0.1` and never need a firewall exception.
+Read this reference only when a requested scenario explicitly needs a client on another machine or private Wi-Fi to reach the server UDP game listener `27015` and discovery listener `27016`. A cross-machine launch adds the launch script's `-CrossMachine` switch, which omits `--loopback-only`, to each role's launch call the project `launch.md` shows; the client on the other machine also omits `--loopback-only`. Agent command channels remain on `127.0.0.1` and never need a firewall exception.
 
 Firewall changes are operator-driven. Never execute the install/removal blocks, request elevation, disable firewall/notifications, change a network category, or add an executable-path/Public-profile rule. Give the operator this exact-name, idempotent elevated-PowerShell install block:
 

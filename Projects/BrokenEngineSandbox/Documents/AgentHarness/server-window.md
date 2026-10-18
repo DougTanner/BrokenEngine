@@ -9,7 +9,7 @@ ImGui surface. The client `screenshot`, `describe_ui`, and `click` commands
 cannot observe or drive it. When a criterion needs that window, copy the
 following complete block verbatim into the ignored
 `<absolute adopted worktree>\Temp\Capture-ServerWindow.ps1`, then run it with
-the exact `serverPid` retained by the launch snapshot. Do not replace PID
+the exact `pid` of the server's latest launch result. Do not replace PID
 ownership with a process-name search or add this as a tracked helper.
 
 ```powershell

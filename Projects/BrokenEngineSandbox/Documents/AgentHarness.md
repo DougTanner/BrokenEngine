@@ -27,7 +27,16 @@ game commands are split into [server](AgentHarness/commands-server.md) and
 
 ## Machine-readable launch configuration
 
-The claim consumer `scripts/Invoke-HarnessClaim.ps1` reads exactly one current assignment set from this hub with the regular expressions in its launch-document parser. It uses `$Output`, `$ServerExe`, and `$ClientExe` to check the requested executables before provisioning and claiming. Humans must follow the complete [launch recipe](AgentHarness/launch.md), which owns process checks, fresh-state choices, readiness, and the concrete arguments.
+The claim consumer `scripts/Invoke-HarnessClaim.ps1` and the launch script
+`scripts/Invoke-HarnessLaunch.ps1` read exactly one current assignment set from
+this hub through the shared `Get-AgentHarnessLaunchConfiguration`
+(`.agents/scripts/AgentScriptCommon.psm1`). The claim uses `$Output`,
+`$ServerExe`, and `$ClientExe` to check the requested executables before
+provisioning and claiming, and the launch script starts them. The launch script
+owns the process-check sequence, the readiness wait, and the game argument set;
+humans must follow the complete [launch recipe](AgentHarness/launch.md), which
+owns the launch-script call's values, the fresh-state choices, and the
+readiness text.
 
 ```powershell
 $ROOT = '<absolute adopted worktree>'
@@ -36,7 +45,7 @@ $ServerExe = Join-Path $Output 'BrokenEngineSandboxServer.Debug.exe'
 $ClientExe = Join-Path $Output 'BrokenEngineSandbox.Debug.exe'
 ```
 
-The claim script and the `/agent-harness` release-only recovery map these Debug names to the requested configuration — `.Profile.exe` for Profile, and the unsuffixed `.exe` for Release; do not edit this hub for another build.
+The claim and launch scripts, through `Get-AgentHarnessLaunchConfiguration`, and the `/agent-harness` release-only recovery map these Debug names to the requested configuration — `.Profile.exe` for Profile, and the unsuffixed `.exe` for Release; do not edit this hub for another build.
 
 ## Focused references
 

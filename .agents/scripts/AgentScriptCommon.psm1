@@ -199,6 +199,96 @@ function Get-AgentShaderSourceFingerprint([string] $Root, [string] $Revision, [s
 	return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.UTF8Encoding]::new($false).GetBytes($listing -join "`n"))).ToLowerInvariant()
 }
 
+# The listing a successful, non-selective Shared game build of Target and Configuration records for the Shared data
+# directory it compiled against. It sits under the gitignored per-worktree game Output.
+function Get-AgentSharedDataRecordPath([string] $Root, [string] $Project, [string] $Target, [string] $Configuration) {
+	return Join-Path $Root "Projects\$Project\Platforms\VisualStudio2026\Output\SharedDataRecord.$Target.$Configuration.txt"
+}
+
+# One line per file at any depth, hidden included: relative path, size, and last-write time in UTC ticks, tab-separated
+# and sorted ordinally. DataPacker publishes every data file by temp-file rename, so each publish moves the time. Only
+# directory metadata is read, so no file is opened and DataPacker's publish probe never meets a handle held here.
+function Get-AgentDataListing([string] $Directory) {
+	if (-not [IO.Directory]::Exists($Directory)) { return }
+	$directoryInfo = [IO.DirectoryInfo]::new($Directory)
+	$options = [IO.EnumerationOptions]::new()
+	$options.RecurseSubdirectories = $true
+	$options.AttributesToSkip = [IO.FileAttributes]::None
+	[string[]] $lines = @(foreach ($file in $directoryInfo.EnumerateFiles('*', $options)) {
+		"$([IO.Path]::GetRelativePath($directoryInfo.FullName, $file.FullName))`t$($file.Length)`t$($file.LastWriteTimeUtc.Ticks)"
+	})
+	[Array]::Sort($lines, [StringComparer]::Ordinal)
+	return $lines
+}
+
+# The one Shared data comparison the harness claim and launch scripts run, against the Target and Configuration record.
+# Nothing when the data directory is under the worktree root (Local output, or a derived copy under Temp, which the
+# worktree owns) or the record equals the current listing; otherwise a Code and Message result.
+function Compare-AgentSharedDataRecord([string] $Root, [string] $DataDirectory, [string] $Project, [string] $Target, [string] $Configuration) {
+	if ((Get-AgentCanonicalPath $DataDirectory).StartsWith((Get-AgentCanonicalPath $Root) + '\', [StringComparison]::OrdinalIgnoreCase)) { return }
+	$recordPath = Get-AgentSharedDataRecordPath $Root $Project $Target $Configuration
+	if (-not [IO.File]::Exists($recordPath)) {
+		return [pscustomobject] @{
+			Code = 'shared-data.record-missing'
+			Message = "No Shared data record exists for $Target $Configuration; /compile of $Target $Configuration writes it."
+		}
+	}
+	$record = [Collections.Generic.HashSet[string]]::new([IO.File]::ReadAllLines($recordPath), [StringComparer]::Ordinal)
+	$listing = [Collections.Generic.HashSet[string]]::new([string[]]@(Get-AgentDataListing $DataDirectory), [StringComparer]::Ordinal)
+	[string[]] $differing = @(@($record | Where-Object { -not $listing.Contains($_) }) + @($listing | Where-Object { -not $record.Contains($_) }))
+	if ($differing.Count -eq 0) { return }
+	[Array]::Sort($differing, [StringComparer]::Ordinal)
+	return [pscustomobject] @{
+		Code = 'shared-data.changed'
+		Message = ("The Shared data differs from this worktree's $Target $Configuration record: $($differing.Count) line(s) are in only one " +
+			"of the record and the listing, first '$(($differing[0] -split "`t", 2)[0])'. The Shared data MUST be re-exported; stop and ask the user.")
+	}
+}
+
+# The harness launch configuration for a game data directory: the project its
+# Projects\<Name>\Platforms\VisualStudio2026\Output\Data suffix names, and the Output directory and executables the
+# project hub's machine-readable launch configuration assigns, so the executables can never belong to a different game
+# than the data. Only those three assignments are read, and the hub's hardcoded Debug suffix becomes the requested
+# configuration's suffix: none for Release, whose TargetName is the bare project name. Failure is null on success,
+# otherwise 'project-underivable' or 'launch-doc-unreadable' with its Message, which the caller maps to its own code.
+function Get-AgentHarnessLaunchConfiguration([string] $Root, [string] $DataDirectory, [string] $Configuration) {
+	$launch = [pscustomobject] @{
+		Failure = $null; Message = $null; Project = $null; OutputRelative = $null; OutputDirectory = $null
+		ServerExe = $null; ClientExe = $null; ServerBaseName = $null
+	}
+	$segments = (Get-AgentCanonicalPath $DataDirectory).Split('\')
+	if ($segments.Count -lt 6 -or $segments[-6] -cne 'Projects' -or $segments[-4] -cne 'Platforms' -or
+		$segments[-3] -cne 'VisualStudio2026' -or $segments[-2] -cne 'Output' -or $segments[-1] -cne 'Data') {
+		$launch.Failure = 'project-underivable'
+		$launch.Message = "GameDataDirectory '$(Get-AgentCanonicalPath $DataDirectory)' does not end in " +
+			'Projects\<Name>\Platforms\VisualStudio2026\Output\Data, so its game project cannot be derived.'
+		return $launch
+	}
+	$launch.Project = $segments[-5]
+	$harnessDocument = Join-Path $Root "Projects\$($launch.Project)\Documents\AgentHarness.md"
+	$launchText = ''
+	if (Test-Path -LiteralPath $harnessDocument -PathType Leaf) {
+		# A read failure leaves the text empty so it reports the same unreadable-doc failure as a parse failure.
+		$launchText = [string](Get-Content -LiteralPath $harnessDocument -Raw -ErrorAction SilentlyContinue)
+	}
+	$outputMatch = [regex]::Match($launchText, '(?m)^\s*\$Output\s*=\s*Join-Path \$ROOT ''([^'']+)''\s*$')
+	$serverMatch = [regex]::Match($launchText, '(?m)^\s*\$ServerExe\s*=\s*Join-Path \$Output ''([^'']+)''\s*$')
+	$clientMatch = [regex]::Match($launchText, '(?m)^\s*\$ClientExe\s*=\s*Join-Path \$Output ''([^'']+)''\s*$')
+	if (-not $outputMatch.Success -or -not $serverMatch.Success -or -not $clientMatch.Success) {
+		$launch.Failure = 'launch-doc-unreadable'
+		$launch.Message = "Output, ServerExe, and ClientExe could not be read from '$harnessDocument'."
+		return $launch
+	}
+	$launch.OutputRelative = $outputMatch.Groups[1].Value
+	$launch.OutputDirectory = Join-Path $Root $launch.OutputRelative
+	$suffix = if ($Configuration -ieq 'Release') { '' } else { ".$Configuration" }
+	$launch.ServerExe = [regex]::Replace($serverMatch.Groups[1].Value, '\.Debug\.exe$', "$suffix.exe")
+	$launch.ClientExe = [regex]::Replace($clientMatch.Groups[1].Value, '\.Debug\.exe$', "$suffix.exe")
+	# A running-server probe on the base name matches every configuration's server.
+	$launch.ServerBaseName = [regex]::Replace($serverMatch.Groups[1].Value, '\.Debug\.exe$', '')
+	return $launch
+}
+
 # The Documents/Plans/AGENTS.md `## Plan files` layout violations in the index and working tree, as {rule, path} rows
 # sorted ordinally. The index stands for presence, so a staged Plan and its staged support files count as present.
 # Every path deeper than <Area>/<Name>.md lies in the support folder <Area>/<Name>/, a nested Plan included. With
@@ -249,4 +339,4 @@ function Get-AgentPlansLayoutViolation([string] $RepositoryRoot, [string] $Folde
 	return @($sorted | ForEach-Object { $parts = $_.Split("`0"); [pscustomobject] @{ rule = $parts[1]; path = $parts[0] } })
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentShaderSourceFingerprint, Get-AgentPlansLayoutViolation
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentShaderSourceFingerprint, Get-AgentSharedDataRecordPath, Get-AgentDataListing, Compare-AgentSharedDataRecord, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation
