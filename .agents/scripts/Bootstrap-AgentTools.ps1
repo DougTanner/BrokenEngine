@@ -206,14 +206,7 @@ try {
 			# uncommitted in the primary can never fail session start.
 			$discoveredProjects = @(Get-AgentGameProjects $root)
 			$committedProjectFiles = @(Invoke-AgentGit (@('-C', $root, 'ls-tree', '--name-only', 'HEAD', '--') + @($discoveredProjects | ForEach-Object { "Projects/$_/Platforms/VisualStudio2026/$_.vcxproj" })))
-			# A game's first export runs against an empty per-game DataPacker cache, a full Engine/Data
-			# re-export that would hold this mutex for hours, so a game with no primary Output\Data yet is
-			# skipped, which also leaves it out of the process wait below.
-			$gameProjects = @(foreach ($committedProject in @($discoveredProjects | Where-Object { "Projects/$_/Platforms/VisualStudio2026/$_.vcxproj" -cin $committedProjectFiles })) {
-				$committedDataDirectory = Join-Path $root "Projects\$committedProject\Platforms\VisualStudio2026\Output\Data"
-				if (Test-Path -LiteralPath $committedDataDirectory -PathType Container) { $committedProject }
-				else { Write-Warning "Skipped the primary data refresh for '$committedProject' because '$committedDataDirectory' does not exist yet. Run '$dataPackerExe' once by hand with no arguments, which packs every game; later session starts refresh it normally." }
-			})
+			$gameProjects = @($discoveredProjects | Where-Object { "Projects/$_/Platforms/VisualStudio2026/$_.vcxproj" -cin $committedProjectFiles })
 		}
 		if ($gameProjects.Count -ne 0) {
 			# A pack locked by a running game auto-cancels the export instead of prompting, which would hard-fail

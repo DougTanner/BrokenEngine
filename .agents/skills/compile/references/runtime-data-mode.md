@@ -97,11 +97,10 @@ start it runs the primary's DataPacker over the primary checkout's current
 asset inputs, which are not checked against HEAD, once per game project whose
 client `.vcxproj` is committed at the primary `HEAD`, into that game's primary
 `Output\Data`, and it skips the runs when the DataPacker prebuild was not
-stamped. It skips, with one warning, a game whose primary `Output\Data` does
-not exist yet, because that game's first export is a full Engine/Data
-re-export into an empty per-game DataPacker cache; the warning tells the user
-to run the primary DataPacker once by hand with no arguments, after which
-session starts refresh that game. It first waits up to its `-WaitSeconds`
+stamped. When a game's primary `Output\Data` is missing, DataPacker generates
+it automatically. That first export is a full Engine/Data re-export into an
+empty per-game DataPacker cache and can take hours while the bootstrap mutex
+is held, so peer session starts can time out. It first waits up to its `-WaitSeconds`
 budget for any process named after one of the games it refreshes (`<Name>*`)
 to exit, and skips the runs with a warning only if one is still alive when that
 budget expires. A peer session starting mid-session can therefore move primary
