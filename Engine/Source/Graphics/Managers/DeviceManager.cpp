@@ -268,11 +268,10 @@ DeviceManager::DeviceManager()
 		// submerged-vert sink).
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 8'192},
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 1'024},
-		// Only global Set 0 declares samplers: three per set * up to four framebuffers = 12, plus the ImGui backend's
-		// IMGUI_IMPL_VULKAN_MINIMUM_SAMPLER_POOL_SIZE (2) = 14; reserve 16.
+		// Only global Set 0 declares samplers: three per set * up to four framebuffers = 12; reserve 16.
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 16},
 		// Only global Set 0's bindless array is a sampled image: (texture chunks + kiLightingBlurSlots) per set * up to
-		// four framebuffers, plus the ImGui backend's IMGUI_IMPL_VULKAN_MINIMUM_SAMPLED_IMAGE_POOL_SIZE (8).
+		// four framebuffers; reserve 4 * 1,024.
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 4 * 1'024},
 		VkDescriptorPoolSize {.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 1'024},
 	};

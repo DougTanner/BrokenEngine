@@ -124,7 +124,7 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 		.Device = gpDeviceManager->mVkDevice,
 		.QueueFamily = static_cast<uint32_t>(gpInstanceManager->miGraphicsQueueFamilyIndex),
 		.Queue = gpDeviceManager->mGraphicsVkQueue,
-		.DescriptorPool = gpDeviceManager->mVkDescriptorPool,
+		.DescriptorPoolSize = IMGUI_IMPL_VULKAN_MINIMUM_SAMPLED_IMAGE_POOL_SIZE,
 		.MinImageCount = static_cast<uint32_t>(std::ssize(gpSwapchainManager->mFramebuffers)),
 		.ImageCount = static_cast<uint32_t>(std::ssize(gpSwapchainManager->mFramebuffers)),
 		.PipelineInfoMain

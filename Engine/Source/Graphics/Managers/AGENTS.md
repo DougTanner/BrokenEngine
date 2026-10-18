@@ -39,7 +39,7 @@ instance creation at the cost of validation layers.
 
 ### DeviceManager
 
-Logical device, queues, and GPU memory allocation. Creates the device enabling every core and Vulkan 1.2 feature `InstanceManager` validated. Initializes VMA and the single descriptor pool with both `FREE_DESCRIPTOR_SET_BIT` and `UPDATE_AFTER_BIND_BIT`. Graphics, presentation, and transfer queue handles are deduplicated. Queries `VK_KHR_maintenance9` for optional queue-family ownership transfer.
+Logical device, queues, and GPU memory allocation. Creates the device enabling every core and Vulkan 1.2 feature `InstanceManager` validated. Initializes VMA and the Global descriptor pool with both `FREE_DESCRIPTOR_SET_BIT` and `UPDATE_AFTER_BIND_BIT`. Graphics, presentation, and transfer queue handles are deduplicated. Queries `VK_KHR_maintenance9` for optional queue-family ownership transfer.
 
 Owns the one command pool and fence shared by every `OneShotCommandBuffer`. Because they are shared, two such lifetimes must never overlap; an in-use flag asserts on overlap rather than letting the two silently corrupt each other's recording.
 
@@ -165,4 +165,5 @@ Integrates Dear ImGui with a dedicated load-preserving overlay pass. It records 
 - Theme geometry resets to ImGui defaults before scaling so it can be reapplied safely. Font scale composes framebuffer and user scaling. UI dimensions use a 2160-pixel reference height through `UiScale()`, a repository-wide convention: every authored pixel constant in engine and game UI code is written for a 2160-high screen and multiplied by `UiScale()` at use, under authoring rules owned by the engine screens hub (`../../Ui/Screens/AGENTS.md`).
 - Opaque-region registration is rectangular, so rounded opaque windows must remain visually compatible with rectangular scene occlusion.
 - The Win32 backend publishes physical cursor state during frame preparation. Synthetic agent mouse position is reissued afterward so it wins last-writer ordering. Physical-input suppression parks the cursor unless an agent pin owns it and always clears backend gamepad navigation state.
+- The Vulkan backend owns a dedicated descriptor pool whose lifetime follows ImGuiManager, releasing all UI descriptors on each recreation.
 - One default font, loaded from a pack chunk at boot.
