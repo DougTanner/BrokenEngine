@@ -1,9 +1,9 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-12T22:42:29.897Z","dependsOn":["Documents/Plans/ChangeWorkflow/ProvisionAzureServerVm.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-12T22:42:29.897Z","dependsOn":["Documents/Plans/ChangeWorkflow/CreateAzureServerVm.md"]} -->
 # Connect the client to the hosted server from the Remote Server button
 
 ## Context
 
-This is the third of four Plans that put the dedicated server on the internet. `Documents/Plans/ChangeWorkflow/ProvisionAzureServerVm.md` (the prerequisite) provisioned an Azure VM with a Standard static public IP and wrote that address into `## Server address` below. `Documents/Plans/ChangeWorkflow/DeployAndRunHostedServer.md` follows. It deploys the server and proves this Plan's connection end to end.
+This is the fourth of five Plans that put the dedicated server on the internet. `Documents/Plans/ChangeWorkflow/CreateAzureServerVm.md` (the prerequisite) provisioned an Azure VM with a Standard static public IP and wrote that address into `## Server address` below. `Documents/Plans/ChangeWorkflow/DeployAndRunHostedServer.md` follows. It deploys the server and proves this Plan's connection end to end.
 
 Today the client cannot reach a server outside its LAN. Main Menu's Remote
 Server entry is always drawn disabled, with the comment "displayed disabled
@@ -25,7 +25,7 @@ For a dotted IPv4 literal, ENet's resolver needs no name lookup. When `gethostby
 
 ## Server address
 
-`kRemoteServerAddress` is the IPv4 literal on the line below. `ProvisionAzureServerVm.md` writes it in its final step, and this Plan becomes claimable only after that Plan lands. If the line still reads `none`, stop BLOCKED. Once this Plan lands, the C++ constant is the address's single source of truth.
+`kRemoteServerAddress` is the IPv4 literal on the line below. `CreateAzureServerVm.md` writes it, and this Plan becomes claimable only after that Plan lands. If the line still reads `none`, stop BLOCKED. Once this Plan lands, the C++ constant is the address's single source of truth.
 
 Recorded address: none
 
@@ -74,7 +74,7 @@ Risk tier: Tier 2. This is client-only menu behavior through the engine-owned st
 - With `/agent-harness`, a Debug client and a local Debug server run on the main menu:
   - `describe_ui` lists `REMOTE SERVER` as an enabled item while no client exists.
   - The Local Server entry still connects to the local server as before.
-  - After returning to the main menu, clicking `REMOTE SERVER` disables the entry while the attempt runs. The VM is only provisioned at this point, deallocated with no server deployed (`DeployAndRunHostedServer.md` deploys it), so nothing answers the address, and the attempt ends in the `Connection failed` modal.
+  - After returning to the main menu, clicking `REMOTE SERVER` disables the entry while the attempt runs. The VM is only provisioned at this point, with no server deployed (running or deallocated by its daily schedule) (`DeployAndRunHostedServer.md` deploys it), so nothing answers the address, and the attempt ends in the `Connection failed` modal.
 
 ## Coordination
 

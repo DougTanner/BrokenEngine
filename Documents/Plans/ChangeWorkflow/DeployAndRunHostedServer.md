@@ -3,13 +3,15 @@
 
 ## Context
 
-This is the last of four Plans that put the dedicated server on the internet. When this Plan is claimed, the earlier three have landed:
+This is the last of five Plans that put the dedicated server on the internet. When this Plan is claimed, the earlier four have landed:
 
 - `Documents/Plans/Engine/HardenServerForUnattendedHosting.md` made the server save its world on `WM_ENDSESSION` and fail fast on a game-port bind failure.
-- `Documents/Plans/ChangeWorkflow/ProvisionAzureServerVm.md` created the `/deploy-server` skill, its `New-ServerVm.ps1`, and the deallocated VM `brokenengine-server` in `brokenengine-server-rg`. The VM has NSG rules for UDP 27015 (any source) and TCP 3389 and 22 (the user's IP only). `references/azure-facts.md` holds the prices and billing facts.
+- `Documents/Plans/ChangeWorkflow/ProvisionAzureServerVm.md` created the `/deploy-server` skill and its provisioning template under `assets/`; `Documents/Plans/ChangeWorkflow/CreateAzureServerVm.md` used them to create the VM `brokenengine-server` in `brokenengine-server-rg` (running or deallocated by its daily schedule). The VM has NSG rules for UDP 27015 (any source) and TCP 3389 and 22 (the user's IP only). `references/azure-facts.md` holds the prices and billing facts.
 - `Documents/Plans/Engine/ConnectClientToHostedServer.md` made Main Menu's Remote Server button connect to the VM's static IP (`kRemoteServerAddress`, `Projects/BrokenEngineSandbox/Source/Game.cpp`).
 
 This Plan adds the scripts that configure the VM, copy the server to it, start and stop it, and prove the whole path end to end.
+
+Requirement (user, 2026-10-18): this Plan's scripts keep their generic parts in the `/deploy-server` skill and their project-specific parts under the project folder (`Projects/<Name>/DeployServer/`).
 
 User decisions (this session, binding):
 
@@ -43,7 +45,7 @@ What Microsoft documents:
 No Microsoft primary source states that deallocation or auto-shutdown delivers `WM_ENDSESSION` to the interactive session, or within what time. `WM_ENDSESSION` itself allows termination as soon as the handler returns (https://learn.microsoft.com/en-us/windows/win32/shutdown/wm-endsession). This Plan therefore does not rely on the guest shutdown for a scripted stop:
 
 - Scripted stop: `Stop-ServerVm.ps1` first sends the agent `quit` command over loopback on the VM. It waits for the server process to exit, which happens after its post-loop final autosave (`Main.cpp:522-524`, routed through `FinalAutosave()` by the hardening Plan). Only then does it deallocate.
-- Nightly auto-shutdown: no script runs. The server's `WM_ENDSESSION` handler saves if Windows delivers that message. Otherwise the loss is bounded by the hourly periodic autosave (`kAutosaveInterval`, `Engine/Source/File/ServerSaveLoad.h:20`). The acceptance below observes which case happens once, and records it.
+- Nightly 23:00 US Eastern scheduled deallocate (the `/deploy-server` schedule workflow): no script runs. The server's `WM_ENDSESSION` handler saves if Windows delivers that message. Otherwise the loss is bounded by the hourly periodic autosave (`kAutosaveInterval`, `Engine/Source/File/ServerSaveLoad.h:20`). The acceptance below observes which case happens once, and records it.
 
 Agent wire format, from `Engine/Source/Agent/AgentCommandServer.cpp`:
 
@@ -79,7 +81,7 @@ The deploy set is the exe plus `Data\Islands.manifest` and `Data\Islands.pack`, 
 
 ### Accounts, auto-logon, and the scheduled task
 
-- `beadmin` is the administrator from `ProvisionAzureServerVm.md`, used by SSH and the user's RDP.
+- `beadmin` is the administrator from `CreateAzureServerVm.md`, used by SSH and the user's RDP.
 - `beserver` is a dedicated local non-administrator account, a member of `Users`. `Initialize-ServerHost.ps1` creates it with a random 32-character password from `System.Security.Cryptography.RandomNumberGenerator` that meets Windows complexity rules. The password never leaves the VM and is never printed.
 - Auto-logon: set `AutoAdminLogon` `1`, `DefaultUserName` `beserver`, and
   `DefaultPassword` under
@@ -140,10 +142,10 @@ The deploy set is the exe plus `Data\Islands.manifest` and `Data\Islands.pack`, 
 
 ### Script set
 
-Local scripts run on the user's PC in PowerShell 7 with `pwsh -NoProfile -File .agents/skills/deploy-server/scripts/<name>.ps1`. Each prints one JSON result object in `/external-skill-creator`'s form, and each first requires `az account show` to succeed, otherwise its message tells the user to run `! az login`.
+Local scripts run on the user's PC in PowerShell 7 with `pwsh -NoProfile -File .agents/skills/deploy-server/scripts/<name>.ps1`. Each prints one JSON result object in the repository's script result envelope (`schemaVersion`, `status`, `code`, `message`), and each first requires `az account show` to succeed, otherwise its message tells the user to run `! az login`.
 
 - `Initialize-ServerVm.ps1`, one-time and safe to rerun:
-  1. Start the VM if it is deallocated.
+  1. If the VM is deallocated, run the `/deploy-server` `SKILL.md` turn-back-on `az rest` call that enables the schedule workflow, then `az vm start`.
   2. Create the SSH key.
   3. Run `scripts/vm/Initialize-ServerHost.ps1` through run-command, with the public key as a parameter.
   4. `az vm restart`, so auto-logon takes effect.
@@ -162,7 +164,7 @@ Local scripts run on the user's PC in PowerShell 7 with `pwsh -NoProfile -File .
   4. `scp` the VM-side scripts to `C:\BrokenEngine\Scripts\`, the exe to `C:\BrokenEngine\Server\`, and the two Islands files to `C:\BrokenEngine\Server\Data\`.
   5. Run `schtasks /Run /TN BrokenEngineServer` over SSH.
   6. Poll for up to 5 minutes until `Get-NetUDPEndpoint -LocalPort 27015` is owned by the server process.
-- `Start-ServerVm.ps1`: `az vm start`, then poll over SSH for up to 10 minutes, retrying while `sshd` comes up, until the server process owns UDP 27015. It reports the newest log file name.
+- `Start-ServerVm.ps1`: the `/deploy-server` `SKILL.md` turn-back-on `az rest` call that enables the schedule workflow, then `az vm start`, then poll over SSH for up to 10 minutes, retrying while `sshd` comes up, until the server process owns UDP 27015. It reports the newest log file name.
 - `Stop-ServerVm.ps1`:
   1. If the VM is already deallocated, report that and exit successfully.
   2. Otherwise run `Stop-Server.ps1` over SSH, then `az vm deallocate`.
@@ -195,9 +197,9 @@ The logon task is the one exception, explained above.
   3. `Wait-Process` for up to 120 s. Exit `0` when the process has exited, otherwise `1`.
   4. Print `ServerAutosave.save`'s `LastWriteTimeUtc`.
 
-`SKILL.md` gains these operations, the explicit user confirmation before any step that starts the VM (it bills $0.193/hour while running, `references/azure-facts.md`), the RDP note, and the agent port. `references/azure-facts.md` gains a `## Nightly auto-shutdown` section with the observation below.
+`SKILL.md` gains these operations, the explicit user confirmation before any step that starts the VM (it bills $0.193/hour while running, `references/azure-facts.md`), the RDP note, and the agent port. `references/azure-facts.md` gains a `## Nightly scheduled deallocate` section with the observation below.
 
-Risk tier: Tier 2. This is tool behavior inside one skill. No repository runtime surface changes: no C++, wire, save, determinism, or threading change, and the server's trust rules are untouched. The external exposure (UDP 27015 public) was fixed by `ProvisionAzureServerVm.md`. This Plan adds only the VM-side firewall rule that matches it.
+Risk tier: Tier 2. This is tool behavior inside one skill. No repository runtime surface changes: no C++, wire, save, determinism, or threading change, and the server's trust rules are untouched. The external exposure (UDP 27015 public) was fixed by `CreateAzureServerVm.md`. This Plan adds only the VM-side firewall rule that matches it.
 
 ## Critical files
 
@@ -208,11 +210,11 @@ Risk tier: Tier 2. This is tool behavior inside one skill. No repository runtime
 ## In scope
 
 - The seven new scripts above, and the `SKILL.md` and `references/azure-facts.md` additions named in the Design.
-- Configuring the existing VM, deploying to it, starting it, stopping it, and changing then restoring its auto-shutdown time for the acceptance observation, all after the user's explicit confirmation.
+- Configuring the existing VM, deploying to it, starting it, and stopping it, all after the user's explicit confirmation.
 
 ## Out of scope
 
-- Any C++ change, any change to `New-ServerVm.ps1` or the Azure resources it created (other than the temporary auto-shutdown time), and any other Plan.
+- Any C++ change, any change to the `/deploy-server` provisioning template under `assets/` or the Azure resources it created, and any other Plan.
 - A Debug or Profile server deployment, PDB deployment, and Visual Studio remote debugging.
 - Running the server as a Windows service. A non-interactive "run whether user is logged on or not" task. Re-asserting `DefaultUserName` after a console logon.
 - Minidumps (gap G10), pruning autosave backups (gap G6) or logs, and copying autosaves off the VM.
@@ -234,11 +236,8 @@ Risk tier: Tier 2. This is tool behavior inside one skill. No repository runtime
 6. The executor gives the user the exact command to start the Release client: the session worktree's `Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output\BrokenEngineSandbox.exe` with `--data-directory` set to the primary checkout's `...\Output\Data`. The user starts it on their PC, clicks `REMOTE SERVER`, connects, plays for at least a few minutes (spawn, move a fleet), and confirms in their own message.
 7. `Stop-ServerVm.ps1` succeeds. It reports the server process exited after `quit`, a `ServerAutosave.save` `LastWriteTimeUtc` later than the moment it sent `quit`, and `PowerState/deallocated`.
 8. `Start-ServerVm.ps1` succeeds with no RDP session and no manual step on the VM. It reports a new log file while the previous one still exists. The user reconnects through `REMOTE SERVER` and confirms the world resumed where they left it (their units where they were).
-9. Auto-shutdown observation:
-   1. Read the current schedule time.
-   2. Set `az vm auto-shutdown --time` to about 10 minutes ahead in UTC, with the server running.
-   3. Poll `az vm get-instance-view` until the VM leaves `PowerState/running`, and record the final power state.
-   4. Start the VM with `Start-ServerVm.ps1`. Record whether `ServerAutosave.save`'s `LastWriteTimeUtc` falls within the shutdown window, and whether the previous log contains `WM_ENDSESSION: final autosave`.
-   5. Write both findings in `references/azure-facts.md` `## Nightly auto-shutdown`. Either outcome is acceptable. The section states the resulting loss bound: none, or up to one `kAutosaveInterval`.
-   6. Restore the schedule time read in step 1.
+9. Scheduled deallocate observation (the 23:00 US Eastern schedule calls the same Deallocate operation as `az vm deallocate`):
+   1. With the server running, run the raw `az vm deallocate` command from `SKILL.md` without `Stop-Server.ps1`, and record the final power state from `az vm get-instance-view`.
+   2. Start the VM with `Start-ServerVm.ps1`. Record whether `ServerAutosave.save`'s `LastWriteTimeUtc` falls within the deallocate window, and whether the previous log contains `WM_ENDSESSION: final autosave`.
+   3. Write both findings in `references/azure-facts.md` `## Nightly scheduled deallocate`. Either outcome is acceptable. The section states the resulting loss bound: none, or up to one `kAutosaveInterval`.
 10. The VM ends deallocated, by `Stop-ServerVm.ps1`.
