@@ -1,13 +1,13 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-17T15:06:15.647Z","dependsOn":["Documents/Plans/Game/FrameEditRows.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-17T15:06:15.647Z","dependsOn":[]} -->
 # Bound `inject_payload` so agent-queued status changes cannot exceed the per-cell cap
 
-Line numbers cite baseline `d8ce779b3b4fb984b572522896b6382d8dd19d19` plus the shape `Documents/Plans/Game/FrameEditRows.md` (the unified spawn system, this Plan's `dependsOn`) gives the harness and the engine `ServerSpawnQueue`. Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other.
+Line numbers cite baseline `d8ce779b3b4fb984b572522896b6382d8dd19d19` plus the shape `Documents/Plans/Game/FrameEditRows.md` (the unified spawn system, this Plan's `dependsOn`) gives the harness and the engine `ServerTransferManager` spawn queue. Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other.
 
 ## Context
 
 A cell's published batch for one tick is that tick's `FrameInput::statusChanges`
-snapshot plus the arrivals applied to it after the tick
-(`Engine/Source/Network/Server/ServerBroadcaster.cpp:36-54` snapshot, `:142-167`
+snapshot plus the post-tick batch (arrivals and out-of-tick spawns) applied to
+it after the tick (`Engine/Source/Network/Server/ServerBroadcaster.cpp:36-54` snapshot, `:142-167`
 concatenation per coordinate). The protocol caps that batch at
 `engine::kiMaximumStatusChangesPerCell` 1,024
 (`Engine/Source/Network/NetworkProtocol.h:94`), which is also the client decode
@@ -24,9 +24,13 @@ array and validates each entry
 and every queued entry whose tick has come and whose coordinate is active drains
 into the same tick's input. One batch of more than 1,024 entries at one
 coordinate, or several smaller batches for the same tick, reaches the debug
-break. After `FrameEditRows.md` lands, every `inject_payload` entry queues
-through `engine::ServerSpawnQueue` and `ServerSpawnQueue::Drain` appends all due
-entries of a coordinate at once, so the hazard is unchanged. Recorded as
+break. After `FrameEditRows.md` lands, an `inject_payload` spawn entry queues
+through `ServerTransferManager::QueueSpawn` and joins its target tick's
+post-tick batch through `DrainPendingSpawns`, while a `DestroyOmni`,
+`UpdateOmni`, or `UpdateFleet` entry stays in the harness tick-input queue that
+`DrainPendingAgentStatusChanges` empties into its tick's input; each drain
+appends all due entries of a coordinate at once into the one published batch,
+so the hazard is unchanged. Recorded as
 pre-existing by `FrameEditRows.md` (`## Out of scope`, the per-cell cap bullet),
 which documents the hazard in the `inject_payload` entry and leaves the fix
 here.
@@ -35,7 +39,7 @@ Unmet condition: an agent command must not be able to drive the server into its 
 
 ## Design
 
-Author's recommendation, with rationale: refuse the batch at `inject_payload` validation, before anything is queued, when it would leave more than `kiMaximumPendingAgentStatusChanges` entries pending in the server's `ServerSpawnQueue`:
+Author's recommendation, with rationale: refuse the batch at `inject_payload` validation, before anything is queued, when it would leave more than `kiMaximumPendingAgentStatusChanges` entries pending in the server's two agent queues (the harness tick-input queue and the `ServerTransferManager` spawn queue):
 
 ```cpp
 // ServerSimulationHarnessRigs.cpp, file scope. Half the per-cell cap: every pending entry may drain into one tick of
@@ -45,7 +49,8 @@ constexpr int64_t kiMaximumPendingAgentStatusChanges = engine::kiMaximumStatusCh
 
 In `inject_payload`, after the whole batch has been built and validated and
 before the commit loop that mints global ids and queues: if
-`std::ssize(built) + gpServerSession->mpSpawnQueue->PendingCount()` exceeds
+`std::ssize(built) + CountPendingAgentStatusChanges(*gpServerSession) + gpServerSession->mpTransferManager->PendingSpawnCount()`
+exceeds
 `kiMaximumPendingAgentStatusChanges`, throw `std::runtime_error` with a message
 naming the limit and the current pending count
 (`inject_payload would leave {} status changes pending; the limit is {}`), so
@@ -54,10 +59,10 @@ unchanged.
 
 Why this shape:
 
-- It bounds the only unbounded producer. The other tick-input writers are natural and per-update (the fleet omni spawns, `ProcessUpdateOwnedEntityRequests`, `FleetNavigationController`), and they stay under the existing contract that the simulation never exceeds the cap.
-- Counting all pending entries rather than per coordinate and per tick is conservative and needs only the existing `PendingCount()`: entries queued for different ticks or coordinates count against one limit, and 512 entries is far above any scenario in `Projects/BrokenEngineSandbox/Documents/AgentHarness/`.
+- It bounds the only unbounded producer. The other producers are natural and per-update (the fleet omni spawns, `ProcessUpdateOwnedEntityRequests`, `FleetNavigationController`), and they stay under the existing contract that the simulation never exceeds the cap.
+- Counting all pending entries rather than per coordinate and per tick is conservative and needs only the two existing counts `status.pendingAgentStatusChangeCount` sums: entries queued for different ticks or coordinates count against one limit, and 512 entries is far above any scenario in `Projects/BrokenEngineSandbox/Documents/AgentHarness/`.
 - It changes no tick input, ordering, wire byte, replay record, or save content: a batch is either queued whole as today or refused whole.
-- Not chosen: spreading over-budget entries across later ticks inside `ServerSpawnQueue::Drain`. That would change which tick a spawn enters, a determinism-visible change to server tick input, and would break the `inject_payload` contract that pause, inject, unpause applies every entry in the first unpaused tick.
+- Not chosen: spreading over-budget entries across later ticks inside `DrainPendingSpawns` or `DrainPendingAgentStatusChanges`. That would change which tick's batch or input an entry joins, a determinism-visible change, and would break the `inject_payload` contract that pause, inject, unpause applies every entry with the first unpaused tick.
 
 Documentation: the `inject_payload` entry of `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md` replaces the per-cell cap hazard note `FrameEditRows.md` added with the limit: a batch that would leave more than 512 status changes pending is refused whole; split larger scenes across ticks with `tick` and unpaused steps.
 
@@ -73,7 +78,7 @@ Documentation: the `inject_payload` entry of `Projects/BrokenEngineSandbox/Docum
 
 ## Out of scope
 
-- `ServerSpawnQueue` (no per-coordinate count, no deferral, no assert), `ServerBroadcaster`, `ServerTransferManager`, `ServerBufferedFrames.cpp` and its debug break, `kiMaximumStatusChangesPerCell`, the batch codec, and the client decode path.
+- `ServerTransferManager` and its spawn queue and the harness tick-input queue (`QueueAgentStatusChange`, `DrainPendingAgentStatusChanges`) (no per-coordinate count, no deferral, no assert), `ServerBroadcaster`, `ServerBufferedFrames.cpp` and its debug break, `kiMaximumStatusChangesPerCell`, the batch codec, and the client decode path.
 - Natural producers and natural arrival counts; the fleet spawn path.
 - Replay, save, and wire formats; `kiProtocolVersion`, `FrameInput::kiVersion`, `Frame::kiVersion`.
 - `edit_frame`, `status` fields, and every other harness command.

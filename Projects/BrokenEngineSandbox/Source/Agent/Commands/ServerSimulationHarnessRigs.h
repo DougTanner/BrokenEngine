@@ -5,7 +5,6 @@
 namespace engine
 {
 
-class ServerTransferManager;
 struct GridCoord;
 
 } // namespace engine
@@ -26,13 +25,9 @@ struct ReplayTransferCaptureCounts
 
 bool ExecuteServerSimulationHarnessRigCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult);
 void QueueAgentStatusChange(const ServerSession& rSession, engine::GridCoord coordinate, int64_t iTick, const StatusChange& rChange);
-bool QueueReplayTransferHarnessRig(const ServerSession& rSession, engine::GridCoord destination, int64_t iTick, StatusChange transfer);
 void DrainPendingAgentStatusChanges(const ServerSession& rSession);
-void DrainReplayTransferHarnessRigs(const ServerSession& rSession, engine::ServerTransferManager& rTransferManager);
 void ResetPendingAgentStatusChanges(const ServerSession& rSession);
-void ResetReplayTransferHarnessRigs(const ServerSession& rSession);
 int64_t CountPendingAgentStatusChanges(const ServerSession& rSession);
-int64_t CountReplayTransferHarnessRigs(const ServerSession& rSession);
 void DetachServerSimulationHarnessRigs(const ServerSession& rSession);
 void CountCapturedReplayTransfers(std::span<const StatusChange> transfers, ReplayTransferCaptureCounts& rCounts);
 

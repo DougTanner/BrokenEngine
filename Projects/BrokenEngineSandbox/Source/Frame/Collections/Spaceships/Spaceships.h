@@ -3,6 +3,7 @@
 #include "Frame/Collections/Pushers/Pushers.h"
 #include "Frame/Collections/Collection.h"
 #include "Frame/Alignments.h"
+#include "Frame/FrameRegistry.h"
 #include "Frame/GridCoord.h"
 #if defined(BT_CLIENT)
 #include "Frame/Collections/WindTrails/WindTrails.h"
@@ -189,6 +190,12 @@ public:
 		std::chrono::duration<float> nextBlasterSpawnTime = std::chrono::duration<float>::zero();
 		std::chrono::duration<float> arrivalGracePeriod = std::chrono::duration<float>::zero();
 		float fDeltaRotation = 0.0f;
+
+		// Status-change payload members.
+		static constexpr auto Fields()
+		{
+			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, fHealth), FRAME_COLUMN(SpawnInfo, nextBlasterSpawnTime), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, fDeltaRotation)> {};
+		}
 	};
 
 	static bool Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo);

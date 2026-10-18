@@ -31,22 +31,23 @@ game state around the deterministic Frame tick.
 - The engine owns the active set, which keeps every coordinate holding at least one Omni because the Omni rows form the ownership layer. Retention after the departing-Frame handoff, and generation activation, belong to the [File Replay contract](../../../../../Engine/Source/File/AGENTS.md#replay-streams).
 - Normal update prepares tick inputs; replay uses coordinates with live readers and consumes its recorded `FrameInput` order exactly, without sorting it again.
 - A replay transfer recorded in the post-dispatch channel at event tick `E` is applied and published after dispatch at `E`; the newly activated destination first dispatches at `E + 1`.
-- A spawned omni row is born owned by the requesting client's GUID carried in the spawn status change the advancing update builds; the tick's owned-entity rebuild registers it and reports it `Spawned`, and no pairing pass runs. That GUID is the persistent ownership key.
+- A spawned omni row is born owned by the requesting client's GUID carried in the spawn the advancing update queues; its first tick's owned-entity rebuild registers it and reports it `Spawned`, and no pairing pass runs. That GUID is the persistent ownership key.
 - Fleet navigation defers flagship updates through `StatusChange`s. Within
   `ServerSession::BuildAdvancingFrameInputs`, which the engine
   `ServerBroadcaster::BuildFrameInputs` calls after its frame-input reset,
   queued owned-entity updates, fleet timers and pending flagship updates, and
   waiting-client spawn construction run once per update and only
   on advancing updates, staying deferred through paused and other zero-tick
-  updates. The agent status-change drain and the broadcast snapshot run in every
-  normal-play tick's `PrepareTick`, after those once-per-update natural changes,
-  so spawn construction precedes the drain.
-- Agent-injected `StatusChange`s remain queued until the first normal tick at or after the entry's target tick whose coordinate is active and has a committed current Frame; consumed changes then follow the engine-owned status-change ordering.
+  updates. Waiting-client spawns queue on the engine transfer manager for the
+  update's first tick, whose harvest drains them into its post-tick batch. The
+  agent status-change drain and the broadcast snapshot run in every normal-play
+  tick's `PrepareTick`, after those once-per-update natural changes.
+- Agent-injected `StatusChange`s remain queued until the first normal tick at or after the entry's target tick whose coordinate is active and has a committed current Frame: a destroy or update entry then enters that tick's input at `PrepareTick`, and a spawn entry joins that tick's post-tick batch at its harvest. Consumed changes then follow the engine-owned status-change ordering.
 - Transfer validation, deterministic ordering, destination materialization and
   CRC recompute, and publication assembly are engine-owned
   ([engine Server contract](../../../../../Engine/Source/Network/Server/AGENTS.md#transfers-and-publication)).
   The game half is the transfer payloads, waiting-client spawn coordination,
-  and fleet notification; replay-transfer and injected-status harness rig state
+  and fleet notification; injected-status harness rig state
   follows the [game Agent contract](../../Agent/AGENTS.md#contracts).
 
 ## Trust and Lifecycle Boundaries
@@ -59,8 +60,8 @@ game state around the deterministic Frame tick.
   `OnResetForLoad`. That function clears pending flagship updates before any
   fleet `OnResetForLoad`, then clears client and request transient state after
   restored fleet state is read; the engine then resets its two managers, which
-  clears their game Agent harness rig queues through the existing game functions
-  they call, so no second clear belongs here. Do not erase restored fleet RNG or
+  clear their own queues (engine Server contract), so no second clear belongs
+  here. Do not erase restored fleet RNG or
   the navigation updates fleet `OnResetForLoad` queues.
 
 ## See Also

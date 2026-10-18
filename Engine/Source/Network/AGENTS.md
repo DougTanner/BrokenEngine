@@ -9,8 +9,8 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
 - Load generation identifies the server's current debugging-load world across connection bootstrap and load-scoped subscription traffic. Both receivers compare it with their own before applying the slot epoch or mutating transport/game state; a mismatch logs a Network warning and returns. Epoch stays the reuse counter within one load generation. Wire and reset behavior: [Network architecture](../../../Documents/Architecture/Network.md#debug-load-generation).
 - Engine packet types remain below `kGamePacketStart`; game packets are forwarded opaquely.
 - Every incompatible wire change increments `engine::kiProtocolVersion`: a game
-  `StatusChange` or `TransferData` layout change is bumped by its game codec
-  owner; an engine packet layout change or an added engine packet type is bumped
+  `StatusChange` payload (any `StatusChangeData` arm's `Fields()`) layout change is bumped by its
+  game codec owner; an engine packet layout change or an added engine packet type is bumped
   here, because inserting a type before `kGamePacketStart` shifts every game
   packet identifier. Engine Network owns the shared version and the Hello
   rejection gate the handshake applies (`Server/AGENTS.md`). `Frame::kiVersion`
@@ -86,7 +86,9 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
   envelope, the per-item size bound, and the LZ4 framing. Game Network owns the
   status-change type set and each type's payload read/write
   (`game::WriteStatusChangePayload`/`game::ReadStatusChangePayload`), which the
-  codec calls directly per item.
+  codec calls directly per item. Those payload functions are table-driven: they
+  call the engine field codec `StatusChangeFields.h`, which Engine Network owns,
+  over each payload's `Fields()` list.
   Batches emit non-empty type groups in ascending `StatusChangeType` order,
   preserving input order within each type; published server tick inputs use that
   sequence because clients apply the wire order, so changing it can alter

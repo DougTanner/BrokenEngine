@@ -4,7 +4,6 @@
 
 #include "Save/GameSaveLoad.h"
 
-#include "Agent/Commands/ServerSimulationHarnessRigs.h"
 #include "Network/Server/ServerSession.h"
 #include "Game.h"
 
@@ -30,11 +29,6 @@ bool ReadReplayMetadata(const engine::FileFlags_t& rFlags, const std::filesystem
 void AdoptReplayMetadata(const ReplayStagedMeta&& rStagedMetadata)
 {
 	game::gpGame->RestoreReplayMetadata(rStagedMetadata.metadata);
-}
-
-void OnReplayStreamsInvalidated()
-{
-	ResetReplayTransferHarnessRigs(*game::gpServerSession);
 }
 
 void OnStateReplaced()

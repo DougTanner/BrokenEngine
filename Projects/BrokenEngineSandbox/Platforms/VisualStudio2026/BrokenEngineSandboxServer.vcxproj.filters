@@ -195,9 +195,6 @@
     <ClInclude Include="..\..\Source\Version.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\SpawnTransfer.h">
-      <Filter>Game</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Source\Network\StatusChangeCodec.h">
       <Filter>Game\Network</Filter>
     </ClInclude>
@@ -250,6 +247,9 @@
       <Filter>Engine\Network</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSimulation.h">
+      <Filter>Engine\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\StatusChangeFields.h">
       <Filter>Engine\Network</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Network\Server\Server.h">
@@ -638,9 +638,6 @@
     <ClCompile Include="..\..\Source\Game.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\SpawnTransfer.cpp">
-      <Filter>Game</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Source\Network\StatusChangeCodec.cpp">
       <Filter>Game\Network</Filter>
     </ClCompile>
@@ -747,6 +744,9 @@
       <Filter>Game\Frame</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\FrameInput.cpp">
+      <Filter>Game\Frame</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\StatusChange.cpp">
       <Filter>Game\Frame</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\TerrainUtils.cpp">

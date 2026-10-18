@@ -29,7 +29,7 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 				const Frame& rFrame = *rScratch.replayStack.at(static_cast<size_t>(i));
 				for (const TransferRequest& rRequest : rFrame.postRender.transferRequests)
 				{
-					if (rRequest.eType != StatusChangeType::kTransferOmni)
+					if (rRequest.change.eType != StatusChangeType::kTransferOmni)
 					{
 						continue;
 					}
@@ -37,7 +37,7 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 					{
 						continue;
 					}
-					if (rRequest.data.globalId != clientState.clientGlobalIdentifier)
+					if (OwnedSpawnGlobalId(rRequest.change) != clientState.clientGlobalIdentifier)
 					{
 						continue;
 					}
@@ -55,7 +55,7 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 						continue;
 					}
 					LOG(kNetwork, kVerbose, "ReconcileUpdateClientState TransferOmni GlobalId: {} Source: ({},{}) Dest: ({},{})", clientState.clientGlobalIdentifier, rWork.coord.iX, rWork.coord.iY, destination.iX, destination.iY);
-					clientState.fPreviousClientArmor = rRequest.data.fHealth;
+					clientState.fPreviousClientArmor = std::get<OmnisPostRender::SpawnInfo>(rRequest.change.data).fArmor;
 				}
 			}
 		}

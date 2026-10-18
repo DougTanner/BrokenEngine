@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Frame/Collections/Collection.h"
+#include "Frame/FrameUtils.h"
 #include "Frame/GridCoord.h"
 
 namespace game
@@ -286,6 +287,12 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 		float fSizePercent = 1.0f;
 		float fSmokePercent = 1.0f;
 		float fTimePercent = 1.0f;
+
+		// Status-change payload members. The coordinate and start time come from the cell the spawn is applied to.
+		static constexpr auto Fields()
+		{
+			return FrameColumnList<FRAME_COLUMN(SpawnInfo, iTypeIndex), FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, iTrailCount), FRAME_COLUMN(SpawnInfo, fTrailAngle), FRAME_COLUMN(SpawnInfo, iParticleCount), FRAME_COLUMN(SpawnInfo, fParticleAngle), FRAME_COLUMN(SpawnInfo, fSizePercent), FRAME_COLUMN(SpawnInfo, fSmokePercent), FRAME_COLUMN(SpawnInfo, fTimePercent)> {};
+		}
 	};
 
 	// coordinate is the cell rSpawnInformation.vecPosition is local to.

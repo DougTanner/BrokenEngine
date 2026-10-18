@@ -22,8 +22,6 @@ struct MissilesPostRender;
 struct SpaceshipsInterpolate;
 struct SpaceshipsPostRender;
 
-using omni_t = engine::Id<OmnisInterpolate>;
-
 struct FrameInterpolate : public engine::FrameInterpolateBase
 {
 #if defined(BT_CLIENT)
@@ -77,8 +75,7 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 
 struct TransferRequest
 {
-	StatusChangeType eType {};
-	TransferData data {};
+	StatusChange change {};
 	int8_t iDeltaX = 0;
 	int8_t iDeltaY = 0;
 };

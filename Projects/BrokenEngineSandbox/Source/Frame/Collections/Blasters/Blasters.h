@@ -108,6 +108,12 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 		float fWindTrailIntensity = 0.0f;
 		float fWindTrailWidth = 0.0f;
 		float fWindTrailLengthMultiplier = 1.0f;
+
+		// Status-change payload members.
+		static constexpr auto Fields()
+		{
+			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, iTypeIndex), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, fWindTrailIntensity), FRAME_COLUMN(SpawnInfo, fWindTrailWidth), FRAME_COLUMN(SpawnInfo, fWindTrailLengthMultiplier)> {};
+		}
 	};
 
 	static bool Spawn(Frame& __restrict rFrame, const SpawnInfo& rSpawnInformation);

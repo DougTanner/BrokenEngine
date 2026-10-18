@@ -6,18 +6,11 @@
 
 #include "File/Replay.h"
 
-#include "Agent/Commands/ServerSimulationHarnessRigs.h"
 #include "Network/Server/ServerSession.h"
 #include "Game.h"
-#include "SpawnTransfer.h"
 
 namespace engine
 {
-
-static engine::ClientGuid TransferDataClientGuid(const game::TransferData& rData)
-{
-	return {.uiHigh = rData.uiClientGuidHigh, .uiLow = rData.uiClientGuidLow};
-}
 
 // A destination is "live" if it has a committed owned entity or any client actively subscribes to it.
 // Deliberately does not consult mActiveCoordinates: ComputeActiveSet force-adds kOriginCoordinate (0,0)
@@ -60,7 +53,7 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 			// Transfers must stay within one cell in each axis; larger deltas teleport entities.
 			if (std::abs(rRequest.iDeltaX) > 1 || std::abs(rRequest.iDeltaY) > 1) [[unlikely]]
 			{
-				LOG(kDefault, kError, "Transfer delta spans more than one grid cell Tick: {} Source: ({},{}) Delta: ({},{}) Dest: ({},{}) Type: {} Position: {} Velocity: {}", rNextFrame.interpolate.iTick, rCoord.iX, rCoord.iY, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), rCoord.iX + rRequest.iDeltaX, rCoord.iY + rRequest.iDeltaY, game::StatusChangeTypeName(rRequest.eType), common::WbV2(rRequest.data.vecPosition, 1), common::WbV2(rRequest.data.vecVelocity, 1));
+				LOG(kDefault, kError, "Transfer delta spans more than one grid cell Tick: {} Source: ({},{}) Delta: ({},{}) Dest: ({},{}) Type: {} Position: {}", rNextFrame.interpolate.iTick, rCoord.iX, rCoord.iY, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), rCoord.iX + rRequest.iDeltaX, rCoord.iY + rRequest.iDeltaY, game::StatusChangeTypeName(rRequest.change.eType), common::WbV2(game::SpawnPosition(rRequest.change), 1));
 				DEBUG_BREAK();
 			}
 
@@ -69,15 +62,15 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 			engine::GridCoord destination {};
 			if (!engine::TryAddGridCoordinate(rCoord, rRequest.iDeltaX, rRequest.iDeltaY, destination)) [[unlikely]]
 			{
-				LOG(kDefault, kError, "Transfer destination leaves the coordinate range Tick: {} Source: ({},{}) Delta: ({},{}) Type: {} Position: {}", rNextFrame.interpolate.iTick, rCoord.iX, rCoord.iY, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), game::StatusChangeTypeName(rRequest.eType), common::WbV2(rRequest.data.vecPosition, 1));
+				LOG(kDefault, kError, "Transfer destination leaves the coordinate range Tick: {} Source: ({},{}) Delta: ({},{}) Type: {} Position: {}", rNextFrame.interpolate.iTick, rCoord.iX, rCoord.iY, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), game::StatusChangeTypeName(rRequest.change.eType), common::WbV2(game::SpawnPosition(rRequest.change), 1));
 				continue;
 			}
 
 			// Owned-entity arrivals create subscriptions. Other transfers require an owned entity or an active
 			// subscription, including subscriptions to empty sibling cells, to avoid creating unseen entities.
-			if (rRequest.eType != game::kOwnedEntityTransferType && !IsDestinationLive(destination))
+			if (rRequest.change.eType != game::kOwnedEntityTransferType && !IsDestinationLive(destination))
 			{
-				LOG(kNetwork, kVerbose, "Dropping transfer to unsubscribed Frame Tick: {} Source: ({},{}) Dest: ({},{}) Type: {}", rNextFrame.interpolate.iTick, rCoord.iX, rCoord.iY, destination.iX, destination.iY, game::StatusChangeTypeName(rRequest.eType));
+				LOG(kNetwork, kVerbose, "Dropping transfer to unsubscribed Frame Tick: {} Source: ({},{}) Dest: ({},{}) Type: {}", rNextFrame.interpolate.iTick, rCoord.iX, rCoord.iY, destination.iX, destination.iY, game::StatusChangeTypeName(rRequest.change.eType));
 				continue;
 			}
 
@@ -91,22 +84,48 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 				it = game::gpGame->mCells.find(destination);
 			}
 
-			mTransfers.try_emplace(destination).first->second.push_back(
-			{
-				.eType = rRequest.eType,
-				.data = game::StatusChangeData(rRequest.data),
-			});
+			mTransfers.try_emplace(destination).first->second.push_back(rRequest.change);
 
-			if (rRequest.eType == game::kOwnedEntityTransferType && (rRequest.data.globalId.iValue != 0))
+			if (rRequest.change.eType == game::kOwnedEntityTransferType && (game::OwnedSpawnGlobalId(rRequest.change).iValue != 0))
 			{
 				rTransfersArena.mBuffer.PushBack(ClientTransferInfo
 				{
-					.globalId = rRequest.data.globalId,
+					.globalId = game::OwnedSpawnGlobalId(rRequest.change),
 					.destination = destination,
-					.clientGuid = TransferDataClientGuid(rRequest.data),
+					.clientGuid = game::OwnedSpawnClientGuid(rRequest.change),
 				});
 			}
 		}
+	}
+}
+
+void ServerTransferManager::DrainPendingSpawns()
+{
+	int64_t iTick = game::gpGame->miTickCounter;
+	auto IsReleased = [iTick](const PendingSpawn& rPending)
+	{
+		return rPending.iTick <= iTick;
+	};
+	for (auto it = mPendingSpawns.begin(); it != mPendingSpawns.end();)
+	{
+		auto& [rCoordinate, rPendingSpawns] = *it;
+		auto cellIt = game::gpGame->mCells.find(rCoordinate);
+		if (!std::ranges::contains(game::gpGame->mActiveCoordinates, rCoordinate) || cellIt == game::gpGame->mCells.end() || cellIt->second.pCurrent == nullptr || std::ranges::none_of(rPendingSpawns, IsReleased))
+		{
+			++it;
+			continue;
+		}
+
+		std::vector<game::StatusChange>& rTransfers = mTransfers.try_emplace(rCoordinate).first->second;
+		for (const PendingSpawn& rPending : rPendingSpawns)
+		{
+			if (IsReleased(rPending))
+			{
+				rTransfers.push_back(rPending.spawn);
+			}
+		}
+		std::erase_if(rPendingSpawns, IsReleased);
+		it = rPendingSpawns.empty() ? mPendingSpawns.erase(it) : std::next(it);
 	}
 }
 
@@ -129,15 +148,14 @@ void ServerTransferManager::SpawnTransfers(bool bFilterDestinationLiveness)
 		for (const game::StatusChange& rTransfer : rTransfers)
 		{
 			// Liveness filtering requires non-owned transfers to target live destinations, matching CollectTransfers.
-			// Replay spawning bypasses this check.
-			if (bFilterDestinationLiveness && rTransfer.eType != game::kOwnedEntityTransferType && !IsDestinationLive(rCoord)) [[unlikely]]
+			// A spawn targets an active cell that need not be live. Replay spawning bypasses this check.
+			if (bFilterDestinationLiveness && game::IsTransferType(rTransfer.eType) && rTransfer.eType != game::kOwnedEntityTransferType && !IsDestinationLive(rCoord)) [[unlikely]]
 			{
 				LOG(kDefault, kError, "Non-owned transfer reached Spawn for non-live Frame Tick: {} Dest: ({},{}) Type: {}", rDestinationFrame.interpolate.iTick, rCoord.iX, rCoord.iY, game::StatusChangeTypeName(rTransfer.eType));
 				DEBUG_BREAK();
 			}
 
-			game::TransferData data = std::get<game::TransferData>(rTransfer.data);
-			game::SpawnTransfer(rDestinationFrame, rTransfer.eType, data);
+			game::ApplySpawnStatusChange(rDestinationFrame, rTransfer, rCoord);
 		}
 	}
 }
@@ -187,7 +205,7 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 				}
 
 				// The final byte stays the zero terminator.
-				pOwnedIdsWrite = std::format_to_n(pOwnedIdsWrite, pcOwnedIds + std::ssize(pcOwnedIds) - 1 - pOwnedIdsWrite, "{}{}", iOwnedIdCount > 0 ? ", " : "", std::get<game::TransferData>(rTransfer.data).globalId.iValue).out;
+				pOwnedIdsWrite = std::format_to_n(pOwnedIdsWrite, pcOwnedIds + std::ssize(pcOwnedIds) - 1 - pOwnedIdsWrite, "{}{}", iOwnedIdCount > 0 ? ", " : "", game::OwnedSpawnGlobalId(rTransfer).iValue).out;
 				++iOwnedIdCount;
 			}
 
@@ -235,6 +253,23 @@ void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferI
 	}
 }
 
+void ServerTransferManager::QueueSpawn(engine::GridCoord coordinate, int64_t iTick, const game::StatusChange& rSpawn)
+{
+	ASSERT(game::IsSpawnType(rSpawn.eType));
+	ASSERT(common::InsideArea(game::SpawnPosition(rSpawn), engine::LocalCellArea()));
+	mPendingSpawns.try_emplace(coordinate).first->second.push_back({.iTick = iTick, .spawn = rSpawn});
+}
+
+int64_t ServerTransferManager::PendingSpawnCount() const
+{
+	int64_t iCount = 0;
+	for ([[maybe_unused]] const auto& [rCoordinate, rPendingSpawns] : mPendingSpawns)
+	{
+		iCount += std::ssize(rPendingSpawns);
+	}
+	return iCount;
+}
+
 void ServerTransferManager::HarvestTransfers()
 {
 	// Heap: Transfer spawns into destination frames, which may grow SOA buffers and update idToIndexMaps
@@ -245,7 +280,7 @@ void ServerTransferManager::HarvestTransfers()
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena transfersArena = rWorkbuffer.Push();
 	CollectTransfers(transfersArena);
-	game::DrainReplayTransferHarnessRigs(*game::gpServerSession, *this);
+	DrainPendingSpawns();
 
 	SortTransfersByType();
 
@@ -264,7 +299,10 @@ void ServerTransferManager::HarvestTransfers()
 	// mTransfers still holds the batch just applied; the broadcaster clears it later this tick.
 	for (const auto& [rCoordinate, rTransfers] : mTransfers)
 	{
-		miHarvestedTransferTotal += std::ssize(rTransfers);
+		miHarvestedTransferTotal += std::ranges::count_if(rTransfers, [](const game::StatusChange& rTransfer)
+		{
+			return game::IsTransferType(rTransfer.eType);
+		});
 	}
 }
 
@@ -298,17 +336,17 @@ void ServerTransferManager::ApplyReplayTransfers()
 				continue;
 			}
 
-			const game::TransferData& rData = std::get<game::TransferData>(rTransfer.data);
-			if (!(rData.globalId.iValue != 0))
+			engine::GlobalId globalId = game::OwnedSpawnGlobalId(rTransfer);
+			if (!(globalId.iValue != 0))
 			{
 				continue;
 			}
 
 			clientTransfersArena.mBuffer.PushBack(ClientTransferInfo
 			{
-				.globalId = rData.globalId,
+				.globalId = globalId,
 				.destination = rCoord,
-				.clientGuid = TransferDataClientGuid(rData),
+				.clientGuid = game::OwnedSpawnClientGuid(rTransfer),
 			});
 		}
 	}
@@ -319,7 +357,7 @@ void ServerTransferManager::ApplyReplayTransfers()
 void ServerTransferManager::ResetState()
 {
 	mTransfers.clear();
-	game::ResetReplayTransferHarnessRigs(*game::gpServerSession);
+	mPendingSpawns.clear();
 	miHarvestedTransferTotal = 0;
 }
 

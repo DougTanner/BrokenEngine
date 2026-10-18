@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-06T17:48:39.498Z","dependsOn":["Documents/Plans/Game/FrameEditRows.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-06T17:48:39.498Z","dependsOn":[]} -->
 # `pin_cell` and `unpin_cell`: initialize and remove cells through a saved pinned-coordinate set
 
 Line numbers cite baseline `2b4cb8d38aa57ca7ccd45983cc5121f64e85cf15`. Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other.

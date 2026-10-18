@@ -307,24 +307,29 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 	}, [&](int64_t i)
 	{
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
-
+		XMVECTOR vecDirection = rCurrentInterpolate.pVecDirections[i];
+		engine::AlignmentIdentifier alignment = rCurrentPostRender.pAlignments[i];
+		MissileFlags_t missileFlags;
+		missileFlags.Set(alignment == rFrame.postRender.omniAlignment ? kTargetEnemy : kTargetOmni);
 		TransferRequest request
 		{
-			.eType = StatusChangeType::kTransferMissile,
-			.data =
+			.change = MakeTransfer(SpawnInfo
 			{
 				.vecPosition = vecPosition,
-				.vecDirection = rCurrentInterpolate.pVecDirections[i],
+				.vecDirection = vecDirection,
 				.vecVelocity = rCurrentPostRender.pVecVelocities[i],
-				.alignment = rCurrentPostRender.pAlignments[i],
+				.vecStoredDirection = vecDirection,
 				.fAcceleration = rCurrentPostRender.pfAccelerations[i],
-				.deltaRotationDelaySeconds = rCurrentPostRender.pDeltaRotationDelays[i],
-				.timeSeconds = rCurrentPostRender.pTimes[i],
-				.nextJitterSeconds = rCurrentPostRender.pNextJitter[i],
+				.flags = missileFlags,
+				.alignment = alignment,
+				.deltaRotationDelay = rCurrentPostRender.pDeltaRotationDelays[i],
 				.fDeltaRotation = rCurrentPostRender.pfDeltaRotations[i],
 				.fDeltaRotationMaximum = rCurrentPostRender.pfDeltaRotationMaximum[i],
 				.fPitch = rCurrentPostRender.pfPitches[i],
-			},
+				.time = rCurrentPostRender.pTimes[i],
+				.nextJitter = rCurrentPostRender.pNextJitter[i],
+				.bTransfer = true,
+			}),
 		};
 		if (rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
 		{

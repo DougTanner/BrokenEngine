@@ -6,6 +6,7 @@
 #include "Frame/IslandTerrain.h"
 #include "Frame/NavQuery.h"
 
+#include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
 
 namespace game
@@ -214,33 +215,35 @@ void OmnisPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 	{
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
 
-		// Build transfer request
+		OmniFlags_t flags = rCurrentPostRender.pFlags[i];
+		flags.Set(kTransfer, false);
 		TransferRequest request
 		{
-			.eType = StatusChangeType::kTransferOmni,
-			.data =
+			.change = MakeTransfer(SpawnInfo
 			{
 				.vecPosition = vecPosition,
 				.vecDirection = rCurrentInterpolate.pVecDirections[i],
 				.vecVelocity = rCurrentPostRender.pVecVelocities[i],
 				.alignment = rCurrentPostRender.pAlignments[i],
-				.fHealth = rCurrentPostRender.pfArmors[i],
+				.fArmor = rCurrentPostRender.pfArmors[i],
 				.fShield = rCurrentPostRender.pfShields[i],
-				.nextBlasterFireTimeSeconds = rCurrentPostRender.pNextBlasterFireTimes[i],
-				.nextSecondarySpawnTimeSeconds = rCurrentPostRender.pNextSecondarySpawnTimes[i],
-				.shieldCooldownSeconds = rCurrentPostRender.pShieldCooldowns[i],
-				.shieldDownSoundCooldownSeconds = rCurrentPostRender.pShieldDownSoundCooldowns[i],
-				.animationTimeSeconds = rCurrentInterpolate.pAnimationTimes[i],
-				.uiOmniFlags = static_cast<uint16_t>(std::to_underlying(rCurrentPostRender.pFlags[i].meFlags) & ~std::to_underlying(kTransfer)),
-				.navigationDelaySeconds = rCurrentPostRender.pNavigationDelays[i],
-			},
+				.nextBlasterFireTime = rCurrentPostRender.pNextBlasterFireTimes[i],
+				.nextSecondarySpawnTime = rCurrentPostRender.pNextSecondarySpawnTimes[i],
+				.shieldCooldown = rCurrentPostRender.pShieldCooldowns[i],
+				.shieldDownSoundCooldown = rCurrentPostRender.pShieldDownSoundCooldowns[i],
+				.animationTime = rCurrentInterpolate.pAnimationTimes[i],
+				.flags = flags,
+				.transferLockTimer = std::chrono::duration<float>(1.0f),
+				.arrivalGracePeriod = kArrivalGracePeriod,
+				.navigationDelay = rCurrentPostRender.pNavigationDelays[i],
+				.globalId = rCurrentPostRender.pGlobalIds[i],
+				.clientGuid = rCurrentPostRender.pClientGuids[i],
+				.fleetWantedCoordinate = rCurrentPostRender.pFleetWantedCoordinates[i],
+				.uiPendingFleetWantedCoordinateTicks = rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[i],
+				.uiPendingWeaponModeTicks = rCurrentPostRender.puiPendingWeaponModeTicks[i],
+				.bTransfer = true,
+			}),
 		};
-		request.data.globalId = rCurrentPostRender.pGlobalIds[i];
-		request.data.fleetWantedCoordinate = rCurrentPostRender.pFleetWantedCoordinates[i];
-		request.data.uiPendingFleetWantedCoordinateTicks = rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[i];
-		request.data.uiPendingWeaponModeTicks = rCurrentPostRender.puiPendingWeaponModeTicks[i];
-		request.data.uiClientGuidHigh = rCurrentPostRender.pClientGuids[i].uiHigh;
-		request.data.uiClientGuidLow = rCurrentPostRender.pClientGuids[i].uiLow;
 		if (rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
 		{
 			LOG(kDefault, kError, "Omni Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) GlobalId: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), rCurrentPostRender.pGlobalIds[i], rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());

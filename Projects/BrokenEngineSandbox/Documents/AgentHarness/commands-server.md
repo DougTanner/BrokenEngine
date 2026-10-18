@@ -5,17 +5,16 @@
 ### Server commands
 
 - `status`: no params. Returns
-  `{"tick","paused","recording","replaying","clientCount","activeCoords":[[x,y],...],"nextGlobalId","pendingFlagshipUpdateCount":int,"harvestedTransferTotal":int,"pendingTransferHarnessRigCount":int,"pendingAgentStatusChangeCount":int}`.
+  `{"tick","paused","recording","replaying","clientCount","activeCoords":[[x,y],...],"nextGlobalId","pendingFlagshipUpdateCount":int,"harvestedTransferTotal":int,"pendingAgentStatusChangeCount":int}`.
   `pendingFlagshipUpdateCount` counts restored or runtime-queued flagship
   navigation updates waiting for an advancing update. `harvestedTransferTotal`
-  counts every transfer applied by a harvest since the current game state began,
-  cumulatively; it is zeroed on load, reset, a resynchronizing `edit_frame`, and
-  entering replay playback, and does not move while paused or during playback.
-  `pendingTransferHarnessRigCount` counts queued `inject_payload` transfer
-  entries and `pendingAgentStatusChangeCount` counts queued `inject_payload`
-  status-change entries; both include entries scheduled for a later `tick` until
-  a drain releases them, and a transfer entry dropped at release leaves the
-  count.
+  counts every cell-crossing transfer applied by a harvest since the current
+  game state began, cumulatively, and no spawn; it is zeroed on load, reset, a
+  resynchronizing `edit_frame`, and entering replay playback, and does not move
+  while paused or during playback. `pendingAgentStatusChangeCount` counts every
+  queued `inject_payload` entry, spawn entries and destroy and update entries
+  alike, including entries scheduled for a later `tick` until a drain releases
+  them.
 - `pause`: `{"paused":bool}`. Returns the applied `paused` value.
 - `timescale`: `{"faster":bool}`. Steps the shared timescale and returns `{"numerator","denominator"}`. The slowest step is 1/32; `{"faster":false}` there changes nothing and still succeeds.
 - `save`: `{"file"?:"bare filename"}`; defaults to quicksave. `file` (also `load`'s) is an appdata-relative bare filename; empty names, NUL, separators, `..`, `:`, and Windows device basenames are rejected. Returns `{"file"}`.
@@ -45,9 +44,12 @@
   (reset, and any recording or playback failure, cancellation, or abort). It is
   kept after a successful stop and is carried into playback. An entry's
   `playbackEventTick` is `-1` until playback applies that entry's record and
-  then equals its `recordingEventTick`. A transfer captured after dispatch at
-  `E` is recorded at `E` in the post-dispatch channel and published/replayed at
-  `E`. During playback, an entry's `playbackEventTick` is latched from the exact
+  then equals its `recordingEventTick`. An event is a post-dispatch record: the
+  post-tick batch of cell-crossing transfers and `inject_payload` or fleet
+  spawns applied after dispatch at `E` is recorded at `E` in the post-dispatch
+  channel and published/replayed at `E`. A spawn counts under its collection's
+  count, as a transfer does; a `SpawnExplosion` counts under none, so an event
+  holding only explosion spawns has every count zero. During playback, an entry's `playbackEventTick` is latched from the exact
   tick whose post-dispatch record the reader loaded and applied. If the
   `set_log_level` response reports effective Network `Verbose`, use
   `ServerBroadcaster::BuildTickPublication` as runtime publication evidence; if
@@ -64,8 +66,8 @@
   `coordinate_writer` and `fullframes_record` require `coord`; every other stage
   rejects it. `invalidation` and `grid` require inactive recording; every other
   stage requires active recording. `transfer_capture` invalidates recording when
-  the next accepted transfer batch reaches replay capture, before a writer is
-  created or changed; the live transfer still proceeds. `coordinate_writer` and
+  the next accepted post-tick batch (transfers and spawns) reaches replay
+  capture, before a writer is created or changed; the live batch still proceeds. `coordinate_writer` and
   `fullframes_record` resolve their target when armed: they select the open last
   generation when present, otherwise the most recently terminalized generation
   with retained state. A later generation append cannot redirect either failure.
@@ -193,92 +195,118 @@
   records. The client `query_profile` remains `{}`-only; its response is
   documented in `commands-client.md`.
 - `inject_payload`: `{"entries":[...],"pauseAfterWriterInput"?:bool}`; these are
-  the only top-level keys, and `entries` is a non-empty array. It queues omni
-  status changes into a cell's tick input and cross-cell transfer arrivals into
-  a cell's transfer harvest. The whole batch validates before anything is queued
-  or any global id is minted, so a rejected batch changes no pending count and
-  leaves `status.nextGlobalId` unchanged. Each entry is
+  the only top-level keys, and `entries` is a non-empty array. It queues spawns
+  into a cell's post-tick batch, the batch that also carries that tick's
+  cross-cell arrivals, and omni destroy and update status changes into a cell's
+  tick input. The whole batch validates before anything is queued or any global
+  id is minted, so a rejected batch changes no pending count and leaves
+  `status.nextGlobalId` unchanged. Each entry is
   `{"coord":[x,y],"type":<type>,"tick"?:int,...fields}` with a `type` from the
   table below; a key other than `coord`, `type`, `tick`, and that type's fields
-  fails the batch. Field keys are the payload member names in
-  `Frame/StatusChange.h`, verbatim. Values by member type: `bool` a JSON
-  boolean; `int64_t` a JSON integer; `uint8_t` a JSON integer in `[0,255]`;
-  `float` a finite number; a `std::chrono::duration<float>` (the `...Seconds`
-  members) a finite number of seconds; `engine::GridCoord` an `[x,y]` grid
-  coordinate; `XMVECTOR` an `[x,y]` pair of finite numbers in the cell's local
-  frame, a position being meters from the cell's center, whose z and w the
-  server sets.
+  fails the batch. Field keys are the `Fields()` member tokens of the type's
+  payload, verbatim: the collection's `SpawnInfo` for a spawn type (`Frame/Collections/<Collection>/<Collection>.h`; Explosions in
+  `Engine/Source/Frame/Collections/Explosions/Explosions.h`) and the destroy and
+  update payloads in `Frame/StatusChange.h`. Values by member type: `bool` a
+  JSON boolean; `int64_t` a JSON integer; `uint8_t` a JSON integer in
+  `[0,255]`; `float` a finite number; `std::chrono::duration<float>` a finite
+  number of seconds; `engine::GridCoord` an `[x,y]` grid coordinate; `XMVECTOR`
+  an `[x,y]` pair of finite numbers in the cell's local frame, a position being
+  meters from the cell's center: `vecPosition` takes z at the lowest flight
+  plane and w 1, every other vector z 0 and w 0; `engine::AlignmentIdentifier`
+  `"omni"` or `"enemy"`, the game's two alignments; a flags member the whole
+  mask as an integer within its underlying type, replacing the default mask;
+  `engine::GlobalId` is refused, because the server mints it.
 
-  | `type` | Fields | Also requires |
-  |--------|--------|---------------|
-  | `SpawnOmni` | `fSpawnOffsetX`, `fSpawnOffsetY`, `bIsFlagship`, `fleetWantedCoordinate` | active `coord` |
-  | `DestroyOmni` | `iOmniUuid` (required) | active `coord` |
-  | `UpdateOmni` | `iOmniUuid` (required), `bUseMissiles`, `navigationDelaySeconds` | active `coord` |
-  | `UpdateFleet` | `iOmniUuid` (required), `fleetWantedCoordinate` (required), `bIsFlagship` | active `coord` |
-  | `TransferOmni` | `vecPosition`, `vecDirection`, `vecVelocity`, `fHealth`, `fShield`, `nextBlasterFireTimeSeconds`, `nextSecondarySpawnTimeSeconds`, `shieldCooldownSeconds`, `shieldDownSoundCooldownSeconds`, `animationTimeSeconds`, `navigationDelaySeconds`, `fleetWantedCoordinate` | `kbDebugInput`; creates a missing `coord` |
-  | `TransferSpaceship` | `vecPosition`, `vecDirection`, `vecVelocity`, `fHealth`, `nextBlasterSpawnTimeSeconds`, `fDeltaRotation` | `kbDebugInput`; live `coord` |
-  | `TransferBlaster` | `vecPosition`, `vecVelocity`, `uiTypeIndex` | `kbDebugInput`; live `coord` |
-  | `TransferMissile` | `vecPosition`, `vecDirection`, `vecVelocity`, `fAcceleration`, `deltaRotationDelaySeconds`, `timeSeconds`, `nextJitterSeconds`, `fDeltaRotation`, `fDeltaRotationMaximum`, `fPitch` | `kbDebugInput`; live `coord` |
+  | `type` | Fields |
+  |--------|--------|
+  | `SpawnOmni` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `fArmor`, `fShield`, `nextBlasterFireTime`, `nextSecondarySpawnTime`, `shieldCooldown`, `shieldDownSoundCooldown`, `animationTime`, `flags`, `transferLockTimer`, `arrivalGracePeriod`, `navigationDelay`, `globalId` (refused), `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiPendingWeaponModeTicks`, `bTransfer` |
+  | `SpawnSpaceship` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `fHealth`, `nextBlasterSpawnTime`, `arrivalGracePeriod`, `fDeltaRotation` |
+  | `SpawnBlaster` | `vecPosition`, `vecVelocity`, `iTypeIndex`, `flags`, `alignment`, `fWindTrailIntensity`, `fWindTrailWidth`, `fWindTrailLengthMultiplier` |
+  | `SpawnMissile` | `vecPosition`, `vecDirection`, `vecVelocity`, `vecStoredDirection`, `fAcceleration`, `flags`, `alignment`, `deltaRotationDelay`, `fDeltaRotation`, `fDeltaRotationMaximum`, `fPitch`, `time`, `nextJitter`, `bTransfer` |
+  | `SpawnExplosion` | `iTypeIndex`, `vecPosition`, `vecDirection`, `flags`, `iTrailCount`, `fTrailAngle`, `iParticleCount`, `fParticleAngle`, `fSizePercent`, `fSmokePercent`, `fTimePercent` |
+  | `DestroyOmni` | `iOmniUuid` (required) |
+  | `UpdateOmni` | `iOmniUuid` (required), `bUseMissiles`, `navigationDelaySeconds`, `uiPendingWeaponModeTicks` |
+  | `UpdateFleet` | `iOmniUuid` (required), `bIsFlagship`, `fleetWantedCoordinate` (required), `uiPendingFleetWantedCoordinateTicks` |
 
-  `iOmniUuid` is a `query_omnis` `uuid`, which changes when the omni
-  crosses cells. A live `coord` holds an omni or an active client subscription.
-  An omitted field takes its payload struct default (`fSpawnOffsetX` 45,
-  `fSpawnOffsetY` -12, `navigationDelaySeconds` 60), except that
-  `fleetWantedCoordinate` defaults to `coord`, and a transfer's `vecPosition`
-  defaults to the cell center, `vecDirection` and `vecVelocity` to `[1,0]`,
-  `fHealth` and `fShield` to 1, `uiTypeIndex` to the omni blaster type, and
-  `fDeltaRotationMaximum` to 2. The server sets the rest: a minted global id for
-  `SpawnOmni` and `TransferOmni`, the omni alignment, an empty client
-  GUID, zero omni flags, and the pending countdown ticks. An injected omni
-  is therefore synthetic AI and not an ownership harness rig. A spawned omni
-  starts with `kUseMissiles` clear; an `UpdateOmni` entry with
-  `bUseMissiles:true` takes effect one second (`kiTickRate` ticks) after the
-  tick it enters.
+  `iOmniUuid` is a `query_omnis` `uuid`, which changes when the omni crosses
+  cells. An omitted field takes its payload struct default (for example an
+  omni's `flags` 4, `kBlasterSpawnLeft`, and `navigationDelay` 60), except
+  that `vecPosition` defaults to the cell center; `vecDirection`,
+  `vecVelocity`, and a missile's `vecStoredDirection` to `[1,0]`; `alignment` to
+  `"omni"`; an omni's `fleetWantedCoordinate` to `coord`; a `SpawnMissile`'s
+  `flags`, when the entry has no `flags` key, to `kTargetEnemy` (16) for an
+  `"omni"` `alignment` and to `kTargetOmni` (8) otherwise; and the `UpdateOmni`
+  `uiPendingWeaponModeTicks` and `UpdateFleet`
+  `uiPendingFleetWantedCoordinateTicks` to 32 (`engine::kiTickRate`). A spawn
+  gets no arrival values: `transferLockTimer` and `arrivalGracePeriod` stay 0
+  unless the entry sets them. `bTransfer` defaults to false, so the
+  collection's `Spawn` starts the row as a fresh spawn; an omni then takes full
+  armor and shield (`kfOmniArmor`, `kfOmniShield`) whatever `fArmor` and
+  `fShield` say, so an entry that sets `bTransfer:true` also sets both. The
+  server sets the rest: a minted global id for `SpawnOmni` and an empty client
+  GUID, so an injected omni is synthetic AI and not an ownership harness rig; a
+  missile starts with no homing target, which only in-tick code sets. A
+  `SpawnExplosion` starts at the simulation time of the tick it is applied
+  after, in its `coord`.
+  An `UpdateOmni` entry's `bUseMissiles` takes effect `uiPendingWeaponModeTicks`
+  ticks after the tick it enters; `0` leaves it pending.
 
-  The batch also fails during replay playback, on a transfer entry without
-  `kbDebugInput`, on a non-finite value, on a `SpawnOmni` offset or a transfer
-  `vecPosition` outside the cell, on a `TransferOmni` `vecVelocity` whose XY
-  length exceeds `kfOmniMaximumSpeed` (33.33 m/s), on a
-  `navigationDelaySeconds` outside `[0,60]`, on a `nextBlasterFireTimeSeconds`
-  outside `[0,kBlasterFireInterval]`, and on a `uiTypeIndex` that is not an
-  adoptable blaster type. The command makes no terrain check; a blaster destroys
-  itself on terrain contact, so a `TransferBlaster` that must survive needs a
-  terrain-clear `vecPosition` (the probe in
-  [replay.md](replay.md#replay-transfer-capture-harness-rig)). To send an omni
-  out across a cell's east edge, queue
-  `{"coord":<cell>,"type":"TransferOmni","vecPosition":[433.86,0],"vecVelocity":[33.33,0]}`: 433.86
-  m is half the cell width (`cell_coordinate_probe` `area.width`) less 15.5
-  ticks of travel at `kfOmniMaximumSpeed`, so the arrival coasts under its
-  post-arrival transfer lock and crosses into the eastern neighbor about 16
-  ticks after its harvest through the ordinary transfer producers. Terrain near
-  that path can push the coast off its line; then pick another cell.
+  The batch also fails during replay playback, on an inactive `coord`, on an
+  unknown key, on a value outside its member type's form above, on a
+  non-finite value, on a `vecPosition` outside the cell, on a `SpawnBlaster` or
+  `SpawnExplosion` `iTypeIndex` that is not an adoptable blaster or explosion
+  type, on a `SpawnExplosion` `iTrailCount` below 0 or
+  `fTimePercent` outside `[0,1]`, on a `SpawnOmni` `vecVelocity` whose XY length
+  exceeds `kfOmniMaximumSpeed` (33.33 m/s), on a `navigationDelay` or
+  `navigationDelaySeconds` outside `[0,60]`, and on a `nextBlasterFireTime`
+  outside `[0,kBlasterFireInterval]`. The command makes no terrain check; a
+  blaster destroys itself on terrain contact, so a `SpawnBlaster` that must
+  survive needs a terrain-clear `vecPosition` (the probe in
+  [replay.md](replay.md#replay-transfer-capture-harness-rig)). It also puts no
+  bound on how many entries one cell's tick receives: every due entry of a
+  coordinate joins that tick's one published batch, which the protocol caps at
+  1,024 status changes per cell tick (`engine::kiMaximumStatusChangesPerCell`),
+  and an over-cap batch hits the server's debug break and resynchronizes every
+  subscribed client, so keep one cell's entries for one tick well below the cap.
+
+  Edge coast: to send an omni out across a cell's east edge, queue
+  `{"coord":<cell>,"type":"SpawnOmni","vecPosition":[433.86,0],"vecVelocity":[33.33,0],"transferLockTimer":1}`:
+  433.86 m is half the cell width (`cell_coordinate_probe` `area.width`) less
+  15.5 ticks of travel at `kfOmniMaximumSpeed`, so the omni coasts under its
+  transfer lock, which skips navigation and acceleration, and crosses into the
+  eastern neighbor about 16 ticks after the tick it is applied, through the
+  ordinary transfer producers; that crossing creates the neighbor when it is
+  not active. A smaller margin crosses sooner: `vecPosition:[449.5,0]` crosses
+  on the first tick after the one it is applied. For another edge, mirror or
+  swap the components. Terrain near that path can push the coast off its line; then pick
+  another cell.
 
   `tick` is an absolute `status.tick` value and must be a JSON integer greater
   than the current `status.tick`; omitted, it means the next tick,
-  `status.tick + 1`. A status change enters the input of exactly its target
-  tick, and a transfer is harvested at exactly its target tick, at any timescale
-  and in catch-up bursts that run several ticks per update; a pause stops the
-  clock, so entries wait. A status-change entry whose coordinate is inactive or
-  whose frame is not ready at its target tick stays queued and applies on the
-  first later tick that can take it. A non-omni transfer entry whose
-  destination is no longer live at its target tick is dropped with a Network
-  warning. An active recording captures released entries as it captures natural
-  ones: status changes in their tick's input, transfers in the post-dispatch
-  channel. Load, `reset`, and session replacement clear both queues. Recording
-  stop, a recording-start failure, cancelling a not-yet-started recording, and a
-  replay transient-state clear drop every queued transfer entry, future-tick
-  ones included, while queued status-change entries survive.
+  `status.tick + 1`. A spawn entry is applied right after exactly its target
+  tick, with that tick's arrivals, so its row is in the frame published for
+  that tick and first simulated on the next one; a destroy or update entry
+  enters the input of exactly its target tick. Both hold at any timescale and
+  in catch-up bursts that run several ticks per update; a pause stops the
+  clock, so entries wait. An entry whose coordinate is inactive or whose frame
+  is not ready at its target tick stays queued and applies with the first later
+  tick that can take it. An active recording captures released entries as it
+  captures natural ones: spawns in their tick's post-dispatch channel, destroy
+  and update entries in their tick's input. Load, `reset`, and session
+  replacement clear both queues, and so do a replay playback start and abort,
+  which replace state as `load` does. Recording start, stop, failure, and
+  cancellation and a replay transient-state clear drop no queued entry.
 
   `pauseAfterWriterInput` requires `kbDebugInput` and must be a JSON boolean
   whenever present; the response echoes it. `false` imposes nothing further and
-  arms nothing. `true` also requires a transfer entry in the batch, active
+  arms nothing. `true` also requires a spawn entry in the batch, active
   recording or a paused, unconsumed `replay_record {"start":true}`, no automatic
   pause already armed, and no entry carrying `tick`. After queueing, `true` arms
   count `1` for a pending start, or snapshots the active writer-input count `N`
   and pauses at `N + 1`, the writer input of the event tick whose post-dispatch
   record is written later in the same update.
 
-  The response is `{"injected":int,"globalIds":[...],"deferred":bool}`. `globalIds` lists the ids minted for `SpawnOmni` and `TransferOmni` entries in entry order, and `deferred` is true while the server is paused. A request carrying `pauseAfterWriterInput` adds its echo.
+  The response is `{"injected":int,"globalIds":[...],"deferred":bool}`. `globalIds` lists the ids minted for `SpawnOmni` entries in entry order, and `deferred` is true while the server is paused. A request carrying `pauseAfterWriterInput` adds its echo.
 
 Every server `[x,y]` grid-coordinate parameter (`coord`, `fleetWantedCoordinate`) must hold two JSON integer literals, with no fraction or exponent, within the signed 32-bit range; any other component, including a whole-valued `1.0` or `1e0`, fails the command before that coordinate is looked up or used, before that entry mints an ID, and before anything is queued.
 

@@ -39,8 +39,8 @@ void ServerBroadcaster::PrepareTickStatusChanges()
 	ScopedSuppressAllocationTracking suppress;
 
 	// Runs once per normal-play tick, so an agent-injected StatusChange can enter any tick of a multi-tick update and
-	// rides the same broadcast / CRC / replay channel as real spawns. An entry stays queued until its scheduled tick
-	// and until its coord is one the tick will simulate (active, with a committed pCurrent frame).
+	// rides the same broadcast / CRC / replay channel as natural status changes. An entry stays queued until its
+	// scheduled tick and until its coord is one the tick will simulate (active, with a committed pCurrent frame).
 	game::DrainPendingAgentStatusChanges(*game::gpServerSession);
 
 	// Save this tick's StatusChanges for broadcasting (transfers handled separately in HarvestTransfers)

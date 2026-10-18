@@ -1,19 +1,32 @@
 #pragma once
 
-// Direct include, not the Engine.h aggregation: the game PCH pulls this header in ahead of Engine.h.
+// Direct includes, not the Engine.h aggregation: the game PCH pulls this header in ahead of Engine.h.
+#include "Frame/Collections/Explosions/Explosions.h"
 #include "Network/NetworkProtocol.h" // ClientGuid
+
+#include "Frame/Collections/Blasters/Blasters.h"
+#include "Frame/Collections/Missiles/Missiles.h"
+#include "Frame/Collections/Omnis/Omnis.h"
+#include "Frame/Collections/Spaceships/Spaceships.h"
 
 namespace game
 {
 
-// Underlying values are serialized wire/save bytes — enumerators are append-only; never reorder or insert.
+// Underlying values are serialized wire, replay, and save bytes — enumerators are append-only; never reorder or insert.
 enum class StatusChangeType : uint8_t
 {
+	// Creations decided outside the tick and cross-cell arrivals: the post-tick batch, applied to the destination right
+	// after its tick; never in server tick input.
 	kSpawnOmni,
+	kSpawnSpaceship,
+	kSpawnBlaster,
+	kSpawnMissile,
+	kSpawnExplosion,
 	kTransferOmni,
 	kTransferSpaceship,
 	kTransferBlaster,
 	kTransferMissile,
+	// Tick input.
 	kDestroyOmni,
 	kUpdateOmni,
 	kUpdateFleet,
@@ -28,12 +41,23 @@ inline constexpr bool IsKnownStatusChangeType(StatusChangeType eType)
 	return eType < StatusChangeType::kCount;
 }
 
+inline constexpr bool IsSpawnType(StatusChangeType eType)
+{
+	return eType >= StatusChangeType::kSpawnOmni && eType <= StatusChangeType::kSpawnExplosion;
+}
+
 inline constexpr bool IsTransferType(StatusChangeType eType)
 {
 	return eType >= StatusChangeType::kTransferOmni && eType <= StatusChangeType::kTransferMissile;
 }
 
-static_assert(static_cast<uint8_t>(StatusChangeType::kTransferSpaceship) == static_cast<uint8_t>(StatusChangeType::kTransferOmni) + 1 && static_cast<uint8_t>(StatusChangeType::kTransferBlaster) == static_cast<uint8_t>(StatusChangeType::kTransferOmni) + 2 && static_cast<uint8_t>(StatusChangeType::kTransferMissile) == static_cast<uint8_t>(StatusChangeType::kTransferOmni) + 3, "IsTransferType assumes kTransferOmni..kTransferMissile stay contiguous; inserting an enumerator between them breaks the range check.");
+// The post-tick batch: every spawn and transfer tag.
+inline constexpr bool IsPostDispatchType(StatusChangeType eType)
+{
+	return eType >= StatusChangeType::kSpawnOmni && eType <= StatusChangeType::kTransferMissile;
+}
+
+static_assert(std::to_underlying(StatusChangeType::kSpawnExplosion) == std::to_underlying(StatusChangeType::kSpawnOmni) + 4 && std::to_underlying(StatusChangeType::kTransferOmni) == std::to_underlying(StatusChangeType::kSpawnExplosion) + 1 && std::to_underlying(StatusChangeType::kTransferMissile) == std::to_underlying(StatusChangeType::kTransferOmni) + 3, "IsSpawnType, IsTransferType, and IsPostDispatchType assume kSpawnOmni..kSpawnExplosion and kTransferOmni..kTransferMissile stay contiguous and adjacent; inserting an enumerator inside them breaks the range checks.");
 
 // The transfer type whose rows carry the owned-entity identity Frame::OwnershipLayer binds.
 inline constexpr StatusChangeType kOwnedEntityTransferType = StatusChangeType::kTransferOmni;
@@ -43,6 +67,10 @@ inline const char* StatusChangeTypeName(StatusChangeType eType)
 	switch (eType)
 	{
 		case StatusChangeType::kSpawnOmni:         return "SpawnOmni";
+		case StatusChangeType::kSpawnSpaceship:    return "SpawnSpaceship";
+		case StatusChangeType::kSpawnBlaster:      return "SpawnBlaster";
+		case StatusChangeType::kSpawnMissile:      return "SpawnMissile";
+		case StatusChangeType::kSpawnExplosion:    return "SpawnExplosion";
 		case StatusChangeType::kTransferOmni:      return "TransferOmni";
 		case StatusChangeType::kTransferSpaceship: return "TransferSpaceship";
 		case StatusChangeType::kTransferBlaster:   return "TransferBlaster";
@@ -55,24 +83,14 @@ inline const char* StatusChangeTypeName(StatusChangeType eType)
 	return "Unknown";
 }
 
-struct SpawnOmniData
-{
-	int64_t iGlobalId = 0;
-	bool bIsFlagship = false;
-	engine::GridCoord fleetWantedCoordinate {};
-	uint8_t uiPendingFleetWantedCoordinateTicks = 0;
-	// Spawn point in meters from the target cell's center.
-	float fSpawnOffsetX = 45.0f;
-	float fSpawnOffsetY = -12.0f;
-	// Owning client GUID, so a requested omni row is born owned (not serialized over network, like the transfer payload's GUID).
-	engine::ClientGuid clientGuid {};
-	bool operator==(const SpawnOmniData&) const = default;
-};
-
 struct DestroyOmniData
 {
 	int64_t iOmniUuid = 0;
-	bool operator==(const DestroyOmniData&) const = default;
+
+	static constexpr auto Fields()
+	{
+		return engine::FrameColumnList<FRAME_COLUMN(DestroyOmniData, iOmniUuid)> {};
+	}
 };
 
 struct UpdateOmniData
@@ -81,7 +99,11 @@ struct UpdateOmniData
 	bool bUseMissiles = false;
 	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
 	uint8_t uiPendingWeaponModeTicks = 0;
-	bool operator==(const UpdateOmniData&) const = default;
+
+	static constexpr auto Fields()
+	{
+		return engine::FrameColumnList<FRAME_COLUMN(UpdateOmniData, iOmniUuid), FRAME_COLUMN(UpdateOmniData, bUseMissiles), FRAME_COLUMN(UpdateOmniData, navigationDelaySeconds), FRAME_COLUMN(UpdateOmniData, uiPendingWeaponModeTicks)> {};
+	}
 };
 
 struct UpdateFleetData
@@ -90,97 +112,125 @@ struct UpdateFleetData
 	bool bIsFlagship = false;
 	engine::GridCoord fleetWantedCoordinate {};
 	uint8_t uiPendingFleetWantedCoordinateTicks = 0;
-	bool operator==(const UpdateFleetData&) const = default;
-};
 
-struct TransferData
-{
-	auto SharedMembers(this auto&& rSelf)
+	static constexpr auto Fields()
 	{
-		return std::tie(rSelf.vecPosition, rSelf.vecDirection, rSelf.vecVelocity, rSelf.alignment, rSelf.fHealth, rSelf.fShield, rSelf.uiTypeIndex, rSelf.fAcceleration, rSelf.nextBlasterFireTimeSeconds, rSelf.nextSecondarySpawnTimeSeconds, rSelf.shieldCooldownSeconds, rSelf.shieldDownSoundCooldownSeconds, rSelf.animationTimeSeconds, rSelf.uiOmniFlags, rSelf.nextBlasterSpawnTimeSeconds, rSelf.navigationDelaySeconds, rSelf.deltaRotationDelaySeconds, rSelf.timeSeconds, rSelf.nextJitterSeconds, rSelf.fDeltaRotation, rSelf.fDeltaRotationMaximum, rSelf.fPitch, rSelf.globalId, rSelf.fleetWantedCoordinate, rSelf.uiPendingFleetWantedCoordinateTicks, rSelf.uiPendingWeaponModeTicks);
+		return engine::FrameColumnList<FRAME_COLUMN(UpdateFleetData, iOmniUuid), FRAME_COLUMN(UpdateFleetData, bIsFlagship), FRAME_COLUMN(UpdateFleetData, fleetWantedCoordinate), FRAME_COLUMN(UpdateFleetData, uiPendingFleetWantedCoordinateTicks)> {};
 	}
-
-	bool operator==(const TransferData& rOther) const
-	{
-		return SharedMembers() == rOther.SharedMembers();
-	}
-
-	XMVECTOR vecPosition = DirectX::XMVectorZero();
-	XMVECTOR vecDirection = DirectX::XMVectorZero();
-	XMVECTOR vecVelocity = DirectX::XMVectorZero();
-	engine::AlignmentIdentifier alignment {};
-	float fHealth = 0.0f;
-	float fShield = 0.0f;
-	uint8_t uiTypeIndex = 0;
-	float fAcceleration = 0.0f;
-
-	// Omni timers
-	std::chrono::duration<float> nextBlasterFireTimeSeconds = std::chrono::duration<float>(0.0f);
-	std::chrono::duration<float> nextSecondarySpawnTimeSeconds = std::chrono::duration<float>(0.0f);
-	std::chrono::duration<float> shieldCooldownSeconds = std::chrono::duration<float>(0.0f);
-	std::chrono::duration<float> shieldDownSoundCooldownSeconds = std::chrono::duration<float>(0.0f);
-
-	// Omni interpolate state
-	std::chrono::duration<float> animationTimeSeconds = std::chrono::duration<float>(0.0f);
-	uint16_t uiOmniFlags = 0;
-
-	// Spaceship timers
-	std::chrono::duration<float> nextBlasterSpawnTimeSeconds = std::chrono::duration<float>(0.0f);
-
-	// Navigation delay (omni transfers only)
-	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
-
-	// Missile timers
-	std::chrono::duration<float> deltaRotationDelaySeconds = std::chrono::duration<float>(0.0f);
-	std::chrono::duration<float> timeSeconds = std::chrono::duration<float>(0.0f);
-	std::chrono::duration<float> nextJitterSeconds = std::chrono::duration<float>(0.0f);
-
-	// Live turn rate (spaceship and missile transfers)
-	float fDeltaRotation = 0.0f;
-	float fDeltaRotationMaximum = 0.0f;
-	float fPitch = 0.0f;
-
-	// Global ID (omni transfers only)
-	engine::GlobalId globalId {};
-
-	// Fleet wanted coord (omni transfers only)
-	engine::GridCoord fleetWantedCoordinate {};
-
-	// Pending countdown ticks (omni transfers only)
-	uint8_t uiPendingFleetWantedCoordinateTicks = 0;
-	uint8_t uiPendingWeaponModeTicks = 0;
-
-	// Client GUID (omni transfers only, not serialized over network)
-	uint64_t uiClientGuidHigh = 0;
-	uint64_t uiClientGuidLow = 0;
 };
 
 using StatusChangeData = std::variant<
-	SpawnOmniData,             // kSpawnOmni
-	TransferData,              // kTransfer* (all 4 types)
-	DestroyOmniData,           // kDestroyOmni
-	UpdateOmniData,            // kUpdateOmni
-	UpdateFleetData    // kUpdateFleet
->;
+	OmnisPostRender::SpawnInfo,
+	SpaceshipsPostRender::SpawnInfo,
+	BlastersPostRender::SpawnInfo,
+	MissilesPostRender::SpawnInfo,
+	engine::ExplosionsPostRender::SpawnInfo,
+	DestroyOmniData,
+	UpdateOmniData,
+	UpdateFleetData>;
+
+// A spawn payload's collection and tags. Pushers have no SpawnInfo and no specialization, so they cannot be
+// queued, parsed, or applied from outside their owner's Spawn.
+template <typename SPAWN_INFO>
+struct SpawnTraits {};
+
+template <>
+struct SpawnTraits<OmnisPostRender::SpawnInfo>
+{
+	using Collection = OmnisPostRender;
+	static constexpr StatusChangeType kSpawn = StatusChangeType::kSpawnOmni;
+	static constexpr StatusChangeType kTransfer = StatusChangeType::kTransferOmni;
+};
+
+template <>
+struct SpawnTraits<SpaceshipsPostRender::SpawnInfo>
+{
+	using Collection = SpaceshipsPostRender;
+	static constexpr StatusChangeType kSpawn = StatusChangeType::kSpawnSpaceship;
+	static constexpr StatusChangeType kTransfer = StatusChangeType::kTransferSpaceship;
+};
+
+template <>
+struct SpawnTraits<BlastersPostRender::SpawnInfo>
+{
+	using Collection = BlastersPostRender;
+	static constexpr StatusChangeType kSpawn = StatusChangeType::kSpawnBlaster;
+	static constexpr StatusChangeType kTransfer = StatusChangeType::kTransferBlaster;
+};
+
+template <>
+struct SpawnTraits<MissilesPostRender::SpawnInfo>
+{
+	using Collection = MissilesPostRender;
+	static constexpr StatusChangeType kSpawn = StatusChangeType::kSpawnMissile;
+	static constexpr StatusChangeType kTransfer = StatusChangeType::kTransferMissile;
+};
+
+template <>
+struct SpawnTraits<engine::ExplosionsPostRender::SpawnInfo>
+{
+	using Collection = engine::ExplosionsPostRender;
+	static constexpr StatusChangeType kSpawn = StatusChangeType::kSpawnExplosion;
+};
+
+static_assert(std::is_trivially_copyable_v<OmnisPostRender::SpawnInfo> && std::is_trivially_copyable_v<SpaceshipsPostRender::SpawnInfo> && std::is_trivially_copyable_v<BlastersPostRender::SpawnInfo> && std::is_trivially_copyable_v<MissilesPostRender::SpawnInfo> && std::is_trivially_copyable_v<engine::ExplosionsPostRender::SpawnInfo>, "Every SpawnInfo is a status-change payload the replay difference stream writes as a raw image.");
 
 inline StatusChangeData DefaultDataForType(StatusChangeType eType)
 {
 	switch (eType)
 	{
-		case StatusChangeType::kSpawnOmni:        return SpawnOmniData {};
-		case StatusChangeType::kDestroyOmni:      return DestroyOmniData {};
+		case StatusChangeType::kSpawnOmni:
+		case StatusChangeType::kTransferOmni:      return OmnisPostRender::SpawnInfo {};
+		case StatusChangeType::kSpawnSpaceship:
+		case StatusChangeType::kTransferSpaceship: return SpaceshipsPostRender::SpawnInfo {};
+		case StatusChangeType::kSpawnBlaster:
+		case StatusChangeType::kTransferBlaster:   return BlastersPostRender::SpawnInfo {};
+		case StatusChangeType::kSpawnMissile:
+		case StatusChangeType::kTransferMissile:   return MissilesPostRender::SpawnInfo {};
+		case StatusChangeType::kSpawnExplosion:    return engine::ExplosionsPostRender::SpawnInfo {};
+		case StatusChangeType::kDestroyOmni:       return DestroyOmniData {};
 		case StatusChangeType::kUpdateOmni:        return UpdateOmniData {};
 		case StatusChangeType::kUpdateFleet:       return UpdateFleetData {};
-		default:                                      return TransferData {};
+		case StatusChangeType::kCount:             break;
 	}
+	ASSERT(false);
+	std::unreachable();
 }
 
 struct StatusChange
 {
-	bool operator==(const StatusChange&) const = default;
-
 	StatusChangeType eType {};
 	StatusChangeData data {};
 };
+
+template <typename SPAWN_INFO>
+StatusChange MakeSpawn(const SPAWN_INFO& rInfo)
+{
+	return {.eType = SpawnTraits<SPAWN_INFO>::kSpawn, .data = rInfo};
+}
+
+template <typename SPAWN_INFO>
+StatusChange MakeTransfer(const SPAWN_INFO& rInfo)
+{
+	return {.eType = SpawnTraits<SPAWN_INFO>::kTransfer, .data = rInfo};
+}
+
+// Payload accessors over spawn and transfer tags; the engine transfer and reconcile code calls them by name.
+XMVECTOR SpawnPosition(const StatusChange& rChange);
+// The position PrepareTransferRequest rebases into the destination cell.
+XMVECTOR& SpawnPositionRef(StatusChange& rChange);
+// common::ValidateVector on the payload's position, direction, and velocity, where it has them.
+void ValidateSpawnVectors(const StatusChange& rChange);
+// The kSpawnOmni or kTransferOmni payload's owned-entity identity.
+engine::GlobalId OwnedSpawnGlobalId(const StatusChange& rChange);
+engine::ClientGuid OwnedSpawnClientGuid(const StatusChange& rChange);
+
+// Adoptability check the replay stream reader and the harness apply, because client hydration looks the Blaster and
+// Explosion types up with a checked index.
+bool IsAdoptableStatusChange(const StatusChange& rChange);
+
+// The one application point of the post-tick batch: server harvest, replay playback, and the client post-tick loop.
+// coordinate is the cell rFrame belongs to; an explosion takes it and rFrame's tick time.
+void ApplySpawnStatusChange(Frame& __restrict rFrame, const StatusChange& rChange, engine::GridCoord coordinate);
 
 } // namespace game

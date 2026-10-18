@@ -211,7 +211,7 @@ void OmnisPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 	});
 }
 
-static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
+static void ProcessDestroyStatusChanges([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
 	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
@@ -233,42 +233,6 @@ static void ProcessSpawnStatusChanges([[maybe_unused]] Frame& __restrict rFrame,
 
 				engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, destroyId, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 			}
-			continue;
-		}
-
-		if (rStatusChange.eType == StatusChangeType::kSpawnOmni)
-		{
-			const SpawnOmniData& rSpawnData = std::get<SpawnOmniData>(rStatusChange.data);
-			OmniFlags_t spawnFlags {OmniFlags::kBlasterSpawnLeft};
-			if (rSpawnData.bIsFlagship)
-			{
-				spawnFlags.Set(kIsFlagship);
-			}
-
-			// The cell's local frame is centered on the origin, so the spawn offset is the local position.
-			XMVECTOR vecSpawnPosition = XMVectorSet(rSpawnData.fSpawnOffsetX, rSpawnData.fSpawnOffsetY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
-
-			// These offsets arrive from outside the simulation (network or harness), so refuse one outside this
-			// cell here.
-			if (!common::InsideArea(vecSpawnPosition, engine::LocalCellArea()))
-			{
-				continue;
-			}
-
-			OmnisPostRender::Spawn(rFrame,
-			{
-				.vecPosition = vecSpawnPosition,
-				.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f),
-				.vecVelocity = XMVectorZero(),
-				.alignment = rFrame.postRender.omniAlignment,
-				.flags = spawnFlags,
-				.arrivalGracePeriod = kArrivalGracePeriod,
-				.globalId = {.iValue = rSpawnData.iGlobalId},
-				// Empty unless the spawn request carries an owning client: agent-injected rows are born unowned.
-				.clientGuid = rSpawnData.clientGuid,
-				.fleetWantedCoordinate = rSpawnData.fleetWantedCoordinate,
-				.iPendingFleetWantedCoordinateTicks = rSpawnData.uiPendingFleetWantedCoordinateTicks,
-			});
 		}
 	}
 }
@@ -340,7 +304,7 @@ void OmnisPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __restr
 
 void OmnisPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
-	ProcessSpawnStatusChanges(rFrame, rFrameInput, rStaticData);
+	ProcessDestroyStatusChanges(rFrame, rFrameInput, rStaticData);
 
 #if defined(BT_CLIENT)
 	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
@@ -431,8 +395,8 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.pClientGuids[iIndex] = rInfo.clientGuid;
 	rCurrentPostRender.pGlobalIds[iIndex] = rInfo.globalId;
 	rCurrentPostRender.pFleetWantedCoordinates[iIndex] = rInfo.fleetWantedCoordinate;
-	rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = static_cast<uint8_t>(rInfo.iPendingFleetWantedCoordinateTicks);
-	rCurrentPostRender.puiPendingWeaponModeTicks[iIndex] = static_cast<uint8_t>(rInfo.iPendingWeaponModeTicks);
+	rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = rInfo.uiPendingFleetWantedCoordinateTicks;
+	rCurrentPostRender.puiPendingWeaponModeTicks[iIndex] = rInfo.uiPendingWeaponModeTicks;
 #if defined(BT_CLIENT)
 	rCurrentPostRender.pVecDebugNavigationWaypoints[iIndex] = XMVectorZero();
 #endif // BT_CLIENT

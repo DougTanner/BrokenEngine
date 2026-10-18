@@ -87,10 +87,19 @@ the engine calls by name.
 
 ## Transfers and Publication
 
-- `ServerTransferManager` owns cross-cell transfer harvest, adjacency and destination-liveness validation, deterministic type ordering, and destination materialization. `ServerBroadcaster` owns the broadcast snapshot of a tick's status changes, the drain of agent-injected changes held for a later tick, and the per-coordinate publication `ServerSessionRuntime` hands to the delta resend ring at tick completion.
+- `ServerTransferManager` owns cross-cell transfer harvest, adjacency and
+  destination-liveness validation, deterministic type ordering, and destination
+  materialization. It also holds spawns decided outside the tick (`QueueSpawn`)
+  until the first tick at or after their target tick whose coordinate is active
+  with a committed current Frame, and adds them to that tick's post-tick batch,
+  which is applied right after the tick with its arrivals; adjacency and
+  liveness rules apply to transfers only. `ServerBroadcaster` owns the broadcast
+  snapshot of a tick's status changes, the drain of agent-injected changes held
+  for a later tick, and the per-coordinate publication `ServerSessionRuntime`
+  hands to the delta resend ring at tick completion.
 - Keep every workbuffer-backed publication view valid until synchronous delta and optional full-frame buffering have consumed it. Preflight capacity for the complete publication block before forming any view, including the codec-owned maximum nested compression scratch; update that maximum whenever status compression adds or enlarges workbuffer reservations.
 - A transfer destination must be adjacent. A non-owned transfer requires a destination that is already live; an owned-entity transfer makes its destination live.
-- Recompute each destination Frame's `uiSharedCrc` after applying arrived transfers: the frame tick computes it before transfers land, and clients check their own simulated frame against the broadcast CRC for that tick, so skipping the recompute desyncs every client receiving a transfer. This is not defensive recomputation and must not be optimized away as redundant.
+- Recompute each destination Frame's `uiSharedCrc` after applying its post-tick batch (arrived transfers and queued spawns): the frame tick computes it before that batch lands, and clients check their own simulated frame against the broadcast CRC for that tick, so skipping the recompute desyncs every client receiving a transfer or spawn. This is not defensive recomputation and must not be optimized away as redundant.
 - Both classes name `game::StatusChange` and read, create, and pass whole game
   Frames and their state, such as `postRender.transferRequests` — a deliberate
   exception to the engine/game contract, because the payload crossing a cell
@@ -100,15 +109,18 @@ the engine calls by name.
   `Engine.h` aggregation and consumers include them directly. The two managers
   also use these game names directly, naming no gameplay type:
   `game::kOwnedEntityTransferType` (the transfer type that carries an owned
-  entity), `game::Frame::OwnershipLayer`, `game::SpawnTransfer`,
+  entity), `game::Frame::OwnershipLayer`, `game::ApplySpawnStatusChange`,
+  `game::IsSpawnType`, `game::IsTransferType`, `game::SpawnPosition`,
+  `game::OwnedSpawnGlobalId`, `game::OwnedSpawnClientGuid`,
   `game::ServerSession::OnOwnedEntityChangedCell`, and
   `game::ServerSession::BuildAdvancingFrameInputs`.
-- Harness rig queues come from the game Agent's session-bound state (the game
-  project's own `Source/Agent/AGENTS.md` `## Contracts`). The broadcaster drains injected
-  changes and takes its snapshot once per normal-play tick, so an injected
-  change can enter any tick of a multi-tick update, and the transfer manager
-  drains harness rig transfers after natural collection and before deterministic
-  sorting; each manager's reset clears only the harness rig queue it drains.
+- The harness rig status-change queue comes from the game Agent's session-bound
+  state (the game project's own `Source/Agent/AGENTS.md` `## Contracts`). The
+  broadcaster drains injected changes and takes its snapshot once per
+  normal-play tick, so an injected change can enter any tick of a multi-tick
+  update, and its reset clears that queue. The transfer manager drains its spawn
+  queue after natural collection and before deterministic sorting, and its reset
+  clears that queue.
   Each accepted transfer batch goes to the engine replay owner before live
   application (`../../File/AGENTS.md#replay-streams`); capture failure
   invalidates recording but never vetoes the accepted batch.

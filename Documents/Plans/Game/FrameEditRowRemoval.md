@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-17T15:06:11.923Z","dependsOn":["Documents/Plans/Game/FrameEditRows.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-17T15:06:11.923Z","dependsOn":[]} -->
 # Harness row removal through the regular Destroy phase: document the kill-state writes
 
 Line numbers cite baseline `d8ce779b3b4fb984b572522896b6382d8dd19d19`. Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other. Saved as `Documents/Plans/Game/FrameEditRowRemoval.md`; its `dependsOn` names `Documents/Plans/Game/FrameEditRows.md`, which holds the Stage 1 Plan (the unified spawn system): its `inject_payload` spawn entries are the setup of every check below.

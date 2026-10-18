@@ -18,7 +18,7 @@ Game implementation built on Engine and Common. `Game` owns the per-side session
 ## Architecture
 
 - Client subscriptions cover the current cell plus visible neighbors within the authorized 3x3 ring; the engine client session runtime computes them (`../../../Engine/Source/Network/Client/AGENTS.md`). The client's cell is stored on `GameBase`, but game policy chooses it; its write path is engine-owned (`../../../Engine/Source/Network/Client/AGENTS.md` `## Other`).
-- Cross-cell transfers are serialized `StatusChange`s carrying spawn state; the machinery that moves them between cells is engine-owned (`../../../Engine/Source/Network/Server/AGENTS.md`). The client removes them from `FrameInput` before normal Spawn processing; server replay records them in the difference stream's post-dispatch channel, never inside `FrameInput`.
+- Cross-cell transfers and spawns decided outside the tick are serialized `StatusChange`s carrying spawn state; the machinery that moves them between cells and applies them is engine-owned (`../../../Engine/Source/Network/Server/AGENTS.md`). The client applies them right after the frame tick and then removes them from `FrameInput`; server replay records them in the difference stream's post-dispatch channel, never inside the recorded input.
 - Omni/enemy alignments are copied into each new `FramePostRender`; frame code reads the snapshot, not `gpGame`.
 - The game-owned persisted client setting `ClientState.bin` is versioned POD
   written through the engine versioned-file helpers. `ClientState.bin` loads once at startup, the focused

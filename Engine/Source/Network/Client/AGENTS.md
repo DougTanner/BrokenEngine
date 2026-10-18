@@ -79,7 +79,7 @@ are in [Network](../../../../Documents/Architecture/Network.md).
 
 This directory owns CRC fast-path, rollback/ring orchestration, replay, per-coord parallel dispatch, profiling merge, and first-in-slot-order unresolved mismatch selection. Each worker writes only its coord. The game supplies payloads, transfer materialization, and reconciliation/desync policy; see [Game Reconciliation](../../../../Documents/Architecture/GameReconciliation.md).
 
-- `ReconcileReplayTick.cpp` applies transfer `StatusChange`s after each replay tick in server Destroy/Spawn order and recomputes CRC after transfers; this ordering is required for the broadcast CRC ([server detail](../Server/AGENTS.md)).
+- `ReconcileReplayTick.cpp` applies the post-tick batch (spawn and transfer `StatusChange`s) after each replay tick in server Destroy/Spawn order and recomputes CRC after that batch; this ordering is required for the broadcast CRC ([server detail](../Server/AGENTS.md)).
 - `ReconcileReplay.h` and `ClientDesyncCore.h` deliberately name game types because their payloads are game-defined while their machinery is engine-owned; both stay out of `Engine.h`, and consumers include them directly, matching the exception in the [server detail](../Server/AGENTS.md). `ClientSessionBase.h` includes `ClientDesyncCore.h`.
 
 ## Other

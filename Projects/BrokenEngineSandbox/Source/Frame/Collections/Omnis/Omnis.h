@@ -143,10 +143,12 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	bool LogDifferences(const OmnisInterpolate& rOther) const;
 
 #if defined(BT_CLIENT)
-	// Helper shared by Omnis.cpp (Destroy, spawn-status-change cleanup) and OmnisNavigation.cpp (Transfer)
+	// Helper shared by Omnis.cpp (Destroy, destroy-status-change cleanup) and OmnisNavigation.cpp (Transfer)
 	static void RemoveOwnedVisuals(Frame& rFrame, OmnisInterpolate& rCurrentInterpolate, int64_t i);
 #endif
 };
+
+using omni_t = engine::Id<OmnisInterpolate>;
 
 enum class OmniFlags : uint16_t
 {
@@ -350,10 +352,17 @@ public:
 		engine::GlobalId globalId {};
 		engine::ClientGuid clientGuid {};
 		engine::GridCoord fleetWantedCoordinate {};
-		int64_t iPendingFleetWantedCoordinateTicks = 0;
-		int64_t iPendingWeaponModeTicks = 0;
+		uint8_t uiPendingFleetWantedCoordinateTicks = 0;
+		uint8_t uiPendingWeaponModeTicks = 0;
 		// Transfers preserve supplied combat fields and animation time; navigation resets at spawn, and shield rotation and shrink use defaults.
 		bool bTransfer = false;
+
+		// Status-change payload members. clientGuid is server-local and the shield rotation and shrink are client visuals,
+		// so none of them is listed.
+		static constexpr auto Fields()
+		{
+			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, fArmor), FRAME_COLUMN(SpawnInfo, fShield), FRAME_COLUMN(SpawnInfo, nextBlasterFireTime), FRAME_COLUMN(SpawnInfo, nextSecondarySpawnTime), FRAME_COLUMN(SpawnInfo, shieldCooldown), FRAME_COLUMN(SpawnInfo, shieldDownSoundCooldown), FRAME_COLUMN(SpawnInfo, animationTime), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, transferLockTimer), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiPendingWeaponModeTicks), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
+		}
 	};
 
 	static bool Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo);

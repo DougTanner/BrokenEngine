@@ -1,7 +1,5 @@
 #include "FrameInput.h"
 
-#include "SpawnTransfer.h"
-
 namespace game
 {
 
@@ -31,7 +29,7 @@ void AdmitFrameInputStatusChange(const StatusChange& rChange)
 	}
 	// Every legitimate spawn carries a real global ID; a zero ID would create an
 	// unaddressable Omni row.
-	if (rChange.eType == StatusChangeType::kSpawnOmni && std::get<SpawnOmniData>(rChange.data).iGlobalId == 0)
+	if (rChange.eType == StatusChangeType::kSpawnOmni && OwnedSpawnGlobalId(rChange).iValue == 0)
 	{
 		throw std::ios_base::failure("FrameInput SpawnOmni global ID");
 	}

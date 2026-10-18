@@ -140,7 +140,7 @@ void ServerSession::AfterNetworkPoll()
 	mpClientManager->NewClients();
 	// Ordering contract: Create runs first so requests naming a fleet created in the same poll can
 	// resolve its guid. SpawnInto before Respawn also matters: both append to the client manager's
-	// spawn queue, and that order is the order spawn status changes enter the frame input, and
+	// spawn queue, and that order is the order spawns are queued for the post-tick batch, and
 	// therefore the simulation and the CRC.
 	mpFleetManager->ProcessCreateFleetRequests();
 	mpFleetManager->ProcessDeleteFleetRequests();
@@ -194,8 +194,7 @@ void ServerSession::BuildAdvancingFrameInputs()
 	mpFleetManager->ProcessFlagshipUpdates();
 
 	// After ProcessFlagshipUpdates so the flagship update this queues is consumed on the following update and its
-	// fleet-RNG draw keeps its position, and before the first tick's PrepareTickStatusChanges drain so a drain that
-	// releases agent entries for the origin coordinate sorts this spawn in with them.
+	// fleet-RNG draw keeps its position. Each spawn is queued for the next tick's post-tick batch.
 	mpClientManager->SpawnWaitingClients();
 }
 

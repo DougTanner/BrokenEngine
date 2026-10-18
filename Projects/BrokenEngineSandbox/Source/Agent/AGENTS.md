@@ -28,10 +28,16 @@ orchestration for `inject_payload`, `replay_record`, `replay_play`,
   hooks. Cell moves require a connected session whose owned entity is already
   assigned, because before assignment the client subscription policy falls back
   to origin and discards the requested cell.
-- Server handlers own simulation controls, status-change injection, frame and CPU profile queries, and save/replay operations. Their focused simulation-harness-rig module owns one state slot bound to the live `ServerSession`, including the coordinate-keyed status and transfer queues that `inject_payload` fills; replacing or destroying the bound session clears that state (`../../Documents/AgentHarness/commands-server.md`).
+- Server handlers own simulation controls, status-change injection, frame and
+  CPU profile queries, and save/replay operations. Their focused
+  simulation-harness-rig module owns one state slot bound to the live
+  `ServerSession`, including the coordinate-keyed status-change queue that
+  `inject_payload` destroy and update entries fill; replacing or destroying the
+  bound session clears that state. `inject_payload` spawn entries go to the
+  engine `ServerTransferManager` spawn queue instead
+  (`../../Documents/AgentHarness/commands-server.md`).
 - Replay commands fail when `kbDebugInput` is disabled because the simulation will not consume those requests.
-- `inject_payload` transfer entries are server-only debug controls, and their queue also seeds arrivals outside replay, so draining it stays independent of replay state. Keep their injected state deterministic.
-- The game Agent owns replay transfer type classification, capture-count storage shape, and command JSON fields. The [engine replay harness rig](../../../../Engine/Source/Agent/AGENTS.md#architecture) owns how those counts are observed and when the classifier is invoked. `inject_payload` field keys are the member tokens named through `INJECTED_FIELD` in `Commands/ServerSimulationHarnessRigs.cpp`; a kind's accepted fields change only there.
+- The game Agent owns replay transfer type classification, capture-count storage shape, and command JSON fields. The [engine replay harness rig](../../../../Engine/Source/Agent/AGENTS.md#architecture) owns how those counts are observed and when the classifier is invoked. `inject_payload` field keys are the `Fields()` member tokens of each payload (each collection's `SpawnInfo` and the update and destroy payloads in `Frame/StatusChange.h`); a kind's accepted fields change only there.
 - `edit_frame` and `read_frame` keys are the `FRAME_COLUMN` tokens of each
   collection's column list in `Commands/ServerFrameEdit.cpp` and of each frame
   struct's `Values()`; `read_frame` reads every one of them, identity and clock

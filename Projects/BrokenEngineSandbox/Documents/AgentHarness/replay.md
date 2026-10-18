@@ -10,7 +10,8 @@ Run replay acceptance only on a `kbDebugInput` build. It must prove transitions 
 2. To compare literal per-tick CRC values instead of only the absence of
    failures, also send `set_log_level {"category":"Replay","level":"Verbose"}`
    and run a single-coordinate replay: a freshly `reset` server with
-   `status.activeCoords` length 1 and no `inject_payload` transfer entry. Scrape
+   `status.activeCoords` length 1, no `inject_payload` spawn entry, and no cell
+   crossing. Scrape
    `get_logs {"category":"Replay"}` incrementally through recording and playback
    — that category ring holds 128 lines — then diff the
    `Checksum DifferenceStreamWriter Update` sequence against the
@@ -38,29 +39,35 @@ semantic replay acceptance. In the clamped case, use the static source/phase
 trace for publication-at-`E`, with replay capture ticks, final state/count,
 checksum/no-desync, and the completed loop as runtime signals. Keep the
 effective setting for the baselines and the entire A–G matrix. It replaces the
-unavailable historical tick-39222 artifact with deterministic transfers. Keep a
+unavailable historical tick-39222 artifact with deterministic spawns and
+transfers. Keep a
 newly appended server-log slice for the whole harness rig and reject any new
 `LogDifferences CRC Client`, checksum mismatch, `CONFIRMED DESYNC`,
 replay-reader error, or `SaveLoadReplay aborted` line.
 
-The harness rig is an `inject_payload` batch of transfer entries
-(`TransferOmni`, `TransferSpaceship`, `TransferBlaster`, or `TransferMissile`)
-with no `tick`, so each lands on the next tick. `pauseAfterWriterInput:true` is
-accepted during active recording, or only while the server is paused with an
-unconsumed `replay_record {"start":true}` transition; it rejects an unpaused
-pending start, cancelled starts, and a batch with no transfer entry or with a
-`tick` entry, and playback rejects every injection. It arms count `1` for a
-pending start. During active recording it snapshots the current writer-input
-count `N` and arms `N + 1`: after command drain, that update's `SyncReplayTick`
-records writer input `N + 1` for event tick `E`, then the same update's
-`FinalizeFrameTick` harvests the transfer at `E` and records it in that coord's
-post-dispatch channel at `E`, so the whole event is complete before the pause
-takes effect. Playback applies and publishes the transfer after dispatch at `E`,
-while the destination first enters the simulation dispatch set at `E + 1`. A
-`TransferOmni` entry mints a synthetic omni with an empty client GUID, so
-this harness rig proves transfer state, ordering, CRC, and replay-reader
-behavior only; it cannot prove persistent ownership or GUID relinking. The
-result echoes the applied Boolean.
+The harness rig is an `inject_payload` batch of spawn entries (`SpawnOmni`,
+`SpawnSpaceship`, `SpawnBlaster`, `SpawnMissile`, or `SpawnExplosion`) at an
+active cell with no `tick`, so each is applied right after the next tick and is
+that tick's post-dispatch event, counted under its collection. A case that
+needs a newly created destination instead uses the edge-coast `SpawnOmni` of
+the `inject_payload` entry in [commands-server.md](commands-server.md), whose
+cell crossing is the destination's event: the crossing harvested at `E` is
+published at `E`, while the destination first enters the simulation dispatch
+set at `E + 1`. `pauseAfterWriterInput:true` is accepted during active
+recording, or only while the server is paused with an unconsumed
+`replay_record {"start":true}` transition; it rejects an unpaused pending
+start, cancelled starts, and a batch with no spawn entry or with a `tick`
+entry, and playback rejects every injection. It arms count `1` for a pending
+start. During active recording it snapshots the current writer-input count `N`
+and arms `N + 1`: after command drain, that update's `SyncReplayTick` records
+writer input `N + 1` for event tick `E`, then the same update's
+`FinalizeFrameTick` harvests the post-tick batch at `E`, applies the spawn, and
+records it in that coord's post-dispatch channel at `E`, so the whole event is
+complete before the pause takes effect. Playback applies and publishes the
+spawn after dispatch at `E`. A `SpawnOmni` entry mints a synthetic omni with an
+empty client GUID, so this harness rig proves spawn and transfer state,
+ordering, CRC, and replay-reader behavior only; it cannot prove persistent
+ownership or GUID relinking. The result echoes the applied Boolean.
 
 `replay_transfer_capture` exposes `firstWriterInputTick` and `writerInputCount`
 beside an `events` array holding one entry per recording event tick in capture
@@ -76,9 +83,9 @@ during playback require every entry's `playbackEventTick` to equal its
 line as runtime publication evidence. If the requested `Verbose` level was
 clamped to `Debug`, that kVerbose line is unavailable and must not be required;
 the static source/phase trace owns publication-at-`E` (post-dispatch record load
-and transfer staging at `E` before dispatch, normal dispatch at `E`, transfer
-apply/publication at `E` after that dispatch, then the destination's first
-dispatch at `E + 1`). In either case, a status or query response cannot prove
+and batch staging at `E` before dispatch, normal dispatch at `E`, batch
+apply/publication at `E` after that dispatch, then, for a newly created
+destination, its first dispatch at `E + 1`). In either case, a status or query response cannot prove
 historical timing; runtime acceptance uses the capture event ticks, final
 state/count, checksum/no-desync signals, and the completed replay loop.
 `writerInputCount` is one per advancing simulation tick with one or more
@@ -86,70 +93,74 @@ nonterminal writer updates, never one per writer or coordinate; terminal flushes
 do not increment it.
 
 For the focused active-recording pause scenario, begin with
-`writerInputCount == N > 1`, then send a `TransferOmni` entry with
+`writerInputCount == N > 1`, then send a `SpawnOmni` entry with
 `pauseAfterWriterInput:true`. Require one automatic pause at count `N + 1`,
 exactly one `events` entry with `recordingEventTick == E` whose
 `playbackEventTick == E` after playback, and exactly one synthetic omni
-transfer. Resume, allow a later writer input, and prove it does not pause again.
+spawn. Resume, allow a later writer input, and prove it does not pause again.
 Use the natural persistent-GUID scenario below for ownership and GUID
 assertions; do not attribute those assertions to this harness rig.
 
 Run the following A–G matrix. Keep a newly appended server-log slice for the entire matrix and reject any new `LogDifferences CRC Client`, checksum mismatch, `CONFIRMED DESYNC`, replay-reader error, or `SaveLoadReplay aborted` line.
+Run it with no client connected: a client's fleet spawns join the post-tick
+batch at the origin `[0,0]` and count under `omniCount`, which breaks the
+per-case counts below.
 
 A. Send `reset`, `pause {"paused":true}`, then `replay_record {"start":true}`.
 While still paused, send
-`inject_payload {"entries":[{"coord":[1,0],"type":"TransferOmni"}],"pauseAfterWriterInput":true}`
-and require its echoed Boolean. Unpause. Tick `E` starts recording and harvests
-the transfer; after the `E + 1` writer input, require automatic
+`inject_payload {"entries":[{"coord":[0,0],"type":"SpawnOmni"}],"pauseAfterWriterInput":true}`
+and require its echoed Boolean. Unpause. Tick `E` starts recording and applies
+the spawn after its dispatch; after the `E + 1` writer input, require automatic
 `status.paused:true`, `firstWriterInputTick == E + 1`, `writerInputCount == 1`,
 and exactly one `events` entry with `recordingEventTick == E`,
-`omniCount == 1`, and every other transfer count zero. Treat the omni as
-synthetic state only; no ownership or GUID conclusion is allowed.
+`omniCount == 1`, and every other count zero. Treat the omni as synthetic state
+only; no ownership or GUID conclusion is allowed.
 B. While automatically paused after A, send `pause {"paused":false}` and require the server to resume recording. Keep recording for at least `engine::kiTickRate` advancing ticks beyond the `recordingEventTick` of that recording's `events` entry selected by `recordingEventTick == E` (require `status.tick >= recordingEventTick + engine::kiTickRate`) before sending `replay_record {"start":false}`. Poll until `status.recording:false` before sending `replay_play`, then poll `status.replaying:true`.
 C. During that playback, poll `replay_transfer_capture` until that recording's
 `events` entry selected by `recordingEventTick == E` has
 `playbackEventTick == E`. Immediately, before terminal reload, query
-`query_frame` and `query_omnis {"coord":[1,0]}`; require exactly one synthetic
-omni, the matching destination omni count, and that entry's expected event
-tick and final transfer count. If the setup response reported effective Network
-`Verbose`, require the newly appended `ServerBroadcaster::BuildTickPublication`
-line for destination `[1,0]` at `Tick: E`; if it reported clamped `Debug`, do
-not fail on the missing line and use the static source/phase trace to establish
-publication at `E` and first simulation dispatch at `E + 1`. Do not infer either
-historical point from `status` or `query_omnis`. After those immediate
+`query_frame` and `query_omnis {"coord":[0,0]}`; require exactly one synthetic
+omni, the matching omni count, and that entry's expected event tick and final
+count. If the setup response reported effective Network `Verbose`, require the
+newly appended `ServerBroadcaster::BuildTickPublication` line for `[0,0]` at
+`Tick: E`; if it reported clamped `Debug`, do not fail on the missing line and
+use the static source/phase trace to establish publication at `E`. Do not infer
+that historical point from `status` or `query_omnis`. After those immediate
 observations, separately wait for a newly appended `End replay <tick>, looping`
 marker and scan the appended log slice for CRC/read/`CONFIRMED DESYNC` errors.
-This proves delayed activation, replayed transfer publication, and checksum
-validation; the marker confirms one completed loop while playback remains
-active.
-D. First choose the D blaster's `vecPosition` in `[1,0]` and confirm it
+This proves replayed spawn publication and checksum validation; the marker
+confirms one completed loop while playback remains active.
+D. First choose the D blaster's `vecPosition` in `[0,0]` and confirm it
 terrain-clear in a probe that records nothing, because the command makes no
 terrain check and a blaster destroys itself on terrain contact. C ends in active
 playback, so cancel it by sending `replay_play` again and polling
-`status.replaying:false`. Send `reset`, then a `TransferOmni` entry into
-`[1,0]` so the destination is live; once `query_omnis {"coord":[1,0]}` lists
-its minted global id, read `status.tick` and send a `TransferBlaster` entry into
-`[1,0]` at the chosen `vecPosition` with `tick:T` for some `T` above it, so `T`
-is its harvest tick. Pause once `status.tick >= T + 1`, then require a
-`query_collection {"coord":[1,0],"collection":"blasters"}` row whose `local` x
+`status.replaying:false`. Send `reset`, read `status.tick`, and send a
+`SpawnBlaster` entry into `[0,0]` at the chosen `vecPosition` with `tick:T` for
+some `T` above it, so `T` is the tick it is applied after. Pause once
+`status.tick >= T + 1`, then require a
+`query_collection {"coord":[0,0],"collection":"blasters"}` row whose `local` x
 and y equal `vecPosition + vecVelocity * (status.tick - T) / 32` within 0.05 m
 (`vecVelocity` defaults to `[1,0]`); if none matches, choose another position
-and repeat. Send `reset` again, so no probe omni or blaster is present when D
-records, and unpause. Then record a multi-event variant in this order: send a
-`TransferOmni` entry to create `[1,0]`, then send one each of
-`TransferSpaceship`, `TransferBlaster` at the probed `vecPosition`, and
-`TransferMissile` into `[1,0]`. Send each entry only after the previous one has
-been harvested, confirmed by an advanced `status.tick`; entries queued for the
-same harvest are drained as one batch and merge into a single capture entry.
-After recording stops, one `replay_transfer_capture` read must return the four
-`events` entries in capture order, each with its own type count `1` and the
-other counts zero; during playback, poll `replay_transfer_capture` until every
-entry's `playbackEventTick` equals its `recordingEventTick`. When effective
-Network `Verbose` is available, also require the matching
-`ServerBroadcaster::BuildTickPublication` line at the event tick; when it is
+and repeat. Send `reset` again, so no probe blaster is present when D records,
+and unpause. Then record a multi-event variant in this order: send the
+edge-coast `SpawnOmni` entry into `[0,0]` and wait until its crossing creates
+`[1,0]` (`[1,0]` appears in `status.activeCoords`), then send one each of
+`SpawnSpaceship`, `SpawnBlaster` at the probed `vecPosition`, and
+`SpawnMissile` into `[0,0]`. Send each entry only after the previous event has
+been applied, confirmed by an advanced `status.tick`; entries released for the
+same tick join one batch and merge into a single capture entry. After recording
+stops, one `replay_transfer_capture` read must return five `events` entries in
+capture order: the omni spawn and then its crossing, each with `omniCount` `1`,
+then one each with `spaceshipCount`, `blasterCount`, and `missileCount` `1`,
+every other count zero; during playback, poll `replay_transfer_capture` until
+every entry's `playbackEventTick` equals its `recordingEventTick`. When
+effective Network `Verbose` is available, also require the matching
+`ServerBroadcaster::BuildTickPublication` line at each event tick; when it is
 clamped to `Debug`, use the static source/phase trace and do not require that
-line. Require the matching `query_collection` count at `[1,0]` after playback,
-no checksum/CRC/`CONFIRMED DESYNC` error, and the completed replay loop. The
+line. The crossing proves delayed activation: `[1,0]` is published at its event
+tick and first dispatched one tick later. Require the matching `query_frame`
+counts at `[0,0]` and the crossed omni at `[1,0]` after playback, no
+checksum/CRC/`CONFIRMED DESYNC` error, and the completed replay loop. The
 Blaster query is the deterministic tick-39222 regression signal; this matrix
 makes no ownership claim.
 E. D ends in active playback and injection is rejected during replay, so first
@@ -165,8 +176,8 @@ then issue `replay_play`. The destination must retire at its recorded terminal
 boundary without missing/duplicate collections,
 `Replay reader terminal data was not fully consumed`, or
 `advanced beyond terminal`; require an `End replay <tick>, looping` marker.
-F. Abort a pending start: `reset`, pause, request recording, send the `TransferOmni` entry of A, then send `replay_record {"start":false}` before unpausing. After unpausing, require no `[1,0]` destination, no transferred entity, and no recording event in `replay_transfer_capture`.
-G. Abort an injected start failure: `reset`, pause, arm `replay_inject_persistence_failure {"stage":"invalidation"}`, request recording, and send the `TransferOmni` entry of A. Unpause. Require no `[1,0]` destination, no transferred entity, and no recording event in `replay_transfer_capture`.
+F. Abort a pending start: `reset`, pause, request recording, send the `SpawnOmni` entry of A, then send `replay_record {"start":false}` before unpausing. After unpausing, require `status.recording:false`, no recording event in `replay_transfer_capture`, and the spawned omni live at `[0,0]` (its minted global id in `query_omnis`), because cancelling a start drops no queued entry.
+G. Abort an injected start failure: `reset`, pause, arm `replay_inject_persistence_failure {"stage":"invalidation"}`, request recording, and send the `SpawnOmni` entry of A. Unpause. Require `status.recording:false`, no recording event in `replay_transfer_capture`, and the spawned omni live at `[0,0]`, because a recording-start failure drops no queued entry.
 
 ### Natural persistent-GUID ownership and cell crossing
 
@@ -304,13 +315,13 @@ Use fresh recordings for these two failure cases and preserve a stopped-server c
 
 1. For capture invalidation, start recording, arm
    `replay_inject_persistence_failure {"stage":"transfer_capture"}`, and queue
-   one valid `TransferOmni` entry or natural Omni transfer. Require the live
-   transfer to complete at its destination, exactly one recording-invalidation
+   one valid `SpawnOmni` entry or wait for a natural Omni transfer. Require the
+   live spawn or transfer to complete at its destination, exactly one recording-invalidation
    error line, `status.recording:false`, and a cleared `replay_transfer_capture`
    result (an empty `events` array and `-1` `firstWriterInputTick`).
    Stop/release the server and require no valid v5 manifest; after relaunch,
    `replay_play` must not adopt or alter the live state. This case proves Replay
-   failure does not veto an already accepted live transfer.
+   failure does not veto an already accepted live post-tick batch.
 2. For the stable writer target, discover the sole real Omni by querying every
    coordinate in `status.activeCoords`; record its actual non-origin A and
    `globalId`, choose adjacent B, and never assume origin or a fixed A. Start
@@ -330,47 +341,55 @@ Use fresh recordings for these two failure cases and preserve a stopped-server c
 
 Use the existing commands to create a valid `savedEnd + 1` pair; do not edit
 replay files or add a harness rig API. Discover a real Omni cell S from
-`status.activeCoords`, choose an empty adjacent A, and choose a different
-auxiliary destination C. Pause, move the client to A until A is active, request
-recording, and send
-`inject_payload {"entries":[{"coord":<C>,"type":"TransferOmni"}],"pauseAfterWriterInput":true}`.
-Unpause exactly once and wait for the automatic pause after the next writer
-input. While still paused at completed tick T, repeatedly move the client away
-until A is unsubscribed and absent from `status.activeCoords`; the clock must
-remain T. Still paused, send
-`inject_payload {"entries":[{"coord":<A>,"type":"TransferOmni"}],"pauseAfterWriterInput":true}`,
-then manually unpause so the next writer input captures the return at `T + 1`
-and pauses again. While still paused after that writer input, send
+`status.activeCoords` and choose an empty A that shares an edge with S, never a
+diagonal neighbor. A plain spawn entry
+`{"coord":<S>,"type":"SpawnOmni"}` with `pauseAfterWriterInput:true` arms a
+pause; its omni only marks the event. Pause, move the client to A until A is
+active, request recording, send that plain entry, unpause exactly once, and
+wait for the automatic pause after the next writer input, so recording is
+active. Still paused, send an edge-coast spawn into S whose margin is one tick:
+`inject_payload {"entries":[{"coord":<S>,"type":"SpawnOmni","vecPosition":<p>,"vecVelocity":<v>,"transferLockTimer":1}],"pauseAfterWriterInput":true}`,
+with `p` 449.5 m from S's center toward A on the S→A axis and 0 on the other
+axis, and `v` 33.33 m/s toward A (for A east of S, `[449.5,0]` and
+`[33.33,0]`). Unpause exactly once and wait for the automatic pause: during
+active recording it follows the writer input of the spawn's event tick, so the
+omni is applied in S right after that tick and has not moved. While still
+paused at completed tick T, repeatedly move the client away until A is
+unsubscribed and absent from `status.activeCoords`; the clock must remain T.
+Still paused, send the plain entry again, then manually unpause: tick `T + 1`
+carries the coasting omni across into A, so the next writer input captures the
+return at `T + 1` and pauses again. While still paused after that writer input, send
 `replay_record {"start":false}`, then send `pause {"paused":false}` and poll
 until `status.recording:false`; only then send `replay_play`, play it through a
 completed loop, and inspect the stopped manifest. Require A's earlier generation
 to end at T, its next activation to equal `T + 1`, a valid root digest over the
-qualified siblings, and no CRC, read, or desync error. The proven setup used
-S=`[1,-1]`, A=`[2,-1]`, C=`[1,0]`, T=`38974`, and activation `38975`.
+qualified siblings, and no CRC, read, or desync error.
 
 ### Replay stop-before-dispatch decisions
 
 These checks combine harness observations with a static phase trace because the public commands do not expose a dispatch counter.
 
-1. For playback abort, record exactly one `inject_payload` `TransferOmni`
-   event at tick `E` and no other transfer event for that destination, stop
+1. For playback abort, record exactly one cell crossing into a newly created
+   destination at tick `E`, made with the edge-coast `SpawnOmni` of the
+   `inject_payload` entry, and no other post-dispatch event for that
+   destination, stop
    recording, release the server, and preserve the complete valid v5 artifact
    set. From the manifest records, compute the destination's exact
    `(coordKey,activationTick)` kind-2 header file and authenticate the untouched
    manifest and artifacts with the root-digest self-check before editing. In
    that header require exactly one occurrence of the byte sequence consisting of
    post-dispatch count `1` as little-endian int64, `E` as little-endian int64,
-   status count `1` as little-endian int64, and the `TransferOmni` byte `01`,
-   followed by that record's serialized `TransferData` payload running to the
-   end of the file, so the sequence opens the header's trailing post-dispatch
-   section and its only record. Change that status count to `0` and truncate the
-   file immediately after it; the record then parses as an empty batch, which
-   the post-dispatch check rejects with the same semantic error as a
-   non-transfer entry. Recompute the manifest root digest using the v5 repair
+   status count `1` as little-endian int64, and the `TransferOmni` byte `05`,
+   followed by that record's serialized `OmnisPostRender::SpawnInfo` image
+   running to the end of the file, so the sequence opens the header's trailing
+   post-dispatch section and its only record. Change that status count to `0`
+   and truncate the file immediately after it; the record then parses as an
+   empty batch, which the post-dispatch check rejects with the same semantic
+   error as a tick-input entry. Recompute the manifest root digest using the v5 repair
    procedure under Replay manifest v5 integrity and generation matrix below.
    After relaunch, capture ordered-log counts for `ReadGrid F7.replay.grid`,
    `GameBase::ResetSession()`, and `Replay post-dispatch record is not a
-   transfer batch`, plus a status tick, before sending `replay_play`. The
+   post-tick batch`, plus a status tick, before sending `replay_play`. The
    malformed event may abort in the same update that adopts the replay, so do
    not require an observable `replaying:true` state. Require exactly one new
    semantic-error line, `status.replaying:false`, later status ticks advancing

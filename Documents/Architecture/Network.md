@@ -10,14 +10,15 @@
   - Client confirms ASAP via an ACK stream carrying, per-slot, `(slot, epoch, floor, bitfield-low, bitfield-high)`, followed by a single trailing 8-byte client timestamp the server echoes back to drive pipeline RTT. The bitfield covers 128 ticks (= `kiNetworkBufferSize`) above the floor
   - **Epoch**: `AckState.uiEpoch` guards against ghost ACKs reactivating a slot that has been reassigned to a different coord. An ACK whose epoch doesn't match the current slot epoch is dropped
 - After per-cell dispatch, the live post-tick transfer tail harvests requests,
-  validates adjacency and destination liveness, sorts transfers by type,
-  materializes them into destination frame state, recomputes each changed
+  validates adjacency and destination liveness, adds the spawns decided outside
+  the tick that are queued for that tick, sorts the batch by type,
+  materializes it into destination frame state, recomputes each changed
   destination's `sharedCrc`, and then swaps/publishes the frames. Replay
-  transfer publication follows the same post-dispatch ordering: a transfer
-  harvested at event tick `E` is recorded at `E` in the replay difference
-  stream's post-dispatch channel, and playback loads that exact tick, applies
-  the recorded transfers, recomputes the destination CRC, and publishes after
-  dispatch at `E`. The destination may therefore be publication-only at `E` and
+  transfer publication follows the same post-dispatch ordering: a batch
+  harvested at event tick `E`, its spawns included, is recorded at `E` in the
+  replay difference stream's post-dispatch channel, and playback loads that
+  exact tick, applies the recorded batch, recomputes the destination CRC, and
+  publishes after dispatch at `E`. The destination may therefore be publication-only at `E` and
   enter the simulation dispatch set at `E + 1`; its update still uses the
   existing `GridUpdateData`/per-slot route, with no wire-format,
   client-starvation, or subscription rule change.
@@ -167,7 +168,7 @@
      - No speculative snapshot exists in the ring at `iShrunkTick` (pruned or never captured)
      - Shrunk rollback was attempted but desynced at its very first replay tick — interpreted as the speculative starting state being bad. The two-tier fallback clears desync state, resets replay, and retries from `iConfirmedTick`
      - Note: the `Replayed: true` field in `Reconcile post-replay` log lines means "rollback-and-replay pipeline ran" (non-fast-path), *not* "full rollback was used" — the `ShrunkRollback:` field distinguishes shrunk vs full rollback
-  2. Replay each buffered server update tick-by-tick. `RunFrameTick` completes first; transfer StatusChanges are then applied in the post-tick tail, removed from the replay input, and any frame changed by transfers has its `sharedCrc` recomputed before CRC validation against the server's `sharedCrc`. Matching ticks advance `iConfirmedTick` in the same pass
+  2. Replay each buffered server update tick-by-tick. `RunFrameTick` completes first; spawn and transfer StatusChanges are then applied in the post-tick tail, removed from the replay input, and any frame changed by them has its `sharedCrc` recomputed before CRC validation against the server's `sharedCrc`. Matching ticks advance `iConfirmedTick` in the same pass
   3. If a replayed Tick still CRC-fails *with* its StatusChanges applied, that is a genuine desync → escalate to resync/disconnect
   4. This is strictly better than "re-simulate forward with empty inputs": buffered server updates carry StatusChanges that must be folded in, otherwise every subsequent Tick would immediately mismatch again and thrash reconciliation every frame until the buffer drains
 - **Per-frame replay bound**: replay per call runs to `iMaximumConsecutive` (the
@@ -283,7 +284,7 @@ sizes are the full packet including the type byte.
 
 | Packet | Min | Max | /tick | Handshake | Over-cap | Residual semantic validation |
 |--------|----|----|------|-----------|----------|------------------------------|
-| `kClientHello` | 21 | 101 | 4 | no | violation | `kiProtocolVersion` (every incompatible `StatusChange`/`TransferData` layout change requires its author to increment the then-current literal; no automatic signature) → `game::Frame::kiVersion` → ordered `Islands.manifest` chunk-table integrity-token gates (any mismatch rejects+disconnects); build-config warn; idempotent re-Hello; duplicate live nonempty GUID rejects+disconnects |
+| `kClientHello` | 21 | 101 | 4 | no | violation | `kiProtocolVersion` (every incompatible `StatusChange` payload (`SpawnInfo` `Fields()`) layout change requires its author to increment the then-current literal; no automatic signature) → `game::Frame::kiVersion` → ordered `Islands.manifest` chunk-table integrity-token gates (any mismatch rejects+disconnects); build-config warn; idempotent re-Hello; duplicate live nonempty GUID rejects+disconnects |
 | `kClientAcknowledgmentStream` | 10 | 1738 | 128 | yes | **silent** | exact size `2 + count*27 + 8` (`BoundedCursor`); per-slot epoch match; floor clamped ≤ latest buffered tick; floor must advance, except the one backward floor a client's coord-full-state adoption produces, admitted no lower than that full state's own tick; timestamp echo monotonic |
 | `kClientSubscribe` | 10 | 10 | 64 | yes | violation | load generation must match the server's current generation before mutation; a coord already holding an active slot is answered with that slot's accept and not queued again (every in-generation subscribe gets exactly one reliable answer); 3×3 adjacency of an authorized coord (`kOriginCoordinate` always allowed); slot clamped to `kiCoordinateSlots` |
 | `kClientUnsubscribe` | 4 | 4 | 64 | yes | violation | slot index + epoch; after existing-client lookup, ACK every syntactically valid request; free only an in-range active slot with matching epoch |
@@ -303,10 +304,12 @@ sizes are the full packet including the type byte.
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
-client-sendable). The current wire-protocol version is 26, which moves the
-owned-entity state notification and the seven debug-control requests to engine
-packet types and folds the assign notification into each `Spawned` and
-`ChangedCell` state; version 25 removed the frame clock from full-state frames
+client-sendable). The current wire-protocol version is 27, which replaces the
+`StatusChangeType` tag set with spawn, transfer, and tick-input tags and makes
+each spawn and transfer payload its collection's `SpawnInfo` `Fields()` list;
+version 26 moved the owned-entity state notification and the seven
+debug-control requests to engine packet types and folded the assign
+notification into each `Spawned` and `ChangedCell` state; version 25 removed the frame clock from full-state frames
 and made `ExplosionsInterpolate::pStartTimes` 64-bit integer nanoseconds;
 version 24
 dropped the per-frame main-menu flags from every full-state frame; version 23
@@ -315,7 +318,7 @@ inserted the engine `kClientChat` and `kServerChat` types before
 FleetSync member carries a member flags byte whose `kIsDead` bit marks a dead
 member; the FleetSync flagship and the `kClientRespawnInFleetRequest` member
 name a fleet member by its global ID, not its list position; omni and
-spaceship TransferData wire payloads exclude arrival grace. Protocol 16 is one
+spaceship transfer payloads carry the arrival grace their source sets. Protocol 16 is one
 deliberate generation break taken with cell-local geometry: `kiProtocolVersion`
 bumps together with the navigation-data version
 (`Engine/Source/Frame/NavBuild.h`), the `Frame::kiVersion` base term, and
@@ -326,7 +329,7 @@ navigation blob, and connection is rejected by those gates; no compatibility
 path reads the previous generation. The separate `FrameInput::kiVersion` gates
 replay-input compatibility; `Frame::kiVersion` is the Hello gate for
 deterministic-Frame/save/replay compatibility. Neither replaces the protocol
-gate for wire-only `StatusChange` or `TransferData` layouts. The four fleet
+gate for wire-only `StatusChange` payload (`SpawnInfo` `Fields()`) layouts. The four fleet
 request packets address a fleet by its stable `FleetGuid` rather than a vector
 index, so a delete that shifts the fleet vector cannot misdirect a request
 already in transit or queued; `kClientUnsubscribe` carries a slot index plus

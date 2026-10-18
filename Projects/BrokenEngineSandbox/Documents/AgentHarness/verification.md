@@ -14,10 +14,9 @@ Set up server and client state with the recipe below, then verify and release pe
 
 To place omnis at exact positions instead of the single default spawn point,
 send one `inject_payload` batch holding two `SpawnOmni` entries on the same
-active coord whose `fSpawnOffsetX`/`fSpawnOffsetY` offsets lie about 600 m
-apart, for example `"fSpawnOffsetX":-300,"fSpawnOffsetY":0` and
-`"fSpawnOffsetX":300,"fSpawnOffsetY":0` (a cell is 900 m square, so an offset
-must stay inside +/-450 or the batch fails). No response reports the tick that
+active coord whose `vecPosition` values lie about 600 m apart, for example
+`"vecPosition":[-300,0]` and `"vecPosition":[300,0]` (a cell is 900 m square,
+so a position must stay inside +/-450 or the batch fails). No response reports the tick that
 applied the batch, so poll `query_omnis {"coord":[x,y]}` on that coord until
 both minted `globalIds` from the injection response appear in `omnis` (`total`
 rises by two), then send `pause {"paused":true}` and read the exact positions

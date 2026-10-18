@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-15T23:39:11.135Z","dependsOn":["Documents/Plans/Game/FrameEditCellPins.md","Documents/Plans/Game/FrameEditRows.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-15T23:39:11.135Z","dependsOn":["Documents/Plans/Game/FrameEditCellPins.md"]} -->
 # Move the game-agnostic agent commands into `Engine/Source/Agent` and the engine-generic harness documentation into the agent-harness skill
 
 Line numbers cite baseline `f1d140ae26d0a8684264c8a1fa4f55c1bec1f601`. The prerequisite Plans edit several of these files first, so locate each region by the symbol named beside it. Where a statement here and the code disagree, the code wins; report the contradiction instead of matching one side to the other.
@@ -97,7 +97,7 @@ client-generic include (`Engine.h:92-95`) and declares the game hooks it calls
 in a `namespace game` block (the form `Engine/Source/GameBase.h:13-20` uses for
 game types), so a game that omits one fails to link with the hook's name.
 
-- `status`: `:84-106` verbatim, then `game::AppendAgentServerStatus(nlohmann::json& rResult)`; the game defines it with the three fields at `:107`, `:108`, and `:110` (`FrameEditRows.md` removed `pendingTransferHarnessRigCount` and made `pendingAgentStatusChangeCount` read `ServerSpawnQueue::PendingCount`).
+- `status`: `:84-106` verbatim, then `game::AppendAgentServerStatus(nlohmann::json& rResult)`; the game defines it with the three fields at `:107`, `:108`, and `:110` (`FrameEditRows.md` removed `pendingTransferHarnessRigCount` and made `pendingAgentStatusChangeCount` read `CountPendingAgentStatusChanges(*gpServerSession) + gpServerSession->mpTransferManager->PendingSpawnCount()`).
 - `pause`: `:113-122` verbatim.
 - `query_profile`: `:179-227`, with the `if constexpr (kbProfiling)` block at
   `:200-210` replaced by
@@ -114,8 +114,9 @@ game types), so a game that omits one fails to link with the hook's name.
   `blasterCount`, `missileCount`); `ReplayTransferCaptureCounts` is the game
   type `ReplayHarnessRigs::TransferCaptureEvent::transferCounts` already holds
   (`ReplayHarnessRigs.h:32`), forward-declared in the header.
-  `FrameEditRows.md` removed the harness state slot, `Bind`, and the
-  replay-transfer queue, so nothing else game-side is carried over.
+  `FrameEditRows.md` removed the replay-transfer queue; the harness state slot,
+  `Bind`, and the tick-input queue stay game-side with `inject_payload`, so
+  nothing else game-side is carried over.
 - `ExecuteServerSimulationHarnessRigCommand` handles only `inject_payload`.
 - `game::ExecuteAgentCommand` (`AgentCommands.cpp:30-34`) tries `engine::ExecuteServerAgentCommand` before `ExecuteAgentCommandServer`, as its client branch does (`:20-24`). `ExecuteAgentCommandServer` keeps `timescale`, `save`, `load`, `reset`, `edit_frame`, `read_frame`, `inject_payload`, and the three frame queries.
 
@@ -292,7 +293,8 @@ Invariants:
 ## Out of scope
 
 - `set_client_grid_coord`, `release_client_grid_coord`, `inject_payload` with
-  its `Fields()`-table parser (its queue is the engine `ServerSpawnQueue`),
+  its `Fields()`-table parser (its queues are the engine `ServerTransferManager`
+  spawn queue and the game harness tick-input queue),
   `query_frame`/`query_omnis`/`query_collection` and their extractors (including
   `Vector3ToJson`, a direction writer, not a position), `timescale`, and the
   `save`/`load`/`reset` bodies with `BareFilenameParameter` (no engine

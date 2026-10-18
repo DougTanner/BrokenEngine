@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-08T23:54:23.561Z","dependsOn":["Documents/Plans/Game/FrameEditRowRemoval.md","Documents/Plans/Game/FrameEditRows.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-08T23:54:23.561Z","dependsOn":["Documents/Plans/Game/FrameEditRowRemoval.md"]} -->
 # Split Omnis and Spaceships into the Fighters, Omnis, and Battleships ship types
 
 Tier 3 (`.agents/references/risk-tiers.md`): the change alters CRC'd gameplay
@@ -700,13 +700,16 @@ One Plan, one landing; the stages order the work so each builds and runs.
   status-change family this Plan was written against: `SpawnOmniData`,
   `TransferData`, and `Projects/BrokenEngineSandbox/Source/SpawnTransfer.h/.cpp`
   are gone; each spawnable collection's own `SpawnInfo` is the payload of a
-  `kSpawn<Collection>` tick-input tag and a `kTransfer<Collection>` arrival tag
+  `kSpawn<Collection>` spawn tag and a `kTransfer<Collection>` arrival tag, both
+  applied in their destination's post-tick batch
   (`SpawnTraits`, `MakeSpawn`/`MakeTransfer`, per-`SpawnInfo` `Fields()` tables
   driving `StatusChangeCodec.cpp` and the `inject_payload` parser); out-of-tick
-  spawns queue through `engine::ServerSpawnQueue`; `inject_payload` takes
+  spawns queue through `ServerTransferManager::QueueSpawn` and join their tick's
+  post-tick batch; `inject_payload` takes
   `Spawn*` entries keyed by `Fields()` member tokens and has no `Transfer*`
-  entries. Decisions 9, 10, 11, 13 (its spawns go through `mpSpawnQueue->Spawn`
-  with the type's `SpawnInfo` instead of a direct `kSpawnShip` push), and 21,
+  entries. Decisions 9, 10, 11, 13 (its spawns go through
+  `mpTransferManager->QueueSpawn` with `MakeSpawn` of the type's `SpawnInfo`
+  instead of a direct `kSpawnShip` push), and 21,
   `### Status changes and spawning`, the `TransferData` and `SpawnTransfer`
   names in `## Context`, `### Integration sites`, `### Stages`,
   `## Critical files`, and `## In scope`, and the acceptance rows that inject

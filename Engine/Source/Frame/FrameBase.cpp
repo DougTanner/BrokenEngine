@@ -140,14 +140,15 @@ bool FramePostRenderBase::PrepareTransferRequest(const CellBounds& rBounds, game
 {
 	int64_t iDeltaX = 0;
 	int64_t iDeltaY = 0;
-	ComputeTransferDelta(rBounds, rRequest.data.vecPosition, iDeltaX, iDeltaY);
+	XMVECTOR& rVecPosition = game::SpawnPositionRef(rRequest.change);
+	ComputeTransferDelta(rBounds, rVecPosition, iDeltaX, iDeltaY);
 	rRequest.iDeltaX = static_cast<int8_t>(iDeltaX);
 	rRequest.iDeltaY = static_cast<int8_t>(iDeltaY);
 
 	// The payload leaves here already expressed in the destination cell's local frame: one cell width per
-	// transferred axis. Every downstream consumer — network transfer, SpawnTransfer, replay reconcile —
+	// transferred axis. Every downstream consumer — network transfer, ApplySpawnStatusChange, replay reconcile —
 	// forwards the position unchanged, so this is the single conversion point.
-	rRequest.data.vecPosition = XMVectorSubtract(rRequest.data.vecPosition, XMVectorSet(static_cast<float>(rRequest.iDeltaX) * kfCellWidth, static_cast<float>(rRequest.iDeltaY) * kfCellHeight, 0.0f, 0.0f));
+	rVecPosition = XMVectorSubtract(rVecPosition, XMVectorSet(static_cast<float>(rRequest.iDeltaX) * kfCellWidth, static_cast<float>(rRequest.iDeltaY) * kfCellHeight, 0.0f, 0.0f));
 
 	// Transfer producers are unbounded, so a full buffer can reallocate during a shared per-tick burst.
 	return std::ssize(transferRequests) == static_cast<int64_t>(transferRequests.capacity());
@@ -155,9 +156,7 @@ bool FramePostRenderBase::PrepareTransferRequest(const CellBounds& rBounds, game
 
 void FramePostRenderBase::PushTransferRequest(const game::TransferRequest& rRequest)
 {
-	common::ValidateVector<true >(rRequest.data.vecPosition);
-	common::ValidateVector<false>(rRequest.data.vecDirection);
-	common::ValidateVector<false>(rRequest.data.vecVelocity);
+	game::ValidateSpawnVectors(rRequest.change);
 	{
 		// Heap: no finite reserve can be proven sufficient because engine::GrowPairedCollections
 		// grows collections unbounded

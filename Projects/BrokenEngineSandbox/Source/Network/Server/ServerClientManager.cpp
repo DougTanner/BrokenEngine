@@ -5,6 +5,7 @@
 #include "Network/Server/ServerTransferManager.h"
 
 #include "Frame/Collections/Omnis/Omnis.h"
+#include "Frame/HealthDamage.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
 #include "Game.h"
@@ -17,8 +18,8 @@ namespace game
 void ServerClientManager::QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId)
 {
 	// Dedup only the queue push on the full spawn identity so a client spamming spawn-into/respawn queues at most one spawn
-	// per (fleet guid, member). Skip duplicates without reordering — request order is the order spawn status changes enter
-	// the frame input, and therefore the simulation and the CRC.
+	// per (fleet guid, member). Skip duplicates without reordering — request order is the order spawns are queued for the
+	// post-tick batch, which the simulation and the CRC depend on.
 	bool bAlreadyQueued = std::ranges::any_of(mClientsWaitingForSpawn, [&](const ClientSpawnInformation& rInformation)
 	{
 		return rInformation.iClientId == iClientId && rInformation.fleetGuid == rFleetGuid && rInformation.memberGlobalId == memberGlobalId;
@@ -90,9 +91,13 @@ void ServerClientManager::LogConnectingClientDiagnostic(const engine::ClientConn
 	}
 }
 
+// The fleet spawn point in meters, local to the origin cell, whose frame is centered on the cell.
+constexpr float kfFleetSpawnOffsetX = 45.0f;
+constexpr float kfFleetSpawnOffsetY = -12.0f;
+
 void ServerClientManager::SpawnWaitingClients()
 {
-	// Heap: vector push_back for status changes and processed-client set inserts
+	// Heap: spawn-queue push_back and processed-client set inserts
 	ScopedSuppressAllocationTracking suppress;
 
 	for (const ClientSpawnInformation& rClientSpawnInformation : mClientsWaitingForSpawn)
@@ -113,9 +118,26 @@ void ServerClientManager::SpawnWaitingClients()
 			iSpawnPendingFleetTicks = result.iPendingFleetWantedCoordTicks;
 		}
 
-		// The requesting client's GUID rides the status change, so the row this tick creates is born owned.
-		StatusChange spawnChange {.eType = StatusChangeType::kSpawnOmni, .data = SpawnOmniData {.iGlobalId = globalId.iValue, .bIsFlagship = bIsFlagship, .fleetWantedCoordinate = spawnFleetWantedCoordinate, .uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(iSpawnPendingFleetTicks), .clientGuid = rClientSpawnInformation.clientGuid}};
-		gpGame->mFrameInputs.try_emplace(engine::kOriginCoordinate).first->second.statusChanges.push_back(spawnChange);
+		OmniFlags_t spawnFlags {OmniFlags::kBlasterSpawnLeft};
+		if (bIsFlagship)
+		{
+			spawnFlags.Set(OmniFlags::kIsFlagship);
+		}
+
+		// miTickCounter + 1 is the next tick; its post-tick batch creates the row. The requesting client's GUID rides the
+		// spawn, so that row is born owned.
+		gpServerSession->mpTransferManager->QueueSpawn(engine::kOriginCoordinate, gpGame->miTickCounter + 1, MakeSpawn(OmnisPostRender::SpawnInfo
+		{
+			.vecPosition = XMVectorSet(kfFleetSpawnOffsetX, kfFleetSpawnOffsetY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f),
+			.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f),
+			.alignment = gpGame->mOmniAlignment,
+			.flags = spawnFlags,
+			.arrivalGracePeriod = kArrivalGracePeriod,
+			.globalId = globalId,
+			.clientGuid = rClientSpawnInformation.clientGuid,
+			.fleetWantedCoordinate = spawnFleetWantedCoordinate,
+			.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(iSpawnPendingFleetTicks),
+		}));
 		LOG(kNetwork, kVerbose, "ServerClientManager::SpawnWaitingClients::kSpawnOmni Client: {} GlobalId: {} Coord: ({},{}) Flagship: {}", rClientSpawnInformation.iClientId, globalId.iValue, engine::kOriginCoordinate.iX, engine::kOriginCoordinate.iY, bIsFlagship);
 
 		// A client spawning this update is not handled again by NewClients after another of its queued spawns drops.

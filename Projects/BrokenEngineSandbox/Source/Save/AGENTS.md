@@ -13,7 +13,6 @@ This subsystem supplies the game half of the engine-owned server save/load, grid
 Recording, playback, the manifest, and every stream lifetime rule are engine-owned (`../../../../Engine/Source/File/AGENTS.md`), the same deferral the grid file uses. This subsystem owns the game half of that contract.
 
 - Replay metadata is game-owned: written after the writer files complete, and read into an isolated staged value the engine carries without inspecting and applies only once the whole replay generation validates.
-- When the engine invalidates its replay streams, this subsystem routes the reset to the game Agent's replay-transfer harness rig queue and leaves the live game running.
 - After a successful save load, a fresh reset, replay adoption, a replay playback abort, or an agent frame edit with a connected client, one game entry point runs the engine session load reset, which rebuilds client ownership and resynchronizes connected clients. It is the sole caller of that load reset, so every one of these paths shares identical ordering.
 - Replay capture diagnostics use the game Agent's transfer-count contract (`../Agent/AGENTS.md`) and the engine Agent's replay-timed observations (`../../../../Engine/Source/Agent/AGENTS.md`).
 

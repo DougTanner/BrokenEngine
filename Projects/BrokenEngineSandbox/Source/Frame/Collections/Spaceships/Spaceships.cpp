@@ -367,17 +367,17 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 
 		TransferRequest request
 		{
-			.eType = StatusChangeType::kTransferSpaceship,
-			.data =
+			.change = MakeTransfer(SpawnInfo
 			{
 				.vecPosition = vecPosition,
 				.vecDirection = rCurrentInterpolate.pVecDirections[i],
 				.vecVelocity = rCurrentPostRender.pVecVelocities[i],
 				.alignment = rCurrentPostRender.pAlignments[i],
 				.fHealth = rCurrentPostRender.pfHealths[i],
-				.nextBlasterSpawnTimeSeconds = rCurrentPostRender.pNextBlasterSpawnTimes[i],
+				.nextBlasterSpawnTime = rCurrentPostRender.pNextBlasterSpawnTimes[i],
+				.arrivalGracePeriod = kArrivalGracePeriod,
 				.fDeltaRotation = rCurrentInterpolate.pfDeltaRotations[i],
-			},
+			}),
 		};
 		if (rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
 		{

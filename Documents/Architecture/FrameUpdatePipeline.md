@@ -109,7 +109,9 @@ flowchart LR
 Replay transfers are recorded on the exact tick that harvested them, in the
 difference stream's post-dispatch channel rather than inside any `FrameInput`;
 the authoritative state and network publication stay on that same harvest tick.
-For an event at `E`, the recording path calls
+The record holds the whole post-tick batch, so spawns decided outside the tick
+and applied after it are recorded with that tick's transfers; status-change
+spawns take no part in the Spawn phase. For an event at `E`, the recording path calls
 `mPostDispatchRecords.emplace_back(E)` with the harvested transfers. The channel
 is named for when its transfers are applied, not for when its record is read:
 during playback, `SyncReplayTick` first checksum-validates and removes any prior

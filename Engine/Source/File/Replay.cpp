@@ -269,7 +269,6 @@ void Replay::ClearReplayTransientState()
 	mReplayReaders.clear();
 	mPendingReplayReaders.clear();
 	game::gpGame->mbReplaying = !mReplayReaders.empty() || !mPendingReplayReaders.empty();
-	game::OnReplayStreamsInvalidated();
 }
 
 void Replay::ClearReplayAbortState()
@@ -298,7 +297,6 @@ void Replay::InvalidateReplayRecording()
 	game::gpGame->mGameFlags.Set(engine::GameFlags::kSaveReplay, false);
 	miReplayInitialTick = 0;
 	ReplayHarnessRigs::Reset(*this);
-	game::OnReplayStreamsInvalidated();
 }
 
 void Replay::UpdateTerminalReplayWriter(GridCoord coordinate, const ReplayWriterState& rWriterState, const game::Frame& rEndFrame)
@@ -586,7 +584,6 @@ void Replay::SaveLoadReplay()
 			// Heap: manifest records, DifferenceStream writer saves, ReplayMeta + manifest file I/O
 			ScopedSuppressAllocationTracking suppress;
 			game::gpGame->mGameFlags.Set(engine::GameFlags::kSaveReplay, false);
-			game::OnReplayStreamsInvalidated();
 
 			// Preserve the valid manifest's deterministic coord ordering after writer state is cleared.
 			std::vector<ReplayManifestRecord> recordedRecords;
@@ -699,14 +696,12 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 			{
 				LOG(kDefault, kError, "Injected replay manifest invalidation failure; recording not started");
 				ReplayHarnessRigs::Reset(*this);
-				game::OnReplayStreamsInvalidated();
 				return ReplayTickDecision::kDispatch;
 			}
 			if (!InvalidateReplayManifest())
 			{
 				LOG(kDefault, kError, "Replay manifest invalidation failed; recording not started");
 				ReplayHarnessRigs::Reset(*this);
-				game::OnReplayStreamsInvalidated();
 				return ReplayTickDecision::kDispatch;
 			}
 
@@ -719,7 +714,6 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 			{
 				LOG(kDefault, kError, "Replay grid write failed; recording not started");
 				ReplayHarnessRigs::Reset(*this);
-				game::OnReplayStreamsInvalidated();
 				return ReplayTickDecision::kDispatch;
 			}
 
@@ -737,7 +731,6 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 					LOG(kDefault, kError, "Replay recording start has inconsistent coord ticks");
 					mReplayWriters.clear();
 					ReplayHarnessRigs::Reset(*this);
-					game::OnReplayStreamsInvalidated();
 					return ReplayTickDecision::kDispatch;
 				}
 
@@ -861,14 +854,14 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 					return AbortReplay();
 				}
 
-				// Transfers belong only to the post-dispatch channel, so a recorded
+				// Spawns and transfers belong only to the post-dispatch channel, so a recorded
 				// input carrying one would publish an entry a connected client applies against authoritative state.
 				if (std::ranges::any_of(rFrameInput.statusChanges, [](const game::StatusChange& rStatusChange)
 				{
-					return game::IsTransferType(rStatusChange.eType);
+					return game::IsPostDispatchType(rStatusChange.eType);
 				}))
 				{
-					LOG(kDefault, kError, "Replay input carries a transfer status change for coord ({},{})", rCoordinate.iX, rCoordinate.iY);
+					LOG(kDefault, kError, "Replay input carries a spawn or transfer status change for coord ({},{})", rCoordinate.iX, rCoordinate.iY);
 					return AbortReplay();
 				}
 
@@ -876,13 +869,13 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 				if (rpReader->LoadPostDispatch(game::gpGame->miTickCounter, postDispatchInput))
 				{
 					// The generic channel cannot know StatusChange semantics, and a
-					// valid non-transfer entry would reach std::get<TransferData> in the spawn path.
+					// valid tick-input entry would reach ApplySpawnStatusChange, which accepts only spawn and transfer tags.
 					if (postDispatchInput.statusChanges.empty() || !std::ranges::all_of(postDispatchInput.statusChanges, [](const game::StatusChange& rStatusChange)
 					{
-						return game::IsTransferType(rStatusChange.eType);
+						return game::IsPostDispatchType(rStatusChange.eType);
 					}))
 					{
-						LOG(kDefault, kError, "Replay post-dispatch record is not a transfer batch for coord ({},{})", rCoordinate.iX, rCoordinate.iY);
+						LOG(kDefault, kError, "Replay post-dispatch record is not a post-tick batch for coord ({},{})", rCoordinate.iX, rCoordinate.iY);
 						return AbortReplay();
 					}
 					game::gpServerSession->mpTransferManager->PrepareReplayTransfers(rCoordinate, postDispatchInput.statusChanges);

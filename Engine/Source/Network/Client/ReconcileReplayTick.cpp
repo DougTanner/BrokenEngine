@@ -9,7 +9,6 @@
 #include "Frame/Frame.h"
 #include "Frame/FrameInput.h"
 #include "Frame/StatusChange.h"
-#include "SpawnTransfer.h"
 
 namespace engine
 {
@@ -117,23 +116,22 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, game::FrameIn
 	};
 	engine::RunFrameTick(activeFrameReference, iTick);
 
-	// Apply transfer StatusChanges (runs after Destroy/Spawn to match server ordering)
+	// Apply the post-tick batch, spawn and transfer StatusChanges, after the tick to match server ordering
 	int64_t iTransferCount = 0;
 	int64_t iOwnedTransferCount = 0;
 	engine::GlobalId pOwnedIds[8] {};
 	for (const game::StatusChange& rStatusChange : rFrameInput.statusChanges)
 	{
-		if (game::IsTransferType(rStatusChange.eType))
+		if (game::IsPostDispatchType(rStatusChange.eType))
 		{
-			const game::TransferData& rData = std::get<game::TransferData>(rStatusChange.data);
-			game::SpawnTransfer(*pNext, rStatusChange.eType, rData);
+			game::ApplySpawnStatusChange(*pNext, rStatusChange, rWork.coord);
 			++iTransferCount;
 
 			if (rStatusChange.eType == game::kOwnedEntityTransferType)
 			{
 				if (iOwnedTransferCount < 8)
 				{
-					pOwnedIds[iOwnedTransferCount] = rData.globalId;
+					pOwnedIds[iOwnedTransferCount] = game::OwnedSpawnGlobalId(rStatusChange);
 				}
 				++iOwnedTransferCount;
 			}
@@ -146,7 +144,7 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, game::FrameIn
 	}
 	std::erase_if(rFrameInput.statusChanges, [](const game::StatusChange& rStatusChange)
 	{
-		return game::IsTransferType(rStatusChange.eType);
+		return game::IsPostDispatchType(rStatusChange.eType);
 	});
 
 	if (iTransferCount > 0)

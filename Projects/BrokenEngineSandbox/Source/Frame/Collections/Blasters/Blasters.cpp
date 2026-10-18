@@ -4,6 +4,8 @@
 
 #include "Frame/CellStaticData.h"
 
+#include "Ui/WindDepositsWrappers.h"
+
 namespace engine
 {
 template struct Collection<game::BlastersInterpolate>;
@@ -155,16 +157,21 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 	}, [&](int64_t i)
 	{
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
-
+		engine::AlignmentIdentifier alignment = rCurrentPostRender.pAlignments[i];
+		bool bOmniAlignment = alignment == rFrame.postRender.omniAlignment;
 		TransferRequest request
 		{
-			.eType = StatusChangeType::kTransferBlaster,
-			.data = {
+			.change = MakeTransfer(SpawnInfo
+			{
 				.vecPosition = vecPosition,
 				.vecVelocity = rCurrentPostRender.pVecVelocities[i],
-				.alignment = rCurrentPostRender.pAlignments[i],
-				.uiTypeIndex = rCurrentInterpolate.puiTypeIndices[i],
-			},
+				.iTypeIndex = rCurrentInterpolate.puiTypeIndices[i],
+				.alignment = alignment,
+				// Wind-trail tuning is client-only visual debug state; reset to canonical defaults on transfer.
+				.fWindTrailIntensity = bOmniAlignment ? gWindDepositOmniBlastersIntensity.mfDefault : gWindDepositSpaceshipsBlastersIntensity.mfDefault,
+				.fWindTrailWidth = bOmniAlignment ? gWindDepositOmniBlastersWidth.mfDefault : gWindDepositSpaceshipsBlastersWidth.mfDefault,
+				.fWindTrailLengthMultiplier = bOmniAlignment ? gWindDepositOmniBlastersLengthMultiplier.mfDefault : gWindDepositSpaceshipsBlastersLengthMultiplier.mfDefault,
+			}),
 		};
 		if (rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
 		{

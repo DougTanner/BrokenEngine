@@ -460,6 +460,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkProtocol.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSerialization.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Network\NetworkSimulation.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Network\StatusChangeFields.h" />
     <ClInclude Include="..\..\Source\Profile\ProfileRows.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksSliderMap.h" />
     <ClInclude Include="..\..\Source\Ui\Screens\TweaksScreen\Tweaks.h" />
@@ -500,7 +501,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="..\..\Source\Game.h" />
     <ClInclude Include="..\..\Source\Fleet.h" />
     <ClInclude Include="..\..\Source\Version.h" />
-    <ClInclude Include="..\..\Source\SpawnTransfer.h" />
     <ClInclude Include="..\..\Source\ClientSettings.h" />
     <ClInclude Include="..\..\Source\FleetSelection.h" />
     <ClInclude Include="..\..\Source\Network\Client\ClientSession.h" />
@@ -742,13 +742,13 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Frame\Collections\Spaceships\SpaceshipsRender.cpp" />
     <ClCompile Include="..\..\Source\Frame\Frame.cpp" />
     <ClCompile Include="..\..\Source\Frame\FrameInput.cpp" />
+    <ClCompile Include="..\..\Source\Frame\StatusChange.cpp" />
     <ClCompile Include="..\..\Source\Frame\TerrainUtils.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Omnis\Omnis.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisNavigation.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisCombat.cpp" />
     <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisRender.cpp" />
     <ClCompile Include="..\..\Source\Game.cpp" />
-    <ClCompile Include="..\..\Source\SpawnTransfer.cpp" />
     <ClCompile Include="..\..\Source\ClientSettings.cpp" />
     <ClCompile Include="..\..\Source\FleetSelection.cpp" />
     <ClCompile Include="..\..\Source\Network\Client\ClientSession.cpp" />

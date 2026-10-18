@@ -112,12 +112,17 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
 12. Decide whether the value must survive cross-cell transfer; if it must, the
     whole path moves together:
 
-    - the `TransferData` declaration and its member tuple when applicable;
-    - source `TransferRequest` construction;
-    - wire serialization/deserialization and payload-size accounting when the
-      field crosses the network;
-    - `/Projects/BrokenEngineSandbox/Source/SpawnTransfer.cpp` receive mapping
-      plus destination `SpawnInfo` and spawn assignment.
+    - the collection's `SpawnInfo` member and its `Fields()` entry, which drives
+      the wire codec and the `inject_payload` keys listed in
+      `/Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md`,
+      so a member left out never crosses the network; a layout change follows
+      the protocol-version rule in
+      `/Projects/BrokenEngineSandbox/Source/Network/AGENTS.md`
+      `## Status-Change Wire Format`;
+    - the source Transfer-phase `MakeTransfer(SpawnInfo {...})` literal in its
+      `TransferRequest`;
+    - payload-size accounting when the field crosses the network;
+    - the destination `Spawn` assignment of that `SpawnInfo` member.
 
     Use Blasters for the live send/receive shape. Match existing client guards;
     do not invent a second receive path. Done when transfer is either fully

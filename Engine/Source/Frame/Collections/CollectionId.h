@@ -6,7 +6,7 @@ namespace engine
 struct FramePostRenderBase;
 
 // Stable entity identity across transfers and reconnects
-// Assigned by server at first spawn, carried in TransferData
+// Assigned by server at first spawn, carried in the omni SpawnInfo
 struct GlobalId
 {
 	int64_t iValue = 0;
