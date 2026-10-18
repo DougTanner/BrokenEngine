@@ -2,7 +2,7 @@
 
 ## Overview
 
-Engine side of the agent harness: the loopback TCP JSON command channel and the engine-generic commands, input, UI snapshots, and harness rig state it serves. Game-specific command semantics live in the project Agent (`../../../Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md`).
+Engine side of the agent harness: the loopback TCP JSON command channel and the engine-generic commands, input, UI snapshots, and harness rig state it serves. Game-specific command semantics live in the game project's own `Source/Agent/AGENTS.md`.
 
 The harness exists so agents can drive the running client and server the way a
 player or developer would, to verify a change live. Agents are the harness's
@@ -22,31 +22,50 @@ whose purpose is to execute a scripted pass/fail scenario itself.
   arrives as a plain `int64_t`, never through game globals. Focused Commands
   modules own the `crash_report_harness_rig` and the read-only
   `cell_coordinate_probe`, and `AgentCommandsShared.h` defines the one agent
-  position shape and the one checked grid-coordinate reader that engine and game
-  commands share; the harness command reference
+  position shape and the checked grid-coordinate and float readers that engine
+  and game commands share; the harness command reference
   (`../../../.agents/skills/agent-harness/references/command-reference.md`)
   defines their schemas.
+- The game dispatcher tries the shared handlers first, then its own side
+  handler, then the engine side-generic handler (`ExecuteClientAgentCommand`
+  or `ExecuteServerAgentCommand`). A game side handler that handles an engine
+  command name takes that command over: it validates its own parameters, calls
+  the exported engine command function — `CommandDescribeScene`
+  (`Commands/DescribeScene.h`, whole-file `BT_CLIENT`, outside `Engine.h`),
+  `CommandStatus`, `CommandLoad`, or `CommandReplayTransferCapture` — and then
+  writes only its own fields.
 - `ExecuteClientAgentCommand` (`AgentCommandsClientGeneric.cpp`, whole-file
-  `BT_CLIENT`) owns the client-generic handlers; the client command reference
-  (`../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-client.md`)
-  defines their schemas. The game dispatcher tries it after the shared handlers
-  and before its own client handlers; they read live game and profile state
-  directly through `game::gpGame` and `gpProfileManager`, and a deferred UI
-  script reads `game::gpGame` when the script completes. `query_profile` reads
-  existing main-thread telemetry without forcing query reads. A focused module
-  owns the read-only `presentation_continuity_probe`, which reports the
+  `BT_CLIENT`) owns the client-generic handlers, `send_raw_packet`,
+  `set_client_grid_coord`, and `release_client_grid_coord`, and dispatches the
+  focused `audio_streaming_harness_rig`, `desync_probe`, and `describe_scene`
+  modules; the client commands of the harness command reference
+  (`../../../.agents/skills/agent-harness/references/command-reference.md`)
+  define their schemas. `set_client_grid_coord` requires a connected session
+  whose owned entity is already assigned (`## Game contract`), because before
+  assignment the client subscription policy falls back to origin and discards
+  the requested cell. The handlers read live game and profile state directly through
+  `game::gpGame` and `gpProfileManager`, and a deferred UI script reads
+  `game::gpGame` when the script completes. `query_profile` reads existing
+  main-thread telemetry without forcing query reads. A focused module owns the
+  read-only `presentation_continuity_probe`, which reports the
   render-published presentation-continuity snapshot
   (`../Graphics/Render/AGENTS.md`).
+- `ExecuteServerAgentCommand` (`AgentCommandsServerGeneric.cpp`, whole-file
+  `BT_SERVER`) owns `status`, `pause`, `timescale`, `save`, `load`, `reset`, the
+  server `query_profile`, `create_cell`, and the five replay commands; the
+  server commands of the harness command reference define their schemas. It exports
+  `RefuseDuringReplay`, which `create_cell` and the game `edit_frame` share.
 - `AudioStreamingHarnessRig` owns the client Debug audio/File harness rig state,
   snapshots, controls, and subsystem hooks; `AgentCommandServer` owns its
-  instance, while the game Agent owns the command schema and action dispatch.
+  instance, while `Commands/AgentCommandsAudioStreaming.cpp` owns the command's
+  validation, action dispatch, and deferred replies.
   Loader-thread hooks discover it through a separately published atomic
   attachment rather than through the command-server global. Teardown clears the
   deferred response while captured dependencies are live, releases the read hold
   and the loader stall, drains accepted loader jobs, and detaches under the
   loader queue lock before destroying the harness rig, so neither an active job
   nor the idle-loader lookup can retain it across destruction.
-- `ReplayHarnessRigs` owns one server slot bound to live `Replay` for controls and replay observations. The slot keeps a per-event list of the recording's captured transfer events and never drops a captured event. It carries replay-timed transfer counts opaquely and invokes the classifier through the [game Agent contract](../../../Projects/BrokenEngineSandbox/Source/Agent/AGENTS.md#contracts). The [File Replay contract](../File/AGENTS.md#replay-streams) owns production replay state and storage.
+- `ReplayHarnessRigs` owns one server slot bound to live `Replay` for controls and replay observations. The slot keeps a per-event list of the recording's captured transfer events and never drops a captured event. It carries replay-timed transfer counts opaquely and invokes the classifier the game provides (`## Game contract`). The [File Replay contract](../File/AGENTS.md#replay-streams) owns production replay state and storage.
 - Construction binds on the startup thread with `SO_REUSEADDR` and retries a
   `WSAEADDRINUSE` bind (port still in TIME_WAIT after a rapid relaunch) for up
   to ~2.5 s before throwing `std::runtime_error`. Only the constructor call has
@@ -78,6 +97,36 @@ whose purpose is to execute a scripted pass/fail scenario itself.
 - Keep steady-state input and registry paths allocation-free.
 - Client implementations remain whole-file `BT_CLIENT`; server hook stubs keep shared ImGui integration linkable.
 - Do not execute game mutations or Vulkan/UI work on the socket thread.
+
+## Game contract
+
+The engine declares no agent hook: the files here reach game state only through
+these game-provided names (`../AGENTS.md` `## Hub Conventions`), and a game
+project that provides them gets every engine command.
+
+- Globals: `game::gpGame`, for `GameBase` members and `Game::HasFocusedClientEntity`
+  (the owned-entity check of `set_client_grid_coord`); `game::gpClientSession`,
+  for the `ClientSessionBase` members `mpRuntime` and `mpDesynchronizationCore`;
+  `game::gpServerSession`, for the `ServerSessionBase` members
+  `mpTransferManager` and `StepTimescale`.
+- Functions: `game::ExecuteAgentCommand`, which `AgentCommandServer::Drain`
+  calls, and `game::CountCapturedReplayTransfers`, the classifier
+  `ReplayHarnessRigs` invokes.
+- Types: `game::Frame` (`Cell::TailFrame` and the desync probe's snapshot),
+  `game::FrameInterpolate` and `game::FramePostRender` (`FrameValueColumns`),
+  `game::StatusChange` (`ReplayHarnessRigs::ObserveAcceptedTransfers`), and
+  `game::ReplayTransferCaptureCounts`, carried opaquely per captured event.
+- Compile-time symbols: `game::kCpuTimerPostRenderUpdateNavigationQuery`, the
+  server `query_profile` raw timer row.
+- Game headers: `Game.h`, `Agent/AgentCommands.h`,
+  `Agent/Commands/ServerSimulationHarnessRigs.h` (from `ReplayHarnessRigs.h`),
+  `Frame/Frame.h`, `Network/Client/ClientSession.h`,
+  `Network/Server/ServerSession.h`, and `Profile/ProfileRows.h`.
+- `Commands/FrameEdit.h` (whole-file `BT_SERVER`) owns the `edit_frame` and
+  `read_frame` column machinery and the Explosions and Pushers column lists. It
+  includes the game `Frame/Frame.h` for `FrameValueColumns`, so it stays out of
+  `Engine.h` and only the game frame-edit commands include it; the game keeps its
+  own collections' column lists and `FrameCollection` specializations.
 
 ## See Also
 

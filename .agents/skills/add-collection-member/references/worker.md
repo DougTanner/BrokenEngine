@@ -114,7 +114,7 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
 
     - the collection's `SpawnInfo` member and its `Fields()` entry, which drives
       the wire codec and the `inject_payload` keys listed in
-      `/Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md`,
+      `/Projects/<Project>/Documents/AgentHarness/commands-server.md`,
       so a member left out never crosses the network; a layout change follows
       the protocol-version rule in
       `/Projects/BrokenEngineSandbox/Source/Network/AGENTS.md`

@@ -4,7 +4,9 @@
 
 ### Cross-cell subscription verification
 
-Live recipe for `set_client_grid_coord`. Run it in order.
+Live recipe for the engine
+[`set_client_grid_coord`](../../../../.agents/skills/agent-harness/references/command-reference.md#client-commands).
+Run it in order.
 
 1. `reset` the server, then inject one flagship at the origin: `inject_payload {"entries":[{"coord":[0,0],"type":"SpawnOmni","flags":132}]}` (`kIsFlagship` plus the default `kBlasterSpawnLeft`). Do not set `fleetWantedCoordinate` — the client auto-follows its own ship, which would make the coordinate evidence ambiguous.
 2. Give the client the assigned owned entity this command requires. A connected client starts with zero owned entities and the injected flagship is unowned AI, so spawn through the ordinary fleet path: client `click {"label":"[+]##Fleet"}`, then client `click {"label":"[+]##Omni"}`. Then poll `set_client_grid_coord {"coord":[0,0]}` until it returns `ok:true`; it returns `ok:false` until the server has assigned the spawned owned entity. Do no coordinate work before that.

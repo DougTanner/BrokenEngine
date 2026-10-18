@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-16T13:05:05.556Z","dependsOn":["Documents/Plans/Engine/AgentHarnessIntoEngine.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-16T13:05:05.556Z","dependsOn":[]} -->
 # Sweep `Engine/` and `Common/` for remaining engine-to-game hooks
 
 Tier 3 (`.agents/references/risk-tiers.md`): fixes may land in any engine
@@ -101,7 +101,7 @@ Run `/sweep` with the `cpp-adoption` type over the `## Sweep` targets. Each unit
 ## Out of scope
 
 - Every mechanism `## Context` lists as removed, kept, not a hook, or already direct.
-- Removing Sandbox gameplay names from the engine and moving game code into the engine (`AgentHarnessIntoEngine.md`, and the landed session-protocol and GameShellIntoGameBase changes).
+- Removing Sandbox gameplay names from the engine and moving game code into the engine (the game-agnostic agent commands already in `Engine/Source/Agent`, and the landed session-protocol and GameShellIntoGameBase changes).
 - `Engine/Data/` shader-layout headers, `DataPacker/`, `Tools/`, and `ThirdParty/`.
 - Any format, version, or protocol change.
 
@@ -113,5 +113,5 @@ Run `/sweep` with the `cpp-adoption` type over the `## Sweep` targets. Each unit
 
 ## Notes
 
-- Depends on `AgentHarnessIntoEngine.md`, which changes the engine/game boundary this sweep reviews, so sweeping earlier would review code it replaces. The two hook Plans above and the session-protocol and GameShellIntoGameBase changes that also moved that boundary have already landed.
+- The two hook Plans above, the session-protocol and GameShellIntoGameBase changes, and the move of the game-agnostic agent commands into `Engine/Source/Agent`, each of which changed the engine/game boundary this sweep reviews, have already landed.
 - The sweep creates no follow-up Plans itself (`/sweep` `## Rules`); the user decides on the deferred entries.

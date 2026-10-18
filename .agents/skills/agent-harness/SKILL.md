@@ -23,10 +23,10 @@ length-prefixed JSON.
   screenshot the game.
 - A request for GPU frame capture or RenderDoc capture analysis.
 - Any user request to launch the game for their own play or testing: always,
-  with no further prompting, run the project
-  [`launch.md`](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/launch.md#normal-launch)
-  `## Normal launch` recipe in place of the worker steps, apart from the worker
-  steps it cites, leave both processes running for the user, and return
+  with no further prompting, run the
+  [`launch.md`](references/launch.md#normal-launch) `## Normal launch` recipe
+  for the requested game project in place of the worker steps, apart from the
+  worker steps it cites, leave both processes running for the user, and return
   `Criterion results: 0/0 passed` with the launch command and both PIDs as
   `Decisive checks` rows.
 - After the dispatching session stops a harness worker before its handoff
@@ -49,10 +49,8 @@ stating the agent-harness scenario trigger in
 A release-only recovery (`## When to use`) needs no `/compile` result; its
 brief names the stopped dispatch's game and configuration instead.
 A replay determinism check needs a `kbDebugInput` build, so request `Debug` for
-it;
-[`replay.md`](../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/replay.md)
-owns that rule. The brief may state a wall-clock budget for the run; otherwise a
-20-minute default applies.
+it; [`replay.md`](references/replay.md) owns that rule. The brief may state a
+wall-clock budget for the run; otherwise a 20-minute default applies.
 
 ## Handoff
 

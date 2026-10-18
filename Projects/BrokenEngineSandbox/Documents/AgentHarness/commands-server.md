@@ -4,92 +4,31 @@
 
 ### Server commands
 
-- `status`: no params. Returns
-  `{"tick","paused","recording","replaying","clientCount","activeCoords":[[x,y],...],"nextGlobalId","pendingFlagshipUpdateCount":int,"harvestedTransferTotal":int,"pendingAgentStatusChangeCount":int}`.
+The engine-owned server commands are in the
+[command reference](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands).
+BrokenEngineSandbox takes over `status`, `load`, and `replay_transfer_capture`,
+adding the fields below; the other entries are its own commands.
+
+- `status`: takes over the engine
+  [`status`](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands),
+  adding `{"pendingFlagshipUpdateCount":int,"pendingAgentStatusChangeCount":int}`.
   `pendingFlagshipUpdateCount` counts restored or runtime-queued flagship
-  navigation updates waiting for an advancing update. `harvestedTransferTotal`
-  counts every cell-crossing transfer applied by a harvest since the current
-  game state began, cumulatively, and no spawn; it is zeroed on load, reset, a
-  resynchronizing `edit_frame`, and entering replay playback, and does not move
-  while paused or during playback. `pendingAgentStatusChangeCount` counts every
-  queued `inject_payload` entry, spawn entries and destroy and update entries
-  alike, including entries scheduled for a later `tick` until a drain releases
-  them.
-- `pause`: `{"paused":bool}`. Returns the applied `paused` value. To advance a
-  paused server by exactly one tick, send `timescale {"faster":false}` until it
-  returns `denominator` 32, then send `pause {"paused":false}` and
-  `pause {"paused":true}` back to back, with no wait or other command between
-  them, and confirm that `status.tick` rose by 1. The server takes one agent
-  request at the start of each update, before that update's tick wait: the
-  unpause lets the tick ending that update run, and the pause stops the next
-  tick only if it arrives before the next update starts. That window is one
-  update interval, about 1 s at 1/32 but 31 ms at 1/1, shorter than one
-  AgentHarness call, so a wait between the two commands, or a faster timescale,
-  lets extra ticks run.
-- `timescale`: `{"faster":bool}`. Steps the shared timescale and returns `{"numerator","denominator"}`. The slowest step is 1/32; `{"faster":false}` there changes nothing and still succeeds.
-- `save`: `{"file"?:"bare filename"}`; defaults to quicksave. `file` (also `load`'s) is an appdata-relative bare filename; empty names, NUL, separators, `..`, `:`, and Windows device basenames are rejected. Every loaded cell is saved with its frame, so pinned cells (`create_cell`) stay pinned. Returns `{"file"}`.
-- `load`: `{"file"?:"bare filename","pauseAfterLoad"?:false}`. `pauseAfterLoad`
-  must be Boolean when present; invalid parameters fail before loading or
-  resetting and do not change pause state. Missing/corrupt/truncated data resets
-  fresh while returning success, as does a save written under another
-  `Frame::kiVersion`, such as an older build's (`resetToFresh:true`).
-  Absent/false leaves the normal post-load state unpaused; true atomically
-  pauses after a successful load or completed fresh fallback, before frame
-  inputs can be constructed. Returns
-  `{"file","resetToFresh":bool,"paused":bool,"pendingFlagshipUpdateCount":int}`.
-- `reset`: no params. Resets the fresh game and fleet manager. Returns `{}`.
-- `replay_record`: `{"start":bool}`. Schedules or cancels an idempotent recording transition and returns `{"pending":bool}`. Poll `status.recording` for the effective transition. `{"start":true}` fails while playback is active or pending. Requires `kbDebugInput`.
-- `replay_play`: no params. Starts playback or cancels active playback and
-  returns `{"pending":true}`. Fails while recording is active or a record start
-  or stop is pending. Poll `status.replaying`. Per-tick checks call
-  `DifferenceStreamReader::ValidateChecksum`; mismatch logs
-  `LogDifferences CRC Client: ...`. Readers retire independently. When the last
-  reader reaches its endpoint, the server logs `End replay <tick>, looping` at
-  `Default/Debug` and loops; playback never ends by itself. Requires
-  `kbDebugInput`.
-- `replay_transfer_capture`: no params. Returns
-  `{"firstWriterInputTick","writerInputCount","events":[{"recordingEventTick","playbackEventTick","omniCount","spaceshipCount","blasterCount","missileCount"}]}`.
-  `firstWriterInputTick` is `-1` until observed. `events` holds one entry per
-  recording event tick in capture order, each entry's counts summed across the
-  destinations of that tick; it holds every captured event of the recording and
-  clears at recording start and whenever the harness rig snapshot is cleared
-  (reset, and any recording or playback failure, cancellation, or abort). It is
-  kept after a successful stop and is carried into playback. An entry's
-  `playbackEventTick` is `-1` until playback applies that entry's record and
-  then equals its `recordingEventTick`. An event is a post-dispatch record: the
-  post-tick batch of cell-crossing transfers and `inject_payload` or fleet
-  spawns applied after dispatch at `E` is recorded at `E` in the post-dispatch
-  channel and published/replayed at `E`. A spawn counts under its collection's
-  count, as a transfer does; a `SpawnExplosion` counts under none, so an event
-  holding only explosion spawns has every count zero. During playback, an entry's `playbackEventTick` is latched from the exact
-  tick whose post-dispatch record the reader loaded and applied. If the
-  `set_log_level` response reports effective Network `Verbose`, use
-  `ServerBroadcaster::BuildTickPublication` as runtime publication evidence; if
-  the requested level is clamped to `Debug`, that kVerbose line is unavailable
-  and the static source/phase trace owns publication-at-`E`. In both cases,
-  runtime acceptance uses the event ticks, final state/count, checksum/no-desync
-  signals, and completed replay loop; status/query results are not historical
-  timing evidence. `writerInputCount` is the total normal-writer update ticks
-  since a successful recording start; terminal flushes do not increment it.
-  Requires `kbDebugInput`.
-- `replay_drop_retained_end_frame`: `{"coord":[x,y]}`. During recording, removes the retained terminal frame from that coordinate's most recently terminalized generation: the last generation when it is terminal, otherwise the generation immediately before the open last generation. Returns `{"coord":[x,y],"dropped":true}`. Requires `kbDebugInput`.
-- `replay_inject_persistence_failure`:
-  `{"stage":"invalidation"|"grid"|"transfer_capture"|"coordinate_writer"|"fullframes_record"|"metadata"|"inventory"|"final_manifest","coord"?:[x,y]}`.
-  `coordinate_writer` and `fullframes_record` require `coord`; every other stage
-  rejects it. `invalidation` and `grid` require inactive recording; every other
-  stage requires active recording. `transfer_capture` invalidates recording when
-  the next accepted post-tick batch (transfers and spawns) reaches replay
-  capture, before a writer is created or changed; the live batch still proceeds. `coordinate_writer` and
-  `fullframes_record` resolve their target when armed: they select the open last
-  generation when present, otherwise the most recently terminalized generation
-  with retained state. A later generation append cannot redirect either failure.
-  After the selected writer saves, `fullframes_record` atomically truncates its
-  nonempty `.fullframes` file by one byte before final artifact hashing; a
-  mutation I/O failure deletes that writer's complete sibling set and prevents
-  manifest publication. `inventory` is consumed immediately before final
-  artifact hashing and manifest publication. Returns
-  `{"stage","coord"?:[x,y],"armed":true}`; the response does not expose a
-  generation selector. Requires `kbDebugInput`.
+  navigation updates waiting for an advancing update.
+  `pendingAgentStatusChangeCount` counts every queued `inject_payload` entry,
+  spawn entries and destroy and update entries alike, including entries
+  scheduled for a later `tick` until a drain releases them.
+- `load`: takes over the engine
+  [`load`](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands),
+  adding `{"pendingFlagshipUpdateCount":int}`, as `status` reports it after the
+  load. The game frame version a save must match is this project's
+  `Frame::kiVersion`.
+- `replay_transfer_capture`: takes over the engine
+  [`replay_transfer_capture`](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands),
+  adding `omniCount`, `spaceshipCount`, `blasterCount`, and `missileCount` to
+  each `events` entry, each entry's counts summed across the destinations of
+  that tick. A spawn, whether an `inject_payload` or a fleet spawn, counts under
+  its collection's count, as a transfer does; a `SpawnExplosion` counts under
+  none, so an event holding only explosion spawns has every count zero.
 - `query_frame`: `{"coord":[x,y]}` for a loaded, ready cell. Returns counts under `omnis`, `spaceships`, `missiles`, and `blasters`.
 - `query_omnis`: `{"coord":[x,y],"offset"?:0,"limit"?:256}`. A negative `offset` or `limit` is a parameter error. Returns `{"total","omnis":[{"index","uuid","globalId","local":[x,y,z],"dir":[x,y,z],"armor","shield","flags":int,"alignment"}]}`. Every row belongs to the requested cell, so `local` is meters from that cell's center and no row repeats the coordinate.
 - `query_collection`:
@@ -120,8 +59,10 @@
   collection's Interpolate and PostRender structs; a `frame` edit takes no
   `index` and its keys are `fSpawnTimer`, `randomEngine`, `uiNextUuid`,
   `uiFrameIdentifier`, `uiPinned`, `alignments`, `enemyAlignment`, and
-  `omniAlignment` (`uiPinned` nonzero pins the cell and 0 releases it, as
-  `create_cell` describes);
+  `omniAlignment` (`uiPinned` nonzero pins the cell and 0 releases it, as the
+  engine
+  [`create_cell`](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands)
+  describes);
   `iTick` and `fDeltaTime` are named but refused as clock values. Collection
   keys are the C++ member names, verbatim, as listed in
   `Agent/Commands/ServerFrameEdit.cpp`; `frame` keys are each frame struct's
@@ -222,37 +163,6 @@
   sorted order with `a <= b` in each pair. The command fails without
   `kbDebugInput`; recording, playback, and a pending `replay_record` or
   `replay_play` transition do not refuse it.
-- `create_cell`: `{"coord":[x,y]}`; `coord` is the only key. Creates a fresh
-  cell at a coordinate that has none, sets its frame value `uiPinned` to 1, and
-  returns `{"coord":[x,y]}`. A pinned cell stays in `status.activeCoords` across
-  updates, paused or not, with no omni or subscription, until an `edit_frame`
-  `frame` write of `uiPinned` 0 releases it; `edit_frame` pins an existing cell
-  with a nonzero `uiPinned`. The value lives in the frame, so `save` and `load`
-  keep it and a server relaunch restores it through the exit autosave; `reset`
-  leaves no pinned cell. A pinned cell is still not a live transfer
-  destination: a non-owned transfer into an omniless neighbour that no client
-  watches is dropped, pinned or not. Fails without `kbDebugInput`, while
-  recording, during playback, and while a `replay_record` or `replay_play`
-  transition is pending (`create_cell is refused while recording, during
-  playback, or with a replay_record or replay_play transition pending`), and on
-  a coordinate that already has a cell (`coord already has a cell; pin it with
-  edit_frame`).
-- `query_profile`: server-only CPU profile query. `params` must be `{}`; any
-  other value fails before any profile read. It returns raw
-  `timers[{index,name,currentUs,averageUs,maxUs,allocations,threads}]` and
-  `counters[{index,name,count}]`, including zero rows hidden by the Profile UI.
-  On a server built with `kbProfiling`, only the `NavQuery` timer row
-  additionally returns `sampleSequence`, `sampleUs`, `queryCount`, and
-  `aStarCount`. `sampleSequence` starts at `0` and advances once per accepted
-  normal one-tick update; `sampleUs` is the accumulated timed
-  `NavQueryDirection` duration latched after all active-cell workers join,
-  `queryCount` counts timed calls, and `aStarCount` counts calls that entered
-  A*. Repeated reads before a newly accepted tick return the same raw sequence
-  and values. Paused, burst, non-`1/1` timescale, save, replay, zero-tick, and
-  other rejected/no-dispatch paths discard pending raw values. Polling can skip
-  raw sequence values; skipped values are unobserved gaps, not rejected-update
-  records. The client `query_profile` remains `{}`-only; its response is
-  documented in `commands-client.md`.
 - `inject_payload`: `{"entries":[...],"pauseAfterWriterInput"?:bool}`; these are
   the only top-level keys, and `entries` is a non-empty array. It queues spawns
   into a cell's post-tick batch, the batch that also carries that tick's
@@ -370,14 +280,8 @@
 
   The response is `{"injected":int,"globalIds":[...],"deferred":bool}`. `globalIds` lists the ids minted for `SpawnOmni` entries in entry order, and `deferred` is true while the server is paused. A request carrying `pauseAfterWriterInput` adds its echo.
 
-Every server `[x,y]` grid-coordinate parameter (`coord`, `fleetWantedCoordinate`) must hold two JSON integer literals, with no fraction or exponent, within the signed 32-bit range; any other component, including a whole-valued `1.0` or `1e0`, fails the command before that coordinate is looked up or used, before that entry mints an ID, and before anything is queued.
+Every grid-coordinate parameter of this project's server commands (`coord`, `fleetWantedCoordinate`) follows the engine
+[grid-coordinate rule](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands),
+and a bad one fails `inject_payload` before that entry mints an ID and before anything is queued.
 
 `inject_payload` fails during replay playback. While paused, it remains accepted and queued; `deferred:true` means each entry applies on the next unpaused tick, or on its `tick` when that is later. A speculative client reconciliation line after that tick is not a confirmed desync; only `CONFIRMED DESYNC after full rollback/replay` proves one.
-
-Pause/timescale persist on an empty server. They reset only when the last connected client disconnects. A client may join a paused server and render frozen state, but spawning still needs an unpaused tick.
-
-Frame-read schemas/extractors (`query_frame`, `query_omnis`, `query_collection`) are owned by `AgentCommandsServerQueries.cpp`. CPU `query_profile`, simulation control, and server dispatch remain in `AgentCommandsServer.cpp`; replay and injection live in `Commands/ServerSimulationHarnessRigs.cpp`; frame edits and reads and `create_cell` live in `Commands/ServerFrameEdit.cpp`.
-
-## Durable caveats
-
-- Server frame-read query schema and extraction live in `Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsServerQueries.cpp`; simulation control, CPU `query_profile`, and dispatch live in `AgentCommandsServer.cpp`; replay and injection live in `Commands/ServerSimulationHarnessRigs.cpp`; frame edits and reads live in `Commands/ServerFrameEdit.cpp`.

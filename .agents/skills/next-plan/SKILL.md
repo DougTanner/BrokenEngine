@@ -327,7 +327,7 @@ Execution card:
   reverted when the criterion fails, and when `query_profile` measures the gain
   it also names its baseline cohorts and expects a gap outside the
   cohort-to-cohort range the `query_profile` caveat in
-  `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-client.md`
+  `.agents/skills/agent-harness/references/command-reference.md`
   `## Durable caveats` defines>
 - Roles: <required and conditional assignments>
 ```

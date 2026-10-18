@@ -663,12 +663,6 @@
     <ClInclude Include="..\..\Source\Agent\AgentScene.h">
       <Filter>Game\Agent</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Agent\Commands\AgentCommandsAudioStreaming.h">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\Agent\Commands\ClientDesyncProbe.h">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Frame\Collections\Collection.h">
       <Filter>Engine\Frame\Collections</Filter>
     </ClInclude>
@@ -887,6 +881,15 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreen.h">
       <Filter>Engine\Ui\Screens\TweaksScreen</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\AgentCommandsAudioStreaming.h">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\ClientDesyncProbe.h">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\DescribeScene.h">
+      <Filter>Engine\Agent\Commands</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -1195,12 +1198,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Source\Agent\AgentScene.cpp">
       <Filter>Game\Agent</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Agent\Commands\AgentCommandsAudioStreaming.cpp">
-      <Filter>Game\Agent\Commands</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Source\Agent\Commands\ClientDesyncProbe.cpp">
-      <Filter>Game\Agent\Commands</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\FrameBase.cpp">
       <Filter>Engine\Frame</Filter>
@@ -1568,6 +1565,15 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreen.cpp">
       <Filter>Engine\Ui\Screens\TweaksScreen</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\AgentCommandsAudioStreaming.cpp">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\ClientDesyncProbe.cpp">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\DescribeScene.cpp">
+      <Filter>Engine\Agent\Commands</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

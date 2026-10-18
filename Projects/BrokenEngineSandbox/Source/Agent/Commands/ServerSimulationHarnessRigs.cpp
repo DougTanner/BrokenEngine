@@ -10,7 +10,6 @@
 #include "Network/Server/ServerTransferManager.h"
 #include "Network/StatusChangeFields.h"
 
-#include "Agent/AgentCommandsServerQueries.h"
 #include "Frame/Collections/Omnis/Omnis.h"
 #include "Network/Server/ServerSession.h"
 #include "Game.h"
@@ -47,223 +46,19 @@ static bool IsCoordinateActive(engine::GridCoord coordinate)
 	return std::ranges::contains(gpGame->mActiveCoordinates, coordinate);
 }
 
-static void CommandReplayRecord([[maybe_unused]] const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
+static void CommandReplayTransferCapture(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	// SaveLoadReplay/SyncReplayTick are compiled out under !kbDebugInput, so the flag would never be consumed.
-	if constexpr (!kbDebugInput)
+	engine::ReplayHarnessRigs::TransferCaptureSnapshot captureSnapshot = engine::CommandReplayTransferCapture(rParameters, rResult);
+	nlohmann::json& rEvents = rResult.at("events");
+	for (const auto& [i, rEvent] : std::views::enumerate(captureSnapshot.events))
 	{
-		throw std::runtime_error("replay requires kbDebugInput build");
+		const ReplayTransferCaptureCounts& rCounts = rEvent.transferCounts;
+		nlohmann::json& rEventJson = rEvents.at(static_cast<size_t>(i));
+		rEventJson["omniCount"] = rCounts.iOmniCount;
+		rEventJson["spaceshipCount"] = rCounts.iSpaceshipCount;
+		rEventJson["blasterCount"] = rCounts.iBlasterCount;
+		rEventJson["missileCount"] = rCounts.iMissileCount;
 	}
-	else
-	{
-		if (!rParameters.contains("start"))
-		{
-			throw std::runtime_error("replay_record requires bool 'start'");
-		}
-		if (!rParameters.at("start").is_boolean())
-		{
-			throw std::runtime_error("replay_record requires bool 'start'");
-		}
-		bool bStart = rParameters.at("start").get<bool>();
-		if (bStart && (game::gpGame->mbReplaying || (game::gpGame->mGameFlags & engine::GameFlags::kLoadReplay)))
-		{
-			throw std::runtime_error("replay_record start rejected: playback is active or pending");
-		}
-		// SyncReplayTick consumes kSaveReplay as a start request on a dispatched tick; SaveLoadReplay consumes it as a stop request on its next run.
-		// A pending flag inverts writer presence to give the requested state; setting it schedules a transition, and clearing it cancels one.
-		bool bFlagPending = gpGame->mGameFlags & engine::GameFlags::kSaveReplay;
-		bool bEffective = (!engine::gpReplay->mReplayWriters.empty()) != bFlagPending;
-		if (bStart == bEffective)
-		{
-			rResult["pending"] = false;
-		}
-		else if (bFlagPending)
-		{
-			// Cancel a pending transition (e.g. a stop request voids a not-yet-started recording).
-			if (engine::gpReplay->mReplayWriters.empty())
-			{
-				engine::ReplayHarnessRigs::Reset(*engine::gpReplay);
-			}
-			gpGame->mGameFlags.Set(engine::GameFlags::kSaveReplay, false);
-			rResult["pending"] = false;
-		}
-		else
-		{
-			gpGame->mGameFlags.Set(engine::GameFlags::kSaveReplay);
-			rResult["pending"] = true;
-		}
-	}
-}
-
-static void CommandReplayPlay([[maybe_unused]] const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
-{
-	if constexpr (!kbDebugInput)
-	{
-		throw std::runtime_error("replay requires kbDebugInput build");
-	}
-	else
-	{
-		// Same semantics as F8 / kClientReplayPlaybackRequest: starts playback, or cancels if already replaying.
-		if ((!engine::gpReplay->mReplayWriters.empty() || (game::gpGame->mGameFlags & engine::GameFlags::kSaveReplay)))
-		{
-			throw std::runtime_error("replay_play rejected: active or pending recording");
-		}
-		gpGame->mGameFlags.Set(engine::GameFlags::kLoadReplay);
-		rResult["pending"] = true;
-	}
-}
-
-static void CommandReplayTransferCapture([[maybe_unused]] const nlohmann::json& rParameters, nlohmann::json& rResult)
-{
-	if constexpr (!kbDebugInput)
-	{
-		throw std::runtime_error("replay_transfer_capture requires kbDebugInput build");
-	}
-	else
-	{
-		engine::ReplayHarnessRigs::TransferCaptureSnapshot captureSnapshot = engine::ReplayHarnessRigs::CaptureSnapshot(*engine::gpReplay);
-		rResult["firstWriterInputTick"] = captureSnapshot.iFirstWriterInputTick;
-		rResult["writerInputCount"] = captureSnapshot.iWriterInputCount;
-
-		nlohmann::json events = nlohmann::json::array();
-		for (const engine::ReplayHarnessRigs::TransferCaptureEvent& rEvent : captureSnapshot.events)
-		{
-			nlohmann::json eventJson;
-			eventJson["recordingEventTick"] = rEvent.iRecordingEventTick;
-			eventJson["playbackEventTick"] = rEvent.iPlaybackEventTick;
-			eventJson["omniCount"] = rEvent.transferCounts.iOmniCount;
-			eventJson["spaceshipCount"] = rEvent.transferCounts.iSpaceshipCount;
-			eventJson["blasterCount"] = rEvent.transferCounts.iBlasterCount;
-			eventJson["missileCount"] = rEvent.transferCounts.iMissileCount;
-			events.push_back(std::move(eventJson));
-		}
-		rResult["events"] = std::move(events);
-	}
-}
-
-static void CommandReplayDropRetainedEndFrame([[maybe_unused]] const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
-{
-	if constexpr (!kbDebugInput)
-	{
-		throw std::runtime_error("replay requires kbDebugInput build");
-	}
-	else
-	{
-		if (engine::gpReplay->mReplayWriters.empty())
-		{
-			throw std::runtime_error("replay_drop_retained_end_frame requires active recording");
-		}
-
-		engine::GridCoord coordinate = CoordinateFromParameter(rParameters);
-		if (!engine::ReplayHarnessRigs::DropRetainedEndFrame(*engine::gpReplay, coordinate))
-		{
-			throw std::runtime_error("replay_drop_retained_end_frame requires a retained terminal frame for 'coord'");
-		}
-
-		rResult["coord"] = {coordinate.iX, coordinate.iY};
-		rResult["dropped"] = true;
-	}
-}
-
-static void CommandReplayInjectPersistenceFailure([[maybe_unused]] const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
-{
-	if constexpr (!kbDebugInput)
-	{
-		throw std::runtime_error("replay requires kbDebugInput build");
-	}
-	else
-	{
-		if (!rParameters.contains("stage"))
-		{
-			throw std::runtime_error("replay_inject_persistence_failure requires string 'stage'");
-		}
-		if (!rParameters.at("stage").is_string())
-		{
-			throw std::runtime_error("replay_inject_persistence_failure requires string 'stage'");
-		}
-
-		std::string stage = rParameters.at("stage").get<std::string>();
-		engine::ReplayHarnessRigs::PersistenceFailurePoint eFailurePoint = engine::ReplayHarnessRigs::PersistenceFailurePoint::kNone;
-		if (stage == "invalidation")
-		{
-			eFailurePoint = engine::ReplayHarnessRigs::PersistenceFailurePoint::kManifestInvalidation;
-		}
-		else if (stage == "grid")
-		{
-			eFailurePoint = engine::ReplayHarnessRigs::PersistenceFailurePoint::kGrid;
-		}
-		else if (stage == "transfer_capture")
-		{
-			eFailurePoint = engine::ReplayHarnessRigs::PersistenceFailurePoint::kTransferCapture;
-		}
-		else if (stage == "coordinate_writer")
-		{
-			eFailurePoint = engine::ReplayHarnessRigs::PersistenceFailurePoint::kCoordinateWriter;
-		}
-		else if (stage == "fullframes_record")
-		{
-			eFailurePoint = engine::ReplayHarnessRigs::PersistenceFailurePoint::kFullFramesRecord;
-		}
-		else if (stage == "metadata")
-		{
-			eFailurePoint = engine::ReplayHarnessRigs::PersistenceFailurePoint::kMetadata;
-		}
-		else if (stage == "inventory")
-		{
-			eFailurePoint = engine::ReplayHarnessRigs::PersistenceFailurePoint::kInventory;
-		}
-		else if (stage == "final_manifest")
-		{
-			eFailurePoint = engine::ReplayHarnessRigs::PersistenceFailurePoint::kFinalManifest;
-		}
-		else
-		{
-			throw std::runtime_error("'stage' must be invalidation|grid|transfer_capture|coordinate_writer|fullframes_record|metadata|inventory|final_manifest");
-		}
-
-		if ((eFailurePoint == engine::ReplayHarnessRigs::PersistenceFailurePoint::kManifestInvalidation || eFailurePoint == engine::ReplayHarnessRigs::PersistenceFailurePoint::kGrid) == (!engine::gpReplay->mReplayWriters.empty()))
-		{
-			throw std::runtime_error((!engine::gpReplay->mReplayWriters.empty()) ? "selected stage requires recording to be inactive" : "selected stage requires active recording");
-		}
-
-		bool bRequiresCoordinate = eFailurePoint == engine::ReplayHarnessRigs::PersistenceFailurePoint::kCoordinateWriter
-		                        || eFailurePoint == engine::ReplayHarnessRigs::PersistenceFailurePoint::kFullFramesRecord;
-		if (bRequiresCoordinate != rParameters.contains("coord"))
-		{
-			throw std::runtime_error(bRequiresCoordinate ? "selected stage requires 'coord'" : "'coord' is only valid for coordinate_writer or fullframes_record");
-		}
-
-		engine::GridCoord coordinate {};
-		if (bRequiresCoordinate)
-		{
-			coordinate = CoordinateFromParameter(rParameters);
-		}
-		if (!engine::ReplayHarnessRigs::ArmPersistenceFailure(*engine::gpReplay, eFailurePoint, coordinate))
-		{
-			throw std::runtime_error("selected 'coord' has no replay writer with an end frame");
-		}
-
-		rResult["stage"] = std::move(stage);
-		if (bRequiresCoordinate)
-		{
-			rResult["coord"] = {coordinate.iX, coordinate.iY};
-		}
-		rResult["armed"] = true;
-	}
-}
-
-static float FiniteFloatFromValue(const nlohmann::json& rValue, std::string_view name)
-{
-	if (!rValue.is_number())
-	{
-		throw std::runtime_error(std::format("'{}' must be a finite number", name));
-	}
-	float fValue = rValue.get<float>();
-	if (!std::isfinite(fValue))
-	{
-		throw std::runtime_error(std::format("'{}' must be a finite number", name));
-	}
-	return fValue;
 }
 
 template <typename COLUMN, typename DATA>
@@ -309,15 +104,15 @@ static void ParseStatusChangeField(const nlohmann::json& rEntry, DATA& rData)
 	}
 	else if constexpr (std::is_same_v<Member, float>)
 	{
-		rMember = FiniteFloatFromValue(rValue, kName);
+		rMember = engine::AgentFloatValue(rValue, kName);
 	}
 	else if constexpr (std::is_same_v<Member, std::chrono::duration<float>>)
 	{
-		rMember = std::chrono::duration<float>(FiniteFloatFromValue(rValue, kName));
+		rMember = std::chrono::duration<float>(engine::AgentFloatValue(rValue, kName));
 	}
 	else if constexpr (std::is_same_v<Member, engine::GridCoord>)
 	{
-		rMember = CoordinateFromParameter(rEntry, kName);
+		rMember = engine::CoordinateFromParameter(rEntry, kName);
 	}
 	else if constexpr (std::is_same_v<Member, XMVECTOR>)
 	{
@@ -332,7 +127,7 @@ static void ParseStatusChangeField(const nlohmann::json& rEntry, DATA& rData)
 		// The caller supplies local XY only; the position sits on the lowest flight plane, and the W lane follows the
 		// position/direction invariant.
 		static constexpr bool kbIsPosition = kName == "vecPosition";
-		rMember = XMVectorSet(FiniteFloatFromValue(rValue.at(0), kName), FiniteFloatFromValue(rValue.at(1), kName), kbIsPosition ? engine::gpFlightPlanes->Lowest().fHeightMeters : 0.0f, kbIsPosition ? 1.0f : 0.0f);
+		rMember = XMVectorSet(engine::AgentFloatValue(rValue.at(0), kName), engine::AgentFloatValue(rValue.at(1), kName), kbIsPosition ? engine::gpFlightPlanes->Lowest().fHeightMeters : 0.0f, kbIsPosition ? 1.0f : 0.0f);
 	}
 	else if constexpr (std::is_same_v<Member, engine::AlignmentIdentifier>)
 	{
@@ -470,7 +265,7 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 	{
 		throw std::runtime_error("each inject_payload entry must be an object");
 	}
-	engine::GridCoord coordinate = CoordinateFromParameter(rEntry);
+	engine::GridCoord coordinate = engine::CoordinateFromParameter(rEntry);
 	StatusChangeType eType = StatusChangeTypeFromEntry(rEntry);
 
 	ScheduledStatusChange scheduled {.iTick = gpGame->miTickCounter + 1, .change = {.eType = eType, .data = DefaultDataForType(eType)}};
@@ -705,34 +500,14 @@ static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::js
 
 bool ExecuteServerSimulationHarnessRigCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (command != "replay_record" && command != "replay_play" && command != "replay_transfer_capture" && command != "replay_drop_retained_end_frame" && command != "replay_inject_persistence_failure" && command != "inject_payload")
+	if (command != "replay_transfer_capture" && command != "inject_payload")
 	{
 		return false;
 	}
 	Bind(*gpServerSession);
-	if (command == "replay_record")
-	{
-		CommandReplayRecord(rParameters, rResult);
-		return true;
-	}
-	if (command == "replay_play")
-	{
-		CommandReplayPlay(rParameters, rResult);
-		return true;
-	}
 	if (command == "replay_transfer_capture")
 	{
 		CommandReplayTransferCapture(rParameters, rResult);
-		return true;
-	}
-	if (command == "replay_drop_retained_end_frame")
-	{
-		CommandReplayDropRetainedEndFrame(rParameters, rResult);
-		return true;
-	}
-	if (command == "replay_inject_persistence_failure")
-	{
-		CommandReplayInjectPersistenceFailure(rParameters, rResult);
 		return true;
 	}
 	if (command == "inject_payload")

@@ -1,16 +1,18 @@
-#include "Agent/Commands/AgentCommandsAudioStreaming.h"
+#include "Pch.h"
 
 #if defined(BT_CLIENT)
+
+#include "Agent/Commands/AgentCommandsAudioStreaming.h"
 
 #include "Agent/Commands/AudioStreamingHarnessRig.h"
 #include "Agent/AgentCommandServer.h"
 
-namespace game
+namespace engine
 {
 
 #if defined(BT_DEBUG)
 
-constexpr const char* kpcAudioStreamingHarnessRigSchema = "audio_streaming_harness_rig requires {\"action\":\"inspect|play|clear|suspend|resume|clear_history|hold_read|release_read|stall_loaders|release_loaders|stop_publication|resume_publication|load_chunk\"} plus exactly its action's fields: play {\"crc\"}, hold_read {\"crc\",\"offset\",\"length\"}, load_chunk {\"crc\",\"priority\":\"realtime|normal\"}";
+constexpr const char* kpcAudioStreamingHarnessRigSchema = R"(audio_streaming_harness_rig requires {"action":"inspect|play|clear|suspend|resume|clear_history|hold_read|release_read|stall_loaders|release_loaders|stop_publication|resume_publication|load_chunk"} plus exactly its action's fields: play {"crc"}, hold_read {"crc","offset","length"}, load_chunk {"crc","priority":"realtime|normal"})";
 
 static const char* AudioStreamingHarnessRigPartitionName(engine::AudioStreamingHarnessRigPartition ePartition)
 {
@@ -137,9 +139,7 @@ static nlohmann::json BuildAudioStreamingHarnessRigSnapshot()
 	result["retryCount"] = snapshot.iRetryCount;
 	result["holdOwner"] = AudioStreamingHarnessRigHoldOwnerName(snapshot.eHoldOwner);
 	result["holdState"] = AudioStreamingHarnessRigHoldStateName(snapshot.eHoldState);
-	result["heldPoolIndex"] = snapshot.iHeldIndex == 4'294'967'295i64
-			? nlohmann::json(nullptr)
-			: nlohmann::json(snapshot.iHeldIndex);
+	result["heldPoolIndex"] = snapshot.iHeldIndex == 4'294'967'295i64 ? nlohmann::json(nullptr) : nlohmann::json(snapshot.iHeldIndex);
 	result["heldGeneration"] = snapshot.iHeldGeneration;
 	result["heldState"] = AudioStreamingHarnessRigQueueStateName(snapshot.eHeldState);
 	result["coherent"] = snapshot.flags & engine::AudioStreamingHarnessRigSnapshotFlags::kCoherent;
@@ -189,9 +189,7 @@ static nlohmann::json BuildAudioStreamingHarnessRigSnapshot()
 		record["phase"] = AudioStreamingHarnessRigPhaseName(rRecord.ePhase);
 		record["threadId"] = rRecord.iThreadId;
 		record["threadPriority"] = rRecord.iThreadPriority;
-		record["poolIndex"] = rRecord.iPoolIndex == 4'294'967'295i64
-		                    ? nlohmann::json(nullptr)
-		                    : nlohmann::json(rRecord.iPoolIndex);
+		record["poolIndex"] = rRecord.iPoolIndex == 4'294'967'295i64 ? nlohmann::json(nullptr) : nlohmann::json(rRecord.iPoolIndex);
 		record["crc"] = rRecord.crc;
 		record["offset"] = rRecord.iOffset;
 		record["length"] = rRecord.iLength;
@@ -393,6 +391,6 @@ void CommandAudioStreamingHarnessRig([[maybe_unused]] const nlohmann::json& rPar
 #endif
 }
 
-} // namespace game
+} // namespace engine
 
 #endif // defined(BT_CLIENT)

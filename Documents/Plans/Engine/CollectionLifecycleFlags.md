@@ -215,9 +215,7 @@ base-class pointer would sit outside every tuple. Per the
   hydration rebuilds client-owned visuals from the owners
   (`Network/Client/ClientSession.cpp:249-266`), so a client-only row awaiting
   its Destroy is simply absent from a hydrated frame.
-- Agent: the six `edit_frame` column lists in
-  `Agent/Commands/ServerFrameEdit.cpp:35-40`, Pushers' included, add
-  `pLifecycleFlags`, as the list's `static_assert` requires.
+- Agent: the six `edit_frame` column lists, Pushers' included, add `pLifecycleFlags`, as the list's `static_assert` requires: `OmnisFrameColumns`, `SpaceshipsFrameColumns`, `MissilesFrameColumns`, and `BlastersFrameColumns` in `Agent/Commands/ServerFrameEdit.cpp`, and `ExplosionsFrameColumns` and `PushersFrameColumns` in `Engine/Source/Agent/Commands/FrameEdit.h`.
 
 ### Unique flags
 
@@ -372,6 +370,7 @@ No older file is accepted (root `AGENTS.md`):
   `Spaceships/`, `Missiles/`, `Blasters/`
 - `Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerFrameEdit.cpp`,
   `Agent/AgentScene.cpp`, `Agent/AgentCommandsServerQueries.cpp`
+- `Engine/Source/Agent/Commands/FrameEdit.h`
 - `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md`
 
 ## In scope
@@ -428,7 +427,7 @@ No older file is accepted (root `AGENTS.md`):
 - `Frame/FrameInput.h:10` and `NetworkProtocol.h:83`: the two bumps. If the
   status-change per-item maximum no longer covers the Explosions payload, it
   is raised.
-- `Agent/Commands/ServerFrameEdit.cpp:35-40`: the six column lists.
+- `Agent/Commands/ServerFrameEdit.cpp` (`OmnisFrameColumns`, `SpaceshipsFrameColumns`, `MissilesFrameColumns`, `BlastersFrameColumns`) and `Engine/Source/Agent/Commands/FrameEdit.h` (`ExplosionsFrameColumns`, `PushersFrameColumns`): the six column lists.
 - `Agent/AgentScene.cpp:21-85`: `OmniFlagNames` and `SpaceshipFlagNames` take
   the lifecycle mask too and emit its names (`kTransfer`, `kDestroy`,
   `kDying`) through one shared file-static helper into the same `flags` array,
@@ -496,7 +495,7 @@ No older file is accepted (root `AGENTS.md`):
 | Determinism holds | `/agent-harness` replay record over live combat with deaths, owner releases, and cross-cell transfers, then playback with no CRC mismatch |
 | Uniform kill write | `/agent-harness` `edit_frame` `pLifecycleFlags:2` on one omni, spaceship, missile, and blaster row: after one unpaused tick each collection's count drops by one; `pLifecycleFlags:4` on a trail-less explosion removes it |
 | Staged death unchanged | `edit_frame` `pfArmors:0` on an omni: it explodes and is removed after `kDestroyTime` |
-| A killed omni's owned rows leave through release | With a client connected, `edit_frame` `pfArmors:0` on an omni, then step one tick at a time with the `pause` one-tick recipe in `commands-server.md`: the client `query_profile` `HexShields` counter drops by one one tick after the death starts; on the tick the omni row is gone, `read_frame` `pushers` shows its pusher with `pLifecycleFlags` 4, and one tick later the `pushers` count is one lower |
+| A killed omni's owned rows leave through release | With a client connected, `edit_frame` `pfArmors:0` on an omni, then step one tick at a time with the `pause` one-tick recipe in `.agents/skills/agent-harness/references/command-reference.md` `## Server commands`: the client `query_profile` `HexShields` counter drops by one one tick after the death starts; on the tick the omni row is gone, `read_frame` `pushers` shows its pusher with `pLifecycleFlags` 4, and one tick later the `pushers` count is one lower |
 | No pusher leak | Over a 2000-tick combat run with deaths and transfers, sampled every 100 ticks with the server paused: every `pushers` row with `pLifecycleFlags` 0 is the `pPushers` or `puiPushers` value of exactly one omni or spaceship, and every other `pushers` row is gone one tick later |
 | No client-only owned-row leak | In a cell whose rows all came from `inject_payload`, with no other subscribed cell holding rows (the counters sum over active cells), after combat, writing every row's kill state and waiting for explosions and controller lights to expire leaves the `pushers` count and the client `HexShields`, `AreaLights`, `PointLights`, and `SmokeTrails` counters at 0 |
 | Transfer unchanged | The `cross-cell.md` flagship recipe: the omni arrives in the neighbour with `kIsFlagship` set and lifecycle `0` |
@@ -514,17 +513,6 @@ No older file is accepted (root `AGENTS.md`):
   `ReleaseIndexableElementAndClearHandle`; if that Plan lands first, this
   Plan's Omnis and Spaceships rows, including the owner releases, apply to its
   Fighters, Omnis, and Battleships.
-- `Documents/Plans/Engine/AgentHarnessIntoEngine.md` moves regions of
-  `ServerFrameEdit.cpp` and `AgentScene.cpp` this Plan edits, among them
-  `ExplosionsFrameColumns` and `PushersFrameColumns`, two of the six column
-  lists this Plan extends, which its Stage 4 moves to
-  `Engine/Source/Agent/Commands/FrameEdit.h`; whichever lands second applies its
-  edits at the other's locations. Its Stage 5 also moves the `pause` entry of
-  `commands-server.md`, whose one-tick recipe the owned-row release acceptance
-  row cites, to `.agents/skills/agent-harness/references/command-reference.md`
-  `## Server commands`, while `timescale`, which that recipe sends, stays in
-  `commands-server.md`; whichever lands second points that citation at the
-  entry's location then.
 - The game `Frame` read rejects a frame whose Omnis and Spaceships pusher
   handles do not pair one-to-one with its Pushers rows
   (`Frame/Frame.cpp` `ValidatePusherOwners`). A pusher this Plan releases stays

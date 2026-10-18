@@ -216,6 +216,35 @@ int64_t AgentGridCoordinateValue(const nlohmann::json& rValue, std::string_view 
 	return iValue;
 }
 
+GridCoord CoordinateFromParameter(const nlohmann::json& rParameters, std::string_view key)
+{
+	if (!rParameters.contains(key) || !rParameters.at(std::string(key)).is_array() || rParameters.at(std::string(key)).size() != 2)
+	{
+		std::string message("'");
+		message.append(key);
+		message.append("' must be a [x,y] array");
+		throw std::runtime_error(message);
+	}
+	const nlohmann::json& rCoordinate = rParameters.at(std::string(key));
+	std::string name = std::format("'{}'", key);
+	return GridCoord {.iX = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(0), name)), .iY = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(1), name))};
+}
+
+float AgentFloatValue(const nlohmann::json& rValue, std::string_view name)
+{
+	// The transport parse already rejects a literal that overflows double, so only the narrowing to float can leave
+	// the finite range.
+	if (rValue.is_number())
+	{
+		double fValue = rValue.get<double>();
+		if (std::abs(fValue) <= std::numeric_limits<float>::max())
+		{
+			return static_cast<float>(fValue);
+		}
+	}
+	throw std::runtime_error(std::format("'{}' must be a finite number within the float range", name));
+}
+
 bool ExecuteSharedAgentCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult, int64_t iGameTick)
 {
 	if (command == "ping")

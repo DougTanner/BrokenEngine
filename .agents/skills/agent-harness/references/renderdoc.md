@@ -12,9 +12,9 @@ Caveat — capture runs drop Vulkan validation. With `renderdoc.dll` loaded (whi
 
 ## Launch, capture, analyze
 
-Launch with the selected project's focused `launch.md` recipe (`Projects/<Project>/Documents/AgentHarness/launch.md`), adding the launch script's `-RenderDoc` switch, which passes `--renderdoc`, to the client call only. Confirm the API attached with `get_logs {"pattern":"renderDocHmodule|RenderDoc API"}` — expect a nonzero `renderDocHmodule` and a nonzero `RenderDoc API` pointer.
+Launch with the [`launch.md`](launch.md) recipe and the selected project's launch values, adding the launch script's `-RenderDoc` switch, which passes `--renderdoc`, to the client call only. Confirm the API attached with `get_logs {"pattern":"renderDocHmodule|RenderDoc API"}` — expect a nonzero `renderDocHmodule` and a nonzero `RenderDoc API` pointer.
 
-Capture with `renderdoc_capture` (schema in the project's [client commands](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-client.md)). Size `--timeout-ms` for the drain-count progress bound, not wall-clock. The default agent client is minimized, so the command restores it without activation, captures, and re-minimizes.
+Capture with `renderdoc_capture` (schema in the [command reference](command-reference.md#client-commands)). Size `--timeout-ms` for the drain-count progress bound, not wall-clock. The default agent client is minimized, so the command restores it without activation, captures, and re-minimizes.
 
 ```powershell
 '{"cmd":"renderdoc_capture","params":{"frames":1}}' |

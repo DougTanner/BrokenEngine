@@ -2,11 +2,11 @@
 
 #if defined(BT_CLIENT)
 
-namespace game
+namespace engine
 {
 
 void CommandAudioStreamingHarnessRig(const nlohmann::json& rParameters, nlohmann::json& rResult);
 
-} // namespace game
+} // namespace engine
 
 #endif // defined(BT_CLIENT)

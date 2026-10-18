@@ -16,19 +16,25 @@ void ExecuteAgentCommand(std::string_view command, const nlohmann::json& rParame
 		return;
 	}
 
+	// The game side handler runs before the engine side-generic one, so it can take over an engine command: it calls the
+	// exported engine command function and appends its own fields.
 #if defined(BT_CLIENT)
-	// Engine-generic client automation (capture, window, UI, synthetic input, GPU profile) runs before the game client handler.
-	if (engine::ExecuteClientAgentCommand(command, rParameters, rResult))
+	if (ExecuteAgentCommandClient(command, rParameters, rResult))
 	{
 		return;
 	}
 
-	if (!ExecuteAgentCommandClient(command, rParameters, rResult))
+	if (!engine::ExecuteClientAgentCommand(command, rParameters, rResult))
 	{
 		throw std::runtime_error("unknown command");
 	}
 #elif defined(BT_SERVER)
-	if (!ExecuteAgentCommandServer(command, rParameters, rResult))
+	if (ExecuteAgentCommandServer(command, rParameters, rResult))
+	{
+		return;
+	}
+
+	if (!engine::ExecuteServerAgentCommand(command, rParameters, rResult))
 	{
 		throw std::runtime_error("unknown command");
 	}

@@ -1,16 +1,15 @@
-#include "Agent/Commands/ClientDesyncProbe.h"
+#include "Pch.h"
 
 #if defined(BT_CLIENT)
 
-#include "Network/Client/Client.h"
-#include "Network/Client/ClientSessionRuntime.h"
+#include "Agent/Commands/ClientDesyncProbe.h"
+
 #include "Network/Client/ReconcileReplay.h"
 
-#include "Agent/AgentCommands.h"
 #include "Network/Client/ClientSession.h"
 #include "Game.h"
 
-namespace game
+namespace engine
 {
 
 static int64_t DesynchronizationProbeCountParameter(const nlohmann::json& rParameters, std::string_view parameterName)
@@ -85,51 +84,46 @@ void CommandDesynchronizationProbe(const nlohmann::json& rParameters, nlohmann::
 		}
 	}
 
-	RequireHarnessRigClient("desync_probe");
-	if ((gpGame->mGameFlags & engine::GameFlags::kMainMenu))
+	Client& rClient = RequireAcceptedClient("desync_probe");
+	if ((game::gpGame->mGameFlags & engine::GameFlags::kMainMenu))
 	{
 		throw std::runtime_error("desync_probe requires a connected live client/server session");
 	}
 
-	auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
-	if (it == gpGame->mCells.end())
+	auto it = game::gpGame->mCells.find(game::gpGame->mClientGridCoordinate);
+	if (it == game::gpGame->mCells.end())
 	{
 		throw std::runtime_error("desync_probe requires a current client frame");
 	}
-	if (it->second.iSnapshotCount <= 0)
-	{
-		throw std::runtime_error("desync_probe requires a current client frame");
-	}
-	int64_t iSnapshotIndex = engine::SnapshotIndex(it->second.iSnapshotHead, it->second.iSnapshotCount - 1);
-	const std::unique_ptr<Frame>& rpCurrentFrame = it->second.ppSnapshots[iSnapshotIndex];
-	if (rpCurrentFrame == nullptr)
+	const game::Frame* pCurrentFrame = it->second.TailFrame();
+	if (pCurrentFrame == nullptr)
 	{
 		throw std::runtime_error("desync_probe requires a current client frame");
 	}
 
-	int64_t iTick = rpCurrentFrame->interpolate.iTick;
-	engine::GridCoord coordinate = gpGame->mClientGridCoordinate;
-	common::crc_t uiExpectedCrc = rpCurrentFrame->postRender.uiSharedCrc;
+	int64_t iTick = pCurrentFrame->interpolate.iTick;
+	engine::GridCoord coordinate = game::gpGame->mClientGridCoordinate;
+	common::crc_t uiExpectedCrc = pCurrentFrame->postRender.uiSharedCrc;
 	common::crc_t uiActualCrc = uiExpectedCrc ^ static_cast<common::crc_t>(1);
 
 	for (int64_t i = 0; i < iDesynchronizationReportCount; ++i)
 	{
-		gpClientSession->mpRuntime->mpClient->SendDesynchronizationReport(iTick, coordinate, uiExpectedCrc, uiActualCrc);
+		rClient.SendDesynchronizationReport(iTick, coordinate, uiExpectedCrc, uiActualCrc);
 	}
 	for (int64_t i = 0; i < iDebugFrameRequestCount; ++i)
 	{
-		gpClientSession->mpRuntime->mpClient->SendDebugFrameRequest(iTick, coordinate);
+		rClient.SendDebugFrameRequest(iTick, coordinate);
 	}
 
 	if (bTriggerRecovery)
 	{
-		if (gpClientSession->mpDesynchronizationCore->IsStalled())
+		if (game::gpClientSession->mpDesynchronizationCore->IsStalled())
 		{
 			throw std::runtime_error("desync_probe cannot trigger recovery while desync debug mode is already stalled");
 		}
 
-		std::unique_ptr<Frame> pSnapshot = std::make_unique<Frame>();
-		engine::TransferViaStream(*rpCurrentFrame, *pSnapshot);
+		std::unique_ptr<game::Frame> pSnapshot = std::make_unique<game::Frame>();
+		engine::TransferViaStream(*pCurrentFrame, *pSnapshot);
 
 		engine::ReconcileDesyncInfo desynchronizationInformation
 		{
@@ -140,18 +134,18 @@ void CommandDesynchronizationProbe(const nlohmann::json& rParameters, nlohmann::
 			.desyncActualCrc = uiActualCrc,
 			.pDesyncClientFrame = std::move(pSnapshot),
 		};
-		gpClientSession->mpDesynchronizationCore->OnDesyncDetected(std::move(desynchronizationInformation));
+		game::gpClientSession->mpDesynchronizationCore->OnDesyncDetected(std::move(desynchronizationInformation));
 	}
 
 	rResult["tick"] = iTick;
 	rResult["coord"] = {coordinate.iX, coordinate.iY};
 	rResult["desyncDebugFrames"] = kbDesynchronizationDebugFrames;
-	rResult["stalled"] = gpClientSession->mpDesynchronizationCore->IsStalled();
+	rResult["stalled"] = game::gpClientSession->mpDesynchronizationCore->IsStalled();
 	rResult["desyncReports"] = iDesynchronizationReportCount;
 	rResult["debugFrameRequests"] = iDebugFrameRequestCount;
 	rResult["triggerRecovery"] = bTriggerRecovery;
 }
 
-} // namespace game
+} // namespace engine
 
 #endif // BT_CLIENT

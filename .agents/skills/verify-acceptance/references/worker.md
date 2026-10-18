@@ -39,7 +39,7 @@ criterion only once its pre-change red run is on record, each as the execution
 card `Acceptance checks:` field in [`next-plan`](../../next-plan/SKILL.md)
 `## Handoff` defines it; a `query_profile` timing criterion settles only on
 cohorts compared as the
-`query_profile` caveat in [`commands-client.md`](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-client.md)
+`query_profile` caveat in [`command-reference.md`](../../agent-harness/references/command-reference.md)
 `## Durable caveats` requires.
 
 ## Rules

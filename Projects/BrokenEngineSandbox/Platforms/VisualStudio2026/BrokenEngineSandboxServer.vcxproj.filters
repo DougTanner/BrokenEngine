@@ -615,6 +615,12 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManager.h">
       <Filter>Engine\Profile</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandsServerGeneric.h">
+      <Filter>Engine\Agent</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\FrameEdit.h">
+      <Filter>Engine\Agent\Commands</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Engine\Source\File\FileManager.cpp">
@@ -947,6 +953,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManager.cpp">
       <Filter>Engine\Profile</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentCommandsServerGeneric.cpp">
+      <Filter>Engine\Agent</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

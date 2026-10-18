@@ -10,19 +10,19 @@ and the handoff this run returns.
    worktree. Done when this run's ports and adopted worktree path are fixed.
 
    - A scenario needing a second simultaneous client adds port `27102` (see the
-     project's [Additional simultaneous client](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/launch.md#additional-simultaneous-client)
+     [Additional simultaneous client](launch.md#additional-simultaneous-client)
      recipe).
    - A local server is a development instance, not an Azure production server.
 
 2. Read the focused references only when applicable. Done when every reference
    this scenario makes applicable has been read:
 
-   - Read the command reference (`command-reference.md#shared-commands`) for
-     the engine-shared command schemas and the `params`/`result` placement
-     convention; the request/response envelope itself is defined in the Invoke
-     commands steps below. The selected project's
+   - Read the command reference (`command-reference.md`) for the engine-owned
+     shared, client, and server command schemas and the `params`/`result`
+     placement convention; the request/response envelope itself is defined in
+     the Invoke commands steps below. The selected project's
      `Projects/<Project>/Documents/AgentHarness.md` hub routes every game
-     command schema, launch recipe, verification scenario, and game caveat to a
+     command schema, launch value, verification scenario, and game caveat to a
      focused reference.
    - Read the private-LAN firewall reference (`private-lan-firewall.md`) only
      for an explicitly requested cross-machine or private-Wi-Fi scenario.
@@ -45,9 +45,9 @@ and the handoff this run returns.
    hub before launching. Done when that hub has been read.
 
    - Its machine-readable launch configuration owns the executable names and
-     output directory, `../scripts/Invoke-HarnessLaunch.ps1` owns the launch
-     sequence and the game argument set, and the hub's linked `launch.md` owns
-     the concrete values of each launch-script call.
+     output directory, its `## Launch values` own the other project values,
+     `../scripts/Invoke-HarnessLaunch.ps1` owns the launch sequence and the game
+     argument set, and `launch.md` owns each launch-script call.
    - The root hub routes project command schemas and verification scenarios to
      focused children.
 
@@ -71,8 +71,8 @@ and the handoff this run returns.
      which narrows that existence check to the server executable.
    - Declare `-ServerOnly` from what your scenario actually launches; it binds
      the whole claimed session, so a `-ServerOnly` session must not launch a
-     client under that claim, and it is never inferred from the project's server
-     command document, which is not uniformly client-free.
+     client under that claim, and it is never inferred from the server command
+     documents, which are not uniformly client-free.
    - It also compares a Shared data directory with this worktree's record of
      what each required executable's build compiled against, proves that the
      pack version this worktree's source expects matches the version the
@@ -274,12 +274,14 @@ and the handoff this run returns.
       `-AppDataDirectory` is the only override selecting where saves, settings,
       caches, and replays are written.
 
-17. Take the launch-script calls from the selected project's documents. Done
-    when this run's launch-script calls come from that project's `launch.md`.
+17. Take the launch-script calls from `launch.md` with the selected project's
+    values. Done when this run's launch-script calls come from `launch.md` and
+    that project's hub.
 
-    - The selected project's hub owns the machine-readable executable paths,
-      while its linked `launch.md` owns the concrete values of each
-      launch-script call, game-specific connect notes, and fresh-state choices.
+    - The selected project's hub owns the machine-readable executable paths and
+      the `## Launch values`, while `launch.md` owns each launch-script call,
+      connect notes, and fresh-state choices, and the project's own `launch.md`
+      adds its game-specific launch notes.
     - A server-side reset command resets server state only, so a comparison
       requiring fresh client state must launch under an app-data directory that
       did not exist before that launch; use the `launch.md` recipe.
@@ -337,8 +339,8 @@ and the handoff this run returns.
       earlier run's registrations.
 
 21. On every host, launch and relaunch each role through
-    `../scripts/Invoke-HarnessLaunch.ps1`, one call per role in the form the
-    project `launch.md` shows, server first. Never run `Start-Process` on a game
+    `../scripts/Invoke-HarnessLaunch.ps1`, one call per role in the form
+    `launch.md` shows, server first. Never run `Start-Process` on a game
     executable. Done when every role this run launches has returned its launch
     result.
 
@@ -367,8 +369,8 @@ and the handoff this run returns.
       the attempt the same way and route `/compile` for the named target, with
       no user stop.
     - `launch.server-running` (exit `2`) means a server process was already
-      running, and nothing started; follow the running-server route in the
-      project `launch.md`.
+      running, and nothing started; follow the running-server route in
+      `launch.md`.
     - The passed-through `check.unexpected-exit` (exit `2`, from the immediate
       `Check`) keeps its step 22 meaning, and `process.unexpected-exit` and
       `ping.timeout` (exit `2`, from the readiness wait) keep their step 23
@@ -472,14 +474,14 @@ and the handoff this run returns.
     - A checker that could not run at all is advisory `ProcessCheckWarning` in
       the artifact and the wait continues. Every existing exit-code meaning is
       unchanged.
-    - The selected project document owns the concrete argument values and the
-      evidence check around this call.
+    - `launch.md` owns the concrete argument values and the evidence check
+      around this call.
 
 25. Before relinking or relaunching, send `quit` and wait for the exact numeric
     `pid` from the role's latest launch result. Done when that PID is gone.
 
-    - Use the quit and exit-wait form of the project's
-      [Additional simultaneous client](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/launch.md#additional-simultaneous-client)
+    - Use the quit and exit-wait form of the
+      [Additional simultaneous client](launch.md#additional-simultaneous-client)
       shutdown, with the role's own port and `pid`.
     - A live executable locks its image.
     - Do not launch a duplicate to displace it — with `SO_REUSEADDR`, a
@@ -518,7 +520,7 @@ and the handoff this run returns.
       all processes of one run must select the same asset data root.
     - Each additional client needs its own app-data root because of how one root
       separates client and server state (`Engine/Source/File/AGENTS.md`).
-    - The project `launch.md` owns the concrete call.
+    - `launch.md` owns the concrete call.
 
 29. Quit the additional client before the release call, then run one fresh
     `Baseline` for its role alone. Done when its PID is gone and its role is
@@ -543,8 +545,8 @@ and the handoff this run returns.
     '{"cmd":"ping"}' | & '<absolute AgentHarness path>' --owner '<owner token>' --port 27100 -
     ```
 
-31. For server-window verification, read the project-owned
-    [server-window recipe](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/server-window.md#server-gdi-monitoring-window-capture-and-click).
+31. For server-window verification, read the
+    [server-window recipe](server-window.md#server-gdi-monitoring-window-capture-and-click).
     Done when that recipe has been read, or the scenario needs no server-window
     verification.
 
@@ -605,12 +607,13 @@ and the handoff this run returns.
     the commands that seed server state, confirm client connection, and address
     UI. Done when this run's setup recipe comes from that hub:
 
-    - The hub routes [common verification](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/verification.md).
-    - It routes endpoint commands.
-    - It routes
-      [replay determinism](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/replay.md)
-      or [cross-cell](../../../../Projects/BrokenEngineSandbox/Documents/AgentHarness/cross-cell.md)
-      scenario material.
+    - The hub (`Projects/<Project>/Documents/AgentHarness.md`) routes common
+      verification.
+    - It routes its endpoint commands; the engine-owned ones are in
+      `command-reference.md`.
+    - It routes its replay or cross-cell scenario material; the replay
+      determinism acceptance every project shares is in
+      [`replay.md`](replay.md).
 
 38. Regardless of project, hold these verification-evidence principles. Done
     when each principle holds for every criterion this run verifies:
@@ -841,9 +844,10 @@ case.
 ### Durable caveats
 
 The selected project's focused verification, replay, and endpoint references own
-game-specific caveats (injection/pause/replay timing, queued-update semantics,
-and command source-file ownership). These engine-generic caveats hold for every
-project:
+game-specific caveats (injection/pause/replay timing and queued-update
+semantics); `command-reference.md` `## Durable caveats` owns the command caveats
+every project shares, command source-file ownership included. These
+engine-generic caveats hold for every project:
 
 - Physical mouse, keyboard, wheel, and gamepad input is suppressed for an
   agent-mode client. Synthetic input is the sole game/ImGui source, except IME

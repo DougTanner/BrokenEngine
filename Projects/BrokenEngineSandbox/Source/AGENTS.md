@@ -13,7 +13,8 @@ Game implementation built on Engine and Common. `Game` owns the per-side session
 - Server save, load, reset, and autosave, like replay recording and playback, are engine-owned (`../../../Engine/Source/File/AGENTS.md`); the game half of those contracts and of the grid save lives in `Save/AGENTS.md`.
 - The server monitoring window is engine-owned (`../../../Engine/Source/Server/AGENTS.md`); the game reaches it only through the per-cell population snapshot in `Frame/AGENTS.md` and the profile counters it publishes for its own reasons.
 - Display input is engine-owned (`../../../Engine/Source/Input/AGENTS.md`). The game's only display-input entry point is `Game::ProcessGameMenuInput`, which `GameBase::ProcessInput` calls last, after engine menu policy and the engine's debug-control requests: it polls its own keys through the borrowed `engine::InputPoll`. Everything it does is `kbDebugInput`-only today.
-- Agent commands are game-dispatched, but transport, synthetic input, UI snapshots, the build-agnostic shared handlers, and the client-generic handlers are engine-owned; the dispatcher tries the engine shared handlers before its side-specific ones, and under `BT_CLIENT` tries the engine client-generic handler before its own client handlers. `Game` teardown clears any deferred agent response first, while its captured runtime dependencies are still live. See `Agent/AGENTS.md`.
+- Agent commands are game-dispatched, but transport, synthetic input, UI snapshots, the build-agnostic shared handlers, and the client-generic and server-generic handlers are engine-owned;
+  the dispatcher tries the engine shared handlers first, then its own side-specific handlers, then the engine side-generic handler, so a game handler can take over an engine command and append its own fields. `Game` teardown clears any deferred agent response first, while its captured runtime dependencies are still live. See `Agent/AGENTS.md`.
 
 ## Architecture
 
@@ -35,7 +36,7 @@ Game implementation built on Engine and Common. `Game` owns the per-side session
 
 ## Subsystems
 
-- `Agent/AGENTS.md` - Harness command dispatch, queries, and network diagnostic probes
+- `Agent/AGENTS.md` - Harness command dispatch, queries, frame edits, and engine-command take-overs
 - `Frame/AGENTS.md` - Game simulation and collections
 - `Graphics/AGENTS.md` - Camera controller
 - `Network/AGENTS.md` - Game protocol and sessions

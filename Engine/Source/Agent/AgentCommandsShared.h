@@ -21,4 +21,10 @@ nlohmann::json AgentLocalPositionJson(FXMVECTOR vecLocalPosition);
 // is a legal cell identity, so the only rejected values are non-integers and integers no GridCoord can hold.
 int64_t AgentGridCoordinateValue(const nlohmann::json& rValue, std::string_view name);
 
+// Read the [x,y] grid coordinate under key; its elements must be integers representable by int32_t.
+GridCoord CoordinateFromParameter(const nlohmann::json& rParameters, std::string_view key = "coord");
+
+// Read one JSON number as a float; name prefixes the thrown message.
+float AgentFloatValue(const nlohmann::json& rValue, std::string_view name);
+
 } // namespace engine

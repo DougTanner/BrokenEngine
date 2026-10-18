@@ -2,11 +2,11 @@
 
 #if defined(BT_CLIENT)
 
-namespace game
+namespace engine
 {
 
 void CommandDesynchronizationProbe(const nlohmann::json& rParameters, nlohmann::json& rResult);
 
-} // namespace game
+} // namespace engine
 
 #endif // BT_CLIENT

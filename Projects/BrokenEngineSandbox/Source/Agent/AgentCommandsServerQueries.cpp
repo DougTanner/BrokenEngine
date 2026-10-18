@@ -139,7 +139,7 @@ static nlohmann::json ExtractBlasters(const Frame& rFrame, int64_t iOffset, int6
 
 Frame& QueryFrame(const nlohmann::json& rParameters)
 {
-	engine::GridCoord coordinate = CoordinateFromParameter(rParameters);
+	engine::GridCoord coordinate = engine::CoordinateFromParameter(rParameters);
 	auto it = gpGame->mCells.find(coordinate);
 	if (it == gpGame->mCells.end())
 	{

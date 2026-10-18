@@ -9,8 +9,7 @@ namespace game
 // Invalid parameters throw into AgentCommandServer::Drain()'s failure envelope.
 // Injection commands are in Commands/ServerSimulationHarnessRigs.cpp;
 // frame edits and reads are in Commands/ServerFrameEdit.cpp, which shares the queries' cell-frame lookup.
-// AgentCommandsServer.cpp owns simulation control, dispatch, and the coordinate parser shared with injection commands.
-engine::GridCoord CoordinateFromParameter(const nlohmann::json& rParameters, std::string_view key = "coord");
+// AgentCommandsServer.cpp owns the status and load take-overs and the server command dispatch.
 Frame& QueryFrame(const nlohmann::json& rParameters);
 void CommandQueryFrame(const nlohmann::json& rParameters, nlohmann::json& rResult);
 void CommandQueryOmnis(const nlohmann::json& rParameters, nlohmann::json& rResult);

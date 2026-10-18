@@ -461,6 +461,8 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClInclude Include="$(GameDataDirectory)\Model.h" />
     <ClInclude Include="$(GameDataDirectory)\Texture.h" />
     <ClInclude Include="..\..\..\..\Engine\Source\Profile\ProfileManager.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\AgentCommandsServerGeneric.h" />
+    <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\FrameEdit.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Common\ErrorUtils.cpp" />
@@ -577,6 +579,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\LocalizationBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\MenuUtils.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManager.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Agent\AgentCommandsServerGeneric.cpp" />
   </ItemGroup>
   <Target Name="ValidateDataBuildProperties" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(DataBuildMode)'!='Local' and '$(DataBuildMode)'!='Shared'" Text="DataBuildMode must be Local or Shared; received '$(DataBuildMode)'." />

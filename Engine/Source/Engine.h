@@ -93,6 +93,10 @@
 #include "Agent/AgentCommandsClientGeneric.h"
 #endif // BT_CLIENT
 
+#if defined(BT_SERVER)
+#include "Agent/AgentCommandsServerGeneric.h"
+#endif // BT_SERVER
+
 // Formatters for engine types used by LogDifference.
 // GlobalId's formatter stays with its type in Frame/Collections/CollectionId.h.
 template<>

@@ -28,3 +28,4 @@ follows this layout needs no change to that tooling.
 ## See Also
 
 - Agent command field rules: `BrokenEngineSandbox/Source/Agent/AGENTS.md`
+- Agent game contract: a game project provides the names `../Engine/Source/Agent/AGENTS.md` `## Game contract` lists, and may take over an engine agent command (`## Architecture` there)

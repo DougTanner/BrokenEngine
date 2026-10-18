@@ -112,7 +112,7 @@ The background DxDiag reader appends to its report string without a lock, and th
 
 ## Subsystems
 
-- Agent (`Agent/AGENTS.md`) - Harness command transport, shared and client-generic command handlers, synthetic input, and UI snapshots
+- Agent (`Agent/AGENTS.md`) - Harness command transport, shared, client-generic, and server-generic command handlers, synthetic input, and UI snapshots
 - Audio (`Audio/AGENTS.md`) - XAudio2 spatial audio
 - File (`File/AGENTS.md`) - Packed assets, versioned files, grid saves, and replay record/playback
 - Frame (`Frame/AGENTS.md`) - Base frame state, terrain, navigation, and collections

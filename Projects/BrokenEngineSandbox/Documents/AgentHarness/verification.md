@@ -29,10 +29,12 @@ tick, so a server injection reaches the client before the client simulates that
 tick and nothing is re-simulated. To force a rollback and re-simulation, the
 injection must apply on a tick the client has already simulated: slowing the
 timescale shrinks the lag, and pausing until the client's `tailTick` passes the
-server tick guarantees it. Command contracts:
-[server](commands-server.md#server-commands),
-[client](commands-client.md#client-commands), and the engine-shared
-[`get_logs`/`set_log_level`](../../../../.agents/skills/agent-harness/references/command-reference.md).
+server tick guarantees it. Command contracts: the engine
+[server](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands),
+[client](../../../../.agents/skills/agent-harness/references/command-reference.md#client-commands), and shared
+[`get_logs`/`set_log_level`](../../../../.agents/skills/agent-harness/references/command-reference.md#shared-commands)
+commands, and this project's [server](commands-server.md#server-commands) and
+[client](commands-client.md#client-commands) additions.
 
 1. Client `set_log_level {"category":"Network","level":"Debug"}`.
 2. Server `timescale {"faster":false}` once, then poll client `query_profile` until `clock.targetBehindTicks` is at most 2 (about 11 s at 1/2).
@@ -47,6 +49,6 @@ The client suppresses that line when a CRC mismatch on the same coord falls with
 ## Durable caveats
 
 The durable caveats are kept with the focused material that exercises them:
-[launch](launch.md#durable-caveats), [replay](replay.md#durable-caveats),
-[server commands](commands-server.md#durable-caveats), and
-[client commands](commands-client.md#durable-caveats).
+[launch](launch.md#durable-caveats), [replay](replay.md#durable-caveats), and
+the engine
+[command reference](../../../../.agents/skills/agent-harness/references/command-reference.md#durable-caveats).

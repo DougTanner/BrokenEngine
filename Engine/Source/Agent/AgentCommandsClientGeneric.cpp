@@ -4,10 +4,14 @@
 
 #include "Agent/AgentCommandsClientGeneric.h"
 
+#include "Agent/Commands/AgentCommandsAudioStreaming.h"
+#include "Agent/Commands/ClientDesyncProbe.h"
+#include "Agent/Commands/DescribeScene.h"
 #include "Agent/Commands/PresentationContinuityProbe.h"
 #include "Ui/Screens/TweaksScreen/TweaksSliderMap.h"
 #include "Ui/WrapperBase.h"
 
+#include "Network/Client/ClientSession.h"
 #include "Profile/ProfileRows.h"
 #include "Game.h"
 
@@ -673,9 +677,7 @@ static void CommandDumpRenderTarget(const nlohmann::json& rParameters, [[maybe_u
 static nlohmann::json BuildDescribeUi()
 {
 	nlohmann::json result;
-	result["uiState"] = UiStateName(game::gpGame->meUiState);
-	result["tweaksVisible"] = game::gpGame->mbShowImGui;
-	result["gameFlags"] = GameFlagNames(game::gpGame->mGameFlags);
+	AppendUiStateFields(result);
 
 	result["framebuffer"] = {engine::gpGraphics->mFramebufferVkExtent2D.width, engine::gpGraphics->mFramebufferVkExtent2D.height};
 
@@ -1175,10 +1177,7 @@ static void CommandSendRawPacket(const nlohmann::json& rParameters, nlohmann::js
 	{
 		throw std::runtime_error("send_raw_packet requires exactly {\"bytes\":[int,...]}");
 	}
-	if (engine::gpClient == nullptr || !(engine::gpClient->mStateFlags & engine::Client::ClientStateFlags::kConnectionAccepted))
-	{
-		throw std::runtime_error("send_raw_packet requires an accepted connected client");
-	}
+	Client& rClient = RequireAcceptedClient("send_raw_packet");
 
 	const nlohmann::json& rBytes = rParameters.at("bytes");
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
@@ -1192,9 +1191,65 @@ static void CommandSendRawPacket(const nlohmann::json& rParameters, nlohmann::js
 		}
 		rWorkbuffer.PushBack<uint8_t>(static_cast<uint8_t>(rByte.get<uint64_t>()));
 	}
-	engine::NetworkManager::SendPacket(engine::gpClient->mpServerPeer, engine::NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	engine::NetworkManager::SendPacket(rClient.mpServerPeer, engine::NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 
 	rResult["size"] = static_cast<int64_t>(rBytes.size());
+}
+
+// set_client_grid_coord: move the client's grid cell and pin it against every game writer until
+// release_client_grid_coord or GameBase::ResetSession, so automation can drive the cross-cell subscribe and full-state
+// adoption path. Schema: {"coord":[x,y]}.
+static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nlohmann::json& rResult)
+{
+	// Heap: validation errors and JSON result
+	ScopedSuppressAllocationTracking suppress;
+
+	if (rParameters.size() != 1 || !rParameters.contains("coord"))
+	{
+		throw std::runtime_error("set_client_grid_coord accepts only 'coord'");
+	}
+
+	const nlohmann::json& rCoordinate = rParameters.at("coord");
+	if (!rCoordinate.is_array() || rCoordinate.size() != 2)
+	{
+		throw std::runtime_error("set_client_grid_coord 'coord' must be an array of 2 integers");
+	}
+
+	GridCoord coordinate {.iX = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(0), "set_client_grid_coord 'coord'")), .iY = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(1), "set_client_grid_coord 'coord'"))};
+
+	// Before owned-entity assignment the subscription policy falls back to origin, so the requested cell would be dropped.
+	RequireAcceptedClient("set_client_grid_coord");
+	if ((game::gpGame->mGameFlags & GameFlags::kMainMenu))
+	{
+		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned owned entity");
+	}
+	if (!game::gpGame->HasFocusedClientEntity())
+	{
+		throw std::runtime_error("set_client_grid_coord requires a connected live client/server session with an assigned owned entity");
+	}
+
+	// Order is an invariant: the setter clears the visible-neighbour cache keyed by the old cell.
+	game::gpClientSession->mpRuntime->PinClientGridCoordinate(coordinate);
+	game::gpClientSession->mpRuntime->UpdateDesiredCoordinates("kPollTick");
+
+	rResult["clientGridCoord"] = {coordinate.iX, coordinate.iY};
+}
+
+// release_client_grid_coord: clear the set_client_grid_coord pin; the cell stays put until the next game writer
+// moves it. Schema: {}.
+static void CommandReleaseClientGridCoordinate(const nlohmann::json& rParameters, nlohmann::json& rResult)
+{
+	// Heap: validation errors and JSON result
+	ScopedSuppressAllocationTracking suppress;
+
+	if (!rParameters.empty())
+	{
+		throw std::runtime_error("release_client_grid_coord accepts no params");
+	}
+
+	game::gpClientSession->mpRuntime->mStateFlags.Set(ClientSessionStateFlags::kClientGridCoordinatePinned, false);
+
+	rResult["clientGridCoord"] = {game::gpGame->mClientGridCoordinate.iX, game::gpGame->mClientGridCoordinate.iY};
 }
 
 const char* UiStateName(UiState eState)
@@ -1235,6 +1290,22 @@ nlohmann::json GameFlagNames(GameFlags_t flags)
 		names.push_back("kPaused");
 	}
 	return names;
+}
+
+Client& RequireAcceptedClient(std::string_view command)
+{
+	if (gpClient == nullptr || !(gpClient->mStateFlags & Client::ClientStateFlags::kConnectionAccepted))
+	{
+		throw std::runtime_error(std::format("{} requires an accepted connected client", command));
+	}
+	return *gpClient;
+}
+
+void AppendUiStateFields(nlohmann::json& rResult)
+{
+	rResult["uiState"] = UiStateName(game::gpGame->meUiState);
+	rResult["tweaksVisible"] = game::gpGame->mbShowImGui;
+	rResult["gameFlags"] = GameFlagNames(game::gpGame->mGameFlags);
 }
 
 bool ExecuteClientAgentCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)
@@ -1327,6 +1398,31 @@ bool ExecuteClientAgentCommand(std::string_view command, const nlohmann::json& r
 	if (command == "send_raw_packet")
 	{
 		CommandSendRawPacket(rParameters, rResult);
+		return true;
+	}
+	if (command == "audio_streaming_harness_rig")
+	{
+		CommandAudioStreamingHarnessRig(rParameters, rResult);
+		return true;
+	}
+	if (command == "describe_scene")
+	{
+		CommandDescribeScene(rParameters, rResult);
+		return true;
+	}
+	if (command == "desync_probe")
+	{
+		CommandDesynchronizationProbe(rParameters, rResult);
+		return true;
+	}
+	if (command == "set_client_grid_coord")
+	{
+		CommandSetClientGridCoordinate(rParameters, rResult);
+		return true;
+	}
+	if (command == "release_client_grid_coord")
+	{
+		CommandReleaseClientGridCoordinate(rParameters, rResult);
 		return true;
 	}
 	return false;

@@ -1,6 +1,6 @@
-# BrokenEngineSandbox Server Window Recipe
+# Agent Harness Server Window Recipe
 
-[Back to AgentHarness hub](../AgentHarness.md)
+[Back to the command reference](command-reference.md)
 
 ### Server GDI monitoring window capture and click
 
