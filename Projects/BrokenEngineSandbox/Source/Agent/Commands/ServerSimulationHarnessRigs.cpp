@@ -765,19 +765,7 @@ void DrainPendingAgentStatusChanges(const ServerSession& rSession)
 	for (auto it = sHarnessRig.pendingAgentStatusChanges.begin(); it != sHarnessRig.pendingAgentStatusChanges.end();)
 	{
 		const engine::GridCoord& rCoordinate = it->first;
-		auto cellIt = gpGame->mCells.find(rCoordinate);
-		bool bActive = std::ranges::contains(gpGame->mActiveCoordinates, rCoordinate);
-		if (!bActive)
-		{
-			++it;
-			continue;
-		}
-		if (cellIt == gpGame->mCells.end())
-		{
-			++it;
-			continue;
-		}
-		if (cellIt->second.pCurrent == nullptr)
+		if (!IsCoordinateActive(rCoordinate))
 		{
 			++it;
 			continue;

@@ -20,8 +20,7 @@ namespace engine
 bool ServerTransferManager::IsDestinationLive(engine::GridCoord destination) const
 {
 	auto it = game::gpGame->mCells.find(destination);
-	if (it != game::gpGame->mCells.end() && it->second.pCurrent != nullptr
-	 && (game::Frame::OwnershipLayer(*it->second.pCurrent)).iCount > 0)
+	if (it != game::gpGame->mCells.end() && (game::Frame::OwnershipLayer(*it->second.pCurrent)).iCount > 0)
 	{
 		return true;
 	}
@@ -75,7 +74,7 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 			}
 
 			auto it = game::gpGame->mCells.find(destination);
-			if (it == game::gpGame->mCells.end() || it->second.pNext == nullptr)
+			if (it == game::gpGame->mCells.end())
 			{
 				game::gpGame->CreateCellAtCoordinate(destination);
 				engine::Cell& rCell = game::gpGame->mCells.at(destination);
@@ -109,8 +108,7 @@ void ServerTransferManager::DrainPendingSpawns()
 	for (auto it = mPendingSpawns.begin(); it != mPendingSpawns.end();)
 	{
 		auto& [rCoordinate, rPendingSpawns] = *it;
-		auto cellIt = game::gpGame->mCells.find(rCoordinate);
-		if (!std::ranges::contains(game::gpGame->mActiveCoordinates, rCoordinate) || cellIt == game::gpGame->mCells.end() || cellIt->second.pCurrent == nullptr || std::ranges::none_of(rPendingSpawns, IsReleased))
+		if (!std::ranges::contains(game::gpGame->mActiveCoordinates, rCoordinate) || std::ranges::none_of(rPendingSpawns, IsReleased))
 		{
 			++it;
 			continue;
@@ -310,15 +308,6 @@ void ServerTransferManager::PrepareReplayTransfers(engine::GridCoord coord, std:
 {
 	std::vector<game::StatusChange>& rTransfers = mTransfers.try_emplace(coord).first->second;
 	rTransfers.append_range(recordedTransfers);
-
-	auto it = game::gpGame->mCells.find(coord);
-	if (it == game::gpGame->mCells.end() || it->second.pNext == nullptr)
-	{
-		game::gpGame->CreateCellAtCoordinate(coord);
-		engine::Cell& rCell = game::gpGame->mCells.at(coord);
-		rCell.pNext = std::make_unique<game::Frame>();
-		std::swap(rCell.pCurrent, rCell.pNext);
-	}
 }
 
 void ServerTransferManager::ApplyReplayTransfers()

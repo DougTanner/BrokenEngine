@@ -70,6 +70,7 @@ struct Cell
 	CellStaticData staticData;
 
 #if defined(BT_SERVER)
+	// Never null on a server cell: every path that creates a cell sets it, and pNext is non-null whenever the two are swapped.
 	std::unique_ptr<game::Frame> pCurrent;
 	std::unique_ptr<game::Frame> pNext;
 #endif

@@ -145,13 +145,7 @@ Frame& QueryFrame(const nlohmann::json& rParameters)
 	{
 		throw std::runtime_error("coord has no loaded frame");
 	}
-	// Newly activated coordinates can have no current frame until the next post-tick SwapFrames; paused simulation does not swap.
-	// The coordinate comes from agent input, so an unavailable frame raises a command error.
-	if (it->second.pCurrent == nullptr)
-	{
-		throw std::runtime_error("coord frame not ready");
-	}
-	return (*gpGame->mCells.at(coordinate).pCurrent);
+	return (*it->second.pCurrent);
 }
 
 void CommandQueryFrame(const nlohmann::json& rParameters, nlohmann::json& rResult)

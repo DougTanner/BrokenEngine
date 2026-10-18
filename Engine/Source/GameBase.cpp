@@ -532,11 +532,6 @@ void GameBase::BuildAndDispatchFrameTicks(const std::vector<GridCoord>& rActiveC
 		for (const GridCoord& rCoordinate : rActiveCoordinates)
 		{
 			Cell& rCell = mCells.at(rCoordinate);
-			if (rCell.pCurrent == nullptr || rCell.pNext == nullptr)
-			{
-				LOG(kDefault, kWarning, "BuildDispatch NullFrame Coord: ({},{}) pCurrent: {} pNext: {}", rCoordinate.iX, rCoordinate.iY, rCell.pCurrent != nullptr, rCell.pNext != nullptr);
-				continue;
-			}
 			mActiveFrameReferences.push_back(
 			{
 				.pNext = rCell.pNext.get(),
@@ -959,14 +954,14 @@ bool GameBase::ShouldUseCrosshair() const
 void GameBase::RefreshReplayActiveSet()
 {
 	// During replay, all coords with live readers are active; SyncReplayTick retires ended readers before dispatch.
-	// Heap: vector clear/push_back, unordered_map insertion + make_unique<Frame>
+	// Heap: vector clear/push_back + make_unique<Frame>
 	ScopedSuppressAllocationTracking suppress;
 	mActiveCoordinates.clear();
 	mActiveCoordinates.reserve(gpReplay->mReplayReaders.size());
 	for (const auto& [rCoordinate, rpReader] : gpReplay->mReplayReaders)
 	{
 		mActiveCoordinates.push_back(rCoordinate);
-		Cell& rCell = mCells.try_emplace(rCoordinate).first->second;
+		Cell& rCell = mCells.at(rCoordinate);
 		if (rCell.pNext == nullptr)
 		{
 			rCell.pNext = std::make_unique<game::Frame>();
@@ -1137,12 +1132,12 @@ void GameBase::ResetSession()
 #if defined(BT_SERVER)
 void GameBase::EnsureNextFrames()
 {
-	// Heap: cell entries and their next frames persist across ticks.
+	// Heap: next frames persist across ticks.
 	ScopedSuppressAllocationTracking suppress;
 
 	for (const GridCoord& rCoordinate : mActiveCoordinates)
 	{
-		if (mCells.try_emplace(rCoordinate).first->second.pNext == nullptr)
+		if (mCells.at(rCoordinate).pNext == nullptr)
 		{
 			mCells.at(rCoordinate).pNext = std::make_unique<game::Frame>();
 		}
@@ -1177,17 +1172,6 @@ void GameBase::SwapFrames()
 	}
 
 	// After swap, .next holds old current frames (stale data, reusable memory).
-	// Ensure active entries exist for next iteration's AllocateAndCopy.
-	if (!mbReplaying)
-	{
-		EnsureNextFrames();
-	}
-	else if (mCells.contains(game::gpGame->mClientGridCoordinate) && mCells.at(game::gpGame->mClientGridCoordinate).pNext == nullptr)
-	{
-		// Heap: make_unique<Frame> for replay target coordinate
-		ScopedSuppressAllocationTracking suppress;
-		mCells.at(game::gpGame->mClientGridCoordinate).pNext = std::make_unique<game::Frame>();
-	}
 }
 #endif // BT_SERVER
 
