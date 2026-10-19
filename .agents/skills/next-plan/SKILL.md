@@ -63,9 +63,13 @@ The `argument-hint` value selects the Plan:
    That brief carries `Skill: none` — `/prepare-change` excludes a claimed
    executable Plan — and a `Return:` naming the shared handoff form plus the
    extension fields this file's `## Handoff` declares, so
-   exactly one handoff contract binds the worker. It also carries the Change
-   Workflow step and role assignments the claimed Plan triggers, as main states
-   them from the workflow.
+   exactly one handoff contract binds the worker.
+
+   It also carries the Change Workflow step and role assignments the claimed
+   Plan triggers, as main states them from the workflow, and cites
+   [`references/preparation-brief.md`](references/preparation-brief.md) by path
+   for the snapshot, the leftovers, the citation rule for citing Plans, and the
+   stage split.
 
    The Plan is immutable, current code wins, and every delegation states that
    Plan and card statements are hypotheses, so every contradiction returns to
@@ -73,74 +77,41 @@ The `argument-hint` value selects the Plan:
 
    Main writes that brief from the claimed Plan's own citations — path plus
    line range — citing the claimed Plan as its path plus the section line
-   ranges a `^## ` heading Grep of it returns, and reading only the Plan
-   sections it must state from, such as the risk tier that sets the role
-   assignments, just as it reads only the cited `## Task brief` section above,
-   and leaves reading both the target source and the handoff and reporting
+   ranges a `^## ` heading Grep of it returns.
+
+   Main reads only the Plan sections it must state from, such as the risk tier
+   that sets the role assignments, just as it reads only the cited
+   `## Task brief` section above.
+
+   It leaves reading both the target source and the handoff and reporting
    references the brief cites to the dispatched `implementer`, naming those
-   references as paths only, and reading source itself only for a decision it
+   references as paths only, and reads source itself only for a decision it
    must make that the Plan and the returned handoff cannot settle.
 
    The brief bounds the card's verification evidence: no verbatim source
    text, except an acceptance item whose purpose is proposed replacement
-   text. A
-   preparation handoff that returns a quantitative feasibility estimate as a
+   text.
+
+   A preparation handoff that returns a quantitative feasibility estimate as a
    Finding must name the check proving that the measured trial preserved the
    source document's rule or item inventory, or report the estimate as
    unvalidated. That is an expectation of the dispatch, not a gate the Done
    condition tests.
 
-   The brief has the preparation `implementer` write the complete resolved
-   Plan—its mechanism, corrections, the claimed Plan's `## In scope` and
-   `## Out of scope` sections copied verbatim as top-level headings with their
-   content intact, and the complete execution card—into one gitignored `Temp/`
-   file addressed by its path from the worktree root, each under its own `##`
-   heading, with a `## Unresolved decisions` section (`none` when every
-   decision is resolved), cite that path under `Evidence` with one `##`
-   selector per section for the Plan review reviews and the approval
-   presentation, and,
-   before returning that handoff, run
-`pwsh -NoProfile -File .agents/skills/plan-audit/scripts/Test-PlanCitations.ps1 <snapshot path>`
-   and report that result's `headings.inScopePresent` and
-   `headings.outOfScopePresent` values as one `Decisive checks` row. Of that
-   result, only those two booleans gate this step's Done condition; every other
-   record it carries, including a `citations.items` entry with `pathExists` or
-   `lineExists` false, is an advisory lead, never a defect to clear and rerun.
-
-   The brief also has the preparation `implementer` apply the Change Workflow
-   Verify the acceptance table step's Leftovers rule in
-   [change-workflow.md](../../references/change-workflow.md) to every leftover
-   it proves, such as the same defect at a sibling site: each small one goes on
-   the snapshot's execution card as approved scope, named in the card's
-   `### What does this plan do?`, and into `Slices`, so the Plan review step
-   reviews it, and every other one returns under `Residuals`. The brief also
-   has that `implementer` find every live Plan other than the claimed one that
-   names the claimed Plan's file name after its metadata line, and put
-   rewriting each such line on the card as approved scope by this rule, judging
-   "landed" against the tree after the change, so the claimed Plan's own change
-   counts as landed on completion and as not landed on rejection: a pending
-   claim becomes the present-tense fact with its current `path:line` or symbol
-   when the work landed, and is removed when it did not; a `## Coordination`
-   bullet that only orders against the claimed Plan is removed, and a
-   conditional in it resolves to the branch that tree shows, updating the
-   citing Plan's affected decisions to match; a past-tense record keeps its
-   fact and drops the file name; and a conditional neither branch of which that
-   tree settles returns to main as a user decision.
-
    After that preparation handoff, and before the Plan review reviewers, main
    runs `/plan-alternatives` when its trigger fires and presents per that
    skill's `### User presentation`; step 5 runs only on the approach the user
    picks, after the redraft a pick other than the drafted plan requires.
+
    `/plan-alternatives` runs and is presented once per run: a re-entry of this
    step keeps the earlier pick and does not present alternatives again.
 
-   Done when the execution card carries every field of the card template in
-   this file's `### Execution card presentation/template`, the preparation
-   handoff cites that snapshot as one file path plus the `##` selectors this
-   step requires, its `Decisive checks` row for that `Temp/` snapshot
-   reports `headings.inScopePresent` and `headings.outOfScopePresent` both
-   `true`, and, when that presentation ran, the pick has arrived and any pick
-   other than the drafted plan has been redrafted or routed to rejection.
+   Done when the handoff cites the snapshot by the selectors
+   preparation-brief.md requires, its `Decisive checks` row reports both
+   `headings` values `true` and `card.missingFields` empty, and, when that
+   presentation ran, its pick has
+   arrived and a pick other than the drafted plan is redrafted or routed to
+   rejection.
 5. Run the Plan review step in
    [change-workflow.md](../../references/change-workflow.md), after preparation and alternatives and
    before the final claim refresh. Tier 3 retains the additional route in
@@ -149,31 +120,20 @@ The `argument-hint` value selects the Plan:
    reviewer is reported as a blocker.
 6. Unless step 10 already ran (the changes-requested row in
    `### Post-checkpoint outcomes`), invoke step 3's claim script idempotently
-   immediately before the final preparation handoff. When that result carries
-   a `sync` object, the tree moved under the preparation evidence, and main
-   never lists or reads that
-   range itself: it dispatches one `researcher` with `sync.from..sync.to`, the
-   preparation snapshot's path and `##` selectors, and the preparation
-   handoff's one-line rows that cite repository paths outside that snapshot.
-   That worker lists the changed names with
-   `git diff --name-only --no-renames <sync.from> <sync.to>`, keeps those the
-   snapshot or those rows cite, including skill-relative (resolving against
-   the directory of the skill whose `SKILL.md` or name the surrounding text
-   cites), directory, and skill-name (`/<skill>`, resolving to that skill's
-   `.agents/skills/<name>/` files) citations, and returns under
-   `Decisive checks`, without quoting the diff or the uncited names, one row
-   with the count of changed cited paths and one row per changed cited path
-   whose change touches a statement the preparation handoff or execution card
-   relies on.
-   A changed cited path whose change leaves the relied-on statements' wording
-   intact and moves them only within their `##` section (or within the file,
-   for a file without `##` headings) counts in the count row but is not a
-   touch and gets no per-path row.
-   When any row reports a touch, return to step 4, rerun the affected Plan
+   immediately before the final preparation handoff.
+
+   When that result carries a `sync` object, the tree moved under the
+   preparation evidence: main never lists or reads that range itself, and
+   dispatches one `researcher` on the sync brief in
+   [claim-results.md](references/claim-results.md)
+   `## Session baseline and the sync object`.
+
+   When any row of that `researcher`'s handoff reports a touch, return to step 4, rerun the affected Plan
    review checks in step 5, and repeat this final refresh before approval;
-   reuse review evidence whose inputs did not change. Done when the claim
-   result reports the held claim and either the claim result carries no `sync`
-   object or no row reports a touch.
+   reuse review evidence whose inputs did not change.
+
+   Done when the claim result reports the held claim and either the claim
+   result carries no `sync` object or no row reports a touch.
 7. Present for approval per this file's `### Implementation approval`, unless
    that section sends the run to implementation on an earlier user choice. Done
    when the user's decision arrives or that earlier choice stands.
@@ -188,7 +148,8 @@ The `argument-hint` value selects the Plan:
    latest handoff that returned that field, each brief citing as the approved
    plan the step-4 preparation snapshot (the `Temp/` path whose `## In scope`
    and `## Out of scope` the preparation handoff cites, or the difference
-   preparation's snapshot on the changes-requested route) and copying that row
+   preparation's snapshot on the changes-requested or `completion.plan-cited`
+   route) and copying that row
    as the assigned items and allowed file scope; main never reads the
    snapshot's `## In scope` itself. Main assigns each change the user approved
    after the plan to exactly one row, adding one slice when none fits, and
@@ -198,10 +159,7 @@ The `argument-hint` value selects the Plan:
    acceptance checks, before step 10 when that step applies, and before
    `/finalize-changes` prepares the
    landing commit, so a Plan it produces is an ordinary new worktree file riding
-   the same squash with no landing-commit join. Every terminal path of the run
-   reaches this step before the run ends: a `none-available` or other claim
-   stop, a deferral, a blocker, or a refused approval comes straight here from
-   wherever it stopped, while an implemented run keeps the position above.
+   the same squash with no landing-commit join.
 
    Main never performs the review itself; it dispatches it per
    [run-checkpoint.md](references/run-checkpoint.md) `## Dispatch`. Done when both
@@ -213,18 +171,12 @@ The `argument-hint` value selects the Plan:
    with no arguments for completion, appending `-Reject` only after explicit
    user-authorized rejection.
 
-   Success removes only direct-child dependency edges, deletes the selected Plan
-   and its support folder in the worktree, reports the changed paths the landing
-   commit must contain, and returns `nextAction: finalize-changes`. That
-   deletion is not reviewed before the landing gate, per the
-   [landing acceptance table](../finalize-changes/references/landing-acceptance-table.md)
-   `## Acceptance table`.
+   What that result reports and changes is in
+   [claim-results.md](references/claim-results.md) `## Claim-exit result fields`.
    Main passes that result verbatim into every `/finalize-changes` brief the run
    dispatches, after acceptance, after rejection, and after changes are
    requested at the landing confirmation.
-   While another live Plan still names the held Plan's file name after its
-   metadata line, the script changes nothing and refuses with
-   `completion.plan-cited`.
+
    Done when the success result is in hand; the claim stays held until landing
    succeeds, and `/finalize-changes` deletes it after primary advances.
 11. End the run per this file's `### IMPORTANT: Session-complete marker`: print
@@ -237,10 +189,11 @@ The `argument-hint` value selects the Plan:
 | Run outcome | Claim disposition | Next action |
 | --- | --- | --- |
 | implementation accepted and verified | held | run `Complete-NextPlan.ps1`, then the landing gate |
-| changes requested at the `/finalize-changes` landing confirmation | held | prepare only the difference at step 4, whose brief cites the existing preparation snapshot, with its `## In scope` and `## Out of scope`, in place of the deleted claimed Plan; run step 5, then step 8 on top of the unlanded candidate commit, because the request is a choice under `### Implementation approval`, which decides whether step 7 presents; skip steps 6, 9, and 10, which already ran, and skip the checkpoint for every later outcome of the run; then dispatch a fresh `/finalize-changes` preparation with the step-10 result, because the claim exit already ran |
+| changes requested at the `/finalize-changes` landing confirmation | held | follow [claim-exceptions.md](references/claim-exceptions.md) `## Changes requested at landing` |
 | user explicitly authorizes rejection | held | run `Complete-NextPlan.ps1 -Reject`, then the landing gate |
+| `Complete-NextPlan.ps1` refuses with `completion.plan-cited` | held | run the changes-requested row's difference preparation, step 5, and step 8, skipping the checkpoint for every later outcome of the run, except that the step-4 brief also states whether the refused exit was completion or `-Reject`, so step 4's citing-line rule puts each rewrite on the card and into `Slices` as scope that rule already approves, which needs no presentation of the difference, and step 7 presents only a user decision that preparation returns; skip steps 6 and 9; then run step 10 again with the same arguments |
 | claim wrapper returns `claim.plan-mismatch` | held, identified only by `conflict.heldPlan` | run the checkpoint once, retain the held claim and all work, report requested and held Plans, and stop; never complete, reject, or defer implicitly |
-| approval refused, or a blocker whose authoritative result explicitly reports a held claim, with no separate defer instruction | held | run the checkpoint once, retain the claim and all work, report and stop; never complete, reject, or defer implicitly, and any checkpoint work created stays with the retained session |
+| approval refused, or a blocker other than `completion.plan-cited` whose authoritative result explicitly reports a held claim, with no separate defer instruction | held | run the checkpoint once, retain the claim and all work, report and stop; never complete, reject, or defer implicitly, and any checkpoint work created stays with the retained session |
 | blocker before an authoritative claim disposition is available | unknown | follow the supplied `nextAction`, run the checkpoint once, report the error and unknown claim state, and stop, retaining all work with the session; `claim: null` alone never proves claim absence, so add no recovery probe and do not query claim status or mutate a claim |
 | user separately and explicitly directs deferral, or the run is already deferred | released/absent only through `Defer-NextPlan.ps1`'s documented result | run the checkpoint once; if it creates tracked follow-up content, use a followup-only landing gate, which runs no Plan completion or rejection and releases no other held claim, otherwise report and stop |
 | authoritative result explicitly reports that no claim is held, including `none-available` | absent | run the checkpoint once; if it creates tracked follow-up content, use a followup-only landing gate as the previous row defines it, otherwise report and stop |
@@ -286,62 +239,15 @@ per-statement enumeration of unaffected results.
   `none` for an empty realized change and for every preparation handoff after
   the `/plan-alternatives` pick.
 
-### Execution card presentation/template
+### Execution card
 
-The card, cited under `Evidence`, carries the following required content. Main
-reads that content and presents its first two sections per
-`### Implementation approval`; the card itself is not repeated inline in the
-handoff.
-
-```text
-Execution card:
-### What does this plan do?
-<2-4 plain sentences>
-### Why this is good for the codebase
-<2-4 plain sentences: what prompted it, who uses the result, and how>
-- Goal: <result>
-- Out of scope: <boundary>
-- Tier trigger: <trigger or none>
-- Interfaces and invariants: <contracts>
-- Acceptance checks: <check and expected observation; a criterion for new or
-  fixed behavior names a check the unedited tree could not pass, and a bug-fix
-  criterion (one stating a defect no longer occurs) also names its pre-change
-  red run: an /external-diagnose-bug Reproducing signal, a run on a build of
-  the unedited tree, or, for a defect in the instruction prose
-  /progressive-disclosure-review reviews, a read at the session baseline commit
-  that shows the defect unambiguously, citing the defective rule by path and
-  line and the case it mishandles; a criterion compared against the unedited
-  tree, such as a result that must stay unchanged, names that pre-change
-  baseline run, which for that instruction prose may be a read at the session
-  baseline commit; the card marks each red run on a build of the unedited tree
-  and each pre-change baseline run other than a read at the session baseline
-  commit `before the first edit`, the literal text the Change Workflow
-  Implement and propagate step's pre-edit bullets key on to record that run
-  before the first slice, and cites a Reproducing signal or a read at the
-  session baseline commit as-is, unmarked; when
-  the proven cause is a general rule, the bug-fix check also covers one input
-  beyond the reported case that a patch for only that case would still fail,
-  settled by a code read of the general fix when the agent settling it is
-  confident the change is correct because it is small and self-contained, and
-  otherwise by a run; a criterion for a performance gain the change exists to
-  make covers one independent optimization and states that the optimization is
-  reverted when the criterion fails, and when `query_profile` measures the gain
-  it also names its baseline cohorts and expects a gap outside the
-  cohort-to-cohort range the `query_profile` caveat in
-  `.agents/skills/agent-harness/references/command-reference.md`
-  `## Durable caveats` defines>
-- Roles: <required and conditional assignments>
-```
-
-A bullet field's label may carry a parenthetical qualifier before the colon,
-and its content may follow the colon or sit in indented lines nested directly
-under the bullet.
-
-The preparation fills `Roles` from the Change Workflow step and role
-assignments its brief supplies, citing the brief as the evidence and never
-reading the workflow itself. When the classified tier differs from the tier
-those assignments assume, main rewrites the card's `Roles` field to the
-classified tier before the Plan review step.
+The card, on the template in
+[`../../references/execution-card.md`](../../references/execution-card.md)
+`## Template`, is cited under `Evidence` and not repeated inline in the
+handoff; main presents its first two sections per `### Implementation approval`.
+When the classified tier differs from the tier the brief's role assignments
+assume, main rewrites the card's `Roles` field to the classified tier before the
+Plan review step.
 
 ### Implementation approval
 
@@ -365,7 +271,8 @@ decision. An approval accepts the recommendation for every decision it leaves
 unanswered, except a recommendation to reject the Plan, which still needs an
 explicit answer. A different approach the user chooses at approval returns the
 run to preparation and Plan review. Every user choice in the run that neither
-rejects the Plan nor refuses approval — the `/plan-alternatives` pick, an
+rejects the Plan, refuses approval, nor defers it from step 4's size entry —
+the `/plan-alternatives` pick, an
 `/external-grill-plan` answer, a choice at approval, or a change request at the
 `/finalize-changes` landing confirmation — approves implementation, and the run
 goes to implementation unless an existing or new question for the user remains
@@ -382,37 +289,48 @@ answers; that worker updates the card's affected fields to the approved scope,
 and the dispatch always names `Slices` in its `Return:`, whether or not the
 update changes the snapshot's scope, so step 8 dispatches from that handoff's
 `Slices`. Main does not read or edit the card or the snapshot for this update.
+A yes to step 4's split question, including one accepted as its
+recommendation, is the user's direction to defer stages 2 to M. The
+preparation `implementer` that records the yes — that approval-update worker,
+or the preparation `implementer` of the Tier-3 grill round that carries the
+yes — also marks each card acceptance check and citation rewrite of stages 2
+to M deferred to its stage's Plan, never deleting it, and names those stages
+in the card's `Out of scope`. After the handoff that records the yes and
+before step 8, and never earlier, because `/create-follow-up-plans` rejects
+in-scope work, main sends stages 2 to M, as leftovers the user chose to defer,
+through the Change Workflow Verify the acceptance table step's Leftovers rule,
+with a brief citing as evidence the claimed Plan path and the snapshot path
+with its `## Unresolved decisions`, `## Execution card`, `## Decisions`, and
+`## Design` selectors, citing the claimed Plan's matching section for either
+of the last two the snapshot lacks, and stating that each stage Plan restates
+in its own words the decisions and design its stage needs, and that the
+dispatch also performs the citation rewrites the card marks deferred to each
+stage, renaming each such pending claim in its citing Plan to that stage
+Plan's file name.
 
 ### IMPORTANT: Session-complete marker
 
 The user closes the session tab on this line alone, so it must be
 unambiguous. When, and only when, the `/finalize-changes` handoff carries its
-`SESSION COMPLETE` line under the conditions its `## Handoff` states — the
-Plan was completed or rejected and its file removed, landing onto primary
-succeeded, the claim was released, the worktree is clean, and every objective
-stage is complete or explicitly deferred to a named unclaimed Plan — main's
-final message of that turn ends with the bare line `SESSION COMPLETE` as its
-very last line, after the `Follow-up Plans created:` footer, and asks the user
-nothing. Every other ending — retained claim, blocker, refused approval,
+`SESSION COMPLETE` line, whose conditions that skill's `## Handoff` owns,
+main's final message of that turn ends with the bare line `SESSION COMPLETE` as
+its very last line, after the `Follow-up Plans created:` footer, and asks the
+user nothing. Every other ending — retained claim, blocker, refused approval,
 deferral, unknown claim state, or work still to land — never prints that line.
 
 ## Rules
 
 - The preparation worker must never run the mutation-capable claim script.
-- Every result is acted on per its `nextAction`, and for a `-Plan`-targeted
-  invocation the manager never selects or claims a different candidate in that
-  run.
+- Every result is acted on per its `nextAction`, never by reconstructing a
+  script's transitions, and for a `-Plan`-targeted invocation the manager never
+  selects or claims a different candidate in that run.
 - Never create or adopt a worktree, or inspect machine-local claims directly.
-- Which reviewer runs at which tier is the Plan review step of
-  [change-workflow.md](../../references/change-workflow.md); Tier 3
-  additionally follows [tier3-workflow.md](references/tier3-workflow.md).
-  Missing a mandatory reviewer blocks. When the preparation handoff reports an
-  empty realized change, or that the problem the Plan describes is gone, the
-  run goes from preparation straight to this file's
-  `### Implementation approval` route, at any tier, without reaching the Plan
-  review step. Approving either counts as implementation accepted; once step
-  8's acceptance checks pass on the empty change, step 10's completion
-  applies. Refusing either is the approval-refused
+- When the preparation handoff reports an empty realized change, or that the
+  problem the Plan describes is gone, the run goes from preparation straight to
+  this file's `### Implementation approval` route, at any tier, without reaching
+  the Plan review step. Approving either counts as implementation accepted;
+  once step 8's acceptance checks pass on the empty change, step 10's
+  completion applies. Refusing either is the approval-refused
   `### Post-checkpoint outcomes` row.
 - When the claimed Plan carries a `## Sweep` section, main runs `/sweep` on it
   in place of steps 4-8 — preparation, `/plan-alternatives`, Plan review, the
@@ -421,69 +339,26 @@ deferral, unknown claim state, or work still to land — never prints that line.
   run as written, with `/sweep`'s stage close standing in for step 8's
   acceptance checks.
 - A Plan, card, scope, invariant, or acceptance change after approval, other
-  than one `### Implementation approval` sends to implementation without a
+  than one `### Implementation approval` or the `completion.plan-cited` row of
+  `### Post-checkpoint outcomes` sends to implementation without a
   presentation, requires a new presentation of the difference.
-- Deferral uses
-`pwsh -NoProfile -File .agents/skills/next-plan/scripts/Defer-NextPlan.ps1`
-  and only an ordinary live claim. After final preparation has run, deferral
-  requires an explicit user instruction given in the current session, recorded
-  in the handoff; nothing else unlocks it. Deferral never touches the worktree,
-  so uncommitted implementation work stays exactly as it is.
-- When preparation or a harness run shows that a runtime acceptance criterion of
-  the claimed Plan can be settled only by reading values off rendered pixels,
-  because no harness query exposes them, the pixel-evidence prohibition in
-  `/agent-harness` `## Handoff` binds main too: never settle it from a
-  screenshot yourself. Report the gap and, on the explicit user deferral
-  instruction the bullet above requires, act in this order: file the missing
-  query as a follow-up Plan through `/create-follow-up-plans`, citing the
-  harness command documentation that exposes no such query and naming the
-  values the client already computes and the narrowest query that would expose
-  them; add that Plan's normalized path to the claimed Plan's `dependsOn`
-  through that skill's existing-Plan dependency-change case; then defer. That
-  Plan and the `dependsOn` edit are already in the worktree when the checkpoint
-  runs and are the followup-only landing gate's content under the deferred row
-  in `### Post-checkpoint outcomes`. Deferral is not waiver: the criterion
-  stays unmet and the Plan stays unimplemented in the tree.
-- Resuming retained work needs an explicit user resume instruction given in the
-  current session, recorded in the handoff, and then the targeted claim with
-  `-ResumeRetained` appended:
-`pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1 -Plan 'Documents/Plans/example.md' -ResumeRetained`
-  That switch is valid only with `-Plan` and changes no file. A retained-work
-  resume is the one exception to step 1's clean wrapper-created worktree.
-- A targeted `none-available` result naming another session's claim keeps its
-  `nextAction`: report the result's `holder`
-  ([claim-results.md](references/claim-results.md)) and that worktree's state,
-  read only with
-  `git --no-optional-locks -C <holder worktree> status --porcelain` plus a
-  read-only check whether its HEAD is already on the primary branch, never a
-  plain `git status`. Taking the Plan over needs an explicit user takeover
-  instruction given in the current session, recorded in the handoff, and then
-  the targeted claim with `-UserAuthorizedTakeover` appended:
-`pwsh -NoProfile -File .agents/skills/next-plan/scripts/Invoke-NextPlanClaim.ps1 -Plan '<path>' -UserAuthorizedTakeover`
-  That switch is valid only with `-Plan`; nothing else releases another
-  session's claim.
-- On Claude, the checkpoint review covers friction, oversized-result telemetry,
-  and isolation evidence after the previous checkpoint's dispatch in the same
-  transcript, or from transcript start when none exists, through immediately
-  before its own dispatch, excluding only the previous checkpoint's correlated
-  completed handoff; `/next-plan-review` covers the rest after landing. Codex
-  runs no live checkpoint lens and leaves all three concerns to
-  `/next-plan-review`. OpenCode runs no live checkpoint lens and records the
-  explicit unsupported state that [run-checkpoint.md](references/run-checkpoint.md)
-  `## Measurement states` defines; its landed retrospective is also unsupported
-  until an OpenCode transcript source is implemented.
-- [claim-results.md](references/claim-results.md) owns how each claim, listing, and
-  claim-exit result is read, including the `sync` and `nextAction` fields, the
-  listing's snapshot limits and tier-constrained reading procedure, and the
-  completion and retained-path result shapes. Do not reconstruct any script's
-  transitions.
-- [follow-up-provenance.md](references/follow-up-provenance.md) owns where the provenance
-  block's values come from.
+- Deferral, pixel-evidence deferral, retained-work resume, and takeover each
+  need an explicit user instruction given in the current session (for
+  deferral, once final preparation has run), recorded in the handoff; follow
+  [claim-exceptions.md](references/claim-exceptions.md) for them, for a runtime
+  criterion only rendered pixels can settle, and for a targeted
+  `none-available` result naming another session's claim.
 
 ## References
 
 - [references/claim-results.md](references/claim-results.md) — how each claim,
   listing, and claim-exit result is read.
+- [references/claim-exceptions.md](references/claim-exceptions.md) — deferral,
+  pixel-evidence deferral, retained resume, takeover, and changes requested at
+  landing.
+- [references/preparation-brief.md](references/preparation-brief.md) — the
+  step-4 preparation `implementer`'s snapshot, leftovers, citation rule, and
+  stage split; cited in its brief, not read by main.
 - [references/tier3-workflow.md](references/tier3-workflow.md) — the additional
   Tier-3 preparation route.
 - [references/run-checkpoint.md](references/run-checkpoint.md) — the end-of-run

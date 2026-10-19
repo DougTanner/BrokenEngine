@@ -2,8 +2,9 @@
 
 On Claude, one external review covers the run for tooling friction, context
 efficiency, and content a subagent could have consumed instead. Codex runs no
-live lens. OpenCode has no supported transcript source, so no live lens runs and
-the checkpoint records that limitation explicitly.
+live lens and leaves all three concerns to `/next-plan-review` after landing.
+OpenCode has no supported live or retrospective transcript source, so no live
+lens runs and the checkpoint records that limitation explicitly.
 [The `/next-plan` steps](../SKILL.md#steps) own when it runs; this reference owns how.
 
 ## Dispatch
@@ -41,37 +42,20 @@ returns `BLOCKED` instead. The review skill's
 [`## Handoff`](../../next-plan-checkpoint-review/SKILL.md#handoff) owns the
 exact reviewer summary output for each measurement state.
 
-The `Handoff line recorded` column is main's own record after `## Follow-up
-routing`, not reviewer output: `/next-plan-checkpoint-review` returns findings
-and its own summary block, and main writes both follow-up lines from what that
-routing produced. The `Friction follow-ups:` line records `<Plan path(s) or
-none>` in every row that does not name it. The `Context-efficiency follow-ups:`
-line's `blocked (<code>)` form covers those codes and `transcript-unavailable`.
-The reviewer skips the context-efficiency lens in every blocked and error case
-except the transcript-unavailable one. It observes each skipping state directly
-in its own measurement run and records it as a friction observation, so none of
-them needs recovery machinery of its own. The transcript-unavailable case leaves
-no lens to record anything, so main writes `blocked (transcript-unavailable)` on
-both lines itself from the returned `BLOCKED` handoff. A Codex session's
-measurement reads Claude transcripts only, and this repository documents no way
-for a Codex main to name its own live transcript, so Codex coverage of all three
-concerns stays with `/next-plan-review` after landing. OpenCode has no supported
-live or retrospective transcript source: `unsupported (opencode)` is a truthful
-coverage limit, not a passing review or a follow-up finding.
+The `Handoff line recorded` column is main's own record, written from what
+`## Follow-up routing` produced, not reviewer output; the `Friction follow-ups:`
+line records `<Plan path(s) or none>` in every row that does not name it.
 
 ## Follow-up routing
 
-For each accepted finding that the Verify the acceptance table step's own
-fix-it-here rule in
-[change-workflow.md](../../../references/change-workflow.md) does not fix inside this session, an
-`implementer` routes it through `/create-follow-up-plans` as a tooling-friction
-or isolation proposal, supplying the observed symptom with its citation plus the
-provenance block sourced per [follow-up-provenance.md](follow-up-provenance.md).
-An `active-change-blocker` finding never becomes a follow-up Plan: it returns
-to the current change as a blocker. This Plan is a leftover routed after the
-Review and resolve correctness review dispatch; the Verify the acceptance table
-step in [change-workflow.md](../../../references/change-workflow.md) owns how it is authored and
-verified.
+Each accepted finding follows the Leftovers rule of the Verify the acceptance
+table step in [change-workflow.md](../../../references/change-workflow.md); an
+`implementer` routes one that goes to `/create-follow-up-plans` as a
+tooling-friction or isolation proposal, supplying the observed symptom with its
+citation plus the provenance block sourced per
+[follow-up-provenance.md](follow-up-provenance.md). An `active-change-blocker`
+finding never becomes a follow-up Plan: it returns to the current change as a
+blocker.
 
 The [post-checkpoint outcome table](../SKILL.md#post-checkpoint-outcomes) owns the
 authoritative claim disposition and whether a landing is followup-only.

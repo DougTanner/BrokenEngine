@@ -8,7 +8,6 @@
 #include "Frame/Collections/Missiles/Missiles.h"
 #include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
-#include "Ui/WindDepositsWrappers.h"
 
 #if defined(BT_CLIENT)
 #include "Frame/Collections/PointLights/PointLights.h"
@@ -277,9 +276,6 @@ void OmnisPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]] e
 				.vecVelocity = vecBlasterVelocity,
 				.iTypeIndex = OmnisInterpolate::siBlasterTypeIndex,
 				.alignment = rCurrentPostRender.pAlignments[i],
-				.fWindTrailIntensity = game::gWindDepositOmniBlastersIntensity.mfCurrent,
-				.fWindTrailWidth = game::gWindDepositOmniBlastersWidth.mfCurrent,
-				.fWindTrailLengthMultiplier = game::gWindDepositOmniBlastersLengthMultiplier.mfCurrent,
 			});
 
 #if defined(BT_CLIENT)

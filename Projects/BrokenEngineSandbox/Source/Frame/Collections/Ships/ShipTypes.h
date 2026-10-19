@@ -49,15 +49,30 @@ constexpr const char* ShipControllerName(ShipController eController)
 	return "Unknown";
 }
 
-// Set by controllers (the fleet path through the spawn, kUpdateShip, and kUpdateFleet); CountdownPendingOrders also
-// applies kPendingUseMissiles to kUseMissiles when the weapon-mode countdown ends.
+// Set by controllers (the fleet path through the spawn, kUpdateShip, and kUpdateFleet, and the random-wave spawn);
+// kUpdateShip also writes the target flight plane. CountdownPendingOrders also applies kPendingUseMissiles to
+// kUseMissiles when the weapon-mode countdown ends.
 enum class ShipOrders : uint16_t
 {
 	kIsFlagship         = 0x0001,
 	kUseMissiles        = 0x0002,
 	kPendingUseMissiles = 0x0004,
+
+	// Target flight plane index in bits 8-15 (0 = lowest)
 };
 using ShipOrders_t = common::Flags<ShipOrders>;
+
+inline constexpr int64_t GetTargetFlightPlane(ShipOrders_t orders)
+{
+	return static_cast<int64_t>((std::to_underlying(orders.meFlags) >> 8) & 0xFF);
+}
+
+inline void SetTargetFlightPlane(ShipOrders_t& rOrders, int64_t iFlightPlane)
+{
+	uint16_t uiRaw = std::to_underlying(rOrders.meFlags);
+	uiRaw = static_cast<uint16_t>((uiRaw & ~0xFF00) | (static_cast<uint16_t>(iFlightPlane) << 8));
+	rOrders.meFlags = static_cast<ShipOrders>(uiRaw);
+}
 
 // Ship-internal state written by the ship's own phases.
 enum class ShipFlags : uint16_t

@@ -6,6 +6,7 @@ namespace engine
 {
 
 struct CellStaticData;
+struct NavData;
 
 SegmentHit XM_CALLCONV TracePointAgainstTerrain(const CellStaticData& rStaticData, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition);
 
@@ -29,8 +30,8 @@ struct DiscTerrainResult
 // Sim path. Sweeps a horizontal disc of fRadius from vecStart to vecEnd over the cell's own elevation grid, where a
 // grid cell at or above fThresholdHeight blocks, and stops it at first contact; with bSlide the remaining motion,
 // less its component into the contact normal, is swept once more. An overlapped start is first moved by
-// NavQuerySnapToNavigable, the end moving with it, and the cells still overlapping the resolved start are left out
-// of both sweeps. Reads only rStaticData, never mCells.
-DiscTerrainResult XM_CALLCONV ResolveDiscAgainstTerrain(const CellStaticData& rStaticData, FXMVECTOR vecStart, FXMVECTOR vecEnd, float fRadius, float fThresholdHeight, bool bSlide);
+// NavQuerySnapToNavigable against rNavData, the end moving with it, and the cells still overlapping the resolved
+// start are left out of both sweeps. Reads only rStaticData and rNavData, never mCells.
+DiscTerrainResult XM_CALLCONV ResolveDiscAgainstTerrain(const CellStaticData& rStaticData, const NavData& rNavData, FXMVECTOR vecStart, FXMVECTOR vecEnd, float fRadius, float fThresholdHeight, bool bSlide);
 
 } // namespace engine

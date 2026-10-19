@@ -3,6 +3,7 @@
 #include "Frame/Collections/Pushers/Pushers.h"
 #include "Frame/Collections/Collection.h"
 #include "Frame/Alignments.h"
+#include "Frame/FlightPlanes.h"
 #include "Frame/FrameRegistry.h"
 #include "Frame/GridCoord.h"
 #if defined(BT_CLIENT)
@@ -10,6 +11,7 @@
 #endif
 
 #include "Frame/Collections/Ships/ShipBehaviours.h"
+#include "Frame/FlightPlaneTable.h"
 
 namespace engine
 {
@@ -28,6 +30,12 @@ inline constexpr float kfFighterAcceleration = 10.0f;
 inline constexpr float kfFighterDrag = 0.25f;
 inline constexpr float kfFighterMaxSpeed = 40.0f;
 inline constexpr float kfFighterMaxTurnRate = 4.0f;
+
+inline constexpr float kfFighterClimbRate = 25.0f;
+inline constexpr int64_t kiFighterHighestFlightPlane = 2;
+static_assert(kiFighterHighestFlightPlane < std::ssize(kFlightPlanes));
+// Render-only nose pitch in radians at the full climb rate.
+inline constexpr float kfFighterClimbTilt = 0.35f;
 
 inline constexpr float kfFighterSteeringSmoothing = 0.064f;
 inline constexpr float kfFighterSteeringDecay = 6.0f;
@@ -51,7 +59,7 @@ inline constexpr float kfFighterMaxPusherPushVelocity = kfFighterMaxSpeed * 0.5f
 
 struct FightersInterpolate : public engine::Collection<FightersInterpolate, engine::CollectionFlags::kIdToIndex>
 {
-	static constexpr int64_t kiVersion = 5;
+	static constexpr int64_t kiVersion = 6;
 
 	static void Register();
 
@@ -59,6 +67,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 
 	// Simulation keeps the destroyed time at the -1 sentinel or in [0, kFighterDestroyTime]; reject anything else as a corrupt stream, since a
 	// huge or +inf value puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
+	// Only the climb moves height, so it stays within [Lowest, Highest] flight plane heights; reject any other the same way.
 	static void PostRead(const FightersInterpolate& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -67,6 +76,11 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 			if (!(destroyedTime == std::chrono::duration<float>(-1.0f) || (destroyedTime.count() >= 0.0f && destroyedTime.count() <= kFighterDestroyTime.count())))
 			{
 				throw std::ios_base::failure("FightersInterpolate pDestroyedTimes");
+			}
+			float fHeight = XMVectorGetZ(rCurrent.pVecPositions[i]);
+			if (!(fHeight >= engine::gpFlightPlanes->Lowest().fHeightMeters && fHeight <= engine::gpFlightPlanes->Highest().fHeightMeters))
+			{
+				throw std::ios_base::failure("FightersInterpolate position height");
 			}
 		}
 	}
@@ -89,6 +103,8 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 	float* __restrict pfDeltaRotations = nullptr;
 #if defined(BT_CLIENT)
 	std::chrono::duration<float>* __restrict pAnimationTimes = nullptr;
+	// Render-only nose pitch from this tick's climb.
+	float* __restrict pfClimbTilts = nullptr;
 #endif
 	auto SharedMembers(this auto&& rSelf)
 	{
@@ -97,7 +113,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pAnimationTimes, rSelf.pWindTrails);
+		return std::tie(rSelf.pAnimationTimes, rSelf.pWindTrails, rSelf.pfClimbTilts);
 	}
 #endif
 	auto Members(this auto&& rSelf)
@@ -139,10 +155,11 @@ using fighter_t = engine::Id<FightersInterpolate>;
 
 struct FightersPostRender : public engine::Collection<FightersPostRender>
 {
-	static constexpr int64_t kiVersion = 8;
+	static constexpr int64_t kiVersion = 9;
 
 	// Reject a value the simulation never produces as a corrupt stream: NaN or +inf health never dies, an unknown
-	// controller selects no script, and the client echoes the navigation delay back in its update-owned-entity request.
+	// controller selects no script, the client echoes the navigation delay back in its update-owned-entity request, and
+	// no controller writes a target flight plane the type disallows.
 	static void PostRead(const FightersPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -158,6 +175,10 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 			if (!IsNavigationDelayInRange(rCurrent.pNavigationDelays[i].count()))
 			{
 				throw std::ios_base::failure("FightersPostRender pNavigationDelays");
+			}
+			if (!IsFlightPlaneAllowed(ShipType::kFighter, GetTargetFlightPlane(rCurrent.pOrders[i])))
+			{
+				throw std::ios_base::failure("FightersPostRender target flight plane");
 			}
 		}
 	}

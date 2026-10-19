@@ -243,7 +243,7 @@ struct FramePostRenderBase
 	// Cross-cell transfer producers push through these two calls: the split keeps the capacity-hit LOG
 	// and DEBUG_BREAK between them, reading the pre-push size and capacity.
 	// PrepareTransferRequest fills the per-axis delta and rewrites the payload's vecPosition into the
-	// destination cell's local frame.
+	// destination cell's local frame, and returns false when the queue is full, so the next push reallocates.
 	[[nodiscard]] bool PrepareTransferRequest(const CellBounds& rBounds, game::TransferRequest& rRequest) const;
 	void PushTransferRequest(const game::TransferRequest& rRequest);
 

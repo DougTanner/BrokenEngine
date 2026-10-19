@@ -34,14 +34,16 @@ adding the fields below; the other entries are its own commands.
   `{"coord":[x,y],"collection":"fighters"|"omnis"|"battleships"|"missiles"|"blasters","offset"?:0,"limit"?:256}`.
   A negative `offset` or `limit` is a parameter error. Returns
   `{"total","items":[...]}`. Ship rows (`fighters`, `omnis`, `battleships`):
-  `index,uuid,globalId,controller,orders,flags,lifecycleFlags,alignment,local,dir,vel,arrivalGrace,flagshipGlobalId,registryId`,
+  `index,uuid,globalId,controller,orders,targetFlightPlane,flags,lifecycleFlags,alignment,local,dir,vel,arrivalGrace,flagshipGlobalId,registryId`,
   plus `armor,shield` for omnis and `health` for fighters and battleships;
   missile rows:
   `index,local,dir,deltaRotation,deltaRotationDelay,alignment,registryTargetId`;
   blaster rows: `index,local,dir,alignment`. Every row belongs to the requested
   cell, so `local` is meters from that cell's center. A ship's `controller` is
   `Fleet` or `RandomSpawn`, `orders` the integer `ShipOrders` mask (1
-  `kIsFlagship`, 2 `kUseMissiles`, 4 `kPendingUseMissiles`), `flags` the
+  `kIsFlagship`, 2 `kUseMissiles`, 4 `kPendingUseMissiles`, and the target
+  flight plane index in bits 8-15), `targetFlightPlane` that index (0 the
+  lowest plane; a Fighter allows 0-2, an Omni 0-1, a Battleship 0), `flags` the
   integer `ShipFlags` mask, `lifecycleFlags` the integer lifecycle mask, and
   `arrivalGrace` seconds. `registryId` is the ship's frame registry handle
   and `registryTargetId` is the registry handle the missile is homing on, so a
@@ -96,7 +98,14 @@ adding the fields below; the other entries are its own commands.
   `DestroyShip` entry. Identity and handle columns (`engine::Id<T>`, such as
   `pIds`, `pPushers`, and `pRegistryIds`) are refused.
 
-  `uiFrameIdentifier`, `pGlobalIds`, and `pClientGuids` are written unchecked: a value that duplicates another frame's or ship's identity gives odd behavior but no assert. Positions are also unchecked and must stay inside the cell: an out-of-cell omni position transfers at most one cell per axis per tick and then asserts in `OmnisPostRender::Spawn` ([Frame invariants](../../../../Engine/Source/Frame/AGENTS.md)).
+  `uiFrameIdentifier`, `pGlobalIds`, and `pClientGuids` are written unchecked: a
+  value that duplicates another frame's or ship's identity gives odd behavior
+  but no assert. Positions are also unchecked, apart from a ship's height, which
+  its `PostRead` hook rejects outside the lowest-to-highest flight-plane
+  heights, and must stay inside the cell: an out-of-cell omni position transfers
+  at most one cell per axis per tick and then asserts in
+  `OmnisPostRender::Spawn` ([Frame
+  invariants](../../../../Engine/Source/Frame/AGENTS.md)).
 
   The edits apply to a staged copy of the frame, which is committed through the
   save reader's checks (pair count/capacity parity and ID maps, the
@@ -193,8 +202,10 @@ adding the fields below; the other entries are its own commands.
   `[0,255]`; `float` a finite number; `std::chrono::duration<float>` a finite
   number of seconds; `engine::GridCoord` an `[x,y]` grid coordinate; `XMVECTOR`
   an `[x,y]` pair of finite numbers in the cell's local frame, a position being
-  meters from the cell's center: `vecPosition` takes z at the lowest flight
-  plane and w 1, every other vector z 0 and w 0; `engine::AlignmentIdentifier`
+  meters from the cell's center: a ship spawn's `vecPosition` takes z at the
+  height of its `orders` target flight plane (`orders` 256 names plane 1, 512
+  plane 2), any other `vecPosition` z at the lowest flight plane, both w 1,
+  and every other vector z 0 and w 0; `engine::AlignmentIdentifier`
   `"fleet"` or `"random"`, the game's two alignments; a ship's `eController`
   `"Fleet"` or `"RandomSpawn"`; an `eType` `"Fighter"`, `"Omni"`, or
   `"Battleship"`; a flags member, such as a ship's `orders` or an omni's
@@ -207,11 +218,11 @@ adding the fields below; the other entries are its own commands.
   | `SpawnFighter` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `nextBlasterSpawnTime`, `arrivalGracePeriod`, `fDeltaRotation`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `bTransfer` |
   | `SpawnOmni` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fArmor`, `fShield`, `nextBlasterFireTime`, `nextSecondarySpawnTime`, `shieldCooldown`, `shieldDownSoundCooldown`, `animationTime`, `flags`, `transferLockTimer`, `arrivalGracePeriod`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiPendingWeaponModeTicks`, `bTransfer` |
   | `SpawnBattleship` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `nextBlasterSpawnTime`, `nextRearBlasterSpawnTime`, `arrivalGracePeriod`, `fDeltaRotation`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `bTransfer` |
-  | `SpawnBlaster` | `vecPosition`, `vecVelocity`, `iTypeIndex`, `alignment`, `fWindTrailIntensity`, `fWindTrailWidth`, `fWindTrailLengthMultiplier` |
+  | `SpawnBlaster` | `vecPosition`, `vecVelocity`, `iTypeIndex`, `alignment` |
   | `SpawnMissile` | `vecPosition`, `vecDirection`, `vecVelocity`, `vecStoredDirection`, `fAcceleration`, `flags`, `alignment`, `deltaRotationDelay`, `fDeltaRotation`, `fDeltaRotationMaximum`, `fPitch`, `time`, `nextJitter`, `bTransfer` |
   | `SpawnExplosion` | `iTypeIndex`, `vecPosition`, `vecDirection`, `flags`, `lifecycleFlags`, `iTrailCount`, `fTrailAngle`, `iParticleCount`, `fParticleAngle`, `fSizePercent`, `fSmokePercent`, `fTimePercent` |
   | `DestroyShip` | `eType` (required), `iUuid` (required) |
-  | `UpdateShip` | `eType` (required), `iUuid` (required), `bUseMissiles`, `navigationDelaySeconds`, `uiPendingWeaponModeTicks` |
+  | `UpdateShip` | `eType` (required), `iUuid` (required), `bUseMissiles`, `navigationDelaySeconds`, `uiPendingWeaponModeTicks`, `uiTargetFlightPlane` |
   | `UpdateFleet` | `eType` (required), `iUuid` (required), `bIsFlagship`, `flagshipGlobalId`, `fleetWantedCoordinate` (required), `uiPendingFleetWantedCoordinateTicks` |
 
   `iUuid` is the `uuid` of a `query_collection` row in the collection `eType`
@@ -224,7 +235,9 @@ adding the fields below; the other entries are its own commands.
   `flags`, when the entry has no `flags` key, to `kTargetRandom` (16) for a
   `"fleet"` `alignment` and to `kTargetFleet` (8) otherwise; and the `UpdateShip`
   `uiPendingWeaponModeTicks` and `UpdateFleet`
-  `uiPendingFleetWantedCoordinateTicks` to 32 (`engine::kiTickRate`). A spawn
+  `uiPendingFleetWantedCoordinateTicks` to 32 (`engine::kiTickRate`); the
+  `UpdateShip` `uiTargetFlightPlane` default 255 keeps the ship's target flight
+  plane. A spawn
   gets no arrival values: `transferLockTimer` and `arrivalGracePeriod` stay 0
   unless the entry sets them. `bTransfer` defaults to false, so the
   collection's `Spawn` starts the row as a fresh spawn; a fighter or battleship
@@ -240,10 +253,20 @@ adding the fields below; the other entries are its own commands.
   An `UpdateShip` entry's `bUseMissiles` takes effect on an omni
   `uiPendingWeaponModeTicks` ticks after the tick it enters; `0` leaves it
   pending. Fighters and battleships fire no missiles.
+  Any other `uiTargetFlightPlane` sets the ship's target flight plane, toward
+  which it then climbs or descends. Every `UpdateShip` entry also applies its
+  `bUseMissiles`, `navigationDelaySeconds`, and `uiPendingWeaponModeTicks`,
+  defaults included, and resets the ship's cell-change timer to that delay, so
+  an entry that only changes the plane restates the ship's current weapon mode
+  (`orders` bit 2) and delay (`read_frame` `pNavigationDelays`).
 
   The batch also fails during replay playback, on an inactive `coord`, on an
   unknown key, on a value outside its member type's form above, on a
-  non-finite value, on a `vecPosition` outside the cell, on a `SpawnBlaster` or
+  non-finite value, on a `vecPosition` outside the cell, on a ship spawn whose
+  `orders` target flight plane its type does not allow
+  (`'orders' target flight plane is not allowed for <type>`), on an
+  `UpdateShip` `uiTargetFlightPlane` other than 255 that its `eType` does not
+  allow (`'uiTargetFlightPlane' is not allowed for <type>`), on a `SpawnBlaster` or
   `SpawnExplosion` `iTypeIndex` that is not an adoptable blaster or explosion
   type, on a `SpawnExplosion` `iTrailCount` below 0 or
   `fTimePercent` outside `[0,1]`, on a `SpawnOmni` `vecVelocity` whose XY length
@@ -272,7 +295,12 @@ adding the fields below; the other entries are its own commands.
   not active. A smaller margin crosses sooner: `vecPosition:[449.5,0]` crosses
   on the first tick after the one it is applied. For another edge, mirror or
   swap the components. Terrain near that path can push the coast off its line; then pick
-  another cell.
+  another cell. For any moving row, choose a start position whose per-tick steps
+  never land exactly on the edge, as 433.86 m (15.5 ticks) does: a row that
+  reaches the edge exactly arrives on the destination cell's opposite edge, where
+  a refusing collection such as Blasters drops it without any signal and an
+  asserting one such as Omnis asserts
+  ([Frame invariants](../../../../Engine/Source/Frame/AGENTS.md)).
 
   `tick` is an absolute `status.tick` value and must be a JSON integer greater
   than the current `status.tick`; omitted, it means the next tick,
@@ -300,6 +328,18 @@ adding the fields below; the other entries are its own commands.
   record is written later in the same update.
 
   The response is `{"injected":int,"globalIds":[...],"deferred":bool}`. `globalIds` lists the ids minted for ship spawn entries whose `eController` is `"Fleet"`, in entry order, and `deferred` is true while the server is paused. A request carrying `pauseAfterWriterInput` adds its echo.
+- `set_fleet_flight_plane`:
+  `{"globalId":int,"type":"Fighter"|"Omni"|"Battleship","plane":int}`; these
+  are the only keys. Sets the target flight plane that the fleet whose members
+  include `globalId` gives its later spawns of `type`, its joins and respawns,
+  which are born at that plane's height; it queues no status change and no
+  live member's plane changes (move one with an `inject_payload` `UpdateShip`
+  `uiTargetFlightPlane`). The value is saved with the fleet. The `result` is `null`.
+  Fails during replay playback (`cannot set fleet flight plane during replay
+  playback`), on an unknown key, on a non-integer `globalId` or `plane`, on an
+  unknown `type` (`'type' must be Fighter|Omni|Battleship`), on a `plane` the
+  type does not allow (`'plane' is not allowed for <type>`), and when no fleet
+  has `globalId` as a member (`no fleet contains globalId`).
 
 Every grid-coordinate parameter of this project's server commands (`coord`, `fleetWantedCoordinate`) follows the engine
 [grid-coordinate rule](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands),

@@ -119,6 +119,7 @@ void ServerClientManager::SpawnWaitingClients()
 		engine::GlobalId flagshipGlobalId {};
 		engine::GridCoord spawnFleetWantedCoordinate {};
 		int64_t iSpawnPendingFleetTicks = 0;
+		int64_t iTargetFlightPlane = 0;
 		if ((rClientSpawnInformation.fleetGuid.uiHigh != 0 || rClientSpawnInformation.fleetGuid.uiLow != 0))
 		{
 			ServerFleetManager::FleetLookupResult result = gpServerSession->mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.memberGlobalId);
@@ -127,6 +128,7 @@ void ServerClientManager::SpawnWaitingClients()
 			flagshipGlobalId = bIsFlagship ? globalId : result.flagshipGlobalId;
 			spawnFleetWantedCoordinate = result.fleetWantedCoord;
 			iSpawnPendingFleetTicks = result.iPendingFleetWantedCoordTicks;
+			iTargetFlightPlane = result.targetFlightPlanes.at(std::to_underlying(rClientSpawnInformation.eType));
 		}
 
 		ShipOrders_t spawnOrders {};
@@ -134,12 +136,13 @@ void ServerClientManager::SpawnWaitingClients()
 		{
 			spawnOrders.Set(ShipOrders::kIsFlagship);
 		}
+		SetTargetFlightPlane(spawnOrders, iTargetFlightPlane);
 
 		// miTickCounter + 1 is the next tick; its post-tick batch creates the row. The requesting client's GUID rides the
 		// spawn, so that row is born owned.
 		auto QueueFleetSpawn = [&](auto spawnInfo)
 		{
-			spawnInfo.vecPosition = XMVectorSet(kfFleetSpawnOffsetX, kfFleetSpawnOffsetY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
+			spawnInfo.vecPosition = XMVectorSet(kfFleetSpawnOffsetX, kfFleetSpawnOffsetY, engine::gpFlightPlanes->Plane(iTargetFlightPlane).fHeightMeters, 1.0f);
 			spawnInfo.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 			spawnInfo.alignment = gpGame->mFleetAlignment;
 			spawnInfo.eController = ShipController::kFleet;

@@ -52,7 +52,7 @@ void OmnisPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 				.bTransfer = true,
 			}),
 		};
-		if (rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
+		if (!rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
 		{
 			LOG(kDefault, kError, "Omni Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) GlobalId: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), rCurrentPostRender.pGlobalIds[i], rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();

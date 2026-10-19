@@ -153,7 +153,7 @@ bool FramePostRenderBase::PrepareTransferRequest(const CellBounds& rBounds, game
 	rVecPosition = XMVectorSubtract(rVecPosition, XMVectorSet(static_cast<float>(rRequest.iDeltaX) * kfCellWidth, static_cast<float>(rRequest.iDeltaY) * kfCellHeight, 0.0f, 0.0f));
 
 	// Transfer producers are unbounded, so a full buffer can reallocate during a shared per-tick burst.
-	return std::ssize(transferRequests) == static_cast<int64_t>(transferRequests.capacity());
+	return std::ssize(transferRequests) < static_cast<int64_t>(transferRequests.capacity());
 }
 
 void FramePostRenderBase::PushTransferRequest(const game::TransferRequest& rRequest)

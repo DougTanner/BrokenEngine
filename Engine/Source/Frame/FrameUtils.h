@@ -156,7 +156,7 @@ inline XMVECTOR XM_CALLCONV LocalCellArea()
 	return true;
 }
 
-inline constexpr int64_t kiInitialTransferCapacity = 32;
+inline constexpr int64_t kiInitialTransferCapacity = 64;
 
 inline bool XM_CALLCONV IsOutOfBounds(const CellBounds& rBounds, FXMVECTOR vecPosition)
 {

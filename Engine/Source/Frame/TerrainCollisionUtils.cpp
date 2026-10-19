@@ -1,7 +1,6 @@
 #include "TerrainCollisionUtils.h"
 
 #include "Frame/CellStaticData.h"
-#include "Frame/FlightPlanes.h"
 #include "Frame/IslandTerrain.h"
 #include "Frame/NavQuery.h"
 
@@ -332,7 +331,7 @@ static float RoundAlongNormal(double fCoordinate, double fNormal)
 	return fRounded;
 }
 
-DiscTerrainResult XM_CALLCONV ResolveDiscAgainstTerrain(const CellStaticData& rStaticData, FXMVECTOR vecStart, FXMVECTOR vecEnd, float fRadius, float fThresholdHeight, bool bSlide)
+DiscTerrainResult XM_CALLCONV ResolveDiscAgainstTerrain(const CellStaticData& rStaticData, const NavData& rNavData, FXMVECTOR vecStart, FXMVECTOR vecEnd, float fRadius, float fThresholdHeight, bool bSlide)
 {
 	DiscTerrainResult result
 	{
@@ -367,8 +366,7 @@ DiscTerrainResult XM_CALLCONV ResolveDiscAgainstTerrain(const CellStaticData& rS
 	result.flags.Set(DiscTerrainFlags::kStartOverlap, !IsDiscClear(rGrid, fThresholdHeight, fResolvedStartX, fResolvedStartY, fDiscRadius, fOverlapRadiusSquared));
 	if (result.flags & DiscTerrainFlags::kStartOverlap) [[unlikely]]
 	{
-		// The snap asserts that Z is the base height; only its XY is used.
-		XMVECTOR vecSnapped = NavQuerySnapToNavigable(XMVectorSetZ(vecStart, gpFlightPlanes->Lowest().fHeightMeters), rStaticData.navigationData);
+		XMVECTOR vecSnapped = NavQuerySnapToNavigable(vecStart, rNavData);
 		XMFLOAT4A f4Snapped {};
 		XMStoreFloat4A(&f4Snapped, vecSnapped);
 		bool bMoved = f4Snapped.x != f4Start.x || f4Snapped.y != f4Start.y;

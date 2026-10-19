@@ -12,7 +12,7 @@ struct NavContour
 	std::vector<int64_t> polygonOffsets;
 };
 
-inline constexpr int64_t kiNavDataVersion = 15;
+inline constexpr int64_t kiNavDataVersion = 16;
 
 // Broad-phase edge grid dimensions (tunable). Mirrors the fixed-zone grid in Collision.h; finer here
 // because obstacle edges are denser than collision objects. Only affects derived (non-serialized) data.
@@ -32,7 +32,7 @@ inline int64_t NavGridCell(float fValue, float fMinimum, float fMaximum, int64_t
 	return std::clamp(iCell, 0i64, iZones - 1);
 }
 
-// Cell-local navigation data stored in CellStaticData.
+// Cell-local navigation data for one flight plane; CellStaticData holds one per plane, index-parallel with gpFlightPlanes.
 struct NavData
 {
 	// Serialized content; layout changes require a kiNavDataVersion bump.
@@ -61,7 +61,7 @@ struct NavData
 };
 
 void BuildNavContour(NavContour& rContour, std::span<const float> heightmapData, int64_t iHeightmapWidth, int64_t iHeightmapHeight, float fWorldThreshold, float fClearanceMeters, float fFootprintXMeters, float fFootprintYMeters);
-void BuildCellNavigationData(NavData& rNavData, const std::vector<IslandPlacement>& rPlacements);
+void BuildCellNavigationData(std::vector<NavData>& rNavigationData, const std::vector<IslandPlacement>& rPlacements); // one NavData per flight plane
 
 // Client and server must derive identical acceleration structures from identical serialized input.
 void BuildNavigationAcceleration(NavData& rNavData);

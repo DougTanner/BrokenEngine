@@ -242,11 +242,12 @@ void WorldLightingShadowPipelines::CreatePipelineShadows()
 
 void WorldLightingShadowPipelines::CreateLightingBlurPipelines()
 {
-	// Lighting texture pre-blur pipelines (descriptors rebound per-texture at blur time)
+	// Lighting texture pre-blur pipelines (descriptors rebound per-texture at blur time, one set per framebuffer so a blur
+	// recorded for one framebuffer never rewrites a set another in-flight frame binds)
 	mpPipelines[kPipelineLightingBlurH].Create(
 	{
 		.name = "LightingBlurH",
-		.flags = {PipelineFlags::kCompute, PipelineFlags::kPushConstants},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kPushConstants, PipelineFlags::kPerCommandBuffer},
 		.ppShaders = {&mrShaders.at(data::kShadersLightingLightingBlurHcompCrc)},
 		.descriptorInfos =
 		{
@@ -258,7 +259,7 @@ void WorldLightingShadowPipelines::CreateLightingBlurPipelines()
 	mpPipelines[kPipelineLightingBlurV].Create(
 	{
 		.name = "LightingBlurV",
-		.flags = {PipelineFlags::kCompute, PipelineFlags::kPushConstants},
+		.flags = {PipelineFlags::kCompute, PipelineFlags::kPushConstants, PipelineFlags::kPerCommandBuffer},
 		.ppShaders = {&mrShaders.at(data::kShadersLightingLightingBlurVcompCrc)},
 		.descriptorInfos =
 		{

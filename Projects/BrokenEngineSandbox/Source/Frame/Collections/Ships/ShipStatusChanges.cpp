@@ -76,6 +76,10 @@ void ApplyUpdateStatusChanges(Frame& rFrame, const FrameInput& rFrameInput, cons
 				}
 				rPostRender.pNavigationDelays[iIndex] = rUpdate.navigationDelaySeconds;
 				rPostRender.pCellChangeTimers[iIndex] = rUpdate.navigationDelaySeconds;
+				if (rUpdate.uiTargetFlightPlane != kuiKeepTargetFlightPlane)
+				{
+					SetTargetFlightPlane(rPostRender.pOrders[iIndex], rUpdate.uiTargetFlightPlane);
+				}
 			});
 			if (!bFound)
 			{

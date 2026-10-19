@@ -488,7 +488,7 @@ ServerFleetManager::FleetLookupResult ServerFleetManager::LookupFleetWantedCoord
 
 	FleetLookupFlags_t flags {FleetLookupFlags::kFound};
 	flags.Set(FleetLookupFlags::kIsFlagship, bIsFlagship);
-	return {.flags = flags, .flagshipGlobalId = rFleet.flagshipGlobalId, .fleetWantedCoord = rFleet.wantedCoordinate, .iPendingFleetWantedCoordTicks = rFleet.uiPendingFleetWantedCoordinateTicks};
+	return {.flags = flags, .flagshipGlobalId = rFleet.flagshipGlobalId, .fleetWantedCoord = rFleet.wantedCoordinate, .iPendingFleetWantedCoordTicks = rFleet.uiPendingFleetWantedCoordinateTicks, .targetFlightPlanes = rFleet.targetFlightPlanes};
 }
 
 void ServerFleetManager::DetectDisconnectedOwnedEntityDeaths()

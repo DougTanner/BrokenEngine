@@ -13,7 +13,10 @@ namespace engine
 enum class TextureManagerFlags : uint8_t
 {
 	kPendingAcquireBarriers = 1 << 0,
-	kPendingLightingReblur  = 1 << 1,
+	kAcquireCommandBufferBegun = 1 << 1,
+	// Set when a blur is recorded into the acquire command buffer, cleared by EndAcquireCommandBuffer: set f of the blur
+	// pipelines holds one blur's bindings, so a second blur in the same acquire command buffer waits for a later frame.
+	kBlurRecorded = 1 << 2,
 };
 
 class TextureManager : public common::Singleton<TextureManager>
@@ -48,11 +51,29 @@ public:
 	// cube / the five island bindless-array anchors); only name/flags/format/layers/view-type/pixel differ.
 	void CreatePlaceholderTexture(Texture& rTexture, std::string_view name, VkImageCreateFlags vkImageCreateFlags, VkFormat vkFormat, int64_t iArrayLayers, VkImageViewType vkImageViewType, const std::function<void(std::span<std::byte>, int64_t)>& rPixelWriter);
 
-	void AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bool bNeedAcquireBarrier, VkCommandBuffer vkAcquireCommandBuffer, bool& rbRecordedBarriers);
-	void EnsureAcquireCommandBufferBegun(VkCommandBuffer vkAcquireCommandBuffer, bool& rbRecordedBarriers);
+	void AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bool bNeedAcquireBarrier);
+	// Returns the acquire command buffer of the framebuffer ProcessPendingTextures last named, beginning it on first use
+	// since the last EndAcquireCommandBuffer. Work recorded into it precedes that framebuffer's Global submission.
+	VkCommandBuffer EnsureAcquireCommandBufferBegun();
+	// Ends a begun acquire command buffer and publishes it for the next Global submission; once per frame, after the last
+	// recording (RenderGlobal after RestorationSweep, and each WaitForTextures pass before its flush).
+	void EndAcquireCommandBuffer();
 
+	// Drained context: opens its own all-framebuffer bindless write epoch, so the caller must not hold one.
 	void WaitForTextures(std::span<const common::crc_t> crcs);
 	void WaitForTextures(std::span<Texture* const> textures);
+
+	// Retirement: staging buffers and images recorded work or descriptors may still use are destroyed only once every
+	// framebuffer current at retirement has had its fence waited and its publications applied, or after a device drain.
+	void RetireStagingBuffer(std::unique_ptr<StagingBuffer> pStagingBuffer);
+	// Moves rTexture's image and view into retirement; rTexture keeps its info and generation with null handles, as Destroy leaves it.
+	void RetireImage(Texture& rTexture);
+	// Every frame once iFramebuffer's fence has signaled: no retired resource is held by that framebuffer any longer.
+	void MarkFramebufferWaited(int64_t iFramebuffer);
+	// Every frame after RenderGlobal's publication block: destroys the retired resources no framebuffer holds.
+	void DestroyUnheldRetiredResources();
+	// After a device drain.
+	void DestroyAllRetiredResources();
 
 	// Water normal map atlas: ordered alphabetically by stripped display name; index used by Wrapper indices and shader.
 	static inline constexpr int64_t kiWaterNormalCount = shaders::kiWaterNormalCount;
@@ -164,13 +185,33 @@ public:
 	// Pre-blur lighting textures (the registered CRC set lives on TextureUploadManager, which outlives this manager)
 	std::unordered_map<common::crc_t, Texture> mBlurredLightingTextures;
 	std::unordered_map<common::crc_t, Texture> mBlurIntermediateTextures;
-	void BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBarrier = false);
+	// Records the blur into vkCommandBuffer through the blur pipelines' Set 1 copy iDescriptorSet, which must not be bound
+	// by another recording command buffer.
+	void BlurLightingTexture(common::crc_t crc, int64_t iDescriptorSet, VkCommandBuffer vkCommandBuffer);
+	// Drained context only: one executed one-shot per ready lighting texture, rewriting its blur images in place.
 	void ReblurAllLightingTextures();
 
 	VkCommandPool mAcquireVkCommandPool = VK_NULL_HANDLE;
 	std::vector<VkCommandBuffer> mAcquireVkCommandBuffers;
 	int64_t miAcquireFramebufferIndex = 0;
 	common::Flags<TextureManagerFlags> mFlags;
+
+private:
+
+	struct RetiredStagingBuffer
+	{
+		std::unique_ptr<StagingBuffer> pStagingBuffer;
+		uint32_t uiFramebufferMask = 0; // Framebuffers whose fence has not been waited since retirement
+	};
+
+	struct RetiredImage
+	{
+		std::unique_ptr<Texture> pTexture;
+		uint32_t uiFramebufferMask = 0; // Framebuffers whose fence has not been waited since retirement
+	};
+
+	std::vector<RetiredStagingBuffer> mRetiredStagingBuffers;
+	std::vector<RetiredImage> mRetiredImages;
 };
 
 inline TextureManager* gpTextureManager = nullptr;

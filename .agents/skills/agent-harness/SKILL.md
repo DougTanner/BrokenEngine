@@ -84,7 +84,8 @@ whether the authorized change includes that extension or whether user
 authority/criterion revision is required; when the blocked criterion belongs to
 a claimed Plan and the values it needs appear only in rendered pixels, that
 decision follows the screenshot-only deferral rule in
-[`../next-plan/SKILL.md`](../next-plan/SKILL.md) `## Rules`, which defers the
+[`../next-plan/references/claim-exceptions.md`](../next-plan/references/claim-exceptions.md)
+`## Pixel-evidence deferral`, which defers the
 Plan rather than waiving the criterion. Never fake state with pixel guessing,
 log scraping, or seeding: seeding commands set preconditions only, and the
 state a criterion observes must come from the code path under test. Never

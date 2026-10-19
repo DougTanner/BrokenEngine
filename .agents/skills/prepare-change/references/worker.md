@@ -21,8 +21,9 @@ Triggers, inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    to 5 are skipped.
 4. Draft the execution card into the same file, headed and filled as
    [`../../plan-audit/SKILL.md`](../../plan-audit/SKILL.md) `## Inputs` requires,
-   on the field template
-   [`../../next-plan/SKILL.md`](../../next-plan/SKILL.md) `## Handoff` owns, with
+   on the field template in
+   [`../../../references/execution-card.md`](../../../references/execution-card.md)
+   `## Template`, with
    each acceptance check inside the tier's evidence ceiling in
    [`../../verify-acceptance/references/worker.md`](../../verify-acceptance/references/worker.md)
    `## Tier evidence ceiling`. Done when every template field is filled under

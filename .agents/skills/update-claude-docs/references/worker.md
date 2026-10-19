@@ -56,7 +56,15 @@ the modes, the inputs, and the handoff.
    links, and sizes.
    - If a directory is no longer a distinct subsystem, report its `AGENTS.md`
      as a proposed deletion rather than deleting it without authority.
-   - Done when each check has run and its result is in the handoff.
+   - Run the static checks and rewrap every `line-length` failure in a file you
+     edited; the runner owns the limit:
+
+     ```powershell
+     pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<worktree root>' -Baseline <session baseline> -IncludeUntracked
+     ```
+
+   - Done when a run after your last rewrap reports no `line-length` failure in
+     a file you edited and each check's result from that run is in the handoff.
 
 ## Rules
 

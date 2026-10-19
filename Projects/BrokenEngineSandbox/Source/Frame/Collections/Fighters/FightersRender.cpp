@@ -149,9 +149,11 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 
 			XMMATRIX matScaling = XMMatrixScaling(fSize, fSize, fSize);
 			XMMATRIX matRoll = XMMatrixRotationX(-kfRoll * rCurrent.pfDeltaRotations[i]);
+			// Negated so a positive climb tilt raises the +X nose.
+			XMMATRIX matClimbTilt = XMMatrixRotationY(-rCurrent.pfClimbTilts[i]);
 			XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 			XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
-			XMMATRIX matTransform = matScaling * smatPreRotate * matRoll * matYaw * matTranslation;
+			XMMATRIX matTransform = matScaling * smatPreRotate * matRoll * matClimbTilt * matYaw * matTranslation;
 
 			shaders::ModelLayout& rModelLayout = pLayouts[iRenderedOffset + j];
 			rModelLayout.f4Position = f4Position;

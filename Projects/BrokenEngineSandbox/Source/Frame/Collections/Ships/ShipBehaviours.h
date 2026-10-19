@@ -40,6 +40,19 @@ struct HeadingMovementConstants
 	float fVelocityToDirection = 0.0f;
 };
 
+// The type's ki<Type>HighestFlightPlane; each type header asserts it indexes game::kFlightPlanes.
+[[nodiscard]] int64_t HighestFlightPlane(ShipType eType);
+[[nodiscard]] bool IsFlightPlaneAllowed(ShipType eType, int64_t iFlightPlane);
+// The plane whose height equals fHeight exactly, or none between planes. The climb lands on the table's own height, so
+// a ship on a plane always matches.
+[[nodiscard]] std::optional<int64_t> FlightPlaneAtHeight(float fHeight);
+// The plane whose graph a ship paths and steers on: min(highest plane at or below its height, target plane).
+[[nodiscard]] int64_t NavigationFlightPlane(float fHeight, int64_t iTargetPlane);
+// True on a plane without kTerrainCollision.
+[[nodiscard]] bool SkipsTerrainContact(float fHeight);
+// Moves Z toward the target plane's height by at most fClimbRate times the delta, landing exactly on it; W is untouched.
+[[nodiscard]] XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime);
+
 void CountdownPendingOrders(int64_t& riPendingFleetWantedCoordinateTicks);
 // Also counts down the weapon-mode change and applies kPendingUseMissiles when it finishes.
 void CountdownPendingOrders(ShipOrders_t& rOrders, int64_t& riPendingFleetWantedCoordinateTicks, int64_t& riPendingWeaponModeTicks);
@@ -57,12 +70,15 @@ void XM_CALLCONV SteerHeadingTowards(FXMVECTOR vecPosition, FXMVECTOR vecDirecti
 void XM_CALLCONV ApplyAcceleratedMovement(int64_t iNavigationDirection, FXMVECTOR vecAiDirection, std::chrono::duration<float> deltaTime, float fAccelerationMultiplier, float fDecayMultiplier, const AcceleratedMovementConstants& rConstants, XMVECTOR& rVecVelocity);
 void XM_CALLCONV ApplyHeadingMovement(FXMVECTOR vecDirection, ShipFlags_t flags, std::chrono::duration<float> deltaTime, const HeadingMovementConstants& rConstants, XMVECTOR& rVecVelocity);
 
-// Soft push away from terrain inside the band below the lowest flight plane that the radius and margin define.
-void XM_CALLCONV ApplyTerrainPush(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, float fRadius, float fPushMargin, XMVECTOR& rVecVelocity);
-// Hard contact at the lowest flight plane: rVecPosition slides along the terrain once.
-void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, float fRadius, XMVECTOR& rVecVelocity);
-// Hard contact at the lowest flight plane: rVecPosition stops at the terrain and the heading bounces off it.
-void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, FXMVECTOR vecDirection, float fRadius, std::chrono::duration<float> deltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity);
+// Soft push away from terrain inside the band below fHeight that the radius and margin define; vecPosition supplies
+// only the XY of the terrain samples.
+void XM_CALLCONV ApplyTerrainPush(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, float fRadius, float fHeight, float fPushMargin, XMVECTOR& rVecVelocity);
+// Hard contact at the height of rVecPosition: rVecPosition slides along the terrain once. An overlapped start snaps on
+// the NavigationFlightPlane graph.
+void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, float fRadius, XMVECTOR& rVecVelocity, int64_t iTargetFlightPlane);
+// Hard contact at the height of rVecPosition: rVecPosition stops at the terrain and the heading bounces off it. An
+// overlapped start snaps on the NavigationFlightPlane graph.
+void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, FXMVECTOR vecDirection, float fRadius, std::chrono::duration<float> deltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity, int64_t iTargetFlightPlane);
 // Pass the row's own pusher so it ignores its own push.
 void XM_CALLCONV ApplyPusherPush(const Frame& rFrame, FXMVECTOR vecPosition, engine::pusher_t pusher, float fMaximumPushVelocity, XMVECTOR& rVecVelocity);
 

@@ -14,7 +14,7 @@ Fighters combine heading-based steering, health and damage, a fixed forward blas
   regenerate health.
 - Steering turn rate crosses cell boundaries with the ship rather than restarting on arrival.
 - Direct blaster hits and ship rams arrive through collision; missile splash damage arrives through the area-damage phase. Destruction applies horizontal knockback and a staged explosion sequence.
-- Interpolate Update owns a ship's height: each tick it moves position Z toward the ship's target height — the lowest flight plane's height for every ship — by at most the maximum flight speed times the tick delta, and lands exactly on it. PostRender Update stores velocity Z as 0 after every other velocity write, so pusher response, knockback, and terrain bounce move ships only horizontally. Change a ship's height through its target height, not its velocity.
+- The nose climb tilt is client-only render state: Interpolate Update derives it from the tick's height change and Render pitches the model by it, while the simulated heading stays yaw-only.
 - Body, collision, effect, and model sizing derive from `kfFighterRadius`.
 - The simulation keeps the Interpolate `pDestroyedTimes` at the -1 spawn sentinel or in [0, `kFighterDestroyTime`]. The Interpolate `PostRead` rejects any other row on every Frame read.
 - Under the [shared arrival-grace contract](../AGENTS.md#game-specific-rules),

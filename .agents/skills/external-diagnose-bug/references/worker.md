@@ -83,8 +83,8 @@ boundary, and the handoff form live in [`../SKILL.md`](../SKILL.md).
     so removal is one search. Done when every temporary log carries that
     marker.
 14. Treat instrumentation as temporary session state: it stays in the diagnosis
-    worktree, never lands, and is removed before the handoff. Done when no
-    instrumentation remains at the handoff.
+    worktree, never lands, and is removed before the handoff; never review or
+    style-check it. Done when no instrumentation remains at the handoff.
 15. Gather evidence until it confirms exactly one hypothesis, or falsifies the
     current set — which sends you back to step 9 to rerank. Done when exactly
     one hypothesis is confirmed or the current set is falsified.

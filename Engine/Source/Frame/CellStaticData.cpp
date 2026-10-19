@@ -16,7 +16,11 @@ void CellStaticData::Write(std::ostream& rStream, bool bIncludeNavigationData) c
 	}
 	if (bIncludeNavigationData)
 	{
-		navigationData.Write(rStream);
+		common::Write(rStream, static_cast<int32_t>(std::ssize(navigationData)));
+		for (const NavData& rNavData : navigationData)
+		{
+			rNavData.Write(rStream);
+		}
 	}
 }
 
@@ -36,7 +40,13 @@ void CellStaticData::Read(std::istream& rStream, bool bIncludeNavigationData)
 	}
 	if (bIncludeNavigationData)
 	{
-		navigationData.Read(rStream);
+		int32_t iPlaneCount = 0;
+		common::Read(rStream, iPlaneCount);
+		navigationData.resize(iPlaneCount);
+		for (NavData& rNavData : navigationData)
+		{
+			rNavData.Read(rStream);
+		}
 		// Wire-received navigationData is authoritative (client never rebuilds — server-only NavContour), so mark it
 		// built regardless of vertex count.
 		bNavigationDataBuilt = true;

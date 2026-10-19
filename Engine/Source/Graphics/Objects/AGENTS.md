@@ -4,7 +4,7 @@ Client-only RAII wrappers for Vulkan buffers, textures, shaders, pipelines, and 
 
 ## Lifetime and Synchronization
 
-- Object `Destroy` methods do not wait for GPU work. Destroy potentially in-flight resources only after device/fence synchronization, through an owning manager's path that retires objects later, once the GPU is done with them, or inside the renderer's post-fence descriptor-patch window.
+- Object `Destroy` methods do not wait for GPU work. Destroy potentially in-flight resources only after a device drain or through an owning manager's retirement path, which destroys them once the GPU is done with them.
 - Pipeline descriptor registrations contain raw pipeline back-references. Individual `Pipeline::Destroy` calls unregister them; whole-`PipelineManager` clear remains defensive.
 - Texture image creation or adoption increments its generation (the reuse counter). Descriptors snapshot that generation, while destruction is detected through the null live image; both signals protect cached bindings from recycled handles.
 - Lazy textures borrow the placeholder view while their image is null. Destruction must not free that borrowed view. Eviction and descriptor fallback policy belong to Managers (`../Managers/AGENTS.md`).
@@ -12,6 +12,8 @@ Client-only RAII wrappers for Vulkan buffers, textures, shaders, pipelines, and 
 ## Resource Contracts
 
 - Persistent mapped, one-shot staged, and copy-every-frame buffers have distinct ownership and barrier requirements. Keep draw indexing within the slots allocated for that mode.
+- Texture and device-local buffer uploads have a one-shot form and a recording form; the recording form returns its staging buffer, which the caller keeps alive until that command buffer's execution completes.
+- A pipeline allocates one Set 1 per framebuffer when a descriptor carries per-framebuffer data or is a combined-sampler binding that per-framebuffer descriptor publication can rewrite; a pipeline whose sets are rewritten per framebuffer for another reason, such as the lighting blur, requests it by flag. Global Set 0 is always bound at the framebuffer index.
 - Buffer memory property flags are hard requirements for the allocator, not preferences: a buffer gets every requested flag or its creation throws, so a device-local buffer never falls back to system memory. Every host-visible buffer is host-coherent and persistently mapped, and no code flushes or invalidates mapped memory; requesting non-coherent host memory breaks every caller that writes or reads through the mapping.
 - Descriptor arrays end at the first empty entry. Use each descriptor's resolved Vulkan binding for deferred updates.
 - A uniform-buffer descriptor must name the routing its source uses:

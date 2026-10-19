@@ -98,6 +98,9 @@ struct DestroyShipData
 	}
 };
 
+// UpdateShipData::uiTargetFlightPlane value that leaves the row's target flight plane unchanged.
+inline constexpr uint8_t kuiKeepTargetFlightPlane = 255;
+
 struct UpdateShipData
 {
 	ShipType eType {};
@@ -105,10 +108,11 @@ struct UpdateShipData
 	bool bUseMissiles = false;
 	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
 	uint8_t uiPendingWeaponModeTicks = 0;
+	uint8_t uiTargetFlightPlane = kuiKeepTargetFlightPlane;
 
 	static constexpr auto Fields()
 	{
-		return engine::FrameColumnList<FRAME_COLUMN(UpdateShipData, eType), FRAME_COLUMN(UpdateShipData, iUuid), FRAME_COLUMN(UpdateShipData, bUseMissiles), FRAME_COLUMN(UpdateShipData, navigationDelaySeconds), FRAME_COLUMN(UpdateShipData, uiPendingWeaponModeTicks)> {};
+		return engine::FrameColumnList<FRAME_COLUMN(UpdateShipData, eType), FRAME_COLUMN(UpdateShipData, iUuid), FRAME_COLUMN(UpdateShipData, bUseMissiles), FRAME_COLUMN(UpdateShipData, navigationDelaySeconds), FRAME_COLUMN(UpdateShipData, uiPendingWeaponModeTicks), FRAME_COLUMN(UpdateShipData, uiTargetFlightPlane)> {};
 	}
 };
 
@@ -247,7 +251,9 @@ engine::GlobalId OwnedSpawnGlobalId(const StatusChange& rChange);
 engine::ClientGuid OwnedSpawnClientGuid(const StatusChange& rChange);
 
 // Adoptability check the replay stream reader and the harness apply: client hydration looks the Blaster and Explosion
-// types up with a checked index, and a ship controller or ship type outside its enumerators selects no collection.
+// types up with a checked index, a ship controller or ship type outside its enumerators selects no collection, and a
+// ship spawn's target flight plane, or an UpdateShipData one other than kuiKeepTargetFlightPlane, must be one its ship
+// type allows.
 bool IsAdoptableStatusChange(const StatusChange& rChange);
 
 // The one application point of the post-tick batch: server harvest, replay playback, and the client post-tick loop.

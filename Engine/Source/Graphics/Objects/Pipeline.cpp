@@ -21,11 +21,39 @@ static void RecordPushConstants(VkCommandBuffer vkCommandBuffer, VkPipelineLayou
 	vkCmdPushConstants(vkCommandBuffer, vkPipelineLayout, vkStageFlags, 0, sizeof(pushConstantsLayout), &pushConstantsLayout);
 }
 
-static void BindGraphicsDescriptorSets(VkCommandBuffer vkCommandBuffer, VkPipelineLayout vkPipelineLayout, VkDescriptorSetLayout vkExternalLayout, int64_t iDescriptorSetIndex, const std::vector<VkDescriptorSet>& rDescriptorSets)
+// Descriptor publication (TextureDescriptors) rewrites a combined-sampler binding registered under an mTextureMap CRC, or a
+// bindless array consumer, one framebuffer at a time; its pipeline needs one Set 1 per framebuffer so no write reaches a set
+// an in-flight frame binds. Model descriptors register their image-based-lighting bindings under mTextureMap CRCs.
+static bool IsPublishedTextureDescriptor(const DescriptorInfo& rDescriptorInfo)
 {
+	if (rDescriptorInfo.flags & kModel)
+	{
+		return true;
+	}
+	if (!(rDescriptorInfo.flags & kCombinedSamplers))
+	{
+		return false;
+	}
+	if (rDescriptorInfo.textureCrc != 0)
+	{
+		return true;
+	}
+	if (rDescriptorInfo.flags & kBindlessArrayConsumer)
+	{
+		return true;
+	}
+	return rDescriptorInfo.ppTextures != nullptr && std::ranges::any_of(std::span<Texture* const>(rDescriptorInfo.ppTextures, static_cast<size_t>(rDescriptorInfo.iCount)), [](const Texture* pTexture)
+	{
+		return pTexture->mInfo.uiCrc != 0 && gpTextureManager->mTextureMap.contains(pTexture->mInfo.uiCrc);
+	});
+}
+
+static void BindGraphicsDescriptorSets(VkCommandBuffer vkCommandBuffer, VkPipelineLayout vkPipelineLayout, VkDescriptorSetLayout vkExternalLayout, int64_t iCommandBuffer, int64_t iDescriptorSetIndex, const std::vector<VkDescriptorSet>& rDescriptorSets)
+{
+	// Global Set 0 is indexed per-framebuffer (iCommandBuffer); per-pipeline Set 1 follows mbPerCommandBuffer (iDescriptorSetIndex).
 	if (vkExternalLayout != VK_NULL_HANDLE)
 	{
-		VkDescriptorSet pVkDescriptorSets[2] = {gpTextureManager->mTextureDescriptors.mGlobalDescriptorSets.at(iDescriptorSetIndex), rDescriptorSets.at(iDescriptorSetIndex)};
+		VkDescriptorSet pVkDescriptorSets[2] = {gpTextureManager->mTextureDescriptors.mGlobalDescriptorSets.at(iCommandBuffer), rDescriptorSets.at(iDescriptorSetIndex)};
 		vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout, 0, 2, pVkDescriptorSets, 0, nullptr);
 	}
 	else
@@ -95,10 +123,10 @@ void Pipeline::Create(const PipelineInfo& rInfo)
 		ASSERT(mInfo.vkExtent3D.width != 0 && mInfo.vkExtent3D.height != 0);
 	}
 
-	mbPerCommandBuffer = mInfo.flags & kIndirectHostVisible;
+	mbPerCommandBuffer = mInfo.flags & kIndirectHostVisible || mInfo.flags & kPerCommandBuffer;
 	mbPerCommandBuffer = std::ranges::any_of(mInfo.descriptorInfos, [](const DescriptorInfo& rDescriptorInfo)
 	{
-		return rDescriptorInfo.flags & kPerCommandBufferUniformBuffers || rDescriptorInfo.flags & kPerCommandBufferStorageBuffers || rDescriptorInfo.flags & kGlobalLayoutUniformBuffers || rDescriptorInfo.flags & kMainLayoutUniformBuffers;
+		return rDescriptorInfo.flags & kPerCommandBufferUniformBuffers || rDescriptorInfo.flags & kPerCommandBufferStorageBuffers || rDescriptorInfo.flags & kGlobalLayoutUniformBuffers || rDescriptorInfo.flags & kMainLayoutUniformBuffers || IsPublishedTextureDescriptor(rDescriptorInfo);
 	}) || mbPerCommandBuffer;
 
 	// Bound descriptor entries by ShaderHeader::kiMaxDescriptorSetLayoutBindings; PipelineDescriptorWriter's scratch arrays use the same cap. A
@@ -198,7 +226,7 @@ void Pipeline::RecordDraw(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffe
 
 	int64_t iDescriptorSetIndex = mbPerCommandBuffer ? iCommandBuffer : 0;
 	vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVkPipeline);
-	BindGraphicsDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mExternalVkDescriptorSetLayout, iDescriptorSetIndex, mVkDescriptorSets);
+	BindGraphicsDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mExternalVkDescriptorSetLayout, iCommandBuffer, iDescriptorSetIndex, mVkDescriptorSets);
 	mInfo.pVertexBuffer->RecordBindVertexBuffer(vkCommandBuffer);
 
 	vkCmdDrawIndexed(vkCommandBuffer, static_cast<uint32_t>(mInfo.pVertexBuffer->mInfo.iCount), static_cast<uint32_t>(iInstanceCount), 0, 0, static_cast<uint32_t>(iFirstInstance));
@@ -214,7 +242,7 @@ void Pipeline::RecordBindPipelineAndDescriptors(int64_t iCommandBuffer, VkComman
 
 	int64_t iDescriptorSetIndex = mbPerCommandBuffer ? iCommandBuffer : 0;
 	vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVkPipeline);
-	BindGraphicsDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mExternalVkDescriptorSetLayout, iDescriptorSetIndex, mVkDescriptorSets);
+	BindGraphicsDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mExternalVkDescriptorSetLayout, iCommandBuffer, iDescriptorSetIndex, mVkDescriptorSets);
 }
 
 void Pipeline::RecordDrawIndirect(int64_t iCommandBuffer, VkCommandBuffer vkCommandBuffer, const XMFLOAT4& rf4PushConstants)
@@ -228,7 +256,7 @@ void Pipeline::RecordDrawIndirect(int64_t iCommandBuffer, VkCommandBuffer vkComm
 	}
 
 	vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVkPipeline);
-	BindGraphicsDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mExternalVkDescriptorSetLayout, iCommandBuffer, mVkDescriptorSets);
+	BindGraphicsDescriptorSets(vkCommandBuffer, mVkPipelineLayout, mExternalVkDescriptorSetLayout, iCommandBuffer, iCommandBuffer, mVkDescriptorSets);
 	mInfo.pVertexBuffer->RecordBindVertexBuffer(vkCommandBuffer);
 	// Device-local reads slot 0; host-visible indexes per-framebuffer
 	int64_t iIndirectSlot = mInfo.flags & kIndirectDeviceLocal ? 0 : iCommandBuffer;

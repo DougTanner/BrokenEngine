@@ -3,6 +3,8 @@
 #include "Ui/WrapperBase.h"
 
 #if defined(BT_CLIENT)
+#include "Ui/SmokeWrappers.h"
+#include "Ui/WindDepositsWrappers.h"
 #include "Data/Texture.h"
 #include "Graphics/Managers/ParticleManager.h"
 #include "Frame/Collections/PointLights/PointLights.h"
@@ -115,7 +117,7 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 	if (rType.iWindRadialControllerTypeIndex != kiInvalidControllerType)
 	{
 		float fWindSizePercent = std::sqrt(rSpawnInformation.fSizePercent);
-		WindRadialsPostRender::AddControlled(rFrame, currentTime, rType.iWindRadialControllerTypeIndex, rSpawnInformation.vecPosition, ExplosionsInterpolate::sTuning.pWindIntensity->mfCurrent * fWindSizePercent, ExplosionsInterpolate::sTuning.pWindWidth->mfCurrent * fWindSizePercent);
+		WindRadialsPostRender::AddControlled(rFrame, currentTime, rType.iWindRadialControllerTypeIndex, rSpawnInformation.vecPosition, game::gWindDepositExplosionsIntensity.mfCurrent * fWindSizePercent, game::gWindDepositExplosionsWidth.mfCurrent * fWindSizePercent);
 	}
 #endif
 
@@ -141,9 +143,9 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 #if defined(BT_CLIENT)
 		// j == 0 is the central trail along the explosion direction; j > 0 are angle-jittered side trails
 		bool bPrimary = (j == 0);
-		float fLengthMultiplier = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailLength->mfCurrent : ExplosionsInterpolate::sTuning.pSecondaryTrailLength->mfCurrent;
-		float fDurationMultiplier = bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailDuration->mfCurrent : ExplosionsInterpolate::sTuning.pSecondaryTrailDuration->mfCurrent;
-		fTrailIntensity *= bPrimary ? ExplosionsInterpolate::sTuning.pPrimaryTrailIntensity->mfCurrent : ExplosionsInterpolate::sTuning.pSecondaryTrailIntensity->mfCurrent;
+		float fLengthMultiplier = bPrimary ? game::gExplosionPrimaryTrailLength.mfCurrent : game::gExplosionSecondaryTrailLength.mfCurrent;
+		float fDurationMultiplier = bPrimary ? game::gExplosionPrimaryTrailDuration.mfCurrent : game::gExplosionSecondaryTrailDuration.mfCurrent;
+		fTrailIntensity *= bPrimary ? game::gExplosionPrimaryTrailIntensity.mfCurrent : game::gExplosionSecondaryTrailIntensity.mfCurrent;
 		// Scaling the head's travel distance by Duration keeps head speed constant when Update later scales
 		// pTrailTimes by the same Duration multiplier — so increasing Duration extends both space and time
 		// in lockstep rather than slowing the head into the engine's smoke-decay window.

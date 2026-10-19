@@ -531,7 +531,7 @@ void PackChunks::ResetTextureChunkStates(std::span<const common::crc_t> targetCr
 	// pData/iDataSize are fixed at construction and never rewritten, so this reset touches only the selected
 	// textures' eState and GPU handles. Callers own exclusion against the loading threads: full recovery drains
 	// them through mLoader.WaitForLoadersIdle and then waits the upload thread, while LRU eviction runs in RenderGlobal's
-	// drained descriptor window (a Vulkan descriptor/image drain, not a loader drain) and targets resident,
+	// bindless write epoch (a Vulkan descriptor window, not a loader drain) and targets resident,
 	// non-uploading textures, for which no whole-chunk loader can be in flight.
 	bool bResetAll = targetCrcs.empty();
 	for (auto& [crc, rLazyChunk] : mLazyChunkMap)

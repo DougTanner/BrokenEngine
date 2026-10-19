@@ -287,7 +287,7 @@ void ServerTransferManager::HarvestTransfers()
 	// Capture must precede ApplyPreparedTransfers so the snapshot excludes arriving entities.
 	for (const auto& [rCoord, rTransfers] : mTransfers)
 	{
-		if (gpReplay->CaptureAcceptedTransfers(rCoord, rTransfers, *game::gpGame->mCells.at(rCoord).pNext)) [[unlikely]]
+		if (!gpReplay->CaptureAcceptedTransfers(rCoord, rTransfers, *game::gpGame->mCells.at(rCoord).pNext)) [[unlikely]]
 		{
 			LOG(kDefault, kError, "Replay transfer capture failed; recording invalidated");
 		}

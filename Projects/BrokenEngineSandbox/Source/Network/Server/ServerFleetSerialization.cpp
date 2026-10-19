@@ -39,6 +39,10 @@ static void WriteFleet(std::fstream& rFileStream, const Fleet& rFleet)
 	common::Write(rFileStream, rFleet.uiPendingFleetWantedCoordinateTicks);
 	common::Write(rFileStream, rFleet.navigationDelaySeconds.count());
 	common::Write(rFileStream, rFleet.cellChangeTimerSeconds.count());
+	for (uint8_t uiTargetFlightPlane : rFleet.targetFlightPlanes)
+	{
+		common::Write(rFileStream, uiTargetFlightPlane);
+	}
 	for (const FleetMember& rMember : rFleet.members)
 	{
 		common::Write(rFileStream, rMember.globalId.iValue);
@@ -85,6 +89,17 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	if (!std::isfinite(rFleet.cellChangeTimerSeconds.count()))
 	{
 		throw std::ios_base::failure("Fleet cell change timer");
+	}
+	// Trust boundary (save / replay file): a spawn seats its Z at the plane's height through an unchecked table lookup.
+	// Not std::views::enumerate: MSVC then makes its iterator's friend iter_move ambiguous with std::ranges::iter_move in the std::ranges::sort below (C2872).
+	for (int64_t i = 0; uint8_t& ruiTargetFlightPlane : rFleet.targetFlightPlanes)
+	{
+		common::Read(rFileStream, ruiTargetFlightPlane);
+		if (!IsFlightPlaneAllowed(static_cast<ShipType>(i), ruiTargetFlightPlane))
+		{
+			throw std::ios_base::failure("Fleet target flight plane");
+		}
+		++i;
 	}
 	// Trust boundary (save / replay file): bound the member count against the cap and stream before resize.
 	common::ValidateDeserializedCountCapacity(iMemberCount, kiMaximumFleetMembers, sizeof(int64_t) + 2 * sizeof(uint8_t) + 2 * sizeof(int32_t), rFileStream, "ReadFleet members");

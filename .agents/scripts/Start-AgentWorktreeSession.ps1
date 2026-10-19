@@ -31,9 +31,39 @@ Import-Module (Join-Path $PSScriptRoot 'AgentWorktreeSession.psm1') -Force -Disa
 function Assert-AgentWorktreeSkillsLink([string] $Worktree) {
 	$skillsLink = Join-Path $Worktree '.claude\skills'
 	$skillsItem = Get-Item -LiteralPath $skillsLink -Force -ErrorAction SilentlyContinue
-	if ($null -eq $skillsItem -or -not $skillsItem.PSIsContainer -or -not ($skillsItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
-		$null -eq (Get-ChildItem -LiteralPath $skillsLink -ErrorAction SilentlyContinue | Select-Object -First 1)) {
-		throw "'.claude\skills' in worktree '$Worktree' did not check out as a working directory link, so agent skills are unavailable. Enable Windows Developer Mode (Settings -> System -> For developers -> Developer Mode -> On), open a new terminal, then restore the link: git -C '$Worktree' config core.symlinks true; git -C '$Worktree' checkout -- .claude/skills"
+	if ($null -ne $skillsItem -and $skillsItem.PSIsContainer -and ($skillsItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -and
+		$null -ne (Get-ChildItem -LiteralPath $skillsLink -ErrorAction SilentlyContinue | Select-Object -First 1)) { return }
+	$preservedMessage = "'.claude\skills' in worktree '$Worktree' is not a working directory link or an unchanged tracked placeholder. Local changes were preserved; resolve this path and its index entry manually, then rerun startup or reattach."
+	if ($null -eq $skillsItem -or $skillsItem.PSIsContainer -or ($skillsItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw $preservedMessage }
+	$placeholderBytes = [IO.File]::ReadAllBytes($skillsLink)
+	$expectedBytes = [Text.Encoding]::UTF8.GetBytes('../.agents/skills')
+	if ([Convert]::ToBase64String($placeholderBytes) -cne [Convert]::ToBase64String($expectedBytes)) { throw $preservedMessage }
+	$indexEntry = @(Invoke-AgentGit @('-C', $Worktree, 'ls-files', '--stage', '--', '.claude/skills'))
+	if ($indexEntry.Count -ne 1 -or $indexEntry[0] -cnotmatch '^120000 ([0-9a-f]+) 0\t\.claude/skills$') { throw $preservedMessage }
+	$blob = $Matches[1]
+	$headEntry = @(Invoke-AgentGit @('-C', $Worktree, 'ls-tree', 'HEAD', '--', '.claude/skills'))
+	if ($headEntry.Count -ne 1 -or $headEntry[0] -cne "120000 blob $blob`t.claude/skills") { throw $preservedMessage }
+	$target = Invoke-AgentProcess 'git' @('-C', $Worktree, 'cat-file', 'blob', $blob) $Worktree
+	if ($target.ExitCode -ne 0 -or $target.Stdout -cne '../.agents/skills') { throw $preservedMessage }
+	try {
+		Invoke-AgentGit @('-C', $Worktree, '-c', 'core.symlinks=true', 'checkout-index', '--force', '--', '.claude/skills') | Out-Null
+		$skillsItem = Get-Item -LiteralPath $skillsLink -Force -ErrorAction SilentlyContinue
+		if ($null -eq $skillsItem -or -not $skillsItem.PSIsContainer -or -not ($skillsItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+			$null -eq (Get-ChildItem -LiteralPath $skillsLink -ErrorAction SilentlyContinue | Select-Object -First 1)) {
+			throw 'Git did not produce a working directory link.'
+		}
+	}
+	catch {
+		$repairError = $_.Exception.Message
+		if ($null -eq (Get-Item -LiteralPath $skillsLink -Force -ErrorAction SilentlyContinue)) {
+			try {
+				$restore = [IO.File]::Open($skillsLink, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+				try { $restore.Write($placeholderBytes, 0, $placeholderBytes.Length) }
+				finally { $restore.Dispose() }
+			}
+			catch { $repairError += " Placeholder restoration failed: $($_.Exception.Message)" }
+		}
+		throw "Could not repair '.claude\skills' in worktree '$Worktree': $repairError Enable Windows Developer Mode or use a terminal with symlink privilege, then rerun startup or reattach."
 	}
 }
 

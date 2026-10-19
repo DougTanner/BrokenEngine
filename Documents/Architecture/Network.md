@@ -304,7 +304,12 @@ sizes are the full packet including the type byte.
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
-client-sendable). The current wire-protocol version is 30, which split the
+client-sendable). The current wire-protocol version is 33, which made the
+`kServerCoordinateStaticData` payload carry one navigation graph per flight
+plane (an `int32_t` plane count, then each plane's `NavData`); version 32 added
+`uiTargetFlightPlane` to the `UpdateShipData` `Fields()` list; version 31
+dropped the three wind-trail fields from the `BlastersPostRender::SpawnInfo`
+`Fields()` list; version 30 split the
 ship collections into Fighters, Omnis, and Battleships: it replaced the
 `StatusChangeType` tag set with per-type ship spawn and transfer tags and the
 `kDestroyShip`, `kUpdateShip`, and `kUpdateFleet` tick-input tags addressed by

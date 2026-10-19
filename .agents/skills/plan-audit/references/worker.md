@@ -83,7 +83,8 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 17. For a `/next-plan` invocation, compare the complete current plan to the
     execution card and session baseline. Done when that comparison is made.
 18. Verify that every field of the card template in
-    [`../../next-plan/SKILL.md`](../../next-plan/SKILL.md) `## Handoff`, plus
+    [`../../../references/execution-card.md`](../../../references/execution-card.md)
+    `## Template`, plus
     the plan's unresolved decisions, agrees with current repository evidence.
     Done when each of those is checked against that evidence.
 19. Report any mismatch as a finding for the manager; do not manufacture

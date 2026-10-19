@@ -53,7 +53,7 @@ void Buffer::CreateBuffer([[maybe_unused]] std::string_view name, int64_t iDevic
 	}
 }
 
-void Buffer::UploadToDeviceLocal(VkBuffer vkDeviceLocalBuffer, std::span<const DeviceLocalBufferUpload> uploads)
+std::unique_ptr<StagingBuffer> Buffer::RecordUploadToDeviceLocal(VkCommandBuffer vkCommandBuffer, VkBuffer vkDeviceLocalBuffer, std::span<const DeviceLocalBufferUpload> uploads)
 {
 	ASSERT(vkDeviceLocalBuffer != VK_NULL_HANDLE);
 	ASSERT(!uploads.empty());
@@ -66,14 +66,14 @@ void Buffer::UploadToDeviceLocal(VkBuffer vkDeviceLocalBuffer, std::span<const D
 		iStagingSize += rUpload.iSize;
 	}
 
-	StagingBuffer stagingBuffer("BufferUpload", iStagingSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+	std::unique_ptr<StagingBuffer> pStagingBuffer = std::make_unique<StagingBuffer>("BufferUpload", iStagingSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 	common::ScopedWorkbufferArena scopedWorkbufferArena = common::gpThreadLocal->mWorkbuffer.Push();
 	auto copiesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<VkBufferCopy*>(uploads.size() * sizeof(VkBufferCopy));
 	int64_t iStagingOffset = 0;
 	for (int64_t i = 0; i < std::ssize(uploads); ++i)
 	{
 		const DeviceLocalBufferUpload& rUpload = uploads[static_cast<size_t>(i)];
-		std::memcpy(static_cast<std::byte*>(stagingBuffer.vmaAllocationInfo.pMappedData) + iStagingOffset, rUpload.pData, static_cast<size_t>(rUpload.iSize));
+		std::memcpy(static_cast<std::byte*>(pStagingBuffer->vmaAllocationInfo.pMappedData) + iStagingOffset, rUpload.pData, static_cast<size_t>(rUpload.iSize));
 		copiesAllocation.mpData[i] =
 		{
 			.srcOffset = static_cast<VkDeviceSize>(iStagingOffset),
@@ -83,9 +83,23 @@ void Buffer::UploadToDeviceLocal(VkBuffer vkDeviceLocalBuffer, std::span<const D
 		iStagingOffset += rUpload.iSize;
 	}
 
-	OneShotCommandBuffer oneShotCommandBuffer;
-	vkCmdCopyBuffer(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.vkStagingBuffer, vkDeviceLocalBuffer, static_cast<uint32_t>(uploads.size()), copiesAllocation.mpData);
-	oneShotCommandBuffer.Execute();
+	vkCmdCopyBuffer(vkCommandBuffer, pStagingBuffer->vkStagingBuffer, vkDeviceLocalBuffer, static_cast<uint32_t>(uploads.size()), copiesAllocation.mpData);
+
+	VkBufferMemoryBarrier vkBufferMemoryBarrier
+	{
+		.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+		.pNext = nullptr,
+		.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+		.dstAccessMask = VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
+		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.buffer = vkDeviceLocalBuffer,
+		.offset = 0,
+		.size = VK_WHOLE_SIZE,
+	};
+	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr, 1, &vkBufferMemoryBarrier, 0, nullptr);
+
+	return pStagingBuffer;
 }
 
 StagingBuffer::StagingBuffer(std::string_view name, int64_t iDeviceSize, VkBufferUsageFlags vkBufferUsageFlags)

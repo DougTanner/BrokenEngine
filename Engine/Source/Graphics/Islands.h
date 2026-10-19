@@ -33,8 +33,19 @@ public:
 
 	bool AllocateMeshRanges(int64_t iIndexSize, int64_t iVertexSize, VmaVirtualAllocation& rIndexAllocation, int64_t& riIndexOffset, VmaVirtualAllocation& rVertexAllocation, int64_t& riVertexOffset);
 	void FreeMeshRanges(VmaVirtualAllocation vmaIndexAllocation, VmaVirtualAllocation vmaVertexAllocation);
-	void UploadMesh(int64_t iIndexOffset, std::span<const std::byte> indexData, int64_t iVertexOffset, std::span<const std::byte> vertexData);
-	void WriteMeshIndirect(int64_t iTemplate, int64_t iIndexOffset, int64_t iVertexOffset, int64_t iIndexCount);
+	// Records the arena copies into vkCommandBuffer; the caller retires the returned staging buffer.
+	std::unique_ptr<StagingBuffer> UploadMesh(VkCommandBuffer vkCommandBuffer, int64_t iIndexOffset, std::span<const std::byte> indexData, int64_t iVertexOffset, std::span<const std::byte> vertexData);
+
+	// Retirement, mirroring TextureManager's: an evicted template's ranges stay allocated until every framebuffer current at
+	// retirement has had its fence waited, so no pending frame's indirect record can draw from a reused range.
+	void RetireMeshRanges(VmaVirtualAllocation vmaIndexAllocation, VmaVirtualAllocation vmaVertexAllocation);
+	bool HasRetiredMeshRanges() const;
+	// Every frame once iFramebuffer's fence has signaled.
+	void MarkFramebufferWaited(int64_t iFramebuffer);
+	// Every frame after RenderGlobal's publication block; each free bumps miMeshArenaCapacityGeneration.
+	void FreeUnheldRetiredMeshRanges();
+	// After a device drain.
+	void FreeAllRetiredMeshRanges();
 
 	void UpdateActiveIslands(const std::unordered_map<GridCoord, Cell>& rCells, std::span<const GridCoord> activeCoordinates);
 
@@ -49,9 +60,8 @@ public:
 	// in-flight frame's GPU read never races the host rewrite of the instance the current frame consumes.
 	std::array<Buffer, kiMaxFramebuffers> mIslandsStorageBuffers;
 
-	// One per-template VkDrawIndexedIndirectCommand buffer per framebuffer index. Mesh residency rewrites
-	// indexCount / firstIndex / vertexOffset in every instance; firstInstance and instanceCount are rewritten
-	// per frame by UpdateActiveIslands in the acquired framebuffer's instance only.
+	// One per-template VkDrawIndexedIndirectCommand buffer per framebuffer index. UpdateActiveIslands rewrites every
+	// field per frame in the acquired framebuffer's instance only, taking the mesh range from residency state.
 	// Allocated manually (Buffer wrapper has no INDIRECT_BUFFER_BIT path); mirrors Pipeline's
 	// mIndirectVkBuffer pattern in SetupIndirectBuffer (Engine/Source/Graphics/Objects/PipelineCreator.cpp).
 	std::array<VkBuffer, kiMaxFramebuffers> mIslandsIndirectVkBuffers {};
@@ -68,7 +78,15 @@ public:
 
 private:
 
+	struct RetiredMeshRanges
+	{
+		VmaVirtualAllocation vmaIndexAllocation = VK_NULL_HANDLE;
+		VmaVirtualAllocation vmaVertexAllocation = VK_NULL_HANDLE;
+		uint32_t uiFramebufferMask = 0; // Framebuffers whose fence has not been waited since retirement
+	};
+
 	VmaVirtualBlock mIslandMeshVirtualBlock = VK_NULL_HANDLE;
+	std::vector<RetiredMeshRanges> mRetiredMeshRanges;
 };
 
 inline Islands* gpIslands = nullptr;

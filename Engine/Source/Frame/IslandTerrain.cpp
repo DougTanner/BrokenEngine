@@ -121,7 +121,7 @@ IslandTerrain::IslandTerrain()
 }
 
 #if defined(BT_SERVER)
-void IslandTerrain::WaitForElevationMaps(float fNavigationThreshold, float fNavigationClearanceMeters)
+void IslandTerrain::WaitForElevationMaps(std::span<const float> navigationThresholds, float fNavigationClearanceMeters)
 #else
 void IslandTerrain::WaitForElevationMaps()
 #endif
@@ -203,7 +203,9 @@ void IslandTerrain::WaitForElevationMaps()
 	}
 
 #if defined(BT_SERVER)
-	// Build NavContour for every template so multi-template cells produce correct nav data.
+	// Build one NavContour per terrain-collision flight plane for every template so multi-template cells produce
+	// correct nav data.
+	ASSERT(std::ssize(navigationThresholds) == gpFlightPlanes->Count());
 	LOG(kLoading, kInfo, "Building NavContour for {} island templates", mIslands.size());
 	ScopedBootTimer scopedTimer(kBootTimerIslands);
 	for (auto& [rCrc, rTemplate] : mIslands)
@@ -213,7 +215,14 @@ void IslandTerrain::WaitForElevationMaps()
 		int64_t iHeightmapTexels = static_cast<int64_t>(rTemplate.iHeightmapWidth) * static_cast<int64_t>(rTemplate.iHeightmapHeight);
 		std::vector<float> heightmapFloats(static_cast<size_t>(iHeightmapTexels));
 		DirectX::PackedVector::XMConvertHalfToFloatStream(heightmapFloats.data(), sizeof(float), rTemplate.puiHeightmapHalf, sizeof(uint16_t), static_cast<size_t>(iHeightmapTexels));
-		BuildNavContour(rTemplate.navContour, heightmapFloats, rTemplate.iHeightmapWidth, rTemplate.iHeightmapHeight, fNavigationThreshold, fNavigationClearanceMeters, rTemplate.fQuadFootprintX, rTemplate.fQuadFootprintY);
+		rTemplate.navContours.resize(static_cast<size_t>(gpFlightPlanes->Count()));
+		for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
+		{
+			if (gpFlightPlanes->Plane(i).flags & FlightPlaneFlags::kTerrainCollision)
+			{
+				BuildNavContour(rTemplate.navContours.at(i), heightmapFloats, rTemplate.iHeightmapWidth, rTemplate.iHeightmapHeight, navigationThresholds[static_cast<size_t>(i)], fNavigationClearanceMeters, rTemplate.fQuadFootprintX, rTemplate.fQuadFootprintY);
+			}
+		}
 	}
 #endif
 }

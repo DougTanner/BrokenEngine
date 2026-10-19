@@ -112,9 +112,9 @@ rule: rendered message text, with the question immediately before the mandatory
 `Follow-up Plans created:` footer, and no tool call — question tools included —
 after it. The user's next message is the decision.
 
-Only a current explicit affirmative response to the latest unchanged summary
-authorizes primary change. Plan or implementation approval, a request to finish
-or land, or reconciliation consent is not a substitute. After confirmation main
+Only a current explicit affirmative response to the latest unchanged summary,
+or a landing override below, authorizes primary change. Plan or implementation
+approval or reconciliation consent is not a substitute. After confirmation main
 dispatches a fresh landing `implementer` whose brief carries the ordinary fields
 plus the continuation capsule below
 ([`subagent-handoff.md`](../../references/subagent-handoff.md)
@@ -141,13 +141,18 @@ then dispatches a fresh preparation whose path set is the session's full
 landing set, now including every path the difference changed. The unlanded
 candidate commit on the session branch is session-owned work: implementation
 continues on top of it, the fresh preparation rewrites it through
-`references/worker.md` step 2, and main asks the user nothing about it. Two
+`references/worker.md` step 2, and main asks the user nothing about it. Three
 standing exceptions skip only the question, never the
 SmartGit launch or the summary: `/save-plan`, when the change contains exactly
-the saved Plan file; and an explicit user-authorized Plan rejection, when the
+the saved Plan file; an explicit user-authorized Plan rejection, when the
 change contains exactly the paths `Complete-NextPlan.ps1 -Reject` reported and
-the acceptance table has no non-PASS row. The authorizing user message fills
-the capsule's confirmation row.
+the acceptance table has no non-PASS row; and a landing override — a direct
+user instruction to land the current change, such as `Confirm Landing` or
+`Land on main`, given before or after its summary; it stands for that change
+through every refreshed summary below. Under an exception main
+presents the summary and dispatches the landing `implementer` in the same turn,
+without waiting for a reply. The authorizing user message fills the capsule's
+confirmation row.
 
 Confirmation binds the reviewed diff, not commit hashes. Landing's clean
 identical rebase onto an advanced primary after confirmation lands without
@@ -156,7 +161,8 @@ owned by `references/worker.md` step 5. An actual rebase conflict
 requiring manual resolution, a change to the session bytes, or a meaningful
 semantic change re-runs review of the affected regions and requires a refreshed
 summary, a fresh `SmartGit launch:` line for the new commit that main runs the
-same way, and a fresh confirmation, through a fresh preparation dispatch and
+same way, and a fresh confirmation unless a landing override stands, through a
+fresh preparation dispatch and
 then a fresh landing dispatch; `references/worker.md` defines the recovery
 transition after `rebase.conflicted`.
 

@@ -59,6 +59,7 @@ static nlohmann::json ExtractShips(const INTERPOLATE& rInterpolate, const POST_R
 			{"globalId", rPost.pGlobalIds[i].iValue},
 			{"controller", EnumToken(rPost.pController[i])},
 			{"orders", std::to_underlying(rPost.pOrders[i].meFlags)},
+			{"targetFlightPlane", GetTargetFlightPlane(rPost.pOrders[i])},
 			{"flags", std::to_underlying(rPost.pFlags[i].meFlags)},
 			{"lifecycleFlags", std::to_underlying(rPost.pLifecycleFlags[i].meFlags)},
 			{"alignment", rPost.pAlignments[i].uiValue},

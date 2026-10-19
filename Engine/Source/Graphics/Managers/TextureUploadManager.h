@@ -19,6 +19,9 @@ public:
 	void StartThread();
 
 	void RequestUpload(common::crc_t crc, LoadPriority ePriority);
+	// Island CRCs whose elevation upload finished since the last call; each image waits in its island chunk's
+	// vkUploadImage/vmaAllocation, and the caller adopts every returned CRC and disarms the pending-adoption counter once per CRC.
+	std::vector<common::crc_t> TakeCompletedElevations();
 	void WaitIdle();
 	void SignalFrame();
 	void RethrowException();
@@ -26,12 +29,12 @@ public:
 	// Trust boundary for signed on-disk texture metadata used by both upload paths.
 	static void ValidateTextureDimensions(const LazyChunk& rLazyChunk);
 
-	// Pending-adoption counter: tracks chunks in an adoptable state (kDiskLoaded / kGpuUploadComplete) awaiting
-	// TextureManager::ProcessPendingTextures. Lives here (not on TextureManager) because this manager outlives the
-	// device-loss Graphics recreate that destroys TextureManager — so the upload thread never touches a freed owner
-	// and the count survives the recreate (PackChunks::ResetTextureChunkStates re-arms it through device loss).
-	// Relaxed ordering: the count is decoupled from chunk-data visibility (eState's own acquire/release carries that);
-	// the worst case is one frame of adoption latency.
+	// Pending-adoption counter: tracks chunks in an adoptable state (kDiskLoaded / kGpuUploadComplete) plus completed,
+	// unadopted island elevation uploads, awaiting TextureManager::ProcessPendingTextures. Lives here (not on
+	// TextureManager) because this manager outlives the device-loss Graphics recreate that destroys TextureManager — so
+	// the upload thread never touches a freed owner and the count survives the recreate (PackChunks::ResetTextureChunkStates
+	// re-arms it through device loss). Relaxed ordering: the count is decoupled from chunk-data visibility (eState's own
+	// acquire/release, or mUploadMutex for elevations, carries that); the worst case is one frame of adoption latency.
 	std::atomic<int64_t> miPendingAdoptions = 0;
 
 	// Registered pre-blur lighting-texture CRCs. Lives here for the same reason as the counter above: this manager
@@ -88,6 +91,7 @@ private:
 	static_assert(decltype(mbThreadExited)::is_always_lock_free);
 	std::mutex mUploadMutex;
 	std::priority_queue<LoadRequest> mUploadQueue;
+	std::vector<common::crc_t> mCompletedElevationCrcs; // Guarded by mUploadMutex; each entry is counted in miPendingAdoptions
 	std::atomic<bool> mbShutdown = false;
 
 	VkCommandPool mTransferVkCommandPool = VK_NULL_HANDLE;

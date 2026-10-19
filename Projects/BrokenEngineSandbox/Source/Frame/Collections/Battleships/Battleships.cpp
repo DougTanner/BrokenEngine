@@ -128,6 +128,9 @@ static void RegisterBattleshipBlasterType()
 	{
 		.f2Size = {kfBattleshipBlasterSize, kfBattleshipBlasterSize},
 		.iPointLightTypeIndex = siBattleshipBlasterPointLightTypeIndex,
+		.pWindTrailIntensityWrapper = &gWindDepositFightersBlastersIntensity,
+		.pWindTrailWidthWrapper = &gWindDepositFightersBlastersWidth,
+		.pWindTrailLengthMultiplierWrapper = &gWindDepositFightersBlastersLengthMultiplier,
 	});
 }
 
@@ -224,9 +227,6 @@ void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restric
 	const BattleshipsInterpolate& rPrevious = *rPreviousFrame.interpolate.pBattleships;
 	const BattleshipsPostRender& rPreviousPostRender = *rPreviousFrame.postRender.pBattleships;
 	std::chrono::duration<float> deltaTime(rCurrentFrameInterpolate.fDeltaTime);
-	// The climb rate is capped at the maximum flight speed.
-	float fTargetHeight = engine::gpFlightPlanes->Lowest().fHeightMeters;
-	float fClimbStep = kfBattleshipMaxSpeed * deltaTime.count();
 
 #if defined(BT_CLIENT)
 	// Indexed by ShipController: each row's clock advances through its own model's animation.
@@ -245,23 +245,8 @@ void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restric
 #endif
 
 		vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
-		// PostRender Update stores velocity Z as 0, so this glide is what moves a ship's height; the final
-		// assignment lands it bit-exactly on the target and keeps it there.
-		float fHeight = XMVectorGetZ(vecPosition);
-		float fHeightGap = fTargetHeight - fHeight;
-		if (fHeightGap > fClimbStep)
-		{
-			fHeight += fClimbStep;
-		}
-		else if (fHeightGap < -fClimbStep)
-		{
-			fHeight -= fClimbStep;
-		}
-		else
-		{
-			fHeight = fTargetHeight;
-		}
-		vecPosition = XMVectorSetZ(vecPosition, fHeight);
+		// PostRender Update stores velocity Z as 0, so the climb is what moves a ship's height.
+		vecPosition = ClimbTowardsFlightPlane(vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfBattleshipClimbRate, deltaTime);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation.
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
@@ -350,7 +335,7 @@ void BattleshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, 
 				.bTransfer = true,
 			}),
 		};
-		if (rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
+		if (!rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
 		{
 			LOG(kDefault, kError, "Battleship Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) Health: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), common::Wb(rCurrentPostRender.pfHealths[i], 1), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
@@ -402,9 +387,6 @@ static void XM_CALLCONV FireGun(Frame& __restrict rFrame, [[maybe_unused]] engin
 		.vecVelocity = vecBlasterVelocity,
 		.iTypeIndex = siBattleshipBlasterTypeIndex,
 		.alignment = rCurrentPostRender.pAlignments[i],
-		.fWindTrailIntensity = game::gWindDepositFightersBlastersIntensity.mfCurrent,
-		.fWindTrailWidth = game::gWindDepositFightersBlastersWidth.mfCurrent,
-		.fWindTrailLengthMultiplier = game::gWindDepositFightersBlastersLengthMultiplier.mfCurrent,
 	});
 
 #if defined(BT_CLIENT)
@@ -636,7 +618,10 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 			vecVelocity = XMVectorScale(XMVectorNegate(rPrevious.pVecDamageDirections[i]), kfDeathKnockbackSpeed);
 		}
 
-		ApplyTerrainBounce(rStaticData, {.eType = ShipType::kBattleship, .iRow = i}, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], vecDirection, kfBattleshipRadius, deltaTime, fDeltaRotation, vecVelocity);
+		if (!SkipsTerrainContact(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])))
+		{
+			ApplyTerrainBounce(rStaticData, {.eType = ShipType::kBattleship, .iRow = i}, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], vecDirection, kfBattleshipRadius, deltaTime, fDeltaRotation, vecVelocity, GetTargetFlightPlane(rPrevious.pOrders[i]));
+		}
 		// Last velocity write, after pusher response, knockback, and bounce: a stored Z speed would reach the next
 		// tick's ApplyHeadingMovement, which rescales its blend to the full 3D speed and would turn it into horizontal speed.
 		vecVelocity = XMVectorSetZ(vecVelocity, 0.0f);

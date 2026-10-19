@@ -56,9 +56,7 @@ Islands::Islands()
 		});
 		std::memset(mIslandsStorageBuffers.at(i).mpMappedMemory, 0, static_cast<size_t>(iStorageBufferEntryCount) * sizeof(shaders::AxisAlignedQuadLayout));
 
-		// Per-template VkDrawIndexedIndirectCommand buffer. Residency writes indexCount / firstIndex /
-		// vertexOffset in the drained churn window; firstInstance and instanceCount are rewritten per frame by
-		// UpdateActiveIslands.
+		// Per-template VkDrawIndexedIndirectCommand buffer, rewritten per frame by UpdateActiveIslands.
 		VmaAllocationInfo vmaAllocationInfo {};
 		Buffer::CreateBuffer("IslandsIndirect", iIndirectSize, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mIslandsIndirectVkBuffers.at(i), mIslandsIndirectVmaAllocations.at(i), &vmaAllocationInfo);
 		mppIslandsIndirectMappedVkDrawIndexedIndirectCommands.at(i) = static_cast<VkDrawIndexedIndirectCommand*>(vmaAllocationInfo.pMappedData);
@@ -135,7 +133,7 @@ void Islands::FreeMeshRanges(VmaVirtualAllocation vmaIndexAllocation, VmaVirtual
 	++miMeshArenaCapacityGeneration;
 }
 
-void Islands::UploadMesh(int64_t iIndexOffset, std::span<const std::byte> indexData, int64_t iVertexOffset, std::span<const std::byte> vertexData)
+std::unique_ptr<StagingBuffer> Islands::UploadMesh(VkCommandBuffer vkCommandBuffer, int64_t iIndexOffset, std::span<const std::byte> indexData, int64_t iVertexOffset, std::span<const std::byte> vertexData)
 {
 	ASSERT(iIndexOffset >= 0 && iIndexOffset <= kiIslandMeshArenaBytes && std::ssize(indexData) <= kiIslandMeshArenaBytes - iIndexOffset);
 	ASSERT(iVertexOffset >= 0 && iVertexOffset <= kiIslandMeshArenaBytes && std::ssize(vertexData) <= kiIslandMeshArenaBytes - iVertexOffset);
@@ -144,21 +142,51 @@ void Islands::UploadMesh(int64_t iIndexOffset, std::span<const std::byte> indexD
 		{.pData = indexData.data(), .iDestinationOffset = iIndexOffset, .iSize = std::ssize(indexData)},
 		{.pData = vertexData.data(), .iDestinationOffset = iVertexOffset, .iSize = std::ssize(vertexData)},
 	};
-	Buffer::UploadToDeviceLocal(mIslandMeshArena.mDeviceLocalVkBuffer, pUploads);
+	return Buffer::RecordUploadToDeviceLocal(vkCommandBuffer, mIslandMeshArena.mDeviceLocalVkBuffer, pUploads);
 }
 
-void Islands::WriteMeshIndirect(int64_t iTemplate, int64_t iIndexOffset, int64_t iVertexOffset, int64_t iIndexCount)
+void Islands::RetireMeshRanges(VmaVirtualAllocation vmaIndexAllocation, VmaVirtualAllocation vmaVertexAllocation)
 {
-	ASSERT(iTemplate >= 0 && iTemplate < miTemplateCount);
-	ASSERT(iIndexOffset % static_cast<int64_t>(sizeof(uint32_t)) == 0);
-	ASSERT(iVertexOffset % static_cast<int64_t>(2 * sizeof(float)) == 0);
-	for (VkDrawIndexedIndirectCommand* pVkIndirect : mppIslandsIndirectMappedVkDrawIndexedIndirectCommands)
+	// Heap: the entry persists across frames; retired inside RenderGlobal.
+	ScopedSuppressAllocationTracking suppress;
+	uint32_t uiAllFramebuffersMask = (1ui32 << static_cast<uint32_t>(std::ssize(gpSwapchainManager->mFramebuffers))) - 1ui32;
+	mRetiredMeshRanges.push_back({.vmaIndexAllocation = vmaIndexAllocation, .vmaVertexAllocation = vmaVertexAllocation, .uiFramebufferMask = uiAllFramebuffersMask});
+}
+
+bool Islands::HasRetiredMeshRanges() const
+{
+	return !mRetiredMeshRanges.empty();
+}
+
+void Islands::MarkFramebufferWaited(int64_t iFramebuffer)
+{
+	uint32_t uiClearMask = ~(1ui32 << static_cast<uint32_t>(iFramebuffer));
+	for (RetiredMeshRanges& rRetired : mRetiredMeshRanges)
 	{
-		VkDrawIndexedIndirectCommand& rVkIndirect = pVkIndirect[iTemplate];
-		rVkIndirect.indexCount = static_cast<uint32_t>(iIndexCount);
-		rVkIndirect.firstIndex = static_cast<uint32_t>(iIndexOffset / static_cast<int64_t>(sizeof(uint32_t)));
-		rVkIndirect.vertexOffset = static_cast<int32_t>(iVertexOffset / static_cast<int64_t>(2 * sizeof(float)));
+		rRetired.uiFramebufferMask &= uiClearMask;
 	}
+}
+
+void Islands::FreeUnheldRetiredMeshRanges()
+{
+	std::erase_if(mRetiredMeshRanges, [this](const RetiredMeshRanges& rRetired)
+	{
+		if (rRetired.uiFramebufferMask != 0)
+		{
+			return false;
+		}
+		FreeMeshRanges(rRetired.vmaIndexAllocation, rRetired.vmaVertexAllocation);
+		return true;
+	});
+}
+
+void Islands::FreeAllRetiredMeshRanges()
+{
+	for (const RetiredMeshRanges& rRetired : mRetiredMeshRanges)
+	{
+		FreeMeshRanges(rRetired.vmaIndexAllocation, rRetired.vmaVertexAllocation);
+	}
+	mRetiredMeshRanges.clear();
 }
 
 void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, Cell>& rCells, std::span<const GridCoord> activeCoordinates)
@@ -174,9 +202,16 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, Cell>& rCe
 
 	// Per-template reference counts reset each frame. Templates with reference count zero for
 	// kiGraceRenderFrames become eviction candidates in RenderGlobal's next post-fence EvictionSweep.
+	// Mesh draw ranges come from residency state, so a range retired by eviction leaves this framebuffer's
+	// record before its next submission, and a restored range enters it only after the frame that recorded its copy.
 	for (auto& [rCrc, rTemplate] : gpIslandTerrain->mIslands)
 	{
 		rTemplate.iReferenceCount = 0;
+		bool bMeshResident = rTemplate.eMeshResidency == IslandMeshResidency::kResident;
+		VkDrawIndexedIndirectCommand& rVkIndirect = pVkIndirect[rTemplate.iTemplateArrayIndex];
+		rVkIndirect.indexCount = bMeshResident ? static_cast<uint32_t>(rTemplate.iMeshIndexCount) : 0;
+		rVkIndirect.firstIndex = bMeshResident ? static_cast<uint32_t>(rTemplate.iMeshIndexOffset / static_cast<int64_t>(sizeof(uint32_t))) : 0;
+		rVkIndirect.vertexOffset = bMeshResident ? static_cast<int32_t>(rTemplate.iMeshVertexOffset / static_cast<int64_t>(2 * sizeof(float))) : 0;
 	}
 
 	auto pStorageBufferQuads = reinterpret_cast<shaders::AxisAlignedQuadLayout*>(rStorageBuffer.mpMappedMemory);

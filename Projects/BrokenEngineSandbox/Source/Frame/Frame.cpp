@@ -4,9 +4,6 @@
 #include "Frame/Collections/Ships/ShipStatusChanges.h"
 #include "Frame/FrameCollections.h"
 #include "Profile/ProfileRows.h"
-#include "Ui/LightingWrappers.h"
-#include "Ui/SmokeWrappers.h"
-#include "Ui/WindDepositsWrappers.h"
 
 namespace game
 {
@@ -99,57 +96,6 @@ Frame::Frame() = default;
 Frame::~Frame() = default;
 Frame::Frame(Frame&&) noexcept = default;
 Frame& Frame::operator=(Frame&&) noexcept = default;
-
-#if defined(BT_CLIENT)
-void FrameInterpolate::AssignExplosionTuning()
-{
-	// Explosion tuning is game content driven by the Tweaks sliders; the engine owns only the effect mechanism.
-	// This must complete before the GameBase constructor's engine ForEachRegister() walk, which reads every field.
-	engine::ExplosionsInterpolate::sTuning =
-	{
-		.pPrimaryVisibleAreaOne = &gExplosionPrimaryVisibleAreaOne,
-		.pPrimaryVisibleAreaTwo = &gExplosionPrimaryVisibleAreaTwo,
-		.pPrimaryVisibleAreaThree = &gExplosionPrimaryVisibleAreaThree,
-		.pPrimaryVisibleIntensityOne = &gExplosionPrimaryVisibleIntensityOne,
-		.pPrimaryVisibleIntensityTwo = &gExplosionPrimaryVisibleIntensityTwo,
-		.pPrimaryVisibleIntensityThree = &gExplosionPrimaryVisibleIntensityThree,
-		.pPrimaryLightingAreaOne = &gExplosionPrimaryLightingAreaOne,
-		.pPrimaryLightingAreaTwo = &gExplosionPrimaryLightingAreaTwo,
-		.pPrimaryLightingAreaThree = &gExplosionPrimaryLightingAreaThree,
-		.pPrimaryLightingIntensityOne = &gExplosionPrimaryLightingIntensityOne,
-		.pPrimaryLightingIntensityTwo = &gExplosionPrimaryLightingIntensityTwo,
-		.pPrimaryLightingIntensityThree = &gExplosionPrimaryLightingIntensityThree,
-		.pSecondaryVisibleAreaOne = &gExplosionSecondaryVisibleAreaOne,
-		.pSecondaryVisibleAreaTwo = &gExplosionSecondaryVisibleAreaTwo,
-		.pSecondaryVisibleAreaThree = &gExplosionSecondaryVisibleAreaThree,
-		.pSecondaryVisibleIntensityOne = &gExplosionSecondaryVisibleIntensityOne,
-		.pSecondaryVisibleIntensityTwo = &gExplosionSecondaryVisibleIntensityTwo,
-		.pSecondaryVisibleIntensityThree = &gExplosionSecondaryVisibleIntensityThree,
-		.pSecondaryLightingAreaOne = &gExplosionSecondaryLightingAreaOne,
-		.pSecondaryLightingAreaTwo = &gExplosionSecondaryLightingAreaTwo,
-		.pSecondaryLightingAreaThree = &gExplosionSecondaryLightingAreaThree,
-		.pSecondaryLightingIntensityOne = &gExplosionSecondaryLightingIntensityOne,
-		.pSecondaryLightingIntensityTwo = &gExplosionSecondaryLightingIntensityTwo,
-		.pSecondaryLightingIntensityThree = &gExplosionSecondaryLightingIntensityThree,
-		.pPrimaryPuffAreaOne = &gExplosionPrimaryPuffAreaOne,
-		.pPrimaryPuffAreaTwo = &gExplosionPrimaryPuffAreaTwo,
-		.pPrimaryPuffIntensityOne = &gExplosionPrimaryPuffIntensityOne,
-		.pPrimaryPuffIntensityTwo = &gExplosionPrimaryPuffIntensityTwo,
-		.pSecondaryPuffAreaOne = &gExplosionSecondaryPuffAreaOne,
-		.pSecondaryPuffAreaTwo = &gExplosionSecondaryPuffAreaTwo,
-		.pSecondaryPuffIntensityOne = &gExplosionSecondaryPuffIntensityOne,
-		.pSecondaryPuffIntensityTwo = &gExplosionSecondaryPuffIntensityTwo,
-		.pPrimaryTrailLength = &gExplosionPrimaryTrailLength,
-		.pPrimaryTrailDuration = &gExplosionPrimaryTrailDuration,
-		.pPrimaryTrailIntensity = &gExplosionPrimaryTrailIntensity,
-		.pSecondaryTrailLength = &gExplosionSecondaryTrailLength,
-		.pSecondaryTrailDuration = &gExplosionSecondaryTrailDuration,
-		.pSecondaryTrailIntensity = &gExplosionSecondaryTrailIntensity,
-		.pWindIntensity = &gWindDepositExplosionsIntensity,
-		.pWindWidth = &gWindDepositExplosionsWidth,
-	};
-}
-#endif // BT_CLIENT
 
 void FrameInterpolate::Register()
 {
@@ -258,19 +204,23 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 
 	// The wave's type: one equal-odds draw over the three types, whose radius sets the wave's clearance and spacing.
 	ShipType eWaveType = static_cast<ShipType>(common::Random(2i64, rFrame.postRender.randomEngine));
+	// The wave's flight plane: one draw over the planes its type may fly, even when that is only the lowest.
+	int64_t iWaveFlightPlane = static_cast<int64_t>(common::Random(HighestFlightPlane(eWaveType), rFrame.postRender.randomEngine));
+	const engine::FlightPlane& rWaveFlightPlane = engine::gpFlightPlanes->Plane(iWaveFlightPlane);
 	float fWaveRadius = eWaveType == ShipType::kFighter ? kfFighterRadius : eWaveType == ShipType::kOmni ? kfOmniRadius : kfBattleshipRadius;
 	float fTerrainClearance = fWaveRadius * 2.0f;
 	float fChevronStagger = fWaveRadius * 2.0f;
 	float fShipSideSpacing = fWaveRadius * 3.0f;
 
-	// Reject positions outside the cell, inside terrain (with full body clearance), or within visible range of any alive fleet ship
+	// Reject positions outside the cell, inside terrain at the wave's plane (with full body clearance; none on a plane
+	// without terrain collision), or within horizontal visible range of any alive fleet ship on any plane
 	auto IsSpawnPositionValid = [&](FXMVECTOR vecPosition) -> bool
 	{
 		if (!common::InsideArea(vecPosition, engine::LocalCellArea()))
 		{
 			return false;
 		}
-		if (engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) > engine::gpFlightPlanes->Lowest().fHeightMeters - fTerrainClearance)
+		if ((rWaveFlightPlane.flags & engine::FlightPlaneFlags::kTerrainCollision) && engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition) > rWaveFlightPlane.fHeightMeters - fTerrainClearance)
 		{
 			return false;
 		}
@@ -289,7 +239,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 					continue;
 				}
 				XMVECTOR vecDelta = XMVectorSubtract(vecPosition, rShipInterpolate.pVecPositions[j]);
-				bNearFleetShip = XMVectorGetX(XMVector3LengthSq(vecDelta)) < kfMinimumFleetDistance * kfMinimumFleetDistance;
+				bNearFleetShip = XMVectorGetX(XMVector2LengthSq(vecDelta)) < kfMinimumFleetDistance * kfMinimumFleetDistance;
 			}
 		});
 		return !bNearFleetShip;
@@ -309,7 +259,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 	{
 		for (int64_t j = 0; j < kiGridDimension; ++j)
 		{
-			auto vecGridCell = XMVectorSet(fAreaMinimumX + (static_cast<float>(j) + 0.5f) * fPitchX, fAreaMinimumY + (static_cast<float>(i) + 0.5f) * fPitchY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
+			auto vecGridCell = XMVectorSet(fAreaMinimumX + (static_cast<float>(j) + 0.5f) * fPitchX, fAreaMinimumY + (static_cast<float>(i) + 0.5f) * fPitchY, rWaveFlightPlane.fHeightMeters, 1.0f);
 			pbValidGrid[i * kiGridDimension + j] = IsSpawnPositionValid(vecGridCell);
 		}
 	}
@@ -393,19 +343,22 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 	int64_t iBestGridY = iBestAnchorIndex / kiGridDimension;
 	float fBestAnchorX = fAreaMinimumX + (static_cast<float>(iBestGridX) + 0.5f) * fPitchX;
 	float fBestAnchorY = fAreaMinimumY + (static_cast<float>(iBestGridY) + 0.5f) * fPitchY;
+	ShipOrders_t waveOrders {};
+	SetTargetFlightPlane(waveOrders, iWaveFlightPlane);
 	for (int64_t i = 0; i < iShipCount; ++i)
 	{
 		float fLocalForward = pf2LocalOffsets[i].x;
 		float fLocalSide = pf2LocalOffsets[i].y;
 		float fWorldX = fBestAnchorX + fBestFacingCosine * fLocalForward - fBestFacingSine * fLocalSide;
 		float fWorldY = fBestAnchorY + fBestFacingSine * fLocalForward + fBestFacingCosine * fLocalSide;
-		auto vecSpawnPosition = XMVectorSet(fWorldX, fWorldY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
+		auto vecSpawnPosition = XMVectorSet(fWorldX, fWorldY, rWaveFlightPlane.fHeightMeters, 1.0f);
 		if (!IsSpawnPositionValid(vecSpawnPosition))
 		{
 			continue;
 		}
 
-		auto vecDirectionToFleet = XMVector3Normalize(XMVectorSubtract(vecFleetPosition, vecSpawnPosition));
+		// Flattened because the spawn-center ship may fly another plane; the validity check keeps its horizontal part nonzero.
+		auto vecDirectionToFleet = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecFleetPosition, vecSpawnPosition), 0.0f));
 		switch (eWaveType)
 		{
 			case ShipType::kFighter:
@@ -415,6 +368,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 					.vecDirection = vecDirectionToFleet,
 					.alignment = rFrame.postRender.randomAlignment,
 					.eController = ShipController::kRandomSpawn,
+					.orders = waveOrders,
 				});
 				break;
 			case ShipType::kOmni:
@@ -424,6 +378,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 					.vecDirection = vecDirectionToFleet,
 					.alignment = rFrame.postRender.randomAlignment,
 					.eController = ShipController::kRandomSpawn,
+					.orders = waveOrders,
 				});
 				break;
 			case ShipType::kBattleship:
@@ -433,6 +388,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 					.vecDirection = vecDirectionToFleet,
 					.alignment = rFrame.postRender.randomAlignment,
 					.eController = ShipController::kRandomSpawn,
+					.orders = waveOrders,
 				});
 				break;
 			case ShipType::kCount:

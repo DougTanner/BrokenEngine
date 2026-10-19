@@ -66,11 +66,27 @@ diagnostic with code `invalid-metadata`, stops the run as
 `nextAction: stop-report-to-user`, before any Plan is claimed. Main reports
 each listed item and diagnostic to the user in its next message.
 
+When the final claim refresh at [the `/next-plan` steps](../SKILL.md#steps)
+step 6 returns a `sync` object, main's one `researcher` brief carries
+`sync.from..sync.to`, the preparation snapshot's path and `##` selectors, and
+the preparation handoff's one-line rows that cite repository paths outside that
+snapshot. That worker lists the changed names with
+`git diff --name-only --no-renames <sync.from> <sync.to>`, keeps those the
+snapshot or those rows cite, including skill-relative (resolving against the
+directory of the skill whose `SKILL.md` or name the surrounding text cites),
+directory, and skill-name (`/<skill>`, resolving to that skill's
+`.agents/skills/<name>/` files) citations, and returns under `Decisive checks`,
+without quoting the diff or the uncited names, one row with the count of changed
+cited paths and one row per changed cited path whose change touches a statement
+the preparation handoff or execution card relies on. A changed cited path whose
+change leaves the relied-on statements' wording intact and moves them only
+within their `##` section (or within the file, for a file without `##`
+headings) counts in the count row but is not a touch and gets no per-path row.
+
 ## Reading the queue listing
 
-`Get-NextPlanList.ps1` runs only when [the `/next-plan` steps](../SKILL.md#steps) step 2 calls for
-it. It reports a bounded projection: per-state counts, then the first Plans in
-selection order (default 5) as `path`/`state` rows, with `blockedBy` on a
+`Get-NextPlanList.ps1` reports a bounded projection: per-state counts, then the
+first Plans in selection order (default 5) as `path`/`state` rows, with `blockedBy` on a
 blocked row and `diagnostic` on an excluded one, and `claim` (`session`,
 `worktree`, `expiresAt`) on any row with a live claim. It never emits the whole
 tree, so a large Plan queue cannot flood the session. It deliberately reads the
@@ -112,12 +128,24 @@ only projects those paths. The existing claim remains unchanged.
 
 ## Claim-exit result fields
 
+`Complete-NextPlan.ps1` success removes only direct-child dependency edges and
+deletes the selected Plan and its support folder in the worktree; that deletion
+is not reviewed before the landing gate, per the
+[landing acceptance table](../../finalize-changes/references/landing-acceptance-table.md)
+`## Acceptance table`. While another live Plan still names the held Plan's file
+name after its metadata line, the script changes nothing and refuses with
+`completion.plan-cited`.
+
 `Complete-NextPlan.ps1` writes every changed path the landing commit must
 contain, one per line, to the `Temp/` file its result names as
 `changes.path`, counted by `changes.totalCount`, and returns
-`nextAction: finalize-changes` only on the `ok` result and
-`checkpoint-followup-gate` on the `no-claim` result; every other completion
-result returns `stop-report-to-user`.
+`nextAction: finalize-changes` only on the `ok` result,
+`checkpoint-followup-gate` on the `no-claim` result, and `prepare` on the
+`completion.plan-cited` result; every other completion result returns
+`stop-report-to-user`. Its `claim` is `null` until the held-claim read,
+`absent` on `no-claim`, `claimed` with disposition `none` after that read, and
+carries the prepared disposition once WorktreeCli has prepared the terminal
+state.
 
 `Defer-NextPlan.ps1` reports the uncommitted work it leaves in place as
 `retained`: a bounded `paths` list with the full `count`. The claim script's
@@ -131,6 +159,8 @@ Every claim, deferral, and completion result carries a `nextAction` naming the
 one thing to do next, drawn from these six values:
 
 - `prepare` — this session holds the claim; continue the preparation workflow.
+  On the `completion.plan-cited` completion result, follow that code's row in
+  [post-checkpoint outcomes](../SKILL.md#post-checkpoint-outcomes).
 - `stop-report-to-user` — the run stops here; report the result and let the user
   decide what happens next, after [the `/next-plan` steps](../SKILL.md#steps) step 9 checkpoint.
 - `checkpoint-followup-gate` — the claim was released by a deferral, or no claim
@@ -140,7 +170,7 @@ one thing to do next, drawn from these six values:
 - `resume-with-flag` — a `-Plan` run holding no claim the early lookup reports
   found an unclean worktree whose dirty paths are all outside `Documents/Plans`;
   the rerun with `-ResumeRetained` is gated by
-  [the `/next-plan` rules](../SKILL.md#rules).
+  [claim-exceptions.md](claim-exceptions.md) `## Retained resume`.
 - `retry-later` — tell the user, and the same command can be run again later.
 - `finalize-changes` — the Plan terminal state is prepared; land the change
   through `/finalize-changes`.

@@ -79,6 +79,7 @@ public:
 		engine::GlobalId flagshipGlobalId {};
 		engine::GridCoord fleetWantedCoord {};
 		int64_t iPendingFleetWantedCoordTicks = 0;
+		std::array<uint8_t, std::to_underlying(ShipType::kCount)> targetFlightPlanes {};
 	};
 	FleetLookupResult LookupFleetWantedCoord(const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId);
 

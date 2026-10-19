@@ -115,21 +115,6 @@ Graphics::~Graphics()
 	Destroy();
 }
 
-void Graphics::WaitAllFramebufferFencesIdle()
-{
-	// Drain ALL in-flight framebuffer fences (RenderGlobal already waited only the current one). This
-	// is NOT vkDeviceWaitIdle — only graphics-queue work references the island slots being freed /
-	// re-patched, so the present and transfer queues need not stall. The kExecuted guard skips fences
-	// that were never submitted (early frames), which are not signalable.
-	for (const CommandBuffers& rCommandBuffers : gpCommandBufferManager->mPerFramebufferCommandBuffers)
-	{
-		if (rCommandBuffers.mFlags & CommandBufferFlags::kExecuted)
-		{
-			CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &rCommandBuffers.mVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count()));
-		}
-	}
-}
-
 void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
 {
 	int64_t iCommandBuffer = gpSwapchainManager->miFramebufferIndex;
@@ -146,34 +131,57 @@ void Graphics::RenderGlobal(std::chrono::duration<float> currentTime)
 		CHECK_VK(vkResult);
 	}
 
+	// Outside the churn gate, so a retired resource is released in the frame its last holder is waited even in a quiet scene.
+	gpTextureManager->MarkFramebufferWaited(iCommandBuffer);
+	gpIslands->MarkFramebufferWaited(iCommandBuffer);
+
 	mRenderFrameDeltaNanoseconds = mRenderFrameTimer.GetDeltaNs(true);
 
-	// UPDATE_AFTER_BIND permits descriptor writes but does not prevent races with in-flight samplers, so eviction, adoption, lighting
-	// reblur, and restoration run only after every framebuffer fence drains. AnyRestorationPending also covers template-owned elevation
-	// without a texture-map chunk. Clear the prior acquire publication before testing the predicate so an idle frame cannot resubmit it;
-	// ProcessPendingTextures republishes only inside the write epoch. This drain covers Vulkan descriptor and image use only — it is not
-	// the PackChunks loader drain (Graphics::Destroy owns that), so unrelated disk loads keep running through this window.
+	// Only this framebuffer's sets are idle after its fence wait, so the epoch writes them alone; every other framebuffer applies
+	// the queued publications once its own fence has signaled. AnyRestorationPending also covers template-owned elevation without a
+	// texture-map chunk. Clear the prior acquire publication before testing the predicate so an idle frame cannot resubmit it.
 	gpTextureManager->mFlags.Set(TextureManagerFlags::kPendingAcquireBarriers, false);
 	bool bDescriptorChurnPending = gpIslandTerrainResidency->AnyEvictionPending() || gpIslandTerrainResidency->AnyRestorationPending()
 	                            || (gpTextureUploadManager->miPendingAdoptions.load(std::memory_order_relaxed) != 0)
-	                            || (gpTextureManager->mFlags & TextureManagerFlags::kPendingLightingReblur);
+	                            || gpTextureManager->mTextureDescriptors.HasUnappliedPublications(iCommandBuffer);
 	if (bDescriptorChurnPending)
 	{
-		WaitAllFramebufferFencesIdle();
-
 		// A completion can race the pre-scan; when no epoch opens it waits until the next frame.
-		// Every island descriptor mutation in this scope therefore follows the all-fence drain.
-		TextureDescriptors::ScopedBindlessWriteEpoch bindlessWriteEpoch(gpTextureManager->mTextureDescriptors);
+		TextureDescriptors::ScopedBindlessWriteEpoch bindlessWriteEpoch(gpTextureManager->mTextureDescriptors, iCommandBuffer);
 		gpIslandTerrainResidency->EvictionSweep();
+		// Before RestorationSweep: it names the acquire command buffer the restoration uploads record into.
 		gpTextureManager->ProcessPendingTextures(iCommandBuffer);
-		if (gpTextureManager->mFlags & TextureManagerFlags::kPendingLightingReblur)
-		{
-			gpTextureManager->ReblurAllLightingTextures();
-			gpTextureManager->mFlags.Set(TextureManagerFlags::kPendingLightingReblur, false);
-		}
 		gpIslandTerrainResidency->RestorationSweep();
+		gpTextureManager->EndAcquireCommandBuffer();
+		gpTextureManager->mTextureDescriptors.PublishFramebuffer(iCommandBuffer);
 		gpTextureManager->mTextureDescriptors.VerifyAllDescriptorGenerations();
 	}
+	// Vulkan does not bound how long an image index can go unacquired, so a starved framebuffer would hold every retired
+	// resource and publication forever. Any other framebuffer whose fence has signaled has no pending work and is next submitted
+	// only after its own re-acquire rewrites its indirect records, so it is treated as waited here without blocking.
+	for (const auto& [i, rFramebufferCommandBuffers] : std::views::enumerate(std::as_const(gpCommandBufferManager->mPerFramebufferCommandBuffers)))
+	{
+		if (i == iCommandBuffer)
+		{
+			continue;
+		}
+		VkResult vkFenceResult = vkGetFenceStatus(gpDeviceManager->mVkDevice, rFramebufferCommandBuffers.mVkFence);
+		if (vkFenceResult == VK_NOT_READY)
+		{
+			continue;
+		}
+		CHECK_VK(vkFenceResult);
+		gpTextureManager->MarkFramebufferWaited(i);
+		gpIslands->MarkFramebufferWaited(i);
+		if (gpTextureManager->mTextureDescriptors.HasUnappliedPublications(i))
+		{
+			TextureDescriptors::ScopedBindlessWriteEpoch bindlessWriteEpoch(gpTextureManager->mTextureDescriptors, i);
+			gpTextureManager->mTextureDescriptors.PublishFramebuffer(i);
+		}
+	}
+	// After every signaled framebuffer's publication, so no set it binds still names a destroyed view.
+	gpTextureManager->DestroyUnheldRetiredResources();
+	gpIslands->FreeUnheldRetiredMeshRanges();
 
 	// miFrameCounter advances every frame, independent of memory-budget support, as the LRU grace clock.
 	if (gpDeviceManager->mCapabilities & DeviceCapabilityFlags::kMemoryBudgetAvailable)
@@ -372,6 +380,10 @@ void Graphics::Create()
 		mpIslands = std::make_unique<Islands>();
 	}
 	bool bInitializeBootTextures = false;
+	// Open over a surviving texture manager's rebuild through the pipeline manager's construction; never encloses
+	// InitializeBootTextures, whose waits open their own epoch.
+	std::optional<TextureDescriptors::ScopedBindlessWriteEpoch> optionalBindlessWriteEpoch;
+	bool bReblurLightingTextures = false;
 	if (mpTextureManager == nullptr)
 	{
 		mpTextureManager = std::make_unique<TextureManager>();
@@ -382,8 +394,12 @@ void Graphics::Create()
 	else
 	{
 		// Rebuild only after Destroy() ran this call, so its vkDeviceWaitIdle has drained every user of the old resources
+		// and every framebuffer's sets are writable
 		if (eDestroyType != DestroyType::kNone)
 		{
+			optionalBindlessWriteEpoch.emplace(gpTextureManager->mTextureDescriptors, TextureDescriptors::kiAllFramebuffers);
+			// RecreateResources clears the flags
+			bReblurLightingTextures = mDestroyFlags & DestroyFlags::kLightingBlur;
 			RecreateResources();
 		}
 
@@ -411,6 +427,16 @@ void Graphics::Create()
 	if (mpPipelineManager == nullptr)
 	{
 		mpPipelineManager = std::make_unique<PipelineManager>();
+	}
+	if (optionalBindlessWriteEpoch.has_value())
+	{
+		// After the pipeline manager, which owns the lighting blur pipelines
+		if (bReblurLightingTextures)
+		{
+			gpTextureManager->ReblurAllLightingTextures();
+		}
+		gpTextureManager->mTextureDescriptors.PublishAllFramebuffers();
+		optionalBindlessWriteEpoch.reset();
 	}
 	// After the pipeline manager, so the lighting blur pipelines exist before any adoption the boot waits drive can
 	// reach TextureManager::BlurLightingTexture. The texture manager is still constructed first, which the pipeline
@@ -548,8 +574,9 @@ void Graphics::Refresh()
 	[[maybe_unused]] auto [fLightingBlurEdgeFalloff, fLightingBlurEdgeFalloffPrevious, bLightingBlurEdgeFalloffChanged] = gLightingBlurEdgeFalloff.Changed<float>();
 	if ((bLightingBlurSigmaChanged || bLightingBlurSampleCountChanged || bLightingBlurEdgeFalloffChanged) && gpTextureManager != nullptr) [[unlikely]]
 	{
-		// Earlier frames may still sample the blur results, so RenderGlobal reblurs after its all-fence drain
-		gpTextureManager->mFlags.Set(TextureManagerFlags::kPendingLightingReblur);
+		mDestroyFlags.Set(DestroyFlags::kLightingBlur);
+
+		meDestroyType = std::max(DestroyType::kPipelines, meDestroyType);
 	}
 
 	[[maybe_unused]] auto [fObjectShadowsRenderMultiplier, fObjectShadowsRenderMultiplierPrevious, bObjectShadowsRenderMultiplierChanged] = gObjectShadowsRenderMultiplier.Changed<float>();
@@ -663,6 +690,16 @@ void Graphics::Destroy()
 	{
 		// Teardown must continue even if the device is already lost; result escalation is not actionable here.
 		vkDeviceWaitIdle(gpDeviceManager->mVkDevice);
+	}
+
+	// At every tier: a recreation can lower the framebuffer count, leaving retirement bits no later fence wait clears.
+	if (gpTextureManager != nullptr)
+	{
+		gpTextureManager->DestroyAllRetiredResources();
+	}
+	if (gpIslands != nullptr)
+	{
+		gpIslands->FreeAllRetiredMeshRanges();
 	}
 
 	if (meDestroyType >= DestroyType::kCommandBuffers)

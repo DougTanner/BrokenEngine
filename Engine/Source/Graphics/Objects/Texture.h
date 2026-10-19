@@ -97,6 +97,9 @@ public:
 	~Texture();
 
 	void Create(const TextureInfo& rInfo, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction = nullptr);
+	// Create with data, but the upload and final-layout transition are recorded into vkCommandBuffer instead of a one-shot
+	// submission. The caller keeps the returned staging buffer alive until that command buffer's execution completes.
+	std::unique_ptr<StagingBuffer> RecordCreate(VkCommandBuffer vkCommandBuffer, const TextureInfo& rInfo, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction);
 	void InitDeferred(const TextureInfo& rInfo, VkImageView vkPlaceholderImageView);
 	void AdoptTransferredImage(VkImage& rVkImage, VmaAllocation& rVmaAllocation);
 	void RecordAcquireBarrier(VkCommandBuffer vkCommandBuffer);
@@ -111,7 +114,9 @@ public:
 
 private:
 
+	void CreateImage(const TextureInfo& rInfo);
 	void UploadImageData(const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction, TextureLayout eOldLayout, TextureLayout eFinalLayout);
+	void RecordImageData(VkCommandBuffer vkCommandBuffer, const StagingBuffer& rStagingBuffer, int64_t iSize, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction, TextureLayout eOldLayout, TextureLayout eFinalLayout);
 	void CreateRenderTarget();
 
 public:

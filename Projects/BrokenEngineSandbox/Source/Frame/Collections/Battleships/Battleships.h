@@ -3,6 +3,7 @@
 #include "Frame/Collections/Pushers/Pushers.h"
 #include "Frame/Collections/Collection.h"
 #include "Frame/Alignments.h"
+#include "Frame/FlightPlanes.h"
 #include "Frame/FrameRegistry.h"
 #include "Frame/GridCoord.h"
 #if defined(BT_CLIENT)
@@ -10,6 +11,7 @@
 #endif
 
 #include "Frame/Collections/Ships/ShipBehaviours.h"
+#include "Frame/FlightPlaneTable.h"
 
 namespace engine
 {
@@ -28,6 +30,10 @@ inline constexpr float kfBattleshipAcceleration = 4.0f;
 inline constexpr float kfBattleshipDrag = 0.25f;
 inline constexpr float kfBattleshipMaxSpeed = 15.0f;
 inline constexpr float kfBattleshipMaxTurnRate = 1.0f;
+
+inline constexpr float kfBattleshipClimbRate = 5.0f;
+inline constexpr int64_t kiBattleshipHighestFlightPlane = 0;
+static_assert(kiBattleshipHighestFlightPlane < std::ssize(kFlightPlanes));
 
 inline constexpr float kfBattleshipSteeringSmoothing = 0.064f;
 inline constexpr float kfBattleshipSteeringDecay = 6.0f;
@@ -54,7 +60,7 @@ inline constexpr float kfBattleshipBlasterArcHalfAngle = XM_PIDIV4;
 
 struct BattleshipsInterpolate : public engine::Collection<BattleshipsInterpolate, engine::CollectionFlags::kIdToIndex>
 {
-	static constexpr int64_t kiVersion = 1;
+	static constexpr int64_t kiVersion = 2;
 
 	static void Register();
 
@@ -62,6 +68,7 @@ struct BattleshipsInterpolate : public engine::Collection<BattleshipsInterpolate
 
 	// Simulation keeps the destroyed time at the -1 sentinel or in [0, kBattleshipDestroyTime]; reject anything else as a corrupt stream, since a
 	// huge or +inf value puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
+	// Only the climb moves height, so it stays within [Lowest, Highest] flight plane heights; reject any other the same way.
 	static void PostRead(const BattleshipsInterpolate& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -70,6 +77,11 @@ struct BattleshipsInterpolate : public engine::Collection<BattleshipsInterpolate
 			if (!(destroyedTime == std::chrono::duration<float>(-1.0f) || (destroyedTime.count() >= 0.0f && destroyedTime.count() <= kBattleshipDestroyTime.count())))
 			{
 				throw std::ios_base::failure("BattleshipsInterpolate pDestroyedTimes");
+			}
+			float fHeight = XMVectorGetZ(rCurrent.pVecPositions[i]);
+			if (!(fHeight >= engine::gpFlightPlanes->Lowest().fHeightMeters && fHeight <= engine::gpFlightPlanes->Highest().fHeightMeters))
+			{
+				throw std::ios_base::failure("BattleshipsInterpolate position height");
 			}
 		}
 	}
@@ -142,10 +154,11 @@ using battleship_t = engine::Id<BattleshipsInterpolate>;
 
 struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 {
-	static constexpr int64_t kiVersion = 2;
+	static constexpr int64_t kiVersion = 3;
 
 	// Reject a value the simulation never produces as a corrupt stream: NaN or +inf health never dies, an unknown
-	// controller selects no script, and the client echoes the navigation delay back in its update-owned-entity request.
+	// controller selects no script, the client echoes the navigation delay back in its update-owned-entity request, and
+	// no controller writes a target flight plane the type disallows.
 	static void PostRead(const BattleshipsPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -161,6 +174,10 @@ struct BattleshipsPostRender : public engine::Collection<BattleshipsPostRender>
 			if (!IsNavigationDelayInRange(rCurrent.pNavigationDelays[i].count()))
 			{
 				throw std::ios_base::failure("BattleshipsPostRender pNavigationDelays");
+			}
+			if (!IsFlightPlaneAllowed(ShipType::kBattleship, GetTargetFlightPlane(rCurrent.pOrders[i])))
+			{
+				throw std::ios_base::failure("BattleshipsPostRender target flight plane");
 			}
 		}
 	}

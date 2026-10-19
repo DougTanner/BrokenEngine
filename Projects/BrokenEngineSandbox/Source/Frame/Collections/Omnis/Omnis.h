@@ -2,6 +2,7 @@
 
 #include "Frame/Collections/Collection.h"
 #include "Frame/Alignments.h"
+#include "Frame/FlightPlanes.h"
 #include "Frame/FrameRegistry.h"
 #include "Frame/GridCoord.h"
 #if defined(BT_CLIENT)
@@ -10,6 +11,7 @@
 #endif
 
 #include "Frame/Collections/Ships/ShipBehaviours.h"
+#include "Frame/FlightPlaneTable.h"
 
 namespace engine
 {
@@ -40,6 +42,10 @@ inline constexpr float kfOmniMaximumSpeed = 33.33f;
 inline constexpr float kfOmniCatchUpMaximumSpeed = 33.33f;
 inline constexpr float kfOmniJitterRange = 0.60f;
 
+inline constexpr float kfOmniClimbRate = 12.0f;
+inline constexpr int64_t kiOmniHighestFlightPlane = 1;
+static_assert(kiOmniHighestFlightPlane < std::ssize(kFlightPlanes));
+
 inline constexpr AcceleratedMovementConstants kOmniMovement
 {
 	.fAcceleration = kfOmniAcceleration,
@@ -68,7 +74,7 @@ struct HexShieldIntensities
 
 struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::CollectionFlags::kIdToIndex>
 {
-	static constexpr int64_t kiVersion = 14;
+	static constexpr int64_t kiVersion = 15;
 
 	static void Register();
 
@@ -83,6 +89,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 
 	// Simulation keeps the destroyed time in [0, kDestroyTime]; reject anything else as a corrupt stream, since a huge or +inf value
 	// puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
+	// Only the climb moves height, so it stays within [Lowest, Highest] flight plane heights; reject any other the same way.
 	static void PostRead(const OmnisInterpolate& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -91,6 +98,11 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 			if (!(destroyedTime.count() >= 0.0f && destroyedTime.count() <= kDestroyTime.count()))
 			{
 				throw std::ios_base::failure("OmnisInterpolate pDestroyedTimes");
+			}
+			float fHeight = XMVectorGetZ(rCurrent.pVecPositions[i]);
+			if (!(fHeight >= engine::gpFlightPlanes->Lowest().fHeightMeters && fHeight <= engine::gpFlightPlanes->Highest().fHeightMeters))
+			{
+				throw std::ios_base::failure("OmnisInterpolate position height");
 			}
 		}
 	}
@@ -168,7 +180,7 @@ using omni_t = engine::Id<OmnisInterpolate>;
 
 struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 {
-	static constexpr int64_t kiVersion = 21;
+	static constexpr int64_t kiVersion = 22;
 
 	// Collision layer (set each frame in PreCollision)
 	// thread_local: parallel per-Frame tick via Dispatch
@@ -183,8 +195,8 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 	}
 
 	// Reject an out-of-range countdown as a corrupt stream: NaN or +inf never fires, and a large negative value never finishes the burst loop.
-	// Reject an out-of-range navigation delay too, since the client echoes it back in its update-owned-entity request, and
-	// an unknown controller, which selects no script.
+	// Reject an out-of-range navigation delay too, since the client echoes it back in its update-owned-entity request, an
+	// unknown controller, which selects no script, and a target flight plane the type disallows, which no controller writes.
 	static void PostRead(const OmnisPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -200,6 +212,10 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 			if (rCurrent.pController[i] >= ShipController::kCount)
 			{
 				throw std::ios_base::failure("OmnisPostRender pController");
+			}
+			if (!IsFlightPlaneAllowed(ShipType::kOmni, GetTargetFlightPlane(rCurrent.pOrders[i])))
+			{
+				throw std::ios_base::failure("OmnisPostRender target flight plane");
 			}
 		}
 	}

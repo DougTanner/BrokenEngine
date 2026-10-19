@@ -17,13 +17,13 @@ struct FlightPlane
 
 inline constexpr int64_t kiMaxFlightPlanes = 8;
 
-// The game's flight-plane table, handed over once at boot on both builds and immutable afterwards, so tick code on
+// The game's flight-plane table is read directly at boot on both builds and stays immutable, so tick code on
 // worker threads reads it without synchronization. Index 0 is the lowest plane; heights ascend.
 class FlightPlanes : public common::Singleton<FlightPlanes>
 {
 public:
 
-	explicit FlightPlanes(std::span<const FlightPlane> planes);
+	FlightPlanes();
 
 	[[nodiscard]] _Ret_range_(1, kiMaxFlightPlanes) int64_t Count() const;
 	[[nodiscard]] const FlightPlane& Plane(int64_t iIndex) const;

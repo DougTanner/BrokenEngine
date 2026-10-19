@@ -127,7 +127,13 @@ bool IsAdoptableStatusChange(const StatusChange& rChange)
 		}
 		else if constexpr (IsShipSpawnInfo<Data>)
 		{
-			return rData.eController < ShipController::kCount;
+			static constexpr ShipType keShipType = std::is_same_v<Data, FightersPostRender::SpawnInfo> ? ShipType::kFighter : std::is_same_v<Data, OmnisPostRender::SpawnInfo> ? ShipType::kOmni : ShipType::kBattleship;
+			return rData.eController < ShipController::kCount && IsFlightPlaneAllowed(keShipType, GetTargetFlightPlane(rData.orders));
+		}
+		else if constexpr (std::is_same_v<Data, UpdateShipData>)
+		{
+			// eType first: IsFlightPlaneAllowed has no plane range for an out-of-range type.
+			return rData.eType < ShipType::kCount && (rData.uiTargetFlightPlane == kuiKeepTargetFlightPlane || IsFlightPlaneAllowed(rData.eType, rData.uiTargetFlightPlane));
 		}
 		else if constexpr (requires { rData.eType; })
 		{

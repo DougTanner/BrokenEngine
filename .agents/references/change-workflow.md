@@ -105,7 +105,7 @@ OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no ef
 <!-- session-context-part: Change Workflow, Steps 1-5 (continues in the next part) -->
 ## IMPORTANT: Change Workflow (YOU MUST follow this when changing anything tracked in this repository)
 
-This workflow governs every tracked artifact — C++, shaders, PowerShell and other scripts, skills, plans, and documentation. An artifact type a step does not name is a case this workflow does not assign to anyone: resolve it with the user, never by treating the step as inapplicable.
+This workflow governs every tracked artifact. An artifact type a step does not name is a case this workflow does not assign to anyone: resolve it with the user, never by treating the step as inapplicable.
 
 A sweep run, defined by `/sweep`, does not follow this workflow; `/sweep` owns what it keeps.
 
@@ -113,7 +113,7 @@ For Tier 1 and Tier 2, the user's request is the approval. Classify the work, ma
 
 Definitions:
 
-- Execution card — the pre-implementation record the Step 2 preparation drafts (`/prepare-change`, or `/next-plan` for a claimed Plan) and `/plan-audit` audits; after approval it carries the approved scope before any dispatch cites the card.
+- Execution card — the pre-implementation record the Step 2 preparation drafts (`/prepare-change`, or `/next-plan` for a claimed Plan) and `/plan-audit` audits; after approval it carries the approved scope before any dispatch cites the card. Field template: `.agents/references/execution-card.md`.
 - Landing gate — the finalizer's acceptance table plus the `/finalize-changes` landing flow with one explicit user confirmation; applies whenever primary will be changed: landing a session's work, or executable Plan completion or rejection. Shared AgentTools promotion and Tier-3 integration always land through it.
 - Executable Plan — tracked `Documents/Plans/**/*.md` with byte-zero `broken-engine-plan/v1` metadata; selection and marker rules: `Documents/Plans/AGENTS.md`. `Documents/Features` is manual.
 - Wrapper session — session started through `.claude/claude-worktree.sh`, `.codex/codex-worktree.ps1`, or `.opencode/opencode-worktree.ps1`, owning an isolated worktree. A retained wrapper session reattaches only through the same wrapper with its explicit reattach worktree input — `--reattach-worktree <path>` for Claude and `-ReattachWorktree <path>` for Codex and OpenCode; never adopt an arbitrary worktree.
@@ -221,7 +221,7 @@ pair runs once per stage; a later `/resolve-findings` round's re-review covers
 its own fix.
 
 - fresh `reviewer` runs `/over-engineering-review` in its finder pass, then a fresh `implementer` runs its validator pass — when a `cpp`-class file changed (`overEngineeringReview`), every tier; skip the validator when the finder returns no removal candidates.
-- fresh `reviewer` runs `/repo-code-review` — when the change touches C++.
+- fresh `reviewer` runs `/repo-code-review` — when the change touches C++; its brief carries the full session baseline SHA, the immutable diff boundary, and the path of the targets file main saves first, as `.agents/skills/repo-code-review/SKILL.md` `## Inputs` states.
 - fresh `reviewer` runs `/glsl-review` — when the change touches shaders.
 - `mechanic` runs `/comment-review` — when the change touches C++ or GLSL.
 - fresh `reviewer` runs `/coherence-review` — Tier-1 non-C++ artifacts; at Tier 1 with no changed C++ or GLSL this dispatch is the Step 6 combined pass and also carries Steps 7 and 8.

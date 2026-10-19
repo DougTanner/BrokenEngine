@@ -37,8 +37,9 @@ through `/external-grill-plan` for Tier 3, or directly with the user for Tier 2.
   whose body carries the plan's `## In scope` and `## Out of scope` sections — headings verbatim, with their content intact — because
   the citation check reads heading presence from the supplied file alone. Never inline text: the citation check takes only a path.
 - Draft execution card for every Tier-2 and Tier-3 plan, carrying every field of
-  the card template in [`../next-plan/SKILL.md`](../next-plan/SKILL.md)
-  `## Handoff`. Head it with the words `execution card`, in any casing, which
+  the card template in
+  [`../../references/execution-card.md`](../../references/execution-card.md)
+  `## Template`. Head it with the words `execution card`, in any casing, which
   `/codex-review`'s prompt assembly requires in the scope file before it will
   dispatch this audit.
 - Approved execution card, superseding the draft above, and session baseline

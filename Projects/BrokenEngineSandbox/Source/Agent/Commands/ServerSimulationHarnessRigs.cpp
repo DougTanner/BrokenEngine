@@ -12,6 +12,7 @@
 
 #include "Agent/AgentCommandsServerQueries.h"
 #include "Frame/Collections/Omnis/Omnis.h"
+#include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
 #include "Game.h"
 
@@ -126,8 +127,8 @@ static void ParseStatusChangeField(const nlohmann::json& rEntry, DATA& rData)
 		{
 			throw std::runtime_error(std::format("'{}' must be an [x,y] array of finite numbers", kName));
 		}
-		// The caller supplies local XY only; the position sits on the lowest flight plane, and the W lane follows the
-		// position/direction invariant.
+		// The caller supplies local XY only; the position sits on the lowest flight plane until a ship spawn seats its
+		// target plane's height, and the W lane follows the position/direction invariant.
 		static constexpr bool kbIsPosition = kName == "vecPosition";
 		rMember = XMVectorSet(engine::AgentFloatValue(rValue.at(0), kName), engine::AgentFloatValue(rValue.at(1), kName), kbIsPosition ? engine::gpFlightPlanes->Lowest().fHeightMeters : 0.0f, kbIsPosition ? 1.0f : 0.0f);
 	}
@@ -284,6 +285,19 @@ static SPAWN_INFO& ParseSpawnEntry(const nlohmann::json& rEntry, StatusChange& r
 	return rData;
 }
 
+// The plane is tested before its height is read, because the plane lookup is unchecked and the orders byte can name
+// any index up to 255.
+template <typename SPAWN_INFO>
+static void SeatShipSpawnHeight(SPAWN_INFO& rData, ShipType eType)
+{
+	int64_t iFlightPlane = GetTargetFlightPlane(rData.orders);
+	if (!IsFlightPlaneAllowed(eType, iFlightPlane))
+	{
+		throw std::runtime_error(std::format("'{}' target flight plane is not allowed for {}", FRAME_COLUMN(SPAWN_INFO, orders)::kName, EnumToken(eType)));
+	}
+	rData.vecPosition = XMVectorSetZ(rData.vecPosition, engine::gpFlightPlanes->Plane(iFlightPlane).fHeightMeters);
+}
+
 // Validates one entry without touching any queue.
 static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(const nlohmann::json& rEntry)
 {
@@ -316,11 +330,12 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 	switch (eType)
 	{
 		case StatusChangeType::kSpawnFighter:
-			ParseSpawnEntry<FightersPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
+			SeatShipSpawnHeight(ParseSpawnEntry<FightersPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate), ShipType::kFighter);
 			break;
 		case StatusChangeType::kSpawnOmni:
 		{
-			const OmnisPostRender::SpawnInfo& rData = ParseSpawnEntry<OmnisPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
+			OmnisPostRender::SpawnInfo& rData = ParseSpawnEntry<OmnisPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
+			SeatShipSpawnHeight(rData, ShipType::kOmni);
 			// An omni coasts under a transfer lock the entry may set. A velocity that crosses a whole cell in one tick
 			// outruns the one-cell transfer delta and asserts at the destination's Spawn, so cap it at the speed
 			// navigation never exceeds.
@@ -335,7 +350,7 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 			break;
 		}
 		case StatusChangeType::kSpawnBattleship:
-			ParseSpawnEntry<BattleshipsPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
+			SeatShipSpawnHeight(ParseSpawnEntry<BattleshipsPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate), ShipType::kBattleship);
 			break;
 		case StatusChangeType::kSpawnBlaster:
 			ParseSpawnEntry<BlastersPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
@@ -389,6 +404,11 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 			if (!IsNavigationDelayInRange(rData.navigationDelaySeconds.count()))
 			{
 				throw std::runtime_error(std::format("'{}' must be within [0,60]", FRAME_COLUMN(UpdateShipData, navigationDelaySeconds)::kName));
+			}
+			// eType parsed as a token, so only the target flight plane can fail here.
+			if (!IsAdoptableStatusChange(scheduled.change))
+			{
+				throw std::runtime_error(std::format("'{}' is not allowed for {}", FRAME_COLUMN(UpdateShipData, uiTargetFlightPlane)::kName, EnumToken(rData.eType)));
 			}
 			break;
 		}
@@ -532,9 +552,55 @@ static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::js
 	rResult["deferred"] = static_cast<bool>(gpGame->mGameFlags & engine::GameFlags::kPaused);
 }
 
+// Writes only the fleet's per-type plane, which its later spawns of that type take; live members keep their planes.
+static void CommandSetFleetFlightPlane(const nlohmann::json& rParameters)
+{
+	// Fleet state is not tick input, so a write during playback would be missing from the recording.
+	if (gpGame->mbReplaying)
+	{
+		throw std::runtime_error("cannot set fleet flight plane during replay playback");
+	}
+	for (const auto& [rKey, rValue] : rParameters.items())
+	{
+		if (rKey != "globalId" && rKey != "type" && rKey != "plane")
+		{
+			throw std::runtime_error("set_fleet_flight_plane unknown parameter '" + rKey + "'");
+		}
+	}
+	if (!rParameters.contains("globalId") || !rParameters.at("globalId").is_number_integer())
+	{
+		throw std::runtime_error("set_fleet_flight_plane requires integer 'globalId'");
+	}
+	ShipType eType {};
+	EnumFromToken(rParameters.contains("type") ? rParameters.at("type") : nlohmann::json(), "type", eType);
+	if (!rParameters.contains("plane") || !rParameters.at("plane").is_number_integer())
+	{
+		throw std::runtime_error("set_fleet_flight_plane requires integer 'plane'");
+	}
+	int64_t iFlightPlane = rParameters.at("plane").get<int64_t>();
+	if (!IsFlightPlaneAllowed(eType, iFlightPlane))
+	{
+		throw std::runtime_error(std::format("'plane' is not allowed for {}", EnumToken(eType)));
+	}
+
+	engine::GlobalId globalId {.iValue = rParameters.at("globalId").get<int64_t>()};
+	for (auto& [rClientGuid, rFleets] : gpServerSession->mpFleetManager->mFleets)
+	{
+		for (Fleet& rFleet : rFleets)
+		{
+			if (std::ranges::contains(rFleet.members, globalId, &FleetMember::globalId))
+			{
+				rFleet.targetFlightPlanes[std::to_underlying(eType)] = static_cast<uint8_t>(iFlightPlane);
+				return;
+			}
+		}
+	}
+	throw std::runtime_error("no fleet contains globalId");
+}
+
 bool ExecuteServerSimulationHarnessRigCommand(std::string_view command, const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
-	if (command != "replay_transfer_capture" && command != "inject_payload")
+	if (command != "replay_transfer_capture" && command != "inject_payload" && command != "set_fleet_flight_plane")
 	{
 		return false;
 	}
@@ -547,6 +613,11 @@ bool ExecuteServerSimulationHarnessRigCommand(std::string_view command, const nl
 	if (command == "inject_payload")
 	{
 		CommandInjectPayload(rParameters, rResult);
+		return true;
+	}
+	if (command == "set_fleet_flight_plane")
+	{
+		CommandSetFleetFlightPlane(rParameters);
 		return true;
 	}
 	return false;
@@ -593,10 +664,14 @@ void DrainPendingAgentStatusChanges(const ServerSession& rSession)
 				rStatusChanges.push_back(rScheduled.change);
 			}
 		}
-		std::stable_sort(rStatusChanges.begin(), rStatusChanges.end(), [](const StatusChange& rLeft, const StatusChange& rRight)
+		for (auto itStatusChange = rStatusChanges.begin(); itStatusChange != rStatusChanges.end(); ++itStatusChange)
 		{
-			return rLeft.eType < rRight.eType;
-		});
+			auto itInsertion = std::upper_bound(rStatusChanges.begin(), itStatusChange, *itStatusChange, [](const StatusChange& rLeft, const StatusChange& rRight)
+			{
+				return rLeft.eType < rRight.eType;
+			});
+			std::rotate(itInsertion, itStatusChange, std::next(itStatusChange));
+		}
 		std::erase_if(rScheduledChanges, IsReleased);
 		it = rScheduledChanges.empty() ? sHarnessRig.pendingAgentStatusChanges.erase(it) : std::next(it);
 	}

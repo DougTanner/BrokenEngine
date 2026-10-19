@@ -40,6 +40,76 @@ constexpr float kfTerrainBounceVelocity = 4.0f;
 constexpr float kfHealthRegeneration = 0.1f;
 constexpr float kfHealthRegenerationDistance = 60.0f;
 
+int64_t HighestFlightPlane(ShipType eType)
+{
+	switch (eType)
+	{
+		case ShipType::kFighter:    return kiFighterHighestFlightPlane;
+		case ShipType::kOmni:       return kiOmniHighestFlightPlane;
+		case ShipType::kBattleship: return kiBattleshipHighestFlightPlane;
+		case ShipType::kCount:      break;
+	}
+	ASSERT(false);
+	std::unreachable();
+}
+
+bool IsFlightPlaneAllowed(ShipType eType, int64_t iFlightPlane)
+{
+	return iFlightPlane >= 0 && iFlightPlane <= HighestFlightPlane(eType);
+}
+
+std::optional<int64_t> FlightPlaneAtHeight(float fHeight)
+{
+	for (int64_t i = 0; i < engine::gpFlightPlanes->Count(); ++i)
+	{
+		if (engine::gpFlightPlanes->Plane(i).fHeightMeters == fHeight)
+		{
+			return i;
+		}
+	}
+	return std::nullopt;
+}
+
+int64_t NavigationFlightPlane(float fHeight, int64_t iTargetPlane)
+{
+	// Heights ascend, and a ship's Z never drops below the lowest plane, so plane 0 is the floor.
+	int64_t iBelow = 0;
+	for (int64_t i = 1; i < engine::gpFlightPlanes->Count() && engine::gpFlightPlanes->Plane(i).fHeightMeters <= fHeight; ++i)
+	{
+		iBelow = i;
+	}
+	return std::min(iBelow, iTargetPlane);
+}
+
+bool SkipsTerrainContact(float fHeight)
+{
+	std::optional<int64_t> optionalFlightPlane = FlightPlaneAtHeight(fHeight);
+	return optionalFlightPlane && !(engine::gpFlightPlanes->Plane(*optionalFlightPlane).flags & engine::FlightPlaneFlags::kTerrainCollision);
+}
+
+XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime)
+{
+	// Fixed operation order and the table's own height on arrival keep client and server bit-identical, which
+	// FlightPlaneAtHeight's exact equality relies on.
+	float fTargetHeight = engine::gpFlightPlanes->Plane(iTargetFlightPlane).fHeightMeters;
+	float fClimbStep = fClimbRate * deltaTime.count();
+	float fHeight = XMVectorGetZ(vecPosition);
+	float fHeightGap = fTargetHeight - fHeight;
+	if (fHeightGap > fClimbStep)
+	{
+		fHeight += fClimbStep;
+	}
+	else if (fHeightGap < -fClimbStep)
+	{
+		fHeight -= fClimbStep;
+	}
+	else
+	{
+		fHeight = fTargetHeight;
+	}
+	return XMVectorSetZ(vecPosition, fHeight);
+}
+
 void CountdownPendingOrders(int64_t& riPendingFleetWantedCoordinateTicks)
 {
 	if (riPendingFleetWantedCoordinateTicks > 0)
@@ -106,7 +176,8 @@ static void XM_CALLCONV FollowFlagship(const Frame& rPreviousFrame, FXMVECTOR ve
 	}
 
 	XMVECTOR vecFlagshipPosition = ShipPosition(rPreviousFrame.interpolate, *optionalFlagship);
-	float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, vecFlagshipPosition)));
+	// Horizontal, so a wingman on another flight plane than its flagship can still close in.
+	float fDistanceSquared = XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecPosition, vecFlagshipPosition)));
 
 	if (fDistanceSquared > kfFlagshipFollowDistanceSquared)
 	{
@@ -191,7 +262,7 @@ static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFram
 	}
 }
 
-static bool ShouldRecomputeNavigation(const Frame& rFrame, engine::GlobalId globalId, FXMVECTOR vecPosition, FXMVECTOR vecArtificialIntelligenceDirection, int64_t iEntryNavigationDirection, bool bReseededDirection, int64_t iNavigationDirection, const engine::CellStaticData& rStaticData)
+static bool ShouldRecomputeNavigation(const Frame& rFrame, engine::GlobalId globalId, FXMVECTOR vecPosition, FXMVECTOR vecArtificialIntelligenceDirection, int64_t iEntryNavigationDirection, bool bReseededDirection, int64_t iNavigationDirection, const engine::NavData& rNavData)
 {
 	// Cadence, mode changes, direction reseeding, and blocked position/lookahead probes request pathfinding; otherwise
 	// cached steering is reused without NavQueryDirection.
@@ -200,15 +271,15 @@ static bool ShouldRecomputeNavigation(const Frame& rFrame, engine::GlobalId glob
 
 	// The throttle carries the shared world-space bearing for up to kiNavigationRecomputeInterval ticks. Recompute when
 	// either the kfNavigationLookahead point or current position is inside a nav polygon: lookahead alone misses ships
-	// already stranded inside. NavigationThresholdElevation and the Omni ApplyTerrainPush use the lowest flight plane's height minus
-	// kfOmniRadius and kfPushMargin; the nav polygon inflates that contour, leaving a no-nav band
+	// already stranded inside. NavigationThresholdElevation, like the Omni ApplyTerrainPush on the navigated flight plane,
+	// uses that plane's height minus kfOmniRadius and kfPushMargin; the nav polygon inflates that contour, leaving a no-nav band
 	// with zero terrain push. rVecArtificialIntelligenceDirection, vecPosition, and server-built, wire-shipped navigationData match on
 	// client/server, and this check draws no RNG. Roam mode -1 is exempt because ComputeArtificialIntelligenceSteering re-steers
 	// every tick.
 	if (!bRecompute && iNavigationDirection >= 0 && XMVectorGetX(XMVector3LengthSq(vecArtificialIntelligenceDirection)) > 0.001f)
 	{
 		XMVECTOR vecLookahead = XMVectorMultiplyAdd(XMVectorReplicate(kfNavigationLookahead), vecArtificialIntelligenceDirection, vecPosition);
-		if (engine::NavQueryPointBlocked(vecLookahead, rStaticData.navigationData) || engine::NavQueryPointBlocked(vecPosition, rStaticData.navigationData))
+		if (engine::NavQueryPointBlocked(vecLookahead, rNavData) || engine::NavQueryPointBlocked(vecPosition, rNavData))
 		{
 			bRecompute = true;
 		}
@@ -217,10 +288,12 @@ static bool ShouldRecomputeNavigation(const Frame& rFrame, engine::GlobalId glob
 	return bRecompute;
 }
 
-static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] Frame& rFrame, [[maybe_unused]] ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecDestination, const engine::CellStaticData& rStaticData, XMVECTOR& rVecArtificialIntelligenceDirection)
+static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] Frame& rFrame, [[maybe_unused]] ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecDestination, const engine::NavData& rNavData, XMVECTOR& rVecArtificialIntelligenceDirection)
 {
 	XMVECTOR vecDebugWaypoint = XMVectorZero();
-	XMVECTOR vecNavigationDirection = engine::NavQueryDirection(vecPosition, vecDestination, rStaticData.navigationData, vecDebugWaypoint);
+	// Destinations can sit on another plane's height; at the ship's own Z the query delta, and so the direction, stays
+	// horizontal.
+	XMVECTOR vecNavigationDirection = engine::NavQueryDirection(vecPosition, XMVectorSetZ(vecDestination, XMVectorGetZ(vecPosition)), rNavData, vecDebugWaypoint);
 	if (XMVectorGetX(XMVector3LengthSq(vecNavigationDirection)) > 0.001f)
 	{
 		rVecArtificialIntelligenceDirection = vecNavigationDirection;
@@ -238,6 +311,13 @@ static void XM_CALLCONV RecomputeNavigationPath([[maybe_unused]] Frame& rFrame, 
 		});
 	}
 #endif // BT_CLIENT
+}
+
+// A client cell whose static data has not arrived holds no graphs; it navigates with an empty graph.
+static const engine::NavData& NavigationPlaneData(const engine::CellStaticData& rStaticData, int64_t iNavigationPlane)
+{
+	static const engine::NavData sEmptyNavData;
+	return (iNavigationPlane < std::ssize(rStaticData.navigationData)) ? rStaticData.navigationData.at(static_cast<size_t>(iNavigationPlane)) : sEmptyNavData;
 }
 
 void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer)
@@ -260,9 +340,12 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 		bReseededDirection = true;
 	}
 
+	int64_t iNavigationPlane = NavigationFlightPlane(XMVectorGetZ(vecPosition), GetTargetFlightPlane(orders));
+	const engine::NavData& rNavData = NavigationPlaneData(rStaticData, iNavigationPlane);
+
 	UpdateFleetAndFlagshipNavigation(rFrame, rPreviousFrame, self, globalId, vecPosition, rStaticData, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, flagshipGlobalId, deltaTime, riNavigationDirection, rVecIslandDestination, rCellChangeTimer);
 
-	bool bRecompute = ShouldRecomputeNavigation(rFrame, globalId, vecPosition, rVecArtificialIntelligenceDirection, iEntryNavigationDirection, bReseededDirection, riNavigationDirection, rStaticData);
+	bool bRecompute = ShouldRecomputeNavigation(rFrame, globalId, vecPosition, rVecArtificialIntelligenceDirection, iEntryNavigationDirection, bReseededDirection, riNavigationDirection, rNavData);
 
 	if (riNavigationDirection == 5)
 	{
@@ -284,7 +367,7 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 
 		if (bRecompute)
 		{
-			RecomputeNavigationPath(rFrame, self, vecPosition, rVecIslandDestination, rStaticData, rVecArtificialIntelligenceDirection);
+			RecomputeNavigationPath(rFrame, self, vecPosition, rVecIslandDestination, rNavData, rVecArtificialIntelligenceDirection);
 		}
 	}
 	else if (riNavigationDirection == 4)
@@ -319,22 +402,31 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 				rVecIslandDestination = XMVectorSet(fX, fY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 
 				// Snap to navigable area if inside an obstacle
-				rVecIslandDestination = engine::NavQuerySnapToNavigable(rVecIslandDestination, rStaticData.navigationData);
+				rVecIslandDestination = engine::NavQuerySnapToNavigable(rVecIslandDestination, rNavData);
 				LOG(kNavData, kVerbose, "{} {} NavSwitch: island dest generated pos={} dest={}", ShipTypeName(self.eType), self.iRow, common::WbV2(vecPosition, 1), common::WbV2(rVecIslandDestination, 1));
 				bRecompute = true; // new destination -> path immediately
 			}
 		}
+		else if (engine::NavQueryPointBlocked(rVecIslandDestination, rNavData))
+		{
+			// A destination snapped on a higher plane's graph can lie inside this plane's polygons once the navigation
+			// plane drops; left there, the path stops at the polygon edge, so the arrival test passes only when that edge lies
+			// within its radius of the destination.
+			// NavQueryDirection already snaps its destination to this same point, so the snap needs no immediate recompute.
+			rVecIslandDestination = engine::NavQuerySnapToNavigable(rVecIslandDestination, rNavData);
+		}
 
 		if (bRecompute)
 		{
-			RecomputeNavigationPath(rFrame, self, vecPosition, rVecIslandDestination, rStaticData, rVecArtificialIntelligenceDirection);
+			RecomputeNavigationPath(rFrame, self, vecPosition, rVecIslandDestination, rNavData, rVecArtificialIntelligenceDirection);
 		}
 
 		// Arrival check (unconditional — independent of the pathfind throttle). Zeroing the destination
 		// makes the next tick's mode-4 entry block immediately pick the next island in the
 		// largest -> smallest -> random sequence (no idle between islands). Staying in mode 4 keeps the
 		// tour progressing; the fleet still leaves the cell when the server cell-change timer fires.
-		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, rVecIslandDestination)));
+		// Horizontal, so a ship above the destination's height can still arrive.
+		float fDistanceSquared = XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecPosition, rVecIslandDestination)));
 		if (fDistanceSquared < 100.0f)
 		{
 			LOG(kNavData, kVerbose, "{} {} NavSwitch: arrived at island dest pos={} dest={}", ShipTypeName(self.eType), self.iRow, common::WbV2(vecPosition, 1), common::WbV2(rVecIslandDestination, 1));
@@ -366,13 +458,13 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 
 		if (bRecompute)
 		{
-			RecomputeNavigationPath(rFrame, self, vecPosition, vecDestination, rStaticData, rVecArtificialIntelligenceDirection);
+			RecomputeNavigationPath(rFrame, self, vecPosition, vecDestination, rNavData, rVecArtificialIntelligenceDirection);
 		}
 	}
 	else
 	{
 		rVecIslandDestination = XMVectorZero();
-		auto [vecNewArtificialIntelligenceDirection] = ComputeArtificialIntelligenceSteering(rStaticData, vecPosition, rVecArtificialIntelligenceDirection, vecCellCenter, deltaTime.count(), self.iRow % 2 == 0);
+		auto [vecNewArtificialIntelligenceDirection] = ComputeArtificialIntelligenceSteering(rStaticData, vecPosition, rVecArtificialIntelligenceDirection, vecCellCenter, deltaTime.count(), self.iRow % 2 == 0, iNavigationPlane);
 		rVecArtificialIntelligenceDirection = vecNewArtificialIntelligenceDirection;
 #if defined(BT_CLIENT)
 		if constexpr (kbDebugRender)
@@ -466,11 +558,11 @@ void XM_CALLCONV ApplyHeadingMovement(FXMVECTOR vecDirection, ShipFlags_t flags,
 	rVecVelocity = engine::ApplyMovement<true>(rVecVelocity, vecDirection, deltaTime.count(), fAcceleration, rConstants.fDrag, rConstants.fMaximumSpeed, rConstants.fVelocityToDirection);
 }
 
-void XM_CALLCONV ApplyTerrainPush(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, float fRadius, float fPushMargin, XMVECTOR& rVecVelocity)
+void XM_CALLCONV ApplyTerrainPush(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, float fRadius, float fHeight, float fPushMargin, XMVECTOR& rVecVelocity)
 {
 	// Terrain collision - add velocity away from terrain, gentle at first then ramping up
 	float fElevation = engine::gpIslandTerrain->MakeCellElevationSampler(rStaticData).Sample(vecPosition);
-	float fPushHeight = engine::gpFlightPlanes->Lowest().fHeightMeters - fRadius - fPushMargin;
+	float fPushHeight = fHeight - fRadius - fPushMargin;
 	if (fElevation >= fPushHeight) [[unlikely]]
 	{
 		XMVECTOR vecTerrainNormal = XMVector3Normalize(XMVectorSetZ(engine::gpIslandTerrain->CellNormal(rStaticData, vecPosition), 0.0f));
@@ -480,10 +572,20 @@ void XM_CALLCONV ApplyTerrainPush(const engine::CellStaticData& rStaticData, FXM
 	}
 }
 
-void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, float fRadius, XMVECTOR& rVecVelocity)
+// The graph of the plane a ship at fHeight navigates. Callers skip terrain contact on a plane without
+// kTerrainCollision, and kFlightPlanes clears that flag only on its highest plane, so the navigated plane carries it.
+static const engine::NavData& TerrainContactNavData(const engine::CellStaticData& rStaticData, float fHeight, int64_t iTargetFlightPlane)
 {
-	// Hard contact at the lowest flight plane's height; ApplyTerrainPush is the softer band in front of it.
-	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, vecPreviousPosition, rVecPosition, fRadius, engine::gpFlightPlanes->Lowest().fHeightMeters, true);
+	int64_t iNavigationPlane = NavigationFlightPlane(fHeight, iTargetFlightPlane);
+	ASSERT(engine::gpFlightPlanes->Plane(iNavigationPlane).flags & engine::FlightPlaneFlags::kTerrainCollision);
+	return NavigationPlaneData(rStaticData, iNavigationPlane);
+}
+
+void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, float fRadius, XMVECTOR& rVecVelocity, int64_t iTargetFlightPlane)
+{
+	// Hard contact at the sweep end's height; ApplyTerrainPush is the softer band in front of it.
+	float fHeight = XMVectorGetZ(rVecPosition);
+	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, TerrainContactNavData(rStaticData, fHeight, iTargetFlightPlane), vecPreviousPosition, rVecPosition, fRadius, fHeight, true);
 	if (result.flags & engine::DiscTerrainFlags::kStartOverlap) [[unlikely]]
 	{
 		LOG(kDefault, kWarning, "{} terrain start overlap Cell: ({},{}) Index: {} Start: {} Moved: {}", ShipTypeName(self.eType), rStaticData.coordinate.iX, rStaticData.coordinate.iY, self.iRow, common::WbV2(vecPreviousPosition, 1), common::Wb(result.fStartOverlapDistance, 1));
@@ -497,9 +599,10 @@ void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData
 	}
 }
 
-void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, FXMVECTOR vecDirection, float fRadius, std::chrono::duration<float> deltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity)
+void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, ShipLocator self, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, FXMVECTOR vecDirection, float fRadius, std::chrono::duration<float> deltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity, int64_t iTargetFlightPlane)
 {
-	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, vecPreviousPosition, rVecPosition, fRadius, engine::gpFlightPlanes->Lowest().fHeightMeters, false);
+	float fHeight = XMVectorGetZ(rVecPosition);
+	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, TerrainContactNavData(rStaticData, fHeight, iTargetFlightPlane), vecPreviousPosition, rVecPosition, fRadius, fHeight, false);
 	if (result.flags & engine::DiscTerrainFlags::kStartOverlap) [[unlikely]]
 	{
 		LOG(kDefault, kWarning, "{} terrain start overlap Cell: ({},{}) Index: {} Start: {} Moved: {}", ShipTypeName(self.eType), rStaticData.coordinate.iX, rStaticData.coordinate.iY, self.iRow, common::WbV2(vecPreviousPosition, 1), common::Wb(result.fStartOverlapDistance, 1));

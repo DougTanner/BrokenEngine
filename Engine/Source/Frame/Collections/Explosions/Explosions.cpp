@@ -4,6 +4,8 @@
 #include "Data/Texture.h"
 #include "Profile/ProfileRows.h"
 #include "Ui/WrapperBase.h"
+#include "Ui/LightingWrappers.h"
+#include "Ui/SmokeWrappers.h"
 #include "Graphics/Managers/ParticleManager.h"
 #include "Frame/Collections/PointLights/PointLights.h"
 #include "Frame/Collections/Puffs/Puffs.h"
@@ -56,23 +58,14 @@ void ExplosionsInterpolate::Register()
 		return;
 	}
 
-	// Most of these pointers end up in controller-scale arrays that treat nullptr as "multiplier 1.0", so an
-	// unfilled field would silently disable that slider instead of failing. Catch it here while it is still cheap.
-	static constexpr int64_t kiTuningFieldCount = static_cast<int64_t>(sizeof(ExplosionTuning) / sizeof(Wrapper*));
-	static_assert(kiTuningFieldCount == 40);
-	for (const Wrapper* pTuningField : std::bit_cast<std::array<Wrapper*, static_cast<size_t>(kiTuningFieldCount)>>(sTuning))
-	{
-		ASSERT(pTuningField != nullptr);
-	}
-
 	PointLightsInterpolate::RegisterType(siExplosionPointLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesBC7ExplosionpngCrc,
 		.uiColor = 0xFFFFFFFF,
-		.fVisibleArea = sTuning.pPrimaryVisibleAreaOne->mfCurrent,
-		.fVisibleIntensity = sTuning.pPrimaryVisibleIntensityOne->mfCurrent,
-		.fLightingArea = sTuning.pPrimaryLightingAreaOne->mfCurrent,
-		.fLightingIntensity = sTuning.pPrimaryLightingIntensityOne->mfCurrent,
+		.fVisibleArea = game::gExplosionPrimaryVisibleAreaOne.mfCurrent,
+		.fVisibleIntensity = game::gExplosionPrimaryVisibleIntensityOne.mfCurrent,
+		.fLightingArea = game::gExplosionPrimaryLightingAreaOne.mfCurrent,
+		.fLightingIntensity = game::gExplosionPrimaryLightingIntensityOne.mfCurrent,
 	});
 
 	// Keyframes are normalized; wrappers supply their magnitudes.
@@ -89,10 +82,10 @@ void ExplosionsInterpolate::Register()
 			{.fVisibleArea = 0.6f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.2f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
 			{},
 		},
-		.ppVisibleAreaScales = {sTuning.pPrimaryVisibleAreaOne, sTuning.pPrimaryVisibleAreaTwo, sTuning.pPrimaryVisibleAreaThree, nullptr},
-		.ppVisibleIntensityScales = {sTuning.pPrimaryVisibleIntensityOne, sTuning.pPrimaryVisibleIntensityTwo, sTuning.pPrimaryVisibleIntensityThree, nullptr},
-		.ppLightingAreaScales = {sTuning.pPrimaryLightingAreaOne, sTuning.pPrimaryLightingAreaTwo, sTuning.pPrimaryLightingAreaThree, nullptr},
-		.ppLightingIntensityScales = {sTuning.pPrimaryLightingIntensityOne, sTuning.pPrimaryLightingIntensityTwo, sTuning.pPrimaryLightingIntensityThree, nullptr},
+		.ppVisibleAreaScales = {&game::gExplosionPrimaryVisibleAreaOne, &game::gExplosionPrimaryVisibleAreaTwo, &game::gExplosionPrimaryVisibleAreaThree, nullptr},
+		.ppVisibleIntensityScales = {&game::gExplosionPrimaryVisibleIntensityOne, &game::gExplosionPrimaryVisibleIntensityTwo, &game::gExplosionPrimaryVisibleIntensityThree, nullptr},
+		.ppLightingAreaScales = {&game::gExplosionPrimaryLightingAreaOne, &game::gExplosionPrimaryLightingAreaTwo, &game::gExplosionPrimaryLightingAreaThree, nullptr},
+		.ppLightingIntensityScales = {&game::gExplosionPrimaryLightingIntensityOne, &game::gExplosionPrimaryLightingIntensityTwo, &game::gExplosionPrimaryLightingIntensityThree, nullptr},
 	});
 
 	PointLightsInterpolate::RegisterControllerType(giExplosionSecondaryLightControllerTypeIndex,
@@ -108,10 +101,10 @@ void ExplosionsInterpolate::Register()
 			{.fVisibleArea = 1.0f, .fVisibleIntensity = 1.0f, .fLightingArea = 1.0f, .fLightingIntensity = 1.0f, .fRotation = 0.0f},
 			{},
 		},
-		.ppVisibleAreaScales = {sTuning.pSecondaryVisibleAreaOne, sTuning.pSecondaryVisibleAreaTwo, sTuning.pSecondaryVisibleAreaThree, nullptr},
-		.ppVisibleIntensityScales = {sTuning.pSecondaryVisibleIntensityOne, sTuning.pSecondaryVisibleIntensityTwo, sTuning.pSecondaryVisibleIntensityThree, nullptr},
-		.ppLightingAreaScales = {sTuning.pSecondaryLightingAreaOne, sTuning.pSecondaryLightingAreaTwo, sTuning.pSecondaryLightingAreaThree, nullptr},
-		.ppLightingIntensityScales = {sTuning.pSecondaryLightingIntensityOne, sTuning.pSecondaryLightingIntensityTwo, sTuning.pSecondaryLightingIntensityThree, nullptr},
+		.ppVisibleAreaScales = {&game::gExplosionSecondaryVisibleAreaOne, &game::gExplosionSecondaryVisibleAreaTwo, &game::gExplosionSecondaryVisibleAreaThree, nullptr},
+		.ppVisibleIntensityScales = {&game::gExplosionSecondaryVisibleIntensityOne, &game::gExplosionSecondaryVisibleIntensityTwo, &game::gExplosionSecondaryVisibleIntensityThree, nullptr},
+		.ppLightingAreaScales = {&game::gExplosionSecondaryLightingAreaOne, &game::gExplosionSecondaryLightingAreaTwo, &game::gExplosionSecondaryLightingAreaThree, nullptr},
+		.ppLightingIntensityScales = {&game::gExplosionSecondaryLightingIntensityOne, &game::gExplosionSecondaryLightingIntensityTwo, &game::gExplosionSecondaryLightingIntensityThree, nullptr},
 	});
 
 	PuffsInterpolate::RegisterType(siExplosionPuffTypeIndex,
@@ -133,8 +126,8 @@ void ExplosionsInterpolate::Register()
 			{},
 			{},
 		},
-		.ppAreaScales = {sTuning.pPrimaryPuffAreaOne, sTuning.pPrimaryPuffAreaTwo, nullptr, nullptr},
-		.ppIntensityScales = {sTuning.pPrimaryPuffIntensityOne, sTuning.pPrimaryPuffIntensityTwo, nullptr, nullptr},
+		.ppAreaScales = {&game::gExplosionPrimaryPuffAreaOne, &game::gExplosionPrimaryPuffAreaTwo, nullptr, nullptr},
+		.ppIntensityScales = {&game::gExplosionPrimaryPuffIntensityOne, &game::gExplosionPrimaryPuffIntensityTwo, nullptr, nullptr},
 	});
 
 	PuffsInterpolate::RegisterControllerType(giExplosionSecondaryPuffControllerTypeIndex,
@@ -150,8 +143,8 @@ void ExplosionsInterpolate::Register()
 			{},
 			{},
 		},
-		.ppAreaScales = {sTuning.pSecondaryPuffAreaOne, sTuning.pSecondaryPuffAreaTwo, nullptr, nullptr},
-		.ppIntensityScales = {sTuning.pSecondaryPuffIntensityOne, sTuning.pSecondaryPuffIntensityTwo, nullptr, nullptr},
+		.ppAreaScales = {&game::gExplosionSecondaryPuffAreaOne, &game::gExplosionSecondaryPuffAreaTwo, nullptr, nullptr},
+		.ppIntensityScales = {&game::gExplosionSecondaryPuffIntensityOne, &game::gExplosionSecondaryPuffIntensityTwo, nullptr, nullptr},
 	});
 
 	SmokeTrailsInterpolate::RegisterType(siExplosionTrailTypeIndex,

@@ -572,33 +572,38 @@ void PipelineDescriptorWriter::UpdateStorageBuffer(const Pipeline& rPipeline, in
 
 void PipelineDescriptorWriter::UpdateImageDescriptor(const Pipeline& rPipeline, int64_t iBinding, VkSampler vkSampler, VkImageView vkImageView, VkImageLayout vkImageLayout, VkDescriptorType vkDescriptorType)
 {
+	for (int64_t i = 0; i < std::ssize(rPipeline.mVkDescriptorSets); ++i)
+	{
+		UpdateImageDescriptorInSet(rPipeline, i, iBinding, vkSampler, vkImageView, vkImageLayout, vkDescriptorType);
+	}
+}
+
+void PipelineDescriptorWriter::UpdateImageDescriptorInSet(const Pipeline& rPipeline, int64_t iDescriptorSet, int64_t iBinding, VkSampler vkSampler, VkImageView vkImageView, VkImageLayout vkImageLayout, VkDescriptorType vkDescriptorType)
+{
 	ASSERT(PipelineDescriptorWriter::BindingExistsInShaderLayout(rPipeline, iBinding));
 
-	for (const VkDescriptorSet& rVkDescriptorSet : rPipeline.mVkDescriptorSets)
+	VkDescriptorImageInfo vkDescriptorImageInfo
 	{
-		VkDescriptorImageInfo vkDescriptorImageInfo
-		{
-			.sampler = vkSampler,
-			.imageView = vkImageView,
-			.imageLayout = vkImageLayout,
-		};
+		.sampler = vkSampler,
+		.imageView = vkImageView,
+		.imageLayout = vkImageLayout,
+	};
 
-		VkWriteDescriptorSet vkWriteDescriptorSet
-		{
-			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.pNext = nullptr,
-			.dstSet = rVkDescriptorSet,
-			.dstBinding = static_cast<uint32_t>(iBinding),
-			.dstArrayElement = 0,
-			.descriptorCount = 1,
-			.descriptorType = vkDescriptorType,
-			.pImageInfo = &vkDescriptorImageInfo,
-			.pBufferInfo = nullptr,
-			.pTexelBufferView = nullptr,
-		};
+	VkWriteDescriptorSet vkWriteDescriptorSet
+	{
+		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		.pNext = nullptr,
+		.dstSet = rPipeline.mVkDescriptorSets.at(iDescriptorSet),
+		.dstBinding = static_cast<uint32_t>(iBinding),
+		.dstArrayElement = 0,
+		.descriptorCount = 1,
+		.descriptorType = vkDescriptorType,
+		.pImageInfo = &vkDescriptorImageInfo,
+		.pBufferInfo = nullptr,
+		.pTexelBufferView = nullptr,
+	};
 
-		vkUpdateDescriptorSets(gpDeviceManager->mVkDevice, 1, &vkWriteDescriptorSet, 0, nullptr);
-	}
+	vkUpdateDescriptorSets(gpDeviceManager->mVkDevice, 1, &vkWriteDescriptorSet, 0, nullptr);
 }
 
 } // namespace engine

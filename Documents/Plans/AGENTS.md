@@ -58,6 +58,8 @@ folder through it too.
 
 An executable plan provides metadata, `# Title`, context, design, critical files, a required `## In scope` section naming the specific functions, members, or regions to change, required `## Out of scope` boundaries, risk triggers/invariants, and observable acceptance criteria when a diff is not decisive. Put directional prerequisites in metadata, not prose.
 
+Work that splits into stages (the term as `.agents/references/change-workflow.md` `## IMPORTANT: Change Workflow` defines it), each ending at a cut after which the tree builds and that stage's acceptance criteria can pass, is written as one Plan per stage, whether or not the stages edit the same files.
+
 The two scope sections are the control the finished change is measured against (`.agents/references/scope-authorization.md`), so write each boundary precisely enough to enforce.
 
 A document presenting options rather than a decision-complete implementation belongs in `../Investigations/` (see `../Investigations/AGENTS.md`) until the decision exists. Work blocked on another change expresses that as a `dependsOn` edge; work blocked on a decision is not a Plan yet.

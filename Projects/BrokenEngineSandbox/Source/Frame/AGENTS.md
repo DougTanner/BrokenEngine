@@ -21,7 +21,7 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
 - `Frame::kiVersion` composes navigation and collection versions. Bump its base when CRC semantics change without a contributing version bump.
 - At save/replay read boundaries, reject a non-finite ship-spawn timer or one at or above the shared 0.5-second spawn interval as a corrupt stream, and leave smaller finite values unchanged before the loop that repeatedly subtracts the interval.
 - At the same read boundaries, reject as a corrupt stream a frame whose Fighters, Omnis, and Battleships `pPushers` handles do not pair one-to-one with its Pushers rows, or any of whose Pushers rows carries a nonzero `pLifecycleFlags`.
-- Navigation and elevation are deterministic derived data excluded from both the CRC and persisted frame payload. The game derives the clearance distance and elevation threshold for the engine's contour bake (`TerrainUtils.h`, server-only) and hands them to engine startup, the only way engine navigation gets them. It likewise hands engine startup its flight-plane table (`FlightPlaneTable.h`, both builds), whose lowest plane sets that elevation threshold.
+- Navigation and elevation are deterministic derived data excluded from both the CRC and persisted frame payload. The game derives the clearance distance and, from each flight plane's height, that plane's elevation threshold for the engine's contour bake (`TerrainUtils.h`, server-only) and hands them to engine startup, the only way engine navigation gets them. The engine reads the game's immutable flight-plane table (`FlightPlaneTable.h`, both builds) directly at boot.
 - Status changes are consumed here: `kUpdateShip`, `kUpdateFleet`, and `kDestroyShip` in Update, after every ship Update; spawn and transfer status changes in the post-tick batch, outside the tick phases, through `ApplySpawnStatusChange` (`StatusChange.h`). Their serialized tags and wire rule are owned by game Network (`../Network/AGENTS.md`).
 - `FrameInput` — the per-tick deterministic unit, a versioned serializable list
   of `StatusChange`s — is declared here (`FrameInput.h/.cpp`) and serialized by
@@ -45,9 +45,10 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
   After each payload read the engine replay reader (`engine::ReadFrameInput`,
   `../../../../Engine/Source/Frame/AGENTS.md`) calls
   `AdmitFrameInputStatusChange`, which rejects a payload the game cannot adopt:
-  an unregistered Blaster or Explosion type index or an out-of-range ship
-  controller or ship type (`IsAdoptableStatusChange`), or a fleet-controlled
-  ship spawn payload with global ID 0.
+  an unregistered Blaster or Explosion type index, an out-of-range ship
+  controller or ship type, or a target flight plane the ship type disallows
+  (`IsAdoptableStatusChange`), or a fleet-controlled ship spawn payload with
+  global ID 0.
 - Delayed behavior updates use countdowns that transfer with the entity; transfer, spawn, and destroy status changes apply immediately.
 - Missile and omni homing acquire through the engine frame registry (`../../../../Engine/Source/Frame/AGENTS.md` `## Frame Registry`). This scope builds its only two query windows — the Missile-Update window in Missiles Update and the Omni-Spawn window at omni spawn — as specified in Frame Registry Query Windows (`../../../../Documents/Architecture/FrameUpdatePipeline.md`).
 - Acquiring a target writes the frame — it takes a subscription — so the order acquisitions happen in within a tick is part of the deterministic stream. Do not hoist one out of a loop, cache its result, or run it in parallel across entities.

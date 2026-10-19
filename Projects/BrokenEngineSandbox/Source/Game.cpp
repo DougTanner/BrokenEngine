@@ -209,8 +209,9 @@ void Game::ProcessGameMenuInput(const engine::InputPoll& rInputPoll)
 			it->second.staticData.islandRenderQueries = {};
 
 			// Pre-mint the texture slot now (mirrors ClientSessionBase::ApplyReceivedStaticData) so the
-			// elevation upload and chunk loads are in-flight before UpdateActiveIslands references the
-			// slot this same frame. AcquireTextureSlot is idempotent (hot-path early return).
+			// chunk loads, and the elevation upload request on a distinct transfer queue, are in-flight
+			// before UpdateActiveIslands references the slot this same frame. AcquireTextureSlot is
+			// idempotent (hot-path early return).
 			for (const engine::IslandPlacement& rPlacement : it->second.staticData.islands)
 			{
 				engine::gpIslandTerrainResidency->AcquireTextureSlot(rPlacement.islandCrc);

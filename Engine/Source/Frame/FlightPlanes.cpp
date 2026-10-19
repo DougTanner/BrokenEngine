@@ -2,19 +2,21 @@
 
 #include "Frame/IslandTerrain.h"
 
+#include "Frame/FlightPlaneTable.h"
+
 namespace engine
 {
 
-FlightPlanes::FlightPlanes(std::span<const FlightPlane> planes)
+FlightPlanes::FlightPlanes()
 : common::Singleton<FlightPlanes>(gpFlightPlanes, this)
-, mPlanes(planes)
+, mPlanes(game::kFlightPlanes)
 {
 	// Every height is positive and above its predecessor. These run first because the terrain check below reads
 	// Highest(), which needs a non-empty table.
-	ASSERT(!planes.empty());
-	ASSERT(std::ssize(planes) <= kiMaxFlightPlanes);
+	ASSERT(!mPlanes.empty());
+	ASSERT(std::ssize(mPlanes) <= kiMaxFlightPlanes);
 	float fPreviousHeightMeters = 0.0f;
-	for (const FlightPlane& rPlane : planes)
+	for (const FlightPlane& rPlane : mPlanes)
 	{
 		ASSERT(rPlane.fHeightMeters > fPreviousHeightMeters);
 		fPreviousHeightMeters = rPlane.fHeightMeters;

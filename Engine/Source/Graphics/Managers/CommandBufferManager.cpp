@@ -68,8 +68,9 @@ void CommandBufferManager::SubmitGlobalToQueue(int64_t iFramebufferIndex)
 {
 	CommandBuffers& rCommandBuffers = mPerFramebufferCommandBuffers.at(iFramebufferIndex);
 
-	// Prepend acquire barrier command buffer for QFOT when textures were adopted this frame. kPendingAcquireBarriers
-	// and miAcquireFramebufferIndex are written on the main thread in TextureManager::ProcessPendingTextures; under
+	// Prepend the acquire command buffer when this frame recorded into it (QFOT acquires, recorded uploads, lighting blur).
+	// kPendingAcquireBarriers and miAcquireFramebufferIndex are written on the main thread in TextureManager's
+	// ProcessPendingTextures and EndAcquireCommandBuffer; under
 	// kbRenderThread this read runs on the mSubmitGlobal worker, safe only because SubmitGlobalCommandBuffer's
 	// mSubmitGlobal.Wake() edge published those writes first. Same family as CommandBuffers.h (mFlags/mVkFence).
 	VkCommandBuffer pVkCommandBuffers[2] {};

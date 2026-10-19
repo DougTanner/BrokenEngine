@@ -23,9 +23,6 @@ namespace engine
 GameBase::GameBase()
 {
 	// Registration order fixes type indices: engine collections, then the game's.
-#if defined(BT_CLIENT)
-	game::FrameInterpolate::AssignExplosionTuning();
-#endif
 	ForEachRegister(InterpolateTypes {});
 	game::FrameInterpolate::Register();
 

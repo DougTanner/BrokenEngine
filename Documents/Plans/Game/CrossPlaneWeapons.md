@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:19:47.086Z","dependsOn":["Documents/Plans/Game/FlightPlaneClimbing.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:19:47.086Z","dependsOn":[]} -->
 # Weapons and targeting across flight planes
 
 Tier 3 (`.agents/references/risk-tiers.md`): the change alters CRC'd PostRender
@@ -14,7 +14,7 @@ repository-relative. Flight-plane series.
 
 ## Context
 
-After `Documents/Plans/Game/FlightPlaneClimbing.md` ships sit on one of three
+Ships sit on one of three
 planes (6, 50, 100 m) or climb between them with velocity Z always 0;
 `ShipTypes.h` offers `GetTargetFlightPlane`, and `ShipBehaviours.h` offers
 `FlightPlaneAtHeight` and `ClimbTowardsFlightPlane`.
@@ -44,7 +44,7 @@ Current-tree evidence this design rests on:
   `Common/Math/MathUtils.cpp:88-119`); `UpdateFacing` stores its normalized 3D
   direction in `pVecWantedDirections` (`:147`); Interpolate Update feeds that
   column's horizontal projection to `common::RotateTowardsPercent`
-  (`Omnis.cpp:482`; FlightPlaneClimbing decision 16), so the hull stays
+  (`OmnisInterpolate::Update`), so the hull stays
   horizontal while the column keeps the 3D lead direction decision 3 pitches
   shots from. Omni blasters leave along the jittered hull direction (`:292-311`,
   jitter is a rotation about Z, `MathUtils.cpp:60-64`); left vectors come from a
@@ -96,7 +96,7 @@ Each decision is recorded as made; the alternatives are not open.
 2. **The visibility test stays X and Y only.** It models the top-down visible footprint, within which all planes are stacked; the `kfFlatFireHeightTolerance` band of decisions 1, 6, and 7 is the only height gate flat shooters and missiles need, and the Omni blaster aim acquires across planes by design.
 3. **Omnis aim in 3D, face in 2D.** `AcquireTarget` and `UpdateFacing` are
    unchanged: `pVecWantedDirections` keeps the unit 3D lead direction, and the
-   hull faces its horizontal projection through FlightPlaneClimbing decision 16,
+   hull faces its horizontal projection in `OmnisInterpolate::Update`,
    so the hull direction keeps Z = 0. `SpawnBlasters` pitches each shot to the
    aim: with `fHorizontal = XMVectorGetX(XMVector2Length(vecWanted))` the fire
    direction is
@@ -113,7 +113,7 @@ Each decision is recorded as made; the alternatives are not open.
    spawn-interval reset and the side toggle (today's
    `OmnisCombat.cpp:379-381`), so a skipped launch spends neither: (a) when
    `FlightPlaneAtHeight(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i]))` is
-   none (between planes, FlightPlaneClimbing decision 2); (b) when the aim
+   none (it returns none between planes); (b) when the aim
    search (today's `FindTargetSpaceshipIndex`, `OmnisCombat.cpp:70-88`, called
    at `:391`), which now skips a candidate whose `std::abs(zCandidate - zOmni)`
    exceeds `kfFlatFireHeightTolerance` before the distance compare, finds no
@@ -223,7 +223,7 @@ no longer the only release site while the window is live. `Frame/Frame.cpp`: the
 - Any Fighter or Battleship pitch, ship hull pitch or roll, missile render pitch, Omni reticle changes.
 - A sea-surface impact for a downward blaster; blaster lifetime; blaster or missile damage values; explosion and pusher mechanics (3D falloff stays as is).
 - Missile flight (powered Z hold, homing steering, falling, sea despawn), any missile column, `TransferData` field, serializer, or harness change; `MissileFlags`, the exhaust, smoke, lighting, audio, and HUD.
-- New client-to-server packets; FlightPlaneClimbing's `set_fleet_flight_plane`, `UpdateFlightPlane`, and Omni Interpolate Update horizontal projection (its decision 16); `FlightPlaneTable.h`.
+- New client-to-server packets; `set_fleet_flight_plane`, the `inject_payload` `UpdateShip` `uiTargetFlightPlane` field, and the `OmnisInterpolate::Update` horizontal projection; `FlightPlaneTable.h`.
 - Backward compatibility of saves, replays, or the wire.
 
 ## Risk triggers and invariants
@@ -231,7 +231,7 @@ no longer the only release site while the window is live. `Frame/Frame.cpp`: the
 - CRC'd state changes: Omni blaster velocities, Fighter and Battleship target choice, Omni missile launches and aim, missile registry targets. The `Frame::kiVersion` bump of decision 8 rejects older saves, replays, and clients.
 - Bit determinism (`Documents/FloatingPointDeterminism.txt`): the pitched fire direction uses only DirectXMath basic operations and `XMVector3Normalize`; the band tests compare the absolute value of one float subtraction; no random draw is added or moved, and a skipped missile launch skips its jitter draw identically on every build; the registry acquisition order and count are unchanged.
 - Plane invariant: an Omni launches only when its Z equals a plane height bit-exactly, and the missile spawn adds only Z = 0 offsets (the +Z-cross barrel normal, the horizontal aim pre-move), so every powered missile's Z equals its launch plane's height until it falls or explodes.
-- Z invariant: every direction fed to `RotateTowardsPercent`, `XMMatrixRotationZ`, and a +Z cross keeps Z = 0 (Omni hull direction through FlightPlaneClimbing decision 16's horizontal projection, missile aim and direction through decision 6); `pVecWantedDirections` is the one column that carries Z and is consumed only through that projection and decision 3. Missile velocity Z stays 0 in powered flight; blaster velocities carry Z by design.
+- Z invariant: every direction fed to `RotateTowardsPercent`, `XMMatrixRotationZ`, and a +Z cross keeps Z = 0 (Omni hull direction through the `OmnisInterpolate::Update` horizontal projection, missile aim and direction through decision 6); `pVecWantedDirections` is the one column that carries Z and is consumed only through that projection and decision 3. Missile velocity Z stays 0 in powered flight; blaster velocities carry Z by design.
 - W invariant: the pitched fire direction and velocity keep W = 0 (`XMVectorSetZ` and `XMVectorScale` of a W = 0 vector).
 - Previous/current frame rules: Omni blaster aim reads the previous frame (`AcquireTarget`); the retained-target band test reads `retained.vecPreviousPosition`, the position homing steers to; the Fighter and Battleship Spawn-phase fire reads the current frame after every Update (ShipTypeSplit decision 8); the missile spawn plane skip and aim read the current frame as today.
 - Subscriber counts stay balanced: the band drop releases through `ReleaseRegistryTarget` inside the live window, like the expiry release, before the post-loop acquisition.
@@ -245,7 +245,7 @@ no longer the only release site while the window is live. `Frame/Frame.cpp`: the
 | Fighter on low ignores an enemy directly above | With a fleet Fighter on plane 0 and one random-spawn Fighter moved by `edit_frame` to the same X and Y at Z 50.0 with `pOrders` target plane 1 (and no other enemy in the cell), 5 s of `query_frame` show the `blasters` count stays 0; the same enemy moved to Z 6.0 with target plane 0, 30 m ahead of the Fighter, produces blasters whose `dir[2]` is 0 and `local[2]` is 6.0 | `/agent-harness`: launch, `edit_frame`, timed `query_frame` and `query_collection blasters` |
 | Omni on low hits an enemy on medium | With a fleet Omni on plane 0 and an enemy Fighter edited onto plane 1 about 60 m away, `query_collection blasters` shows Omni-aligned rows with `dir[2]` > 0, and the enemy's `health` drops or it explodes within 10 s; the Omni's `dir` keeps `dir[2]` 0 | `/agent-harness`: `edit_frame`, `query_collection` samples |
 | Omni fires no missiles at another plane | With a fleet Omni on plane 0 using missiles (`inject_payload` `UpdateShip` with `bUseMissiles`) and the only enemy in the cell a Fighter edited onto plane 1 (Z 50.0, `pOrders` target plane 1) about 60 m away, 5 s of `query_frame` show the `missiles` count stays 0 | `/agent-harness`: `inject_payload`, `edit_frame`, timed `query_frame` |
-| Omni mid-climb fires no missiles | With that Omni still using missiles, `set_fleet_flight_plane {type: Omni, plane: 1}`: no missile row appears while the Omni's `local[2]` is strictly between 6.0 and 50.0, including the ticks within 2 m of 50.0 where the enemy is in the band; after arrival missiles launch; no missile row ever has `local[2]` above 50.0, and every missile row sampled within 10 s of the first launch (`kMissileLifetime`, before any can fall) has `local[2]` exactly 50.0 | `/agent-harness`: `set_fleet_flight_plane`, timed `query_collection omnis` and `missiles` |
+| Omni mid-climb fires no missiles | With that Omni still using missiles, an `inject_payload` `UpdateShip` entry for it with `uiTargetFlightPlane` 1 (restating `bUseMissiles` and `navigationDelaySeconds`): no missile row appears while the Omni's `local[2]` is strictly between 6.0 and 50.0, including the ticks within 2 m of 50.0 where the enemy is in the band; after arrival missiles launch; no missile row ever has `local[2]` above 50.0, and every missile row sampled within 10 s of the first launch (`kMissileLifetime`, before any can fall) has `local[2]` exactly 50.0 | `/agent-harness`: `inject_payload` `UpdateShip` with `uiTargetFlightPlane`, timed `query_collection omnis` and `missiles` |
 | Same-plane missile hits | A fleet Omni on plane 0 with `bUseMissiles` and an enemy Fighter on plane 0 about 60 m away launches missiles whose rows never have `local[2]` above 6.0 and have it exactly 6.0 in every sample within 10 s of the first launch, show a nonzero `registryTargetId` once within 45 m, and the enemy loses `health` or explodes | `/agent-harness`: `inject_payload`, `edit_frame`, timed `query_collection` |
 | Missile ignores a ship overhead on another plane | With a missile from the previous row holding its target, `edit_frame` moves that Fighter (the only enemy in the cell) to Z 50.0 with `pOrders` target plane 1, within 45 m of the missile: the next sample shows the missile's `registryTargetId` 0, it stays 0 while the Fighter is overhead within 45 m, and the missile's `local[2]` never exceeds 6.0 and is exactly 6.0 in every sample within 10 s of the previous row's first launch | `/agent-harness`: `edit_frame`, timed `query_collection missiles` |
 | Battleship fires flat | A fleet Battleship on plane 0 with an enemy on plane 0 ahead produces blasters with `dir[2]` 0 at `local[2]` 6.0; with the enemy overhead on plane 1 it produces none | `/agent-harness`: `edit_frame`, `query_collection` |

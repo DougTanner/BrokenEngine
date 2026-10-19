@@ -6,8 +6,20 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
 
 - Frames submit Global, Main, and ImGui work before present. The frame boundary is between Main submission and the next acquire.
 - Global and Main command buffers are recorded once and rebuilt only by the recreation pipeline. Per-frame variation belongs in host-visible buffers, descriptors, and indirect commands; resources discovered within existing capacity must not depend on a re-record.
-- `RenderGlobal` pre-scans descriptor churn. When island eviction, lazy adoption, a lighting reblur latched by `Refresh`, or restoration is pending, it drains every framebuffer fence, opens the bindless write epoch (a time window in which bindless descriptor writes are safe), then performs those mutations; a completion that races the scan waits for the next frame. Descriptor writes must not race in-flight samplers.
-- Texture-adoption acquire barriers are single-publication work: clear prior publication before the churn scan, and let only a fresh adoption republish barriers for Global submission. An idle frame must not replay prior barriers.
+- `RenderGlobal` waits only its own framebuffer fence, then pre-scans
+  descriptor churn. When island eviction, lazy adoption, or restoration is
+  pending, or that framebuffer has unapplied descriptor publications, it opens
+  the bindless write epoch (a time window in which bindless descriptor writes
+  are safe) for that framebuffer alone, performs those mutations, ends the
+  acquire command buffer, and publishes into that framebuffer's sets; a
+  completion that races the scan waits for the next frame. Descriptor writes
+  reach only framebuffers whose fence has signaled; only drained contexts (the
+  texture waits, and `Graphics::Create` over a surviving texture manager) write
+  every framebuffer's sets. Every frame `RenderGlobal` also publishes to, and
+  marks waited, each other framebuffer whose fence already reads signaled,
+  without blocking.
+- Staging buffers, evicted images, and evicted mesh ranges that recorded work or descriptors may still use are retired, not destroyed. Every frame, outside the churn gate, each waited framebuffer leaves every retirement entry, and after that frame's publications an entry no framebuffer holds is destroyed; `Graphics::Destroy` destroys every entry after its device drain, at every tier.
+- The acquire command buffer, prepended to Global, carries queue-family acquire barriers, recorded uploads, and lighting blurs, and its work precedes any descriptor or indirect record exposing the result. It is single-publication work: clear prior publication before the churn scan, end it at most once per frame after the last recording, and let only fresh recording republish it. An idle frame must not replay prior barriers.
 - `CheckVkFailed` handles every failed `CHECK_VK` result: out-of-date and
   suboptimal swapchain results escalate to the swapchain tier, surface loss to
   the surface tier, and `VK_ERROR_DEVICE_LOST` throws `std::system_error` with
@@ -28,7 +40,7 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   down, at every tier. For a surviving tier, `Graphics::Create` rebuilds flagged
   texture and buffer resources and, at the sampler tier and above, the texture
   manager's samplers; destroy flags stay set across both swapchain deferrals.
-- `Graphics::Create` constructs the texture manager before the pipeline manager, which that constructor requires, but runs the boot-texture initialization only after the pipeline manager exists, so no texture adoption its waits drive can reach the lighting blur without the blur pipelines.
+- `Graphics::Create` constructs the texture manager before the pipeline manager, which that constructor requires, but runs the boot-texture initialization only after the pipeline manager exists, so no texture adoption its waits drive can reach the lighting blur without the blur pipelines. A lighting-blur tunable change requests pipeline-tier recreation, whose `Create` reblurs every ready lighting texture once the pipeline manager exists.
 - A zero-area swapchain extent defers swapchain-tier recreation. The render loop
   skips submission, retries creation at sim-tick cadence, and acquires again
   only after recreation succeeds; surface-loss recovery remains a full recreate.
@@ -81,15 +93,17 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   arena, and a per-framebuffer placement arena derived from the active-cell
   subscription slots plus one local unconfirmed cell and the 107-placement cell
   contract. The record-once terrain command buffer binds the mesh arena once;
-  each acquired framebuffer's indirect records provide the current per-template
-  run offset and mesh-visible count, with each run contiguous and mesh-visible
-  instances first, while the elevation and shadow prepasses consume the full
-  fixed arena. Clear the stale placement tail before publishing a shorter run,
-  and zero the mesh-residency fields in every framebuffer's indirect record
-  before returning mesh subranges for reuse. Drained residency updates publish
-  or revoke each template's mesh subrange through indirect records, never by
-  replacing the mesh-buffer handle or re-recording. Arena teardown invalidates
-  every suballocation, while File-owned asynchronous range state survives.
+  each acquired framebuffer's indirect records, rewritten every frame from
+  residency state, provide each template's mesh subrange (zero unless
+  resident) plus the current per-template run offset and mesh-visible count,
+  with each run contiguous and mesh-visible instances first, while the
+  elevation and shadow prepasses consume the full fixed arena. Clear the stale
+  placement tail before publishing a shorter run. A restored mesh is copied
+  through the acquire command buffer, and an evicted template's subranges are
+  retired, so a pending frame's stale indirect record never draws from a
+  reused range. Residency never replaces the mesh-buffer handle or re-records.
+  Arena teardown invalidates every suballocation, while File-owned
+  asynchronous range state survives.
 - The island least-recently-used grace period counts rendered frames, not sim ticks or wall time. Both the frame counter and each template's last-used stamp advance only inside the render path, so a frame that skips rendering ages nothing and cannot evict an island early.
 - Render-target sizes derive from a fixed 3840-pixel reference width, not the
   live window. Smoke simulation resolution scales against that reference, and

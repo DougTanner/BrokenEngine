@@ -9,8 +9,9 @@ Game-specific SOA collections built on the engine Collection framework (`../../.
 - Transferable entity collections resolve collision/terrain outcomes before marking surviving out-of-bounds rows for Transfer.
 - Every ship type stops at terrain in PostRender Update: each sweeps its
   disc from the previous to the current Interpolate position against the cell's
-  elevation grid, blocked at the lowest flight plane, and writes the resolved
-  position back to the current Interpolate row. On contact Omnis slide along
+  elevation grid, blocked at the current position's height, and writes the
+  resolved position back to the current Interpolate row. A ship on a flight
+  plane without terrain collision skips terrain contact. On contact Omnis slide along
   the terrain once and Fighters and Battleships bounce off it. A start already inside terrain
   logs a warning; spawn sites test at most the body's center against terrain, so
   a warning right after a spawn is expected.
@@ -20,9 +21,9 @@ Game-specific SOA collections built on the engine Collection framework (`../../.
   grace, which is an intentional fresh one-second arrival default, each ship's
   navigation state, which resets to spawn defaults, Fighters' and Battleships'
   previous-frame reaction flags, which restart from defaults, and client-only
-  visual or debug tuning and shield animation state, which use canonical client
-  defaults; other fresh gameplay spawn defaults and fresh random draws apply
-  only to genuine spawns. Select between transferred gameplay values and fresh
+  shield animation state, which uses canonical client defaults; other fresh
+  gameplay spawn defaults and fresh random draws apply only to genuine spawns.
+  Select between transferred gameplay values and fresh
   gameplay spawn defaults from an explicit transfer marker, not by testing a
   carried value for zero or non-positive.
 - Spawn and Transfer sites validate position and velocity XMVECTORs through

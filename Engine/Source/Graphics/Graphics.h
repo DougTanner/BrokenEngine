@@ -41,6 +41,7 @@ enum class DestroyFlags : uint16_t
 	kLightingTextures   = 0x0010,
 	kWaterMesh          = 0x0020,
 	kTerrainElevation   = 0x0040,
+	kLightingBlur       = 0x0080,
 	kSmokeTextures      = 0x0400,
 };
 using DestroyFlags_t = common::Flags<DestroyFlags>;
@@ -97,9 +98,6 @@ public:
 	Graphics() = delete;
 
 	void RenderGlobal(std::chrono::duration<float> currentTime);
-	// Wait on all in-flight per-framebuffer fences (not just the current one). Used to quiesce the
-	// graphics queue before island eviction/restoration frees images / rewrites descriptors.
-	void WaitAllFramebufferFencesIdle();
 	void RenderMainPresentAcquire(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoords, GridCoord cameraCoord, std::chrono::duration<float> currentTime);
 	void Create();
 	void Refresh();

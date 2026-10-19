@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param([switch]$Reject)
 $ErrorActionPreference='Stop';Set-StrictMode -Version Latest
-$result=[ordered]@{schemaVersion='broken-engine-next-plan-completion-result/v4';status='error';code='internal.error';message='Terminal preparation did not run.';messageLength=33;messageTruncated=$false;workflowTerminal=$false;nextAction='stop-report-to-user';claim=[ordered]@{state='absent';disposition='none'};changes=[ordered]@{totalCount=0;path=$null};diagnostics=[ordered]@{totalCount=0;items=@();truncated=$false;selector=$null;requery=$null}}
+$result=[ordered]@{schemaVersion='broken-engine-next-plan-completion-result/v5';status='error';code='internal.error';message='Terminal preparation did not run.';messageLength=33;messageTruncated=$false;workflowTerminal=$false;nextAction='stop-report-to-user';claim=$null;changes=[ordered]@{totalCount=0;path=$null};diagnostics=[ordered]@{totalCount=0;items=@();truncated=$false;selector=$null;requery=$null}}
 function Get-BoundedText([AllowNull()]$Value,[int]$Limit) { if($null -eq $Value){return [pscustomobject]@{Text=$null;Length=0;Truncated=$false}};$Value=[string]$Value;$length=$Value.Length;[pscustomobject]@{Text=$(if($length -gt $Limit){$Value.Substring(0,$Limit)}else{$Value});Length=$length;Truncated=($length -gt $Limit)} }
 function Set-ResultMessage([string]$Message) {$bounded=Get-BoundedText $Message 512;$result.message=$bounded.Text;$result.messageLength=$bounded.Length;$result.messageTruncated=$bounded.Truncated}
 function Add-Diagnostic([string]$Source,[string]$Code,[AllowNull()][string]$Path,[string]$Message) {$codeText=Get-BoundedText $Code 128;$pathText=Get-BoundedText $Path 1024;$messageText=Get-BoundedText $Message 512;$result.diagnostics.items=@([ordered]@{source=$Source;code=$codeText.Text;codeLength=$codeText.Length;codeTruncated=$codeText.Truncated;path=$pathText.Text;pathLength=$pathText.Length;pathTruncated=$pathText.Truncated;message=$messageText.Text;messageLength=$messageText.Length;messageTruncated=$messageText.Truncated});$result.diagnostics.totalCount=1}
@@ -16,7 +16,8 @@ try {
  $status=Get-NextPlanClaimStatus $context
  $claimArguments=$status.Arguments;$claimStatus=$status.Status
  if($status.ExitCode -ne 0){$exit=if($status.ExitCode -eq 2){2}else{1};Complete-Workflow $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'completion.claim-status-failed' 'WorktreeCli could not report the Plan claim.' 'stop-report-to-user'}
- if([string]$claimStatus.code -ceq 'none'){Complete-Workflow 0 'pass' 'no-claim' 'No Plan claim is present.' 'checkpoint-followup-gate'}
+ if([string]$claimStatus.code -ceq 'none'){$result.claim=[ordered]@{state='absent';disposition='none'};Complete-Workflow 0 'pass' 'no-claim' 'No Plan claim is present.' 'checkpoint-followup-gate'}
+ $result.claim=[ordered]@{state='claimed';disposition='none'}
  # The held Plan's support folder is checked before the terminal command's first change, so a refusal leaves everything in place.
  $heldPlan=[string]$claimStatus.plan;$supportFolder=$heldPlan.Substring(0,$heldPlan.Length-'.md'.Length)
  $folderViolations=@(Get-AgentPlansLayoutViolation -RepositoryRoot $context.Worktree -Folder $supportFolder)
@@ -36,7 +37,7 @@ try {
   $lines=[IO.File]::ReadAllLines($file)
   for($index=1;$index -lt $lines.Count;$index++){if($citation.IsMatch($lines[$index])){$citingCount++;if($null -eq $firstCiting){$firstCiting=[pscustomobject]@{Path=$path;Line=$index+1}}}}
  }
- if($citingCount -ne 0){Add-Diagnostic 'Complete-NextPlan' 'completion.plan-cited' $firstCiting.Path "Line $($firstCiting.Line) names '$heldName'.";Complete-Workflow 2 'blocked' 'completion.plan-cited' "$citingCount line(s) in other live Plans name '$heldName'; nothing was changed. Rewrite each line by the citation rule in .agents/skills/next-plan/SKILL.md step 4, then rerun." 'stop-report-to-user'}
+ if($citingCount -ne 0){Add-Diagnostic 'Complete-NextPlan' 'completion.plan-cited' $firstCiting.Path "Line $($firstCiting.Line) names '$heldName'.";Complete-Workflow 2 'blocked' 'completion.plan-cited' "$citingCount line(s) in other live Plans name '$heldName'; nothing was changed. Rewrite each line by the citation rule in .agents/skills/next-plan/references/preparation-brief.md '## Citation rule', then rerun." 'prepare'}
  $operation=if($Reject){'reject'}else{'complete'}
  $expectedDisposition=if($Reject){'rejected'}else{'completed'}
  $arguments=@('plan',$operation)+$claimArguments

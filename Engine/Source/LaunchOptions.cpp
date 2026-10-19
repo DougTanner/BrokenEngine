@@ -44,8 +44,8 @@ bool ParseLaunchOptions()
 	LPWSTR* pArgumentValues = CommandLineToArgvW(GetCommandLineW(), &iApiArgumentCount);
 	if (pArgumentValues == nullptr)
 	{
-		LOG(kDefault, kWarning, "ParseLaunchOptions CommandLineToArgvW failed: {}", GetLastError());
-		return true;
+		LOG(kDefault, kError, "ParseLaunchOptions CommandLineToArgvW failed: {}", GetLastError());
+		return false;
 	}
 
 	int64_t iArgumentCount = static_cast<int64_t>(iApiArgumentCount);

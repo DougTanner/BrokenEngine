@@ -11,7 +11,7 @@ For every proposal:
 3. Prove it is pre-existing or outside the approved implementation boundary.
 4. Preserve user decisions and the authority order among user direction, approved plan, documentation, and current behavior; report contradictions.
 
-Group items only when root cause, implementation boundary, invariant, and verification strategy all match. Split independently landable work, architectural decisions, separate subsystems, or meaningfully different risks.
+Group items only when root cause, implementation boundary, invariant, and verification strategy all match. Split stages by the stage rule in `Documents/Plans/AGENTS.md` `## Plan files`, and split architectural decisions, separate subsystems, or meaningfully different risks.
 
 Search all live plan files by symbols, paths, root-cause terms, outcome, and `## Coordination`. A plan is a duplicate when it owns the same root cause and implementation boundary. Map the proposal to it unless the proven unmet acceptance criterion requires extending that plan.
 
@@ -38,9 +38,9 @@ risk trigger in [`risk-tiers.md`](../../../references/risk-tiers.md) and record
 that trigger in the Plan. Put only directional prerequisites in `dependsOn`; put
 mandatory nondirectional constraints in reciprocal standard `## Coordination`
 sections in every affected Plan. A follow-up authored during a `/next-plan` run
-never names the Plan that run is completing; the claim-exit step in
-[`../../next-plan/SKILL.md`](../../next-plan/SKILL.md#steps) shows why the edge
-cannot survive completion. Do not add score, effort ranking, queue tier, queue
+never names the Plan that run is completing;
+[`claim-results.md`](../../next-plan/references/claim-results.md#claim-exit-result-fields)
+shows why the edge cannot survive completion. Do not add score, effort ranking, queue tier, queue
 row, request file, or claim data.
 
 For a tooling-friction proposal, draft the body from [`tooling-friction-plan-template.md`](tooling-friction-plan-template.md).

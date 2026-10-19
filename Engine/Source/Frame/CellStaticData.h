@@ -25,11 +25,13 @@ struct CellStaticData
 {
 	GridCoord coordinate {};
 	std::vector<IslandPlacement> islands;
-	// Derived from islands + per-template NavContour. Built lazily on the per-coord
+	// Derived from islands + per-template NavContours. Built lazily on the per-coord
 	// frame-tick thread (server-only) and refreshed when the network resends staticData,
 	// so it lives outside the persisted save format. mutable lets RunFrameTick fill it
-	// through the const CellStaticData& it gets from ActiveFrameReference.
-	mutable NavData navigationData;
+	// through the const CellStaticData& it gets from ActiveFrameReference. One NavData per
+	// flight plane, index-parallel with gpFlightPlanes; a client cell whose static data has
+	// not arrived holds an empty vector.
+	mutable std::vector<NavData> navigationData;
 
 	// A completed navigation build can have no vertices (degenerate or underwater contours), so emptiness cannot
 	// signal an unbuilt cell. BuildCellNavigationData on the server and Read(true) on the client set this flag; Read(false)

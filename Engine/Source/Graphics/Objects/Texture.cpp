@@ -148,10 +148,44 @@ void Texture::RecordAcquireBarrier(VkCommandBuffer vkCommandBuffer)
 		.image = mVkImage,
 		.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = static_cast<uint32_t>(mInfo.iMipLevels), .baseArrayLayer = 0, .layerCount = static_cast<uint32_t>(mInfo.iArrayLayers)},
 	};
-	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &vkImageMemoryBarrier);
+	// Island elevation is sampled in the vertex shader (Terrain.vert), so the acquire must also precede vertex-shader reads.
+	vkCmdPipelineBarrier(vkCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &vkImageMemoryBarrier);
 }
 
 void Texture::Create(const TextureInfo& rInfo, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction)
+{
+	CreateImage(rInfo);
+
+	if (rDataFunction != nullptr)
+	{
+		UploadImageData(rDataFunction, kUndefined, mInfo.eTextureLayout);
+	}
+
+	if (mInfo.textureFlags & kRenderPass)
+	{
+		CreateRenderTarget();
+	}
+
+	// Transition to final layout only if no rDataFunction was provided (rDataFunction case handles this above)
+	if (rDataFunction == nullptr && mInfo.eTextureLayout != kUndefined)
+	{
+		OneShotCommandBuffer oneShotCommandBuffer;
+		TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, kUndefined, mInfo.eTextureLayout);
+		oneShotCommandBuffer.Execute();
+	}
+}
+
+std::unique_ptr<StagingBuffer> Texture::RecordCreate(VkCommandBuffer vkCommandBuffer, const TextureInfo& rInfo, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction)
+{
+	CreateImage(rInfo);
+
+	int64_t iSize = common::ComputeImageByteSize(mInfo.vkFormat, mInfo.vkExtent3D.width, mInfo.vkExtent3D.height, mInfo.iMipLevels, mInfo.iArrayLayers, mInfo.vkExtent3D.depth);
+	std::unique_ptr<StagingBuffer> pStagingBuffer = std::make_unique<StagingBuffer>(mInfo.name, iSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+	RecordImageData(vkCommandBuffer, *pStagingBuffer, iSize, rDataFunction, kUndefined, mInfo.eTextureLayout);
+	return pStagingBuffer;
+}
+
+void Texture::CreateImage(const TextureInfo& rInfo)
 {
 	Destroy();
 
@@ -193,24 +227,6 @@ void Texture::Create(const TextureInfo& rInfo, const std::function<void(std::spa
 
 	CreateImageView(mVkImage, mInfo, true, mVkImageView);
 	++miGeneration;
-
-	if (rDataFunction != nullptr)
-	{
-		UploadImageData(rDataFunction, kUndefined, mInfo.eTextureLayout);
-	}
-
-	if (mInfo.textureFlags & kRenderPass)
-	{
-		CreateRenderTarget();
-	}
-
-	// Transition to final layout only if no rDataFunction was provided (rDataFunction case handles this above)
-	if (rDataFunction == nullptr && mInfo.eTextureLayout != kUndefined)
-	{
-		OneShotCommandBuffer oneShotCommandBuffer;
-		TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, kUndefined, mInfo.eTextureLayout);
-		oneShotCommandBuffer.Execute();
-	}
 }
 
 void Texture::UpdateData(const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction)
@@ -225,11 +241,16 @@ void Texture::UploadImageData(const std::function<void(std::span<std::byte>, int
 
 	StagingBuffer stagingBuffer(mInfo.name, iSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
-	rDataFunction(std::span<std::byte>(static_cast<std::byte*>(stagingBuffer.vmaAllocationInfo.pMappedData), static_cast<size_t>(iSize)), 0);
-
 	OneShotCommandBuffer oneShotCommandBuffer;
+	RecordImageData(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer, iSize, rDataFunction, eOldLayout, eFinalLayout);
+	oneShotCommandBuffer.Execute();
+}
 
-	TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, eOldLayout, kTransferDestination);
+void Texture::RecordImageData(VkCommandBuffer vkCommandBuffer, const StagingBuffer& rStagingBuffer, int64_t iSize, const std::function<void(std::span<std::byte>, int64_t)>& rDataFunction, TextureLayout eOldLayout, TextureLayout eFinalLayout)
+{
+	rDataFunction(std::span<std::byte>(static_cast<std::byte*>(rStagingBuffer.vmaAllocationInfo.pMappedData), static_cast<size_t>(iSize)), 0);
+
+	TransitionImageLayout(vkCommandBuffer, eOldLayout, kTransferDestination);
 
 	int64_t iOffset = 0;
 	for (int64_t i = 0; i < mInfo.iArrayLayers; ++i)
@@ -252,16 +273,14 @@ void Texture::UploadImageData(const std::function<void(std::span<std::byte>, int
 			iWidth = std::max(1i64, iWidth / 2);
 			iHeight = std::max(1i64, iHeight / 2);
 
-			vkCmdCopyBufferToImage(oneShotCommandBuffer.mVkCommandBuffer, stagingBuffer.vkStagingBuffer, mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
+			vkCmdCopyBufferToImage(vkCommandBuffer, rStagingBuffer.vkStagingBuffer, mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
 		}
 	}
 
 	if (eFinalLayout != kUndefined)
 	{
-		TransitionImageLayout(oneShotCommandBuffer.mVkCommandBuffer, kTransferDestination, eFinalLayout);
+		TransitionImageLayout(vkCommandBuffer, kTransferDestination, eFinalLayout);
 	}
-
-	oneShotCommandBuffer.Execute();
 }
 
 void Texture::CreateRenderTarget()

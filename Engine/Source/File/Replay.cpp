@@ -311,16 +311,16 @@ bool Replay::CaptureAcceptedTransfers(GridCoord destination, std::span<const gam
 {
 	if (mReplayWriters.empty())
 	{
-		return false;
+		return true;
 	}
 	if (ReplayHarnessRigs::ConsumePersistenceFailure(*this, ReplayHarnessRigs::PersistenceFailurePoint::kTransferCapture))
 	{
 		InvalidateReplayRecording();
-		return true;
+		return false;
 	}
 	if (sortedTransfers.empty())
 	{
-		return false;
+		return true;
 	}
 
 	std::vector<ReplayWriterState>& rWriterGenerations = mReplayWriters.try_emplace(destination).first->second;
@@ -328,7 +328,7 @@ bool Replay::CaptureAcceptedTransfers(GridCoord destination, std::span<const gam
 	{
 		game::FrameInput emptyInput {};
 		rWriterGenerations.push_back({
-			.pWriter = std::make_unique<engine::DifferenceStreamWriter<game::Frame, game::FrameInput>>(rPreTransferFrame, emptyInput, /*bRecordInitialChecksum=*/false),
+			.pWriter = std::make_unique<engine::DifferenceStreamWriter>(rPreTransferFrame, emptyInput, /*bRecordInitialChecksum=*/false),
 			.iActivationTick = rPreTransferFrame.interpolate.iTick,
 		});
 	}
@@ -337,7 +337,7 @@ bool Replay::CaptureAcceptedTransfers(GridCoord destination, std::span<const gam
 	postDispatchInput.statusChanges.assign(sortedTransfers.begin(), sortedTransfers.end());
 	rWriterState.pWriter->mPostDispatchRecords.emplace_back(rPreTransferFrame.interpolate.iTick, std::move(postDispatchInput));
 	ReplayHarnessRigs::ObserveAcceptedTransfers(*this, rPreTransferFrame.interpolate.iTick, sortedTransfers);
-	return false;
+	return true;
 }
 
 void Replay::ActivateReplayReader(GridCoord coordinate, PendingReplayReader&& rPendingReader)
@@ -436,7 +436,7 @@ void Replay::SaveLoadReplay()
 					bool bVersionMismatch = false;
 					int64_t iFileVersion = 0;
 					int64_t iExpectedVersion = 0;
-					staged.pendingReader.pReader = std::make_unique<engine::DifferenceStreamReader<game::Frame, game::FrameInput>>(engine::FileFlags_t {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, coordinateReplayPath, *staged.pendingReader.pSavedStart, staged.pendingReader.initialInput, bLoaded, bVersionMismatch, iFileVersion, iExpectedVersion, rRecord.iActivationTick == iInitialTick);
+					staged.pendingReader.pReader = std::make_unique<engine::DifferenceStreamReader>(engine::FileFlags_t {engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, coordinateReplayPath, *staged.pendingReader.pSavedStart, staged.pendingReader.initialInput, bLoaded, bVersionMismatch, iFileVersion, iExpectedVersion, rRecord.iActivationTick == iInitialTick);
 					if (bVersionMismatch)
 					{
 						// An older build recorded this replay: an expected refusal, not damaged data.
@@ -736,7 +736,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 				game::FrameInput& rFrameInput = game::gpGame->mFrameInputs.try_emplace(rCoordinate).first->second;
 				std::vector<ReplayWriterState>& rWriterGenerations = mReplayWriters.try_emplace(rCoordinate).first->second;
 				rWriterGenerations.push_back({
-					.pWriter = std::make_unique<engine::DifferenceStreamWriter<game::Frame, game::FrameInput>>(*rCell.pCurrent, rFrameInput),
+					.pWriter = std::make_unique<engine::DifferenceStreamWriter>(*rCell.pCurrent, rFrameInput),
 					.iActivationTick = miReplayInitialTick,
 				});
 			}
@@ -796,7 +796,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 			for (auto it = mReplayReaders.begin(); it != mReplayReaders.end();)
 			{
 				engine::GridCoord coordinate = it->first;
-				std::unique_ptr<engine::DifferenceStreamReader<game::Frame, game::FrameInput>>& rpReader = it->second;
+				std::unique_ptr<engine::DifferenceStreamReader>& rpReader = it->second;
 				bool bTerminalTick = rpReader->IsTerminalTick(game::gpGame->miTickCounter);
 				if (!bTerminalTick)
 				{

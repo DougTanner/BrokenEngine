@@ -26,11 +26,6 @@ struct BattleshipsPostRender;
 
 struct FrameInterpolate : public engine::FrameInterpolateBase
 {
-#if defined(BT_CLIENT)
-	// Called on Game creation, before the engine collections register
-	static void AssignExplosionTuning();
-#endif
-
 	// Called on Game creation
 	static void Register();
 

@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:05:45.634Z","dependsOn":["Documents/Plans/Game/FlightPlaneClimbing.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:05:45.634Z","dependsOn":[]} -->
 # Give each ship type a fleet model and a random-spawn model
 
 Tier 2 (`.agents/references/risk-tiers.md`): the change adds four source model
@@ -125,9 +125,9 @@ After the four folders are in place, run DataPacker for the sandbox through `/co
 `ShipTypeSplit` decision 17 leaves each file with two model CRCs, two scales,
 two dynamic buffers, two pipelines (`"<Type>Fleet"`, `"<Type>Random"`), and a
 `Render` that partitions rows by `pController`.
-`Documents/Plans/Game/FlightPlaneClimbing.md` (prerequisite, its decision 13)
-then inserts the client-only climb tilt `XMMatrixRotationY(-pfClimbTilts[i])`
-between roll and yaw in `FightersRender`. This Plan changes only the constants
+`FightersRender.cpp` inserts the client-only climb tilt (an
+`XMMatrixRotationY(-pfClimbTilts[i])` of `FightersInterpolate::pfClimbTilts`) between roll and
+yaw. This Plan changes only the constants
 and adds the per-model pre-rotation, which takes the existing pre-rotation slot
 ahead of roll:
 
@@ -168,7 +168,7 @@ Each new folder's `license.txt` is the one Sketchfab ships. `Projects/BrokenEngi
 
 - The four new model folders of decision 1 with Sketchfab's `license.txt`, and their DataPacker intermediates.
 - The decision 3 pre-checks on each downloaded `scene.gltf`.
-- In the three `*Render.cpp` files: the model CRC, `kfModelScale`, and pre-rotation constants per controller (decisions 4 and 5), the per-row selection of scale and pre-rotation by `pController` in `Render` (the pre-rotation in the existing pre-rotation slot, ahead of roll and, in `FightersRender.cpp`, ahead of FlightPlaneClimbing's climb tilt), and deletion of any leftover placeholder reuse or `#if 0` model block.
+- In the three `*Render.cpp` files: the model CRC, `kfModelScale`, and pre-rotation constants per controller (decisions 4 and 5), the per-row selection of scale and pre-rotation by `pController` in `Render` (the pre-rotation in the existing pre-rotation slot, ahead of roll and, in `FightersRender.cpp`, ahead of the `pfClimbTilts` climb tilt), and deletion of any leftover placeholder reuse or `#if 0` model block.
 - One DataPacker sandbox run and the client build and harness screenshots in `## Acceptance`.
 
 ## Out of scope
@@ -186,7 +186,7 @@ Each new folder's `license.txt` is the one Sketchfab ships. `Projects/BrokenEngi
 - Generated CRC symbols are unique across the run (`DataPacker/Source/AGENTS.md` `## Design Patterns`); the four folder names of decision 1 collide with nothing in `Models/`.
 - Pre-export intermediates are tracked beside their sources and committed with them, or the next session's pre-export re-runs and `git status` dirties (`DataPacker/Source/ExportJobs/AGENTS.md` `## Scene and Model`).
 - Every new folder carries its licence sidecar (`Projects/BrokenEngineSandbox/Data/AGENTS.md`); only CC-BY-4.0 and CC0 licences are accepted, no NC, SA, or ND term.
-- Each `Render`'s transform chain order is the one FlightPlaneClimbing leaves (Fighters: `scaling * preRotate * roll * climbTilt * yaw * translation`) and is unchanged here; only the per-model pre-rotation matrices and scale literals differ.
+- Each `Render`'s transform chain order is the current one (Fighters: `scaling * preRotate * roll * climbTilt * yaw * translation`) and is unchanged here; only the per-model pre-rotation matrices and scale literals differ.
 - No main-loop allocation beyond `ShipTypeSplit`'s two pipelines per type.
 
 ## Acceptance

@@ -3,6 +3,7 @@
 #if defined(BT_CLIENT)
 
 #include "Agent/Commands/DescribeScene.h"
+#include "Ui/WrapperBase.h"
 
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
@@ -262,12 +263,13 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 			const BlastersPostRender& rBlastersPost = *rFrame.postRender.pBlasters;
 			AppendVisibleUnits("blaster", rBlastersInterpolate.pVecPositions, rBlastersPost.iCount, rCoordinate, basis, f4VisibleArea, iMaximumUnits, iUnitCount, bTruncated, units, [&](int64_t i) -> nlohmann::json
 			{
+				const BlastersType& rType = BlastersInterpolate::sTypes.at(rBlastersInterpolate.puiTypeIndices[i]);
 				return
 				{
 					{"alignment", rBlastersPost.pAlignments[i].uiValue},
-					{"windTrailIntensity", rBlastersInterpolate.pfWindTrailIntensities[i]},
-					{"windTrailWidth", rBlastersInterpolate.pfWindTrailWidths[i]},
-					{"windTrailLengthMultiplier", rBlastersInterpolate.pfWindTrailLengthMultipliers[i]},
+					{"windTrailIntensity", rType.pWindTrailIntensityWrapper->mfCurrent},
+					{"windTrailWidth", rType.pWindTrailWidthWrapper->mfCurrent},
+					{"windTrailLengthMultiplier", rType.pWindTrailLengthMultiplierWrapper->mfCurrent},
 				};
 			});
 		}

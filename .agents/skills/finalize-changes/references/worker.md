@@ -236,7 +236,8 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
   restored the approved session commit, and released its normal postconfirmation
   landing lease. The original landing arguments, candidate, baseline, expected
   tips, verification evidence, SmartGit receipt, summary, and confirmation are
-  invalid. Only after abort, restoration, and lease release are proven, return
+  invalid; a landing override (`SKILL.md` `### Landing confirmation`) still
+  stands. Only after abort, restoration, and lease release are proven, return
   that result as a handoff for the recovery dispatch; that worker restarts
   preconfirmation reconciliation: it re-resolves the current session and
   primary tips, and a fresh candidate
@@ -244,12 +245,14 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
   `Recovery` section, recreates and prepares a new candidate, reruns the
   affected reviews and the acceptance table, and produces a fresh summary and
   launch line — main reopens SmartGit from that line — for fresh user
-  confirmation. If any abort, restoration, or release is unproven, retain the
-  existing blocker and lease state and stop; do not begin recovery or expose a
-  user wait. No primary change is attempted until the fresh review and
-  confirmation complete. Never reuse the original approved landing arguments.
+  confirmation unless a landing override stands. If any abort, restoration, or
+  release is unproven, retain the existing blocker and lease state and stop; do
+  not begin recovery or expose a user wait. No primary change is attempted
+  until the fresh review and any fresh confirmation complete. Never reuse the
+  original approved landing arguments.
 - Preconfirmation reconciliation conflict: resolve under the approved
-  invariants, then re-review the affected regions and re-ask the confirmation.
+  invariants, then re-review the affected regions and re-ask the confirmation
+  unless a landing override stands.
   Resolve hunk by hunk, tracing each side's intent to its originating commit or
   Plan before choosing, and preserve both intents where they are compatible.
   Keep the resolution to behavior one side already had; never invent new

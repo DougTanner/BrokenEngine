@@ -85,6 +85,7 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 {
 	CreateRenderPass();
 	CreateFramebuffers();
+	mTextureRetirements.resize(mImGuiFramebuffers.size());
 	CreateUiPrepassIndirectBuffer();
 
 	IMGUI_CHECKVERSION();
@@ -148,18 +149,10 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 	ImGui::GetStyle().FontScaleDpi = mfUiScale;
 	ApplyThemeColors(GetUiTheme());
 
-	// NewFrame creates the font atlas; upload its textures before EndFrame validates them.
+	// Bootstrap the font atlas; the first UI submission uploads its pending texture.
 	ImGui_ImplVulkan_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
-
-	for (ImTextureData* pTexture : ImGui::GetPlatformIO().Textures)
-	{
-		if (pTexture->Status != ImTextureStatus_OK)
-		{
-			ImGui_ImplVulkan_UpdateTexture(pTexture);
-		}
-	}
 
 	ImGui::EndFrame();
 
@@ -278,6 +271,9 @@ void ImGuiManager::ApplyThemeColors(UiTheme eTheme)
 
 ImGuiManager::~ImGuiManager()
 {
+	mTextureResources.clear();
+	mTextureRetirements.clear();
+
 	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImPlot::DestroyContext();
@@ -584,8 +580,107 @@ void ImGuiManager::UpdateUiRectangleBuffers(int64_t iFramebuffer)
 	miOpaqueRectangleCount = 0;
 }
 
+ImGuiManager::TextureResource::~TextureResource()
+{
+	if (vkDescriptorSet != VK_NULL_HANDLE)
+	{
+		ImGui_ImplVulkan_RemoveTexture(vkDescriptorSet);
+	}
+}
+
+void ImGuiManager::ProcessTextures(VkCommandBuffer vkCommandBuffer, int64_t iFramebuffer, const ImVector<ImTextureData*>* pTextures)
+{
+	TextureRetirement& rRetirement = mTextureRetirements.at(iFramebuffer);
+	for (ImTextureData* pTexture : *pTextures)
+	{
+		if (pTexture->Status == ImTextureStatus_WantDestroy)
+		{
+			auto it = mTextureResources.find(pTexture);
+			if (it != mTextureResources.end())
+			{
+				{
+					// Heap: detached GPU ownership must survive until this framebuffer's fence completes.
+					ScopedSuppressAllocationTracking suppress;
+					rRetirement.resources.push_back(std::move(it->second));
+				}
+				mTextureResources.erase(it);
+			}
+			pTexture->SetTexID(ImTextureID_Invalid);
+			pTexture->SetStatus(ImTextureStatus_Destroyed);
+			continue;
+		}
+
+		bool bCreate = pTexture->Status == ImTextureStatus_WantCreate;
+		if (!bCreate && pTexture->Status != ImTextureStatus_WantUpdates)
+		{
+			continue;
+		}
+
+		ASSERT(pTexture->Format == ImTextureFormat_RGBA32 && pTexture->BytesPerPixel == 4);
+		ASSERT(pTexture->BackendUserData == nullptr);
+		if (bCreate)
+		{
+			ASSERT(pTexture->TexID == ImTextureID_Invalid);
+			TextureInfo textureInfo
+			{
+				.name = "ImGuiTexture",
+				.vkFormat = VK_FORMAT_R8G8B8A8_UNORM,
+				.vkExtent3D = {.width = static_cast<uint32_t>(pTexture->Width), .height = static_cast<uint32_t>(pTexture->Height), .depth = 1},
+				.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+				.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
+				.eTextureLayout = TextureLayout::kUndefined,
+			};
+			// Heap: active texture ownership lasts until retirement; resource/descriptor allocations share that lifetime.
+			ScopedSuppressAllocationTracking suppress;
+			auto pResource = std::make_unique<TextureResource>();
+			pResource->texture.Create(textureInfo);
+			pResource->vkDescriptorSet = ImGui_ImplVulkan_AddTexture(pResource->texture.mVkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			mTextureResources.emplace(pTexture, std::move(pResource));
+		}
+
+		TextureResource& rResource = *mTextureResources.at(pTexture);
+		int64_t iX = bCreate ? 0 : pTexture->UpdateRect.x;
+		int64_t iY = bCreate ? 0 : pTexture->UpdateRect.y;
+		int64_t iWidth = bCreate ? pTexture->Width : pTexture->UpdateRect.w;
+		int64_t iHeight = bCreate ? pTexture->Height : pTexture->UpdateRect.h;
+		ASSERT(iWidth > 0 && iHeight > 0 && iX + iWidth <= pTexture->Width && iY + iHeight <= pTexture->Height);
+		int64_t iRowBytes = iWidth * 4;
+		{
+			// Heap: staging ownership and its container must survive until this framebuffer's fence completes.
+			ScopedSuppressAllocationTracking suppress;
+			rRetirement.stagingBuffers.push_back(std::make_unique<StagingBuffer>("ImGuiTextureUpload", iRowBytes * iHeight, VK_BUFFER_USAGE_TRANSFER_SRC_BIT));
+		}
+		StagingBuffer& rStagingBuffer = *rRetirement.stagingBuffers.back();
+		for (int64_t i = 0; i < iHeight; ++i)
+		{
+			std::memcpy(static_cast<std::byte*>(rStagingBuffer.vmaAllocationInfo.pMappedData) + i * iRowBytes, pTexture->GetPixelsAt(static_cast<int>(iX), static_cast<int>(iY + i)), static_cast<size_t>(iRowBytes));
+		}
+
+		// Previous graphics-queue fragment reads must finish before an in-place upload overwrites this image.
+		rResource.texture.TransitionImageLayout(vkCommandBuffer, bCreate ? TextureLayout::kUndefined : TextureLayout::kFragmentShaderReadOnly, TextureLayout::kTransferDestination);
+		VkBufferImageCopy vkBufferImageCopy
+		{
+			.bufferOffset = 0,
+			.bufferRowLength = 0,
+			.bufferImageHeight = 0,
+			.imageSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1},
+			.imageOffset = {.x = static_cast<int32_t>(iX), .y = static_cast<int32_t>(iY), .z = 0},
+			.imageExtent = {.width = static_cast<uint32_t>(iWidth), .height = static_cast<uint32_t>(iHeight), .depth = 1},
+		};
+		vkCmdCopyBufferToImage(vkCommandBuffer, rStagingBuffer.vkStagingBuffer, rResource.texture.mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBufferImageCopy);
+		rResource.texture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kTransferDestination, TextureLayout::kFragmentShaderReadOnly);
+		pTexture->SetTexID(reinterpret_cast<ImTextureID>(rResource.vkDescriptorSet));
+		pTexture->SetStatus(ImTextureStatus_OK);
+	}
+}
+
 void ImGuiManager::Submit(int64_t iFramebuffer)
 {
+	// RenderGlobal completed this framebuffer's previous fence before Main reset it for the current submission.
+	TextureRetirement& rRetirement = mTextureRetirements.at(iFramebuffer);
+	rRetirement.resources.clear();
+	rRetirement.stagingBuffers.clear();
+
 	CommandBuffers& rCommandBuffers = gpCommandBufferManager->mPerFramebufferCommandBuffers.at(iFramebuffer);
 
 	CHECK_VK(vkResetCommandBuffer(rCommandBuffers.mImGuiVkCommandBuffer, 0));
@@ -601,6 +696,9 @@ void ImGuiManager::Submit(int64_t iFramebuffer)
 
 	gpProfileManager->ResetQueryPools(iFramebuffer, rCommandBuffers.mImGuiVkCommandBuffer, kGpuTimerUiRender, kGpuTimerCount);
 	gpProfileManager->GpuStart(iFramebuffer, rCommandBuffers.mImGuiVkCommandBuffer, kGpuTimerUiRender);
+
+	ImVector<ImTextureData*>* pTextures = mpDrawData->Textures;
+	ProcessTextures(rCommandBuffers.mImGuiVkCommandBuffer, iFramebuffer, pTextures);
 
 	VkRenderPassBeginInfo vkRenderPassBeginInfo
 	{
@@ -618,6 +716,7 @@ void ImGuiManager::Submit(int64_t iFramebuffer)
 	};
 	vkCmdBeginRenderPass(rCommandBuffers.mImGuiVkCommandBuffer, &vkRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+	mpDrawData->Textures = nullptr;
 	ImGui_ImplVulkan_RenderDrawData(mpDrawData, rCommandBuffers.mImGuiVkCommandBuffer);
 
 	vkCmdEndRenderPass(rCommandBuffers.mImGuiVkCommandBuffer);

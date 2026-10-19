@@ -25,7 +25,7 @@ enum class IslandMeshResidency : uint8_t
 #endif
 
 // One entry per kIsland chunk in the manifest. Heightmap pointer fills in
-// WaitForElevationMaps once chunk data is resident; NavContour is built for
+// WaitForElevationMaps once chunk data is resident; navContours are built for
 // every template server-side so multi-template cells get correct nav data.
 struct IslandTemplate
 {
@@ -51,7 +51,7 @@ struct IslandTemplate
 	float fQuadFootprintX = 0.0f;
 	float fQuadFootprintY = 0.0f;
 
-	NavContour navContour;
+	std::vector<NavContour> navContours;   // one per flight plane, index-parallel with gpFlightPlanes; empty without kTerrainCollision
 
 	int64_t iTextureSlot = -1;
 
@@ -99,8 +99,9 @@ struct IslandTemplate
 	// True once the [positions][indices] CPU slice has been decommitted from the lazy pool.
 	bool bMeshCpuDecommitted = false;
 
-	// Elevation R16_SFLOAT is raw-copied from puiHeightmapHalf at first mint, freed by EvictionSweep with
-	// color/normals/AO/masks, and recreated on the next AcquireTextureSlot first mint. The template owns it
+	// Elevation R16_SFLOAT is raw-copied from the resident heightmap after first mint (by the upload thread on a
+	// distinct transfer queue, otherwise recorded at restoration), retired by EvictionSweep with
+	// color/normals/AO/masks, and re-uploaded after the next AcquireTextureSlot first mint. The template owns it
 	// outside TextureManager::mTextureMap because elevation lives in the kIsland heightmap payload,
 	// without a standalone chunk.
 	Texture elevationTexture;
@@ -124,7 +125,7 @@ public:
 	IslandTerrain();
 
 #if defined(BT_SERVER)
-	void WaitForElevationMaps(float fNavigationThreshold, float fNavigationClearanceMeters);
+	void WaitForElevationMaps(std::span<const float> navigationThresholds, float fNavigationClearanceMeters); // size == gpFlightPlanes->Count()
 #else
 	void WaitForElevationMaps();
 #endif

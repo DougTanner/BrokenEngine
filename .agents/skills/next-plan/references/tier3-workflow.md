@@ -1,11 +1,8 @@
 # Tier 3 Preparation
 
-This route inherits the global Change Workflow from the
-[change-workflow.md](../../../references/change-workflow.md) Verify and land
-step and the Implementation approval section of [`/next-plan`](../SKILL.md);
-Tier 3 risk does not add another approval gate. This reference owns
-only the additional Tier-3 preparation, review, and implementation actions
-below.
+This reference owns only the Tier-3 additions to the Change Workflow in
+[change-workflow.md](../../../references/change-workflow.md) and to
+[`/next-plan`](../SKILL.md); Tier 3 adds no approval gate.
 
 Read this reference only after `/next-plan` has claimed and classified a plan as
 Tier 3. It prepares a high-risk change without making its administration the
@@ -13,11 +10,10 @@ main task.
 
 ## Execution card
 
-The preparation `implementer` writes a short current-state card before
-implementation on the card template
-[`../../prepare-change/references/worker.md`](../../prepare-change/references/worker.md)
-step 4 names; for Tier 3 the trigger must be concrete and each acceptance check
-names its expected observation.
+On the card template in
+[`execution-card.md`](../../../references/execution-card.md) `## Template`,
+the Tier-3 card's trigger must be concrete and each acceptance check names its
+expected observation.
 
 Never edit the claimed plan file during execution; carry meaningfully stale
 source-citation corrections in the execution card instead. Search for
@@ -26,11 +22,9 @@ identity, semantics, layout, guard scope, or named invariant.
 
 ## Plan review
 
-Main dispatches `/plan-audit`, plus `/plan-simplicity-review` when the plan adds
-new code or modifies non-documentation behavior per that skill's
-[`## When to use`](../../plan-simplicity-review/SKILL.md#when-to-use), to one `reviewer` each,
-then returns their accepted findings to the preparation `implementer`. That
-worker performs every repository read and search `/external-grill-plan` requires
+Main returns the accepted findings of the Plan review step's reviewers to the
+preparation `implementer`. That worker performs every repository read and
+search `/external-grill-plan` requires
 and returns an immutable decision brief in the shape that skill's `## Handoff`
 defines; it never interviews, chooses, or delegates.
 Main routes external-claim requests to a `locator` through
@@ -47,8 +41,6 @@ interview questions to justify the review.
 
 ## Implementation and stop rule
 
-Main dispatches the assigned roles for implementation and the normal Tier 3
-checks: targeted compile/static checks, one correctness review, scoped
-adversarial review, and the cleanup steps the change triggers. Permit one focused fix/retest. A
-second pass requires a reproduced decisive blocker and is limited to invalidated
-regions and checks.
+Implementation, its checks, and the fix/retest limit follow the Change Workflow
+steps at Tier 3, which already include `/adversarial-review`; this route adds
+nothing to them.

@@ -15,6 +15,7 @@
 		"skill": {
 			"cleanup-worktrees": "ask",
 			"codex-review": "ask",
+			"eod": "ask",
 			"external-deep-analysis": "ask",
 			"gaea2-diagnose": "ask",
 			"gaea2-load": "ask",

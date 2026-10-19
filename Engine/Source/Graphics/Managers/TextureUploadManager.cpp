@@ -80,6 +80,9 @@ void TextureUploadManager::DestroyTransferResources()
 	{
 		std::unique_lock lock(mUploadMutex);
 		mUploadQueue = {};
+		// The loop below destroys these elevations' unadopted images, so they leave the pending-adoption count with them.
+		miPendingAdoptions.fetch_sub(std::ssize(mCompletedElevationCrcs), std::memory_order_relaxed);
+		mCompletedElevationCrcs.clear();
 	}
 
 	if (mTransferVkFence != VK_NULL_HANDLE)
@@ -144,6 +147,12 @@ void TextureUploadManager::RequestUpload(common::crc_t crc, LoadPriority ePriori
 
 		mUploadQueue.push({.crc = crc, .ePriority = ePriority});
 	}
+}
+
+std::vector<common::crc_t> TextureUploadManager::TakeCompletedElevations()
+{
+	std::unique_lock lock(mUploadMutex);
+	return std::exchange(mCompletedElevationCrcs, {});
 }
 
 void TextureUploadManager::WaitIdle()
@@ -244,7 +253,12 @@ void TextureUploadManager::UploadThread()
 			}
 
 			LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(mCurrentCrc);
-			ValidateTextureDimensions(rLazyChunk);
+			// A non-texture chunk is an island whose elevation image uploads from the resident heightmap at the start of its payload.
+			bool bElevation = !(rLazyChunk.header.flags & common::ChunkFlags::kTexture);
+			if (!bElevation)
+			{
+				ValidateTextureDimensions(rLazyChunk);
+			}
 
 			if (HandleUploadEarlyOut(rLazyChunk))
 			{
@@ -255,19 +269,37 @@ void TextureUploadManager::UploadThread()
 			CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &mTransferVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count()));
 
 			bool bFirstChunk = (miCurrentDataOffset == 0);
-			bool bCubemap = rLazyChunk.header.flags & common::ChunkFlags::kCubemap;
-			VkFormat vkFormat = rLazyChunk.header.textureHeader.vkFormat;
-			bool bCompressed = (vkFormat == VK_FORMAT_BC4_UNORM_BLOCK || vkFormat == VK_FORMAT_BC5_UNORM_BLOCK || vkFormat == VK_FORMAT_BC7_UNORM_BLOCK);
-			ChunkDimensions dimensions
+			ChunkDimensions dimensions {};
+			if (bElevation)
 			{
-				.bCubemap = bCubemap,
-				.vkFormat = vkFormat,
-				.iBlockHeight = bCompressed ? 4i64 : 1i64,
-				.iArrayLayers = bCubemap ? 6i64 : 1i64,
-				.iMipLevels = rLazyChunk.header.textureHeader.iMipLevels,
-				.uiBaseWidth = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureWidth),
-				.uiBaseHeight = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureHeight),
-			};
+				// IslandTerrain::WaitForElevationMaps validated the heightmap extent against the resident payload at boot.
+				dimensions = ChunkDimensions
+				{
+					.bCubemap = false,
+					.vkFormat = shaders::kVkFormatElevation,
+					.iBlockHeight = 1,
+					.iArrayLayers = 1,
+					.iMipLevels = 1,
+					.uiBaseWidth = static_cast<uint32_t>(rLazyChunk.header.islandHeader.iHeightmapWidth),
+					.uiBaseHeight = static_cast<uint32_t>(rLazyChunk.header.islandHeader.iHeightmapHeight),
+				};
+			}
+			else
+			{
+				bool bCubemap = rLazyChunk.header.flags & common::ChunkFlags::kCubemap;
+				VkFormat vkFormat = rLazyChunk.header.textureHeader.vkFormat;
+				bool bCompressed = (vkFormat == VK_FORMAT_BC4_UNORM_BLOCK || vkFormat == VK_FORMAT_BC5_UNORM_BLOCK || vkFormat == VK_FORMAT_BC7_UNORM_BLOCK);
+				dimensions = ChunkDimensions
+				{
+					.bCubemap = bCubemap,
+					.vkFormat = vkFormat,
+					.iBlockHeight = bCompressed ? 4i64 : 1i64,
+					.iArrayLayers = bCubemap ? 6i64 : 1i64,
+					.iMipLevels = rLazyChunk.header.textureHeader.iMipLevels,
+					.uiBaseWidth = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureWidth),
+					.uiBaseHeight = static_cast<uint32_t>(rLazyChunk.header.textureHeader.iTextureHeight),
+				};
+			}
 
 			if (bFirstChunk)
 			{
@@ -319,9 +351,13 @@ void TextureUploadManager::UploadThread()
 			}
 
 			// Device lost during upload -- DestroyTransferResources will clean up GPU resources.
+			// An island elevation job has no chunk state to re-arm: the rebuilt TextureManager re-mints the island and requests it again.
 			LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(mCurrentCrc);
-			rLazyChunk.eState.value.store(ChunkState::kDiskLoaded, std::memory_order_release);
-			miPendingAdoptions.fetch_add(1, std::memory_order_relaxed); // kUploading -> kDiskLoaded: arm the pending-adoption counter
+			if (rLazyChunk.header.flags & common::ChunkFlags::kTexture)
+			{
+				rLazyChunk.eState.value.store(ChunkState::kDiskLoaded, std::memory_order_release);
+				miPendingAdoptions.fetch_add(1, std::memory_order_relaxed); // kUploading -> kDiskLoaded: arm the pending-adoption counter
+			}
 			mCurrentCrc = 0;
 			// workLock already holds the non-recursive mWorkMutex; locking it again would self-deadlock.
 			// Publish the exit and notify the drain waiter before leaving the thread, since it cannot acknowledge another probe.
@@ -366,6 +402,8 @@ bool TextureUploadManager::HandleUploadEarlyOut(LazyChunk& rLazyChunk)
 	// Early out: same queue (concurrent vkQueueSubmit is not thread-safe)
 	if (gpDeviceManager->mTransferVkQueue == gpDeviceManager->mGraphicsVkQueue)
 	{
+		// Island elevation is requested only on a distinct transfer queue; a shared queue records it at restoration instead.
+		ASSERT(rLazyChunk.header.flags & common::ChunkFlags::kTexture);
 		rLazyChunk.eState.value.store(ChunkState::kDiskLoaded, std::memory_order_release);
 		miPendingAdoptions.fetch_add(1, std::memory_order_relaxed); // kUploading -> kDiskLoaded: arm the pending-adoption counter
 		gpFileManager->mpPackChunks->mLoader.NotifyChunkCompletion();
@@ -575,9 +613,23 @@ void TextureUploadManager::SubmitChunkUpload(LazyChunk& rLazyChunk, VkImageMemor
 		// Wait for GPU to finish before signaling completion
 		CHECK_VK(vkWaitForFences(gpDeviceManager->mVkDevice, 1, &mTransferVkFence, VK_TRUE, kFenceTimeoutNanoseconds.count()));
 
-		rLazyChunk.eState.value.store(ChunkState::kGpuUploadComplete, std::memory_order_release);
-		miPendingAdoptions.fetch_add(1, std::memory_order_relaxed); // kUploading -> kGpuUploadComplete: arm the pending-adoption counter
-		gpFileManager->mpPackChunks->mLoader.NotifyChunkCompletion();
+		if (rLazyChunk.header.flags & common::ChunkFlags::kTexture)
+		{
+			rLazyChunk.eState.value.store(ChunkState::kGpuUploadComplete, std::memory_order_release);
+			miPendingAdoptions.fetch_add(1, std::memory_order_relaxed); // kUploading -> kGpuUploadComplete: arm the pending-adoption counter
+			gpFileManager->mpPackChunks->mLoader.NotifyChunkCompletion();
+		}
+		else
+		{
+			// The island chunk's eState stays kReady; mUploadMutex publishes its upload image handles to TakeCompletedElevations.
+			{
+				std::unique_lock lock(mUploadMutex);
+				// Heap: the list persists until the main thread takes it, so a workbuffer (frame-scoped) can't own it
+				ScopedSuppressAllocationTracking suppress;
+				mCompletedElevationCrcs.push_back(mCurrentCrc);
+			}
+			miPendingAdoptions.fetch_add(1, std::memory_order_relaxed); // completed elevation: arm the pending-adoption counter
+		}
 
 		ResetUploadProgress();
 	}

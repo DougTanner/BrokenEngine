@@ -43,6 +43,8 @@ struct BufferInfo
 	int64_t iElementSize = 0;
 };
 
+struct StagingBuffer;
+
 struct DeviceLocalBufferUpload
 {
 	const void* pData = nullptr;
@@ -55,7 +57,9 @@ class Buffer
 public:
 
 	static void CreateBuffer(std::string_view name, int64_t iDeviceSize, VkBufferUsageFlags vkBufferUsageFlags, VkMemoryPropertyFlags vkMemoryPropertyFlags, VkBuffer& rVkBuffer, VmaAllocation& rVmaAllocation, VmaAllocationInfo* pVmaAllocationInfo = nullptr);
-	static void UploadToDeviceLocal(VkBuffer vkDeviceLocalBuffer, std::span<const DeviceLocalBufferUpload> uploads);
+	// Records the staged copies plus a transfer-to-vertex-input barrier (index/vertex buffer destinations) into vkCommandBuffer.
+	// The caller keeps the returned staging buffer alive until that command buffer's execution completes.
+	static std::unique_ptr<StagingBuffer> RecordUploadToDeviceLocal(VkCommandBuffer vkCommandBuffer, VkBuffer vkDeviceLocalBuffer, std::span<const DeviceLocalBufferUpload> uploads);
 	static void RecordBarriers(VkCommandBuffer vkCommandBuffer, std::span<const BarrierInfo> barriers);
 
 	Buffer() = default;

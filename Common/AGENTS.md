@@ -66,7 +66,7 @@ reviewed heap work and retain the root-required `// Heap:` rationale.
 ## Logging and Threading Usage
 
 - `LOG(category, level, format, ...)` is compile-time and runtime filtered. Allocation-tracked call sites must stay allocation-free; use the Common formatters/workbuffer wrappers rather than temporary strings. New formatters for Common-visible types belong in `Log/LogFormatters.h`; higher-layer formatters stay with their owning hub.
-- `kTemp` is reserved for transient diagnostics. Durable messages use the owning category and the root log-level meanings.
+- `kTemp` is reserved for transient diagnostics. Durable messages use the owning category and the root log-level meanings. Temporary code, including `kTemp` logs, never lands, so never review or style-check it beyond removing it.
 - Use `gpMultithreading->Dispatch()` for bounded data-parallel work and `PersistentWorker` for a long-lived single worker. A pool dispatch is non-reentrant. Temporary allocations inside dispatched work use that worker's `ThreadLocal` workbuffer.
 
 ## Headers, Validation, and Platform

@@ -17,6 +17,11 @@ namespace engine
 // Extra texture-descriptor slots reserved for pre-blurred lighting texture copies (one per registered lighting texture CRC)
 constexpr int64_t kiLightingBlurSlots = 16;
 
+static uint32_t AllFramebuffersMask()
+{
+	return (1ui32 << static_cast<uint32_t>(std::ssize(gpSwapchainManager->mFramebuffers))) - 1ui32;
+}
+
 std::tuple<int64_t, int64_t> TextureManager::DetailTextureSize(float fMultiplier)
 {
 	auto [iWorldDetailX, iWorldDetailY] = FullDetail();
@@ -500,21 +505,38 @@ VkSampler TextureManager::GetSampler(DescriptorFlags_t flags)
 
 void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 {
-	mFlags.Set(TextureManagerFlags::kPendingAcquireBarriers, false);
+	// Set before the idle early-out: RestorationSweep records into this framebuffer's acquire command buffer afterwards.
+	miAcquireFramebufferIndex = iFramebufferIndex;
 
-	// kGpuUploadComplete awaits transfer-queue adoption; kDiskLoaded uses the same-queue or re-armed Create fallback.
-	// Both states write per-slot, texture-array, and lighting-blur descriptors, requiring RenderGlobal's all-framebuffer-fence drain first.
+	// kGpuUploadComplete awaits transfer-queue adoption; kDiskLoaded uses the same-queue or re-armed recorded fallback.
+	// Both record into the acquire command buffer and queue descriptor publication, so they run inside a bindless write epoch.
 	// The pending-adoption counter excludes kUploading and provides an O(1) idle check.
 	if (gpTextureUploadManager->miPendingAdoptions.load(std::memory_order_relaxed) == 0)
 	{
 		return;
 	}
 
-	miAcquireFramebufferIndex = iFramebufferIndex;
 	bool bNeedAcquireBarrier = gpInstanceManager->miTransferQueueFamilyIndex != gpInstanceManager->miGraphicsQueueFamilyIndex;
-	bool bRecordedBarriers = false;
-	bool bAdoptedTextures = false;
-	VkCommandBuffer vkAcquireCommandBuffer = mAcquireVkCommandBuffers.at(iFramebufferIndex);
+
+	{
+		// Every taken elevation is adopted in this call: teardown subtracts only the untaken list from the counter.
+		// Heap: the taken list is freed here, inside RenderGlobal.
+		ScopedSuppressAllocationTracking suppress;
+		for (common::crc_t islandCrc : gpTextureUploadManager->TakeCompletedElevations())
+		{
+			// Eviction requires a resident template and residency requires adopted elevation, so the minted template
+			// that requested this upload is still waiting for it.
+			IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(islandCrc);
+			ASSERT(rTemplate.iTextureSlot >= 0 && !rTemplate.bGpuResident);
+			LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(islandCrc);
+			rTemplate.elevationTexture.AdoptTransferredImage(rLazyChunk.vkUploadImage, rLazyChunk.vmaAllocation);
+			if (bNeedAcquireBarrier)
+			{
+				rTemplate.elevationTexture.RecordAcquireBarrier(EnsureAcquireCommandBufferBegun());
+			}
+			gpTextureUploadManager->miPendingAdoptions.fetch_sub(1, std::memory_order_relaxed); // completed elevation adopted: disarm the pending-adoption counter
+		}
+	}
 
 	int64_t iAdoptedCount = 0;
 	static constexpr int64_t kiMaxAdoptionsPerFrame = 4;
@@ -529,17 +551,19 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 			continue;
 		}
 
-		if (eState == ChunkState::kGpuUploadComplete)
+		// A lighting texture is blurred at adoption; once this acquire command buffer holds a blur, it waits for a later frame.
+		bool bBlurDeferred = (mFlags & TextureManagerFlags::kBlurRecorded) && gpTextureUploadManager->mLightingTextureCrcs.contains(rCrc);
+
+		if (eState == ChunkState::kGpuUploadComplete && !bBlurDeferred)
 		{
-			AdoptUploadedChunk(rCrc, rTexture, bNeedAcquireBarrier, vkAcquireCommandBuffer, bRecordedBarriers);
-			bAdoptedTextures = true;
+			AdoptUploadedChunk(rCrc, rTexture, bNeedAcquireBarrier);
 
 			if (++iAdoptedCount >= kiMaxAdoptionsPerFrame)
 			{
 				break;
 			}
 		}
-		else if (eState == ChunkState::kDiskLoaded)
+		else if (eState == ChunkState::kDiskLoaded && !bBlurDeferred)
 		{
 			// Fallback: upload thread didn't GPU upload (same queue family)
 
@@ -547,59 +571,45 @@ void TextureManager::ProcessPendingTextures(int64_t iFramebufferIndex)
 			int64_t iExpectedBytes = common::ComputeImageByteSize(rTexture.mInfo.vkFormat, rTexture.mInfo.vkExtent3D.width, rTexture.mInfo.vkExtent3D.height, rTexture.mInfo.iMipLevels, rTexture.mInfo.iArrayLayers, rTexture.mInfo.vkExtent3D.depth);
 			ASSERT(iExpectedBytes > 0 && iExpectedBytes <= rLazyChunk.iDataSize);
 
-			rTexture.Create(rTexture.mInfo, [&](std::span<std::byte> data, int64_t iPosition)
 			{
-				std::memcpy(data.data(), &rLazyChunk.pData[iPosition], static_cast<int64_t>(data.size_bytes()));
-			});
+				// Heap: the recorded create allocates its staging buffer and retirement entry inside RenderGlobal.
+				ScopedSuppressAllocationTracking suppress;
+				RetireStagingBuffer(rTexture.RecordCreate(EnsureAcquireCommandBufferBegun(), rTexture.mInfo, [&](std::span<std::byte> data, int64_t iPosition)
+				{
+					std::memcpy(data.data(), &rLazyChunk.pData[iPosition], static_cast<int64_t>(data.size_bytes()));
+				}));
+			}
 
-			// The copy above is synchronous and no upload thread owns this chunk on the early-out path, so the
-			// pool pages are reclaimable here exactly as on the kGpuUploadComplete path in AdoptUploadedChunk.
+			// RecordCreate copied the pixels into staging and no upload thread owns this chunk on the early-out path, so
+			// the pool pages are reclaimable here exactly as on the kGpuUploadComplete path in AdoptUploadedChunk.
 			gpFileManager->mpPackChunks->DecommitChunkRange(rCrc, 0, rLazyChunk.iDataSize);
 			mTextureDescriptors.UpdateDescriptorsForTexture(rCrc);
-			bAdoptedTextures = true;
 
 			rLazyChunk.eState.value.store(ChunkState::kReady, std::memory_order_release);
 			gpTextureUploadManager->miPendingAdoptions.fetch_sub(1, std::memory_order_relaxed); // adoptable -> kReady: disarm the pending-adoption counter
 
 			if (gpTextureUploadManager->mLightingTextureCrcs.contains(rCrc))
 			{
-				BlurLightingTexture(rCrc);
+				BlurLightingTexture(rCrc, miAcquireFramebufferIndex, EnsureAcquireCommandBufferBegun());
+				mFlags.Set(TextureManagerFlags::kBlurRecorded);
 			}
 
 			// Only upload one texture a frame
 			break;
 		}
 	}
-
-	if (bAdoptedTextures)
-	{
-		mTextureDescriptors.UpdateTextureArrayDescriptors();
-	}
-
-	// CommandBufferManager prepends this acquire buffer. ProcessPendingTextures writes the non-atomic kPendingAcquireBarriers
-	// flag and miAcquireFramebufferIndex on Graphics::RenderGlobal's main thread; SubmitGlobalToQueue reads them on
-	// mSubmitGlobal. Publication depends on that worker's Wake/Wait edge.
-	if (bRecordedBarriers)
-	{
-		CHECK_VK(vkEndCommandBuffer(vkAcquireCommandBuffer));
-		mFlags.Set(TextureManagerFlags::kPendingAcquireBarriers);
-	}
 }
 
-void TextureManager::AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bool bNeedAcquireBarrier, VkCommandBuffer vkAcquireCommandBuffer, bool& rbRecordedBarriers)
+void TextureManager::AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bool bNeedAcquireBarrier)
 {
 	LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(crc);
 
 	// Adopt the GPU-uploaded image (sets mVkImage and creates VkImageView)
 	rTexture.AdoptTransferredImage(rLazyChunk.vkUploadImage, rLazyChunk.vmaAllocation);
 
-	bool bIsLightingTexture = gpTextureUploadManager->mLightingTextureCrcs.contains(crc);
-
-	// Lighting textures handle their own acquire barrier inside BlurLightingTexture's OneShotCommandBuffer
-	if (bNeedAcquireBarrier && !bIsLightingTexture)
+	if (bNeedAcquireBarrier)
 	{
-		EnsureAcquireCommandBufferBegun(vkAcquireCommandBuffer, rbRecordedBarriers);
-		rTexture.RecordAcquireBarrier(vkAcquireCommandBuffer);
+		rTexture.RecordAcquireBarrier(EnsureAcquireCommandBufferBegun());
 	}
 
 	// Race-free decommit of worker-thread-shared CPU-pool state: reaching kGpuUploadComplete means the
@@ -613,17 +623,19 @@ void TextureManager::AdoptUploadedChunk(common::crc_t crc, Texture& rTexture, bo
 	rLazyChunk.eState.value.store(ChunkState::kReady, std::memory_order_release);
 	gpTextureUploadManager->miPendingAdoptions.fetch_sub(1, std::memory_order_relaxed); // adoptable -> kReady: disarm the pending-adoption counter
 
-	if (bIsLightingTexture)
+	if (gpTextureUploadManager->mLightingTextureCrcs.contains(crc))
 	{
-		BlurLightingTexture(crc, bNeedAcquireBarrier);
+		BlurLightingTexture(crc, miAcquireFramebufferIndex, EnsureAcquireCommandBufferBegun());
+		mFlags.Set(TextureManagerFlags::kBlurRecorded);
 	}
 }
 
-void TextureManager::EnsureAcquireCommandBufferBegun(VkCommandBuffer vkAcquireCommandBuffer, bool& rbRecordedBarriers)
+VkCommandBuffer TextureManager::EnsureAcquireCommandBufferBegun()
 {
-	if (rbRecordedBarriers)
+	VkCommandBuffer vkAcquireCommandBuffer = mAcquireVkCommandBuffers.at(miAcquireFramebufferIndex);
+	if (mFlags & TextureManagerFlags::kAcquireCommandBufferBegun)
 	{
-		return;
+		return vkAcquireCommandBuffer;
 	}
 
 	VkCommandBufferBeginInfo vkCommandBufferBeginInfo
@@ -634,13 +646,32 @@ void TextureManager::EnsureAcquireCommandBufferBegun(VkCommandBuffer vkAcquireCo
 		.pInheritanceInfo = nullptr,
 	};
 	CHECK_VK(vkBeginCommandBuffer(vkAcquireCommandBuffer, &vkCommandBufferBeginInfo));
-	rbRecordedBarriers = true;
+	mFlags.Set(TextureManagerFlags::kAcquireCommandBufferBegun);
+	return vkAcquireCommandBuffer;
+}
+
+void TextureManager::EndAcquireCommandBuffer()
+{
+	mFlags.Set(TextureManagerFlags::kBlurRecorded, false);
+	if (!(mFlags & TextureManagerFlags::kAcquireCommandBufferBegun))
+	{
+		return;
+	}
+
+	// CommandBufferManager prepends this acquire buffer. The non-atomic kPendingAcquireBarriers flag and miAcquireFramebufferIndex
+	// are written on Graphics::RenderGlobal's main thread; SubmitGlobalToQueue reads them on mSubmitGlobal. Publication depends on
+	// that worker's Wake/Wait edge.
+	CHECK_VK(vkEndCommandBuffer(mAcquireVkCommandBuffers.at(miAcquireFramebufferIndex)));
+	mFlags.Set(TextureManagerFlags::kAcquireCommandBufferBegun, false);
+	mFlags.Set(TextureManagerFlags::kPendingAcquireBarriers);
 }
 
 void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 {
 	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(crcs, LoadPriority::kRealtime);
 
+	// Boot and device recreation: no frame is in flight and each pass waits its own acquire submission, so every set is writable.
+	TextureDescriptors::ScopedBindlessWriteEpoch bindlessWriteEpoch(mTextureDescriptors, TextureDescriptors::kiAllFramebuffers);
 	for (common::crc_t crc : crcs)
 	{
 		LazyChunk& rLazyChunk = gpFileManager->mpPackChunks->mLazyChunkMap.at(crc);
@@ -657,6 +688,7 @@ void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 
 			std::this_thread::yield();
 			ProcessPendingTextures(0);
+			EndAcquireCommandBuffer();
 
 			// Flush pending acquire barriers since we're not in the render loop
 			if (mFlags & TextureManagerFlags::kPendingAcquireBarriers)
@@ -691,6 +723,7 @@ void TextureManager::WaitForTextures(std::span<const common::crc_t> crcs)
 			}
 		}
 	}
+	mTextureDescriptors.PublishAllFramebuffers();
 }
 
 void TextureManager::WaitForTextures(std::span<Texture* const> textures)
@@ -704,6 +737,52 @@ void TextureManager::WaitForTextures(std::span<Texture* const> textures)
 	WaitForTextures(common::gpThreadLocal->mWorkbuffer.Span<common::crc_t>());
 }
 
+void TextureManager::RetireStagingBuffer(std::unique_ptr<StagingBuffer> pStagingBuffer)
+{
+	// Heap: the entry persists across frames; retired inside RenderGlobal.
+	ScopedSuppressAllocationTracking suppress;
+	mRetiredStagingBuffers.push_back({.pStagingBuffer = std::move(pStagingBuffer), .uiFramebufferMask = AllFramebuffersMask()});
+}
+
+void TextureManager::RetireImage(Texture& rTexture)
+{
+	ASSERT(rTexture.mVkImage != VK_NULL_HANDLE);
+	// Heap: the entry persists across frames; retired inside RenderGlobal.
+	ScopedSuppressAllocationTracking suppress;
+	mRetiredImages.push_back({.pTexture = std::make_unique<Texture>(std::move(rTexture)), .uiFramebufferMask = AllFramebuffersMask()});
+}
+
+void TextureManager::MarkFramebufferWaited(int64_t iFramebuffer)
+{
+	uint32_t uiClearMask = ~(1ui32 << static_cast<uint32_t>(iFramebuffer));
+	for (RetiredStagingBuffer& rRetired : mRetiredStagingBuffers)
+	{
+		rRetired.uiFramebufferMask &= uiClearMask;
+	}
+	for (RetiredImage& rRetired : mRetiredImages)
+	{
+		rRetired.uiFramebufferMask &= uiClearMask;
+	}
+}
+
+void TextureManager::DestroyUnheldRetiredResources()
+{
+	std::erase_if(mRetiredStagingBuffers, [](const RetiredStagingBuffer& rRetired)
+	{
+		return rRetired.uiFramebufferMask == 0;
+	});
+	std::erase_if(mRetiredImages, [](const RetiredImage& rRetired)
+	{
+		return rRetired.uiFramebufferMask == 0;
+	});
+}
+
+void TextureManager::DestroyAllRetiredResources()
+{
+	mRetiredStagingBuffers.clear();
+	mRetiredImages.clear();
+}
+
 void RegisterLightingTextureCrc(common::crc_t crc)
 {
 	gpFileManager->mpPackChunks->mLoader.RequestChunkLoad(std::span(&crc, 1), LoadPriority::kNormal);
@@ -714,8 +793,9 @@ void RegisterLightingTextureCrc(common::crc_t crc)
 	ASSERT(static_cast<int64_t>(gpTextureUploadManager->mLightingTextureCrcs.size()) <= kiLightingBlurSlots);
 }
 
-void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBarrier)
+void TextureManager::BlurLightingTexture(common::crc_t crc, int64_t iDescriptorSet, VkCommandBuffer vkCommandBuffer)
 {
+	mTextureDescriptors.AssertSetsWritable(iDescriptorSet);
 	// Heap: GPU textures for pre-blurred lighting
 	ScopedSuppressAllocationTracking suppress;
 
@@ -723,89 +803,75 @@ void TextureManager::BlurLightingTexture(common::crc_t crc, bool bNeedAcquireBar
 	int64_t iBlurWidth = static_cast<int64_t>(rSource.mInfo.vkExtent3D.width) * 2i64;
 	int64_t iBlurHeight = static_cast<int64_t>(rSource.mInfo.vkExtent3D.height) * 2i64;
 
-	// Texture::Create destroys the existing image before recreation.
-	auto itIntermediate = mBlurIntermediateTextures.try_emplace(crc).first;
-	itIntermediate->second.Create(
-	{
-		.textureFlags = {},
-		.name = "LightingBlurIntermediate",
-		.vkImageCreateFlags = 0,
-		.vkFormat = shaders::kVkFormatCombine,
-		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iBlurWidth), .height = static_cast<uint32_t>(iBlurHeight), .depth = 1},
-		.iMipLevels = 1,
-		.iArrayLayers = 1,
-		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
-		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
-		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = TextureLayout::kComputeReadWrite,
-	});
-
+	// The source extent is fixed per CRC, so later blurs rewrite both images in place.
+	auto [itIntermediate, bFirstBlur] = mBlurIntermediateTextures.try_emplace(crc);
 	auto itResult = mBlurredLightingTextures.try_emplace(crc).first;
-	itResult->second.Create(
-	{
-		.textureFlags = {},
-		.name = "LightingBlurResult",
-		.vkImageCreateFlags = 0,
-		.vkFormat = shaders::kVkFormatCombine,
-		.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iBlurWidth), .height = static_cast<uint32_t>(iBlurHeight), .depth = 1},
-		.iMipLevels = 1,
-		.iArrayLayers = 1,
-		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
-		.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
-		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
-		.eTextureLayout = TextureLayout::kShaderReadOnly,
-	});
-
 	Texture& rIntermediate = itIntermediate->second;
 	Texture& rResult = itResult->second;
+	if (bFirstBlur)
+	{
+		// kUndefined: Texture::Create submits no layout transition; the first barrier below records it.
+		TextureInfo blurInfo
+		{
+			.textureFlags = {},
+			.name = "LightingBlurIntermediate",
+			.vkImageCreateFlags = 0,
+			.vkFormat = shaders::kVkFormatCombine,
+			.vkExtent3D = VkExtent3D {.width = static_cast<uint32_t>(iBlurWidth), .height = static_cast<uint32_t>(iBlurHeight), .depth = 1},
+			.iMipLevels = 1,
+			.iArrayLayers = 1,
+			.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+			.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+			.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+			.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
+			.eTextureLayout = TextureLayout::kUndefined,
+		};
+		rIntermediate.Create(blurInfo);
+		blurInfo.name = "LightingBlurResult";
+		rResult.Create(blurInfo);
+	}
 
 	Pipeline& rHorizontalBlur = gpPipelineManager->mpPipelines[kPipelineLightingBlurH];
 	Pipeline& rVerticalBlur = gpPipelineManager->mpPipelines[kPipelineLightingBlurV];
 
-	PipelineDescriptorWriter::UpdateImageDescriptor(rHorizontalBlur, 0, mpSamplersVkSampler[kSamplerSlotLinearClamp], rSource.mVkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-	PipelineDescriptorWriter::UpdateImageDescriptor(rHorizontalBlur, 1, VK_NULL_HANDLE, rIntermediate.mVkImageView, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-	PipelineDescriptorWriter::UpdateImageDescriptor(rVerticalBlur, 0, mpSamplersVkSampler[kSamplerSlotLinearClamp], rIntermediate.mVkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-	PipelineDescriptorWriter::UpdateImageDescriptor(rVerticalBlur, 1, VK_NULL_HANDLE, rResult.mVkImageView, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+	PipelineDescriptorWriter::UpdateImageDescriptorInSet(rHorizontalBlur, iDescriptorSet, 0, mpSamplersVkSampler[kSamplerSlotLinearClamp], rSource.mVkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	PipelineDescriptorWriter::UpdateImageDescriptorInSet(rHorizontalBlur, iDescriptorSet, 1, VK_NULL_HANDLE, rIntermediate.mVkImageView, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+	PipelineDescriptorWriter::UpdateImageDescriptorInSet(rVerticalBlur, iDescriptorSet, 0, mpSamplersVkSampler[kSamplerSlotLinearClamp], rIntermediate.mVkImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	PipelineDescriptorWriter::UpdateImageDescriptorInSet(rVerticalBlur, iDescriptorSet, 1, VK_NULL_HANDLE, rResult.mVkImageView, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
 	int32_t iWidth = static_cast<int32_t>(iBlurWidth);
 	int32_t iHeight = static_cast<int32_t>(iBlurHeight);
 	float fSigma = gLightingBlurSigma.mfCurrent;
 	float fPackedW = static_cast<float>(static_cast<int32_t>(gLightingBlurSampleCount.mfCurrent)) + gLightingBlurEdgeFalloff.mfCurrent / 100.0f;
 
-	OneShotCommandBuffer oneShotCommandBuffer;
-	VkCommandBuffer vkCommandBuffer = oneShotCommandBuffer.mVkCommandBuffer;
-
-	// Complete queue family ownership transfer if texture was uploaded on a separate transfer queue
-	if (bNeedAcquireBarrier)
-	{
-		rSource.RecordAcquireBarrier(vkCommandBuffer);
-	}
+	// From kShaderReadOnly, the barrier orders this in-place rewrite after earlier frames' reads on the same queue.
+	TextureLayout ePreviousLayout = bFirstBlur ? TextureLayout::kUndefined : TextureLayout::kShaderReadOnly;
+	rIntermediate.TransitionImageLayout(vkCommandBuffer, ePreviousLayout, TextureLayout::kComputeReadWrite);
+	rResult.TransitionImageLayout(vkCommandBuffer, ePreviousLayout, TextureLayout::kComputeReadWrite);
 
 	// Horizontal pass: source → intermediate
-	rIntermediate.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kComputeReadWrite);
-	rHorizontalBlur.RecordCompute(0, vkCommandBuffer, TileCount(iBlurWidth), TileCount(iBlurHeight), 1, {std::bit_cast<float>(iWidth), std::bit_cast<float>(iHeight), fSigma, fPackedW});
+	rHorizontalBlur.RecordCompute(iDescriptorSet, vkCommandBuffer, TileCount(iBlurWidth), TileCount(iBlurHeight), 1, {std::bit_cast<float>(iWidth), std::bit_cast<float>(iHeight), fSigma, fPackedW});
 
 	// Transition intermediate: storage write → shader read for V pass sampler
 	rIntermediate.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 
 	// Vertical pass: intermediate → result
-	rResult.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
-	rVerticalBlur.RecordCompute(0, vkCommandBuffer, TileCount(iBlurWidth), TileCount(iBlurHeight), 1, {std::bit_cast<float>(iWidth), std::bit_cast<float>(iHeight), fSigma, fPackedW});
+	rVerticalBlur.RecordCompute(iDescriptorSet, vkCommandBuffer, TileCount(iBlurWidth), TileCount(iBlurHeight), 1, {std::bit_cast<float>(iWidth), std::bit_cast<float>(iHeight), fSigma, fPackedW});
 
 	// Transition result back to shader read for bindless sampling
 	rResult.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 
-	oneShotCommandBuffer.Execute();
-
-	// Register blurred texture in bindless array. Render-phase caller: CrcToIndex is lock-free, safe only
-	//   because no worker Spawn runs concurrently (see TextureDescriptors::CrcToIndex).
-	ASSERT(common::gpThreadLocal != nullptr && !common::gpThreadLocal->mbInFrameTick);
-	common::crc_t blurredCrc = crc ^ TextureDescriptors::kBlurSalt;
-	int64_t iBlurredIndex = mTextureDescriptors.CrcToIndex(blurredCrc);
-	mTextureDescriptors.mImageInfos.at(iBlurredIndex).imageView = rResult.mVkImageView;
-	mTextureDescriptors.UpdateTextureArrayDescriptors();
+	// A reblur leaves the bindless element unchanged, so only the first blur publishes it.
+	if (bFirstBlur)
+	{
+		// Register blurred texture in bindless array. Render-phase caller: CrcToIndex is lock-free, safe only
+		//   because no worker Spawn runs concurrently (see TextureDescriptors::CrcToIndex).
+		ASSERT(common::gpThreadLocal != nullptr && !common::gpThreadLocal->mbInFrameTick);
+		common::crc_t blurredCrc = crc ^ TextureDescriptors::kBlurSalt;
+		int64_t iBlurredIndex = mTextureDescriptors.CrcToIndex(blurredCrc);
+		mTextureDescriptors.mImageInfos.at(iBlurredIndex).imageView = rResult.mVkImageView;
+		mTextureDescriptors.AppendPublication(blurredCrc, -1);
+	}
 }
 
 void TextureManager::ReblurAllLightingTextures()
@@ -816,7 +882,10 @@ void TextureManager::ReblurAllLightingTextures()
 		//   not ready, so it stays unblurred like the request path leaves it
 		if (gpFileManager->mpPackChunks->IsChunkReady(crc))
 		{
-			BlurLightingTexture(crc);
+			// Executed before the next blur rewrites the blur pipelines' set 0.
+			OneShotCommandBuffer oneShotCommandBuffer;
+			BlurLightingTexture(crc, 0, oneShotCommandBuffer.mVkCommandBuffer);
+			oneShotCommandBuffer.Execute();
 		}
 	}
 }

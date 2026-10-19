@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:18:59.221Z","dependsOn":["Documents/Plans/Engine/NavigationPerFlightPlane.md","Documents/Plans/Game/FlightPlaneClimbing.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:18:59.221Z","dependsOn":[]} -->
 # Present ships on higher flight planes correctly: camera, shadows, lighting samples, audio panning, debug markers
 
 Tier 3 (`.agents/references/risk-tiers.md`): client-only render and audio
@@ -16,7 +16,7 @@ repository-relative.
 
 ## Context
 
-After `Documents/Plans/Game/FlightPlaneClimbing.md` a ship's position Z is a plane height (6, 50, or 100 m) or strictly between the lowest and highest, and Fighters tilt while climbing. Every presentation path still assumes the lowest plane:
+A ship's position Z is a plane height (6, 50, or 100 m) or strictly between the lowest and highest, moved only by `ClimbTowardsFlightPlane` (`ShipBehaviours.h`), and Fighters tilt while climbing through the client-only `FightersInterpolate::pfClimbTilts`. Every presentation path still assumes the lowest plane:
 
 - Camera: `PullTarget` returns the tracked ship's full position
   (`Projects/BrokenEngineSandbox/Source/Graphics/Camera.cpp:50,58`); the engine
@@ -74,9 +74,8 @@ After `Documents/Plans/Game/FlightPlaneClimbing.md` a ship's position Z is a pla
   plane (`:155,165,172`), so a high ship's markers float 94 m below it. The
   cell-edge and island-boundary debug lines in
   `Engine/Source/Graphics/Render/MainUniforms.cpp:23,62` are world geometry, not
-  ship markers, and `Documents/Plans/Engine/NavigationPerFlightPlane.md`
-  (prerequisite, its decision 8) draws the nav-polygon debug lines (`:160`) per
-  plane at each plane's height.
+  ship markers, and `DebugRenderNavigationData` draws the nav-polygon
+  debug lines per plane at each plane's height.
 - Tuning convention: `Wrapper(value, min, max)` globals in `Engine/Source/Ui/ShadowWrappersBase.cpp/.h` (`gObjectShadowsGrow` at `:28`/`:30`), each registered by label in `Engine/Source/Ui/Screens/TweaksScreen/TweaksScreenShadow.cpp` (`"Object Shadow Grow"` at `:33`). Uniform-only products are folded CPU-side (`Engine/Data/Shaders/AGENTS.md`).
 - Binding decisions from the user: the camera height stays player-controlled (zoom) and never follows the tracked ship's climb; everything here is client-only render and audio outside the CRC; no backward compatibility.
 
@@ -184,8 +183,8 @@ Each decision is recorded as made; the alternatives are not open.
    the flagship destination circle (`:165`) drops its `XMVectorSetZ` and uses
    the flagship's own interpolated position. The cell and island debug lines in
    `MainUniforms.cpp` stay on the lowest plane: they outline cells and islands,
-   not ships; the nav-polygon debug lines are left as `NavigationPerFlightPlane`
-   draws them, per plane.
+   not ships; the nav-polygon debug lines stay as `DebugRenderNavigationData`
+   (`MainUniforms.cpp`) draws them, per plane at each plane's height.
 10. **Culling is unchanged.** The Z = 0 footprint over-includes everything above zero under the straight-down eye (Context), so no renderer's `InVisibleArea` test moves.
 11. **No format or version changes.** `GlobalLayout` and `HexShieldLayout` are per-frame GPU layouts rebuilt every frame; the shader pack is re-exported by the build; no `Frame::kiVersion`, `kiProtocolVersion`, save, or replay bytes change.
 
@@ -277,7 +276,7 @@ The post-split `RenderNavigation` in the ship render files: decision 9.
 - `LightingHeightFalloff`'s deposit dimming, `SurfaceHeight`'s definition, `ProjectToBaseHeight`, `ToBaseHeight`, `BaseHeightPosition`, and the smoke, particle, wind-trail, and smoke-trail projections (`SmokePerFlightPlane` owns the smoke ones).
 - `VisibleLight.frag`, point- and area-light sprites, explosion and hit-flash effects at height.
 - Audio fade, cull, priority, Doppler, listener orientation, and the height-lerped curves; a 3D listener.
-- `MainUniforms.cpp` debug lines (cell edges, island boundaries, nav polygons); the Fighter climb tilt (`FlightPlaneClimbing` decision 13).
+- `MainUniforms.cpp` debug lines (cell edges, island boundaries, nav polygons); the Fighter climb tilt (`FightersInterpolate::pfClimbTilts`).
 - The HUD, `ScreenToWorld` picking heights, screenshots or captures of a plane, and any new harness command.
 - Renaming `fBaseHeight` or any uniform; `Frame::kiVersion`, `kiProtocolVersion`, save, replay, and wire formats.
 
@@ -304,11 +303,11 @@ The post-split `RenderNavigation` in the ship render files: decision 9.
 |---|---|---|
 | Builds | Client and server BrokenEngineSandbox build; the shader pack rebuilds `ModelStatic.vert`, `ModelSkinned.vert`, `Model.frag`, `HexShield.vert`, and `HexShieldLighting.frag` without diagnostics | `/compile` client and server |
 | Tuning values are live | With the F3 Tweaks overlay open, `describe_ui` lists `Object Shadow Height Offset` at `1` and `Terrain Shadow Height Fade` at `30` | `/agent-harness` client `describe_ui` |
-| Camera framing unchanged by a climb | Tracking a fleet Fighter, `set_fleet_flight_plane {type: Fighter, plane: 2}`: screenshots before, mid-climb, and at 100 m show the same water-grid scale and visible-area extent (`query_camera` or the continuity probe reports the same eye height and visible area), the Fighter growing on screen as it climbs; `plane: 0` returns it | `/agent-harness`: launch, `set_fleet_flight_plane`, timed `screenshot`, camera/continuity query |
+| Camera framing unchanged by a climb | Tracking a fleet Fighter, an `inject_payload` `UpdateShip` entry for it with `uiTargetFlightPlane` 2 (restating `bUseMissiles` and `navigationDelaySeconds`): screenshots before, mid-climb, and at 100 m show the same water-grid scale and visible-area extent (`query_camera` or the continuity probe reports the same eye height and visible area), the Fighter growing on screen as it climbs; `uiTargetFlightPlane` 0 returns it | `/agent-harness`: launch, `inject_payload` `UpdateShip` with `uiTargetFlightPlane`, timed `screenshot`, camera/continuity query |
 | Shadow offset grows with height | Two Fighters in one screenshot with the sun away from the zenith, one on plane 0 and one on plane 2: the high one's object shadow lies further from its hull along the sun's ground projection; a mid-climb screenshot shows an intermediate offset | `/agent-harness` `screenshot`; `edit_frame` on a `fighters` row's `pVecPositions` Z for a paused still if the climb is too fast |
 | High ship leaves terrain shadow | A Fighter ordered to plane 2 over a terrain-shadowed slope (morning or evening sun) is drawn lit while a plane-0 Fighter in the same shadow is drawn dark | `/agent-harness` `screenshot`, `edit_frame` placement |
 | Model lighting follows its deposit | A Fighter on plane 2 near the screen edge, firing: its hull picks up its own blaster light (the lit side faces the deposit), where the baseline build leaves the hull unlit because the deposit lies outward of the raw XY | `/agent-harness` `screenshot` baseline then change, `UpdateShip` fire via `inject_payload` or a random-spawn fight |
-| Hex shield glow centred under a high Omni | An Omni ordered to its highest plane (plane 1, 50 m) over an island slope near the screen edge, shields up: the shield's ground glow sits directly under the shield on screen; on the baseline build it is displaced outward | `/agent-harness` `set_fleet_flight_plane {type: Omni, plane: 1}`, `screenshot` baseline then change |
+| Hex shield glow centred under a high Omni | An Omni ordered to its highest plane (plane 1, 50 m) over an island slope near the screen edge, shields up: the shield's ground glow sits directly under the shield on screen; on the baseline build it is displaced outward | `/agent-harness` `inject_payload` `UpdateShip` with `uiTargetFlightPlane` 1 (restating `bUseMissiles` and `navigationDelaySeconds`), `screenshot` baseline then change |
 | Debug markers at ship height | With `kbDebugRender`, a navigating Fighter on plane 2 shows its waypoint line and destination circle at its own height (no vertical drop from the hull to the markers in a screenshot near the screen edge) | `/agent-harness` `screenshot` |
 | Audio pans by XY | With a Fighter on plane 2 firing left of screen centre, `query_audio` (or the audio harness rig's per-voice matrix) reports a left-weighted output matrix equal to the same ship firing on plane 0 at the same XY | `/agent-harness` audio rig, or code reading of `ApplyThreeDimensionalVolume` if no rig exposes the matrix |
 | Low plane unchanged | With every ship on plane 0, screenshots over water and over terrain and the Tweaks-default audio mix match a baseline session at `c1420821` plus the prerequisites, up to the lighting and shadow passes' own temporal noise | `/agent-harness` `verification.md` smoke run, `screenshot`, baseline then change |

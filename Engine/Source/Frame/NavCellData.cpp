@@ -289,7 +289,7 @@ static void BuildCellVisibilityGraph(NavData& rNavigationData)
 	}
 }
 
-void BuildCellNavigationData(NavData& rNavigationData, const std::vector<IslandPlacement>& rPlacements)
+static void BuildPlaneNavigationData(NavData& rNavigationData, const std::vector<IslandPlacement>& rPlacements, int64_t iPlane)
 {
 	std::chrono::steady_clock::time_point startTimePoint = std::chrono::steady_clock::now();
 
@@ -313,7 +313,7 @@ void BuildCellNavigationData(NavData& rNavigationData, const std::vector<IslandP
 		}
 
 		const IslandTemplate& rTemplate = it->second;
-		const NavContour& rContour = rTemplate.navContour;
+		const NavContour& rContour = rTemplate.navContours.at(iPlane);
 		int64_t iVertexCount = std::ssize(rContour.vertices);
 		if (iVertexCount == 0)
 		{
@@ -365,7 +365,17 @@ void BuildCellNavigationData(NavData& rNavigationData, const std::vector<IslandP
 		BuildNavigationAdjacency(rNavigationData);
 	}
 
-	LOG(kNavData, kInfo, "BuildCellNavData: placements={} vertices={} polygons={} visEdges={} wireBytes={} elapsedUs={}", std::ssize(rPlacements), std::ssize(rNavigationData.vertices), std::ssize(rNavigationData.polygonOffsets), std::ssize(rNavigationData.visibilityEdgeA), std::ssize(rNavigationData.visibilityEdgeA) * (sizeof(int32_t) + sizeof(int32_t)), std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - startTimePoint).count());
+	LOG(kNavData, kInfo, "BuildCellNavData: plane={} placements={} vertices={} polygons={} visEdges={} wireBytes={} elapsedUs={}", iPlane, std::ssize(rPlacements), std::ssize(rNavigationData.vertices), std::ssize(rNavigationData.polygonOffsets), std::ssize(rNavigationData.visibilityEdgeA), std::ssize(rNavigationData.visibilityEdgeA) * (sizeof(int32_t) + sizeof(int32_t)), std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - startTimePoint).count());
+}
+
+void BuildCellNavigationData(std::vector<NavData>& rNavigationData, const std::vector<IslandPlacement>& rPlacements)
+{
+	// A plane without kTerrainCollision has empty template contours, so its graph builds empty.
+	rNavigationData.resize(static_cast<size_t>(gpFlightPlanes->Count()));
+	for (const auto& [i, rPlaneNavigationData] : std::views::enumerate(rNavigationData))
+	{
+		BuildPlaneNavigationData(rPlaneNavigationData, rPlacements, i);
+	}
 }
 
 void BuildNavigationAcceleration(NavData& rNavigationData)

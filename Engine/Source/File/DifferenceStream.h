@@ -6,22 +6,20 @@ namespace engine
 {
 
 // Streaming supports non-copyable types.
-template <typename T>
-inline void TransferViaStream(const T& rFrom, T& rTo)
+inline void TransferViaStream(const game::Frame& rFrom, game::Frame& rTo)
 {
 	std::stringstream buffer;
 	buffer << rFrom;
 	buffer >> rTo;
 }
 
-template <typename SAVED_TYPE, typename DIFFERENCE_TYPE>
 class DifferenceStreamWriter
 {
 public:
 
-	using difference_t = std::tuple<int64_t, DIFFERENCE_TYPE>;
+	using difference_t = std::tuple<int64_t, game::FrameInput>;
 
-	DifferenceStreamWriter(const SAVED_TYPE& rSavedStart, const DIFFERENCE_TYPE& rInitialDifference, bool bRecordInitialChecksum = true)
+	DifferenceStreamWriter(const game::Frame& rSavedStart, const game::FrameInput& rInitialDifference, bool bRecordInitialChecksum = true)
 	{
 		mDifferences.reserve(1'024);
 
@@ -50,7 +48,7 @@ public:
 		}
 	}
 
-	void Update(int64_t iTick, const DIFFERENCE_TYPE& rDifference, const SAVED_TYPE& rSavedCurrent)
+	void Update(int64_t iTick, const game::FrameInput& rDifference, const game::Frame& rSavedCurrent)
 	{
 		mChecksums.push_back(rSavedCurrent.Crc());
 		LOG(kReplay, kVerbose, "Checksum DifferenceStreamWriter Update {}: {}", rSavedCurrent.interpolate.iTick, *std::prev(mChecksums.end()));
@@ -69,15 +67,15 @@ public:
 		mCurrentDifference = rDifference;
 	}
 
-	bool Save(FileFlags_t fileFlags, const std::filesystem::path& rFilename, const SAVED_TYPE& rSavedEnd)
+	bool Save(FileFlags_t fileFlags, const std::filesystem::path& rFilename, const game::Frame& rSavedEnd)
 	{
 		int64_t iDifferenceCount = std::ssize(mDifferences);
 		int64_t iPostDispatchCount = std::ssize(mPostDispatchRecords);
 
 		bool bHeaderWritten = gpFileManager->WriteFileAtomically(fileFlags, rFilename, [&](std::fstream& rHeaderStream)
 		{
-			WriteVersionHeader<SAVED_TYPE>(rHeaderStream);
-			WriteVersionHeader<DIFFERENCE_TYPE>(rHeaderStream);
+			WriteVersionHeader<game::Frame>(rHeaderStream);
+			WriteVersionHeader<game::FrameInput>(rHeaderStream);
 
 			rHeaderStream << mSavedStart;
 			rHeaderStream << mInitialDifference;
@@ -175,17 +173,17 @@ public:
 
 private:
 
-	static void WriteDifferenceRecord(std::ostream& rStream, int64_t iTick, const DIFFERENCE_TYPE& rDifference)
+	static void WriteDifferenceRecord(std::ostream& rStream, int64_t iTick, const game::FrameInput& rDifference)
 	{
 		common::Write(rStream, iTick);
 		rStream << rDifference;
 	}
 
-	SAVED_TYPE mSavedStart {};
-	DIFFERENCE_TYPE mInitialDifference {};
+	game::Frame mSavedStart {};
+	game::FrameInput mInitialDifference {};
 
 	std::vector<difference_t> mDifferences;
-	DIFFERENCE_TYPE mCurrentDifference {};
+	game::FrameInput mCurrentDifference {};
 
 public:
 	// Records an event that happens after iTick's dispatch. Appends are strictly increasing by construction,
@@ -199,14 +197,13 @@ private:
 	std::stringstream mFullFramesStream;
 };
 
-template <typename SAVED_TYPE, typename DIFFERENCE_TYPE>
 class DifferenceStreamReader
 {
 public:
 
-	using difference_t = std::tuple<int64_t, DIFFERENCE_TYPE>;
+	using difference_t = std::tuple<int64_t, game::FrameInput>;
 
-	DifferenceStreamReader(const FileFlags_t& rFileFlags, const std::filesystem::path& rFilename, SAVED_TYPE& rSavedStart, DIFFERENCE_TYPE& rInitialDifference, bool& rbLoaded, bool& rbVersionMismatch, int64_t& riMismatchFileVersion, int64_t& riMismatchExpectedVersion, bool bRecordsInitialChecksum = true)
+	DifferenceStreamReader(const FileFlags_t& rFileFlags, const std::filesystem::path& rFilename, game::Frame& rSavedStart, game::FrameInput& rInitialDifference, bool& rbLoaded, bool& rbVersionMismatch, int64_t& riMismatchFileVersion, int64_t& riMismatchExpectedVersion, bool bRecordsInitialChecksum = true)
 	{
 		rbLoaded = false;
 		rbVersionMismatch = false;
@@ -221,30 +218,30 @@ public:
 
 		int64_t iSavedVersion = 0;
 		int64_t iSavedSize = 0;
-		if (!ReadAndValidateVersionHeader<SAVED_TYPE>(headerStream, iSavedVersion, iSavedSize))
+		if (!ReadAndValidateVersionHeader<game::Frame>(headerStream, iSavedVersion, iSavedSize))
 		{
-			LOG(kDefault, kWarning, "DifferenceStreamReader SAVED_TYPE version mismatch: file {} {}, expected {} {}", iSavedVersion, iSavedSize, SAVED_TYPE::kiVersion, sizeof(SAVED_TYPE));
+			LOG(kDefault, kWarning, "DifferenceStreamReader SAVED_TYPE version mismatch: file {} {}, expected {} {}", iSavedVersion, iSavedSize, game::Frame::kiVersion, sizeof(game::Frame));
 			// Only a fully read header naming a different version is a version mismatch; a short read leaves the
 			// values meaningless, and a matching version that failed the size check is a damaged header.
-			if (headerStream && iSavedVersion != SAVED_TYPE::kiVersion)
+			if (headerStream && iSavedVersion != game::Frame::kiVersion)
 			{
 				rbVersionMismatch = true;
 				riMismatchFileVersion = iSavedVersion;
-				riMismatchExpectedVersion = SAVED_TYPE::kiVersion;
+				riMismatchExpectedVersion = game::Frame::kiVersion;
 			}
 			return;
 		}
 
 		int64_t iDifferenceVersion = 0;
 		int64_t iDifferenceSize = 0;
-		if (!ReadAndValidateVersionHeader<DIFFERENCE_TYPE>(headerStream, iDifferenceVersion, iDifferenceSize))
+		if (!ReadAndValidateVersionHeader<game::FrameInput>(headerStream, iDifferenceVersion, iDifferenceSize))
 		{
-			LOG(kDefault, kWarning, "DifferenceStreamReader DIFFERENCE_TYPE version mismatch: file {} {}, expected {} {}", iDifferenceVersion, iDifferenceSize, DIFFERENCE_TYPE::kiVersion, sizeof(DIFFERENCE_TYPE));
-			if (headerStream && iDifferenceVersion != DIFFERENCE_TYPE::kiVersion)
+			LOG(kDefault, kWarning, "DifferenceStreamReader DIFFERENCE_TYPE version mismatch: file {} {}, expected {} {}", iDifferenceVersion, iDifferenceSize, game::FrameInput::kiVersion, sizeof(game::FrameInput));
+			if (headerStream && iDifferenceVersion != game::FrameInput::kiVersion)
 			{
 				rbVersionMismatch = true;
 				riMismatchFileVersion = iDifferenceVersion;
-				riMismatchExpectedVersion = DIFFERENCE_TYPE::kiVersion;
+				riMismatchExpectedVersion = game::FrameInput::kiVersion;
 			}
 			return;
 		}
@@ -279,7 +276,7 @@ public:
 		for (int64_t i = 0; i < iPostDispatchCount; ++i)
 		{
 			int64_t iTick = 0;
-			DIFFERENCE_TYPE postDispatch {};
+			game::FrameInput postDispatch {};
 			if (!ReadDifferenceRecord(headerStream, iTick, postDispatch))
 			{
 				LOG(kDefault, kWarning, "DifferenceStreamReader post-dispatch section doesn't match its count");
@@ -330,7 +327,7 @@ public:
 		for (int64_t i = 0; i < miDifferenceCount; ++i)
 		{
 			int64_t iTick = 0;
-			DIFFERENCE_TYPE difference {};
+			game::FrameInput difference {};
 			if (!ReadDifferenceRecord(fileStream, iTick, difference))
 			{
 				LOG(kDefault, kWarning, "Recorded frames file size doesn't match header");
@@ -400,7 +397,7 @@ public:
 				mFullFramesStream << fullFramesFile.rdbuf();
 				if (mReaderFlags & ReaderFlags::kRecordsInitialChecksum)
 				{
-					SAVED_TYPE firstFrame;
+					game::Frame firstFrame;
 					if (TryReadFullFrame(firstFrame))
 					{
 						if (firstFrame.Crc() != rSavedStart.Crc())
@@ -431,7 +428,7 @@ public:
 		return (mReaderFlags & ReaderFlags::kTerminalChecksumValidated) && mDifferencesIterator == mDifferences.end();
 	}
 
-	void ValidateChecksum(int64_t iTick, const SAVED_TYPE& rSavedCurrent)
+	void ValidateChecksum(int64_t iTick, const game::Frame& rSavedCurrent)
 	{
 		if (mChecksums.empty())
 		{
@@ -446,7 +443,7 @@ public:
 
 		LOG(kReplay, kVerbose, "Checksum DifferenceStreamReader {}: {}", rSavedCurrent.interpolate.iTick, rSavedCurrent.Crc());
 
-		[[maybe_unused]] SAVED_TYPE savedFrame {};
+		[[maybe_unused]] game::Frame savedFrame {};
 		[[maybe_unused]] bool bSavedFrameValid = false;
 		if constexpr (kbReplayFullFrames)
 		{
@@ -481,7 +478,7 @@ public:
 
 	// Post-dispatch records are one-shot events, so an exact tick match is the only hit: a record is never
 	// carried forward the way a difference is.
-	bool LoadPostDispatch(int64_t iTick, DIFFERENCE_TYPE& rPostDispatch)
+	bool LoadPostDispatch(int64_t iTick, game::FrameInput& rPostDispatch)
 	{
 		if (mPostDispatchRecordsIterator == mPostDispatchRecords.end() || iTick != std::get<0>(*mPostDispatchRecordsIterator))
 		{
@@ -496,7 +493,7 @@ public:
 		return true;
 	}
 
-	bool LoadDifference(int64_t iTick, DIFFERENCE_TYPE& rDifference)
+	bool LoadDifference(int64_t iTick, game::FrameInput& rDifference)
 	{
 		// The terminal tick applies its final input to the retained saved end frame, validates it,
 		// and only then lets the game retire this reader without dispatching another frame.
@@ -521,7 +518,7 @@ public:
 		return true;
 	}
 
-	bool Update(int64_t iTick, DIFFERENCE_TYPE& rDifference, const SAVED_TYPE& rSavedCurrent)
+	bool Update(int64_t iTick, game::FrameInput& rDifference, const game::Frame& rSavedCurrent)
 	{
 		ValidateChecksum(iTick, rSavedCurrent);
 
@@ -538,7 +535,7 @@ private:
 		kFullFramesInvalid         = 0x08,
 	};
 
-	static bool ReadDifferenceRecord(std::istream& rStream, int64_t& riTick, DIFFERENCE_TYPE& rDifference)
+	static bool ReadDifferenceRecord(std::istream& rStream, int64_t& riTick, game::FrameInput& rDifference)
 	{
 		common::Read(rStream, riTick);
 		if (rStream.gcount() != static_cast<std::streamsize>(sizeof(riTick)))
@@ -549,7 +546,7 @@ private:
 		return static_cast<bool>(rStream);
 	}
 
-	bool TryReadFullFrame(SAVED_TYPE& rSavedFrame)
+	bool TryReadFullFrame(game::Frame& rSavedFrame)
 	{
 		bool bReadSucceeded = false;
 		try
@@ -590,7 +587,7 @@ private:
 	}
 
 public:
-	SAVED_TYPE mSavedEnd {};
+	game::Frame mSavedEnd {};
 
 	int64_t miDifferenceCount = 0;
 
@@ -598,7 +595,7 @@ private:
 
 	std::vector<difference_t> mDifferences;
 	typename std::vector<difference_t>::iterator mDifferencesIterator = mDifferences.end();
-	DIFFERENCE_TYPE mCurrentDifference {};
+	game::FrameInput mCurrentDifference {};
 
 	std::vector<difference_t> mPostDispatchRecords;
 	typename std::vector<difference_t>::iterator mPostDispatchRecordsIterator = mPostDispatchRecords.end();

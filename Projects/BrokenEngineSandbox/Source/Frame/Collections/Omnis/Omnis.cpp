@@ -83,6 +83,9 @@ void OmnisInterpolate::Register()
 	{
 		.f2Size = {kfBlasterSizeX, kfBlasterSizeY},
 		.iAreaLightTypeIndex = siAreaLightTypeIndex,
+		.pWindTrailIntensityWrapper = &gWindDepositOmniBlastersIntensity,
+		.pWindTrailWidthWrapper = &gWindDepositOmniBlastersWidth,
+		.pWindTrailLengthMultiplierWrapper = &gWindDepositOmniBlastersLengthMultiplier,
 	});
 
 	engine::ExplosionsInterpolate::RegisterType(siExplosionTypeIndex,
@@ -322,11 +325,17 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 		{
 			vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
 		}
-		vecPosition = XMVectorSetZ(vecPosition, engine::gpFlightPlanes->Lowest().fHeightMeters);
+		vecPosition = ClimbTowardsFlightPlane(vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfOmniClimbRate, deltaTime);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation (pos.W += dt * vel.W).
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
-		vecDirection = common::RotateTowardsPercent(vecDirection, rPreviousPostRender.pVecWantedDirections[i], common::ExponentialInterpolant(kfRotateTowardsSpeed, deltaTime.count()));
+		// The hull turns only about Z: it follows the horizontal part of a wanted direction that may aim at another
+		// plane, and holds when the target is exactly overhead.
+		XMVECTOR vecWantedHorizontal = XMVectorSetZ(rPreviousPostRender.pVecWantedDirections[i], 0.0f);
+		if (XMVectorGetX(XMVector3LengthSq(vecWantedHorizontal)) > 0.0f)
+		{
+			vecDirection = common::RotateTowardsPercent(vecDirection, XMVector3Normalize(vecWantedHorizontal), common::ExponentialInterpolant(kfRotateTowardsSpeed, deltaTime.count()));
+		}
 
 		if (rPreviousPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) [[unlikely]]
 		{
@@ -576,11 +585,21 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 			}
 		}
 
-		// Shield regeneration and pushes also run while transfer-locked.
+		// Shield regeneration and pushes also run while transfer-locked. Terrain contact uses the sweep end's height.
+		float fHeight = XMVectorGetZ(rFrame.interpolate.pOmnis->pVecPositions[i]);
+		bool bTerrainContact = !SkipsTerrainContact(fHeight);
 		RegenerateShield(deltaTime, shieldCooldown, kfOmniShield, kfOmniShieldRegeneration, fShield);
-		ApplyTerrainPush(rStaticData, vecPosition, kfOmniRadius, kfPushMargin, vecVelocity);
+		if (bTerrainContact)
+		{
+			ApplyTerrainPush(rStaticData, vecPosition, kfOmniRadius, fHeight, kfPushMargin, vecVelocity);
+		}
 		ApplyPusherPush(rFrame, vecPosition, rPreviousInterpolate.pPushers[i], kfOmniMaximumPusherPushVelocity, vecVelocity);
-		ResolveTerrainContact(rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, rFrame.interpolate.pOmnis->pVecPositions[i], kfOmniRadius, vecVelocity);
+		if (bTerrainContact)
+		{
+			ResolveTerrainContact(rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, rFrame.interpolate.pOmnis->pVecPositions[i], kfOmniRadius, vecVelocity, GetTargetFlightPlane(orders));
+		}
+		// Last velocity write: pushers keep their 3D direction, but only the climb moves height.
+		vecVelocity = XMVectorSetZ(vecVelocity, 0.0f);
 
 		SetNavigationDirection(flags, iNavigationDirection);
 		SetNavigationWaypointIndex(flags, iNavigationWaypointIndex);

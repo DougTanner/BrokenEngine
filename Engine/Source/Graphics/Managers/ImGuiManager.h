@@ -66,6 +66,20 @@ public:
 
 private:
 
+	struct TextureResource
+	{
+		~TextureResource();
+
+		Texture texture;
+		VkDescriptorSet vkDescriptorSet = VK_NULL_HANDLE;
+	};
+
+	struct TextureRetirement
+	{
+		std::vector<std::unique_ptr<TextureResource>> resources;
+		std::vector<std::unique_ptr<StagingBuffer>> stagingBuffers;
+	};
+
 	void CreateRenderPass();
 	void CreateFramebuffers();
 	void CreateUiPrepassIndirectBuffer();
@@ -73,6 +87,10 @@ private:
 	void SetupThemeGeometry(float fUiScale);
 	void ApplyThemeColors(UiTheme eTheme);
 	void RenderTextAreas();
+	void ProcessTextures(VkCommandBuffer vkCommandBuffer, int64_t iFramebuffer, const ImVector<ImTextureData*>* pTextures);
+
+	std::unordered_map<ImTextureData*, std::unique_ptr<TextureResource>> mTextureResources;
+	std::vector<TextureRetirement> mTextureRetirements;
 
 	VkRenderPass mImGuiVkRenderPass = VK_NULL_HANDLE;
 	std::vector<VkFramebuffer> mImGuiFramebuffers;

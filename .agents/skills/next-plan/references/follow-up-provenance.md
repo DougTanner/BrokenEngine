@@ -12,8 +12,9 @@ The block names the client (the session-branch `claude`/`codex`/`opencode` prefi
 worktree/branch UUID, the session branch, a profile-relative worktree locator
 with the user-profile prefix stripped, and, on Claude, the conversation session
 ID. Take the client, worktree/branch UUID, session branch, and worktree locator
-from the `Get-NextPlanContext` result already resolved in the Preconditions and
-selection section, or from `git branch --show-current` and
+from the `Get-NextPlanContext` result already resolved at
+[the `/next-plan` steps](../SKILL.md#steps) step 1, or from
+`git branch --show-current` and
 `git rev-parse --show-toplevel`.
 
 ## Conversation session ID

@@ -129,6 +129,9 @@ static void RegisterFighterBlasterType()
 	{
 		.f2Size = {kfFighterBlasterSize, kfFighterBlasterSize},
 		.iPointLightTypeIndex = siFighterBlasterPointLightTypeIndex,
+		.pWindTrailIntensityWrapper = &gWindDepositFightersBlastersIntensity,
+		.pWindTrailWidthWrapper = &gWindDepositFightersBlastersWidth,
+		.pWindTrailLengthMultiplierWrapper = &gWindDepositFightersBlastersLengthMultiplier,
 	});
 }
 
@@ -225,11 +228,9 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 	const FightersInterpolate& rPrevious = *rPreviousFrame.interpolate.pFighters;
 	const FightersPostRender& rPreviousPostRender = *rPreviousFrame.postRender.pFighters;
 	std::chrono::duration<float> deltaTime(rCurrentFrameInterpolate.fDeltaTime);
-	// The climb rate is capped at the maximum flight speed.
-	float fTargetHeight = engine::gpFlightPlanes->Lowest().fHeightMeters;
-	float fClimbStep = kfFighterMaxSpeed * deltaTime.count();
 
 #if defined(BT_CLIENT)
+	float fClimbStep = kfFighterClimbRate * deltaTime.count();
 	// Indexed by ShipController: each row's clock advances through its own model's animation.
 	std::array<const engine::AnimationData*, std::to_underlying(ShipController::kCount)> animationDatas {LoopingAnimationData(kFighterFleetModel), LoopingAnimationData(kFighterRandomModel)};
 #endif
@@ -246,25 +247,17 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 #endif
 
 		vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
-		// PostRender Update stores velocity Z as 0, so this glide is what moves a ship's height; the final
-		// assignment lands it bit-exactly on the target and keeps it there.
-		float fHeight = XMVectorGetZ(vecPosition);
-		float fHeightGap = fTargetHeight - fHeight;
-		if (fHeightGap > fClimbStep)
-		{
-			fHeight += fClimbStep;
-		}
-		else if (fHeightGap < -fClimbStep)
-		{
-			fHeight -= fClimbStep;
-		}
-		else
-		{
-			fHeight = fTargetHeight;
-		}
-		vecPosition = XMVectorSetZ(vecPosition, fHeight);
+#if defined(BT_CLIENT)
+		float fHeightBeforeClimb = XMVectorGetZ(vecPosition);
+#endif
+		// PostRender Update stores velocity Z as 0, so the climb is what moves a ship's height.
+		vecPosition = ClimbTowardsFlightPlane(vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfFighterClimbRate, deltaTime);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation.
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
+#if defined(BT_CLIENT)
+		// Full tilt at the full climb rate, none on a plane; a zero-length render step keeps the last tilt.
+		float fClimbTilt = fClimbStep > 0.0f ? kfFighterClimbTilt * ((XMVectorGetZ(vecPosition) - fHeightBeforeClimb) / fClimbStep) : rPrevious.pfClimbTilts[i];
+#endif
 
 		vecDirection = XMVector3Normalize(XMVector4Transform(vecDirection, XMMatrixRotationZ(deltaTime.count() * fDeltaRotation)));
 
@@ -287,6 +280,7 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 		rCurrent.pfDeltaRotations[i] = fDeltaRotation;
 #if defined(BT_CLIENT)
 		rCurrent.pAnimationTimes[i] = animationTime;
+		rCurrent.pfClimbTilts[i] = fClimbTilt;
 #endif
 
 		// Sync owned objects (IDs copied in AllocateAndCopy)
@@ -350,7 +344,7 @@ void FightersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.bTransfer = true,
 			}),
 		};
-		if (rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
+		if (!rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
 		{
 			LOG(kDefault, kError, "Fighter Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) Health: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), common::Wb(rCurrentPostRender.pfHealths[i], 1), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
@@ -431,9 +425,6 @@ void FightersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 				.vecVelocity = vecBlasterVelocity,
 				.iTypeIndex = siFighterBlasterTypeIndex,
 				.alignment = rCurrentPostRender.pAlignments[i],
-				.fWindTrailIntensity = game::gWindDepositFightersBlastersIntensity.mfCurrent,
-				.fWindTrailWidth = game::gWindDepositFightersBlastersWidth.mfCurrent,
-				.fWindTrailLengthMultiplier = game::gWindDepositFightersBlastersLengthMultiplier.mfCurrent,
 			});
 
 #if defined(BT_CLIENT)
@@ -495,6 +486,7 @@ bool FightersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentInterpolate.pfDeltaRotations[iIndex] = rInfo.fDeltaRotation;
 #if defined(BT_CLIENT)
 	rCurrentInterpolate.pAnimationTimes[iIndex] = std::chrono::duration<float>::zero();
+	rCurrentInterpolate.pfClimbTilts[iIndex] = 0.0f;
 #endif
 
 	rCurrentInterpolate.pPushers[iIndex] = {};
@@ -631,7 +623,10 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			vecVelocity = XMVectorScale(XMVectorNegate(rPrevious.pVecDamageDirections[i]), kfDeathKnockbackSpeed);
 		}
 
-		ApplyTerrainBounce(rStaticData, {.eType = ShipType::kFighter, .iRow = i}, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], vecDirection, kfFighterRadius, deltaTime, fDeltaRotation, vecVelocity);
+		if (!SkipsTerrainContact(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])))
+		{
+			ApplyTerrainBounce(rStaticData, {.eType = ShipType::kFighter, .iRow = i}, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], vecDirection, kfFighterRadius, deltaTime, fDeltaRotation, vecVelocity, GetTargetFlightPlane(rPrevious.pOrders[i]));
+		}
 		// Last velocity write, after pusher response, knockback, and bounce: a stored Z speed would reach the next
 		// tick's ApplyHeadingMovement, which rescales its blend to the full 3D speed and would turn it into horizontal speed.
 		vecVelocity = XMVectorSetZ(vecVelocity, 0.0f);

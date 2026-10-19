@@ -9,7 +9,8 @@ Vulkan services exposed through `gp*` globals. `Graphics` constructs its manager
 - Global and Main command buffers are immutable between recreation events; ImGui records per frame. Fence and semaphore ownership belongs to the submitting manager's contract below.
 - Queue synchronization depends on selected queue families: uploads may transfer ownership to graphics, and present waits for graphics when present uses a distinct queue. Do not assume all queues alias or that every transition is cross-queue.
 - The shared descriptor pool serves graphics and compute pipelines. Most pipelines consume global Set 0, but legacy standalone compute pipelines retain their own layouts and do not. Pipeline-specific sets and bindless arrays must remain valid through partial recreation.
-- The texture-descriptor registry owns island bindless-slot metadata and descriptor registrations. Fixed bindless-array storage addresses and slot indices are registry identity. During the post-fence bindless write epoch (a time window in which bindless descriptor writes are safe), eviction redirects all five island channels to slot-0 placeholders and retires their registrations before any view is freed or slot is reused; restoration exposes elevation only after the four lazy channels are ready.
+- The texture-descriptor registry owns island bindless-slot metadata and descriptor registrations. Fixed bindless-array storage addresses and slot indices are registry identity. Inside the bindless write epoch, eviction redirects all five island channels to slot-0 placeholders and removes their registrations before any view is retired; the slot is reusable at once because each framebuffer republishes it from live state. Restoration exposes elevation only after the four lazy channels are ready.
+- Texture adoption, island restoration and eviction, and a first lighting blur update only live registry state and queue a publication entry. Publishing writes each entry a framebuffer has not applied into that framebuffer's sets only, reading live state so a replay is idempotent, and every entry reaches each framebuffer before its next submission. The epoch records which framebuffer's sets are writable.
 - A pipeline rebuild clears raw pipeline registrations but preserves live island-slot metadata. Registering a rebuilt bindless consumer must recreate its live per-slot descriptors so an in-flight lazy adoption still reaches that pipeline.
 - Boot fails loud when the device does not advertise
   `VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT` (the device's promise that it
@@ -55,7 +56,7 @@ The HDR attachments (color, depth, MSAA) are single images reused every frame in
 
 Per-framebuffer command buffers and the submission graph. The Global and Main record helpers own compute/world preparation and scene rendering respectively. The per-framebuffer recorded flag is an idempotence guard, not a runtime re-record mechanism.
 
-- Global may prepend texture queue-family ownership-acquire barriers, then signals Main. Main waits on both Global completion and swapchain image availability; swapchain acquisition therefore gates Main rather than Global.
+- Global may prepend the texture manager's acquire command buffer, then signals Main. Main waits on both Global completion and swapchain image availability; swapchain acquisition therefore gates Main rather than Global.
 - Main signals the particle semaphore consumed by the next frame's Global submission. Preserve this cross-frame edge when changing particle compute or rendering order.
 - Submission workers publish work through `PersistentWorker` wake/wait edges: Main waits for Global, and UI waits for Main. Data read by a worker must be written before its wake.
 - Per-frame uniform copies need no host-write barrier of their own: `Buffer::RecordCopy` supplies barriers on both sides of the copy, and `vkQueueSubmit` implicitly makes the CPU's earlier host-visible writes device-visible. That is what lets a record-once command buffer have its uniform contents rewritten every frame; do not add a per-frame `VK_ACCESS_HOST_WRITE_BIT` barrier or conclude the scheme is unsafe.
@@ -104,7 +105,15 @@ Loaded textures, global texture descriptors, cached generated textures, and rend
 - Swapchain recreation selectively rebuilds screen-dependent targets and descriptor sets while preserving loaded textures.
 - Explicit repeat/clamp samplers cover authored/generated deposit lookup and visible-light textures. Unflagged combined samplers, explicit offscreen linear variants, and dedicated smoke/wind variants all omit anisotropy, so unflagged render-target reads such as object shadows and terrain elevation stay non-anisotropic; the border samplers follow the player's anisotropy setting. Format-specific elevation, model-material, and water-normal variants remain separate.
 - Light-type textures consume a fixed reservation of bindless slots for pre-blurred results. Grow that reservation if the registered lighting-texture count exceeds its capacity.
-- A lighting texture's pre-blurred result is found under its own CRC salted with `kBlurSalt`, so the blur write site and every read site agree without a second lookup table. `ReblurAllLightingTextures` re-runs the blur for every ready lighting texture after a change that invalidates the results.
+- Adoption records into the current framebuffer's acquire command buffer: queue-family acquire barriers, whose destination stages cover vertex, fragment, and compute shader reads because island elevation is sampled in the vertex shader; the same-queue fallback upload, whose staging it retires; and completed island elevation uploads, which do not count against the per-frame adoption limit.
+- A lighting texture's pre-blurred result is found under its own CRC salted
+  with `kBlurSalt`, so the blur write site and every read site agree without a
+  second lookup table. Adoption records the blur through the blur pipelines'
+  framebuffer-indexed sets, at most one blur per acquire command buffer,
+  because a second would rewrite a set that command buffer already binds; a
+  lighting texture adopted after it waits for a later frame.
+  `ReblurAllLightingTextures` runs only in a drained context, one executed
+  one-shot per texture, after a change that invalidates the results.
 - Three owned-by-value units carry the detail: `TextureDescriptors` (global descriptor Set 0, the bindless texture array, per-pipeline binding tracking, deferred descriptor updates), `TextureCache` (GPU-to-CPU readback, the on-disk cache of generated textures, PBR BRDF lookup tables), and `RenderTargetTextures` (creation and sizing of effect render targets).
 - The on-disk cache is versioned: a cached file is reused only when its shared version header (`../../File/AGENTS.md`) validates and its format, extent, mip count, and layer count all match the request; the payload size is derived from that request, not read from the file. Any newly generated texture reuses this cache rather than regenerating every boot or adding a second caching path.
 
@@ -130,7 +139,8 @@ present family, so concurrent submissions do not share that queue.
   that exact image format, square cubemaps, and enough resident bytes for every
   layer and mip. Upload-thread failures travel the published fatal path. Other
   upload failures leave active ownership intact for that path.
-- The pending-adoption counter belongs to this manager because it outlives `TextureManager` during device recreation. Keep file-state rearming and adoption completion synchronized with that counter.
+- Island elevation, requested only on a distinct transfer queue, is an upload job too: a dequeued chunk without the texture flag uploads its resident heightmap with dimensions from the island header, leaves the island chunk's state untouched, and hands its CRC to main-thread adoption through a completed-elevation list.
+- The pending-adoption counter belongs to this manager because it outlives `TextureManager` during device recreation. It counts adoptable texture chunks plus completed, unadopted elevation uploads; keep file-state rearming, the completed-elevation list, teardown, and adoption completion synchronized with it.
 - The registered lighting-texture CRC set belongs to this manager for the same reason: startup registration happens once, so a set owned by `TextureManager` would come back empty from every device recreation. Unlike the counter, it is main-thread-only and unsynchronized — written by startup registration, read by adoption and reblur — so the upload thread must never touch it.
 
 ### PipelineManager
@@ -165,5 +175,12 @@ Integrates Dear ImGui with a dedicated load-preserving overlay pass. It records 
 - Theme geometry resets to ImGui defaults before scaling so it can be reapplied safely. Font scale composes framebuffer and user scaling. UI dimensions use a 2160-pixel reference height through `UiScale()`, a repository-wide convention: every authored pixel constant in engine and game UI code is written for a 2160-high screen and multiplied by `UiScale()` at use, under authoring rules owned by the engine screens hub (`../../Ui/Screens/AGENTS.md`).
 - Opaque-region registration is rectangular, so rounded opaque windows must remain visually compatible with rectangular scene occlusion.
 - The Win32 backend publishes physical cursor state during frame preparation. Synthetic agent mouse position is reissued afterward so it wins last-writer ordering. Physical-input suppression parks the cursor unless an agent pin owns it and always clears backend gamepad navigation state.
-- The Vulkan backend owns a dedicated descriptor pool whose lifetime follows ImGuiManager, releasing all UI descriptors on each recreation.
+- Engine-owned ImGui textures upload changed rectangles outside the UI render
+  pass, ordering earlier graphics-queue fragment reads before transfer writes
+  and subsequent reads. Staging and detached GPU resources retire only on the
+  same framebuffer's next reuse after frame-start fence completion; retired
+  ownership holds no CPU texture pointers. Teardown uses the existing device
+  drain and removes descriptors before images and backend shutdown.
+  BackendUserData stays null; vendor drawing runs with automatic texture updates
+  disabled. The backend owns the descriptor pool and samplers.
 - One default font, loaded from a pack chunk at boot.

@@ -18,7 +18,7 @@ public:
 
 	struct ReplayWriterState
 	{
-		std::unique_ptr<DifferenceStreamWriter<game::Frame, game::FrameInput>> pWriter;
+		std::unique_ptr<DifferenceStreamWriter> pWriter;
 		std::unique_ptr<game::Frame> pRetainedEndFrame;
 		int64_t iActivationTick = 0;
 		bool bTerminal = false;
@@ -33,6 +33,7 @@ public:
 	[[nodiscard]] ReplayTickDecision SyncReplayTick();
 
 	void ResetStreams();
+	// Returns false when capture failed and the recording was invalidated.
 	[[nodiscard]] bool CaptureAcceptedTransfers(GridCoord destination, std::span<const game::StatusChange> sortedTransfers, const game::Frame& rPreTransferFrame);
 	void RetireCoordinate(GridCoord coordinate, std::unique_ptr<game::Frame> pLastCompleteFrame);
 
@@ -47,13 +48,13 @@ private:
 	struct PendingReplayReader
 	{
 		GridCoord coordinate {};
-		std::unique_ptr<DifferenceStreamReader<game::Frame, game::FrameInput>> pReader;
+		std::unique_ptr<DifferenceStreamReader> pReader;
 		std::unique_ptr<game::Frame> pSavedStart;
 		game::FrameInput initialInput;
 		int64_t iActivationTick = 0;
 	};
 
-	std::unordered_map<GridCoord, std::unique_ptr<DifferenceStreamReader<game::Frame, game::FrameInput>>> mReplayReaders;
+	std::unordered_map<GridCoord, std::unique_ptr<DifferenceStreamReader>> mReplayReaders;
 	std::vector<PendingReplayReader> mPendingReplayReaders;
 	int64_t miReplayInitialTick = 0;
 

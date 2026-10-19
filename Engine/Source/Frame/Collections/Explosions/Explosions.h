@@ -21,56 +21,6 @@ class Wrapper;
 struct SmokeTrailsInterpolate;
 using smoke_trails_t = Id<SmokeTrailsInterpolate>;
 
-// Live-tunable explosion content values. The game owns the sliders; the engine owns the effect mechanism.
-// Contract: the game fills every field once at client startup, before ForEachRegister(). The
-// server never reads it, and the engine dereferences each pointer without a null fallback.
-struct ExplosionTuning
-{
-	Wrapper* pPrimaryVisibleAreaOne = nullptr;
-	Wrapper* pPrimaryVisibleAreaTwo = nullptr;
-	Wrapper* pPrimaryVisibleAreaThree = nullptr;
-	Wrapper* pPrimaryVisibleIntensityOne = nullptr;
-	Wrapper* pPrimaryVisibleIntensityTwo = nullptr;
-	Wrapper* pPrimaryVisibleIntensityThree = nullptr;
-	Wrapper* pPrimaryLightingAreaOne = nullptr;
-	Wrapper* pPrimaryLightingAreaTwo = nullptr;
-	Wrapper* pPrimaryLightingAreaThree = nullptr;
-	Wrapper* pPrimaryLightingIntensityOne = nullptr;
-	Wrapper* pPrimaryLightingIntensityTwo = nullptr;
-	Wrapper* pPrimaryLightingIntensityThree = nullptr;
-
-	Wrapper* pSecondaryVisibleAreaOne = nullptr;
-	Wrapper* pSecondaryVisibleAreaTwo = nullptr;
-	Wrapper* pSecondaryVisibleAreaThree = nullptr;
-	Wrapper* pSecondaryVisibleIntensityOne = nullptr;
-	Wrapper* pSecondaryVisibleIntensityTwo = nullptr;
-	Wrapper* pSecondaryVisibleIntensityThree = nullptr;
-	Wrapper* pSecondaryLightingAreaOne = nullptr;
-	Wrapper* pSecondaryLightingAreaTwo = nullptr;
-	Wrapper* pSecondaryLightingAreaThree = nullptr;
-	Wrapper* pSecondaryLightingIntensityOne = nullptr;
-	Wrapper* pSecondaryLightingIntensityTwo = nullptr;
-	Wrapper* pSecondaryLightingIntensityThree = nullptr;
-
-	Wrapper* pPrimaryPuffAreaOne = nullptr;
-	Wrapper* pPrimaryPuffAreaTwo = nullptr;
-	Wrapper* pPrimaryPuffIntensityOne = nullptr;
-	Wrapper* pPrimaryPuffIntensityTwo = nullptr;
-	Wrapper* pSecondaryPuffAreaOne = nullptr;
-	Wrapper* pSecondaryPuffAreaTwo = nullptr;
-	Wrapper* pSecondaryPuffIntensityOne = nullptr;
-	Wrapper* pSecondaryPuffIntensityTwo = nullptr;
-
-	Wrapper* pPrimaryTrailLength = nullptr;
-	Wrapper* pPrimaryTrailDuration = nullptr;
-	Wrapper* pPrimaryTrailIntensity = nullptr;
-	Wrapper* pSecondaryTrailLength = nullptr;
-	Wrapper* pSecondaryTrailDuration = nullptr;
-	Wrapper* pSecondaryTrailIntensity = nullptr;
-
-	Wrapper* pWindIntensity = nullptr;
-	Wrapper* pWindWidth = nullptr;
-};
 #endif
 
 inline constexpr int64_t kiMaxExplosionTrails = 8;
@@ -199,7 +149,6 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 	}
 
 #if defined(BT_CLIENT)
-	static inline ExplosionTuning sTuning;
 	static inline int64_t siTotalCount = 0;
 
 	static inline int64_t siExplosionTrailTypeIndex = kiInvalidTrailType;

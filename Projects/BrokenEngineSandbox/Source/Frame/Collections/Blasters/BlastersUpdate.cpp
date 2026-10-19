@@ -4,6 +4,7 @@
 
 #include "Data/Audio.h"
 #include "Frame/CellStaticData.h"
+#include "Ui/WrapperBase.h"
 
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
@@ -154,12 +155,13 @@ void BlastersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 
 		if ((rCurrent.pWindTrails[i].uuid.iValue != 0))
 		{
+			const BlastersType& rType = sTypes.at(static_cast<size_t>(iTypeIndex));
 			engine::WindTrailsInterpolate::Sync(rCurrentFrameInterpolate, rCurrent.pWindTrails[i],
 			{
 				.vecPosition = vecPosition,
-				.fIntensity = rCurrent.pfWindTrailIntensities[i],
-				.fWidth = rCurrent.pfWindTrailWidths[i],
-				.fLengthMultiplier = rCurrent.pfWindTrailLengthMultipliers[i],
+				.fIntensity = rType.pWindTrailIntensityWrapper->mfCurrent,
+				.fWidth = rType.pWindTrailWidthWrapper->mfCurrent,
+				.fLengthMultiplier = rType.pWindTrailLengthMultiplierWrapper->mfCurrent,
 			});
 		}
 #endif // BT_CLIENT

@@ -65,7 +65,7 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   `Collision::GetOutcome` in `Collision.h`). Per-pair collision masks must be
   bi-directional and same-layer collision is unsupported; both are asserted.
 - Large terrain/nav allocations are lazy. Do not make frame constructors allocate proportional to world or mesh size.
-- `FlightPlanes` holds the game's flight-plane table, handed over once at boot on both builds; its lowest plane is the base height every simulation, navigation, and render consumer reads. Construction asserts that the table holds 1 to `kiMaxFlightPlanes` planes with positive, strictly ascending heights, then that every island template's header elevation ceiling stays below the highest plane, so it follows `IslandTerrain` construction.
+- `FlightPlanes` reads the game's immutable flight-plane table directly at boot on both builds; its lowest plane is the base height every simulation and render consumer reads. Construction asserts that the table holds 1 to `kiMaxFlightPlanes` planes with positive, strictly ascending heights, then that every island template's header elevation ceiling stays below the highest plane, so it follows `IslandTerrain` construction.
 
 ## Frame Registry
 
@@ -122,11 +122,23 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   port the curve into `CellElevation`: it would change CRC'd sim positions for a
   purely visual effect. Do not assert stronger guarantees about the texture's
   sampling format here.
-- Client terrain residency keeps the shared heightmap and hull resident but decommits each template's CPU mesh slice whenever it is not being restored. Coordinate texture and mesh restoration or eviction only in the renderer's window after all pending adds and removes are processed; this visual residency stays outside the CRC. Renderer teardown invalidates its mesh allocations without cancelling File-owned range-reload state.
+- Client terrain residency keeps the shared heightmap and hull resident but
+  decommits each template's CPU mesh slice whenever it is not being restored.
+  Coordinate texture and mesh restoration or eviction only in the renderer's
+  bindless write epoch after all pending adds and removes are processed; this
+  visual residency stays outside the CRC. A template's elevation image is a raw
+  copy of the resident heightmap: on a distinct transfer queue the upload thread
+  uploads it after first mint and restoration waits until it is adopted;
+  otherwise restoration records it. Eviction retires images and mesh ranges, so
+  arena room returns only when retirement frees them; do not evict another
+  template for arena room while earlier evictions are still retiring. Renderer
+  teardown invalidates its mesh allocations without cancelling File-owned
+  range-reload state.
+- Each flight plane has its own template contours and cell graph, index-parallel with the planes (`CellStaticData::navigationData`); a plane without `kTerrainCollision` gets an empty one. A caller picks the plane by passing that plane's graph, and queries take waypoint Z from the query position.
 - The obstacle visibility graph is built once per cell, in that cell's local meters, over every obstacle polygon the cell contains; island templates contribute contour geometry only, because per-template building would yield disjoint per-island graphs with inter-island routes unreachable. Because the graph spans the cell, an A* miss is unexpected: disconnection is the usual cause, and a found path whose first waypoint coincides with the start also reports as a miss.
 - The build path and the runtime query share one segment-blocked and one point-in-polygon predicate through `NavBuildInternal.h`. Keep them shared: a divergent epsilon or boundary rule lets the graph claim a segment the query rejects, threading paths through obstacles.
 - Navigation data arrives only from the server, which built it, so its deserialization trusts it under the corrupt-input policy (`../Network/AGENTS.md`); the acceleration build, runtime queries, and debug nav rendering must not validate it either.
-- The contour bake takes its clearance distance and elevation threshold from the caller (the game derives both and the server passes them in at startup) and forwards them unchanged; engine navigation code must not reach back into game constants for them.
+- The contour bake takes its clearance distance and per-plane elevation thresholds from the caller (the game derives both and the server passes them in at startup) and forwards them unchanged; engine navigation code must not reach back into game constants for them.
 - Frame and gameplay geometry uses meters (one meter per engine unit); UV is only the normalized template representation. For navigation contours, union in UV, convert to centered local meters with the template's anisotropic footprint, apply clearance and simplification there, then map back to UV for storage; a scalar offset in UV makes the margin in meters depend on the footprint.
 - Nav polygons in the cell frame wind clockwise, because placing a template mirrors Y; the template's own UV-space contour winds counter-clockwise. Derive orientation-dependent tests such as vertex convexity from measured winding rather than assuming the counter-clockwise convention the placement hulls carry.
 - Navigation version changes invalidate derived data and contribute to the game frame version.

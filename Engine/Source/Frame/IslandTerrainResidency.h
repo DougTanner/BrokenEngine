@@ -24,14 +24,15 @@ public:
 	// textures) until RestorationSweep detects per-texture adoption and patches the slot to real.
 	int64_t AcquireTextureSlot(common::crc_t uiIslandCrc);
 
-	// LRU eviction sweeps. Both must run inside RenderGlobal post-fence-wait
-	// (descriptor-patch safety window), bracketing TextureManager::ProcessPendingTextures.
+	// LRU eviction sweeps. Both must run inside RenderGlobal's framebuffer-local bindless write epoch,
+	// bracketing TextureManager::ProcessPendingTextures; RestorationSweep records its uploads into the
+	// acquire command buffer that call names.
 	void EvictionSweep();
 	void RestorationSweep();
 
-	// Cheap pre-scans: true iff EvictionSweep / RestorationSweep would actually free or patch GPU
-	// resources this frame. RenderGlobal uses these to drain all in-flight fences only on churn
-	// frames (the guard conditions mirror the in-sweep skip logic exactly).
+	// Cheap pre-scans: true iff EvictionSweep / RestorationSweep would actually retire or patch GPU
+	// resources this frame. RenderGlobal uses these to open its write epoch only on churn frames
+	// (the guard conditions mirror the in-sweep skip logic exactly).
 	bool AnyEvictionPending() const;
 	bool AnyRestorationPending() const;
 
@@ -48,8 +49,8 @@ public:
 	void ResetTextureSlots();
 
 private:
-	// AcquireTextureSlot's first-mint path picks or reuses a slot, creates elevation from the in-memory
-	// heightmap, wires five bindless array pointers, registers per-pipeline bindings, and returns the slot.
+	// AcquireTextureSlot's first-mint path picks or reuses a slot, defers elevation (requesting its upload on
+	// a distinct transfer queue), wires five bindless array pointers, registers per-pipeline bindings, and returns the slot.
 	int64_t FirstMintTextureSlot(common::crc_t uiIslandCrc, IslandTemplate& rTemplate, const common::crc_t (&rTextureCrcs)[4], std::string_view name);
 
 	enum class MeshEvictionReason : uint8_t

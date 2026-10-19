@@ -153,7 +153,6 @@ static void DebugRenderNavigationData(const std::vector<GridCoord>& rActiveCoord
 		return;
 	}
 
-	float fZ = gpFlightPlanes->Lowest().fHeightMeters;
 	static constexpr XMFLOAT4A kf4PolygonColor = {1.0f, 1.0f, 0.0f, 1.0f};
 	static constexpr XMFLOAT4A kf4VertexColor = {1.0f, 0.5f, 0.0f, 1.0f};
 
@@ -165,27 +164,34 @@ static void DebugRenderNavigationData(const std::vector<GridCoord>& rActiveCoord
 			continue;
 		}
 
-		const NavData& rNavigationData = it->second.staticData.navigationData;
 		// Nav vertices are local to this cell; the two draw sites below are this helper's conversion point.
 		XMFLOAT2 f2Offset = MakeRenderBasis(rCoordinate, cameraCoordinate).f2Offset;
 
-		for (int64_t i = 0; i < std::ssize(rNavigationData.polygonOffsets); ++i)
+		// A cell whose static data has not arrived holds no per-plane entries.
+		const std::vector<NavData>& rPlaneNavigationData = it->second.staticData.navigationData;
+		for (int64_t i = 0; i < std::ssize(rPlaneNavigationData); ++i)
 		{
-			int64_t iStart = rNavigationData.polygonOffsets.at(i);
-			int64_t iEnd = (i + 1 < std::ssize(rNavigationData.polygonOffsets)) ? rNavigationData.polygonOffsets.at(i + 1) : std::ssize(rNavigationData.vertices);
+			const NavData& rNavigationData = rPlaneNavigationData.at(i);
+			float fZ = gpFlightPlanes->Plane(i).fHeightMeters;
 
-			for (int64_t j = iStart; j < iEnd; ++j)
+			for (int64_t j = 0; j < std::ssize(rNavigationData.polygonOffsets); ++j)
 			{
-				int64_t iNext = (j + 1 < iEnd) ? j + 1 : iStart;
-				XMFLOAT3A f3StartVertex = {rNavigationData.vertices.at(j).x + f2Offset.x, rNavigationData.vertices.at(j).y + f2Offset.y, fZ};
-				XMFLOAT3A f3EndVertex = {rNavigationData.vertices.at(iNext).x + f2Offset.x, rNavigationData.vertices.at(iNext).y + f2Offset.y, fZ};
-				DebugRender::Line(f3StartVertex, f3EndVertex, kf4PolygonColor);
-			}
-		}
+				int64_t iStart = rNavigationData.polygonOffsets.at(j);
+				int64_t iEnd = (j + 1 < std::ssize(rNavigationData.polygonOffsets)) ? rNavigationData.polygonOffsets.at(j + 1) : std::ssize(rNavigationData.vertices);
 
-		for (const XMFLOAT2& rVertex : rNavigationData.vertices)
-		{
-			DebugRender::Circle({rVertex.x + f2Offset.x, rVertex.y + f2Offset.y, fZ}, 0.75f, kf4VertexColor);
+				for (int64_t k = iStart; k < iEnd; ++k)
+				{
+					int64_t iNext = (k + 1 < iEnd) ? k + 1 : iStart;
+					XMFLOAT3A f3StartVertex = {rNavigationData.vertices.at(k).x + f2Offset.x, rNavigationData.vertices.at(k).y + f2Offset.y, fZ};
+					XMFLOAT3A f3EndVertex = {rNavigationData.vertices.at(iNext).x + f2Offset.x, rNavigationData.vertices.at(iNext).y + f2Offset.y, fZ};
+					DebugRender::Line(f3StartVertex, f3EndVertex, kf4PolygonColor);
+				}
+			}
+
+			for (const XMFLOAT2& rVertex : rNavigationData.vertices)
+			{
+				DebugRender::Circle({rVertex.x + f2Offset.x, rVertex.y + f2Offset.y, fZ}, 0.75f, kf4VertexColor);
+			}
 		}
 	}
 }

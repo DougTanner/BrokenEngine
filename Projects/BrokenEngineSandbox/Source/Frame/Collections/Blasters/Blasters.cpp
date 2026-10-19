@@ -3,8 +3,7 @@
 #include "Blasters.h"
 
 #include "Frame/CellStaticData.h"
-
-#include "Ui/WindDepositsWrappers.h"
+#include "Ui/WrapperBase.h"
 
 namespace engine
 {
@@ -42,14 +41,14 @@ void BlastersInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 	}
 
 	rBlasters.pWindTrails[iIndex] = {};
-	if (rBlasters.pfWindTrailIntensities[iIndex] > 0.0f)
+	if (rType.pWindTrailIntensityWrapper->mfCurrent > 0.0f)
 	{
 		engine::WindTrailsPostRender::Add(rFrame, rBlasters.pWindTrails[iIndex],
 		{
 			.vecPosition = rBlasters.pVecPositions[iIndex],
-			.fIntensity = rBlasters.pfWindTrailIntensities[iIndex],
-			.fWidth = rBlasters.pfWindTrailWidths[iIndex],
-			.fLengthMultiplier = rBlasters.pfWindTrailLengthMultipliers[iIndex],
+			.fIntensity = rType.pWindTrailIntensityWrapper->mfCurrent,
+			.fWidth = rType.pWindTrailWidthWrapper->mfCurrent,
+			.fLengthMultiplier = rType.pWindTrailLengthMultiplierWrapper->mfCurrent,
 		});
 	}
 
@@ -107,11 +106,6 @@ bool BlastersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rSpawn
 	rCurrentInterpolate.pVecPositions[iIndex] = rSpawnInformation.vecPosition;
 	rCurrentInterpolate.pVecDirections[iIndex] = XMVector3Normalize(rSpawnInformation.vecVelocity);
 	rCurrentInterpolate.puiTypeIndices[iIndex] = static_cast<uint8_t>(rSpawnInformation.iTypeIndex);
-#if defined(BT_CLIENT)
-	rCurrentInterpolate.pfWindTrailIntensities[iIndex] = rSpawnInformation.fWindTrailIntensity;
-	rCurrentInterpolate.pfWindTrailWidths[iIndex] = rSpawnInformation.fWindTrailWidth;
-	rCurrentInterpolate.pfWindTrailLengthMultipliers[iIndex] = rSpawnInformation.fWindTrailLengthMultiplier;
-#endif
 
 	rCurrentPostRender.pVecVelocities[iIndex] = rSpawnInformation.vecVelocity;
 	rCurrentPostRender.pAlignments[iIndex] = rSpawnInformation.alignment;
@@ -137,7 +131,6 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 	{
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
 		engine::AlignmentIdentifier alignment = rCurrentPostRender.pAlignments[i];
-		bool bFleetAlignment = alignment == rFrame.postRender.fleetAlignment;
 		TransferRequest request
 		{
 			.change = MakeTransfer(SpawnInfo
@@ -146,13 +139,9 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.vecVelocity = rCurrentPostRender.pVecVelocities[i],
 				.iTypeIndex = rCurrentInterpolate.puiTypeIndices[i],
 				.alignment = alignment,
-				// Wind-trail tuning is client-only visual debug state; reset to canonical defaults on transfer.
-				.fWindTrailIntensity = bFleetAlignment ? gWindDepositOmniBlastersIntensity.mfDefault : gWindDepositFightersBlastersIntensity.mfDefault,
-				.fWindTrailWidth = bFleetAlignment ? gWindDepositOmniBlastersWidth.mfDefault : gWindDepositFightersBlastersWidth.mfDefault,
-				.fWindTrailLengthMultiplier = bFleetAlignment ? gWindDepositOmniBlastersLengthMultiplier.mfDefault : gWindDepositFightersBlastersLengthMultiplier.mfDefault,
 			}),
 		};
-		if (rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
+		if (!rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
 		{
 			LOG(kDefault, kError, "Blaster Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) TypeIndex: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int64_t>(request.iDeltaX), static_cast<int64_t>(request.iDeltaY), static_cast<int64_t>(rCurrentInterpolate.puiTypeIndices[i]), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();

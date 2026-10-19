@@ -22,7 +22,7 @@ $script:MaximumCitations = 48
 $script:MaximumTextLength = 160
 $script:MaximumMessageLength = 256
 $script:MaximumOutputBytes = 32768
-# The execution-card fields in the order ../../next-plan/SKILL.md '## Handoff' lists them. A Section
+# The execution-card fields in the order ../../../references/execution-card.md '## Template' lists them. A Section
 # field is a '###' heading, present only with a non-blank line under it; the others are bullets whose
 # label may carry a parenthetical qualifier before the colon, present only with text after the colon
 # or an indented line nested directly under the bullet.
