@@ -174,8 +174,9 @@ The `argument-hint` value selects the Plan:
    reuse review evidence whose inputs did not change. Done when the claim
    result reports the held claim and either the claim result carries no `sync`
    object or no row reports a touch.
-7. Present for approval per this file's `### Implementation approval`. Done
-   when the user's decision arrives.
+7. Present for approval per this file's `### Implementation approval`, unless
+   that section sends the run to implementation on an earlier user choice. Done
+   when the user's decision arrives or that earlier choice stands.
 8. Implement the approved change. A pre-edit acceptance check whose brief
    `Baseline:` differs from the recorded session baseline
    ([claim-results.md](references/claim-results.md)
@@ -236,7 +237,7 @@ The `argument-hint` value selects the Plan:
 | Run outcome | Claim disposition | Next action |
 | --- | --- | --- |
 | implementation accepted and verified | held | run `Complete-NextPlan.ps1`, then the landing gate |
-| changes requested at the `/finalize-changes` landing confirmation | held | prepare only the difference at step 4, whose brief cites the existing preparation snapshot, with its `## In scope` and `## Out of scope`, in place of the deleted claimed Plan; run step 5, then step 8 on top of the unlanded candidate commit, because the request is a choice that came with approval under `### Implementation approval`, so step 7 presents only the difference when step 5 adds a user decision, widens scope, or raises the tier; skip steps 6, 9, and 10, which already ran, and skip the checkpoint for every later outcome of the run; then dispatch a fresh `/finalize-changes` preparation with the step-10 result, because the claim exit already ran |
+| changes requested at the `/finalize-changes` landing confirmation | held | prepare only the difference at step 4, whose brief cites the existing preparation snapshot, with its `## In scope` and `## Out of scope`, in place of the deleted claimed Plan; run step 5, then step 8 on top of the unlanded candidate commit, because the request is a choice under `### Implementation approval`, which decides whether step 7 presents; skip steps 6, 9, and 10, which already ran, and skip the checkpoint for every later outcome of the run; then dispatch a fresh `/finalize-changes` preparation with the step-10 result, because the claim exit already ran |
 | user explicitly authorizes rejection | held | run `Complete-NextPlan.ps1 -Reject`, then the landing gate |
 | claim wrapper returns `claim.plan-mismatch` | held, identified only by `conflict.heldPlan` | run the checkpoint once, retain the held claim and all work, report requested and held Plans, and stop; never complete, reject, or defer implicitly |
 | approval refused, or a blocker whose authoritative result explicitly reports a held claim, with no separate defer instruction | held | run the checkpoint once, retain the claim and all work, report and stop; never complete, reject, or defer implicitly, and any checkpoint work created stays with the retained session |
@@ -344,8 +345,9 @@ classified tier before the Plan review step.
 
 ### Implementation approval
 
-Preparation and claim do not require approval. Before implementation, present
-only the execution card's `### What does this plan do?` and
+Preparation and claim do not require approval. Before implementation that no
+earlier user choice approved (below), present only the execution card's
+`### What does this plan do?` and
 `### Why this is good for the codebase` sections, plus a
 `### Plan review changes` section listing each change the Plan review step
 made to the approach being approved, or `none`, plus a
@@ -362,12 +364,17 @@ rendered message text whose approval question is the last thing before the
 decision. An approval accepts the recommendation for every decision it leaves
 unanswered, except a recommendation to reject the Plan, which still needs an
 explicit answer. A different approach the user chooses at approval returns the
-run to preparation and Plan review. When approval came with the choice, the redraft
-goes to implementation unless those reviews add a user decision, widen scope
-beyond the choice, or raise the tier; in that case, and when the choice came
-without approval, main presents only the difference. When the approved presentation differs from the
-execution card, main dispatches, before step 8, one fresh preparation
-`implementer` whose continuation capsule
+run to preparation and Plan review. Every user choice in the run that neither
+rejects the Plan nor refuses approval — the `/plan-alternatives` pick, an
+`/external-grill-plan` answer, a choice at approval, or a change request at the
+`/finalize-changes` landing confirmation — approves implementation, and the run
+goes to implementation unless an existing or new question for the user remains
+that the user has not yet answered; main then presents only those questions, in
+the `### User decisions needed` form and delivered as above. Whether a reply
+answered a decision follows
+[`authority-order.md`](../../references/authority-order.md). When the approved
+presentation differs from the execution card, main dispatches, before step 8,
+one fresh preparation `implementer` whose continuation capsule
 ([`../../references/subagent-handoff.md`](../../references/subagent-handoff.md)
 `## Continuation capsule`) carries the snapshot step 8 cites as the approved
 plan with its `##` selectors, and the user's approval
@@ -414,8 +421,8 @@ deferral, unknown claim state, or work still to land — never prints that line.
   run as written, with `/sweep`'s stage close standing in for step 8's
   acceptance checks.
 - A Plan, card, scope, invariant, or acceptance change after approval, other
-  than the redraft `### Implementation approval` allows, requires a new
-  presentation of the difference.
+  than one `### Implementation approval` sends to implementation without a
+  presentation, requires a new presentation of the difference.
 - Deferral uses
 `pwsh -NoProfile -File .agents/skills/next-plan/scripts/Defer-NextPlan.ps1`
   and only an ordinary live claim. After final preparation has run, deferral
