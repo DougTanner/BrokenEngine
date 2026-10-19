@@ -13,8 +13,10 @@ enum GameCpuCounters : int64_t
 		kCpuCounterBlastersRendered,
 	kCpuCounterMissiles,
 		kCpuCounterMissilesRendered,
-	kCpuCounterSpaceships,
-		kCpuCounterSpaceshipsRendered,
+	kCpuCounterFighters,
+		kCpuCounterFightersRendered,
+	kCpuCounterBattleships,
+		kCpuCounterBattleshipsRendered,
 
 	kGameCpuCounterCount
 };
@@ -24,14 +26,17 @@ enum GameCpuTimers : int64_t
 	kCpuTimerFrameUpdate = engine::kEngineCpuTimerCount,
 		kCpuTimerFrameInterpolate,
 			kCpuTimerInterpolateAllocateAndCopy,
-				kCpuTimerInterpolateAllocateAndCopySpaceships,
+				kCpuTimerInterpolateAllocateAndCopyFighters,
+				kCpuTimerInterpolateAllocateAndCopyBattleships,
 			kCpuTimerInterpolateUpdate,
-				kCpuTimerInterpolateUpdateSpaceships,
+				kCpuTimerInterpolateUpdateFighters,
+				kCpuTimerInterpolateUpdateBattleships,
 		kCpuTimerFramePostRender,
 			kCpuTimerPostRenderAllocateAndCopy,
 			kCpuTimerPostRenderUpdate,
 				kCpuTimerPostRenderUpdateNavigationQuery,
-				kCpuTimerPostRenderUpdateSpaceships,
+				kCpuTimerPostRenderUpdateFighters,
+				kCpuTimerPostRenderUpdateBattleships,
 			kCpuTimerPostRenderPreCollision,
 			kCpuTimerPostRenderCollide,
 			kCpuTimerPostRenderPostCollision,
@@ -41,8 +46,9 @@ enum GameCpuTimers : int64_t
 
 	kCpuTimerRender,
 		kCpuTimerRenderOmnis,
-		kCpuTimerRenderSpaceships,
-			kCpuTimerRenderSpaceshipsAnimate,
+		kCpuTimerRenderFighters,
+			kCpuTimerRenderFightersAnimate,
+		kCpuTimerRenderBattleships,
 
 	kGameCpuTimerCount
 };
@@ -56,7 +62,9 @@ inline constexpr std::string_view kpGameCpuCounterNames[]
 	"    Rendered",
 	"Missiles",
 	"    Rendered",
-	"Spaceships",
+	"Fighters",
+	"    Rendered",
+	"Battleships",
 	"    Rendered",
 };
 static_assert(std::size(kpGameCpuCounterNames) == static_cast<size_t>(kGameCpuCounterCount) - static_cast<size_t>(engine::kEngineCpuCounterCount));
@@ -66,14 +74,17 @@ inline constexpr std::string_view kpGameCpuTimerNames[]
 	"Frame update",
 	"    Interpolate",
 	"        AllocateAndCopy",
-	"            Spaceships",
+	"            Fighters",
+	"            Battleships",
 	"        Update",
-	"            Spaceships",
+	"            Fighters",
+	"            Battleships",
 	"    PostRender",
 	"        AllocateAndCopy",
 	"        Update",
 	"            NavQuery",
-	"            Spaceships",
+	"            Fighters",
+	"            Battleships",
 	"        PreCollision",
 	"        Collide",
 	"        PostCollision",
@@ -82,8 +93,9 @@ inline constexpr std::string_view kpGameCpuTimerNames[]
 	"        Spawn",
 	"Render",
 	"    Omnis",
-	"    Spaceships",
+	"    Fighters",
 	"        Animate",
+	"    Battleships",
 };
 static_assert(std::size(kpGameCpuTimerNames) == static_cast<size_t>(kGameCpuTimerCount) - static_cast<size_t>(engine::kEngineCpuTimerCount));
 

@@ -61,8 +61,8 @@ constexpr float kfDeltaRotationLimitMinimum = 2.0f;
 constexpr float kfDeltaRotationLimitRandom = 2.0f;
 
 #if defined(BT_CLIENT)
-static int64_t siOmniExhaustAreaLightTypeIndex = 0xFF;
-static int64_t siEnemyExhaustAreaLightTypeIndex = 0xFF;
+static int64_t siFleetExhaustAreaLightTypeIndex = 0xFF;
+static int64_t siRandomExhaustAreaLightTypeIndex = 0xFF;
 
 static int64_t siSmokeTrailTypeIndex = 0xFF;
 #endif // BT_CLIENT
@@ -104,7 +104,7 @@ void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine:
 
 		engine::AreaLightsInterpolate::Sync(rFrameInterpolate, uiAreaLight,
 		{
-			.iTypeIndex = (flags & kTargetOmni) ? siEnemyExhaustAreaLightTypeIndex : siOmniExhaustAreaLightTypeIndex,
+			.iTypeIndex = (flags & kTargetFleet) ? siRandomExhaustAreaLightTypeIndex : siFleetExhaustAreaLightTypeIndex,
 			.pVecVisiblePositions = {vecTopLeft, vecTopRight, vecBottomLeft, vecBottomRight},
 			.fIntensityMultiplier = fIntensityMultiplier,
 		});
@@ -152,8 +152,8 @@ void MissilesInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 		return;
 	}
 
-	int64_t iAreaLightType = (rPostRender.pFlags[iIndex] & kTargetEnemy)
-		? siOmniExhaustAreaLightTypeIndex : siEnemyExhaustAreaLightTypeIndex;
+	int64_t iAreaLightType = (rPostRender.pFlags[iIndex] & kTargetRandom)
+		? siFleetExhaustAreaLightTypeIndex : siRandomExhaustAreaLightTypeIndex;
 	engine::AreaLightsPostRender::Add(rFrame, rMissiles.puiAreaLights[iIndex], iAreaLightType);
 
 	engine::SmokeTrailsPostRender::Add(rFrame, rMissiles.puiSmokeTrails[iIndex], siSmokeTrailTypeIndex);
@@ -180,7 +180,7 @@ void MissilesInterpolate::ClientInitializeAll(Frame& rFrame)
 void MissilesInterpolate::Register()
 {
 #if defined(BT_CLIENT)
-	engine::AreaLightsInterpolate::RegisterType(siOmniExhaustAreaLightTypeIndex,
+	engine::AreaLightsInterpolate::RegisterType(siFleetExhaustAreaLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesMissilesBC73pngCrc,
 		.puiColors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
@@ -193,7 +193,7 @@ void MissilesInterpolate::Register()
 		.pLightingIntensityWrapper = &gMissileExhaustLightingIntensity,
 	});
 
-	engine::AreaLightsInterpolate::RegisterType(siEnemyExhaustAreaLightTypeIndex,
+	engine::AreaLightsInterpolate::RegisterType(siRandomExhaustAreaLightTypeIndex,
 	{
 		.uiCrc = data::kTexturesMissilesBC71pngCrc,
 		.puiColors = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
@@ -288,7 +288,7 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 		XMVECTOR vecDirection = rCurrentInterpolate.pVecDirections[i];
 		engine::AlignmentIdentifier alignment = rCurrentPostRender.pAlignments[i];
 		MissileFlags_t missileFlags;
-		missileFlags.Set(alignment == rFrame.postRender.omniAlignment ? kTargetEnemy : kTargetOmni);
+		missileFlags.Set(alignment == rFrame.postRender.fleetAlignment ? kTargetRandom : kTargetFleet);
 		TransferRequest request
 		{
 			.change = MakeTransfer(SpawnInfo
@@ -445,13 +445,13 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 
 	SpawnMissileExplosion(rFrame, rStaticData.coordinate, 1.0f, rCurrentInterpolate.pVecPositions[i], rCurrentPostRender.pVecExplosionDirections[i], rCurrentPostRender.pFlags[i]);
 
-	// Register area damage for the AreaDamage phase
+	// Register area damage for the AreaDamage phase, tagged with the side that fired the missile
 	engine::AreaDamage::Add(
 	{
 		.vecPosition = rCurrentInterpolate.pVecPositions[i],
 		.fRadius = kfMissileDamageRadius,
 		.fDamage = kfMissileDamage,
-		.uiCategory = CollisionCategory::kuiMissile,
+		.uiCategory = FiredBlastCategory(rCurrentPostRender.pAlignments[i], rFrame.postRender.fleetAlignment),
 	});
 }
 

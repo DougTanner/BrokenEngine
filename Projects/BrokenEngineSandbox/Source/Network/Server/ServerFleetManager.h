@@ -32,6 +32,7 @@ struct PendingSpawnIntoFleetRequest
 {
 	int64_t iClientId = 0;
 	FleetGuid fleetGuid {};
+	ShipType eType {};
 };
 
 struct PendingRespawnInFleetRequest
@@ -75,6 +76,7 @@ public:
 	struct FleetLookupResult
 	{
 		FleetLookupFlags_t flags {};
+		engine::GlobalId flagshipGlobalId {};
 		engine::GridCoord fleetWantedCoord {};
 		int64_t iPendingFleetWantedCoordTicks = 0;
 	};

@@ -13,14 +13,16 @@ namespace game
 {
 
 struct Frame;
-struct OmnisInterpolate;
-struct OmnisPostRender;
 struct BlastersInterpolate;
 struct BlastersPostRender;
 struct MissilesInterpolate;
 struct MissilesPostRender;
-struct SpaceshipsInterpolate;
-struct SpaceshipsPostRender;
+struct FightersInterpolate;
+struct FightersPostRender;
+struct OmnisInterpolate;
+struct OmnisPostRender;
+struct BattleshipsInterpolate;
+struct BattleshipsPostRender;
 
 struct FrameInterpolate : public engine::FrameInterpolateBase
 {
@@ -54,11 +56,11 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 
 	float fSpawnTimer = 0.0f;
 
-	std::unique_ptr<OmnisInterpolate> pOmnis;
-
 	std::unique_ptr<BlastersInterpolate> pBlasters;
 	std::unique_ptr<MissilesInterpolate> pMissiles;
-	std::unique_ptr<SpaceshipsInterpolate> pSpaceships;
+	std::unique_ptr<FightersInterpolate> pFighters;
+	std::unique_ptr<OmnisInterpolate> pOmnis;
+	std::unique_ptr<BattleshipsInterpolate> pBattleships;
 
 	// The game frame-wide values Write, Read, and ServerRead serialize after the base values, in stream order.
 	static auto Values()
@@ -96,19 +98,19 @@ struct FramePostRender : public engine::FramePostRenderBase
 	static void Destroy(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 	static void Spawn(Frame& __restrict rFrame, const FrameInput& __restrict rFrameInput, const engine::CellStaticData& rStaticData);
 
-	engine::AlignmentIdentifier enemyAlignment {};
-	engine::AlignmentIdentifier omniAlignment {};
-
-	std::unique_ptr<OmnisPostRender> pOmnis;
+	engine::AlignmentIdentifier randomAlignment {};
+	engine::AlignmentIdentifier fleetAlignment {};
 
 	std::unique_ptr<BlastersPostRender> pBlasters;
 	std::unique_ptr<MissilesPostRender> pMissiles;
-	std::unique_ptr<SpaceshipsPostRender> pSpaceships;
+	std::unique_ptr<FightersPostRender> pFighters;
+	std::unique_ptr<OmnisPostRender> pOmnis;
+	std::unique_ptr<BattleshipsPostRender> pBattleships;
 
 	// The game frame-wide values Write, Read, and ServerRead serialize after the base values, in stream order.
 	static auto Values()
 	{
-		return engine::FrameColumnList<FRAME_COLUMN(FramePostRender, enemyAlignment), FRAME_COLUMN(FramePostRender, omniAlignment)> {};
+		return engine::FrameColumnList<FRAME_COLUMN(FramePostRender, randomAlignment), FRAME_COLUMN(FramePostRender, fleetAlignment)> {};
 	}
 
 	static common::crc_t Crcs(const FramePostRender& rCurrent);
@@ -126,8 +128,6 @@ struct RegistryWindow
 	engine::RegistryQueryContext context {};
 };
 
-[[nodiscard]] RegistryWindow BuildSpaceshipRegistryWindow(const Frame& rFrame, const XMVECTOR* pVecPreviousPositions, const std::chrono::duration<float>* pArrivalGracePeriods, const MissilesPostRender& rSubscribers);
-
 struct Frame
 {
 	Frame();
@@ -137,9 +137,11 @@ struct Frame
 
 	static const int64_t kiVersion;
 
-	// Post-tick main-thread identity view over the omni rows. Held by value by its caller for as long as it is
-	// used, and never across a tick, a transfer, or a reallocation.
-	[[nodiscard]] static engine::RegistryOwnershipLayer OwnershipLayer(const Frame& rFrame);
+	// Post-tick main-thread identity views over the ship rows, one per ShipType in ShipType order. Held by value by
+	// its caller for as long as it is used, and never across a tick, a transfer, or a reallocation.
+	[[nodiscard]] static std::array<engine::RegistryOwnershipLayer, std::to_underlying(ShipType::kCount)> OwnershipLayers(const Frame& rFrame);
+	// Rows owned by a fleet (pController == kFleet) across the ship types.
+	[[nodiscard]] static int64_t OwnedEntityCount(const Frame& rFrame);
 
 	FrameInterpolate interpolate;
 	FramePostRender postRender;

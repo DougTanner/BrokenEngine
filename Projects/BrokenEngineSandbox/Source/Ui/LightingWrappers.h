@@ -74,12 +74,12 @@ extern engine::Wrapper gMissileExhaustVisibleIntensity;
 extern engine::Wrapper gMissileExhaustLightingArea;
 extern engine::Wrapper gMissileExhaustLightingIntensity;
 
-// Spaceships - Enemy blaster
-extern engine::Wrapper gEnemyBlasterVisibleIntensity;
-extern engine::Wrapper gEnemyBlasterLightingArea;
-extern engine::Wrapper gEnemyBlasterLightingIntensity;
+// Fighters - Blaster
+extern engine::Wrapper gFighterBlasterVisibleIntensity;
+extern engine::Wrapper gFighterBlasterLightingArea;
+extern engine::Wrapper gFighterBlasterLightingIntensity;
 
-// Spaceships - Hit flash
+// Fighters - Hit flash
 extern engine::Wrapper gHitFlashVisibleAreaOne;
 extern engine::Wrapper gHitFlashVisibleAreaTwo;
 extern engine::Wrapper gHitFlashVisibleIntensityOne;

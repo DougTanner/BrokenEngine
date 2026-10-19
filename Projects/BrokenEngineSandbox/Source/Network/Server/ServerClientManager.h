@@ -15,13 +15,14 @@ struct ClientSpawnInformation
 	FleetGuid fleetGuid {};
 	// Invalid {} spawns a new fleet member; a valid ID respawns that member and keeps its ID.
 	engine::GlobalId memberGlobalId {};
+	ShipType eType {};
 };
 
 class ServerClientManager
 {
 public:
 
-	void QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId);
+	void QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId, ShipType eType);
 	void NewClients();
 	void SpawnWaitingClients();
 	void OnClientDisconnected(int64_t iClientId, const engine::ClientGuid& rClientGuid);

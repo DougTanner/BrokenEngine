@@ -6,7 +6,7 @@
 
 Set up server and client state with the recipe below, then verify and release per the skill's Authoritative verification evidence principles and lifecycle checklist.
 
-1. Set up server state with `reset`, then `inject_payload` entries at a coord from `status.activeCoords`; confirm through `query_omnis`/`query_frame`.
+1. Set up server state with `reset`, then `inject_payload` entries at a coord from `status.activeCoords`; confirm through `query_collection`/`query_frame`.
 2. Launch/connect the client and require `status.clientCount` to increase.
 3. Use `describe_ui` before label-addressed `click`, `hover`, or `set_slider`; use `key`/`mouse` for raw input.
 
@@ -17,10 +17,10 @@ send one `inject_payload` batch holding two `SpawnOmni` entries on the same
 active coord whose `vecPosition` values lie about 600 m apart, for example
 `"vecPosition":[-300,0]` and `"vecPosition":[300,0]` (a cell is 900 m square,
 so a position must stay inside +/-450 or the batch fails). No response reports the tick that
-applied the batch, so poll `query_omnis {"coord":[x,y]}` on that coord until
-both minted `globalIds` from the injection response appear in `omnis` (`total`
-rises by two), then send `pause {"paused":true}` and read the exact positions
-with a final `query_omnis`.
+applied the batch, so poll `query_collection {"coord":[x,y],"collection":"omnis"}`
+on that coord until both minted `globalIds` from the injection response appear
+in `items` (`total` rises by two), then send `pause {"paused":true}` and read
+the exact positions with a final `query_collection`.
 
 ### Forced reconciliation re-simulation
 

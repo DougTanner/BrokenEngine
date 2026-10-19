@@ -5,7 +5,8 @@
 #include "Network/NetworkCursor.h"
 
 #include "Agent/Commands/ServerSimulationHarnessRigs.h"
-#include "Frame/Collections/Omnis/Omnis.h"
+#include "Frame/Collections/Ships/ShipBehaviours.h"
+#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/ServerCellStats.h"
 #include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetManager.h"
@@ -35,7 +36,7 @@ ServerSession::~ServerSession()
 // the delay resets the navigation timers, and a non-finite one would freeze them or fire them every tick.
 static float AdmitNavigationDelay(float fDelay)
 {
-	if (!OmnisPostRender::IsNavigationDelayInRange(fDelay))
+	if (!IsNavigationDelayInRange(fDelay))
 	{
 		engine::NetworkMessages::ThrowCorruptStream("ServerSession navigation delay");
 	}
@@ -52,10 +53,20 @@ static bool ReadBooleanByte(const uint8_t*& pCursor)
 	return iValue != 0;
 }
 
+static ShipType ReadShipTypeByte(const uint8_t*& pCursor)
+{
+	uint8_t uiValue = engine::ReadUint8(pCursor);
+	if (uiValue >= std::to_underlying(ShipType::kCount))
+	{
+		engine::NetworkMessages::ThrowCorruptStream("ServerSession ship type byte");
+	}
+	return static_cast<ShipType>(uiValue);
+}
+
 // The engine drain admits each packet through its contract row first. Every client-sendable game contract row has
 // min == max (GamePacketType.h), so admission settles each payload's size exactly and the cases below add no per-case
-// size check; only residual value checks a row cannot express — navigation-delay range and Boolean bytes — stay, and
-// they throw to drop the packet.
+// size check; only residual value checks a row cannot express — navigation-delay range, Boolean bytes, and ship type
+// bytes — stay, and they throw to drop the packet.
 void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket)
 {
 	switch (static_cast<GamePacketType>(rPacket.iPacketType))
@@ -88,12 +99,13 @@ void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket
 		}
 		case GamePacketType::kClientSpawnIntoFleetRequest:
 		{
-			// 16B fleetGuid = 16 bytes (type byte already stripped)
+			// 16B fleetGuid + 1B ShipType = 17 bytes (type byte already stripped)
 			const uint8_t* pCursor = rPacket.payload.data();
 			FleetGuid fleetGuid {};
 			fleetGuid.uiHigh = engine::ReadUint64(pCursor);
 			fleetGuid.uiLow = engine::ReadUint64(pCursor);
-			mpFleetManager->mPendingSpawnIntoFleetRequests.push_back({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid});
+			ShipType eType = ReadShipTypeByte(pCursor);
+			mpFleetManager->mPendingSpawnIntoFleetRequests.push_back({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid, .eType = eType});
 			break;
 		}
 		case GamePacketType::kClientRespawnInFleetRequest:
@@ -235,17 +247,17 @@ void ServerSession::ProcessUpdateOwnedEntityRequests()
 			continue;
 		}
 
-		int64_t iOmniUuid = engine::RegistryUuidByGlobalId(game::Frame::OwnershipLayer((*game::gpGame->mCells.at(updateCoord).pCurrent)), rRequest.globalId).iValue;
-		if (iOmniUuid == 0)
+		ShipUuid shipUuid = ShipUuidByGlobalId(*game::gpGame->mCells.at(updateCoord).pCurrent, rRequest.globalId);
+		if (shipUuid.iUuid == 0)
 		{
 			continue;
 		}
 
 		int64_t iPendingWeaponModeTicks = engine::kiTickRate;
-		game::StatusChange updateChange {.eType = game::StatusChangeType::kUpdateOmni, .data = game::UpdateOmniData {.iOmniUuid = iOmniUuid, .bUseMissiles = rRequest.bUseMissiles, .navigationDelaySeconds = rRequest.navigationDelaySeconds, .uiPendingWeaponModeTicks = static_cast<uint8_t>(iPendingWeaponModeTicks)}};
+		game::StatusChange updateChange {.eType = game::StatusChangeType::kUpdateShip, .data = game::UpdateShipData {.eType = shipUuid.eType, .iUuid = shipUuid.iUuid, .bUseMissiles = rRequest.bUseMissiles, .navigationDelaySeconds = rRequest.navigationDelaySeconds, .uiPendingWeaponModeTicks = static_cast<uint8_t>(iPendingWeaponModeTicks)}};
 		it->second.statusChanges.push_back(updateChange);
 
-		LOG(kNetwork, kDebug, "ServerSession::ProcessUpdateOwnedEntityRequests Client: {} GlobalId: {} OmniUuid: {} Coord: ({},{}) Missiles: {} NavDelay: {}", rRequest.iClientId, rRequest.globalId, iOmniUuid, updateCoord.iX, updateCoord.iY, rRequest.bUseMissiles, common::Wb(rRequest.navigationDelaySeconds.count(), 3));
+		LOG(kNetwork, kDebug, "ServerSession::ProcessUpdateOwnedEntityRequests Client: {} GlobalId: {} Type: {} Uuid: {} Coord: ({},{}) Missiles: {} NavDelay: {}", rRequest.iClientId, rRequest.globalId, ShipTypeName(shipUuid.eType), shipUuid.iUuid, updateCoord.iX, updateCoord.iY, rRequest.bUseMissiles, common::Wb(rRequest.navigationDelaySeconds.count(), 3));
 	}
 }
 

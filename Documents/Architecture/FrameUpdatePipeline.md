@@ -16,19 +16,20 @@ flowchart LR
 
 The engine [`FrameRegistry`](../../Engine/Source/Frame/FrameRegistry.cpp)
 answers "which row of another collection" questions during the tick, and the
-game opens exactly two windows for it from
-[`Frame.h`](../../Projects/BrokenEngineSandbox/Source/Frame/Frame.h). The
-Missile-Update window opens inside the Update phase before Spaceships Update
-runs. A Spaceship is eligible while it still publishes a valid registry id and
-its previous-frame arrival grace has run out, and the window binds both position
-columns: current positions, which acquisition ranks and range-checks against,
-and previous-frame positions, which a retained Missile homes on. Subscriber
-counts come from the previous frame's Missile handles. Still-active targetless
-Missiles are acquired after the loop and only home from the next tick. The
-Omni-Spawn window is rebuilt in the Spawn phase, after Update, Transfer, and
-Destroy, from current Spaceship lifecycle state and fully initialized Missile
-handles; it binds no previous-frame positions, and is then reused across the
-whole omni spawn loop.
+game opens exactly two windows for it through `BuildShipRegistryWindow` in
+[`ShipQueries.h`](../../Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipQueries.h),
+each binding one source layer per ship type (Fighters, Omnis, Battleships). The
+Missile-Update window opens inside the Update phase before the ship Updates
+run. A ship of any type is eligible while it still publishes a valid registry
+id and its previous-frame arrival grace has run out, and the window binds both
+position columns: current positions, which acquisition ranks and range-checks
+against, and previous-frame positions, which a retained Missile homes on.
+Subscriber counts come from the previous frame's Missile handles. Still-active
+targetless Missiles are acquired after the loop and only home from the next
+tick. The Omni-Spawn window is rebuilt in the Spawn phase, after Update,
+Transfer, and Destroy, from current ship lifecycle state and fully initialized
+Missile handles; it binds no previous-frame positions, and is then reused
+across the whole omni spawn loop.
 
 Each window makes one combined workbuffer reservation for its source rows,
 registry scratch, alignment padding, and layer descriptor. The pointer-derived

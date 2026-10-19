@@ -1,41 +1,10 @@
-# Omnis - Omni Fleet Ships
+# Omnis - Armored Shielded Ships
 
-Omnis represent a flagship and AI-driven wingmen through one collection. Stable global IDs provide lookup and transfer identity; flagship status is a flag, never a privileged SOA index. Collision, terrain-push, and pusher sizing all derive from the shared omni radius, so tuning size means changing that one constant.
-
-## Navigation Invariants
-
-- Navigation covers roaming, cross-cell movement, island destinations, and flagship following. Mode transitions depend only on shared state.
-- Flagship following has no frame-local exit when the flagship row is gone;
-  recovery comes from the server's flagship reassignment landing in the next
-  tick's Update phase, not from navigation. Two ticks after the death (D+2), the
-  promoted flagship's reassigned flag, carried mode 5 (following the flagship),
-  and same-cell wanted coord recover it to mode 4 (navigating to an island
-  destination) and clear the stale destination; this preserves mode 4's schedule
-  of three random draws and leaves the fleet's 60-second rally timer unchanged.
-- Path queries run on a deterministic cadence staggered by tick and stable global ID, with immediate recomputation for mode, destination, or direction changes.
-- The cadence also breaks off-schedule when a navigation polygon contains either
-  the lookahead point along the carried steering bearing or the current
-  position. Both tests are needed: containment ahead does not imply containment
-  at the position, and a ship already driven inside sits there as its steady
-  state. Key this on nav-polygon containment, not a terrain-elevation probe —
-  the polygon is that elevation contour inflated outward, so a ship stranded in
-  the band between them measures clear terrain and never re-paths.
-- Random draws, arrival checks, and mode transitions remain outside the
-  pathfinding throttle. Modes 4 and 5 must consume the same number of random
-  draws on any tick they can flip between, so mode 5 mirrors mode 4's three
-  entry draws (island pick, footprint X, footprint Y) on every tick it runs. In
-  a cell with no islands neither mode draws: mode 5 skips the mirror and mode 4
-  navigates to the cell center instead of an island. Only the draw count matters
-  — each `common::Random` advances the shared random stream once no matter what
-  bound it is given — so mode 5's mirror draws are load-bearing, not dead code,
-  even though it throws their results away.
-- Spawning always consumes its cell-change random draw.
-- Preserve cached steering and client debug waypoints across ticks where pathfinding is skipped.
+Omnis are the armored, shielded ship type; fleet navigation, flagship identity, and the other shared ship rules are in `../Ships/AGENTS.md`. Collision, terrain-push, and pusher sizing all derive from the shared omni radius, so tuning size means changing that one constant.
 
 ## State Boundaries
 
 - Shared CRC excludes client animation time, the local records tracking each pusher, and server-assigned global identity. Some excluded state still participates in save or transfer.
 - The simulation keeps `pNextBlasterFireTimes` in [0, `kBlasterFireInterval`], which `SpawnBlasters` asserts. `PostRead` rejects out-of-range rows on every Frame read.
-- `pNavigationDelays` stays within [0, 60] seconds, the range `IsNavigationDelayInRange` tests and every navigation-delay admission shares. `PostRead` also rejects a non-finite or out-of-range row on every Frame read.
 - The simulation keeps the Interpolate `pDestroyedTimes` in [0, `kDestroyTime`]. The Interpolate `PostRead` rejects out-of-range rows on every Frame read.
 - `OmnisPostRender::Spawn(SpawnInfo)` is the asserting overload of the engine bounds rule (`../../../../../../Engine/Source/Frame/AGENTS.md`): an omni outside its cell is a bug, so it asserts instead of refusing and always reports success.

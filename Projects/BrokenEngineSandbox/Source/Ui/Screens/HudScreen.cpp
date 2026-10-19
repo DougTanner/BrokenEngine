@@ -4,8 +4,8 @@
 
 #include "Ui/MenuUtils.h"
 
-#include "Frame/Collections/Omnis/Omnis.h"
-#include "Frame/Collections/Spaceships/Spaceships.h"
+#include "Frame/Collections/Ships/ShipBehaviours.h"
+#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Fleet.h"
 #include "Game.h"
 
@@ -58,15 +58,17 @@ void HudScreen::Render()
 				continue;
 			}
 			++iSubscribedCellCount;
-			const OmnisPostRender& rOmnis = *gpGame->RenderFrame(rCoordinate).postRender.pOmnis;
-			for (int64_t i = 0; i < rOmnis.iCount && !bFoundAny; ++i)
+			ForEachShipType(gpGame->RenderFrame(rCoordinate), [&]([[maybe_unused]] ShipType eType, [[maybe_unused]] const auto& rInterpolate, const auto& rPostRender)
 			{
-				engine::GlobalId globalId = rOmnis.pGlobalIds[i];
-				bFoundAny = std::ranges::any_of(pFleet->members, [globalId](const FleetMember& rMember)
+				for (int64_t i = 0; i < rPostRender.iCount && !bFoundAny; ++i)
 				{
-					return rMember.globalId == globalId;
-				});
-			}
+					engine::GlobalId globalId = rPostRender.pGlobalIds[i];
+					bFoundAny = std::ranges::any_of(pFleet->members, [globalId](const FleetMember& rMember)
+					{
+						return rMember.globalId == globalId;
+					});
+				}
+			});
 			if (bFoundAny)
 			{
 				break;
@@ -103,15 +105,15 @@ void HudScreen::Render()
 	mbPreviousForceOpen = bForceOpen;
 
 	// Right panel content gate: it has nothing useful to show without a focused owned entity in current snapshot.
-	std::optional<int64_t> optionalOwnedEntityIndex;
+	std::optional<ShipLocator> optionalOwnedEntity;
 	{
 		auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
 		if (it != gpGame->mCells.end() && it->second.iSnapshotCount > 0)
 		{
-			optionalOwnedEntityIndex = gpGame->ClientOwnedEntityIndex(*gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pOmnis);
+			optionalOwnedEntity = gpGame->ClientOwnedEntity(gpGame->RenderFrame(gpGame->mClientGridCoordinate));
 		}
 	}
-	bool bRightHasContent = optionalOwnedEntityIndex.has_value();
+	bool bRightHasContent = optionalOwnedEntity.has_value();
 
 	// With focused owned-entity content, mouse proximity to either anchor opens both panels together.
 	ImVec2 vLeftAnchor(rInputOutput.DisplaySize.x * kfHudEdgeMarginFraction, rInputOutput.DisplaySize.y * kfHudPanelTopFraction);
@@ -147,8 +149,8 @@ float HudScreen::PanelWidth()
 	// gUiFontScale/UiScale() with no magnifying multiplier.
 	const ImGuiStyle& rStyle = ImGui::GetStyle();
 
-	// Member-row template: content-spanning Selectable rows.
-	float fMemberRowWidth = ImGui::CalcTextSize("Ship 88 (-888,-888) #8888888888").x;
+	// Member-row template: content-spanning Selectable rows, with the longest ship type name.
+	float fMemberRowWidth = ImGui::CalcTextSize("Battleship 88 (-888,-888) #8888888888").x;
 
 	// Nav-row template: [<] 88/88 [>] [+] [-]. Padding-dominated — at low gUiFontScale text shrinks but the per-button
 	// FramePadding and per-joint ItemSpacing don't, so measure them explicitly: 4 buttons × 2 edges (8× FramePadding.x),
@@ -274,7 +276,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 			if (!(rMember.flags & FleetMemberFlags::kIsDead))
 			{
 				char pcLabel[64];
-				std::snprintf(pcLabel, sizeof(pcLabel), "Ship %lld (%d,%d) #%lld", i + 1, memberCoordinate.iX, memberCoordinate.iY, rMember.globalId.iValue);
+				std::snprintf(pcLabel, sizeof(pcLabel), "%s %lld (%d,%d) #%lld", ShipTypeName(rMember.eType), i + 1, memberCoordinate.iX, memberCoordinate.iY, rMember.globalId.iValue);
 				if (ImGui::Selectable(pcLabel, bSelected))
 				{
 					gpGame->mFleetSelection.SelectOwnedEntityInFleet(rMember.globalId);
@@ -284,7 +286,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 			else
 			{
 				char pcLabel[64];
-				std::snprintf(pcLabel, sizeof(pcLabel), "Ship %lld [DEAD] #%lld", i + 1, rMember.globalId.iValue);
+				std::snprintf(pcLabel, sizeof(pcLabel), "%s %lld [DEAD] #%lld", ShipTypeName(rMember.eType), i + 1, rMember.globalId.iValue);
 				ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
 				if (ImGui::Selectable(pcLabel, false))
 				{
@@ -299,14 +301,27 @@ void HudScreen::RenderFleetPanel(float fTarget)
 			ImGui::PopID();
 		}
 
-		ImGui::BeginDisabled((gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || std::ssize(pFleet->members) >= kiMaximumFleetMembers);
-		if (ImGui::Button("[+]##Omni"))
+		struct SpawnButton
 		{
-			if (gpClientSession != nullptr)
+			const char* pcLabel = nullptr;
+			ShipType eType {};
+		};
+		static constexpr SpawnButton kpSpawnButtons[] {{.pcLabel = "[+F]##Fighter", .eType = ShipType::kFighter}, {.pcLabel = "[+O]##Omni", .eType = ShipType::kOmni}, {.pcLabel = "[+B]##Battleship", .eType = ShipType::kBattleship}};
+		ImGui::BeginDisabled((gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || std::ssize(pFleet->members) >= kiMaximumFleetMembers);
+		for (const auto& [i, rButton] : std::views::enumerate(kpSpawnButtons))
+		{
+			if (i > 0)
 			{
-				gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
-				gpClientSession->SendSpawnIntoFleetRequest(pFleet->guid);
-				LOG(kDefault, kVerbose, "HUD SpawnIntoFleet Fleet: ({},{})", pFleet->guid.uiHigh, pFleet->guid.uiLow);
+				ImGui::SameLine();
+			}
+			if (ImGui::Button(rButton.pcLabel))
+			{
+				if (gpClientSession != nullptr)
+				{
+					gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
+					gpClientSession->SendSpawnIntoFleetRequest(pFleet->guid, rButton.eType);
+					LOG(kDefault, kVerbose, "HUD SpawnIntoFleet Fleet: ({},{}) Type: {}", pFleet->guid.uiHigh, pFleet->guid.uiLow, ShipTypeName(rButton.eType));
+				}
 			}
 		}
 		ImGui::EndDisabled();
@@ -331,7 +346,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 		sbNavigationDelaySliderWasActive = ImGui::IsItemActive();
 		if (ImGui::IsItemDeactivatedAfterEdit())
 		{
-			if (!OmnisPostRender::IsNavigationDelayInRange(sfNavigationDelayEditValue))
+			if (!IsNavigationDelayInRange(sfNavigationDelayEditValue))
 			{
 				sfNavigationDelayEditValue = pFleet->navigationDelaySeconds.count();
 			}
@@ -353,12 +368,12 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 	ImGuiIO& rInputOutput = ImGui::GetIO();
 	engine::ScopedMenuScale menuScale;
 
-	std::optional<int64_t> optionalOwnedEntityIndex = std::nullopt;
+	std::optional<ShipLocator> optionalOwnedEntity = std::nullopt;
 	{
 		auto it = gpGame->mCells.find(gpGame->mClientGridCoordinate);
 		if (it != gpGame->mCells.end() && it->second.iSnapshotCount > 0)
 		{
-			optionalOwnedEntityIndex = gpGame->ClientOwnedEntityIndex(*gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pOmnis);
+			optionalOwnedEntity = gpGame->ClientOwnedEntity(gpGame->RenderFrame(gpGame->mClientGridCoordinate));
 		}
 	}
 
@@ -380,10 +395,23 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 	ImVec2 vPanelSize = ImGui::GetWindowSize();
 	engine::DrawPanelAccents(ImGui::GetWindowDrawList(), vPanelPosition, ImVec2(vPanelPosition.x + vPanelSize.x, vPanelPosition.y + vPanelSize.y));
 
-	if (optionalOwnedEntityIndex.has_value())
+	ShipOrders_t orders {};
+	float fNavigationDelay = 0.0f;
+	bool bHasWeaponMode = false;
+	if (optionalOwnedEntity.has_value())
 	{
-		OmnisPostRender& rOmnis = *gpGame->RenderFrame(gpGame->mClientGridCoordinate).postRender.pOmnis;
-		bool bUseMissiles = static_cast<bool>(rOmnis.pFlags[*optionalOwnedEntityIndex] & OmniFlags::kUseMissiles);
+		VisitShip(gpGame->RenderFrame(gpGame->mClientGridCoordinate), *optionalOwnedEntity, [&]([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
+		{
+			orders = rPostRender.pOrders[iRow];
+			fNavigationDelay = rPostRender.pNavigationDelays[iRow].count();
+			// Only a ship with a weapon-mode countdown ever applies kPendingUseMissiles, so only it shows the toggle
+			bHasWeaponMode = requires { rPostRender.puiPendingWeaponModeTicks; };
+		});
+	}
+
+	if (bHasWeaponMode)
+	{
+		bool bUseMissiles = static_cast<bool>(orders & ShipOrders::kUseMissiles);
 		gpGame->mWeaponModeToggle.Update(WeaponModeKey {.ownedEntityIdentifier = gpGame->ClientOwnedEntityIdentifier(), .bUseMissiles = bUseMissiles});
 
 		const char* pcLabel = bUseMissiles ? "Missiles" : "Blasters";
@@ -400,7 +428,6 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 			if (gpClientSession != nullptr && (gpGame->ClientOwnedEntityIdentifier().iValue != 0))
 			{
 				gpGame->mWeaponModeToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
-				float fNavigationDelay = rOmnis.pNavigationDelays[*optionalOwnedEntityIndex].count();
 				gpClientSession->SendUpdateOwnedEntityRequest(gpGame->ClientOwnedEntityIdentifier().iValue, !bUseMissiles, fNavigationDelay);
 			}
 		}

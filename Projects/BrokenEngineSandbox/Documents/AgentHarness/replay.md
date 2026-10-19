@@ -26,8 +26,9 @@ newly appended server-log slice for the whole harness rig and reject any new
 `LogDifferences CRC Client`, checksum mismatch, `CONFIRMED DESYNC`,
 replay-reader error, or `SaveLoadReplay aborted` line.
 
-The harness rig is an `inject_payload` batch of spawn entries (`SpawnOmni`,
-`SpawnSpaceship`, `SpawnBlaster`, `SpawnMissile`, or `SpawnExplosion`) at an
+The harness rig is an `inject_payload` batch of spawn entries (`SpawnFighter`,
+`SpawnOmni`, `SpawnBattleship`, `SpawnBlaster`, `SpawnMissile`, or
+`SpawnExplosion`) at an
 active cell with no `tick`, so each is applied right after the next tick and is
 that tick's post-dispatch event, counted under its collection. A case that
 needs a newly created destination instead uses the edge-coast `SpawnOmni` of
@@ -84,7 +85,7 @@ assertions; do not attribute those assertions to this harness rig.
 
 Run the following A–G matrix. Keep a newly appended server-log slice for the entire matrix and reject any new `LogDifferences CRC Client`, checksum mismatch, `CONFIRMED DESYNC`, replay-reader error, or `SaveLoadReplay aborted` line.
 Run it with no client connected: a client's fleet spawns join the post-tick
-batch at the origin `[0,0]` and count under `omniCount`, which breaks the
+batch at the origin `[0,0]` and count under their ship type's count, which breaks the
 per-case counts below.
 
 A. Send `reset`, `pause {"paused":true}`, then `replay_record {"start":true}`.
@@ -100,13 +101,13 @@ B. While automatically paused after A, send `pause {"paused":false}` and require
 C. During that playback, poll `replay_transfer_capture` until that recording's
 `events` entry selected by `recordingEventTick == E` has
 `playbackEventTick == E`. Immediately, before terminal reload, query
-`query_frame` and `query_omnis {"coord":[0,0]}`; require exactly one synthetic
+`query_frame` and `query_collection {"coord":[0,0],"collection":"omnis"}`; require exactly one synthetic
 omni, the matching omni count, and that entry's expected event tick and final
 count. If the setup response reported effective Network `Verbose`, require the
 newly appended `ServerBroadcaster::BuildTickPublication` line for `[0,0]` at
 `Tick: E`; if it reported clamped `Debug`, do not fail on the missing line and
 use the static source/phase trace to establish publication at `E`. Do not infer
-that historical point from `status` or `query_omnis`. After those immediate
+that historical point from `status` or `query_collection`. After those immediate
 observations, separately wait for a newly appended `End replay <tick>, looping`
 marker and scan the appended log slice for CRC/read/`CONFIRMED DESYNC` errors.
 This proves replayed spawn publication and checksum validation; the marker
@@ -126,13 +127,13 @@ and repeat. Send `reset` again, so no probe blaster is present when D records,
 and unpause. Then record a multi-event variant in this order: send the
 edge-coast `SpawnOmni` entry into `[0,0]` and wait until its crossing creates
 `[1,0]` (`[1,0]` appears in `status.activeCoords`), then send one each of
-`SpawnSpaceship`, `SpawnBlaster` at the probed `vecPosition`, and
+`SpawnFighter`, `SpawnBlaster` at the probed `vecPosition`, and
 `SpawnMissile` into `[0,0]`. Send each entry only after the previous event has
 been applied, confirmed by an advanced `status.tick`; entries released for the
 same tick join one batch and merge into a single capture entry. After recording
 stops, one `replay_transfer_capture` read must return five `events` entries in
 capture order: the omni spawn and then its crossing, each with `omniCount` `1`,
-then one each with `spaceshipCount`, `blasterCount`, and `missileCount` `1`,
+then one each with `fighterCount`, `blasterCount`, and `missileCount` `1`,
 every other count zero; during playback, poll `replay_transfer_capture` until
 every entry's `playbackEventTick` equals its `recordingEventTick`. When
 effective Network `Verbose` is available, also require the matching
@@ -151,13 +152,13 @@ cancel that playback by sending `replay_play` again and polling
 and keep recording through advancing ticks so the retirement below lands
 mid-recording. Retire `[1,0]` during that fresh recording by reading its omni
 `uuid`, sending
-`inject_payload {"entries":[{"coord":[1,0],"type":"DestroyOmni","iOmniUuid":<uuid>}]}`,
+`inject_payload {"entries":[{"coord":[1,0],"type":"DestroyShip","eType":"Omni","iUuid":<uuid>}]}`,
 and waiting for it to leave `status.activeCoords`. Stop, poll `recording:false`,
 then issue `replay_play`. The destination must retire at its recorded terminal
 boundary without missing/duplicate collections,
 `Replay reader terminal data was not fully consumed`, or
 `advanced beyond terminal`; require an `End replay <tick>, looping` marker.
-F. Abort a pending start: `reset`, pause, request recording, send the `SpawnOmni` entry of A, then send `replay_record {"start":false}` before unpausing. After unpausing, require `status.recording:false`, no recording event in `replay_transfer_capture`, and the spawned omni live at `[0,0]` (its minted global id in `query_omnis`), because cancelling a start drops no queued entry.
+F. Abort a pending start: `reset`, pause, request recording, send the `SpawnOmni` entry of A, then send `replay_record {"start":false}` before unpausing. After unpausing, require `status.recording:false`, no recording event in `replay_transfer_capture`, and the spawned omni live at `[0,0]` (its minted global id in `query_collection` `omnis`), because cancelling a start drops no queued entry.
 G. Abort an injected start failure: `reset`, pause, arm `replay_inject_persistence_failure {"stage":"invalidation"}`, request recording, and send the `SpawnOmni` entry of A. Unpause. Require `status.recording:false`, no recording event in `replay_transfer_capture`, and the spawned omni live at `[0,0]`, because a recording-start failure drops no queued entry.
 
 ### Natural persistent-GUID ownership and cell crossing
@@ -181,10 +182,10 @@ must prove.
    publication log baselines. When Network is clamped to `Debug`, record that
    result and do not require unavailable kVerbose publication lines. Keep the
    client connected through recording and playback.
-2. Use `describe_ui`, click `[+]##Fleet`, then click `[+]##Omni`. Wait for the
+2. Use `describe_ui`, click `[+]##Fleet`, then click `[+O]##Omni`. Wait for the
    fleet member and the ordinary `ServerSessionBase::SendOwnedEntityState State: Spawned`
    line. Read `status.activeCoords`, query each current coordinate with
-   `query_omnis`, and require exactly one Omni overall. Record its
+   `query_collection` `omnis`, and require exactly one Omni overall. Record its
    `globalId` and current `uuid`, then wait, injecting nothing, for its first
    `ServerSessionBase::SendOwnedEntityState State: ChangedCell ... GlobalId: <globalId>`
    line; call that line's cell W. The server fleet timer moves a new flagship
@@ -199,7 +200,7 @@ must prove.
    not request, restart from a fresh server. This discovers the runtime state
    instead of assuming where the Omni spawned or settled; the proven setup
    used A=`[2,0]`, B=`[3,0]`, and `globalId:1`, which fits W=`[1,0]`.
-3. Immediately before every crossing, query the source coordinate again for that `globalId` and use its current per-cell `uuid` in `inject_payload {"entries":[{"coord":<source>,"type":"UpdateFleet","iOmniUuid":<fresh-uuid>,"fleetWantedCoordinate":<destination>,"bIsFlagship":true}]}`. An Omni receives a new cell-local UUID after crossing, so a previously captured UUID is not reusable.
+3. Immediately before every crossing, query the source coordinate again for that `globalId` and use its current per-cell `uuid` in `inject_payload {"entries":[{"coord":<source>,"type":"UpdateFleet","eType":"Omni","iUuid":<fresh-uuid>,"fleetWantedCoordinate":<destination>,"bIsFlagship":true,"flagshipGlobalId":<globalId>}]}`. An Omni receives a new cell-local UUID after crossing, so a previously captured UUID is not reusable.
 4. Start recording and poll `status.recording:true`. Confirm A is subscribed, and keep the current client `describe_scene.subscribedCoords` plus newly appended `Server::ClientSubscribe` lines as the subscription baseline. The exact initial activation tick `A1` comes from the stopped manifest in step 11; a later status poll does not establish it.
 5. Move A→B using the fresh UUID rule. Require the same `globalId` at B and
    exactly one new
@@ -254,7 +255,7 @@ must prove.
     `Server::ClientUnsubscribe` line for A from that `E1` line through its
     `(E4,A)` line. Between one loop's `E1` and `E2` lines, take one sample:
     `describe_scene.clientGridCoord` must equal A while
-    `query_omnis {"coord":<B>}` places the Omni's `globalId` at B. At each
+    `query_collection {"coord":<B>,"collection":"omnis"}` places the Omni's `globalId` at B. At each
     restarted A activation (`E2` and `E4`; the original failure's first restart
     was `7338`, 155 ticks after the prior generation ended at `7183` and beyond
     the 128-tick receive window), require a new server `SendCoordFullState` line
@@ -361,7 +362,7 @@ These checks combine harness observations with a static phase trace because the 
    manifest and artifacts with the root-digest self-check before editing. In
    that header require exactly one occurrence of the byte sequence consisting of
    post-dispatch count `1` as little-endian int64, `E` as little-endian int64,
-   status count `1` as little-endian int64, and the `TransferOmni` byte `05`,
+   status count `1` as little-endian int64, and the `TransferOmni` byte `07`,
    followed by that record's serialized `OmnisPostRender::SpawnInfo` image
    running to the end of the file, so the sequence opens the header's trailing
    post-dispatch section and its only record. Change that status count to `0`

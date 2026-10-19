@@ -39,19 +39,19 @@ extern engine::Wrapper gOmniExplosionParticleIntensitySpread;
 extern engine::Wrapper gOmniExplosionParticleIntensityDecay;
 extern engine::Wrapper gOmniExplosionParticleIntensityPower;
 
-extern engine::Wrapper gSpaceshipExplosionParticleWidth;
-extern engine::Wrapper gSpaceshipExplosionParticleLength;
-extern engine::Wrapper gSpaceshipExplosionParticleLengthSpread;
-extern engine::Wrapper gSpaceshipExplosionParticlePositionJitter;
-extern engine::Wrapper gSpaceshipExplosionParticleVelocityBase;
-extern engine::Wrapper gSpaceshipExplosionParticleVelocitySpread;
-extern engine::Wrapper gSpaceshipExplosionParticleVerticalVelocityBase;
-extern engine::Wrapper gSpaceshipExplosionParticleVerticalVelocitySpread;
-extern engine::Wrapper gSpaceshipExplosionParticleVelocityDecay;
-extern engine::Wrapper gSpaceshipExplosionParticleGravity;
-extern engine::Wrapper gSpaceshipExplosionParticleVisibleIntensity;
-extern engine::Wrapper gSpaceshipExplosionParticleIntensitySpread;
-extern engine::Wrapper gSpaceshipExplosionParticleIntensityDecay;
-extern engine::Wrapper gSpaceshipExplosionParticleIntensityPower;
+extern engine::Wrapper gFighterExplosionParticleWidth;
+extern engine::Wrapper gFighterExplosionParticleLength;
+extern engine::Wrapper gFighterExplosionParticleLengthSpread;
+extern engine::Wrapper gFighterExplosionParticlePositionJitter;
+extern engine::Wrapper gFighterExplosionParticleVelocityBase;
+extern engine::Wrapper gFighterExplosionParticleVelocitySpread;
+extern engine::Wrapper gFighterExplosionParticleVerticalVelocityBase;
+extern engine::Wrapper gFighterExplosionParticleVerticalVelocitySpread;
+extern engine::Wrapper gFighterExplosionParticleVelocityDecay;
+extern engine::Wrapper gFighterExplosionParticleGravity;
+extern engine::Wrapper gFighterExplosionParticleVisibleIntensity;
+extern engine::Wrapper gFighterExplosionParticleIntensitySpread;
+extern engine::Wrapper gFighterExplosionParticleIntensityDecay;
+extern engine::Wrapper gFighterExplosionParticleIntensityPower;
 
 } // namespace game

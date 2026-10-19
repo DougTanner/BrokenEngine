@@ -21,7 +21,7 @@ runner applies. The purpose and the triggers live in
 
    | Requested variant | Live exemplar files and symbols | Pattern to preserve |
    |---|---|---|
-   | Shared-only game collection struct | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.h`: `SpaceshipsPostRender`; sibling `.cpp` files | `SharedMembers()` plus `Members()` returning it, so a later client-only field cannot silently join the CRC; no special frame dispatch |
+   | Shared-only game collection struct | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Blasters/Blasters.h`: `BlastersPostRender`; sibling `.cpp` files | `SharedMembers()` plus `Members()` returning it, so a later client-only field cannot silently join the CRC; no special frame dispatch |
    | Shared game state plus client-owned state | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.h`: both structs; `Missiles.cpp`: `ClientInitialize`, `ClientInitializeAll`, `Transfer`; `MissilesUpdate.cpp` | guarded `ClientMembers()`, client `tuple_cat`, hydration, `OwnedHandles()` on both structs, transfer payload |
    | Server-visible engine collection | `Engine/Source/Frame/Collections/Pushers/Pushers.h`: both structs; sibling `.cpp` files; `Engine/Source/Frame/FrameBase.h` | direct FrameBase storage, server tuple registration, index helpers, per-struct `kiVersion` declarations folded through server tuple registration |
    | Owner-synchronized whole-file client-only collection | `Engine/Source/Frame/Collections/Sounds/Sounds.h`: both structs; sibling `.cpp` files; `FrameBase.h` | outer `BT_CLIENT` guard, `Members()` only, owner `Sync`/Add, owner releases the row through its `OwnedHandles()` or `ReleaseIndexableElementAndClearHandle`, custom client-only identity only when required |
@@ -103,13 +103,8 @@ runner applies. The purpose and the triggers live in
       game `GameInterpolateTypes`/`GamePostRenderTypes` lists and the engine
       `ServerCollections()` lists, so the registration in step 11 or 12 adds
       both terms; add none by hand.
-    - An explicitly dispatched pair kept outside those lists, as Omnis
-      is, adds its own `kiVersion` terms to the `game::Frame::kiVersion`
-      definition in `Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp`, as
-      Omnis does.
 
-    Done when both declarations exist, plus those explicit terms for such a
-    pair.
+    Done when both declarations exist.
 
 ### Settle and verify
 
@@ -180,10 +175,6 @@ runner applies. The purpose and the triggers live in
 - Tuple registration supplies normal phase dispatch, allocation/copy walks,
   build-local Write/Read, shared ServerRead/CRC, and output merging in
   `LogDifferences`.
-- Reserve explicit per-collection Frame.cpp dispatch for a concrete special
-  contract such as Omnis; `CollectionFlags::kIdToIndex` alone is not one.
-  `engine::PushersInterpolate` proves that an indexable collection can use the
-  normal tuples.
 - Pure client-only engine collections do not alter persisted shared layout and
   do not contribute version terms. Sounds and Puffs are the live engine
   examples.

@@ -6,7 +6,7 @@
 
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
-#include "Frame/Collections/Spaceships/Spaceships.h"
+#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Ui/WindDepositsWrappers.h"
 
@@ -18,11 +18,6 @@
 
 namespace game
 {
-
-using enum OmniFlags;
-
-constexpr float kfBlasterTargetRange = 120.0f;
-constexpr float kfMissileTargetRange = 160.0f;
 
 constexpr std::chrono::duration<float> kShieldCooldown(2.0f);
 constexpr std::chrono::duration<float> kShieldDownSoundCooldown(2.0f);
@@ -48,111 +43,33 @@ constexpr float kfExplosionSmoke = 0.25f;
 constexpr float kfDeathRadialPower = 0.3f;
 constexpr int64_t kiDeathTrailCount = 2;
 
-// Firing, look targets, and missile aim require a living, visible spaceship past arrival grace.
-static bool XM_CALLCONV IsAcquireCandidate(const SpaceshipsInterpolate& __restrict rSpaceshipsInterpolate, const SpaceshipsPostRender& __restrict rSpaceshipsPostRender, FXMVECTOR vecOmniPosition, int64_t j)
-{
-	if (rSpaceshipsInterpolate.pDestroyedTimes[j] != std::chrono::duration<float>(-1.0f))
-	{
-		return false;
-	}
-	if (rSpaceshipsPostRender.pArrivalGracePeriods[j] > std::chrono::duration<float>::zero())
-	{
-		return false;
-	}
-	if (!FrameInterpolate::IsVisible(vecOmniPosition, rSpaceshipsInterpolate.pVecPositions[j]))
-	{
-		return false;
-	}
-	return true;
-}
-
-// Missile aim searches current-frame data; AcquireTarget selects firing and look targets from previous-frame data.
-static int64_t XM_CALLCONV FindTargetSpaceshipIndex(const SpaceshipsInterpolate& __restrict rSpaceshipsInterpolate, const SpaceshipsPostRender& __restrict rSpaceshipsPostRender, FXMVECTOR vecOmniPosition)
+// Missile aim searches current-frame data for the nearest visible enemy within missile range; AcquireTarget selects
+// firing and look targets from previous-frame data.
+static bool XM_CALLCONV FindMissileAimTarget(const Frame& rFrame, FXMVECTOR vecOmniPosition, engine::AlignmentIdentifier alignment, XMVECTOR& rVecTarget)
 {
 	float fClosestDistance = kfMissileTargetRange;
-	int64_t iClosestSpaceship = -1;
-	for (int64_t j = 0; j < rSpaceshipsPostRender.iCount; ++j)
+	bool bFound = false;
+	ForEachEnemyShip(rFrame.interpolate, rFrame.postRender, alignment, [&]([[maybe_unused]] ShipLocator locator, FXMVECTOR vecTargetPosition, [[maybe_unused]] FXMVECTOR vecTargetVelocity)
 	{
-		if (!IsAcquireCandidate(rSpaceshipsInterpolate, rSpaceshipsPostRender, vecOmniPosition, j))
+		if (!FrameInterpolate::IsVisible(vecOmniPosition, vecTargetPosition))
 		{
-			continue;
+			return;
 		}
-		float fDistance = common::Distance(vecOmniPosition, rSpaceshipsInterpolate.pVecPositions[j]);
+		float fDistance = common::Distance(vecOmniPosition, vecTargetPosition);
 		if (fDistance < fClosestDistance)
 		{
 			fClosestDistance = fDistance;
-			iClosestSpaceship = j;
+			rVecTarget = vecTargetPosition;
+			bFound = true;
 		}
-	}
-	return iClosestSpaceship;
-}
-
-
-void XM_CALLCONV OmnisPostRender::AcquireTarget(const Frame& __restrict rPreviousFrame, FXMVECTOR vecPosition, OmniFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition)
-{
-	const SpaceshipsInterpolate& rSpaceshipsInterpolate = *rPreviousFrame.interpolate.pSpaceships;
-	const SpaceshipsPostRender& rSpaceshipsPostRender = *rPreviousFrame.postRender.pSpaceships;
-	int64_t iSpaceshipCount = rSpaceshipsPostRender.iCount;
-
-	int64_t iTargetInRange = -1;
-	int64_t iTargetForLook = -1;
-	float fBestInRange = kfMissileTargetRange;
-	float fBestForLook = std::numeric_limits<float>::max();
-	for (int64_t j = 0; j < iSpaceshipCount; ++j)
-	{
-		if (!IsAcquireCandidate(rSpaceshipsInterpolate, rSpaceshipsPostRender, vecPosition, j))
-		{
-			continue;
-		}
-		float fDistance = common::Distance(vecPosition, rSpaceshipsInterpolate.pVecPositions[j]);
-		if (fDistance < fBestInRange)
-		{
-			fBestInRange = fDistance;
-			iTargetInRange = j;
-		}
-		if (fDistance < fBestForLook)
-		{
-			fBestForLook = fDistance;
-			iTargetForLook = j;
-		}
-	}
-
-	rbLookTargetFound = false;
-	rVecLookPosition = XMVectorZero();
-	if (iTargetInRange >= 0)
-	{
-		rVecLookPosition = common::ComputeLeadPosition(vecPosition, rSpaceshipsInterpolate.pVecPositions[iTargetInRange], rSpaceshipsPostRender.pVecVelocities[iTargetInRange], kfOmniBlastersSpeed);
-		rbLookTargetFound = true;
-	}
-	else if (iTargetForLook >= 0)
-	{
-		rVecLookPosition = rSpaceshipsInterpolate.pVecPositions[iTargetForLook];
-		rbLookTargetFound = true;
-	}
-
-	// Weapon spawn timers rate-limit continuous fire; blasters require the shorter target range.
-	if (iTargetInRange >= 0)
-	{
-		rFlags.Set(kFireMissile);
-		if (common::Distance(vecPosition, rSpaceshipsInterpolate.pVecPositions[iTargetInRange]) <= kfBlasterTargetRange)
-		{
-			rFlags.Set(kFireBlaster);
-		}
-	}
+	});
+	return bFound;
 }
 
 void XM_CALLCONV OmnisPostRender::UpdateFacing(FXMVECTOR vecPosition, FXMVECTOR vecLookPosition, XMVECTOR& rVecWantedDirection)
 {
 	// The reticle uses this unsmoothed lead-intercept direction; OmnisInterpolate::Update smooths hull rotation with kfRotateTowardsSpeed.
 	rVecWantedDirection = XMVector3Normalize(XMVectorSubtract(vecLookPosition, vecPosition));
-}
-
-void OmnisPostRender::RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::duration<float> shieldCooldown, float& rfShield)
-{
-	if (shieldCooldown.count() <= 0.0f)
-	{
-		rfShield = std::min(rfShield + deltaTime.count() * kfOmniShieldRegeneration, kfOmniShield);
-	}
 }
 
 
@@ -214,6 +131,16 @@ static void XM_CALLCONV ApplyDamage([[maybe_unused]] const Frame& rFrame, [[mayb
 	}
 }
 
+static void BeginExplosion(OmnisInterpolate& rCurrentInterpolate, OmnisPostRender& rCurrentPostRender, int64_t i)
+{
+	rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDying);
+	rCurrentInterpolate.pDestroyedTimes[i] = kDestroyTime;
+	rCurrentPostRender.pDestroyedExplosionTimes[i] = kDestroyExplosionInterval;
+
+	// Clear the registry id so missiles stop tracking
+	rCurrentInterpolate.pRegistryIds[i] = {};
+}
+
 void OmnisPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
@@ -228,11 +155,12 @@ void OmnisPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 			continue;
 		}
 
+		// Missile damage arrives through the area-damage phase, so a missile contact applies none here.
 		for (const engine::CollisionResult& rResult : engine::Collision::GetCollisions(siCollisionLayerIndex, i))
 		{
-			if (rResult.uiOtherCategory == CollisionCategory::kuiSpaceship)
+			if (rResult.uiOtherCategory & CollisionCategory::kuiShips)
 			{
-				ApplyDamage(rFrame, rStaticData.coordinate, rCurrentInterpolate, rCurrentPostRender, i, kfSpaceshipCollisionDamage, rResult.vecContactPoint);
+				ApplyDamage(rFrame, rStaticData.coordinate, rCurrentInterpolate, rCurrentPostRender, i, kfShipCollisionDamage, rResult.vecContactPoint);
 			}
 			else if (rResult.uiOtherCategory == CollisionCategory::kuiBlaster)
 			{
@@ -247,14 +175,46 @@ void OmnisPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 
 		if (rCurrentPostRender.pfArmors[i] <= 0.0f)
 		{
-			rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDying);
-			rCurrentInterpolate.pDestroyedTimes[i] = kDestroyTime;
-			rCurrentPostRender.pDestroyedExplosionTimes[i] = kDestroyExplosionInterval;
+			BeginExplosion(rCurrentInterpolate, rCurrentPostRender, i);
 		}
 		else if (engine::IsOutOfBounds(bounds, rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
 		{
 			// Entity candidates at or beyond cell exit were filtered during PreCollision.
 			rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kTransfer);
+		}
+	}
+}
+
+void OmnisPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
+{
+	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
+	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
+
+	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
+	{
+		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
+		{
+			continue;
+		}
+
+		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kTransfer)
+		{
+			continue;
+		}
+
+		XMVECTOR vecClosestSource {};
+		float fDamage = engine::AreaDamage::Get(rCurrentInterpolate.pVecPositions[i], OpposingBlastCategory(rCurrentPostRender.pAlignments[i], rFrame.postRender.fleetAlignment), vecClosestSource);
+
+		if (fDamage <= 0.0f)
+		{
+			continue;
+		}
+
+		ApplyDamage(rFrame, rStaticData.coordinate, rCurrentInterpolate, rCurrentPostRender, i, fDamage, vecClosestSource);
+
+		if (rCurrentPostRender.pfArmors[i] <= 0.0f)
+		{
+			BeginExplosion(rCurrentInterpolate, rCurrentPostRender, i);
 		}
 	}
 }
@@ -268,13 +228,13 @@ void OmnisPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]] e
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		if (!(rCurrentPostRender.pFlags[i] & kFireBlaster))
+		if (!(rCurrentPostRender.pFlags[i] & ShipFlags::kFireBlaster))
 		{
 			continue;
 		}
-		rCurrentPostRender.pFlags[i].Set(kFireBlaster, false);
+		rCurrentPostRender.pFlags[i].Set(ShipFlags::kFireBlaster, false);
 
-		if (rCurrentPostRender.pFlags[i] & kUseMissiles)
+		if (rCurrentPostRender.pOrders[i] & ShipOrders::kUseMissiles)
 		{
 			continue;
 		}
@@ -300,8 +260,8 @@ void OmnisPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]] e
 			// Rewind omni to the fire-moment position (end-of-tick position minus elapsed time times velocity).
 			XMVECTOR vecOmniPositionAtSpawn = XMVectorSubtract(rCurrentInterpolate.pVecPositions[i], XMVectorScale(rCurrentPostRender.pVecVelocities[i], interFrameTime.count()));
 
-			rCurrentPostRender.pFlags[i].Toggle(kBlasterSpawnLeft);
-			float fBarrelOffset = (rCurrentPostRender.pFlags[i] & kBlasterSpawnLeft) ? kfBlastersSpawnBarrelOffset : -kfBlastersSpawnBarrelOffset;
+			rCurrentPostRender.pFlags[i].Toggle(ShipFlags::kBlasterSpawnLeft);
+			float fBarrelOffset = (rCurrentPostRender.pFlags[i] & ShipFlags::kBlasterSpawnLeft) ? kfBlastersSpawnBarrelOffset : -kfBlastersSpawnBarrelOffset;
 
 			XMVECTOR vecJitteredDirection = common::RandomAngleJitter(vecBaseDirection, kfBlasterAngleJitter, rFrame.postRender.randomEngine);
 			XMVECTOR vecBlasterVelocity = XMVectorScale(vecJitteredDirection, kfOmniBlastersSpeed);
@@ -340,24 +300,24 @@ void OmnisPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame, [
 	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 	std::chrono::duration<float> deltaTime(rFrame.interpolate.fDeltaTime);
 
-	// Built once for the whole spawn loop, after Update, Transfer, and Destroy have settled this tick's spaceship
+	// Built once for the whole spawn loop, after Update, Transfer, and Destroy have settled this tick's ship
 	// rows and every current missile handle. Missiles spawned below may grow their collection, which the context
 	// tolerates because its subscription binding was already consumed. Previous rows no longer align after
 	// Transfer and Destroy, so no previous positions are bound; new missiles do not home until the next tick.
-	RegistryWindow window = BuildSpaceshipRegistryWindow(rFrame, nullptr, rFrame.postRender.pSpaceships->pArrivalGracePeriods, *rFrame.postRender.pMissiles);
+	RegistryWindow window = BuildShipRegistryWindow(rFrame, nullptr, *rFrame.postRender.pMissiles);
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		// Always decrement timer so releasing and re-pressing fires immediately after cooldown
 		rCurrentPostRender.pNextSecondarySpawnTimes[i] -= deltaTime;
 
-		if (!(rCurrentPostRender.pFlags[i] & kFireMissile))
+		if (!(rCurrentPostRender.pFlags[i] & ShipFlags::kFireMissile))
 		{
 			continue;
 		}
-		rCurrentPostRender.pFlags[i].Set(kFireMissile, false);
+		rCurrentPostRender.pFlags[i].Set(ShipFlags::kFireMissile, false);
 
-		if (!(rCurrentPostRender.pFlags[i] & kUseMissiles))
+		if (!(rCurrentPostRender.pOrders[i] & ShipOrders::kUseMissiles))
 		{
 			continue;
 		}
@@ -374,8 +334,8 @@ void OmnisPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame, [
 
 		rCurrentPostRender.pNextSecondarySpawnTimes[i] = kMissileSpawnInterval;
 
-		rCurrentPostRender.pFlags[i].Toggle(kMissileSpawnLeft);
-		bool bLeftSide = rCurrentPostRender.pFlags[i] & kMissileSpawnLeft;
+		rCurrentPostRender.pFlags[i].Toggle(ShipFlags::kMissileSpawnLeft);
+		bool bLeftSide = rCurrentPostRender.pFlags[i] & ShipFlags::kMissileSpawnLeft;
 
 		// Hull direction drives the barrel-offset normal: missiles spawn from the visible left/right
 		// barrel positions on the ship even when the hull is rotated toward the lead point.
@@ -383,10 +343,10 @@ void OmnisPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame, [
 		XMVECTOR vecLeftNormal = XMVector3Normalize(XMVector3Cross(vecHullDirection, XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f)));
 		float fBarrelOffset = bLeftSide ? kfMissileSpawnBarrelOffset : -kfMissileSpawnBarrelOffset;
 
-		// Missiles aim at current positions; hull direction is the fallback when no eligible spaceship is in range.
-		int64_t iTargetSpaceship = FindTargetSpaceshipIndex(*rFrame.interpolate.pSpaceships, *rFrame.postRender.pSpaceships, rCurrentInterpolate.pVecPositions[i]);
-		XMVECTOR vecAimDirection = (iTargetSpaceship >= 0)
-			? common::DirectionTo(rCurrentInterpolate.pVecPositions[i], rFrame.interpolate.pSpaceships->pVecPositions[iTargetSpaceship])
+		// Missiles aim at current positions; hull direction is the fallback when no eligible enemy ship is in range.
+		XMVECTOR vecAimTarget = XMVectorZero();
+		XMVECTOR vecAimDirection = FindMissileAimTarget(rFrame, rCurrentInterpolate.pVecPositions[i], rCurrentPostRender.pAlignments[i], vecAimTarget)
+			? common::DirectionTo(rCurrentInterpolate.pVecPositions[i], vecAimTarget)
 			: vecHullDirection;
 
 		float fAngleOffset = bLeftSide ? -kfMissileSpawnAngle : kfMissileSpawnAngle;
@@ -426,7 +386,7 @@ void OmnisPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame, [
 			.vecStoredDirection = vecAimDirection,
 			.uiTarget = registryTarget,
 			.fAcceleration = kfMissileAcceleration,
-			.flags = MissileFlags::kTargetEnemy,
+			.flags = (rCurrentPostRender.pAlignments[i] == rFrame.postRender.fleetAlignment) ? MissileFlags::kTargetRandom : MissileFlags::kTargetFleet,
 			.alignment = rCurrentPostRender.pAlignments[i],
 		});
 

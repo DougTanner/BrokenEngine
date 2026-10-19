@@ -8,7 +8,7 @@ Use `/add-collection` for a new collection and `/add-collection-member` for any 
 
 ## Core Contract
 
-- `Members()` defines allocated and build-local serialized columns. `SharedMembers()` is the server wire/CRC subset; `ClientMembers()` holds client-only state. Server builds require member parity because they write the shared format directly.
+- `Members()` defines allocated and build-local serialized columns. `SharedMembers()` is the server wire subset and also the CRC subset unless the struct declares a narrower `SharedCrcMembers()`, which the CRC uses instead; `ClientMembers()` holds client-only state. Server builds require member parity because they write the shared format directly.
 - `AllocateAndCopyMembers()` allocates at the previous frame's exact capacity, then copies `PersistentMembers()` when declared or the full `Members()` tuple otherwise. Tuple entries and nested pointer arrays pair by position, so corresponding shapes and element types must match. `PersistentMembers()` must remain a subset of `Members()`; an omitted member's owning phase must initialize it before use.
 - Interpolate and PostRender rows have identical counts. Grow/copy/remove them through paired helpers so indices remain aligned.
 - A positive capacity always has backing storage, even when `Members()` is empty. Allocation failure must not publish a capacity or layout that was not installed.

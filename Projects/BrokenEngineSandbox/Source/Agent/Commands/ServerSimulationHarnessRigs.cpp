@@ -10,6 +10,7 @@
 #include "Network/Server/ServerTransferManager.h"
 #include "Network/StatusChangeFields.h"
 
+#include "Agent/AgentCommandsServerQueries.h"
 #include "Frame/Collections/Omnis/Omnis.h"
 #include "Network/Server/ServerSession.h"
 #include "Game.h"
@@ -54,8 +55,9 @@ static void CommandReplayTransferCapture(const nlohmann::json& rParameters, nloh
 	{
 		const ReplayTransferCaptureCounts& rCounts = rEvent.transferCounts;
 		nlohmann::json& rEventJson = rEvents.at(static_cast<size_t>(i));
+		rEventJson["fighterCount"] = rCounts.iFighterCount;
 		rEventJson["omniCount"] = rCounts.iOmniCount;
-		rEventJson["spaceshipCount"] = rCounts.iSpaceshipCount;
+		rEventJson["battleshipCount"] = rCounts.iBattleshipCount;
 		rEventJson["blasterCount"] = rCounts.iBlasterCount;
 		rEventJson["missileCount"] = rCounts.iMissileCount;
 	}
@@ -131,17 +133,17 @@ static void ParseStatusChangeField(const nlohmann::json& rEntry, DATA& rData)
 	}
 	else if constexpr (std::is_same_v<Member, engine::AlignmentIdentifier>)
 	{
-		if (rValue == "omni")
+		if (rValue == "fleet")
 		{
-			rMember = gpGame->mOmniAlignment;
+			rMember = gpGame->mFleetAlignment;
 		}
-		else if (rValue == "enemy")
+		else if (rValue == "random")
 		{
-			rMember = gpGame->mEnemyAlignment;
+			rMember = gpGame->mRandomAlignment;
 		}
 		else
 		{
-			throw std::runtime_error(std::format("'{}' must be \"omni\" or \"enemy\"", kName));
+			throw std::runtime_error(std::format("'{}' must be \"fleet\" or \"random\"", kName));
 		}
 	}
 	else if constexpr (engine::kbIsFlags<Member>)
@@ -159,9 +161,25 @@ static void ParseStatusChangeField(const nlohmann::json& rEntry, DATA& rData)
 		}
 		rMember.meFlags = static_cast<Enum>(iValue);
 	}
+	else if constexpr (std::is_enum_v<Member>)
+	{
+		EnumFromToken(rValue, kName, rMember);
+	}
 	else if constexpr (std::is_same_v<Member, engine::GlobalId>)
 	{
-		throw std::runtime_error(std::format("'{}' is minted by the server", kName));
+		// A ship's own global id is minted by the server; any other names an existing ship.
+		if constexpr (kName == "globalId")
+		{
+			throw std::runtime_error(std::format("'{}' is minted by the server", kName));
+		}
+		else
+		{
+			if (!rValue.is_number_integer())
+			{
+				throw std::runtime_error(std::format("'{}' must be an integer", kName));
+			}
+			rMember.iValue = rValue.get<int64_t>();
+		}
 	}
 	else
 	{
@@ -216,7 +234,7 @@ static StatusChangeType StatusChangeTypeFromEntry(const nlohmann::json& rEntry)
 			return eType;
 		}
 	}
-	throw std::runtime_error("'type' must be SpawnOmni|SpawnSpaceship|SpawnBlaster|SpawnMissile|SpawnExplosion|DestroyOmni|UpdateOmni|UpdateFleet");
+	throw std::runtime_error("'type' must be SpawnFighter|SpawnOmni|SpawnBattleship|SpawnBlaster|SpawnMissile|SpawnExplosion|DestroyShip|UpdateShip|UpdateFleet");
 }
 
 static void ValidateInjectedPosition(FXMVECTOR vecPosition)
@@ -227,7 +245,8 @@ static void ValidateInjectedPosition(FXMVECTOR vecPosition)
 	}
 }
 
-// Seats the spawn defaults, parses the entry over them, and rejects an outside position, which QueueSpawn asserts on.
+// Seats the spawn defaults, parses the entry over them, and rejects an outside position, which QueueSpawn asserts on,
+// and a ship navigation delay the frame read would reject.
 template <typename SPAWN_INFO>
 static SPAWN_INFO& ParseSpawnEntry(const nlohmann::json& rEntry, StatusChange& rChange, [[maybe_unused]] engine::GridCoord coordinate)
 {
@@ -247,7 +266,7 @@ static SPAWN_INFO& ParseSpawnEntry(const nlohmann::json& rEntry, StatusChange& r
 	}
 	if constexpr (requires { rData.alignment; })
 	{
-		rData.alignment = gpGame->mOmniAlignment;
+		rData.alignment = gpGame->mFleetAlignment;
 	}
 	if constexpr (requires { rData.fleetWantedCoordinate; })
 	{
@@ -255,6 +274,13 @@ static SPAWN_INFO& ParseSpawnEntry(const nlohmann::json& rEntry, StatusChange& r
 	}
 	ParseStatusChangeFields(rEntry, rData);
 	ValidateInjectedPosition(rData.vecPosition);
+	if constexpr (requires { rData.navigationDelay; })
+	{
+		if (!IsNavigationDelayInRange(rData.navigationDelay.count()))
+		{
+			throw std::runtime_error(std::format("'{}' must be within [0,60]", FRAME_COLUMN(SPAWN_INFO, navigationDelay)::kName));
+		}
+	}
 	return rData;
 }
 
@@ -289,6 +315,9 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 
 	switch (eType)
 	{
+		case StatusChangeType::kSpawnFighter:
+			ParseSpawnEntry<FightersPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
+			break;
 		case StatusChangeType::kSpawnOmni:
 		{
 			const OmnisPostRender::SpawnInfo& rData = ParseSpawnEntry<OmnisPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
@@ -303,14 +332,10 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 			{
 				throw std::runtime_error(std::format("'{}' is out of range", FRAME_COLUMN(OmnisPostRender::SpawnInfo, nextBlasterFireTime)::kName));
 			}
-			if (!OmnisPostRender::IsNavigationDelayInRange(rData.navigationDelay.count()))
-			{
-				throw std::runtime_error(std::format("'{}' must be within [0,60]", FRAME_COLUMN(OmnisPostRender::SpawnInfo, navigationDelay)::kName));
-			}
 			break;
 		}
-		case StatusChangeType::kSpawnSpaceship:
-			ParseSpawnEntry<SpaceshipsPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
+		case StatusChangeType::kSpawnBattleship:
+			ParseSpawnEntry<BattleshipsPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
 			break;
 		case StatusChangeType::kSpawnBlaster:
 			ParseSpawnEntry<BlastersPostRender::SpawnInfo>(rEntry, scheduled.change, coordinate);
@@ -325,7 +350,7 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 			// Without explicit flags the missile homes on the other alignment.
 			if (!rEntry.contains(FRAME_COLUMN(MissilesPostRender::SpawnInfo, flags)::kName))
 			{
-				rData.flags = (rData.alignment == gpGame->mOmniAlignment) ? MissileFlags::kTargetEnemy : MissileFlags::kTargetOmni;
+				rData.flags = (rData.alignment == gpGame->mFleetAlignment) ? MissileFlags::kTargetRandom : MissileFlags::kTargetFleet;
 			}
 			break;
 		}
@@ -348,20 +373,22 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 			}
 			break;
 		}
-		case StatusChangeType::kDestroyOmni:
-			RequireEntryKey<FRAME_COLUMN(DestroyOmniData, iOmniUuid)>(rEntry);
-			ParseStatusChangeFields(rEntry, std::get<DestroyOmniData>(scheduled.change.data));
+		case StatusChangeType::kDestroyShip:
+			RequireEntryKey<FRAME_COLUMN(DestroyShipData, eType)>(rEntry);
+			RequireEntryKey<FRAME_COLUMN(DestroyShipData, iUuid)>(rEntry);
+			ParseStatusChangeFields(rEntry, std::get<DestroyShipData>(scheduled.change.data));
 			break;
-		case StatusChangeType::kUpdateOmni:
+		case StatusChangeType::kUpdateShip:
 		{
-			UpdateOmniData& rData = std::get<UpdateOmniData>(scheduled.change.data);
+			UpdateShipData& rData = std::get<UpdateShipData>(scheduled.change.data);
 			rData.uiPendingWeaponModeTicks = static_cast<uint8_t>(engine::kiTickRate);
-			RequireEntryKey<FRAME_COLUMN(UpdateOmniData, iOmniUuid)>(rEntry);
+			RequireEntryKey<FRAME_COLUMN(UpdateShipData, eType)>(rEntry);
+			RequireEntryKey<FRAME_COLUMN(UpdateShipData, iUuid)>(rEntry);
 			ParseStatusChangeFields(rEntry, rData);
-			// Rejects a delay the wire would reject, so an injected omni never holds an out-of-range delay.
-			if (!OmnisPostRender::IsNavigationDelayInRange(rData.navigationDelaySeconds.count()))
+			// Rejects a delay the wire would reject, so an injected ship never holds an out-of-range delay.
+			if (!IsNavigationDelayInRange(rData.navigationDelaySeconds.count()))
 			{
-				throw std::runtime_error(std::format("'{}' must be within [0,60]", FRAME_COLUMN(UpdateOmniData, navigationDelaySeconds)::kName));
+				throw std::runtime_error(std::format("'{}' must be within [0,60]", FRAME_COLUMN(UpdateShipData, navigationDelaySeconds)::kName));
 			}
 			break;
 		}
@@ -369,7 +396,8 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 		{
 			UpdateFleetData& rData = std::get<UpdateFleetData>(scheduled.change.data);
 			rData.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(engine::kiTickRate);
-			RequireEntryKey<FRAME_COLUMN(UpdateFleetData, iOmniUuid)>(rEntry);
+			RequireEntryKey<FRAME_COLUMN(UpdateFleetData, eType)>(rEntry);
+			RequireEntryKey<FRAME_COLUMN(UpdateFleetData, iUuid)>(rEntry);
 			RequireEntryKey<FRAME_COLUMN(UpdateFleetData, fleetWantedCoordinate)>(rEntry);
 			ParseStatusChangeFields(rEntry, rData);
 			break;
@@ -461,13 +489,19 @@ static void CommandInjectPayload(const nlohmann::json& rParameters, nlohmann::js
 	nlohmann::json globalIds = nlohmann::json::array();
 	for (std::pair<engine::GridCoord, ScheduledStatusChange>& rBuiltEntry : built)
 	{
-		ScheduledStatusChange& rScheduled = rBuiltEntry.second;
-		if (rScheduled.change.eType == StatusChangeType::kSpawnOmni)
+		// A fleet ship spawn needs a global id; a random-spawn ship keeps 0, as the director's do.
+		std::visit([&](auto& rData)
 		{
-			int64_t iGlobalId = iNextGlobalId++;
-			std::get<OmnisPostRender::SpawnInfo>(rScheduled.change.data).globalId = engine::GlobalId {.iValue = iGlobalId};
-			globalIds.push_back(iGlobalId);
-		}
+			if constexpr (requires { rData.eController; })
+			{
+				if (rData.eController == ShipController::kFleet)
+				{
+					int64_t iGlobalId = iNextGlobalId++;
+					rData.globalId = engine::GlobalId {.iValue = iGlobalId};
+					globalIds.push_back(iGlobalId);
+				}
+			}
+		}, rBuiltEntry.second.change.data);
 	}
 	if (bPauseAfterWriterInputPresent)
 	{
@@ -605,10 +639,12 @@ void CountCapturedReplayTransfers(std::span<const StatusChange> transfers, Repla
 	{
 		switch (rTransfer.eType)
 		{
+			case StatusChangeType::kSpawnFighter:
+			case StatusChangeType::kTransferFighter: ++rCounts.iFighterCount; break;
 			case StatusChangeType::kSpawnOmni:
 			case StatusChangeType::kTransferOmni: ++rCounts.iOmniCount; break;
-			case StatusChangeType::kSpawnSpaceship:
-			case StatusChangeType::kTransferSpaceship: ++rCounts.iSpaceshipCount; break;
+			case StatusChangeType::kSpawnBattleship:
+			case StatusChangeType::kTransferBattleship: ++rCounts.iBattleshipCount; break;
 			case StatusChangeType::kSpawnBlaster:
 			case StatusChangeType::kTransferBlaster: ++rCounts.iBlasterCount; break;
 			case StatusChangeType::kSpawnMissile:

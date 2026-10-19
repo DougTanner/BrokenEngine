@@ -12,9 +12,9 @@ engine::Wrapper gOmniBlasterVolume(0.1f, 0.0f, 0.2f);
 engine::Wrapper gOmniBlasterPitchMinimum(0.75f, 0.5f, 1.5f);
 engine::Wrapper gOmniBlasterPitchRandom(0.5f, 0.0f, 1.0f);
 
-engine::Wrapper gEnemyBlasterVolume(0.1f, 0.0f, 0.2f);
-engine::Wrapper gEnemyBlasterPitchMinimum(1.5f, 0.5f, 2.0f);
-engine::Wrapper gEnemyBlasterPitchRandom(1.0f, 0.0f, 1.5f);
+engine::Wrapper gFighterBlasterVolume(0.1f, 0.0f, 0.2f);
+engine::Wrapper gFighterBlasterPitchMinimum(1.5f, 0.5f, 2.0f);
+engine::Wrapper gFighterBlasterPitchRandom(1.0f, 0.0f, 1.5f);
 
 // Blasters - Terrain impact
 engine::Wrapper gTerrainImpactVolume(0.075f, 0.0f, 0.2f);
@@ -35,10 +35,10 @@ engine::Wrapper gShieldDownVolume(0.0f, 0.0f, 0.2f);
 engine::Wrapper gArmorHitVolumeBase(0.0f, 0.0f, 0.2f);
 engine::Wrapper gArmorHitVolumeScale(0.0f, 0.0f, 0.2f);
 
-engine::Wrapper gSpaceshipDeathVolume(0.1f, 0.0f, 0.2f);
-engine::Wrapper gSpaceshipDeathPitchMinimum(0.75f, 0.5f, 1.5f);
-engine::Wrapper gSpaceshipDeathPitchRandom(0.5f, 0.0f, 1.0f);
-engine::Wrapper gSpaceshipHitVolume(0.075f, 0.0f, 0.2f);
+engine::Wrapper gFighterDeathVolume(0.1f, 0.0f, 0.2f);
+engine::Wrapper gFighterDeathPitchMinimum(0.75f, 0.5f, 1.5f);
+engine::Wrapper gFighterDeathPitchRandom(0.5f, 0.0f, 1.0f);
+engine::Wrapper gFighterHitVolume(0.075f, 0.0f, 0.2f);
 
 } // namespace game
 

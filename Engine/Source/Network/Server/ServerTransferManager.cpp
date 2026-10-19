@@ -20,7 +20,7 @@ namespace engine
 bool ServerTransferManager::IsDestinationLive(engine::GridCoord destination) const
 {
 	auto it = game::gpGame->mCells.find(destination);
-	if (it != game::gpGame->mCells.end() && (game::Frame::OwnershipLayer(*it->second.pCurrent)).iCount > 0)
+	if (it != game::gpGame->mCells.end() && game::Frame::OwnedEntityCount(*it->second.pCurrent) > 0)
 	{
 		return true;
 	}
@@ -67,7 +67,7 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 
 			// Owned-entity arrivals create subscriptions. Other transfers require an owned entity or an active
 			// subscription, including subscriptions to empty sibling cells, to avoid creating unseen entities.
-			if (rRequest.change.eType != game::kOwnedEntityTransferType && !IsDestinationLive(destination))
+			if (!game::IsOwnedEntityTransfer(rRequest.change) && !IsDestinationLive(destination))
 			{
 				LOG(kNetwork, kVerbose, "Dropping transfer to unsubscribed Frame Tick: {} Source: ({},{}) Dest: ({},{}) Type: {}", rNextFrame.interpolate.iTick, rCoord.iX, rCoord.iY, destination.iX, destination.iY, game::StatusChangeTypeName(rRequest.change.eType));
 				continue;
@@ -84,7 +84,7 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 
 			mTransfers.try_emplace(destination).first->second.push_back(rRequest.change);
 
-			if (rRequest.change.eType == game::kOwnedEntityTransferType && (game::OwnedSpawnGlobalId(rRequest.change).iValue != 0))
+			if (game::IsOwnedEntityTransfer(rRequest.change) && (game::OwnedSpawnGlobalId(rRequest.change).iValue != 0))
 			{
 				rTransfersArena.mBuffer.PushBack(ClientTransferInfo
 				{
@@ -146,7 +146,7 @@ void ServerTransferManager::SpawnTransfers(bool bFilterDestinationLiveness)
 		{
 			// Liveness filtering requires non-owned transfers to target live destinations, matching CollectTransfers.
 			// A spawn targets an active cell that need not be live. Replay spawning bypasses this check.
-			if (bFilterDestinationLiveness && game::IsTransferType(rTransfer.eType) && rTransfer.eType != game::kOwnedEntityTransferType && !IsDestinationLive(rCoord)) [[unlikely]]
+			if (bFilterDestinationLiveness && game::IsTransferType(rTransfer.eType) && !game::IsOwnedEntityTransfer(rTransfer) && !IsDestinationLive(rCoord)) [[unlikely]]
 			{
 				LOG(kDefault, kError, "Non-owned transfer reached Spawn for non-live Frame Tick: {} Dest: ({},{}) Type: {}", rDestinationFrame.interpolate.iTick, rCoord.iX, rCoord.iY, game::StatusChangeTypeName(rTransfer.eType));
 				DEBUG_BREAK();
@@ -191,7 +191,7 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 			int64_t iOwnedIdCount = 0;
 			for (const game::StatusChange& rTransfer : rTransfers)
 			{
-				if (rTransfer.eType != game::kOwnedEntityTransferType)
+				if (!game::IsOwnedEntityTransfer(rTransfer))
 				{
 					continue;
 				}
@@ -208,7 +208,7 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 
 			if (iOwnedIdCount > 0)
 			{
-				LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {} OwnedIds: [{}]", rCoord.iX, rCoord.iY, std::ssize(rTransfers), (game::Frame::OwnershipLayer(rDestinationFrame)).iCount, pcCrcPre, pcCrcPost, pcOwnedIds);
+				LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {} OwnedIds: [{}]", rCoord.iX, rCoord.iY, std::ssize(rTransfers), game::Frame::OwnedEntityCount(rDestinationFrame), pcCrcPre, pcCrcPost, pcOwnedIds);
 			}
 			else
 			{
@@ -218,7 +218,7 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 				});
 				if (bAnySubscribed)
 				{
-					LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {}", rCoord.iX, rCoord.iY, std::ssize(rTransfers), (game::Frame::OwnershipLayer(rDestinationFrame)).iCount, pcCrcPre, pcCrcPost);
+					LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {}", rCoord.iX, rCoord.iY, std::ssize(rTransfers), game::Frame::OwnedEntityCount(rDestinationFrame), pcCrcPre, pcCrcPost);
 				}
 			}
 		}
@@ -232,20 +232,22 @@ void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferI
 	for (const ClientTransferInfo& rClientTransfer : clientTransfers)
 	{
 		game::Frame& rDestinationFrame = *game::gpGame->mCells.at(rClientTransfer.destination).pNext;
-		engine::RegistryOwnershipLayer destinationLayer = game::Frame::OwnershipLayer(rDestinationFrame);
-
-		// An invalid uuid means the transferred owned entity never landed in the destination, so there is nothing to bind.
-		if (!(engine::RegistryUuidByGlobalId(destinationLayer, rClientTransfer.globalId).iValue != 0))
+		for (const engine::RegistryOwnershipLayer& rDestinationLayer : game::Frame::OwnershipLayers(rDestinationFrame))
 		{
-			continue;
-		}
+			// An invalid uuid means the transferred owned entity did not land in this layer, so there is nothing to bind.
+			if (!(engine::RegistryUuidByGlobalId(rDestinationLayer, rClientTransfer.globalId).iValue != 0))
+			{
+				continue;
+			}
 
-		// Connected or not, the owner keeps its GUID in the destination; ServerSessionBase::RebuildOwnedEntities reports
-		// the cell change to a connected owner.
-		if (rClientTransfer.clientGuid.uiHigh != 0 || rClientTransfer.clientGuid.uiLow != 0)
-		{
-			engine::AssignRegistryClientGuid(destinationLayer, rClientTransfer.globalId, rClientTransfer.clientGuid);
-			game::gpServerSession->OnOwnedEntityChangedCell(rClientTransfer.clientGuid, rClientTransfer.globalId, rClientTransfer.destination);
+			// Connected or not, the owner keeps its GUID in the destination; ServerSessionBase::RebuildOwnedEntities reports
+			// the cell change to a connected owner.
+			if (rClientTransfer.clientGuid.uiHigh != 0 || rClientTransfer.clientGuid.uiLow != 0)
+			{
+				engine::AssignRegistryClientGuid(rDestinationLayer, rClientTransfer.globalId, rClientTransfer.clientGuid);
+				game::gpServerSession->OnOwnedEntityChangedCell(rClientTransfer.clientGuid, rClientTransfer.globalId, rClientTransfer.destination);
+			}
+			break;
 		}
 	}
 }
@@ -319,7 +321,7 @@ void ServerTransferManager::ApplyReplayTransfers()
 	{
 		for (const game::StatusChange& rTransfer : rTransfers)
 		{
-			if (rTransfer.eType != game::kOwnedEntityTransferType)
+			if (!game::IsOwnedEntityTransfer(rTransfer))
 			{
 				continue;
 			}

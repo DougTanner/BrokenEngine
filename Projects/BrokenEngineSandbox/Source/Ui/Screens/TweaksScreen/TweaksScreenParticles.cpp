@@ -39,20 +39,20 @@ const engine::TweaksSliderMapRegistrar gParticlesRegistrar
 	{"Omni Particle Intensity Spread", &gOmniExplosionParticleIntensitySpread},
 	{"Omni Particle Intensity Decay", &gOmniExplosionParticleIntensityDecay},
 	{"Omni Particle Intensity Power", &gOmniExplosionParticleIntensityPower},
-	{"Spaceship Particle Width", &gSpaceshipExplosionParticleWidth},
-	{"Spaceship Particle Length", &gSpaceshipExplosionParticleLength},
-	{"Spaceship Particle Length Spread", &gSpaceshipExplosionParticleLengthSpread},
-	{"Spaceship Particle Position Jitter", &gSpaceshipExplosionParticlePositionJitter},
-	{"Spaceship Particle Velocity Base", &gSpaceshipExplosionParticleVelocityBase},
-	{"Spaceship Particle Velocity Spread", &gSpaceshipExplosionParticleVelocitySpread},
-	{"Spaceship Particle Vertical Velocity Base", &gSpaceshipExplosionParticleVerticalVelocityBase},
-	{"Spaceship Particle Vertical Velocity Spread", &gSpaceshipExplosionParticleVerticalVelocitySpread},
-	{"Spaceship Particle Velocity Decay", &gSpaceshipExplosionParticleVelocityDecay},
-	{"Spaceship Particle Gravity", &gSpaceshipExplosionParticleGravity},
-	{"Spaceship Particle Visible Intensity", &gSpaceshipExplosionParticleVisibleIntensity},
-	{"Spaceship Particle Intensity Spread", &gSpaceshipExplosionParticleIntensitySpread},
-	{"Spaceship Particle Intensity Decay", &gSpaceshipExplosionParticleIntensityDecay},
-	{"Spaceship Particle Intensity Power", &gSpaceshipExplosionParticleIntensityPower},
+	{"Fighter Particle Width", &gFighterExplosionParticleWidth},
+	{"Fighter Particle Length", &gFighterExplosionParticleLength},
+	{"Fighter Particle Length Spread", &gFighterExplosionParticleLengthSpread},
+	{"Fighter Particle Position Jitter", &gFighterExplosionParticlePositionJitter},
+	{"Fighter Particle Velocity Base", &gFighterExplosionParticleVelocityBase},
+	{"Fighter Particle Velocity Spread", &gFighterExplosionParticleVelocitySpread},
+	{"Fighter Particle Vertical Velocity Base", &gFighterExplosionParticleVerticalVelocityBase},
+	{"Fighter Particle Vertical Velocity Spread", &gFighterExplosionParticleVerticalVelocitySpread},
+	{"Fighter Particle Velocity Decay", &gFighterExplosionParticleVelocityDecay},
+	{"Fighter Particle Gravity", &gFighterExplosionParticleGravity},
+	{"Fighter Particle Visible Intensity", &gFighterExplosionParticleVisibleIntensity},
+	{"Fighter Particle Intensity Spread", &gFighterExplosionParticleIntensitySpread},
+	{"Fighter Particle Intensity Decay", &gFighterExplosionParticleIntensityDecay},
+	{"Fighter Particle Intensity Power", &gFighterExplosionParticleIntensityPower},
 };
 
 void RenderParticlesSection(engine::TweaksScreen& rScreen)
@@ -111,27 +111,27 @@ void RenderParticlesSection(engine::TweaksScreen& rScreen)
 			ImGui::EndTabItem();
 		}
 
-		if (rScreen.BeginSubtab("Spaceship", iSection, 2))
+		if (rScreen.BeginSubtab("Fighter", iSection, 2))
 		{
 			rScreen.WrapperSeparatorText("Size");
-			rScreen.WrapperSlider("Width",           iSection, 1.0f, "Spaceship Particle Width");
-			rScreen.WrapperSlider("Length",          iSection, 1.0f, "Spaceship Particle Length");
-			rScreen.WrapperSlider("Length Spread",   iSection, 1.0f, "Spaceship Particle Length Spread");
-			rScreen.WrapperSlider("Position Jitter", iSection, 1.0f, "Spaceship Particle Position Jitter");
+			rScreen.WrapperSlider("Width",           iSection, 1.0f, "Fighter Particle Width");
+			rScreen.WrapperSlider("Length",          iSection, 1.0f, "Fighter Particle Length");
+			rScreen.WrapperSlider("Length Spread",   iSection, 1.0f, "Fighter Particle Length Spread");
+			rScreen.WrapperSlider("Position Jitter", iSection, 1.0f, "Fighter Particle Position Jitter");
 
 			rScreen.WrapperSeparatorText("Speed");
-			rScreen.WrapperSlider("Velocity Base",            iSection, 1.0f, "Spaceship Particle Velocity Base");
-			rScreen.WrapperSlider("Velocity Spread",          iSection, 1.0f, "Spaceship Particle Velocity Spread");
-			rScreen.WrapperSlider("Vertical Velocity Base",   iSection, 1.0f, "Spaceship Particle Vertical Velocity Base");
-			rScreen.WrapperSlider("Vertical Velocity Spread", iSection, 1.0f, "Spaceship Particle Vertical Velocity Spread");
-			rScreen.WrapperSlider("Velocity Decay",           iSection, 1.0f, "Spaceship Particle Velocity Decay");
-			rScreen.WrapperSlider("Gravity",                  iSection, 1.0f, "Spaceship Particle Gravity");
+			rScreen.WrapperSlider("Velocity Base",            iSection, 1.0f, "Fighter Particle Velocity Base");
+			rScreen.WrapperSlider("Velocity Spread",          iSection, 1.0f, "Fighter Particle Velocity Spread");
+			rScreen.WrapperSlider("Vertical Velocity Base",   iSection, 1.0f, "Fighter Particle Vertical Velocity Base");
+			rScreen.WrapperSlider("Vertical Velocity Spread", iSection, 1.0f, "Fighter Particle Vertical Velocity Spread");
+			rScreen.WrapperSlider("Velocity Decay",           iSection, 1.0f, "Fighter Particle Velocity Decay");
+			rScreen.WrapperSlider("Gravity",                  iSection, 1.0f, "Fighter Particle Gravity");
 
 			rScreen.WrapperSeparatorText("Visible");
-			rScreen.WrapperSlider("Visible Intensity", iSection, 1.0f, "Spaceship Particle Visible Intensity");
-			rScreen.WrapperSlider("Intensity Spread",  iSection, 1.0f, "Spaceship Particle Intensity Spread");
-			rScreen.WrapperSlider("Intensity Decay",   iSection, 1.0f, "Spaceship Particle Intensity Decay");
-			rScreen.WrapperSlider("Intensity Power",   iSection, 1.0f, "Spaceship Particle Intensity Power");
+			rScreen.WrapperSlider("Visible Intensity", iSection, 1.0f, "Fighter Particle Visible Intensity");
+			rScreen.WrapperSlider("Intensity Spread",  iSection, 1.0f, "Fighter Particle Intensity Spread");
+			rScreen.WrapperSlider("Intensity Decay",   iSection, 1.0f, "Fighter Particle Intensity Decay");
+			rScreen.WrapperSlider("Intensity Power",   iSection, 1.0f, "Fighter Particle Intensity Power");
 
 			ImGui::EndTabItem();
 		}

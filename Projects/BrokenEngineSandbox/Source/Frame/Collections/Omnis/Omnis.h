@@ -2,11 +2,14 @@
 
 #include "Frame/Collections/Collection.h"
 #include "Frame/Alignments.h"
+#include "Frame/FrameRegistry.h"
 #include "Frame/GridCoord.h"
 #if defined(BT_CLIENT)
 #include "Frame/Collections/HexShields/HexShields.h"
 #include "Frame/Collections/WindTrails/WindTrails.h"
 #endif
+
+#include "Frame/Collections/Ships/ShipBehaviours.h"
 
 namespace engine
 {
@@ -22,6 +25,8 @@ inline constexpr std::chrono::duration<float> kDestroyTime = std::chrono::durati
 inline constexpr std::chrono::duration<float> kDestroyExplosionInterval = std::chrono::duration<float>(0.005f);
 inline constexpr float kfOmniBlastersSpeed = 150.0f;
 inline constexpr std::chrono::duration<float> kBlasterFireInterval = std::chrono::duration<float>(0.05f);
+inline constexpr float kfBlasterTargetRange = 120.0f;
+inline constexpr float kfMissileTargetRange = 160.0f;
 
 inline constexpr float kfOmniRadius = 1.1f;
 
@@ -34,6 +39,15 @@ inline constexpr float kfOmniDrag = 1.0f;
 inline constexpr float kfOmniMaximumSpeed = 33.33f;
 inline constexpr float kfOmniCatchUpMaximumSpeed = 33.33f;
 inline constexpr float kfOmniJitterRange = 0.60f;
+
+inline constexpr AcceleratedMovementConstants kOmniMovement
+{
+	.fAcceleration = kfOmniAcceleration,
+	.fCatchUpAcceleration = kfOmniCatchUpAcceleration,
+	.fDrag = kfOmniDrag,
+	.fMaximumSpeed = kfOmniMaximumSpeed,
+	.fCatchUpMaximumSpeed = kfOmniCatchUpMaximumSpeed,
+};
 
 inline constexpr float kfOmniPusherRadius = kfOmniRadius * 3.3333f;
 inline constexpr float kfOmniPusherIntensity = 50.0f;
@@ -54,9 +68,7 @@ struct HexShieldIntensities
 
 struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::CollectionFlags::kIdToIndex>
 {
-	static constexpr int64_t kiVersion = 13;
-	static constexpr char kpcName[] = "Omni";
-	static constexpr common::crc_t kCrc = common::CrcConsteval(kpcName);
+	static constexpr int64_t kiVersion = 14;
 
 	static void Register();
 
@@ -90,6 +102,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	std::chrono::duration<float>* __restrict pDestroyedTimes = nullptr;
 	std::chrono::duration<float>* __restrict pAnimationTimes = nullptr;
 	engine::pusher_t* __restrict pPushers = nullptr;
+	engine::registry_id_t* __restrict pRegistryIds = nullptr;
 #if defined(BT_CLIENT)
 	float* __restrict pfRotationAccelerationXs = nullptr;
 	float* __restrict pfRotationAccelerationYs = nullptr;
@@ -104,7 +117,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pAnimationTimes, rSelf.pPushers);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pAnimationTimes, rSelf.pPushers, rSelf.pRegistryIds);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -123,16 +136,16 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	auto PersistentMembers(this auto&& rSelf)
 	{
 #if defined(BT_CLIENT)
-		return std::tie(rSelf.pPushers, rSelf.pWindTrails, rSelf.pHexShields);
+		return std::tie(rSelf.pPushers, rSelf.pRegistryIds, rSelf.pWindTrails, rSelf.pHexShields);
 #else
-		return std::tie(rSelf.pPushers);
+		return std::tie(rSelf.pPushers, rSelf.pRegistryIds);
 #endif
 	}
 
 	// CRC excludes client-only animation time and cell-local pusher handles.
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pRegistryIds);
 	}
 	auto OwnedHandles(this auto&& rSelf)
 	{
@@ -153,56 +166,9 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 
 using omni_t = engine::Id<OmnisInterpolate>;
 
-enum class OmniFlags : uint16_t
-{
-	kFireBlaster      = 0x0002,
-	kBlasterSpawnLeft = 0x0004,
-	kFireMissile      = 0x0008,
-	kMissileSpawnLeft = 0x0010,
-	kUseMissiles      = 0x0040,
-	kIsFlagship       = 0x0080,
-
-	// Nav direction in bits 8-10 (3 bits, stored as value+1: 0-6 representing -1 to 5)
-	kNavigationDirectionBit0 = 0x0100,
-	kNavigationDirectionBit1 = 0x0200,
-	kNavigationDirectionBit2 = 0x0400,
-
-	// Pending weapon mode (bit 11)
-	kPendingUseMissiles = 0x0800,
-
-	// Nav waypoint index in bits 12-13 (2 bits): 0 = largest island, 1 = smallest, 2 = random (saturates at 2)
-	kNavigationWaypointBit0 = 0x1000,
-	kNavigationWaypointBit1 = 0x2000,
-};
-using OmniFlags_t = common::Flags<OmniFlags>;
-
-inline constexpr int64_t GetNavigationDirection(OmniFlags_t flags)
-{
-	return static_cast<int64_t>(((std::to_underlying(flags.meFlags) >> 8) & 0x7) - 1);
-}
-
-inline void SetNavigationDirection(OmniFlags_t& rFlags, int64_t iDirection)
-{
-	uint16_t uiRaw = std::to_underlying(rFlags.meFlags);
-	uiRaw = static_cast<uint16_t>((uiRaw & ~0x0700) | (static_cast<uint16_t>(iDirection + 1) << 8));
-	rFlags.meFlags = static_cast<OmniFlags>(uiRaw);
-}
-
-inline constexpr int64_t GetNavigationWaypointIndex(OmniFlags_t flags)
-{
-	return static_cast<int64_t>((std::to_underlying(flags.meFlags) >> 12) & 0x3);
-}
-
-inline void SetNavigationWaypointIndex(OmniFlags_t& rFlags, int64_t iIndex)
-{
-	uint16_t uiRaw = std::to_underlying(rFlags.meFlags);
-	uiRaw = static_cast<uint16_t>((uiRaw & ~0x3000) | (static_cast<uint16_t>(iIndex) << 12));
-	rFlags.meFlags = static_cast<OmniFlags>(uiRaw);
-}
-
 struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 {
-	static constexpr int64_t kiVersion = 20;
+	static constexpr int64_t kiVersion = 21;
 
 	// Collision layer (set each frame in PreCollision)
 	// thread_local: parallel per-Frame tick via Dispatch
@@ -216,14 +182,9 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 		return fTime >= 0.0f && fTime <= kBlasterFireInterval.count();
 	}
 
-	// Navigation delays in seconds match the HUD slider's [0, 60] range. Written as one range test so NaN and both infinities fail it too.
-	static bool IsNavigationDelayInRange(float fDelay)
-	{
-		return fDelay >= 0.0f && fDelay <= 60.0f;
-	}
-
 	// Reject an out-of-range countdown as a corrupt stream: NaN or +inf never fires, and a large negative value never finishes the burst loop.
-	// Reject an out-of-range navigation delay too, since the client echoes it back in its update-owned-entity request.
+	// Reject an out-of-range navigation delay too, since the client echoes it back in its update-owned-entity request, and
+	// an unknown controller, which selects no script.
 	static void PostRead(const OmnisPostRender& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -236,35 +197,29 @@ struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 			{
 				throw std::ios_base::failure("OmnisPostRender pNavigationDelays");
 			}
+			if (rCurrent.pController[i] >= ShipController::kCount)
+			{
+				throw std::ios_base::failure("OmnisPostRender pController");
+			}
 		}
 	}
 
 	// Update (orchestrator in Omnis.cpp; per-omni phase work split into helpers below)
 	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
-	static void ProcessUpdateStatusChanges(Frame& __restrict rFrame, const FrameInput& __restrict rFrameInput, const engine::CellStaticData& rStaticData);
 
-	// Collision (PreCollision: Omnis.cpp; PostCollision: OmnisCombat.cpp)
+	// Collision (PreCollision: Omnis.cpp; PostCollision and AreaDamage: OmnisCombat.cpp)
 	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 	static void PostCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
+	static void AreaDamage(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 
 	// Lifecycle (Transfer: OmnisNavigation.cpp; Destroy/Spawn: Omnis.cpp)
 	static void Transfer(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 	static void Destroy(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
-	static void Spawn(Frame& __restrict rFrame, const FrameInput& __restrict rFrameInput, const engine::CellStaticData& rStaticData);
+	static void Spawn(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 
 private:
-	// Per-omni Update helpers (called from OmnisPostRender::Update orchestrator)
-	// Defined in OmnisNavigation.cpp:
-	static void XM_CALLCONV ComputeNavigation(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPosition, FXMVECTOR vecCellCenter, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, OmniFlags_t flags, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, int64_t& riNavigationWaypointIndex, XMVECTOR& rVecArtificialIntelligenceDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer);
-	static void XM_CALLCONV ApplyMovement(int64_t iNavigationDirection, FXMVECTOR vecArtificialIntelligenceDirection, std::chrono::duration<float> deltaTime, float fAccelerationMultiplier, float fDecayMultiplier, XMVECTOR& rVecVelocity);
-	static void XM_CALLCONV ApplyTerrainPush(const engine::CellStaticData& rStaticData, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity);
-	static void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData, int64_t i, FXMVECTOR vecPreviousPosition, XMVECTOR& rVecPosition, XMVECTOR& rVecVelocity);
-	static void XM_CALLCONV ApplyPusherPush(const Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, int64_t i, FXMVECTOR vecPosition, XMVECTOR& rVecVelocity);
-
 	// Defined in OmnisCombat.cpp:
-	static void XM_CALLCONV AcquireTarget(const Frame& __restrict rPreviousFrame, FXMVECTOR vecPosition, OmniFlags_t& rFlags, bool& rbLookTargetFound, XMVECTOR& rVecLookPosition);
 	static void XM_CALLCONV UpdateFacing(FXMVECTOR vecPosition, FXMVECTOR vecLookPosition, XMVECTOR& rVecWantedDirection);
-	static void RegenerateShield(std::chrono::duration<float> deltaTime, std::chrono::duration<float> shieldCooldown, float& rfShield);
 
 	// Weapon and death-explosion spawn helpers (called from OmnisPostRender::Spawn). Defined in OmnisCombat.cpp.
 	static void SpawnBlasters(Frame& __restrict rFrame, engine::GridCoord emitterCoordinate);
@@ -275,7 +230,9 @@ public:
 
 	omni_t* __restrict pIds = nullptr;
 	engine::LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;
-	OmniFlags_t* __restrict pFlags = nullptr;
+	ShipController* __restrict pController = nullptr;
+	ShipOrders_t* __restrict pOrders = nullptr;
+	ShipFlags_t* __restrict pFlags = nullptr;
 	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	std::chrono::duration<float>* __restrict pNextBlasterFireTimes = nullptr;
 	std::chrono::duration<float>* __restrict pNextSecondarySpawnTimes = nullptr;
@@ -293,6 +250,7 @@ public:
 	XMVECTOR* __restrict pVecIslandDestinations = nullptr;
 	engine::ClientGuid* __restrict pClientGuids = nullptr;
 	engine::GlobalId* __restrict pGlobalIds = nullptr;
+	engine::GlobalId* __restrict pFlagshipGlobalIds = nullptr;
 	std::chrono::duration<float>* __restrict pNavigationDelays = nullptr;
 	engine::GridCoord* __restrict pFleetWantedCoordinates = nullptr;
 	uint8_t* __restrict puiPendingFleetWantedCoordinateTicks = nullptr;
@@ -303,7 +261,7 @@ public:
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pDestroyedExplosionTimes, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pClientGuids, rSelf.pGlobalIds, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pDestroyedExplosionTimes, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pClientGuids, rSelf.pGlobalIds, rSelf.pFlagshipGlobalIds, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -321,13 +279,13 @@ public:
 	}
 	auto PersistentMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pAlignments, rSelf.pClientGuids, rSelf.pGlobalIds);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pAlignments, rSelf.pClientGuids, rSelf.pGlobalIds, rSelf.pFlagshipGlobalIds);
 	}
 
 	// CRC-only subset: excludes pClientGuids and pGlobalIds which are server-side bookkeeping
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pDestroyedExplosionTimes, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pController, rSelf.pOrders, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pDestroyedExplosionTimes, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pFlagshipGlobalIds, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
 	}
 
 	bool LogDifferences(const OmnisPostRender& rOther) const;
@@ -338,6 +296,8 @@ public:
 		XMVECTOR vecDirection = DirectX::XMVectorZero();
 		XMVECTOR vecVelocity = DirectX::XMVectorZero();
 		engine::AlignmentIdentifier alignment {};
+		ShipController eController {};
+		ShipOrders_t orders {};
 		float fArmor = 0.0f;
 		float fShield = 0.0f;
 		std::chrono::duration<float> nextBlasterFireTime = std::chrono::duration<float>::zero();
@@ -347,12 +307,13 @@ public:
 		std::chrono::duration<float> animationTime = std::chrono::duration<float>::zero();
 		float fShieldRotation = 0.0f;
 		float fShieldShrink = 1.0f;
-		OmniFlags_t flags = {OmniFlags::kBlasterSpawnLeft};
+		ShipFlags_t flags = {ShipFlags::kBlasterSpawnLeft};
 		std::chrono::duration<float> transferLockTimer = std::chrono::duration<float>::zero();
 		std::chrono::duration<float> arrivalGracePeriod = std::chrono::duration<float>::zero();
 		std::chrono::duration<float> navigationDelay = std::chrono::duration<float>(60.0f);
 		engine::GlobalId globalId {};
 		engine::ClientGuid clientGuid {};
+		engine::GlobalId flagshipGlobalId {};
 		engine::GridCoord fleetWantedCoordinate {};
 		uint8_t uiPendingFleetWantedCoordinateTicks = 0;
 		uint8_t uiPendingWeaponModeTicks = 0;
@@ -363,7 +324,7 @@ public:
 		// so none of them is listed.
 		static constexpr auto Fields()
 		{
-			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, fArmor), FRAME_COLUMN(SpawnInfo, fShield), FRAME_COLUMN(SpawnInfo, nextBlasterFireTime), FRAME_COLUMN(SpawnInfo, nextSecondarySpawnTime), FRAME_COLUMN(SpawnInfo, shieldCooldown), FRAME_COLUMN(SpawnInfo, shieldDownSoundCooldown), FRAME_COLUMN(SpawnInfo, animationTime), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, transferLockTimer), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiPendingWeaponModeTicks), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
+			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fArmor), FRAME_COLUMN(SpawnInfo, fShield), FRAME_COLUMN(SpawnInfo, nextBlasterFireTime), FRAME_COLUMN(SpawnInfo, nextSecondarySpawnTime), FRAME_COLUMN(SpawnInfo, shieldCooldown), FRAME_COLUMN(SpawnInfo, shieldDownSoundCooldown), FRAME_COLUMN(SpawnInfo, animationTime), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, transferLockTimer), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiPendingWeaponModeTicks), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
 		}
 	};
 

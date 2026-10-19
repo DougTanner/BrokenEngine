@@ -33,19 +33,19 @@ engine::Wrapper gOmniExplosionParticleIntensitySpread(1.0f, 0.0f, 3.0f);
 engine::Wrapper gOmniExplosionParticleIntensityDecay(1.0f, 0.0f, 5.0f);
 engine::Wrapper gOmniExplosionParticleIntensityPower(1.0f, 0.0f, 5.0f);
 
-engine::Wrapper gSpaceshipExplosionParticleWidth(0.75f, 0.0f, 3.0f);
-engine::Wrapper gSpaceshipExplosionParticleLength(0.5f, 0.0f, 3.0f);
-engine::Wrapper gSpaceshipExplosionParticleLengthSpread(2.0f, 0.0f, 6.0f);
-engine::Wrapper gSpaceshipExplosionParticlePositionJitter(0.5f, 0.0f, 10.0f);
-engine::Wrapper gSpaceshipExplosionParticleVelocityBase(4.0f, 0.0f, 10.0f);
-engine::Wrapper gSpaceshipExplosionParticleVelocitySpread(5.0f, 0.0f, 10.0f);
-engine::Wrapper gSpaceshipExplosionParticleVerticalVelocityBase(0.25f, 0.0f, 3.0f);
-engine::Wrapper gSpaceshipExplosionParticleVerticalVelocitySpread(3.0f, 0.0f, 3.0f);
-engine::Wrapper gSpaceshipExplosionParticleVelocityDecay(5.0f, 0.0f, 6.0f);
-engine::Wrapper gSpaceshipExplosionParticleGravity(2.0f, 0.0f, 5.0f);
-engine::Wrapper gSpaceshipExplosionParticleVisibleIntensity(1.0f, 0.0f, 6.0f);
-engine::Wrapper gSpaceshipExplosionParticleIntensitySpread(5.0f, 0.0f, 6.0f);
-engine::Wrapper gSpaceshipExplosionParticleIntensityDecay(1.5f, 0.0f, 5.0f);
-engine::Wrapper gSpaceshipExplosionParticleIntensityPower(0.75f, 0.0f, 5.0f);
+engine::Wrapper gFighterExplosionParticleWidth(0.75f, 0.0f, 3.0f);
+engine::Wrapper gFighterExplosionParticleLength(0.5f, 0.0f, 3.0f);
+engine::Wrapper gFighterExplosionParticleLengthSpread(2.0f, 0.0f, 6.0f);
+engine::Wrapper gFighterExplosionParticlePositionJitter(0.5f, 0.0f, 10.0f);
+engine::Wrapper gFighterExplosionParticleVelocityBase(4.0f, 0.0f, 10.0f);
+engine::Wrapper gFighterExplosionParticleVelocitySpread(5.0f, 0.0f, 10.0f);
+engine::Wrapper gFighterExplosionParticleVerticalVelocityBase(0.25f, 0.0f, 3.0f);
+engine::Wrapper gFighterExplosionParticleVerticalVelocitySpread(3.0f, 0.0f, 3.0f);
+engine::Wrapper gFighterExplosionParticleVelocityDecay(5.0f, 0.0f, 6.0f);
+engine::Wrapper gFighterExplosionParticleGravity(2.0f, 0.0f, 5.0f);
+engine::Wrapper gFighterExplosionParticleVisibleIntensity(1.0f, 0.0f, 6.0f);
+engine::Wrapper gFighterExplosionParticleIntensitySpread(5.0f, 0.0f, 6.0f);
+engine::Wrapper gFighterExplosionParticleIntensityDecay(1.5f, 0.0f, 5.0f);
+engine::Wrapper gFighterExplosionParticleIntensityPower(0.75f, 0.0f, 5.0f);
 
 } // namespace game

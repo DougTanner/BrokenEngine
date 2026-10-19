@@ -1,5 +1,7 @@
 #include "Network/Client/ReconcileReplay.h"
 
+#include "Frame/Collections/Battleships/Battleships.h"
+#include "Frame/Collections/Fighters/Fighters.h"
 #include "Frame/Collections/Omnis/Omnis.h"
 #include "Network/Client/ClientReconciler.h"
 #include "Game.h"
@@ -29,7 +31,7 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 				const Frame& rFrame = *rScratch.replayStack.at(static_cast<size_t>(i));
 				for (const TransferRequest& rRequest : rFrame.postRender.transferRequests)
 				{
-					if (rRequest.change.eType != StatusChangeType::kTransferOmni)
+					if (!IsOwnedEntityTransfer(rRequest.change))
 					{
 						continue;
 					}
@@ -54,8 +56,25 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 					{
 						continue;
 					}
-					LOG(kNetwork, kVerbose, "ReconcileUpdateClientState TransferOmni GlobalId: {} Source: ({},{}) Dest: ({},{})", clientState.clientGlobalIdentifier, rWork.coord.iX, rWork.coord.iY, destination.iX, destination.iY);
-					clientState.fPreviousClientArmor = std::get<OmnisPostRender::SpawnInfo>(rRequest.change.data).fArmor;
+					LOG(kNetwork, kVerbose, "ReconcileUpdateClientState {} GlobalId: {} Source: ({},{}) Dest: ({},{})", StatusChangeTypeName(rRequest.change.eType), clientState.clientGlobalIdentifier, rWork.coord.iX, rWork.coord.iY, destination.iX, destination.iY);
+					// The carried hull: armor for Omnis, health for Fighters and Battleships.
+					clientState.fPreviousClientArmor = std::visit([](const auto& rData) -> float
+					{
+						using Data = std::remove_cvref_t<decltype(rData)>;
+						if constexpr (std::is_same_v<Data, OmnisPostRender::SpawnInfo>)
+						{
+							return rData.fArmor;
+						}
+						else if constexpr (std::is_same_v<Data, FightersPostRender::SpawnInfo> || std::is_same_v<Data, BattleshipsPostRender::SpawnInfo>)
+						{
+							return rData.fHealth;
+						}
+						else
+						{
+							ASSERT(false);
+							std::unreachable();
+						}
+					}, rRequest.change.data);
 				}
 			}
 		}

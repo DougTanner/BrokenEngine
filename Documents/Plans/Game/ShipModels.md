@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:05:45.634Z","dependsOn":["Documents/Plans/Game/FlightPlaneClimbing.md","Documents/Plans/Game/ShipTypeSplit.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:05:45.634Z","dependsOn":["Documents/Plans/Game/FlightPlaneClimbing.md"]} -->
 # Give each ship type a fleet model and a random-spawn model
 
 Tier 2 (`.agents/references/risk-tiers.md`): the change adds four source model
@@ -6,10 +6,12 @@ assets and their DataPacker intermediates, and rewires the client-only model
 selection, scale, and orientation constants in the three `*Render.cpp` files. No
 CRC'd state, wire format, save, or replay format changes; the server is
 untouched. Line numbers cite baseline `c1420821` where a file exists there;
-`Documents/Plans/Game/ShipTypeSplit.md` (prerequisite) renames `Spaceships/` to
-`Fighters/`, adds `Battleships/`, and introduces
-the per-controller model constants this Plan fills in, so carry its names
-forward. Where a statement here and the code disagree, the code wins; report the
+the ship collections now live in `Fighters/`, `Omnis/`, and `Battleships/`, and
+each `*Render.cpp` holds the per-controller model constants this Plan fills in
+(`kFighterFleetModel`, `kfFighterFleetModelScale`, `kFighterRandomModel`, and
+`kfFighterRandomModelScale` at `FightersRender.cpp:14-17`, with their Omni and
+Battleship counterparts at `OmnisRender.cpp:16-19` and
+`BattleshipsRender.cpp:15-18`), so carry those names forward. Where a statement here and the code disagree, the code wins; report the
 contradiction instead of matching one side to the other. Paths below `Frame/`
 mean `Projects/BrokenEngineSandbox/Source/Frame/`; `Models/` means
 `Projects/BrokenEngineSandbox/Data/Models/`.

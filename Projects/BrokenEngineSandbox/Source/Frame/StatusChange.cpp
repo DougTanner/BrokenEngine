@@ -6,6 +6,10 @@ namespace game
 template <typename DATA>
 concept HasSpawnTraits = requires { typename SpawnTraits<DATA>::Collection; };
 
+// The three ship SpawnInfo types: each carries a controller and an owned-entity identity.
+template <typename DATA>
+concept IsShipSpawnInfo = requires(const DATA& rData) { rData.eController; rData.globalId; rData.clientGuid; };
+
 template <typename CHANGE>
 using SpawnPayloadPositionType = std::conditional_t<std::is_const_v<CHANGE>, const XMVECTOR, XMVECTOR>;
 
@@ -60,27 +64,80 @@ void ValidateSpawnVectors(const StatusChange& rChange)
 	}, rChange.data);
 }
 
+bool IsOwnedEntityTransfer(const StatusChange& rChange)
+{
+	return IsTransferType(rChange.eType) && std::visit([](const auto& rData)
+	{
+		if constexpr (IsShipSpawnInfo<std::remove_cvref_t<decltype(rData)>>)
+		{
+			return rData.eController == ShipController::kFleet;
+		}
+		else
+		{
+			return false;
+		}
+	}, rChange.data);
+}
+
+// Only ship spawn and transfer tags carry an owned-entity identity; any other tag here is a caller bug.
 engine::GlobalId OwnedSpawnGlobalId(const StatusChange& rChange)
 {
-	return std::get<OmnisPostRender::SpawnInfo>(rChange.data).globalId;
+	return std::visit([](const auto& rData) -> engine::GlobalId
+	{
+		if constexpr (IsShipSpawnInfo<std::remove_cvref_t<decltype(rData)>>)
+		{
+			return rData.globalId;
+		}
+		else
+		{
+			ASSERT(false);
+			std::unreachable();
+		}
+	}, rChange.data);
 }
 
 engine::ClientGuid OwnedSpawnClientGuid(const StatusChange& rChange)
 {
-	return std::get<OmnisPostRender::SpawnInfo>(rChange.data).clientGuid;
+	return std::visit([](const auto& rData) -> engine::ClientGuid
+	{
+		if constexpr (IsShipSpawnInfo<std::remove_cvref_t<decltype(rData)>>)
+		{
+			return rData.clientGuid;
+		}
+		else
+		{
+			ASSERT(false);
+			std::unreachable();
+		}
+	}, rChange.data);
 }
 
 bool IsAdoptableStatusChange(const StatusChange& rChange)
 {
-	if (const BlastersPostRender::SpawnInfo* pBlaster = std::get_if<BlastersPostRender::SpawnInfo>(&rChange.data); pBlaster != nullptr)
+	return std::visit([](const auto& rData)
 	{
-		return pBlaster->iTypeIndex >= 0 && pBlaster->iTypeIndex < std::ssize(BlastersInterpolate::sTypes);
-	}
-	if (const engine::ExplosionsPostRender::SpawnInfo* pExplosion = std::get_if<engine::ExplosionsPostRender::SpawnInfo>(&rChange.data); pExplosion != nullptr)
-	{
-		return pExplosion->iTypeIndex >= 0 && pExplosion->iTypeIndex < std::ssize(engine::ExplosionsInterpolate::sTypes);
-	}
-	return true;
+		using Data = std::remove_cvref_t<decltype(rData)>;
+		if constexpr (std::is_same_v<Data, BlastersPostRender::SpawnInfo>)
+		{
+			return rData.iTypeIndex >= 0 && rData.iTypeIndex < std::ssize(BlastersInterpolate::sTypes);
+		}
+		else if constexpr (std::is_same_v<Data, engine::ExplosionsPostRender::SpawnInfo>)
+		{
+			return rData.iTypeIndex >= 0 && rData.iTypeIndex < std::ssize(engine::ExplosionsInterpolate::sTypes);
+		}
+		else if constexpr (IsShipSpawnInfo<Data>)
+		{
+			return rData.eController < ShipController::kCount;
+		}
+		else if constexpr (requires { rData.eType; })
+		{
+			return rData.eType < ShipType::kCount;
+		}
+		else
+		{
+			return true;
+		}
+	}, rChange.data);
 }
 
 void ApplySpawnStatusChange(Frame& __restrict rFrame, const StatusChange& rChange, engine::GridCoord coordinate)

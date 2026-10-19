@@ -91,8 +91,14 @@
     <Filter Include="Game\Frame\Collections\Missiles">
       <UniqueIdentifier>{c3d4e5f6-7890-abcd-ef01-345678901234}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Game\Frame\Collections\Spaceships">
+    <Filter Include="Game\Frame\Collections\Fighters">
       <UniqueIdentifier>{d4e5f6a7-8901-bcde-f012-456789012345}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Frame\Collections\Battleships">
+      <UniqueIdentifier>{1a6168e1-cec6-47a4-8bfd-14d62dbb26a9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Frame\Collections\Ships">
+      <UniqueIdentifier>{42dfe6e3-dbfc-4aec-b93e-b4628ac42dee}</UniqueIdentifier>
     </Filter>
     <Filter Include="Game\Ui">
       <UniqueIdentifier>{fd1606d0-4688-43e7-96d0-0a61e35fefab}</UniqueIdentifier>
@@ -423,8 +429,23 @@
     <ClInclude Include="..\..\Source\Frame\Collections\Omnis\Omnis.h">
       <Filter>Game\Frame\Collections\Omnis</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\Frame\Collections\Spaceships\Spaceships.h">
-      <Filter>Game\Frame\Collections\Spaceships</Filter>
+    <ClInclude Include="..\..\Source\Frame\Collections\Fighters\Fighters.h">
+      <Filter>Game\Frame\Collections\Fighters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Battleships\Battleships.h">
+      <Filter>Game\Frame\Collections\Battleships</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipBehaviours.h">
+      <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipQueries.h">
+      <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipStatusChanges.h">
+      <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Frame\Collections\Ships\ShipTypes.h">
+      <Filter>Game\Frame\Collections\Ships</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Ui\ParticleWrappers.h">
       <Filter>Game\Ui</Filter>
@@ -770,14 +791,32 @@
     <ClCompile Include="..\..\Source\Frame\Collections\Omnis\OmnisCombat.cpp">
       <Filter>Game\Frame\Collections\Omnis</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Frame\Collections\Spaceships\Spaceships.cpp">
-      <Filter>Game\Frame\Collections\Spaceships</Filter>
+    <ClCompile Include="..\..\Source\Frame\Collections\Fighters\Fighters.cpp">
+      <Filter>Game\Frame\Collections\Fighters</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Frame\Collections\Spaceships\SpaceshipsCombat.cpp">
-      <Filter>Game\Frame\Collections\Spaceships</Filter>
+    <ClCompile Include="..\..\Source\Frame\Collections\Fighters\FightersCombat.cpp">
+      <Filter>Game\Frame\Collections\Fighters</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Frame\Collections\Spaceships\SpaceshipsNavigation.cpp">
-      <Filter>Game\Frame\Collections\Spaceships</Filter>
+    <ClCompile Include="..\..\Source\Frame\Collections\Fighters\FightersNavigation.cpp">
+      <Filter>Game\Frame\Collections\Fighters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Battleships\Battleships.cpp">
+      <Filter>Game\Frame\Collections\Battleships</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Battleships\BattleshipsCombat.cpp">
+      <Filter>Game\Frame\Collections\Battleships</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Battleships\BattleshipsNavigation.cpp">
+      <Filter>Game\Frame\Collections\Battleships</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipBehaviours.cpp">
+      <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipQueries.cpp">
+      <Filter>Game\Frame\Collections\Ships</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Frame\Collections\Ships\ShipStatusChanges.cpp">
+      <Filter>Game\Frame\Collections\Ships</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\Collections\Missiles\Missiles.cpp">
       <Filter>Game\Frame\Collections\Missiles</Filter>

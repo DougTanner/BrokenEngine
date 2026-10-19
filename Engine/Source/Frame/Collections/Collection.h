@@ -283,6 +283,9 @@ inline common::crc_t CollectionCrc(const STRUCT& rCurrent, const TUPLE& rMembers
 template <typename T>
 concept HasSharedMembers = requires(const T value) { value.SharedMembers(); };
 
+template <typename T>
+concept HasSharedCrcMembers = requires(const T value) { value.SharedCrcMembers(); };
+
 // Server broadcasts use the save-format Members() tuple; clients deserialize SharedMembers().
 // Server Members() and SharedMembers() must have identical tuple types for wire/CRC parity.
 template <typename STRUCT>
@@ -290,6 +293,7 @@ inline constexpr bool kbServerMembersParity = std::is_same_v<
 	decltype(std::declval<const STRUCT&>().Members()),
 	decltype(std::declval<const STRUCT&>().SharedMembers())>;
 
+// A declared SharedCrcMembers() narrows the CRC to that subset of SharedMembers().
 template <typename STRUCT>
 inline common::crc_t SharedCollectionCrc(const STRUCT& rCurrent)
 {
@@ -298,7 +302,16 @@ inline common::crc_t SharedCollectionCrc(const STRUCT& rCurrent)
 #if defined(BT_SERVER)
 		static_assert(kbServerMembersParity<STRUCT>, "Server-build Members() must be identical to SharedMembers() — wire format / CRC parity");
 #endif
-		return CollectionCrc(rCurrent, rCurrent.SharedMembers());
+		if constexpr (HasSharedCrcMembers<STRUCT>)
+		{
+			// A SharedCrcMembers entry absent from SharedMembers would CRC client-local state — permanent false desync
+			ASSERT(IsMemberTupleSubset(rCurrent.SharedCrcMembers(), rCurrent.SharedMembers()));
+			return CollectionCrc(rCurrent, rCurrent.SharedCrcMembers());
+		}
+		else
+		{
+			return CollectionCrc(rCurrent, rCurrent.SharedMembers());
+		}
 	}
 	else
 	{

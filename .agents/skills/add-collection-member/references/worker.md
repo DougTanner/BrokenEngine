@@ -15,7 +15,7 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
 
    | Variant | Live exemplar | Inspect for |
    |---|---|---|
-   | Shared-only game collection struct | `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.h`: `SpaceshipsPostRender`, `SpaceshipsPostRender::Spawn`, `SpaceshipsPostRender::PersistentMembers` | `SharedMembers()` with `Members()` forwarding to it; per-struct versions, `PersistentMembers()` carry-forward, spawn initialization |
+   | Shared-only game collection struct | `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Blasters/Blasters.h`: `BlastersPostRender`, `BlastersPostRender::Spawn`; `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Fighters/Fighters.h`: `FightersPostRender::PersistentMembers` (the `PersistentMembers()` carry-forward example only; `FightersPostRender` is not shared-only) | `SharedMembers()` with `Members()` forwarding to it; per-struct versions, `PersistentMembers()` carry-forward, spawn initialization |
    | Shared/client-split game pair | `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.h`, `/Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.cpp`, `MissilesInterpolate::Update` | `SharedMembers()` plus guarded `ClientMembers()`, `Members()` composition, spawn, copy, `ClientInitialize`, transfer send |
    | Server-visible engine pair | `/Engine/Source/Frame/Collections/Pushers/Pushers.h`, `PushersInterpolate::Sync`, `PushersPostRender::Add` | Existing `Members()`-only shape, per-struct versions, owner sync, zero-init, difference logging, ID map |
    | Owner-synchronized client-only pair | `/Engine/Source/Frame/Collections/Sounds/Sounds.h`, `SoundsInterpolate::Sync`, `SoundsPostRender::Add` | Whole-file `BT_CLIENT`, `Members()` only, full carry-forward copy, `SyncData`/`Sync`, Add defaults, no shared version or differences |
@@ -94,7 +94,7 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
     - Some transition-only, controller, and identity columns are copied instead.
     - Owner-fed state travels through `SyncData` and `Sync()`, and every
       `Sync()` aggregate initializer and caller has to agree.
-    - Follow the target's live pattern: Spaceships carries its persistent
+    - Follow the target's live pattern: Fighters carries its persistent
       columns through `PersistentMembers()` and Pushers copies in Update.
 
     Done when the chosen carry-forward mechanism is wired and every affected
@@ -156,8 +156,8 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
 
     - Current exposure lives in
       `/Projects/BrokenEngineSandbox/Source/Agent/AgentCommandsServerQueries.cpp`
-      through `ExtractOmnis`, `ExtractSpaceships`, `ExtractMissiles`, and
-      `ExtractBlasters`.
+      through `ExtractShips` (shared by the Fighters, Omnis, and Battleships
+      pairs), `ExtractMissiles`, and `ExtractBlasters`.
     - Record an intentional exclusion when no scenario needs it.
     - A server-visible column joins its collection's `edit_frame` column list
       per the `edit_frame` rule in

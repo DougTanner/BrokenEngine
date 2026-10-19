@@ -1,8 +1,9 @@
 #include "Network/Client/ClientSession.h"
 
+#include "Frame/Collections/Battleships/Battleships.h"
 #include "Frame/Collections/Blasters/Blasters.h"
+#include "Frame/Collections/Fighters/Fighters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
-#include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Network/Client/ClientReconciler.h"
 #include "Network/GamePacketType.h"
 #include "Profile/ProfileRows.h"
@@ -222,12 +223,12 @@ void ClientSession::SendDeleteFleetRequest(const FleetGuid& rFleetGuid)
 	}, rFleetGuid.uiHigh, rFleetGuid.uiLow);
 }
 
-void ClientSession::SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid)
+void ClientSession::SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid, ShipType eType)
 {
 	mpRuntime->SendGameRequest(GamePacketType::kClientSpawnIntoFleetRequest, [&]
 	{
-		LOG(kNetwork, kDebug, "ClientSession::SendSpawnIntoFleetRequest Fleet: ({},{})", rFleetGuid.uiHigh, rFleetGuid.uiLow);
-	}, rFleetGuid.uiHigh, rFleetGuid.uiLow);
+		LOG(kNetwork, kDebug, "ClientSession::SendSpawnIntoFleetRequest Fleet: ({},{}) Type: {}", rFleetGuid.uiHigh, rFleetGuid.uiLow, ShipTypeName(eType));
+	}, rFleetGuid.uiHigh, rFleetGuid.uiLow, std::to_underlying(eType));
 }
 
 void ClientSession::SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId)
@@ -250,7 +251,8 @@ void ClientSession::HydrateReceivedFullState(Frame& rReceived, const Frame* pRin
 {
 	BlastersInterpolate::ClientInitializeAll(rReceived);
 	MissilesInterpolate::ClientInitializeAll(rReceived);
-	SpaceshipsInterpolate::ClientInitializeAll(rReceived);
+	FightersInterpolate::ClientInitializeAll(rReceived);
+	BattleshipsInterpolate::ClientInitializeAll(rReceived);
 
 	// Copy smoke trail smoothed positions from the most recent ring frame to preserve
 	// rendering continuity across reconciliation.

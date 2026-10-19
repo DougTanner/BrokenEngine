@@ -2,7 +2,7 @@
 
 #include "Network/Server/FleetNavigationController.h"
 
-#include "Frame/Collections/Omnis/Omnis.h"
+#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Game.h"
 
 namespace game
@@ -67,22 +67,16 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 				continue;
 			}
 
-			const OmnisPostRender& rOmnis = *(*gpGame->mCells.at(rFlagship.coordinate).pCurrent).postRender.pOmnis;
-			bool bFoundFlagship = false;
-			int64_t iFlagshipNavigationDirection = -1;
-			for (int64_t k = 0; k < rOmnis.iCount; ++k)
-			{
-				if (rOmnis.pGlobalIds[k] == rFlagship.globalId)
-				{
-					iFlagshipNavigationDirection = GetNavigationDirection(rOmnis.pFlags[k]);
-					bFoundFlagship = true;
-					break;
-				}
-			}
-			if (!bFoundFlagship)
+			const Frame& rFlagshipFrame = *gpGame->mCells.at(rFlagship.coordinate).pCurrent;
+			std::optional<ShipLocator> optionalFlagship = FindShipByGlobalId(rFlagshipFrame, rFlagship.globalId);
+			if (!optionalFlagship)
 			{
 				continue;
 			}
+			int64_t iFlagshipNavigationDirection = VisitShip(rFlagshipFrame, *optionalFlagship, []([[maybe_unused]] const auto& rInterpolate, const auto& rPostRender, int64_t iRow)
+			{
+				return GetNavigationDirection(rPostRender.pFlags[iRow]);
+			});
 
 			if (iFlagshipNavigationDirection >= 0 && iFlagshipNavigationDirection <= 3)
 			{
@@ -154,27 +148,25 @@ void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<
 				continue;
 			}
 
-			const OmnisPostRender& rOmnis = *(*gpGame->mCells.at(memberCoordinate).pCurrent).postRender.pOmnis;
-			for (int64_t k = 0; k < rOmnis.iCount; ++k)
+			ShipUuid shipUuid = ShipUuidByGlobalId(*gpGame->mCells.at(memberCoordinate).pCurrent, rMember.globalId);
+			if (shipUuid.iUuid == 0)
 			{
-				if (rOmnis.pGlobalIds[k] == rMember.globalId)
-				{
-					int64_t iOmniUuid = rOmnis.pIds[k].uuid.iValue;
-					frameInputIt->second.statusChanges.push_back(
-					{
-						.eType = StatusChangeType::kUpdateFleet,
-						.data = UpdateFleetData
-						{
-							.iOmniUuid = iOmniUuid,
-							.bIsFlagship = bMemberIsFlagship,
-							.fleetWantedCoordinate = rUpdate.newWantedCoordinate,
-							.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(rUpdate.iPendingFleetWantedCoordinateTicks),
-						},
-					});
-					++iMembersUpdated;
-					break;
-				}
+				continue;
 			}
+			frameInputIt->second.statusChanges.push_back(
+			{
+				.eType = StatusChangeType::kUpdateFleet,
+				.data = UpdateFleetData
+				{
+					.eType = shipUuid.eType,
+					.iUuid = shipUuid.iUuid,
+					.bIsFlagship = bMemberIsFlagship,
+					.flagshipGlobalId = rFleet.flagshipGlobalId,
+					.fleetWantedCoordinate = rUpdate.newWantedCoordinate,
+					.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(rUpdate.iPendingFleetWantedCoordinateTicks),
+				},
+			});
+			++iMembersUpdated;
 		}
 		LOG(kNetwork, kVerbose, "FleetNavigationController::ProcessFlagshipUpdates Guid: ({},{}) FleetGuid: ({},{}) MembersUpdated: {} WantedCoord: ({},{})", rUpdate.clientGuid.uiHigh, rUpdate.clientGuid.uiLow, rUpdate.fleetGuid.uiHigh, rUpdate.fleetGuid.uiLow, iMembersUpdated, rUpdate.newWantedCoordinate.iX, rUpdate.newWantedCoordinate.iY);
 	}

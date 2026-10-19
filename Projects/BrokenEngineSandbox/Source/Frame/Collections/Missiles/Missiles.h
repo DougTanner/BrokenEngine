@@ -37,15 +37,15 @@ struct FrameInterpolate;
 enum class MissileFlags : uint8_t
 {
 	kDirectional = 0x04,
-	kTargetOmni  = 0x08,
-	kTargetEnemy = 0x10,
-	kFalling     = 0x20,
+	kTargetFleet  = 0x08,
+	kTargetRandom = 0x10,
+	kFalling      = 0x20,
 };
 using MissileFlags_t = common::Flags<MissileFlags>;
 
 struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 {
-	static constexpr int64_t kiVersion = 2;
+	static constexpr int64_t kiVersion = 3;
 	static constexpr const char* kpcName = "Missiles";
 	static constexpr common::crc_t kuiCrc = common::CrcConsteval("Missiles");
 
@@ -114,7 +114,7 @@ struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 
 struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 {
-	static constexpr int64_t kiVersion = 12;
+	static constexpr int64_t kiVersion = 13;
 
 	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);

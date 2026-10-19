@@ -137,7 +137,7 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 	{
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
 		engine::AlignmentIdentifier alignment = rCurrentPostRender.pAlignments[i];
-		bool bOmniAlignment = alignment == rFrame.postRender.omniAlignment;
+		bool bFleetAlignment = alignment == rFrame.postRender.fleetAlignment;
 		TransferRequest request
 		{
 			.change = MakeTransfer(SpawnInfo
@@ -147,9 +147,9 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.iTypeIndex = rCurrentInterpolate.puiTypeIndices[i],
 				.alignment = alignment,
 				// Wind-trail tuning is client-only visual debug state; reset to canonical defaults on transfer.
-				.fWindTrailIntensity = bOmniAlignment ? gWindDepositOmniBlastersIntensity.mfDefault : gWindDepositSpaceshipsBlastersIntensity.mfDefault,
-				.fWindTrailWidth = bOmniAlignment ? gWindDepositOmniBlastersWidth.mfDefault : gWindDepositSpaceshipsBlastersWidth.mfDefault,
-				.fWindTrailLengthMultiplier = bOmniAlignment ? gWindDepositOmniBlastersLengthMultiplier.mfDefault : gWindDepositSpaceshipsBlastersLengthMultiplier.mfDefault,
+				.fWindTrailIntensity = bFleetAlignment ? gWindDepositOmniBlastersIntensity.mfDefault : gWindDepositFightersBlastersIntensity.mfDefault,
+				.fWindTrailWidth = bFleetAlignment ? gWindDepositOmniBlastersWidth.mfDefault : gWindDepositFightersBlastersWidth.mfDefault,
+				.fWindTrailLengthMultiplier = bFleetAlignment ? gWindDepositOmniBlastersLengthMultiplier.mfDefault : gWindDepositFightersBlastersLengthMultiplier.mfDefault,
 			}),
 		};
 		if (rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]

@@ -8,8 +8,8 @@ namespace game
 struct Frame;
 
 // Row labels of ServerCellStats::entityCounts, indexed by ServerEntityCount.
-inline constexpr std::array<const char*, 4> kServerEntityCountNames {"Omnis", "Spaceships", "Blasters", "Missiles"};
-enum class ServerEntityCount : uint8_t { kOmnis, kSpaceships, kBlasters, kMissiles };
+inline constexpr std::array<const char*, 5> kServerEntityCountNames {"Fighters", "Omnis", "Battleships", "Blasters", "Missiles"};
+enum class ServerEntityCount : uint8_t { kFighters, kOmnis, kBattleships, kBlasters, kMissiles };
 
 // One cell's monitoring snapshot; the tick/time are the ones the cell last advanced to.
 struct ServerCellStats

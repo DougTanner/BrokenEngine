@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:09:43.448Z","dependsOn":["Documents/Plans/Game/ShipTypeSplit.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-09T00:09:43.448Z","dependsOn":[]} -->
 # Give every ship a target flight plane and climb smoothly toward it
 
 Tier 3 (`.agents/references/risk-tiers.md`): the change alters CRC'd Interpolate
@@ -19,11 +19,14 @@ The engine loads the game's three planes (low 6 m and
 medium 50 m with `engine::FlightPlaneFlags::kTerrainCollision`, high 100 m
 without it) into `engine::gpFlightPlanes` (`Count()`, `Plane(i)`, `Lowest()`,
 `Highest()`), and every ship still flies on `Lowest()`.
-`Documents/Plans/Game/ShipTypeSplit.md` gives the three types (Fighters, Omnis,
-Battleships) one `ShipOrders_t pOrders` column whose bits 8-15 are reserved for
-the target flight plane, one `ShipController pController` column, the shared
-`ShipBehaviours.h`, `ShipQueries.h`, and `ShipStatusChanges.h`, and
-`TransferData` carrying `uiOrders` for every ship transfer.
+The three ship types (Fighters, Omnis, Battleships) share one
+`ShipOrders_t pOrders` column whose `ShipOrders` bits 8-15 are unused
+(`Frame/Collections/Ships/ShipTypes.h:54-60`), one `ShipController pController`
+column, and `Frame/Collections/Ships/` `ShipBehaviours.h`, `ShipQueries.h`, and
+`ShipStatusChanges.h`; every ship transfer carries `orders` in its type's
+`SpawnInfo` (`Fighters.h:248`, `Omnis.h:326`, `Battleships.h:253`), the
+`kTransferFighter`, `kTransferOmni`, and `kTransferBattleship` payload
+(`Frame/StatusChange.h:29-31,130-133`).
 
 Current-tree evidence this design rests on:
 

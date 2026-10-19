@@ -85,7 +85,7 @@ public:
 	void AddClientOwnedEntity(engine::GlobalId identifier, engine::GridCoord coordinate);
 	void RemoveClientOwnedEntity(engine::GlobalId identifier);
 	void RestoreReplayMetadata(const ReplayMeta& rMetadata);
-	std::optional<int64_t> ClientOwnedEntityIndex(const OmnisPostRender& rOmnis) const;
+	std::optional<ShipLocator> ClientOwnedEntity(const Frame& rFrame) const;
 
 #if defined(BT_CLIENT)
 	void CaptureClientState();
@@ -119,8 +119,8 @@ public:
 	std::vector<engine::GlobalId> mClientOwnedEntityIdentifiers;
 	std::vector<engine::GridCoord> mClientOwnedEntityCoordinates;
 	float mfPreviousClientArmor = 0.0f;
-	engine::AlignmentIdentifier mOmniAlignment {};
-	engine::AlignmentIdentifier mEnemyAlignment {};
+	engine::AlignmentIdentifier mFleetAlignment {};
+	engine::AlignmentIdentifier mRandomAlignment {};
 	engine::Alignments mAlignments {};
 
 #if defined(BT_CLIENT)

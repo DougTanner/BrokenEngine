@@ -2,7 +2,7 @@
 
 #include "Network/Server/ServerFleetSerialization.h"
 
-#include "Frame/Collections/Omnis/Omnis.h"
+#include "Frame/Collections/Ships/ShipBehaviours.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
 #include "Network/GamePacketType.h"
@@ -42,6 +42,7 @@ static void WriteFleet(std::fstream& rFileStream, const Fleet& rFleet)
 	for (const FleetMember& rMember : rFleet.members)
 	{
 		common::Write(rFileStream, rMember.globalId.iValue);
+		common::Write(rFileStream, std::to_underlying(rMember.eType));
 		rMember.flags.Write(rFileStream);
 		common::Write(rFileStream, rMember.coordinate.iX);
 		common::Write(rFileStream, rMember.coordinate.iY);
@@ -71,7 +72,7 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	// Trust boundary (save / replay file): the wire admits only [0, 60], so reject any other fleet delay. It
 	// resets cellChangeTimerSeconds, whose count > 0.0f test gates the fire: +Inf freezes fleet nav forever and NaN fires
 	// every tick; it also feeds a common::Random bound.
-	if (!OmnisPostRender::IsNavigationDelayInRange(rFleet.navigationDelaySeconds.count()))
+	if (!IsNavigationDelayInRange(rFleet.navigationDelaySeconds.count()))
 	{
 		throw std::ios_base::failure("Fleet navigation delay");
 	}
@@ -86,12 +87,19 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 		throw std::ios_base::failure("Fleet cell change timer");
 	}
 	// Trust boundary (save / replay file): bound the member count against the cap and stream before resize.
-	common::ValidateDeserializedCountCapacity(iMemberCount, kiMaximumFleetMembers, sizeof(int64_t) + sizeof(uint8_t) + 2 * sizeof(int32_t), rFileStream, "ReadFleet members");
+	common::ValidateDeserializedCountCapacity(iMemberCount, kiMaximumFleetMembers, sizeof(int64_t) + 2 * sizeof(uint8_t) + 2 * sizeof(int32_t), rFileStream, "ReadFleet members");
 	rFleet.members.resize(static_cast<size_t>(iMemberCount));
 	for (FleetMember& rMember : rFleet.members)
 	{
 		int64_t iGlobalId = 0;
 		common::Read(rFileStream, iGlobalId);
+		// Trust boundary (save / replay file): a respawn spawns the member's type, so it must name a ship collection.
+		uint8_t uiType = 0;
+		common::Read(rFileStream, uiType);
+		if (uiType >= std::to_underlying(ShipType::kCount))
+		{
+			throw std::ios_base::failure("Fleet member ship type");
+		}
 		FleetMemberFlags_t flags {};
 		flags.Read(rFileStream);
 		// Trust boundary (save / replay file): kIsDead is the only member flag.
@@ -105,7 +113,7 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 		int32_t iCoordY = 0;
 		common::Read(rFileStream, iCoordX);
 		common::Read(rFileStream, iCoordY);
-		rMember = FleetMember {.globalId = engine::GlobalId {.iValue = iGlobalId}, .flags = flags, .coordinate = engine::GridCoord {.iX = iCoordX, .iY = iCoordY}};
+		rMember = FleetMember {.globalId = engine::GlobalId {.iValue = iGlobalId}, .eType = static_cast<ShipType>(uiType), .flags = flags, .coordinate = engine::GridCoord {.iX = iCoordX, .iY = iCoordY}};
 	}
 	// Trust boundary (save / replay file): members and the flagship are looked up by global ID, so each member ID
 	// must be valid and unique within its fleet, and the flagship must name a member ({} only for an empty fleet).

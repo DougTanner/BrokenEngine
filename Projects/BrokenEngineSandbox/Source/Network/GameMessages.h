@@ -9,11 +9,11 @@ struct FleetSyncMessage
 {
 	static constexpr int64_t kiFleetCountSize = sizeof(int64_t);
 	static constexpr int64_t kiFleetHeaderSize = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(int64_t) + sizeof(int64_t) + sizeof(float);
-	static constexpr int64_t kiFleetMemberSize = sizeof(int64_t) + sizeof(uint8_t);
+	static constexpr int64_t kiFleetMemberSize = sizeof(int64_t) + sizeof(uint8_t) + sizeof(uint8_t);
 
 	static_assert(kiFleetCountSize == 8);
 	static_assert(kiFleetHeaderSize == 36);
-	static_assert(kiFleetMemberSize == 9);
+	static_assert(kiFleetMemberSize == 10);
 
 	template <typename TVISITOR, typename TFLEET>
 	static void VisitFleetHeader(TVISITOR& rVisitor, TFLEET& rFleet, int64_t& riMemberCount)
@@ -30,11 +30,12 @@ struct FleetSyncMessage
 		}
 	}
 
-	template <typename TVISITOR, typename TFLEETMEMBER, typename TFLAGS>
-	static void VisitFleetMember(TVISITOR& rVisitor, TFLEETMEMBER& rMember, TFLAGS& rFlags)
+	template <typename TVISITOR, typename TFLEETMEMBER, typename TBYTE>
+	static void VisitFleetMember(TVISITOR& rVisitor, TFLEETMEMBER& rMember, TBYTE& ruiType, TBYTE& ruiFlags)
 	{
 		rVisitor.Field(rMember.globalId.iValue);
-		rVisitor.Field(rFlags);
+		rVisitor.Field(ruiType);
+		rVisitor.Field(ruiFlags);
 	}
 
 	static void WritePayload(common::Workbuffer& rWorkbuffer, const std::vector<Fleet>& rFleets)
@@ -53,8 +54,9 @@ struct FleetSyncMessage
 			for (const FleetMember& rMember : rFleet.members)
 			{
 				int64_t iMemberStart = rWorkbuffer.Count<uint8_t>();
+				uint8_t uiType = std::to_underlying(rMember.eType);
 				uint8_t uiFlags = std::to_underlying(rMember.flags.meFlags);
-				VisitFleetMember(writer, rMember, uiFlags);
+				VisitFleetMember(writer, rMember, uiType, uiFlags);
 				ASSERT(rWorkbuffer.Count<uint8_t>() == iMemberStart + kiFleetMemberSize);
 				iExpectedSize += kiFleetMemberSize;
 			}
@@ -78,8 +80,10 @@ struct FleetSyncMessage
 			rFleet.members.resize(static_cast<size_t>(iMemberCount));
 			for (FleetMember& rMember : rFleet.members)
 			{
+				uint8_t uiType = 0;
 				uint8_t uiFlags = 0;
-				VisitFleetMember(reader, rMember, uiFlags);
+				VisitFleetMember(reader, rMember, uiType, uiFlags);
+				rMember.eType = static_cast<ShipType>(uiType);
 				rMember.flags.meFlags = static_cast<FleetMemberFlags>(uiFlags);
 			}
 		}

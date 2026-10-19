@@ -27,11 +27,20 @@ void AdmitFrameInputStatusChange(const StatusChange& rChange)
 	{
 		throw std::ios_base::failure("FrameInput StatusChange payload");
 	}
-	// Every legitimate spawn carries a real global ID; a zero ID would create an
-	// unaddressable Omni row.
-	if (rChange.eType == StatusChangeType::kSpawnOmni && OwnedSpawnGlobalId(rChange).iValue == 0)
+	// Every legitimate fleet ship spawn carries a real global ID; a zero ID would create an unaddressable fleet row.
+	if (IsSpawnType(rChange.eType) && std::visit([](const auto& rData)
 	{
-		throw std::ios_base::failure("FrameInput SpawnOmni global ID");
+		if constexpr (requires { rData.eController; })
+		{
+			return rData.eController == ShipController::kFleet && rData.globalId.iValue == 0;
+		}
+		else
+		{
+			return false;
+		}
+	}, rChange.data))
+	{
+		throw std::ios_base::failure("FrameInput ship spawn global ID");
 	}
 }
 

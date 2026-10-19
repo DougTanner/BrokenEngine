@@ -11,9 +11,9 @@ extern engine::Wrapper gOmniBlasterVolume;
 extern engine::Wrapper gOmniBlasterPitchMinimum;
 extern engine::Wrapper gOmniBlasterPitchRandom;
 
-extern engine::Wrapper gEnemyBlasterVolume;
-extern engine::Wrapper gEnemyBlasterPitchMinimum;
-extern engine::Wrapper gEnemyBlasterPitchRandom;
+extern engine::Wrapper gFighterBlasterVolume;
+extern engine::Wrapper gFighterBlasterPitchMinimum;
+extern engine::Wrapper gFighterBlasterPitchRandom;
 
 // Blasters - Terrain impact
 extern engine::Wrapper gTerrainImpactVolume;
@@ -34,10 +34,10 @@ extern engine::Wrapper gShieldDownVolume;
 extern engine::Wrapper gArmorHitVolumeBase;
 extern engine::Wrapper gArmorHitVolumeScale;
 
-extern engine::Wrapper gSpaceshipDeathVolume;
-extern engine::Wrapper gSpaceshipDeathPitchMinimum;
-extern engine::Wrapper gSpaceshipDeathPitchRandom;
-extern engine::Wrapper gSpaceshipHitVolume;
+extern engine::Wrapper gFighterDeathVolume;
+extern engine::Wrapper gFighterDeathPitchMinimum;
+extern engine::Wrapper gFighterDeathPitchRandom;
+extern engine::Wrapper gFighterHitVolume;
 
 } // namespace game
 

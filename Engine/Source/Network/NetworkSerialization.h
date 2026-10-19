@@ -16,7 +16,7 @@ namespace engine
 
 // Upper bound on a single serialized StatusChange payload of any type. A game wire fact, kept here so the engine
 // codec's SerializeGroup per-item ASSERT and the engine Server's compression-scratch sizing reference one source.
-inline constexpr int64_t kiMaxStatusChangeBytesPerItem = 120;
+inline constexpr int64_t kiMaxStatusChangeBytesPerItem = 128;
 
 // Worst-case serialized bytes for a batch of that many status changes: every item at its max size plus a
 // conservative 3-byte group header charged per item (over-bounds the real per-type group headers so this stays

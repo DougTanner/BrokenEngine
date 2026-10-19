@@ -28,10 +28,10 @@ game state around the deterministic Frame tick.
 
 ## Deterministic Tick Contracts
 
-- The engine owns the active set, which keeps every coordinate holding at least one Omni because the Omni rows form the ownership layer. Retention after the departing-Frame handoff, and generation activation, belong to the [File Replay contract](../../../../../Engine/Source/File/AGENTS.md#replay-streams).
+- The engine owns the active set, which keeps every coordinate holding at least one fleet-controlled ship, because those rows are the owned entities (`Frame::OwnedEntityCount`). Retention after the departing-Frame handoff, and generation activation, belong to the [File Replay contract](../../../../../Engine/Source/File/AGENTS.md#replay-streams).
 - Normal update prepares tick inputs; replay uses coordinates with live readers and consumes its recorded `FrameInput` order exactly, without sorting it again.
 - A replay transfer recorded in the post-dispatch channel at event tick `E` is applied and published after dispatch at `E`; the newly activated destination first dispatches at `E + 1`.
-- A spawned omni row is born owned by the requesting client's GUID carried in the spawn the advancing update queues; its first tick's owned-entity rebuild registers it and reports it `Spawned`, and no pairing pass runs. That GUID is the persistent ownership key.
+- A spawned fleet ship row is born owned by the requesting client's GUID carried in the spawn the advancing update queues; its first tick's owned-entity rebuild registers it and reports it `Spawned`, and no pairing pass runs. That GUID is the persistent ownership key.
 - Fleet navigation defers flagship updates through `StatusChange`s. Within
   `ServerSession::BuildAdvancingFrameInputs`, which the engine
   `ServerBroadcaster::BuildFrameInputs` calls after its frame-input reset,

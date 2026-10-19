@@ -18,11 +18,15 @@ After `Documents/Plans/Game/FlightPlaneClimbing.md` ships sit on one of three
 planes (6, 50, 100 m) or climb between them with velocity Z always 0;
 `ShipTypes.h` offers `GetTargetFlightPlane`, and `ShipBehaviours.h` offers
 `FlightPlaneAtHeight` and `ClimbTowardsFlightPlane`.
-`Documents/Plans/Game/ShipTypeSplit.md` gives Fighters and Battleships the
-Spawn-phase blaster fire at the nearest enemy ship, Omnis `AcquireTarget`,
-`UpdateFacing`, `SpawnBlasters`, and `SpawnMissiles`, and the queries
-`FindNearestEnemyShip` and `BuildShipRegistryWindow`. Weapons still assume one
-plane. The user decided (this session, binding): Fighters and Battleships fire
+Fighters fire Spawn-phase blasters at the nearest enemy ship
+(`FightersPostRender::Spawn`, `FindNearestEnemyShip` at `Fighters.cpp:432`);
+Battleships fire each of their two Spawn-phase guns, forward and rear, straight
+at the nearest enemy inside that gun's arc (`FireGun`,
+`FindNearestEnemyShipInArc` at `Battleships.cpp:418`, called at `:473-474`);
+Omnis have `AcquireTarget`, `UpdateFacing`, `SpawnBlasters`, and
+`SpawnMissiles`; and `Ships/ShipQueries.h:77-97` offers
+`FindNearestEnemyShip`, `FindNearestEnemyShipInArc`, and
+`BuildShipRegistryWindow`. Weapons still assume one plane. The user decided (this session, binding): Fighters and Battleships fire
 flat on their own plane; Omnis pitch their blaster aim up or down at their
 target; a fired blaster flies in 3D; a missile stays on the plane it was
 launched on for its whole powered flight, as today (velocity Z zeroed, Z held),

@@ -127,7 +127,7 @@ static bool ReconcileRunTickCoord(CoordWork& rWork, int64_t iTick, game::FrameIn
 			game::ApplySpawnStatusChange(*pNext, rStatusChange, rWork.coord);
 			++iTransferCount;
 
-			if (rStatusChange.eType == game::kOwnedEntityTransferType)
+			if (game::IsOwnedEntityTransfer(rStatusChange))
 			{
 				if (iOwnedTransferCount < 8)
 				{

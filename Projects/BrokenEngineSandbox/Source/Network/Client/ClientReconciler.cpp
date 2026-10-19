@@ -2,7 +2,7 @@
 
 #include "Network/Client/ReconcileReplay.h"
 
-#include "Frame/Collections/Omnis/Omnis.h"
+#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Profile/ProfileRows.h"
 #include "Game.h"
 
@@ -13,12 +13,12 @@ namespace game
 
 static bool GetClientOwnedEntityPosition(const Frame& rFrame, XMVECTOR& rVecPosition)
 {
-	std::optional<int64_t> optionalClientOwnedEntityIndex = gpGame->ClientOwnedEntityIndex(*rFrame.postRender.pOmnis);
-	if (!optionalClientOwnedEntityIndex.has_value())
+	std::optional<ShipLocator> optionalClientOwnedEntity = gpGame->ClientOwnedEntity(rFrame);
+	if (!optionalClientOwnedEntity.has_value())
 	{
 		return false;
 	}
-	rVecPosition = rFrame.interpolate.pOmnis->pVecPositions[*optionalClientOwnedEntityIndex];
+	rVecPosition = ShipPosition(rFrame.interpolate, *optionalClientOwnedEntity);
 	return true;
 }
 

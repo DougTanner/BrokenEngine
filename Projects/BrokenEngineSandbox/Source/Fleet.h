@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Frame/Collections/Ships/ShipTypes.h"
+
 namespace game
 {
 
@@ -29,6 +31,8 @@ using FleetMemberFlags_t = common::Flags<FleetMemberFlags>;
 struct FleetMember
 {
 	engine::GlobalId globalId {};
+	// Fixed at the member's first spawn; every respawn spawns this type.
+	ShipType eType {};
 	FleetMemberFlags_t flags {};
 	engine::GridCoord coordinate {};
 	// Server-only automatic respawn countdown in seconds; read only while kIsDead is set, never saved or sent.

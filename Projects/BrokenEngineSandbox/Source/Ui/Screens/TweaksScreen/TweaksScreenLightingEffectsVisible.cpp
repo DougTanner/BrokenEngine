@@ -38,7 +38,7 @@ const engine::TweaksSliderMapRegistrar gLightingEffectsVisibleRegistrar
 	{"Omni Impact Visible Intensity Two", &gOmniImpactVisibleIntensityTwo},
 	{"Hex Shield Intensity Decay", &gHexShieldIntensityDecay},
 	{"Missile Exhaust Visible Intensity", &gMissileExhaustVisibleIntensity},
-	{"Enemy Blaster Visible Intensity", &gEnemyBlasterVisibleIntensity},
+	{"Fighter Blaster Visible Intensity", &gFighterBlasterVisibleIntensity},
 	{"Hit Flash Visible Area One", &gHitFlashVisibleAreaOne},
 	{"Hit Flash Visible Area Two", &gHitFlashVisibleAreaTwo},
 	{"Hit Flash Visible Intensity One", &gHitFlashVisibleIntensityOne},
@@ -96,10 +96,10 @@ void RenderLightingEffectsVisibleTab(engine::TweaksScreen& rScreen)
 		rScreen.WrapperSeparatorText("Missiles - Exhaust");
 		rScreen.WrapperSlider("Visible Intensity", iSection, 1.0f, "Missile Exhaust Visible Intensity");
 
-		rScreen.WrapperSeparatorText("Spaceships - Enemy Blaster");
-		rScreen.WrapperSlider("Visible Intensity", iSection, 1.0f, "Enemy Blaster Visible Intensity");
+		rScreen.WrapperSeparatorText("Fighters - Blaster");
+		rScreen.WrapperSlider("Visible Intensity", iSection, 1.0f, "Fighter Blaster Visible Intensity");
 
-		rScreen.WrapperSeparatorText("Spaceships - Hit Flash");
+		rScreen.WrapperSeparatorText("Fighters - Hit Flash");
 		rScreen.WrapperSlider("Visible Area One", iSection, 1.0f, "Hit Flash Visible Area One");
 		rScreen.WrapperSlider("Visible Area Two", iSection, 1.0f, "Hit Flash Visible Area Two");
 		rScreen.WrapperSlider("Visible Int One", iSection, 1.0f, "Hit Flash Visible Intensity One");

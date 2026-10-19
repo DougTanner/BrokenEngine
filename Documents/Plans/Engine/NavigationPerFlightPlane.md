@@ -20,9 +20,8 @@ The game hands the engine its
 flight-plane table at startup (`engine::gpFlightPlanes`: `Count()`, `Plane(i)`,
 `Lowest()`, `Highest()`, `FlightPlaneFlags::kTerrainCollision`; low 6 m and
 medium 50 m collide with terrain, high 100 m does not).
-`Documents/Plans/Game/ShipTypeSplit.md` moves navigation into
-`Frame/Collections/Ships/ShipBehaviours.cpp` `ComputeNavigation` and gives every
-ship `pOrders`. `Documents/Plans/Game/FlightPlaneClimbing.md` puts the target
+Ship navigation runs in `Frame/Collections/Ships/ShipBehaviours.cpp`
+`ComputeNavigation` (`:243`), and every ship carries `pOrders`. `Documents/Plans/Game/FlightPlaneClimbing.md` puts the target
 plane in `ShipOrders` bits 8-15 (`GetTargetFlightPlane`), derives the current
 plane from Z (`FlightPlaneAtHeight`), and, as a stopgap, flattens every
 `NavQuery*` argument to `Lowest()` so ships on every plane path around the

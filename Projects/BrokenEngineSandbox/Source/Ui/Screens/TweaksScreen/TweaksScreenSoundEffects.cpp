@@ -14,9 +14,9 @@ const engine::TweaksSliderMapRegistrar gSoundEffectsRegistrar
 	{"Omni Blaster Volume", &gOmniBlasterVolume},
 	{"Omni Blaster Pitch Min", &gOmniBlasterPitchMinimum},
 	{"Omni Blaster Pitch Random", &gOmniBlasterPitchRandom},
-	{"Enemy Blaster Volume", &gEnemyBlasterVolume},
-	{"Enemy Blaster Pitch Min", &gEnemyBlasterPitchMinimum},
-	{"Enemy Blaster Pitch Random", &gEnemyBlasterPitchRandom},
+	{"Fighter Blaster Volume", &gFighterBlasterVolume},
+	{"Fighter Blaster Pitch Min", &gFighterBlasterPitchMinimum},
+	{"Fighter Blaster Pitch Random", &gFighterBlasterPitchRandom},
 	{"Terrain Impact Volume", &gTerrainImpactVolume},
 	{"Missile Launch Volume", &gMissileLaunchVolume},
 	{"Missile Loop Volume", &gMissileLoopVolume},
@@ -28,10 +28,10 @@ const engine::TweaksSliderMapRegistrar gSoundEffectsRegistrar
 	{"Shield Down Volume", &gShieldDownVolume},
 	{"Armor Hit Volume Base", &gArmorHitVolumeBase},
 	{"Armor Hit Volume Scale", &gArmorHitVolumeScale},
-	{"Spaceship Death Volume", &gSpaceshipDeathVolume},
-	{"Spaceship Death Pitch Min", &gSpaceshipDeathPitchMinimum},
-	{"Spaceship Death Pitch Random", &gSpaceshipDeathPitchRandom},
-	{"Spaceship Hit Volume", &gSpaceshipHitVolume},
+	{"Fighter Death Volume", &gFighterDeathVolume},
+	{"Fighter Death Pitch Min", &gFighterDeathPitchMinimum},
+	{"Fighter Death Pitch Random", &gFighterDeathPitchRandom},
+	{"Fighter Hit Volume", &gFighterHitVolume},
 };
 
 void RenderSoundEffects(engine::TweaksScreen& rScreen)
@@ -45,8 +45,8 @@ void RenderSoundEffects(engine::TweaksScreen& rScreen)
 		rScreen.WrapperSeparatorText("Blasters - Omni");
 		rScreen.WrapperSlider("Volume", iSection, 1.0f, "Omni Blaster Volume");
 
-		rScreen.WrapperSeparatorText("Blasters - Enemy");
-		rScreen.WrapperSlider("Volume", iSection, 1.0f, "Enemy Blaster Volume");
+		rScreen.WrapperSeparatorText("Blasters - Fighter");
+		rScreen.WrapperSlider("Volume", iSection, 1.0f, "Fighter Blaster Volume");
 
 		rScreen.WrapperSeparatorText("Blasters - Terrain Impact");
 		rScreen.WrapperSlider("Volume", iSection, 1.0f, "Terrain Impact Volume");
@@ -67,9 +67,9 @@ void RenderSoundEffects(engine::TweaksScreen& rScreen)
 		rScreen.WrapperSlider("Hit Volume Base", iSection, 1.0f, "Armor Hit Volume Base");
 		rScreen.WrapperSlider("Hit Volume Scale", iSection, 1.0f, "Armor Hit Volume Scale");
 
-		rScreen.WrapperSeparatorText("Spaceships");
-		rScreen.WrapperSlider("Death Volume", iSection, 1.0f, "Spaceship Death Volume");
-		rScreen.WrapperSlider("Hit Volume", iSection, 1.0f, "Spaceship Hit Volume");
+		rScreen.WrapperSeparatorText("Fighters");
+		rScreen.WrapperSlider("Death Volume", iSection, 1.0f, "Fighter Death Volume");
+		rScreen.WrapperSlider("Hit Volume", iSection, 1.0f, "Fighter Hit Volume");
 
 		ImGui::TableNextColumn();
 
@@ -77,17 +77,17 @@ void RenderSoundEffects(engine::TweaksScreen& rScreen)
 		rScreen.WrapperSlider("Pitch Min", iSection, 1.0f, "Omni Blaster Pitch Min");
 		rScreen.WrapperSlider("Pitch Random", iSection, 1.0f, "Omni Blaster Pitch Random");
 
-		rScreen.WrapperSeparatorText("Blasters - Enemy");
-		rScreen.WrapperSlider("Pitch Min", iSection, 1.0f, "Enemy Blaster Pitch Min");
-		rScreen.WrapperSlider("Pitch Random", iSection, 1.0f, "Enemy Blaster Pitch Random");
+		rScreen.WrapperSeparatorText("Blasters - Fighter");
+		rScreen.WrapperSlider("Pitch Min", iSection, 1.0f, "Fighter Blaster Pitch Min");
+		rScreen.WrapperSlider("Pitch Random", iSection, 1.0f, "Fighter Blaster Pitch Random");
 
 		rScreen.WrapperSeparatorText("Missiles");
 		rScreen.WrapperSlider("Pitch Min", iSection, 1.0f, "Missile Pitch Min");
 		rScreen.WrapperSlider("Pitch Random", iSection, 1.0f, "Missile Pitch Random");
 
-		rScreen.WrapperSeparatorText("Spaceships");
-		rScreen.WrapperSlider("Death Pitch Min", iSection, 1.0f, "Spaceship Death Pitch Min");
-		rScreen.WrapperSlider("Death Pitch Random", iSection, 1.0f, "Spaceship Death Pitch Random");
+		rScreen.WrapperSeparatorText("Fighters");
+		rScreen.WrapperSlider("Death Pitch Min", iSection, 1.0f, "Fighter Death Pitch Min");
+		rScreen.WrapperSlider("Death Pitch Random", iSection, 1.0f, "Fighter Death Pitch Random");
 
 		ImGui::EndTable();
 	}

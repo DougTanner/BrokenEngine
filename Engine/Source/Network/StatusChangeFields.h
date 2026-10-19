@@ -55,6 +55,11 @@ void WriteStatusChangeField(uint8_t*& rpCursor, const VALUE& rValue)
 		std::underlying_type_t<decltype(rValue.meFlags)> uiValue = std::to_underlying(rValue.meFlags);
 		WriteBytes(rpCursor, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&uiValue), sizeof(uiValue)));
 	}
+	else if constexpr (std::is_enum_v<VALUE>)
+	{
+		std::underlying_type_t<VALUE> uiValue = std::to_underlying(rValue);
+		WriteBytes(rpCursor, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&uiValue), sizeof(uiValue)));
+	}
 	else
 	{
 		static_assert(false, "status-change payload has no wire form for this member type");
@@ -106,6 +111,12 @@ void ReadStatusChangeField(const uint8_t*& rpCursor, VALUE& rValue)
 		std::underlying_type_t<Enum> uiValue = 0;
 		ReadBytes(rpCursor, std::span<uint8_t>(reinterpret_cast<uint8_t*>(&uiValue), sizeof(uiValue)));
 		rValue.meFlags = static_cast<Enum>(uiValue);
+	}
+	else if constexpr (std::is_enum_v<VALUE>)
+	{
+		std::underlying_type_t<VALUE> uiValue = 0;
+		ReadBytes(rpCursor, std::span<uint8_t>(reinterpret_cast<uint8_t*>(&uiValue), sizeof(uiValue)));
+		rValue = static_cast<VALUE>(uiValue);
 	}
 	else
 	{

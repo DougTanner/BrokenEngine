@@ -47,8 +47,7 @@ counts; the focused server frame-edit module owns `edit_frame` and
   values included. A server-visible column added to or removed from a collection
   is added to or removed from that collection's list; the list's `static_assert`
   against its pair's `Members()` fails until it is. A server-visible collection
-  pair added to any frame tuple, or an explicitly dispatched pair added beside
-  `pOmnis` to the shared `FrameCollections` helper, fails the server build
+  pair added to any frame tuple fails the server build
   until a `FrameCollection` specialization names it and its column list, the
   only per-collection code; add its name to the `edit_frame` collection names of
   [`commands-server.md`](../../Documents/AgentHarness/commands-server.md). A new

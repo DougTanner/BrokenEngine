@@ -3,7 +3,7 @@
 #include "Frame/Collections/Collection.h"
 #include "Frame/CellStaticData.h"
 
-#include "Frame/Collections/Spaceships/Spaceships.h"
+#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
 
@@ -86,10 +86,10 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 	const MissilesPostRender& rPrevious = *rPreviousFrame.postRender.pMissiles;
 	std::chrono::duration<float> deltaTime(rFrame.interpolate.fDeltaTime);
 
-	// Before Spaceships Update, current registry ids and interpolated positions still align with previous rows.
+	// Before the ship Updates, current registry ids and interpolated positions still align with previous rows.
 	// Bind previous positions for retained-target homing, previous arrival grace for eligibility, and previous
 	// missile handles while current handles are being updated.
-	RegistryWindow window = BuildSpaceshipRegistryWindow(rFrame, rPreviousFrame.interpolate.pSpaceships->pVecPositions, rPreviousFrame.postRender.pSpaceships->pArrivalGracePeriods, *rPreviousFrame.postRender.pMissiles);
+	RegistryWindow window = BuildShipRegistryWindow(rFrame, &rPreviousFrame, *rPreviousFrame.postRender.pMissiles);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{

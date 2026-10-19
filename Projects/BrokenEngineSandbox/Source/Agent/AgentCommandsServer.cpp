@@ -57,11 +57,6 @@ bool ExecuteAgentCommandServer(std::string_view command, const nlohmann::json& r
 		CommandQueryFrame(rParameters, rResult);
 		return true;
 	}
-	if (command == "query_omnis")
-	{
-		CommandQueryOmnis(rParameters, rResult);
-		return true;
-	}
 	if (command == "query_collection")
 	{
 		CommandQueryCollection(rParameters, rResult);

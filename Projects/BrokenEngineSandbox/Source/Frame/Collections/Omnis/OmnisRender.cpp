@@ -3,52 +3,40 @@
 #include "Omnis.h"
 
 #include "Data/Scene.h"
-#include "Frame/FlightPlanes.h"
 #include "Graphics/Debug/DebugRender.h"
 
-#include "Frame/Collections/Spaceships/Spaceships.h"
+#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Profile/ProfileRows.h"
 #include "Game.h"
 
 namespace game
 {
 
-// Omni model (also used by Omnis.cpp for animation lookup in OmnisInterpolate::Update)
-#if 1
-extern const common::crc_t kOmniModel = data::kModelsspaceship2scenegltfCrc;
-constexpr float kfModelScale = 0.3667f;
-#endif
-
-#if 0
-extern const common::crc_t kOmniModel = data::kModelsblack_dragon_with_idle_animationscenegltfCrc;
-constexpr float kfModelScale = 2.0f;
-#endif
-#if 0
-extern const common::crc_t kOmniModel = data::kModelschernovan_nemesisscenegltfCrc;
-constexpr float kfModelScale = 2.0f;
-#endif
-#if 0
-extern const common::crc_t kOmniModel = data::kModelsmirascenegltfCrc;
-constexpr float kfModelScale = 0.0667f;
-#endif
-#if 0
-extern const common::crc_t kOmniModel = data::kModelsDamagedHelmetDamagedHelmetgltfCrc;
-constexpr float kfModelScale = 13.333f;
-#endif
-#if 0
-extern const common::crc_t kOmniModel = data::kModelsSpaceshipscenegltfCrc;
-constexpr float kfModelScale = 0.0667f;
-#endif
+// Placeholder models, one per ShipController (also used by Omnis.cpp for animation lookup in OmnisInterpolate::Update).
+extern const common::crc_t kOmniFleetModel = data::kModelsspaceship2scenegltfCrc;
+constexpr float kfOmniFleetModelScale = 0.3667f;
+extern const common::crc_t kOmniRandomModel = data::kModelsSpaceshipscenegltfCrc;
+constexpr float kfOmniRandomModelScale = 0.00175f;
 
 constexpr float kfDeathShrinkPower = 2.0f;
 
+// One model pipeline per ShipController, indexed by it.
+constexpr int64_t kiPipelineCount = std::to_underlying(ShipController::kCount);
+constexpr std::array<const char*, kiPipelineCount> kpcPipelineNames {"OmnisFleet", "OmnisRandom"};
+constexpr std::array<common::crc_t, kiPipelineCount> kuiPipelineCrcs {common::CrcConsteval("OmnisFleet"), common::CrcConsteval("OmnisRandom")};
+constexpr std::array<float, kiPipelineCount> kfModelScales {kfOmniFleetModelScale, kfOmniRandomModelScale};
+const std::array<common::crc_t, kiPipelineCount> kuiModels {kOmniFleetModel, kOmniRandomModel};
+
 void OmnisInterpolate::GraphicsResources()
 {
-	engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kCrc, engine::kBufferMain, kpcName, sizeof(shaders::ModelLayout));
-	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(kCrc, kpcName, kOmniModel, pStorageBuffers);
+	for (int64_t i = 0; i < kiPipelineCount; ++i)
+	{
+		engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kuiPipelineCrcs[i], engine::kBufferMain, kpcPipelineNames[i], sizeof(shaders::ModelLayout));
+		engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(kuiPipelineCrcs[i], kpcPipelineNames[i], kuiModels[i], pStorageBuffers);
+	}
 }
 
-static int64_t siRendered = 0;
+static std::array<int64_t, kiPipelineCount> siRendered {};
 // Non-concurrency tripwire: per-frame Render calls must run sequentially across active coords — siRendered
 // accumulates across them and offsets each call's slab writes. Parallelizing coord renders would race.
 static std::atomic<bool> sbRenderActive = false;
@@ -72,37 +60,35 @@ struct [[nodiscard]] OmnisRenderActiveGuard
 
 // Every position here is local to the rendered cell, so each one converts into the camera cell's frame where it is
 // handed to the debug renderer; the distances and directions are computed in the local frame, which is the same.
-static void XM_CALLCONV RenderCombatAim(const SpaceshipsInterpolate& __restrict rSpaceships, const SpaceshipsPostRender& __restrict rSpaceshipsPostRender, FXMVECTOR vecPosition, FXMVECTOR vecWantedDirection, const engine::RenderBasis& rBasis)
+static void XM_CALLCONV RenderCombatAim(const FrameInterpolate& rFrameInterpolate, const FramePostRender& rRenderPostRender, FXMVECTOR vecPosition, FXMVECTOR vecWantedDirection, engine::AlignmentIdentifier alignment)
 {
+	const engine::RenderBasis& rBasis = rFrameInterpolate.renderBasis;
 	float fClosestDistanceSquared = std::numeric_limits<float>::max();
 	XMVECTOR vecClosestPosition = XMVectorZero();
-	int64_t iClosestSpaceship = -1;
+	XMVECTOR vecClosestVelocity = XMVectorZero();
+	bool bFound = false;
 
-	for (int64_t j = 0; j < rSpaceships.iCount; ++j)
+	ForEachEnemyShip(rFrameInterpolate, rRenderPostRender, alignment, [&]([[maybe_unused]] ShipLocator locator, FXMVECTOR vecEnemyPosition, FXMVECTOR vecEnemyVelocity)
 	{
-		if (rSpaceships.pDestroyedTimes[j] != std::chrono::duration<float>(-1.0f))
-		{
-			continue;
-		}
-
-		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, rSpaceships.pVecPositions[j])));
+		float fDistanceSquared = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, vecEnemyPosition)));
 		if (fDistanceSquared < fClosestDistanceSquared)
 		{
 			fClosestDistanceSquared = fDistanceSquared;
-			vecClosestPosition = rSpaceships.pVecPositions[j];
-			iClosestSpaceship = j;
+			vecClosestPosition = vecEnemyPosition;
+			vecClosestVelocity = vecEnemyVelocity;
+			bFound = true;
 		}
-	}
+	});
 
-	if (iClosestSpaceship >= 0)
+	if (bFound)
 	{
-		// Yellow reticle at the lead-intercept point: where the omni must aim so blasters land on the moving spaceship
-		XMVECTOR vecLead = common::ComputeLeadPosition(vecPosition, vecClosestPosition, rSpaceshipsPostRender.pVecVelocities[iClosestSpaceship], kfOmniBlastersSpeed);
+		// Yellow reticle at the lead-intercept point: where the omni must aim so blasters land on the moving enemy ship
+		XMVECTOR vecLead = common::ComputeLeadPosition(vecPosition, vecClosestPosition, vecClosestVelocity, kfOmniBlastersSpeed);
 		XMFLOAT3A f3Lead {};
 		XMStoreFloat3A(&f3Lead, engine::Rebase(rBasis, vecLead));
 		engine::DebugRender::Circle(f3Lead, kfOmniRadius * 0.5f, {1.0f, 1.0f, 0.0f, 1.0f});
 
-		// The red line uses PostRender's wanted-aim direction; the yellow reticle recomputes the nearest alive spaceship's intercept from interpolated positions.
+		// The red line uses PostRender's wanted-aim direction; the yellow reticle recomputes the nearest alive enemy ship's intercept from interpolated positions.
 		float fDistanceToLead = common::Distance(vecPosition, vecLead);
 		XMVECTOR vecLineEnd = XMVectorAdd(vecPosition, XMVectorScale(vecWantedDirection, fDistanceToLead));
 		XMFLOAT3A f3Start {};
@@ -113,68 +99,9 @@ static void XM_CALLCONV RenderCombatAim(const SpaceshipsInterpolate& __restrict 
 	}
 }
 
-static std::pair<bool, XMVECTOR> FindFlagshipPosition(const OmnisInterpolate& __restrict rOmnis, const OmnisPostRender& __restrict rPostRender, int64_t i, int64_t iCount)
-{
-	for (int64_t j = 0; j < iCount; ++j)
-	{
-		if (j == i)
-		{
-			continue;
-		}
-		if (!(rPostRender.pFlags[j] & OmniFlags::kIsFlagship))
-		{
-			continue;
-		}
-		return {true, rOmnis.pVecPositions[j]};
-	}
-
-	return {false, XMVectorZero()};
-}
-
-static void XM_CALLCONV RenderNavigation(const OmnisInterpolate& __restrict rOmnis, const OmnisPostRender& __restrict rPostRender, int64_t i, int64_t iCount, FXMVECTOR vecPosition, const engine::RenderBasis& rBasis)
-{
-	int64_t iNavigationDirection = GetNavigationDirection(rPostRender.pFlags[i]);
-	bool bFlagshipFound = false;
-	XMVECTOR vecFlagshipPosition = XMVectorZero();
-	if (iNavigationDirection == 5)
-	{
-		auto [bFound, vecFoundPosition] = FindFlagshipPosition(rOmnis, rPostRender, i, iCount);
-		bFlagshipFound = bFound;
-		vecFlagshipPosition = vecFoundPosition;
-	}
-
-	if (XMVectorGetW(rPostRender.pVecDebugNavigationWaypoints[i]) > 0.0f && (iNavigationDirection != 5 || bFlagshipFound))
-	{
-		// In mode 5 (flagship follow), use the flagship's interpolated position as the waypoint
-		XMVECTOR vecWaypoint = (iNavigationDirection == 5) ? vecFlagshipPosition : rPostRender.pVecDebugNavigationWaypoints[i];
-		XMFLOAT3A f3NavigationStart {};
-		XMFLOAT3A f3NavigationEnd {};
-		XMStoreFloat3A(&f3NavigationStart, engine::Rebase(rBasis, vecPosition));
-		XMStoreFloat3A(&f3NavigationEnd, engine::Rebase(rBasis, XMVectorSetZ(vecWaypoint, engine::gpFlightPlanes->Lowest().fHeightMeters)));
-		engine::DebugRender::Line(f3NavigationStart, f3NavigationEnd, {0.0f, 1.0f, 0.0f, 1.0f});
-		engine::DebugRender::Circle(f3NavigationEnd, kfOmniRadius * 0.5f, {0.0f, 1.0f, 0.0f, 1.0f});
-	}
-
-	if (iNavigationDirection == 5)
-	{
-		if (bFlagshipFound)
-		{
-			XMFLOAT3A f3Destination {};
-			XMStoreFloat3A(&f3Destination, engine::Rebase(rBasis, XMVectorSetZ(vecFlagshipPosition, engine::gpFlightPlanes->Lowest().fHeightMeters)));
-			engine::DebugRender::Circle(f3Destination, kfOmniRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
-		}
-	}
-	else if (XMVectorGetW(rPostRender.pVecIslandDestinations[i]) > 0.0f)
-	{
-		XMFLOAT3A f3Destination {};
-		XMStoreFloat3A(&f3Destination, engine::Rebase(rBasis, XMVectorSetZ(rPostRender.pVecIslandDestinations[i], engine::gpFlightPlanes->Lowest().fHeightMeters)));
-		engine::DebugRender::Circle(f3Destination, kfOmniRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
-	}
-}
-
 void OmnisInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
 {
-	siRendered = 0;
+	siRendered = {};
 
 	int64_t iTotalCapacity = engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const OmnisInterpolate&
 	{
@@ -186,42 +113,45 @@ void OmnisInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, cons
 		return;
 	}
 
-	if (engine::Buffer* pBuffer = engine::gpBufferManager->ResizeDynamicBufferIfNeeded(kCrc, engine::kBufferMain, kpcName, sizeof(shaders::ModelLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
+	// Any row can use either pipeline, so each reserves the whole capacity.
+	for (int64_t i = 0; i < kiPipelineCount; ++i)
 	{
-		engine::gpPipelineManager->mDynamicPipelines.UpdateModelPipelineDescriptors(kCrc, iCommandBuffer, 2, pBuffer);
+		if (engine::Buffer* pBuffer = engine::gpBufferManager->ResizeDynamicBufferIfNeeded(kuiPipelineCrcs[i], engine::kBufferMain, kpcPipelineNames[i], sizeof(shaders::ModelLayout), iTotalCapacity, iCommandBuffer); pBuffer != nullptr)
+		{
+			engine::gpPipelineManager->mDynamicPipelines.UpdateModelPipelineDescriptors(kuiPipelineCrcs[i], iCommandBuffer, 2, pBuffer);
+		}
 	}
 }
 
-void OmnisInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer)
+// Draws the rows whose controller selects iPipeline into that pipeline's buffer.
+static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const OmnisPostRender& __restrict rPostRender, const engine::RenderBasis& rBasis, int64_t iPipeline, int64_t iCommandBuffer)
 {
-	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerRenderOmnis);
-
-	const OmnisInterpolate& rCurrent = *rFrameInterpolate.pOmnis;
-	const engine::RenderBasis& rBasis = rFrameInterpolate.renderBasis;
-
-	int64_t iCount = rCurrent.iCount;
-
-	if (iCount == 0)
+	int64_t iCount = 0;
+	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		return;
+		iCount += std::to_underlying(rPostRender.pController[i]) == iPipeline ? 1 : 0;
 	}
 
-	OmnisRenderActiveGuard renderActiveGuard;
-
-	auto [pOmniLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kCrc, engine::kBufferMain, iCommandBuffer);
-	ASSERT(siRendered + rCurrent.iCount <= iBufferCapacity);
+	auto [pOmniLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiPipelineCrcs[iPipeline], engine::kBufferMain, iCommandBuffer);
+	ASSERT(siRendered[iPipeline] + iCount <= iBufferCapacity);
 
 	const engine::AnimationData* pAnimationData = nullptr;
 	engine::SkinningReservation skinningReservation {};
-	if (engine::gAnimationDataMap.contains(kOmniModel))
+	if (engine::gAnimationDataMap.contains(kuiModels[iPipeline]))
 	{
-		pAnimationData = &engine::gAnimationDataMap.at(kOmniModel);
+		pAnimationData = &engine::gAnimationDataMap.at(kuiModels[iPipeline]);
 		skinningReservation = pAnimationData->ReserveSkinning(iCommandBuffer, iCount);
 	}
 
-	for (int64_t i = 0; i < iCount; ++i)
+	int64_t iInstance = 0;
+	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		float fSize = kfOmniRadius * kfModelScale;
+		if (std::to_underlying(rPostRender.pController[i]) != iPipeline)
+		{
+			continue;
+		}
+
+		float fSize = kfOmniRadius * kfModelScales[iPipeline];
 		if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
 		{
 			fSize *= std::pow(rCurrent.pDestroyedTimes[i] / kDestroyTime, kfDeathShrinkPower);
@@ -240,7 +170,7 @@ void OmnisInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpola
 		auto matRotationAccelerationY = XMMatrixRotationX(rCurrent.pfRotationAccelerationYs[i]);
 		auto matTransform = XMMatrixMultiply(matRotationX, XMMatrixMultiply(matRotationY, XMMatrixMultiply(matRotationZ, XMMatrixMultiply(matRotationAccelerationX, XMMatrixMultiply(matRotationAccelerationY, XMMatrixMultiply(matScaling, matTranslation))))));
 
-		shaders::ModelLayout& rOmniLayout = pOmniLayouts[siRendered];
+		shaders::ModelLayout& rOmniLayout = pOmniLayouts[siRendered[iPipeline]];
 		XMStoreFloat4(&rOmniLayout.f4Position, vecPosition);
 
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rOmniLayout.f3x4Transform[0]), matTransform);
@@ -250,16 +180,43 @@ void OmnisInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpola
 
 		if (pAnimationData != nullptr)
 		{
-			rOmniLayout.uiMeshDataBase = static_cast<uint32_t>(pAnimationData->EvaluateInstance(skinningReservation, i, rCurrent.pAnimationTimes[i].count()));
+			rOmniLayout.uiMeshDataBase = static_cast<uint32_t>(pAnimationData->EvaluateInstance(skinningReservation, iInstance, rCurrent.pAnimationTimes[i].count()));
 		}
 
-		++siRendered;
+		++iInstance;
+		++siRendered[iPipeline];
+	}
+}
+
+void OmnisInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer)
+{
+	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerRenderOmnis);
+
+	const OmnisInterpolate& rCurrent = *rFrameInterpolate.pOmnis;
+	const engine::RenderBasis& rBasis = rFrameInterpolate.renderBasis;
+
+	if (rCurrent.iCount == 0)
+	{
+		return;
+	}
+
+	OmnisRenderActiveGuard renderActiveGuard;
+
+	// The interpolated rows align with the snapshot they were interpolated from, which holds each row's controller.
+	const OmnisPostRender& rPostRender = *gpGame->RenderFrame(rBasis.coordinate).postRender.pOmnis;
+
+	for (int64_t i = 0; i < kiPipelineCount; ++i)
+	{
+		RenderPipeline(rCurrent, rPostRender, rBasis, i, iCommandBuffer);
 	}
 }
 
 void OmnisInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 {
-	engine::gpPipelineManager->mDynamicPipelines.WriteModelPipelineIndirectBuffers(kCrc, iCommandBuffer, siRendered);
+	for (int64_t i = 0; i < kiPipelineCount; ++i)
+	{
+		engine::gpPipelineManager->mDynamicPipelines.WriteModelPipelineIndirectBuffers(kuiPipelineCrcs[i], iCommandBuffer, siRendered[i]);
+	}
 }
 
 void OmnisInterpolate::DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate)
@@ -273,17 +230,17 @@ void OmnisInterpolate::DebugRender(const FrameInterpolate& __restrict rFrameInte
 	// never from PostRender. PostRender positions lag behind the rendered frame.
 	// Only flags, metadata, and static world positions (nav waypoints, island destinations) come from PostRender.
 	const OmnisInterpolate& rOmnis = *rFrameInterpolate.pOmnis;
-	const SpaceshipsInterpolate& rSpaceships = *rFrameInterpolate.pSpaceships;
-	const OmnisPostRender& rPostRender = *gpGame->RenderFrame(coordinate).postRender.pOmnis;
-	const SpaceshipsPostRender& rSpaceshipsPostRender = *gpGame->RenderFrame(coordinate).postRender.pSpaceships;
+	const Frame& rRenderFrame = gpGame->RenderFrame(coordinate);
+	const OmnisPostRender& rPostRender = *rRenderFrame.postRender.pOmnis;
 
-	int64_t iCount = rOmnis.iCount;
-
-	for (int64_t i = 0; i < iCount; ++i)
+	for (int64_t i = 0; i < rOmnis.iCount; ++i)
 	{
 		XMVECTOR vecPosition = rOmnis.pVecPositions[i];
-		RenderCombatAim(rSpaceships, rSpaceshipsPostRender, vecPosition, rPostRender.pVecWantedDirections[i], rFrameInterpolate.renderBasis);
-		RenderNavigation(rOmnis, rPostRender, i, iCount, vecPosition, rFrameInterpolate.renderBasis);
+		RenderCombatAim(rFrameInterpolate, rRenderFrame.postRender, vecPosition, rPostRender.pVecWantedDirections[i], rPostRender.pAlignments[i]);
+		if (rPostRender.pController[i] == ShipController::kFleet)
+		{
+			DebugRenderNavigation(rFrameInterpolate, rRenderFrame, vecPosition, rPostRender.pVecDebugNavigationWaypoints[i], rPostRender.pVecIslandDestinations[i], rPostRender.pFlags[i], rPostRender.pFlagshipGlobalIds[i], kfOmniRadius);
+		}
 	}
 }
 

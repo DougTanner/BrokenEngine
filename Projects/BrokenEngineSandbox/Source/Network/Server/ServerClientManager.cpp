@@ -4,7 +4,7 @@
 
 #include "Network/Server/ServerTransferManager.h"
 
-#include "Frame/Collections/Omnis/Omnis.h"
+#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
@@ -15,7 +15,7 @@ namespace game
 
 #if defined(BT_SERVER)
 
-void ServerClientManager::QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId)
+void ServerClientManager::QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId, ShipType eType)
 {
 	// Dedup only the queue push on the full spawn identity so a client spamming spawn-into/respawn queues at most one spawn
 	// per (fleet guid, member). Skip duplicates without reordering — request order is the order spawns are queued for the
@@ -26,7 +26,7 @@ void ServerClientManager::QueueSpawnForClient(int64_t iClientId, const engine::C
 	});
 	if (!bAlreadyQueued)
 	{
-		mClientsWaitingForSpawn.push_back({.iClientId = iClientId, .clientGuid = rClientGuid, .fleetGuid = rFleetGuid, .memberGlobalId = memberGlobalId});
+		mClientsWaitingForSpawn.push_back({.iClientId = iClientId, .clientGuid = rClientGuid, .fleetGuid = rFleetGuid, .memberGlobalId = memberGlobalId, .eType = eType});
 	}
 }
 
@@ -78,16 +78,24 @@ void ServerClientManager::LogConnectingClientDiagnostic(const engine::ClientConn
 	}
 	for (const auto& [rCoordinate, rCell] : gpGame->mCells)
 	{
-		const OmnisPostRender& rOmnis = *rCell.pCurrent->postRender.pOmnis;
-		if (rOmnis.iCount == 0)
+		const Frame& rFrame = *rCell.pCurrent;
+		int64_t iOwnedCount = Frame::OwnedEntityCount(rFrame);
+		if (iOwnedCount == 0)
 		{
 			continue;
 		}
-		LOG(kNetwork, kInfo, "  Coord: ({},{}) OmniCount: {}", rCoordinate.iX, rCoordinate.iY, rOmnis.iCount);
-		for (int64_t i = 0; i < rOmnis.iCount; ++i)
+		LOG(kNetwork, kInfo, "  Coord: ({},{}) OwnedCount: {}", rCoordinate.iX, rCoordinate.iY, iOwnedCount);
+		ForEachShipType(rFrame, [&](ShipType eType, [[maybe_unused]] const auto& rInterpolate, const auto& rPostRender)
 		{
-			LOG(kNetwork, kInfo, "    Global: {} Guid: ({},{}) Match: {}", rOmnis.pGlobalIds[i].iValue, rOmnis.pClientGuids[i].uiHigh, rOmnis.pClientGuids[i].uiLow, rOmnis.pClientGuids[i] == rClient.clientGuid);
-		}
+			for (int64_t i = 0; i < rPostRender.iCount; ++i)
+			{
+				if (rPostRender.pController[i] != ShipController::kFleet)
+				{
+					continue;
+				}
+				LOG(kNetwork, kInfo, "    Type: {} Global: {} Guid: ({},{}) Match: {}", ShipTypeName(eType), rPostRender.pGlobalIds[i].iValue, rPostRender.pClientGuids[i].uiHigh, rPostRender.pClientGuids[i].uiLow, rPostRender.pClientGuids[i] == rClient.clientGuid);
+			}
+		});
 	}
 }
 
@@ -108,37 +116,52 @@ void ServerClientManager::SpawnWaitingClients()
 			: engine::GlobalId {.iValue = gpGame->miNextGlobalId++};
 
 		bool bIsFlagship = false;
+		engine::GlobalId flagshipGlobalId {};
 		engine::GridCoord spawnFleetWantedCoordinate {};
 		int64_t iSpawnPendingFleetTicks = 0;
 		if ((rClientSpawnInformation.fleetGuid.uiHigh != 0 || rClientSpawnInformation.fleetGuid.uiLow != 0))
 		{
 			ServerFleetManager::FleetLookupResult result = gpServerSession->mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.memberGlobalId);
 			bIsFlagship = result.flags & ServerFleetManager::FleetLookupFlags::kIsFlagship;
+			// A flagship spawn follows itself; an empty fleet's first ship gets its ID only above, so the lookup cannot name it.
+			flagshipGlobalId = bIsFlagship ? globalId : result.flagshipGlobalId;
 			spawnFleetWantedCoordinate = result.fleetWantedCoord;
 			iSpawnPendingFleetTicks = result.iPendingFleetWantedCoordTicks;
 		}
 
-		OmniFlags_t spawnFlags {OmniFlags::kBlasterSpawnLeft};
+		ShipOrders_t spawnOrders {};
 		if (bIsFlagship)
 		{
-			spawnFlags.Set(OmniFlags::kIsFlagship);
+			spawnOrders.Set(ShipOrders::kIsFlagship);
 		}
 
 		// miTickCounter + 1 is the next tick; its post-tick batch creates the row. The requesting client's GUID rides the
 		// spawn, so that row is born owned.
-		gpServerSession->mpTransferManager->QueueSpawn(engine::kOriginCoordinate, gpGame->miTickCounter + 1, MakeSpawn(OmnisPostRender::SpawnInfo
+		auto QueueFleetSpawn = [&](auto spawnInfo)
 		{
-			.vecPosition = XMVectorSet(kfFleetSpawnOffsetX, kfFleetSpawnOffsetY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f),
-			.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f),
-			.alignment = gpGame->mOmniAlignment,
-			.flags = spawnFlags,
-			.arrivalGracePeriod = kArrivalGracePeriod,
-			.globalId = globalId,
-			.clientGuid = rClientSpawnInformation.clientGuid,
-			.fleetWantedCoordinate = spawnFleetWantedCoordinate,
-			.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(iSpawnPendingFleetTicks),
-		}));
-		LOG(kNetwork, kVerbose, "ServerClientManager::SpawnWaitingClients::kSpawnOmni Client: {} GlobalId: {} Coord: ({},{}) Flagship: {}", rClientSpawnInformation.iClientId, globalId.iValue, engine::kOriginCoordinate.iX, engine::kOriginCoordinate.iY, bIsFlagship);
+			spawnInfo.vecPosition = XMVectorSet(kfFleetSpawnOffsetX, kfFleetSpawnOffsetY, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
+			spawnInfo.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+			spawnInfo.alignment = gpGame->mFleetAlignment;
+			spawnInfo.eController = ShipController::kFleet;
+			spawnInfo.orders = spawnOrders;
+			spawnInfo.arrivalGracePeriod = kArrivalGracePeriod;
+			spawnInfo.globalId = globalId;
+			spawnInfo.clientGuid = rClientSpawnInformation.clientGuid;
+			spawnInfo.flagshipGlobalId = flagshipGlobalId;
+			spawnInfo.fleetWantedCoordinate = spawnFleetWantedCoordinate;
+			spawnInfo.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(iSpawnPendingFleetTicks);
+			gpServerSession->mpTransferManager->QueueSpawn(engine::kOriginCoordinate, gpGame->miTickCounter + 1, MakeSpawn(spawnInfo));
+		};
+		switch (rClientSpawnInformation.eType)
+		{
+			case ShipType::kFighter:    QueueFleetSpawn(FightersPostRender::SpawnInfo {}); break;
+			case ShipType::kOmni:       QueueFleetSpawn(OmnisPostRender::SpawnInfo {}); break;
+			case ShipType::kBattleship: QueueFleetSpawn(BattleshipsPostRender::SpawnInfo {}); break;
+			case ShipType::kCount:
+				ASSERT(false);
+				std::unreachable();
+		}
+		LOG(kNetwork, kVerbose, "ServerClientManager::SpawnWaitingClients Type: {} Client: {} GlobalId: {} Coord: ({},{}) Flagship: {} FlagshipGlobalId: {}", ShipTypeName(rClientSpawnInformation.eType), rClientSpawnInformation.iClientId, globalId.iValue, engine::kOriginCoordinate.iX, engine::kOriginCoordinate.iY, bIsFlagship, flagshipGlobalId.iValue);
 
 		// A client spawning this update is not handled again by NewClients after another of its queued spawns drops.
 		mProcessedClientIds.insert(rClientSpawnInformation.iClientId);

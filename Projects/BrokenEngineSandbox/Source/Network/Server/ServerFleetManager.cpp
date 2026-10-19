@@ -2,7 +2,7 @@
 
 #include "Network/Server/ServerFleetManager.h"
 
-#include "Frame/Collections/Omnis/Omnis.h"
+#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetSerialization.h"
 #include "Network/Server/ServerSession.h"
@@ -131,8 +131,8 @@ void ServerFleetManager::ProcessSpawnIntoFleetRequests()
 			continue;
 		}
 
-		gpServerSession->mpClientManager->QueueSpawnForClient(rRequest.iClientId, guid, rRequest.fleetGuid, {});
-		LOG(kNetwork, kDebug, "ServerFleetManager::ProcessSpawnIntoFleetRequests Client: {} FleetGuid: ({},{})", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow);
+		gpServerSession->mpClientManager->QueueSpawnForClient(rRequest.iClientId, guid, rRequest.fleetGuid, {}, rRequest.eType);
+		LOG(kNetwork, kDebug, "ServerFleetManager::ProcessSpawnIntoFleetRequests Client: {} FleetGuid: ({},{}) Type: {}", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow, ShipTypeName(rRequest.eType));
 	}
 
 	mPendingSpawnIntoFleetRequests.clear();
@@ -166,7 +166,7 @@ void ServerFleetManager::ProcessRespawnInFleetRequests()
 			continue;
 		}
 
-		gpServerSession->mpClientManager->QueueSpawnForClient(rRequest.iClientId, guid, rRequest.fleetGuid, rRequest.memberGlobalId);
+		gpServerSession->mpClientManager->QueueSpawnForClient(rRequest.iClientId, guid, rRequest.fleetGuid, rRequest.memberGlobalId, memberIt->eType);
 		LOG(kNetwork, kDebug, "ServerFleetManager::ProcessRespawnInFleetRequests Client: {} FleetGuid: ({},{}) Member: {}", rRequest.iClientId, rRequest.fleetGuid.uiHigh, rRequest.fleetGuid.uiLow, rRequest.memberGlobalId.iValue);
 	}
 
@@ -208,7 +208,7 @@ void ServerFleetManager::TickRespawnTimers()
 					continue;
 				}
 
-				gpServerSession->mpClientManager->QueueSpawnForClient(iClientId, rGuid, rFleet.guid, rMember.globalId);
+				gpServerSession->mpClientManager->QueueSpawnForClient(iClientId, rGuid, rFleet.guid, rMember.globalId, rMember.eType);
 				LOG(kNetwork, kDebug, "ServerFleetManager::TickRespawnTimers Client: {} FleetGuid: ({},{}) Member: {}", iClientId, rFleet.guid.uiHigh, rFleet.guid.uiLow, rMember.globalId.iValue);
 			}
 		}
@@ -314,7 +314,7 @@ void ServerFleetManager::OnOwnedEntitySpawned(int64_t iClientId, const engine::C
 			LOG(kNetwork, kWarning, "ServerFleetManager::OnOwnedEntitySpawned Client: {} FleetGuid: ({},{}) at member cap {}, ignoring spawn", iClientId, rFleet.guid.uiHigh, rFleet.guid.uiLow, kiMaximumFleetMembers);
 			return;
 		}
-		rFleet.members.push_back(FleetMember {.globalId = globalId, .coordinate = engine::kOriginCoordinate});
+		rFleet.members.push_back(FleetMember {.globalId = globalId, .eType = rSpawnInfo.eType, .coordinate = engine::kOriginCoordinate});
 	}
 
 	auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId);
@@ -488,7 +488,7 @@ ServerFleetManager::FleetLookupResult ServerFleetManager::LookupFleetWantedCoord
 
 	FleetLookupFlags_t flags {FleetLookupFlags::kFound};
 	flags.Set(FleetLookupFlags::kIsFlagship, bIsFlagship);
-	return {.flags = flags, .fleetWantedCoord = rFleet.wantedCoordinate, .iPendingFleetWantedCoordTicks = rFleet.uiPendingFleetWantedCoordinateTicks};
+	return {.flags = flags, .flagshipGlobalId = rFleet.flagshipGlobalId, .fleetWantedCoord = rFleet.wantedCoordinate, .iPendingFleetWantedCoordTicks = rFleet.uiPendingFleetWantedCoordinateTicks};
 }
 
 void ServerFleetManager::DetectDisconnectedOwnedEntityDeaths()
@@ -519,18 +519,7 @@ void ServerFleetManager::DetectDisconnectedOwnedEntityDeaths()
 					continue;
 				}
 
-				const OmnisPostRender& rOmnis = *(*gpGame->mCells.at(rMember.coordinate).pCurrent).postRender.pOmnis;
-				bool bFound = false;
-				for (int64_t k = 0; k < rOmnis.iCount; ++k)
-				{
-					if (rOmnis.pGlobalIds[k] == rMember.globalId)
-					{
-						bFound = true;
-						break;
-					}
-				}
-
-				if (!bFound)
+				if (!FindShipByGlobalId(*gpGame->mCells.at(rMember.coordinate).pCurrent, rMember.globalId))
 				{
 					rMember.flags.Set(FleetMemberFlags::kIsDead);
 					if (rMember.globalId == rFleet.flagshipGlobalId)

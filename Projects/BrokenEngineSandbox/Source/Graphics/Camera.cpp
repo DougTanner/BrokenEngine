@@ -4,7 +4,7 @@
 
 #include "Ui/GraphicsSettingsWrappersBase.h"
 
-#include "Frame/Collections/Omnis/Omnis.h"
+#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/Frame.h"
 #include "Game.h"
 
@@ -32,20 +32,19 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 	}
 
 	// The interpolate's own cell, not the client cell: its positions are local to that cell, and the camera works in
-	// that same frame, so a target taken from it needs no conversion. Reading the index from a different cell's
-	// omnis would pick a position a whole cell away.
+	// that same frame, so a target taken from it needs no conversion.
 	engine::GridCoord coordinate = rGameInterpolate.renderBasis.coordinate;
 	auto it = gpGame->mCells.find(coordinate);
 	bool bHasCoordinate = it != gpGame->mCells.end() && it->second.iSnapshotCount > 0;
-	std::optional<int64_t> optionalOwnedEntityIndex = bHasCoordinate ? gpGame->ClientOwnedEntityIndex(*gpGame->RenderFrame(coordinate).postRender.pOmnis) : std::nullopt;
-	if (optionalOwnedEntityIndex)
+	std::optional<ShipLocator> optionalOwnedEntity = bHasCoordinate ? gpGame->ClientOwnedEntity(gpGame->RenderFrame(coordinate)) : std::nullopt;
+	if (optionalOwnedEntity)
 	{
 		engine::GlobalId focusedOwnedEntityIdentifier = gpGame->ClientOwnedEntityIdentifier();
-		XMVECTOR vecOwnedEntityPosition = rGameInterpolate.pOmnis->pVecPositions[*optionalOwnedEntityIndex];
+		XMVECTOR vecOwnedEntityPosition = ShipPosition(rGameInterpolate, *optionalOwnedEntity);
 
 		if (focusedOwnedEntityIdentifier != mLastTrackedOwnedEntityIdentifier)
 		{
-			LOG(kGraphics, kVerbose, "Camera NowTracking GlobalId: {} Coord: ({},{}) Index: {}", focusedOwnedEntityIdentifier, coordinate.iX, coordinate.iY, *optionalOwnedEntityIndex);
+			LOG(kGraphics, kVerbose, "Camera NowTracking GlobalId: {} Coord: ({},{}) Type: {} Row: {}", focusedOwnedEntityIdentifier, coordinate.iX, coordinate.iY, ShipTypeName(optionalOwnedEntity->eType), optionalOwnedEntity->iRow);
 			mLastTrackedOwnedEntityIdentifier = focusedOwnedEntityIdentifier;
 		}
 
@@ -58,12 +57,15 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 		sLastLogTime = std::chrono::duration<float>(mfTime);
 		if (bHasCoordinate)
 		{
-			const OmnisPostRender& rOmnis = *gpGame->RenderFrame(coordinate).postRender.pOmnis;
-			LOG(kGraphics, kVerbose, "Camera OwnedEntityNotFound FocusedGlobalId: {} Coord: ({},{}) PostRenderCount: {} InterpolateCount: {}", gpGame->ClientOwnedEntityIdentifier(), coordinate.iX, coordinate.iY, rOmnis.iCount, rGameInterpolate.pOmnis->iCount);
-			for (int64_t i = 0; i < rOmnis.iCount; ++i)
+			LOG(kGraphics, kVerbose, "Camera OwnedEntityNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientOwnedEntityIdentifier(), coordinate.iX, coordinate.iY);
+			ForEachShipType(rGameInterpolate, gpGame->RenderFrame(coordinate).postRender, [](ShipType eType, const auto& rInterpolate, const auto& rPostRender)
 			{
-				LOG(kGraphics, kVerbose, "  PostRender[{}] GlobalId: {}", i, rOmnis.pGlobalIds[i]);
-			}
+				LOG(kGraphics, kVerbose, "  {} PostRenderCount: {} InterpolateCount: {}", ShipTypeName(eType), rPostRender.iCount, rInterpolate.iCount);
+				for (int64_t i = 0; i < rPostRender.iCount; ++i)
+				{
+					LOG(kGraphics, kVerbose, "  PostRender[{}] GlobalId: {}", i, rPostRender.pGlobalIds[i]);
+				}
+			});
 		}
 		else
 		{

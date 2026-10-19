@@ -196,12 +196,14 @@ void ServerSessionBase::RebuildOwnedEntities()
 		common::ScopedWorkbufferArena entitiesArena = common::gpThreadLocal->mWorkbuffer.Push();
 		for (const auto& [rCoordinate, rCell] : game::gpGame->mCells)
 		{
-			RegistryOwnershipLayer layer = game::Frame::OwnershipLayer(*rCell.pCurrent);
-			for (int64_t i = 0; i < layer.iCount; ++i)
+			for (const RegistryOwnershipLayer& rLayer : game::Frame::OwnershipLayers(*rCell.pCurrent))
 			{
-				if (layer.pClientGuids[i] == rClient.clientGuid)
+				for (int64_t i = 0; i < rLayer.iCount; ++i)
 				{
-					entitiesArena.mBuffer.PushBack(OwnedEntity {.globalId = layer.pGlobalIds[i], .coord = rCoordinate});
+					if (rLayer.pClientGuids[i] == rClient.clientGuid)
+					{
+						entitiesArena.mBuffer.PushBack(OwnedEntity {.globalId = rLayer.pGlobalIds[i], .coord = rCoordinate});
+					}
 				}
 			}
 		}
@@ -255,7 +257,7 @@ void ServerSessionBase::AddOwnedEntityCoordinates()
 {
 	for (const auto& [rCoordinate, rCell] : game::gpGame->mCells)
 	{
-		if ((game::Frame::OwnershipLayer(*rCell.pCurrent).iCount > 0 || rCell.pCurrent->postRender.uiPinned != 0) && !std::ranges::contains(game::gpGame->mActiveCoordinates, rCoordinate))
+		if ((game::Frame::OwnedEntityCount(*rCell.pCurrent) > 0 || rCell.pCurrent->postRender.uiPinned != 0) && !std::ranges::contains(game::gpGame->mActiveCoordinates, rCoordinate))
 		{
 			game::gpGame->mActiveCoordinates.push_back(rCoordinate);
 		}

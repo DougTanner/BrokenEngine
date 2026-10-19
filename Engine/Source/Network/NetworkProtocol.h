@@ -80,7 +80,7 @@ inline constexpr const char* PacketTypeName(PacketType eType)
 	return "Unknown";
 }
 
-inline constexpr int64_t kiProtocolVersion = 29;
+inline constexpr int64_t kiProtocolVersion = 30;
 inline constexpr int64_t kiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
 inline constexpr int64_t kiDefaultPort = 27'015;
 inline constexpr int64_t kiCoordinateSlots = 16; // 9 visible subscriptions + 6 sticky + 1 spare

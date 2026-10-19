@@ -2,7 +2,7 @@
 
 #include "Input/Input.h"
 
-#include "Frame/Collections/Omnis/Omnis.h"
+#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Ui/Localization.h"
 
 namespace game
@@ -17,9 +17,9 @@ Game::Game()
 	InitializeLocalization();
 
 	int64_t iNextAlignment = 1;
-	mOmniAlignment = engine::AlignmentIdentifier {iNextAlignment++};
-	mEnemyAlignment = engine::AlignmentIdentifier {iNextAlignment++};
-	mAlignments.AddAlignment(mOmniAlignment, mEnemyAlignment, engine::AlignmentFlags::kuiEnemies);
+	mFleetAlignment = engine::AlignmentIdentifier(iNextAlignment++);
+	mRandomAlignment = engine::AlignmentIdentifier(iNextAlignment++);
+	mAlignments.AddAlignment(mFleetAlignment, mRandomAlignment, engine::AlignmentFlags::kuiEnemies);
 
 #if defined(BT_SERVER)
 	mpServerSession = std::make_unique<ServerSession>();
@@ -82,21 +82,9 @@ void Game::RemoveClientOwnedEntity(engine::GlobalId identifier)
 	}
 }
 
-std::optional<int64_t> Game::ClientOwnedEntityIndex(const OmnisPostRender& rOmnis) const
+std::optional<ShipLocator> Game::ClientOwnedEntity(const Frame& rFrame) const
 {
-	engine::GlobalId focusedIdentifier = ClientOwnedEntityIdentifier();
-	if ((focusedIdentifier.iValue != 0))
-	{
-		for (int64_t i = 0; i < rOmnis.iCount; ++i)
-		{
-			if (rOmnis.pGlobalIds[i] == focusedIdentifier)
-			{
-				return i;
-			}
-		}
-	}
-
-	return std::nullopt;
+	return FindShipByGlobalId(rFrame, ClientOwnedEntityIdentifier());
 }
 
 #if defined(BT_CLIENT)
@@ -113,12 +101,11 @@ void Game::UpdateCameraShake()
 	if ((ClientOwnedEntityIdentifier().iValue != 0) && pTailFrame != nullptr)
 	{
 		const Frame& rCurrentFrame = *pTailFrame;
-		const OmnisPostRender& rOmnisPostRender = *rCurrentFrame.postRender.pOmnis;
 
-		std::optional<int64_t> optionalOwnedEntityIndex = ClientOwnedEntityIndex(rOmnisPostRender);
-		if (optionalOwnedEntityIndex)
+		std::optional<ShipLocator> optionalOwnedEntity = ClientOwnedEntity(rCurrentFrame);
+		if (optionalOwnedEntity)
 		{
-			float fCurrentArmor = rOmnisPostRender.pfArmors[*optionalOwnedEntityIndex];
+			float fCurrentArmor = ShipHull(rCurrentFrame, *optionalOwnedEntity);
 			if (fCurrentArmor < mfPreviousClientArmor)
 			{
 				engine::gpCamera->mfShake = std::min(engine::gpCamera->mfShake + kfCameraShakeAdd, kfCameraShakeMax);
@@ -265,8 +252,8 @@ common::crc_t Game::GetNextMusicTrack()
 
 void Game::InitializeFramePostRender(Frame& rFrame)
 {
-	rFrame.postRender.omniAlignment = mOmniAlignment;
-	rFrame.postRender.enemyAlignment = mEnemyAlignment;
+	rFrame.postRender.fleetAlignment = mFleetAlignment;
+	rFrame.postRender.randomAlignment = mRandomAlignment;
 	rFrame.postRender.alignments = mAlignments;
 }
 

@@ -151,6 +151,11 @@ void ReadElement(const nlohmann::json& rWrites, std::string_view name, ELEMENT& 
 		using Enum = decltype(ELEMENT::meFlags);
 		rElement = ELEMENT(static_cast<Enum>(IntegerFromValue<std::underlying_type_t<Enum>>(rValue, name)));
 	}
+	else if constexpr (std::is_enum_v<ELEMENT>)
+	{
+		// The enum's own namespace supplies EnumFromToken and EnumToken, found by argument-dependent lookup.
+		EnumFromToken(rValue, name, rElement);
+	}
 	else if constexpr (std::is_same_v<ELEMENT, AlignmentIdentifier>)
 	{
 		rElement.uiValue = IntegerFromValue<uint32_t>(rValue, name);
@@ -330,6 +335,10 @@ void WriteElement(nlohmann::json& rValue, const ELEMENT& rElement)
 	else if constexpr (kbIsFlags<ELEMENT>)
 	{
 		rValue = std::to_underlying(rElement.meFlags);
+	}
+	else if constexpr (std::is_enum_v<ELEMENT>)
+	{
+		rValue = EnumToken(rElement);
 	}
 	else if constexpr (std::is_same_v<ELEMENT, AlignmentIdentifier>)
 	{

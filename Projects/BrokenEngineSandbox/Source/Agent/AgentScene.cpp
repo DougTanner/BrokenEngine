@@ -6,8 +6,7 @@
 
 #include "Frame/Collections/Blasters/Blasters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
-#include "Frame/Collections/Omnis/Omnis.h"
-#include "Frame/Collections/Spaceships/Spaceships.h"
+#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Game.h"
 
 namespace game
@@ -36,57 +35,53 @@ static void AppendLifecycleFlagNames(engine::LifecycleFlags_t lifecycleFlags, nl
 	}
 }
 
-// Boolean OmniFlags only — the packed nav-direction (bits 8-10) and nav-waypoint (bits 12-13) ranges are
-// excluded; iterating them as single bits would emit meaningless names.
-static nlohmann::json OmniFlagNames(engine::LifecycleFlags_t lifecycleFlags, OmniFlags_t flags)
+// Boolean ShipOrders and ShipFlags only — the packed nav-direction (bits 8-10) and nav-waypoint (bits 12-13) ranges
+// are excluded; iterating them as single bits would emit meaningless names.
+static nlohmann::json ShipFlagNames(engine::LifecycleFlags_t lifecycleFlags, ShipOrders_t orders, ShipFlags_t flags)
 {
 	nlohmann::json names = nlohmann::json::array();
 	AppendLifecycleFlagNames(lifecycleFlags, names);
-	if (flags & OmniFlags::kFireBlaster)
-	{
-		names.push_back("kFireBlaster");
-	}
-	if (flags & OmniFlags::kBlasterSpawnLeft)
-	{
-		names.push_back("kBlasterSpawnLeft");
-	}
-	if (flags & OmniFlags::kFireMissile)
-	{
-		names.push_back("kFireMissile");
-	}
-	if (flags & OmniFlags::kMissileSpawnLeft)
-	{
-		names.push_back("kMissileSpawnLeft");
-	}
-	if (flags & OmniFlags::kUseMissiles)
-	{
-		names.push_back("kUseMissiles");
-	}
-	if (flags & OmniFlags::kIsFlagship)
+	if (orders & ShipOrders::kIsFlagship)
 	{
 		names.push_back("kIsFlagship");
 	}
-	if (flags & OmniFlags::kPendingUseMissiles)
+	if (orders & ShipOrders::kUseMissiles)
+	{
+		names.push_back("kUseMissiles");
+	}
+	if (orders & ShipOrders::kPendingUseMissiles)
 	{
 		names.push_back("kPendingUseMissiles");
 	}
-	return names;
-}
-
-static nlohmann::json SpaceshipFlagNames(engine::LifecycleFlags_t lifecycleFlags, SpaceshipFlags_t flags)
-{
-	nlohmann::json names = nlohmann::json::array();
-	AppendLifecycleFlagNames(lifecycleFlags, names);
-	if (flags & SpaceshipFlags::kFleeOmni)
+	if (flags & ShipFlags::kFireBlaster)
 	{
-		names.push_back("kFleeOmni");
+		names.push_back("kFireBlaster");
 	}
-	if (flags & SpaceshipFlags::kReturnToIslandCenter)
+	if (flags & ShipFlags::kBlasterSpawnLeft)
+	{
+		names.push_back("kBlasterSpawnLeft");
+	}
+	if (flags & ShipFlags::kFireMissile)
+	{
+		names.push_back("kFireMissile");
+	}
+	if (flags & ShipFlags::kMissileSpawnLeft)
+	{
+		names.push_back("kMissileSpawnLeft");
+	}
+	if (flags & ShipFlags::kFlee)
+	{
+		names.push_back("kFlee");
+	}
+	if (flags & ShipFlags::kReturnToIslandCenter)
 	{
 		names.push_back("kReturnToIslandCenter");
 	}
 	return names;
 }
+
+// Indexed by ShipType.
+constexpr std::array<std::string_view, std::to_underlying(ShipType::kCount)> kShipUnitTypes {"fighter", "omni", "battleship"};
 
 // Only the focused fleet reports its members; non-focused fleets get index + focused flag only.
 static nlohmann::json BuildFleets()
@@ -166,8 +161,8 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 
 	// Absent 'unitTypes' means every type; a present list (including an empty one) selects exactly what it names.
 	bool bHasUnitTypes = rParameters.contains("unitTypes");
-	bool bIncludeOmnis = !bHasUnitTypes;
-	bool bIncludeSpaceships = !bHasUnitTypes;
+	std::array<bool, std::to_underlying(ShipType::kCount)> includeShips {};
+	includeShips.fill(!bHasUnitTypes);
 	bool bIncludeBlasters = !bHasUnitTypes;
 	if (bHasUnitTypes)
 	{
@@ -178,13 +173,10 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 				throw std::runtime_error("describe_scene 'unitTypes' must be an array of strings");
 			}
 			std::string unitType = rUnitType.get<std::string>();
-			if (unitType == "omni")
+			auto shipIt = std::ranges::find(kShipUnitTypes, unitType);
+			if (shipIt != kShipUnitTypes.end())
 			{
-				bIncludeOmnis = true;
-			}
-			else if (unitType == "spaceship")
-			{
-				bIncludeSpaceships = true;
+				includeShips[static_cast<size_t>(shipIt - kShipUnitTypes.begin())] = true;
 			}
 			else if (unitType == "blaster")
 			{
@@ -192,7 +184,7 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 			}
 			else
 			{
-				throw std::runtime_error("describe_scene 'unitTypes' entries must be 'omni', 'spaceship', or 'blaster'");
+				throw std::runtime_error("describe_scene 'unitTypes' entries must be 'fighter', 'omni', 'battleship', or 'blaster'");
 			}
 		}
 	}
@@ -203,8 +195,7 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 	rResult["fleets"] = BuildFleets();
 
 	nlohmann::json units = nlohmann::json::array();
-	int64_t iOmniTotal = 0;
-	int64_t iSpaceshipTotal = 0;
+	std::array<int64_t, std::to_underlying(ShipType::kCount)> shipTotals {};
 	int64_t iMissileTotal = 0;
 	int64_t iBlasterTotal = 0;
 	int64_t iUnitCount = 0;
@@ -224,46 +215,44 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 		// unrebased local value.
 		engine::RenderBasis basis = engine::MakeRenderBasis(rCoordinate, engine::gpCamera->mBasisCoordinate);
 
-		iOmniTotal += rFrame.postRender.pOmnis->iCount;
-		iSpaceshipTotal += rFrame.postRender.pSpaceships->iCount;
 		iMissileTotal += rFrame.postRender.pMissiles->iCount;
 		iBlasterTotal += rFrame.postRender.pBlasters->iCount;
+		ForEachShipType(rFrame, [&](ShipType eType, const auto& rShipInterpolate, const auto& rShipPost)
+		{
+			shipTotals[std::to_underlying(eType)] += rShipPost.iCount;
+			if (!bIncludeUnits)
+			{
+				return;
+			}
+
+			if (!includeShips[std::to_underlying(eType)])
+			{
+				return;
+			}
+			AppendVisibleUnits(kShipUnitTypes[std::to_underlying(eType)], rShipInterpolate.pVecPositions, rShipPost.iCount, rCoordinate, basis, f4VisibleArea, iMaximumUnits, iUnitCount, bTruncated, units, [&](int64_t i) -> nlohmann::json
+			{
+				nlohmann::json row =
+				{
+					{"globalId", rShipPost.pGlobalIds[i].iValue},
+					{"alignment", rShipPost.pAlignments[i].uiValue},
+					{"flags", ShipFlagNames(rShipPost.pLifecycleFlags[i], rShipPost.pOrders[i], rShipPost.pFlags[i])},
+				};
+				if constexpr (requires { rShipPost.pfArmors; })
+				{
+					row["armor"] = rShipPost.pfArmors[i];
+					row["shield"] = rShipPost.pfShields[i];
+				}
+				else
+				{
+					row["health"] = rShipPost.pfHealths[i];
+				}
+				return row;
+			});
+		});
 
 		if (!bIncludeUnits)
 		{
 			continue;
-		}
-
-		if (bIncludeOmnis)
-		{
-			const OmnisInterpolate& rOmnisInterpolate = *rFrame.interpolate.pOmnis;
-			const OmnisPostRender& rOmnisPost = *rFrame.postRender.pOmnis;
-			AppendVisibleUnits("omni", rOmnisInterpolate.pVecPositions, rOmnisPost.iCount, rCoordinate, basis, f4VisibleArea, iMaximumUnits, iUnitCount, bTruncated, units, [&](int64_t i) -> nlohmann::json
-			{
-				return
-				{
-					{"globalId", rOmnisPost.pGlobalIds[i].iValue},
-					{"armor", rOmnisPost.pfArmors[i]},
-					{"shield", rOmnisPost.pfShields[i]},
-					{"alignment", rOmnisPost.pAlignments[i].uiValue},
-					{"flags", OmniFlagNames(rOmnisPost.pLifecycleFlags[i], rOmnisPost.pFlags[i])},
-				};
-			});
-		}
-
-		if (bIncludeSpaceships)
-		{
-			const SpaceshipsInterpolate& rShipsInterpolate = *rFrame.interpolate.pSpaceships;
-			const SpaceshipsPostRender& rShipsPost = *rFrame.postRender.pSpaceships;
-			AppendVisibleUnits("spaceship", rShipsInterpolate.pVecPositions, rShipsPost.iCount, rCoordinate, basis, f4VisibleArea, iMaximumUnits, iUnitCount, bTruncated, units, [&](int64_t i) -> nlohmann::json
-			{
-				return
-				{
-					{"health", rShipsPost.pfHealths[i]},
-					{"alignment", rShipsPost.pAlignments[i].uiValue},
-					{"flags", SpaceshipFlagNames(rShipsPost.pLifecycleFlags[i], rShipsPost.pFlags[i])},
-				};
-			});
 		}
 
 		// Blasters stay last so a cell over the unit budget truncates these rows instead of displacing the others.
@@ -287,8 +276,9 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 	rResult["units"] = std::move(units);
 	rResult["counts"] =
 	{
-		{"omnis", iOmniTotal},
-		{"spaceships", iSpaceshipTotal},
+		{"fighters", shipTotals[std::to_underlying(ShipType::kFighter)]},
+		{"omnis", shipTotals[std::to_underlying(ShipType::kOmni)]},
+		{"battleships", shipTotals[std::to_underlying(ShipType::kBattleship)]},
 		{"missiles", iMissileTotal},
 		{"blasters", iBlasterTotal},
 	};

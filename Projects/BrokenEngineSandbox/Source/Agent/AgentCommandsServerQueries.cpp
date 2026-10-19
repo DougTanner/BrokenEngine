@@ -2,10 +2,11 @@
 
 #if defined(BT_SERVER)
 
+#include "Frame/Collections/Battleships/Battleships.h"
 #include "Frame/Collections/Blasters/Blasters.h"
+#include "Frame/Collections/Fighters/Fighters.h"
 #include "Frame/Collections/Missiles/Missiles.h"
 #include "Frame/Collections/Omnis/Omnis.h"
-#include "Frame/Collections/Spaceships/Spaceships.h"
 #include "Game.h"
 
 namespace game
@@ -42,53 +43,42 @@ static void ClampWindow(int64_t iTotal, int64_t iOffset, int64_t iLimit, int64_t
 
 // Every row of one of these reports belongs to the cell the request named, so the position is the local
 // component alone; the caller's own 'coord' parameter identifies the cell.
-static nlohmann::json ExtractOmnis(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
+template <typename INTERPOLATE, typename POST_RENDER>
+static nlohmann::json ExtractShips(const INTERPOLATE& rInterpolate, const POST_RENDER& rPost, int64_t iOffset, int64_t iLimit)
 {
-	const OmnisInterpolate& rInterpolate = *rFrame.interpolate.pOmnis;
-	const OmnisPostRender& rPost = *rFrame.postRender.pOmnis;
 	int64_t iBegin = 0;
 	int64_t iEnd = 0;
 	ClampWindow(rPost.iCount, iOffset, iLimit, iBegin, iEnd);
 	nlohmann::json items = nlohmann::json::array();
 	for (int64_t i = iBegin; i < iEnd; ++i)
 	{
-		items.push_back(
+		nlohmann::json item =
 		{
 			{"index", i},
 			{"uuid", rPost.pIds[i].uuid.iValue},
 			{"globalId", rPost.pGlobalIds[i].iValue},
-			{"local", engine::AgentLocalPositionJson(rInterpolate.pVecPositions[i])},
-			{"dir", Vector3ToJson(rInterpolate.pVecDirections[i])},
-			{"armor", rPost.pfArmors[i]},
-			{"shield", rPost.pfShields[i]},
+			{"controller", EnumToken(rPost.pController[i])},
+			{"orders", std::to_underlying(rPost.pOrders[i].meFlags)},
 			{"flags", std::to_underlying(rPost.pFlags[i].meFlags)},
 			{"lifecycleFlags", std::to_underlying(rPost.pLifecycleFlags[i].meFlags)},
 			{"alignment", rPost.pAlignments[i].uiValue},
-		});
-	}
-	return items;
-}
-
-static nlohmann::json ExtractSpaceships(const Frame& rFrame, int64_t iOffset, int64_t iLimit)
-{
-	const SpaceshipsInterpolate& rInterpolate = *rFrame.interpolate.pSpaceships;
-	const SpaceshipsPostRender& rPost = *rFrame.postRender.pSpaceships;
-	int64_t iBegin = 0;
-	int64_t iEnd = 0;
-	ClampWindow(rPost.iCount, iOffset, iLimit, iBegin, iEnd);
-	nlohmann::json items = nlohmann::json::array();
-	for (int64_t i = iBegin; i < iEnd; ++i)
-	{
-		items.push_back(
-		{
-			{"index", i},
 			{"local", engine::AgentLocalPositionJson(rInterpolate.pVecPositions[i])},
 			{"dir", Vector3ToJson(rInterpolate.pVecDirections[i])},
-			{"health", rPost.pfHealths[i]},
-			{"deltaRotation", rInterpolate.pfDeltaRotations[i]},
-			{"alignment", rPost.pAlignments[i].uiValue},
-			{"registryId", rInterpolate.puiRegistryIds[i].uuid.iValue},
-		});
+			{"vel", Vector3ToJson(rPost.pVecVelocities[i])},
+			{"arrivalGrace", rPost.pArrivalGracePeriods[i].count()},
+			{"flagshipGlobalId", rPost.pFlagshipGlobalIds[i].iValue},
+			{"registryId", rInterpolate.pRegistryIds[i].uuid.iValue},
+		};
+		if constexpr (requires { rPost.pfArmors; })
+		{
+			item["armor"] = rPost.pfArmors[i];
+			item["shield"] = rPost.pfShields[i];
+		}
+		else
+		{
+			item["health"] = rPost.pfHealths[i];
+		}
+		items.push_back(std::move(item));
 	}
 	return items;
 }
@@ -152,19 +142,11 @@ Frame& QueryFrame(const nlohmann::json& rParameters)
 void CommandQueryFrame(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	const Frame& rFrame = QueryFrame(rParameters);
+	rResult["fighters"] = {{"count", rFrame.postRender.pFighters->iCount}};
 	rResult["omnis"] = {{"count", rFrame.postRender.pOmnis->iCount}};
-	rResult["spaceships"] = {{"count", rFrame.postRender.pSpaceships->iCount}};
+	rResult["battleships"] = {{"count", rFrame.postRender.pBattleships->iCount}};
 	rResult["missiles"] = {{"count", rFrame.postRender.pMissiles->iCount}};
 	rResult["blasters"] = {{"count", rFrame.postRender.pBlasters->iCount}};
-}
-
-void CommandQueryOmnis(const nlohmann::json& rParameters, nlohmann::json& rResult)
-{
-	const Frame& rFrame = QueryFrame(rParameters);
-	int64_t iOffset = OptionalCount(rParameters, "offset", 0);
-	int64_t iLimit = OptionalCount(rParameters, "limit", 256);
-	rResult["total"] = rFrame.postRender.pOmnis->iCount;
-	rResult["omnis"] = ExtractOmnis(rFrame, iOffset, iLimit);
 }
 
 void CommandQueryCollection(const nlohmann::json& rParameters, nlohmann::json& rResult)
@@ -180,10 +162,20 @@ void CommandQueryCollection(const nlohmann::json& rParameters, nlohmann::json& r
 
 	int64_t iTotal = 0;
 	nlohmann::json items;
-	if (collection == "spaceships")
+	if (collection == "fighters")
 	{
-		iTotal = rFrame.postRender.pSpaceships->iCount;
-		items = ExtractSpaceships(rFrame, iOffset, iLimit);
+		iTotal = rFrame.postRender.pFighters->iCount;
+		items = ExtractShips(*rFrame.interpolate.pFighters, *rFrame.postRender.pFighters, iOffset, iLimit);
+	}
+	else if (collection == "omnis")
+	{
+		iTotal = rFrame.postRender.pOmnis->iCount;
+		items = ExtractShips(*rFrame.interpolate.pOmnis, *rFrame.postRender.pOmnis, iOffset, iLimit);
+	}
+	else if (collection == "battleships")
+	{
+		iTotal = rFrame.postRender.pBattleships->iCount;
+		items = ExtractShips(*rFrame.interpolate.pBattleships, *rFrame.postRender.pBattleships, iOffset, iLimit);
 	}
 	else if (collection == "missiles")
 	{
@@ -197,7 +189,7 @@ void CommandQueryCollection(const nlohmann::json& rParameters, nlohmann::json& r
 	}
 	else
 	{
-		throw std::runtime_error("'collection' must be spaceships|missiles|blasters");
+		throw std::runtime_error("'collection' must be fighters|omnis|battleships|missiles|blasters");
 	}
 	rResult["total"] = iTotal;
 	rResult["items"] = std::move(items);

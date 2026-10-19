@@ -14,13 +14,13 @@ Ships are being split into the Fighters, Omnis, and Battleships Collections. Fle
 ## Pushers compared with collision
 
 - A pusher is a radial field per entity, `(1 - d²/r²)^power * intensity`, measured in 3D and summed (`Engine/Source/Frame/Collections/Pushers/PushersUpdate.cpp:152-165`), on a 50x50 XY zone grid (`:6-7`). Pushers ignore alignment and collection and filter only by flags (`:134-144`).
-- The response is a velocity impulse capped by `ApplyClampedPush` (`Pushers.h:27-32`) at half the maximum speed (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.h:32`, `SpaceshipsNavigation.cpp:125-136`). It applies no position correction and produces no events or damage. The spaceship pusher radius of 2.25 (`Spaceships.h:29`) lies inside the 3.0 contact distance (`Spaceships.h:22`), so same-type ships can rest overlapping.
-- Collision produces events (`Collision.h:47-57`) that the game turns into damage (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Omnis/OmnisCombat.cpp:236-238`, `Spaceships/SpaceshipsCombat.cpp:147-149`), never separation. It runs after Update (`Engine/Source/Frame/FrameBase.cpp:248-252`).
+- The response is a velocity impulse capped by `ApplyClampedPush` (`Pushers.h:27-32`) at half the maximum speed (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Fighters/Fighters.h:50`, `Fighters.cpp:634`, `Ships/ShipBehaviours.cpp:521-530`). It applies no position correction and produces no events or damage. The fighter pusher radius of 2.25 (`Fighters.h:47`) lies inside the 3.0 contact distance of two 1.5 radii (`Fighters.h:25`), so same-type ships can rest overlapping.
+- Collision produces events (`Collision.h:47-57`) that the game turns into damage (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Omnis/OmnisCombat.cpp:159-164`, `Fighters/FightersCombat.cpp:104-108`), never separation. It runs after Update (`Engine/Source/Frame/FrameBase.cpp:248-252`).
 
 ## Open question for the user
 
 What should a same-type collision do?
-- Damage events, as a bump that deals `kDamageSpaceshipCollision` (`Projects/BrokenEngineSandbox/Source/Frame/HealthDamage.h:11`, `:19`).
+- Damage events, as a bump that deals `kfShipCollisionDamage` (`Projects/BrokenEngineSandbox/Source/Frame/HealthDamage.h:27`).
 - Hard separation, meaning ships never interpenetrate.
 - Both.
 
@@ -39,15 +39,15 @@ Allow `uiCollidesWith & uiCategory` on one layer and enumerate the diagonal once
 ### (b) A second layer view onto the same collection
 
 Register the collection twice with paired categories X and Y that collide with each other. No engine change is needed.
-- Sites: two `AddLayer` calls per type (pattern `SpaceshipsCombat.cpp:105-118`), three new category bits in `uint16_t` (`Collision.h:41-42`; five used, `HealthDamage.h:45-49`), and a layer budget of 16 (`Collision.h:11`).
+- Sites: two `AddLayer` calls per type (pattern `FightersCombat.cpp:63-74`), a paired category bit for each of the three per-type ship categories in `uint16_t` (`Collision.h:43-44`; five used, `HealthDamage.h:32-36`, ship types `:33-35`), and a layer budget of 16 (`Collision.h:11`).
 - Determinism: deterministic, but (X,i,Y,j) and (X,j,Y,i) both pass, so every contact appears twice; the game must read one view, and blasters and missiles must target only X (`HealthDamage.h:57-61`). Only the alignment check drops the self pair (`Collision.cpp:495`).
 - Cost: double the tests, candidates, and sort length.
 - Risks: high. Duplicate-event discipline is spread across every consumer.
 
 ### (c) Stronger pushers plus a hard non-penetration resolve
 
-Raise the pusher radius above the contact distance or raise the cap (`Spaceships.h:29-32`). Optionally add a deterministic position projection that runs in Update in index order.
-- Sites: game constants and a resolve pass before PreCollision. PreCollision traces the cell exit from final positions (`SpaceshipsCombat.cpp:101-102`), so the resolve must run first. The terrain response is at `SpaceshipsNavigation.cpp:138`.
+Raise the pusher radius above the contact distance or raise the cap (`Fighters.h:47-50`). Optionally add a deterministic position projection that runs in Update in index order.
+- Sites: game constants and a resolve pass before PreCollision. PreCollision registers the collision layer from final positions (`FightersCombat.cpp:63-74`), so the resolve must run first. The terrain response is at `Fighters.cpp:662`.
 - Determinism: single-threaded per cell, and positions enter the CRC; bump `Frame::kiVersion`.
 - Cost: O(n·k) per pusher zone.
 - Risks: jitter in dense fleets, a residual overlap after one pass, and pushes into terrain. It produces no events, and it covers allies and every type.

@@ -6,6 +6,7 @@
 #include "Frame/CellStaticData.h"
 
 #include "Frame/Collections/Blasters/Blasters.h"
+#include "Frame/Collections/Ships/ShipQueries.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
 #include "Ui/ParticleWrappers.h"
@@ -26,8 +27,6 @@ template struct Collection<game::OmnisPostRender>;
 
 namespace game
 {
-
-using enum OmniFlags;
 
 constexpr float kfBlasterSizeX = kfOmniRadius * 0.3333f;
 constexpr float kfBlasterSizeY = kfOmniRadius * 1.0f;
@@ -55,8 +54,9 @@ constexpr float kfHexShieldSizeScale = kfOmniRadius * 0.0667f;
 constexpr float kfHexShieldColorMix = 0.85f;
 constexpr float kfHexShieldFadeThreshold = 0.25f;
 
-// Omni model (defined in OmnisRender.cpp)
-extern const common::crc_t kOmniModel;
+// Omni models, one per ShipController (defined in OmnisRender.cpp)
+extern const common::crc_t kOmniFleetModel;
+extern const common::crc_t kOmniRandomModel;
 
 constexpr float kfRotationTiltFactor = 0.015f;
 constexpr float kfRotationTiltMaximum = 0.4f;
@@ -197,83 +197,7 @@ void OmnisPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 	});
 }
 
-void OmnisPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
-{
-	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
-	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
-
-	int64_t iUpdateFleetCount = 0;
-	engine::GridCoord updateFleetNewCoordinate {};
-	int64_t iUpdateFleetFlagshipGlobalId = 0;
-
-	for (const StatusChange& rStatusChange : rFrameInput.statusChanges)
-	{
-		if (rStatusChange.eType == StatusChangeType::kUpdateFleet)
-		{
-			const UpdateFleetData& rUpdate = std::get<UpdateFleetData>(rStatusChange.data);
-			omni_t updateId {engine::Uuid {rUpdate.iOmniUuid}};
-			auto it = rCurrentInterpolate.idToIndexMap.find(updateId);
-			if (it != rCurrentInterpolate.idToIndexMap.end())
-			{
-				int64_t iIndex = it->second;
-				if (rUpdate.bIsFlagship)
-				{
-					rCurrentPostRender.pFlags[iIndex].Set(kIsFlagship);
-					iUpdateFleetFlagshipGlobalId = rCurrentPostRender.pGlobalIds[iIndex].iValue;
-				}
-				else
-				{
-					rCurrentPostRender.pFlags[iIndex].Set(kIsFlagship, false);
-				}
-				++iUpdateFleetCount;
-				updateFleetNewCoordinate = rUpdate.fleetWantedCoordinate;
-				rCurrentPostRender.pFleetWantedCoordinates[iIndex] = rUpdate.fleetWantedCoordinate;
-				rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = rUpdate.uiPendingFleetWantedCoordinateTicks;
-			}
-			continue;
-		}
-
-		if (rStatusChange.eType == StatusChangeType::kUpdateOmni)
-		{
-			const UpdateOmniData& rUpdate = std::get<UpdateOmniData>(rStatusChange.data);
-			omni_t updateId {engine::Uuid {rUpdate.iOmniUuid}};
-
-			auto it = rCurrentInterpolate.idToIndexMap.find(updateId);
-			if (it != rCurrentInterpolate.idToIndexMap.end())
-			{
-				int64_t iIndex = it->second;
-				// Weapon mode change is deferred via countdown ticks
-				rCurrentPostRender.pFlags[iIndex].Set(kPendingUseMissiles, rUpdate.bUseMissiles);
-				rCurrentPostRender.puiPendingWeaponModeTicks[iIndex] = rUpdate.uiPendingWeaponModeTicks;
-				rCurrentPostRender.pNavigationDelays[iIndex] = rUpdate.navigationDelaySeconds;
-				rCurrentPostRender.pCellChangeTimers[iIndex] = rUpdate.navigationDelaySeconds;
-			}
-			else
-			{
-				LOG(kNetwork, kWarning, "ProcessUpdateStatusChanges::kUpdateOmni Uuid: {} NOT FOUND in idToIndexMap", rUpdate.iOmniUuid);
-			}
-			continue;
-		}
-
-		if (rStatusChange.eType == StatusChangeType::kDestroyOmni)
-		{
-			omni_t destroyId {engine::Uuid {std::get<DestroyOmniData>(rStatusChange.data).iOmniUuid}};
-			auto it = rCurrentInterpolate.idToIndexMap.find(destroyId);
-			if (it != rCurrentInterpolate.idToIndexMap.end())
-			{
-				rCurrentPostRender.pLifecycleFlags[it->second].Set(engine::LifecycleFlags::kDestroy);
-			}
-			continue;
-		}
-	}
-
-	if (iUpdateFleetCount > 0)
-	{
-		LOG(kNetwork, kVerbose, "ProcessUpdateStatusChanges::kUpdateFleet Coord: ({},{}) NewWantedCoord: ({},{}) Omnis: {} Flagship: {}", rStaticData.coordinate.iX, rStaticData.coordinate.iY, updateFleetNewCoordinate.iX, updateFleetNewCoordinate.iY, iUpdateFleetCount, iUpdateFleetFlagshipGlobalId);
-	}
-}
-
-void OmnisPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
+void OmnisPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 #if defined(BT_CLIENT)
 	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
@@ -325,6 +249,9 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentInterpolate.pAnimationTimes[iIndex] = rInfo.animationTime;
 	rCurrentInterpolate.pPushers[iIndex] = {};
 	engine::PushersPostRender::Add(rFrame, rCurrentInterpolate.pPushers[iIndex]);
+	// Generate the missile-homing registry ID with one frame UUID after the pusher ID, preserving per-spawn UUID
+	// order for replay.
+	rCurrentInterpolate.pRegistryIds[iIndex] = engine::registry_id_t::Generate(rFrame.postRender);
 #if defined(BT_CLIENT)
 	rCurrentInterpolate.pfRotationAccelerationXs[iIndex] = 0.0f;
 	rCurrentInterpolate.pfRotationAccelerationYs[iIndex] = 0.0f;
@@ -338,6 +265,8 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 #endif // BT_CLIENT
 
 	rCurrentPostRender.pIds[iIndex] = newId;
+	rCurrentPostRender.pController[iIndex] = rInfo.eController;
+	rCurrentPostRender.pOrders[iIndex] = rInfo.orders;
 	rCurrentPostRender.pAlignments[iIndex] = rInfo.alignment;
 	rCurrentPostRender.pNextBlasterFireTimes[iIndex] = rInfo.nextBlasterFireTime;
 	rCurrentPostRender.pNextSecondarySpawnTimes[iIndex] = rInfo.nextSecondarySpawnTime;
@@ -354,15 +283,16 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentPostRender.pCellChangeTimers[iIndex] = std::chrono::duration<float>(15.0f + common::Random<10.0f>(rFrame.postRender.randomEngine));
 	// Entering a cell is a fresh spawn for navigation, cross-cell transfers included: the wanted direction comes from the
 	// hull direction, and the cached steering, island destination, navigation mode, and waypoint index reset here.
-	// Flagship navigates to island destination on enter; non-flagship starts roaming and follows flagship via proximity
-	OmniFlags_t spawnFlags = rInfo.flags;
-	SetNavigationDirection(spawnFlags, (rInfo.flags & kIsFlagship) ? 4i64 : -1i64);
+	// Flagship navigates to island destination on enter; non-flagship starts roaming and follows its flagship in the same cell
+	ShipFlags_t spawnFlags = rInfo.flags;
+	SetNavigationDirection(spawnFlags, (rInfo.orders & ShipOrders::kIsFlagship) ? 4i64 : -1i64);
 	SetNavigationWaypointIndex(spawnFlags, 0);
 	rCurrentPostRender.pFlags[iIndex] = spawnFlags;
 	rCurrentPostRender.pNavigationDelays[iIndex] = rInfo.navigationDelay;
 	rCurrentPostRender.pVecIslandDestinations[iIndex] = XMVectorZero();
 	rCurrentPostRender.pClientGuids[iIndex] = rInfo.clientGuid;
 	rCurrentPostRender.pGlobalIds[iIndex] = rInfo.globalId;
+	rCurrentPostRender.pFlagshipGlobalIds[iIndex] = rInfo.flagshipGlobalId;
 	rCurrentPostRender.pFleetWantedCoordinates[iIndex] = rInfo.fleetWantedCoordinate;
 	rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = rInfo.uiPendingFleetWantedCoordinateTicks;
 	rCurrentPostRender.puiPendingWeaponModeTicks[iIndex] = rInfo.uiPendingWeaponModeTicks;
@@ -430,9 +360,11 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 		rCurrent.pfShieldRotations[i] = fShieldRotation;
 		rCurrent.pfShieldShrinks[i] = fShieldShrink;
 
-		if (engine::gAnimationDataMap.contains(kOmniModel))
+		// Each row's clock advances through its own controller's model.
+		common::crc_t uiModel = rPreviousPostRender.pController[i] == ShipController::kFleet ? kOmniFleetModel : kOmniRandomModel;
+		if (engine::gAnimationDataMap.contains(uiModel))
 		{
-			animationTime = engine::gAnimationDataMap.at(kOmniModel).AdvanceLoopingTime(animationTime, deltaTime);
+			animationTime = engine::gAnimationDataMap.at(uiModel).AdvanceLoopingTime(animationTime, deltaTime);
 			rCurrent.pAnimationTimes[i] = animationTime;
 		}
 
@@ -526,7 +458,7 @@ void OmnisPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[
 		.pVecVelocities = rCurrentPostRender.pVecVelocities,
 		.iCount = rCurrentInterpolate.iCount,
 		.fRadius = kfOmniRadius,
-		.fDamage = 0.0f, // Omni doesn't deal collision damage
+		.fDamage = kfShipCollisionDamage,
 		.uiCategory = CollisionCategory::kuiOmni,
 		.uiCollidesWith = CollidesWith::kuiOmni,
 		.pAlignments = rCurrentPostRender.pAlignments,
@@ -539,7 +471,7 @@ void OmnisPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[
 	}
 }
 
-// OmnisPostRender::Update orchestrates per-iteration helpers in OmnisNavigation.cpp and OmnisCombat.cpp.
+// OmnisPostRender::Update orchestrates the shared per-row behaviours in ShipBehaviours.cpp and the helpers in OmnisCombat.cpp.
 
 void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
@@ -558,9 +490,20 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 	// so normalize fallbacks don't leak W into the AI direction and on into velocity.
 	XMVECTOR vecCellCenter = XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 
+	// Random-spawn destinations: island centers are fixed for this cell's tick; the per-thread workbuffer shares them across ships.
+	int64_t iIslandCount = std::ssize(rStaticData.islands);
+	auto islandCandidatesAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<XMFLOAT4*>(iIslandCount * static_cast<int64_t>(sizeof(XMFLOAT4)));
+	for (int64_t i = 0; i < iIslandCount; ++i)
+	{
+		const engine::IslandPlacement& rPlacement = rStaticData.islands.at(i);
+		XMStoreFloat4(&islandCandidatesAllocation.mpData[i], XMVectorSet(rPlacement.f2WorldPosition.x, rPlacement.f2WorldPosition.y, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f));
+	}
+	std::span<const XMFLOAT4> islandCandidates(islandCandidatesAllocation.mpData, static_cast<size_t>(iIslandCount));
+
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		OmniFlags_t flags = rPrevious.pFlags[i];
+		ShipOrders_t orders = rPrevious.pOrders[i];
+		ShipFlags_t flags = rPrevious.pFlags[i];
 		std::chrono::duration<float> nextBlasterFireTime = rPrevious.pNextBlasterFireTimes[i];
 		std::chrono::duration<float> nextSecondarySpawnTime = rPrevious.pNextSecondarySpawnTimes[i];
 		XMVECTOR vecVelocity = rPrevious.pVecVelocities[i];
@@ -594,25 +537,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		}
 #endif // BT_CLIENT
 
-		if (iPendingFleetWantedCoordinateTicks > 0)
-		{
-			iPendingFleetWantedCoordinateTicks--;
-		}
-		if (iPendingWeaponModeTicks > 0)
-		{
-			iPendingWeaponModeTicks--;
-			if (iPendingWeaponModeTicks == 0)
-			{
-				if (flags & kPendingUseMissiles)
-				{
-					flags.Set(kUseMissiles);
-				}
-				else
-				{
-					flags.Set(kUseMissiles, false);
-				}
-			}
-		}
+		CountdownPendingOrders(orders, iPendingFleetWantedCoordinateTicks, iPendingWeaponModeTicks);
 
 		// Transfer lock skips navigation, target acquisition, and movement acceleration.
 		if (transferLockTimer > std::chrono::duration<float>::zero())
@@ -621,15 +546,29 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		}
 		else
 		{
-			ComputeNavigation(rFrame, rPreviousFrame, rStaticData, i, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, flags, deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
+			if (rPrevious.pController[i] == ShipController::kFleet)
+			{
+				ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
+			}
+			else
+			{
+				XMVECTOR vecNearestEnemy = XMVectorZero();
+				bool bEnemyFound = FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], vecNearestEnemy);
+				bool bHasDestination = false;
+				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecNearestEnemy, flags, bHasDestination);
+				if (bHasDestination)
+				{
+					vecAiDirection = XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecDestination, vecPosition), 0.0f));
+				}
+			}
 
 			bool bLookTargetFound = false;
 			XMVECTOR vecLookPosition = XMVectorZero();
-			AcquireTarget(rPreviousFrame, vecPosition, flags, bLookTargetFound, vecLookPosition);
+			AcquireTarget(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], kfOmniBlastersSpeed, kfBlasterTargetRange, kfMissileTargetRange, flags, bLookTargetFound, vecLookPosition);
 
 			float fAccelerationMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
 			float fDecayMultiplier = (1.0f - kfOmniJitterRange * 0.5f) + common::Random<kfOmniJitterRange>(rFrame.postRender.randomEngine);
-			ApplyMovement(iNavigationDirection, vecAiDirection, deltaTime, fAccelerationMultiplier, fDecayMultiplier, vecVelocity);
+			ApplyAcceleratedMovement(iNavigationDirection, vecAiDirection, deltaTime, fAccelerationMultiplier, fDecayMultiplier, kOmniMovement, vecVelocity);
 
 			if (bLookTargetFound)
 			{
@@ -638,13 +577,14 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 		}
 
 		// Shield regeneration and pushes also run while transfer-locked.
-		RegenerateShield(deltaTime, shieldCooldown, fShield);
-		ApplyTerrainPush(rStaticData, vecPosition, vecVelocity);
-		ApplyPusherPush(rFrame, rPreviousFrame, i, vecPosition, vecVelocity);
-		ResolveTerrainContact(rStaticData, i, vecPosition, rFrame.interpolate.pOmnis->pVecPositions[i], vecVelocity);
+		RegenerateShield(deltaTime, shieldCooldown, kfOmniShield, kfOmniShieldRegeneration, fShield);
+		ApplyTerrainPush(rStaticData, vecPosition, kfOmniRadius, kfPushMargin, vecVelocity);
+		ApplyPusherPush(rFrame, vecPosition, rPreviousInterpolate.pPushers[i], kfOmniMaximumPusherPushVelocity, vecVelocity);
+		ResolveTerrainContact(rStaticData, {.eType = ShipType::kOmni, .iRow = i}, vecPosition, rFrame.interpolate.pOmnis->pVecPositions[i], kfOmniRadius, vecVelocity);
 
 		SetNavigationDirection(flags, iNavigationDirection);
 		SetNavigationWaypointIndex(flags, iNavigationWaypointIndex);
+		rCurrent.pOrders[i] = orders;
 		rCurrent.pFlags[i] = flags;
 		rCurrent.pNextBlasterFireTimes[i] = nextBlasterFireTime;
 		rCurrent.pNextSecondarySpawnTimes[i] = nextSecondarySpawnTime;
@@ -679,6 +619,7 @@ bool OmnisInterpolate::LogDifferences(const OmnisInterpolate& rOther) const
 		bEqual &= common::LogDifference<"pVecDirections">(i, pVecDirections[i], rOther.pVecDirections[i]);
 		bEqual &= common::LogDifference<"pDestroyedTimes">(i, pDestroyedTimes[i], rOther.pDestroyedTimes[i]);
 		bEqual &= common::LogDifference<"pPushers">(i, pPushers[i], rOther.pPushers[i]);
+		bEqual &= common::LogDifference<"pRegistryIds">(i, pRegistryIds[i], rOther.pRegistryIds[i]);
 	}
 
 	return bEqual;
@@ -694,6 +635,8 @@ bool OmnisPostRender::LogDifferences(const OmnisPostRender& rOther) const
 	{
 		bEqual &= common::LogDifference<"pIds">(i, pIds[i].uuid.iValue, rOther.pIds[i].uuid.iValue);
 		bEqual &= common::LogDifference<"pLifecycleFlags">(i, pLifecycleFlags[i], rOther.pLifecycleFlags[i]);
+		bEqual &= common::LogDifference<"pController">(i, std::to_underlying(pController[i]), std::to_underlying(rOther.pController[i]));
+		bEqual &= common::LogDifference<"pOrders">(i, pOrders[i], rOther.pOrders[i]);
 		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
 		bEqual &= common::LogDifference<"pAlignments">(i, pAlignments[i], rOther.pAlignments[i]);
 		bEqual &= common::LogDifference<"pNextBlasterFireTimes">(i, pNextBlasterFireTimes[i], rOther.pNextBlasterFireTimes[i]);
@@ -714,6 +657,7 @@ bool OmnisPostRender::LogDifferences(const OmnisPostRender& rOther) const
 		bEqual &= common::LogDifference<"pClientGuids.uiHigh">(i, pClientGuids[i].uiHigh, rOther.pClientGuids[i].uiHigh);
 		bEqual &= common::LogDifference<"pClientGuids.uiLow">(i, pClientGuids[i].uiLow, rOther.pClientGuids[i].uiLow);
 		bEqual &= common::LogDifference<"pGlobalIds">(i, pGlobalIds[i], rOther.pGlobalIds[i]);
+		bEqual &= common::LogDifference<"pFlagshipGlobalIds">(i, pFlagshipGlobalIds[i], rOther.pFlagshipGlobalIds[i]);
 		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iX">(i, pFleetWantedCoordinates[i].iX, rOther.pFleetWantedCoordinates[i].iX);
 		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iY">(i, pFleetWantedCoordinates[i].iY, rOther.pFleetWantedCoordinates[i].iY);
 		bEqual &= common::LogDifference<"puiPendingFleetWantedCoordinateTicks">(i, puiPendingFleetWantedCoordinateTicks[i], rOther.puiPendingFleetWantedCoordinateTicks[i]);
