@@ -40,9 +40,9 @@ bool ExplosionsPostRender::Spawn(game::Frame& __restrict rFrame, [[maybe_unused]
 
 	GrowPairedCollections(rInterpolate, rPostRender, rInterpolate.Members(), rPostRender.Members());
 	int64_t iSpawnIndex = AddElement(rInterpolate, rPostRender);
+	rPostRender.pLifecycleFlags[iSpawnIndex] = rSpawnInformation.lifecycleFlags;
 
 	rInterpolate.puiTypeIndices[iSpawnIndex] = static_cast<uint8_t>(rSpawnInformation.iTypeIndex);
-	rInterpolate.pFlags[iSpawnIndex] = rSpawnInformation.flags;
 	rInterpolate.pStartTimes[iSpawnIndex] = currentTime;
 	rInterpolate.pVecPositions[iSpawnIndex] = rSpawnInformation.vecPosition;
 	rInterpolate.pVecDirections[iSpawnIndex] = rSpawnInformation.vecDirection;

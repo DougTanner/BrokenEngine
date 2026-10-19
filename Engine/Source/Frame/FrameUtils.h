@@ -390,6 +390,80 @@ void DestroySweep(const INTERPOLATE& rInterpolate, [[maybe_unused]] const POST_R
 	}
 }
 
+// Releases every row a nonzero handle in row i's OwnedHandles() columns names; a pair half without the accessor owns
+// nothing.
+template <typename FRAME, typename INTERPOLATE, typename POST_RENDER>
+void ReleaseOwnedHandles([[maybe_unused]] FRAME& rFrame, INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, [[maybe_unused]] int64_t i)
+{
+	auto OwnedHandleColumns = [](auto& rCollection)
+	{
+		if constexpr (requires { rCollection.OwnedHandles(); })
+		{
+			return rCollection.OwnedHandles();
+		}
+		else
+		{
+			return std::tie();
+		}
+	};
+
+	std::apply([&](auto&... rHandleColumns)
+	{
+		(ForEachMemberPointer(rHandleColumns, [&](auto& rpHandles)
+		{
+			ReleaseIndexableElementAndClearHandle(rFrame, rpHandles[i]);
+		}), ...);
+	}, std::tuple_cat(OwnedHandleColumns(rInterpolate), OwnedHandleColumns(rPostRender)));
+}
+
+// The one removal of kTransfer and kDestroy rows, at the end of the Destroy phase. The cascade pass releases the rows
+// each such row owns in every pair before any pair compacts, so an owned row leaves in its owner's fold whatever the
+// tuple order.
+template <typename FRAME, typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE, int64_t... INDICES>
+void CompactCollections(FRAME& rFrame, const INTERPOLATE_TUPLE& rInterpolateCollections, const POST_RENDER_TUPLE& rPostRenderCollections, std::integer_sequence<int64_t, INDICES...>)
+{
+	auto IsCompacted = [](const auto& rPostRender, int64_t i)
+	{
+		return (rPostRender.pLifecycleFlags[i] & LifecycleFlags::kTransfer) || (rPostRender.pLifecycleFlags[i] & LifecycleFlags::kDestroy);
+	};
+
+	([&](auto& rInterpolate, auto& rPostRender)
+	{
+		for (int64_t i = 0; i < rInterpolate.iCount; ++i)
+		{
+			if (IsCompacted(rPostRender, i))
+			{
+				ReleaseOwnedHandles(rFrame, rInterpolate, rPostRender, i);
+			}
+		}
+	}(std::get<static_cast<size_t>(INDICES)>(rInterpolateCollections), std::get<static_cast<size_t>(INDICES)>(rPostRenderCollections)), ...);
+
+	([&](auto& rInterpolate, auto& rPostRender)
+	{
+		DestroySweep(rInterpolate, rPostRender, [&](int64_t i)
+		{
+			return IsCompacted(rPostRender, i);
+		}, [&](int64_t i)
+		{
+			if constexpr (HasIdToIndex<std::remove_cvref_t<decltype(rInterpolate)>>)
+			{
+				RemoveIndexableElement(rInterpolate, rPostRender, rPostRender.pIds[i], rInterpolate.Members(), rPostRender.Members());
+			}
+			else
+			{
+				DestroyElement(rInterpolate, rPostRender, i, rInterpolate.Members(), rPostRender.Members());
+			}
+		});
+	}(std::get<static_cast<size_t>(INDICES)>(rInterpolateCollections), std::get<static_cast<size_t>(INDICES)>(rPostRenderCollections)), ...);
+}
+
+template <typename FRAME, typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE>
+void CompactCollections(FRAME& rFrame, const INTERPOLATE_TUPLE& rInterpolateCollections, const POST_RENDER_TUPLE& rPostRenderCollections)
+{
+	static_assert(std::tuple_size_v<INTERPOLATE_TUPLE> == std::tuple_size_v<POST_RENDER_TUPLE>);
+	CompactCollections(rFrame, rInterpolateCollections, rPostRenderCollections, std::make_integer_sequence<int64_t, static_cast<int64_t>(std::tuple_size_v<INTERPOLATE_TUPLE>)> {});
+}
+
 template <typename INTERPOLATE, typename POST_RENDER>
 void ValidateCollectionPair(INTERPOLATE& rInterpolate, const POST_RENDER& rPostRender)
 {

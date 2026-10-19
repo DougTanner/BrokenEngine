@@ -75,12 +75,12 @@ struct HexShieldsPostRender : public Collection<HexShieldsPostRender>
 	static void Update(const game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	static void Add(game::Frame& __restrict rFrame, hex_shields_t& rId, int64_t iTypeIndex);
-	static void Remove(game::Frame& __restrict rFrame, hex_shields_t& rId);
 
 	hex_shields_t* __restrict pIds = nullptr;
+	LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;
 	auto Members(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags);
 	}
 
 };

@@ -84,9 +84,9 @@ void XM_CALLCONV SynchronizeMissileTrail(FrameInterpolate& rFrameInterpolate, en
 	});
 }
 
-void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, engine::smoke_trails_t uiSmokeTrail, engine::sound_t uiSound, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecVelocity, GXMVECTOR vecPreviousPosition, MissileFlags_t flags, float fPitch, [[maybe_unused]] float fDeltaRotation, float fExhaustLength)
+void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, engine::smoke_trails_t uiSmokeTrail, engine::sound_t uiSound, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecVelocity, GXMVECTOR vecPreviousPosition, MissileFlags_t flags, engine::LifecycleFlags_t lifecycleFlags, float fPitch, [[maybe_unused]] float fDeltaRotation, float fExhaustLength)
 {
-	if ((uiAreaLight.uuid.iValue != 0) && !(flags & kExploding) && !(flags & kFalling))
+	if ((uiAreaLight.uuid.iValue != 0) && !(lifecycleFlags & engine::LifecycleFlags::kDying) && !(flags & kFalling))
 	{
 		float fLength = fExhaustLength;
 		float fWidth = kfExhaustWidth;
@@ -114,11 +114,11 @@ void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine:
 	{
 		float fTrailOffset = kfTrailOffset;
 		XMVECTOR vecTrailOffset = XMVectorMultiply(XMVectorReplicate(fTrailOffset), XMVector3Normalize(vecDirection));
-		XMVECTOR vecTrailPosition = XMVectorAdd(vecPosition, (flags & kExploding) ? XMVectorZero() : vecTrailOffset);
+		XMVECTOR vecTrailPosition = XMVectorAdd(vecPosition, (lifecycleFlags & engine::LifecycleFlags::kDying) ? XMVectorZero() : vecTrailOffset);
 		SynchronizeMissileTrail(rFrameInterpolate, uiSmokeTrail, vecTrailPosition);
 	}
 
-	if ((uiSound.uuid.iValue != 0) && !(flags & kExploding) && !(flags & kFalling))
+	if ((uiSound.uuid.iValue != 0) && !(lifecycleFlags & engine::LifecycleFlags::kDying) && !(flags & kFalling))
 	{
 		engine::SoundsInterpolate::Sync(rFrameInterpolate, uiSound,
 		{
@@ -147,7 +147,7 @@ void MissilesInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 		return;
 	}
 
-	if (rPostRender.pFlags[iIndex] & kSilentDespawn)
+	if (rPostRender.pLifecycleFlags[iIndex] & engine::LifecycleFlags::kDestroy)
 	{
 		return;
 	}
@@ -160,7 +160,7 @@ void MissilesInterpolate::ClientInitialize(Frame& rFrame, int64_t iIndex)
 
 	engine::SoundsPostRender::Add(rFrame, rPostRender.puiSounds[iIndex]);
 
-	SynchronizeMissile(rFrame.interpolate, rMissiles.puiAreaLights[iIndex], rMissiles.puiSmokeTrails[iIndex], rPostRender.puiSounds[iIndex], rMissiles.pVecPositions[iIndex], rMissiles.pVecDirections[iIndex], rPostRender.pVecVelocities[iIndex], rMissiles.pVecPositions[iIndex], rPostRender.pFlags[iIndex], rPostRender.pfPitches[iIndex], rPostRender.pfDeltaRotations[iIndex], rPostRender.pfExhaustLengths[iIndex]);
+	SynchronizeMissile(rFrame.interpolate, rMissiles.puiAreaLights[iIndex], rMissiles.puiSmokeTrails[iIndex], rPostRender.puiSounds[iIndex], rMissiles.pVecPositions[iIndex], rMissiles.pVecDirections[iIndex], rPostRender.pVecVelocities[iIndex], rMissiles.pVecPositions[iIndex], rPostRender.pFlags[iIndex], rPostRender.pLifecycleFlags[iIndex], rPostRender.pfPitches[iIndex], rPostRender.pfDeltaRotations[iIndex], rPostRender.pfExhaustLengths[iIndex]);
 }
 
 void MissilesInterpolate::ClientInitializeAll(Frame& rFrame)
@@ -258,7 +258,8 @@ static void SpawnMissileExplosion(Frame& __restrict rFrame, engine::GridCoord em
 				.iTypeIndex = siMissileExplosionTypeIndex,
 				.vecPosition = vecExplosionPosition,
 				.vecDirection = vecDirection,
-				.flags = {engine::ExplosionFlags::kDestroysSelf, engine::ExplosionFlags::kYellow},
+				.flags = {engine::ExplosionFlags::kYellow},
+				.lifecycleFlags = {engine::LifecycleFlags::kDying},
 				.iTrailCount = static_cast<int64_t>(2.0f * fScaledPercent * (flags & kDirectional ? 0.6f : 1.0f) * kfExplosionTrailCountMinimum + kfExplosionTrailCountRandom * common::Random(rFrame.postRender.randomEngine)),
 				.fTrailAngle = flags & kDirectional ? XM_PI : XM_2PI,
 				.iParticleCount = static_cast<int64_t>(2.0f * fScaledPercent * kfExplosionParticleCount),
@@ -271,29 +272,6 @@ static void SpawnMissileExplosion(Frame& __restrict rFrame, engine::GridCoord em
 	}
 }
 
-static void RemoveOwnedObjects([[maybe_unused]] Frame& rFrame, [[maybe_unused]] MissilesInterpolate& rCurrentInterpolate, MissilesPostRender& rCurrentPostRender, int64_t i)
-{
-#if defined(BT_CLIENT)
-	if ((rCurrentInterpolate.puiAreaLights[i].uuid.iValue != 0))
-	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiAreaLights[i]);
-	}
-
-	if ((rCurrentInterpolate.puiSmokeTrails[i].uuid.iValue != 0))
-	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiSmokeTrails[i]);
-	}
-	if ((rCurrentPostRender.puiSounds[i].uuid.iValue != 0))
-	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentPostRender.puiSounds[i]);
-	}
-#endif // BT_CLIENT
-
-	// Removal runs outside any query window, so the handle is only cleared. Subscriber counts are derived afresh
-	// from the surviving handles each window, so a cleared handle needs no release.
-	rCurrentPostRender.puiRegistryTargets[i] = {};
-}
-
 void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
@@ -303,7 +281,7 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
-		return rCurrentPostRender.pFlags[i] & kTransfer;
+		return rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kTransfer;
 	}, [&](int64_t i)
 	{
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
@@ -337,10 +315,6 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 			DEBUG_BREAK();
 		}
 		rFrame.postRender.PushTransferRequest(request);
-
-		RemoveOwnedObjects(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
-
-		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	});
 }
 
@@ -351,15 +325,10 @@ void MissilesPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
-		bool bSilentDespawn = rCurrentPostRender.pFlags[i] & kSilentDespawn;
-		bool bExplosionFinished = (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pDestroyedTimes[i].count() <= 0.0f;
-		return bSilentDespawn || bExplosionFinished;
+		return (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && rCurrentInterpolate.pDestroyedTimes[i].count() <= 0.0f;
 	}, [&](int64_t i)
 	{
-		// Owned effects and the registry handle may already be released by Fall() or Explode()
-		RemoveOwnedObjects(rFrame, rCurrentInterpolate, rCurrentPostRender, i);
-
-		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+		rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDestroy);
 	});
 }
 
@@ -427,7 +396,7 @@ void MissilesPostRender::Fall(Frame& __restrict rFrame, int64_t i, std::chrono::
 {
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
-	ASSERT(!(rCurrentPostRender.pFlags[i] & kExploding));
+	ASSERT(!(rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying));
 	ASSERT(!(rCurrentPostRender.pFlags[i] & kFalling));
 
 	// The registry subscription is released by the Update caller, which is the only site holding a live query
@@ -438,18 +407,9 @@ void MissilesPostRender::Fall(Frame& __restrict rFrame, int64_t i, std::chrono::
 
 #if defined(BT_CLIENT)
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
-	if ((rCurrentInterpolate.puiAreaLights[i].uuid.iValue != 0))
-	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiAreaLights[i]);
-	}
-	if ((rCurrentInterpolate.puiSmokeTrails[i].uuid.iValue != 0))
-	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiSmokeTrails[i]);
-	}
-	if ((rCurrentPostRender.puiSounds[i].uuid.iValue != 0))
-	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentPostRender.puiSounds[i]);
-	}
+	engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiAreaLights[i]);
+	engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiSmokeTrails[i]);
+	engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentPostRender.puiSounds[i]);
 #endif
 }
 
@@ -458,7 +418,7 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
-	ASSERT(!(rCurrentPostRender.pFlags[i] & kExploding));
+	ASSERT(!(rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying));
 	// PostCollision runs after the Update query window is gone, so the handle is only cleared.
 	rCurrentPostRender.puiRegistryTargets[i] = {};
 
@@ -466,7 +426,7 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	engine::gpAudioManager->PlayOneShot3d(rFrame, data::kAudioExplosions80401__steveygos93__explosion2wavCrc, rStaticData.coordinate, rCurrentInterpolate.pVecPositions[i], gExplosionVolume.mfCurrent);
 #endif
 
-	rCurrentPostRender.pFlags[i].Set(kExploding);
+	rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDying);
 	if (bDirectional)
 	{
 		rCurrentPostRender.pFlags[i].Set(kDirectional);
@@ -475,18 +435,12 @@ void MissilesPostRender::Explode([[maybe_unused]] Frame& __restrict rFrame, [[ma
 	rCurrentInterpolate.pDestroyedTimes[i] = kMissileDestroyTime;
 
 #if defined(BT_CLIENT)
-	if ((rCurrentInterpolate.puiAreaLights[i].uuid.iValue != 0))
-	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiAreaLights[i]);
-	}
+	engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiAreaLights[i]);
 #endif
 
 	// Remove sound when exploding (missile engine sound stops, replaced by explosion sound)
 #if defined(BT_CLIENT)
-	if ((rCurrentPostRender.puiSounds[i].uuid.iValue != 0))
-	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentPostRender.puiSounds[i]);
-	}
+	engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentPostRender.puiSounds[i]);
 #endif
 
 	SpawnMissileExplosion(rFrame, rStaticData.coordinate, 1.0f, rCurrentInterpolate.pVecPositions[i], rCurrentPostRender.pVecExplosionDirections[i], rCurrentPostRender.pFlags[i]);
@@ -525,6 +479,7 @@ bool MissilesPostRender::LogDifferences(const MissilesPostRender& rOther) const
 
 	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
 	{
+		bEqual &= common::LogDifference<"pLifecycleFlags">(i, pLifecycleFlags[i], rOther.pLifecycleFlags[i]);
 		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
 		bEqual &= common::LogDifference<"pVecVelocities">(i, pVecVelocities[i], rOther.pVecVelocities[i]);
 		bEqual &= common::LogDifference<"pVecExplosionDirections">(i, pVecExplosionDirections[i], rOther.pVecExplosionDirections[i]);

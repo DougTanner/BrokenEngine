@@ -8,6 +8,18 @@ namespace engine
 
 struct FramePostRenderBase;
 
+// Every PostRender's pLifecycleFlags column. The Destroy-phase compaction fold (CompactCollections) removes a
+// kTransfer or kDestroy row; kDying marks a timed death its own collection plays out before it sets kDestroy.
+enum class LifecycleFlags : uint8_t
+{
+	kTransfer = 0x01,
+	kDestroy  = 0x02,
+	kDying    = 0x04,
+};
+using LifecycleFlags_t = common::Flags<LifecycleFlags>;
+
+template <typename FRAME, typename INTERPOLATE, typename POST_RENDER>
+void ReleaseOwnedHandles(FRAME& rFrame, INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, int64_t i);
 
 template <typename INTERPOLATE, typename POST_RENDER>
 inline int64_t AddElement(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender)
@@ -16,6 +28,7 @@ inline int64_t AddElement(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender)
 	++rPostRender.iCount;
 	int64_t iSpawnIndex = rInterpolate.iCount - 1;
 	ASSERT(iSpawnIndex < rInterpolate.iCapacity);
+	rPostRender.pLifecycleFlags[iSpawnIndex] = {};
 	return iSpawnIndex;
 }
 
@@ -98,15 +111,6 @@ void RemoveIndexableElement(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender,
 	rInterpolate.idToIndexMap.erase(id);
 }
 
-// Removes an externally-owned handle from paired collections, then invalidates that handle.
-template <typename INTERPOLATE, typename POST_RENDER, typename INTERPOLATE_TUPLE, typename POST_RENDER_TUPLE>
-void RemoveIndexableElementAndClearHandle(INTERPOLATE& rInterpolate, POST_RENDER& rPostRender, typename INTERPOLATE::id_t& rId, INTERPOLATE_TUPLE&& rInterpolateTuple, POST_RENDER_TUPLE&& rPostRenderTuple)
-{
-	ASSERT((rId.uuid.iValue != 0));
-	RemoveIndexableElement(rInterpolate, rPostRender, rId, std::forward<INTERPOLATE_TUPLE>(rInterpolateTuple), std::forward<POST_RENDER_TUPLE>(rPostRenderTuple));
-	rId = {};
-}
-
 // Position of collection type T in a Collections() tuple of references; the tuple size when T is absent.
 template <typename T, typename... TS>
 consteval int64_t CollectionTupleIndex([[maybe_unused]] std::type_identity<std::tuple<TS...>> typeIdentity)
@@ -120,19 +124,29 @@ consteval int64_t CollectionTupleIndex([[maybe_unused]] std::type_identity<std::
 	return iIndex;
 }
 
-// Frame-collection form: both frame halves list each collection pair at the same Collections() index.
+// Releases an owner's handle if it holds one: marks the named row kDestroy for the Destroy-phase compaction fold,
+// releases the rows that row owns in turn, and invalidates the handle. A zero handle is a no-op. Both frame halves
+// list each collection pair at the same Collections() index.
 template <typename FRAME, typename INTERPOLATE>
-void RemoveIndexableElementAndClearHandle(FRAME& rFrame, Id<INTERPOLATE>& rId)
+void ReleaseIndexableElementAndClearHandle(FRAME& rFrame, Id<INTERPOLATE>& rId)
 {
 	using InterpolateTuple = decltype(rFrame.interpolate.Collections());
 	using PostRenderTuple = decltype(rFrame.postRender.Collections());
 	static constexpr int64_t kiIndex = CollectionTupleIndex<INTERPOLATE>(std::type_identity<InterpolateTuple> {});
-	static_assert(kiIndex < static_cast<int64_t>(std::tuple_size_v<InterpolateTuple>), "RemoveIndexableElementAndClearHandle: the handle's collection is not a frame collection");
+	static_assert(kiIndex < static_cast<int64_t>(std::tuple_size_v<InterpolateTuple>), "ReleaseIndexableElementAndClearHandle: the handle's collection is not a frame collection");
+
+	if (rId.uuid.iValue == 0)
+	{
+		return;
+	}
 
 	INTERPOLATE& rInterpolate = std::get<static_cast<size_t>(kiIndex)>(rFrame.interpolate.Collections());
 	std::tuple_element_t<static_cast<size_t>(kiIndex), PostRenderTuple> rPostRender = std::get<static_cast<size_t>(kiIndex)>(rFrame.postRender.Collections());
 
-	RemoveIndexableElementAndClearHandle(rInterpolate, rPostRender, rId, rInterpolate.Members(), rPostRender.Members());
+	int64_t iIndex = rInterpolate.idToIndexMap.at(rId);
+	rPostRender.pLifecycleFlags[iIndex].Set(LifecycleFlags::kDestroy);
+	ReleaseOwnedHandles(rFrame, rInterpolate, rPostRender, iIndex);
+	rId = {};
 }
 
 // Removes element at index from paired collections using swap-and-pop: the last row moves into index iIndex, so

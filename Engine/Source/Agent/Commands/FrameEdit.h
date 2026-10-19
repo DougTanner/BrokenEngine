@@ -24,8 +24,8 @@ template <typename OWNER, typename MEMBER> struct MemberOwner<MEMBER OWNER::*>
 	using Type = OWNER;
 };
 
-using ExplosionsFrameColumns = FrameColumnList<FRAME_COLUMN(ExplosionsInterpolate, puiTypeIndices), FRAME_COLUMN(ExplosionsInterpolate, pFlags), FRAME_COLUMN(ExplosionsInterpolate, pStartTimes), FRAME_COLUMN(ExplosionsInterpolate, pVecPositions), FRAME_COLUMN(ExplosionsInterpolate, pVecDirections), FRAME_COLUMN(ExplosionsInterpolate, pfTimePercents), FRAME_COLUMN(ExplosionsInterpolate, piTrailCounts), FRAME_COLUMN(ExplosionsInterpolate, pTrailTimes)>;
-using PushersFrameColumns = FrameColumnList<FRAME_COLUMN(PushersInterpolate, pVecPositions), FRAME_COLUMN(PushersInterpolate, pfRadii), FRAME_COLUMN(PushersInterpolate, pfIntensities), FRAME_COLUMN(PushersInterpolate, pfPowers), FRAME_COLUMN(PushersInterpolate, pFlags), FRAME_COLUMN(PushersPostRender, pIds)>;
+using ExplosionsFrameColumns = FrameColumnList<FRAME_COLUMN(ExplosionsInterpolate, puiTypeIndices), FRAME_COLUMN(ExplosionsInterpolate, pStartTimes), FRAME_COLUMN(ExplosionsInterpolate, pVecPositions), FRAME_COLUMN(ExplosionsInterpolate, pVecDirections), FRAME_COLUMN(ExplosionsInterpolate, pfTimePercents), FRAME_COLUMN(ExplosionsInterpolate, piTrailCounts), FRAME_COLUMN(ExplosionsInterpolate, pTrailTimes), FRAME_COLUMN(ExplosionsPostRender, pLifecycleFlags)>;
+using PushersFrameColumns = FrameColumnList<FRAME_COLUMN(PushersInterpolate, pVecPositions), FRAME_COLUMN(PushersInterpolate, pfRadii), FRAME_COLUMN(PushersInterpolate, pfIntensities), FRAME_COLUMN(PushersInterpolate, pfPowers), FRAME_COLUMN(PushersInterpolate, pFlags), FRAME_COLUMN(PushersPostRender, pIds), FRAME_COLUMN(PushersPostRender, pLifecycleFlags)>;
 
 template <typename... FIRST, typename... SECOND, typename... THIRD, typename... FOURTH>
 FrameColumnList<FIRST..., SECOND..., THIRD..., FOURTH...> ConcatenateColumns(FrameColumnList<FIRST...>, FrameColumnList<SECOND...>, FrameColumnList<THIRD...>, FrameColumnList<FOURTH...>);

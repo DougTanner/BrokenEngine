@@ -57,9 +57,9 @@ counts; the focused server frame-edit module owns `edit_frame` and
 - `edit_frame` writes a cell's current CRC'd frame state directly, outside the
   tick input, so it is refused while recording, during playback, or with a
   pending replay transition, because no replay records the edit. The command
-  adds and removes no row itself; the next tick's Destroy phase removes a row
-  whose kill state it wrote, through that collection's own hook, so
-  `edit_frame` never writes a handle or runs a removal. Connected clients
+  adds and removes no row itself; the shared compaction ending the next tick's
+  Destroy phase removes a row whose kill state it wrote, with the rows it owns,
+  so `edit_frame` never writes a handle or runs a removal. Connected clients
   resynchronize through the Save entry point (`../Save/AGENTS.md`). Command
   contract: `../../Documents/AgentHarness/commands-server.md`.
 - The engine `create_cell` and the game `edit_frame` are the only writers of the engine pinned frame value `uiPinned` (what it keeps loaded: the active-set bullet of `../../../../Engine/Source/Network/Server/AGENTS.md` `## Session Invariants`).

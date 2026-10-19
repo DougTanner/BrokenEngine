@@ -6,10 +6,10 @@ Explosions coordinate point lights, puffs, smoke trails, wind radials, and GPU p
 
 - Keep every shared-random draw outside client guards. Client-only effects consume the results, but both builds must advance the frame random engine identically.
 - Recalculated client frames suppress GPU-particle spawning without suppressing its random draws, preventing duplicate visuals during reconciliation while preserving stream lockstep.
-- Explosion state lives in Interpolate; the paired PostRender collection hosts phase operations and the public spawn API. Only shared members participate in deterministic CRC.
+- Explosion state lives in Interpolate; the paired PostRender collection holds only the standard lifecycle column and hosts phase operations and the public spawn API. Only shared members participate in deterministic CRC.
 - On clients, `PersistentMembers()` carries the fixed `pTrails[]` child-handle arrays through `AllocateAndCopyMembers()`; the server persistent tuple is empty. `Update` repopulates the shared columns and remaining client trail state.
 - Tuning values are game content, so the engine keeps only client-side pointers to the game's tuning wrappers in `ExplosionTuning`. The game fills every field before `ForEachRegister()` runs; registration verifies the fill because an unfilled pointer reaching a controller scale array reads as a neutral multiplier instead of failing. The engine dereferences the pointers with no null fallback, and the server never reads them.
 - Trail duration tuning scales both travel distance and elapsed trail time so head speed remains constant. Cleanup intentionally uses unmultiplied trail time, keeping child removal aligned with shared parent destruction.
-- Fixed trail slots are cleared when inactive so row reuse cannot expose stale shared state. Self-destroying explosions remove their row after owned trails expire; otherwise the caller owns row lifetime.
+- Fixed trail slots are cleared when inactive so row reuse cannot expose stale shared state. A `kDying` explosion marks its row `kDestroy` once its last trail ends; any other row stays until something marks it `kDestroy`, and its remaining trails leave with it.
 - Expiry compares whole nanoseconds: the shared destruction, the client trail cleanup, and the client expired-trail sync each convert a trail end with `common::FloatSecondsToNanoseconds`, so cleanup and destruction agree on every row.
 - `PostRead` rejects any row whose start time, time percent, or used trail time lies outside the ranges `Spawn` produces (`Explosions.h`).

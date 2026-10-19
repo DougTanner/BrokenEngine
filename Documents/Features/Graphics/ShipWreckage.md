@@ -6,9 +6,9 @@ Revisit When: ship deaths feel abrupt in playtests, or after `Documents/Features
 
 A destroyed spaceship explodes in place and vanishes; nothing outlives it:
 
-- A lethal blaster hit (collision) or missile splash (area damage) calls `BeginExplosion` (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/SpaceshipsCombat.cpp`). It sets `kExploding`, starts `pDestroyedTimes` at `kSpaceshipDestroyTime` (`Spaceships.h`), plays the death sound, and spawns the first explosion.
+- A lethal blaster hit (collision) or missile splash (area damage) calls `BeginExplosion` (`Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/SpaceshipsCombat.cpp`). It sets `kDying`, starts `pDestroyedTimes` at `kSpaceshipDestroyTime` (`Spaceships.h`), plays the death sound, and spawns the first explosion.
 - While the ship explodes, `SpaceshipsPostRender::Update` (`Spaceships.cpp`) replaces its velocity with a knockback away from the damage direction at `kfDeathKnockbackSpeed`. The `Spawn` phase hook emits a smaller explosion every `kSpaceshipDestroyExplosionInterval`, and `SpaceshipsRender.cpp` shrinks the model by the remaining destroy fraction.
-- `SpaceshipsPostRender::Destroy` removes the row once `pDestroyedTimes` reaches zero.
+- `SpaceshipsPostRender::Destroy` marks the row `kDestroy` once `pDestroyedTimes` reaches zero, and the compaction ending the same Destroy phase removes it.
 
 No message tells the client about a destruction. The client runs the same
 deterministic tick itself, then rolls back and replays a cell whose CRC

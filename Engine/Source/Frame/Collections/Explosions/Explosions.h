@@ -78,9 +78,8 @@ inline constexpr int64_t kiInvalidTrailType = 255;
 
 enum class ExplosionFlags : uint8_t
 {
-	kDestroysSelf = 0x01,
-	kYellow       = 0x02,
-	kRed          = 0x04,
+	kYellow = 0x02,
+	kRed    = 0x04,
 };
 using ExplosionFlags_t = common::Flags<ExplosionFlags>;
 
@@ -160,7 +159,7 @@ struct ExplosionType
 struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 	public TypeRegistry<ExplosionType>
 {
-	static constexpr int64_t kiVersion = 2;
+	static constexpr int64_t kiVersion = 3;
 
 	// Register default explosion effect types (called from ForEachRegister)
 	static void Register();
@@ -209,7 +208,6 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 	static void Update(game::FrameInterpolate& __restrict rCurrentFrameInterpolate, const game::Frame& __restrict rPreviousFrame);
 
 	uint8_t* __restrict puiTypeIndices = nullptr;
-	ExplosionFlags_t* __restrict pFlags = nullptr;
 	SimulationTime* __restrict pStartTimes = nullptr;
 	XMVECTOR* __restrict pVecPositions = nullptr;
 	XMVECTOR* __restrict pVecDirections = nullptr;
@@ -230,7 +228,7 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.puiTypeIndices, rSelf.pFlags, rSelf.pStartTimes, rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfTimePercents, rSelf.piTrailCounts, rSelf.pTrailTimes);
+		return std::tie(rSelf.puiTypeIndices, rSelf.pStartTimes, rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pfTimePercents, rSelf.piTrailCounts, rSelf.pTrailTimes);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -254,6 +252,14 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 		return std::tie();
 #endif
 	}
+	auto OwnedHandles([[maybe_unused]] this auto&& rSelf)
+	{
+#if defined(BT_CLIENT)
+		return std::tie(rSelf.pTrails);
+#else
+		return std::tie();
+#endif
+	}
 
 	bool LogDifferences(const ExplosionsInterpolate& rOther) const;
 };
@@ -261,15 +267,16 @@ struct ExplosionsInterpolate : public Collection<ExplosionsInterpolate>,
 struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 {
 	// Bump on any SOA layout change — feeds the Frame::kiVersion save/replay gate
-	static constexpr int64_t kiVersion = 1;
+	static constexpr int64_t kiVersion = 2;
 
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	static void Destroy(game::Frame& __restrict rFrame, const CellStaticData& rStaticData);
 
-	auto Members([[maybe_unused]] this auto&& rSelf)
+	LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;
+	auto Members(this auto&& rSelf)
 	{
-		return std::tie();
+		return std::tie(rSelf.pLifecycleFlags);
 	}
 
 	bool LogDifferences(const ExplosionsPostRender& rOther) const;
@@ -280,6 +287,7 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 		XMVECTOR vecPosition = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 		XMVECTOR vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 		ExplosionFlags_t flags {};
+		LifecycleFlags_t lifecycleFlags {};
 		int64_t iTrailCount = 0;
 		float fTrailAngle = XM_2PI;
 		int64_t iParticleCount = 0;
@@ -291,7 +299,7 @@ struct ExplosionsPostRender : public Collection<ExplosionsPostRender>
 		// Status-change payload members. The coordinate and start time come from the cell the spawn is applied to.
 		static constexpr auto Fields()
 		{
-			return FrameColumnList<FRAME_COLUMN(SpawnInfo, iTypeIndex), FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, iTrailCount), FRAME_COLUMN(SpawnInfo, fTrailAngle), FRAME_COLUMN(SpawnInfo, iParticleCount), FRAME_COLUMN(SpawnInfo, fParticleAngle), FRAME_COLUMN(SpawnInfo, fSizePercent), FRAME_COLUMN(SpawnInfo, fSmokePercent), FRAME_COLUMN(SpawnInfo, fTimePercent)> {};
+			return FrameColumnList<FRAME_COLUMN(SpawnInfo, iTypeIndex), FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, lifecycleFlags), FRAME_COLUMN(SpawnInfo, iTrailCount), FRAME_COLUMN(SpawnInfo, fTrailAngle), FRAME_COLUMN(SpawnInfo, iParticleCount), FRAME_COLUMN(SpawnInfo, fParticleAngle), FRAME_COLUMN(SpawnInfo, fSizePercent), FRAME_COLUMN(SpawnInfo, fSmokePercent), FRAME_COLUMN(SpawnInfo, fTimePercent)> {};
 		}
 	};
 

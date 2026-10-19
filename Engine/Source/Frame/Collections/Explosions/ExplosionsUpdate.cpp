@@ -22,7 +22,6 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
 		int64_t iTypeIndex = rPrevious.puiTypeIndices[i];
-		ExplosionFlags_t flags = rPrevious.pFlags[i];
 		XMVECTOR vecPosition = rPrevious.pVecPositions[i];
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
 
@@ -31,7 +30,6 @@ void ExplosionsInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __re
 		int64_t iTrailCount = rPrevious.piTrailCounts[i];
 
 		rCurrent.puiTypeIndices[i] = static_cast<uint8_t>(iTypeIndex);
-		rCurrent.pFlags[i] = flags;
 		rCurrent.pStartTimes[i] = rPrevious.pStartTimes[i];
 		rCurrent.pVecPositions[i] = vecPosition;
 		rCurrent.pVecDirections[i] = vecDirection;

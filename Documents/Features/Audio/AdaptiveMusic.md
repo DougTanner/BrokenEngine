@@ -51,7 +51,7 @@ Changes (3 files)
      };
 
    Update() evaluates game state each frame to compute a desired intensity:
-   - Count alive spaceships (iCount minus those with kExploding flag) from
+   - Count alive spaceships (iCount minus those with kDying flag) from
      SpaceshipsPostRender in the flagship owned entity's render frame
    - Check flagship owned entity armor/shields from OmnisPostRender
    - Count active blasters and missiles from the interpolate collections
@@ -78,7 +78,7 @@ Changes (3 files)
 
    Update():
    - Early-out if the flagship owned entity's frame is not available
-   - Get SpaceshipsPostRender from the frame, count alive enemies (skip kExploding)
+   - Get SpaceshipsPostRender from the frame, count alive enemies (skip kDying)
    - Get OmnisPostRender, find flagship owned entity index, read armor and shields
    - Get BlastersInterpolate and MissilesInterpolate counts for projectile activity
    - Use Game's mfPreviousClientArmor member field to detect recent damage (armor

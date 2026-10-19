@@ -78,9 +78,10 @@ struct WindRadialsPostRender : public Collection<WindRadialsPostRender>
 	// Add controlled wind radial (fire-and-forget, auto-destroys when animation ends)
 	static void XM_CALLCONV AddControlled(game::Frame& __restrict rFrame, SimulationTime currentTime, int64_t iControllerTypeIndex, FXMVECTOR vecPosition, float fBaseIntensity, float fBaseSize);
 
-	auto Members([[maybe_unused]] this auto&& rSelf)
+	LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;
+	auto Members(this auto&& rSelf)
 	{
-		return std::tie();
+		return std::tie(rSelf.pLifecycleFlags);
 	}
 
 };

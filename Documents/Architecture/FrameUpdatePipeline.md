@@ -191,7 +191,12 @@ provides game collection registration to the compile-time folds in
 [`FrameUtils.h`](../../Engine/Source/Frame/FrameUtils.h). `Update` is mandatory
 for every registered collection and compile-checked by its fold. Other phase
 participation is declaration-driven: collections participate only when their
-matching hook is declared. Engine code walks the engine collections immediately
+matching hook is declared. The one exception is removal: the game's Destroy
+body ends with the engine compaction fold `CompactCollections`, which removes
+the rows marked for transfer or removal from every registered collection pair,
+declared hook or not
+([`Engine/Source/Frame/Collections/AGENTS.md`](../../Engine/Source/Frame/Collections/AGENTS.md)).
+Engine code walks the engine collections immediately
 before each game call — registration in the `GameBase` constructor, graphics
 resources in `PipelineManager`, the PostRender phases from PreCollision on in
 `RunFrameTick`, and begin/render/end in the main render pass — so engine

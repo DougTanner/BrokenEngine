@@ -704,19 +704,23 @@ One Plan, one landing; the stages order the work so each builds and runs.
   names and decision 4's `ShipFlags` values (`kExploding` is `0x0001` for all
   three types, where today's Spaceships use 2), and keeps the clause true of the
   three ship collections.
-- `Documents/Plans/Engine/CollectionLifecycleFlags.md` moves the Omnis and
-  Spaceships `kExploding` and `kTransfer` bits out of `pFlags` into one shared
-  engine `pLifecycleFlags` column (`engine::LifecycleFlags_t`), renaming
-  `kExploding` to `kDying`, turns their pusher and wind-trail removals and the
-  Omnis hex-shield removals into releases through `engine::ReleaseIndexableElementAndClearHandle`
-  that the owned collection's next Destroy completes, and rewrites the Omnis and
-  Spaceships `edit_frame` kill-state rows. Decision 4 puts those two bits in
-  `ShipFlags`. Whichever lands second re-derives: if that Plan lands first,
-  `ShipFlags` drops `kExploding` and `kTransfer`, the Fighters, Omnis, and
-  Battleships each carry `pLifecycleFlags` and release their owned rows, and
-  this Plan's kill-state rows write `pLifecycleFlags` instead of `pFlags`; if
-  this Plan lands first, that Plan's Omnis and Spaceships rows apply to the
-  Fighters, Omnis, and Battleships.
+- The collection lifecycle-flags change (landed: one shared engine
+  `pLifecycleFlags` column, mark-only Transfer/Destroy hooks, one
+  `CompactCollections` fold with an `OwnedHandles()` cascade) moved the Omnis
+  and Spaceships `kExploding` and `kTransfer` bits out of `pFlags` into
+  `pLifecycleFlags` (`engine::LifecycleFlags_t`), renaming `kExploding` to
+  `kDying`. Their pushers and wind trails and the Omnis hex shields are listed
+  in `OwnedHandles()` and leave in the same tick's fold as their owner; an owner
+  releasing a held row while it stays alive tags it `kDestroy` through
+  `engine::ReleaseIndexableElementAndClearHandle`. It rewrote the Omnis and
+  Spaceships `edit_frame` kill-state rows, dropped the lifecycle parameter from
+  `SpaceshipsPostRender::RegenerateHealth`, and made `ValidatePusherOwners`
+  also reject any nonzero Pushers `pLifecycleFlags`. Decision 4 puts those two
+  bits in `ShipFlags`; this Plan re-derives at claim: `ShipFlags` drops
+  `kExploding` and `kTransfer`, the Fighters, Omnis, and Battleships each carry
+  `pLifecycleFlags`, mark-only hooks, and an `OwnedHandles()` list, the shared
+  `RegenerateHealth` takes no flags, and this Plan's kill-state rows write
+  `pLifecycleFlags` instead of `pFlags`.
 - The game `Frame` read checks that every Omnis and Spaceships pusher handle
   names its own Pushers row and that the Pushers count equals the owner counts
   (`Frame/Frame.cpp` `ValidatePusherOwners`). This Plan makes the check cover

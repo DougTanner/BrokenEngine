@@ -210,13 +210,11 @@ void OmnisPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
-		return rCurrentPostRender.pFlags[i] & kTransfer;
+		return rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kTransfer;
 	}, [&](int64_t i)
 	{
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
 
-		OmniFlags_t flags = rCurrentPostRender.pFlags[i];
-		flags.Set(kTransfer, false);
 		TransferRequest request
 		{
 			.change = MakeTransfer(SpawnInfo
@@ -232,7 +230,7 @@ void OmnisPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 				.shieldCooldown = rCurrentPostRender.pShieldCooldowns[i],
 				.shieldDownSoundCooldown = rCurrentPostRender.pShieldDownSoundCooldowns[i],
 				.animationTime = rCurrentInterpolate.pAnimationTimes[i],
-				.flags = flags,
+				.flags = rCurrentPostRender.pFlags[i],
 				.transferLockTimer = std::chrono::duration<float>(1.0f),
 				.arrivalGracePeriod = kArrivalGracePeriod,
 				.navigationDelay = rCurrentPostRender.pNavigationDelays[i],
@@ -250,13 +248,6 @@ void OmnisPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 			DEBUG_BREAK();
 		}
 		rFrame.postRender.PushTransferRequest(request);
-
-		engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.pPushers[i]);
-#if defined(BT_CLIENT)
-		OmnisInterpolate::RemoveOwnedVisuals(rFrame, rCurrentInterpolate, i);
-#endif // BT_CLIENT
-
-		engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, rCurrentPostRender.pIds[i], rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	});
 }
 

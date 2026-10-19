@@ -93,9 +93,10 @@ struct PointLightsPostRender : public Collection<PointLightsPostRender>
 	static void Destroy(game::Frame& __restrict rFrame, const CellStaticData& rStaticData);
 
 	point_lights_t* __restrict pIds = nullptr;
+	LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;
 	auto Members(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags);
 	}
 
 };

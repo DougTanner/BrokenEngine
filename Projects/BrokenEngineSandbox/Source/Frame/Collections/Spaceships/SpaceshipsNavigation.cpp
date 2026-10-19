@@ -163,7 +163,7 @@ void SpaceshipsPostRender::AvoidTerrain([[maybe_unused]] Frame& __restrict rFram
 
 	for (int64_t i = iStart; i < iEnd; ++i)
 	{
-		if (rCurrentPostRender.pFlags[i] & kExploding) [[unlikely]]
+		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) [[unlikely]]
 		{
 			continue;
 		}

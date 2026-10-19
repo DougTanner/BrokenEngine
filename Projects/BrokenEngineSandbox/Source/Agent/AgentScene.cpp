@@ -20,15 +20,28 @@ static nlohmann::json Vector2ToJson(float fX, float fY)
 	return nlohmann::json::array({fX, fY});
 }
 
+static void AppendLifecycleFlagNames(engine::LifecycleFlags_t lifecycleFlags, nlohmann::json& rNames)
+{
+	if (lifecycleFlags & engine::LifecycleFlags::kTransfer)
+	{
+		rNames.push_back("kTransfer");
+	}
+	if (lifecycleFlags & engine::LifecycleFlags::kDestroy)
+	{
+		rNames.push_back("kDestroy");
+	}
+	if (lifecycleFlags & engine::LifecycleFlags::kDying)
+	{
+		rNames.push_back("kDying");
+	}
+}
+
 // Boolean OmniFlags only — the packed nav-direction (bits 8-10) and nav-waypoint (bits 12-13) ranges are
 // excluded; iterating them as single bits would emit meaningless names.
-static nlohmann::json OmniFlagNames(OmniFlags_t flags)
+static nlohmann::json OmniFlagNames(engine::LifecycleFlags_t lifecycleFlags, OmniFlags_t flags)
 {
 	nlohmann::json names = nlohmann::json::array();
-	if (flags & OmniFlags::kExploding)
-	{
-		names.push_back("kExploding");
-	}
+	AppendLifecycleFlagNames(lifecycleFlags, names);
 	if (flags & OmniFlags::kFireBlaster)
 	{
 		names.push_back("kFireBlaster");
@@ -45,10 +58,6 @@ static nlohmann::json OmniFlagNames(OmniFlags_t flags)
 	{
 		names.push_back("kMissileSpawnLeft");
 	}
-	if (flags & OmniFlags::kTransfer)
-	{
-		names.push_back("kTransfer");
-	}
 	if (flags & OmniFlags::kUseMissiles)
 	{
 		names.push_back("kUseMissiles");
@@ -64,24 +73,17 @@ static nlohmann::json OmniFlagNames(OmniFlags_t flags)
 	return names;
 }
 
-static nlohmann::json SpaceshipFlagNames(SpaceshipFlags_t flags)
+static nlohmann::json SpaceshipFlagNames(engine::LifecycleFlags_t lifecycleFlags, SpaceshipFlags_t flags)
 {
 	nlohmann::json names = nlohmann::json::array();
+	AppendLifecycleFlagNames(lifecycleFlags, names);
 	if (flags & SpaceshipFlags::kFleeOmni)
 	{
 		names.push_back("kFleeOmni");
 	}
-	if (flags & SpaceshipFlags::kExploding)
-	{
-		names.push_back("kExploding");
-	}
 	if (flags & SpaceshipFlags::kReturnToIslandCenter)
 	{
 		names.push_back("kReturnToIslandCenter");
-	}
-	if (flags & SpaceshipFlags::kTransfer)
-	{
-		names.push_back("kTransfer");
 	}
 	return names;
 }
@@ -244,7 +246,7 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 					{"armor", rOmnisPost.pfArmors[i]},
 					{"shield", rOmnisPost.pfShields[i]},
 					{"alignment", rOmnisPost.pAlignments[i].uiValue},
-					{"flags", OmniFlagNames(rOmnisPost.pFlags[i])},
+					{"flags", OmniFlagNames(rOmnisPost.pLifecycleFlags[i], rOmnisPost.pFlags[i])},
 				};
 			});
 		}
@@ -259,7 +261,7 @@ void CommandDescribeScene(const nlohmann::json& rParameters, nlohmann::json& rRe
 				{
 					{"health", rShipsPost.pfHealths[i]},
 					{"alignment", rShipsPost.pAlignments[i].uiValue},
-					{"flags", SpaceshipFlagNames(rShipsPost.pFlags[i])},
+					{"flags", SpaceshipFlagNames(rShipsPost.pLifecycleFlags[i], rShipsPost.pFlags[i])},
 				};
 			});
 		}

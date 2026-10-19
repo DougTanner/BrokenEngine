@@ -101,6 +101,14 @@ struct SpaceshipsInterpolate : public engine::Collection<SpaceshipsInterpolate>
 		return std::tie(rSelf.puiPushers, rSelf.puiRegistryIds);
 #endif
 	}
+	auto OwnedHandles(this auto&& rSelf)
+	{
+#if defined(BT_CLIENT)
+		return std::tie(rSelf.puiPushers, rSelf.puiWindTrails);
+#else
+		return std::tie(rSelf.puiPushers);
+#endif
+	}
 
 	bool LogDifferences(const SpaceshipsInterpolate& rOther) const;
 
@@ -114,15 +122,13 @@ struct SpaceshipsInterpolate : public engine::Collection<SpaceshipsInterpolate>
 enum class SpaceshipFlags : uint8_t
 {
 	kFleeOmni             = 0x01,
-	kExploding            = 0x02,
 	kReturnToIslandCenter = 0x04,
-	kTransfer             = 0x08,
 };
 using SpaceshipFlags_t = common::Flags<SpaceshipFlags>;
 
 struct SpaceshipsPostRender : public engine::Collection<SpaceshipsPostRender>
 {
-	static constexpr int64_t kiVersion = 6;
+	static constexpr int64_t kiVersion = 7;
 
 	// Simulation never produces non-finite health; reject it as a corrupt stream, since NaN or +inf health never dies.
 	static void PostRead(const SpaceshipsPostRender& rCurrent)
@@ -152,9 +158,10 @@ private:
 	static void ApplyTerrainBounce(const engine::CellStaticData& rStaticData, const SpaceshipsInterpolate& rPreviousInterpolate, SpaceshipsInterpolate& __restrict rCurrentInterpolate, int64_t i, std::chrono::duration<float> deltaTime, float& rfDeltaRotation, XMVECTOR& rVecVelocity);
 
 	// Defined in SpaceshipsCombat.cpp:
-	static void XM_CALLCONV RegenerateHealth(FXMVECTOR vecPosition, bool bOmniAlive, FXMVECTOR vecNearestOmni, SpaceshipFlags_t flags, std::chrono::duration<float> deltaTime, float& rfHealth);
+	static void XM_CALLCONV RegenerateHealth(FXMVECTOR vecPosition, bool bOmniAlive, FXMVECTOR vecNearestOmni, std::chrono::duration<float> deltaTime, float& rfHealth);
 
 public:
+	engine::LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;
 	SpaceshipFlags_t* __restrict pFlags = nullptr;
 	XMVECTOR* __restrict pVecVelocities = nullptr;
 	XMVECTOR* __restrict pVecDamageDirections = nullptr;
@@ -166,7 +173,7 @@ public:
 	// Server Members() must match SharedMembers() for wire/CRC parity; client-only fields stay outside SharedMembers().
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.pNextBlasterSpawnTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods);
+		return std::tie(rSelf.pLifecycleFlags, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecDamageDirections, rSelf.pfHealths, rSelf.pDestroyedExplosionTimes, rSelf.pNextBlasterSpawnTimes, rSelf.pAlignments, rSelf.pArrivalGracePeriods);
 	}
 	auto Members(this auto&& rSelf)
 	{
@@ -174,7 +181,7 @@ public:
 	}
 	auto PersistentMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecDamageDirections, rSelf.pAlignments);
+		return std::tie(rSelf.pLifecycleFlags, rSelf.pVecDamageDirections, rSelf.pAlignments);
 	}
 
 	bool LogDifferences(const SpaceshipsPostRender& rOther) const;

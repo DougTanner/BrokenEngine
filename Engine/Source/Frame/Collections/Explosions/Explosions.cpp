@@ -17,8 +17,6 @@ namespace engine
 template struct Collection<ExplosionsInterpolate>;
 template struct Collection<ExplosionsPostRender>;
 
-using enum ExplosionFlags;
-
 #if defined(BT_CLIENT)
 
 constexpr std::chrono::duration<float> kWindDepositDuration = std::chrono::duration<float>(0.3f);
@@ -196,29 +194,21 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 		int64_t iTrailCount = rInterpolate.piTrailCounts[i];
 
 #if defined(BT_CLIENT)
-		// Remove expired trails (cleanup happens every frame, not just at explosion expiration).
+		// Release expired trails (cleanup happens every frame, not just at explosion expiration).
 		// Cleanup uses unmultiplied pTrailTimes so it fires in lockstep with the shared explosion-entry
 		// destruction below — applying the client-only Duration multiplier here would let the entry be
-		// destroyed before the cleanup fires, orphaning the SmokeTrail and leaking it indefinitely.
+		// destroyed first, and the compaction fold would then release its trails before they end.
 		for (int64_t j = 0; j < iTrailCount; ++j)
 		{
-			smoke_trails_t& rTrailId = rInterpolate.pTrails[j][i];
-			if (!(rTrailId.uuid.iValue != 0))
-			{
-				continue;
-			}
-
 			std::chrono::duration<float> trailEndTime = fTimePercent * rType.trailDelayTime + rInterpolate.pTrailTimes[j][i];
 			if (explosionTime >= common::FloatSecondsToNanoseconds(trailEndTime))
 			{
-				RemoveIndexableElementAndClearHandle(rFrame, rTrailId);
+				ReleaseIndexableElementAndClearHandle(rFrame, rInterpolate.pTrails[j][i]);
 			}
 		}
 #endif // BT_CLIENT
 
-		ExplosionFlags_t flags = rInterpolate.pFlags[i];
-
-		if (!(flags & kDestroysSelf))
+		if (!(rPostRender.pLifecycleFlags[i] & LifecycleFlags::kDying))
 		{
 			continue;
 		}
@@ -235,9 +225,7 @@ void ExplosionsPostRender::Destroy(game::Frame& __restrict rFrame, [[maybe_unuse
 			continue;
 		}
 
-		// Remove the explosion using swap-and-pop
-		DestroyElement(rInterpolate, rPostRender, i, rInterpolate.Members(), rPostRender.Members());
-		--i;
+		rPostRender.pLifecycleFlags[i].Set(LifecycleFlags::kDestroy);
 	}
 }
 
@@ -250,7 +238,6 @@ bool ExplosionsInterpolate::LogDifferences(const ExplosionsInterpolate& rOther) 
 	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
 	{
 		bEqual &= common::LogDifference<"puiTypeIndices">(i, puiTypeIndices[i], rOther.puiTypeIndices[i]);
-		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
 		bEqual &= common::LogDifference<"pStartTimes">(i, pStartTimes[i].time_since_epoch().count(), rOther.pStartTimes[i].time_since_epoch().count());
 		bEqual &= common::LogDifference<"pVecPositions">(i, pVecPositions[i], rOther.pVecPositions[i]);
 		bEqual &= common::LogDifference<"pVecDirections">(i, pVecDirections[i], rOther.pVecDirections[i]);
@@ -269,7 +256,15 @@ bool ExplosionsInterpolate::LogDifferences(const ExplosionsInterpolate& rOther) 
 bool ExplosionsPostRender::LogDifferences(const ExplosionsPostRender& rOther) const
 {
 	common::ScopedLogDifferenceContext context("ExplosionsPostRender");
-	return Collection::LogDifferences(rOther);
+	bool bEqual = true;
+	bEqual &= Collection::LogDifferences(rOther);
+
+	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
+	{
+		bEqual &= common::LogDifference<"pLifecycleFlags">(i, pLifecycleFlags[i], rOther.pLifecycleFlags[i]);
+	}
+
+	return bEqual;
 }
 
 #if defined(BT_CLIENT)

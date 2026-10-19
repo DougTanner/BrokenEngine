@@ -22,7 +22,8 @@ static float AdmitSpawnTimer(float fSpawnTimer)
 }
 
 // Requires the Pushers id map already rebuilt from the read ids; that rebuild rejects id 0, so the map lookup also
-// rejects a zero handle.
+// rejects a zero handle. A pusher leaves only with its owner and rests with no lifecycle bit, so a kTransfer or
+// kDestroy bit on one would let the next compaction fold remove it while its owner still holds the handle.
 static void ValidatePusherOwners(const Frame& rFrame)
 {
 	const FrameInterpolate& rInterpolate = rFrame.interpolate;
@@ -30,6 +31,14 @@ static void ValidatePusherOwners(const Frame& rFrame)
 	if (rPushers.iCount != rInterpolate.pOmnis->iCount + rInterpolate.pSpaceships->iCount)
 	{
 		throw std::ios_base::failure("Frame pusher owners");
+	}
+	const engine::PushersPostRender& rPushersPostRender = rFrame.postRender.pushers;
+	for (int64_t i = 0; i < rPushersPostRender.iCount; ++i)
+	{
+		if (std::to_underlying(rPushersPostRender.pLifecycleFlags[i].meFlags) != 0)
+		{
+			throw std::ios_base::failure("Frame pusher owners");
+		}
 	}
 
 	auto seenAllocation = common::gpThreadLocal->mWorkbuffer.PushBuffer<bool*>(rPushers.iCount * static_cast<int64_t>(sizeof(bool)));
@@ -218,6 +227,8 @@ void FramePostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 	OmnisPostRender::Destroy(rFrame, rStaticData);
 
 	engine::ForEachPostRenderDestroy(GamePostRenderTypes {}, rFrame, rStaticData);
+
+	engine::CompactCollections(rFrame, std::tuple_cat(rFrame.interpolate.Collections(), std::tie(*rFrame.interpolate.pOmnis), GameInterpolateCollections(rFrame.interpolate)), std::tuple_cat(rFrame.postRender.Collections(), std::tie(*rFrame.postRender.pOmnis), GamePostRenderCollections(rFrame.postRender)));
 }
 
 static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData)
@@ -238,7 +249,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::CellStat
 	bool bFoundCenter = false;
 	for (int64_t i = 0; i < rInterpolate.pOmnis->iCount; ++i)
 	{
-		if (!(rFrame.postRender.pOmnis->pFlags[i] & OmniFlags::kExploding))
+		if (!(rFrame.postRender.pOmnis->pLifecycleFlags[i] & engine::LifecycleFlags::kDying))
 		{
 			if (!bFoundCenter)
 			{
@@ -267,7 +278,7 @@ static void SpawnSpaceshipGroup(Frame& __restrict rFrame, const engine::CellStat
 		}
 		for (int64_t j = 0; j < rInterpolate.pOmnis->iCount; ++j)
 		{
-			if (rFrame.postRender.pOmnis->pFlags[j] & OmniFlags::kExploding)
+			if (rFrame.postRender.pOmnis->pLifecycleFlags[j] & engine::LifecycleFlags::kDying)
 			{
 				continue;
 			}

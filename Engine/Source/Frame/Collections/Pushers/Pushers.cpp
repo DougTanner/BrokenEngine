@@ -42,6 +42,7 @@ bool PushersPostRender::LogDifferences(const PushersPostRender& rOther) const
 	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
 	{
 		bEqual &= common::LogDifference<"pIds">(i, pIds[i], rOther.pIds[i]);
+		bEqual &= common::LogDifference<"pLifecycleFlags">(i, pLifecycleFlags[i], rOther.pLifecycleFlags[i]);
 	}
 
 	return bEqual;

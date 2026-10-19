@@ -32,8 +32,6 @@ namespace game
 
 constexpr float kfDeathKnockbackSpeed = 20.0f;
 
-using enum SpaceshipFlags;
-
 constexpr float kfSpaceshipExplosionParticleCount = 8.0f;
 constexpr float kfSpaceshipExplosionSizeStart = kfSpaceshipRadius * 0.625f;
 constexpr float kfSpaceshipExplosionSizeEnd = kfSpaceshipRadius * 0.25f;
@@ -82,7 +80,7 @@ constexpr std::chrono::duration<float> kHitFlashDuration(0.3f);
 
 	for (int64_t i = 0; i < rOmnis.iCount; ++i)
 	{
-		if (rOmnisPostRender.pFlags[i] & OmniFlags::kExploding)
+		if (rOmnisPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
 		{
 			continue;
 		}
@@ -217,7 +215,8 @@ void SpawnSpaceshipExplosion(Frame& __restrict rFrame, engine::GridCoord emitter
 		.iTypeIndex = giSpaceshipExplosionTypeIndex,
 		.vecPosition = vecJitteredPosition,
 		.vecDirection = vecJitteredDirection,
-		.flags = {engine::ExplosionFlags::kDestroysSelf, engine::ExplosionFlags::kRed},
+		.flags = {engine::ExplosionFlags::kRed},
+		.lifecycleFlags = {engine::LifecycleFlags::kDying},
 		.iTrailCount = kiSpaceshipExplosionTrailCount,
 		.fTrailAngle = fPercent * XM_PI,
 		.iParticleCount = static_cast<int64_t>(fPercent * kfSpaceshipExplosionParticleCount),
@@ -336,21 +335,6 @@ void SpaceshipsInterpolate::AllocateAndCopy(SpaceshipsInterpolate& rCurrent, con
 	engine::AllocateAndCopyMembers(rCurrent, rPrevious);
 }
 
-static void RemoveOwnedObjects(Frame& rFrame, SpaceshipsInterpolate& rCurrentInterpolate, int64_t i, bool bClearRegistryId)
-{
-	if (bClearRegistryId)
-	{
-		rCurrentInterpolate.puiRegistryIds[i] = {};
-	}
-	engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.puiPushers[i]);
-#if defined(BT_CLIENT)
-	if ((rCurrentInterpolate.puiWindTrails[i].uuid.iValue != 0))
-	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.puiWindTrails[i]);
-	}
-#endif
-}
-
 void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
@@ -360,7 +344,7 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
-		return rCurrentPostRender.pFlags[i] & kTransfer;
+		return rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kTransfer;
 	}, [&](int64_t i)
 	{
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
@@ -385,10 +369,6 @@ void SpaceshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [
 			DEBUG_BREAK();
 		}
 		rFrame.postRender.PushTransferRequest(request);
-
-		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i, true);
-
-		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	});
 }
 
@@ -399,12 +379,10 @@ void SpaceshipsPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[
 
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
-		return (rCurrentPostRender.pFlags[i] & kExploding) && !(rCurrentInterpolate.pDestroyedTimes[i] > std::chrono::duration<float>::zero());
+		return (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && !(rCurrentInterpolate.pDestroyedTimes[i] > std::chrono::duration<float>::zero());
 	}, [&](int64_t i)
 	{
-		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i, false);
-
-		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+		rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDestroy);
 	});
 }
 
@@ -418,7 +396,7 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		if ((rCurrentPostRender.pFlags[i] & kExploding) && rCurrentPostRender.pDestroyedExplosionTimes[i].count() <= 0.0f)
+		if ((rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && rCurrentPostRender.pDestroyedExplosionTimes[i].count() <= 0.0f)
 		{
 			rCurrentPostRender.pDestroyedExplosionTimes[i] = kSpaceshipDestroyExplosionInterval;
 
@@ -428,7 +406,7 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 			continue;
 		}
 
-		if (rCurrentPostRender.pFlags[i] & kExploding)
+		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
 		{
 			continue;
 		}
@@ -468,7 +446,6 @@ void SpaceshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[ma
 				.vecPosition = vecPosition,
 				.vecVelocity = vecBlasterVelocity,
 				.iTypeIndex = siEnemyBlasterTypeIndex,
-				.flags = {},
 				.alignment = rCurrentPostRender.pAlignments[i],
 				.fWindTrailIntensity = game::gWindDepositSpaceshipsBlastersIntensity.mfCurrent,
 				.fWindTrailWidth = game::gWindDepositSpaceshipsBlastersWidth.mfCurrent,
@@ -590,6 +567,7 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 	{
 		// Load from PostRender (static fields copied via memcpy in AllocateAndCopy)
 		SpaceshipFlags_t flags = rPrevious.pFlags[i];
+		engine::LifecycleFlags_t lifecycleFlags = rPrevious.pLifecycleFlags[i];
 		XMVECTOR vecVelocity = rPrevious.pVecVelocities[i];
 		float fHealth = rPrevious.pfHealths[i];
 		std::chrono::duration<float> destroyedExplosionTime = rPrevious.pDestroyedExplosionTimes[i] - deltaTime;
@@ -598,7 +576,7 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 
 		float fDeltaRotation = rPreviousInterpolate.pfDeltaRotations[i];
 
-		if (!(flags & kExploding)) [[likely]]
+		if (!(lifecycleFlags & engine::LifecycleFlags::kDying)) [[likely]]
 		{
 			if (arrivalGracePeriod > std::chrono::duration<float>::zero())
 			{
@@ -609,16 +587,13 @@ void SpaceshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[m
 				XMVECTOR vecNearestOmni = XMVectorZero();
 				bool bOmniAlive = NearestAliveOmniPosition(rOmnis, rOmnisPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestOmni);
 
-				RegenerateHealth(rCurrentInterpolate.pVecPositions[i], bOmniAlive, vecNearestOmni, flags, deltaTime, fHealth);
+				RegenerateHealth(rCurrentInterpolate.pVecPositions[i], bOmniAlive, vecNearestOmni, deltaTime, fHealth);
 				ComputeSteering(islandCandidates, rCurrentInterpolate.pVecPositions[i], rCurrentInterpolate.pVecDirections[i], bOmniAlive, vecNearestOmni, deltaTime, flags, fDeltaRotation);
 				ApplyMovement(rFrame, rCurrentInterpolate, i, flags, deltaTime, vecVelocity);
 			}
 		}
 		else
 		{
-			XMVECTOR vecNearestOmni = XMVectorZero();
-			bool bOmniAlive = NearestAliveOmniPosition(rOmnis, rOmnisPostRender, rCurrentInterpolate.pVecPositions[i], vecNearestOmni);
-			RegenerateHealth(rCurrentInterpolate.pVecPositions[i], bOmniAlive, vecNearestOmni, flags, deltaTime, fHealth);
 			vecVelocity = XMVectorScale(XMVectorNegate(rPrevious.pVecDamageDirections[i]), kfDeathKnockbackSpeed);
 		}
 
@@ -669,6 +644,7 @@ bool SpaceshipsPostRender::LogDifferences(const SpaceshipsPostRender& rOther) co
 
 	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
 	{
+		bEqual &= common::LogDifference<"pLifecycleFlags">(i, pLifecycleFlags[i], rOther.pLifecycleFlags[i]);
 		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
 		bEqual &= common::LogDifference<"pVecVelocities">(i, pVecVelocities[i], rOther.pVecVelocities[i]);
 		bEqual &= common::LogDifference<"pVecDamageDirections">(i, pVecDamageDirections[i], rOther.pVecDamageDirections[i]);

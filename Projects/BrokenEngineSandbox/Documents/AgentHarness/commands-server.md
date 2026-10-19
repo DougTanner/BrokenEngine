@@ -30,7 +30,7 @@ adding the fields below; the other entries are its own commands.
   its collection's count, as a transfer does; a `SpawnExplosion` counts under
   none, so an event holding only explosion spawns has every count zero.
 - `query_frame`: `{"coord":[x,y]}` for a loaded, ready cell. Returns counts under `omnis`, `spaceships`, `missiles`, and `blasters`.
-- `query_omnis`: `{"coord":[x,y],"offset"?:0,"limit"?:256}`. A negative `offset` or `limit` is a parameter error. Returns `{"total","omnis":[{"index","uuid","globalId","local":[x,y,z],"dir":[x,y,z],"armor","shield","flags":int,"alignment"}]}`. Every row belongs to the requested cell, so `local` is meters from that cell's center and no row repeats the coordinate.
+- `query_omnis`: `{"coord":[x,y],"offset"?:0,"limit"?:256}`. A negative `offset` or `limit` is a parameter error. Returns `{"total","omnis":[{"index","uuid","globalId","local":[x,y,z],"dir":[x,y,z],"armor","shield","flags":int,"lifecycleFlags":int,"alignment"}]}`. Every row belongs to the requested cell, so `local` is meters from that cell's center and no row repeats the coordinate.
 - `query_collection`:
   `{"coord":[x,y],"collection":"spaceships"|"missiles"|"blasters","offset"?:0,"limit"?:256}`.
   A negative `offset` or `limit` is a parameter error. Returns
@@ -94,8 +94,9 @@ adding the fields below; the other entries are its own commands.
   The edits apply to a staged copy of the frame, which is committed through the
   save reader's checks (pair count/capacity parity and ID maps, the
   `puiTypeIndices` bound, the `PostRead` hooks, the spawn-timer bound, and the
-  one-to-one pairing of omni and spaceship pusher handles with Pushers rows)
-  plus one more refusal: a changed `uiNextUuid` must lie within `[current, 2^47]`.
+  one-to-one pairing of omni and spaceship pusher handles with Pushers rows, and
+  no lifecycle bit on a Pushers row) plus one more refusal: a changed
+  `uiNextUuid` must lie within `[current, 2^47]`.
   Any failure before the commit returns `ok:false` with the frame unchanged. On
   success the frame CRC is recomputed. The command fails without `kbDebugInput`,
   while recording, during playback, and while a `replay_record` or `replay_play`
@@ -104,21 +105,24 @@ adding the fields below; the other entries are its own commands.
   written keys.
 
   Removing rows: write a row's kill state and the next unpaused tick's Destroy
-  phase removes it through the collection's own hook, exactly as a natural death
-  ends; an omni's or spaceship's pusher goes with it. Removal is swap-and-pop, so
-  another row may move into the removed slot: read indices again after the tick.
+  phase removes it in the
+  [shared compaction](../../../../Engine/Source/Frame/Collections/AGENTS.md#core-contract)
+  that ends the phase, exactly as a natural death ends; an omni's or spaceship's
+  pusher goes with it. Removal is swap-and-pop, so another row may move into the
+  removed slot: read indices again after the tick.
 
   | Collection | Writes that remove the row at the next tick | Normal staged death instead |
   |---|---|---|
-  | `omnis` | `pFlags:1` (`kExploding`; `pDestroyedTimes` is already 0 on a live omni) | `pfArmors:0`: PostCollision starts the 0.7 s death sequence with its explosions |
-  | `spaceships` | `pFlags:2` (`kExploding`; the live sentinel `pDestroyedTimes` -1 is not positive) | `pFlags:2`, `pDestroyedTimes:0.25`, `pDestroyedExplosionTimes:0.024`: the 0.25 s staged explosions, without the first full-size explosion and death sound a killing hit adds; missiles keep homing until removal. `pfHealths:0` alone changes nothing until the next hit, and health regenerates while a live omni is more than 60 m away |
-  | `missiles` | `pFlags:64` (`kSilentDespawn`) | none: `pFlags:2`, `pDestroyedTimes:0.35` only holds the missile still and shrinks it for 0.35 s before removal; its explosion and area damage come only from a hit |
-  | `blasters` | `pFlags:1` (`kDestroy`) | none |
-  | `explosions` | `pFlags:1` (`kDestroysSelf`) on a row without trails (`piTrailCounts` 0, the `SpawnExplosion` `iTrailCount` default) | `pFlags:1` on a row with trails: the row goes when its last trail ends. A row without `kDestroysSelf`, such as a `SpawnExplosion` injected without `flags`, is never removed |
+  | `omnis` | `pLifecycleFlags:2` (`kDestroy`) | `pfArmors:0`: PostCollision starts the 0.7 s death sequence with its explosions |
+  | `spaceships` | `pLifecycleFlags:2` (`kDestroy`) | `pLifecycleFlags:4` (`kDying`), `pDestroyedTimes:0.25`, `pDestroyedExplosionTimes:0.024`: the 0.25 s staged explosions, without the first full-size explosion and death sound a killing hit adds; missiles keep homing until removal. `pfHealths:0` alone changes nothing until the next hit, and health regenerates while a live omni is more than 60 m away |
+  | `missiles` | `pLifecycleFlags:2` (`kDestroy`) | none: `pLifecycleFlags:4` (`kDying`), `pDestroyedTimes:0.35` only holds the missile still and shrinks it for 0.35 s before removal; its explosion and area damage come only from a hit |
+  | `blasters` | `pLifecycleFlags:2` (`kDestroy`) | none |
+  | `explosions` | `pLifecycleFlags:2` (`kDestroy`); a row with trails takes its trails with it. Also `pLifecycleFlags:4` (`kDying`) on a row without trails (`piTrailCounts` 0, the `SpawnExplosion` `iTrailCount` default) | `pLifecycleFlags:4` on a row with trails: the row goes when its last trail ends. A row with neither bit, such as a `SpawnExplosion` injected without `lifecycleFlags`, is never removed unless one is written |
   | `pushers` | removed with their owning omni or spaceship only | |
 
-  - A `pFlags` write replaces the whole mask, so include any bit the scenario
-    still needs (for omnis, Update rebuilds the navigation bits).
+  - A `pFlags` or `pLifecycleFlags` write replaces the whole mask, so include
+    any bit the scenario still needs (for omnis, Update rebuilds the `pFlags`
+    navigation bits).
   - With a handshaken client the commit resynchronizes clients before the tick,
     as every `edit_frame` does. A fleet-owned omni removed this way is detected
     as a death after that tick (`ServerSessionBase::RebuildOwnedEntities`). Its
@@ -190,9 +194,9 @@ adding the fields below; the other entries are its own commands.
   |--------|--------|
   | `SpawnOmni` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `fArmor`, `fShield`, `nextBlasterFireTime`, `nextSecondarySpawnTime`, `shieldCooldown`, `shieldDownSoundCooldown`, `animationTime`, `flags`, `transferLockTimer`, `arrivalGracePeriod`, `navigationDelay`, `globalId` (refused), `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiPendingWeaponModeTicks`, `bTransfer` |
   | `SpawnSpaceship` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `fHealth`, `nextBlasterSpawnTime`, `arrivalGracePeriod`, `fDeltaRotation` |
-  | `SpawnBlaster` | `vecPosition`, `vecVelocity`, `iTypeIndex`, `flags`, `alignment`, `fWindTrailIntensity`, `fWindTrailWidth`, `fWindTrailLengthMultiplier` |
+  | `SpawnBlaster` | `vecPosition`, `vecVelocity`, `iTypeIndex`, `alignment`, `fWindTrailIntensity`, `fWindTrailWidth`, `fWindTrailLengthMultiplier` |
   | `SpawnMissile` | `vecPosition`, `vecDirection`, `vecVelocity`, `vecStoredDirection`, `fAcceleration`, `flags`, `alignment`, `deltaRotationDelay`, `fDeltaRotation`, `fDeltaRotationMaximum`, `fPitch`, `time`, `nextJitter`, `bTransfer` |
-  | `SpawnExplosion` | `iTypeIndex`, `vecPosition`, `vecDirection`, `flags`, `iTrailCount`, `fTrailAngle`, `iParticleCount`, `fParticleAngle`, `fSizePercent`, `fSmokePercent`, `fTimePercent` |
+  | `SpawnExplosion` | `iTypeIndex`, `vecPosition`, `vecDirection`, `flags`, `lifecycleFlags`, `iTrailCount`, `fTrailAngle`, `iParticleCount`, `fParticleAngle`, `fSizePercent`, `fSmokePercent`, `fTimePercent` |
   | `DestroyOmni` | `iOmniUuid` (required) |
   | `UpdateOmni` | `iOmniUuid` (required), `bUseMissiles`, `navigationDelaySeconds`, `uiPendingWeaponModeTicks` |
   | `UpdateFleet` | `iOmniUuid` (required), `bIsFlagship`, `fleetWantedCoordinate` (required), `uiPendingFleetWantedCoordinateTicks` |

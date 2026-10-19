@@ -187,12 +187,4 @@ void PushersPostRender::Add(game::Frame& __restrict rFrame, pusher_t& rId)
 	ZeroMemberRow(iSpawnIndex, rInterpolate.Members());
 }
 
-void PushersPostRender::Remove(game::Frame& __restrict rFrame, pusher_t& rId)
-{
-	PushersInterpolate& rInterpolate = rFrame.interpolate.pushers;
-	PushersPostRender& rPostRender = rFrame.postRender.pushers;
-
-	RemoveIndexableElementAndClearHandle(rInterpolate, rPostRender, rId, rInterpolate.Members(), rPostRender.Members());
-}
-
 } // namespace engine

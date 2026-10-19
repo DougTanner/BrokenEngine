@@ -15,8 +15,6 @@ template struct Collection<game::BlastersPostRender>;
 namespace game
 {
 
-using enum BlasterFlags;
-
 #if !defined(BT_CLIENT)
 void BlastersInterpolate::Register()
 {
@@ -115,7 +113,6 @@ bool BlastersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rSpawn
 	rCurrentInterpolate.pfWindTrailLengthMultipliers[iIndex] = rSpawnInformation.fWindTrailLengthMultiplier;
 #endif
 
-	rCurrentPostRender.pFlags[iIndex] = rSpawnInformation.flags;
 	rCurrentPostRender.pVecVelocities[iIndex] = rSpawnInformation.vecVelocity;
 	rCurrentPostRender.pAlignments[iIndex] = rSpawnInformation.alignment;
 
@@ -124,24 +121,6 @@ bool BlastersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rSpawn
 #endif
 
 	return true;
-}
-
-static void RemoveOwnedObjects([[maybe_unused]] Frame& rFrame, [[maybe_unused]] BlastersInterpolate& rCurrentInterpolate, [[maybe_unused]] int64_t i)
-{
-#if defined(BT_CLIENT)
-	if ((rCurrentInterpolate.pPointLights[i].uuid.iValue != 0))
-	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pPointLights[i]);
-	}
-	else
-	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pAreaLights[i]);
-	}
-	if ((rCurrentInterpolate.pWindTrails[i].uuid.iValue != 0))
-	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pWindTrails[i]);
-	}
-#endif // BT_CLIENT
 }
 
 void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
@@ -153,7 +132,7 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
-		return rCurrentPostRender.pFlags[i] & kTransfer;
+		return rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kTransfer;
 	}, [&](int64_t i)
 	{
 		XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
@@ -179,26 +158,6 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 			DEBUG_BREAK();
 		}
 		rFrame.postRender.PushTransferRequest(request);
-
-		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i);
-
-		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
-	});
-}
-
-void BlastersPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
-{
-	BlastersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBlasters;
-	BlastersPostRender& rCurrentPostRender = *rFrame.postRender.pBlasters;
-
-	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
-	{
-		return rCurrentPostRender.pFlags[i] & kDestroy;
-	}, [&](int64_t i)
-	{
-		RemoveOwnedObjects(rFrame, rCurrentInterpolate, i);
-
-		engine::DestroyElement(rCurrentInterpolate, rCurrentPostRender, i, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
 	});
 }
 
@@ -226,7 +185,7 @@ bool BlastersPostRender::LogDifferences(const BlastersPostRender& rOther) const
 
 	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
 	{
-		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
+		bEqual &= common::LogDifference<"pLifecycleFlags">(i, pLifecycleFlags[i], rOther.pLifecycleFlags[i]);
 		bEqual &= common::LogDifference<"pVecVelocities">(i, pVecVelocities[i], rOther.pVecVelocities[i]);
 		bEqual &= common::LogDifference<"pAlignments">(i, pAlignments[i], rOther.pAlignments[i]);
 	}

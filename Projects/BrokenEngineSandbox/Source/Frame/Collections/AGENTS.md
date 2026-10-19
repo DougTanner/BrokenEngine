@@ -14,7 +14,7 @@ Game-specific SOA collections built on the engine Collection framework (`../../.
   the terrain once and Spaceships bounce off it. A start already inside terrain
   logs a warning; spawn sites test at most the body's center against terrain, so
   a warning right after a spawn is expected.
-- Collections with client-owned visual/audio objects hydrate them after shared state arrives. Omnis instead recreate missing owned visuals during Update. Hydration is filling a newly allocated collection slot from transferred or loaded data.
+- Collections with client-owned visual/audio objects hydrate them after shared state arrives. Omnis instead recreate missing owned visuals in PostRender Spawn. Hydration is filling a newly allocated collection slot from transferred or loaded data.
 - Omnis and Spaceships receive a fresh one-second arrival grace timer after transfer. It suppresses targeting and behavior scans, not collision or damage.
 - A transfer arrival restores carried gameplay state verbatim except arrival
   grace, which is an intentional fresh one-second arrival default, Omnis'
@@ -38,7 +38,7 @@ Game-specific SOA collections built on the engine Collection framework (`../../.
   calls. In a `Spawn(SpawnInfo)` overload the bounds test runs before them
   (`../../../../../Engine/Source/Frame/AGENTS.md`).
 - Shared Update fields are loaded from the previous row and stored to the current row unconditionally. Persistent transition-only fields copied by `AllocateAndCopy` are the documented exception.
-- Pack related multi-valued state into the collection `Flags` type where appropriate. Use `/add-collection-member` for every layout change.
+- Pack related multi-valued state into the collection `Flags` type where appropriate; transfer, destroy, and dying states go in the engine lifecycle column instead (`../../../../../Engine/Source/Frame/Collections/AGENTS.md` `## Core Contract`). Use `/add-collection-member` for every layout change.
 - Debug geometry reads positions from the fully interpolated frame; PostRender may supply only flags, metadata, and static world positions.
 
 ## Collections

@@ -62,6 +62,7 @@ static nlohmann::json ExtractOmnis(const Frame& rFrame, int64_t iOffset, int64_t
 			{"armor", rPost.pfArmors[i]},
 			{"shield", rPost.pfShields[i]},
 			{"flags", std::to_underlying(rPost.pFlags[i].meFlags)},
+			{"lifecycleFlags", std::to_underlying(rPost.pLifecycleFlags[i].meFlags)},
 			{"alignment", rPost.pAlignments[i].uiValue},
 		});
 	}

@@ -304,9 +304,11 @@ sizes are the full packet including the type byte.
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
-client-sendable). The current wire-protocol version is 28, which lets one
-cell's per-tick status-change batch exceed `kiMaximumStatusChangesPerCell`: the
-server sends it whole and the client's decode scratch grows to fit; version 27
+client-sendable). The current wire-protocol version is 29, which drops `flags`
+from the `BlastersPostRender::SpawnInfo` `Fields()` list and adds
+`lifecycleFlags` to the `ExplosionsPostRender::SpawnInfo` one; version 28 let
+one cell's per-tick status-change batch exceed `kiMaximumStatusChangesPerCell`:
+the server sends it whole and the client's decode scratch grows to fit; version 27
 replaced the `StatusChangeType` tag set with spawn, transfer, and tick-input
 tags and made each spawn and transfer payload its collection's `SpawnInfo`
 `Fields()` list; version 26 moved the owned-entity state notification and the

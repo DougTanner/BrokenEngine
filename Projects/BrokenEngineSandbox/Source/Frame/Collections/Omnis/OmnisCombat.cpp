@@ -223,7 +223,7 @@ void OmnisPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		if (rCurrentPostRender.pFlags[i] & kExploding)
+		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
 		{
 			continue;
 		}
@@ -247,14 +247,14 @@ void OmnisPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 
 		if (rCurrentPostRender.pfArmors[i] <= 0.0f)
 		{
-			rCurrentPostRender.pFlags[i].Set(kExploding);
+			rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDying);
 			rCurrentInterpolate.pDestroyedTimes[i] = kDestroyTime;
 			rCurrentPostRender.pDestroyedExplosionTimes[i] = kDestroyExplosionInterval;
 		}
 		else if (engine::IsOutOfBounds(bounds, rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
 		{
 			// Entity candidates at or beyond cell exit were filtered during PreCollision.
-			rCurrentPostRender.pFlags[i].Set(kTransfer);
+			rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kTransfer);
 		}
 	}
 }
@@ -280,7 +280,7 @@ void OmnisPostRender::SpawnBlasters(Frame& __restrict rFrame, [[maybe_unused]] e
 		}
 
 		// Dying omnis stop firing blasters through the death-explosion animation (mirrors SpawnMissiles gate)
-		if (rCurrentPostRender.pFlags[i] & kExploding)
+		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
 		{
 			continue;
 		}
@@ -367,7 +367,7 @@ void OmnisPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame, [
 			continue;
 		}
 
-		if (rCurrentPostRender.pFlags[i] & kExploding)
+		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
 		{
 			continue;
 		}
@@ -443,7 +443,7 @@ void OmnisPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict rF
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		if (!((rCurrentPostRender.pFlags[i] & kExploding) && rCurrentPostRender.pDestroyedExplosionTimes[i].count() <= 0.0f && rCurrentInterpolate.pDestroyedTimes[i] > std::chrono::duration<float>::zero()))
+		if (!((rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && rCurrentPostRender.pDestroyedExplosionTimes[i].count() <= 0.0f && rCurrentInterpolate.pDestroyedTimes[i] > std::chrono::duration<float>::zero()))
 		{
 			continue;
 		}
@@ -465,7 +465,8 @@ void OmnisPostRender::SpawnDeathExplosions([[maybe_unused]] Frame& __restrict rF
 			.iTypeIndex = OmnisInterpolate::siExplosionTypeIndex,
 			.vecPosition = vecJitteredPosition,
 			.vecDirection = vecJitteredDirection,
-			.flags = {engine::ExplosionFlags::kDestroysSelf, engine::ExplosionFlags::kYellow},
+			.flags = {engine::ExplosionFlags::kYellow},
+			.lifecycleFlags = {engine::LifecycleFlags::kDying},
 			.iTrailCount = kiDeathTrailCount,
 			.fTrailAngle = fPercent * XM_PIDIV2,
 			.iParticleCount = static_cast<int64_t>(fPercent * kfExplosionParticleCount),

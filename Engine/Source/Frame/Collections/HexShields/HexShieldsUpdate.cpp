@@ -71,14 +71,6 @@ void HexShieldsPostRender::Add(game::Frame& __restrict rFrame, hex_shields_t& rI
 	rInterpolate.puiTypeIndices[iSpawnIndex] = static_cast<uint8_t>(iTypeIndex);
 }
 
-void HexShieldsPostRender::Remove(game::Frame& __restrict rFrame, hex_shields_t& rId)
-{
-	HexShieldsInterpolate& rInterpolate = rFrame.interpolate.hexShields;
-	HexShieldsPostRender& rPostRender = rFrame.postRender.hexShields;
-
-	RemoveIndexableElementAndClearHandle(rInterpolate, rPostRender, rId, rInterpolate.Members(), rPostRender.Members());
-}
-
 } // namespace engine
 
 #endif // BT_CLIENT

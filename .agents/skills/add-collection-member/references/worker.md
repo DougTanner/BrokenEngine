@@ -127,15 +127,21 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
     Use Blasters for the live send/receive shape. Match existing client guards;
     do not invent a second receive path. Done when transfer is either fully
     wired end to end or explicitly decided against.
-13. Create a client-owned handle or resource in per-row `ClientInitialize`.
+13. Wire what the column owns.
 
-    - Make it survive `ClientInitializeAll` full-state hydration through
-      `/Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp`,
-      local spawn, and teardown/removal.
-    - Copy it only where ownership persists.
+    - A client-owned handle or resource: create it in per-row
+      `ClientInitialize`, make it survive `ClientInitializeAll` full-state
+      hydration through
+      `/Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp`
+      and local spawn, and copy it only where ownership persists.
+    - A column of handles to rows the struct owns, shared or client-only: list
+      it in the owner's `OwnedHandles()`, so those rows leave with the owner,
+      per the row-lifecycle bullet of
+      `/Engine/Source/Frame/Collections/AGENTS.md` `## Core Contract`.
 
-    Done when each of those paths handles the resource, or the column owns no
-    client resource.
+    Done when any owned-row handle column is in `OwnedHandles()`, and the
+    hydration and local-spawn paths handle the client resource or the column
+    owns no client resource.
 14. Decide the column's identity semantics.
 
     - For `CollectionFlags::kIdToIndex`, tuple membership makes swap-and-pop
@@ -185,8 +191,9 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
     - [ ] Owner `SyncData`/`Sync`/callers complete when applicable
     - [ ] Transfer send, wire, receive, and destination initialization complete
       when applicable
-    - [ ] Client hydration, local creation, persistence, and teardown complete
-      when applicable
+    - [ ] Client hydration, local creation, and persistence complete, and an
+      owned-row handle column listed in the owner's `OwnedHandles()`, when
+      applicable
     - [ ] Identity semantics and agent-query exposure explicitly decided
     - [ ] Paired element counts remain valid and tuple order still reads as the
       intended wire order

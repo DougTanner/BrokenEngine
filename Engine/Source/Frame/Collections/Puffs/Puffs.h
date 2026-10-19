@@ -95,9 +95,10 @@ struct PuffsPostRender : public Collection<PuffsPostRender>
 
 	static void Destroy(game::Frame& __restrict rFrame, const CellStaticData& rStaticData);
 
-	auto Members([[maybe_unused]] this auto&& rSelf)
+	LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;
+	auto Members(this auto&& rSelf)
 	{
-		return std::tie();
+		return std::tie(rSelf.pLifecycleFlags);
 	}
 
 };

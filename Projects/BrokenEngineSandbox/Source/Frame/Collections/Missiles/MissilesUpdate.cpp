@@ -30,7 +30,7 @@ constexpr float kfDeltaRotationTowardsStored = 3.0f;
 
 #if defined(BT_CLIENT)
 // Defined in Missiles.cpp, where ClientInitialize also calls it.
-void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, engine::smoke_trails_t uiSmokeTrail, engine::sound_t uiSound, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecVelocity, GXMVECTOR vecPreviousPosition, MissileFlags_t flags, float fPitch, float fDeltaRotation, float fExhaustLength);
+void XM_CALLCONV SynchronizeMissile(FrameInterpolate& rFrameInterpolate, engine::area_lights_t uiAreaLight, engine::smoke_trails_t uiSmokeTrail, engine::sound_t uiSound, FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecVelocity, GXMVECTOR vecPreviousPosition, MissileFlags_t flags, engine::LifecycleFlags_t lifecycleFlags, float fPitch, float fDeltaRotation, float fExhaustLength);
 void XM_CALLCONV SynchronizeMissileTrail(FrameInterpolate& rFrameInterpolate, engine::smoke_trails_t uiSmokeTrail, FXMVECTOR vecPosition);
 #endif
 
@@ -48,8 +48,9 @@ void MissilesInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
 		std::chrono::duration<float> destroyedTime = rPrevious.pDestroyedTimes[i];
 		MissileFlags_t flags = rPreviousPostRender.pFlags[i];
+		engine::LifecycleFlags_t lifecycleFlags = rPreviousPostRender.pLifecycleFlags[i];
 
-		if (!(flags & kExploding)) [[likely]]
+		if (!(lifecycleFlags & engine::LifecycleFlags::kDying)) [[likely]]
 		{
 			vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
 			// Positions must always have W=1.0 — prevents W-lane drift via MultiplyAdd.
@@ -73,7 +74,7 @@ void MissilesInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 
 		// Sync owned objects (IDs copied in AllocateAndCopy)
 #if defined(BT_CLIENT)
-		SynchronizeMissile(rCurrentFrameInterpolate, rCurrent.puiAreaLights[i], rCurrent.puiSmokeTrails[i], rPreviousPostRender.puiSounds[i], vecPosition, vecDirection, rPreviousPostRender.pVecVelocities[i], vecPreviousPosition, flags, rPreviousPostRender.pfPitches[i], rPreviousPostRender.pfDeltaRotations[i], rPreviousPostRender.pfExhaustLengths[i]);
+		SynchronizeMissile(rCurrentFrameInterpolate, rCurrent.puiAreaLights[i], rCurrent.puiSmokeTrails[i], rPreviousPostRender.puiSounds[i], vecPosition, vecDirection, rPreviousPostRender.pVecVelocities[i], vecPreviousPosition, flags, lifecycleFlags, rPreviousPostRender.pfPitches[i], rPreviousPostRender.pfDeltaRotations[i], rPreviousPostRender.pfExhaustLengths[i]);
 #endif // BT_CLIENT
 	}
 }
@@ -102,7 +103,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		std::chrono::duration<float> nextJitter = rPrevious.pNextJitter[i];
 		XMVECTOR vecStoredDirection = rPrevious.pVecStoredDirections[i];
 
-		if (!(rCurrent.pFlags[i] & kExploding) && !(rCurrent.pFlags[i] & kFalling) && missileTime < kMissileLifetime) [[likely]]
+		if (!(rCurrent.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && !(rCurrent.pFlags[i] & kFalling) && missileTime < kMissileLifetime) [[likely]]
 		{
 			nextJitter -= deltaTime;
 
@@ -212,7 +213,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		rCurrent.pfExhaustLengths[i] = fExhaustLength;
 		rCurrent.pNextJitter[i] = nextJitter;
 
-		if (!(rCurrent.pFlags[i] & kExploding) && !(rCurrent.pFlags[i] & kFalling) && missileTime.count() >= kMissileLifetime.count())
+		if (!(rCurrent.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && !(rCurrent.pFlags[i] & kFalling) && missileTime.count() >= kMissileLifetime.count())
 		{
 			// The only release site: this is the one missile transition that happens while the window is live.
 			engine::ReleaseRegistryTarget(window.context, rCurrent.puiRegistryTargets[i]);
@@ -244,7 +245,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		if (rCurrent.pFlags[i] & kExploding)
+		if (rCurrent.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
 		{
 			continue;
 		}
@@ -308,7 +309,7 @@ void MissilesPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame,
 	std::span<engine::CollisionFlags_t> flags = engine::Collision::GetLayerFlags(siCollisionLayerIndex);
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		flags[static_cast<size_t>(i)] = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {engine::CollisionFlags::kDestroyOnCollide};
+		flags[static_cast<size_t>(i)] = (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {engine::CollisionFlags::kDestroyOnCollide};
 	}
 }
 
@@ -324,12 +325,12 @@ void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		if (rCurrentPostRender.pFlags[i] & kExploding) [[unlikely]]
+		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) [[unlikely]]
 		{
 			continue;
 		}
 
-		if (rCurrentPostRender.pFlags[i] & kSilentDespawn) [[unlikely]]
+		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDestroy) [[unlikely]]
 		{
 			continue;
 		}
@@ -355,7 +356,7 @@ void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 #endif
 			if ((rCurrentPostRender.pFlags[i] & kFalling) && XMVectorGetZ(outcome.vecTerrainPosition) <= 0.0f)
 			{
-				rCurrentPostRender.pFlags[i].Set(kSilentDespawn);
+				rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDestroy);
 			}
 			else
 			{
@@ -364,7 +365,7 @@ void MissilesPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 		}
 		else if (outcome.eType == engine::CollisionOutcomeType::kCellExit) [[unlikely]]
 		{
-			rCurrentPostRender.pFlags[i].Set(kTransfer);
+			rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kTransfer);
 		}
 	}
 }

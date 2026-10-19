@@ -82,18 +82,17 @@ using pusher_t = PushersInterpolate::id_t;
 struct PushersPostRender : public Collection<PushersPostRender>
 {
 	// Bump on any SOA layout change — feeds the Frame::kiVersion save/replay gate
-	static constexpr int64_t kiVersion = 1;
+	static constexpr int64_t kiVersion = 2;
 
 	static void Update(game::Frame& __restrict rFrame, const game::Frame& __restrict rPreviousFrame, const CellStaticData& rStaticData);
 
 	static void Add(game::Frame& __restrict rFrame, pusher_t& rId);
 
-	static void Remove(game::Frame& __restrict rFrame, pusher_t& rId);
-
 	pusher_t* __restrict pIds = nullptr;
+	LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;
 	auto Members(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags);
 	}
 
 	bool LogDifferences(const PushersPostRender& rOther) const;

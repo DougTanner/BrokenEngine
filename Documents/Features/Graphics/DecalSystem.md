@@ -54,8 +54,10 @@ Changes (15 files)
      SyncData struct with vecPosition, uiTypeIndex, fRotation, fAlpha.
      Static methods: Register, AllocateAndCopy, Sync, Update,
      GraphicsResources, BeginRender, Render, EndRender
-   - DecalsPostRender: Collection<DecalsPostRender> with pIds member.
-     Static methods: AllocateAndCopy, Update, PreCollision, Add, Remove,
+   - DecalsPostRender: Collection<DecalsPostRender> with pIds and
+     pLifecycleFlags members (Engine/Source/Frame/Collections/AGENTS.md,
+     Core Contract).
+     Static methods: AllocateAndCopy, Update, PreCollision, Add,
      PostCollision, AreaDamage, Transfer, Destroy, Spawn
    - extern template declarations for both collections
    - using decal_t = DecalsInterpolate::id_t
@@ -74,7 +76,10 @@ Changes (15 files)
    - Sync() -- copy SyncData fields to SOA arrays through idToIndexMap.at()
    - Add() -- GrowPairedCollections + AddVisualIndexableElement,
      set type index
-   - Remove() -- RemoveIndexableElement, clear id
+   - No Remove() wrapper: an owner releases its decal with
+     ReleaseIndexableElementAndClearHandle and lists its decal_t column
+     in OwnedHandles() so its decal leaves with it
+     (Engine/Source/Frame/Collections/AGENTS.md, Core Contract)
    - PreCollision/PostCollision/AreaDamage -- empty stubs
 
 4. Engine/Source/Frame/Collections/Decals/DecalsRender.cpp  [NEW]

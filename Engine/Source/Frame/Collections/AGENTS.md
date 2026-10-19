@@ -16,11 +16,29 @@ Use `/add-collection` for a new collection and `/add-collection-member` for any 
 - The interpolate-phase `Update` fan-out runs in two situations it cannot tell apart: fixed-step simulation inside the frame tick, and client render interpolation at a variable time step that is 0.0 while a coord's snapshots are still filling. Every `Update` must therefore be correct at any delta time including zero, and must not assume it is called once per tick — no counters, cooldowns, or spawns driven by call count.
 - Registering a collection type is a startup-only, once-per-type action with side effects: on the client, a non-zero type CRC schedules that texture chunk to load and registers it for lighting pre-blur. Register every type before the worker threads fan out; afterwards the type registry is read from parallel ticks without synchronization.
 - Use `ZeroMemberRow()` when a spawn's defaults are zero across a whole member tuple, then apply collection-specific non-zero defaults. Every Add path must still initialize its complete new row; stale shared state can desynchronize CRCs, and stale client-only state still corrupts local behavior.
+- Row lifecycle is mark-then-compact. Every PostRender carries the standard
+  `pLifecycleFlags` column (`engine::LifecycleFlags_t`,
+  `CollectionLifecycle.h`), carried to the next frame (listed in
+  `PersistentMembers()` where declared): `kTransfer` leaves the cell, `kDestroy`
+  removes the row, and `kDying` marks a timed death in progress, which only a
+  collection with a timed death acts on. `AddElement` zeroes it on every new
+  row. Transfer and Destroy hooks only set these bits and build transfer
+  requests; the one removal a hook makes is `DestroyExpiredControlled` dropping
+  expired controlled rows, which no handle names. `engine::CompactCollections` (`FrameUtils.h`),
+  called once as the last step of the game's Destroy phase, is the only removal
+  of a `kTransfer` or `kDestroy` row, and the rows a marked row's
+  `OwnedHandles()` name leave in their owner's tick whatever the tuple order.
+  `OwnedHandles()` returns a `std::tie` of the handle columns naming rows the
+  struct owns, each also a `Members()` column and client-only ones only under
+  `BT_CLIENT`; handles that name no collection row, such as frame registry
+  handles, stay out of it. An owner that drops a held row while it stays alive
+  calls `ReleaseIndexableElementAndClearHandle(rFrame, rId)`. Its lookup reaches
+  only the engine `Collections()`, so only engine collections can be owned.
 
 ## Identity, Serialization, and CRC
 
 - Optional ID maps are part of collection identity. Add/remove/swap operations must keep map entries and row indices synchronized.
-- Unconditional removals that consume an owner handle use `RemoveIndexableElementAndClearHandle()`. Conditional lifetime policies clear the handle separately, while internal removals of entries whose IDs were borrowed from another owner keep using `RemoveIndexableElement()`. Generated insertion callables are invoked exactly once so each helper preserves its assigned ID stream.
+- Collection code calls `RemoveIndexableElement()` only from the removals the `## Core Contract` row-lifecycle bullet names: the `CompactCollections` fold and a `DestroyExpiredControlled` callback. Generated insertion callables are invoked exactly once so each helper preserves its assigned ID stream.
 - ID maps are not serialized. Once both frame halves are read,
   `engine::ValidateCollectionPair` checks each pair's count/capacity parity and
   then rebuilds the map from the paired PostRender `pIds`, rejecting a zero or

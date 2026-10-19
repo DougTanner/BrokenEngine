@@ -134,6 +134,14 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	{
 		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes);
 	}
+	auto OwnedHandles(this auto&& rSelf)
+	{
+#if defined(BT_CLIENT)
+		return std::tie(rSelf.pPushers, rSelf.pWindTrails, rSelf.pHexShields);
+#else
+		return std::tie(rSelf.pPushers);
+#endif
+	}
 
 	static void BeginRender(int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates);
 	static void Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer);
@@ -141,23 +149,16 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	static void DebugRender(const FrameInterpolate& __restrict rFrameInterpolate, engine::GridCoord coordinate);
 
 	bool LogDifferences(const OmnisInterpolate& rOther) const;
-
-#if defined(BT_CLIENT)
-	// Helper shared by Omnis.cpp (Destroy, destroy-status-change cleanup) and OmnisNavigation.cpp (Transfer)
-	static void RemoveOwnedVisuals(Frame& rFrame, OmnisInterpolate& rCurrentInterpolate, int64_t i);
-#endif
 };
 
 using omni_t = engine::Id<OmnisInterpolate>;
 
 enum class OmniFlags : uint16_t
 {
-	kExploding        = 0x0001,
 	kFireBlaster      = 0x0002,
 	kBlasterSpawnLeft = 0x0004,
 	kFireMissile      = 0x0008,
 	kMissileSpawnLeft = 0x0010,
-	kTransfer         = 0x0020,
 	kUseMissiles      = 0x0040,
 	kIsFlagship       = 0x0080,
 
@@ -201,7 +202,7 @@ inline void SetNavigationWaypointIndex(OmniFlags_t& rFlags, int64_t iIndex)
 
 struct OmnisPostRender : public engine::Collection<OmnisPostRender>
 {
-	static constexpr int64_t kiVersion = 19;
+	static constexpr int64_t kiVersion = 20;
 
 	// Collision layer (set each frame in PreCollision)
 	// thread_local: parallel per-Frame tick via Dispatch
@@ -273,6 +274,7 @@ private:
 public:
 
 	omni_t* __restrict pIds = nullptr;
+	engine::LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;
 	OmniFlags_t* __restrict pFlags = nullptr;
 	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	std::chrono::duration<float>* __restrict pNextBlasterFireTimes = nullptr;
@@ -301,7 +303,7 @@ public:
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pDestroyedExplosionTimes, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pClientGuids, rSelf.pGlobalIds, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pDestroyedExplosionTimes, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pClientGuids, rSelf.pGlobalIds, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -319,13 +321,13 @@ public:
 	}
 	auto PersistentMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pAlignments, rSelf.pClientGuids, rSelf.pGlobalIds);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pAlignments, rSelf.pClientGuids, rSelf.pGlobalIds);
 	}
 
 	// CRC-only subset: excludes pClientGuids and pGlobalIds which are server-side bookkeeping
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pIds, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pDestroyedExplosionTimes, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
+		return std::tie(rSelf.pIds, rSelf.pLifecycleFlags, rSelf.pFlags, rSelf.pAlignments, rSelf.pNextBlasterFireTimes, rSelf.pNextSecondarySpawnTimes, rSelf.pVecVelocities, rSelf.pVecWantedDirections, rSelf.pfArmors, rSelf.pfShields, rSelf.pShieldCooldowns, rSelf.pDestroyedExplosionTimes, rSelf.pShieldDownSoundCooldowns, rSelf.pVecAiDirections, rSelf.pTransferLockTimers, rSelf.pArrivalGracePeriods, rSelf.pCellChangeTimers, rSelf.pVecIslandDestinations, rSelf.pNavigationDelays, rSelf.pFleetWantedCoordinates, rSelf.puiPendingFleetWantedCoordinateTicks, rSelf.puiPendingWeaponModeTicks);
 	}
 
 	bool LogDifferences(const OmnisPostRender& rOther) const;

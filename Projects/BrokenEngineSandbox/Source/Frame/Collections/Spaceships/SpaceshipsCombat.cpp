@@ -14,8 +14,6 @@
 namespace game
 {
 
-using enum SpaceshipFlags;
-
 constexpr float kfHealthRegeneration = 0.1f;
 constexpr float kfHealthRegenerationDistance = 60.0f;
 
@@ -37,7 +35,7 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::G
 	SpaceshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pSpaceships;
 	SpaceshipsPostRender& rCurrentPostRender = *rFrame.postRender.pSpaceships;
 
-	rCurrentPostRender.pFlags[i].Set(kExploding);
+	rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDying);
 	rCurrentInterpolate.pDestroyedTimes[i] = kSpaceshipDestroyTime;
 	rCurrentPostRender.pDestroyedExplosionTimes[i] = kSpaceshipDestroyExplosionInterval;
 
@@ -55,9 +53,9 @@ static void XM_CALLCONV BeginExplosion(Frame& rFrame, [[maybe_unused]] engine::G
 	SpawnSpaceshipExplosion(rFrame, emitterCoordinate, rCurrentInterpolate.pVecPositions[i], vecDirection, 1.0f);
 }
 
-void XM_CALLCONV SpaceshipsPostRender::RegenerateHealth(FXMVECTOR vecPosition, bool bOmniAlive, FXMVECTOR vecNearestOmni, SpaceshipFlags_t flags, std::chrono::duration<float> deltaTime, float& rfHealth)
+void XM_CALLCONV SpaceshipsPostRender::RegenerateHealth(FXMVECTOR vecPosition, bool bOmniAlive, FXMVECTOR vecNearestOmni, std::chrono::duration<float> deltaTime, float& rfHealth)
 {
-	if (!(flags & kExploding) && bOmniAlive && common::Distance(vecPosition, vecNearestOmni) > kfHealthRegenerationDistance) [[unlikely]]
+	if (bOmniAlive && common::Distance(vecPosition, vecNearestOmni) > kfHealthRegenerationDistance) [[unlikely]]
 	{
 		rfHealth = std::min(rfHealth + deltaTime.count() * kfHealthRegeneration, kfSpaceshipHealth);
 	}
@@ -89,7 +87,7 @@ void SpaceshipsPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFram
 	std::span<engine::CollisionFlags_t> flags = engine::Collision::GetLayerFlags(siCollisionLayerIndex);
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		flags[static_cast<size_t>(i)] = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
+		flags[static_cast<size_t>(i)] = (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
 	}
 }
 
@@ -107,7 +105,7 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		if (rCurrentPostRender.pFlags[i] & kExploding) [[unlikely]]
+		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) [[unlikely]]
 		{
 			continue;
 		}
@@ -137,10 +135,10 @@ void SpaceshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFra
 			}
 		}
 
-		if (!(rCurrentPostRender.pFlags[i] & kExploding) && engine::IsOutOfBounds(bounds, rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
+		if (!(rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && engine::IsOutOfBounds(bounds, rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
 		{
 			// PreCollision's exclusive maximum-time cutoff excludes entity contacts at or beyond cell exit.
-			rCurrentPostRender.pFlags[i].Set(kTransfer);
+			rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kTransfer);
 		}
 	}
 }
@@ -152,12 +150,12 @@ void SpaceshipsPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame,
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		if (rCurrentPostRender.pFlags[i] & kExploding)
+		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
 		{
 			continue;
 		}
 
-		if (rCurrentPostRender.pFlags[i] & kTransfer)
+		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kTransfer)
 		{
 			continue;
 		}

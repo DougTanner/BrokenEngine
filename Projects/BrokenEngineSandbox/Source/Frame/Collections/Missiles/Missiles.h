@@ -36,13 +36,10 @@ struct FrameInterpolate;
 
 enum class MissileFlags : uint8_t
 {
-	kTransfer  = 0x01,
-	kExploding = 0x02,
 	kDirectional = 0x04,
 	kTargetOmni  = 0x08,
 	kTargetEnemy = 0x10,
-	kFalling       = 0x20,
-	kSilentDespawn = 0x40,
+	kFalling     = 0x20,
 };
 using MissileFlags_t = common::Flags<MissileFlags>;
 
@@ -95,6 +92,14 @@ struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 		return std::tie();
 #endif
 	}
+	auto OwnedHandles([[maybe_unused]] this auto&& rSelf)
+	{
+#if defined(BT_CLIENT)
+		return std::tie(rSelf.puiAreaLights, rSelf.puiSmokeTrails);
+#else
+		return std::tie();
+#endif
+	}
 
 	bool LogDifferences(const MissilesInterpolate& rOther) const;
 
@@ -109,7 +114,7 @@ struct MissilesInterpolate : public engine::Collection<MissilesInterpolate>
 
 struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 {
-	static constexpr int64_t kiVersion = 11;
+	static constexpr int64_t kiVersion = 12;
 
 	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
@@ -119,6 +124,7 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 	static void Explode(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData, int64_t i, bool bDirectional);
 	static void Fall(Frame& __restrict rFrame, int64_t i, std::chrono::duration<float> deltaTime);
 
+	engine::LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;
 	MissileFlags_t* __restrict pFlags = nullptr;
 	XMVECTOR* __restrict pVecVelocities = nullptr;
 	XMVECTOR* __restrict pVecExplosionDirections = nullptr;
@@ -138,7 +144,7 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecExplosionDirections, rSelf.pVecStoredDirections, rSelf.puiRegistryTargets, rSelf.pTimes, rSelf.pDeltaRotationDelays, rSelf.pfDeltaRotations, rSelf.pNextJitter, rSelf.pfDeltaRotationMaximum, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.pfExhaustLengths, rSelf.pAlignments);
+		return std::tie(rSelf.pLifecycleFlags, rSelf.pFlags, rSelf.pVecVelocities, rSelf.pVecExplosionDirections, rSelf.pVecStoredDirections, rSelf.puiRegistryTargets, rSelf.pTimes, rSelf.pDeltaRotationDelays, rSelf.pfDeltaRotations, rSelf.pNextJitter, rSelf.pfDeltaRotationMaximum, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.pfExhaustLengths, rSelf.pAlignments);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -157,9 +163,17 @@ struct MissilesPostRender : public engine::Collection<MissilesPostRender>
 	auto PersistentMembers(this auto&& rSelf)
 	{
 #if defined(BT_CLIENT)
-		return std::tie(rSelf.pFlags, rSelf.pVecExplosionDirections, rSelf.pfDeltaRotationMaximum, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.puiSounds, rSelf.pAlignments);
+		return std::tie(rSelf.pLifecycleFlags, rSelf.pFlags, rSelf.pVecExplosionDirections, rSelf.pfDeltaRotationMaximum, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.puiSounds, rSelf.pAlignments);
 #else
-		return std::tie(rSelf.pFlags, rSelf.pVecExplosionDirections, rSelf.pfDeltaRotationMaximum, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.pAlignments);
+		return std::tie(rSelf.pLifecycleFlags, rSelf.pFlags, rSelf.pVecExplosionDirections, rSelf.pfDeltaRotationMaximum, rSelf.pfAccelerations, rSelf.pfPitches, rSelf.pAlignments);
+#endif
+	}
+	auto OwnedHandles([[maybe_unused]] this auto&& rSelf)
+	{
+#if defined(BT_CLIENT)
+		return std::tie(rSelf.puiSounds);
+#else
+		return std::tie();
 #endif
 	}
 

@@ -170,20 +170,6 @@ void OmnisInterpolate::Register()
 #endif // BT_CLIENT
 }
 
-#if defined(BT_CLIENT)
-void OmnisInterpolate::RemoveOwnedVisuals(Frame& rFrame, OmnisInterpolate& rCurrentInterpolate, int64_t i)
-{
-	if ((rCurrentInterpolate.pWindTrails[i].uuid.iValue != 0))
-	{
-		engine::RemoveIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pWindTrails[i]);
-	}
-	if ((rCurrentInterpolate.pHexShields[i].uuid.iValue != 0))
-	{
-		engine::HexShieldsPostRender::Remove(rFrame, rCurrentInterpolate.pHexShields[i]);
-	}
-}
-#endif // BT_CLIENT
-
 void OmnisPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
@@ -192,49 +178,23 @@ void OmnisPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[maybe
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 #if defined(BT_CLIENT)
-		if (rCurrentPostRender.pFlags[i] & kExploding)
+		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
 		{
-			OmnisInterpolate::RemoveOwnedVisuals(rFrame, rCurrentInterpolate, i);
+			engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pWindTrails[i]);
+			engine::ReleaseIndexableElementAndClearHandle(rFrame, rCurrentInterpolate.pHexShields[i]);
 		}
 #endif // BT_CLIENT
 	}
 
-	// Remove dead omnis (reverse iteration for swap-and-pop safety)
+	// Mark dead omnis for the compaction fold, which removes their pushers with them
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
-		return (rCurrentPostRender.pFlags[i] & kExploding) && rCurrentInterpolate.pDestroyedTimes[i].count() <= 0.0f;
+		return (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && rCurrentInterpolate.pDestroyedTimes[i].count() <= 0.0f;
 	},
 	[&](int64_t i)
 	{
-		engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.pPushers[i]);
-		engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, rCurrentPostRender.pIds[i], rCurrentInterpolate.Members(), rCurrentPostRender.Members());
+		rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDestroy);
 	});
-}
-
-static void ProcessDestroyStatusChanges([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
-{
-	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
-	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
-
-	for (const StatusChange& rStatusChange : rFrameInput.statusChanges)
-	{
-		if (rStatusChange.eType == StatusChangeType::kDestroyOmni)
-		{
-			int64_t iOmniUuid = std::get<DestroyOmniData>(rStatusChange.data).iOmniUuid;
-			omni_t destroyId {engine::Uuid {iOmniUuid}};
-
-			auto it = rCurrentInterpolate.idToIndexMap.find(destroyId);
-			if (it != rCurrentInterpolate.idToIndexMap.end())
-			{
-				engine::PushersPostRender::Remove(rFrame, rCurrentInterpolate.pPushers[it->second]);
-#if defined(BT_CLIENT)
-				OmnisInterpolate::RemoveOwnedVisuals(rFrame, rCurrentInterpolate, it->second);
-#endif // BT_CLIENT
-
-				engine::RemoveIndexableElement(rCurrentInterpolate, rCurrentPostRender, destroyId, rCurrentInterpolate.Members(), rCurrentPostRender.Members());
-			}
-		}
-	}
 }
 
 void OmnisPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
@@ -294,6 +254,17 @@ void OmnisPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __restr
 			}
 			continue;
 		}
+
+		if (rStatusChange.eType == StatusChangeType::kDestroyOmni)
+		{
+			omni_t destroyId {engine::Uuid {std::get<DestroyOmniData>(rStatusChange.data).iOmniUuid}};
+			auto it = rCurrentInterpolate.idToIndexMap.find(destroyId);
+			if (it != rCurrentInterpolate.idToIndexMap.end())
+			{
+				rCurrentPostRender.pLifecycleFlags[it->second].Set(engine::LifecycleFlags::kDestroy);
+			}
+			continue;
+		}
 	}
 
 	if (iUpdateFleetCount > 0)
@@ -304,15 +275,13 @@ void OmnisPostRender::ProcessUpdateStatusChanges([[maybe_unused]] Frame& __restr
 
 void OmnisPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const FrameInput& __restrict rFrameInput, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
-	ProcessDestroyStatusChanges(rFrame, rFrameInput, rStaticData);
-
 #if defined(BT_CLIENT)
 	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
 	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		if (!(rCurrentInterpolate.pWindTrails[i].uuid.iValue != 0) && !(rCurrentPostRender.pFlags[i] & kExploding))
+		if (!(rCurrentInterpolate.pWindTrails[i].uuid.iValue != 0) && !(rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying))
 		{
 			engine::WindTrailsPostRender::Add(rFrame, rCurrentInterpolate.pWindTrails[i],
 			{
@@ -323,7 +292,7 @@ void OmnisPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_u
 			});
 		}
 
-		if (!(rCurrentInterpolate.pHexShields[i].uuid.iValue != 0) && !(rCurrentPostRender.pFlags[i] & kExploding))
+		if (!(rCurrentInterpolate.pHexShields[i].uuid.iValue != 0) && !(rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying))
 		{
 			engine::HexShieldsPostRender::Add(rFrame, rCurrentInterpolate.pHexShields[i], OmnisInterpolate::siHexShieldTypeIndex);
 		}
@@ -419,7 +388,7 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 		std::chrono::duration<float> destroyedTime = rPrevious.pDestroyedTimes[i];
 		std::chrono::duration<float> animationTime = rPrevious.pAnimationTimes[i];
 
-		if (!(rPreviousPostRender.pFlags[i] & kExploding)) [[likely]]
+		if (!(rPreviousPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)) [[likely]]
 		{
 			vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
 		}
@@ -429,7 +398,7 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 
 		vecDirection = common::RotateTowardsPercent(vecDirection, rPreviousPostRender.pVecWantedDirections[i], common::ExponentialInterpolant(kfRotateTowardsSpeed, deltaTime.count()));
 
-		if (rPreviousPostRender.pFlags[i] & kExploding) [[unlikely]]
+		if (rPreviousPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) [[unlikely]]
 		{
 			destroyedTime = std::max(destroyedTime - deltaTime, std::chrono::duration<float>::zero());
 		}
@@ -490,7 +459,7 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 		rCurrent.pHexShieldVertexIntensities[i] = hexShieldVertexIntensities;
 		rCurrent.pHexShieldFragmentIntensities[i] = hexShieldFragmentIntensities;
 
-		if ((rCurrent.pHexShields[i].uuid.iValue != 0) && !(rPreviousPostRender.pFlags[i] & kExploding))
+		if ((rCurrent.pHexShields[i].uuid.iValue != 0) && !(rPreviousPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying))
 		{
 			XMMATRIX matRotation = XMMatrixRotationZ(rCurrent.pfShieldRotations[i]);
 			XMFLOAT3X4 f3x4Transform {};
@@ -566,7 +535,7 @@ void OmnisPostRender::PreCollision([[maybe_unused]] Frame& __restrict rFrame, [[
 	std::span<engine::CollisionFlags_t> flags = engine::Collision::GetLayerFlags(siCollisionLayerIndex);
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
-		flags[static_cast<size_t>(i)] = (rCurrentPostRender.pFlags[i] & kExploding) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
+		flags[static_cast<size_t>(i)] = (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) ? engine::CollisionFlags_t {engine::CollisionFlags::kAlreadyCollided} : engine::CollisionFlags_t {};
 	}
 }
 
@@ -724,6 +693,7 @@ bool OmnisPostRender::LogDifferences(const OmnisPostRender& rOther) const
 	for (int64_t i = 0; i < std::min(iCount, rOther.iCount); ++i)
 	{
 		bEqual &= common::LogDifference<"pIds">(i, pIds[i].uuid.iValue, rOther.pIds[i].uuid.iValue);
+		bEqual &= common::LogDifference<"pLifecycleFlags">(i, pLifecycleFlags[i], rOther.pLifecycleFlags[i]);
 		bEqual &= common::LogDifference<"pFlags">(i, pFlags[i], rOther.pFlags[i]);
 		bEqual &= common::LogDifference<"pAlignments">(i, pAlignments[i], rOther.pAlignments[i]);
 		bEqual &= common::LogDifference<"pNextBlasterFireTimes">(i, pNextBlasterFireTimes[i], rOther.pNextBlasterFireTimes[i]);

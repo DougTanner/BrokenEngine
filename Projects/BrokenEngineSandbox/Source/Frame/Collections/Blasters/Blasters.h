@@ -69,31 +69,31 @@ struct BlastersInterpolate : public engine::Collection<BlastersInterpolate>, pub
 		return std::tie(rSelf.puiTypeIndices);
 #endif
 	}
+	auto OwnedHandles([[maybe_unused]] this auto&& rSelf)
+	{
+#if defined(BT_CLIENT)
+		return std::tie(rSelf.pAreaLights, rSelf.pPointLights, rSelf.pWindTrails);
+#else
+		return std::tie();
+#endif
+	}
 
 	bool LogDifferences(const BlastersInterpolate& rOther) const;
 };
 
-enum class BlasterFlags : uint8_t
-{
-	kDestroy       = 0x01,
-	kTransfer      = 0x02,
-};
-using BlasterFlags_t = common::Flags<BlasterFlags>;
-
 struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 {
-	static constexpr int64_t kiVersion = 2;
+	static constexpr int64_t kiVersion = 3;
 
 	static void Update(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 	static void PreCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 	static void PostCollision(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, const engine::CellStaticData& rStaticData);
 	static void Transfer(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
-	static void Destroy(Frame& __restrict rFrame, const engine::CellStaticData& rStaticData);
 
-	BlasterFlags_t* __restrict pFlags = nullptr;
+	engine::LifecycleFlags_t* __restrict pLifecycleFlags = nullptr;
 	XMVECTOR* __restrict pVecVelocities = nullptr;
 	engine::AlignmentIdentifier* __restrict pAlignments = nullptr;
-	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.pFlags, rSelf.pVecVelocities, rSelf.pAlignments); }
+	auto SharedMembers(this auto&& rSelf) { return std::tie(rSelf.pLifecycleFlags, rSelf.pVecVelocities, rSelf.pAlignments); }
 	auto Members(this auto&& rSelf) { return rSelf.SharedMembers(); }
 
 	bool LogDifferences(const BlastersPostRender& rOther) const;
@@ -103,7 +103,6 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 		XMVECTOR vecPosition = DirectX::XMVectorZero();
 		XMVECTOR vecVelocity = DirectX::XMVectorZero();
 		int64_t iTypeIndex = 0;
-		BlasterFlags_t flags {};
 		engine::AlignmentIdentifier alignment {};
 		float fWindTrailIntensity = 0.0f;
 		float fWindTrailWidth = 0.0f;
@@ -112,7 +111,7 @@ struct BlastersPostRender : public engine::Collection<BlastersPostRender>
 		// Status-change payload members.
 		static constexpr auto Fields()
 		{
-			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, iTypeIndex), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, fWindTrailIntensity), FRAME_COLUMN(SpawnInfo, fWindTrailWidth), FRAME_COLUMN(SpawnInfo, fWindTrailLengthMultiplier)> {};
+			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, iTypeIndex), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, fWindTrailIntensity), FRAME_COLUMN(SpawnInfo, fWindTrailWidth), FRAME_COLUMN(SpawnInfo, fWindTrailLengthMultiplier)> {};
 		}
 	};
 

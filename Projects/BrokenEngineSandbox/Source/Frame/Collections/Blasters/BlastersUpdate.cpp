@@ -19,8 +19,6 @@
 namespace game
 {
 
-using enum BlasterFlags;
-
 // Collision layer index (set each frame in PreCollision)
 // thread_local: parallel per-Frame tick via Dispatch
 static thread_local int64_t siCollisionLayerIndex = 0;
@@ -220,13 +218,13 @@ void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 		engine::CollisionOutcome outcome = engine::Collision::GetOutcome(siCollisionLayerIndex, i);
 		if (outcome.eType == engine::CollisionOutcomeType::kEntity)
 		{
-			rCurrentPostRender.pFlags[i].Set(kDestroy);
+			rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDestroy);
 			continue;
 		}
 
 		if (outcome.eType == engine::CollisionOutcomeType::kTerrain) [[unlikely]]
 		{
-			rCurrentPostRender.pFlags[i].Set(kDestroy);
+			rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kDestroy);
 			XMVECTOR vecCollisionPosition = outcome.vecTerrainPosition;
 
 			// Add jitter for visual variety
@@ -244,7 +242,7 @@ void BlastersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 		}
 		else if (outcome.eType == engine::CollisionOutcomeType::kCellExit) [[unlikely]]
 		{
-			rCurrentPostRender.pFlags[i].Set(kTransfer);
+			rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kTransfer);
 		}
 	}
 }

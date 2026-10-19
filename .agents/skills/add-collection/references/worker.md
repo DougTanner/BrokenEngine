@@ -22,9 +22,9 @@ runner applies. The purpose and the triggers live in
    | Requested variant | Live exemplar files and symbols | Pattern to preserve |
    |---|---|---|
    | Shared-only game collection struct | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Spaceships/Spaceships.h`: `SpaceshipsPostRender`; sibling `.cpp` files | `SharedMembers()` plus `Members()` returning it, so a later client-only field cannot silently join the CRC; no special frame dispatch |
-   | Shared game state plus client-owned state | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.h`: both structs; `Missiles.cpp`: `ClientInitialize`, `ClientInitializeAll`, `Transfer`; `MissilesUpdate.cpp` | guarded `ClientMembers()`, client `tuple_cat`, hydration, owned-object teardown, transfer payload |
+   | Shared game state plus client-owned state | `Projects/BrokenEngineSandbox/Source/Frame/Collections/Missiles/Missiles.h`: both structs; `Missiles.cpp`: `ClientInitialize`, `ClientInitializeAll`, `Transfer`; `MissilesUpdate.cpp` | guarded `ClientMembers()`, client `tuple_cat`, hydration, `OwnedHandles()` on both structs, transfer payload |
    | Server-visible engine collection | `Engine/Source/Frame/Collections/Pushers/Pushers.h`: both structs; sibling `.cpp` files; `Engine/Source/Frame/FrameBase.h` | direct FrameBase storage, server tuple registration, index helpers, per-struct `kiVersion` declarations folded through server tuple registration |
-   | Owner-synchronized whole-file client-only collection | `Engine/Source/Frame/Collections/Sounds/Sounds.h`: both structs; sibling `.cpp` files; `FrameBase.h` | outer `BT_CLIENT` guard, `Members()` only, owner `Sync`/Add/Remove, custom client-only identity only when required |
+   | Owner-synchronized whole-file client-only collection | `Engine/Source/Frame/Collections/Sounds/Sounds.h`: both structs; sibling `.cpp` files; `FrameBase.h` | outer `BT_CLIENT` guard, `Members()` only, owner `Sync`/Add, owner releases the row through its `OwnedHandles()` or `ReleaseIndexableElementAndClearHandle`, custom client-only identity only when required |
    | Controller-driven fire-and-forget client-only collection | `Engine/Source/Frame/Collections/Puffs/Puffs.h`: both structs; `Puffs.cpp`, `PuffsUpdate.cpp`, `PuffsRender.cpp`; `FrameBase.h` | `Members()` only, controller metadata copy, paired Add/Destroy, no owner handle or persisted version |
 
    Done when every listed file has been read.
@@ -56,8 +56,16 @@ runner applies. The purpose and the triggers live in
 
    Done when the pair's accessors match the reachability case chosen in step 2.
 8. Create Interpolate/PostRender structs and their implementation files beside
-   the chosen exemplar. Done when both structs and their implementation files
-   are in place.
+   the chosen exemplar.
+
+   - Give the PostRender the standard `pLifecycleFlags` column, and declare
+     `OwnedHandles()` on each struct holding handles to rows it owns, per the
+     row-lifecycle bullet of `Engine/Source/Frame/Collections/AGENTS.md`
+     `## Core Contract`.
+
+   Done when both structs and their implementation files are in place, the
+   PostRender carries `pLifecycleFlags`, and every owning struct declares
+   `OwnedHandles()`.
 9. Give the mandatory `Update` its generic dispatch signature. Done when
    `Update` uses that signature and no no-op hook boilerplate was added.
 10. Declare `extern template struct Collection<...>` for both structs and
@@ -110,11 +118,12 @@ runner applies. The purpose and the triggers live in
     and guard relations (step 17); it cannot reach these
     two decisions, so settle them before finishing:
 
-    - [ ] Transferable state has matching send and receive wiring; source-owned
-      client objects are removed and destination objects recreated. Shared
-      collections with client-owned objects initialize them at local spawn and
-      after server state arrives (`ClientInitialize`/`ClientInitializeAll`
-      pattern), adding the `ClientInitializeAll` call to
+    - [ ] Transferable state has matching send and receive wiring; the source
+      row's owned rows leave with it through its `OwnedHandles()` (step 8), and
+      destination objects are recreated. Shared collections with client-owned
+      objects initialize them at local spawn and after server state arrives
+      (`ClientInitialize`/`ClientInitializeAll` pattern), adding the
+      `ClientInitializeAll` call to
       `ClientSession::HydrateReceivedFullState` in
       `/Projects/BrokenEngineSandbox/Source/Network/Client/ClientSession.cpp`.
 
@@ -179,8 +188,11 @@ runner applies. The purpose and the triggers live in
   do not contribute version terms. Sounds and Puffs are the live engine
   examples.
 - Use `CollectionFlags::kIdToIndex` only when external owners need a stable
-  handle. Prefer `AddIndexableElement` and `RemoveIndexableElement`; they
-  maintain the map during add and swap-and-pop.
+  handle. Add rows with `AddIndexableElement`, which maintains the map; never
+  call `RemoveIndexableElement` from collection code outside the removals the
+  row-lifecycle bullet of `Engine/Source/Frame/Collections/AGENTS.md`
+  `## Core Contract` names; remove any other row by releasing it from its owner
+  or marking it `kDestroy`, as that bullet directs.
   Manual identity wiring is conditional on a real alternate ID source or
   lifecycle, such as Sounds' client-only UUID stream, not on the flag itself.
 - Optional hooks merged into the surrounding phase need no no-op boilerplate:
