@@ -105,7 +105,12 @@ Tools builds have no allocation tracker, so the engine LOG float-format-spec res
   paths must be unique before deterministic sorting and aggregate assembly.
   Generated CRC header symbols must be unique per project run, and every
   discovered job participates in that check even when its type is clean.
-- Attribution generation: ThirdParty license collection detects changes before materializing Attribution and is additive: it copies selected licenses that are missing or newer than the generated files, but does not reconcile obsolete generated files or directories, so stale Attribution entries are accepted.
+- Attribution generation: ThirdParty license collection detects changes before
+  materializing Attribution and is additive: it copies selected licenses that
+  are missing or newer than the generated files, but does not reconcile obsolete
+  generated files or directories, so stale Attribution entries are accepted.
+  Assimp's nested dependency licenses and additional incorporated-code notices
+  are explicitly queued through the same destination validation and copy path.
 - Atomic output: Jobs write temporary files and rename only on complete success,
   discarding a failed temporary output without replacing the prior one;
   generated headers update only when content differs. A dirty export stages its

@@ -86,3 +86,6 @@
 	path = ThirdParty/json
 	url = https://github.com/nlohmann/json.git
 	branch = develop
+[submodule "ThirdParty/assimp"]
+	path = ThirdParty/assimp
+	url = https://github.com/assimp/assimp.git

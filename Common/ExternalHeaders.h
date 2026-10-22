@@ -346,8 +346,8 @@ inline constexpr bool XmIsInf(float fValue)
 	#define GLM_STATIC_ASSERT static_assert
 	#include "gli/gli/gli.hpp"
 
-	// cmft - cubemap filtering. Its headers don't parse with the CRT debug-heap malloc/realloc/free macros
-	// (from ENABLE_CRT_DEBUG_HEAP); neutralize across the cmft includes, then restore so the rest of the tool
+	// cmft and Assimp headers don't parse with the CRT debug-heap malloc/realloc/free macros
+	// (from ENABLE_CRT_DEBUG_HEAP); neutralize across their includes, then restore so the rest of the tool
 	// keeps leak tracking.
 	#undef malloc
 	#undef realloc
@@ -355,6 +355,10 @@ inline constexpr bool XmIsInf(float fValue)
 	#include <cmft/clcontext.h>
 	#include <cmft/image.h>
 	#include <cmft/cubemapfilter.h>
+	#include <assimp/Importer.hpp>
+	#include <assimp/importerdesc.h>
+	#include <assimp/postprocess.h>
+	#include <assimp/scene.h>
 	#if defined(_CRTDBG_MAP_ALLOC)
 		#define malloc(s) _malloc_dbg(s, _NORMAL_BLOCK, __FILE__, __LINE__)
 		#define realloc(p, s) _realloc_dbg(p, s, _NORMAL_BLOCK, __FILE__, __LINE__)

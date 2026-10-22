@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="DataPacker\assimp">
+      <UniqueIdentifier>{4EF41735-EA53-4947-8FB9-C63CD6F547E0}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Engine">
       <UniqueIdentifier>{a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d}</UniqueIdentifier>
     </Filter>
@@ -104,6 +107,272 @@
     </ClCompile>
     <ClCompile Include="..\..\Source\DataPacker\cmft.cpp">
       <Filter>DataPacker</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\3DS\3DSConverter.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\3DS\3DSLoader.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Collada\ColladaHelper.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Collada\ColladaLoader.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Collada\ColladaParser.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXAnimation.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXBinaryTokenizer.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXConverter.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXDeformer.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXDocument.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXDocumentUtil.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXImporter.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXMaterial.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXMeshGeometry.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXModel.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXNodeAttribute.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXParser.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXProperties.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXTokenizer.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXUtil.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Obj\ObjFileImporter.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Obj\ObjFileMtlImporter.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Obj\ObjFileParser.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Ply\PlyLoader.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Ply\PlyParser.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\STL\STLLoader.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\CApi\CInterfaceIOWrapper.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\AssertHandler.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\Assimp.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\BaseImporter.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\BaseProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\Compression.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\CreateAnimMesh.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\DefaultIOStream.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\DefaultIOSystem.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\DefaultLogger.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\Exceptional.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\Importer.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\ImporterRegistry.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\IOSystem.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\material.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\PostStepRegistry.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\scene.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\SceneCombiner.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\ScenePreprocessor.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\SGSpatialSort.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\SkeletonMeshBuilder.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\SpatialSort.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\TargetAnimation.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\Version.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\VertexTriangleAdjacency.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\ZipArchiveIOSystem.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Geometry\GeometryUtils.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Material\MaterialSystem.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\ArmaturePopulate.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\CalcTangentsProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\ComputeUVMappingProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\ConvertToLHProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\DeboneProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\DropFaceNormalsProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\EmbedTexturesProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\FindDegenerates.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\FindInstancesProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\FindInvalidDataProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\FixNormalsStep.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\GenBoundingBoxesProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\GenFaceNormalsProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\GenVertexNormalsProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\ImproveCacheLocality.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\JoinVerticesProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\LimitBoneWeightsProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\MakeVerboseFormat.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\OptimizeGraph.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\OptimizeMeshes.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\PretransformVertices.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\ProcessHelper.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\RemoveRedundantMaterials.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\RemoveVCProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\ScaleProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\SortByPTypeProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\SplitByBoneCountProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\SplitLargeMeshes.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\TextureTransform.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\TriangulateProcess.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\ValidateDataStructure.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\contrib\pugixml\src\pugixml.cpp">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\contrib\unzip\ioapi.c">
+      <Filter>DataPacker\assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\contrib\unzip\unzip.c">
+      <Filter>DataPacker\assimp</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

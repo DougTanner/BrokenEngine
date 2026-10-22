@@ -56,6 +56,11 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Label="Assimp">
+    <AssimpIncludeDirectories>$(ProjectDir)..\..\Source\DataPacker\assimp;$(ProjectDir)..\..\..\assimp\include;$(ProjectDir)..\..\..\assimp\code;$(ProjectDir)..\..\..\assimp;$(ProjectDir)..\..\..\assimp\contrib\pugixml\src;$(ProjectDir)..\..\..\assimp\contrib\utf8cpp\source;$(ProjectDir)..\..\..\assimp\contrib\unzip</AssimpIncludeDirectories>
+    <AssimpPreprocessorDefinitions>ASSIMP_BUILD_NO_EXPORT=1;ASSIMP_BUILD_NO_OWN_ZLIB=1;ASSIMP_BUILD_NO_3D_IMPORTER=1;ASSIMP_BUILD_NO_3MF_IMPORTER=1;ASSIMP_BUILD_NO_AC_IMPORTER=1;ASSIMP_BUILD_NO_AMF_IMPORTER=1;ASSIMP_BUILD_NO_ASE_IMPORTER=1;ASSIMP_BUILD_NO_ASSBIN_IMPORTER=1;ASSIMP_BUILD_NO_B3D_IMPORTER=1;ASSIMP_BUILD_NO_BLEND_IMPORTER=1;ASSIMP_BUILD_NO_BVH_IMPORTER=1;ASSIMP_BUILD_NO_C4D_IMPORTER=1;ASSIMP_BUILD_NO_COB_IMPORTER=1;ASSIMP_BUILD_NO_CSM_IMPORTER=1;ASSIMP_BUILD_NO_DXF_IMPORTER=1;ASSIMP_BUILD_NO_GLTF_IMPORTER=1;ASSIMP_BUILD_NO_GLTF1_IMPORTER=1;ASSIMP_BUILD_NO_GLTF2_IMPORTER=1;ASSIMP_BUILD_NO_HMP_IMPORTER=1;ASSIMP_BUILD_NO_IFC_IMPORTER=1;ASSIMP_BUILD_NO_IQM_IMPORTER=1;ASSIMP_BUILD_NO_IRR_IMPORTER=1;ASSIMP_BUILD_NO_IRRMESH_IMPORTER=1;ASSIMP_BUILD_NO_LWO_IMPORTER=1;ASSIMP_BUILD_NO_LWS_IMPORTER=1;ASSIMP_BUILD_NO_M3D_IMPORTER=1;ASSIMP_BUILD_NO_MD2_IMPORTER=1;ASSIMP_BUILD_NO_MD3_IMPORTER=1;ASSIMP_BUILD_NO_MD5_IMPORTER=1;ASSIMP_BUILD_NO_MDC_IMPORTER=1;ASSIMP_BUILD_NO_MDL_IMPORTER=1;ASSIMP_BUILD_NO_MMD_IMPORTER=1;ASSIMP_BUILD_NO_MS3D_IMPORTER=1;ASSIMP_BUILD_NO_NDO_IMPORTER=1;ASSIMP_BUILD_NO_NFF_IMPORTER=1;ASSIMP_BUILD_NO_OFF_IMPORTER=1;ASSIMP_BUILD_NO_OGRE_IMPORTER=1;ASSIMP_BUILD_NO_OPENGEX_IMPORTER=1;ASSIMP_BUILD_NO_Q3BSP_IMPORTER=1;ASSIMP_BUILD_NO_Q3D_IMPORTER=1;ASSIMP_BUILD_NO_RAW_IMPORTER=1;ASSIMP_BUILD_NO_SIB_IMPORTER=1;ASSIMP_BUILD_NO_SMD_IMPORTER=1;ASSIMP_BUILD_NO_TERRAGEN_IMPORTER=1;ASSIMP_BUILD_NO_USD_IMPORTER=1;ASSIMP_BUILD_NO_X_IMPORTER=1;ASSIMP_BUILD_NO_X3D_IMPORTER=1;ASSIMP_BUILD_NO_XGL_IMPORTER=1</AssimpPreprocessorDefinitions>
+    <AssimpPreprocessorDefinitions Condition="'$(Configuration)'=='Debug'">ASSIMP_BUILD_DEBUG;$(AssimpPreprocessorDefinitions)</AssimpPreprocessorDefinitions>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(ProjectDir)\Output\</OutDir>
     <IntDir>$(ProjectDir)\Build\$(Configuration)\</IntDir>
@@ -178,6 +183,533 @@
     <ClCompile Include="..\..\..\zlib\trees.c" />
     <ClCompile Include="..\..\..\zlib\uncompr.c" />
     <ClCompile Include="..\..\..\zlib\zutil.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\3DS\3DSConverter.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_3DS_3DSConverter.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\3DS\3DSLoader.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_3DS_3DSLoader.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Collada\ColladaHelper.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_Collada_ColladaHelper.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Collada\ColladaLoader.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_Collada_ColladaLoader.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Collada\ColladaParser.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_Collada_ColladaParser.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXAnimation.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXAnimation.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXBinaryTokenizer.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXBinaryTokenizer.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXConverter.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXConverter.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXDeformer.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXDeformer.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXDocument.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXDocument.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXDocumentUtil.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXDocumentUtil.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXImporter.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXImporter.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXMaterial.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXMaterial.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXMeshGeometry.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXMeshGeometry.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXModel.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXModel.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXNodeAttribute.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXNodeAttribute.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXParser.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXParser.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXProperties.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXProperties.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXTokenizer.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXTokenizer.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\FBX\FBXUtil.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_FBX_FBXUtil.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Obj\ObjFileImporter.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_Obj_ObjFileImporter.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Obj\ObjFileMtlImporter.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_Obj_ObjFileMtlImporter.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Obj\ObjFileParser.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_Obj_ObjFileParser.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Ply\PlyLoader.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_Ply_PlyLoader.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\Ply\PlyParser.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_Ply_PlyParser.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\AssetLib\STL\STLLoader.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_AssetLib_STL_STLLoader.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\CApi\CInterfaceIOWrapper.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_CApi_CInterfaceIOWrapper.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\AssertHandler.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_AssertHandler.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\Assimp.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_Assimp.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\BaseImporter.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_BaseImporter.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\BaseProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_BaseProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\Compression.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_Compression.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\CreateAnimMesh.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_CreateAnimMesh.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\DefaultIOStream.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_DefaultIOStream.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\DefaultIOSystem.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_DefaultIOSystem.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\DefaultLogger.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_DefaultLogger.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\Exceptional.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_Exceptional.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\Importer.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_Importer.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\ImporterRegistry.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_ImporterRegistry.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\IOSystem.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_IOSystem.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\material.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_material.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\PostStepRegistry.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_PostStepRegistry.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\scene.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_scene.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\SceneCombiner.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_SceneCombiner.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\ScenePreprocessor.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_ScenePreprocessor.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\SGSpatialSort.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_SGSpatialSort.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\SkeletonMeshBuilder.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_SkeletonMeshBuilder.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\SpatialSort.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_SpatialSort.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\TargetAnimation.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_TargetAnimation.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\Version.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_Version.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\VertexTriangleAdjacency.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_VertexTriangleAdjacency.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Common\ZipArchiveIOSystem.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Common_ZipArchiveIOSystem.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Geometry\GeometryUtils.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Geometry_GeometryUtils.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\Material\MaterialSystem.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_Material_MaterialSystem.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\ArmaturePopulate.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_ArmaturePopulate.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\CalcTangentsProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_CalcTangentsProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\ComputeUVMappingProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_ComputeUVMappingProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\ConvertToLHProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_ConvertToLHProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\DeboneProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_DeboneProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\DropFaceNormalsProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_DropFaceNormalsProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\EmbedTexturesProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_EmbedTexturesProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\FindDegenerates.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_FindDegenerates.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\FindInstancesProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_FindInstancesProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\FindInvalidDataProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_FindInvalidDataProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\FixNormalsStep.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_FixNormalsStep.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\GenBoundingBoxesProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_GenBoundingBoxesProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\GenFaceNormalsProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_GenFaceNormalsProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\GenVertexNormalsProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_GenVertexNormalsProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\ImproveCacheLocality.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_ImproveCacheLocality.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\JoinVerticesProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_JoinVerticesProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\LimitBoneWeightsProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_LimitBoneWeightsProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\MakeVerboseFormat.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_MakeVerboseFormat.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\OptimizeGraph.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_OptimizeGraph.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\OptimizeMeshes.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_OptimizeMeshes.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\PretransformVertices.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_PretransformVertices.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\ProcessHelper.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_ProcessHelper.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\RemoveRedundantMaterials.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_RemoveRedundantMaterials.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\RemoveVCProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_RemoveVCProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\ScaleProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_ScaleProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\SortByPTypeProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_SortByPTypeProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\SplitByBoneCountProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_SplitByBoneCountProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\SplitLargeMeshes.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_SplitLargeMeshes.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\TextureTransform.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_TextureTransform.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\TriangulateProcess.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_TriangulateProcess.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\code\PostProcessing\ValidateDataStructure.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\code_PostProcessing_ValidateDataStructure.obj</ObjectFileName>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\contrib\pugixml\src\pugixml.cpp">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\contrib_pugixml_src_pugixml.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\contrib\unzip\ioapi.c">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\contrib_unzip_ioapi.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\assimp\contrib\unzip\unzip.c">
+      <AdditionalIncludeDirectories>$(AssimpIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)assimp\contrib_unzip_unzip.obj</ObjectFileName>
+    </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

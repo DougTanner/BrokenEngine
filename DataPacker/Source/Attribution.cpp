@@ -180,6 +180,14 @@ static std::vector<PendingCopy> BuildPendingCopies(const std::filesystem::path& 
 		{
 			AddPendingCopy(rLicenseFile, libraryAttributionDirectory / rLicenseFile.filename(), libraryName);
 		}
+		if (libraryName == "assimp")
+		{
+			for (std::string_view noticePath : { "contrib/pugixml/LICENSE.md", "contrib/utf8cpp/doc/LICENSE", "contrib/earcut-hpp/LICENSE", "contrib/unzip/MiniZip64_info.txt", })
+			{
+				AddPendingCopy(rDirectoryEntry.path() / noticePath, libraryAttributionDirectory / noticePath, libraryName);
+			}
+			AddPendingCopy(rThirdPartyDirectory / "Prebuilts/Source/DataPacker/assimp/NOTICES.txt", libraryAttributionDirectory / "NOTICES.txt", libraryName);
+		}
 	}
 	return pendingCopies;
 }

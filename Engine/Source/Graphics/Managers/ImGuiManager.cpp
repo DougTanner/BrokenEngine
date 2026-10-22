@@ -517,6 +517,14 @@ void ImGuiManager::UpdateTextArea(TextAreas eTextArea, std::string_view characte
 	std::memcpy(rTextArea.pcText, characters.data(), rTextArea.iCharacterCount);
 }
 
+std::string_view ImGuiManager::GetTextArea(TextAreas eTextArea) const
+{
+	ASSERT(common::gpMultithreading->IsMainThread());
+
+	const TextArea& rTextArea = mpTextAreas[eTextArea];
+	return std::string_view(rTextArea.pcText, static_cast<size_t>(rTextArea.iCharacterCount));
+}
+
 void ImGuiManager::RenderTextAreas()
 {
 	ImVec2 displaySize = ImGui::GetIO().DisplaySize;

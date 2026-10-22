@@ -13,7 +13,8 @@ Solution and project that compile all compiled third-party library source into a
   Profile/Release (codegen defers to the consumer's LTCG link), `/Z7` (debug
   info embedded in each object; a single shared compiler PDB is rewritten by any
   partial recompile, orphaning every untouched object and producing LNK4099 in
-  every consumer link), RTTI off, `/EHa`, OpenMP, `/bigobj`, `/Zc:__cplusplus`,
+  every consumer link), RTTI off except the Assimp-owned C++ units whose FBX
+  object type checks require it, `/EHa`, OpenMP, `/bigobj`, `/Zc:__cplusplus`,
   no PCH, all warnings disabled (external code), MultiByte charset
 - Defines: `USING_XINPUT`, `VK_NO_PROTOTYPES`, `VK_USE_PLATFORM_WIN32_KHR`
 - Requires: `VK_SDK_PATH` environment variable for Vulkan SDK headers
@@ -30,7 +31,20 @@ HEAD; beyond that, rebuild only as explicit primary maintenance.
 
 ## Source Organization
 
-The `.vcxproj` filters split units by consumer (`Engine`, `DataPacker`, `DataPacker\zlib`), following the source root each unit comes from. Compilation units come from two roots: unity wrapper `.cpp`/`.c` files under `ThirdParty/Prebuilts/Source/{Engine,DataPacker}/`, and upstream sources referenced directly in their library directories (bc7enc_rdo, zlib).
+The `.vcxproj` filters split units by consumer (`Engine`, `DataPacker`,
+`DataPacker\zlib`, `DataPacker\assimp`), following the source root each unit
+comes from. Compilation units come from two roots: unity wrapper `.cpp`/`.c`
+files under `ThirdParty/Prebuilts/Source/{Engine,DataPacker}/`, and upstream
+sources referenced directly in their library directories (bc7enc_rdo, zlib,
+Assimp).
+
+Assimp uses explicit non-unity sources and generated configuration/revision
+headers under `Source/DataPacker/assimp/`. Only FBX, 3DS, OBJ, COLLADA, PLY and
+STL importers are enabled; exporters are disabled. Its per-source include and
+definition metadata shares the project's Assimp properties across all three
+configurations, reuses existing zlib, and assigns distinct object paths. Keep
+RTTI consistent across its common, importer and postprocessing C++ units;
+contrib units retain the project default.
 
 When adding a new library:
 

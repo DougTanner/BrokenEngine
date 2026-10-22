@@ -55,6 +55,7 @@ public:
 	void Submit(int64_t iFramebuffer);
 	void RegisterOpaqueRectangle(const ImVec2& rPosition, const ImVec2& rSize);
 	void UpdateTextArea(TextAreas eTextArea, std::string_view characters);
+	std::string_view GetTextArea(TextAreas eTextArea) const;
 
 	static constexpr int64_t kiMaxUiRectangles = 32;
 

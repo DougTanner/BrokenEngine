@@ -1125,6 +1125,25 @@ static void CommandQueryProfile(const nlohmann::json& rParameters, nlohmann::jso
 		throw std::runtime_error("query_profile requires empty params");
 	}
 
+	nlohmann::json cpuTimers = nlohmann::json::array();
+	{
+		std::lock_guard lock(gpProfileManager->mCpuTimerMutex);
+		for (int64_t i = 0; i < gpProfileManager->miCpuTimerCount; ++i)
+		{
+			const engine::CpuTimer& rCpuTimer = gpProfileManager->GetCpuTimer(i);
+			nlohmann::json cpuTimer;
+			cpuTimer["index"] = i;
+			cpuTimer["name"] = std::string(gpProfileManager->GetCpuTimerName(i));
+			cpuTimer["displayUs"] = rCpuTimer.smoothedMicroseconds.mSmoothedValue;
+			cpuTimer["displayAllocations"] = rCpuTimer.smoothedAllocations.mSmoothedValue;
+			cpuTimer["threads"] = rCpuTimer.iThreads;
+			cpuTimer["visible"] = rCpuTimer.flags & engine::ProfileRowFlags::kVisible;
+			cpuTimers.push_back(std::move(cpuTimer));
+		}
+	}
+	rResult["cpuTimers"] = std::move(cpuTimers);
+	rResult["cpuTimerText"] = gpImGuiManager != nullptr ? std::string(gpImGuiManager->GetTextArea(kTextProfileCpuTimers)) : std::string();
+
 	engine::GpuTimer* pGpuTimers = gpProfileManager->mpGpuTimers;
 	nlohmann::json gpuTimers = nlohmann::json::array();
 	for (int64_t i = 0; i < engine::kGpuTimerCount; ++i)

@@ -232,6 +232,19 @@ The server monitor is an engine-owned GDI window, not a protocol command surface
   zero until a client session publishes a clock correction. `fps` is the frame
   count the profile overlay's fps header prints (renders in the last second),
   sampled at the moment of the query.
+  Also returns `cpuTimers[{index,name,displayUs,displayAllocations,threads,visible}]`
+  for every CPU timer in index order, including hidden zero rows. `index`,
+  `displayUs`, `displayAllocations`, and `threads` are integers; `name` preserves
+  its exact table text, including indentation, and `visible` is boolean. The
+  display values are the stored smoothed microseconds and allocation counts
+  used by the CPU overlay; visibility is the formatter's stored decision and
+  may remain unchanged while another screen is selected. Timer fields and names
+  are copied under the CPU timer mutex at query time. `cpuTimerText` is a string
+  copied from the CPU timer area's explicit retained character span, preserving
+  whitespace and empty contents exactly. It is empty after the area is cleared
+  or while ImGuiManager is temporarily absent during graphics recreation. The
+  text reflects the most recent publication to that area; it and the structured
+  timer fields have distinct cadences and need not describe the same frame.
 - `presentation_continuity_probe`: no params (only an empty object is accepted).
   Read-only client query of the presentation state the most recently published
   render frame sent. Returns

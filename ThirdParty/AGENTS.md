@@ -39,6 +39,12 @@ Before importing or registering a library:
 
 `lz4/lib/**` is BSD-2-Clause and may be linked. Do not reference its GPL-covered `programs`, `tests`, or `examples` trees from any project.
 
+Assimp's root license does not cover every incorporated notice. Its selected
+closure also uses MIT, ISC, Boost, zlib/Irrlicht, and Paul Hsieh's explicitly
+offered three-clause BSD grant for SuperFastHash. Preserve the additional Qt,
+Hsieh, and Irrlicht notices in `Prebuilts/Source/DataPacker/assimp/NOTICES.txt`;
+DataPacker's attribution collector distributes them with the nested licenses.
+
 ## Boundaries
 
 Do not add or edit `AGENTS.md` inside external library or submodule folders. Upstream-owned copies are pristine third-party data and do not override Broken Engine policy. This file owns the upstream and license boundary; the existing Prebuilts platform document owns build registration.

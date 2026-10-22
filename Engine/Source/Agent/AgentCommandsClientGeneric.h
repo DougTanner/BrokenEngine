@@ -6,7 +6,7 @@ namespace engine
 {
 
 // Engine-generic client agent commands shared by every game project: capture, window state, UI and scene inspection,
-// synthetic input, the client GPU profile query, presentation_continuity_probe, and the network, desync,
+// synthetic input, the client CPU/GPU profile query, presentation_continuity_probe, and the network, desync,
 // grid-coordinate, and audio streaming harness rigs.
 // Returns true when command was handled.
 // Throws on invalid params; AgentCommandServer::Drain() converts to the failure envelope.

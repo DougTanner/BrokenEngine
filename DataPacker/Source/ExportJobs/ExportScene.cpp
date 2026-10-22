@@ -8,7 +8,7 @@
 
 std::optional<common::ChunkFlags_t> ExportScene::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
 {
-	if (rDirectoryEntry.path().extension() != ".gltf")
+	if (rDirectoryEntry.path().extension() != ".gltf" && rDirectoryEntry.path().extension() != ".glb")
 	{
 		return std::nullopt;
 	}
@@ -179,6 +179,31 @@ static bool HasSurvivingAnimationClip(const tinygltf::Model& rGltfModel)
 	return !animations.empty();
 }
 
+static std::optional<std::string> ReadGlbJson(const std::filesystem::path& rPath)
+{
+	try
+	{
+		int64_t iFileSize = SourceFileSize(rPath, kpcContext);
+		uint32_t puiHeader[5] {};
+		RequireSourceExtent(static_cast<uintmax_t>(iFileSize), 0, sizeof(puiHeader), kpcContext);
+		std::fstream fileStreamIn(rPath, std::ios::in | std::ios::binary);
+		ReadSourceBytes(fileStreamIn, std::span<char>(reinterpret_cast<char*>(puiHeader), sizeof(puiHeader)), kpcContext);
+		if (puiHeader[0] != 0x46546C67 || puiHeader[1] != 2 || puiHeader[2] != static_cast<uintmax_t>(iFileSize) || puiHeader[4] != 0x4E4F534A)
+		{
+			return std::nullopt;
+		}
+		RequireSourceExtent(static_cast<uintmax_t>(iFileSize), sizeof(puiHeader), puiHeader[3], kpcContext);
+		std::string json(static_cast<size_t>(puiHeader[3]), '\0');
+		ReadSourceBytes(fileStreamIn, std::span<char>(json.data(), json.size()), kpcContext);
+		return json;
+	}
+	catch (const std::runtime_error&)
+	{
+		// CheckDirty has no per-asset catch; defer binary read failures to the export-time loader.
+		return std::nullopt;
+	}
+}
+
 // Collects the glTF's external file references (images[].uri and buffers[].uri) by reading the JSON directly:
 // going through tinygltf would re-read every .bin and stb-decode every texture on each dirty check. Reading
 // "uri" is exact, because tinygltf only treats it as an external file here too - bufferView-backed and
@@ -187,11 +212,24 @@ static std::vector<std::string> ReadExternalUris(const std::filesystem::path& rG
 {
 	std::vector<std::string> uris;
 
-	std::fstream fileStreamIn(rGltfPath, std::ios::in | std::ios::binary);
 	// Non-throwing parse: CheckDirty runs outside the per-asset try/catch, so a throw here would abort the
-	// whole run instead of failing one asset. An unreadable or malformed .gltf contributes no dependencies
+	// whole run instead of failing one asset. An unreadable or malformed scene contributes no dependencies
 	// and still fails per-asset later through Export().
-	nlohmann::json gltfJson = nlohmann::json::parse(fileStreamIn, nullptr, false);
+	nlohmann::json gltfJson;
+	if (rGltfPath.extension() == ".glb")
+	{
+		std::optional<std::string> optionalJson = ReadGlbJson(rGltfPath);
+		if (!optionalJson.has_value())
+		{
+			return uris;
+		}
+		gltfJson = nlohmann::json::parse(optionalJson.value(), nullptr, false);
+	}
+	else
+	{
+		std::fstream fileStreamIn(rGltfPath, std::ios::in | std::ios::binary);
+		gltfJson = nlohmann::json::parse(fileStreamIn, nullptr, false);
+	}
 	if (gltfJson.is_discarded())
 	{
 		return uris;
@@ -379,6 +417,10 @@ tinygltf::Model ExportScene::LoadGltfModel()
 
 	std::string filename = mInputPath.string();
 	bool bBinary = mInputPath.extension() == ".glb";
+	if (bBinary && !ReadGlbJson(mInputPath).has_value())
+	{
+		throw std::runtime_error(std::format("Failed to load GLTF model '{}': invalid GLB framing", filename));
+	}
 
 	std::string error;
 	std::string warning;
