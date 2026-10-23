@@ -202,15 +202,9 @@ void ServerBufferedFrames::SendCoordinateFullState(int64_t iClientIdentifier, in
 	NetworkManager::SendPacket(pClient->pPeer, NetworkManager::CoordinateSlotReliable(iSlot), rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
-void ServerBufferedFrames::SendCoordinateStaticData(int64_t iClientIdentifier, int64_t iSlot, GridCoord coordinate, const CellStaticData& rStaticData)
+ENetPacket* ServerBufferedFrames::SendCoordinateStaticData(const ClientConnection& rClient, int64_t iSlot, GridCoord coordinate, const CellStaticData& rStaticData, ENetPacketFreeCallback pFreeCallback)
 {
-	ClientConnection* pClient = mrServer.FindClient(iClientIdentifier);
-	if (pClient == nullptr)
-	{
-		return;
-	}
-
-	LOG(kNetwork, kDebug, "Server::SendCoordStaticData Client: {} Slot: {} Coord: ({},{})", iClientIdentifier, iSlot, coordinate.iX, coordinate.iY);
+	LOG(kNetwork, kDebug, "Server::SendCoordStaticData Client: {} Slot: {} Coord: ({},{})", rClient.iClientId, iSlot, coordinate.iX, coordinate.iY);
 
 	// Serialize static data into the reusable scratch (server main thread only - single-writer contract)
 	ScopedSuppressAllocationTracking suppress;
@@ -226,13 +220,13 @@ void ServerBufferedFrames::SendCoordinateStaticData(int64_t iClientIdentifier, i
 	{
 		.uiLoadGeneration = static_cast<uint8_t>(mrServer.miLoadGeneration),
 		.uiSlotIndex = static_cast<uint8_t>(iSlot),
-		.uiEpoch = pClient->slots.at(iSlot).ack.uiEpoch,
+		.uiEpoch = rClient.slots.at(iSlot).ack.uiEpoch,
 		.coord = coordinate,
 		.staticData = {.puiData = reinterpret_cast<const uint8_t*>(mSendScratch.data()), .iSize = static_cast<int32_t>(mSendScratch.size())},
 	};
 	NetworkMessages::Write(rWorkbuffer, message);
 
-	NetworkManager::SendPacket(pClient->pPeer, NetworkManager::CoordinateSlotReliable(iSlot), rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
+	return NetworkManager::SendPacket(rClient.pPeer, NetworkManager::CoordinateSlotReliable(iSlot), rWorkbuffer, ENET_PACKET_FLAG_RELIABLE, pFreeCallback);
 }
 
 void ServerBufferedFrames::WriteBufferedFramePacket(common::Workbuffer& rWorkbuffer, PacketType eType, int64_t iSlot, int64_t iEpoch, const PerCoordBufferedFrame& rBuffered, int64_t iTimestampNanoseconds)
@@ -459,8 +453,37 @@ void ServerBufferedFrames::ApplyAckStream(ClientConnection& rClient, const Netwo
 			}
 			if (bFullStateAcknowledgement)
 			{
+				bool bReleasedHold = rSlot.bHoldUpdatesUntilFullStateAck;
 				rSlot.iPendingFullStateTick = -1;
 				rSlot.bHoldUpdatesUntilFullStateAck = false;
+
+				// SendUpdate skipped every tick buffered while held, and SendResends returns at most kiMaximumResendFrames
+				// per call, too slowly for a stalled client to stay within its kiNetworkBufferSize gap limit. Resend them
+				// once here, capped at kiNetworkBufferSize; SendResends recovers any that are lost. The release ACK's
+				// bitfield is always empty, so no tick is skipped as received.
+				if (bReleasedHold)
+				{
+					// Heap: workbuffer Push and ENet packet creation per resend frame
+					ScopedSuppressAllocationTracking suppress;
+
+					GridCoord coordinate = rSlot.subscription.coordinate;
+					int64_t iLastHeldTick = std::min(miLatestBufferedTick, iSlotAcknowledgementFloor + kiNetworkBufferSize);
+					for (int64_t j = iSlotAcknowledgementFloor + 1; j <= iLastHeldTick; ++j)
+					{
+						const PerCoordBufferedFrame* pBuffered = FindBufferedFrame(coordinate, j);
+						if (pBuffered == nullptr)
+						{
+							continue;
+						}
+
+						common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+						common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
+
+						WriteBufferedFramePacket(rWorkbuffer, PacketType::kServerCoordinateResend, iSlotIndex, rSlot.ack.uiEpoch, *pBuffered, rClient.iClientTimestampNanoseconds);
+
+						NetworkManager::SendPacket(rClient.pPeer, NetworkManager::CoordinateSlotUnreliable(iSlotIndex), rWorkbuffer, 0);
+					}
+				}
 			}
 		}
 		else if (iSlotEpoch != rSlot.ack.uiEpoch)

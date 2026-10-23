@@ -74,8 +74,9 @@ included. These are the identities the process check
 baselines, which is why its `-GameName` is the role's `<Game Name>`
 (`<server game name>` or `<client game name>`) and its
 `-ConfiguredAppDataRoot` is the same root this block launches with. A report the
-check reports as newly written stays on disk as evidence; never delete, move, or
-rewrite one. A fresh root has no autosave and cold
+check reports as newly written stays on disk as evidence until the role's next
+launch with the same root renames it to `<Game-Name>-Crash-Report-Pending.txt`
+beside it; never delete, move, or rewrite one. A fresh root has no autosave and cold
 `pipeline.cache`/`BrdfLut.cache`, so the first launch after creating it is
 slower; wrapper-worktree setup pre-seeds those two caches into the shared
 `Temp\AppData` root while creating the worktree, taking each file independently
@@ -226,7 +227,7 @@ pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.p
   launched.
 - Any other non-zero exit: report the claim result to the user and launch nothing.
 
-Then launch both. Take the `$Output`, `$ServerExe`, and `$ClientExe` values from the hub's machine-readable launch configuration; its executable names are the Debug ones, so under a Profile or Release claim substitute the `.Profile.exe` or the unsuffixed `.exe` names:
+Then launch both. Take the `$Output`, `$ServerExe`, and `$ClientExe` values from the `## Machine-readable launch configuration` of the project hub, `Projects/<Project>/Documents/AgentHarness.md`; its executable names are the Debug ones, so under a Profile or Release claim substitute the `.Profile.exe` or the unsuffixed `.exe` names:
 
 ```powershell
 $ROOT = '<absolute adopted worktree>'

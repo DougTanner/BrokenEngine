@@ -50,7 +50,7 @@ settling evidence and never restates it. A `NOTE` may be informational; only a
 
 ```text
 Membership outcomes: <settled>/<total> settled
-<path> — <client|server|both|DataPacker|AgentHarness|WorktreeCli|AgentTools|non-member> — <project> — filter <path|none> — NOTE <detail>|FAIL <detail> — <path-plus-selector | Decisive checks row | Residuals row>
+<path> — <client|server|both|DataPacker|ModelViewer|AgentHarness|WorktreeCli|AgentTools|non-member> — <project> — filter <path|none> — NOTE <detail>|FAIL <detail> — <path-plus-selector | Decisive checks row | Residuals row>
 ```
 
 Use `Debug|x64` for game client/server unless approved otherwise,

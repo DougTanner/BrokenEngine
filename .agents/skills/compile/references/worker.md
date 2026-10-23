@@ -20,6 +20,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      not supplied, so omit the parameter and let the derived default apply.
      Pass the same explicitly supplied values to the build invocation.
    - Append `-Project <Name>` only as step 3's game selection directs.
+   - For a requested ModelViewer build, append `-Target ModelViewer`; its context
+     resolves BrokenEngineSandbox as data owner even with several game projects.
    - `-IncludeDevEnvDir` is not an agent-run option: the build entry point
      requests DevEnvDir itself for every game build.
 
@@ -64,6 +66,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      `<project>Server` row is `-Target Server`, but you still fix the final
      list, because the rules below depend on session state and request inputs
      the script cannot see.
+     A `ModelViewer` row maps to `-Target ModelViewer`. Build it once, with its
+     fixed BrokenEngineSandbox data owner, separately from any multi-game loop.
    - Game selection: when the caller named a game, pass `-Project <Name>` to
      step 1 and to each Client/Server invocation. With one game and none
      named, the invocations stay as shown, with no `-Project`. When none is
@@ -140,6 +144,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
 pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Target Client -Configuration Debug
 pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Target Server -Configuration Debug
 
+# ModelViewer: Debug or Release, always using BrokenEngineSandbox data.
+pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Target ModelViewer -Configuration Debug
+
 # AgentTools: Release candidates under the session-local ignored Temp tree.
 pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Target WorktreeCli
 pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Target AgentHarness
@@ -147,17 +154,19 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
 
    Parameters:
 
-   - `-Target` — `ThirdParty`, `DataPacker`, `Client`, `Server`, `WorktreeCli`,
-     or `AgentHarness`.
+   - `-Target` — `ThirdParty`, `DataPacker`, `Client`, `Server`, `ModelViewer`,
+     `WorktreeCli`, or `AgentHarness`.
    - `-Configuration` — `Debug`, `Profile`, or `Release`; required for
-     ThirdParty, Client, and Server. Omit it for the Release-only targets
+     ThirdParty, Client, Server, and ModelViewer (Debug/Release only). Omit it for
+     the Release-only targets
      [`../SKILL.md`](../SKILL.md) `## Inputs` names; an explicit non-Release
      value on those targets is a typed block.
-   - `-Files` — selective compile, Client/Server only; see step 8.
-   - `-AllowGaeaExport`, `-ForbidExpensiveExport` — Client/Server only;
+   - `-Files` — selective compile, Client/Server/ModelViewer only; see step 8.
+   - `-AllowGaeaExport`, `-ForbidExpensiveExport` — Client/Server/ModelViewer only;
      [runtime-data-mode.md](runtime-data-mode.md) `## Local generation` owns
      when each applies.
-   - `-Project` — Client/Server only; the game project per step 3.
+   - `-Project` — the game project per step 3; ModelViewer permits only
+     BrokenEngineSandbox and selects it automatically when omitted.
    - `-Prefast` — Client/Server Release only; see
      [prefast-mode.md](prefast-mode.md).
    - `-ClangTidy` — Client/Server Debug or Release and DataPacker only, never

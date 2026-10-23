@@ -335,7 +335,12 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 		{
 			renderPassFlags.Set(RenderPassFlags::kMultisampling);
 		}
-		Texture::RecordBeginRenderPass(vkCommandBuffer, gpSwapchainManager->mHdrVkRenderPass, gpSwapchainManager->mHdrVkFramebuffer, gpGraphics->mFramebufferVkExtent2D, VkClearColorValue {}, renderPassFlags);
+		VkClearColorValue vkClearColorValue {};
+		if constexpr (kbModelViewer)
+		{
+			vkClearColorValue = {{0.025f, 0.025f, 0.025f, 1.0f}};
+		}
+		Texture::RecordBeginRenderPass(vkCommandBuffer, gpSwapchainManager->mHdrVkRenderPass, gpSwapchainManager->mHdrVkFramebuffer, gpGraphics->mFramebufferVkExtent2D, vkClearColorValue, renderPassFlags);
 	}
 
 	// UI depth pre-pass: depth-only quads at ImGui window positions (instanceCount=0 when disabled)
@@ -368,6 +373,7 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 		}
 		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerObjects);
 
+#if !defined(BT_MODEL_VIEWER)
 		gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerTerrain);
 		// Per-template terrain draws: one indirect draw per IslandTemplate (count fixed at boot
 		// from gpIslandTerrain->mIslandCrcsSorted). The stable arena is bound once; each acquired
@@ -394,6 +400,7 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 			pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f});
 		}
 		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerHexShields);
+#endif
 
 		gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerTransparentObjects);
 		// Transparent model pass (after all opaque geometry and water for correct blending)
@@ -406,6 +413,7 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 		}
 		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerTransparentObjects);
 
+#if !defined(BT_MODEL_VIEWER)
 		gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerLongParticlesRender);
 		pPipelines[kPipelineLongParticlesRender].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer);
 		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerLongParticlesRender);
@@ -435,6 +443,7 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 			pPipelines[kPipelineDebugCircle].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer);
 			pPipelines[kPipelineDebugLine].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer);
 		}
+#endif
 	}
 
 	vkCmdEndRenderPass(vkCommandBuffer);

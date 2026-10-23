@@ -22,8 +22,8 @@ void DumpRenderTarget(int64_t iFramebufferIndex, const DumpRenderTargetRequest& 
 // std::runtime_error on an unknown name (message lists valid names) or an out-of-range index/channel.
 void ValidateDumpRenderTargetRequest(const DumpRenderTargetRequest& rRequest);
 
-// Thread-safe capture-result slot. The async save/encode thread publishes the finished agent "result" JSON; the
-// AgentCommandServer deferred-response poll (main thread) drains it via TakeCaptureResult. There is one active agent
+// Thread-safe capture-result slot. The async save/encode thread publishes the finished result JSON; the
+// main-thread request owner drains it via TakeCaptureResult. There is one active
 // request/result slot, but abandoned screenshot and dump encoders may overlap because their independent futures
 // outlive timeout/disconnect. ResetCaptureResult records a fresh active token; SetCaptureResult rejects stale-token
 // publications, and TakeCaptureResult consumes only the active request's result.

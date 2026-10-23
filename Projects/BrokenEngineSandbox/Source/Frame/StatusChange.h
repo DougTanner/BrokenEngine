@@ -252,8 +252,8 @@ engine::ClientGuid OwnedSpawnClientGuid(const StatusChange& rChange);
 
 // Adoptability check the replay stream reader and the harness apply: client hydration looks the Blaster and Explosion
 // types up with a checked index, a ship controller or ship type outside its enumerators selects no collection, and a
-// ship spawn's target flight plane, or an UpdateShipData one other than kuiKeepTargetFlightPlane, must be one its ship
-// type allows.
+// ship spawn's target flight plane, its stored flight plane other than kuiNoFlightPlane, or an UpdateShipData target
+// flight plane other than kuiKeepTargetFlightPlane, must be one its ship type allows.
 bool IsAdoptableStatusChange(const StatusChange& rChange);
 
 // The one application point of the post-tick batch: server harvest, replay playback, and the client post-tick loop.

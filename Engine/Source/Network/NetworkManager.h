@@ -42,7 +42,8 @@ public:
 		return iChannel == kiChannelUnreliable || (IsCoordinateChannel(iChannel) && (iChannel % 2) == 1);
 	}
 
-	static inline void SendPacket(ENetPeer* pPeer, int64_t iChannel, common::Workbuffer& rWorkbuffer, uint32_t uiFlags, ENetPacketFreeCallback pFreeCallback = nullptr)
+	// Returns the queued packet, which ENet owns and frees, or nullptr when enet_peer_send failed.
+	static inline ENetPacket* SendPacket(ENetPeer* pPeer, int64_t iChannel, common::Workbuffer& rWorkbuffer, uint32_t uiFlags, ENetPacketFreeCallback pFreeCallback = nullptr)
 	{
 		std::span<const uint8_t> packetSpan = rWorkbuffer.Span<uint8_t>();
 		ScopedSuppressAllocationTracking suppress;
@@ -53,7 +54,9 @@ public:
 		{
 			// enet_peer_send does not take ownership of the packet on failure — free it to avoid a leak.
 			enet_packet_destroy(pPacket);
+			return nullptr;
 		}
+		return pPacket;
 	}
 
 	template <typename TTYPE, typename... TARGS>

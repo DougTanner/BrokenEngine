@@ -280,7 +280,7 @@ function Compare-AgentSharedDataRecord([string] $Root, [string] $DataDirectory, 
 	return [pscustomobject] @{
 		Code = 'shared-data.changed'
 		Message = ("The Shared data differs from this worktree's $Target $Configuration record: $($differing.Count) line(s) are in only one " +
-			"of the record and the listing, first '$(($differing[0] -split "`t", 2)[0])'. The Shared data MUST be re-exported; stop and ask the user.")
+			"of the record and the listing, first '$(($differing[0] -split "`t", 2)[0])'. The record is stale; /compile of $Target $Configuration rewrites it.")
 	}
 }
 

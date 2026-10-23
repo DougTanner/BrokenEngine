@@ -7,15 +7,37 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
 - A row's CRC'd `ShipController` selects its script branch and its model. Fleet-controlled rows run the fleet navigation below and are the owned entities (`Frame::OwnedEntityCount`); random-spawn rows, which the frame's random-spawn waves create, carry global ID 0.
 - Stable global IDs provide lookup and transfer identity; flagship status is the `ShipOrders::kIsFlagship` bit, never a privileged SOA index. A fleet row follows its own flagship, found by `pFlagshipGlobalIds` in any of the three types.
 - In PostRender Update a ship script reads other ship rows only from the previous frame, so the tuple order never hands it a row this tick has not updated yet; Spawn-phase weapon targeting reads the current frame, after every ship's Update. Changing a read's source frame shifts CRC-visible behavior by one tick.
-- Every ship type's `pNavigationDelays` stays within [0, 60] seconds, the range `IsNavigationDelayInRange` tests and every navigation-delay admission shares. Each type's PostRender `PostRead` rejects a non-finite or out-of-range navigation delay, an unknown controller, and a target flight plane the type disallows, and each Interpolate `PostRead` rejects a height outside the lowest-to-highest flight plane range, on every Frame read.
-- A ship's target flight plane lives in its orders, set at spawn and changed by `kUpdateShip`; each type flies only up to its own highest plane (`IsFlightPlaneAllowed`). Its current plane is derived from position Z (`FlightPlaneAtHeight`), none while between planes, and no column stores it.
+- Every ship type's `pNavigationDelays` stays within [0, 60] seconds, the range
+  `IsNavigationDelayInRange` tests and every navigation-delay admission shares.
+  Each type's PostRender `PostRead` rejects a non-finite or out-of-range
+  navigation delay, an unknown controller, and a target flight plane the type
+  disallows, and each Interpolate `PostRead` rejects a height outside the
+  lowest-to-highest flight plane range and a stored flight plane that is neither
+  `kuiNoFlightPlane` nor allowed for the type, on every Frame read.
+- A ship's target flight plane lives in its orders, set at spawn and changed by
+  `kUpdateShip`; each type flies only up to its own highest plane
+  (`IsFlightPlaneAllowed`). Its current plane is stored in the shared
+  Interpolate column `puiFlightPlanes`: the plane index while settled,
+  `kuiNoFlightPlane` while climbing between planes. A genuine spawn stores its
+  spawn plane and a transfer arrival carries the stored value.
 - A ship navigates on one plane, its `NavigationFlightPlane` (`ShipBehaviours.h`): path queries and the terrain-contact start snap use that plane's graph, and terrain steering and avoidance read terrain relative to that plane's height, ignoring it on a plane without terrain collision.
-- Interpolate Update owns a ship's height: `ClimbTowardsFlightPlane` lands on
-  the plane table's own height, so client and server match bit-exactly.
+- Interpolate Update owns a ship's height and stored plane:
+  `ClimbTowardsFlightPlane` lands on the plane table's own height, so client and
+  server match bit-exactly, and stores the target plane on arrival and
+  `kuiNoFlightPlane` once a climb toward another plane begins.
   PostRender Update stores velocity Z as 0 as its last velocity write in every
   type, so pushers, knockback, and terrain contact move ships only horizontally.
   Change a ship's height through its target plane, not its velocity.
 - Headings stay horizontal: a direction that can aim at another plane, such as the Omni wanted direction or the random-wave heading, is flattened before it becomes or turns a ship's heading.
+- Fighter and Battleship blasters and Omni missiles target only an enemy that
+  stores the shooter's own plane, aim along the horizontal offset to it, and are
+  not fired by a ship storing `kuiNoFlightPlane`. They read the stored plane
+  rather than Z, so a ship moved off its plane's height keeps its plane for
+  targeting; navigation and terrain contact still read height, and an Omni
+  launches missiles only while exactly at its stored plane's height. Omni
+  blasters alone fire on or between planes, pitched toward the target by the
+  wanted direction. Plane rules govern only target choice and aim; blaster and
+  missile collision, explosion damage, and pushers ignore planes.
 
 ## Fleet Navigation Invariants
 

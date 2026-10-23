@@ -47,7 +47,9 @@ public:
 	// After a device drain.
 	void FreeAllRetiredMeshRanges();
 
+#if !defined(BT_MODEL_VIEWER)
 	void UpdateActiveIslands(const std::unordered_map<GridCoord, Cell>& rCells, std::span<const GridCoord> activeCoordinates);
+#endif
 
 	Buffer mIslandMeshArena;
 	int64_t miMeshArenaCapacityGeneration = 0;

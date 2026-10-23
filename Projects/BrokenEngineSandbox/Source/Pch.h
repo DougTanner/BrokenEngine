@@ -2,8 +2,6 @@
 
 #include "ExternalHeaders.h"
 
-inline constexpr bool kbInvincibility = true;
-
 #if defined(BT_DEBUG)
 inline constexpr bool kbAutoConnect = true;
 #elif defined(BT_PROFILE)

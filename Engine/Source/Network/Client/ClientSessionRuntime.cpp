@@ -739,15 +739,26 @@ void ClientSessionRuntime::ComputeActiveSet()
 		game::gpGame->mActiveCoordinates.push_back(game::gpGame->mClientGridCoordinate);
 	}
 
-	// Delete local-only cells outside the active set, preserve network-subscribed cells
-	std::erase_if(game::gpGame->mCells, [](const std::pair<const GridCoord, Cell>& rPair)
+	auto HoldsSlotOrRequest = [this](GridCoord coordinate)
 	{
-		return !std::ranges::contains(game::gpGame->mActiveCoordinates, rPair.first) && rPair.second.iConfirmedTick < 0;
+		return mpClient != nullptr && (mpClient->mSubscriptions.mSubscribeRequests.IsLive(coordinate) || std::ranges::any_of(mpClient->mSubscriptions.mCoordinateSlots, [coordinate](const ClientCoordSlot& rSlot)
+		{
+			return IsSlotActive(rSlot) && rSlot.coordinate == coordinate;
+		}));
+	};
+
+	// Delete local-only cells outside the active set, preserve network-subscribed cells. A cell whose coordinate holds an
+	// active subscription slot or a live subscribe request counts as subscribed even while unconfirmed, as between a
+	// resynchronization reset and its full state, or when its static data arrives before its subscribe accept, so it and
+	// its static data live as long as that slot or request.
+	std::erase_if(game::gpGame->mCells, [&](const std::pair<const GridCoord, Cell>& rPair)
+	{
+		return !std::ranges::contains(game::gpGame->mActiveCoordinates, rPair.first) && rPair.second.iConfirmedTick < 0 && !HoldsSlotOrRequest(rPair.first);
 	});
 
-	ASSERT(std::ranges::count_if(game::gpGame->mCells, [](const std::pair<const GridCoord, Cell>& rPair)
+	ASSERT(std::ranges::count_if(game::gpGame->mCells, [&](const std::pair<const GridCoord, Cell>& rPair)
 	{
-		return rPair.second.iConfirmedTick < 0;
+		return rPair.second.iConfirmedTick < 0 && !HoldsSlotOrRequest(rPair.first);
 	}) <= 9);
 }
 

@@ -90,8 +90,8 @@ inline SegmentHit XM_CALLCONV TracePointToCellExit(FXMVECTOR vecArea, FXMVECTOR 
 	float fPercent = std::numeric_limits<float>::max();
 
 	bool bStartsOutside = f4Start.x < bounds.fMinX || f4Start.x > bounds.fMaxX || f4Start.y < bounds.fMinY || f4Start.y > bounds.fMaxY;
-	bool bStartsOnNonInwardBoundary = (f4Start.x == bounds.fMinX && fDeltaX <= 0.0f) || (f4Start.x == bounds.fMaxX && fDeltaX >= 0.0f)
-	                               || (f4Start.y == bounds.fMinY && fDeltaY <= 0.0f) || (f4Start.y == bounds.fMaxY && fDeltaY >= 0.0f);
+	bool bStartsOnNonInwardBoundary = (f4Start.x == bounds.fMinX && fDeltaX < 0.0f) || (f4Start.x == bounds.fMaxX && fDeltaX >= 0.0f)
+	                               || (f4Start.y == bounds.fMinY && fDeltaY < 0.0f) || (f4Start.y == bounds.fMaxY && fDeltaY >= 0.0f);
 	if (bStartsOutside || bStartsOnNonInwardBoundary)
 	{
 		fPercent = 0.0f;
@@ -102,7 +102,7 @@ inline SegmentHit XM_CALLCONV TracePointToCellExit(FXMVECTOR vecArea, FXMVECTOR 
 		{
 			fPercent = std::min(fPercent, (bounds.fMaxX - f4Start.x) / fDeltaX);
 		}
-		else if (fDeltaX < 0.0f && f4End.x <= bounds.fMinX)
+		else if (fDeltaX < 0.0f && f4End.x < bounds.fMinX)
 		{
 			fPercent = std::min(fPercent, (bounds.fMinX - f4Start.x) / fDeltaX);
 		}
@@ -110,7 +110,7 @@ inline SegmentHit XM_CALLCONV TracePointToCellExit(FXMVECTOR vecArea, FXMVECTOR 
 		{
 			fPercent = std::min(fPercent, (bounds.fMaxY - f4Start.y) / fDeltaY);
 		}
-		else if (fDeltaY < 0.0f && f4End.y <= bounds.fMinY)
+		else if (fDeltaY < 0.0f && f4End.y < bounds.fMinY)
 		{
 			fPercent = std::min(fPercent, (bounds.fMinY - f4Start.y) / fDeltaY);
 		}
@@ -156,22 +156,22 @@ inline XMVECTOR XM_CALLCONV LocalCellArea()
 	return true;
 }
 
-inline constexpr int64_t kiInitialTransferCapacity = 64;
+inline constexpr int64_t kiInitialTransferCapacity = 256;
 
 inline bool XM_CALLCONV IsOutOfBounds(const CellBounds& rBounds, FXMVECTOR vecPosition)
 {
 	float fPositionX = XMVectorGetX(vecPosition);
 	float fPositionY = XMVectorGetY(vecPosition);
 
-	return !(fPositionX > rBounds.fMinX && fPositionX < rBounds.fMaxX && fPositionY > rBounds.fMinY && fPositionY < rBounds.fMaxY);
+	return !(fPositionX >= rBounds.fMinX && fPositionX < rBounds.fMaxX && fPositionY >= rBounds.fMinY && fPositionY < rBounds.fMaxY);
 }
 
 inline void XM_CALLCONV ComputeTransferDelta(const CellBounds& rBounds, FXMVECTOR vecPosition, int64_t& riDeltaX, int64_t& riDeltaY)
 {
 	float fPositionX = XMVectorGetX(vecPosition);
 	float fPositionY = XMVectorGetY(vecPosition);
-	riDeltaX = (fPositionX >= rBounds.fMaxX) ? 1 : (fPositionX <= rBounds.fMinX) ? -1 : 0;
-	riDeltaY = (fPositionY >= rBounds.fMaxY) ? 1 : (fPositionY <= rBounds.fMinY) ? -1 : 0;
+	riDeltaX = (fPositionX >= rBounds.fMaxX) ? 1 : (fPositionX < rBounds.fMinX) ? -1 : 0;
+	riDeltaY = (fPositionY >= rBounds.fMaxY) ? 1 : (fPositionY < rBounds.fMinY) ? -1 : 0;
 }
 
 template<typename... TS>

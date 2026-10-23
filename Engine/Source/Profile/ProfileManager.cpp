@@ -614,6 +614,7 @@ void ProfileManager::UpdateProfileText()
 			DumpTimers();
 		}
 
+#if !defined(BT_MODEL_VIEWER)
 		if (meProfileScreen == ProfileScreen::kOff)
 		{
 			return;
@@ -643,6 +644,7 @@ void ProfileManager::UpdateProfileText()
 		{
 			FormatNetworkScreen(rWorkbuffer);
 		}
+#endif // !defined(BT_MODEL_VIEWER)
 #endif // BT_CLIENT
 	}
 }
@@ -659,12 +661,20 @@ CpuTimer& ProfileManager::GetCpuTimer(int64_t iIndex)
 
 std::string_view ProfileManager::GetCpuCounterName(int64_t iIndex)
 {
+#if defined(BT_MODEL_VIEWER)
+	return iIndex < kEngineCpuCounterCount ? kpEngineCpuCounterNames[iIndex] : game::kGameCpuCounterNames[iIndex - kEngineCpuCounterCount];
+#else
 	return iIndex < kEngineCpuCounterCount ? kpEngineCpuCounterNames[iIndex] : game::kpGameCpuCounterNames[iIndex - kEngineCpuCounterCount];
+#endif
 }
 
 std::string_view ProfileManager::GetCpuTimerName(int64_t iIndex)
 {
+#if defined(BT_MODEL_VIEWER)
+	return iIndex < kEngineCpuTimerCount ? kpEngineCpuTimerNames[iIndex] : game::kGameCpuTimerNames[iIndex - kEngineCpuTimerCount];
+#else
 	return iIndex < kEngineCpuTimerCount ? kpEngineCpuTimerNames[iIndex] : game::kpGameCpuTimerNames[iIndex - kEngineCpuTimerCount];
+#endif
 }
 
 ScopedBootTimer::ScopedBootTimer(BootTimers eBootTimer)

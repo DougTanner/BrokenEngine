@@ -7,7 +7,7 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
 ## Ordering and Publication
 
 - Global population precedes Main. Global is submitted, possibly on a worker thread, before `RenderFrameMain` runs, so nothing in Main's call tree writes GlobalLayout: a value Main produces for a shader, such as the water band counts and active quad dimensions, is published in MainLayout. Within Global, Smoke precedes Wind because wind consumes smoke's current and previous world areas.
-- Main rendering runs collection `BeginRender`, per-coord `Render`, collection `EndRender`, lighting-spread gate publication, then debug publication, with the camera coord first. The no-renderable-coord path, including an empty active set, still runs begin/end publication so every indirect count and per-render profile counter reaches zero instead of ghost-drawing or reporting prior-frame instances.
+- Gameplay main rendering runs collection `BeginRender`, per-coord `Render`, collection `EndRender`, lighting-spread gate publication, then debug publication, with the camera coord first. The no-renderable-coord path, including an empty active set, still runs begin/end publication so every indirect count and per-render profile counter reaches zero instead of ghost-drawing or reporting prior-frame instances.
 - Lighting deposit clears its attachments through the render pass load operation every frame, so no separate clear pass is recorded.
 - The lighting spread, combine, temporal, and history-copy chain shares one
   update interval. A refresh atomically advances its current and history area

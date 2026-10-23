@@ -254,7 +254,8 @@ struct MaterialShaderData
 	// Shader material (must exactly match PbrMaterialLayout in engine)
 	// PBR material properties per glTF 2.0 metallic-roughness specification
 	XMFLOAT4 f4BaseColorFactor {1.0f, 1.0f, 1.0f, 1.0f};
-	XMFLOAT4 f4EmissiveFactor {1.0f, 1.0f, 1.0f, 1.0f};
+	XMFLOAT3 f3EmissiveFactor {1.0f, 1.0f, 1.0f};
+	float fOcclusionStrength = 1.0f;
 	int32_t iColorTextureSet = -1;
 	int32_t iPhysicalDescriptorTextureSet = -1;
 	int32_t iNormalTextureSet = -1;
@@ -265,8 +266,10 @@ struct MaterialShaderData
 	float fAlphaMask = 0.0f;
 	float fAlphaMaskCutoff = 1.0f;
 };
-static_assert(sizeof(MaterialShaderData) == 76, "MaterialShaderData layout changed — bump DataHeader::kiVersion and re-check PbrMaterialLayout; same-size reorder also bumps ExportScene::kiVersion's raw version (sizeof fold catches size changes only)");
+static_assert(sizeof(MaterialShaderData) == 76, "MaterialShaderData layout changed — bump DataHeader::kiVersion and re-check PbrMaterialLayout; same-size layout or semantic changes also bump ExportScene::kiVersion's raw version (sizeof fold catches size changes only)");
 static_assert(BT_OFFSETOF(MaterialShaderData, f4BaseColorFactor) == 8, "MaterialShaderData padding changed — PBR factor block no longer at offset 8");
+static_assert(BT_OFFSETOF(MaterialShaderData, f3EmissiveFactor) == 24, "MaterialShaderData emissive offset no longer matches PbrMaterialLayout");
+static_assert(BT_OFFSETOF(MaterialShaderData, fOcclusionStrength) == 36, "MaterialShaderData occlusion strength offset no longer matches PbrMaterialLayout");
 
 constexpr int64_t SceneHeader::AnimationSectionOffset(int64_t iTextureCount, int64_t iMaterialCount)
 {
@@ -425,8 +428,8 @@ struct DataHeader
 	// edits require a manual bump to this version's constant; per-header sizeof/offsetof assertions
 	// identify guarded layouts. A version mismatch forces full re-export, and the engine rejects stale
 	// manifests. Per-job caches are separate: payload-size changes invalidate them through each job's
-	// sizeof folds, while same-size reorders also require the owning job's raw-version bump.
-	static constexpr int64_t kiVersion = 54 + sizeof(ChunkHeader);
+	// sizeof folds, while same-size layout or semantic changes also require the owning job's raw-version bump.
+	static constexpr int64_t kiVersion = 55 + sizeof(ChunkHeader);
 	int64_t iVersion = kiVersion;
 
 	int64_t iChunkCount = 0;

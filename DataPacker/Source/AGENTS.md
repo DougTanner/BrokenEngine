@@ -8,6 +8,11 @@ The vcxproj provisions ThirdParty before linking and requires the prebuilt confi
 
 `Main.cpp` orchestrates legacy-intermediate migration, Scene and Island pre-export (including explicitly authorized Gaea baking), IBL cubemap convolution, the remaining asset exports, generated headers, and ThirdParty attribution collection. Every asset type and each IBL cubemap pre-pass runs even after an earlier failure, and each type's job failures become one structured aggregate diagnostic.
 
+Scene ingestion, including direct exchange-format decoding, belongs to
+the asynchronous scene job.
+[ExportJobs/AGENTS.md](ExportJobs/AGENTS.md) owns the decoding/export boundary,
+authored-scene identity, converter freshness, and source/output tracking.
+
 Each normal command emits a `kInfo` run summary after the single-instance mutex
 is acquired, counting jobs across every export type; a zero-argument command
 emits one summary per project. A dirty type counts as

@@ -27,6 +27,8 @@ Wrapper gObjectShadowsSunsetStretch(2.5f, 0.0f, 10.0f);
 Wrapper gObjectShadowsBlurSigma(8.0f, 1.0f, 40.0f);
 Wrapper gObjectShadowsBlurRadius(8.0f, 1.0f, 32.0f, 1.0f);
 Wrapper gObjectShadowsGrow(0.2f, 0.0f, 2.0f);
+Wrapper gObjectShadowsHeightOffset(1.0f, 0.0f, 4.0f);
+Wrapper gObjectShadowsTerrainShadowFade(30.0f, 1.0f, 200.0f); // min >= 1.0f load-bearing: keeps the folded fObjectShadowsTerrainShadowFadeInverse finite.
 Wrapper gSmokeShadowIntensity(0.5f, 0.0f, 1.0f);
 
 } // namespace engine

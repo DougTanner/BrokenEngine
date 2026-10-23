@@ -13,11 +13,13 @@
 namespace engine
 {
 
+constexpr int64_t kiDynamicBufferInitialCapacity = 8'192;
+
 void PointLightsInterpolate::GraphicsResources()
 {
-	gpBufferManager->CreateDynamicBuffer(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreateAreaLightingPipeline(kDynamicPipelineAxisAlignedLighting, kCrc, kpcName, sizeof(shaders::AxisAlignedQuadLayout), data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersLightingPointLightfragCrc, DescriptorFlags::kSamplerClamp);
-	Buffer* pVisibleLightsBuffers = gpBufferManager->CreateDynamicBuffer(kCrc, kBufferVisibleLights, kpcName, sizeof(shaders::VisibleLightQuadLayout));
+	gpBufferManager->CreateDynamicBuffer(kCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), kiDynamicBufferInitialCapacity);
+	gpPipelineManager->mDynamicPipelines.CreateAreaLightingPipeline(kDynamicPipelineAxisAlignedLighting, kCrc, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersLightingPointLightfragCrc, DescriptorFlags::kSamplerClamp);
+	Buffer* pVisibleLightsBuffers = gpBufferManager->CreateDynamicBuffer(kCrc, kBufferVisibleLights, kpcName, sizeof(shaders::VisibleLightQuadLayout), kiDynamicBufferInitialCapacity);
 	gpPipelineManager->mDynamicPipelines.CreatePipelineVisibleLights(kCrc, kpcName, pVisibleLightsBuffers);
 }
 

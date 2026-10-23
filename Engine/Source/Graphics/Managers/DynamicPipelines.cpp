@@ -176,14 +176,12 @@ void DynamicPipelines::CreateShadowModelPipeline(common::crc_t crc, std::string_
 	}
 }
 
-void DynamicPipelines::CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, int64_t iBufferSize, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, DescriptorFlags eSamplerFlag)
+void DynamicPipelines::CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, DescriptorFlags eSamplerFlag)
 {
 	if (mpPipelineMaps[eType].contains(crc))
 	{
 		return;
 	}
-
-	gpBufferManager->CreateDynamicBuffer(crc, kBufferMain, name, iBufferSize);
 
 	AddPipeline(eType, crc,
 	{
@@ -228,14 +226,12 @@ void DynamicPipelines::CreatePipelineVisibleLights(common::crc_t crc, std::strin
 	});
 }
 
-void DynamicPipelines::CreatePipelineBillboards(common::crc_t crc, std::string_view name, int64_t iBufferSize)
+void DynamicPipelines::CreatePipelineBillboards(common::crc_t crc, std::string_view name)
 {
 	if (mpPipelineMaps[kDynamicPipelineBillboards].contains(crc))
 	{
 		return;
 	}
-
-	gpBufferManager->CreateDynamicBuffer(crc, kBufferMain, name, iBufferSize);
 
 	AddPipeline(kDynamicPipelineBillboards, crc,
 	{
@@ -254,16 +250,11 @@ void DynamicPipelines::CreatePipelineBillboards(common::crc_t crc, std::string_v
 	});
 }
 
-void DynamicPipelines::CreateDepositPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, const Texture& rTargetTexture, const DescriptorInfo& rTextureDescriptor, VkBuffer* pVkOccupancyBuffer, int64_t iBufferSize)
+void DynamicPipelines::CreateDepositPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, const Texture& rTargetTexture, const DescriptorInfo& rTextureDescriptor, VkBuffer* pVkOccupancyBuffer)
 {
 	if (mpPipelineMaps[eType].contains(crc))
 	{
 		return;
-	}
-
-	if (iBufferSize > 0)
-	{
-		gpBufferManager->CreateDynamicBuffer(crc, kBufferMain, name, iBufferSize);
 	}
 
 	AddPipeline(eType, crc,
@@ -290,14 +281,12 @@ common::crc_t DynamicPipelines::SmokeDepositKey(common::crc_t crc, int64_t iPlan
 	return common::Crc(std::span<const int64_t>(piKeyValues));
 }
 
-void DynamicPipelines::CreatePipelineHexShields(common::crc_t crc, std::string_view name, int64_t iBufferSize)
+void DynamicPipelines::CreatePipelineHexShields(common::crc_t crc, std::string_view name)
 {
 	if (mpPipelineMaps[kDynamicPipelineHexShields].contains(crc))
 	{
 		return;
 	}
-
-	gpBufferManager->CreateDynamicBuffer(crc, kBufferMain, name, iBufferSize);
 
 	AddPipeline(kDynamicPipelineHexShields, crc,
 	{

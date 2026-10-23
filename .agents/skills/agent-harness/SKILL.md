@@ -102,14 +102,10 @@ extended with these fields:
 
 Each shared `Residuals` row names a missing capability or environment, or a
 criterion left unsettled by the run budget; use `none` when absent.
-A `shared-data.changed` residual from the claim or a launch is a mandatory user
-stop: main tells the user the Shared data MUST be re-exported, never
-redispatches or applies a fix itself, and after the user confirms runs
-`/compile` for the claimed targets, the record's only writer, before the next
-harness dispatch. A `shared-data.record-missing` residual instead routes
-`/compile` for the named target, and a `claim.data-directory-mismatch` residual
-routes `/compile` of both the Server and the Client target in one data mode,
-each with no user stop.
+A `shared-data.changed` or `shared-data.record-missing` residual from the claim
+or a launch routes `/compile` for the named target, and a
+`claim.data-directory-mismatch` residual routes `/compile` of both the Server
+and the Client target in one data mode, each with no user stop.
 
 Each exception row cites the handoff row or path plus selector that holds its
 settling evidence and never restates it:

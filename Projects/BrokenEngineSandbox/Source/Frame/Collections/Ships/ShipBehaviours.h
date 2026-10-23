@@ -40,18 +40,22 @@ struct HeadingMovementConstants
 	float fVelocityToDirection = 0.0f;
 };
 
+// A ship's stored flight plane while it climbs between planes.
+inline constexpr uint8_t kuiNoFlightPlane = 255;
+
 // The type's ki<Type>HighestFlightPlane; each type header asserts it indexes game::kFlightPlanes.
 [[nodiscard]] int64_t HighestFlightPlane(ShipType eType);
 [[nodiscard]] bool IsFlightPlaneAllowed(ShipType eType, int64_t iFlightPlane);
-// The plane whose height equals fHeight exactly, or none between planes. The climb lands on the table's own height, so
-// a ship on a plane always matches.
+// The plane whose height equals fHeight exactly, or none between planes. The climb lands on the table's own height.
 [[nodiscard]] std::optional<int64_t> FlightPlaneAtHeight(float fHeight);
 // The plane whose graph a ship paths and steers on: min(highest plane at or below its height, target plane).
 [[nodiscard]] int64_t NavigationFlightPlane(float fHeight, int64_t iTargetPlane);
 // True on a plane without kTerrainCollision.
 [[nodiscard]] bool SkipsTerrainContact(float fHeight);
 // Moves Z toward the target plane's height by at most fClimbRate times the delta, landing exactly on it; W is untouched.
-[[nodiscard]] XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime);
+// A stored plane equal to the target plane stays; any other becomes the target plane on arrival and kuiNoFlightPlane
+// while the climb is under way.
+[[nodiscard]] XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime, uint8_t& ruiFlightPlane);
 
 void CountdownPendingOrders(int64_t& riPendingFleetWantedCoordinateTicks);
 // Also counts down the weapon-mode change and applies kPendingUseMissiles when it finishes.

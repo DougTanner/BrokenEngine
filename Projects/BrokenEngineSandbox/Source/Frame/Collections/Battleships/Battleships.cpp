@@ -239,6 +239,7 @@ void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restric
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
 		std::chrono::duration<float> destroyedTime = rPrevious.pDestroyedTimes[i];
 		float fDeltaRotation = rPrevious.pfDeltaRotations[i];
+		uint8_t uiFlightPlane = rPrevious.puiFlightPlanes[i];
 #if defined(BT_CLIENT)
 		std::chrono::duration<float> animationTime = rPrevious.pAnimationTimes[i];
 		const engine::AnimationData* pAnimationData = animationDatas[std::to_underlying(rPreviousPostRender.pController[i])];
@@ -246,7 +247,7 @@ void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restric
 
 		vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
 		// PostRender Update stores velocity Z as 0, so the climb is what moves a ship's height.
-		vecPosition = ClimbTowardsFlightPlane(vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfBattleshipClimbRate, deltaTime);
+		vecPosition = ClimbTowardsFlightPlane(vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfBattleshipClimbRate, deltaTime, uiFlightPlane);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation.
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
@@ -269,6 +270,7 @@ void BattleshipsInterpolate::Update([[maybe_unused]] FrameInterpolate& __restric
 		rCurrent.pVecDirections[i] = vecDirection;
 		rCurrent.pDestroyedTimes[i] = destroyedTime;
 		rCurrent.pfDeltaRotations[i] = fDeltaRotation;
+		rCurrent.puiFlightPlanes[i] = uiFlightPlane;
 #if defined(BT_CLIENT)
 		rCurrent.pAnimationTimes[i] = animationTime;
 #endif
@@ -332,6 +334,7 @@ void BattleshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, 
 				.flagshipGlobalId = rCurrentPostRender.pFlagshipGlobalIds[i],
 				.fleetWantedCoordinate = rCurrentPostRender.pFleetWantedCoordinates[i],
 				.uiPendingFleetWantedCoordinateTicks = rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[i],
+				.uiFlightPlane = rCurrentInterpolate.puiFlightPlanes[i],
 				.bTransfer = true,
 			}),
 		};
@@ -358,8 +361,8 @@ void BattleshipsPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [
 	});
 }
 
-// One gun: once its cooldown has run out, shoots from the ship's position straight at the nearest visible enemy within
-// the arc about vecAxisNormal.
+// One gun: once its cooldown has run out, shoots flat from the ship's position at the nearest visible enemy on the
+// ship's flight plane within the arc about vecAxisNormal.
 static void XM_CALLCONV FireGun(Frame& __restrict rFrame, [[maybe_unused]] engine::GridCoord emitterCoordinate, int64_t i, FXMVECTOR vecAxisNormal, std::chrono::duration<float>& rNextBlasterSpawnTime)
 {
 	const BattleshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBattleships;
@@ -372,14 +375,14 @@ static void XM_CALLCONV FireGun(Frame& __restrict rFrame, [[maybe_unused]] engin
 
 	XMVECTOR vecPosition = rCurrentInterpolate.pVecPositions[i];
 	XMVECTOR vecTarget = XMVectorZero();
-	if (!FindNearestEnemyShipInArc(rFrame, vecPosition, vecAxisNormal, kfBattleshipBlasterArcHalfAngle, rCurrentPostRender.pAlignments[i], vecTarget))
+	if (!FindNearestEnemyShipInArc(rFrame, vecPosition, vecAxisNormal, kfBattleshipBlasterArcHalfAngle, rCurrentPostRender.pAlignments[i], rCurrentInterpolate.puiFlightPlanes[i], vecTarget))
 	{
 		return;
 	}
 
 	rNextBlasterSpawnTime = kBlastersSpawnCooldown;
 
-	XMVECTOR vecBlasterVelocity = XMVectorScale(XMVector3Normalize(XMVectorSubtract(vecTarget, vecPosition)), kfBlastersSpeed);
+	XMVECTOR vecBlasterVelocity = XMVectorScale(XMVector3Normalize(XMVectorSetZ(XMVectorSubtract(vecTarget, vecPosition), 0.0f)), kfBlastersSpeed);
 
 	BlastersPostRender::Spawn(rFrame,
 	{
@@ -417,6 +420,12 @@ void BattleshipsPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[m
 		}
 
 		if (rCurrentPostRender.pArrivalGracePeriods[i] > std::chrono::duration<float>::zero())
+		{
+			continue;
+		}
+
+		// A ship climbing between planes stores no plane and holds fire.
+		if (rCurrentInterpolate.puiFlightPlanes[i] == kuiNoFlightPlane)
 		{
 			continue;
 		}
@@ -478,6 +487,7 @@ bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rIn
 	rCurrentInterpolate.pVecDirections[iIndex] = rInfo.vecDirection;
 	rCurrentInterpolate.pDestroyedTimes[iIndex] = std::chrono::duration<float>(-1.0f); // Sentinel: -1.0f = not exploding
 	rCurrentInterpolate.pfDeltaRotations[iIndex] = rInfo.fDeltaRotation;
+	rCurrentInterpolate.puiFlightPlanes[iIndex] = rInfo.uiFlightPlane;
 #if defined(BT_CLIENT)
 	rCurrentInterpolate.pAnimationTimes[iIndex] = std::chrono::duration<float>::zero();
 #endif
@@ -602,7 +612,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 			else
 			{
 				XMVECTOR vecNearestEnemy = XMVectorZero();
-				bool bEnemyFound = FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], vecNearestEnemy);
+				bool bEnemyFound = FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], std::nullopt, vecNearestEnemy);
 
 				RegenerateHealth(vecPosition, bEnemyFound, vecNearestEnemy, deltaTime, kfBattleshipHealth, fHealth);
 				bool bHasDestination = false;
@@ -664,6 +674,7 @@ bool BattleshipsInterpolate::LogDifferences(const BattleshipsInterpolate& rOther
 		bEqual &= common::LogDifference<"pPushers">(i, pPushers[i], rOther.pPushers[i]);
 		bEqual &= common::LogDifference<"pRegistryIds">(i, pRegistryIds[i], rOther.pRegistryIds[i]);
 		bEqual &= common::LogDifference<"pfDeltaRotations">(i, pfDeltaRotations[i], rOther.pfDeltaRotations[i]);
+		bEqual &= common::LogDifference<"puiFlightPlanes">(i, puiFlightPlanes[i], rOther.puiFlightPlanes[i]);
 	}
 
 	return bEqual;

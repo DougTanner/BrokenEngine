@@ -1,0 +1,11 @@
+Model Information:
+* title:	Sea Creature 2
+* source:	https://sketchfab.com/3d-models/sea-creature-2-ec3085f2df2b4cf9bfa426d14bc5a363
+* author:	Comitre (https://sketchfab.com/Comitre)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Sea Creature 2" (https://sketchfab.com/3d-models/sea-creature-2-ec3085f2df2b4cf9bfa426d14bc5a363) by Comitre (https://sketchfab.com/Comitre) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

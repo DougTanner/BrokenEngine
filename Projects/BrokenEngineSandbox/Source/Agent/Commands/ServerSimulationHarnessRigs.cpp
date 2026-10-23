@@ -296,6 +296,7 @@ static void SeatShipSpawnHeight(SPAWN_INFO& rData, ShipType eType)
 		throw std::runtime_error(std::format("'{}' target flight plane is not allowed for {}", FRAME_COLUMN(SPAWN_INFO, orders)::kName, EnumToken(eType)));
 	}
 	rData.vecPosition = XMVectorSetZ(rData.vecPosition, engine::gpFlightPlanes->Plane(iFlightPlane).fHeightMeters);
+	rData.uiFlightPlane = static_cast<uint8_t>(iFlightPlane);
 }
 
 // Validates one entry without touching any queue.

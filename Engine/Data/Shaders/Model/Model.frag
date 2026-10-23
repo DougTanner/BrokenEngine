@@ -72,6 +72,7 @@ layout (location = 4) in vec2 f2InUV2;
 layout (location = 5) in vec2 f2InUV3;
 layout (location = 6) in vec2 f2InUV4;
 layout (location = 7) in vec4 f4InColorAdd;
+layout (location = 8) in float fInHeightAboveBase;
 
 // Fragment output
 layout (location = 0) out vec4 f4OutColor;
@@ -184,8 +185,8 @@ void GetIBLContribution(float NdotV, float perceptualRoughness, vec3 diffuseColo
 	float lod = pow(perceptualRoughness, mainLayout.fPhysicallyBasedRenderingCubemapLevelOfDetailPower) * mainLayout.fPhysicallyBasedRenderingMipmapCount
 	            + perceptualRoughness * mainLayout.fPhysicallyBasedRenderingCubemapLevelOfDetailOffset;
 	vec3 brdf = texture(samplerBRDFLUT, vec2(NdotV, 1.0 - perceptualRoughness)).rgb;
-	vec3 diffuseLight = SRGBtoLinear(texture(samplerIrradiance, ToCubemapCoord(n))).rgb;
-	vec3 specularLight = min(SRGBtoLinear(textureLod(prefilteredMap, ToCubemapCoord(reflection), lod)).rgb, vec3(kfIblSpecularMax));
+	vec3 diffuseLight = texture(samplerIrradiance, ToCubemapCoord(n)).rgb;
+	vec3 specularLight = min(textureLod(prefilteredMap, ToCubemapCoord(reflection), lod).rgb, vec3(kfIblSpecularMax));
 	f3Diffuse = diffuseLight * diffuseColor;
 	f3Specular = specularLight * (specularColor * brdf.x + brdf.y);
 }
@@ -242,10 +243,11 @@ void main()
 	vec3 reflectance90 = vec3(clamp(max(max(specularColor.r, specularColor.g), specularColor.b) * 25.0, 0.0, 1.0));
 
 	// Sample ambient occlusion
-	float ao = 1.0;
+	float fEffectiveAo = 1.0;
 	if (material.iOcclusionTextureSet > -1)
 	{
-		ao = texture(sampler2D(pTextures[nonuniformEXT(int(material.fOcclusionTextureIndex))], samplerRepeat), getUV(material.iOcclusionTextureSet)).r;
+		float fAo = texture(sampler2D(pTextures[nonuniformEXT(int(material.fOcclusionTextureIndex))], samplerRepeat), getUV(material.iOcclusionTextureSet)).r;
+		fEffectiveAo = 1.0 + material.fOcclusionStrength * (fAo - 1.0);
 	}
 
 	// Engine-specific lighting. Sun and moon split: moon bypasses shadow attenuation (Model.frag samples only
@@ -260,6 +262,8 @@ void main()
 	vec2 f2LightingPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.f4LightingArea);
 	vec2 f2ShadowPosition = WorldToVisibleArea(f3InWorldPosition, globalLayout.f4ShadowArea);
 	float fShadow = max(mainLayout.fPhysicallyBasedRenderingShadowFloor, SampleTerrainShadow(shadowTextureSampler, f2ShadowPosition));
+	// The terrain shadow lies on the ground, so a ship climbing above the lowest flight plane fades out of it.
+	fShadow = mix(fShadow, 1.0f, clamp(fInHeightAboveBase * globalLayout.fObjectShadowsTerrainShadowFadeInverse, 0.0f, 1.0f));
 	const float fShadowMoon = 1.0; // moon bypasses terrain shadow; Model.frag has no other shadow inputs
 
 	// Accumulate lighting
@@ -293,18 +297,15 @@ void main()
 	                     globalLayout.f4PhysicallyBasedRenderingMoonColorObjectsImageBasedLighting.rgb * fShadowMoon);
 	vec3 f3IblDiffuseResult = pow(mainLayout.fPhysicallyBasedRenderingImageBasedLightingDiffuse * f3IblDiffuse, vec3(mainLayout.fPhysicallyBasedRenderingImageBasedLightingDiffusePower));
 	vec3 f3IblSpecularResult = pow(mainLayout.fPhysicallyBasedRenderingImageBasedLightingSpecular * f3IblSpecular, vec3(mainLayout.fPhysicallyBasedRenderingImageBasedLightingSpecularPower));
-	color += f3IblDiffuseResult + f3IblSpecularResult;
+	color += fEffectiveAo * (f3IblDiffuseResult + f3IblSpecularResult);
 #endif
 
-	// Apply ambient occlusion
-	if (material.iOcclusionTextureSet > -1)
-	{
-		color *= ao;
-	}
-
 	#if 1
-	// Sample lighting texture at world x/y (very close to base-height already)
-	vec2 f2LightingTexcoord = WorldToVisibleArea(f3InWorldPosition, globalLayout.f4LightingArea);
+	// Sample lighting where this model's own lights deposit: the eye line through the model, continued down to the
+	// lowest flight plane. Zero height samples the raw XY exactly.
+	vec3 f3ToEye = mainLayout.f4EyePosition.xyz - f3InWorldPosition;
+	vec2 f2LightingWorldPosition = f3InWorldPosition.xy - (fInHeightAboveBase / f3ToEye.z) * f3ToEye.xy;
+	vec2 f2LightingTexcoord = WorldToVisibleArea(vec3(f2LightingWorldPosition, 0.0f), globalLayout.f4LightingArea);
 	vec4 pf4Lighting[3];
 	ReadLighting(pf4Lighting, pLightingSamplers, f2LightingTexcoord);
 
@@ -361,7 +362,7 @@ void main()
 
 	// Add emissive
 #if ENABLE_EMISSIVE
-	vec3 emissive = material.f4EmissiveFactor.rgb;
+	vec3 emissive = material.f3EmissiveFactor;
 	if (material.iEmissiveTextureSet > -1)
 	{
 		emissive *= SRGBtoLinear(texture(sampler2D(pTextures[nonuniformEXT(int(material.fEmissiveTextureIndex))], samplerRepeat), getUV(material.iEmissiveTextureSet)).rgb);

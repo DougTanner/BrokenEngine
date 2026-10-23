@@ -4,6 +4,7 @@
 
 #include "Data/Raw.h"
 #include "File/PackChunks.h"
+#if !defined(BT_MODEL_VIEWER)
 #include "Ui/Screens/TweaksScreen/TweaksScreen.h"
 #include "Ui/Screens/ChatScreen.h"
 #include "Ui/Screens/GameSettingsScreen.h"
@@ -12,10 +13,13 @@
 #include "Ui/Screens/ModalScreen.h"
 #include "Ui/Screens/PauseMenuScreen.h"
 #include "Ui/Screens/SoundMenuScreen.h"
+#endif
 #include "Ui/GraphicsSettingsWrappersBase.h"
 
 #include "Profile/ProfileRows.h"
+#if !defined(BT_MODEL_VIEWER)
 #include "Ui/Screens/HudScreen.h"
+#endif
 #include "Game.h"
 
 namespace engine
@@ -139,12 +143,14 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 	// ImGui_ImplVulkan_Init reports failures through internal IM_ASSERTs and always returns true.
 	ImGui_ImplVulkan_Init(&initializationInfo);
 
+#if !defined(BT_MODEL_VIEWER)
 	// Minimized/zero-height: keep the 1.0f default scale rather than collapsing style to 0
 	float fHeight = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	if (fHeight > 0.0f)
 	{
 		mfUiScale = fHeight / kfUiReferenceHeight;
 	}
+#endif
 	SetupThemeGeometry(mfUiScale);
 	ImGui::GetStyle().FontScaleDpi = mfUiScale;
 	ApplyThemeColors(GetUiTheme());
@@ -156,6 +162,7 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 
 	ImGui::EndFrame();
 
+#if !defined(BT_MODEL_VIEWER)
 	mpTweaksScreen = std::make_unique<TweaksScreen>();
 	mpMainMenuScreen = std::make_unique<MainMenuScreen>();
 	mpModalScreen = std::make_unique<ModalScreen>();
@@ -165,6 +172,7 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 	mpGameSettingsScreen = std::make_unique<GameSettingsScreen>();
 	mpHudScreen = std::make_unique<game::HudScreen>();
 	mpChatScreen = std::make_unique<ChatScreen>();
+#endif
 }
 
 // Reset all geometry before scaling to prevent cumulative drift across resolution changes, including fields without explicit overrides.
@@ -421,6 +429,7 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 		rStyle.Colors[ImGuiCol_PopupBg].w = fAlpha;
 	}
 
+#if !defined(BT_MODEL_VIEWER)
 	// Update geometry only when its scale changes; ImGui_ImplWin32_NewFrame refreshes DisplaySize later. Extent changes recreate this manager and its ImGui context at the kSwapchain destroy tier.
 	float fPreviousUiScale = mfUiScale;
 	// Minimized/zero-height: keep previous scale rather than collapsing style to 0
@@ -433,6 +442,7 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 	{
 		SetupThemeGeometry(mfUiScale);
 	}
+#endif
 	// Both font scale factors set unconditionally after the geometry block: SetupThemeGeometry's whole-style reset
 	// (rStyle = defaultStyle) clears FontScaleMain to 1.0f, so re-applying here restores the user's Font Size on a
 	// scale-change frame rather than dropping it for that frame.
@@ -470,6 +480,9 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 
 	ImGui::NewFrame();
 
+#if defined(BT_MODEL_VIEWER)
+	game::RenderViewerUi();
+#else
 	// Menu screens required to progress past the pre-game / rejection flows must render even
 	// with Tweaks open — otherwise a persisted-active Tweaks menu strands a fresh client with
 	// no way to reach Connect/Spawn. Each self-gates internally on the game's UI state.
@@ -494,6 +507,7 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 
 	RenderImPlotGraphs();
 	RenderTextAreas();
+#endif
 
 	ImGui::Render();
 	mpDrawData = ImGui::GetDrawData();

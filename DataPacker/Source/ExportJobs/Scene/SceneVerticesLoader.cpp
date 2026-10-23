@@ -71,14 +71,10 @@ static XMMATRIX NodeLocalMatrix(const tinygltf::Node& rNode)
 	return XMMatrixIdentity();
 }
 
-// Primitives sharing a glTF material need separate entries when their mesh nodes or skinning modes differ,
+// Primitives sharing a source material need separate entries when their mesh nodes or skinning modes differ,
 // so each draw uses one mesh transform and one deformation path.
-static int64_t ResolveEffectiveMaterial(LoadVerticesContext& rContext, int64_t iOriginalMaterial, int64_t iCurrentNodeIndex, bool bHasSkinning, const XMMATRIX& rMatMeshWorld)
+int64_t ResolveEffectiveMaterial(std::vector<Material>& rMaterials, std::vector<MaterialNodeInfo>& rMaterialNodeInfos, MaterialNodeMap& rMaterialNodeMap, int64_t iOriginalMaterial, int64_t iCurrentNodeIndex, bool bHasSkinning, const XMMATRIX& rMatMeshWorld)
 {
-	std::vector<Material>& rMaterials = rContext.rMaterials;
-	std::vector<MaterialNodeInfo>& rMaterialNodeInfos = rContext.rMaterialNodeInfos;
-	MaterialNodeMap& rMaterialNodeMap = rContext.rMaterialNodeMap;
-
 	std::tuple<int64_t, int64_t, bool> key = std::make_tuple(iOriginalMaterial, iCurrentNodeIndex, bHasSkinning);
 	auto it = rMaterialNodeMap.find(key);
 
@@ -347,7 +343,10 @@ void LoadVertices(const Parent* pParent, int64_t iCurrentNodeIndex, const tinygl
 		}
 
 		ASSERT(rPrimitive.attributes.find("POSITION") != rPrimitive.attributes.end());
-		ASSERT(rPrimitive.attributes.find("COLOR_0") == rPrimitive.attributes.end());
+		if (rPrimitive.attributes.contains("COLOR_0"))
+		{
+			LOG(kDefault, kWarning, "{}: node {}, mesh {}, primitive {}: unsupported COLOR_0 vertex colors are ignored in packed appearance", rContext.sourcePath, iCurrentNodeIndex, rNode.mesh, i);
+		}
 		if (rPrimitive.attributes.find("TEXCOORD_6") != rPrimitive.attributes.end())
 		{
 			LOG(kDefault, kWarning, "WARNING: Found TEXCOORD_6");
@@ -359,7 +358,7 @@ void LoadVertices(const Parent* pParent, int64_t iCurrentNodeIndex, const tinygl
 		// joint/inverse-bind mapping to apply, so the primitive ships as a mesh-matrix draw and the shader ignores its joint attributes
 		bool bHasSkinning = rNode.skin >= 0 && rPrimitive.attributes.find("JOINTS_0") != rPrimitive.attributes.end();
 
-		int64_t iEffectiveMaterial = ResolveEffectiveMaterial(rContext, iOriginalMaterial, iCurrentNodeIndex, bHasSkinning, matMeshWorld);
+		int64_t iEffectiveMaterial = ResolveEffectiveMaterial(rContext.rMaterials, rContext.rMaterialNodeInfos, rContext.rMaterialNodeMap, iOriginalMaterial, iCurrentNodeIndex, bHasSkinning, matMeshWorld);
 		Material& rMaterial = rMaterials.at(static_cast<size_t>(iEffectiveMaterial));
 
 		// CanonicalizeSceneSkin range-checked rNode.skin before export, and this full count is the per-material joint-matrix
@@ -402,4 +401,72 @@ bool IsOcclusion(int64_t iIndex, const tinygltf::Material& rMaterial)
 bool IsNormal(int64_t iIndex, const tinygltf::Material& rMaterial)
 {
 	return UsesTexture(rMaterial.additionalValues, "normalTexture", iIndex);
+}
+
+void AccumulateDrawnBounds(const std::vector<common::ModelVertex>& rVertices, const std::vector<Material>& rMaterials, const std::vector<MaterialNodeInfo>& rMaterialNodeInfos, const std::vector<XMMATRIX>& rJointMatrices, bool bMeshLocal, XMVECTOR& rVecMin, XMVECTOR& rVecMax)
+{
+	for (int64_t i = 0; i < std::ssize(rMaterials); ++i)
+	{
+		const MaterialNodeInfo& rInfo = rMaterialNodeInfos.at(i);
+		for (int64_t iVertexIndex : rMaterials.at(i).indexBuffer)
+		{
+			const common::ModelVertex& rVertex = rVertices.at(iVertexIndex);
+			XMVECTOR vecLocalPosition = XMLoadFloat3(&rVertex.f3Pos);
+			XMVECTOR vecPosition = XMVectorZero();
+			if (rInfo.bHasSkinning)
+			{
+				float pfWeights[] = {rVertex.f4Weight0.x, rVertex.f4Weight0.y, rVertex.f4Weight0.z, rVertex.f4Weight0.w};
+				float pfJoints[] = {rVertex.f4Joint0.x, rVertex.f4Joint0.y, rVertex.f4Joint0.z, rVertex.f4Joint0.w};
+				for (int64_t k = 0; k < 4; ++k)
+				{
+					// Zero-weight slots contribute nothing and may contain arbitrary joint indices.
+					if (pfWeights[k] == 0.0f)
+					{
+						continue;
+					}
+					vecPosition = XMVectorAdd(vecPosition, XMVectorScale(XMVector3Transform(vecLocalPosition, rJointMatrices.at(static_cast<size_t>(pfJoints[k]))), pfWeights[k]));
+				}
+			}
+			else if (bMeshLocal)
+			{
+				vecPosition = XMVector3Transform(vecLocalPosition, rInfo.matMeshWorld);
+			}
+			else
+			{
+				vecPosition = vecLocalPosition;
+			}
+			rVecMin = XMVectorMin(rVecMin, vecPosition);
+			rVecMax = XMVectorMax(rVecMax, vecPosition);
+		}
+	}
+}
+
+float BoundsLongestExtent(FXMVECTOR vecMin, FXMVECTOR vecMax)
+{
+	XMFLOAT3A f3Extent {};
+	XMStoreFloat3A(&f3Extent, XMVectorSubtract(vecMax, vecMin));
+	return std::max({f3Extent.x, f3Extent.y, f3Extent.z});
+}
+
+XMVECTOR BoundsCenter(FXMVECTOR vecMin, FXMVECTOR vecMax)
+{
+	return XMVectorScale(XMVectorAdd(vecMin, vecMax), 0.5f);
+}
+
+void SetMaterialTransform(const MaterialNodeInfo& rInfo, bool bHasSkeleton, const XMMATRIX& rMatNodeWorld, common::MaterialInfo& rMaterialInfo)
+{
+	rMaterialInfo.flags.Set(common::MaterialFlags::kSkinned, rInfo.bHasSkinning);
+	rMaterialInfo.iOriginalMaterialIndex = static_cast<int16_t>(rInfo.iOriginalMaterialIndex);
+	if (rInfo.bHasSkinning)
+	{
+		ASSERT(rInfo.iNodeIndex >= 0);
+		rMaterialInfo.iParentNodeIndex = static_cast<int16_t>(rInfo.iNodeIndex);
+		XMStoreFloat4x4(&rMaterialInfo.f4x4RelativeTransform, XMMatrixIdentity());
+	}
+	else if (rInfo.iNodeIndex >= 0 && bHasSkeleton)
+	{
+		rMaterialInfo.iParentNodeIndex = static_cast<int16_t>(rInfo.iNodeIndex);
+		XMMATRIX matRelative = rInfo.matMeshWorld * XMMatrixInverse(nullptr, rMatNodeWorld);
+		XMStoreFloat4x4(&rMaterialInfo.f4x4RelativeTransform, matRelative);
+	}
 }

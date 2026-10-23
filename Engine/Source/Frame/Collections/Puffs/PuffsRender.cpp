@@ -11,13 +11,15 @@
 namespace engine
 {
 
+constexpr int64_t kiDynamicBufferInitialCapacity = 1'024;
+
 void PuffsInterpolate::GraphicsResources()
 {
 	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
 		common::crc_t uiDepositKey = DynamicPipelines::SmokeDepositKey(kCrc, i);
-		gpBufferManager->CreateDynamicBuffer(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout));
-		gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineSmokeAxisAligned, uiDepositKey, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[i], {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesSmokeBC44jpgCrc}, &gpBufferManager->mpSmokeOccupancyVkBuffers[i][0], sizeof(shaders::AxisAlignedQuadLayout));
+		gpBufferManager->CreateDynamicBuffer(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), kiDynamicBufferInitialCapacity);
+		gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineSmokeAxisAligned, uiDepositKey, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[i], {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesSmokeBC44jpgCrc}, &gpBufferManager->mpSmokeOccupancyVkBuffers[i][0]);
 	}
 }
 

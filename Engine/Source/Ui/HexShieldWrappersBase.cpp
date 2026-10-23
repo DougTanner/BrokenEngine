@@ -5,12 +5,12 @@
 namespace engine
 {
 
-engine::Wrapper gHexShieldGrow(2.0f, 1.0f, 4.0f);
-engine::Wrapper gHexShieldEdgeDistance(18.8f, 18.0f, 19.1f);
+engine::Wrapper gHexShieldGrow(0.1f, 0.05f, 0.2f);
+engine::Wrapper gHexShieldEdgeDistance(0.94f, 0.9f, 0.955f);
 engine::Wrapper gHexShieldEdgePower(1.0f, 0.5f, 2.0f);
-engine::Wrapper gHexShieldEdgeMultiplier(0.5f, 0.25f, 1.0f);
+engine::Wrapper gHexShieldEdgeMultiplier(10.0f, 5.0f, 20.0f);
 
-engine::Wrapper gHexShieldWaveMultiplier(7.0f, 0.0f, 20.0f);
+engine::Wrapper gHexShieldWaveMultiplier(0.35f, 0.0f, 1.0f);
 engine::Wrapper gHexShieldWaveDotMultiplier(5.0f, 0.5f, 10.0f);
 engine::Wrapper gHexShieldWaveIntensityMultiplier(12.0f, 0.5f, 20.0f);
 engine::Wrapper gHexShieldWaveIntensityPower(1.6f, 0.25f, 4.0f);

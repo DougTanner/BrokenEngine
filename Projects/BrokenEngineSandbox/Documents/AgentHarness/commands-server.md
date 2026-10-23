@@ -102,7 +102,9 @@ adding the fields below; the other entries are its own commands.
   value that duplicates another frame's or ship's identity gives odd behavior
   but no assert. Positions are also unchecked, apart from a ship's height, which
   its `PostRead` hook rejects outside the lowest-to-highest flight-plane
-  heights, and must stay inside the cell: an out-of-cell omni position transfers
+  heights, and a flying (neither falling nor dying) missile's height and
+  velocity z, which the save reader requires to be exactly a flight-plane height
+  and 0. Positions must stay inside the cell: an out-of-cell omni position transfers
   at most one cell per axis per tick and then asserts in
   `OmnisPostRender::Spawn` ([Frame
   invariants](../../../../Engine/Source/Frame/AGENTS.md)).
@@ -111,7 +113,8 @@ adding the fields below; the other entries are its own commands.
   save reader's checks (pair count/capacity parity and ID maps, the
   `puiTypeIndices` bound, the `PostRead` hooks, the spawn-timer bound, and the
   one-to-one pairing of fighter, omni, and battleship pusher handles with
-  Pushers rows, and no lifecycle bit on a Pushers row) plus one more refusal: a changed
+  Pushers rows, no lifecycle bit on a Pushers row, and every flying missile
+  exactly at a flight-plane height with velocity z 0) plus one more refusal: a changed
   `uiNextUuid` must lie within `[current, 2^47]`.
   Any failure before the commit returns `ok:false` with the frame unchanged. On
   success the frame CRC is recomputed. The command fails without `kbDebugInput`,
@@ -204,7 +207,8 @@ adding the fields below; the other entries are its own commands.
   an `[x,y]` pair of finite numbers in the cell's local frame, a position being
   meters from the cell's center: a ship spawn's `vecPosition` takes z at the
   height of its `orders` target flight plane (`orders` 256 names plane 1, 512
-  plane 2), any other `vecPosition` z at the lowest flight plane, both w 1,
+  plane 2) and its `uiFlightPlane` that plane whatever the entry supplies, any
+  other `vecPosition` z at the lowest flight plane, both w 1,
   and every other vector z 0 and w 0; `engine::AlignmentIdentifier`
   `"fleet"` or `"random"`, the game's two alignments; a ship's `eController`
   `"Fleet"` or `"RandomSpawn"`; an `eType` `"Fighter"`, `"Omni"`, or
@@ -215,9 +219,9 @@ adding the fields below; the other entries are its own commands.
 
   | `type` | Fields |
   |--------|--------|
-  | `SpawnFighter` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `nextBlasterSpawnTime`, `arrivalGracePeriod`, `fDeltaRotation`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `bTransfer` |
-  | `SpawnOmni` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fArmor`, `fShield`, `nextBlasterFireTime`, `nextSecondarySpawnTime`, `shieldCooldown`, `shieldDownSoundCooldown`, `animationTime`, `flags`, `transferLockTimer`, `arrivalGracePeriod`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiPendingWeaponModeTicks`, `bTransfer` |
-  | `SpawnBattleship` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `nextBlasterSpawnTime`, `nextRearBlasterSpawnTime`, `arrivalGracePeriod`, `fDeltaRotation`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `bTransfer` |
+  | `SpawnFighter` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `nextBlasterSpawnTime`, `arrivalGracePeriod`, `fDeltaRotation`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiFlightPlane`, `bTransfer` |
+  | `SpawnOmni` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fArmor`, `fShield`, `nextBlasterFireTime`, `nextSecondarySpawnTime`, `shieldCooldown`, `shieldDownSoundCooldown`, `animationTime`, `flags`, `transferLockTimer`, `arrivalGracePeriod`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiPendingWeaponModeTicks`, `uiFlightPlane`, `bTransfer` |
+  | `SpawnBattleship` | `vecPosition`, `vecDirection`, `vecVelocity`, `alignment`, `eController`, `orders`, `fHealth`, `nextBlasterSpawnTime`, `nextRearBlasterSpawnTime`, `arrivalGracePeriod`, `fDeltaRotation`, `navigationDelay`, `globalId` (refused), `flagshipGlobalId`, `fleetWantedCoordinate`, `uiPendingFleetWantedCoordinateTicks`, `uiFlightPlane`, `bTransfer` |
   | `SpawnBlaster` | `vecPosition`, `vecVelocity`, `iTypeIndex`, `alignment` |
   | `SpawnMissile` | `vecPosition`, `vecDirection`, `vecVelocity`, `vecStoredDirection`, `fAcceleration`, `flags`, `alignment`, `deltaRotationDelay`, `fDeltaRotation`, `fDeltaRotationMaximum`, `fPitch`, `time`, `nextJitter`, `bTransfer` |
   | `SpawnExplosion` | `iTypeIndex`, `vecPosition`, `vecDirection`, `flags`, `lifecycleFlags`, `iTrailCount`, `fTrailAngle`, `iParticleCount`, `fParticleAngle`, `fSizePercent`, `fSmokePercent`, `fTimePercent` |
@@ -295,12 +299,7 @@ adding the fields below; the other entries are its own commands.
   not active. A smaller margin crosses sooner: `vecPosition:[449.5,0]` crosses
   on the first tick after the one it is applied. For another edge, mirror or
   swap the components. Terrain near that path can push the coast off its line; then pick
-  another cell. For any moving row, choose a start position whose per-tick steps
-  never land exactly on the edge, as 433.86 m (15.5 ticks) does: a row that
-  reaches the edge exactly arrives on the destination cell's opposite edge, where
-  a refusing collection such as Blasters drops it without any signal and an
-  asserting one such as Omnis asserts
-  ([Frame invariants](../../../../Engine/Source/Frame/AGENTS.md)).
+  another cell.
 
   `tick` is an absolute `status.tick` value and must be a JSON integer greater
   than the current `status.tick`; omitted, it means the next tick,

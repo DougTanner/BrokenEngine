@@ -1,0 +1,11 @@
+Model Information:
+* title:	Aeriusu Drone Ship
+* source:	https://sketchfab.com/3d-models/aeriusu-drone-ship-1b121a8965e241ada855288eef2732ba
+* author:	morepolys (https://sketchfab.com/morepolys)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Aeriusu Drone Ship" (https://sketchfab.com/3d-models/aeriusu-drone-ship-1b121a8965e241ada855288eef2732ba) by morepolys (https://sketchfab.com/morepolys) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

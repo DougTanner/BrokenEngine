@@ -17,11 +17,15 @@ flowchart LR
 The engine [`FrameRegistry`](../../Engine/Source/Frame/FrameRegistry.cpp)
 answers "which row of another collection" questions during the tick, and the
 game opens exactly two windows for it through `BuildShipRegistryWindow` in
-[`ShipQueries.h`](../../Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipQueries.h),
-each binding one source layer per ship type (Fighters, Omnis, Battleships). The
-Missile-Update window opens inside the Update phase before the ship Updates
-run. A ship of any type is eligible while it still publishes a valid registry
-id and its previous-frame arrival grace has run out, and the window binds both
+[`ShipQueries.h`](../../Projects/BrokenEngineSandbox/Source/Frame/Collections/Ships/ShipQueries.h).
+Each window holds one registry context per flight plane, built once when the
+window opens and reused for the rest of its phase; each context binds one source
+layer per ship type (Fighters, Omnis, Battleships) holding only the ships whose
+current Interpolate row stores that plane, so a ship storing no plane while it
+climbs between planes is in no context. The Missile-Update window opens inside
+the Update phase before the ship Updates run. A ship of any type is eligible
+while it still publishes a valid registry id and its previous-frame arrival
+grace has run out, and the window binds both
 position columns: current positions, which acquisition ranks and range-checks
 against, and previous-frame positions, which a retained Missile homes on.
 Subscriber counts come from the previous frame's Missile handles. Still-active
@@ -32,9 +36,9 @@ Missile handles; it binds no previous-frame positions, and is then reused
 across the whole omni spawn loop.
 
 Each window makes one combined workbuffer reservation for its source rows,
-registry scratch, alignment padding, and layer descriptor. The pointer-derived
-spans are formed only after that reservation returns, and the single scoped
-allocation owns them for the context lifetime
+every plane's registry scratch, alignment padding, and every plane's layer
+descriptors. The pointer-derived spans are formed only after that reservation
+returns, and the single scoped allocation owns them for the contexts' lifetime
 ([`Engine/Source/Frame/AGENTS.md`](../../Engine/Source/Frame/AGENTS.md)). The
 worker workbuffer's 64 KiB initial size remains a performance preallocation, not
 a hard bound: a grow while a context is live does not invalidate it (that same

@@ -146,22 +146,17 @@ bool XM_CALLCONV AxisAlignedBoundingBoxIntersectsArea(XMFLOAT4 f4Area, FXMVECTOR
 	return !(fMaximumX < f4Area.x || fMinimumX > f4Area.z || fMaximumY < f4Area.w || fMinimumY > f4Area.y);
 }
 
-bool XM_CALLCONV InsideArea(FXMVECTOR vecPosition, const XMFLOAT4& rf4Area)
-{
-	float fPositionX = XMVectorGetX(vecPosition);
-	float fPositionY = XMVectorGetY(vecPosition);
-	return fPositionX > rf4Area.x && fPositionX < rf4Area.z && fPositionY < rf4Area.y && fPositionY > rf4Area.w;
-}
-
 bool XM_CALLCONV InsideArea(FXMVECTOR vecPosition, FXMVECTOR vecArea)
 {
 	// vecArea: x=minX, y=maxY, z=maxX, w=minY
-	// Inside if: minX < posX < maxX AND minY < posY < maxY
-	// Rearranged: posX > minX AND posY > minY AND maxX > posX AND maxY > posY
+	// Half-open, so a shared cell edge has exactly one owner: inside if minX <= posX < maxX AND minY <= posY < maxY
+	// Every lane compare is false for a NaN operand, so a NaN position is outside.
 	XMVECTOR vecPositionAndMaximum = XMVectorPermute<0, 1, 6, 5>(vecPosition, vecArea);  // (posX, posY, maxX, maxY)
 	XMVECTOR vecMinimumAndPosition = XMVectorPermute<4, 7, 0, 1>(vecPosition, vecArea);  // (minX, minY, posX, posY)
-	uint32_t uiControlResult = XMVector4GreaterR(vecPositionAndMaximum, vecMinimumAndPosition);
-	return XMComparisonAllTrue(uiControlResult);
+	XMVECTOR vecGreater = XMVectorGreater(vecPositionAndMaximum, vecMinimumAndPosition);
+	XMVECTOR vecGreaterOrEqual = XMVectorGreaterOrEqual(vecPositionAndMaximum, vecMinimumAndPosition);
+	XMVECTOR vecInside = XMVectorSelect(vecGreater, vecGreaterOrEqual, g_XMSelect1100);  // >= on lanes 0-1, > on lanes 2-3
+	return XMVector4EqualInt(vecInside, XMVectorTrueInt());
 }
 
 XMVECTOR XM_CALLCONV ColorToVector(uint32_t uiColor)

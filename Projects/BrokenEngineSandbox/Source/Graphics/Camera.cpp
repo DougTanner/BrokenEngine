@@ -12,7 +12,7 @@ namespace game
 {
 
 Camera::Camera()
-: engine::CameraBase(engine::CameraSetup {.vecInitialPosition = XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 0.0f))})
+: engine::CameraBase(engine::CameraSetup {.vecInitialPosition = XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset)})
 {
 }
 
@@ -23,12 +23,12 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 	// The main menu and an invalid client owned-entity identity use the canonical menu pose to avoid retaining a stale gameplay target.
 	if (gpGame->mGameFlags & engine::GameFlags::kMainMenu)
 	{
-		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 0.0f)));
+		return engine::CameraTarget::Direct(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset));
 	}
 
 	if (!(gpGame->ClientOwnedEntityIdentifier().iValue != 0))
 	{
-		return engine::CameraTarget::Direct(XMVectorAdd(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset), XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 0.0f)));
+		return engine::CameraTarget::Direct(XMVectorAdd(kVecMenuIslandCenter, kVecMenuCameraOffset));
 	}
 
 	// The interpolate's own cell, not the client cell: its positions are local to that cell, and the camera works in

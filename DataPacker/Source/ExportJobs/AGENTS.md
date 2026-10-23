@@ -13,7 +13,7 @@ Asset processors convert source files into cached `.pack` chunks. The parent `Ru
   own marker and a fingerprint covering only its own inputs. Name and key that
   marker by the stage's own version alone, keep that version outside
   `Version(...)`, and bump whichever version owns the behavior that changed.
-  Island texture encoding is the current instance; the scene `.PreExport` marker
+  Island texture encoding uses this pattern; the scene `.PreExport` marker
   also guards tracked outputs but departs from all three: its filename carries
   no version, its version is the scene's own `Version(...)` export version, and
   it fingerprints the stage's generated outputs instead of its inputs. Every
@@ -33,14 +33,103 @@ Texture encoding and chunk routing are described in `Texture/AGENTS.md`. Island/
 
 ## Scene and Model
 
-Scene export accepts `.gltf` and `.glb` and is two-phase. The `.PreExport` marker
+Scene discovery accepts `.blend`, `.gltf`, `.glb`, `.fbx`, `.obj`, `.dae`,
+`.ply`, `.stl`, and `.3ds` outside `Intermediates`.
+A `.blend` owns its sibling `.glb`, suppressing that sibling's discovery even
+when it already exists. The job uses the GLB path for chunk identity, CRCs,
+manifest entries, generated symbols, and model/texture names, including when
+the GLB is initially missing. Ordinary export-only scenes need no Blender.
+Commit available production `.blend` sources together with their export-ready
+sibling GLBs; neither extension is ignored. Conversion never saves the author
+source, and DataPacker never performs Git operations.
+
+Authored scenes convert before the ordinary two-phase scene export. Only
+installed Blender 5.2 LTS is supported, selected from Windows installation
+directories or `PATH`; no installer or converter configuration is provided.
+Freshness checks inspect executable version resources without launching
+Blender. Only dirty conversion launches it, within the scene's existing
+asynchronous job; simultaneous dirty scenes retain separate processes and
+scratch outputs. DataPacker's C++ code launches `blender.exe` through
+`common::RunExecutable`; Blender executes the runtime input
+`DataPacker/Scripts/ExportBlenderScene.py` with its bundled Python, outside
+Visual Studio project membership. DataPacker does not launch `python.exe`,
+require a separate Python installation, or embed Python.
+
+The authored scene's primary fingerprint hashes the `.blend`, not the GLB
+that conversion replaces after the fingerprint is captured. A separate shared
+cache marker uses the converter's own version, independent of scene payload
+and `.PreExport` versions. It records source, tool identity/content, script and
+recipe, consumed external dependency hashes, and published GLB content.
+Dependencies include transitive linked Blender data and unpacked images used
+by exported content, excluding unrelated datablocks. In-root dependencies use
+input-root-relative identities; external dependencies use source-relative
+identities where possible. Missing or unreadable dependencies, tool or marker,
+and changed inputs or output force conversion before any clean return.
+
+Conversion validates a private sibling GLB stage before replacing the output
+on the same volume. Process or validation failure preserves the previous GLB
+and fails that scene through the existing aggregate, preventing scene pack
+publication while unrelated exports continue. The conversion marker is
+invalidated before replacement and committed after successful publication;
+an incomplete publication stays dirty. Later scene packing failure does not
+invalidate a successful conversion, so repairs can reuse it. Dirty conversion
+also forces normal pre-export from the newly published GLB.
+
+`GltfSceneDecoder` owns glTF/GLB loading and decoding into `SceneExportData`,
+which owns the consumed image, texture-slot, mesh, material, skeleton and
+animation values without references into the source model. `ExportScene` owns
+optimization, intermediate/chunk writes, and cache/publication behavior.
+Material decoding preserves RGB emissive factors and glTF occlusion strength;
+formats without an occlusion strength keep the neutral default.
+glTF decoding stays phased: source loading, canonical skin selection and normalization
+precede pre-export marker removal; texture publication and orphan sweeping
+precede pre-export skeleton/animation and mesh/material checks. Main-only export
+retains its own consumed-data predicates and validation order. Blender staging
+validation loads the source without decoding export payloads.
+
+`AssimpSceneDecoder` decodes the six exchange formats directly into the same
+owned payload, including representable skeletal and node TRS clips. Fidelity
+starts at the decoded Assimp scene: importer conversions are accepted, but the
+exporter rejects unsupported behavior instead of adding approximations. Morphs,
+mesh animation and unsupported material behavior remain rejected, including
+nonzero effective Phong specular contribution, wireframe and two-sided
+rendering; inactive importer defaults are accepted. PLY alone ignores Assimp's
+synthesized sidedness and imports one-sided. Mesh instances retain effective
+material splits; omitted materials have concrete defaults.
+Missing normals are generated; invalid supplied normals fail. Importer root
+corrections precede conversion to engine Z-up/meters. FBX's corrected root uses
+centimeters; Collada's uses meters. Static vertices bake mesh-world transforms,
+inverse-transpose normals and determinant-correct winding.
+
+Assimp clips must fit the packed hierarchy, skin and animation capacities.
+Animated nodes must decompose into TRS; keys must preserve their timing,
+interpolation and reached boundary behavior in the runtime representation.
+Animated scale must stay nonzero over the played interval; valid STEP changes
+and reflections remain supported. One packed skin requires consistent
+inverse-bind matrices for shared bones and at most four normalized nonzero
+weights per vertex. Animated exports keep mesh-local vertices, source keys and
+inverse binds, with separate unanimated ancestors for basis conversion and
+default-pose normalization.
+
+OBJ, FBX, DAE and 3DS UVs flip V exactly once into the engine's top-origin image
+convention. PLY UVs pass through unchanged despite its undefined format origin;
+STL has no UVs. Absent UV channels stay zero.
+
+Assimp scenes keep a source-only primary fingerprint and an independently
+versioned scene dependency sidecar. Successful auxiliary opens and external image
+reads record input-root-relative identities and content hashes, including an
+empty dependency set. Warm checks read that sidecar without loading Assimp;
+missing or changed dependencies force pre-export. Failed opens fail the asset
+even if Assimp would substitute a default. Export failure removes both markers.
+
+The ordinary two-phase export's `.PreExport` marker
 covers the scene's generated
 outputs — the `<scene>.MODEL` file and every matched texture intermediate — not
 just the source scene, so a deleted, reverted, or edited output re-runs
 pre-export. The main phase writes scene metadata and optional animation data.
 Pre-export also removes orphaned scene texture intermediates so recursive
 texture discovery cannot ship stale assets. Generated assets are referenced by
-relative-path CRC. A scene's dirty check covers the source plus every external
+relative-path CRC. An export-only glTF scene's dirty check covers the source plus every external
 file it references, so editing a referenced texture or buffer re-runs
 pre-export; a reference the scene names but disk does not have keeps the scene
 dirty, leaving that failure to the per-asset export rather than aborting the
@@ -51,9 +140,31 @@ loader. The source fingerprint covers embedded bytes.
 
 Scene texture pre-export deduplicates attempts by source and output format. Each attempt writes a private, untagged stage; all attempts must finish before any final intermediate is published. Keep cleanup ownership separate for stages from this attempt and final paths published by it, because a failure during encoding or publication must not classify one kind of path as the other.
 
-A scene pack supports one node-referenced skin, and a scene whose nodes reference more than one skin is rejected. A vertex joint index is bounded by that skin's full joint count: a scene with a weighted joint index at or above that count, or any joint index at or above it when the primitive carries no weights, is rejected; a zero-weight slot is not checked.
+A scene pack supports one node-referenced skin, and a scene whose nodes reference
+more than one skin is rejected. A vertex joint index is bounded by that skin's
+full joint count: a scene with a weighted joint index at or above that count, or
+any joint index at or above it when the primitive carries no weights, is rejected;
+a zero-weight slot is not checked. CPU and GPU consumers must skip zero-weight
+slots before dereferencing their unused joint indices.
 
-When multiple mesh nodes reuse one glTF material, or primitives under one material differ in deformation mode (skinned versus not), preserve distinct material entries while retaining the source material index used for texture lookup, so no draw mixes deformation modes.
+Exported default-pose geometry is centered at the origin with its longest
+extent spanning -1..1, so game render scales are plain sizes. For glTF,
+`GltfSceneDecoder` inserts one synthetic, unanimated root node
+at index 0 holding only a translation and a uniform scale. Every default-scene
+root becomes its child and every node reference shifts by one, so an exported
+skeleton's node index is the source index plus one. Static exports bake node 0
+into their vertices; skeleton exports ship it as the hierarchy root and keep
+vertices mesh-local and inverse-bind matrices and keyframes as authored. Bounds
+cover only drawn vertices at their runtime default-pose positions; no drawn
+vertex, non-finite bounds, or a zero extent fails the export. A skin whose
+joints lie outside the default scene does not inherit node 0, so its geometry
+exports un-normalized.
+
+When multiple mesh nodes reuse one source material, or primitives under one material differ in deformation mode (skinned versus not), preserve distinct material entries while retaining the source material index used for texture lookup, so no draw mixes deformation modes.
+
+Vertex colors are not part of the packed model format. Scene export warns with
+source path and primitive identity when `COLOR_0` is present and ignores that attribute
+without modifying the source.
 
 ## Cubemap Pre-pass
 

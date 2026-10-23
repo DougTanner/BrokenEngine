@@ -57,5 +57,7 @@ void main()
 	mapped = clamp(mapped, 0.0f, 1.0f);
 
 	// Gamma
-	f4OutColor = vec4(pow(mapped, vec3(mainLayout.fPhysicallyBasedRenderingGammaInverse)), 1.0f);
+	vec3 linearColor = pow(mapped, vec3(mainLayout.fPhysicallyBasedRenderingGammaInverse));
+	vec3 encodedColor = mix(1.055f * pow(linearColor, vec3(1.0f / 2.4f)) - 0.055f, 12.92f * linearColor, lessThanEqual(linearColor, vec3(0.0031308f)));
+	f4OutColor = vec4(encodedColor, 1.0f);
 }

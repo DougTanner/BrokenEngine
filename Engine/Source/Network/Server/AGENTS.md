@@ -53,7 +53,7 @@ the engine calls by name.
   deferred packets. Limits, gates, and the drop and removal mechanics:
   [Client to Server Contract](../../../../Documents/Architecture/Network.md#client--server-contract).
 - Each client admits one desync report and one debug-frame request per two seconds of `steady_clock` time after contract validation; immediate repeats within the per-update cap are silent, and over-cap traffic keeps the contract-violation policy. A disabled-build debug-frame request with a valid tick starts its cooldown, then returns without logging, lookup, compression, or sending.
-- A stored client crash report is written atomically, and a report dropped by the cap or a failed write shows only in the server log. Per-connection and per-run limits, storage, and the absence of a reply: the `kClientCrashReport` row of [Client to Server Contract](../../../../Documents/Architecture/Network.md#client--server-contract).
+- A stored client crash report is written atomically, and a report dropped by the cap or a failed write shows only in the server log. Per-connection and per-day limits, header validation, storage, and the absence of a reply: the `kClientCrashReport` row of [Client to Server Contract](../../../../Documents/Architecture/Network.md#client--server-contract). Posting stored reports to GitHub: Engine Source (`../../AGENTS.md`) `## Crash Reporting`.
 - After each complete `AfterNetworkPoll()`, `ServerSessionRuntime` samples the engine client set and updates its presence tracker unconditionally; it clears network-driven pause and writes 1:1 timescale only on the sampled nonempty-to-empty transition and only when the ratio differs, so an already-empty server keeps its commanded pause/timescale.
 - Each update polls twice, at update start and at the tick boundary after the fixed-tick wait, so commands that arrived during the wait enter the imminent tick. The boundary poll deliberately omits `BeforeNetworkPoll`, which clears the previous update's pending request queues, and continues the first poll's admission budget window: one budget window per update, not one per poll.
 - The fixed-tick wait consumes the carried tick remainder but does not maintain it; `TimeStep::TickRealtime`, which `GameBase` calls immediately after the wait, accumulates and wraps it. Preserve the `siTotalTicks`/`siOvershootTicks` counters and their profiling-gated verbose log when changing this path.
@@ -90,7 +90,13 @@ the engine calls by name.
   client's subscribe and unsubscribe are exempt from the per-update budget
   ([Client to Server Contract](../../../../Documents/Architecture/Network.md#client--server-contract)).
 - After existing-client lookup, unsubscribe ACKs every syntactically valid request and frees only an in-range active slot whose epoch matches the request.
-- Clamp ACK floors to buffered history and otherwise require them to advance. The one exception is the backward floor a client produces by adopting a coord full state: sending that full state arms it per slot, and it is admitted only down to that full state's own tick and only while the tick stays within a bounded window of the latest buffered tick. Treat an all-zero ACK field as latency, not a resend gap, and cap resends per slot per tick.
+- Clamp ACK floors to buffered history and otherwise require them to advance.
+  The one exception is the backward floor a client produces by adopting a coord
+  full state: sending that full state arms it per slot, and it is admitted only
+  down to that full state's own tick and only while the tick stays within a
+  bounded window of the latest buffered tick. Treat an all-zero ACK field as
+  latency, not a resend gap, and cap resends per slot per tick. The hold-release
+  burst (`## Buffered State`) is the exception to both.
 
 ## Transfers and Publication
 
@@ -143,9 +149,20 @@ the engine calls by name.
 ## Buffered State
 
 - Buffer exactly one delta entry per supplied coordinate per tick in monotonically increasing order; resend lookup depends on contiguous tick offsets. With `kbDesynchronizationDebugFrames` enabled, also buffer the separate full-frame diagnostic ring. Clear both rings across save-load tick resets, and prune from the coordinates actually supplied to `BufferFrame`, not from simulation membership, so a replay coordinate published before it joins the dispatch set keeps its buffer.
-- When an active slot's coordinate delta ring restarts after a gap, send the current authoritative full state before any delta or resend and hold both update paths until an accepted matching-epoch ACK reaches the pending full-state tick. A further restart while held supersedes the target with its newer tick; reuse an existing same-tick full state instead of sending a duplicate. Initial subscriptions, continuous rings, and ordinary explicit resync keep their existing ACK behavior.
+- When an active slot's coordinate delta ring restarts after a gap, send the
+  current authoritative full state before any delta or resend and hold both
+  update paths until an accepted matching-epoch ACK reaches the pending
+  full-state tick. That ACK triggers the hold-release burst
+  ([Server](../../../../Documents/Architecture/Network.md#server)). A further restart
+  while held supersedes the target with its newer tick; reuse an existing
+  same-tick full state instead of sending a duplicate. Initial subscriptions,
+  continuous rings, and ordinary explicit resync keep their existing ACK
+  behavior.
 - Revalidate client, the slot's active flag, and coordinate immediately before sending a deferred full state because an unsubscribe or disconnect may have invalidated it in the same poll batch.
-- A queued new subscription stays queued until it is served or invalid. It is served only once its coordinate has a Frame whose navigation data is built, because static data always carries navigation data; an entry whose client, slot, or coordinate no longer matches is erased. A resync sends no full state to a slot whose new subscription is still queued ([Subscription Receive Invariants](../Client/AGENTS.md#subscription-receive-invariants)).
+- A queued new subscription stays queued until its full state is sent, its static-data send fails (`enet_peer_send` rejects the packet), or it is invalid. It is served only once its coordinate has a Frame whose navigation data is built, because static data always carries navigation data; an entry whose client, slot, or coordinate no longer matches is erased.
+- Serving a queued new subscription takes two steps: the static data, then, in the first servicing pass after ENet frees that packet with `ENET_PACKET_FLAG_SENT` (the client's ENet received it, which does not mean the client applied it), the full state at the current tick.
+- One entry per client is served at a time, so a client's next queued subscription sends its static data only after the previous one has left the queue or restarted. A re-subscribe that reuses the slot of a still-queued entry restarts that entry from static data, giving up the client's turn if that entry held it.
+- A resync sends no full state to a slot whose new subscription is still queued ([Subscription Receive Invariants](../Client/AGENTS.md#subscription-receive-invariants)).
 - Full-state resync and load notification are transport mechanisms; game state reconstruction remains game-owned.
 
 ## See Also

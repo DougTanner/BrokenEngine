@@ -26,7 +26,7 @@ namespace game
 inline constexpr std::chrono::duration<float> kDestroyTime = std::chrono::duration<float>(0.7f);
 inline constexpr std::chrono::duration<float> kDestroyExplosionInterval = std::chrono::duration<float>(0.005f);
 inline constexpr float kfOmniBlastersSpeed = 150.0f;
-inline constexpr std::chrono::duration<float> kBlasterFireInterval = std::chrono::duration<float>(0.05f);
+inline constexpr std::chrono::duration<float> kBlasterFireInterval = std::chrono::duration<float>(0.1f);
 inline constexpr float kfBlasterTargetRange = 120.0f;
 inline constexpr float kfMissileTargetRange = 160.0f;
 
@@ -74,7 +74,7 @@ struct HexShieldIntensities
 
 struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::CollectionFlags::kIdToIndex>
 {
-	static constexpr int64_t kiVersion = 15;
+	static constexpr int64_t kiVersion = 16;
 
 	static void Register();
 
@@ -90,6 +90,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	// Simulation keeps the destroyed time in [0, kDestroyTime]; reject anything else as a corrupt stream, since a huge or +inf value
 	// puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
 	// Only the climb moves height, so it stays within [Lowest, Highest] flight plane heights; reject any other the same way.
+	// The stored flight plane is kuiNoFlightPlane or a plane the type flies.
 	static void PostRead(const OmnisInterpolate& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -104,6 +105,10 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 			{
 				throw std::ios_base::failure("OmnisInterpolate position height");
 			}
+			if (rCurrent.puiFlightPlanes[i] != kuiNoFlightPlane && !IsFlightPlaneAllowed(ShipType::kOmni, rCurrent.puiFlightPlanes[i]))
+			{
+				throw std::ios_base::failure("OmnisInterpolate puiFlightPlanes");
+			}
 		}
 	}
 
@@ -115,6 +120,8 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	std::chrono::duration<float>* __restrict pAnimationTimes = nullptr;
 	engine::pusher_t* __restrict pPushers = nullptr;
 	engine::registry_id_t* __restrict pRegistryIds = nullptr;
+	// The plane the ship is on, kuiNoFlightPlane while it climbs between planes.
+	uint8_t* __restrict puiFlightPlanes = nullptr;
 #if defined(BT_CLIENT)
 	float* __restrict pfRotationAccelerationXs = nullptr;
 	float* __restrict pfRotationAccelerationYs = nullptr;
@@ -129,7 +136,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pAnimationTimes, rSelf.pPushers, rSelf.pRegistryIds);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pAnimationTimes, rSelf.pPushers, rSelf.pRegistryIds, rSelf.puiFlightPlanes);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -157,7 +164,7 @@ struct OmnisInterpolate : public engine::Collection<OmnisInterpolate, engine::Co
 	// CRC excludes client-only animation time and cell-local pusher handles.
 	auto SharedCrcMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pRegistryIds);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pRegistryIds, rSelf.puiFlightPlanes);
 	}
 	auto OwnedHandles(this auto&& rSelf)
 	{
@@ -333,6 +340,7 @@ public:
 		engine::GridCoord fleetWantedCoordinate {};
 		uint8_t uiPendingFleetWantedCoordinateTicks = 0;
 		uint8_t uiPendingWeaponModeTicks = 0;
+		uint8_t uiFlightPlane = kuiNoFlightPlane;
 		// Transfers preserve supplied combat fields and animation time; navigation resets at spawn, and shield rotation and shrink use defaults.
 		bool bTransfer = false;
 
@@ -340,7 +348,7 @@ public:
 		// so none of them is listed.
 		static constexpr auto Fields()
 		{
-			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fArmor), FRAME_COLUMN(SpawnInfo, fShield), FRAME_COLUMN(SpawnInfo, nextBlasterFireTime), FRAME_COLUMN(SpawnInfo, nextSecondarySpawnTime), FRAME_COLUMN(SpawnInfo, shieldCooldown), FRAME_COLUMN(SpawnInfo, shieldDownSoundCooldown), FRAME_COLUMN(SpawnInfo, animationTime), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, transferLockTimer), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiPendingWeaponModeTicks), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
+			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fArmor), FRAME_COLUMN(SpawnInfo, fShield), FRAME_COLUMN(SpawnInfo, nextBlasterFireTime), FRAME_COLUMN(SpawnInfo, nextSecondarySpawnTime), FRAME_COLUMN(SpawnInfo, shieldCooldown), FRAME_COLUMN(SpawnInfo, shieldDownSoundCooldown), FRAME_COLUMN(SpawnInfo, animationTime), FRAME_COLUMN(SpawnInfo, flags), FRAME_COLUMN(SpawnInfo, transferLockTimer), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiPendingWeaponModeTicks), FRAME_COLUMN(SpawnInfo, uiFlightPlane), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
 		}
 	};
 

@@ -192,6 +192,8 @@ struct GlobalLayout
 	float fShadowSunriseStretchCubed INIT; // (fSunriseStretch * gObjectShadowsSunsetStretch)^3 (ShadowStretchProjection)
 	float fShadowSunsetStretchCubed INIT;  // (fSunsetStretch  * gObjectShadowsSunsetStretch)^3 (ShadowStretchProjection)
 	vec2 f2ShadowStretchTranslation INIT;  // (sunrise+sunset cubes) * -f4SunMoonNormal.xy (ShadowStretchProjection base translation)
+	vec2 f2ShadowHeightOffsetPerMeter INIT;            // Untilted sun direction (-x / max(z, 0.5), 0) * gObjectShadowsHeightOffset: object-shadow XY shift per metre above fBaseHeight (ModelCommon.h mode 2)
+	float fObjectShadowsTerrainShadowFadeInverse INIT; // 1 / gObjectShadowsTerrainShadowFade (Model.frag terrain-shadow fade by height above fBaseHeight)
 	float fShadowAffectAmbient INIT;
 	float fWaterReducedNoiseOriginX INIT;
 	int32_t iShadowElevationSize INIT;

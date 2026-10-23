@@ -414,7 +414,7 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 	}
 }
 
-Buffer* BufferManager::CreateDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, int64_t iElementSize)
+Buffer* BufferManager::CreateDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, int64_t iElementSize, int64_t iInitialCapacity)
 {
 	std::unordered_map<common::crc_t, std::vector<Buffer>>& rMap = mpDynamicStorageBuffers[eType];
 	auto [it, bInserted] = rMap.try_emplace(crc);
@@ -432,7 +432,7 @@ Buffer* BufferManager::CreateDynamicBuffer(common::crc_t crc, DynamicBufferType 
 		{
 			.name = name,
 			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
-			.iDataSize = iElementSize,
+			.iDataSize = iInitialCapacity * iElementSize,
 			.iElementSize = iElementSize,
 		});
 	}
@@ -467,11 +467,20 @@ Buffer* BufferManager::ResizeDynamicBufferIfNeeded(common::crc_t crc, DynamicBuf
 {
 	int64_t iRequiredSize = iLayoutSize * iCapacity;
 	Buffer& rBuffer = mpDynamicStorageBuffers[eType].at(crc).at(iCommandBuffer);
-	if (rBuffer.mInfo.iDataSize >= iRequiredSize)
+	int64_t iNewSize = rBuffer.mInfo.iDataSize;
+	if (iNewSize >= iRequiredSize)
 	{
 		return nullptr;
 	}
-	ResizeDynamicBuffer(crc, eType, name, iRequiredSize, iCommandBuffer);
+
+	LOG(kGraphics, kWarning, "Dynamic buffer {} needs {} elements but holds {}; raise kiDynamicBufferInitialCapacity", name, iCapacity, iNewSize / iLayoutSize);
+	DEBUG_BREAK();
+
+	while (iNewSize < iRequiredSize)
+	{
+		iNewSize *= 2;
+	}
+	ResizeDynamicBuffer(crc, eType, name, iNewSize, iCommandBuffer);
 	return &rBuffer;
 }
 

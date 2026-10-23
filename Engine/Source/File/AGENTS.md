@@ -55,7 +55,9 @@ Eager types load whole at startup; lazy chunks load on demand on loader threads 
   for a complete read, before discarding a cancelled generation: corruption
   stays fatal even for an unwanted result. Loaders write only Pack-owned result
   storage; the polling main thread copies to Audio.
-- The [Agent audio harness rig](../Agent/AGENTS.md) may inspect Pack state and use loader-queue synchronization only in client Debug builds; elsewhere that state stays private.
+- The [Agent audio harness rig](../Agent/AGENTS.md) may inspect Pack state and
+  use loader-queue synchronization only in gameplay client Debug builds;
+  elsewhere that state stays private.
 - Lazy chunks live in one virtual-memory reservation laid out at construction; each chunk's pointer and size, fixed for the process lifetime, describe reserved, not resident, bytes. Never compact pointers or recompute offsets: readers use a chunk pointer after the state acquire, with no lock.
 
 ## Replay Streams

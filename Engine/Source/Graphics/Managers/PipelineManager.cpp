@@ -9,6 +9,8 @@
 namespace engine
 {
 
+constexpr int64_t kiDynamicBufferInitialCapacity = 256;
+
 PipelineManager::PipelineManager()
 : common::Singleton<PipelineManager>(gpPipelineManager, this)
 {
@@ -159,7 +161,9 @@ PipelineManager::PipelineManager()
 
 	CreateDebugRenderPipelines();
 
+#if !defined(BT_MODEL_VIEWER)
 	ForEachGraphicsResources(InterpolateTypes {});
+#endif
 	game::FrameInterpolate::GraphicsResources();
 }
 
@@ -456,7 +460,7 @@ void PipelineManager::CreateDebugRenderPipelines()
 
 	for (const DebugRenderPipelineEntry& rEntry : pEntries)
 	{
-		gpBufferManager->CreateDynamicBuffer(rEntry.crc, kBufferMain, rEntry.name, sizeof(shaders::DebugRenderLayout));
+		gpBufferManager->CreateDynamicBuffer(rEntry.crc, kBufferMain, rEntry.name, sizeof(shaders::DebugRenderLayout), kiDynamicBufferInitialCapacity);
 
 		mpPipelines[rEntry.ePipeline].Create(
 		{

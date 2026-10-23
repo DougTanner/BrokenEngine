@@ -78,7 +78,8 @@ public:
 	void SendUpdate(ClientConnection& rClient, int64_t iTick);
 	void SendResends(ClientConnection& rClient, int64_t iTick);
 	void SendCoordinateFullState(int64_t iClientId, int64_t iSlot, int64_t iTick, GridCoord coordinate, const game::Frame* pFrame);
-	void SendCoordinateStaticData(int64_t iClientId, int64_t iSlot, GridCoord coordinate, const CellStaticData& rStaticData);
+	// Returns the queued packet, or nullptr when the send failed.
+	ENetPacket* SendCoordinateStaticData(const ClientConnection& rClient, int64_t iSlot, GridCoord coordinate, const CellStaticData& rStaticData, ENetPacketFreeCallback pFreeCallback);
 	void ApplyAckStream(ClientConnection& rClient, const NetworkMessages::ClientAckStreamMessage& rMessage, int64_t iClientId);
 	void SendDebugFrame(ENetPeer* pPeer, int64_t iTick, GridCoord coordinate);
 

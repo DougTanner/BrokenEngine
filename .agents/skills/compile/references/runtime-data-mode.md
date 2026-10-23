@@ -69,6 +69,15 @@ The resolved context's `changedPaths` is the changed-path set measured from the 
 
 The build invocation derives the mode, both directories, and the four `DataBuildMode`/`RunDataPacker`/`GameDataDirectory`/`GeneratedDataIncludeRoot` properties itself, for every client/server solution, project, and selective compile alike; no agent command composes them, and no invocation form overrides the mode.
 
+ModelViewer uses this same resolution and generation flow with BrokenEngineSandbox
+as data owner, including selective builds. Its project generates an ignored
+`Build/ModelViewerDataRoot.h` from the resolved directory. The invocation also
+writes `ModelViewer/Platforms/VisualStudio2026/Build/ResolvedData.props`, which the
+viewer project imports so configured Visual Studio builds retain the same data
+mode, generated-header root and default launch root. The viewer's identity never
+changes pack names or export inputs. Viewer builds do not write sandbox harness
+Shared-data records.
+
 Every Local game build sets `RunDataPacker=true`; every other build is `false`. A Local game build also needs `DevEnvDir` for the game project's nested DataPacker build. The invocation resolves `DevEnvDir` for every game build, so an unresolvable `DevEnvDir` blocks every game build, Shared included, under `context.unresolved` naming `dev-env-dir.unresolved`; only a Local game build passes it, so it cannot leak into a Shared one.
 
 ## Generated Data directory inventory
@@ -76,7 +85,7 @@ Every Local game build sets `RunDataPacker=true`; every other build is `false`. 
 A correctly generated Data directory holds 23 files: `Data.h`, `DataTypes.h`,
 and one nonempty header, manifest, and pack for each of `Audio`, `Scene`,
 `Islands`, `Model`, `Shader`, `Texture`, and `Raw`. The build does not validate
-the selected Data directory's inventory or contents, so a malformed, partial,
+the selected sandbox Data directory's inventory or contents, so a malformed, partial,
 or stale directory is not detected as such — it surfaces only as an ordinary
 compile or runtime failure. One exception covers Shared data provenance: the
 `/agent-harness` claim and launch scripts compare a Shared directory with the
@@ -89,6 +98,10 @@ and, for a Shared build only, the listing of that directory — each file's
 relative path, size, and last-write time. The `/agent-harness` claim reads its
 data directory from that record; `/agent-harness` worker steps 7 and 21 own the
 refusal codes and their routing.
+
+ModelViewer's precompile target requires this inventory to exist and reports the
+exact missing path before compiling. Pack contents still pass through the engine's
+ordinary runtime validation.
 
 ## Wrapper bootstrap Shared-data refresh
 

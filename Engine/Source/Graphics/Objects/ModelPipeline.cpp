@@ -186,7 +186,7 @@ void ModelPipeline::WriteIndirectBuffer(int64_t iCommandBuffer, int64_t iCount)
 		std::span<const common::crc_t> textureCrcs(pTextureCrcs, rChunk.pHeader->sceneHeader.uiTextureCount);
 
 		// A scene's texture references come from shared header definitions built alongside it, so a missing one is a
-		// data-build error, not a runtime condition. Island channel references are the soft-failing case instead.
+		// data-build error, not a runtime condition.
 		for (common::crc_t textureCrc : textureCrcs)
 		{
 			ASSERT(gpFileManager->mpPackChunks->mLazyChunkMap.contains(textureCrc));

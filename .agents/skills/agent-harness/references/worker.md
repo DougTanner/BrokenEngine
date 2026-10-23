@@ -96,7 +96,12 @@ and the handoff this run returns.
      the claim is running — a background task's completion notification cannot
      resume a worker whose turn has ended.
    - If the host call times out, re-invoke the identical command; it resumes the
-     same wait.
+     same wait. If the host instead moves the still-running call to the
+     background and that background task has already exited, use its exit
+     code and JSON output as the claim result and do not re-invoke: an exit-0
+     claim returns holding the lock. Otherwise stop that background task, then
+     re-invoke the identical command in the foreground: a still-running wait
+     has not claimed, and the new invocation mints a fresh owner token.
    - The launch-script calls below pass the claim result's `gameDataDirectory`
      as their `-GameDataDirectory`. Only when the approved acceptance needs
      derived data, such as a deliberately corrupted pack, make a real byte copy
@@ -149,10 +154,9 @@ and the handoff this run returns.
      server, re-enter with `-ServerOnly` instead of building the client.
    - `shared-data.changed` means the Shared data directory's listing differs
      from this worktree's record for a required target: nothing was
-     provisioned and no lock was taken. It is a mandatory user stop: end the
-     attempt `BLOCKED` with one `Residuals` row carrying the code and message,
-     and never rebuild, refresh, rebase, switch data, or edit or delete a record
-     to clear it.
+     provisioned and no lock was taken, so route `/compile` for the named target
+     and re-enter; it is not a user stop. Never refresh, rebase, switch data, or
+     edit or delete a record to clear it.
    - `shared-data.record-missing` means no current-format record exists for
      that target and configuration, either none or only an old-format one:
      nothing was provisioned and no lock was taken, so route `/compile` for the
@@ -362,8 +366,9 @@ and the handoff this run returns.
       identity, and its port answered ping.
     - `shared-data.changed` (exit `2`) means the Shared data directory's listing
       differs from this worktree's record for the role's target, and nothing
-      started. End the attempt through release (step 39) with the `pid` of each
-      role still running; the rest is step 7's `shared-data.changed` user stop.
+      started; end the attempt through release (step 39) with the `pid` of each
+      role still running and route `/compile` for the named target, with no user
+      stop.
     - `shared-data.record-missing` (exit `2`) means no current-format record
       exists for the role's target and configuration, and nothing started; end
       the attempt the same way and route `/compile` for the named target, with
@@ -406,8 +411,8 @@ and the handoff this run returns.
       each exited role's exit code, and a zero exit code never makes a
       disappearance intentional — and its findings carry any crash report
       written since that role's pre-launch baseline.
-      - A report unchanged since that baseline, or changed only by the client
-        appending its sent trailer, is stale and is never announced as a new
+      - A report unchanged since that baseline, or moved to the pending file
+        by the role's startup rename, is stale and is never announced as a new
         crash, and a role that exited without writing a report reports
         `reportPath` and `headline` as `null` rather than inventing evidence.
     - Exit `1` is a setup or state failure.

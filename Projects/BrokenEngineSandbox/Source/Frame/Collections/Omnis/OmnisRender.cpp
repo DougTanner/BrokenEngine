@@ -13,10 +13,13 @@ namespace game
 {
 
 // Placeholder models, one per ShipController (also used by Omnis.cpp for animation lookup in OmnisInterpolate::Update).
+// Each model offset puts back the model's native origin as its rotation pivot.
 extern const common::crc_t kOmniFleetModel = data::kModelsspaceship2scenegltfCrc;
-constexpr float kfOmniFleetModelScale = 0.3667f;
+constexpr float kfOmniFleetModelScale = 1.0927087f;
+constexpr XMFLOAT3 kf3OmniFleetModelOffset {0.0f, 0.1817180f, -0.1686860f};
 extern const common::crc_t kOmniRandomModel = data::kModelsSpaceshipscenegltfCrc;
-constexpr float kfOmniRandomModelScale = 0.00175f;
+constexpr float kfOmniRandomModelScale = 0.6723890f;
+constexpr XMFLOAT3 kf3OmniRandomModelOffset {0.0f, 0.0621412f, -0.0985188f};
 
 constexpr float kfDeathShrinkPower = 2.0f;
 
@@ -25,13 +28,16 @@ constexpr int64_t kiPipelineCount = std::to_underlying(ShipController::kCount);
 constexpr std::array<const char*, kiPipelineCount> kpcPipelineNames {"OmnisFleet", "OmnisRandom"};
 constexpr std::array<common::crc_t, kiPipelineCount> kuiPipelineCrcs {common::CrcConsteval("OmnisFleet"), common::CrcConsteval("OmnisRandom")};
 constexpr std::array<float, kiPipelineCount> kfModelScales {kfOmniFleetModelScale, kfOmniRandomModelScale};
+constexpr std::array<XMFLOAT3, kiPipelineCount> kf3ModelOffsets {kf3OmniFleetModelOffset, kf3OmniRandomModelOffset};
 const std::array<common::crc_t, kiPipelineCount> kuiModels {kOmniFleetModel, kOmniRandomModel};
+
+constexpr int64_t kiDynamicBufferInitialCapacity = 256;
 
 void OmnisInterpolate::GraphicsResources()
 {
 	for (int64_t i = 0; i < kiPipelineCount; ++i)
 	{
-		engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kuiPipelineCrcs[i], engine::kBufferMain, kpcPipelineNames[i], sizeof(shaders::ModelLayout));
+		engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kuiPipelineCrcs[i], engine::kBufferMain, kpcPipelineNames[i], sizeof(shaders::ModelLayout), kiDynamicBufferInitialCapacity);
 		engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(kuiPipelineCrcs[i], kpcPipelineNames[i], kuiModels[i], pStorageBuffers);
 	}
 }
@@ -143,6 +149,8 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 		skinningReservation = pAnimationData->ReserveSkinning(iCommandBuffer, iCount);
 	}
 
+	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&kf3ModelOffsets[iPipeline]));
+
 	int64_t iInstance = 0;
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -168,7 +176,7 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 		auto matRotationZ = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f));
 		auto matRotationAccelerationX = XMMatrixRotationY(rCurrent.pfRotationAccelerationXs[i]);
 		auto matRotationAccelerationY = XMMatrixRotationX(rCurrent.pfRotationAccelerationYs[i]);
-		auto matTransform = XMMatrixMultiply(matRotationX, XMMatrixMultiply(matRotationY, XMMatrixMultiply(matRotationZ, XMMatrixMultiply(matRotationAccelerationX, XMMatrixMultiply(matRotationAccelerationY, XMMatrixMultiply(matScaling, matTranslation))))));
+		auto matTransform = XMMatrixMultiply(matPreMove, XMMatrixMultiply(matRotationX, XMMatrixMultiply(matRotationY, XMMatrixMultiply(matRotationZ, XMMatrixMultiply(matRotationAccelerationX, XMMatrixMultiply(matRotationAccelerationY, XMMatrixMultiply(matScaling, matTranslation)))))));
 
 		shaders::ModelLayout& rOmniLayout = pOmniLayouts[siRendered[iPipeline]];
 		XMStoreFloat4(&rOmniLayout.f4Position, vecPosition);

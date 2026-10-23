@@ -50,7 +50,7 @@ constexpr float kfRotateTowardsSpeed = 10.0f;
 constexpr float kfShieldShrinkSpeed = 1.5f;
 constexpr float kfShieldRotationSpeed = 4.0f;
 
-constexpr float kfHexShieldSizeScale = kfOmniRadius * 0.0667f;
+constexpr float kfHexShieldSizeScale = kfOmniRadius * 1.334f;
 constexpr float kfHexShieldColorMix = 0.85f;
 constexpr float kfHexShieldFadeThreshold = 0.25f;
 
@@ -255,6 +255,7 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	// Generate the missile-homing registry ID with one frame UUID after the pusher ID, preserving per-spawn UUID
 	// order for replay.
 	rCurrentInterpolate.pRegistryIds[iIndex] = engine::registry_id_t::Generate(rFrame.postRender);
+	rCurrentInterpolate.puiFlightPlanes[iIndex] = rInfo.uiFlightPlane;
 #if defined(BT_CLIENT)
 	rCurrentInterpolate.pfRotationAccelerationXs[iIndex] = 0.0f;
 	rCurrentInterpolate.pfRotationAccelerationYs[iIndex] = 0.0f;
@@ -320,12 +321,13 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
 		std::chrono::duration<float> destroyedTime = rPrevious.pDestroyedTimes[i];
 		std::chrono::duration<float> animationTime = rPrevious.pAnimationTimes[i];
+		uint8_t uiFlightPlane = rPrevious.puiFlightPlanes[i];
 
 		if (!(rPreviousPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)) [[likely]]
 		{
 			vecPosition = XMVectorMultiplyAdd(XMVectorReplicate(deltaTime.count()), rPreviousPostRender.pVecVelocities[i], vecPosition);
 		}
-		vecPosition = ClimbTowardsFlightPlane(vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfOmniClimbRate, deltaTime);
+		vecPosition = ClimbTowardsFlightPlane(vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfOmniClimbRate, deltaTime, uiFlightPlane);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation (pos.W += dt * vel.W).
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 
@@ -346,6 +348,7 @@ void OmnisInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict rFra
 		rCurrent.pVecDirections[i] = vecDirection;
 		rCurrent.pDestroyedTimes[i] = destroyedTime;
 		rCurrent.pAnimationTimes[i] = animationTime;
+		rCurrent.puiFlightPlanes[i] = uiFlightPlane;
 
 		engine::PushersInterpolate::Sync(rFrameInterpolate, rCurrent.pPushers[i],
 		{
@@ -562,7 +565,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 			else
 			{
 				XMVECTOR vecNearestEnemy = XMVectorZero();
-				bool bEnemyFound = FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], vecNearestEnemy);
+				bool bEnemyFound = FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], std::nullopt, vecNearestEnemy);
 				bool bHasDestination = false;
 				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecNearestEnemy, flags, bHasDestination);
 				if (bHasDestination)
@@ -639,6 +642,7 @@ bool OmnisInterpolate::LogDifferences(const OmnisInterpolate& rOther) const
 		bEqual &= common::LogDifference<"pDestroyedTimes">(i, pDestroyedTimes[i], rOther.pDestroyedTimes[i]);
 		bEqual &= common::LogDifference<"pPushers">(i, pPushers[i], rOther.pPushers[i]);
 		bEqual &= common::LogDifference<"pRegistryIds">(i, pRegistryIds[i], rOther.pRegistryIds[i]);
+		bEqual &= common::LogDifference<"puiFlightPlanes">(i, puiFlightPlanes[i], rOther.puiFlightPlanes[i]);
 	}
 
 	return bEqual;

@@ -1,17 +1,11 @@
 #pragma once
 
+#include "SceneExportData.h"
+
 namespace tinygltf
 {
 	class Model;
 } // namespace tinygltf
-
-struct SkeletonData
-{
-	common::Skeleton skeleton;  // counts only
-	std::vector<common::ModelNode> nodes;
-	std::vector<uint16_t> skinJointToNode;
-	std::vector<XMFLOAT4X4> inverseBindMatrices;
-};
 
 std::unordered_map<int64_t, int64_t> BuildNodeParentMap(const tinygltf::Model& rModel);
 

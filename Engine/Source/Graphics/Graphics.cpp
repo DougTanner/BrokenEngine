@@ -462,6 +462,7 @@ void Graphics::Create()
 	{
 		mpImGuiManager = std::make_unique<ImGuiManager>(mHwnd);
 
+#if !defined(BT_MODEL_VIEWER)
 		if constexpr (kbDebugInput)
 		{
 			if (game::gpGame != nullptr)
@@ -469,6 +470,7 @@ void Graphics::Create()
 				LoadTweaksSettings();
 			}
 		}
+#endif
 	}
 
 	if (bRecordCommandBuffers)
@@ -742,6 +744,7 @@ void Graphics::Destroy()
 			mOldVkSwapchainKHR = mpSwapchainManager->ReleaseHandleForRecreation();
 		}
 		mpSwapchainManager.reset();
+#if !defined(BT_MODEL_VIEWER)
 		if constexpr (kbDebugInput)
 		{
 			// gpImGuiManager guard: SaveTweaksSettings derefs gpImGuiManager->mpTweaksScreen, and a post-Destroy re-defer
@@ -751,6 +754,7 @@ void Graphics::Destroy()
 				SaveTweaksSettings();
 			}
 		}
+#endif
 		mpImGuiManager.reset();
 	}
 

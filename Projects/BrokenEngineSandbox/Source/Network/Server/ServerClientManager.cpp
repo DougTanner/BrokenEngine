@@ -153,6 +153,7 @@ void ServerClientManager::SpawnWaitingClients()
 			spawnInfo.flagshipGlobalId = flagshipGlobalId;
 			spawnInfo.fleetWantedCoordinate = spawnFleetWantedCoordinate;
 			spawnInfo.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(iSpawnPendingFleetTicks);
+			spawnInfo.uiFlightPlane = static_cast<uint8_t>(iTargetFlightPlane);
 			gpServerSession->mpTransferManager->QueueSpawn(engine::kOriginCoordinate, gpGame->miTickCounter + 1, MakeSpawn(spawnInfo));
 		};
 		switch (rClientSpawnInformation.eType)

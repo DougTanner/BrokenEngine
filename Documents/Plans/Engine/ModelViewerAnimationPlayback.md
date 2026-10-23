@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-21T19:14:05.276Z","dependsOn":["Documents/Plans/Engine/ModelViewerApplication.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-21T19:14:05.276Z","dependsOn":[]} -->
 # Add animation playback and an exported articulated sample
 
 ## Context and design

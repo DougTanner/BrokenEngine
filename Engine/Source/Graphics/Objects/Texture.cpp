@@ -71,7 +71,7 @@ void Texture::RecordBeginRenderPass(VkCommandBuffer vkCommandBuffer, VkRenderPas
 	{
 		{.color = vkClearColorValue},
 		{.depthStencil = {.depth = kfMaxDepth, .stencil = 0}},
-		{.color = {.float32 = {0.0f, 0.0f, 0.0f, 0.0f}}},
+		{.color = vkClearColorValue},
 	};
 
 	int64_t iAttachmentCount = 1;

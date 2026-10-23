@@ -40,10 +40,8 @@ $WatcherBindTimeoutSeconds = 5
 $ExitCodeWaitSeconds = 2
 $NoExceptionText = '(no exception text)'
 $CallstackMarker = '<Begin callstack>'
-# Mirrors kpcCrashReportSentTrailer in Engine/Source/CrashReport.cpp. The client appends it in
-# binary mode, so each newline is a single LF byte.
-$CrashReportSentTrailer = [Text.Encoding]::ASCII.GetBytes("`nThis crash report was sent to the server.`n")
-$VersionPrefix = 'Game version:'
+# Mirrors the crash-report version line HandleException writes right after the game version line.
+$VersionPrefix = 'Crash report version:'
 # The registered start time is a formatted round-trip of the live one, so only formatting rounding
 # may separate them; anything larger is a different process holding a recycled PID.
 $IdentityToleranceMilliseconds = 50
@@ -127,30 +125,18 @@ function Get-CandidateSnapshot([string] $Path) {
 	return [ordered]@{ path = $Path; exists = $exists; byteSize = $byteSize; lastWriteTimeUtc = $lastWriteTimeUtc }
 }
 
-function Test-EndsWithSentTrailer([string] $Path) {
-	try {
-		$bytes = [IO.File]::ReadAllBytes($Path)
-		$tail = [byte[]]$bytes[(-$CrashReportSentTrailer.Length)..-1]
-		return [Linq.Enumerable]::SequenceEqual($tail, $CrashReportSentTrailer)
-	}
-	catch {
-		# An unreadable report is announced as a changed one rather than hidden as stale.
-		return $false
-	}
-}
-
+# The startup rename moves the previous run's report to the pending file, which removes a baselined
+# candidate without this run writing anything, so a candidate that is gone now is stale. A sent or
+# posted trailer reaches a candidate only right after this run wrote it, so any other change to a
+# candidate is a report this run wrote.
 function Test-CandidateChanged($Baseline, $Current) {
-	if ([bool]$Baseline.exists -ne [bool]$Current.exists) { return $true }
 	if (-not [bool]$Current.exists) { return $false }
-	# A live client appends the sent trailer to the pre-launch report once the server confirms
-	# delivery, and that report is still stale. A report this run wrote replaces the file, so it can
-	# match only when its untagged size equals the baseline size.
-	if ([int64]$Current.byteSize -eq ([int64]$Baseline.byteSize + $CrashReportSentTrailer.Length) -and (Test-EndsWithSentTrailer ([string]$Current.path))) { return $false }
+	if ([bool]$Baseline.exists -ne [bool]$Current.exists) { return $true }
 	if ([string]$Baseline.byteSize -cne [string]$Current.byteSize) { return $true }
 	return ([string]$Baseline.lastWriteTimeUtc -cne [string]$Current.lastWriteTimeUtc)
 }
 
-# The exception text is the first non-empty line after the game version line and before the
+# The exception text is the first non-empty line after the crash-report version line and before the
 # callstack marker. The report is untrusted input written by a crashing process, so a missing,
 # truncated, or unreadable file yields the placeholder instead of throwing.
 function Get-ReportHeadline([string] $Path) {
@@ -379,7 +365,7 @@ try {
 				if ($null -ne $exitCode) { $exitCodeText = [string]$exitCode }
 				$exitedRoles += "$($record.role) (exit code $exitCodeText)"
 				# Only a report this run wrote is its crash evidence. A candidate unchanged since the
-				# pre-launch baseline, or changed only by the client appending its sent trailer, is stale.
+				# pre-launch baseline, or moved away by the startup rename, is stale.
 				$changed = @(foreach ($candidate in @($record.candidates)) {
 					$current = Get-CandidateSnapshot ([string]$candidate.path)
 					if (Test-CandidateChanged $candidate $current) { $current }

@@ -49,8 +49,8 @@ public:
 	void UpdateModelPipelineDescriptors(common::crc_t crc, int64_t iCommandBuffer, int64_t iBinding, Buffer* pBuffer);
 	void WriteModelPipelineIndirectBuffers(common::crc_t crc, int64_t iCommandBuffer, int64_t iCount);
 	void CreatePipelineVisibleLights(common::crc_t crc, std::string_view name, Buffer* pStorageBuffers);
-	void CreatePipelineBillboards(common::crc_t crc, std::string_view name, int64_t iBufferSize);
-	void CreatePipelineHexShields(common::crc_t crc, std::string_view name, int64_t iBufferSize);
+	void CreatePipelineBillboards(common::crc_t crc, std::string_view name);
+	void CreatePipelineHexShields(common::crc_t crc, std::string_view name);
 	void CreatePipelineHexShieldsLighting(common::crc_t crc, std::string_view name);
 	void UpdateAllModelPipelineDescriptors(int64_t iCommandBuffer, int64_t iBinding, Buffer* pBuffer);
 
@@ -60,8 +60,8 @@ public:
 	std::unordered_map<common::crc_t, ModelPipeline*> mpModelPipelineMaps[kDynamicModelPipelineCount];
 	std::unordered_map<common::crc_t, std::string> mShadowPipelineNames; // Owns shadow pipeline name strings
 
-	void CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, int64_t iBufferSize, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, DescriptorFlags eSamplerFlag);
-	void CreateDepositPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, const Texture& rTargetTexture, const DescriptorInfo& rTextureDescriptor, VkBuffer* pVkOccupancyBuffer, int64_t iBufferSize);
+	void CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, DescriptorFlags eSamplerFlag);
+	void CreateDepositPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, const Texture& rTargetTexture, const DescriptorInfo& rTextureDescriptor, VkBuffer* pVkOccupancyBuffer);
 	// Pipeline-map and dynamic-buffer key of one smoke collection's deposit into flight plane iPlane.
 	static common::crc_t SmokeDepositKey(common::crc_t crc, int64_t iPlane);
 

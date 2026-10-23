@@ -8,7 +8,9 @@
 #include "Frame/TimeStep.h"
 
 #include "File/FileManager.h"
+#if !defined(BT_MODEL_VIEWER)
 #include "File/DifferenceStream.h"
+#endif
 
 #include "Network/NetworkManager.h"
 #include "Network/NetworkProtocol.h"
@@ -86,6 +88,7 @@
 #include "Network/Server/ServerSessionRuntime.h"
 #endif
 
+#if !defined(BT_MODEL_VIEWER)
 #include "GameBase.h"
 
 #if defined(BT_CLIENT)
@@ -96,6 +99,7 @@
 #if defined(BT_SERVER)
 #include "Agent/AgentCommandsServerGeneric.h"
 #endif // BT_SERVER
+#endif // !defined(BT_MODEL_VIEWER)
 
 // Formatters for engine types used by LogDifference.
 // GlobalId's formatter stays with its type in Frame/Collections/CollectionId.h.

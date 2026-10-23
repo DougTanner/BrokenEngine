@@ -73,10 +73,12 @@ void ForEachEnemyShip(const FrameInterpolate& rInterpolate, const FramePostRende
 // Global ID 0 names no ship: every random-spawn row carries it.
 [[nodiscard]] std::optional<ShipLocator> FindShipByGlobalId(const Frame& rFrame, engine::GlobalId globalId);
 
-// Returns false when no enemy row qualifies; ties keep the first row in ForEachShipType order.
-[[nodiscard]] bool XM_CALLCONV FindNearestEnemyShip(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, XMVECTOR& rVecResult);
-// FindNearestEnemyShip restricted to visible rows within fHalfAngle of vecAxisNormal, a normalized direction.
-[[nodiscard]] bool XM_CALLCONV FindNearestEnemyShipInArc(const Frame& rFrame, FXMVECTOR vecFrom, FXMVECTOR vecAxisNormal, float fHalfAngle, engine::AlignmentIdentifier alignment, XMVECTOR& rVecResult);
+// Returns false when no enemy row qualifies; ties keep the first row in ForEachShipType order. With
+// optionalFlightPlane, only rows storing that flight plane qualify.
+[[nodiscard]] bool XM_CALLCONV FindNearestEnemyShip(const Frame& rFrame, FXMVECTOR vecFrom, engine::AlignmentIdentifier alignment, std::optional<int64_t> optionalFlightPlane, XMVECTOR& rVecResult);
+// FindNearestEnemyShip restricted to visible rows storing iFlightPlane whose horizontal offset from vecFrom lies within
+// fHalfAngle of vecAxisNormal, a normalized direction; the nearest is the one with the smallest horizontal distance.
+[[nodiscard]] bool XM_CALLCONV FindNearestEnemyShipInArc(const Frame& rFrame, FXMVECTOR vecFrom, FXMVECTOR vecAxisNormal, float fHalfAngle, engine::AlignmentIdentifier alignment, int64_t iFlightPlane, XMVECTOR& rVecResult);
 
 struct ShipUuid
 {
@@ -87,13 +89,25 @@ struct ShipUuid
 [[nodiscard]] ShipUuid ShipUuidByGlobalId(const Frame& rFrame, engine::GlobalId globalId);
 
 [[nodiscard]] XMVECTOR ShipPosition(const FrameInterpolate& rInterpolate, ShipLocator locator);
+// The stored flight plane, kuiNoFlightPlane while climbing between planes.
+[[nodiscard]] int64_t ShipFlightPlane(const FrameInterpolate& rInterpolate, ShipLocator locator);
 // Armor for Omnis, health otherwise.
 [[nodiscard]] float ShipHull(const Frame& rFrame, ShipLocator locator);
 
-// Binds the three ship types as source layers in ForEachShipType order and the missile handles as the subscription
-// layer. A row is eligible while it publishes a registry id and its arrival grace has run out. With pPreviousFrame, its
-// arrival grace decides eligibility and its positions are bound as previous positions; without, the current grace
-// decides and no previous positions are bound.
+// One registry query window: one context per flight plane, indexed by plane, plus the single workbuffer allocation
+// their spans point into. The owner keeps the whole object alive for the window; the allocation pops when it dies, so
+// no context span outlives it.
+struct RegistryWindow
+{
+	common::ScopedWorkbufferAllocation<std::byte*> buffer;
+	std::array<engine::RegistryQueryContext, kFlightPlanes.size()> contexts {};
+};
+
+// Builds one context per flight plane. Each binds the three ship types as source layers in ForEachShipType order and
+// the missile handles as the subscription layer. A row is eligible while it publishes a registry id and its arrival
+// grace has run out, and it joins only the context of the flight plane its current Interpolate row stores; a row
+// storing kuiNoFlightPlane joins none. With pPreviousFrame, its arrival grace decides eligibility and its positions are
+// bound as previous positions; without, the current grace decides and no previous positions are bound.
 [[nodiscard]] RegistryWindow BuildShipRegistryWindow(const Frame& rFrame, const Frame* pPreviousFrame, const MissilesPostRender& rSubscribers);
 
 } // namespace game

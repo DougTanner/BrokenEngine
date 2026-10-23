@@ -13,7 +13,6 @@ enum DynamicBufferType
 {
 	kBufferMain,
 	kBufferVisibleLights,
-	kBufferWindDeposit,
 
 	kBufferTypeCount,
 };
@@ -30,7 +29,7 @@ public:
 
 	void CreateWaterMesh();
 
-	Buffer* CreateDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, int64_t iElementSize);
+	Buffer* CreateDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, int64_t iElementSize, int64_t iInitialCapacity);
 	void ResizeDynamicBuffer(common::crc_t crc, DynamicBufferType eType, std::string_view name, int64_t iNewSize, int64_t iFramebuffer);
 	Buffer* ResizeDynamicBufferIfNeeded(common::crc_t crc, DynamicBufferType eType, std::string_view name, int64_t iLayoutSize, int64_t iCapacity, int64_t iCommandBuffer);
 

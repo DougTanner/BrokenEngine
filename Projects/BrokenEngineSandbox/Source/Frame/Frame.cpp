@@ -61,10 +61,37 @@ static void ValidatePusherOwners(const Frame& rFrame)
 	});
 }
 
+// Missiles Update asserts that a flying missile, neither falling nor dying, is at a flight plane's height; it holds
+// that height only while its velocity has no Z.
+static void ValidateFlyingMissilePlanes(const Frame& rFrame)
+{
+	const MissilesInterpolate& rInterpolate = *rFrame.interpolate.pMissiles;
+	const MissilesPostRender& rPostRender = *rFrame.postRender.pMissiles;
+	for (int64_t i = 0; i < rInterpolate.iCount; ++i)
+	{
+		if (rPostRender.pFlags[i] & MissileFlags::kFalling)
+		{
+			continue;
+		}
+		if (rPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
+		{
+			continue;
+		}
+		if (!FlightPlaneAtHeight(XMVectorGetZ(rInterpolate.pVecPositions[i])))
+		{
+			throw std::ios_base::failure("Frame flying missile plane");
+		}
+		if (XMVectorGetZ(rPostRender.pVecVelocities[i]) != 0.0f)
+		{
+			throw std::ios_base::failure("Frame flying missile plane");
+		}
+	}
+}
+
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 138 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
+const int64_t Frame::kiVersion = 139 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
 
 FrameInterpolate::FrameInterpolate()
 : pBlasters(std::make_unique<BlastersInterpolate>())
@@ -345,6 +372,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 	float fBestAnchorY = fAreaMinimumY + (static_cast<float>(iBestGridY) + 0.5f) * fPitchY;
 	ShipOrders_t waveOrders {};
 	SetTargetFlightPlane(waveOrders, iWaveFlightPlane);
+	uint8_t uiWaveFlightPlane = static_cast<uint8_t>(iWaveFlightPlane);
 	for (int64_t i = 0; i < iShipCount; ++i)
 	{
 		float fLocalForward = pf2LocalOffsets[i].x;
@@ -369,6 +397,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 					.alignment = rFrame.postRender.randomAlignment,
 					.eController = ShipController::kRandomSpawn,
 					.orders = waveOrders,
+					.uiFlightPlane = uiWaveFlightPlane,
 				});
 				break;
 			case ShipType::kOmni:
@@ -379,6 +408,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 					.alignment = rFrame.postRender.randomAlignment,
 					.eController = ShipController::kRandomSpawn,
 					.orders = waveOrders,
+					.uiFlightPlane = uiWaveFlightPlane,
 				});
 				break;
 			case ShipType::kBattleship:
@@ -389,6 +419,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 					.alignment = rFrame.postRender.randomAlignment,
 					.eController = ShipController::kRandomSpawn,
 					.orders = waveOrders,
+					.uiFlightPlane = uiWaveFlightPlane,
 				});
 				break;
 			case ShipType::kCount:
@@ -677,6 +708,7 @@ std::istream& operator>>(std::istream& rStream, Frame& rCurrent)
 	engine::ValidateBaseCollectionPairs(loadedFrame.interpolate, loadedFrame.postRender);
 	engine::ValidateCollectionPairs(GameInterpolateCollections(loadedFrame.interpolate), GamePostRenderCollections(loadedFrame.postRender));
 	ValidatePusherOwners(loadedFrame);
+	ValidateFlyingMissilePlanes(loadedFrame);
 	rCurrent = std::move(loadedFrame);
 	return rStream;
 }

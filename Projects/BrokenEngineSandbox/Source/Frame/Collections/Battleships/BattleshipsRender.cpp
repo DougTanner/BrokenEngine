@@ -11,11 +11,14 @@ namespace game
 {
 
 // Placeholder models, one per ShipController (also used by Battleships.cpp for animation lookup): the Fighter's models
-// and scales, so the larger radius alone makes a battleship larger.
+// and scales, so the larger radius alone makes a battleship larger. Each model offset puts back the model's native
+// origin as its rotation pivot.
 extern const common::crc_t kBattleshipFleetModel = data::kModelsspaceship2scenegltfCrc;
-constexpr float kfBattleshipFleetModelScale = 0.3667f;
+constexpr float kfBattleshipFleetModelScale = 1.0927087f;
+constexpr XMFLOAT3 kf3BattleshipFleetModelOffset {0.0f, 0.1817180f, -0.1686860f};
 extern const common::crc_t kBattleshipRandomModel = data::kModelsSpaceshipscenegltfCrc;
-constexpr float kfBattleshipRandomModelScale = 0.00175f;
+constexpr float kfBattleshipRandomModelScale = 0.6723890f;
+constexpr XMFLOAT3 kf3BattleshipRandomModelOffset {0.0f, 0.0621412f, -0.0985188f};
 
 constexpr float kfRoll = 0.2f;
 
@@ -24,13 +27,16 @@ constexpr int64_t kiPipelineCount = std::to_underlying(ShipController::kCount);
 constexpr std::array<const char*, kiPipelineCount> kpcPipelineNames {"BattleshipsFleet", "BattleshipsRandom"};
 constexpr std::array<common::crc_t, kiPipelineCount> kuiPipelineCrcs {common::CrcConsteval("BattleshipsFleet"), common::CrcConsteval("BattleshipsRandom")};
 constexpr std::array<float, kiPipelineCount> kfModelScales {kfBattleshipFleetModelScale, kfBattleshipRandomModelScale};
+constexpr std::array<XMFLOAT3, kiPipelineCount> kf3ModelOffsets {kf3BattleshipFleetModelOffset, kf3BattleshipRandomModelOffset};
 const std::array<common::crc_t, kiPipelineCount> kuiModels {kBattleshipFleetModel, kBattleshipRandomModel};
+
+constexpr int64_t kiDynamicBufferInitialCapacity = 256;
 
 void BattleshipsInterpolate::GraphicsResources()
 {
 	for (int64_t i = 0; i < kiPipelineCount; ++i)
 	{
-		engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kuiPipelineCrcs[i], engine::kBufferMain, kpcPipelineNames[i], sizeof(shaders::ModelLayout));
+		engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kuiPipelineCrcs[i], engine::kBufferMain, kpcPipelineNames[i], sizeof(shaders::ModelLayout), kiDynamicBufferInitialCapacity);
 		engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(kuiPipelineCrcs[i], kpcPipelineNames[i], kuiModels[i], pStorageBuffers);
 	}
 }
@@ -130,6 +136,7 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 
 	int64_t iRenderedOffset = siRendered[iPipeline];
 	float fModelScale = kfModelScales[iPipeline];
+	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&kf3ModelOffsets[iPipeline]));
 
 	// Per-range processing lambda — each visible index j writes to deterministic non-overlapping output slots
 	auto ProcessRange = [&](int64_t iStart, int64_t iEnd)
@@ -152,7 +159,7 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 			XMMATRIX matRoll = XMMatrixRotationX(-kfRoll * rCurrent.pfDeltaRotations[i]);
 			XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 			XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
-			XMMATRIX matTransform = matScaling * smatPreRotate * matRoll * matYaw * matTranslation;
+			XMMATRIX matTransform = matPreMove * matScaling * smatPreRotate * matRoll * matYaw * matTranslation;
 
 			shaders::ModelLayout& rModelLayout = pLayouts[iRenderedOffset + j];
 			rModelLayout.f4Position = f4Position;

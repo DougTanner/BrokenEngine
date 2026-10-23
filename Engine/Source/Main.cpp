@@ -193,6 +193,9 @@ static int64_t MainThread(HINSTANCE hinstance)
 	}
 
 #if defined(BT_SERVER)
+	// Before the game, so its startup list holds no report stored in this run and it outlives Server, which posts through it.
+	auto pCrashReportPoster = std::make_unique<CrashReportPoster>();
+
 	// Construct the game before the window, so the window is destroyed while the game object the server WindowProcedure reads still exists.
 	auto pIslandTerrain = std::make_unique<IslandTerrain>();
 	auto pFlightPlanes = std::make_unique<FlightPlanes>();
@@ -377,123 +380,126 @@ static int64_t MainThread(HINSTANCE hinstance)
 
 	LOG(kDefault, kInfo, "\nEnter main loop");
 	LogIndent(1);
-#if defined(BT_CLIENT)
-	// Write and upload while the client connection is still alive; unwinding destroys it before ProcessMain's catch.
+	// Write and send while the client connection (upload) or the server's crash report poster (post) is still alive; unwinding destroys it before ProcessMain's catch.
 	try
 	{
-#endif
-	while (true)
-	{
-		gpProfileManager->CpuStart(kCpuTimerMessagesAndInput);
-
-		[[maybe_unused]] bool bLostFocus = ProcessMessages();
-		if (gbQuit) [[unlikely]]
+		while (true)
 		{
-			break;
-		}
+			gpProfileManager->CpuStart(kCpuTimerMessagesAndInput);
 
-#if defined(BT_CLIENT)
-		// Reconcile a pending fullscreen toggle here, in the main loop only — never from the teardown / boot
-		// ProcessMessages() calls, so a mid-shutdown mismatch can't SetWindowPos a dying window. Read through
-		// WantedFullscreen() so the --windowed / agent overrides fold in and gFullscreen is never mutated.
-		bool bWantedFullscreen = WantedFullscreen();
-		bool bIsFullscreen = (siWindowStyle & WS_POPUP) != 0;
-		if (bIsFullscreen != bWantedFullscreen)
-		{
-			SetupWindow(bWantedFullscreen, siWindowStyle, sWindowRectangle);
-			SetWindowLongPtr(sHwnd, GWL_STYLE, static_cast<LONG_PTR>(static_cast<LONG>(siWindowStyle)));
-			// SWP_NOZORDER | SWP_NOACTIVATE: the agent fullscreen command reaches this path, and the harness must never steal foreground focus.
-			SetWindowPos(sHwnd, nullptr, sWindowRectangle.left, sWindowRectangle.top, sWindowRectangle.right - sWindowRectangle.left, sWindowRectangle.bottom - sWindowRectangle.top, SWP_NOZORDER | SWP_NOACTIVATE);
-		}
-
-		// Drain agent commands before input so injected input scripts act on the same frame.
-		// The server drains in GameBase::ServerUpdate instead, matching the debug-control packet ordering.
-		if (gpAgentCommandServer != nullptr) [[unlikely]]
-		{
-			gpAgentCommandServer->Drain();
-
-			// Advance the active synthetic-input script one step before input/ImGui so its ImGui IO events and
-			// RawInput-overlay state land in this frame (RawInputManager::Update runs later via ProcessInput).
-			if (gpAgentInput != nullptr) [[unlikely]]
+			[[maybe_unused]] bool bLostFocus = ProcessMessages();
+			if (gbQuit) [[unlikely]]
 			{
-				gpAgentInput->AdvanceFrame();
+				break;
 			}
-		}
+
+#if defined(BT_CLIENT)
+			// Reconcile a pending fullscreen toggle here, in the main loop only — never from the teardown / boot
+			// ProcessMessages() calls, so a mid-shutdown mismatch can't SetWindowPos a dying window. Read through
+			// WantedFullscreen() so the --windowed / agent overrides fold in and gFullscreen is never mutated.
+			bool bWantedFullscreen = WantedFullscreen();
+			bool bIsFullscreen = (siWindowStyle & WS_POPUP) != 0;
+			if (bIsFullscreen != bWantedFullscreen)
+			{
+				SetupWindow(bWantedFullscreen, siWindowStyle, sWindowRectangle);
+				SetWindowLongPtr(sHwnd, GWL_STYLE, static_cast<LONG_PTR>(static_cast<LONG>(siWindowStyle)));
+				// SWP_NOZORDER | SWP_NOACTIVATE: the agent fullscreen command reaches this path, and the harness must never steal foreground focus.
+				SetWindowPos(sHwnd, nullptr, sWindowRectangle.left, sWindowRectangle.top, sWindowRectangle.right - sWindowRectangle.left, sWindowRectangle.bottom - sWindowRectangle.top, SWP_NOZORDER | SWP_NOACTIVATE);
+			}
+
+			// Drain agent commands before input so injected input scripts act on the same frame.
+			// The server drains in GameBase::ServerUpdate instead, matching the debug-control packet ordering.
+			if (gpAgentCommandServer != nullptr) [[unlikely]]
+			{
+				gpAgentCommandServer->Drain();
+
+				// Advance the active synthetic-input script one step before input/ImGui so its ImGui IO events and
+				// RawInput-overlay state land in this frame (RawInputManager::Update runs later via ProcessInput).
+				if (gpAgentInput != nullptr) [[unlikely]]
+				{
+					gpAgentInput->AdvanceFrame();
+				}
+			}
 #endif
 
 #if defined(BT_CLIENT)
-		pGame->ProcessInput(bLostFocus);
-		if (pGame->mGameFlags & engine::GameFlags::kQuit) [[unlikely]]
-		{
-			break;
-		}
+			pGame->ProcessInput(bLostFocus);
+			if (pGame->mGameFlags & engine::GameFlags::kQuit) [[unlikely]]
+			{
+				break;
+			}
 #endif
 
-		gpProfileManager->CpuStop(kCpuTimerMessagesAndInput);
+			gpProfileManager->CpuStop(kCpuTimerMessagesAndInput);
 
 #if defined(BT_CLIENT)
-		pGame->ClientUpdate();
+			pGame->ClientUpdate();
 #else
-		pGame->ServerUpdate();
+			pGame->ServerUpdate();
 #endif // BT_CLIENT
 
 #if defined(BT_CLIENT)
-		try
-		{
-			gpTextureUploadManager->RethrowException();
-			pGame->Render();
-		}
-		catch (const std::system_error& rException)
-		{
-			if (rException.code() != VkErrorCode(VK_ERROR_DEVICE_LOST))
+			try
 			{
-				throw;
+				gpTextureUploadManager->RethrowException();
+				pGame->Render();
 			}
-			LOG(kDefault, kDebug, "Caught Vulkan device loss: {}", rException.what());
-			pGraphics.reset();
-			pGraphics = std::make_unique<Graphics>(hinstance, sHwnd);
-		}
-
-		auto it = pGame->mCells.find(game::gpGame->mClientGridCoordinate);
-		pAudioManager->Update(it != pGame->mCells.end() && it->second.iSnapshotCount > 0 ? &pGame->RenderFrame(game::gpGame->mClientGridCoordinate) : nullptr);
-#else
-		{
-			// Heap: Win32 InvalidateRect may trigger internal GDI allocations
-			ScopedSuppressAllocationTracking suppress;
-			ServerUpdateDisplayStatistics();
-
-			// Throttle full-window GDI repaint to a fraction of the tick rate — paint cost dwarfs stat aggregation, and the window shows only coarse stats/map. Clicks still repaint immediately via WM_LBUTTONDOWN.
-			static constexpr int64_t kiServerDisplayRepaintTicks = 8;
-			static int64_t siServerDisplayRepaintCounter = 0;
-			if (++siServerDisplayRepaintCounter >= kiServerDisplayRepaintTicks)
+			catch (const std::system_error& rException)
 			{
-				siServerDisplayRepaintCounter = 0;
-
-				// Skip the repaint when it would blit nothing new: a minimized/hidden window paints offscreen for no benefit, and a visible window whose displayed stats/map are unchanged need not repaint an identical frame.
-				// Keep a slow heartbeat while visible-but-unchanged so the free-running tick/timer text (deliberately outside the content hash) stays visibly alive instead of reading as a hung server.
-				static constexpr int64_t kiServerDisplayHeartbeatWindows = 4; // 4 x 8-tick windows = 1 Hz at the 32 Hz tick rate
-				static int64_t siServerDisplayHeartbeatCounter = 0;
-				if (IsIconic(sHwnd) == FALSE && IsWindowVisible(sHwnd) != FALSE)
+				if (rException.code() != VkErrorCode(VK_ERROR_DEVICE_LOST))
 				{
-					bool bHeartbeat = ++siServerDisplayHeartbeatCounter >= kiServerDisplayHeartbeatWindows;
-					if (ServerDisplayContentChanged() || bHeartbeat)
+					throw;
+				}
+				LOG(kDefault, kDebug, "Caught Vulkan device loss: {}", rException.what());
+				pGraphics.reset();
+				pGraphics = std::make_unique<Graphics>(hinstance, sHwnd);
+			}
+
+			auto it = pGame->mCells.find(game::gpGame->mClientGridCoordinate);
+			pAudioManager->Update(it != pGame->mCells.end() && it->second.iSnapshotCount > 0 ? &pGame->RenderFrame(game::gpGame->mClientGridCoordinate) : nullptr);
+#else
+			{
+				// Heap: Win32 InvalidateRect may trigger internal GDI allocations
+				ScopedSuppressAllocationTracking suppress;
+				ServerUpdateDisplayStatistics();
+
+				// Throttle full-window GDI repaint to a fraction of the tick rate — paint cost dwarfs stat aggregation, and the window shows only coarse stats/map. Clicks still repaint immediately via WM_LBUTTONDOWN.
+				static constexpr int64_t kiServerDisplayRepaintTicks = 8;
+				static int64_t siServerDisplayRepaintCounter = 0;
+				if (++siServerDisplayRepaintCounter >= kiServerDisplayRepaintTicks)
+				{
+					siServerDisplayRepaintCounter = 0;
+
+					// Skip the repaint when it would blit nothing new: a minimized/hidden window paints offscreen for no benefit, and a visible window whose displayed stats/map are unchanged need not repaint an identical frame.
+					// Keep a slow heartbeat while visible-but-unchanged so the free-running tick/timer text (deliberately outside the content hash) stays visibly alive instead of reading as a hung server.
+					static constexpr int64_t kiServerDisplayHeartbeatWindows = 4; // 4 x 8-tick windows = 1 Hz at the 32 Hz tick rate
+					static int64_t siServerDisplayHeartbeatCounter = 0;
+					if (IsIconic(sHwnd) == FALSE && IsWindowVisible(sHwnd) != FALSE)
 					{
-						siServerDisplayHeartbeatCounter = 0;
-						InvalidateRect(sHwnd, nullptr, FALSE);
+						bool bHeartbeat = ++siServerDisplayHeartbeatCounter >= kiServerDisplayHeartbeatWindows;
+						if (ServerDisplayContentChanged() || bHeartbeat)
+						{
+							siServerDisplayHeartbeatCounter = 0;
+							InvalidateRect(sHwnd, nullptr, FALSE);
+						}
 					}
 				}
 			}
-		}
 #endif // BT_CLIENT
-	}
-#if defined(BT_CLIENT)
+		}
 	}
 	catch (const std::exception& rException)
 	{
 		if (IsDebuggerPresent() == 0) [[likely]]
 		{
-			HandleException(&rException);
-			TryUploadCrashReport();
+			if (HandleException(&rException))
+			{
+#if defined(BT_CLIENT)
+				TryUploadCrashReport();
+#else
+				TryPostCrashReport();
+#endif
+			}
 		}
 		throw;
 	}
@@ -501,12 +507,17 @@ static int64_t MainThread(HINSTANCE hinstance)
 	{
 		if (IsDebuggerPresent() == 0) [[likely]]
 		{
-			HandleException();
-			TryUploadCrashReport();
+			if (HandleException())
+			{
+#if defined(BT_CLIENT)
+				TryUploadCrashReport();
+#else
+				TryPostCrashReport();
+#endif
+			}
 		}
 		throw;
 	}
-#endif
 	LogIndent(-1);
 	LOG(kDefault, kInfo, "Exit main loop\n\n");
 
@@ -883,6 +894,10 @@ static int64_t ProcessMain(HINSTANCE hinstance)
 			return 0;
 		}
 	}
+
+	// After the single-instance check, so a refused second server never moves the running server's report, and before
+	// any other thread starts, so no crash writer or report reader can touch either file during the rename.
+	engine::RenamePreviousCrashReport();
 
 	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);

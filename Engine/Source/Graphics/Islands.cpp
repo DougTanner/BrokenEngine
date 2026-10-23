@@ -189,6 +189,7 @@ void Islands::FreeAllRetiredMeshRanges()
 	mRetiredMeshRanges.clear();
 }
 
+#if !defined(BT_MODEL_VIEWER)
 void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, Cell>& rCells, std::span<const GridCoord> activeCoordinates)
 {
 	// Write only the framebuffer instance the current frame will consume. miFramebufferIndex was set by the
@@ -394,6 +395,8 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, Cell>& rCe
 	}
 	mLastWrittenCounts.at(iFramebuffer) = iCurrentWrittenTotal;
 }
+
+#endif // !defined(BT_MODEL_VIEWER)
 
 } // namespace engine
 

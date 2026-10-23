@@ -6,14 +6,15 @@
 # UTF-8, an added BOM, and a missing final newline the baseline side had; and `line-length` for every
 # changed markdown file and `Documents/<name>.txt` guide: every line of the whole file, not only the
 # added lines, longer than 500 characters without its line ending (Grep elides such a line), apart
-# from, in a markdown file only, fence delimiters, lines inside a fence, and table rows (first
-# non-space character `|`). The
+# from, in a markdown file only, fence delimiters, lines inside a fence, table rows (first
+# non-space character `|`), and a line 1 starting with the Plan metadata marker prefix. The
 # first composes an existing script (the bundled skill validator). The
 # run reports results only — it never decides whether a failing check blocks a slice, never edits a
 # file, and writes nothing to disk (GIT_OPTIONAL_LOCKS=0 keeps Git from refreshing the index), so it is
 # safe under a read-only sandbox. Stdout carries only the result document.
 # The result document holds one `checks` row per check, each carrying a boolean `triggered` and a
-# `status` (pass, fail, blocked, or skipped). The run passes (exit 0) when no triggered row fails or is
+# `status` (pass, fail, blocked, or skipped); a passing or failing `line-length` row's detail also
+# carries the enforced `limit`. The run passes (exit 0) when no triggered row fails or is
 # blocked, including when none triggers; otherwise it exits 2 if any triggered row is blocked, else 1. A
 # setup failure (invalid root, missing composed script, unavailable inventory) exits 2 with no rows, and
 # an unexpected error exits 1 with status `error`. `-Head <commit>` selects the changed
@@ -48,7 +49,7 @@ $script:LinkPattern = '\[(?:[^\[\]]*)\]\(\s*([^)\s]+)'
 $script:SchemePattern = '^[A-Za-z][A-Za-z0-9+.-]*:'
 
 $result = [ordered]@{
-	schemaVersion = 'broken-engine-static-checks/v4'
+	schemaVersion = 'broken-engine-static-checks/v5'
 	status = 'error'
 	code = 'internal.error'
 	message = 'Static checks did not run.'
@@ -344,9 +345,11 @@ function Get-LineLengthFailure([string] $Path) {
 		$number++
 		if ($markdown) {
 			# The Get-HeadingSlug fence toggle: a fenced code line must stay copyable as one line, and a
-			# table row cannot wrap without breaking the table.
+			# table row cannot wrap without breaking the table, and the Plan scheduler reads the line-1
+			# metadata marker as one line.
 			if ($line -match '^\s*(?:```|~~~)') { $fenced = -not $fenced; continue }
 			if ($fenced -or $line -match '^\s*\|') { continue }
+			if ($number -eq 1 -and $line.StartsWith('<!-- broken-engine-plan/v1 ', [StringComparison]::Ordinal)) { continue }
 		}
 		if ($line.Length -gt $script:MaximumLineLength) { $failures.Add([ordered]@{ path = $Path; line = $number; length = $line.Length }) }
 	}
@@ -368,7 +371,7 @@ function Invoke-LineLengthCheck([object] $Inventory, [bool] $Truncated) {
 		foreach ($failure in (Get-LineLengthFailure $path)) { $failures.Add($failure) }
 	}
 	$status = if ($failures.Count -gt 0) { 'fail' } else { 'pass' }
-	return New-CheckRow 'line-length' $true $status ([ordered]@{ fileCount = $paths.Count; failures = [object[]] $failures.ToArray() })
+	return New-CheckRow 'line-length' $true $status ([ordered]@{ fileCount = $paths.Count; limit = $script:MaximumLineLength; failures = [object[]] $failures.ToArray() })
 }
 
 function Add-WhitespaceFailure([string[]] $Arguments, [int] $CleanExit, [int] $FindingsExit, [Collections.Generic.List[object]] $Failures) {

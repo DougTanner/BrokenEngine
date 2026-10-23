@@ -11,11 +11,12 @@ namespace engine
 {
 
 constexpr float kfAdjust = 20.0f;
+constexpr int64_t kiDynamicBufferInitialCapacity = 256;
 
 void HexShieldsInterpolate::GraphicsResources()
 {
-	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::HexShieldLayout));
-	gpPipelineManager->mDynamicPipelines.CreatePipelineHexShields(kuiCrc, kpcName, sizeof(shaders::HexShieldLayout));
+	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::HexShieldLayout), kiDynamicBufferInitialCapacity);
+	gpPipelineManager->mDynamicPipelines.CreatePipelineHexShields(kuiCrc, kpcName);
 	gpPipelineManager->mDynamicPipelines.CreatePipelineHexShieldsLighting(kuiCrc, kpcName);
 }
 

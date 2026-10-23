@@ -4,7 +4,9 @@
 #include "Frame/CellStaticData.h"
 #include "Frame/IslandChainPlacement.h"
 
+#if !defined(BT_MODEL_VIEWER)
 #include "Game.h"
+#endif
 
 namespace engine
 {
@@ -227,6 +229,7 @@ void IslandTerrain::WaitForElevationMaps()
 #endif
 }
 
+#if !defined(BT_MODEL_VIEWER)
 // Re-home a cell-local position that has stepped outside its cell onto the neighbouring cell that contains
 // it, rewriting both the coord and the local XY. GlobalElevation's callers hand in a position local to the
 // basis coord, and GlobalNormal's taps can cross the edge. Returns false when the neighbour would leave the
@@ -250,6 +253,7 @@ static bool ResolveLocalPosition(GridCoord& rCoord, XMFLOAT4A& rf4Local)
 	rf4Local.y -= static_cast<float>(iStepY) * kfCellHeight;
 	return true;
 }
+#endif // !defined(BT_MODEL_VIEWER)
 
 template <bool MULTIPLY_UV, bool HOISTED_HEIGHTMAP_MAXIMUM>
 static bool SamplePlacementHeightmap(float fDeltaX, float fDeltaY, float fCosine, float fSine, float fFootprintX, float fFootprintY, float fHalfX, float fHalfY, const uint16_t* puiHeightmapHalf, int64_t iHeightmapWidth, int64_t iHeightmapHeight, float fInverseFootprintX, float fInverseFootprintY, float fHeightmapMaximumU, float fHeightmapMaximumV, float& rfSample)
@@ -317,6 +321,7 @@ static XMVECTOR NormalFromElevation(FXMVECTOR vecPosition, float fDistance, ELEV
 	return XMVector3Normalize(XMVector3Cross(XMVectorSubtract(vecTopRight, vecBottomLeft), XMVectorSubtract(vecTopLeft, vecBottomRight)));
 }
 
+#if !defined(BT_MODEL_VIEWER)
 // CellElevation shares MAX elevation over a resolved cell between GlobalElevation and GlobalNormal; the
 // latter reuses cell resolution across four taps. Hull-based placement permits overlapping footprint
 // rectangles, so the highest terrain wins, matching the GPU prepass and remaining order-independent and
@@ -394,6 +399,8 @@ float XM_CALLCONV IslandTerrain::GlobalElevation(GridCoord coord, FXMVECTOR vecL
 
 	return CellElevation(*this, it->second.staticData, f4Local);
 }
+
+#endif // !defined(BT_MODEL_VIEWER)
 
 // Splat one island placement's heightmap into the per-cell elevation grid (max-blend over the rotated
 // footprint). Pure deterministic computation — the grid feeds CellElevationSampler::Sample, which steers CRC'd sim
@@ -515,6 +522,7 @@ XMVECTOR XM_CALLCONV IslandTerrain::CellNormal(const CellStaticData& rStaticData
 	});
 }
 
+#if !defined(BT_MODEL_VIEWER)
 XMVECTOR XM_CALLCONV IslandTerrain::GlobalNormal(GridCoord coord, FXMVECTOR vecLocalPosition) const
 {
 	// Frame Purity Constraint (see GlobalElevation): must never run from frame-tick code. GlobalNormal
@@ -557,5 +565,7 @@ XMVECTOR XM_CALLCONV IslandTerrain::GlobalNormal(GridCoord coord, FXMVECTOR vecL
 
 	return NormalFromElevation(vecLocalPosition, fDistance, SampleElevation);
 }
+
+#endif // !defined(BT_MODEL_VIEWER)
 
 } // namespace engine

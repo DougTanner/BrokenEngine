@@ -26,7 +26,11 @@ decision-complete plan with `# Title`, `## Context`, `## Design`,
 when the diff is insufficient, and `## Notes`. Include verified root cause,
 originating gap, implementation boundary, and applicable determinism/CRC,
 serialization/`.pack`/`kiVersion`, replay, wire, affinity, threading,
-allocation, shader, build, or live-verification exposure. Pre-stage
+allocation, shader, build, or live-verification exposure.
+When an acceptance criterion is settled by a live `/agent-harness` run, name
+the setup that reproduced the observed state (the harness commands or UI
+actions, in order, as the observing run recorded them), or state that the
+supplied evidence records none. Pre-stage
 architectural choices instead of deciding them. Phrase every choice you do make
 as the author's recommendation with its rationale rather than in binding
 language, per

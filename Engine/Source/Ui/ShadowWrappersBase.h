@@ -29,6 +29,8 @@ extern Wrapper gObjectShadowsSunsetStretch;
 extern Wrapper gObjectShadowsBlurSigma;
 extern Wrapper gObjectShadowsBlurRadius;
 extern Wrapper gObjectShadowsGrow;
+extern Wrapper gObjectShadowsHeightOffset;
+extern Wrapper gObjectShadowsTerrainShadowFade;
 extern Wrapper gSmokeShadowIntensity;
 
 } // namespace engine

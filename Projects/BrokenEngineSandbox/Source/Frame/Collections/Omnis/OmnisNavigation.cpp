@@ -49,6 +49,7 @@ void OmnisPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 				.fleetWantedCoordinate = rCurrentPostRender.pFleetWantedCoordinates[i],
 				.uiPendingFleetWantedCoordinateTicks = rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[i],
 				.uiPendingWeaponModeTicks = rCurrentPostRender.puiPendingWeaponModeTicks[i],
+				.uiFlightPlane = rCurrentInterpolate.puiFlightPlanes[i],
 				.bTransfer = true,
 			}),
 		};

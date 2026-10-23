@@ -120,6 +120,7 @@ SmokePlaneWeights ComputeSmokePlaneWeights(float fZ)
 	return {.iLowerPlane = gpFlightPlanes->Count() - 1, .fUpperWeight = 0.0f};
 }
 
+#if !defined(BT_MODEL_VIEWER)
 XMVECTOR ProjectToFlightPlane(XMVECTOR vecLocalPosition, const RenderBasis& rBasis, int64_t iPlane)
 {
 	// The elevation query is answered in the emitter's own cell, from the coordinate the basis carries; the
@@ -132,6 +133,7 @@ XMVECTOR ProjectToBaseHeight(XMVECTOR vecLocalPosition, const RenderBasis& rBasi
 {
 	return ProjectToFlightPlane(vecLocalPosition, rBasis, 0);
 }
+#endif
 
 void BuildAxisAlignedQuad(shaders::AxisAlignedQuadLayout& rLayout, const XMFLOAT4A& rf4Position, float fArea, const XMFLOAT4A& rf4Parameters, uint32_t uiColor)
 {

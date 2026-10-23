@@ -10,13 +10,15 @@
 namespace engine
 {
 
+constexpr int64_t kiDynamicBufferInitialCapacity = 8'192;
+
 static int64_t siRendered = 0;
 
 void WindTrailsInterpolate::GraphicsResources()
 {
-	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::QuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositA, kuiCrc, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc}, &gpBufferManager->mpWindOccupancyVkBuffers[0], sizeof(shaders::QuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositB, kuiCrc, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureTwo, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc}, &gpBufferManager->mpWindOccupancyVkBuffers[1], 0);
+	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::QuadLayout), kiDynamicBufferInitialCapacity);
+	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositA, kuiCrc, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc}, &gpBufferManager->mpWindOccupancyVkBuffers[0]);
+	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositB, kuiCrc, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureTwo, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesBC4Radial2pngCrc}, &gpBufferManager->mpWindOccupancyVkBuffers[1]);
 }
 
 void WindTrailsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates)

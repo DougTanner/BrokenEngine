@@ -613,16 +613,24 @@ function Get-LandingState([string] $BaselineSha, [string] $HeadSha, [ref] $Trunc
 			break
 		}
 	}
+	$emittedReviewed = [object[]] $reviewed.ToArray()
+	$emittedPorcelain = [string[]] $porcelain
+	$emittedSubmodules = [string[]] $submodules
+	if ([string]::IsNullOrWhiteSpace($OutputPath)) {
+		$emittedReviewed = [object[]] @($reviewed | Select-Object -First $script:MaximumEntries)
+		$emittedPorcelain = [string[]] @($porcelain | Select-Object -First $script:MaximumEntries)
+		$emittedSubmodules = [string[]] @($submodules | Select-Object -First $script:MaximumEntries)
+	}
 	$landingTruncation = [ordered]@{
-		reviewed = [ordered]@{ full = $reviewed.Count; emitted = [Math]::Min($reviewed.Count, $script:MaximumEntries) }
-		porcelain = [ordered]@{ full = $porcelain.Count; emitted = [Math]::Min($porcelain.Count, $script:MaximumEntries) }
-		submodules = [ordered]@{ full = $submodules.Count; emitted = [Math]::Min($submodules.Count, $script:MaximumEntries) }
+		reviewed = [ordered]@{ full = $reviewed.Count; emitted = $emittedReviewed.Count }
+		porcelain = [ordered]@{ full = $porcelain.Count; emitted = $emittedPorcelain.Count }
+		submodules = [ordered]@{ full = $submodules.Count; emitted = $emittedSubmodules.Count }
 	}
 	$Truncation.Value = $landingTruncation
 	return [ordered]@{
-		reviewed = [object[]] @($reviewed | Select-Object -First $script:MaximumEntries)
-		porcelain = [string[]] @($porcelain | Select-Object -First $script:MaximumEntries)
-		submodules = [string[]] @($submodules | Select-Object -First $script:MaximumEntries)
+		reviewed = $emittedReviewed
+		porcelain = $emittedPorcelain
+		submodules = $emittedSubmodules
 		planTouched = $planTouched
 		acceptanceSkeleton = [object[]] $skeleton.ToArray()
 	}
@@ -723,10 +731,10 @@ try {
 	$manifestConflict = $EmitManifest -and ($modes.Count -gt 0 -or $PSBoundParameters.ContainsKey('Head') -or $PSBoundParameters.ContainsKey('IncludeUntracked'))
 	# Those three modes never read the filtered entries or regions, so they would silently ignore the filter.
 	$prefixConflict = $PSBoundParameters.ContainsKey('PathPrefix') -and ($Landing -or $EmitTargets -or $EmitManifest)
-	# Those three modes keep their own stdout contracts and the landing arrays' caps.
-	$outputConflict = -not [string]::IsNullOrWhiteSpace($OutputPath) -and ($Landing -or $EmitTargets -or $EmitManifest)
+	# Those two modes keep their own stdout contracts.
+	$outputConflict = -not [string]::IsNullOrWhiteSpace($OutputPath) -and ($EmitTargets -or $EmitManifest)
 	if ($modes.Count -gt 1 -or $manifestConflict -or $prefixConflict -or $outputConflict) {
-		$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -EmitTargets, -Head, and -IncludeUntracked.' } elseif ($prefixConflict) { 'The -PathPrefix filter is exclusive with -Landing, -EmitTargets, and -EmitManifest.' } elseif ($outputConflict) { 'The -OutputPath result file is exclusive with -Landing, -EmitTargets, and -EmitManifest.' } else { 'Supply at most one of -Regions, -Landing, and -EmitTargets.' }
+		$message = if ($manifestConflict) { 'The -EmitManifest mode is exclusive with -Regions, -Landing, -EmitTargets, -Head, and -IncludeUntracked.' } elseif ($prefixConflict) { 'The -PathPrefix filter is exclusive with -Landing, -EmitTargets, and -EmitManifest.' } elseif ($outputConflict) { 'The -OutputPath result file is exclusive with -EmitTargets and -EmitManifest.' } else { 'Supply at most one of -Regions, -Landing, and -EmitTargets.' }
 		Complete-SessionChangeInventory 2 'blocked' 'inventory.mode-conflict' $message
 	}
 	$script:Root = Get-AgentCanonicalPath $RepositoryRoot

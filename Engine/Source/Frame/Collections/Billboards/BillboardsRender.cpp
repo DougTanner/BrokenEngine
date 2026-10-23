@@ -11,10 +11,12 @@ namespace engine
 
 using enum BillboardFlags;
 
+constexpr int64_t kiDynamicBufferInitialCapacity = 16;
+
 void BillboardsInterpolate::GraphicsResources()
 {
-	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::BillboardLayout));
-	gpPipelineManager->mDynamicPipelines.CreatePipelineBillboards(kuiCrc, kpcName, sizeof(shaders::BillboardLayout));
+	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::BillboardLayout), kiDynamicBufferInitialCapacity);
+	gpPipelineManager->mDynamicPipelines.CreatePipelineBillboards(kuiCrc, kpcName);
 }
 
 static int64_t siRendered = 0;

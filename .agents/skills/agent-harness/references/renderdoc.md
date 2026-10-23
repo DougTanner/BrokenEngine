@@ -23,7 +23,23 @@ Capture with `renderdoc_capture` (schema in the [command reference](command-refe
 
 The result `paths` are absolute `.rdc` files (RenderDoc's template writes `%TEMP%\RenderDoc\agent_frameNNN.rdc`). Use the returned paths verbatim; never guess them. `Test-Path` each and sanity-check its size before analysis.
 
-Analyze with the `rdc_*` scripts through `qrenderdoc --python`. qrenderdoc is a GUI process whose stdout is not reliably capturable, so each script writes its result to an `--out` file that is the completion signal; poll for that file, then stop the process.
+Analyze with the `rdc_*` scripts through `qrenderdoc --python`. Each script raises `SystemExit` after successful analysis or an escaping failure, so qrenderdoc skips its post-script main-window startup. Hidden launch and output polling alone do not prevent that startup. qrenderdoc's stdout is not reliably capturable, so the `--out` file remains the analysis-completion contract; its process exit code does not carry the Python exit status.
+
+Before each background launch, recheck the current `%APPDATA%\qrenderdoc\UI.config` and
+`analytics.json` read-only, recording their parse results, hashes,
+`Analytics_TotalOptOut`, `Analytics_ManualCheck`, analytics schema/date and local
+year/month. With analytics enabled (`Analytics_TotalOptOut=false`), v1.44 leaves no
+pending prompt when analytics schema 1 has a nonzero `Date.Year` and `Date.Month` matching
+the local year/month; a missing or uninitialized database selects the first-time prompt,
+while a different month/year selects report submission, where `Analytics_ManualCheck`
+controls the confirmation. `Analytics_ManualCheck=false` does not suppress the first-time
+prompt. Settle any different state against the installed version's source before launch,
+without changing configuration. This prerequisite covers the independent
+`Analytics::Prompt` call before Python execution; the scripts cannot suppress arbitrary
+pre-script initialization UI. See the [v1.44 analytics
+source](https://github.com/baldurk/renderdoc/blob/v1.44/qrenderdoc/Code/Interface/Analytics.cpp)
+and [startup
+ordering](https://github.com/baldurk/renderdoc/blob/v1.44/qrenderdoc/Code/qrenderdoc.cpp).
 
 The embedded interpreter has two quirks the launch must work around:
 
@@ -56,8 +72,12 @@ $Proc = Start-Process -FilePath $QRenderDoc -WorkingDirectory $ScriptsDir -Windo
 	'--python', ('"' + $Script + '"'))
 # Replay init scales with capture size; a multi-hundred-MB capture needs minutes, not seconds.
 $Deadline = (Get-Date).AddSeconds(240)
-while (-not (Test-Path -LiteralPath $Out) -and (Get-Date) -lt $Deadline) { Start-Sleep -Milliseconds 250 }
-Stop-Process -Id $Proc.Id -Force -ErrorAction SilentlyContinue
+while (-not (Test-Path -LiteralPath $Out) -and -not $Proc.HasExited -and (Get-Date) -lt $Deadline) { Start-Sleep -Milliseconds 250 }
+# The script self-exits; give qrenderdoc bounded time to finish before cleanup.
+if (-not $Proc.HasExited -and -not $Proc.WaitForExit(10000)) {
+	Stop-Process -InputObject $Proc -Force -ErrorAction SilentlyContinue
+	if (-not $Proc.WaitForExit(10000)) { throw "qrenderdoc did not exit after cleanup" }
+}
 if (-not (Test-Path -LiteralPath $Out)) { throw "rdc_summary produced no output: '$Out'" }
 Get-Content -LiteralPath $Out
 ```
@@ -66,11 +86,16 @@ Get-Content -LiteralPath $Out
 pwsh -NoProfile -File '<absolute adopted worktree>\Temp\renderdoc-rdc-summary.ps1'
 ```
 
-Other scripts differ only in `RDC_ARGS`: `rdc_pipeline.py` needs `"'<absolute .rdc path>' --event N --out '<absolute output path>'"`, and `rdc_texture.py` needs `"'<absolute .rdc path>' --event N --out '<absolute output path>'"` (add `--target K` or `--depth` as needed). For `rdc_texture.py` the `--out` PNG is the completion file, so poll for the PNG rather than a `.txt`. Launch one qrenderdoc per script and stop it before the next, so a stale GUI never holds the capture.
+Other scripts differ only in `RDC_ARGS`: `rdc_pipeline.py` needs `"'<absolute .rdc path>'
+--event N --out '<absolute output path>'"`, and `rdc_texture.py` needs `"'<absolute .rdc
+path>' --event N --out '<absolute output path>'"` (add `--target K` or `--depth` as
+needed). For `rdc_texture.py` the `--out` PNG is the completion file, so poll for the PNG
+rather than a `.txt`. Launch one qrenderdoc per script and wait for its exit or complete
+the bounded cleanup before the next, so the previous replay releases the capture.
 
 ## Scripts
 
-All live in `.agents/skills/agent-harness/scripts/` and share `rdc_common.py` (dual-mode loader; Python 3.6 syntax). Each exits nonzero with a one-line reason on failure.
+All live in `.agents/skills/agent-harness/scripts/` and share `rdc_common.py` (dual-mode loader; Python 3.6 syntax). Each reports a one-line reason where possible and raises a nonzero `SystemExit` on analysis failure; standalone Python preserves that status, while embedded qrenderdoc recognizes the exception type only.
 
 - `rdc_summary.py <rdc> [--out FILE]` — recursive action tree (eventId, kind, name, draw/dispatch params) with a per-kind totals footer. Default out `<capture>.summary.txt`. Start here to find a draw's eventId.
 - `rdc_pipeline.py <rdc> --event N [--out FILE]` — pipeline state at event `N`: bound shaders, viewport/scissor, depth/blend, color/depth targets with format + dimensions, vertex/index bindings. Default out `<capture>.pipeline_evN.txt`.

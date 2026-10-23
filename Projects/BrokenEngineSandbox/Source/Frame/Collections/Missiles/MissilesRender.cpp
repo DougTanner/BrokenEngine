@@ -14,6 +14,8 @@ constexpr float kfMissileWidth = 2.0f;
 
 constexpr common::crc_t kMissileModelCrc = data::kModelsaim9_missilescenegltfCrc;
 
+constexpr int64_t kiDynamicBufferInitialCapacity = 512;
+
 static int64_t siRendered = 0;
 // Non-concurrency tripwire: per-frame Render calls must run sequentially across active coords — siRendered
 // accumulates across them and offsets each call's slab writes. Parallelizing coord renders would race.
@@ -38,7 +40,7 @@ struct [[nodiscard]] MissilesRenderActiveGuard
 
 void MissilesInterpolate::GraphicsResources()
 {
-	engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kuiCrc, engine::kBufferMain, kpcName, sizeof(shaders::ModelLayout));
+	engine::Buffer* pStorageBuffers = engine::gpBufferManager->CreateDynamicBuffer(kuiCrc, engine::kBufferMain, kpcName, sizeof(shaders::ModelLayout), kiDynamicBufferInitialCapacity);
 	engine::gpPipelineManager->mDynamicPipelines.CreateModelPipelines(kuiCrc, kpcName, kMissileModelCrc, pStorageBuffers);
 }
 
@@ -87,7 +89,11 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 		XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, vecPosition);
-		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position))
+		// A high row's shadow lies offset toward the opposite side, so the area widens only on the side the shadow comes from.
+		float fHeightAboveLowest = std::max(f4Position.z - engine::gpFlightPlanes->Lowest().fHeightMeters, 0.0f);
+		float fShadowOffsetX = fHeightAboveLowest * engine::gf2ShadowHeightOffsetPerMeter.x;
+		float fShadowOffsetY = fHeightAboveLowest * engine::gf2ShadowHeightOffsetPerMeter.y;
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position, std::max(fShadowOffsetX, 0.0f), std::max(-fShadowOffsetX, 0.0f), std::max(-fShadowOffsetY, 0.0f), std::max(fShadowOffsetY, 0.0f)))
 		{
 			continue;
 		}

@@ -241,6 +241,7 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 		XMVECTOR vecDirection = rPrevious.pVecDirections[i];
 		std::chrono::duration<float> destroyedTime = rPrevious.pDestroyedTimes[i];
 		float fDeltaRotation = rPrevious.pfDeltaRotations[i];
+		uint8_t uiFlightPlane = rPrevious.puiFlightPlanes[i];
 #if defined(BT_CLIENT)
 		std::chrono::duration<float> animationTime = rPrevious.pAnimationTimes[i];
 		const engine::AnimationData* pAnimationData = animationDatas[std::to_underlying(rPreviousPostRender.pController[i])];
@@ -251,7 +252,7 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 		float fHeightBeforeClimb = XMVectorGetZ(vecPosition);
 #endif
 		// PostRender Update stores velocity Z as 0, so the climb is what moves a ship's height.
-		vecPosition = ClimbTowardsFlightPlane(vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfFighterClimbRate, deltaTime);
+		vecPosition = ClimbTowardsFlightPlane(vecPosition, GetTargetFlightPlane(rPreviousPostRender.pOrders[i]), kfFighterClimbRate, deltaTime, uiFlightPlane);
 		// Enforce W=1.0 — prevents drift via MultiplyAdd's 4-lane propagation.
 		vecPosition = XMVectorSetW(vecPosition, 1.0f);
 #if defined(BT_CLIENT)
@@ -278,6 +279,7 @@ void FightersInterpolate::Update([[maybe_unused]] FrameInterpolate& __restrict r
 		rCurrent.pVecDirections[i] = vecDirection;
 		rCurrent.pDestroyedTimes[i] = destroyedTime;
 		rCurrent.pfDeltaRotations[i] = fDeltaRotation;
+		rCurrent.puiFlightPlanes[i] = uiFlightPlane;
 #if defined(BT_CLIENT)
 		rCurrent.pAnimationTimes[i] = animationTime;
 		rCurrent.pfClimbTilts[i] = fClimbTilt;
@@ -341,6 +343,7 @@ void FightersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.flagshipGlobalId = rCurrentPostRender.pFlagshipGlobalIds[i],
 				.fleetWantedCoordinate = rCurrentPostRender.pFleetWantedCoordinates[i],
 				.uiPendingFleetWantedCoordinateTicks = rCurrentPostRender.puiPendingFleetWantedCoordinateTicks[i],
+				.uiFlightPlane = rCurrentInterpolate.puiFlightPlanes[i],
 				.bTransfer = true,
 			}),
 		};
@@ -394,8 +397,15 @@ void FightersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 			continue;
 		}
 
+		// A ship climbing between planes stores no plane and holds fire.
+		uint8_t uiFlightPlane = rCurrentInterpolate.puiFlightPlanes[i];
+		if (uiFlightPlane == kuiNoFlightPlane)
+		{
+			continue;
+		}
+
 		XMVECTOR vecNearestEnemy = XMVectorZero();
-		if (!FindNearestEnemyShip(rFrame, rCurrentInterpolate.pVecPositions[i], rCurrentPostRender.pAlignments[i], vecNearestEnemy))
+		if (!FindNearestEnemyShip(rFrame, rCurrentInterpolate.pVecPositions[i], rCurrentPostRender.pAlignments[i], uiFlightPlane, vecNearestEnemy))
 		{
 			continue;
 		}
@@ -405,7 +415,8 @@ void FightersPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[mayb
 			continue;
 		}
 
-		XMVECTOR vecToEnemy = XMVectorSubtract(vecNearestEnemy, rCurrentInterpolate.pVecPositions[i]);
+		// Horizontal offset: the blaster flies flat along the heading, so only the heading-plane angle decides a hit.
+		XMVECTOR vecToEnemy = XMVectorSetZ(XMVectorSubtract(vecNearestEnemy, rCurrentInterpolate.pVecPositions[i]), 0.0f);
 		XMVECTOR vecToEnemyNormal = XMVector3Normalize(vecToEnemy);
 		float fAngleToEnemy = XMVectorGetX(XMVector3AngleBetweenNormals(rCurrentInterpolate.pVecDirections[i], vecToEnemyNormal));
 
@@ -484,6 +495,7 @@ bool FightersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	rCurrentInterpolate.pVecDirections[iIndex] = rInfo.vecDirection;
 	rCurrentInterpolate.pDestroyedTimes[iIndex] = std::chrono::duration<float>(-1.0f); // Sentinel: -1.0f = not exploding
 	rCurrentInterpolate.pfDeltaRotations[iIndex] = rInfo.fDeltaRotation;
+	rCurrentInterpolate.puiFlightPlanes[iIndex] = rInfo.uiFlightPlane;
 #if defined(BT_CLIENT)
 	rCurrentInterpolate.pAnimationTimes[iIndex] = std::chrono::duration<float>::zero();
 	rCurrentInterpolate.pfClimbTilts[iIndex] = 0.0f;
@@ -607,7 +619,7 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 			else
 			{
 				XMVECTOR vecNearestEnemy = XMVectorZero();
-				bool bEnemyFound = FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], vecNearestEnemy);
+				bool bEnemyFound = FindNearestEnemyShip(rPreviousFrame, vecPosition, rPrevious.pAlignments[i], std::nullopt, vecNearestEnemy);
 
 				RegenerateHealth(vecPosition, bEnemyFound, vecNearestEnemy, deltaTime, kfFighterHealth, fHealth);
 				bool bHasDestination = false;
@@ -668,6 +680,7 @@ bool FightersInterpolate::LogDifferences(const FightersInterpolate& rOther) cons
 		bEqual &= common::LogDifference<"pPushers">(i, pPushers[i], rOther.pPushers[i]);
 		bEqual &= common::LogDifference<"pRegistryIds">(i, pRegistryIds[i], rOther.pRegistryIds[i]);
 		bEqual &= common::LogDifference<"pfDeltaRotations">(i, pfDeltaRotations[i], rOther.pfDeltaRotations[i]);
+		bEqual &= common::LogDifference<"puiFlightPlanes">(i, puiFlightPlanes[i], rOther.puiFlightPlanes[i]);
 	}
 
 	return bEqual;

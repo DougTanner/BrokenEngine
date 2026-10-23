@@ -11,6 +11,8 @@ This is the last of five Plans that put the dedicated server on the internet. Wh
 
 This Plan adds the scripts that configure the VM, copy the server to it, start and stop it, and prove the whole path end to end.
 
+The server posts crash reports as GitHub issues to the private `DougTanner/Coretide` repository only when its app-data game folder holds `GitHubCrashReportToken.txt`. The file holds a fine-grained GitHub token for that repository with Issues read/write access. Without the file, nothing is posted (`CrashReportPoster`'s constructor, `Engine/Source/CrashReport.cpp`). The user creates the token. This Plan copies it to the VM.
+
 Requirement (user, 2026-10-18): this Plan's scripts keep their generic parts in the `/deploy-server` skill and their project-specific parts under the project folder (`Projects/<Name>/DeployServer/`).
 
 User decisions (this session, binding):
@@ -61,7 +63,7 @@ The VM-side stop script speaks this framing with `System.Net.Sockets.TcpClient`.
 | --- | --- | --- |
 | `C:\BrokenEngine\Server\BrokenEngineSandboxServer.exe` | Release server | no |
 | `C:\BrokenEngine\Server\Data\Islands.manifest`, `Islands.pack` | the only data the server opens (`Engine/Source/File/PackChunks.cpp:104-108,264-271`) | no |
-| `C:\BrokenEngine\State\` | `--app-data-directory`. The server appends `Broken Engine Sandbox Server\`, giving `ServerAutosave.save`, its timestamped backups, and crash reports | yes (Modify) |
+| `C:\BrokenEngine\State\` | `--app-data-directory`. The server appends `Broken Engine Sandbox Server\`, giving `ServerAutosave.save`, its timestamped backups, crash reports, and `GitHubCrashReportToken.txt` | yes (Modify), except the token file, which `beserver` can only read |
 | `C:\BrokenEngine\Logs\` | one log per launch, `server-<yyyyMMdd-HHmmss UTC>.log` | yes (Modify) |
 | `C:\BrokenEngine\Scripts\` | the VM-side scripts | no |
 
@@ -162,8 +164,14 @@ Local scripts run on the user's PC in PowerShell 7 with `pwsh -NoProfile -File .
      `git rev-parse --path-format=absolute --git-common-dir`.
   3. If `BrokenEngineSandboxServer` is running on the VM, run `Stop-Server.ps1` over SSH and fail if it fails.
   4. `scp` the VM-side scripts to `C:\BrokenEngine\Scripts\`, the exe to `C:\BrokenEngine\Server\`, and the two Islands files to `C:\BrokenEngine\Server\Data\`.
-  5. Run `schtasks /Run /TN BrokenEngineServer` over SSH.
-  6. Poll for up to 5 minutes until `Get-NetUDPEndpoint -LocalPort 27015` is owned by the server process.
+  5. Copy the GitHub token. This mirrors the `admin-password.txt` handling in `/deploy-server` `SKILL.md` `## Inputs`. The token file is `%LOCALAPPDATA%\BrokenEngine\DeployServer\GitHubCrashReportToken.txt`, which the user creates on their PC.
+     - When the file is absent, skip this step. Report that no token was copied and that any token already on the VM is unchanged.
+     - Otherwise, over SSH, create `C:\BrokenEngine\State\Broken Engine Sandbox Server\` when it is absent, then `scp` the file into it.
+     - Then set the copy's ACL over SSH. Author's recommendation: `icacls <file> /inheritance:r /grant "beserver:R" /grant "*S-1-5-32-544:F" /grant "SYSTEM:F"`. With that ACL, `beserver` is the only non-administrator account that can read the file, and administrators can still replace it on a later publish.
+     - Only after the copy and the ACL both succeed, delete the local file (`Remove-Item -LiteralPath`). Never print the token.
+     - The step runs before the start below, because the server reads the token once, at startup.
+  6. Run `schtasks /Run /TN BrokenEngineServer` over SSH.
+  7. Poll for up to 5 minutes until `Get-NetUDPEndpoint -LocalPort 27015` is owned by the server process.
 - `Start-ServerVm.ps1`: the `/deploy-server` `SKILL.md` turn-back-on `az rest` call that enables the schedule workflow, then `az vm start`, then poll over SSH for up to 10 minutes, retrying while `sshd` comes up, until the server process owns UDP 27015. It reports the newest log file name.
 - `Stop-ServerVm.ps1`:
   1. If the VM is already deallocated, report that and exit successfully.
@@ -197,7 +205,7 @@ The logon task is the one exception, explained above.
   3. `Wait-Process` for up to 120 s. Exit `0` when the process has exited, otherwise `1`.
   4. Print `ServerAutosave.save`'s `LastWriteTimeUtc`.
 
-`SKILL.md` gains these operations, the explicit user confirmation before any step that starts the VM (it bills $0.193/hour while running, `references/azure-facts.md`), the RDP note, and the agent port. `references/azure-facts.md` gains a `## Nightly scheduled deallocate` section with the observation below.
+`SKILL.md` gains these operations, the optional token file in `## Inputs`, the explicit user confirmation before any step that starts the VM (it bills $0.193/hour while running, `references/azure-facts.md`), the RDP note, and the agent port. `references/azure-facts.md` gains a `## Nightly scheduled deallocate` section with the observation below.
 
 Risk tier: Tier 2. This is tool behavior inside one skill. No repository runtime surface changes: no C++, wire, save, determinism, or threading change, and the server's trust rules are untouched. The external exposure (UDP 27015 public) was fixed by `CreateAzureServerVm.md`. This Plan adds only the VM-side firewall rule that matches it.
 
@@ -217,6 +225,7 @@ Risk tier: Tier 2. This is tool behavior inside one skill. No repository runtime
 - Any C++ change, any change to the `/deploy-server` provisioning template under `assets/` or the Azure resources it created, and any other Plan.
 - A Debug or Profile server deployment, PDB deployment, and Visual Studio remote debugging.
 - Running the server as a Windows service. A non-interactive "run whether user is logged on or not" task. Re-asserting `DefaultUserName` after a console logon.
+- Creating or rotating the GitHub token, and posting a test issue.
 - Minidumps (gap G10), pruning autosave backups (gap G6) or logs, and copying autosaves off the VM.
 - Deploying Local-mode (changed) island data. Changed islands invalidate the autosave, and the server then starts a fresh world (`Projects/BrokenEngineSandbox/Source/Game.cpp:27-30`).
 - Installing PowerShell 7 on the VM, changing the Azure guest patch mode, IPv6, DNS names, Dev/Test pricing, Azure Bastion, and load testing.
@@ -232,7 +241,8 @@ Risk tier: Tier 2. This is tool behavior inside one skill. No repository runtime
    - `C:\BrokenEngine\Server` holds exactly the exe and `Data\Islands.manifest` and `Data\Islands.pack`;
    - `Get-NetFirewallRule -Name BrokenEngine-Game-UDP` is enabled with action Allow;
    - no enabled inbound Block rule names the server exe;
-   - a `server-*.log` exists.
+   - a `server-*.log` exists;
+   - when the user supplied the token file, `C:\BrokenEngine\State\Broken Engine Sandbox Server\GitHubCrashReportToken.txt` exists, `icacls` lists only `beserver` (read), Administrators, and SYSTEM, the local file is gone, and the newest `server-*.log` has the `CrashReportPoster` posting-enabled line.
 6. The executor gives the user the exact command to start the Release client: the session worktree's `Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output\BrokenEngineSandbox.exe` with `--data-directory` set to the primary checkout's `...\Output\Data`. The user starts it on their PC, clicks `REMOTE SERVER`, connects, plays for at least a few minutes (spawn, move a fleet), and confirms in their own message.
 7. `Stop-ServerVm.ps1` succeeds. It reports the server process exited after `quit`, a `ServerAutosave.save` `LastWriteTimeUtc` later than the moment it sent `quit`, and `PowerState/deallocated`.
 8. `Start-ServerVm.ps1` succeeds with no RDP session and no manual step on the VM. It reports a new log file while the previous one still exists. The user reconnects through `REMOTE SERVER` and confirms the world resumed where they left it (their units where they were).

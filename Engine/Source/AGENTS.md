@@ -23,8 +23,8 @@ Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.
   whole-file `BT_CLIENT` or `BT_SERVER` guard. An engine header that must
   include a game header stays out of the aggregation and is included directly by
   its consumers, so game types never reach the shared PCH; the leaf document
-  owning such a header records the deliberate game-type ownership. `GameBase.h`
-  is the one aggregated header that includes game headers anyway, recorded here
+  owning such a header records the deliberate game-type ownership. In gameplay
+  builds, `GameBase.h` is the one aggregated header that includes game headers anyway, recorded here
   because it has no detail document: it stores two game types by value, so each
   needs a complete definition — the per-coord tick input from
   `Frame/FrameInput.h`, and, client only, the per-coord render interpolation
@@ -68,8 +68,8 @@ Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.
 ## Crash Reporting
 
 A crash runs in a fixed order: `HandleException` writes the report, a connected
-client uploads it, the main thread unwinds, and only then does
-`PromptCrashReportDesktopCopy` handle the Desktop copy. The write and the prompt
+client uploads it or a server posts it, the main thread unwinds, and only then
+does `PromptCrashReportDesktopCopy` handle the Desktop copy. The write and the prompt
 use fixed buffers because they are reachable during heap corruption. Do not add
 allocator-dependent formatting or path construction there, and do not log from
 them. Nothing on them may allocate or follow a pointer the heap owns, so
@@ -90,25 +90,55 @@ The server never asks and always copies the written report to the Desktop path,
 even in an agent launch. The client's prompt never shows in an agent launch; Yes
 copies the report.
 
-Only the client main-loop catch, when no debugger is attached, and the agent
-crash-report harness rig call `TryUploadCrashReport`, on the main thread after
-the write. It may allocate and log, never propagates an exception, and sends the
-first `kiMaximumCrashReportSize` bytes only when the client is connected and
-accepted and the connection has not already carried a report; the per-connection
-limit is the `kClientCrashReport` row of
+Reports leave the machine, so `common::CrashFileWriter` replaces every
+occurrence of the user profile path, in the UTF-8 and ANSI forms
+`ResolveCrashReportPaths` also stores, with `%USERPROFILE%` in every byte it
+writes; each caller passes whole strings so a path is never split across two
+writes. The header carries a crash-report version, and
+`ParseCrashReportHeader`, the one parser of that header, rejects any other or
+missing version, so bump the version on any header or report layout change.
+`ProcessMain` renames the previous run's non-empty report to the pending file
+beside it, right after the single-instance check and before any other thread
+starts, and only when both paths resolved from the same base. From then on
+`HandleException` writes only the live path, and only the client's
+`PollPendingCrashReport` or the server's startup pass reads the pending file,
+so no writer and reader ever share a file.
+
+Only the main-loop catch, when no debugger is attached, and the agent
+crash-report harness rig call `TryUploadCrashReport` (client) or
+`TryPostCrashReport` (server), on the main thread and only when their own
+`HandleException` call returned `true` because it wrote the report, so neither
+reads a report another thread's SIGABRT handler is still writing. Both may
+allocate and log and never propagate an exception. The upload sends the first
+`kiMaximumCrashReportSize` bytes only when the client is connected and accepted
+and the connection has not already carried a report; the per-connection limit
+is the `kClientCrashReport` row of
 [Client to Server Contract](../../Documents/Architecture/Network.md#client--server-contract).
 `ProcessMain`'s catches and the SIGABRT handler write and prompt but never
-upload.
+upload or post; the next start's rename makes that report the pending file.
 
 A report counts as sent once it ends with a fixed trailer; `HandleException`
 truncates the file it writes, so every new report starts unsent. The trailer is
 appended only after ENet confirms that the server received the whole report.
 Once per accepted connection, `PollPendingCrashReport`, called at the top of
-`ClientSessionRuntime::PollAndDrain`, sends the report at the path this
-process's `HandleException` writes when it is non-empty and unsent; a report an
-earlier session left at a different path is never sent.
+`ClientSessionRuntime::PollAndDrain`, sends the pending file, never the live
+path, when it is non-empty and unsent; one whose header fails
+`ParseCrashReportHeader` stays unsent, because the server rejects it as corrupt.
 
-The background DxDiag reader appends to its report string without a lock, and the agent crash-report harness rig can enter the exception path while that reader is still running. The report always writes the DxDiag begin/end markers but includes the collected text only once the reader publishes completion.
+The server posts reports as issues in the private `DougTanner/Coretide` GitHub
+repository, which every game shares, only when its app-data folder holds
+`GitHubCrashReportToken.txt`. `CrashReportPoster`'s startup pass posts the
+pending file and every stored client report in the app-data folder, and a report
+it fails to post is retried at the next start; each report
+`Server::ClientCrashReport` stores gets its own background post, so the store
+cap bounds posts too. A report counts as posted once it ends with a separate
+posted trailer, appended only after GitHub answers 201, or 400 or 422, which
+reject the request itself, so a client report GitHub never accepts does not
+block later reports; a posted report is skipped. A crash between that answer
+and the append posts the report again, because the issues API has no
+idempotency key. Shutdown waits for unfinished posts.
+
+`kbDxDiag` is off in every build, so the DxDiag section is empty: DxDiag text carries machine-identifying values the profile-path replacement does not remove. When the switch is on, the background DxDiag reader appends to its report string without a lock, and the agent crash-report harness rig can enter the exception path while that reader is still running. The report always writes the DxDiag begin/end markers but includes the collected text only once the reader publishes completion.
 
 ## Subsystems
 

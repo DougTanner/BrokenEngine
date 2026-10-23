@@ -8,8 +8,8 @@
 namespace engine
 {
 
-// Thread-safe hand-off of the finished agent "result" JSON from the async save/encode thread to the main-thread
-// deferred-response poll. There is one active agent request/result slot, but abandoned screenshot and dump encoders
+// Thread-safe hand-off of the finished result JSON from the async save/encode thread to the main-thread
+// request owner. There is one active request/result slot, but abandoned screenshot and dump encoders
 // may overlap because their independent futures outlive timeout/disconnect. The active token rejects their late
 // publications so they cannot replace the newer request's result.
 static std::mutex sCaptureResultMutex;
@@ -175,8 +175,8 @@ void SaveScreenshot(int64_t iFramebufferIndex, const ScreenshotRequest& rRequest
 				}
 			}
 
-			// Publish to the agent capture-result slot only for agent-originated requests; an F9 dev save must not
-			// have its result consumed as the response to a concurrent agent capture.
+			// Publish only when the caller requested a result; ordinary gameplay F9 dev saves leave publication
+			// disabled so their result cannot be consumed as the response to a concurrent agent capture.
 			if (rRequest.bPublishResult)
 			{
 				nlohmann::json result;

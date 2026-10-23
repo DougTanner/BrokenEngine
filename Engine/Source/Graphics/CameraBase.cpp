@@ -6,12 +6,15 @@
 #include "Ui/ShadowWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
+#if !defined(BT_MODEL_VIEWER)
 #include "Graphics/Camera.h"
 #include "Game.h"
+#endif
 
 namespace engine
 {
 
+#if !defined(BT_MODEL_VIEWER)
 // Mouse-wheel zoom: per-frame scroll delta nudges target height; current eases toward target
 constexpr float kfEyeHeightPerWheelTick = 0.1f;
 constexpr float kfEyeBlendDuration = 0.35f;
@@ -61,12 +64,16 @@ CameraTarget CameraTarget::Extrapolate()
 	return CameraTarget(Kind::kExtrapolate, XMVectorZero(), XMVectorZero());
 }
 
+#endif // !defined(BT_MODEL_VIEWER)
+
 CameraBase::CameraBase(const CameraSetup& rCameraSetup)
 : common::Singleton<CameraBase>(gpCamera, this)
 {
-	mVecPosition = rCameraSetup.vecInitialPosition;
+	// Gameplay starts on the lowest flight plane; CameraBase::Update keeps the look-at there, so the opening pose needs no chase-blend ease.
+	mVecPosition = XMVectorSetZ(rCameraSetup.vecInitialPosition, gpFlightPlanes->Lowest().fHeightMeters);
 }
 
+#if !defined(BT_MODEL_VIEWER)
 void CameraBase::DiscardTrackingCaches()
 {
 	mVecLastKnownTargetPosition = {};
@@ -166,7 +173,9 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 	}
 
 	// Free camera already is the target, so the game camera's PullTarget is not consulted while it drives the pose.
-	XMVECTOR vecTargetPosition = ResolveTarget(bFreeCameraActive ? CameraTarget::Direct(mVecPosition) : static_cast<game::Camera&>(*this).PullTarget(rFrameInterpolate));
+	// The look-at sits on the lowest flight plane whatever the target's height, so a climb neither raises the eye nor
+	// widens the Z = 0 visible area.
+	XMVECTOR vecTargetPosition = XMVectorSetZ(ResolveTarget(bFreeCameraActive ? CameraTarget::Direct(mVecPosition) : static_cast<game::Camera&>(*this).PullTarget(rFrameInterpolate)), gpFlightPlanes->Lowest().fHeightMeters);
 
 	UpdatePosition(vecTargetPosition, fDeltaTime);
 	UpdateEyeHeight();
@@ -356,6 +365,8 @@ float XM_CALLCONV CameraBase::AddVisualErrorOffset(FXMVECTOR vecError)
 	return fTotal;
 }
 
+#endif // !defined(BT_MODEL_VIEWER)
+
 XMVECTOR XM_CALLCONV CameraBase::WorldToScreen(FXMVECTOR vecWorldPosition) const
 {
 	// X/Y are screen pixels and Z is projected depth.
@@ -366,6 +377,7 @@ XMVECTOR XM_CALLCONV CameraBase::WorldToScreen(FXMVECTOR vecWorldPosition) const
 	return XMVectorSetW(XMVector3Project(vecWorldPosition, 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, XMMatrixIdentity()), 1.0f);
 }
 
+#if !defined(BT_MODEL_VIEWER)
 void CameraBase::CalculateMatricesAndVisibleArea()
 {
 	auto vecToEyeNormal = XMVector3Normalize(XMVectorSubtract(mVecEyePosition, mVecPosition));
@@ -507,6 +519,8 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	mf4RenderVisibleArea.z = mf4RenderVisibleArea.x + fQuadsX * mf2VisibleAreaQuadSize.x;
 	mf4RenderVisibleArea.w = mf4RenderVisibleArea.y - fQuadsY * mf2VisibleAreaQuadSize.y;
 }
+
+#endif // !defined(BT_MODEL_VIEWER)
 
 } // namespace engine
 

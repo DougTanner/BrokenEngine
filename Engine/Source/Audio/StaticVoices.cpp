@@ -571,13 +571,13 @@ void StaticVoices::UpdateListenerPosition()
 	}
 
 	// mVecListenerPosition is the camera eye in full XYZ, so altitude contributes to manual fade distance.
-	// mX3dAudioListener.Position is the camera look-at on the lowest flight plane for pan/Doppler; its XY-only vector to
-	// ground emitters keeps screen-left audible on the left rather than collapsed toward center by altitude. Listener
-	// velocity is zero because RTS camera-motion Doppler is negligible and snap/jump easing must not add artifacts.
+	// mX3dAudioListener.Position is the camera look-at, which the camera keeps on the lowest flight plane, for pan/Doppler.
+	// ApplyThreeDimensionalVolume flattens every emitter to its Z, so the XY-only vector keeps screen-left audible on the
+	// left rather than collapsed toward center by altitude or emitter height. Listener velocity is zero because RTS
+	// camera-motion Doppler is negligible and snap/jump easing must not add artifacts.
 	mVecListenerPosition = engine::gpCamera->mVecEyePosition;
-	XMVECTOR vecPanListener = XMVectorSetZ(engine::gpCamera->mVecPosition, gpFlightPlanes->Lowest().fHeightMeters);
 	XMFLOAT3A f3PanPosition {};
-	XMStoreFloat3A(&f3PanPosition, vecPanListener);
+	XMStoreFloat3A(&f3PanPosition, engine::gpCamera->mVecPosition);
 	mX3dAudioListener.OrientFront = {0.0f, 0.0f, -1.0f};
 	mX3dAudioListener.OrientTop = {0.0f, -1.0f, 0.0f};
 	mX3dAudioListener.Position = f3PanPosition;
@@ -663,8 +663,10 @@ float StaticVoices::ComputeAttenuatedVolume(float fDistance, float fSoundVolume)
 
 void XM_CALLCONV StaticVoices::ApplyThreeDimensionalVolume(IXAudio2SourceVoice* pVoice, FXMVECTOR vecPosition, FXMVECTOR vecVelocity, float fVolume, float fPitch)
 {
+	// Pan follows XY alone; the manual fade distance below keeps the full position.
 	XMFLOAT3A f3Position {};
 	XMStoreFloat3A(&f3Position, vecPosition);
+	f3Position.z = mX3dAudioListener.Position.z;
 	XMFLOAT3A f3Velocity {};
 	XMStoreFloat3A(&f3Velocity, vecVelocity);
 

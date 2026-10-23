@@ -330,6 +330,12 @@ inline constexpr bool XmIsInf(float fValue)
 	#pragma comment(lib, "bcrypt.lib")
 #endif
 
+#if defined(BT_SERVER)
+	// The server posts crash reports as GitHub issues through WinHTTP.
+	#include <winhttp.h>
+	#pragma comment(lib, "winhttp.lib")
+#endif
+
 #if defined(BT_DATA_PACKER)
 	// Offline file traversal needs reparse-point FSCTL queries.
 	#include <winioctl.h>
@@ -359,6 +365,8 @@ inline constexpr bool XmIsInf(float fValue)
 	#include <assimp/importerdesc.h>
 	#include <assimp/postprocess.h>
 	#include <assimp/scene.h>
+	#include <assimp/material.h>
+	#include <assimp/DefaultIOSystem.h>
 	#if defined(_CRTDBG_MAP_ALLOC)
 		#define malloc(s) _malloc_dbg(s, _NORMAL_BLOCK, __FILE__, __LINE__)
 		#define realloc(p, s) _realloc_dbg(p, s, _NORMAL_BLOCK, __FILE__, __LINE__)

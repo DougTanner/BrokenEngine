@@ -252,6 +252,18 @@ function Resolve-PathMapping
 		}
 	}
 
+	if ($RelativePath -imatch '^ModelViewer/Source/')
+	{
+		return [ordered]@{
+			mapping = 'resolved'
+			code = 'mapping.modelviewer-source'
+			projects = @('ModelViewer')
+			itemType = $itemType
+			filter = 'Viewer'
+			detail = 'ModelViewer owns its own source tree.'
+		}
+	}
+
 	$affinityProjects = @(Get-AffinityProjects $Affinity)
 
 	# Rows 8-9 — engine and game source, owned by structural affinity.

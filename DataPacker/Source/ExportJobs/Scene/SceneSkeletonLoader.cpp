@@ -208,7 +208,7 @@ SkeletonData LoadSkeletonData(const tinygltf::Model& rModel)
 			// that follows its child would only be caught at load (AnimationData::Load, std::ios_base::failure).
 			if (parentIt->second >= i)
 			{
-				throw std::runtime_error(std::format("ExportScene node {} has parent node {}, which does not precede it; glTF nodes must be ordered parent-before-child", i, parentIt->second));
+				throw std::runtime_error(std::format("ExportScene node {} (\"{}\") has parent node {} (\"{}\"), which does not precede it; glTF nodes must be ordered parent-before-child", i, rGltfNode.name, parentIt->second, rModel.nodes.at(parentIt->second).name));
 			}
 
 			rNode.iParentIndex = static_cast<int16_t>(parentIt->second);

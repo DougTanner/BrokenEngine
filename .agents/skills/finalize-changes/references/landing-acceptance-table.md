@@ -8,7 +8,8 @@ diff, before main asks the confirmation.
 1. Derive the reviewed diff from the read-only inventory: `pwsh -NoProfile -File
    .agents/scripts/Get-SessionChangeInventory.ps1 -RepositoryRoot '<absolute
    repository toplevel>' -Baseline <primary-tip full SHA> -Head <session branch
-   tip, or the squashed landing commit when one exists> -Landing`. Its
+   tip, or the squashed landing commit when one exists> -Landing -OutputPath
+   Temp/finalize-landing-inventory.json`. Read that JSON result file. Its
    `landing.reviewed` rows give status, path, old path, and baseline/current
    modes for that three-dot diff, covering additions/deletions, renames,
    symlinks, and gitlinks. That list is diff-derived and contains no untracked
@@ -29,8 +30,9 @@ diff, before main asks the confirmation.
    working-tree bytes match the reviewed `-Head` tree is the expected state of an
    uncommitted candidate and classifies as `intentionally persisted`.
 
-The run writes no file. `-Landing` requires a commit-valued `-Head` and excludes
-the other modes. Only `status` `pass` is usable; any other status means the
+The run writes only the named result file and emits one summary line on stdout.
+`-Landing` requires a commit-valued `-Head` and excludes the other modes.
+Only `status` `pass` is usable; any other status means the
 reviewed diff is unavailable, which is a `BLOCKED` table, never a diff rebuilt
 inline. Treat `truncated` true as unreviewed state rather than a clean
 inventory. A `-Landing` run still reports the complete top-level `triggers`

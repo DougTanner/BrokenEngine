@@ -355,5 +355,11 @@ and `rebased`:
 | Exit | Status | Codes | Caller action |
 | ---: | --- | --- | --- |
 | 0 | `pass` | `ok` | The session branch was replayed onto `primaryTip` and `baseline` was recorded as the session's new baseline. Continue. |
-| 2 | `blocked` | `fork-point.not-recoverable`, `fork-point.repair-refused` | The session branch was not replayed: `fork-point.not-recoverable` means the resolved fork point is still on primary's history, so there is nothing to replay, which after a detected rewrite means the true fork point has expired from the primary branch's reflog; `fork-point.repair-refused` means the shared repair threw — a dirty tree, a failed replay, or a Git failure. The message states any cleanup the worktree still needs. Return the message as a blocker. |
+| 2 | `blocked` | `fork-point.not-recoverable`, `fork-point.repair-refused` | `fork-point.not-recoverable` means the resolved fork point is still on primary's history, so there is nothing to replay, which after a detected rewrite means the true fork point has expired from the primary branch's reflog; `fork-point.repair-refused` means preservation, replay, or restoration failed, or another Git operation is active. `rebased` is true if replay completed but restoration failed. The message describes the actual state and any retained snapshot recovery command. Return the message as a blocker. |
 | 1 | `error` | `session.unresolved` | The session worktree could not be resolved. Return the message as a blocker. |
+
+When repair is needed, the shared helper preserves staged, unstaged, and untracked
+work in a uniquely named stash, replays session commits, and restores local work
+with its index. The stash is retained on success and failure; the helper's
+diagnostic identifies it and gives the recovery command. A failed restoration
+leaves the resulting state for manual resolution and does not publish a baseline.

@@ -75,9 +75,13 @@ inline std::vector<std::byte> ReadEntireFile(const std::filesystem::path& rPath)
 // construction allocates (new locale), which re-enters allocation tracking and can deadlock on the non-recursive log mutex.
 struct CrashFileWriter
 {
-	// Deny-none sharing: a reader already holding the crash report open must not block this handle's creation.
-	explicit CrashFileWriter(const wchar_t* pcPath)
+	// Deny-none sharing: a reader already holding the crash report open must not block this handle's creation. Write
+	// replaces each ASCII-case-insensitive occurrence of a non-empty replaced prefix with %USERPROFILE%; the prefixes
+	// must outlive the writer.
+	CrashFileWriter(const wchar_t* pcPath, std::string_view firstPrefix, std::string_view secondPrefix)
 	: handle(CreateFileW(pcPath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr))
+	, firstReplacedPrefix(firstPrefix)
+	, secondReplacedPrefix(secondPrefix)
 	{
 	}
 
@@ -99,12 +103,61 @@ struct CrashFileWriter
 			return;
 		}
 
+		int64_t iUnwrittenStart = 0;
+		int64_t i = 0;
+		while (i < std::ssize(text))
+		{
+			std::string_view rest = text.substr(static_cast<size_t>(i));
+			int64_t iPrefixSize = 0;
+			if (StartsWithIgnoringAsciiCase(rest, firstReplacedPrefix))
+			{
+				iPrefixSize = std::ssize(firstReplacedPrefix);
+			}
+			else if (StartsWithIgnoringAsciiCase(rest, secondReplacedPrefix))
+			{
+				iPrefixSize = std::ssize(secondReplacedPrefix);
+			}
+
+			if (iPrefixSize == 0)
+			{
+				++i;
+				continue;
+			}
+
+			WriteUnchanged(text.substr(static_cast<size_t>(iUnwrittenStart), static_cast<size_t>(i - iUnwrittenStart)));
+			WriteUnchanged("%USERPROFILE%");
+			i += iPrefixSize;
+			iUnwrittenStart = i;
+		}
+		WriteUnchanged(text.substr(static_cast<size_t>(iUnwrittenStart)));
+	}
+
+	HANDLE handle = INVALID_HANDLE_VALUE;
+	std::string_view firstReplacedPrefix;
+	std::string_view secondReplacedPrefix;
+
+private:
+
+	static bool StartsWithIgnoringAsciiCase(std::string_view text, std::string_view prefix)
+	{
+		if (prefix.empty() || text.size() < prefix.size())
+		{
+			return false;
+		}
+
+		auto LowerAscii = [](char cCharacter)
+		{
+			return (cCharacter >= 'A' && cCharacter <= 'Z') ? static_cast<char>(cCharacter - 'A' + 'a') : cCharacter;
+		};
+		return std::ranges::equal(text.substr(0, prefix.size()), prefix, {}, LowerAscii, LowerAscii);
+	}
+
+	void WriteUnchanged(std::string_view text)
+	{
 		DWORD uiWritten = 0;
 		// Nothing on the crash path may recover or log a failed write.
 		WriteFile(handle, text.data(), static_cast<DWORD>(text.size()), &uiWritten, nullptr);
 	}
-
-	HANDLE handle = INVALID_HANDLE_VALUE;
 };
 
 } // namespace common

@@ -59,7 +59,7 @@ inline constexpr float kfFighterMaxPusherPushVelocity = kfFighterMaxSpeed * 0.5f
 
 struct FightersInterpolate : public engine::Collection<FightersInterpolate, engine::CollectionFlags::kIdToIndex>
 {
-	static constexpr int64_t kiVersion = 6;
+	static constexpr int64_t kiVersion = 7;
 
 	static void Register();
 
@@ -68,6 +68,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 	// Simulation keeps the destroyed time at the -1 sentinel or in [0, kFighterDestroyTime]; reject anything else as a corrupt stream, since a
 	// huge or +inf value puts the death-explosion particle count cast out of range. Written as one range test so NaN and both infinities fail it too.
 	// Only the climb moves height, so it stays within [Lowest, Highest] flight plane heights; reject any other the same way.
+	// The stored flight plane is kuiNoFlightPlane or a plane the type flies.
 	static void PostRead(const FightersInterpolate& rCurrent)
 	{
 		for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -81,6 +82,10 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 			if (!(fHeight >= engine::gpFlightPlanes->Lowest().fHeightMeters && fHeight <= engine::gpFlightPlanes->Highest().fHeightMeters))
 			{
 				throw std::ios_base::failure("FightersInterpolate position height");
+			}
+			if (rCurrent.puiFlightPlanes[i] != kuiNoFlightPlane && !IsFlightPlaneAllowed(ShipType::kFighter, rCurrent.puiFlightPlanes[i]))
+			{
+				throw std::ios_base::failure("FightersInterpolate puiFlightPlanes");
 			}
 		}
 	}
@@ -101,6 +106,8 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 	engine::wind_trail_t* __restrict pWindTrails = nullptr;
 #endif
 	float* __restrict pfDeltaRotations = nullptr;
+	// The plane the ship is on, kuiNoFlightPlane while it climbs between planes.
+	uint8_t* __restrict puiFlightPlanes = nullptr;
 #if defined(BT_CLIENT)
 	std::chrono::duration<float>* __restrict pAnimationTimes = nullptr;
 	// Render-only nose pitch from this tick's climb.
@@ -108,7 +115,7 @@ struct FightersInterpolate : public engine::Collection<FightersInterpolate, engi
 #endif
 	auto SharedMembers(this auto&& rSelf)
 	{
-		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pPushers, rSelf.pRegistryIds, rSelf.pfDeltaRotations);
+		return std::tie(rSelf.pVecPositions, rSelf.pVecDirections, rSelf.pDestroyedTimes, rSelf.pPushers, rSelf.pRegistryIds, rSelf.pfDeltaRotations, rSelf.puiFlightPlanes);
 	}
 #if defined(BT_CLIENT)
 	auto ClientMembers(this auto&& rSelf)
@@ -266,13 +273,14 @@ struct FightersPostRender : public engine::Collection<FightersPostRender>
 		engine::GlobalId flagshipGlobalId {};
 		engine::GridCoord fleetWantedCoordinate {};
 		uint8_t uiPendingFleetWantedCoordinateTicks = 0;
+		uint8_t uiFlightPlane = kuiNoFlightPlane;
 		// Transfers preserve the supplied health; navigation resets at spawn.
 		bool bTransfer = false;
 
 		// Status-change payload members. clientGuid is server-local, so it is not listed.
 		static constexpr auto Fields()
 		{
-			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fHealth), FRAME_COLUMN(SpawnInfo, nextBlasterSpawnTime), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, fDeltaRotation), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
+			return engine::FrameColumnList<FRAME_COLUMN(SpawnInfo, vecPosition), FRAME_COLUMN(SpawnInfo, vecDirection), FRAME_COLUMN(SpawnInfo, vecVelocity), FRAME_COLUMN(SpawnInfo, alignment), FRAME_COLUMN(SpawnInfo, eController), FRAME_COLUMN(SpawnInfo, orders), FRAME_COLUMN(SpawnInfo, fHealth), FRAME_COLUMN(SpawnInfo, nextBlasterSpawnTime), FRAME_COLUMN(SpawnInfo, arrivalGracePeriod), FRAME_COLUMN(SpawnInfo, fDeltaRotation), FRAME_COLUMN(SpawnInfo, navigationDelay), FRAME_COLUMN(SpawnInfo, globalId), FRAME_COLUMN(SpawnInfo, flagshipGlobalId), FRAME_COLUMN(SpawnInfo, fleetWantedCoordinate), FRAME_COLUMN(SpawnInfo, uiPendingFleetWantedCoordinateTicks), FRAME_COLUMN(SpawnInfo, uiFlightPlane), FRAME_COLUMN(SpawnInfo, bTransfer)> {};
 		}
 	};
 

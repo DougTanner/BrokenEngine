@@ -224,7 +224,6 @@ inline std::pair<XMVECTOR, XMVECTOR> XM_CALLCONV ComputeAxisAlignedBoundingBox(F
 
 bool XM_CALLCONV AxisAlignedBoundingBoxIntersectsArea(XMFLOAT4 f4Area, FXMVECTOR vecMinimum, FXMVECTOR vecMaximum);
 
-bool XM_CALLCONV InsideArea(FXMVECTOR vecPosition, const XMFLOAT4& rf4Area);
 bool XM_CALLCONV InsideArea(FXMVECTOR vecPosition, FXMVECTOR vecArea);
 
 } // namespace common

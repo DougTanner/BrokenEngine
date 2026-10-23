@@ -19,6 +19,7 @@ layout (location = 4) out vec2 f2OutUV2;
 layout (location = 5) out vec2 f2OutUV3;
 layout (location = 6) out vec2 f2OutUV4;
 layout (location = 7) out vec4 f4OutColorAdd;
+layout (location = 8) out float fOutHeightAboveBase;
 
 // Push constants
 layout(push_constant) uniform pushConstants
@@ -92,6 +93,8 @@ void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, ModelLayout mod
 	f2OutUV3 = f2InUV3;
 	f2OutUV4 = f2InUV4;
 	f4OutColorAdd = model.f4ColorAdd;
+	// The model centre, not the vertex, so every vertex of a ship on the lowest flight plane gets exactly 0.
+	fOutHeightAboveBase = max(model.f4Position.z - globalLayout.fBaseHeight, 0.0f);
 
 	int iRenderingMode = int(pushConstantsLayout.f4Pipeline.y);
 	if (iRenderingMode == 0)
@@ -113,6 +116,10 @@ void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, ModelLayout mod
 		vec2 f2Lateral = f3WorldPosition.xy - model.f4Position.xy;
 		f2Lateral *= (1.0f + globalLayout.fObjectShadowsGrow);
 		f3GrownWorldPosition.xy = model.f4Position.xy + f2Lateral;
-		gl_Position = ShadowStretchProjection(globalLayout, f3GrownWorldPosition, model.f4Position.xyz);
+		// Shift the whole footprint along the sun's ground projection by the object's height above the lowest flight
+		// plane; both positions move so their difference, which the horizon stretch reads, stays the same.
+		vec2 f2HeightOffset = fOutHeightAboveBase * globalLayout.f2ShadowHeightOffsetPerMeter;
+		f3GrownWorldPosition.xy += f2HeightOffset;
+		gl_Position = ShadowStretchProjection(globalLayout, f3GrownWorldPosition, vec3(model.f4Position.xy + f2HeightOffset, model.f4Position.z));
 	}
 }

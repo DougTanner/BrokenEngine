@@ -1,6 +1,6 @@
 ---
 name: compile
-description: Builds Broken Engine projects through WorktreeCli's serialized MSBuild driver and governs immutable prebuilt AgentTools bootstrap/maintenance policy. Use whenever you need to build, rebuild, compile, or check for compile/link errors in ThirdParty, DataPacker, AgentHarness, WorktreeCli, or a game project such as BrokenEngineSandbox (client or server).
+description: Builds Broken Engine projects through WorktreeCli's serialized MSBuild driver and governs immutable prebuilt AgentTools bootstrap/maintenance policy. Use whenever you need to build, rebuild, compile, or check for compile/link errors in ThirdParty, DataPacker, AgentHarness, WorktreeCli, ModelViewer, or a game project such as BrokenEngineSandbox (client or server).
 allowed-tools: [PowerShell]
 ---
 
@@ -15,8 +15,8 @@ delegated `builder`; separate-role requirements return to the manager.
 ## When to use
 
 - Any request to build, rebuild, compile, or check for compile/link errors in
-  ThirdParty, DataPacker, AgentHarness, WorktreeCli, or a game project under
-  `Projects/` (client or server).
+  ThirdParty, DataPacker, AgentHarness, WorktreeCli, ModelViewer, or a game project
+  under `Projects/` (client or server).
 - PREfast verification runs only when an approved plan explicitly requires it;
   never infer PREfast authorization from a routine compile, rebuild, or
   link-error check.
@@ -49,6 +49,9 @@ skill-specific inputs:
 - optionally, the game project (`Projects/<Name>`) a client or server build
   targets. With one game project none is needed; with several and none named,
   a game build request builds every game project in turn;
+- ModelViewer builds require Debug or Release x64 and always use
+  BrokenEngineSandbox as their data owner; they do not add another game project.
+  The worker's target routing and the runtime-data reference govern invocation;
 - the repository root, primary checkout, and baseline the caller explicitly
   supplied, or none;
 - whether the session's approved plan or acceptance table includes an

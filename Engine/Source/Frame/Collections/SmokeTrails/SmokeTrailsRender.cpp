@@ -12,6 +12,8 @@
 namespace engine
 {
 
+constexpr int64_t kiDynamicBufferInitialCapacity = 1'024;
+
 static int64_t spiRendered[shaders::kiMaxFlightPlanes] {};
 static int64_t siTotalCount = 0;
 
@@ -20,8 +22,8 @@ void SmokeTrailsInterpolate::GraphicsResources()
 	for (int64_t i = 0; i < gpFlightPlanes->Count(); ++i)
 	{
 		common::crc_t uiDepositKey = DynamicPipelines::SmokeDepositKey(kuiCrc, i);
-		gpBufferManager->CreateDynamicBuffer(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::QuadLayout));
-		gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineSmoke, uiDepositKey, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[i], {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeGradientTexture}, &gpBufferManager->mpSmokeOccupancyVkBuffers[i][0], sizeof(shaders::QuadLayout));
+		gpBufferManager->CreateDynamicBuffer(uiDepositKey, kBufferMain, kpcName, sizeof(shaders::QuadLayout), kiDynamicBufferInitialCapacity);
+		gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineSmoke, uiDepositKey, kpcName, data::kShadersQuadsQuadsVisibleAreavertCrc, data::kShadersSmokeSmokefragCrc, gpTextureManager->mRenderTargetTextures.mSmokeTexturesOne[i], {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .pTexture = &gpTextureManager->mRenderTargetTextures.mSmokeGradientTexture}, &gpBufferManager->mpSmokeOccupancyVkBuffers[i][0]);
 	}
 }
 

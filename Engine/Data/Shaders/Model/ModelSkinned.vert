@@ -19,10 +19,11 @@ void main()
 	{
 		// Use offset-based indexing into separate joint matrix buffer
 		uint baseOffset = data.jointMatrixOffset;
-		JointMatrix jm0 = jointMatrices[baseOffset + int(f4Joint0.x)];
-		JointMatrix jm1 = jointMatrices[baseOffset + int(f4Joint0.y)];
-		JointMatrix jm2 = jointMatrices[baseOffset + int(f4Joint0.z)];
-		JointMatrix jm3 = jointMatrices[baseOffset + int(f4Joint0.w)];
+		JointMatrix zeroJoint = JointMatrix(vec4[3](vec4(0.0), vec4(0.0), vec4(0.0)));
+		JointMatrix jm0 = f4Weight0.x != 0.0 ? jointMatrices[baseOffset + int(f4Joint0.x)] : zeroJoint;
+		JointMatrix jm1 = f4Weight0.y != 0.0 ? jointMatrices[baseOffset + int(f4Joint0.y)] : zeroJoint;
+		JointMatrix jm2 = f4Weight0.z != 0.0 ? jointMatrices[baseOffset + int(f4Joint0.z)] : zeroJoint;
+		JointMatrix jm3 = f4Weight0.w != 0.0 ? jointMatrices[baseOffset + int(f4Joint0.w)] : zeroJoint;
 
 		// Weighted blend of 3-row matrices, then reconstruct mat4
 		// Each row stores rotation in .xyz and translation component in .w

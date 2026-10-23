@@ -62,11 +62,11 @@ struct ScreenshotRequest
 	int64_t iMaxWidth = 1'568;
 	bool bPng = false;
 	int64_t iQuality = 80;
-	// Set only by the agent screenshot handler: the async save publishes its result JSON to the capture-result slot
-	// (consumed by the deferred-response poll). False for F9 dev saves so they never publish into an agent response.
+	// Publish the async save's result JSON for the caller to consume from the capture-result slot.
+	// Ordinary gameplay F9 dev saves leave publication disabled.
 	bool bPublishResult = false;
 	// Capture token minted and made active by ResetCaptureResult(); the async save publishes only while it remains
-	// active, so an overlapping abandoned encoder cannot replace a newer request's result. 0 for dev saves.
+	// active, so an overlapping abandoned encoder cannot replace a newer request's result. 0 when no result is requested.
 	int64_t iCaptureToken = 0;
 };
 

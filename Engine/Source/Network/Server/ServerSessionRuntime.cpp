@@ -197,39 +197,76 @@ void ServerSessionRuntime::HandleResyncRequests()
 	rResyncClientIds.clear();
 }
 
+// Runs inside ENet calls (polls, peer disconnects, host teardown), so it only marks the entry holding the packet.
+// ENet sets ENET_PACKET_FLAG_SENT only when the acknowledgment of the packet's last unacknowledged fragment frees it;
+// a reset, a timeout, or enet_host_destroy frees it without the flag.
+static void OnStaticDataPacketFreed(ENetPacket* pPacket)
+{
+	for (engine::PendingNewSubscription& rSubscription : engine::gpServer->mPendingNewSubscriptions)
+	{
+		if (rSubscription.pStaticDataPacket == pPacket)
+		{
+			rSubscription.pStaticDataPacket = nullptr;
+			rSubscription.bStaticDataDelivered = (pPacket->flags & ENET_PACKET_FLAG_SENT) != 0;
+			return;
+		}
+	}
+}
+
 void ServerSessionRuntime::SendNewSubscriptionFullStates()
 {
-	// Persist-until-served: Server::Poll leaves this runtime-owned queue intact, and an entry leaves it only once
-	// served or once its client or slot is gone. Serving needs a frame whose navigation data is built, because
-	// static data always carries navigation data; a replay reader activated this tick has a frame whose first
-	// dispatch, and so its build, is next tick. A paused or otherwise zero-tick update builds first in
-	// CompleteUpdate through PreparePausedSubscriptions.
-	std::erase_if(mpServer->mPendingNewSubscriptions, [this](const engine::PendingNewSubscription& rSubscription)
+	// Persist-until-served: Server::Poll leaves this runtime-owned queue intact, and an entry leaves it only once its
+	// full state is sent, its static-data send fails, or its client or slot is gone. Static data always carries
+	// navigation data, so an entry waits for a frame whose navigation data is built: a replay reader activated this tick
+	// builds on its first dispatch next tick, and a paused or otherwise zero-tick update builds in CompleteUpdate
+	// through PreparePausedSubscriptions. The full state waits for ENet's delivery confirmation of the static data and
+	// carries the tick counter current when it is sent, so a multi-poll static-data transfer does not leave it stale.
+	// A client is served one entry at a time, so only an erased or restarted entry's static data can still be in flight
+	// ahead of a full state.
+	std::vector<engine::PendingNewSubscription>& rPendingSubscriptions = mpServer->mPendingNewSubscriptions;
+	for (int64_t i = 0; i < std::ssize(rPendingSubscriptions);)
 	{
+		engine::PendingNewSubscription& rSubscription = rPendingSubscriptions.at(i);
 		const engine::ClientConnection* pClient = engine::gpServer->FindClient(rSubscription.iClientId);
 		bool bSlotStillValid = (pClient != nullptr
 		                     && (pClient->slots.at(rSubscription.iSlot).subscription.flags & engine::SubscriptionFlags::kActive)
 		                     && pClient->slots.at(rSubscription.iSlot).subscription.coordinate == rSubscription.coordinate);
 		if (!bSlotStillValid)
 		{
-			return true;
+			rPendingSubscriptions.erase(rPendingSubscriptions.begin() + i);
+			continue;
 		}
 
 		auto it = game::gpGame->mCells.find(rSubscription.coordinate);
-		if (it == game::gpGame->mCells.end())
+		if (it == game::gpGame->mCells.end() || !it->second.staticData.bNavigationDataBuilt)
 		{
-			return false;
+			++i;
+			continue;
 		}
 
-		if (!it->second.staticData.bNavigationDataBuilt)
+		if (rSubscription.bStaticDataDelivered)
 		{
-			return false;
+			mpServer->mBufferedFrames.SendCoordinateFullState(rSubscription.iClientId, rSubscription.iSlot, game::gpGame->miTickCounter, rSubscription.coordinate, it->second.pCurrent.get());
+			rPendingSubscriptions.erase(rPendingSubscriptions.begin() + i);
+			continue;
 		}
 
-		mpServer->mBufferedFrames.SendCoordinateStaticData(rSubscription.iClientId, rSubscription.iSlot, rSubscription.coordinate, it->second.staticData);
-		mpServer->mBufferedFrames.SendCoordinateFullState(rSubscription.iClientId, rSubscription.iSlot, game::gpGame->miTickCounter, rSubscription.coordinate, it->second.pCurrent.get());
-		return true;
-	});
+		// Includes this entry, so an entry whose static data is in flight waits for it
+		bool bClientBeingServed = std::ranges::any_of(rPendingSubscriptions, [&rSubscription](const engine::PendingNewSubscription& rOther)
+		{
+			return rOther.iClientId == rSubscription.iClientId && (rOther.pStaticDataPacket != nullptr || rOther.bStaticDataDelivered);
+		});
+		if (!bClientBeingServed)
+		{
+			rSubscription.pStaticDataPacket = mpServer->mBufferedFrames.SendCoordinateStaticData(*pClient, rSubscription.iSlot, rSubscription.coordinate, it->second.staticData, &OnStaticDataPacketFreed);
+			if (rSubscription.pStaticDataPacket == nullptr)
+			{
+				rPendingSubscriptions.erase(rPendingSubscriptions.begin() + i);
+				continue;
+			}
+		}
+		++i;
+	}
 }
 
 void ServerSessionRuntime::CompleteTick(int64_t iTick)

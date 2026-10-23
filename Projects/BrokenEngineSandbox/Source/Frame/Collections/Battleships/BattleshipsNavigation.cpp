@@ -31,7 +31,7 @@ void BattleshipsPostRender::AvoidTerrain([[maybe_unused]] Frame& __restrict rFra
 		}
 
 		XMVECTOR vecNearestEnemy = XMVectorZero();
-		if (FindNearestEnemyShip(rPreviousFrame, rCurrentInterpolate.pVecPositions[i], rCurrentPostRender.pAlignments[i], vecNearestEnemy))
+		if (FindNearestEnemyShip(rPreviousFrame, rCurrentInterpolate.pVecPositions[i], rCurrentPostRender.pAlignments[i], std::nullopt, vecNearestEnemy))
 		{
 			XMVECTOR vecToEnemy = XMVectorSubtract(vecNearestEnemy, rCurrentInterpolate.pVecPositions[i]);
 			float fDistanceToEnemy = XMVectorGetX(XMVector3Length(vecToEnemy));

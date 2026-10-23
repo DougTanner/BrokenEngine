@@ -7,6 +7,7 @@
 #include "File/PackChunks.h"
 #include "Network/Server/ServerSessionRuntime.h"
 #include "Network/NetworkCursor.h"
+#include "CrashReport.h"
 
 #include "Network/Server/ServerClientManager.h"
 #include "Game.h"
@@ -768,14 +769,15 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, ClientConnecti
 
 	ScopedSuppressAllocationTracking suppress;
 	// Replace an existing pending entry for this client+slot (a subscribe->unsubscribe->subscribe
-	// cycle reuses the slot with a new coord) rather than appending a duplicate.
+	// cycle reuses the slot with a new coord) rather than appending a duplicate. The replacement starts over from
+	// static data: the reused slot has a new epoch, so the client drops static data sent under the old one.
 	auto it = std::ranges::find_if(mPendingNewSubscriptions, [&rClient, iSlot](const PendingNewSubscription& rPending)
 	{
 		return rPending.iClientId == rClient.iClientId && rPending.iSlot == iSlot;
 	});
 	if (it != mPendingNewSubscriptions.end())
 	{
-		it->coordinate = coordinate;
+		*it = {.iClientId = rClient.iClientId, .iSlot = iSlot, .coordinate = coordinate};
 	}
 	else
 	{
@@ -835,6 +837,10 @@ void Server::ClientCrashReport(std::span<const uint8_t> packetData, ClientConnec
 	{
 		NetworkMessages::ThrowCorruptStream("Server::ClientCrashReport");
 	}
+	if (!ParseCrashReportHeader(std::string_view(reinterpret_cast<const char*>(message.report.puiData), static_cast<size_t>(message.report.iSize))))
+	{
+		NetworkMessages::ThrowCorruptStream("Server::ClientCrashReport");
+	}
 
 	if (rClient.stateFlags & ClientConnection::StateFlags::kCrashReportReceived)
 	{
@@ -843,16 +849,22 @@ void Server::ClientCrashReport(std::span<const uint8_t> packetData, ClientConnec
 	}
 	rClient.stateFlags.Set(ClientConnection::StateFlags::kCrashReportReceived);
 
+	std::chrono::sys_seconds now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
+	std::chrono::sys_days today = std::chrono::floor<std::chrono::days>(now);
+	if (today != mStoredCrashReportDay)
+	{
+		mStoredCrashReportDay = today;
+		miStoredCrashReportCount = 0;
+	}
 	if (miStoredCrashReportCount >= kiMaximumStoredCrashReports)
 	{
-		LOG(kNetwork, kWarning, "Server::ClientCrashReport Not stored, per-run cap reached Client: {}", rClient.iClientId);
+		LOG(kNetwork, kWarning, "Server::ClientCrashReport Not stored, daily cap reached Client: {}", rClient.iClientId);
 		return;
 	}
 
 	ScopedSuppressAllocationTracking suppress;
-	// Heap: timestamp formatting, the file path, and the file stream allocate
+	// Heap: timestamp formatting, the file path, the file stream, and the posting task allocate
 	char pcFilename[96] {};
-	std::chrono::sys_seconds now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
 	std::format_to_n(pcFilename, std::ssize(pcFilename) - 1, "CrashReport-{:%Y%m%dT%H%M%SZ}-{}-{:016X}{:016X}.txt", now, miStoredCrashReportCount, rClient.clientGuid.uiHigh, rClient.clientGuid.uiLow);
 
 	bool bWritten = gpFileManager->WriteFileAtomically({FileFlags::kAppDataDirectory, FileFlags::kWrite}, std::filesystem::path(pcFilename), [&message](std::fstream& rStream)
@@ -867,6 +879,7 @@ void Server::ClientCrashReport(std::span<const uint8_t> packetData, ClientConnec
 
 	++miStoredCrashReportCount;
 	LOG(kNetwork, kInfo, "Server::ClientCrashReport Stored Client: {} File: {}", rClient.iClientId, pcFilename);
+	gpCrashReportPoster->PostAsync(gpFileManager->GetFilePath({FileFlags::kAppDataDirectory}, pcFilename));
 }
 
 void Server::SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char* pcMessage, const ClientGuid* pGloballyUniqueIdentifier)

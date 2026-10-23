@@ -115,14 +115,6 @@ struct FramePostRender : public engine::FramePostRenderBase
 	void ServerRead(std::istream& rStream);
 };
 
-// One registry query window: the context plus the single workbuffer allocation its spans point into. The owner
-// keeps the whole object alive for the window; the allocation pops when it dies, so no context span outlives it.
-struct RegistryWindow
-{
-	common::ScopedWorkbufferAllocation<std::byte*> buffer;
-	engine::RegistryQueryContext context {};
-};
-
 struct Frame
 {
 	Frame();

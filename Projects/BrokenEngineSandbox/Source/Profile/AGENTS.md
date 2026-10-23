@@ -24,7 +24,7 @@ Overlay screens and their graphs are engine-owned, so this scope holds only the 
   (`NavQuery.cpp` times `NavQueryDirection` and, on the server, adds its A*
   count), `kGameCpuCounterFirst`, the anchor the engine's compile-time check
   uses to pin the start of the game counter range, and `kGameCpuCounterCount`,
-  `kGameCpuTimerCount`, `kGameCpuCounterNames`, and `kGameCpuTimerNames`
+  `kGameCpuTimerCount`, `kpGameCpuCounterNames`, and `kpGameCpuTimerNames`
   (`ProfileManager.cpp` sizes the row arrays and reads the names). Renaming
   or removing any of them breaks the engine build.
 - Display names live in `static_assert`-guarded name tables in `ProfileRows.h` (mirroring the engine convention; the struct rows carry only runtime state). Indented strings encode overlay hierarchy; preserve the leading-space convention when adding entries.

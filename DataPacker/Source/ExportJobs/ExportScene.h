@@ -1,8 +1,9 @@
 #pragma once
 
-namespace tinygltf { class Model; }
+class GltfSceneDecoder;
+class AssimpSceneDecoder;
 
-#include "Scene/SceneVerticesLoader.h"
+#include "Scene/SceneExportData.h"
 #include "ExportJob.h"
 
 class ExportScene : public ExportJob
@@ -13,8 +14,8 @@ public:
 
 	static std::optional<common::ChunkFlags_t> Handles(const std::filesystem::directory_entry& rDirectoryEntry);
 
-	// Payload-struct sizes fold in so size-changing layout edits auto-dirty cached chunks and the .PreExport marker; same-size reorders need the raw version bumped
-	static constexpr int64_t kiVersion = Version(68
+	// Payload-struct sizes fold in so size-changing layout edits auto-dirty cached chunks and the .PreExport marker; same-size layout or semantic changes need the raw version bumped
+	static constexpr int64_t kiVersion = Version(70
 		+ sizeof(common::MaterialShaderData)
 		+ sizeof(common::AnimationHeader)
 		+ sizeof(common::Skeleton)
@@ -26,10 +27,7 @@ public:
 		+ sizeof(common::AnimationKeyframeCubic)
 		+ sizeof(common::ModelVertex));
 
-	ExportScene(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile)
-	: ExportJob(rChunkFlags, rFile, kiVersion)
-	{
-	}
+	ExportScene(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile);
 
 	~ExportScene() override = default;
 
@@ -43,28 +41,30 @@ protected:
 
 private:
 
-	tinygltf::Model LoadGltfModel();
+	std::filesystem::path GetBlenderExportMarkerPath() const;
+	std::filesystem::path GetSceneDependencyMarkerPath() const;
+	bool SceneDependenciesDirty() const;
+	void CaptureSceneDependencies(const std::vector<std::filesystem::path>& rDependencies);
 	std::filesystem::path GetPreExportMarkerPath() const;
 	std::optional<std::string> GetPreExportFingerprint() const;
 	std::filesystem::path GetTextureIntermediatePath(int64_t iTextureIndex, VkFormat vkFormat) const;
 	std::filesystem::path GetTextureIntermediateStagePath(int64_t iStageIndex) const;
 
-	void PreExport(const tinygltf::Model& rGltfModel);
-	void MainExport(const tinygltf::Model& rGltfModel);
+	void PreExport(const GltfSceneDecoder& rDecoder, SceneExportData& rData);
+	void MainExport(const GltfSceneDecoder* pGltfDecoder, const AssimpSceneDecoder* pAssimpDecoder, SceneExportData& rData);
 
-	void ProcessTextures(const tinygltf::Model& rGltfModel);
+	void ProcessTextures(const SceneExportData& rData);
 	void CleanupTextureAttemptFiles();
-	bool SetupSkeletonAndMaterials(const tinygltf::Model& rGltfModel);
-	void LoadVerticesAndOptimizeMeshes(const tinygltf::Model& rGltfModel, bool bHasSkeleton, std::vector<Material>& rMaterials, std::vector<MaterialNodeInfo>& rMaterialNodeInfos, std::vector<common::ModelVertex>& rVertices);
-	void BuildMaterialInfos(const tinygltf::Model& rGltfModel, bool bHasSkeleton, const std::vector<Material>& rMaterials, const std::vector<MaterialNodeInfo>& rMaterialNodeInfos, std::vector<common::MaterialInfo>& rMaterialInfos);
+	void OptimizeMeshes(std::vector<Material>& rMaterials, std::vector<common::ModelVertex>& rVertices);
 	void WriteModelFile(const std::vector<Material>& rMaterials, const std::vector<common::MaterialInfo>& rMaterialInfos, std::vector<common::ModelVertex>& rVertices);
 
 	void ReadMaterialInfosFromModel(const std::filesystem::path& rModelPath, std::span<uint32_t> indexStarts, std::vector<common::MaterialInfo>& rMaterialInfos);
-	void FillMaterialShaderDatas(const tinygltf::Model& rGltfModel, const std::vector<common::MaterialInfo>& rMaterialInfos, std::span<common::MaterialShaderData> materialShaderDatas);
-	void WriteAnimationSection(const tinygltf::Model& rGltfModel, const std::vector<common::MaterialInfo>& rMaterialInfos, common::ChunkHeader* pHeader);
+	void WriteAnimationSection(const SceneExportData& rData, common::ChunkHeader* pHeader);
 
 	void CleanupOnFailure() override;
 
+	std::filesystem::path mBlenderSourcePath;
+	std::string mSceneDependencyMetadata;
 	std::vector<std::filesystem::path> mIntermediateFiles;
 	std::vector<std::filesystem::path> mTextureAttemptFiles;
 	std::vector<std::filesystem::path> mPublishedTextureFiles;

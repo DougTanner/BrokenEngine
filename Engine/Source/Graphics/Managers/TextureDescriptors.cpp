@@ -438,20 +438,9 @@ void TextureDescriptors::MintIslandSlot(int64_t iSlot, common::crc_t islandCrc, 
 	// Keep the real target in IslandSlot so sampler/pipeline recreation cannot expose it early.
 	rTargets.mElevationTextures.at(iSlot) = rTargets.mElevationTextures.at(0);
 
-	// An island header names its four channel textures by CRC across pack files, so a mixed pack generation can
-	// reference a texture this set never published. Soft-fail that channel to the slot-0 placeholder (the same
-	// state EvictIslandSlot leaves behind) rather than throwing out of the render path.
 	auto AssignChannel = [&](int64_t iChannel, std::vector<Texture*>& rTextures)
 	{
-		auto it = mrTextureManager.mTextureMap.find(textureCrcs[iChannel]);
-		if (it == mrTextureManager.mTextureMap.end())
-		{
-			LOG(kGraphics, kError, "Island channel texture missing: islandCrc={} channel={} textureCrc={}", islandCrc, iChannel, textureCrcs[iChannel]);
-			rTextures.at(iSlot) = rTextures.at(0);
-			return;
-		}
-
-		rTextures.at(iSlot) = &it->second;
+		rTextures.at(iSlot) = &mrTextureManager.mTextureMap.at(textureCrcs[iChannel]);
 	};
 	AssignChannel(0, rTargets.mColorTextures);
 	AssignChannel(1, rTargets.mNormalsTextures);

@@ -161,7 +161,7 @@ static void EmitCubicKeyframes(std::span<const float> times, std::span<const flo
 	}
 }
 
-static void EmitKeyframes(std::span<const float> times, std::span<const float> values, int64_t iValueStride, common::AnimationChannel& rChannel, float& rfDuration, std::vector<common::AnimationKeyframe>& rKeyframes)
+void EmitKeyframes(std::span<const float> times, std::span<const float> values, int64_t iValueStride, common::AnimationChannel& rChannel, float& rfDuration, std::vector<common::AnimationKeyframe>& rKeyframes)
 {
 	rChannel.uiKeyframeStart = static_cast<uint32_t>(std::ssize(rKeyframes));
 
@@ -208,6 +208,32 @@ bool DetermineAnimationPath(const tinygltf::Model& rGltfModel)
 	return true;
 }
 
+common::AnimationClip BeginAnimationClip(std::string_view name, int64_t iChannelStart)
+{
+	common::AnimationClip animation {};
+	int64_t iNameLength = std::min(std::ssize(name), common::AnimationClip::kiMaxNameLength - 1);
+	std::memcpy(animation.pcName, name.data(), static_cast<size_t>(iNameLength));
+	animation.pcName[iNameLength] = '\0';
+	animation.uiChannelStart = static_cast<uint32_t>(iChannelStart);
+	animation.uiChannelCount = 0;
+	animation.fDuration = 0.0f;
+	return animation;
+}
+
+void AppendAnimationChannel(const common::AnimationChannel& rChannel, common::AnimationClip& rAnimation, std::vector<common::AnimationChannel>& rChannels)
+{
+	rChannels.push_back(rChannel);
+	++rAnimation.uiChannelCount;
+}
+
+void FinishAnimationClip(const common::AnimationClip& rAnimation, std::vector<common::AnimationClip>& rAnimations)
+{
+	if (rAnimation.uiChannelCount > 0)
+	{
+		rAnimations.push_back(rAnimation);
+	}
+}
+
 void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOutput)
 {
 	std::vector<common::AnimationClip>& rAnimations = rOutput.rAnimations;
@@ -219,15 +245,7 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOutput)
 
 	for (const tinygltf::Animation& rAnimation : rModel.animations)
 	{
-		common::AnimationClip animation {};
-
-		int64_t iNameLength = std::min(std::ssize(rAnimation.name), common::AnimationClip::kiMaxNameLength - 1);
-		std::memcpy(animation.pcName, rAnimation.name.c_str(), static_cast<size_t>(iNameLength));
-		animation.pcName[iNameLength] = '\0';
-
-		animation.uiChannelStart = static_cast<uint32_t>(std::ssize(rChannels));
-		animation.uiChannelCount = 0;
-		animation.fDuration = 0.0f;
+		common::AnimationClip animation = BeginAnimationClip(rAnimation.name, std::ssize(rChannels));
 
 		for (const tinygltf::AnimationChannel& rGltfChannel : rAnimation.channels)
 		{
@@ -318,13 +336,9 @@ void LoadAnimations(const tinygltf::Model& rModel, AnimationOutput& rOutput)
 				EmitKeyframes(std::span<const float>(pfTimes, rInputAccessor.count), std::span<const float>(pfValues, uiOutputFloatCount), iValueStride, channel, animation.fDuration, rKeyframes);
 			}
 
-			rChannels.push_back(channel);
-			++animation.uiChannelCount;
+			AppendAnimationChannel(channel, animation, rChannels);
 		}
 
-		if (animation.uiChannelCount > 0)
-		{
-			rAnimations.push_back(animation);
-		}
+		FinishAnimationClip(animation, rAnimations);
 	}
 }

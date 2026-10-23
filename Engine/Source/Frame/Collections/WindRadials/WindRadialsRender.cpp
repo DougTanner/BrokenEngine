@@ -10,11 +10,13 @@
 namespace engine
 {
 
+constexpr int64_t kiDynamicBufferInitialCapacity = 512;
+
 void WindRadialsInterpolate::GraphicsResources()
 {
-	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositAxisAlignedA, kuiCrc, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesParticlesBC4Square24pngCrc}, &gpBufferManager->mpWindOccupancyVkBuffers[0], sizeof(shaders::AxisAlignedQuadLayout));
-	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositAxisAlignedB, kuiCrc, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureTwo, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesParticlesBC4Square24pngCrc}, &gpBufferManager->mpWindOccupancyVkBuffers[1], 0);
+	gpBufferManager->CreateDynamicBuffer(kuiCrc, kBufferMain, kpcName, sizeof(shaders::AxisAlignedQuadLayout), kiDynamicBufferInitialCapacity);
+	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositAxisAlignedA, kuiCrc, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureOne, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesParticlesBC4Square24pngCrc}, &gpBufferManager->mpWindOccupancyVkBuffers[0]);
+	gpPipelineManager->mDynamicPipelines.CreateDepositPipeline(kDynamicPipelineWindDepositAxisAlignedB, kuiCrc, kpcName, data::kShadersQuadsQuadsAxisAlignedVisibleAreavertCrc, data::kShadersWindWindDepositfragCrc, gpTextureManager->mRenderTargetTextures.mWindTextureTwo, {.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClamp}, .textureCrc = data::kTexturesParticlesBC4Square24pngCrc}, &gpBufferManager->mpWindOccupancyVkBuffers[1]);
 }
 
 static int64_t siRendered = 0;

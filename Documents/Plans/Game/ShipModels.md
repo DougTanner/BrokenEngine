@@ -8,10 +8,11 @@ CRC'd state, wire format, save, or replay format changes; the server is
 untouched. Line numbers cite baseline `c1420821` where a file exists there;
 the ship collections now live in `Fighters/`, `Omnis/`, and `Battleships/`, and
 each `*Render.cpp` holds the per-controller model constants this Plan fills in
-(`kFighterFleetModel`, `kfFighterFleetModelScale`, `kFighterRandomModel`, and
-`kfFighterRandomModelScale` at `FightersRender.cpp:14-17`, with their Omni and
-Battleship counterparts at `OmnisRender.cpp:16-19` and
-`BattleshipsRender.cpp:15-18`), so carry those names forward. Where a statement here and the code disagree, the code wins; report the
+(`kFighterFleetModel`, `kfFighterFleetModelScale`, `kf3FighterFleetModelOffset`,
+`kFighterRandomModel`, `kfFighterRandomModelScale`, and
+`kf3FighterRandomModelOffset` at `FightersRender.cpp:15-20`, with their Omni and
+Battleship counterparts at `OmnisRender.cpp:17-22` and
+`BattleshipsRender.cpp:16-21`), so carry those names forward. Where a statement here and the code disagree, the code wins; report the
 contradiction instead of matching one side to the other. Paths below `Frame/`
 mean `Projects/BrokenEngineSandbox/Source/Frame/`; `Models/` means
 `Projects/BrokenEngineSandbox/Data/Models/`.
@@ -44,7 +45,14 @@ Pipeline facts the design rests on (verified at baseline):
 - At most 64 textures and 128 materials per scene (`Common/DataFile.h:93-94`); one node-referenced skin (`DataPacker/Source/ExportJobs/AGENTS.md` `## Scene and Model`).
 - Scene textures are encoded from the images tinygltf decodes (`ExportScene.cpp:498-503`), so `.png`, `.jpg`, and `.jpeg` references all work (`Models/aim-9_missile` uses `.jpeg`).
 - Pre-export writes tracked `scene.gltf.MODEL`, `scene.gltf.PreExport`, and `scene.gltf.Texture<N>.<FORMAT>` intermediates beside the source (`DataPacker/Source/ExportJobs/AGENTS.md` `## Scene and Model`); `.gitattributes` already marks every such suffix binary. The generated symbol is the relative path with non-alphanumerics dropped: `Models/Spaceship/scene.gltf` is `data::kModelsSpaceshipscenegltfCrc`.
-- Rendered size is `radius * kfModelScale` applied as a uniform scale to the model's native units (`SpaceshipsRender.cpp:162,172`; `OmnisRender.cpp:230,240`); orientation fixups are hard-coded per model (`SpaceshipsRender.cpp:94` `smatPreRotate = RotationX(PI/2) * RotationY(0) * RotationZ(PI/2)`; `OmnisRender.cpp:242-243` `RotationX(PI/2)`, `RotationY(0)`). Forward is `+X` before yaw (`common::RotationMatrixFromDirection(dir, {1,0,0,0})`, `SpaceshipsRender.cpp:174`).
+- Rendered size is `radius * kfModelScale` applied as a uniform scale to
+  exported normalized model space, which is centered with its longest extent
+  spanning -1..1 (`SpaceshipsRender.cpp:162,172`; `OmnisRender.cpp:230,240`);
+  orientation fixups are hard-coded per model (`SpaceshipsRender.cpp:94`
+  `smatPreRotate = RotationX(PI/2) * RotationY(0) * RotationZ(PI/2)`;
+  `OmnisRender.cpp:242-243` `RotationX(PI/2)`, `RotationY(0)`). Forward is `+X`
+  before yaw (`common::RotationMatrixFromDirection(dir, {1,0,0,0})`,
+  `SpaceshipsRender.cpp:174`).
 - Each existing model folder carries Sketchfab's `license.txt` sidecar (`Models/spaceship2/license.txt`); `Projects/BrokenEngineSandbox/Data/AGENTS.md` requires one per asset.
 - `Projects/BrokenEngineSandbox/Data` is inside the session worktree's sparse checkout (only `Engine/Data/Islands` and `Engine/Data/Textures` are excluded) and the repository has no Git LFS rules; the existing model folders already track 3-5 MB textures directly, so the new folders are tracked the same way.
 
@@ -85,17 +93,22 @@ Each decision is recorded as made; the alternatives are not open.
    the implementer returns the failure to main with the offending field, because
    choosing a replacement model is not a trivial choice.
 
-4. **Scale from measured extent.** For each of the four new models, compute the
-   model's native longest horizontal extent `L` from `scene.gltf`: the
+4. **Scale from measured extent.** Scene export centers every model's
+   default-pose bounds at the origin and scales them to longest extent 2, so
+   `L` is the longest horizontal extent in that exported model space. For each
+   of the four new models, take the default-pose bounds from `scene.gltf`: the
    per-primitive POSITION accessor `min`/`max`, transformed by the node chain's
    `scale`/`matrix` down to the root (Sketchfab commonly bakes a unit conversion
-   into a root node). Set `kfModelScale` so the rendered longest extent equals
-   the type's collision diameter: `kfModelScale = 2 / L`, written as a literal
-   with four significant digits and a comment naming `L`. Radii are
-   `ShipTypeSplit`'s: `kfFighterRadius = 1.5f`, `kfOmniRadius = 1.1f`,
-   `kfBattleshipRadius = 4.5f`. The two existing models keep their scales
-   (`0.00175f` for `Spaceship`, `0.3667f` for `spaceship2`); the Battleship
-   placeholders' tripled scales are deleted with the placeholders.
+   into a root node). `L` is those bounds' longest horizontal extent times
+   `2 /` their longest extent over all three axes. Set `kfModelScale` so the
+   rendered longest extent equals the type's collision diameter:
+   `kfModelScale = 2 / L`, written as a literal with four significant digits
+   and a comment naming `L`. Radii are `ShipTypeSplit`'s:
+   `kfFighterRadius = 1.5f`, `kfOmniRadius = 1.1f`, `kfBattleshipRadius = 4.5f`.
+   The two existing models keep the scales that hold their displayed size in
+   that model space (`0.6723890f` for `Spaceship`, `1.0927087f` for
+   `spaceship2`); the Battleship placeholders' tripled scales are deleted with
+   the placeholders.
 
 5. **Orientation per model.** Each `*Render.cpp` carries one pre-rotation matrix
    per model, selected with the model by `pController`. Start every new model
@@ -104,9 +117,14 @@ Each decision is recorded as made; the alternatives are not open.
    by multiples of `PI/2` about Z (and `PI` about X if upside down) until a
    harness screenshot shows the hull upright and the nose pointing along the
    ship's direction of travel; record the final matrix as a `static` constant
-   like `SpaceshipsRender.cpp:94`. Nothing else in the transform chain (death
-   shrink, roll, the Fighter climb tilt, yaw, translation, rotation-acceleration
-   tilt) changes.
+   like `SpaceshipsRender.cpp:94`. Each pipeline's model offset (the leftmost
+   translation that sets the model's rotation pivot) is selected with its model:
+   `Spaceship` (Fighter random) keeps `(0.0f, 0.0621412f, -0.0985188f)` and
+   `spaceship2` (Omni fleet) keeps `(0.0f, 0.1817180f, -0.1686860f)`, restoring
+   their native-origin pivot; each new model takes `(0.0f, 0.0f, 0.0f)`,
+   so it turns about its bounds center, because it has no earlier placement to
+   keep. Nothing else in the transform chain (death shrink, roll, the Fighter
+   climb tilt, yaw, translation, rotation-acceleration tilt) changes.
 
 6. **No new engine or DataPacker code.** The four assets go through the existing scene export unchanged; no format version moves.
 
@@ -127,28 +145,34 @@ two dynamic buffers, two pipelines (`"<Type>Fleet"`, `"<Type>Random"`), and a
 `Render` that partitions rows by `pController`.
 `FightersRender.cpp` inserts the client-only climb tilt (an
 `XMMatrixRotationY(-pfClimbTilts[i])` of `FightersInterpolate::pfClimbTilts`) between roll and
-yaw. This Plan changes only the constants
-and adds the per-model pre-rotation, which takes the existing pre-rotation slot
-ahead of roll:
+yaw. Each file also carries one model offset per pipeline, beside
+`kfModelScales`, applied as a translation matrix multiplied leftmost into
+`matTransform` (decision 5). This Plan changes only the constants, sets each
+pipeline's model offset with its model, and adds the per-model pre-rotation,
+which takes the existing pre-rotation slot ahead of roll:
 
 ```cpp
 // FightersRender.cpp
 extern const common::crc_t kFighterFleetModel = data::kModelsJetFighterscenegltfCrc;
 constexpr float kfFighterFleetModelScale = /* 2 / L, decision 4 */;
+constexpr XMFLOAT3 kf3FighterFleetModelOffset {0.0f, 0.0f, 0.0f};
 static const XMMATRIX smatFighterFleetPreRotate = /* decision 5 */;
 extern const common::crc_t kFighterRandomModel = data::kModelsSpaceshipscenegltfCrc;
-constexpr float kfFighterRandomModelScale = 0.00175f;
+constexpr float kfFighterRandomModelScale = 0.6723890f;
+constexpr XMFLOAT3 kf3FighterRandomModelOffset {0.0f, 0.0621412f, -0.0985188f};
 static const XMMATRIX smatFighterRandomPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
 ```
 
 Omnis mirror this with
-`kModelsspaceship2scenegltfCrc`/`0.3667f`/`RotationX(PI/2)` for `kFleet` and
-`kModelsFlyingSaucerscenegltfCrc` for `kRandomSpawn`; Battleships with
+`kModelsspaceship2scenegltfCrc`/`1.0927087f`/`(0.0f, 0.1817180f, -0.1686860f)`/`RotationX(PI/2)`
+for `kFleet` and `kModelsFlyingSaucerscenegltfCrc` with offset
+`(0.0f, 0.0f, 0.0f)` for `kRandomSpawn`; Battleships with
 `kModelsBattleshipscenegltfCrc` for `kFleet` and
 `kModelsLowPolyBattleshipscenegltfCrc` for `kRandomSpawn`, both scaled from
-`kfBattleshipRadius`. Inside each `Render`, the per-row `fSize` and pre-rotation
-come from the row's controller, the same branch that already selects the
-pipeline. The animation-clock lookup (`Omnis.cpp:516-518`,
+`kfBattleshipRadius` and both with offset `(0.0f, 0.0f, 0.0f)`. Inside each
+`Render`, the per-row `fSize` and pre-rotation come from the row's controller,
+the same branch that already selects the pipeline, and the model offset comes
+from that pipeline. The animation-clock lookup (`Omnis.cpp:516-518`,
 `Spaceships.cpp:263-265` at baseline, per-model after `ShipTypeSplit`) keeps
 using the row's own model CRC; none of the four new models carries an animation,
 so the clock stays inert for them.
@@ -168,7 +192,8 @@ Each new folder's `license.txt` is the one Sketchfab ships. `Projects/BrokenEngi
 
 - The four new model folders of decision 1 with Sketchfab's `license.txt`, and their DataPacker intermediates.
 - The decision 3 pre-checks on each downloaded `scene.gltf`.
-- In the three `*Render.cpp` files: the model CRC, `kfModelScale`, and pre-rotation constants per controller (decisions 4 and 5), the per-row selection of scale and pre-rotation by `pController` in `Render` (the pre-rotation in the existing pre-rotation slot, ahead of roll and, in `FightersRender.cpp`, ahead of the `pfClimbTilts` climb tilt), and deletion of any leftover placeholder reuse or `#if 0` model block.
+- In the three `*Render.cpp` files: the model CRC, `kfModelScale`, model offset, and pre-rotation constants per controller (decisions 4 and 5; each new model's offset is `(0.0f, 0.0f, 0.0f)`, and `Spaceship` and `spaceship2` keep theirs),
+  the per-row selection of scale and pre-rotation by `pController` in `Render` (the pre-rotation in the existing pre-rotation slot, ahead of roll and, in `FightersRender.cpp`, ahead of the `pfClimbTilts` climb tilt), and deletion of any leftover placeholder reuse or `#if 0` model block.
 - One DataPacker sandbox run and the client build and harness screenshots in `## Acceptance`.
 
 ## Out of scope
@@ -186,7 +211,7 @@ Each new folder's `license.txt` is the one Sketchfab ships. `Projects/BrokenEngi
 - Generated CRC symbols are unique across the run (`DataPacker/Source/AGENTS.md` `## Design Patterns`); the four folder names of decision 1 collide with nothing in `Models/`.
 - Pre-export intermediates are tracked beside their sources and committed with them, or the next session's pre-export re-runs and `git status` dirties (`DataPacker/Source/ExportJobs/AGENTS.md` `## Scene and Model`).
 - Every new folder carries its licence sidecar (`Projects/BrokenEngineSandbox/Data/AGENTS.md`); only CC-BY-4.0 and CC0 licences are accepted, no NC, SA, or ND term.
-- Each `Render`'s transform chain order is the current one (Fighters: `scaling * preRotate * roll * climbTilt * yaw * translation`) and is unchanged here; only the per-model pre-rotation matrices and scale literals differ.
+- Each `Render`'s transform chain order is the current one (Fighters: `preMove * scaling * preRotate * roll * climbTilt * yaw * translation`, with `preMove` the pipeline's model-offset translation, leftmost) and is unchanged here; only the per-model pre-rotation matrices, scale literals, and model offsets (decision 5) differ.
 - No main-loop allocation beyond `ShipTypeSplit`'s two pipelines per type.
 
 ## Acceptance

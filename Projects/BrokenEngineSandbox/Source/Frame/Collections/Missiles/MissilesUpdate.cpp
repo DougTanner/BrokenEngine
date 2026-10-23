@@ -88,7 +88,8 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 
 	// Before the ship Updates, current registry ids and interpolated positions still align with previous rows.
 	// Bind previous positions for retained-target homing, previous arrival grace for eligibility, and previous
-	// missile handles while current handles are being updated.
+	// missile handles while current handles are being updated. A missile reads only the context of the flight plane at
+	// its height.
 	RegistryWindow window = BuildShipRegistryWindow(rFrame, &rPreviousFrame, *rPreviousFrame.postRender.pMissiles);
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -102,6 +103,7 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		float fExhaustLength = rPrevious.pfExhaustLengths[i];
 		std::chrono::duration<float> nextJitter = rPrevious.pNextJitter[i];
 		XMVECTOR vecStoredDirection = rPrevious.pVecStoredDirections[i];
+		std::optional<int64_t> optionalFlightPlane = FlightPlaneAtHeight(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i]));
 
 		if (!(rCurrent.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && !(rCurrent.pFlags[i] & kFalling) && missileTime < kMissileLifetime) [[likely]]
 		{
@@ -144,13 +146,15 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 
 			fExhaustLength = kfMissileExhaustLength + common::Random<kfMissileExhaustLengthRandom>(rFrame.postRender.randomEngine);
 
-			// Validate the retained handle against the rows the registry currently considers eligible; a source
-			// that died, transferred, or is still in arrival grace drops the handle.
+			// Validate the retained handle against the rows the registry currently considers eligible on the missile's
+			// plane; a source that died, transferred, is still in arrival grace, or left the missile's plane drops the
+			// handle.
 			engine::RegistryResult retained {};
 			bool bRetained = false;
 			if ((uiTarget.uuid.iValue != 0))
 			{
-				bRetained = engine::ResolveRegistryHandle(window.context, uiTarget, retained);
+				ASSERT(optionalFlightPlane.has_value());
+				bRetained = engine::ResolveRegistryHandle(window.contexts[static_cast<size_t>(*optionalFlightPlane)], uiTarget, retained);
 				if (!bRetained)
 				{
 					uiTarget = {};
@@ -216,21 +220,23 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		if (!(rCurrent.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && !(rCurrent.pFlags[i] & kFalling) && missileTime.count() >= kMissileLifetime.count())
 		{
 			// The only release site: this is the one missile transition that happens while the window is live.
-			engine::ReleaseRegistryTarget(window.context, rCurrent.puiRegistryTargets[i]);
+			ASSERT(optionalFlightPlane.has_value());
+			engine::ReleaseRegistryTarget(window.contexts[static_cast<size_t>(*optionalFlightPlane)], rCurrent.puiRegistryTargets[i]);
 			Fall(rFrame, i, deltaTime);
 		}
 	}
 
-	// Acquire targetless flying missiles in ascending row order after all handles and expiry releases are published.
-	// Fixed-size stack arrays bound acquisition scratch storage; each chunk updates shared subscription counts before the next.
+	// Acquire targetless flying missiles after all handles and expiry releases are published, one flight plane at a time
+	// in its own context, in ascending row order within the plane. Fixed-size stack arrays bound acquisition scratch
+	// storage; each chunk updates shared subscription counts before the next.
 	static constexpr int64_t kiAcquireChunk = 64;
 	int64_t piAcquireRows[kiAcquireChunk] {};
 	engine::RegistryResult pAcquireResults[kiAcquireChunk] {};
 	int64_t iAcquireCount = 0;
 
-	auto AcquireChunk = [&]()
+	auto AcquireChunk = [&](engine::RegistryQueryContext& rContext)
 	{
-		engine::AcquireRegistryTargets(window.context,
+		engine::AcquireRegistryTargets(rContext,
 		{
 			.pTargets = rCurrent.puiRegistryTargets,
 			.pVecOrigins = rCurrentInterpolate.pVecPositions,
@@ -243,41 +249,51 @@ void MissilesPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 		iAcquireCount = 0;
 	};
 
-	for (int64_t i = 0; i < rCurrent.iCount; ++i)
+	for (int64_t j = 0; j < std::ssize(window.contexts); ++j)
 	{
-		if (rCurrent.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
+		engine::RegistryQueryContext& rContext = window.contexts[j];
+
+		for (int64_t i = 0; i < rCurrent.iCount; ++i)
 		{
-			continue;
+			if (rCurrent.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
+			{
+				continue;
+			}
+
+			if (rCurrent.pFlags[i] & kFalling)
+			{
+				continue;
+			}
+
+			if (rCurrent.pTimes[i].count() >= kMissileLifetime.count())
+			{
+				continue;
+			}
+
+			if ((rCurrent.puiRegistryTargets[i].uuid.iValue != 0))
+			{
+				continue;
+			}
+
+			if (FlightPlaneAtHeight(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])) != j)
+			{
+				continue;
+			}
+
+			// /analyze loses the iAcquireCount reset because it happens inside AcquireChunk: the flush below runs on
+			// every write, so the counter is always below the chunk size here.
+			_Analysis_assume_(iAcquireCount >= 0 && iAcquireCount < kiAcquireChunk);
+			piAcquireRows[iAcquireCount++] = i;
+			if (iAcquireCount == kiAcquireChunk)
+			{
+				AcquireChunk(rContext);
+			}
 		}
 
-		if (rCurrent.pFlags[i] & kFalling)
+		if (iAcquireCount > 0)
 		{
-			continue;
+			AcquireChunk(rContext);
 		}
-
-		if (rCurrent.pTimes[i].count() >= kMissileLifetime.count())
-		{
-			continue;
-		}
-
-		if ((rCurrent.puiRegistryTargets[i].uuid.iValue != 0))
-		{
-			continue;
-		}
-
-		// /analyze loses the iAcquireCount reset because it happens inside AcquireChunk: the flush below runs on
-		// every write, so the counter is always below the chunk size here.
-		_Analysis_assume_(iAcquireCount >= 0 && iAcquireCount < kiAcquireChunk);
-		piAcquireRows[iAcquireCount++] = i;
-		if (iAcquireCount == kiAcquireChunk)
-		{
-			AcquireChunk();
-		}
-	}
-
-	if (iAcquireCount > 0)
-	{
-		AcquireChunk();
 	}
 }
 

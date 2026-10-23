@@ -1,10 +1,10 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-18T15:25:05.648Z","dependsOn":["Documents/Plans/Engine/FlightPlanePresentation.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-18T15:25:05.648Z","dependsOn":["Documents/Plans/Engine/ModelViewerAnimationPlayback.md","Documents/Plans/Engine/SharedSceneExportData.md","Documents/Plans/Engine/TrackDeltasReceivedBeforeFullStateAdoption.md","Documents/Plans/Game/ShipModels.md"]} -->
 # Create the Azure server VM with /deploy-server and record its address
 
 ## Context
 
 The `/deploy-server` skill (`.agents/skills/deploy-server/`) holds a create-only subscription-scope Bicep template (`assets/main.bicep`, `assets/server.bicep`), deployed with the BrokenEngineSandbox parameters file `Projects/BrokenEngineSandbox/DeployServer/main.bicepparam` (instance `brokenengine`), and the provisioning procedure, `SKILL.md` `## Steps` 1-10, for the dedicated server's Azure VM, its daily schedule workflow, and its $200 budget stop.
-The skill landed without its live steps being run, so nothing exists in Azure. On 2026-10-18 the user declined the spending confirmation at `SKILL.md` step 6. The user directed that nothing be created in Azure, and the server not be started, until the Engine Plans in this Plan's `dependsOn` are done. This Plan is that deferred live run.
+The skill landed without its live steps being run, so nothing exists in Azure. On 2026-10-18 the user declined the spending confirmation at `SKILL.md` step 6. The user directed that nothing be created in Azure, and the server not be started, until the Plans in this Plan's `dependsOn` are done; on 2026-10-22 the user directed that `dependsOn` list every Plan outside the Azure hosting work. This Plan is that deferred live run.
 
 Gap this Plan closes:
 
@@ -80,6 +80,6 @@ Live Azure checks, each after the user's step 6 yes; expected settings are those
 
 ## Notes
 
-- The `dependsOn` Engine Plans carry the user's decision that nothing is created until they are done. `ConnectClientToHostedServer.md` depends on this Plan because it compiles the recorded IP.
+- The `dependsOn` Plans, every Plan outside the Azure hosting work, carry the user's decision that nothing is created until they are done. `ConnectClientToHostedServer.md` depends on this Plan because it compiles the recorded IP.
 - Costs to show at step 6 are in `azure-facts.md` `## Cost examples`: $0.193/hour running, $13.25/month always, about $101.31/month on the schedule. The first 08:00 US Eastern after creation starts the VM before any game server is deployed.
 - The live steps need Azure CLI 2.53 or later and the user's `! az login`.

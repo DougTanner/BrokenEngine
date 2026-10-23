@@ -42,18 +42,19 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   collision layers, whose count is fixed at compile time: a `std::vector` sized
   once under `ScopedSuppressAllocationTracking`, whose overflow logs `kError`
   and asserts rather than growing.
-- An entity's position must lie inside its own cell's bounds; a position outside
-  them belongs to a neighbouring cell, so an out-of-bounds entity transfers
-  instead of being simulated locally. Each collection's `Spawn(SpawnInfo)` tests
-  the position before appending anything. An overload either refuses an outside
+- An entity's position must lie inside its own cell's bounds, which are
+  half-open on each axis: a cell owns its west and south edges and not its east
+  and north edges, which belong to the neighbour; a position outside them
+  belongs to a neighbouring cell, so an out-of-bounds entity transfers instead
+  of being simulated locally. Each collection's `Spawn(SpawnInfo)` tests the
+  position before appending anything. An overload either refuses an outside
   position silently, never clamping, requeuing, or leaving the row to the
   transfer path, and returns whether it appended, or, where an outside position
-  is a bug, asserts instead and always reports success. No caller is exempt: a
-  transfer arrival that rebases exactly onto the destination edge of a refusing
-  collection is refused and lost. A producer must test bounds itself before
-  calling `Spawn` when a side effect that cannot be undone precedes the append,
-  or when the position comes from outside the simulation rather than another
-  cell's transfer, because an asserting overload asserts rather than refusing.
+  is a bug, asserts instead and always reports success. No caller is exempt. A
+  producer must test bounds itself before calling `Spawn` when a side effect
+  that cannot be undone precedes the append, or when the position comes from
+  outside the simulation rather than another cell's transfer, because an
+  asserting overload asserts rather than refusing.
 - The produce and consume windows are fixed, not merely ordered: area damage is added during PostCollision and queried during AreaDamage, and `RunFrameTick` clears each queue right after the game's body for its owning phase returns, so every engine and game collection has run that phase first. Adding from AreaDamage, or querying from Update, silently drops the hit or delivers it a tick late.
 - Collision gathers candidate events across every layer pair, sorts them
   globally by time of impact with layer and object indices as tiebreakers so the

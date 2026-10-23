@@ -48,7 +48,8 @@ static XMVECTOR XM_CALLCONV PopulateSunMoonDirection(shaders::GlobalLayout& rGlo
 	XMVECTOR vecSunMoonNormal = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 	XMMATRIX matSunRotation = XMMatrixRotationY(-fDirectionAngle);
 	vecSunMoonNormal = XMVector4Transform(vecSunMoonNormal, matSunRotation);
-	// Normal-only pitch tilt around world X. Shadows derive from raw fSunAngle and are unaffected.
+	// Pitch tilt around world X. Of the shadow terms it moves only the object-shadow stretch translation; terrain
+	// shadows and the object-shadow height offset derive from raw fSunAngle.
 	XMMATRIX matSunTilt = XMMatrixRotationX(gSunMoonNormalTilt.mfCurrent);
 	vecSunMoonNormal = XMVector4Normalize(XMVector4Transform(vecSunMoonNormal, matSunTilt));
 	XMStoreFloat4(&rGlobalLayout.f4SunMoonNormal, vecSunMoonNormal);
@@ -284,6 +285,19 @@ static void XM_CALLCONV PopulateShadowStretch(shaders::GlobalLayout& rGlobalLayo
 	float fSumCubes = fSunriseStretchCubed + fSunsetStretchCubed;
 	rGlobalLayout.f2ShadowStretchTranslation.x = -fSumCubes * XMVectorGetX(vecSunMoonNormal);
 	rGlobalLayout.f2ShadowStretchTranslation.y = -fSumCubes * XMVectorGetY(vecSunMoonNormal);
+
+	// A model's object shadow shifts by its height above the lowest flight plane times this, along the sun's ground
+	// projection. The Z floor caps the shift near the horizon, where the stretch above already lengthens shadows. The
+	// direction is the untilted one from PopulateSunMoonDirection: the Normal Tilt would add a north-south shift.
+	static constexpr float kfObjectShadowsHeightOffsetMinimumSunZ = 0.5f;
+	float fDirectionAngle = fSunAngle < XM_PI ? fSunAngle : XM_2PI - fSunAngle;
+	float fSunZ = 0.0f;
+	float fSunX = 0.0f;
+	XMScalarSinCos(&fSunZ, &fSunX, fDirectionAngle);
+	float fHeightOffsetScale = -gObjectShadowsHeightOffset.mfCurrent / std::max(fSunZ, kfObjectShadowsHeightOffsetMinimumSunZ);
+	gf2ShadowHeightOffsetPerMeter = XMFLOAT2(fHeightOffsetScale * fSunX, 0.0f);
+	rGlobalLayout.f2ShadowHeightOffsetPerMeter.x = gf2ShadowHeightOffsetPerMeter.x;
+	rGlobalLayout.f2ShadowHeightOffsetPerMeter.y = gf2ShadowHeightOffsetPerMeter.y;
 }
 
 static void PopulateShadowArea(int64_t iCommandBuffer, shaders::GlobalLayout& rGlobalLayout, float fShadowTextureSizeWidth, float fShadowTextureSizeHeight, float& rfWorldTexelX, float& rfFullWidth, XMFLOAT4& rf4ShadowArea)
@@ -431,6 +445,7 @@ static void XM_CALLCONV PopulateShadowParameters(int64_t iCommandBuffer, shaders
 	rGlobalLayout.fObjectShadowsBlurSigma = gObjectShadowsBlurSigma.mfCurrent;
 	rGlobalLayout.iObjectShadowsBlurRadius = static_cast<int32_t>(gObjectShadowsBlurRadius.mfCurrent);
 	rGlobalLayout.fObjectShadowsGrow = gObjectShadowsGrow.mfCurrent;
+	rGlobalLayout.fObjectShadowsTerrainShadowFadeInverse = 1.0f / gObjectShadowsTerrainShadowFade.mfCurrent;
 	float fObjectShadowsIntensity = fDayPercent * gObjectShadowsNoon.mfCurrent + (1.0f - fDayPercent) * gObjectShadowsSunset.mfCurrent;
 	rGlobalLayout.fObjectShadowsIntensity = fObjectShadowsIntensity * std::pow(fDayPercent, 0.1f);
 	// fShadowSunsetOffset contributes to fShadowAngleOffsetSum after the sun extension resolves the shadow sun angle.
@@ -503,7 +518,11 @@ void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> curr
 	RenderSmokeGlobal(iCommandBuffer);
 	RenderWindGlobal(iCommandBuffer);
 
+#if defined(BT_MODEL_VIEWER)
+	float fSunAngle = engine::gpCamera->mfSunAngle;
+#else
 	float fSunAngle = static_cast<game::Camera*>(engine::gpCamera)->SunAngle();
+#endif
 
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 

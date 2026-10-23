@@ -87,7 +87,7 @@ bool SkipsTerrainContact(float fHeight)
 	return optionalFlightPlane && !(engine::gpFlightPlanes->Plane(*optionalFlightPlane).flags & engine::FlightPlaneFlags::kTerrainCollision);
 }
 
-XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime)
+XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(FXMVECTOR vecPosition, int64_t iTargetFlightPlane, float fClimbRate, std::chrono::duration<float> deltaTime, uint8_t& ruiFlightPlane)
 {
 	// Fixed operation order and the table's own height on arrival keep client and server bit-identical, which
 	// FlightPlaneAtHeight's exact equality relies on.
@@ -95,6 +95,7 @@ XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(FXMVECTOR vecPosition, int64_t iTar
 	float fClimbStep = fClimbRate * deltaTime.count();
 	float fHeight = XMVectorGetZ(vecPosition);
 	float fHeightGap = fTargetHeight - fHeight;
+	bool bArrived = false;
 	if (fHeightGap > fClimbStep)
 	{
 		fHeight += fClimbStep;
@@ -106,6 +107,11 @@ XMVECTOR XM_CALLCONV ClimbTowardsFlightPlane(FXMVECTOR vecPosition, int64_t iTar
 	else
 	{
 		fHeight = fTargetHeight;
+		bArrived = true;
+	}
+	if (ruiFlightPlane != iTargetFlightPlane)
+	{
+		ruiFlightPlane = bArrived ? static_cast<uint8_t>(iTargetFlightPlane) : kuiNoFlightPlane;
 	}
 	return XMVectorSetZ(vecPosition, fHeight);
 }
@@ -730,7 +736,9 @@ void XM_CALLCONV DebugRenderNavigation(const FrameInterpolate& rFrameInterpolate
 		XMFLOAT3A f3NavigationStart {};
 		XMFLOAT3A f3NavigationEnd {};
 		XMStoreFloat3A(&f3NavigationStart, engine::Rebase(rBasis, vecPosition));
-		XMStoreFloat3A(&f3NavigationEnd, engine::Rebase(rBasis, XMVectorSetZ(vecWaypoint, engine::gpFlightPlanes->Lowest().fHeightMeters)));
+		// The waypoint line end and circle draw at the ship's own height, whatever height navigation stored, so a ship
+		// on a higher plane shows no vertical drop.
+		XMStoreFloat3A(&f3NavigationEnd, engine::Rebase(rBasis, XMVectorSetZ(vecWaypoint, XMVectorGetZ(vecPosition))));
 		engine::DebugRender::Line(f3NavigationStart, f3NavigationEnd, {0.0f, 1.0f, 0.0f, 1.0f});
 		engine::DebugRender::Circle(f3NavigationEnd, fRadius * 0.5f, {0.0f, 1.0f, 0.0f, 1.0f});
 	}
@@ -740,14 +748,14 @@ void XM_CALLCONV DebugRenderNavigation(const FrameInterpolate& rFrameInterpolate
 		if (bFlagshipFound)
 		{
 			XMFLOAT3A f3Destination {};
-			XMStoreFloat3A(&f3Destination, engine::Rebase(rBasis, XMVectorSetZ(vecFlagshipPosition, engine::gpFlightPlanes->Lowest().fHeightMeters)));
+			XMStoreFloat3A(&f3Destination, engine::Rebase(rBasis, vecFlagshipPosition));
 			engine::DebugRender::Circle(f3Destination, fRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
 		}
 	}
 	else if (XMVectorGetW(vecIslandDestination) > 0.0f)
 	{
 		XMFLOAT3A f3Destination {};
-		XMStoreFloat3A(&f3Destination, engine::Rebase(rBasis, XMVectorSetZ(vecIslandDestination, engine::gpFlightPlanes->Lowest().fHeightMeters)));
+		XMStoreFloat3A(&f3Destination, engine::Rebase(rBasis, XMVectorSetZ(vecIslandDestination, XMVectorGetZ(vecPosition))));
 		engine::DebugRender::Circle(f3Destination, fRadius * 2.0f, {0.0f, 1.0f, 0.0f, 1.0f});
 	}
 }

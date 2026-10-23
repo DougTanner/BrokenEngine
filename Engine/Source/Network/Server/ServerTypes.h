@@ -31,6 +31,10 @@ struct PendingNewSubscription
 	int64_t iClientId = 0;
 	int64_t iSlot = 0;
 	GridCoord coordinate {};
+	// The static-data packet ENet still holds, nullptr when none is in flight. ENet owns and frees it, so it is only
+	// compared, never dereferenced.
+	ENetPacket* pStaticDataPacket = nullptr;
+	bool bStaticDataDelivered = false;
 };
 
 struct GridUpdateData

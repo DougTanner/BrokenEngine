@@ -40,7 +40,13 @@
   floor below a superseding target, or ACK for an older restart cannot release
   it. The existing accepted bounded backward rebaseline also clears the
   full-state hold. Client ACKs continue periodically while deltas are held, so
-  release does not depend on resumed delta traffic. This recovery keeps the slot
+  release does not depend on resumed delta traffic. The accepted ACK that
+  releases the hold also triggers the hold-release burst: before the next
+  update is sent, the server resends once, as `kServerCoordinateResend` packets
+  on the slot's unreliable coordinate channel, every tick above the accepted
+  floor through the latest buffered tick that the coordinate ring still holds,
+  stopping at `kiNetworkBufferSize` (128) ticks above the floor. Ordinary resends
+  recover any of those ticks that are lost. This recovery keeps the slot
   coordinate, epoch, packet formats, and the client's 128-tick gap rule
   unchanged.
 - **Resend**: per client, scan each slot's ACK bitfield for unset bits above the
@@ -49,9 +55,12 @@
   slot** per call (the resend counter resets per slot, so a client with N active
   slots can receive up to 8 × N resends per tick). The server does NOT blindly
   re-send the entire range from oldest-unacked — only the exact gaps the client
-  reported. Because the scan is oldest-first and the floor never advances past
-  an unacked tick, the oldest gap is always prioritized: if >8 gaps exist, newer
-  ones wait for the next `SendResends` call. The resend source is a per-coord
+  reported. The hold-release burst above is the one exception to each of these
+  rules: it resends the held range without a bitfield scan, outside the
+  per-slot cap. Because the scan is
+  oldest-first and the floor never advances past an unacked tick, the oldest gap
+  is always prioritized: if >8 gaps exist, newer ones wait for the next
+  `SendResends` call. The resend source is a per-coord
   ring buffer of compressed frame deltas; an unacked tick keeps getting retried
   until it either arrives or is evicted from that ring buffer (logged as
   `Evicted frame`), at which point the client can only recover via full state
@@ -291,7 +300,7 @@ sizes are the full packet including the type byte.
 | `kClientResynchronizationRequest` | 1 | 1 | 4 | yes | violation | — |
 | `kClientDesynchronizationReport` | 33 | 33 | 8 | yes | violation | negative tick → corrupt, rejected before the cooldown; independent per-client two-second wall-clock cooldown after contract validation; immediate repeats silently drop |
 | `kClientDebugFrameRequest` | 17 | 17 | 8 | yes | violation | negative tick → corrupt, rejected before the cooldown in every build; independent per-client two-second wall-clock cooldown; otherwise a no-op when `kbDesynchronizationDebugFrames == false` |
-| `kClientCrashReport` | 6 | 1048581 | 1 | yes | violation | declared `int32` report size other than the remaining packet bytes → corrupt; one report per connection, a repeat counts a rate violation and is not stored; at most 32 stored per server run, further reports log `kWarning` and are not stored; payload written verbatim to `CrashReport-*.txt` in the app-data root, never parsed; the server sends no reply |
+| `kClientCrashReport` | 6 | 1048581 | 1 | yes | violation | declared `int32` report size other than the remaining packet bytes → corrupt; a report whose header is not the one `HandleException` writes, including its crash-report version line, → corrupt; one report per connection, a repeat counts a rate violation and is not stored; at most 32 stored per UTC calendar day, counted in memory so a restart resets the count, further reports log `kWarning` and are not stored; payload written verbatim to `CrashReport-*.txt` in the app-data root; GitHub posting: `Engine/Source/AGENTS.md` `## Crash Reporting`; the server sends no reply |
 | `kClientChat` | 3 | 258 | 8 | yes | violation | `IsValidChatText` on the text up to the first NUL (1–256 bytes of well-formed UTF-8 per Unicode Table 3-7, no C0, DEL, or C1 control) → corrupt, rejected before the token bucket; per-client token bucket (burst 5, refill 1 per `steady_clock` second) drops excess silently with no violation; only the validated text is re-encoded and relayed |
 | `kClientUpdateOwnedEntityRequest` | 14 | 14 | 8 | yes | violation | use-missiles byte other than 0 or 1 → corrupt; nav delay non-finite or outside `[0,60]` → corrupt (`IsNavigationDelayInRange`), never clamped |
 | `kClientFleetNavigationDelay` | 21 | 21 | 8 | yes | violation | fleet-guid lookup; nav delay non-finite or outside `[0,60]` → corrupt, never clamped |
@@ -304,8 +313,12 @@ sizes are the full packet including the type byte.
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
-client-sendable). The current wire-protocol version is 33, which made the
-`kServerCoordinateStaticData` payload carry one navigation graph per flight
+client-sendable). The current wire-protocol version is 35, which made the
+`kClientCrashReport` payload a crash report whose header, including its
+crash-report version line, the server parses and rejects as corrupt when it
+does not match; version 34 added `uiFlightPlane` to the Fighters, Omnis, and
+Battleships `SpawnInfo` `Fields()` lists (commit `a1b4bbb91`); version 33 made
+the `kServerCoordinateStaticData` payload carry one navigation graph per flight
 plane (an `int32_t` plane count, then each plane's `NavData`); version 32 added
 `uiTargetFlightPlane` to the `UpdateShipData` `Fields()` list; version 31
 dropped the three wind-trail fields from the `BlastersPostRender::SpawnInfo`

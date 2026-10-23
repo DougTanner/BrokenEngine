@@ -202,9 +202,10 @@ private:
 	std::chrono::steady_clock::time_point mBudgetGraceDeadline {};
 	int64_t miLoadGeneration = 0;
 
-	// Bounds the disk space clients can fill with crash reports however often they reconnect.
+	// Bounds the disk space clients can fill with crash reports however often they reconnect; counts per UTC calendar day.
 	static constexpr int64_t kiMaximumStoredCrashReports = 32;
 	int64_t miStoredCrashReportCount = 0;
+	std::chrono::sys_days mStoredCrashReportDay {};
 
 	ServerBufferedFrames mBufferedFrames = ServerBufferedFrames(*this);
 

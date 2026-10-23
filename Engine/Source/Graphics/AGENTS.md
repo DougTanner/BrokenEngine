@@ -54,7 +54,7 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
 
 ## World and Camera Contracts
 
-- `engine::CameraBase` (`CameraBase.h`) owns the whole generic camera: matrices,
+- In gameplay builds, `engine::CameraBase` (`CameraBase.h`) owns the whole generic camera: matrices,
   world/screen projection, visible-area LOD, grid-snapped render extents, and
   the display-rate update — target resolution, jump/chase, Hermite zoom,
   texel-height references, shake, vibration, and sun angle. It registers and
@@ -68,7 +68,10 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   client render state outside the CRC: `AddVisualErrorOffset` accumulates it,
   and the update decays it after `PullTarget` has read it. A tracked target's
   raw position updates the tracking velocity and last-known position; the offset
-  is added only to the resolved target.
+  is added only to the resolved target. The engine places the initial position
+  and every resolved target, free camera included, on the lowest flight plane,
+  so the look-at always lies on it and a target's height never moves the eye or
+  the visible area; `PullTarget` supplies no height policy.
 - Camera position, easing, shake, and visual timers advance from the sim-scaled render delta the caller passes to `CameraBase::Update` (wall delta multiplied by the active time ratio; equal to wall time at ratio 1.0). Sun angle advances from the interpolate frame's own delta and pauses in the main menu. Debug free-camera motion is main-menu-only and drives the pose directly instead of consulting `PullTarget`.
 - Long-distance target changes use a bounded smoothstep jump that may re-anchor from the current position; normal tracking tightens with camera height. Mouse-wheel input updates a persisted, clamped eye-height target, with height and velocity re-anchored while scrolling so repeated input stays smooth; the gameplay zoom ceiling is not a texel-grid boundary. Damage-driven shake decays here and drives controller vibration.
 - The camera works entirely in the local frame of the cell it is rendering,

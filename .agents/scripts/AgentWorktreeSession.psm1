@@ -152,8 +152,8 @@ function Get-AgentWorktreeSessionContext {
 # repair script. It is outcome-neutral: 'ancestor' means the resolved fork point is still on the
 # primary tip's history, which the wrapper treats as success and the repair script as a blocker.
 # --fork-point can succeed with no output, so the plain merge-base fallback runs before the guard and
-# --is-ancestor never receives an unset value. A refusal beats a partial repair, so a dirty tree is
-# rejected outright and a failed replay is aborted back to what was found.
+# --is-ancestor never receives an unset value. Local work is saved before replay and restored with
+# its index afterward; the uniquely named stash remains available even after successful recovery.
 function Repair-AgentWorktreeForkPoint([string] $Worktree, [string] $PrimaryBranch, [string] $PrimaryTip, [string] $Branch) {
 	$forkPoint = @(& git -C $Worktree merge-base --fork-point "refs/heads/$PrimaryBranch" HEAD 2>$null)
 	$baseline = if ($LASTEXITCODE -eq 0 -and $forkPoint.Count -eq 1 -and -not [string]::IsNullOrWhiteSpace($forkPoint[0])) { $forkPoint[0].Trim() }
@@ -162,14 +162,51 @@ function Repair-AgentWorktreeForkPoint([string] $Worktree, [string] $PrimaryBran
 	if ($LASTEXITCODE -eq 0) { return [pscustomobject]@{ Outcome = 'ancestor'; ForkPoint = $baseline; Baseline = $baseline } }
 	$repair = "git -C '$Worktree' rebase --onto $PrimaryTip $baseline $Branch"
 	$refusal = "Primary branch '$PrimaryBranch' was rewritten: fork point $baseline is no longer on its history, which is now at $PrimaryTip. Replay this session onto the new tip manually: $repair"
+	Test-AgentWorktreeNoGitOperation $Worktree
+	$snapshot = $null
+	$recovery = ''
 	if (@(Invoke-AgentGit @('-C', $Worktree, 'status', '--porcelain', '-z', '--untracked-files=all')).Count -ne 0) {
-		throw "Worktree '$Worktree' has staged, unstaged, or untracked changes, so it was left untouched. $refusal"
+		$tag = "fork-point-recovery-$([guid]::NewGuid()) worktree '$Worktree'"
+		$recovery = "Recovery stash tag: $tag. No recovery stash is automatically dropped."
+		try {
+			$saveOutput = @(& git -C $Worktree stash push --include-untracked -m $tag 2>&1)
+			$saveExit = $LASTEXITCODE
+			# refs/stash is shared by linked worktrees and may have moved since push; find our UUID instead.
+			$entries = @(Invoke-AgentGit @('-C', $Worktree, 'stash', 'list', '--format=%H%x09%gs') | Where-Object { $_.EndsWith($tag, [StringComparison]::Ordinal) })
+			if ($entries.Count -eq 1) {
+				$snapshot = $entries[0].Split("`t")[0]
+				$recovery = "Retained recovery stash $snapshot (tag: $tag). After resolving any partial operation or restoration, recover manually with: git -C '$Worktree' stash apply --index $snapshot."
+			}
+			if ($saveExit -ne 0 -or $null -eq $snapshot) { throw "Stash save did not complete with an identified snapshot: $($saveOutput -join '; ')" }
+			if (@(Invoke-AgentGit @('-C', $Worktree, 'status', '--porcelain', '-z', '--untracked-files=all')).Count -ne 0) { throw 'Stash save left local changes in the worktree.' }
+		}
+		catch { throw "Could not preserve local work in '$Worktree'; no rebase was started. $($_.Exception.Message) $recovery" }
 	}
-	& git -C $Worktree rebase --onto $PrimaryTip $baseline $Branch
+	$rebaseOutput = @(& git -C $Worktree rebase --onto $PrimaryTip $baseline $Branch 2>&1)
 	if ($LASTEXITCODE -ne 0) {
-		& git -C $Worktree rebase --abort
-		if ($LASTEXITCODE -ne 0) { throw "Replaying this session onto the rewritten primary branch failed, and rolling that replay back failed too, so the worktree is left mid-rebase. Roll it back manually: git -C '$Worktree' rebase --abort. $refusal" }
-		throw "Replaying this session onto the rewritten primary branch failed and was aborted, so the worktree was left untouched. $refusal"
+		$aborted = $false
+		foreach ($marker in @('rebase-merge', 'rebase-apply')) {
+			$markerPath = Get-AgentWorktreeGitValue $Worktree @('rev-parse', '--path-format=absolute', '--git-path', $marker) "Git operation marker '$marker'"
+			if (-not (Test-Path -LiteralPath $markerPath)) { continue }
+			$abortOutput = @(& git -C $Worktree rebase --abort 2>&1)
+			if ($LASTEXITCODE -ne 0) { throw "Replaying this session failed, and abort failed, so '$Worktree' is left mid-rebase. No saved local work was applied. Roll it back manually: git -C '$Worktree' rebase --abort. $($abortOutput -join '; ') $recovery $refusal" }
+			$aborted = $true
+			break
+		}
+		if ($null -ne $snapshot) {
+			$restoreOutput = @(& git -C $Worktree stash apply --index $snapshot 2>&1)
+			if ($LASTEXITCODE -ne 0) { throw "Replaying this session failed (aborted: $aborted), and restoring saved local work also failed in '$Worktree'; restoration may be partial. $($restoreOutput -join '; ') $recovery" }
+		}
+		throw "Replaying this session failed (aborted: $aborted); saved local work was restored when present. $($rebaseOutput -join '; ') $recovery $refusal"
+	}
+	if ($null -ne $snapshot) {
+		$restoreOutput = @(& git -C $Worktree stash apply --index $snapshot 2>&1)
+		if ($LASTEXITCODE -ne 0) {
+			$failure = [Exception]::new("The rebase completed onto $PrimaryTip, but restoring saved local work failed in '$Worktree'; the rebased branch and partial restoration were preserved. $($restoreOutput -join '; ') $recovery")
+			$failure.Data['Rebased'] = $true
+			throw $failure
+		}
+		Write-Warning "Restored local work in '$Worktree'. $recovery"
 	}
 	return [pscustomobject]@{ Outcome = 'rebased'; ForkPoint = $baseline; Baseline = $PrimaryTip }
 }

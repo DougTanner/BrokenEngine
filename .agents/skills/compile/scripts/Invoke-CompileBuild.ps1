@@ -11,7 +11,7 @@
 # 1 for an internal error.
 [CmdletBinding()]
 param(
-	[Parameter(Mandatory)][ValidateSet('ThirdParty', 'DataPacker', 'Client', 'Server', 'WorktreeCli', 'AgentHarness')][string] $Target,
+	[Parameter(Mandatory)][ValidateSet('ThirdParty', 'DataPacker', 'Client', 'Server', 'ModelViewer', 'WorktreeCli', 'AgentHarness')][string] $Target,
 	[ValidateSet('Debug', 'Profile', 'Release')][string] $Configuration,
 	[string[]] $Files,
 	[switch] $AllowGaeaExport,
@@ -43,7 +43,7 @@ foreach ($parameterName in @('Target', 'Configuration')) {
 	Set-Variable -Name $parameterName -Value @($declared | Where-Object { $_ -eq $boundValue })[0]
 }
 
-$script:GameTargets = @('Client', 'Server')
+$script:GameTargets = @('Client', 'Server', 'ModelViewer')
 $script:ReleaseOnlyTargets = @('DataPacker', 'WorktreeCli', 'AgentHarness')
 $script:AgentToolsTargets = @('WorktreeCli', 'AgentHarness')
 $script:GaeaGuardVariable = 'BT_DATAPACKER_FORBID_GAEA_EXPORT'
@@ -56,9 +56,10 @@ $script:TargetFiles = @{
 	DataPacker = 'DataPacker\Platforms\VisualStudio2026\DataPacker.sln'
 	WorktreeCli = 'Tools\WorktreeCli\Platforms\VisualStudio2026\WorktreeCli.sln'
 	AgentHarness = 'Tools\AgentHarness\Platforms\VisualStudio2026\AgentHarness.sln'
+	ModelViewer = 'ModelViewer\Platforms\VisualStudio2026\ModelViewer.sln'
 }
 # --files requires a .vcxproj target, so a selective compile builds the project, not the solution.
-$script:SelectiveTargetFiles = @{}
+$script:SelectiveTargetFiles = @{ ModelViewer = 'ModelViewer\Platforms\VisualStudio2026\ModelViewer.vcxproj' }
 $script:DataOutputSuffix = $null
 
 $script:BlockedCode = $null
@@ -201,11 +202,17 @@ try {
 	elseif ([string]::IsNullOrWhiteSpace($Configuration)) {
 		Stop-CompileInvoke 'parameter.configuration-required' "-Configuration is required for $Target."
 	}
-	if ($Prefast -and (-not $isGameTarget -or $script:ResolvedConfiguration -cne 'Release')) {
+	if ($Target -ceq 'ModelViewer' -and $script:ResolvedConfiguration -ceq 'Profile') {
+		Stop-CompileInvoke 'parameter.configuration-invalid' 'ModelViewer supports Debug or Release only.'
+	}
+	if ($Target -ceq 'ModelViewer' -and -not [string]::IsNullOrWhiteSpace($Project) -and $Project -cne 'BrokenEngineSandbox') {
+		Stop-CompileInvoke 'parameter.project-invalid' 'ModelViewer uses BrokenEngineSandbox data; -Project cannot select another data owner.'
+	}
+	if ($Prefast -and ($Target -cnotin @('Client', 'Server') -or $script:ResolvedConfiguration -cne 'Release')) {
 		Stop-CompileInvoke 'parameter.prefast-invalid' 'PREfast verification applies to Client or Server Release builds only.'
 	}
 	# Profile is blocked because the global property would override the client Profile's clang-tidy opt-out.
-	if ($ClangTidy -and ($Prefast -or $script:ResolvedConfiguration -ceq 'Profile' -or -not ($isGameTarget -or $Target -ceq 'DataPacker'))) {
+	if ($ClangTidy -and ($Prefast -or $script:ResolvedConfiguration -ceq 'Profile' -or $Target -cnotin @('Client', 'Server', 'DataPacker'))) {
 		Stop-CompileInvoke 'parameter.clangtidy-invalid' 'Clang-Tidy verification applies to Client or Server Debug or Release builds and DataPacker builds only, and never with -Prefast.'
 	}
 	if (-not $isGameTarget) {
@@ -214,7 +221,7 @@ try {
 			@{ Set = [bool]$AllowGaeaExport; Name = '-AllowGaeaExport' },
 			@{ Set = [bool]$ForbidExpensiveExport; Name = '-ForbidExpensiveExport' },
 			@{ Set = -not [string]::IsNullOrWhiteSpace($Project); Name = '-Project' })) {
-			if ($pair.Set) { Stop-CompileInvoke 'parameter.game-only' "$($pair.Name) applies to Client or Server builds only." }
+			if ($pair.Set) { Stop-CompileInvoke 'parameter.game-only' "$($pair.Name) applies to Client, Server or ModelViewer builds only." }
 		}
 	}
 	if ($null -ne $Files) {
@@ -228,6 +235,7 @@ try {
 	if (-not [string]::IsNullOrWhiteSpace($PrimaryCheckout)) { $contextArguments.AddRange([string[]]@('-PrimaryCheckout', $PrimaryCheckout)) }
 	if (-not [string]::IsNullOrWhiteSpace($Baseline)) { $contextArguments.AddRange([string[]]@('-Baseline', $Baseline)) }
 	if (-not [string]::IsNullOrWhiteSpace($Project)) { $contextArguments.AddRange([string[]]@('-Project', $Project)) }
+	if ($Target -ceq 'ModelViewer') { $contextArguments.AddRange([string[]]@('-Target', 'ModelViewer')) }
 	if ($isGameTarget) { $contextArguments.Add('-IncludeDevEnvDir') }
 	$contextResponse = Invoke-CompileScript 'Resolve-CompileContext.ps1' $contextArguments.ToArray()
 	$context = ConvertFrom-ChildJson $contextResponse.Stdout 'Resolve-CompileContext.ps1'
@@ -331,17 +339,36 @@ try {
 		"/p:GeneratedDataIncludeRoot=$generatedDataIncludeRoot"
 	)
 	$script:Summary.Add("RunDataPacker=$(if ($runGeneration) { 'true' } else { 'false' })")
+	if ($Target -ceq 'ModelViewer') {
+		# Visual Studio imports the same resolved data properties as this build; its project generates
+		# the default-root header from those properties before compiling the viewer host.
+		$viewerBuildDirectory = Join-Path $script:Root 'ModelViewer\Platforms\VisualStudio2026\Build'
+		[void] [IO.Directory]::CreateDirectory($viewerBuildDirectory)
+		$escapedDataDirectory = [Security.SecurityElement]::Escape($gameDataDirectory)
+		$escapedIncludeRoot = [Security.SecurityElement]::Escape($generatedDataIncludeRoot)
+		$resolvedProperties = @"
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <DataBuildMode>$dataBuildMode</DataBuildMode>
+    <RunDataPacker>$(if ($runGeneration) { 'true' } else { 'false' })</RunDataPacker>
+    <GameDataDirectory>$escapedDataDirectory</GameDataDirectory>
+    <GeneratedDataIncludeRoot>$escapedIncludeRoot</GeneratedDataIncludeRoot>
+  </PropertyGroup>
+</Project>
+"@
+		[IO.File]::WriteAllText((Join-Path $viewerBuildDirectory 'ResolvedData.props'), $resolvedProperties)
+	}
 
 	if (-not $runGeneration) {
 		# The harness claim reads its data directory from this record, and the claim and launch compare the
 		# Shared data directory against its listing. The listing is taken before MSBuild runs, so a refresh
 		# during the build differs at the next comparison, and a failed build keeps the previous record.
 		[string[]] $sharedDataListing = @()
-		if ($dataBuildMode -ceq 'Shared' -and $script:SelectedFiles.Count -eq 0) {
+		if ($dataBuildMode -ceq 'Shared' -and $script:SelectedFiles.Count -eq 0 -and $Target -cne 'ModelViewer') {
 			$sharedDataListing = [string[]]@(Get-AgentDataListing $gameDataDirectory)
 		}
 		$buildExitCode = Invoke-WorktreeCliBuild $dataProperties
-		if ($buildExitCode -eq 0 -and $script:SelectedFiles.Count -eq 0) {
+		if ($buildExitCode -eq 0 -and $script:SelectedFiles.Count -eq 0 -and $Target -cne 'ModelViewer') {
 			Write-AgentSharedDataRecord $script:Root $gameProject $Target $script:ResolvedConfiguration $gameDataDirectory $sharedDataListing
 		}
 		Complete-CompileBuild $buildExitCode
@@ -431,7 +458,7 @@ try {
 		$script:Summary.Add("A failure reporting 'Gaea.Swarm export blocked by $($script:GaeaGuardVariable)=1' means this worktree's island inputs differ from the shared Gaea bake. When this worktree is behind primary main, rebase onto it. A change to this worktree's own island inputs exports only through -AllowGaeaExport, which only an approved plan or acceptance criterion requiring that island re-bake authorizes.")
 	}
 	# Local output needs no listing: the comparison skips data directories under the worktree root.
-	if ($buildExitCode -eq 0 -and $script:SelectedFiles.Count -eq 0) {
+	if ($buildExitCode -eq 0 -and $script:SelectedFiles.Count -eq 0 -and $Target -cne 'ModelViewer') {
 		Write-AgentSharedDataRecord $script:Root $gameProject $Target $script:ResolvedConfiguration $gameDataDirectory @()
 	}
 

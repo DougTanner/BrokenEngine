@@ -30,6 +30,11 @@ Renderer-wide frame and recreation ordering stays in Graphics; the contracts bel
 
 Vulkan instance, physical-device selection, and the Win32 surface. Capability validation runs against the finally selected device before logical-device creation and covers the selected required core/Vulkan 1.2 features plus format-specific optimal-tiling support; `DeviceManager` must enable every feature required here.
 
+Presentation selects the first advertised `R8G8B8A8_UNORM` or
+`B8G8R8A8_UNORM` paired with `SRGB_NONLINEAR`; startup fails if no such
+pair exists. Scene display transfer belongs to the
+[HDR resolve](../../../Data/Shaders/AGENTS.md#top-level-shaders).
+
 Under RenderDoc (`renderdoc.dll` loaded), the validation layer, its
 `VK_EXT_layer_settings` extension, and the `VkLayerSettingsCreateInfoEXT`
 `pNext` chain must be dropped together; the retry path on a machine without the
@@ -66,7 +71,18 @@ Per-framebuffer command buffers and the submission graph. The Global and Main re
 
 All GPU buffers: vertex (terrain, water, models), uniform (per-framebuffer view/projection), and storage (dynamic game objects, particles, skinning). Model buffers are indexed by CRC.
 
-- Collections register storage buffers during `CreatePipelines()` through the CRC-keyed dynamic buffer system with three categories (main, visible lights, wind deposit). Access is templated with runtime size validation, and automatic resizing defers destruction to avoid validation errors from in-flight command buffers.
+- Collections create storage buffers in `GraphicsResources()` through the
+  CRC-keyed dynamic buffer system with two categories (main, visible lights).
+  Access is templated with runtime size validation, and
+  automatic resizing defers destruction to avoid validation errors from
+  in-flight command buffers. Each creator passes its own file-local
+  `kiDynamicBufferInitialCapacity` to `CreateDynamicBuffer` as the buffer's
+  starting element count. The `DebugRender` buffers take theirs from
+  `PipelineManager.cpp` `CreateDebugRenderPipelines`; a grow warning names
+  `DebugRender`, whose own file holds no count. The `DynamicPipelines` helpers
+  create no buffer, so the creator creates it before registering the pipeline.
+  A buffer that must grow doubles its own size until it fits, and each grow
+  logs a warning naming that constant and calls `DEBUG_BREAK()`.
 - Skinning bump-allocates mesh data and joint matrices per frame with
   per-command-buffer offset tracking, auto-grows by doubling, and propagates
   descriptor updates to model pipelines. Joint matrices use a compact 3-row
@@ -171,8 +187,13 @@ whole-cell offset in the update pass, and a larger step resets the pool.
 
 Integrates Dear ImGui with a dedicated load-preserving overlay pass. It records the UI command buffer each frame, waits for Main, signals presentation, and signals the per-framebuffer fence as the frame's final graphics submission.
 
-- Owns the engine standard menu screens, `ChatScreen` (`mpChatScreen`), and the engine Tweaks screen, plus the game HUD object, the sanctioned engine-to-game dependency exception described by the Engine hub. Engine screens are called as `Render()`; the HUD is called through its own signature. Screen behavior belongs to UI documentation (`../../Ui/Screens/AGENTS.md`).
-- Theme geometry resets to ImGui defaults before scaling so it can be reapplied safely. Font scale composes framebuffer and user scaling. UI dimensions use a 2160-pixel reference height through `UiScale()`, a repository-wide convention: every authored pixel constant in engine and game UI code is written for a 2160-high screen and multiplied by `UiScale()` at use, under authoring rules owned by the engine screens hub (`../../Ui/Screens/AGENTS.md`).
+- Gameplay builds own the engine standard menu screens, `ChatScreen` (`mpChatScreen`), and the engine Tweaks screen, plus the game HUD object, the sanctioned engine-to-game dependency exception described by the Engine hub. Engine screens are called as `Render()`; the HUD is called through its own signature. Screen behavior belongs to UI documentation (`../../Ui/Screens/AGENTS.md`).
+- Theme geometry resets to ImGui defaults before scaling so it can be reapplied
+  safely. Font scale composes `UiScale()` and user scaling. Gameplay builds use
+  framebuffer height divided by the 2160-pixel reference height; authored pixel
+  constants multiply `UiScale()` under the engine screens' authoring rules
+  (`../../Ui/Screens/AGENTS.md`). ModelViewer retains `UiScale()` at 1.0 so its
+  controls use native pixel dimensions at every framebuffer size.
 - Opaque-region registration is rectangular, so rounded opaque windows must remain visually compatible with rectangular scene occlusion.
 - The Win32 backend publishes physical cursor state during frame preparation. Synthetic agent mouse position is reissued afterward so it wins last-writer ordering. Physical-input suppression parks the cursor unless an agent pin owns it and always clears backend gamepad navigation state.
 - Engine-owned ImGui textures upload changed rectangles outside the UI render

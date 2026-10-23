@@ -128,7 +128,7 @@ bool IsAdoptableStatusChange(const StatusChange& rChange)
 		else if constexpr (IsShipSpawnInfo<Data>)
 		{
 			static constexpr ShipType keShipType = std::is_same_v<Data, FightersPostRender::SpawnInfo> ? ShipType::kFighter : std::is_same_v<Data, OmnisPostRender::SpawnInfo> ? ShipType::kOmni : ShipType::kBattleship;
-			return rData.eController < ShipController::kCount && IsFlightPlaneAllowed(keShipType, GetTargetFlightPlane(rData.orders));
+			return rData.eController < ShipController::kCount && IsFlightPlaneAllowed(keShipType, GetTargetFlightPlane(rData.orders)) && (rData.uiFlightPlane == kuiNoFlightPlane || IsFlightPlaneAllowed(keShipType, rData.uiFlightPlane));
 		}
 		else if constexpr (std::is_same_v<Data, UpdateShipData>)
 		{

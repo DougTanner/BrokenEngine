@@ -13,6 +13,7 @@ param(
 	[string] $Baseline,
 	[string] $PrimaryCheckout,
 	[string] $Project,
+	[ValidateSet('ModelViewer')][string] $Target,
 	[switch] $IncludeDevEnvDir
 )
 
@@ -117,16 +118,25 @@ function Get-ContextRecommendedTargets([string[]] $Paths, [string] $Project) {
 	# contributes nothing, so this stays advisory and the worker still fixes the final list.
 	if ([string]::IsNullOrEmpty($Project)) { return @() }
 	$sharedPrefixes = @('Common/', 'Engine/', "Projects/$Project/Source/")
+	$viewerChanged = @($Paths | Where-Object {
+		$_.StartsWith('ModelViewer/', [StringComparison]::OrdinalIgnoreCase) -or
+		$_.StartsWith('Common/', [StringComparison]::OrdinalIgnoreCase) -or
+		$_.StartsWith('Engine/', [StringComparison]::OrdinalIgnoreCase)
+	}).Count -gt 0
+	$viewerTargets = @(if ($viewerChanged -or $Target -eq 'ModelViewer') {
+		@([pscustomobject][ordered]@{ project = 'ModelViewer'; configuration = 'Debug'; reason = 'viewer' })
+	})
 	foreach ($path in $Paths) {
 		foreach ($prefix in $sharedPrefixes) {
 			if ($path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
 				return @(
 					[pscustomobject][ordered]@{ project = $Project; configuration = 'Debug'; reason = 'shared-code' }
 					[pscustomobject][ordered]@{ project = "$($Project)Server"; configuration = 'Debug'; reason = 'shared-code' }
-				)
+				) + $viewerTargets
 			}
 		}
 	}
+	if ($viewerTargets.Count -gt 0) { return $viewerTargets }
 	return @([pscustomobject][ordered]@{ project = $Project; configuration = 'Debug'; reason = 'default' })
 }
 
@@ -164,6 +174,12 @@ try {
 	# With several game projects and none named, the project stays null and the caller picks from projects.
 	$projects = @(Get-AgentGameProjects $root)
 	$script:Result.projects = $projects
+	if ($Target -eq 'ModelViewer') {
+		if (-not [string]::IsNullOrWhiteSpace($Project) -and $Project.Trim() -cne 'BrokenEngineSandbox') {
+			Stop-CompileContext 'project.invalid-data-owner' 'ModelViewer uses BrokenEngineSandbox data.'
+		}
+		$Project = 'BrokenEngineSandbox'
+	}
 	if (-not [string]::IsNullOrWhiteSpace($Project)) {
 		$projectInput = $Project.Trim()
 		if ($projectInput -cnotin $projects) {

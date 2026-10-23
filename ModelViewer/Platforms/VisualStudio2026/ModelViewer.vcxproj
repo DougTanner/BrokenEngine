@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <ProjectGuid>{E651848A-CC5C-4D67-AF0F-04F3BE95C228}</ProjectGuid>
+    <RootNamespace>ModelViewer</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+    <WholeProgramOptimization Condition="'$(Configuration)'=='Release'">true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <Import Project="$(ProjectDir)Build\ResolvedData.props" Condition="exists('$(ProjectDir)Build\ResolvedData.props')" />
+  <PropertyGroup>
+    <DataRepositoryRoot>$([System.IO.Path]::GetFullPath('$(ProjectDir)..\..\..'))</DataRepositoryRoot>
+    <DataRepositoryIsLinkedWorktree>$([System.IO.File]::Exists('$(DataRepositoryRoot)\.git'))</DataRepositoryIsLinkedWorktree>
+    <DataBuildMode Condition="'$(DataBuildMode)'==''">Local</DataBuildMode>
+    <RunDataPacker Condition="'$(RunDataPacker)'=='' and '$(DataBuildMode)'=='Local' and '$(DataRepositoryIsLinkedWorktree)'!='True'">true</RunDataPacker>
+    <RunDataPacker Condition="'$(RunDataPacker)'==''">false</RunDataPacker>
+    <GameDataDirectory Condition="'$(GameDataDirectory)'=='' and '$(DataBuildMode)'=='Local'">$(DataRepositoryRoot)\Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output\Data</GameDataDirectory>
+    <GeneratedDataIncludeRoot Condition="'$(GeneratedDataIncludeRoot)'=='' and '$(GameDataDirectory)'!=''">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetFullPath('$(GameDataDirectory)'))))</GeneratedDataIncludeRoot>
+    <GameDataDirectoryIsAbsolute Condition="'$(GameDataDirectory)'!=''">$([System.Text.RegularExpressions.Regex]::IsMatch('$(GameDataDirectory)', '^(?:[A-Za-z]:[\\/]|[\\/]{2})'))</GameDataDirectoryIsAbsolute>
+    <OutDir>$(ProjectDir)Output\</OutDir>
+    <IntDir>$(ProjectDir)Build\$(ProjectName)\$(Configuration)\</IntDir>
+    <TargetName Condition="'$(Configuration)'=='Debug'">$(ProjectName).Debug</TargetName>
+    <TargetName Condition="'$(Configuration)'=='Release'">$(ProjectName)</TargetName>
+    <LinkIncremental>false</LinkIncremental>
+    <CustomBuildAfterTargets>PreBuildEvent</CustomBuildAfterTargets>
+    <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
+    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+    <ClangTidyToolExeAdditionalOptions>--quiet</ClangTidyToolExeAdditionalOptions>
+    <ClangTidyChecks>clang-analyzer-*,-clang-analyzer-optin.core.EnumCastOutOfRange,-clang-analyzer-deadcode.DeadStores,-clang-analyzer-security.ArrayBound</ClangTidyChecks>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <RunCodeAnalysis>true</RunCodeAnalysis>
+    <EnableMicrosoftCodeAnalysis>true</EnableMicrosoftCodeAnalysis>
+    <CodeAnalysisRuleSet>$(DataRepositoryRoot)\Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\BrokenEngineAnalysis.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <ConformanceMode>false</ConformanceMode>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <FloatingPointModel>Strict</FloatingPointModel>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\Source;$(ProjectDir)Build;$(GeneratedDataIncludeRoot);$(VK_SDK_PATH)\Include;$(ProjectDir)..\..\..\ThirdParty;$(ProjectDir)..\..\..\ThirdParty\enet\include;$(ProjectDir)..\..\..\ThirdParty\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)..\..\..\ThirdParty\mimalloc\include;$(ProjectDir)..\..\..\ThirdParty\imgui;$(ProjectDir)..\..\..\ThirdParty\implot;$(ProjectDir)..\..\..\ThirdParty\DirectXTK\Inc;$(ProjectDir)..\..\..\ThirdParty\RenderDoc;$(ProjectDir)..\..\..\Common;$(ProjectDir)..\..\..\Common\ClangTidyShims;$(ProjectDir)..\..\..\Engine\Source;$(ProjectDir)..\..\..\Engine\Data;$(ProjectDir)..\..\..\Projects\BrokenEngineSandbox\Data;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>BT_ENGINE;BT_CLIENT;BT_MODEL_VIEWER;BT_MODEL_VIEWER;_ITERATOR_DEBUG_LEVEL=0;_MSVC_STL_HARDENING_VECTOR=0;_MSVC_STL_HARDENING_SPAN=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ExceptionHandling>Async</ExceptionHandling>
+      <EnableModules>false</EnableModules>
+      <BuildStlModules>false</BuildStlModules>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalLibraryDirectories>$(VK_SDK_PATH)\Lib;$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ThirdParty.$(Configuration).lib;ws2_32.lib;winmm.lib;Rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PreBuildEvent>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(DataRepositoryRoot)\.agents\scripts\Provision-WorktreeThirdParty.ps1" -RepositoryRoot "$(DataRepositoryRoot)"
+if errorlevel 1 exit /b %errorlevel%
+if not EXIST "$(DataRepositoryRoot)\ThirdParty\Prebuilts\Platforms\VisualStudio2026\Output\ThirdParty.$(Configuration).lib" ( echo Required ThirdParty.$(Configuration).lib is missing after provisioning. 1&gt;&amp;2 &amp; exit /b 1 )
+if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="True" (
+    "$(DevEnvDir)devenv" "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
+    if errorlevel 1 exit /b 1
+)
+if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(DataRepositoryIsLinkedWorktree)"=="False" if not EXIST "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" (
+    "$(DevEnvDir)devenv" "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.sln" /Build "Release|x64" /project "$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\DataPacker.vcxproj"
+    if errorlevel 1 exit /b 1
+)
+</Command>
+    </PreBuildEvent>
+    <CustomBuildStep>
+      <Command Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">"$(DataRepositoryRoot)\DataPacker\Platforms\VisualStudio2026\Output\DataPacker.exe" "$(DataRepositoryRoot)\Engine\Data" "$(DataRepositoryRoot)\Projects\BrokenEngineSandbox\Data" "$(GameDataDirectory)"</Command>
+      <Message Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">Running DataPacker.exe</Message>
+      <Outputs Condition="'$(DataBuildMode)'=='Local' and '$(RunDataPacker)'=='true'">true</Outputs>
+    </CustomBuildStep>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>BT_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <SupportJustMyCode>false</SupportJustMyCode>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <MinimalRebuild>false</MinimalRebuild>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <PreprocessorDefinitions>BT_RELEASE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <EnablePREfast>true</EnablePREfast>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+    </ClCompile>
+    <Link><EnableCOMDATFolding>true</EnableCOMDATFolding><OptimizeReferences>true</OptimizeReferences><LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration></Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Source\Pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
+    <ClInclude Include="..\..\Source\Pch.h" />
+    <ClInclude Include="..\..\..\Engine\Data\Shaders\ShaderLayoutsBase.h" />
+    <ClInclude Include="..\..\..\Projects\BrokenEngineSandbox\Data\Shaders\ShaderLayouts.h" />
+    <ClInclude Include="$(ProjectDir)Build\ModelViewerDataRoot.h" />
+    <ClInclude Include="$(GameDataDirectory)\Data.h" />
+    <ClInclude Include="$(GameDataDirectory)\DataTypes.h" />
+    <ClInclude Include="$(GameDataDirectory)\Audio.h" />
+    <ClInclude Include="$(GameDataDirectory)\Scene.h" />
+    <ClInclude Include="$(GameDataDirectory)\Islands.h" />
+    <ClInclude Include="$(GameDataDirectory)\Model.h" />
+    <ClInclude Include="$(GameDataDirectory)\Shader.h" />
+    <ClInclude Include="$(GameDataDirectory)\Texture.h" />
+    <ClInclude Include="$(GameDataDirectory)\Raw.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\Common\Determinism.cpp" />
+    <ClCompile Include="..\..\..\Common\ErrorUtils.cpp" />
+    <ClCompile Include="..\..\..\Common\Log\DiagnosticLog.cpp" />
+    <ClCompile Include="..\..\..\Common\Log\Log.cpp" />
+    <ClCompile Include="..\..\..\Common\Math\MathUtils.cpp" />
+    <ClCompile Include="..\..\..\Common\Math\Random.cpp" />
+    <ClCompile Include="..\..\..\Common\Smoothed.cpp" />
+    <ClCompile Include="..\..\..\Common\StringUtils.cpp" />
+    <ClCompile Include="..\..\..\Common\TextureFormat.cpp" />
+    <ClCompile Include="..\..\..\Common\Threading\Multithreading.cpp" />
+    <ClCompile Include="..\..\..\Common\Threading\PersistentWorker.cpp" />
+    <ClCompile Include="..\..\..\Common\Threading\ThreadLocal.cpp" />
+    <ClCompile Include="..\..\..\Common\WindowsUtils.cpp" />
+    <ClCompile Include="..\..\..\Common\Workbuffer.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Agent\AgentInput.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Agent\AgentUiRegistry.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\CrashReport.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\File\FileManager.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\File\PackChunkLoader.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\File\PackChunks.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Frame\FlightPlanes.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Frame\IslandChainPlacement.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Frame\IslandTerrain.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Frame\IslandTerrainResidency.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\AnimationData.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\CameraBase.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Debug\DebugRender.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Graphics.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\GraphicsUtils.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Islands.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\BufferManager.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\CommandBufferManager.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\CommandBufferRecordGlobal.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\CommandBufferRecordMain.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\DeviceManager.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\DynamicPipelines.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\ImGuiManager.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\InstanceManager.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\ParticleManager.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\PipelineManager.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\RenderTargetTextures.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\RenderTargetTexturesLighting.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\SwapchainManager.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\TextureCache.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\TextureDescriptors.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\TextureManager.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\TextureUploadManager.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Managers\WorldLightingShadowPipelines.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Objects\Buffer.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Objects\CommandBuffers.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Objects\ModelPipeline.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Objects\Pipeline.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Objects\PipelineCreator.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Objects\PipelineDescriptorWriter.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Objects\Shader.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Objects\Texture.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\OneShotCommandBuffer.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\GlobalUniforms.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\LightingUniforms.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\MainUniforms.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\SmokeUniforms.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\WaterUniforms.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\WindUniforms.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Graphics\Screenshot.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\LaunchOptions.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Memory\GlobalAllocator.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Profile\ProfileManager.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\GraphicsSettings.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\HexShieldWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\LightingWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\MiscWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\PbrWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\ShadowWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\SmokeWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\SunMoonWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\TerrainWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\WaterWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\WindWrappersBase.cpp" />
+    <ClCompile Include="..\..\..\Engine\Source\Ui\WrapperBase.cpp" />
+    <ClCompile Include="..\..\Source\Graphics\Camera.cpp" />
+    <ClCompile Include="..\..\Source\Main.cpp" />
+    <ClCompile Include="..\..\Source\ModelViewerApplication.cpp" />
+    <ClInclude Include="..\..\..\Common\AlignedMemory.h" />
+    <ClInclude Include="..\..\..\Common\AllocationTracking.h" />
+    <ClInclude Include="..\..\..\Common\Common.h" />
+    <ClInclude Include="..\..\..\Common\Crc.h" />
+    <ClInclude Include="..\..\..\Common\DataFile.h" />
+    <ClInclude Include="..\..\..\Common\Determinism.h" />
+    <ClInclude Include="..\..\..\Common\ErrorUtils.h" />
+    <ClInclude Include="..\..\..\Common\ExternalHeaders.h" />
+    <ClInclude Include="..\..\..\Common\FileUtils.h" />
+    <ClInclude Include="..\..\..\Common\Flags.h" />
+    <ClInclude Include="..\..\..\Common\Log\DiagnosticLog.h" />
+    <ClInclude Include="..\..\..\Common\Log\Log.h" />
+    <ClInclude Include="..\..\..\Common\Log\LogDifference.h" />
+    <ClInclude Include="..\..\..\Common\Log\LogFormatters.h" />
+    <ClInclude Include="..\..\..\Common\Log\LogTypes.h" />
+    <ClInclude Include="..\..\..\Common\Math\ConvexHull.h" />
+    <ClInclude Include="..\..\..\Common\Math\MathUtils.h" />
+    <ClInclude Include="..\..\..\Common\Math\Random.h" />
+    <ClInclude Include="..\..\..\Common\ScopedLambda.h" />
+    <ClInclude Include="..\..\..\Common\Serialization.h" />
+    <ClInclude Include="..\..\..\Common\Sha256Hasher.h" />
+    <ClInclude Include="..\..\..\Common\Singleton.h" />
+    <ClInclude Include="..\..\..\Common\Smoothed.h" />
+    <ClInclude Include="..\..\..\Common\StableVector.h" />
+    <ClInclude Include="..\..\..\Common\StackWalker.h" />
+    <ClInclude Include="..\..\..\Common\StringUtils.h" />
+    <ClInclude Include="..\..\..\Common\TextureFormat.h" />
+    <ClInclude Include="..\..\..\Common\Threading\Multithreading.h" />
+    <ClInclude Include="..\..\..\Common\Threading\PersistentWorker.h" />
+    <ClInclude Include="..\..\..\Common\Threading\ThreadLocal.h" />
+    <ClInclude Include="..\..\..\Common\Timer.h" />
+    <ClInclude Include="..\..\..\Common\WindowsUtils.h" />
+    <ClInclude Include="..\..\..\Common\Workbuffer.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Agent\AgentCommandsClientGeneric.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Agent\AgentCommandServer.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Agent\AgentCommandsShared.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Agent\AgentInput.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Agent\AgentUiRegistry.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Agent\Commands\AudioStreamingHarnessRig.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Audio\AudioManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Audio\AudioUtility.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Audio\StaticVoice.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Audio\StaticVoices.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Audio\StreamingVoices.h" />
+    <ClInclude Include="..\..\..\Engine\Source\CrashReport.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Engine.h" />
+    <ClInclude Include="..\..\..\Engine\Source\EngineSwitches.h" />
+    <ClInclude Include="..\..\..\Engine\Source\File\DifferenceStream.h" />
+    <ClInclude Include="..\..\..\Engine\Source\File\FileManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\File\PackChunkLoader.h" />
+    <ClInclude Include="..\..\..\Engine\Source\File\PackChunks.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Alignments.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\AreaDamage.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\CellStaticData.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\AreaLights\AreaLights.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\Billboards\Billboards.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\Collection.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\CollectionController.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\CollectionId.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\CollectionLifecycle.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\CollectionMemory.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\Explosions\Explosions.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\HexShields\HexShields.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\PointLights\PointLights.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\Puffs\Puffs.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\Pushers\Pushers.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\SmokeTrails\SmokeTrails.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\Sounds\Sounds.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\WindRadials\WindRadials.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collections\WindTrails\WindTrails.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\Collision.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\FlightPlanes.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\FrameBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\FrameRegistry.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\FrameUtils.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\GridCoord.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\IslandChainPlacement.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\IslandTerrain.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\IslandTerrainResidency.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\NavBuild.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\TerrainCollisionUtils.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Frame\TimeStep.h" />
+    <ClInclude Include="..\..\..\Engine\Source\GameBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\AnimationData.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\CameraBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Debug\DebugRender.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Graphics.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\GraphicsUtils.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Islands.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\BufferManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\CommandBufferManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\CommandBufferRecordGlobal.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\CommandBufferRecordMain.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\DeviceManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\DynamicPipelines.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\ImGuiManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\InstanceManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\ParticleManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\PipelineManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\RenderTargetTextures.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\SwapchainManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\TextureCache.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\TextureDescriptors.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\TextureManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\TextureUploadManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Managers\WorldLightingShadowPipelines.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Objects\Buffer.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Objects\CommandBuffers.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Objects\ModelPipeline.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Objects\Pipeline.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Objects\PipelineCreator.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Objects\PipelineDescriptorWriter.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Objects\Shader.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Objects\Texture.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\OneShotCommandBuffer.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Render\Render.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Graphics\Screenshot.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Input\Input.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Input\RawInputManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\LaunchOptions.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Memory\GlobalAllocator.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Network\ChatText.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Network\Client\Client.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Network\Client\ClientSessionRuntime.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Network\Client\ClientSubscriptions.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Network\NetworkCursor.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Network\NetworkDiscoveryScanner.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Network\NetworkManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Network\NetworkMessages.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Network\NetworkProtocol.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Network\NetworkSerialization.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Network\NetworkSimulation.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Profile\ProfileManager.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\ChatLog.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\CurveData.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\GraphicsSettings.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\GraphicsSettingsWrappersBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\HeightLerpWrapperQuartet.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\HexShieldWrappersBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\LightingWrappersBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\LocalizationBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\MiscWrappersBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\PbrWrappersBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\Screens\ChatScreen.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\Screens\GameSettingsScreen.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\Screens\GraphicsMenuScreen.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\Screens\MainMenuScreen.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\Screens\ModalScreen.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\Screens\PauseMenuScreen.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\Screens\SoundMenuScreen.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\Screens\TweaksScreen\TweaksScreen.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\ShadowWrappersBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\SmokeWrappersBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\SoundSettingsWrappersBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\SunMoonWrappersBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\TerrainWrappersBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\TweaksSettings.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\WaterWrappersBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\WindWrappersBase.h" />
+    <ClInclude Include="..\..\..\Engine\Source\Ui\WrapperBase.h" />
+    <ClInclude Include="..\..\Source\Frame\FlightPlaneTable.h" />
+    <ClInclude Include="..\..\Source\Frame\Frame.h" />
+    <ClInclude Include="..\..\Source\Game.h" />
+    <ClInclude Include="..\..\Source\Graphics\Camera.h" />
+    <ClInclude Include="..\..\Source\ModelViewerApplication.h" />
+    <ClInclude Include="..\..\Source\Profile\ProfileRows.h" />
+  </ItemGroup>
+  <Target Name="ValidateDataBuildProperties" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(Configuration)|$(Platform)'!='Debug|x64' and '$(Configuration)|$(Platform)'!='Release|x64'" Text="ModelViewer supports Debug|x64 or Release|x64." />
+    <Error Condition="'$(DataBuildMode)'!='Local' and '$(DataBuildMode)'!='Shared'" Text="DataBuildMode must be Local or Shared." />
+    <Error Condition="'$(RunDataPacker)'!='true' and '$(RunDataPacker)'!='false'" Text="RunDataPacker must be true or false." />
+    <Error Condition="'$(DataBuildMode)'=='Shared' and '$(RunDataPacker)'!='false'" Text="Shared DataBuildMode requires RunDataPacker=false." />
+    <Error Condition="'$(GameDataDirectoryIsAbsolute)'!='True'" Text="ModelViewer requires an absolute GameDataDirectory; configure data through /compile." />
+  </Target>
+  <Target Name="PrepareModelViewerData" BeforeTargets="ClCompile" DependsOnTargets="CustomBuildStep">
+    <ItemGroup>
+      <RequiredViewerData Include="$(GameDataDirectory)\Data.h;$(GameDataDirectory)\DataTypes.h" />
+      <ViewerDataType Include="Audio;Scene;Islands;Model;Shader;Texture;Raw" />
+      <RequiredViewerData Include="@(ViewerDataType->'$(GameDataDirectory)\%(Identity).h');@(ViewerDataType->'$(GameDataDirectory)\%(Identity).pack');@(ViewerDataType->'$(GameDataDirectory)\%(Identity).manifest')" />
+    </ItemGroup>
+    <Error Condition="!Exists('%(RequiredViewerData.Identity)')" Text="ModelViewer required data input is missing: %(RequiredViewerData.Identity)" />
+    <MakeDir Directories="$(ProjectDir)Build" />
+    <WriteLinesToFile File="$(ProjectDir)Build\ModelViewerDataRoot.h" Lines="#pragma once&#xA;namespace game { inline constexpr const wchar_t* kpcDefaultDataDirectory = LR&quot;($(GameDataDirectory))&quot;%3B }" Overwrite="true" WriteOnlyWhenDifferent="true" Encoding="UTF-8" />
+  </Target>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

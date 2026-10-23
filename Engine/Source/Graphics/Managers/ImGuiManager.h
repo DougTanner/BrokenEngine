@@ -61,7 +61,9 @@ public:
 
 	float mfUiScale = 1.0f;
 
+#if !defined(BT_MODEL_VIEWER)
 	std::unique_ptr<TweaksScreen> mpTweaksScreen;
+#endif
 
 	VkBuffer mUiPrepassIndirectVkBuffer = VK_NULL_HANDLE;
 
@@ -99,6 +101,7 @@ private:
 
 public:
 
+#if !defined(BT_MODEL_VIEWER)
 	std::unique_ptr<MainMenuScreen> mpMainMenuScreen;
 	std::unique_ptr<ModalScreen> mpModalScreen;
 	std::unique_ptr<PauseMenuScreen> mpPauseMenuScreen;
@@ -107,6 +110,7 @@ public:
 	std::unique_ptr<GameSettingsScreen> mpGameSettingsScreen;
 	std::unique_ptr<game::HudScreen> mpHudScreen;
 	std::unique_ptr<ChatScreen> mpChatScreen;
+#endif
 
 private:
 
@@ -134,7 +138,6 @@ inline ImGuiManager* gpImGuiManager = nullptr;
 
 inline constexpr float kfUiReferenceHeight = 2'160.0f;
 
-// Resolution scale relative to the 2160-high reference monitor; multiply raw pixel constants by this
 inline float UiScale()
 {
 	return gpImGuiManager != nullptr ? gpImGuiManager->mfUiScale : 1.0f;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SceneExportData.h"
+
 namespace tinygltf { class Model; class Node; struct Material; }
 
 // Hash function for the (originalMaterial, nodeIndex, hasSkinning) effective-material key
@@ -13,25 +15,11 @@ struct MaterialNodeKeyHash
 
 using MaterialNodeMap = std::unordered_map<std::tuple<int64_t, int64_t, bool>, int64_t, MaterialNodeKeyHash>;
 
-struct Material
-{
-	std::vector<uint32_t> indexBuffer;
-};
-
 struct Parent
 {
 	const Parent* pParent = nullptr;
 	XMMATRIX matNode {};
 	int64_t iNodeIndex = -1;
-};
-
-// Tracks per-material skinning metadata during export
-struct MaterialNodeInfo
-{
-	bool bHasSkinning = false;  // Deformation mode of every primitive routed to this material
-	int64_t iNodeIndex = -1;        // Node index of the mesh contributing to this material
-	XMMATRIX matMeshWorld = XMMatrixIdentity();  // World transform of mesh at bind pose (accumulated matLocal)
-	int64_t iOriginalMaterialIndex = -1;  // Original glTF material index (for split materials)
 };
 
 XMMATRIX ComputeNodeWorldTransform(int64_t iNodeIndex, const tinygltf::Model& rModel, const std::unordered_map<int64_t, int64_t>& rNodeParentMap);
@@ -45,6 +33,7 @@ struct LoadVerticesContext
 	std::vector<Material>& rMaterials;
 	std::vector<MaterialNodeInfo>& rMaterialNodeInfos;
 	MaterialNodeMap& rMaterialNodeMap;
+	std::string_view sourcePath;
 	bool bHasSkeleton = false;
 };
 
@@ -53,3 +42,9 @@ void LoadVertices(const Parent* pParent, int64_t iCurrentNodeIndex, const tinygl
 bool IsNonOcclusionUse(int64_t iIndex, const tinygltf::Material& rMaterial);
 bool IsOcclusion(int64_t iIndex, const tinygltf::Material& rMaterial);
 bool IsNormal(int64_t iIndex, const tinygltf::Material& rMaterial);
+
+int64_t ResolveEffectiveMaterial(std::vector<Material>& rMaterials, std::vector<MaterialNodeInfo>& rMaterialNodeInfos, MaterialNodeMap& rMaterialNodeMap, int64_t iOriginalMaterial, int64_t iCurrentNodeIndex, bool bHasSkinning, const XMMATRIX& rMatMeshWorld);
+void AccumulateDrawnBounds(const std::vector<common::ModelVertex>& rVertices, const std::vector<Material>& rMaterials, const std::vector<MaterialNodeInfo>& rMaterialNodeInfos, const std::vector<XMMATRIX>& rJointMatrices, bool bMeshLocal, XMVECTOR& rVecMin, XMVECTOR& rVecMax);
+float BoundsLongestExtent(FXMVECTOR vecMin, FXMVECTOR vecMax);
+XMVECTOR BoundsCenter(FXMVECTOR vecMin, FXMVECTOR vecMax);
+void SetMaterialTransform(const MaterialNodeInfo& rInfo, bool bHasSkeleton, const XMMATRIX& rMatNodeWorld, common::MaterialInfo& rMaterialInfo);

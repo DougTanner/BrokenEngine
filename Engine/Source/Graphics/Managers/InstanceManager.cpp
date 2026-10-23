@@ -626,7 +626,6 @@ void InstanceManager::SelectSurfaceFormat()
 {
 	uint32_t uiFormatCount = 0;
 	CHECK_VK(vkGetPhysicalDeviceSurfaceFormatsKHR(mVkPhysicalDevice, mVkSurfaceKHR, &uiFormatCount, nullptr));
-	ASSERT(uiFormatCount != 0);
 	std::vector<VkSurfaceFormatKHR> physicalDeviceSurfaceFormats(uiFormatCount);
 	CHECK_VK(vkGetPhysicalDeviceSurfaceFormatsKHR(mVkPhysicalDevice, mVkSurfaceKHR, &uiFormatCount, physicalDeviceSurfaceFormats.data()));
 
@@ -637,34 +636,18 @@ void InstanceManager::SelectSurfaceFormat()
 	}
 	LOG(kGraphics, kInfo, "");
 
-	// If the format list includes just one entry of VK_FORMAT_UNDEFINED, the surface has no preferred format
-	if (uiFormatCount == 1 && physicalDeviceSurfaceFormats.at(0).format == VK_FORMAT_UNDEFINED)
+	for (const VkSurfaceFormatKHR& rVkSurfaceFormatKHR : physicalDeviceSurfaceFormats)
 	{
-		mFramebufferVkFormat = VK_FORMAT_B8G8R8A8_UNORM;
-		LOG(kGraphics, kInfo, "Selected framebuffer format: {} with color space: {} (no preferred format)\n", string_VkFormat(mFramebufferVkFormat), string_VkColorSpaceKHR(mFramebufferVkColorSpaceKHR));
-	}
-	else
-	{
-		bool bFoundPreferredFormat = false;
-		for (const VkSurfaceFormatKHR& rVkSurfaceFormatKHR : physicalDeviceSurfaceFormats)
+		if ((rVkSurfaceFormatKHR.format == VK_FORMAT_B8G8R8A8_UNORM || rVkSurfaceFormatKHR.format == VK_FORMAT_R8G8B8A8_UNORM) && rVkSurfaceFormatKHR.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 		{
-			if (rVkSurfaceFormatKHR.format == VK_FORMAT_B8G8R8A8_UNORM || rVkSurfaceFormatKHR.format == VK_FORMAT_R8G8B8A8_UNORM)
-			{
-				mFramebufferVkFormat = rVkSurfaceFormatKHR.format;
-				mFramebufferVkColorSpaceKHR = rVkSurfaceFormatKHR.colorSpace;
-				bFoundPreferredFormat = true;
-				LOG(kGraphics, kInfo, "Selected framebuffer format: {} with color space: {}\n", string_VkFormat(mFramebufferVkFormat), string_VkColorSpaceKHR(mFramebufferVkColorSpaceKHR));
-				break;
-			}
+			mFramebufferVkFormat = rVkSurfaceFormatKHR.format;
+			mFramebufferVkColorSpaceKHR = rVkSurfaceFormatKHR.colorSpace;
+			LOG(kGraphics, kInfo, "Selected framebuffer format: {} with color space: {}\n", string_VkFormat(mFramebufferVkFormat), string_VkColorSpaceKHR(mFramebufferVkColorSpaceKHR));
+			return;
 		}
+	}
 
-		if (!bFoundPreferredFormat)
-		{
-			mFramebufferVkFormat = physicalDeviceSurfaceFormats.at(0).format;
-			mFramebufferVkColorSpaceKHR = physicalDeviceSurfaceFormats.at(0).colorSpace;
-			LOG(kGraphics, kInfo, "Using fallback surface format: {} with color space: {} (preferred formats not available)\n", string_VkFormat(mFramebufferVkFormat), string_VkColorSpaceKHR(mFramebufferVkColorSpaceKHR));
-		}
-	}
+	throw std::runtime_error("Surface does not support R8G8B8A8_UNORM or B8G8R8A8_UNORM with SRGB_NONLINEAR color space");
 }
 
 void InstanceManager::SelectDepthFormat()

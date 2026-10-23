@@ -32,7 +32,7 @@ catch { Complete-ForkPointRepair 1 'error' 'session.unresolved' "The session wor
 
 $repair = $null
 try { $repair = Repair-AgentWorktreeForkPoint $context.Worktree $context.PrimaryBranch $context.PrimaryTip $context.Branch }
-catch { Complete-ForkPointRepair 2 'blocked' 'fork-point.repair-refused' $_.Exception.Message $context }
+catch { Complete-ForkPointRepair 2 'blocked' 'fork-point.repair-refused' $_.Exception.Message $context -Rebased ($_.Exception.Data['Rebased'] -eq $true) }
 
 # Unlike the wrapper, this caller runs only because the primary branch was rewritten. An ancestor fork
 # point therefore means the pre-rewrite tip has expired from the reflog and the true fork point is

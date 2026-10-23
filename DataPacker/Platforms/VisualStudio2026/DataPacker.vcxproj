@@ -28,6 +28,8 @@
     <ClCompile Include="..\..\Source\ExportJobs\ExportAudio.cpp" />
     <ClCompile Include="..\..\Source\ExportJobs\ExportCubemapIbl.cpp" />
     <ClCompile Include="..\..\Source\ExportJobs\ExportScene.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\Scene\GltfSceneDecoder.cpp" />
+    <ClCompile Include="..\..\Source\ExportJobs\Scene\AssimpSceneDecoder.cpp" />
     <ClCompile Include="..\..\Source\ExportJobs\Scene\SceneVerticesLoader.cpp" />
     <ClCompile Include="..\..\Source\ExportJobs\Scene\SceneSkeletonLoader.cpp" />
     <ClCompile Include="..\..\Source\ExportJobs\Scene\SceneAnimationLoader.cpp" />
@@ -37,6 +39,7 @@
     <ClCompile Include="..\..\Source\ExportJobs\ExportRaw.cpp" />
     <ClCompile Include="..\..\Source\ExportJobs\ExportShader.cpp" />
     <ClCompile Include="..\..\Source\ExportJobs\ExportTexture.cpp" />
+    <ClCompile Include="..\..\Source\BlenderExport.cpp" />
     <ClCompile Include="..\..\Source\Attribution.cpp" />
     <ClCompile Include="..\..\Source\DiagnosticReporter.cpp" />
     <ClCompile Include="..\..\Source\ExportJobs\Island\BakeIslandIntermediates.cpp" />
@@ -91,6 +94,9 @@
     <ClInclude Include="..\..\Source\ExportJobs\ExportCubemapIbl.h" />
     <ClInclude Include="..\..\Source\ExportJobs\ExportScene.h" />
     <ClInclude Include="..\..\Source\ExportJobs\SourceReadValidation.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\Scene\GltfSceneDecoder.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\Scene\AssimpSceneDecoder.h" />
+    <ClInclude Include="..\..\Source\ExportJobs\Scene\SceneExportData.h" />
     <ClInclude Include="..\..\Source\ExportJobs\Scene\SceneVerticesLoader.h" />
     <ClInclude Include="..\..\Source\ExportJobs\Scene\SceneSkeletonLoader.h" />
     <ClInclude Include="..\..\Source\ExportJobs\Scene\SceneAnimationLoader.h" />
@@ -111,6 +117,7 @@
     <ClInclude Include="..\..\Source\Pch.h" />
     <ClInclude Include="..\..\Source\ExportJobs\Island\SubdivideBeachBand.h" />
     <ClInclude Include="..\..\Source\ExportJobs\Texture\Texture.h" />
+    <ClInclude Include="..\..\Source\BlenderExport.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

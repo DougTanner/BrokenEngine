@@ -233,10 +233,11 @@ struct VisibleLightQuadLayout
 
 struct PbrMaterialLayout
 {
-	// First 11 fields must exactly match MaterialShaderData (from f4BaseColorFactor onward)
+	// The prefix before bindless indices must exactly match MaterialShaderData from f4BaseColorFactor onward
 	// PBR material properties per glTF 2.0 metallic-roughness specification
 	vec4 f4BaseColorFactor INIT;
-	vec4 f4EmissiveFactor INIT;
+	vec3 f3EmissiveFactor INIT;
+	float fOcclusionStrength INIT;
 	int32_t iColorTextureSet INIT;
 	int32_t iPhysicalDescriptorTextureSet INIT;
 	int32_t iNormalTextureSet INIT;
@@ -254,6 +255,12 @@ struct PbrMaterialLayout
 	float fOcclusionTextureIndex INIT;
 	float fEmissiveTextureIndex INIT;
 };
+#if defined(BT_ENGINE)
+static_assert(sizeof(PbrMaterialLayout) == 88, "PbrMaterialLayout stride no longer matches the scalar-layout shader buffer");
+static_assert(BT_OFFSETOF(PbrMaterialLayout, f3EmissiveFactor) == 16, "PbrMaterialLayout emissive offset no longer matches MaterialShaderData");
+static_assert(BT_OFFSETOF(PbrMaterialLayout, fOcclusionStrength) == 28, "PbrMaterialLayout occlusion strength offset no longer matches MaterialShaderData");
+static_assert(BT_OFFSETOF(PbrMaterialLayout, fColorTextureIndex) == 68, "PbrMaterialLayout prefix no longer matches the MaterialShaderData upload");
+#endif
 
 struct ModelLayout
 {
