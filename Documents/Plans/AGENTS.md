@@ -20,7 +20,9 @@ For a scheduler health check, run
 `pwsh -NoProfile -File .agents/scripts/Test-PlanSchedulerState.ps1` — it folds
 `plan validate` into a compact status/diagnostics result; never run a raw
 whole-tree `plan validate`, whose result lists every Plan and floods a session
-context. To validate one Plan, run
+context, except the whole-tree `--lint-only` run of
+`.agents/skills/finalize-changes/references/landing-acceptance-table.md`
+`## Executable Plan check`. To validate one Plan, run
 `Tools/WorktreeCli/Platforms/VisualStudio2026/Output/WorktreeCli.exe plan validate --lint-only --plan <normalized Plan path> --repo '<absolute Git common directory>' --worktree '<session worktree root>'`.
 The named Plan is valid when it appears in `plans`, which holds only that Plan;
 a present-but-invalid Plan still exits 0 with an empty `plans` array, an absent
