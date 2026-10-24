@@ -8,7 +8,7 @@ Set up server and client state with the recipe below, then verify and release pe
 
 1. Set up server state with `reset`, then `inject_payload` entries at a coord from `status.activeCoords`; confirm through `query_collection`/`query_frame`.
 2. Launch/connect the client and require `status.clientCount` to increase.
-3. Use `describe_ui` before label-addressed `click`, `hover`, or `set_slider`; use `key`/`mouse` for raw input.
+3. Use `describe_ui` before label-addressed `click` or `set_slider`, which activate the item even offscreen; use `key` for key bindings and `wheel` for camera zoom.
 
 ### Chosen omni placement
 

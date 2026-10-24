@@ -13,18 +13,6 @@ namespace engine
 constexpr int64_t kiWheelDelta = 120; // Win32 WHEEL_DELTA — one notch of the DirectXTK lifetime scroll accumulator
 constexpr int64_t kiMaximumWheelNotches = INT32_MAX / kiWheelDelta;
 
-// Rect stability threshold: max per-corner pixel delta below which two consecutive frames count as settled.
-constexpr float kfRectangleStablePixels = 0.5f;
-
-static float MaximumCornerDelta(const XMFLOAT4& rRectangleA, const XMFLOAT4& rRectangleB)
-{
-	float fDeltaMinimumX = std::fabs(rRectangleA.x - rRectangleB.x);
-	float fDeltaMinimumY = std::fabs(rRectangleA.y - rRectangleB.y);
-	float fDeltaMaximumX = std::fabs(rRectangleA.z - rRectangleB.z);
-	float fDeltaMaximumY = std::fabs(rRectangleA.w - rRectangleB.w);
-	return std::max(std::max(fDeltaMinimumX, fDeltaMinimumY), std::max(fDeltaMaximumX, fDeltaMaximumY));
-}
-
 AgentInput::AgentInput()
 : common::Singleton<AgentInput>(gpAgentInput, this)
 {
@@ -43,19 +31,11 @@ bool AgentInput::BeginScript(const AgentScript& rScript)
 
 	miPhase = 0;
 	miPhaseFrame = 0;
-	miElapsedFrames = 0;
-	miStableCount = 0;
-	mbHaveLastRectangle = false;
 	mbResolvedDisabled = false;
 
-	// Clear held synthetic key/button/pos state so nothing leaks from a prior script; the scroll accumulator is a
-	// lifetime accumulator by design (consumers diff it), so it persists. The ImGui-pos pin is cleared here (not in
-	// Finish) so it persists across a script's completion: describe_ui runs after Finish, so it must survive until the
-	// next script re-seeds or clears it.
+	// Clear held synthetic keys so nothing leaks from a prior script; the scroll accumulator is a lifetime accumulator
+	// by design (consumers diff it), so it persists.
 	std::fill(std::begin(mpbSyntheticKeys), std::end(mpbSyntheticKeys), false);
-	muiSyntheticMouseButtons = 0;
-	mbSyntheticMousePosValid = false;
-	mbImGuiMousePositionPinned = false;
 	return true;
 }
 
@@ -73,34 +53,11 @@ void AgentInput::Finish(AgentScriptStatus eStatus)
 {
 	meStatus = eStatus;
 
-	// Finish clears synthetic keys/buttons and the game mouse position; scroll persists and the ImGui position stays pinned until BeginScript.
-	// Mouse-command clicks emit down/up on both sinks; label clicks use ImGui only. Bare mouse-down releases the overlay after two frames but leaves ImGui held until mouse-up.
+	// Finish clears synthetic keys; scroll persists.
 	std::fill(std::begin(mpbSyntheticKeys), std::end(mpbSyntheticKeys), false);
-	muiSyntheticMouseButtons = 0;
-	mbSyntheticMousePosValid = false;
 }
 
-void AgentInput::IssueImGuiMousePosition(float fX, float fY)
-{
-	// Remember the pos + pin it so ImGuiManager::Prepare can re-issue it after the Win32 backend (last-writer-wins).
-	mbImGuiMousePositionPinned = true;
-	mpfImGuiPinnedPixels[0] = fX;
-	mpfImGuiPinnedPixels[1] = fY;
-	if (ImGui::GetCurrentContext() != nullptr)
-	{
-		ImGui::GetIO().AddMousePosEvent(fX, fY);
-	}
-}
-
-void AgentInput::ReissueImGuiMousePosition()
-{
-	if (mbImGuiMousePositionPinned && ImGui::GetCurrentContext() != nullptr)
-	{
-		ImGui::GetIO().AddMousePosEvent(mpfImGuiPinnedPixels[0], mpfImGuiPinnedPixels[1]);
-	}
-}
-
-bool AgentInput::StabilizeTarget()
+bool AgentInput::ActivateTarget()
 {
 	int64_t iIndex = gpAgentUiRegistry->ResolveLabel(mScript.pcLabel, mScript.bHasWindow ? mScript.pcWindow : nullptr);
 	if (iIndex == AgentUiRegistry::kiNotFound)
@@ -115,46 +72,25 @@ bool AgentInput::StabilizeTarget()
 	}
 
 	const AgentUiItem& rItem = gpAgentUiRegistry->mpItems[gpAgentUiRegistry->miRead][iIndex];
-	XMFLOAT4 f4Rectangle = rItem.f4Rectangle;
-	mpfTargetCenter[0] = 0.5f * (f4Rectangle.x + f4Rectangle.z);
-	mpfTargetCenter[1] = 0.5f * (f4Rectangle.y + f4Rectangle.w);
-	IssueImGuiMousePosition(mpfTargetCenter[0], mpfTargetCenter[1]);
-
-	if (mbHaveLastRectangle && MaximumCornerDelta(f4Rectangle, mf4LastRectangle) < kfRectangleStablePixels)
+	mbResolvedDisabled = rItem.bDisabled;
+	bool bSetSlider = mScript.eKind == AgentScriptKind::kSetSlider;
+	// Prefer-input activation of a non-inputable item would press it instead of opening a text box, so validate first.
+	if (bSetSlider && (rItem.iStatusFlags & ImGuiItemStatusFlags_Inputable) == 0)
 	{
-		++miStableCount;
-	}
-	else
-	{
-		miStableCount = 0;
-	}
-	mf4LastRectangle = f4Rectangle;
-	mbHaveLastRectangle = true;
-
-	if (miElapsedFrames >= mScript.iTimeoutFrames)
-	{
-		Finish(AgentScriptStatus::kTimeout);
+		Finish(AgentScriptStatus::kNotInputable);
 		return false;
 	}
 
-	if (miStableCount >= 2)
+	// The same remote activation ImGui's own navigation uses: ItemAdd does not clip an activated item, so an
+	// offscreen item activates too, and the synthetic mouse never moves.
+	ImGuiContext* pContext = ImGui::GetCurrentContext();
+	ImGui::ActivateItemByID(rItem.uiIdentifier);
+	if (bSetSlider)
 	{
-		mbResolvedDisabled = rItem.bDisabled;
-		miResolvedStatusFlags = rItem.iStatusFlags;
-		// ImGuiItemStatusFlags_Visible is set only inside ItemAdd when the rect overlaps the clip rect (imgui.cpp:11292).
-		// Checkbox/menu-item-class widgets emit ITEM_INFO on their clipped early-return too (e.g. Checkbox imgui_widgets.cpp:1247)
-		// with StatusFlags lacking Visible — that is how a clipped item is label-resolvable yet reads not-visible. Widgets that
-		// emit no clipped-path ITEM_INFO (sliders/drags/buttons/InvisibleButton) never gain a registry label when clipped and
-		// resolve as kNotFound instead — except a nav-focused/active clipped widget, which bypasses ItemAdd's clip early-return
-		// (imgui.cpp:11251) and still lands here without the Visible bit. This one site covers kClick, kHover, kSetSlider.
-		if ((miResolvedStatusFlags & ImGuiItemStatusFlags_Visible) == 0)
-		{
-			Finish(AgentScriptStatus::kClipped);
-			return false;
-		}
-		return true;
+		// Opens the slider's temp text-input with its value selected instead of a drag.
+		pContext->NavNextActivateFlags = ImGuiActivateFlags_PreferInput;
 	}
-	return false;
+	return true;
 }
 
 void AgentInput::AdvanceFrame()
@@ -172,8 +108,6 @@ void AgentInput::AdvanceFrame()
 		return;
 	}
 
-	++miElapsedFrames;
-
 	ImGuiIO* pInputOutput = (ImGui::GetCurrentContext() != nullptr) ? &ImGui::GetIO() : nullptr;
 
 	switch (mScript.eKind)
@@ -182,31 +116,11 @@ void AgentInput::AdvanceFrame()
 		{
 			if (miPhase == 0)
 			{
-				if (!StabilizeTarget())
+				if (!ActivateTarget())
 				{
 					return;
 				}
 				miPhase = 1;
-				miPhaseFrame = 0;
-				return;
-			}
-			IssueImGuiMousePosition(mpfTargetCenter[0], mpfTargetCenter[1]);
-			if (miPhase == 1)
-			{
-				if (pInputOutput != nullptr)
-				{
-					pInputOutput->AddMouseButtonEvent(static_cast<int>(mScript.iImGuiMouseButton), true);
-				}
-				miPhase = 2;
-				return;
-			}
-			if (miPhase == 2)
-			{
-				if (pInputOutput != nullptr)
-				{
-					pInputOutput->AddMouseButtonEvent(static_cast<int>(mScript.iImGuiMouseButton), false);
-				}
-				miPhase = 3;
 				miPhaseFrame = 0;
 				return;
 			}
@@ -217,68 +131,19 @@ void AgentInput::AdvanceFrame()
 			return;
 		}
 
-		case AgentScriptKind::kHover:
-		{
-			if (miPhase == 0)
-			{
-				if (!StabilizeTarget())
-				{
-					return;
-				}
-				miPhase = 1;
-				miPhaseFrame = 0;
-				return;
-			}
-			IssueImGuiMousePosition(mpfTargetCenter[0], mpfTargetCenter[1]);
-			if (++miPhaseFrame >= mScript.iHoldFrames)
-			{
-				Finish(AgentScriptStatus::kDone);
-			}
-			return;
-		}
-
 		case AgentScriptKind::kSetSlider:
 		{
+			// Activation opens the slider's temp text-input (value pre-selected); type the value; Enter commits.
 			if (miPhase == 0)
 			{
-				if (!StabilizeTarget())
+				if (!ActivateTarget())
 				{
-					return;
-				}
-				// Ctrl+click opens temporary input on inputable widgets and activates non-inputable targets, so validate Inputable first.
-				if ((miResolvedStatusFlags & ImGuiItemStatusFlags_Inputable) == 0)
-				{
-					Finish(AgentScriptStatus::kNotInputable);
 					return;
 				}
 				miPhase = 1;
-				miPhaseFrame = 0;
 				return;
 			}
-			IssueImGuiMousePosition(mpfTargetCenter[0], mpfTargetCenter[1]);
-			// Ctrl+Click opens ImGui's temp text-input on the slider (value pre-selected); type the value; Enter commits.
 			if (miPhase == 1)
-			{
-				if (pInputOutput != nullptr)
-				{
-					pInputOutput->AddKeyEvent(ImGuiMod_Ctrl, true);
-					pInputOutput->AddMouseButtonEvent(0, true);
-				}
-				miPhase = 2;
-				return;
-			}
-			if (miPhase == 2)
-			{
-				if (pInputOutput != nullptr)
-				{
-					pInputOutput->AddMouseButtonEvent(0, false);
-					// Release Ctrl with the mouse-up: held into phase 3 it trips InputText's ignore_char_inputs, dropping typed chars.
-					pInputOutput->AddKeyEvent(ImGuiMod_Ctrl, false);
-				}
-				miPhase = 3;
-				return;
-			}
-			if (miPhase == 3)
 			{
 				if (pInputOutput != nullptr)
 				{
@@ -287,25 +152,25 @@ void AgentInput::AdvanceFrame()
 						pInputOutput->AddInputCharacter(static_cast<unsigned int>(static_cast<unsigned char>(mScript.pcValueText[i])));
 					}
 				}
-				miPhase = 4;
+				miPhase = 2;
 				return;
 			}
-			if (miPhase == 4)
+			if (miPhase == 2)
 			{
 				if (pInputOutput != nullptr)
 				{
 					pInputOutput->AddKeyEvent(ImGuiKey_Enter, true);
 				}
-				miPhase = 5;
+				miPhase = 3;
 				return;
 			}
-			if (miPhase == 5)
+			if (miPhase == 3)
 			{
 				if (pInputOutput != nullptr)
 				{
 					pInputOutput->AddKeyEvent(ImGuiKey_Enter, false);
 				}
-				miPhase = 6;
+				miPhase = 4;
 				miPhaseFrame = 0;
 				return;
 			}
@@ -345,108 +210,17 @@ void AgentInput::AdvanceFrame()
 			return;
 		}
 
-		case AgentScriptKind::kMouse:
+		case AgentScriptKind::kWheel:
 		{
-			// Raw pixel coords feed both sinks (overlay for game world clicks, ImGui IO for UI). Pos re-pinned each frame.
-			if (mScript.bHasCoordinate)
+			// Camera-zoom sink only: RawInputManager folds the lifetime accumulator into the published wheel value.
+			if (miPhase == 0)
 			{
-				mbSyntheticMousePosValid = true;
-				mpfSyntheticMousePixels[0] = mScript.pfCoordinatePixels[0];
-				mpfSyntheticMousePixels[1] = mScript.pfCoordinatePixels[1];
-				IssueImGuiMousePosition(mScript.pfCoordinatePixels[0], mScript.pfCoordinatePixels[1]);
+				miSyntheticScrollAccumulator += mScript.iWheelNotches * kiWheelDelta;
+				miPhase = 1;
 			}
-
-			switch (mScript.eMouseAction)
+			if (++miPhaseFrame >= 2)
 			{
-				case AgentMouseAction::kMove:
-				{
-					if (++miPhaseFrame >= 2)
-					{
-						Finish(AgentScriptStatus::kDone);
-					}
-					return;
-				}
-				case AgentMouseAction::kWheel:
-				{
-					if (miPhase == 0)
-					{
-						miSyntheticScrollAccumulator += mScript.iWheelNotches * kiWheelDelta;
-						if (pInputOutput != nullptr)
-						{
-							pInputOutput->AddMouseWheelEvent(0.0f, static_cast<float>(mScript.iWheelNotches));
-						}
-						miPhase = 1;
-					}
-					if (++miPhaseFrame >= 2)
-					{
-						Finish(AgentScriptStatus::kDone);
-					}
-					return;
-				}
-				case AgentMouseAction::kDown:
-				{
-					if (miPhase == 0)
-					{
-						muiSyntheticMouseButtons |= mScript.uiOverlayMouseButtonBit;
-						if (pInputOutput != nullptr)
-						{
-							pInputOutput->AddMouseButtonEvent(static_cast<int>(mScript.iImGuiMouseButton), true);
-						}
-						miPhase = 1;
-					}
-					if (++miPhaseFrame >= 2)
-					{
-						Finish(AgentScriptStatus::kDone);
-					}
-					return;
-				}
-				case AgentMouseAction::kUp:
-				{
-					if (miPhase == 0)
-					{
-						muiSyntheticMouseButtons &= ~mScript.uiOverlayMouseButtonBit;
-						if (pInputOutput != nullptr)
-						{
-							pInputOutput->AddMouseButtonEvent(static_cast<int>(mScript.iImGuiMouseButton), false);
-						}
-						miPhase = 1;
-					}
-					if (++miPhaseFrame >= 2)
-					{
-						Finish(AgentScriptStatus::kDone);
-					}
-					return;
-				}
-				case AgentMouseAction::kClick:
-				{
-					if (miPhase == 0)
-					{
-						muiSyntheticMouseButtons |= mScript.uiOverlayMouseButtonBit;
-						if (pInputOutput != nullptr)
-						{
-							pInputOutput->AddMouseButtonEvent(static_cast<int>(mScript.iImGuiMouseButton), true);
-						}
-						miPhase = 1;
-						miPhaseFrame = 0;
-						return;
-					}
-					if (miPhase == 1)
-					{
-						muiSyntheticMouseButtons &= ~mScript.uiOverlayMouseButtonBit;
-						if (pInputOutput != nullptr)
-						{
-							pInputOutput->AddMouseButtonEvent(static_cast<int>(mScript.iImGuiMouseButton), false);
-						}
-						miPhase = 2;
-						miPhaseFrame = 0;
-						return;
-					}
-					if (++miPhaseFrame >= 2)
-					{
-						Finish(AgentScriptStatus::kDone);
-					}
-					return;
-				}
+				Finish(AgentScriptStatus::kDone);
 			}
 			return;
 		}
@@ -496,34 +270,6 @@ void AgentInput::Overlay(RawInput& rRawInput)
 		{
 			rRawInput.pbKeyboardKeys[i] = true;
 		}
-	}
-
-	if ((muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonLeft)) != 0)
-	{
-		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonLeft, true);
-	}
-	if ((muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonMiddle)) != 0)
-	{
-		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonMiddle, true);
-	}
-	if ((muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonRight)) != 0)
-	{
-		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonRight, true);
-	}
-	if ((muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonExtraOne)) != 0)
-	{
-		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonExtraOne, true);
-	}
-	if ((muiSyntheticMouseButtons & std::to_underlying(MouseButtons::kMouseButtonExtraTwo)) != 0)
-	{
-		rRawInput.mouseButtons.Set(MouseButtons::kMouseButtonExtraTwo, true);
-	}
-
-	// Overwrite mouse position with the synthetic pixel pos (normalized as the hardware path does).
-	if (mbSyntheticMousePosValid)
-	{
-		rRawInput.f2MousePosition.x = mpfSyntheticMousePixels[0] / static_cast<float>(gpGraphics->mFramebufferVkExtent2D.width);
-		rRawInput.f2MousePosition.y = mpfSyntheticMousePixels[1] / static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	}
 
 	// NOTE: the synthetic scroll accumulator is deliberately NOT added here. iScrollWheelValue is a lifetime

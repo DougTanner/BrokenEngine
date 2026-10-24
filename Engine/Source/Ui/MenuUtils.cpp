@@ -85,8 +85,20 @@ bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, s
 	}
 
 	// Rows that repeat the same option labels (the Low/Medium/High quality rows) would otherwise collide on ImGui's
-	// label-derived IDs; the wrapper address is the row's stable identity.
+	// label-derived IDs; the wrapper address is the row's stable identity. A headed row's options carry a "##<header>"
+	// suffix so the harness names each one uniquely within its window.
 	ImGui::PushID(pWrapper);
+
+	char pcLabel[64] {};
+	auto OptionLabel = [&](const char* pcOption) -> const char*
+	{
+		if (pcHeader == nullptr)
+		{
+			return pcOption;
+		}
+		std::snprintf(pcLabel, sizeof(pcLabel), "%s##%s", pcOption, pcHeader);
+		return pcLabel;
+	};
 
 	bool bChanged = false;
 	bool bFirst = true;
@@ -104,7 +116,7 @@ bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, s
 		}
 		bFirst = false;
 
-		if (ImGui::RadioButton(rOption.first, fCurrent == rOption.second))
+		if (ImGui::RadioButton(OptionLabel(rOption.first), fCurrent == rOption.second))
 		{
 			pWrapper->Set(rOption.second);
 			bChanged = true;
@@ -117,7 +129,7 @@ bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, s
 		float fFinal = pWrapper->mfCurrent;
 		for (const std::pair<const char*, float>& rOption : options)
 		{
-			gpAgentUiRegistry->RecordItemChecked(ImGui::GetID(rOption.first), fFinal == rOption.second);
+			gpAgentUiRegistry->RecordItemChecked(ImGui::GetID(OptionLabel(rOption.first)), fFinal == rOption.second);
 		}
 	}
 #endif

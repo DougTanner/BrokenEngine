@@ -98,9 +98,12 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 
 	// Enable the vendored imgui's test-engine ItemAdd/ItemInfo hooks so engine::AgentUiRegistry captures widget
 	// rects/labels each frame. Only worth the per-item hook cost when the agent layer is live; defaults false otherwise.
+	// ItemUnclipByLog turns off ItemAdd's clip early-out, so offscreen items still report their labels and the harness
+	// can list and activate them. Only ImGui's log finish clears it, and the engine never starts an ImGui log.
 	if (gpAgentCommandServer != nullptr)
 	{
 		ImGui::GetCurrentContext()->TestEngineHookItems = true;
+		ImGui::GetCurrentContext()->ItemUnclipByLog = true;
 	}
 	ImGuiIO& rInputOutput = ImGui::GetIO();
 #if defined(BT_MODEL_VIEWER)
@@ -457,26 +460,16 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 
 	ImGui_ImplVulkan_NewFrame();
 	ImGui_ImplWin32_NewFrame();
-	// The Win32 backend re-queues the physical cursor pos in NewFrame above; re-issue the harness's synthetic pin after
-	// it so the injected pos wins last-writer-wins in ImGui::NewFrame (agent harness only; pin-valid gate lives inside).
-	if (gpAgentInput != nullptr)
-	{
-		gpAgentInput->ReissueImGuiMousePosition();
-	}
 
-	// Suppressed harness client: neutralize the two NewFrame physical polls the Win32 backend just ran. This runs after
-	// the synthetic re-pin above so an active pin still wins last-writer-wins.
+	// Suppressed harness client: neutralize the two NewFrame physical polls the Win32 backend just ran.
 	if (PhysicalInputSuppressed())
 	{
 		ImGuiIO& rInputOutput = ImGui::GetIO();
 
 #if !defined(BT_MODEL_VIEWER)
-		// (d) Physical cursor poll: unless a synthetic pin owns io.MousePos, park it at ImGui's no-mouse sentinel.
-		// Missing agent input must also suppress the physical cursor rather than dereference a nullable startup global.
-		if (gpAgentInput == nullptr || !gpAgentInput->mbImGuiMousePositionPinned)
-		{
-			rInputOutput.AddMousePosEvent(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
-		}
+		// Physical cursor poll: park io.MousePos at ImGui's no-mouse sentinel; the harness drives the UI by item
+		// activation and never sets a mouse position.
+		rInputOutput.AddMousePosEvent(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
 #endif
 
 		// XInputGetState polls ImGui gamepad navigation; clear the ImGuiKey_Gamepad* range because the harness injects no gamepad events.

@@ -163,16 +163,33 @@ The server monitor is an engine-owned GDI window, not a protocol command surface
   `existing_complete` for a finished whole-chunk or range load.
 - `dump_render_target`: `{"name","index"?:0,"channel"?:0,"path"?,"raw"?:false}`. Unknown names list valid names. Single-channel output normalizes to grayscale PNG; four-byte RGBA writes direct PNG; float formats require raw `.bin`. The default base path is `%TEMP%\Screenshots\dump_<name>_N`. Requires `kbScreenshots`.
 - `describe_ui`: no params. Returns UI state, `tweaksVisible` (true while the F3
-  Tweaks overlay is shown), game flags, framebuffer, mouse, windows, and labeled
-  items with rect/disabled/checked/inputable/hovered/visible fields. Menu
+  Tweaks overlay is shown), game flags, framebuffer, windows, and labeled
+  items with rect/disabled/checked/inputable/visible fields. Items include
+  offscreen and clipped ones with `visible:false` (`### Client command
+  behavior`). An item is named by its `window` plus its full `label`; a label
+  whose visible text repeats within one window carries a hidden `##<section>`
+  suffix, such as `Low##Terrain Shadows`. Menu
   controls created with `MenuUtils::WrapperSlider` and
   `MenuUtils::WrapperPlusMinus` also include optional `value` text for the
   current numeric value, using the control's display format. Other items omit
   the field; checkbox state and radio controls created with
   `MenuUtils::RadioRow` expose their state through `checked`.
-- `click`: `{"label","window"?,"timeoutFrames"?:120,"describeUiAfter"?:true}`. `timeoutFrames` is an integer in `0..1797`; a value outside that range is a parameter error. The limit counts client drains/frames rather than wall-clock time, so duration varies with the client drain rate. Stabilizes and clicks the item center. Returns found/enabled and optional UI. Ambiguous/not-found errors list candidates; scrolled-out targets fail.
-- `hover`: `{"label","window"?,"holdFrames"?:2}`. `holdFrames` is an integer in `0..1681`; a value outside that range is a parameter error. The limit counts client drains/frames rather than wall-clock time, so duration varies with the client drain rate. Returns found/enabled plus UI.
-- `set_slider`: `{"label","window"?,"value":number}`. Uses Ctrl+Click, typing, Enter. Returns found/enabled. Tweaks overlay sliders are reachable only in Debug clients, where `kbDebugInput` lets F3 open the overlay; in Profile and Release clients they fail with `no widget matches label`.
+- `click`: `{"label","window"?,"describeUiAfter"?:true}`. Resolves the label in
+  the last completed UI frame and activates that item by its ImGui ID, as
+  ImGui's own navigation does, then settles two frames; the mouse never moves,
+  and an offscreen item activates too. Presses buttons, selectables,
+  checkboxes, radio buttons, tab items, and the engine menu buttons; a text
+  field becomes active with its text selected, ready for `type_text`. Returns
+  found/enabled and optional UI. Ambiguous/not-found errors list candidates;
+  pass the full label, including any `##` suffix, and `window` to select one.
+- `set_slider`: `{"label","window"?,"value":number}`. Activates the slider into
+  its text box (ImGui's prefer-input activation, offscreen sliders too), types
+  the value, and presses Enter. A target that is not inputable (a button or
+  checkbox, for example) fails with `target is not inputable`; an inputable
+  text field is typed into the same way, and Enter submits it. Returns
+  found/enabled. Tweaks overlay sliders are reachable only in Debug clients,
+  where `kbDebugInput` lets F3 open the overlay; in Profile and Release clients
+  they fail with `no widget matches label`.
 - `get_wrapper`: `{"key":string}`. Read-only lookup of a Tweaks-registered wrapper. Returns `value`, `min`, and `max`, each a `"%.6f"` string matching the slider's own display format. `key` is the registrar's slider map key, not the display label where the two differ. Needs no F3 overlay and works in every client build. A missing or non-string `key` fails with `get_wrapper requires string 'key'`; an unregistered key fails with `get_wrapper: no Tweaks slider key '<key>'`.
 - `key`: `{"key":name,"holdFrames"?:1}`. `holdFrames` is an integer in `0..1798`
   (default `1`); a value outside that range is a parameter error. The limit
@@ -183,24 +200,13 @@ The server monitor is an engine-owned GDI window, not a protocol command surface
   (minimized or swapchain recreate deferred), only the RawInput overlay takes
   effect; `key` sends no ImGui event.
 - `type_text`: `{"text":string}`. Types the UTF-8 text into the active ImGui text field through ImGui character input, then presses and releases Enter on its own frames. An empty string only presses Enter. A missing, non-string, or longer-than-256-byte `text` fails with `type_text requires string 'text'`. Returns `{"ok":true}`.
-- `mouse`:
-  `{"action"?:"move"|"down"|"up"|"click"|"wheel","x"?,"y"?,"button"?:"left"|"right"|"middle","notches"?:1}`.
-  Non-wheel actions require x/y. Wheel `notches` is an integer in
-  `-17895697..17895697` whose running total with every earlier synthetic wheel
-  command must also stay within that range; any other value fails without
-  changing input state. Wheel accepts both coordinates or neither and always
-  feeds the ImGui wheel event. It also feeds camera zoom unless the hovered
-  ImGui window can actually scroll, ImGui's wheeling lock holds an earlier
-  scroll target, or an ImGui key owner claims `ImGuiKey_MouseWheelY` (including
-  ImPlot); menus that do not scroll still zoom the camera. ImPlot ownership
-  remains visible for the first two input polls after leaving a plot; the
-  following poll first sees no owner. A coordinate mouse move runs two active
-  frames and, once complete, establishes the new target. A direct
-  coordinate-bearing background wheel immediately after plot hover may remain
-  UI-owned; a subsequent notch after that command completes reaches the camera.
-  Returns `{"ok":true}`. While the client is not rendering (minimized or
-  swapchain recreate deferred), only the RawInput overlay takes effect; `mouse`
-  ImGui events sent then never reach ImGui.
+- `wheel`: `{"notches"?:1}`. Adds mouse-wheel notches for camera zoom only: no
+  coordinates, buttons, or ImGui event, so it never scrolls an ImGui window.
+  `notches` is an integer in `-17895697..17895697` whose running total with
+  every earlier `wheel` command must also stay within that range; any other
+  value fails without changing input state. Every notch reaches the camera,
+  because the agent client's ImGui mouse never hovers a window. Returns
+  `{"ok":true}`.
 - `describe_scene`: no params; the engine command reads none, and a project may
   take it over to add parameters and fields. Returns
   `camera{basisCoord,eye,visibleArea,lod}`, `uiState`, `tweaksVisible` (true
@@ -270,21 +276,26 @@ The server monitor is an engine-owned GDI window, not a protocol command surface
 
 Client input/capture commands can defer across frames. The single channel remains occupied until the response; size timeout accordingly and never overlap calls.
 
-Capture commands temporarily restore a minimized client without activation, wait for extent settlement, capture, then re-minimize. An already-visible client fails if swapchain recreation is deferred. `resize`/`fullscreen` reject minimized state; restore first. `click`, `hover`, `set_slider`, and `type_text` fail while the client is not rendering (minimized or swapchain recreate deferred); restore first. After resize/fullscreen/restore, call `describe_ui` or `screenshot` to remeasure.
+Capture commands temporarily restore a minimized client without activation, wait for extent settlement, capture, then re-minimize. An already-visible client fails if swapchain recreation is deferred. `resize`/`fullscreen` reject minimized state; restore first. `click`, `set_slider`, and `type_text` fail while the client is not rendering (minimized or swapchain recreate deferred); restore first. After resize/fullscreen/restore, call `describe_ui` or `screenshot` to remeasure.
 
-Only labeled visible ImGui items are addressable. Scroll a clipped container with `mouse` wheel, then retry.
+The harness drives ImGui UI only by item activation: `click` and `set_slider`
+activate the item behind a labeled `describe_ui` entry by its ImGui ID, and no
+command sends an ImGui mouse position, button, or wheel event. On an agent
+client ImGui does not clip items, so an item outside the viewport or its
+window's visible area — a slid-away panel's buttons, a row scrolled out of view
+— is listed with `visible:false` and activates like a visible one; only items
+inside a fully clipped child window are skipped. Side effects: offscreen labels
+take part in label resolution, so a label unique on screen can become
+ambiguous — for six frames once per Tweaks screen lifetime, the Tweaks slider
+audit renders every section into an offscreen `##slider-audit` window,
+repeating the sections' tab items and non-slider controls — and `window`
+narrows the match; offscreen widgets also run their full behavior and draw
+code. Mouse-only widgets (curve-editor control points, ImPlot plot
+interactions) and hover effects, such as hover-opened panels, cannot be driven.
 
-Injected mouse position owns `io.MousePos`: a coordinate-carrying script such as
-`hover`, `click`, or coordinate-bearing `mouse move` pins an ImGui mouse
-position from when that script issues it until the next accepted script begins.
-A later coordinate-free script such as `key` clears the pin; after that,
-`describe_ui.mouse` reports ImGui's no-mouse sentinel, and a coordinate-free
-`mouse wheel` does not target the previous pixel. Send wheel coordinates
-explicitly; do not rely on a pin surviving an intervening script. With no pin, a
-focused agent client's `describe_ui.mouse` reports ImGui's no-mouse sentinel
-rather than the real cursor, and the RawInput game mouse stays at a frozen
-boot-time snapshot (under agent suppression, physical mouse messages never reach
-DirectXTK Mouse).
+The agent client's ImGui mouse stays at ImGui's no-mouse sentinel, and the
+RawInput game mouse stays at a frozen boot-time snapshot (under agent
+suppression, physical mouse messages never reach DirectXTK Mouse).
 
 ## Server commands
 

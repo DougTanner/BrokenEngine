@@ -59,8 +59,9 @@ bool WrapperPlusMinus(std::string_view label, engine::Wrapper* pWrapper);
 
 // RadioRow draws an optional header and wraps option buttons to the available width. Present mode, sample count, quality, and
 // theme share this enum/index mapping; exact discrete float equality selects the checked option, and a click writes
-// its value. Wrapper-address ID scopes keep repeated labels distinct. Header/button labels are the harness API and
-// must stay stable; return true on the click frame.
+// its value. Wrapper-address ID scopes keep repeated labels distinct. With a header, each option's label is
+// "<option>##<header>", its harness name; ImGui draws only the option text. Header/button labels are the harness API
+// and must stay stable; return true on the click frame.
 bool RadioRow(const char* pcHeader, engine::Wrapper* pWrapper, float fCurrent, std::initializer_list<std::pair<const char*, float>> options);
 
 #if defined(BT_CLIENT)

@@ -527,7 +527,7 @@ Profile, Server, and `GameBase.cpp`; S3 the game project; S4 docs. Each file bel
   per-spawn safe search of D12: the first candidate clear of cell (0,0)'s generated islands and of its ships, or a
   retry on the next advancing update),
   `Documents/Architecture/Network.md:298` (`kClientSubscribe` adjacency) and `:347-358`,
-  `.agents/skills/agent-harness/references/command-reference.md` (45, 93, 214),
+  `.agents/skills/agent-harness/references/command-reference.md` (45, 93, 220),
   `Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md:302-311`,
   `Projects/BrokenEngineSandbox/Documents/AgentHarness/replay.md` (216, 329-341),
   `Projects/BrokenEngineSandbox/Documents/AgentHarness/verification.md:18`.

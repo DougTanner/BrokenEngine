@@ -247,9 +247,9 @@ Files:
 
 10. Harness Addressability
 --------------------------
-Widget labels are an automation API. The agent harness clicks, hovers, and
-queries widgets by their visible label (describe_ui / click). A layout change
-must never silently rename a label: the before/after describe_ui label set is
+Widget labels are an automation API. The agent harness queries and activates
+widgets by their label (describe_ui / click). A layout change must never
+silently rename a label: the before/after describe_ui label set is
 expected to be identical across a pure-layout pass. Renaming a label is a
 deliberate API change, made on purpose and verified, never as a side effect of
 moving a button.
@@ -263,8 +263,16 @@ ResolveLabel's case-insensitive substring tier. Adding the prefix is itself a
 deliberate label-set change: it is allowed only where the visible text is
 unchanged and the name still resolves to exactly one widget.
 
+The harness names a widget by its window plus its full label, so labels must be
+unique within one window. A label whose visible text repeats within a window
+carries a hidden "##<section>" suffix naming its section, so describe_ui reports
+"Low##Terrain Shadows" while the player sees "Low"; RadioRow does this for every
+headed row. Nothing checks uniqueness in code: a repeat surfaces as the
+harness's ambiguous-label error, and the harness has no coordinate targeting to
+fall back on.
+
 Files:
-  Engine/Source/Agent/AgentCommandsClientGeneric.cpp                 (describe_ui / click / hover by label)
+  Engine/Source/Agent/AgentCommandsClientGeneric.cpp                 (describe_ui / click / set_slider by label)
   Engine/Source/Agent/                                               (AgentUiRegistry label snapshot)
 
 

@@ -88,9 +88,19 @@ whose purpose is to execute a scripted pass/fail scenario itself.
   response despite stop under a single 3 s deadline.
 - Only one request is in flight. Deferred handlers return a poll function; later drains publish its first result under the original request ID. Each request carries its connection generation (the reuse counter); a reply, synchronous or deferred, whose connection has since torn down is discarded rather than sent to a later client, and the drain-count timeout prevents a lost async result from blocking the channel indefinitely.
 - The command channel is an exempt developer tool, so handlers need not range-check arguments; a check that exists throws into the failure envelope, which `Drain()` produces from the exception.
-- `AgentInput` is client-only and runs one frame-stepped synthetic script at a time. It feeds ImGui events and overlays the published `RawInput` snapshot that engine key bindings read. Physical input suppression is owned by the startup/input path.
+- `AgentInput` is client-only and runs one frame-stepped synthetic script at a time. It queues ImGui item activation, typed text, and keys, adds wheel notches to the published `RawInput` scroll value, and overlays that snapshot's keys for engine key bindings. Physical input suppression is owned by the startup/input path.
+- ImGui item activation is the only way the harness drives the UI: an agent
+  lists items, offscreen ones included, with `describe_ui`, and `click` or
+  `set_slider` activates one by the ImGui ID behind its label, the way ImGui's
+  own navigation does. Label naming is owned by
+  [Ui/Screens/AGENTS.md](../Ui/Screens/AGENTS.md) `## Shared Authoring Rules`.
+  With the agent layer live, `ImGuiManager` turns off ImGui's per-item clipping
+  so offscreen items stay listed and activatable
+  (`../../../.agents/skills/agent-harness/references/command-reference.md`
+  `### Client command behavior`). Clicks on the 3D world area, such as picking
+  an individual ship, may be allowed in future; programmatic picking through a
+  command would still be preferred then.
 - `AgentUiRegistry` is client-only and double-buffers fixed-capacity ImGui window/item snapshots, including optional current numeric text from menu controls created with `MenuUtils::WrapperSlider` and `MenuUtils::WrapperPlusMinus` and checked state supplied by `MenuUtils::RadioRow`. Publish after `ImGui::Render()`; label resolution and `describe_ui` read only the completed buffer.
-- Synthetic ImGui mouse position is reissued after the Win32 backend so physical cursor polling cannot overwrite it. It remains pinned for post-script UI inspection until the next script begins.
 
 ## Constraints
 

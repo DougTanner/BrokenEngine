@@ -51,7 +51,7 @@ Global: `gpInput` — constructed in `Main.cpp`, polled only from `engine::GameB
 - Focus gain registers the keyboard and clears scratch state; focus loss unregisters it and freezes the published snapshot. Gamepad suspend/resume follows focus.
 - An active agent script may publish synthetic input while unfocused; agent-port clients suppress physical keyboard, mouse, gamepad, and cursor trapping for the process lifetime, preserving window close handling. The one exception is IME: `WM_IME_*` messages are not stripped, so IME result characters a human composes on a focused agent window still reach an active ImGui text field.
 - Cursor trapping uses Win32 `ClipCursor`, follows game policy while focused, and is forced off on focus loss or physical-input suppression.
-- Synthetic key and mouse input overlays the published snapshot; synthetic ImGui mouse position is re-applied after the Win32 backend. Keep these sinks separate because their lifetimes differ.
+- Synthetic keys overlay the published snapshot only while a script runs; the synthetic wheel offset is added to the lifetime wheel value on every publish, script or not. Keep these sinks separate because their lifetimes differ.
 - Gamepad construction may fail; polling and vibration paths tolerate a null gamepad object and clear the published pad state on disconnect.
 
 ## See Also

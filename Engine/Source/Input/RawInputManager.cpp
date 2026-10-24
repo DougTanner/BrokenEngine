@@ -206,7 +206,7 @@ void RawInputManager::Update(bool bLostFocus)
 		}
 	}
 
-	// Overlay ORs synthetic keys and mouse buttons and overrides synthetic mouse position; it does not add scroll.
+	// Overlay ORs synthetic keys; it does not add scroll.
 	// Run it after the keyboard copy so that copy does not overwrite synthetic key bits.
 	if (bScriptActive)
 	{

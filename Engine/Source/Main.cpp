@@ -669,8 +669,8 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 	// When suppressed, keep the ImGui Win32 backend running for lifecycle bookkeeping (focus, tracking) but starve it
 	// of physical input messages (mouse/keyboard/char/wheel ranges) so real human activity never becomes ImGui IO.
 	// Non-client mouse messages (WM_NCMOUSEMOVE etc.) are deliberately NOT added to the bypass ranges: the backend may
-	// queue a physical pos from them, but ImGuiManager::Prepare's re-pin/sentinel is always the last mouse-pos event
-	// before NewFrame.
+	// queue a physical pos from them, but ImGuiManager::Prepare's sentinel is always the last mouse-pos event before
+	// NewFrame.
 	bool bInputMessage = (uiMessage >= WM_MOUSEFIRST && uiMessage <= WM_MOUSELAST) || (uiMessage >= WM_KEYFIRST && uiMessage <= WM_KEYLAST);
 	if (!(bInputSuppressed && bInputMessage))
 	{

@@ -290,9 +290,9 @@ void ImGuiTestEngineHook_ItemAdd(ImGuiContext* pContext, ImGuiID uiIdentifier, c
 
 void ImGuiTestEngineHook_ItemInfo(ImGuiContext* pContext, ImGuiID uiIdentifier, const char* pcLabel, ImGuiItemStatusFlags iStatusFlags)
 {
-	// Begin() registers window pseudo-items without ImGuiItemStatusFlags_Visible.
-	// Empty labels omit them from describe_ui and label lookup (kiNotFound), avoiding visible:false entries and kClipped window-label clicks.
-	// Window names remain queryable through the window snapshot.
+	// Begin() registers a window pseudo-item under the window's name, which is not an activatable item. Leaving its
+	// label empty omits it from describe_ui and label lookup (kiNotFound); window names remain queryable through the
+	// window snapshot.
 	if (pContext->CurrentWindow != nullptr && uiIdentifier == pContext->CurrentWindow->ID)
 	{
 		return;

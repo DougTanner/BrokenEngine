@@ -681,9 +681,6 @@ static nlohmann::json BuildDescribeUi()
 
 	result["framebuffer"] = {engine::gpGraphics->mFramebufferVkExtent2D.width, engine::gpGraphics->mFramebufferVkExtent2D.height};
 
-	ImVec2 mousePosition = (ImGui::GetCurrentContext() != nullptr) ? ImGui::GetIO().MousePos : ImVec2(0.0f, 0.0f);
-	result["mouse"] = {mousePosition.x, mousePosition.y};
-
 	nlohmann::json windows = nlohmann::json::array();
 	nlohmann::json items = nlohmann::json::array();
 	for (int64_t i = 0; i < engine::gpAgentUiRegistry->mpiWindowCount[engine::gpAgentUiRegistry->miRead]; ++i)
@@ -696,7 +693,7 @@ static nlohmann::json BuildDescribeUi()
 		const engine::AgentUiItem& rItem = engine::gpAgentUiRegistry->mpItems[engine::gpAgentUiRegistry->miRead][i];
 		if (rItem.pcLabel[0] == '\0')
 		{
-			continue; // no label recorded (invisible / no ItemInfo) — not addressable, omit
+			continue; // no label recorded (no ItemInfo) — not addressable, omit
 		}
 		nlohmann::json item =
 		{
@@ -706,7 +703,6 @@ static nlohmann::json BuildDescribeUi()
 			{"disabled", rItem.bDisabled},
 			{"checked", (rItem.iStatusFlags & ImGuiItemStatusFlags_Checked) != 0},
 			{"inputable", (rItem.iStatusFlags & ImGuiItemStatusFlags_Inputable) != 0},
-			{"hovered", (rItem.iStatusFlags & ImGuiItemStatusFlags_HoveredRect) != 0},
 			{"visible", (rItem.iStatusFlags & ImGuiItemStatusFlags_Visible) != 0},
 		};
 		if (rItem.pcValue[0] != '\0')
@@ -818,7 +814,7 @@ static void CopyStringParameter(std::span<char> destination, std::string_view so
 	destination[i] = '\0';
 }
 
-// Shared label-target parse for click / hover / set_slider.
+// Shared label-target parse for click / set_slider.
 static void FillLabelTarget(const nlohmann::json& rParameters, engine::AgentScript& rScript)
 {
 	if (!rParameters.contains("label") || !rParameters.at("label").is_string())
@@ -849,10 +845,6 @@ static void BeginScriptAndDefer(const engine::AgentScript& rScript, bool bDescri
 		{
 			return std::nullopt;
 		}
-		if (eStatus == engine::AgentScriptStatus::kTimeout)
-		{
-			throw std::runtime_error("timed out");
-		}
 		if (eStatus == engine::AgentScriptStatus::kNotFound)
 		{
 			throw std::runtime_error("no widget matches label; candidates: " + CandidateLabels(bHasWindow ? errorWindow.c_str() : nullptr));
@@ -864,10 +856,6 @@ static void BeginScriptAndDefer(const engine::AgentScript& rScript, bool bDescri
 		if (eStatus == engine::AgentScriptStatus::kNotInputable)
 		{
 			throw std::runtime_error("target is not inputable");
-		}
-		if (eStatus == engine::AgentScriptStatus::kClipped)
-		{
-			throw std::runtime_error("target not visible (scrolled out of view)");
 		}
 
 		nlohmann::json result;
@@ -903,33 +891,19 @@ static void CommandDescribeUi([[maybe_unused]] const nlohmann::json& rParameters
 	rResult = BuildDescribeUi();
 }
 
-// click {label, window?, timeoutFrames?=120, describeUiAfter?=true}: stabilize target rect, press/release the left
-// mouse button at its center through ImGui IO, then optionally dump the post-click UI.
+// click {label, window?, describeUiAfter?=true}: activate the labeled item by its ImGui ID (offscreen items too; the
+// mouse never moves), settle, then optionally dump the post-click UI.
 static void CommandClick(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	engine::AgentScript script;
 	script.eKind = engine::AgentScriptKind::kClick;
 	FillLabelTarget(rParameters, script);
-	// Latest stabilization lands on advance timeoutFrames - 1; press, release, and settle add 4 more advances.
-	script.iTimeoutFrames = FrameCountParameter(rParameters, "click", "timeoutFrames", script.iTimeoutFrames, engine::AgentCommandServer::kiDeferredTimeoutDrains - 3);
 	bool bDescribeUiAfter = !rParameters.contains("describeUiAfter") || rParameters.at("describeUiAfter").get<bool>();
 	ThrowIfClientNotRendering();
 	BeginScriptAndDefer(script, bDescribeUiAfter, true, script.bHasWindow, script.pcWindow);
 }
 
-// hover {label, window?, holdFrames?=2}: move to and stabilize on the target, hold, then dump the UI.
-static void CommandHover(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
-{
-	engine::AgentScript script;
-	script.eKind = engine::AgentScriptKind::kHover;
-	FillLabelTarget(rParameters, script);
-	// Latest stabilization lands on advance iTimeoutFrames - 1, and the hold then finishes at least holdFrames advances later.
-	script.iHoldFrames = FrameCountParameter(rParameters, "hover", "holdFrames", script.iHoldFrames, engine::AgentCommandServer::kiDeferredTimeoutDrains - script.iTimeoutFrames + 1);
-	ThrowIfClientNotRendering();
-	BeginScriptAndDefer(script, true, true, script.bHasWindow, script.pcWindow);
-}
-
-// set_slider {label, window?, value}: Ctrl+Click the slider to open ImGui temp-input, type the value, commit (Enter).
+// set_slider {label, window?, value}: activate the slider into ImGui temp-input, type the value, commit (Enter).
 static void CommandSetSlider(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	if (!rParameters.contains("value"))
@@ -1005,115 +979,34 @@ static void CommandTypeText(const nlohmann::json& rParameters, [[maybe_unused]] 
 	BeginScriptAndDefer(script, false, false, false, std::string());
 }
 
-// mouse {x, y, action:"move|down|up|click|wheel", button?="left", notches?}: raw pixel coords feeding both the ImGui
-// IO sink and the RawInput overlay (normalized) for world clicks / unlabeled targets and camera-zoom wheel.
-// (x/y optional for wheel — both or neither)
-static void CommandMouse(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
+// wheel {notches?=1}: add mouse-wheel notches to the RawInput lifetime scroll accumulator for camera zoom; ImGui
+// receives no wheel event.
+static void CommandWheel(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	engine::AgentScript script;
-	script.eKind = engine::AgentScriptKind::kMouse;
+	script.eKind = engine::AgentScriptKind::kWheel;
 
-	std::string action = rParameters.contains("action") ? rParameters.at("action").get<std::string>() : "move";
-	if (action == "move")
+	int64_t iNotches = 1;
+	if (rParameters.contains("notches"))
 	{
-		script.eMouseAction = engine::AgentMouseAction::kMove;
+		const nlohmann::json& rNotches = rParameters.at("notches");
+		bool bValid = rNotches.is_number_integer();
+		if (bValid && rNotches.is_number_unsigned())
+		{
+			bValid = std::in_range<int64_t>(rNotches.get<uint64_t>());
+		}
+		if (!bValid)
+		{
+			throw std::runtime_error("wheel 'notches' must be an integer");
+		}
+		iNotches = rNotches.get<int64_t>();
 	}
-	else if (action == "down")
+	// The default single notch is checked too: the lifetime total can sit within one notch of the int limit.
+	if (!engine::gpAgentInput->WheelNotchesFit(iNotches))
 	{
-		script.eMouseAction = engine::AgentMouseAction::kDown;
+		throw std::runtime_error("wheel 'notches' delta or lifetime wheel total would exceed int32");
 	}
-	else if (action == "up")
-	{
-		script.eMouseAction = engine::AgentMouseAction::kUp;
-	}
-	else if (action == "click")
-	{
-		script.eMouseAction = engine::AgentMouseAction::kClick;
-	}
-	else if (action == "wheel")
-	{
-		script.eMouseAction = engine::AgentMouseAction::kWheel;
-	}
-	else
-	{
-		throw std::runtime_error("mouse 'action' must be move|down|up|click|wheel");
-	}
-
-	if (script.eMouseAction == engine::AgentMouseAction::kWheel)
-	{
-		int64_t iNotches = 1;
-		if (rParameters.contains("notches"))
-		{
-			const nlohmann::json& rNotches = rParameters.at("notches");
-			bool bValid = rNotches.is_number_integer();
-			if (bValid && rNotches.is_number_unsigned())
-			{
-				bValid = std::in_range<int64_t>(rNotches.get<uint64_t>());
-			}
-			if (!bValid)
-			{
-				throw std::runtime_error("mouse 'notches' must be an integer");
-			}
-			iNotches = rNotches.get<int64_t>();
-		}
-		// The default single notch is checked too: the lifetime total can sit within one notch of the int limit.
-		if (!engine::gpAgentInput->WheelNotchesFit(iNotches))
-		{
-			throw std::runtime_error("mouse 'notches' wheel delta or lifetime wheel total would exceed int32");
-		}
-		script.iWheelNotches = iNotches;
-
-		// Optional target coords: both present routes the ImGui wheel to the window under (x,y); neither supplies a new
-		// ImGui target or preserves a pin from an earlier script. Camera zoom is suppressed when the hovered window can
-		// actually scroll, ImGui's wheeling lock holds an earlier target, or a widget owns ImGuiKey_MouseWheelY (for
-		// example, an ImPlot). ImPlot ownership remains visible for the first two input polls after leaving a plot; a
-		// coordinate mouse move runs two active frames and, once complete, establishes its new target. A direct
-		// coordinate-bearing background wheel immediately after plot hover may remain UI-owned; a subsequent notch after
-		// that command completes reaches the camera.
-		bool bHasX = rParameters.contains("x");
-		bool bHasY = rParameters.contains("y");
-		if (bHasX != bHasY)
-		{
-			throw std::runtime_error("mouse wheel requires both 'x' and 'y' or neither");
-		}
-		if (bHasX)
-		{
-			script.pfCoordinatePixels[0] = static_cast<float>(rParameters.at("x").get<double>());
-			script.pfCoordinatePixels[1] = static_cast<float>(rParameters.at("y").get<double>());
-			script.bHasCoordinate = true;
-		}
-	}
-	else
-	{
-		if (!rParameters.contains("x") || !rParameters.contains("y"))
-		{
-			throw std::runtime_error("mouse requires 'x' and 'y'");
-		}
-		script.pfCoordinatePixels[0] = static_cast<float>(rParameters.at("x").get<double>());
-		script.pfCoordinatePixels[1] = static_cast<float>(rParameters.at("y").get<double>());
-		script.bHasCoordinate = true;
-
-		std::string button = rParameters.contains("button") ? rParameters.at("button").get<std::string>() : "left";
-		if (button == "left")
-		{
-			script.iImGuiMouseButton = 0;
-			script.uiOverlayMouseButtonBit = std::to_underlying(engine::MouseButtons::kMouseButtonLeft);
-		}
-		else if (button == "right")
-		{
-			script.iImGuiMouseButton = 1;
-			script.uiOverlayMouseButtonBit = std::to_underlying(engine::MouseButtons::kMouseButtonRight);
-		}
-		else if (button == "middle")
-		{
-			script.iImGuiMouseButton = 2;
-			script.uiOverlayMouseButtonBit = std::to_underlying(engine::MouseButtons::kMouseButtonMiddle);
-		}
-		else
-		{
-			throw std::runtime_error("mouse 'button' must be left|right|middle");
-		}
-	}
+	script.iWheelNotches = iNotches;
 
 	BeginScriptAndDefer(script, false, false, false, std::string());
 }
@@ -1374,11 +1267,6 @@ bool ExecuteClientAgentCommand(std::string_view command, const nlohmann::json& r
 		CommandClick(rParameters, rResult);
 		return true;
 	}
-	if (command == "hover")
-	{
-		CommandHover(rParameters, rResult);
-		return true;
-	}
 	if (command == "set_slider")
 	{
 		CommandSetSlider(rParameters, rResult);
@@ -1399,9 +1287,9 @@ bool ExecuteClientAgentCommand(std::string_view command, const nlohmann::json& r
 		CommandTypeText(rParameters, rResult);
 		return true;
 	}
-	if (command == "mouse")
+	if (command == "wheel")
 	{
-		CommandMouse(rParameters, rResult);
+		CommandWheel(rParameters, rResult);
 		return true;
 	}
 	if (command == "query_profile")

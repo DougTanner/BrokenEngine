@@ -46,7 +46,7 @@ These apply to every ImGui screen, engine or game.
 
 - General ImGui layout mechanics - scale, sizing, placement, rhythm, and primitives - live in the layout contract (`../../../../Documents/UserInterfaceDesign.txt`).
 - A screen registers its rendered rectangle for world-render occlusion only while its background is fully opaque; a screen that picks its own background alpha independently of the opaque-UI setting stays unregistered even at full alpha.
-- Control and header label text is the harness automation API and does not get renamed. Several Graphics rows repeat the same option labels, so a label-based harness lookup is ambiguous there and has to target those rows by coordinates; they stay distinguishable to ImGui by scoping each row to its wrapper, not by unique labels.
+- Control and header label text is the harness automation API and does not get renamed. A label whose visible text repeats within one window carries a hidden `##<section>` suffix, as the Graphics quality rows' `RadioRow` options carry their row header, so the harness names each item by its window and full label.
 - Menu font pushes must be balanced within the owning ImGui window. Construct scoped font helpers before `Begin` or entirely inside the window so `End` sees the expected stack.
 - Hover animation is caller-owned state and composes ImGui alpha, including disabled controls, without heap allocation.
 - Settings controls bind through the shared menu helpers. Tweaks sliders instead follow the engine TweaksScreen contract (`TweaksScreen/AGENTS.md`).
