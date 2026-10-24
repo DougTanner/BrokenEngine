@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-24T13:20:12.998Z","dependsOn":["Documents/Plans/ChangeWorkflow/ModelViewerHarnessCapture.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-24T13:20:12.998Z","dependsOn":[]} -->
 # Remove BT_MODEL_VIEWER, Phase 1: Image Pass Convergence and Program Switches
 
 ## Context
@@ -332,7 +332,7 @@ inventoried for the two follow-up plans.
     units, UI) with no black, gray, or garbage pixels and no difference beyond time-driven animation; no desync,
     CRC-mismatch, or Vulkan validation-error log lines in either run.
   - A5 ModelViewer Debug per `/agent-harness` `references/model-viewer.md` `## Capture` with `-RequireStable` (the
-    capture `Documents/Plans/ChangeWorkflow/ModelViewerHarnessCapture.md` adds), run once before the first edit and
+    capture `.agents/skills/agent-harness/scripts/Invoke-ModelViewerCapture.ps1` runs), run once before the first edit and
     once after: the startup model and camera capture shows the same model shading, the same gray background with no
     terrain, water, or particle pixels, and the same UI panel size and layout; neither viewer log has a
     `DEBUG_BREAK at` (Vulkan validation) line.

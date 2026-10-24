@@ -4,8 +4,8 @@ description: >-
   Drive the Broken Engine client/server for automated verification. Use for
   runtime-observable acceptance criteria, replay determinism, or whenever the
   user or a plan's Verification section asks to launch, drive, query, or
-  screenshot the game, or requests GPU frame capture or RenderDoc capture
-  analysis.
+  screenshot the game or to screenshot the ModelViewer, or requests GPU frame
+  capture or RenderDoc capture analysis.
 allowed-tools: [PowerShell]
 ---
 
@@ -14,13 +14,14 @@ allowed-tools: [PowerShell]
 ## Purpose
 
 Drive the local headless server and rendered client through loopback,
-length-prefixed JSON.
+length-prefixed JSON, and capture ModelViewer screenshots without showing the
+viewer.
 
 ## When to use
 
 - A runtime-observable acceptance criterion or a replay determinism check.
 - The user or a plan's Verification section asks to launch, drive, query, or
-  screenshot the game.
+  screenshot the game, or to screenshot the ModelViewer.
 - A request for GPU frame capture or RenderDoc capture analysis.
 - Any user request to launch the game for their own play or testing: always,
   with no further prompting, run the
@@ -46,6 +47,8 @@ include the server executable, and the client executable unless the scenario
 launches only the server, for the requested configuration; request that build by
 stating the agent-harness scenario trigger in
 [`/compile`](../compile/SKILL.md) `## Inputs`.
+A ModelViewer scenario instead requires the latest `/compile` ModelViewer Debug
+result and no game project build.
 A release-only recovery (`## When to use`) needs no `/compile` result; its
 brief names the stopped dispatch's game and configuration instead.
 A replay determinism check needs a `kbDebugInput` build, so request `Debug` for
@@ -105,7 +108,9 @@ criterion left unsettled by the run budget; use `none` when absent.
 A `shared-data.changed` or `shared-data.record-missing` residual from the claim
 or a launch routes `/compile` for the named target, and a
 `claim.data-directory-mismatch` residual routes `/compile` of both the Server
-and the Client target in one data mode, each with no user stop.
+and the Client target in one data mode, and a ModelViewer
+`capture.executable-missing` residual routes `/compile` ModelViewer Debug, each
+with no user stop.
 
 Each exception row cites the handoff row or path plus selector that holds its
 settling evidence and never restates it:
@@ -153,3 +158,6 @@ this `Temp/` file.
 - [`references/worker.md`](references/worker.md) — private: read it only if you
   are the session executing this skill. The harness steps and rules the
   dispatched worker runs.
+- [`references/model-viewer.md`](references/model-viewer.md) — private: read it
+  only if you are the session executing this skill. The ModelViewer capture
+  recipe a ModelViewer scenario runs.

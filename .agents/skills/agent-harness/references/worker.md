@@ -41,6 +41,12 @@ and the handoff this run returns.
    never pick one by default. Done when the target project is named or the
    choice is returned.
 
+   - A brief that targets only the ModelViewer runs
+     [`model-viewer.md`](model-viewer.md) `## Capture` in place of steps 3-46,
+     then returns the handoff. A brief that also has game criteria runs that
+     capture for its ModelViewer criteria in addition to steps 3-46 for the game
+     criteria; the capture holds no lock or port, so the two do not conflict.
+
 4. Read the selected project's `Projects/<Project>/Documents/AgentHarness.md`
    hub before launching. Done when that hub has been read.
 

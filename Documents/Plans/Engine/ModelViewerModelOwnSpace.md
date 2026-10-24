@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-24T18:17:44.927Z","dependsOn":["Documents/Plans/ChangeWorkflow/ModelViewerHarnessCapture.md","Documents/Plans/Engine/ModelViewerWorldUniforms.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-24T18:17:44.927Z","dependsOn":["Documents/Plans/Engine/ModelViewerWorldUniforms.md"]} -->
 # ModelViewer world, stage 2: the model in its own space over a world camera
 
 ## Context
