@@ -22,11 +22,11 @@ both EXE/PDB pairs before another build overwrites them. A build with diagnostic
 probes and a build with a production fix are distinct experiments.
 
 Work from the session worktree root. Repository scripts retain their documented
-form, `pwsh -NoProfile -File <repo-relative-script> <arguments>`, one script per
-shell call; do not change directory or execution policy. Do not launch a game,
-build, or tracing session merely by reading this document. Probe changes require
-their own authorized scope; these are diagnosis techniques, not instructions to
-review or remove temporary probes.
+form, `pwsh -NoProfile -File <repo-relative-script> <arguments>`; do not change
+directory or execution policy. Do not launch a game, build, or tracing session
+merely by reading this document. Probe changes require their own authorized
+scope; these are diagnosis techniques, not instructions to review or remove
+temporary probes.
 
 Preserve initial persisted-state presence, bytes and hashes before any writers;
 retain changed runtime output, then restore originals only after final writers

@@ -61,13 +61,9 @@ are not, and stay out of the CRC.
   `pwsh -NoProfile -File <repo-relative script path> [arguments]`, run from the
   session worktree root; never an absolute path or `-ExecutionPolicy Bypass`.
   Never change the working directory (no `cd`, no `Set-Location`); address
-  scratch files by path from the worktree root. One script per shell call with
-  nothing chained before or after it; using that call's own output (assigning
-  it, piping to `ConvertFrom-Json`, piping to `Set-Content`, or reading
-  `$LASTEXITCODE` after it) is allowed from the PowerShell tool only. Import a
-  `.psm1` with `Import-Module ./<repo-relative path>` (leading `./` required)
-  and call its functions in the same shell call. When a parameter takes an
-  array, use
+  scratch files by path from the worktree root. Import a `.psm1` with
+  `Import-Module ./<repo-relative path>` (leading `./` required) and call its
+  functions in the same shell call. When a parameter takes an array, use
   `pwsh -NoProfile -Command "& '<repo-relative path>' -Param 'a','b'"` instead
   of `-File`.
 - Trivial choices (naming, small implementation details, options with the same outcome): pick the simplest and proceed; a worker returns any other decision to main.

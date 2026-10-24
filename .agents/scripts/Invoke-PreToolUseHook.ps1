@@ -5,12 +5,6 @@
 #     Push-Location, or Pop-Location as a command word;
 #   - -ExecutionPolicy Bypass, including the -ep and -ex... abbreviations;
 #   - a .ps1 or .psm1 path rooted under the input cwd but outside <cwd>/Temp/;
-#   - a repository script call (pwsh -File <relative .ps1>,
-#     pwsh -Command "& '<relative .ps1>' ...", or Import-Module ./<path>) with
-#     any other command in the same call; from the PowerShell tool only, a
-#     $name = assignment before it, | ConvertFrom-Json or | Set-Content after
-#     it, a later statement that only reads $LASTEXITCODE, and later calls to
-#     the imported module's own functions are allowed;
 #   - git stash bare, pop, save, clear, push without both -u and -m, or apply
 #     without a hexadecimal SHA;
 #   - sed -i/--in-place or perl -i on a file outside Temp/;
@@ -408,7 +402,6 @@ $script:Messages = @{
 	DirectoryChange = 'do not change the working directory (cd, Set-Location, Push-Location, or their aliases); run every command from the worktree root and address files by path.'
 	ExecutionPolicy = 'never use -ExecutionPolicy Bypass; run a repository script as pwsh -NoProfile -File <repo-relative script path> [arguments].'
 	AbsoluteScriptPath = 'never run a repository script by absolute path; use pwsh -NoProfile -File <repo-relative script path> [arguments] from the worktree root.'
-	ChainedScript = 'run one repository script per shell call with nothing chained before or after it; only from the PowerShell tool may the call assign its output, pipe it to ConvertFrom-Json or Set-Content, or read $LASTEXITCODE after it.'
 	Stash = 'the git stash stack is shared by every worktree; use only git stash push -u -m <unique-tag>, git stash list, git stash apply <sha>, and git stash drop.'
 	InPlaceEdit = 'do not edit files in place with sed or perl outside Temp/; change tracked files with the host Edit tool.'
 	ComputedDeletion = 'delete only by exact literal paths, never by wildcard, pattern filter, pipeline, find, xargs, variable, or substitution; name each path literally (in PowerShell, -LiteralPath ''<path>''); a directory may be deleted recursively.'
@@ -429,12 +422,10 @@ function Get-WordsFrom($Words, [int] $Start) {
 # its command word past leading keywords, call operators, and assignments.
 function New-ShellElement($Words, [string] $PrecededBy, [string] $FollowedBy, [bool] $IsBash) {
 	$index = 0
-	$assigned = $false
 	while ($index -lt $Words.Count) {
 		$raw = $Words[$index].Raw
 		if ($script:LeadingKeywords -contains $raw -or $raw -eq '&' -or $raw -eq '.') { $index++ }
 		elseif ($raw -match '^\$[\w:]+$' -and $index + 1 -lt $Words.Count -and $Words[$index + 1].Raw -eq '=') {
-			$assigned = $true
 			$index += 2
 		}
 		elseif ($IsBash -and $raw -match '^[A-Za-z_]\w*=') { $index++ }
@@ -455,7 +446,6 @@ function New-ShellElement($Words, [string] $PrecededBy, [string] $FollowedBy, [b
 		FollowedBy = $FollowedBy
 		CommandIndex = $index
 		Name = $name
-		Assigned = $assigned
 	}
 }
 
@@ -641,71 +631,6 @@ function Test-ComputedDeletion($Element, $Arguments, [bool] $IsBash) {
 	return Test-ComputedTarget $Arguments $IsBash $isGit
 }
 
-function Get-ScriptCall($Element) {
-	if ($Element.CommandIndex -lt 0) { return $null }
-	$words = $Element.Words
-	if ($Element.Name -eq 'import-module') {
-		for ($j = $Element.CommandIndex + 1; $j -lt $words.Count; $j++) {
-			if ($words[$j].Value -match '^\.[\\/]') { return @{ Module = $words[$j].Value } }
-		}
-		return $null
-	}
-	if ($Element.Name -ne 'pwsh') { return $null }
-	for ($j = $Element.CommandIndex + 1; $j -lt $words.Count - 1; $j++) {
-		$parameter = $words[$j].Value.ToLowerInvariant()
-		$argument = $words[$j + 1].Value
-		if ($parameter -match '^-(f|fi|fil|file)$' -and $argument -match '(?i)\.ps1$' -and $argument -notmatch $script:RootedPattern) {
-			return @{ Module = $null }
-		}
-		if ($parameter -match '^-(c|com|comm|comma|comman|command)$' -and $argument -match "(?i)^\s*&\s*['""]([^'""]+\.ps1)['""]" -and
-			$Matches[1] -notmatch $script:RootedPattern) {
-			return @{ Module = $null }
-		}
-	}
-	return $null
-}
-
-function Test-ExitCodeRead($Element) {
-	$index = $Element.CommandIndex
-	if ($Element.Words[$index].Raw -match '(?i)\$LASTEXITCODE\b') { return $true }
-	if (@('write-output', 'write-host', 'echo') -notcontains $Element.Name) { return $false }
-	for ($j = $index + 1; $j -lt $Element.Words.Count; $j++) {
-		if ($Element.Words[$j].Raw -match '(?i)\$LASTEXITCODE\b') { return $true }
-	}
-	return $false
-}
-
-function Test-ChainedScriptCall($Elements, [bool] $IsBash, [string] $Cwd) {
-	$call = $null
-	$callIndex = -1
-	for ($j = 0; $j -lt $Elements.Count; $j++) {
-		$found = Get-ScriptCall $Elements[$j]
-		if ($null -eq $found) { continue }
-		if ($null -ne $call) { return $true }
-		$call = $found
-		$callIndex = $j
-	}
-	if ($null -eq $call) { return $false }
-	if ($IsBash -and $Elements[$callIndex].Assigned) { return $true }
-	$functions = $null
-	for ($j = 0; $j -lt $Elements.Count; $j++) {
-		if ($j -eq $callIndex) { continue }
-		$element = $Elements[$j]
-		if ($IsBash -or $j -lt $callIndex -or $element.CommandIndex -lt 0) { return $true }
-		if (@('convertfrom-json', 'set-content') -contains $element.Name -and $element.PrecededBy -eq '|') { continue }
-		if (Test-ExitCodeRead $element) { continue }
-		if ($call.Module) {
-			if ($null -eq $functions) {
-				$text = [IO.File]::ReadAllText((Join-Path $Cwd $call.Module))
-				$functions = @([regex]::Matches($text, '(?im)^\s*function\s+(?:global:|script:)?([\w-]+)') | ForEach-Object { $_.Groups[1].Value })
-			}
-			if ($functions -contains $element.Name) { continue }
-		}
-		return $true
-	}
-	return $false
-}
-
 function Get-ElementViolation($Element, [bool] $IsBash, [string] $CwdPath) {
 	foreach ($word in $Element.Words) {
 		if (Test-AbsoluteScriptPath $word.Value $CwdPath) { return $script:Messages.AbsoluteScriptPath }
@@ -738,10 +663,6 @@ function Get-ShellRuleViolation([string] $Command, [bool] $IsBash, [string] $Cwd
 			$message = Get-ElementViolation $element $IsBash $cwdPath
 			if ($message) { return $message }
 		}
-		# A script call inside a substitution always runs within another command.
-		$chained = if ($j -eq 0) { Test-ChainedScriptCall $elements $IsBash $Cwd }
-		else { @($elements | Where-Object { $null -ne (Get-ScriptCall $_) }).Count -gt 0 }
-		if ($chained) { return $script:Messages.ChainedScript }
 	}
 	return $null
 }
