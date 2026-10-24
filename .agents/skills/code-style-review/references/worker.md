@@ -277,15 +277,20 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
 16. Remove confirmed temporary debug instrumentation added during the session,
     including temporary `LOG`, `printf`, `DEBUG_BREAK()`, `assert(false)`,
     `// FIXME`, and `// HACK` lines, taking the added-versus-pre-existing
-    distinction from the scanner.
+    distinction from the scanner. Also remove every block wrapping a temporary
+    verification edit (block form:
+    [`change-workflow.md`](../../../references/change-workflow.md)
+    `#### Step 5 — Run targeted pre-review checks`): find each by searching its
+    marker lines, and remove the whole block, including both marker lines,
+    restoring any pre-existing line it changed as that step states.
     - When an `assert-false` row is an `ASSERT(false)` kept as an intended
       assertion rather than temporary instrumentation, check the next
       statement against rule 70. `ASSERT` always throws
       (`Common/AGENTS.md:79`), so a fallback `return` there never runs and
       step 10 applies the `std::unreachable()` replacement.
-    - Done when a search for their exact text or existing unique debug tag
-      returns zero remaining matches in session-added C++, where a kept,
-      intended `ASSERT(false)` is not remaining residue.
+    - Done when a search for their exact text, `// TEMP START`, and
+      `// TEMP END` returns zero remaining matches in session-added C++, where
+      a kept, intended `ASSERT(false)` is not remaining residue.
 
 ## Rules
 

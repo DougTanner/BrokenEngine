@@ -123,10 +123,6 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
      `SmartGit launch:` line in step 6 and the existing landing summary.
    - A `primary.path-overlap` result runs the overlap recovery in
      `## Recovery` in this same dispatch.
-   - Apply the Verify and land step's rule that exactly one explicit user
-     confirmation authorizes changing primary, and
-     [`scripts.md#landing-and-recovery`](scripts.md#landing-and-recovery) for the
-     movement and lease rules.
    - A candidate/session change still returns its changed bytes through normal
      review. Any later primary movement is handled by landing's existing bounded
      internal rebase and terminal result.
@@ -177,9 +173,6 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
       on it, and step 14 disposes of such a block like any other blocked landing.
     - For a claimed Plan pass `-ReleasePlanClaim` so the machine-local claim is
       deleted best-effort.
-    - Under the landing lease, landing follows the Verify and land step's rule
-      that exactly one explicit user confirmation authorizes changing primary,
-      and the exact mechanics in [`scripts.md`](scripts.md).
     - Done when landing has returned its result.
 11. Read the advance and cleanup landing performed.
     - Landing advances primary by compare-and-swap with rollback, resets and
@@ -203,9 +196,8 @@ Every preparation dispatch recovers `primary.path-overlap` itself under
     - Done when the deletion is recorded as performed or as that residual.
 14. Dispose of a landing blocked by primary advancing.
     - If primary advanced before the advance succeeds, landing does its own
-      bounded rebase and retry, following the Verify and land step's rule that
-      exactly one explicit user confirmation authorizes changing primary, and
-      [`scripts.md`](scripts.md) for the resulting disposition.
+      bounded rebase and retry, and [`scripts.md`](scripts.md) owns the
+      resulting disposition.
     - Never rebase or resolve by hand.
     - Act on the blocked result's reported `disposition` and `lock` projection
       exactly as `scripts.md` specifies, never a memorized list of codes.

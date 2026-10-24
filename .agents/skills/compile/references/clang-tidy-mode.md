@@ -4,17 +4,6 @@
 
 Use this mode only when an approved plan explicitly requires a clang-tidy run. Outside this explicitly authorized mode, omit `-ClangTidy` so the build keeps `EnableClangTidyCodeAnalysis=false`.
 
-## Retained protections
-
-Retain every ordinary build protection the skill states: the rules for taking
-and releasing the short-lived operation lock, immutable prebuilt WorktreeCli,
-worktree provisioning and lifecycle validation, WorktreeCli target
-serialization, synchronous foreground execution, and, for a game build,
-data-mode selection with the authoritative data properties from
-[runtime-data-mode.md](runtime-data-mode.md). `-ClangTidy` changes only the
-analysis switches and the log verbosity and, on a full build, forces a rebuild.
-Do not invoke MSBuild or clang-tidy outside WorktreeCli.
-
 ## Invocation and coverage
 
 `-ClangTidy` is accepted for Client and Server Debug and Release builds and for DataPacker, which builds Release only. Profile, every other target, and the combination with `-Prefast` block before any child process runs, under `parameter.clangtidy-invalid` — except that `-Prefast` invalid for the target or configuration on its own blocks first under `parameter.prefast-invalid`.

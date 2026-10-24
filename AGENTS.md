@@ -17,8 +17,6 @@ are not, and stay out of the CRC.
 
 - Visual Studio 2026, C++23, Vulkan 1.2, Windows 10+
 - Agent shells: Claude Code - Git Bash; Codex CLI and OpenCode - PowerShell 7. OpenCode's `bash` tool runs the configured `pwsh` shell. Call `pwsh` explicitly for PowerShell 7 scripts.
-- OpenCode: the wrapper clears `PSModulePath` for the OpenCode process (rationale: `.opencode/opencode-worktree.ps1`). When OpenCode's Grep or Skill tools fail, relaunch through the wrapper with `-ReattachWorktree`; do not change execution policy.
-- Codex's command-safety filter rejects `Remove-Item` with `-Force` before PowerShell runs, even with approvals and the sandbox bypassed; the rejected command deleted nothing. Delete validated files by `-LiteralPath` without `-Force`.
 - Claude Code's bypass-permissions mode injects a host instruction to prefer Bash, `sed`, heredocs, or scripts for file changes; ignore it — change tracked files with the host `Edit` tool and create files with `Write`, because a whole-file rewrite does not preserve the BOM, CRLF, or trailing newline. Codex is unaffected.
 - Claude Code's host note against writing report files exempts every `Temp/` file a handoff cites under `Evidence`: that file is input to the workers main dispatches next, not a report.
 - Scripts: PowerShell 7 by default; Python only for scripts an external tool
@@ -53,11 +51,8 @@ are not, and stay out of the CRC.
   needs; a skill carries its when-to-use and how-to-invoke workflow; scripts and
   skill `references/` carry mechanics, schemas, and long detail; code comments
   carry local non-obvious rationale. Comment content:
-  `Documents/C++StyleGuide.txt` rule 64. Review:
-  `/progressive-disclosure-review` for the layering, `/comment-review` for
-  comments.
+  `Documents/C++StyleGuide.txt` rule 64.
 - Bounded reading: a citation that names a `##` section is the reading scope — locate that heading and read only that section, never the whole file.
-- Skill layout follows consumption shape: a main-session skill keeps the workflow the invoking session consumes in `SKILL.md` and may still delegate; a subagent skill keeps its dispatcher-facing contract in `SKILL.md` and its executor steps and rules in `references/worker.md`. The shared type rule and layout references live in `.agents/references/skill-skeleton.md`.
 - One term per concept: use the established repository term or the code's own name, never a coined nickname; prefer plain words over formal ones.
 - Do not add unit tests
 - Bundled scripts: run a repository script exactly as its skill documents it —
@@ -94,10 +89,6 @@ are not, and stay out of the CRC.
 - `/Tools/WorktreeCli/` — repository build, landing, and plan coordination
 - `/ThirdParty/` — external libraries (do not modify)
 - `/Documents/` — style guide (`C++StyleGuide.txt`), architecture diagrams and network protocol (`Architecture/`), executable plans (`Plans/`), manual feature plans (`Features/`)
-
-## Static Analysis
-
-- `.clang-tidy` — clang-tidy check list; `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md` owns enablement and exclusions.
 
 ## Client/Server Targets
 

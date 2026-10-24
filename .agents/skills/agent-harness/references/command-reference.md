@@ -24,8 +24,7 @@ The server monitor is an engine-owned GDI window, not a protocol command surface
   that floor clamps up to it. An effective level above the requested one
   therefore means the lines below it are compiled out of that build, not
   filtered at runtime, and no runtime level emits them. A run that needs those
-  lines lowers that category's floor through a verification-only temporary
-  source edit
+  lines lowers that category's floor through a temporary verification edit
   ([`.agents/references/change-workflow.md`](../../../references/change-workflow.md)
   `#### Step 5 — Run targeted pre-review checks`).
 - `cell_coordinate_probe`: `{"coord":[x,y]}` and nothing else — a params object

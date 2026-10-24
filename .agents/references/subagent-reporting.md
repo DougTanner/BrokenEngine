@@ -8,17 +8,12 @@ with the table's `subagent_type` and omits `task_id`. A positive Codex turn
 fork is allowed only when exact authoritative conversation text cannot be
 safely summarized, and the prompt states why.
 
-The rule that subagents never spawn subagents is enforced by
-`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1` and by `disallowedTools: Agent` in each
-Claude role definition, by the Codex role instructions, and by OpenCode's
-worker `permission.task: deny` configuration.
-
-The Change Workflow delegation role table authoritatively assigns
-delegated work and owns every role exception. This reference owns only
-reporting-local conduct: independent findings-only work uses a fresh context,
-any root-authorized narrow edit path includes its required self-check, and tool
-restrictions a skill body states are prose boundaries rather than host
-enforcement.
+The Change Workflow delegation role table authoritatively assigns delegated
+work; a role exception it does not list is stated in the skill it governs. This
+reference owns only reporting-local conduct: independent findings-only work
+uses a fresh context, any authorized narrow edit path includes its
+required self-check, and tool restrictions a skill body states are prose
+boundaries rather than host enforcement.
 
 ## Task brief
 
@@ -41,14 +36,6 @@ Return: <the shared handoff plus the named skill's declared extension fields, or
 
 `Required sections` names which skill-specific report sections the caller will
 read; the worker skips the rest. The shared handoff is always returned in full.
-In addition to that full shared handoff, a brief that has the worker run
-another skill one or more times as acceptance evidence names the run skill's
-field its acceptance criterion turns on and adds one `Decisive checks` row per
-run — the expected observation met or not, that run's `Status`, and that named
-field's row — plus one row on the resulting tree state, and has the worker
-write each full run handoff to one gitignored `Temp/` file under a
-`## Run <n>` heading, cited under `Evidence` as path plus selector;
-`git status --porcelain` output never travels inline.
 
 The session baseline is the attribution and delegation fork point for the
 session's work. It begins as the commit reported by
@@ -81,8 +68,9 @@ module name and searches `PSModulePath` instead of the worktree.
 
 That output's `SessionId` is the worktree/branch UUID parsed from the session
 branch, never the conversation session ID a follow-up Plan's provenance block
-records; `.agents/skills/next-plan/references/follow-up-provenance.md`,
-`## Conversation session ID`, owns where that value comes from.
+records (where that ID comes from:
+`.agents/skills/next-plan/references/follow-up-provenance.md`
+`## Conversation session ID`).
 
 On a direct `reviewer` dispatch the targets file where the assigned skill
 requires one, and the changed-file inventory where the assigned skill documents

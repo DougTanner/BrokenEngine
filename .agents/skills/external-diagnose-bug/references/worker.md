@@ -41,10 +41,10 @@ boundary, and the handoff form live in [`../SKILL.md`](../SKILL.md).
    clean one — loop the trigger, add load, narrow the timing window. A failure
    that appears half the runs is diagnosable; one in a hundred is not. Done
    when the reproduction rate is high enough to diagnose.
-5. When no signal can be built, say so, list what you tried, and ask the user
-   for the environment, a captured artifact, or permission to add temporary
-   instrumentation. Stop there; do not hypothesize without a signal. Done when
-   that request is made and no hypothesis has been formed.
+5. When no signal can be built, even with a temporary log (step 13), say so,
+   list what you tried, and ask the user for the environment or a captured
+   artifact. Stop there; do not hypothesize without a signal. Done when that
+   request is made and no hypothesis has been formed.
 6. Name the signal and show it going red before continuing. Done when the
    signal is named and its red result is shown.
 
@@ -79,9 +79,11 @@ boundary, and the handoff form live in [`../SKILL.md`](../SKILL.md).
     targeted logs at the boundary that separates two hypotheses over broad
     logging. For a performance regression, measure rather than log. Done when
     every probe is tied to a named prediction.
-13. Tag every temporary log with a unique marker, for example `[DEBUG-a4f2]`,
-    so removal is one search. Done when every temporary log carries that
-    marker.
+13. Wrap every temporary log and other temporary code in a marked block under
+    the rule in [`change-workflow.md`](../../../references/change-workflow.md)
+    `#### Step 5 — Run targeted pre-review checks`, so removal is one search.
+    Done when every temporary edit sits between a `// TEMP START` line and a
+    `// TEMP END` line.
 14. Treat instrumentation as temporary session state: it stays in the diagnosis
     worktree, never lands, and is removed before the handoff; never review or
     style-check it. Done when no instrumentation remains at the handoff.
@@ -101,7 +103,8 @@ boundary, and the handoff form live in [`../SKILL.md`](../SKILL.md).
     run.
 18. Verify before reporting:
 
-    - every `[DEBUG-...]` log removed (search the marker);
+    - every `// TEMP START` / `// TEMP END` block removed (search the
+      markers);
     - every throwaway script and scratch file deleted;
     - the reproducing signal still goes red — rerun it when it is runnable,
       recheck the inspection or capture when it is not.

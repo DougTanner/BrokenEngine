@@ -4,17 +4,6 @@
 
 Use this mode only when an approved plan explicitly requires Microsoft PREfast verification. Outside this explicitly authorized mode, omit `-Prefast` so the build keeps the Microsoft rule-set path off.
 
-## Retained protections
-
-Retain every ordinary game-build protection the skill states: the rules for
-taking and releasing the short-lived operation lock, immutable prebuilt
-WorktreeCli, worktree provisioning and lifecycle validation, WorktreeCli target
-serialization, synchronous foreground execution, and data-mode selection with
-the authoritative data properties from
-[runtime-data-mode.md](runtime-data-mode.md). `-Prefast` changes only the
-analysis switches and, on a full build, forces a rebuild, so those protections
-all still apply. Do not invoke MSBuild or `/analyze` outside WorktreeCli.
-
 ## Invocation and coverage
 
 `Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/AGENTS.md` owns the Microsoft code analysis explanation in its "Microsoft code analysis" bullet: the two Release paths selected by the toolchain's `RunMsvcAnalysis`, the `EnablePREfast` gate, the rule set, `CodeAnalysisTreatWarningsAsErrors`, and the `CodeAnalysisNeverReportRuleErrors` prohibition. The facts this mode adds on top of it:

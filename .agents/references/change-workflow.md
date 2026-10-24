@@ -17,7 +17,7 @@ This table is the authoritative spawned-agent routing policy; native role defini
 | `subagent_type` | Model | Effort | Work |
 | --- | --- | --- | --- |
 | `planner` | Opus | medium | Plans, design |
-| `reviewer` | Opus | medium | Every independent findings-only review and audit except `/comment-review`; adversarial review that tries to disprove the change |
+| `reviewer` | Opus | medium | Every independent findings-only review and audit except `/comment-review`, including `/next-plan-review` (run directly in one fresh reviewer); adversarial review that tries to disprove the change |
 | `implementer` | Opus | high | Preparation, implementation, propagation, docs, plans, harness, finalization |
 | `researcher` | Opus | medium | Research requiring judgment; approach options for /plan-alternatives |
 | `locator` | Haiku | high | Exploration, search, log filtering, spec fetch, claim verification — returns file:line, quotes, or links, never summaries |
@@ -26,19 +26,10 @@ This table is the authoritative spawned-agent routing policy; native role defini
 
 - Delegate by `subagent_type`; an ad-hoc `model:` cannot lock in effort. On Claude only, a documented host-unavailability fallback to `general-purpose` may pass `model:` and runs without a locked-in effort
 - Host built-in agent types (`Explore`, `Plan`, `general-purpose`) never substitute for a role, including inside plan mode — route the work through the table above. The documented host-unavailability fallback is the only exception
-- Host plan mode never substitutes for Change Workflow steps: a plan produced there still gets Step 3's `/plan-audit` (and the Tier-3 additions) before implementation
-- Every independent findings-only review or audit the table above assigns to
-  `reviewer` runs as that subagent (`.claude/agents/reviewer.md`), including
-  `/next-plan-review`, which runs directly in one fresh reviewer.
-  `/comment-review` remains the `mechanic` exception; same-context
-  `/implement-plan` and `/update-claude-docs` audits remain with their
-  implementer; and `/coherence-review` may make only the narrow
-  caller-authorized meaning-preserving wording and formatting fixes its worker
-  contract allows, followed by that contract's self-check. Do not follow review
-  findings blindly. Use judgement on each one: accept it when the failure is
-  real and reachable, and be especially careful with findings that add guards,
-  options, or machinery for cases nobody has observed (YAGNI and
-  over-engineering).
+- Do not follow review findings blindly. Use judgement on each one: accept it
+  when the failure is real and reachable, and be especially careful with
+  findings that add guards, options, or machinery for cases nobody has observed
+  (YAGNI and over-engineering).
 
 ChatGPT Codex: Fable -> Astra (gpt-6-astra medium); Opus -> Sol (gpt-6.1-sol medium); Sonnet -> Luna (gpt-6-luna max); Haiku -> Luna (gpt-6-luna max, through `sonnet.toml`).
 OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no effort mapping.
@@ -58,33 +49,31 @@ OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no ef
 - AVOID jargon: the user is NOT a domain expert. Use everyday words and short sentences. Define an unavoidable technical term in one clause the first time it appears.
 - Explain fully when asked; use headings and bullet points so a longer explanation stays skimmable.
 - Reporting work: state what was built and what was verified separately, and name every required check still open; "done" means those checks have closed. A defect is stated with its evidence and effect, never as a verdict or count alone.
-- Comparing options: use the same criteria, evidence, detail, and tone for each;
-  recommend one, but never sell the favorite by its benefit and the alternative
-  by its risk. Prefer removing a cause over suppressing a symptom. Each pro and
-  con says only how the option leaves the codebase — less code, a root cause
-  removed, better structure, runtime cost, invariants kept — never its review
-  status, how far it departs from a drafted plan or from current documents or
-  code, which wire, trust, or invariant surfaces it touches as a cost in
-  itself, the amount of change, or the effort; a plan's scope or its author's
-  choice counts only when the user set it
-  (`.agents/references/authority-order.md`). Start each option with a
-  written label such as `Option 1:`, never a list marker the client renders, and
-  make a question that names options use those same labels.
+- Comparing options: give each the same criteria, evidence, detail, and tone;
+  recommend one without selling the favorite by benefit and the alternative by
+  risk; prefer removing a cause to suppressing a symptom. Pros and cons cover
+  only how the option leaves the codebase (less code, root cause removed, better
+  structure, runtime cost, invariants kept), never review status, departure from
+  a drafted plan or current documents or code, touched wire, trust, or invariant
+  surfaces as a cost in themselves, amount of change, or effort; a plan's scope
+  or author's choice counts only when the user set it
+  (`.agents/references/authority-order.md`). Open each option with a written
+  label such as `Option 1:`, never a rendered list marker, and reuse those
+  labels in any question naming options.
 - Footer: the main session's final message of any turn that ran Change Workflow
-  work ends with `Follow-up Plans created:` followed by one repo-relative path
-  per Plan created that turn, tagged `landed in <commit>`,
-  `unlanded in worktree`, or `executed in this change` for a Plan folded in by
-  the Leftovers do-now rule, or the single word `none`. Each path also answers
-  whether the Plan is worth doing in this session while its context is fresh:
-  `do now: yes` when it is Tier 1 or 2, bounded, and every file and fact it
-  needs was already read or changed this session, so doing it adds little new
-  context; otherwise `do now: no`, with the failed condition in a few words. A
-  `do now: yes` on a `landed in <commit>` Plan ends with
-  `(run /next-plan <path>)`, because only the user can start `/next-plan`. One
-  line per Plan:
+  work ends with `Follow-up Plans created:` and the single word `none`, or one
+  line per Plan created that turn: its repo-relative path; a tag,
+  `landed in <commit>`, `unlanded in worktree`, or `executed in this change`
+  (folded in by the Leftovers do-now rule); and whether to do it this session
+  while its context is fresh: `do now: yes` when it is Tier 1 or 2, bounded,
+  and needs only files and facts already read or changed this session (so it
+  adds little new context), otherwise `do now: no` with the failed condition in
+  a few words. A `do now: yes` on a `landed in <commit>` Plan ends with
+  `(run /next-plan <path>)`, since only the user can start `/next-plan`.
+  Example:
   `Documents/Plans/<area>/<Plan>.md — unlanded in worktree — do now: no (needs files not read this session)`.
-  The verdict is an answer, never a question; the user decides, and it never
-  displaces a pending landing question or the session-complete marker. Only the
+  The verdict answers, never asks; the user decides, and it never displaces a
+  pending landing question or the session-complete marker; only the
   `/next-plan` session-complete marker may follow it.
 
 ### Resolving Ambiguity
@@ -118,7 +107,6 @@ Definitions:
 - Executable Plan — tracked `Documents/Plans/**/*.md` with byte-zero `broken-engine-plan/v1` metadata; selection and marker rules: `Documents/Plans/AGENTS.md`. `Documents/Features` is manual.
 - Wrapper session — session started through `.claude/claude-worktree.sh`, `.codex/codex-worktree.ps1`, or `.opencode/opencode-worktree.ps1`, owning an isolated worktree. A retained wrapper session reattaches only through the same wrapper with its explicit reattach worktree input — `--reattach-worktree <path>` for Claude and `-ReattachWorktree <path>` for Codex and OpenCode; never adopt an arbitrary worktree.
 - Primary — the shared main checkout and its main branch that finished session work lands into.
-- Tracked artifact — any file Git tracks in this repository: code, shaders, scripts, skills, plans, and documentation.
 - Step and stage — a step is one of the nine numbered Change Workflow steps below; outside this file a step is cited by its heading name (`the Plan review step`), never by its number, so renumbering here changes nothing elsewhere; a stage is one approved unit of session work that can complete or land independently.
 - Residual — a known leftover problem reported at the end of a task instead of fixed inside it.
 
@@ -165,7 +153,7 @@ Order: `/plan-audit` and `/plan-simplicity-review` in parallel; then `/verify-ex
 - main runs `/verify-external-claims`, dispatching one `locator` as its evidence worker — Tier 2+, for the external claims a `/plan-audit` handoff raises, and at Tier 3 also for the claims a grill round raises.
 - fresh `implementer` carrying a continuation capsule from the preparation writes the Plan review findings main accepts into the plan snapshot; main does not write those findings into the snapshot itself — Tier 1-2 with a plan snapshot, after main accepts a finding; Tier 3 follows `.agents/skills/next-plan/references/tier3-workflow.md` `## Plan review`.
 
-Main reports a blocker if the `reviewer` role is unavailable for `/plan-audit`. At Tier 3 main only decides and interviews from the `implementer` and `locator` handoffs, then presents the resolved plan for approval per `/next-plan` `### Implementation approval`; the brief and iteration contract is in `.agents/skills/next-plan/references/tier3-workflow.md`.
+At Tier 3 main only decides and interviews from the `implementer` and `locator` handoffs, then presents the resolved plan for approval per `/next-plan` `### Implementation approval`; the brief and iteration contract is in `.agents/skills/next-plan/references/tier3-workflow.md`.
 
 #### Step 4 — Implement and propagate
 
@@ -191,14 +179,12 @@ Full builds and runtime or harness scenarios remain acceptance-table work.
 A path nothing reaches today (a rejection, ASSERT, or recovery path no existing
 harness command or ordinary save file triggers) is verified by code reading,
 plus the build when code changed; the execution card, when one exists, says so.
-Never propose a new harness command, a hand-edited file, or a temporary source
-edit only to observe it. A verification-only temporary source edit is never made
-by main: an `implementer` saves each edited file's pre-edit bytes to `Temp/`,
-makes the edit, and returns `Build required`; after the harness run, a fresh
-`implementer` whose continuation capsule names those copies restores the files
-from them byte for byte, sets each restored file's write time to the current
-time so the incremental build sees it as newer than the outputs built from the
-edit, and returns `Build required` again.
+Never propose a new harness command or a hand-edited file only to observe it.
+Temporary verification edits (`kTemp` logs, log-level changes, other temporary
+code) are always allowed, with no permission asked and no backup; wrap each in
+a block that opens with a `// TEMP START` line and closes with a `// TEMP END`
+line. Removing a block also restores any pre-existing line its edit changed to
+its baseline text, which Git holds.
 
 <!-- session-context-part: Change Workflow, Steps 6-9, Convergence, and Risk tiers (continued from the previous part) -->
 #### Step 6 — Review and resolve correctness
@@ -234,10 +220,8 @@ its own fix.
 Main dispatches one fresh `reviewer` per changed artifact type, plus the
 `mechanic` for `/comment-review` and, for C++, the `/over-engineering-review`
 finder `reviewer` and validator `implementer`, scoped to the changed bytes and
-the rules they touch. Scope, minimality, and simplicity checks run inside each
-Tier 2+ review; there is no separate scope dispatch. Main decides each finding
-once. `/over-engineering-review` candidates are not findings: the validator's
-re-proof, not main, decides each one, the landing reconciliation records the
+the rules they touch. Main decides each finding once. `/over-engineering-review`
+candidates are not findings: the validator's re-proof, not main, decides each one, the landing reconciliation records the
 pair as one review row from the validator handoff, or the finder's when the
 validator is skipped, and the later reviews check the applied removals like any
 other changed bytes. Main decides each design suggestion from either pass once,

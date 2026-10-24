@@ -6,21 +6,10 @@ client behavior lives in [`client-compatibility.md`](client-compatibility.md).
 
 ## Structural Validation
 
-In author mode, run the PowerShell validator against the
-`external-skill-creator` package and then the finished skill. Require `VALID`
-and exit `0` from both, and record both command results in the author handoff.
-These author mechanical checks do not replace independent review. Return the
-validate-mode request to the manager, which dispatches a fresh reviewer for the
-semantic and inbound-reference review and owns any finding-fix cycle.
-
 The validator and independent semantic review are the authority for repository
 frontmatter, companion files, package layout, bundled links, section placement,
 handoff shape, and semantic behavior. Client parsing does not replace these
 checks.
-
-Measure every changed Markdown file with the command owned by
-`/progressive-disclosure-review` and record its `bt-token-v1` count against that
-skill's thresholds.
 
 ## Codex Loader Check
 
