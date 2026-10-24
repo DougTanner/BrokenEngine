@@ -186,7 +186,7 @@ az deployment sub <what-if|create> --name <instance>-server --location eastus --
    the password file is deleted; otherwise when the failure handling below has
    run and been reported.
    - On `Succeeded`, delete the password file
-     (`Remove-Item -LiteralPath "$env:LOCALAPPDATA\BrokenEngine\DeployServer\admin-password.txt"`).
+     (`Remove-Item -LiteralPath '<expanded %LOCALAPPDATA%>\BrokenEngine\DeployServer\admin-password.txt'`).
    - On failure, when `az vm show -g <instance>-server-rg -n <instance>-server`
      finds the VM: first, when the schedule workflow exists, disable it (block
      below) so the 08:00 start cannot restart the VM; then run the

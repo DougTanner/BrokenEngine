@@ -57,7 +57,7 @@ enforces those available presets.
    yet checked this session:
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/claude-to-codex/scripts/Test-CodexModels.ps1 [-Model <slug>]
+   pwsh -NoProfile -File .agents/skills/claude-to-codex/scripts/Invoke-CodexModelsCheck.ps1 [-Model <slug>]
    ```
 
    It prints one JSON line. Exit `0` passes. On exit `2`, a block, halt and show
@@ -144,5 +144,5 @@ enforces those available presets.
 - [scripts/Invoke-Codex.ps1](scripts/Invoke-Codex.ps1) — the launcher; its
   `.NOTES` owns the receipt fields, exit codes, verdict-line check, and
   automatic read-only retry.
-- [scripts/Test-CodexModels.ps1](scripts/Test-CodexModels.ps1) — the model
+- [scripts/Invoke-CodexModelsCheck.ps1](scripts/Invoke-CodexModelsCheck.ps1) — the model
   check; its header owns the block conditions and exit codes.

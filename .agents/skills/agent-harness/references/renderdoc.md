@@ -64,7 +64,7 @@ $ScriptsDir = Join-Path '<absolute adopted worktree>' '.agents\skills\agent-harn
 $Script = Join-Path $ScriptsDir 'rdc_summary.py'
 $Capture = '<absolute .rdc path from renderdoc_capture>'
 $Out = "$Capture.summary.txt"
-if (Test-Path -LiteralPath $Out) { Remove-Item -LiteralPath $Out }
+if (Test-Path -LiteralPath '<absolute .rdc path from renderdoc_capture>.summary.txt') { Remove-Item -LiteralPath '<absolute .rdc path from renderdoc_capture>.summary.txt' }
 # Script args reach the embedded interpreter only via RDC_ARGS; single-quote paths for shlex.
 $env:RDC_ARGS = "'$Capture' --out '$Out'"
 # -WorkingDirectory = scripts dir so the no-__file__ sys.path fallback finds rdc_common.

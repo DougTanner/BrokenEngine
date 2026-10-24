@@ -147,7 +147,7 @@ before creating it:
 ```powershell
 $ROOT = '<absolute adopted worktree>'
 $SecondAppDataRoot = Join-Path (Join-Path $ROOT 'Temp') 'AppData-ClientB'
-if (Test-Path -LiteralPath $SecondAppDataRoot) { Remove-Item -Recurse -Force -LiteralPath $SecondAppDataRoot }
+if (Test-Path -LiteralPath '<absolute adopted worktree>\Temp\AppData-ClientB') { Remove-Item -Recurse -LiteralPath '<absolute adopted worktree>\Temp\AppData-ClientB' }
 New-Item -ItemType Directory -Path $SecondAppDataRoot | Out-Null
 [ordered]@{
 	secondAppDataRoot = $SecondAppDataRoot

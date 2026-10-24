@@ -141,7 +141,7 @@ try {
 		WorktreeCli = Join-Path $worktreeCliOutput 'WorktreeCli.exe'
 		AgentHarness = Join-Path $agentHarnessOutput 'AgentHarness.exe'
 	}
-	$capabilityScript = Join-Path $primaryRoot '.agents\scripts\Test-AgentToolsCapabilities.ps1'
+	$capabilityScript = Join-Path $primaryRoot '.agents\scripts\Invoke-AgentToolsCapabilitiesCheck.ps1'
 	if (-not (Test-Path -LiteralPath $capabilityScript -PathType Leaf)) { throw "AgentTools capability checker is missing: '$capabilityScript'." }
 
 	$promotionAction = {

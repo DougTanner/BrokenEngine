@@ -24,7 +24,7 @@ Procedure:
 2. Run the include-order check without `-Fix` on exactly the unit files,
    from the repository root, with the repository root and the scanner path
    arguments the prompt states:
-   `pwsh -NoProfile -Command "& '.agents/scripts/Test-IncludeOrder.ps1' -RepositoryRoot '<repository root>' -Path <scanner path arguments>"`.
+   `pwsh -NoProfile -Command "& '.agents/scripts/Invoke-IncludeOrderCheck.ps1' -RepositoryRoot '<repository root>' -Path <scanner path arguments>"`.
    Adjudicate every row it returns against rule 47 in
    `Documents/C++StyleGuide.txt` as step 1 does: a row is a candidate, not a
    verdict, and a rejected row goes under `## Rejected scanner rows`.

@@ -29,7 +29,7 @@ foreach ($output in @($worktreeCliOutput, $agentHarnessOutput, $thirdPartyOutput
 $worktreeCli = Join-Path $worktreeCliOutput 'WorktreeCli.exe'
 $agentHarness = Join-Path $agentHarnessOutput 'AgentHarness.exe'
 $stampPath = Join-Path $worktreeCliOutput 'AgentToolsSourceStamp.txt'
-$capabilityScript = Join-Path $PSScriptRoot 'Test-AgentToolsCapabilities.ps1'
+$capabilityScript = Join-Path $PSScriptRoot 'Invoke-AgentToolsCapabilitiesCheck.ps1'
 function Get-AgentToolsSourceStamp {
 	# The stamp records built-source provenance only; a rev-parse failure must never block the
 	# build, so on failure the stamp is simply left unwritten.

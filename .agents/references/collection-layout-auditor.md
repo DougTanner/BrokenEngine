@@ -1,6 +1,6 @@
 # Collection-Layout Auditor
 
-`.agents/scripts/Test-CollectionLayout.ps1` owns the mechanical sweeps over SOA
+`.agents/scripts/Invoke-CollectionLayoutCheck.ps1` owns the mechanical sweeps over SOA
 collection headers. It audits only: it never writes, generates, or repairs
 header text. Never reconstruct these operations inline.
 
@@ -20,7 +20,7 @@ header text. Never reconstruct these operations inline.
 From the session worktree root:
 
 ```powershell
-pwsh -NoProfile -File .agents/scripts/Test-CollectionLayout.ps1
+pwsh -NoProfile -File .agents/scripts/Invoke-CollectionLayoutCheck.ps1
 ```
 
 Pass `-Path` to narrow the sweep to specific headers or directories,

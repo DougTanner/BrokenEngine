@@ -14,8 +14,8 @@ A game project is a `Projects/<Name>` directory holding `Platforms/VisualStudio2
 - `Projects/<Name>/Source/Frame/Collections/`
 - `Projects/<Name>/Documents/AgentHarness.md`
 
-That tooling is the shared checkers `.agents/scripts/Test-CollectionLayout.ps1`
-and `.agents/scripts/Test-IncludeOrder.ps1`, `/update-vcxproj`'s
+That tooling is the shared checkers `.agents/scripts/Invoke-CollectionLayoutCheck.ps1`
+and `.agents/scripts/Invoke-IncludeOrderCheck.ps1`, `/update-vcxproj`'s
 `Update-EngineVcxprojItem.ps1`, `/compile`, the wrapper session-start data
 refresh (`.agents/scripts/Bootstrap-AgentTools.ps1`), the `/agent-harness`
 claim, DataPacker's zero-argument run, diagsession symbolization, and the

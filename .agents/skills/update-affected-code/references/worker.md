@@ -38,7 +38,7 @@
    (`../../add-collection-member/references/worker.md`)
    completely and treat its live-variant checklist as authoritative, and run
    the collection-layout auditor from the repository root as
-   `pwsh -NoProfile -File .agents/scripts/Test-CollectionLayout.ps1`.
+   `pwsh -NoProfile -File .agents/scripts/Invoke-CollectionLayoutCheck.ps1`.
    Its sweeps, shell-specific invocation, exit codes, truncation, JSON shape,
    and blocking rule are in `../../../references/collection-layout-auditor.md`.
    Report an unresolved CRC, persistence, transfer, hydration, version, or

@@ -2,7 +2,7 @@
 
 The field template every execution card carries. What the card is and when it
 is drafted belong to the Change Workflow Definitions in
-[`change-workflow.md`](change-workflow.md); `Test-PlanCitations.ps1` in
+[`change-workflow.md`](change-workflow.md); `Invoke-PlanCitationsCheck.ps1` in
 `/plan-audit` reports each absent field as `card.missingFields`.
 
 ## Template

@@ -172,7 +172,7 @@ and the triggers live in [`../SKILL.md`](../SKILL.md).
 16. Run the collection-layout auditor from the repository root:
 
     ```powershell
-    pwsh -NoProfile -File .agents/scripts/Test-CollectionLayout.ps1
+    pwsh -NoProfile -File .agents/scripts/Invoke-CollectionLayoutCheck.ps1
     ```
 
     Sweeps, shell-specific invocation, exit codes, truncation, JSON shape, and

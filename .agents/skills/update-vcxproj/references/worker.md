@@ -87,7 +87,7 @@ For each affected project pair:
 3. Run once after inspection or hand repair:
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/update-vcxproj/scripts/Test-VcxprojPair.ps1 -ProjectPath <project>.vcxproj
+   pwsh -NoProfile -File .agents/skills/update-vcxproj/scripts/Invoke-VcxprojPairCheck.ps1 -ProjectPath <project>.vcxproj
    ```
 
    After an `Update-EngineVcxprojItem.ps1` run, run this multi-project form
@@ -96,7 +96,7 @@ For each affected project pair:
    in its output, because its per-path records can be truncated:
 
    ```powershell
-   pwsh -NoProfile -Command "& '.agents/skills/update-vcxproj/scripts/Test-VcxprojPair.ps1' -ProjectPath '<project>.vcxproj','<project>.vcxproj'"
+   pwsh -NoProfile -Command "& '.agents/skills/update-vcxproj/scripts/Invoke-VcxprojPairCheck.ps1' -ProjectPath '<project>.vcxproj','<project>.vcxproj'"
    ```
 
    Require exit `0`. On compact failure, report its `code` and violations, fix

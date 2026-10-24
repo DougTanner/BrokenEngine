@@ -19,7 +19,7 @@ Windows-generated per-executable `Query User` inbound block rules override this 
 `-ExecutablePath` binds an array, so this call uses the canonical form's array-argument exception (`-Command`, not `-File`); under `-File` the comma list would arrive as one literal path and fail before any check runs. Run it from the session worktree root and read the readiness verdict from the exit code below:
 
 ```powershell
-pwsh -NoProfile -Command "& '.agents/skills/agent-harness/scripts/Test-PrivateLanFirewallReadiness.ps1' -ExecutablePath '<exact client executable path>','<exact server executable path>'"
+pwsh -NoProfile -Command "& '.agents/skills/agent-harness/scripts/Invoke-PrivateLanFirewallReadinessCheck.ps1' -ExecutablePath '<exact client executable path>','<exact server executable path>'"
 ```
 
 The JSON result includes resolved executables and blockers, local

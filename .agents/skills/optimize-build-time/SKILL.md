@@ -77,7 +77,9 @@ percent.
       relinks:
 
       ```powershell
-      foreach ($path in 'Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Build/BrokenEngineSandbox/<Configuration>', 'Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Build/BrokenEngineSandboxServer/<Configuration>', 'DataPacker/Platforms/VisualStudio2026/Build/Release') { if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse } }
+      if (Test-Path -LiteralPath 'Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Build/BrokenEngineSandbox/<Configuration>') { Remove-Item -LiteralPath 'Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Build/BrokenEngineSandbox/<Configuration>' -Recurse }
+      if (Test-Path -LiteralPath 'Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Build/BrokenEngineSandboxServer/<Configuration>') { Remove-Item -LiteralPath 'Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/Build/BrokenEngineSandboxServer/<Configuration>' -Recurse }
+      if (Test-Path -LiteralPath 'DataPacker/Platforms/VisualStudio2026/Build/Release') { Remove-Item -LiteralPath 'DataPacker/Platforms/VisualStudio2026/Build/Release' -Recurse }
       ```
 
    4. Dispatch one `builder` running `/compile` for Client then Server at the

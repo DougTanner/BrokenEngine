@@ -31,7 +31,7 @@ Triggers, inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 5. Confirm the drafted file's structure with one run from the worktree root:
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/plan-audit/scripts/Test-PlanCitations.ps1 <drafted plan path>
+   pwsh -NoProfile -File .agents/skills/plan-audit/scripts/Invoke-PlanCitationsCheck.ps1 <drafted plan path>
    ```
 
    Write in whatever `headings.inScopePresent`, `headings.outOfScopePresent`, or

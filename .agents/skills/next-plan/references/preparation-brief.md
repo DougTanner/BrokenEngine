@@ -21,7 +21,7 @@ brief supplies, citing the brief as the evidence and never reading the workflow
 itself.
 
 Before returning the handoff, run
-`pwsh -NoProfile -File .agents/skills/plan-audit/scripts/Test-PlanCitations.ps1 <snapshot path>`
+`pwsh -NoProfile -File .agents/skills/plan-audit/scripts/Invoke-PlanCitationsCheck.ps1 <snapshot path>`
 and report that result's `headings.inScopePresent`,
 `headings.outOfScopePresent`, and `card.missingFields` values as one
 `Decisive checks` row. Of that result, only those values gate step 4's Done

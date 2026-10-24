@@ -247,7 +247,7 @@ NOTE: The following global namespaces are allowed: `using namespace DirectX;`. `
 	d) External C++/platform headers, only in projects without a precompiled header (Tools/); elsewhere external and common:: headers go in Pch.h, except that files under Common/ include the common:: headers they depend on
 	Within each group, compare paths one folder level at a time: at each level folders sort before files, then alphabetically (case-insensitive)
 	Includes inside an #if block that is not a whole-file guard keep their hand order
-	.agents/scripts/Test-IncludeOrder.ps1 checks this rule, except d)'s external-header placement, which /repo-code-review checks, and fixes order and blank lines with -Fix
+	.agents/scripts/Invoke-IncludeOrderCheck.ps1 checks this rule, except d)'s external-header placement, which /repo-code-review checks, and fixes order and blank lines with -Fix
 
 	#include "Player.h"
 

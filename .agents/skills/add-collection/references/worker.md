@@ -145,7 +145,7 @@ runner applies. The purpose and the triggers live in
     violation:
 
     ```powershell
-    pwsh -NoProfile -File .agents/scripts/Test-CollectionLayout.ps1
+    pwsh -NoProfile -File .agents/scripts/Invoke-CollectionLayoutCheck.ps1
     ```
 
     Sweeps, shell-specific invocation, exit codes, truncation, JSON shape, and

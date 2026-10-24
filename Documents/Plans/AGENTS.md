@@ -17,7 +17,7 @@ Both keys are mandatory. `createdUtc` is immutable after creation. `dependsOn` i
 WorktreeCli is the only component that parses the scheduler and changes claims. It selects the newest eligible executable plan by `(createdUtc descending, normalized path)`. Existing valid dependencies block a child; a missing dependency is a satisfied stale edge reported as a notice. A plan is excluded from selection — left out without affecting other plans, which stay claimable — when its metadata is invalid, its dependencies form a cycle, or it is not present and valid at the primary tip.
 
 For a scheduler health check, run
-`pwsh -NoProfile -File .agents/scripts/Test-PlanSchedulerState.ps1` — it folds
+`pwsh -NoProfile -File .agents/scripts/Invoke-PlanSchedulerStateCheck.ps1` — it folds
 `plan validate` into a compact status/diagnostics result; never run a raw
 whole-tree `plan validate`, whose result lists every Plan and floods a session
 context, except the whole-tree `--lint-only` run of

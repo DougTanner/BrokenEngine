@@ -8,10 +8,10 @@ inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 1. Read the complete plan, applicable `AGENTS.md` files, and every cited code
    region. Done when each of those has been read.
 2. Resolve the plan's citations with the bundled
-   `scripts/Test-PlanCitations.ps1`; never reconstruct its lookups inline:
+   `scripts/Invoke-PlanCitationsCheck.ps1`; never reconstruct its lookups inline:
 
    ```powershell
-   pwsh -NoProfile -File .agents/skills/plan-audit/scripts/Test-PlanCitations.ps1 <plan path>
+   pwsh -NoProfile -File .agents/skills/plan-audit/scripts/Invoke-PlanCitationsCheck.ps1 <plan path>
    ```
 
    It writes nothing and returns one `broken-engine-plan-citations/v1` JSON

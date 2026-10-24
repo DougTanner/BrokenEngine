@@ -342,7 +342,7 @@ function Test-PromptScopeEvidence() {
 	# the caller's bytes verbatim. The plan-audit checker owns the marker match and the field rules, so
 	# it runs as a child process here rather than being reimplemented.
 	if ($AssignedSkill -ne 'plan-audit') { return }
-	$checker = Join-Path $script:Root '.agents/skills/plan-audit/scripts/Test-PlanCitations.ps1'
+	$checker = Join-Path $script:Root '.agents/skills/plan-audit/scripts/Invoke-PlanCitationsCheck.ps1'
 	if (-not (Test-Path -LiteralPath $checker -PathType Leaf)) {
 		Complete-CodexReviewPrompt 1 'error' 'prompt.execution-card-check-failed' "The execution-card checker is missing: '$checker'."
 	}

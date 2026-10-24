@@ -126,7 +126,7 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
    - rule 41: the "always write `std::`" half;
    - rule 47: include grouping and order, and rule 47d's `common::` half (the
      `common` kind), not hand read: run
-     `pwsh -NoProfile -Command "& '.agents/scripts/Test-IncludeOrder.ps1' -RepositoryRoot '<absolute repository toplevel>' -Path '<file>','<file>' -Fix"`
+     `pwsh -NoProfile -Command "& '.agents/scripts/Invoke-IncludeOrderCheck.ps1' -RepositoryRoot '<absolute repository toplevel>' -Path '<file>','<file>' -Fix"`
      once over the distinct paths of the selected `cpp`-class ranges (or the
      caller-supplied scope's files). Only `status` `pass` or `fail` is usable;
      `error` means the include check is unavailable — report that instead of

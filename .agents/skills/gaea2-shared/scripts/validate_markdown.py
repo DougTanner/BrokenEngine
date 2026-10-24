@@ -17,7 +17,7 @@ import sys
 
 SCHEMA_VERSION = "broken-engine-gaea2-markdown/v1"
 
-# Output caps, modelled on .agents/skills/update-vcxproj/scripts/Test-VcxprojPair.ps1.
+# Output caps, modelled on .agents/skills/update-vcxproj/scripts/Invoke-VcxprojPairCheck.ps1.
 MAXIMUM_ENTRIES = 64
 MAXIMUM_MESSAGE_LENGTH = 256
 # Invoke-Gaea2Python.ps1 cuts a child stream at 8192 characters, which would leave
