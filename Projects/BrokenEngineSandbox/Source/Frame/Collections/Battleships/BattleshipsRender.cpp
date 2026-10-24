@@ -10,15 +10,20 @@
 namespace game
 {
 
-// Placeholder models, one per ShipController (also used by Battleships.cpp for animation lookup): the Fighter's models
-// and scales, so the larger radius alone makes a battleship larger. Each model offset puts back the model's native
-// origin as its rotation pivot.
-extern const common::crc_t kBattleshipFleetModel = data::kModelsspaceship2scenegltfCrc;
-constexpr float kfBattleshipFleetModelScale = 1.0927087f;
-constexpr XMFLOAT3 kf3BattleshipFleetModelOffset {0.0f, 0.1817180f, -0.1686860f};
-extern const common::crc_t kBattleshipRandomModel = data::kModelsSpaceshipscenegltfCrc;
-constexpr float kfBattleshipRandomModelScale = 0.6723890f;
-constexpr XMFLOAT3 kf3BattleshipRandomModelOffset {0.0f, 0.0621412f, -0.0985188f};
+// One model per ShipController, also used by Battleships.cpp for animation lookup. A scale of 2 / L, where L is the
+// model's longest horizontal extent in exported model space, makes the hull span the collision diameter. The
+// pre-rotation stands the Y-up model upright with its nose along +X.
+extern const common::crc_t kBattleshipFleetModel = data::kModelsBattleshipJesterz86scenegltfCrc;
+constexpr float kfBattleshipFleetModelScale = 1.000f; // L = 2.000
+constexpr XMFLOAT3 kf3BattleshipFleetModelOffset {0.0f, 0.0f, 0.0f};
+const XMMATRIX kmatBattleshipFleetModelPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
+extern const common::crc_t kBattleshipRandomModel = data::kModelsSpaceBattleshipAquamarinescenegltfCrc;
+// L = 0.9691 is the hull alone: the model's transparent AO_shadow_catcher quad is larger and sets its exported bounds.
+constexpr float kfBattleshipRandomModelScale = 2.064f;
+// The exported origin is the center of those bounds, which puts the hull center 0.0994 ahead of it along model Z (the
+// nose axis); the offset moves it back onto the ship position.
+constexpr XMFLOAT3 kf3BattleshipRandomModelOffset {0.0f, 0.0f, -0.0994f};
+const XMMATRIX kmatBattleshipRandomModelPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
 
 constexpr float kfRoll = 0.2f;
 
@@ -28,6 +33,7 @@ constexpr std::array<const char*, kiPipelineCount> kpcPipelineNames {"Battleship
 constexpr std::array<common::crc_t, kiPipelineCount> kuiPipelineCrcs {common::CrcConsteval("BattleshipsFleet"), common::CrcConsteval("BattleshipsRandom")};
 constexpr std::array<float, kiPipelineCount> kfModelScales {kfBattleshipFleetModelScale, kfBattleshipRandomModelScale};
 constexpr std::array<XMFLOAT3, kiPipelineCount> kf3ModelOffsets {kf3BattleshipFleetModelOffset, kf3BattleshipRandomModelOffset};
+const std::array<XMMATRIX, kiPipelineCount> kmatModelPreRotates {kmatBattleshipFleetModelPreRotate, kmatBattleshipRandomModelPreRotate};
 const std::array<common::crc_t, kiPipelineCount> kuiModels {kBattleshipFleetModel, kBattleshipRandomModel};
 
 constexpr int64_t kiDynamicBufferInitialCapacity = 256;
@@ -90,8 +96,6 @@ void BattleshipsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 // Draws the rows whose controller selects iPipeline into that pipeline's buffer. piVisibleIndices is scratch for every row.
 static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, const BattleshipsPostRender& __restrict rPostRender, const engine::RenderBasis& rBasis, int64_t iPipeline, int64_t* piVisibleIndices, int64_t iCommandBuffer)
 {
-	static XMMATRIX smatPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
-
 	auto [pLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiPipelineCrcs[iPipeline], engine::kBufferMain, iCommandBuffer);
 	ASSERT(siRendered[iPipeline] + rCurrent.iCount <= iBufferCapacity);
 
@@ -137,6 +141,7 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 	int64_t iRenderedOffset = siRendered[iPipeline];
 	float fModelScale = kfModelScales[iPipeline];
 	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&kf3ModelOffsets[iPipeline]));
+	XMMATRIX matPreRotate = kmatModelPreRotates[iPipeline];
 
 	// Per-range processing lambda — each visible index j writes to deterministic non-overlapping output slots
 	auto ProcessRange = [&](int64_t iStart, int64_t iEnd)
@@ -159,7 +164,7 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 			XMMATRIX matRoll = XMMatrixRotationX(-kfRoll * rCurrent.pfDeltaRotations[i]);
 			XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 			XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
-			XMMATRIX matTransform = matPreMove * matScaling * smatPreRotate * matRoll * matYaw * matTranslation;
+			XMMATRIX matTransform = matPreMove * matScaling * matPreRotate * matRoll * matYaw * matTranslation;
 
 			shaders::ModelLayout& rModelLayout = pLayouts[iRenderedOffset + j];
 			rModelLayout.f4Position = f4Position;

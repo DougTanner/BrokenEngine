@@ -36,7 +36,7 @@ than a re-record, and has its CPU slice released by
 
 The server never opens the Model pack: `IsServerChunk` accepts Islands only. DataPacker has no notion of eager or lazy, Model chunks are written uncompressed, and the lazy open path already validates any chunk type's location and header, so moving Model to the lazy set changes no `.pack` or `.manifest` layout and needs no `common::DataHeader::kiVersion` bump.
 
-Four models are tracked today: the engine DualGeodesicIcosahedron and the sandbox Spaceship, spaceship2, and aim-9_missile.
+Sixteen models are tracked today: ten under `Engine/Data/Models` and six under the sandbox's `Data/Models`.
 
 ## Design
 

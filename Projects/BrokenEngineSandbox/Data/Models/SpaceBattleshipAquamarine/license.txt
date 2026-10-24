@@ -1,0 +1,11 @@
+Model Information:
+* title:	Space Battleship Aquamarine
+* source:	https://sketchfab.com/3d-models/space-battleship-aquamarine-c508be042d9a4d358359623f6be34bc3
+* author:	Kai Xiang (https://sketchfab.com/kirikom9000)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Space Battleship Aquamarine" (https://sketchfab.com/3d-models/space-battleship-aquamarine-c508be042d9a4d358359623f6be34bc3) by Kai Xiang (https://sketchfab.com/kirikom9000) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

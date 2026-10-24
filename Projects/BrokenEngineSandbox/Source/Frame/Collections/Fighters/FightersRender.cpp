@@ -10,14 +10,18 @@
 namespace game
 {
 
-// Placeholder models, one per ShipController (also used by Fighters.cpp for animation lookup). Each model offset puts
-// back the model's native origin as its rotation pivot.
-extern const common::crc_t kFighterFleetModel = data::kModelsspaceship2scenegltfCrc;
-constexpr float kfFighterFleetModelScale = 1.0927087f;
-constexpr XMFLOAT3 kf3FighterFleetModelOffset {0.0f, 0.1817180f, -0.1686860f};
+// One model per ShipController, also used by Fighters.cpp for animation lookup. A scale commented with its L is 2 / L,
+// where L is the model's longest horizontal extent in exported model space, so the hull spans the collision diameter.
+// A nonzero model offset puts back the model's native origin as its rotation pivot. The pre-rotation stands the Y-up
+// model upright with its nose along +X.
+extern const common::crc_t kFighterFleetModel = data::kModelsLightFighterSpaceshipscenegltfCrc;
+constexpr float kfFighterFleetModelScale = 1.000f; // L = 2.000
+constexpr XMFLOAT3 kf3FighterFleetModelOffset {0.0f, 0.0f, 0.0f};
+const XMMATRIX kmatFighterFleetModelPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
 extern const common::crc_t kFighterRandomModel = data::kModelsSpaceshipscenegltfCrc;
 constexpr float kfFighterRandomModelScale = 0.6723890f;
 constexpr XMFLOAT3 kf3FighterRandomModelOffset {0.0f, 0.0621412f, -0.0985188f};
+const XMMATRIX kmatFighterRandomModelPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
 
 constexpr float kfRoll = 0.2f;
 
@@ -27,6 +31,7 @@ constexpr std::array<const char*, kiPipelineCount> kpcPipelineNames {"FightersFl
 constexpr std::array<common::crc_t, kiPipelineCount> kuiPipelineCrcs {common::CrcConsteval("FightersFleet"), common::CrcConsteval("FightersRandom")};
 constexpr std::array<float, kiPipelineCount> kfModelScales {kfFighterFleetModelScale, kfFighterRandomModelScale};
 constexpr std::array<XMFLOAT3, kiPipelineCount> kf3ModelOffsets {kf3FighterFleetModelOffset, kf3FighterRandomModelOffset};
+const std::array<XMMATRIX, kiPipelineCount> kmatModelPreRotates {kmatFighterFleetModelPreRotate, kmatFighterRandomModelPreRotate};
 const std::array<common::crc_t, kiPipelineCount> kuiModels {kFighterFleetModel, kFighterRandomModel};
 
 constexpr int64_t kiDynamicBufferInitialCapacity = 1'024;
@@ -89,8 +94,6 @@ void FightersInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, c
 // Draws the rows whose controller selects iPipeline into that pipeline's buffer. piVisibleIndices is scratch for every row.
 static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const FightersPostRender& __restrict rPostRender, const engine::RenderBasis& rBasis, int64_t iPipeline, int64_t* piVisibleIndices, int64_t iCommandBuffer)
 {
-	static XMMATRIX smatPreRotate = XMMatrixRotationX(XM_PIDIV2) * XMMatrixRotationY(0.0f) * XMMatrixRotationZ(XM_PIDIV2);
-
 	auto [pLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiPipelineCrcs[iPipeline], engine::kBufferMain, iCommandBuffer);
 	ASSERT(siRendered[iPipeline] + rCurrent.iCount <= iBufferCapacity);
 
@@ -140,6 +143,7 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 	int64_t iRenderedOffset = siRendered[iPipeline];
 	float fModelScale = kfModelScales[iPipeline];
 	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&kf3ModelOffsets[iPipeline]));
+	XMMATRIX matPreRotate = kmatModelPreRotates[iPipeline];
 
 	// Per-range processing lambda — each visible index j writes to deterministic non-overlapping output slots
 	auto ProcessRange = [&](int64_t iStart, int64_t iEnd)
@@ -164,7 +168,7 @@ static void RenderPipeline(const FightersInterpolate& __restrict rCurrent, const
 			XMMATRIX matClimbTilt = XMMatrixRotationY(-rCurrent.pfClimbTilts[i]);
 			XMMATRIX matYaw = common::RotationMatrixFromDirection(rCurrent.pVecDirections[i], XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f));
 			XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
-			XMMATRIX matTransform = matPreMove * matScaling * smatPreRotate * matRoll * matClimbTilt * matYaw * matTranslation;
+			XMMATRIX matTransform = matPreMove * matScaling * matPreRotate * matRoll * matClimbTilt * matYaw * matTranslation;
 
 			shaders::ModelLayout& rModelLayout = pLayouts[iRenderedOffset + j];
 			rModelLayout.f4Position = f4Position;
