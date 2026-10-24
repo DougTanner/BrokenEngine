@@ -1,1 +1,1 @@
-All data files have their individual licenses. Check each asset's license and provenance sidecars for its terms, including commercial-use restrictions and attribution requirements.
+All data files have their individual licenses. They are all available for commercial use (some require attribution, check individual licenses).
