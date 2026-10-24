@@ -13,6 +13,17 @@ namespace game
 
 constexpr int64_t kiDynamicBufferInitialCapacity = 1;
 
+struct LightingPreset
+{
+	static constexpr int64_t kiVersion = 2;
+	std::array<float, 21> values {};
+};
+
+static_assert(sizeof(LightingPreset) == 84, "LightingPreset::kiVersion must be bumped with its layout or participant order");
+static_assert(std::is_trivially_copyable_v<LightingPreset>);
+
+constexpr std::array<const char*, 3> kLightingPresetPaths {"ModelViewerPresetW.bin", "ModelViewerPresetE.bin", "ModelViewerPresetR.bin"};
+
 ModelViewerApplication::ModelViewerApplication()
 : common::Singleton<ModelViewerApplication>(gpModelViewerApplication, this)
 {
@@ -42,6 +53,126 @@ ModelViewerApplication::ModelViewerApplication()
 	{
 		PreparePreview(rPreview);
 	}
+	SelectLightingPreset(0);
+}
+
+struct LightingDescriptor
+{
+	engine::Wrapper* pWrapper = nullptr;
+	const char* pcLabel = nullptr;
+	const char* pcHeading = nullptr;
+};
+
+constexpr std::array<LightingDescriptor, 21> kLightingDescriptors
+{
+	LightingDescriptor { .pWrapper = &engine::gSunMoonMinimumAmbient, .pcLabel = "Minimum Ambient", .pcHeading = "Ambient and environment", },
+	LightingDescriptor { .pWrapper = &engine::gSunMoonAmbientMultiplier, .pcLabel = "Ambient Multiplier", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingAmbient, .pcLabel = "IBL Ambient", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingDiffuse, .pcLabel = "IBL Diffuse", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingDiffusePower, .pcLabel = "IBL Diffuse Power", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingSpecular, .pcLabel = "IBL Specular", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingSpecularPower, .pcLabel = "IBL Specular Power", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingAmbientColorBlend, .pcLabel = "IBL Ambient Color Blend", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingCubemapLevelOfDetailPower, .pcLabel = "Cubemap Lod Power", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingCubemapLevelOfDetailOffset, .pcLabel = "Cubemap Lod Offset", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse, .pcLabel = "BRDF Diffuse", .pcHeading = "BRDF", },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower, .pcLabel = "BRDF Diffuse Power", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular, .pcLabel = "BRDF Specular", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower, .pcLabel = "BRDF Specular Power", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingModelDataMipmapLevelOfDetailBias, .pcLabel = "Model Data Mip Bias", .pcHeading = "Material sampling and emissive", },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingEmissive, .pcLabel = "Emissive", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingExposure, .pcLabel = "Exposure", .pcHeading = "HDR color grading", },
+	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingGamma, .pcLabel = "Gamma", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gColorGradingSaturation, .pcLabel = "Saturation", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gColorGradingContrast, .pcLabel = "Contrast", .pcHeading = nullptr, },
+	LightingDescriptor { .pWrapper = &engine::gColorGradingTemperature, .pcLabel = "Temperature", .pcHeading = nullptr, },
+};
+
+static std::array<float, 21> GetLightingDefaults()
+{
+	std::array<float, 21> values {};
+	for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
+	{
+		values.at(i) = rDescriptor.pWrapper->mfDefault;
+	}
+	return values;
+}
+
+void ModelViewerApplication::UpdateDefaultComparison(bool bHeld)
+{
+	if (bHeld == (mFlags & ViewerFlags::kComparingDefaults))
+	{
+		return;
+	}
+	if (bHeld)
+	{
+		for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
+		{
+			mLightingTweaks.at(i) = rDescriptor.pWrapper->mfCurrent;
+		}
+	}
+	for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
+	{
+		rDescriptor.pWrapper->Set(bHeld ? rDescriptor.pWrapper->mfDefault : mLightingTweaks.at(i));
+	}
+	mFlags.Set(ViewerFlags::kComparingDefaults, bHeld);
+}
+
+void ModelViewerApplication::ApplyLightingValues(const std::array<float, 21>& rValues)
+{
+	// End slider interactions with the previous lighting state.
+	++muiLightingRevision;
+	if (mFlags & ViewerFlags::kComparingDefaults)
+	{
+		mLightingTweaks = rValues;
+		return;
+	}
+	for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
+	{
+		rDescriptor.pWrapper->Set(rValues.at(i));
+	}
+}
+
+void ModelViewerApplication::SaveLightingPreset(const std::array<float, 21>& rValues)
+{
+	// Heap: preset file I/O allocates paths and streams.
+	ScopedSuppressAllocationTracking suppress;
+	LightingPreset preset {.values = rValues};
+	const char* pcPath = kLightingPresetPaths.at(miSelectedLightingPreset);
+	if (!engine::WriteVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kWrite}, pcPath, preset))
+	{
+		LOG(kLoading, kError, "ModelViewer preset save failed: {}", pcPath);
+	}
+}
+
+void ModelViewerApplication::SelectLightingPreset(int64_t iSlot)
+{
+	// Heap: preset file I/O allocates paths and streams.
+	ScopedSuppressAllocationTracking suppress;
+	LightingPreset preset {};
+	const char* pcPath = kLightingPresetPaths.at(iSlot);
+	bool bRead = engine::ReadVersionedFile({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, pcPath, preset);
+	if (bRead)
+	{
+		for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
+		{
+			if (!rDescriptor.pWrapper->IsInRange(preset.values.at(i)))
+			{
+				LOG(kLoading, kWarning, "{} rejected: invalid slider {}", pcPath, i);
+				bRead = false;
+				break;
+			}
+		}
+	}
+	miSelectedLightingPreset = iSlot;
+	ApplyLightingValues(bRead ? preset.values : GetLightingDefaults());
+}
+
+void ModelViewerApplication::ResetLightingPreset()
+{
+	std::array<float, 21> values = GetLightingDefaults();
+	ApplyLightingValues(values);
+	SaveLightingPreset(values);
 }
 
 void ModelViewerApplication::PreparePreview(Preview& rPreview)
@@ -332,6 +463,61 @@ void ModelViewerApplication::RenderUi()
 			}
 			ImGui::Separator();
 		}
+		float fQualityTrackWidth = ImGui::GetContentRegionAvail().x;
+		float fNormalFrameHeight = ImGui::GetFrameHeight();
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, (1.5f * fNormalFrameHeight - ImGui::GetFontSize()) / 2.0f));
+		auto QualitySlider = [fQualityTrackWidth](const char* pcLabel, engine::Wrapper& rWrapper)
+		{
+			ImGui::PushID(pcLabel);
+			ImGui::TextUnformatted(pcLabel);
+			ImGui::SetNextItemWidth(fQualityTrackWidth);
+			float fValue = rWrapper.mfCurrent;
+			if (ImGui::SliderFloat("##Value", &fValue, rWrapper.mfMin, rWrapper.mfMax, "%.3f", ImGuiSliderFlags_AlwaysClamp))
+			{
+				rWrapper.Set(fValue);
+			}
+			ImGui::PopID();
+		};
+		ImGui::SeparatorText("Render quality");
+		auto QualityToggle = [](const char* pcLabel, engine::Wrapper& rWrapper)
+		{
+			bool bValue = rWrapper.Get<bool>();
+			if (ImGui::Checkbox(pcLabel, &bValue))
+			{
+				rWrapper.Set(bValue);
+			}
+		};
+		QualityToggle("Multisampling", engine::gMultisampling);
+		ImGui::BeginDisabled(!engine::gMultisampling.Get<bool>());
+		ImGui::TextUnformatted("Sample count");
+		ImGui::SetNextItemWidth(fQualityTrackWidth);
+		char pcSampleCount[16];
+		std::snprintf(pcSampleCount, sizeof(pcSampleCount), "%dx", engine::gSampleCount.Get<int>());
+		if (ImGui::BeginCombo("##Sample count", pcSampleCount))
+		{
+			for (float fSampleCount : engine::gSampleCount.mAllowed)
+			{
+				VkSampleCountFlagBits vkSampleCount = static_cast<VkSampleCountFlagBits>(fSampleCount);
+				std::snprintf(pcSampleCount, sizeof(pcSampleCount), "%dx", static_cast<int>(vkSampleCount));
+				if (ImGui::Selectable(pcSampleCount, vkSampleCount == engine::gSampleCount.Get<VkSampleCountFlagBits>()))
+				{
+					engine::gSampleCount.Set(vkSampleCount);
+				}
+			}
+			ImGui::EndCombo();
+		}
+		QualityToggle("Sample Shading", engine::gSampleShading);
+		ImGui::BeginDisabled(!engine::gSampleShading.Get<bool>());
+		QualitySlider("Min Sample Shading", engine::gMinimumSampleShading);
+		ImGui::EndDisabled();
+		ImGui::EndDisabled();
+		QualityToggle("Anisotropy", engine::gAnisotropy);
+		ImGui::BeginDisabled(!engine::gAnisotropy.Get<bool>());
+		QualitySlider("Max Anisotropy", engine::gMaximumAnisotropy);
+		ImGui::EndDisabled();
+		QualitySlider("Mip Lod Bias", engine::gMipmapLevelOfDetailBias);
+		ImGui::PopStyleVar();
+		ImGui::Separator();
 		ImGui::Text("Scenes: %lld", static_cast<long long>(std::ssize(mPreviews)));
 		ImGui::Separator();
 		if (mPreviews.empty())
@@ -367,89 +553,42 @@ void ModelViewerApplication::RenderUi()
 	{
 		ImGui::SetNextWindowSizeConstraints(ImVec2(fLightingWidth, 0.0f), ImVec2(fLightingWidth, fLightingHeight));
 	}
-	if (ImGui::Begin("Lighting", nullptr, iPanelWindowFlags | ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysVerticalScrollbar))
+	char pcLightingTitle[32];
+	std::snprintf(pcLightingTitle, sizeof(pcLightingTitle), "Preset: %c###Lighting", "WER"[miSelectedLightingPreset]);
+	if (ImGui::Begin(pcLightingTitle, nullptr, iPanelWindowFlags | ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysVerticalScrollbar))
 	{
 		float fNormalFrameHeight = ImGui::GetFrameHeight();
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, (1.5f * fNormalFrameHeight - ImGui::GetFontSize()) / 2.0f));
-		auto LightingSlider = [fLightingTrackWidth](const char* pcLabel, engine::Wrapper& rWrapper)
+		auto LightingSlider = [this, fLightingTrackWidth](const char* pcLabel, engine::Wrapper& rWrapper)
 		{
+			ImGui::BeginDisabled(mFlags & ViewerFlags::kComparingDefaults);
+			ImGui::PushID(static_cast<int>(muiLightingRevision));
 			ImGui::PushID(pcLabel);
 			ImGui::TextUnformatted(pcLabel);
 			ImGui::SetNextItemWidth(fLightingTrackWidth);
 			float fValue = rWrapper.mfCurrent;
-			if (ImGui::SliderFloat("##Value", &fValue, rWrapper.mfMin, rWrapper.mfMax, "%.3f", ImGuiSliderFlags_AlwaysClamp))
+			if (ImGui::SliderFloat(mFlags & ViewerFlags::kComparingDefaults ? "##ComparisonValue" : "##Value", &fValue, rWrapper.mfMin, rWrapper.mfMax, "%.3f", ImGuiSliderFlags_AlwaysClamp) && !(mFlags & ViewerFlags::kComparingDefaults))
 			{
 				rWrapper.Set(fValue);
+				std::array<float, 21> values {};
+				for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
+				{
+					values.at(i) = rDescriptor.pWrapper->mfCurrent;
+				}
+				SaveLightingPreset(values);
 			}
 			ImGui::PopID();
+			ImGui::PopID();
+			ImGui::EndDisabled();
 		};
-		ImGui::SeparatorText("Ambient and environment");
-		LightingSlider("Minimum Ambient", engine::gSunMoonMinimumAmbient);
-		LightingSlider("Ambient Multiplier", engine::gSunMoonAmbientMultiplier);
-		LightingSlider("IBL Ambient", engine::gPhysicallyBasedRenderingImageBasedLightingAmbient);
-		LightingSlider("IBL Diffuse", engine::gPhysicallyBasedRenderingImageBasedLightingDiffuse);
-		LightingSlider("IBL Diffuse Power", engine::gPhysicallyBasedRenderingImageBasedLightingDiffusePower);
-		LightingSlider("IBL Specular", engine::gPhysicallyBasedRenderingImageBasedLightingSpecular);
-		LightingSlider("IBL Specular Power", engine::gPhysicallyBasedRenderingImageBasedLightingSpecularPower);
-		LightingSlider("IBL Ambient Color Blend", engine::gPhysicallyBasedRenderingImageBasedLightingAmbientColorBlend);
-		LightingSlider("Cubemap Lod Power", engine::gPhysicallyBasedRenderingCubemapLevelOfDetailPower);
-		LightingSlider("Cubemap Lod Offset", engine::gPhysicallyBasedRenderingCubemapLevelOfDetailOffset);
-
-		ImGui::SeparatorText("BRDF");
-		LightingSlider("BRDF Diffuse", engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse);
-		LightingSlider("BRDF Diffuse Power", engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower);
-		LightingSlider("BRDF Specular", engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular);
-		LightingSlider("BRDF Specular Power", engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower);
-
-		ImGui::SeparatorText("Material sampling and emissive");
-		LightingSlider("Model Data Mip Bias", engine::gPhysicallyBasedRenderingModelDataMipmapLevelOfDetailBias);
-		LightingSlider("Emissive", engine::gPhysicallyBasedRenderingEmissive);
-
-		ImGui::SeparatorText("HDR color grading");
-		LightingSlider("Exposure", engine::gPhysicallyBasedRenderingExposure);
-		LightingSlider("Gamma", engine::gPhysicallyBasedRenderingGamma);
-		LightingSlider("Saturation", engine::gColorGradingSaturation);
-		LightingSlider("Contrast", engine::gColorGradingContrast);
-		LightingSlider("Temperature", engine::gColorGradingTemperature);
-
-		ImGui::SeparatorText("Render quality");
-		auto LightingToggle = [](const char* pcLabel, engine::Wrapper& rWrapper)
+		for (const LightingDescriptor& rDescriptor : kLightingDescriptors)
 		{
-			bool bValue = rWrapper.Get<bool>();
-			if (ImGui::Checkbox(pcLabel, &bValue))
+			if (rDescriptor.pcHeading != nullptr)
 			{
-				rWrapper.Set(bValue);
+				ImGui::SeparatorText(rDescriptor.pcHeading);
 			}
-		};
-		LightingToggle("Multisampling", engine::gMultisampling);
-		ImGui::BeginDisabled(!engine::gMultisampling.Get<bool>());
-		ImGui::TextUnformatted("Sample count");
-		ImGui::SetNextItemWidth(fLightingTrackWidth);
-		char pcSampleCount[16];
-		std::snprintf(pcSampleCount, sizeof(pcSampleCount), "%dx", engine::gSampleCount.Get<int>());
-		if (ImGui::BeginCombo("##Sample count", pcSampleCount))
-		{
-			for (float fSampleCount : engine::gSampleCount.mAllowed)
-			{
-				VkSampleCountFlagBits vkSampleCount = static_cast<VkSampleCountFlagBits>(fSampleCount);
-				std::snprintf(pcSampleCount, sizeof(pcSampleCount), "%dx", static_cast<int>(vkSampleCount));
-				if (ImGui::Selectable(pcSampleCount, vkSampleCount == engine::gSampleCount.Get<VkSampleCountFlagBits>()))
-				{
-					engine::gSampleCount.Set(vkSampleCount);
-				}
-			}
-			ImGui::EndCombo();
+			LightingSlider(rDescriptor.pcLabel, *rDescriptor.pWrapper);
 		}
-		LightingToggle("Sample Shading", engine::gSampleShading);
-		ImGui::BeginDisabled(!engine::gSampleShading.Get<bool>());
-		LightingSlider("Min Sample Shading", engine::gMinimumSampleShading);
-		ImGui::EndDisabled();
-		ImGui::EndDisabled();
-		LightingToggle("Anisotropy", engine::gAnisotropy);
-		ImGui::BeginDisabled(!engine::gAnisotropy.Get<bool>());
-		LightingSlider("Max Anisotropy", engine::gMaximumAnisotropy);
-		ImGui::EndDisabled();
-		LightingSlider("Mip Lod Bias", engine::gMipmapLevelOfDetailBias);
 		ImGui::PopStyleVar();
 		engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
 	}

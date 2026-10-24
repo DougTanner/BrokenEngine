@@ -13,6 +13,33 @@ Preserve ordinary Graphics ownership, upload acquisition, descriptor publication
 submission fences and resource retirement. Selected identity and viewer controls
 must survive Graphics recreation, with resources republished before use.
 
+Holding Q temporarily applies engine defaults to the 21 right-hand float
+sliders and disables their edits. Preserve the current tweaks across Graphics
+recreation and restore them on Q release, focus loss, or shutdown before saving
+settings. Preset selection or reset while Q is held updates what will be restored;
+comparison never saves a preset or changes its selection. Sun angle and the left
+Render quality controls remain outside comparison, presets and Backspace reset;
+quality persists through ordinary graphics settings. Model Data Mip Bias remains
+a lighting participant. One ordered descriptor table owns both lighting UI and
+preset/comparison membership.
+
+W/E/R taps load independent presets for those same 21 sliders; edits auto-save
+only the selected preset. Missing or invalid presets apply all compiled defaults,
+without writing on selection. Backspace applies compiled defaults and saves them
+to the selected preset, retaining selection. Startup loads ordinary graphics
+settings, then selects and loads W before Graphics construction; a preset is
+always selected. Selection survives Graphics recreation. The right window title
+shows Preset: followed by the selected key, with a stable ImGui window ID and no
+duplicate content header. Ignore slot/reset key repeats and apply taps in
+received order before rendering.
+
+Presets use separate viewer-owned v2 AppData files through the shared atomic
+file helpers. Unsupported versions are rejected without migration and use the
+same compiled-default fallback. Validate the complete payload before applying
+any value; participant order is part of the format and changes require its
+version bump.
+Only slider edits and explicit selected-preset resets write preset files.
+
 F9 permits one outstanding PNG capture. Successful completion is logged only
 from the matching engine capture result after the PNG write; queued requests
 survive Graphics replacement.

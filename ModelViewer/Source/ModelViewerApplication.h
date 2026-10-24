@@ -8,6 +8,9 @@ class ModelViewerApplication : public common::Singleton<ModelViewerApplication>
 public:
 
 	ModelViewerApplication();
+	void UpdateDefaultComparison(bool bHeld);
+	void SelectLightingPreset(int64_t iSlot);
+	void ResetLightingPreset();
 	bool Render();
 	void RenderUi();
 	void CreateGraphicsResources();
@@ -16,6 +19,7 @@ public:
 private:
 	enum class ViewerFlags : uint8_t
 	{
+		kComparingDefaults = 0x01,
 		kPlaying = 0x02,
 	};
 
@@ -30,12 +34,17 @@ private:
 		float fRadius = 0.0f;
 	};
 	void PreparePreview(Preview& rPreview);
+	void ApplyLightingValues(const std::array<float, 21>& rValues);
+	void SaveLightingPreset(const std::array<float, 21>& rValues);
 	std::vector<Preview> mPreviews;
 	int64_t miSelected = 0;
 	int64_t miFittedSelection = -1;
 	int64_t miSelectedAnimation = -1;
 	std::chrono::duration<float> mAnimationTime {};
 	common::Flags<ViewerFlags> mFlags;
+	std::array<float, 21> mLightingTweaks {};
+	int64_t miSelectedLightingPreset = 0;
+	uint32_t muiLightingRevision = 0;
 	int64_t miDragButton = -1;
 	glm::vec2 mPreviousMousePosition {};
 

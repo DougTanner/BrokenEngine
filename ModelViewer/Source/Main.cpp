@@ -11,6 +11,7 @@ namespace game
 {
 
 static bool sbQuit = false;
+static bool sbComparisonHeld = false;
 static bool sbScreenshotRequested = false;
 static int64_t siScreenshotToken = 0;
 
@@ -43,6 +44,23 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 	switch (uiMessage)
 	{
 		case WM_KEYDOWN:
+			if (uiWordParameter == 'Q')
+			{
+				sbComparisonHeld = true;
+			}
+			if ((uiWordParameter == 'W' || uiWordParameter == 'E' || uiWordParameter == 'R' || uiWordParameter == VK_BACK) && (iLongParameter & (1i64 << 30)) == 0 && gpModelViewerApplication != nullptr)
+			{
+				gpModelViewerApplication->UpdateDefaultComparison(sbComparisonHeld);
+				if (uiWordParameter == VK_BACK)
+				{
+					gpModelViewerApplication->ResetLightingPreset();
+				}
+				else
+				{
+					gpModelViewerApplication->SelectLightingPreset(uiWordParameter == 'W' ? 0 : uiWordParameter == 'E' ? 1 : 2);
+				}
+				return 0;
+			}
 			if (uiWordParameter == VK_F9 && (iLongParameter & (1i64 << 30)) == 0)
 			{
 				if (sbScreenshotRequested || siScreenshotToken != 0)
@@ -55,6 +73,15 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 				}
 				return 0;
 			}
+			break;
+		case WM_KEYUP:
+			if (uiWordParameter == 'Q')
+			{
+				sbComparisonHeld = false;
+			}
+			break;
+		case WM_KILLFOCUS:
+			sbComparisonHeld = false;
 			break;
 		case WM_SIZE:
 			engine::gVkWantedFramebufferExtent2D = {.width = LOWORD(iLongParameter), .height = HIWORD(iLongParameter)};
@@ -198,6 +225,7 @@ int RunModelViewer(HINSTANCE hinstance)
 		{
 			break;
 		}
+		pApplication->UpdateDefaultComparison(sbComparisonHeld);
 		try
 		{
 			if (sbScreenshotRequested)
@@ -261,6 +289,7 @@ int RunModelViewer(HINSTANCE hinstance)
 		}
 	}
 	gbAllocationTrackingReady.store(false, std::memory_order_relaxed);
+	pApplication->UpdateDefaultComparison(false);
 	engine::SaveGraphicsSettings();
 	return 0;
 }
