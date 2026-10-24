@@ -7,14 +7,16 @@ brief, stay in [the `/next-plan` steps](../SKILL.md#steps) step 4.
 ## Snapshot
 
 Write the complete resolved Plan—its mechanism, corrections, the claimed Plan's
-`## In scope` and `## Out of scope` sections copied verbatim as top-level
-headings with their content intact, and the complete execution card on the
+`## In scope` and `## Out of scope` sections first copied verbatim as top-level
+headings, and the complete execution card on the
 template in [`execution-card.md`](../../../references/execution-card.md)
 `## Template`—into one gitignored `Temp/` file addressed by its path from the
 worktree root, each under its own `##` heading, with a `## Unresolved decisions`
 section (`none` when every decision is resolved). Cite that path under
 `Evidence` with one `##` selector per section for the Plan review reviews and
-the approval presentation.
+the approval presentation. Later accepted Plan review refinements and
+user-approved scope changes are written into the snapshot's copies of those
+two sections.
 
 Fill the card's `Roles` from the Change Workflow step and role assignments the
 brief supplies, citing the brief as the evidence and never reading the workflow

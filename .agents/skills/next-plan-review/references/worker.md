@@ -39,8 +39,8 @@ step owns.
      choose among the listed roots on Step 6's proof, and report `BLOCKED` only
      when no candidate can be proven.
    - **The listing order is presentational and its evidence fields are never
-     selectors.** The worktree the finder matched may be a producing parent
-     worktree rather than this review checkout.
+     selectors.** The worktree the finder matched for a Codex candidate may be
+     a producing parent worktree rather than this review checkout.
    - Done when the result is classified as proceed or `BLOCKED` and, on
      `needs-selection`, the candidate set to prove is fixed.
 4. Establish the commit facts and the contracts as they existed at that commit.
@@ -70,14 +70,17 @@ step owns.
    projection or read a transcript whole. Done when the transcript to read is
    fixed or the review is `BLOCKED` for want of an exact ID.
 6. Prove production of the commit, then build the routing inventory.
-   - Prove the parent started before and covered the commit, used the eligible
-     retained registered worktree selected by the finder, and recorded
+   - Prove the parent started before and covered the commit and recorded
      finalization producing the full hash. An exact ID or filename is selection
      evidence, not production proof.
-   - On a `selection.mode: explicit-session-id` result, query the recorded
-     worktree with one bounded command — `git worktree list --porcelain`
-     filtered to the one recorded worktree path — never an unfiltered listing;
-     on a bounded result the finder's eligible-worktree gate already settles it.
+   - Claude, on a bounded result: the finder's commit-time span and full-hash
+     mention select the transcript and are not production proof by themselves.
+   - Codex: prove the parent used the eligible retained registered worktree
+     selected by the finder. On a bounded result the finder's eligible-worktree
+     gate already settles it; on a `selection.mode: explicit-session-id` result,
+     query the recorded worktree with one bounded command —
+     `git worktree list --porcelain` filtered to the one recorded worktree path
+     — never an unfiltered listing.
    - A default `HEAD` is eligible only when transcript and finalization evidence
      prove production of that exact commit; otherwise report
      `Transcript provenance: BLOCKED`.

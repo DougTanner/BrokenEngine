@@ -145,16 +145,6 @@ function Get-Locator([string] $Path) {
 	return [IO.Path]::GetFileName($Path)
 }
 
-function Get-ClaudeProjectDirectory([string] $WorktreeRoot) {
-	# The Claude store holds one project directory per checkout, named after that checkout's absolute
-	# path with every ':', '\', '/', and '.' replaced by '-'. The encoding is one-way, so an already
-	# eligible worktree root is encoded forward instead of directory names being decoded.
-	if ([string]::IsNullOrWhiteSpace($ClaudeSessionStoreRoot) -or [string]::IsNullOrWhiteSpace($WorktreeRoot)) { return $null }
-	$encoded = $WorktreeRoot
-	foreach ($character in @(':', '\', '/', '.')) { $encoded = $encoded.Replace($character, '-') }
-	return Join-Path $ClaudeSessionStoreRoot $encoded
-}
-
 function Get-PathSafety([string] $Path) {
 	$fullPath = ConvertTo-LexicalCanonicalPath $Path
 	if ($null -eq $fullPath) { return [pscustomobject]@{ Status = 'error'; Item = $null; Path = $null } }
@@ -290,19 +280,24 @@ function Get-TranscriptSessionMeta([string] $Path) {
 	}
 }
 
-function Get-ClaudeTranscriptMetadata([string] $Path, [string] $CommitHash) {
+function Get-ClaudeTranscriptMetadata([string] $Path, [string] $CommitHash, [switch] $RequireCommitHash) {
 	# A Claude transcript carries no session_meta record, so identity, working directory, and window
 	# come from ordinary records. One file is one whole session, so it is always reported as a root
 	# with no root session id: its subagents live under a sibling directory, not in the store's sessions.
 	$stream = [IO.FileStream]::new($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
 	$reader = [IO.StreamReader]::new($stream)
 	try {
+		# The file is read once; the hash test and the line parse share that text, so a bounded search
+		# skips a file that never mentions the commit before any JSON parsing.
+		$text = $reader.ReadToEnd()
+		if ($RequireCommitHash -and -not $text.Contains($CommitHash, [StringComparison]::OrdinalIgnoreCase)) { return $null }
+		$lines = [IO.StringReader]::new($text)
 		$start = $null
 		$end = $null
 		$cwd = $null
 		$sessionId = $null
 		$commitHashMentions = 0
-		while (($line = $reader.ReadLine()) -ne $null) {
+		while (($line = $lines.ReadLine()) -ne $null) {
 			if ([string]::IsNullOrWhiteSpace($line)) { continue }
 			if ($line.Contains($CommitHash, [StringComparison]::OrdinalIgnoreCase)) { $commitHashMentions++ }
 			$record = $line | ConvertFrom-Json -Depth 64 -DateKind String
@@ -463,16 +458,23 @@ try {
 		}
 		Add-Files -Files $files -ReadErrors $readErrors -Root $SessionStoreRoot -Filter '*.jsonl' -Recurse -Include $includeLastWrite
 		Add-Files -Files $files -ReadErrors $readErrors -Root $ArchivedSessionStoreRoot -Filter '*.jsonl' -Recurse -Include $includeLastWrite
-		# Claude filenames carry no date, so the write time is the only Claude prefilter, applied per
-		# eligible worktree's project directory and never below its top level. Only its lower bound is
-		# kept: a file last written before the window cannot span the commit, while a session appended
-		# to after the window still spans it, so an upper bound would discard a real candidate.
-		$includeClaudeLastWrite = {
+		# Claude filenames carry no date, so file times are the only Claude prefilter, applied to every
+		# project directory in the store and never below its top level. A file last written before the
+		# window or created after the commit cannot span the commit. No last-write upper bound is kept:
+		# a session appended to after the window still spans it.
+		$includeClaudeFileTimes = {
 			param($File)
-			return $File.LastWriteTimeUtc -ge $windowStart.UtcDateTime
+			return $File.LastWriteTimeUtc -ge $windowStart.UtcDateTime -and $File.CreationTimeUtc -le $commitTimestamp.UtcDateTime
 		}
-		foreach ($worktreeRoot in $eligibleWorktreeRoots) {
-			Add-Files -Files $claudeFiles -ReadErrors $readErrors -Root (Get-ClaudeProjectDirectory $worktreeRoot) -Filter '*.jsonl' -Include $includeClaudeLastWrite
+		if (-not [string]::IsNullOrWhiteSpace($ClaudeSessionStoreRoot)) {
+			try { $projectDirectories = @(Get-ChildItem -LiteralPath $ClaudeSessionStoreRoot -Directory -Force -ErrorAction Stop) }
+			catch {
+				$projectDirectories = @()
+				Add-ReadError $readErrors (Get-Locator $ClaudeSessionStoreRoot) 'transcript.read-failed' 'Transcript store contents could not be read.'
+			}
+			foreach ($projectDirectory in $projectDirectories) {
+				Add-Files -Files $claudeFiles -ReadErrors $readErrors -Root $projectDirectory.FullName -Filter '*.jsonl' -Include $includeClaudeFileTimes
+			}
 		}
 	}
 
@@ -488,11 +490,12 @@ try {
 	}
 	foreach ($file in @($claudeFiles.Values | Sort-Object FullName)) {
 		$locator = Get-Locator $file.FullName
-		try { $metadata = Get-ClaudeTranscriptMetadata $file.FullName $commitHash }
+		try { $metadata = Get-ClaudeTranscriptMetadata $file.FullName $commitHash -RequireCommitHash:($selection -eq 'bounded-commit-window') }
 		catch {
 			Add-ReadError $readErrors $locator 'transcript.read-failed' 'Transcript metadata could not be read.'
 			continue
 		}
+		if ($null -eq $metadata) { continue }
 		$records.Add([pscustomobject]@{ Client = 'claude'; Locator = $locator; Metadata = $metadata })
 	}
 
@@ -529,8 +532,12 @@ try {
 		}
 		else {
 			if (-not $metadata.IsRoot) { continue }
-			$metadataRoot = Get-CanonicalMetadataCwd $metadata.Cwd
-			if ($null -eq $metadataRoot -or -not $eligibleWorktreeRoots.Contains($metadataRoot)) { continue }
+			# A Claude record already passed the full-hash prefilter, and its project directory may name a
+			# removed worktree, so only a Codex record must come from an eligible retained worktree.
+			if ($record.Client -ceq 'codex') {
+				$metadataRoot = Get-CanonicalMetadataCwd $metadata.Cwd
+				if ($null -eq $metadataRoot -or -not $eligibleWorktreeRoots.Contains($metadataRoot)) { continue }
+			}
 			if ($metadata.Start -gt $commitTimestamp -or $metadata.End -lt $commitTimestamp) { continue }
 		}
 		$descendants = $null
@@ -671,7 +678,7 @@ try {
 			'No transcript matched the requested session ID; commit-time and eligible-worktree gates were not applied.'
 		}
 		else {
-			'No transcript matched the commit time and an eligible retained worktree.'
+			'No root transcript spanned the commit time with its client rule met: a Codex root needs an eligible retained worktree, a Claude root a full commit hash mention.'
 		}
 		Write-Result $result 2
 	}
