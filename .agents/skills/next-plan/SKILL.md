@@ -126,7 +126,7 @@ The `argument-hint` value selects the Plan:
    preparation evidence: main never lists or reads that range itself, and
    dispatches one `researcher` on the sync brief in
    [claim-results.md](references/claim-results.md)
-   `## Session baseline and the sync object`.
+   `## Final-refresh sync brief`.
 
    When any row of that `researcher`'s handoff reports a touch, return to step 4, rerun the affected Plan
    review checks in step 5, and repeat this final refresh before approval;

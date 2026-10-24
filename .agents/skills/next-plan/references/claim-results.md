@@ -66,13 +66,22 @@ diagnostic with code `invalid-metadata`, stops the run as
 `nextAction: stop-report-to-user`, before any Plan is claimed. Main reports
 each listed item and diagnostic to the user in its next message.
 
+## Final-refresh sync brief
+
 When the final claim refresh at [the `/next-plan` steps](../SKILL.md#steps)
 step 6 returns a `sync` object, main's one `researcher` brief carries
 `sync.from..sync.to`, the preparation snapshot's path and `##` selectors, and
 the preparation handoff's one-line rows that cite repository paths outside that
-snapshot. That worker lists the changed names with
+snapshot. The brief cites the worker's steps by path plus selector, as
+`.agents/skills/next-plan/references/claim-results.md`
+`## Sync researcher steps`.
+
+## Sync researcher steps
+
+The sync `researcher` lists the changed names with
 `git diff --name-only --no-renames <sync.from> <sync.to>`, keeps those the
-snapshot or those rows cite, including skill-relative (resolving against the
+brief's preparation snapshot or the brief's preparation handoff rows cite,
+including skill-relative (resolving against the
 directory of the skill whose `SKILL.md` or name the surrounding text cites),
 directory, and skill-name (`/<skill>`, resolving to that skill's
 `.agents/skills/<name>/` files) citations, and returns under `Decisive checks`,
