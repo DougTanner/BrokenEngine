@@ -123,7 +123,6 @@
     <ClCompile Include="..\..\..\Engine\Source\Graphics\OneShotCommandBuffer.cpp"><Filter>Engine\Graphics</Filter></ClCompile>
     <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\GlobalUniforms.cpp"><Filter>Engine\Graphics\Render</Filter></ClCompile>
     <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\LightingUniforms.cpp"><Filter>Engine\Graphics\Render</Filter></ClCompile>
-    <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\MainUniforms.cpp"><Filter>Engine\Graphics\Render</Filter></ClCompile>
     <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\SmokeUniforms.cpp"><Filter>Engine\Graphics\Render</Filter></ClCompile>
     <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\WaterUniforms.cpp"><Filter>Engine\Graphics\Render</Filter></ClCompile>
     <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\WindUniforms.cpp"><Filter>Engine\Graphics\Render</Filter></ClCompile>

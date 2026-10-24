@@ -136,8 +136,6 @@ private:
 
 inline ImGuiManager* gpImGuiManager = nullptr;
 
-inline constexpr float kfUiReferenceHeight = 2'160.0f;
-
 inline float UiScale()
 {
 	return gpImGuiManager != nullptr ? gpImGuiManager->mfUiScale : 1.0f;

@@ -5,9 +5,11 @@
 ModelViewer is a separate client executable. Viewer policy and game contracts
 belong here; shared rendering mechanisms remain engine-owned. Do not instantiate
 the sandbox Game or start a network session. The selected scene is the only
-visible geometry, against a fixed displayed RGB (0.5, 0.5, 0.5) background.
-Scene grading does not alter that background. World allocations required by
-existing graphics managers do not authorize visible world passes.
+visible geometry, against a gray background that is the viewer's HDR clear
+color, displayed about RGB 0.5 at default grading
+([Top-Level Shaders](../Engine/Data/Shaders/AGENTS.md#top-level-shaders)).
+World allocations required by existing graphics managers do not authorize
+visible world passes.
 
 Preserve ordinary Graphics ownership, upload acquisition, descriptor publication,
 submission fences and resource retirement. Selected identity and viewer controls
@@ -61,8 +63,8 @@ preserve circular rotation. The initiating button owns the gesture until release
 or cancellation; a held secondary button cannot take over without a fresh click.
 UI cancellation also requires a fresh click before dragging resumes.
 
-With `--agent-port`, the viewer remains hidden, suppresses startup error dialogs
-and disables backend cursor changes; it does not start generic agent transport.
+With `--agent-port`, the viewer remains hidden and suppresses startup error
+dialogs; it does not start generic agent transport.
 Programmatic pointer positions and left/right-button transitions enter ImGui's
 public input queue through viewer-private messages without physical mouse-leave
 tracking or native mouse capture. Preserve ordinary native input forwarding.
@@ -82,20 +84,23 @@ collection pipeline registration, sandbox screen ownership, network crash upload
 and profile-screen presentation. Keep local crash reporting, ordinary engine
 profiling collection and Graphics lifecycle.
 The viewer supplies a presentation frame, camera matrices and sun input,
-`RenderViewerFrame` for Main uniforms and `RenderViewerUi` inside the ordinary
-ImGui backend. Model illumination uses the game's shared sun/day cycle, ambient
-and model skybox environment for equal sun input and shared defaults. Right-drag
+`engine::RenderFrameMain` by project membership for Main uniforms,
+`game::Camera::SunAngle`, its HDR clear color and UI reference height in
+`Game.h`, and `RenderViewerUi` inside the ordinary ImGui backend, and writes
+the sun rotation its camera inherits from `engine::CameraBase`. Model
+illumination uses the game's shared sun/day cycle, ambient and model skybox
+environment for equal sun input and shared defaults. Right-drag
 sun rotation changes direction only and persists in world space across Sun angle edits,
 model changes and Graphics recreation. Sun angle still drives the shared day-cycle
 colors and brightness and moves the base direction through the rotated orbit.
 Preview isolation excludes world lighting deposits, smoke and terrain occlusion
 from model shading.
 Auxiliary world render targets retain their normal initialization
-and transitions; the image pass clears uncovered HDR pixels and records model
-draws and UI depth only before HDR resolve. Coverage composition belongs to
-[HDR resolve](../Engine/Data/Shaders/AGENTS.md#top-level-shaders). Do not satisfy
-an unused gameplay dependency with dummy cells, flags, sessions or reporting
-functions.
+and transitions; the image pass clears HDR color to the viewer's gray, its world
+draws record zero instances because the viewer writes no world indirect records,
+and only model draws and UI depth
+produce pixels before HDR resolve. Do not satisfy an unused gameplay dependency
+with dummy cells, flags, sessions or reporting functions.
 
 ## Build and data ownership
 

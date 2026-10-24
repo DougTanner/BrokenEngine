@@ -13,13 +13,6 @@
 namespace engine
 {
 
-#if defined(BT_MODEL_VIEWER)
-void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, [[maybe_unused]] const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, [[maybe_unused]] std::chrono::duration<float> currentTime)
-{
-	game::RenderViewerFrame(iCommandBuffer, rRenderInterpolates.at(cameraCoordinate));
-}
-#else
-
 static void DebugRenderCellEdges(const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate)
 {
 	if constexpr (!kbDebugRender)
@@ -621,8 +614,6 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 
 	PopulateHexShield(rMainLayout);
 }
-
-#endif // defined(BT_MODEL_VIEWER)
 
 } // namespace engine
 

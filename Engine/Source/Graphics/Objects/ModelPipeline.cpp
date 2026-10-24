@@ -116,10 +116,6 @@ void ModelPipeline::Create(common::crc_t sceneCrc, const PipelineInfo& rPipeline
 		{
 			pipelineInfo.flags = originalFlags;
 			pipelineInfo.flags.Set(PipelineFlags::kAlphaBlend);
-			if constexpr (kbModelViewer)
-			{
-				pipelineInfo.flags.Set(PipelineFlags::kCoverageAlpha);
-			}
 			// Partly transparent materials also contain opaque regions, so blending retains the base depth/cull flags.
 		}
 		else

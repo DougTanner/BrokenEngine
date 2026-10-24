@@ -453,7 +453,7 @@ static void ConfigureBlendState(GraphicsPipelineState& rState, const Pipeline& r
 		rState.vkPipelineColorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 		rState.vkPipelineColorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 		rState.vkPipelineColorBlendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		rState.vkPipelineColorBlendAttachmentState.dstAlphaBlendFactor = rPipeline.mInfo.flags & PipelineFlags::kCoverageAlpha ? VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA : VK_BLEND_FACTOR_ZERO;
+		rState.vkPipelineColorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 	}
 	else if (rPipeline.mInfo.flags & PipelineFlags::kAddAlpha)
 	{

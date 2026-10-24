@@ -106,12 +106,10 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 		ImGui::GetCurrentContext()->ItemUnclipByLog = true;
 	}
 	ImGuiIO& rInputOutput = ImGui::GetIO();
-#if defined(BT_MODEL_VIEWER)
-	if (gLaunchOptions.iAgentPort != 0)
+	if (PhysicalInputSuppressed())
 	{
 		rInputOutput.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 	}
-#endif
 	rInputOutput.IniFilename = nullptr;
 	rInputOutput.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
@@ -152,14 +150,12 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 	// ImGui_ImplVulkan_Init reports failures through internal IM_ASSERTs and always returns true.
 	ImGui_ImplVulkan_Init(&initializationInfo);
 
-#if !defined(BT_MODEL_VIEWER)
 	// Minimized/zero-height: keep the 1.0f default scale rather than collapsing style to 0
 	float fHeight = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	if (fHeight > 0.0f)
 	{
-		mfUiScale = fHeight / kfUiReferenceHeight;
+		mfUiScale = fHeight / game::kfUiReferenceHeight;
 	}
-#endif
 	SetupThemeGeometry(mfUiScale);
 	ImGui::GetStyle().FontScaleDpi = mfUiScale;
 	ApplyThemeColors(GetUiTheme());
@@ -438,20 +434,18 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 		rStyle.Colors[ImGuiCol_PopupBg].w = fAlpha;
 	}
 
-#if !defined(BT_MODEL_VIEWER)
 	// Update geometry only when its scale changes; ImGui_ImplWin32_NewFrame refreshes DisplaySize later. Extent changes recreate this manager and its ImGui context at the kSwapchain destroy tier.
 	float fPreviousUiScale = mfUiScale;
 	// Minimized/zero-height: keep previous scale rather than collapsing style to 0
 	float fHeight = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);
 	if (fHeight > 0.0f)
 	{
-		mfUiScale = fHeight / kfUiReferenceHeight;
+		mfUiScale = fHeight / game::kfUiReferenceHeight;
 	}
 	if (mfUiScale != fPreviousUiScale)
 	{
 		SetupThemeGeometry(mfUiScale);
 	}
-#endif
 	// Both font scale factors set unconditionally after the geometry block: SetupThemeGeometry's whole-style reset
 	// (rStyle = defaultStyle) clears FontScaleMain to 1.0f, so re-applying here restores the user's Font Size on a
 	// scale-change frame rather than dropping it for that frame.
@@ -461,16 +455,19 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 	ImGui_ImplVulkan_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 
-	// Suppressed harness client: neutralize the two NewFrame physical polls the Win32 backend just ran.
+	// Suppressed harness client: neutralize the physical polls the Win32 backend's NewFrame just ran (the cursor poll
+	// only when agent input exists).
 	if (PhysicalInputSuppressed())
 	{
 		ImGuiIO& rInputOutput = ImGui::GetIO();
 
-#if !defined(BT_MODEL_VIEWER)
-		// Physical cursor poll: park io.MousePos at ImGui's no-mouse sentinel; the harness drives the UI by item
-		// activation and never sets a mouse position.
-		rInputOutput.AddMousePosEvent(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
-#endif
+		// Physical cursor poll: when agent input exists, park io.MousePos at ImGui's no-mouse sentinel; the harness drives
+		// the UI by item activation and never sets a mouse position. A host without agent input keeps its own queued
+		// pointer events.
+		if (gpAgentInput != nullptr)
+		{
+			rInputOutput.AddMousePosEvent(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
+		}
 
 		// XInputGetState polls ImGui gamepad navigation; clear the ImGuiKey_Gamepad* range because the harness injects no gamepad events.
 		for (int64_t i = ImGuiKey_GamepadStart; i <= ImGuiKey_GamepadRStickDown; ++i)

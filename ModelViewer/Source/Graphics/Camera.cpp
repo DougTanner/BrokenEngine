@@ -61,11 +61,9 @@ void Camera::RotateSun(const glm::vec2& rAnchor, const glm::vec2& rPosition)
 	mSunRotation = glm::normalize(worldRotation * mSunRotation);
 }
 
-XMVECTOR XM_CALLCONV Camera::ApplySunRotation(FXMVECTOR vecDirection) const
+float Camera::SunAngle() const
 {
-	glm::vec3 direction(XMVectorGetX(vecDirection), XMVectorGetY(vecDirection), XMVectorGetZ(vecDirection));
-	direction = mSunRotation * direction;
-	return XMVectorSet(direction.x, direction.y, direction.z, 0.0f);
+	return mfSunAngle;
 }
 
 } // namespace game

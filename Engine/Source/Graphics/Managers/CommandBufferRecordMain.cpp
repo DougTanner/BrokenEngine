@@ -9,6 +9,7 @@
 #include "CommandBufferManager.h"
 
 #include "Profile/ProfileRows.h"
+#include "Game.h"
 
 namespace engine
 {
@@ -335,8 +336,7 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 		{
 			renderPassFlags.Set(RenderPassFlags::kMultisampling);
 		}
-		VkClearColorValue vkClearColorValue {};
-		Texture::RecordBeginRenderPass(vkCommandBuffer, gpSwapchainManager->mHdrVkRenderPass, gpSwapchainManager->mHdrVkFramebuffer, gpGraphics->mFramebufferVkExtent2D, vkClearColorValue, renderPassFlags);
+		Texture::RecordBeginRenderPass(vkCommandBuffer, gpSwapchainManager->mHdrVkRenderPass, gpSwapchainManager->mHdrVkFramebuffer, gpGraphics->mFramebufferVkExtent2D, game::kVkHdrClearColor, renderPassFlags);
 	}
 
 	// UI depth pre-pass: depth-only quads at ImGui window positions (instanceCount=0 when disabled)
@@ -365,11 +365,10 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 		gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerObjects);
 		for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpModelPipelineMaps[kDynamicModelPipelineModel])
 		{
-			pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {kbModelViewer ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f}, ModelDrawPass::kOpaque);
+			pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f}, ModelDrawPass::kOpaque);
 		}
 		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerObjects);
 
-#if !defined(BT_MODEL_VIEWER)
 		gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerTerrain);
 		// Per-template terrain draws: one indirect draw per IslandTemplate (count fixed at boot
 		// from gpIslandTerrain->mIslandCrcsSorted). The stable arena is bound once; each acquired
@@ -396,7 +395,6 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 			pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f});
 		}
 		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerHexShields);
-#endif
 
 		gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerTransparentObjects);
 		// Transparent model pass (after all opaque geometry and water for correct blending)
@@ -404,12 +402,11 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 		{
 			if (pPipeline->mFlags & ModelPipelineFlags::kHasTransparentMaterials)
 			{
-				pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {kbModelViewer ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f}, ModelDrawPass::kTransparent);
+				pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f}, ModelDrawPass::kTransparent);
 			}
 		}
 		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerTransparentObjects);
 
-#if !defined(BT_MODEL_VIEWER)
 		gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerLongParticlesRender);
 		pPipelines[kPipelineLongParticlesRender].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer);
 		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerLongParticlesRender);
@@ -439,7 +436,6 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 			pPipelines[kPipelineDebugCircle].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer);
 			pPipelines[kPipelineDebugLine].RecordDrawIndirect(iCommandBuffer, vkCommandBuffer);
 		}
-#endif
 	}
 
 	vkCmdEndRenderPass(vkCommandBuffer);
@@ -451,7 +447,7 @@ void CommandBufferRecordMain::RecordHighDynamicRangeResolve(VkCommandBuffer vkCo
 	// color attachment (fully overwritten by the fullscreen quad) — empty flags, no clear.
 	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerHdrResolve);
 	Texture::RecordBeginRenderPass(vkCommandBuffer, gpSwapchainManager->mVkRenderPass, gpSwapchainManager->mFramebuffers.at(iFramebuffer).vkPresentFramebuffer, gpGraphics->mFramebufferVkExtent2D, VkClearColorValue {}, RenderPassFlags_t {});
-	gpPipelineManager->mpPipelines[kPipelineHdrResolve].RecordDraw(iCommandBuffer, vkCommandBuffer, 1, 0, {kbModelViewer ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f});
+	gpPipelineManager->mpPipelines[kPipelineHdrResolve].RecordDraw(iCommandBuffer, vkCommandBuffer, 1, 0);
 	vkCmdEndRenderPass(vkCommandBuffer);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerHdrResolve);
 }

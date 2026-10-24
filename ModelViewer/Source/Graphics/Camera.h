@@ -14,9 +14,8 @@ public:
 	void Fit(const XMFLOAT3A& rf3Center, float fRadius);
 	void Zoom(float fWheelDelta);
 	void RotateSun(const glm::vec2& rAnchor, const glm::vec2& rPosition);
-	XMVECTOR XM_CALLCONV ApplySunRotation(FXMVECTOR vecDirection) const;
+	float SunAngle() const;
 	arc_ball::ArcBall mArcBall {glm::vec3(0.0f), 0.75f, glm::mat4(1.0f)};
-	glm::quat mSunRotation {1.0f, 0.0f, 0.0f, 0.0f};
 
 private:
 	static constexpr float kfInitialPitch = 0.5404195f;

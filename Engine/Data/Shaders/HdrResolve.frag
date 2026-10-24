@@ -2,11 +2,6 @@
 
 #include "ShaderLayouts.h"
 
-layout(push_constant) uniform pushConstants
-{
-	PushConstantsLayout pushConstantsLayout;
-};
-
 // Uniforms
 layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
 {
@@ -42,14 +37,7 @@ vec3 ACESFilm(vec3 x)
 void main()
 {
 	// Exposure -> ACES tone map the accumulated HDR scene
-	vec4 scene = texture(hdrSampler, f2InTexcoord);
-	bool viewerCoverage = pushConstantsLayout.f4Pipeline.x != 0.0f;
-	if (viewerCoverage && scene.a == 0.0f)
-	{
-		f4OutColor = vec4(0.5f, 0.5f, 0.5f, 1.0f);
-		return;
-	}
-	vec3 hdr = viewerCoverage ? scene.rgb / scene.a : scene.rgb;
+	vec3 hdr = texture(hdrSampler, f2InTexcoord).rgb;
 	hdr = min(hdr, vec3(65000.0f)); // Kill F16 Inf
 	hdr *= mainLayout.fPhysicallyBasedRenderingExposure;
 	vec3 mapped = ACESFilm(hdr);
@@ -70,11 +58,6 @@ void main()
 
 	// Gamma
 	vec3 linearColor = pow(mapped, vec3(mainLayout.fPhysicallyBasedRenderingGammaInverse));
-	if (viewerCoverage)
-	{
-		// Decoded sRGB gray 0.5 is composed after foreground grading.
-		linearColor = scene.a * linearColor + (1.0f - scene.a) * vec3(0.21404114f);
-	}
 	vec3 encodedColor = mix(1.055f * pow(linearColor, vec3(1.0f / 2.4f)) - 0.055f, 12.92f * linearColor, lessThanEqual(linearColor, vec3(0.0031308f)));
 	f4OutColor = vec4(encodedColor, 1.0f);
 }

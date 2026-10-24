@@ -48,15 +48,12 @@ static XMVECTOR XM_CALLCONV PopulateSunMoonDirection(shaders::GlobalLayout& rGlo
 	XMVECTOR vecSunMoonNormal = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 	XMMATRIX matSunRotation = XMMatrixRotationY(-fDirectionAngle);
 	vecSunMoonNormal = XMVector4Transform(vecSunMoonNormal, matSunRotation);
-	// Pitch tilt around world X. Of the shadow terms it moves only the object-shadow stretch translation; terrain
-	// shadows and the object-shadow height offset derive from raw fSunAngle.
-	XMMATRIX matSunTilt = XMMatrixRotationX(gSunMoonNormalTilt.mfCurrent);
-#if defined(BT_MODEL_VIEWER)
-	vecSunMoonNormal = XMVector4Transform(vecSunMoonNormal, matSunTilt);
-	vecSunMoonNormal = XMVector4Normalize(static_cast<game::Camera*>(gpCamera)->ApplySunRotation(vecSunMoonNormal));
-#else
-	vecSunMoonNormal = XMVector4Normalize(XMVector4Transform(vecSunMoonNormal, matSunTilt));
-#endif
+	// Pitch tilt around world X first, then the camera's world-space sun rotation. Of the shadow terms the result moves
+	// only the object-shadow stretch translation; terrain shadows and the object-shadow height offset derive from raw
+	// fSunAngle.
+	glm::quat sunRotation = gpCamera->mSunRotation * glm::angleAxis(gSunMoonNormalTilt.mfCurrent, glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::vec3 sunMoonDirection = sunRotation * glm::vec3(XMVectorGetX(vecSunMoonNormal), XMVectorGetY(vecSunMoonNormal), XMVectorGetZ(vecSunMoonNormal));
+	vecSunMoonNormal = XMVector4Normalize(XMVectorSet(sunMoonDirection.x, sunMoonDirection.y, sunMoonDirection.z, 0.0f));
 	XMStoreFloat4(&rGlobalLayout.f4SunMoonNormal, vecSunMoonNormal);
 
 	// Uniform-only sun-normal products folded here (both need the finished sun/moon normal): Terrain.frag's
@@ -523,11 +520,7 @@ void RenderFrameGlobal(int64_t iCommandBuffer, std::chrono::duration<float> curr
 	RenderSmokeGlobal(iCommandBuffer);
 	RenderWindGlobal(iCommandBuffer);
 
-#if defined(BT_MODEL_VIEWER)
-	float fSunAngle = engine::gpCamera->mfSunAngle;
-#else
 	float fSunAngle = static_cast<game::Camera*>(engine::gpCamera)->SunAngle();
-#endif
 
 	shaders::GlobalLayout& rGlobalLayout = *reinterpret_cast<shaders::GlobalLayout*>(&gpBufferManager->mGlobalLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 

@@ -175,6 +175,8 @@ public:
 	float XM_CALLCONV AddVisualErrorOffset(FXMVECTOR vecError);
 
 	float mfSunAngle = 1.4f;
+	// World-space sun rotation, identity unless the host writes it.
+	glm::quat mSunRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
 	XMVECTOR XM_CALLCONV WorldToScreen(FXMVECTOR vecWorldPosition) const;
 

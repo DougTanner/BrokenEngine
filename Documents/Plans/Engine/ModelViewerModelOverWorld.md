@@ -19,7 +19,9 @@ decisions (user choices, agent-recorded) this stage implements:
   every sun uniform carries the world-space sun rotation, Phase 1 Site 6).
 - D7: world light deposits, smoke, and terrain shadow stay excluded from the model (the viewer's four PBR
   isolation writes stay).
-- D8: the gray background goes: `kbHdrResolveGrayBackground` and its shader branch are deleted.
+- D8: the gray background goes: terrain and water write every pixel, so the HDR color target needs no clear outside
+  `kbVulkanWireframe` builds and the per-program `game::kVkHdrClearColor` is deleted (user: "The water/island render
+  will write over the framebuffer completely, so it will no longer need to be cleared").
 - D10: a seed field and a reroll button in the existing viewer panel; the seed is not saved and resets each launch.
 
 Facts (commit bae72d574b2f422ad876e9804304065b040627c3; locate by content after earlier stages):
@@ -37,9 +39,9 @@ Facts (commit bae72d574b2f422ad876e9804304065b040627c3; locate by content after 
   generator).
 - The viewer's `elapsedTime` passed to `RenderMainPresentAcquire` grows monotonically (`mTimer.GetDeltaNs()`
   without reset, ModelViewerApplication.cpp:375), as the waves need.
-- After Phase 1, HDR resolve pushes `kbHdrResolveGrayBackground ? 1 : 0` (CommandBufferRecordMain.cpp:454) and
-  HdrResolve.frag's `grayBackground` local selects the unpremultiply and gray composite (HdrResolve.frag:46-52,
-  73-77); the sandbox pushes 0, whose path is `hdr = scene.rgb` with no composite.
+- After Phase 1, HDR resolve takes no push constants and grades `scene.rgb` for both programs, and the HDR color
+  attachment clears to each program's `game::kVkHdrClearColor` (sandbox `{0, 0, 0, 0}`; viewer gray
+  `{0.153, 0.153, 0.153, 1}`, which grades to about sRGB 0.5), so the gray shows wherever the viewer draws nothing.
 
 ## Design
 
@@ -63,32 +65,37 @@ Facts (commit bae72d574b2f422ad876e9804304065b040627c3; locate by content after 
    `ImGui::Button("Reroll")`, which sets `mIslandSeed = engine::GridCoord::FromKey(common::RandomNext(mSeedRandomEngine))`
    and calls `GenerateIslands()`; then `ImGui::Separator()`. Nothing is saved.
 5. Gray background removal (D8):
-   - Delete `kbHdrResolveGrayBackground` from both `Pch.h` switch blocks.
-   - CommandBufferRecordMain.cpp HDR resolve `RecordDraw` drops its push argument (default `{}`).
-   - HdrResolve.frag: delete the `grayBackground` local, the gray early return, and the composite; `hdr` is
-     `scene.rgb`. The sandbox's executed path is unchanged.
+   - Delete `kVkHdrClearColor` from Projects/BrokenEngineSandbox/Source/Game.h and ModelViewer/Source/Game.h.
+   - CommandBufferRecordMain.cpp `RecordImageRenderPass`: the begin call passes a local `VkClearColorValue {}` (the
+     depth clear still needs the clear values), and the `Game.h` include Phase 1 added goes.
+   - SwapchainManager.cpp HDR render pass: the HDR color load op becomes `kbVulkanWireframe ?
+     (gMultisampling.Get<bool>() ? VK_ATTACHMENT_LOAD_OP_DONT_CARE : VK_ATTACHMENT_LOAD_OP_CLEAR) :
+     VK_ATTACHMENT_LOAD_OP_DONT_CARE` and the MSAA color load op `kbVulkanWireframe ? VK_ATTACHMENT_LOAD_OP_CLEAR :
+     VK_ATTACHMENT_LOAD_OP_DONT_CARE`, the sandbox's form before Phase 1, so wireframe builds still clear to black.
 6. Docs (`/update-claude-docs`):
    - ModelViewer/AGENTS.md `## Application contracts` :7-10: a seeded one-cell world (terrain and water) is drawn
      behind the selected model under the same grading; the model draws in its own space over cleared depth; the
      seed is a grid coordinate edited or rerolled in the panel and never saved.
    - `## Engine integration`: the viewer supplies one cell's static data to `UpdateActiveIslands` each frame,
      frames the world camera on the anchor island, and calls `RenderWaterMain`.
-   - Engine/Data/Shaders/AGENTS.md `## Top-Level Shaders` HDR resolve: no background composition.
-   - Every line naming `kbHdrResolveGrayBackground` (Phase 1 Site 14 placed them).
+   - Engine/Data/Shaders/AGENTS.md `## Top-Level Shaders` HDR resolve: world draws cover every pixel, so no program
+     depends on an HDR clear color; the line naming `game::kVkHdrClearColor` goes.
+   - ModelViewer/AGENTS.md: every line naming `game::kVkHdrClearColor` or the viewer's gray HDR clear color,
+     including the list of game names the viewer supplies (Phase 1 and Phase 3 placed them).
 
 ## Critical files
 
 - ModelViewer/Source/ModelViewerApplication.h, ModelViewerApplication.cpp.
-- Engine/Data/Shaders/HdrResolve.frag, Engine/Source/Graphics/Managers/CommandBufferRecordMain.cpp.
-- Projects/BrokenEngineSandbox/Source/Pch.h, ModelViewer/Source/Pch.h.
+- Projects/BrokenEngineSandbox/Source/Game.h, ModelViewer/Source/Game.h.
+- Engine/Source/Graphics/Managers/CommandBufferRecordMain.cpp, Engine/Source/Graphics/Managers/SwapchainManager.cpp.
 - ModelViewer/AGENTS.md, Engine/Data/Shaders/AGENTS.md.
 
 ## Risk triggers and invariants
 
-- Tier 3: a shared shader and the sandbox image-pass push change beside viewer residency, upload, and per-frame
-  indirect publication.
-- Sandbox: HDR resolve output unchanged (its executed path is the kept path); no CRC, PostRender, or
-  determinism change.
+- Tier 3: the image-pass clear value and HDR load ops for both programs and both programs' `Game.h` beside viewer
+  residency, upload, and per-frame indirect publication.
+- Sandbox: the HDR color and MSAA color load ops return to their form before Phase 1 (`DONT_CARE` outside wireframe
+  builds); water and terrain write every pixel, so the frame is unchanged; no CRC, PostRender, or determinism change.
 - The viewer constructs no `GameBase`, cell map, or session; its cell is real data the renderer consumes.
 - `UpdateActiveIslands` runs exactly once per rendered frame, only after `Render()`'s swapchain early return.
 
@@ -96,7 +103,8 @@ Facts (commit bae72d574b2f422ad876e9804304065b040627c3; locate by content after 
 
 - ModelViewerApplication.h members and `GenerateIslands` declaration; ModelViewerApplication.cpp constructor,
   `GenerateIslands`, `Render`, `RenderUi` panel rows, `engine::RenderFrameMain`.
-- Both `Pch.h` (one line each); CommandBufferRecordMain.cpp HDR resolve push; HdrResolve.frag branch removal.
+- Both `Game.h` `kVkHdrClearColor` definitions; CommandBufferRecordMain.cpp image-pass clear value and `Game.h`
+  include; SwapchainManager.cpp HDR color and MSAA color load ops.
 - The doc lines in Design item 6.
 
 ## Out of scope
@@ -104,18 +112,17 @@ Facts (commit bae72d574b2f422ad876e9804304065b040627c3; locate by content after 
 - Engine generator, residency, or `Islands` changes; neighbor cells; navigation, elevation grids, or
   `BuildRenderPlacementCache`.
 - Saving the seed; world-camera pan or zoom; changing the model's orbit camera, sun drag, presets, or comparison.
-- Removing coverage alpha or the model push value x; any other shader.
+- Any shader change.
 
 ## Acceptance criteria
 
-- A1 `git grep -n kbHdrResolveGrayBackground -- . ':!Documents/Plans'` prints nothing; `git grep -n -E
-  "f4Pipeline|grayBackground" -- Engine/Data/Shaders/HdrResolve.frag` prints nothing (the push-constant block
-  declaration may stay); ModelViewerApplication.cpp
-  calls `GenerateIslandChain`, `UpdateActiveIslands`, and `RenderWaterMain` once each.
+- A1 `git grep -n kVkHdrClearColor -- . ':!Documents/Plans'` prints nothing; ModelViewerApplication.cpp calls
+  `GenerateIslandChain`, `UpdateActiveIslands`, and `RenderWaterMain` once each.
 - A2 `/compile` ModelViewer Debug|x64 and Release|x64 and BrokenEngineSandbox client and server Debug|x64 succeed
-  with warnings as errors; the game build resolves Local data for the shader change.
-- A3 Code read against the session baseline: the sandbox HDR resolve path equals its baseline push-0 path; the
-  island update runs after the camera update and before `RenderGlobal` and after the deferred-swapchain return.
+  with warnings as errors.
+- A3 Code read against the session baseline: the HDR color and MSAA color load ops equal Design item 5's form and the
+  image-pass clear value is `{}`; the island update runs after the camera update and before `RenderGlobal` and after
+  the deferred-swapchain return.
 - A4 Sandbox Debug client+server per `/agent-harness`, before the first edit and after with the same steps: a
   client `screenshot` of the same camera pose shows the same scene; no `DEBUG_BREAK at` lines in either client log.
 - A5 ModelViewer Debug per `/agent-harness` `references/model-viewer.md` `## Capture` (no `-RequireStable`, since

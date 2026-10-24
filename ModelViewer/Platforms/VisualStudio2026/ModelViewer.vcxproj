@@ -195,7 +195,6 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\Engine\Source\Graphics\OneShotCommandBuffer.cpp" />
     <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\GlobalUniforms.cpp" />
     <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\LightingUniforms.cpp" />
-    <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\MainUniforms.cpp" />
     <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\SmokeUniforms.cpp" />
     <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\WaterUniforms.cpp" />
     <ClCompile Include="..\..\..\Engine\Source\Graphics\Render\WindUniforms.cpp" />

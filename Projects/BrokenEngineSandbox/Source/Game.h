@@ -23,6 +23,8 @@ namespace game
 
 #if defined(BT_CLIENT)
 inline constexpr std::string_view kGameName = "Broken Engine Sandbox";
+inline constexpr VkClearColorValue kVkHdrClearColor {{0.0f, 0.0f, 0.0f, 0.0f}};
+inline constexpr float kfUiReferenceHeight = 2'160.0f;
 #else
 inline constexpr std::string_view kGameName = "Broken Engine Sandbox Server";
 #endif

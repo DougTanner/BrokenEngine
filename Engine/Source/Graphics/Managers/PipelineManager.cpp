@@ -146,7 +146,7 @@ PipelineManager::PipelineManager()
 	mpPipelines[kPipelineHdrResolve].Create(
 	{
 		.name = "HdrResolve",
-		.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kNoWireframe, PipelineFlags::kPushConstants},
+		.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kNoWireframe},
 		.ppShaders = {&mShaders.at(data::kShadersQuadsQuadsFullscreenvertCrc), &mShaders.at(data::kShadersHdrResolvefragCrc)},
 		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
 		.vkTargetRenderPass = gpSwapchainManager->mVkRenderPass,

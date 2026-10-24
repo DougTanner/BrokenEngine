@@ -189,17 +189,17 @@ Integrates Dear ImGui with a dedicated load-preserving overlay pass. It records 
 
 - Gameplay builds own the engine standard menu screens, `ChatScreen` (`mpChatScreen`), and the engine Tweaks screen, plus the game HUD object, the sanctioned engine-to-game dependency exception described by the Engine hub. Engine screens are called as `Render()`; the HUD is called through its own signature. Screen behavior belongs to UI documentation (`../../Ui/Screens/AGENTS.md`).
 - Theme geometry resets to ImGui defaults before scaling so it can be reapplied
-  safely. Font scale composes `UiScale()` and user scaling. Gameplay builds use
-  framebuffer height divided by the 2160-pixel reference height; authored pixel
-  constants multiply `UiScale()` under the engine screens' authoring rules
-  (`../../Ui/Screens/AGENTS.md`). ModelViewer retains `UiScale()` at 1.0 so its
-  controls use native pixel dimensions at every framebuffer size.
+  safely. Font scale composes `UiScale()` and user scaling. `UiScale()` is
+  framebuffer height divided by the program's `game::kfUiReferenceHeight` (2160
+  in the game); authored pixel constants multiply `UiScale()` under the engine
+  screens' authoring rules (`../../Ui/Screens/AGENTS.md`).
 - Opaque-region registration is rectangular, so rounded opaque windows must remain visually compatible with rectangular scene occlusion.
 - The Win32 backend publishes physical cursor state during frame preparation.
-  In gameplay builds, physical-input suppression then always parks the cursor
-  at ImGui's no-mouse position, as the last mouse-position event before
-  `ImGui::NewFrame`. ModelViewer preserves its private queued pointer
-  positions. Suppression always clears backend gamepad navigation state.
+  Physical-input suppression disables backend cursor-shape changes and, when
+  agent input exists, parks the cursor at ImGui's no-mouse position, as the
+  last mouse-position event before `ImGui::NewFrame`; a host without agent
+  input keeps its own queued pointer events. Suppression always clears backend
+  gamepad navigation state.
 - Engine-owned ImGui textures upload changed rectangles outside the UI render
   pass, ordering earlier graphics-queue fragment reads before transfer writes
   and subsequent reads. Staging and detached GPU resources retire only on the

@@ -30,13 +30,11 @@ Vulkan 1.2 GLSL compiled to SPIR-V by DataPacker. The project `ShaderLayouts.h` 
 
 ## Top-Level Shaders
 
-- HDR resolve performs the final scene tone map and color grading for game and
-  ModelViewer; material shaders output linear HDR. After policy gamma, it
-  applies standard piecewise sRGB encoding once to scene RGB, with alpha 1.
-  Viewer rendering reserves HDR alpha for coverage: model draws and blending
-  must preserve it, and resolve grades the unassociated foreground before
-  compositing the background in linear light and applying sRGB encoding.
-  Presentation formats belong to
+- HDR resolve tone maps and color grades the whole frame for every program;
+  material shaders output linear HDR. After policy gamma, it applies standard
+  piecewise sRGB encoding once to scene RGB, with alpha 1. Pixels no draw
+  covers hold the program's HDR clear color (`game::kVkHdrClearColor`), graded
+  with the scene. Presentation formats belong to
   [InstanceManager](../../Source/Graphics/Managers/AGENTS.md#instancemanager).
 - Debug texture display decodes renderer targets, including EWNS views.
 - The UI depth prepass is self-contained and expands opaque ImGui rectangles to populate depth before world rendering.

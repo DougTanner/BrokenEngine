@@ -6,9 +6,9 @@
 The engine must not know that the ModelViewer exists. `BT_CLIENT` and `BT_SERVER` stay, because both executables are
 the engine; `BT_MODEL_VIEWER` names one application and goes. This is phase 3 of 3:
 
-- Phase 1 (Documents/Plans/Engine/RemoveModelViewerDefineFeatureSwitches.md): one image pass serves both programs;
-  purpose-named `kb*` switches, defined in each program's `Pch.h`, and viewer-supplied definitions replace the
-  remaining gates where the viewer renders or behaves differently.
+- Phase 1 (landed): one image pass serves both programs; each program's `Game.h` supplies `game::kVkHdrClearColor`
+  and `game::kfUiReferenceHeight`, and the viewer's `engine::RenderFrameMain` and `game::Camera::SunAngle` replace the
+  gates where the viewer renders or behaves differently.
 - Phase 2 (Documents/Plans/Engine/RemoveModelViewerDefineEngineServices.md, this plan depends on it): the crash upload,
   audio streaming harness rig hooks, profile overlay screens, and engine-collection graphics resources lose their gates.
 - Phase 3 (this plan): removes every remaining gate, each around engine code that names the game, and deletes the
@@ -33,9 +33,10 @@ History: every `BT_MODEL_VIEWER` gate was introduced in 601012a8d and 7d64500ec,
 reason).
 
 Line numbers cite commit 7d64500ecb21b6d05acc859ab5f417067a8f0796. Phase 1 edits ImGuiManager.cpp:106-111, 152-159,
-438-451, 473-480, Islands.h:50/52 (gate lines only), ModelViewerApplication.cpp:257 and 521-537, ModelViewer/Source/Game.h:10-11,
-and ModelViewer/AGENTS.md; Phase 2 edits ModelViewer/AGENTS.md. No other region named here is edited by an earlier
-phase. Locate regions by content when lines have shifted.
+438-451, 473-480, ImGuiManager.h:139 (deleted), Islands.h:50/52 (gate lines only), ModelViewerApplication.cpp:521-537,
+ModelViewer/Source/Game.h (two constants added after :7; :10-11 deleted), Engine/Source/Graphics/AGENTS.md:57-64, and
+ModelViewer/AGENTS.md; Phase 2 edits ModelViewer/AGENTS.md and the Engine/Source/AGENTS.md Switches bullet (:33). No
+other region named here is edited by an earlier phase. Locate regions by content when lines have shifted.
 
 ## Design
 
@@ -150,8 +151,9 @@ camera, or UI code outside PostRender and the CRC, or include placement.
      construction, between `ImGui::NewFrame` and `ImGui::Render`, and at destruction. Delete the screen members
      (:64-66, :104-113 with their gate lines) and the now-unused forward declarations (:5-8, :13-20); move
      `RenderTextAreas` (:92) to the public section.
-   - ImGuiManager.cpp: delete :7-16 and :20-22 and the `Profile/ProfileRows.h` and `Game.h` includes (:19, :23), whose
-     only users are removed; :171-181 becomes `CreateUiScreens();`; :491-518 becomes `RenderUiScreens();`;
+   - ImGuiManager.cpp: delete :7-16 and :20-22 and the `Profile/ProfileRows.h` include (:19), whose only users are
+     removed; the `Game.h` include (:23) stays for the Phase 1 `game::kfUiReferenceHeight` reads; :171-181 becomes
+     `CreateUiScreens();`; :491-518 becomes `RenderUiScreens();`;
      `DestroyUiScreens();` becomes the first statement of `~ImGuiManager` (:286-287).
    - New file Engine/Source/Ui/Screens/UiScreens.cpp, client-only, sandbox client project only: file-static
      `std::unique_ptr`s for the nine screens; `CreateUiScreens` constructs them in ImGuiManager.cpp:172-180 order, then
@@ -195,8 +197,9 @@ camera, or UI code outside PostRender and the CRC, or include placement.
      33: `UiScreens.cpp` owns construction and invocation; ImGuiManager owns submission.
    - ModelViewer/AGENTS.md: the `## Application contracts` prohibition on instantiating the sandbox Game (:5-8) and the
      placeholder-dependency prohibition (:70-71), plus `## Engine integration`, rewritten to the result: no define; the
-     viewer compiles only engine files whose game names it supplies (game name and version, flight-plane table,
-     profile rows, frame interpolate, camera `SunAngle`), defines `engine::RenderFrameMain` and the three UI functions
+     viewer compiles only engine files whose game names it supplies (game name and version, HDR clear color, UI
+     reference height, flight-plane table, profile rows, frame interpolate, camera `SunAngle`), defines
+     `engine::RenderFrameMain` and the three UI functions
      by project membership (empty where it has nothing to do), sets feature switches in its `Pch.h`, and constructs no
      `GameBase` or network session.
    - Unchanged and still true: Projects/BrokenEngineSandbox/Source/Graphics/AGENTS.md:7-8, Engine/Source/Ui/AGENTS.md:44,
@@ -286,7 +289,7 @@ itself. The flag is then deleted from the viewer project.
 The user does not want the engine to know the viewer exists; after this no engine file mentions it, and every engine
 file the viewer compiles names no gameplay symbol beyond what the viewer supplies. The engine's aggregation header stops
 pulling game types into every program, and the dead `GlobalNormal` goes.
-- Goal: `BT_MODEL_VIEWER` absent from every file outside Documents/Plans; viewer-compiled engine files changed here name no `game::` symbol; sandbox and viewer behavior unchanged except the documented verbose-log throttle shift; all six builds pass.
+- Goal: `BT_MODEL_VIEWER` absent from every file outside Documents/Plans; viewer-compiled engine files changed here name no `game::` symbol other than the `Game.h` constants each program supplies (`game::kfUiReferenceHeight` in ImGuiManager.cpp); sandbox and viewer behavior unchanged except the documented verbose-log throttle shift; all six builds pass.
 - Out of scope: earlier-phase sites, adding gameplay pieces or files to the viewer, behavior changes, other review findings, new harness commands (see `## Out of scope`).
 - Tier trigger: Tier 3 — public engine signatures, the aggregation header, and independently owned subsystems (Graphics, Frame, UI, File, sandbox, ModelViewer).
 - Interfaces and invariants: `CameraBase::Update(rFrameInterpolate, fDeltaTime, bMainMenuFrame, rPulledTarget)` with
@@ -302,8 +305,9 @@ pulling game types into every program, and the dead `GlobalNormal` goes.
     "modelviewer|model viewer" -- Engine Common Projects` prints nothing; `git grep -n -E "game::|namespace game" --
     Engine/Source/Engine.h Engine/Source/Graphics/CameraBase.cpp Engine/Source/Frame/IslandTerrain.cpp
     Engine/Source/Graphics/Islands.cpp Engine/Source/Graphics/GraphicsUtils.cpp
-    Engine/Source/Graphics/Managers/ImGuiManager.h Engine/Source/Graphics/Managers/ImGuiManager.cpp` prints nothing; a
-    read at the session baseline commit shows each of these present.
+    Engine/Source/Graphics/Managers/ImGuiManager.h Engine/Source/Graphics/Managers/ImGuiManager.cpp` prints only the
+    two ImGuiManager.cpp `game::kfUiReferenceHeight` reads; a read at the session baseline commit shows each of these
+    present.
   - A2 `/compile` ModelViewer Debug|x64 and Release|x64 and BrokenEngineSandbox client and server Debug|x64 and Release|x64 all succeed with warnings as errors (Release includes PREfast).
   - A3 Code read of the diff against the session baseline commit, per Design item: moved bodies equal their baseline
     text apart from the stated substitutions; `GameBase::UpdateCamera` passes the same flag and target and computes

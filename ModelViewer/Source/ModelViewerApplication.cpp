@@ -657,7 +657,12 @@ void RenderViewerUi()
 	gpModelViewerApplication->RenderUi();
 }
 
-void RenderViewerFrame(int64_t iCommandBuffer, const FrameInterpolate& rFrame)
+} // namespace game
+
+namespace engine
+{
+
+void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, [[maybe_unused]] const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, [[maybe_unused]] std::chrono::duration<float> currentTime)
 {
 	engine::gpBufferManager->ResetSkinningAllocations(iCommandBuffer);
 	engine::RenderLightingMain(iCommandBuffer);
@@ -666,13 +671,13 @@ void RenderViewerFrame(int64_t iCommandBuffer, const FrameInterpolate& rFrame)
 	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ViewProjection[0]), XMMatrixTranspose(engine::gpCamera->mMatView * engine::gpCamera->mMatPerspective));
 	XMStoreFloat4(&rMainLayout.f4EyePosition, engine::gpCamera->mVecEyePosition);
 	XMStoreFloat4(&rMainLayout.f4ToEyeNormal, engine::gpCamera->mVecToEyeNormal);
-	rMainLayout.iFrameNumber = static_cast<int32_t>(rFrame.iFrame);
+	rMainLayout.iFrameNumber = static_cast<int32_t>(rRenderInterpolates.at(cameraCoordinate).iFrame);
 	rMainLayout.iRenderNumber = static_cast<int32_t>(engine::gpGraphics->miFrameCounter);
 	rMainLayout.fPhysicallyBasedRenderingLighting = 0.0f;
 	rMainLayout.fPhysicallyBasedRenderingLightingSpecular = 0.0f;
 	rMainLayout.fPhysicallyBasedRenderingSmoke = 0.0f;
 	rMainLayout.fPhysicallyBasedRenderingShadowFloor = 1.0f;
-	gpModelViewerApplication->RenderModel(iCommandBuffer);
+	game::gpModelViewerApplication->RenderModel(iCommandBuffer);
 }
 
-} // namespace game
+} // namespace engine

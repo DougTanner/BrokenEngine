@@ -94,7 +94,6 @@ enum class PipelineFlags : uint64_t
 	// Forces one Set 1 per framebuffer for a pipeline whose descriptor inputs do not imply it but whose sets are rewritten
 	// one framebuffer at a time (the lighting blur).
 	kPerCommandBuffer          = 0x100000,
-	kCoverageAlpha             = 0x200000,
 };
 using PipelineFlags_t = common::Flags<PipelineFlags>;
 

@@ -34,9 +34,10 @@ Files:
 2. One Scale System
 --------------------
 There is exactly one resolution scale factor: engine::UiScale(). It is the
-framebuffer height divided by a fixed 2160-high reference monitor, so a screen
-authored against 4K renders proportionally at any resolution. No screen may
-invent a second scale factor.
+framebuffer height divided by the program's reference height
+(game::kfUiReferenceHeight, 2160 in the game), so a screen authored against 4K
+renders proportionally at any resolution. No screen may invent a second scale
+factor.
 
 Scale is applied in three stacked, non-overlapping layers:
   - Style geometry (padding, spacing, rounding, ~35 fields) is pre-scaled once
@@ -73,7 +74,7 @@ player-menu scale exceptions.
 
 Files:
   Engine/Source/Graphics/Managers/ImGuiManager.cpp         Noto Sans SC Light default font load
-  Engine/Source/Graphics/Managers/ImGuiManager.h:112    inline constexpr float kfUiReferenceHeight = 2160.0f;
+  Projects/BrokenEngineSandbox/Source/Game.h:27         inline constexpr float kfUiReferenceHeight = 2'160.0f;
   Engine/Source/Graphics/Managers/ImGuiManager.h:115    inline float UiScale()
   Engine/Source/Graphics/Managers/ImGuiManager.cpp:29   kfMinimumStyleGeometryFactor = 0.25f;
   Engine/Source/Graphics/Managers/ImGuiManager.cpp:194  ImGuiManager::SetupThemeGeometry (style geometry and scale floor)

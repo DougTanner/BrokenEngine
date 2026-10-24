@@ -48,8 +48,8 @@ Current state after Phase 3 (line numbers cite commit bae72d574b2f422ad876e98043
 3. Sandbox: the game `RenderFrameMain` (MainUniforms.cpp:608-610) computes the transposed view-projection once
    into a local and stores it to both `f4x4ViewProjection` and `f4x4ModelViewProjection`, and stores
    `mVecEyePosition` to both `f4EyePosition` and `f4ModelEyePosition`. Every sandbox shader input is bit-identical.
-4. Program switch `kbDrawModelsOverWorld`, in the program-switch block Phase 1 created in each `Pch.h`, beside
-   `kbScaleUiToFramebufferHeight`: sandbox `false`, viewer `true`. It names the feature, not the application.
+4. Program switch `kbDrawModelsOverWorld`, in the program-switch block Phase 2 created in each `Pch.h`, after
+   `kbProfileScreens`: sandbox `false`, viewer `true`. It names the feature, not the application.
 5. `CommandBufferRecordMain::RecordImageRenderPass`: the UI depth pre-pass block (:342-351) and the opaque model
    loop (:365-370, timer included) become two local lambdas. The opaque-model lambda body is unchanged; the
    pre-pass lambda body is :345-349, and its `kGpuTimerUiDepth` `GpuStart`/`GpuStop` (:344, :350) bracket only its
@@ -112,10 +112,10 @@ Current state after Phase 3 (line numbers cite commit bae72d574b2f422ad876e98043
 
 ## Out of scope
 
-- Island generation, `UpdateActiveIslands`, `RenderWaterMain` in the viewer, the seed UI, the gray background and
-  `kbHdrResolveGrayBackground` (stage 3).
+- Island generation, `UpdateActiveIslands`, `RenderWaterMain` in the viewer, the seed UI, and the gray background
+  (stage 3).
 - Model.frag:306 and every other shader line; transparent, particle, light, billboard, or debug draw order.
-- Removing coverage alpha or the PBR isolation writes; camera shake for the model; sandbox camera behavior.
+- Removing the PBR isolation writes; camera shake for the model; sandbox camera behavior.
 
 ## Acceptance criteria
 
