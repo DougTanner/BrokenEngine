@@ -306,18 +306,19 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
   `git diff`/`git ls-files` commands, no hand-resolved repository root, primary
   checkout, or baseline, and no inline `vswhere`/`DevEnvDir` discovery. A
   blocked result is a stop, not a cue to redo its work by hand.
-- Worktree session start seeds the worktree's DataPacker Release Output by
-  verified copy from the primary bootstrap prebuild when the worktree's clean
-  `DataPacker/`/`Common/`/`ThirdParty/` trees match the stamp, and otherwise
-  builds it locally (`.agents/scripts/Build-WorktreeDataPacker.ps1`), so
-  `DataPacker.exe` is already present at session start; a session that changes
-  DataPacker-relevant sources performs a full local rebuild on its first
-  DataPacker build. Bootstrap also refreshes primary Shared data per game
+- Worktree session start seeds the worktree's DataPacker and ModelViewer
+  Release Output by verified copy from the primary bootstrap prebuilds, and
+  otherwise builds each locally, so `DataPacker.exe` and `ModelViewer.exe` are
+  already present at session start. The seed conditions and local-build
+  fallbacks are in `.agents/scripts/Build-WorktreeTarget.ps1`. A session that
+  changes either target's sources performs a full local rebuild on its first
+  build of that target.
+  Bootstrap also refreshes primary Shared data per game
   ([Wrapper bootstrap Shared-data refresh](runtime-data-mode.md#wrapper-bootstrap-shared-data-refresh)),
   and a nonzero DataPacker exit fails session start. DataPacker's
   `"BrokenEngineDataPacker"` mutex and the AgentTools bootstrap mutex are the
-  two PC-global build coordination points; add no others (the seed copy reuses
-  the bootstrap mutex for its prebuild). They now nest: bootstrap holds its own
+  two PC-global build coordination points; add no others (the seed copies reuse
+  the bootstrap mutex for their prebuilds). They now nest: bootstrap holds its own
   mutex while that refresh waits for `"BrokenEngineDataPacker"`, and that wait
   is deliberately unbounded, so a peer DataPacker run or a rare island bake can
   block session start long enough to time other session starts out.
@@ -335,8 +336,8 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
   only exceptions to worktree-local build artifacts.
 - Keep existing build serialization and the gated AgentTools promotion path; do
   not share mutable build output between checkouts (the session-start DataPacker
-  seed is a one-time verified copy the worktree then owns and may rebuild over,
-  not shared output).
+  and ModelViewer seeds are one-time verified copies the worktree then owns and
+  may rebuild over, not shared output).
 - The AgentTools targets build into a session-local `OutDir` because the default
   Output is the shared immutable primary Output held by the running WorktreeCli
   driver; a default-output WorktreeCli build therefore fails with a structural

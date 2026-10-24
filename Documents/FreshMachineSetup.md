@@ -80,10 +80,11 @@ existing one when reattaching), writes the session's private-Git receipt into
 it, rebuilds the shared primary binaries incrementally — the AgentTools
 executables (WorktreeCli, AgentHarness) and ThirdParty in Debug/Profile/Release
 — so they always match primary HEAD, re-exports the primary game data with the
-rebuilt DataPacker, provisions links to the primary ThirdParty/tool outputs,
-verifies the worktree's skills are available (the `.claude/skills` link for
-Claude Code and Codex, `.agents/skills` for OpenCode), pre-builds the worktree's
-DataPacker, and launches the agent CLI inside the worktree. Do not bypass the
+rebuilt DataPacker, prebuilds ModelViewer Release in the primary against that
+data, provisions links to the primary ThirdParty/tool outputs, verifies the
+worktree's skills are available (the `.claude/skills` link for Claude Code and
+Codex, `.agents/skills` for OpenCode), seeds or builds the worktree's DataPacker
+and ModelViewer, and launches the agent CLI inside the worktree. Do not bypass the
 wrapper.
 
 A newly created worktree skips the `Engine/Data/Islands` and

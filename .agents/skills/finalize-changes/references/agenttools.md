@@ -31,7 +31,8 @@ a retryable idle wait applies, or rollback failed with its named backup.
 
 Wrapper bootstrap is the only in-place shared-Output build path. It runs at
 wrapper start under its global mutex, incrementally rebuilds WorktreeCli,
-AgentHarness, and ThirdParty, and best-effort seeds DataPacker; it also runs on
-demand with `-SharedDataOnly`, which builds only the DataPacker prebuild and
-refreshes Shared data. Routine builds
+AgentHarness, and ThirdParty, and best-effort prebuilds DataPacker and
+ModelViewer Release for worktree seeds; it also runs on demand with
+`-SharedDataOnly`, which builds only the DataPacker prebuild and refreshes
+Shared data. Routine builds
 consume immutable primary outputs and never promote or copy tools.

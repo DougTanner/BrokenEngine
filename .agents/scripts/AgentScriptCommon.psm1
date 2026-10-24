@@ -284,6 +284,26 @@ function Compare-AgentSharedDataRecord([string] $Root, [string] $DataDirectory, 
 	}
 }
 
+# The ModelViewer Build\ResolvedData.props under Root, which Visual Studio imports so it builds with the same resolved data
+# properties as the last /compile or session-start seed of ModelViewer.
+function Write-AgentModelViewerResolvedData([string] $Root, [string] $DataBuildMode, [string] $RunDataPacker, [string] $GameDataDirectory, [string] $GeneratedDataIncludeRoot) {
+	$viewerBuildDirectory = Join-Path $Root 'ModelViewer\Platforms\VisualStudio2026\Build'
+	[void] [IO.Directory]::CreateDirectory($viewerBuildDirectory)
+	$escapedDataDirectory = [Security.SecurityElement]::Escape($GameDataDirectory)
+	$escapedIncludeRoot = [Security.SecurityElement]::Escape($GeneratedDataIncludeRoot)
+	$resolvedProperties = @"
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <DataBuildMode>$DataBuildMode</DataBuildMode>
+    <RunDataPacker>$RunDataPacker</RunDataPacker>
+    <GameDataDirectory>$escapedDataDirectory</GameDataDirectory>
+    <GeneratedDataIncludeRoot>$escapedIncludeRoot</GeneratedDataIncludeRoot>
+  </PropertyGroup>
+</Project>
+"@
+	[IO.File]::WriteAllText((Join-Path $viewerBuildDirectory 'ResolvedData.props'), $resolvedProperties)
+}
+
 # The harness launch configuration for a game data directory: the project its
 # Projects\<Name>\Platforms\VisualStudio2026\Output\Data suffix names, and the Output directory and executables the
 # project hub's machine-readable launch configuration assigns, so the executables can never belong to a different game
@@ -378,4 +398,4 @@ function Get-AgentPlansLayoutViolation([string] $RepositoryRoot, [string] $Folde
 	return @($sorted | ForEach-Object { $parts = $_.Split("`0"); [pscustomobject] @{ rule = $parts[1]; path = $parts[0] } })
 }
 
-Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation
+Export-ModuleMember -Function Get-AgentCanonicalPath, Invoke-AgentGit, Invoke-AgentProcess, Get-AgentNormalizedText, Measure-AgentTokenCount, Get-AgentMarkdownSearchText, Get-AgentModelFamily, Compare-AgentModelVersion, Get-AgentGameProjects, Get-AgentDataInputChanges, Get-AgentSharedDataStampPath, Get-AgentSharedDataRecordPath, Write-AgentSharedDataRecord, Get-AgentSharedDataRecord, Get-AgentDataListing, Compare-AgentSharedDataRecord, Write-AgentModelViewerResolvedData, Get-AgentHarnessLaunchConfiguration, Get-AgentPlansLayoutViolation

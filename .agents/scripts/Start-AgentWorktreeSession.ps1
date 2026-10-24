@@ -233,16 +233,15 @@ try {
 	# Provisioning above is conflict-insensitive.
 	if ($null -eq $firstTask) {
 		Write-Host ''
-		& (Join-Path $root '.agents\scripts\Build-WorktreeDataPacker.ps1') -Worktree $identity.Worktree -WorktreeCliExecutable $worktreeCli -PrimaryCheckout $root
+		& (Join-Path $root '.agents\scripts\Build-WorktreeTarget.ps1') -Target DataPacker -Worktree $identity.Worktree -WorktreeCliExecutable $worktreeCli -PrimaryCheckout $root -Baseline $identity.Baseline
 		Write-Host ''
-		& pwsh -NoProfile -File (Join-Path $root '.agents\skills\compile\scripts\Invoke-CompileBuild.ps1') -Target ModelViewer -Configuration Release -RepositoryRoot $identity.Worktree -PrimaryCheckout $root -Baseline $identity.Baseline
-		if ($LASTEXITCODE -ne 0) { throw "ModelViewer build failed in worktree '$($identity.Worktree)' (exit $LASTEXITCODE)." }
+		& (Join-Path $root '.agents\scripts\Build-WorktreeTarget.ps1') -Target ModelViewer -Worktree $identity.Worktree -WorktreeCliExecutable $worktreeCli -PrimaryCheckout $root -Baseline $identity.Baseline
 	}
 	Write-Host ''
 	$banner = "$(if ($worktreeCreated) { 'Created' } else { 'Reattached' }) worktree $($identity.Worktree) on branch $($identity.Branch) at baseline $($identity.Baseline)."
 	if ($null -ne $firstTask) {
-		$buildCommand = "'.agents\scripts\Build-WorktreeDataPacker.ps1' -Worktree '$($identity.Worktree)' -WorktreeCliExecutable '$worktreeCli' -PrimaryCheckout '$root'"
-		$viewerBuildCommand = "pwsh -NoProfile -File '.agents\skills\compile\scripts\Invoke-CompileBuild.ps1' -Target ModelViewer -Configuration Release -RepositoryRoot '$($identity.Worktree)' -PrimaryCheckout '$root' -Baseline '$($identity.Baseline)'"
+		$buildCommand = "pwsh -NoProfile -File '.agents\scripts\Build-WorktreeTarget.ps1' -Target DataPacker -Worktree '$($identity.Worktree)' -WorktreeCliExecutable '$worktreeCli' -PrimaryCheckout '$root' -Baseline '$($identity.Baseline)'"
+		$viewerBuildCommand = "pwsh -NoProfile -File '.agents\scripts\Build-WorktreeTarget.ps1' -Target ModelViewer -Worktree '$($identity.Worktree)' -WorktreeCliExecutable '$worktreeCli' -PrimaryCheckout '$root' -Baseline '$($identity.Baseline)'"
 		$banner = "FIRST TASK: $firstTask Then run $buildCommand to build the deferred DataPacker, followed by $viewerBuildCommand to build the deferred ModelViewer.`n" + $banner
 	}
 	Write-Host $banner

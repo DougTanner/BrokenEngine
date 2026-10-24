@@ -75,15 +75,23 @@ try {
 	foreach ($solution in @($worktreeCliSolution, $agentHarnessSolution, $thirdPartySolution)) {
 		if (-not (Test-Path -LiteralPath $solution -PathType Leaf)) { throw "Bootstrap solution is missing: '$solution'." }
 	}
-	# DataPacker is intentionally kept out of the hard-fail existence check above: its prebuild is
-	# best-effort, so a missing solution warns and skips rather than failing session start.
+	# DataPacker and ModelViewer are intentionally kept out of the hard-fail existence check above: their
+	# prebuilds are best-effort, so a missing solution warns and skips rather than failing session start.
+	# Each tree list holds every tracked tree its target's build reads, in stamp order; Build-WorktreeTarget.ps1 keeps
+	# the same lists.
 	$dataPackerSolution = Join-Path $root 'DataPacker\Platforms\VisualStudio2026\DataPacker.sln'
 	$dataPackerOutput = Join-Path $root 'DataPacker\Platforms\VisualStudio2026\Output'
 	$dataPackerExe = Join-Path $dataPackerOutput 'DataPacker.exe'
 	$dataPackerStampPath = Join-Path $dataPackerOutput 'DataPackerPrebuildStamp.txt'
+	$dataPackerTrees = @('DataPacker', 'Common', 'ThirdParty')
+	$modelViewerSolution = Join-Path $root 'ModelViewer\Platforms\VisualStudio2026\ModelViewer.sln'
+	$modelViewerOutput = Join-Path $root 'ModelViewer\Platforms\VisualStudio2026\Output'
+	$modelViewerExe = Join-Path $modelViewerOutput 'ModelViewer.exe'
+	$modelViewerStampPath = Join-Path $modelViewerOutput 'ModelViewerPrebuildStamp.txt'
+	$modelViewerTrees = @('ModelViewer', 'Common', 'Engine', 'ThirdParty', 'DataPacker', 'Projects/BrokenEngineSandbox/Data')
 
 	$commonBuildArguments = @('/p:Platform=x64', '/p:EnableClangTidyCodeAnalysis=false', '/p:RunCodeAnalysis=false', '/verbosity:minimal')
-	function Invoke-BootstrapBuild([string] $Solution, [string] $Configuration, [string] $Executable) {
+	function Invoke-BootstrapBuild([string] $Solution, [string] $Configuration, [string] $Executable, [string[]] $ExtraArguments = @()) {
 		# Blank line so each build's MSBuild output reads as its own block in the session start transcript.
 		Write-Host ''
 		# A link in place fails while another session runs $Executable, so the original is renamed aside
@@ -102,12 +110,54 @@ try {
 		}
 		try {
 			if ($null -ne $aside) { [IO.File]::Move("$aside.staging", $Executable) }
-			$exitCode = Invoke-WorktreeCliTrackedProcess -Executable $msBuild -ArgumentList (@($Solution, "/p:Configuration=$Configuration") + $commonBuildArguments) -WorkingDirectory $root
+			$exitCode = Invoke-WorktreeCliTrackedProcess -Executable $msBuild -ArgumentList (@($Solution, "/p:Configuration=$Configuration") + $commonBuildArguments + $ExtraArguments) -WorkingDirectory $root
 		}
 		finally {
 			if ($null -ne $aside -and -not (Test-Path -LiteralPath $Executable)) { [IO.File]::Move($aside, $Executable) }
 		}
 		if ($exitCode -ne 0) { throw "AgentTools bootstrap build failed for '$Solution' with exit code $exitCode. If another live worktree session is holding these executables, wrap up active worktree sessions and retry." }
+	}
+
+	function Get-PrebuildSnapshot([string[]] $Trees) {
+		return [pscustomobject] @{
+			Trees = @(Invoke-AgentGit (@('-C', $root, 'rev-parse') + @($Trees | ForEach-Object { "HEAD:$_" })))
+			Dirty = @(Invoke-AgentGit (@('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--') + $Trees))
+		}
+	}
+
+	# Best-effort Release prebuild so a new session worktree seeds its Output\<Name>.exe by verified copy
+	# (Build-WorktreeTarget.ps1) instead of compiling from scratch. It runs inside the bootstrap mutex so
+	# the exe and its stamp stay atomic against peer bootstraps. Unlike the hard-fail AgentTools builds it
+	# only warns on failure: the worktree-local fallback reproduces any real failure. The mutex excludes
+	# peer bootstraps but not a landing or user VS build, so the stamp (the tree hashes, then the exe
+	# SHA-256 and length) is written only when the pre-snapshot, taken before the ThirdParty lib build so
+	# it covers every input the target consumes, and the post-build snapshot hold identical tree hashes
+	# and a clean state. Returns $true only when it wrote the stamp; a null pre-snapshot was already
+	# warned about and skips silently.
+	function Invoke-StampedPrebuild([string] $Name, [object] $PreSnapshot, [string] $Solution, [string] $Executable, [string] $StampPath, [string[]] $Trees, [string[]] $ExtraArguments = @()) {
+		if ($null -eq $PreSnapshot) { return $false }
+		$treeNames = ($Trees | ForEach-Object { "$_/" }) -join ', '
+		try {
+			if ($PreSnapshot.Dirty.Count -ne 0) {
+				Write-Warning "Primary has uncommitted changes under $($treeNames), so the $Name Release prebuild was skipped: $($PreSnapshot.Dirty -join '; ')."
+				return $false
+			}
+			Invoke-BootstrapBuild $Solution 'Release' $Executable $ExtraArguments
+			if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) { throw "$Name executable is missing after the prebuild: '$Executable'." }
+			$bytes = [IO.File]::ReadAllBytes($Executable)
+			$hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+			$postSnapshot = Get-PrebuildSnapshot $Trees
+			if (($PreSnapshot.Trees -join "`n") -cne ($postSnapshot.Trees -join "`n") -or $postSnapshot.Dirty.Count -ne 0) {
+				Write-Warning "Primary $treeNames changed during the $Name prebuild, so the stamp was not written; new worktrees will build $Name locally."
+				return $false
+			}
+			[IO.File]::WriteAllText($StampPath, (($PreSnapshot.Trees + $hash + $bytes.Length) -join "`n") + "`n")
+			return $true
+		}
+		catch {
+			Write-Warning "$Name Release prebuild failed, so new worktrees will build $Name locally: $($_.Exception.Message)"
+			return $false
+		}
 	}
 
 	# PC-global mutex scoped like the session ledger mutex (Global\ + SID + repo hash) so concurrent
@@ -131,25 +181,28 @@ try {
 			$builtStamp = Get-AgentToolsSourceStamp
 			if ($null -ne $builtStamp) { [IO.File]::WriteAllText($stampPath, $builtStamp + "`n") }
 		}
-		# Snapshot DataPacker's build inputs before the ThirdParty Release lib it links is (re)built just
-		# below (skipped under -SharedDataOnly, where the stamp's ThirdParty tree must match instead), so the
-		# post-build re-check covers a landing or user VS build that advances any consumed input during the
-		# prebuild. Best-effort like the prebuild: a snapshot failure disables it.
-		$dataPackerPreTrees = $null
-		$dataPackerPrebuiltClean = $false
-		try {
-			$dataPackerPreTrees = @(Invoke-AgentGit @('-C', $root, 'rev-parse', 'HEAD:DataPacker', 'HEAD:Common', 'HEAD:ThirdParty'))
-			$dataPackerPreDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'DataPacker', 'Common', 'ThirdParty'))
+		# Snapshot each prebuild's inputs before the ThirdParty Release lib it links is (re)built just below
+		# (skipped under -SharedDataOnly, where the DataPacker stamp's ThirdParty tree must match instead), so
+		# the post-build re-check in Invoke-StampedPrebuild covers a landing or user VS build that advances
+		# any consumed input in between, including one landing between the lib build and the later
+		# ModelViewer prebuild. -SharedDataOnly runs no ModelViewer prebuild. Best-effort like the prebuilds:
+		# a snapshot failure disables that prebuild.
+		$dataPackerPreSnapshot = $null
+		try { $dataPackerPreSnapshot = Get-PrebuildSnapshot $dataPackerTrees }
+		catch { Write-Warning "Could not snapshot DataPacker prebuild inputs, so the prebuild was skipped: $($_.Exception.Message)" }
+		$modelViewerPreSnapshot = $null
+		if (-not $SharedDataOnly) {
+			try { $modelViewerPreSnapshot = Get-PrebuildSnapshot $modelViewerTrees }
+			catch { Write-Warning "Could not snapshot ModelViewer prebuild inputs, so the prebuild was skipped: $($_.Exception.Message)" }
 		}
-		catch { Write-Warning "Could not snapshot DataPacker prebuild inputs, so the prebuild was skipped: $($_.Exception.Message)"; $dataPackerPreTrees = $null }
-		if ($SharedDataOnly -and $null -ne $dataPackerPreTrees) {
+		if ($SharedDataOnly -and $null -ne $dataPackerPreSnapshot) {
 			# The prebuild links the existing ThirdParty Release lib, built from the ThirdParty tree on the
 			# existing stamp's third line, so a new stamp must not record a different tree.
 			$stampThirdPartyTree = $null
 			try { $stampThirdPartyTree = @([IO.File]::ReadAllLines($dataPackerStampPath))[2] } catch { }
-			if ($stampThirdPartyTree -cne $dataPackerPreTrees[2]) {
+			if ($stampThirdPartyTree -cne $dataPackerPreSnapshot.Trees[2]) {
 				Write-Warning "Primary ThirdParty changed since the last DataPacker prebuild, or its stamp '$dataPackerStampPath' is missing or unreadable, so the DataPacker prebuild and the primary data refresh were skipped. A wrapper session start is needed to rebuild ThirdParty and refresh the data."
-				$dataPackerPreTrees = $null
+				$dataPackerPreSnapshot = $null
 			}
 		}
 		if (-not $SharedDataOnly) { foreach ($configuration in @('Debug', 'Profile', 'Release')) { Invoke-BootstrapBuild $thirdPartySolution $configuration } }
@@ -157,49 +210,22 @@ try {
 			$library = Join-Path $thirdPartyOutput "ThirdParty.$configuration.lib"
 			if (-not (Test-Path -LiteralPath $library -PathType Leaf) -or (Get-Item -LiteralPath $library).Length -eq 0) { throw "Required primary ThirdParty library is missing or empty after bootstrap: '$library'." }
 		}
-		# Best-effort DataPacker Release prebuild so a new session worktree seeds its Output\DataPacker.exe
-		# by verified copy (Build-WorktreeDataPacker.ps1) instead of compiling from scratch. It links the
-		# primary ThirdParty Release lib, built just above, or under -SharedDataOnly matched to the existing
-		# stamp's ThirdParty tree, and runs inside this mutex so the exe and its stamp stay
-		# atomic against peer bootstraps. Unlike the hard-fail AgentTools builds it only warns on failure:
-		# the worktree-local fallback reproduces any real failure. The mutex excludes peer bootstraps but
-		# not a landing or user VS build, so the stamp is written only when the before and after snapshots
-		# (the three DataPacker/Common/ThirdParty tree hashes plus a clean DataPacker/Common/ThirdParty
-		# state) are identical. The pre-snapshot is captured above, before the ThirdParty lib build, so it
-		# covers every input DataPacker consumes; the pre-mutex Tools/, ThirdParty/, and Common/Sha256Hasher.h
-		# dirty early-return (lines 50-59) plus this scoped gate keep the normal path clean.
-		try {
-			if ($null -ne $dataPackerPreTrees -and $dataPackerPreDirty.Count -eq 0) {
-				Invoke-BootstrapBuild $dataPackerSolution 'Release' $dataPackerExe
-				if (-not (Test-Path -LiteralPath $dataPackerExe -PathType Leaf)) { throw "DataPacker executable is missing after the prebuild: '$dataPackerExe'." }
-				$dataPackerBytes = [IO.File]::ReadAllBytes($dataPackerExe)
-				$dataPackerHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($dataPackerBytes)).ToLowerInvariant()
-				$dataPackerPostTrees = @(Invoke-AgentGit @('-C', $root, 'rev-parse', 'HEAD:DataPacker', 'HEAD:Common', 'HEAD:ThirdParty'))
-				$dataPackerPostDirty = @(Invoke-AgentGit @('-C', $root, 'status', '--porcelain', '--untracked-files=all', '--', 'DataPacker', 'Common', 'ThirdParty'))
-				if (($dataPackerPreTrees -join "`n") -cne ($dataPackerPostTrees -join "`n") -or $dataPackerPostDirty.Count -ne 0) {
-					Write-Warning "Primary DataPacker/Common/ThirdParty changed during the DataPacker prebuild, so the stamp was not written; new worktrees will build DataPacker locally."
-				}
-				else {
-					$dataPackerStamp = ($dataPackerPreTrees + $dataPackerHash + $dataPackerBytes.Length) -join "`n"
-					[IO.File]::WriteAllText($dataPackerStampPath, $dataPackerStamp + "`n")
-					$dataPackerPrebuiltClean = $true
-				}
-			}
-			elseif ($null -ne $dataPackerPreTrees) {
-				Write-Warning "Primary has uncommitted changes under DataPacker/, Common/, or ThirdParty/, so the DataPacker Release prebuild was skipped: $($dataPackerPreDirty -join '; ')."
-			}
-		}
-		catch { Write-Warning "DataPacker Release prebuild failed, so new worktrees will build DataPacker locally: $($_.Exception.Message)" }
+		# The DataPacker prebuild links the primary ThirdParty Release lib, built just above, or under
+		# -SharedDataOnly matched to the existing stamp's ThirdParty tree. The pre-mutex Tools/, ThirdParty/,
+		# and Common/Sha256Hasher.h dirty early-return (lines 50-59) plus the routine's scoped gate keep the
+		# normal path clean.
+		$dataPackerPrebuiltClean = Invoke-StampedPrebuild 'DataPacker' $dataPackerPreSnapshot $dataPackerSolution $dataPackerExe $dataPackerStampPath $dataPackerTrees
 		# Refresh the primary's generated data that Shared-mode worktrees consume. Gated on the prebuild's
 		# clean-snapshot stamp so the data is only ever produced by an exe just built and hash-verified from
-		# committed sources. Deliberately outside the best-effort prebuild try above: a run failure must
-		# abort session start rather than be swallowed by that warn-only catch. This can block for a long
+		# committed sources. Deliberately outside the best-effort prebuild routine: a run failure must
+		# abort session start rather than be swallowed by its warn-only catch. This can block for a long
 		# time - on DataPacker's own PC-global "BrokenEngineDataPacker" mutex, on a rare full island bake, or
 		# on the bounded wait below for an open client or server - while this bootstrap mutex is held, timing
 		# out peer session starts; that cost is accepted. A peer whose own $WaitSeconds bootstrap-mutex
 		# deadline expires during that wait fails with the existing mutex-timeout error, which is the
 		# expected outcome there rather than a defect.
 		$refreshedDataDirectories = [Collections.Generic.List[string]]::new()
+		$stampedDataProjects = [Collections.Generic.List[string]]::new()
 		$gameProjects = @()
 		if ($dataPackerPrebuiltClean) {
 			# Only game projects whose client project is committed at HEAD are refreshed, so a project still
@@ -262,7 +288,10 @@ try {
 					if ($null -ne $stampCommit) {
 						try {
 							[string[]] $dataInputChanges = @(Get-AgentDataInputChanges $root $stampCommit $gameProject)
-							if ($dataInputChanges.Count -eq 0) { [IO.File]::WriteAllText($dataStampPath, $stampCommit + "`n") }
+							if ($dataInputChanges.Count -eq 0) {
+								[IO.File]::WriteAllText($dataStampPath, $stampCommit + "`n")
+								$stampedDataProjects.Add($gameProject)
+							}
 							else {
 								Write-Warning ("Primary data inputs differ from commit $stampCommit after the data refresh, so the Shared data stamp was not written and worktree game builds resolve Local until a clean refresh: $($dataInputChanges -join '; '). " +
 									'When the export itself rewrote tracked data inputs (island BC textures, scene .PreExport markers), committing them in the primary restores Shared at the next refresh.')
@@ -272,6 +301,20 @@ try {
 					}
 				}
 			}
+		}
+		# ModelViewer compiles the generated BrokenEngineSandbox data headers and embeds the data path, so it
+		# is prebuilt only against data this run exported and stamped, with the four data properties a Shared
+		# worktree build passes (derived as Resolve-CompileContext.ps1 derives them). Every path that leaves
+		# that data stamp unwritten has already warned.
+		if (-not $SharedDataOnly -and 'BrokenEngineSandbox' -cin $stampedDataProjects) {
+			$modelViewerDataDirectory = Get-AgentCanonicalPath (Join-Path $root 'Projects\BrokenEngineSandbox\Platforms\VisualStudio2026\Output\Data')
+			$modelViewerDataProperties = @(
+				'/p:DataBuildMode=Shared',
+				'/p:RunDataPacker=false',
+				"/p:GameDataDirectory=$modelViewerDataDirectory",
+				"/p:GeneratedDataIncludeRoot=$(Get-AgentCanonicalPath ([IO.Path]::GetDirectoryName($modelViewerDataDirectory)))"
+			)
+			[void] (Invoke-StampedPrebuild 'ModelViewer' $modelViewerPreSnapshot $modelViewerSolution $modelViewerExe $modelViewerStampPath $modelViewerTrees $modelViewerDataProperties)
 		}
 		Write-Host ''
 		if (-not $SharedDataOnly) { Write-Host "Built primary AgentTools and ThirdParty at '$worktreeCliOutput', '$agentHarnessOutput', and '$thirdPartyOutput'." }

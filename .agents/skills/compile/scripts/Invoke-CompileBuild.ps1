@@ -342,21 +342,7 @@ try {
 	if ($Target -ceq 'ModelViewer') {
 		# Visual Studio imports the same resolved data properties as this build; its project generates
 		# the default-root header from those properties before compiling the viewer host.
-		$viewerBuildDirectory = Join-Path $script:Root 'ModelViewer\Platforms\VisualStudio2026\Build'
-		[void] [IO.Directory]::CreateDirectory($viewerBuildDirectory)
-		$escapedDataDirectory = [Security.SecurityElement]::Escape($gameDataDirectory)
-		$escapedIncludeRoot = [Security.SecurityElement]::Escape($generatedDataIncludeRoot)
-		$resolvedProperties = @"
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <PropertyGroup>
-    <DataBuildMode>$dataBuildMode</DataBuildMode>
-    <RunDataPacker>$(if ($runGeneration) { 'true' } else { 'false' })</RunDataPacker>
-    <GameDataDirectory>$escapedDataDirectory</GameDataDirectory>
-    <GeneratedDataIncludeRoot>$escapedIncludeRoot</GeneratedDataIncludeRoot>
-  </PropertyGroup>
-</Project>
-"@
-		[IO.File]::WriteAllText((Join-Path $viewerBuildDirectory 'ResolvedData.props'), $resolvedProperties)
+		Write-AgentModelViewerResolvedData $script:Root $dataBuildMode $(if ($runGeneration) { 'true' } else { 'false' }) $gameDataDirectory $generatedDataIncludeRoot
 	}
 
 	if (-not $runGeneration) {

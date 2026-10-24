@@ -121,9 +121,9 @@ Data under this session, and a regenerated header can force a recompile here.
 
 The same refresh also runs on demand, from the session worktree root, as
 `pwsh -NoProfile -File .agents/scripts/Bootstrap-AgentTools.ps1 -RepositoryRoot '<primary checkout>' -SharedDataOnly`.
-It skips the AgentTools and ThirdParty builds, keeps the DataPacker prebuild,
-the bootstrap mutex, the game wait, and the DataPacker prebuild stamp and data
-stamp rules, and skips the prebuild
+It skips the AgentTools and ThirdParty builds and the ModelViewer prebuild,
+keeps the DataPacker prebuild, the bootstrap mutex, the game wait, and the
+DataPacker prebuild stamp and data stamp rules, and skips the DataPacker prebuild
 and the refresh, with a warning naming a wrapper session start, when primary
 ThirdParty changed since the last prebuild or the DataPacker prebuild stamp is
 missing or unreadable. Every skip exits 0, so its
