@@ -94,7 +94,7 @@ private:
 	void Finish(AgentScriptStatus eStatus);
 	// Resolve the target label in the registry's last completed frame and queue ImGui activation of its ID, which
 	// this frame's ImGui::NewFrame applies. On not-found / ambiguous / a non-inputable set_slider target it calls
-	// Finish() and returns false.
+	// Finish() with that error, and on a disabled target it calls Finish(kDone) without activating; both return false.
 	bool ActivateTarget();
 
 	AgentScript mScript {};

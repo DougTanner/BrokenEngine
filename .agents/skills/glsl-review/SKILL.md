@@ -46,7 +46,6 @@ extended with these fields:
 - `Scope` — `PASS`, `NEEDS_ACTION`, `not applicable (Tier 1)`, or
   `not supplied`.
 - `External claim verification requests` — single checkable requests, or none.
-- `Files reviewed` — one row per path: the regions and affected paths traced.
 - `Sibling review required` — `/repo-code-review` and the shader-facing shared
   headers, or none.
 
@@ -64,7 +63,11 @@ review never edits a file.
 
 Use `NEEDS_ACTION` when a finding or pending external verdict requires action,
 `BLOCKED` when required review evidence is unavailable, and `PASS` only when
-the review is clean.
+the review is clean. A clean `PASS` means every review-set path was covered as
+`references/worker.md` `## Steps` requires; a review that leaves any review-set
+path not so covered is not clean and returns `NEEDS_ACTION` with an
+incomplete-review `Residuals` row naming the path, or `BLOCKED` when the
+evidence needed to cover it is unavailable.
 
 ## References
 

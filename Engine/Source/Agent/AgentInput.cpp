@@ -80,6 +80,12 @@ bool AgentInput::ActivateTarget()
 		Finish(AgentScriptStatus::kNotInputable);
 		return false;
 	}
+	// ImGui::ActivateItemByID applies no disabled filter, and sliders and text fields accept input while disabled.
+	if (rItem.bDisabled)
+	{
+		Finish(AgentScriptStatus::kDone);
+		return false;
+	}
 
 	// The same remote activation ImGui's own navigation uses: ItemAdd does not clip an activated item, so an
 	// offscreen item activates too, and the synthetic mouse never moves.

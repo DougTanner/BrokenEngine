@@ -891,8 +891,8 @@ static void CommandDescribeUi([[maybe_unused]] const nlohmann::json& rParameters
 	rResult = BuildDescribeUi();
 }
 
-// click {label, window?, describeUiAfter?=true}: activate the labeled item by its ImGui ID (offscreen items too; the
-// mouse never moves), settle, then optionally dump the post-click UI.
+// click {label, window?, describeUiAfter?=true}: activate the labeled item by its ImGui ID unless it is disabled
+// (offscreen items too; the mouse never moves), settle, then optionally dump the post-click UI.
 static void CommandClick(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	engine::AgentScript script;
@@ -903,7 +903,8 @@ static void CommandClick(const nlohmann::json& rParameters, [[maybe_unused]] nlo
 	BeginScriptAndDefer(script, bDescribeUiAfter, true, script.bHasWindow, script.pcWindow);
 }
 
-// set_slider {label, window?, value}: activate the slider into ImGui temp-input, type the value, commit (Enter).
+// set_slider {label, window?, value}: activate the slider into ImGui temp-input unless it is disabled, type the value,
+// commit (Enter).
 static void CommandSetSlider(const nlohmann::json& rParameters, [[maybe_unused]] nlohmann::json& rResult)
 {
 	if (!rParameters.contains("value"))

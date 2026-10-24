@@ -91,8 +91,8 @@ whose purpose is to execute a scripted pass/fail scenario itself.
 - `AgentInput` is client-only and runs one frame-stepped synthetic script at a time. It queues ImGui item activation, typed text, and keys, adds wheel notches to the published `RawInput` scroll value, and overlays that snapshot's keys for engine key bindings. Physical input suppression is owned by the startup/input path.
 - ImGui item activation is the only way the harness drives the UI: an agent
   lists items, offscreen ones included, with `describe_ui`, and `click` or
-  `set_slider` activates one by the ImGui ID behind its label, the way ImGui's
-  own navigation does. Label naming is owned by
+  `set_slider` activates an enabled one by the ImGui ID behind its label, the
+  way ImGui's own navigation does. Label naming is owned by
   [Ui/Screens/AGENTS.md](../Ui/Screens/AGENTS.md) `## Shared Authoring Rules`.
   With the agent layer live, `ImGuiManager` turns off ImGui's per-item clipping
   so offscreen items stay listed and activatable

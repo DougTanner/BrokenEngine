@@ -177,19 +177,22 @@ The server monitor is an engine-owned GDI window, not a protocol command surface
 - `click`: `{"label","window"?,"describeUiAfter"?:true}`. Resolves the label in
   the last completed UI frame and activates that item by its ImGui ID, as
   ImGui's own navigation does, then settles two frames; the mouse never moves,
-  and an offscreen item activates too. Presses buttons, selectables,
-  checkboxes, radio buttons, tab items, and the engine menu buttons; a text
-  field becomes active with its text selected, ready for `type_text`. Returns
-  found/enabled and optional UI. Ambiguous/not-found errors list candidates;
-  pass the full label, including any `##` suffix, and `window` to select one.
+  and an offscreen item activates too. A disabled item (`disabled:true` in
+  `describe_ui`) is not activated, and the reply reports `enabled:false`.
+  Presses buttons, selectables, checkboxes, radio buttons, tab items, and the
+  engine menu buttons; a text field becomes active with its text selected,
+  ready for `type_text`. Returns found/enabled and optional UI.
+  Ambiguous/not-found errors list candidates; pass the full label, including
+  any `##` suffix, and `window` to select one.
 - `set_slider`: `{"label","window"?,"value":number}`. Activates the slider into
   its text box (ImGui's prefer-input activation, offscreen sliders too), types
   the value, and presses Enter. A target that is not inputable (a button or
-  checkbox, for example) fails with `target is not inputable`; an inputable
-  text field is typed into the same way, and Enter submits it. Returns
-  found/enabled. Tweaks overlay sliders are reachable only in Debug clients,
-  where `kbDebugInput` lets F3 open the overlay; in Profile and Release clients
-  they fail with `no widget matches label`.
+  checkbox, for example) fails with `target is not inputable`. A disabled
+  target is not activated and nothing is typed; the reply reports
+  `enabled:false`. An inputable text field is typed into the same way, and
+  Enter submits it. Returns found/enabled. Tweaks overlay sliders are reachable
+  only in Debug clients, where `kbDebugInput` lets F3 open the overlay; in
+  Profile and Release clients they fail with `no widget matches label`.
 - `get_wrapper`: `{"key":string}`. Read-only lookup of a Tweaks-registered wrapper. Returns `value`, `min`, and `max`, each a `"%.6f"` string matching the slider's own display format. `key` is the registrar's slider map key, not the display label where the two differ. Needs no F3 overlay and works in every client build. A missing or non-string `key` fails with `get_wrapper requires string 'key'`; an unregistered key fails with `get_wrapper: no Tweaks slider key '<key>'`.
 - `key`: `{"key":name,"holdFrames"?:1}`. `holdFrames` is an integer in `0..1798`
   (default `1`); a value outside that range is a parameter error. The limit
@@ -279,11 +282,12 @@ Client input/capture commands can defer across frames. The single channel remain
 Capture commands temporarily restore a minimized client without activation, wait for extent settlement, capture, then re-minimize. An already-visible client fails if swapchain recreation is deferred. `resize`/`fullscreen` reject minimized state; restore first. `click`, `set_slider`, and `type_text` fail while the client is not rendering (minimized or swapchain recreate deferred); restore first. After resize/fullscreen/restore, call `describe_ui` or `screenshot` to remeasure.
 
 The harness drives ImGui UI only by item activation: `click` and `set_slider`
-activate the item behind a labeled `describe_ui` entry by its ImGui ID, and no
-command sends an ImGui mouse position, button, or wheel event. On an agent
-client ImGui does not clip items, so an item outside the viewport or its
-window's visible area — a slid-away panel's buttons, a row scrolled out of view
-— is listed with `visible:false` and activates like a visible one; only items
+activate the item behind a labeled `describe_ui` entry by its ImGui ID unless
+it is disabled, and no command sends an ImGui mouse position, button, or wheel
+event. On an agent client ImGui does not clip items, so an item
+outside the viewport or its window's visible area — a slid-away
+panel's buttons, a row scrolled out of view — is listed with
+`visible:false` and activates like a visible one; only items
 inside a fully clipped child window are skipped. Side effects: offscreen labels
 take part in label resolution, so a label unique on screen can become
 ambiguous — for six frames once per Tweaks screen lifetime, the Tweaks slider
