@@ -13,10 +13,10 @@ than guessing.
 1. Authorization pass: map each changed region to the `## In scope` entry or
    user instruction that authorizes it, counting the mechanical necessities the
    named change requires (includes, declarations, documents the change makes
-   wrong). An unmapped region is an
-   `unauthorized` finding; a region matching an `## Out of scope` entry is
-   likewise `unauthorized`, unless scope added under the Leftovers rule covers
-   it.
+   wrong, the Change Workflow Run targeted pre-review checks step's
+   `line-length` rewraps). An unmapped region is an `unauthorized` finding; a
+   region matching an `## Out of scope` entry is likewise `unauthorized`,
+   unless scope added under the Leftovers rule covers it.
 2. Minimality pass over added bytes only: flag an unused option, a speculative
    path with no current consumer, one-use indirection with no required
    contract, or backward-compatibility code the authorization source did not

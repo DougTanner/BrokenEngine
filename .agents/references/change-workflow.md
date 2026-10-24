@@ -182,7 +182,7 @@ Main splits the work into disjoint slices where possible. Review-fix exceptions 
 
 Order: the full applicable static pass and `/code-style-review` run after propagation; each `Build required` handoff compiles as it arrives and may run in parallel with the static pass, except that when the change touches C++ the pre-review build waits for `/code-style-review`. Focused implementation self-checks remain inside the implementation slices.
 
-- main runs `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<worktree root>' -Baseline <baseline SHA> -IncludeUntracked` after propagation — every tier; the runner selects its own checks, and its header documents the result and options.
+- main runs `pwsh -NoProfile -File .agents/scripts/Invoke-StaticChecks.ps1 -RepositoryRoot '<worktree root>' -Baseline <baseline SHA> -IncludeUntracked` after propagation — every tier; the runner selects its own checks, and its header documents the result and options. Main has an `implementer` rewrap every `line-length` failure the static-checks runner reports in that same pass, whether or not the change added the line, and never records one as a residual.
 - `mechanic` runs `/code-style-review` — for changed C++; a later `/resolve-findings` round that changes C++ re-runs it over the newly changed ranges before that round's `Build required` handoff compiles.
 - `builder` runs `/compile` — every `Build required` handoff, before the covered work advances; the brief states the agent-harness trigger `/compile` `## Inputs` defines, so a stage whose acceptance table carries `/agent-harness` criteria also builds the client and the server.
 
