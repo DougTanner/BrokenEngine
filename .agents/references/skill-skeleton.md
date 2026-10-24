@@ -47,6 +47,17 @@ Choose a shape by who consumes the workflow. The presence of
    passing word (`passed`, `traced`, `settled`), followed only by the items
    that did not pass, each citing where its settling evidence lives as a path
    plus selector or as the handoff row that holds it, never restating it.
+   The `Handoff` of a skill an inbound workflow requirement has a worker run
+   inside that worker's own task, rather than as a separate dispatch, as
+   evidence for that task also carries a run-as-evidence paragraph addressed to
+   that worker: the skill's decisive field; one row per run under the worker's
+   shared `Decisive checks` (expected observation met or not, the run's
+   `Status`, the decisive field's row) plus one working-tree row, never inline
+   `git status --porcelain` output; every such run's complete handoff in one
+   gitignored `Temp/` file under one `## Run <n>` heading per run, by the
+   `subagent-handoff.md` `## Handoffs` overflow rule; and precedence for a
+   running skill's own `## Handoff` field for the run's result and its own
+   complete-handoff placement.
 6. `Rules` — judgment no step owns, as bullets.
 7. `References` (`SKILL.md`) — each linked file owning one topic.
 
@@ -99,4 +110,6 @@ other status or severity term.
 - `## Handoff` follows `## Section order` item 5: it renders no return fence
   holding a shared handoff field, and it mandates inline only what item 5
   allows.
+- When item 5's run-as-evidence trigger applies, `## Handoff` carries the
+  item 5 run-as-evidence paragraph in full.
 - Size and layering pass `/progressive-disclosure-review`.

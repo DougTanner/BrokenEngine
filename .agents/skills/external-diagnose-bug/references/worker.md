@@ -26,7 +26,10 @@ boundary, and the handoff form live in [`../SKILL.md`](../SKILL.md).
       replay determinism sequence for desync and CRC mismatch.
    2. `get_logs` at a lower log-level threshold (`set_log_level`), so the
       failing transition is visible without unrelated noise.
-   3. `/compile` — for build, link, and static failures.
+   3. For build, link, and static failures, name the targets under your shared
+      `Build required` field for main to build through a `builder` before
+      diagnosis continues; every rerun of a build signal is another
+      `Build required` request, not a run by you.
    4. A differential run: the same input through the old and new build or two
       configurations, diffing the output.
    5. For a performance regression, return the requirement for main to invoke

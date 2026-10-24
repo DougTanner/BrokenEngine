@@ -100,6 +100,20 @@ Re-run this review only when those bytes differ at the two baselines.
 The manager decides each finding on whether the failure is concrete and
 meaningful under the standard defaults; this review adds no extra rounds.
 
+When an inbound workflow requirement has a worker run this skill inside that
+worker's own task, rather than as a separate dispatch, as evidence for that
+task, the decisive field is `Status`. That worker adds one row per run under its
+own shared `Decisive checks` — whether the expected observation was met and
+that run's `Status` — plus one row summarizing the resulting working-tree state,
+never pasting `git status --porcelain` output inline. It writes every such
+run's complete handoff, not only past the character cap, to one gitignored
+`Temp/` file with one `## Run <n>` heading per run, by the overflow rule in
+[`subagent-handoff.md`](../../references/subagent-handoff.md) `## Handoffs`. A
+running skill whose own `## Handoff` declares a field for the run's result puts
+that run's row there instead of under `Decisive checks`; one that also places
+each run's complete handoff follows its own placement instead of these rows and
+this `Temp/` file.
+
 ## References
 
 - [`references/worker.md`](references/worker.md) — private: read it only if you

@@ -51,9 +51,15 @@ Public contract, inputs, and handoff form: [`../SKILL.md`](../SKILL.md).
    records with per-root hit counts; never reconstruct that sweep inline.
    Complete a `truncated` result with targeted searches of the roots whose
    reported counts exceed the returned records. Report the blocker on error
-   (exit `1`). Done when every collected reference is classified: model
-   invocation or chaining is a workflow requirement, and a command only the user
-   types is an example.
+   (exit `1`). When an inbound workflow requirement has a worker run the target
+   inside that worker's own task, rather than as a separate dispatch, as
+   evidence for that task, a missing or incomplete run-as-evidence paragraph in
+   the target's `## Handoff` is a Critical finding citing
+   [`skill-skeleton.md`](../../../references/skill-skeleton.md)
+   `## Section order` item 5. Done when the run-as-evidence check has a verdict
+   for the target and every collected reference is classified: model invocation
+   or chaining is a workflow requirement, and a command only the user types is
+   an example.
 7. Return the handoff form in [`../SKILL.md`](../SKILL.md). Done when every
    declared field is filled and returned.
 
@@ -92,7 +98,8 @@ Public contract, inputs, and handoff form: [`../SKILL.md`](../SKILL.md).
 - Recommended: end each workflow step on a checkable done-condition, so the agent
   can tell done from not-done.
 - Do not promote ordinary quality advice to Critical unless discovery or
-  invocation is concretely incorrect.
+  invocation is concretely incorrect, or the finding is the step 6
+  run-as-evidence check.
 - Progressive disclosure and body/reference size belong to
   `/progressive-disclosure-review`; report neither here.
 - For validator changes, run the disposable `VALID`/`INVALID`/`SETUP_ERROR`
