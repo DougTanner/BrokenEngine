@@ -351,9 +351,14 @@ void PackChunks::LoadPackFiles()
 			overlapped.Offset = static_cast<DWORD>(rChunkLocation.uiOffset & 0xffffffff);
 			overlapped.OffsetHigh = static_cast<DWORD>(rChunkLocation.uiOffset >> 32);
 			DWORD uiBytesRead = 0;
-			if (ReadFile(handlePackValidation, &chunkHeader, static_cast<DWORD>(sizeof(chunkHeader)), &uiBytesRead, &overlapped) == FALSE || uiBytesRead != sizeof(chunkHeader))
+			if (ReadFile(handlePackValidation, &chunkHeader, static_cast<DWORD>(sizeof(chunkHeader)), &uiBytesRead, &overlapped) == FALSE)
 			{
-				FailMissingRequiredAsset(mpPackFilePaths[i], "pack header table truncated");
+				int64_t iError = GetLastError();
+				FailMissingRequiredAsset(mpPackFilePaths[i], std::format("chunk header read failed: Windows error {} at offset {}", iError, rChunkLocation.uiOffset));
+			}
+			if (uiBytesRead != sizeof(chunkHeader))
+			{
+				FailMissingRequiredAsset(mpPackFilePaths[i], std::format("chunk header short read: {} of {} bytes at offset {}", uiBytesRead, sizeof(chunkHeader), rChunkLocation.uiOffset));
 			}
 			if (const char* pcReason = ValidateChunkHeader(static_cast<data::DataTypes>(i), rChunkLocation, chunkHeader); pcReason != nullptr)
 			{
