@@ -124,9 +124,9 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
    clang-tidy run. Done when each such reference has been read, or stays
    unloaded because its authorization does not exist.
 
-7. Compose one bundled-script invocation per target. Done when the exact command
-   is chosen without any shell variable, composed MSBuild `/p:` switch, or state
-   carried between shell calls.
+7. Compose one bundled-script invocation per target. Done when the script's exact
+   arguments are chosen without any shell variable, composed MSBuild `/p:`
+   switch, or state carried between shell calls.
 
    - Each call is independently valid in a fresh shell because it re-derives
      identities, data mode, directories, and tool paths itself.
@@ -194,23 +194,32 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
    every requested target has returned that pair and each build's block is in
    this dispatch's envelope file.
 
-   - Create `Temp/AgentBuildEnvelopes/` if absent, in a call of its own before
-     the first build call, as the root `AGENTS.md` bundled-scripts rule
-     requires. `Temp/` is gitignored, so the directory is absent in a fresh
-     worktree.
-   - Write every build's captured `broken-engine-build-result/v1` envelope
-     verbatim into one Markdown file there, unique to this dispatch and named
-     `compile-<UTC yyyyMMddTHHmmssfffZ>-<process id>.md` from the first build
-     call's own UTC time and process id.
-   - The file carries a single `##` heading for the dispatch, with one fenced
-     block per build.
-   - The first build's own PowerShell call creates the file and the heading and
-     prints the file's repo-relative path. Each later build's own call appends
-     its block to that exact path, written as a literal in the command text;
+   - In a call of its own before the first build call, create
+     `Temp/AgentBuildEnvelopes/` if absent and this dispatch's envelope file in
+     it: compose the repo-relative path
+     `Temp/AgentBuildEnvelopes/compile-<UTC yyyyMMddTHHmmssfffZ>-<process id>.md`
+     from that call's own UTC time and process id, create the file holding the
+     dispatch's single `##` heading, and print the path. `Temp/` is gitignored,
+     so the directory is absent in a fresh worktree.
+   - Every build call has the same shape, with that path written as a literal;
      never find the file by name pattern, process id, or modification time,
-     because other dispatches' files share the directory. Each block is written
-     from that call's own captured output — never a new script, never a
-     retyped envelope.
+     because other dispatches' files share the directory. The build script is
+     piped to `Tee-Object -Variable buildOutput`, so its envelope still reaches
+     stdout for step 10, and one `Add-Content` statement then writes the
+     call's whole fenced block after the script returns. Its value begins with
+     an empty line, so the opening fence always starts its own line whether or
+     not the line before it ended with a line break:
+
+```powershell
+pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 <arguments> | Tee-Object -Variable buildOutput; Add-Content -LiteralPath '<path>' -Value '', '```json', "$buildOutput", '```'
+```
+
+   - The block holds that call's stdout envelope verbatim, whichever schema it
+     carries: `broken-engine-build-result/v1` or
+     `broken-engine-compile-invoke-result/v1`. Keep the fence literals
+     single-quoted and `"$buildOutput"` double-quoted, so an empty stdout
+     still writes one line between the fences. Never write a block from a new
+     script or a retyped envelope.
    - Give the call the maximum available execution timeout so the 500-second
      target-lock wait is not preempted. Never use `Start-Job`, a trailing `&`, a
      fire-and-forget watcher, or a host background-execution parameter such as

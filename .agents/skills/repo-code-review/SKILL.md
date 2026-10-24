@@ -59,9 +59,8 @@ supplies it as the `Targets file: <path>` entry in its evidence section (the
 receipt's `targetsPath`, written next to the prompt file), and inlines the same
 bytes there as a copy of that file. Otherwise the dispatching manager saves one
 read-only run to a file with the targets-file bullet's invocation above, piping
-that script call's own stdout inside the same single PowerShell-tool call,
-which the root `AGENTS.md` bundled-scripts rule permits as using that call's
-own output. That invocation's gitignored `Temp/` path is the save-path
+that script call's own stdout inside the same single PowerShell-tool call.
+That invocation's gitignored `Temp/` path is the save-path
 convention, and the manager supplies the path, not
 the targets bytes, to the review worker. The run reports its own `status` rather
 than a field of the saved file: on `pass` (exit 0) stdout carries only the
