@@ -6,9 +6,9 @@
 The engine must not know that the ModelViewer exists. `BT_CLIENT` and `BT_SERVER` stay, because both executables are
 the engine; `BT_MODEL_VIEWER` names one application and goes. This is phase 3 of 3:
 
-- Phase 1 (Documents/Plans/Engine/RemoveModelViewerDefineFeatureSwitches.md): purpose-named `kb*` switches and
-  viewer-supplied definitions replace the gates where the viewer renders or behaves differently; the viewer `Pch.h`
-  defines its own switch values.
+- Phase 1 (Documents/Plans/Engine/RemoveModelViewerDefineFeatureSwitches.md): one image pass serves both programs;
+  purpose-named `kb*` switches, defined in each program's `Pch.h`, and viewer-supplied definitions replace the
+  remaining gates where the viewer renders or behaves differently.
 - Phase 2 (Documents/Plans/Engine/RemoveModelViewerDefineEngineServices.md, this plan depends on it): the crash upload,
   audio streaming harness rig hooks, profile overlay screens, and engine-collection graphics resources lose their gates.
 - Phase 3 (this plan): removes every remaining gate, each around engine code that names the game, and deletes the
@@ -52,7 +52,9 @@ camera, or UI code outside PostRender and the CRC, or include placement.
      Engine/Source/Network/Client/ReconcileReplayTick.cpp, and
      Projects/BrokenEngineSandbox/Source/Agent/Commands/ServerFrameEdit.cpp, the other `TransferViaStream` callers
      (:126, :187, :145/:197). Recommended in Replay.h rather than Replay.cpp because Replay.h declares the members.
-   - The viewer Pch.h needs no `kbReplayFullFrames`, since no viewer file reaches DifferenceStream.h.
+   - The viewer Pch.h gets no change: it already has `kbReplayFullFrames` through `EngineSwitches.h`
+     (EngineSwitches.h:38/:55/:72), which it keeps including after Phase 1, and no viewer file reaches
+     DifferenceStream.h.
    - Sandbox: the same header compiles into the same TUs that use it; no code changes.
 2. `GameBase.h` and the generic agent command headers out of the aggregation (Engine.h:91-102). `GameBase.h` stores
    game types by value (GameBase.h:3-14, 68-157). The sandbox `Pch.h` includes the block right after `Engine.h`:
@@ -256,7 +258,8 @@ camera, or UI code outside PostRender and the CRC, or include placement.
 
 - Phase 1 and Phase 2 sites and changes.
 - Compiling more engine files into the viewer, giving the viewer a `GameBase`, `game::gpGame`, cells, sessions, or a
-  HUD, or adding `kbReplayFullFrames` to the viewer `Pch.h`.
+  HUD, or defining `kbReplayFullFrames` in the viewer `Pch.h` (it comes from `EngineSwitches.h`; a second
+  definition would redefine it).
 - Changing screen behavior, screen lifetime across Graphics recreation, the Tweaks file format or version, camera
   behavior beyond the documented throttle shift, terrain sampling, island placement packing, or replay streams.
 - Moving `GlobalNormal` anywhere (it is deleted), renaming `CellElevation`, or changing `CellNormal`/`CellElevationSampler`.

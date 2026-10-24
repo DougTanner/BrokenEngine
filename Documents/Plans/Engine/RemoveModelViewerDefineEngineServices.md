@@ -6,10 +6,10 @@
 The engine must not know that the ModelViewer exists. `BT_CLIENT` and `BT_SERVER` stay, because both executables are
 the engine; `BT_MODEL_VIEWER` names one application and goes. This is phase 2 of 3:
 
-- Phase 1 (Documents/Plans/Engine/RemoveModelViewerDefineFeatureSwitches.md, lands first): deletes `kbModelViewer`,
-  replaces every gate where the viewer renders or behaves differently with a purpose-named `kb*` switch or a
-  viewer-supplied definition, and makes the viewer's `Pch.h` define its own switch values instead of including
-  `EngineSwitches.h`.
+- Phase 1 (Documents/Plans/Engine/RemoveModelViewerDefineFeatureSwitches.md, lands first): deletes `kbModelViewer`
+  and `kbFramebufferClearColor`, runs one image pass for both programs, defines each switch whose value differs by
+  program in that program's own `Pch.h` (both still include `EngineSwitches.h`), and replaces the remaining gates
+  where the viewer behaves differently with viewer-supplied definitions.
 - Phase 2 (this plan): removes the gates around four engine services the viewer neither uses nor can link: the client
   crash-report upload, the audio streaming harness rig hooks in pack loading, the profile overlay screens, and the
   engine collections' graphics resources.
@@ -49,8 +49,8 @@ History: every `BT_MODEL_VIEWER` gate was introduced in 601012a8d and 7d64500ec,
 reason).
 
 Line numbers cite commit 7d64500ecb21b6d05acc859ab5f417067a8f0796. Phase 1 does not edit any region this plan names
-except EngineSwitches.h and ModelViewer/Source/Pch.h, where this plan adds to the switch lists Phase 1 creates; locate
-regions by content when lines have shifted.
+except the per-program switch blocks it adds to Projects/BrokenEngineSandbox/Source/Pch.h and
+ModelViewer/Source/Pch.h, which this plan extends; locate regions by content when lines have shifted.
 
 ## Design
 
@@ -79,9 +79,11 @@ Each item states the path chosen, why, and the sandbox and viewer equivalence.
      viewer has no audio streaming for a rig to observe (it compiles no Engine/Source/Audio file), so the switch names a
      real difference. Pulling the audio chain into the viewer would need `StreamingVoices`, `StreamingVoice`, and
      `AudioManager`, which reach the game too, plus a change to the lazy playlist advance in `CheckTrackTransition`.
-   - EngineSwitches.h: `inline constexpr bool kbAudioStreamingHarnessRig = true;` with a trailing comment stating it
-     compiles the agent audio streaming harness rig's pack-loading hooks (Debug clients). ModelViewer/Source/Pch.h:
-     the same name `= false`.
+   - Projects/BrokenEngineSandbox/Source/Pch.h (shared by the sandbox client and server), in the Phase 1 switch
+     block: `inline constexpr bool kbAudioStreamingHarnessRig = true;` with a trailing comment stating it compiles the
+     agent audio streaming harness rig's pack-loading hooks (Debug clients). ModelViewer/Source/Pch.h, in its Phase 1
+     switch block: the same name `= false`. Not in EngineSwitches.h: the viewer `Pch.h` includes it, so a definition
+     there would collide.
    - Include gates Engine/Source/File/PackChunks.cpp:8 and Engine/Source/File/PackChunkLoader.cpp:7 become
      `#if defined(BT_DEBUG)`, so the rig names stay declared for the discarded statements.
    - Every hook site keeps its configuration gate without the viewer term and wraps its unchanged statements in
@@ -101,8 +103,9 @@ Each item states the path chosen, why, and the sandbox and viewer equivalence.
      Engine/Source/Profile/ProfileManager.h:494-500; `game::kCpuTimerFrameUpdate`, already read unconditionally at
      ProfileManager.cpp:14), and the viewer presents no profile screens. The formatters themselves name the game, so
      compiling them into the viewer is not an option.
-   - EngineSwitches.h: `inline constexpr bool kbProfileScreens = true;` with a trailing comment stating it compiles the
-     CPU, GPU, and Network profile overlay screens. ModelViewer/Source/Pch.h: `= false`.
+   - Projects/BrokenEngineSandbox/Source/Pch.h, in the Phase 1 switch block: `inline constexpr bool kbProfileScreens =
+     true;` with a trailing comment stating it compiles the CPU, GPU, and Network profile overlay screens.
+     ModelViewer/Source/Pch.h, in its Phase 1 switch block: `= false`.
    - ProfileManager.cpp:617-647: `#if !defined(BT_MODEL_VIEWER)` ... `#endif` becomes
      `if constexpr (kbProfileScreens) { ... }` with the body unchanged (still inside the existing
      `#if defined(BT_CLIENT)` and `if constexpr (kbProfiling)`).
@@ -143,7 +146,7 @@ Each item states the path chosen, why, and the sandbox and viewer equivalence.
 - Engine/Source/Profile/ProfileManager.cpp.
 - Engine/Source/Frame/FrameBase.h, Engine/Source/Frame/FrameBase.cpp, Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp,
   Engine/Source/Graphics/Managers/PipelineManager.cpp.
-- Engine/Source/EngineSwitches.h, ModelViewer/Source/Pch.h.
+- Projects/BrokenEngineSandbox/Source/Pch.h, ModelViewer/Source/Pch.h.
 - Projects/BrokenEngineSandbox/Platforms/VisualStudio2026/BrokenEngineSandbox.vcxproj and .filters.
 
 ## Risk triggers and invariants
@@ -172,8 +175,8 @@ Each item states the path chosen, why, and the sandbox and viewer equivalence.
 - Engine/Source/Frame/FrameBase.cpp after :200 — `FrameInterpolateBase::GraphicsResources` definition.
 - Projects/BrokenEngineSandbox/Source/Frame/Frame.cpp:131-134.
 - Engine/Source/Graphics/Managers/PipelineManager.cpp:164-166.
-- Engine/Source/EngineSwitches.h — two switches after the Phase 1 feature switches; ModelViewer/Source/Pch.h — the same
-  two with viewer values, in the Phase 1 config-independent group.
+- Projects/BrokenEngineSandbox/Source/Pch.h and ModelViewer/Source/Pch.h — the two switches, sandbox `true` and viewer
+  `false`, appended to the per-program switch block Phase 1 adds.
 - Membership: sandbox client vcxproj and filters add CrashReportUpload.cpp.
 - Documentation lines in Design item 6.
 
@@ -219,7 +222,7 @@ replacement names what it controls, and what remains for Phase 3 is only the eng
 - Tier trigger: Tier 3 — spans independently owned subsystems (crash reporting, File/Agent rig, Profile, Frame/Graphics, sandbox frame type, project membership).
 - Interfaces and invariants: new client-only Engine/Source/CrashReportUpload.cpp (sandbox client only) holds the upload
   block verbatim; `engine::ReportPath()`/`PendingReportPath()` become declared non-static functions; new switches
-  `kbAudioStreamingHarnessRig` and `kbProfileScreens`, `true` in EngineSwitches.h and `false` in the viewer Pch.h;
+  `kbAudioStreamingHarnessRig` and `kbProfileScreens`, `true` in the sandbox Pch.h and `false` in the viewer Pch.h;
   `FrameInterpolateBase::GraphicsResources()` (client) iterates the engine collections and the sandbox
   `FrameInterpolate::GraphicsResources` calls it first. Invariants: no PostRender/CRC change; sandbox statements and
   order at every site equal baseline; no callback to game code; no switch names the application.
