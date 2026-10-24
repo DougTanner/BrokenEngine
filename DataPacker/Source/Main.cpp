@@ -64,6 +64,21 @@ static bool WriteIfChanged(std::string_view content, const std::filesystem::path
 // regenerates its header.
 static std::unordered_map<std::string, std::string> sGeneratedCrcNames;
 
+// A dirty type whose export succeeded, with its temporary manifest, pack, and header written beside their finals
+struct PendingPublish
+{
+	std::filesystem::path temporaryManifestFile;
+	std::filesystem::path manifestFile;
+	std::filesystem::path temporaryPackFile;
+	std::filesystem::path packFile;
+	std::filesystem::path temporaryHeaderFile;
+	std::filesystem::path headerFile;
+};
+
+// Filled in export order and published only after the last export, so a locked destination pack stops the run before
+// any type's output is replaced.
+static std::vector<PendingPublish> sPendingPublishes;
+
 template <typename T>
 using ExportJobList = std::vector<std::unique_ptr<T>>;
 
@@ -117,59 +132,57 @@ static bool IsFileLockedError(const std::error_code& rError)
 	return rError.category() == std::system_category() && IsFileLockedError(rError.value());
 }
 
-// Publishes the manifest and pack over the previous output. A running game client or server keeps its
-// packs open share-read-only for the whole process lifetime, so without this the pack rename fails after the manifest
-// already published, leaving a torn publish. Returns false when the user cancels the export at the retry prompt.
-static bool PublishManifestAndPack(const std::filesystem::path& rTemporaryManifestFile, const std::filesystem::path& rManifestFile, const std::filesystem::path& rTemporaryPackFile, const std::filesystem::path& rPackFile)
+// Requesting DELETE access fails with a sharing or lock violation against any process holding the pack share-read-only,
+// and while the returned handle stays open every later open that does not share delete fails, so the handle is also a
+// lock that keeps such a holder out. Returns the opened handle, or INVALID_HANDLE_VALUE with rbLocked set when the open
+// failed with such a violation.
+static HANDLE OpenDeleteProbe(const std::filesystem::path& rPackFile, bool& rbLocked)
 {
-	std::string lockedFailure = std::format("\"{}\" is locked by a running game client or server.", rPackFile.string());
+	HANDLE handleProbe = CreateFileW(rPackFile.native().c_str(), DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr);
+	rbLocked = handleProbe == INVALID_HANDLE_VALUE && IsFileLockedError(GetLastError());
+	return handleProbe;
+}
+
+// Returns false when the user cancels the export.
+static bool PromptRetryPublish(std::string_view message)
+{
+	diagnostic::Record record
+	{
+		.eSeverity = diagnostic::Severity::kWarning,
+		.title = "Data Packer - Cannot Publish Output",
+		.message = std::string(message),
+		.eButtons = diagnostic::ButtonContract::kOkCancel,
+		.eIcon = diagnostic::ModalIcon::kWarning,
+	};
+	return diagnostic::Report(record) != diagnostic::ButtonResult::kCancelled;
+}
+
+// Only lazy packs stay open, share-read-only, for the holder's
+// whole process lifetime: Audio, Islands, and Texture in a game client or ModelViewer, and Islands in a server. A holder
+// blocks only the replacement of a pack it holds, so CheckPendingPacksUnlocked locks only the packs this run replaces.
+// handlePackLock is that lock on the existing pack, held by the caller until this returns, or null when the pack had none
+// to take. Any failure of the pack step, which runs after the manifest publishes, prompts to retry or cancel. Returns
+// false when the user cancels the export at the retry prompt.
+static bool PublishManifestAndPack(const std::filesystem::path& rTemporaryManifestFile, const std::filesystem::path& rManifestFile, const std::filesystem::path& rTemporaryPackFile, const std::filesystem::path& rPackFile, HANDLE handlePackLock)
+{
+	std::string lockedFailure = std::format("\"{}\" is locked by a running game client, server, or ModelViewer.", rPackFile.string());
 
 	bool bManifestPublished = false;
+	bool bPackRenamedAside = false;
 	// Empty means no prompt is pending; otherwise it is the sentence describing why publishing failed
 	std::string pendingFailure;
-	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
-	{
-		CloseHandle(handle);
-	})>;
 	while (true)
 	{
-		// Requesting DELETE access fails against a client or server already holding the pack share-read-only, so an
-		// already-running one is detected before the manifest publishes and the common case prompts with nothing torn yet.
-		ScopedHandle pProbe(nullptr);
-		if (pendingFailure.empty() && std::filesystem::exists(rPackFile))
-		{
-			HANDLE handleProbe = CreateFileW(rPackFile.native().c_str(), DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr);
-			if (handleProbe != INVALID_HANDLE_VALUE)
-			{
-				pProbe.reset(handleProbe);
-			}
-			else if (IsFileLockedError(GetLastError()))
-			{
-				pendingFailure = lockedFailure;
-			}
-			// Any other probe failure falls through to the renames, which report the real cause: the manifest rename by
-			// throwing, the pack rename through the prompt below
-		}
-
 		if (!pendingFailure.empty())
 		{
-			diagnostic::Record record
-			{
-				.eSeverity = diagnostic::Severity::kWarning,
-				.title = "Data Packer - Cannot Publish Output",
-				.message = std::format("{}\n\nClose it and press OK to retry, or press Cancel to abort the export.", pendingFailure),
-				.eButtons = diagnostic::ButtonContract::kOkCancel,
-				.eIcon = diagnostic::ModalIcon::kWarning,
-			};
-			if (diagnostic::Report(record) == diagnostic::ButtonResult::kCancelled)
+			if (!PromptRetryPublish(std::format("{}\n\nClose it and press OK to retry, or press Cancel to abort the export.", pendingFailure)))
 			{
 				return false;
 			}
 			pendingFailure.clear();
-			continue;
 		}
 
-		// Manifest before pack, preserving the commit-point ordering and kill semantics documented at the header publish in RunDirtyExport
+		// Manifest before pack, preserving the commit-point ordering and kill semantics documented at the header publish in PublishPendingExports
 		std::error_code renameError;
 		if (!bManifestPublished)
 		{
@@ -180,16 +193,37 @@ static bool PublishManifestAndPack(const std::filesystem::path& rTemporaryManife
 				{
 					throw std::filesystem::filesystem_error("Failed to publish manifest", rTemporaryManifestFile, rManifestFile, renameError);
 				}
-				// A lock that survives the probe must prompt rather than spin, so the next pass skips straight to the prompt
 				pendingFailure = lockedFailure;
 				continue;
 			}
 			bManifestPublished = true;
 		}
 
-		// Windows refuses to replace a destination that has any open handle, including this process's own, so the probe
-		// must go first. A client that opens the pack in that gap fails the rename below and reaches the prompt.
-		pProbe.reset();
+		// Windows refuses to rename onto a destination that has any open handle, this lock included, so the locked pack
+		// is first renamed aside through the lock, which frees the final name, then marked so closing the lock deletes it.
+		// A retry after a failed rename-in never repeats this step.
+		if (handlePackLock != nullptr && !bPackRenamedAside)
+		{
+			std::wstring asideFile = rPackFile.native() + L".old";
+			int64_t iFileNameBytes = std::ssize(asideFile) * static_cast<int64_t>(sizeof(wchar_t));
+			// The zeroed buffer leaves RootDirectory null and NUL-terminates the full-path FileName
+			std::vector<uint8_t> renameInfoBytes(sizeof(FILE_RENAME_INFO) + static_cast<size_t>(iFileNameBytes));
+			FILE_RENAME_INFO* pRenameInfo = reinterpret_cast<FILE_RENAME_INFO*>(renameInfoBytes.data());
+			pRenameInfo->ReplaceIfExists = TRUE;
+			pRenameInfo->FileNameLength = static_cast<DWORD>(iFileNameBytes);
+			std::ranges::copy(asideFile, pRenameInfo->FileName);
+			if (SetFileInformationByHandle(handlePackLock, FileRenameInfo, pRenameInfo, static_cast<DWORD>(std::ssize(renameInfoBytes))) == FALSE)
+			{
+				int64_t iError = GetLastError();
+				pendingFailure = std::format("Failed to publish \"{}\": {}", rPackFile.string(), std::system_category().message(static_cast<int>(iError)));
+				continue;
+			}
+			bPackRenamedAside = true;
+
+			// A failed mark only leaves the aside file, which nothing reads and the next run's aside rename replaces
+			FILE_DISPOSITION_INFO dispositionInfo {.DeleteFile = TRUE};
+			std::ignore = SetFileInformationByHandle(handlePackLock, FileDispositionInfo, &dispositionInfo, sizeof(dispositionInfo));
+		}
 
 		std::filesystem::rename(rTemporaryPackFile, rPackFile, renameError);
 		if (!renameError)
@@ -509,7 +543,7 @@ static std::expected<bool, FileManager::EnsureLocalResult> RunDirtyExport(const 
 	}
 
 	// Stage beside the finals, never in the cache: the cache lives under LocalAppData and can be on another
-	// volume, where the publish renames below degrade to copy-then-delete and a kill mid-copy leaves a
+	// volume, where the publish renames degrade to copy-then-delete and a kill mid-copy leaves a
 	// truncated manifest/pack/header where a complete one used to be. Same-directory renames stay atomic.
 	std::filesystem::path temporaryManifestFile = gpFileManager->mOutputDirectory;
 	temporaryManifestFile /= T::kName;
@@ -545,30 +579,15 @@ static std::expected<bool, FileManager::EnsureLocalResult> RunDirtyExport(const 
 	else
 	{
 		WriteCrcHeader(temporaryHeaderFile, rExportJobs);
-
-		// Only copy header if it has changed (causes game re-compilation otherwise). The header must publish
-		// before the pack: the pack rename is the commit point every dirty check keys off, so a header
-		// renamed after it would strand on a kill — pack/manifest new, every fingerprint older than the
-		// fresh pack, and the header check above only tests existence, never staleness. Publishing first
-		// cannot strand it: the constants are Crc(mRelativeFile), path-derived only, so the header changes
-		// only when the asset path set changes, and every such cause re-dirties against the still-old pack
-		// next run — any add, removal, or rename trips the path-CRC set comparison in
-		// DiscoverExportJobsAndAggregateDirty, and a regenerated missing header already matches the pack.
-		if (!common::ContentsEqual(temporaryHeaderFile, rHeaderFile))
+		sPendingPublishes.push_back(PendingPublish
 		{
-			std::filesystem::rename(temporaryHeaderFile, rHeaderFile);
-		}
-		else
-		{
-			std::filesystem::remove(temporaryHeaderFile);
-		}
-
-		if (!PublishManifestAndPack(temporaryManifestFile, rManifestFile, temporaryPackFile, rPackFile))
-		{
-			std::filesystem::remove(temporaryManifestFile);
-			std::filesystem::remove(temporaryPackFile);
-			bFailed = true;
-		}
+			.temporaryManifestFile = std::move(temporaryManifestFile),
+			.manifestFile = rManifestFile,
+			.temporaryPackFile = std::move(temporaryPackFile),
+			.packFile = rPackFile,
+			.temporaryHeaderFile = std::move(temporaryHeaderFile),
+			.headerFile = rHeaderFile,
+		});
 	}
 
 	return !bFailed;
@@ -639,6 +658,89 @@ static std::expected<bool, FileManager::EnsureLocalResult> RunAllMainExports(Dat
 	return result;
 }
 
+using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
+{
+	CloseHandle(handle);
+})>;
+
+// Locks every pending type's existing destination pack before any rename, so a pack held by a running game client,
+// server, or ModelViewer stops the run with nothing replaced, and a lazy-pack holder cannot open a pack this run
+// replaces until its swap. Fills rPackLocks with one entry per pending type, in order, null where the pack does not
+// exist or failed to open for another cause. Returns false when the user cancels, after removing every pending temporary
+// manifest, pack, and header.
+static bool CheckPendingPacksUnlocked(std::vector<ScopedHandle>& rPackLocks)
+{
+	rPackLocks.reserve(static_cast<size_t>(std::ssize(sPendingPublishes)));
+	while (true)
+	{
+		std::string lockedPacks;
+		for (const PendingPublish& rPendingPublish : sPendingPublishes)
+		{
+			bool bLocked = false;
+			HANDLE handlePackLock = OpenDeleteProbe(rPendingPublish.packFile, bLocked);
+			rPackLocks.emplace_back(handlePackLock != INVALID_HANDLE_VALUE ? handlePackLock : nullptr);
+			if (bLocked)
+			{
+				lockedPacks += std::format("\"{}\"\n", rPendingPublish.packFile.string());
+			}
+		}
+		if (lockedPacks.empty())
+		{
+			return true;
+		}
+
+		// No lock stays held while the prompt waits on the user, and Cancel leaves nothing held
+		rPackLocks.clear();
+		if (!PromptRetryPublish(std::format("{}\nEach pack above is locked by a running game client, server, or ModelViewer. Close it and press OK to retry, or press Cancel to abort the export without replacing any output.", lockedPacks)))
+		{
+			for (const PendingPublish& rPendingPublish : sPendingPublishes)
+			{
+				std::filesystem::remove(rPendingPublish.temporaryManifestFile);
+				std::filesystem::remove(rPendingPublish.temporaryPackFile);
+				std::filesystem::remove(rPendingPublish.temporaryHeaderFile);
+			}
+			return false;
+		}
+	}
+}
+
+// Publishes each pending type in export order, closing its pack lock from rPackLocks right after its pack step. Returns
+// false when any type's publish is cancelled at its retry prompt, after removing that type's temporary manifest and pack.
+static bool PublishPendingExports(std::vector<ScopedHandle>& rPackLocks)
+{
+	bool bSuccess = true;
+	for (int64_t i = 0; i < std::ssize(sPendingPublishes); ++i)
+	{
+		const PendingPublish& rPendingPublish = sPendingPublishes.at(i);
+		// Only copy header if it has changed (causes game re-compilation otherwise). The header must publish
+		// before the pack: the pack rename is the commit point every dirty check keys off, so a header
+		// renamed after it would strand on a kill — pack/manifest new, every fingerprint older than the
+		// fresh pack, and the header check in RunExportJobs only tests existence, never staleness. Publishing
+		// first cannot strand it: the constants are Crc(mRelativeFile), path-derived only, so the header changes
+		// only when the asset path set changes, and every such cause re-dirties against the still-old pack
+		// next run — any add, removal, or rename trips the path-CRC set comparison in
+		// DiscoverExportJobsAndAggregateDirty, and a regenerated missing header already matches the pack.
+		if (!common::ContentsEqual(rPendingPublish.temporaryHeaderFile, rPendingPublish.headerFile))
+		{
+			std::filesystem::rename(rPendingPublish.temporaryHeaderFile, rPendingPublish.headerFile);
+		}
+		else
+		{
+			std::filesystem::remove(rPendingPublish.temporaryHeaderFile);
+		}
+
+		bool bPublished = PublishManifestAndPack(rPendingPublish.temporaryManifestFile, rPendingPublish.manifestFile, rPendingPublish.temporaryPackFile, rPendingPublish.packFile, rPackLocks.at(i).get());
+		rPackLocks.at(i).reset();
+		if (!bPublished)
+		{
+			std::filesystem::remove(rPendingPublish.temporaryManifestFile);
+			std::filesystem::remove(rPendingPublish.temporaryPackFile);
+			bSuccess = false;
+		}
+	}
+	return bSuccess;
+}
+
 static bool GenerateDataTypesHeader(const std::filesystem::path& rOutPath)
 {
 	std::stringstream content;
@@ -698,6 +800,7 @@ bool MainThread(int64_t iArgumentCount, char* ppcArguments[], DataPackerRunSumma
 {
 	common::Multithreading multithreading(std::max<int64_t>(0, common::HardwareCoreCount() - 3));
 	sGeneratedCrcNames.clear();
+	sPendingPublishes.clear();
 
 	LOG(kDefault, kDebug, "\nData Packer");
 	ScopedLogIndent scopedLogIndent;
@@ -748,6 +851,13 @@ bool MainThread(int64_t iArgumentCount, char* ppcArguments[], DataPackerRunSumma
 		return false;
 	}
 	bSuccess &= *exportResult;
+
+	std::vector<ScopedHandle> packLocks;
+	if (!CheckPendingPacksUnlocked(packLocks))
+	{
+		return false;
+	}
+	bSuccess &= PublishPendingExports(packLocks);
 
 	if (!GenerateDataTypesHeader(gpFileManager->mOutputDirectory / "DataTypes.h"))
 	{

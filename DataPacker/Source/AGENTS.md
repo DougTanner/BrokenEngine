@@ -120,14 +120,19 @@ Tools builds have no allocation tracker, so the engine LOG float-format-spec res
   discarding a failed temporary output without replacing the prior one;
   generated headers update only when content differs. A dirty export stages its
   manifest, pack, and header beside their finals in the output tree, so each
-  publish rename stays on one volume. A running client or server holds its packs
-  open for the whole process lifetime, so publishing a type probes the
-  destination pack before the manifest rename and releases that handle before
-  the pack rename, which Windows refuses while any handle, including this
-  process's own, is open. A sharing or lock violation at the probe, or any pack
-  rename failure, prompts to retry or cancel rather than failing unannounced.
-  Cancelling discards that type's temporary manifest and pack and fails the
-  type; an already-published manifest then stays beside the unreplaced pack
+  publish rename stays on one volume, and every dirty type stages first and
+  publishes only after the last export. Every existing pack this run replaces
+  is locked, unless it fails to open for another cause, before any rename; when
+  any is held by a lazy-pack holder, whose lifetime
+  [File](../../Engine/Source/File/AGENTS.md) `## Packed Assets` owns, one
+  retry-or-cancel prompt names every locked pack, and Cancel there fails the
+  run with nothing replaced. A held lock keeps a lazy-pack holder out of its
+  pack until that pack's swap, which runs through the lock. Each type then
+  publishes header, manifest, and pack in that order. A sharing or lock
+  violation at the manifest rename, or any pack rename failure, prompts to
+  retry or cancel rather than failing unannounced. Cancelling
+  discards that type's temporary manifest and pack and fails the type; an
+  already-published manifest then stays beside an unreplaced or missing pack
   until the next run re-dirties the type and republishes it.
 - Reproducibility: Chunk ordering and direct base BC encoding are machine-independent, but OpenCL IBL convolution and GPU-accelerated Gaea bytes assume one authoritative bake host.
 

@@ -87,7 +87,8 @@ ButtonResult Report(const Record& rRecord)
 	{
 		LOG(kDefault, kWarning, "{}: {}", rRecord.title, text);
 	}
-	// Automated runs skip modal input; cancelling a locked pack prompt fails the affected asset type.
+	// Automated runs skip modal input; cancelling the up-front locked pack prompt fails the run, and cancelling a later
+	// per-type one fails that asset type.
 	static const bool sbNoninteractiveEnvironment = []()
 	{
 		wchar_t pcNoninteractive[2] {};
