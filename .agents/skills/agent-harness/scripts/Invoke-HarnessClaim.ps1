@@ -1,13 +1,14 @@
 # Read the game data directory from the project's build records, require the project executables,
 # provision the checkout, resolve AgentHarness, mint an owner token, and claim the harness lock.
 # A foreign owner is waited out, not stolen from: provisioning runs once and only the claim attempt
-# repeats, until the lock is acquired or the holder's own heartbeat reaches the staleness point, and
-# nothing touches the holder's processes, heartbeat, or claim. A holder that keeps refreshing its
-# heartbeat is waited on for as long as it holds the lock. A stale holder is still waited on while a
-# project server started without --agent-port is running: that server holds the machine-wide
-# single-instance mutex, so no harness server can start beside it, and the takeover steps quit only
-# --agent-port listeners. An ended wait reports the holder record the last claim attempt itself
-# printed.
+# repeats, until the lock is acquired, the holder's own heartbeat reaches the staleness point, or
+# the wait budget ends, and nothing touches the holder's processes, heartbeat, or claim. The wait
+# is bounded: a holder that keeps refreshing its heartbeat is waited on for at most
+# $WaitBudgetSeconds, which then ends with claim.wait-timeout for the caller to re-invoke. A stale
+# holder is still waited on, within that same budget, while a project server started without
+# --agent-port is running: that server holds the machine-wide single-instance mutex, so no harness
+# server can start beside it, and the takeover steps quit only --agent-port listeners. An ended
+# wait reports the holder record the last claim attempt itself printed.
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
@@ -30,6 +31,10 @@ $MaximumOutputCharacters = 2048
 $PollMilliseconds = 5000
 # Mirrors the five-minute staleness rule that agent-harness worker.md step 11 owns.
 $StaleHeartbeatSeconds = 300
+# The foreign-owner claim wait, timed from after provisioning, stays under Claude Code's 600000 ms
+# tool cap and outlasts $StaleHeartbeatSeconds, so a holder that stops heartbeating is still judged
+# stale within one invocation.
+$WaitBudgetSeconds = 480
 
 $result = [ordered]@{
 	schemaVersion = 'broken-engine-harness-claim/v1'
@@ -289,7 +294,7 @@ try {
 
 	# The Shared data directory belongs to the primary checkout, so a later refresh or export can
 	# change it after this worktree's build. Refusing here, before provisioning and before the
-	# unbounded wait on a foreign lock holder, brings that stop to the caller at once.
+	# bounded wait on a foreign lock holder, brings that stop to the caller at once.
 	foreach ($recordTarget in $recordTargets) {
 		$dataChange = Compare-AgentSharedDataRecord $root $dataDirectory $project $recordTarget $Configuration
 		if ($null -ne $dataChange) { Complete-HarnessClaim 2 'blocked' $dataChange.Code $dataChange.Message }
@@ -350,12 +355,15 @@ try {
 
 	# Only the claim attempt repeats: provisioning, the harness path, and the owner token above stay
 	# valid for the whole wait, and the same owner token reclaims after each foreign-owner refusal.
-	# The wait ends only when the lock is acquired or the refused holder's heartbeat reaches
-	# $StaleHeartbeatSeconds old while no project server started without --agent-port is running, so a
-	# holder that keeps its heartbeat fresh is waited on instead of being given up on, and a holder the
-	# worker may take over is not waited past once no such server remains.
+	# The wait ends when the lock is acquired, when the refused holder's heartbeat reaches
+	# $StaleHeartbeatSeconds old while no project server started without --agent-port is running, or
+	# when $WaitBudgetSeconds have passed. A holder the worker may take over is not waited past once no
+	# such server remains, and the budget, checked after staleness so a holder that goes stale inside it
+	# still ends with claim.foreign-owner, ends any other wait with claim.wait-timeout, which the caller
+	# answers by re-invoking instead of giving up on the holder.
 	$stopwatch = [Diagnostics.Stopwatch]::StartNew()
 	$attempts = 0
+	$budgetEnded = $false
 	while ($true) {
 		$attempts++
 		$claim = Invoke-NativeCapture $agentHarness @(
@@ -382,6 +390,10 @@ try {
 			if ($gameServers.Count -eq 0) { break }
 			$remainingMilliseconds = $PollMilliseconds
 		}
+		if ($stopwatch.Elapsed.TotalSeconds -ge $WaitBudgetSeconds) {
+			$budgetEnded = $true
+			break
+		}
 		Start-Sleep -Milliseconds ([Math]::Min($PollMilliseconds, $remainingMilliseconds))
 	}
 
@@ -403,6 +415,11 @@ try {
 		heartbeatAt = Get-LockField $record 'heartbeatAt'
 		holdSeconds = $holdSeconds
 		record = $record
+	}
+	if ($budgetEnded) {
+		Complete-HarnessClaim 2 'blocked' 'claim.wait-timeout' ("Harness lock '$Key' is held by owner $(Get-LockField $record 'owner') " +
+			"since $claimedAtText ($holdSeconds seconds) and was still held after waiting " +
+			"$([Math]::Round($stopwatch.Elapsed.TotalSeconds, 3)) seconds over $attempts attempt(s).")
 	}
 	Complete-HarnessClaim 2 'blocked' 'claim.foreign-owner' ("Harness lock '$Key' is held by owner $(Get-LockField $record 'owner') " +
 		"since $claimedAtText ($holdSeconds seconds) and has gone stale after waiting " +

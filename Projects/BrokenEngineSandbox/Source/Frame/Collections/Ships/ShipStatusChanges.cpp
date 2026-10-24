@@ -33,7 +33,6 @@ void ApplyUpdateStatusChanges(Frame& rFrame, const FrameInput& rFrameInput, cons
 {
 	int64_t iUpdateFleetCount = 0;
 	engine::GridCoord updateFleetNewCoordinate {};
-	int64_t iUpdateFleetFlagshipGlobalId = 0;
 
 	for (const StatusChange& rStatusChange : rFrameInput.statusChanges)
 	{
@@ -42,16 +41,6 @@ void ApplyUpdateStatusChanges(Frame& rFrame, const FrameInput& rFrameInput, cons
 			const UpdateFleetData& rUpdate = std::get<UpdateFleetData>(rStatusChange.data);
 			bool bFound = VisitShipByUuid(rFrame, rUpdate.eType, rUpdate.iUuid, [&]([[maybe_unused]] const auto& rInterpolate, auto& rPostRender, int64_t iIndex)
 			{
-				if (rUpdate.bIsFlagship)
-				{
-					rPostRender.pOrders[iIndex].Set(ShipOrders::kIsFlagship);
-					iUpdateFleetFlagshipGlobalId = rPostRender.pGlobalIds[iIndex].iValue;
-				}
-				else
-				{
-					rPostRender.pOrders[iIndex].Set(ShipOrders::kIsFlagship, false);
-				}
-				rPostRender.pFlagshipGlobalIds[iIndex] = rUpdate.flagshipGlobalId;
 				rPostRender.pFleetWantedCoordinates[iIndex] = rUpdate.fleetWantedCoordinate;
 				rPostRender.puiPendingFleetWantedCoordinateTicks[iIndex] = rUpdate.uiPendingFleetWantedCoordinateTicks;
 			});
@@ -101,7 +90,7 @@ void ApplyUpdateStatusChanges(Frame& rFrame, const FrameInput& rFrameInput, cons
 
 	if (iUpdateFleetCount > 0)
 	{
-		LOG(kNetwork, kVerbose, "ApplyUpdateStatusChanges::kUpdateFleet Coord: ({},{}) NewWantedCoord: ({},{}) Ships: {} Flagship: {}", rStaticData.coordinate.iX, rStaticData.coordinate.iY, updateFleetNewCoordinate.iX, updateFleetNewCoordinate.iY, iUpdateFleetCount, iUpdateFleetFlagshipGlobalId);
+		LOG(kNetwork, kVerbose, "ApplyUpdateStatusChanges::kUpdateFleet Coord: ({},{}) NewWantedCoord: ({},{}) Ships: {}", rStaticData.coordinate.iX, rStaticData.coordinate.iY, updateFleetNewCoordinate.iX, updateFleetNewCoordinate.iY, iUpdateFleetCount);
 	}
 }
 

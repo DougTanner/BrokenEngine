@@ -390,10 +390,23 @@ static std::pair<engine::GridCoord, ScheduledStatusChange> BuildInjectedEntry(co
 			break;
 		}
 		case StatusChangeType::kDestroyShip:
+		{
+			DestroyShipData& rData = std::get<DestroyShipData>(scheduled.change.data);
 			RequireEntryKey<FRAME_COLUMN(DestroyShipData, eType)>(rEntry);
 			RequireEntryKey<FRAME_COLUMN(DestroyShipData, iUuid)>(rEntry);
-			ParseStatusChangeFields(rEntry, std::get<DestroyShipData>(scheduled.change.data));
+			ParseStatusChangeFields(rEntry, rData);
+			// A fleet Battleship is permanent, so its removal is refused.
+			if (rData.eType == ShipType::kBattleship)
+			{
+				const Frame& rFrame = QueryFrame(rEntry);
+				auto it = rFrame.interpolate.pBattleships->idToIndexMap.find(BattleshipsInterpolate::id_t(engine::Uuid(rData.iUuid)));
+				if (it != rFrame.interpolate.pBattleships->idToIndexMap.end() && rFrame.postRender.pBattleships->pController[it->second] == ShipController::kFleet)
+				{
+					throw std::runtime_error(std::format("DestroyShip '{}' {} is a fleet Battleship and cannot be destroyed", FRAME_COLUMN(DestroyShipData, iUuid)::kName, rData.iUuid));
+				}
+			}
 			break;
+		}
 		case StatusChangeType::kUpdateShip:
 		{
 			UpdateShipData& rData = std::get<UpdateShipData>(scheduled.change.data);

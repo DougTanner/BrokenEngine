@@ -251,12 +251,6 @@ static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFram
 		FollowFlagship(rPreviousFrame, vecPosition, flagshipGlobalId, riNavigationDirection, rVecIslandDestination);
 	}
 
-	if ((orders & ShipOrders::kIsFlagship) && riNavigationDirection == 5 && (fleetWantedCoordinate == rStaticData.coordinate))
-	{
-		riNavigationDirection = 4;
-		rVecIslandDestination = XMVectorZero();
-	}
-
 	// Cell change timer: cycle back to island destination when roaming
 	if (riNavigationDirection == -1)
 	{
@@ -355,10 +349,8 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 
 	if (riNavigationDirection == 5)
 	{
-		// A missing flagship leaves FollowFlagship without a target. OnOwnedEntityDeath shifts the flagship after removal;
-		// ProcessFlagshipUpdates queues kUpdateFleet, whose Update handler writes kIsFlagship and the flagship global ID.
-		// Followers normally stall one tick before replacement or fleet override. A same-cell promoted flagship
-		// recovers on D+2 via mode 4, clearing its stale destination without advancing the rally timer.
+		// A missing flagship leaves FollowFlagship without a target; the fleet flagship is its Battleship, which never
+		// dies, so a follower stalls until that row is back in this cell or the fleet override moves it on.
 		// Agent-injected ships have no Fleet updates. Mode 5 follows without arrival or missing-flagship fallback.
 		// It consumes three draws (island pick, footprint X/Y) each tick with islands; mode 4 draws only when
 		// selecting a destination. Both skip draws without islands. Every Random call advances once regardless of bound.

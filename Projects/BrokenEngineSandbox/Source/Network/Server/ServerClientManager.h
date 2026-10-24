@@ -7,29 +7,19 @@
 namespace game
 {
 
-struct ClientSpawnInformation
-{
-	int64_t iClientId = 0;
-	engine::ClientGuid clientGuid {};
-	// Default-constructed (empty) guid means this spawn is not fleet-triggered.
-	FleetGuid fleetGuid {};
-	// Invalid {} spawns a new fleet member; a valid ID respawns that member and keeps its ID.
-	engine::GlobalId memberGlobalId {};
-	ShipType eType {};
-};
-
 class ServerClientManager
 {
 public:
 
-	void QueueSpawnForClient(int64_t iClientId, const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId, ShipType eType);
 	void NewClients();
-	void SpawnWaitingClients();
+	void SpawnFleetMember(const engine::ClientGuid& rClientGuid, const Fleet& rFleet, FleetMember& rMember);
 	void OnClientDisconnected(int64_t iClientId, const engine::ClientGuid& rClientGuid);
 	void ResetState();
 
-	std::vector<ClientSpawnInformation> mClientsWaitingForSpawn;
 	std::unordered_set<int64_t> mProcessedClientIds;
+	// Per fleet, the first spawn tick at which its Battleship may launch another Fighter. Outside the Frame and never in a
+	// grid save: replay fleet records carry it, and a launch reaches clients only as its spawn status change.
+	std::unordered_map<FleetGuid, int64_t> mNextFighterLaunchTicks;
 
 private:
 

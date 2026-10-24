@@ -13,7 +13,7 @@ Collection-slot hydration rules are in `../../Frame/Collections/AGENTS.md`.
 ## Ownership
 
 - Engine-owned: connection/GUID/discovery, subscription and clock state, generic full-state/delta adoption, the received-update ring/buffer/confirmation mechanics and drain order, clock correction, the per-coordinate reconcile work list and its parallel dispatch, filling the desync record, reported-desync selection, the remaining desync core, and the session-base duties in the [engine client overview](../../../../../Engine/Source/Network/Client/AGENTS.md#overview).
-- `ClientSession` triggers desired-coordinate updates on game events, applies each owned-entity event to the client's owned-entity list, hydrates gameplay state with smoke continuity, and clears game identity, fleet, and visual-error state on server load.
+- `ClientSession` triggers desired-coordinate updates on game events, applies each owned-entity event to the client's owned-entity list, hydrates gameplay state with smoke continuity, and clears game identity, fleet, and visual-error state on server load. Focus moves to a newly added fleet member once it exists as an owned entity: at the fleet sync that adds it if its `Spawned` owned-entity event was already applied, otherwise when that event arrives.
 - `ClientReconciler` runs one engine reconcile dispatch per client update, returns the desync record the dispatch fills to the session base, and owns what stays game-side: confirmed client-state tracking and the visual-error aggregation and cross-coordinate owned-entity transfer migration it computes from the dispatch result.
 
 ## Session Policy

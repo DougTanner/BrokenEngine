@@ -73,6 +73,7 @@ void FleetSelection::SelectOwnedEntityInFleet(engine::GlobalId memberGlobalId)
 	}
 
 	mFocusedMemberGlobalId = memberGlobalId;
+	mPendingFocusMemberGlobalId = {};
 	gpGame->mWeaponModeToggle.Reset();
 
 	const FleetMember& rMember = *memberIt;
@@ -147,7 +148,7 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 					}
 				}
 			}
-			// The server's fleet invariant guarantees the flagship names a member, or is {} for an empty fleet.
+			// The server's fleet invariant guarantees the flagship names a member.
 			if (!(mFocusedMemberGlobalId.iValue != 0))
 			{
 				mFocusedMemberGlobalId = rFleet.flagshipGlobalId;
@@ -160,8 +161,6 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 
 	if (!bRestoredRemembered)
 	{
-		// Re-anchor by identity before clamping: the server can erase a fleet from the middle of the vector,
-		// so an index still in range would otherwise silently address a different fleet.
 		int64_t iReanchoredFleetIndex = FindFleetIndexByGuid(previousFocusedFleetGuid);
 		if (iReanchoredFleetIndex >= 0)
 		{
@@ -191,20 +190,37 @@ void FleetSelection::SynchronizeFleets(std::vector<Fleet>&& rFleets)
 
 		if (std::ssize(pFleet->members) > iPreviousFocusedFleetMemberCount)
 		{
-			mFocusedMemberGlobalId = pFleet->members.back().globalId;
+			engine::GlobalId newMemberGlobalId = pFleet->members.back().globalId;
+			// The spawn event and this sync share one reliable flush, and the client applies owned-entity events
+			// before game packets, so the spawn may already have been applied.
+			if (std::ranges::contains(gpGame->mClientOwnedEntityIdentifiers, newMemberGlobalId))
+			{
+				mFocusedMemberGlobalId = newMemberGlobalId;
+				mPendingFocusMemberGlobalId = {};
+			}
+			else
+			{
+				mPendingFocusMemberGlobalId = newMemberGlobalId;
+			}
 		}
-		else if (!(mFocusedMemberGlobalId.iValue != 0) && !pFleet->members.empty())
+		else if (!(mFocusedMemberGlobalId.iValue != 0) && !pFleet->members.empty() && pFleet->members.back().globalId != mPendingFocusMemberGlobalId)
 		{
 			mFocusedMemberGlobalId = pFleet->members.back().globalId;
 		}
 
+		if (!std::ranges::contains(pFleet->members, mPendingFocusMemberGlobalId, &FleetMember::globalId))
+		{
+			mPendingFocusMemberGlobalId = {};
+		}
+
+		// The pending member has no owned-entity coordinate until its spawn event, even once a sync clears its kIsDead.
 		auto focusedIt = std::ranges::find(pFleet->members, mFocusedMemberGlobalId, &FleetMember::globalId);
-		if ((mFocusedMemberGlobalId.iValue != 0) && (focusedIt->flags & FleetMemberFlags::kIsDead))
+		if (!(mFocusedMemberGlobalId.iValue != 0) || (focusedIt->flags & FleetMemberFlags::kIsDead))
 		{
 			mFocusedMemberGlobalId = {};
 			for (const FleetMember& rMember : pFleet->members)
 			{
-				if (!(rMember.flags & FleetMemberFlags::kIsDead))
+				if (!(rMember.flags & FleetMemberFlags::kIsDead) && rMember.globalId != mPendingFocusMemberGlobalId)
 				{
 					mFocusedMemberGlobalId = rMember.globalId;
 					break;
@@ -248,9 +264,9 @@ void FleetSelection::Clear()
 	mClientFleets.clear();
 	miFocusedFleetIndex = -1;
 	mFocusedMemberGlobalId = {};
+	mPendingFocusMemberGlobalId = {};
 	mCreateFleetToggle.Reset();
 	mSpawnIntoFleetToggle.Reset();
-	mDeleteFleetToggle.Reset();
 	mNavigationDelayControl.Reset();
 }
 

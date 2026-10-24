@@ -45,6 +45,9 @@ void ServerSessionBase::PrepareTick()
 		game::gpGame->mFrameInputs.try_emplace(rCoordinate);
 	}
 
+	// Before the broadcast snapshot, so the game's per-tick changes enter this tick's broadcast and recorded input.
+	game::gpServerSession->TickGameTimers(!gpReplay->mReplayWriters.empty());
+
 	mpBroadcaster->PrepareTickStatusChanges();
 }
 

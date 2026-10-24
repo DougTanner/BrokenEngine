@@ -120,14 +120,12 @@ struct UpdateFleetData
 {
 	ShipType eType {};
 	int64_t iUuid = 0;
-	bool bIsFlagship = false;
-	engine::GlobalId flagshipGlobalId {};
 	engine::GridCoord fleetWantedCoordinate {};
 	uint8_t uiPendingFleetWantedCoordinateTicks = 0;
 
 	static constexpr auto Fields()
 	{
-		return engine::FrameColumnList<FRAME_COLUMN(UpdateFleetData, eType), FRAME_COLUMN(UpdateFleetData, iUuid), FRAME_COLUMN(UpdateFleetData, bIsFlagship), FRAME_COLUMN(UpdateFleetData, flagshipGlobalId), FRAME_COLUMN(UpdateFleetData, fleetWantedCoordinate), FRAME_COLUMN(UpdateFleetData, uiPendingFleetWantedCoordinateTicks)> {};
+		return engine::FrameColumnList<FRAME_COLUMN(UpdateFleetData, eType), FRAME_COLUMN(UpdateFleetData, iUuid), FRAME_COLUMN(UpdateFleetData, fleetWantedCoordinate), FRAME_COLUMN(UpdateFleetData, uiPendingFleetWantedCoordinateTicks)> {};
 	}
 };
 

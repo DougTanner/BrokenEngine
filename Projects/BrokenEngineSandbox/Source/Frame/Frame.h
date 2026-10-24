@@ -12,6 +12,9 @@
 namespace game
 {
 
+// Seconds between a cell's random-spawn wave attempts, and between two Fighter launches of one fleet.
+inline constexpr float kfShipSpawnInterval = 0.5f;
+
 struct Frame;
 struct BlastersInterpolate;
 struct BlastersPostRender;

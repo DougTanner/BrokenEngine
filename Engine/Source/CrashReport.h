@@ -19,6 +19,8 @@ bool HandleException(std::optional<const std::exception*> optionalException = st
 void PromptCrashReportDesktopCopy();
 std::optional<CrashReportHeader> ParseCrashReportHeader(std::string_view report);
 #if defined(BT_CLIENT)
+// Allocates, so it runs only at startup and never on the crash path.
+std::wstring ClientInstanceMutexName();
 void TryUploadCrashReport();
 void PollPendingCrashReport(Client* pClient);
 #endif

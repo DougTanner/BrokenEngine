@@ -9,7 +9,7 @@ Live recipe for the engine
 Run it in order.
 
 1. `reset` the server, then inject one flagship at the origin: `inject_payload {"entries":[{"coord":[0,0],"type":"SpawnOmni","orders":1}]}` (`orders` `kIsFlagship`). Do not set `fleetWantedCoordinate` — the client auto-follows its own ship, which would make the coordinate evidence ambiguous.
-2. Give the client the assigned owned entity this command requires. A connected client starts with zero owned entities and the injected flagship is unowned AI, so spawn through the ordinary fleet path: client `click {"label":"[+]##Fleet"}`, then client `click {"label":"[+O]##Omni"}`. Then poll `set_client_grid_coord {"coord":[0,0]}` until it returns `ok:true`; it returns `ok:false` until the server has assigned the spawned owned entity. Do no coordinate work before that.
+2. Wait for the assigned owned entity this command requires. The injected flagship is unowned AI; the client's owned entity is the Battleship of the fleet the server makes for it at connect, and again after the `reset`. Poll `set_client_grid_coord {"coord":[0,0]}` until it returns `ok:true`; it returns `ok:false` until the server has assigned the spawned owned entity. Do no coordinate work before that.
 3. Set the server Network log level to Debug with
    `set_log_level {"category":"Network","level":"Debug"}` so the decisive server
    lines emit past the default `kInfo` runtime threshold. Do not ask the client

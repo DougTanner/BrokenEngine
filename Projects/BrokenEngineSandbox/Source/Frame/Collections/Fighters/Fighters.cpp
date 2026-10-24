@@ -547,6 +547,27 @@ bool FightersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	return true;
 }
 
+// The collision body's 3D sphere test against every other ship row of the previous frame, any alignment or lifecycle
+// state.
+static bool XM_CALLCONV OverlapsAnotherShip(const Frame& rPreviousFrame, int64_t iFighterRow, FXMVECTOR vecPosition)
+{
+	bool bOverlaps = false;
+	ForEachShipType(rPreviousFrame, [&](ShipType eType, const auto& rShipInterpolate, [[maybe_unused]] const auto& rShipPostRender)
+	{
+		float fRadius = eType == ShipType::kFighter ? kfFighterRadius : eType == ShipType::kOmni ? kfOmniRadius : kfBattleshipRadius;
+		float fCombinedRadius = kfFighterRadius + fRadius;
+		for (int64_t i = 0; i < rShipInterpolate.iCount && !bOverlaps; ++i)
+		{
+			if (eType == ShipType::kFighter && i == iFighterRow)
+			{
+				continue;
+			}
+			bOverlaps = XMVectorGetX(XMVector3LengthSq(XMVectorSubtract(vecPosition, rShipInterpolate.pVecPositions[i]))) <= fCombinedRadius * fCombinedRadius;
+		}
+	});
+	return bOverlaps;
+}
+
 void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_unused]] const Frame& __restrict rPreviousFrame, [[maybe_unused]] const engine::CellStaticData& rStaticData)
 {
 	engine::ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderUpdateFighters);
@@ -628,6 +649,11 @@ void FightersPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[may
 				SteerHeadingTowards(vecPosition, vecDirection, vecDestination, bHasDestination, fTurnRate, kfFighterSteeringSmoothing, kfFighterSteeringDecay, deltaTime, fDeltaRotation);
 				ApplyHeadingMovement(vecDirection, flags, deltaTime, kFighterMovement, vecVelocity);
 				ApplyPusherPush(rFrame, vecPosition, rCurrentInterpolate.pPushers[i], kfFighterMaxPusherPushVelocity, vecVelocity);
+			}
+
+			if ((rPrevious.pOrders[i] & ShipOrders::kSpawning) && !OverlapsAnotherShip(rPreviousFrame, i, vecPosition))
+			{
+				rCurrent.pOrders[i].Set(ShipOrders::kSpawning, false);
 			}
 		}
 		else

@@ -652,6 +652,7 @@ void Client::ServerConnectionResponse(std::span<const uint8_t> packetData)
 		{
 			mStateFlags.Set(ClientStateFlags::kServerDebugInput);
 		}
+		mStateFlags.Set(ClientStateFlags::kServerReplaying, message.uiReplaying != 0);
 
 		if (message.bHasGuid)
 		{
@@ -801,6 +802,7 @@ void Client::ServerLoadNotification(std::span<const uint8_t> packetData)
 	mReceivedGamePackets.clear();
 	mReceivedOwnedEntityEvents.clear();
 	mStateFlags.Set(ClientStateFlags::kLoadNotificationReceived);
+	mStateFlags.Set(ClientStateFlags::kServerReplaying, message.uiReplaying != 0);
 }
 
 void Client::ServerTimespeedUpdate(std::span<const uint8_t> packetData)

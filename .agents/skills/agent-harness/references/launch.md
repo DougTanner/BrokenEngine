@@ -67,16 +67,23 @@ simultaneous client gets its own root instead (see
 reports are always written under the `--app-data-directory` root when the
 complete identity fits the fixed path buffer:
 `<app-data-root>\<Game Name>\<Game-Name>-Crash-Report.txt`; otherwise the
-existing `%APPDATA%` per-user location remains. A client Yes at the
+existing `%APPDATA%` per-user location remains. A crash before the game
+resolves those paths writes `Crash-Report.txt` to its working directory, which
+the launch script sets to the app-data root: `<app-data-root>\Crash-Report.txt`.
+That file is shared by every role launched on the root rather than tied to one,
+so the process check can report it under more than one exited role.
+A client Yes at the
 save-to-desktop prompt, which appears only in a launch without `--agent-port`,
 adds a Desktop copy; the server always adds one without asking, harness launches
 included. These are the identities the process check
 baselines, which is why its `-GameName` is the role's `<Game Name>`
 (`<server game name>` or `<client game name>`) and its
-`-ConfiguredAppDataRoot` is the same root this block launches with. A report the
-check reports as newly written stays on disk as evidence until the role's next
-launch with the same root renames it to `<Game-Name>-Crash-Report-Pending.txt`
-beside it; never delete, move, or rewrite one. A fresh root has no autosave and cold
+`-ConfiguredAppDataRoot` is the same root this block launches with. A
+`<Game-Name>-Crash-Report.txt` the check reports as newly written stays on disk
+as evidence until the role's next launch with the same root renames it to
+`<Game-Name>-Crash-Report-Pending.txt` beside it, and a reported
+`<app-data-root>\Crash-Report.txt` stays there because no launch renames it;
+never delete, move, or rewrite one. A fresh root has no autosave and cold
 `pipeline.cache`/`BrdfLut.cache`, so the first launch after creating it is
 slower; wrapper-worktree setup pre-seeds those two caches into the shared
 `Temp\AppData` root while creating the worktree, taking each file independently
@@ -225,6 +232,7 @@ pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.p
   `claim.foreign-owner` result's `gameDataDirectory`, and its new owner token is
   not kept either; a `BLOCKED` takeover is reported to the user with nothing
   launched.
+- `claim.wait-timeout`: re-invoke the claim.
 - Any other non-zero exit: report the claim result to the user and launch nothing.
 
 Then launch both. Take the `$Output`, `$ServerExe`, and `$ClientExe` values from the `## Machine-readable launch configuration` of the project hub, `Projects/<Project>/Documents/AgentHarness.md`; its executable names are the Debug ones, so under a Profile or Release claim substitute the `.Profile.exe` or the unsuffixed `.exe` names:

@@ -97,6 +97,9 @@ writes; each caller passes whole strings so a path is never split across two
 writes. The header carries a crash-report version, and
 `ParseCrashReportHeader`, the one parser of that header, rejects any other or
 missing version, so bump the version on any header or report layout change.
+The client's single-instance check is keyed on its live report path, so only
+one client process uses an app-data folder at a time; one folder named by two
+different path strings is not detected.
 `ProcessMain` renames the previous run's non-empty report to the pending file
 beside it, right after the single-instance check and before any other thread
 starts, and only when both paths resolved from the same base. From then on

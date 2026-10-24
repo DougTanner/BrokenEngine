@@ -330,12 +330,7 @@ void PackChunkLoader::LoadChunk(const LoadRequest& rRequest, int64_t iThreadInde
 
 	bool bCompressed = common::IsCompressed(rLazyChunk.header.flags);
 
-#if defined(BT_CLIENT)
-	if (rLazyChunk.header.flags & common::ChunkFlags::kTexture)
-	{
-		VERIFY_SUCCESS(mrPackChunks.RecommitChunkRange(rRequest.crc, rLazyChunk, 0, rLazyChunk.iDataSize));
-	}
-#endif // BT_CLIENT
+	VERIFY_SUCCESS(mrPackChunks.RecommitChunkRange(rRequest.crc, rLazyChunk, 0, rLazyChunk.iDataSize));
 
 	int64_t iOnDiskSize = rLazyChunk.location.uiSize - common::kiChunkDataOffset;
 

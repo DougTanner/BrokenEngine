@@ -14,11 +14,16 @@ public:
 	void RenderModel(int64_t iCommandBuffer);
 
 private:
+	enum class ViewerFlags : uint8_t
+	{
+		kPlaying = 0x02,
+	};
+
 	struct Preview
 	{
 		common::crc_t crc = 0;
 		const char* pcPath = nullptr;
-		// Cache rest output once so framebuffer publication needs no pose evaluation or heap allocation.
+		// Cache rest output once for bounds and rest-pose publication.
 		std::vector<common::MeshData> meshData;
 		std::vector<common::JointMatrix> jointMatrices;
 		XMFLOAT3A f3Center {};
@@ -28,7 +33,11 @@ private:
 	std::vector<Preview> mPreviews;
 	int64_t miSelected = 0;
 	int64_t miFittedSelection = -1;
-	bool mbOrbiting = false;
+	int64_t miSelectedAnimation = -1;
+	std::chrono::duration<float> mAnimationTime {};
+	common::Flags<ViewerFlags> mFlags;
+	int64_t miDragButton = -1;
+	glm::vec2 mPreviousMousePosition {};
 
 	common::Timer mTimer;
 	std::unordered_map<engine::GridCoord, FrameInterpolate> mRenderInterpolates;

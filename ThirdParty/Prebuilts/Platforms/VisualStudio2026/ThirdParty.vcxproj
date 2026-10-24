@@ -86,7 +86,7 @@
       <Optimization>Disabled</Optimization>
       <SupportJustMyCode>false</SupportJustMyCode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(ProjectDir)\..\..\..\;$(ProjectDir)\..\..\..\imgui;$(ProjectDir)\..\..\..\implot;$(ProjectDir)\..\..\..\DirectXTK\Inc;$(ProjectDir)\..\..\..\DirectXTK\Src;$(ProjectDir)\..\..\..\mimalloc\include;$(ProjectDir)\..\..\..\zlib;$(ProjectDir)\..\..\..\lz4\lib;$(ProjectDir)\..\..\..\enet\include;$(ProjectDir)\..\..\..\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\cmft\include;$(ProjectDir)\..\..\..\cmft\src;$(ProjectDir)\..\..\..\cmft\dependency;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(ProjectDir)\..\..\..\;$(ProjectDir)\..\..\..\glm;$(ProjectDir)\..\..\..\imgui;$(ProjectDir)\..\..\..\implot;$(ProjectDir)\..\..\..\DirectXTK\Inc;$(ProjectDir)\..\..\..\DirectXTK\Src;$(ProjectDir)\..\..\..\mimalloc\include;$(ProjectDir)\..\..\..\zlib;$(ProjectDir)\..\..\..\lz4\lib;$(ProjectDir)\..\..\..\enet\include;$(ProjectDir)\..\..\..\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\cmft\include;$(ProjectDir)\..\..\..\cmft\src;$(ProjectDir)\..\..\..\cmft\dependency;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>USING_XINPUT;VK_NO_PROTOTYPES;VK_USE_PLATFORM_WIN32_KHR;_ITERATOR_DEBUG_LEVEL=0;_MSVC_STL_HARDENING_VECTOR=0;_MSVC_STL_HARDENING_SPAN=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
@@ -107,7 +107,7 @@
       <TreatWarningAsError>false</TreatWarningAsError>
       <Optimization>MaxSpeed</Optimization>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(ProjectDir)\..\..\..\;$(ProjectDir)\..\..\..\imgui;$(ProjectDir)\..\..\..\implot;$(ProjectDir)\..\..\..\DirectXTK\Inc;$(ProjectDir)\..\..\..\DirectXTK\Src;$(ProjectDir)\..\..\..\mimalloc\include;$(ProjectDir)\..\..\..\zlib;$(ProjectDir)\..\..\..\lz4\lib;$(ProjectDir)\..\..\..\enet\include;$(ProjectDir)\..\..\..\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\cmft\include;$(ProjectDir)\..\..\..\cmft\src;$(ProjectDir)\..\..\..\cmft\dependency;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(ProjectDir)\..\..\..\;$(ProjectDir)\..\..\..\glm;$(ProjectDir)\..\..\..\imgui;$(ProjectDir)\..\..\..\implot;$(ProjectDir)\..\..\..\DirectXTK\Inc;$(ProjectDir)\..\..\..\DirectXTK\Src;$(ProjectDir)\..\..\..\mimalloc\include;$(ProjectDir)\..\..\..\zlib;$(ProjectDir)\..\..\..\lz4\lib;$(ProjectDir)\..\..\..\enet\include;$(ProjectDir)\..\..\..\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\cmft\include;$(ProjectDir)\..\..\..\cmft\src;$(ProjectDir)\..\..\..\cmft\dependency;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>USING_XINPUT;VK_NO_PROTOTYPES;VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
@@ -130,7 +130,7 @@
       <TreatWarningAsError>false</TreatWarningAsError>
       <Optimization>MaxSpeed</Optimization>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(ProjectDir)\..\..\..\;$(ProjectDir)\..\..\..\imgui;$(ProjectDir)\..\..\..\implot;$(ProjectDir)\..\..\..\DirectXTK\Inc;$(ProjectDir)\..\..\..\DirectXTK\Src;$(ProjectDir)\..\..\..\mimalloc\include;$(ProjectDir)\..\..\..\zlib;$(ProjectDir)\..\..\..\lz4\lib;$(ProjectDir)\..\..\..\enet\include;$(ProjectDir)\..\..\..\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\cmft\include;$(ProjectDir)\..\..\..\cmft\src;$(ProjectDir)\..\..\..\cmft\dependency;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VK_SDK_PATH)\Include;$(ProjectDir)\..\..\..\;$(ProjectDir)\..\..\..\glm;$(ProjectDir)\..\..\..\imgui;$(ProjectDir)\..\..\..\implot;$(ProjectDir)\..\..\..\DirectXTK\Inc;$(ProjectDir)\..\..\..\DirectXTK\Src;$(ProjectDir)\..\..\..\mimalloc\include;$(ProjectDir)\..\..\..\zlib;$(ProjectDir)\..\..\..\lz4\lib;$(ProjectDir)\..\..\..\enet\include;$(ProjectDir)\..\..\..\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)\..\..\Source\DataPacker\openexr;$(ProjectDir)\..\..\..\cmft\include;$(ProjectDir)\..\..\..\cmft\src;$(ProjectDir)\..\..\..\cmft\dependency;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>USING_XINPUT;VK_NO_PROTOTYPES;VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
@@ -148,6 +148,7 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Source\Engine\ArcBall.cpp" />
     <ClCompile Include="..\..\Source\Engine\DirectXTK.cpp">
       <ObjectFileName>$(IntDir)Engine\</ObjectFileName>
     </ClCompile>
@@ -710,6 +711,9 @@
       <PreprocessorDefinitions>$(AssimpPreprocessorDefinitions);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)assimp\contrib_unzip_unzip.obj</ObjectFileName>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Source\Engine\ArcBall.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -3,29 +3,15 @@
 #if defined(BT_SERVER)
 
 #include "Network/Server/FleetNavigationController.h"
+#include "Network/Server/ServerFleetSerialization.h"
 #include "Fleet.h"
-
-namespace engine
-{
-
-struct OwnedEntity;
-
-} // namespace engine
 
 namespace game
 {
 
-struct ClientSpawnInformation;
-
 struct PendingCreateFleetRequest
 {
 	int64_t iClientId = 0;
-};
-
-struct PendingDeleteFleetRequest
-{
-	int64_t iClientId = 0;
-	FleetGuid fleetGuid {};
 };
 
 struct PendingSpawnIntoFleetRequest
@@ -35,13 +21,6 @@ struct PendingSpawnIntoFleetRequest
 	ShipType eType {};
 };
 
-struct PendingRespawnInFleetRequest
-{
-	int64_t iClientId = 0;
-	FleetGuid fleetGuid {};
-	engine::GlobalId memberGlobalId {};
-};
-
 class ServerFleetManager
 {
 public:
@@ -49,43 +28,23 @@ public:
 	ServerFleetManager();
 
 	void ProcessCreateFleetRequests();
-	void ProcessDeleteFleetRequests();
 	void ProcessSpawnIntoFleetRequests();
-	void ProcessRespawnInFleetRequests();
 	void TickFleetTimers();
-	void ProcessFlagshipUpdates();
+	void TickRespawnTimers();
 
-	void SendFleetSyncToClient(int64_t iClientId, const engine::ClientGuid& rClientGuid);
+	void SendFleetSyncToClient(const engine::ClientGuid& rClientGuid);
 
 	void ClearPendingRequests();
 
-	void OnOwnedEntityDeath(const engine::ClientGuid& rGuid, engine::GlobalId globalId);
-	void OnOwnedEntitySpawned(int64_t iClientId, const engine::ClientGuid& rClientGuid, const ClientSpawnInformation& rSpawnInfo, engine::GlobalId globalId);
 	void OnOwnedEntityTransferred(const engine::ClientGuid& rGuid, engine::GlobalId globalId, engine::GridCoord destination);
 	void OnClientConnected(int64_t iClientId, const engine::ClientGuid& rClientGuid);
 	void OnClientDisconnected(int64_t iClientId, const engine::ClientGuid& rClientGuid);
 	void OnResetForLoad(int64_t iClientId, const engine::ClientGuid& rClientGuid);
-
-	enum class FleetLookupFlags : uint8_t
-	{
-		kFound      = 1 << 0,
-		kIsFlagship = 1 << 1,
-	};
-	using FleetLookupFlags_t = common::Flags<FleetLookupFlags>;
-
-	struct FleetLookupResult
-	{
-		FleetLookupFlags_t flags {};
-		engine::GlobalId flagshipGlobalId {};
-		engine::GridCoord fleetWantedCoord {};
-		int64_t iPendingFleetWantedCoordTicks = 0;
-		std::array<uint8_t, std::to_underlying(ShipType::kCount)> targetFlightPlanes {};
-	};
-	FleetLookupResult LookupFleetWantedCoord(const engine::ClientGuid& rClientGuid, const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId);
+	void RebuildFleetMembersForLoad();
 
 	void UpdateFleetNavigationDelay(const engine::ClientGuid& rGuid, const FleetGuid& rFleetGuid, std::chrono::duration<float> navigationDelaySeconds);
 
-	void DetectDisconnectedOwnedEntityDeaths();
+	void DetectFleetMemberDeaths();
 
 	// Destructive wipe of all fleet state (mFleets, mGuidToClientId, pending requests).
 	// Use ONLY for fresh-game flows (ServerReset, including the client reset request it serves).
@@ -104,21 +63,19 @@ public:
 
 	common::RandomEngine mRandomEngine;
 
+	ReplayFleetLog mReplayLog;
+
 private:
 
-	// Position of rFleetGuid within one client's fleet vector; -1 when absent. Delete needs the position, not just the fleet.
+	// Position of rFleetGuid within one client's fleet vector; -1 when absent.
 	int64_t FindFleetIndexByGuid(const std::vector<Fleet>& rFleets, const FleetGuid& rFleetGuid) const;
 
-	void TickRespawnTimers();
-	void RefreshFleetMembers(Fleet& rFleet, std::span<const engine::OwnedEntity> ownedEntities);
-	void ResetFleetForLoad(Fleet& rFleet, const engine::ClientGuid& rClientGuid);
+	void CreateFleet(const engine::ClientGuid& rClientGuid);
 
 public:
 
 	std::vector<PendingCreateFleetRequest> mPendingCreateFleetRequests;
-	std::vector<PendingDeleteFleetRequest> mPendingDeleteFleetRequests;
 	std::vector<PendingSpawnIntoFleetRequest> mPendingSpawnIntoFleetRequests;
-	std::vector<PendingRespawnInFleetRequest> mPendingRespawnInFleetRequests;
 };
 
 } // namespace game

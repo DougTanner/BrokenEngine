@@ -262,6 +262,11 @@ inline constexpr bool XmIsInf(float fValue)
 	#endif
 #endif
 
+// ArcBall
+#if defined(BT_CLIENT)
+	#include "Prebuilts/Source/Engine/ArcBall.h"
+#endif
+
 // PerlinNoise
 #if defined(BT_CLIENT)
 	#include "PerlinNoise/PerlinNoise.hpp"

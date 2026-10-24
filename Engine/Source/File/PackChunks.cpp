@@ -376,7 +376,7 @@ void PackChunks::LoadPackFiles()
 		CloseHandle(handlePackValidation);
 	}
 
-	// Pre-allocate memory pool for all lazy chunk data (eliminates heap lock contention during background loading)
+	// Reserve stable chunk destinations without heap lock contention during background loading.
 	int64_t iPoolOffset = 0;
 	for (const auto& [crc, rLazyChunk] : mLazyChunkMap)
 	{
@@ -387,10 +387,13 @@ void PackChunks::LoadPackFiles()
 	miLazyPoolSize = iPoolOffset;
 	if (miLazyPoolSize > 0)
 	{
-		mpLazyPool = static_cast<std::byte*>(VirtualAlloc(nullptr, miLazyPoolSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+		mpLazyPool = static_cast<std::byte*>(VirtualAlloc(nullptr, miLazyPoolSize, MEM_RESERVE, PAGE_READWRITE));
 		if (mpLazyPool == nullptr)
 		{
-			FailMissingRequiredAsset(mDataDirectory, "lazy chunk pool allocation failed");
+			int64_t iError = GetLastError();
+			LOG(kLoading, kError, "Lazy chunk pool reservation failed: bytes={} error={}", miLazyPoolSize, iError);
+			common::ScopedExpectedThrows scopedExpectedThrows;
+			throw std::runtime_error(std::format("Lazy chunk pool allocation failed: requested {} bytes, Windows error {}.", miLazyPoolSize, iError));
 		}
 
 		iPoolOffset = 0;
@@ -894,8 +897,8 @@ void PackChunks::DecommitChunkRange(common::crc_t crc, int64_t iOffset, int64_t 
 {
 	// Reclaim a dead sub-range of a resident lazy chunk. Only the page-aligned interior is decommitted, so the
 	// boundary partial-pages — which may share bytes with the neighbouring heightmap/hull payload — stay committed;
-	// a sub-page range (tiny island) decommits nothing. Other chunks live at disjoint pages in the shared pool
-	// reservation, so they are untouched. Main-thread only, with no concurrent reader of the range.
+	// a sub-page range (tiny island) decommits nothing. Other chunks are untouched.
+	// Main-thread only, with no concurrent reader of the range.
 	// A failed MEM_DECOMMIT is benign (the pages simply stay committed) so its result is not checked.
 	LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
 	int64_t iRangeStart = reinterpret_cast<int64_t>(rLazyChunk.pData) + iOffset;
@@ -911,8 +914,7 @@ void PackChunks::DecommitChunkRange(common::crc_t crc, int64_t iOffset, int64_t 
 
 bool PackChunks::RecommitAndReloadChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength, int64_t iThreadIndex)
 {
-	// Inverse of DecommitChunkRange: re-commit the same page-aligned interior, then re-read the whole
-	// [iOffset, iOffset + iLength) range straight from the pack file on disk.
+	// Commit every page intersecting [iOffset, iOffset + iLength), then re-read that range from the pack.
 	LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
 	// Compressed chunks store decompressed bytes in the pool, so a raw disk reload corrupts that representation without
 	// necessarily crashing. This path requires uncompressed chunks; island chunks satisfy that contract.
@@ -929,20 +931,21 @@ bool PackChunks::RecommitAndReloadChunkRange(common::crc_t crc, int64_t iOffset,
 
 bool PackChunks::RecommitChunkRange(common::crc_t crc, const LazyChunk& rLazyChunk, int64_t iOffset, int64_t iLength)
 {
+	if (iLength == 0)
+	{
+		return true;
+	}
+
 	int64_t iRangeStart = reinterpret_cast<int64_t>(rLazyChunk.pData) + iOffset;
 	int64_t iRangeEnd = iRangeStart + iLength;
-	int64_t iAlignedStart = common::RoundUp(iRangeStart, miPageSize);
-	int64_t iAlignedEnd = common::RoundDown(iRangeEnd, miPageSize);
-	if (iAlignedEnd > iAlignedStart)
+	int64_t iAlignedStart = common::RoundDown(iRangeStart, miPageSize);
+	int64_t iAlignedEnd = common::RoundUp(iRangeEnd, miPageSize);
+	if (VirtualAlloc(reinterpret_cast<void*>(iAlignedStart), static_cast<SIZE_T>(iAlignedEnd - iAlignedStart), MEM_COMMIT, PAGE_READWRITE) == nullptr)
 	{
-		// VirtualAlloc result is an OS trust boundary: on failure the interior stays decommitted and the read below
-		// would fault, so fail the recommit soft (leave the range as-is) rather than crash the recovery path.
-		if (VirtualAlloc(reinterpret_cast<void*>(iAlignedStart), static_cast<SIZE_T>(iAlignedEnd - iAlignedStart), MEM_COMMIT, PAGE_READWRITE) == nullptr)
-		{
-			LOG(kLoading, kError, "Recommit MEM_COMMIT failed for chunk {}", crc);
-			DEBUG_BREAK();
-			return false;
-		}
+		int64_t iError = GetLastError();
+		LOG(kLoading, kError, "Recommit MEM_COMMIT failed for chunk {}: address={} bytes={} error={}", crc, iAlignedStart, iAlignedEnd - iAlignedStart, iError);
+		DEBUG_BREAK();
+		return false;
 	}
 	return true;
 }

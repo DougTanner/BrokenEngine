@@ -24,11 +24,11 @@ namespace engine
 // fSetStart and finishes at fSetEnd (transition back).
 static float ComputeNightEnvelope(float fSunAngle, float fRiseStart, float fRiseEnd, float fSetStart, float fSetEnd)
 {
-	if (fSunAngle >= fRiseStart && fSunAngle <= fRiseEnd)
+	if (fSunAngle >= fRiseStart && fSunAngle < fRiseEnd)
 	{
 		return (fSunAngle - fRiseStart) / (fRiseEnd - fRiseStart);
 	}
-	if (fSunAngle > fRiseEnd || fSunAngle <= fSetStart)
+	if (fSunAngle >= fRiseEnd || fSunAngle <= fSetStart)
 	{
 		return 1.0f;
 	}
@@ -51,7 +51,12 @@ static XMVECTOR XM_CALLCONV PopulateSunMoonDirection(shaders::GlobalLayout& rGlo
 	// Pitch tilt around world X. Of the shadow terms it moves only the object-shadow stretch translation; terrain
 	// shadows and the object-shadow height offset derive from raw fSunAngle.
 	XMMATRIX matSunTilt = XMMatrixRotationX(gSunMoonNormalTilt.mfCurrent);
+#if defined(BT_MODEL_VIEWER)
+	vecSunMoonNormal = XMVector4Transform(vecSunMoonNormal, matSunTilt);
+	vecSunMoonNormal = XMVector4Normalize(static_cast<game::Camera*>(gpCamera)->ApplySunRotation(vecSunMoonNormal));
+#else
 	vecSunMoonNormal = XMVector4Normalize(XMVector4Transform(vecSunMoonNormal, matSunTilt));
+#endif
 	XMStoreFloat4(&rGlobalLayout.f4SunMoonNormal, vecSunMoonNormal);
 
 	// Uniform-only sun-normal products folded here (both need the finished sun/moon normal): Terrain.frag's

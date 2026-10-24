@@ -3,6 +3,9 @@
 #include "File/PackChunks.h"
 #include "Graphics/Camera.h"
 #include "Profile/ProfileRows.h"
+#include "Ui/GraphicsSettingsWrappersBase.h"
+#include "Ui/PbrWrappersBase.h"
+#include "Ui/SunMoonWrappersBase.h"
 #include "Game.h"
 
 namespace game
@@ -191,14 +194,22 @@ void ModelViewerApplication::RenderModel(int64_t iCommandBuffer)
 		XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rLayout.f3x4TransformNormal[0]), XMMatrixIdentity());
 		if (!rPreview.meshData.empty())
 		{
-			engine::SkinningReservation reservation = engine::gAnimationDataMap.at(rPreview.crc).ReserveSkinning(iCommandBuffer, 1);
-			for (int64_t j = 0; j < reservation.iMaterialCount; ++j)
+			const engine::AnimationData& rAnimation = engine::gAnimationDataMap.at(rPreview.crc);
+			engine::SkinningReservation reservation = rAnimation.ReserveSkinning(iCommandBuffer, 1);
+			if (miSelectedAnimation >= 0)
 			{
-				common::MeshData meshData = rPreview.meshData.at(j);
-				meshData.uiJointMatrixOffset += static_cast<uint32_t>(reservation.iJointBase);
-				reservation.pMeshData[reservation.iMeshDataBase + j] = meshData;
+				rAnimation.EvaluateAnimation(miSelectedAnimation, mAnimationTime.count(), std::span(reservation.pMeshData + reservation.iMeshDataBase, static_cast<size_t>(reservation.iMaterialCount)), reservation.pJointMatrices, reservation.iJointBase);
 			}
-			std::copy(rPreview.jointMatrices.begin(), rPreview.jointMatrices.end(), reservation.pJointMatrices + reservation.iJointBase);
+			else
+			{
+				for (int64_t j = 0; j < reservation.iMaterialCount; ++j)
+				{
+					common::MeshData meshData = rPreview.meshData.at(j);
+					meshData.uiJointMatrixOffset += static_cast<uint32_t>(reservation.iJointBase);
+					reservation.pMeshData[reservation.iMeshDataBase + j] = meshData;
+				}
+				std::copy(rPreview.jointMatrices.begin(), rPreview.jointMatrices.end(), reservation.pJointMatrices + reservation.iJointBase);
+			}
 			rLayout.uiMeshDataBase = static_cast<uint32_t>(reservation.iMeshDataBase);
 			rLayout.uiMaterialCount = static_cast<uint32_t>(reservation.iMaterialCount);
 		}
@@ -232,6 +243,13 @@ bool ModelViewerApplication::Render()
 	rFrame.iFrame = miFrame++;
 	std::chrono::duration<float> elapsedTime(mTimer.GetDeltaNs());
 	engine::gpGraphics->RenderGlobal(elapsedTime);
+	if (mFlags & ViewerFlags::kPlaying)
+	{
+		const engine::AnimationData& rAnimation = engine::gAnimationDataMap.at(mPreviews.at(miSelected).crc);
+		float fDuration = rAnimation.mpAnimations[miSelectedAnimation].fDuration;
+		std::chrono::duration<float> deltaTime(engine::gpGraphics->mRenderFrameDeltaNanoseconds);
+		mAnimationTime = fDuration > 0.0f ? std::chrono::duration<float>(std::fmod((mAnimationTime + deltaTime).count(), fDuration)) : 0s;
+	}
 	engine::gpGraphics->RenderMainPresentAcquire(engine::gpSwapchainManager->miFramebufferIndex, mRenderInterpolates, mActiveCoordinates, engine::kOriginCoordinate, elapsedTime);
 	return true;
 }
@@ -241,13 +259,79 @@ void ModelViewerApplication::RenderUi()
 	// Heap: ImGui retains window and draw storage between frames and rebuilds it after recreation.
 	ScopedSuppressAllocationTracking suppress;
 	float fScale = engine::UiScale();
-	ImGui::SetNextWindowPos(ImVec2(32.0f * fScale, 32.0f * fScale), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(460.0f * fScale, 520.0f * fScale), ImGuiCond_FirstUseEver);
-	if (ImGui::Begin("Model Viewer"))
+	const ImGuiViewport* pViewport = ImGui::GetMainViewport();
+	float fMargin = 16.0f * fScale;
+	float fSunTrackWidth = 0.5f * pViewport->Size.x;
+	float fSunWindowWidth = fSunTrackWidth + 2.0f * ImGui::GetStyle().WindowPadding.x;
+	ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
+	ImGui::SetNextWindowPos(ImVec2(pViewport->Pos.x + 0.5f * (pViewport->Size.x - fSunWindowWidth), pViewport->Pos.y + fMargin));
+	ImGui::SetNextWindowSize(ImVec2(fSunWindowWidth, 0.0f));
+	if (ImGui::Begin("Sun angle", nullptr, windowFlags | ImGuiWindowFlags_NoTitleBar))
 	{
-		ImGui::TextUnformatted("Left drag: orbit | Wheel: zoom");
-		ImGui::SliderFloat("Sun angle", &engine::gpCamera->mfSunAngle, 0.0f, XM_2PI, "%.2f rad", ImGuiSliderFlags_AlwaysClamp);
-		ImGui::Separator();
+		ImGui::TextUnformatted("Sun angle");
+		float fNormalFrameHeight = ImGui::GetFrameHeight();
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, (2.0f * fNormalFrameHeight - ImGui::GetFontSize()) / 2.0f));
+		ImGui::SetNextItemWidth(fSunTrackWidth);
+		ImGui::SliderFloat("##Sun angle", &engine::gpCamera->mfSunAngle, 0.0f, XM_2PI, "%.2f rad", ImGuiSliderFlags_AlwaysClamp);
+		ImGui::PopStyleVar();
+		engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
+	}
+	float fPanelsTop = ImGui::GetWindowPos().y + ImGui::GetWindowSize().y + fMargin;
+	ImGui::End();
+	float fPanelHeight = std::max(1.0f, pViewport->Pos.y + pViewport->Size.y - fMargin - fPanelsTop);
+	float fPanelCenter = pViewport->Pos.y + 0.5f * pViewport->Size.y;
+	float fCenteredPanelHeight = std::max(1.0f, 2.0f * std::min(fPanelCenter - fPanelsTop, pViewport->Pos.y + pViewport->Size.y - fMargin - fPanelCenter));
+	float fCatalogWidth = std::min(460.0f * fScale, 0.4f * pViewport->Size.x);
+	float fAvailableWidth = std::max(1.0f, pViewport->Size.x - 2.0f * fMargin);
+	float fLightingTrackWidth = 2.0f * std::max(1.0f, std::min(340.0f * fScale, 0.4f * pViewport->Size.x) - 2.0f * ImGui::GetStyle().WindowPadding.x);
+	float fLightingWidth = fLightingTrackWidth + 2.0f * ImGui::GetStyle().WindowPadding.x + ImGui::GetStyle().ScrollbarSize;
+	bool bStackPanels = fCatalogWidth + fLightingWidth + 3.0f * fMargin > pViewport->Size.x || fPanelsTop >= fPanelCenter;
+	float fCatalogHeight = bStackPanels ? std::max(1.0f, (fPanelHeight - fMargin) * 0.5f) : fCenteredPanelHeight;
+	fCatalogWidth = bStackPanels ? fAvailableWidth : fCatalogWidth;
+	fLightingWidth = std::min(fLightingWidth, fAvailableWidth);
+	ImGuiWindowFlags iPanelWindowFlags = windowFlags | (bStackPanels ? 0 : ImGuiWindowFlags_AlwaysAutoResize);
+	ImGui::SetNextWindowPos(ImVec2(pViewport->Pos.x + fMargin, bStackPanels ? fPanelsTop : fPanelCenter), ImGuiCond_Always, ImVec2(0.0f, bStackPanels ? 0.0f : 0.5f));
+	if (bStackPanels)
+	{
+		ImGui::SetNextWindowSize(ImVec2(fCatalogWidth, fCatalogHeight));
+	}
+	else
+	{
+		ImGui::SetNextWindowSizeConstraints(ImVec2(fCatalogWidth, 0.0f), ImVec2(fCatalogWidth, fCatalogHeight));
+	}
+	if (ImGui::Begin("Model Viewer", nullptr, iPanelWindowFlags))
+	{
+		if (!mPreviews.empty())
+		{
+			const Preview& rPreview = mPreviews.at(miSelected);
+			const engine::AnimationData* pAnimation = rPreview.meshData.empty() ? nullptr : &engine::gAnimationDataMap.at(rPreview.crc);
+			const char* pcAnimation = miSelectedAnimation < 0 ? "Rest pose" : pAnimation->mpAnimations[miSelectedAnimation].pcName;
+			if (ImGui::BeginCombo("Animation", pcAnimation))
+			{
+				if (ImGui::Selectable("Rest pose", miSelectedAnimation < 0))
+				{
+					miSelectedAnimation = -1;
+					mAnimationTime = 0s;
+					mFlags.Set(ViewerFlags::kPlaying, false);
+				}
+				if (pAnimation != nullptr)
+				{
+					for (int64_t i = 0; std::cmp_less(i, pAnimation->mHeader.uiAnimationCount); ++i)
+					{
+						ImGui::PushID(static_cast<int>(i));
+						if (ImGui::Selectable(pAnimation->mpAnimations[i].pcName, i == miSelectedAnimation))
+						{
+							miSelectedAnimation = i;
+							mAnimationTime = 0s;
+							mFlags.Set(ViewerFlags::kPlaying);
+						}
+						ImGui::PopID();
+					}
+				}
+				ImGui::EndCombo();
+			}
+			ImGui::Separator();
+		}
 		ImGui::Text("Scenes: %lld", static_cast<long long>(std::ssize(mPreviews)));
 		ImGui::Separator();
 		if (mPreviews.empty())
@@ -256,14 +340,15 @@ void ModelViewerApplication::RenderUi()
 		}
 		for (int64_t i = 0; i < std::ssize(mPreviews); ++i)
 		{
-			if (ImGui::Selectable(mPreviews.at(i).pcPath, i == miSelected))
+			if (ImGui::Selectable(mPreviews.at(i).pcPath, i == miSelected) && i != miSelected)
 			{
 				miSelected = i;
+				miSelectedAnimation = -1;
+				mAnimationTime = 0s;
+				mFlags.Set(ViewerFlags::kPlaying, false);
 			}
 		}
 		ImGui::Spacing();
-		ImGui::Text("Framebuffer: %u x %u", engine::gpGraphics->mFramebufferVkExtent2D.width, engine::gpGraphics->mFramebufferVkExtent2D.height);
-		ImGui::Text("Rendered frames: %lld", static_cast<long long>(miFrame));
 		if (ImGui::CollapsingHeader("Data directory"))
 		{
 			ImGui::TextWrapped("%ls", engine::gLaunchOptions.dataDirectory.c_str());
@@ -271,20 +356,156 @@ void ModelViewerApplication::RenderUi()
 		engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
 	}
 	ImGui::End();
+	float fLightingTop = bStackPanels ? fPanelsTop + fCatalogHeight + fMargin : fPanelCenter;
+	float fLightingHeight = bStackPanels ? std::max(1.0f, fPanelHeight - fCatalogHeight - fMargin) : fCenteredPanelHeight;
+	ImGui::SetNextWindowPos(ImVec2(pViewport->Pos.x + pViewport->Size.x - fMargin - fLightingWidth, fLightingTop), ImGuiCond_Always, ImVec2(0.0f, bStackPanels ? 0.0f : 0.5f));
+	if (bStackPanels)
+	{
+		ImGui::SetNextWindowSize(ImVec2(fLightingWidth, fLightingHeight));
+	}
+	else
+	{
+		ImGui::SetNextWindowSizeConstraints(ImVec2(fLightingWidth, 0.0f), ImVec2(fLightingWidth, fLightingHeight));
+	}
+	if (ImGui::Begin("Lighting", nullptr, iPanelWindowFlags | ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysVerticalScrollbar))
+	{
+		float fNormalFrameHeight = ImGui::GetFrameHeight();
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, (1.5f * fNormalFrameHeight - ImGui::GetFontSize()) / 2.0f));
+		auto LightingSlider = [fLightingTrackWidth](const char* pcLabel, engine::Wrapper& rWrapper)
+		{
+			ImGui::PushID(pcLabel);
+			ImGui::TextUnformatted(pcLabel);
+			ImGui::SetNextItemWidth(fLightingTrackWidth);
+			float fValue = rWrapper.mfCurrent;
+			if (ImGui::SliderFloat("##Value", &fValue, rWrapper.mfMin, rWrapper.mfMax, "%.3f", ImGuiSliderFlags_AlwaysClamp))
+			{
+				rWrapper.Set(fValue);
+			}
+			ImGui::PopID();
+		};
+		ImGui::SeparatorText("Ambient and environment");
+		LightingSlider("Minimum Ambient", engine::gSunMoonMinimumAmbient);
+		LightingSlider("Ambient Multiplier", engine::gSunMoonAmbientMultiplier);
+		LightingSlider("IBL Ambient", engine::gPhysicallyBasedRenderingImageBasedLightingAmbient);
+		LightingSlider("IBL Diffuse", engine::gPhysicallyBasedRenderingImageBasedLightingDiffuse);
+		LightingSlider("IBL Diffuse Power", engine::gPhysicallyBasedRenderingImageBasedLightingDiffusePower);
+		LightingSlider("IBL Specular", engine::gPhysicallyBasedRenderingImageBasedLightingSpecular);
+		LightingSlider("IBL Specular Power", engine::gPhysicallyBasedRenderingImageBasedLightingSpecularPower);
+		LightingSlider("IBL Ambient Color Blend", engine::gPhysicallyBasedRenderingImageBasedLightingAmbientColorBlend);
+		LightingSlider("Cubemap Lod Power", engine::gPhysicallyBasedRenderingCubemapLevelOfDetailPower);
+		LightingSlider("Cubemap Lod Offset", engine::gPhysicallyBasedRenderingCubemapLevelOfDetailOffset);
+
+		ImGui::SeparatorText("BRDF");
+		LightingSlider("BRDF Diffuse", engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse);
+		LightingSlider("BRDF Diffuse Power", engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower);
+		LightingSlider("BRDF Specular", engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular);
+		LightingSlider("BRDF Specular Power", engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower);
+
+		ImGui::SeparatorText("Material sampling and emissive");
+		LightingSlider("Model Data Mip Bias", engine::gPhysicallyBasedRenderingModelDataMipmapLevelOfDetailBias);
+		LightingSlider("Emissive", engine::gPhysicallyBasedRenderingEmissive);
+
+		ImGui::SeparatorText("HDR color grading");
+		LightingSlider("Exposure", engine::gPhysicallyBasedRenderingExposure);
+		LightingSlider("Gamma", engine::gPhysicallyBasedRenderingGamma);
+		LightingSlider("Saturation", engine::gColorGradingSaturation);
+		LightingSlider("Contrast", engine::gColorGradingContrast);
+		LightingSlider("Temperature", engine::gColorGradingTemperature);
+
+		ImGui::SeparatorText("Render quality");
+		auto LightingToggle = [](const char* pcLabel, engine::Wrapper& rWrapper)
+		{
+			bool bValue = rWrapper.Get<bool>();
+			if (ImGui::Checkbox(pcLabel, &bValue))
+			{
+				rWrapper.Set(bValue);
+			}
+		};
+		LightingToggle("Multisampling", engine::gMultisampling);
+		ImGui::BeginDisabled(!engine::gMultisampling.Get<bool>());
+		ImGui::TextUnformatted("Sample count");
+		ImGui::SetNextItemWidth(fLightingTrackWidth);
+		char pcSampleCount[16];
+		std::snprintf(pcSampleCount, sizeof(pcSampleCount), "%dx", engine::gSampleCount.Get<int>());
+		if (ImGui::BeginCombo("##Sample count", pcSampleCount))
+		{
+			for (float fSampleCount : engine::gSampleCount.mAllowed)
+			{
+				VkSampleCountFlagBits vkSampleCount = static_cast<VkSampleCountFlagBits>(fSampleCount);
+				std::snprintf(pcSampleCount, sizeof(pcSampleCount), "%dx", static_cast<int>(vkSampleCount));
+				if (ImGui::Selectable(pcSampleCount, vkSampleCount == engine::gSampleCount.Get<VkSampleCountFlagBits>()))
+				{
+					engine::gSampleCount.Set(vkSampleCount);
+				}
+			}
+			ImGui::EndCombo();
+		}
+		LightingToggle("Sample Shading", engine::gSampleShading);
+		ImGui::BeginDisabled(!engine::gSampleShading.Get<bool>());
+		LightingSlider("Min Sample Shading", engine::gMinimumSampleShading);
+		ImGui::EndDisabled();
+		ImGui::EndDisabled();
+		LightingToggle("Anisotropy", engine::gAnisotropy);
+		ImGui::BeginDisabled(!engine::gAnisotropy.Get<bool>());
+		LightingSlider("Max Anisotropy", engine::gMaximumAnisotropy);
+		ImGui::EndDisabled();
+		LightingSlider("Mip Lod Bias", engine::gMipmapLevelOfDetailBias);
+		ImGui::PopStyleVar();
+		engine::gpImGuiManager->RegisterOpaqueRectangle(ImGui::GetWindowPos(), ImGui::GetWindowSize());
+	}
+	ImGui::End();
 	const ImGuiIO& rInputOutput = ImGui::GetIO();
 	bool bCaptureMouse = rInputOutput.WantCaptureMouse || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
 	Camera* pCamera = static_cast<Camera*>(engine::gpCamera);
-	if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) || bCaptureMouse || mPreviews.empty())
+	float fViewportSize = std::min(pViewport->Size.x, pViewport->Size.y);
+	if (bCaptureMouse || mPreviews.empty() || !ImGui::IsMousePosValid(&rInputOutput.MousePos) || fViewportSize <= 0.0f)
 	{
-		mbOrbiting = false;
+		miDragButton = -1;
 	}
-	else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+	else
 	{
-		mbOrbiting = true;
-	}
-	else if (mbOrbiting)
-	{
-		pCamera->Orbit(-0.01f * rInputOutput.MouseDelta.x, 0.01f * rInputOutput.MouseDelta.y);
+		glm::vec2 mousePosition(2.0f * (rInputOutput.MousePos.x - pViewport->Pos.x - 0.5f * pViewport->Size.x) / fViewportSize, -2.0f * (rInputOutput.MousePos.y - pViewport->Pos.y - 0.5f * pViewport->Size.y) / fViewportSize);
+		if (miDragButton >= 0 && !ImGui::IsMouseDown(static_cast<ImGuiMouseButton>(miDragButton)))
+		{
+			miDragButton = -1;
+		}
+		else if (miDragButton < 0)
+		{
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+			{
+				miDragButton = ImGui::IsMouseClicked(ImGuiMouseButton_Left) ? ImGuiMouseButton_Left : ImGuiMouseButton_Right;
+				mPreviousMousePosition = mousePosition;
+			}
+		}
+		else
+		{
+			glm::vec2 delta = mousePosition - mPreviousMousePosition;
+			glm::vec2 anchor = mPreviousMousePosition;
+			mPreviousMousePosition = mousePosition;
+			float fDeltaLength = glm::length(delta);
+			if (fDeltaLength > 0.0f)
+			{
+				float fAnchorLength = glm::length(anchor);
+				if (fAnchorLength > 0.375f)
+				{
+					anchor *= 0.375f / fAnchorLength;
+				}
+				int64_t iSteps = std::max(1i64, static_cast<int64_t>(std::ceil(fDeltaLength / 0.25f)));
+				glm::vec2 increment = delta / static_cast<float>(iSteps);
+				for (int64_t i = 0; i < iSteps; ++i)
+				{
+					if (miDragButton == ImGuiMouseButton_Left)
+					{
+						pCamera->mArcBall.beginDrag(anchor);
+						pCamera->mArcBall.drag(anchor + increment);
+					}
+					else
+					{
+						pCamera->RotateSun(anchor, anchor + increment);
+					}
+				}
+			}
+		}
 	}
 	if (!bCaptureMouse && !mPreviews.empty())
 	{

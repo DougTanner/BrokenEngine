@@ -50,8 +50,6 @@ public:
 	void SendUpdateOwnedEntityRequest(int64_t iGlobalId, bool bUseMissiles, float fNavigationDelay);
 	void SendCreateFleetRequest();
 	void SendSpawnIntoFleetRequest(const FleetGuid& rFleetGuid, ShipType eType);
-	void SendRespawnInFleetRequest(const FleetGuid& rFleetGuid, engine::GlobalId memberGlobalId);
-	void SendDeleteFleetRequest(const FleetGuid& rFleetGuid);
 	void SendFleetNavigationDelayRequest(const FleetGuid& rFleetGuid, float fDelay);
 
 	std::unique_ptr<ClientReconciler> mpReconciler;

@@ -15,6 +15,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Source\Engine\ArcBall.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\Engine\DirectXTK.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
@@ -374,5 +377,10 @@
     <ClCompile Include="..\..\..\assimp\contrib\unzip\unzip.c">
       <Filter>DataPacker\assimp</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Source\Engine\ArcBall.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

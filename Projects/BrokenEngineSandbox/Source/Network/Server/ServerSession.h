@@ -31,6 +31,11 @@ public:
 	// before the first tick's PrepareTickStatusChanges drain.
 	void BuildAdvancingFrameInputs();
 
+	// Steps the fleet and respawn timers once per tick. Engine ServerSessionBase::PrepareTick calls this in every
+	// normal-play tick, after the tick's frame inputs exist and before PrepareTickStatusChanges takes the broadcast
+	// snapshot; replay playback calls it through PrepareReplayPlaybackTick.
+	void TickGameTimers(bool bRecording);
+
 	// Engine ServerTransferManager calls this after a transferred owned entity's client GUID is assigned in its destination.
 	void OnOwnedEntityChangedCell(const engine::ClientGuid& rClientGuid, engine::GlobalId globalId, engine::GridCoord destination);
 

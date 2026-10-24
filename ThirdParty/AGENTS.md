@@ -22,6 +22,12 @@ them — because DirectXTK reports only the left/right-specific keys. Do not uni
 the keyboard onto DirectXTK to match the mouse and gamepad paths; see
 `Engine/Source/Input/AGENTS.md`.
 
+ArcBall's complete implementation is compiled only through `Prebuilts/Source/Engine/ArcBall.cpp`.
+Its shared `ArcBall.h` adapter owns `GLM_FORCE_SWIZZLE`, `GLM_FORCE_CTOR_INIT`, the
+`glm::float_t = float` alias, and namespace `arc_ball` before upstream header
+consumption. Both the wrapper and client exposure use this adapter and the existing
+`ThirdParty/glm` include root; keep their GLM configuration identical.
+
 ## License Policy
 
 Only permissive licenses compatible with closed-source commercial redistribution are accepted: MIT/X11, BSD-2/3-Clause, Apache-2.0, zlib/libpng, Boost 1.0, ISC, Unlicense, public domain, and CC0.
@@ -44,6 +50,12 @@ closure also uses MIT, ISC, Boost, zlib/Irrlicht, and Paul Hsieh's explicitly
 offered three-clause BSD grant for SuperFastHash. Preserve the additional Qt,
 Hsieh, and Irrlicht notices in `Prebuilts/Source/DataPacker/assimp/NOTICES.txt`;
 DataPacker's attribution collector distributes them with the nested licenses.
+
+`cpm-arc-ball` is approved under MIT, copyright 2013 James Hughes. Its selected
+source closure is `arc-ball/ArcBall.cpp` and `arc-ball/ArcBall.hpp`; exclude its
+CPM scripts, tests, examples, and dependency downloads from compilation. Preserve
+the complete upstream root `LICENSE`; the existing attribution collector copies
+it to `Attribution/cpm-arc-ball/LICENSE`.
 
 ## Boundaries
 

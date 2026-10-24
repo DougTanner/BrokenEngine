@@ -158,6 +158,11 @@ void OmnisPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 		// Missile damage arrives through the area-damage phase, so a missile contact applies none here.
 		for (const engine::CollisionResult& rResult : engine::Collision::GetCollisions(siCollisionLayerIndex, i))
 		{
+			// A contact with a spawning Fighter damages neither side; its own PostCollision drops the same contact.
+			if (rResult.uiOtherCategory == CollisionCategory::kuiFighter && (rFrame.postRender.pFighters->pOrders[rResult.iOtherIndex] & ShipOrders::kSpawning))
+			{
+				continue;
+			}
 			if (rResult.uiOtherCategory & CollisionCategory::kuiShips)
 			{
 				ApplyDamage(rFrame, rStaticData.coordinate, rCurrentInterpolate, rCurrentPostRender, i, kfShipCollisionDamage, rResult.vecContactPoint);

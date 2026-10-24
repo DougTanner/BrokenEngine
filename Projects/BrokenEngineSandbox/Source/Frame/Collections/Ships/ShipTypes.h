@@ -49,14 +49,15 @@ constexpr const char* ShipControllerName(ShipController eController)
 	return "Unknown";
 }
 
-// Set by controllers (the fleet path through the spawn, kUpdateShip, and kUpdateFleet, and the random-wave spawn);
-// kUpdateShip also writes the target flight plane. CountdownPendingOrders also applies kPendingUseMissiles to
-// kUseMissiles when the weapon-mode countdown ends.
+// Set by controllers (the fleet path through the spawn and kUpdateShip, and the random-wave spawn); kUpdateShip also
+// writes the target flight plane. CountdownPendingOrders also applies kPendingUseMissiles to kUseMissiles when the
+// weapon-mode countdown ends. The Fighter launch spawn sets kSpawning and Fighter Update clears it.
 enum class ShipOrders : uint16_t
 {
 	kIsFlagship         = 0x0001,
 	kUseMissiles        = 0x0002,
 	kPendingUseMissiles = 0x0004,
+	kSpawning           = 0x0008,
 
 	// Target flight plane index in bits 8-15 (0 = lowest)
 };

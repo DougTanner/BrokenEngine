@@ -15,6 +15,7 @@ runtime contracts of the screens that remain here.
 - Screen bodies are client-only. `HudScreen.h` is listed in the server project for IDE visibility and guards its client-only members internally, so screen headers must remain parseable in their project affinity.
 - Screens gate themselves from authoritative game/UI state because `ImGuiManager` invokes main and modal surfaces independently of in-game screen gating.
 - Networked controls remain disabled through `NetworkUiControl` until authoritative state resolves the request.
+- While the server plays a replay, the HUD disables every control that sends a simulation-affecting request; fleet and member focus change only subscriptions and stay enabled. The server refuses those requests during playback regardless, so this gating keeps players from sending requests that do nothing.
 - The HUD is the only game UI that changes network subscription state: its fleet
   and owned-entity focus controls tell the client session which cells it wants, tagged
   with an explicit reason. A rebuilt focus button that drops that call leaves

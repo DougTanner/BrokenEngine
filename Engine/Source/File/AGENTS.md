@@ -59,6 +59,10 @@ Eager types load whole at startup; lazy chunks load on demand on loader threads 
   use loader-queue synchronization only in gameplay client Debug builds;
   elsewhere that state stays private.
 - Lazy chunks live in one virtual-memory reservation laid out at construction; each chunk's pointer and size, fixed for the process lifetime, describe reserved, not resident, bytes. Never compact pointers or recompute offsets: readers use a chunk pointer after the state acquire, with no lock.
+- Pool construction reserves address space only. Whole-chunk loads and range
+  reloads commit every page intersecting their destination before writing,
+  rounding outward. Decommit rounds inward to preserve shared boundary pages;
+  a published chunk state does not make a decommitted range readable again.
 
 ## Replay Streams
 
@@ -68,6 +72,7 @@ Server-only. Recording writes one stream set per active cell plus recording-wide
 - As a debug-only developer tool, replay streams are exempt from trust-boundary validation: existing replay checks may stay; no new ones are required.
 - A generation is one activation lifetime, identified in its stream files and manifest record by coord and activation tick.
 - The manifest is the commit marker: recording start invalidates it before replacing any component, and stop publishes it only after every generation and the game metadata succeed.
+- The manifest carries the next-global-ID counter as of recording stop, and every playback adoption, each loop included, assigns it right after adopting the grid, so the counter stays ahead of every replayed global ID during playback and after an abort.
 - Missing retained terminal state for an evicted coord invalidates only that generation's files; other writers and metadata still attempt their writes.
 - The in-memory active-coord list is not order-significant: coords dispatch in parallel and every consumer is coord-keyed.
 - Replay persistence never gates an accepted live transfer: a capture failure invalidates recording state instead, and the accepted batch still completes.
@@ -76,3 +81,4 @@ Server-only. Recording writes one stream set per active cell plus recording-wide
 - Recording and playback are mutually exclusive, a pending request counting as active: every path that sets a record-start or playback request refuses it, before changing anything, while the running-state or pending-request flags show the opposite mode. `Replay`'s `ASSERT`s on consuming those requests catch a skipped check; they are not recovery.
 - A coord's later generation activates only after the retiring reader's coord is removed. Adjacent lifetimes may meet at the tick after the prior saved end; overlap or a skipped activation aborts playback. Loop only after the last reader retires.
 - Loop completion and abort both stop the current fixed-tick iteration before dispatch, then diverge: completion reloads the initial state, abort keeps the current frames, restores the pre-tick clock, and resumes live simulation. Abort also runs the game state-replacement hook (the game project's own `Source/Save/AGENTS.md` `## Replay Contract`).
+- The game keeps replay state the frames do not hold through calls at recording start, on each playback tick, and after each recorded or replayed tick completes (the same game `## Replay Contract`). The playback call comes after every abort and loop-completion return, so it runs only on a tick that dispatches and an abort leaves that state matching the kept frames.

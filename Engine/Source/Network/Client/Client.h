@@ -97,6 +97,7 @@ public:
 		kServerDebugInput         = 1 << 7, // the accepting server takes debug-control requests (its kbDebugInput)
 		kCrashReportChecked       = 1 << 8, // PollPendingCrashReport has looked for an unsent report on this connection
 		kCrashReportSent          = 1 << 9, // this connection carried a crash report; the server counts a second as a violation
+		kServerReplaying          = 1 << 10, // the server plays a replay, per its latest connection response or load notification
 	};
 
 	ENetPeer* mpServerPeer = nullptr;

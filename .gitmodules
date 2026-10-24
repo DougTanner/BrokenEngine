@@ -89,3 +89,6 @@
 [submodule "ThirdParty/assimp"]
 	path = ThirdParty/assimp
 	url = https://github.com/assimp/assimp.git
+[submodule "ThirdParty/cpm-arc-ball"]
+	path = ThirdParty/cpm-arc-ball
+	url = https://github.com/iauns/cpm-arc-ball.git

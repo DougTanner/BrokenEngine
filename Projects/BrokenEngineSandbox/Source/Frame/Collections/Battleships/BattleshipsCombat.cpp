@@ -3,6 +3,7 @@
 #include "Data/Audio.h"
 #include "Frame/CellStaticData.h"
 
+#include "Frame/Collections/Fighters/Fighters.h"
 #include "Frame/HealthDamage.h"
 #include "Frame/TerrainUtils.h"
 
@@ -103,6 +104,11 @@ void BattleshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFr
 		// Note: Missile damage is handled via area damage system in AreaDamage phase
 		for (const engine::CollisionResult& rResult : engine::Collision::GetCollisions(siCollisionLayerIndex, i))
 		{
+			// A contact with a spawning Fighter damages neither side; its own PostCollision drops the same contact.
+			if (rResult.uiOtherCategory == CollisionCategory::kuiFighter && (rFrame.postRender.pFighters->pOrders[rResult.iOtherIndex] & ShipOrders::kSpawning))
+			{
+				continue;
+			}
 			if (rResult.uiOtherCategory & (CollisionCategory::kuiBlaster | CollisionCategory::kuiShips))
 			{
 				rCurrentPostRender.pfHealths[i] -= rResult.fDamageReceived;
@@ -117,6 +123,12 @@ void BattleshipsPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFr
 
 				if (rCurrentPostRender.pfHealths[i] <= 0.0f)
 				{
+					// A fleet Battleship never dies: its health holds at 0.
+					if (rCurrentPostRender.pController[i] == ShipController::kFleet)
+					{
+						rCurrentPostRender.pfHealths[i] = 0.0f;
+						continue;
+					}
 					XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorNegate(rResult.vecOtherVelocity));
 					BeginExplosion(rFrame, rStaticData.coordinate, i, vecDamageDirection);
 					break;
@@ -161,6 +173,12 @@ void BattleshipsPostRender::AreaDamage([[maybe_unused]] Frame& __restrict rFrame
 
 		if (rCurrentPostRender.pfHealths[i] <= 0.0f)
 		{
+			// A fleet Battleship never dies: its health holds at 0.
+			if (rCurrentPostRender.pController[i] == ShipController::kFleet)
+			{
+				rCurrentPostRender.pfHealths[i] = 0.0f;
+				continue;
+			}
 			XMVECTOR vecDamageDirection = XMVector3Normalize(XMVectorSubtract(vecClosestSource, rCurrentInterpolate.pVecPositions[i]));
 			BeginExplosion(rFrame, rStaticData.coordinate, i, vecDamageDirection);
 		}

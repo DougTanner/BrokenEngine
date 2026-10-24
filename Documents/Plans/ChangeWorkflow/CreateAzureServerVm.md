@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-18T15:25:05.648Z","dependsOn":["Documents/Plans/Engine/ModelViewerAnimationPlayback.md","Documents/Plans/Engine/SharedSceneExportData.md","Documents/Plans/Engine/TrackDeltasReceivedBeforeFullStateAdoption.md","Documents/Plans/Game/ShipModels.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-18T15:25:05.648Z","dependsOn":["Documents/Plans/Engine/SharedSceneExportData.md","Documents/Plans/Engine/TrackDeltasReceivedBeforeFullStateAdoption.md","Documents/Plans/Game/ShipModels.md"]} -->
 # Create the Azure server VM with /deploy-server and record its address
 
 ## Context

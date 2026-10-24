@@ -17,6 +17,12 @@ constexpr float kfHudPanelTopFraction = 0.125f;
 constexpr float kfHudPanelMaximumHeightFraction = 0.75f;
 constexpr std::chrono::seconds kForceOpenGracePeriod = 2s;
 
+// Controls that send a simulation-affecting request are disabled while the server plays a replay
+static bool IsServerReplaying()
+{
+	return engine::gpClient != nullptr && (engine::gpClient->mStateFlags & engine::Client::ClientStateFlags::kServerReplaying);
+}
+
 void HudScreen::Render()
 {
 	// Ensure tick prefix for the auto-unhide log — Render() runs outside ClientUpdate's LogTickScope.
@@ -223,7 +229,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	ImGui::EndDisabled();
 
 	ImGui::SameLine();
-	ImGui::BeginDisabled((gpGame->mFleetSelection.mCreateFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || iFleetCount >= kiMaximumFleetsPerClient);
+	ImGui::BeginDisabled((gpGame->mFleetSelection.mCreateFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || iFleetCount >= kiMaximumFleetsPerClient || IsServerReplaying());
 	if (ImGui::Button("[+]##Fleet"))
 	{
 		if (gpClientSession != nullptr)
@@ -236,22 +242,6 @@ void HudScreen::RenderFleetPanel(float fTarget)
 	ImGui::EndDisabled();
 
 	const Fleet* pFleet = gpGame->mFleetSelection.FocusedFleet();
-
-	gpGame->mFleetSelection.mDeleteFleetToggle.Update(iFleetCount);
-	bool bCanDelete = pFleet != nullptr && pFleet->members.empty();
-	ImGui::SameLine();
-	ImGui::BeginDisabled(!bCanDelete || (gpGame->mFleetSelection.mDeleteFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending));
-	if (ImGui::Button("[-]##Fleet"))
-	{
-		if (pFleet != nullptr && gpClientSession != nullptr)
-		{
-			gpGame->mFleetSelection.mDeleteFleetToggle.mFlags.Set(engine::NetworkUiControlFlags::kPending);
-			gpClientSession->SendDeleteFleetRequest(pFleet->guid);
-			LOG(kDefault, kVerbose, "HUD DeleteFleetRequest Fleet: ({},{}) FleetCount: {}", pFleet->guid.uiHigh, pFleet->guid.uiLow, iFleetCount);
-		}
-	}
-	ImGui::EndDisabled();
-
 	if (pFleet != nullptr)
 	{
 		ImGui::Separator();
@@ -287,16 +277,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 			{
 				char pcLabel[64];
 				std::snprintf(pcLabel, sizeof(pcLabel), "%s %lld [DEAD] #%lld", ShipTypeName(rMember.eType), i + 1, rMember.globalId.iValue);
-				ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-				if (ImGui::Selectable(pcLabel, false))
-				{
-					if (gpClientSession != nullptr)
-					{
-						gpClientSession->SendRespawnInFleetRequest(pFleet->guid, rMember.globalId);
-						LOG(kDefault, kVerbose, "HUD RespawnInFleet Fleet: ({},{}) Member: {}", pFleet->guid.uiHigh, pFleet->guid.uiLow, rMember.globalId.iValue);
-					}
-				}
-				ImGui::PopStyleColor();
+				ImGui::TextDisabled("%s", pcLabel);
 			}
 			ImGui::PopID();
 		}
@@ -306,8 +287,8 @@ void HudScreen::RenderFleetPanel(float fTarget)
 			const char* pcLabel = nullptr;
 			ShipType eType {};
 		};
-		static constexpr SpawnButton kpSpawnButtons[] {{.pcLabel = "[+F]##Fighter", .eType = ShipType::kFighter}, {.pcLabel = "[+O]##Omni", .eType = ShipType::kOmni}, {.pcLabel = "[+B]##Battleship", .eType = ShipType::kBattleship}};
-		ImGui::BeginDisabled((gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || std::ssize(pFleet->members) >= kiMaximumFleetMembers);
+		static constexpr SpawnButton kpSpawnButtons[] {{.pcLabel = "[+F]##Fighter", .eType = ShipType::kFighter}, {.pcLabel = "[+O]##Omni", .eType = ShipType::kOmni}};
+		ImGui::BeginDisabled((gpGame->mFleetSelection.mSpawnIntoFleetToggle.mFlags & engine::NetworkUiControlFlags::kPending) || std::ssize(pFleet->members) >= kiMaximumFleetMembers || IsServerReplaying());
 		for (const auto& [i, rButton] : std::views::enumerate(kpSpawnButtons))
 		{
 			if (i > 0)
@@ -328,7 +309,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 
 		ImGui::Separator();
 		gpGame->mFleetSelection.mNavigationDelayControl.Update(NavigationDelayKey {.fleetGuid = pFleet->guid, .fNavigationDelay = pFleet->navigationDelaySeconds.count()});
-		ImGui::BeginDisabled((gpGame->mFleetSelection.mNavigationDelayControl.mFlags & engine::NetworkUiControlFlags::kPending));
+		ImGui::BeginDisabled((gpGame->mFleetSelection.mNavigationDelayControl.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
 		static float sfNavigationDelayEditValue = 0.0f;
 		static bool sbNavigationDelaySliderWasActive = false;
 		// Reload only while the slider is inactive, so it owns the value for the whole interaction and a release
@@ -422,7 +403,7 @@ void HudScreen::RenderFocusedOwnedEntityPanel(float fTarget)
 		ImVec2 vCursor = ImGui::GetCursorPos();
 		ImGui::SetCursorPos(ImVec2(vCursor.x + std::max(0.0f, 0.5f * (vAvailable.x - vButtonSize.x)), vCursor.y + std::max(0.0f, 0.5f * (vAvailable.y - vButtonSize.y))));
 
-		ImGui::BeginDisabled((gpGame->mWeaponModeToggle.mFlags & engine::NetworkUiControlFlags::kPending));
+		ImGui::BeginDisabled((gpGame->mWeaponModeToggle.mFlags & engine::NetworkUiControlFlags::kPending) || IsServerReplaying());
 		if (ImGui::Button(pcLabel, vButtonSize))
 		{
 			if (gpClientSession != nullptr && (gpGame->ClientOwnedEntityIdentifier().iValue != 0))

@@ -8,8 +8,6 @@
 namespace game
 {
 
-constexpr float kfShipSpawnInterval = 0.5f;
-
 static float AdmitSpawnTimer(float fSpawnTimer)
 {
 	if (!std::isfinite(fSpawnTimer) || fSpawnTimer >= kfShipSpawnInterval)
@@ -91,7 +89,7 @@ static void ValidateFlyingMissilePlanes(const Frame& rFrame)
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 139 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
+const int64_t Frame::kiVersion = 140 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
 
 FrameInterpolate::FrameInterpolate()
 : pBlasters(std::make_unique<BlastersInterpolate>())
@@ -204,35 +202,47 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 	static constexpr float kfMinimumFleetDistance = 120.0f;
 	static constexpr float kfDesiredAnchorDistance = 150.0f;
 
-	// Count non-exploding fleet ships, use first as spawn center
-	int64_t iSpawnCount = 0;
+	// Count non-exploding fleet and random-spawn ships per type; the first fleet ship is the spawn center
+	std::array<int64_t, std::to_underlying(ShipType::kCount)> fleetCounts {};
+	std::array<int64_t, std::to_underlying(ShipType::kCount)> randomSpawnCounts {};
 	auto vecFleetPosition = XMVectorZero();
 	bool bFoundCenter = false;
-	ForEachShipType(rFrame, [&]([[maybe_unused]] ShipType eType, const auto& rShipInterpolate, const auto& rShipPostRender)
+	ForEachShipType(rFrame, [&](ShipType eType, const auto& rShipInterpolate, const auto& rShipPostRender)
 	{
 		for (int64_t i = 0; i < rShipPostRender.iCount; ++i)
 		{
-			if (rShipPostRender.pController[i] == ShipController::kFleet && !(rShipPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying))
+			if (rShipPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
 			{
-				if (!bFoundCenter)
-				{
-					vecFleetPosition = rShipInterpolate.pVecPositions[i];
-					bFoundCenter = true;
-				}
-				++iSpawnCount;
+				continue;
 			}
+			if (rShipPostRender.pController[i] != ShipController::kFleet)
+			{
+				++randomSpawnCounts[std::to_underlying(eType)];
+				continue;
+			}
+			if (!bFoundCenter)
+			{
+				vecFleetPosition = rShipInterpolate.pVecPositions[i];
+				bFoundCenter = true;
+			}
+			++fleetCounts[std::to_underlying(eType)];
 		}
 	});
-	if (iSpawnCount == 0)
+	if (!bFoundCenter)
 	{
 		return;
 	}
-	int64_t iShipCount = std::min(iSpawnCount, kiMaximumFleetSize);
 
 	// The wave's type: one equal-odds draw over the three types, whose radius sets the wave's clearance and spacing.
 	ShipType eWaveType = static_cast<ShipType>(common::Random(2i64, rFrame.postRender.randomEngine));
 	// The wave's flight plane: one draw over the planes its type may fly, even when that is only the lowest.
 	int64_t iWaveFlightPlane = static_cast<int64_t>(common::Random(HighestFlightPlane(eWaveType), rFrame.postRender.randomEngine));
+	// Both draws happen even when the wave's type has no room, so a full type does not shift later draws.
+	int64_t iShipCount = std::clamp(fleetCounts[std::to_underlying(eWaveType)] - randomSpawnCounts[std::to_underlying(eWaveType)], 0i64, kiMaximumFleetSize);
+	if (iShipCount == 0)
+	{
+		return;
+	}
 	const engine::FlightPlane& rWaveFlightPlane = engine::gpFlightPlanes->Plane(iWaveFlightPlane);
 	float fWaveRadius = eWaveType == ShipType::kFighter ? kfFighterRadius : eWaveType == ShipType::kOmni ? kfOmniRadius : kfBattleshipRadius;
 	float fTerrainClearance = fWaveRadius * 2.0f;
@@ -436,7 +446,7 @@ void FramePostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_u
 
 	FrameInterpolate& rInterpolate = rFrame.interpolate;
 
-	// Each interval attempts a wave capped by kiMaximumFleetSize and the non-exploding fleet ship count; invalid positions are skipped.
+	// Each interval attempts one wave; invalid positions are skipped.
 	while (rInterpolate.fSpawnTimer >= kfShipSpawnInterval)
 	{
 		rInterpolate.fSpawnTimer -= kfShipSpawnInterval;

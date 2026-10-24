@@ -15,10 +15,14 @@ void Camera::Update()
 {
 	float fHalfFov = std::min(XM_PIDIV4 * 0.5f, std::atan(std::tan(XM_PIDIV4 * 0.5f) * engine::gpSwapchainManager->mfAspectRatio));
 	float fDistance = mfZoom * 1.1f * mfRadius / std::sin(fHalfFov);
-	XMVECTOR vecToEyeNormal = XMVectorSet(std::sin(mfYaw) * std::cos(mfPitch), -std::cos(mfYaw) * std::cos(mfPitch), std::sin(mfPitch), 0.0f);
+	glm::mat3 initialBasis(glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, std::sin(kfInitialPitch), std::cos(kfInitialPitch)), glm::vec3(0.0f, -std::cos(kfInitialPitch), std::sin(kfInitialPitch)));
+	glm::mat3 orientation = initialBasis * glm::mat3(mArcBall.getTransformation());
+	glm::vec3 toEye = orientation[2];
+	glm::vec3 up = orientation[1];
+	XMVECTOR vecToEyeNormal = XMVectorSet(toEye.x, toEye.y, toEye.z, 0.0f);
 	mVecEyePosition = XMVectorAdd(mVecPosition, XMVectorScale(vecToEyeNormal, fDistance));
 	mVecToEyeNormal = XMVector3Normalize(XMVectorSubtract(mVecEyePosition, mVecPosition));
-	mMatView = XMMatrixLookAtRH(mVecEyePosition, mVecPosition, XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f));
+	mMatView = XMMatrixLookAtRH(mVecEyePosition, mVecPosition, XMVectorSet(up.x, up.y, up.z, 0.0f));
 	mMatPerspective = XMMatrixPerspectiveFovRH(XM_PIDIV4, engine::gpSwapchainManager->mfAspectRatio, std::max(0.001f * mfRadius, fDistance - 1.5f * mfRadius), fDistance + 2.0f * mfRadius);
 	mfCameraEyeHeight = fDistance;
 	mfShadowTexelEyeHeight = mfCameraEyeHeight;
@@ -34,20 +38,34 @@ void Camera::Fit(const XMFLOAT3A& rf3Center, float fRadius)
 {
 	mVecPosition = XMVectorSetW(XMLoadFloat3A(&rf3Center), 1.0f);
 	mfRadius = fRadius;
-	mfYaw = 0.0f;
-	mfPitch = kfInitialPitch;
+	mArcBall = arc_ball::ArcBall(glm::vec3(0.0f), 0.75f, glm::mat4(1.0f));
 	mfZoom = 1.0f;
-}
-
-void Camera::Orbit(float fYawDelta, float fPitchDelta)
-{
-	mfYaw = std::remainder(mfYaw + fYawDelta, XM_2PI);
-	mfPitch = std::clamp(mfPitch + fPitchDelta, -0.49f * XM_PI, 0.49f * XM_PI);
 }
 
 void Camera::Zoom(float fWheelDelta)
 {
 	mfZoom = std::clamp(mfZoom * std::exp(-0.15f * fWheelDelta), 0.5f, 5.0f);
+}
+
+void Camera::RotateSun(const glm::vec2& rAnchor, const glm::vec2& rPosition)
+{
+	arc_ball::ArcBall increment(glm::vec3(0.0f), 0.75f, glm::mat4(1.0f));
+	increment.beginDrag(rAnchor);
+	increment.drag(rPosition);
+	XMFLOAT4X4A f4x4View {};
+	XMStoreFloat4x4A(&f4x4View, mMatView);
+	glm::mat3 cameraBasis(glm::vec3(f4x4View._11, f4x4View._21, f4x4View._31), glm::vec3(f4x4View._12, f4x4View._22, f4x4View._32), glm::vec3(f4x4View._13, f4x4View._23, f4x4View._33));
+	// ArcBall rotates the camera basis; a direction follows the inverse rotation in that basis.
+	glm::mat3 screenRotation = glm::transpose(glm::mat3(increment.getTransformation()));
+	glm::quat worldRotation = glm::quat_cast(cameraBasis * screenRotation * glm::transpose(cameraBasis));
+	mSunRotation = glm::normalize(worldRotation * mSunRotation);
+}
+
+XMVECTOR XM_CALLCONV Camera::ApplySunRotation(FXMVECTOR vecDirection) const
+{
+	glm::vec3 direction(XMVectorGetX(vecDirection), XMVectorGetY(vecDirection), XMVectorGetZ(vecDirection));
+	direction = mSunRotation * direction;
+	return XMVectorSet(direction.x, direction.y, direction.z, 0.0f);
 }
 
 } // namespace game

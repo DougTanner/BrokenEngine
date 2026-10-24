@@ -26,6 +26,16 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 		}
 		return 0;
 	}
+	if (uiMessage == WM_APP + 2)
+	{
+		if (ImGui::GetCurrentContext() != nullptr && (iLongParameter == 0 || iLongParameter == 1))
+		{
+			ImGuiIO& rInputOutput = ImGui::GetIO();
+			rInputOutput.AddMouseSourceEvent(ImGuiMouseSource_Mouse);
+			rInputOutput.AddMouseButtonEvent(static_cast<int>(iLongParameter), std::cmp_not_equal(uiWordParameter, 0));
+		}
+		return 0;
+	}
 	if (ImGui::GetCurrentContext() != nullptr && ImGui_ImplWin32_WndProcHandler(hwnd, uiMessage, uiWordParameter, iLongParameter) != 0)
 	{
 		return TRUE;
@@ -93,7 +103,10 @@ int RunModelViewer(HINSTANCE hinstance)
 	catch (const std::runtime_error& rException)
 	{
 		LOG(kDefault, kError, "ModelViewer failed: {}", rException.what());
-		MessageBox(nullptr, rException.what(), kGameName.data(), MB_OK | MB_ICONERROR);
+		if (engine::gLaunchOptions.iAgentPort == 0)
+		{
+			std::ignore = MessageBox(nullptr, rException.what(), kGameName.data(), MB_OK | MB_ICONERROR);
+		}
 		return 1;
 	}
 	engine::gpIslandTerrain->WaitForElevationMaps();
@@ -152,10 +165,19 @@ int RunModelViewer(HINSTANCE hinstance)
 	{
 		pApplication->Render();
 	}
-	ShowWindow(hwnd, SW_SHOWDEFAULT);
+	if (engine::gLaunchOptions.iAgentPort == 0)
+	{
+		std::ignore = ShowWindow(hwnd, engine::gLaunchOptions.vkWindowedExtent.width != 0 ? SW_SHOWNORMAL : SW_SHOWMAXIMIZED);
+		std::ignore = SetForegroundWindow(hwnd);
+		std::ignore = BringWindowToTop(hwnd);
+		std::ignore = SetFocus(hwnd);
+	}
 	common::ScopedLambda hideWindow([&]()
 	{
-		ShowWindow(hwnd, SW_HIDE);
+		if (engine::gLaunchOptions.iAgentPort == 0)
+		{
+			std::ignore = ShowWindow(hwnd, SW_HIDE);
+		}
 	});
 	pProfileManager->BootLog();
 	common::ScopedLambda disableTracking([]()
@@ -280,7 +302,10 @@ static int ProcessMain(HINSTANCE hinstance)
 		catch (const std::runtime_error& rException)
 		{
 			LOG(kDefault, kError, "ModelViewer failed: {}", rException.what());
-			MessageBox(nullptr, rException.what(), kGameName.data(), MB_OK | MB_ICONERROR);
+			if (engine::gLaunchOptions.iAgentPort == 0)
+			{
+			std::ignore = MessageBox(nullptr, rException.what(), kGameName.data(), MB_OK | MB_ICONERROR);
+			}
 			return 1;
 		}
 		return RunModelViewer(hinstance);

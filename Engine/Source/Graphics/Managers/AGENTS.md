@@ -195,7 +195,11 @@ Integrates Dear ImGui with a dedicated load-preserving overlay pass. It records 
   (`../../Ui/Screens/AGENTS.md`). ModelViewer retains `UiScale()` at 1.0 so its
   controls use native pixel dimensions at every framebuffer size.
 - Opaque-region registration is rectangular, so rounded opaque windows must remain visually compatible with rectangular scene occlusion.
-- The Win32 backend publishes physical cursor state during frame preparation. Synthetic agent mouse position is reissued afterward so it wins last-writer ordering. Physical-input suppression parks the cursor unless an agent pin owns it and always clears backend gamepad navigation state.
+- The Win32 backend publishes physical cursor state during frame preparation.
+  Synthetic agent mouse position is reissued afterward so it wins last-writer
+  ordering. In gameplay builds, physical-input suppression parks the cursor
+  unless an agent pin owns it. ModelViewer preserves its private queued pointer
+  positions. Suppression always clears backend gamepad navigation state.
 - Engine-owned ImGui textures upload changed rectangles outside the UI render
   pass, ordering earlier graphics-queue fragment reads before transfer writes
   and subsequent reads. Staging and detached GPU resources retire only on the

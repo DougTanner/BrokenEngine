@@ -29,7 +29,7 @@ Run replay acceptance only on a `kbDebugInput` build. It must prove transitions 
 
 If the 512-line relevant-log window cannot retain the baseline through this bounded scenario, rerun with file-offset evidence from the configured per-process logs; never downgrade to “silence = pass.”
 
-#### Replay manifest v5 integrity and generation matrix
+#### Replay manifest v6 integrity and generation matrix
 
 This is a stopped-server AppData test, not an agent command. Produce a valid
 repeated-generation harness rig from the selected project's replay recipes and
@@ -38,8 +38,9 @@ server, back up the complete `F7.replay.manifest`, `.grid`, `.meta`, and every
 qualified coordinate sibling from
 `<absolute app-data root>\<server game name>` (the hub's `## Launch values`);
 restore the backup
-before each change and relaunch. The v5 manifest is fixed-width little-endian:
-version, initial tick, activation count and `(activationTick,x,y)` records; a
+before each change and relaunch. The v6 manifest is fixed-width little-endian:
+version, initial tick, next global ID, activation count and
+`(activationTick,x,y)` records; a
 `hasFullFrames` byte; then the 32-byte generation digest. It stores no
 inventory: the artifact set and order are computed from the records. The
 recording has one grid and one meta artifact, and each record has a header,
@@ -50,7 +51,7 @@ header, `.frames`, `.checksums`, and `.fullframes` artifacts in that order.
 `ToKey` packs `x` in the high 32 bits and `y` in the low, so `[0,0]` is key `0`.
 Coordinate names are `F7.replay.<coordKey>.<activationTick>` plus the existing
 suffix. The SHA-256 preimage is, in order, the four little-endian length bytes
-`2B 00 00 00`, the 43 bytes of `broken-engine/replay-manifest-generation/v5`
+`2B 00 00 00`, the 43 bytes of `broken-engine/replay-manifest-generation/v6`
 without a NUL, the exact stored manifest payload bytes from version through
 `hasFullFrames`, then each artifact's raw 32-byte SHA-256 in that order, with no
 byte count.
@@ -62,25 +63,25 @@ reused. Retain the current claim response's `owner` as the only valid owner and
 substitute that literal token in every socket command, `Wait-HarnessPing.ps1`,
 `Wait-IslandSceneReady.ps1`, and release call; never use an owner from an
 earlier claim. A stale token hard-stops on owner mismatch and reads like a
-scenario failure. The claim invocation is itself the wait for a foreign holder,
-so add no polling of your own around the re-claim.
+scenario failure. The claim waits for a foreign holder as worker step 5
+states, so add no polling of your own around the re-claim.
 
 Under that same backup-and-restore discipline, staging a byte-modified artifact
 the reader still accepts is a manifest repair in a fixed order. First self-check
 the repair tool: recompute the root digest over the untouched manifest and
 artifacts by the preimage above and require it to equal the stored trailing 32
 bytes, because otherwise a repair bug is indistinguishable from the corrupt-data
-rejection under test. The fixed widths are int64 for version, initial tick, and
-activation count, 16 bytes per activation record (int64 `activationTick`, int32
-`x`, int32 `y`), and one byte for `hasFullFrames`, so the digest begins at byte
-`24 + 16 * activationCount + 1`. Then modify the artifact file, recompute the
+rejection under test. The fixed widths are int64 for version, initial tick, next
+global ID, and activation count, 16 bytes per activation record (int64
+`activationTick`, int32 `x`, int32 `y`), and one byte for `hasFullFrames`, so the
+digest begins at byte `32 + 16 * activationCount + 1`. Then modify the artifact file, recompute the
 root digest over the stored payload plus every artifact's current plain SHA-256
 over raw bytes (no domain prefix, no byte count), and replace the trailing 32
 bytes.
 
 For every rejection case, pause immediately after relaunch, record `status.activeCoords` and the live ID state, send `replay_play`, and require `status.replaying:false` with unchanged live state (no adoption). Corruption cases require a new `SaveLoadReplay aborted: corrupt replay data:` line.
 
-H1. Change version to `4`: reject with a new `Replay manifest version ...` line; restore v5 unchanged and require a loop as the control.
+H1. Change version to `5`: reject with a new `Replay manifest version ...` line; restore v6 unchanged and require a loop as the control.
 H2. Change one byte or the length of one artifact of each kind and require root-digest rejection; then separately remove, replace with a directory, or replace with a reparse point each named artifact. Reject before grid/meta/stream parsing.
 H3. Change the generation digest and reject. Separately test invalid fullframes flag, negative activation count, and trailing data. Reject each before adoption.
 H4. Preserve a repeated coordinate but duplicate one complete manifest record `(activationTick,x,y)`, raise the activation count by one, and recompute the root digest. Require `ReplayManifest overlapping coordinate generations` rejection before adoption. A repeated coordinate with distinct activation ticks remains the clean control.
@@ -104,6 +105,6 @@ later generation's header unchanged: the reader requires its start tick to equal
 its manifest activation, so lowering that tick is rejected as
 `ReplayManifest stream bounds` before the overlap check runs.
 H6. Change the staged grid so it contains a later-only coordinate or omits a distinct coordinate activated at the initial tick, recompute the root digest, and require rejection before state replacement. A coordinate present at the initial tick may also have later records; the clean repeated-A harness rig must load.
-H7. On Debug, kind-5 `.fullframes` holds complete snapshots distinct from the kind-3 `.frames` stream. Require the root digest to fold one kind-5 artifact per complete `(coordKey,activationTick)` header identity. A clean replay proves snapshot consumption without CRC, desync, or read errors. On non-Debug, static inspection proves `kbReplayFullFrames == false` and the v5 root digest folds no kind-5 artifact. Do not enable runtime Release diagnostics.
+H7. On Debug, kind-5 `.fullframes` holds complete snapshots distinct from the kind-3 `.frames` stream. Require the root digest to fold one kind-5 artifact per complete `(coordKey,activationTick)` header identity. A clean replay proves snapshot consumption without CRC, desync, or read errors. On non-Debug, static inspection proves `kbReplayFullFrames == false` and the v6 root digest folds no kind-5 artifact. Do not enable runtime Release diagnostics.
 H8. While recording, arm `replay_inject_persistence_failure {"stage":"inventory"}`, stop, poll until `status.recording:false`, then call `replay_play`: it must fail with no valid manifest/adoption. This verifies manifest-last publication.
 H9. These procedures do not claim authentication or protection against files changed after preflight.

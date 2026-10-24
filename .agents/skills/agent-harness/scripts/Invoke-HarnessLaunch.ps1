@@ -154,7 +154,7 @@ try {
 	if ($Role -cne 'server' -and -not $NativeResolution) { $gameArguments += @('--windowed', '1600x900') }
 	if ($RenderDoc) { $gameArguments += '--renderdoc' }
 	try {
-		$process = Start-Process -FilePath $executable -ArgumentList $gameArguments -WindowStyle Hidden -PassThru -ErrorAction Stop
+		$process = Start-Process -FilePath $executable -ArgumentList $gameArguments -WorkingDirectory $appDataRoot -WindowStyle Hidden -PassThru -ErrorAction Stop
 	}
 	catch {
 		Complete-HarnessLaunch 1 'error' 'launch.start-failed' "Role '$Role' could not start '$executable': $($_.Exception.Message)"

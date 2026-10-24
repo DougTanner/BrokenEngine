@@ -25,6 +25,17 @@ Fighters combine heading-based steering, health and damage, a fixed forward blas
   terrain avoidance, and firing. Ordinary behavior resumes in the same tick that
   grace reaches zero; exploding fighters continue through the existing death
   path.
+- A fleet fighter launches from inside its fleet's Battleship with
+  `ShipOrders::kSpawning` set (`../../../Network/Server/AGENTS.md`). The bit
+  survives a cell transfer, where the fighter takes arrival grace like any
+  arrival. A spawning fighter behaves as a fleet fighter — navigation, terrain
+  avoidance, firing, and acceleration from its launch velocity to fighter
+  speed; its own pusher keeps pushing other ships and every other pusher
+  pushes it — except that a ship-ship contact involving it damages neither
+  side; blaster and missile hits on it are unchanged. Update clears the bit
+  on the first tick on which the fighter's body overlaps no other ship row's
+  body at that row's previous-frame position, measured in 3D, in any alignment
+  or lifecycle state.
 - The PostRender Spawn phase hook never creates fighters, despite the name: it emits the staggered death explosions and fires blasters. Creation is the separate `SpawnInfo` overload of `Spawn`, called from the frame's random-spawn waves and from the post-tick batch's spawn and transfer status changes. Creation logic belongs in that overload, not in the phase hook, which runs per tick per ship inside the blaster-fire loop.
 - Cross-phase field ownership: the steering delta rotation (this tick's turn
   amount) lives in the Interpolate struct and is read by Interpolate Update and

@@ -103,6 +103,12 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 		ImGui::GetCurrentContext()->TestEngineHookItems = true;
 	}
 	ImGuiIO& rInputOutput = ImGui::GetIO();
+#if defined(BT_MODEL_VIEWER)
+	if (gLaunchOptions.iAgentPort != 0)
+	{
+		rInputOutput.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+	}
+#endif
 	rInputOutput.IniFilename = nullptr;
 	rInputOutput.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
@@ -464,12 +470,14 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 	{
 		ImGuiIO& rInputOutput = ImGui::GetIO();
 
+#if !defined(BT_MODEL_VIEWER)
 		// (d) Physical cursor poll: unless a synthetic pin owns io.MousePos, park it at ImGui's no-mouse sentinel.
 		// Missing agent input must also suppress the physical cursor rather than dereference a nullable startup global.
 		if (gpAgentInput == nullptr || !gpAgentInput->mbImGuiMousePositionPinned)
 		{
 			rInputOutput.AddMousePosEvent(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
 		}
+#endif
 
 		// XInputGetState polls ImGui gamepad navigation; clear the ImGuiKey_Gamepad* range because the harness injects no gamepad events.
 		for (int64_t i = ImGuiKey_GamepadStart; i <= ImGuiKey_GamepadRStickDown; ++i)

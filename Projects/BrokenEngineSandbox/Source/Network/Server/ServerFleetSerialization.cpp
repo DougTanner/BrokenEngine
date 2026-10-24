@@ -3,6 +3,7 @@
 #include "Network/Server/ServerFleetSerialization.h"
 
 #include "Frame/Collections/Ships/ShipBehaviours.h"
+#include "Network/Server/ServerClientManager.h"
 #include "Network/Server/ServerFleetManager.h"
 #include "Network/Server/ServerSession.h"
 #include "Network/GamePacketType.h"
@@ -27,29 +28,29 @@ void SendFleetSync(int64_t iClientId, const std::vector<Fleet>& rFleets)
 	engine::NetworkManager::SendPacket(pClient->pPeer, engine::NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 }
 
-static void WriteFleet(std::fstream& rFileStream, const Fleet& rFleet)
+static void WriteFleet(std::ostream& rStream, const Fleet& rFleet)
 {
-	common::Write(rFileStream, rFleet.guid.uiHigh);
-	common::Write(rFileStream, rFleet.guid.uiLow);
+	common::Write(rStream, rFleet.guid.uiHigh);
+	common::Write(rStream, rFleet.guid.uiLow);
 	int64_t iMemberCount = std::ssize(rFleet.members);
-	common::Write(rFileStream, iMemberCount);
-	common::Write(rFileStream, rFleet.flagshipGlobalId.iValue);
-	common::Write(rFileStream, rFleet.wantedCoordinate.iX);
-	common::Write(rFileStream, rFleet.wantedCoordinate.iY);
-	common::Write(rFileStream, rFleet.uiPendingFleetWantedCoordinateTicks);
-	common::Write(rFileStream, rFleet.navigationDelaySeconds.count());
-	common::Write(rFileStream, rFleet.cellChangeTimerSeconds.count());
+	common::Write(rStream, iMemberCount);
+	common::Write(rStream, rFleet.flagshipGlobalId.iValue);
+	common::Write(rStream, rFleet.wantedCoordinate.iX);
+	common::Write(rStream, rFleet.wantedCoordinate.iY);
+	common::Write(rStream, rFleet.uiPendingFleetWantedCoordinateTicks);
+	common::Write(rStream, rFleet.navigationDelaySeconds.count());
+	common::Write(rStream, rFleet.cellChangeTimerSeconds.count());
 	for (uint8_t uiTargetFlightPlane : rFleet.targetFlightPlanes)
 	{
-		common::Write(rFileStream, uiTargetFlightPlane);
+		common::Write(rStream, uiTargetFlightPlane);
 	}
 	for (const FleetMember& rMember : rFleet.members)
 	{
-		common::Write(rFileStream, rMember.globalId.iValue);
-		common::Write(rFileStream, std::to_underlying(rMember.eType));
-		rMember.flags.Write(rFileStream);
-		common::Write(rFileStream, rMember.coordinate.iX);
-		common::Write(rFileStream, rMember.coordinate.iY);
+		common::Write(rStream, rMember.globalId.iValue);
+		common::Write(rStream, std::to_underlying(rMember.eType));
+		rMember.flags.Write(rStream);
+		common::Write(rStream, rMember.coordinate.iX);
+		common::Write(rStream, rMember.coordinate.iY);
 	}
 }
 
@@ -130,58 +131,37 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 		common::Read(rFileStream, iCoordY);
 		rMember = FleetMember {.globalId = engine::GlobalId {.iValue = iGlobalId}, .eType = static_cast<ShipType>(uiType), .flags = flags, .coordinate = engine::GridCoord {.iX = iCoordX, .iY = iCoordY}};
 	}
-	// Trust boundary (save / replay file): members and the flagship are looked up by global ID, so each member ID
-	// must be valid and unique within its fleet, and the flagship must name a member ({} only for an empty fleet).
-	for (int64_t k = 0; k < iMemberCount; ++k)
+	// Trust boundary (save / replay file): the fleet must hold exactly one Battleship, named by the flagship.
+	auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId);
+	if (std::ranges::count(rFleet.members, ShipType::kBattleship, &FleetMember::eType) != 1 || flagshipIt == rFleet.members.end() || flagshipIt->eType != ShipType::kBattleship)
 	{
-		engine::GlobalId memberGlobalId = rFleet.members.at(static_cast<size_t>(k)).globalId;
-		if (!(memberGlobalId.iValue != 0) || std::ranges::contains(rFleet.members.begin(), rFleet.members.begin() + k, memberGlobalId, &FleetMember::globalId))
-		{
-			throw std::ios_base::failure("Fleet member global ID");
-		}
-	}
-	bool bFlagshipValid = rFleet.members.empty() ? !(rFleet.flagshipGlobalId.iValue != 0) : std::ranges::contains(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId);
-	if (!bFlagshipValid)
-	{
-		throw std::ios_base::failure("Fleet flagship global ID");
+		throw std::ios_base::failure("Fleet flagship Battleship");
 	}
 }
 
-void WriteFleetData(std::fstream& rFileStream, const std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, const common::RandomEngine& rRandom)
+void WriteFleetData(std::ostream& rStream, const std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, const common::RandomEngine& rRandom)
 {
-	// Heap: sorted fleet-owner scratch vector for deterministic save output
-	ScopedSuppressAllocationTracking suppress;
-	std::vector<engine::ClientGuid> fleetOwnerGuids;
-	fleetOwnerGuids.reserve(rFleets.size());
-	for (const auto& [rGuid, rFleetVector] : rFleets)
-	{
-		fleetOwnerGuids.push_back(rGuid);
-	}
-	std::ranges::sort(fleetOwnerGuids, [](const engine::ClientGuid& rLeft, const engine::ClientGuid& rRight)
-	{
-		return rLeft.uiHigh != rRight.uiHigh ? rLeft.uiHigh < rRight.uiHigh : rLeft.uiLow < rRight.uiLow;
-	});
-
 	int64_t iFleetOwnerCount = std::ssize(rFleets);
-	common::Write(rFileStream, iFleetOwnerCount);
+	common::Write(rStream, iFleetOwnerCount);
 
-	for (const engine::ClientGuid& rGuid : fleetOwnerGuids)
+	common::ScopedWorkbufferArena ownersArena = common::gpThreadLocal->mWorkbuffer.Push();
+	for (const engine::ClientGuid& rGuid : SortedGuidKeys(rFleets, ownersArena))
 	{
 		const std::vector<Fleet>& rFleetVector = rFleets.at(rGuid);
-		common::Write(rFileStream, rGuid.uiHigh);
-		common::Write(rFileStream, rGuid.uiLow);
+		common::Write(rStream, rGuid.uiHigh);
+		common::Write(rStream, rGuid.uiLow);
 		int64_t iFleetCount = std::ssize(rFleetVector);
-		common::Write(rFileStream, iFleetCount);
+		common::Write(rStream, iFleetCount);
 		for (const Fleet& rFleet : rFleetVector)
 		{
-			WriteFleet(rFileStream, rFleet);
+			WriteFleet(rStream, rFleet);
 		}
 	}
 
-	common::Write(rFileStream, rRandom.State());
+	common::Write(rStream, rRandom.State());
 }
 
-void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, std::unordered_map<engine::ClientGuid, int64_t>& rGuidToClientId, common::RandomEngine& rRandom)
+void ReadFleetData(std::fstream& rFileStream, int64_t iNextGlobalId, std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, std::unordered_map<engine::ClientGuid, int64_t>& rGuidToClientId, common::RandomEngine& rRandom)
 {
 	rFleets.clear();
 	rGuidToClientId.clear();
@@ -191,6 +171,13 @@ void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientG
 	// Trust boundary (save / replay file): bound the owner count against the stream (each owner
 	// serializes at least its 16-byte GUID plus an int64 fleet count).
 	common::ValidateDeserializedCount(iFleetOwnerCount, 2 * sizeof(uint64_t) + sizeof(int64_t), rFileStream, "ReadFleetData owners");
+	// Trust boundary (save / replay file): members and the flagship are looked up by global ID, and the load revives
+	// only the first member matching a row, so each member ID must be valid and unique across every owner's fleets;
+	// it must also lie below the saved next-global-ID counter, or a later mint would reuse it.
+	// Each fleet GUID must also be unique across every owner: fleet lookup takes the first match and the Fighter
+	// launch timer is keyed by fleet GUID alone.
+	std::unordered_set<int64_t> memberGlobalIds;
+	std::unordered_set<FleetGuid> fleetGuids;
 	for (int64_t i = 0; i < iFleetOwnerCount; ++i)
 	{
 		uint64_t uiGuidHigh = 0;
@@ -211,6 +198,17 @@ void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientG
 		for (Fleet& rFleet : fleets)
 		{
 			ReadFleet(rFileStream, rFleet);
+			if (!fleetGuids.insert(rFleet.guid).second)
+			{
+				throw std::ios_base::failure("duplicate Fleet FleetGuid");
+			}
+			for (const FleetMember& rMember : rFleet.members)
+			{
+				if (rMember.globalId.iValue <= 0 || rMember.globalId.iValue >= iNextGlobalId || !memberGlobalIds.insert(rMember.globalId.iValue).second)
+				{
+					throw std::ios_base::failure("Fleet member global ID");
+				}
+			}
 		}
 		if (!rFleets.try_emplace(guid, std::move(fleets)).second)
 		{
@@ -225,14 +223,79 @@ void ReadFleetData(std::fstream& rFileStream, std::unordered_map<engine::ClientG
 	rRandom.SetSerializedState(uiRandomState);
 }
 
+std::string ReplayFleetRecordBytes()
+{
+	const ServerFleetManager& rFleetManager = *gpServerSession->mpFleetManager;
+	std::ostringstream recordStream(std::ios::binary);
+	WriteFleetData(recordStream, rFleetManager.mFleets, rFleetManager.mRandomEngine);
+
+	common::ScopedWorkbufferArena ownersArena = common::gpThreadLocal->mWorkbuffer.Push();
+	for (const engine::ClientGuid& rGuid : SortedGuidKeys(rFleetManager.mFleets, ownersArena))
+	{
+		for (const Fleet& rFleet : rFleetManager.mFleets.at(rGuid))
+		{
+			for (const FleetMember& rMember : rFleet.members)
+			{
+				common::Write(recordStream, rMember.respawnTimerSeconds.count());
+			}
+		}
+	}
+
+	const std::unordered_map<FleetGuid, int64_t>& rNextFighterLaunchTicks = gpServerSession->mpClientManager->mNextFighterLaunchTicks;
+	int64_t iLaunchTickCount = std::ssize(rNextFighterLaunchTicks);
+	common::Write(recordStream, iLaunchTickCount);
+	common::ScopedWorkbufferArena launchFleetsArena = common::gpThreadLocal->mWorkbuffer.Push();
+	for (const FleetGuid& rFleetGuid : SortedGuidKeys(rNextFighterLaunchTicks, launchFleetsArena))
+	{
+		common::Write(recordStream, rFleetGuid.uiHigh);
+		common::Write(recordStream, rFleetGuid.uiLow);
+		common::Write(recordStream, rNextFighterLaunchTicks.at(rFleetGuid));
+	}
+
+	return std::move(recordStream).str();
+}
+
+void ReadReplayFleetRecord(std::fstream& rFileStream, int64_t iNextGlobalId, ReplayFleetRecord& rRecord)
+{
+	// A record carries no owner client IDs, so ReadFleetData's all-disconnected map is dropped.
+	std::unordered_map<engine::ClientGuid, int64_t> guidToClientId;
+	ReadFleetData(rFileStream, iNextGlobalId, rRecord.fleets, guidToClientId, rRecord.randomEngine);
+
+	common::ScopedWorkbufferArena ownersArena = common::gpThreadLocal->mWorkbuffer.Push();
+	for (const engine::ClientGuid& rGuid : SortedGuidKeys(rRecord.fleets, ownersArena))
+	{
+		for (Fleet& rFleet : rRecord.fleets.at(rGuid))
+		{
+			for (FleetMember& rMember : rFleet.members)
+			{
+				float fRespawnTimer = 0.0f;
+				common::Read(rFileStream, fRespawnTimer);
+				rMember.respawnTimerSeconds = std::chrono::duration<float>(fRespawnTimer);
+			}
+		}
+	}
+
+	int64_t iLaunchTickCount = 0;
+	common::Read(rFileStream, iLaunchTickCount);
+	for (int64_t i = 0; i < iLaunchTickCount; ++i)
+	{
+		FleetGuid fleetGuid {};
+		common::Read(rFileStream, fleetGuid.uiHigh);
+		common::Read(rFileStream, fleetGuid.uiLow);
+		int64_t iLaunchTick = 0;
+		common::Read(rFileStream, iLaunchTick);
+		rRecord.nextFighterLaunchTicks.insert_or_assign(fleetGuid, iLaunchTick);
+	}
+}
+
 void WriteSaveState(std::fstream& rFileStream)
 {
 	gpServerSession->WriteFleetData(rFileStream);
 }
 
-void ReadSaveState(std::fstream& rFileStream, SaveStagedState& rStagedState)
+void ReadSaveState(std::fstream& rFileStream, int64_t iNextGlobalId, SaveStagedState& rStagedState)
 {
-	ReadFleetData(rFileStream, rStagedState.fleets, rStagedState.guidToClientId, rStagedState.randomEngine);
+	ReadFleetData(rFileStream, iNextGlobalId, rStagedState.fleets, rStagedState.guidToClientId, rStagedState.randomEngine);
 }
 
 void AdoptSaveState(SaveStagedState&& rStagedState)

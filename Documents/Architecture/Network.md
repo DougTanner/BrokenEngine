@@ -288,6 +288,15 @@ sizes are the full packet including the type byte.
   drain. The accepted `kServerConnectionResponse` carries the server's
   `kbDebugInput` as one byte (0 or 1) ahead of the optional GUID; a Debug client
   sends no debug-control request to a server that does not accept them.
+- **Replay playback byte**: the accepted `kServerConnectionResponse`, after its
+  `kbDebugInput` byte, and every `kServerLoadNotification`, after its load
+  generation, carry one byte (0 or 1) saying whether the server plays a replay.
+  The client keeps the latest value, which every playback start and end updates
+  because each runs the load reset that sends the notification; the game
+  disables its simulation-affecting controls while it is set. Accepted limit: a
+  replay loop re-read that fails on replay files changed during playback ends
+  playback with no load notification, so the client keeps the set value until
+  the next notification or reconnect.
 
 **Contract table** (sizes = full packet incl. type byte):
 
@@ -304,21 +313,25 @@ sizes are the full packet including the type byte.
 | `kClientChat` | 3 | 258 | 8 | yes | violation | `IsValidChatText` on the text up to the first NUL (1–256 bytes of well-formed UTF-8 per Unicode Table 3-7, no C0, DEL, or C1 control) → corrupt, rejected before the token bucket; per-client token bucket (burst 5, refill 1 per `steady_clock` second) drops excess silently with no violation; only the validated text is re-encoded and relayed |
 | `kClientUpdateOwnedEntityRequest` | 14 | 14 | 8 | yes | violation | use-missiles byte other than 0 or 1 → corrupt; nav delay non-finite or outside `[0,60]` → corrupt (`IsNavigationDelayInRange`), never clamped |
 | `kClientFleetNavigationDelay` | 21 | 21 | 8 | yes | violation | fleet-guid lookup; nav delay non-finite or outside `[0,60]` → corrupt, never clamped |
-| `kClientCreateFleetRequest` | 1 | 1 | 4 | yes | violation | per-client fleet cap 16 (over-cap `kWarning`) |
-| `kClientDeleteFleetRequest` | 17 | 17 | 8 | yes | violation | fleet-guid lookup |
-| `kClientSpawnIntoFleetRequest` | 18 | 18 | 8 | yes | violation | ship-type byte at or above `ShipType::kCount` → corrupt; fleet-guid lookup; per-fleet member cap 16; spawn dedup on `{client, fleetGuid, member}` |
-| `kClientRespawnInFleetRequest` | 25 | 25 | 16 | yes | violation | fleet-guid lookup; member global-ID lookup; spawn dedup |
+| `kClientCreateFleetRequest` | 1 | 1 | 4 | yes | violation | per-client fleet cap 4 (over-cap `kWarning`) |
+| `kClientSpawnIntoFleetRequest` | 18 | 18 | 8 | yes | violation | ship-type byte at or above `ShipType::kCount` or equal to `ShipType::kBattleship` → corrupt; fleet-guid lookup; per-fleet member cap 16 |
 | `kClientSaveRequest` / `LoadRequest` / `ResetRequest` / `ReplayRecordRequest` / `ReplayPlaybackRequest` | 1 | 1 | 2 | yes | violation | **`kbDebugInput`-gated** — sentinel (violation) on a non-debug server |
 | `kClientPauseRequest` | 2 | 2 | 4 | yes | violation | **`kbDebugInput`-gated**; pause byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
-client-sendable). The current wire-protocol version is 35, which made the
-`kClientCrashReport` payload a crash report whose header, including its
-crash-report version line, the server parses and rejects as corrupt when it
-does not match; version 34 added `uiFlightPlane` to the Fighters, Omnis, and
-Battleships `SpawnInfo` `Fields()` lists (commit `a1b4bbb91`); version 33 made
-the `kServerCoordinateStaticData` payload carry one navigation graph per flight
+client-sendable). The current wire-protocol version is 37, which added the
+replay playback byte to the accepted `kServerConnectionResponse` and to
+`kServerLoadNotification`; version 36 dropped
+`bIsFlagship` and `flagshipGlobalId` from the `UpdateFleetData` `Fields()`
+list and removed `kClientRespawnInFleetRequest` and
+`kClientDeleteFleetRequest`, shifting the later `GamePacketType` values;
+version 35 made the `kClientCrashReport` payload a crash report whose header,
+including its crash-report version line, the server parses and rejects as
+corrupt when it does not match; version 34 added `uiFlightPlane` to the
+Fighters, Omnis, and Battleships `SpawnInfo` `Fields()` lists (commit
+`a1b4bbb91`); version 33 made the `kServerCoordinateStaticData` payload carry
+one navigation graph per flight
 plane (an `int32_t` plane count, then each plane's `NavData`); version 32 added
 `uiTargetFlightPlane` to the `UpdateShipData` `Fields()` list; version 31
 dropped the three wind-trail fields from the `BlastersPostRender::SpawnInfo`
@@ -344,8 +357,8 @@ dropped the per-frame main-menu flags from every full-state frame; version 23
 inserted the engine `kClientChat` and `kServerChat` types before
 `kGamePacketStart`; each
 FleetSync member carries a member flags byte whose `kIsDead` bit marks a dead
-member; the FleetSync flagship and the `kClientRespawnInFleetRequest` member
-name a fleet member by its global ID, not its list position; omni and
+member; the FleetSync flagship names a fleet member by its global ID, not its
+list position; omni and
 spaceship transfer payloads carry the arrival grace their source sets. Protocol 16 is one
 deliberate generation break taken with cell-local geometry: `kiProtocolVersion`
 bumps together with the navigation-data version
@@ -357,10 +370,9 @@ navigation blob, and connection is rejected by those gates; no compatibility
 path reads the previous generation. The separate `FrameInput::kiVersion` gates
 replay-input compatibility; `Frame::kiVersion` is the Hello gate for
 deterministic-Frame/save/replay compatibility. Neither replaces the protocol
-gate for wire-only `StatusChange` payload (`SpawnInfo` `Fields()`) layouts. The four fleet
-request packets address a fleet by its stable `FleetGuid` rather than a vector
-index, so a delete that shifts the fleet vector cannot misdirect a request
-already in transit or queued; `kClientUnsubscribe` carries a slot index plus
+gate for wire-only `StatusChange` payload (`SpawnInfo` `Fields()`) layouts. The two fleet
+request packets that name a fleet address it by its stable `FleetGuid` rather
+than a vector index; `kClientUnsubscribe` carries a slot index plus
 epoch, and Hello carries an 8-byte integrity token derived from the ordered
 Islands manifest `ChunkLocation` table. The gate runs pre-sim and
 server-authoritative — no deterministic simulation/shared-CRC exposure; the

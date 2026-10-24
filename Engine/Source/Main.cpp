@@ -883,20 +883,31 @@ static int64_t ProcessMain(HINSTANCE hinstance)
 		CloseHandle(handle);
 	})>;
 	ScopedHandle pMutex(nullptr);
-	if constexpr (kbSingleInstance)
+#if defined(BT_CLIENT)
+	// Keyed on the live crash report path, not the game name: clients run side by side only when those paths differ.
+	std::wstring mutexName = engine::ClientInstanceMutexName();
+	HANDLE handleMutex = CreateMutexW(nullptr, TRUE, mutexName.c_str());
+#else
+	HANDLE handleMutex = CreateMutex(nullptr, TRUE, game::kGameName.data());
+#endif
+	pMutex.reset(handleMutex);
+	if (GetLastError() == ERROR_ALREADY_EXISTS)
 	{
-		HANDLE handleMutex = CreateMutex(nullptr, TRUE, game::kGameName.data());
-		pMutex.reset(handleMutex);
-		if (GetLastError() == ERROR_ALREADY_EXISTS)
+#if defined(BT_CLIENT)
+		LOG(kDefault, kError, "Another client is already using this app-data folder: {}", mutexName);
+		if (engine::gLaunchOptions.iAgentPort == 0)
 		{
-			// The server shows no dialog and fails fast, so a supervisor or AgentHarness sees the exit.
-			LOG(kDefault, kError, "Another instance is already running");
-			return 0;
+			MessageBox(nullptr, "Another client is already using this app-data folder", game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 		}
+#else
+		// The server shows no dialog and fails fast, so a supervisor or AgentHarness sees the exit.
+		LOG(kDefault, kError, "Another instance is already running");
+#endif
+		return 0;
 	}
 
-	// After the single-instance check, so a refused second server never moves the running server's report, and before
-	// any other thread starts, so no crash writer or report reader can touch either file during the rename.
+	// After the single-instance check, so a refused second client or server never moves the running instance's report,
+	// and before any other thread starts, so no crash writer or report reader can touch either file during the rename.
 	engine::RenamePreviousCrashReport();
 
 	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);

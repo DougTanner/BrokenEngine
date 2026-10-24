@@ -88,8 +88,9 @@ struct Cell
 	// any tick <= this value is an invariant violation and trips DEBUG_BREAK in ReconcileRunTickCoord.
 	int64_t iHighWaterValidatedTick = -1;
 
-	// Monotonic guard for the rendered frame: the renderer must never regress to an older tick
-	// for the same coord. Trips DEBUG_BREAK in UpdateRenderInterpolation().
+	// Monotonic guard for the rendered frame over a coord's confirmed history: the renderer must never
+	// regress to an older tick for it. Provisional-frame renders before the first full state are not
+	// recorded. Trips DEBUG_BREAK in UpdateRenderInterpolation().
 	int64_t iLastRenderedTick = -1;
 
 	struct CoordServerUpdate

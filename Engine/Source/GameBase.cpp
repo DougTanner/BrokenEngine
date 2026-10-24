@@ -579,6 +579,13 @@ void GameBase::FinalizeFrameTick()
 
 	game::gpServerSession->mpRuntime->CompleteTick(miTickCounter);
 
+	if ((!gpReplay->mReplayWriters.empty()) || mbReplaying || (mGameFlags & GameFlags::kSaveReplay)) [[unlikely]]
+	{
+		// Heap: the game's replay checksum serialization and the recording's per-tick checksum list
+		ScopedSuppressAllocationTracking suppress;
+		game::FinalizeReplayTick(!gpReplay->mReplayWriters.empty());
+	}
+
 	for (auto& [rCoordinate, rFrameInput] : mFrameInputs)
 	{
 		rFrameInput.statusChanges.clear();
@@ -796,12 +803,15 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 		{
 			const game::Frame& rFrame = RenderFrame(rCoordinate);
 			Cell& rCell = mCells.at(rCoordinate);
-			if (rFrame.interpolate.iTick < rCell.iLastRenderedTick)
+			if (rCell.iConfirmedTick >= 0)
 			{
-				LOG(kNetwork, kError, "Render regressed to older frame Coord: ({},{}) Tick: {} LastTick: {}", rCoordinate.iX, rCoordinate.iY, rFrame.interpolate.iTick, rCell.iLastRenderedTick);
-				DEBUG_BREAK();
+				if (rFrame.interpolate.iTick < rCell.iLastRenderedTick)
+				{
+					LOG(kNetwork, kError, "Render regressed to older frame Coord: ({},{}) Tick: {} LastTick: {}", rCoordinate.iX, rCoordinate.iY, rFrame.interpolate.iTick, rCell.iLastRenderedTick);
+					DEBUG_BREAK();
+				}
+				rCell.iLastRenderedTick = rFrame.interpolate.iTick;
 			}
-			rCell.iLastRenderedTick = rFrame.interpolate.iTick;
 			float fCoordinateDeltaTime = (rCell.iSnapshotCount >= kiRenderBehindTicks + 1) ? fDeltaTime : 0.0f;
 			game::FrameInterpolate::AllocateAndCopy(mRenderInterpolates.try_emplace(rCoordinate).first->second, rFrame.interpolate);
 			game::FrameInterpolate::Update(mRenderInterpolates.at(rCoordinate), rFrame, fCoordinateDeltaTime);

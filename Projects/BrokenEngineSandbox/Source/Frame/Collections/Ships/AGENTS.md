@@ -42,13 +42,11 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
 ## Fleet Navigation Invariants
 
 - Navigation covers roaming, cross-cell movement, island destinations, and flagship following. Mode transitions depend only on shared state.
-- Flagship following has no frame-local exit when the flagship row is gone;
-  recovery comes from the server's flagship reassignment landing in the next
-  tick's Update phase, not from navigation. Two ticks after the death (D+2), the
-  promoted flagship's reassigned flag, carried mode 5 (following the flagship),
-  and same-cell wanted coord recover it to mode 4 (navigating to an island
-  destination) and clear the stale destination; this preserves mode 4's schedule
-  of three random draws and leaves the fleet's 60-second rally timer unchanged.
+- Flagship following has no frame-local exit when the flagship row is not in
+  the follower's cell, and the server never reassigns the flagship: a fleet's
+  flagship is its Battleship, which never dies (`../Battleships/AGENTS.md`), so
+  a follower stalls until that row is in its cell again or a fleet wanted cell
+  other than its own sends it cross-cell.
 - Path queries run on a deterministic cadence staggered by tick and stable global ID, with immediate recomputation for mode, destination, or direction changes.
 - The cadence also breaks off-schedule when a navigation polygon contains either
   the lookahead point along the carried steering bearing or the current

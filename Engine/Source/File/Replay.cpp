@@ -18,7 +18,7 @@ namespace engine
 {
 
 // On-disk version of F7.replay.manifest. Old manifests are rejected on read.
-constexpr int64_t kiReplayManifestVersion = 5;
+constexpr int64_t kiReplayManifestVersion = 6;
 constexpr int64_t kiInvalidReplayManifestVersion = 0;
 
 template <std::integral TYPE>
@@ -74,11 +74,13 @@ enum class ReplayArtifactKind : uint8_t
 struct ReplayManifest
 {
 	int64_t iInitialTick = 0;
+	// GameBase::miNextGlobalId at recording stop: above every global ID the recorded rows carry.
+	int64_t iNextGlobalId = 0;
 	std::vector<ReplayManifestRecord> records;
 	bool bHasFullFrames = false;
 };
 
-constexpr std::string_view kReplayManifestGenerationDomain = "broken-engine/replay-manifest-generation/v5";
+constexpr std::string_view kReplayManifestGenerationDomain = "broken-engine/replay-manifest-generation/v6";
 static_assert(kReplayManifestGenerationDomain.size() == 43);
 
 static std::filesystem::path ReplayArtifactFilename(ReplayArtifactKind eKind, uint64_t uiCoordinateKey, int64_t iActivationTick)
@@ -98,7 +100,7 @@ static std::filesystem::path ReplayArtifactFilename(ReplayArtifactKind eKind, ui
 
 static void AppendReplayManifestPayload(const ReplayManifest& rManifest, std::vector<std::byte>& rPayload)
 {
-	static constexpr int64_t kiFixedBytes = sizeof(int64_t) * 3 + 1;
+	static constexpr int64_t kiFixedBytes = sizeof(int64_t) * 4 + 1;
 	rPayload.clear();
 	rPayload.reserve(static_cast<size_t>(kiFixedBytes + std::ssize(rManifest.records) * 16));
 	auto AppendValue = [&rPayload]<std::integral TYPE>(TYPE value)
@@ -113,6 +115,7 @@ static void AppendReplayManifestPayload(const ReplayManifest& rManifest, std::ve
 
 	AppendValue(kiReplayManifestVersion);
 	AppendValue(rManifest.iInitialTick);
+	AppendValue(rManifest.iNextGlobalId);
 	AppendValue(static_cast<int64_t>(std::ssize(rManifest.records)));
 	for (const ReplayManifestRecord& rRecord : rManifest.records)
 	{
@@ -206,6 +209,10 @@ static bool ReadReplayManifest(ReplayManifest& rManifest)
 	if (!ReadReplayManifestValue(manifestStream, rManifest.iInitialTick))
 	{
 		throw std::ios_base::failure("ReplayManifest initial tick");
+	}
+	if (!ReadReplayManifestValue(manifestStream, rManifest.iNextGlobalId))
+	{
+		throw std::ios_base::failure("ReplayManifest next global ID");
 	}
 	int64_t iCoordinateCount = 0;
 	if (!ReadReplayManifestValue(manifestStream, iCoordinateCount))
@@ -411,7 +418,7 @@ void Replay::SaveLoadReplay()
 				const std::vector<ReplayManifestRecord>& rRecordedRecords = manifest.records;
 
 				game::ReplayStagedMeta stagedMeta {};
-				if (!game::ReadReplayMetadata({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, ReplayArtifactFilename(ReplayArtifactKind::kMeta, 0, -1), stagedMeta))
+				if (!game::ReadReplayMetadata({engine::FileFlags::kAppDataDirectory, engine::FileFlags::kRead}, ReplayArtifactFilename(ReplayArtifactKind::kMeta, 0, -1), manifest.iNextGlobalId, stagedMeta))
 				{
 					LOG(kDefault, kError, "Failed to read replay metadata");
 					ReplayHarnessRigs::Reset(*this);
@@ -525,6 +532,9 @@ void Replay::SaveLoadReplay()
 				ReplayHarnessRigs::TransferCaptureSnapshot recordingCaptureInfo = ReplayHarnessRigs::CaptureSnapshot(*this);
 				game::gpGame->ResetSession();
 				engine::AdoptGridSave(std::move(stagedGrid));
+				// Replaces the grid's recording-start counter before anything below can throw, so an abort that keeps
+				// replayed frames never leaves a counter at or below a global ID they carry.
+				game::gpGame->miNextGlobalId = manifest.iNextGlobalId;
 
 				for (StagedReplayReader& rStagedReader : stagedReaders)
 				{
@@ -658,6 +668,7 @@ void Replay::SaveLoadReplay()
 				ReplayManifest manifest
 				{
 					.iInitialTick = recordedRecords.empty() ? 0 : recordedRecords.front().iActivationTick,
+					.iNextGlobalId = game::gpGame->miNextGlobalId,
 					.records = std::move(recordedRecords),
 					.bHasFullFrames = kbReplayFullFrames,
 				};
@@ -740,6 +751,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 					.iActivationTick = miReplayInitialTick,
 				});
 			}
+			game::StartReplayRecording();
 
 			ReplayHarnessRigs::RecordingStarted(*this);
 			LOG(kDefault, kDebug, "Recording started for {} coords", mReplayWriters.size());
@@ -895,6 +907,9 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 				game::gpGame->mGameFlags.Set(engine::GameFlags::kLoadReplay);
 				return ReplayTickDecision::kStopBeforeDispatch;
 			}
+
+			// Only a tick that dispatches reaches here, so the game state stays matched to the kept frames on abort.
+			game::PrepareReplayPlaybackTick();
 		}
 	}
 

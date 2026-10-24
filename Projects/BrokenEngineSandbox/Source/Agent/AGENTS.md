@@ -9,7 +9,7 @@ dispatch first; the game dispatcher then tries its own side-specific handlers
 under `BT_CLIENT` or `BT_SERVER`, and only then the engine's side-generic
 handler, so a game handler can take over an engine command
 (`../../../../Engine/Source/Agent/AGENTS.md` `## Architecture`). This project
-takes over `status` and `load`
+takes over `status`
 (`AgentCommandsServer.cpp`), `replay_transfer_capture` (the server
 simulation-harness-rig module), and `describe_scene` (`AgentScene.cpp`). The
 focused server simulation-harness-rig module owns the parsing, result assembly,
@@ -31,7 +31,7 @@ and orchestration for `inject_payload`, `set_fleet_flight_plane`, and the
 - The engine owns simulation control, save/load/reset, the server CPU profile
   query, `create_cell`, and the replay commands. Game server handlers own
   status-change injection, frame queries, frame edits and reads, and the
-  `status`, `load`, and `replay_transfer_capture` take-overs. Their focused
+  `status` and `replay_transfer_capture` take-overs. Their focused
   simulation-harness-rig module owns one state slot bound to the live
   `ServerSession`, including the coordinate-keyed status-change queue that
   `inject_payload` destroy and update entries fill; replacing or destroying the
@@ -58,9 +58,12 @@ and orchestration for `inject_payload`, `set_fleet_flight_plane`, and the
   pending replay transition, because no replay records the edit. The command
   adds and removes no row itself; the shared compaction ending the next tick's
   Destroy phase removes a row whose kill state it wrote, with the rows it owns,
-  so `edit_frame` never writes a handle or runs a removal. Connected clients
-  resynchronize through the Save entry point (`../Save/AGENTS.md`). Command
-  contract: `../../Documents/AgentHarness/commands-server.md`.
+  so `edit_frame` never writes a handle or runs a removal. `edit_frame` and
+  `inject_payload` refuse an edit that would let a fleet Battleship die or
+  leave its fleet, because one never does (`../Frame/Collections/Battleships/AGENTS.md`).
+  Connected clients resynchronize through the Save entry point
+  (`../Save/AGENTS.md`). Command contract:
+  `../../Documents/AgentHarness/commands-server.md`.
 - `set_fleet_flight_plane` writes fleet state, not tick input, so it is refused
   during playback, because no recording carries the write. Command contract:
   `../../Documents/AgentHarness/commands-server.md`.

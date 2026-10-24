@@ -6,22 +6,17 @@
 
 The engine-owned server commands are in the
 [command reference](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands).
-BrokenEngineSandbox takes over `status`, `load`, and `replay_transfer_capture`,
-adding the fields below; the other entries are its own commands.
+BrokenEngineSandbox takes over `status` and `replay_transfer_capture`,
+adding the fields below; the other entries are its own commands. For the engine
+`load`, the game frame version a save must match is this project's
+`Frame::kiVersion`.
 
 - `status`: takes over the engine
   [`status`](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands),
-  adding `{"pendingFlagshipUpdateCount":int,"pendingAgentStatusChangeCount":int}`.
-  `pendingFlagshipUpdateCount` counts restored or runtime-queued flagship
-  navigation updates waiting for an advancing update.
+  adding `{"pendingAgentStatusChangeCount":int}`.
   `pendingAgentStatusChangeCount` counts every queued `inject_payload` entry,
   spawn entries and destroy and update entries alike, including entries
   scheduled for a later `tick` until a drain releases them.
-- `load`: takes over the engine
-  [`load`](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands),
-  adding `{"pendingFlagshipUpdateCount":int}`, as `status` reports it after the
-  load. The game frame version a save must match is this project's
-  `Frame::kiVersion`.
 - `replay_transfer_capture`: takes over the engine
   [`replay_transfer_capture`](../../../../.agents/skills/agent-harness/references/command-reference.md#server-commands),
   adding `fighterCount`, `omniCount`, `battleshipCount`, `blasterCount`, and `missileCount` to
@@ -41,7 +36,7 @@ adding the fields below; the other entries are its own commands.
   blaster rows: `index,local,dir,alignment`. Every row belongs to the requested
   cell, so `local` is meters from that cell's center. A ship's `controller` is
   `Fleet` or `RandomSpawn`, `orders` the integer `ShipOrders` mask (1
-  `kIsFlagship`, 2 `kUseMissiles`, 4 `kPendingUseMissiles`, and the target
+  `kIsFlagship`, 2 `kUseMissiles`, 4 `kPendingUseMissiles`, 8 `kSpawning`, and the target
   flight plane index in bits 8-15), `targetFlightPlane` that index (0 the
   lowest plane; a Fighter allows 0-2, an Omni 0-1, a Battleship 0), `flags` the
   integer `ShipFlags` mask, `lifecycleFlags` the integer lifecycle mask, and
@@ -144,10 +139,17 @@ adding the fields below; the other entries are its own commands.
     navigation bits).
   - With a handshaken client the commit resynchronizes clients before the tick,
     as every `edit_frame` does. A fleet-owned ship removed this way is detected
-    as a death after that tick (`ServerSessionBase::RebuildOwnedEntities`). Its
-    fleet then respawns it under the same global id after the 1 s delay
-    (`ServerFleetManager::OnOwnedEntityDeath`, `TickRespawnTimers`), the
-    ordinary death path.
+    as a death after that tick (`ServerFleetManager::DetectFleetMemberDeaths`).
+    Its fleet then respawns it under the same global id after its type's
+    respawn delay
+    ([server contract](../../Source/Network/Server/AGENTS.md#state-ownership),
+    `TickRespawnTimers`), the ordinary death path.
+  - A fleet-controlled Battleship cannot be removed or detached from its fleet:
+    the commit fails when a `battleships` row whose live or staged `pController`
+    is `Fleet` is given `kDestroy` or `kDying`, or has its `pController` changed
+    away from `Fleet`, and when a row whose live `pController` is `Fleet` has its
+    `pGlobalIds` or `pClientGuids` changed (`inject_payload` `DestroyShip`
+    refuses its destruction too).
 
   With a handshaken client, each successful edit runs the load-time
   resynchronization (`resynchronizedClients` counts those clients): it advances
@@ -227,7 +229,7 @@ adding the fields below; the other entries are its own commands.
   | `SpawnExplosion` | `iTypeIndex`, `vecPosition`, `vecDirection`, `flags`, `lifecycleFlags`, `iTrailCount`, `fTrailAngle`, `iParticleCount`, `fParticleAngle`, `fSizePercent`, `fSmokePercent`, `fTimePercent` |
   | `DestroyShip` | `eType` (required), `iUuid` (required) |
   | `UpdateShip` | `eType` (required), `iUuid` (required), `bUseMissiles`, `navigationDelaySeconds`, `uiPendingWeaponModeTicks`, `uiTargetFlightPlane` |
-  | `UpdateFleet` | `eType` (required), `iUuid` (required), `bIsFlagship`, `flagshipGlobalId`, `fleetWantedCoordinate` (required), `uiPendingFleetWantedCoordinateTicks` |
+  | `UpdateFleet` | `eType` (required), `iUuid` (required), `fleetWantedCoordinate` (required), `uiPendingFleetWantedCoordinateTicks` |
 
   `iUuid` is the `uuid` of a `query_collection` row in the collection `eType`
   names, which changes when the ship crosses cells. An omitted field takes its
@@ -275,8 +277,9 @@ adding the fields below; the other entries are its own commands.
   type, on a `SpawnExplosion` `iTrailCount` below 0 or
   `fTimePercent` outside `[0,1]`, on a `SpawnOmni` `vecVelocity` whose XY length
   exceeds `kfOmniMaximumSpeed` (33.33 m/s), on a `navigationDelay` or
-  `navigationDelaySeconds` outside `[0,60]`, and on a `nextBlasterFireTime`
-  outside `[0,kBlasterFireInterval]`. The command makes no terrain check; a
+  `navigationDelaySeconds` outside `[0,60]`, on a `nextBlasterFireTime`
+  outside `[0,kBlasterFireInterval]`, and on a `DestroyShip` whose `iUuid`
+  names a fleet-controlled Battleship in its `coord`'s current frame. The command makes no terrain check; a
   blaster destroys itself on terrain contact, so a `SpawnBlaster` that must
   survive needs a terrain-clear `vecPosition` (the probe in
   [replay.md](replay.md#replay-transfer-capture-harness-rig)). It also puts no
@@ -330,8 +333,10 @@ adding the fields below; the other entries are its own commands.
 - `set_fleet_flight_plane`:
   `{"globalId":int,"type":"Fighter"|"Omni"|"Battleship","plane":int}`; these
   are the only keys. Sets the target flight plane that the fleet whose members
-  include `globalId` gives its later spawns of `type`, its joins and respawns,
-  which are born at that plane's height; it queues no status change and no
+  include `globalId` gives its later spawns of `type`, its joins and respawns:
+  an Omni or Battleship is born at that plane's height, and a Fighter launches
+  at its Battleship's height and plane but takes the plane set here as its
+  target flight plane. It queues no status change and no
   live member's plane changes (move one with an `inject_payload` `UpdateShip`
   `uiTargetFlightPlane`). The value is saved with the fleet. The `result` is `null`.
   Fails during replay playback (`cannot set fleet flight plane during replay

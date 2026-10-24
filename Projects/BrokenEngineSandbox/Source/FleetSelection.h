@@ -33,12 +33,12 @@ public:
 
 	engine::NetworkUiControl<int64_t> mCreateFleetToggle;
 	engine::NetworkUiControl<int64_t> mSpawnIntoFleetToggle;
-	engine::NetworkUiControl<int64_t> mDeleteFleetToggle;
 	engine::NetworkUiControl<NavigationDelayKey> mNavigationDelayControl;
 
 	std::vector<Fleet> mClientFleets;
 	int64_t miFocusedFleetIndex = -1;
 	engine::GlobalId mFocusedMemberGlobalId {};
+	engine::GlobalId mPendingFocusMemberGlobalId {};
 };
 
 } // namespace game

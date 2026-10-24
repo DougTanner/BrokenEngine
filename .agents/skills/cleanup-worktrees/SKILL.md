@@ -1,6 +1,14 @@
 ---
 name: cleanup-worktrees
-description: Remove every worktree registered to the current Broken Engine repository, wherever it lives, once it is 48+ hours old by folder creation time, regardless of dirty or unlanded state, and delete repository-root `Temp/` files 48+ hours old by last-write time. Use this skill manually each morning before creating new sessions, once per primary checkout; it leaves younger worktrees untouched and reports saved Codex refs without deleting them.
+description: >-
+  Remove every worktree registered to the current Broken Engine repository,
+  wherever it lives, once it is 48+ hours old by folder creation time,
+  regardless of dirty or unlanded state, delete repository-root `Temp/` files
+  48+ hours old by last-write time, and delete Codex CLI session logs under
+  `~/.codex/sessions` 30+ days old by last-write time. Use this skill manually
+  each morning before creating new sessions, once per primary checkout; it
+  leaves younger worktrees untouched and reports saved Codex refs without
+  deleting them.
 argument-hint: [preview]
 allowed-tools: [Read, Bash, PowerShell]
 disable-model-invocation: true
@@ -11,7 +19,8 @@ disable-model-invocation: true
 ## Purpose
 
 Clean every worktree registered to the repository, except the primary checkout,
-whose folder is 48+ hours old.
+whose folder is 48+ hours old, repository-root `Temp/` files 48+ hours old, and
+Codex session logs 30+ days old.
 
 ## When to use
 
@@ -49,6 +58,8 @@ Return the script's complete report, including:
 - removed worktrees and branches
 - retained worktrees with exact reasons
 - removed `Temp/` files and emptied subfolders (eligible-only under preview)
+- removed Codex session logs summarized per day folder with count and bytes,
+  and emptied folders (eligible-only under preview)
 - reported saved `refs/codex/snapshots/*` refs
 - residuals as the final line, with distinct errors and one retained-worktree
   count instead of duplicated retained entries
@@ -61,13 +72,23 @@ Return the script's complete report, including:
   second confirmation.
 - The same run deletes files under the repository-root `Temp/` directory whose
   last-write time is 48+ hours old, then removes emptied subfolders created 48+
-  hours ago; `Temp/` itself and younger files stay. `-Preview` lists eligible
-  Temp files instead of deleting them.
+  hours ago; `Temp/` itself and younger files stay, and reparse-point files and
+  folders are skipped. `-Preview` lists eligible Temp files instead of deleting
+  them.
+- The same run deletes Codex CLI session log files (`rollout-*.jsonl` and
+  `rollout-*.jsonl.zst` in `YYYY\MM\DD` folders) under the per-user
+  `~/.codex/sessions` whose last-write time is 30+ days old, matching Claude
+  Code's 30-day transcript retention. Each is deleted by its exact literal path;
+  reparse points and any other name are skipped, and the pass is skipped with a
+  residual when `.codex` or `sessions` is a reparse point. Emptied folders
+  created 30+ days ago are removed one at a time; `~/.codex/archived_sessions`
+  is untouched. `-Preview` lists the eligible logs per day folder instead of
+  deleting them.
 - The script blocks if the checkout's Git directory differs from its common Git
   directory; do not work around it.
 - Do not recreate failed commands with broader Git or filesystem operations.
 - The script deliberately refuses saved-ref deletion and global pruning, and
-  never touches a folder Git has not registered as a worktree. It deliberately
+  never removes a worktree folder Git has not registered. It deliberately
   force-removes eligible worktrees and force-deletes their `claude/`/`codex/`/`opencode/`
   branches with `git branch -D`; a worktree on any other branch is removed but
   its branch is left.

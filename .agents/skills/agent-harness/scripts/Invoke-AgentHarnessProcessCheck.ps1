@@ -89,6 +89,8 @@ function ConvertTo-UtcDateTime([string] $Value) {
 
 # The report path the engine builds: the chosen root, a child directory named for the game, and the
 # game name with its spaces replaced by dashes. Each root the crash path can choose is a candidate.
+# A crash before the engine resolves those paths writes the fixed Crash-Report.txt to its working
+# directory instead, which the launch script sets to the configured root, so that file is one too.
 function Get-CandidatePaths([string] $GameName, [string] $ConfiguredAppDataRoot) {
 	$roots = @()
 	if (-not [string]::IsNullOrWhiteSpace($ConfiguredAppDataRoot)) { $roots += $ConfiguredAppDataRoot }
@@ -105,6 +107,7 @@ function Get-CandidatePaths([string] $GameName, [string] $ConfiguredAppDataRoot)
 		# A configured root that is already the roaming root would otherwise report the same file twice.
 		if (@($paths | Where-Object { $_ -ieq $candidate }).Count -eq 0) { $paths += $candidate }
 	}
+	if (-not [string]::IsNullOrWhiteSpace($ConfiguredAppDataRoot)) { $paths += Join-Path $ConfiguredAppDataRoot 'Crash-Report.txt' }
 	return $paths
 }
 
@@ -364,6 +367,11 @@ try {
 				$exitCodeText = 'unknown'
 				if ($null -ne $exitCode) { $exitCodeText = [string]$exitCode }
 				$exitedRoles += "$($record.role) (exit code $exitCodeText)"
+				# An exit is reported once, by the first Check after it, so the exited role is left unregistered
+				# exactly as Baseline leaves it and no later Check reports it again.
+				$record.processId = $null
+				$record.startTimeUtc = $null
+				$record.registeredUtc = $null
 				# Only a report this run wrote is its crash evidence. A candidate unchanged since the
 				# pre-launch baseline, or moved away by the startup rename, is stale.
 				$changed = @(foreach ($candidate in @($record.candidates)) {
@@ -387,6 +395,7 @@ try {
 			}
 			$result.findings = @($findings)
 			if ($findings.Count -gt 0) {
+				Write-CheckState $statePath $roles
 				$reported = @()
 				foreach ($finding in $findings) {
 					if ($null -eq $finding.reportPath) { continue }

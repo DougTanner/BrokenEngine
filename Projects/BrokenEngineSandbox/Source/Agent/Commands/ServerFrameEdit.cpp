@@ -150,6 +150,28 @@ void CommandEditFrame([[maybe_unused]] const nlohmann::json& rParameters, [[mayb
 			iEdited += ApplyEdit(stagedFrame, rEdit);
 		}
 
+		// A fleet Battleship is permanent, so a kill state written to one is refused, and so is a pController write away
+		// from kFleet, which would let a later batch or combat kill it, and an identity write, which detaches it from its
+		// fleet member so the fleet respawns a second one. Edits add no row, so staged row i is live row i.
+		const BattleshipsPostRender& rLiveBattleships = *rLiveFrame.postRender.pBattleships;
+		const BattleshipsPostRender& rStagedBattleships = *stagedFrame.postRender.pBattleships;
+		for (int64_t i = 0; i < rStagedBattleships.iCount; ++i)
+		{
+			if (rLiveBattleships.pController[i] == ShipController::kFleet && rStagedBattleships.pController[i] != ShipController::kFleet)
+			{
+				throw std::runtime_error(std::format("battleships row {} is fleet-controlled and cannot leave Fleet control", i));
+			}
+			if (rLiveBattleships.pController[i] == ShipController::kFleet && (rStagedBattleships.pGlobalIds[i] != rLiveBattleships.pGlobalIds[i] || rStagedBattleships.pClientGuids[i] != rLiveBattleships.pClientGuids[i]))
+			{
+				throw std::runtime_error(std::format("battleships row {} is fleet-controlled and cannot change its pGlobalIds or pClientGuids", i));
+			}
+			bool bIsFleet = rLiveBattleships.pController[i] == ShipController::kFleet || rStagedBattleships.pController[i] == ShipController::kFleet;
+			if (bIsFleet && ((rStagedBattleships.pLifecycleFlags[i] & engine::LifecycleFlags::kDestroy) || (rStagedBattleships.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)))
+			{
+				throw std::runtime_error(std::format("battleships row {} is fleet-controlled and cannot be destroyed", i));
+			}
+		}
+
 		int64_t iClientCount = std::ranges::count_if(engine::gpServer->mClients, [](const engine::ClientConnection& rClient)
 		{
 			return rClient.bHandshakeComplete;

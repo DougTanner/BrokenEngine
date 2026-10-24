@@ -103,6 +103,12 @@ void FightersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 		// Note: Missile damage is handled via area damage system in AreaDamage phase
 		for (const engine::CollisionResult& rResult : engine::Collision::GetCollisions(siCollisionLayerIndex, i))
 		{
+			// A contact between a spawning Fighter and another ship damages neither side; the other ship's PostCollision
+			// drops the same contact.
+			if ((rResult.uiOtherCategory & CollisionCategory::kuiShips) && (rCurrentPostRender.pOrders[i] & ShipOrders::kSpawning))
+			{
+				continue;
+			}
 			if (rResult.uiOtherCategory & (CollisionCategory::kuiBlaster | CollisionCategory::kuiShips))
 			{
 				rCurrentPostRender.pfHealths[i] -= rResult.fDamageReceived;

@@ -18,7 +18,7 @@ static_assert(std::is_trivially_copyable_v<FleetGuid>, "FleetGuid must stay triv
 static_assert(std::is_standard_layout_v<FleetGuid>, "FleetGuid must stay standard-layout — BT_OFFSETOF above is only well-defined for standard-layout types");
 
 // Bounds per-client fleet storage against request spam.
-inline constexpr int64_t kiMaximumFleetsPerClient = 16;
+inline constexpr int64_t kiMaximumFleetsPerClient = 4;
 // Per-fleet member cap — parity with Frame.cpp's kiMaximumFleetSize (16); bounds Fleet::members against a spamming client.
 inline constexpr int64_t kiMaximumFleetMembers = 16;
 
@@ -31,11 +31,12 @@ using FleetMemberFlags_t = common::Flags<FleetMemberFlags>;
 struct FleetMember
 {
 	engine::GlobalId globalId {};
-	// Fixed at the member's first spawn; every respawn spawns this type.
+	// Fixed when the member is added; every spawn spawns this type.
 	ShipType eType {};
 	FleetMemberFlags_t flags {};
 	engine::GridCoord coordinate {};
-	// Server-only automatic respawn countdown in seconds; read only while kIsDead is set, never saved or sent.
+	// Server-only automatic respawn countdown in seconds; TickRespawnTimers reads it only while kIsDead is set. Replay
+	// fleet records carry every member's value; grid saves and the wire do not.
 	std::chrono::duration<float> respawnTimerSeconds = std::chrono::duration<float>::zero();
 };
 
@@ -43,7 +44,7 @@ struct Fleet
 {
 	FleetGuid guid {};
 	std::vector<FleetMember> members;
-	// Invalid {} only while the fleet has no members; otherwise names one of them.
+	// Names the fleet's Battleship member from the fleet's creation.
 	engine::GlobalId flagshipGlobalId {};
 	engine::GridCoord wantedCoordinate {};
 	uint8_t uiPendingFleetWantedCoordinateTicks = 0;

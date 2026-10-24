@@ -23,7 +23,8 @@ inline constexpr float kfMissileGravity = 9.8f;
 
 inline constexpr float kfFighterHealth = 10.0f;
 inline constexpr float kfBattleshipHealth = 60.0f;
-// Every ship takes this from a ship collision, whatever the other ship's type.
+// Every ship takes this from a ship collision, whatever the other ship's type; a contact with a spawning Fighter
+// (ShipOrders::kSpawning) deals none to either side.
 inline constexpr float kfShipCollisionDamage = 5.0f;
 
 namespace CollisionCategory

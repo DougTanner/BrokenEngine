@@ -69,6 +69,14 @@ static ShipType ReadShipTypeByte(const uint8_t*& pCursor)
 // bytes — stay, and they throw to drop the packet.
 void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket)
 {
+	// Playback takes every simulation change from the recording. This is a timing refusal, not corruption, so it records
+	// no contract violation.
+	if (gpGame->mbReplaying)
+	{
+		LOG(kNetwork, kWarning, "ServerSession::HandleGamePacket type {} refused during replay playback Client: {}", rPacket.iPacketType, rPacket.iClientId);
+		return;
+	}
+
 	switch (static_cast<GamePacketType>(rPacket.iPacketType))
 	{
 		case GamePacketType::kClientUpdateOwnedEntityRequest:
@@ -87,16 +95,6 @@ void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket
 			mpFleetManager->mPendingCreateFleetRequests.push_back({.iClientId = rPacket.iClientId});
 			break;
 		}
-		case GamePacketType::kClientDeleteFleetRequest:
-		{
-			// 16B fleetGuid = 16 bytes (type byte already stripped)
-			const uint8_t* pCursor = rPacket.payload.data();
-			FleetGuid fleetGuid {};
-			fleetGuid.uiHigh = engine::ReadUint64(pCursor);
-			fleetGuid.uiLow = engine::ReadUint64(pCursor);
-			mpFleetManager->mPendingDeleteFleetRequests.push_back({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid});
-			break;
-		}
 		case GamePacketType::kClientSpawnIntoFleetRequest:
 		{
 			// 16B fleetGuid + 1B ShipType = 17 bytes (type byte already stripped)
@@ -105,18 +103,12 @@ void ServerSession::HandleGamePacket(const engine::DeferredClientPacket& rPacket
 			fleetGuid.uiHigh = engine::ReadUint64(pCursor);
 			fleetGuid.uiLow = engine::ReadUint64(pCursor);
 			ShipType eType = ReadShipTypeByte(pCursor);
+			// A fleet's one Battleship is made with the fleet.
+			if (eType == ShipType::kBattleship)
+			{
+				engine::NetworkMessages::ThrowCorruptStream("ServerSession spawn-into Battleship type");
+			}
 			mpFleetManager->mPendingSpawnIntoFleetRequests.push_back({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid, .eType = eType});
-			break;
-		}
-		case GamePacketType::kClientRespawnInFleetRequest:
-		{
-			// 16B fleetGuid + 8B member globalId = 24 bytes (type byte already stripped)
-			const uint8_t* pCursor = rPacket.payload.data();
-			FleetGuid fleetGuid {};
-			fleetGuid.uiHigh = engine::ReadUint64(pCursor);
-			fleetGuid.uiLow = engine::ReadUint64(pCursor);
-			engine::GlobalId memberGlobalId {.iValue = engine::ReadInt64(pCursor)};
-			mpFleetManager->mPendingRespawnInFleetRequests.push_back({.iClientId = rPacket.iClientId, .fleetGuid = fleetGuid, .memberGlobalId = memberGlobalId});
 			break;
 		}
 		case GamePacketType::kClientFleetNavigationDelay:
@@ -150,19 +142,13 @@ void ServerSession::BeforeNetworkPoll()
 void ServerSession::AfterNetworkPoll()
 {
 	mpClientManager->NewClients();
-	// Ordering contract: Create runs first so requests naming a fleet created in the same poll can
-	// resolve its guid. SpawnInto before Respawn also matters: both append to the client manager's
-	// spawn queue, and that order is the order spawns are queued for the post-tick batch, and
-	// therefore the simulation and the CRC.
 	mpFleetManager->ProcessCreateFleetRequests();
-	mpFleetManager->ProcessDeleteFleetRequests();
 	mpFleetManager->ProcessSpawnIntoFleetRequests();
-	mpFleetManager->ProcessRespawnInFleetRequests();
 }
 
 void ServerSession::FinalizeTickClients()
 {
-	mpFleetManager->DetectDisconnectedOwnedEntityDeaths();
+	mpFleetManager->DetectFleetMemberDeaths();
 
 	// Post-swap, so the counters describe the tick that just finished, and once per advancing tick.
 	PublishServerEntityCounts();
@@ -170,44 +156,26 @@ void ServerSession::FinalizeTickClients()
 
 void ServerSession::BuildAdvancingFrameInputs()
 {
-	std::erase_if(mpClientManager->mClientsWaitingForSpawn, [&](const game::ClientSpawnInformation& rClientSpawnInformation)
-	{
-		if ((rClientSpawnInformation.fleetGuid.uiHigh == 0 && rClientSpawnInformation.fleetGuid.uiLow == 0))
-		{
-			return false;
-		}
-
-		game::ServerFleetManager::FleetLookupResult result = mpFleetManager->LookupFleetWantedCoord(rClientSpawnInformation.clientGuid, rClientSpawnInformation.fleetGuid, rClientSpawnInformation.memberGlobalId);
-		if (result.flags & game::ServerFleetManager::FleetLookupFlags::kFound)
-		{
-			return false;
-		}
-
-		LOG(kNetwork, kWarning, "ServerSession::BuildAdvancingFrameInputs Dropping queued spawn Client: {} FleetGuid: ({},{})", rClientSpawnInformation.iClientId, rClientSpawnInformation.fleetGuid.uiHigh, rClientSpawnInformation.fleetGuid.uiLow);
-
-		// A client left with no owned entity is handled again by the next NewClients, whose fleet connect step restarts
-		// its dead members' respawn countdowns; SpawnWaitingClients marks it handled again if it still spawns this update.
-		auto ownedIt = mClientOwnedEntities.mOwned.find(rClientSpawnInformation.iClientId);
-		if (ownedIt == mClientOwnedEntities.mOwned.end() || ownedIt->second.empty())
-		{
-			mpClientManager->mProcessedClientIds.erase(rClientSpawnInformation.iClientId);
-		}
-		return true;
-	});
-
 	// Inject weapon mode toggle StatusChanges
 	ProcessUpdateOwnedEntityRequests();
+}
 
-	// Tick fleet timers and inject fleet coord updates only when this update advances. Subtracting
-	// a zero delta does not make TickFleetTimers inert: an already-expired timer can still fire,
-	// consume random state, and queue an update that no frame tick could consume. Deferring the
-	// timer and all queued work here applies them in order on the first advancing update.
+void ServerSession::TickGameTimers(bool bRecording)
+{
+	// Every fleet change outside the fleet step and the tick lands between the previous tick's end-of-tick checksum and
+	// here, so a changed checksum means the recording needs this tick's fleet state.
+	ReplayFleetLog& rReplayLog = mpFleetManager->mReplayLog;
+	bool bOutsideChange = bRecording && common::Crc(ReplayFleetRecordBytes()) != rReplayLog.uiLastChecksum;
+
 	mpFleetManager->TickFleetTimers();
-	mpFleetManager->ProcessFlagshipUpdates();
 
-	// After ProcessFlagshipUpdates so the flagship update this queues is consumed on the following update and its
-	// fleet-RNG draw keeps its position. Each spawn is queued for the next tick's post-tick batch.
-	mpClientManager->SpawnWaitingClients();
+	// Each spawn is queued for this tick's post-tick batch; playback queues none.
+	mpFleetManager->TickRespawnTimers();
+
+	if (bOutsideChange)
+	{
+		rReplayLog.recordedRecords.push_back({.iTick = gpGame->miTickCounter, .bytes = ReplayFleetRecordBytes()});
+	}
 }
 
 void ServerSession::ProcessUpdateOwnedEntityRequests()
@@ -266,14 +234,15 @@ void ServerSession::OnOwnedEntityChangedCell(const engine::ClientGuid& rClientGu
 	mpFleetManager->OnOwnedEntityTransferred(rClientGuid, globalId, destination);
 }
 
-void ServerSession::OnOwnedEntityDied(const engine::ClientGuid& rClientGuid, engine::GlobalId globalId)
+// Empty: DetectFleetMemberDeaths handles every fleet member death, for connected and offline owners alike.
+void ServerSession::OnOwnedEntityDied([[maybe_unused]] const engine::ClientGuid& rClientGuid, [[maybe_unused]] engine::GlobalId globalId)
 {
-	mpFleetManager->OnOwnedEntityDeath(rClientGuid, globalId);
 }
 
 void ServerSession::OnResetForLoad()
 {
-	mpFleetManager->mNavigation.mPendingFlagshipUpdates.clear();
+	// Before the per-client fleet syncs, so each carries the rebuilt member flags.
+	mpFleetManager->RebuildFleetMembersForLoad();
 
 	for (const engine::ClientConnection& rClient : engine::gpServer->mClients)
 	{
@@ -284,7 +253,6 @@ void ServerSession::OnResetForLoad()
 	mPendingUpdateOwnedEntityRequests.clear();
 	// ReadFleetData restores mFleets and OnResetForLoad restores mGuidToClientId; preserve both while clearing pending requests.
 	mpFleetManager->ClearPendingRequests();
-	// OnResetForLoad queues flagship updates after the initial clear; retain those updates.
 }
 
 void ServerSession::WriteFleetData(std::fstream& rFileStream) const

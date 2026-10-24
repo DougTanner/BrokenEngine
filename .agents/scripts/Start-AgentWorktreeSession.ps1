@@ -88,6 +88,7 @@ try {
 	$worktreeCli = Join-Path $root 'Tools\WorktreeCli\Platforms\VisualStudio2026\Output\WorktreeCli.exe'
 	$identity = $null
 	$rebaseInProgress = $false
+	$firstTask = $null
 
 	if (-not [string]::IsNullOrWhiteSpace($ReattachWorktree)) {
 		# Reattach identity is Git-derived: the worktree must be uniquely registered against this primary
@@ -107,7 +108,10 @@ try {
 			if ([string]::IsNullOrWhiteSpace($branch) -and (Test-Path -LiteralPath $headName)) { $branch = (Get-Content -LiteralPath $headName -Raw).Trim() -replace '^refs/heads/', '' }
 		}
 		if ($branch -cnotmatch "^$Client/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$") { throw "Worktree '$reattachTarget' is not checked out on a $Client session branch: '$branch'." }
-		if ($rebaseInProgress) { $baseline = @(Invoke-AgentGit @('-C', $reattachTarget, 'merge-base', 'HEAD', $primary.Head))[0].Trim() }
+		if ($rebaseInProgress) {
+			$baseline = @(Invoke-AgentGit @('-C', $reattachTarget, 'merge-base', 'HEAD', $primary.Head))[0].Trim()
+			$firstTask = "this worktree has a rebase in progress - resolve your rebase first. Fix the conflicted files and run 'git rebase --continue'."
+		}
 		else {
 			# The primary branch name and the primary HEAD are read separately, so they disagree if that
 			# checkout switched branches between the two reads. Resolving the tip from the branch ref binds
@@ -118,7 +122,14 @@ try {
 			# created from, so the shared repair recovers the real fork point and, when that fork point left
 			# primary's history, replays only this session's own commits onto the new tip. Here an ancestor
 			# fork point simply means no repair is needed.
-			$baseline = (Repair-AgentWorktreeForkPoint $reattachTarget $primary.Branch $primaryTip $branch).Baseline
+			try { $baseline = (Repair-AgentWorktreeForkPoint $reattachTarget $primary.Branch $primaryTip $branch).Baseline }
+			catch {
+				if ($_.Exception.Data['Rebased'] -ne $true) { throw }
+				# The branch already sits on the new tip, so the session starts and resolves the restore
+				# itself, like an in-progress rebase.
+				$baseline = $primaryTip
+				$firstTask = "the reattach rebased this branch, but restoring its saved local work failed: $($_.Exception.Message) Do not run that stash apply command: before anything else, resolve any conflicts and make sure every saved change is back, taking only missing ones from that recovery stash, never reapplying what it already restored."
+			}
 		}
 		$identity = [pscustomobject]@{ Primary = $primary; Worktree = $reattachTarget; Branch = $branch; TargetBranch = $primary.Branch; Baseline = $baseline }
 	}
@@ -216,18 +227,23 @@ try {
 	if (-not $PrepareOnly -and [string]::IsNullOrWhiteSpace($ClientExecutable)) {
 		$ClientExecutable = (Get-Command $Client -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 	}
-	# Skip the DataPacker build while a rebase is in progress: a tree with conflict markers cannot build,
-	# and a wrapper exit here would block the very session that must resolve the conflict from launching.
-	# The session runs the build itself after `git rebase --continue`. Provisioning above is conflict-insensitive.
-	if (-not $rebaseInProgress) {
+	# Skip the DataPacker and ModelViewer builds while a rebase is in progress or a restore failed after the reattach rebase:
+	# a tree with conflict markers cannot build, and a wrapper exit here would block the very session that
+	# must resolve the conflict from launching. The session runs the builds itself after resolving it.
+	# Provisioning above is conflict-insensitive.
+	if ($null -eq $firstTask) {
 		Write-Host ''
 		& (Join-Path $root '.agents\scripts\Build-WorktreeDataPacker.ps1') -Worktree $identity.Worktree -WorktreeCliExecutable $worktreeCli -PrimaryCheckout $root
+		Write-Host ''
+		& pwsh -NoProfile -File (Join-Path $root '.agents\skills\compile\scripts\Invoke-CompileBuild.ps1') -Target ModelViewer -Configuration Release -RepositoryRoot $identity.Worktree -PrimaryCheckout $root -Baseline $identity.Baseline
+		if ($LASTEXITCODE -ne 0) { throw "ModelViewer build failed in worktree '$($identity.Worktree)' (exit $LASTEXITCODE)." }
 	}
 	Write-Host ''
 	$banner = "$(if ($worktreeCreated) { 'Created' } else { 'Reattached' }) worktree $($identity.Worktree) on branch $($identity.Branch) at baseline $($identity.Baseline)."
-	if ($rebaseInProgress) {
+	if ($null -ne $firstTask) {
 		$buildCommand = "'.agents\scripts\Build-WorktreeDataPacker.ps1' -Worktree '$($identity.Worktree)' -WorktreeCliExecutable '$worktreeCli' -PrimaryCheckout '$root'"
-		$banner = "FIRST TASK: this worktree has a rebase in progress - resolve your rebase first. Fix the conflicted files, run 'git rebase --continue', then run $buildCommand to build the deferred DataPacker.`n" + $banner
+		$viewerBuildCommand = "pwsh -NoProfile -File '.agents\skills\compile\scripts\Invoke-CompileBuild.ps1' -Target ModelViewer -Configuration Release -RepositoryRoot '$($identity.Worktree)' -PrimaryCheckout '$root' -Baseline '$($identity.Baseline)'"
+		$banner = "FIRST TASK: $firstTask Then run $buildCommand to build the deferred DataPacker, followed by $viewerBuildCommand to build the deferred ModelViewer.`n" + $banner
 	}
 	Write-Host $banner
 	if ($PrepareOnly) { $exitCode = 0 }

@@ -5,7 +5,7 @@
 The engine
 [replay determinism acceptance](../../../../.agents/skills/agent-harness/references/replay.md#replay-determinism-acceptance)
 and
-[replay manifest v5 integrity and generation matrix](../../../../.agents/skills/agent-harness/references/replay.md#replay-manifest-v5-integrity-and-generation-matrix)
+[replay manifest v6 integrity and generation matrix](../../../../.agents/skills/agent-harness/references/replay.md#replay-manifest-v6-integrity-and-generation-matrix)
 are in the shared replay reference; the recipes below are BrokenEngineSandbox's.
 
 ### Replay transfer-capture harness rig
@@ -182,25 +182,31 @@ must prove.
    publication log baselines. When Network is clamped to `Debug`, record that
    result and do not require unavailable kVerbose publication lines. Keep the
    client connected through recording and playback.
-2. Use `describe_ui`, click `[+]##Fleet`, then click `[+O]##Omni`. Wait for the
-   fleet member and the ordinary `ServerSessionBase::SendOwnedEntityState State: Spawned`
+2. Click nothing: the server makes the client's fleet and its Battleship, the
+   fleet's flagship, at connect, so this step finds its `Spawned` and first
+   `ChangedCell` lines in the log from the connect onward: both can precede the
+   step-1 baselines. Wait for the ordinary
+   `ServerSessionBase::SendOwnedEntityState State: Spawned`
    line. Read `status.activeCoords`, query each current coordinate with
-   `query_collection` `omnis`, and require exactly one Omni overall. Record its
+   `query_collection` `battleships`, and require exactly one `Fleet`-controller
+   Battleship overall. Record its
    `globalId` and current `uuid`, then wait, injecting nothing, for its first
    `ServerSessionBase::SendOwnedEntityState State: ChangedCell ... GlobalId: <globalId>`
-   line; call that line's cell W. The server fleet timer moves a new flagship
-   once within 60 s of spawn, and afterwards only while the flagship sits in W.
+   line; call that line's cell W. The server fleet timer moves a new fleet's
+   flagship once within 60 s of the fleet's creation, and afterwards only while
+   the flagship sits in W.
    Pick the unit step s along a nonzero axis of W that points away from origin,
    and set A=W+s and B=W+2s. Send the W→A injection under step 3 within 50 s of
    the W line (the crossing itself need not complete in that window), wait for
    its OwnedEntity `ChangedCell` line naming A, and only then start step 4. Never
-   route the Omni back into W. A and B are never origin, because the server
+   route the Battleship back into W. A and B are never origin, because the server
    keeps origin active every tick and it cannot retire. If, after the W line and
    through step 7, any OwnedEntity `ChangedCell` line names a cell the harness did
    not request, restart from a fresh server. This discovers the runtime state
-   instead of assuming where the Omni spawned or settled; the proven setup
-   used A=`[2,0]`, B=`[3,0]`, and `globalId:1`, which fits W=`[1,0]`.
-3. Immediately before every crossing, query the source coordinate again for that `globalId` and use its current per-cell `uuid` in `inject_payload {"entries":[{"coord":<source>,"type":"UpdateFleet","eType":"Omni","iUuid":<fresh-uuid>,"fleetWantedCoordinate":<destination>,"bIsFlagship":true,"flagshipGlobalId":<globalId>}]}`. An Omni receives a new cell-local UUID after crossing, so a previously captured UUID is not reusable.
+   instead of assuming where the Battleship spawned or settled; an earlier
+   proven setup, driving an owned Omni, used A=`[2,0]`, B=`[3,0]`, and
+   `globalId:1`, which fits W=`[1,0]`.
+3. Immediately before every crossing, query the source coordinate again for that `globalId` and use its current per-cell `uuid` in `inject_payload {"entries":[{"coord":<source>,"type":"UpdateFleet","eType":"Battleship","iUuid":<fresh-uuid>,"fleetWantedCoordinate":<destination>}]}`. A ship receives a new cell-local UUID after crossing, so a previously captured UUID is not reusable.
 4. Start recording and poll `status.recording:true`. Confirm A is subscribed, and keep the current client `describe_scene.subscribedCoords` plus newly appended `Server::ClientSubscribe` lines as the subscription baseline. The exact initial activation tick `A1` comes from the stopped manifest in step 11; a later status poll does not establish it.
 5. Move A→B using the fresh UUID rule. Require the same `globalId` at B and
    exactly one new
@@ -209,13 +215,13 @@ must prove.
    [`set_client_grid_coord`](../../../../.agents/skills/agent-harness/references/command-reference.md#client-commands)
    once to a parking coordinate P whose 3x3 ring
    contains neither A, B, nor origin; the command pins the viewer at P, so
-   auto-follow cannot return it to the Omni, and the pin stays there through
+   auto-follow cannot return it to the Battleship, and the pin stays there through
    step 7. Wait until `describe_scene.subscribedCoords` omits A, the server logs
    `Server::ClientUnsubscribe` for A, and A leaves `status.activeCoords`. This
    closes generation `(A,A1)`. From here through step 7 send no other
    `set_client_grid_coord` or `release_client_grid_coord` command, and require
    no new `Server::ClientSubscribe` line for A or B, so every later activation
-   of A comes from an Omni transfer.
+   of A comes from a Battleship transfer.
 6. Move B→A using B's newly queried UUID. Require the same `globalId` at A and
    exactly one destination-specific OwnedEntity `ChangedCell` line; its tick is `E2`,
    not the tick from a later unrelated transfer batch. With the viewer still
@@ -255,12 +261,12 @@ must prove.
     `Server::ClientUnsubscribe` line for A from that `E1` line through its
     `(E4,A)` line. Between one loop's `E1` and `E2` lines, take one sample:
     `describe_scene.clientGridCoord` must equal A while
-    `query_collection {"coord":<B>,"collection":"omnis"}` places the Omni's `globalId` at B. At each
+    `query_collection {"coord":<B>,"collection":"battleships"}` places the Battleship's `globalId` at B. At each
     restarted A activation (`E2` and `E4`; the original failure's first restart
     was `7338`, 155 ticks after the prior generation ended at `7183` and beyond
     the 128-tick receive window), require a new server `SendCoordFullState` line
     for A at that activation tick, corresponding client full-state receipt, and
-    later resumed A traffic. Require `clientCount:1`, the same final Omni
+    later resumed A traffic. Require `clientCount:1`, the same final Battleship
     `globalId` and ownership at A, a completed clean loop, no client gap
     disconnect, and no new CRC, checksum, replay-reader, or `CONFIRMED DESYNC`
     errors. These are the runtime observations; the internal hold and
@@ -275,7 +281,7 @@ must prove.
     the client `release_client_grid_coord {}` and require `ok:true`; once that
     crossing's line appears, poll `describe_scene` until `clientGridCoord`
     equals B, before the next replayed B→A line.
-11. Cancel playback, release the processes, and inspect the stopped v5 artifacts. The manifest must contain three records for A with activation ticks `A1`, `E2`, and `E4`, and each must have its own `F7.replay.<A-key>.<activationTick>` header plus `.frames`, `.checksums`, and Debug `.fullframes` siblings. Require each record's sibling set to be present and the earlier siblings' SHA-256 values to remain distinct from the third generation's.
+11. Cancel playback, release the processes, and inspect the stopped v6 artifacts. The manifest must contain three records for A with activation ticks `A1`, `E2`, and `E4`, and each must have its own `F7.replay.<A-key>.<activationTick>` header plus `.frames`, `.checksums`, and Debug `.fullframes` siblings. Require each record's sibling set to be present and the earlier siblings' SHA-256 values to remain distinct from the third generation's.
 
 #### Command-only malformed fullframes route
 
@@ -302,17 +308,17 @@ Use fresh recordings for these two failure cases and preserve a stopped-server c
    live spawn or transfer to complete at its destination, exactly one recording-invalidation
    error line, `status.recording:false`, and a cleared `replay_transfer_capture`
    result (an empty `events` array and `-1` `firstWriterInputTick`).
-   Stop/release the server and require no valid v5 manifest; after relaunch,
+   Stop/release the server and require no valid v6 manifest; after relaunch,
    `replay_play` must not adopt or alter the live state. This case proves Replay
    failure does not veto an already accepted live post-tick batch.
-2. For the stable writer target, discover the sole real Omni by querying every
+2. For the stable writer target, discover the client's fleet Battleship by querying every
    coordinate in `status.activeCoords`; record its actual non-origin A and
    `globalId`, choose adjacent B, and never assume origin or a fixed A. Start
    recording, arm
    `replay_inject_persistence_failure {"stage":"coordinate_writer","coord":<A>}`,
-   refresh the Omni UUID immediately before moving A→B, then park the viewer
+   refresh the Battleship UUID immediately before moving A→B, then park the viewer
    beyond A until A is absent from both `describe_scene.subscribedCoords` and
-   `status.activeCoords`. Refresh the same Omni's UUID at B immediately before
+   `status.activeCoords`. Refresh the same Battleship's UUID at B immediately before
    returning B→A. Stop recording and require the failure to name the originally
    armed activation, no valid manifest publication, the armed generation's
    siblings absent, and the later A generation's qualified siblings present
@@ -323,7 +329,7 @@ Use fresh recordings for these two failure cases and preserve a stopped-server c
 ### Live adjacent-generation control
 
 Use the existing commands to create a valid `savedEnd + 1` pair; do not edit
-replay files or add a harness rig API. Discover a real Omni cell S from
+replay files or add a harness rig API. Discover the client's fleet Battleship cell S from
 `status.activeCoords` and choose an empty A that shares an edge with S, never a
 diagonal neighbor. A plain spawn entry
 `{"coord":<S>,"type":"SpawnOmni"}` with `pauseAfterWriterInput:true` arms a
@@ -356,7 +362,7 @@ These checks combine harness observations with a static phase trace because the 
    destination at tick `E`, made with the edge-coast `SpawnOmni` of the
    `inject_payload` entry, and no other post-dispatch event for that
    destination, stop
-   recording, release the server, and preserve the complete valid v5 artifact
+   recording, release the server, and preserve the complete valid v6 artifact
    set. From the manifest records, compute the destination's exact
    `(coordKey,activationTick)` kind-2 header file and authenticate the untouched
    manifest and artifacts with the root-digest self-check before editing. In
@@ -368,9 +374,9 @@ These checks combine harness observations with a static phase trace because the 
    post-dispatch section and its only record. Change that status count to `0`
    and truncate the file immediately after it; the record then parses as an
    empty batch, which the post-dispatch check rejects with the same semantic
-   error as a tick-input entry. Recompute the manifest root digest using the v5 repair
+   error as a tick-input entry. Recompute the manifest root digest using the v6 repair
    procedure under the shared
-   [Replay manifest v5 integrity and generation matrix](../../../../.agents/skills/agent-harness/references/replay.md#replay-manifest-v5-integrity-and-generation-matrix).
+   [Replay manifest v6 integrity and generation matrix](../../../../.agents/skills/agent-harness/references/replay.md#replay-manifest-v6-integrity-and-generation-matrix).
    After relaunch, capture ordered-log counts for `ReadGrid F7.replay.grid`,
    `GameBase::ResetSession()`, and `Replay post-dispatch record is not a
    post-tick batch`, plus a status tick, before sending `replay_play`. The
@@ -385,7 +391,7 @@ These checks combine harness observations with a static phase trace because the 
    the command surface cannot expose: `kStopBeforeDispatch`, no load flag,
    pre-tick tick/time rollback, normal active-set rebuild, and the loop
    break before dispatch.
-2. For normal loop completion, play an unmodified v5 recording through its final
+2. For normal loop completion, play an unmodified v6 recording through its final
    terminal reader. Require `End replay <tick>, looping`, continued
    `status.replaying:true`, and the next loop's initial state on a later
    fixed-tick iteration. The static trace must show terminal validation/removal

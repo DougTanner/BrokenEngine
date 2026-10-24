@@ -101,7 +101,7 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			throw std::ios_base::failure("iNextGlobalId");
 		}
 
-		game::ReadSaveState(fileStream, rStagedGrid.saveState);
+		game::ReadSaveState(fileStream, rStagedGrid.iNextGlobalId, rStagedGrid.saveState);
 
 		for (int64_t i = 0; i < iFrameCount; ++i)
 		{

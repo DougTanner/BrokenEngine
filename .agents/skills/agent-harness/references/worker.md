@@ -81,27 +81,31 @@ and the handoff this run returns.
      and claims the lock, printing one compact `broken-engine-harness-claim/v1`
      JSON object.
    - When another session holds the lock, it provisions once and then retries
-     only the claim until it succeeds or the holder becomes stale under step 11,
-     so the invocation above is itself the wait and has no budget of its own —
-     never hand-write a poll loop, invent a sleep window, or add a wait
-     parameter. A stale holder is still waited on while a project server
-     started without `--agent-port` is running, because a harness server cannot
-     start beside it; once none remains the wait ends with
-     `claim.foreign-owner`.
+     only the claim until it succeeds, the holder becomes stale under step 11,
+     or the script's own wait budget ends with `claim.wait-timeout` (step 7).
+     Never hand-write a poll loop, invent a sleep window, or add a wait
+     parameter. A stale holder is still waited on while a
+     project server started without `--agent-port` is running, because a
+     harness server cannot start beside it; once none remains the wait ends
+     with `claim.foreign-owner`.
    - Run it synchronously in the foreground and remain in-turn until its exit
      code and JSON result are captured, giving the call the maximum available
-     execution timeout so the wait is not preempted. Never use `Start-Job`, a
-     trailing `&`, a fire-and-forget watcher, or a host background-execution
-     parameter such as `run_in_background`, and never end a delegated turn while
-     the claim is running — a background task's completion notification cannot
-     resume a worker whose turn has ended.
+     execution timeout, or at least 600000 ms on a host with no maximum, so the
+     wait is not preempted. Never use `Start-Job`, a trailing `&`, a
+     fire-and-forget watcher, or a host background-execution parameter such as
+     `run_in_background`, and never end a delegated turn while the claim is
+     running — a background task's completion notification cannot resume a
+     worker whose turn has ended.
    - If the host call times out, re-invoke the identical command; it resumes the
      same wait. If the host instead moves the still-running call to the
      background and that background task has already exited, use its exit
      code and JSON output as the claim result and do not re-invoke: an exit-0
      claim returns holding the lock. Otherwise stop that background task, then
      re-invoke the identical command in the foreground: a still-running wait
-     has not claimed, and the new invocation mints a fresh owner token.
+     has not claimed, and the new invocation mints a fresh owner token. A host
+     that hands a still-running call back to be polled, as Codex's
+     `exec_command` does, has not moved it to the background: keep polling it
+     in-turn until it exits.
    - The launch-script calls below pass the claim result's `gameDataDirectory`
      as their `-GameDataDirectory`. Only when the approved acceptance needs
      derived data, such as a deliberately corrupted pack, make a real byte copy
@@ -122,7 +126,8 @@ and the handoff this run returns.
 
 7. Read the claim result and act on its exit code. Done when the claim is held
    with its values retained, or the reported block or failure is reported and
-   the attempt ends or, for a stale holder, routes to the takeover steps.
+   the attempt ends or, for a stale holder, routes to the takeover steps or,
+   for `claim.wait-timeout`, step 5 is re-invoked.
 
    - Exit `0` (`status` `pass`) supplies the `owner` token, the resolved
      `agentHarness` path, and the `claim` record; retain those values outside
@@ -134,15 +139,20 @@ and the handoff this run returns.
      ends before reading it; carries `project`, the derived game project,
      `null` until derived; and carries a `packVersion` field that is `null`
      except on the `claim.pack-version-mismatch` block below.
-   - Exit `2` (`status` `blocked`) carries one of seven codes. A
+   - Exit `2` (`status` `blocked`) carries one of eight codes. A
      `claim.foreign-owner` reports a holder the script judged stale and
-     continues into the takeover steps, which reconfirm that under step 11,
-     while `claim.project-underivable`, `claim.executable-missing`,
+     continues into the takeover steps, which reconfirm that under step 11, a
+     `claim.wait-timeout` re-invokes step 5, while
+     `claim.project-underivable`, `claim.executable-missing`,
      `claim.data-directory-mismatch`, `shared-data.changed`,
      `shared-data.record-missing`, and `claim.pack-version-mismatch` end the
      attempt here; for every exit `2` the
      script never launches the game, so the Launch and ping-wait steps below are
      not performed and their absence is not a further failure to diagnose.
+   - `claim.wait-timeout` means the lock was still held when the script's wait
+     budget ended, by a fresh holder or by a stale one kept waiting for a
+     project server started without `--agent-port`: no lock was taken and its
+     owner token was never recorded, so re-invoke the claim per step 5.
    - `claim.project-underivable` means the recorded data directory lacks the
      `Projects\<Name>\Platforms\VisualStudio2026\Output\Data` suffix: nothing
      was provisioned and no owner token or lock was taken, so route `/compile`
@@ -181,8 +191,8 @@ and the handoff this run returns.
      the harness path from `agentHarness`. When step 11 instead classifies the
      holder fresh, re-invoke the claim per step 5.
    - The script never steals and never touches a foreign owner's processes,
-     heartbeat, or claim, whether it acquires the lock or blocks once the holder
-     is stale.
+     heartbeat, or claim, whether it acquires the lock, blocks once the holder
+     is stale, or ends its wait with `claim.wait-timeout`.
    - Exit `1` is a failure naming its step (`claim.repository-missing`,
      `claim.provisioner-missing`, `claim.launch-doc-unreadable`,
      `claim.pack-version-underivable`, `claim.game-data-unreadable`,
@@ -273,10 +283,12 @@ and the handoff this run returns.
     - The launch script reads the executable names from the hub (step 4) and
       owns the game argument set, so the run fixes only these paths.
     - Create log parents under `<absolute adopted worktree>\Temp`.
-    - Do not change process working directories; the launch script's
-      `-GameDataDirectory` is the only override selecting packed assets, and its
-      `-AppDataDirectory` is the only override selecting where saves, settings,
-      caches, and replays are written.
+    - Do not change your shell's working directory or set a game process's
+      working directory yourself; the launch script sets each game process's
+      working directory to its `-AppDataDirectory` root. Its
+      `-GameDataDirectory` is the only override selecting packed assets, and
+      its `-AppDataDirectory` is the only override selecting where saves,
+      settings, caches, and replays are written.
 
 17. Take the launch-script calls from `launch.md` with the selected project's
     values. Done when this run's launch-script calls come from `launch.md` and
@@ -401,21 +413,26 @@ and the handoff this run returns.
       evidence directory).
     - `exitCode` is the registered process's exit code, or `null` when the exit
       code was not captured — usually because the watcher could not bind it, a
-      process that had already exited when `Register` ran; prove an intentional
-      clean exit (after `crash_report_harness_rig`,
-      for example) from `exitCode`, never from a second launch.
+      process that had already exited when `Register` ran. Step 33 owns the
+      expected exit after `crash_report_harness_rig`; never prove it from a
+      second launch.
     - Exit `0` means every registered role still holds its registered exact
       identity — the registered PID plus its registered start time, never a
       process-name search.
-    - Exit `2` means a registered role exited unexpectedly — its message names
-      each exited role's exit code, and a zero exit code never makes a
-      disappearance intentional — and its findings carry any crash report
-      written since that role's pre-launch baseline.
+    - Exit `2` means a registered role exited — its message names each exited
+      role's exit code, and a zero exit code alone never makes a disappearance
+      intentional — and its findings carry any crash report written since that
+      role's pre-launch baseline.
+      The first `Check` after an exit, whether a launch, wait, release, or step
+      33 runs it, reports that exit once and clears the role's registration, so
+      no later `Check` reports it again.
       - A report unchanged since that baseline, or moved to the pending file
         by the role's startup rename, is stale and is never announced as a new
         crash, and a role that exited without writing a report reports
         `reportPath` and `headline` as `null` rather than inventing evidence.
-    - Exit `1` is a setup or state failure.
+    - Exit `1` is a setup or state failure, except code
+      `check.no-registered-roles` after every registered role has exited and
+      been reported, which is expected.
     - Never delete, move, or rewrite a reported crash report or its retained
       evidence; report it by path.
     - The checker reports only through the command, poll, or check that is
@@ -573,7 +590,11 @@ and the handoff this run returns.
 
     - That active command is the only channel the checker reports through, so a
       lost connection is diagnosed here rather than waited out.
-    - A check exit of `2` means the endpoint exited unexpectedly, including a
+    - After `crash_report_harness_rig`, a check exit of `2` whose finding for
+      that command's role carries `exitCode` `0` and a non-null `reportPath` is
+      the rig's expected result: report that finding as the rig's outcome,
+      never as a process-check failure. Any other check exit of `2`, or any
+      other finding in it, means the endpoint exited unexpectedly, including a
       handled exception that terminated with exit code `0` and wrote a crash
       report, so retry nothing and report the finding's role, report path,
       exception headline, exit code, and retained evidence path.

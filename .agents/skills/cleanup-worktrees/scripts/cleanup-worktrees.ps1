@@ -73,6 +73,48 @@ function Add-Retained {
 	$List.Add([pscustomobject] @{ Path = $Path; Reason = $Reason; Expected = $Expected })
 }
 
+function Remove-AgedFiles {
+	param(
+		[Parameter(Mandatory = $true)][string] $Root,
+		[Parameter(Mandatory = $true)][DateTime] $Cutoff,
+		[string] $RelativePathPattern = '',
+		[Parameter(Mandatory = $true)][string] $Label,
+		[Parameter(Mandatory = $true)][AllowEmptyCollection()][Collections.Generic.List[string]] $Residuals,
+		[switch] $Preview
+	)
+
+	$files = @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force |
+		Where-Object { -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -and $_.LastWriteTime -le $Cutoff -and
+			(-not $RelativePathPattern -or [IO.Path]::GetRelativePath($Root, $_.FullName) -cmatch $RelativePathPattern) })
+	foreach ($file in $files) {
+		if ($Preview) { $file; continue }
+		try {
+			Remove-Item -LiteralPath $file.FullName -Force -Confirm:$false -ErrorAction Stop
+			$file
+		}
+		catch { $Residuals.Add("$Label file deletion failed for $($file.FullName)") }
+	}
+	if (-not $Preview) {
+		# Descending ordinal order visits children before parents, so nested
+		# just-emptied folders unwind bottom-up. Directory age uses CreationTime:
+		# deleting contents refreshes the folder's LastWriteTime, which would
+		# otherwise keep every just-emptied folder alive past this run.
+		$directories = @(Get-ChildItem -LiteralPath $Root -Recurse -Directory -Force |
+			Where-Object { -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -and $_.CreationTime -le $Cutoff } |
+			ForEach-Object { $_.FullName })
+		[Array]::Sort($directories, [StringComparer]::OrdinalIgnoreCase)
+		[Array]::Reverse($directories)
+		foreach ($directory in $directories) {
+			if (@(Get-ChildItem -LiteralPath $directory -Force).Count -ne 0) { continue }
+			try {
+				Remove-Item -LiteralPath $directory -Force -Confirm:$false -ErrorAction Stop
+				[IO.DirectoryInfo]::new($directory)
+			}
+			catch { $Residuals.Add("$Label directory deletion failed for $directory") }
+		}
+	}
+}
+
 function Write-Report {
 	param(
 		[Parameter(Mandatory = $true)][string] $Status,
@@ -82,8 +124,10 @@ function Write-Report {
 		[Parameter(Mandatory = $true)][AllowEmptyCollection()][Collections.Generic.List[object]] $Removed,
 		[Parameter(Mandatory = $true)][AllowEmptyCollection()][Collections.Generic.List[object]] $Retained,
 		[Parameter(Mandatory = $true)][AllowEmptyCollection()][Collections.Generic.List[string]] $TempRemoved,
+		[Parameter(Mandatory = $true)][AllowEmptyCollection()][Collections.Generic.List[object]] $CodexLogsRemoved,
 		[Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]] $SnapshotRefs,
-		[Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]] $Residuals
+		[Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]] $Residuals,
+		[switch] $Preview
 	)
 
 	Write-Output "Cleanup: $Status"
@@ -106,6 +150,18 @@ function Write-Report {
 	else {
 		foreach ($item in $TempRemoved) { Write-Output "- $item" }
 	}
+	Write-Output 'Codex logs removed:'
+	$codexLines = [Collections.Generic.List[string]]::new()
+	foreach ($group in @($CodexLogsRemoved | Where-Object { $_ -is [IO.FileInfo] } | Group-Object -Property DirectoryName)) {
+		$bytes = [long] ($group.Group | Measure-Object -Property Length -Sum).Sum
+		$codexLines.Add("$($group.Name) | $($group.Count) files, $bytes bytes$(if ($Preview) { ' | eligible (preview)' })")
+	}
+	foreach ($item in @($CodexLogsRemoved | Where-Object { $_ -is [IO.DirectoryInfo] })) { $codexLines.Add("$($item.FullName) | emptied folder removed") }
+	$codexLines.Sort([StringComparer]::OrdinalIgnoreCase)
+	if ($codexLines.Count -eq 0) { Write-Output '- none' }
+	else {
+		foreach ($item in $codexLines) { Write-Output "- $item" }
+	}
 	Write-Output 'Snapshot refs:'
 	if ($SnapshotRefs.Count -eq 0) { Write-Output '- none' }
 	else {
@@ -118,6 +174,7 @@ function Write-Report {
 $removed = [Collections.Generic.List[object]]::new()
 $retained = [Collections.Generic.List[object]]::new()
 $tempRemoved = [Collections.Generic.List[string]]::new()
+$codexLogsRemoved = [Collections.Generic.List[object]]::new()
 $residuals = [Collections.Generic.List[string]]::new()
 $snapshotRefs = @()
 $repositoryRoot = ''
@@ -199,38 +256,21 @@ try {
 
 	$tempRoot = Get-CanonicalPath -Path (Join-Path $repositoryRoot 'Temp')
 	if (Test-Path -LiteralPath $tempRoot -PathType Container) {
-		$eligibleTempFiles = @(Get-ChildItem -LiteralPath $tempRoot -Recurse -File -Force |
-			Where-Object { $_.LastWriteTime -le $cutoff } |
-			ForEach-Object { $_.FullName })
-		[Array]::Sort($eligibleTempFiles, [StringComparer]::OrdinalIgnoreCase)
-		foreach ($file in $eligibleTempFiles) {
-			if ($Preview) { $tempRemoved.Add("$file | eligible (preview)"); continue }
-			try {
-				Remove-Item -LiteralPath $file -Force -Confirm:$false -ErrorAction Stop
-				$tempRemoved.Add($file)
-			}
-			catch { $residuals.Add("temp file deletion failed for $file") }
-		}
-		if (-not $Preview) {
-			# Descending ordinal order visits children before parents, so nested
-			# just-emptied folders unwind bottom-up. Directory age uses CreationTime:
-			# deleting contents refreshes the folder's LastWriteTime, which would
-			# otherwise keep every just-emptied folder alive past this run.
-			$tempDirectories = @(Get-ChildItem -LiteralPath $tempRoot -Recurse -Directory -Force |
-				Where-Object { $_.CreationTime -le $cutoff } |
-				ForEach-Object { $_.FullName })
-			[Array]::Sort($tempDirectories, [StringComparer]::OrdinalIgnoreCase)
-			[Array]::Reverse($tempDirectories)
-			foreach ($directory in $tempDirectories) {
-				if (@(Get-ChildItem -LiteralPath $directory -Force).Count -ne 0) { continue }
-				try {
-					Remove-Item -LiteralPath $directory -Force -Confirm:$false -ErrorAction Stop
-					$tempRemoved.Add($directory)
-				}
-				catch { $residuals.Add("temp directory deletion failed for $directory") }
-			}
-		}
+		Remove-AgedFiles -Root $tempRoot -Cutoff $cutoff -Label 'temp' -Residuals $residuals -Preview:$Preview |
+			ForEach-Object { $tempRemoved.Add($(if ($Preview) { "$($_.FullName) | eligible (preview)" } else { $_.FullName })) }
 		$tempRemoved.Sort([StringComparer]::OrdinalIgnoreCase)
+	}
+
+	$codexHome = Get-CanonicalPath -Path (Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)) '.codex')
+	$codexRoot = Join-Path $codexHome 'sessions'
+	if (Test-Path -LiteralPath $codexRoot -PathType Container) {
+		if (((Get-Item -LiteralPath $codexHome -Force).Attributes -bor (Get-Item -LiteralPath $codexRoot -Force).Attributes) -band [IO.FileAttributes]::ReparsePoint) {
+			$residuals.Add('Codex sessions root is a reparse point; Codex logs skipped')
+		}
+		else {
+			Remove-AgedFiles -Root $codexRoot -Cutoff ([DateTime]::Now.AddDays(-30)) -RelativePathPattern '^\d{4}\\\d{2}\\\d{2}\\rollout-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl(\.zst)?$' -Label 'Codex log' -Residuals $residuals -Preview:$Preview |
+				ForEach-Object { $codexLogsRemoved.Add($_) }
+		}
 	}
 
 	$unexpectedRetained = @($retained | Where-Object { -not $_.Expected })
@@ -238,11 +278,11 @@ try {
 	elseif ($residuals.Count -ne 0 -or $unexpectedRetained.Count -ne 0) { $cleanupStatus = 'PARTIAL' }
 	else { $cleanupStatus = 'COMPLETED' }
 	if ($unexpectedRetained.Count -ne 0) { $residuals.Add("$($unexpectedRetained.Count) worktree(s) retained for safety; see Retained") }
-	Write-Report -Status $cleanupStatus -RepositoryRoot $repositoryRoot -PrimaryBranch $primaryBranch -PrimaryHead $primaryHead -Removed $removed -Retained $retained -TempRemoved $tempRemoved -SnapshotRefs $snapshotRefs -Residuals $residuals.ToArray()
+	Write-Report -Status $cleanupStatus -RepositoryRoot $repositoryRoot -PrimaryBranch $primaryBranch -PrimaryHead $primaryHead -Removed $removed -Retained $retained -TempRemoved $tempRemoved -CodexLogsRemoved $codexLogsRemoved -SnapshotRefs $snapshotRefs -Residuals $residuals.ToArray() -Preview:$Preview
 	if ($cleanupStatus -eq 'PARTIAL') { exit 2 }
 }
 catch {
 	$residuals.Add($_.Exception.Message)
-	Write-Report -Status 'BLOCKED' -RepositoryRoot $(if ($repositoryRoot) { $repositoryRoot } else { '<unproven>' }) -PrimaryBranch $primaryBranch -PrimaryHead $primaryHead -Removed $removed -Retained $retained -TempRemoved $tempRemoved -SnapshotRefs $snapshotRefs -Residuals $residuals.ToArray()
+	Write-Report -Status 'BLOCKED' -RepositoryRoot $(if ($repositoryRoot) { $repositoryRoot } else { '<unproven>' }) -PrimaryBranch $primaryBranch -PrimaryHead $primaryHead -Removed $removed -Retained $retained -TempRemoved $tempRemoved -CodexLogsRemoved $codexLogsRemoved -SnapshotRefs $snapshotRefs -Residuals $residuals.ToArray() -Preview:$Preview
 	exit 1
 }

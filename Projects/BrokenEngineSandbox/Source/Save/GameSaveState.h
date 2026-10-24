@@ -16,7 +16,7 @@ struct SaveStagedState
 };
 
 void WriteSaveState(std::fstream& rFileStream);
-void ReadSaveState(std::fstream& rFileStream, SaveStagedState& rStagedState);
+void ReadSaveState(std::fstream& rFileStream, int64_t iNextGlobalId, SaveStagedState& rStagedState);
 void AdoptSaveState(SaveStagedState&& rStagedState);
 void ResetSaveState();
 

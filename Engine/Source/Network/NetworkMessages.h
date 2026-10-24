@@ -129,11 +129,12 @@ public:
 		}
 	}
 
-	void ConnectionResponseTail(const uint8_t& ruiAccepted, const uint8_t& ruiDebugInput, const ClientGuid& rGuid, const bool& rbHasGuid, const std::string_view& rRejectionMessage) const
+	void ConnectionResponseTail(const uint8_t& ruiAccepted, const uint8_t& ruiDebugInput, const uint8_t& ruiReplaying, const ClientGuid& rGuid, const bool& rbHasGuid, const std::string_view& rRejectionMessage) const
 	{
 		if (ruiAccepted != 0)
 		{
 			Field(ruiDebugInput);
+			Field(ruiReplaying);
 			OptionalGuid(rGuid, rbHasGuid);
 		}
 		else
@@ -262,7 +263,7 @@ public:
 		rbHasGuid = mbValid;
 	}
 
-	void ConnectionResponseTail(const uint8_t& ruiAccepted, uint8_t& ruiDebugInput, ClientGuid& rGuid, bool& rbHasGuid, std::string_view& rRejectionMessage)
+	void ConnectionResponseTail(const uint8_t& ruiAccepted, uint8_t& ruiDebugInput, uint8_t& ruiReplaying, ClientGuid& rGuid, bool& rbHasGuid, std::string_view& rRejectionMessage)
 	{
 		rbHasGuid = false;
 		rRejectionMessage = {};
@@ -274,6 +275,7 @@ public:
 		if (ruiAccepted != 0)
 		{
 			Field(ruiDebugInput);
+			Field(ruiReplaying);
 			OptionalGuid(rGuid, rbHasGuid);
 			return;
 		}
@@ -379,7 +381,7 @@ public:
 	void OptionalGuid(const ClientGuid&, const bool&)
 	{
 	}
-	void ConnectionResponseTail(const uint8_t&, const uint8_t&, const ClientGuid&, const bool&, const std::string_view&)
+	void ConnectionResponseTail(const uint8_t&, const uint8_t&, const uint8_t&, const ClientGuid&, const bool&, const std::string_view&)
 	{
 	}
 	void Invalidate()
@@ -567,13 +569,14 @@ struct ServerConnectionResponseMessage
 {
 	static constexpr PacketType keType = PacketType::kServerConnectionResponse;
 	static constexpr int64_t kiMinSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t);
-	static constexpr int64_t kiAcceptedGuidSize = kiMinSize + sizeof(uint8_t) + kiGuidSize;
+	static constexpr int64_t kiAcceptedGuidSize = kiMinSize + sizeof(uint8_t) + sizeof(uint8_t) + kiGuidSize;
 
 	uint8_t uiLoadGeneration = 0;
 	uint8_t uiAccepted = 0;
-	// Server kbDebugInput (0 or 1): whether it accepts debug-control requests. Accepted tail only, so a
-	// protocol-mismatch rejection keeps its message where an older peer reads it.
+	// Server kbDebugInput (0 or 1): whether it accepts debug-control requests. This and uiReplaying are accepted
+	// tail only, so a protocol-mismatch rejection keeps its message where an older peer reads it.
 	uint8_t uiDebugInput = 0;
+	uint8_t uiReplaying = 0; // server mbReplaying (0 or 1) when it accepted the client
 	ClientGuid guid {};
 	bool bHasGuid = false;
 	std::string_view rejectionMessage;
@@ -584,7 +587,7 @@ struct ServerConnectionResponseMessage
 		rVisitor.Type(keType);
 		rVisitor.Field(rMessage.uiLoadGeneration);
 		rVisitor.Field(rMessage.uiAccepted);
-		rVisitor.ConnectionResponseTail(rMessage.uiAccepted, rMessage.uiDebugInput, rMessage.guid, rMessage.bHasGuid, rMessage.rejectionMessage);
+		rVisitor.ConnectionResponseTail(rMessage.uiAccepted, rMessage.uiDebugInput, rMessage.uiReplaying, rMessage.guid, rMessage.bHasGuid, rMessage.rejectionMessage);
 	}
 };
 
@@ -691,15 +694,17 @@ struct ServerUnsubscribeAckMessage
 struct ServerLoadNotificationMessage
 {
 	static constexpr PacketType keType = PacketType::kServerLoadNotification;
-	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(uint8_t);
+	static constexpr int64_t kiFixedSize = kiPacketTypeSize + sizeof(uint8_t) + sizeof(uint8_t);
 
 	uint8_t uiLoadGeneration = 0;
+	uint8_t uiReplaying = 0; // server mbReplaying (0 or 1) after the load
 
 	template <typename TVISITOR>
 	static void Visit(TVISITOR& rVisitor, ServerLoadNotificationMessage& rMessage)
 	{
 		rVisitor.Type(keType);
 		rVisitor.Field(rMessage.uiLoadGeneration);
+		rVisitor.Field(rMessage.uiReplaying);
 	}
 };
 

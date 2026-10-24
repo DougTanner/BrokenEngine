@@ -33,15 +33,30 @@ resumes the work.
 4. From the worktree root, run `Get-AgentWorktreeSessionContext` as
    [`subagent-reporting.md`](../../references/subagent-reporting.md)
    `## Task brief` shows, and `git status --porcelain`. Done when `Worktree`,
-   `Branch`, `PrimaryRoot`, and the uncommitted files are in context.
+   `Branch`, `PrimaryRoot`, `Baseline`, and the uncommitted files are in
+   context.
 5. Write `Temp/eod-resume.md` in the worktree, replacing any earlier copy. Open
-   it with: "Resume from this file: redispatch each stopped worker as a fresh
-   worker of the same role carrying its capsule, then take the next action."
+   it with: "Resume from this file: first resolve any conflicts in the worktree
+   hunk by hunk, tracing each side's intent, preserving both where compatible,
+   and keeping to behavior one side already had. Confirm `git status` still
+   shows the uncommitted files recorded here, taking any missing one from the
+   retained `fork-point-recovery-*` stash (`git stash list`; untracked files
+   from `<stash>^3`) and merging it with the current file where that path now
+   exists, without reapplying what it already restored. If
+   `Get-AgentWorktreeSessionContext` reports a `Baseline` other than the one recorded here, record the new one,
+   fix every place that merged cleanly but changed the code's meaning (such as
+   a version constant both sides bumped to the same value) - find them by
+   comparing `git diff <recorded Baseline> <stash>` against
+   `git diff <recorded Baseline> <new Baseline>` - and rerun every build and
+   check recorded at the old one. Then redispatch each stopped worker as a
+   fresh worker of the same role carrying its capsule, then take the next
+   action."
    Done when the file holds every item listed next, or `none` for it.
    - Objective and current Change Workflow step.
    - Each stopped worker's role and continuation capsule.
    - The finished `/finalize-changes` worker's landing outcome.
    - Uncommitted files, and builds or checks still open.
+   - `Baseline`, as the commit every recorded build and check ran against.
    - Each pending user question, verbatim.
    - The next action.
 6. Build the resume command from the `Branch` prefix with the table below,
@@ -57,9 +72,8 @@ resumes the work.
 
 7. End the turn. Done when its final message names what stopped, step 5's
    landing outcome, uncommitted files, open builds or checks, pending questions,
-   the resume file, the command, where to run it, its Conversation note, and,
-   for a new conversation, the prompt
-   `Read Temp/eod-resume.md and resume the session from it.`
+   the resume file, the command, where to run it, its Conversation note, and
+   the prompt `Read Temp/eod-resume.md and resume the session from it.`
 
 ## Rules
 

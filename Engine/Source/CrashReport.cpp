@@ -343,6 +343,14 @@ void PromptCrashReportDesktopCopy()
 
 #if defined(BT_CLIENT) && !defined(BT_MODEL_VIEWER)
 
+// The live report path fits the MAX_PATH mutex name limit; a mutex name may not contain a backslash.
+std::wstring ClientInstanceMutexName()
+{
+	std::wstring name = ReportPath();
+	std::replace(name.begin(), name.end(), L'\\', L'/');
+	return name;
+}
+
 // A report counts as sent only when it ends with this trailer. HandleException truncates the report it writes, so
 // every new report starts unsent.
 constexpr char kpcCrashReportSentTrailer[] = "\nThis crash report was sent to the server.\n";

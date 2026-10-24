@@ -7,6 +7,7 @@
 #include "FleetSelection.h"
 
 #if defined(BT_SERVER)
+#include "Network/Server/ServerFleetSerialization.h"
 #include "Network/Server/ServerSession.h"
 #endif
 #if defined(BT_CLIENT)
@@ -28,18 +29,23 @@ inline constexpr std::string_view kGameName = "Broken Engine Sandbox Server";
 
 struct ReplayMeta
 {
-	static constexpr int64_t kiVersion = 2;
+	static constexpr int64_t kiVersion = 3;
 	engine::GridCoord clientGridCoordinate {};
 	int64_t iClientOwnedEntityIdentifierValue = 0;
 	float fPreviousClientArmor = 0.0f;
 	uint8_t puiPadding[4] {};
 };
 
+#if defined(BT_SERVER)
 // Isolated replay metadata: staged by ReadReplayMetadata, applied only once the whole replay generation validates.
 struct ReplayStagedMeta
 {
 	ReplayMeta metadata {};
+	std::vector<ReplayFleetRecord> fleetRecords;
+	int64_t iFirstFleetChecksumTick = 0;
+	std::vector<common::crc_t> fleetChecksums;
 };
+#endif
 
 #if defined(BT_CLIENT)
 // The ship ID is part of the key so a pending request clears when focus moves to another ship, even one with the same mode.

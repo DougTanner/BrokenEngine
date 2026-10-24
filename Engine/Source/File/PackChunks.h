@@ -60,11 +60,11 @@ public:
 
 	// Reclaim a dead sub-range of a resident lazy chunk's decompressed pool memory. Decommits only the
 	// page-aligned interior of [iOffset, iOffset + iLength); the boundary partial-pages (which may share
-	// bytes with the neighbouring payload) and every other chunk stay committed, and the chunk's pData pointer
-	// is unchanged. A consumer must recommit and reload the range before reading it again. Main-thread
+	// bytes with the neighbouring payload) stay committed. Other chunks and the chunk's pData pointer
+	// are unchanged. A consumer must recommit and reload the range before reading it again. Main-thread
 	// only (boot / device-loss recovery / transfer-complete texture adoption) — the range must have no concurrent reader.
 	void DecommitChunkRange(common::crc_t crc, int64_t iOffset, int64_t iLength);
-	// Inverse of DecommitChunkRange: MEM_COMMITs the interior and re-reads [iOffset, iOffset + iLength)
+	// MEM_COMMITs every intersecting page and re-reads [iOffset, iOffset + iLength)
 	// straight from the pack file on disk into the pool (NOT via the decommitted resident copy). Uncompressed chunks only.
 	// Returns true on success; false on soft-fail (MEM_COMMIT failure). On false the
 	// caller must NOT read the range — the interior may be decommitted or hold partial data.
@@ -140,7 +140,7 @@ private:
 	int64_t miReadBufferSize = 0;
 	int64_t miPageSize = 0; // VM page granularity for lazy-chunk sub-range decommit/recommit
 
-	// Pre-allocated memory pool for all lazy chunk data (VirtualAlloc MEM_COMMIT — committed, not pre-faulted)
+	// Stable reservation for all lazy chunk data; destination pages are committed before loading.
 	std::byte* mpLazyPool = nullptr;
 	int64_t miLazyPoolSize = 0;
 

@@ -892,6 +892,7 @@ void Server::SendConnectionResponse(ENetPeer* pPeer, bool bAccepted, const char*
 		.uiLoadGeneration = static_cast<uint8_t>(miLoadGeneration),
 		.uiAccepted = static_cast<uint8_t>(bAccepted ? 1 : 0),
 		.uiDebugInput = static_cast<uint8_t>(kbDebugInput ? 1 : 0),
+		.uiReplaying = static_cast<uint8_t>(game::gpGame->mbReplaying ? 1 : 0),
 		.guid = (pGloballyUniqueIdentifier != nullptr) ? *pGloballyUniqueIdentifier : ClientGuid {},
 		.bHasGuid = bAccepted && pGloballyUniqueIdentifier != nullptr,
 		.rejectionMessage = (!bAccepted && pcMessage != nullptr) ? pcMessage : "",
@@ -930,7 +931,11 @@ void Server::BroadcastLoadNotification()
 
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
-		NetworkMessages::ServerLoadNotificationMessage message {.uiLoadGeneration = static_cast<uint8_t>(miLoadGeneration)};
+		NetworkMessages::ServerLoadNotificationMessage message
+		{
+			.uiLoadGeneration = static_cast<uint8_t>(miLoadGeneration),
+			.uiReplaying = static_cast<uint8_t>(game::gpGame->mbReplaying ? 1 : 0),
+		};
 		NetworkMessages::Write(rWorkbuffer, message);
 		NetworkManager::SendPacket(rClient.pPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
 	}

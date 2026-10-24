@@ -12,14 +12,15 @@ public:
 	Camera();
 	void Update();
 	void Fit(const XMFLOAT3A& rf3Center, float fRadius);
-	void Orbit(float fYawDelta, float fPitchDelta);
 	void Zoom(float fWheelDelta);
+	void RotateSun(const glm::vec2& rAnchor, const glm::vec2& rPosition);
+	XMVECTOR XM_CALLCONV ApplySunRotation(FXMVECTOR vecDirection) const;
+	arc_ball::ArcBall mArcBall {glm::vec3(0.0f), 0.75f, glm::mat4(1.0f)};
+	glm::quat mSunRotation {1.0f, 0.0f, 0.0f, 0.0f};
 
 private:
 	static constexpr float kfInitialPitch = 0.5404195f;
 	float mfRadius = 1.0f;
-	float mfYaw = 0.0f;
-	float mfPitch = kfInitialPitch;
 	float mfZoom = 1.0f;
 };
 

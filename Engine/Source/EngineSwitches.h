@@ -22,12 +22,6 @@ inline constexpr bool kbModelViewer = false;
 inline constexpr bool kbFramebufferClearColor = kbVulkanWireframe;
 #endif
 
-#if defined(BT_SERVER)
-inline constexpr bool kbSingleInstance = true;
-#else
-inline constexpr bool kbSingleInstance = false;
-#endif
-
 #if defined(BT_DEBUG)
 inline constexpr const char* kpcBuildConfigurationName = "Debug";
 inline constexpr bool kbMimallocDiagnostics = true;

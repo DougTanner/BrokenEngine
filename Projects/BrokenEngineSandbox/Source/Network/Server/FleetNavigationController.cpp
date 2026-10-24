@@ -3,6 +3,7 @@
 #include "Network/Server/FleetNavigationController.h"
 
 #include "Frame/Collections/Ships/ShipQueries.h"
+#include "Network/Server/ServerFleetSerialization.h"
 #include "Game.h"
 
 namespace game
@@ -24,19 +25,16 @@ static engine::GridCoord NavigationDirectionOffset(int64_t iNavigationDirection)
 	}
 }
 
+// Owners walk in GUID order because each fleet's direction draw consumes the one fleet RNG, and replay playback must
+// draw in the recording's order.
 void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets, common::RandomEngine& rRandom)
 {
-	for (auto& [rGuid, rFleetVector] : rFleets)
+	common::ScopedWorkbufferArena ownersArena = common::gpThreadLocal->mWorkbuffer.Push();
+	for (const engine::ClientGuid& rGuid : SortedGuidKeys(rFleets, ownersArena))
 	{
-		for (Fleet& rFleet : rFleetVector)
+		for (Fleet& rFleet : rFleets.at(rGuid))
 		{
-			auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId);
-			if (!(rFleet.flagshipGlobalId.iValue != 0) || flagshipIt == rFleet.members.end())
-			{
-				continue;
-			}
-
-			const FleetMember& rFlagship = *flagshipIt;
+			const FleetMember& rFlagship = *std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId);
 			if (rFlagship.flags & FleetMemberFlags::kIsDead)
 			{
 				continue;
@@ -44,12 +42,10 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 
 			// Drain cellChangeTimerSeconds only while the flagship is at wantedCoordinate, so the cycle is transit plus
 			// navigationDelaySeconds of idle time. Drain there even in cardinal mode; an expired timer fires when that mode
-			// ends instead of freezing. GameBase::ServerUpdate supplies mfLastDeltaTime = iFullTicks * kfDeltaTime
-			// after pause/time-scale resolution. BuildFrameInputs runs this only for advancing updates, including
-			// mTimeStep fast-forward/slow-motion scaling, keeping it in tick lockstep.
+			// ends instead of freezing. The fleet step runs once per tick, so each pass drains one tick.
 			if (rFlagship.coordinate == rFleet.wantedCoordinate)
 			{
-				rFleet.cellChangeTimerSeconds -= std::chrono::duration<float>(gpGame->mfLastDeltaTime);
+				rFleet.cellChangeTimerSeconds -= std::chrono::duration<float>(engine::kfDeltaTime);
 			}
 
 			if (rFleet.cellChangeTimerSeconds.count() > 0.0f)
@@ -99,104 +95,50 @@ void FleetNavigationController::TickFleetTimers(std::unordered_map<engine::Clien
 			rFleet.wantedCoordinate = destination;
 			rFleet.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(iPendingTicks);
 			rFleet.cellChangeTimerSeconds = rFleet.navigationDelaySeconds;
-			mPendingFlagshipUpdates.push_back({.clientGuid = rGuid, .fleetGuid = rFleet.guid, .newWantedCoordinate = destination, .iPendingFleetWantedCoordinateTicks = iPendingTicks});
-			LOG(kNetwork, kVerbose, "FleetNavigationController::TickFleetTimers Guid: ({},{}) FleetGuid: ({},{}) Direction: {} WantedCoord: ({},{})", rGuid.uiHigh, rGuid.uiLow, rFleet.guid.uiHigh, rFleet.guid.uiLow, iDirection, destination.iX, destination.iY);
-		}
-	}
-}
 
-void FleetNavigationController::ProcessFlagshipUpdates(const std::unordered_map<engine::ClientGuid, std::vector<Fleet>>& rFleets)
-{
-	for (const PendingFlagshipUpdate& rUpdate : mPendingFlagshipUpdates)
-	{
-		auto fleetIt = rFleets.find(rUpdate.clientGuid);
-		if (fleetIt == rFleets.end())
-		{
-			continue;
-		}
-
-		auto matchIt = std::ranges::find(fleetIt->second, rUpdate.fleetGuid, &Fleet::guid);
-		if (matchIt == fleetIt->second.end())
-		{
-			continue;
-		}
-		const Fleet& rFleet = *matchIt;
-
-		if (!(rFleet.flagshipGlobalId.iValue != 0) || !std::ranges::contains(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId))
-		{
-			continue;
-		}
-
-		int64_t iMembersUpdated = 0;
-		for (const FleetMember& rMember : rFleet.members)
-		{
-			if (rMember.flags & FleetMemberFlags::kIsDead)
+			// Playback takes every frame change from the recording.
+			if (gpGame->mbReplaying)
 			{
 				continue;
 			}
 
-			engine::GridCoord memberCoordinate = rMember.coordinate;
-			bool bMemberIsFlagship = (rMember.globalId == rFleet.flagshipGlobalId);
-
-			auto frameInputIt = gpGame->mFrameInputs.find(memberCoordinate);
-			if (frameInputIt == gpGame->mFrameInputs.end())
+			int64_t iMembersUpdated = 0;
+			for (const FleetMember& rMember : rFleet.members)
 			{
-				continue;
-			}
-			if (!gpGame->mCells.contains(memberCoordinate))
-			{
-				continue;
-			}
-
-			ShipUuid shipUuid = ShipUuidByGlobalId(*gpGame->mCells.at(memberCoordinate).pCurrent, rMember.globalId);
-			if (shipUuid.iUuid == 0)
-			{
-				continue;
-			}
-			frameInputIt->second.statusChanges.push_back(
-			{
-				.eType = StatusChangeType::kUpdateFleet,
-				.data = UpdateFleetData
+				if (rMember.flags & FleetMemberFlags::kIsDead)
 				{
-					.eType = shipUuid.eType,
-					.iUuid = shipUuid.iUuid,
-					.bIsFlagship = bMemberIsFlagship,
-					.flagshipGlobalId = rFleet.flagshipGlobalId,
-					.fleetWantedCoordinate = rUpdate.newWantedCoordinate,
-					.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(rUpdate.iPendingFleetWantedCoordinateTicks),
-				},
-			});
-			++iMembersUpdated;
-		}
-		LOG(kNetwork, kVerbose, "FleetNavigationController::ProcessFlagshipUpdates Guid: ({},{}) FleetGuid: ({},{}) MembersUpdated: {} WantedCoord: ({},{})", rUpdate.clientGuid.uiHigh, rUpdate.clientGuid.uiLow, rUpdate.fleetGuid.uiHigh, rUpdate.fleetGuid.uiLow, iMembersUpdated, rUpdate.newWantedCoordinate.iX, rUpdate.newWantedCoordinate.iY);
-	}
-	mPendingFlagshipUpdates.clear();
-}
+					continue;
+				}
 
-void FleetNavigationController::ShiftFlagshipAfterDeath(const engine::ClientGuid& rGuid, Fleet& rFleet)
-{
-	// The flagship's list position is only the rotation start; every caller has already matched the flagship to a member.
-	int64_t iFlagshipPosition = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId) - rFleet.members.begin();
-	int64_t iNewFlagship = -1;
-	for (int64_t k = 1; k < std::ssize(rFleet.members); ++k)
-	{
-		int64_t iCandidate = (iFlagshipPosition + k) % std::ssize(rFleet.members);
-		if (!(rFleet.members.at(static_cast<size_t>(iCandidate)).flags & FleetMemberFlags::kIsDead))
-		{
-			iNewFlagship = iCandidate;
-			break;
+				engine::GridCoord memberCoordinate = rMember.coordinate;
+
+				auto frameInputIt = gpGame->mFrameInputs.find(memberCoordinate);
+				if (frameInputIt == gpGame->mFrameInputs.end())
+				{
+					continue;
+				}
+
+				ShipUuid shipUuid = ShipUuidByGlobalId(*gpGame->mCells.at(memberCoordinate).pCurrent, rMember.globalId);
+				if (shipUuid.iUuid == 0)
+				{
+					continue;
+				}
+				frameInputIt->second.statusChanges.push_back(
+				{
+					.eType = StatusChangeType::kUpdateFleet,
+					.data = UpdateFleetData
+					{
+						.eType = shipUuid.eType,
+						.iUuid = shipUuid.iUuid,
+						.fleetWantedCoordinate = destination,
+						.uiPendingFleetWantedCoordinateTicks = static_cast<uint8_t>(iPendingTicks),
+					},
+				});
+				++iMembersUpdated;
+			}
+			LOG(kNetwork, kVerbose, "FleetNavigationController::TickFleetTimers Guid: ({},{}) FleetGuid: ({},{}) Direction: {} WantedCoord: ({},{}) MembersUpdated: {}", rGuid.uiHigh, rGuid.uiLow, rFleet.guid.uiHigh, rFleet.guid.uiLow, iDirection, destination.iX, destination.iY, iMembersUpdated);
 		}
 	}
-	if (iNewFlagship < 0)
-	{
-		return;
-	}
-
-	const FleetMember& rNewFlagship = rFleet.members.at(static_cast<size_t>(iNewFlagship));
-	rFleet.flagshipGlobalId = rNewFlagship.globalId;
-	rFleet.wantedCoordinate = rNewFlagship.coordinate;
-	rFleet.cellChangeTimerSeconds = rFleet.navigationDelaySeconds;
-	mPendingFlagshipUpdates.push_back({.clientGuid = rGuid, .fleetGuid = rFleet.guid, .newWantedCoordinate = rFleet.wantedCoordinate});
 }
 
 #endif // BT_SERVER

@@ -98,7 +98,8 @@ owns the engine network cycle;
 [`ServerSessionBase.cpp`](../../Engine/Source/Network/Server/ServerSessionBase.cpp)
 owns tick preparation, and
 [`ServerSession.cpp`](../../Projects/BrokenEngineSandbox/Source/Network/Server/ServerSession.cpp)
-builds the game frame inputs on advancing updates. After the fixed-tick wait,
+builds the game's request inputs on advancing updates and runs the game's
+per-tick fleet step from tick preparation. After the fixed-tick wait,
 `ServerSessionRuntime::PollTickBoundary` polls a second time so commands that
 arrived during the wait enter the imminent tick.
 

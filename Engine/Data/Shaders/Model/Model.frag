@@ -387,4 +387,8 @@ void main()
 
 	// Per-instance color add (for effects like damage flash)
 	f4OutColor += f4InColorAdd;
+	if (pushConstantsLayout.f4Pipeline.x != 0.0f && material.fAlphaMask < 2.0f)
+	{
+		f4OutColor.a = 1.0f;
+	}
 }
