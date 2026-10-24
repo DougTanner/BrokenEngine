@@ -306,8 +306,8 @@ contract main reads is [`../SKILL.md`](../SKILL.md).
   `.agents/scripts/Find-SessionCandidates.ps1`). Read the file only after that
   run printed the line; no summary line means no result document, so that
   step's result is unavailable.
-- Comment content — what a comment says and whether it should exist — is
-  `/comment-review` work; this review touches a comment only as the step-16
+- Comment content is `/comment-review` work, as [`../SKILL.md`](../SKILL.md)
+  `## When to use` defines it; this review touches a comment only as the step-16
   residue removal directs.
 - Every judgment in steps 9 and 16 stays here, because the scanner's
   contract (`.agents/scripts/Find-SessionCandidates.ps1`) never edits a source

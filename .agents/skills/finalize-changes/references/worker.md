@@ -7,14 +7,12 @@ Worker-only mechanics for `/finalize-changes`.
 Every script this skill runs lives under `../scripts/`; its command line, result
 contract, and lease rules are in [`scripts.md`](scripts.md).
 
-Use the root AGENTS.md canonical invocation form.
-
-Invoke them directly, exactly as documented; never write a wrapper,
-orchestrator, or replacement around them, and never reconstruct their steps by
-hand. An improvised invocation can send wrong arguments into an operation that
-changes primary. `Show-FinalizeApprovalReview.ps1` is the one script this worker
-fills in and returns for main to run verbatim; this worker never invokes it.
-A script that cannot be run as documented is a bug: stop and report it.
+Run them as the root AGENTS.md `## Directives` bundled-scripts bullet requires,
+in its canonical invocation form, and stop on a script that cannot be run as
+documented: an improvised invocation can send wrong arguments into an operation
+that changes primary. `Show-FinalizeApprovalReview.ps1` is the one script this
+worker fills in and returns for main to run verbatim; this worker never invokes
+it.
 
 Under its landing lease, finalization follows the Verify and land step's rule
 that exactly one explicit user confirmation authorizes changing primary, and the

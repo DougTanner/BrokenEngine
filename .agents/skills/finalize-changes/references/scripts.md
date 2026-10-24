@@ -27,8 +27,7 @@ never re-typed by hand.
 
 ## Invocation
 
-Use the root AGENTS.md canonical form — from the session worktree root, one
-script invocation per shell call, repo-relative path, no `-ExecutionPolicy`.
+Use the canonical invocation form in root AGENTS.md `## Directives`.
 Angle-bracket values are placeholders; quote every one. `<owner-token>` is a
 canonical lowercase GUID in `8-4-4-4-12` form. For the lock claim, either omit
 `-LandingOwner` so `Invoke-FinalizeLockClaim.ps1` creates and returns one, or

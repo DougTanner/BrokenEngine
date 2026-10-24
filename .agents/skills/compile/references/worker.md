@@ -86,15 +86,13 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Resolve-CompileContext.ps1
      agent-harness scenario, build both client and server in the same request
      regardless of changed-file affinity — the harness launches both executables
      and hard-stops when either is missing.
-   - ThirdParty builds run only in the primary checkout, per Consumer
-     Provisioning in
-     `ThirdParty/Prebuilts/Platforms/VisualStudio2026/AGENTS.md`; from any other
-     checkout `-Target ThirdParty` is the typed block
-     `thirdparty.worktree-not-primary`. Missing source or library links are
-     provisioning failures and a routine `/compile` never rebuilds ThirdParty
-     itself. Wrapper bootstrap does incremental-rebuild ThirdParty at every
-     session start (see Bootstrap AgentTools), so a routine `/compile` normally
-     finds it already current.
+   - ThirdParty builds run only in the primary checkout
+     ([`../SKILL.md`](../SKILL.md) `## Inputs`); from any other checkout
+     `-Target ThirdParty` is the typed block `thirdparty.worktree-not-primary`.
+     Missing source or library links are provisioning failures and a routine
+     `/compile` never rebuilds ThirdParty itself. Wrapper bootstrap does
+     incremental-rebuild ThirdParty at every session start (see Bootstrap
+     AgentTools), so a routine `/compile` normally finds it already current.
    - Build the Release-only targets that [`../SKILL.md`](../SKILL.md)
      `## Inputs` names in Release. WorktreeCli still supplies the normal
      worktree-local target serialization.

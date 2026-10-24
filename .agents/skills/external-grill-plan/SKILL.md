@@ -108,14 +108,13 @@ Lead with the first concrete decision, not a plan summary. For each question:
 - keep the question answerable from the current message alone, without the user
   recalling earlier turns or reading the plan or the source.
 
-Use the host's structured choice UI when available. Make the structured-choice
-tool call only after the round's full context is already visible to the user as
-rendered message text, and let that call carry only the choices; text emitted in
-the same turn before such a call may never be displayed, so it does not count.
-Otherwise ask in prose but preserve the same two or three choices, in the same
-recommended-first order, with the same tradeoffs and refinements. Do not replace
-them with an open-ended prompt. In prose, give every question in the round one
-fixed numbered shape so the user can answer by number:
+Use the host's structured choice UI when available, under the first bullet of
+[`../../references/change-workflow.md`](../../references/change-workflow.md)
+`### User Interaction`, and let the structured-choice call carry only the
+choices. Otherwise ask in prose but preserve the same two or three choices, in
+the same recommended-first order, with the same tradeoffs and refinements. Do
+not replace them with an open-ended prompt. In prose, give every question in the
+round one fixed numbered shape so the user can answer by number:
 
 ```text
 Q<n> — <decision title>: <evidence, why the choice changes the plan, and the

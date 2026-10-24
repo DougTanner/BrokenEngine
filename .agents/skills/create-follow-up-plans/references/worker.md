@@ -9,7 +9,7 @@ For every proposal:
 1. State the false required condition and its originating criterion, accepted finding, or residual.
 2. Confirm root cause and unresolved state from current source or direct logs. Record durable `path:line`, symbol, and observed behavior evidence.
 3. Prove it is pre-existing or outside the approved implementation boundary.
-4. Preserve user decisions and the authority order among user direction, approved plan, documentation, and current behavior; report contradictions.
+4. Preserve user decisions and the authority order in root `AGENTS.md` `### Diagnosis Discipline`; report contradictions.
 
 Group items only when root cause, implementation boundary, invariant, and verification strategy all match. Split stages by the stage rule in `Documents/Plans/AGENTS.md` `## Plan files`, and split architectural decisions, separate subsystems, or meaningfully different risks.
 

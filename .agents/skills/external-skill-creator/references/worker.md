@@ -18,7 +18,7 @@ Mode selection and executor boundaries. Triggers, inputs, and handoffs live in
 
 ## Rules
 
-- Treat author and validate as separate executions. Independent validation uses
-  a fresh reviewer that did not author the package.
+- Treat author and validate as separate executions; independent validation
+  follows [`../SKILL.md`](../SKILL.md) `## When to use`.
 - Stay within the supplied package scope and return separate-role work to the
   manager.

@@ -221,7 +221,7 @@ pair runs once per stage; a later `/resolve-findings` round's re-review covers
 its own fix.
 
 - fresh `reviewer` runs `/over-engineering-review` in its finder pass, then a fresh `implementer` runs its validator pass — when a `cpp`-class file changed (`overEngineeringReview`), every tier; skip the validator when the finder returns no removal candidates.
-- fresh `reviewer` runs `/repo-code-review` — when the change touches C++; its brief carries the full session baseline SHA, the immutable diff boundary, and the path of the targets file main saves first, as `.agents/skills/repo-code-review/SKILL.md` `## Inputs` states.
+- fresh `reviewer` runs `/repo-code-review` — when the change touches C++; its brief carries what `.agents/skills/repo-code-review/SKILL.md` `## Inputs` requires.
 - fresh `reviewer` runs `/glsl-review` — when the change touches shaders.
 - `mechanic` runs `/comment-review` — when the change touches C++ or GLSL.
 - fresh `reviewer` runs `/coherence-review` — Tier-1 non-C++ artifacts; at Tier 1 with no changed C++ or GLSL this dispatch is the Step 6 combined pass and also carries Steps 7 and 8.

@@ -5,8 +5,8 @@ Triggers, inputs, and the handoff form live in [`../SKILL.md`](../SKILL.md).
 
 ## Steps
 
-1. Read the request text, or the plan document this change comes from when it is
-   not a claimed executable Plan, then `### Risk tiers` in
+1. Read the request text or plan document [`../SKILL.md`](../SKILL.md)
+   `## Inputs` names, then `### Risk tiers` in
    [risk-tiers.md](../../../references/risk-tiers.md), and every
    repository region the request names. Done when each of those has been read.
 2. Gather the tier evidence: for each risk-tier trigger the change could touch,
