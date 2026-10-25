@@ -34,14 +34,18 @@ Texture encoding and chunk routing are described in `Texture/AGENTS.md`. Island/
 ## Scene and Model
 
 Scene discovery accepts `.blend`, `.gltf`, `.glb`, `.fbx`, `.obj`, `.dae`,
-`.ply`, `.stl`, and `.3ds` outside `Intermediates`.
-A `.blend` owns its sibling `.glb`, suppressing that sibling's discovery even
-when it already exists. The job uses the GLB path for chunk identity, CRCs,
-manifest entries, generated symbols, and model/texture names, including when
-the GLB is initially missing. Ordinary export-only scenes need no Blender.
-Commit available production `.blend` sources together with their export-ready
-sibling GLBs; neither extension is ignored. Conversion never saves the author
-source, and DataPacker never performs Git operations.
+`.ply`, `.stl`, and `.3ds` outside `Intermediates`. A `.blend`, `.fbx` or
+`.obj` file, its extension compared ignoring case, is an authored scene's
+Blender source. A Blender source owns the `.glb` named after its full file name
+(`X.fbx.glb`, `X.obj.glb`, `X.blend.glb`), suppressing that file's discovery
+even when it already exists; an `X.glb` beside an `X.fbx`, `X.obj` or `X.blend`
+is an ordinary export-only scene. The job uses the GLB path for
+chunk identity, CRCs, manifest entries, generated symbols, and model/texture
+names, including when the GLB is initially missing. Ordinary export-only scenes
+need no Blender.
+Commit available production Blender sources together with their export-ready
+converted GLBs; none of these extensions is ignored. Conversion never saves the
+author source, and DataPacker never performs Git operations.
 
 Authored scenes convert before the ordinary two-phase scene export. Only
 installed Blender 5.2 LTS is supported, selected from Windows installation
@@ -53,18 +57,30 @@ scratch outputs. DataPacker's C++ code launches `blender.exe` through
 `common::RunExecutable`; Blender executes the runtime input
 `DataPacker/Scripts/ExportBlenderScene.py` with its bundled Python, outside
 Visual Studio project membership. DataPacker does not launch `python.exe`,
-require a separate Python installation, or embed Python.
+require a separate Python installation, or embed Python. The script opens a
+`.blend`, and imports an FBX or OBJ into an empty scene with Blender's bundled
+importer. For an FBX source, the script overrides material alpha from the FBX
+file's own transparency properties; `DataPacker/Source/AGENTS.md`
+`## Architecture` owns when such an override is allowed. Before export, the
+script drops animation actions that move nothing.
 
-The authored scene's primary fingerprint hashes the `.blend`, not the GLB
+The authored scene's primary fingerprint hashes its Blender source, not the GLB
 that conversion replaces after the fingerprint is captured. A separate shared
 cache marker uses the converter's own version, independent of scene payload
 and `.PreExport` versions. It records source, tool identity/content, script and
 recipe, consumed external dependency hashes, and published GLB content.
 Dependencies include transitive linked Blender data and unpacked images used
-by exported content, excluding unrelated datablocks. In-root dependencies use
-input-root-relative identities; external dependencies use source-relative
-identities where possible. Missing or unreadable dependencies, tool or marker,
-and changed inputs or output force conversion before any clean return.
+by exported content, excluding unrelated datablocks, plus each existing file an
+OBJ's `mtllib` statements name, the `.mtl` file sharing the OBJ's stem (`X.mtl`
+for `X.obj`) when it exists whether or not a statement names it, and every
+candidate image in the source file's folder tree (extensions
+`CANDIDATE_EXTENSIONS` in the script, mirrored by `kpCandidateImageExtensions`
+in `BlenderExport.cpp`), from which conversion relinks missing images and fills
+empty material inputs. In-root dependencies use input-root-relative
+identities; external dependencies use source-relative identities where
+possible. Missing or unreadable dependencies, tool or marker,
+changed inputs or output, and a candidate image with no recorded dependency
+force conversion before any clean return.
 
 Conversion validates a private sibling GLB stage before replacing the output
 on the same volume. Process or validation failure preserves the previous GLB
@@ -81,13 +97,14 @@ animation values without references into the source model. `ExportScene` owns
 optimization, intermediate/chunk writes, and cache/publication behavior.
 Material decoding preserves RGB emissive factors and glTF occlusion strength;
 formats without an occlusion strength keep the neutral default.
+A glTF primitive with no material gets the glTF 2.0 default material.
 glTF decoding stays phased: source loading, canonical skin selection and normalization
 precede pre-export marker removal; texture publication and orphan sweeping
 precede pre-export skeleton/animation and mesh/material checks. Main-only export
 retains its own consumed-data predicates and validation order. Blender staging
 validation loads the source without decoding export payloads.
 
-`AssimpSceneDecoder` decodes the six exchange formats directly into the same
+`AssimpSceneDecoder` decodes the four exchange formats directly into the same
 owned payload, including representable skeletal and node TRS clips. Fidelity
 starts at the decoded Assimp scene: importer conversions are accepted, but the
 exporter rejects unsupported behavior instead of adding approximations. Morphs,
@@ -97,8 +114,8 @@ rendering; inactive importer defaults are accepted. PLY alone ignores Assimp's
 synthesized sidedness and imports one-sided. Mesh instances retain effective
 material splits; omitted materials have concrete defaults.
 Missing normals are generated; invalid supplied normals fail. Importer root
-corrections precede conversion to engine Z-up/meters. FBX's corrected root uses
-centimeters; Collada's uses meters. Static vertices bake mesh-world transforms,
+corrections precede conversion to engine Z-up/meters; Collada's corrected root
+uses meters. Static vertices bake mesh-world transforms,
 inverse-transpose normals and determinant-correct winding.
 
 Assimp clips must fit the packed hierarchy, skin and animation capacities.
@@ -111,7 +128,7 @@ weights per vertex. Animated exports keep mesh-local vertices, source keys and
 inverse binds, with separate unanimated ancestors for basis conversion and
 default-pose normalization.
 
-OBJ, FBX, DAE and 3DS UVs flip V exactly once into the engine's top-origin image
+DAE and 3DS UVs flip V exactly once into the engine's top-origin image
 convention. PLY UVs pass through unchanged despite its undefined format origin;
 STL has no UVs. Absent UV channels stay zero.
 

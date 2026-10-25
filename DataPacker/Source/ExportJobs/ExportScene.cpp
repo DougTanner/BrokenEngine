@@ -10,18 +10,26 @@
 static bool IsAssimpScene(const std::filesystem::path& rPath)
 {
 	std::string extension = rPath.extension().string();
-	return extension == ".fbx" || extension == ".obj" || extension == ".dae" || extension == ".ply" || extension == ".stl" || extension == ".3ds";
+	return extension == ".dae" || extension == ".ply" || extension == ".stl" || extension == ".3ds";
+}
+
+// Lowercase: a source's extension is lowercased before it is compared with these.
+constexpr std::string_view kpBlenderSourceExtensions[] = {".blend", ".fbx", ".obj"};
+
+static bool IsBlenderSource(const std::filesystem::path& rPath)
+{
+	return std::ranges::contains(kpBlenderSourceExtensions, common::ToLower(rPath.extension().string()));
 }
 
 ExportScene::ExportScene(common::ChunkFlags_t rChunkFlags, const std::filesystem::path& rFile)
-: ExportJob(rChunkFlags, rFile.extension() == ".blend" ? std::filesystem::path(rFile).replace_extension(".glb") : rFile, kiVersion)
-, mBlenderSourcePath(rFile.extension() == ".blend" ? rFile : std::filesystem::path())
+: ExportJob(rChunkFlags, IsBlenderSource(rFile) ? std::filesystem::path(rFile) += ".glb" : rFile, kiVersion)
+, mBlenderSourcePath(IsBlenderSource(rFile) ? rFile : std::filesystem::path())
 {
 }
 
 std::optional<common::ChunkFlags_t> ExportScene::Handles(const std::filesystem::directory_entry& rDirectoryEntry)
 {
-	if (!IsAssimpScene(rDirectoryEntry.path()) && rDirectoryEntry.path().extension() != ".gltf" && rDirectoryEntry.path().extension() != ".glb" && rDirectoryEntry.path().extension() != ".blend")
+	if (!IsAssimpScene(rDirectoryEntry.path()) && rDirectoryEntry.path().extension() != ".gltf" && rDirectoryEntry.path().extension() != ".glb" && !IsBlenderSource(rDirectoryEntry.path()))
 	{
 		return std::nullopt;
 	}
@@ -34,9 +42,13 @@ std::optional<common::ChunkFlags_t> ExportScene::Handles(const std::filesystem::
 			return std::nullopt;
 		}
 	}
-	if (rDirectoryEntry.path().extension() == ".glb" && std::filesystem::is_regular_file(std::filesystem::path(rDirectoryEntry.path()).replace_extension(".blend")))
+	if (rDirectoryEntry.path().extension() == ".glb")
 	{
-		return std::nullopt;
+		std::filesystem::path sourcePath = std::filesystem::path(rDirectoryEntry.path()).replace_extension();
+		if (IsBlenderSource(sourcePath) && std::filesystem::is_regular_file(sourcePath))
+		{
+			return std::nullopt;
+		}
 	}
 	return std::optional<common::ChunkFlags_t>(common::ChunkFlags::kScene);
 }

@@ -1,15 +1,44 @@
 """Export one authored scene and its consumed external dependencies with Blender 5.2."""
 
 import json
+import math
+import os
 from pathlib import Path
+import re
 import struct
 import sys
 import types
 
 import bpy
+import numpy
 
 
 dependencies = set()
+CANDIDATE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".tga"}
+CHANNEL_WORDS = {
+    "base color": ("basecolor", "albedo", "diffuse", "diff", "colour", "color"),
+    "normal": ("normalopengl", "normaldirectx", "normal", "normals", "nor"),
+    "metallic": ("metallic", "metalness"),
+    "roughness": ("roughness",),
+    "emissive": ("emissive", "emit", "glow"),
+    "opacity": ("opacity",),
+}
+CHANNEL_INPUTS = {
+    "base color": "Base Color",
+    "normal": "Normal",
+    "metallic": "Metallic",
+    "roughness": "Roughness",
+    "emissive": "Emission Color",
+    "opacity": "Alpha",
+}
+# Pose channels are relative to the bone's rest pose, which the exporter writes as the joint transform.
+IDENTITY_TRANSFORM = {
+    "location": (0.0, 0.0, 0.0),
+    "rotation_quaternion": (1.0, 0.0, 0.0, 0.0),
+    "rotation_euler": (0.0, 0.0, 0.0),
+    "rotation_axis_angle": (0.0, 0.0, 1.0, 0.0),
+    "scale": (1.0, 1.0, 1.0),
+}
 
 
 def record_library(datablock):
@@ -34,6 +63,236 @@ def record_image(image):
         if not path.is_file():
             raise RuntimeError(f"Missing consumed Blender image: {path}")
         dependencies.add(str(path))
+
+
+def record_material_libraries(source):
+    with source.open("rb") as stream:
+        for line in stream:
+            words = line.split(None, 1)
+            if len(words) == 2 and words[0] == b"mtllib":
+                # Blender reads the rest of the line as one path, dropping enclosing quotes.
+                name = words[1].strip().decode("utf-8", "replace")
+                if len(name) > 2 and name.startswith('"') and name.endswith('"'):
+                    name = name[1:-1]
+                path = (source.parent / name).resolve()
+                if path.is_file():
+                    dependencies.add(str(path))
+    # Blender also reads the same-stem .mtl whether or not an mtllib line names it.
+    path = source.with_suffix(".mtl").resolve()
+    if path.is_file():
+        dependencies.add(str(path))
+
+
+def load_source(source):
+    extension = source.suffix.lower()
+    if extension == ".blend":
+        bpy.ops.wm.open_mainfile(filepath=str(source), load_ui=False, use_scripts=False)
+        return
+    # Factory startup holds a default cube that the export would include.
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    alphas = []
+    if extension == ".fbx":
+        from io_scene_fbx import import_fbx
+
+        original_read_material = import_fbx.blen_read_material
+
+        def read_material(fbx_tmpl, fbx_obj, settings):
+            material = original_read_material(fbx_tmpl, fbx_obj, settings)
+            props = (import_fbx.elem_find_first(fbx_obj, b"Properties70"),
+                     import_fbx.elem_find_first(fbx_tmpl, b"Properties70", import_fbx.fbx_elem_nil))
+            # The importer's alpha formula, except that it reads Opacity without the Material
+            # template, so a material inheriting the template's Opacity falls back to TransparentColor.
+            alpha = 1.0 - import_fbx.elem_props_get_number(props, b"TransparencyFactor", 0.0)
+            if alpha == 1.0 or alpha == 0.0:
+                alpha = import_fbx.elem_props_get_number(props, b"Opacity", None)
+                if alpha is None:
+                    alpha = 1.0 - import_fbx.elem_props_get_color_rgb(props, b"TransparentColor", (0.0, 0.0, 0.0))[0]
+            alphas.append((settings.nodal_material_wrap_map[material], alpha))
+            return material
+
+        import_fbx.blen_read_material = read_material
+        # The importer's image search takes the first same-named file in walk order, hiding ties.
+        result = bpy.ops.import_scene.fbx(filepath=str(source), use_image_search=False)
+    else:
+        result = bpy.ops.wm.obj_import(filepath=str(source))
+        record_material_libraries(source)
+    if result != {"FINISHED"}:
+        raise RuntimeError(f"Blender import failed: {result}")
+    for wrapper, alpha in alphas:
+        if not wrapper.node_principled_bsdf.inputs["Alpha"].is_linked:
+            wrapper.alpha = alpha
+
+
+def find_candidates(source):
+    def fail(error):
+        raise error
+
+    candidates = []
+    for directory, _, names in os.walk(source.resolve().parent, onerror=fail):
+        candidates += [Path(directory, name) for name in names if Path(name).suffix.lower() in CANDIDATE_EXTENSIONS]
+    return sorted(path for path in candidates if path.is_file())
+
+
+def file_stem(filepath):
+    return os.path.splitext(re.split(r"[\\/]", filepath)[-1])[0]
+
+
+def relink_missing_images(candidates):
+    for image in bpy.data.images:
+        if image.packed_file or image.source != "FILE" or Path(bpy.path.abspath(image.filepath, library=image.library)).is_file():
+            continue
+        name = re.split(r"[\\/]", image.filepath)[-1].lower()
+        stem = file_stem(name)
+        tiers = (
+            [path for path in candidates if path.name.lower() == name],
+            [path for path in candidates if path.stem.lower() == stem],
+            # Sketchfab truncates file stems to 42 characters.
+            [path for path in candidates if len(path.stem) == 42 and path.stem.lower() == stem[:42]],
+        )
+        matches = next((tier for tier in tiers if tier), [])
+        if len(matches) > 1:
+            raise RuntimeError(f"Several candidates for missing image {image.filepath}: {', '.join(map(str, matches))}")
+        if matches:
+            # Assigning the path loads the new file's size and pixels.
+            image.filepath = str(matches[0])
+
+
+def classify(stem):
+    letters = stem.replace("_", "")
+    suffix = ""
+    channel = None
+    for word_channel, words in CHANNEL_WORDS.items():
+        for word in words:
+            # Truncation to 42 characters can cut the channel word short.
+            for length in range(3, len(word) + 1) if len(stem) == 42 else (len(word),):
+                if length > len(suffix) and letters[-length:].lower() == word[:length]:
+                    suffix, channel = word[:length], word_channel
+    if channel is None:
+        return None
+    index = len(stem)
+    remaining = len(suffix)
+    while remaining:
+        index -= 1
+        remaining -= stem[index] != "_"
+    # Of the channel words, only normaldirectx starts with "normald".
+    return stem[:index].rstrip("_"), channel, suffix.startswith("normald")
+
+
+def set_key(name):
+    return re.sub(r"\W", "_", name.lower())
+
+
+def names_match(set_name, material_name):
+    return set_name == material_name or set_name.endswith("_" + material_name) or material_name.startswith(set_name + "_")
+
+
+def wire_material(material, channels):
+    tree = material.node_tree
+    output = next((node for node in tree.nodes if node.type == "OUTPUT_MATERIAL" and node.is_active_output), None) if tree else None
+    links = output.inputs["Surface"].links if output else ()
+    # The glTF exporter reads only the active output's Principled BSDF.
+    if not links or links[0].from_node.type != "BSDF_PRINCIPLED":
+        return
+    principled = links[0].from_node
+    for channel, path in channels.items():
+        socket = principled.inputs[CHANNEL_INPUTS[channel]]
+        normal_map = None
+        if channel == "normal" and socket.is_linked and socket.links[0].from_node.type == "NORMAL_MAP":
+            # The FBX importer feeds Normal from a Normal Map node even without a normal texture.
+            normal_map = socket.links[0].from_node
+            socket = normal_map.inputs["Color"]
+        if socket.is_linked:
+            continue
+        image = bpy.data.images.load(str(path), check_existing=True)
+        if channel not in {"base color", "emissive"}:
+            image.colorspace_settings.name = "Non-Color"
+        texture = tree.nodes.new("ShaderNodeTexImage")
+        texture.image = image
+        if channel == "normal" and normal_map is None:
+            normal_map = tree.nodes.new("ShaderNodeNormalMap")
+            tree.links.new(normal_map.outputs["Normal"], socket)
+            socket = normal_map.inputs["Color"]
+        tree.links.new(texture.outputs["Color"], socket)
+        if channel == "emissive" and principled.inputs["Emission Strength"].default_value == 0:
+            # The exporter drops an emissive factor scaled by zero strength.
+            principled.inputs["Emission Strength"].default_value = 1.0
+
+
+def wire_texture_sets(candidates):
+    sets = {}
+    for path in candidates:
+        texture = classify(path.stem)
+        if texture is not None:
+            channels = sets.setdefault(set_key(texture[0]), {})
+            if texture[1] in channels:
+                raise RuntimeError(f"Texture set has two {texture[1]} images: {channels[texture[1]]} and {path}")
+            channels[texture[1]] = path
+    matches = {}
+    for material in bpy.data.materials:
+        nodes = material.node_tree.nodes if material.node_tree else ()
+        textures = [classify(file_stem(node.image.filepath)) for node in nodes if node.type == "TEX_IMAGE" and node.image is not None]
+        linked = {set_key(texture[0]) for texture in textures if texture is not None} & sets.keys()
+        matches[material] = linked or {key for key in sets if names_match(key, set_key(material.name))}
+    if len(sets) == 1 and not any(matches.values()):
+        matches = dict.fromkeys(matches, set(sets))
+    for material, keys in matches.items():
+        channels = {}
+        for key in sorted(keys):
+            for channel, path in sets[key].items():
+                if channel in channels:
+                    raise RuntimeError(f"Material {material.name} matches two {channel} images: {channels[channel]} and {path}")
+                channels[channel] = path
+        wire_material(material, channels)
+
+
+def invert_directx_normals():
+    for image in bpy.data.images:
+        texture = classify(file_stem(image.filepath))
+        if texture is not None and texture[2] and all(image.size):
+            pixels = numpy.empty(len(image.pixels), numpy.float32)
+            image.pixels.foreach_get(pixels)
+            # DirectX normal maps point green down; glTF expects OpenGL's up.
+            pixels[1::image.channels] = 1.0 - pixels[1::image.channels]
+            image.pixels.foreach_set(pixels)
+
+
+def rest_values(slot, fcurve):
+    bone = re.fullmatch(r'pose\.bones\["(?:[^"\\]|\\.)*"\]\.(\w+)', fcurve.data_path)
+    if bone:
+        rest = IDENTITY_TRANSFORM.get(bone[1])
+        return [rest[fcurve.array_index]] if rest else []
+    if slot.target_id_type != "OBJECT" or fcurve.data_path not in IDENTITY_TRANSFORM:
+        return []
+    # An object's rest transform is its own stored transform, which the exporter writes when unanimated.
+    return [getattr(user, fcurve.data_path)[fcurve.array_index] for user in slot.users()]
+
+
+def is_static_action(action):
+    from bpy_extras.anim_utils import action_get_channelbag_for_slot
+
+    for slot in action.slots:
+        channelbag = action_get_channelbag_for_slot(action, slot)
+        for fcurve in channelbag.fcurves if channelbag else ():
+            rests = rest_values(slot, fcurve)
+            if not rests or len(fcurve.modifiers):
+                return False
+            # Handles shape only Bezier segments; the FBX importer's linear keys carry unrelated handles.
+            bezier = any(point.interpolation == "BEZIER" for point in fcurve.keyframe_points)
+            for point in fcurve.keyframe_points:
+                values = (point.co[1], point.handle_left[1], point.handle_right[1]) if bezier else (point.co[1],)
+                if not all(math.isclose(value, rest, rel_tol=1e-5, abs_tol=1e-5) for value in values for rest in rests):
+                    return False
+    return True
+
+
+def drop_static_actions():
+    # The FBX importer makes one action per object of a take, and the exporter writes each as an animation,
+    # so a take that moves nothing would otherwise become one animation per object.
+    for action in list(bpy.data.actions):
+        if is_static_action(action):
+            # The dropped action's content decided the export, so its library is consumed.
+            record_library(action)
+            bpy.data.actions.remove(action)
 
 
 class DependencyExtension:
@@ -126,7 +385,14 @@ def main():
     if bpy.app.version[:2] != (5, 2):
         raise RuntimeError("Only Blender 5.2 LTS is supported")
     source, output, report = map(Path, sys.argv[sys.argv.index("--") + 1:])
-    bpy.ops.wm.open_mainfile(filepath=str(source), load_ui=False, use_scripts=False)
+    load_source(source)
+    candidates = find_candidates(source)
+    # Listing every candidate lets an edited, added or removed image dirty the conversion.
+    dependencies.update(map(str, candidates))
+    relink_missing_images(candidates)
+    wire_texture_sets(candidates)
+    invert_directx_normals()
+    drop_static_actions()
     module_name = "broken_engine_dependencies"
     module = types.ModuleType(module_name)
     module.glTF2ExportUserExtension = DependencyExtension

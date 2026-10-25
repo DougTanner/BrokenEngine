@@ -13,6 +13,12 @@ the asynchronous scene job.
 [ExportJobs/AGENTS.md](ExportJobs/AGENTS.md) owns the decoding/export boundary,
 authored-scene identity, converter freshness, and source/output tracking.
 
+DataPacker trusts a third-party converter's output by default, whether from
+Blender's importers and glTF exporter, Assimp, or any other converter. Only a
+specific value a converter is proven to get wrong is read from the original
+source file instead, and each such override names, at the override site, the
+converter defect it works around.
+
 Each normal command emits a `kInfo` run summary after the single-instance mutex
 is acquired, counting jobs across every export type; a zero-argument command
 emits one summary per project. A dirty type counts as

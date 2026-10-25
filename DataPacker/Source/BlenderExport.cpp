@@ -178,6 +178,16 @@ bool BlenderExportDirty(const std::filesystem::path& rSource, const std::filesys
 				return true;
 			}
 		}
+		// ExportBlenderScene.py records every candidate texture image under the source folder, with the same extensions
+		// compared ignoring case, so a candidate with no recorded dependency was added after conversion.
+		static constexpr std::string_view kpCandidateImageExtensions[] = {".png", ".jpg", ".jpeg", ".tga"};
+		for (const std::filesystem::directory_entry& rEntry : std::filesystem::recursive_directory_iterator(rSource.parent_path()))
+		{
+			if (rEntry.is_regular_file() && std::ranges::contains(kpCandidateImageExtensions, common::ToLower(BlenderPathText(rEntry.path().extension()))) && !std::ranges::contains(marker.at("dependencies"), BlenderDependency(rSource, rEntry.path())))
+			{
+				return true;
+			}
+		}
 		return false;
 	}
 	catch (const std::exception&)

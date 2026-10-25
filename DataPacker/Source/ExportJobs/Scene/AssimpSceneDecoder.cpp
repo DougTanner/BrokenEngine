@@ -653,7 +653,7 @@ AssimpSceneDecoder::AssimpSceneDecoder(const std::filesystem::path& rPath, Scene
 	SceneIOSystem* pIO = new SceneIOSystem(mDependencies);
 	importer.SetIOHandler(pIO);
 	unsigned int uiFlags = aiProcess_Triangulate | aiProcess_GenNormals;
-	if (rPath.extension() == ".obj" || rPath.extension() == ".fbx" || rPath.extension() == ".dae" || rPath.extension() == ".3ds")
+	if (rPath.extension() == ".dae" || rPath.extension() == ".3ds")
 	{
 		uiFlags |= aiProcess_FlipUVs;
 	}
@@ -705,9 +705,7 @@ AssimpSceneDecoder::AssimpSceneDecoder(const std::filesystem::path& rPath, Scene
 		material.f3EmissiveFactor = XMFLOAT3(0.0f, 0.0f, 0.0f);
 		mSourceMaterialShaderDatas.push_back(material);
 	}
-	// FBX's corrected root is in centimeters; Collada's corrected root is already in meters.
-	float fMeters = rPath.extension() == ".fbx" ? 0.01f : 1.0f;
-	XMMATRIX matBasis = XMMatrixScaling(fMeters, fMeters, fMeters) * XMMatrixRotationX(XM_PIDIV2);
+	XMMATRIX matBasis = XMMatrixRotationX(XM_PIDIV2);
 	std::unordered_map<std::string, int64_t> nodeNames;
 	std::vector<XMMATRIX> worldMatrices;
 	if (bHasSkeleton)

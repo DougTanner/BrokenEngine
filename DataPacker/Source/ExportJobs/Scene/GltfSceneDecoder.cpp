@@ -175,6 +175,30 @@ static tinygltf::Model LoadGltfModel(const std::filesystem::path& rPath, bool bB
 	return gltfModel;
 }
 
+// glTF 2.0 draws a primitive with no material with the default material, a material with no properties specified,
+// which a default-constructed tinygltf::Material is.
+static void AssignDefaultMaterial(tinygltf::Model& rGltfModel)
+{
+	int64_t iDefaultMaterial = std::ssize(rGltfModel.materials);
+	bool bDefaultMaterialUsed = false;
+	for (tinygltf::Mesh& rMesh : rGltfModel.meshes)
+	{
+		for (tinygltf::Primitive& rPrimitive : rMesh.primitives)
+		{
+			if (rPrimitive.material == -1)
+			{
+				rPrimitive.material = static_cast<int>(iDefaultMaterial);
+				bDefaultMaterialUsed = true;
+			}
+		}
+	}
+
+	if (bDefaultMaterialUsed)
+	{
+		rGltfModel.materials.emplace_back();
+	}
+}
+
 // Inserts node 0 as the default scene's only root, translating and uniformly scaling the default-pose bounds of every
 // drawn vertex to center (0, 0, 0) with longest extent 2. Node 0 is unanimated: a static export bakes it into its
 // vertices and a skeleton export ships it in its hierarchy. Every existing node reference shifts by one.
@@ -281,6 +305,7 @@ GltfSceneDecoder::GltfSceneDecoder(const std::filesystem::path& rPath, bool bBin
 : mpGltfModel(std::make_unique<tinygltf::Model>(LoadGltfModel(rPath, bBinary)))
 , mSourcePath(rPath.string())
 {
+	AssignDefaultMaterial(*mpGltfModel);
 	CanonicalizeSceneSkin(*mpGltfModel);
 	InsertNormalizationRootNode(*mpGltfModel, mSourcePath);
 
