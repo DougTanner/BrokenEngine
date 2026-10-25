@@ -7,8 +7,7 @@
 namespace engine
 {
 
-struct Cell;
-struct GridCoord;
+struct CellStaticData;
 
 // Global SSBO arena capacity: every subscribed coordinate slot plus the local unconfirmed cell can contribute
 // at most kiMaximumIslandsPerCell placements. Per-template runs are packed contiguously into this shared arena,
@@ -47,7 +46,7 @@ public:
 	// After a device drain.
 	void FreeAllRetiredMeshRanges();
 
-	void UpdateActiveIslands(const std::unordered_map<GridCoord, Cell>& rCells, std::span<const GridCoord> activeCoordinates);
+	void UpdateActiveIslands(std::span<const CellStaticData* const> activeCells);
 
 	Buffer mIslandMeshArena;
 	int64_t miMeshArenaCapacityGeneration = 0;

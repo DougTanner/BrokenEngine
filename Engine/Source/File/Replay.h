@@ -2,6 +2,8 @@
 
 #if defined(BT_SERVER)
 
+#include "File/DifferenceStream.h"
+
 #include "Save/GameSaveLoad.h"
 
 namespace engine

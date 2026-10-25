@@ -4,6 +4,7 @@
 
 #if defined(BT_CLIENT)
 
+#include "File/DifferenceStream.h"
 #include "Frame/FrameBase.h"
 
 #include "Frame/Frame.h"

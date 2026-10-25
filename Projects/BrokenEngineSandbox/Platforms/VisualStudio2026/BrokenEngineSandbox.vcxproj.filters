@@ -1623,6 +1623,9 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientCrashReport.cpp">
       <Filter>Engine\Network\Client</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Graphics\FlightPlaneProjection.cpp">
+      <Filter>Engine\Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Engine\Data\Shaders\Terrain\Terrain.frag">

@@ -65,7 +65,7 @@ public:
 	int64_t miLogIndent = 0;
 	int64_t miLogTickCounter = -1;
 	// True while this thread is executing a deterministic frame tick (set by FrameTickScope at the top
-	// of RunFrameTick). Read to enforce the IslandTerrain Frame Purity Constraint.
+	// of RunFrameTick). Render-only code, such as GlobalElevation and bindless descriptor writes, asserts it is false.
 	bool mbInFrameTick = false;
 
 private:
@@ -128,7 +128,7 @@ private:
 
 // Marks the calling thread as inside a deterministic frame tick for its scope (instantiated at the top
 // of RunFrameTick, which runs on the per-coord dispatch workers and the client reconcile-replay thread).
-// IslandTerrain::GlobalElevation reads the flag to fail fast if the render-only terrain query is ever
+// GlobalElevation reads the flag to fail fast if the render-only terrain query is ever
 // called from frame-tick code (the Frame Purity Constraint). Saves/restores the prior value for nesting
 // safety, mirroring LogTickScope.
 class [[nodiscard]] FrameTickScope

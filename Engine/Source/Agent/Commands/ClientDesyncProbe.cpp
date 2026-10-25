@@ -4,6 +4,7 @@
 
 #include "Agent/Commands/ClientDesyncProbe.h"
 
+#include "File/DifferenceStream.h"
 #include "Network/Client/ReconcileReplay.h"
 
 #include "Network/Client/ClientSession.h"

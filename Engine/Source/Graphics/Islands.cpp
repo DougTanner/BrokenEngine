@@ -189,8 +189,7 @@ void Islands::FreeAllRetiredMeshRanges()
 	mRetiredMeshRanges.clear();
 }
 
-#if !defined(BT_MODEL_VIEWER)
-void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, Cell>& rCells, std::span<const GridCoord> activeCoordinates)
+void Islands::UpdateActiveIslands(std::span<const CellStaticData* const> activeCells)
 {
 	// Write only the framebuffer instance the current frame will consume. miFramebufferIndex was set by the
 	// trailing AcquireNextImage of the prior render (Graphics.cpp); it is the index RenderGlobal reads
@@ -254,18 +253,12 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, Cell>& rCe
 		return engine::gpCamera->InVisibleArea(f4MeshVisibleArea, f4Position, fRadius, fRadius, fRadius, fRadius);
 	};
 
-	// Count each active placement with the frame and visibility predicates used by both emission passes.
+	// Count each active placement, and the mesh-visible ones with the visibility predicate both emission passes use.
 	// Acquire residency and texture slots once per placement; write placements after all per-template bases are known.
-	for (const GridCoord& rCoordinate : activeCoordinates)
+	for (const CellStaticData* pStaticData : activeCells)
 	{
-		auto it = rCells.find(rCoordinate);
-		if (it == rCells.end() || it->second.iSnapshotCount == 0)
-		{
-			continue;
-		}
-
-		const CellStaticData& rStaticData = it->second.staticData;
-		XMFLOAT2 f2Offset = MakeRenderBasis(rCoordinate, engine::gpCamera->mBasisCoordinate).f2Offset;
+		const CellStaticData& rStaticData = *pStaticData;
+		XMFLOAT2 f2Offset = MakeRenderBasis(rStaticData.coordinate, engine::gpCamera->mBasisCoordinate).f2Offset;
 		for (const IslandPlacement& rPlacement : rStaticData.islands)
 		{
 			IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
@@ -337,16 +330,10 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, Cell>& rCe
 
 	// First emission pass packs the mesh-visible prefix for every template. Visible placements receive the
 	// beginning of each template's run so the indirect terrain draw consumes exactly this prefix.
-	for (const GridCoord& rCoordinate : activeCoordinates)
+	for (const CellStaticData* pStaticData : activeCells)
 	{
-		auto it = rCells.find(rCoordinate);
-		if (it == rCells.end() || it->second.iSnapshotCount == 0)
-		{
-			continue;
-		}
-
-		const CellStaticData& rStaticData = it->second.staticData;
-		XMFLOAT2 f2Offset = MakeRenderBasis(rCoordinate, engine::gpCamera->mBasisCoordinate).f2Offset;
+		const CellStaticData& rStaticData = *pStaticData;
+		XMFLOAT2 f2Offset = MakeRenderBasis(rStaticData.coordinate, engine::gpCamera->mBasisCoordinate).f2Offset;
 		for (const IslandPlacement& rPlacement : rStaticData.islands)
 		{
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
@@ -361,16 +348,10 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, Cell>& rCe
 	// template-owned slot without touching residency. Mesh-visible placements always remain in the prefix so
 	// TerrainElevation covers every terrain mesh instance, while the full subscribed set remains available to
 	// ShadowElevation.
-	for (const GridCoord& rCoordinate : activeCoordinates)
+	for (const CellStaticData* pStaticData : activeCells)
 	{
-		auto it = rCells.find(rCoordinate);
-		if (it == rCells.end() || it->second.iSnapshotCount == 0)
-		{
-			continue;
-		}
-
-		const CellStaticData& rStaticData = it->second.staticData;
-		XMFLOAT2 f2Offset = MakeRenderBasis(rCoordinate, engine::gpCamera->mBasisCoordinate).f2Offset;
+		const CellStaticData& rStaticData = *pStaticData;
+		XMFLOAT2 f2Offset = MakeRenderBasis(rStaticData.coordinate, engine::gpCamera->mBasisCoordinate).f2Offset;
 		for (const IslandPlacement& rPlacement : rStaticData.islands)
 		{
 			const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(rPlacement.islandCrc);
@@ -395,8 +376,6 @@ void Islands::UpdateActiveIslands(const std::unordered_map<GridCoord, Cell>& rCe
 	}
 	mLastWrittenCounts.at(iFramebuffer) = iCurrentWrittenTotal;
 }
-
-#endif // !defined(BT_MODEL_VIEWER)
 
 } // namespace engine
 

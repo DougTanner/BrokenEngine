@@ -2,6 +2,7 @@
 
 #include "Game.h"
 #if defined(BT_CLIENT)
+#include "Graphics/Camera.h"
 #include "Network/Client/ClientSession.h"
 #endif
 #if defined(BT_SERVER)
@@ -831,7 +832,7 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 				continue;
 			}
 			// Skip empty-ring coords: RenderFrame(rCoordinate) inside InterpolateFrame asserts iSnapshotCount > 0
-			// (mirrors Islands::UpdateActiveIslands' empty-ring skip).
+			// (mirrors GameBase::UpdateActiveIslands' empty-ring skip).
 			if (!IsCoordinateRenderable(rCoordinate))
 			{
 				continue;
@@ -851,8 +852,20 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 	// holds its last state and mRenderInterpolates.at(cameraCoordinate) would throw on the absent entry.
 	if (bHaveRenderableCamera)
 	{
-		gpCamera->Update(mRenderInterpolates.at(cameraCoordinate), static_cast<float>(mfLastRenderFrameSeconds));
+		UpdateCamera(cameraCoordinate);
 	}
+}
+
+void GameBase::UpdateCamera(GridCoord cameraCoordinate)
+{
+	const game::FrameInterpolate& rFrameInterpolate = mRenderInterpolates.at(cameraCoordinate);
+	bool bMainMenuFrame = mGameFlags & GameFlags::kMainMenu;
+	CameraTarget pulledTarget = static_cast<game::Camera&>(*gpCamera).PullTarget(rFrameInterpolate);
+	gpCamera->Update(rFrameInterpolate, static_cast<float>(mfLastRenderFrameSeconds), bMainMenuFrame, pulledTarget);
+
+	// Vibration follows the shake Update just decayed.
+	float fVibration = std::pow(gpCamera->mfShake, 0.5f);
+	gpRawInputManager->SetVibration(fVibration, fVibration);
 }
 
 bool GameBase::HandleDeferredSwapchain()
@@ -1128,18 +1141,18 @@ void GameBase::ResetSession()
 #if defined(BT_CLIENT)
 void GameBase::UpdateActiveIslands()
 {
-	// Include confirmed cells and the client cell's provisional frame.
-	// The filtered coordinates use per-frame workbuffer storage; Islands::UpdateActiveIslands' nested reservation pops before this arena.
+	// Include confirmed cells and the client cell's provisional frame, skipping empty-ring cells that have nothing rendered.
+	// The filtered static data pointers use per-frame workbuffer storage; Islands::UpdateActiveIslands' nested reservation pops before this arena.
 	common::ScopedWorkbufferArena subscribedArena = common::gpThreadLocal->mWorkbuffer.Push();
 	for (const GridCoord& rCoordinate : mActiveCoordinates)
 	{
 		auto it = mCells.find(rCoordinate);
-		if (it != mCells.end() && (it->second.iConfirmedTick >= 0 || rCoordinate == mClientGridCoordinate))
+		if (it != mCells.end() && (it->second.iConfirmedTick >= 0 || rCoordinate == mClientGridCoordinate) && it->second.iSnapshotCount != 0)
 		{
-			subscribedArena.mBuffer.PushBack<GridCoord>(rCoordinate);
+			subscribedArena.mBuffer.PushBack<const CellStaticData*>(&it->second.staticData);
 		}
 	}
-	gpIslands->UpdateActiveIslands(mCells, subscribedArena.mBuffer.Span<const GridCoord>());
+	gpIslands->UpdateActiveIslands(subscribedArena.mBuffer.Span<const CellStaticData* const>());
 }
 #endif // BT_CLIENT
 

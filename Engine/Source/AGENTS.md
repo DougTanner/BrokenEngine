@@ -25,15 +25,15 @@ Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.
   the game PCH. Preserve its documented include order and existing affinity
   spans. New single-build headers and source files still carry their own
   whole-file `BT_CLIENT` or `BT_SERVER` guard. An engine header that must
-  include a game header stays out of the aggregation and is included directly by
-  its consumers, so game types never reach the shared PCH; the leaf document
-  owning such a header records the deliberate game-type ownership. In gameplay
-  builds, `GameBase.h` is the one aggregated header that includes game headers anyway, recorded here
-  because it has no detail document: it stores two game types by value, so each
-  needs a complete definition — the per-coord tick input from
-  `Frame/FrameInput.h`, and, client only, the per-coord render interpolation
-  `game::FrameInterpolate` from `Frame/Frame.h`. Do not read it as license to
-  add another.
+  include a game header stays out of `Engine.h` and is included directly by its
+  consumers; the leaf document owning such a header records the deliberate
+  game-type ownership. `GameBase.h` is such a header, recorded here because it
+  has no detail document: it stores two game types by value, so each needs a
+  complete definition — the per-coord tick input from `Frame/FrameInput.h`,
+  and, client only, the per-coord render interpolation `game::FrameInterpolate`
+  from `Frame/Frame.h`. Each game's `Pch.h` includes it, and then the generic
+  agent command headers whose interfaces name its types, right after `Engine.h`;
+  that placement is a recorded exception, not license to add another.
 - Switches: `EngineSwitches.h` holds the engine-read compile-time switches that have one value for every program and the `keLogLevel*` compile floors; each program's `Pch.h` (each game's and ModelViewer's) includes it after `Log/LogTypes.h` and before `Common.h`. An engine-read switch whose value differs by program, such as `kbProfileScreens`, is defined in each program's `Pch.h` before those includes.
 - Keep implementation internals out of the aggregation: heavy private state in a
   header `Engine.h` aggregates belongs behind a `std::unique_ptr` and a forward

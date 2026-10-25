@@ -1,6 +1,6 @@
 # File - Runtime I/O and Packed Assets
 
-`FileManager` (`gpFileManager`) owns platform paths, versioned atomic file writes, and packed-asset access through `PackChunks`, a private non-manager engine outside the aggregation header. `Replay` (`gpReplay`) owns server record and playback lifetime. `GridSave.h` and `Replay.h` are the only headers here that include a game header, deliberately.
+`FileManager` (`gpFileManager`) owns platform paths, versioned atomic file writes, and packed-asset access through `PackChunks`, a private non-manager engine outside the aggregation header. `Replay` (`gpReplay`) owns server record and playback lifetime. `GridSave.h` and `Replay.h` are the only headers here that include a game header, deliberately. `DifferenceStream.h` names game frame types, so it stays out of the aggregation header and its users include it directly.
 
 ## File Contracts
 

@@ -234,7 +234,7 @@ void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame
 
 void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 {
-	// Mark this thread as inside a deterministic tick so a stray render-path GlobalElevation/GlobalNormal
+	// Mark this thread as inside a deterministic tick so a stray render-path GlobalElevation
 	// call (which walks mCells with libm trig) fails fast instead of silently desyncing across CPUs.
 	common::FrameTickScope frameTickScope;
 
@@ -274,7 +274,7 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 
 #if defined(BT_CLIENT)
 	// Render-only cache: per-placement flattened query (inverse-rotation sin/cos + template footprint /
-	// heightmap pointer / dims) for GlobalElevation/GlobalNormal (ProjectToBaseHeight). Built here alongside
+	// heightmap pointer / dims) for GlobalElevation (ProjectToBaseHeight). Built here alongside
 	// the elevation grid — placement rotation and template are static for the cell's life — so the render
 	// path does zero hash lookups and zero libm trig per call. The server never calls GlobalElevation, so
 	// skip it there.

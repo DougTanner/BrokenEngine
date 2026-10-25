@@ -138,19 +138,15 @@ public:
 	// that would query.
 	[[nodiscard]] XMVECTOR XM_CALLCONV CellNormal(const CellStaticData& rStaticData, FXMVECTOR vecLocalPosition) const;
 
+	// Render path. Highest elevation of the cell's island placements at rf4Position, local to that cell; sea floor
+	// where no placement covers it.
+	[[nodiscard]] float CellElevation(const CellStaticData& rStaticData, const XMFLOAT4A& rf4Position) const;
+
 	[[nodiscard]] CellElevationSampler XM_CALLCONV MakeCellElevationSampler(const CellStaticData& rStaticData) const;
 
 	// Centered cell-local grids cover the cell's bounding rectangle, with sea floor outside its hexagon; overlapping island
 	// footprints max-blend, matching GlobalElevation.
 	void XM_CALLCONV BuildElevationGrid(const std::vector<IslandPlacement>& rPlacements, std::vector<float>& rOutGrid) const;
-
-	// Render path (engine client — ProjectToBaseHeight). Takes the cell the position is local to plus that
-	// local position, and iterates mCells' immutable islands list; a position (or a GlobalNormal tap)
-	// past the cell edge resolves onto the neighbouring cell. Never touches the per-cell grid, so it never
-	// races the tick-time build. MUST NOT be called from Frame-tick code; use CellElevationSampler::Sample/CellNormal
-	// from a Frame-tick context.
-	[[nodiscard]] float XM_CALLCONV GlobalElevation(GridCoord coord, FXMVECTOR vecLocalPosition) const;
-	[[nodiscard]] XMVECTOR XM_CALLCONV GlobalNormal(GridCoord coord, FXMVECTOR vecLocalPosition) const;
 
 	std::unordered_map<common::crc_t, IslandTemplate> mIslands;
 	std::vector<common::crc_t> mIslandCrcsSorted;

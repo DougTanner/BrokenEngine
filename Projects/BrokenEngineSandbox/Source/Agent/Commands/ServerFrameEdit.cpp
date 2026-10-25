@@ -3,6 +3,7 @@
 #if defined(BT_SERVER)
 
 #include "Agent/Commands/FrameEdit.h"
+#include "File/DifferenceStream.h"
 
 #include "Agent/AgentCommandsServerQueries.h"
 #include "Frame/Collections/Battleships/Battleships.h"

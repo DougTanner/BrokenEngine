@@ -56,7 +56,7 @@ is engine-owned here.
 Engine UI headers stay out of `Engine.h` and are included directly, or through
 the game facade for localization, so tuning edits recompile little. `ChatLog.h`
 is the one exception: `GameBase.h` stores `mChatLog` by value, so it includes
-`ChatLog.h` and carries it into `Engine.h`. Headers compiling into both builds
+`ChatLog.h` and carries it into the game PCH. Headers compiling into both builds
 carry no `BT_CLIENT`/`BT_SERVER` guard: localization, most wrapper storage so
 server-side simulation can read defaults, and the shared menu helper that shared
 game UI code includes on both sides. Client-only ImPlot types and menu panel,

@@ -6,15 +6,9 @@
 #include "Ui/ShadowWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
-#if !defined(BT_MODEL_VIEWER)
-#include "Graphics/Camera.h"
-#include "Game.h"
-#endif
-
 namespace engine
 {
 
-#if !defined(BT_MODEL_VIEWER)
 // Mouse-wheel zoom: per-frame scroll delta nudges target height; current eases toward target
 constexpr float kfEyeHeightPerWheelTick = 0.1f;
 constexpr float kfEyeBlendDuration = 0.35f;
@@ -64,8 +58,6 @@ CameraTarget CameraTarget::Extrapolate()
 	return CameraTarget(Kind::kExtrapolate, XMVectorZero(), XMVectorZero());
 }
 
-#endif // !defined(BT_MODEL_VIEWER)
-
 CameraBase::CameraBase(const CameraSetup& rCameraSetup)
 : common::Singleton<CameraBase>(gpCamera, this)
 {
@@ -73,7 +65,6 @@ CameraBase::CameraBase(const CameraSetup& rCameraSetup)
 	mVecPosition = XMVectorSetZ(rCameraSetup.vecInitialPosition, gpFlightPlanes->Lowest().fHeightMeters);
 }
 
-#if !defined(BT_MODEL_VIEWER)
 void CameraBase::DiscardTrackingCaches()
 {
 	mVecLastKnownTargetPosition = {};
@@ -118,7 +109,7 @@ void CameraBase::ShiftToRenderedCell(GridCoord cameraCoordinate)
 	mVecLastKnownTargetPosition = XMVectorAdd(mVecLastKnownTargetPosition, vecShift);
 }
 
-void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime)
+void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDeltaTime, bool bMainMenuFrame, const CameraTarget& rPulledTarget)
 {
 	// fDeltaTime is the sim-scaled render delta the engine just measured: wall delta multiplied by the active time
 	// ratio (equal to wall time at ratio 1.0). Driving camera blend, shake decay, and mfTime off the same source
@@ -133,8 +124,6 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 	mfShake = std::max(mfShake - fDeltaTime * 2.0f, 0.0f);
 
 	miFrame = rFrameInterpolate.iTick;
-
-	bool bMainMenuFrame = game::gpGame->mGameFlags & GameFlags::kMainMenu;
 
 	if (!bMainMenuFrame)
 	{
@@ -171,10 +160,10 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 		}
 	}
 
-	// Free camera already is the target, so the game camera's PullTarget is not consulted while it drives the pose.
+	// Free camera already is the target, so the caller's pulled target is ignored while it drives the pose.
 	// The look-at sits on the lowest flight plane whatever the target's height, so a climb neither raises the eye nor
 	// widens the Z = 0 visible area.
-	XMVECTOR vecTargetPosition = XMVectorSetZ(ResolveTarget(bFreeCameraActive ? CameraTarget::Direct(mVecPosition) : static_cast<game::Camera&>(*this).PullTarget(rFrameInterpolate)), gpFlightPlanes->Lowest().fHeightMeters);
+	XMVECTOR vecTargetPosition = XMVectorSetZ(ResolveTarget(bFreeCameraActive ? CameraTarget::Direct(mVecPosition) : rPulledTarget), gpFlightPlanes->Lowest().fHeightMeters);
 
 	UpdatePosition(vecTargetPosition, fDeltaTime);
 	UpdateEyeHeight();
@@ -191,13 +180,10 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 	mVecToEyeNormal = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 	mVecEyePosition = XMVectorAdd(mVecPosition, vecEyePositionRelative);
 
-	float fVibration = std::pow(mfShake, 0.5f);
-	gpRawInputManager->SetVibration(fVibration, fVibration);
-
 	CalculateMatricesAndVisibleArea();
 
 	// Decay the visual error offset for smooth reconciliation corrections on the sim-scaled render delta the camera and
-	// entity interpolation use. PullTarget read it above.
+	// entity interpolation use. The caller's PullTarget read it before this update.
 	float fDecay = std::exp(-kfVisualErrorDecayRate * fDeltaTime);
 	mVecVisualErrorOffset = XMVectorScale(mVecVisualErrorOffset, fDecay);
 	if (XMVectorGetX(XMVector3Length(mVecVisualErrorOffset)) < kfVisualErrorMinDistance)
@@ -364,8 +350,6 @@ float XM_CALLCONV CameraBase::AddVisualErrorOffset(FXMVECTOR vecError)
 	return fTotal;
 }
 
-#endif // !defined(BT_MODEL_VIEWER)
-
 XMVECTOR XM_CALLCONV CameraBase::WorldToScreen(FXMVECTOR vecWorldPosition) const
 {
 	// X/Y are screen pixels and Z is projected depth.
@@ -376,7 +360,6 @@ XMVECTOR XM_CALLCONV CameraBase::WorldToScreen(FXMVECTOR vecWorldPosition) const
 	return XMVectorSetW(XMVector3Project(vecWorldPosition, 0.0f, 0.0f, fViewportWidth, fViewportHeight, 0.0f, 1.0f, mMatPerspective, mMatView, XMMatrixIdentity()), 1.0f);
 }
 
-#if !defined(BT_MODEL_VIEWER)
 void CameraBase::CalculateMatricesAndVisibleArea()
 {
 	auto vecToEyeNormal = XMVector3Normalize(XMVectorSubtract(mVecEyePosition, mVecPosition));
@@ -518,8 +501,6 @@ void CameraBase::CalculateMatricesAndVisibleArea()
 	mf4RenderVisibleArea.z = mf4RenderVisibleArea.x + fQuadsX * mf2VisibleAreaQuadSize.x;
 	mf4RenderVisibleArea.w = mf4RenderVisibleArea.y - fQuadsY * mf2VisibleAreaQuadSize.y;
 }
-
-#endif // !defined(BT_MODEL_VIEWER)
 
 } // namespace engine
 

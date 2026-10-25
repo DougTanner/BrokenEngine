@@ -81,9 +81,8 @@ and foreground.
 
 ## Engine integration
 
-`BT_MODEL_VIEWER` is confined to this project. It excludes gameplay host and
-generic agent aggregation, gameplay camera updates and terrain cell queries,
-and sandbox screen ownership. The viewer `Pch.h` sets `kbAudioStreamingHarnessRig`
+`BT_MODEL_VIEWER` is confined to this project. It excludes sandbox screen
+ownership. The viewer `Pch.h` sets `kbAudioStreamingHarnessRig`
 and `kbProfileScreens` to `false`. Keep ordinary engine profiling collection,
 Graphics lifecycle and local crash reporting without network upload.
 The viewer supplies a presentation frame, camera matrices and sun input,

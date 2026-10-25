@@ -284,6 +284,10 @@ public:
 	// Frame-head skip check shared by Render() and the Main.cpp boot render loop; true means skip this frame.
 	bool HandleDeferredSwapchain();
 
+	// Pulls the game camera's target, runs the display-rate camera update for the coord the camera renders, and sets
+	// controller vibration from the decayed shake; shared by Render() and the Main.cpp boot render.
+	void UpdateCamera(GridCoord cameraCoordinate);
+
 private:
 
 	void UpdateActiveIslands();

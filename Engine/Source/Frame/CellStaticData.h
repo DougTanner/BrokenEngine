@@ -46,7 +46,7 @@ struct CellStaticData
 	// kiElevationGridDimension^2 when populated.
 	mutable std::vector<float> elevationGrid;
 
-	// Client-only queries for GlobalElevation/GlobalNormal (ProjectToBaseHeight), index-parallel to islands.
+	// Client-only queries for GlobalElevation (ProjectToBaseHeight), index-parallel to islands.
 	// RunFrameTick caches each placement's inverse rotation and template footprint, heightmap pointer and dimensions
 	// alongside elevationGrid, avoiding per-island hash lookups and trigonometry. Placement edits clear the cache;
 	// the next tick rebuilds an empty cache. It is derived from placements and shared templates and never serialized.

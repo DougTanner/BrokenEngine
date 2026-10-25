@@ -54,28 +54,29 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
 
 ## World and Camera Contracts
 
-- In gameplay builds, `engine::CameraBase` (`CameraBase.h`) owns the whole generic camera: matrices,
+- `engine::CameraBase` (`CameraBase.h`) owns the whole generic camera: matrices,
   world/screen projection, visible-area LOD, grid-snapped render extents, and
   the display-rate update — target resolution, jump/chase, Hermite zoom,
-  texel-height references, shake, vibration, and sun angle. In every
-  program, `CameraBase` also holds the world-space sun rotation, identity
-  unless the host writes it, applied after the Normal Tilt. It registers and
-  clears the single `engine::gpCamera` global. Game code derives one final
-  `game::Camera` from it, the only camera ever constructed, and supplies only
-  policy — `PullTarget` and `SunAngle` — as non-virtual members the engine calls
-  by name through a `static_cast` to `game::Camera`; the engine update reads the
-  main menu from the session's `GameBase::mGameFlags`, takes `const
-  FrameInterpolateBase&` plus the sim-scaled render delta, and never names a
-  game frame type. The camera also owns the reconciliation visual-error offset,
-  client render state outside the CRC: `AddVisualErrorOffset` accumulates it,
-  and the update decays it after `PullTarget` has read it. A tracked target's
-  raw position updates the tracking velocity and last-known position; the offset
-  is added only to the resolved target. The engine places the initial position
-  and every resolved target, free camera included, on the lowest flight plane,
-  so the look-at always lies on it and a target's height never moves the eye or
-  the visible area; `PullTarget` supplies no height policy.
-- Camera position, easing, shake, and visual timers advance from the sim-scaled render delta the caller passes to `CameraBase::Update` (wall delta multiplied by the active time ratio; equal to wall time at ratio 1.0). Sun angle advances from the interpolate frame's own delta and pauses in the main menu. Debug free-camera motion is main-menu-only and drives the pose directly instead of consulting `PullTarget`.
-- Long-distance target changes use a bounded smoothstep jump that may re-anchor from the current position; normal tracking tightens with camera height. Mouse-wheel input updates a persisted, clamped eye-height target, with height and velocity re-anchored while scrolling so repeated input stays smooth; the gameplay zoom ceiling is not a texel-grid boundary. Damage-driven shake decays here and drives controller vibration.
+  texel-height references, shake, and sun angle. `CameraBase` also holds the
+  world-space sun rotation, identity unless the host writes it, applied after
+  the Normal Tilt. It registers and clears the single `engine::gpCamera` global.
+  Game code derives one final `game::Camera` from it, the only camera ever
+  constructed, and supplies only policy — `PullTarget` and `SunAngle` — as
+  non-virtual members the engine calls by name through a `static_cast` to
+  `game::Camera`. `CameraBase::Update` names no game type: the gameplay host's
+  `GameBase::UpdateCamera` reads the main menu from `GameBase::mGameFlags`,
+  pulls the target, and passes both with the interpolate frame and the
+  sim-scaled render delta. The camera also owns the reconciliation visual-error
+  offset, client render state outside the CRC: `AddVisualErrorOffset`
+  accumulates it, and the update decays it after `PullTarget` has read it. A
+  tracked target's raw position updates the tracking velocity and last-known
+  position; the offset is added only to the resolved target. The engine places
+  the initial position and every resolved target, free camera included, on the
+  lowest flight plane, so the look-at always lies on it and a target's height
+  never moves the eye or the visible area; `PullTarget` supplies no height
+  policy.
+- Camera position, easing, shake, and visual timers advance from the sim-scaled render delta the caller passes to `CameraBase::Update` (wall delta multiplied by the active time ratio; equal to wall time at ratio 1.0). Sun angle advances from the interpolate frame's own delta and pauses in the main menu. Debug free-camera motion is main-menu-only and drives the pose directly, ignoring the pulled target.
+- Long-distance target changes use a bounded smoothstep jump that may re-anchor from the current position; normal tracking tightens with camera height. Mouse-wheel input updates a persisted, clamped eye-height target, with height and velocity re-anchored while scrolling so repeated input stays smooth; the gameplay zoom ceiling is not a texel-grid boundary. Damage-driven shake decays here; after the update, `GameBase::UpdateCamera` sets controller vibration from the decayed shake.
 - The camera works entirely in the local frame of the cell it is rendering,
   building its presentation basis with `MakeRenderBasis` (`CameraBase.h`). The
   rebasing rule every client conversion point follows is in Frame

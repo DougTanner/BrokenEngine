@@ -4,10 +4,6 @@
 #include "Frame/CellStaticData.h"
 #include "Frame/IslandChainPlacement.h"
 
-#if !defined(BT_MODEL_VIEWER)
-#include "Game.h"
-#endif
-
 namespace engine
 {
 
@@ -232,32 +228,6 @@ void IslandTerrain::WaitForElevationMaps()
 #endif
 }
 
-#if !defined(BT_MODEL_VIEWER)
-// Re-home a cell-local position that has stepped outside its cell onto the neighbouring cell that contains
-// it, rewriting both the coord and the local XY. GlobalElevation's callers hand in a position local to the
-// basis coord, and GlobalNormal's taps can cross the edge. Each step moves to the crossed edge's neighbour with the
-// nearest center, which shortens the local position, then nudges the landing so a rounding residue cannot step back
-// and forth across one edge or vertex. Returns false when a neighbour would leave the signed-int32 identity range, so
-// an edge cell reports sea floor instead of wrapping to the far side.
-static bool ResolveLocalPosition(GridCoord& rCoord, XMFLOAT4A& rf4Local)
-{
-	XMVECTOR vecLocal = XMLoadFloat4A(&rf4Local);
-	while (!IsInsideCell(vecLocal))
-	{
-		const common::HexDirection& rDirection = kCellDirections.pEntries[CellExitDirection(vecLocal)];
-		if (!TryAddGridCoordinate(rCoord, rDirection.iDeltaQ, rDirection.iDeltaR, rCoord))
-		{
-			return false;
-		}
-
-		vecLocal = NudgeIntoCell(XMVectorSubtract(vecLocal, XMLoadFloat2(&rDirection.f2CenterOffset)));
-	}
-
-	XMStoreFloat4A(&rf4Local, vecLocal);
-	return true;
-}
-#endif // !defined(BT_MODEL_VIEWER)
-
 template <bool MULTIPLY_UV, bool HOISTED_HEIGHTMAP_MAXIMUM>
 static bool SamplePlacementHeightmap(float fDeltaX, float fDeltaY, float fCosine, float fSine, float fFootprintX, float fFootprintY, float fHalfX, float fHalfY, const uint16_t* puiHeightmapHalf, int64_t iHeightmapWidth, int64_t iHeightmapHeight, float fInverseFootprintX, float fInverseFootprintY, float fHeightmapMaximumU, float fHeightmapMaximumV, float& rfSample)
 {
@@ -324,15 +294,13 @@ static XMVECTOR NormalFromElevation(FXMVECTOR vecPosition, float fDistance, ELEV
 	return XMVector3Normalize(XMVector3Cross(XMVectorSubtract(vecTopRight, vecBottomLeft), XMVectorSubtract(vecTopLeft, vecBottomRight)));
 }
 
-#if !defined(BT_MODEL_VIEWER)
-// CellElevation shares MAX elevation over a resolved cell between GlobalElevation and GlobalNormal; the
-// latter reuses cell resolution across four taps. Hull-based placement permits overlapping footprint
-// rectangles, so the highest terrain wins, matching the GPU prepass and remaining order-independent and
-// deterministic. BuildRenderPlacementCache stores inverse rotation, footprint, and heightmap data in
-// island-parallel queries, avoiding per-island hashes and trig. Placement edits clear the cache, which
+// CellElevation takes the MAX elevation over a resolved cell for GlobalElevation. Hull-based placement permits
+// overlapping footprint rectangles, so the highest terrain wins, matching the GPU prepass and remaining
+// order-independent and deterministic. BuildRenderPlacementCache stores inverse rotation, footprint, and heightmap
+// data in island-parallel queries, avoiding per-island hashes and trig. Placement edits clear the cache, which
 // can lag RunFrameTick's rebuild by one tick; the server never builds it. Until available, reconstruct
 // each query from placement/template with inline trig and one mIslands.at lookup.
-static float CellElevation(const IslandTerrain& rTerrain, const CellStaticData& rStaticData, const XMFLOAT4A& rf4Position)
+float IslandTerrain::CellElevation(const CellStaticData& rStaticData, const XMFLOAT4A& rf4Position) const
 {
 	const std::vector<IslandPlacement>& rIslands = rStaticData.islands;
 	const std::vector<IslandRenderQuery>& rQueries = rStaticData.islandRenderQueries;
@@ -341,7 +309,7 @@ static float CellElevation(const IslandTerrain& rTerrain, const CellStaticData& 
 	// Reused across the fallback path's iterations (every field overwritten before use each time), so the
 	// common cache-hit path constructs nothing per island.
 	IslandRenderQuery fallbackQuery;
-	float fMaximumElevation = rTerrain.mfSeaFloorElevation;
+	float fMaximumElevation = mfSeaFloorElevation;
 	for (int64_t i = 0; i < std::ssize(rIslands); ++i)
 	{
 		const IslandRenderQuery* pQuery = nullptr;
@@ -352,7 +320,7 @@ static float CellElevation(const IslandTerrain& rTerrain, const CellStaticData& 
 		else
 		{
 			const IslandPlacement& rPlacement = rIslands.at(i);
-			const IslandTemplate& rTemplate = rTerrain.mIslands.at(rPlacement.islandCrc);
+			const IslandTemplate& rTemplate = mIslands.at(rPlacement.islandCrc);
 			fallbackQuery.fCosine = std::cos(-rPlacement.fRotation);
 			fallbackQuery.fSine = std::sin(-rPlacement.fRotation);
 			fallbackQuery.f2WorldPosition = rPlacement.f2WorldPosition;
@@ -378,32 +346,6 @@ static float CellElevation(const IslandTerrain& rTerrain, const CellStaticData& 
 
 	return fMaximumElevation;
 }
-
-float XM_CALLCONV IslandTerrain::GlobalElevation(GridCoord coord, FXMVECTOR vecLocalPosition) const
-{
-	// Frame Purity Constraint (IslandTerrain.h): GlobalElevation/GlobalNormal walk mCells with
-	// libm trig and must never run from frame-tick code — the sim hot path uses CellElevationSampler::Sample/CellNormal.
-	ASSERT(common::gpThreadLocal != nullptr && !common::gpThreadLocal->mbInFrameTick);
-
-	XMFLOAT4A f4Local {};
-	XMStoreFloat4A(&f4Local, vecLocalPosition);
-
-	if (!ResolveLocalPosition(coord, f4Local))
-	{
-		return mfSeaFloorElevation;
-	}
-
-	// Look up per-cell placements. Cells outside the simulated set fall through to sea floor.
-	auto it = game::gpGame->mCells.find(coord);
-	if (it == game::gpGame->mCells.end())
-	{
-		return mfSeaFloorElevation;
-	}
-
-	return CellElevation(*this, it->second.staticData, f4Local);
-}
-
-#endif // !defined(BT_MODEL_VIEWER)
 
 // Splat one island placement's heightmap into the per-cell elevation grid (max-blend over the rotated
 // footprint). Pure deterministic computation — the grid feeds CellElevationSampler::Sample, which steers CRC'd sim
@@ -521,8 +463,8 @@ float XM_CALLCONV CellElevationSampler::Sample(FXMVECTOR vecLocalPosition) const
 
 XMVECTOR XM_CALLCONV IslandTerrain::CellNormal(const CellStaticData& rStaticData, FXMVECTOR vecLocalPosition) const
 {
-	// 4-tap finite-difference over CellElevationSampler::Sample. Same baseline as GlobalNormal so contour-following
-	// AI behaves identically — only the elevation source changes.
+	// 4-tap finite-difference over CellElevationSampler::Sample, each tap offset +/-2 units on X and Y (2 m, since
+	// islands use 1 m = 1 engine unit); that spacing captures normals without falling below per-pixel heightmap noise.
 	float fDistance = 2.0f;
 
 	return NormalFromElevation(vecLocalPosition, fDistance, [&](FXMVECTOR vecTap)
@@ -530,51 +472,5 @@ XMVECTOR XM_CALLCONV IslandTerrain::CellNormal(const CellStaticData& rStaticData
 		return MakeCellElevationSampler(rStaticData).Sample(vecTap);
 	});
 }
-
-#if !defined(BT_MODEL_VIEWER)
-XMVECTOR XM_CALLCONV IslandTerrain::GlobalNormal(GridCoord coord, FXMVECTOR vecLocalPosition) const
-{
-	// Frame Purity Constraint (see GlobalElevation): must never run from frame-tick code. GlobalNormal
-	// resolves cells itself (batching the 4 taps' lookups below) rather than routing each tap through
-	// GlobalElevation, so it carries its own guard.
-	ASSERT(common::gpThreadLocal != nullptr && !common::gpThreadLocal->mbInFrameTick);
-
-	// 4-tap finite-difference over the terrain elevation. Each tap resolves its own cell/island list, so a
-	// single fixed baseline works across multiple islands at different scales. The 2-unit cross-tap baseline
-	// (1 meter per half-step, since islands use 1 m = 1 engine unit) is fine-grained enough to capture
-	// normals without falling below per-pixel heightmap noise.
-	float fDistance = 2.0f;
-
-	// The 4 taps sit ±fDistance around the center, so they almost always land in the same cell. Resolve the
-	// cell (hash lookup + island/query list) once and cache it, re-resolving only when a tap crosses into a
-	// neighbor cell — collapsing 4 hash lookups + 4 list walks to ~1 in the common case. Same per-tap
-	// arithmetic and cell mapping as GlobalElevation, so results are identical.
-	bool bHaveCachedCoord = false;
-	GridCoord cachedCoord {};
-	const CellStaticData* pCachedStaticData = nullptr;
-
-	auto SampleElevation = [&](FXMVECTOR vecTap) -> float
-	{
-		XMFLOAT4A f4Tap {};
-		XMStoreFloat4A(&f4Tap, vecTap);
-		GridCoord tapCoord = coord;
-		if (!ResolveLocalPosition(tapCoord, f4Tap))
-		{
-			return mfSeaFloorElevation;
-		}
-		if (!bHaveCachedCoord || tapCoord != cachedCoord)
-		{
-			auto it = game::gpGame->mCells.find(tapCoord);
-			pCachedStaticData = it == game::gpGame->mCells.end() ? nullptr : &it->second.staticData;
-			cachedCoord = tapCoord;
-			bHaveCachedCoord = true;
-		}
-		return pCachedStaticData == nullptr ? mfSeaFloorElevation : CellElevation(*this, *pCachedStaticData, f4Tap);
-	};
-
-	return NormalFromElevation(vecLocalPosition, fDistance, SampleElevation);
-}
-
-#endif // !defined(BT_MODEL_VIEWER)
 
 } // namespace engine
