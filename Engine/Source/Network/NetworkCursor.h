@@ -69,8 +69,8 @@ inline XMVECTOR ReadVector4(const uint8_t*& rpCursor)
 inline GridCoord ReadGridCoord(const uint8_t*& rpCursor)
 {
 	GridCoord gridCoordinate {};
-	gridCoordinate.iX = ReadInt32(rpCursor);
-	gridCoordinate.iY = ReadInt32(rpCursor);
+	gridCoordinate.iQ = ReadInt32(rpCursor);
+	gridCoordinate.iR = ReadInt32(rpCursor);
 	return gridCoordinate;
 }
 
@@ -143,14 +143,14 @@ inline void WriteVector4(uint8_t*& rpCursor, XMVECTOR vecValue)
 
 inline void WriteGridCoord(uint8_t*& rpCursor, GridCoord gridCoordinate)
 {
-	WriteInt32(rpCursor, gridCoordinate.iX);
-	WriteInt32(rpCursor, gridCoordinate.iY);
+	WriteInt32(rpCursor, gridCoordinate.iQ);
+	WriteInt32(rpCursor, gridCoordinate.iR);
 }
 
 inline void WriteGridCoord(common::Workbuffer& rWorkbuffer, GridCoord gridCoordinate)
 {
-	rWorkbuffer.PushBack<int32_t>(gridCoordinate.iX);
-	rWorkbuffer.PushBack<int32_t>(gridCoordinate.iY);
+	rWorkbuffer.PushBack<int32_t>(gridCoordinate.iQ);
+	rWorkbuffer.PushBack<int32_t>(gridCoordinate.iR);
 }
 
 template <typename T>

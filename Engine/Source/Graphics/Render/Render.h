@@ -55,18 +55,17 @@ inline WorldSizedTexelArea XM_CALLCONV ComputeWorldSizedTexelArea(float fHeadroo
 
 // Retained world rectangles (shadow and lighting history, and the held visible area) are expressed in the camera
 // cell's frame, so they follow the camera when it changes cell. The whole-cell step keeps GPU history usable for the
-// one-cell case the 3x3 subscription allows; a larger step leaves no overlap, so the owner resets instead.
+// edge-neighbour step the subscription ring allows; a larger step leaves no overlap, so the owner resets instead.
 struct RetainedAreaBasis
 {
 	GridCoord coordinate {};
 
 	[[nodiscard]] std::optional<XMFLOAT2> Advance(GridCoord cameraCoordinate)
 	{
-		int64_t iStepX = static_cast<int64_t>(cameraCoordinate.iX) - static_cast<int64_t>(coordinate.iX);
-		int64_t iStepY = static_cast<int64_t>(cameraCoordinate.iY) - static_cast<int64_t>(coordinate.iY);
+		int64_t iStepDistance = GridDistance(coordinate, cameraCoordinate);
 		XMFLOAT2 f2Offset = MakeRenderBasis(coordinate, cameraCoordinate).f2Offset;
 		coordinate = cameraCoordinate;
-		if (iStepX < -1 || iStepX > 1 || iStepY < -1 || iStepY > 1)
+		if (iStepDistance > 1)
 		{
 			return std::nullopt;
 		}

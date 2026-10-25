@@ -118,7 +118,7 @@ void ClientSession::ApplyOwnedEntityEvent(const engine::ReceivedOwnedEntityEvent
 	// Spawned and ChangedCell each carry the assignment.
 	if (!((rEvent.globalId.iValue != 0) && std::ranges::contains(gpGame->mClientOwnedEntityIdentifiers, rEvent.globalId)))
 	{
-		LOG(kNetwork, kVerbose, "OwnedEntityEvent kAssigned NewGlobalId: {} NewCoord: ({},{}) FocusedGlobalId: {} FocusedCoord: ({},{})", rEvent.globalId, rEvent.coordinate.iX, rEvent.coordinate.iY, gpGame->ClientOwnedEntityIdentifier(), gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY);
+		LOG(kNetwork, kVerbose, "OwnedEntityEvent kAssigned NewGlobalId: {} NewCoord: ({},{}) FocusedGlobalId: {} FocusedCoord: ({},{})", rEvent.globalId, rEvent.coordinate.iQ, rEvent.coordinate.iR, gpGame->ClientOwnedEntityIdentifier(), gpGame->mClientGridCoordinate.iQ, gpGame->mClientGridCoordinate.iR);
 		gpGame->AddClientOwnedEntity(rEvent.globalId, rEvent.coordinate);
 	}
 	mpRuntime->UpdateDesiredCoordinates(ToString(SubscriptionChangeReason::kAssigned));

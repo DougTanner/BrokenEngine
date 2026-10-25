@@ -19,8 +19,11 @@ constexpr float kfHugeIslandAreaMeters = 120'000.0f;   // 1x1     = 400x400 = 16
 constexpr float kfLargeIslandAreaMeters = 48'000.0f;   // 2x1/3x1 strips    = 53k-80k
 constexpr float kfMediumIslandAreaMeters = 16'000.0f;  // mid tiles; 4x4 (10k) falls below -> Small
 
-constexpr float kfGridPitchX = kfCellWidth / static_cast<float>(kiElevationGridDimension);
-constexpr float kfGridPitchY = kfCellHeight / static_cast<float>(kiElevationGridDimension);
+// The elevation grid spans the cell's bounding rectangle.
+constexpr float kfGridPitchX = 2.0f * kfCellHalfWidth / static_cast<float>(kiElevationGridDimension);
+constexpr float kfGridPitchY = 2.0f * kfCellHalfHeight / static_cast<float>(kiElevationGridDimension);
+constexpr float kfCellOriginX = -kfCellHalfWidth;
+constexpr float kfCellOriginY = -kfCellHalfHeight;
 
 IslandTerrain::IslandTerrain()
 : common::Singleton<IslandTerrain>(gpIslandTerrain, this)
@@ -232,25 +235,25 @@ void IslandTerrain::WaitForElevationMaps()
 #if !defined(BT_MODEL_VIEWER)
 // Re-home a cell-local position that has stepped outside its cell onto the neighbouring cell that contains
 // it, rewriting both the coord and the local XY. GlobalElevation's callers hand in a position local to the
-// basis coord, and GlobalNormal's taps can cross the edge. Returns false when the neighbour would leave the
-// signed-int32 identity range, so an edge cell reports sea floor instead of wrapping to the far side.
+// basis coord, and GlobalNormal's taps can cross the edge. Each step moves to the crossed edge's neighbour with the
+// nearest center, which shortens the local position, then nudges the landing so a rounding residue cannot step back
+// and forth across one edge or vertex. Returns false when a neighbour would leave the signed-int32 identity range, so
+// an edge cell reports sea floor instead of wrapping to the far side.
 static bool ResolveLocalPosition(GridCoord& rCoord, XMFLOAT4A& rf4Local)
 {
-
-	int64_t iStepX = static_cast<int64_t>(std::floor((rf4Local.x - kfBaseAreaMinimumX) / kfCellWidth));
-	int64_t iStepY = static_cast<int64_t>(std::floor((rf4Local.y - kfBaseAreaMinimumY) / kfCellHeight));
-	if (iStepX == 0 && iStepY == 0)
+	XMVECTOR vecLocal = XMLoadFloat4A(&rf4Local);
+	while (!IsInsideCell(vecLocal))
 	{
-		return true;
+		const common::HexDirection& rDirection = kCellDirections.pEntries[CellExitDirection(vecLocal)];
+		if (!TryAddGridCoordinate(rCoord, rDirection.iDeltaQ, rDirection.iDeltaR, rCoord))
+		{
+			return false;
+		}
+
+		vecLocal = NudgeIntoCell(XMVectorSubtract(vecLocal, XMLoadFloat2(&rDirection.f2CenterOffset)));
 	}
 
-	if (!TryAddGridCoordinate(rCoord, iStepX, iStepY, rCoord))
-	{
-		return false;
-	}
-
-	rf4Local.x -= static_cast<float>(iStepX) * kfCellWidth;
-	rf4Local.y -= static_cast<float>(iStepY) * kfCellHeight;
+	XMStoreFloat4A(&rf4Local, vecLocal);
 	return true;
 }
 #endif // !defined(BT_MODEL_VIEWER)
@@ -405,7 +408,9 @@ float XM_CALLCONV IslandTerrain::GlobalElevation(GridCoord coord, FXMVECTOR vecL
 // Splat one island placement's heightmap into the per-cell elevation grid (max-blend over the rotated
 // footprint). Pure deterministic computation — the grid feeds CellElevationSampler::Sample, which steers CRC'd sim
 // positions, so client and server must build a bit-identical grid. Every position is centered cell-local
-// meters, so grid texel 0,0 sits at the cell's south-west corner, the constant (kfBaseAreaMinimumX, kfBaseAreaMinimumY).
+// meters, so grid texel 0,0 sits at the bounding rectangle's south-west corner, (kfCellOriginX, kfCellOriginY). A
+// texel whose center lies outside the cell's hexagon belongs to a neighbouring cell and keeps the sea floor, because a
+// footprint rectangle can extend past its placement's hull.
 static void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const IslandTemplate& rTemplate, std::vector<float>& rOutGrid)
 {
 	float fFootprintX = rTemplate.fQuadFootprintX;
@@ -429,10 +434,10 @@ static void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const Isla
 	float fAxisAlignedBoundingBoxMaximumY = rPlacement.f2WorldPosition.y + fAxisAlignedBoundingBoxHalfY;
 
 	// Clamp AABB to this cell's grid index range. Texel center at (ix + 0.5) * pitch.
-	int64_t iMinimumGridX = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMinimumX - kfBaseAreaMinimumX) / kfGridPitchX - 0.5f));
-	int64_t iMaximumGridX = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMaximumX - kfBaseAreaMinimumX) / kfGridPitchX - 0.5f));
-	int64_t iMinimumGridY = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMinimumY - kfBaseAreaMinimumY) / kfGridPitchY - 0.5f));
-	int64_t iMaximumGridY = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMaximumY - kfBaseAreaMinimumY) / kfGridPitchY - 0.5f));
+	int64_t iMinimumGridX = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMinimumX - kfCellOriginX) / kfGridPitchX - 0.5f));
+	int64_t iMaximumGridX = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMaximumX - kfCellOriginX) / kfGridPitchX - 0.5f));
+	int64_t iMinimumGridY = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMinimumY - kfCellOriginY) / kfGridPitchY - 0.5f));
+	int64_t iMaximumGridY = static_cast<int64_t>(std::floor((fAxisAlignedBoundingBoxMaximumY - kfCellOriginY) / kfGridPitchY - 0.5f));
 	iMinimumGridX = std::clamp(iMinimumGridX, 0i64, kiElevationGridDimension - 1);
 	iMaximumGridX = std::clamp(iMaximumGridX, 0i64, kiElevationGridDimension - 1);
 	iMinimumGridY = std::clamp(iMinimumGridY, 0i64, kiElevationGridDimension - 1);
@@ -445,14 +450,18 @@ static void BlendPlacementIntoGrid(const IslandPlacement& rPlacement, const Isla
 
 	for (int64_t j = iMinimumGridY; j <= iMaximumGridY; ++j)
 	{
-		float fTexelY = kfBaseAreaMinimumY + (static_cast<float>(j) + 0.5f) * kfGridPitchY;
+		float fTexelY = kfCellOriginY + (static_cast<float>(j) + 0.5f) * kfGridPitchY;
 		float fDeltaY = fTexelY - rPlacement.f2WorldPosition.y;
 		for (int64_t i = iMinimumGridX; i <= iMaximumGridX; ++i)
 		{
-			float fTexelX = kfBaseAreaMinimumX + (static_cast<float>(i) + 0.5f) * kfGridPitchX;
+			float fTexelX = kfCellOriginX + (static_cast<float>(i) + 0.5f) * kfGridPitchX;
 			float fDeltaX = fTexelX - rPlacement.f2WorldPosition.x;
 			float fSample = 0.0f;
 			if (!SamplePlacementHeightmap<true, true>(fDeltaX, fDeltaY, fCosine, fSine, fFootprintX, fFootprintY, fHalfX, fHalfY, rTemplate.puiHeightmapHalf, rTemplate.iHeightmapWidth, rTemplate.iHeightmapHeight, fInverseFootprintX, fInverseFootprintY, fHeightmapMaximumU, fHeightmapMaximumV, fSample))
+			{
+				continue;
+			}
+			if (!IsInsideCell(XMVectorSet(fTexelX, fTexelY, 0.0f, 1.0f)))
 			{
 				continue;
 			}
@@ -498,8 +507,8 @@ float XM_CALLCONV CellElevationSampler::Sample(FXMVECTOR vecLocalPosition) const
 	XMFLOAT4A f4Position {};
 	XMStoreFloat4A(&f4Position, vecLocalPosition);
 
-	float fGridX = f4Position.x - kfBaseAreaMinimumX;
-	float fGridY = f4Position.y - kfBaseAreaMinimumY;
+	float fGridX = f4Position.x - kfCellOriginX;
+	float fGridY = f4Position.y - kfCellOriginY;
 	int64_t iGridX = static_cast<int64_t>(std::floor(fGridX / kfGridPitchX));
 	int64_t iGridY = static_cast<int64_t>(std::floor(fGridY / kfGridPitchY));
 	if (iGridX < 0 || iGridX >= kiElevationGridDimension || iGridY < 0 || iGridY >= kiElevationGridDimension)

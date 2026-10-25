@@ -44,19 +44,15 @@ void ReconcileUpdateClientState(std::span<const engine::CoordWork> works, bool b
 						continue;
 					}
 
-					if (std::abs(rRequest.iDeltaX) > 1 || std::abs(rRequest.iDeltaY) > 1) [[unlikely]]
-					{
-						LOG(kDefault, kError, "ReconcileUpdateClientState Transfer delta spans more than one grid cell Tick: {} Source: ({},{}) Delta: ({},{}) GlobalId: {}", rFrame.interpolate.iTick, rWork.coord.iX, rWork.coord.iY, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), clientState.clientGlobalIdentifier);
-						DEBUG_BREAK();
-					}
 					// Checked exactly like the server's transfer destination, so a cell at a numeric coordinate edge
 					// follows the server in having no outward neighbour instead of wrapping to the far side.
+					const common::HexDirection& rDirection = engine::kCellDirections.pEntries[rRequest.iDirection];
 					engine::GridCoord destination {};
-					if (!engine::TryAddGridCoordinate(rWork.coord, rRequest.iDeltaX, rRequest.iDeltaY, destination)) [[unlikely]]
+					if (!engine::TryAddGridCoordinate(rWork.coord, rDirection.iDeltaQ, rDirection.iDeltaR, destination)) [[unlikely]]
 					{
 						continue;
 					}
-					LOG(kNetwork, kVerbose, "ReconcileUpdateClientState {} GlobalId: {} Source: ({},{}) Dest: ({},{})", StatusChangeTypeName(rRequest.change.eType), clientState.clientGlobalIdentifier, rWork.coord.iX, rWork.coord.iY, destination.iX, destination.iY);
+					LOG(kNetwork, kVerbose, "ReconcileUpdateClientState {} GlobalId: {} Source: ({},{}) Direction: {} Dest: ({},{})", StatusChangeTypeName(rRequest.change.eType), clientState.clientGlobalIdentifier, rWork.coord.iQ, rWork.coord.iR, static_cast<int64_t>(rRequest.iDirection), destination.iQ, destination.iR);
 					// The carried hull: armor for Omnis, health for Fighters and Battleships.
 					clientState.fPreviousClientArmor = std::visit([](const auto& rData) -> float
 					{

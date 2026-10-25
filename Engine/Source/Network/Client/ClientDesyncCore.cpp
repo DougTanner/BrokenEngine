@@ -49,17 +49,17 @@ void ClientDesyncCore::PollDebugFrameResponse()
 
 	if (pDebugFrame->iTick != mDesyncDebugState.iTick)
 	{
-		LOG(kNetwork, kDebug, "ClientDesyncCore::PollDebugFrameResponse Ignoring non-matching response Frame: {} Coord: ({},{}) Expected Frame: {} Coord: ({},{})", pDebugFrame->iTick, pDebugFrame->coordinate.iX, pDebugFrame->coordinate.iY, mDesyncDebugState.iTick, mDesyncDebugState.coord.iX, mDesyncDebugState.coord.iY);
+		LOG(kNetwork, kDebug, "ClientDesyncCore::PollDebugFrameResponse Ignoring non-matching response Frame: {} Coord: ({},{}) Expected Frame: {} Coord: ({},{})", pDebugFrame->iTick, pDebugFrame->coordinate.iQ, pDebugFrame->coordinate.iR, mDesyncDebugState.iTick, mDesyncDebugState.coord.iQ, mDesyncDebugState.coord.iR);
 		return;
 	}
 
 	if (pDebugFrame->coordinate != mDesyncDebugState.coord)
 	{
-		LOG(kNetwork, kDebug, "ClientDesyncCore::PollDebugFrameResponse Ignoring non-matching response Frame: {} Coord: ({},{}) Expected Frame: {} Coord: ({},{})", pDebugFrame->iTick, pDebugFrame->coordinate.iX, pDebugFrame->coordinate.iY, mDesyncDebugState.iTick, mDesyncDebugState.coord.iX, mDesyncDebugState.coord.iY);
+		LOG(kNetwork, kDebug, "ClientDesyncCore::PollDebugFrameResponse Ignoring non-matching response Frame: {} Coord: ({},{}) Expected Frame: {} Coord: ({},{})", pDebugFrame->iTick, pDebugFrame->coordinate.iQ, pDebugFrame->coordinate.iR, mDesyncDebugState.iTick, mDesyncDebugState.coord.iQ, mDesyncDebugState.coord.iR);
 		return;
 	}
 
-	LOG(kNetwork, kError, "ClientDesyncCore::PollDebugFrameResponse Frame: {} Coord: ({},{}) matched, dumping diff", mDesyncDebugState.iTick, mDesyncDebugState.coord.iX, mDesyncDebugState.coord.iY);
+	LOG(kNetwork, kError, "ClientDesyncCore::PollDebugFrameResponse Frame: {} Coord: ({},{}) matched, dumping diff", mDesyncDebugState.iTick, mDesyncDebugState.coord.iQ, mDesyncDebugState.coord.iR);
 	mDesyncDebugState.pClientFrame->LogDifferences(*pDebugFrame->pFrame);
 	mDesyncDebugState = {};
 

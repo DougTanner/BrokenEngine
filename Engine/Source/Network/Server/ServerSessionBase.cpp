@@ -272,7 +272,7 @@ void ServerSessionBase::SendOwnedEntityState(int64_t iClientId, OwnedEntityState
 	ClientConnection* pClient = gpServer->FindClient(iClientId);
 
 	const OwnedEntityStateDescriptor& rDescriptor = kpOwnedEntityStateDescriptors[static_cast<size_t>(eState)];
-	LOG(kNetwork, kInfo, "ServerSessionBase::SendOwnedEntityState State: {} Client: {} GlobalId: {} Grid: ({},{})", rDescriptor.pcName, iClientId, globalId.iValue, coordinate.iX, coordinate.iY);
+	LOG(kNetwork, kInfo, "ServerSessionBase::SendOwnedEntityState State: {} Client: {} GlobalId: {} Grid: ({},{})", rDescriptor.pcName, iClientId, globalId.iValue, coordinate.iQ, coordinate.iR);
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();

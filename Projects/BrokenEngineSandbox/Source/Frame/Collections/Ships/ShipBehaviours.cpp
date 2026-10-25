@@ -187,62 +187,50 @@ static void XM_CALLCONV FollowFlagship(const Frame& rPreviousFrame, FXMVECTOR ve
 
 	if (fDistanceSquared > kfFlagshipFollowDistanceSquared)
 	{
-		riNavigationDirection = 5;
+		riNavigationDirection = 7;
 		rVecIslandDestination = XMVectorSetW(vecFlagshipPosition, 1.0f);
 	}
-	else if (riNavigationDirection == 5)
+	else if (riNavigationDirection == 7)
 	{
 		rVecIslandDestination = XMVectorSetW(vecFlagshipPosition, 1.0f);
 		if (fDistanceSquared < kfFlagshipCloseDistanceSquared)
 		{
-			riNavigationDirection = 4;
+			riNavigationDirection = 6;
 			rVecIslandDestination = XMVectorZero();
 		}
 	}
 }
 
-static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFrame, const Frame& __restrict rPreviousFrame, ShipLocator self, engine::GlobalId globalId, FXMVECTOR vecPosition, const engine::CellStaticData& rStaticData, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer)
+static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(const Frame& __restrict rPreviousFrame, ShipLocator self, engine::GlobalId globalId, FXMVECTOR vecPosition, const engine::CellStaticData& rStaticData, engine::GridCoord fleetWantedCoordinate, int64_t iPendingFleetWantedCoordinateTicks, ShipOrders_t orders, engine::GlobalId flagshipGlobalId, std::chrono::duration<float> deltaTime, int64_t& riNavigationDirection, XMVECTOR& rVecIslandDestination, std::chrono::duration<float>& rCellChangeTimer)
 {
 	// Fleet navigation: navigate toward fleet's wanted coord after countdown expires
 	if (!(fleetWantedCoordinate == rStaticData.coordinate) && iPendingFleetWantedCoordinateTicks == 0)
 	{
 		// Two coords anywhere in the signed-int32 identity range can separate by more than int32 holds, so each converts to int64 ahead of the subtraction.
-		int64_t iDeltaX = static_cast<int64_t>(fleetWantedCoordinate.iX) - static_cast<int64_t>(rStaticData.coordinate.iX);
-		int64_t iDeltaY = static_cast<int64_t>(fleetWantedCoordinate.iY) - static_cast<int64_t>(rStaticData.coordinate.iY);
+		int64_t iDeltaQ = static_cast<int64_t>(fleetWantedCoordinate.iQ) - static_cast<int64_t>(rStaticData.coordinate.iQ);
+		int64_t iDeltaR = static_cast<int64_t>(fleetWantedCoordinate.iR) - static_cast<int64_t>(rStaticData.coordinate.iR);
 
-		// Check if already heading in a valid direction toward wanted coord
-		bool bAlreadyValid = false;
-		if (riNavigationDirection >= 0 && riNavigationDirection <= 3)
+		// The most direct neighbour: the largest integer cube-coordinate dot product with the delta, which is proportional
+		// to the dot product of the center offsets; an exact tie goes to the first entry in table order. A pure function
+		// of the two coordinates, so fleets sharing an origin and destination share a route.
+		int64_t iPickedDirection = 0;
+		int64_t iBestDot = std::numeric_limits<int64_t>::min();
+		for (int64_t k = 0; k < common::kiHexDirectionCount; ++k)
 		{
-			switch (riNavigationDirection)
+			const common::HexDirection& rDirection = engine::kCellDirections.pEntries[k];
+			int64_t iDot = iDeltaQ * rDirection.iDeltaQ + (iDeltaQ + iDeltaR) * (rDirection.iDeltaQ + rDirection.iDeltaR) + iDeltaR * rDirection.iDeltaR;
+			if (iDot > iBestDot)
 			{
-				case 0: bAlreadyValid = iDeltaY > 0; break;
-				case 1: bAlreadyValid = iDeltaY < 0; break;
-				case 2: bAlreadyValid = iDeltaX > 0; break;
-				case 3: bAlreadyValid = iDeltaX < 0; break;
-				default: break;
+				iBestDot = iDot;
+				iPickedDirection = k;
 			}
 		}
 
-		if (!bAlreadyValid)
+		if (iPickedDirection != riNavigationDirection)
 		{
-			int64_t iRandom = static_cast<int64_t>(common::Random(3i64, rFrame.postRender.randomEngine));
-			if (iDeltaX != 0 && iDeltaY != 0)
-			{
-				riNavigationDirection = (iRandom < 2)
-					? (iDeltaY > 0 ? 0 : 1)
-					: (iDeltaX > 0 ? 2 : 3);
-			}
-			else if (iDeltaY != 0)
-			{
-				riNavigationDirection = iDeltaY > 0 ? 0 : 1;
-			}
-			else
-			{
-				riNavigationDirection = iDeltaX > 0 ? 2 : 3;
-			}
+			riNavigationDirection = iPickedDirection;
 			rVecIslandDestination = XMVectorZero();
-			LOG(kNavData, kVerbose, "{} {} GlobalId: {} fleet override NavDir: {} WantedCoord: ({},{}) CellCoord: ({},{})", ShipTypeName(self.eType), self.iRow, globalId, riNavigationDirection, fleetWantedCoordinate.iX, fleetWantedCoordinate.iY, rStaticData.coordinate.iX, rStaticData.coordinate.iY);
+			LOG(kNavData, kVerbose, "{} {} GlobalId: {} fleet override NavDir: {} WantedCoord: ({},{}) CellCoord: ({},{})", ShipTypeName(self.eType), self.iRow, globalId, riNavigationDirection, fleetWantedCoordinate.iQ, fleetWantedCoordinate.iR, rStaticData.coordinate.iQ, rStaticData.coordinate.iR);
 		}
 	}
 
@@ -257,7 +245,7 @@ static void XM_CALLCONV UpdateFleetAndFlagshipNavigation(Frame& __restrict rFram
 		rCellChangeTimer -= deltaTime;
 		if (rCellChangeTimer.count() <= 0.0f)
 		{
-			riNavigationDirection = 4;
+			riNavigationDirection = 6;
 		}
 	}
 }
@@ -343,16 +331,16 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 	int64_t iNavigationPlane = NavigationFlightPlane(XMVectorGetZ(vecPosition), GetTargetFlightPlane(orders));
 	const engine::NavData& rNavData = NavigationPlaneData(rStaticData, iNavigationPlane);
 
-	UpdateFleetAndFlagshipNavigation(rFrame, rPreviousFrame, self, globalId, vecPosition, rStaticData, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, flagshipGlobalId, deltaTime, riNavigationDirection, rVecIslandDestination, rCellChangeTimer);
+	UpdateFleetAndFlagshipNavigation(rPreviousFrame, self, globalId, vecPosition, rStaticData, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, orders, flagshipGlobalId, deltaTime, riNavigationDirection, rVecIslandDestination, rCellChangeTimer);
 
 	bool bRecompute = ShouldRecomputeNavigation(rFrame, globalId, vecPosition, rVecArtificialIntelligenceDirection, iEntryNavigationDirection, bReseededDirection, riNavigationDirection, rNavData);
 
-	if (riNavigationDirection == 5)
+	if (riNavigationDirection == 7)
 	{
 		// A missing flagship leaves FollowFlagship without a target; the fleet flagship is its Battleship, which never
 		// dies, so a follower stalls until that row is back in this cell or the fleet override moves it on.
-		// Agent-injected ships have no Fleet updates. Mode 5 follows without arrival or missing-flagship fallback.
-		// It consumes three draws (island pick, footprint X/Y) each tick with islands; mode 4 draws only when
+		// Agent-injected ships have no Fleet updates. Mode 7 follows without arrival or missing-flagship fallback.
+		// It consumes three draws (island pick, footprint X/Y) each tick with islands; mode 6 draws only when
 		// selecting a destination. Both skip draws without islands. Every Random call advances once regardless of bound.
 		if (!rStaticData.islands.empty())
 		{
@@ -368,7 +356,7 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 			RecomputeNavigationPath(rFrame, self, vecPosition, rVecIslandDestination, rNavData, rVecArtificialIntelligenceDirection);
 		}
 	}
-	else if (riNavigationDirection == 4)
+	else if (riNavigationDirection == 6)
 	{
 		// Navigate to island destination
 		if (XMVectorGetW(rVecIslandDestination) == 0.0f)
@@ -420,8 +408,8 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 		}
 
 		// Arrival check (unconditional — independent of the pathfind throttle). Zeroing the destination
-		// makes the next tick's mode-4 entry block immediately pick the next island in the
-		// largest -> smallest -> random sequence (no idle between islands). Staying in mode 4 keeps the
+		// makes the next tick's mode-6 entry block immediately pick the next island in the
+		// largest -> smallest -> random sequence (no idle between islands). Staying in mode 6 keeps the
 		// tour progressing; the fleet still leaves the cell when the server cell-change timer fires.
 		// Horizontal, so a ship above the destination's height can still arrive.
 		float fDistanceSquared = XMVectorGetX(XMVector2LengthSq(XMVectorSubtract(vecPosition, rVecIslandDestination)));
@@ -436,22 +424,9 @@ void XM_CALLCONV ComputeNavigation(Frame& rFrame, const Frame& rPreviousFrame, c
 		// Navigate toward neighboring cell center
 		rVecIslandDestination = XMVectorZero();
 		XMVECTOR vecDestination = vecCellCenter;
-		switch (riNavigationDirection)
+		if (riNavigationDirection < common::kiHexDirectionCount)
 		{
-			case 0:
-				vecDestination = XMVectorAdd(vecCellCenter, XMVectorSet(0.0f, engine::kfCellHeight, 0.0f, 0.0f));
-				break;
-			case 1:
-				vecDestination = XMVectorAdd(vecCellCenter, XMVectorSet(0.0f, -engine::kfCellHeight, 0.0f, 0.0f));
-				break;
-			case 2:
-				vecDestination = XMVectorAdd(vecCellCenter, XMVectorSet(engine::kfCellWidth, 0.0f, 0.0f, 0.0f));
-				break;
-			case 3:
-				vecDestination = XMVectorAdd(vecCellCenter, XMVectorSet(-engine::kfCellWidth, 0.0f, 0.0f, 0.0f));
-				break;
-			default:
-				break;
+			vecDestination = XMVectorAdd(vecCellCenter, XMLoadFloat2(&engine::kCellDirections.pEntries[riNavigationDirection].f2CenterOffset));
 		}
 
 		if (bRecompute)
@@ -543,8 +518,8 @@ void XM_CALLCONV SteerHeadingTowards(FXMVECTOR vecPosition, FXMVECTOR vecDirecti
 
 void XM_CALLCONV ApplyAcceleratedMovement(int64_t iNavigationDirection, FXMVECTOR vecAiDirection, std::chrono::duration<float> deltaTime, float fAccelerationMultiplier, float fDecayMultiplier, const AcceleratedMovementConstants& rConstants, XMVECTOR& rVecVelocity)
 {
-	float fAcceleration = (iNavigationDirection == 5 ? rConstants.fCatchUpAcceleration : rConstants.fAcceleration) * fAccelerationMultiplier;
-	float fMaximumSpeed = iNavigationDirection == 5 ? rConstants.fCatchUpMaximumSpeed : rConstants.fMaximumSpeed;
+	float fAcceleration = (iNavigationDirection == 7 ? rConstants.fCatchUpAcceleration : rConstants.fAcceleration) * fAccelerationMultiplier;
+	float fMaximumSpeed = iNavigationDirection == 7 ? rConstants.fCatchUpMaximumSpeed : rConstants.fMaximumSpeed;
 	rVecVelocity = engine::ApplyMovement(rVecVelocity, vecAiDirection, deltaTime.count(), fAcceleration, rConstants.fDrag * fDecayMultiplier, fMaximumSpeed);
 }
 
@@ -586,7 +561,7 @@ void XM_CALLCONV ResolveTerrainContact(const engine::CellStaticData& rStaticData
 	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, TerrainContactNavData(rStaticData, fHeight, iTargetFlightPlane), vecPreviousPosition, rVecPosition, fRadius, fHeight, true);
 	if (result.flags & engine::DiscTerrainFlags::kStartOverlap) [[unlikely]]
 	{
-		LOG(kDefault, kWarning, "{} terrain start overlap Cell: ({},{}) Index: {} Start: {} Moved: {}", ShipTypeName(self.eType), rStaticData.coordinate.iX, rStaticData.coordinate.iY, self.iRow, common::WbV2(vecPreviousPosition, 1), common::Wb(result.fStartOverlapDistance, 1));
+		LOG(kDefault, kWarning, "{} terrain start overlap Cell: ({},{}) Index: {} Start: {} Moved: {}", ShipTypeName(self.eType), rStaticData.coordinate.iQ, rStaticData.coordinate.iR, self.iRow, common::WbV2(vecPreviousPosition, 1), common::Wb(result.fStartOverlapDistance, 1));
 	}
 
 	rVecPosition = result.vecPosition;
@@ -603,7 +578,7 @@ void XM_CALLCONV ApplyTerrainBounce(const engine::CellStaticData& rStaticData, S
 	engine::DiscTerrainResult result = engine::ResolveDiscAgainstTerrain(rStaticData, TerrainContactNavData(rStaticData, fHeight, iTargetFlightPlane), vecPreviousPosition, rVecPosition, fRadius, fHeight, false);
 	if (result.flags & engine::DiscTerrainFlags::kStartOverlap) [[unlikely]]
 	{
-		LOG(kDefault, kWarning, "{} terrain start overlap Cell: ({},{}) Index: {} Start: {} Moved: {}", ShipTypeName(self.eType), rStaticData.coordinate.iX, rStaticData.coordinate.iY, self.iRow, common::WbV2(vecPreviousPosition, 1), common::Wb(result.fStartOverlapDistance, 1));
+		LOG(kDefault, kWarning, "{} terrain start overlap Cell: ({},{}) Index: {} Start: {} Moved: {}", ShipTypeName(self.eType), rStaticData.coordinate.iQ, rStaticData.coordinate.iR, self.iRow, common::WbV2(vecPreviousPosition, 1), common::Wb(result.fStartOverlapDistance, 1));
 	}
 
 	// The resolved position carries W=1.0 — this write bypasses the main integration clamp.
@@ -711,7 +686,7 @@ void XM_CALLCONV DebugRenderNavigation(const FrameInterpolate& rFrameInterpolate
 	int64_t iNavigationDirection = GetNavigationDirection(flags);
 	bool bFlagshipFound = false;
 	XMVECTOR vecFlagshipPosition = XMVectorZero();
-	if (iNavigationDirection == 5)
+	if (iNavigationDirection == 7)
 	{
 		std::optional<ShipLocator> optionalFlagship = FindShipByGlobalId(rRenderFrame, flagshipGlobalId);
 		if (optionalFlagship)
@@ -721,10 +696,10 @@ void XM_CALLCONV DebugRenderNavigation(const FrameInterpolate& rFrameInterpolate
 		}
 	}
 
-	if (XMVectorGetW(vecDebugWaypoint) > 0.0f && (iNavigationDirection != 5 || bFlagshipFound))
+	if (XMVectorGetW(vecDebugWaypoint) > 0.0f && (iNavigationDirection != 7 || bFlagshipFound))
 	{
-		// In mode 5 (flagship follow), use the flagship's interpolated position as the waypoint
-		XMVECTOR vecWaypoint = (iNavigationDirection == 5) ? vecFlagshipPosition : vecDebugWaypoint;
+		// In mode 7 (flagship follow), use the flagship's interpolated position as the waypoint
+		XMVECTOR vecWaypoint = (iNavigationDirection == 7) ? vecFlagshipPosition : vecDebugWaypoint;
 		XMFLOAT3A f3NavigationStart {};
 		XMFLOAT3A f3NavigationEnd {};
 		XMStoreFloat3A(&f3NavigationStart, engine::Rebase(rBasis, vecPosition));
@@ -735,7 +710,7 @@ void XM_CALLCONV DebugRenderNavigation(const FrameInterpolate& rFrameInterpolate
 		engine::DebugRender::Circle(f3NavigationEnd, fRadius * 0.5f, {0.0f, 1.0f, 0.0f, 1.0f});
 	}
 
-	if (iNavigationDirection == 5)
+	if (iNavigationDirection == 7)
 	{
 		if (bFlagshipFound)
 		{

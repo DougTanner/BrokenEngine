@@ -36,7 +36,7 @@ static void AppendLifecycleFlagNames(engine::LifecycleFlags_t lifecycleFlags, nl
 	}
 }
 
-// Boolean ShipOrders and ShipFlags only — the packed nav-direction (bits 8-10) and nav-waypoint (bits 12-13) ranges
+// Boolean ShipOrders and ShipFlags only — the packed nav-direction (bits 8-11) and nav-waypoint (bits 12-13) ranges
 // are excluded; iterating them as single bits would emit meaningless names.
 static nlohmann::json ShipFlagNames(engine::LifecycleFlags_t lifecycleFlags, ShipOrders_t orders, ShipFlags_t flags)
 {

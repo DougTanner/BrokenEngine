@@ -76,7 +76,7 @@ static CrcValidateResult CrcValidateLoop(const CoordWork& rWork, int64_t iTarget
 			result.iHighestMatchIndex = iIndex;
 			if (iLowestUnresolved != std::numeric_limits<int64_t>::max())
 			{
-				LOG(kNetwork, kDebug, "CrcValidateLoop Speculative CRC mismatch superseded by later CRC match Coord: ({},{}) MismatchTick: {} MatchTick: {}", rWork.coord.iX, rWork.coord.iY, iLowestUnresolved, iTick);
+				LOG(kNetwork, kDebug, "CrcValidateLoop Speculative CRC mismatch superseded by later CRC match Coord: ({},{}) MismatchTick: {} MatchTick: {}", rWork.coord.iQ, rWork.coord.iR, iLowestUnresolved, iTick);
 				iLowestUnresolved = std::numeric_limits<int64_t>::max();
 			}
 		}
@@ -116,7 +116,7 @@ static CrcValidateResult CrcValidateLoop(const CoordWork& rWork, int64_t iTarget
 					}
 				}
 
-				LOG(kNetwork, kDebug, "CrcValidateLoop Speculative CRC mismatch; reconciliation pending Coord: ({},{}) ForTick: {} ServerCrc: {} ClientCrc: {} StatusChanges: {} [{}] TicksSinceFullState: {}", rWork.coord.iX, rWork.coord.iY, iTick, pcSharedCrc, pcClientCrc, std::ssize(it->second.statusChanges), builder.mBuffer.View(), (rCell.iLastFullStateTick >= 0) ? (iTick - rCell.iLastFullStateTick) : -1i64);
+				LOG(kNetwork, kDebug, "CrcValidateLoop Speculative CRC mismatch; reconciliation pending Coord: ({},{}) ForTick: {} ServerCrc: {} ClientCrc: {} StatusChanges: {} [{}] TicksSinceFullState: {}", rWork.coord.iQ, rWork.coord.iR, iTick, pcSharedCrc, pcClientCrc, std::ssize(it->second.statusChanges), builder.mBuffer.View(), (rCell.iLastFullStateTick >= 0) ? (iTick - rCell.iLastFullStateTick) : -1i64);
 			}
 			++iMismatchCount;
 			if (iMismatchCount > 1)
@@ -140,7 +140,7 @@ static CrcValidateResult CrcValidateLoop(const CoordWork& rWork, int64_t iTarget
 
 	if (!bSuppressRepeatLogs && iMismatchCount > 1)
 	{
-		LOG(kNetwork, kVerbose, "CrcValidateLoop {} additional mismatches Coord: ({},{}) Ticks: {}-{} ({} with StatusChanges)", iMismatchCount - 1, rWork.coord.iX, rWork.coord.iY, iSecondMismatchTick, iLastMismatchTick, iAdditionalMismatchesWithStatusChanges);
+		LOG(kNetwork, kVerbose, "CrcValidateLoop {} additional mismatches Coord: ({},{}) Ticks: {}-{} ({} with StatusChanges)", iMismatchCount - 1, rWork.coord.iQ, rWork.coord.iR, iSecondMismatchTick, iLastMismatchTick, iAdditionalMismatchesWithStatusChanges);
 	}
 
 	if (iLowestUnresolved != std::numeric_limits<int64_t>::max())
@@ -192,7 +192,7 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 	if (FindDuePendingFullState(rCell, iTargetTick) != nullptr)
 	{
 		result.bHandled = false;
-		LOG(kNetwork, kVerbose, "CrcFastPathProcessCoord Due pending full state forces reconcile Coord: ({},{})", rWork.coord.iX, rWork.coord.iY);
+		LOG(kNetwork, kVerbose, "CrcFastPathProcessCoord Due pending full state forces reconcile Coord: ({},{})", rWork.coord.iQ, rWork.coord.iR);
 		return result;
 	}
 
@@ -225,7 +225,7 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 		rWork.scratch.flags.Set(ReconcileScratchFlags::kSuppressRepeatLogs);
 		if ((rCell.iStuckFrameCount % engine::Cell::kiStuckLogInterval) == 0)
 		{
-			LOG(kNetwork, kVerbose, "CrcValidateLoop still stuck Coord: ({},{}) ConfirmedTick: {} FirstMismatch: {} StuckFrames: {}", rWork.coord.iX, rWork.coord.iY, rCell.iConfirmedTick, rCell.iLastLoggedFirstMismatch, rCell.iStuckFrameCount);
+			LOG(kNetwork, kVerbose, "CrcValidateLoop still stuck Coord: ({},{}) ConfirmedTick: {} FirstMismatch: {} StuckFrames: {}", rWork.coord.iQ, rWork.coord.iR, rCell.iConfirmedTick, rCell.iLastLoggedFirstMismatch, rCell.iStuckFrameCount);
 		}
 	}
 	else if (!validateResult.bMatch)
@@ -272,7 +272,7 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 			result.iLowestUnresolvedMismatch = validateResult.iLowestUnresolvedMismatch;
 			if (!(rWork.scratch.flags & ReconcileScratchFlags::kSuppressRepeatLogs))
 			{
-				LOG(kNetwork, kDebug, "CrcFastPathProcessCoord Later CRC match left an unresolved speculative mismatch; rollback/replay required Coord: ({},{}) HighestMatch: {} LowestMismatch: {}", rWork.coord.iX, rWork.coord.iY, validateResult.iHighestMatch, validateResult.iLowestUnresolvedMismatch);
+				LOG(kNetwork, kDebug, "CrcFastPathProcessCoord Later CRC match left an unresolved speculative mismatch; rollback/replay required Coord: ({},{}) HighestMatch: {} LowestMismatch: {}", rWork.coord.iQ, rWork.coord.iR, validateResult.iHighestMatch, validateResult.iLowestUnresolvedMismatch);
 			}
 		}
 	}
@@ -282,7 +282,7 @@ CrcFastPathCoordResult CrcFastPathProcessCoord(CoordWork& rWork, int64_t iTarget
 		result.iLowestUnresolvedMismatch = validateResult.iLowestUnresolvedMismatch;
 		if (!(rWork.scratch.flags & ReconcileScratchFlags::kSuppressRepeatLogs))
 		{
-			LOG(kNetwork, kDebug, "CrcFastPathProcessCoord No snapshot CRC match; rollback/replay required Coord: ({},{}) FirstMismatchTick: {}", rWork.coord.iX, rWork.coord.iY, validateResult.iLowestUnresolvedMismatch);
+			LOG(kNetwork, kDebug, "CrcFastPathProcessCoord No snapshot CRC match; rollback/replay required Coord: ({},{}) FirstMismatchTick: {}", rWork.coord.iQ, rWork.coord.iR, validateResult.iLowestUnresolvedMismatch);
 		}
 	}
 	else if (rCell.iConfirmedTick + 1 < iTargetTick)

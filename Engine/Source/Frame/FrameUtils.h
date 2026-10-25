@@ -51,14 +51,6 @@ template<bool kbBlendVelocityToDirection = false>
 	return vecResult;
 }
 
-struct CellBounds
-{
-	float fMinX = 0.0f;
-	float fMinY = 0.0f;
-	float fMaxX = 0.0f;
-	float fMaxY = 0.0f;
-};
-
 struct SegmentHit
 {
 	bool bHit = false;
@@ -66,57 +58,17 @@ struct SegmentHit
 	XMVECTOR vecPosition {};
 };
 
-inline CellBounds XM_CALLCONV ComputeCellBounds(FXMVECTOR vecArea)
+// Whether a cell-local position lies inside its own cell. Geometry is centered cell-local, so the grid coordinate is
+// identity only and never moves an edge.
+inline bool XM_CALLCONV IsInsideCell(FXMVECTOR vecPosition)
 {
-	// vecArea: x=minX, y=maxY, z=maxX, w=minY
-	return
-	{
-		.fMinX = XMVectorGetX(vecArea),
-		.fMinY = XMVectorGetW(vecArea),
-		.fMaxX = XMVectorGetZ(vecArea),
-		.fMaxY = XMVectorGetY(vecArea),
-	};
+	return common::IsInsideHex(vecPosition, kCellDirections, 0.0f);
 }
 
-inline SegmentHit XM_CALLCONV TracePointToCellExit(FXMVECTOR vecArea, FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition)
+inline SegmentHit XM_CALLCONV TracePointToCellExit(FXMVECTOR vecStartPosition, FXMVECTOR vecEndPosition)
 {
-	CellBounds bounds = ComputeCellBounds(vecArea);
-	XMFLOAT4A f4Start {};
-	XMFLOAT4A f4End {};
-	XMStoreFloat4A(&f4Start, vecStartPosition);
-	XMStoreFloat4A(&f4End, vecEndPosition);
-	float fDeltaX = f4End.x - f4Start.x;
-	float fDeltaY = f4End.y - f4Start.y;
-	float fPercent = std::numeric_limits<float>::max();
-
-	bool bStartsOutside = f4Start.x < bounds.fMinX || f4Start.x > bounds.fMaxX || f4Start.y < bounds.fMinY || f4Start.y > bounds.fMaxY;
-	bool bStartsOnNonInwardBoundary = (f4Start.x == bounds.fMinX && fDeltaX < 0.0f) || (f4Start.x == bounds.fMaxX && fDeltaX >= 0.0f)
-	                               || (f4Start.y == bounds.fMinY && fDeltaY < 0.0f) || (f4Start.y == bounds.fMaxY && fDeltaY >= 0.0f);
-	if (bStartsOutside || bStartsOnNonInwardBoundary)
-	{
-		fPercent = 0.0f;
-	}
-	else
-	{
-		if (fDeltaX > 0.0f && f4End.x >= bounds.fMaxX)
-		{
-			fPercent = std::min(fPercent, (bounds.fMaxX - f4Start.x) / fDeltaX);
-		}
-		else if (fDeltaX < 0.0f && f4End.x < bounds.fMinX)
-		{
-			fPercent = std::min(fPercent, (bounds.fMinX - f4Start.x) / fDeltaX);
-		}
-		if (fDeltaY > 0.0f && f4End.y >= bounds.fMaxY)
-		{
-			fPercent = std::min(fPercent, (bounds.fMaxY - f4Start.y) / fDeltaY);
-		}
-		else if (fDeltaY < 0.0f && f4End.y < bounds.fMinY)
-		{
-			fPercent = std::min(fPercent, (bounds.fMinY - f4Start.y) / fDeltaY);
-		}
-	}
-
-	if (fPercent == std::numeric_limits<float>::max())
+	std::optional<float> optionalTime = common::TraceHexExit(vecStartPosition, vecEndPosition, kCellDirections);
+	if (!optionalTime.has_value())
 	{
 		return {};
 	}
@@ -124,55 +76,72 @@ inline SegmentHit XM_CALLCONV TracePointToCellExit(FXMVECTOR vecArea, FXMVECTOR 
 	return
 	{
 		.bHit = true,
-		.fTime = fPercent,
-		.vecPosition = XMVectorLerp(vecStartPosition, vecEndPosition, fPercent),
+		.fTime = *optionalTime,
+		.vecPosition = XMVectorLerp(vecStartPosition, vecEndPosition, *optionalTime),
 	};
 }
 
-// The one cell area, identical in every cell: geometry is centered cell-local, so the grid coordinate is
-// identity only and never scales an edge. Lanes follow the convention ComputeCellBounds reads.
-inline XMVECTOR XM_CALLCONV LocalCellArea()
+// The kCellDirections entry whose neighbour a position outside IsInsideCell belongs to.
+inline int64_t XM_CALLCONV CellExitDirection(FXMVECTOR vecPosition)
 {
-	return XMVectorSet(kfBaseAreaMinimumX, kfBaseAreaMaximumY, kfBaseAreaMaximumX, kfBaseAreaMinimumY);
+	return common::HexExitDirection(vecPosition, kCellDirections);
+}
+
+inline int64_t GridDistance(GridCoord first, GridCoord second)
+{
+	return common::HexGridDistance(static_cast<int64_t>(second.iQ) - static_cast<int64_t>(first.iQ), static_cast<int64_t>(second.iR) - static_cast<int64_t>(first.iR));
+}
+
+// The offset from fromCoordinate's center to toCoordinate's center, with W 0.
+inline XMVECTOR XM_CALLCONV CellCenterOffset(GridCoord fromCoordinate, GridCoord toCoordinate)
+{
+	return common::HexCenterOffset(static_cast<int64_t>(toCoordinate.iQ) - static_cast<int64_t>(fromCoordinate.iQ), static_cast<int64_t>(toCoordinate.iR) - static_cast<int64_t>(fromCoordinate.iR), kCellDirections);
+}
+
+inline std::pair<double, double> CellCenterOffsetDouble(GridCoord fromCoordinate, GridCoord toCoordinate)
+{
+	return common::HexCenterOffsetDouble(static_cast<int64_t>(toCoordinate.iQ) - static_cast<int64_t>(fromCoordinate.iQ), static_cast<int64_t>(toCoordinate.iR) - static_cast<int64_t>(fromCoordinate.iR), kCellDirections);
+}
+
+// Subtracting a float center offset whose x component rounds can leave a position that was just past one cell's edge
+// on the far side of the destination cell's facing edge or vertex. Eight one-ulp steps toward the cell center on
+// both axes cover that rounding for any position within one tick of travel of the edge it crossed; the cap is twice
+// that and moves a position at most about 1 mm per axis.
+inline constexpr int64_t kiLandingNudgeSteps = 16;
+
+// Steps x and y one ulp toward the local origin while the position is outside IsInsideCell, at most
+// kiLandingNudgeSteps times; the result can still be outside.
+inline XMVECTOR XM_CALLCONV NudgeIntoCell(FXMVECTOR vecPosition)
+{
+	XMVECTOR vecResult = vecPosition;
+	for (int64_t i = 0; i < kiLandingNudgeSteps && !IsInsideCell(vecResult); ++i)
+	{
+		vecResult = XMVectorSetY(XMVectorSetX(vecResult, std::nextafter(XMVectorGetX(vecResult), 0.0f)), std::nextafter(XMVectorGetY(vecResult), 0.0f));
+	}
+	return vecResult;
 }
 
 // Neighbour and transfer-destination coordinate arithmetic. Returns false and leaves rOutputCoordinate untouched when
 // the sum leaves the signed-int32 identity range, so a cell at a numeric edge omits that neighbour instead of
 // wrapping to the opposite end of the grid.
-[[nodiscard]] inline bool TryAddGridCoordinate(GridCoord coordinate, int64_t iDeltaX, int64_t iDeltaY, GridCoord& rOutputCoordinate)
+[[nodiscard]] inline bool TryAddGridCoordinate(GridCoord coordinate, int64_t iDeltaQ, int64_t iDeltaR, GridCoord& rOutputCoordinate)
 {
-	int64_t iSumX = static_cast<int64_t>(coordinate.iX) + static_cast<int64_t>(iDeltaX);
-	int64_t iSumY = static_cast<int64_t>(coordinate.iY) + static_cast<int64_t>(iDeltaY);
-	if (!std::in_range<int32_t>(iSumX))
+	int64_t iSumQ = static_cast<int64_t>(coordinate.iQ) + static_cast<int64_t>(iDeltaQ);
+	int64_t iSumR = static_cast<int64_t>(coordinate.iR) + static_cast<int64_t>(iDeltaR);
+	if (!std::in_range<int32_t>(iSumQ))
 	{
 		return false;
 	}
-	if (!std::in_range<int32_t>(iSumY))
+	if (!std::in_range<int32_t>(iSumR))
 	{
 		return false;
 	}
 
-	rOutputCoordinate = {.iX = static_cast<int32_t>(iSumX), .iY = static_cast<int32_t>(iSumY)};
+	rOutputCoordinate = {.iQ = static_cast<int32_t>(iSumQ), .iR = static_cast<int32_t>(iSumR)};
 	return true;
 }
 
 inline constexpr int64_t kiInitialTransferCapacity = 256;
-
-inline bool XM_CALLCONV IsOutOfBounds(const CellBounds& rBounds, FXMVECTOR vecPosition)
-{
-	float fPositionX = XMVectorGetX(vecPosition);
-	float fPositionY = XMVectorGetY(vecPosition);
-
-	return !(fPositionX >= rBounds.fMinX && fPositionX < rBounds.fMaxX && fPositionY >= rBounds.fMinY && fPositionY < rBounds.fMaxY);
-}
-
-inline void XM_CALLCONV ComputeTransferDelta(const CellBounds& rBounds, FXMVECTOR vecPosition, int64_t& riDeltaX, int64_t& riDeltaY)
-{
-	float fPositionX = XMVectorGetX(vecPosition);
-	float fPositionY = XMVectorGetY(vecPosition);
-	riDeltaX = (fPositionX >= rBounds.fMaxX) ? 1 : (fPositionX < rBounds.fMinX) ? -1 : 0;
-	riDeltaY = (fPositionY >= rBounds.fMaxY) ? 1 : (fPositionY < rBounds.fMinY) ? -1 : 0;
-}
 
 template<typename... TS>
 struct TypeList {};

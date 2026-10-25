@@ -24,7 +24,7 @@ void SubscribeRequests::Cancel(GridCoord coordinate)
 			rRecord.flags.Set(SubscribeRequestFlags::kCancelled);
 		}
 	}
-	LOG(kNetwork, kVerbose, "SubscribeRequests::Cancel Coord: ({},{}) Records: {}", coordinate.iX, coordinate.iY, std::ssize(mRecords));
+	LOG(kNetwork, kVerbose, "SubscribeRequests::Cancel Coord: ({},{}) Records: {}", coordinate.iQ, coordinate.iR, std::ssize(mRecords));
 }
 
 void SubscribeRequests::WarnTimedOut(std::chrono::steady_clock::time_point now)
@@ -47,7 +47,7 @@ void SubscribeRequests::WarnTimedOut(std::chrono::steady_clock::time_point now)
 		}
 
 		rRecord.flags.Set(SubscribeRequestFlags::kTimeoutWarned);
-		LOG(kNetwork, kWarning, "SubscribeRequests::WarnTimedOut unanswered subscribe Coord: ({},{})", rRecord.coordinate.iX, rRecord.coordinate.iY);
+		LOG(kNetwork, kWarning, "SubscribeRequests::WarnTimedOut unanswered subscribe Coord: ({},{})", rRecord.coordinate.iQ, rRecord.coordinate.iR);
 	}
 }
 
@@ -117,7 +117,7 @@ bool ClientSubscriptions::IsStaleRetainedEpoch(int64_t iSlot, int64_t iEpoch, Gr
 		return false;
 	}
 
-	LOG(kNetwork, kDebug, "Client::IsStaleRetainedEpoch dropped stale packet Slot: {} Coord: ({},{}) Epoch: {} RetainedEpoch: {}", iSlot, coordinate.iX, coordinate.iY, iEpoch, iRetainedEpoch);
+	LOG(kNetwork, kDebug, "Client::IsStaleRetainedEpoch dropped stale packet Slot: {} Coord: ({},{}) Epoch: {} RetainedEpoch: {}", iSlot, coordinate.iQ, coordinate.iR, iEpoch, iRetainedEpoch);
 	return true;
 }
 

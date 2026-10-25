@@ -423,7 +423,7 @@ void Client::ServerCoordinateFullState(std::span<const uint8_t> packetData)
 	int64_t iTick = message.iTick;
 	GridCoord coord = message.coord;
 
-	LOG(kNetwork, kVerbose, "Client::ServerCoordFullState Frame: {} Slot: {} Coord: ({},{})", iTick, iSlotIndex, coord.iX, coord.iY);
+	LOG(kNetwork, kVerbose, "Client::ServerCoordFullState Frame: {} Slot: {} Coord: ({},{})", iTick, iSlotIndex, coord.iQ, coord.iR);
 	ScopedLogIndent scopedLogIndent;
 
 	ScopedSuppressAllocationTracking suppress;
@@ -438,7 +438,7 @@ void Client::ServerCoordinateFullState(std::span<const uint8_t> packetData)
 		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = static_cast<uint8_t>(iSlotIndex), .uiEpoch = static_cast<uint16_t>(iEpoch)};
 		NetworkMessages::Write(rWorkbuffer, unsubscribe);
 		NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
-		LOG(kNetwork, kVerbose, "Client::ServerCoordFullState coord mismatch, sent unsubscribe for ghost Slot: {} Coord: ({},{}) SlotCoord: ({},{})", iSlotIndex, coord.iX, coord.iY, rSlot.coordinate.iX, rSlot.coordinate.iY);
+		LOG(kNetwork, kVerbose, "Client::ServerCoordFullState coord mismatch, sent unsubscribe for ghost Slot: {} Coord: ({},{}) SlotCoord: ({},{})", iSlotIndex, coord.iQ, coord.iR, rSlot.coordinate.iQ, rSlot.coordinate.iR);
 		// Retire the ghost's epoch on a slot with no server-assigned epoch so its late accept is dropped
 		bool bHasNoAssignedEpoch = rSlot.eState == CoordSubscriptionState::kUnsubscribed;
 		if (bHasNoAssignedEpoch && static_cast<int16_t>(iEpoch - rSlot.acknowledgementState.uiEpoch) > 0)
@@ -619,7 +619,7 @@ void Client::ServerDebugFrame(std::span<const uint8_t> packetData)
 
 	int64_t iTick = message.iTick;
 	GridCoord coord = message.coord;
-	LOG(kNetwork, kError, "Client::ServerDebugFrame Frame: {} Grid: ({},{})", iTick, coord.iX, coord.iY);
+	LOG(kNetwork, kError, "Client::ServerDebugFrame Frame: {} Grid: ({},{})", iTick, coord.iQ, coord.iR);
 	ScopedLogIndent scopedLogIndent;
 
 	// Heap: LZ4 decompresses debug frame; Frame allocated on heap
@@ -702,7 +702,7 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 	{
 		// Server rejected subscription (not adjacent / no free slot)
 		mSubscriptions.mSubscribeRequests.TakeAnswer(coord);
-		LOG(kNetwork, kWarning, "Client::ServerSubscribeAccept Rejected Coord: ({},{})", coord.iX, coord.iY);
+		LOG(kNetwork, kWarning, "Client::ServerSubscribeAccept Rejected Coord: ({},{})", coord.iQ, coord.iR);
 		return;
 	}
 
@@ -710,7 +710,7 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 	// throw at mCoordinateSlots.at() below. Unsubscribe so a server-side slot cannot leak, then drop.
 	if (iSlotIndex >= std::ssize(mSubscriptions.mCoordinateSlots))
 	{
-		LOG(kNetwork, kWarning, "Client::ServerSubscribeAccept Out-of-range, unsubscribing Slot: {} Coord: ({},{})", iSlotIndex, coord.iX, coord.iY);
+		LOG(kNetwork, kWarning, "Client::ServerSubscribeAccept Out-of-range, unsubscribing Slot: {} Coord: ({},{})", iSlotIndex, coord.iQ, coord.iR);
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = static_cast<uint8_t>(iSlotIndex), .uiEpoch = static_cast<uint16_t>(iEpoch)};
@@ -726,13 +726,13 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 
 	if (actions & ClientSubscriptions::SubscribeAcceptFlags::kRejectGhost)
 	{
-		LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept Ignoring Slot: {} Coord: ({},{}) SlotCoord: ({},{}) State: {}", iSlotIndex, coord.iX, coord.iY, rSlot.coordinate.iX, rSlot.coordinate.iY, static_cast<int>(rSlot.eState));
+		LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept Ignoring Slot: {} Coord: ({},{}) SlotCoord: ({},{}) State: {}", iSlotIndex, coord.iQ, coord.iR, rSlot.coordinate.iQ, rSlot.coordinate.iR, static_cast<int>(rSlot.eState));
 		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 		common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
 		NetworkMessages::ClientUnsubscribeMessage unsubscribe {.uiSlotIndex = static_cast<uint8_t>(iSlotIndex), .uiEpoch = static_cast<uint16_t>(iEpoch)};
 		NetworkMessages::Write(rWorkbuffer, unsubscribe);
 		NetworkManager::SendPacket(mpServerPeer, NetworkManager::kiChannelReliable, rWorkbuffer, ENET_PACKET_FLAG_RELIABLE);
-		LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept sent unsubscribe for ghost Slot: {} Coord: ({},{})", iSlotIndex, coord.iX, coord.iY);
+		LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept sent unsubscribe for ghost Slot: {} Coord: ({},{})", iSlotIndex, coord.iQ, coord.iR);
 		return;
 	}
 
@@ -741,12 +741,12 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 		rSlot.acknowledgementState.uiEpoch = static_cast<uint16_t>(iEpoch);
 		if (!bLive)
 		{
-			LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept Healed then cancelled Slot: {} Coord: ({},{})", iSlotIndex, coord.iX, coord.iY);
+			LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept Healed then cancelled Slot: {} Coord: ({},{})", iSlotIndex, coord.iQ, coord.iR);
 			SendUnsubscribe(iSlotIndex);
 		}
 		else
 		{
-			LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept Healed active slot Slot: {} Coord: ({},{}) Epoch: {}", iSlotIndex, coord.iX, coord.iY, iEpoch);
+			LOG(kNetwork, kVerbose, "Client::ServerSubscribeAccept Healed active slot Slot: {} Coord: ({},{}) Epoch: {}", iSlotIndex, coord.iQ, coord.iR, iEpoch);
 		}
 		return;
 	}
@@ -763,7 +763,7 @@ void Client::ServerSubscribeAccept(std::span<const uint8_t> packetData)
 
 		if (!bLive)
 		{
-			LOG(kNetwork, kDebug, "Client::ServerSubscribeAccept Cancelled Slot: {} Coord: ({},{})", iSlotIndex, coord.iX, coord.iY);
+			LOG(kNetwork, kDebug, "Client::ServerSubscribeAccept Cancelled Slot: {} Coord: ({},{})", iSlotIndex, coord.iQ, coord.iR);
 			SendUnsubscribe(iSlotIndex);
 		}
 	}
@@ -908,7 +908,7 @@ void Client::SendDesynchronizationReport(int64_t iTick, GridCoord coordinate, co
 
 	char pcExpected[20] {};
 	char pcActual[20] {};
-	LOG(kNetwork, kError, "Client::SendDesyncReport Frame: {} Grid: ({},{}) Expected: {} Actual: {}", iTick, coordinate.iX, coordinate.iY, common::ToHex(std::span(pcExpected), uiExpectedCrc), common::ToHex(std::span(pcActual), uiActualCrc));
+	LOG(kNetwork, kError, "Client::SendDesyncReport Frame: {} Grid: ({},{}) Expected: {} Actual: {}", iTick, coordinate.iQ, coordinate.iR, common::ToHex(std::span(pcExpected), uiExpectedCrc), common::ToHex(std::span(pcActual), uiActualCrc));
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();
@@ -930,7 +930,7 @@ void Client::SendDebugFrameRequest(int64_t iTick, GridCoord coordinate)
 		return;
 	}
 
-	LOG(kNetwork, kError, "Client::SendDebugFrameRequest Frame: {} Grid: ({},{})", iTick, coordinate.iX, coordinate.iY);
+	LOG(kNetwork, kError, "Client::SendDebugFrameRequest Frame: {} Grid: ({},{})", iTick, coordinate.iQ, coordinate.iR);
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
 	common::ScopedWorkbufferArena scopedWorkbufferArena = rWorkbuffer.Push();

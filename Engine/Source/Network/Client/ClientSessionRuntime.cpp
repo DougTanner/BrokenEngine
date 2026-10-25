@@ -314,7 +314,7 @@ void ClientSessionRuntime::ApplyReceivedFullStates()
 		{
 			if (iTick <= rCell.iConfirmedTick)
 			{
-				LOG(kNetwork, kVerbose, "ApplyReceivedFullStates Rejected stale full state Coord: ({},{}) FullStateTick: {} ConfirmedTick: {}", coordinate.iX, coordinate.iY, iTick, rCell.iConfirmedTick);
+				LOG(kNetwork, kVerbose, "ApplyReceivedFullStates Rejected stale full state Coord: ({},{}) FullStateTick: {} ConfirmedTick: {}", coordinate.iQ, coordinate.iR, iTick, rCell.iConfirmedTick);
 				continue;
 			}
 
@@ -377,7 +377,7 @@ bool ClientSessionRuntime::ApplyReceivedUpdates()
 
 			if (static_cast<int64_t>(rCell.serverUpdates.size()) >= engine::kiMaximumBufferedFrames)
 			{
-				LOG(kNetwork, kWarning, "ClientSession::ApplyReceivedUpdates Buffer full, requesting full-state resync Coord: ({},{}) Size: {} Tick: {}", coordinate.iX, coordinate.iY, rCell.serverUpdates.size(), rUpdate.iTick);
+				LOG(kNetwork, kWarning, "ClientSession::ApplyReceivedUpdates Buffer full, requesting full-state resync Coord: ({},{}) Size: {} Tick: {}", coordinate.iQ, coordinate.iR, rCell.serverUpdates.size(), rUpdate.iTick);
 
 				// The engine already acked these ticks, so a dropped update would never be resent: abandon the
 				// whole drain and take authoritative state instead. Returning here sends exactly one request even
@@ -506,7 +506,7 @@ void ClientSessionRuntime::UpdateDesiredCoordinates(std::string_view reason)
 	std::optional<common::LogTickScope> optionalTickScope;
 	InitializeLogTickScope(optionalTickScope);
 
-	static constexpr int64_t kiMaximumDesiredCoordinates = 9;
+	static constexpr int64_t kiMaximumDesiredCoordinates = 1 + common::kiHexDirectionCount;
 	GridCoord pDesiredCoordinates[kiMaximumDesiredCoordinates] {};
 	int64_t iDesiredCount = 0;
 	auto PushCoordinate = [&](GridCoord coordinate)
@@ -679,14 +679,8 @@ void ClientSessionRuntime::ComputeActiveSet()
 			const XMFLOAT4& rf4Visible = gpCamera->mf4LargeVisibleArea;
 			// The visible area is in the camera basis cell's frame, which is not always the client cell: it lags a
 			// client-cell change and can be another coord entirely while render-camera selection falls back. Each
-			// neighbour rectangle therefore offsets the one local area every cell has by that neighbour's own offset
-			// from the camera basis, so both sides of the test are always in the same frame.
-			XMVECTOR vecArea = LocalCellArea();
-			float fCellMinX = XMVectorGetX(vecArea);
-			float fCellMaxY = XMVectorGetY(vecArea);
-			float fCellMaxX = XMVectorGetZ(vecArea);
-			float fCellMinY = XMVectorGetW(vecArea);
-
+			// neighbour hexagon is therefore centered at that neighbour's own offset from the camera basis, so both
+			// sides of the test are always in the same frame.
 			auto EnsureNeighbor = [&](GridCoord neighbor)
 			{
 				auto it = game::gpGame->mCells.find(neighbor);
@@ -700,34 +694,21 @@ void ClientSessionRuntime::ComputeActiveSet()
 				}
 			};
 
-			// Adjacent-only clamp: at wide zoom the VisibleArea may extend past the 3x3 ring;
-			// only the immediate ring is ever subscribed regardless.
-			for (int64_t i = -1; i <= 1; ++i)
+			// Edge-neighbour-only clamp: at wide zoom the VisibleArea may extend past the six edge neighbours;
+			// only that ring is ever subscribed regardless.
+			for (const common::HexDirection& rDirection : kCellDirections.pEntries)
 			{
-				for (int64_t j = -1; j <= 1; ++j)
+				// A cell at the numeric edge of the grid has no neighbour in that direction; skip it rather than wrap
+				// to the opposite end.
+				GridCoord neighbor {};
+				if (!TryAddGridCoordinate(game::gpGame->mClientGridCoordinate, rDirection.iDeltaQ, rDirection.iDeltaR, neighbor))
 				{
-					if (i == 0 && j == 0)
-					{
-						continue;
-					}
-					// A cell at the numeric edge of the grid has no neighbour in that direction; skip it rather than
-					// wrap to the opposite end.
-					GridCoord neighbor {};
-					if (!TryAddGridCoordinate(game::gpGame->mClientGridCoordinate, i, j, neighbor))
-					{
-						continue;
-					}
-					XMFLOAT2 f2Offset = MakeRenderBasis(neighbor, gpCamera->mBasisCoordinate).f2Offset;
-					float fNeighborMinX = fCellMinX + f2Offset.x;
-					float fNeighborMaxX = fCellMaxX + f2Offset.x;
-					float fNeighborMinY = fCellMinY + f2Offset.y;
-					float fNeighborMaxY = fCellMaxY + f2Offset.y;
-					if (rf4Visible.x < fNeighborMaxX && rf4Visible.z > fNeighborMinX && rf4Visible.w < fNeighborMaxY
-					 && rf4Visible.y > fNeighborMinY)
-					{
-						mpVisibleNeighbors[miVisibleNeighborCount++] = neighbor;
-						EnsureNeighbor(neighbor);
-					}
+					continue;
+				}
+				if (common::RectangleOverlapsHex(rf4Visible, CellCenterOffset(gpCamera->mBasisCoordinate, neighbor), kCellDirections))
+				{
+					mpVisibleNeighbors[miVisibleNeighborCount++] = neighbor;
+					EnsureNeighbor(neighbor);
 				}
 			}
 		}
@@ -759,7 +740,7 @@ void ClientSessionRuntime::ComputeActiveSet()
 	ASSERT(std::ranges::count_if(game::gpGame->mCells, [&](const std::pair<const GridCoord, Cell>& rPair)
 	{
 		return rPair.second.iConfirmedTick < 0 && !HoldsSlotOrRequest(rPair.first);
-	}) <= 9);
+	}) <= 1 + common::kiHexDirectionCount);
 }
 
 void ClientSessionRuntime::PinClientGridCoordinate(GridCoord coordinate)

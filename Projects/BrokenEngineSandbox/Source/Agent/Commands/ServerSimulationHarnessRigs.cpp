@@ -240,7 +240,7 @@ static StatusChangeType StatusChangeTypeFromEntry(const nlohmann::json& rEntry)
 
 static void ValidateInjectedPosition(FXMVECTOR vecPosition)
 {
-	if (!common::InsideArea(vecPosition, engine::LocalCellArea()))
+	if (!engine::IsInsideCell(vecPosition))
 	{
 		throw std::runtime_error("inject_payload position must lie inside the cell");
 	}

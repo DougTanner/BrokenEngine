@@ -189,9 +189,9 @@ static void FormatGpuTimerRows(common::Workbuffer& rWorkbuffer, bool bReevaluate
 static void FormatCellReadout(common::Workbuffer& rWorkbuffer)
 {
 	rWorkbuffer.Append("Cell: [");
-	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mClientGridCoordinate.iX));
+	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mClientGridCoordinate.iQ));
 	rWorkbuffer.Append(",");
-	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mClientGridCoordinate.iY));
+	rWorkbuffer.Append(static_cast<int64_t>(game::gpGame->mClientGridCoordinate.iR));
 	rWorkbuffer.Append("]\nActive: ");
 	rWorkbuffer.Append(std::ssize(game::gpGame->mActiveCoordinates));
 	rWorkbuffer.Append("\n");

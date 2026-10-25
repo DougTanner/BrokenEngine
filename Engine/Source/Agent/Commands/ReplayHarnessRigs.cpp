@@ -225,11 +225,11 @@ bool InjectMalformedFullFrames(const Replay& rReplay, GridCoord coordinate, int6
 	}
 	if (bFullFramesTruncated)
 	{
-		LOG(kDefault, kDebug, "Injected malformed replay fullframes for coord ({},{}); bytes {} -> {}", coordinate.iX, coordinate.iY, iBeforeBytes, std::ssize(prefix));
+		LOG(kDefault, kDebug, "Injected malformed replay fullframes for coord ({},{}); bytes {} -> {}", coordinate.iQ, coordinate.iR, iBeforeBytes, std::ssize(prefix));
 	}
 	else
 	{
-		LOG(kDefault, kError, "Injected malformed replay fullframes failed for coord ({},{}); deleting replay sibling set", coordinate.iX, coordinate.iY);
+		LOG(kDefault, kError, "Injected malformed replay fullframes failed for coord ({},{}); deleting replay sibling set", coordinate.iQ, coordinate.iR);
 	}
 	return bFullFramesTruncated;
 }

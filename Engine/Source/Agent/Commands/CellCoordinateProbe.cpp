@@ -25,7 +25,7 @@ static common::crc_t PlacementsCrc(const std::vector<IslandPlacement>& rPlacemen
 }
 
 // cell_coordinate_probe: report the cell geometry a requested coordinate produces, on either endpoint, without
-// subscribing to it or touching live cells. Schema: {"coord":[x,y]}.
+// subscribing to it or touching live cells. Schema: {"coord":[q,r]}.
 void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	if (rParameters.size() != 1 || !rParameters.contains("coord"))
@@ -37,7 +37,7 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 	{
 		throw std::runtime_error("cell_coordinate_probe 'coord' must be an array of 2 integers");
 	}
-	GridCoord coordinate {.iX = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(0), "cell_coordinate_probe 'coord'")), .iY = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(1), "cell_coordinate_probe 'coord'"))};
+	GridCoord coordinate {.iQ = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(0), "cell_coordinate_probe 'coord'")), .iR = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(1), "cell_coordinate_probe 'coord'"))};
 
 	if (gpIslandTerrain == nullptr)
 	{
@@ -60,9 +60,8 @@ void CommandCellCoordinateProbe(const nlohmann::json& rParameters, nlohmann::jso
 		return std::isfinite(fSample);
 	});
 
-	CellBounds bounds = ComputeCellBounds(LocalCellArea());
 	rResult["coord"] = AgentCoordinateJson(coordinate);
-	rResult["area"] = {{"width", bounds.fMaxX - bounds.fMinX}, {"height", bounds.fMaxY - bounds.fMinY}};
+	rResult["area"] = {{"width", 2.0f * kfCellHalfWidth}, {"height", 2.0f * kfCellHalfHeight}};
 	rResult["terrain"] = {{"samplesFinite", bSamplesFinite}};
 	rResult["placements"] = {{"count", std::ssize(placements)}, {"crc", PlacementsCrc(placements)}};
 	rResult["elevation"] = {{"crc", common::Crc(std::span<const float>(elevationGrid.data(), static_cast<size_t>(std::ssize(elevationGrid))))}};

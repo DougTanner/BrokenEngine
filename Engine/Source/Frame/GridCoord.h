@@ -3,22 +3,23 @@
 namespace engine
 {
 
+// Axial coordinates of a hexagonal cell: kCellDirections lists the q and r delta to each edge neighbour.
 struct GridCoord
 {
-	int32_t iX = 0;
-	int32_t iY = 0;
+	int32_t iQ = 0;
+	int32_t iR = 0;
 
 	constexpr bool operator==(const GridCoord&) const = default;
 
 	constexpr uint64_t ToKey() const
 	{
-		return (static_cast<uint64_t>(static_cast<uint32_t>(iX)) << 32) |
-		        static_cast<uint64_t>(static_cast<uint32_t>(iY));
+		return (static_cast<uint64_t>(static_cast<uint32_t>(iQ)) << 32) |
+		        static_cast<uint64_t>(static_cast<uint32_t>(iR));
 	}
 
 	static constexpr GridCoord FromKey(uint64_t uiKey)
 	{
-		return {.iX = static_cast<int32_t>(uiKey >> 32), .iY = static_cast<int32_t>(uiKey)};
+		return {.iQ = static_cast<int32_t>(uiKey >> 32), .iR = static_cast<int32_t>(uiKey)};
 	}
 
 	common::crc_t Crc() const
@@ -28,37 +29,36 @@ struct GridCoord
 
 	void Write(std::ostream& rStream) const
 	{
-		common::Write(rStream, iX);
-		common::Write(rStream, iY);
+		common::Write(rStream, iQ);
+		common::Write(rStream, iR);
 	}
 
 	void Read(std::istream& rStream)
 	{
-		common::Read(rStream, iX);
-		common::Read(rStream, iY);
+		common::Read(rStream, iQ);
+		common::Read(rStream, iR);
 	}
 };
 
-inline constexpr GridCoord kOriginCoordinate {.iX = 0, .iY = 0};
+inline constexpr GridCoord kOriginCoordinate {.iQ = 0, .iR = 0};
 
-inline constexpr float kfCellWidth = 900.0f;
-inline constexpr float kfCellHeight = 900.0f;
+inline constexpr float kfCellApothem = 450.0f;
+inline constexpr common::HexDirections kCellDirections = common::MakeHexDirections(kfCellApothem);
 
-// Per-cell elevation grids use 4 MiB for 1,024 × 1,024 floats at ~0.88-unit spacing.
-// CellElevationSampler::Sample quantizes queries to these sub-meter sample centers; IslandTerrain::BuildElevationGrid fills the grid.
+// Half extents of the cell's bounding rectangle, which the elevation, collision, and pusher grids span.
+inline constexpr float kfCellHalfWidth = kCellDirections.f2HalfExtents.x;
+inline constexpr float kfCellHalfHeight = kCellDirections.f2HalfExtents.y;
+
+// Per-cell elevation grids use 4 MiB for 1,024 × 1,024 floats spanning the bounding rectangle, at ~1.01-unit spacing in
+// x and ~0.88-unit spacing in y. CellElevationSampler::Sample quantizes queries to these sample centers;
+// IslandTerrain::BuildElevationGrid fills the grid.
 inline constexpr int64_t kiElevationGridDimension = 1'024;
-
-inline constexpr float kfBaseAreaMinimumX = -kfCellWidth / 2.0f;
-inline constexpr float kfBaseAreaMaximumY = kfCellHeight / 2.0f;
-inline constexpr float kfBaseAreaMaximumX = kfCellWidth / 2.0f;
-inline constexpr float kfBaseAreaMinimumY = -kfCellHeight / 2.0f;
 
 #if defined(BT_CLIENT)
 // Client-only presentation basis: the cell a value's positions are local to, plus the offset from the camera
 // cell's origin to that cell's origin. coordinate answers cross-cell queries such as GlobalElevation, which need
-// the cell identity rather than the offset. Both cells come from the small active set around the camera, so the
-// offset is a small integer multiple of the 900-unit cell size and is therefore exact in float. Exactness rests
-// on that multiple alone; a camera-coord fallback can put an active cell more than one cell away per axis.
+// the cell identity rather than the offset. The offset is the center offset of the two cells' axial delta, computed
+// from the float lattice basis, so it is deterministic for a given pair of cells.
 struct RenderBasis
 {
 	GridCoord coordinate {};
@@ -73,9 +73,9 @@ inline XMVECTOR XM_CALLCONV Rebase(const RenderBasis& rBasis, FXMVECTOR vecLocal
 }
 #endif
 
-// Pre-mix coordinate.ToKey() into a 32-bit seed where both x and y bits influence the result.
-// Required because ToKey() packs x into bits 32-63: a naive `static_cast<uint32_t>(key)` would
-// drop x entirely. The 64-bit multiply spreads every input bit through the upper half of the
+// Pre-mix coordinate.ToKey() into a 32-bit seed where both q and r bits influence the result.
+// Required because ToKey() packs q into bits 32-63: a naive `static_cast<uint32_t>(key)` would
+// drop q entirely. The 64-bit multiply spreads every input bit through the upper half of the
 // product, and the distinct multiplier per use case decorrelates offset and rotation streams.
 // RandomEngine's constructor then runs full splitmix64 on the 32-bit seed to produce its state.
 inline constexpr uint32_t SeedFromGridCoordinate(GridCoord coordinate, uint64_t uiMultiplier)

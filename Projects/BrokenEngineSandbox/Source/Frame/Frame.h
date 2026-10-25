@@ -76,8 +76,8 @@ struct FrameInterpolate : public engine::FrameInterpolateBase
 struct TransferRequest
 {
 	StatusChange change {};
-	int8_t iDeltaX = 0;
-	int8_t iDeltaY = 0;
+	// The engine::kCellDirections index of the destination neighbour.
+	int8_t iDirection = 0;
 };
 
 struct FramePostRender : public engine::FramePostRenderBase

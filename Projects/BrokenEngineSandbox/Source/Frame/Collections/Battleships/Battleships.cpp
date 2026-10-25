@@ -304,8 +304,6 @@ void BattleshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, 
 	BattleshipsInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBattleships;
 	BattleshipsPostRender& rCurrentPostRender = *rFrame.postRender.pBattleships;
 
-	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
-
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
 		return rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kTransfer;
@@ -338,9 +336,9 @@ void BattleshipsPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, 
 				.bTransfer = true,
 			}),
 		};
-		if (!rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
+		if (!rFrame.postRender.PrepareTransferRequest(request)) [[unlikely]]
 		{
-			LOG(kDefault, kError, "Battleship Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) Health: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), common::Wb(rCurrentPostRender.pfHealths[i], 1), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
+			LOG(kDefault, kError, "Battleship Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Direction: {} Health: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iQ, rStaticData.coordinate.iR, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDirection), common::Wb(rCurrentPostRender.pfHealths[i], 1), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
 		rFrame.postRender.PushTransferRequest(request);
@@ -468,7 +466,7 @@ void BattleshipsInterpolate::ClientInitializeAll(Frame& rFrame)
 
 bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 {
-	if (!common::InsideArea(rInfo.vecPosition, engine::LocalCellArea()))
+	if (!engine::IsInsideCell(rInfo.vecPosition))
 	{
 		return false;
 	}
@@ -510,7 +508,7 @@ bool BattleshipsPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rIn
 	// fresh spawn for navigation, cross-cell transfers included: a flagship navigates to an island destination and every
 	// other row starts roaming.
 	ShipFlags_t spawnFlags {};
-	SetNavigationDirection(spawnFlags, (rInfo.orders & ShipOrders::kIsFlagship) ? 4i64 : -1i64);
+	SetNavigationDirection(spawnFlags, (rInfo.orders & ShipOrders::kIsFlagship) ? 6i64 : -1i64);
 	rCurrentPostRender.pFlags[iIndex] = spawnFlags;
 	rCurrentPostRender.pVecVelocities[iIndex] = rInfo.vecVelocity;
 	rCurrentPostRender.pVecDamageDirections[iIndex] = XMVectorZero();
@@ -705,8 +703,8 @@ bool BattleshipsPostRender::LogDifferences(const BattleshipsPostRender& rOther) 
 		bEqual &= common::LogDifference<"pClientGuids.uiHigh">(i, pClientGuids[i].uiHigh, rOther.pClientGuids[i].uiHigh);
 		bEqual &= common::LogDifference<"pClientGuids.uiLow">(i, pClientGuids[i].uiLow, rOther.pClientGuids[i].uiLow);
 		bEqual &= common::LogDifference<"pFlagshipGlobalIds">(i, pFlagshipGlobalIds[i], rOther.pFlagshipGlobalIds[i]);
-		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iX">(i, pFleetWantedCoordinates[i].iX, rOther.pFleetWantedCoordinates[i].iX);
-		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iY">(i, pFleetWantedCoordinates[i].iY, rOther.pFleetWantedCoordinates[i].iY);
+		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iQ">(i, pFleetWantedCoordinates[i].iQ, rOther.pFleetWantedCoordinates[i].iQ);
+		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iR">(i, pFleetWantedCoordinates[i].iR, rOther.pFleetWantedCoordinates[i].iR);
 		bEqual &= common::LogDifference<"puiPendingFleetWantedCoordinateTicks">(i, puiPendingFleetWantedCoordinateTicks[i], rOther.puiPendingFleetWantedCoordinateTicks[i]);
 		bEqual &= common::LogDifference<"pNavigationDelays">(i, pNavigationDelays[i], rOther.pNavigationDelays[i]);
 		bEqual &= common::LogDifference<"pCellChangeTimers">(i, pCellChangeTimers[i], rOther.pCellChangeTimers[i]);

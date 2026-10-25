@@ -35,8 +35,8 @@ static void WriteFleet(std::ostream& rStream, const Fleet& rFleet)
 	int64_t iMemberCount = std::ssize(rFleet.members);
 	common::Write(rStream, iMemberCount);
 	common::Write(rStream, rFleet.flagshipGlobalId.iValue);
-	common::Write(rStream, rFleet.wantedCoordinate.iX);
-	common::Write(rStream, rFleet.wantedCoordinate.iY);
+	common::Write(rStream, rFleet.wantedCoordinate.iQ);
+	common::Write(rStream, rFleet.wantedCoordinate.iR);
 	common::Write(rStream, rFleet.uiPendingFleetWantedCoordinateTicks);
 	common::Write(rStream, rFleet.navigationDelaySeconds.count());
 	common::Write(rStream, rFleet.cellChangeTimerSeconds.count());
@@ -49,8 +49,8 @@ static void WriteFleet(std::ostream& rStream, const Fleet& rFleet)
 		common::Write(rStream, rMember.globalId.iValue);
 		common::Write(rStream, std::to_underlying(rMember.eType));
 		rMember.flags.Write(rStream);
-		common::Write(rStream, rMember.coordinate.iX);
-		common::Write(rStream, rMember.coordinate.iY);
+		common::Write(rStream, rMember.coordinate.iQ);
+		common::Write(rStream, rMember.coordinate.iR);
 	}
 }
 
@@ -65,11 +65,11 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	int64_t iMemberCount = 0;
 	common::Read(rFileStream, iMemberCount);
 	common::Read(rFileStream, rFleet.flagshipGlobalId.iValue);
-	int32_t iWantedX = 0;
-	int32_t iWantedY = 0;
-	common::Read(rFileStream, iWantedX);
-	common::Read(rFileStream, iWantedY);
-	rFleet.wantedCoordinate = engine::GridCoord {.iX = iWantedX, .iY = iWantedY};
+	int32_t iWantedQ = 0;
+	int32_t iWantedR = 0;
+	common::Read(rFileStream, iWantedQ);
+	common::Read(rFileStream, iWantedR);
+	rFleet.wantedCoordinate = engine::GridCoord {.iQ = iWantedQ, .iR = iWantedR};
 	common::Read(rFileStream, rFleet.uiPendingFleetWantedCoordinateTicks);
 	float fNavigationDelay = 0.0f;
 	common::Read(rFileStream, fNavigationDelay);
@@ -85,7 +85,7 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 	common::Read(rFileStream, fCellChangeTimer);
 	rFleet.cellChangeTimerSeconds = std::chrono::duration<float>(fCellChangeTimer);
 	// Trust boundary (save / replay file): finite-check only — cellChangeTimerSeconds legitimately goes/stays
-	// negative in cardinal mode (FleetNavigationController fires without resetting), so a range test would
+	// negative in cross-cell mode (FleetNavigationController fires without resetting), so a range test would
 	// reject valid data. A saved +Inf would freeze fleet nav forever.
 	if (!std::isfinite(rFleet.cellChangeTimerSeconds.count()))
 	{
@@ -125,11 +125,11 @@ static void ReadFleet(std::fstream& rFileStream, Fleet& rFleet)
 		{
 			throw std::ios_base::failure("Fleet member flags");
 		}
-		int32_t iCoordX = 0;
-		int32_t iCoordY = 0;
-		common::Read(rFileStream, iCoordX);
-		common::Read(rFileStream, iCoordY);
-		rMember = FleetMember {.globalId = engine::GlobalId {.iValue = iGlobalId}, .eType = static_cast<ShipType>(uiType), .flags = flags, .coordinate = engine::GridCoord {.iX = iCoordX, .iY = iCoordY}};
+		int32_t iCoordQ = 0;
+		int32_t iCoordR = 0;
+		common::Read(rFileStream, iCoordQ);
+		common::Read(rFileStream, iCoordR);
+		rMember = FleetMember {.globalId = engine::GlobalId {.iValue = iGlobalId}, .eType = static_cast<ShipType>(uiType), .flags = flags, .coordinate = engine::GridCoord {.iQ = iCoordQ, .iR = iCoordR}};
 	}
 	// Trust boundary (save / replay file): the fleet must hold exactly one Battleship, named by the flagship.
 	auto flagshipIt = std::ranges::find(rFleet.members, rFleet.flagshipGlobalId, &FleetMember::globalId);

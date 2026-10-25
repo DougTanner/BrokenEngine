@@ -32,7 +32,11 @@ game state around the deterministic Frame tick.
 - Normal update prepares tick inputs; replay uses coordinates with live readers and consumes its recorded `FrameInput` order exactly, without sorting it again.
 - A replay transfer recorded in the post-dispatch channel at event tick `E` is applied and published after dispatch at `E`; the newly activated destination first dispatches at `E + 1`.
 - A spawned fleet ship row is born owned by its owner's GUID carried in the spawn the per-tick fleet step queues; its first tick's owned-entity rebuild registers it and reports it `Spawned`, and no pairing pass runs. That GUID is the persistent ownership key.
-- An Omni or Battleship spawns at the origin cell's one fixed spawn point. A Fighter launches from inside its fleet's
+- An Omni or Battleship spawns at the first clear candidate `FindFleetSpawnPoint` returns, with no random draw: the
+  search is a pure function of the candidates, the origin's committed frame, and the pass's taken points, so replay
+  playback reaches the recording's spawn-or-wait decision, as the fleet checksum (`../../Save/AGENTS.md`) requires.
+  With none clear the member stays dead and is retried on the next tick. `ServerClientManager.cpp` owns the candidate
+  set, the clearance, and the blocked-episode logging. A Fighter launches from inside its fleet's
   Battleship: it spawns in that row's cell with its heading, velocity, and stored plane,
   `kfBattleshipRadius - kfFighterRadius` ahead of its position along the heading, so that Battleship's own pusher
   pushes it out the front, with `ShipOrders::kSpawning` set (`../../Frame/Collections/Fighters/AGENTS.md`). At most
@@ -50,9 +54,10 @@ game state around the deterministic Frame tick.
   a builder that found a coordinate's frame input reads that cell with
   `mCells.at` without checking that it exists.
 - The fleet step runs once per tick: fleet timers, then respawn timers and the
-  spawns they make, each draining one tick's `kfDeltaTime`. The fleet timers
-  walk owners in GUID order because each fleet's direction draw consumes the one fleet RNG and
-  replay playback must draw in the recording's order. In normal play the
+  spawns they make, each draining one tick's `kfDeltaTime`. Both timer passes
+  walk owners in GUID order, because each fleet's direction draw consumes the
+  one fleet RNG and each fleet spawn search keeps clear of the points earlier
+  spawns of its pass took, so replay playback must walk the recording's order. In normal play the
   engine's `PrepareTick` runs it after the tick's frame inputs exist and before
   the agent status-change drain and the broadcast snapshot, so the `StatusChange`s
   the fleet timers write into the frame input when a flagship picks a new cell

@@ -128,16 +128,22 @@ void ServerFleetManager::TickFleetTimers()
 	mNavigation.TickFleetTimers(mFleets, mRandomEngine);
 }
 
-// The queue order — owners in mFleets walk order, fleets and members in list order — is the order this tick's spawns
-// join its post-tick batch, which the simulation and the CRC depend on. Playback queues none.
+// The queue order — owners in GUID order, fleets and members in list order — is the order this tick's spawns join its
+// post-tick batch, which the simulation and the CRC depend on. Playback queues none, but its rerun must walk the same
+// order: the spawn search is greedy over the points this pass took, so the order decides which members stay dead.
 void ServerFleetManager::TickRespawnTimers()
 {
 	// Heap: transfer-manager spawn-queue push_back, launch-tick map insert
 	ScopedSuppressAllocationTracking suppress;
 
-	for (auto& [rGuid, rFleets] : mFleets)
+	common::ScopedWorkbufferArena ownersArena = common::gpThreadLocal->mWorkbuffer.Push();
+	std::span<const engine::ClientGuid> owners = SortedGuidKeys(mFleets, ownersArena);
+	// The spawns queued earlier in this pass are not yet rows of the origin's frame, so each fleet spawn search also
+	// keeps clear of the points they took. Opened after the owner keys, so it is the top frame for every PushBack.
+	common::ScopedWorkbufferArena takenSpawnPoints = common::gpThreadLocal->mWorkbuffer.Push();
+	for (const engine::ClientGuid& rGuid : owners)
 	{
-		for (Fleet& rFleet : rFleets)
+		for (Fleet& rFleet : mFleets.at(rGuid))
 		{
 			for (FleetMember& rMember : rFleet.members)
 			{
@@ -152,7 +158,7 @@ void ServerFleetManager::TickRespawnTimers()
 					continue;
 				}
 
-				gpServerSession->mpClientManager->SpawnFleetMember(rGuid, rFleet, rMember);
+				gpServerSession->mpClientManager->SpawnFleetMember(rGuid, rFleet, rMember, takenSpawnPoints);
 				LOG(kNetwork, kVerbose, "ServerFleetManager::TickRespawnTimers Guid: ({},{}) FleetGuid: ({},{}) Member: {}", rGuid.uiHigh, rGuid.uiLow, rFleet.guid.uiHigh, rFleet.guid.uiLow, rMember.globalId.iValue);
 			}
 		}

@@ -49,19 +49,13 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 
 		for (const game::TransferRequest& rRequest : rNextFrame.postRender.transferRequests)
 		{
-			// Transfers must stay within one cell in each axis; larger deltas teleport entities.
-			if (std::abs(rRequest.iDeltaX) > 1 || std::abs(rRequest.iDeltaY) > 1) [[unlikely]]
-			{
-				LOG(kDefault, kError, "Transfer delta spans more than one grid cell Tick: {} Source: ({},{}) Delta: ({},{}) Dest: ({},{}) Type: {} Position: {}", rNextFrame.interpolate.iTick, rCoord.iX, rCoord.iY, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), rCoord.iX + rRequest.iDeltaX, rCoord.iY + rRequest.iDeltaY, game::StatusChangeTypeName(rRequest.change.eType), common::WbV2(game::SpawnPosition(rRequest.change), 1));
-				DEBUG_BREAK();
-			}
-
 			// Reject coordinate-edge transfers before queuing or creating a destination, preventing wraparound.
 			// The source has already released the entity; an out-of-range destination cannot exist.
+			const common::HexDirection& rDirection = engine::kCellDirections.pEntries[rRequest.iDirection];
 			engine::GridCoord destination {};
-			if (!engine::TryAddGridCoordinate(rCoord, rRequest.iDeltaX, rRequest.iDeltaY, destination)) [[unlikely]]
+			if (!engine::TryAddGridCoordinate(rCoord, rDirection.iDeltaQ, rDirection.iDeltaR, destination)) [[unlikely]]
 			{
-				LOG(kDefault, kError, "Transfer destination leaves the coordinate range Tick: {} Source: ({},{}) Delta: ({},{}) Type: {} Position: {}", rNextFrame.interpolate.iTick, rCoord.iX, rCoord.iY, static_cast<int32_t>(rRequest.iDeltaX), static_cast<int32_t>(rRequest.iDeltaY), game::StatusChangeTypeName(rRequest.change.eType), common::WbV2(game::SpawnPosition(rRequest.change), 1));
+				LOG(kDefault, kError, "Transfer destination leaves the coordinate range Tick: {} Source: ({},{}) Direction: {} Type: {} Position: {}", rNextFrame.interpolate.iTick, rCoord.iQ, rCoord.iR, static_cast<int64_t>(rRequest.iDirection), game::StatusChangeTypeName(rRequest.change.eType), common::WbV2(game::SpawnPosition(rRequest.change), 1));
 				continue;
 			}
 
@@ -69,7 +63,7 @@ void ServerTransferManager::CollectTransfers(common::ScopedWorkbufferArena& rTra
 			// subscription, including subscriptions to empty sibling cells, to avoid creating unseen entities.
 			if (!game::IsOwnedEntityTransfer(rRequest.change) && !IsDestinationLive(destination))
 			{
-				LOG(kNetwork, kVerbose, "Dropping transfer to unsubscribed Frame Tick: {} Source: ({},{}) Dest: ({},{}) Type: {}", rNextFrame.interpolate.iTick, rCoord.iX, rCoord.iY, destination.iX, destination.iY, game::StatusChangeTypeName(rRequest.change.eType));
+				LOG(kNetwork, kVerbose, "Dropping transfer to unsubscribed Frame Tick: {} Source: ({},{}) Dest: ({},{}) Type: {}", rNextFrame.interpolate.iTick, rCoord.iQ, rCoord.iR, destination.iQ, destination.iR, game::StatusChangeTypeName(rRequest.change.eType));
 				continue;
 			}
 
@@ -148,7 +142,7 @@ void ServerTransferManager::SpawnTransfers(bool bFilterDestinationLiveness)
 			// A spawn targets an active cell that need not be live. Replay spawning bypasses this check.
 			if (bFilterDestinationLiveness && game::IsTransferType(rTransfer.eType) && !game::IsOwnedEntityTransfer(rTransfer) && !IsDestinationLive(rCoord)) [[unlikely]]
 			{
-				LOG(kDefault, kError, "Non-owned transfer reached Spawn for non-live Frame Tick: {} Dest: ({},{}) Type: {}", rDestinationFrame.interpolate.iTick, rCoord.iX, rCoord.iY, game::StatusChangeTypeName(rTransfer.eType));
+				LOG(kDefault, kError, "Non-owned transfer reached Spawn for non-live Frame Tick: {} Dest: ({},{}) Type: {}", rDestinationFrame.interpolate.iTick, rCoord.iQ, rCoord.iR, game::StatusChangeTypeName(rTransfer.eType));
 				DEBUG_BREAK();
 			}
 
@@ -208,7 +202,7 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 
 			if (iOwnedIdCount > 0)
 			{
-				LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {} OwnedIds: [{}]", rCoord.iX, rCoord.iY, std::ssize(rTransfers), game::Frame::OwnedEntityCount(rDestinationFrame), pcCrcPre, pcCrcPost, pcOwnedIds);
+				LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {} OwnedIds: [{}]", rCoord.iQ, rCoord.iR, std::ssize(rTransfers), game::Frame::OwnedEntityCount(rDestinationFrame), pcCrcPre, pcCrcPost, pcOwnedIds);
 			}
 			else
 			{
@@ -218,7 +212,7 @@ void ServerTransferManager::ApplyPreparedTransfers(const common::ScopedWorkbuffe
 				});
 				if (bAnySubscribed)
 				{
-					LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {}", rCoord.iX, rCoord.iY, std::ssize(rTransfers), game::Frame::OwnedEntityCount(rDestinationFrame), pcCrcPre, pcCrcPost);
+					LOG(kNetwork, kVerbose, "ServerTransferManager::SpawnTransfers Dest: ({},{}) TransferCount: {} OwnedCount: {} CrcPre: {} CrcPost: {}", rCoord.iQ, rCoord.iR, std::ssize(rTransfers), game::Frame::OwnedEntityCount(rDestinationFrame), pcCrcPre, pcCrcPost);
 				}
 			}
 		}
@@ -255,7 +249,7 @@ void ServerTransferManager::TrackClientTransfers(std::span<const ClientTransferI
 void ServerTransferManager::QueueSpawn(engine::GridCoord coordinate, int64_t iTick, const game::StatusChange& rSpawn)
 {
 	ASSERT(game::IsSpawnType(rSpawn.eType));
-	ASSERT(common::InsideArea(game::SpawnPosition(rSpawn), engine::LocalCellArea()));
+	ASSERT(engine::IsInsideCell(game::SpawnPosition(rSpawn)));
 	mPendingSpawns.try_emplace(coordinate).first->second.push_back({.iTick = iTick, .spawn = rSpawn});
 }
 

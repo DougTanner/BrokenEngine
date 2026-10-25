@@ -138,19 +138,17 @@ void FramePostRenderBase::ServerRead(std::istream& rStream)
 	}, ServerCollections());
 }
 
-bool FramePostRenderBase::PrepareTransferRequest(const CellBounds& rBounds, game::TransferRequest& rRequest) const
+bool FramePostRenderBase::PrepareTransferRequest(game::TransferRequest& rRequest) const
 {
-	int64_t iDeltaX = 0;
-	int64_t iDeltaY = 0;
 	XMVECTOR& rVecPosition = game::SpawnPositionRef(rRequest.change);
-	ComputeTransferDelta(rBounds, rVecPosition, iDeltaX, iDeltaY);
-	rRequest.iDeltaX = static_cast<int8_t>(iDeltaX);
-	rRequest.iDeltaY = static_cast<int8_t>(iDeltaY);
+	int64_t iDirection = CellExitDirection(rVecPosition);
+	rRequest.iDirection = static_cast<int8_t>(iDirection);
 
-	// The payload leaves here already expressed in the destination cell's local frame: one cell width per
-	// transferred axis. Every downstream consumer — network transfer, ApplySpawnStatusChange, replay reconcile —
-	// forwards the position unchanged, so this is the single conversion point.
-	rVecPosition = XMVectorSubtract(rVecPosition, XMVectorSet(static_cast<float>(rRequest.iDeltaX) * kfCellWidth, static_cast<float>(rRequest.iDeltaY) * kfCellHeight, 0.0f, 0.0f));
+	// The payload leaves here already expressed in the destination cell's local frame: the exit direction's center
+	// offset is subtracted and the landing nudged inside the destination. Every downstream consumer — network transfer,
+	// ApplySpawnStatusChange, replay reconcile — forwards the position unchanged, so this is the single conversion point.
+	rVecPosition = NudgeIntoCell(XMVectorSubtract(rVecPosition, XMLoadFloat2(&kCellDirections.pEntries[iDirection].f2CenterOffset)));
+	ASSERT(IsInsideCell(rVecPosition));
 
 	// Transfer producers are unbounded, so a full buffer can reallocate during a shared per-tick burst.
 	return std::ssize(transferRequests) < static_cast<int64_t>(transferRequests.capacity());
@@ -231,7 +229,7 @@ void FramePostRenderBase::Update([[maybe_unused]] game::Frame& __restrict rFrame
 	ForEachPostRenderUpdate(PostRenderBaseTypes {}, rFrame, rPreviousFrame, rStaticData);
 
 	// Setup pusher zones for spatial acceleration
-	PushersInterpolate::SetupZones(rFrame, LocalCellArea());
+	PushersInterpolate::SetupZones(rFrame);
 }
 
 void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
@@ -298,7 +296,7 @@ void RunFrameTick(const ActiveFrameReference& rReference, int64_t iTickCounter)
 	// every collection has run the phase that consumes it.
 	ForEachPostRenderPreCollision(PostRenderBaseTypes {}, rNext, rCurrent, rStaticData);
 	game::FramePostRender::PreCollision(rNext, rCurrent, rStaticData);
-	Collision::Collide(rNext.postRender.alignments, LocalCellArea());
+	Collision::Collide(rNext.postRender.alignments);
 	ForEachPostRenderPostCollision(PostRenderBaseTypes {}, rNext, rCurrent, rStaticData);
 	game::FramePostRender::PostCollision(rNext, rCurrent, rStaticData);
 	Collision::siLayerCount = 0;

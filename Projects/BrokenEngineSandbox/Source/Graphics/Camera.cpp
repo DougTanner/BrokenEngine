@@ -44,7 +44,7 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 
 		if (focusedOwnedEntityIdentifier != mLastTrackedOwnedEntityIdentifier)
 		{
-			LOG(kGraphics, kVerbose, "Camera NowTracking GlobalId: {} Coord: ({},{}) Type: {} Row: {}", focusedOwnedEntityIdentifier, coordinate.iX, coordinate.iY, ShipTypeName(optionalOwnedEntity->eType), optionalOwnedEntity->iRow);
+			LOG(kGraphics, kVerbose, "Camera NowTracking GlobalId: {} Coord: ({},{}) Type: {} Row: {}", focusedOwnedEntityIdentifier, coordinate.iQ, coordinate.iR, ShipTypeName(optionalOwnedEntity->eType), optionalOwnedEntity->iRow);
 			mLastTrackedOwnedEntityIdentifier = focusedOwnedEntityIdentifier;
 		}
 
@@ -57,7 +57,7 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 		sLastLogTime = std::chrono::duration<float>(mfTime);
 		if (bHasCoordinate)
 		{
-			LOG(kGraphics, kVerbose, "Camera OwnedEntityNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientOwnedEntityIdentifier(), coordinate.iX, coordinate.iY);
+			LOG(kGraphics, kVerbose, "Camera OwnedEntityNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientOwnedEntityIdentifier(), coordinate.iQ, coordinate.iR);
 			ForEachShipType(rGameInterpolate, gpGame->RenderFrame(coordinate).postRender, [](ShipType eType, const auto& rInterpolate, const auto& rPostRender)
 			{
 				LOG(kGraphics, kVerbose, "  {} PostRenderCount: {} InterpolateCount: {}", ShipTypeName(eType), rPostRender.iCount, rInterpolate.iCount);
@@ -69,7 +69,7 @@ engine::CameraTarget Camera::PullTarget(const engine::FrameInterpolateBase& rFra
 		}
 		else
 		{
-			LOG(kGraphics, kVerbose, "Camera CoordNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientOwnedEntityIdentifier(), coordinate.iX, coordinate.iY);
+			LOG(kGraphics, kVerbose, "Camera CoordNotFound FocusedGlobalId: {} Coord: ({},{})", gpGame->ClientOwnedEntityIdentifier(), coordinate.iQ, coordinate.iR);
 		}
 	}
 

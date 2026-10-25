@@ -10,11 +10,11 @@ constexpr int64_t kiMaxPushersPerZone = 512;
 alignas(64) static thread_local int64_t sppiPushersPerZone[kiPusherZones][kiPusherZones] {};
 alignas(64) static thread_local int16_t spppiPusherZones[kiPusherZones][kiPusherZones][kiMaxPushersPerZone] {};
 
-// Cell bounds the zone grid spans, refreshed by SetupZones from the cell's own area
-static thread_local float sfPusherAreaMinX = 0.0f;
-static thread_local float sfPusherAreaMinY = 0.0f;
-static thread_local float sfPusherZoneWidth = 0.0f;
-static thread_local float sfPusherZoneHeight = 0.0f;
+// The zone grid spans the cell's bounding rectangle.
+constexpr float kfPusherAreaMinimumX = -kfCellHalfWidth;
+constexpr float kfPusherAreaMinimumY = -kfCellHalfHeight;
+constexpr float kfPusherZoneWidth = 2.0f * kfCellHalfWidth / static_cast<float>(kiPusherZones);
+constexpr float kfPusherZoneHeight = 2.0f * kfCellHalfHeight / static_cast<float>(kiPusherZones);
 
 void PushersInterpolate::Update([[maybe_unused]] game::FrameInterpolate& __restrict rFrameInterpolate, [[maybe_unused]] const game::Frame& __restrict rPreviousFrame)
 {
@@ -40,18 +40,11 @@ void XM_CALLCONV PushersInterpolate::Sync(game::FrameInterpolate& rFrameInterpol
 	rPushers.pFlags[iIndex] = rData.flags;
 }
 
-void XM_CALLCONV PushersInterpolate::SetupZones([[maybe_unused]] const game::Frame& __restrict rFrame, FXMVECTOR vecArea)
+void PushersInterpolate::SetupZones([[maybe_unused]] const game::Frame& __restrict rFrame)
 {
 	const PushersInterpolate& rCurrent = rFrame.interpolate.pushers;
 
 	ZeroMemory(sppiPushersPerZone, sizeof(sppiPushersPerZone));
-
-	// Span the whole cell with the fixed zone grid
-	CellBounds bounds = ComputeCellBounds(vecArea);
-	sfPusherAreaMinX = bounds.fMinX;
-	sfPusherAreaMinY = bounds.fMinY;
-	sfPusherZoneWidth = (bounds.fMaxX - bounds.fMinX) / static_cast<float>(kiPusherZones);
-	sfPusherZoneHeight = (bounds.fMaxY - bounds.fMinY) / static_cast<float>(kiPusherZones);
 
 	int64_t iDroppedRegistrations = 0;
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
@@ -60,10 +53,10 @@ void XM_CALLCONV PushersInterpolate::SetupZones([[maybe_unused]] const game::Fra
 		XMStoreFloat4A(&f4Position, rCurrent.pVecPositions[i]);
 		float fRadius = rCurrent.pfRadii[i];
 
-		int64_t iZoneStartX = static_cast<int64_t>((f4Position.x - fRadius - sfPusherAreaMinX) / sfPusherZoneWidth);
-		int64_t iZoneEndX = static_cast<int64_t>((f4Position.x + fRadius - sfPusherAreaMinX) / sfPusherZoneWidth);
-		int64_t iZoneStartY = static_cast<int64_t>((f4Position.y - fRadius - sfPusherAreaMinY) / sfPusherZoneHeight);
-		int64_t iZoneEndY = static_cast<int64_t>((f4Position.y + fRadius - sfPusherAreaMinY) / sfPusherZoneHeight);
+		int64_t iZoneStartX = static_cast<int64_t>((f4Position.x - fRadius - kfPusherAreaMinimumX) / kfPusherZoneWidth);
+		int64_t iZoneEndX = static_cast<int64_t>((f4Position.x + fRadius - kfPusherAreaMinimumX) / kfPusherZoneWidth);
+		int64_t iZoneStartY = static_cast<int64_t>((f4Position.y - fRadius - kfPusherAreaMinimumY) / kfPusherZoneHeight);
+		int64_t iZoneEndY = static_cast<int64_t>((f4Position.y + fRadius - kfPusherAreaMinimumY) / kfPusherZoneHeight);
 
 		if (iZoneStartX >= kiPusherZones || iZoneEndX < 0 || iZoneStartY >= kiPusherZones || iZoneEndY < 0)
 		{
@@ -106,8 +99,8 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 	XMFLOAT2A f2Position {};
 	XMStoreFloat2A(&f2Position, vecPosition);
 
-	int64_t iZoneX = std::clamp(static_cast<int64_t>((f2Position.x - sfPusherAreaMinX) / sfPusherZoneWidth), 0i64, kiPusherZones - 1);
-	int64_t iZoneY = std::clamp(static_cast<int64_t>((f2Position.y - sfPusherAreaMinY) / sfPusherZoneHeight), 0i64, kiPusherZones - 1);
+	int64_t iZoneX = std::clamp(static_cast<int64_t>((f2Position.x - kfPusherAreaMinimumX) / kfPusherZoneWidth), 0i64, kiPusherZones - 1);
+	int64_t iZoneY = std::clamp(static_cast<int64_t>((f2Position.y - kfPusherAreaMinimumY) / kfPusherZoneHeight), 0i64, kiPusherZones - 1);
 	int16_t* piZone = spppiPusherZones[iZoneX][iZoneY];
 	int64_t iPushersInZone = sppiPushersPerZone[iZoneX][iZoneY];
 

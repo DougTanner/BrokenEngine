@@ -90,7 +90,7 @@ void ApplyUpdateStatusChanges(Frame& rFrame, const FrameInput& rFrameInput, cons
 
 	if (iUpdateFleetCount > 0)
 	{
-		LOG(kNetwork, kVerbose, "ApplyUpdateStatusChanges::kUpdateFleet Coord: ({},{}) NewWantedCoord: ({},{}) Ships: {}", rStaticData.coordinate.iX, rStaticData.coordinate.iY, updateFleetNewCoordinate.iX, updateFleetNewCoordinate.iY, iUpdateFleetCount);
+		LOG(kNetwork, kVerbose, "ApplyUpdateStatusChanges::kUpdateFleet Coord: ({},{}) NewWantedCoord: ({},{}) Ships: {}", rStaticData.coordinate.iQ, rStaticData.coordinate.iR, updateFleetNewCoordinate.iQ, updateFleetNewCoordinate.iR, iUpdateFleetCount);
 	}
 }
 

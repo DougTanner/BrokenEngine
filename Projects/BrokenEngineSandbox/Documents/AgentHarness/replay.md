@@ -213,8 +213,8 @@ must prove.
    `ServerSessionBase::SendOwnedEntityState State: ChangedCell ... GlobalId: <globalId> Grid: (<B>)`
    line; its log tick is `E1`. During recording only, send the client
    [`set_client_grid_coord`](../../../../.agents/skills/agent-harness/references/command-reference.md#client-commands)
-   once to a parking coordinate P whose 3x3 ring
-   contains neither A, B, nor origin; the command pins the viewer at P, so
+   once to a parking coordinate P that is neither A, B, nor origin nor one of
+   their edge neighbors; the command pins the viewer at P, so
    auto-follow cannot return it to the Battleship, and the pin stays there through
    step 7. Wait until `describe_scene.subscribedCoords` omits A, the server logs
    `Server::ClientUnsubscribe` for A, and A leaves `status.activeCoords`. This
@@ -286,7 +286,7 @@ must prove.
 #### Command-only malformed fullframes route
 
 On Debug, create an active recording with the target coord present, then arm
-`replay_inject_persistence_failure {"stage":"fullframes_record","coord":[x,y]}`
+`replay_inject_persistence_failure {"stage":"fullframes_record","coord":[q,r]}`
 and stop recording. Require the new `Injected malformed replay fullframes` Debug
 line to name the selected coord and report before/after byte sizes differing by
 exactly one. Poll until recording stops, send `replay_play`, and require a valid
@@ -330,17 +330,17 @@ Use fresh recordings for these two failure cases and preserve a stopped-server c
 
 Use the existing commands to create a valid `savedEnd + 1` pair; do not edit
 replay files or add a harness rig API. Discover the client's fleet Battleship cell S from
-`status.activeCoords` and choose an empty A that shares an edge with S, never a
-diagonal neighbor. A plain spawn entry
+`status.activeCoords` and choose an empty A that is one of S's six edge
+neighbors. A plain spawn entry
 `{"coord":<S>,"type":"SpawnOmni"}` with `pauseAfterWriterInput:true` arms a
 pause; its omni only marks the event. Pause, move the client to A until A is
 active, request recording, send that plain entry, unpause exactly once, and
 wait for the automatic pause after the next writer input, so recording is
 active. Still paused, send an edge-coast spawn into S whose margin is one tick:
 `inject_payload {"entries":[{"coord":<S>,"type":"SpawnOmni","vecPosition":<p>,"vecVelocity":<v>,"transferLockTimer":1}],"pauseAfterWriterInput":true}`,
-with `p` 449.5 m from S's center toward A on the S→A axis and 0 on the other
-axis, and `v` 33.33 m/s toward A (for A east of S, `[449.5,0]` and
-`[33.33,0]`). Unpause exactly once and wait for the automatic pause: during
+with `p` 449.5 m from S's center toward A's center and `v` 33.33 m/s toward
+A's center (for A north of S, S plus `[0,1]`, `[0,449.5]` and `[0,33.33]`;
+other directions: the `commands-server.md` edge-coast recipe). Unpause exactly once and wait for the automatic pause: during
 active recording it follows the writer input of the spawn's event tick, so the
 omni is applied in S right after that tick and has not moved. While still
 paused at completed tick T, repeatedly move the client away until A is

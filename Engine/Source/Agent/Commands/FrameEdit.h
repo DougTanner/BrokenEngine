@@ -354,7 +354,7 @@ void WriteElement(nlohmann::json& rValue, const ELEMENT& rElement)
 	}
 	else if constexpr (std::is_same_v<ELEMENT, GridCoord>)
 	{
-		rValue = nlohmann::json::array({rElement.iX, rElement.iY});
+		rValue = nlohmann::json::array({rElement.iQ, rElement.iR});
 	}
 	else if constexpr (std::is_same_v<ELEMENT, common::RandomEngine>)
 	{

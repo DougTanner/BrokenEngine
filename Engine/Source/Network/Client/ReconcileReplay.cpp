@@ -89,7 +89,7 @@ static void AdoptUnreachablePendingFullState(CoordWork& rWork, engine::Cell::Pen
 	rCell.iLastReplayConfirmedTick = -1;
 	rCell.iLastReplayServerUpdateCount = -1;
 
-	LOG(kNetwork, kWarning, "ReconcileCoord Adopted authoritative full state past update gap Coord: ({},{}) AdoptedTick: {}", rWork.coord.iX, rWork.coord.iY, iAdoptedTick);
+	LOG(kNetwork, kWarning, "ReconcileCoord Adopted authoritative full state past update gap Coord: ({},{}) AdoptedTick: {}", rWork.coord.iQ, rWork.coord.iR, iAdoptedTick);
 }
 
 // Aggressive CRC walk: finds the highest matching ring frame across all server updates
@@ -203,7 +203,7 @@ static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const Ri
 	{
 		if (!(rScratch.flags & ReconcileScratchFlags::kSuppressRepeatLogs))
 		{
-			LOG(kNetwork, kDebug, "ReconcileCoord Provisional shrunk-rollback mismatch; retrying from full rollback Coord: ({},{}) DesyncTick: {}", rWork.coord.iX, rWork.coord.iY, rScratch.iDesyncTick);
+			LOG(kNetwork, kDebug, "ReconcileCoord Provisional shrunk-rollback mismatch; retrying from full rollback Coord: ({},{}) DesyncTick: {}", rWork.coord.iQ, rWork.coord.iR, rScratch.iDesyncTick);
 		}
 		rScratch.iDesyncTick = -1;
 		rScratch.desyncExpectedCrc = 0;
@@ -226,12 +226,12 @@ static bool RunReplay(CoordWork& rWork, const ReconcileInputs& rInputs, const Ri
 		ReconcileInjectPendingFullState(rWork);
 		if (eMode == ReplayMode::kPrimary)
 		{
-			LOG(kNetwork, kVerbose, "ReconcileCoord Injected pending full state Coord: ({},{}) AtTick: {}", rWork.coord.iX, rWork.coord.iY, rCell.iConfirmedTick);
+			LOG(kNetwork, kVerbose, "ReconcileCoord Injected pending full state Coord: ({},{}) AtTick: {}", rWork.coord.iQ, rWork.coord.iR, rCell.iConfirmedTick);
 		}
 	}
 	else if (eMode == ReplayMode::kPrimary && pDuePendingFullState != nullptr && pDuePendingFullState->iTick < rCell.iConfirmedTick)
 	{
-		LOG(kNetwork, kVerbose, "ReconcileCoord Discarded stale pending full state Coord: ({},{}) FullStateTick: {} ConfirmedTick: {}", rWork.coord.iX, rWork.coord.iY, pDuePendingFullState->iTick, rCell.iConfirmedTick);
+		LOG(kNetwork, kVerbose, "ReconcileCoord Discarded stale pending full state Coord: ({},{}) FullStateTick: {} ConfirmedTick: {}", rWork.coord.iQ, rWork.coord.iR, pDuePendingFullState->iTick, rCell.iConfirmedTick);
 		rCell.optionalPendingFullState.reset();
 	}
 
@@ -481,11 +481,11 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 			{
 				if (rScratch.iDesyncTick >= 0)
 				{
-					LOG(kNetwork, kDebug, "Reconcile post-replay Rollback/replay exhausted with unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.iX, rWork.coord.iY, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, rScratch.iReplayStackCount, static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
+					LOG(kNetwork, kDebug, "Reconcile post-replay Rollback/replay exhausted with unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.iQ, rWork.coord.iR, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, rScratch.iReplayStackCount, static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
 				}
 				else
 				{
-					LOG(kNetwork, kDebug, "Reconcile post-replay Reconciliation resimulation completed without an unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.iX, rWork.coord.iY, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, rScratch.iReplayStackCount, static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
+					LOG(kNetwork, kDebug, "Reconcile post-replay Reconciliation resimulation completed without an unresolved CRC mismatch Coord: ({},{}) NewConfirmedTick: {} Validated: {}/{} CrcFastPath: {} Replayed: {} ShrunkRollback: {} DesyncTick: {}", rWork.coord.iQ, rWork.coord.iR, rScratch.iNewConfirmedTick, rScratch.iLastValidatedIndex + 1, rScratch.iReplayStackCount, static_cast<bool>(rScratch.flags & kCrcFastPath), static_cast<bool>(rScratch.flags & kReplayed), static_cast<bool>(rScratch.flags & kShrunkRollback), rScratch.iDesyncTick);
 				}
 			}
 		}
@@ -497,7 +497,7 @@ ReconcileDispatchResult ReconcileDispatcher::Run(const ReconcileInputs& rInputs)
 		char pcExpected[20] {}, pcActual[20] {};
 		common::ToHex(std::span<char, 20>(pcExpected), rScratch.desyncExpectedCrc);
 		common::ToHex(std::span<char, 20>(pcActual), rScratch.desyncActualCrc);
-		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesyncWork->coord.iX, pDesyncWork->coord.iY, rScratch.iDesyncTick, pcExpected, pcActual, rScratch.iReplayStackCount, rScratch.iNewConfirmedTick);
+		LOG(kNetwork, kError, "CONFIRMED DESYNC after full rollback/replay Coord: ({},{}) DesyncTick: {} ExpectedCrc: {} ActualCrc: {} ReplayTicks: {} NewConfirmed: {}", pDesyncWork->coord.iQ, pDesyncWork->coord.iR, rScratch.iDesyncTick, pcExpected, pcActual, rScratch.iReplayStackCount, rScratch.iNewConfirmedTick);
 
 		result.desync.bDesync = true;
 		result.desync.iDesyncTick = rScratch.iDesyncTick;

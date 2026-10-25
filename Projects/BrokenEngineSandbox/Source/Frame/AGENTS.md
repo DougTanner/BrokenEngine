@@ -54,7 +54,7 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
 - Missile and omni homing acquire through the engine frame registry (`../../../../Engine/Source/Frame/AGENTS.md` `## Frame Registry`). This scope builds its only two query windows — the Missile-Update window in Missiles Update and the Omni-Spawn window at omni spawn — as specified in Frame Registry Query Windows (`../../../../Documents/Architecture/FrameUpdatePipeline.md`).
 - Acquiring a target writes the frame — it takes a subscription — so the order acquisitions happen in within a tick is part of the deterministic stream. Do not hoist one out of a loop, cache its result, or run it in parallel across entities.
 - `Frame::OwnershipLayers` maps the engine registry's ownership layer onto each ship type's PostRender columns, one layer per type; `Frame::OwnedEntityCount` counts a frame's fleet-controlled rows.
-- Bounds helpers use the `vecArea` lane convention expected by `common::InsideArea`.
+- Cell containment uses `engine::IsInsideCell`; a transfer producer calls `PrepareTransferRequest` only for a position that fails it, because `CellExitDirection` names no direction for an inside position.
 - `GetServerCellStatistics` and its row labels `kServerEntityCountNames`
   (`ServerCellStats.h`, server-only) are the cell-statistics names the
   engine-owned server monitoring window consumes

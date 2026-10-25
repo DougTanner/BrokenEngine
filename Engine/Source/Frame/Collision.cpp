@@ -6,6 +6,12 @@
 namespace engine
 {
 
+// The zone grid spans the cell's bounding rectangle.
+constexpr float kfCollisionAreaMinimumX = -kfCellHalfWidth;
+constexpr float kfCollisionAreaMinimumY = -kfCellHalfHeight;
+constexpr float kfCollisionZoneWidth = 2.0f * kfCellHalfWidth / static_cast<float>(kiCollisionZonesX);
+constexpr float kfCollisionZoneHeight = 2.0f * kfCellHalfHeight / static_cast<float>(kiCollisionZonesY);
+
 // Accepted collision result retained after globally sorting candidate events.
 struct PendingCollisionResult
 {
@@ -139,7 +145,7 @@ int64_t Collision::AddLayer(const CollisionLayer& rLayer)
 		{
 			terrainHit = TracePointAgainstTerrain(*rLayer.pTerrainStaticData, rLayer.pVecStartPositions[i], rLayer.pVecEndPositions[i]);
 		}
-		SegmentHit boundaryHit = TracePointToCellExit(LocalCellArea(), rLayer.pVecStartPositions[i], rLayer.pVecEndPositions[i]);
+		SegmentHit boundaryHit = TracePointToCellExit(rLayer.pVecStartPositions[i], rLayer.pVecEndPositions[i]);
 		// A cell-exit hit time is finite and below float max, so a terrain-free layer's cutoff is exactly the boundary time.
 		float fMaximumTime = std::numeric_limits<float>::max();
 		if (terrainHit.bHit)
@@ -173,10 +179,10 @@ ZoneRange Collision::CalculateZoneRange(float fMinimumX, float fMaximumX, float 
 {
 	return
 	{
-		.iStartX = std::clamp(static_cast<int64_t>((fMinimumX - fRadius - sfAreaMinimumX) / sfZoneWidth), 0i64, kiCollisionZonesX - 1),
-		.iEndX = std::clamp(static_cast<int64_t>((fMaximumX + fRadius - sfAreaMinimumX) / sfZoneWidth), 0i64, kiCollisionZonesX - 1),
-		.iStartY = std::clamp(static_cast<int64_t>((fMinimumY - fRadius - sfAreaMinimumY) / sfZoneHeight), 0i64, kiCollisionZonesY - 1),
-		.iEndY = std::clamp(static_cast<int64_t>((fMaximumY + fRadius - sfAreaMinimumY) / sfZoneHeight), 0i64, kiCollisionZonesY - 1),
+		.iStartX = std::clamp(static_cast<int64_t>((fMinimumX - fRadius - kfCollisionAreaMinimumX) / kfCollisionZoneWidth), 0i64, kiCollisionZonesX - 1),
+		.iEndX = std::clamp(static_cast<int64_t>((fMaximumX + fRadius - kfCollisionAreaMinimumX) / kfCollisionZoneWidth), 0i64, kiCollisionZonesX - 1),
+		.iStartY = std::clamp(static_cast<int64_t>((fMinimumY - fRadius - kfCollisionAreaMinimumY) / kfCollisionZoneHeight), 0i64, kiCollisionZonesY - 1),
+		.iEndY = std::clamp(static_cast<int64_t>((fMaximumY + fRadius - kfCollisionAreaMinimumY) / kfCollisionZoneHeight), 0i64, kiCollisionZonesY - 1),
 	};
 }
 
@@ -289,20 +295,12 @@ static bool XM_CALLCONV SweptSphereTest(FXMVECTOR vecStartA, FXMVECTOR vecEndA, 
 	return false;
 }
 
-void Collision::SetupZones(FXMVECTOR vecArea)
+void Collision::SetupZones()
 {
 	if (sLayerPairZones.Size() == 0)
 	{
 		sLayerPairZones.Resize(kiCollisionLayerPairPreallocate);
 	}
-
-	// Compute zone dimensions from vecArea (x=minX, y=maxY, z=maxX, w=minY)
-	XMFLOAT4A f4Area {};
-	XMStoreFloat4A(&f4Area, vecArea);
-	sfAreaMinimumX = f4Area.x;
-	sfAreaMinimumY = f4Area.w;
-	sfZoneWidth = (f4Area.z - f4Area.x) / kiCollisionZonesX;
-	sfZoneHeight = (f4Area.y - f4Area.w) / kiCollisionZonesY;
 
 	// Reset counts while retaining zone storage.
 	for (int64_t i = 0; i < siLayerPairCount; ++i)
@@ -363,13 +361,13 @@ void Collision::SetupZones(FXMVECTOR vecArea)
 	siLayerPairCount = iPairIndex;
 }
 
-void Collision::Collide(const Alignments& rAlignments, FXMVECTOR vecArea)
+void Collision::Collide(const Alignments& rAlignments)
 {
 	CollisionEventScratch& rScratch = GetCollisionEventScratch();
 	ScopedCpuProfile scopedCpuProfile(game::kCpuTimerPostRenderCollide);
 
 	// Build zone acceleration structure (includes layer pair filtering and same-layer collision assert)
-	SetupZones(vecArea);
+	SetupZones();
 
 	// Collect every candidate before mutating collision flags so traversal order cannot select winners.
 	if (rScratch.candidates.Size() == 0)

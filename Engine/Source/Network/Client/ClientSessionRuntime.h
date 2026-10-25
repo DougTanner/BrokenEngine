@@ -105,7 +105,7 @@ public:
 	std::vector<GridCoord> mDesiredCoordinates;
 	std::vector<GridCoord> mSubscriptionQueue;
 	std::unordered_map<GridCoord, std::chrono::steady_clock::time_point> mUnwantedTimestamps;
-	GridCoord mpVisibleNeighbors[8] {};
+	GridCoord mpVisibleNeighbors[common::kiHexDirectionCount] {};
 	int64_t miVisibleNeighborCount = 0;
 
 private:

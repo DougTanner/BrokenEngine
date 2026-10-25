@@ -146,17 +146,135 @@ bool XM_CALLCONV AxisAlignedBoundingBoxIntersectsArea(XMFLOAT4 f4Area, FXMVECTOR
 	return !(fMaximumX < f4Area.x || fMinimumX > f4Area.z || fMaximumY < f4Area.w || fMinimumY > f4Area.y);
 }
 
-bool XM_CALLCONV InsideArea(FXMVECTOR vecPosition, FXMVECTOR vecArea)
+// |n|^2 / 2 for edge normal n, the edge's dot(p, n) threshold. Every hex dot product is an XMVector2Dot, so the inside
+// test, the exit trace, and the exit direction compare identically rounded values.
+static XMVECTOR XM_CALLCONV HexEdgeThreshold(FXMVECTOR vecNormal)
 {
-	// vecArea: x=minX, y=maxY, z=maxX, w=minY
-	// Half-open, so a shared cell edge has exactly one owner: inside if minX <= posX < maxX AND minY <= posY < maxY
-	// Every lane compare is false for a NaN operand, so a NaN position is outside.
-	XMVECTOR vecPositionAndMaximum = XMVectorPermute<0, 1, 6, 5>(vecPosition, vecArea);  // (posX, posY, maxX, maxY)
-	XMVECTOR vecMinimumAndPosition = XMVectorPermute<4, 7, 0, 1>(vecPosition, vecArea);  // (minX, minY, posX, posY)
-	XMVECTOR vecGreater = XMVectorGreater(vecPositionAndMaximum, vecMinimumAndPosition);
-	XMVECTOR vecGreaterOrEqual = XMVectorGreaterOrEqual(vecPositionAndMaximum, vecMinimumAndPosition);
-	XMVECTOR vecInside = XMVectorSelect(vecGreater, vecGreaterOrEqual, g_XMSelect1100);  // >= on lanes 0-1, > on lanes 2-3
-	return XMVector4EqualInt(vecInside, XMVectorTrueInt());
+	return XMVectorScale(XMVector2Dot(vecNormal, vecNormal), 0.5f);
+}
+
+// Closed on the edges toward entries 1-3 and open on 4, 5, and 0: edge k of a hexagon is edge k+3 of its neighbour
+// across it, and {1, 2, 3} and {4, 5, 0} partition the entries, so every edge has one owner. Both compares are false
+// for a NaN dot, and every axis has edge normals of both signs, so a NaN or infinite position fails some edge.
+static bool XM_CALLCONV PassesHexEdge(int64_t iDirection, FXMVECTOR vecDot, FXMVECTOR vecThreshold)
+{
+	if (iDirection >= 1 && iDirection <= 3)
+	{
+		return XMVector2LessOrEqual(vecDot, vecThreshold);
+	}
+	return XMVector2Less(vecDot, vecThreshold);
+}
+
+bool XM_CALLCONV IsInsideHex(FXMVECTOR vecPosition, const HexDirections& rDirections, float fInset)
+{
+	for (int64_t k = 0; k < kiHexDirectionCount; ++k)
+	{
+		XMVECTOR vecNormal = XMLoadFloat2(&rDirections.pEntries[k].f2CenterOffset);
+		XMVECTOR vecThreshold = XMVectorSubtract(HexEdgeThreshold(vecNormal), XMVectorScale(XMVector2Length(vecNormal), fInset));
+		if (!PassesHexEdge(k, XMVector2Dot(vecPosition, vecNormal), vecThreshold))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+std::optional<float> XM_CALLCONV TraceHexExit(FXMVECTOR vecStart, FXMVECTOR vecEnd, const HexDirections& rDirections)
+{
+	std::optional<float> optionalTime;
+	for (int64_t k = 0; k < kiHexDirectionCount; ++k)
+	{
+		XMVECTOR vecNormal = XMLoadFloat2(&rDirections.pEntries[k].f2CenterOffset);
+		XMVECTOR vecThreshold = HexEdgeThreshold(vecNormal);
+		XMVECTOR vecStartDot = XMVector2Dot(vecStart, vecNormal);
+		if (!PassesHexEdge(k, vecStartDot, vecThreshold))
+		{
+			return 0.0f;
+		}
+
+		XMVECTOR vecEndDot = XMVector2Dot(vecEnd, vecNormal);
+		if (PassesHexEdge(k, vecEndDot, vecThreshold))
+		{
+			continue;
+		}
+
+		// The start passes this edge's compare and the end fails it, so the divisor is positive and the numerator lies
+		// in [0, divisor]; rounding keeps the time in [0, 1].
+		float fStartDot = XMVectorGetX(vecStartDot);
+		float fTime = (XMVectorGetX(vecThreshold) - fStartDot) / (XMVectorGetX(vecEndDot) - fStartDot);
+		optionalTime = std::min(optionalTime.value_or(fTime), fTime);
+	}
+	return optionalTime;
+}
+
+int64_t XM_CALLCONV HexExitDirection(FXMVECTOR vecPosition, const HexDirections& rDirections)
+{
+	int64_t iExitDirection = -1;
+	float fLargestDot = 0.0f;
+	for (int64_t k = 0; k < kiHexDirectionCount; ++k)
+	{
+		XMVECTOR vecNormal = XMLoadFloat2(&rDirections.pEntries[k].f2CenterOffset);
+		XMVECTOR vecDot = XMVector2Dot(vecPosition, vecNormal);
+		if (PassesHexEdge(k, vecDot, HexEdgeThreshold(vecNormal)))
+		{
+			continue;
+		}
+
+		float fDot = XMVectorGetX(vecDot);
+		if (iExitDirection < 0 || fDot > fLargestDot)
+		{
+			iExitDirection = k;
+			fLargestDot = fDot;
+		}
+	}
+	return iExitDirection;
+}
+
+XMVECTOR XM_CALLCONV HexCenterOffset(int64_t iDeltaQ, int64_t iDeltaR, const HexDirections& rDirections)
+{
+	return XMVectorAdd(XMVectorScale(XMLoadFloat2(&rDirections.f2BasisQ), static_cast<float>(iDeltaQ)), XMVectorScale(XMLoadFloat2(&rDirections.f2BasisR), static_cast<float>(iDeltaR)));
+}
+
+std::pair<double, double> XM_CALLCONV HexCenterOffsetDouble(int64_t iDeltaQ, int64_t iDeltaR, const HexDirections& rDirections)
+{
+	double fDeltaQ = static_cast<double>(iDeltaQ);
+	double fDeltaR = static_cast<double>(iDeltaR);
+	return {fDeltaQ * static_cast<double>(rDirections.f2BasisQ.x) + fDeltaR * static_cast<double>(rDirections.f2BasisR.x), fDeltaQ * static_cast<double>(rDirections.f2BasisQ.y) + fDeltaR * static_cast<double>(rDirections.f2BasisR.y)};
+}
+
+int64_t XM_CALLCONV HexGridDistance(int64_t iDeltaQ, int64_t iDeltaR)
+{
+	return (std::abs(iDeltaQ) + std::abs(iDeltaR) + std::abs(iDeltaQ + iDeltaR)) / 2;
+}
+
+bool XM_CALLCONV RectangleOverlapsHex(XMFLOAT4 f4Rectangle, FXMVECTOR vecHexCenter, const HexDirections& rDirections)
+{
+	XMFLOAT2A f2HexCenter {};
+	XMStoreFloat2A(&f2HexCenter, vecHexCenter);
+	float fHexHalfWidth = rDirections.f2HalfExtents.x;
+	float fHexHalfHeight = rDirections.f2HalfExtents.y;
+	bool bBoundingRectanglesOverlap = f4Rectangle.x < f2HexCenter.x + fHexHalfWidth && f4Rectangle.z > f2HexCenter.x - fHexHalfWidth
+	                               && f4Rectangle.w < f2HexCenter.y + fHexHalfHeight && f4Rectangle.y > f2HexCenter.y - fHexHalfHeight;
+	if (!bBoundingRectanglesOverlap)
+	{
+		return false;
+	}
+
+	// The bounding rectangle test covers the x axis and the N and S edges. Entries 0 and 1 are the two slanted edge
+	// normals; entries 3 and 4 are their negations and give the same absolute-value test.
+	XMVECTOR vecRectangleCenter = XMVectorSet(0.5f * (f4Rectangle.x + f4Rectangle.z), 0.5f * (f4Rectangle.y + f4Rectangle.w), 0.0f, 0.0f);
+	XMVECTOR vecRectangleHalfExtents = XMVectorSet(0.5f * (f4Rectangle.z - f4Rectangle.x), 0.5f * (f4Rectangle.y - f4Rectangle.w), 0.0f, 0.0f);
+	XMVECTOR vecOffset = XMVectorSubtract(vecRectangleCenter, vecHexCenter);
+	for (int64_t k = 0; k < 2; ++k)
+	{
+		XMVECTOR vecNormal = XMLoadFloat2(&rDirections.pEntries[k].f2CenterOffset);
+		XMVECTOR vecReach = XMVectorAdd(HexEdgeThreshold(vecNormal), XMVector2Dot(vecRectangleHalfExtents, XMVectorAbs(vecNormal)));
+		if (XMVector2GreaterOrEqual(XMVectorAbs(XMVector2Dot(vecOffset, vecNormal)), vecReach))
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 XMVECTOR XM_CALLCONV ColorToVector(uint32_t uiColor)

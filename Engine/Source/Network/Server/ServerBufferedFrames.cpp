@@ -52,7 +52,7 @@ void ServerBufferedFrames::BufferFrame(int64_t iTick, std::span<const std::pair<
 			{
 				// Breaks on every over-constant batch, not only on growth: full-frame compression may already have grown
 				// mCompressionBuffer past the bound, and the break is what signals that the constant should be raised.
-				LOG(kNetwork, kWarning, "Server::BufferFrame status change count {} exceeds capacity {}. Increase kiMaximumStatusChangesPerCell in NetworkProtocol.h Coord: ({},{}) Frame: {}", iStatusChangeCount, kiMaximumStatusChangesPerCell, rCoordinate.iX, rCoordinate.iY, iTick);
+				LOG(kNetwork, kWarning, "Server::BufferFrame status change count {} exceeds capacity {}. Increase kiMaximumStatusChangesPerCell in NetworkProtocol.h Coord: ({},{}) Frame: {}", iStatusChangeCount, kiMaximumStatusChangesPerCell, rCoordinate.iQ, rCoordinate.iR, iTick);
 				DEBUG_BREAK();
 				int64_t iCompressedBound = MaxCompressedStatusChangeBatchBytes(iStatusChangeCount);
 				if (std::ssize(mCompressionBuffer) < iCompressedBound)
@@ -171,7 +171,7 @@ void ServerBufferedFrames::SendCoordinateFullState(int64_t iClientIdentifier, in
 	// client discarded on adoption are never resent, and the client self-disconnects on its frozen floor.
 	// Pre-adoption ACKs keep raising the server's floor until the reliable full state arrives.
 	ClientConnection::SlotState& rSlot = pClient->slots.at(iSlot);
-	LOG(kNetwork, kDebug, "Server::SendCoordFullState Client: {} Frame: {} Slot: {} Coord: ({},{}) AckFloor: {}", iClientIdentifier, iTick, iSlot, coordinate.iX, coordinate.iY, rSlot.ack.iAcknowledgmentFloor);
+	LOG(kNetwork, kDebug, "Server::SendCoordFullState Client: {} Frame: {} Slot: {} Coord: ({},{}) AckFloor: {}", iClientIdentifier, iTick, iSlot, coordinate.iQ, coordinate.iR, rSlot.ack.iAcknowledgmentFloor);
 	rSlot.iPendingFullStateTick = iTick;
 
 	// Serialize frame into the reusable scratch (server main thread only - single-writer contract)
@@ -204,7 +204,7 @@ void ServerBufferedFrames::SendCoordinateFullState(int64_t iClientIdentifier, in
 
 ENetPacket* ServerBufferedFrames::SendCoordinateStaticData(const ClientConnection& rClient, int64_t iSlot, GridCoord coordinate, const CellStaticData& rStaticData, ENetPacketFreeCallback pFreeCallback)
 {
-	LOG(kNetwork, kDebug, "Server::SendCoordStaticData Client: {} Slot: {} Coord: ({},{})", rClient.iClientId, iSlot, coordinate.iX, coordinate.iY);
+	LOG(kNetwork, kDebug, "Server::SendCoordStaticData Client: {} Slot: {} Coord: ({},{})", rClient.iClientId, iSlot, coordinate.iQ, coordinate.iR);
 
 	// Serialize static data into the reusable scratch (server main thread only - single-writer contract)
 	ScopedSuppressAllocationTracking suppress;
@@ -297,7 +297,7 @@ void ServerBufferedFrames::SendUpdate(ClientConnection& rClient, int64_t iTick)
 		NetworkManager::SendPacket(rClient.pPeer, NetworkManager::CoordinateSlotUnreliable(i), rWorkbuffer, 0);
 		if (!(rSlot.subscription.flags & SubscriptionFlags::kFirstUpdateLogged))
 		{
-			LOG(kNetwork, kVerbose, "Server::SendUpdate Client: {} Slot: {} Coord: ({},{}) Tick: {}", rClient.iClientId, i, coordinate.iX, coordinate.iY, iTick);
+			LOG(kNetwork, kVerbose, "Server::SendUpdate Client: {} Slot: {} Coord: ({},{}) Tick: {}", rClient.iClientId, i, coordinate.iQ, coordinate.iR, iTick);
 			rSlot.subscription.flags.Set(SubscriptionFlags::kFirstUpdateLogged);
 		}
 	}
@@ -335,7 +335,7 @@ void ServerBufferedFrames::SendResends(ClientConnection& rClient, int64_t iTick)
 		int64_t iAcknowledgmentGap = iTick - rAcknowledgmentState.iAcknowledgmentFloor;
 		if (iAcknowledgmentGap > 64)
 		{
-			LOG(kNetwork, kVerbose, "Server::SendResends Client: {} Slot: {} Coord: ({},{}) AckFloor: {} CurrentTick: {} Gap: {}", rClient.iClientId, i, coordinate.iX, coordinate.iY, rAcknowledgmentState.iAcknowledgmentFloor, iTick, iAcknowledgmentGap);
+			LOG(kNetwork, kVerbose, "Server::SendResends Client: {} Slot: {} Coord: ({},{}) AckFloor: {} CurrentTick: {} Gap: {}", rClient.iClientId, i, coordinate.iQ, coordinate.iR, rAcknowledgmentState.iAcknowledgmentFloor, iTick, iAcknowledgmentGap);
 		}
 
 		if (rAcknowledgmentState.uiReceivedBitfieldLow == 0 && rAcknowledgmentState.uiReceivedBitfieldHigh == 0)
@@ -365,7 +365,7 @@ void ServerBufferedFrames::SendResends(ClientConnection& rClient, int64_t iTick)
 			const PerCoordBufferedFrame* pBuffered = FindBufferedFrame(coordinate, iMissingFrame);
 			if (pBuffered == nullptr)
 			{
-				LOG(kNetwork, kVerbose, "Server::SendResends Evicted frame Client: {} Slot: {} Coord: ({},{}) MissingTick: {} LatestBuffered: {}", rClient.iClientId, i, coordinate.iX, coordinate.iY, iMissingFrame, miLatestBufferedTick);
+				LOG(kNetwork, kVerbose, "Server::SendResends Evicted frame Client: {} Slot: {} Coord: ({},{}) MissingTick: {} LatestBuffered: {}", rClient.iClientId, i, coordinate.iQ, coordinate.iR, iMissingFrame, miLatestBufferedTick);
 				continue;
 			}
 
@@ -397,7 +397,7 @@ void ServerBufferedFrames::UpdateResendLogState(ClientConnection& rClient, int64
 
 	if (bWasResending != bIsResending && rClient.slots.at(iSlot).iResendLogCooldown <= 0)
 	{
-		LOG(kNetwork, kVerbose, "Server::SendResends Client: {} Slot: {} Coord: ({},{}) Count: {}", rClient.iClientId, iSlot, coordinate.iX, coordinate.iY, iSlotResendCount);
+		LOG(kNetwork, kVerbose, "Server::SendResends Client: {} Slot: {} Coord: ({},{}) Count: {}", rClient.iClientId, iSlot, coordinate.iQ, coordinate.iR, iSlotResendCount);
 		rClient.slots.at(iSlot).iResendLogCooldown = kiResendLogCooldownTicks;
 	}
 	rClient.slots.at(iSlot).iPreviousResendCount = iSlotResendCount;
@@ -527,7 +527,7 @@ void ServerBufferedFrames::SendDebugFrame(ENetPeer* pPeer, int64_t iTick, GridCo
 {
 	if constexpr (kbDesynchronizationDebugFrames)
 	{
-		LOG(kNetwork, kError, "Server::ClientDebugFrameRequest Frame: {} Grid: ({},{})", iTick, coordinate.iX, coordinate.iY);
+		LOG(kNetwork, kError, "Server::ClientDebugFrameRequest Frame: {} Grid: ({},{})", iTick, coordinate.iQ, coordinate.iR);
 		ScopedLogIndent scopedLogIndent;
 
 		const BufferedFullFrame* pBuffered = nullptr;
@@ -549,7 +549,7 @@ void ServerBufferedFrames::SendDebugFrame(ENetPeer* pPeer, int64_t iTick, GridCo
 		auto it = pBuffered->serializedFrames.find(coordinate);
 		if (it == pBuffered->serializedFrames.end())
 		{
-			LOG(kNetwork, kError, "Server::ClientDebugFrameRequest Frame: {} Coord: ({},{}) not found", iTick, coordinate.iX, coordinate.iY);
+			LOG(kNetwork, kError, "Server::ClientDebugFrameRequest Frame: {} Coord: ({},{}) not found", iTick, coordinate.iQ, coordinate.iR);
 			return;
 		}
 

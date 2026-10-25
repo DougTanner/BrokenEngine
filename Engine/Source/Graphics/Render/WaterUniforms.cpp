@@ -106,8 +106,9 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	// Phase must follow the camera across a cell change, so the reductions below run on the absolute camera position,
 	// reconstructed as a double from the camera cell and the camera's local position. This is client-only CPU work:
 	// fWaterOriginX/Y above stays in the rebased frame the shaders add it back to.
-	double fCameraX = static_cast<double>(engine::gpCamera->mBasisCoordinate.iX) * static_cast<double>(kfCellWidth) + static_cast<double>(f4CameraPosition.x);
-	double fCameraY = static_cast<double>(engine::gpCamera->mBasisCoordinate.iY) * static_cast<double>(kfCellHeight) + static_cast<double>(f4CameraPosition.y);
+	auto [fCellX, fCellY] = CellCenterOffsetDouble(kOriginCoordinate, engine::gpCamera->mBasisCoordinate);
+	double fCameraX = fCellX + static_cast<double>(f4CameraPosition.x);
+	double fCameraY = fCellY + static_cast<double>(f4CameraPosition.y);
 
 	// Rotate cameraXY by R(-theta) before fmod on the CPU: rotation is already encoded when shader fract() absorbs the integral sizeMult*10
 	// wrap. Rotating an already-reduced origin gives nonintegral wrap shifts except at multiples of pi/2, causing normal-pattern jumps at each

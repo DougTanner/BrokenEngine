@@ -69,11 +69,11 @@ static void LogTransferSummary(const CoordWork& rWork, int64_t iTick, int64_t iT
 			}
 			iPosition += iWritten;
 		}
-		LOG(kNetwork, kVerbose, "ReconcileRunTickCoord SpawnTransfers Coord: ({},{}) ForTick: {} TransferCount: {} OwnedCount: {} OwnedIds: [{}]", rWork.coord.iX, rWork.coord.iY, iTick, iTransferCount, iOwnedTransferCount, pcOwnedIds);
+		LOG(kNetwork, kVerbose, "ReconcileRunTickCoord SpawnTransfers Coord: ({},{}) ForTick: {} TransferCount: {} OwnedCount: {} OwnedIds: [{}]", rWork.coord.iQ, rWork.coord.iR, iTick, iTransferCount, iOwnedTransferCount, pcOwnedIds);
 	}
 	else
 	{
-		LOG(kNetwork, kVerbose, "ReconcileRunTickCoord SpawnTransfers Coord: ({},{}) ForTick: {} TransferCount: {} OwnedCount: {}", rWork.coord.iX, rWork.coord.iY, iTick, iTransferCount, iOwnedTransferCount);
+		LOG(kNetwork, kVerbose, "ReconcileRunTickCoord SpawnTransfers Coord: ({},{}) ForTick: {} TransferCount: {} OwnedCount: {}", rWork.coord.iQ, rWork.coord.iR, iTick, iTransferCount, iOwnedTransferCount);
 	}
 }
 
@@ -175,7 +175,7 @@ static bool ReconcileValidateCrcCoord(CoordWork& rWork, int64_t iTick, const eng
 			char pcSharedCrc[20] {}, pcClientCrc[20] {};
 			common::ToHex(std::span<char, 20>(pcSharedCrc), rUpdate.uiSharedCrc);
 			common::ToHex(std::span<char, 20>(pcClientCrc), uiClientCrc);
-			LOG(kNetwork, kDebug, "ReconcileValidateCrcCoord Replay CRC mismatch; reconciliation outcome pending Coord: ({},{}) ForTick: {} ServerCrc: {} ClientCrc: {} ServerStatusChanges: {} ClientStatusChanges: {}", rWork.coord.iX, rWork.coord.iY, iTick, pcSharedCrc, pcClientCrc, std::ssize(rUpdate.statusChanges), std::ssize(rFrameInput.statusChanges));
+			LOG(kNetwork, kDebug, "ReconcileValidateCrcCoord Replay CRC mismatch; reconciliation outcome pending Coord: ({},{}) ForTick: {} ServerCrc: {} ClientCrc: {} ServerStatusChanges: {} ClientStatusChanges: {}", rWork.coord.iQ, rWork.coord.iR, iTick, pcSharedCrc, pcClientCrc, std::ssize(rUpdate.statusChanges), std::ssize(rFrameInput.statusChanges));
 		}
 
 		rScratch.iDesyncTick = iTick;
@@ -226,7 +226,7 @@ void ReconcileReplayCoord(CoordWork& rWork, int64_t iReplayStart, int64_t iMaxim
 		if (rCell.optionalPendingFullState.has_value() && rCell.optionalPendingFullState->iTick == i)
 		{
 			ReconcileInjectPendingFullState(rWork);
-			LOG(kNetwork, kVerbose, "ReconcileReplayCoord Injected pending full state Coord: ({},{}) ForTick: {}", rWork.coord.iX, rWork.coord.iY, i);
+			LOG(kNetwork, kVerbose, "ReconcileReplayCoord Injected pending full state Coord: ({},{}) ForTick: {}", rWork.coord.iQ, rWork.coord.iR, i);
 		}
 
 		if (!ReconcileValidateCrcCoord(rWork, i, it->second, frameInput))

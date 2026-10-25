@@ -549,7 +549,7 @@ void Server::ClientDesynchronizationReport(std::span<const uint8_t> packetData, 
 
 	char pcExpected[20] {};
 	char pcActual[20] {};
-	LOG(kNetwork, kError, "Server::ClientDesyncReport Frame: {} Grid: ({},{}) Expected: {} Actual: {}", iTick, coordinate.iX, coordinate.iY, common::ToHex(std::span(pcExpected), uiExpectedCrc), common::ToHex(std::span(pcActual), uiActualCrc));
+	LOG(kNetwork, kError, "Server::ClientDesyncReport Frame: {} Grid: ({},{}) Expected: {} Actual: {}", iTick, coordinate.iQ, coordinate.iR, common::ToHex(std::span(pcExpected), uiExpectedCrc), common::ToHex(std::span(pcActual), uiActualCrc));
 }
 
 void Server::ClientDebugFrameRequest(std::span<const uint8_t> packetData, ClientConnection& rClient)
@@ -730,7 +730,7 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, ClientConnecti
 	int64_t iExistingSlot = rClient.FindSlotForCoordinate(coordinate);
 	if (iExistingSlot >= 0)
 	{
-		LOG(kNetwork, kVerbose, "Server::ClientSubscribe AlreadySubscribed Client: {} Coord: ({},{})", rClient.iClientId, coordinate.iX, coordinate.iY);
+		LOG(kNetwork, kVerbose, "Server::ClientSubscribe AlreadySubscribed Client: {} Coord: ({},{})", rClient.iClientId, coordinate.iQ, coordinate.iR);
 		SendSubscribeAccept(rClient, iExistingSlot, coordinate);
 		return;
 	}
@@ -739,14 +739,13 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, ClientConnecti
 	bool bAdjacent = (coordinate == kOriginCoordinate);
 	bAdjacent |= std::ranges::any_of(rClient.authorizedCoordinates, [&coordinate](const GridCoord& rOwnedCoordinate)
 	{
-		// 64-bit: the client-supplied coord is hostile input, so the difference can overflow int32 and std::abs(INT32_MIN) is undefined.
-		int64_t iDeltaX = std::abs(static_cast<int64_t>(coordinate.iX) - static_cast<int64_t>(rOwnedCoordinate.iX));
-		int64_t iDeltaY = std::abs(static_cast<int64_t>(coordinate.iY) - static_cast<int64_t>(rOwnedCoordinate.iY));
-		return iDeltaX <= 1 && iDeltaY <= 1;
+		// The client-supplied coord is hostile input, so its difference from an owned coord can overflow int32;
+		// GridDistance takes both differences and their sum in int64.
+		return GridDistance(rOwnedCoordinate, coordinate) <= 1;
 	});
 	if (!bAdjacent)
 	{
-		LOG(kNetwork, kWarning, "Server::ClientSubscribe Rejected (not adjacent) Client: {} Coord: ({},{})", rClient.iClientId, coordinate.iX, coordinate.iY);
+		LOG(kNetwork, kWarning, "Server::ClientSubscribe Rejected (not adjacent) Client: {} Coord: ({},{})", rClient.iClientId, coordinate.iQ, coordinate.iR);
 		SendSubscribeAccept(rClient, kiSubscribeRejectSlot, coordinate);
 		return;
 	}
@@ -754,7 +753,7 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, ClientConnecti
 	int64_t iSlot = rClient.AllocateSlot();
 	if (iSlot < 0)
 	{
-		LOG(kNetwork, kWarning, "Server::ClientSubscribe No free slot Client: {} Coord: ({},{})", rClient.iClientId, coordinate.iX, coordinate.iY);
+		LOG(kNetwork, kWarning, "Server::ClientSubscribe No free slot Client: {} Coord: ({},{})", rClient.iClientId, coordinate.iQ, coordinate.iR);
 		SendSubscribeAccept(rClient, kiSubscribeRejectSlot, coordinate);
 		return;
 	}
@@ -763,7 +762,7 @@ void Server::ClientSubscribe(std::span<const uint8_t> packetData, ClientConnecti
 	rClient.slots.at(iSlot).subscription.flags.Set(SubscriptionFlags::kActive);
 	++rClient.slots.at(iSlot).ack.uiEpoch;
 
-	LOG(kNetwork, kDebug, "Server::ClientSubscribe Client: {} Coord: ({},{}) Slot: {}", rClient.iClientId, coordinate.iX, coordinate.iY, iSlot);
+	LOG(kNetwork, kDebug, "Server::ClientSubscribe Client: {} Coord: ({},{}) Slot: {}", rClient.iClientId, coordinate.iQ, coordinate.iR, iSlot);
 
 	SendSubscribeAccept(rClient, iSlot, coordinate);
 
@@ -801,7 +800,7 @@ void Server::ClientUnsubscribe(std::span<const uint8_t> packetData, ClientConnec
 		GridCoord coordinate = rClient.slots.at(static_cast<size_t>(iSlotIndex)).subscription.coordinate;
 		rClient.FreeSlot(iSlotIndex);
 
-		LOG(kNetwork, kDebug, "Server::ClientUnsubscribe Client: {} Slot: {} Coord: ({},{})", rClient.iClientId, iSlotIndex, coordinate.iX, coordinate.iY);
+		LOG(kNetwork, kDebug, "Server::ClientUnsubscribe Client: {} Slot: {} Coord: ({},{})", rClient.iClientId, iSlotIndex, coordinate.iQ, coordinate.iR);
 	}
 
 	common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;

@@ -224,6 +224,87 @@ inline std::pair<XMVECTOR, XMVECTOR> XM_CALLCONV ComputeAxisAlignedBoundingBox(F
 
 bool XM_CALLCONV AxisAlignedBoundingBoxIntersectsArea(XMFLOAT4 f4Area, FXMVECTOR vecMinimum, FXMVECTOR vecMaximum);
 
-bool XM_CALLCONV InsideArea(FXMVECTOR vecPosition, FXMVECTOR vecArea);
+inline constexpr int64_t kiHexDirectionCount = 6;
+
+// One edge neighbour of a flat-top hexagon on the axial lattice: the axial coordinate delta to the neighbour and the
+// offset n from this hexagon's center to the neighbour's center. n is also the shared edge's normal: that edge is the
+// line dot(p, n) = |n|^2 / 2.
+struct HexDirection
+{
+	int32_t iDeltaQ = 0;
+	int32_t iDeltaR = 0;
+	XMFLOAT2 f2CenterOffset {};
+};
+
+// A flat-top regular hexagon tiling. The entries run clockwise from NE: NE (1,0), SE (1,-1), S (0,-1), SW (-1,0),
+// NW (-1,1), N (0,1), so entry k+3 is entry k negated and entry k+1's offset minus entry k's is entry k+2's. The
+// basis vectors are the center offsets one q step and one r step make; the half extents are the bounding
+// rectangle's (circumradius, apothem).
+struct HexDirections
+{
+	HexDirection pEntries[kiHexDirectionCount] {};
+	XMFLOAT2 f2BasisQ {};
+	XMFLOAT2 f2BasisR {};
+	XMFLOAT2 f2HalfExtents {};
+};
+
+// fApothem is the center-to-edge distance. sqrt(3) is the only irrational factor, so the r basis vector, the N and S
+// offsets, and every offset's y component are exact in float.
+constexpr HexDirections XM_CALLCONV MakeHexDirections(float fApothem)
+{
+	XMFLOAT2 f2BasisQ(fApothem * std::numbers::sqrt3_v<float>, fApothem);
+	XMFLOAT2 f2BasisR(0.0f, 2.0f * fApothem);
+	auto Direction = [&](int32_t iDeltaQ, int32_t iDeltaR)
+	{
+		float fDeltaQ = static_cast<float>(iDeltaQ);
+		float fDeltaR = static_cast<float>(iDeltaR);
+		return HexDirection {.iDeltaQ = iDeltaQ, .iDeltaR = iDeltaR, .f2CenterOffset = XMFLOAT2(fDeltaQ * f2BasisQ.x + fDeltaR * f2BasisR.x, fDeltaQ * f2BasisQ.y + fDeltaR * f2BasisR.y)};
+	};
+
+	return HexDirections
+	{
+		.pEntries =
+		{
+			Direction(1, 0),
+			Direction(1, -1),
+			Direction(0, -1),
+			Direction(-1, 0),
+			Direction(-1, 1),
+			Direction(0, 1),
+		},
+		.f2BasisQ = f2BasisQ,
+		.f2BasisR = f2BasisR,
+		.f2HalfExtents = XMFLOAT2(2.0f * fApothem / std::numbers::sqrt3_v<float>, fApothem),
+	};
+}
+
+// Whether a position lies inside the hexagon centered at the origin, shrunk by fInset on every edge. Closed on the
+// edges toward entries 1-3 (SE, S, SW) and open on 4, 5, and 0, so of two edge neighbours the one with the larger
+// coordinate (larger r, or equal r and larger q) owns their shared edge, and exactly one of the three hexagons at a
+// vertex owns it. A NaN or infinite position is outside.
+bool XM_CALLCONV IsInsideHex(FXMVECTOR vecPosition, const HexDirections& rDirections, float fInset);
+
+// The fraction of the segment from vecStart to vecEnd at which it leaves the hexagon centered at the origin: 0 when
+// the start is outside IsInsideHex, otherwise a hit exactly when the end is outside, at the smallest edge crossing.
+// A start on a closed edge moving outward leaves at 0.
+std::optional<float> XM_CALLCONV TraceHexExit(FXMVECTOR vecStart, FXMVECTOR vecEnd, const HexDirections& rDirections);
+
+// For a position outside IsInsideHex, the entry whose edge it crosses with the largest dot(position, offset), which is
+// the nearest neighbour center among the crossed edges; an exact tie goes to the first such entry in table order.
+int64_t XM_CALLCONV HexExitDirection(FXMVECTOR vecPosition, const HexDirections& rDirections);
+
+// The offset from a hexagon's center to the center of the one at axial delta (iDeltaQ, iDeltaR), with W 0.
+XMVECTOR XM_CALLCONV HexCenterOffset(int64_t iDeltaQ, int64_t iDeltaR, const HexDirections& rDirections);
+
+// The same offset in double, from the float basis promoted to double, so a double absolute position moves by exactly
+// the float offset a one-step delta gives.
+std::pair<double, double> XM_CALLCONV HexCenterOffsetDouble(int64_t iDeltaQ, int64_t iDeltaR, const HexDirections& rDirections);
+
+// The number of edge-neighbour steps an axial delta spans.
+int64_t XM_CALLCONV HexGridDistance(int64_t iDeltaQ, int64_t iDeltaR);
+
+// Whether an axis-aligned rectangle, packed (minX, maxY, maxX, minY) as AxisAlignedBoundingBoxIntersectsArea reads
+// it, shares interior area with the hexagon centered at vecHexCenter; edge touching returns false.
+bool XM_CALLCONV RectangleOverlapsHex(XMFLOAT4 f4Rectangle, FXMVECTOR vecHexCenter, const HexDirections& rDirections);
 
 } // namespace common

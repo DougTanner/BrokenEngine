@@ -89,7 +89,7 @@ void BlastersInterpolate::ClientInitializeAll(Frame& rFrame)
 
 bool BlastersPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rSpawnInformation)
 {
-	if (!common::InsideArea(rSpawnInformation.vecPosition, engine::LocalCellArea()))
+	if (!engine::IsInsideCell(rSpawnInformation.vecPosition))
 	{
 		return false;
 	}
@@ -122,8 +122,6 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 	BlastersInterpolate& rCurrentInterpolate = *rFrame.interpolate.pBlasters;
 	BlastersPostRender& rCurrentPostRender = *rFrame.postRender.pBlasters;
 
-	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
-
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
 		return rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kTransfer;
@@ -141,9 +139,9 @@ void BlastersPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.alignment = alignment,
 			}),
 		};
-		if (!rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
+		if (!rFrame.postRender.PrepareTransferRequest(request)) [[unlikely]]
 		{
-			LOG(kDefault, kError, "Blaster Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) TypeIndex: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int64_t>(request.iDeltaX), static_cast<int64_t>(request.iDeltaY), static_cast<int64_t>(rCurrentInterpolate.puiTypeIndices[i]), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
+			LOG(kDefault, kError, "Blaster Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Direction: {} TypeIndex: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iQ, rStaticData.coordinate.iR, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int64_t>(request.iDirection), static_cast<int64_t>(rCurrentInterpolate.puiTypeIndices[i]), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, std::ssize(rFrame.postRender.transferRequests), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
 		rFrame.postRender.PushTransferRequest(request);

@@ -80,10 +80,10 @@ inline constexpr const char* PacketTypeName(PacketType eType)
 	return "Unknown";
 }
 
-inline constexpr int64_t kiProtocolVersion = 37;
+inline constexpr int64_t kiProtocolVersion = 38;
 inline constexpr int64_t kiSubscribeRejectSlot = 0xFF; // Sentinel slot in kServerSubscribeAccept: server rejected the subscribe (not adjacent / no free slot)
 inline constexpr int64_t kiDefaultPort = 27'015;
-inline constexpr int64_t kiCoordinateSlots = 16; // 9 visible subscriptions + 6 sticky + 1 spare
+inline constexpr int64_t kiCoordinateSlots = 16; // 7 visible subscriptions + 6 sticky + 3 spare
 inline constexpr int64_t kiMaximumResendFrames = 8;
 inline constexpr int64_t kiFloorStallLogThreshold = 15;
 inline constexpr int64_t kiMaximumBufferedFrames = 256;

@@ -99,7 +99,7 @@ public:
 	static std::span<CollisionFlags_t> GetLayerFlags(int64_t iLayerIndex);
 
 	// Frame drives collision detection; layer category masks and alignment pairs filter collisions.
-	static void Collide(const Alignments& rAlignments, FXMVECTOR vecArea);
+	static void Collide(const Alignments& rAlignments);
 
 	static std::span<const CollisionResult> GetCollisions(int64_t iLayerIndex, int64_t iIndex);
 
@@ -113,7 +113,7 @@ private:
 	// Every per-row column shares one element ceiling, so no column limits the row count below another.
 	static constexpr int64_t kiRowReserveCount = kiCollisionLiveDataReserveBytes / static_cast<int64_t>(sizeof(CollisionResultSpan));
 
-	static void SetupZones(FXMVECTOR vecArea);
+	static void SetupZones();
 	static ZoneRange CalculateZoneRange(float fMinimumX, float fMaximumX, float fMinimumY, float fMaximumY, float fRadius);
 	static ZoneRange CalculateObjectZoneRange(const CollisionLayer& rLayer, int64_t iIndex, bool bSweptPair);
 	static void InsertObjectIntoZones(LayerPairZones& rPairZones, int64_t iIndex, const ZoneRange& rRange, bool bIsLayerA);
@@ -121,12 +121,6 @@ private:
 	static void CollideLayerPair(const Alignments& rAlignments, const LayerPairZones& rPairZones);
 	static void CommitCandidate(const CollisionCandidate& rCandidate);
 	static void AllocateResultStorage();
-
-	// thread_local: each Dispatch worker and reconcile thread gets its own copy
-	static inline thread_local float sfAreaMinimumX = 0.0f;
-	static inline thread_local float sfAreaMinimumY = 0.0f;
-	static inline thread_local float sfZoneWidth = 0.0f;
-	static inline thread_local float sfZoneHeight = 0.0f;
 
 	// Default-constructed (no allocation): thread_local constructors run during
 	// mi_process_init before the allocator is ready, so pre-allocation would crash.

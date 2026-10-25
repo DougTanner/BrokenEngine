@@ -110,7 +110,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 			float fTotal = engine::gpCamera->AddVisualErrorOffset(vecError);
 			if (fTotal > engine::CameraBase::kfVisualErrorMaxDistance)
 			{
-				LOG(kNetwork, kWarning, "Visual error offset reset (exceeded max) Coord: ({},{}) Delta: {} Max: {}", gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY, common::Wb(XMVectorGetX(XMVector3Length(vecError)), 3), common::Wb(engine::CameraBase::kfVisualErrorMaxDistance, 1));
+				LOG(kNetwork, kWarning, "Visual error offset reset (exceeded max) Coord: ({},{}) Delta: {} Max: {}", gpGame->mClientGridCoordinate.iQ, gpGame->mClientGridCoordinate.iR, common::Wb(XMVectorGetX(XMVector3Length(vecError)), 3), common::Wb(engine::CameraBase::kfVisualErrorMaxDistance, 1));
 			}
 			else
 			{
@@ -123,7 +123,7 @@ engine::ReconcileDesyncInfo ClientReconciler::Run()
 					int64_t iCurrentTick = gpGame->miTickCounter;
 					if (fChange > 0.15f && (iCurrentTick - miLastVisualErrorLogTick > 32))
 					{
-						LOG(kNetwork, kDebug, "Visual error offset Coord: ({},{}) Delta: {} Accumulated: {}", gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY, common::Wb(fDelta, 3), common::Wb(fTotal, 3));
+						LOG(kNetwork, kDebug, "Visual error offset Coord: ({},{}) Delta: {} Accumulated: {}", gpGame->mClientGridCoordinate.iQ, gpGame->mClientGridCoordinate.iR, common::Wb(fDelta, 3), common::Wb(fTotal, 3));
 						mfLastLoggedVisualErrorDelta = fDelta;
 						miLastVisualErrorLogTick = iCurrentTick;
 					}

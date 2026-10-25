@@ -24,9 +24,9 @@ adding the fields below; the other entries are its own commands. For the engine
   that tick. A spawn, whether an `inject_payload` or a fleet spawn, counts under
   its collection's count, as a transfer does; a `SpawnExplosion` counts under
   none, so an event holding only explosion spawns has every count zero.
-- `query_frame`: `{"coord":[x,y]}` for a loaded, ready cell. Returns counts under `fighters`, `omnis`, `battleships`, `missiles`, and `blasters`.
+- `query_frame`: `{"coord":[q,r]}` for a loaded, ready cell. Returns counts under `fighters`, `omnis`, `battleships`, `missiles`, and `blasters`.
 - `query_collection`:
-  `{"coord":[x,y],"collection":"fighters"|"omnis"|"battleships"|"missiles"|"blasters","offset"?:0,"limit"?:256}`.
+  `{"coord":[q,r],"collection":"fighters"|"omnis"|"battleships"|"missiles"|"blasters","offset"?:0,"limit"?:256}`.
   A negative `offset` or `limit` is a parameter error. Returns
   `{"total","items":[...]}`. Ship rows (`fighters`, `omnis`, `battleships`):
   `index,uuid,globalId,controller,orders,targetFlightPlane,flags,lifecycleFlags,alignment,local,dir,vel,arrivalGrace,flagshipGlobalId,registryId`,
@@ -48,7 +48,7 @@ adding the fields below; the other entries are its own commands. For the engine
   target. A missile's `deltaRotation` is the live turn rate and its
   `deltaRotationDelay` counts down through zero and stays negative after its
   launch ramp finishes.
-- `edit_frame`: `{"coord":[x,y],"edits":[...]}`; these are the only top-level
+- `edit_frame`: `{"coord":[q,r],"edits":[...]}`; these are the only top-level
   keys. Overwrites chosen values in the cell's current frame, the frame
   `query_frame` reads, at the command drain, paused or not; the next tick
   simulates from the edited frame. Each edit is
@@ -81,7 +81,7 @@ adding the fields below; the other entries are its own commands. For the engine
   `"Fleet"` or `"RandomSpawn"`, the form `read_frame` returns;
   `engine::AlignmentIdentifier` an integer within `uint32_t`;
   `engine::GlobalId` an integer within `int64_t`;
-  `engine::ClientGuid` `[high,low]`; `engine::GridCoord` an `[x,y]` grid
+  `engine::ClientGuid` `[high,low]`; `engine::GridCoord` a `[q,r]` grid
   coordinate; the `explosions` `pTrailTimes` array exactly
   `kiMaxExplosionTrails` values; `randomEngine` a nonzero integer within
   `uint64_t`; `alignments` an array of `{"a","b","flags"}` objects (`a` and `b`
@@ -99,9 +99,10 @@ adding the fields below; the other entries are its own commands. For the engine
   its `PostRead` hook rejects outside the lowest-to-highest flight-plane
   heights, and a flying (neither falling nor dying) missile's height and
   velocity z, which the save reader requires to be exactly a flight-plane height
-  and 0. Positions must stay inside the cell: an out-of-cell omni position transfers
-  at most one cell per axis per tick and then asserts in
-  `OmnisPostRender::Spawn` ([Frame
+  and 0. Positions must stay inside the cell: an out-of-cell omni position
+  transfers to one edge neighbour, so a position more than one neighbour step out
+  asserts in the source cell's `FramePostRenderBase::PrepareTransferRequest`
+  before any transfer ([Frame
   invariants](../../../../Engine/Source/Frame/AGENTS.md)).
 
   The edits apply to a staged copy of the frame, which is committed through the
@@ -173,7 +174,7 @@ adding the fields below; the other entries are its own commands. For the engine
   entries survive.
 
   Recipe: `load {"pauseAfterLoad":true}` or `pause {"paused":true}`, then `create_cell` when the scenario needs an isolated empty cell, then `edit_frame`, then `pause {"paused":false}`; edit before `inject_payload`, because with a handshaken client the resynchronization drops queued entries, as `load` and `reset` do. Edits are never recorded into a replay; recording an edit into the replay stream could be built if an agent needs edits inside a recorded scenario.
-- `read_frame`: `{"coord":[x,y],"collection":<name>,"index"?:int}`; these are
+- `read_frame`: `{"coord":[q,r],"collection":<name>,"index"?:int}`; these are
   the only top-level keys. Reads one row or the frame-wide values of the cell's
   current frame, the frame `query_frame` reads, and changes nothing.
   `collection` is one of the `edit_frame` collection names or `frame`. A
@@ -197,7 +198,7 @@ adding the fields below; the other entries are its own commands. For the engine
   tick input. The whole batch validates before anything is queued or any global
   id is minted, so a rejected batch changes no pending count and leaves
   `status.nextGlobalId` unchanged. Each entry is
-  `{"coord":[x,y],"type":<type>,"tick"?:int,...fields}` with a `type` from the
+  `{"coord":[q,r],"type":<type>,"tick"?:int,...fields}` with a `type` from the
   table below; a key other than `coord`, `type`, `tick`, and that type's fields
   fails the batch. Field keys are the `Fields()` member tokens of the type's
   payload, verbatim: the collection's `SpawnInfo` for a spawn type (`Frame/Collections/<Collection>/<Collection>.h`; Explosions in
@@ -205,7 +206,7 @@ adding the fields below; the other entries are its own commands. For the engine
   update payloads in `Frame/StatusChange.h`. Values by member type: `bool` a
   JSON boolean; `int64_t` a JSON integer; `uint8_t` a JSON integer in
   `[0,255]`; `float` a finite number; `std::chrono::duration<float>` a finite
-  number of seconds; `engine::GridCoord` an `[x,y]` grid coordinate; `XMVECTOR`
+  number of seconds; `engine::GridCoord` a `[q,r]` grid coordinate; `XMVECTOR`
   an `[x,y]` pair of finite numbers in the cell's local frame, a position being
   meters from the cell's center: a ship spawn's `vecPosition` takes z at the
   height of its `orders` target flight plane (`orders` 256 names plane 1, 512
@@ -292,16 +293,21 @@ adding the fields below; the other entries are its own commands. For the engine
   limit is 65,535 entries of a single status-change type in one cell's tick,
   which the server's batch encoder asserts.
 
-  Edge coast: to send an omni out across a cell's east edge, queue
-  `{"coord":<cell>,"type":"SpawnOmni","vecPosition":[433.86,0],"vecVelocity":[33.33,0],"transferLockTimer":1}`:
-  433.86 m is half the cell width (`cell_coordinate_probe` `area.width`) less
-  15.5 ticks of travel at `kfOmniMaximumSpeed`, so the omni coasts under its
-  transfer lock, which skips navigation and acceleration, and crosses into the
-  eastern neighbor about 16 ticks after the tick it is applied, through the
+  Edge coast: to send an omni out across a cell's north edge, queue
+  `{"coord":<cell>,"type":"SpawnOmni","vecPosition":[0,433.86],"vecVelocity":[0,33.33],"transferLockTimer":1}`:
+  433.86 m is the 450 m from the cell's center to each edge midpoint (half
+  `cell_coordinate_probe` `area.height`) less 15.5 ticks of travel at
+  `kfOmniMaximumSpeed`, so the omni coasts under its transfer lock, which skips
+  navigation and acceleration, and crosses into the northern neighbor, `<cell>`
+  plus `[0,1]`, about 16 ticks after the tick it is applied, through the
   ordinary transfer producers; that crossing creates the neighbor when it is
-  not active. A smaller margin crosses sooner: `vecPosition:[449.5,0]` crosses
-  on the first tick after the one it is applied. For another edge, mirror or
-  swap the components. Terrain near that path can push the coast off its line; then pick
+  not active. A smaller margin crosses sooner: `vecPosition:[0,449.5]` crosses
+  on the first tick after the one it is applied. For another edge, rotate both
+  vectors to that edge's direction: edge k of the `kCellDirections` table
+  (`../../../../Engine/Source/Frame/AGENTS.md` `## Architecture`) faces
+  30 - 60k degrees from +x, for example `[375.73,216.93]` and `[28.87,16.67]` for
+  the NE edge (k = 0), and the omni arrives at `<cell>` plus that entry's axial
+  delta. Terrain near that path can push the coast off its line; then pick
   another cell.
 
   `tick` is an absolute `status.tick` value and must be a JSON integer greater

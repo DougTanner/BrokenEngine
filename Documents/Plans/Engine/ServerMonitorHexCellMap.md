@@ -1,12 +1,12 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-23T17:42:12.289Z","dependsOn":["Documents/Plans/Engine/HexagonalSimulationCells.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-23T17:42:12.289Z","dependsOn":[]} -->
 # Server monitor cell map drawn as flat-top hexes
 
-Authored against `86020b734f78e45a03374b78bd4e0fab58593078` with its prerequisite,
-`Documents/Plans/Engine/HexagonalSimulationCells.md` (the parent Plan), not yet landed. This Plan is written
-against the tree the parent leaves: hexagonal cells, axial `GridCoord` fields `iQ`/`iR`, and the parent's
-`kCellDirections` table and `FrameUtils.h` wrappers. `Engine/Source/Server/ServerDisplay.cpp` line numbers below
-are from the authoring tree; the parent changes that file by its field rename only, so they shift by nothing more
-than that rename.
+Authored against `86020b734f78e45a03374b78bd4e0fab58593078`, before its prerequisite, the Hexagonal simulation
+cells Plan (the parent Plan), landed. Cells are flat-top hexagons whose `GridCoord` fields are the axial `iQ`/`iR`;
+`Engine/Source/Frame/GridCoord.h` holds the `kCellDirections` table and the bounding half extents
+`kfCellHalfWidth`/`kfCellHalfHeight`, and `Engine/Source/Frame/FrameUtils.h` holds the wrappers, among them the
+float centre offset `CellCenterOffset`. `Engine/Source/Server/ServerDisplay.cpp` line numbers below are from the
+authoring tree; the parent changed that file by its field rename only, so they shift by nothing more than that rename.
 
 ## Context
 

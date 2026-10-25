@@ -11,7 +11,7 @@ constexpr uint64_t kuiRotationSeedMultiplier = 0x9E37'79B9'7F4A'7C15ui64;
 constexpr uint64_t kuiAnchorSeedMultiplier = 0xFF51'AFD7'ED55'8CCDui64;
 constexpr uint64_t kuiCurveSeedMultiplier = 0xC4CE'B9FE'1A85'EC53ui64;
 
-// Anchor: large island centered at 1/3 of the cell from the SW (min) corner.
+// Anchor: large island targeted at 1/3 of the cell's bounding rectangle from its SW (min) corner.
 constexpr float kfAnchorFraction = 1.0f / 3.0f;
 constexpr float kfAnchorJitterMeters = 25.0f;
 constexpr float kfAnchorRotationJitter = 0.2f;
@@ -133,27 +133,38 @@ static int64_t CommitPlacement(CellContext& rContext, common::crc_t crc, XMFLOAT
 	return std::ssize(rContext.placedHullViews) - 1;
 }
 
-// Place the large anchor at the clamped target (output index 0). The center is clamped so the rotation-
-// expanded footprint rectangle stays inside the cell; returns false only if the island cannot fit at all.
-// Returns the accepted cell-local position via rAcceptedLocalOut.
+// Place the large anchor at the limited target (output index 0). Along each edge normal the center may lie at most
+// the margin-inset apothem minus the rotated footprint rectangle's support along that normal from the cell center,
+// so the rectangle stays inside the margin-inset hexagon; a target past any limit is scaled toward the center until
+// it meets every limit. Returns false only if the island cannot fit at all.
 static bool PlaceAnchor(CellContext& rContext, common::crc_t crc, float fTargetLocalX, float fTargetLocalY, float fRotation, XMFLOAT2& rAcceptedLocalOut)
 {
 	const IslandTemplate& rTemplate = gpIslandTerrain->mIslands.at(crc);
 
 	common::SinCos rotation = common::DeterministicSinCos(fRotation);
-	float fAbsoluteCosine = std::abs(rotation.fCos);
-	float fAbsoluteSine = std::abs(rotation.fSin);
-	float fRotatedHalfWidth = 0.5f * (rTemplate.fQuadFootprintX * fAbsoluteCosine + rTemplate.fQuadFootprintY * fAbsoluteSine);
-	float fRotatedHalfHeight = 0.5f * (rTemplate.fQuadFootprintX * fAbsoluteSine + rTemplate.fQuadFootprintY * fAbsoluteCosine);
-	float fLimitX = rContext.fHalfWidth - fRotatedHalfWidth - kfCellEdgeMarginMeters;
-	float fLimitY = rContext.fHalfHeight - fRotatedHalfHeight - kfCellEdgeMarginMeters;
-	if (fLimitX < 0.0f || fLimitY < 0.0f)
+	float fHalfFootprintX = 0.5f * rTemplate.fQuadFootprintX;
+	float fHalfFootprintY = 0.5f * rTemplate.fQuadFootprintY;
+	float fScale = 1.0f;
+	for (const common::HexDirection& rDirection : kCellDirections.pEntries)
 	{
-		return false;
+		XMFLOAT2A f2Normal {};
+		XMStoreFloat2A(&f2Normal, XMVector2Normalize(XMLoadFloat2(&rDirection.f2CenterOffset)));
+		float fSupport = fHalfFootprintX * std::abs(f2Normal.x * rotation.fCos + f2Normal.y * rotation.fSin) + fHalfFootprintY * std::abs(f2Normal.y * rotation.fCos - f2Normal.x * rotation.fSin);
+		float fLimit = kfCellApothem - kfCellEdgeMarginMeters - fSupport;
+		if (fLimit < 0.0f)
+		{
+			return false;
+		}
+
+		float fTargetDistance = fTargetLocalX * f2Normal.x + fTargetLocalY * f2Normal.y;
+		if (fTargetDistance > fLimit)
+		{
+			fScale = std::min(fScale, fLimit / fTargetDistance);
+		}
 	}
 
-	float fLocalX = std::clamp(fTargetLocalX, -fLimitX, fLimitX);
-	float fLocalY = std::clamp(fTargetLocalY, -fLimitY, fLimitY);
+	float fLocalX = fScale * fTargetLocalX;
+	float fLocalY = fScale * fTargetLocalY;
 	XMFLOAT2 f2Local {fLocalX, fLocalY};
 
 	rContext.scratch.resize(static_cast<size_t>(rTemplate.iValidAreaVertexCount));
@@ -204,10 +215,12 @@ static bool TryTouchPlace(CellContext& rContext, common::crc_t crc, int64_t iHos
 	rContext.scratch.resize(static_cast<size_t>(rTemplate.iValidAreaVertexCount));
 	common::ConvexHull2D candidate = common::BuildWorldHull(std::span<const XMFLOAT2>(rTemplate.pf2ValidAreaVertices, static_cast<size_t>(rTemplate.iValidAreaVertexCount)), f2Local, fCosine, fSine, std::span<XMFLOAT2>(rContext.scratch));
 
-	// Keep the whole cluster inside the cell (the touch pose is not clamped — that would break contact).
-	float fLimitX = rContext.fHalfWidth - kfCellEdgeMarginMeters;
-	float fLimitY = rContext.fHalfHeight - kfCellEdgeMarginMeters;
-	if (candidate.f2AabbMin.x < -fLimitX || candidate.f2AabbMax.x > fLimitX || candidate.f2AabbMin.y < -fLimitY || candidate.f2AabbMax.y > fLimitY)
+	// Keep the whole cluster inside the margin-inset hexagon (the touch pose is not clamped — that would break
+	// contact). The hull is convex, so it lies inside the convex hexagon exactly when every vertex does.
+	if (!std::ranges::all_of(std::span(candidate.pVertices, static_cast<size_t>(candidate.iVertexCount)), [](const XMFLOAT2& rVertex)
+	{
+		return common::IsInsideHex(XMLoadFloat2(&rVertex), kCellDirections, kfCellEdgeMarginMeters);
+	}))
 	{
 		return false;
 	}
@@ -228,8 +241,8 @@ void GenerateIslandChain(GridCoord coordinate, std::vector<IslandPlacement>& rOu
 {
 	rOut.clear();
 
-	float fCellWidth = kfCellWidth;
-	float fCellHeight = kfCellHeight;
+	float fCellWidth = 2.0f * kfCellHalfWidth;
+	float fCellHeight = 2.0f * kfCellHalfHeight;
 
 	// Coordinates seed the random streams; all placement geometry stays centered in cell-local meters.
 	CellContext context;

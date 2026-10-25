@@ -138,7 +138,7 @@ void CommandDesynchronizationProbe(const nlohmann::json& rParameters, nlohmann::
 	}
 
 	rResult["tick"] = iTick;
-	rResult["coord"] = {coordinate.iX, coordinate.iY};
+	rResult["coord"] = {coordinate.iQ, coordinate.iR};
 	rResult["desyncDebugFrames"] = kbDesynchronizationDebugFrames;
 	rResult["stalled"] = game::gpClientSession->mpDesynchronizationCore->IsStalled();
 	rResult["desyncReports"] = iDesynchronizationReportCount;

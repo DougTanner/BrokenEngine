@@ -12,12 +12,13 @@ Set up server and client state with the recipe below, then verify and release pe
 
 ### Chosen omni placement
 
-To place omnis at exact positions instead of the single default spawn point,
+To place omnis at exact positions instead of the point the fleet spawn search picks,
 send one `inject_payload` batch holding two `SpawnOmni` entries on the same
 active coord whose `vecPosition` values lie about 600 m apart, for example
-`"vecPosition":[-300,0]` and `"vecPosition":[300,0]` (a cell is 900 m square,
-so a position must stay inside +/-450 or the batch fails). No response reports the tick that
-applied the batch, so poll `query_collection {"coord":[x,y],"collection":"omnis"}`
+`"vecPosition":[-300,0]` and `"vecPosition":[300,0]` (a cell is a flat-top
+hexagon whose edges lie 450 m from its center, so any position less than 450 m
+from the center is inside; a position outside the hexagon fails the batch). No response reports the tick that
+applied the batch, so poll `query_collection {"coord":[q,r],"collection":"omnis"}`
 on that coord until both minted `globalIds` from the injection response appear
 in `items` (`total` rises by two), then send `pause {"paused":true}` and read
 the exact positions with a final `query_collection`.

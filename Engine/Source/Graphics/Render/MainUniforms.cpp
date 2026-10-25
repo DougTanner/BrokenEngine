@@ -31,24 +31,23 @@ static void DebugRenderCellEdges(const std::vector<GridCoord>& rActiveCoordinate
 			continue;
 		}
 
-		// Every cell has the same local edges; the basis offset is what places this one on screen.
-		// vecArea packing: x=minX, y=maxY, z=maxX, w=minY
+		// Every cell has the same local edges; the basis offset is what places this one on screen. The vertex shared by
+		// edges k and k+1 is the centroid of the cell center and those two neighbour centers.
 		XMFLOAT2 f2Offset = MakeRenderBasis(rCoordinate, cameraCoordinate).f2Offset;
-		XMVECTOR vecArea = LocalCellArea();
-		float fMinX = XMVectorGetX(vecArea) + f2Offset.x;
-		float fMaxY = XMVectorGetY(vecArea) + f2Offset.y;
-		float fMaxX = XMVectorGetZ(vecArea) + f2Offset.x;
-		float fMinY = XMVectorGetW(vecArea) + f2Offset.y;
+		XMVECTOR vecOffset = XMVectorSet(f2Offset.x, f2Offset.y, fZ, 0.0f);
+		auto Vertex = [&](int64_t k)
+		{
+			XMVECTOR vecFirst = XMLoadFloat2(&kCellDirections.pEntries[k % common::kiHexDirectionCount].f2CenterOffset);
+			XMVECTOR vecSecond = XMLoadFloat2(&kCellDirections.pEntries[(k + 1) % common::kiHexDirectionCount].f2CenterOffset);
+			XMFLOAT3A f3Vertex {};
+			XMStoreFloat3A(&f3Vertex, XMVectorAdd(XMVectorScale(XMVectorAdd(vecFirst, vecSecond), 1.0f / 3.0f), vecOffset));
+			return f3Vertex;
+		};
 
-		XMFLOAT3A f3MinMin = {fMinX, fMinY, fZ};
-		XMFLOAT3A f3MaxMin = {fMaxX, fMinY, fZ};
-		XMFLOAT3A f3MaxMax = {fMaxX, fMaxY, fZ};
-		XMFLOAT3A f3MinMax = {fMinX, fMaxY, fZ};
-
-		DebugRender::Line(f3MinMin, f3MaxMin, kf4EdgeColor);
-		DebugRender::Line(f3MaxMin, f3MaxMax, kf4EdgeColor);
-		DebugRender::Line(f3MaxMax, f3MinMax, kf4EdgeColor);
-		DebugRender::Line(f3MinMax, f3MinMin, kf4EdgeColor);
+		for (int64_t k = 0; k < common::kiHexDirectionCount; ++k)
+		{
+			DebugRender::Line(Vertex(k), Vertex(k + 1), kf4EdgeColor);
+		}
 	}
 }
 
@@ -423,8 +422,9 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurre
 	// absolute camera position for the wave phase to be continuous: reconstruct it as a double from the camera cell
 	// and the camera's local position, exactly as the reduced water origins do. CPU only — the uploaded phase is
 	// already reduced modulo 2*pi.
-	double fWaveCameraX = static_cast<double>(engine::gpCamera->mBasisCoordinate.iX) * static_cast<double>(kfCellWidth) + static_cast<double>(f4WaveCameraPosition.x);
-	double fWaveCameraY = static_cast<double>(engine::gpCamera->mBasisCoordinate.iY) * static_cast<double>(kfCellHeight) + static_cast<double>(f4WaveCameraPosition.y);
+	auto [fWaveCellX, fWaveCellY] = CellCenterOffsetDouble(kOriginCoordinate, engine::gpCamera->mBasisCoordinate);
+	double fWaveCameraX = fWaveCellX + static_cast<double>(f4WaveCameraPosition.x);
+	double fWaveCameraY = fWaveCellY + static_cast<double>(f4WaveCameraPosition.y);
 
 	// Fade geometric wave amplitudes by camera eye height — per-stack Start/End sliders (1.0 at ≤ Start, 0.0 at ≥ End, linear between).
 	float fCameraEyeHeight = engine::gpCamera->mfCameraEyeHeight;

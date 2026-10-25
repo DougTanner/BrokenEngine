@@ -146,8 +146,6 @@ void OmnisPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
 	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
 
-	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
-
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying)
@@ -182,7 +180,7 @@ void OmnisPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame, [
 		{
 			BeginExplosion(rCurrentInterpolate, rCurrentPostRender, i);
 		}
-		else if (engine::IsOutOfBounds(bounds, rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
+		else if (!engine::IsInsideCell(rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
 		{
 			// Entity candidates at or beyond cell exit were filtered during PreCollision.
 			rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kTransfer);
@@ -378,7 +376,7 @@ void OmnisPostRender::SpawnMissiles([[maybe_unused]] Frame& __restrict rFrame, [
 		XMVECTOR vecMissileVelocity = XMVectorScale(vecJitteredDirection, kfMissileInitialVelocity);
 
 		// Refuse before acquisition: a subscription taken for a row that is never appended is never released.
-		if (!common::InsideArea(vecMissilePosition, engine::LocalCellArea()))
+		if (!engine::IsInsideCell(vecMissilePosition))
 		{
 			continue;
 		}

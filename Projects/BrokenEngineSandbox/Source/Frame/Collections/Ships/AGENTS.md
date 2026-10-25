@@ -56,13 +56,13 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
   the polygon is that elevation contour inflated outward, so a ship stranded in
   the band between them measures clear terrain and never re-paths.
 - Random draws, arrival checks, and mode transitions remain outside the
-  pathfinding throttle. Modes 4 and 5 must consume the same number of random
-  draws on any tick they can flip between, so mode 5 mirrors mode 4's three
+  pathfinding throttle. Modes 6 and 7 must consume the same number of random
+  draws on any tick they can flip between, so mode 7 mirrors mode 6's three
   entry draws (island pick, footprint X, footprint Y) on every tick it runs. In
-  a cell with no islands neither mode draws: mode 5 skips the mirror and mode 4
+  a cell with no islands neither mode draws: mode 7 skips the mirror and mode 6
   navigates to the cell center instead of an island. Only the draw count matters
   — each `common::Random` advances the shared random stream once no matter what
-  bound it is given — so mode 5's mirror draws are load-bearing, not dead code,
+  bound it is given — so mode 7's mirror draws are load-bearing, not dead code,
   even though it throws their results away.
 - Spawning always consumes its cell-change random draw.
 - Preserve cached steering and client debug waypoints across ticks where pathfinding is skipped.

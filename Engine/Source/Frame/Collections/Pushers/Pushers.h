@@ -52,8 +52,8 @@ struct PushersInterpolate : public Collection<PushersInterpolate, CollectionFlag
 	// Sync pusher state from owner collection
 	static void XM_CALLCONV Sync(game::FrameInterpolate& rFrameInterpolate, id_t id, const SyncData& rData);
 
-	// Zone system - builds spatial acceleration structure each frame over the cell's own area
-	static void XM_CALLCONV SetupZones(const game::Frame& __restrict rFrame, FXMVECTOR vecArea);
+	// Zone system - builds spatial acceleration structure each frame over the cell's bounding rectangle
+	static void SetupZones(const game::Frame& __restrict rFrame);
 
 	// Query force at position using zone acceleration
 	static XMVECTOR XM_CALLCONV ApplyPush(const game::FrameInterpolate& rFrameInterpolate, FXMVECTOR vecPosition, id_t ignorePusher = id_t {}, PusherFlags_t includeFlags = PusherFlags::kTypeDefault, PusherFlags_t excludeFlags = PusherFlags::kTypeMines);

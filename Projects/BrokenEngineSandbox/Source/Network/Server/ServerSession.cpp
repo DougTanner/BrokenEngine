@@ -225,7 +225,7 @@ void ServerSession::ProcessUpdateOwnedEntityRequests()
 		game::StatusChange updateChange {.eType = game::StatusChangeType::kUpdateShip, .data = game::UpdateShipData {.eType = shipUuid.eType, .iUuid = shipUuid.iUuid, .bUseMissiles = rRequest.bUseMissiles, .navigationDelaySeconds = rRequest.navigationDelaySeconds, .uiPendingWeaponModeTicks = static_cast<uint8_t>(iPendingWeaponModeTicks)}};
 		it->second.statusChanges.push_back(updateChange);
 
-		LOG(kNetwork, kDebug, "ServerSession::ProcessUpdateOwnedEntityRequests Client: {} GlobalId: {} Type: {} Uuid: {} Coord: ({},{}) Missiles: {} NavDelay: {}", rRequest.iClientId, rRequest.globalId, ShipTypeName(shipUuid.eType), shipUuid.iUuid, updateCoord.iX, updateCoord.iY, rRequest.bUseMissiles, common::Wb(rRequest.navigationDelaySeconds.count(), 3));
+		LOG(kNetwork, kDebug, "ServerSession::ProcessUpdateOwnedEntityRequests Client: {} GlobalId: {} Type: {} Uuid: {} Coord: ({},{}) Missiles: {} NavDelay: {}", rRequest.iClientId, rRequest.globalId, ShipTypeName(shipUuid.eType), shipUuid.iUuid, updateCoord.iQ, updateCoord.iR, rRequest.bUseMissiles, common::Wb(rRequest.navigationDelaySeconds.count(), 3));
 	}
 }
 

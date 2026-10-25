@@ -277,8 +277,6 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 	MissilesInterpolate& rCurrentInterpolate = *rFrame.interpolate.pMissiles;
 	MissilesPostRender& rCurrentPostRender = *rFrame.postRender.pMissiles;
 
-	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
-
 	engine::DestroySweep(rCurrentInterpolate, rCurrentPostRender, [&](int64_t i)
 	{
 		return rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kTransfer;
@@ -309,9 +307,9 @@ void MissilesPostRender::Transfer([[maybe_unused]] Frame& __restrict rFrame, [[m
 				.bTransfer = true,
 			}),
 		};
-		if (!rFrame.postRender.PrepareTransferRequest(bounds, request)) [[unlikely]]
+		if (!rFrame.postRender.PrepareTransferRequest(request)) [[unlikely]]
 		{
-			LOG(kDefault, kError, "Missile Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Delta: ({},{}) Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iX, rStaticData.coordinate.iY, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDeltaX), static_cast<int32_t>(request.iDeltaY), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, rFrame.postRender.transferRequests.size(), rFrame.postRender.transferRequests.capacity());
+			LOG(kDefault, kError, "Missile Transfer capacity hit Tick: {} Source: ({},{}) Index: {} Position: {} Velocity: {} Direction: {} Alignment: {} SourceCount: {} Pushed: {} Capacity: {}", rFrame.interpolate.iTick, rStaticData.coordinate.iQ, rStaticData.coordinate.iR, i, common::WbV2(vecPosition, 1), common::WbV2(rCurrentPostRender.pVecVelocities[i], 1), static_cast<int32_t>(request.iDirection), rCurrentPostRender.pAlignments[i], rCurrentInterpolate.iCount, rFrame.postRender.transferRequests.size(), rFrame.postRender.transferRequests.capacity());
 			DEBUG_BREAK();
 		}
 		rFrame.postRender.PushTransferRequest(request);
@@ -334,7 +332,7 @@ void MissilesPostRender::Destroy([[maybe_unused]] Frame& __restrict rFrame, [[ma
 
 bool MissilesPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rSpawnInformation)
 {
-	if (!common::InsideArea(rSpawnInformation.vecPosition, engine::LocalCellArea()))
+	if (!engine::IsInsideCell(rSpawnInformation.vecPosition))
 	{
 		return false;
 	}

@@ -11,12 +11,12 @@ namespace engine
 struct IslandPlacement
 {
 	common::crc_t islandCrc = 0;
-	// Centered cell-local meters within [-450,+450]; the owning cell's GridCoord supplies the identity.
+	// Centered cell-local meters inside the cell's hexagon; the owning cell's GridCoord supplies the identity.
 	XMFLOAT2 f2WorldPosition {};
 	float fRotation = 0.0f;
 };
 
-// Chain links after the Huge anchor (a fixed sequence, truncated by the cell edge).
+// Chain links after the Huge anchor (a fixed sequence, truncated by the cell's hexagon edge).
 inline constexpr int64_t kiChainLargeCount = 2;
 inline constexpr int64_t kiChainMediumCount = 3;
 
@@ -31,10 +31,10 @@ inline constexpr int64_t kiMaximumBigIslands = 1 + kiChainLargeCount + kiChainMe
 inline constexpr int64_t kiMaximumIslandsPerCell = kiMaximumBigIslands + kiMaximumBigIslands * kiMaximumSurroundSlots + kiTailSmallCount;
 
 // Deterministic per-cell archipelago generator. Builds a chain by contact growth — a Huge anchor
-// in the SW third of the cell, then a fixed sequence of Large/Medium links each placed just-touching
-// the chain tip along a hard-turning curve (truncated where the next link would leave the cell), then
-// Small islets ringing each big island — packing every island by its rotated true valid-area hull so
-// no two hulls overlap (bounding rectangles may overlap, hidden underwater). The grid coordinate is used only
+// targeted at the SW third of the cell's bounding rectangle, then a fixed sequence of Large/Medium links each
+// placed just-touching the chain tip along a hard-turning curve (truncated where the next link would leave the
+// margin-inset hexagon), then Small islets ringing each big island — packing every island by its rotated true
+// valid-area hull so no two hulls overlap (bounding rectangles may overlap, hidden underwater). The grid coordinate is used only
 // to seed the RNG streams, so client and server produce identical layouts and the emitted positions are
 // centered cell-local meters at every coordinate.
 void GenerateIslandChain(GridCoord coordinate, std::vector<IslandPlacement>& rOut);

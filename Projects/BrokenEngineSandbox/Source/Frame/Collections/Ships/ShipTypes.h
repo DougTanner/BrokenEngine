@@ -85,10 +85,12 @@ enum class ShipFlags : uint16_t
 	kFlee                 = 0x0040,
 	kReturnToIslandCenter = 0x0080,
 
-	// Nav direction in bits 8-10 (3 bits, stored as value+1: 0-6 representing -1 to 5)
+	// Nav direction in bits 8-11 (4 bits, stored as value+1: 0-8 representing -1 to 7): -1 roaming, 0-5 the
+	// engine::kCellDirections index of the neighbour headed for, 6 island tour, 7 follow flagship
 	kNavigationDirectionBit0 = 0x0100,
 	kNavigationDirectionBit1 = 0x0200,
 	kNavigationDirectionBit2 = 0x0400,
+	kNavigationDirectionBit3 = 0x0800,
 
 	// Nav waypoint index in bits 12-13 (2 bits): 0 = largest island, 1 = smallest, 2 = random (saturates at 2)
 	kNavigationWaypointBit0 = 0x1000,
@@ -98,13 +100,13 @@ using ShipFlags_t = common::Flags<ShipFlags>;
 
 inline constexpr int64_t GetNavigationDirection(ShipFlags_t flags)
 {
-	return static_cast<int64_t>(((std::to_underlying(flags.meFlags) >> 8) & 0x7) - 1);
+	return static_cast<int64_t>(((std::to_underlying(flags.meFlags) >> 8) & 0xF) - 1);
 }
 
 inline void SetNavigationDirection(ShipFlags_t& rFlags, int64_t iDirection)
 {
 	uint16_t uiRaw = std::to_underlying(rFlags.meFlags);
-	uiRaw = static_cast<uint16_t>((uiRaw & ~0x0700) | (static_cast<uint16_t>(iDirection + 1) << 8));
+	uiRaw = static_cast<uint16_t>((uiRaw & ~0x0F00) | (static_cast<uint16_t>(iDirection + 1) << 8));
 	rFlags.meFlags = static_cast<ShipFlags>(uiRaw);
 }
 

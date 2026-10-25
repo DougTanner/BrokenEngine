@@ -183,7 +183,7 @@ static void CommandSetLogLevel(const nlohmann::json& rParameters, nlohmann::json
 
 nlohmann::json AgentCoordinateJson(GridCoord coordinate)
 {
-	return nlohmann::json::array({coordinate.iX, coordinate.iY});
+	return nlohmann::json::array({coordinate.iQ, coordinate.iR});
 }
 
 nlohmann::json AgentLocalPositionJson(FXMVECTOR vecLocalPosition)
@@ -222,12 +222,12 @@ GridCoord CoordinateFromParameter(const nlohmann::json& rParameters, std::string
 	{
 		std::string message("'");
 		message.append(key);
-		message.append("' must be a [x,y] array");
+		message.append("' must be a [q,r] array");
 		throw std::runtime_error(message);
 	}
 	const nlohmann::json& rCoordinate = rParameters.at(std::string(key));
 	std::string name = std::format("'{}'", key);
-	return GridCoord {.iX = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(0), name)), .iY = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(1), name))};
+	return GridCoord {.iQ = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(0), name)), .iR = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(1), name))};
 }
 
 float AgentFloatValue(const nlohmann::json& rValue, std::string_view name)

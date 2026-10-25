@@ -140,7 +140,8 @@ public:
 
 	[[nodiscard]] CellElevationSampler XM_CALLCONV MakeCellElevationSampler(const CellStaticData& rStaticData) const;
 
-	// Centered cell-local grids cover [-450,+450] meters; overlapping island footprints max-blend, matching GlobalElevation.
+	// Centered cell-local grids cover the cell's bounding rectangle, with sea floor outside its hexagon; overlapping island
+	// footprints max-blend, matching GlobalElevation.
 	void XM_CALLCONV BuildElevationGrid(const std::vector<IslandPlacement>& rPlacements, std::vector<float>& rOutGrid) const;
 
 	// Render path (engine client — ProjectToBaseHeight). Takes the cell the position is local to plus that

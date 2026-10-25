@@ -234,7 +234,7 @@ void OmnisPostRender::Spawn([[maybe_unused]] Frame& __restrict rFrame, [[maybe_u
 bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 {
 	// An omni outside its own cell is a bug, not gameplay.
-	ASSERT(common::InsideArea(rInfo.vecPosition, engine::LocalCellArea()));
+	ASSERT(engine::IsInsideCell(rInfo.vecPosition));
 
 	OmnisInterpolate& rCurrentInterpolate = *rFrame.interpolate.pOmnis;
 	OmnisPostRender& rCurrentPostRender = *rFrame.postRender.pOmnis;
@@ -289,7 +289,7 @@ bool OmnisPostRender::Spawn(Frame& __restrict rFrame, const SpawnInfo& rInfo)
 	// hull direction, and the cached steering, island destination, navigation mode, and waypoint index reset here.
 	// Flagship navigates to island destination on enter; non-flagship starts roaming and follows its flagship in the same cell
 	ShipFlags_t spawnFlags = rInfo.flags;
-	SetNavigationDirection(spawnFlags, (rInfo.orders & ShipOrders::kIsFlagship) ? 4i64 : -1i64);
+	SetNavigationDirection(spawnFlags, (rInfo.orders & ShipOrders::kIsFlagship) ? 6i64 : -1i64);
 	SetNavigationWaypointIndex(spawnFlags, 0);
 	rCurrentPostRender.pFlags[iIndex] = spawnFlags;
 	rCurrentPostRender.pNavigationDelays[iIndex] = rInfo.navigationDelay;
@@ -498,7 +498,7 @@ void OmnisPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[maybe_
 	}
 
 	// Cell center: every cell's local frame is centered on the origin.
-	// W=1.0 keeps this a proper position — every downstream (cellCenter - vecPosition) and cardinal offset add stays W-clean,
+	// W=1.0 keeps this a proper position — every downstream (cellCenter - vecPosition) and neighbour offset add stays W-clean,
 	// so normalize fallbacks don't leak W into the AI direction and on into velocity.
 	XMVECTOR vecCellCenter = XMVectorSet(0.0f, 0.0f, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 
@@ -681,8 +681,8 @@ bool OmnisPostRender::LogDifferences(const OmnisPostRender& rOther) const
 		bEqual &= common::LogDifference<"pClientGuids.uiLow">(i, pClientGuids[i].uiLow, rOther.pClientGuids[i].uiLow);
 		bEqual &= common::LogDifference<"pGlobalIds">(i, pGlobalIds[i], rOther.pGlobalIds[i]);
 		bEqual &= common::LogDifference<"pFlagshipGlobalIds">(i, pFlagshipGlobalIds[i], rOther.pFlagshipGlobalIds[i]);
-		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iX">(i, pFleetWantedCoordinates[i].iX, rOther.pFleetWantedCoordinates[i].iX);
-		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iY">(i, pFleetWantedCoordinates[i].iY, rOther.pFleetWantedCoordinates[i].iY);
+		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iQ">(i, pFleetWantedCoordinates[i].iQ, rOther.pFleetWantedCoordinates[i].iQ);
+		bEqual &= common::LogDifference<"pFleetWantedCoordinates.iR">(i, pFleetWantedCoordinates[i].iR, rOther.pFleetWantedCoordinates[i].iR);
 		bEqual &= common::LogDifference<"puiPendingFleetWantedCoordinateTicks">(i, puiPendingFleetWantedCoordinateTicks[i], rOther.puiPendingFleetWantedCoordinateTicks[i]);
 		bEqual &= common::LogDifference<"puiPendingWeaponModeTicks">(i, puiPendingWeaponModeTicks[i], rOther.puiPendingWeaponModeTicks[i]);
 	}

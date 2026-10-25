@@ -81,7 +81,7 @@ the engine calls by name.
   `CompleteTick` and carry the owner's GUID onto the destination row, so a live
   handoff is reported as `ChangedCell`, never as a death. A disconnected owner's
   rows match no handshaken client and register again when that GUID reconnects.
-- A subscription must be origin or adjacent to an authorized coordinate. Subscription, ACK, and resend-log bookkeeping stay together per slot; allocation stays within `kiCoordinateSlots`, the slot count the client's pool also uses, and reuse increments rather than resets the epoch.
+- A subscription must be origin or within grid distance 1 (`GridDistance`, `../../Frame/FrameUtils.h`) of an authorized coordinate: that coordinate or one of its six edge neighbours. Subscription, ACK, and resend-log bookkeeping stay together per slot; allocation stays within `kiCoordinateSlots`, the slot count the client's pool also uses, and reuse increments rather than resets the epoch.
 - Answer every current-generation subscribe from a handshaken client exactly
   once on the control channel — a reject, a new slot, or, for a coordinate that
   already holds an active slot, that existing slot — because the client matches
@@ -100,13 +100,13 @@ the engine calls by name.
 
 ## Transfers and Publication
 
-- `ServerTransferManager` owns cross-cell transfer harvest, adjacency and
-  destination-liveness validation, deterministic type ordering, and destination
-  materialization. It also holds spawns decided outside the tick (`QueueSpawn`)
-  until the first tick at or after their target tick whose coordinate is active
-  with a committed current Frame, and adds them to that tick's post-tick batch,
-  which is applied right after the tick with its arrivals; adjacency and
-  liveness rules apply to transfers only. `ServerBroadcaster` owns the broadcast
+- `ServerTransferManager` owns cross-cell transfer harvest, destination
+  formation and liveness validation, deterministic type ordering, and
+  destination materialization. It also holds spawns decided outside the tick
+  (`QueueSpawn`) until the first tick at or after their target tick whose
+  coordinate is active with a committed current Frame, and adds them to that
+  tick's post-tick batch, which is applied right after the tick with its
+  arrivals; destination and liveness rules apply to transfers only. `ServerBroadcaster` owns the broadcast
   snapshot of a tick's status changes, the drain of agent-injected changes held
   for a later tick, and the per-coordinate publication `ServerSessionRuntime`
   hands to the delta resend ring at tick completion.
@@ -118,7 +118,7 @@ the engine calls by name.
   grows the workbuffer in place through `Workbuffer::Grow`, which keeps every
   view valid. Update that bound whenever status compression adds or enlarges
   workbuffer reservations.
-- A transfer destination must be adjacent. A non-owned transfer requires a destination that is already live; an owned-entity transfer makes its destination live.
+- A transfer destination is the edge neighbour its request's direction index names in `kCellDirections` (`../../Frame/GridCoord.h`), formed through `TryAddGridCoordinate`, so no transfer can skip a cell. A non-owned transfer requires a destination that is already live; an owned-entity transfer makes its destination live.
 - Recompute each destination Frame's `uiSharedCrc` after applying its post-tick batch (arrived transfers and queued spawns): the frame tick computes it before that batch lands, and clients check their own simulated frame against the broadcast CRC for that tick, so skipping the recompute desyncs every client receiving a transfer or spawn. This is not defensive recomputation and must not be optimized away as redundant.
 - Both classes name `game::StatusChange` and read, create, and pass whole game
   Frames and their state, such as `postRender.transferRequests` — a deliberate

@@ -2,28 +2,23 @@
 
 #if defined(BT_CLIENT)
 
-#include "Frame/GridCoord.h"
+#include "Frame/FrameUtils.h"
 
 namespace engine
 {
 
 struct FrameInterpolateBase;
 
-// The presentation basis for a cell whose positions are shown against cameraCoordinate's cell. The offset is a whole
-// number of cell widths, so it is exact in float, and it is the only value a grid coordinate contributes to
-// presentation. Collection render bodies read the one stamped on their interpolate copy; every other conversion
-// point builds its own here. Nothing publishes one render-wide for a renderer to find.
-constexpr RenderBasis MakeRenderBasis(GridCoord coordinate, GridCoord cameraCoordinate)
+// The presentation basis for a cell whose positions are shown against cameraCoordinate's cell. The offset is the
+// center offset of the two cells' axial delta, so it is deterministic for a given pair of cells, and it is the only
+// value a grid coordinate contributes to presentation. Collection render bodies read the one stamped on their
+// interpolate copy; every other conversion point builds its own here. Nothing publishes one render-wide for a
+// renderer to find.
+inline RenderBasis MakeRenderBasis(GridCoord coordinate, GridCoord cameraCoordinate)
 {
-	return RenderBasis
-	{
-		.coordinate = coordinate,
-		.f2Offset =
-		{
-			static_cast<float>(static_cast<int64_t>(coordinate.iX) - static_cast<int64_t>(cameraCoordinate.iX)) * kfCellWidth,
-			static_cast<float>(static_cast<int64_t>(coordinate.iY) - static_cast<int64_t>(cameraCoordinate.iY)) * kfCellHeight,
-		},
-	};
+	RenderBasis basis {.coordinate = coordinate};
+	XMStoreFloat2(&basis.f2Offset, CellCenterOffset(cameraCoordinate, coordinate));
+	return basis;
 }
 
 // Minimum eye height (LOD pivot floor). Single source for both the engine LOD-bucket math in

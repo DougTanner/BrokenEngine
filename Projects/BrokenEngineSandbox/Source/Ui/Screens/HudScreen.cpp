@@ -106,7 +106,7 @@ void HudScreen::Render()
 	// kWarning clears both the compile floor (keLogLevelDefault, kDebug) and the runtime default threshold (kInfo).
 	if (bForceOpen && !mbPreviousForceOpen)
 	{
-		LOG(kDefault, kWarning, "HUD auto-unhide reason: {} coord: ({},{}) cells: {}", pcWantReason, gpGame->mClientGridCoordinate.iX, gpGame->mClientGridCoordinate.iY, iSubscribedCellCount);
+		LOG(kDefault, kWarning, "HUD auto-unhide reason: {} coord: ({},{}) cells: {}", pcWantReason, gpGame->mClientGridCoordinate.iQ, gpGame->mClientGridCoordinate.iR, iSubscribedCellCount);
 	}
 	mbPreviousForceOpen = bForceOpen;
 
@@ -266,7 +266,7 @@ void HudScreen::RenderFleetPanel(float fTarget)
 			if (!(rMember.flags & FleetMemberFlags::kIsDead))
 			{
 				char pcLabel[64];
-				std::snprintf(pcLabel, sizeof(pcLabel), "%s %lld (%d,%d) #%lld", ShipTypeName(rMember.eType), i + 1, memberCoordinate.iX, memberCoordinate.iY, rMember.globalId.iValue);
+				std::snprintf(pcLabel, sizeof(pcLabel), "%s %lld (%d,%d) #%lld", ShipTypeName(rMember.eType), i + 1, memberCoordinate.iQ, memberCoordinate.iR, rMember.globalId.iValue);
 				if (ImGui::Selectable(pcLabel, bSelected))
 				{
 					gpGame->mFleetSelection.SelectOwnedEntityInFleet(rMember.globalId);

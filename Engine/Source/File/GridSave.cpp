@@ -116,16 +116,16 @@ bool ReadGridSave(const FileFlags_t& rFlags, const std::filesystem::path& rFilen
 			engine::Cell& rCell = itCell->second;
 			rCell.staticData.Read(fileStream, /*bIncludeNavigationData=*/false);
 			rCell.staticData.coordinate = coordinate;
-			// Trust boundary (save file): generation places only loaded templates with centers inside the cell's base
-			// area. The center tests are range tests, so NaN and both infinities fail them too.
+			// Trust boundary (save file): generation places only loaded templates with centers inside the cell's
+			// margin-inset hexagon. IsInsideCell rejects a center in a bounding-rectangle corner, NaN, and both
+			// infinities.
 			for (const IslandPlacement& rPlacement : rCell.staticData.islands)
 			{
 				if (!gpIslandTerrain->mIslands.contains(rPlacement.islandCrc))
 				{
 					throw std::ios_base::failure("island placement template");
 				}
-				if (!(rPlacement.f2WorldPosition.x >= kfBaseAreaMinimumX && rPlacement.f2WorldPosition.x <= kfBaseAreaMaximumX)
-				 || !(rPlacement.f2WorldPosition.y >= kfBaseAreaMinimumY && rPlacement.f2WorldPosition.y <= kfBaseAreaMaximumY))
+				if (!IsInsideCell(XMLoadFloat2(&rPlacement.f2WorldPosition)))
 				{
 					throw std::ios_base::failure("island placement center");
 				}

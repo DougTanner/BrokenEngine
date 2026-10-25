@@ -162,7 +162,7 @@ void ServerBroadcaster::BuildTickPublication(int64_t iTick, engine::ServerSessio
 		if (iRunCount > 0)
 		{
 			updateData.statusChanges = {pStatusChanges + iRunStart, static_cast<size_t>(iRunCount)};
-			LOG(kNetwork, kVerbose, "ServerBroadcaster::BuildTickPublication Coord: ({},{}) Tick: {} StatusChanges: {}", rCoord.iX, rCoord.iY, iTick, iRunCount);
+			LOG(kNetwork, kVerbose, "ServerBroadcaster::BuildTickPublication Coord: ({},{}) Tick: {} StatusChanges: {}", rCoord.iQ, rCoord.iR, iTick, iRunCount);
 		}
 		pGridUpdates[iGridUpdateIndex++] = {rCoord, updateData};
 	}

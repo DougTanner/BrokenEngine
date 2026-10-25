@@ -89,7 +89,7 @@ static void ValidateFlyingMissilePlanes(const Frame& rFrame)
 // Bump this base on any change that shifts computed frame CRCs without bumping a collection's own kiVersion
 // — notably the CRC mixing algorithm/constants in Common/Crc.h. This gate is the only thing distinguishing
 // "data desynced" from "checksum algorithm changed"; skipping the bump makes straddling replays false-desync.
-const int64_t Frame::kiVersion = 140 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
+const int64_t Frame::kiVersion = 141 + engine::kiFrameBaseVersion + engine::SumVersions(GameInterpolateTypes {}) + engine::SumVersions(GamePostRenderTypes {});
 
 FrameInterpolate::FrameInterpolate()
 : pBlasters(std::make_unique<BlastersInterpolate>())
@@ -253,7 +253,7 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 	// without terrain collision), or within horizontal visible range of any alive fleet ship on any plane
 	auto IsSpawnPositionValid = [&](FXMVECTOR vecPosition) -> bool
 	{
-		if (!common::InsideArea(vecPosition, engine::LocalCellArea()))
+		if (!engine::IsInsideCell(vecPosition))
 		{
 			return false;
 		}
@@ -282,13 +282,11 @@ static void SpawnRandomShipGroup(Frame& __restrict rFrame, const engine::CellSta
 		return !bNearFleetShip;
 	};
 
-	// Cell-area extents and grid pitch (area layout: x=minX, y=maxY, z=maxX, w=minY — see common::InsideArea)
-	XMFLOAT4A f4Area;
-	XMStoreFloat4A(&f4Area, engine::LocalCellArea());
-	float fAreaMinimumX = f4Area.x;
-	float fAreaMinimumY = f4Area.w;
-	float fPitchX = (f4Area.z - f4Area.x) / static_cast<float>(kiGridDimension);
-	float fPitchY = (f4Area.y - f4Area.w) / static_cast<float>(kiGridDimension);
+	// The grid spans the cell's bounding rectangle; IsSpawnPositionValid rejects the corners outside the hexagon.
+	float fAreaMinimumX = -engine::kfCellHalfWidth;
+	float fAreaMinimumY = -engine::kfCellHalfHeight;
+	float fPitchX = (2.0f * engine::kfCellHalfWidth) / static_cast<float>(kiGridDimension);
+	float fPitchY = (2.0f * engine::kfCellHalfHeight) / static_cast<float>(kiGridDimension);
 
 	// Step 1: rasterize cell into a validity grid sampled at cell centers
 	bool pbValidGrid[kiGridDimension * kiGridDimension] {};

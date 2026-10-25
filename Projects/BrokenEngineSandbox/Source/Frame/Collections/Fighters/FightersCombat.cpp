@@ -90,8 +90,6 @@ void FightersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 		return;
 	}
 
-	engine::CellBounds bounds = engine::ComputeCellBounds(engine::LocalCellArea());
-
 	for (int64_t i = 0; i < rCurrentInterpolate.iCount; ++i)
 	{
 		if (rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) [[unlikely]]
@@ -130,7 +128,7 @@ void FightersPostRender::PostCollision([[maybe_unused]] Frame& __restrict rFrame
 			}
 		}
 
-		if (!(rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && engine::IsOutOfBounds(bounds, rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
+		if (!(rCurrentPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && !engine::IsInsideCell(rCurrentInterpolate.pVecPositions[i])) [[unlikely]]
 		{
 			// PreCollision's exclusive maximum-time cutoff excludes entity contacts at or beyond cell exit.
 			rCurrentPostRender.pLifecycleFlags[i].Set(engine::LifecycleFlags::kTransfer);

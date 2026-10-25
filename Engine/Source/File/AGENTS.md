@@ -23,7 +23,7 @@ snapshot carries the game's payload half by value, uninspected; the game side
 owns it (game Network Server: the game project's own
 `Source/Network/Server/AGENTS.md`), and the two stage sets change together.
 
-- A placement whose island CRC is absent from this build's island pack, whose centre lies outside the cell's base area, or whose rotation is non-finite aborts the load.
+- A placement whose island CRC is absent from this build's island pack, whose centre fails `IsInsideCell` (a bounding-rectangle corner, NaN, and both infinities fail it), or whose rotation is non-finite aborts the load.
 - `ServerSaveLoad` (`GameBase::mServerSaveLoad`) owns when a save, load, reset,
   or autosave runs and what happens around it, and returns the actual commit
   result to callers. A successful load keeps the saved simulation clock and

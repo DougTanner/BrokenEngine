@@ -1111,7 +1111,7 @@ static void CommandSendRawPacket(const nlohmann::json& rParameters, nlohmann::js
 
 // set_client_grid_coord: move the client's grid cell and pin it against every game writer until
 // release_client_grid_coord or GameBase::ResetSession, so automation can drive the cross-cell subscribe and full-state
-// adoption path. Schema: {"coord":[x,y]}.
+// adoption path. Schema: {"coord":[q,r]}.
 static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	// Heap: validation errors and JSON result
@@ -1128,7 +1128,7 @@ static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nl
 		throw std::runtime_error("set_client_grid_coord 'coord' must be an array of 2 integers");
 	}
 
-	GridCoord coordinate {.iX = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(0), "set_client_grid_coord 'coord'")), .iY = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(1), "set_client_grid_coord 'coord'"))};
+	GridCoord coordinate {.iQ = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(0), "set_client_grid_coord 'coord'")), .iR = static_cast<int32_t>(AgentGridCoordinateValue(rCoordinate.at(1), "set_client_grid_coord 'coord'"))};
 
 	// Before owned-entity assignment the subscription policy falls back to origin, so the requested cell would be dropped.
 	RequireAcceptedClient("set_client_grid_coord");
@@ -1145,7 +1145,7 @@ static void CommandSetClientGridCoordinate(const nlohmann::json& rParameters, nl
 	game::gpClientSession->mpRuntime->PinClientGridCoordinate(coordinate);
 	game::gpClientSession->mpRuntime->UpdateDesiredCoordinates("kPollTick");
 
-	rResult["clientGridCoord"] = {coordinate.iX, coordinate.iY};
+	rResult["clientGridCoord"] = {coordinate.iQ, coordinate.iR};
 }
 
 // release_client_grid_coord: clear the set_client_grid_coord pin; the cell stays put until the next game writer
@@ -1162,7 +1162,7 @@ static void CommandReleaseClientGridCoordinate(const nlohmann::json& rParameters
 
 	game::gpClientSession->mpRuntime->mStateFlags.Set(ClientSessionStateFlags::kClientGridCoordinatePinned, false);
 
-	rResult["clientGridCoord"] = {game::gpGame->mClientGridCoordinate.iX, game::gpGame->mClientGridCoordinate.iY};
+	rResult["clientGridCoord"] = {game::gpGame->mClientGridCoordinate.iQ, game::gpGame->mClientGridCoordinate.iR};
 }
 
 const char* UiStateName(UiState eState)

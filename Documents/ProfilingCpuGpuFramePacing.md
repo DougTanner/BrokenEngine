@@ -158,7 +158,7 @@ alignment. Native submit/wait CPU elapsed is not GPU execution time.
 
 ## 3. Reproduce streaming with lifecycle proof
 
-Use existing `/agent-harness` `set_client_grid_coord` with `coord:[x,y]` to pin
+Use existing `/agent-harness` `set_client_grid_coord` with `coord:[q,r]` to pin
 the observed initial viewer cell before measurement, switch to a distinct target,
 then return. The controlled log runs used 20 seconds per phase (60 total), two
 timed setters and zero timed queries. Record actual dispatch and acknowledgement

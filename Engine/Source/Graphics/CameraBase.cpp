@@ -92,14 +92,13 @@ void CameraBase::ShiftToRenderedCell(GridCoord cameraCoordinate)
 		return;
 	}
 
-	int64_t iStepX = static_cast<int64_t>(cameraCoordinate.iX) - static_cast<int64_t>(mBasisCoordinate.iX);
-	int64_t iStepY = static_cast<int64_t>(cameraCoordinate.iY) - static_cast<int64_t>(mBasisCoordinate.iY);
+	int64_t iStepDistance = GridDistance(mBasisCoordinate, cameraCoordinate);
 	// Z and W stay zero: the step is planar, and the cached values it moves are homogeneous points.
 	RenderBasis previousBasis = MakeRenderBasis(mBasisCoordinate, cameraCoordinate);
 	XMVECTOR vecShift = XMVectorSet(previousBasis.f2Offset.x, previousBasis.f2Offset.y, 0.0f, 0.0f);
 	mBasisCoordinate = cameraCoordinate;
 
-	if (iStepX < -1 || iStepX > 1 || iStepY < -1 || iStepY > 1)
+	if (iStepDistance > 1)
 	{
 		// Farther than the subscribed ring: nothing the camera cached describes a place inside the new cell, so drop
 		// the tracking state and re-enter the cell at its center. The sun angle and the zoom state are not positional
@@ -109,7 +108,7 @@ void CameraBase::ShiftToRenderedCell(GridCoord cameraCoordinate)
 		return;
 	}
 
-	// One-cell step: move the whole cached set by the same exact whole-cell delta. Both flight endpoints shift
+	// Edge-neighbour step: move the whole cached set by the same whole-cell delta. Both flight endpoints shift
 	// together, so the smoothstep parameter and the elapsed jump clock are untouched and the flight stays monotonic
 	// across the boundary.
 	mVecPosition = XMVectorAdd(mVecPosition, vecShift);

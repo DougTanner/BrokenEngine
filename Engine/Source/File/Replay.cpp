@@ -58,7 +58,7 @@ struct ReplayManifestRecord
 
 static bool ReplayManifestRecordLess(const ReplayManifestRecord& rLeft, const ReplayManifestRecord& rRight)
 {
-	return std::tie(rLeft.iActivationTick, rLeft.coordinate.iX, rLeft.coordinate.iY) < std::tie(rRight.iActivationTick, rRight.coordinate.iX, rRight.coordinate.iY);
+	return std::tie(rLeft.iActivationTick, rLeft.coordinate.iQ, rLeft.coordinate.iR) < std::tie(rRight.iActivationTick, rRight.coordinate.iQ, rRight.coordinate.iR);
 }
 
 enum class ReplayArtifactKind : uint8_t
@@ -120,8 +120,8 @@ static void AppendReplayManifestPayload(const ReplayManifest& rManifest, std::ve
 	for (const ReplayManifestRecord& rRecord : rManifest.records)
 	{
 		AppendValue(rRecord.iActivationTick);
-		AppendValue(rRecord.coordinate.iX);
-		AppendValue(rRecord.coordinate.iY);
+		AppendValue(rRecord.coordinate.iQ);
+		AppendValue(rRecord.coordinate.iR);
 	}
 	AppendValue(static_cast<uint8_t>(rManifest.bHasFullFrames ? 1 : 0));
 }
@@ -219,12 +219,12 @@ static bool ReadReplayManifest(ReplayManifest& rManifest)
 	{
 		throw std::ios_base::failure("ReplayManifest activation count");
 	}
-	common::ValidateDeserializedCount(iCoordinateCount, sizeof(ReplayManifestRecord::iActivationTick) + sizeof(GridCoord::iX) + sizeof(GridCoord::iY), manifestStream, "ReplayManifest records");
+	common::ValidateDeserializedCount(iCoordinateCount, sizeof(ReplayManifestRecord::iActivationTick) + sizeof(GridCoord::iQ) + sizeof(GridCoord::iR), manifestStream, "ReplayManifest records");
 	rManifest.records.reserve(iCoordinateCount);
 	for (int64_t i = 0; i < iCoordinateCount; ++i)
 	{
 		ReplayManifestRecord record {};
-		if (!ReadReplayManifestValue(manifestStream, record.iActivationTick) || !ReadReplayManifestValue(manifestStream, record.coordinate.iX) || !ReadReplayManifestValue(manifestStream, record.coordinate.iY))
+		if (!ReadReplayManifestValue(manifestStream, record.iActivationTick) || !ReadReplayManifestValue(manifestStream, record.coordinate.iQ) || !ReadReplayManifestValue(manifestStream, record.coordinate.iR))
 		{
 			throw std::ios_base::failure("ReplayManifest activation record");
 		}
@@ -637,14 +637,14 @@ void Replay::SaveLoadReplay()
 						bWriterSaved = rWriterState.pWriter->Save(fileFlags, coordinateReplayPath, *pEndFrame);
 						if (ReplayHarnessRigs::ConsumePersistenceFailure(*this, ReplayHarnessRigs::PersistenceFailurePoint::kCoordinateWriter, rCoordinate, rWriterState.iActivationTick))
 						{
-							LOG(kDefault, kError, "Injected replay writer failure for coord ({},{}) activation {}; deleting replay sibling set", rCoordinate.iX, rCoordinate.iY, rWriterState.iActivationTick);
+							LOG(kDefault, kError, "Injected replay writer failure for coord ({},{}) activation {}; deleting replay sibling set", rCoordinate.iQ, rCoordinate.iR, rWriterState.iActivationTick);
 							rWriterState.pWriter->CleanupFiles(fileFlags, coordinateReplayPath);
 							bWriterSaved = false;
 						}
 					}
 					else
 					{
-						LOG(kDefault, kError, "Replay writer for coord ({},{}) activation {} has no terminal frame; deleting partial replay set", rCoordinate.iX, rCoordinate.iY, rWriterState.iActivationTick);
+						LOG(kDefault, kError, "Replay writer for coord ({},{}) activation {} has no terminal frame; deleting partial replay set", rCoordinate.iQ, rCoordinate.iR, rWriterState.iActivationTick);
 						rWriterState.pWriter->CleanupFiles(fileFlags, coordinateReplayPath);
 					}
 					if (bWriterSaved && !ReplayHarnessRigs::InjectMalformedFullFrames(*this, rCoordinate, rWriterState.iActivationTick, fileFlags, coordinateReplayPath))
@@ -819,13 +819,13 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 				game::FrameInput& rFrameInput = game::gpGame->mFrameInputs.try_emplace(coordinate).first->second;
 				if (!rpReader->LoadDifference(game::gpGame->miTickCounter, rFrameInput))
 				{
-					LOG(kDefault, kError, "Replay reader advanced beyond terminal tick for coord ({},{})", coordinate.iX, coordinate.iY);
+					LOG(kDefault, kError, "Replay reader advanced beyond terminal tick for coord ({},{})", coordinate.iQ, coordinate.iR);
 					return AbortReplay();
 				}
 				rpReader->ValidateChecksum(game::gpGame->miTickCounter, (*game::gpGame->mCells.at(coordinate).pCurrent));
 				if (!rpReader->TerminalConsumed())
 				{
-					LOG(kDefault, kError, "Replay reader terminal data was not fully consumed for coord ({},{})", coordinate.iX, coordinate.iY);
+					LOG(kDefault, kError, "Replay reader terminal data was not fully consumed for coord ({},{})", coordinate.iQ, coordinate.iR);
 					return AbortReplay();
 				}
 				rFrameInput.statusChanges.clear();
@@ -842,12 +842,12 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 				mPendingReplayReaders.erase(mPendingReplayReaders.begin());
 				if (pendingReader.iActivationTick < game::gpGame->miTickCounter)
 				{
-					LOG(kDefault, kError, "Replay reader activation tick was skipped for coord ({},{})", pendingReader.coordinate.iX, pendingReader.coordinate.iY);
+					LOG(kDefault, kError, "Replay reader activation tick was skipped for coord ({},{})", pendingReader.coordinate.iQ, pendingReader.coordinate.iR);
 					return AbortReplay();
 				}
 				if (mReplayReaders.contains(pendingReader.coordinate))
 				{
-					LOG(kDefault, kError, "Replay reader activation overlaps live reader for coord ({},{})", pendingReader.coordinate.iX, pendingReader.coordinate.iY);
+					LOG(kDefault, kError, "Replay reader activation overlaps live reader for coord ({},{})", pendingReader.coordinate.iQ, pendingReader.coordinate.iR);
 					return AbortReplay();
 				}
 				GridCoord coordinate = pendingReader.coordinate;
@@ -861,7 +861,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 				game::FrameInput& rFrameInput = game::gpGame->mFrameInputs.try_emplace(rCoordinate).first->second;
 				if (!rpReader->LoadDifference(game::gpGame->miTickCounter, rFrameInput))
 				{
-					LOG(kDefault, kError, "Replay reader advanced beyond terminal tick for coord ({},{})", rCoordinate.iX, rCoordinate.iY);
+					LOG(kDefault, kError, "Replay reader advanced beyond terminal tick for coord ({},{})", rCoordinate.iQ, rCoordinate.iR);
 					return AbortReplay();
 				}
 
@@ -872,7 +872,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 					return game::IsPostDispatchType(rStatusChange.eType);
 				}))
 				{
-					LOG(kDefault, kError, "Replay input carries a spawn or transfer status change for coord ({},{})", rCoordinate.iX, rCoordinate.iY);
+					LOG(kDefault, kError, "Replay input carries a spawn or transfer status change for coord ({},{})", rCoordinate.iQ, rCoordinate.iR);
 					return AbortReplay();
 				}
 
@@ -886,7 +886,7 @@ Replay::ReplayTickDecision Replay::SyncReplayTick()
 						return game::IsPostDispatchType(rStatusChange.eType);
 					}))
 					{
-						LOG(kDefault, kError, "Replay post-dispatch record is not a post-tick batch for coord ({},{})", rCoordinate.iX, rCoordinate.iY);
+						LOG(kDefault, kError, "Replay post-dispatch record is not a post-tick batch for coord ({},{})", rCoordinate.iQ, rCoordinate.iR);
 						return AbortReplay();
 					}
 					game::gpServerSession->mpTransferManager->PrepareReplayTransfers(rCoordinate, postDispatchInput.statusChanges);

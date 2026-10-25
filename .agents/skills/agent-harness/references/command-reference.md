@@ -27,7 +27,7 @@ The server monitor is an engine-owned GDI window, not a protocol command surface
   lines lowers that category's floor through a temporary verification edit
   ([`.agents/references/change-workflow.md`](../../../references/change-workflow.md)
   `#### Step 5 — Run targeted pre-review checks`).
-- `cell_coordinate_probe`: `{"coord":[x,y]}` and nothing else — a params object
+- `cell_coordinate_probe`: `{"coord":[q,r]}` and nothing else — a params object
   that is not exactly that one key fails with
   `cell_coordinate_probe accepts only 'coord'`; both endpoints accept it. Any
   pair of integers in the signed-int32 range is valid — the cell needs no
@@ -41,7 +41,8 @@ The server monitor is an engine-owned GDI window, not a protocol command surface
   generates a throwaway placement list and elevation grid for the requested
   cell, reports them, and frees them, touching no live cell, tick, or
   subscription. Returns
-  `{"coord":[x,y],"area":{"width":900.0,"height":900.0},"terrain":{"samplesFinite":true},"placements":{"count":int,"crc":uint64},"elevation":{"crc":uint64}}`.
+  `{"coord":[q,r],"area":{"width":float,"height":900.0},"terrain":{"samplesFinite":true},"placements":{"count":int,"crc":uint64},"elevation":{"crc":uint64}}`,
+  where `area` is the cell hexagon's bounding rectangle, about 1,039.23 m wide.
   Run the same coordinate on the client and on the server and require both CRCs
   to be equal; the two endpoints generate the cell independently from the same
   coordinate.
@@ -74,14 +75,14 @@ The server monitor is an engine-owned GDI window, not a protocol command surface
   `Network` `Debug` level, `Server::Receive dropped corrupt packet`. For example
   `{"bytes":[0]}` sends a server-only packet type, which the server counts as
   one corrupt-data violation with reason `not client-sendable`.
-- `desync_probe`: packet mode `{"desyncReports"?:0..8,"debugFrameRequests"?:0..8}` or mutually exclusive recovery mode `{"triggerRecovery":true}`. Requires an accepted connected client and in-game current state. Returns `{"tick","coord":[x,y],"desyncDebugFrames","stalled","desyncReports","debugFrameRequests","triggerRecovery"}`.
-- `set_client_grid_coord`: `{"coord":[x,y]}`. The object accepts only `coord`,
+- `desync_probe`: packet mode `{"desyncReports"?:0..8,"debugFrameRequests"?:0..8}` or mutually exclusive recovery mode `{"triggerRecovery":true}`. Requires an accepted connected client and in-game current state. Returns `{"tick","coord":[q,r],"desyncDebugFrames","stalled","desyncReports","debugFrameRequests","triggerRecovery"}`.
+- `set_client_grid_coord`: `{"coord":[q,r]}`. The object accepts only `coord`,
   an array of exactly two integers anywhere in the signed-int32 range; only an
   integer that does not fit in `int32` is rejected. Moves the client's grid cell
   and immediately refreshes its desired subscriptions, so automation can drive
   the cross-cell subscribe and full-state adoption path. Requires an accepted
   connected client with a valid assigned owned entity. Returns
-  `{"clientGridCoord":[x,y]}`. Any invalid input returns the normal
+  `{"clientGridCoord":[q,r]}`. Any invalid input returns the normal
   `ok:false`/`error` envelope and changes no state. The command also pins the
   coordinate: while pinned, every other write of the client's cell — the game's
   own writers, such as owned-entity events, and the server-load clear — leaves
@@ -89,8 +90,9 @@ The server monitor is an engine-owned GDI window, not a protocol command surface
   `set_client_grid_coord` moves the pin; only `release_client_grid_coord` or a
   game reset (main-menu connect or frame change, including connection loss)
   clears it. The pin is never persisted. The server remains the subscription
-  authority — a non-adjacent cell is accepted locally and rejected on the wire.
-- `release_client_grid_coord`: no params (only an empty object is accepted). Requires a running game. Clears the `set_client_grid_coord` pin and returns the current `{"clientGridCoord":[x,y]}`. The viewer stays in that cell until the next game writer, such as an owned-entity event, moves it.
+  authority — a cell other than origin whose `GridDistance` from every
+  authorized cell exceeds 1 is accepted locally and rejected on the wire.
+- `release_client_grid_coord`: no params (only an empty object is accepted). Requires a running game. Clears the `set_client_grid_coord` pin and returns the current `{"clientGridCoord":[q,r]}`. The viewer stays in that cell until the next game writer, such as an owned-entity event, moves it.
 - `screenshot`: `{"path"?,"maxWidth"?:1568,"format"?:"jpg"|"png","quality"?:80}`. A `quality` outside `1..100` is a parameter error. A `maxWidth` value `<= 0` disables downscaling and preserves native framebuffer dimensions. Default path is `%TEMP%\Screenshots\agent_N.<ext>` using the process temp directory. Returns `{"path","width","height"}` — the saved file and its pixel dimensions, never image bytes. Requires `kbScreenshots`.
 - `renderdoc_capture`: `{"frames"?:1}`; `frames` is `1..8`. Triggers RenderDoc
   capture(s) of the next presented frame(s) and returns
@@ -218,8 +220,9 @@ The server monitor is an engine-owned GDI window, not a protocol command surface
   and `islands[{coord,local,rotation,footprint?}]`.
   `camera.basisCoord` is the cell the camera's own values are local to: `eye`
   and `visibleArea` are in that cell's meters, while each row's `local` is in
-  its own `coord` cell, so compare them only after adding
-  `(coord - basisCoord) * 900` per axis. An island's `local` is its placement
+  its own `coord` cell, so compare them only after adding the center offset of
+  the axial delta `[dq,dr] = coord - basisCoord`, which is
+  `[dq * 779.42, dq * 450 + dr * 900]` meters. An island's `local` is its placement
   center in its cell's meters. `cellStates` has one row per `subscribedCoords`
   entry, whether or not the cell has a snapshot, and reports that cell's
   reconciliation state: `confirmedTick` is -1 until the cell adopts a full
@@ -256,7 +259,7 @@ The server monitor is an engine-owned GDI window, not a protocol command surface
 - `presentation_continuity_probe`: no params (only an empty object is accepted).
   Read-only client query of the presentation state the most recently published
   render frame sent. Returns
-  `{"publishedFrames":int,"basisCoord":[x,y],"water":{"origin":[x,y],"reducedNoiseOrigin":[x,y],"noiseFrequency":float}}`
+  `{"publishedFrames":int,"basisCoord":[q,r],"water":{"origin":[x,y],"reducedNoiseOrigin":[x,y],"noiseFrequency":float}}`
   plus a `shadow`, `lighting`, and `smoke` object each shaped
   `{"currentArea":[x,y,z,w],"previousArea":[x,y,z,w],"historyResets":int}`;
   `smoke` reports flight plane 0's area pair, the pair wind reads. Take
@@ -303,7 +306,7 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
 ## Server commands
 
 - `status`: no params. Returns
-  `{"tick","paused","recording","replaying","clientCount","activeCoords":[[x,y],...],"nextGlobalId","harvestedTransferTotal":int}`.
+  `{"tick","paused","recording","replaying","clientCount","activeCoords":[[q,r],...],"nextGlobalId","harvestedTransferTotal":int}`.
   `harvestedTransferTotal` counts every cell-crossing transfer applied by a
   harvest since the current game state began, cumulatively, and no spawn; it is
   zeroed on load, reset, every load-time client resynchronization, and entering
@@ -331,9 +334,9 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
   inputs can be constructed. Returns
   `{"file","resetToFresh":bool,"paused":bool}`.
 - `reset`: no params. Resets the server to a fresh game, game-owned server state included. Returns `{}`.
-- `create_cell`: `{"coord":[x,y]}`; `coord` is the only key. Creates a fresh
+- `create_cell`: `{"coord":[q,r]}`; `coord` is the only key. Creates a fresh
   cell at a coordinate that has none, sets its frame value `uiPinned` to 1, and
-  returns `{"coord":[x,y]}`. A pinned cell stays in `status.activeCoords` across
+  returns `{"coord":[q,r]}`. A pinned cell stays in `status.activeCoords` across
   updates, paused or not, with no owned entity or subscription, until a project
   `edit_frame` `frame` write of `uiPinned` 0 releases it; `edit_frame` pins an
   existing cell with a nonzero `uiPinned`. The value lives in the frame, so
@@ -378,9 +381,9 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
   are not historical timing evidence. `writerInputCount` is the total
   normal-writer update ticks since a successful recording start; terminal
   flushes do not increment it. Requires `kbDebugInput`.
-- `replay_drop_retained_end_frame`: `{"coord":[x,y]}`. During recording, removes the retained terminal frame from that coordinate's most recently terminalized generation: the last generation when it is terminal, otherwise the generation immediately before the open last generation. Returns `{"coord":[x,y],"dropped":true}`. Requires `kbDebugInput`.
+- `replay_drop_retained_end_frame`: `{"coord":[q,r]}`. During recording, removes the retained terminal frame from that coordinate's most recently terminalized generation: the last generation when it is terminal, otherwise the generation immediately before the open last generation. Returns `{"coord":[q,r],"dropped":true}`. Requires `kbDebugInput`.
 - `replay_inject_persistence_failure`:
-  `{"stage":"invalidation"|"grid"|"transfer_capture"|"coordinate_writer"|"fullframes_record"|"metadata"|"inventory"|"final_manifest","coord"?:[x,y]}`.
+  `{"stage":"invalidation"|"grid"|"transfer_capture"|"coordinate_writer"|"fullframes_record"|"metadata"|"inventory"|"final_manifest","coord"?:[q,r]}`.
   `coordinate_writer` and `fullframes_record` require `coord`; every other stage
   rejects it. `invalidation` and `grid` require inactive recording; every other
   stage requires active recording. `transfer_capture` invalidates recording when
@@ -394,7 +397,7 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
   mutation I/O failure deletes that writer's complete sibling set and prevents
   manifest publication. `inventory` is consumed immediately before final
   artifact hashing and manifest publication. Returns
-  `{"stage","coord"?:[x,y],"armed":true}`; the response does not expose a
+  `{"stage","coord"?:[q,r],"armed":true}`; the response does not expose a
   generation selector. Requires `kbDebugInput`.
 - `query_profile`: server-only CPU profile query. `params` must be `{}`; any
   other value fails before any profile read. It returns raw
@@ -413,7 +416,7 @@ suppression, physical mouse messages never reach DirectXTK Mouse).
   records. The client `query_profile` remains `{}`-only; its response is the
   client entry under `## Client commands`.
 
-Every server `[x,y]` grid-coordinate parameter (`coord`) must hold two JSON integer literals, with no fraction or exponent, within the signed 32-bit range; any other component, including a whole-valued `1.0` or `1e0`, fails the command before that coordinate is looked up or used.
+Every server `[q,r]` axial grid-coordinate parameter (`coord`) must hold two JSON integer literals, with no fraction or exponent, within the signed 32-bit range; any other component, including a whole-valued `1.0` or `1e0`, fails the command before that coordinate is looked up or used.
 
 Pause/timescale persist on an empty server. They reset only when the last connected client disconnects. A client may join a paused server and render frozen state, but spawning still needs an unpaused tick.
 

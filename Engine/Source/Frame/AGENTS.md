@@ -31,7 +31,20 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   where the position reaches the GPU or a cross-cell query; never rewrite the
   position columns. The basis is client-only and stays out of CRC,
   serialization, and difference logging.
-- Static cell data derives from the grid coordinate and packed island assets; elevation is shared, while navigation is server-built. The cell area is one constant stored nowhere: every consumer reads `LocalCellArea()` (`FrameUtils.h`), so no save file or network payload carries an area to validate. Form a neighbour or transfer-destination coordinate through `TryAddGridCoordinate` (`FrameUtils.h`), which may report that none exists.
+- Static cell data derives from the grid coordinate and packed island assets;
+  elevation is shared, while navigation is server-built. Every cell is the same
+  flat-top regular hexagon, 900 m tall (`kfCellApothem` 450 m), centred on its
+  local origin, and `GridCoord` holds its axial coordinates (`iQ`, `iR`). The
+  cell shape is one constant stored nowhere, the `kCellDirections` table
+  (`GridCoord.h`): its six edge neighbours in the fixed order
+  `common::HexDirections` (`../../../Common/Math/MathUtils.h`) defines, each
+  with its axial delta and centre offset. Containment, exit, transfer direction, and
+  centre offsets all evaluate that table through the `FrameUtils.h` wrappers
+  (`IsInsideCell`, `TracePointToCellExit`, `CellExitDirection`,
+  `CellCenterOffset`), and adjacency (`GridDistance`) is pure axial arithmetic,
+  so no save file or network payload carries a cell shape to validate. Form a neighbour or
+  transfer-destination coordinate through `TryAddGridCoordinate`
+  (`FrameUtils.h`), which may report that none exists.
 - Collision and area-damage queues are thread-local because coord ticks may run
   in parallel. The `thread_local` containers in `Collision.cpp` and
   `AreaDamage.cpp` are `common::StableVector`s (`../../../Common/AGENTS.md`)
@@ -42,16 +55,22 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   collision layers, whose count is fixed at compile time: a `std::vector` sized
   once under `ScopedSuppressAllocationTracking`, whose overflow logs `kError`
   and asserts rather than growing.
-- An entity's position must lie inside its own cell's bounds, which are
-  half-open on each axis: a cell owns its west and south edges and not its east
-  and north edges, which belong to the neighbour; a position outside them
-  belongs to a neighbouring cell, so an out-of-bounds entity transfers instead
-  of being simulated locally. Each collection's `Spawn(SpawnInfo)` tests the
+- An entity's position must lie inside its own cell's hexagon
+  (`IsInsideCell`). A position on a shared edge or vertex belongs to the cell
+  whose `IsInsideCell` accepts it, by the tie-break rule `IsInsideHex`
+  (`../../../Common/Math/MathUtils.h`) owns; a position outside the hexagon
+  belongs to the neighbour `CellExitDirection` names, so an
+  out-of-cell entity transfers instead of being simulated locally. The
+  elevation, collision, and pusher grids span the hexagon's bounding rectangle
+  (`kfCellHalfWidth`, `kfCellHalfHeight`), whose corners outside the hexagon
+  belong to the neighbours: they hold no island placement, no elevation sample
+  but the sea floor, and no entity this cell spawns, and the zone grids there
+  hold only this cell's own rows. Each collection's `Spawn(SpawnInfo)` tests the
   position before appending anything. An overload either refuses an outside
   position silently, never clamping, requeuing, or leaving the row to the
   transfer path, and returns whether it appended, or, where an outside position
   is a bug, asserts instead and always reports success. No caller is exempt. A
-  producer must test bounds itself before calling `Spawn` when a side effect
+  producer must test `IsInsideCell` itself before calling `Spawn` when a side effect
   that cannot be undone precedes the append, or when the position comes from
   outside the simulation rather than another cell's transfer, because an
   asserting overload asserts rather than refusing.
@@ -104,8 +123,10 @@ Engine-owned frame state, fixed-tick phase orchestration, per-cell static data, 
   placements; static-data deserialization rejects a larger count before
   resize/publication, and client rendering derives its aggregate placement arena
   from that cap and the active-cell subscription slots plus one local
-  unconfirmed cell. Keep world/local transforms, the placement bound, and the
-  west/east/north/south convention consistent across CPU sampling and shaders.
+  unconfirmed cell. Every placement's hull lies inside the cell's hexagon inset
+  by the generator's edge margin. Keep world/local transforms, the placement
+  bound, and the west/east/north/south convention consistent across CPU
+  sampling and shaders.
 - Two terrain-sampling paths exist and must not be mixed. Simulation code calls `CellElevationSampler::Sample`/`CellNormal`, which read only the cell's own `CellStaticData` elevation grid, never `mCells` or a neighbouring cell, so parallel per-cell ticks cannot race the tick-time grid build. Render and other non-tick code calls `GlobalElevation`/`GlobalNormal`, which walk `mCells` and must never run from frame-tick code; both assert on it.
 - `ResolveDiscAgainstTerrain`, the simulation's swept-disc terrain query,
   resolves an overlapped start with the navigation snap (its declaration comment

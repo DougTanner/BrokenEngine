@@ -10,7 +10,7 @@
   - Client confirms ASAP via an ACK stream carrying, per-slot, `(slot, epoch, floor, bitfield-low, bitfield-high)`, followed by a single trailing 8-byte client timestamp the server echoes back to drive pipeline RTT. The bitfield covers 128 ticks (= `kiNetworkBufferSize`) above the floor
   - **Epoch**: `AckState.uiEpoch` guards against ghost ACKs reactivating a slot that has been reassigned to a different coord. An ACK whose epoch doesn't match the current slot epoch is dropped
 - After per-cell dispatch, the live post-tick transfer tail harvests requests,
-  validates adjacency and destination liveness, adds the spawns decided outside
+  validates destination formation and liveness, adds the spawns decided outside
   the tick that are queued for that tick, sorts the batch by type,
   materializes it into destination frame state, recomputes each changed
   destination's `sharedCrc`, and then swaps/publishes the frames. Replay
@@ -304,7 +304,7 @@ sizes are the full packet including the type byte.
 |--------|----|----|------|-----------|----------|------------------------------|
 | `kClientHello` | 21 | 101 | 4 | no | violation | `kiProtocolVersion` (every incompatible `StatusChange` payload (`SpawnInfo` `Fields()`) layout change requires its author to increment the then-current literal; no automatic signature) → `game::Frame::kiVersion` → ordered `Islands.manifest` chunk-table integrity-token gates (any mismatch rejects+disconnects); build-config warn; idempotent re-Hello; duplicate live nonempty GUID rejects+disconnects |
 | `kClientAcknowledgmentStream` | 10 | 1738 | 128 | yes | **silent** | exact size `2 + count*27 + 8` (`BoundedCursor`); per-slot epoch match; floor clamped ≤ latest buffered tick; floor must advance, except the one backward floor a client's coord-full-state adoption produces, admitted no lower than that full state's own tick; timestamp echo monotonic |
-| `kClientSubscribe` | 10 | 10 | 64 | yes | violation | load generation must match the server's current generation before mutation; a coord already holding an active slot is answered with that slot's accept and not queued again (every in-generation subscribe gets exactly one reliable answer); 3×3 adjacency of an authorized coord (`kOriginCoordinate` always allowed); slot clamped to `kiCoordinateSlots` |
+| `kClientSubscribe` | 10 | 10 | 64 | yes | violation | load generation must match the server's current generation before mutation; a coord already holding an active slot is answered with that slot's accept and not queued again (every in-generation subscribe gets exactly one reliable answer); grid distance at most 1 (`GridDistance`) from an authorized coord, that coord or one of its six edge neighbours (`kOriginCoordinate` always allowed); slot clamped to `kiCoordinateSlots` |
 | `kClientUnsubscribe` | 4 | 4 | 64 | yes | violation | slot index + epoch; after existing-client lookup, ACK every syntactically valid request; free only an in-range active slot with matching epoch |
 | `kClientResynchronizationRequest` | 1 | 1 | 4 | yes | violation | — |
 | `kClientDesynchronizationReport` | 33 | 33 | 8 | yes | violation | negative tick → corrupt, rejected before the cooldown; independent per-client two-second wall-clock cooldown after contract validation; immediate repeats silently drop |
@@ -320,7 +320,11 @@ sizes are the full packet including the type byte.
 | `kClientTimespeedRequest` | 2 | 2 | 8 | yes | violation | **`kbDebugInput`-gated**; direction byte other than 0 or 1 → corrupt (`"corrupt payload"`, at `Server::Receive` before queuing) |
 
 Server→client types and unknown type bytes resolve to the sentinel (not
-client-sendable). The current wire-protocol version is 37, which added the
+client-sendable). The current wire-protocol version is 38, which made every
+cell a flat-top hexagon: each `GridCoord` on the wire carries axial
+coordinates (`iQ`, `iR`), every cell-local position is local to its hexagon,
+and a `kClientSubscribe` coord must lie within grid distance 1 of an
+authorized coord; version 37 added the
 replay playback byte to the accepted `kServerConnectionResponse` and to
 `kServerLoadNotification`; version 36 dropped
 `bIsFlagship` and `flagshipGlobalId` from the `UpdateFleetData` `Fields()`
@@ -365,7 +369,7 @@ bumps together with the navigation-data version
 (`Engine/Source/Frame/NavBuild.h`), the `Frame::kiVersion` base term, and
 `FrameInput::kiVersion` (`Projects/BrokenEngineSandbox/Source/Frame/AGENTS.md`),
 transfer payloads are destination-local, and the static stream follows the
-cell-area rule in `Engine/Source/Frame/AGENTS.md`. Every older save, replay,
+cell-shape rule in `Engine/Source/Frame/AGENTS.md`. Every older save, replay,
 navigation blob, and connection is rejected by those gates; no compatibility
 path reads the previous generation. The separate `FrameInput::kiVersion` gates
 replay-input compatibility; `Frame::kiVersion` is the Hello gate for

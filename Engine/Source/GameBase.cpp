@@ -807,7 +807,7 @@ void GameBase::UpdateRenderInterpolation(const std::vector<GridCoord>& rActiveCo
 			{
 				if (rFrame.interpolate.iTick < rCell.iLastRenderedTick)
 				{
-					LOG(kNetwork, kError, "Render regressed to older frame Coord: ({},{}) Tick: {} LastTick: {}", rCoordinate.iX, rCoordinate.iY, rFrame.interpolate.iTick, rCell.iLastRenderedTick);
+					LOG(kNetwork, kError, "Render regressed to older frame Coord: ({},{}) Tick: {} LastTick: {}", rCoordinate.iQ, rCoordinate.iR, rFrame.interpolate.iTick, rCell.iLastRenderedTick);
 					DEBUG_BREAK();
 				}
 				rCell.iLastRenderedTick = rFrame.interpolate.iTick;

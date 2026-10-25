@@ -136,8 +136,8 @@ bool ServerDisplayContentChanged()
 
 	for (const GridCoord& rCoordinate : game::gpGame->mActiveCoordinates)
 	{
-		Mix(rCoordinate.iX);
-		Mix(rCoordinate.iY);
+		Mix(rCoordinate.iQ);
+		Mix(rCoordinate.iR);
 
 		// Mix each count separately — summing would alias conversions (e.g. a death that removes one entity
 		// and adds one explosion leaves the sum unchanged) and skip a repaint whose displayed numbers did change.
@@ -155,16 +155,16 @@ bool ServerDisplayContentChanged()
 	{
 		for (const GridCoord& rOwnedCoordinate : rClient.authorizedCoordinates)
 		{
-			Mix(rOwnedCoordinate.iX);
-			Mix(rOwnedCoordinate.iY);
+			Mix(rOwnedCoordinate.iQ);
+			Mix(rOwnedCoordinate.iR);
 		}
 
 		for (const ClientConnection::SlotState& rSlot : rClient.slots)
 		{
 			if (rSlot.subscription.flags & SubscriptionFlags::kActive)
 			{
-				Mix(rSlot.subscription.coordinate.iX);
-				Mix(rSlot.subscription.coordinate.iY);
+				Mix(rSlot.subscription.coordinate.iQ);
+				Mix(rSlot.subscription.coordinate.iR);
 			}
 		}
 	}
@@ -193,23 +193,23 @@ static void PaintGridMap(HDC hdcBuffer, std::span<char> buffer, int64_t iMapLeft
 	}
 
 	// Compute grid bounds with 1-cell padding
-	int64_t iMinimumX = game::gpGame->mActiveCoordinates.at(0).iX;
+	int64_t iMinimumX = game::gpGame->mActiveCoordinates.at(0).iQ;
 	int64_t iMaximumX = iMinimumX;
-	int64_t iMinimumY = game::gpGame->mActiveCoordinates.at(0).iY;
+	int64_t iMinimumY = game::gpGame->mActiveCoordinates.at(0).iR;
 	int64_t iMaximumY = iMinimumY;
 
 	for (const GridCoord& rCoordinate : game::gpGame->mActiveCoordinates)
 	{
-		iMinimumX = std::min<int64_t>(iMinimumX, rCoordinate.iX);
-		iMaximumX = std::max<int64_t>(iMaximumX, rCoordinate.iX);
-		iMinimumY = std::min<int64_t>(iMinimumY, rCoordinate.iY);
-		iMaximumY = std::max<int64_t>(iMaximumY, rCoordinate.iY);
+		iMinimumX = std::min<int64_t>(iMinimumX, rCoordinate.iQ);
+		iMaximumX = std::max<int64_t>(iMaximumX, rCoordinate.iQ);
+		iMinimumY = std::min<int64_t>(iMinimumY, rCoordinate.iR);
+		iMaximumY = std::max<int64_t>(iMaximumY, rCoordinate.iR);
 	}
 
-	iMinimumX = std::max<int64_t>(iMinimumX - 1, std::numeric_limits<decltype(GridCoord::iX)>::min());
-	iMaximumX = std::min<int64_t>(iMaximumX + 1, std::numeric_limits<decltype(GridCoord::iX)>::max());
-	iMinimumY = std::max<int64_t>(iMinimumY - 1, std::numeric_limits<decltype(GridCoord::iY)>::min());
-	iMaximumY = std::min<int64_t>(iMaximumY + 1, std::numeric_limits<decltype(GridCoord::iY)>::max());
+	iMinimumX = std::max<int64_t>(iMinimumX - 1, std::numeric_limits<decltype(GridCoord::iQ)>::min());
+	iMaximumX = std::min<int64_t>(iMaximumX + 1, std::numeric_limits<decltype(GridCoord::iQ)>::max());
+	iMinimumY = std::max<int64_t>(iMinimumY - 1, std::numeric_limits<decltype(GridCoord::iR)>::min());
+	iMaximumY = std::min<int64_t>(iMaximumY + 1, std::numeric_limits<decltype(GridCoord::iR)>::max());
 
 	int64_t iGridWidth = iMaximumX - iMinimumX + 1;
 	int64_t iGridHeight = iMaximumY - iMinimumY + 1;
@@ -236,7 +236,7 @@ static void PaintGridMap(HDC hdcBuffer, std::span<char> buffer, int64_t iMapLeft
 			int64_t iCellTop = iMapTop + iOffsetY + (iMaximumY - i) * iCellSize;
 			RECT cellRectangle {.left = static_cast<LONG>(iCellLeft), .top = static_cast<LONG>(iCellTop), .right = static_cast<LONG>(iCellLeft + iCellSize), .bottom = static_cast<LONG>(iCellTop + iCellSize)};
 
-			GridCoord coordinate {.iX = static_cast<int32_t>(j), .iY = static_cast<int32_t>(i)};
+			GridCoord coordinate {.iQ = static_cast<int32_t>(j), .iR = static_cast<int32_t>(i)};
 			bool bIsActive = std::ranges::any_of(game::gpGame->mActiveCoordinates, [&coordinate](const GridCoord& rActiveCoordinate)
 			{
 				return rActiveCoordinate == coordinate;

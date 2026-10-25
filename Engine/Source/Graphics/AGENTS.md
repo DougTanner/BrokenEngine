@@ -79,9 +79,10 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
 - The camera works entirely in the local frame of the cell it is rendering,
   building its presentation basis with `MakeRenderBasis` (`CameraBase.h`). The
   rebasing rule every client conversion point follows is in Frame
-  (`../Frame/AGENTS.md`). A rendered-cell change of at most one cell on each
-  axis shifts every cached camera position by the exact whole-cell delta; a
-  larger change discards the tracking caches. A new cached position must join
+  (`../Frame/AGENTS.md`). A rendered-cell change to an edge neighbour
+  (`GridDistance` at most 1) shifts every cached camera position by the
+  whole-cell centre offset (`CellCenterOffset`); a larger change discards the
+  tracking caches. A new cached position must join
   that shift or it will describe a place in the previous cell.
 - Visible-area edges snap to the water quad grid. Zoom and LOD use hysteretic buckets so quad size remains stable across adjacent frames; terrain, water, shadow, and lighting areas must preserve this shared grid contract.
 - Shadow and lighting texel sizes track independent camera-height references
