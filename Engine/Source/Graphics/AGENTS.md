@@ -37,9 +37,10 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   resources; full teardown drains the pack loaders, then waits for uploads and
   device work, before destroying dependencies and resetting texture chunk state;
   that order is required (`../File/AGENTS.md`). `Graphics::Destroy` only tears
-  down, at every tier. For a surviving tier, `Graphics::Create` rebuilds flagged
-  texture and buffer resources and, at the sampler tier and above, the texture
-  manager's samplers; destroy flags stay set across both swapchain deferrals.
+  down, at every tier. Destroying `Graphics` tears down at the surface tier.
+  For a surviving tier, `Graphics::Create` rebuilds flagged texture and buffer
+  resources and, at the sampler tier and above, the texture manager's samplers;
+  destroy flags stay set across both swapchain deferrals.
 - `Graphics::Create` constructs the texture manager before the pipeline manager, which that constructor requires, but runs the boot-texture initialization only after the pipeline manager exists, so no texture adoption its waits drive can reach the lighting blur without the blur pipelines. A lighting-blur tunable change requests pipeline-tier recreation, whose `Create` reblurs every ready lighting texture once the pipeline manager exists.
 - A zero-area swapchain extent defers swapchain-tier recreation. The render loop
   skips submission, retries creation at sim-tick cadence, and acquires again

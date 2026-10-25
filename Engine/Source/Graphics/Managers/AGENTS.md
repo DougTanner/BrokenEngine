@@ -5,7 +5,7 @@ Vulkan services exposed through `gp*` globals. `Graphics` constructs its manager
 ## Shared Contracts
 
 - A manager owns its `gp<ClassName>` singleton; owned-by-value helpers are reached through their manager. Constructors publish the global and destructors clear it.
-- Swapchain- and screen-dependent resources use paired destroy/create phases without replacing every manager; full destruction happens only on device loss. Full device recreation also tears down and rebuilds transfer resources around the independently owned upload manager.
+- Swapchain- and screen-dependent resources use paired destroy/create phases without replacing every manager; full destruction happens only at the surface tier (`../AGENTS.md` `## Frame and Resource Lifecycle`). Full device recreation also tears down and rebuilds transfer resources around the independently owned upload manager.
 - Global and Main command buffers are immutable between recreation events; ImGui records per frame. Fence and semaphore ownership belongs to the submitting manager's contract below.
 - Queue synchronization depends on selected queue families: uploads may transfer ownership to graphics, and present waits for graphics when present uses a distinct queue. Do not assume all queues alias or that every transition is cross-queue.
 - The shared descriptor pool serves graphics and compute pipelines. Most pipelines consume global Set 0, but legacy standalone compute pipelines retain their own layouts and do not. Pipeline-specific sets and bindless arrays must remain valid through partial recreation.
@@ -189,6 +189,12 @@ the pool.
 Integrates Dear ImGui with a dedicated load-preserving overlay pass. It records the UI command buffer each frame, waits for Main, signals presentation, and signals the per-framebuffer fence as the frame's final graphics submission.
 
 - The manager owns ImGui setup and submission only. It calls three UI functions `ImGuiManager.h` declares and each client program defines by project membership, `CreateUiScreens`, `RenderUiScreens`, and `DestroyUiScreens`, at construction, each frame, and destruction. The gameplay client defines them in `../../Ui/Screens/UiScreens.cpp` (`../../Ui/Screens/AGENTS.md`).
+- A swapchain-tier recreation, deferred or not, keeps the manager: only its
+  swapchain-image framebuffers, texture retirements, and UI prepass indirect
+  buffer are destroyed and rebuilt, while the ImGui context, backends, font
+  atlas, UI screens, and text areas persist. Only the surface tier replaces it,
+  so `gpImGuiManager` is never null on the main loop; window messages can still
+  arrive while no ImGui context exists.
 - Theme geometry resets to ImGui defaults before scaling so it can be reapplied
   safely. Font scale composes `UiScale()` and user scaling. `UiScale()` is
   framebuffer height divided by the program's `game::kfUiReferenceHeight` (2160

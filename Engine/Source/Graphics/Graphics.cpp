@@ -461,6 +461,10 @@ void Graphics::Create()
 	{
 		mpImGuiManager = std::make_unique<ImGuiManager>(mHwnd);
 	}
+	else if (bSwapchainRecreated)
+	{
+		gpImGuiManager->CreateScreenDependentResources();
+	}
 
 	if (bRecordCommandBuffers)
 	{
@@ -707,7 +711,7 @@ void Graphics::Destroy()
 	{
 		if (meDestroyType < DestroyType::kSurface)
 		{
-			// Partial destroy: keep TextureManager and BufferManager alive, only destroy screen-dependent internals
+			// Partial destroy: keep TextureManager, BufferManager, and ImGuiManager alive, only destroy screen-dependent internals
 			if (gpTextureManager != nullptr)
 			{
 				gpTextureManager->DestroyScreenDependentResources();
@@ -716,12 +720,17 @@ void Graphics::Destroy()
 			{
 				gpBufferManager->DestroySwapchainDependentBuffers();
 			}
+			if (gpImGuiManager != nullptr)
+			{
+				gpImGuiManager->DestroyScreenDependentResources();
+			}
 		}
 		else
 		{
 			// Full destroy: tear down completely for device recreation
 			mpTextureManager.reset();
 			mpBufferManager.reset();
+			mpImGuiManager.reset();
 		}
 		if constexpr (kbProfiling)
 		{
@@ -733,7 +742,6 @@ void Graphics::Destroy()
 			mOldVkSwapchainKHR = mpSwapchainManager->ReleaseHandleForRecreation();
 		}
 		mpSwapchainManager.reset();
-		mpImGuiManager.reset();
 	}
 
 	if (meDestroyType >= DestroyType::kSurface)

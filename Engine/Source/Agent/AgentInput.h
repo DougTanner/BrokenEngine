@@ -69,8 +69,8 @@ public:
 	// At the client main-thread drain point before GameBase::Render and ImGui::NewFrame, advance the active script and
 	// queue this frame's ImGui input. The call is unconditional, so minimized frames still advance while Render takes the
 	// swapchain-deferred skip and bypasses ImGuiManager::Prepare. While the client is not rendering (minimized or
-	// swapchain recreate deferred), only the RawInput overlay takes effect; ImGui input queued then never reaches
-	// ImGui, and key scripts send none.
+	// swapchain recreate deferred), only the RawInput overlay and scroll accumulator take effect; ImGui input queued then
+	// stays queued in the ImGui context until rendering resumes, and key scripts send none.
 	void AdvanceFrame();
 
 	// End of RawInputManager::Update: OR the synthetic keys onto the just-published snapshot so game edge-detection

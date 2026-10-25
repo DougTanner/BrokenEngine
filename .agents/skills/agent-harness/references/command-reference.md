@@ -252,9 +252,8 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   may remain unchanged while another screen is selected. Timer fields and names
   are copied under the CPU timer mutex at query time. `cpuTimerText` is a string
   copied from the CPU timer area's explicit retained character span, preserving
-  whitespace and empty contents exactly. It is empty after the area is cleared
-  or while ImGuiManager is temporarily absent during graphics recreation. The
-  text reflects the most recent publication to that area; it and the structured
+  whitespace and empty contents exactly. It is empty after the area is cleared.
+  The text reflects the most recent publication to that area; it and the structured
   timer fields have distinct cadences and need not describe the same frame.
 - `presentation_continuity_probe`: no params (only an empty object is accepted).
   Read-only client query of the presentation state the most recently published

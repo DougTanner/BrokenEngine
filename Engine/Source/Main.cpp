@@ -650,8 +650,8 @@ static bool ProcessMessages()
 static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWordParameter, LPARAM iLongParameter)
 {
 #if defined(BT_CLIENT)
-	// Game handles cursor when ImGui doesn't want the mouse. Guard GetIO(): the ImGui context can be destroyed across a
-	// multi-frame deferred swapchain recreate (minimized client), and this fires on the restore frame over the client area.
+	// Game handles cursor when ImGui doesn't want the mouse. Guard GetIO(): this window receives messages while no ImGui
+	// context exists — before Graphics constructs ImGuiManager, after Graphics is destroyed, and during device-loss recreation.
 	if (uiMessage == WM_SETCURSOR && LOWORD(iLongParameter) == HTCLIENT && ImGui::GetCurrentContext() != nullptr && !ImGui::GetIO().WantCaptureMouse)
 	{
 		SetCursor(game::gpGame->ShouldUseCrosshair() ? sHcursorCrosshair : sHcursorArrow);

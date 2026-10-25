@@ -37,6 +37,10 @@ public:
 	ImGuiManager(HWND hwnd);
 	~ImGuiManager();
 
+	// Idempotent: a deferred swapchain retry or device-loss teardown repeats it on already-destroyed state.
+	void DestroyScreenDependentResources();
+	void CreateScreenDependentResources();
+
 	void Prepare(int64_t iFramebuffer);
 	void Submit(int64_t iFramebuffer);
 	void RegisterOpaqueRectangle(const ImVec2& rPosition, const ImVec2& rSize);

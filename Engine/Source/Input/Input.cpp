@@ -26,7 +26,7 @@ InputPoll Input::BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuI
 	// PlatformImeData.WantTextInput in NewFrame and sets it during that frame, so at poll time it describes the frame
 	// just rendered; io.WantTextInput is one frame staler and io.WantCaptureKeyboard is also set by mouse-dragged sliders.
 	const ImGuiContext* pImGuiContext = ImGui::GetCurrentContext();
-	bool bUserInterfaceOwnsKeyboard = pImGuiContext != nullptr && pImGuiContext->PlatformImeData.WantTextInput;
+	bool bUserInterfaceOwnsKeyboard = pImGuiContext->PlatformImeData.WantTextInput;
 
 	InputPoll inputPoll(rRawInput, mPreviousRawInput, bUserInterfaceOwnsKeyboard);
 
@@ -122,17 +122,16 @@ InputPoll Input::BeginPoll(bool bLostFocus, bool bMenuVisible, MenuInput& rMenuI
 	// WheelingWindow retains its earlier target, and ImPlot's owner suppresses notches for two polls after exit; the
 	// next owner-free poll can zoom. Hover resolves in NewFrame after this poll, so panel-edge crossings use the prior
 	// hover.
-	const ImGuiWindow* pHoveredWindow = pImGuiContext != nullptr ? pImGuiContext->HoveredWindow : nullptr;
-	bool bUserInterfaceOwnsScroll = (pImGuiContext != nullptr && pImGuiContext->WheelingWindow != nullptr)
-	                             || (pImGuiContext != nullptr && !ImGui::TestKeyOwner(ImGuiKey_MouseWheelY, ImGuiKeyOwner_NoOwner))
+	const ImGuiWindow* pHoveredWindow = pImGuiContext->HoveredWindow;
+	bool bUserInterfaceOwnsScroll = pImGuiContext->WheelingWindow != nullptr
+	                             || !ImGui::TestKeyOwner(ImGuiKey_MouseWheelY, ImGuiKeyOwner_NoOwner)
 	                             || (pHoveredWindow != nullptr && !pHoveredWindow->Collapsed && pHoveredWindow->ScrollMax.y != 0.0f && (pHoveredWindow->Flags & (ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMouseInputs)) == 0);
 	// The previous snapshot advances after every edge consumer even when the wheel is swallowed, so suppressed
 	// notches cannot surface later as zoom.
 	gpCamera->mCameraInput.iScrollDelta = bUserInterfaceOwnsScroll ? 0 : rRawInput.iScrollWheelValue - mPreviousRawInput.iScrollWheelValue;
 
-	// Populate ImGui gamepad inputs when menus are visible. Guard GetIO(): the ImGui context can be destroyed across a
-	// multi-frame deferred swapchain recreate (minimized client), and this fires every deferred frame if a menu was open.
-	if (bMenuVisible && ImGui::GetCurrentContext() != nullptr)
+	// Populate ImGui gamepad inputs when menus are visible.
+	if (bMenuVisible)
 	{
 		ImGuiIO& rInputOutput = ImGui::GetIO();
 		rInputOutput.BackendFlags |= ImGuiBackendFlags_HasGamepad;

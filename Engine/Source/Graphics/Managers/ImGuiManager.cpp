@@ -74,9 +74,7 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 : common::Singleton<ImGuiManager>(gpImGuiManager, this)
 {
 	CreateRenderPass();
-	CreateFramebuffers();
-	mTextureRetirements.resize(mImGuiFramebuffers.size());
-	CreateUiPrepassIndirectBuffer();
+	CreateScreenDependentResources();
 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -124,7 +122,9 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 		.Queue = gpDeviceManager->mGraphicsVkQueue,
 		.DescriptorPoolSize = IMGUI_IMPL_VULKAN_MINIMUM_SAMPLED_IMAGE_POOL_SIZE,
 		.MinImageCount = static_cast<uint32_t>(std::ssize(gpSwapchainManager->mFramebuffers)),
-		.ImageCount = static_cast<uint32_t>(std::ssize(gpSwapchainManager->mFramebuffers)),
+		// The backend sizes its vertex/index buffer ring by ImageCount once at init, and this manager survives swapchain
+		// recreations that can change the framebuffer count, so size the ring for the largest count.
+		.ImageCount = static_cast<uint32_t>(kiMaxFramebuffers),
 		.PipelineInfoMain
 		{
 			.RenderPass = mImGuiVkRenderPass,
@@ -262,21 +262,39 @@ ImGuiManager::~ImGuiManager()
 {
 	DestroyUiScreens();
 	mTextureResources.clear();
-	mTextureRetirements.clear();
+	// Before backend shutdown: retired TextureResource destructors remove their backend descriptors
+	DestroyScreenDependentResources();
 
 	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImPlot::DestroyContext();
 	ImGui::DestroyContext();
 
+	vkDestroyRenderPass(gpDeviceManager->mVkDevice, mImGuiVkRenderPass, nullptr);
+}
+
+void ImGuiManager::DestroyScreenDependentResources()
+{
+	// Callers drain the device first, so every retired texture and staging buffer is free
+	mTextureRetirements.clear();
+
 	vmaDestroyBuffer(gpDeviceManager->mpAllocator, mUiPrepassIndirectVkBuffer, mUiPrepassIndirectVmaAllocation);
+	mUiPrepassIndirectVkBuffer = VK_NULL_HANDLE;
+	mUiPrepassIndirectVmaAllocation = VK_NULL_HANDLE;
+	mpUiPrepassIndirectMappedVkDrawIndirectCommand = nullptr;
 
 	for (VkFramebuffer vkFramebuffer : mImGuiFramebuffers)
 	{
 		vkDestroyFramebuffer(gpDeviceManager->mVkDevice, vkFramebuffer, nullptr);
 	}
+	mImGuiFramebuffers.clear();
+}
 
-	vkDestroyRenderPass(gpDeviceManager->mVkDevice, mImGuiVkRenderPass, nullptr);
+void ImGuiManager::CreateScreenDependentResources()
+{
+	CreateFramebuffers();
+	mTextureRetirements.resize(static_cast<size_t>(std::ssize(mImGuiFramebuffers)));
+	CreateUiPrepassIndirectBuffer();
 }
 
 void ImGuiManager::CreateUiPrepassIndirectBuffer()
@@ -411,7 +429,7 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 		rStyle.Colors[ImGuiCol_PopupBg].w = fAlpha;
 	}
 
-	// Update geometry only when its scale changes; ImGui_ImplWin32_NewFrame refreshes DisplaySize later. Extent changes recreate this manager and its ImGui context at the kSwapchain destroy tier.
+	// Update geometry only when its scale changes; ImGui_ImplWin32_NewFrame refreshes DisplaySize later. This manager and its ImGui context persist across swapchain recreation, so this scale check reapplies geometry after an extent change.
 	float fPreviousUiScale = mfUiScale;
 	// Minimized/zero-height: keep previous scale rather than collapsing style to 0
 	float fHeight = static_cast<float>(gpGraphics->mFramebufferVkExtent2D.height);

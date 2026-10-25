@@ -39,9 +39,8 @@ Global: `gpInput` — constructed in `Main.cpp`, polled only from `engine::GameB
   by window flags), or while `ImGuiContext::WheelingWindow` still holds an
   earlier target. Everything else, including an open but non-scrolling menu or
   modal, gives the delta to the camera. The test mirrors ImGui's own
-  `UpdateMouseWheel` routing, reads `ImGuiContext` from the client-only
-  `imgui_internal.h` view, and inspects ImGui state only after confirming a live
-  context.
+  `UpdateMouseWheel` routing and reads `ImGuiContext` from the client-only
+  `imgui_internal.h` view.
 - Two accepted timing tolerances: hover is one frame stale (ImGui resolves it in `NewFrame`, after input polling), so a notch on the frame the cursor crosses a panel edge may be double-handled or lost; and ImPlot's `MouseWheelY` ownership stays visible for two input polls after leaving a plot, which may suppress an immediate background notch.
 - The hovered-window test assumes no child windows. If a `BeginChild`, popup, combo, list box, or scrolling table is ever added, the gate must grow ImGui's `ParentWindow` bubble logic from `FindBestWheelingWindow`.
 - The previous-snapshot assignment always advances the wheel baseline, including when input is swallowed, so a suppressed notch cannot surface later as zoom applied after the fact.
