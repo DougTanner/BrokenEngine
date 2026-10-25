@@ -8,14 +8,18 @@ Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.
 
 ## Hub Conventions
 
-- Engine/game contract: Engine code reaches the game types, functions, globals,
-  and compile-time symbols the game is required to provide directly by name —
-  for example through `game::gpGame`, a `game::` free function or global, or a
-  cast to the one concrete game type — and never adds a virtual function,
-  callback, function pointer, or back-reference only to reach game code. An
-  engine-owned shared/public member, enum value, friend, or signature must not
-  name a game-only concept unless an existing leaf document records deliberate
-  ownership. If one would, stop and surface the ownership decision.
+- IMPORTANT: Engine/game contract — the engine uses game code by name, and that
+  is the intended design. Every game project provides the types, functions,
+  globals, constants, and compile-time symbols the engine names, and engine
+  code calls them directly — for example through `game::gpGame`, a `game::`
+  free function or constant, or a cast to the one concrete game type. This is
+  not a layering violation: never flag it in review, never propose removing it,
+  and never add a virtual function, callback, function pointer, or
+  back-reference only to reach game code. The one limit is the engine's own
+  interface, not its use of game code: an engine-owned shared/public member,
+  enum value, friend, or signature must not name a game-only concept unless an
+  existing leaf document records deliberate ownership. If one would, stop and
+  surface the ownership decision.
 - Game references: an engine document names a game document as plain text, never a link — the game project's own `<project-relative path>`, plus the `## Heading` when one is needed — because each game project carries its own copy.
 - Aggregation: `Engine.h` is the engine aggregation header and is included by
   the game PCH. Preserve its documented include order and existing affinity
