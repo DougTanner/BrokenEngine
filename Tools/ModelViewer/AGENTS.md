@@ -83,9 +83,9 @@ and foreground.
 
 `BT_MODEL_VIEWER` is confined to this project. It excludes gameplay host and
 generic agent aggregation, gameplay camera updates and terrain cell queries,
-collection pipeline registration, sandbox screen ownership, network crash uploads
-and profile-screen presentation. Keep local crash reporting, ordinary engine
-profiling collection and Graphics lifecycle.
+and sandbox screen ownership. The viewer `Pch.h` sets `kbAudioStreamingHarnessRig`
+and `kbProfileScreens` to `false`. Keep ordinary engine profiling collection,
+Graphics lifecycle and local crash reporting without network upload.
 The viewer supplies a presentation frame, camera matrices and sun input,
 `engine::RenderFrameMain` by project membership for Main uniforms,
 `game::Camera::SunAngle`, its HDR clear color and UI reference height in

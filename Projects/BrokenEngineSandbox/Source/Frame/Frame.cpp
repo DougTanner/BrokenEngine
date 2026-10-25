@@ -130,6 +130,7 @@ void FrameInterpolate::Register()
 #if defined(BT_CLIENT)
 void FrameInterpolate::GraphicsResources()
 {
+	engine::ForEachGraphicsResources(engine::InterpolateTypes {});
 	engine::ForEachGraphicsResources(GameInterpolateTypes {});
 }
 #endif // BT_CLIENT

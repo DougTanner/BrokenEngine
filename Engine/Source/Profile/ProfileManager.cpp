@@ -614,37 +614,38 @@ void ProfileManager::UpdateProfileText()
 			DumpTimers();
 		}
 
-#if !defined(BT_MODEL_VIEWER)
-		if (meProfileScreen == ProfileScreen::kOff)
+		if constexpr (kbProfileScreens)
 		{
-			return;
+			if (meProfileScreen == ProfileScreen::kOff)
+			{
+				return;
+			}
+
+			bool bReevaluate = TickVisibilityCadence();
+
+			common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
+
+			if (meProfileScreen == ProfileScreen::kCpu || meProfileScreen == ProfileScreen::kGpu)
+			{
+				std::chrono::microseconds elapsedCpuTime(GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.mSmoothedValue);
+				FormatFramesPerSecondHeader(rWorkbuffer, elapsedCpuTime);
+			}
+
+			if (meProfileScreen == ProfileScreen::kCpu)
+			{
+				FormatCpuScreen(rWorkbuffer, bReevaluate);
+			}
+
+			if (meProfileScreen == ProfileScreen::kGpu)
+			{
+				FormatGpuScreen(rWorkbuffer, bReevaluate);
+			}
+
+			if (meProfileScreen == ProfileScreen::kNetwork)
+			{
+				FormatNetworkScreen(rWorkbuffer);
+			}
 		}
-
-		bool bReevaluate = TickVisibilityCadence();
-
-		common::Workbuffer& rWorkbuffer = common::gpThreadLocal->mWorkbuffer;
-
-		if (meProfileScreen == ProfileScreen::kCpu || meProfileScreen == ProfileScreen::kGpu)
-		{
-			std::chrono::microseconds elapsedCpuTime(GetCpuTimer(game::kCpuTimerFrameUpdate).smoothedMicroseconds.mSmoothedValue);
-			FormatFramesPerSecondHeader(rWorkbuffer, elapsedCpuTime);
-		}
-
-		if (meProfileScreen == ProfileScreen::kCpu)
-		{
-			FormatCpuScreen(rWorkbuffer, bReevaluate);
-		}
-
-		if (meProfileScreen == ProfileScreen::kGpu)
-		{
-			FormatGpuScreen(rWorkbuffer, bReevaluate);
-		}
-
-		if (meProfileScreen == ProfileScreen::kNetwork)
-		{
-			FormatNetworkScreen(rWorkbuffer);
-		}
-#endif // !defined(BT_MODEL_VIEWER)
 #endif // BT_CLIENT
 	}
 }

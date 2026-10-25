@@ -161,9 +161,6 @@ PipelineManager::PipelineManager()
 
 	CreateDebugRenderPipelines();
 
-#if !defined(BT_MODEL_VIEWER)
-	ForEachGraphicsResources(InterpolateTypes {});
-#endif
 	game::FrameInterpolate::GraphicsResources();
 }
 

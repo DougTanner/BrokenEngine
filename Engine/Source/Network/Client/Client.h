@@ -182,6 +182,9 @@ private:
 
 inline Client* gpClient = nullptr;
 
+void TryUploadCrashReport();
+void PollPendingCrashReport(Client* pClient);
+
 } // namespace engine
 
 #endif // BT_CLIENT

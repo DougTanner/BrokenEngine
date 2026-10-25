@@ -31,7 +31,7 @@ Game implementation built on Engine and Common. `Game` owns the per-side session
   sound, and graphics settings persistence is engine-owned
   (`../../../Engine/Source/Ui/AGENTS.md`).
 - Save/replay compatibility is gated by `Frame::kiVersion`; `Version.h::kiGameVersion` is informational.
-- `Pch.h` defines only the game's own compile-time switches and includes the engine's (`../../../Engine/Source/AGENTS.md` `## Hub Conventions`).
+- `Pch.h` defines the game's own compile-time switches and includes the engine's (`../../../Engine/Source/AGENTS.md` `## Hub Conventions`).
 - The game PCH force-includes shared aggregation/layout headers. Consumer TUs do not repeat those includes; DataPacker has a separate PCH.
 
 ## Subsystems

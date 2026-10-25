@@ -5,7 +5,7 @@
 
 #if defined(BT_CLIENT)
 #include "Graphics/Managers/TextureUploadManager.h"
-#if defined(BT_DEBUG) && !defined(BT_MODEL_VIEWER)
+#if defined(BT_DEBUG)
 #include "Agent/Commands/AudioStreamingHarnessRig.h"
 #endif
 #endif
@@ -651,8 +651,11 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 		}
 
 		std::memcpy(buffer.data(), rEntry.data.data(), static_cast<size_t>(rEntry.iLength));
-#if defined(BT_DEBUG) && !defined(BT_MODEL_VIEWER)
-		AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillReady, rRequest.miEntryIndex, crc, iOffset, rEntry.iLength, AudioStreamingHarnessRigQueueState::kReady, rRequest.muiGeneration, false);
+#if defined(BT_DEBUG)
+		if constexpr (kbAudioStreamingHarnessRig)
+		{
+			AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillReady, rRequest.miEntryIndex, crc, iOffset, rEntry.iLength, AudioStreamingHarnessRigQueueState::kReady, rRequest.muiGeneration, false);
+		}
 #endif
 		uint64_t uiFreeOwnership = PackAudioReadOwnership(AudioChunkReadState::kFree, rRequest.muiGeneration);
 		if (!rEntry.uiOwnership.compare_exchange_strong(uiOwnership, uiFreeOwnership, std::memory_order_acq_rel))
@@ -723,15 +726,21 @@ ChunkReadResult PackChunks::TryReadChunkData(ChunkReadRequest& rRequest, common:
 			ClearRequest();
 			continue;
 		}
-#if defined(BT_DEBUG) && !defined(BT_MODEL_VIEWER)
-		AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillQueued, i, crc, iOffset, buffer.size(), AudioStreamingHarnessRigQueueState::kQueued, uiGeneration, false);
+#if defined(BT_DEBUG)
+		if constexpr (kbAudioStreamingHarnessRig)
+		{
+			AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillQueued, i, crc, iOffset, buffer.size(), AudioStreamingHarnessRigQueueState::kQueued, uiGeneration, false);
+		}
 #endif
 		mLoader.PublishWake();
 		return ChunkReadResult::kPending;
 	}
 
-#if defined(BT_DEBUG) && !defined(BT_MODEL_VIEWER)
-	AudioStreamingHarnessRig::CountRetry();
+#if defined(BT_DEBUG)
+	if constexpr (kbAudioStreamingHarnessRig)
+	{
+		AudioStreamingHarnessRig::CountRetry();
+	}
 #endif
 	return ChunkReadResult::kRetry;
 }
@@ -760,8 +769,11 @@ void PackChunks::CancelChunkRead(ChunkReadRequest& rRequest)
 		uint64_t uiCancelledOwnership = PackAudioReadOwnership(eCancelledState, uiCancelledGeneration);
 		if (rEntry.uiOwnership.compare_exchange_weak(uiOwnership, uiCancelledOwnership, std::memory_order_acq_rel))
 		{
-#if defined(BT_DEBUG) && !defined(BT_MODEL_VIEWER)
-			AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillCancelled, rRequest.miEntryIndex, rRequest.muiCrc, rRequest.miOffset, rRequest.miLength, static_cast<AudioStreamingHarnessRigQueueState>(eState), uiRequestGeneration, eState != AudioChunkReadState::kLoading);
+#if defined(BT_DEBUG)
+			if constexpr (kbAudioStreamingHarnessRig)
+			{
+				AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kRefillCancelled, rRequest.miEntryIndex, rRequest.muiCrc, rRequest.miOffset, rRequest.miLength, static_cast<AudioStreamingHarnessRigQueueState>(eState), uiRequestGeneration, eState != AudioChunkReadState::kLoading);
+			}
 #endif
 			break;
 		}
@@ -844,10 +856,14 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 	common::crc_t crc = rEntry.crc;
 	int64_t iOffset = rEntry.iOffset;
 	int64_t iLength = rEntry.iLength;
-#if defined(BT_DEBUG) && !defined(BT_MODEL_VIEWER)
+#if defined(BT_DEBUG)
 	AudioStreamingHarnessRigPartition ePartition = iThreadIndex == 0 ? AudioStreamingHarnessRigPartition::kLoader0 : AudioStreamingHarnessRigPartition::kLoader1;
-	AudioStreamingHarnessRig::Record(ePartition, AudioStreamingHarnessRigPhase::kRefillLoading, iIndex, crc, iOffset, iLength, AudioStreamingHarnessRigQueueState::kLoading, uiGeneration, false);
-	bool bHeld = AudioStreamingHarnessRig::HoldAudioRead(crc, iOffset, iLength, iIndex, uiGeneration);
+	bool bHeld = false;
+	if constexpr (kbAudioStreamingHarnessRig)
+	{
+		AudioStreamingHarnessRig::Record(ePartition, AudioStreamingHarnessRigPhase::kRefillLoading, iIndex, crc, iOffset, iLength, AudioStreamingHarnessRigQueueState::kLoading, uiGeneration, false);
+		bHeld = AudioStreamingHarnessRig::HoldAudioRead(crc, iOffset, iLength, iIndex, uiGeneration);
+	}
 #endif
 
 	const LazyChunk& rLazyChunk = mLazyChunkMap.at(crc);
@@ -887,9 +903,12 @@ void PackChunks::LoadAudioRead(int64_t iIndex, uint64_t uiGeneration, int64_t iT
 		uint64_t uiFreeOwnership = PackAudioReadOwnership(AudioChunkReadState::kFree, AudioReadGeneration(uiExpectedOwnership));
 		VERIFY_SUCCESS(rEntry.uiOwnership.compare_exchange_strong(uiExpectedOwnership, uiFreeOwnership, std::memory_order_acq_rel));
 	}
-#if defined(BT_DEBUG) && !defined(BT_MODEL_VIEWER)
-	AudioStreamingHarnessRig::Record(ePartition, bCurrent ? AudioStreamingHarnessRigPhase::kRefillReady : AudioStreamingHarnessRigPhase::kRefillCancelled, iIndex, crc, iOffset, iLength, bCurrent ? AudioStreamingHarnessRigQueueState::kReady : AudioStreamingHarnessRigQueueState::kFree, uiGeneration, !bCurrent);
-	AudioStreamingHarnessRig::CompleteAudioRead(bHeld);
+#if defined(BT_DEBUG)
+	if constexpr (kbAudioStreamingHarnessRig)
+	{
+		AudioStreamingHarnessRig::Record(ePartition, bCurrent ? AudioStreamingHarnessRigPhase::kRefillReady : AudioStreamingHarnessRigPhase::kRefillCancelled, iIndex, crc, iOffset, iLength, bCurrent ? AudioStreamingHarnessRigQueueState::kReady : AudioStreamingHarnessRigQueueState::kFree, uiGeneration, !bCurrent);
+		AudioStreamingHarnessRig::CompleteAudioRead(bHeld);
+	}
 #endif
 	mLoader.NotifyChunkCompletion();
 }

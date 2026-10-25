@@ -34,7 +34,7 @@ Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.
   `Frame/FrameInput.h`, and, client only, the per-coord render interpolation
   `game::FrameInterpolate` from `Frame/Frame.h`. Do not read it as license to
   add another.
-- Switches: `EngineSwitches.h` holds the compile-time switches the engine reads and the `keLogLevel*` compile floors; each game's `Pch.h` includes it after `Log/LogTypes.h` and before `Common.h`.
+- Switches: `EngineSwitches.h` holds the engine-read compile-time switches that have one value for every program and the `keLogLevel*` compile floors; each program's `Pch.h` (each game's and ModelViewer's) includes it after `Log/LogTypes.h` and before `Common.h`. An engine-read switch whose value differs by program, such as `kbProfileScreens`, is defined in each program's `Pch.h` before those includes.
 - Keep implementation internals out of the aggregation: heavy private state in a
   header `Engine.h` aggregates belongs behind a `std::unique_ptr` and a forward
   declaration, its definition header included only by the owner's TUs and never

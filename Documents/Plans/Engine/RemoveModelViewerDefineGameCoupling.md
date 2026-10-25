@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-24T14:06:53.740Z","dependsOn":["Documents/Plans/Engine/RemoveModelViewerDefineEngineServices.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-24T14:06:53.740Z","dependsOn":[]} -->
 # Remove BT_MODEL_VIEWER, Phase 3: Game Coupling
 
 ## Context
@@ -9,8 +9,11 @@ the engine; `BT_MODEL_VIEWER` names one application and goes. This is phase 3 of
 - Phase 1 (landed): one image pass serves both programs; each program's `Game.h` supplies `game::kVkHdrClearColor`
   and `game::kfUiReferenceHeight`, and the viewer's `engine::RenderFrameMain` and `game::Camera::SunAngle` replace the
   gates where the viewer renders or behaves differently.
-- Phase 2 (Documents/Plans/Engine/RemoveModelViewerDefineEngineServices.md, this plan depends on it): the crash upload,
-  audio streaming harness rig hooks, profile overlay screens, and engine-collection graphics resources lose their gates.
+- Phase 2 (landed): the client crash-report upload is in Engine/Source/Network/Client/ClientCrashReport.cpp, which only
+  the sandbox client compiles; the audio streaming harness rig's pack-loading hooks compile under
+  `kbAudioStreamingHarnessRig` and the profile overlay screens under `kbProfileScreens`, both switches set in each
+  program's `Pch.h`; and the sandbox `FrameInterpolate::GraphicsResources` creates the engine-collection graphics
+  resources.
 - Phase 3 (this plan): removes every remaining gate, each around engine code that names the game, and deletes the
   define. Afterwards no file outside Documents/Plans mentions `BT_MODEL_VIEWER`.
 
@@ -34,9 +37,12 @@ reason).
 
 Line numbers cite commit 7d64500ecb21b6d05acc859ab5f417067a8f0796. Phase 1 edits ImGuiManager.cpp:106-111, 152-159,
 438-451, 473-480, ImGuiManager.h:139 (deleted), Islands.h:50/52 (gate lines only), ModelViewerApplication.cpp:521-537,
-Tools/ModelViewer/Source/Game.h (two constants added after :7; :10-11 deleted), Engine/Source/Graphics/AGENTS.md:57-64, and
-Tools/ModelViewer/AGENTS.md; Phase 2 edits Tools/ModelViewer/AGENTS.md and the Engine/Source/AGENTS.md Switches bullet (:33). No
-other region named here is edited by an earlier phase. Locate regions by content when lines have shifted.
+Tools/ModelViewer/Source/Game.h (two constants added after :7; :10-11 deleted), Engine/Source/Graphics/AGENTS.md:57-64,
+and Tools/ModelViewer/AGENTS.md; Phase 2 edits Tools/ModelViewer/AGENTS.md, the Engine/Source/AGENTS.md
+`## Hub Conventions` Switches bullet, Projects/BrokenEngineSandbox/Source/Pch.h and Tools/ModelViewer/Source/Pch.h (a
+`kbAudioStreamingHarnessRig` and `kbProfileScreens` switch block, in the sandbox after the `kbAutoConnect` block and
+before `#include "Engine.h"`), and the sandbox client project and filter files (one `ClCompile` item each). No other
+region named here is edited by an earlier phase. Locate regions by content when lines have shifted.
 
 ## Design
 

@@ -1,6 +1,10 @@
 #pragma once
 
 #include "ExternalHeaders.h"
+
+inline constexpr bool kbAudioStreamingHarnessRig = false;
+inline constexpr bool kbProfileScreens = false;
+
 #include "Log/LogTypes.h"
 #include "EngineSwitches.h"
 #include "Common.h"

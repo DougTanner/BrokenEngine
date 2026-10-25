@@ -203,10 +203,12 @@ the rows marked for transfer or removal from every registered collection pair,
 declared hook or not
 ([`Engine/Source/Frame/Collections/AGENTS.md`](../../Engine/Source/Frame/Collections/AGENTS.md)).
 Engine code walks the engine collections immediately
-before each game call — registration in the `GameBase` constructor, graphics
-resources in `PipelineManager`, the PostRender phases from PreCollision on in
-`RunFrameTick`, and begin/render/end in the main render pass — so engine
-registration, and with it the engine type indices, always comes first.
+before each game call — registration in the `GameBase` constructor, the
+PostRender phases from PreCollision on in `RunFrameTick`, and begin/render/end
+in the main render pass — so engine registration, and with it the engine type
+indices, always comes first. Graphics resources are the exception:
+`PipelineManager` calls only the game's `FrameInterpolate::GraphicsResources`,
+which walks the engine collections before the game collections.
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%

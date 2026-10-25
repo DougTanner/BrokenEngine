@@ -12,7 +12,8 @@ confirmation, ordered receive draining, ACK/flush, and resets.
 `ClientSessionBase`, which the game client session inherits, holds the runtime
 and the desync core and owns static-data application, owned-entity event
 application, `Reconcile`, and the resync, disconnect, and server-load session
-resets. This directory also owns replay and desync machinery. The game client
+resets. This directory also owns replay and desync machinery and the client
+crash-report upload. The game client
 session (the game project's own `Source/Network/Client/AGENTS.md`) owns the
 reconciler, each owned-entity event's gameplay effect, gameplay hydration and
 smoke continuity, UI, and gameplay policy. Collection hydration rules are in

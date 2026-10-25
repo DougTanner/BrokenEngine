@@ -10,6 +10,9 @@ inline constexpr bool kbAutoConnect = true;
 inline constexpr bool kbAutoConnect = false;
 #endif
 
+inline constexpr bool kbAudioStreamingHarnessRig = true; // Compiles the agent audio streaming harness rig's pack-loading hooks (Debug clients)
+inline constexpr bool kbProfileScreens = true; // Compiles the CPU, GPU, and Network profile overlay screens
+
 #include "Log/LogTypes.h"
 #include "EngineSwitches.h"
 

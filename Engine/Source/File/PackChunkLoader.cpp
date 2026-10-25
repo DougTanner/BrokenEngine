@@ -4,7 +4,7 @@
 
 #if defined(BT_CLIENT)
 #include "Graphics/Managers/TextureUploadManager.h"
-#if defined(BT_DEBUG) && !defined(BT_MODEL_VIEWER)
+#if defined(BT_DEBUG)
 #include "Agent/Commands/AudioStreamingHarnessRig.h"
 #endif
 #endif
@@ -86,10 +86,13 @@ void PackChunkLoader::RequestChunkLoad(std::span<const common::crc_t> crcs, Load
 
 				mRequestQueue.push({.crc = crc, .ePriority = ePriority, .eKind = LoadRequestKind::kWholeChunk});
 				rLazyChunk.eState.value.store(ChunkState::kLoadRequested, std::memory_order_release);
-#if defined(BT_CLIENT) && defined(BT_DEBUG) && !defined(BT_MODEL_VIEWER)
-				if (common::gpMultithreading->IsMainThread())
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+				if constexpr (kbAudioStreamingHarnessRig)
 				{
-					AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kExistingQueued, std::numeric_limits<uint32_t>::max(), crc, 0, rLazyChunk.iDataSize, AudioStreamingHarnessRigQueueState::kQueued, 0, false);
+					if (common::gpMultithreading->IsMainThread())
+					{
+						AudioStreamingHarnessRig::Record(AudioStreamingHarnessRigPartition::kMain, AudioStreamingHarnessRigPhase::kExistingQueued, std::numeric_limits<uint32_t>::max(), crc, 0, rLazyChunk.iDataSize, AudioStreamingHarnessRigQueueState::kQueued, 0, false);
+					}
 				}
 #endif
 				bAddedAny = true;
@@ -190,8 +193,11 @@ void PackChunkLoader::WaitForLoadersIdle()
 	// This excludes concurrent enqueueing, including tick-worker audio requests from PlayOneShot3d through StaticVoice::LoadXAudio2SourceVoice.
 	// Drain before the all-texture reset: a late kUploading store would escape the reset, and RequestChunkLoad skips
 	// states >= kDiskLoaded, leaving that texture permanently unrequested.
-#if defined(BT_CLIENT) && defined(BT_DEBUG) && !defined(BT_MODEL_VIEWER)
-	AudioStreamingHarnessRig::PrepareLoaderDrain();
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+	if constexpr (kbAudioStreamingHarnessRig)
+	{
+		AudioStreamingHarnessRig::PrepareLoaderDrain();
+	}
 #endif
 	std::unique_lock lock(mQueueMutex);
 	LOG(kLoading, kInfo, "PackChunks loader drain begin queued={} active={}", mRequestQueue.size(), miActiveLoadJobs);
@@ -239,12 +245,15 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 #else
 			bool bAudioWork = false;
 #endif
-#if defined(BT_CLIENT) && defined(BT_DEBUG) && !defined(BT_MODEL_VIEWER)
-			if (AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire); pHarnessRig != nullptr && pHarnessRig->mbLoadersStalled.load(std::memory_order_seq_cst))
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+			if constexpr (kbAudioStreamingHarnessRig)
 			{
-				bExistingWork = false;
-				bRealtimeWork = false;
-				bAudioWork = false;
+				if (AudioStreamingHarnessRig* pHarnessRig = gpAttachedAudioStreamingHarnessRig.load(std::memory_order_acquire); pHarnessRig != nullptr && pHarnessRig->mbLoadersStalled.load(std::memory_order_seq_cst))
+				{
+					bExistingWork = false;
+					bRealtimeWork = false;
+					bAudioWork = false;
+				}
 			}
 #endif
 			if (bRealtimeWork || (bExistingWork && (!bAudioWork || !mbPreferAudio)))
@@ -298,11 +307,14 @@ void PackChunkLoader::LoadingThread(int64_t iThreadIndex)
 			LoadChunk(loadRequest, iThreadIndex);
 		}
 
-#if defined(BT_CLIENT) && defined(BT_DEBUG) && !defined(BT_MODEL_VIEWER)
-		if (!bAudioRead)
+#if defined(BT_CLIENT) && defined(BT_DEBUG)
+		if constexpr (kbAudioStreamingHarnessRig)
 		{
-			const LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(loadRequest.crc);
-			AudioStreamingHarnessRig::Record(iThreadIndex == 0 ? AudioStreamingHarnessRigPartition::kLoader0 : AudioStreamingHarnessRigPartition::kLoader1, AudioStreamingHarnessRigPhase::kExistingComplete, std::numeric_limits<uint32_t>::max(), loadRequest.crc, loadRequest.iOffset, loadRequest.eKind == LoadRequestKind::kWholeChunk ? rLazyChunk.iDataSize : loadRequest.iLength, AudioStreamingHarnessRigQueueState::kReady, 0, false);
+			if (!bAudioRead)
+			{
+				const LazyChunk& rLazyChunk = mrPackChunks.mLazyChunkMap.at(loadRequest.crc);
+				AudioStreamingHarnessRig::Record(iThreadIndex == 0 ? AudioStreamingHarnessRigPartition::kLoader0 : AudioStreamingHarnessRigPartition::kLoader1, AudioStreamingHarnessRigPhase::kExistingComplete, std::numeric_limits<uint32_t>::max(), loadRequest.crc, loadRequest.iOffset, loadRequest.eKind == LoadRequestKind::kWholeChunk ? rLazyChunk.iDataSize : loadRequest.iLength, AudioStreamingHarnessRigQueueState::kReady, 0, false);
+			}
 		}
 #endif
 
