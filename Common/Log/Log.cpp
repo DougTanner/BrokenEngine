@@ -165,13 +165,14 @@ void LogWrite(char* pLogBuffer)
 	++giMyOutputDebugString;
 	OutputDebugString(pLogBuffer);
 	--giMyOutputDebugString;
+	// Heap: console output and the file sink may allocate while emitting a tracked-loop log.
+	ScopedSuppressAllocationTracking suppress;
 	if constexpr (kbAlsoLogToPrintf)
 	{
 		std::printf("%s", pLogBuffer);
 	}
 	if (sLogFileStream.is_open())
 	{
-		ScopedSuppressAllocationTracking suppress; // Heap: ofstream write/flush may allocate post-open; off the tracked main-loop path
 		sLogFileStream << pLogBuffer;
 		sLogFileStream.flush();
 	}

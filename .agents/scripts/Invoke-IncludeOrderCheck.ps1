@@ -48,6 +48,7 @@ $script:ExcludedFiles = @(
 	'Engine/Source/Engine.h'
 )
 $script:ProjectFiles = @(
+	@{ Prefix = '^Tools/ServerMonitor/'; Project = 'Tools/ServerMonitor/Platforms/VisualStudio2026/ServerMonitor.vcxproj' }
 	@{ Prefix = '^DataPacker/'; Project = 'DataPacker/Platforms/VisualStudio2026/DataPacker.vcxproj' }
 	@{ Prefix = '^Tools/ModelViewer/Source/'; Project = 'Tools/ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj' }
 	@{ Prefix = '^Tools/(?:AgentHarness|ToolCommon)/'; Project = 'Tools/AgentHarness/Platforms/VisualStudio2026/AgentHarness.vcxproj' }

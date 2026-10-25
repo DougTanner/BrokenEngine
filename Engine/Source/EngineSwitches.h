@@ -6,7 +6,11 @@ inline constexpr bool kbFrameDispatch = true;
 inline constexpr bool kbLogging = true;
 inline constexpr bool kbRenderThread = true;
 
+#if defined(BT_SERVER)
+inline constexpr bool kbAlsoLogToPrintf = true;
+#else
 inline constexpr bool kbAlsoLogToPrintf = false;
+#endif
 inline constexpr bool kbGraphicsProcessingUnitAssistedValidation = false;
 inline constexpr bool kbRecording = false;
 inline constexpr bool kbRenderDoc = true; // Compile-time gate for RenderDoc in-app capture; runtime activation still requires --renderdoc

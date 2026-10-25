@@ -123,6 +123,9 @@ using namespace std::chrono_literals;
 #include <vector>
 
 // Windows
+#if defined(BT_SERVER)
+	#include <ws2tcpip.h>
+#endif
 #include <windows.h>
 
 #include <corecrt_math.h>

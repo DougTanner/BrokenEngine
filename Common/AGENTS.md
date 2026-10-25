@@ -9,7 +9,7 @@ code. If a Common change requires one of those dependencies, stop before
 editing: move the behavior to its higher owner or obtain an architectural
 decision. Add public headers to `Common.h`, the single Common aggregation header
 included by `Pch.h`. The PCH-less AgentTools also compile `Sha256Hasher.h` by
-path.
+path. ServerMonitor compiles `ServerMonitorProtocol.h` by path.
 
 Focused implementation contracts live in Log (`Log/AGENTS.md`), Math (`Math/AGENTS.md`), and Threading (`Threading/AGENTS.md`). This hub owns only their cross-codebase usage rules.
 
@@ -67,7 +67,10 @@ reviewed heap work and retain the root-required `// Heap:` rationale.
 
 - `LOG(category, level, format, ...)` is compile-time and runtime filtered. Allocation-tracked call sites must stay allocation-free; use the Common formatters/workbuffer wrappers rather than temporary strings. New formatters for Common-visible types belong in `Log/LogFormatters.h`; higher-layer formatters stay with their owning hub.
 - `kTemp` is reserved for transient diagnostics. Durable messages use the owning category and the root log-level meanings. Temporary code, including `kTemp` logs, never lands, so never review or style-check it beyond removing it.
-- Use `gpMultithreading->Dispatch()` for bounded data-parallel work and `PersistentWorker` for a long-lived single worker. A pool dispatch is non-reentrant. Temporary allocations inside dispatched work use that worker's `ThreadLocal` workbuffer.
+- Use `gpMultithreading->Dispatch()` for bounded data-parallel work. For a
+  long-lived single worker, follow the scheduling and lifecycle constraints in
+  `Threading/AGENTS.md`. A pool dispatch is non-reentrant. Temporary allocations
+  inside dispatched work use that worker's `ThreadLocal` workbuffer.
 
 ## Headers, Validation, and Platform
 

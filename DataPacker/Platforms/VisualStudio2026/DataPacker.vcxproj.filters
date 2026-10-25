@@ -218,6 +218,9 @@
     <ClInclude Include="..\..\..\Common\ScopedLambda.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Common\ServerMonitorProtocol.h">
+      <Filter>Common</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\Common\Sha256Hasher.h">
       <Filter>Common</Filter>
     </ClInclude>

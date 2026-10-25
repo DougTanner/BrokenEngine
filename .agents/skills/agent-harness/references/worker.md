@@ -573,9 +573,9 @@ and the handoff this run returns.
     '{"cmd":"ping"}' | & '<absolute AgentHarness path>' --owner '<owner token>' --port 27100 -
     ```
 
-31. For server-window verification, read the
-    [server-window recipe](server-window.md#server-gdi-monitoring-window-capture-and-click).
-    Done when that recipe has been read, or the scenario needs no server-window
+31. For server-monitor verification, read the
+    [server-monitor recipe](server-monitor.md#server-monitor-window-capture-and-click).
+    Done when that recipe has been read, or the scenario needs no server-monitor
     verification.
 
 32. Use `--timeout-ms N` for a deferred client command; default is 15000 and

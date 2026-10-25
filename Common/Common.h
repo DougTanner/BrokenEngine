@@ -6,6 +6,7 @@
 #include "Crc.h"
 #include "FileUtils.h"
 #include "Serialization.h"
+#include "ServerMonitorProtocol.h"
 #include "Sha256Hasher.h"
 #include "Singleton.h"
 #include "StableVector.h"

@@ -90,7 +90,7 @@ flowchart LR
 
 The server main loop in [`Main.cpp`](../../Engine/Source/Main.cpp) calls
 [`GameBase::ServerUpdate()`](../../Engine/Source/GameBase.cpp), followed by
-`ServerUpdateDisplayStatistics()`. `ServerUpdate()` establishes the high-level
+`ServerMonitorHost::Update()`. `ServerUpdate()` establishes the high-level
 boundaries for network intake, game tick preparation, shared frame simulation,
 and network completion.
 [`ServerSessionRuntime.cpp`](../../Engine/Source/Network/Server/ServerSessionRuntime.cpp)
@@ -107,7 +107,7 @@ arrived during the wait enter the imminent tick.
 %%{init: {'theme': 'default'}}%%
 flowchart LR
     intake["Network intake"] --> boundary["Tick-boundary poll"] --> prepare["Game tick preparation"] --> simulation["Shared frame simulation"] --> completion["Network completion"]
-    completion --> display["ServerUpdateDisplayStatistics"]
+    completion --> display["ServerMonitorHost::Update"]
 ```
 
 ## Replay Transfer Publication

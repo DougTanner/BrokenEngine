@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup><Filter Include="ServerMonitor"><UniqueIdentifier>{6e5b9f4d-b1ab-44ef-88b4-c6c8355164df}</UniqueIdentifier></Filter></ItemGroup>
+  <ItemGroup><ClCompile Include="..\..\ServerMonitor.cpp"><Filter>ServerMonitor</Filter></ClCompile></ItemGroup>
+  <ItemGroup><ClInclude Include="..\..\..\..\Common\ServerMonitorProtocol.h"><Filter>ServerMonitor</Filter></ClInclude></ItemGroup>
+</Project>

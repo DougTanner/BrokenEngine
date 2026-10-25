@@ -55,6 +55,9 @@ Shared ENet transport, slot subscriptions, ACK state, discovery, wire cursors, a
 
 ## Ownership
 
+- The Server Monitor TCP channel is a separate, non-ENet protocol owned by
+  `../Server/AGENTS.md` `## Monitor Channel`.
+
 - `NetworkManager` owns ENet lifetime, channel math, and the allocation-suppressed send path.
 - `NetworkProtocol` owns shared packet identifiers, compatibility constants, slot identity, ACK structures, and client-to-server contract rows.
 - `NetworkDiscoveryResponder` (server) and `NetworkDiscoveryScanner` (client)

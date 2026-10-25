@@ -50,6 +50,10 @@ Update Frame Update Pipeline (`../../Documents/Architecture/FrameUpdatePipeline.
 
 ## Startup and Main Loop
 
+- The server uses the console subsystem and disables QuickEdit. Its hidden window
+  receives WM_ENDSESSION only; Ctrl+C, Ctrl+Break and console close request quit
+  and wait for the main thread's final autosave and monitor worker shutdown.
+
 - `LaunchOptions` owns command-line parsing. `--loopback-only` is independent of `--agent-port`; `--data-directory` and `--app-data-directory` must each resolve to an existing absolute directory; port values are validated before conversion. The `--log-file` sink opens in `ProcessMain` immediately after a successful parse, so `FileManager`-constructor diagnostics reach the file while parse rejections do not.
 - Agent launches stay minimized and suppress physical client input, except IME result characters on a focused agent window (`Input/AGENTS.md` `## Focus and Agent Input`), while preserving the close/Alt+F4 escape path. Synthetic input and command transport live in Agent (`Agent/AGENTS.md`).
 - `FileManager` directory-setup failures during construction and required-asset failures at eager-load completion log their full diagnostic at `kError`. At those two startup boundaries, a normal client launch shows that same detail once, an agent launch shows no modal, and both return nonzero through ordinary cleanup without writing a crash report. Other exceptions are rethrown to an attached debugger and otherwise retain the crash-report path.
@@ -158,5 +162,5 @@ idempotency key. Shutdown waits for unfinished posts.
 - Memory (`Memory/AGENTS.md`) - Allocator and tracking
 - Network (`Network/AGENTS.md`) - ENet transport and discovery
 - Profile (`Profile/AGENTS.md`) - CPU/GPU profiling
-- Server (`Server/AGENTS.md`) - Headless server monitoring window
+- Server (`Server/AGENTS.md`) - Server Monitor host: statistics aggregation and the monitor channel
 - Ui (`Ui/AGENTS.md`) - Runtime settings and screens

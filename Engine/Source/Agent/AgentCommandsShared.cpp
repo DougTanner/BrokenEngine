@@ -107,7 +107,7 @@ static void CommandPing([[maybe_unused]] const nlohmann::json& rParameters, nloh
 static void CommandQuit([[maybe_unused]] const nlohmann::json& rParameters, nlohmann::json& rResult)
 {
 	rResult = nlohmann::json::object();
-	engine::gbQuit = true;
+	engine::gbQuit.store(true, std::memory_order_relaxed);
 }
 
 static void CommandGetLogs(const nlohmann::json& rParameters, nlohmann::json& rResult)

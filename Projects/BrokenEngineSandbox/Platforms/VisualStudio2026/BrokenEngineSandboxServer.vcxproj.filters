@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Engine">
@@ -627,7 +627,7 @@
     <ClInclude Include="..\..\..\..\Common\ErrorUtils.h">
       <Filter>Common</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\..\Engine\Source\Server\ServerDisplay.h">
+    <ClInclude Include="..\..\..\..\Engine\Source\Server\ServerMonitorHost.h">
       <Filter>Engine\Server</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Frame\ServerCellStats.h">
@@ -641,6 +641,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\FrameEdit.h">
       <Filter>Engine\Agent\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\ServerMonitorProtocol.h">
+      <Filter>Common</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -984,7 +987,7 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Frame\FlightPlanes.cpp">
       <Filter>Engine\Frame</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Engine\Source\Server\ServerDisplay.cpp">
+    <ClCompile Include="..\..\..\..\Engine\Source\Server\ServerMonitorHost.cpp">
       <Filter>Engine\Server</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Frame\ServerCellStats.cpp">

@@ -1,7 +1,7 @@
 #include "File/PackChunks.h"
 #include "Input/Input.h"
 #include "Memory/GlobalAllocator.h"
-#include "Server/ServerDisplay.h"
+#include "Server/ServerMonitorHost.h"
 #include "Ui/GameSettings.h"
 #include "Ui/GraphicsSettings.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
@@ -19,14 +19,31 @@
 namespace engine
 {
 
+#if defined(BT_SERVER)
+static std::atomic<bool> sbFinalAutosaveDone = false;
+
+static BOOL WINAPI ConsoleControlHandler(DWORD uiControlType)
+{
+	if (uiControlType != CTRL_C_EVENT && uiControlType != CTRL_BREAK_EVENT && uiControlType != CTRL_CLOSE_EVENT)
+	{
+		return FALSE;
+	}
+	gbQuit.store(true, std::memory_order_relaxed);
+	sbFinalAutosaveDone.wait(false, std::memory_order_acquire);
+	return TRUE;
+}
+#endif
+
 #if defined(BT_CLIENT)
 static HCURSOR sHcursorArrow = nullptr;
 static HCURSOR sHcursorCrosshair = nullptr;
 #endif
 
 static HWND sHwnd = nullptr;
+#if defined(BT_CLIENT)
 static HMONITOR sHmonitor = nullptr;
 static MONITORINFO sMonitorInfo {};
+#endif
 
 static bool sbHasFocus = false;
 
@@ -211,6 +228,7 @@ static int64_t MainThread(HINSTANCE hinstance)
 	gpIslandTerrain->WaitForElevationMaps(navigationThresholds, game::NavigationClearanceMeters());
 
 	auto pGame = std::make_unique<game::Game>();
+	auto pServerMonitorHost = std::make_unique<ServerMonitorHost>();
 #endif
 
 	WNDCLASSEX windowClassExtended
@@ -242,16 +260,13 @@ static int64_t MainThread(HINSTANCE hinstance)
 #if defined(BT_CLIENT)
 	LoadGraphicsSettings();
 	gVkWantedFramebufferExtent2D = SetupWindow(WantedFullscreen(), siWindowStyle, sWindowRectangle);
-#else
-	int64_t iWindowStyle = WS_POPUP;
-	RECT windowRectangle {};
-	SystemParametersInfo(SPI_GETWORKAREA, 0, &windowRectangle, 0);
 #endif // BT_CLIENT
 
 #if defined(BT_CLIENT)
 	sHwnd = CreateWindow(game::kGameName.data(), game::kGameName.data(), static_cast<DWORD>(siWindowStyle), sWindowRectangle.left, sWindowRectangle.top, sWindowRectangle.right - sWindowRectangle.left, sWindowRectangle.bottom - sWindowRectangle.top, nullptr, nullptr, hinstance, nullptr);
 #else
-	sHwnd = CreateWindow(game::kGameName.data(), game::kGameName.data(), static_cast<DWORD>(iWindowStyle), windowRectangle.left, windowRectangle.top, windowRectangle.right - windowRectangle.left, windowRectangle.bottom - windowRectangle.top, nullptr, nullptr, hinstance, nullptr);
+	// This window is never shown; it receives WM_ENDSESSION for the final autosave.
+	sHwnd = CreateWindow(game::kGameName.data(), game::kGameName.data(), WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, hinstance, nullptr);
 #endif
 	if (sHwnd == nullptr)
 	{
@@ -345,25 +360,17 @@ static int64_t MainThread(HINSTANCE hinstance)
 
 	// Agent-mode launch stays minimized and must not steal focus from the user's active app
 	ShowWindow(sHwnd, gLaunchOptions.iAgentPort != 0 ? SW_SHOWMINNOACTIVE : SW_SHOWDEFAULT);
-#else
-	ShowWindow(sHwnd, gLaunchOptions.iAgentPort != 0 ? SW_SHOWMINNOACTIVE : SW_SHOWNOACTIVATE);
-#endif // BT_CLIENT
+
 	common::ScopedLambda hideWindow([]()
 	{
 		LOG(kDefault, kDebug, "Hide window");
 		ShowWindow(sHwnd, SW_HIDE);
 	});
-#if defined(BT_CLIENT)
 	// Agent-mode launch must not steal focus from the user's active app
 	if (gLaunchOptions.iAgentPort == 0)
 	{
 		SetForegroundWindow(sHwnd);
 		BringWindowToTop(sHwnd);
-		SetFocus(sHwnd);
-	}
-#else
-	if (gLaunchOptions.iAgentPort == 0)
-	{
 		SetFocus(sHwnd);
 	}
 #endif
@@ -378,6 +385,12 @@ static int64_t MainThread(HINSTANCE hinstance)
 	gbAllocationTrackingReady.store(true, std::memory_order_relaxed);
 	pGame->mTimeStep.mRealTime.Reset();
 
+#if defined(BT_SERVER)
+	if (SetConsoleCtrlHandler(ConsoleControlHandler, TRUE) == 0)
+	{
+		throw std::runtime_error("SetConsoleCtrlHandler failed");
+	}
+#endif
 	LOG(kDefault, kInfo, "\nEnter main loop");
 	LogIndent(1);
 	// Write and send while the client connection (upload) or the server's crash report poster (post) is still alive; unwinding destroys it before ProcessMain's catch.
@@ -388,7 +401,7 @@ static int64_t MainThread(HINSTANCE hinstance)
 			gpProfileManager->CpuStart(kCpuTimerMessagesAndInput);
 
 			[[maybe_unused]] bool bLostFocus = ProcessMessages();
-			if (gbQuit) [[unlikely]]
+			if (gbQuit.load(std::memory_order_relaxed)) [[unlikely]]
 			{
 				break;
 			}
@@ -459,31 +472,9 @@ static int64_t MainThread(HINSTANCE hinstance)
 			pAudioManager->Update(it != pGame->mCells.end() && it->second.iSnapshotCount > 0 ? &pGame->RenderFrame(game::gpGame->mClientGridCoordinate) : nullptr);
 #else
 			{
-				// Heap: Win32 InvalidateRect may trigger internal GDI allocations
+				// Heap: immutable snapshot strings and cell records own their storage.
 				ScopedSuppressAllocationTracking suppress;
-				ServerUpdateDisplayStatistics();
-
-				// Throttle full-window GDI repaint to a fraction of the tick rate — paint cost dwarfs stat aggregation, and the window shows only coarse stats/map. Clicks still repaint immediately via WM_LBUTTONDOWN.
-				static constexpr int64_t kiServerDisplayRepaintTicks = 8;
-				static int64_t siServerDisplayRepaintCounter = 0;
-				if (++siServerDisplayRepaintCounter >= kiServerDisplayRepaintTicks)
-				{
-					siServerDisplayRepaintCounter = 0;
-
-					// Skip the repaint when it would blit nothing new: a minimized/hidden window paints offscreen for no benefit, and a visible window whose displayed stats/map are unchanged need not repaint an identical frame.
-					// Keep a slow heartbeat while visible-but-unchanged so the free-running tick/timer text (deliberately outside the content hash) stays visibly alive instead of reading as a hung server.
-					static constexpr int64_t kiServerDisplayHeartbeatWindows = 4; // 4 x 8-tick windows = 1 Hz at the 32 Hz tick rate
-					static int64_t siServerDisplayHeartbeatCounter = 0;
-					if (IsIconic(sHwnd) == FALSE && IsWindowVisible(sHwnd) != FALSE)
-					{
-						bool bHeartbeat = ++siServerDisplayHeartbeatCounter >= kiServerDisplayHeartbeatWindows;
-						if (ServerDisplayContentChanged() || bHeartbeat)
-						{
-							siServerDisplayHeartbeatCounter = 0;
-							InvalidateRect(sHwnd, nullptr, FALSE);
-						}
-					}
-				}
+				pServerMonitorHost->Update();
 			}
 #endif // BT_CLIENT
 		}
@@ -525,6 +516,9 @@ static int64_t MainThread(HINSTANCE hinstance)
 
 #if defined(BT_SERVER)
 	pGame->mServerSaveLoad.FinalAutosave();
+	pServerMonitorHost.reset();
+	sbFinalAutosaveDone.store(true, std::memory_order_release);
+	sbFinalAutosaveDone.notify_all();
 #endif
 
 #if defined(BT_CLIENT)
@@ -712,43 +706,13 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 	switch (uiMessage)
 	{
 #if defined(BT_SERVER)
-		case WM_ERASEBKGND:
-			return 1;
-
-		case WM_PAINT:
-		{
-			// Heap: GDI painting creates/destroys kernel objects that may trigger CRT allocations
-			ScopedSuppressAllocationTracking suppress;
-			PaintServerDisplay(hwnd);
-			return 0;
-		}
-
-		case WM_KEYDOWN:
-		{
-			if constexpr (kbDebugInput)
-			{
-				if (uiWordParameter == VK_F4)
-				{
-					gbQuit = true;
-				}
-			}
-			return 0;
-		}
-
-		case WM_LBUTTONDOWN:
-		{
-			HandleServerClick(hwnd, LOWORD(iLongParameter), HIWORD(iLongParameter));
-			InvalidateRect(hwnd, nullptr, FALSE);
-			return 0;
-		}
-
 		case WM_ENDSESSION:
 		{
 			// The session may end when this returns, so the final autosave must finish here.
 			if (uiWordParameter != 0)
 			{
 				LOG(kDefault, kInfo, "WM_ENDSESSION: final autosave");
-				gbQuit = true;
+				gbQuit.store(true, std::memory_order_relaxed);
 				game::gpGame->mServerSaveLoad.FinalAutosave();
 			}
 			return 0;
@@ -759,14 +723,7 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 		{
 			// Suppress system commands that enter modal loops and block the main thread
 			WORD uiSystemCommand = uiWordParameter & 0xFFF0;
-			if (uiSystemCommand == SC_KEYMENU
-#if defined(BT_SERVER)
-				|| uiSystemCommand == SC_MOVE
-				|| uiSystemCommand == SC_SIZE
-				|| uiSystemCommand == SC_MAXIMIZE
-				|| uiSystemCommand == SC_RESTORE
-#endif
-				)
+			if (uiSystemCommand == SC_KEYMENU)
 			{
 				return 0;
 			}
@@ -834,14 +791,14 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 		case WM_CLOSE:
 		{
 			LOG(kDefault, kDebug, "WM_CLOSE");
-			gbQuit = true;
+			gbQuit.store(true, std::memory_order_relaxed);
 			return 0;
 		}
 
 		case WM_DESTROY:
 		{
 			LOG(kDefault, kDebug, "WM_DESTROY");
-			gbQuit = true;
+			gbQuit.store(true, std::memory_order_relaxed);
 			sHwnd = nullptr;
 			break;
 		}
@@ -859,6 +816,14 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 
 static int64_t ProcessMain(HINSTANCE hinstance)
 {
+#if defined(BT_SERVER)
+	DWORD uiConsoleMode = 0;
+	HANDLE handleInput = GetStdHandle(STD_INPUT_HANDLE);
+	if (GetConsoleMode(handleInput, &uiConsoleMode) != 0)
+	{
+		std::ignore = SetConsoleMode(handleInput, (uiConsoleMode | ENABLE_EXTENDED_FLAGS) & ~ENABLE_QUICK_EDIT_MODE);
+	}
+#endif
 	if (!engine::ParseLaunchOptions())
 	{
 		return 0; // Fatal launch-option error (e.g. --agent-port out of range); already logged kError.

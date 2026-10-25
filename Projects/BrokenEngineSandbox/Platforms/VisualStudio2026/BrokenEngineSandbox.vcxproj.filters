@@ -912,6 +912,9 @@
     <ClInclude Include="..\..\..\..\Engine\Source\Agent\Commands\DescribeScene.h">
       <Filter>Engine\Agent\Commands</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Common\ServerMonitorProtocol.h">
+      <Filter>Common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Engine\Source\File\FileManager.cpp">

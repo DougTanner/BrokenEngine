@@ -93,6 +93,6 @@ private:
 
 inline AgentCommandServer* gpAgentCommandServer = nullptr;
 
-inline bool gbQuit = false;
+inline std::atomic<bool> gbQuit = false;
 
 } // namespace engine

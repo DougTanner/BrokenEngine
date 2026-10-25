@@ -153,7 +153,7 @@ pwsh -NoProfile -File .agents/skills/compile/scripts/Invoke-CompileBuild.ps1 -Ta
    Parameters:
 
    - `-Target` — `ThirdParty`, `DataPacker`, `Client`, `Server`, `ModelViewer`,
-     `WorktreeCli`, or `AgentHarness`.
+     `WorktreeCli`, `AgentHarness`, or `ServerMonitor`.
    - `-Configuration` — `Debug`, `Profile`, or `Release`; required for
      ThirdParty, Client, Server, and ModelViewer (Debug/Release only). Omit it for
      the Release-only targets

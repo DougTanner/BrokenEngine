@@ -264,6 +264,18 @@ function Resolve-PathMapping
 		}
 	}
 
+	if ($RelativePath -imatch '^Tools/ServerMonitor/')
+	{
+		return [ordered]@{
+			mapping = 'resolved'
+			code = 'mapping.tools-servermonitor'
+			projects = @('ServerMonitor')
+			itemType = $itemType
+			filter = (Get-FilterPath 'ServerMonitor' $RelativePath 2)
+			detail = 'ServerMonitor owns its own source tree.'
+		}
+	}
+
 	$affinityProjects = @(Get-AffinityProjects $Affinity)
 
 	# Rows 8-9 — engine and game source, owned by structural affinity.

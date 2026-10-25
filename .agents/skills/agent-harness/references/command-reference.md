@@ -8,7 +8,7 @@ A project may take over an engine client or server command: its handler runs bef
 
 Positions in any command's result are cell-local: a `local` array is meters from the center of the cell, and a `coord` array beside it names that cell whenever a report's rows span cells. A project command may name its pair differently (the selected project's command files). No command reports absolute world meters; derive them from the pair when they are wanted.
 
-The server monitor is an engine-owned GDI window, not a protocol command surface; use the [server-window recipe](server-window.md#server-gdi-monitoring-window-capture-and-click) when that window must be observed or clicked.
+The Server Monitor is a separate Windows program showing the server monitor channel; use the [server-monitor recipe](server-monitor.md#server-monitor-window-capture-and-click) when that window must be observed or clicked.
 
 ## Shared commands
 

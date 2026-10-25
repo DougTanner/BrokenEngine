@@ -1,6 +1,6 @@
 ---
 name: compile
-description: Builds Broken Engine projects through WorktreeCli's serialized MSBuild driver and governs immutable prebuilt AgentTools bootstrap/maintenance policy. Use whenever you need to build, rebuild, compile, or check for compile/link errors in ThirdParty, DataPacker, AgentHarness, WorktreeCli, ModelViewer, or a game project such as BrokenEngineSandbox (client or server).
+description: Builds Broken Engine projects through WorktreeCli's serialized MSBuild driver and governs immutable prebuilt AgentTools bootstrap/maintenance policy. Use whenever you need to build, rebuild, compile, or check for compile/link errors in ThirdParty, DataPacker, AgentHarness, WorktreeCli, ModelViewer, ServerMonitor, or a game project such as BrokenEngineSandbox (client or server).
 allowed-tools: [PowerShell]
 ---
 
@@ -15,7 +15,7 @@ delegated `builder`; separate-role requirements return to the manager.
 ## When to use
 
 - Any request to build, rebuild, compile, or check for compile/link errors in
-  ThirdParty, DataPacker, AgentHarness, WorktreeCli, ModelViewer, or a game project
+  ThirdParty, DataPacker, AgentHarness, WorktreeCli, ModelViewer, ServerMonitor, or a game project
   under `Projects/` (client or server).
 - PREfast verification runs only when an approved plan explicitly requires it;
   never infer PREfast authorization from a routine compile, rebuild, or
@@ -37,7 +37,7 @@ Consumes the task-brief fields in
 skill-specific inputs:
 
 - the targets and configurations to build, and any selective `.cpp` file list.
-  Agents build DataPacker, WorktreeCli, and AgentHarness in Release only, and
+  Agents build DataPacker, WorktreeCli, AgentHarness, and ServerMonitor in Release only, and
   the build script refuses any other configuration for them. Agent tooling
   runs only the Release executables, since each Debug build is named
   `<Project>.Debug.exe`. Those Debug configurations are for humans debugging

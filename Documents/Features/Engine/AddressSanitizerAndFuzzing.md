@@ -21,7 +21,8 @@ No sanitizer configuration exists today: nothing in the tree outside `ThirdParty
   process init. ASan only guards allocations made through the CRT allocator it
   intercepts. The existing `ENABLE_CRT_DEBUG_HEAP` switch already routes all of
   these to the CRT and compiles out every mimalloc call (including the
-  statistics in `Engine/Source/Server/ServerDisplay.cpp`); the ASan
+  statistics in `ServerMonitorHost::Update`, whose main-thread allocation
+  suppression lives in `Engine/Source/Main.cpp`); the ASan
   configuration reuses that routing. Check: whether its CRT debug-heap pieces
   (`_CRTDBG_MAP_ALLOC`, `_CrtSetDbgFlag` in `MemoryInitializer`) coexist with
   ASan; if not, the ASan configuration selects the same CRT operators without

@@ -1,138 +1,109 @@
 <!-- broken-engine-plan/v1 {"createdUtc":"2026-10-23T17:42:12.289Z","dependsOn":[]} -->
-# Server monitor cell map drawn as flat-top hexes
-
-Authored against `86020b734f78e45a03374b78bd4e0fab58593078`, before its prerequisite, the Hexagonal simulation
-cells Plan (the parent Plan), landed. Cells are flat-top hexagons whose `GridCoord` fields are the axial `iQ`/`iR`;
-`Engine/Source/Frame/GridCoord.h` holds the `kCellDirections` table and the bounding half extents
-`kfCellHalfWidth`/`kfCellHalfHeight`, and `Engine/Source/Frame/FrameUtils.h` holds the wrappers, among them the
-float centre offset `CellCenterOffset`. `Engine/Source/Server/ServerDisplay.cpp` line numbers below are from the
-authoring tree; the parent changed that file by its field rename only, so they shift by nothing more than that rename.
+# Server Monitor cell map drawn as flat-top hexes
 
 ## Context
 
-The user deferred the monitor redraw from the parent Plan: "'Option 1: Redraw the monitor's cell map as hexes.'
--> as a followup plan". The parent records that deferral as its D10 settled decision and as an `## Out of scope`
-entry: the server monitor's cell map stays a square grid of the axial coordinates, sheared, until this Plan lands.
+The Server Monitor's `PaintMap` in `Tools/ServerMonitor/ServerMonitor.cpp` draws
+a square grid from `common::ServerMonitorCell` records. Bounds come from active
+records with one cell of padding. Color and labels distinguish active,
+client-authorized, idle and subscribed cells. The monitor runs independently
+of the server and compiles no engine or game headers.
 
-Root cause (current source): `PaintGridMap` (`Engine/Source/Server/ServerDisplay.cpp:188-317`) takes the
-min/max of the active coordinates' two `GridCoord` fields, pads each by one cell (`:195-212`), and draws every
-coordinate of that rectangle as a square, column from the first field and row from the second, North up
-(`:231-240`); each square is a `FillRect` plus a four-segment outline (`:272-281`), with a red inset `Rectangle`
-for a subscribed coordinate (`:283-292`) and text labels at the square's top-left and top-right corners
-(`:294-314`). Once the parent makes those fields axial (q, r) with centre offset dq·A + dr·B, A = (a√3, a),
-B = (0, 2a), a = 450 m (parent D2), that square grid is a sheared lattice: the edge neighbour (1,−1) draws as a
-diagonal of (0,0), and the non-neighbour (1,1) draws as one too. The map's stated job — showing which cells are
-active, client-authorized, idle, and subscribed, North up (`Engine/Source/Server/AGENTS.md`
-`## Ownership and Cadence`, last bullet) — then shows false adjacency.
-
-Exposure: server-only GDI paint (`ServerDisplay.cpp:3`, `#if defined(BT_SERVER)`), on the server main thread
-inside `Main.cpp`'s existing allocation-tracking suppression (`Engine/Source/Server/AGENTS.md`
-`## Ownership and Cadence`). It only reads `game::gpGame->mActiveCoordinates`, the client records, and per-cell
-statistics; it writes no simulation state, so determinism, CRC, wire, save, replay, and trust are untouched.
+Cell coordinates are axial q/r. A square drawing of those coordinates shows false adjacency:
+(1,-1) is a neighbour of (0,0) but draws diagonally, while (1,1) is not a
+neighbour yet draws diagonally too. This Plan changes only monitor presentation.
 
 ## Design
 
-Author's recommendations, each with its rationale; no user decision covers these details beyond the redraw itself.
+The author's recommendations below retain the existing map's filled padded
+rectangle, colors, labels and North-up orientation.
 
-1. **Which cells are drawn.** Today the map fills the padded bounding rectangle of the active coordinates with
-   idle grey cells. Recommended: keep that look in hex form — draw every coordinate whose centre lies in the
-   padded bounding rectangle of the active centres. On the parent's basis the column is q alone (x = q·a√3), and
-   the centre's height in apothems is the integer s = q + 2r (y = a·s), so the rectangle enumerates in integers
-   just as today's bounds do (`:195-212`): q from the active minimum − 1 to the active maximum + 1, clamped to
-   the `int32_t` range as today (`:209-210`); s from the active minimum − 2 to the active maximum + 2 (one cell
-   height of padding, as today's one row); for each q, only the s with s − q even, giving r = (s − q) / 2,
-   skipped when r falls outside the `int32_t` range. Rationale: the padded filled rectangle is what the monitor
-   shows today and fits the rectangular map area; integer bounds avoid any float-to-coordinate conversion.
-2. **Positions.** Each drawn cell's centre is the parent's float centre-offset wrapper in
-   `Engine/Source/Frame/FrameUtils.h` (parent Approach 1, "the centre offset between two `GridCoord`s"),
-   from the first active coordinate to that cell, in metres; screen y is negated so North (+y) stays up. One
-   pass over the enumerated cells takes the min/max of those offsets, widened by the bounding half extents
-   (R, a) ≈ (519.62, 450) that `Engine/Source/Frame/GridCoord.h` reads from `kCellDirections` (parent
-   Approach 1); that world rectangle is fitted and centred in the map area like today's grid (`:217-224`). The
-   pixel scale is the smaller of map width / rectangle width and map height / rectangle height, capped so a hex
-   is at most 60 px tall (today's 60 px cell cap, `:217-219`); when a hex would be under 4 px tall the map is
-   skipped (`:226-229`). Rationale: reuses the parent's offset wrapper and half extents, so no lattice
-   arithmetic beyond the enumeration bounds is restated here.
-3. **Hex outline.** The six vertices of a flat-top hex are the centre plus (±R, 0) and (±R/2, ±a), from the same
-   `GridCoord.h` half extents scaled to pixels and rounded to `POINT`. One GDI `Polygon` call with the cell
-   brush and border pen selected replaces today's `FillRect` and four `LineTo` calls (`:263-281`); brush and pen
-   choice is unchanged (client-authorized, active, idle). Rationale: `Polygon` fills and outlines in one call
-   with the existing cached brushes and pens.
-4. **Subscribed outline.** The red inset outline (`:283-292`) becomes a `Polygon` of the same six vertex
-   offsets scaled about the centre by (a_px − 2) / a_px, with `sHpenRed` and `NULL_BRUSH`, so every edge moves
-   in by the existing 2 px inset (`kiInset`); drawn when the hex is at least 20 px tall (today's
-   `iCellSize >= 20`). Rationale: a regular hexagon's edges are equidistant from its centre, so one scale gives
-   a uniform inset.
-5. **Labels.** Drawn when the hex is at least 24 px tall (today's `iCellSize >= 24`, `:295`), with today's
-   offsets applied to the hex's top edge instead of the square's top edge: the "(q,r)" label at
-   (centre x − R_px/2 + 2, top + 2), the entity count at (centre x − R_px/2 + 2, top + 28), and the client count
-   at (centre x + R_px/2 − 20, top + 2), where top = centre y − a_px. The "(q,r)" label prints the coordinate's
-   `iQ`, `iR`. Rationale: the square's top-left corner lies outside the hex; the top edge's ends are the
-   nearest inside points.
-6. **Hash.** `ServerDisplayContentChanged` (`:121-186`) is unchanged: the redraw paints no new input, and it
-   already folds every active, authorized, and subscribed coordinate (the hash rule in
-   `Engine/Source/Server/AGENTS.md` `## Ownership and Cadence`).
+1. Enumerate a padded rectangle of active centres in axial coordinates. The
+   dimensionless flat-top basis is x = sqrt(3) * q, y = q + 2*r, with apothem 1
+   and circumradius R = 2/sqrt(3). Use monitor-local mathematics; physical cell
+   dimensions cancel under fitting and the monitor needs no engine headers.
+   Bounds use int64_t: q from active minimum minus 1 to maximum plus 1,
+   constrained to int32_t, and s = q + 2*r from active minimum minus 2 to maximum
+   plus 2. For each q enumerate only s with s-q even, yielding r = (s-q)/2;
+   skip r outside int32_t. Record lookup retains the received flags and counts.
+2. Position centres relative to the first active record using the same local
+   basis, negating screen y. Fit the enumerated centres' bounds widened by
+   (R,1) to the map rectangle. Cap hex height at 60 pixels and skip the map
+   below 4 pixels, matching the present size limits. Keep bounds in integers
+   until projecting to display coordinates; subtract the reference coordinate
+   before floating-point conversion.
+3. Draw six flat-top vertices at centre plus (+/-R,0) and (+/-R/2,+/-1),
+   scaled and rounded to POINT. Select the existing brush and pen and use GDI
+   Polygon for fill and border. Preserve the client-authorized, active and idle
+   palette and precedence.
+4. For subscribed cells at least 20 pixels tall, use NULL_BRUSH and the red pen
+   to draw the same polygon scaled about its centre by (a_px-2)/a_px. This
+   preserves a 2-pixel inset on every edge.
+5. For cells at least 24 pixels tall, draw (q,r) at
+   (centre x-R_px/2+2, top+2), entities at (centre x-R_px/2+2, top+28), and
+   client count at (centre x+R_px/2-20, top+2), where top=centre y-a_px.
+   Server snapshot capture reads `GridCoord::iQ`/`iR`; the existing
+   `ServerMonitorCell::iX`/`iY` wire fields carry q/r. Keep the current count and label visibility rules.
+6. Snapshot arrival remains the repaint trigger. The monitor reads only its
+   received model; server snapshot capture and transport remain unchanged.
 
 ## Critical files
 
-- `Engine/Source/Server/ServerDisplay.cpp` — `PaintGridMap`.
-- `Engine/Source/Server/AGENTS.md` — the map bullet.
-- Read only, from the parent: `Engine/Source/Frame/GridCoord.h` (`kCellDirections`, bounding half extents),
-  `Engine/Source/Frame/FrameUtils.h` (float centre-offset wrapper); `ServerDisplay.cpp` already reaches both
-  through `Pch.h` (game `Frame/Frame.h:3` includes `Frame/FrameBase.h`, which includes `Frame/FrameUtils.h` at
-  `FrameBase.h:22`).
+- `Tools/ServerMonitor/ServerMonitor.cpp` — `PaintMap`.
+- `Tools/ServerMonitor/AGENTS.md` — Presentation.
+- Read only: `Common/ServerMonitorProtocol.h` and
+  `Engine/Source/Server/ServerMonitorHost.cpp` capture, which own received cell
+  identity, flags and counts; no new data is needed.
+- Read only: `.agents/skills/agent-harness/references/server-monitor.md`,
+  `### Server Monitor window capture and click`.
 
 ## In scope
 
-- `Engine/Source/Server/ServerDisplay.cpp` `PaintGridMap` (`:188-317`): the cell enumeration and bounds
-  (Design 1), the fit and centre positions (Design 2), the per-cell hex polygon (Design 3), the subscribed inset
-  polygon (Design 4), and the label positions (Design 5). The per-cell active, authorized, and subscribed tests
-  (`:240-261`) and the brush/pen selection keep their logic.
-- `Engine/Source/Server/AGENTS.md` `## Ownership and Cadence`, last bullet ("The map renders North (+y)
-  upward ..."): state that cells draw as flat-top hexes at their axial centre offsets.
+- `Tools/ServerMonitor/ServerMonitor.cpp` `PaintMap`: enumeration, bounds,
+  centre projection, fit, hex fill/border, subscribed inset and label positions
+  described in Design. Preserve received-model lookup and palette selection.
+- `Tools/ServerMonitor/AGENTS.md` `## Presentation`: document that the map draws
+  flat-top hexes at monitor-local axial centre offsets with North upward.
 
 ## Out of scope
 
-- The parent Plan's files other than the `ServerDisplay.cpp` regions under `## In scope`, and its helpers:
-  `kCellDirections`, `common::MakeHexDirections`, the `FrameUtils.h` wrappers, and the client debug cell-edge draw
-  (`Engine/Source/Graphics/Render/MainUniforms.cpp`).
-- Any new `common::` or engine geometry helper (vertex list, pixel-to-hex lookup, hex rounding) and any other
-  new helper.
-- `ServerDisplayContentChanged`, the left statistics panel, the tab bar, the Profile panel, `HandleServerClick`
-  (no map click handling exists or is added), the cached GDI objects (no new brush, pen, or colour), and
-  `Main.cpp` repaint cadence.
-- Map pan, zoom, or selection; drawing cells outside the padded rectangle; changing what counts as active,
-  authorized, or subscribed.
-- The agent-harness server-window recipe and every harness document.
+- Engine/game code, the Common wire contract, server capture and transport,
+  simulation geometry, deterministic CRC, saves and replays.
+- New shared geometry helpers, engine/game dependencies, map pan, zoom,
+  selection or map click handling.
+- Statistics/Profile panels, tabs, Copy handling, GDI cache and palette,
+  connection logic and snapshot repaint cadence.
+- Drawing outside the padded rectangle or changing active, authorized,
+  subscribed or entity-count semantics.
+- Harness recipes and documents.
 
 ## Change Workflow tier
 
-Tier 2 — trigger: one subsystem's runtime behaviour, the server monitor's paint in `PaintGridMap`
-(`Engine/Source/Server/ServerDisplay.cpp:188-317`); it touches no determinism/CRC, wire, serialization, save,
-replay, threading, or trust surface (server-only GDI paint that only reads state on the main thread).
+Tier 2: one subsystem's runtime behavior, the standalone monitor's map paint.
+All changes are display-only reads of the received model on its UI thread;
+threading, trust and wire contracts remain unchanged.
 
 ## Acceptance criteria
 
-- A1 Build: `/compile` BrokenEngineSandbox server Debug and Release x64 succeed with no new warnings, and the
-  static-check runner passes.
-- A2 Live map (`/agent-harness`, Debug). The supplied evidence records no harness run of this state; the
-  recommended setup, in order: launch server and client; with the client connected and authorized at its cell,
-  queue two edge-coast `SpawnOmni` payloads from that cell (`Projects/BrokenEngineSandbox/Documents/AgentHarness/commands-server.md`
-  "Edge coast", as the parent rewrites it for flat-top edges), one across the SE edge toward (1,−1) and one
-  across the N edge toward (0,1) relative to the client's cell; wait until `query_collection` finds each omni
-  in its neighbour; read `describe_scene.subscribedCoords`; then capture the server window with the recipe in
-  `.agents/skills/agent-harness/references/server-window.md` `### Server GDI monitoring window capture and
-  click`, `-Target Map`. The capture shows flat-top hexes with no square cells: the client's cell filled
-  client-authorized blue, (1,−1) active green sharing its lower-right edge, (0,1) active green sharing its top
-  edge, the cell at (1,1) relative to it not sharing an edge with it, idle grey hexes filling the padded
-  rectangle, a red inset outline on each subscribed coordinate, and "(q,r)" labels on active cells.
-- A3 Code read: positions come only from the parent's float centre-offset wrapper and `GridCoord.h` half
-  extents, the enumeration uses only integer bounds, no helper is added, and no new input enters the
-  repaint hash.
+- A1 Build: `/compile -Target ServerMonitor` Release x64 succeeds with no new
+  warnings; the static-check runner passes.
+- A2 Live map (`/agent-harness`, Debug server/client): connect and authorize a
+  client; queue two edge-coast SpawnOmni payloads using the game's
+  `Documents/AgentHarness/commands-server.md` Edge coast recipe,
+  across SE toward (1,-1) and N toward (0,1). Wait for
+  `query_collection` to find each omni in its neighbour and read
+  `describe_scene.subscribedCoords`. Launch the standalone monitor and capture
+  it using `.agents/skills/agent-harness/references/server-monitor.md`
+  `### Server Monitor window capture and click`, `-Target Map`. Evidence shows
+  flat-top hexes: client-authorized blue, active green, idle grey padding,
+  red subscribed insets and (q,r) labels. Relative (1,-1) shares the lower-right
+  edge, (0,1) shares the top edge, and (1,1) shares no edge with the client's
+  cell. Retain the monitor PID and stop it after capture.
+- A3 Code read: only monitor-local dimensionless axial mathematics places
+  cells; integer enumeration respects int32_t coordinate limits; the monitor
+  includes no engine/game header and changes no input or wire contract.
 
 ## Notes
 
-- The parent's D3 tie rule, transfers, and subscription filter do not bear on this paint; the map only places
-  coordinates.
-- Pixel rounding may let a shared edge of two neighbouring hexes differ by one pixel; that is display-only and
-  needs no handling.
+Pixel rounding can separate neighboring polygon edges by one pixel; this is
+presentation-only and needs no special handling.

@@ -13,6 +13,9 @@ Both use `$(ProjectName)` in `IntDir`, so client and server builds can run simul
 
 ## Build Configuration
 
+- The server links SubSystem Console with entry point `wWinMainCRTStartup`; the
+  client uses SubSystem Windows.
+
 - Configurations: Debug, Profile, Release (x64 only)
 - Compiler: C++23, `Pch.h` force-included, `/fp:strict` in every config of both
   projects (cross-binary float determinism for client reconciliation/replay —

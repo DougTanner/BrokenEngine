@@ -1,22 +1,29 @@
-# Agent Harness Server Window Recipe
+# Agent Harness Server Monitor Recipe
 
 [Back to the command reference](command-reference.md)
 
-### Server GDI monitoring window capture and click
+### Server Monitor window capture and click
 
-The server monitoring window is a plain Win32 GDI window, not a JSON-command or
-ImGui surface. The client `screenshot`, `describe_ui`, and `click` commands
-cannot observe or drive it. When a criterion needs that window, copy the
-following complete block verbatim into the ignored
-`<absolute adopted worktree>\Temp\Capture-ServerWindow.ps1`, then run it with
-the exact `pid` of the server's latest launch result. Do not replace PID
-ownership with a process-name search or add this as a tracked helper.
+The server has no visible window. The separate Server Monitor is a plain Win32
+GDI window; client `screenshot`, `describe_ui`, and `click` cannot drive it.
+Build it with `/compile -Target ServerMonitor`, then start it from the adopted
+worktree root:
 
+```powershell
+$monitor = Start-Process -FilePath 'Tools\ServerMonitor\Platforms\VisualStudio2026\Output\ServerMonitor.exe' -WindowStyle Minimized -PassThru
+```
+
+Retain `$monitor.Id` and pass it as `-MonitorPid` to the helper below. A harness
+server's app-data root holds no secret file unless the scenario writes one.
+Stop the monitor with `Stop-Process -Id <pid>` after capture. Copy the complete
+block below verbatim into the ignored `Temp\Capture-ServerMonitor.ps1` under
+the adopted worktree. Keep PID ownership; do not use a process-name search or
+add a tracked helper.
 ```powershell
 param(
 	[Parameter(Mandatory = $true)]
 	[ValidateRange(1, [int]::MaxValue)]
-	[int] $ServerPid,
+	[int] $MonitorPid,
 
 	[ValidateSet('Map', 'Profile', 'ProfileCopy')]
 	[string] $Target = 'Profile',
@@ -31,7 +38,7 @@ Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
 
-public static class AgentServerWindowNative
+public static class AgentServerMonitorNative
 {
 	public const int GWL_EXSTYLE = -20;
 	public const long WS_EX_TOPMOST = 0x00000008L;
@@ -50,6 +57,7 @@ public static class AgentServerWindowNative
 	public const uint RDW_UPDATENOW = 0x0100;
 	public const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
 	public const uint MOUSEEVENTF_LEFTUP = 0x0004;
+	public const uint PW_CLIENTONLY = 0x00000001;
 	public const uint PW_RENDERFULLCONTENT = 0x00000002;
 	public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
 	public static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
@@ -186,21 +194,21 @@ public static class AgentServerWindowNative
 }
 '@
 
-if (-not [AgentServerWindowNative]::IsProcessDPIAware())
+if (-not [AgentServerMonitorNative]::IsProcessDPIAware())
 {
-	if (-not [AgentServerWindowNative]::SetProcessDPIAware())
+	if (-not [AgentServerMonitorNative]::SetProcessDPIAware())
 	{
-		throw 'SetProcessDPIAware failed for the server-window capture helper.'
+		throw 'SetProcessDPIAware failed for the server-monitor capture helper.'
 	}
 }
 
 if ([string]::IsNullOrWhiteSpace($BeforeCapturePath))
 {
-	$BeforeCapturePath = Join-Path $PSScriptRoot ('server-window-before-{0}.png' -f [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
+	$BeforeCapturePath = Join-Path $PSScriptRoot ('server-monitor-before-{0}.png' -f [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
 }
 if ([string]::IsNullOrWhiteSpace($AfterCapturePath))
 {
-	$AfterCapturePath = Join-Path $PSScriptRoot ('server-window-after-{0}.png' -f [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
+	$AfterCapturePath = Join-Path $PSScriptRoot ('server-monitor-after-{0}.png' -f [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
 }
 
 function Format-Handle([IntPtr] $Handle)
@@ -214,33 +222,33 @@ function Format-Handle([IntPtr] $Handle)
 
 function Get-ServerWindowState([IntPtr] $Hwnd)
 {
-	$cursor = [AgentServerWindowNative+POINT]::new()
-	if (-not [AgentServerWindowNative]::GetCursorPos([ref] $cursor))
+	$cursor = [AgentServerMonitorNative+POINT]::new()
+	if (-not [AgentServerMonitorNative]::GetCursorPos([ref] $cursor))
 	{
-		throw 'GetCursorPos failed while recording server-window state.'
+		throw 'GetCursorPos failed while recording server-monitor state.'
 	}
 
-	$windowRect = [AgentServerWindowNative+RECT]::new()
-	if (-not [AgentServerWindowNative]::GetWindowRect($Hwnd, [ref] $windowRect))
+	$windowRect = [AgentServerMonitorNative+RECT]::new()
+	if (-not [AgentServerMonitorNative]::GetWindowRect($Hwnd, [ref] $windowRect))
 	{
-		throw 'GetWindowRect failed while recording server-window state.'
+		throw 'GetWindowRect failed while recording server-monitor state.'
 	}
 
-	$clientRect = [AgentServerWindowNative+RECT]::new()
-	if (-not [AgentServerWindowNative]::GetClientRect($Hwnd, [ref] $clientRect))
+	$clientRect = [AgentServerMonitorNative+RECT]::new()
+	if (-not [AgentServerMonitorNative]::GetClientRect($Hwnd, [ref] $clientRect))
 	{
-		throw 'GetClientRect failed while recording server-window state.'
+		throw 'GetClientRect failed while recording server-monitor state.'
 	}
 
-	$extendedStyle = [AgentServerWindowNative]::GetWindowLongPtr($Hwnd, [AgentServerWindowNative]::GWL_EXSTYLE).ToInt64()
+	$extendedStyle = [AgentServerMonitorNative]::GetWindowLongPtr($Hwnd, [AgentServerMonitorNative]::GWL_EXSTYLE).ToInt64()
 	[pscustomobject]@{
 		CursorX = $cursor.X
 		CursorY = $cursor.Y
-		Visible = [bool][AgentServerWindowNative]::IsWindowVisible($Hwnd)
-		Minimized = [bool][AgentServerWindowNative]::IsIconic($Hwnd)
-		Topmost = (($extendedStyle -band [AgentServerWindowNative]::WS_EX_TOPMOST) -ne 0)
-		Foreground = [AgentServerWindowNative]::GetForegroundWindow()
-		Previous = [AgentServerWindowNative]::GetWindow($Hwnd, [AgentServerWindowNative]::GW_HWNDPREV)
+		Visible = [bool][AgentServerMonitorNative]::IsWindowVisible($Hwnd)
+		Minimized = [bool][AgentServerMonitorNative]::IsIconic($Hwnd)
+		Topmost = (($extendedStyle -band [AgentServerMonitorNative]::WS_EX_TOPMOST) -ne 0)
+		Foreground = [AgentServerMonitorNative]::GetForegroundWindow()
+		Previous = [AgentServerMonitorNative]::GetWindow($Hwnd, [AgentServerMonitorNative]::GW_HWNDPREV)
 		WindowRect = $windowRect
 		ClientRect = $clientRect
 	}
@@ -257,15 +265,15 @@ function Write-ServerWindowState([string] $Label, $State)
 
 function Refresh-ServerWindow([IntPtr] $Hwnd)
 {
-	[AgentServerWindowNative]::ShowWindow($Hwnd, [AgentServerWindowNative]::SW_RESTORE) | Out-Null
-	[AgentServerWindowNative]::ShowWindow($Hwnd, [AgentServerWindowNative]::SW_SHOWNOACTIVATE) | Out-Null
-	$raiseFlags = [uint32]([AgentServerWindowNative]::SWP_NOMOVE -bor [AgentServerWindowNative]::SWP_NOSIZE -bor [AgentServerWindowNative]::SWP_NOACTIVATE -bor [AgentServerWindowNative]::SWP_SHOWWINDOW)
-	[AgentServerWindowNative]::SetWindowPos($Hwnd, [AgentServerWindowNative]::HWND_TOPMOST, 0, 0, 0, 0, $raiseFlags) | Out-Null
-	[AgentServerWindowNative]::BringWindowToTop($Hwnd) | Out-Null
-	[AgentServerWindowNative]::SetForegroundWindow($Hwnd) | Out-Null
-	$redrawFlags = [uint32]([AgentServerWindowNative]::RDW_INVALIDATE -bor [AgentServerWindowNative]::RDW_ERASE -bor [AgentServerWindowNative]::RDW_UPDATENOW)
-	[AgentServerWindowNative]::RedrawWindow($Hwnd, [IntPtr]::Zero, [IntPtr]::Zero, $redrawFlags) | Out-Null
-	[AgentServerWindowNative]::UpdateWindow($Hwnd) | Out-Null
+	[AgentServerMonitorNative]::ShowWindow($Hwnd, [AgentServerMonitorNative]::SW_RESTORE) | Out-Null
+	[AgentServerMonitorNative]::ShowWindow($Hwnd, [AgentServerMonitorNative]::SW_SHOWNOACTIVATE) | Out-Null
+	$raiseFlags = [uint32]([AgentServerMonitorNative]::SWP_NOMOVE -bor [AgentServerMonitorNative]::SWP_NOSIZE -bor [AgentServerMonitorNative]::SWP_NOACTIVATE -bor [AgentServerMonitorNative]::SWP_SHOWWINDOW)
+	[AgentServerMonitorNative]::SetWindowPos($Hwnd, [AgentServerMonitorNative]::HWND_TOPMOST, 0, 0, 0, 0, $raiseFlags) | Out-Null
+	[AgentServerMonitorNative]::BringWindowToTop($Hwnd) | Out-Null
+	[AgentServerMonitorNative]::SetForegroundWindow($Hwnd) | Out-Null
+	$redrawFlags = [uint32]([AgentServerMonitorNative]::RDW_INVALIDATE -bor [AgentServerMonitorNative]::RDW_ERASE -bor [AgentServerMonitorNative]::RDW_UPDATENOW)
+	[AgentServerMonitorNative]::RedrawWindow($Hwnd, [IntPtr]::Zero, [IntPtr]::Zero, $redrawFlags) | Out-Null
+	[AgentServerMonitorNative]::UpdateWindow($Hwnd) | Out-Null
 	Start-Sleep -Milliseconds 100
 }
 
@@ -277,16 +285,16 @@ function Save-ServerWindowCapture([IntPtr] $Hwnd, [string] $Path)
 		[IO.Directory]::CreateDirectory($parent) | Out-Null
 	}
 
-	$clientRect = [AgentServerWindowNative+RECT]::new()
-	if (-not [AgentServerWindowNative]::GetClientRect($Hwnd, [ref] $clientRect))
+	$clientRect = [AgentServerMonitorNative+RECT]::new()
+	if (-not [AgentServerMonitorNative]::GetClientRect($Hwnd, [ref] $clientRect))
 	{
-		throw 'GetClientRect failed while preparing the server-window capture.'
+		throw 'GetClientRect failed while preparing the server-monitor capture.'
 	}
 	$width = $clientRect.right - $clientRect.left
 	$height = $clientRect.bottom - $clientRect.top
 	if ($width -le 0 -or $height -le 0)
 	{
-		throw ('Server-window client area is empty: {0}x{1}.' -f $width, $height)
+		throw ('Server Monitor window client area is empty: {0}x{1}.' -f $width, $height)
 	}
 
 	$bitmap = $null
@@ -300,9 +308,9 @@ function Save-ServerWindowCapture([IntPtr] $Hwnd, [string] $Path)
 		$hdc = $graphics.GetHdc()
 		try
 		{
-			if (-not [AgentServerWindowNative]::PrintWindow($Hwnd, $hdc, [AgentServerWindowNative]::PW_RENDERFULLCONTENT))
+			if (-not [AgentServerMonitorNative]::PrintWindow($Hwnd, $hdc, ([AgentServerMonitorNative]::PW_CLIENTONLY -bor [AgentServerMonitorNative]::PW_RENDERFULLCONTENT)))
 			{
-				throw 'PrintWindow(PW_RENDERFULLCONTENT) failed for the server window.'
+				throw 'PrintWindow(PW_CLIENTONLY | PW_RENDERFULLCONTENT) failed for the monitor window.'
 			}
 		}
 		finally
@@ -330,27 +338,27 @@ function Save-ServerWindowCapture([IntPtr] $Hwnd, [string] $Path)
 	$file = Get-Item -LiteralPath $Path -ErrorAction Stop
 	if ($file.Length -le 0)
 	{
-		throw ('Server-window capture is empty: {0}' -f $Path)
+		throw ('Server Monitor window capture is empty: {0}' -f $Path)
 	}
 	'Capture: {0} ({1} bytes, {2}x{3})' -f $Path, $file.Length, $width, $height
 }
 
 function Invoke-ServerClientClick([IntPtr] $Hwnd, [int] $ClientX, [int] $ClientY)
 {
-	$screenPoint = [AgentServerWindowNative+POINT]::new()
+	$screenPoint = [AgentServerMonitorNative+POINT]::new()
 	$screenPoint.X = $ClientX
 	$screenPoint.Y = $ClientY
-	if (-not [AgentServerWindowNative]::ClientToScreen($Hwnd, [ref] $screenPoint))
+	if (-not [AgentServerMonitorNative]::ClientToScreen($Hwnd, [ref] $screenPoint))
 	{
 		throw ('ClientToScreen failed for ({0},{1}).' -f $ClientX, $ClientY)
 	}
-	if (-not [AgentServerWindowNative]::SetCursorPos($screenPoint.X, $screenPoint.Y))
+	if (-not [AgentServerMonitorNative]::SetCursorPos($screenPoint.X, $screenPoint.Y))
 	{
 		throw ('SetCursorPos failed for screen point ({0},{1}).' -f $screenPoint.X, $screenPoint.Y)
 	}
 	Start-Sleep -Milliseconds 50
-	[AgentServerWindowNative]::mouse_event([AgentServerWindowNative]::MOUSEEVENTF_LEFTDOWN, 0, 0, 0, [UIntPtr]::Zero)
-	[AgentServerWindowNative]::mouse_event([AgentServerWindowNative]::MOUSEEVENTF_LEFTUP, 0, 0, 0, [UIntPtr]::Zero)
+	[AgentServerMonitorNative]::mouse_event([AgentServerMonitorNative]::MOUSEEVENTF_LEFTDOWN, 0, 0, 0, [UIntPtr]::Zero)
+	[AgentServerMonitorNative]::mouse_event([AgentServerMonitorNative]::MOUSEEVENTF_LEFTUP, 0, 0, 0, [UIntPtr]::Zero)
 }
 
 function Restore-ServerWindowState([IntPtr] $Hwnd, $State)
@@ -361,16 +369,16 @@ function Restore-ServerWindowState([IntPtr] $Hwnd, $State)
 		{
 			if ($State.Minimized)
 			{
-				[AgentServerWindowNative]::ShowWindow($Hwnd, [AgentServerWindowNative]::SW_MINIMIZE) | Out-Null
+				[AgentServerMonitorNative]::ShowWindow($Hwnd, [AgentServerMonitorNative]::SW_MINIMIZE) | Out-Null
 			}
 			else
 			{
-				[AgentServerWindowNative]::ShowWindow($Hwnd, [AgentServerWindowNative]::SW_SHOWNOACTIVATE) | Out-Null
+				[AgentServerMonitorNative]::ShowWindow($Hwnd, [AgentServerMonitorNative]::SW_SHOWNOACTIVATE) | Out-Null
 			}
 		}
 		else
 		{
-			[AgentServerWindowNative]::ShowWindow($Hwnd, [AgentServerWindowNative]::SW_HIDE) | Out-Null
+			[AgentServerMonitorNative]::ShowWindow($Hwnd, [AgentServerMonitorNative]::SW_HIDE) | Out-Null
 		}
 	}
 	catch
@@ -380,12 +388,12 @@ function Restore-ServerWindowState([IntPtr] $Hwnd, $State)
 
 	try
 	{
-		$insertAfter = if ($State.Topmost) { [AgentServerWindowNative]::HWND_TOPMOST } else { [AgentServerWindowNative]::HWND_NOTOPMOST }
-		$restoreFlags = [uint32]([AgentServerWindowNative]::SWP_NOMOVE -bor [AgentServerWindowNative]::SWP_NOSIZE -bor [AgentServerWindowNative]::SWP_NOACTIVATE)
-		[AgentServerWindowNative]::SetWindowPos($Hwnd, $insertAfter, 0, 0, 0, 0, $restoreFlags) | Out-Null
-		if ($State.Previous -ne [IntPtr]::Zero -and [AgentServerWindowNative]::IsWindow($State.Previous))
+		$insertAfter = if ($State.Topmost) { [AgentServerMonitorNative]::HWND_TOPMOST } else { [AgentServerMonitorNative]::HWND_NOTOPMOST }
+		$restoreFlags = [uint32]([AgentServerMonitorNative]::SWP_NOMOVE -bor [AgentServerMonitorNative]::SWP_NOSIZE -bor [AgentServerMonitorNative]::SWP_NOACTIVATE)
+		[AgentServerMonitorNative]::SetWindowPos($Hwnd, $insertAfter, 0, 0, 0, 0, $restoreFlags) | Out-Null
+		if ($State.Previous -ne [IntPtr]::Zero -and [AgentServerMonitorNative]::IsWindow($State.Previous))
 		{
-			[AgentServerWindowNative]::SetWindowPos($Hwnd, $State.Previous, 0, 0, 0, 0, $restoreFlags) | Out-Null
+			[AgentServerMonitorNative]::SetWindowPos($Hwnd, $State.Previous, 0, 0, 0, 0, $restoreFlags) | Out-Null
 		}
 	}
 	catch
@@ -395,7 +403,7 @@ function Restore-ServerWindowState([IntPtr] $Hwnd, $State)
 
 	try
 	{
-		[AgentServerWindowNative]::SetCursorPos($State.CursorX, $State.CursorY) | Out-Null
+		[AgentServerMonitorNative]::SetCursorPos($State.CursorX, $State.CursorY) | Out-Null
 	}
 	catch
 	{
@@ -404,9 +412,9 @@ function Restore-ServerWindowState([IntPtr] $Hwnd, $State)
 
 	try
 	{
-		if ($State.Foreground -ne [IntPtr]::Zero -and [AgentServerWindowNative]::IsWindow($State.Foreground))
+		if ($State.Foreground -ne [IntPtr]::Zero -and [AgentServerMonitorNative]::IsWindow($State.Foreground))
 		{
-			[AgentServerWindowNative]::SetForegroundWindow($State.Foreground) | Out-Null
+			[AgentServerMonitorNative]::SetForegroundWindow($State.Foreground) | Out-Null
 		}
 	}
 	catch
@@ -415,15 +423,15 @@ function Restore-ServerWindowState([IntPtr] $Hwnd, $State)
 	}
 }
 
-$serverProcess = Get-Process -Id $ServerPid -ErrorAction Stop
+$serverProcess = Get-Process -Id $MonitorPid -ErrorAction Stop
 if ($serverProcess.HasExited)
 {
-	throw ('Retained server PID {0} has already exited.' -f $ServerPid)
+	throw ('Retained monitor PID {0} has already exited.' -f $MonitorPid)
 }
-$serverWindowHwnd = [AgentServerWindowNative]::FindTopLevelWindow($ServerPid)
+$serverWindowHwnd = [AgentServerMonitorNative]::FindTopLevelWindow($MonitorPid)
 if ($serverWindowHwnd -eq [IntPtr]::Zero)
 {
-	throw ('No top-level HWND owned by retained server PID {0} was found.' -f $ServerPid)
+	throw ('No top-level HWND owned by retained monitor PID {0} was found.' -f $MonitorPid)
 }
 
 $beforeState = Get-ServerWindowState $serverWindowHwnd
@@ -452,8 +460,8 @@ try
 			# Paint Profile before reading its live client height or locating Copy.
 			Invoke-ServerClientClick $serverWindowHwnd 400 16
 			Refresh-ServerWindow $serverWindowHwnd
-			$profileClientRect = [AgentServerWindowNative+RECT]::new()
-			if (-not [AgentServerWindowNative]::GetClientRect($serverWindowHwnd, [ref] $profileClientRect))
+			$profileClientRect = [AgentServerMonitorNative+RECT]::new()
+			if (-not [AgentServerMonitorNative]::GetClientRect($serverWindowHwnd, [ref] $profileClientRect))
 			{
 				throw 'GetClientRect failed after Profile painted.'
 			}
@@ -479,7 +487,7 @@ try
 finally
 {
 	Restore-ServerWindowState $serverWindowHwnd $beforeState
-	if ([AgentServerWindowNative]::IsWindow($serverWindowHwnd))
+	if ([AgentServerMonitorNative]::IsWindow($serverWindowHwnd))
 	{
 		try
 		{
@@ -497,17 +505,13 @@ finally
 From the adopted worktree root, run the ignored copy with the retained PID (the `Profile` target is the acceptance scenario):
 
 ```powershell
-pwsh -NoProfile -File .\Temp\Capture-ServerWindow.ps1 -ServerPid <exact retained server PID> -Target Profile
+pwsh -NoProfile -File .\Temp\Capture-ServerMonitor.ps1 -MonitorPid <exact retained monitor PID> -Target Profile
 ```
 
-Run the acceptance scenario with `-Target Profile`; it switches only the server's Profile tab and writes the before/after captures. The optional `-Target ProfileCopy` click uses the live painted client height and the Copy rectangle `x=260..340`, `y=clientHeight-48..clientHeight-20`; it replaces the current clipboard contents, so use it only when clipboard mutation is intended. `Map` and `Profile` centers are `(300,16)` and `(400,16)` in client coordinates.
+Run the acceptance scenario with `-Target Profile`; it switches only the monitor's Profile tab and writes the before/after captures. The optional `-Target ProfileCopy` click uses the live painted client height and the Copy rectangle `x=260..340`, `y=clientHeight-48..clientHeight-20`; it replaces the current clipboard contents, so use it only when clipboard mutation is intended. `Map` and `Profile` centers are `(300,16)` and `(400,16)` in client coordinates.
 
 This recipe changes the interactive Windows desktop: it moves the physical
 cursor, temporarily changes foreground focus and z-order, and (for
 `ProfileCopy`) replaces clipboard contents. Visibility, minimized state, topmost
 state, and cursor are restored in `finally`; foreground and exact z-order
-restoration are best effort. In the observed verification, cross-process
-`PostMessage`/`SendMessageTimeout` for `WM_LBUTTONDOWN`/`WM_LBUTTONUP` returned
-success but did not trigger the server handler. That is a narrow observed
-pitfall for this verification, not a universal Windows/API limitation, so those
-posted-message results are not click evidence.
+restoration are best effort.

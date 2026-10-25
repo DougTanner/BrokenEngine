@@ -57,13 +57,13 @@ Update `../../../../Documents/Architecture/FrameUpdatePipeline.md` when phase or
 - Cell containment uses `engine::IsInsideCell`; a transfer producer calls `PrepareTransferRequest` only for a position that fails it, because `CellExitDirection` names no direction for an inside position.
 - `GetServerCellStatistics` and its row labels `kServerEntityCountNames`
   (`ServerCellStats.h`, server-only) are the cell-statistics names the
-  engine-owned server monitoring window consumes
+  engine-owned Server Monitor snapshot consumes
   (`../../../../Engine/Source/Server/AGENTS.md`): it reads one cell's frame and
   returns its tick, time, and collection populations by value, the populations
   as `entityCounts` rows indexed by `ServerEntityCount`. Keep it observational —
   no stored state, no display knowledge — and add fields here rather than
   opening a second display path into game collections.
-- `PublishServerEntityCounts` (same header) is the server's only writer of the Fighters, Omnis, Battleships, Blasters, and Missiles profile counters, which the client publishes from the render path instead. It runs once per advancing tick from the post-tick client-finalize hook (`../Network/Server/AGENTS.md`), so totals describe the tick that just finished; the monitoring window must not become a second writer.
+- `PublishServerEntityCounts` (same header) is the server's only writer of the Fighters, Omnis, Battleships, Blasters, and Missiles profile counters, which the client publishes from the render path instead. It runs once per advancing tick from the post-tick client-finalize hook (`../Network/Server/AGENTS.md`), so totals describe the tick that just finished; the Server Monitor snapshot must not become a second writer.
 
 ## See Also
 

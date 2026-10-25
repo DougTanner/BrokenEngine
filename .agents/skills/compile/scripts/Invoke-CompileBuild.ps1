@@ -11,7 +11,7 @@
 # 1 for an internal error.
 [CmdletBinding()]
 param(
-	[Parameter(Mandatory)][ValidateSet('ThirdParty', 'DataPacker', 'Client', 'Server', 'ModelViewer', 'WorktreeCli', 'AgentHarness')][string] $Target,
+	[Parameter(Mandatory)][ValidateSet('ThirdParty', 'DataPacker', 'Client', 'Server', 'ModelViewer', 'ServerMonitor', 'WorktreeCli', 'AgentHarness')][string] $Target,
 	[ValidateSet('Debug', 'Profile', 'Release')][string] $Configuration,
 	[string[]] $Files,
 	[switch] $AllowGaeaExport,
@@ -44,7 +44,7 @@ foreach ($parameterName in @('Target', 'Configuration')) {
 }
 
 $script:GameTargets = @('Client', 'Server', 'ModelViewer')
-$script:ReleaseOnlyTargets = @('DataPacker', 'WorktreeCli', 'AgentHarness')
+$script:ReleaseOnlyTargets = @('DataPacker', 'WorktreeCli', 'AgentHarness', 'ServerMonitor')
 $script:AgentToolsTargets = @('WorktreeCli', 'AgentHarness')
 $script:GaeaGuardVariable = 'BT_DATAPACKER_FORBID_GAEA_EXPORT'
 $script:GaeaAllowVariable = 'BT_DATAPACKER_ALLOW_GAEA_EXPORT'
@@ -56,6 +56,7 @@ $script:TargetFiles = @{
 	DataPacker = 'DataPacker\Platforms\VisualStudio2026\DataPacker.sln'
 	WorktreeCli = 'Tools\WorktreeCli\Platforms\VisualStudio2026\WorktreeCli.sln'
 	AgentHarness = 'Tools\AgentHarness\Platforms\VisualStudio2026\AgentHarness.sln'
+	ServerMonitor = 'Tools\ServerMonitor\Platforms\VisualStudio2026\ServerMonitor.sln'
 	ModelViewer = 'Tools\ModelViewer\Platforms\VisualStudio2026\ModelViewer.sln'
 }
 # --files requires a .vcxproj target, so a selective compile builds the project, not the solution.

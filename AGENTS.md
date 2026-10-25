@@ -80,6 +80,7 @@ are not, and stay out of the CRC.
 - `/DataPacker/` — asset preprocessor producing `.pack`/`.manifest` files
 - `/Engine/` — runtime: graphics, audio, input, frame state (`engine::`); `Engine.h` is the single aggregation header (included by `Pch.h`) with `#ifdef BT_CLIENT`/`BT_SERVER` guards, except for the few deliberate exceptions noted at the subsystem hubs
 - `/Projects/` — game implementations (`game::`)
+- `/Tools/ServerMonitor/` — Server Monitor: Windows program showing a local or remote server's statistics over the monitor channel
 - `/Tools/AgentHarness/` — loopback client/server command transport
 - `/Tools/ToolCommon/` — shared Windows and coordination support compiled into both tools
 - `/Tools/WorktreeCli/` — repository build, landing, and plan coordination
@@ -100,5 +101,6 @@ Same source, two executables: client (graphics, audio, input) defines `BT_CLIENT
   data travels under ENet's datagram checksum and the client trusts it; replays
   and the agent command channel are exempt developer tools. Owners:
   `Engine/Source/Network/AGENTS.md` `## Corrupt Input Policy`,
+  `Engine/Source/Server/AGENTS.md` `## Monitor Channel`,
   `Engine/Source/File/AGENTS.md` `## Grid Saves` and `## Replay Streams`,
   `Engine/Source/Agent/AGENTS.md` `## Architecture`.

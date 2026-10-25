@@ -6,7 +6,7 @@ Engine CPU/GPU profiling, boot timing, overlays, and profile dumps. `ProfileMana
 
 - Game CPU counter and timer enums start at the matching engine count. Name tables preserve enum order and exact extent, except that a game with no counters keeps one unread placeholder entry; compile-time checks enforce both contracts.
 - The manager holds engine and game rows together in one CPU counter array and one CPU timer array, allocated in its constructor at the game counts.
-- Recording code compiles out through `if constexpr (kbProfiling)`. Shared CPU accessors and text formatters remain available to the server display even when profiling is disabled.
+- Recording code compiles out through `if constexpr (kbProfiling)`. Shared CPU accessors and text formatters remain available to the main-thread Server Monitor snapshot capture even when profiling is disabled.
 
 ## CPU Timing
 
