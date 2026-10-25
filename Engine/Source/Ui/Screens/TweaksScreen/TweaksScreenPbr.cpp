@@ -44,57 +44,70 @@ void RenderPhysicallyBasedRenderingSection(TweaksScreen& rScreen)
 {
 	int64_t iSection = giTweakSectionPbr;
 
-	if (ImGui::BeginTable("PbrColumns", 2))
+	if (ImGui::BeginTabBar("PbrTabs"))
 	{
-		ImGui::TableNextColumn();
+		if (rScreen.BeginSubtab("Model", iSection, 0))
+		{
+			if (ImGui::BeginTable("PbrColumns", 2))
+			{
+				ImGui::TableNextColumn();
 
-		rScreen.WrapperSeparatorText("Engine Variables");
-		rScreen.WrapperSlider("Sun", iSection, 1.0f);
-		rScreen.WrapperSlider("Day Brightness", iSection, 1.0f);
-		rScreen.WrapperSlider("Model Data Mip Bias", iSection, 1.0f);
+				rScreen.WrapperSeparatorText("Engine Variables");
+				rScreen.WrapperSlider("Sun", iSection, 1.0f);
+				rScreen.WrapperSlider("Day Brightness", iSection, 1.0f);
+				rScreen.WrapperSlider("Model Data Mip Bias", iSection, 1.0f);
 
-		rScreen.WrapperSeparatorText("BRDF");
-		rScreen.WrapperSlider("BRDF Diffuse", iSection, 1.0f);
-		rScreen.WrapperSlider("BRDF Diffuse Power", iSection, 1.0f);
-		rScreen.WrapperSlider("BRDF Specular", iSection, 1.0f);
-		rScreen.WrapperSlider("BRDF Specular Power", iSection, 1.0f);
+				rScreen.WrapperSeparatorText("BRDF");
+				rScreen.WrapperSlider("BRDF Diffuse", iSection, 1.0f);
+				rScreen.WrapperSlider("BRDF Diffuse Power", iSection, 1.0f);
+				rScreen.WrapperSlider("BRDF Specular", iSection, 1.0f);
+				rScreen.WrapperSlider("BRDF Specular Power", iSection, 1.0f);
 
-		rScreen.WrapperSeparatorText("Tone Mapping");
-		rScreen.WrapperSlider("Exposure", iSection, 1.0f);
-		rScreen.WrapperSlider("Gamma", iSection, 1.0f);
+				rScreen.WrapperSeparatorText("Post Lighting");
+				rScreen.WrapperSlider("Lighting Specular", iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Specular Power", iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting", iSection, 1.0f);
+				rScreen.WrapperSlider("Lighting Power", iSection, 1.0f);
 
-		rScreen.WrapperSeparatorText("Color Grading");
-		rScreen.WrapperSlider("Saturation", iSection, 1.0f);
-		rScreen.WrapperSlider("Contrast", iSection, 1.0f);
-		rScreen.WrapperSlider("Temperature", iSection, 1.0f);
+				ImGui::TableNextColumn();
 
-		rScreen.WrapperSeparatorText("Post Lighting");
-		rScreen.WrapperSlider("Lighting Specular", iSection, 1.0f);
-		rScreen.WrapperSlider("Lighting Specular Power", iSection, 1.0f);
-		rScreen.WrapperSlider("Lighting", iSection, 1.0f);
-		rScreen.WrapperSlider("Lighting Power", iSection, 1.0f);
+				rScreen.WrapperSeparatorText("IBL");
+				rScreen.WrapperSlider("IBL Ambient", iSection, 1.0f);
+				rScreen.WrapperSlider("IBL Diffuse", iSection, 1.0f);
+				rScreen.WrapperSlider("IBL Diffuse Power", iSection, 1.0f);
+				rScreen.WrapperSlider("IBL Specular", iSection, 1.0f);
+				rScreen.WrapperSlider("IBL Specular Power", iSection, 1.0f);
+				rScreen.WrapperSlider("IBL Shadow Blend", iSection, 1.0f);
+				rScreen.WrapperSlider("IBL Ambient Color Blend", iSection, 1.0f);
+				rScreen.WrapperSlider("Cubemap Lod Power", iSection, 1.0f);
+				rScreen.WrapperSlider("Cubemap Lod Offset", iSection, 1.0f);
+				rScreen.WrapperSlider("Shadow Floor", iSection, 1.0f);
 
-		ImGui::TableNextColumn();
+				rScreen.WrapperSeparatorText("Smoke");
+				rScreen.WrapperSlider("Smoke", iSection, 1.0f);
 
-		rScreen.WrapperSeparatorText("IBL");
-		rScreen.WrapperSlider("IBL Ambient", iSection, 1.0f);
-		rScreen.WrapperSlider("IBL Diffuse", iSection, 1.0f);
-		rScreen.WrapperSlider("IBL Diffuse Power", iSection, 1.0f);
-		rScreen.WrapperSlider("IBL Specular", iSection, 1.0f);
-		rScreen.WrapperSlider("IBL Specular Power", iSection, 1.0f);
-		rScreen.WrapperSlider("IBL Shadow Blend", iSection, 1.0f);
-		rScreen.WrapperSlider("IBL Ambient Color Blend", iSection, 1.0f);
-		rScreen.WrapperSlider("Cubemap Lod Power", iSection, 1.0f);
-		rScreen.WrapperSlider("Cubemap Lod Offset", iSection, 1.0f);
-		rScreen.WrapperSlider("Shadow Floor", iSection, 1.0f);
+				rScreen.WrapperSeparatorText("Emissive");
+				rScreen.WrapperSlider("Emissive", iSection, 1.0f);
 
-		rScreen.WrapperSeparatorText("Smoke");
-		rScreen.WrapperSlider("Smoke", iSection, 1.0f);
+				ImGui::EndTable();
+			}
 
-		rScreen.WrapperSeparatorText("Emissive");
-		rScreen.WrapperSlider("Emissive", iSection, 1.0f);
+			ImGui::EndTabItem();
+		}
+		if (rScreen.BeginSubtab("Post Processing", iSection, 1))
+		{
+			rScreen.WrapperSeparatorText("Tone Mapping");
+			rScreen.WrapperSlider("Exposure", iSection);
+			rScreen.WrapperSlider("Gamma", iSection);
 
-		ImGui::EndTable();
+			rScreen.WrapperSeparatorText("Color Grading");
+			rScreen.WrapperSlider("Saturation", iSection);
+			rScreen.WrapperSlider("Contrast", iSection);
+			rScreen.WrapperSlider("Temperature", iSection);
+
+			ImGui::EndTabItem();
+		}
+		ImGui::EndTabBar();
 	}
 }
 
