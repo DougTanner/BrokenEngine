@@ -294,6 +294,14 @@ void ClientSessionRuntime::ApplyReceivedFullStates()
 			rCell.iLastFullStateTick = iTick;
 			rCell.iConfirmedOffset = 0;
 
+			// A full state carries the server's tick when sent and a paused server sends no delta, so without this
+			// seed a load reset or connect while paused leaves no clock reference to bound the simulation ceiling.
+			if (miLatestServerTick < 0)
+			{
+				miLatestServerTick = iTick;
+				mLatestServerTickArrival = std::chrono::steady_clock::now();
+			}
+
 			// Only the first full state sets the game clock. Start behind the server by the jitter-safety floor,
 			// matching EvaluateClock, to avoid a ~150 ms ceiling stall and an initial target-behind error.
 			// Clamp the offset to iTick so a freshly loaded server cannot produce a negative simulation tick.
