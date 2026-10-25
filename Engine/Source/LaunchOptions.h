@@ -16,6 +16,7 @@ struct LaunchOptions
 	int64_t iAgentPort = 0; // 0 = agent command channel disabled
 	common::Flags<LaunchOptionFlags> flags;
 	std::filesystem::path logFile; // empty = no log-file sink
+	std::string scenePath;
 	std::filesystem::path dataDirectory; // empty = executable-sibling Data; --data-directory supplies an existing absolute directory
 	std::filesystem::path appDataDirectory; // empty = roaming AppData; --app-data-directory supplies an existing absolute directory
 	VkExtent2D vkWindowedExtent {.width = 0, .height = 0}; // {0,0} = not requested; --windowed WxH forces a windowed client size (overrides fullscreen at the read sites, never mutates gFullscreen)

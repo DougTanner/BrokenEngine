@@ -94,6 +94,16 @@ bool ParseLaunchOptions()
 				LOG(kDefault, kWarning, "Launch option --log-file missing value");
 			}
 		}
+		else if (std::wcscmp(pArgumentValues[i], L"--scene-path") == 0)
+		{
+			if (i + 1 >= iArgumentCount || pArgumentValues[i + 1][0] == L'\0')
+			{
+				LOG(kDefault, kError, "Launch option --scene-path requires a nonempty packed scene path");
+				bSuccess = false;
+				continue;
+			}
+			gLaunchOptions.scenePath = common::ToString(pArgumentValues[++i]);
+		}
 		else if (std::wcscmp(pArgumentValues[i], L"--data-directory") == 0)
 		{
 			gLaunchOptions.dataDirectory.clear();

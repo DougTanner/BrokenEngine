@@ -65,6 +65,9 @@ UI cancellation also requires a fresh click before dragging resumes.
 
 With `--agent-port`, the viewer remains hidden and suppresses startup error
 dialogs; it does not start generic agent transport.
+Optional `--scene-path` selects an exact packed catalog path before the first
+render; an empty, missing or unknown identity fails startup. Omission retains
+the first entry in the sorted catalog.
 Programmatic pointer positions and left/right-button transitions enter ImGui's
 public input queue through viewer-private messages without physical mouse-leave
 tracking or native mouse capture. Preserve ordinary native input forwarding.

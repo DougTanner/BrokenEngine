@@ -49,6 +49,18 @@ ModelViewerApplication::ModelViewerApplication()
 	{
 		return std::strcmp(rLeft.pcPath, rRight.pcPath) < 0;
 	});
+	if (!engine::gLaunchOptions.scenePath.empty())
+	{
+		auto it = std::find_if(mPreviews.begin(), mPreviews.end(), [](const Preview& rPreview)
+		{
+			return engine::gLaunchOptions.scenePath == rPreview.pcPath;
+		});
+		if (it == mPreviews.end())
+		{
+			throw std::runtime_error(std::format("ModelViewer packed scene not found: {}", engine::gLaunchOptions.scenePath));
+		}
+		miSelected = std::distance(mPreviews.begin(), it);
+	}
 	for (Preview& rPreview : mPreviews)
 	{
 		PreparePreview(rPreview);

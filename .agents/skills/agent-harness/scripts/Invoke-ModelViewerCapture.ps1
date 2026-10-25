@@ -7,6 +7,7 @@ param(
 	[Parameter(Mandatory)][string] $RepositoryRoot,
 	# Absolute and must not exist; the script creates it, so the viewer starts from compiled defaults.
 	[Parameter(Mandatory)][string] $AppDataDirectory,
+	[ValidateNotNullOrEmpty()][string] $ModelPath,
 	# Capture until two consecutive captures share their SHA-256; otherwise return after the first.
 	[switch] $RequireStable
 )
@@ -191,7 +192,10 @@ public static extern bool IsWindowVisible(IntPtr window);
 	$viewerArguments = @(
 		'--agent-port', "$AgentPort",
 		'--log-file', ('"' + $logPath + '"'),
-		'--app-data-directory', ('"' + $appDataRoot + '"'))
+		'--app-data-directory', ('"' + $appDataRoot + '"')
+		if ($PSBoundParameters.ContainsKey('ModelPath')) {
+			'--scene-path', ('"' + $ModelPath + '"')
+		})
 	$process = Start-Process -FilePath $executable -ArgumentList $viewerArguments -WorkingDirectory $appDataRoot -WindowStyle Hidden -PassThru
 	try {
 		$result.pid = $process.Id
