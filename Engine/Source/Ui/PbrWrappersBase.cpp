@@ -10,11 +10,11 @@ Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDif
 Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower(0.891f, 0.5f, 2.0f);
 Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular(16.731f, 0.0f, 30.0f);
 Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower(1.279f, 0.1f, 2.0f);
-Wrapper gPhysicallyBasedRenderingExposure(1.182f, 0.0f, 2.0f);
-Wrapper gPhysicallyBasedRenderingGamma(0.85f, shaders::kfEpsilon, 2.0f); // Nonzero min load-bearing: LightingUniforms.cpp uploads 1.0f / gPhysicallyBasedRenderingGamma.mfCurrent as the HdrResolve.frag pow exponent.
-Wrapper gColorGradingSaturation(1.096f, 0.0f, 2.0f);
-Wrapper gColorGradingContrast(1.014f, 0.5f, 2.0f);
-Wrapper gColorGradingTemperature(-0.109f, -1.0f, 1.0f);
+Wrapper gPhysicallyBasedRenderingExposure(0.85f, 0.0f, 2.0f);
+Wrapper gPhysicallyBasedRenderingGamma(0.6f, shaders::kfEpsilon, 2.0f); // Nonzero min load-bearing: LightingUniforms.cpp uploads 1.0f / gPhysicallyBasedRenderingGamma.mfCurrent as the HdrResolve.frag pow exponent.
+Wrapper gColorGradingSaturation(1.2f, 0.0f, 2.0f);
+Wrapper gColorGradingContrast(1.2f, 0.5f, 2.0f);
+Wrapper gColorGradingTemperature(0.0f, -1.0f, 1.0f);
 Wrapper gPhysicallyBasedRenderingLightingSpecular(0.5f, 0.0f, 1.0f);
 Wrapper gPhysicallyBasedRenderingLightingSpecularPower(0.5f, 0.1f, 1.0f);
 Wrapper gPhysicallyBasedRenderingLighting(0.2f, 0.0f, 0.3f);
