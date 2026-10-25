@@ -140,7 +140,7 @@ try {
  while($true){
   $response=Invoke-NextPlanProcess $context.WorktreeCli $claimArguments $context.Worktree;$claim=ConvertFrom-NextPlanProcessJson $response 'plan claim-next'
   if($response.ExitCode -eq 2 -and [string]$claim.code -ceq 'claim-plan-mismatch'){$result.conflict=[ordered]@{requestedPlan=[string]$claim.requestedPlan;heldPlan=[string]$claim.heldPlan};Complete-Claim 2 'blocked' 'claim.plan-mismatch' 'This session already holds a different Plan claim.' 'stop-report-to-user'}
-  if($response.ExitCode -ne 0){$exit=if($response.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'claim.rejected' 'WorktreeCli rejected the plan claim.' 'stop-report-to-user'}
+  if($response.ExitCode -ne 0){$detail=(($response.Stdout,$response.Stderr) -join "`n").Trim();$exit=if($response.ExitCode -eq 2){2}else{1};Complete-Claim $exit $(if($exit -eq 2){'blocked'}else{'error'}) 'claim.rejected' "WorktreeCli rejected the plan claim (exit $($response.ExitCode)). WorktreeCli reported: $detail" 'stop-report-to-user'}
   $code=[string]$claim.code
   if($code -cne 'none'){break}
   $message=if($targeted){Get-TargetedNoneMessage $context $Plan}elseif($null -ne $heldClaim){Get-TargetedNoneMessage $context ([string]$heldClaim.plan)}else{'No eligible Plan is available.'}
