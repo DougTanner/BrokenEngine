@@ -60,21 +60,18 @@ OpenCode: every role -> Union Alpha (`opencode/union-alpha`); OpenCode has no ef
   (`.agents/references/authority-order.md`). Open each option with a written
   label such as `Option 1:`, never a rendered list marker, and reuse those
   labels in any question naming options.
-- Footer: the main session's final message of any turn that ran Change Workflow
-  work ends with `Follow-up Plans created:` and the single word `none`, or one
-  line per Plan created that turn: its repo-relative path; a tag,
-  `landed in <commit>`, `unlanded in worktree`, or `executed in this change`
-  (folded in by the Leftovers do-now rule); and whether to do it this session
-  while its context is fresh: `do now: yes` when it is Tier 1 or 2, bounded,
-  and needs only files and facts already read or changed this session (so it
-  adds little new context), otherwise `do now: no` with the failed condition in
-  a few words. A `do now: yes` on a `landed in <commit>` Plan ends with
-  `(run /next-plan <path>)`, since only the user can start `/next-plan`.
+- Footer: only the main-session message that asks the `/finalize-changes`
+  landing confirmation question carries it; that message ends with
+  `Follow-up Plans created:` and the single word `none`, or one line per Plan
+  created since the session's last landing: its repo-relative path; a tag,
+  `unlanded in worktree` or `executed in this change` (folded in by the
+  Leftovers do-now rule); and whether to do it this session while its context
+  is fresh: `do now: yes` when it is Tier 1 or 2, bounded, and needs only files
+  and facts already read or changed this session (so it adds little new
+  context), otherwise `do now: no` with the failed condition in a few words.
   Example:
   `Documents/Plans/<area>/<Plan>.md — unlanded in worktree — do now: no (needs files not read this session)`.
-  The verdict answers, never asks; the user decides, and it never displaces a
-  pending landing question or the session-complete marker; only the
-  `/next-plan` session-complete marker may follow it.
+  The verdict answers, never asks; the user decides.
 
 ### Resolving Ambiguity
 
@@ -252,7 +249,7 @@ the highest applicable tier, run every step that tier triggers for the touched
 regions (plan review included), and report the expansion in the message already
 being sent. This rule governs over a plan's `## Out of scope` entry that would
 route such a leftover to residuals or a follow-up Plan, except an entry the
-user's own words chose (`.agents/references/authority-order.md`). When the turn
+user's own words chose (`.agents/references/authority-order.md`). When the
 footer marks a follow-up Plan `unlanded in worktree` as `do now: yes` and the
 user directs it before the landing confirmation, main executes that Plan as
 approved scope of the current change regardless of the current change's tier,

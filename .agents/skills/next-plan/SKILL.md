@@ -265,11 +265,11 @@ reviews and is not presented. Deliver that presentation per the `### User Intera
 [`.agents/references/change-workflow.md`](../../references/change-workflow.md) —
 on Codex as exactly one complete `<proposed_plan>` block, then ending the turn
 without an approval question; on Claude Code, OpenCode, and every other host as
-rendered message text whose approval question is the last thing before the
-`Follow-up Plans created:` footer, after which the user's next message is the
-decision. An approval accepts the recommendation for every decision it leaves
-unanswered, except a recommendation to reject the Plan, which still needs an
-explicit answer. A different approach the user chooses at approval returns the
+rendered message text whose approval question is the last thing in the
+message, after which the user's next message is the decision. An approval
+accepts the recommendation for every decision it leaves unanswered, except a
+recommendation to reject the Plan, which still needs an explicit answer. A
+different approach the user chooses at approval returns the
 run to preparation and Plan review. Every user choice in the run that neither
 rejects the Plan, refuses approval, nor defers it from step 4's size entry —
 the `/plan-alternatives` pick, an
@@ -314,9 +314,9 @@ The user closes the session tab on this line alone, so it must be
 unambiguous. When, and only when, the `/finalize-changes` handoff carries its
 `SESSION COMPLETE` line, whose conditions that skill's `## Handoff` owns,
 main's final message of that turn ends with the bare line `SESSION COMPLETE` as
-its very last line, after the `Follow-up Plans created:` footer, and asks the
-user nothing. Every other ending — retained claim, blocker, refused approval,
-deferral, unknown claim state, or work still to land — never prints that line.
+its very last line and asks the user nothing. Every other ending — retained
+claim, blocker, refused approval, deferral, unknown claim state, or work still
+to land — never prints that line.
 
 ## Rules
 
