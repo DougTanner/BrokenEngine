@@ -21,7 +21,7 @@ exactly as before. Stage 3 makes the world visible.
 
 Current state after Phase 3 (line numbers cite commit bae72d574b2f422ad876e9804304065b040627c3; locate by content):
 
-- `game::Camera` (ModelViewer/Source/Graphics/Camera.h/.cpp) writes the orbit pose into the `CameraBase` members
+- `game::Camera` (Tools/ModelViewer/Source/Graphics/Camera.h/.cpp) writes the orbit pose into the `CameraBase` members
   every engine pass reads: `mMatView`, `mMatPerspective`, `mVecEyePosition`, `mVecToEyeNormal`,
   `mfCameraEyeHeight`, both texel eye heights, the visible areas (Camera.cpp:16-34), with `mVecPosition` as the
   model center (`Fit`, :37-43). `RotateSun` reads `mMatView` for the screen basis (:50-62).
@@ -76,21 +76,21 @@ Current state after Phase 3 (line numbers cite commit bae72d574b2f422ad876e98043
      `CalculateMatricesAndVisibleArea()`, mirroring CameraBase.cpp:189-193, 198. `mVecPosition` keeps the constructor's
      XY (the cell origin) in this stage.
    - `Fit` writes `mVecModelCenter` instead of `mVecPosition`; `RotateSun` reads `mMatModelView`.
-7. Viewer `engine::RenderFrameMain` (ModelViewer/Source/ModelViewerApplication.cpp, the Phase 1 definition): writes
+7. Viewer `engine::RenderFrameMain` (Tools/ModelViewer/Source/ModelViewerApplication.cpp, the Phase 1 definition): writes
    the world camera's view-projection, eye, and to-eye normal to the existing fields as today, and
    `mMatModelView * mMatModelPerspective` (transposed) and `mVecModelEyePosition` to the two new fields, read from
    `static_cast<game::Camera*>(engine::gpCamera)`. The four PBR isolation writes stay (D7).
 8. Docs (`/update-claude-docs`): Engine/Data/Shaders/AGENTS.md (model draws use the model view-projection and
    eye); the image-pass order owner in Engine/Source/Graphics/Managers/AGENTS.md (`kbDrawModelsOverWorld` order);
-   ModelViewer/AGENTS.md `## Engine integration` (the viewer's `CameraBase` state is a fixed top-down world camera;
+   Tools/ModelViewer/AGENTS.md `## Engine integration` (the viewer's `CameraBase` state is a fixed top-down world camera;
    the orbit pose is viewer-owned and reaches only model draws; sun drag uses the orbit view's screen axes).
 
 ## Critical files
 
 - Engine/Data/Shaders/ShaderMainLayout.h, Engine/Data/Shaders/Model/ModelCommon.h, Model.frag.
 - Engine/Source/Graphics/Render/MainUniforms.cpp, Engine/Source/Graphics/Managers/CommandBufferRecordMain.cpp.
-- Projects/BrokenEngineSandbox/Source/Pch.h, ModelViewer/Source/Pch.h.
-- ModelViewer/Source/Graphics/Camera.h, Camera.cpp, ModelViewer/Source/ModelViewerApplication.cpp.
+- Projects/BrokenEngineSandbox/Source/Pch.h, Tools/ModelViewer/Source/Pch.h.
+- Tools/ModelViewer/Source/Graphics/Camera.h, Camera.cpp, Tools/ModelViewer/Source/ModelViewerApplication.cpp.
 
 ## Risk triggers and invariants
 

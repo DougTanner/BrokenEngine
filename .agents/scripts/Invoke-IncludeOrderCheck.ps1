@@ -1,6 +1,6 @@
 # Include-order check and fix for Documents/C++StyleGuide.txt rule 47, run by /code-style-review.
 # Parameters: -RepositoryRoot <absolute toplevel>, exactly one of -Path <repo-relative files> or -All, and
-# -Fix. -All takes tracked *.h/*.cpp files under Common/, DataPacker/, Engine/, ModelViewer/Source/,
+# -Fix. -All takes tracked *.h/*.cpp files under Common/, DataPacker/, Engine/,
 # Projects/ and Tools/.
 # A -Path entry that does not exist or is not *.h/*.cpp is skipped, as is an excluded file; an existing
 # *.h/*.cpp entry outside those roots, or with no owning project, is an input error.
@@ -11,7 +11,7 @@
 # directory whose name stem is the longest ordinal case-insensitive prefix of the .cpp's name stem,
 # wherever it is included; then, resolving a quoted include as MSVC does (the including file's
 # directory, then the owning vcxproj's AdditionalIncludeDirectories in order), 2 engine (under Engine/,
-# Common/, DataPacker/, ModelViewer/Source/ or Tools/, or an unresolved Data/ generated pack header), 3 game (under
+# Common/, DataPacker/ or Tools/, or an unresolved Data/ generated pack header), 3 game (under
 # Projects/), 4 external (under ThirdParty/, or any angle-bracket include). Canonical form: sorted by
 # group, then path compared one folder level at a time with folders before files and names ordinal
 # case-insensitive; no blank line inside a group, exactly one between groups; equal keys keep their
@@ -37,19 +37,19 @@ Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 
 $script:MaximumRows = 400
-$script:SourceRoots = @('Common', 'DataPacker', 'Engine', 'ModelViewer/Source', 'Projects', 'Tools')
+$script:SourceRoots = @('Common', 'DataPacker', 'Engine', 'Projects', 'Tools')
 # Aggregation and precompiled headers whose include order is load-bearing; each game project's Pch.h
 # joins them once the projects are discovered.
 $script:ExcludedFiles = @(
 	'DataPacker/Source/Pch.h'
-	'ModelViewer/Source/Pch.h'
+	'Tools/ModelViewer/Source/Pch.h'
 	'Common/ExternalHeaders.h'
 	'Common/Common.h'
 	'Engine/Source/Engine.h'
 )
 $script:ProjectFiles = @(
 	@{ Prefix = '^DataPacker/'; Project = 'DataPacker/Platforms/VisualStudio2026/DataPacker.vcxproj' }
-	@{ Prefix = '^ModelViewer/Source/'; Project = 'ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj' }
+	@{ Prefix = '^Tools/ModelViewer/Source/'; Project = 'Tools/ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj' }
 	@{ Prefix = '^Tools/(?:AgentHarness|ToolCommon)/'; Project = 'Tools/AgentHarness/Platforms/VisualStudio2026/AgentHarness.vcxproj' }
 	@{ Prefix = '^Tools/WorktreeCli/'; Project = 'Tools/WorktreeCli/Platforms/VisualStudio2026/WorktreeCli.vcxproj' }
 )
@@ -143,7 +143,7 @@ function Get-IncludeGroup([string] $File, [string] $Delimiter, [string] $Spelled
 	$resolved = Resolve-Include $File $Spelled
 	if ($null -eq $resolved) { return $(if ($Spelled -match '^Data/') { 2 } else { $null }) }
 	if ($CorrespondingHeader -and $resolved -ieq $CorrespondingHeader) { return 1 }
-	if ($resolved -match '^(?:(?:Engine|Common|DataPacker|Tools)/|ModelViewer/Source/)') { return 2 }
+	if ($resolved -match '^(?:Engine|Common|DataPacker|Tools)/') { return 2 }
 	if ($resolved -match '^Projects/') { return 3 }
 	if ($resolved -match '^ThirdParty/') { return 4 }
 	return $null

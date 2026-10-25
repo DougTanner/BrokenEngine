@@ -56,10 +56,10 @@ $script:TargetFiles = @{
 	DataPacker = 'DataPacker\Platforms\VisualStudio2026\DataPacker.sln'
 	WorktreeCli = 'Tools\WorktreeCli\Platforms\VisualStudio2026\WorktreeCli.sln'
 	AgentHarness = 'Tools\AgentHarness\Platforms\VisualStudio2026\AgentHarness.sln'
-	ModelViewer = 'ModelViewer\Platforms\VisualStudio2026\ModelViewer.sln'
+	ModelViewer = 'Tools\ModelViewer\Platforms\VisualStudio2026\ModelViewer.sln'
 }
 # --files requires a .vcxproj target, so a selective compile builds the project, not the solution.
-$script:SelectiveTargetFiles = @{ ModelViewer = 'ModelViewer\Platforms\VisualStudio2026\ModelViewer.vcxproj' }
+$script:SelectiveTargetFiles = @{ ModelViewer = 'Tools\ModelViewer\Platforms\VisualStudio2026\ModelViewer.vcxproj' }
 $script:DataOutputSuffix = $null
 
 $script:BlockedCode = $null

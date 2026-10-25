@@ -30,7 +30,7 @@ Facts (commit bae72d574b2f422ad876e9804304065b040627c3; locate by content after 
   cell-local in [-450, 450], and output index 0 is the Huge anchor, always placed
   (IslandChainPlacement.h:33-40; IslandChainPlacement.cpp:227-252). The viewer already compiles it, `Islands.cpp`,
   `IslandTerrain.cpp`, and `IslandTerrainResidency.cpp` (ModelViewer.vcxproj:160-168), and constructs
-  `IslandTerrain`, `FlightPlanes`, and `IslandTerrainResidency` (ModelViewer/Source/Main.cpp:119-121).
+  `IslandTerrain`, `FlightPlanes`, and `IslandTerrainResidency` (Tools/ModelViewer/Source/Main.cpp:119-121).
 - `UpdateActiveIslands` must run once per frame after the camera update and before `RenderGlobal`, once the
   acquired framebuffer index is valid (GameBase.cpp:942-943; Islands.cpp:194-199). It acquires texture slots
   itself (Islands.cpp:276); `RenderGlobal` runs eviction and restoration (Graphics.cpp:144-154). Placement offsets
@@ -65,7 +65,7 @@ Facts (commit bae72d574b2f422ad876e9804304065b040627c3; locate by content after 
    `ImGui::Button("Reroll")`, which sets `mIslandSeed = engine::GridCoord::FromKey(common::RandomNext(mSeedRandomEngine))`
    and calls `GenerateIslands()`; then `ImGui::Separator()`. Nothing is saved.
 5. Gray background removal (D8):
-   - Delete `kVkHdrClearColor` from Projects/BrokenEngineSandbox/Source/Game.h and ModelViewer/Source/Game.h.
+   - Delete `kVkHdrClearColor` from Projects/BrokenEngineSandbox/Source/Game.h and Tools/ModelViewer/Source/Game.h.
    - CommandBufferRecordMain.cpp `RecordImageRenderPass`: the begin call passes a local `VkClearColorValue {}` (the
      depth clear still needs the clear values), and the `Game.h` include Phase 1 added goes.
    - SwapchainManager.cpp HDR render pass: the HDR color load op becomes `kbVulkanWireframe ?
@@ -73,22 +73,22 @@ Facts (commit bae72d574b2f422ad876e9804304065b040627c3; locate by content after 
      VK_ATTACHMENT_LOAD_OP_DONT_CARE` and the MSAA color load op `kbVulkanWireframe ? VK_ATTACHMENT_LOAD_OP_CLEAR :
      VK_ATTACHMENT_LOAD_OP_DONT_CARE`, the sandbox's form before Phase 1, so wireframe builds still clear to black.
 6. Docs (`/update-claude-docs`):
-   - ModelViewer/AGENTS.md `## Application contracts` :7-10: a seeded one-cell world (terrain and water) is drawn
+   - Tools/ModelViewer/AGENTS.md `## Application contracts` :7-10: a seeded one-cell world (terrain and water) is drawn
      behind the selected model under the same grading; the model draws in its own space over cleared depth; the
      seed is a grid coordinate edited or rerolled in the panel and never saved.
    - `## Engine integration`: the viewer supplies one cell's static data to `UpdateActiveIslands` each frame,
      frames the world camera on the anchor island, and calls `RenderWaterMain`.
    - Engine/Data/Shaders/AGENTS.md `## Top-Level Shaders` HDR resolve: world draws cover every pixel, so no program
      depends on an HDR clear color; the line naming `game::kVkHdrClearColor` goes.
-   - ModelViewer/AGENTS.md: every line naming `game::kVkHdrClearColor` or the viewer's gray HDR clear color,
+   - Tools/ModelViewer/AGENTS.md: every line naming `game::kVkHdrClearColor` or the viewer's gray HDR clear color,
      including the list of game names the viewer supplies (Phase 1 and Phase 3 placed them).
 
 ## Critical files
 
-- ModelViewer/Source/ModelViewerApplication.h, ModelViewerApplication.cpp.
-- Projects/BrokenEngineSandbox/Source/Game.h, ModelViewer/Source/Game.h.
+- Tools/ModelViewer/Source/ModelViewerApplication.h, ModelViewerApplication.cpp.
+- Projects/BrokenEngineSandbox/Source/Game.h, Tools/ModelViewer/Source/Game.h.
 - Engine/Source/Graphics/Managers/CommandBufferRecordMain.cpp, Engine/Source/Graphics/Managers/SwapchainManager.cpp.
-- ModelViewer/AGENTS.md, Engine/Data/Shaders/AGENTS.md.
+- Tools/ModelViewer/AGENTS.md, Engine/Data/Shaders/AGENTS.md.
 
 ## Risk triggers and invariants
 

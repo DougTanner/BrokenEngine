@@ -287,7 +287,7 @@ function Compare-AgentSharedDataRecord([string] $Root, [string] $DataDirectory, 
 # The ModelViewer Build\ResolvedData.props under Root, which Visual Studio imports so it builds with the same resolved data
 # properties as the last /compile or session-start seed of ModelViewer.
 function Write-AgentModelViewerResolvedData([string] $Root, [string] $DataBuildMode, [string] $RunDataPacker, [string] $GameDataDirectory, [string] $GeneratedDataIncludeRoot) {
-	$viewerBuildDirectory = Join-Path $Root 'ModelViewer\Platforms\VisualStudio2026\Build'
+	$viewerBuildDirectory = Join-Path $Root 'Tools\ModelViewer\Platforms\VisualStudio2026\Build'
 	[void] [IO.Directory]::CreateDirectory($viewerBuildDirectory)
 	$escapedDataDirectory = [Security.SecurityElement]::Escape($GameDataDirectory)
 	$escapedIncludeRoot = [Security.SecurityElement]::Escape($GeneratedDataIncludeRoot)

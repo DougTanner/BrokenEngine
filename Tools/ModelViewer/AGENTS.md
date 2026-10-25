@@ -7,7 +7,7 @@ belong here; shared rendering mechanisms remain engine-owned. Do not instantiate
 the sandbox Game or start a network session. The selected scene is the only
 visible geometry, against a gray background that is the viewer's HDR clear
 color, displayed about RGB 0.5 at default grading
-([Top-Level Shaders](../Engine/Data/Shaders/AGENTS.md#top-level-shaders)).
+([Top-Level Shaders](../../Engine/Data/Shaders/AGENTS.md#top-level-shaders)).
 World allocations required by existing graphics managers do not authorize
 visible world passes.
 

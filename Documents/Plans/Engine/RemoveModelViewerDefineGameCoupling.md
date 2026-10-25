@@ -22,7 +22,7 @@ work towards the goal." For these sites the user chose, case by case, among the 
 the engine expects and the engine taking game values as parameters or moving code that names the game into engine
 files only gameplay programs compile, "with the simplest most logical paths for the particular code taken on a
 case-by-case basis". Sandbox client/server behavior, CRC/determinism, and pack format stay unchanged; ModelViewer
-behavior stays unchanged. The `ModelViewer/AGENTS.md` prohibitions on placeholder game pieces and on instantiating the
+behavior stays unchanged. The `Tools/ModelViewer/AGENTS.md` prohibitions on placeholder game pieces and on instantiating the
 sandbox game were agent-written and are rewritten to match the result.
 
 A `kb*` switch cannot remove these gates: the gated code names types and globals the viewer does not declare at all
@@ -34,8 +34,8 @@ reason).
 
 Line numbers cite commit 7d64500ecb21b6d05acc859ab5f417067a8f0796. Phase 1 edits ImGuiManager.cpp:106-111, 152-159,
 438-451, 473-480, ImGuiManager.h:139 (deleted), Islands.h:50/52 (gate lines only), ModelViewerApplication.cpp:521-537,
-ModelViewer/Source/Game.h (two constants added after :7; :10-11 deleted), Engine/Source/Graphics/AGENTS.md:57-64, and
-ModelViewer/AGENTS.md; Phase 2 edits ModelViewer/AGENTS.md and the Engine/Source/AGENTS.md Switches bullet (:33). No
+Tools/ModelViewer/Source/Game.h (two constants added after :7; :10-11 deleted), Engine/Source/Graphics/AGENTS.md:57-64, and
+Tools/ModelViewer/AGENTS.md; Phase 2 edits Tools/ModelViewer/AGENTS.md and the Engine/Source/AGENTS.md Switches bullet (:33). No
 other region named here is edited by an earlier phase. Locate regions by content when lines have shifted.
 
 ## Design
@@ -167,10 +167,10 @@ camera, or UI code outside PostRender and the CRC, or include placement.
      `RegisterEngineTweakSections` (:130); Engine/Source/Ui/TweaksSettings.cpp:38 and :58 use it in place of
      `gpImGuiManager->mpTweaksScreen`.
    - Graphics.cpp: delete :465-473 and :747-757 and the now-unused `Ui/TweaksSettings.h` include (:10).
-   - Viewer: ModelViewer/Source/ModelViewerApplication.cpp:516-519 (`game::RenderViewerUi`) is replaced, beside the
+   - Viewer: Tools/ModelViewer/Source/ModelViewerApplication.cpp:516-519 (`game::RenderViewerUi`) is replaced, beside the
      Phase 1 `engine::RenderFrameMain` definition, by `engine::RenderUiScreens` with the same body (:518) and empty
      `engine::CreateUiScreens` and `engine::DestroyUiScreens`, under one comment that the viewer panel keeps its state
-     in `ModelViewerApplication`. Delete the `RenderViewerUi` declaration (ModelViewer/Source/Game.h:9).
+     in `ModelViewerApplication`. Delete the `RenderViewerUi` declaration (Tools/ModelViewer/Source/Game.h:9).
    - Sandbox equivalence: the screens are created in the same order at the end of the manager constructor and the
      Tweaks load runs right after, as Graphics.cpp:463-472 did; render order and conditions are unchanged
      (MainMenu, Modal; the six in-game screens while Tweaks is hidden; Tweaks while shown; ImPlot graphs; text areas);
@@ -178,7 +178,7 @@ camera, or UI code outside PostRender and the CRC, or include placement.
      reset only at Graphics.cpp:758. Screens are destroyed before the ImGui context instead of after it; their
      destructors are implicit and touch no ImGui state (screen headers hold floats, flags, string views, and
      `std::unordered_set`s). Main.cpp:310 and :531 load and save while the manager, and so the screens, exist, as before.
-7. Define removal: delete `BT_MODEL_VIEWER;BT_MODEL_VIEWER;` from ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj:66.
+7. Define removal: delete `BT_MODEL_VIEWER;BT_MODEL_VIEWER;` from Tools/ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj:66.
 8. Project membership via `/update-vcxproj`: add FlightPlaneProjection.cpp (Graphics filter) and UiScreens.cpp
    (Ui\Screens filter) to the sandbox client project and filters. Server and ModelViewer source membership unchanged.
 9. Documentation (`/update-claude-docs`; each would be wrong after the change):
@@ -195,7 +195,7 @@ camera, or UI code outside PostRender and the CRC, or include placement.
    - Engine/Source/Ui/AGENTS.md:56-59: `ChatLog.h` reaches the game PCH through `GameBase.h`.
    - Engine/Source/Ui/Screens/AGENTS.md:3, 18-19, 34 and Projects/BrokenEngineSandbox/Source/Ui/Screens/AGENTS.md:16, 29,
      33: `UiScreens.cpp` owns construction and invocation; ImGuiManager owns submission.
-   - ModelViewer/AGENTS.md: the `## Application contracts` prohibition on instantiating the sandbox Game (:5-8) and the
+   - Tools/ModelViewer/AGENTS.md: the `## Application contracts` prohibition on instantiating the sandbox Game (:5-8) and the
      placeholder-dependency prohibition (:70-71), plus `## Engine integration`, rewritten to the result: no define; the
      viewer compiles only engine files whose game names it supplies (game name and version, HDR clear color, UI
      reference height, flight-plane table, profile rows, frame interpolate, camera `SunAngle`), defines
@@ -213,8 +213,8 @@ camera, or UI code outside PostRender and the CRC, or include placement.
   Engine/Source/Graphics/FlightPlaneProjection.cpp (new).
 - Engine/Source/Graphics/Islands.h, Islands.cpp.
 - Engine/Source/Graphics/Managers/ImGuiManager.h, ImGuiManager.cpp, Engine/Source/Ui/Screens/UiScreens.cpp (new),
-  Engine/Source/Ui/TweaksSettings.cpp, Engine/Source/Graphics/Graphics.cpp, ModelViewer/Source/ModelViewerApplication.cpp.
-- ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj; sandbox client vcxproj and filters.
+  Engine/Source/Ui/TweaksSettings.cpp, Engine/Source/Graphics/Graphics.cpp, Tools/ModelViewer/Source/ModelViewerApplication.cpp.
+- Tools/ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj; sandbox client vcxproj and filters.
 
 ## Risk triggers and invariants
 
@@ -252,8 +252,8 @@ camera, or UI code outside PostRender and the CRC, or include placement.
 - Engine/Source/Ui/Screens/UiScreens.cpp (new).
 - Engine/Source/Ui/Screens/TweaksScreen/TweaksScreen.h after :130; Engine/Source/Ui/TweaksSettings.cpp:38, 58.
 - Engine/Source/Graphics/Graphics.cpp:10, 465-473, 747-757.
-- ModelViewer/Source/ModelViewerApplication.cpp:516-519; ModelViewer/Source/Game.h:9.
-- ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj:66.
+- Tools/ModelViewer/Source/ModelViewerApplication.cpp:516-519; Tools/ModelViewer/Source/Game.h:9.
+- Tools/ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj:66.
 - Membership: sandbox client vcxproj and filters add FlightPlaneProjection.cpp and UiScreens.cpp.
 - Documentation lines in Design item 9.
 

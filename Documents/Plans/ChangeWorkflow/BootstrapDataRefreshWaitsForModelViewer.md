@@ -18,7 +18,7 @@ Verified root cause: that wait matches only game project process names —
 (`:241`, `:251`) use only that list — so a running ModelViewer is never waited
 for. ModelViewer holds the same packs a game client does:
 - It is a client build (`BT_CLIENT` in
-  `ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj:66`), and
+  `Tools/ModelViewer/Platforms/VisualStudio2026/ModelViewer.vcxproj:66`), and
   `PackChunks` opens every lazy pack (Audio, Islands, Texture) with a
   share-read-only lock for the whole process lifetime
   (`Engine/Source/File/PackChunks.cpp:317-323`).

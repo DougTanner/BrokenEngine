@@ -119,7 +119,7 @@ function Get-ContextRecommendedTargets([string[]] $Paths, [string] $Project) {
 	if ([string]::IsNullOrEmpty($Project)) { return @() }
 	$sharedPrefixes = @('Common/', 'Engine/', "Projects/$Project/Source/")
 	$viewerChanged = @($Paths | Where-Object {
-		$_.StartsWith('ModelViewer/', [StringComparison]::OrdinalIgnoreCase) -or
+		$_.StartsWith('Tools/ModelViewer/', [StringComparison]::OrdinalIgnoreCase) -or
 		$_.StartsWith('Common/', [StringComparison]::OrdinalIgnoreCase) -or
 		$_.StartsWith('Engine/', [StringComparison]::OrdinalIgnoreCase)
 	}).Count -gt 0

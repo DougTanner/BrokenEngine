@@ -23,7 +23,7 @@ pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-ModelViewerCap
 
 - Optionally pass `-ModelPath '<exact packed scene path>'` to select a scene
   before rendering. Case and separators are significant; this is not a source
-  filesystem path. See [ModelViewer application contracts](../../../../ModelViewer/AGENTS.md#application-contracts)
+  filesystem path. See [ModelViewer application contracts](../../../../Tools/ModelViewer/AGENTS.md#application-contracts)
   for the shared scene-selection contract.
 - Pass no log or configuration argument: the script always runs the Debug
   executable and writes the viewer log to `ModelViewer.log` inside the app-data
