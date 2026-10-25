@@ -66,10 +66,15 @@ Each `Findings` row is one line on this form:
 <ID> Required|Recommended path:start-end — class: boilerplate | history | speculative | navigation | false | dense — evidence — replacement: delete | <present-tense text> | route: /repo-code-review
 ```
 
+The evidence slot opens with the flagged block's current comment text in
+double quotes, each line's comment text as `scripts/Find-CommentBlocks.ps1`
+defines it beside `CommentPrefixPattern`, joined by single spaces, then gives
+the reason.
+
 Example:
 
 ```text
-F1 Required Common/WindowsUtils.h:35-43 — class: boilerplate — Parameters/Returns/Thread-safety fields restate the signature at :44 — replacement: CreateProcessW writes into rCommandLine, so it cannot be const.
+F1 Required Common/WindowsUtils.h:35-43 — class: boilerplate — "Parameters: rCommandLine - CreateProcessW writes into it, so it is not const. Returns: true on success. Thread-safety: none." Parameters/Returns/Thread-safety fields restate the signature at :44 — replacement: CreateProcessW writes into rCommandLine, so it cannot be const.
 ```
 
 `Changed files` and `Build required` are `none` because this findings-only
