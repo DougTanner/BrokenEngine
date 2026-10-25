@@ -29,9 +29,10 @@ The capture recipe in
 `../../.agents/skills/agent-harness/references/server-monitor.md` depends on
 pixel geometry: process DPI awareness, tab bar left 250, tabs 100 by 32, Copy
 button 80 by 28 with margin 10, Consolas height 28, statistics line height 36,
-profile line height 32, and 4 pixels between profile sections. Map bounds come
-from active cells with one cell of padding; the monitor formats coordinate labels
-from the received cell records. Copy concatenates the profile section text.
+profile line height 32, and 4 pixels between profile sections. The map draws
+flat-top hexes at monitor-local axial centre offsets with North upward. Bounds
+come from active cells with one cell of padding; the monitor formats coordinate
+labels from the received cell records. Copy concatenates the profile section text.
 
 ## Build
 

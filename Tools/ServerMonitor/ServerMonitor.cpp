@@ -1,6 +1,7 @@
 #define NOMINMAX
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -9,6 +10,7 @@
 #include <fstream>
 #include <iterator>
 #include <limits>
+#include <numbers>
 #include <span>
 #include <string>
 #include <string_view>
@@ -292,10 +294,12 @@ static void PaintMap(HDC hdcBuffer, std::span<char> buffer, int64_t iMapLeft, in
 		return;
 	}
 
-	int64_t iMinimumX = itActive->iX;
-	int64_t iMaximumX = iMinimumX;
-	int64_t iMinimumY = itActive->iY;
-	int64_t iMaximumY = iMinimumY;
+	int64_t iReferenceQ = itActive->iX;
+	int64_t iReferenceS = iReferenceQ + 2 * static_cast<int64_t>(itActive->iY);
+	int64_t iMinimumQ = iReferenceQ;
+	int64_t iMaximumQ = iReferenceQ;
+	int64_t iMinimumS = iReferenceS;
+	int64_t iMaximumS = iReferenceS;
 
 	for (const common::ServerMonitorCell& rCoordinate : sCells)
 	{
@@ -303,45 +307,71 @@ static void PaintMap(HDC hdcBuffer, std::span<char> buffer, int64_t iMapLeft, in
 		{
 			continue;
 		}
-		iMinimumX = std::min<int64_t>(iMinimumX, rCoordinate.iX);
-		iMaximumX = std::max<int64_t>(iMaximumX, rCoordinate.iX);
-		iMinimumY = std::min<int64_t>(iMinimumY, rCoordinate.iY);
-		iMaximumY = std::max<int64_t>(iMaximumY, rCoordinate.iY);
+		int64_t iS = static_cast<int64_t>(rCoordinate.iX) + 2 * static_cast<int64_t>(rCoordinate.iY);
+		iMinimumQ = std::min<int64_t>(iMinimumQ, rCoordinate.iX);
+		iMaximumQ = std::max<int64_t>(iMaximumQ, rCoordinate.iX);
+		iMinimumS = std::min(iMinimumS, iS);
+		iMaximumS = std::max(iMaximumS, iS);
 	}
 
-	iMinimumX = std::max<int64_t>(iMinimumX - 1, std::numeric_limits<int32_t>::min());
-	iMaximumX = std::min<int64_t>(iMaximumX + 1, std::numeric_limits<int32_t>::max());
-	iMinimumY = std::max<int64_t>(iMinimumY - 1, std::numeric_limits<int32_t>::min());
-	iMaximumY = std::min<int64_t>(iMaximumY + 1, std::numeric_limits<int32_t>::max());
+	iMinimumQ = std::max<int64_t>(iMinimumQ - 1, std::numeric_limits<int32_t>::min());
+	iMaximumQ = std::min<int64_t>(iMaximumQ + 1, std::numeric_limits<int32_t>::max());
+	iMinimumS -= 2;
+	iMaximumS += 2;
 
-	int64_t iGridWidth = iMaximumX - iMinimumX + 1;
-	int64_t iGridHeight = iMaximumY - iMinimumY + 1;
-
-	int64_t iCellWidth = std::min(60i64, iMapWidth / iGridWidth);
-	int64_t iCellHeight = std::min(60i64, iMapHeight / iGridHeight);
-	int64_t iCellSize = std::min(iCellWidth, iCellHeight);
-
-	int64_t iGridPixelWidth = iGridWidth * iCellSize;
-	int64_t iGridPixelHeight = iGridHeight * iCellSize;
-	int64_t iOffsetX = (iMapWidth - iGridPixelWidth) / 2;
-	int64_t iOffsetY = (iMapHeight - iGridPixelHeight) / 2;
-
-	if (iCellSize < 4)
+	// Both q parities occur in the padded range, so these are the exact s extrema after clipping r.
+	int64_t iMinimumCentreS = std::max(iMinimumS, iMinimumQ + 2 * static_cast<int64_t>(std::numeric_limits<int32_t>::min()));
+	int64_t iMaximumCentreS = std::min(iMaximumS, iMaximumQ + 2 * static_cast<int64_t>(std::numeric_limits<int32_t>::max()));
+	static constexpr double kfCircumradius = 2.0 / std::numbers::sqrt3;
+	double fGridWidth = std::numbers::sqrt3 * static_cast<double>(iMaximumQ - iMinimumQ) + 2.0 * kfCircumradius;
+	double fGridHeight = static_cast<double>(iMaximumCentreS - iMinimumCentreS) + 2.0;
+	double fApothem = std::min({30.0, static_cast<double>(iMapWidth) / fGridWidth, static_cast<double>(iMapHeight) / fGridHeight});
+	double fCellHeight = 2.0 * fApothem;
+	if (fCellHeight < 4.0)
 	{
 		return;
 	}
 
-	for (int64_t i = iMinimumY; i <= iMaximumY; ++i)
-	{
-		for (int64_t j = iMinimumX; j <= iMaximumX; ++j)
-		{
-			int64_t iCellLeft = iMapLeft + iOffsetX + (j - iMinimumX) * iCellSize;
-			int64_t iCellTop = iMapTop + iOffsetY + (iMaximumY - i) * iCellSize;
-			RECT cellRectangle {.left = static_cast<LONG>(iCellLeft), .top = static_cast<LONG>(iCellTop), .right = static_cast<LONG>(iCellLeft + iCellSize), .bottom = static_cast<LONG>(iCellTop + iCellSize)};
+	double fMinimumX = std::numbers::sqrt3 * static_cast<double>(iMinimumQ - iReferenceQ) - kfCircumradius;
+	double fMaximumY = static_cast<double>(iMaximumCentreS - iReferenceS) + 1.0;
+	double fOriginX = static_cast<double>(iMapLeft) + (static_cast<double>(iMapWidth) - fGridWidth * fApothem) / 2.0 - fMinimumX * fApothem;
+	double fOriginY = static_cast<double>(iMapTop) + (static_cast<double>(iMapHeight) - fGridHeight * fApothem) / 2.0 + fMaximumY * fApothem;
+	static constexpr std::array<std::array<double, 2>, 6> kVertices
+	{{
+		{kfCircumradius, 0.0},
+		{kfCircumradius / 2.0, 1.0},
+		{-kfCircumradius / 2.0, 1.0},
+		{-kfCircumradius, 0.0},
+		{-kfCircumradius / 2.0, -1.0},
+		{kfCircumradius / 2.0, -1.0},
+	}};
 
-			auto it = std::ranges::find_if(sCells, [i, j](const common::ServerMonitorCell& rCell)
+	for (int64_t i = iMinimumQ; i <= iMaximumQ; ++i)
+	{
+		int64_t iColumnMinimumS = std::max(iMinimumS, i + 2 * static_cast<int64_t>(std::numeric_limits<int32_t>::min()));
+		int64_t iColumnMaximumS = std::min(iMaximumS, i + 2 * static_cast<int64_t>(std::numeric_limits<int32_t>::max()));
+		if ((iColumnMinimumS - i) % 2 != 0)
+		{
+			++iColumnMinimumS;
+		}
+		for (int64_t j = iColumnMinimumS; j <= iColumnMaximumS; j += 2)
+		{
+			int64_t iR = (j - i) / 2;
+			double fCentreX = fOriginX + std::numbers::sqrt3 * static_cast<double>(i - iReferenceQ) * fApothem;
+			double fCentreY = fOriginY - static_cast<double>(j - iReferenceS) * fApothem;
+			auto DrawHex = [&](double fScale)
 			{
-				return rCell.iX == j && rCell.iY == i;
+				std::array<POINT, 6> points {};
+				for (int64_t k = 0; k < std::ssize(points); ++k)
+				{
+					points.at(k) = POINT {.x = static_cast<LONG>(std::lround(fCentreX + kVertices.at(k).at(0) * fScale)), .y = static_cast<LONG>(std::lround(fCentreY + kVertices.at(k).at(1) * fScale))};
+				}
+				Polygon(hdcBuffer, points.data(), static_cast<int>(std::ssize(points)));
+			};
+
+			auto it = std::ranges::find_if(sCells, [i, iR](const common::ServerMonitorCell& rCell)
+			{
+				return rCell.iX == i && rCell.iY == iR;
 			});
 			bool bIsActive = it != sCells.end() && (it->uiFlags & common::kuiServerMonitorCellActive) != 0;
 			bool bIsSubscribed = it != sCells.end() && (it->uiFlags & common::kuiServerMonitorCellSubscribed) != 0;
@@ -355,44 +385,41 @@ static void PaintMap(HDC hdcBuffer, std::span<char> buffer, int64_t iMapLeft, in
 			{
 				hbrushCell = sHbrushCellActive;
 			}
-			FillRect(hdcBuffer, &cellRectangle, hbrushCell);
-
 			HPEN hpen = (iClientsInCell > 0) ? sHpenCellBorderClient : sHpenGray;
 			HPEN hpenOld = static_cast<HPEN>(SelectObject(hdcBuffer, hpen));
-			MoveToEx(hdcBuffer, static_cast<int>(iCellLeft), static_cast<int>(iCellTop), nullptr);
-			LineTo(hdcBuffer, static_cast<int>(iCellLeft + iCellSize), static_cast<int>(iCellTop));
-			LineTo(hdcBuffer, static_cast<int>(iCellLeft + iCellSize), static_cast<int>(iCellTop + iCellSize));
-			LineTo(hdcBuffer, static_cast<int>(iCellLeft), static_cast<int>(iCellTop + iCellSize));
-			LineTo(hdcBuffer, static_cast<int>(iCellLeft), static_cast<int>(iCellTop));
+			HBRUSH hbrushOld = static_cast<HBRUSH>(SelectObject(hdcBuffer, hbrushCell));
+			DrawHex(fApothem);
+			SelectObject(hdcBuffer, hbrushOld);
 			SelectObject(hdcBuffer, hpenOld);
 
-			if (bIsSubscribed && iCellSize >= 20)
+			if (bIsSubscribed && fCellHeight >= 20.0)
 			{
-				static constexpr int64_t kiInset = 2;
 				HPEN hpenOld2 = static_cast<HPEN>(SelectObject(hdcBuffer, sHpenRed));
-				HBRUSH hbrushOld = static_cast<HBRUSH>(SelectObject(hdcBuffer, GetStockObject(NULL_BRUSH)));
-				Rectangle(hdcBuffer, static_cast<int>(iCellLeft + kiInset), static_cast<int>(iCellTop + kiInset), static_cast<int>(iCellLeft + iCellSize - kiInset + 1), static_cast<int>(iCellTop + iCellSize - kiInset + 1));
-				SelectObject(hdcBuffer, hbrushOld);
+				HBRUSH hbrushOld2 = static_cast<HBRUSH>(SelectObject(hdcBuffer, GetStockObject(NULL_BRUSH)));
+				DrawHex(fApothem - 2.0);
+				SelectObject(hdcBuffer, hbrushOld2);
 				SelectObject(hdcBuffer, hpenOld2);
 			}
 
-			if (bIsActive && iCellSize >= 24)
+			if (bIsActive && fCellHeight >= 24.0)
 			{
 				int64_t iEntityCount = it->iEntityCount;
+				int64_t iLabelLeft = std::lround(fCentreX - kfCircumradius * fApothem / 2.0 + 2.0);
+				int64_t iCellTop = std::lround(fCentreY - fApothem);
 
 				SetTextColor(hdcBuffer, RGB(220, 220, 220));
 
-				int64_t iLineLength = std::snprintf(buffer.data(), buffer.size(), "(%d,%d)", static_cast<int>(j), static_cast<int>(i));
-				TextOutA(hdcBuffer, static_cast<int>(iCellLeft + 2), static_cast<int>(iCellTop + 2), buffer.data(), static_cast<int>(iLineLength));
+				int64_t iLineLength = std::snprintf(buffer.data(), buffer.size(), "(%d,%d)", static_cast<int>(i), static_cast<int>(iR));
+				TextOutA(hdcBuffer, static_cast<int>(iLabelLeft), static_cast<int>(iCellTop + 2), buffer.data(), static_cast<int>(iLineLength));
 
 				iLineLength = std::snprintf(buffer.data(), buffer.size(), "%lld", iEntityCount);
-				TextOutA(hdcBuffer, static_cast<int>(iCellLeft + 2), static_cast<int>(iCellTop + 28), buffer.data(), static_cast<int>(iLineLength));
+				TextOutA(hdcBuffer, static_cast<int>(iLabelLeft), static_cast<int>(iCellTop + 28), buffer.data(), static_cast<int>(iLineLength));
 
 				if (iClientsInCell > 0)
 				{
 					SetTextColor(hdcBuffer, RGB(150, 200, 255));
 					iLineLength = std::snprintf(buffer.data(), buffer.size(), "%lld", iClientsInCell);
-					TextOutA(hdcBuffer, static_cast<int>(iCellLeft + iCellSize - 20), static_cast<int>(iCellTop + 2), buffer.data(), static_cast<int>(iLineLength));
+					TextOutA(hdcBuffer, static_cast<int>(std::lround(fCentreX + kfCircumradius * fApothem / 2.0 - 20.0)), static_cast<int>(iCellTop + 2), buffer.data(), static_cast<int>(iLineLength));
 				}
 			}
 		}
