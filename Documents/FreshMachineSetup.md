@@ -61,11 +61,9 @@ DataPacker and export the data. Later refreshes are usually automatic: each
 wrapper session start (step 6) re-runs this export in the primary from its
 current asset files, but skips it when the primary has uncommitted `Tools/`,
 `ThirdParty/`, `DataPacker/`, or `Common/` changes, or when the session-start
-DataPacker prebuild does not finish cleanly. When a `BrokenEngineSandbox` client
-or server is running, session start waits up to its wait budget (500 seconds by
-default) for you to close it and then exports; only if the game is still open
-when that budget expires does it skip with a warning. Re-run the build above
-yourself after a skip.
+DataPacker prebuild does not finish cleanly. A running `BrokenEngineSandbox`
+client or server, or a running ModelViewer, neither delays the export nor sees
+the new data until it restarts. Re-run the build above yourself after a skip.
 
 ## 6. First wrapper run
 

@@ -129,12 +129,12 @@ Tools builds have no allocation tracker, so the engine LOG float-format-spec res
   publish rename stays on one volume, and every dirty type stages first and
   publishes only after the last export. Every existing pack this run replaces
   is locked, unless it fails to open for another cause, before any rename; when
-  any is held by a lazy-pack holder, whose lifetime
-  [File](../../Engine/Source/File/AGENTS.md) `## Packed Assets` owns, one
+  any is held by a process that does not share delete (lazy-pack holders share
+  it, per [File](../../Engine/Source/File/AGENTS.md) `## Packed Assets`), one
   retry-or-cancel prompt names every locked pack, and Cancel there fails the
-  run with nothing replaced. A held lock keeps a lazy-pack holder out of its
-  pack until that pack's swap, which runs through the lock. Each type then
-  publishes header, manifest, and pack in that order. A sharing or lock
+  run with nothing replaced. Each type then publishes header, manifest, and
+  pack in that order; the pack swap is one POSIX replace-if-exists rename that
+  leaves holders reading the old file. A sharing or lock
   violation at the manifest rename, or any pack rename failure, prompts to
   retry or cancel rather than failing unannounced. Cancelling
   discards that type's temporary manifest and pack and fails the type; an

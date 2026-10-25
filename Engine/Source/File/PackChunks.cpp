@@ -262,8 +262,7 @@ void PackChunks::LoadPackFiles()
 	for (int64_t i = 0; i < data::kDataTypeCount; ++i)
 	{
 #if defined(BT_SERVER)
-		// Server consumes only Islands among lazy chunks; skipping the rest keeps Audio.pack/Texture.pack
-		// unopened (and therefore unlocked) so DataPacker can rewrite them while the server is running.
+		// Server consumes only Islands among lazy chunks, so it skips opening the other lazy packs.
 		if (!IsServerChunk(static_cast<data::DataTypes>(i)))
 		{
 			continue;
@@ -319,15 +318,15 @@ void PackChunks::LoadPackFiles()
 			continue;
 		}
 
-		// Opened before the size and header reads, which go through a handle reopened from it, so its share-read-only lock keeps the validated file unchanged until shutdown.
-		mpHandleLazyPackFile[i] = CreateFileW(mpPackFilePaths[i].c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+		// Opened before the size and header reads, which go through a handle reopened from it. Both deny writes, so the validated file stays unchanged until shutdown, and share delete, so DataPacker can replace the pack's name while every read keeps using the file this handle opened.
+		mpHandleLazyPackFile[i] = CreateFileW(mpPackFilePaths[i].c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
 		// Trust boundary: a missing required .pack yields INVALID_HANDLE_VALUE, fatal like a missing manifest.
 		if (mpHandleLazyPackFile[i] == INVALID_HANDLE_VALUE)
 		{
 			FailMissingRequiredAsset(mpPackFilePaths[i], "pack file could not be opened for loading");
 		}
 
-		HANDLE handlePackValidation = ReOpenFile(mpHandleLazyPackFile[i], GENERIC_READ, FILE_SHARE_READ, 0);
+		HANDLE handlePackValidation = ReOpenFile(mpHandleLazyPackFile[i], GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, 0);
 		// Trust boundary: a failed reopen leaves no handle to read the headers through; reading them would build
 		// the lazy map (and pool layout) from garbage. A required pack is as fatal as a missing manifest.
 		if (handlePackValidation == INVALID_HANDLE_VALUE)

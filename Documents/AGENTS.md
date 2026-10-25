@@ -11,9 +11,7 @@ Holds design-time documentation and three parallel planning trees. No build arti
   worktrees can be pre-loaded with the built binaries instead of rebuilding
   them, then, unless that prebuild did not complete cleanly, runs that
   DataPacker to re-export the primary game data from the primary checkout's
-  current assets, first waiting up to its wait budget for a running client or
-  server to close and skipping with a warning only if the game outlives that
-  budget). Human-facing counterpart to the wrapper scripts under
+  current assets). Human-facing counterpart to the wrapper scripts under
   `.agents/scripts/`.
 - `C++StyleGuide.txt` — numbered style rules (Hungarian notation, Allman braces, `auto` restrictions, DirectXMath conventions). Source of truth for the `code-style-review`, `comment-review`, and `repo-code-review` skills.
 - `FloatingPointDeterminism.txt` — the rules that keep rollback and replay bit-identical across client and server: `/fp:strict`, FMA3 disabled, per-thread MXCSR, fixed 32 Hz timestep, deterministic RNG, single shared CRC. Read before touching simulation math.

@@ -219,11 +219,10 @@ try {
 		# clean-snapshot stamp so the data is only ever produced by an exe just built and hash-verified from
 		# committed sources. Deliberately outside the best-effort prebuild routine: a run failure must
 		# abort session start rather than be swallowed by its warn-only catch. This can block for a long
-		# time - on DataPacker's own PC-global "BrokenEngineDataPacker" mutex, on a rare full island bake, or
-		# on the bounded wait below for an open client or server - while this bootstrap mutex is held, timing
-		# out peer session starts; that cost is accepted. A peer whose own $WaitSeconds bootstrap-mutex
-		# deadline expires during that wait fails with the existing mutex-timeout error, which is the
-		# expected outcome there rather than a defect.
+		# time - on DataPacker's own PC-global "BrokenEngineDataPacker" mutex or on a rare full island bake -
+		# while this bootstrap mutex is held, timing out peer session starts; that cost is accepted. A peer
+		# whose own $WaitSeconds bootstrap-mutex deadline expires during that refresh fails with the existing
+		# mutex-timeout error, which is the expected outcome there rather than a defect.
 		$refreshedDataDirectories = [Collections.Generic.List[string]]::new()
 		$stampedDataProjects = [Collections.Generic.List[string]]::new()
 		$gameProjects = @()
@@ -234,72 +233,48 @@ try {
 			$committedProjectFiles = @(Invoke-AgentGit (@('-C', $root, 'ls-tree', '--name-only', 'HEAD', '--') + @($discoveredProjects | ForEach-Object { "Projects/$_/Platforms/VisualStudio2026/$_.vcxproj" })))
 			$gameProjects = @($discoveredProjects | Where-Object { "Projects/$_/Platforms/VisualStudio2026/$_.vcxproj" -cin $committedProjectFiles })
 		}
-		if ($gameProjects.Count -ne 0) {
-			# A pack locked by a running game auto-cancels the export instead of prompting, which would hard-fail
-			# session start, so wait every game out and skip the run only if one outlives the wait budget.
-			$gameProcessNames = @($gameProjects | ForEach-Object { "$_*" })
-			$gameProcesses = @(Get-Process -Name $gameProcessNames -ErrorAction SilentlyContinue)
-			if ($gameProcesses.Count -ne 0) {
-				Write-Host "Pausing the primary data refresh for up to $WaitSeconds seconds until the game exits: $(($gameProcesses | ForEach-Object { "$($_.ProcessName) ($($_.Id))" } | Sort-Object -Unique) -join '; ') is running."
-				$gameStopwatch = [Diagnostics.Stopwatch]::StartNew()
-				$gameDeadlineMilliseconds = $WaitSeconds * 1000
-				while ($gameProcesses.Count -ne 0 -and $gameStopwatch.ElapsedMilliseconds -lt $gameDeadlineMilliseconds) {
-					# Sleeping a full interval past the deadline would exceed the bounded wait.
-					$remainingMilliseconds = $gameDeadlineMilliseconds - [int]$gameStopwatch.ElapsedMilliseconds
-					Start-Sleep -Milliseconds ([Math]::Min(5000, $remainingMilliseconds))
-					# A full re-snapshot, so a game started mid-wait also blocks the refresh.
-					$gameProcesses = @(Get-Process -Name $gameProcessNames -ErrorAction SilentlyContinue)
-				}
-				if ($gameProcesses.Count -eq 0) { Write-Host "The game closed after $([int]$gameStopwatch.Elapsed.TotalSeconds) seconds, so the primary data refresh is proceeding." }
+		foreach ($gameProject in $gameProjects) {
+			$gameDataDirectory = Join-Path $root "Projects\$gameProject\Platforms\VisualStudio2026\Output\Data"
+			# The data stamp holds the primary commit this export ran from; a worktree game build uses this
+			# Shared data only when its data inputs equal that commit's. The old stamp goes before the export,
+			# and a failed delete aborts here, so data exported from inputs the stamp does not describe is never
+			# vouched for. It sits beside Data, not inside it, to keep the Data inventory.
+			$dataStampPath = Get-AgentSharedDataStampPath $root $gameProject
+			if (Test-Path -LiteralPath $dataStampPath -PathType Leaf) { [IO.File]::Delete($dataStampPath) }
+			# Best-effort like the DataPacker prebuild snapshots: a failure leaves the data unstamped.
+			$stampCommit = $null
+			try { $stampCommit = ([string](Invoke-AgentGit @('-C', $root, 'rev-parse', 'HEAD'))).Trim() }
+			catch { Write-Warning "Could not read the primary HEAD commit, so the Shared data stamp will not be written: $($_.Exception.Message)"; $stampCommit = $null }
+			$hadNoninteractive = Test-Path Env:BT_DATAPACKER_NONINTERACTIVE
+			$previousNoninteractive = [Environment]::GetEnvironmentVariable('BT_DATAPACKER_NONINTERACTIVE', 'Process')
+			try {
+				# The child inherits this process's environment block, so the restore below keeps the flag
+				# out of the agent CLI this bootstrap's caller launches afterwards.
+				$env:BT_DATAPACKER_NONINTERACTIVE = '1'
+				$dataPackerExitCode = Invoke-WorktreeCliTrackedProcess -Executable $dataPackerExe -ArgumentList @((Join-Path $root 'Engine\Data'), (Join-Path $root "Projects\$gameProject\Data"), $gameDataDirectory) -WorkingDirectory $root
 			}
-			if ($gameProcesses.Count -ne 0) {
-				Write-Warning "The $WaitSeconds second wait for the game to exit was exhausted, so the primary DataPacker run was skipped and parent data was left as-is: $(($gameProcesses | ForEach-Object { "$($_.ProcessName) ($($_.Id))" } | Sort-Object -Unique) -join '; ') is still running."
+			finally {
+				if ($hadNoninteractive) { $env:BT_DATAPACKER_NONINTERACTIVE = $previousNoninteractive }
+				else { Remove-Item Env:BT_DATAPACKER_NONINTERACTIVE -ErrorAction SilentlyContinue }
 			}
-			else {
-				foreach ($gameProject in $gameProjects) {
-					$gameDataDirectory = Join-Path $root "Projects\$gameProject\Platforms\VisualStudio2026\Output\Data"
-					# The data stamp holds the primary commit this export ran from; a worktree game build uses this
-					# Shared data only when its data inputs equal that commit's. The old stamp goes before the export,
-					# and a failed delete aborts here, so data exported from inputs the stamp does not describe is never
-					# vouched for. It sits beside Data, not inside it, to keep the Data inventory.
-					$dataStampPath = Get-AgentSharedDataStampPath $root $gameProject
-					if (Test-Path -LiteralPath $dataStampPath -PathType Leaf) { [IO.File]::Delete($dataStampPath) }
-					# Best-effort like the DataPacker prebuild snapshots: a failure leaves the data unstamped.
-					$stampCommit = $null
-					try { $stampCommit = ([string](Invoke-AgentGit @('-C', $root, 'rev-parse', 'HEAD'))).Trim() }
-					catch { Write-Warning "Could not read the primary HEAD commit, so the Shared data stamp will not be written: $($_.Exception.Message)"; $stampCommit = $null }
-					$hadNoninteractive = Test-Path Env:BT_DATAPACKER_NONINTERACTIVE
-					$previousNoninteractive = [Environment]::GetEnvironmentVariable('BT_DATAPACKER_NONINTERACTIVE', 'Process')
-					try {
-						# The child inherits this process's environment block, so the restore below keeps the flag
-						# out of the agent CLI this bootstrap's caller launches afterwards.
-						$env:BT_DATAPACKER_NONINTERACTIVE = '1'
-						$dataPackerExitCode = Invoke-WorktreeCliTrackedProcess -Executable $dataPackerExe -ArgumentList @((Join-Path $root 'Engine\Data'), (Join-Path $root "Projects\$gameProject\Data"), $gameDataDirectory) -WorkingDirectory $root
+			if ($dataPackerExitCode -ne 0) { throw "The primary DataPacker run failed with exit code $dataPackerExitCode, so '$gameDataDirectory' may be incomplete. Fix the offending asset in the primary checkout outside an agent session (or run DataPacker there directly), then retry." }
+			$refreshedDataDirectories.Add($gameDataDirectory)
+			# The mutex excludes peer bootstraps but not a landing or user edit during the export, so the
+			# stamp is written only when the data inputs show no committed or uncommitted difference from the
+			# commit captured before it.
+			if ($null -ne $stampCommit) {
+				try {
+					[string[]] $dataInputChanges = @(Get-AgentDataInputChanges $root $stampCommit $gameProject)
+					if ($dataInputChanges.Count -eq 0) {
+						[IO.File]::WriteAllText($dataStampPath, $stampCommit + "`n")
+						$stampedDataProjects.Add($gameProject)
 					}
-					finally {
-						if ($hadNoninteractive) { $env:BT_DATAPACKER_NONINTERACTIVE = $previousNoninteractive }
-						else { Remove-Item Env:BT_DATAPACKER_NONINTERACTIVE -ErrorAction SilentlyContinue }
-					}
-					if ($dataPackerExitCode -ne 0) { throw "The primary DataPacker run failed with exit code $dataPackerExitCode, so '$gameDataDirectory' may be incomplete. Fix the offending asset in the primary checkout outside an agent session (or run DataPacker there directly), then retry." }
-					$refreshedDataDirectories.Add($gameDataDirectory)
-					# The mutex excludes peer bootstraps but not a landing or user edit during the export, so the
-					# stamp is written only when the data inputs show no committed or uncommitted difference from the
-					# commit captured before it.
-					if ($null -ne $stampCommit) {
-						try {
-							[string[]] $dataInputChanges = @(Get-AgentDataInputChanges $root $stampCommit $gameProject)
-							if ($dataInputChanges.Count -eq 0) {
-								[IO.File]::WriteAllText($dataStampPath, $stampCommit + "`n")
-								$stampedDataProjects.Add($gameProject)
-							}
-							else {
-								Write-Warning ("Primary data inputs differ from commit $stampCommit after the data refresh, so the Shared data stamp was not written and worktree game builds resolve Local until a clean refresh: $($dataInputChanges -join '; '). " +
-									'When the export itself rewrote tracked data inputs (island BC textures, scene .PreExport markers), committing them in the primary restores Shared at the next refresh.')
-							}
-						}
-						catch { Write-Warning "Could not compare the primary data inputs after the data refresh, so the Shared data stamp was not written and worktree game builds resolve Local until a clean refresh: $($_.Exception.Message)" }
+					else {
+						Write-Warning ("Primary data inputs differ from commit $stampCommit after the data refresh, so the Shared data stamp was not written and worktree game builds resolve Local until a clean refresh: $($dataInputChanges -join '; '). " +
+							'When the export itself rewrote tracked data inputs (island BC textures, scene .PreExport markers), committing them in the primary restores Shared at the next refresh.')
 					}
 				}
+				catch { Write-Warning "Could not compare the primary data inputs after the data refresh, so the Shared data stamp was not written and worktree game builds resolve Local until a clean refresh: $($_.Exception.Message)" }
 			}
 		}
 		# ModelViewer compiles the generated BrokenEngineSandbox data headers and embeds the data path, so it

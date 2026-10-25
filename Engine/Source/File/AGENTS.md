@@ -49,10 +49,11 @@ Eager types load whole at startup; lazy chunks load on demand on loader threads 
 - Client streaming-audio reads use six fixed Pack-owned 16 KiB result entries. The caller holds one request identity and exact range while polling; reset or destruction cancels it. Generation-tagged ownership makes cancelled queued and ready entries reusable at once, while an active loader keeps its entry until it acknowledges cancellation. File must outlive Audio.
 - Validate a streaming-audio request against its logical chunk payload before
   publishing: pack open rejects compressed audio, so that payload is the on-disk
-  extent bounded at open. A lazy pack is locked against writes, renames, and
-  deletes from before its size and header reads until shutdown, and every read,
-  validation included, uses that lock, not the path, so the loader checks only
-  for a complete read, before discarding a cancelled generation: corruption
+  extent bounded at open. A lazy pack is locked against writes from before its
+  size and header reads until shutdown but shares delete, so DataPacker can
+  replace its name while the open file stays unchanged; every read, validation
+  included, uses that handle, not the path, so the loader checks only for a
+  complete read, before discarding a cancelled generation: corruption
   stays fatal even for an unwanted result. Loaders write only Pack-owned result
   storage; the polling main thread copies to Audio.
 - The [Agent audio harness rig](../Agent/AGENTS.md) may inspect Pack state and

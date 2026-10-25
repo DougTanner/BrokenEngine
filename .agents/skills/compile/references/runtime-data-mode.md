@@ -113,16 +113,14 @@ client `.vcxproj` is committed at the primary `HEAD`, into that game's primary
 stamped. When a game's primary `Output\Data` is missing, DataPacker generates
 it automatically. That first export is a full Engine/Data re-export into an
 empty per-game DataPacker cache and can take hours while the bootstrap mutex
-is held, so peer session starts can time out. It first waits up to its `-WaitSeconds`
-budget for any process named after one of the games it refreshes (`<Name>*`)
-to exit, and skips the runs with a warning only if one is still alive when that
-budget expires. A peer session starting mid-session can therefore move primary
-Data under this session, and a regenerated header can force a recompile here.
+is held, so peer session starts can time out. A peer session starting
+mid-session can move primary Data under this session, and a regenerated header
+can force a recompile here.
 
 The same refresh also runs on demand, from the session worktree root, as
 `pwsh -NoProfile -File .agents/scripts/Bootstrap-AgentTools.ps1 -RepositoryRoot '<primary checkout>' -SharedDataOnly`.
 It skips the AgentTools and ThirdParty builds and the ModelViewer prebuild,
-keeps the DataPacker prebuild, the bootstrap mutex, the game wait, and the
+keeps the DataPacker prebuild, the bootstrap mutex, and the
 DataPacker prebuild stamp and data stamp rules, and skips the DataPacker prebuild
 and the refresh, with a warning naming a wrapper session start, when primary
 ThirdParty changed since the last prebuild or the DataPacker prebuild stamp is
@@ -132,8 +130,8 @@ worktree's copies of the bootstrap scripts against the primary checkout, so a
 session runs it without asking the user unless this worktree's own committed
 or uncommitted changes, measured from its merge base with primary main, touch
 `.agents/scripts/`; then it asks the user first. One run can outlast a tool-call timeout, up to
-`-WaitSeconds` each for the bootstrap mutex and the game wait, then the
-DataPacker prebuild and the export, so it runs where a tool-call timeout cannot
+`-WaitSeconds` for the bootstrap mutex, then the DataPacker prebuild and the
+export, so it runs where a tool-call timeout cannot
 kill it, for example with the host's background-execution parameter such as
 `run_in_background`; a killed shell
 stops the export midway and leaves the primary data unstamped.
