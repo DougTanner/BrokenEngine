@@ -785,6 +785,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Agent\Commands\DescribeScene.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Network\Client\ClientCrashReport.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\FlightPlaneProjection.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\UiScreens.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Engine\Data\Shaders\Lighting\AreaLight.frag" />

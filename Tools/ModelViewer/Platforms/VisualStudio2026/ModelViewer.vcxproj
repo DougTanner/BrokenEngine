@@ -63,7 +63,7 @@
       <PrecompiledHeaderFile>Pch.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>Pch.h</ForcedIncludeFiles>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\Source;$(ProjectDir)Build;$(GeneratedDataIncludeRoot);$(VK_SDK_PATH)\Include;$(ProjectDir)..\..\..\..\ThirdParty;$(ProjectDir)..\..\..\..\ThirdParty\glm;$(ProjectDir)..\..\..\..\ThirdParty\enet\include;$(ProjectDir)..\..\..\..\ThirdParty\Clipper2\CPP\Clipper2Lib\include;$(ProjectDir)..\..\..\..\ThirdParty\mimalloc\include;$(ProjectDir)..\..\..\..\ThirdParty\imgui;$(ProjectDir)..\..\..\..\ThirdParty\implot;$(ProjectDir)..\..\..\..\ThirdParty\DirectXTK\Inc;$(ProjectDir)..\..\..\..\ThirdParty\RenderDoc;$(ProjectDir)..\..\..\..\Common;$(ProjectDir)..\..\..\..\Common\ClangTidyShims;$(ProjectDir)..\..\..\..\Engine\Source;$(ProjectDir)..\..\..\..\Engine\Data;$(ProjectDir)..\..\..\..\Projects\BrokenEngineSandbox\Data;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>BT_ENGINE;BT_CLIENT;BT_MODEL_VIEWER;BT_MODEL_VIEWER;_ITERATOR_DEBUG_LEVEL=0;_MSVC_STL_HARDENING_VECTOR=0;_MSVC_STL_HARDENING_SPAN=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BT_ENGINE;BT_CLIENT;_ITERATOR_DEBUG_LEVEL=0;_MSVC_STL_HARDENING_VECTOR=0;_MSVC_STL_HARDENING_SPAN=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/Zc:__cplusplus /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <ExceptionHandling>Async</ExceptionHandling>

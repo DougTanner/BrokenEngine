@@ -1626,6 +1626,9 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\FlightPlaneProjection.cpp">
       <Filter>Engine\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Ui\Screens\UiScreens.cpp">
+      <Filter>Engine\Ui\Screens</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\Engine\Data\Shaders\Terrain\Terrain.frag">

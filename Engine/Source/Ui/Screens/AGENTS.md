@@ -1,6 +1,8 @@
 # `/Engine/Source/Ui/Screens/` - Engine ImGui Screens
 
-Engine-owned ImGui screens: the six standard player-facing menus — Main Menu, Pause, Graphics, Sound, Game Settings, and Modal — plus the in-game `ChatScreen` and the `TweaksScreen/` debug family. `ImGuiManager` owns construction and per-frame invocation. The HUD and the game's Tweaks content stay in the game project. This document owns the runtime contracts that code changes must preserve.
+Engine-owned ImGui screens: the six standard player-facing menus — Main Menu, Pause, Graphics, Sound, Game Settings, and Modal — plus the in-game `ChatScreen` and the `TweaksScreen/` debug family.
+`UiScreens.cpp` owns their construction and per-frame invocation through the UI functions `ImGuiManager` calls, loading the Tweaks settings right after construction and saving them right before destruction only while a game exists, that is across `Graphics` recreation; the screens are built before the game at boot and destroyed after it at shutdown, so `Main.cpp` does that boot load and shutdown save; `ImGuiManager` owns submission.
+The HUD and the game's Tweaks content stay in the game project. This document owns the runtime contracts that code changes must preserve.
 
 ## Standard Menu Contract
 
@@ -15,8 +17,8 @@ Engine-owned ImGui screens: the six standard player-facing menus — Main Menu, 
 - `StandardMenuModel` is a snapshot taken at entry, so a screen rereads the model after any action a later decision in the same render pass depends on; Main Menu does that after starting discovery and after connecting.
 - `StandardMenuModel::pcTitle` must point to storage that outlives the render pass; a workbuffer allocation would dangle.
 - Missing `StandardMenuFeature::kLocalServer` suppresses discovery, auto-connect, the scanning placeholder, and the Local Server entry; missing `kRemoteServer` hides its disabled placeholder. Button width is measured over the full label set either way, so a disabled feature never reflows the column.
-- Screen constructors stay implicit and inert: no body, game dereference, filesystem work, or allocation. `ImGuiManager` is built before `game::Game`, so only `Render` may assume a game exists.
-- Screens gate themselves from authoritative game/UI state; `ImGuiManager` invokes main and modal surfaces independently of in-game screen gating.
+- Screen constructors stay implicit and inert: no body, game dereference, filesystem work, or allocation. Screens are constructed with `ImGuiManager`, which is built before `game::Game`, so only `Render` may assume a game exists.
+- Screens gate themselves from authoritative game/UI state; `RenderUiScreens` invokes main and modal surfaces independently of in-game screen gating.
 - Auto-connect keeps render-local state so a succeeded connection is not retried and a lost connection rearms it, while a deliberate return to the main menu does not; the model reports only what the session can observe.
 
 ## Screen-Specific Contracts
@@ -31,7 +33,7 @@ Engine-owned ImGui screens: the six standard player-facing menus — Main Menu, 
 - The Game Settings language buttons stay in their own language and are never routed through the translation table.
 - `ChatScreen` draws the chat state in `GameBase::mChatLog` only in game with
   `UiState::kNone`; anywhere else it closes the input box and clears its text.
-  `ImGuiManager` calls it only while Tweaks is hidden, and
+  `RenderUiScreens` calls it only while Tweaks is hidden, and
   `GameBase::ProcessInput` opens the box only then, so an open box is always
   drawn. Every Enter in the box passes the text to `Client::SendChat`, which
   owns every send check, then clears and closes the box; deactivating the field
@@ -55,4 +57,4 @@ These apply to every ImGui screen, engine or game.
 
 - `TweaksScreen/AGENTS.md` - Tweaks runtime parameter UI
 - The game project's own `Source/Ui/Screens/AGENTS.md` - Game HUD and game Tweaks content
-- `../../Graphics/Managers/AGENTS.md#imguimanager` - Screen invocation and opaque regions
+- `../../Graphics/Managers/AGENTS.md#imguimanager` - UI function call points, submission, and opaque regions

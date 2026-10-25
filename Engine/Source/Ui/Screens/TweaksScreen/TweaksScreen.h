@@ -129,6 +129,8 @@ void RenderHexShieldSection(TweaksScreen& rScreen);
 // TweaksScreen ctor: device loss recreates Graphics in place and would double-register.
 void RegisterEngineTweakSections();
 
+TweaksScreen& GetTweaksScreen();
+
 } // namespace engine
 
 #endif // BT_CLIENT

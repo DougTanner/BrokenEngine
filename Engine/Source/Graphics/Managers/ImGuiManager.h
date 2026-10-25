@@ -2,22 +2,8 @@
 
 #if defined(BT_CLIENT)
 
-namespace game
-{
-class HudScreen;
-} // namespace game
-
 namespace engine
 {
-
-class ChatScreen;
-class GameSettingsScreen;
-class GraphicsMenuScreen;
-class MainMenuScreen;
-class ModalScreen;
-class PauseMenuScreen;
-class SoundMenuScreen;
-class TweaksScreen;
 
 enum class UiTheme : uint8_t;
 
@@ -56,14 +42,11 @@ public:
 	void RegisterOpaqueRectangle(const ImVec2& rPosition, const ImVec2& rSize);
 	void UpdateTextArea(TextAreas eTextArea, std::string_view characters);
 	std::string_view GetTextArea(TextAreas eTextArea) const;
+	void RenderTextAreas();
 
 	static constexpr int64_t kiMaxUiRectangles = 32;
 
 	float mfUiScale = 1.0f;
-
-#if !defined(BT_MODEL_VIEWER)
-	std::unique_ptr<TweaksScreen> mpTweaksScreen;
-#endif
 
 	VkBuffer mUiPrepassIndirectVkBuffer = VK_NULL_HANDLE;
 
@@ -89,7 +72,6 @@ private:
 	void UpdateUiRectangleBuffers(int64_t iFramebuffer);
 	void SetupThemeGeometry(float fUiScale);
 	void ApplyThemeColors(UiTheme eTheme);
-	void RenderTextAreas();
 	void ProcessTextures(VkCommandBuffer vkCommandBuffer, int64_t iFramebuffer, const ImVector<ImTextureData*>* pTextures);
 
 	std::unordered_map<ImTextureData*, std::unique_ptr<TextureResource>> mTextureResources;
@@ -98,21 +80,6 @@ private:
 	VkRenderPass mImGuiVkRenderPass = VK_NULL_HANDLE;
 	std::vector<VkFramebuffer> mImGuiFramebuffers;
 	ImDrawData* mpDrawData = nullptr;
-
-public:
-
-#if !defined(BT_MODEL_VIEWER)
-	std::unique_ptr<MainMenuScreen> mpMainMenuScreen;
-	std::unique_ptr<ModalScreen> mpModalScreen;
-	std::unique_ptr<PauseMenuScreen> mpPauseMenuScreen;
-	std::unique_ptr<GraphicsMenuScreen> mpGraphicsMenuScreen;
-	std::unique_ptr<SoundMenuScreen> mpSoundMenuScreen;
-	std::unique_ptr<GameSettingsScreen> mpGameSettingsScreen;
-	std::unique_ptr<game::HudScreen> mpHudScreen;
-	std::unique_ptr<ChatScreen> mpChatScreen;
-#endif
-
-private:
 
 	VmaAllocation mUiPrepassIndirectVmaAllocation = VK_NULL_HANDLE;
 	VkDrawIndirectCommand* mpUiPrepassIndirectMappedVkDrawIndirectCommand = nullptr;
@@ -135,6 +102,12 @@ private:
 };
 
 inline ImGuiManager* gpImGuiManager = nullptr;
+
+// Defined by the host program. ImGuiManager calls CreateUiScreens at the end of its constructor, RenderUiScreens between
+// ImGui::NewFrame and ImGui::Render, and DestroyUiScreens first in its destructor.
+void CreateUiScreens();
+void RenderUiScreens();
+void DestroyUiScreens();
 
 inline float UiScale()
 {

@@ -1,4 +1,4 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-24T18:16:53.765Z","dependsOn":["Documents/Plans/Engine/RemoveModelViewerDefineUiScreens.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-24T18:16:53.765Z","dependsOn":[]} -->
 # ModelViewer world, stage 1: water Main uniforms as an engine function
 
 ## Context
@@ -19,8 +19,8 @@ Recorded decision D9 (user choice, agent-recorded) this Plan implements: split t
 `MainUniforms.cpp` (water LOD/indirect, waves) into an engine function both `RenderFrameMain` definitions call.
 The viewer's call is added in stage 3; this stage changes only where the sandbox's code lives.
 
-After Phase 3 (`Documents/Plans/Engine/RemoveModelViewerDefineUiScreens.md`) the viewer defines its own
-`engine::RenderFrameMain` and does not compile `MainUniforms.cpp` (Phase 1 Site 5), while it already compiles
+The viewer defines its own `engine::RenderFrameMain` (Tools/ModelViewer/Source/ModelViewerApplication.cpp) and
+does not compile `MainUniforms.cpp` (Phase 1 Site 5), while it already compiles
 `Engine/Source/Graphics/Render/WaterUniforms.cpp` (ModelViewer.vcxproj:200), the file that owns water's Global
 uniforms. Everything the water block reads is engine-declared: `gWaterLevel`
 (Engine/Source/Ui/GraphicsQualityWrappersBase.h:21), the `gWater*` wrappers (Engine/Source/Ui/WaterWrappersBase.h),

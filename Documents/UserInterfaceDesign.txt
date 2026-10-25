@@ -75,12 +75,12 @@ player-menu scale exceptions.
 Files:
   Engine/Source/Graphics/Managers/ImGuiManager.cpp         Noto Sans SC Light default font load
   Projects/BrokenEngineSandbox/Source/Game.h:27         inline constexpr float kfUiReferenceHeight = 2'160.0f;
-  Engine/Source/Graphics/Managers/ImGuiManager.h:115    inline float UiScale()
-  Engine/Source/Graphics/Managers/ImGuiManager.cpp:29   kfMinimumStyleGeometryFactor = 0.25f;
-  Engine/Source/Graphics/Managers/ImGuiManager.cpp:194  ImGuiManager::SetupThemeGeometry (style geometry and scale floor)
-  Engine/Source/Graphics/Managers/ImGuiManager.cpp:226  rStyle.ScaleAllSizes(std::max(kfMinimumStyleGeometryFactor, 2.0f * fUiScale));
-  Engine/Source/Ui/MenuUtils.h:7   inline constexpr float kfMenuUiScale = 2.0f;
-  Engine/Source/Ui/Screens/TweaksScreen/TweaksScreen.cpp:28  static constexpr float kfUiScale = 1.5f;  (sanctioned exception)
+  Engine/Source/Graphics/Managers/ImGuiManager.h:112    inline float UiScale()
+  Engine/Source/Graphics/Managers/ImGuiManager.cpp:15   kfMinimumStyleGeometryFactor = 0.25f;
+  Engine/Source/Graphics/Managers/ImGuiManager.cpp:160  ImGuiManager::SetupThemeGeometry (style geometry and scale floor)
+  Engine/Source/Graphics/Managers/ImGuiManager.cpp:187  rStyle.ScaleAllSizes(std::max(kfMinimumStyleGeometryFactor, 2.0f * fUiScale));
+  Engine/Source/Ui/MenuUtils.h:6   inline constexpr float kfMenuUiScale = 2.0f;
+  Engine/Source/Ui/Screens/TweaksScreen/TweaksScreen.cpp:23  constexpr float kfUiScale = 1.5f;  (sanctioned exception)
   Engine/Source/Ui/MenuUtils.h
     kfMainMenuHeadingScale, kfLanguageMenuFontScale, kfLanguageMenuGeometryScale
 

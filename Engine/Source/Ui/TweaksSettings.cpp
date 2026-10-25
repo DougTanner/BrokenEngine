@@ -35,7 +35,7 @@ void SaveTweaksSettings()
 	TweaksSettings settings {};
 	settings.uiShowImGui = static_cast<uint8_t>(game::gpGame->mbShowImGui);
 	settings.fSunAngle = gSunAngleOverride.mfCurrent;
-	gpImGuiManager->mpTweaksScreen->SaveState(settings.sectionState);
+	GetTweaksScreen().SaveState(settings.sectionState);
 
 	WriteVersionedFile({FileFlags::kAppDataDirectory, FileFlags::kWrite}, kpcTweaksSettingsPath, settings);
 }
@@ -55,7 +55,7 @@ void LoadTweaksSettings()
 	}
 
 	game::gpGame->mbShowImGui = settings.uiShowImGui != 0;
-	gpImGuiManager->mpTweaksScreen->LoadState(settings.sectionState);
+	GetTweaksScreen().LoadState(settings.sectionState);
 	gSunAngleOverride.Set(settings.fSunAngle);
 }
 

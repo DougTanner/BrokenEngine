@@ -188,7 +188,7 @@ the pool.
 
 Integrates Dear ImGui with a dedicated load-preserving overlay pass. It records the UI command buffer each frame, waits for Main, signals presentation, and signals the per-framebuffer fence as the frame's final graphics submission.
 
-- Gameplay builds own the engine standard menu screens, `ChatScreen` (`mpChatScreen`), and the engine Tweaks screen, plus the game HUD object, the sanctioned engine-to-game dependency exception described by the Engine hub. Engine screens are called as `Render()`; the HUD is called through its own signature. Screen behavior belongs to UI documentation (`../../Ui/Screens/AGENTS.md`).
+- The manager owns ImGui setup and submission only. It calls three UI functions `ImGuiManager.h` declares and each client program defines by project membership, `CreateUiScreens`, `RenderUiScreens`, and `DestroyUiScreens`, at construction, each frame, and destruction. The gameplay client defines them in `../../Ui/Screens/UiScreens.cpp` (`../../Ui/Screens/AGENTS.md`).
 - Theme geometry resets to ImGui defaults before scaling so it can be reapplied
   safely. Font scale composes `UiScale()` and user scaling. `UiScale()` is
   framebuffer height divided by the program's `game::kfUiReferenceHeight` (2160

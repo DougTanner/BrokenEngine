@@ -664,11 +664,6 @@ void ModelViewerApplication::RenderUi()
 	}
 }
 
-void RenderViewerUi()
-{
-	gpModelViewerApplication->RenderUi();
-}
-
 } // namespace game
 
 namespace engine
@@ -690,6 +685,20 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	rMainLayout.fPhysicallyBasedRenderingSmoke = 0.0f;
 	rMainLayout.fPhysicallyBasedRenderingShadowFloor = 1.0f;
 	game::gpModelViewerApplication->RenderModel(iCommandBuffer);
+}
+
+// The viewer panel keeps its state in ModelViewerApplication, so creating and destroying the UI screens has nothing to do.
+void CreateUiScreens()
+{
+}
+
+void RenderUiScreens()
+{
+	game::gpModelViewerApplication->RenderUi();
+}
+
+void DestroyUiScreens()
+{
 }
 
 } // namespace engine

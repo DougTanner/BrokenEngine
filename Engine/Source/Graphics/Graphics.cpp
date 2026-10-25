@@ -7,7 +7,6 @@
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/PbrWrappersBase.h"
 #include "Ui/ShadowWrappersBase.h"
-#include "Ui/TweaksSettings.h"
 #include "Ui/WaterWrappersBase.h"
 #include "Ui/WrapperBase.h"
 
@@ -461,16 +460,6 @@ void Graphics::Create()
 	if (mpImGuiManager == nullptr)
 	{
 		mpImGuiManager = std::make_unique<ImGuiManager>(mHwnd);
-
-#if !defined(BT_MODEL_VIEWER)
-		if constexpr (kbDebugInput)
-		{
-			if (game::gpGame != nullptr)
-			{
-				LoadTweaksSettings();
-			}
-		}
-#endif
 	}
 
 	if (bRecordCommandBuffers)
@@ -744,17 +733,6 @@ void Graphics::Destroy()
 			mOldVkSwapchainKHR = mpSwapchainManager->ReleaseHandleForRecreation();
 		}
 		mpSwapchainManager.reset();
-#if !defined(BT_MODEL_VIEWER)
-		if constexpr (kbDebugInput)
-		{
-			// gpImGuiManager guard: SaveTweaksSettings derefs gpImGuiManager->mpTweaksScreen, and a post-Destroy re-defer
-			// runs a second Destroy() after mpImGuiManager.reset() below already nulled the global on the first pass.
-			if (game::gpGame != nullptr && gpImGuiManager != nullptr)
-			{
-				SaveTweaksSettings();
-			}
-		}
-#endif
 		mpImGuiManager.reset();
 	}
 

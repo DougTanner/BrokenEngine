@@ -4,22 +4,8 @@
 
 #include "Data/Raw.h"
 #include "File/PackChunks.h"
-#if !defined(BT_MODEL_VIEWER)
-#include "Ui/Screens/TweaksScreen/TweaksScreen.h"
-#include "Ui/Screens/ChatScreen.h"
-#include "Ui/Screens/GameSettingsScreen.h"
-#include "Ui/Screens/GraphicsMenuScreen.h"
-#include "Ui/Screens/MainMenuScreen.h"
-#include "Ui/Screens/ModalScreen.h"
-#include "Ui/Screens/PauseMenuScreen.h"
-#include "Ui/Screens/SoundMenuScreen.h"
-#endif
 #include "Ui/GraphicsSettingsWrappersBase.h"
 
-#include "Profile/ProfileRows.h"
-#if !defined(BT_MODEL_VIEWER)
-#include "Ui/Screens/HudScreen.h"
-#endif
 #include "Game.h"
 
 namespace engine
@@ -167,17 +153,7 @@ ImGuiManager::ImGuiManager(HWND hwnd)
 
 	ImGui::EndFrame();
 
-#if !defined(BT_MODEL_VIEWER)
-	mpTweaksScreen = std::make_unique<TweaksScreen>();
-	mpMainMenuScreen = std::make_unique<MainMenuScreen>();
-	mpModalScreen = std::make_unique<ModalScreen>();
-	mpPauseMenuScreen = std::make_unique<PauseMenuScreen>();
-	mpGraphicsMenuScreen = std::make_unique<GraphicsMenuScreen>();
-	mpSoundMenuScreen = std::make_unique<SoundMenuScreen>();
-	mpGameSettingsScreen = std::make_unique<GameSettingsScreen>();
-	mpHudScreen = std::make_unique<game::HudScreen>();
-	mpChatScreen = std::make_unique<ChatScreen>();
-#endif
+	CreateUiScreens();
 }
 
 // Reset all geometry before scaling to prevent cumulative drift across resolution changes, including fields without explicit overrides.
@@ -284,6 +260,7 @@ void ImGuiManager::ApplyThemeColors(UiTheme eTheme)
 
 ImGuiManager::~ImGuiManager()
 {
+	DestroyUiScreens();
 	mTextureResources.clear();
 	mTextureRetirements.clear();
 
@@ -478,34 +455,7 @@ void ImGuiManager::Prepare(int64_t iFramebuffer)
 
 	ImGui::NewFrame();
 
-#if defined(BT_MODEL_VIEWER)
-	game::RenderViewerUi();
-#else
-	// Menu screens required to progress past the pre-game / rejection flows must render even
-	// with Tweaks open — otherwise a persisted-active Tweaks menu strands a fresh client with
-	// no way to reach Connect/Spawn. Each self-gates internally on the game's UI state.
-	mpMainMenuScreen->Render();
-	mpModalScreen->Render();
-
-	// Hide in-game UI when Tweaks menu is active
-	if (!game::gpGame->mbShowImGui)
-	{
-		mpHudScreen->Render();
-		mpChatScreen->Render();
-		mpPauseMenuScreen->Render();
-		mpGraphicsMenuScreen->Render();
-		mpSoundMenuScreen->Render();
-		mpGameSettingsScreen->Render();
-	}
-
-	if (game::gpGame->mbShowImGui)
-	{
-		mpTweaksScreen->Render();
-	}
-
-	RenderImPlotGraphs();
-	RenderTextAreas();
-#endif
+	RenderUiScreens();
 
 	ImGui::Render();
 	mpDrawData = ImGui::GetDrawData();

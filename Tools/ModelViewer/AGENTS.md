@@ -3,8 +3,7 @@
 ## Application contracts
 
 ModelViewer is a separate client executable. Viewer policy and game contracts
-belong here; shared rendering mechanisms remain engine-owned. Do not instantiate
-the sandbox Game or start a network session. The selected scene is the only
+belong here; shared rendering mechanisms remain engine-owned. The selected scene is the only
 visible geometry, against a gray background that is the viewer's HDR clear
 color, displayed about RGB 0.5 at default grading
 ([Top-Level Shaders](../../Engine/Data/Shaders/AGENTS.md#top-level-shaders)).
@@ -81,15 +80,20 @@ and foreground.
 
 ## Engine integration
 
-`BT_MODEL_VIEWER` is confined to this project. It excludes sandbox screen
-ownership. The viewer `Pch.h` sets `kbAudioStreamingHarnessRig`
-and `kbProfileScreens` to `false`. Keep ordinary engine profiling collection,
-Graphics lifecycle and local crash reporting without network upload.
-The viewer supplies a presentation frame, camera matrices and sun input,
-`engine::RenderFrameMain` by project membership for Main uniforms,
-`game::Camera::SunAngle`, its HDR clear color and UI reference height in
-`Game.h`, and `RenderViewerUi` inside the ordinary ImGui backend, and writes
-the sun rotation its camera inherits from `engine::CameraBase`. Model
+The viewer compiles only engine files whose game names it supplies: game name
+and version, HDR clear color and UI reference height in `Game.h`, the
+flight-plane table, profile rows, `game::FrameInterpolate`, and
+`game::Camera::SunAngle`. Never satisfy an unused gameplay dependency with
+dummy cells, flags, sessions or reporting functions; the viewer constructs no
+`GameBase` or network session. By project membership it defines
+`engine::RenderFrameMain` for Main uniforms and the three UI functions
+`ImGuiManager` calls: `RenderUiScreens` draws the viewer panel, and
+`CreateUiScreens` and `DestroyUiScreens` are empty. The viewer `Pch.h` sets
+`kbAudioStreamingHarnessRig` and `kbProfileScreens` to `false`. Keep ordinary
+engine profiling collection, Graphics lifecycle and local crash reporting
+without network upload.
+The viewer supplies a presentation frame, camera matrices and sun input, and
+writes the sun rotation its camera inherits from `engine::CameraBase`. Model
 illumination uses the game's shared sun/day cycle, ambient and model skybox
 environment for equal sun input and shared defaults. Right-drag
 sun rotation changes direction only and persists in world space across Sun angle edits,
@@ -101,8 +105,7 @@ Auxiliary world render targets retain their normal initialization
 and transitions; the image pass clears HDR color to the viewer's gray, its world
 draws record zero instances because the viewer writes no world indirect records,
 and only model draws and UI depth
-produce pixels before HDR resolve. Do not satisfy an unused gameplay dependency
-with dummy cells, flags, sessions or reporting functions.
+produce pixels before HDR resolve.
 
 ## Build and data ownership
 
