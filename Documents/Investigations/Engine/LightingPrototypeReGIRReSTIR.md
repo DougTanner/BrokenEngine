@@ -1,9 +1,8 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-23T20:13:23.000Z","dependsOn":[]} -->
-# Prototype clustered direct lighting
+# Prototype ReGIR and ReSTIR direct lighting
 
 ## Context and authority
 
-The user requested isolated, quality-first lighting prototypes and a plan per technique. Does evaluating local lights at the actual fragment improve height, normals, and occlusion enough to justify replacing projected deposits? This document fixes an author-proposed candidate for future claim, review, and user approval; authoring it authorizes no renderer implementation or production adoption.
+The user requested isolated, quality-first lighting prototypes and a plan per technique. Can resampled direct lighting preserve quality and temporal stability with hundreds of dynamic lights? This document fixes an author-proposed candidate for future claim, review, and user approval; authoring it authorizes no renderer implementation or production adoption.
 
 Before any prototype edits, create all five independent experiment worktrees from the same current
 primary tip using `pwsh -NoProfile -File .codex/codex-worktree.ps1`, once per experiment. The wrapper
@@ -21,16 +20,17 @@ Current point/area uploads project emitters to the base plane; deposit/spread us
 
 ## Design
 
-Implement forward clustered direct lighting: a 16 x 16 pixel XY grid with 24 logarithmic view-depth slices spanning the visible scene's near/far depths. Conservatively assign true 3D point and rectangular area light bounds to clusters; shade each visible receiver with the full XYZ source/receiver difference and full material normal. Use a two-pass count/prefix-sum/write list so the 1000-light case has no silent fixed-list truncation. Add diagnostics for counts and assignment omissions.
+Implement one direct-light path following RTXDI's ReGIR candidate generation and ReSTIR DI reservoir equations, adapted to GLSL. Use a bounded uniform camera-cell-relative 3D ReGIR grid, initially 16 x 16 x 8 cells, with eight light-sample reservoirs per cell. Rebuild candidates every frame from all local lights; use a nonzero uniform-light mixture so important lights are not excluded by the proposal distribution.
 
-Evaluate every light assigned to the cluster, using 64 fixed stratified samples per area emitter at
-the quality setting. Use additive linear HDR radiance with the same distance/range, albedo, and
-diffuse BRDF definitions as the exhaustive reference. Include source-to-receiver visibility through
-the tracing prerequisite below. An initial unshadowed debug output isolates clustering/normal
-correctness, but is not the final occluded-light comparison. Clustering reduces candidate-light
-work; it is not GI and provides no shadows without visibility evaluation.
+At each visible receiver, generate eight initial candidates, perform one temporal reuse pass and one
+spatial pass with four neighbors, then evaluate selected-sample source visibility and full-normal
+diffuse contribution. Preserve proposal PDFs, sample counts, normalization, and re-evaluated target
+densities at reuse sites. Use geometric position/normal/depth rejection for disocclusion and moving
+receivers. Area samples carry emitter position and sampling density; source IDs must be stable
+across frames and invalidated on removal. Keep a high-candidate, no-reuse diagnostic output beside
+the exhaustive reference to distinguish estimator error from reuse artifacts.
 
-Keep existing sun, material specular policy, and environmental illumination fixed. New local-light diffuse radiance is shown separately and then composed once into the model, terrain, and water shading paths. This prototype does not add indirect bounce or imply that hundreds of overlapping area lights become cheap.
+ReGIR stores candidate light distributions, not finished radiance. ReSTIR DI estimates direct illumination and requires the tracing prerequisite below for local shadows; neither supplies diffuse bounce lighting. Use explicit client-only light identities, geometry history, and motion reconstruction without adding simulation identity fields or a generic temporal framework.
 
 ## Implementation prerequisite
 
@@ -52,11 +52,11 @@ for plan revision before proceeding.
 - `Engine/Source/Graphics/Managers/{DeviceManager,InstanceManager,BufferManager,PipelineManager,RenderTargetTexturesLighting}.cpp`: capability enablement, resources, descriptors, synchronization, and recreation.
 - `Engine/Source/Graphics/Render/LightingUniforms.cpp`, `Engine/Data/Shaders/{ShaderLayoutsBase.h,ShaderFunctions.h}`: shared layout/publication and receiver lookup.
 - `Engine/Data/Shaders/{Model/Model.frag,Terrain/Terrain.frag,Water/Water.frag}`: actual receiver position/normal and final composition.
-- Proposed client-only `Engine/Source/Graphics/Debug/LightingPrototype.{h,cpp}` and `Engine/Data/Shaders/Lighting/PrototypeClustered*.comp`: bounded fixture/reference/experiment implementation.
+- Proposed client-only `Engine/Source/Graphics/Debug/LightingPrototype.{h,cpp}` and `Engine/Data/Shaders/Lighting/PrototypeReGIRReSTIR*.comp`: bounded fixture/reference/experiment implementation.
 
 ## In scope
 
-- The critical-file regions above, their required headers/project membership, and minimal graphics-object ray-query ownership needed by this single candidate. Add `Engine/Data/Shaders/Lighting/PrototypeClustered*.comp` for cluster bounds/count/prefix/write; `ShaderFunctions.h` for clustered full-3D diffuse evaluation and source visibility.
+- The critical-file regions above, their required headers/project membership, and minimal graphics-object ray-query ownership needed by this single candidate. Add `Engine/Data/Shaders/Lighting/PrototypeReGIRReSTIR*.comp` for cell candidates, receiver reservoirs, temporal/spatial reuse, and visibility; `ShaderFunctions.h` for final full-normal direct contribution.
 - One fixed developer fixture/light stream and capture manifest, controlled through existing supported debug/harness mechanisms; no new simulation fields or network commands.
 - A debug selector for the unchanged baseline versus this one candidate, plus reference/diagnostic outputs. Preserve the baseline path exactly and reset candidate history when selected. This permits valid within-process paired profiling; it is not a multi-technique runtime framework.
 - Exhaustive, high-sample shadowed direct-diffuse reference using all lights and 256 area samples per emitter; double samples to document stability. Keep indirect/environmental lighting fixed across candidate and direct-reference views.
@@ -101,7 +101,7 @@ Use `/compile` for the affected client, shader/DataPacker path, and server/heade
 | Height and direction | Same-XY lights at 6/50/100 m; receivers at those heights and between them; continuous source/receiver travel across plane boundaries; upward/downward/sloped/side normals; unobstructed illumination between different planes. Preserve the actual XYZ distance and full-normal response in outputs. |
 | Visibility | Light behind terrain ridge, thin wall, overhang, and moving mesh; lit and blocked receivers on different heights. Show occluded/unoccluded reference pairs and light-leak differences. Record the geometry traced and any omitted geometry explicitly. |
 | Light density | Fixed nested sets of 100, 300, and 1000 point/area lights at mixed heights; same emitters, power, range, and seed across candidates. Capture both gameplay-scale zoom-out and close inspection. |
-| Technique quality | Clustered: match exhaustive direct lighting without missing lights at cluster edges or depth-slice crossings; inspect counts at 100/300/1000 lights. Demonstrate correct same-XY/different-Z light separation, wall/overhang shadows, full-normal response, and smooth receiver transitions between flight planes. |
+| Technique quality | ReGIR/ReSTIR: record noise and bias against the exhaustive direct reference, candidate support, moving/removed lights, sample identity validity, disocclusion, temporal ghosting, and spatial light leaks. Test a tiny bright source among 1000 lights and a high light passing behind an occluder; reservoir reuse must not flatten XYZ or normals. |
 | Matched visual evidence | Baseline, candidate, and converged reference screenshots for every scene, plus video or equivalent ordered frame sequences for moving lights/occluders, camera pan/zoom, cell-boundary crossing, and history reset. Inspect water/terrain/models and retained smoke. Preserve floating-point diagnostic outputs where display tone mapping hides differences. |
 | Honest radiometry | Record legacy MAX blending and rgba8/tone-map effects separately from candidate additive linear HDR. Use common exposure/materials; include linear direct/indirect diagnostics and overlapping-light scenes rather than tuning exposure per candidate. |
 | Cost and lag | Quality settings first: report per-pass and total GPU time, tracing/acceleration update cost, peak/persistent GPU bytes, update frequency, convergence and visible lag in frames/ms. Compare baseline/candidate timings only via the two-path selector in one process using `query_profile`'s documented caveats. Standalone reference timings are descriptive; no cross-process speedup ratios or guessed pass/fail budget. |
@@ -111,5 +111,5 @@ Finish by retaining the exact branch/commit and evidence bundle and presenting t
 
 ## Sources
 
-[Clustered Deferred and Forward Shading](https://diglib.eg.org/items/6342d4d6-5220-4376-a5c6-a153058f4a3c). Cluster assignment and direct shading are distinct from the prototype's required local-shadow visibility backend.
+[RTXDI integration guide](https://github.com/NVIDIA-RTX/RTXDI/blob/main/Doc/Integration.md). Pin the consumed source revision and estimator equations in the manifest; use ReGIR plus ReSTIR DI only, not RTXDI's indirect-lighting features or a full sample-application port.
 

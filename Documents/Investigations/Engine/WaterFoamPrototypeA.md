@@ -1,7 +1,6 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-23T20:51:07.451Z","dependsOn":[]} -->
 # Prototype A — instantaneous compression control
 
-Executable scheduler Plan; runtime execution approval pending. Research baseline `5f205af6a24a17ebf732f7005f03a48e0e6f91e0`. Execute in a dedicated preserved prototype worktree and branch, separate from B. Saving this Plan authorizes no runtime edits, builds, captures, or worktree setup now.
+Prototype investigation; runtime execution approval pending. Research baseline `5f205af6a24a17ebf732f7005f03a48e0e6f91e0`. Execute in a dedicated preserved prototype worktree and branch, separate from B. Saving this Plan authorizes no runtime edits, builds, captures, or worktree setup now.
 
 ## Context
 

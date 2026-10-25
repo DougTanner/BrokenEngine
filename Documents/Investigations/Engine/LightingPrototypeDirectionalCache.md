@@ -1,4 +1,3 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-23T20:13:20.000Z","dependsOn":[]} -->
 # Prototype a directional irradiance cache
 
 ## Context and authority

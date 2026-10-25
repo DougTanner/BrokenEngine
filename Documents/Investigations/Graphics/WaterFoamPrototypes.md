@@ -6,8 +6,8 @@ Research/design baseline: `5f205af6a24a17ebf732f7005f03a48e0e6f91e0`, 2026-10-23
 
 | Prototype Plan | Emission | Lifetime | Purpose |
 |---|---|---|---|
-| [A](../../Plans/Engine/WaterFoamPrototypeA.md) | Existing horizontal Jacobian compression | Instantaneous | Cheap control; does not satisfy requested persistence |
-| [B](../../Plans/Engine/WaterFoamPrototypeB.md) | Same horizontal Jacobian compression | Exponential persistent coverage | Test persistent fading and filtered coverage |
+| [A](../Engine/WaterFoamPrototypeA.md) | Existing horizontal Jacobian compression | Instantaneous | Cheap control; does not satisfy requested persistence |
+| [B](../Engine/WaterFoamPrototypeB.md) | Same horizontal Jacobian compression | Exponential persistent coverage | Test persistent fading and filtered coverage |
 
 A deliberately retains its cheap interpolated-J source and lacks B's coverage filtering. The comparison therefore
 measures the whole cheap baseline against persistent filtered coverage, rather than isolating persistence alone.

@@ -1,9 +1,8 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-23T20:13:21.000Z","dependsOn":[]} -->
-# Prototype DDGI diffuse indirect lighting
+# Prototype sparse Split Radiance Cascades
 
 ## Context and authority
 
-The user requested isolated, quality-first lighting prototypes and a plan per technique. Does visibility-aware 3D probe interpolation add useful diffuse bounce lighting at the game's camera scales? This document fixes an author-proposed candidate for future claim, review, and user approval; authoring it authorizes no renderer implementation or production adoption.
+The user requested isolated, quality-first lighting prototypes and a plan per technique. Can sparse 3D radiance probes retain nearby indirect-light detail without a dense volumetric cache? This document fixes an author-proposed candidate for future claim, review, and user approval; authoring it authorizes no renderer implementation or production adoption.
 
 Before any prototype edits, create all five independent experiment worktrees from the same current
 primary tip using `pwsh -NoProfile -File .codex/codex-worktree.ps1`, once per experiment. The wrapper
@@ -21,17 +20,23 @@ Current point/area uploads project emitters to the base plane; deposit/spread us
 
 ## Design
 
-Implement one camera-relative DDGI volume, initially 24 x 24 x 12 probes spanning the visible XY footprint plus lighting margin and terrain-to-highest-plane-plus-150 m in Z. Store octahedral irradiance and first/second hit-distance moments per probe; use the paper's visibility-aware trilinear lookup with full XYZ and the full receiver normal. Start with 512 rays per probe per frame, no probe classification, relocation, interleaving, or multi-volume system.
+Implement the world-space Split Radiance Cascades v2 algorithm as one bounded prototype:
+surface-driven rays, distance-based interval splitting, a sparse probe hash table, and
+coarse-to-fine interval reconstruction. Start with four cascades; double spatial spacing and
+interval reach per cascade. Use the paper's 3D angular subdivision and interpolation, not a 2D
+screen-space substitute. Fix the paper revision and reference implementation commit in the
+experiment manifest before implementation. Use source-derived interval/merge equations and document
+the actual spacing, angular counts, hash capacity, and occupancy.
 
-Use exhaustive shadowed direct lighting at the visible receiver and at ray hits: all point lights
-and 64 stratified samples per area emitter, with the same linear radiometry as the reference.
-Ray-hit shading supplies direct radiance only, producing one diffuse indirect bounce; do not feed
-prior irradiance into hit shading or count direct lighting twice. Record initialization,
-convergence, and hysteresis. Compare an accumulated high-ray reference before reducing quality.
-Probes inside solid geometry are omitted from interpolation using traced hit/backface evidence;
-document any uncovered regions.
+Trace 512 directions per visible surface sample at the initial quality setting, shade hits with
+exhaustive shadowed direct illumination, and reconstruct one diffuse indirect bounce from split
+intervals. Evaluate visible direct lighting separately. Begin with all active probes refreshed every
+frame and no temporal reuse; publish explicit missing-probe diagnostics instead of treating
+unallocated entries as valid darkness. Allocate from visible receivers and traced hit locations,
+including off-screen contributors within the bounded volume. Keep three flight-plane heights as test
+receivers, not as the dimensionality of the cache.
 
-DDGI represents diffuse indirect lighting; it does not replace direct light evaluation, specular reflections, or shadow geometry. The tracing prerequisite below is part of this prototype, including material/albedo lookup at hits and dynamic geometry updates. Neither the terrain heightfield nor the sun-shadow pass provides that backend.
+The tracing prerequisite below must expose complete geometry and materials. Sparse storage does not supply visibility by itself. This is a 2026 research prototype: pin the source, preserve its essential 3D construction, and measure quality/cost without inheriting paper performance claims.
 
 ## Implementation prerequisite
 
@@ -53,11 +58,11 @@ for plan revision before proceeding.
 - `Engine/Source/Graphics/Managers/{DeviceManager,InstanceManager,BufferManager,PipelineManager,RenderTargetTexturesLighting}.cpp`: capability enablement, resources, descriptors, synchronization, and recreation.
 - `Engine/Source/Graphics/Render/LightingUniforms.cpp`, `Engine/Data/Shaders/{ShaderLayoutsBase.h,ShaderFunctions.h}`: shared layout/publication and receiver lookup.
 - `Engine/Data/Shaders/{Model/Model.frag,Terrain/Terrain.frag,Water/Water.frag}`: actual receiver position/normal and final composition.
-- Proposed client-only `Engine/Source/Graphics/Debug/LightingPrototype.{h,cpp}` and `Engine/Data/Shaders/Lighting/PrototypeDDGI*.comp`: bounded fixture/reference/experiment implementation.
+- Proposed client-only `Engine/Source/Graphics/Debug/LightingPrototype.{h,cpp}` and `Engine/Data/Shaders/Lighting/PrototypeSplitRadianceCascades*.comp`: bounded fixture/reference/experiment implementation.
 
 ## In scope
 
-- The critical-file regions above, their required headers/project membership, and minimal graphics-object ray-query ownership needed by this single candidate. Add `Engine/Data/Shaders/Lighting/PrototypeDDGI*.comp` for probe tracing, irradiance/distance integration, and history; `ShaderFunctions.h` for visibility-weighted full-3D diffuse-indirect lookup.
+- The critical-file regions above, their required headers/project membership, and minimal graphics-object ray-query ownership needed by this single candidate. Add `Engine/Data/Shaders/Lighting/PrototypeSplitRadianceCascades*.comp` for surface sampling, sparse-probe insertion, interval splitting, and merging; `ShaderFunctions.h` for full-normal indirect evaluation.
 - One fixed developer fixture/light stream and capture manifest, controlled through existing supported debug/harness mechanisms; no new simulation fields or network commands.
 - A debug selector for the unchanged baseline versus this one candidate, plus reference/diagnostic outputs. Preserve the baseline path exactly and reset candidate history when selected. This permits valid within-process paired profiling; it is not a multi-technique runtime framework.
 - Exhaustive, high-sample shadowed direct-diffuse reference using all lights and 256 area samples per emitter; double samples to document stability. Also accumulate a ray-traced one-diffuse-bounce reference, doubling ray/sample count to document convergence; compare indirect separately using identical direct illumination and materials.
@@ -102,7 +107,7 @@ Use `/compile` for the affected client, shader/DataPacker path, and server/heade
 | Height and direction | Same-XY lights at 6/50/100 m; receivers at those heights and between them; continuous source/receiver travel across plane boundaries; upward/downward/sloped/side normals; unobstructed illumination between different planes. Preserve the actual XYZ distance and full-normal response in outputs. |
 | Visibility | Light behind terrain ridge, thin wall, overhang, and moving mesh; lit and blocked receivers on different heights. Show occluded/unoccluded reference pairs and light-leak differences. Record the geometry traced and any omitted geometry explicitly. |
 | Light density | Fixed nested sets of 100, 300, and 1000 point/area lights at mixed heights; same emitters, power, range, and seed across candidates. Capture both gameplay-scale zoom-out and close inspection. |
-| Technique quality | DDGI: capture a colored diffuse bounce between heights with direct contribution disabled only in the diagnostic output; show dark occluded regions, thin-wall leakage, probes near geometry, convergence from cleared history, and a moving source/occluder. Compare indirect-only and direct-plus-indirect outputs separately. |
+| Technique quality | Split Radiance Cascades: record sparse occupancy/missing probes, off-screen bounce sources, thin-occluder leakage, nearby-detail retention, cascade boundaries, and allocation changes during camera motion. Cross-height bounce must survive the full XYZ reconstruction; direct-only output must remain separately inspectable. |
 | Matched visual evidence | Baseline, candidate, and converged reference screenshots for every scene, plus video or equivalent ordered frame sequences for moving lights/occluders, camera pan/zoom, cell-boundary crossing, and history reset. Inspect water/terrain/models and retained smoke. Preserve floating-point diagnostic outputs where display tone mapping hides differences. |
 | Honest radiometry | Record legacy MAX blending and rgba8/tone-map effects separately from candidate additive linear HDR. Use common exposure/materials; include linear direct/indirect diagnostics and overlapping-light scenes rather than tuning exposure per candidate. |
 | Cost and lag | Quality settings first: report per-pass and total GPU time, tracing/acceleration update cost, peak/persistent GPU bytes, update frequency, convergence and visible lag in frames/ms. Compare baseline/candidate timings only via the two-path selector in one process using `query_profile`'s documented caveats. Standalone reference timings are descriptive; no cross-process speedup ratios or guessed pass/fail budget. |
@@ -112,5 +117,5 @@ Finish by retaining the exact branch/commit and evidence bundle and presenting t
 
 ## Sources
 
-[DDGI paper](https://www.jcgt.org/published/0008/02/01/paper-lowres.pdf) and [volume integration guidance](https://github.com/NVIDIAGameWorks/RTXGI-DDGI/blob/main/docs/DDGIVolume.md). Implement the algorithm in the engine's GLSL path; no wholesale SDK/framework import.
+[Split Radiance Cascades v2](https://arxiv.org/abs/2607.20384v2) and [author reference implementation](https://github.com/entropylost/chandra). Original [Radiance Cascades](https://github.com/Raikiri/RadianceCascadesPaper/blob/main/RadianceCascades.tex) is background; a 2D implementation does not satisfy this plan.
 

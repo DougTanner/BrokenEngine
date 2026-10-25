@@ -1,9 +1,8 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-23T20:13:24.000Z","dependsOn":[]} -->
-# Prototype ReGIR and ReSTIR direct lighting
+# Prototype DDGI diffuse indirect lighting
 
 ## Context and authority
 
-The user requested isolated, quality-first lighting prototypes and a plan per technique. Can resampled direct lighting preserve quality and temporal stability with hundreds of dynamic lights? This document fixes an author-proposed candidate for future claim, review, and user approval; authoring it authorizes no renderer implementation or production adoption.
+The user requested isolated, quality-first lighting prototypes and a plan per technique. Does visibility-aware 3D probe interpolation add useful diffuse bounce lighting at the game's camera scales? This document fixes an author-proposed candidate for future claim, review, and user approval; authoring it authorizes no renderer implementation or production adoption.
 
 Before any prototype edits, create all five independent experiment worktrees from the same current
 primary tip using `pwsh -NoProfile -File .codex/codex-worktree.ps1`, once per experiment. The wrapper
@@ -21,17 +20,17 @@ Current point/area uploads project emitters to the base plane; deposit/spread us
 
 ## Design
 
-Implement one direct-light path following RTXDI's ReGIR candidate generation and ReSTIR DI reservoir equations, adapted to GLSL. Use a bounded uniform camera-cell-relative 3D ReGIR grid, initially 16 x 16 x 8 cells, with eight light-sample reservoirs per cell. Rebuild candidates every frame from all local lights; use a nonzero uniform-light mixture so important lights are not excluded by the proposal distribution.
+Implement one camera-relative DDGI volume, initially 24 x 24 x 12 probes spanning the visible XY footprint plus lighting margin and terrain-to-highest-plane-plus-150 m in Z. Store octahedral irradiance and first/second hit-distance moments per probe; use the paper's visibility-aware trilinear lookup with full XYZ and the full receiver normal. Start with 512 rays per probe per frame, no probe classification, relocation, interleaving, or multi-volume system.
 
-At each visible receiver, generate eight initial candidates, perform one temporal reuse pass and one
-spatial pass with four neighbors, then evaluate selected-sample source visibility and full-normal
-diffuse contribution. Preserve proposal PDFs, sample counts, normalization, and re-evaluated target
-densities at reuse sites. Use geometric position/normal/depth rejection for disocclusion and moving
-receivers. Area samples carry emitter position and sampling density; source IDs must be stable
-across frames and invalidated on removal. Keep a high-candidate, no-reuse diagnostic output beside
-the exhaustive reference to distinguish estimator error from reuse artifacts.
+Use exhaustive shadowed direct lighting at the visible receiver and at ray hits: all point lights
+and 64 stratified samples per area emitter, with the same linear radiometry as the reference.
+Ray-hit shading supplies direct radiance only, producing one diffuse indirect bounce; do not feed
+prior irradiance into hit shading or count direct lighting twice. Record initialization,
+convergence, and hysteresis. Compare an accumulated high-ray reference before reducing quality.
+Probes inside solid geometry are omitted from interpolation using traced hit/backface evidence;
+document any uncovered regions.
 
-ReGIR stores candidate light distributions, not finished radiance. ReSTIR DI estimates direct illumination and requires the tracing prerequisite below for local shadows; neither supplies diffuse bounce lighting. Use explicit client-only light identities, geometry history, and motion reconstruction without adding simulation identity fields or a generic temporal framework.
+DDGI represents diffuse indirect lighting; it does not replace direct light evaluation, specular reflections, or shadow geometry. The tracing prerequisite below is part of this prototype, including material/albedo lookup at hits and dynamic geometry updates. Neither the terrain heightfield nor the sun-shadow pass provides that backend.
 
 ## Implementation prerequisite
 
@@ -53,14 +52,14 @@ for plan revision before proceeding.
 - `Engine/Source/Graphics/Managers/{DeviceManager,InstanceManager,BufferManager,PipelineManager,RenderTargetTexturesLighting}.cpp`: capability enablement, resources, descriptors, synchronization, and recreation.
 - `Engine/Source/Graphics/Render/LightingUniforms.cpp`, `Engine/Data/Shaders/{ShaderLayoutsBase.h,ShaderFunctions.h}`: shared layout/publication and receiver lookup.
 - `Engine/Data/Shaders/{Model/Model.frag,Terrain/Terrain.frag,Water/Water.frag}`: actual receiver position/normal and final composition.
-- Proposed client-only `Engine/Source/Graphics/Debug/LightingPrototype.{h,cpp}` and `Engine/Data/Shaders/Lighting/PrototypeReGIRReSTIR*.comp`: bounded fixture/reference/experiment implementation.
+- Proposed client-only `Engine/Source/Graphics/Debug/LightingPrototype.{h,cpp}` and `Engine/Data/Shaders/Lighting/PrototypeDDGI*.comp`: bounded fixture/reference/experiment implementation.
 
 ## In scope
 
-- The critical-file regions above, their required headers/project membership, and minimal graphics-object ray-query ownership needed by this single candidate. Add `Engine/Data/Shaders/Lighting/PrototypeReGIRReSTIR*.comp` for cell candidates, receiver reservoirs, temporal/spatial reuse, and visibility; `ShaderFunctions.h` for final full-normal direct contribution.
+- The critical-file regions above, their required headers/project membership, and minimal graphics-object ray-query ownership needed by this single candidate. Add `Engine/Data/Shaders/Lighting/PrototypeDDGI*.comp` for probe tracing, irradiance/distance integration, and history; `ShaderFunctions.h` for visibility-weighted full-3D diffuse-indirect lookup.
 - One fixed developer fixture/light stream and capture manifest, controlled through existing supported debug/harness mechanisms; no new simulation fields or network commands.
 - A debug selector for the unchanged baseline versus this one candidate, plus reference/diagnostic outputs. Preserve the baseline path exactly and reset candidate history when selected. This permits valid within-process paired profiling; it is not a multi-technique runtime framework.
-- Exhaustive, high-sample shadowed direct-diffuse reference using all lights and 256 area samples per emitter; double samples to document stability. Keep indirect/environmental lighting fixed across candidate and direct-reference views.
+- Exhaustive, high-sample shadowed direct-diffuse reference using all lights and 256 area samples per emitter; double samples to document stability. Also accumulate a ray-traced one-diffuse-bounce reference, doubling ray/sample count to document convergence; compare indirect separately using identical direct illumination and materials.
 - Client-only timers, resource-byte accounting, source/settings manifest, comparison screenshots and motion sequences. Integrate model/terrain/water local diffuse lighting; retain existing smoke/billboard policy and report its mismatch separately.
 
 ## Out of scope
@@ -102,7 +101,7 @@ Use `/compile` for the affected client, shader/DataPacker path, and server/heade
 | Height and direction | Same-XY lights at 6/50/100 m; receivers at those heights and between them; continuous source/receiver travel across plane boundaries; upward/downward/sloped/side normals; unobstructed illumination between different planes. Preserve the actual XYZ distance and full-normal response in outputs. |
 | Visibility | Light behind terrain ridge, thin wall, overhang, and moving mesh; lit and blocked receivers on different heights. Show occluded/unoccluded reference pairs and light-leak differences. Record the geometry traced and any omitted geometry explicitly. |
 | Light density | Fixed nested sets of 100, 300, and 1000 point/area lights at mixed heights; same emitters, power, range, and seed across candidates. Capture both gameplay-scale zoom-out and close inspection. |
-| Technique quality | ReGIR/ReSTIR: record noise and bias against the exhaustive direct reference, candidate support, moving/removed lights, sample identity validity, disocclusion, temporal ghosting, and spatial light leaks. Test a tiny bright source among 1000 lights and a high light passing behind an occluder; reservoir reuse must not flatten XYZ or normals. |
+| Technique quality | DDGI: capture a colored diffuse bounce between heights with direct contribution disabled only in the diagnostic output; show dark occluded regions, thin-wall leakage, probes near geometry, convergence from cleared history, and a moving source/occluder. Compare indirect-only and direct-plus-indirect outputs separately. |
 | Matched visual evidence | Baseline, candidate, and converged reference screenshots for every scene, plus video or equivalent ordered frame sequences for moving lights/occluders, camera pan/zoom, cell-boundary crossing, and history reset. Inspect water/terrain/models and retained smoke. Preserve floating-point diagnostic outputs where display tone mapping hides differences. |
 | Honest radiometry | Record legacy MAX blending and rgba8/tone-map effects separately from candidate additive linear HDR. Use common exposure/materials; include linear direct/indirect diagnostics and overlapping-light scenes rather than tuning exposure per candidate. |
 | Cost and lag | Quality settings first: report per-pass and total GPU time, tracing/acceleration update cost, peak/persistent GPU bytes, update frequency, convergence and visible lag in frames/ms. Compare baseline/candidate timings only via the two-path selector in one process using `query_profile`'s documented caveats. Standalone reference timings are descriptive; no cross-process speedup ratios or guessed pass/fail budget. |
@@ -112,5 +111,5 @@ Finish by retaining the exact branch/commit and evidence bundle and presenting t
 
 ## Sources
 
-[RTXDI integration guide](https://github.com/NVIDIA-RTX/RTXDI/blob/main/Doc/Integration.md). Pin the consumed source revision and estimator equations in the manifest; use ReGIR plus ReSTIR DI only, not RTXDI's indirect-lighting features or a full sample-application port.
+[DDGI paper](https://www.jcgt.org/published/0008/02/01/paper-lowres.pdf) and [volume integration guidance](https://github.com/NVIDIAGameWorks/RTXGI-DDGI/blob/main/docs/DDGIVolume.md). Implement the algorithm in the engine's GLSL path; no wholesale SDK/framework import.
 
