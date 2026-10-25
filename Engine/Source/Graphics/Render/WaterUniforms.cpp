@@ -1,6 +1,7 @@
 #if defined(BT_CLIENT)
 
 #include "Graphics/CameraBase.h"
+#include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/HeightLerpWrapperQuartet.h"
 #include "Ui/WaterWrappersBase.h"
 #include "Render.h"
@@ -197,6 +198,293 @@ void PopulateWaterParameters(shaders::GlobalLayout& rGlobalLayout, float fSunAng
 	rGlobalLayout.fWaterMediumAmplitude = gWaterMediumAmplitude.mfCurrent;
 
 	PopulateWaterReducedUv(rGlobalLayout, elapsedTime);
+}
+
+// Gerstner wave phase-reduction modulus (shared by both bands).
+constexpr double kfWaveTwoPi = 2.0 * 3.14159265358979323846;
+
+// CPU-side staging + frame-invariant cache for one Gerstner wave band (`vec4` == XMFLOAT4, 16-byte
+// stride — matches the mapped layout arrays exactly for a straight memcpy). All wave math reads and
+// writes this cached (normal, cacheable) copy instead of the write-combined mapped uniform buffer,
+// whose readbacks each stall on memory latency; the populate finishes with one memcpy per array
+// region into rMainLayout. Directions (pf4WavesOne), omega (pf4WavesTwo.x), phi (pf4WavesTwo.z), and
+// the clamped-but-unscaled base amplitude (pfBaseAmplitude) are frame-invariant — rebuilt only when
+// the consumed tunables change. The per-frame pass rewrites only pf4WavesTwo.y (base amplitude x the
+// eye-height fade scale) and pf4WavesTwo.w (the fmod phase term). Sized to the 256-entry shader maxima.
+struct GerstnerWaveBandStaging
+{
+	XMFLOAT4 pf4WavesOne[256];
+	XMFLOAT4 pf4WavesTwo[256];
+	float pfBaseAmplitude[256] {};
+};
+
+// Consumed low/medium tunables snapshot; inequality vs last frame triggers an invariant rebuild.
+// iCount defaults to -1 (never a resolved count) so the first real frame always rebuilds. The
+// eye-height amplitude-fade scale is deliberately absent — it folds into the per-frame amplitude
+// multiply, not a rebuild.
+struct LowWaveTunables
+{
+	int64_t iCount = -1;
+	float fAngle = 0.0f;
+	float fWavelength = 0.0f;
+	float fAmplitude = 0.0f;
+	float fSpeed = 0.0f;
+	float fAngleAdjust = 0.0f;
+	float fWavelengthAdjust = 0.0f;
+	float fAmplitudeAdjust = 0.0f;
+	float fSpeedAdjust = 0.0f;
+
+	bool operator==(const LowWaveTunables&) const = default;
+};
+
+struct MediumWaveTunables
+{
+	int64_t iCount = -1;
+	float fWavelength = 0.0f;
+	float fAmplitude = 0.0f;
+	float fSpeed = 0.0f;
+	float fAngleAdjust = 0.0f;
+	float fWavelengthAdjust = 0.0f;
+	float fAmplitudeAdjust = 0.0f;
+	float fSpeedAdjust = 0.0f;
+
+	bool operator==(const MediumWaveTunables&) const = default;
+};
+
+static GerstnerWaveBandStaging sLowWaveStaging {};
+static GerstnerWaveBandStaging sMediumWaveStaging {};
+static LowWaveTunables sLowWaveTunables {};
+static MediumWaveTunables sMediumWaveTunables {};
+
+// Cached wave terms require fixed per-wave float expression order and RandomEngine consumption.
+static void RebuildLowWaveInvariants(int64_t iCount)
+{
+	// Wave 0: fixed primary direction, no RNG draw, no amplitude clamp.
+	auto vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(gWaterLowAngle.mfCurrent));
+	sLowWaveStaging.pf4WavesOne[0].x = XMVectorGetX(vecDirection);
+	sLowWaveStaging.pf4WavesOne[0].y = XMVectorGetY(vecDirection);
+
+	vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(0.0f));
+	sLowWaveStaging.pf4WavesOne[0].z = XMVectorGetX(vecDirection);
+	sLowWaveStaging.pf4WavesOne[0].w = XMVectorGetY(vecDirection);
+
+	sLowWaveStaging.pf4WavesTwo[0].x = (2.0f * XM_PI) / (gWaterLowWavelength.mfCurrent); // Omega
+	sLowWaveStaging.pfBaseAmplitude[0] = gWaterLowAmplitude.mfCurrent;
+	sLowWaveStaging.pf4WavesTwo[0].z = gWaterLowSpeed.mfCurrent * sLowWaveStaging.pf4WavesTwo[0].x; // Phi
+
+	common::RandomEngine randomEngine {};
+	for (int64_t i = 1; i < iCount; ++i)
+	{
+		float fAngleAdjust = ((i % 2) == 0 ? 1.0f : -1.0f) * gWaterLowAngleAdjust.mfCurrent * common::Random(randomEngine);
+		vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(gWaterLowAngle.mfCurrent + fAngleAdjust));
+		sLowWaveStaging.pf4WavesOne[i].x = XMVectorGetX(vecDirection);
+		sLowWaveStaging.pf4WavesOne[i].y = XMVectorGetY(vecDirection);
+
+		vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(XM_2PI * static_cast<float>(i) / static_cast<float>(iCount)));
+		sLowWaveStaging.pf4WavesOne[i].z = XMVectorGetX(vecDirection);
+		sLowWaveStaging.pf4WavesOne[i].w = XMVectorGetY(vecDirection);
+
+		float fAdjust = common::Random(randomEngine);
+		float fWavelengthAdjust = fAdjust * gWaterLowWavelengthAdjust.mfCurrent;
+		float fAmplitudeAdjust = (1.0f - fAdjust) * std::abs(gWaterLowAmplitudeAdjust.mfCurrent) * common::Random(randomEngine);
+		float fSpeedAdjust = fAdjust * gWaterLowSpeedAdjust.mfCurrent;
+		sLowWaveStaging.pf4WavesTwo[i].x = std::abs((2.0f * XM_PI) / (gWaterLowWavelength.mfCurrent + fWavelengthAdjust * gWaterLowWavelength.mfCurrent)); // Omega
+		float fBaseAmplitude = std::abs(gWaterLowAmplitude.mfCurrent - fAmplitudeAdjust * gWaterLowAmplitude.mfCurrent);
+		fBaseAmplitude = std::min(fBaseAmplitude, 0.1f * (1.0f / sLowWaveStaging.pf4WavesTwo[i].x));
+		sLowWaveStaging.pf4WavesTwo[i].z = (gWaterLowSpeed.mfCurrent + gWaterLowSpeed.mfCurrent * fSpeedAdjust * common::Random(randomEngine)) * sLowWaveStaging.pf4WavesTwo[i].x; // Phi
+
+		// Thin the low-frequency band: zero every kiWaveCullModulo-th wave's amplitude below kiWaveCullLimit (tuning to reduce low-wave repetition).
+		static constexpr int64_t kiWaveCullLimit = 64;
+		static constexpr int64_t kiWaveCullModulo = 3;
+		if (i < kiWaveCullLimit && (i % kiWaveCullModulo) == 0)
+		{
+			fBaseAmplitude = 0.0f;
+		}
+		sLowWaveStaging.pfBaseAmplitude[i] = fBaseAmplitude;
+	}
+}
+
+// Rebuild the frame-invariant medium-band terms into the staging cache. Only pf4WavesOne.xy is
+// written (the displacement shader reads only the .xy direction); .zw stay zero-initialised.
+static void RebuildMediumWaveInvariants(int64_t iCount)
+{
+	common::RandomEngine randomEngine {};
+	for (int64_t i = 0; i < iCount; ++i)
+	{
+		float fAngleAdjust = gWaterMediumAngleAdjust.mfCurrent * common::Random(randomEngine);
+		auto vecDirection = XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), XMMatrixRotationZ(fAngleAdjust));
+		sMediumWaveStaging.pf4WavesOne[i].x = XMVectorGetX(vecDirection);
+		sMediumWaveStaging.pf4WavesOne[i].y = XMVectorGetY(vecDirection);
+
+		float fWavelengthAdjust = -gWaterMediumWavelengthAdjust.mfCurrent + 2.0f * gWaterMediumWavelengthAdjust.mfCurrent * common::Random(randomEngine);
+		float fAmplitudeAdjust = -gWaterMediumAmplitudeAdjust.mfCurrent + 2.0f * gWaterMediumAmplitudeAdjust.mfCurrent * common::Random(randomEngine);
+		float fSpeedAdjust = -gWaterMediumSpeedAdjust.mfCurrent + 2.0f * gWaterMediumSpeedAdjust.mfCurrent * common::Random(randomEngine);
+		sMediumWaveStaging.pf4WavesTwo[i].x = std::abs((2.0f * XM_PI) / (gWaterMediumWavelength.mfCurrent + fWavelengthAdjust * gWaterMediumWavelength.mfCurrent)); // Omega
+		float fBaseAmplitude = std::abs(gWaterMediumAmplitude.mfCurrent + fAmplitudeAdjust * gWaterMediumAmplitude.mfCurrent);
+		fBaseAmplitude = std::min(fBaseAmplitude, 0.1f * (1.0f / sMediumWaveStaging.pf4WavesTwo[i].x));
+		sMediumWaveStaging.pfBaseAmplitude[i] = fBaseAmplitude;
+		sMediumWaveStaging.pf4WavesTwo[i].z = (gWaterMediumSpeed.mfCurrent + fSpeedAdjust * gWaterMediumSpeed.mfCurrent) * sMediumWaveStaging.pf4WavesTwo[i].x; // Phi
+	}
+}
+
+static void PopulateGerstnerLowWaves(shaders::MainLayout& rMainLayout, double fWaveTime, double fWaveCameraX, double fWaveCameraY, float fLowAmplitudeScale)
+{
+	if (fLowAmplitudeScale <= 0.0f)
+	{
+		rMainLayout.iWaterLowCount = 0;
+		return;
+	}
+
+	int64_t iCount = std::min(gWaterLowCount.Get<int64_t>(), static_cast<int64_t>(gWaterLowMaximum.mfCurrent));
+
+	LowWaveTunables tunables {};
+	tunables.iCount = iCount;
+	tunables.fAngle = gWaterLowAngle.mfCurrent;
+	tunables.fWavelength = gWaterLowWavelength.mfCurrent;
+	tunables.fAmplitude = gWaterLowAmplitude.mfCurrent;
+	tunables.fSpeed = gWaterLowSpeed.mfCurrent;
+	tunables.fAngleAdjust = gWaterLowAngleAdjust.mfCurrent;
+	tunables.fWavelengthAdjust = gWaterLowWavelengthAdjust.mfCurrent;
+	tunables.fAmplitudeAdjust = gWaterLowAmplitudeAdjust.mfCurrent;
+	tunables.fSpeedAdjust = gWaterLowSpeedAdjust.mfCurrent;
+	if (tunables != sLowWaveTunables)
+	{
+		sLowWaveTunables = tunables;
+		RebuildLowWaveInvariants(iCount);
+	}
+
+	for (int64_t i = 0; i < iCount; ++i)
+	{
+		sLowWaveStaging.pf4WavesTwo[i].y = sLowWaveStaging.pfBaseAmplitude[i] * fLowAmplitudeScale;
+		double fDirectionX = static_cast<double>(sLowWaveStaging.pf4WavesOne[i].x);
+		double fDirectionY = static_cast<double>(sLowWaveStaging.pf4WavesOne[i].y);
+		double fOmega = static_cast<double>(sLowWaveStaging.pf4WavesTwo[i].x);
+		double fPhi = static_cast<double>(sLowWaveStaging.pf4WavesTwo[i].z);
+		sLowWaveStaging.pf4WavesTwo[i].w = static_cast<float>(std::fmod((fDirectionX * fWaveCameraX + fDirectionY * fWaveCameraY) * fOmega + fPhi * (fWaveTime + static_cast<double>(i)), kfWaveTwoPi));
+	}
+
+	std::memcpy(rMainLayout.pf4LowWavesOne, sLowWaveStaging.pf4WavesOne, static_cast<size_t>(iCount) * sizeof(rMainLayout.pf4LowWavesOne[0]));
+	std::memcpy(rMainLayout.pf4LowWavesTwo, sLowWaveStaging.pf4WavesTwo, static_cast<size_t>(iCount) * sizeof(rMainLayout.pf4LowWavesTwo[0]));
+	rMainLayout.iWaterLowCount = static_cast<int32_t>(iCount);
+}
+
+static void PopulateGerstnerMediumWaves(shaders::MainLayout& rMainLayout, double fWaveTime, double fWaveCameraX, double fWaveCameraY, float fMediumAmplitudeScale)
+{
+	if (fMediumAmplitudeScale <= 0.0f)
+	{
+		rMainLayout.iWaterMediumCount = 0;
+		return;
+	}
+
+	int64_t iCount = gWaterMediumCount.Get<int64_t>();
+
+	MediumWaveTunables tunables {};
+	tunables.iCount = iCount;
+	tunables.fWavelength = gWaterMediumWavelength.mfCurrent;
+	tunables.fAmplitude = gWaterMediumAmplitude.mfCurrent;
+	tunables.fSpeed = gWaterMediumSpeed.mfCurrent;
+	tunables.fAngleAdjust = gWaterMediumAngleAdjust.mfCurrent;
+	tunables.fWavelengthAdjust = gWaterMediumWavelengthAdjust.mfCurrent;
+	tunables.fAmplitudeAdjust = gWaterMediumAmplitudeAdjust.mfCurrent;
+	tunables.fSpeedAdjust = gWaterMediumSpeedAdjust.mfCurrent;
+	if (tunables != sMediumWaveTunables)
+	{
+		sMediumWaveTunables = tunables;
+		RebuildMediumWaveInvariants(iCount);
+	}
+
+	for (int64_t i = 0; i < iCount; ++i)
+	{
+		sMediumWaveStaging.pf4WavesTwo[i].y = sMediumWaveStaging.pfBaseAmplitude[i] * fMediumAmplitudeScale;
+		double fDirectionX = static_cast<double>(sMediumWaveStaging.pf4WavesOne[i].x);
+		double fDirectionY = static_cast<double>(sMediumWaveStaging.pf4WavesOne[i].y);
+		double fOmega = static_cast<double>(sMediumWaveStaging.pf4WavesTwo[i].x);
+		double fPhi = static_cast<double>(sMediumWaveStaging.pf4WavesTwo[i].z);
+		sMediumWaveStaging.pf4WavesTwo[i].w = static_cast<float>(std::fmod((fDirectionX * fWaveCameraX + fDirectionY * fWaveCameraY) * fOmega + fPhi * fWaveTime, kfWaveTwoPi));
+	}
+
+	std::memcpy(rMainLayout.pf4MediumWavesOne, sMediumWaveStaging.pf4WavesOne, static_cast<size_t>(iCount) * sizeof(rMainLayout.pf4MediumWavesOne[0]));
+	std::memcpy(rMainLayout.pf4MediumWavesTwo, sMediumWaveStaging.pf4WavesTwo, static_cast<size_t>(iCount) * sizeof(rMainLayout.pf4MediumWavesTwo[0]));
+	rMainLayout.iWaterMediumCount = static_cast<int32_t>(iCount);
+}
+
+// Wave phase reduction: fCurrentTime is the same elapsed time this frame's RenderFrameGlobal received.
+// The band helpers publish each iWater*Count beside its MainLayout wave arrays; when a per-stack camera-eye-height
+// fade clamps amplitude to zero they zero the count so the WaterDisplacement.comp Gerstner loop short-circuits to no work.
+static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurrentTime, GraphicsQualityLevel eWaterLevel)
+{
+	if (eWaterLevel == GraphicsQualityLevel::kLow)
+	{
+		rMainLayout.iWaterLowCount = 0;
+		rMainLayout.iWaterMediumCount = 0;
+		return;
+	}
+
+	double fWaveTime = static_cast<double>(fCurrentTime);
+	XMFLOAT4A f4WaveCameraPosition {};
+	XMStoreFloat4A(&f4WaveCameraPosition, engine::gpCamera->mVecPosition);
+	// WaterDisplacement.comp adds dot(direction, worldPosition - waterOrigin) to this term, so the term must carry the
+	// absolute camera position for the wave phase to be continuous: reconstruct it as a double from the camera cell
+	// and the camera's local position, exactly as the reduced water origins do. CPU only — the uploaded phase is
+	// already reduced modulo 2*pi.
+	auto [fWaveCellX, fWaveCellY] = CellCenterOffsetDouble(kOriginCoordinate, engine::gpCamera->mBasisCoordinate);
+	double fWaveCameraX = fWaveCellX + static_cast<double>(f4WaveCameraPosition.x);
+	double fWaveCameraY = fWaveCellY + static_cast<double>(f4WaveCameraPosition.y);
+
+	// Camera eye height scales geometric wave amplitudes using each stack's Start and End settings.
+	float fCameraEyeHeight = engine::gpCamera->mfCameraEyeHeight;
+	float fLowFadeStart = gWaterLowAmplitudeFadeStart.mfCurrent;
+	float fLowFadeEnd = gWaterLowAmplitudeFadeEnd.mfCurrent;
+	float fLowAmplitudeScale = std::clamp((fLowFadeEnd - fCameraEyeHeight) / std::max(fLowFadeEnd - fLowFadeStart, 1.0e-3f), 0.0f, 1.0f);
+	float fMediumFadeStart = gWaterMediumAmplitudeFadeStart.mfCurrent;
+	float fMediumFadeEnd = gWaterMediumAmplitudeFadeEnd.mfCurrent;
+	float fMediumAmplitudeScale = std::clamp((fMediumFadeEnd - fCameraEyeHeight) / std::max(fMediumFadeEnd - fMediumFadeStart, 1.0e-3f), 0.0f, 1.0f);
+
+	PopulateGerstnerLowWaves(rMainLayout, fWaveTime, fWaveCameraX, fWaveCameraY, fLowAmplitudeScale);
+
+	if (eWaterLevel == GraphicsQualityLevel::kMedium)
+	{
+		rMainLayout.iWaterMediumCount = 0;
+		return;
+	}
+
+	PopulateGerstnerMediumWaves(rMainLayout, fWaveTime, fWaveCameraX, fWaveCameraY, fMediumAmplitudeScale);
+}
+
+void RenderWaterMain(int64_t iCommandBuffer, std::chrono::duration<float> currentTime)
+{
+	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(&gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
+	GraphicsQualityLevel eWaterLevel = static_cast<GraphicsQualityLevel>(std::clamp(gWaterLevel.Get<int64_t>(), 0i64, static_cast<int64_t>(GraphicsQualityLevel::kCount) - 1));
+
+	// Per-frame visible-area LOD draw params for water. The water pipeline binds a single concat
+	// mesh buffer holding all LODs; per-frame we tell vkCmdDrawIndexedIndirect which LOD's index
+	// range and vertex base to draw. engine::CameraBase computes miVisibleAreaLevelOfDetail from eye distance with 4×
+	// hysteresis bands; mesh density and snap-grid are in lockstep. Terrain draws via one
+	// vkCmdDrawIndexedIndirect per island template in CommandBufferRecordMain.cpp.
+	int64_t iLevelOfDetail = engine::gpCamera->miVisibleAreaLevelOfDetail;
+	const BufferManager::VisibleAreaMeshLod& rWaterLevelOfDetail = gpBufferManager->mpWaterMeshLods[iLevelOfDetail];
+	gpPipelineManager->mpPipelines[kPipelineWater].WriteIndirectBuffer(iCommandBuffer, 1, rWaterLevelOfDetail.iIndexCount, rWaterLevelOfDetail.iIndexOffset, rWaterLevelOfDetail.iVertexOffset);
+
+	// Active LOD's vertex-grid dims (iQuadCount* == iMeshX/Y - 1). Read by:
+	//   1) WaterDisplacement.comp — bounds-checks each thread, only writes the top-left rectangle.
+	//   2) Water.vert — scales f2InTexcoord to the matching texel index via texelFetch.
+	// Both shaders must read the SAME values; populating once here keeps them in lockstep.
+	rMainLayout.iWaterActiveQuadX = static_cast<int32_t>(rWaterLevelOfDetail.iQuadCountX);
+	rMainLayout.iWaterActiveQuadY = static_cast<int32_t>(rWaterLevelOfDetail.iQuadCountY);
+
+	// Low writes a zero dispatch because Water.vert also bypasses the displacement textures. Medium and High use
+	// one workgroup per kiComputeTileSize block over the active LOD sub-region, written per framebuffer to match
+	// RecordComputeIndirect's slot indexing.
+	if (eWaterLevel == GraphicsQualityLevel::kLow)
+	{
+		gpPipelineManager->mpPipelines[kPipelineWaterDisplacement].WriteIndirectComputeBuffer(iCommandBuffer, 0, 0, 0);
+	}
+	else
+	{
+		gpPipelineManager->mpPipelines[kPipelineWaterDisplacement].WriteIndirectComputeBuffer(iCommandBuffer, (rWaterLevelOfDetail.iQuadCountX + 1 + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize, (rWaterLevelOfDetail.iQuadCountY + 1 + shaders::kiComputeTileSize - 1) / shaders::kiComputeTileSize, 1);
+	}
+
+	PopulateGerstnerWaves(rMainLayout, currentTime.count(), eWaterLevel);
 }
 
 } // namespace engine

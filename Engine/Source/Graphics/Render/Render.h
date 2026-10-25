@@ -165,6 +165,7 @@ inline XMFLOAT2 gf2ShadowHeightOffsetPerMeter {};
 inline bool gbLightingTemporalReset = false;
 void RenderLightingGlobal(int64_t iCommandBuffer);
 void RenderLightingMain(int64_t iCommandBuffer);
+void RenderWaterMain(int64_t iCommandBuffer, std::chrono::duration<float> currentTime);
 void RenderLightingSpreadIndirect(int64_t iCommandBuffer);
 
 inline bool gbSmokeClear = true;

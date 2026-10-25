@@ -3,8 +3,8 @@
 
 ## Context
 
-Stage 3 of three (stage 1 `Documents/Plans/Engine/ModelViewerWorldUniforms.md` holds the shared context; stage 2
-`Documents/Plans/Engine/ModelViewerModelOwnSpace.md`). User's words (agent-recorded): islands "spawned 'randomly'
+Stage 3 of three; `engine::RenderWaterMain` in `Engine/Source/Graphics/Render/WaterUniforms.cpp` supplies water Main publication.
+Stage 2 is `Documents/Plans/Engine/ModelViewerModelOwnSpace.md`. User's words (agent-recorded): islands "spawned 'randomly'
 from a chosen seed"; "Instead of main-menu it would be the ModelViewer's UI"; the viewer keeps "basically the same
 functionality as it does now (just has water/terrain rendered behind instead of grey framebuffer)". Recorded
 decisions (user choices, agent-recorded) this stage implements:

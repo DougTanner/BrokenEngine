@@ -34,7 +34,7 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
 - Downstream thresholds that the amplitude must cross before the effect applies may clear an upstream count only when they also skip the corresponding array write. Keep count and data publication paired.
 - Write-combined mapped layouts are write-only. Compute dependent values in CPU staging state and copy each populated region once.
 - State that crosses files, or that something outside this directory resets, lives as `inline` globals in `Render.h`. Single-file edge detectors and latches (the statics that remember the previous frame's value) stay function-local or file-static — do not promote them, because a promoted latch looks externally resettable and invites a second writer.
-- Every latch assumes its entry point runs exactly once per frame. The reduced-time accumulators in `WaterUniforms.cpp` integrate per call, so a second call in one frame — an extra preview pass, a second `RenderFrameGlobal` for a capture — silently doubles water scroll speed with no error anywhere.
+- Every latch assumes its entry point runs exactly once per frame. Hosts invoke `RenderWaterMain` in `WaterUniforms.cpp` once per frame from their water-rendering path to publish Main water data. Main wave phases use the supplied elapsed time; water's reduced-time accumulation remains on the Global publication path.
 - The whole day cycle resolves on the CPU in `GlobalUniforms.cpp`: sun and moon angle and direction, the piecewise color and ambient ramps, the separate night-gate and moon envelopes, and every product of those that more than one shader reads. Shaders only read the finished uniform values, so a new day-cycle term belongs here rather than recomputed per pixel.
 
 ## Precision and History

@@ -1,10 +1,10 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-24T18:17:44.927Z","dependsOn":["Documents/Plans/Engine/ModelViewerWorldUniforms.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-24T18:17:44.927Z","dependsOn":[]} -->
 # ModelViewer world, stage 2: the model in its own space over a world camera
 
 ## Context
 
-Stage 2 of three (stage 1 `Documents/Plans/Engine/ModelViewerWorldUniforms.md`, stage 3
-`Documents/Plans/Engine/ModelViewerModelOverWorld.md`; the shared context is in stage 1). User's words
+Stage 2 of three; `engine::RenderWaterMain` in `Engine/Source/Graphics/Render/WaterUniforms.cpp` supplies water Main publication.
+Stage 3 is `Documents/Plans/Engine/ModelViewerModelOverWorld.md`. User's words
 (agent-recorded): the model "would just exist in it's own 3D space not in world-space and would not check Z so it
 would always render over the 'background'". Recorded decisions (user choices, agent-recorded) this stage
 implements:

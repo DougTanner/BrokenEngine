@@ -20,7 +20,7 @@ layout (set = 1, binding = 7) uniform sampler2D noiseTextureSampler;
 // flat-blended normal. Written by WaterDisplacement.comp once per frame so this vertex shader
 // texelFetches one value per vertex instead of summing the wave bands itself.
 // Texel grid is in 1:1 alignment with the active LOD's vertex grid — see
-// MainUniforms.cpp where iWaterActiveQuadX/Y populates next to the LOD draw setup, and
+// WaterUniforms.cpp where iWaterActiveQuadX/Y populates next to the LOD draw setup, and
 // RenderTargetTextures.h for the texture creation comment.
 layout (set = 1, binding = kiWaterBindingDisplacement) uniform sampler2D displacementTextureSampler;
 layout (set = 1, binding = kiWaterBindingDisplacementNormal) uniform sampler2D displacementNormalTextureSampler;
