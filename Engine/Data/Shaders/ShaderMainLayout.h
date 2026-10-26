@@ -17,6 +17,9 @@ struct MainLayout
 	// DebugRenderBillboard.vert uses f4ToEyeNormal as forward; basis w components are unused.
 	vec4 f4BillboardRight INIT;
 	vec4 f4BillboardUp INIT;
+	// Main-pass models use these; hosts drawing world models publish the world camera values.
+	vec4 f4x4ModelViewProjection[4] INIT;
+	vec4 f4ModelEyePosition INIT;
 
 	vec4 pf4LowWavesOne[256] INIT;
 	vec4 pf4LowWavesTwo[256] INIT;

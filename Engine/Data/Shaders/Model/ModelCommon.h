@@ -100,7 +100,7 @@ void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, ModelLayout mod
 	if (iRenderingMode == 0)
 	{
 		// Mode 0: Camera rendering
-		gl_Position = Transform(vec4(f3WorldPosition, 1.0f), mainLayout.f4x4ViewProjection);
+		gl_Position = Transform(vec4(f3WorldPosition, 1.0f), mainLayout.f4x4ModelViewProjection);
 	}
 	else if (iRenderingMode == 1)
 	{

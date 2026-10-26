@@ -4,6 +4,7 @@
 
 inline constexpr bool kbAudioStreamingHarnessRig = false;
 inline constexpr bool kbProfileScreens = false;
+inline constexpr bool kbDrawModelsOverWorld = true;
 
 #include "Log/LogTypes.h"
 #include "EngineSwitches.h"

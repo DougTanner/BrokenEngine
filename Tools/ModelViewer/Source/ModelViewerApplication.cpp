@@ -678,6 +678,9 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ViewProjection[0]), XMMatrixTranspose(engine::gpCamera->mMatView * engine::gpCamera->mMatPerspective));
 	XMStoreFloat4(&rMainLayout.f4EyePosition, engine::gpCamera->mVecEyePosition);
 	XMStoreFloat4(&rMainLayout.f4ToEyeNormal, engine::gpCamera->mVecToEyeNormal);
+	game::Camera* pCamera = static_cast<game::Camera*>(engine::gpCamera);
+	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ModelViewProjection[0]), XMMatrixTranspose(pCamera->mMatModelView * pCamera->mMatModelPerspective));
+	XMStoreFloat4(&rMainLayout.f4ModelEyePosition, pCamera->mVecModelEyePosition);
 	rMainLayout.iFrameNumber = static_cast<int32_t>(rRenderInterpolates.at(cameraCoordinate).iFrame);
 	rMainLayout.iRenderNumber = static_cast<int32_t>(engine::gpGraphics->miFrameCounter);
 	rMainLayout.fPhysicallyBasedRenderingLighting = 0.0f;

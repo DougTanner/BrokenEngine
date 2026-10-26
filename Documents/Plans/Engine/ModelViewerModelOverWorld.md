@@ -1,10 +1,11 @@
-<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-24T18:18:35.011Z","dependsOn":["Documents/Plans/Engine/ModelViewerModelOwnSpace.md"]} -->
+<!-- broken-engine-plan/v1 {"createdUtc":"2026-10-24T18:18:35.011Z","dependsOn":[]} -->
 # ModelViewer world, stage 3: seeded islands and water behind the model
 
 ## Context
 
 Stage 3 of three; `engine::RenderWaterMain` in `Engine/Source/Graphics/Render/WaterUniforms.cpp` supplies water Main publication.
-Stage 2 is `Documents/Plans/Engine/ModelViewerModelOwnSpace.md`. User's words (agent-recorded): islands "spawned 'randomly'
+The viewer's model orbit and fixed world camera are separate (`game::Camera::Update`
+in `Tools/ModelViewer/Source/Graphics/Camera.cpp`). User's words (agent-recorded): islands "spawned 'randomly'
 from a chosen seed"; "Instead of main-menu it would be the ModelViewer's UI"; the viewer keeps "basically the same
 functionality as it does now (just has water/terrain rendered behind instead of grey framebuffer)". Recorded
 decisions (user choices, agent-recorded) this stage implements:

@@ -65,7 +65,7 @@ machine-readable launch configuration above.
 
 ## Focused references
 
-- [Launch](AgentHarness/launch.md) — the project's client persisted state and launch caveats; the shared [launch recipe](../../../.agents/skills/agent-harness/references/launch.md) owns executable startup, process identity, readiness, fresh client state, and an additional client.
+- [Launch](AgentHarness/launch.md) — the project's client persisted state and launch caveats; the shared [launch recipe](../../../.agents/skills/agent-harness/references/launch.md) owns executable startup, process identity, readiness, and fresh client state.
 - [Verification](AgentHarness/verification.md) — common setup, chosen-omni placement, and durable caveat routing.
 - [Replay](AgentHarness/replay.md) — transfer capture, persistent GUID/cell crossing, and the project's replay control recipes; the shared [replay reference](../../../.agents/skills/agent-harness/references/replay.md) owns determinism acceptance and manifest integrity.
 - [Cross-cell](AgentHarness/cross-cell.md) — client subscription movement and full-state adoption.

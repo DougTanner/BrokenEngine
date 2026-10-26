@@ -16,6 +16,10 @@ public:
 	void RotateSun(const glm::vec2& rAnchor, const glm::vec2& rPosition);
 	float SunAngle() const;
 	arc_ball::ArcBall mArcBall {glm::vec3(0.0f), 0.75f, glm::mat4(1.0f)};
+	XMVECTOR mVecModelCenter {0.0f, 0.0f, 0.0f, 1.0f};
+	XMMATRIX mMatModelView {};
+	XMMATRIX mMatModelPerspective {};
+	XMVECTOR mVecModelEyePosition {};
 
 private:
 	static constexpr float kfInitialPitch = 0.5404195f;

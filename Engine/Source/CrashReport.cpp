@@ -341,18 +341,6 @@ void PromptCrashReportDesktopCopy()
 	CopyFileW(ReportPath(), spcDesktopReportPath, FALSE);
 }
 
-#if defined(BT_CLIENT)
-
-// The live report path fits the MAX_PATH mutex name limit; a mutex name may not contain a backslash.
-std::wstring ClientInstanceMutexName()
-{
-	std::wstring name = ReportPath();
-	std::replace(name.begin(), name.end(), L'\\', L'/');
-	return name;
-}
-
-#endif // BT_CLIENT
-
 #if defined(BT_SERVER)
 
 // A report counts as posted only when it ends with this trailer, appended once GitHub has created its issue.

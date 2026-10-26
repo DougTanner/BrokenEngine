@@ -9,9 +9,8 @@ and the handoff this run returns.
 1. Use server port `27100`, client port `27101`, and the absolute adopted
    worktree. Done when this run's ports and adopted worktree path are fixed.
 
-   - A scenario needing a second simultaneous client adds port `27102` (see the
-     [Additional simultaneous client](launch.md#additional-simultaneous-client)
-     recipe).
+   - Apply `launch.md`'s single-client isolation gate before runtime sessions
+     and immediately before the first client launch.
    - A local server is a development instance, not an Azure production server.
 
 2. Read the focused references only when applicable. Done when every reference
@@ -335,14 +334,9 @@ and the handoff this run returns.
     identity.
 
     - The launch script runs `Baseline`, `Register`, and the immediate `Check`
-      for every launch. Run an action directly only for step 29's fresh
-      `Baseline` and step 33's transport-failure `Check`, each as its own shell
-      call in the form shown below, with the role's game name and app-data root
-      from the project harness doc:
-
-      ```powershell
-      pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Baseline -StatePath '<absolute process-check state path>' -Role '<role>' -GameName '<Game Name>' -ConfiguredAppDataRoot '<absolute app-data root>'
-      ```
+      for every launch. Run an action directly only for step 33's
+      transport-failure `Check`, as its own shell call in the form shown below,
+      using the state path retained in step 20:
 
       ```powershell
       pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-AgentHarnessProcessCheck.ps1 -Action Check -StatePath '<absolute process-check state path>'
@@ -366,7 +360,7 @@ and the handoff this run returns.
     executable. Done when every role this run launches has returned its launch
     result.
 
-    - `-Role` is `server`, `client`, or `client-b`. Add `-Configuration <name>`
+    - `-Role` is `server` or `client`. Add `-Configuration <name>`
       only for a build other than `Debug`, matching the claim, the
       client-only switches only as step 18 states, and `-CrossMachine` only as
       `private-lan-firewall.md` states.
@@ -508,9 +502,17 @@ and the handoff this run returns.
 25. Before relinking or relaunching, send `quit` and wait for the exact numeric
     `pid` from the role's latest launch result. Done when that PID is gone.
 
-    - Use the quit and exit-wait form of the
-      [Additional simultaneous client](launch.md#additional-simultaneous-client)
-      shutdown, with the role's own port and `pid`.
+    - Use this independent shell call with the role's port and retained PID:
+
+      ```powershell
+      '{"cmd":"quit"}' | & '<absolute AgentHarness path>' --owner '<owner token>' --port <role port> --timeout-ms 3000 -
+      Wait-Process -Id <retained role PID> -Timeout 60
+      if (Get-Process -Id <retained role PID> -ErrorAction SilentlyContinue) { throw 'Role did not exit.' }
+      ```
+
+      `Wait-Process` reports a non-terminating error on timeout; the subsequent
+      exact-PID check proves exit. If the PID survives, treat the run as failed
+      and investigate or release it through step 39 before continuing.
     - A live executable locks its image.
     - Do not launch a duplicate to displace it — with `SO_REUSEADDR`, a
       duplicate on the same port binds alongside the live listener instead of
@@ -527,42 +529,6 @@ and the handoff this run returns.
 
     - Between that deliberate quit and re-registration the role is not checked,
       so run no process check in that window.
-
-#### Additional simultaneous client
-
-27. Launch an additional client for a criterion that needs two clients connected
-    at once — a late joiner beside a client that must stay connected — after the
-    standard pair. Done when that criterion either has its additional client or
-    provably needs none.
-
-    - Disconnecting and reconnecting the one client is not a substitute when the
-      criterion depends on state the server drops when its last client leaves.
-
-28. Launch the additional client after the standard pair with the client
-    launch call (step 21) changed three ways: `-Role client-b`, its own
-    `-AppDataDirectory` root, and its own `-LogFile`; the call registers,
-    checks, and waits on port `27102` in this run's state path. Done when its
-    launch result has returned.
-
-    - Every other value is unchanged, including the same `-GameDataDirectory` —
-      all processes of one run must select the same asset data root.
-    - Each additional client needs its own app-data root because of how one root
-      separates client and server state (`Engine/Source/File/AGENTS.md`).
-    - `launch.md` owns the concrete call.
-
-29. Quit the additional client before the release call, then run one fresh
-    `Baseline` for its role alone. Done when its PID is gone and its role is
-    baselined again.
-
-    - `../scripts/Invoke-HarnessRelease.ps1` covers only ports `27100`/`27101`
-      and the server/client PIDs you supply, so it never quits an additional
-      client.
-    - Quit the additional client through its own port and confirm that its exact
-      retained PID is gone — a wait that times out is a failed run, so stop or
-      investigate that PID rather than continuing.
-    - The fresh `Baseline` clears its registration so release's entry check does
-      not report the deliberate quit as an unexpected exit. Release then
-      proceeds unchanged.
 
 ### Invoke commands
 
@@ -683,8 +649,6 @@ and the handoff this run returns.
       quit, and runs `lock release` only once every supplied PID is confirmed
       absent. It never searches by process name and never stops a PID you did
       not supply.
-    - An additional client is outside those two ports, so Additional
-      simultaneous client above governs its shutdown before this call.
 
 41. Supply the optional `-ProcessCheckStatePath` whenever the roles are
     registered, which the launch sequence above makes the ordinary case. Done
@@ -704,8 +668,8 @@ and the handoff this run returns.
 
 42. Read the release result, then search for `DEBUG_BREAK at` in the
     `--log-file` of each process this run started: the server and client log
-    paths from the project harness doc's launch, for each PID step 40 retains,
-    and each additional client's. A log no process of this run opened still holds an
+    paths from the project harness doc's launch, for each PID step 40 retains.
+    A log no process of this run opened still holds an
     earlier run's lines and is never searched. Done when the release outcome is
     classified and reported and every such log has been searched.
 

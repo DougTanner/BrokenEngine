@@ -340,15 +340,27 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 	}
 
 	// UI depth pre-pass: depth-only quads at ImGui window positions (instanceCount=0 when disabled)
+	auto RecordUiDepth = [&]()
 	{
-		gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerUiDepth);
 		Pipeline& rUiPrepass = pPipelines[kPipelineUiDepthPrepass];
 		vkCmdBindPipeline(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, rUiPrepass.mVkPipeline);
 		VkDescriptorSet pVkUiPrepassSets[2] = {gpTextureManager->mTextureDescriptors.mGlobalDescriptorSets.at(iFramebuffer), rUiPrepass.mVkDescriptorSets.at(iFramebuffer)};
 		vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, rUiPrepass.mVkPipelineLayout, 0, 2, pVkUiPrepassSets, 0, nullptr);
 		vkCmdDrawIndirect(vkCommandBuffer, gpImGuiManager->mUiPrepassIndirectVkBuffer, static_cast<VkDeviceSize>(iFramebuffer) * sizeof(VkDrawIndirectCommand), 1, sizeof(VkDrawIndirectCommand));
-		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerUiDepth);
-	}
+	};
+	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerUiDepth);
+	RecordUiDepth();
+	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerUiDepth);
+
+	auto RecordOpaqueModels = [&]()
+	{
+		gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerObjects);
+		for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpModelPipelineMaps[kDynamicModelPipelineModel])
+		{
+			pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f}, ModelDrawPass::kOpaque);
+		}
+		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerObjects);
+	};
 
 	bool bDebugTextureMode = false;
 	if constexpr (kbDebugInput)
@@ -362,12 +374,10 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 
 	if (!bDebugTextureMode)
 	{
-		gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerObjects);
-		for (const auto& [rCrc, pPipeline] : gpPipelineManager->mDynamicPipelines.mpModelPipelineMaps[kDynamicModelPipelineModel])
+		if constexpr (!kbDrawModelsOverWorld)
 		{
-			pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f}, ModelDrawPass::kOpaque);
+			RecordOpaqueModels();
 		}
-		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerObjects);
 
 		gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerTerrain);
 		// Per-template terrain draws: one indirect draw per IslandTemplate (count fixed at boot
@@ -395,6 +405,24 @@ void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuf
 			pPipeline->RecordDrawIndirect(iCommandBuffer, vkCommandBuffer, {0.0f, 0.0f, 0.0f, 0.0f});
 		}
 		gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerHexShields);
+
+		if constexpr (kbDrawModelsOverWorld)
+		{
+			VkClearAttachment vkClearAttachment
+			{
+				.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+				.clearValue = {.depthStencil = {.depth = kfMaxDepth}},
+			};
+			VkClearRect vkClearRect
+			{
+				.rect = {.extent = gpGraphics->mFramebufferVkExtent2D},
+				.baseArrayLayer = 0,
+				.layerCount = 1,
+			};
+			vkCmdClearAttachments(vkCommandBuffer, 1, &vkClearAttachment, 1, &vkClearRect);
+			RecordUiDepth();
+			RecordOpaqueModels();
+		}
 
 		gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerTransparentObjects);
 		// Transparent model pass (after all opaque geometry and water for correct blending)

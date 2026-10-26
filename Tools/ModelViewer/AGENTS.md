@@ -89,11 +89,15 @@ dummy cells, flags, sessions or reporting functions; the viewer constructs no
 `engine::RenderFrameMain` for Main uniforms and the three UI functions
 `ImGuiManager` calls: `RenderUiScreens` draws the viewer panel, and
 `CreateUiScreens` and `DestroyUiScreens` are empty. The viewer `Pch.h` sets
-`kbAudioStreamingHarnessRig` and `kbProfileScreens` to `false`. Keep ordinary
+`kbAudioStreamingHarnessRig` and `kbProfileScreens` to `false` and
+`kbDrawModelsOverWorld` to `true`. Keep ordinary
 engine profiling collection, Graphics lifecycle and local crash reporting
 without network upload.
-The viewer supplies a presentation frame, camera matrices and sun input, and
-writes the sun rotation its camera inherits from `engine::CameraBase`. Model
+The viewer's `CameraBase` state is a fixed top-down world camera at the default
+engine height. The viewer owns a separate model orbit pose that reaches only
+model draws; sun dragging uses that orbit view's screen axes. The viewer supplies
+a presentation frame and sun input, and writes the sun rotation its camera
+inherits from `engine::CameraBase`. Model
 illumination uses the game's shared sun/day cycle, ambient and model skybox
 environment for equal sun input and shared defaults. Right-drag
 sun rotation changes direction only and persists in world space across Sun angle edits,

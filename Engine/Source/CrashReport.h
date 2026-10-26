@@ -20,10 +20,6 @@ void PromptCrashReportDesktopCopy();
 std::optional<CrashReportHeader> ParseCrashReportHeader(std::string_view report);
 const wchar_t* ReportPath();
 const wchar_t* PendingReportPath();
-#if defined(BT_CLIENT)
-// Allocates, so it runs only at startup and never on the crash path.
-std::wstring ClientInstanceMutexName();
-#endif
 void ReadDxDiag();
 
 #if defined(BT_SERVER)

@@ -26,6 +26,20 @@ blocking the harness server, mark every criterion `BLOCKED` citing that row, and
 add no `HARNESS-F` finding. Never stop, quit, or signal a listed process; it
 belongs to the user.
 
+The single-client policy is owned by `Engine/Source/AGENTS.md` `## Crash Reporting`.
+Before a runtime session, enumerate sandbox clients across worktrees and build
+configurations (`BrokenEngineSandbox.exe`, `BrokenEngineSandbox.Debug.exe`, and
+`BrokenEngineSandbox.Profile.exe`). Wait until none are running and recheck
+immediately before the first client launch; never stop a foreign client. Run
+one owned client/server pair and require the server to report exactly one
+connected client. A foreign join invalidates an isolated comparison.
+
+A criterion requiring simultaneous clients is `BLOCKED` under this policy;
+another app-data directory cannot enable it. Verify lock exclusion through
+startup-code inspection and required client/server builds. Do not launch a
+second client to test refusal: the harness treats a registered process exit
+as a failure and has no expected-refusal path.
+
 Next create the directories and fix this run's single process-check state path. The timestamp makes that path new for every run, so no earlier run's registrations are ever inherited:
 
 ```powershell
@@ -61,10 +75,7 @@ The skill's launch step owns the launch result's shape and codes.
 Both processes share the absolute app-data root recorded as `appDataRoot`, so
 saves, settings, caches, and replay artifacts land under this worktree instead
 of the per-user AppData folder, each process in its own `game::kGameName` child.
-That name separates only the client and server children, so an additional
-simultaneous client gets its own root instead (see
-[Additional simultaneous client](#additional-simultaneous-client)). Crash
-reports are always written under the `--app-data-directory` root when the
+Crash reports are always written under the `--app-data-directory` root when the
 complete identity fits the fixed path buffer:
 `<app-data-root>\<Game Name>\<Game-Name>-Crash-Report.txt`; otherwise the
 existing `%APPDATA%` per-user location remains. A crash before the game
@@ -131,50 +142,6 @@ client stays on the main menu and needs `click "LOCAL SERVER"`, and only after
 discovery replaces the disabled `SCANNING...` button with it. The server loads
 its exit autosave, so use `reset` when the scenario needs fresh state.
 
-### Additional simultaneous client
-
-Launch this only for a criterion that needs two clients connected at once; the
-worker's
-[Additional simultaneous client](worker.md#additional-simultaneous-client)
-steps own when to launch it, this block owns the concrete call, and the hub's
-`## Launch values` supplies `<client game name>`. Run it after the first client
-is ready. Create its own app-data root first — a directory holding no state
-from any earlier run, so the two clients never share the `<client game name>`
-per-client directory and a later run never inherits the previous run's client
-settings. The fixed path below is reused across runs, so remove a leftover root
-before creating it:
-
-```powershell
-$ROOT = '<absolute adopted worktree>'
-$SecondAppDataRoot = Join-Path (Join-Path $ROOT 'Temp') 'AppData-ClientB'
-if (Test-Path -LiteralPath '<absolute adopted worktree>\Temp\AppData-ClientB') { Remove-Item -Recurse -LiteralPath '<absolute adopted worktree>\Temp\AppData-ClientB' }
-New-Item -ItemType Directory -Path $SecondAppDataRoot | Out-Null
-[ordered]@{
-	secondAppDataRoot = $SecondAppDataRoot
-	secondClientLog = Join-Path (Join-Path $ROOT 'Temp') 'client-b-agent.log'
-} | ConvertTo-Json -Compress
-```
-
-Then launch it with the client call changed only in its role, its app-data root, and its log file, keeping the same Data path and this run's single process-check state path; it returns once port `27102` answers ping. Retain its result's `pid` as `<second client PID>`:
-
-```powershell
-pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessLaunch.ps1 -RepositoryRoot '<absolute adopted worktree>' -Role 'client-b' -GameDataDirectory '<normalized Data path>' -AgentHarness '<absolute AgentHarness path>' -Owner '<owner token>' -ProcessCheckStatePath '<absolute process-check state path>' -AppDataDirectory '<absolute second app-data root>' -LogFile '<absolute second client log path>' -GameName '<client game name>'
-```
-
-Address it like the first client, on port `27102`. It auto-connects the same way, and `status.clientCount` counts both.
-
-Shut it down before the release call, because release covers only ports `27100`/`27101`:
-
-```powershell
-'{"cmd":"quit"}' | & '<absolute AgentHarness path>' --owner '<owner token>' --port 27102 --timeout-ms 3000 -
-Wait-Process -Id <second client PID> -Timeout 60
-if (Get-Process -Id <second client PID> -ErrorAction SilentlyContinue) { throw 'Second client did not exit.' }
-```
-
-`Wait-Process` only reports a non-terminating error when its timeout expires, so the `Get-Process` check above is what proves the exit. Do not run the fresh `Baseline` or release while that PID still exists — treat it as a failed run and stop or investigate that exact process first, otherwise releasing the lock orphans a live client.
-
-Once the exit is confirmed, run one fresh `Baseline` for `-Role 'client-b'` with the same game name and root, clearing its registration so the intended quit is not reported as an unexpected exit, and release with the server and first-client PIDs as usual.
-
 For an approved island-footprint or island-render criterion only, run the readiness helper after both processes launch as its own independent call. Retain the absolute artifact path outside shell state when checking the result:
 
 ```powershell
@@ -227,7 +194,7 @@ pwsh -NoProfile -File .agents/skills/agent-harness/scripts/Invoke-HarnessClaim.p
 - `claim.foreign-owner`: follow worker step 7's `claim.foreign-owner` bullet.
   When step 11 classifies the holder fresh, re-invoke the claim; when stale, run
   steps 11-15 with session label `normal-launch`, using step 1's fixed ports
-  (`27100`, `27101`, and `27102`) and the expected executables from the project
+  (`27100` and `27101`) and the expected executables from the project
   hub step 4 reads. A completed steal continues to the launch below with the
   `claim.foreign-owner` result's `gameDataDirectory`, and its new owner token is
   not kept either; a `BLOCKED` takeover is reported to the user with nothing

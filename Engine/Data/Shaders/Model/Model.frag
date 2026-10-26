@@ -226,7 +226,7 @@ void main()
 
 	// Compute vectors
 	vec3 n = GetNormal(material);
-	vec3 v = normalize(mainLayout.f4EyePosition.xyz - f3InWorldPosition);
+	vec3 v = normalize(mainLayout.f4ModelEyePosition.xyz - f3InWorldPosition);
 	// GlobalUniforms.cpp normalizes f4SunMoonNormal before this shader uses it, so l is unit.
 	vec3 l = globalLayout.f4SunMoonNormal.xyz;
 	vec3 h = normalize(l + v);

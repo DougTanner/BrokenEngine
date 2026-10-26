@@ -20,23 +20,22 @@ void Camera::Update()
 	glm::vec3 toEye = orientation[2];
 	glm::vec3 up = orientation[1];
 	XMVECTOR vecToEyeNormal = XMVectorSet(toEye.x, toEye.y, toEye.z, 0.0f);
-	mVecEyePosition = XMVectorAdd(mVecPosition, XMVectorScale(vecToEyeNormal, fDistance));
-	mVecToEyeNormal = XMVector3Normalize(XMVectorSubtract(mVecEyePosition, mVecPosition));
-	mMatView = XMMatrixLookAtRH(mVecEyePosition, mVecPosition, XMVectorSet(up.x, up.y, up.z, 0.0f));
-	mMatPerspective = XMMatrixPerspectiveFovRH(XM_PIDIV4, engine::gpSwapchainManager->mfAspectRatio, std::max(0.001f * mfRadius, fDistance - 1.5f * mfRadius), fDistance + 2.0f * mfRadius);
-	mfCameraEyeHeight = fDistance;
+	mVecModelEyePosition = XMVectorAdd(mVecModelCenter, XMVectorScale(vecToEyeNormal, fDistance));
+	mMatModelView = XMMatrixLookAtRH(mVecModelEyePosition, mVecModelCenter, XMVectorSet(up.x, up.y, up.z, 0.0f));
+	mMatModelPerspective = XMMatrixPerspectiveFovRH(XM_PIDIV4, engine::gpSwapchainManager->mfAspectRatio, std::max(0.001f * mfRadius, fDistance - 1.5f * mfRadius), fDistance + 2.0f * mfRadius);
+
+	mVecPosition = XMVectorSetZ(mVecPosition, engine::gpFlightPlanes->Lowest().fHeightMeters);
+	mfCameraEyeHeight = kfCameraEyeHeightDefault;
 	mfShadowTexelEyeHeight = mfCameraEyeHeight;
 	mfLightingTexelEyeHeight = mfCameraEyeHeight;
-	XMFLOAT3A f3Center {};
-	XMStoreFloat3A(&f3Center, mVecPosition);
-	mf4RenderVisibleArea = {f3Center.x - fDistance, f3Center.y + fDistance, f3Center.x + fDistance, f3Center.y - fDistance};
-	mf4LargeVisibleArea = mf4RenderVisibleArea;
-	mf2VisibleAreaQuadSize = {1.0f, 1.0f};
+	mVecToEyeNormal = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+	mVecEyePosition = XMVectorAdd(mVecPosition, XMVectorSet(0.0f, 0.0f, mfCameraEyeHeight, 0.0f));
+	CalculateMatricesAndVisibleArea();
 }
 
 void Camera::Fit(const XMFLOAT3A& rf3Center, float fRadius)
 {
-	mVecPosition = XMVectorSetW(XMLoadFloat3A(&rf3Center), 1.0f);
+	mVecModelCenter = XMVectorSetW(XMLoadFloat3A(&rf3Center), 1.0f);
 	mfRadius = fRadius;
 	mArcBall = arc_ball::ArcBall(glm::vec3(0.0f), 0.75f, glm::mat4(1.0f));
 	mfZoom = 1.0f;
@@ -53,7 +52,7 @@ void Camera::RotateSun(const glm::vec2& rAnchor, const glm::vec2& rPosition)
 	increment.beginDrag(rAnchor);
 	increment.drag(rPosition);
 	XMFLOAT4X4A f4x4View {};
-	XMStoreFloat4x4A(&f4x4View, mMatView);
+	XMStoreFloat4x4A(&f4x4View, mMatModelView);
 	glm::mat3 cameraBasis(glm::vec3(f4x4View._11, f4x4View._21, f4x4View._31), glm::vec3(f4x4View._12, f4x4View._22, f4x4View._32), glm::vec3(f4x4View._13, f4x4View._23, f4x4View._33));
 	// ArcBall rotates the camera basis; a direction follows the inverse rotation in that basis.
 	glm::mat3 screenRotation = glm::transpose(glm::mat3(increment.getTransformation()));

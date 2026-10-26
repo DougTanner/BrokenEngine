@@ -63,6 +63,11 @@ Per-framebuffer command buffers and the submission graph. The Global and Main re
 
 - Global may prepend the texture manager's acquire command buffer, then signals Main. Main waits on both Global completion and swapchain image availability; swapchain acquisition therefore gates Main rather than Global.
 - Main signals the particle semaphore consumed by the next frame's Global submission. Preserve this cross-frame edge when changing particle compute or rendering order.
+- The image pass records a timed UI depth prepass before the debug-texture
+  branch. With `kbDrawModelsOverWorld` false, opaque models precede terrain,
+  water and shields. With it true, those world draws precede a depth clear,
+  an untimed UI depth prepass and opaque models. Transparent models follow in
+  both cases. Only the first UI depth prepass writes its timer queries.
 - Submission workers publish work through `PersistentWorker` wake/wait edges: Main waits for Global, and UI waits for Main. Data read by a worker must be written before its wake.
 - Per-frame uniform copies need no host-write barrier of their own: `Buffer::RecordCopy` supplies barriers on both sides of the copy, and `vkQueueSubmit` implicitly makes the CPU's earlier host-visible writes device-visible. That is what lets a record-once command buffer have its uniform contents rewritten every frame; do not add a per-frame `VK_ACCESS_HOST_WRITE_BIT` barrier or conclude the scheme is unsafe.
 - Main resets the framebuffer fence but submits without it. The inseparable following ImGui submission signals that fence; every path that submits Main must also submit ImGui.
