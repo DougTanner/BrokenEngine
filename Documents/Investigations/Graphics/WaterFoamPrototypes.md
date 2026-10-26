@@ -1,12 +1,14 @@
 # Water foam prototype comparison and shared design
 
-Research/design baseline: `5f205af6a24a17ebf732f7005f03a48e0e6f91e0`, 2026-10-23. This non-executable reference owns shared contracts for two executable scheduler Plans in `Documents/Plans/Engine/`. No prototype implementation, worktree setup, build, capture, or performance measurement is claimed. Runtime work awaits Tier3 execution approval; saving these documents authorizes documentation only.
+Research/design baseline: `5f205af6a24a17ebf732f7005f03a48e0e6f91e0`, 2026-10-23. This non-executable reference preserves the original A/B comparison and shared contracts for the remaining B investigation.
+A was rejected and its investigation and experimental implementation were removed; A/B comparison instructions below are historical. B remains independent.
+No prototype implementation, worktree setup, build, capture, or performance measurement is claimed. Runtime work awaits Tier3 execution approval; saving these documents authorizes documentation only.
 
 ## Comparison overview
 
 | Prototype Plan | Emission | Lifetime | Purpose |
 |---|---|---|---|
-| [A](../Engine/WaterFoamPrototypeA.md) | Existing horizontal Jacobian compression | Instantaneous | Cheap control; does not satisfy requested persistence |
+| A (rejected) | Existing horizontal Jacobian compression | Instantaneous | Former cheap control; does not satisfy requested persistence |
 | [B](../Engine/WaterFoamPrototypeB.md) | Same horizontal Jacobian compression | Exponential persistent coverage | Test persistent fading and filtered coverage |
 
 A deliberately retains its cheap interpolated-J source and lacks B's coverage filtering. The comparison therefore
