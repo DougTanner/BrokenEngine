@@ -27,9 +27,6 @@
     <ClCompile Include="..\..\Source\Engine\Stb.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Engine\Mimalloc.cpp">
-      <Filter>Engine</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Source\Engine\Vma.cpp">
       <Filter>Engine</Filter>
     </ClCompile>

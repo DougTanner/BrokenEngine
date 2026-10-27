@@ -2,6 +2,7 @@
 #include "Graphics/Camera.h"
 #include "Graphics/Screenshot.h"
 #include "Memory/GlobalAllocator.h"
+#include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettings.h"
 #include "CrashReport.h"
 #include "Game.h"
@@ -44,6 +45,11 @@ static LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uiMessage, WPARAM uiWord
 	switch (uiMessage)
 	{
 		case WM_KEYDOWN:
+			if (uiWordParameter == VK_F4 && (GetKeyState(VK_SHIFT) & 0x8000) == 0 && (GetKeyState(VK_CONTROL) & 0x8000) == 0 && (GetKeyState(VK_MENU) & 0x8000) == 0 && (GetKeyState(VK_LWIN) & 0x8000) == 0 && (GetKeyState(VK_RWIN) & 0x8000) == 0)
+			{
+				sbQuit = true;
+				return 0;
+			}
 			if (uiWordParameter == 'Q')
 			{
 				sbComparisonHeld = true;
@@ -138,6 +144,8 @@ int RunModelViewer(HINSTANCE hinstance)
 	}
 	engine::gpIslandTerrain->WaitForElevationMaps();
 	engine::LoadGraphicsSettings();
+	// The viewer never publishes a native water source grid.
+	engine::gWaterLevel.Reset(engine::GraphicsQualityLevel::kLow);
 
 	WNDCLASSEX windowClass
 	{
@@ -311,6 +319,27 @@ static int ProcessMain(HINSTANCE hinstance)
 		engine::SetCrashReportAppDataDirectory(engine::gLaunchOptions.appDataDirectory.c_str());
 	}
 	engine::ResolveCrashReportPaths();
+	using ScopedHandle = std::unique_ptr<void, decltype([](HANDLE handle) noexcept
+	{
+		std::ignore = CloseHandle(handle);
+	})>;
+	HANDLE handleMutex = CreateMutex(nullptr, TRUE, "Broken Engine Sandbox");
+	DWORD uiMutexError = GetLastError();
+	ScopedHandle pMutex(handleMutex);
+	if (handleMutex == nullptr)
+	{
+		LOG(kDefault, kError, "ModelViewer CreateMutex failed: {}", uiMutexError);
+		return 1;
+	}
+	if (uiMutexError == ERROR_ALREADY_EXISTS)
+	{
+		LOG(kDefault, kError, "Another instance is already running");
+		if (engine::gLaunchOptions.iAgentPort == 0)
+		{
+			std::ignore = MessageBox(nullptr, "Another instance is already running", kGameName.data(), MB_OK | MB_ICONERROR);
+		}
+		return 1;
+	}
 	auto pUploads = std::make_unique<engine::TextureUploadManager>();
 	std::unique_ptr<engine::FileManager> pFiles;
 	try

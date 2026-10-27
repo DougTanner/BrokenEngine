@@ -8,9 +8,14 @@ script owns that sequence, its result codes, and its fixed capture timeout.
 
 ## Capture
 
-No claim, launch script, process check, or release applies: the viewer binds no
-port, so the capture takes no harness lock and touches no other session's
-process.
+No harness claim, launch script, process check, or release applies: the viewer
+binds no port, so the capture takes no harness lock and touches no other session's
+process. The native application mutex still applies under
+[Engine single-instance policy](../../../../Engine/Source/AGENTS.md#crash-reporting).
+
+Before capture, apply the pre-launch wait policy in [`launch.md`](launch.md)
+`## Launch`, including its final absence recheck immediately before the capture
+call.
 
 Run one call from the session worktree root, with a fresh app-data path under
 `Temp` stamped with the current UTC time. `-RequireStable` captures until two

@@ -30,7 +30,11 @@ is engine-owned here.
 
 ## Graphics Quality Levels
 
-- The renderer quality levels are engine-owned client-only wrappers. Each discrete level is the persisted source of truth. Water is consumed directly during per-frame rendering; the other levels drive derived renderer wrappers that are never persisted.
+- The renderer quality levels are engine-owned client-only wrappers. Each
+  discrete level is the persisted source of truth. Water is consumed during
+  per-frame rendering; the other levels drive derived renderer wrappers that
+  are never persisted. Water recreation rules live in
+  [CommandBufferManager](../Graphics/Managers/AGENTS.md#commandbuffermanager).
 - Apply functions write derived renderer wrappers through `Set` when a level changes and once after both successful and failed graphics-settings loads. `Graphics::Refresh` is the sole consumer polling those wrappers; apply functions never call `Changed<T>()`.
 
 ## Settings Persistence
@@ -38,7 +42,11 @@ is engine-owned here.
 - `SoundSettings.bin` is version 3 and persists the three volume controls plus the checked-by-default `Mute in background` setting, which save and load preserve and reset restores to its checked default. Version 2 is intentionally rejected and settings fall back to defaults.
 - Background mute is client presentation state and remains outside Frame/PostRender CRC and network state.
 - `GraphicsSettings.cpp` persists the five engine-owned player-facing quality levels in `GraphicsSettings.bin`. A selected level is the persisted source of truth; derived renderer wrapper values are not serialized. Water mesh detail is fixed at `0.25` and is not persisted.
-- `GraphicsSettings.bin` version 18 persists Water quality, the Stagger Smoke Layer Updates flag, and Terrain Shadow Update Cadence. Lighting defaults on; version 17 files intentionally fail the current-format gate and reset with the other graphics settings.
+- `GraphicsSettings.bin` version 19 persists Water quality, Water Foam, the
+  Stagger Smoke Layer Updates flag, and Terrain Shadow Update Cadence. Lighting
+  and Water Foam default on, and Defaults restores them. Older versions fail the
+  current-format gate and use defaults. Water Foam is a validated Boolean byte;
+  any value other than zero or one rejects the whole file before application.
 - The loaders check every persisted language index, float, quality level, and graphics sample count before applying any. A non-finite or out-of-range value, or a sample count that is not one of `gSampleCount`'s allowed values, rejects the whole file with one warning, and every setting it holds stays at its default, as when the file is missing. Accepted floats keep the wrapper's normal snapping.
 - `GameSettings.cpp` persists the selected language, UI font scale, opaque-UI toggle, UI opacity, and UI theme in `GameSettings.bin` version 2. The language is stored as a fixed-width `int32_t` so the `Language` enum's underlying type never decides the file layout; an index outside the enum rejects the file.
 - `TweaksSettings.cpp` persists the ImGui visibility toggle, the sun-angle override, and the Tweaks section state in `TweaksSettings.bin` version 14, versioned POD written through the engine versioned-file helpers, in `kbDebugInput` builds only.

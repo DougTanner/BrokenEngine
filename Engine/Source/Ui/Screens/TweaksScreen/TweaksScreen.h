@@ -90,7 +90,7 @@ public:
 	common::Flags<TweakSectionFlags> mSectionCollapsed {};
 	float mfToggleBarBottom = 0.0f;
 
-	// Slider-map drift audit runs once per TweaksScreen lifetime and is re-armed by graphics reconstruction. Cycles mpiActiveSubtab[] across 6 frames: frames 0-4 queue tabs and frame 5 settles the final selection.
+	// Slider-map drift audit runs once per TweaksScreen lifetime and is re-armed by graphics reconstruction.
 	// miAuditFrame: 0..(kiAuditFrameCount-1) = audit running, -1 = audit complete.
 	std::unordered_set<std::string_view> mAuditTouched;
 	std::unordered_set<std::string_view> mAuditMissed;

@@ -105,9 +105,13 @@ writes; each caller passes whole strings so a path is never split across two
 writes. The header carries a crash-report version, and
 `ParseCrashReportHeader`, the one parser of that header, rejects any other or
 missing version, so bump the version on any header or report layout change.
-The single-instance mutex permits one client per game name in the Windows
+The native single-instance mutex permits one client per game name in the Windows
 session, independent of app-data overrides, worktrees, and build configurations.
-The server uses a distinct game name, so one client and server can run together.
+The Sandbox client and ModelViewer share the `Broken Engine Sandbox` key, so only
+one of them can run at a time. ModelViewer acquires it after allocator thread-local
+setup and before constructing `TextureUploadManager` or `FileManager`, and holds
+it until those managers are destroyed. The server uses a distinct game name and
+can run alongside either application.
 `ProcessMain` renames the previous run's non-empty report to the pending file
 beside it, right after the single-instance check and before any other thread
 starts, and only when both paths resolved from the same base. From then on

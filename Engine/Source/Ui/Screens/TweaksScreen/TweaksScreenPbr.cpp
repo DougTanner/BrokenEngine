@@ -32,7 +32,6 @@ const TweaksSliderMapRegistrar gPhysicallyBasedRenderingRegistrar
 	{"IBL Specular", &gPhysicallyBasedRenderingImageBasedLightingSpecular},
 	{"IBL Specular Power", &gPhysicallyBasedRenderingImageBasedLightingSpecularPower},
 	{"IBL Shadow Blend", &gPhysicallyBasedRenderingImageBasedLightingShadowBlend},
-	{"IBL Ambient Color Blend", &gPhysicallyBasedRenderingImageBasedLightingAmbientColorBlend},
 	{"Cubemap Lod Power", &gPhysicallyBasedRenderingCubemapLevelOfDetailPower},
 	{"Cubemap Lod Offset", &gPhysicallyBasedRenderingCubemapLevelOfDetailOffset},
 	{"Shadow Floor", &gPhysicallyBasedRenderingShadowFloor},
@@ -78,7 +77,6 @@ void RenderPhysicallyBasedRenderingSection(TweaksScreen& rScreen)
 				rScreen.WrapperSlider("IBL Specular", iSection, 1.0f);
 				rScreen.WrapperSlider("IBL Specular Power", iSection, 1.0f);
 				rScreen.WrapperSlider("IBL Shadow Blend", iSection, 1.0f);
-				rScreen.WrapperSlider("IBL Ambient Color Blend", iSection, 1.0f);
 				rScreen.WrapperSlider("Cubemap Lod Power", iSection, 1.0f);
 				rScreen.WrapperSlider("Cubemap Lod Offset", iSection, 1.0f);
 				rScreen.WrapperSlider("Shadow Floor", iSection, 1.0f);

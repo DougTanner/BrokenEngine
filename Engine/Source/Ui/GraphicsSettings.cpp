@@ -25,7 +25,7 @@ enum class GraphicsSettingsFlags : uint8_t
 
 struct GraphicsSettings
 {
-	static constexpr int64_t kiVersion = 18;
+	static constexpr int64_t kiVersion = 19;
 
 	common::Flags<GraphicsSettingsFlags> flags {};
 	uint8_t puiPadding[3] {};
@@ -45,7 +45,8 @@ struct GraphicsSettings
 	uint8_t uiObjectShadowsLevel = 0;
 	uint8_t uiLightingLevel = 0;
 	uint8_t uiSmokeDetailLevel = 0;
-	uint8_t puiQualityPadding[3] {};
+	uint8_t uiWaterFoamEnabled = 1;
+	uint8_t puiQualityPadding[2] {};
 };
 static_assert(std::is_trivially_copyable_v<GraphicsSettings>, "GraphicsSettings must stay trivially copyable — WriteVersionedFile stamps sizeof");
 static_assert(std::is_standard_layout_v<GraphicsSettings>, "GraphicsSettings must stay standard-layout — BT_OFFSETOF below is only well-defined for standard-layout types");
@@ -65,7 +66,8 @@ static_assert(BT_OFFSETOF(GraphicsSettings, uiTerrainShadowsLevel) == 41, "Graph
 static_assert(BT_OFFSETOF(GraphicsSettings, uiObjectShadowsLevel) == 42, "GraphicsSettings::uiObjectShadowsLevel offset changed — existing quality bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, uiLightingLevel) == 43, "GraphicsSettings::uiLightingLevel offset changed — existing quality bytes move");
 static_assert(BT_OFFSETOF(GraphicsSettings, uiSmokeDetailLevel) == 44, "GraphicsSettings::uiSmokeDetailLevel offset changed — existing quality bytes move");
-static_assert(BT_OFFSETOF(GraphicsSettings, puiQualityPadding) == 45, "GraphicsSettings padding changed — GraphicsSettings must remain 48 bytes");
+static_assert(BT_OFFSETOF(GraphicsSettings, uiWaterFoamEnabled) == 45, "GraphicsSettings::uiWaterFoamEnabled offset changed — existing quality bytes move");
+static_assert(BT_OFFSETOF(GraphicsSettings, puiQualityPadding) == 46, "GraphicsSettings padding changed — GraphicsSettings must remain 48 bytes");
 static_assert(sizeof(GraphicsSettings) == 48, "GraphicsSettings::kiVersion must be bumped with this layout");
 constexpr char kpcGraphicsSettingsPath[] = "GraphicsSettings.bin";
 
@@ -90,6 +92,7 @@ void SaveGraphicsSettings()
 		.uiObjectShadowsLevel = static_cast<uint8_t>(gObjectShadowsLevel.Get<int64_t>()),
 		.uiLightingLevel = static_cast<uint8_t>(gLightingLevel.Get<int64_t>()),
 		.uiSmokeDetailLevel = static_cast<uint8_t>(gSmokeDetailLevel.Get<int64_t>()),
+		.uiWaterFoamEnabled = static_cast<uint8_t>(gWaterFoamSystemEnabled.Get<bool>()),
 	};
 
 	graphicsSettings.flags.Set(GraphicsSettingsFlags::kFullscreen, gFullscreen.Get<bool>());
@@ -177,6 +180,11 @@ static const char* FindInvalidGraphicsSetting(const GraphicsSettings& rGraphicsS
 		return "uiSmokeDetailLevel";
 	}
 
+	if (rGraphicsSettings.uiWaterFoamEnabled > 1)
+	{
+		return "uiWaterFoamEnabled";
+	}
+
 	return nullptr;
 }
 
@@ -222,6 +230,7 @@ bool LoadGraphicsSettings()
 		gWindEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kWind);
 		gLightingEnabled.Set(graphicsSettings.flags & GraphicsSettingsFlags::kLighting);
 		LoadGraphicsQualityLevel(gWaterLevel, graphicsSettings.uiWaterLevel);
+		gWaterFoamSystemEnabled.Set(graphicsSettings.uiWaterFoamEnabled != 0);
 		LoadGraphicsQualityLevel(gTerrainShadowsLevel, graphicsSettings.uiTerrainShadowsLevel);
 		LoadGraphicsQualityLevel(gObjectShadowsLevel, graphicsSettings.uiObjectShadowsLevel);
 		LoadGraphicsQualityLevel(gLightingLevel, graphicsSettings.uiLightingLevel);
@@ -248,6 +257,7 @@ void ResetGraphicsSettings()
 	gMipmapLevelOfDetailBias.mfCurrent = gMipmapLevelOfDetailBias.mfDefault;
 	gWaterShapeDetail.mfCurrent = gWaterShapeDetail.mfDefault;
 	gSmokeEnabled.mfCurrent = gSmokeEnabled.mfDefault;
+	gWaterFoamSystemEnabled.mfCurrent = gWaterFoamSystemEnabled.mfDefault;
 	gSmokeLayerStagger.mfCurrent = gSmokeLayerStagger.mfDefault;
 	gSmokeSimulationArea.mfCurrent = gSmokeSimulationArea.mfDefault;
 	gSunMoonMinimumAmbient.mfCurrent = gSunMoonMinimumAmbient.mfDefault;

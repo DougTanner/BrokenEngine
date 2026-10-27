@@ -227,8 +227,6 @@ void operator delete[](void* pMemory, std::align_val_t eAlignment, const std::no
 
 #endif
 
-constexpr int64_t kiMimallocArenaReserveMebibytes = 10 * 1'024;
-
 struct MemoryInitializer
 {
 	MemoryInitializer()
@@ -253,11 +251,12 @@ struct MemoryInitializer
 		statistics.size = sizeof(mi_stats_t);
 		statistics.version = MI_STAT_VERSION;
 		bool bStatisticsRead = mi_stats_get(&statistics);
+		int64_t iArenaReserveMebibytes = mi_option_get_size(mi_option_reserve_os_memory) / (1'024 * 1'024);
 		int64_t iReservedMebibytes = statistics.reserved.current / (1'024 * 1'024);
 		int64_t iCommittedMebibytes = statistics.committed.current / (1'024 * 1'024);
-		if (!bStatisticsRead || iReservedMebibytes < kiMimallocArenaReserveMebibytes || iCommittedMebibytes < kiMimallocArenaReserveMebibytes)
+		if (!bStatisticsRead || iReservedMebibytes < iArenaReserveMebibytes || iCommittedMebibytes < iArenaReserveMebibytes)
 		{
-			LOG(kDefault, kWarning, "mimalloc arena reserve of {} MiB not found (reserved: {} MiB, committed: {} MiB); continuing on on-demand arenas", kiMimallocArenaReserveMebibytes, iReservedMebibytes, iCommittedMebibytes);
+			LOG(kDefault, kWarning, "mimalloc arena reserve of {} MiB not found (reserved: {} MiB, committed: {} MiB); continuing on on-demand arenas", iArenaReserveMebibytes, iReservedMebibytes, iCommittedMebibytes);
 		}
 
 		if constexpr (kbMimallocDiagnostics)
@@ -282,10 +281,11 @@ struct MemoryInitializer
 			statistics.version = MI_STAT_VERSION;
 			mi_stats_get(&statistics);
 
+			int64_t iArenaReserveMebibytes = mi_option_get_size(mi_option_reserve_os_memory) / (1'024 * 1'024);
 			int64_t iPeakCommittedMebibytes = statistics.committed.peak / (1'024 * 1'024);
 
 			// May log during static destruction: Log.cpp initializes via init_seg(lib), so it is destroyed after this default-phase object.
-			LOG(kDefault, kInfo, "Mimalloc peak heap usage: {} MiB, peak committed: {} MiB, arenas: {} (after reserve: {}), arena reserve: {} MiB", statistics.page_committed.peak / (1'024 * 1'024), iPeakCommittedMebibytes, statistics.arena_count.total, iArenaCountAfterReserve, kiMimallocArenaReserveMebibytes);
+			LOG(kDefault, kInfo, "Mimalloc peak heap usage: {} MiB, peak committed: {} MiB, arenas: {} (after reserve: {}), arena reserve: {} MiB", statistics.page_committed.peak / (1'024 * 1'024), iPeakCommittedMebibytes, statistics.arena_count.total, iArenaCountAfterReserve, iArenaReserveMebibytes);
 
 			// More arenas than after the reserve means the reserve failed or was undersized.
 			if (statistics.arena_count.total > iArenaCountAfterReserve)

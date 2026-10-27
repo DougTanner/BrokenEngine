@@ -13,6 +13,7 @@ Wrapper gSampleShading(false);
 Wrapper gMinimumSampleShading(0.6f, 0.0f, 1.0f);
 Wrapper gMipmapLevelOfDetailBias(1.0f, 0.0f, 2.0f);
 Wrapper gWaterShapeDetail(1.0f / 4.0f, 1.0f / 8.0f, 1.0f / 2.0f); // Fixed WaterDetailTextureSize scale; not exposed or persisted
+Wrapper gWaterFoamSystemEnabled(true);
 Wrapper gSmokeSimulationPixels(1.0f, 0.5f, 1.5f);
 Wrapper gSmokeSimulationArea(1.2f, 1.0f, 1.5f);
 Wrapper gOpaqueUi(false);

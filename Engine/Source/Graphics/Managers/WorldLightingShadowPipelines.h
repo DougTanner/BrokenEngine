@@ -13,7 +13,7 @@ class WorldLightingShadowPipelines
 {
 public:
 
-	WorldLightingShadowPipelines(std::unordered_map<common::crc_t, Shader>& rShaders, Pipeline* pPipelines, Pipeline* pSpreadPipelines, std::string* pSpreadPipelineNames, Pipeline& rCombinePipeline, Pipeline& rLightingTemporalPipeline, Pipeline& rLightingHistoryCopyPipeline, Texture** ppWaterNormalTextures);
+	WorldLightingShadowPipelines(std::unordered_map<common::crc_t, Shader>& rShaders, Pipeline* pPipelines, Pipeline* pSpreadPipelines, std::string* pSpreadPipelineNames, Pipeline& rCombinePipeline, Pipeline& rLightingTemporalPipeline, Pipeline& rLightingHistoryCopyPipeline, Texture** ppWaterNormalTextures, Texture** ppWaterFoamTextures, Texture** ppWaterFoamBreakupTextures);
 
 	void CreateLightingPipelines();
 	void CreatePipelineShadows();
@@ -28,6 +28,8 @@ public:
 	Pipeline& mrLightingTemporalPipeline;
 	Pipeline& mrLightingHistoryCopyPipeline;
 	Texture** mppWaterNormalTextures = nullptr;
+	Texture** mppWaterFoamTextures = nullptr;
+	Texture** mppWaterFoamBreakupTextures = nullptr;
 };
 
 } // namespace engine

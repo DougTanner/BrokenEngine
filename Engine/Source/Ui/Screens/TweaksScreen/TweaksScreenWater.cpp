@@ -116,6 +116,17 @@ const TweaksSliderMapRegistrar gWaterRegistrar
 	{"Beach Skybox 1 Reduction", &gLightingWaterSkyboxOneBeachReduction},
 	{"Beach Skybox 2 Reduction", &gLightingWaterSkyboxTwoBeachReduction},
 	{"Beach Skybox 3 Reduction", &gLightingWaterSkyboxThreeBeachReduction},
+	// Foam
+	{"Foam Emission Rate", &gWaterFoamEmissionRate},
+	{"Foam J Start", &gWaterFoamJStart},
+	{"Foam J Full", &gWaterFoamJFull},
+	{"Foam Half Life", &gWaterFoamHalfLife},
+	{"Foam Texture Tile Size", &gWaterFoamTextureTileSize},
+	{"Foam Texture Strength", &gWaterFoamTextureStrength},
+	{"Foam Breakup Tile Size", &gWaterFoamBreakupTileSize},
+	{"Foam Breakup Amount", &gWaterFoamBreakupAmount},
+	{"Foam Spawn Noise Amount", &gWaterFoamSpawnNoiseAmount},
+	{"Foam Spawn Noise Tile Size", &gWaterFoamSpawnNoiseTileSize},
 };
 
 void RenderWaterSection(TweaksScreen& rScreen)
@@ -286,6 +297,28 @@ void RenderWaterSection(TweaksScreen& rScreen)
 			rScreen.WrapperSlider("Beach Skybox 2 Reduction", iSection);
 			rScreen.WrapperSlider("Beach Skybox 3 Reduction", iSection);
 
+			ImGui::EndTabItem();
+		}
+		if (rScreen.BeginSubtab("Foam", iSection, 5))
+		{
+			bool bEnabled = gWaterFoamEnabled.Get<bool>();
+			if (ImGui::Checkbox("Foam Enabled", &bEnabled))
+			{
+				gWaterFoamEnabled.Set(bEnabled);
+			}
+			rScreen.WrapperSlider("Foam Emission Rate", iSection);
+			rScreen.WrapperSlider("Foam J Start", iSection);
+			rScreen.WrapperSlider("Foam J Full", iSection);
+			gWaterFoamJFull.Set(std::min(gWaterFoamJFull.mfCurrent, gWaterFoamJStart.mfCurrent - 0.001f));
+			rScreen.WrapperSlider("Foam Half Life", iSection);
+			rScreen.ChevronIndexSelector("Foam Texture", gWaterFoamTextureIndex, TextureManager::kpWaterFoamNames);
+			rScreen.WrapperSlider("Foam Texture Tile Size", iSection);
+			rScreen.WrapperSlider("Foam Texture Strength", iSection);
+			rScreen.ChevronIndexSelector("Foam Breakup Texture", gWaterFoamBreakupTextureIndex, TextureManager::kpWaterFoamBreakupNames);
+			rScreen.WrapperSlider("Foam Breakup Tile Size", iSection);
+			rScreen.WrapperSlider("Foam Breakup Amount", iSection);
+			rScreen.WrapperSlider("Foam Spawn Noise Amount", iSection);
+			rScreen.WrapperSlider("Foam Spawn Noise Tile Size", iSection);
 			ImGui::EndTabItem();
 		}
 		ImGui::EndTabBar();

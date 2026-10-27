@@ -42,6 +42,9 @@ layout (set = 1, binding = 8) uniform sampler2D pWaterNormalSamplers[kiWaterNorm
 layout (set = 1, binding = 9) uniform sampler2D depthLutSampler;
 layout (set = 1, binding = 10) uniform sampler2D pSmokeSamplers[kiMaxFlightPlanes];
 layout (set = 1, binding = 11) uniform sampler2D ambientLightingSampler;
+layout (set = 1, binding = kiWaterBindingFoam) uniform sampler2D foamTextureSampler;
+layout (set = 1, binding = kiWaterBindingFoamColor) uniform sampler2D pFoamColorTextureSamplers[kiWaterFoamTextureCount];
+layout (set = 1, binding = kiWaterBindingFoamBreakup) uniform sampler2D pFoamBreakupTextureSamplers[kiWaterFoamBreakupTextureCount];
 
 // Input
 layout (location = 0) in vec2 f2InInitialPosition;
@@ -108,6 +111,22 @@ void main()
 	float fHeight = f3InPosition.z - fTerrainElevation;
 	vec3 f3PreLightingColor = mix(f3DepthColor, f3WaterColor, clamp(fHeight * globalLayout.fWaterDepthColorFeather + globalLayout.fWaterDepthLookupTableSunsetFade, globalLayout.fWaterDepthColorFloor, 1.0f));
 
+	bool bFoamEnabled = globalLayout.iWaterFoamEnabled != 0;
+	vec3 f3FoamColor;
+	float fFoamShade;
+	if (bFoamEnabled)
+	{
+		vec2 f2FoamUv = vec2(f2WorldInitialPosition.x - globalLayout.f4WaterFoamArea.x, globalLayout.f4WaterFoamArea.y - f2WorldInitialPosition.y) * globalLayout.f2WaterFoamAreaInverseSize;
+		float fCoverage = texture(foamTextureSampler, f2FoamUv).x;
+		vec2 f2FoamTextureUv = globalLayout.fWaterFoamTextureInverseTileSize * f2InInitialPosition + globalLayout.f2WaterFoamReducedTextureOrigin;
+		f3FoamColor = textureGrad(pFoamColorTextureSamplers[globalLayout.uiWaterFoamTextureIndex], f2FoamTextureUv, globalLayout.fWaterFoamTextureInverseTileSize * dFdx(f2InInitialPosition), globalLayout.fWaterFoamTextureInverseTileSize * dFdy(f2InInitialPosition)).rgb;
+		vec2 f2FoamBreakupUv = globalLayout.fWaterFoamBreakupInverseTileSize * f2InInitialPosition + globalLayout.f2WaterFoamBreakupReducedTextureOrigin;
+		float fFoamBreakupOpacity = textureGrad(pFoamBreakupTextureSamplers[globalLayout.uiWaterFoamBreakupTextureIndex], f2FoamBreakupUv, globalLayout.fWaterFoamBreakupInverseTileSize * dFdx(f2InInitialPosition), globalLayout.fWaterFoamBreakupInverseTileSize * dFdy(f2InInitialPosition)).x;
+		float fFoamMask = mix(1.0f, fFoamBreakupOpacity, globalLayout.fWaterFoamBreakupAmount);
+		fFoamShade = clamp(fCoverage * fFoamMask * globalLayout.fWaterFoamTextureStrength, 0.0f, 1.0f);
+		f3FoamColor = pow(f3FoamColor, vec3(2.2));
+	}
+
 	float fDirectionalLighting = max(1.0f - globalLayout.fWaterDirectional, dot(f3InNormal, globalLayout.f4SunMoonNormal.xyz));
 	vec3 f3DirectionalLighting = f3PreLightingColor * fDirectionalLighting;
 	vec3 f3LightingColor = mix(f3PreLightingColor, f3DirectionalLighting, 0.75f);
@@ -127,10 +146,21 @@ void main()
 	// Factor the skybox combine so Height Darken can weight base color and skybox specular independently:
 	// mix(A, B, t) + add*t*B = (1-t)*A + (1+add)*t*B → base = (1-fReflection)*f3LightingColor, specular = (1+fSkyboxAdd)*fReflection*f3SkyboxColorSun.
 	float fSkyboxAdd = mainLayout.fLightingWaterSkyboxAdd;
-	vec3 f3SkyboxSpecular = (1.0f + fSkyboxAdd) * fReflection * f3SkyboxColorSun;
+	vec3 f3SkyboxSpecular;
 	// fReflection is unbounded (~2.5 at defaults at highlight peaks); clamp only this attenuation use so
 	// (1-fReflection) can't go negative and drive negative RGB into the F16 target (UNORM used to clamp this).
-	f3LightingColor = (1.0f - min(fReflection, 1.0f)) * f3LightingColor;
+	if (bFoamEnabled)
+	{
+		vec3 f3FoamLightingColor = mix(f3FoamColor, f3FoamColor * fDirectionalLighting, 0.75f);
+		f3SkyboxSpecular = (1.0f - fFoamShade) * (1.0f + fSkyboxAdd) * fReflection * f3SkyboxColorSun;
+		f3LightingColor = mix((1.0f - min(fReflection, 1.0f)) * f3LightingColor, f3FoamLightingColor, fFoamShade);
+		f3PreLightingColor = mix(f3PreLightingColor, f3FoamColor, fFoamShade);
+	}
+	else
+	{
+		f3SkyboxSpecular = (1.0f + fSkyboxAdd) * fReflection * f3SkyboxColorSun;
+		f3LightingColor = (1.0f - min(fReflection, 1.0f)) * f3LightingColor;
+	}
 
 	// Wave trough darken: at z >= Top no darkening (multiplier 1.0); at z <= Bottom max darkening (multiplier 1.0 - Target).
 	// Source/Lighting weights independently mix the per-path multiplier toward 1.0 so each contribution can opt in/out.

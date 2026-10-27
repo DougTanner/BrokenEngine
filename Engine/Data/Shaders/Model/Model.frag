@@ -227,8 +227,8 @@ void main()
 	// Compute vectors
 	vec3 n = GetNormal(material);
 	vec3 v = normalize(mainLayout.f4ModelEyePosition.xyz - f3InWorldPosition);
-	// GlobalUniforms.cpp normalizes f4SunMoonNormal before this shader uses it, so l is unit.
-	vec3 l = globalLayout.f4SunMoonNormal.xyz;
+	// GlobalUniforms.cpp normalizes f4ModelSunMoonNormal before this shader uses it, so l is unit.
+	vec3 l = globalLayout.f4ModelSunMoonNormal.xyz;
 	vec3 h = normalize(l + v);
 	vec3 reflection = -reflect(v, n);
 
@@ -292,7 +292,7 @@ void main()
 	vec3 f3IblDiffuse;
 	vec3 f3IblSpecular;
 	GetIBLContribution(NdotV, perceptualRoughness, diffuseColor, specularColor, n, reflection, f3IblDiffuse, f3IblSpecular);
-	f3IblDiffuse *= mainLayout.fPhysicallyBasedRenderingAmbient * mix(vec3(1.0), f3AmbientColor, mainLayout.fPhysicallyBasedRenderingImageBasedLightingAmbientColorBlend) * mix(1.0, fShadow, mainLayout.fPhysicallyBasedRenderingImageBasedLightingShadowBlend);
+	f3IblDiffuse *= mainLayout.fPhysicallyBasedRenderingAmbient * f3AmbientColor * mix(1.0, fShadow, mainLayout.fPhysicallyBasedRenderingImageBasedLightingShadowBlend);
 	f3IblSpecular *= max(globalLayout.f4PhysicallyBasedRenderingSunColorObjectsImageBasedLighting.rgb  * fShadow,
 	                     globalLayout.f4PhysicallyBasedRenderingMoonColorObjectsImageBasedLighting.rgb * fShadowMoon);
 	vec3 f3IblDiffuseResult = pow(mainLayout.fPhysicallyBasedRenderingImageBasedLightingDiffuse * f3IblDiffuse, vec3(mainLayout.fPhysicallyBasedRenderingImageBasedLightingDiffusePower));

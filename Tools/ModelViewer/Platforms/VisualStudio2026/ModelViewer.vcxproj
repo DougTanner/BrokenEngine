@@ -201,6 +201,13 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Screenshot.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\LaunchOptions.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Memory\Mimalloc.cpp">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles></ForcedIncludeFiles>
+      <PreprocessorDefinitions>MI_DEFAULT_RESERVE_OS_MEMORY=10485760;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManager.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsSettings.cpp" />

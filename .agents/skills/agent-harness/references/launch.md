@@ -26,11 +26,12 @@ blocking the harness server, mark every criterion `BLOCKED` citing that row, and
 add no `HARNESS-F` finding. Never stop, quit, or signal a listed process; it
 belongs to the user.
 
-The single-client policy is owned by `Engine/Source/AGENTS.md` `## Crash Reporting`.
+The native single-instance policy is owned by `Engine/Source/AGENTS.md` `## Crash Reporting`.
 Before a runtime session, enumerate sandbox clients across worktrees and build
 configurations (`BrokenEngineSandbox.exe`, `BrokenEngineSandbox.Debug.exe`, and
-`BrokenEngineSandbox.Profile.exe`). Wait until none are running and recheck
-immediately before the first client launch; never stop a foreign client. Run
+`BrokenEngineSandbox.Profile.exe`) and viewers (`ModelViewer.exe` and
+`ModelViewer.Debug.exe`). Wait until none are running and recheck
+immediately before the first client launch; never stop a foreign process. Run
 one owned client/server pair and require the server to report exactly one
 connected client. A foreign join invalidates an isolated comparison.
 

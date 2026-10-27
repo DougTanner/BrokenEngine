@@ -634,6 +634,13 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <ClCompile Include="..\..\Source\Agent\AgentCommandsClient.cpp" />
     <ClCompile Include="..\..\Source\Agent\AgentScene.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.cpp" />
+    <ClCompile Include="..\..\..\..\Engine\Source\Memory\Mimalloc.cpp">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles></ForcedIncludeFiles>
+      <PreprocessorDefinitions>MI_DEFAULT_RESERVE_OS_MEMORY=1048576;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\CameraBase.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Debug\DebugRender.cpp" />
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Graphics.cpp" />
@@ -855,6 +862,7 @@ if /I "$(DataBuildMode)"=="Local" if /I "$(RunDataPacker)"=="true" if /I "$(Data
     <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterDisplacement.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Smoke\SmokeOccupancyDilate.comp" />
     <None Include="..\..\..\..\Engine\Data\Shaders\Smoke\SmokeOccupancyDilateRemap.comp" />
+    <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterFoam.comp" />
   </ItemGroup>
   <Target Name="ValidateDataBuildProperties" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(DataBuildMode)'!='Local' and '$(DataBuildMode)'!='Shared'" Text="DataBuildMode must be Local or Shared; received '$(DataBuildMode)'." />

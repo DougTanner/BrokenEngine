@@ -128,6 +128,9 @@
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Render\WindUniforms.cpp"><Filter>Engine\Graphics\Render</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Graphics\Screenshot.cpp"><Filter>Engine\Graphics</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\LaunchOptions.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Memory\Mimalloc.cpp">
+      <Filter>Engine\Memory</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.cpp"><Filter>Engine\Memory</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Profile\ProfileManager.cpp"><Filter>Engine\Profile</Filter></ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Ui\GraphicsQualityWrappersBase.cpp"><Filter>Engine\Ui</Filter></ClCompile>

@@ -230,8 +230,12 @@ static void EndFrameInterpolateRender(int64_t iCommandBuffer)
 
 void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, std::chrono::duration<float> currentTime)
 {
-	if (rActiveCoordinates.empty() || rRenderInterpolates.find(cameraCoordinate) == rRenderInterpolates.end())
+	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(&gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
+	RenderWaterMain(iCommandBuffer, currentTime);
+
+	if (rActiveCoordinates.empty() || !rRenderInterpolates.contains(cameraCoordinate))
 	{
+		gpPipelineManager->mpPipelines[kPipelineWater].WriteIndirectBuffer(iCommandBuffer, 0);
 		// Active-set computation and reset include the client cell, and boot prerender seeds the origin; the empty-set check is defensive.
 		// A missing camera interpolate can coexist with other renderable cells. Begin/end publication without per-cell Render clears indirect counts and per-transaction profile counters; collection BeginRender skips missing interpolates.
 		// Return before accessing the absent camera interpolate.
@@ -247,12 +251,9 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 	}
 
 	const game::FrameInterpolate& rCameraInterpolate = rRenderInterpolates.at(cameraCoordinate);
-	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(&gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory[0]);
 
 	RenderLightingMain(iCommandBuffer);
 	gpBufferManager->ResetSkinningAllocations(iCommandBuffer);
-
-	RenderWaterMain(iCommandBuffer, currentTime);
 
 	BeginFrameInterpolateRender(iCommandBuffer, rRenderInterpolates, rActiveCoordinates);
 

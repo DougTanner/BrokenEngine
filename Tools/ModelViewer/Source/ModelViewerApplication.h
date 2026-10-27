@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Frame/CellStaticData.h"
+
 namespace game
 {
 
@@ -15,6 +17,7 @@ public:
 	void RenderUi();
 	void CreateGraphicsResources();
 	void RenderModel(int64_t iCommandBuffer);
+	bool mbWorldBackground = true;
 
 private:
 	enum class ViewerFlags : uint8_t
@@ -34,21 +37,25 @@ private:
 		float fRadius = 0.0f;
 	};
 	void PreparePreview(Preview& rPreview);
-	void ApplyLightingValues(const std::array<float, 21>& rValues);
-	void SaveLightingPreset(const std::array<float, 21>& rValues);
+	void GenerateIslands();
+	void ApplyLightingValues(const std::array<float, 20>& rValues);
+	void SaveLightingPreset(const std::array<float, 20>& rValues);
 	std::vector<Preview> mPreviews;
 	int64_t miSelected = 0;
 	int64_t miFittedSelection = -1;
 	int64_t miSelectedAnimation = -1;
 	std::chrono::duration<float> mAnimationTime {};
 	common::Flags<ViewerFlags> mFlags;
-	std::array<float, 21> mLightingTweaks {};
+	std::array<float, 20> mLightingTweaks {};
 	int64_t miSelectedLightingPreset = 0;
 	uint32_t muiLightingRevision = 0;
 	int64_t miDragButton = -1;
 	glm::vec2 mPreviousMousePosition {};
 
 	common::Timer mTimer;
+	engine::GridCoord mIslandSeed = engine::kOriginCoordinate;
+	engine::CellStaticData mIslandCell {.coordinate = engine::kOriginCoordinate};
+	common::RandomEngine mSeedRandomEngine;
 	std::unordered_map<engine::GridCoord, FrameInterpolate> mRenderInterpolates;
 	std::vector<engine::GridCoord> mActiveCoordinates;
 	int64_t miFrame = 0;

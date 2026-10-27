@@ -57,7 +57,7 @@ void Camera::RotateSun(const glm::vec2& rAnchor, const glm::vec2& rPosition)
 	// ArcBall rotates the camera basis; a direction follows the inverse rotation in that basis.
 	glm::mat3 screenRotation = glm::transpose(glm::mat3(increment.getTransformation()));
 	glm::quat worldRotation = glm::quat_cast(cameraBasis * screenRotation * glm::transpose(cameraBasis));
-	mSunRotation = glm::normalize(worldRotation * mSunRotation);
+	mModelSunRotation = glm::normalize(worldRotation * mModelSunRotation);
 }
 
 float Camera::SunAngle() const

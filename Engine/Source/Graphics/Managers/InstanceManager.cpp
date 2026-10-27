@@ -514,6 +514,15 @@ void InstanceManager::ValidatePhysicalDeviceCapabilities()
 		throw std::runtime_error("Smoke texture format does not support storage images");
 	}
 
+	VkFormatProperties vkFoamFormatProperties {};
+	vkGetPhysicalDeviceFormatProperties(mVkPhysicalDevice, shaders::kVkFormatWaterFoam, &vkFoamFormatProperties);
+	static constexpr VkFormatFeatureFlags kVkFoamRequiredFeatures = VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT | VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT;
+	if ((vkFoamFormatProperties.optimalTilingFeatures & kVkFoamRequiredFeatures) != kVkFoamRequiredFeatures)
+	{
+		LOG(kGraphics, kError, "Water foam prototype requires R16_SFLOAT storage, sampled linear filtering and blit source/destination support");
+		throw std::runtime_error("Water foam prototype R16_SFLOAT format requirements not supported");
+	}
+
 	ASSERT(mVkPhysicalDeviceFeatures2.features.sampleRateShading == VK_TRUE);
 	ASSERT(mVkPhysicalDeviceFeatures2.features.samplerAnisotropy == VK_TRUE);
 	if constexpr (kbShaderRealtimeClock)

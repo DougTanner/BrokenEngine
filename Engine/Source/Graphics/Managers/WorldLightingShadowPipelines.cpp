@@ -9,7 +9,7 @@
 namespace engine
 {
 
-WorldLightingShadowPipelines::WorldLightingShadowPipelines(std::unordered_map<common::crc_t, Shader>& rShaders, Pipeline* pPipelines, Pipeline* pSpreadPipelines, std::string* pSpreadPipelineNames, Pipeline& rCombinePipeline, Pipeline& rLightingTemporalPipeline, Pipeline& rLightingHistoryCopyPipeline, Texture** ppWaterNormalTextures)
+WorldLightingShadowPipelines::WorldLightingShadowPipelines(std::unordered_map<common::crc_t, Shader>& rShaders, Pipeline* pPipelines, Pipeline* pSpreadPipelines, std::string* pSpreadPipelineNames, Pipeline& rCombinePipeline, Pipeline& rLightingTemporalPipeline, Pipeline& rLightingHistoryCopyPipeline, Texture** ppWaterNormalTextures, Texture** ppWaterFoamTextures, Texture** ppWaterFoamBreakupTextures)
 : mrShaders(rShaders)
 , mpPipelines(pPipelines)
 , mpSpreadPipelines(pSpreadPipelines)
@@ -18,6 +18,8 @@ WorldLightingShadowPipelines::WorldLightingShadowPipelines(std::unordered_map<co
 , mrLightingTemporalPipeline(rLightingTemporalPipeline)
 , mrLightingHistoryCopyPipeline(rLightingHistoryCopyPipeline)
 , mppWaterNormalTextures(ppWaterNormalTextures)
+, mppWaterFoamTextures(ppWaterFoamTextures)
+, mppWaterFoamBreakupTextures(ppWaterFoamBreakupTextures)
 {
 }
 
@@ -276,6 +278,14 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 	{
 		mppWaterNormalTextures[i] = &gpTextureManager->mTextureMap.at(TextureManager::kpWaterNormalCrcs[i]);
 	}
+	for (int64_t i = 0; i < TextureManager::kiWaterFoamTextureCount; ++i)
+	{
+		mppWaterFoamTextures[i] = &gpTextureManager->mTextureMap.at(TextureManager::kpWaterFoamCrcs[i]);
+	}
+	for (int64_t i = 0; i < TextureManager::kiWaterFoamBreakupTextureCount; ++i)
+	{
+		mppWaterFoamBreakupTextures[i] = &gpTextureManager->mTextureMap.at(TextureManager::kpWaterFoamBreakupCrcs[i]);
+	}
 
 	mpPipelines[kPipelineTerrain].Create(
 	{
@@ -344,6 +354,23 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 		},
 	});
 
+	mpPipelines[kPipelineWaterFoam].Create(
+	{
+		.name = "WaterFoam",
+		.flags = {PipelineFlags::kCompute},
+		.ppShaders = {&mrShaders.at(data::kShadersWaterWaterFoamcompCrc)},
+		.descriptorInfos =
+		{
+			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
+			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClampLinear}, .pTexture = &gpTextureManager->mRenderTargetTextures.mTerrainElevationTexture},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClampLinear}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementNormalTexture},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClampLinear}, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterFoamHistoryTexture},
+			{.flags = DescriptorFlags::kStorageImages, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterFoamCurrentTexture},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeat}, .iExplicitBinding = shaders::kiWaterFoamBindingSpawnNoise, .textureCrc = data::kTexturesSmokeBC4tex_glass_0001_MKjpgCrc},
+		},
+	});
+
 	// Water. All three skybox-specular lobes are evaluated inline with analytic specular AA
 	// (WATER_SPEC_AA_MODE in Water.frag) instead of MSAA sample shading — kSampleShading stays off.
 	mpPipelines[kPipelineWater].Create(
@@ -371,6 +398,9 @@ void WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines()
 			// unused.
 			{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiWaterBindingDisplacement, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementTexture},
 			{.flags = DescriptorFlags::kCombinedSamplers, .iExplicitBinding = shaders::kiWaterBindingDisplacementNormal, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterDisplacementNormalTexture},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerClampLinear}, .iExplicitBinding = shaders::kiWaterBindingFoam, .pTexture = &gpTextureManager->mRenderTargetTextures.mWaterFoamHistoryTexture},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeat}, .iCount = TextureManager::kiWaterFoamTextureCount, .iExplicitBinding = shaders::kiWaterBindingFoamColor, .ppTextures = mppWaterFoamTextures},
+			{.flags = {DescriptorFlags::kCombinedSamplers, DescriptorFlags::kSamplerMirroredRepeat}, .iCount = TextureManager::kiWaterFoamBreakupTextureCount, .iExplicitBinding = shaders::kiWaterBindingFoamBreakup, .ppTextures = mppWaterFoamBreakupTextures},
 		},
 	});
 }

@@ -76,8 +76,8 @@ Wrapper gWaterLowWavelengthAdjust(-0.75f, -2.0f, 0.0f);
 Wrapper gWaterLowAmplitudeAdjust(1.0f, 0.0f, 4.0f);
 Wrapper gWaterLowSpeedAdjust(0.288f, 0.0f, 4.0f);
 // Camera-height fade for low-frequency wave amplitudes: 1.0 at or below Start, 0.0 at or above End, and linear between.
-Wrapper gWaterLowAmplitudeFadeStart(300.0f, 0.0f, 1'000.0f);
-Wrapper gWaterLowAmplitudeFadeEnd(600.0f, 0.0f, 1'000.0f);
+Wrapper gWaterLowAmplitudeFadeStart(300.0f, 0.0f, 10'000.0f);
+Wrapper gWaterLowAmplitudeFadeEnd(600.0f, 0.0f, 10'000.0f);
 
 // Medium frequency waves
 Wrapper gWaterMediumCount(255i64, std::vector<int64_t> {15, 31, 63, 127, 255});
@@ -90,8 +90,8 @@ Wrapper gWaterMediumWavelengthAdjust(0.8f, 0.0f, 1.0f);
 Wrapper gWaterMediumAmplitudeAdjust(0.9f, 0.0f, 5.0f);
 Wrapper gWaterMediumSpeedAdjust(2.0f, 0.0f, 5.0f);
 // Camera-height fade for medium-frequency wave amplitudes (independent of low). Same start/end convention as low.
-Wrapper gWaterMediumAmplitudeFadeStart(300.0f, 0.0f, 1'000.0f);
-Wrapper gWaterMediumAmplitudeFadeEnd(600.0f, 0.0f, 1'000.0f);
+Wrapper gWaterMediumAmplitudeFadeStart(300.0f, 0.0f, 10'000.0f);
+Wrapper gWaterMediumAmplitudeFadeEnd(600.0f, 0.0f, 10'000.0f);
 
 // Depth
 Wrapper gWaterTerrainHeight(3.5f, 1.0f, 8.0f);
@@ -124,5 +124,20 @@ Wrapper gWaterMediumShoreSoftness(0.3f, 0.0f, 1.0f);
 Wrapper gLightingWaterSkyboxOneBeachReduction(0.1f, 0.0f, 1.0f);
 Wrapper gLightingWaterSkyboxTwoBeachReduction(0.1f, 0.0f, 1.0f);
 Wrapper gLightingWaterSkyboxThreeBeachReduction(0.5f, 0.0f, 1.0f);
+
+// Foam
+Wrapper gWaterFoamEnabled(true);
+Wrapper gWaterFoamEmissionRate(20.0f, 0.0f, 40.0f);
+Wrapper gWaterFoamJStart(0.805447f, 0.01f, 1.0f);
+Wrapper gWaterFoamJFull(0.306866f, -1.0f, 0.99f);
+Wrapper gWaterFoamHalfLife(0.714428f, 0.1f, 2.0f);
+Wrapper gWaterFoamTextureIndex(0i64, std::vector<int64_t> {0, 1, 2});
+Wrapper gWaterFoamTextureTileSize(3.020149f, 0.1f, 4.0f);
+Wrapper gWaterFoamTextureStrength(0.25f, 0.0f, 2.0f);
+Wrapper gWaterFoamBreakupTextureIndex(1i64, std::vector<int64_t> {0, 1, 2});
+Wrapper gWaterFoamBreakupTileSize(8.0f, 0.1f, 16.0f);
+Wrapper gWaterFoamBreakupAmount(1.0f, 0.0f, 1.0f);
+Wrapper gWaterFoamSpawnNoiseAmount(0.199005f, 0.0f, 1.0f);
+Wrapper gWaterFoamSpawnNoiseTileSize(30.854477f, 1.0f, 128.0f);
 
 } // namespace engine

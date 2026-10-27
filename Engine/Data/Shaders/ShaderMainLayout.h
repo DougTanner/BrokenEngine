@@ -142,7 +142,6 @@ struct MainLayout
 	float fPhysicallyBasedRenderingLightingSpecularPower INIT;
 	float fPhysicallyBasedRenderingEmissive INIT;
 	float fPhysicallyBasedRenderingImageBasedLightingShadowBlend INIT;
-	float fPhysicallyBasedRenderingImageBasedLightingAmbientColorBlend INIT;
 	float fPhysicallyBasedRenderingShadowFloor INIT;
 	float fPhysicallyBasedRenderingCubemapLevelOfDetailPower INIT;
 	float fPhysicallyBasedRenderingCubemapLevelOfDetailOffset INIT;

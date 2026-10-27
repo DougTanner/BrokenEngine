@@ -25,6 +25,7 @@ void RenderTargetTextures::Create()
 	CreateObjectShadowsTextures();
 	CreateTerrainTextures();
 	CreateWaterDisplacementTextures();
+	CreateWaterFoamTextures();
 }
 
 void RenderTargetTextures::CreateWaterDisplacementTextures()
@@ -62,6 +63,31 @@ void RenderTargetTextures::CreateWaterDisplacementTextures()
 		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
 		.eTextureLayout = TextureLayout::kShaderReadOnly,
 	});
+}
+
+void RenderTargetTextures::CreateWaterFoamTextures()
+{
+	gbWaterFoamReset = true;
+	TextureInfo foamTextureInfo
+	{
+		.textureFlags = {},
+		.name = "WaterFoamCurrent",
+		.vkImageCreateFlags = 0,
+		.vkFormat = shaders::kVkFormatWaterFoam,
+		.vkExtent3D = {.width = shaders::kiWaterFoamWidth, .height = shaders::kiWaterFoamHeight, .depth = 1},
+		.iMipLevels = 1,
+		.iArrayLayers = 1,
+		.vkSampleCountFlagBits = VK_SAMPLE_COUNT_1_BIT,
+		.vkImageUsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+		.vkImageViewType = VK_IMAGE_VIEW_TYPE_2D,
+		.vkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
+		.eTextureLayout = TextureLayout::kShaderReadOnly,
+	};
+	mWaterFoamCurrentTexture.Create(foamTextureInfo);
+	foamTextureInfo.name = "WaterFoamHistory";
+	foamTextureInfo.iMipLevels = shaders::kiWaterFoamMipLevels;
+	foamTextureInfo.vkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	mWaterFoamHistoryTexture.Create(foamTextureInfo);
 }
 
 void RenderTargetTextures::CreateShadowTextures()

@@ -4,7 +4,7 @@ Vendored external libraries. Upstream source stays pristine: never edit files in
 
 ## Adaptation and Consumption
 
-- Implementation adaptation belongs in `Prebuilts/Source/` wrappers: unity units, generated configuration shims, implementation-only defines, and source-level warning boundaries.
+- Implementation adaptation belongs in `Prebuilts/Source/` wrappers: unity units, generated configuration shims, implementation-only defines, and source-level warning boundaries. The executable-owned mimalloc wrapper lives in `Engine/Source/Memory/Mimalloc.cpp`.
 - PCH-backed consumption defines, suppressions, and includes belong in `Common/ExternalHeaders.h`, gated by `BT_CLIENT`, `BT_ENGINE`, `BT_SERVER`, or `BT_DATA_PACKER` as appropriate.
 - PCH-less AgentTools centralize shared consumption in `Tools/ToolCommon/ToolCliCommon.h`.
 - Outside those two headers that gather each library's includes, third-party headers appear only in implementation wrappers that must include upstream sources directly.

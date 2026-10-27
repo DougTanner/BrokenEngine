@@ -48,13 +48,13 @@ static XMVECTOR XM_CALLCONV PopulateSunMoonDirection(shaders::GlobalLayout& rGlo
 	XMVECTOR vecSunMoonNormal = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 	XMMATRIX matSunRotation = XMMatrixRotationY(-fDirectionAngle);
 	vecSunMoonNormal = XMVector4Transform(vecSunMoonNormal, matSunRotation);
-	// Pitch tilt around world X first, then the camera's world-space sun rotation. Of the shadow terms the result moves
-	// only the object-shadow stretch translation; terrain shadows and the object-shadow height offset derive from raw
-	// fSunAngle.
-	glm::quat sunRotation = gpCamera->mSunRotation * glm::angleAxis(gSunMoonNormalTilt.mfCurrent, glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::quat sunRotation = glm::angleAxis(gSunMoonNormalTilt.mfCurrent, glm::vec3(1.0f, 0.0f, 0.0f));
 	glm::vec3 sunMoonDirection = sunRotation * glm::vec3(XMVectorGetX(vecSunMoonNormal), XMVectorGetY(vecSunMoonNormal), XMVectorGetZ(vecSunMoonNormal));
 	vecSunMoonNormal = XMVector4Normalize(XMVectorSet(sunMoonDirection.x, sunMoonDirection.y, sunMoonDirection.z, 0.0f));
 	XMStoreFloat4(&rGlobalLayout.f4SunMoonNormal, vecSunMoonNormal);
+	glm::vec3 modelSunMoonDirection = gpCamera->mModelSunRotation * sunMoonDirection;
+	XMVECTOR vecModelSunMoonNormal = XMVector4Normalize(XMVectorSet(modelSunMoonDirection.x, modelSunMoonDirection.y, modelSunMoonDirection.z, 0.0f));
+	XMStoreFloat4(&rGlobalLayout.f4ModelSunMoonNormal, vecModelSunMoonNormal);
 
 	// Uniform-only sun-normal products folded here (both need the finished sun/moon normal): Terrain.frag's
 	// snow sun-normal tilt (fTerrainSnowBlend * normal) and Water.frag's skybox biased sun normal.

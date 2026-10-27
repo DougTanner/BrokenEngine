@@ -21,6 +21,7 @@ struct GlobalLayout
 	vec4 f4ShadowAreaPrevious INIT; // f4ShadowArea as it stood before the latest refresh, for ShadowTemporal.comp reprojection
 
 	vec4 f4SunMoonNormal INIT;
+	vec4 f4ModelSunMoonNormal INIT; // Normalized model sun rotation applied after the world sun/moon tilt; w unused
 	vec4 f4SunColor INIT;
 	vec4 f4MoonColor INIT;
 	vec4 f4AmbientColor INIT;
@@ -204,6 +205,29 @@ struct GlobalLayout
 
 	// Heightmap pixels carry heights in meters directly.
 	float fIslandAmbientOcclusion INIT;
+	vec2 f2WaterFoamReducedTextureOrigin INIT;
+	float fWaterFoamTextureInverseTileSize INIT; // 1 / tile size; material position and derivatives remain per-fragment
+	float fWaterFoamTextureStrength INIT;
+	vec2 f2WaterFoamBreakupReducedTextureOrigin INIT;
+	float fWaterFoamBreakupInverseTileSize INIT; // 1 / breakup tile size; material position and derivatives remain per-fragment
+	float fWaterFoamBreakupAmount INIT;
+	uint32_t uiWaterFoamTextureIndex INIT;
+	uint32_t uiWaterFoamBreakupTextureIndex INIT;
+	vec4 f4WaterFoamArea INIT;
+	vec4 f4WaterFoamPreviousArea INIT;
+	vec2 f2WaterFoamAreaSize INIT; // (right-left, top-bottom), CPU-folded texel-center mapping
+	vec2 f2WaterFoamAreaInverseSize INIT; // 1 / current area size, CPU-folded fragment mapping
+	vec2 f2WaterFoamPreviousAreaInverseSize INIT; // 1 / previous area size, CPU-folded history reprojection
+	vec2 f2WaterFoamSpawnNoiseReducedOrigin INIT; // absolute camera / spawn tile size modulo 2, CPU-folded mirrored phase
+	float fWaterFoamSpawnNoiseInverseTileSize INIT; // 1 / spawn tile size; native local position remains per-sample
+	float fWaterFoamSpawnNoiseAmount INIT;
+	float fWaterFoamEmissionRate INIT;
+	float fWaterFoamJStart INIT;
+	float fWaterFoamJInverseRange INIT; // 1 / (Jstart - min(Jfull, Jstart-0.001)), CPU-folded source threshold
+	float fWaterFoamDecayRate INIT; // ln(2) / half-life, CPU-folded exact integration
+	float fWaterFoamDeltaTime INIT;
+	int iWaterFoamReset INIT;
+	int iWaterFoamEnabled INIT;
 	float fWaterEarlyOut INIT;
 	float fWaterReducedNormalOriginX INIT;
 	float fWaterReducedNormalOriginY INIT;

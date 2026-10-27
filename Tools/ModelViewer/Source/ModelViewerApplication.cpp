@@ -15,11 +15,11 @@ constexpr int64_t kiDynamicBufferInitialCapacity = 1;
 
 struct LightingPreset
 {
-	static constexpr int64_t kiVersion = 2;
-	std::array<float, 21> values {};
+	static constexpr int64_t kiVersion = 3;
+	std::array<float, 20> values {};
 };
 
-static_assert(sizeof(LightingPreset) == 84, "LightingPreset::kiVersion must be bumped with its layout or participant order");
+static_assert(sizeof(LightingPreset) == 80, "LightingPreset::kiVersion must be bumped with its layout or participant order");
 static_assert(std::is_trivially_copyable_v<LightingPreset>);
 
 constexpr std::array<const char*, 3> kLightingPresetPaths {"ModelViewerPresetW.bin", "ModelViewerPresetE.bin", "ModelViewerPresetR.bin"};
@@ -27,6 +27,8 @@ constexpr std::array<const char*, 3> kLightingPresetPaths {"ModelViewerPresetW.b
 ModelViewerApplication::ModelViewerApplication()
 : common::Singleton<ModelViewerApplication>(gpModelViewerApplication, this)
 {
+	mSeedRandomEngine.TimeSeed();
+	GenerateIslands();
 	mRenderInterpolates.try_emplace(engine::kOriginCoordinate);
 	mActiveCoordinates.push_back(engine::kOriginCoordinate);
 	engine::LoadAnimationDataFromEagerChunks();
@@ -75,7 +77,7 @@ struct LightingDescriptor
 	const char* pcHeading = nullptr;
 };
 
-constexpr std::array<LightingDescriptor, 21> kLightingDescriptors
+constexpr std::array<LightingDescriptor, 20> kLightingDescriptors
 {
 	LightingDescriptor { .pWrapper = &engine::gSunMoonMinimumAmbient, .pcLabel = "Minimum Ambient", .pcHeading = "Ambient and environment", },
 	LightingDescriptor { .pWrapper = &engine::gSunMoonAmbientMultiplier, .pcLabel = "Ambient Multiplier", .pcHeading = nullptr, },
@@ -84,7 +86,6 @@ constexpr std::array<LightingDescriptor, 21> kLightingDescriptors
 	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingDiffusePower, .pcLabel = "IBL Diffuse Power", .pcHeading = nullptr, },
 	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingSpecular, .pcLabel = "IBL Specular", .pcHeading = nullptr, },
 	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingSpecularPower, .pcLabel = "IBL Specular Power", .pcHeading = nullptr, },
-	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingImageBasedLightingAmbientColorBlend, .pcLabel = "IBL Ambient Color Blend", .pcHeading = nullptr, },
 	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingCubemapLevelOfDetailPower, .pcLabel = "Cubemap Lod Power", .pcHeading = nullptr, },
 	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingCubemapLevelOfDetailOffset, .pcLabel = "Cubemap Lod Offset", .pcHeading = nullptr, },
 	LightingDescriptor { .pWrapper = &engine::gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse, .pcLabel = "BRDF Diffuse", .pcHeading = "BRDF", },
@@ -100,9 +101,9 @@ constexpr std::array<LightingDescriptor, 21> kLightingDescriptors
 	LightingDescriptor { .pWrapper = &engine::gColorGradingTemperature, .pcLabel = "Temperature", .pcHeading = nullptr, },
 };
 
-static std::array<float, 21> GetLightingDefaults()
+static std::array<float, 20> GetLightingDefaults()
 {
-	std::array<float, 21> values {};
+	std::array<float, 20> values {};
 	for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
 	{
 		values.at(i) = rDescriptor.pWrapper->mfDefault;
@@ -130,7 +131,7 @@ void ModelViewerApplication::UpdateDefaultComparison(bool bHeld)
 	mFlags.Set(ViewerFlags::kComparingDefaults, bHeld);
 }
 
-void ModelViewerApplication::ApplyLightingValues(const std::array<float, 21>& rValues)
+void ModelViewerApplication::ApplyLightingValues(const std::array<float, 20>& rValues)
 {
 	// End slider interactions with the previous lighting state.
 	++muiLightingRevision;
@@ -145,7 +146,7 @@ void ModelViewerApplication::ApplyLightingValues(const std::array<float, 21>& rV
 	}
 }
 
-void ModelViewerApplication::SaveLightingPreset(const std::array<float, 21>& rValues)
+void ModelViewerApplication::SaveLightingPreset(const std::array<float, 20>& rValues)
 {
 	// Heap: preset file I/O allocates paths and streams.
 	ScopedSuppressAllocationTracking suppress;
@@ -182,7 +183,7 @@ void ModelViewerApplication::SelectLightingPreset(int64_t iSlot)
 
 void ModelViewerApplication::ResetLightingPreset()
 {
-	std::array<float, 21> values = GetLightingDefaults();
+	std::array<float, 20> values = GetLightingDefaults();
 	ApplyLightingValues(values);
 	SaveLightingPreset(values);
 }
@@ -305,6 +306,13 @@ void ModelViewerApplication::PreparePreview(Preview& rPreview)
 	LOG(kGraphics, kInfo, "ModelViewer rest preview {}: materials {}, joints {}, center ({}, {}, {}), radius {}", rPreview.pcPath, rSceneHeader.uiMaterialCount, std::ssize(rPreview.jointMatrices), rPreview.f3Center.x, rPreview.f3Center.y, rPreview.f3Center.z, rPreview.fRadius);
 }
 
+void ModelViewerApplication::GenerateIslands()
+{
+	// Heap: island generation builds placement and hull vectors on seed changes.
+	ScopedSuppressAllocationTracking suppress;
+	engine::GenerateIslandChain(mIslandSeed, mIslandCell.islands);
+}
+
 void ModelViewerApplication::CreateGraphicsResources()
 {
 	for (const Preview& rPreview : mPreviews)
@@ -376,12 +384,16 @@ bool ModelViewerApplication::Render()
 		engine::gpGraphics->mRenderFrameTimer.Reset();
 	}
 	Camera* pCamera = static_cast<Camera*>(engine::gpCamera);
+	const XMFLOAT2& rf2Anchor = mIslandCell.islands.at(0).f2WorldPosition;
+	pCamera->mVecPosition = XMVectorSet(rf2Anchor.x, rf2Anchor.y, 0.0f, 1.0f);
 	if (!mPreviews.empty() && miFittedSelection != miSelected)
 	{
 		pCamera->Fit(mPreviews.at(miSelected).f3Center, mPreviews.at(miSelected).fRadius);
 		miFittedSelection = miSelected;
 	}
 	pCamera->Update();
+	const engine::CellStaticData* pIslandCell = &mIslandCell;
+	engine::gpIslands->UpdateActiveIslands(std::span<const engine::CellStaticData* const>(&pIslandCell, mbWorldBackground ? 1 : 0));
 	FrameInterpolate& rFrame = mRenderInterpolates.at(engine::kOriginCoordinate);
 	rFrame.iFrame = miFrame++;
 	std::chrono::duration<float> elapsedTime(mTimer.GetDeltaNs());
@@ -530,6 +542,20 @@ void ModelViewerApplication::RenderUi()
 		QualitySlider("Mip Lod Bias", engine::gMipmapLevelOfDetailBias);
 		ImGui::PopStyleVar();
 		ImGui::Separator();
+		ImGui::SeparatorText("Islands");
+		ImGui::Checkbox("World background", &mbWorldBackground);
+		int piSeed[2] {mIslandSeed.iQ, mIslandSeed.iR};
+		if (ImGui::InputInt2("Seed", piSeed))
+		{
+			mIslandSeed = {.iQ = piSeed[0], .iR = piSeed[1]};
+			GenerateIslands();
+		}
+		if (ImGui::Button("Reroll"))
+		{
+			mIslandSeed = engine::GridCoord::FromKey(common::RandomNext(mSeedRandomEngine));
+			GenerateIslands();
+		}
+		ImGui::Separator();
 		ImGui::Text("Scenes: %lld", static_cast<long long>(std::ssize(mPreviews)));
 		ImGui::Separator();
 		if (mPreviews.empty())
@@ -582,7 +608,7 @@ void ModelViewerApplication::RenderUi()
 			if (ImGui::SliderFloat(mFlags & ViewerFlags::kComparingDefaults ? "##ComparisonValue" : "##Value", &fValue, rWrapper.mfMin, rWrapper.mfMax, "%.3f", ImGuiSliderFlags_AlwaysClamp) && !(mFlags & ViewerFlags::kComparingDefaults))
 			{
 				rWrapper.Set(fValue);
-				std::array<float, 21> values {};
+				std::array<float, 20> values {};
 				for (const auto& [i, rDescriptor] : std::views::enumerate(kLightingDescriptors))
 				{
 					values.at(i) = rDescriptor.pWrapper->mfCurrent;
@@ -669,10 +695,18 @@ void ModelViewerApplication::RenderUi()
 namespace engine
 {
 
-void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, [[maybe_unused]] const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, [[maybe_unused]] std::chrono::duration<float> currentTime)
+void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord, game::FrameInterpolate>& rRenderInterpolates, [[maybe_unused]] const std::vector<GridCoord>& rActiveCoordinates, GridCoord cameraCoordinate, std::chrono::duration<float> currentTime)
 {
 	engine::gpBufferManager->ResetSkinningAllocations(iCommandBuffer);
 	engine::RenderLightingMain(iCommandBuffer);
+	if (game::gpModelViewerApplication->mbWorldBackground)
+	{
+		engine::RenderWaterMain(iCommandBuffer, currentTime);
+	}
+	else
+	{
+		engine::gpPipelineManager->mpPipelines[kPipelineWater].WriteIndirectBuffer(iCommandBuffer, 0);
+	}
 	engine::RenderLightingSpreadIndirect(iCommandBuffer);
 	shaders::MainLayout& rMainLayout = *reinterpret_cast<shaders::MainLayout*>(engine::gpBufferManager->mMainLayoutUniformBuffers.at(iCommandBuffer).mpMappedMemory);
 	XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&rMainLayout.f4x4ViewProjection[0]), XMMatrixTranspose(engine::gpCamera->mMatView * engine::gpCamera->mMatPerspective));

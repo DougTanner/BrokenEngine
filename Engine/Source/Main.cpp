@@ -853,10 +853,10 @@ static int64_t ProcessMain(HINSTANCE hinstance)
 	if (GetLastError() == ERROR_ALREADY_EXISTS)
 	{
 #if defined(BT_CLIENT)
-		LOG(kDefault, kError, "Another client is already running");
+		LOG(kDefault, kError, "Another instance is already running");
 		if (engine::gLaunchOptions.iAgentPort == 0)
 		{
-			MessageBox(nullptr, "Another client is already running", game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+			MessageBox(nullptr, "Another instance is already running", game::kGameName.data(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 		}
 #else
 		// The server shows no dialog and fails fast, so a supervisor or AgentHarness sees the exit.

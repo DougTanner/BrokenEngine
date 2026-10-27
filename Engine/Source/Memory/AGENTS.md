@@ -8,15 +8,18 @@ Overrides the global C++ `operator new`/`delete` to route through mimalloc (or o
 
 - Only the C++ operators live here; the C-level `malloc`/`free` family is overridden by `<mimalloc-override.h>` in `Common/ExternalHeaders.h` (`BT_ENGINE`-gated). Tools builds (DataPacker) compile neither, so they keep the default allocator and suppression is inert there.
 - The non-debug-heap operator block is a hand-maintained fork of `ThirdParty/mimalloc/include/mimalloc-new-delete.h` with `TrackAllocation()` injected (the stock header has no hook point) — diff against the stock header on each mimalloc upgrade.
-- mimalloc's own process init reserves and commits a fixed 10 GiB arena up
-  front, before any C++ static (a default set in the
-  `ThirdParty/Prebuilts/Source/Engine/Mimalloc.cpp` wrapper); the engine static
-  initializer verifies that mimalloc's reserved and committed totals cover it
+- mimalloc's own process init reserves and commits an executable-selected arena
+  up front, before any C++ static. Each executable compiles
+  `Engine/Source/Memory/Mimalloc.cpp` with its startup default;
+  the consuming project's build documentation owns the value. The engine static
+  initializer reads the effective reserve option, including upstream environment
+  overrides, and verifies that mimalloc's reserved and committed totals cover it
   and turns purge off before `main()`. With purge off, mimalloc never decommits
   freed pages back to Windows, so nothing is recommitted during gameplay,
   committed memory never drops below the up-front arena, and touched pages stay
   committed. If the OS refuses the reserve, startup logs a warning and continues
-  on on-demand arenas. `ENABLE_CRT_DEBUG_HEAP` is a compile-time alternative
+  on on-demand arenas. The eager arena is not a process-memory limit.
+  `ENABLE_CRT_DEBUG_HEAP` is a compile-time alternative
   routing through the CRT debug heap for leak detection.
 - Counter and debug break are independently gated. The main-loop enable flag and
   the per-frame counter are both atomic-relaxed (main thread toggles the flag

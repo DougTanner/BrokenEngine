@@ -104,16 +104,37 @@ public:
 		"SlimyWaterB", "StonesAndRipples", "WaterFall",
 	};
 
+	static inline constexpr int64_t kiWaterFoamTextureCount = shaders::kiWaterFoamTextureCount;
+	static inline constexpr common::crc_t kpWaterFoamCrcs[]
+	{
+		data::kTexturesWaterBC7FoamWhiteFinepngCrc,
+		data::kTexturesWaterBC7FoamWhiteBroadpngCrc,
+		data::kTexturesWaterBC7FoamAmbientCGWhitepngCrc,
+	};
+	static inline constexpr std::string_view kpWaterFoamNames[] {"White Fine", "White Broad", "ambientCG White"};
+	static_assert(std::size(kpWaterFoamCrcs) == kiWaterFoamTextureCount);
+	static_assert(std::size(kpWaterFoamNames) == kiWaterFoamTextureCount);
+
+	static inline constexpr int64_t kiWaterFoamBreakupTextureCount = shaders::kiWaterFoamBreakupTextureCount;
+	static inline constexpr common::crc_t kpWaterFoamBreakupCrcs[]
+	{
+		data::kTexturesWaterBC4NoisepngCrc,
+		data::kTexturesSmokeBC4tex_glass_0001_MKjpgCrc,
+		data::kTexturesSmokeBC4tex_swirl_0002_MKjpgCrc,
+	};
+	static inline constexpr std::string_view kpWaterFoamBreakupNames[] {"Noise", "Glass", "Swirl"};
+	static_assert(std::size(kpWaterFoamBreakupCrcs) == kiWaterFoamBreakupTextureCount);
+	static_assert(std::size(kpWaterFoamBreakupNames) == kiWaterFoamBreakupTextureCount);
+
 	// IBL cubemap CRCs (loaded by InitializeBootTextures; referenced by Model and Water pipelines).
 	static inline constexpr common::crc_t kIrradianceCrc       = data::kTexturesCKloofendalPuresky_IrradianceR16G16B16A16_SFLOATCrc;
 	static inline constexpr common::crc_t kPrefilteredCrc      = data::kTexturesCKloofendalPuresky_PrefilteredR16G16B16A16_SFLOATCrc;
 	static inline constexpr common::crc_t kPrefilteredWaterCrc = data::kTexturesCRyfjallet_PrefilteredR16G16B16A16_SFLOATCrc;
 
-	// Non-water priority textures preloaded at boot, surrounding the water-normal block below.
+	// Non-water priority textures preloaded at boot, surrounding the water texture catalogs below.
 	static inline constexpr common::crc_t kpPriorityHead[]
 	{
 		data::kTexturesWaterDepthLutpngCrc,
-		data::kTexturesWaterBC4NoisepngCrc,
 	};
 	static inline constexpr common::crc_t kpPriorityTail[]
 	{
@@ -128,12 +149,12 @@ public:
 	};
 
 	// Priority textures preloaded at boot so chevron switches and the first terrain frame never show a
-	// placeholder. The water-normal block is single-sourced from kpWaterNormalCrcs — do not re-list it here.
-	static inline constexpr int64_t kiPriorityTextureCount = std::size(kpPriorityHead) + kiWaterNormalCount + std::size(kpPriorityTail);
+	// placeholder. The water catalogs are single-sourced from their CRC tables.
+	static inline constexpr int64_t kiPriorityTextureCount = std::size(kpPriorityHead) + kiWaterFoamTextureCount + kiWaterFoamBreakupTextureCount + kiWaterNormalCount + std::size(kpPriorityTail);
 	static inline constexpr std::array<common::crc_t, kiPriorityTextureCount> kPriorityTextures = []() consteval
 	{
 		std::array<common::crc_t, kiPriorityTextureCount> priorityTextures {};
-		std::ranges::copy(kpPriorityTail, std::ranges::copy(kpWaterNormalCrcs, std::ranges::copy(kpPriorityHead, priorityTextures.begin()).out).out);
+		std::ranges::copy(kpPriorityTail, std::ranges::copy(kpWaterNormalCrcs, std::ranges::copy(kpWaterFoamBreakupCrcs, std::ranges::copy(kpWaterFoamCrcs, std::ranges::copy(kpPriorityHead, priorityTextures.begin()).out).out).out).out);
 		return priorityTextures;
 	}();
 

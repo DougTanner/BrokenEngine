@@ -30,6 +30,9 @@ Renderer-wide frame and recreation ordering stays in Graphics; the contracts bel
 
 Vulkan instance, physical-device selection, and the Win32 surface. Capability validation runs against the finally selected device before logical-device creation and covers the selected required core/Vulkan 1.2 features plus format-specific optimal-tiling support; `DeviceManager` must enable every feature required here.
 
+Water foam requires optimal-tiling R16_SFLOAT storage, sampled linear filtering,
+and blit source/destination support; unsupported devices fail startup.
+
 Presentation selects the first advertised `R8G8B8A8_UNORM` or
 `B8G8R8A8_UNORM` paired with `SRGB_NONLINEAR`; startup fails if no such
 pair exists. Scene display transfer belongs to the
@@ -62,7 +65,14 @@ The HDR attachments (color, depth, MSAA) are single images reused every frame in
 Per-framebuffer command buffers and the submission graph. The Global and Main record helpers own compute/world preparation and scene rendering respectively. The per-framebuffer recorded flag is an idempotence guard, not a runtime re-record mechanism.
 
 - Global may prepend the texture manager's acquire command buffer, then signals Main. Main waits on both Global completion and swapchain image availability; swapchain acquisition therefore gates Main rather than Global.
-- Main signals the particle semaphore consumed by the next frame's Global submission. Preserve this cross-frame edge when changing particle compute or rendering order.
+- Main signals the particle semaphore consumed by the next frame's Global submission. Preserve this cross-frame edge when changing particle compute, retained water foam, or rendering order.
+- Foam activation follows [Render's history policy](../Render/AGENTS.md#precision-and-history).
+  Changes to Graphics Water Foam or water quality request command-buffer
+  recreation. Inactive recordings omit every foam transition, dispatch, copy,
+  and mip blit, while retaining paired total, Compute, and History timestamps so
+  empty results replace previous samples. Compute includes the current image's
+  transitions around dispatch; History includes the history copy, mip chain,
+  and final transitions.
 - The image pass records a timed UI depth prepass before the debug-texture
   branch. With `kbDrawModelsOverWorld` false, opaque models precede terrain,
   water and shields. With it true, those world draws precede a depth clear,
@@ -124,6 +134,12 @@ All GPU buffers: vertex (terrain, water, models), uniform (per-framebuffer view/
 Loaded textures, global texture descriptors, cached generated textures, and renderer targets. Lazy textures begin on a white placeholder and enter the bounded per-frame adoption path after a load request. Non-indirect pipelines request at creation, indirect pipelines defer until their first positive instance write, priority textures request at boot, and `InitializeBootTextures` replays every registered lighting-texture CRC so a device recreation does not strand them on the placeholder.
 
 - Swapchain recreation selectively rebuilds screen-dependent targets and descriptor sets while preserving loaded textures.
+- Water foam has independent primary and breakup catalogs. Each keeps picker
+  names and texture CRCs in the same order and supplies boot priority requests;
+  shared textures appear only once in boot priority. Their fixed sampler arrays use
+  PipelineManager-owned stable pointer storage and the texture-descriptor
+  registry for adoption and sampler recreation; picker changes publish indices
+  without rebuilding descriptors.
 - Explicit repeat/clamp samplers cover authored/generated deposit lookup and visible-light textures. Unflagged combined samplers, explicit offscreen linear variants, and dedicated smoke/wind variants all omit anisotropy, so unflagged render-target reads such as object shadows and terrain elevation stay non-anisotropic; the border samplers follow the player's anisotropy setting. Format-specific elevation, model-material, and water-normal variants remain separate.
 - Light-type textures consume a fixed reservation of bindless slots for pre-blurred results. Grow that reservation if the registered lighting-texture count exceeds its capacity.
 - Adoption records into the current framebuffer's acquire command buffer: queue-family acquire barriers, whose destination stages cover vertex, fragment, and compute shader reads because island elevation is sampled in the vertex shader; the same-queue fallback upload, whose staging it retires; and completed island elevation uploads, which do not count against the per-frame adoption limit.
@@ -137,6 +153,15 @@ Loaded textures, global texture descriptors, cached generated textures, and rend
   one-shot per texture, after a change that invalidates the results.
 - Three owned-by-value units carry the detail: `TextureDescriptors` (global descriptor Set 0, the bindless texture array, per-pipeline binding tracking, deferred descriptor updates), `TextureCache` (GPU-to-CPU readback, the on-disk cache of generated textures, PBR BRDF lookup tables), and `RenderTargetTextures` (creation and sizing of effect render targets).
 - The on-disk cache is versioned: a cached file is reused only when its shared version header (`../../File/AGENTS.md`) validates and its format, extent, mip count, and layer count all match the request; the payload size is derived from that request, not read from the file. Any newly generated texture reuses this cache rather than regenerating every boot or adding a second caching path.
+
+Water foam owns a fixed current image and a mipmapped history/presentation image,
+recreated with water targets under the drained Graphics lifecycle; replacement
+re-arms history reset before descriptors rebuild. Images and pipelines remain
+resident while foam is inactive. Active Main recordings run full coverage
+compute after displacement, copy mip 0, and generate every history mip. Local
+per-mip barriers return all levels to shader-read for compute and fragment
+consumers; do not substitute whole-image transitions during the mip chain.
+Coverage history and presentation share that completed image.
 
 Water's variance-table consumption is documented in Water shaders (`../../../Data/Shaders/Water/AGENTS.md`).
 

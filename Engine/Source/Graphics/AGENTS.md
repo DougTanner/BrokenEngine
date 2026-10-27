@@ -59,8 +59,10 @@ Client-only multi-pass Vulkan renderer. `gpGraphics` owns renderer-wide creation
   world/screen projection, visible-area LOD, grid-snapped render extents, and
   the display-rate update — target resolution, jump/chase, Hermite zoom,
   texel-height references, shake, and sun angle. `CameraBase` also holds the
-  world-space sun rotation, identity unless the host writes it, applied after
-  the Normal Tilt. It registers and clears the single `engine::gpCamera` global.
+  world-space model sun rotation, identity unless the host writes it. It affects
+  only the model direction after Normal Tilt; world lighting and shadow products
+  retain the ordinary direction. It registers and clears the single
+  `engine::gpCamera` global.
   Game code derives one final `game::Camera` from it, the only camera ever
   constructed, and supplies only policy — `PullTarget` and `SunAngle` — as
   non-virtual members the engine calls by name through a `static_cast` to

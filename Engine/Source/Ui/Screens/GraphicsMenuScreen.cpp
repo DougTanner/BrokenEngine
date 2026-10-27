@@ -151,6 +151,7 @@ void GraphicsMenuScreen::Render()
 		ImGui::TableNextColumn();
 
 		RadioRow("Water", &gWaterLevel, gWaterLevel.mfCurrent, {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}});
+		WrapperToggle("Water Foam", &gWaterFoamSystemEnabled);
 
 		ImGui::Separator();
 

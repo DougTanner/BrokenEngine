@@ -19,12 +19,21 @@ Both use `$(ProjectName)` in `IntDir`, so client and server builds can run simul
 - Configurations: Debug, Profile, Release (x64 only)
 - Compiler: C++23, `Pch.h` force-included, `/fp:strict` in every config of both
   projects (cross-binary float determinism for client reconciliation/replay —
-  see `Documents/FloatingPointDeterminism.txt`). Warnings are errors in every
-  config of both projects; this enforces style guide rule 43 for polymorphic
-  uses and the compiler-detectable part of rule 39 (C4100/C4101/C4189 unused
-  names not silenced by a `(void)` discard, C4541 RTTI use with RTTI off).
+  see `Documents/FloatingPointDeterminism.txt`). Warnings are errors for engine
+  and game code in every config of both projects; this enforces style guide
+  rule 43 for polymorphic uses and the compiler-detectable part of rule 39
+  (C4100/C4101/C4189 unused names not silenced by a `(void)` discard, C4541 RTTI
+  use with RTTI off).
   Compile settings are mirrored between the two vcxprojs: when changing one,
   change the other.
+- Both projects directly compile
+  `Engine/Source/Memory/Mimalloc.cpp` without PCH or forced includes. This vendor
+  implementation retains its ThirdParty warning policy: compiler warnings and
+  warning promotion are disabled; its other compiler settings follow the
+  consuming project. Its per-source
+  `MI_DEFAULT_RESERVE_OS_MEMORY` definition is in KiB: Client 1 GiB, Server 4 GiB,
+  identical across Debug, Profile and Release. The allocator startup contract is
+  in `Engine/Source/Memory/AGENTS.md`.
 - Data properties: `DataBuildMode` accepts only `Local` or `Shared`; ordinary
   Visual Studio builds default to Local. The authoritative repository-root
   `.git` marker sets `RunDataPacker` default: false when it is a linked-worktree
@@ -93,4 +102,8 @@ Filter paths mirror the on-disk directory structure under three roots:
 - `Projects/BrokenEngineSandbox/Source/<path>` → filter `Game\<path>`
 - `Common[/<subdir>]` → filter `Common[\<subdir>]`
 
-Exception: generated `$(GameDataDirectory)\*.h` headers live in a flat `DataFiles` filter. New filters need a `<Filter Include>` entry with a unique GUID, and every ancestor filter must exist. The server filters file has an empty leftover filter (`Engine\Graphics`) — cruft, not a signal that such files belong in the server project.
+Exception: generated `$(GameDataDirectory)\*.h` headers live in a flat `DataFiles`
+filter. New filters need
+a `<Filter Include>` entry with a unique GUID, and every ancestor filter must
+exist. The server filters file has an empty leftover filter (`Engine\Graphics`)
+— cruft, not a signal that such files belong in the server project.

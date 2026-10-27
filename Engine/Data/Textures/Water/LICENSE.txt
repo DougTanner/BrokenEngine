@@ -1,7 +1,8 @@
-Water Normal Map Textures
+Water Normal Maps and Primary Foam Textures
 =========================
 
 Source:  https://opengameart.org/content/water-batch-of-15-seamless-textures-with-normalmaps
+Title:   Water - Batch of 15 Seamless Textures with normalmaps
 Author:  Keith333
 License: Creative Commons Attribution 3.0 (CC-BY 3.0)
          https://creativecommons.org/licenses/by/3.0/
@@ -23,6 +24,28 @@ Files (normal maps only, originally suffixed _N.jpg in source):
   [BC5]StonesAndRipples.jpg
   [BC5]WaterFall.jpg
 
-Modifications: Resized from original 2048xN dimensions to 1024x1024 square
-(bicubic resampling, JPEG quality 92). Diffuse / specular companions (_S.jpg)
-not included; only the normal maps (_N.jpg) were imported.
+Normal-map modifications: Resized from original 2048xN dimensions to 1024x1024
+square (bicubic resampling, JPEG quality 92).
+
+CC-BY 3.0 permits commercial use and adaptation with attribution, the license
+link, and identification of modifications. No author endorsement is implied.
+Photograph companions (_S.jpg) are not included.
+
+Primary foam color textures:
+  [BC7]FoamWhiteFine.png
+  [BC7]FoamWhiteBroad.png
+Original AI-generated images made with OpenAI image generation, without an
+external reference. Resized from 1254x1254 to opaque RGB 1024x1024 PNG using
+bicubic resampling. These are generated images, not licensed photographs.
+
+  [BC7]FoamAmbientCGWhite.png
+AI-generated brightened derivative referencing ambientCG Foam001's Color map.
+Reference author: ambientCG / Lennart Demes
+Reference asset: https://ambientcg.com/view?id=Foam001
+Reference download: https://ambientcg.com/get?file=Foam001_1K-PNG.zip
+Reference license: CC0 1.0 (public domain dedication)
+  https://docs.ambientcg.com/license/
+  https://creativecommons.org/publicdomain/zero/1.0/
+Modifications: AI brightening/reinterpretation of the reference, then bicubic
+resizing of the 1254x1254 generated output to opaque RGB 1024x1024 PNG.
+This derivative is not an unmodified ambientCG download.

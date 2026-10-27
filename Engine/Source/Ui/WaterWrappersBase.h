@@ -118,4 +118,19 @@ extern Wrapper gLightingWaterSkyboxOneBeachReduction;
 extern Wrapper gLightingWaterSkyboxTwoBeachReduction;
 extern Wrapper gLightingWaterSkyboxThreeBeachReduction;
 
+// Foam
+extern Wrapper gWaterFoamEnabled; // checkbox, not slider-mapped
+extern Wrapper gWaterFoamEmissionRate;
+extern Wrapper gWaterFoamJStart;
+extern Wrapper gWaterFoamJFull;
+extern Wrapper gWaterFoamHalfLife;
+extern Wrapper gWaterFoamTextureIndex;
+extern Wrapper gWaterFoamTextureTileSize;
+extern Wrapper gWaterFoamTextureStrength;
+extern Wrapper gWaterFoamBreakupTextureIndex;
+extern Wrapper gWaterFoamBreakupTileSize;
+extern Wrapper gWaterFoamBreakupAmount;
+extern Wrapper gWaterFoamSpawnNoiseAmount;
+extern Wrapper gWaterFoamSpawnNoiseTileSize;
+
 } // namespace engine

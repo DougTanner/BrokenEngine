@@ -4,6 +4,7 @@
 
 #include "Frame/IslandTerrain.h"
 #include "Graphics/Islands.h"
+#include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
 #include "CommandBufferManager.h"
@@ -51,6 +52,7 @@ void CommandBufferRecordMain::Record(int64_t iFramebuffer)
 	RecordObjectShadows(vkCommandBuffer, iCommandBuffer);
 	RecordObjectShadowsBlur(vkCommandBuffer, iCommandBuffer);
 	RecordWaterDisplacement(vkCommandBuffer, iCommandBuffer);
+	RecordWaterFoam(vkCommandBuffer, iCommandBuffer);
 
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerMain);
 
@@ -324,6 +326,103 @@ void CommandBufferRecordMain::RecordWaterDisplacement(VkCommandBuffer vkCommandB
 	gpTextureManager->mRenderTargetTextures.mWaterDisplacementTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 	gpTextureManager->mRenderTargetTextures.mWaterDisplacementNormalTexture.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kShaderReadOnly);
 	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerWaterDisplacement);
+}
+
+void CommandBufferRecordMain::RecordWaterFoam(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer)
+{
+	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerWaterFoam);
+	bool bActive = gWaterFoamSystemEnabled.Get<bool>() && gWaterLevel.Get<int64_t>() > static_cast<int64_t>(GraphicsQualityLevel::kLow);
+	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerWaterFoamCompute);
+	if (bActive)
+	{
+		Texture& rCurrent = gpTextureManager->mRenderTargetTextures.mWaterFoamCurrentTexture;
+		rCurrent.TransitionImageLayout(vkCommandBuffer, TextureLayout::kShaderReadOnly, TextureLayout::kComputeReadWrite);
+		gpPipelineManager->mpPipelines[kPipelineWaterFoam].RecordCompute(iCommandBuffer, vkCommandBuffer, TileCount(shaders::kiWaterFoamWidth), TileCount(shaders::kiWaterFoamHeight));
+		rCurrent.TransitionImageLayout(vkCommandBuffer, TextureLayout::kComputeReadWrite, TextureLayout::kTransferSource);
+	}
+	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerWaterFoamCompute);
+
+	gpProfileManager->GpuStart(iCommandBuffer, vkCommandBuffer, kGpuTimerWaterFoamHistory);
+	if (bActive)
+	{
+		Texture& rCurrent = gpTextureManager->mRenderTargetTextures.mWaterFoamCurrentTexture;
+		Texture& rHistory = gpTextureManager->mRenderTargetTextures.mWaterFoamHistoryTexture;
+		auto TransitionHistory = [&](int64_t iMip, int64_t iCount, VkImageLayout vkOldLayout, VkImageLayout vkNewLayout, VkAccessFlags vkSourceAccess, VkAccessFlags vkDestinationAccess, VkPipelineStageFlags vkSourceStage, VkPipelineStageFlags vkDestinationStage)
+		{
+			VkImageMemoryBarrier vkBarrier
+			{
+				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+				.pNext = nullptr,
+				.srcAccessMask = vkSourceAccess,
+				.dstAccessMask = vkDestinationAccess,
+				.oldLayout = vkOldLayout,
+				.newLayout = vkNewLayout,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = rHistory.mVkImage,
+				.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = static_cast<uint32_t>(iMip), .levelCount = static_cast<uint32_t>(iCount), .baseArrayLayer = 0, .layerCount = 1},
+			};
+			vkCmdPipelineBarrier(vkCommandBuffer, vkSourceStage, vkDestinationStage, 0, 0, nullptr, 0, nullptr, 1, &vkBarrier);
+		};
+		static constexpr VkPipelineStageFlags kVkHistoryReadStages = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		TransitionHistory(0, shaders::kiWaterFoamMipLevels, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, kVkHistoryReadStages, VK_PIPELINE_STAGE_TRANSFER_BIT);
+		VkImageCopy vkCopy
+		{
+			.srcSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1},
+			.srcOffset = {},
+			.dstSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1},
+			.dstOffset = {},
+			.extent = {.width = shaders::kiWaterFoamWidth, .height = shaders::kiWaterFoamHeight, .depth = 1},
+		};
+		vkCmdCopyImage(vkCommandBuffer, rCurrent.mVkImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rHistory.mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkCopy);
+		int64_t iWidth = shaders::kiWaterFoamWidth;
+		int64_t iHeight = shaders::kiWaterFoamHeight;
+		for (int64_t i = 1; i < shaders::kiWaterFoamMipLevels; ++i)
+		{
+			TransitionHistory(i - 1, 1, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+			int64_t iNextWidth = std::max(1i64, iWidth / 2);
+			int64_t iNextHeight = std::max(1i64, iHeight / 2);
+			VkImageBlit vkBlit
+			{
+				.srcSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = static_cast<uint32_t>(i - 1), .baseArrayLayer = 0, .layerCount = 1},
+				.srcOffsets =
+				{
+					{
+						.x = 0,
+						.y = 0,
+						.z = 0,
+					},
+					{
+						.x = static_cast<int32_t>(iWidth),
+						.y = static_cast<int32_t>(iHeight),
+						.z = 1,
+					},
+				},
+				.dstSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = static_cast<uint32_t>(i), .baseArrayLayer = 0, .layerCount = 1},
+				.dstOffsets =
+				{
+					{
+						.x = 0,
+						.y = 0,
+						.z = 0,
+					},
+					{
+						.x = static_cast<int32_t>(iNextWidth),
+						.y = static_cast<int32_t>(iNextHeight),
+						.z = 1,
+					},
+				},
+			};
+			vkCmdBlitImage(vkCommandBuffer, rHistory.mVkImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rHistory.mVkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &vkBlit, VK_FILTER_LINEAR);
+			TransitionHistory(i - 1, 1, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, kVkHistoryReadStages);
+			iWidth = iNextWidth;
+			iHeight = iNextHeight;
+		}
+		TransitionHistory(shaders::kiWaterFoamMipLevels - 1, 1, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, kVkHistoryReadStages);
+		rCurrent.TransitionImageLayout(vkCommandBuffer, TextureLayout::kTransferSource, TextureLayout::kShaderReadOnly);
+	}
+	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerWaterFoamHistory);
+	gpProfileManager->GpuStop(iCommandBuffer, vkCommandBuffer, kGpuTimerWaterFoam);
 }
 
 void CommandBufferRecordMain::RecordImageRenderPass(VkCommandBuffer vkCommandBuffer, int64_t iCommandBuffer, int64_t iFramebuffer)

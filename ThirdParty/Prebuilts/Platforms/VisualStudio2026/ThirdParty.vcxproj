@@ -156,7 +156,6 @@
     <ClCompile Include="..\..\Source\Engine\Stb.cpp">
       <ObjectFileName>$(IntDir)Engine\</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="..\..\Source\Engine\Mimalloc.cpp" />
     <ClCompile Include="..\..\Source\Engine\Vma.cpp" />
     <ClCompile Include="..\..\Source\Engine\Volk.cpp" />
     <ClCompile Include="..\..\Source\Engine\Lz4.cpp" />

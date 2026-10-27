@@ -1199,6 +1199,9 @@
     <ClCompile Include="..\..\Source\Frame\Collections\Blasters\BlastersUpdate.cpp">
       <Filter>Game\Frame\Collections\Blasters</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Engine\Source\Memory\Mimalloc.cpp">
+      <Filter>Engine\Memory</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\Engine\Source\Memory\GlobalAllocator.cpp">
       <Filter>Engine\Memory</Filter>
     </ClCompile>
@@ -1831,6 +1834,9 @@
     </None>
     <None Include="..\..\..\..\Engine\Data\Shaders\Smoke\SmokeOccupancyDilateRemap.comp">
       <Filter>Engine\Data\Shaders\Smoke</Filter>
+    </None>
+    <None Include="..\..\..\..\Engine\Data\Shaders\Water\WaterFoam.comp">
+      <Filter>Engine\Data\Shaders\Water</Filter>
     </None>
   </ItemGroup>
 </Project>

@@ -1,0 +1,82 @@
+#version 460
+
+#include "ShaderLayouts.h"
+#include "ShaderFunctions.h"
+
+layout (local_size_x = kiComputeTileSize, local_size_y = kiComputeTileSize) in;
+
+layout (set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform
+{
+	GlobalLayout globalLayout;
+};
+
+layout (set = 0, binding = kiGlobalBindingMainUniform) uniform mainUniform
+{
+	MainLayout mainLayout;
+};
+
+layout (set = 1, binding = 2) uniform sampler2D elevationTextureSampler;
+layout (set = 1, binding = 3) uniform sampler2D normalTextureSampler;
+layout (set = 1, binding = 4) uniform sampler2D historyTextureSampler;
+layout (set = 1, binding = 5, r16f) uniform writeonly image2D foamImage;
+layout (set = 1, binding = kiWaterFoamBindingSpawnNoise) uniform sampler2D spawnNoiseTextureSampler;
+
+float NativeSource(ivec2 i2Coord, ivec2 i2Active)
+{
+	i2Coord = clamp(i2Coord, ivec2(0), i2Active);
+	vec2 f2NativeUv = vec2(i2Coord) / vec2(i2Active);
+	if (textureLod(elevationTextureSampler, f2NativeUv, 0.0f).x >= globalLayout.fWaterHeight)
+	{
+		return 0.0f;
+	}
+	vec2 f2WorldPosition = VisibleAreaToWorld(f2NativeUv, globalLayout.f4VisibleArea);
+	vec2 f2LocalPosition = f2WorldPosition - vec2(globalLayout.fWaterOriginX, globalLayout.fWaterOriginY);
+	vec2 f2NoiseUv = globalLayout.fWaterFoamSpawnNoiseInverseTileSize * f2LocalPosition + globalLayout.f2WaterFoamSpawnNoiseReducedOrigin;
+	float fSignedNoise = 2.0f * textureLod(spawnNoiseTextureSampler, f2NoiseUv, 0.0f).r - 1.0f;
+	float fJ = texelFetch(normalTextureSampler, i2Coord, 0).w;
+	float fJEffective = fJ + globalLayout.fWaterFoamSpawnNoiseAmount * fSignedNoise;
+	return clamp((globalLayout.fWaterFoamJStart - fJEffective) * globalLayout.fWaterFoamJInverseRange, 0.0f, 1.0f);
+}
+
+void main()
+{
+	ivec2 i2Coord = ivec2(gl_GlobalInvocationID.xy);
+	if (any(greaterThanEqual(i2Coord, ivec2(kiWaterFoamWidth, kiWaterFoamHeight))))
+	{
+		return;
+	}
+	if (globalLayout.iWaterFoamEnabled == 0)
+	{
+		imageStore(foamImage, i2Coord, vec4(0.0f));
+		return;
+	}
+
+	vec2 f2Uv = (vec2(i2Coord) + 0.5f) / vec2(kiWaterFoamWidth, kiWaterFoamHeight);
+	vec2 f2Position = globalLayout.f4WaterFoamArea.xy + vec2(f2Uv.x, -f2Uv.y) * globalLayout.f2WaterFoamAreaSize;
+	float fPrevious = 0.0f;
+	if (globalLayout.iWaterFoamReset == 0)
+	{
+		vec2 f2PreviousUv = vec2(f2Position.x - globalLayout.f4WaterFoamPreviousArea.x, globalLayout.f4WaterFoamPreviousArea.y - f2Position.y) * globalLayout.f2WaterFoamPreviousAreaInverseSize;
+		vec2 f2HalfTexel = 0.5f / vec2(kiWaterFoamWidth, kiWaterFoamHeight);
+		if (all(greaterThanEqual(f2PreviousUv, f2HalfTexel)) && all(lessThanEqual(f2PreviousUv, 1.0f - f2HalfTexel)))
+		{
+			fPrevious = textureLod(historyTextureSampler, f2PreviousUv, 0.0f).x;
+		}
+	}
+
+	ivec2 i2Active = ivec2(mainLayout.iWaterActiveQuadX, mainLayout.iWaterActiveQuadY);
+	vec2 f2Native = f2Uv * vec2(i2Active);
+	ivec2 i2Native = ivec2(floor(f2Native));
+	vec2 f2Fraction = fract(f2Native);
+	float fSource = mix(mix(NativeSource(i2Native, i2Active), NativeSource(i2Native + ivec2(1, 0), i2Active), f2Fraction.x),
+	                   mix(NativeSource(i2Native + ivec2(0, 1), i2Active), NativeSource(i2Native + ivec2(1, 1), i2Active), f2Fraction.x), f2Fraction.y);
+	float fEmission = globalLayout.fWaterFoamEmissionRate * fSource;
+	float fRate = fEmission + globalLayout.fWaterFoamDecayRate;
+	float fCoverage = fPrevious;
+	if (fRate > 0.0f && globalLayout.fWaterFoamDeltaTime > 0.0f)
+	{
+		float fEquilibrium = fEmission / fRate;
+		fCoverage = fEquilibrium + (fPrevious - fEquilibrium) * exp(-fRate * globalLayout.fWaterFoamDeltaTime);
+	}
+	imageStore(foamImage, i2Coord, vec4(clamp(fCoverage, 0.0f, 1.0f)));
+}

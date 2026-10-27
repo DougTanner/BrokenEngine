@@ -3,6 +3,7 @@
 #include "Graphics.h"
 
 #include "File/PackChunks.h"
+#include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
 #include "Ui/LightingWrappersBase.h"
 #include "Ui/PbrWrappersBase.h"
@@ -548,6 +549,8 @@ void Graphics::Refresh()
 	PollSetting<float>(gWaterNormalMipmapBias, "Water normal mip bias", DestroyType::kSamplers);
 	PollSetting<bool>(gWireframe, "Wireframe", DestroyType::kPipelines);
 	PollSetting<bool>(gDebugTexture, nullptr, DestroyType::kCommandBuffers);
+	PollSetting<bool>(gWaterFoamSystemEnabled, "Water foam", DestroyType::kCommandBuffers);
+	PollSetting<int64_t>(gWaterLevel, "Water quality", DestroyType::kCommandBuffers);
 
 	PollSetting<float>(gWaterShapeDetail, "Water shape detail", DestroyType::kPipelines, DestroyFlags::kWaterMesh, gpBufferManager != nullptr);
 
@@ -629,6 +632,7 @@ void Graphics::RecreateResources()
 		gpBufferManager->CreateWaterMesh();
 		// Texel grid must match the water-mesh vertex grid (see RenderTargetTextures.h comment).
 		gpTextureManager->mRenderTargetTextures.CreateWaterDisplacementTextures();
+		gpTextureManager->mRenderTargetTextures.CreateWaterFoamTextures();
 	}
 
 	if (mDestroyFlags & DestroyFlags::kTerrainElevation)

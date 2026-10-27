@@ -2,7 +2,7 @@
 
 ## Overview
 
-Solution and project that compile all compiled third-party library source into a single static library (`ThirdParty.<Config>.lib`) linked by the client, server, and DataPacker. Centralizing here avoids duplicating external compilation units across projects and guarantees one consistent flag set for code we do not modify. `Output/` and `Build/` hold build artifacts, not committed binaries.
+Solution and project that compile shared third-party library source into a single static library (`ThirdParty.<Config>.lib`) linked by the client, server, and DataPacker. Centralizing here avoids duplicating shared external compilation units across projects and guarantees one consistent flag set for code we do not modify. The executable-owned mimalloc exception is defined under Source Organization. `Output/` and `Build/` hold build artifacts, not committed binaries.
 
 ## Build Configuration
 
@@ -29,6 +29,11 @@ active. Wrapper session start (`.agents/scripts/Bootstrap-AgentTools.ps1`)
 incremental-rebuilds all three primary configurations so they track primary
 HEAD; beyond that, rebuild only as explicit primary maintenance.
 
+Moving mimalloc compilation to the consumers requires no worktree ThirdParty
+rebuild. Before landing that migration and the first primary rebuild removes the
+archived wrapper, coordinate migration of active shared-library readers to direct
+wrapper compilation. Do not retain an obsolete allocator archive member.
+
 ## Source Organization
 
 The `.vcxproj` filters split units by consumer (`Engine`, `DataPacker`,
@@ -37,6 +42,11 @@ comes from. Compilation units come from two roots: unity wrapper `.cpp`/`.c`
 files under `ThirdParty/Prebuilts/Source/{Engine,DataPacker}/`, and upstream
 sources referenced directly in their library directories (bc7enc_rdo, zlib,
 Assimp).
+
+`Engine/Source/Memory/Mimalloc.cpp` is owned outside this shared project and
+compiled directly by its executable consumers. Their owning build documents
+specify the per-source settings and reserve values; the allocator contract is in
+`Engine/Source/Memory/AGENTS.md` `## Architecture Notes`.
 
 Assimp uses explicit non-unity sources and generated configuration/revision
 headers under `Source/DataPacker/assimp/`. Only FBX, 3DS, OBJ, COLLADA, PLY and

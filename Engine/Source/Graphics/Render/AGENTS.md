@@ -6,6 +6,8 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
 
 ## Ordering and Publication
 
+- Main publishes water source dimensions, wave parameters, and displacement work
+  even when the camera interpolate is absent; water drawing still requires it.
 - Global population precedes Main. Global is submitted, possibly on a worker thread, before `RenderFrameMain` runs, so nothing in Main's call tree writes GlobalLayout: a value Main produces for a shader, such as the water band counts and active quad dimensions, is published in MainLayout. Within Global, Smoke precedes Wind because wind consumes smoke's current and previous world areas.
 - Gameplay main rendering runs collection `BeginRender`, per-coord `Render`, collection `EndRender`, lighting-spread gate publication, then debug publication, with the camera coord first. The no-renderable-coord path, including an empty active set, still runs begin/end publication so every indirect count and per-render profile counter reaches zero instead of ghost-drawing or reporting prior-frame instances.
 - Lighting deposit clears its attachments through the render pass load operation every frame, so no separate clear pass is recorded.
@@ -40,10 +42,31 @@ Render free-runs between simulation ticks and sits outside the CRC (the per-tick
 ## Precision and History
 
 - Water phase and camera-relative UV origins are computed in `double`, reduced with `std::fmod`, then cast to float. Integrate reduced phase from per-frame size, speed, and delta time so tunable changes do not jump. The reduction consumes the absolute camera position, rebuilt as a `double` from the camera cell and the camera's local position, so the pattern stays continuous when the camera changes cell.
-- Rotate camera origins into the shader's pattern space before reduction, and preserve integral shader-side wrap multipliers. These CPU reductions are the precision owner for distant-world water sampling.
-- Retained world rectangles — shadow and lighting history areas and the held visible area — are expressed in the camera cell's frame and carry it through `RetainedAreaBasis` (`Render.h`).
+- Rotate normal-map camera origins into the shader's pattern space before
+  reduction, and preserve integral shader-side wrap multipliers. The stationary
+  foam material layers and spawn noise each reduce camera position divided by
+  their independent tile size modulo two in double precision before float
+  publication, preserving the mirrored sampler's two-tile period. These CPU
+  reductions are the precision owner for distant-world water sampling.
+- Retained world rectangles — shadow, lighting, and water foam history areas and the held visible area — are expressed in the camera cell's frame and carry it through `RetainedAreaBasis` (`Render.h`).
 - Lighting snaps its footprint to the light-deposit grid; shadow snaps to its own world-sized texel grid. Both publish current and previous areas for temporal sampling, and recreation reseeds history from the current area for one frame.
-- Each frame that publishes also copies what it published — camera basis, water origins, and each owner's area pair and history-reset count — into the `gPresentationContinuity` snapshot in `Render.h`, which only the agent probe reads (`../../Agent/AGENTS.md`). A new retained or reduced value that a continuity guarantee covers joins it; a frame that skips rendering leaves it untouched.
+- Water owns foam footprint, time, controls, and reset publication. Graphics
+  Water Foam activates the system only above Low water quality. Inactive foam
+  skips CPU history and foam UV preparation; reactivation resets history with
+  zero delta instead of advancing across the disabled interval. The Tweaks foam
+  checkbox controls presentation only, so retained coverage continues updating
+  while that checkbox hides it. Active foam delta uses `steady_clock` between
+  published updates, including render gaps; simulation time detects rewinds
+  only. First use, recreation, rewind, and a multi-cell basis jump reset history;
+  ordinary zoom and LOD changes reproject it. Spawn tuning affects new emission
+  without resetting retained coverage. Threshold resolution preserves a positive
+  J range.
+- Each publishing frame copies its camera basis, water origins, and retained
+  area reports into `gPresentationContinuity` in `Render.h`; skipped rendering
+  leaves it untouched. New values covered by continuity guarantees join this
+  snapshot. The agent probe exposes water origins and shadow, lighting, and
+  smoke reports (`../../Agent/AGENTS.md`); foam history and foam texture phase
+  remain internal to the snapshot.
 - Smoke and wind spread remap through current and previous world areas. Their enable, disable, recreate, and occupancy paths must clear or drain stale tiles without relying on command-buffer re-recording.
 - Each flight plane's smoke keeps its own held area, step count, and decay.
   With `gSmokeLayerStagger` on, a frame without a forced refresh refreshes only

@@ -25,6 +25,7 @@ extern Wrapper gSampleShading;
 extern Wrapper gMinimumSampleShading;
 extern Wrapper gMipmapLevelOfDetailBias;
 extern Wrapper gWaterShapeDetail;
+extern Wrapper gWaterFoamSystemEnabled;
 extern Wrapper gSmokeSimulationPixels;
 extern Wrapper gSmokeSimulationArea;
 extern Wrapper gOpaqueUi;

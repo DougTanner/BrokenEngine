@@ -418,8 +418,8 @@ void TweaksScreen::RunSliderAuditFrame()
 {
 	if constexpr (kbDebugInput)
 	{
-		// Lighting has 5 subtabs (Write/Combine/Read/Visible/Lighting); ImGui applies selection on the following tab-bar frame, so frames 0-4 queue tabs and frame 5 renders Lighting.
-		static constexpr int64_t kiAuditFrameCount = 6;
+		// Water has 6 subtabs ending in Foam; ImGui applies selection on the following tab-bar frame, so frames 0-5 queue tabs and frame 6 renders Foam.
+		static constexpr int64_t kiAuditFrameCount = 7;
 
 		if (miAuditFrame == 0)
 		{

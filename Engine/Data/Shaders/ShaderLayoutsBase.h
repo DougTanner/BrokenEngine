@@ -36,6 +36,7 @@ inline constexpr VkFormat kVkFormatWind = VK_FORMAT_R16G16_SFLOAT;
 inline constexpr VkFormat kVkFormatShadow = VK_FORMAT_R16_UNORM;
 inline constexpr VkFormat kVkFormatCombine = VK_FORMAT_R8G8B8A8_UNORM;
 inline constexpr VkFormat kVkFormatWaterDisplacement = VK_FORMAT_R16G16B16A16_SFLOAT;
+inline constexpr VkFormat kVkFormatWaterFoam = VK_FORMAT_R16_SFLOAT;
 
 struct vec2 : public XMFLOAT2
 {
@@ -129,8 +130,17 @@ CONSTEXPR int kiGlobalBindingSamplerClamp = 12;
 // block above, so the C++ pipeline setup (ModelPipeline kModel descriptor append, BufferManager mesh/joint
 // storage-buffer updates, PipelineManager water displacement descriptors) and the GLSL
 // layout(set = 1, binding = N) qualifiers (ModelCommon.h, Water.vert) stay in lockstep.
+CONSTEXPR int kiWaterFoamBindingSpawnNoise = 6;
 CONSTEXPR int kiWaterBindingDisplacement = 13;
 CONSTEXPR int kiWaterBindingDisplacementNormal = 14;
+CONSTEXPR int kiWaterBindingFoam = 15;
+CONSTEXPR int kiWaterBindingFoamColor = 16;
+CONSTEXPR int kiWaterFoamTextureCount = 3;
+CONSTEXPR int kiWaterBindingFoamBreakup = 17;
+CONSTEXPR int kiWaterFoamBreakupTextureCount = 3;
+CONSTEXPR int kiWaterFoamWidth = 1024;
+CONSTEXPR int kiWaterFoamHeight = 512;
+CONSTEXPR int kiWaterFoamMipLevels = 11;
 CONSTEXPR int kiModelBindingMeshData = 15;
 CONSTEXPR int kiModelBindingJointMatrix = 16;
 

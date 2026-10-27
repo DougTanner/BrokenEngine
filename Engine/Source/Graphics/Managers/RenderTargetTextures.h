@@ -19,6 +19,7 @@ public:
 	void CreateObjectShadowsTextures();
 	void CreateTerrainTextures();
 	void CreateWaterDisplacementTextures();
+	void CreateWaterFoamTextures();
 
 	Texture mLogTexture;
 
@@ -81,6 +82,9 @@ public:
 	// (iWaterActiveQuadX + 1) by (iWaterActiveQuadY + 1) texel rectangle each frame.
 	Texture mWaterDisplacementTexture;
 	Texture mWaterDisplacementNormalTexture;
+
+	Texture mWaterFoamCurrentTexture;
+	Texture mWaterFoamHistoryTexture;
 
 	std::vector<Texture*> mElevationTextures;
 	std::vector<Texture*> mColorTextures;

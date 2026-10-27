@@ -165,7 +165,10 @@ void CameraBase::Update(const FrameInterpolateBase& rFrameInterpolate, float fDe
 	// widens the Z = 0 visible area.
 	XMVECTOR vecTargetPosition = XMVectorSetZ(ResolveTarget(bFreeCameraActive ? CameraTarget::Direct(mVecPosition) : rPulledTarget), gpFlightPlanes->Lowest().fHeightMeters);
 
-	UpdatePosition(vecTargetPosition, fDeltaTime);
+	if (!bFreeCameraActive)
+	{
+		UpdatePosition(vecTargetPosition, fDeltaTime);
+	}
 	UpdateEyeHeight();
 
 	// Keep each world-texel reference at or above the live eye height: zero initialization and outward zoom snap

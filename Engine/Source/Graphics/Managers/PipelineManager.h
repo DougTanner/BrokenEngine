@@ -37,6 +37,7 @@ enum Pipelines
 
 	kPipelineWater,
 	kPipelineWaterDisplacement,
+	kPipelineWaterFoam,
 
 	kPipelineSmokeClearA,
 	kPipelineSmokeClearB,
@@ -92,6 +93,8 @@ public:
 	// Texture* array for the kPipelineWater normal map atlas binding (sized sampler array).
 	// Populated by WorldLightingShadowPipelines::CreateLightingShadowDependentPipelines() before kPipelineWater is built.
 	Texture* mppWaterNormalTextures[shaders::kiWaterNormalCount] {};
+	Texture* mppWaterFoamTextures[shaders::kiWaterFoamTextureCount] {};
+	Texture* mppWaterFoamBreakupTextures[shaders::kiWaterFoamBreakupTextureCount] {};
 
 	// Spread pipelines [pass]: radial directional spread, fragment shader with MRT
 	Pipeline mpSpreadPipelines[shaders::kiMaxSpreadPasses];
@@ -110,7 +113,7 @@ public:
 
 	DynamicPipelines mDynamicPipelines = DynamicPipelines(mShaders);
 
-	WorldLightingShadowPipelines mWorldLightingShadowPipelines = WorldLightingShadowPipelines(mShaders, mpPipelines, mpSpreadPipelines, mpSpreadPipelineNames, mCombinePipeline, mLightingTemporalPipeline, mLightingHistoryCopyPipeline, mppWaterNormalTextures);
+	WorldLightingShadowPipelines mWorldLightingShadowPipelines = WorldLightingShadowPipelines(mShaders, mpPipelines, mpSpreadPipelines, mpSpreadPipelineNames, mCombinePipeline, mLightingTemporalPipeline, mLightingHistoryCopyPipeline, mppWaterNormalTextures, mppWaterFoamTextures, mppWaterFoamBreakupTextures);
 };
 
 inline PipelineManager* gpPipelineManager = nullptr;
