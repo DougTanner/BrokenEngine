@@ -30,6 +30,7 @@
 #include "Graphics/Objects/Texture.h"
 
 #include "Graphics/Graphics.h"
+#include "Graphics/Lighting/Lighting.h"
 #include "Graphics/GraphicsUtils.h"
 #include "Graphics/Managers/BufferManager.h"
 #include "Graphics/Managers/CommandBufferManager.h"

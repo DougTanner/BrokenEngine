@@ -80,8 +80,6 @@ PipelineManager::PipelineManager()
 	// Clear stale pipeline pointers before pipelines are recreated
 	gpTextureManager->mTextureDescriptors.ClearTextureBindings();
 
-	mWorldLightingShadowPipelines.CreateLightingPipelines();
-	mWorldLightingShadowPipelines.CreateLightingBlurPipelines();
 	mWorldLightingShadowPipelines.CreatePipelineShadows();
 	mWorldLightingShadowPipelines.CreateLightingShadowDependentPipelines();
 
@@ -130,9 +128,6 @@ PipelineManager::PipelineManager()
 			{
 				{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
 				{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxDebugTextures, .ppTextures = rTextures.mppDebugTextures},
-				{.flags = DescriptorFlags::kCombinedSamplers, .iCount = 3, .ppTextures = rTextures.mppLightingDepositTextures},
-				{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxDebugTextures, .ppTextures = rTextures.mppDebugTexturesB},
-				{.flags = DescriptorFlags::kCombinedSamplers, .iCount = shaders::kiMaxDebugTextures, .ppTextures = rTextures.mppDebugTexturesC},
 			},
 		});
 	}

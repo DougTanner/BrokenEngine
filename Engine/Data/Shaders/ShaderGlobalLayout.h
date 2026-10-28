@@ -5,7 +5,6 @@
 #define SHADER_GLOBAL_LAYOUT_H
 struct GlobalLayout
 {
-	uint32_t uiRandomSeed INIT;
 
 	float fElapsedTime INIT;
 	float fBaseHeight INIT;
@@ -50,7 +49,6 @@ struct GlobalLayout
 	float fWaterSunWeight INIT;       // Rec.601 luma of fSunIntensityWater*f4SunColor (Water.frag effective-shadow blend)
 	float fWaterMoonWeight INIT;      // Rec.601 luma of fMoonIntensityWater*f4MoonColor (Water.frag effective-shadow blend)
 	float fWaterShadowWeightSumInverse INIT; // 1 / max(fWaterSunWeight + fWaterMoonWeight, 0.001)
-	float fSmokeLightingCombinedMultiplier INIT; // fSmokeLightingMultiplier * fLightingTimeOfDayMultiplier (AddSmoke/BlendSmokePrecomputed)
 
 	// Model.frag uses separate direct BRDF and IBL specular products. IBL stays linear in fPhysicallyBasedRenderingSun
 	// because its Rec.709 luminance uses the unscaled sun/moon color. w unused.
@@ -68,7 +66,6 @@ struct GlobalLayout
 	float pfSmokeStepCounts[kiMaxFlightPlanes] INIT; // Per flight plane: frames since its previous smoke refresh; scales spread offsets and edge decay
 	float fSmokeColorMin INIT;
 	float fSmokeColorMultiplier INIT;
-	float fSmokeLightingMultiplier INIT;
 	float fSmokeIntensityFalloff INIT;
 	float fSmokeWindNoiseScale INIT;
 	float fSmokeWindNoiseQuantity INIT;
@@ -113,69 +110,6 @@ struct GlobalLayout
 	uint32_t uiWindTilesX INIT;
 	uint32_t uiWindTilesY INIT;
 	vec2 f2WindTilesInverse INIT; // (1/uiWindTilesX, 1/uiWindTilesY) (WindOccupancyDilate output-tile-center UV)
-
-	float fLightingObjectsAdd INIT;
-	float fLightingDepositThreshold INIT;
-	float fLightingDepositCompress INIT;
-	// Uchimura tone curve inputs (LightCombine.comp / DebugTexture.frag). fCombineLinearLength folds CPU-side into
-	// fCombineShoulderInputStart/fCombineShoulderOutputStart; fCombineShoulderExponentCoefficient is the segment CP constant (epsilon-guarded on P - S1 in LightingUniforms.cpp).
-	float fCombineMaxBrightness INIT;
-	float fCombineContrast INIT;
-	float fCombineLinearStart INIT;
-	float fCombineToe INIT;
-	float fCombineBlackTightness INIT;
-	float fCombineShoulderInputStart INIT;
-	float fCombineShoulderOutputStart INIT;
-	float fCombineShoulderExponentCoefficient INIT;
-	float fCombineHuePreserve INIT;
-	// Pass normalization/exposure scaling precomputed: fCombinePassNormalizationScale = passNorm * passScale (DebugTexture.frag),
-	// fCombinePassTotalScale = fCombinePassNormalizationScale / passCount (LightCombine.comp averaging).
-	float fCombinePassNormalizationScale INIT;
-	float fCombinePassTotalScale INIT;
-	float pfCombineCurvePoints[kiMaxSpreadPasses] INIT;
-	float fLightingTerrain INIT;
-	float fLightingObjects INIT;
-
-	float fLightingAddTerrain INIT;
-	float fSpreadDirectionalityStart INIT;
-	vec4 f4LightingArea INIT;
-	vec4 f4LightingAreaPrevious INIT; // f4LightingArea as it stood before the latest refresh, for LightingTemporal.comp reprojection
-	vec2 f2LightingAreaExtentInverse INIT; // 1 / lighting-area extent (LightingSpread.frag world->texcoord)
-	float fLightingTemporalBlend INIT; // EMA weight toward current; 1.0 on the first frame so seeded history is never shown
-	vec2 f2LightingDepositSizeInverse INIT; // 1 / (lightTiles * kiComputeTileSize) (LightingDepositEdgeFade)
-
-	// Spread Start (radial directional spread)
-	float fSpreadDirectionCountStart INIT;
-	float fSpreadDistanceStart INIT;
-	float fSpreadRingCountStart INIT;
-	float fSpreadJitterStart INIT;
-	float fSpreadSampleJitterRangeStart INIT;
-	float fSpreadSampleJitterClusteringStart INIT;
-	float fSpreadDecayStart INIT;
-	float fSpreadAccumulationDecayStart INIT;
-	float fSpreadDistanceFalloffStart INIT;
-	float fSpreadOutputThresholdStart INIT;
-	float fSpreadOutputCompressStart INIT;
-	float fSpreadPassCount INIT;
-	float pfSpreadRingRotations[kiMaxSpreadPasses] INIT;
-
-	// Spread End (interpolation targets for last spread pass)
-	float fSpreadDirectionalityEnd INIT;
-	float fSpreadDirectionCountEnd INIT;
-	float fSpreadDistanceEnd INIT;
-	float fSpreadRingCountEnd INIT;
-	float fSpreadJitterEnd INIT;
-	float fSpreadSampleJitterRangeEnd INIT;
-	float fSpreadSampleJitterClusteringEnd INIT;
-	float fSpreadDecayEnd INIT;
-	float fSpreadAccumulationDecayEnd INIT;
-	float fSpreadDistanceFalloffEnd INIT;
-	float fSpreadOutputThresholdEnd INIT;
-	float fSpreadOutputCompressEnd INIT;
-
-	float fSpreadHeightMultiplier INIT;
-	float fSpreadHeightEndHeightInverse INIT; // 1 / max(spreadHeightEndHeight, 0.001) (LightingSpread.frag height fade)
-	float fSpreadHeightPower INIT;
 
 	float fShadowWidthScale INIT;
 	float fShadowDirectionMultiplier INIT;
@@ -304,7 +238,6 @@ struct GlobalLayout
 	float fTerrainBeachNormalsSizeThree INIT;
 	float fTerrainBeachNormalsBlend INIT;
 
-	float fLightingTimeOfDayMultiplier INIT;
 	float fLightingWaterSkyboxOne INIT;
 	float fLightingWaterSkyboxNormalSoften INIT;
 

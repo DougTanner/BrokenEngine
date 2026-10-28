@@ -91,9 +91,7 @@ enum class PipelineFlags : uint64_t
 	kMultiSet                  = 0x20000,
 	kLineList                  = 0x40000,
 	kNoColorWrite              = 0x80000,
-	// Forces one Set 1 per framebuffer for a pipeline whose descriptor inputs do not imply it but whose sets are rewritten
-	// one framebuffer at a time (the lighting blur).
-	kPerCommandBuffer          = 0x100000,
+	kPointList                 = 0x100000,
 };
 using PipelineFlags_t = common::Flags<PipelineFlags>;
 
@@ -114,7 +112,7 @@ struct PipelineInfo
 	int64_t iColorAttachmentCount = 1;
 
 	// Push-constant range size in bytes; 0 => default sizeof(shaders::PushConstantsLayout). Override only
-	// for pipelines whose shader declares a smaller push-constant block (e.g. LightCombine).
+	// for pipelines whose shader declares a different push-constant block.
 	int64_t iPushConstantBytes = 0;
 
 	// Entry count is capped at common::ShaderHeader::kiMaxDescriptorSetLayoutBindings by Pipeline::Create.
@@ -155,7 +153,6 @@ public:
 
 	void WriteIndirectBuffer(int64_t iCommandBuffer, int64_t iInstanceCount, int64_t iIndexCount = -1, int64_t iFirstIndex = 0, int64_t iVertexOffset = 0);
 	void WriteIndirectComputeBuffer(int64_t iCommandBuffer, int64_t iGroupCountX, int64_t iGroupCountY, int64_t iGroupCountZ);
-
 
 	PipelineInfo mInfo;
 

@@ -68,7 +68,7 @@ void CommandBufferManager::SubmitGlobalToQueue(int64_t iFramebufferIndex)
 {
 	CommandBuffers& rCommandBuffers = mPerFramebufferCommandBuffers.at(iFramebufferIndex);
 
-	// Prepend the acquire command buffer when this frame recorded into it (QFOT acquires, recorded uploads, lighting blur).
+	// Prepend the acquire command buffer when this frame recorded into it (QFOT acquires, recorded uploads).
 	// kPendingAcquireBarriers and miAcquireFramebufferIndex are written on the main thread in TextureManager's
 	// ProcessPendingTextures and EndAcquireCommandBuffer; under
 	// kbRenderThread this read runs on the mSubmitGlobal worker, safe only because SubmitGlobalCommandBuffer's
@@ -128,13 +128,29 @@ void CommandBufferManager::SubmitGlobalCommandBuffer(int64_t iFramebufferIndex)
 	}
 }
 
-void CommandBufferManager::SubmitMainToQueue(int64_t iFramebufferIndex)
+void CommandBufferManager::SubmitMainToQueue(int64_t iFramebufferIndex, bool bPreparationSubmitted)
 {
 	CommandBuffers& rCommandBuffers = mPerFramebufferCommandBuffers.at(iFramebufferIndex);
+	VkPipelineStageFlags vkPreparationWaitStages = VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	VkSubmitInfo vkPreparationSubmit
+	{
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = &rCommandBuffers.mGlobalFinishedVkSemaphore,
+		.pWaitDstStageMask = &vkPreparationWaitStages,
+		.commandBufferCount = 1,
+		.pCommandBuffers = &rCommandBuffers.mPreparationVkCommandBuffer,
+		.signalSemaphoreCount = 1,
+		.pSignalSemaphores = &rCommandBuffers.mPreparationFinishedVkSemaphore,
+	};
+	if (!bPreparationSubmitted)
+	{
+		CHECK_VK(vkQueueSubmit(gpDeviceManager->mGraphicsVkQueue, 1, &vkPreparationSubmit, VK_NULL_HANDLE));
+	}
 
 	VkSemaphore pVkSemaphores[]
 	{
-		rCommandBuffers.mGlobalFinishedVkSemaphore,
+		rCommandBuffers.mPreparationFinishedVkSemaphore,
 		gpSwapchainManager->mImageAvailableVkSemaphore,
 	};
 	VkPipelineStageFlags pVkPipelineStageFlags[]
@@ -178,17 +194,29 @@ void CommandBufferManager::SubmitMainToQueue(int64_t iFramebufferIndex)
 
 void CommandBufferManager::SubmitMainCommandBuffer(int64_t iFramebufferIndex)
 {
+	CommandBuffers& rCommandBuffers = mPerFramebufferCommandBuffers.at(iFramebufferIndex);
+	CHECK_VK(vkResetCommandBuffer(rCommandBuffers.mPreparationVkCommandBuffer, 0));
+	VkCommandBufferBeginInfo vkBeginInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+	};
+	CHECK_VK(vkBeginCommandBuffer(rCommandBuffers.mPreparationVkCommandBuffer, &vkBeginInfo));
+	gpGraphics->mpLighting->RecordPreparation(rCommandBuffers.mPreparationVkCommandBuffer);
+	CHECK_VK(vkEndCommandBuffer(rCommandBuffers.mPreparationVkCommandBuffer));
+	bool bPreparationSubmitted = gpGraphics->mpLighting->CapturePreparation(rCommandBuffers.mPreparationVkCommandBuffer, rCommandBuffers.mGlobalFinishedVkSemaphore, rCommandBuffers.mPreparationFinishedVkSemaphore);
+
 	if constexpr (kbRenderThread)
 	{
-		mSubmitMain.Wake([this, iFramebufferIndex]()
+		mSubmitMain.Wake([this, iFramebufferIndex, bPreparationSubmitted]()
 		{
 			mSubmitGlobal.Wait();
-			SubmitMainToQueue(iFramebufferIndex);
+			SubmitMainToQueue(iFramebufferIndex, bPreparationSubmitted);
 		});
 	}
 	else
 	{
-		SubmitMainToQueue(iFramebufferIndex);
+		SubmitMainToQueue(iFramebufferIndex, bPreparationSubmitted);
 	}
 }
 

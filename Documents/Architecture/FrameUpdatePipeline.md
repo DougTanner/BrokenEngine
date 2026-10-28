@@ -86,6 +86,54 @@ flowchart LR
     beginPoll["Input::BeginPoll"] --> policy["Engine menu policy"] --> gameInput["Game::ProcessGameMenuInput"] --> completePoll["Input::previous-snapshot assignment"] --> clientUpdate["GameBase::ClientUpdate"]
 ```
 
+## Client Rendering and Comparison Capture
+
+[`Graphics`](../../Engine/Source/Graphics/Graphics.cpp) and
+[`CommandBufferManager`](../../Engine/Source/Graphics/Managers/CommandBufferManager.cpp)
+submit Global, preparation, Main and ImGui before present. Global and Main are
+recorded once between recreation events. Preparation uploads current Main data,
+displaces water, builds Lighting inputs, and updates smoke/wind emission, object
+shadows/blur and water foam. Main renders the image and HDR resolve. It waits for
+both preparation and image availability; ImGui joins the Main worker and submits
+the framebuffer fence. Main also signals particle synchronization for the next
+Global submission.
+
+[`LightingCapture`](../../Engine/Source/Graphics/Lighting/LightingCapture.cpp)
+intercepts a requested capture after preparation recording and before the Main
+worker wakes. It holds the publication, consumes Global-finished with preparation,
+and waits its covering fence. Receiver and reference tile submissions reuse a
+private command buffer only after each covering fence. The final output barriers
+precede one Preparation-finished signal; Main skips its ordinary preparation
+submission. `FinishCapture` runs after ImGui submission and before present, waits
+the original framebuffer fence, then exports raw images and the finished PNG.
+
+```mermaid
+%%{init: {'theme': 'default'}}%%
+flowchart LR
+    global["Global"] --> preparation["Preparation"]
+    preparation --> ordinary["Ordinary path"] --> main["Main + HDR resolve"]
+    preparation --> held["Capture fence + held publication"]
+    held --> receiver["Receiver fence"] --> tiles["Reference tiles + fences"]
+    tiles --> ready["Output barriers + Preparation-finished"] --> main
+    acquired["Image available"] --> main
+    main --> ui["ImGui + framebuffer fence"]
+    ui --> live["Ordinary path"] --> present["Present"]
+    ui --> export["Capture export if held"] --> invalidate["Disable reference + fence restoration"] --> release["Release publication"] --> present
+    release --> resume["First ordinary Main/UI fence: zero diffuse"]
+```
+
+Throughout capture, the main thread withholds ordinary update, rendering,
+adoption and retirement. Its narrow host pump leaves mutating window messages
+pending; Sandbox services gated agent commands and ENet without session-event
+dispatch, while ModelViewer supplies an empty hook. Mutations before Main
+commitment cancel comparison; later mutations wait through export, invalidation
+and release. The capture owner retains all upstream inputs until those consumers
+finish. [Graphics](../../Engine/Source/Graphics/AGENTS.md#lighting-publication)
+owns the freeze, cancellation, recreation and zero-diffuse resume contract;
+[Client networking](../../Engine/Source/Network/Client/AGENTS.md#receive-paths)
+owns transport limits. These submission paths do not advance Frame simulation
+or add state to its CRC.
+
 ## Server Main Loop
 
 The server main loop in [`Main.cpp`](../../Engine/Source/Main.cpp) calls

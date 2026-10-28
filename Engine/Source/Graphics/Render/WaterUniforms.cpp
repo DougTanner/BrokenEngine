@@ -54,7 +54,7 @@ static void PopulateWaterReducedUv(shaders::GlobalLayout& rGlobalLayout, std::ch
 	double fSizeBaseTwo = static_cast<double>(gLightingSampledNormalsTwoSize.mfCurrent);
 	double fSizeBaseThree = static_cast<double>(gLightingSampledNormalsThreeSize.mfCurrent);
 	// Camera-height-driven speed lerp — single-sourced fade endpoint shared with LightingUniforms.cpp.
-	float fCameraHeightZoomFactor = engine::LerpAtHeight(engine::gpCamera->mfCameraEyeHeight, engine::CameraBase::kfCameraEyeHeightDefault, engine::CameraBase::kfWaveFadeEndHeight, 0.0f, 1.0f);
+	float fCameraHeightZoomFactor = engine::LerpAtHeight(engine::gpCamera->GetRenderEyeHeight(), engine::CameraBase::kfCameraEyeHeightDefault, engine::CameraBase::kfWaveFadeEndHeight, 0.0f, 1.0f);
 	double fSpeedOne = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedOneMinimum.mfCurrent, gLightingSampledNormalsSpeedOneMaximum.mfCurrent, fCameraHeightZoomFactor));
 	double fSpeedTwo = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedTwoMinimum.mfCurrent, gLightingSampledNormalsSpeedTwoMaximum.mfCurrent, fCameraHeightZoomFactor));
 	double fSpeedThree = static_cast<double>(std::lerp(gLightingSampledNormalsSpeedThreeMinimum.mfCurrent, gLightingSampledNormalsSpeedThreeMaximum.mfCurrent, fCameraHeightZoomFactor));
@@ -534,7 +534,7 @@ static void PopulateGerstnerWaves(shaders::MainLayout& rMainLayout, float fCurre
 	double fWaveCameraY = fWaveCellY + static_cast<double>(f4WaveCameraPosition.y);
 
 	// Camera eye height scales geometric wave amplitudes using each stack's Start and End settings.
-	float fCameraEyeHeight = engine::gpCamera->mfCameraEyeHeight;
+	float fCameraEyeHeight = engine::gpCamera->GetRenderEyeHeight();
 	float fLowFadeStart = gWaterLowAmplitudeFadeStart.mfCurrent;
 	float fLowFadeEnd = gWaterLowAmplitudeFadeEnd.mfCurrent;
 	float fLowAmplitudeScale = std::clamp((fLowFadeEnd - fCameraEyeHeight) / std::max(fLowFadeEnd - fLowFadeStart, 1.0e-3f), 0.0f, 1.0f);

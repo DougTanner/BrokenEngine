@@ -4,7 +4,6 @@
 
 #include "File/PackChunks.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
-#include "Ui/LightingWrappersBase.h"
 
 namespace engine
 {
@@ -75,7 +74,7 @@ BufferManager::BufferManager()
 		auto [it, bInserted] = mModelMap.try_emplace(rCrc, BufferInfo
 		{
 			.name = rChunk.pHeader->pcPath,
-			.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal},
+			.flags = {BufferFlags::kIndexVertex, BufferFlags::kDeviceLocal, BufferFlags::kDeviceAddress, BufferFlags::kAccelerationInput},
 			.iCount = rModelHeader.iIndexCount,
 			.vkIndexType = common::ModelHeader::UsesU16Indices(rModelHeader.iVertexCount) ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32,
 			.iVertexStride = rModelHeader.iStride,
@@ -353,7 +352,7 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 		rBuffer.Create(
 		{
 			.name = "MeshData",
-			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
+			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible, BufferFlags::kDeviceAddress},
 			.iDataSize = common::MeshData::kiMaxMeshes * static_cast<int64_t>(sizeof(common::MeshData)),
 		},
 		[&](void* pData)
@@ -383,7 +382,7 @@ void BufferManager::InitializePerCommandBufferBuffers(int64_t iCommandBufferCoun
 		rBuffer.Create(
 		{
 			.name = "JointMatrices",
-			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
+			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible, BufferFlags::kDeviceAddress},
 			.iDataSize = common::kiInitialJointMatrixCapacity * static_cast<int64_t>(sizeof(common::JointMatrix)),
 		},
 		[&](void* pData)
@@ -426,12 +425,17 @@ Buffer* BufferManager::CreateDynamicBuffer(common::crc_t crc, DynamicBufferType 
 
 	int64_t iCommandBufferCount = std::ssize(gpSwapchainManager->mFramebuffers);
 	rBuffers.resize(iCommandBufferCount);
+	BufferFlags_t flags {BufferFlags::kStorage, BufferFlags::kHostVisible};
+	if (eType == kBufferMain && std::cmp_equal(iElementSize, sizeof(shaders::ModelLayout)))
+	{
+		flags.Set(BufferFlags::kDeviceAddress);
+	}
 	for (Buffer& rBuffer : rBuffers)
 	{
 		rBuffer.Create(
 		{
 			.name = name,
-			.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
+			.flags = flags,
 			.iDataSize = iInitialCapacity * iElementSize,
 			.iElementSize = iElementSize,
 		});
@@ -451,13 +455,14 @@ void BufferManager::ResizeDynamicBuffer(common::crc_t crc, DynamicBufferType eTy
 	std::unordered_map<common::crc_t, std::vector<Buffer>>& rMap = mpDynamicStorageBuffers[eType];
 	Buffer& rOldBuffer = rMap.at(crc).at(iFramebuffer);
 	int64_t iElementSize = rOldBuffer.mInfo.iElementSize;
+	BufferFlags_t flags = rOldBuffer.mInfo.flags;
 	mOptionalPreviousBuffer = std::move(rOldBuffer);
 
 	Buffer& rBuffer = rMap.at(crc).at(iFramebuffer);
 	rBuffer.Create(
 	{
 		.name = name,
-		.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
+		.flags = flags,
 		.iDataSize = iNewSize,
 		.iElementSize = iElementSize,
 	});
@@ -532,7 +537,7 @@ void BufferManager::GrowMeshDataBuffer(int64_t iCommandBuffer, int64_t iValidCou
 	mMeshDataStorageBuffers.at(iCommandBuffer).Create(
 	{
 		.name = "MeshData",
-		.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
+		.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible, BufferFlags::kDeviceAddress},
 		.iDataSize = mpiMeshDataCapacity[iCommandBuffer] * static_cast<int64_t>(sizeof(common::MeshData)),
 	});
 
@@ -559,7 +564,7 @@ void BufferManager::GrowJointMatrixBuffer(int64_t iCommandBuffer, int64_t iValid
 	mJointMatrixStorageBuffers.at(iCommandBuffer).Create(
 	{
 		.name = "JointMatrices",
-		.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible},
+		.flags = {BufferFlags::kStorage, BufferFlags::kHostVisible, BufferFlags::kDeviceAddress},
 		.iDataSize = mpiJointMatrixCapacity[iCommandBuffer] * static_cast<int64_t>(sizeof(common::JointMatrix)),
 	});
 

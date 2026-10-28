@@ -73,13 +73,13 @@ public:
 	MemoryStats GetEagerStatistics() const;
 	MemoryStats GetLazyStatistics() const;
 	MemoryStats GetMemoryStatistics(data::DataTypes eDataType) const;
+	std::filesystem::path GetDataFilePath(data::DataTypes eDataType, std::string_view extension) const;
 
 private:
 	friend class PackChunkLoader;
 
 	void LoadPackFiles();
 	[[nodiscard]] bool RecommitChunkRange(common::crc_t crc, const LazyChunk& rLazyChunk, int64_t iOffset, int64_t iLength);
-	std::filesystem::path GetDataFilePath(data::DataTypes eDataType, std::string_view extension) const;
 
 #if defined(BT_CLIENT)
 #if defined(BT_DEBUG)

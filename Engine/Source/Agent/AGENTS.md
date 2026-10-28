@@ -87,6 +87,12 @@ whose purpose is to execute a scripted pass/fail scenario itself.
   that closes mid-wait releases the connection. The listener flushes a published
   response despite stop under a single 3 s deadline.
 - Only one request is in flight. Deferred handlers return a poll function; later drains publish its first result under the original request ID. Each request carries its connection generation (the reuse counter); a reply, synchronous or deferred, whose connection has since torn down is discarded rather than sent to a later client, and the drain-count timeout prevents a lost async result from blocking the channel indefinitely.
+- During a Lighting capture hold, only `query_profile`, `status`, `describe_ui`
+  and `ping` dispatch. Other parsed commands remain pending before their
+  handlers and request cancellation or wait through the committed export tail.
+  Fence-poll drains do not advance deferred drain-count timeouts. The capture
+  lifecycle belongs to [Graphics](../Graphics/AGENTS.md#lighting-publication);
+  operational controls belong to the harness command reference above.
 - The command channel is an exempt developer tool, so handlers need not range-check arguments; a check that exists throws into the failure envelope, which `Drain()` produces from the exception.
 - `AgentInput` is client-only and runs one frame-stepped synthetic script at a time. It queues ImGui item activation, typed text, and keys, adds wheel notches to the published `RawInput` scroll value, and overlays that snapshot's keys for engine key bindings. Physical input suppression is owned by the startup/input path.
 - ImGui item activation is the only way the harness drives the UI: an agent

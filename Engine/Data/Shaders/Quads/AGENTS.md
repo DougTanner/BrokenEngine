@@ -4,7 +4,7 @@ This family supplies fullscreen, world-visible-area, and compact axis-aligned qu
 
 ## Invariants
 
-- A push constant selects camera, shadow, smoke, or lighting projection for visible-area variants. Selector 2 (smoke) also reads push-constant y as the flight plane whose smoke area applies, so wind deposits pass plane 0, the area wind lies in. This allows record-once command buffers to reuse the same pipelines across target spaces.
+- A push constant selects camera, shadow, or smoke projection for visible-area variants. Selector 2 (smoke) also reads push-constant y as the flight plane whose smoke area applies, so wind deposits pass plane 0, the area wind lies in. This allows record-once command buffers to reuse the same pipelines across target spaces.
 - Zero-size rectangles intentionally collapse to degenerate triangles, allowing fixed-capacity instance buffers to cull entries without changing recorded draw counts.
 - General quads carry explicit corner positions; compact axis-aligned quads derive corners from center, size, and rotation. Texture slots are instance data and are independent of `gl_InstanceIndex`.
 - Fragment inputs shared by the general and axis-aligned visible-area variants

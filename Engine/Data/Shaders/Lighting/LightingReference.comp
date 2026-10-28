@@ -1,0 +1,56 @@
+#version 460
+
+#extension GL_EXT_ray_query : require
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+#include "ShaderLayouts.h"
+#include "ShaderFunctions.h"
+#include "Lighting/LightingRadiometry.h"
+
+layout(local_size_x = 4, local_size_y = 4) in;
+layout(push_constant) uniform pushConstants { PushConstantsLayout pushConstantsLayout; };
+layout(set = 1, binding = 2, rgba32f) uniform writeonly image2D referenceOutput;
+layout(set = 1, binding = 18) uniform sampler2D receiverPosition;
+layout(set = 1, binding = 19) uniform sampler2D receiverShadingNormal;
+layout(set = 1, binding = 27) uniform sampler2D receiverGeometricNormal;
+layout(set = 1, binding = 28) uniform sampler2D receiverAlbedo;
+
+void main()
+{
+	ivec2 i2Pixel = ivec2(pushConstantsLayout.f4Pipeline.xy) + ivec2(gl_LocalInvocationID.xy);
+	if (any(lessThan(i2Pixel, ivec2(0))) || any(greaterThanEqual(i2Pixel, imageSize(referenceOutput)))) return;
+	vec4 f4Result = vec4(0.0f);
+	if (all(lessThan(i2Pixel, textureSize(receiverPosition, 0))) &&
+	    all(lessThan(i2Pixel, textureSize(receiverShadingNormal, 0))) &&
+	    all(lessThan(i2Pixel, textureSize(receiverGeometricNormal, 0))) &&
+	    all(lessThan(i2Pixel, textureSize(receiverAlbedo, 0))))
+	{
+		vec4 f4Position = texelFetch(receiverPosition, i2Pixel, 0);
+		if (f4Position.w > 0.0f)
+		{
+			vec3 f3ShadingNormal = texelFetch(receiverShadingNormal, i2Pixel, 0).xyz;
+			vec3 f3GeometricNormal = texelFetch(receiverGeometricNormal, i2Pixel, 0).xyz;
+			vec3 f3Albedo = texelFetch(receiverAlbedo, i2Pixel, 0).rgb;
+			uint uiSamples = uint(pushConstantsLayout.f4Pipeline.z);
+			for (uint i = 0u; i < lightingPublication.uiSourceCount; ++i)
+			{
+				LightingSource source = lightingSources[i];
+				if (source.uiType == kiLightingSourcePoint)
+				{
+					f4Result.rgb += LightingPointRadiance(source, f4Position.xyz, f3GeometricNormal, f3ShadingNormal, f3Albedo);
+				}
+				else
+				{
+					for (uint j = 0u; j < uiSamples; ++j)
+					{
+						f4Result.rgb += LightingRectangleRadiance(source, lightingSamples[j], uiSamples, f4Position.xyz, f3GeometricNormal, f3ShadingNormal, f3Albedo);
+					}
+				}
+			}
+			f4Result.a = 1.0f;
+		}
+	}
+	imageStore(referenceOutput, i2Pixel, f4Result);
+}

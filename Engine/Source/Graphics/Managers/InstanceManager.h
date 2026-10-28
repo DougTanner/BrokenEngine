@@ -24,10 +24,20 @@ public:
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR,
 		.pNext = nullptr,
 	};
+	VkPhysicalDeviceRayQueryFeaturesKHR mVkPhysicalDeviceRayQueryFeaturesKHR
+	{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
+		.pNext = kbShaderRealtimeClock ? &mVkPhysicalDeviceShaderClockFeaturesKHR : nullptr,
+	};
+	VkPhysicalDeviceAccelerationStructureFeaturesKHR mVkPhysicalDeviceAccelerationStructureFeaturesKHR
+	{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
+		.pNext = &mVkPhysicalDeviceRayQueryFeaturesKHR,
+	};
 	VkPhysicalDeviceVulkan12Features mVkPhysicalDeviceVulkan12Features
 	{
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-		.pNext = kbShaderRealtimeClock ? &mVkPhysicalDeviceShaderClockFeaturesKHR : nullptr,
+		.pNext = &mVkPhysicalDeviceAccelerationStructureFeaturesKHR,
 	};
 	VkPhysicalDeviceFeatures2 mVkPhysicalDeviceFeatures2 = 
 	{
@@ -36,6 +46,10 @@ public:
 	};
 
 	VkPhysicalDeviceProperties mVkPhysicalDeviceProperties {};
+	VkPhysicalDeviceAccelerationStructurePropertiesKHR mVkPhysicalDeviceAccelerationStructurePropertiesKHR
+	{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR,
+	};
 
 	int64_t miGraphicsQueueFamilyIndex = UINT32_MAX;
 	int64_t miPresentQueueFamilyIndex = UINT32_MAX;

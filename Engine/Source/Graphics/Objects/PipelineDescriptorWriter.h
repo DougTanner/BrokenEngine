@@ -20,6 +20,7 @@ struct PipelineDescriptorWriter
 	// Writes Set 1 copy iDescriptorSet only (the framebuffer index for a per-framebuffer pipeline).
 	static void UpdateImageDescriptorInSet(const Pipeline& rPipeline, int64_t iDescriptorSet, int64_t iBinding, VkSampler vkSampler, VkImageView vkImageView, VkImageLayout vkImageLayout, VkDescriptorType vkDescriptorType);
 	static void UpdateStorageBuffer(const Pipeline& rPipeline, int64_t iFramebuffer, int64_t iBinding, const Buffer* pBuffer);
+	static void UpdateAccelerationStructure(const Pipeline& rPipeline, int64_t iFramebuffer, int64_t iBinding, VkAccelerationStructureKHR vkAccelerationStructure);
 };
 
 } // namespace engine

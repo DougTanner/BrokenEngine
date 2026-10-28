@@ -939,9 +939,30 @@ void GameBase::Render()
 	std::chrono::duration<float> elapsedTime(common::NanosecondsToFloatSeconds<float>((TickToSimulationTime(miTickCounter) + std::max(0ns, mTimeStep.mTickRemainderNanoseconds)).time_since_epoch()));
 
 	GridCoord cameraCoordinate = mClientGridCoordinate;
+	// TEMP START original native request capture
+	struct [[nodiscard]] NativeRequestCleanup
+	{
+		bool bArmed = true;
+		NativeRequestCleanup() = default;
+		NativeRequestCleanup(const NativeRequestCleanup&) = delete;
+		NativeRequestCleanup& operator=(const NativeRequestCleanup&) = delete;
+		~NativeRequestCleanup() noexcept
+		{
+			if (bArmed && gpGraphics != nullptr && gpGraphics->mpLighting != nullptr && !gpGraphics->mpLighting->IsCaptureHeld())
+			{
+				gpGraphics->mpLighting->CancelCapture();
+			}
+		}
+	} nativeCleanup;
+	// TEMP END original native request capture
+	gpGraphics->mpLighting->ApplyComparisonSettings();
 	bool bHaveRenderableCamera = false;
 	SelectRenderCamera(rActiveCoordinates, cameraCoordinate, bHaveRenderableCamera);
 	UpdateRenderInterpolation(rActiveCoordinates, cameraCoordinate, bHaveRenderableCamera);
+	if (!bHaveRenderableCamera)
+	{
+		gpCamera->UpdateComparisonCamera();
+	}
 
 	if (HandleDeferredSwapchain())
 	{
@@ -959,6 +980,9 @@ void GameBase::Render()
 	// Capture command buffer index before async launch to avoid re-reading in async thread
 	int64_t iCommandBuffer = gpSwapchainManager->miFramebufferIndex;
 	gpGraphics->RenderMainPresentAcquire(iCommandBuffer, mRenderInterpolates, rActiveCoordinates, cameraCoordinate, elapsedTime);
+	// TEMP START original native request capture
+	nativeCleanup.bArmed = false;
+	// TEMP END original native request capture
 
 }
 

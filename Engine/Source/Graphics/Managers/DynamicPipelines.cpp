@@ -176,31 +176,6 @@ void DynamicPipelines::CreateShadowModelPipeline(common::crc_t crc, std::string_
 	}
 }
 
-void DynamicPipelines::CreateAreaLightingPipeline(DynamicPipelineType eType, common::crc_t crc, std::string_view name, common::crc_t vertexShaderCrc, common::crc_t fragmentShaderCrc, DescriptorFlags eSamplerFlag)
-{
-	if (mpPipelineMaps[eType].contains(crc))
-	{
-		return;
-	}
-
-	AddPipeline(eType, crc,
-	{
-		.name = name,
-		.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kIndirectHostVisible, PipelineFlags::kMax, PipelineFlags::kUpdateAfterBind},
-		.ppShaders = {&mrShaders.at(vertexShaderCrc), &mrShaders.at(fragmentShaderCrc)},
-		.pVertexBuffer = &gpBufferManager->mQuadsVertexBuffer,
-		.vkTargetRenderPass = gpTextureManager->mRenderTargetTextures.mLightingVkRenderPass,
-		.vkExtent3D = gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.vkExtent3D,
-		.descriptorInfos =
-		{
-			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mpDynamicStorageBuffers[kBufferMain].at(crc).data()},
-			{.flags = eSamplerFlag},
-			{.flags = DescriptorFlags::kTextures},
-		},
-	});
-}
-
 void DynamicPipelines::CreatePipelineVisibleLights(common::crc_t crc, std::string_view name, Buffer* pStorageBuffers)
 {
 	if (mpPipelineMaps[kDynamicPipelineVisibleLights].contains(crc))
@@ -300,31 +275,6 @@ void DynamicPipelines::CreatePipelineHexShields(common::crc_t crc, std::string_v
 			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
 			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mpDynamicStorageBuffers[kBufferMain].at(crc).data()},
 			{.flags = DescriptorFlags::kCombinedSamplers, .textureCrc = data::kTexturesCSkyboxCrc},
-		},
-	});
-}
-
-void DynamicPipelines::CreatePipelineHexShieldsLighting(common::crc_t crc, std::string_view name)
-{
-	if (mpPipelineMaps[kDynamicPipelineHexShieldsLighting].contains(crc))
-	{
-		return;
-	}
-
-	// Shares the main HexShields pipeline's storage buffer.
-	AddPipeline(kDynamicPipelineHexShieldsLighting, crc,
-	{
-		.name = name,
-		.flags = {PipelineFlags::kRenderTarget, PipelineFlags::kPushConstants, PipelineFlags::kMax, PipelineFlags::kIndirectHostVisible, PipelineFlags::kUpdateAfterBind},
-		.ppShaders = {&mrShaders.at(data::kShadersObjectsHexShieldvertCrc), &mrShaders.at(data::kShadersObjectsHexShieldLightingfragCrc)},
-		.pVertexBuffer = &gpBufferManager->mModelMap.at(data::kModelsDualGeodesicIcosahedronDualGeodesicIcosahedrongltfMODELCrc),
-		.vkTargetRenderPass = gpTextureManager->mRenderTargetTextures.mLightingVkRenderPass,
-		.vkExtent3D = gpTextureManager->mRenderTargetTextures.mpLightingTextures[0].mInfo.vkExtent3D,
-		.descriptorInfos =
-		{
-			{.flags = DescriptorFlags::kGlobalLayoutUniformBuffers},
-			{.flags = DescriptorFlags::kMainLayoutUniformBuffers},
-			{.flags = DescriptorFlags::kPerCommandBufferStorageBuffers, .pBuffers = gpBufferManager->mpDynamicStorageBuffers[kBufferMain].at(crc).data()},
 		},
 	});
 }

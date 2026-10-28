@@ -13,8 +13,25 @@ Client-only RAII wrappers for Vulkan buffers, textures, shaders, pipelines, and 
 
 - Persistent mapped, one-shot staged, and copy-every-frame buffers have distinct ownership and barrier requirements. Keep draw indexing within the slots allocated for that mode.
 - Texture and device-local buffer uploads have a one-shot form and a recording form; the recording form returns its staging buffer, which the caller keeps alive until that command buffer's execution completes.
-- A pipeline allocates one Set 1 per framebuffer when a descriptor carries per-framebuffer data or is a combined-sampler binding that per-framebuffer descriptor publication can rewrite; a pipeline whose sets are rewritten per framebuffer for another reason, such as the lighting blur, requests it by flag. Global Set 0 is always bound at the framebuffer index.
-- Buffer memory property flags are hard requirements for the allocator, not preferences: a buffer gets every requested flag or its creation throws, so a device-local buffer never falls back to system memory. Every host-visible buffer is host-coherent and persistently mapped, and no code flushes or invalidates mapped memory; requesting non-coherent host memory breaks every caller that writes or reads through the mapping.
+- A pipeline allocates one Set 1 per framebuffer when a descriptor carries per-framebuffer data or is a combined-sampler binding that per-framebuffer descriptor publication can rewrite; a pipeline whose sets are rewritten per framebuffer for another reason, such as a private lighting consumer, requests it by flag. Global Set 0 is always bound at the framebuffer index.
+- Buffer memory properties remain mandatory except that ordinary-RAM placement
+  removes `DEVICE_LOCAL` and requires coherent, persistently mapped host memory
+  from a heap without `VK_MEMORY_HEAP_DEVICE_LOCAL_BIT`; BAR-visible local heaps
+  do not qualify. Staging, readback, upload mirrors, acceleration-structure
+  scratch and diagnostic work request ordinary RAM explicitly, with no retry
+  into local memory. Other buffer requests retain their requested properties
+  on the first allocation attempt.
+- For every default `DEVICE_LOCAL` request through `Buffer::CreateBuffer`, only
+  an outer `VK_ERROR_OUT_OF_DEVICE_MEMORY` permits one ordinary-RAM retry when
+  an allowed host type exists, with a warning and `DEBUG_BREAK` before retry.
+  Resource compatibility and all other requested properties remain mandatory;
+  final `CHECK_VK` follows recovery. This policy does not cover direct image or
+  raw ImGui allocations. Logical `BufferFlags` still select handle ownership
+  and upload paths; they do not prove actual heap residency. Keep content,
+  device-address, barrier and completion-lifetime contracts for either placement.
+- Every host-visible buffer is host-coherent and persistently mapped, and no
+  code flushes or invalidates mapped memory; requesting non-coherent host memory
+  breaks every caller that writes or reads through the mapping.
 - Descriptor arrays end at the first empty entry. Use each descriptor's resolved Vulkan binding for deferred updates.
 - A uniform-buffer descriptor must name the routing its source uses:
   `kGlobalLayoutUniformBuffers` for the per-frame global layout,
@@ -28,7 +45,6 @@ Client-only RAII wrappers for Vulkan buffers, textures, shaders, pipelines, and 
 - Pipeline creation trusts shader reflection only after validating the expected vertex input and descriptor shape. Pack-derived model ranges, material starts, and present material texture indices are file trust boundaries and throw `std::ios_base::failure` when invalid; an absent material texture selector leaves its paired index unused.
 - Model pipeline registrations are rebuilt as a unit. Per-material draws preserve empty ranges, transparency filtering, and the manager-owned shared descriptor inputs.
 - Indirect indexed draws read a negative index count as "draw the whole vertex buffer". An explicit zero stays a zero-index draw, which is how a valid empty material range is expressed. Passing `0` to mean "draw everything" silently draws nothing with no validation message, and normalizing a negative count to zero breaks whole-buffer draws.
-- A pipeline created with one color attachment against the lighting render pass is upgraded to three attachments, with its blend state copied to each. Expect that upgrade rather than an attachment-count mismatch, and do not add a second mechanism alongside it.
 
 ## See Also
 

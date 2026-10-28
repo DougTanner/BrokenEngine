@@ -1,0 +1,68 @@
+#version 460
+
+#extension GL_EXT_ray_query : require
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+#include "ShaderLayouts.h"
+#include "ShaderFunctions.h"
+#include "Lighting/LightingRadiometry.h"
+#include "Lighting/LightingSceneDiagnostics.h"
+
+layout(local_size_x = 64) in;
+layout(scalar, set = 1, binding = 27) buffer sceneDiagnosticOutput { LightingSceneDiagnosticResult result; };
+layout(scalar, set = 1, binding = 28) readonly buffer sceneDiagnosticParameters { LightingSceneDiagnosticParameters parameters; };
+
+void main()
+{
+	uint index = gl_GlobalInvocationID.x;
+	if (index == 0u)
+	{
+		result.uiPublication = parameters.uiPublication;
+		result.uiGeneration = parameters.uiGeneration;
+		if (lightingPublication.uiSourceCount > 0u)
+		{
+			result.pSources[0] = lightingSources[0];
+			result.pSources[1] = lightingSources[min(4u, lightingPublication.uiSourceCount - 1u)];
+			result.pSources[2] = lightingSources[lightingPublication.uiSourceCount - 1u];
+		}
+		result.pf2Samples[0] = lightingSamples[0];
+		result.pf2Samples[1] = lightingSamples[255];
+		result.pf2Samples[2] = lightingSamples[parameters.uiSampleCount / 2u];
+		result.pf2Samples[3] = lightingSamples[parameters.uiSampleCount - 1u];
+	}
+	if (index < lightingPublication.uiSourceCount)
+	{
+		LightingSource source = lightingSources[index];
+		bool bad = any(isnan(source.f3Center)) || any(isinf(source.f3Center)) || any(isnan(source.f3Power)) || any(isinf(source.f3Power)) || any(lessThan(source.f3Power, vec3(0.0f))) || isnan(source.fRange) || isinf(source.fRange) || source.fRange < 0.0f || source.uiPadding0 != 0u || source.uiPadding1 != 0u;
+		bad = bad || any(isnan(source.f3HalfEdgeU)) || any(isinf(source.f3HalfEdgeU)) || any(isnan(source.f3HalfEdgeV)) || any(isinf(source.f3HalfEdgeV));
+		if (source.uiType == kiLightingSourcePoint) bad = bad || any(notEqual(source.f3HalfEdgeU, vec3(0.0f))) || any(notEqual(source.f3HalfEdgeV, vec3(0.0f)));
+		else if (source.uiType == kiLightingSourceRectangle) bad = bad || dot(source.f3HalfEdgeU, source.f3HalfEdgeV) != 0.0f || dot(cross(source.f3HalfEdgeU, source.f3HalfEdgeV), cross(source.f3HalfEdgeU, source.f3HalfEdgeV)) == 0.0f;
+		else bad = true;
+		atomicAdd(result.uiCheckedSources, 1u);
+		if (bad) atomicAdd(result.uiBadSources, 1u);
+	}
+	if (index < parameters.uiSampleCount)
+	{
+		vec2 sampleUv = lightingSamples[index];
+		atomicAdd(result.uiCheckedSamples, 1u);
+		if (any(isnan(sampleUv)) || any(isinf(sampleUv)) || any(lessThan(sampleUv, vec2(0.0f))) || any(greaterThanEqual(sampleUv, vec2(1.0f)))) atomicAdd(result.uiBadSamples, 1u);
+	}
+	if (index < 8u && lightingPublication.uiSourceCount > 0u)
+	{
+		LightingSource source = lightingSources[0];
+		vec3 offsets[8] = vec3[8](vec3(0, 0, -3.74), vec3(1.9, 1.9, -3.74), vec3(-4, 0, -3.74), vec3(4, 0, -3.74), vec3(0, 0, -6), vec3(0, 8, -6), vec3(0, -8, -6), vec3(20, 0, -6));
+		vec3 receiver = source.f3Center + offsets[index];
+		vec3 normal = vec3(0.0f, 0.0f, 1.0f);
+		vec3 origin = LightingRayOrigin(receiver, normal, normal);
+		LightingHit hit;
+		bool found = LightingClosestHit(origin, normal, 0.0f, 150.0f, hit);
+		result.pProbes[index].uiHit = found ? 1u : 0u;
+		if (found) result.pProbes[index].hit = hit;
+		result.pProbes[index].f3Receiver = receiver;
+		vec3 segment = source.f3Center - origin;
+		result.pProbes[index].fVisible = LightingOccluded(origin, normalize(segment), 0.0f, length(segment) - kfLightingRayOffset) ? 0.0f : 1.0f;
+		result.pProbes[index].f3Radiance = source.uiType == kiLightingSourcePoint ? LightingPointRadiance(source, receiver, normal, normal, vec3(0.5f)) : LightingRectangleRadiance(source, lightingSamples[0], parameters.uiSampleCount, receiver, normal, normal, vec3(0.5f));
+	}
+}

@@ -52,15 +52,10 @@ void main()
 	{
 		f4VisibleArea = globalLayout.f4ShadowAreaExtra;
 	}
-	else if (int(pushConstantsLayout.f4Pipeline.x) == 2)
+	else
 	{
 		f4VisibleArea = globalLayout.pf4SmokeAreas[int(pushConstantsLayout.f4Pipeline.y)];
 	}
-	else
-	{
-		f4VisibleArea = globalLayout.f4LightingArea;
-	}
-
 	float fWorldX = pQuads[gl_InstanceIndex].pf4VerticesTextureCoordinates[iIndex].x;
 	float fWorldY = pQuads[gl_InstanceIndex].pf4VerticesTextureCoordinates[iIndex].y;
 	gl_Position = vec4(-1.0f + 2.0f * (fWorldX - f4VisibleArea.x) / (f4VisibleArea.z - f4VisibleArea.x),

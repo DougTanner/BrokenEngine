@@ -105,116 +105,6 @@ float Specular(vec3 f3ToEyeNormal, vec3 f3LightNormal, vec3 f3Normal, float fSpe
 	       fSpecularThree * exp2(fSpecularThreePower * fLog2);
 }
 
-float IntensityLighting(vec4 f4Lighting)
-{
-	return f4Lighting.x + f4Lighting.y + f4Lighting.z + f4Lighting.w;
-}
-
-// The transparent-black border sampler returns no lighting outside the footprint, so these are plain reads.
-void ReadLighting(inout vec4 pf4Lighting[3], sampler2D pLightingSamplers[3], vec2 f2Texcoord)
-{
-	pf4Lighting[0] = texture(pLightingSamplers[0], f2Texcoord);
-	pf4Lighting[1] = texture(pLightingSamplers[1], f2Texcoord);
-	pf4Lighting[2] = texture(pLightingSamplers[2], f2Texcoord);
-}
-
-vec3 ReadAmbientLighting(sampler2D ambientLightingSampler, vec2 f2Texcoord)
-{
-	return texture(ambientLightingSampler, f2Texcoord).xyz;
-}
-
-float Sum(vec4 pf4Lighting[3])
-{
-	return pf4Lighting[0].x + pf4Lighting[0].y + pf4Lighting[0].z + pf4Lighting[0].w + pf4Lighting[1].x + pf4Lighting[1].y + pf4Lighting[1].z + pf4Lighting[1].w + pf4Lighting[2].x + pf4Lighting[2].y + pf4Lighting[2].z + pf4Lighting[2].w;
-}
-
-vec3 DirectionalLighting(vec4 pf4Lighting[3], vec3 f3Normal, float fIntensity, float fPower, float fPowerMode)
-{
-	// Guard exact (0,0,1) normals (flat-top geometry): normalize() of a zero-length xy NaNs. Zero weights = no
-	// directional contribution, the intended degenerate behavior.
-	float fLen = length(f3Normal.xy);
-	vec2 f2Normal = fLen > kfEpsilon ? f3Normal.xy / fLen : vec2(0.0f);
-	float fWeightE = max(0.0f, f2Normal.x);
-	float fWeightW = max(0.0f, -f2Normal.x);
-	float fWeightN = max(0.0f, f2Normal.y);
-	float fWeightS = max(0.0f, -f2Normal.y);
-
-	vec3 f3Result = vec3(pf4Lighting[0].x * fWeightE + pf4Lighting[0].y * fWeightW + pf4Lighting[0].z * fWeightN + pf4Lighting[0].w * fWeightS,
-		                 pf4Lighting[1].x * fWeightE + pf4Lighting[1].y * fWeightW + pf4Lighting[1].z * fWeightN + pf4Lighting[1].w * fWeightS,
-		                 pf4Lighting[2].x * fWeightE + pf4Lighting[2].y * fWeightW + pf4Lighting[2].z * fWeightN + pf4Lighting[2].w * fWeightS);
-
-	// Skip the pow for whichever branch the mode discards at its extremes (fPowerMode is a uniform, so the branch is warp-coherent)
-	bool bNeedLum = fPowerMode < 0.999f;
-	bool bNeedAvg = fPowerMode > 0.001f;
-
-	float fLuminance = dot(f3Result, kRec709);
-	vec3 f3LumDir = f3Result / max(fLuminance, 0.001f);
-	vec3 f3LumResult = bNeedLum ? (fIntensity * pow(fLuminance, fPower) * f3LumDir) : vec3(0.0f);
-
-	float fAverage = (f3Result.x + f3Result.y + f3Result.z) / 3.0f;
-	vec3 f3AvgDir = f3Result / max(fAverage, 0.001f);
-	vec3 f3AvgResult = bNeedAvg ? (fIntensity * pow(fAverage, fPower) * f3AvgDir) : vec3(0.0f);
-
-	return mix(f3LumResult, f3AvgResult, fPowerMode);
-}
-
-vec3 WaterLighting(vec4 pf4Lighting[3], vec3 f3Normal, float fSoften, float fOne, float fOnePower, float fTwo, float fTwoPower, float fThree, float fThreePower, float fPowerMode)
-{
-	// Zero-length xy normals use a zero direction to avoid undefined normalization; fSoften blends the resulting zero weights toward 0.25f.
-	float fLen = length(f3Normal.xy);
-	vec2 f2Normal = fLen > kfEpsilon ? f3Normal.xy / fLen : vec2(0.0f);
-	float fWeightE = mix(max(0.0f, f2Normal.x), 0.25f, fSoften);
-	float fWeightW = mix(max(0.0f, -f2Normal.x), 0.25f, fSoften);
-	float fWeightN = mix(max(0.0f, f2Normal.y), 0.25f, fSoften);
-	float fWeightS = mix(max(0.0f, -f2Normal.y), 0.25f, fSoften);
-
-	vec3 f3Result = vec3(pf4Lighting[0].x * fWeightE + pf4Lighting[0].y * fWeightW + pf4Lighting[0].z * fWeightN + pf4Lighting[0].w * fWeightS,
-		                 pf4Lighting[1].x * fWeightE + pf4Lighting[1].y * fWeightW + pf4Lighting[1].z * fWeightN + pf4Lighting[1].w * fWeightS,
-		                 pf4Lighting[2].x * fWeightE + pf4Lighting[2].y * fWeightW + pf4Lighting[2].z * fWeightN + pf4Lighting[2].w * fWeightS);
-
-	// Skip the three pow calls for whichever branch the mode discards at its extremes (fPowerMode is a uniform, so the branch is warp-coherent)
-	bool bNeedLum = fPowerMode < 0.999f;
-	bool bNeedAvg = fPowerMode > 0.001f;
-
-	float fLuminance = dot(f3Result, kRec709);
-	vec3 f3LumDir = f3Result / max(fLuminance, 0.001f);
-	float fLumScalar = bNeedLum ? (fOne * pow(fLuminance, fOnePower) + fTwo * pow(fLuminance, fTwoPower) + fThree * pow(fLuminance, fThreePower)) : 0.0f;
-	vec3 f3LumResult = fLumScalar * f3LumDir;
-
-	float fAverage = (f3Result.x + f3Result.y + f3Result.z) / 3.0f;
-	vec3 f3AvgDir = f3Result / max(fAverage, 0.001f);
-	float fAvgScalar = bNeedAvg ? (fOne * pow(fAverage, fOnePower) + fTwo * pow(fAverage, fTwoPower) + fThree * pow(fAverage, fThreePower)) : 0.0f;
-	vec3 f3AvgResult = fAvgScalar * f3AvgDir;
-
-	return mix(f3LumResult, f3AvgResult, fPowerMode);
-}
-
-// Operates on a precomputed direction-averaged sum (e.g. mAmbientCombineTexture sample).
-vec3 AmbientLightingPrecomputed(vec3 f3Result, float fIntensity, float fPower, float fPowerMode)
-{
-	// Skip the pow for whichever branch the mode discards at its extremes (fPowerMode is a uniform, so the branch is warp-coherent)
-	bool bNeedLum = fPowerMode < 0.999f;
-	bool bNeedAvg = fPowerMode > 0.001f;
-
-	float fLuminance = dot(f3Result, kRec709);
-	vec3 f3LumDir = f3Result / max(fLuminance, 0.001f);
-	vec3 f3LumResult = bNeedLum ? (fIntensity * pow(fLuminance, fPower) * f3LumDir) : vec3(0.0f);
-
-	float fAverage = (f3Result.x + f3Result.y + f3Result.z) / 3.0f;
-	vec3 f3AvgDir = f3Result / max(fAverage, 0.001f);
-	vec3 f3AvgResult = bNeedAvg ? (fIntensity * pow(fAverage, fPower) * f3AvgDir) : vec3(0.0f);
-
-	return mix(f3LumResult, f3AvgResult, fPowerMode);
-}
-
-vec3 AmbientLighting(vec4 pf4Lighting[3], float fIntensity, float fPower, float fPowerMode)
-{
-	vec3 f3Result = 0.25f * vec3(pf4Lighting[0].x + pf4Lighting[0].y + pf4Lighting[0].z + pf4Lighting[0].w,
-		                         pf4Lighting[1].x + pf4Lighting[1].y + pf4Lighting[1].z + pf4Lighting[1].w,
-		                         pf4Lighting[2].x + pf4Lighting[2].y + pf4Lighting[2].z + pf4Lighting[2].w);
-	return AmbientLightingPrecomputed(f3Result, fIntensity, fPower, fPowerMode);
-}
-
 vec2 WorldToSmokeTexcoord(vec4 f4SmokeArea, vec2 f2Position)
 {
 	return vec2((f2Position.x - f4SmokeArea.x) / (f4SmokeArea.z - f4SmokeArea.x),
@@ -259,7 +149,7 @@ float SmokeShadowFaded(GlobalLayout globalLayout, vec3 f3InPosition, sampler2D p
 	return fShadow;
 }
 
-vec3 AddSmoke(GlobalLayout globalLayout, vec3 f3InColor, vec2 f2InPosition, sampler2D smokeSampler, int iPlane, float fInMax, vec4 pf4Lighting[3])
+vec3 AddSmoke(GlobalLayout globalLayout, vec3 f3InColor, vec2 f2InPosition, sampler2D smokeSampler, int iPlane, float fInMax)
 {
 	vec2 f2SmokeTexcoord = WorldToSmokeTexcoord(globalLayout.pf4SmokeAreas[iPlane], f2InPosition);
 	float fSmoke = globalLayout.fSmokeMax * texture(smokeSampler, f2SmokeTexcoord).x;
@@ -267,36 +157,15 @@ vec3 AddSmoke(GlobalLayout globalLayout, vec3 f3InColor, vec2 f2InPosition, samp
 	float fDensity = globalLayout.fSmokeColorMin + globalLayout.fSmokeColorMultiplier * fSmoke;
 	fSmoke *= fInMax;
 
-	float fRed = IntensityLighting(pf4Lighting[0]);
-	float fGreen = IntensityLighting(pf4Lighting[1]);
-	float fBlue = IntensityLighting(pf4Lighting[2]);
-	// fSmokeLightingCombinedMultiplier (= fSmokeLightingMultiplier * fLightingTimeOfDayMultiplier) and
-	// f4SmokeBaseLighting (max(sun,moon) sky term + ambient) are folded CPU-side (GlobalUniforms.cpp).
-	vec3 f3Final = vec3(fRed, fGreen, fBlue) * globalLayout.fSmokeLightingCombinedMultiplier;
-	f3Final += globalLayout.f4SmokeBaseLighting.xyz;
-
+	vec3 f3Final = globalLayout.f4SmokeBaseLighting.xyz;
 	f3Final = min(vec3(1.0f, 1.0f, 1.0f), f3Final);
 	return (1.0f - fSmoke) * f3InColor + fSmoke * f3Final * min(vec3(1.25f, 1.25f, 1.25f), vec3(fDensity, fDensity, fDensity));
 }
 
-vec3 BlendSmoke(vec3 f3Color, float fSmokePow, vec4 pf4Lighting[3], GlobalLayout globalLayout)
+vec3 BlendSmokePrecomputed(vec3 f3Color, float fSmokePow, GlobalLayout globalLayout)
 {
 	float fSmokeDensity = globalLayout.fSmokeColorMin + globalLayout.fSmokeColorMultiplier * fSmokePow;
-	float fRed = IntensityLighting(pf4Lighting[0]);
-	float fGreen = IntensityLighting(pf4Lighting[1]);
-	float fBlue = IntensityLighting(pf4Lighting[2]);
-	vec3 f3SmokeLighting = vec3(fRed, fGreen, fBlue) * globalLayout.fSmokeLightingMultiplier * globalLayout.fLightingTimeOfDayMultiplier;
-	f3SmokeLighting += max(globalLayout.fSunIntensitySmoke * globalLayout.f4SunColor.xyz, globalLayout.fMoonIntensitySmoke * globalLayout.f4MoonColor.xyz) + globalLayout.f4AmbientColor.xyz;
-	f3SmokeLighting = min(vec3(1.0f), f3SmokeLighting);
-	return (1.0f - fSmokePow) * f3Color + fSmokePow * f3SmokeLighting * min(vec3(1.25f), vec3(fSmokeDensity));
-}
-
-// Caller passes 4.0 * mAmbientCombineTexture sample (recovers IntensityLighting magnitude — the texture stores 0.25*sum).
-vec3 BlendSmokePrecomputed(vec3 f3Color, float fSmokePow, vec3 f3LightingSum, GlobalLayout globalLayout)
-{
-	float fSmokeDensity = globalLayout.fSmokeColorMin + globalLayout.fSmokeColorMultiplier * fSmokePow;
-	vec3 f3SmokeLighting = f3LightingSum * globalLayout.fSmokeLightingCombinedMultiplier;
-	f3SmokeLighting += globalLayout.f4SmokeBaseLighting.xyz;
+	vec3 f3SmokeLighting = globalLayout.f4SmokeBaseLighting.xyz;
 	f3SmokeLighting = min(vec3(1.0f), f3SmokeLighting);
 	return (1.0f - fSmokePow) * f3Color + fSmokePow * f3SmokeLighting * min(vec3(1.25f), vec3(fSmokeDensity));
 }
@@ -308,9 +177,3 @@ float WindMagnitudeFactor(GlobalLayout globalLayout, float fMagnitude)
 	return clamp((fMagnitude - globalLayout.fWindThresholdLow) / max(globalLayout.fWindThresholdHigh - globalLayout.fWindThresholdLow, 0.001f), 0.0f, 1.0f);
 }
 
-float LightingDepositEdgeFade(vec2 f2FragCoord, vec2 f2SizeInverse)
-{
-	vec2 f2Uv = f2FragCoord * f2SizeInverse;
-	float fEdgeDist = min(min(f2Uv.x, 1.0f - f2Uv.x), min(f2Uv.y, 1.0f - f2Uv.y));
-	return smoothstep(0.0f, 0.05f, fEdgeDist);
-}

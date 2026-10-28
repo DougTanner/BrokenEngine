@@ -31,7 +31,7 @@ public:
 private:
 
 	void SubmitGlobalToQueue(int64_t iFramebufferIndex);
-	void SubmitMainToQueue(int64_t iFramebufferIndex);
+	void SubmitMainToQueue(int64_t iFramebufferIndex, bool bPreparationSubmitted);
 };
 
 inline CommandBufferManager* gpCommandBufferManager = nullptr;

@@ -18,6 +18,7 @@ class DeviceManager;
 class ImGuiManager;
 class InstanceManager;
 class Islands;
+struct Lighting;
 class ParticleManager;
 class PipelineManager;
 class SwapchainManager;
@@ -38,10 +39,8 @@ enum class DestroyFlags : uint16_t
 {
 	kShadowTextures     = 0x0004,
 	kObjectShadows      = 0x0008,
-	kLightingTextures   = 0x0010,
 	kWaterMesh          = 0x0020,
 	kTerrainElevation   = 0x0040,
-	kLightingBlur       = 0x0080,
 	kSmokeTextures      = 0x0400,
 };
 using DestroyFlags_t = common::Flags<DestroyFlags>;
@@ -79,13 +78,12 @@ struct ScreenshotRequest
 };
 
 // Agent render-target dump request queued into Graphics::mOptionalDumpRenderTargetRequest; consumed at the same capture
-// site. name selects a RenderTargetTextures member (validated at request time); iIndex/iChannel index the array
+// site. name selects a RenderTargetTextures member (validated at request time); iIndex indexes the array
 // members. Empty path -> default %TEMP%\Screenshots\dump_{name}_{N}. bRaw additionally writes the raw texel .bin.
 struct DumpRenderTargetRequest
 {
 	std::string name;
 	int64_t iIndex = 0;
-	int64_t iChannel = 0;
 	std::filesystem::path path;
 	bool bRaw = false;
 	// As ScreenshotRequest::bPublishResult — set only by the agent dump handler so the encode result reaches the
@@ -135,6 +133,7 @@ public:
 	std::unique_ptr<BufferManager> mpBufferManager;
 	std::unique_ptr<TextureManager> mpTextureManager;
 	std::unique_ptr<Islands> mpIslands;
+	std::unique_ptr<Lighting> mpLighting;
 	std::unique_ptr<PipelineManager> mpPipelineManager;
 	std::unique_ptr<ParticleManager> mpParticleManager;
 

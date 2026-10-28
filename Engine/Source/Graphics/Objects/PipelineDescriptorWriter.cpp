@@ -425,6 +425,9 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 				.pSetLayouts = &rPipeline.mVkDescriptorSetLayout,
 			};
 			CHECK_VK(vkAllocateDescriptorSets(gpDeviceManager->mVkDevice, &vkDescriptorSetAllocateInfo, &rPipeline.mVkDescriptorSets.at(j)));
+			// TEMP START descriptor census
+			LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS alloc pool={} set={} layout={} owner={} slot={} setIndex=1 variable=none", reinterpret_cast<uint64_t>(vkDescriptorPool), reinterpret_cast<uint64_t>(rPipeline.mVkDescriptorSets.at(j)), reinterpret_cast<uint64_t>(*vkDescriptorSetAllocateInfo.pSetLayouts), rPipeline.mInfo.name, j);
+			// TEMP END descriptor census
 			VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET, rPipeline.mVkDescriptorSets.at(j), std::format("{}{}", rPipeline.mInfo.name.data(), j).c_str());
 			vkDescriptorSet = rPipeline.mVkDescriptorSets.at(j);
 		}
@@ -442,6 +445,9 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 				.pSetLayouts = &rPipeline.mSet2VkDescriptorSetLayout,
 			};
 			CHECK_VK(vkAllocateDescriptorSets(gpDeviceManager->mVkDevice, &vkDescriptorSetAllocateInfoSet2, &rPipeline.mVkDescriptorSetsSet2.at(j)));
+			// TEMP START descriptor census
+			LOG(kTemp, kInfo, "DESCRIPTOR_CENSUS alloc pool={} set={} layout={} owner={} slot={} setIndex=2 variable=none", reinterpret_cast<uint64_t>(vkDescriptorPool), reinterpret_cast<uint64_t>(rPipeline.mVkDescriptorSetsSet2.at(j)), reinterpret_cast<uint64_t>(*vkDescriptorSetAllocateInfoSet2.pSetLayouts), rPipeline.mInfo.name, j);
+			// TEMP END descriptor census
 			VkName(VK_OBJECT_TYPE_DESCRIPTOR_SET, rPipeline.mVkDescriptorSetsSet2.at(j), std::format("{}Set2{}", rPipeline.mInfo.name.data(), j).c_str());
 			vkDestinationSet2 = rPipeline.mVkDescriptorSetsSet2.at(j);
 		}
@@ -537,6 +543,27 @@ void PipelineDescriptorWriter::Write(Pipeline& rPipeline)
 
 		vkUpdateDescriptorSets(gpDeviceManager->mVkDevice, static_cast<uint32_t>(cursor.iDescriptorCount), cursor.pVkWriteDescriptorSets, 0, nullptr);
 	}
+}
+
+void PipelineDescriptorWriter::UpdateAccelerationStructure(const Pipeline& rPipeline, int64_t iFramebuffer, int64_t iBinding, VkAccelerationStructureKHR vkAccelerationStructure)
+{
+	ASSERT(BindingExistsInShaderLayout(rPipeline, iBinding));
+	VkWriteDescriptorSetAccelerationStructureKHR vkAccelerationWrite
+	{
+		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+		.accelerationStructureCount = 1,
+		.pAccelerationStructures = &vkAccelerationStructure,
+	};
+	VkWriteDescriptorSet vkWrite
+	{
+		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		.pNext = &vkAccelerationWrite,
+		.dstSet = rPipeline.mVkDescriptorSets.at(iFramebuffer),
+		.dstBinding = static_cast<uint32_t>(iBinding),
+		.descriptorCount = 1,
+		.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
+	};
+	vkUpdateDescriptorSets(gpDeviceManager->mVkDevice, 1, &vkWrite, 0, nullptr);
 }
 
 void PipelineDescriptorWriter::UpdateStorageBuffer(const Pipeline& rPipeline, int64_t iFramebuffer, int64_t iBinding, const Buffer* pBuffer)

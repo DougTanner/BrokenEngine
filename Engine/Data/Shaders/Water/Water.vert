@@ -14,7 +14,7 @@ layout (set = 0, binding = kiGlobalBindingMainUniform) uniform mainUniform
 	MainLayout mainLayout;
 };
 
-layout (set = 1, binding = 5) uniform sampler2D elevationTextureSampler;
+layout (set = 1, binding = 4) uniform sampler2D elevationTextureSampler;
 layout (set = 1, binding = 7) uniform sampler2D noiseTextureSampler;
 // Pre-computed Gerstner displacement (Δx, Δy, Δz in camera-relative space) and Jacobian-derived
 // flat-blended normal. Written by WaterDisplacement.comp once per frame so this vertex shader

@@ -1,0 +1,154 @@
+#version 460
+
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+#include "ShaderLayouts.h"
+#include "ShaderFunctions.h"
+#include "Lighting/LightingTerrainCommon.h"
+#include "Lighting/LightingTerrainValidation.h"
+
+layout(local_size_x = kiLightingTerrainGroup) in;
+layout(push_constant) uniform pushConstants { PushConstantsLayout pushConstantsLayout; };
+layout(set = 0, binding = kiGlobalBindingGlobalUniform) uniform globalUniform { GlobalLayout globalLayout; };
+layout(scalar, set = 1, binding = 1) readonly buffer quadsBuffer { AxisAlignedQuadLayout pQuads[]; };
+layout(set = 1, binding = 2) uniform sampler2D ownHeightmaps[kiMaxIslands];
+layout(set = 1, binding = 3) uniform sampler2D visibleElevation;
+layout(set = 1, binding = 4) uniform sampler2D scratchElevation;
+layout(scalar, set = 1, binding = 5) readonly buffer workBuffer { LightingTerrainWork pWork[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer XY { vec2 pXY[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) writeonly buffer XYZ { vec3 pXYZ[]; };
+
+void main()
+{
+	uint uiPlacement = floatBitsToUint(pushConstantsLayout.f4Pipeline.z);
+	uint uiVertex = floatBitsToUint(pushConstantsLayout.f4Pipeline.w) + gl_GlobalInvocationID.x;
+	LightingTerrainWork work = pWork[uiPlacement];
+	if (uiVertex >= work.uiVertexCount) return;
+	vec2 f2Local = XY(work.uiXYAddress).pXY[uiVertex];
+	vec4 f4Rect = pQuads[uiPlacement].f4VertexRect;
+	// TEMP START original operand acquisition
+	float fEvidenceRotation = pQuads[uiPlacement].fRotation;
+	float fCos = cos(fEvidenceRotation);
+	float fSin = sin(fEvidenceRotation);
+	float fEvidenceCenterProductX = 0.5f * f4Rect.z;
+	float fEvidenceCenterProductY = 0.5f * f4Rect.w;
+	float fCenterX = f4Rect.x + fEvidenceCenterProductX;
+	float fCenterY = f4Rect.y + fEvidenceCenterProductY;
+	float fEvidenceXC = f2Local.x * fCos;
+	float fEvidenceYS = f2Local.y * fSin;
+	float fEvidenceXS = f2Local.x * fSin;
+	float fEvidenceYC = f2Local.y * fCos;
+	float fEvidencePartialX = fCenterX + fEvidenceXC;
+	float fEvidencePartialY = fCenterY + fEvidenceXS;
+	float fWorldX = fEvidencePartialX - fEvidenceYS;
+	float fWorldY = fEvidencePartialY + fEvidenceYC;
+	vec2 f2EvidenceNumerator = vec2(fWorldX, fWorldY) - globalLayout.f4VisibleArea.xy;
+	vec2 f2EvidenceDenominator = globalLayout.f4VisibleArea.zw - globalLayout.f4VisibleArea.xy;
+	vec2 f2UV = f2EvidenceNumerator / f2EvidenceDenominator;
+	// TEMP END original operand acquisition
+	ivec2 i2Size = textureSize(visibleElevation, 0);
+	vec2 f2Pixel = f2UV * vec2(i2Size);
+	vec2 f2Lower = floor(f2Pixel - 0.5f);
+	bool bCovered = all(greaterThanEqual(f2Lower, vec2(0.0f))) && all(lessThan(f2Lower + 1.0f, vec2(i2Size)));
+	ivec2 i2Origin = floatBitsToInt(pushConstantsLayout.f4Pipeline.xy);
+	bool bInitial = i2Origin.x == 2147483647;
+	if (bCovered != bInitial) return;
+	float fZ;
+	// TEMP START bounded terrain evidence
+	vec2 fEvidenceSampleUV = f2UV;
+	// TEMP END bounded terrain evidence
+	if (bCovered)
+	{
+		fZ = textureLod(visibleElevation, f2UV, 0.0f).r;
+	}
+	else
+	{
+		ivec2 i2Owner = ivec2(floor(f2Lower / float(kiLightingTerrainTile))) * kiLightingTerrainTile;
+		if (any(notEqual(i2Owner, i2Origin))) return;
+		vec2 f2ScratchUV = (f2Pixel - vec2(i2Origin) + float(kiLightingTerrainHalo)) / float(kiLightingTerrainScratch);
+		// TEMP START bounded terrain evidence
+		fEvidenceSampleUV = f2ScratchUV;
+		// TEMP END bounded terrain evidence
+		fZ = textureLod(scratchElevation, f2ScratchUV, 0.0f).r;
+	}
+	vec2 f2OwnUV = vec2(0.5f + f2Local.x / f4Rect.z, 0.5f + f2Local.y / f4Rect.w);
+	// TEMP START bounded terrain evidence
+	float fEvidenceBefore = fZ;
+	// TEMP END bounded terrain evidence
+	float fOwn = textureLod(ownHeightmaps[nonuniformEXT(pQuads[uiPlacement].uiTextureSlot)], f2OwnUV, 0.0f).r;
+	if (fOwn < globalLayout.fUnderwaterMaskThreshold) fZ = globalLayout.fSeaFloorElevation;
+	XYZ(work.uiXYZAddress).pXYZ[uiVertex] = vec3(fWorldX, fWorldY, fZ);
+	// TEMP START bounded terrain evidence
+	if (work.uiValidation != 0u)
+	{
+		LightingTerrainOriginals o = LightingTerrainOriginals(work.uiOriginalAddress);
+		o.pOriginals[uiVertex].f2ProductionUV = fEvidenceSampleUV;
+		o.pOriginals[uiVertex].f2ProductionOwnUV = f2OwnUV;
+		o.pOriginals[uiVertex].f2ProductionPixel = f2Pixel;
+		o.pOriginals[uiVertex].fProductionBefore = fEvidenceBefore;
+		o.pOriginals[uiVertex].fProductionOwn = fOwn;
+	}
+	// TEMP START original operand acquisition
+	if (work.uiValidation != 0u && uiPlacement == 0u && work.uiTemplate == uint64_t(188901052726349361ul) && uiVertex == 24356u)
+	{
+		TerrainEvidence e = TerrainEvidence(work.uiEvidenceAddress);
+		atomicAdd(e.data.puiCounts[17], 1u);
+		if (atomicCompSwap(e.data.puiClaims[17], 0u, 1u) == 0u)
+		{
+			for (uint i = 0u; i < 128u; ++i) e.data.pClasses[17].puiWords[i] = 0u;
+			e.data.pClasses[17].puiWords[0] = 1u;
+			e.data.pClasses[17].puiWords[1] = uiPlacement;
+			e.data.pClasses[17].puiWords[2] = uiVertex;
+			e.data.pClasses[17].puiWords[3] = uint(work.uiTemplate);
+			e.data.pClasses[17].puiWords[4] = uint(work.uiTemplate >> 32);
+			e.data.pClasses[17].puiWords[5] = floatBitsToUint(f2Local.x);
+			e.data.pClasses[17].puiWords[6] = floatBitsToUint(f2Local.y);
+			e.data.pClasses[17].puiWords[7] = floatBitsToUint(f4Rect.x);
+			e.data.pClasses[17].puiWords[8] = floatBitsToUint(f4Rect.y);
+			e.data.pClasses[17].puiWords[9] = floatBitsToUint(f4Rect.z);
+			e.data.pClasses[17].puiWords[10] = floatBitsToUint(f4Rect.w);
+			e.data.pClasses[17].puiWords[11] = floatBitsToUint(fEvidenceRotation);
+			e.data.pClasses[17].puiWords[12] = floatBitsToUint(globalLayout.f4VisibleArea.x);
+			e.data.pClasses[17].puiWords[13] = floatBitsToUint(globalLayout.f4VisibleArea.y);
+			e.data.pClasses[17].puiWords[14] = floatBitsToUint(globalLayout.f4VisibleArea.z);
+			e.data.pClasses[17].puiWords[15] = floatBitsToUint(globalLayout.f4VisibleArea.w);
+			e.data.pClasses[17].puiWords[16] = floatBitsToUint(fCos);
+			e.data.pClasses[17].puiWords[17] = floatBitsToUint(fSin);
+			e.data.pClasses[17].puiWords[18] = floatBitsToUint(fEvidenceCenterProductX);
+			e.data.pClasses[17].puiWords[19] = floatBitsToUint(fEvidenceCenterProductY);
+			e.data.pClasses[17].puiWords[20] = floatBitsToUint(fCenterX);
+			e.data.pClasses[17].puiWords[21] = floatBitsToUint(fCenterY);
+			e.data.pClasses[17].puiWords[22] = floatBitsToUint(fEvidenceXC);
+			e.data.pClasses[17].puiWords[23] = floatBitsToUint(fEvidenceYS);
+			e.data.pClasses[17].puiWords[24] = floatBitsToUint(fEvidenceXS);
+			e.data.pClasses[17].puiWords[25] = floatBitsToUint(fEvidenceYC);
+			e.data.pClasses[17].puiWords[26] = floatBitsToUint(fEvidencePartialX);
+			e.data.pClasses[17].puiWords[27] = floatBitsToUint(fEvidencePartialY);
+			e.data.pClasses[17].puiWords[28] = floatBitsToUint(fWorldX);
+			e.data.pClasses[17].puiWords[29] = floatBitsToUint(fWorldY);
+			e.data.pClasses[17].puiWords[30] = floatBitsToUint(f2EvidenceNumerator.x);
+			e.data.pClasses[17].puiWords[31] = floatBitsToUint(f2EvidenceNumerator.y);
+			e.data.pClasses[17].puiWords[32] = floatBitsToUint(f2EvidenceDenominator.x);
+			e.data.pClasses[17].puiWords[33] = floatBitsToUint(f2EvidenceDenominator.y);
+			e.data.pClasses[17].puiWords[34] = floatBitsToUint(f2UV.x);
+			e.data.pClasses[17].puiWords[35] = floatBitsToUint(f2UV.y);
+			e.data.pClasses[17].puiWords[36] = floatBitsToUint(fEvidenceSampleUV.x);
+			e.data.pClasses[17].puiWords[37] = floatBitsToUint(fEvidenceSampleUV.y);
+			e.data.pClasses[17].puiWords[38] = floatBitsToUint(fEvidenceBefore);
+			e.data.pClasses[17].puiWords[39] = floatBitsToUint(fZ);
+			e.data.pClasses[17].puiWords[40] = floatBitsToUint(fOwn);
+			e.data.pClasses[17].puiWords[41] = floatBitsToUint(globalLayout.fUnderwaterMaskThreshold);
+			e.data.pClasses[17].puiWords[42] = floatBitsToUint(globalLayout.fSeaFloorElevation);
+			e.data.pClasses[17].puiWords[43] = fOwn < globalLayout.fUnderwaterMaskThreshold ? 1u : 0u;
+			e.data.pClasses[17].puiWords[44] = pQuads[uiPlacement].uiTextureSlot;
+			e.data.pClasses[17].puiWords[45] = bCovered ? 0u : 1u;
+			memoryBarrierBuffer();
+			atomicExchange(e.data.puiClaims[17], 2u);
+		}
+	}
+	// TEMP END original operand acquisition
+	// TEMP END bounded terrain evidence
+	if (work.uiValidation != 0u) atomicAdd(LightingTerrainWrites(work.uiWritesAddress).pCounts[uiVertex], 1u);
+}

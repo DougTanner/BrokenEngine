@@ -129,7 +129,7 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 	int64_t iCount = 0;
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		iCount += std::to_underlying(rPostRender.pController[i]) == iPipeline ? 1 : 0;
+		iCount += std::cmp_equal(std::to_underlying(rPostRender.pController[i]), iPipeline) && !((rPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && rCurrent.pDestroyedTimes[i] == std::chrono::duration<float>::zero()) ? 1 : 0;
 	}
 
 	auto [pOmniLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiPipelineCrcs[iPipeline], engine::kBufferMain, iCommandBuffer);
@@ -157,7 +157,11 @@ static void RenderPipeline(const OmnisInterpolate& __restrict rCurrent, const Om
 	int64_t iInstance = 0;
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
-		if (std::to_underlying(rPostRender.pController[i]) != iPipeline)
+		if (std::cmp_not_equal(std::to_underlying(rPostRender.pController[i]), iPipeline))
+		{
+			continue;
+		}
+		if ((rPostRender.pLifecycleFlags[i] & engine::LifecycleFlags::kDying) && rCurrent.pDestroyedTimes[i] == std::chrono::duration<float>::zero())
 		{
 			continue;
 		}
@@ -228,6 +232,7 @@ void OmnisInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	for (int64_t i = 0; i < kiPipelineCount; ++i)
 	{
 		engine::gpPipelineManager->mDynamicPipelines.WriteModelPipelineIndirectBuffers(kuiPipelineCrcs[i], iCommandBuffer, siRendered[i]);
+		engine::gpGraphics->mpLighting->AddModels(kuiModels[i], kuiPipelineCrcs[i], 0, siRendered[i]);
 	}
 }
 

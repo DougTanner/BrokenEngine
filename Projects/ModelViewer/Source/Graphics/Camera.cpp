@@ -27,7 +27,6 @@ void Camera::Update()
 	mVecPosition = XMVectorSetZ(mVecPosition, engine::gpFlightPlanes->Lowest().fHeightMeters);
 	mfCameraEyeHeight = kfCameraEyeHeightDefault;
 	mfShadowTexelEyeHeight = mfCameraEyeHeight;
-	mfLightingTexelEyeHeight = mfCameraEyeHeight;
 	mVecToEyeNormal = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 	mVecEyePosition = XMVectorAdd(mVecPosition, XMVectorSet(0.0f, 0.0f, mfCameraEyeHeight, 0.0f));
 	CalculateMatricesAndVisibleArea();

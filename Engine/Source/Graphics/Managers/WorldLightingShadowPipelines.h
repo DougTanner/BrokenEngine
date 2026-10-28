@@ -13,20 +13,13 @@ class WorldLightingShadowPipelines
 {
 public:
 
-	WorldLightingShadowPipelines(std::unordered_map<common::crc_t, Shader>& rShaders, Pipeline* pPipelines, Pipeline* pSpreadPipelines, std::string* pSpreadPipelineNames, Pipeline& rCombinePipeline, Pipeline& rLightingTemporalPipeline, Pipeline& rLightingHistoryCopyPipeline, Texture** ppWaterNormalTextures, Texture** ppWaterFoamTextures, Texture** ppWaterFoamBreakupTextures);
+	WorldLightingShadowPipelines(std::unordered_map<common::crc_t, Shader>& rShaders, Pipeline* pPipelines, Texture** ppWaterNormalTextures, Texture** ppWaterFoamTextures, Texture** ppWaterFoamBreakupTextures);
 
-	void CreateLightingPipelines();
 	void CreatePipelineShadows();
-	void CreateLightingBlurPipelines();
 	void CreateLightingShadowDependentPipelines();
 
 	std::unordered_map<common::crc_t, Shader>& mrShaders;
 	Pipeline* mpPipelines = nullptr;
-	Pipeline* mpSpreadPipelines = nullptr;
-	std::string* mpSpreadPipelineNames = nullptr;
-	Pipeline& mrCombinePipeline;
-	Pipeline& mrLightingTemporalPipeline;
-	Pipeline& mrLightingHistoryCopyPipeline;
 	Texture** mppWaterNormalTextures = nullptr;
 	Texture** mppWaterFoamTextures = nullptr;
 	Texture** mppWaterFoamBreakupTextures = nullptr;

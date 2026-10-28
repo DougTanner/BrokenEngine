@@ -4,19 +4,22 @@
 
 The user requested isolated, quality-first lighting prototypes and a plan per technique. Can a compact directional cache preserve light height and full-normal response with acceptable spatial softness? This document fixes an author-proposed candidate for future claim, review, and user approval; authoring it authorizes no renderer implementation or production adoption.
 
-Before any prototype edits, create all five independent experiment worktrees from the same current
-primary tip using `pwsh -NoProfile -File .codex/codex-worktree.ps1`, once per experiment. The wrapper
-chooses current primary; it does not accept a historical baseline ref. Record each worktree's actual
-initial `git rev-parse HEAD` and require all five to equal the recorded comparison baseline. If
-primary advances during creation or that baseline cannot run, stop and reconcile a common baseline
-through the supported wrapper workflow before implementation or comparison runs. Do not use an
-arbitrary checkout or adopt or delete worktrees to force a match. All five candidates use identical
-renderer and fixture baselines, the same fixture specification, and no dependency on another
-candidate. Record baseline and candidate executable/pack byte hashes. The historical
-[per-flight-plane investigation](../../Investigations/Engine/LightingPerFlightPlane.md) is context,
-not a user-approved design or authority for current gameplay.
+All five independent candidates must start from the same verified commit on the reusable
+`lighting-foundation` branch, with no dependency on another candidate. The common foundation is
+being completed; its verified commit and final runtime/capture evidence are not yet available.
+Do not begin candidate implementation or comparison runs until that commit and evidence are
+recorded. Create experiment worktrees through the supported wrapper, then establish the common
+foundation ancestry through the repository workflow; the wrapper's current-primary starting point
+is not the comparison baseline. Record the actual foundation/candidate commits and executable/pack
+byte hashes. Do not adopt or delete worktrees to force a match. The historical
+[per-flight-plane investigation](LightingPerFlightPlane.md) is context, not authority for gameplay.
 
-Current point/area uploads project emitters to the base plane; deposit/spread uses horizontal EWNS, MAX blending, and an rgba8 combine. The candidate must preserve real XYZ and evaluate the complete normal. A brighter additive result alone is not evidence of better directional quality.
+The foundation removes projected local-light deposits and preserves gameplay with exactly zero
+local diffuse. It supplies physical fixture sources, resident triangle/material queries, shared
+radiometry and comparison inputs. Sun/IBL, shadows, water, smoke, sprites and shield visuals retain
+their ordinary paths. The candidate must preserve real XYZ and evaluate the complete normal;
+brightness alone is not evidence of better directional quality. Historical legacy captures remain
+historical evidence, not a retained runtime comparison path.
 
 ## Design
 
@@ -35,32 +38,34 @@ The required tracing prerequisite below supplies both source visibility and inte
 
 ## Implementation prerequisite
 
-Before renderer edits, inspect the selected physical GPU for `VK_KHR_acceleration_structure`, `VK_KHR_ray_query`, their required features/dependencies, and usable storage formats. The current `DeviceManager` does not enable a ray tracing backend. If unavailable, stop this candidate with the capability evidence; do not silently substitute heightfield or screen-space visibility.
+Use the verified foundation's Vulkan ray-query backend, resident terrain and rigid/skinned model
+producers, material evaluation, fixed fixture, exhaustive direct reference and capture evidence.
+Do not rebuild those common mechanisms inside this candidate. Confirm the selected physical GPU's
+required features/extensions/formats and retain its capability evidence; unsupported hardware
+blocks comparison rather than selecting a heightfield or screen-space substitute.
 
-Within this prototype, implement the minimal Vulkan ray-query backend: static triangle acceleration
-structures for loaded terrain/model meshes, per-frame instances and the visible animated geometry
-used by the fixture, safe resource retirement, and hit material/albedo access. Trace terrain, opaque
-meshes, and overhangs; water is a diffuse receiving surface for this comparison, and
-smoke/transparency do not occlude rays. Restrict this to existing resident mesh data and runtime
-buffers; no asset/pack format change. Verify static and moving occluders before judging the lighting
-algorithm. If existing resident geometry cannot supply this, return the concrete missing producer
-for plan revision before proceeding.
+Trace resident terrain, opaque models and overhangs under the foundation's material policy:
+MASK is opaque; BLEND, water, smoke, sprites and shields do not occlude rays. Water remains a
+diffuse receiver. Preserve synchronous Frame borrowing, final GPU geometry/ranges, camera-cell
+coordinates, resource retirement and capture input lifetimes without asset/pack format changes.
+Verify static, moving and off-screen occluders before judging the candidate algorithm. A missing
+producer or failed foundation gate requires plan revision rather than an unrecorded substitute.
 
 ## Critical files
 
-- `Engine/Source/Frame/Collections/PointLights/PointLightsRender.cpp` and `AreaLights/AreaLightsRender.cpp`: publish unprojected camera-cell XYZ to the prototype without altering simulation collections.
-- `Engine/Source/Graphics/Managers/CommandBufferRecordMain.cpp`: deposit/spread/combine/temporal ordering and prototype dispatch.
-- `Engine/Source/Graphics/Managers/{DeviceManager,InstanceManager,BufferManager,PipelineManager,RenderTargetTexturesLighting}.cpp`: capability enablement, resources, descriptors, synchronization, and recreation.
-- `Engine/Source/Graphics/Render/LightingUniforms.cpp`, `Engine/Data/Shaders/{ShaderLayoutsBase.h,ShaderFunctions.h}`: shared layout/publication and receiver lookup.
-- `Engine/Data/Shaders/{Model/Model.frag,Terrain/Terrain.frag,Water/Water.frag}`: actual receiver position/normal and final composition.
-- Proposed client-only `Engine/Source/Graphics/Debug/LightingPrototype.{h,cpp}` and `Engine/Data/Shaders/Lighting/PrototypeDirectionalCache*.comp`: bounded fixture/reference/experiment implementation.
+- `Engine/Source/Graphics/Lighting/Lighting.cpp` and its producers: reuse physical fixture source publication and resident scene queries; gameplay light collections remain zero physical-source stubs.
+- `Engine/Source/Graphics/Managers/CommandBufferRecordMain.cpp`: candidate composition and dispatch ordering.
+- `Engine/Source/Graphics/Managers/{DeviceManager,InstanceManager,BufferManager,PipelineManager,RenderTargetTextures}.cpp`: capability enablement, resources, descriptors, synchronization, and recreation.
+- `Engine/Data/Shaders/Lighting/{LightingCommon.h,LightingQuery.h,LightingRadiometry.h}`: shared source, material/query and radiometry contracts.
+- `Engine/Data/Shaders/{Model/ModelForward.h,Terrain/Terrain.frag,Water/Water.frag}`: actual receiver position/normal and final composition.
+- Proposed client-only `Engine/Source/Graphics/Debug/LightingPrototype.{h,cpp}` and `Engine/Data/Shaders/Lighting/PrototypeDirectionalCache*.comp`: candidate implementation reusing the foundation fixture/reference.
 
 ## In scope
 
-- The critical-file regions above, their required headers/project membership, and minimal graphics-object ray-query ownership needed by this single candidate. Add `Engine/Data/Shaders/Lighting/PrototypeDirectionalCache*.comp` for SH integration and probe publication; `ShaderFunctions.h` for XYZ interpolation and full-normal SH evaluation.
-- One fixed developer fixture/light stream and capture manifest, controlled through existing supported debug/harness mechanisms; no new simulation fields or network commands.
-- A debug selector for the unchanged baseline versus this one candidate, plus reference/diagnostic outputs. Preserve the baseline path exactly and reset candidate history when selected. This permits valid within-process paired profiling; it is not a multi-technique runtime framework.
-- Exhaustive, high-sample shadowed direct-diffuse reference using all lights and 256 area samples per emitter; double samples to document stability. Keep indirect/environmental lighting fixed across candidate and direct-reference views.
+- The critical-file regions above, their required headers/project membership, and candidate resources needed by this single technique; reuse foundation ray-query ownership. Add `Engine/Data/Shaders/Lighting/PrototypeDirectionalCache*.comp` for SH integration and probe publication; `ShaderFunctions.h` for XYZ interpolation and full-normal SH evaluation.
+- Reuse the foundation fixture/light stream and capture manifest through supported debug/harness controls; no new simulation fields or network commands.
+- A debug selector for foundation zero diffuse versus this one candidate, plus reference/diagnostic outputs. Preserve the zero path and reset candidate history when selected. This permits valid within-process paired profiling; it is not a multi-technique runtime framework.
+- Reuse the foundation exhaustive shadowed direct-diffuse reference using all lights and its verified 256/512-area-sample convergence evidence. Keep indirect/environmental lighting fixed across candidate and direct-reference views.
 - Client-only timers, resource-byte accounting, source/settings manifest, comparison screenshots and motion sequences. Integrate model/terrain/water local diffuse lighting; retain existing smoke/billboard policy and report its mismatch separately.
 
 ## Out of scope
@@ -75,10 +80,11 @@ Preserve cell-local positions; convert to the camera cell only at publication/us
 
 ## Comparison fixture
 
-Use a client-only fixture centered at camera-cell XY (0,0): a 512 m square neutral diffuse receiving
+Reuse the foundation fixture and its recorded exact blobs/hashes. Its specification is centered at
+camera-cell XY (0,0): a 512 m square neutral diffuse receiving
 surface, test receivers at Z=6/50/100 m, a vertical wall, a thin wall, an overhang, and a colored
-bounce wall. Fix Lambertian albedo to 0.5 (bounce wall RGB 0.8/0.1/0.1), existing specular
-parameters, and seed 0x51A7. Generate one ordered 1000-light set using the existing fixed-seed RNG;
+bounce wall. Keep Lambertian albedo at 0.5 (bounce wall RGB 0.8/0.1/0.1), existing specular
+parameters, and seed 0x51A7. Reuse the ordered 1000-light set generated by the fixture-owned fixed-seed RNG;
 take its first 100/300/1000 entries, with every fifth light a 4 m square area emitter. Distribute XY
 uniformly over the square and Z cyclically at 6/50/100 m; give all sources the same recorded linear
 power and 150 m range. Freeze the full generated geometry, lights, and camera/event manifest before
@@ -94,18 +100,18 @@ diagnostic.
 
 ## Verification
 
-Use `/compile` for the affected client, shader/DataPacker path, and server/header consumers the approved execution scope requires; use `/agent-harness` for launch, scene setup, captures, replay checks, and profiling. Inspect supported commands first; do not invent harness verbs. Where commands cannot express the fixture, implement the scoped client debug fixture rather than claiming the test ran.
+Use `/compile` for the affected client, shader/DataPacker path, and server/header consumers the approved execution scope requires; use `/agent-harness` for launch, scene setup, captures, replay checks, and profiling. Inspect supported commands first; do not invent harness verbs. If a required foundation control is unavailable, record the missing control for plan revision rather than claiming the test ran.
 
 | Criterion | Required observation/evidence |
 | --- | --- |
-| Reproducible comparison | Manifest records baseline/experiment commits, hardware/driver, packs, fixed seed, scene/light parameters, camera path, material settings, 1920 x 1080 resolution, fixed exposure, sun/environment, warmup and frame/tick identifiers. Use identical fixture inputs across all five worktrees. |
+| Reproducible comparison | Manifest records foundation/experiment commits, hardware/driver, packs, fixed seed, scene/light parameters, camera path, material settings, 1920 x 1080 resolution, fixed exposure, sun/environment, warmup and frame/tick identifiers. Use identical fixture inputs across all five worktrees. |
 | Height and direction | Same-XY lights at 6/50/100 m; receivers at those heights and between them; continuous source/receiver travel across plane boundaries; upward/downward/sloped/side normals; unobstructed illumination between different planes. Preserve the actual XYZ distance and full-normal response in outputs. |
 | Visibility | Light behind terrain ridge, thin wall, overhang, and moving mesh; lit and blocked receivers on different heights. Show occluded/unoccluded reference pairs and light-leak differences. Record the geometry traced and any omitted geometry explicitly. |
 | Light density | Fixed nested sets of 100, 300, and 1000 point/area lights at mixed heights; same emitters, power, range, and seed across candidates. Capture both gameplay-scale zoom-out and close inspection. |
 | Technique quality | Directional cache: upward, downward, and side-facing patches respond to source elevation; report negative SH reconstruction/clamping, angular smoothing, spatial blur, visibility rejection, and probe-density sensitivity. A colored source crossing 6/50/100 m must change the lit footprint continuously. |
-| Matched visual evidence | Baseline, candidate, and converged reference screenshots for every scene, plus video or equivalent ordered frame sequences for moving lights/occluders, camera pan/zoom, cell-boundary crossing, and history reset. Inspect water/terrain/models and retained smoke. Preserve floating-point diagnostic outputs where display tone mapping hides differences. |
-| Honest radiometry | Record legacy MAX blending and rgba8/tone-map effects separately from candidate additive linear HDR. Use common exposure/materials; include linear direct/indirect diagnostics and overlapping-light scenes rather than tuning exposure per candidate. |
-| Cost and lag | Quality settings first: report per-pass and total GPU time, tracing/acceleration update cost, peak/persistent GPU bytes, update frequency, convergence and visible lag in frames/ms. Compare baseline/candidate timings only via the two-path selector in one process using `query_profile`'s documented caveats. Standalone reference timings are descriptive; no cross-process speedup ratios or guessed pass/fail budget. |
+| Matched visual evidence | Foundation zero, candidate, and converged reference screenshots for every scene, plus video or equivalent ordered frame sequences for moving lights/occluders, camera pan/zoom, cell-boundary crossing, and history reset. Inspect water/terrain/models and retained smoke. Preserve floating-point diagnostic outputs where display tone mapping hides differences. |
+| Honest radiometry | Compare candidate additive linear HDR against the foundation float reference; keep historical legacy MAX/rgba8 captures separately identified. Use common exposure/materials; include linear direct/indirect diagnostics and overlapping-light scenes rather than tuning exposure per candidate. |
+| Cost and lag | Quality settings first: report per-pass and total GPU time, tracing/acceleration update cost, peak/persistent GPU bytes, update frequency, convergence and visible lag in frames/ms. Compare foundation zero/candidate timings only via the two-path selector in one process using `query_profile`'s documented caveats. Standalone reference timings are descriptive; no cross-process speedup ratios or guessed pass/fail budget. |
 | Integrity | No validation errors during motion, resource rebuild, or camera-cell change; record client/server replay/CRC evidence through the harness showing visual state remains outside simulation. |
 
 Finish by retaining the exact branch/commit and evidence bundle and presenting the user with quality findings, limitations, and measured costs for adoption, defer, or reject. Do not automatically land the experimental renderer onto primary. Any accepted production change requires its own approved scope and normal landing guards.

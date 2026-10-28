@@ -10,9 +10,7 @@ class RenderTargetTextures
 public:
 	void Create();
 
-	void DestroyLightingTextures();
-	void CreateLightingTextures();
-	void RegisterDebugTextures(int64_t iPassCount);
+	void RegisterDebugTextures();
 	void CreateShadowTextures();
 	void CreateSmokeTextures();
 	void CreateWindTextures();
@@ -34,37 +32,8 @@ public:
 	Texture mWindTextureOne;
 	Texture mWindTextureTwo;
 
-	Texture mpLightingTextures[3];
-	Texture* mppLightingDepositTextures[3] {};
-	VkRenderPass mLightingVkRenderPass = VK_NULL_HANDLE;
-	VkFramebuffer mLightingVkFramebuffer = VK_NULL_HANDLE;
-
-	// Spread output textures [pass][color R/G/B]
-	// mpSpreadTextures: accumulated output fed into next pass
-	// mpSpreadOnlyTextures: pre-accumulation snapshot read by LightCombine
-	Texture mpSpreadTextures[shaders::kiMaxSpreadPasses][3];
-	Texture mpSpreadOnlyTextures[shaders::kiMaxSpreadPasses][3];
-	VkRenderPass mSpreadVkRenderPass = VK_NULL_HANDLE;
-	VkFramebuffer mpSpreadVkFramebuffers[shaders::kiMaxSpreadPasses] {};
-
-	Texture mpCombineTextures[3];
-	Texture* mppLightingFinalTextures[3] {};
-
-	// Direction-averaged 0.25*(E+W+N+S) of the tone-mapped per-direction values.
-	// Terrain/Water read it with one texture sample in the ambient path.
-	Texture mAmbientCombineTexture;
-
-	// Persistent last-refresh combined lighting (3 directional + ambient), reprojected by LightingTemporal.comp to
-	// de-flicker the texel-ramp resample (mirror of mShadowHistoryTexture). LightingHistoryCopy.comp publishes the
-	// temporal result over the whole texture on refresh.
-	Texture mpLightingHistoryTextures[3];
-	Texture mAmbientHistoryTexture;
-
-	// Debug texture array (channels A/B/C used by formats needing 3 textures per slot, e.g., spread direction combined)
 	int64_t miDebugTextureCount = 0;
 	Texture* mppDebugTextures[shaders::kiMaxDebugTextures] {};
-	Texture* mppDebugTexturesB[shaders::kiMaxDebugTextures] {};
-	Texture* mppDebugTexturesC[shaders::kiMaxDebugTextures] {};
 	int64_t mpiDebugTextureFormats[shaders::kiMaxDebugTextures] {};
 
 	Texture mShadowElevationTexture;

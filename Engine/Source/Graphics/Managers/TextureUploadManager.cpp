@@ -52,7 +52,7 @@ void TextureUploadManager::InitializeTransferResources()
 	VkName(VK_OBJECT_TYPE_FENCE, mTransferVkFence, "Transfer");
 
 	VmaAllocationInfo stagingVmaAllocationInfo {};
-	Buffer::CreateBuffer("TransferStaging", kiByteBudgetPerFrame, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mStagingVkBuffer, mStagingVmaAllocation, &stagingVmaAllocationInfo);
+	Buffer::CreateBuffer("TransferStaging", kiByteBudgetPerFrame, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, mStagingVkBuffer, mStagingVmaAllocation, &stagingVmaAllocationInfo, BufferMemoryPlacement::kOrdinaryRam);
 	miStagingSize = kiByteBudgetPerFrame;
 	mpStagingMappedData = stagingVmaAllocationInfo.pMappedData;
 }
@@ -471,7 +471,22 @@ void TextureUploadManager::CreateTransferImage(LazyChunk& rLazyChunk, const Chun
 	};
 	VmaAllocationCreateInfo vmaAllocationCreateInfo {};
 	vmaAllocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
-	CHECK_VK(vmaCreateImage(gpDeviceManager->mpAllocator, &vkImageCreateInfo, &vmaAllocationCreateInfo, &rLazyChunk.vkUploadImage, &rLazyChunk.vmaAllocation, nullptr));
+	// TEMP START memory allocation observation
+	int64_t iMemoryThread = GetCurrentThreadId();
+	LOG(kTemp, kInfo, "MEMORY CREATE_BEGIN thread={} site=TextureUploadManager.cpp owner={} destination={}", iMemoryThread, "LazyChunk", static_cast<const void*>(&rLazyChunk));
+	LOG(kTemp, kInfo, "MEMORY IMAGE_REQUEST thread={} flags={} type={} format={} width={} height={} depth={} mips={} layers={}", iMemoryThread, vkImageCreateInfo.flags, static_cast<int32_t>(vkImageCreateInfo.imageType), static_cast<int32_t>(vkImageCreateInfo.format), vkImageCreateInfo.extent.width, vkImageCreateInfo.extent.height, vkImageCreateInfo.extent.depth, vkImageCreateInfo.mipLevels, vkImageCreateInfo.arrayLayers);
+	LOG(kTemp, kInfo, "MEMORY IMAGE_PROPERTIES thread={} samples={} tiling={} usage={} sharing={} queueCount={} layout={} pNext={}", iMemoryThread, static_cast<uint32_t>(vkImageCreateInfo.samples), static_cast<int32_t>(vkImageCreateInfo.tiling), vkImageCreateInfo.usage, static_cast<int32_t>(vkImageCreateInfo.sharingMode), vkImageCreateInfo.queueFamilyIndexCount, static_cast<int32_t>(vkImageCreateInfo.initialLayout), vkImageCreateInfo.pNext);
+	LOG(kTemp, kInfo, "MEMORY VMA_REQUEST thread={} flags={} usage={} required={} preferred={} typeBits={} pool={}", iMemoryThread, vmaAllocationCreateInfo.flags, static_cast<int32_t>(vmaAllocationCreateInfo.usage), vmaAllocationCreateInfo.requiredFlags, vmaAllocationCreateInfo.preferredFlags, vmaAllocationCreateInfo.memoryTypeBits, reinterpret_cast<uint64_t>(vmaAllocationCreateInfo.pool));
+	VkResult vkMemoryCreateResult = vmaCreateImage(gpDeviceManager->mpAllocator, &vkImageCreateInfo, &vmaAllocationCreateInfo, &rLazyChunk.vkUploadImage, &rLazyChunk.vmaAllocation, nullptr);
+	LOG(kTemp, kInfo, "MEMORY CREATE_END thread={} site=TextureUploadManager.cpp destination={} result={}", iMemoryThread, static_cast<const void*>(&rLazyChunk), static_cast<int32_t>(vkMemoryCreateResult));
+	if (vkMemoryCreateResult == VK_SUCCESS)
+	{
+		VmaAllocationInfo vmaAllocationInfo {};
+		vmaGetAllocationInfo(gpDeviceManager->mpAllocator, rLazyChunk.vmaAllocation, &vmaAllocationInfo);
+		LOG(kTemp, kInfo, "MEMORY CREATE_ALLOCATION thread={} destination={} resource={} allocation={} type={} memory={} offset={} size={}", iMemoryThread, static_cast<const void*>(&rLazyChunk), reinterpret_cast<uint64_t>(rLazyChunk.vkUploadImage), reinterpret_cast<uint64_t>(rLazyChunk.vmaAllocation), vmaAllocationInfo.memoryType, reinterpret_cast<uint64_t>(vmaAllocationInfo.deviceMemory), vmaAllocationInfo.offset, vmaAllocationInfo.size);
+	}
+	CHECK_VK(vkMemoryCreateResult);
+	// TEMP END memory allocation observation
 }
 
 void TextureUploadManager::RecordStagingCopies(const LazyChunk& rLazyChunk, const ChunkDimensions& rDimensions)

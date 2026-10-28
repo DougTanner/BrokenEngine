@@ -17,6 +17,7 @@ public:
 	void Destroy();
 
 	void WriteGlobalDescriptorSets();
+	void SetLightingReference(int64_t iFramebuffer, const Texture* pTexture, bool bEnabled);
 	void InitializeIslandSlots();
 
 	// Epoch framebuffer of a drained context, where no pending command buffer can use any framebuffer's sets.
@@ -77,14 +78,12 @@ public:
 	void ClearTextureBindings();
 
 	int64_t CrcToIndex(common::crc_t crc);
-	float CrcToBlurredIndex(common::crc_t crc);
-
-	// XOR salt shared by TextureManager's blur writes and CrcToBlurredIndex for pre-blurred bindless-array entries.
-	static constexpr common::crc_t kBlurSalt = 0x424C5552; // "BLUR"
 
 	// Global descriptor Set 0 shared by all graphics pipelines
 	VkDescriptorSetLayout mGlobalVkDescriptorSetLayout = VK_NULL_HANDLE;
 	std::vector<VkDescriptorSet> mGlobalDescriptorSets;
+	Texture mLightingFallback;
+	std::vector<Buffer> mLightingControls;
 
 	struct TextureBinding
 	{

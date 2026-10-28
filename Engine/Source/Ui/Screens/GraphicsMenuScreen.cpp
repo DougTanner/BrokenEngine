@@ -5,7 +5,6 @@
 #include "Ui/GraphicsQualityWrappersBase.h"
 #include "Ui/GraphicsSettings.h"
 #include "Ui/GraphicsSettingsWrappersBase.h"
-#include "Ui/LightingWrappersBase.h"
 #include "Ui/LocalizationBase.h"
 #include "Ui/MenuUtils.h"
 #include "Ui/ShadowWrappersBase.h"
@@ -160,17 +159,6 @@ void GraphicsMenuScreen::Render()
 			ApplyTerrainShadowsLevel();
 		}
 		ColumnSlider("Terrain Shadow Update Cadence", &gShadowUpdateCadence, "%.0f");
-
-		ImGui::Separator();
-
-		WrapperToggle("Lighting", &gLightingEnabled);
-		ImGui::BeginDisabled(!gLightingEnabled.Get<bool>());
-		if (RadioRow("Lighting", &gLightingLevel, gLightingLevel.mfCurrent, {{"Low", 0.0f}, {"Medium", 1.0f}, {"High", 2.0f}}))
-		{
-			ApplyLightingLevel();
-		}
-		ColumnSlider("Lighting Update Cadence", &gLightingUpdateCadence, "%.0f");
-		ImGui::EndDisabled();
 
 		ImGui::Separator();
 

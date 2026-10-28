@@ -229,7 +229,21 @@ The Server Monitor is a separate Windows program showing the server monitor chan
   state, and again after a resync reset, and `tailTick` is the newest snapshot
   tick, or -1 with no snapshot.
 - `query_profile`: no params (only an empty object is accepted). Client-only
-  profile query; returns `gpuTimers[{index,name,currentUs,averageUs,maxUs}]` for
+  profile query returns `lighting`: completed publication/resource generation,
+  source/instance/triangle/material counts, GPU terrain validation requested/completed
+  serials and mismatch counts, producer timings/owned bytes, and compact `capture`
+  status with request, held publication, reference validity, fence-completed/total
+  tiles, first-tile GPU/reference wall milliseconds, error and manifest path/SHA256.
+  `not-run`, pending, cancelled/aborted and failed captures are distinct from complete
+  exports. Detailed witnesses, source/query probes and raw RGBA32F receivers/direct
+  output plus the validity mask and original finished PNG live in that manifest's
+  artifact directory. Use the Lighting Comparison developer tab's stable controls
+  to select mode/count/camera/scenario/event/samples and request Capture or Validate
+  terrain. Validation alone performs no reference tile sweep. Capture-hold command
+  dispatch follows [Agent Architecture](../../../../Engine/Source/Agent/AGENTS.md#architecture).
+  A GPU validation
+  completed serial reports actual GPU completion, not acceptance of an aborted
+  capture. Other fields include `gpuTimers[{index,name,currentUs,averageUs,maxUs}]` for
   every timer row, including zeros, frame-coherent
   `shadowSample{sequence,currentUs}`,
   `clock{offsetTicks,targetBehindTicks,errorTicks}`, integer `fps`, and

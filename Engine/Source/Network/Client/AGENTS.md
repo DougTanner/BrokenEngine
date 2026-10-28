@@ -22,6 +22,13 @@ the game collection detail (the game project's own
 
 ## Receive Paths
 
+`ServiceCaptureTransport` services ENet with a null event on the main thread
+without delivering session events or running ordinary poll/adoption. Keep it
+separate from `Poll` while [Lighting capture](../../Graphics/AGENTS.md#lighting-publication)
+holds render inputs. Protocol servicing alone does not guarantee application
+ACK progress or session liveness across an exhaustive capture; verification must
+cover its measured wall-clock duration.
+
 Server updates use separate delta, full-state, static-data, debug-frame,
 owned-entity event, and load-notification buffers. `Client::Receive` decodes
 each owned-entity state into `mReceivedOwnedEntityEvents`, which `Client::Poll`

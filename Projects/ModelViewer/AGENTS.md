@@ -32,7 +32,9 @@ Startup shares the Sandbox client's native instance mutex under
 Acquire it before constructing rendering and file managers; refusal exits before
 their construction, with no dialog in an agent launch.
 
-Preserve ordinary Graphics ownership, upload acquisition, descriptor publication,
+Local diffuse is zero by default; the selected model publishes its final GPU
+ranges to Lighting without enabling the fixture. Preserve ordinary Graphics
+ownership, upload acquisition, descriptor publication,
 submission fences and resource retirement. Selected identity and viewer controls
 must survive Graphics recreation, with resources republished before use.
 
@@ -162,7 +164,9 @@ dummy cells, flags, sessions or reporting functions; the viewer constructs no
 `GameBase` or network session. By project membership it defines
 `engine::RenderFrameMain` for Main uniforms and the three UI functions
 `ImGuiManager` calls: `RenderUiScreens` draws the viewer panel, and
-`CreateUiScreens` and `DestroyUiScreens` are empty. The viewer `Pch.h` sets
+`CreateUiScreens` and `DestroyUiScreens` are empty.
+`DrainLightingCaptureCommands` is also an empty viewer-owned host hook; it must
+not introduce generic agent or Client transport dependencies. The viewer `Pch.h` sets
 `kbAudioStreamingHarnessRig` and `kbProfileScreens` to `false` and
 `kbDrawModelsOverWorld` to `true`. Keep ordinary
 engine profiling collection, Graphics lifecycle and local crash reporting
@@ -186,7 +190,7 @@ shared day-cycle colors and brightness and the base direction for world and mode
 The viewer publishes no native water source grid, so startup selects Low water
 quality after graphics settings load, before Graphics construction; preserve
 that policy across recreation.
-Orbit preview isolation excludes world lighting deposits, smoke and terrain
+Orbit preview isolation excludes smoke and terrain
 occlusion from model shading; flight uses ordinary world shading and depth.
 Flight also uses the engine's projected ground shadows with shared world sun
 and existing shadow settings; right-drag model illumination does not steer

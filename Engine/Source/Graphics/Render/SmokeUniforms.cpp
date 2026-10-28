@@ -57,7 +57,6 @@ void RenderSmokeGlobal(int64_t iCommandBuffer)
 
 	rGlobalLayout.fSmokeColorMin = gSmokeColorMinimum.mfCurrent;
 	rGlobalLayout.fSmokeColorMultiplier = gSmokeColorMultiplier.mfCurrent;
-	rGlobalLayout.fSmokeLightingMultiplier = gSmokeLightingMultiplier.mfCurrent;
 	rGlobalLayout.fSmokeIntensityFalloff = gSmokeIntensityFalloff.mfCurrent;
 	rGlobalLayout.fSmokeWindNoiseScale = gSmokeWindNoiseScale.mfCurrent;
 	rGlobalLayout.fSmokeWindNoiseQuantity = gSmokeWindNoiseQuantity.mfCurrent;

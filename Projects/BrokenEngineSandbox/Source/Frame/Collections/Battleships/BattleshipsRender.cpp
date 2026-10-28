@@ -35,6 +35,7 @@ void BattleshipsInterpolate::GraphicsResources()
 }
 
 static std::array<int64_t, kiPipelineCount> siRendered {};
+static std::array<int64_t, kiPipelineCount> siTraceOnly {};
 // Non-concurrency tripwire: per-frame Render calls must run sequentially across active coords — siRendered
 // accumulates across them and offsets each call's slab writes. Parallelizing coord renders would race.
 static std::atomic<bool> sbRenderActive = false;
@@ -59,6 +60,7 @@ struct [[nodiscard]] BattleshipsRenderActiveGuard
 void BattleshipsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer, const std::unordered_map<engine::GridCoord, game::FrameInterpolate>& rRenderInterpolates, const std::vector<engine::GridCoord>& rActiveCoordinates)
 {
 	siRendered = {};
+	siTraceOnly = {};
 
 	int64_t iTotalCapacity = engine::AccumulateRenderCapacity(rRenderInterpolates, rActiveCoordinates, [](const game::FrameInterpolate& rInterpolate) -> const BattleshipsInterpolate&
 	{
@@ -84,7 +86,7 @@ void BattleshipsInterpolate::BeginRender([[maybe_unused]] int64_t iCommandBuffer
 static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, const BattleshipsPostRender& __restrict rPostRender, const engine::RenderBasis& rBasis, int64_t iPipeline, int64_t* piVisibleIndices, int64_t iCommandBuffer)
 {
 	auto [pLayouts, iBufferCapacity] = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiPipelineCrcs[iPipeline], engine::kBufferMain, iCommandBuffer);
-	ASSERT(siRendered[iPipeline] + rCurrent.iCount <= iBufferCapacity);
+	ASSERT(siRendered[iPipeline] + siTraceOnly[iPipeline] + rCurrent.iCount <= iBufferCapacity);
 
 	const engine::AnimationData* pAnimationData = nullptr;
 	if (engine::gAnimationDataMap.contains(kuiModels[iPipeline]))
@@ -94,6 +96,7 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 
 	// Visibility culling and the controller partition run on the main thread before worker dispatch.
 	int64_t iVisibleCount = 0;
+	int64_t iTraceOnlyCount = 0;
 
 	for (int64_t i = 0; i < rCurrent.iCount; ++i)
 	{
@@ -112,17 +115,18 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 		XMStoreFloat4A(&f4Position, engine::Rebase(rBasis, rCurrent.pVecPositions[i]));
 		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position))
 		{
+			piVisibleIndices[rCurrent.iCount - ++iTraceOnlyCount] = i;
 			continue;
 		}
 
 		piVisibleIndices[iVisibleCount++] = i;
 	}
 
-	// Skinning output for all visible rows of this pipeline is allocated on the main thread before worker dispatch.
+	// The visible prefix and trace-only tail share one pose reservation before workers write either range.
 	engine::SkinningReservation skinningReservation {};
 	if (pAnimationData != nullptr)
 	{
-		skinningReservation = pAnimationData->ReserveSkinning(iCommandBuffer, iVisibleCount);
+		skinningReservation = pAnimationData->ReserveSkinning(iCommandBuffer, iVisibleCount + iTraceOnlyCount);
 	}
 
 	int64_t iRenderedOffset = siRendered[iPipeline];
@@ -133,12 +137,12 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 	XMMATRIX matPreMove = XMMatrixTranslationFromVector(XMLoadFloat3(&rModelHeader.f3Offset));
 	XMMATRIX matPreRotate = XMMatrixRotationX(rModelHeader.f3RotationRadians.x) * XMMatrixRotationY(rModelHeader.f3RotationRadians.y) * XMMatrixRotationZ(rModelHeader.f3RotationRadians.z);
 
-	// Per-range processing lambda — each visible index j writes to deterministic non-overlapping output slots
+	// Each resident row writes once; raster reads only the visible prefix.
 	auto ProcessRange = [&](int64_t iStart, int64_t iEnd)
 	{
 		for (int64_t j = iStart; j < iEnd; ++j)
 		{
-			int64_t i = piVisibleIndices[j];
+			int64_t i = piVisibleIndices[j < iVisibleCount ? j : rCurrent.iCount - 1 - (j - iVisibleCount)];
 
 			XMFLOAT3A f3Size {kfBattleshipRadius * f3ModelScale.x, kfBattleshipRadius * f3ModelScale.y, kfBattleshipRadius * f3ModelScale.z};
 			if (rCurrent.pDestroyedTimes[i] > std::chrono::duration<float>::zero())
@@ -159,7 +163,8 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 			XMMATRIX matTranslation = XMMatrixTranslationFromVector(vecPosition);
 			XMMATRIX matTransform = matPreMove * matScaling * matPreRotate * matRoll * matYaw * matTranslation;
 
-			shaders::ModelLayout& rModelLayout = pLayouts[iRenderedOffset + j];
+			int64_t iOutput = j < iVisibleCount ? iRenderedOffset + j : iBufferCapacity - siTraceOnly[iPipeline] - 1 - (j - iVisibleCount);
+			shaders::ModelLayout& rModelLayout = pLayouts[iOutput];
 			rModelLayout.f4Position = f4Position;
 			XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4Transform[0]), matTransform);
 			XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(&rModelLayout.f3x4TransformNormal[0]), XMMatrixTranspose(XMMatrixInverse(nullptr, matTransform)));
@@ -175,9 +180,10 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 	};
 
 	gpProfileManager->GetCpuTimer(game::kCpuTimerRenderBattleships).iThreads = common::gpMultithreading->WorkerCount() + 1;
-	common::gpMultithreading->Dispatch(iVisibleCount, ProcessRange);
+	common::gpMultithreading->Dispatch(iVisibleCount + iTraceOnlyCount, ProcessRange);
 
 	siRendered[iPipeline] += iVisibleCount;
+	siTraceOnly[iPipeline] += iTraceOnlyCount;
 }
 
 void BattleshipsInterpolate::Render(const FrameInterpolate& __restrict rFrameInterpolate, int64_t iCommandBuffer)
@@ -214,6 +220,9 @@ void BattleshipsInterpolate::EndRender([[maybe_unused]] int64_t iCommandBuffer)
 	for (int64_t i = 0; i < kiPipelineCount; ++i)
 	{
 		engine::gpPipelineManager->mDynamicPipelines.WriteModelPipelineIndirectBuffers(kuiPipelineCrcs[i], iCommandBuffer, siRendered[i]);
+		int64_t iCapacity = engine::gpBufferManager->GetDynamicStorageBuffer<shaders::ModelLayout>(kuiPipelineCrcs[i], engine::kBufferMain, iCommandBuffer).iCapacity;
+		engine::gpGraphics->mpLighting->AddModels(kuiModels[i], kuiPipelineCrcs[i], 0, siRendered[i]);
+		engine::gpGraphics->mpLighting->AddModels(kuiModels[i], kuiPipelineCrcs[i], iCapacity - siTraceOnly[i], siTraceOnly[i]);
 	}
 }
 
