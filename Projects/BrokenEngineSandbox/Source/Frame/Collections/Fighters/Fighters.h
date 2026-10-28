@@ -26,9 +26,9 @@ inline constexpr std::chrono::duration<float> kFighterDestroyExplosionInterval =
 
 inline constexpr float kfFighterRadius = 1.5f;
 
-inline constexpr float kfFighterAcceleration = 10.0f;
+inline constexpr float kfFighterAcceleration = 8.0f;
 inline constexpr float kfFighterDrag = 0.25f;
-inline constexpr float kfFighterMaxSpeed = 40.0f;
+inline constexpr float kfFighterMaxSpeed = 30.0f;
 inline constexpr float kfFighterMaxTurnRate = 4.0f;
 
 inline constexpr float kfFighterClimbRate = 25.0f;
@@ -44,8 +44,8 @@ inline constexpr float kfFighterFleeTurnRate = 32.0f;
 
 inline constexpr HeadingMovementConstants kFighterMovement
 {
-	.fChaseAcceleration = 4.0f,
-	.fFleeAcceleration = 6.0f,
+	.fChaseAcceleration = kfFighterAcceleration,
+	.fFleeAcceleration = 12.0f,
 	.fReturnAcceleration = kfFighterAcceleration,
 	.fDrag = kfFighterDrag,
 	.fMaximumSpeed = kfFighterMaxSpeed,

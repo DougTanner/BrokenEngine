@@ -27,8 +27,8 @@ Import-Module (Join-Path $PSScriptRoot 'AgentScriptCommon.psm1') -Force
 # The tree lists match Bootstrap-AgentTools.ps1's, in stamp order. ThirdParty is included because
 # directly tracked files under it are on the include path; the tree-hash check only catches
 # committed drift, so uncommitted edits need the clean gate.
-$trees = if ($Target -ceq 'DataPacker') { @('DataPacker', 'Common', 'ThirdParty') } else { @('Tools/ModelViewer', 'Common', 'Engine', 'ThirdParty', 'DataPacker', 'Projects/BrokenEngineSandbox/Data') }
-$targetDirectory = if ($Target -ceq 'ModelViewer') { 'Tools\ModelViewer' } else { 'DataPacker' }
+$trees = if ($Target -ceq 'DataPacker') { @('DataPacker', 'Common', 'ThirdParty') } else { @('Projects/ModelViewer', 'Common', 'Engine', 'ThirdParty', 'DataPacker', 'Projects/BrokenEngineSandbox/Data') }
+$targetDirectory = if ($Target -ceq 'ModelViewer') { 'Projects\ModelViewer' } else { 'DataPacker' }
 $outputDirectory = Join-Path $Worktree "$targetDirectory\Platforms\VisualStudio2026\Output"
 $worktreeExe = Join-Path $outputDirectory "$Target.exe"
 $worktreePdb = Join-Path $outputDirectory "$Target.pdb"

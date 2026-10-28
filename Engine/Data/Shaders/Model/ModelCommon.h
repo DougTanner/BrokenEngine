@@ -110,16 +110,7 @@ void ModelVertexOutput(vec3 f3LocalPosition, vec3 f3LocalNormal, ModelLayout mod
 	}
 	else
 	{
-		// Mode 2: Shadow projection. Grow each object's lateral XY footprint around its
-		// own center so small ground units stay readable from the top-down RTS camera.
-		vec3 f3GrownWorldPosition = f3WorldPosition;
-		vec2 f2Lateral = f3WorldPosition.xy - model.f4Position.xy;
-		f2Lateral *= (1.0f + globalLayout.fObjectShadowsGrow);
-		f3GrownWorldPosition.xy = model.f4Position.xy + f2Lateral;
-		// Shift the whole footprint along the sun's ground projection by the object's height above the lowest flight
-		// plane; both positions move so their difference, which the horizon stretch reads, stays the same.
-		vec2 f2HeightOffset = fOutHeightAboveBase * globalLayout.f2ShadowHeightOffsetPerMeter;
-		f3GrownWorldPosition.xy += f2HeightOffset;
-		gl_Position = ShadowStretchProjection(globalLayout, f3GrownWorldPosition, vec3(model.f4Position.xy + f2HeightOffset, model.f4Position.z));
+		// Mode 2: Shadow projection.
+		gl_Position = ShadowStretchProjection(globalLayout, f3WorldPosition, model.f4Position.xyz);
 	}
 }

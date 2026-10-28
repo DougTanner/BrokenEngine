@@ -252,7 +252,7 @@ function Resolve-PathMapping
 		}
 	}
 
-	if ($RelativePath -imatch '^Tools/ModelViewer/Source/')
+	if ($RelativePath -imatch '^Projects/ModelViewer/Source/')
 	{
 		return [ordered]@{
 			mapping = 'resolved'

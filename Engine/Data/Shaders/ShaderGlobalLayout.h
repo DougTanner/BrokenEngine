@@ -188,12 +188,10 @@ struct GlobalLayout
 	float fShadowAngleOffsetSum INIT; // Shadow sun angle + noon + sunset feather offsets, summed CPU-side (Shadow.comp feather term).
 	float fObjectShadowsBlurSigma INIT;
 	float fObjectShadowsIntensity INIT;
-	float fObjectShadowsGrow INIT;
+	float fObjectShadowsExtension INIT; // Grow + max(sunrise stretch cube, sunset stretch cube); the vertex supplies the away-light extent.
 	int32_t iObjectShadowsBlurRadius INIT;
-	float fShadowSunriseStretchCubed INIT; // (fSunriseStretch * gObjectShadowsSunsetStretch)^3 (ShadowStretchProjection)
-	float fShadowSunsetStretchCubed INIT;  // (fSunsetStretch  * gObjectShadowsSunsetStretch)^3 (ShadowStretchProjection)
-	vec2 f2ShadowStretchTranslation INIT;  // (sunrise+sunset cubes) * -f4SunMoonNormal.xy (ShadowStretchProjection base translation)
-	vec2 f2ShadowHeightOffsetPerMeter INIT;            // Untilted sun direction (-x / max(z, 0.5), 0) * gObjectShadowsHeightOffset: object-shadow XY shift per metre above fBaseHeight (ModelCommon.h mode 2)
+	float fObjectShadowsSouthOffset INIT;
+	vec2 f2ObjectShadowsAwayLight INIT; // Unit horizontal direction opposite the active sun/moon, or south for vertical light.
 	float fObjectShadowsTerrainShadowFadeInverse INIT; // 1 / gObjectShadowsTerrainShadowFade (Model.frag terrain-shadow fade by height above fBaseHeight)
 	float fShadowAffectAmbient INIT;
 	float fWaterReducedNoiseOriginX INIT;

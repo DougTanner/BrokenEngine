@@ -276,30 +276,25 @@ static void XM_CALLCONV PopulateShadowStretch(shaders::GlobalLayout& rGlobalLayo
 		fSunsetStretch = 1.0f;
 	}
 
-	// ShadowStretchProjection consumes the uniform stretch cubes and translation; only its position-dependent fStretchX remains shader-side.
 	float fStretchScale = gObjectShadowsSunsetStretch.mfCurrent;
 	float fSunriseStretchScaled = fSunriseStretch * fStretchScale;
 	float fSunsetStretchScaled = fSunsetStretch * fStretchScale;
 	float fSunriseStretchCubed = fSunriseStretchScaled * fSunriseStretchScaled * fSunriseStretchScaled;
 	float fSunsetStretchCubed = fSunsetStretchScaled * fSunsetStretchScaled * fSunsetStretchScaled;
-	rGlobalLayout.fShadowSunriseStretchCubed = fSunriseStretchCubed;
-	rGlobalLayout.fShadowSunsetStretchCubed = fSunsetStretchCubed;
-	float fSumCubes = fSunriseStretchCubed + fSunsetStretchCubed;
-	rGlobalLayout.f2ShadowStretchTranslation.x = -fSumCubes * XMVectorGetX(vecSunMoonNormal);
-	rGlobalLayout.f2ShadowStretchTranslation.y = -fSumCubes * XMVectorGetY(vecSunMoonNormal);
+	rGlobalLayout.fObjectShadowsExtension = gObjectShadowsGrow.mfCurrent + std::max(fSunriseStretchCubed, fSunsetStretchCubed);
+	float fSunX = XMVectorGetX(vecSunMoonNormal);
+	float fSunY = XMVectorGetY(vecSunMoonNormal);
+	float fHorizontalLength = std::sqrt(fSunX * fSunX + fSunY * fSunY);
+	rGlobalLayout.f2ObjectShadowsAwayLight.x = fHorizontalLength == 0.0f ? 0.0f : -fSunX / fHorizontalLength;
+	rGlobalLayout.f2ObjectShadowsAwayLight.y = fHorizontalLength == 0.0f ? -1.0f : -fSunY / fHorizontalLength;
+	rGlobalLayout.fObjectShadowsSouthOffset = gObjectShadowsSouthOffset.mfCurrent;
+}
 
-	// A model's object shadow shifts by its height above the lowest flight plane times this, along the sun's ground
-	// projection. The Z floor caps the shift near the horizon, where the stretch above already lengthens shadows. The
-	// direction is the untilted one from PopulateSunMoonDirection: the Normal Tilt would add a north-south shift.
-	static constexpr float kfObjectShadowsHeightOffsetMinimumSunZ = 0.5f;
-	float fDirectionAngle = fSunAngle < XM_PI ? fSunAngle : XM_2PI - fSunAngle;
-	float fSunZ = 0.0f;
-	float fSunX = 0.0f;
-	XMScalarSinCos(&fSunZ, &fSunX, fDirectionAngle);
-	float fHeightOffsetScale = -gObjectShadowsHeightOffset.mfCurrent / std::max(fSunZ, kfObjectShadowsHeightOffsetMinimumSunZ);
-	gf2ShadowHeightOffsetPerMeter = XMFLOAT2(fHeightOffsetScale * fSunX, 0.0f);
-	rGlobalLayout.f2ShadowHeightOffsetPerMeter.x = gf2ShadowHeightOffsetPerMeter.x;
-	rGlobalLayout.f2ShadowHeightOffsetPerMeter.y = gf2ShadowHeightOffsetPerMeter.y;
+XMFLOAT4 ObjectShadowPosition(XMFLOAT4 f4Position)
+{
+	f4Position.y -= gObjectShadowsSouthOffset.mfCurrent;
+	f4Position.z = gWaterHeight.mfCurrent;
+	return f4Position;
 }
 
 static void PopulateShadowArea(int64_t iCommandBuffer, shaders::GlobalLayout& rGlobalLayout, float fShadowTextureSizeWidth, float fShadowTextureSizeHeight, float& rfWorldTexelX, float& rfFullWidth, XMFLOAT4& rf4ShadowArea)
@@ -446,7 +441,6 @@ static void XM_CALLCONV PopulateShadowParameters(int64_t iCommandBuffer, shaders
 
 	rGlobalLayout.fObjectShadowsBlurSigma = gObjectShadowsBlurSigma.mfCurrent;
 	rGlobalLayout.iObjectShadowsBlurRadius = static_cast<int32_t>(gObjectShadowsBlurRadius.mfCurrent);
-	rGlobalLayout.fObjectShadowsGrow = gObjectShadowsGrow.mfCurrent;
 	rGlobalLayout.fObjectShadowsTerrainShadowFadeInverse = 1.0f / gObjectShadowsTerrainShadowFade.mfCurrent;
 	float fObjectShadowsIntensity = fDayPercent * gObjectShadowsNoon.mfCurrent + (1.0f - fDayPercent) * gObjectShadowsSunset.mfCurrent;
 	rGlobalLayout.fObjectShadowsIntensity = fObjectShadowsIntensity * std::pow(fDayPercent, 0.1f);

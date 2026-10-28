@@ -161,9 +161,7 @@ void RenderFrameMain(int64_t iCommandBuffer, const std::unordered_map<GridCoord,
 
 inline bool gbShadowTemporalReset = false; // Set by CreateShadowTextures; re-arms the PopulateShadowParameters first-frame guard so a recreate doesn't blend stale history for one frame
 
-// Set by PopulateShadowStretch: the CPU copy of GlobalLayout::f2ShadowHeightOffsetPerMeter, which the Fighter and
-// missile culls read because the mapped layout is write-only.
-inline XMFLOAT2 gf2ShadowHeightOffsetPerMeter {};
+XMFLOAT4 ObjectShadowPosition(XMFLOAT4 f4Position);
 
 // Set by CreateLightingTextures; re-arms the PopulateLightingParameters first-frame guard so a recreate doesn't blend stale history for one frame.
 inline bool gbLightingTemporalReset = false;

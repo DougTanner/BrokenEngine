@@ -130,7 +130,7 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 		}
 
 		auto vecPusherPosition = rCurrent.pVecPositions[i];
-		auto vecFromPusher = XMVectorSetZ(XMVectorSubtract(vecPosition, vecPusherPosition), 0.0f);
+		auto vecFromPusher = XMVectorSubtract(vecPosition, vecPusherPosition);
 		auto vecDistanceSquared = XMVector3LengthSq(vecFromPusher);
 		float fRadius = rCurrent.pfRadii[i];
 		if (XMVectorGetX(vecDistanceSquared) > fRadius * fRadius) [[likely]]
@@ -143,7 +143,7 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 		vecIntensity = XMVectorMultiply(XMVectorReplicate(rCurrent.pfIntensities[i]), vecIntensity);
 
 		XMVECTOR vecFromPusherNormal = XMVectorZero();
-		if (XMVectorGetX(vecDistanceSquared) <= 0.0001f * 0.0001f) [[unlikely]]
+		if (XMVector2Equal(vecFromPusher, XMVectorZero())) [[unlikely]]
 		{
 			float fDirectionX = iSelfIndex < i ? -1.0f : 1.0f;
 			rfPositionCorrectionX += fDirectionX * 0.001f;
@@ -151,7 +151,7 @@ XMVECTOR XM_CALLCONV PushersInterpolate::ApplyPush(const game::FrameInterpolate&
 		}
 		else
 		{
-			vecFromPusherNormal = XMVector3Normalize(vecFromPusher);
+			vecFromPusherNormal = XMVector3Normalize(XMVectorSetZ(vecFromPusher, 0.0f));
 		}
 		vecPush = XMVectorMultiplyAdd(vecIntensity, vecFromPusherNormal, vecPush);
 	}

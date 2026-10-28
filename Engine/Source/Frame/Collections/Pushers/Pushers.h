@@ -34,7 +34,7 @@ using PusherFlags_t = common::Flags<PusherFlags>;
 struct PushersInterpolate : public Collection<PushersInterpolate, CollectionFlags::kIdToIndex>
 {
 	// Bump on any SOA layout or push behavior change — feeds the Frame::kiVersion save/replay gate
-	static constexpr int64_t kiVersion = 3;
+	static constexpr int64_t kiVersion = 4;
 
 	static void AllocateAndCopy(PushersInterpolate& rCurrent, const PushersInterpolate& rPrevious);
 
@@ -55,7 +55,7 @@ struct PushersInterpolate : public Collection<PushersInterpolate, CollectionFlag
 	// Zone system - builds spatial acceleration structure each frame over the cell's bounding rectangle
 	static void SetupZones(const game::Frame& __restrict rFrame);
 
-	// Query horizontal force and near-overlap correction for the registered self pusher using zone acceleration.
+	// Query spherical falloff with horizontal force and exact-XY overlap correction for the registered self pusher.
 	static XMVECTOR XM_CALLCONV ApplyPush(const game::FrameInterpolate& rFrameInterpolate, id_t selfPusher, float& rfPositionCorrectionX, PusherFlags_t includeFlags = PusherFlags::kTypeDefault, PusherFlags_t excludeFlags = PusherFlags::kTypeMines);
 
 #if defined(BT_CLIENT)

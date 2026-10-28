@@ -227,10 +227,10 @@ void ServerClientManager::SpawnFleetMember(const engine::ClientGuid& rClientGuid
 		}
 		mbFleetSpawnBlocked = false;
 		rTakenSpawnPoints.mBuffer.PushBack(*optionalSpawnPoint);
-		spawnInfo.vecPosition = XMVectorSet(optionalSpawnPoint->x, optionalSpawnPoint->y, engine::gpFlightPlanes->Plane(iTargetFlightPlane).fHeightMeters, 1.0f);
+		spawnInfo.vecPosition = XMVectorSet(optionalSpawnPoint->x, optionalSpawnPoint->y, engine::gpFlightPlanes->Lowest().fHeightMeters, 1.0f);
 		spawnInfo.vecDirection = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 		spawnInfo.arrivalGracePeriod = kArrivalGracePeriod;
-		spawnInfo.uiFlightPlane = static_cast<uint8_t>(iTargetFlightPlane);
+		spawnInfo.uiFlightPlane = 0;
 		QueueFleetSpawn(engine::kOriginCoordinate, spawnInfo);
 	};
 	switch (rMember.eType)

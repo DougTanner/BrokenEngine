@@ -119,7 +119,7 @@ function Get-ContextRecommendedTargets([string[]] $Paths, [string] $Project) {
 	if ([string]::IsNullOrEmpty($Project)) { return @() }
 	$sharedPrefixes = @('Common/', 'Engine/', "Projects/$Project/Source/")
 	$viewerChanged = @($Paths | Where-Object {
-		$_.StartsWith('Tools/ModelViewer/', [StringComparison]::OrdinalIgnoreCase) -or
+		$_.StartsWith('Projects/ModelViewer/', [StringComparison]::OrdinalIgnoreCase) -or
 		$_.StartsWith('Common/', [StringComparison]::OrdinalIgnoreCase) -or
 		$_.StartsWith('Engine/', [StringComparison]::OrdinalIgnoreCase)
 	}).Count -gt 0
@@ -172,7 +172,7 @@ try {
 	$script:Result.repositoryRoot = $root
 
 	# With several game projects and none named, the project stays null and the caller picks from projects.
-	$projects = @(Get-AgentGameProjects $root)
+	$projects = @(Get-AgentGameProjects $root | Where-Object { $_ -cne 'ModelViewer' })
 	$script:Result.projects = $projects
 	if ($Target -eq 'ModelViewer') {
 		if (-not [string]::IsNullOrWhiteSpace($Project) -and $Project.Trim() -cne 'BrokenEngineSandbox') {

@@ -110,7 +110,8 @@ static void RenderPipeline(const BattleshipsInterpolate& __restrict rCurrent, co
 		// Positions are local to the rendered cell; the visible area is in the camera cell's frame.
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, engine::Rebase(rBasis, rCurrent.pVecPositions[i]));
-		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position))
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position)
+		    && !engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, engine::ObjectShadowPosition(f4Position)))
 		{
 			continue;
 		}

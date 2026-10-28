@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Frame/Collections/Ships/ShipTypes.h"
+#include "Frame/Collections/Ships/ShipBehaviours.h"
 
 namespace game
 {
@@ -51,7 +51,12 @@ struct Fleet
 	std::chrono::duration<float> navigationDelaySeconds = std::chrono::duration<float>(60.0f);
 	std::chrono::duration<float> cellChangeTimerSeconds = std::chrono::duration<float>::zero();
 	// Indexed by ShipType: the target flight plane of this fleet's later spawns of that type; live members keep theirs.
-	std::array<uint8_t, std::to_underlying(ShipType::kCount)> targetFlightPlanes {};
+	std::array<uint8_t, std::to_underlying(ShipType::kCount)> targetFlightPlanes
+	{
+		static_cast<uint8_t>(HighestFlightPlane(ShipType::kFighter)),
+		static_cast<uint8_t>(HighestFlightPlane(ShipType::kOmni)),
+		static_cast<uint8_t>(HighestFlightPlane(ShipType::kBattleship)),
+	};
 };
 
 } // namespace game

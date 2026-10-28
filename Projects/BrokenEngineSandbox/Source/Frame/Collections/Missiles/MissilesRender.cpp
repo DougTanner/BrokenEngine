@@ -96,11 +96,8 @@ void MissilesInterpolate::Render(const FrameInterpolate& __restrict rFrameInterp
 		XMVECTOR vecPosition = engine::Rebase(rBasis, rCurrent.pVecPositions[i]);
 		XMFLOAT4A f4Position {};
 		XMStoreFloat4A(&f4Position, vecPosition);
-		// A high row's shadow lies offset toward the opposite side, so the area widens only on the side the shadow comes from.
-		float fHeightAboveLowest = std::max(f4Position.z - engine::gpFlightPlanes->Lowest().fHeightMeters, 0.0f);
-		float fShadowOffsetX = fHeightAboveLowest * engine::gf2ShadowHeightOffsetPerMeter.x;
-		float fShadowOffsetY = fHeightAboveLowest * engine::gf2ShadowHeightOffsetPerMeter.y;
-		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position, std::max(fShadowOffsetX, 0.0f), std::max(-fShadowOffsetX, 0.0f), std::max(-fShadowOffsetY, 0.0f), std::max(fShadowOffsetY, 0.0f)))
+		if (!engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, f4Position)
+		    && !engine::gpCamera->InVisibleArea(engine::gpCamera->mf4RenderVisibleArea, engine::ObjectShadowPosition(f4Position)))
 		{
 			continue;
 		}

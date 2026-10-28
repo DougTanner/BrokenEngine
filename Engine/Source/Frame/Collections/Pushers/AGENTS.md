@@ -24,12 +24,14 @@ Radial repulsion force fields for entity separation (anti-stacking), owned by ga
   excluding that row. Keep registered positions and zones unchanged throughout
   the game collection Updates; the next ordinary Interpolate Sync refreshes
   positions, rather than each consumer changing the shared query snapshot.
-- Push falloff: `(1 - d²/r²)^power * intensity`, using true XY distance
-  regardless of height, directed pusher-to-query and summed across the query's
-  zone. Include/exclude masks on `PusherFlags_t` default to `kTypeDefault` and
-  `kTypeMines`; new pusher types opt in/out through those flags.
-- At XY distance <= 0.0001 m, each included peer contributes a signed 0.001 m
-  X position correction and uses the same unit-X direction for force: negative
+- Push falloff: `(1 - d²/r²)^power * intensity`, using full 3D distance
+  within the source pusher's sphere, directed horizontally pusher-to-query and
+  summed across the query's zone. Include/exclude masks on `PusherFlags_t`
+  default to `kTypeDefault` and `kTypeMines`; new pusher types opt in/out through
+  those flags.
+- At exactly coincident XY within the source sphere, each included peer
+  contributes a signed 0.001 m X position correction and uses the same unit-X
+  direction for force: negative
   when the self row index is lower, positive otherwise. This avoids normalizing
   zero without changing the true-distance falloff. Force has zero Z/W; the
   correction is transient output for the caller, never a snapshot-position write.

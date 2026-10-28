@@ -504,6 +504,13 @@ XMVECTOR XM_CALLCONV ComputeFleeOrReturnDestination(std::span<const XMFLOAT4> is
 	return vecDestination;
 }
 
+bool XM_CALLCONV IsWithinHeadingCone(FXMVECTOR vecDirection, FXMVECTOR vecAiDirection)
+{
+	static constexpr float kfCosHalfAngle = std::numbers::sqrt2_v<float> * 0.5f;
+	XMVECTOR vecAiNormal = XMVector2Normalize(vecAiDirection);
+	return XMVectorGetX(XMVector2Dot(vecDirection, vecAiNormal)) >= kfCosHalfAngle;
+}
+
 void XM_CALLCONV SteerHeadingTowards(FXMVECTOR vecPosition, FXMVECTOR vecDirection, FXMVECTOR vecDestination, bool bHasDestination, float fTurnRate, float fSmoothing, float fDecay, std::chrono::duration<float> deltaTime, float& rfDeltaRotation)
 {
 	if (bHasDestination)
@@ -523,9 +530,10 @@ void XM_CALLCONV ApplyAcceleratedMovement(int64_t iNavigationDirection, FXMVECTO
 	rVecVelocity = engine::ApplyMovement(rVecVelocity, vecAiDirection, deltaTime.count(), fAcceleration, rConstants.fDrag * fDecayMultiplier, fMaximumSpeed);
 }
 
-void XM_CALLCONV ApplyHeadingMovement(FXMVECTOR vecDirection, ShipFlags_t flags, std::chrono::duration<float> deltaTime, const HeadingMovementConstants& rConstants, XMVECTOR& rVecVelocity)
+void XM_CALLCONV ApplyHeadingMovement(FXMVECTOR vecDirection, ShipFlags_t flags, bool bAllowAcceleration, std::chrono::duration<float> deltaTime, const HeadingMovementConstants& rConstants, XMVECTOR& rVecVelocity)
 {
-	float fAcceleration = flags & ShipFlags::kReturnToIslandCenter ? rConstants.fReturnAcceleration
+	float fAcceleration = !bAllowAcceleration ? 0.0f
+	                    : flags & ShipFlags::kReturnToIslandCenter ? rConstants.fReturnAcceleration
 	                    : flags & ShipFlags::kFlee ? rConstants.fFleeAcceleration
 	                    : rConstants.fChaseAcceleration;
 	rVecVelocity = engine::ApplyMovement<true>(rVecVelocity, vecDirection, deltaTime.count(), fAcceleration, rConstants.fDrag, rConstants.fMaximumSpeed, rConstants.fVelocityToDirection);

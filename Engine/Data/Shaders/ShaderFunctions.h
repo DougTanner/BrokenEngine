@@ -34,15 +34,11 @@ vec2 VisibleAreaToWorld(vec2 f2Uv, vec4 f4VisibleArea)
 
 vec4 ShadowStretchProjection(GlobalLayout globalLayout, vec3 f3WorldPosition, vec3 f3ObjectPosition)
 {
-	// Cubes and the -normal.xy base translation are uniform-only and folded CPU-side (GlobalUniforms.cpp
-	// PopulateShadowStretch); only the varying fStretchX (position-diff dependent) stays here.
-	float fSunriseOffsetCubed = globalLayout.fShadowSunriseStretchCubed;
-	float fSunsetOffsetCubed = globalLayout.fShadowSunsetStretchCubed;
-	vec2 f2Translation = globalLayout.f2ShadowStretchTranslation;
-	float fSunriseDiff = max(0.0f, f3ObjectPosition.x - f3WorldPosition.x);
-	float fSunsetDiff = max(0.0f, f3WorldPosition.x - f3ObjectPosition.x);
-	float fStretchX = -(0.5f + fSunriseDiff) * fSunriseOffsetCubed + (0.5f + fSunsetDiff) * fSunsetOffsetCubed;
-	vec3 f3ShadowPosition = vec3(f3WorldPosition.x + f2Translation.x + fStretchX, f3WorldPosition.y + f2Translation.y, f3WorldPosition.z);
+	vec2 f2Lateral = f3WorldPosition.xy - f3ObjectPosition.xy;
+	float fAwayExtent = max(dot(f2Lateral, globalLayout.f2ObjectShadowsAwayLight), 0.0f);
+	vec3 f3ShadowPosition = f3WorldPosition;
+	f3ShadowPosition.xy += vec2(0.0f, -globalLayout.fObjectShadowsSouthOffset)
+	                    + globalLayout.f2ObjectShadowsAwayLight * globalLayout.fObjectShadowsExtension * fAwayExtent;
 	vec2 f2VisibleAreaUV = WorldToVisibleArea(f3ShadowPosition, globalLayout.f4VisibleArea);
 	return vec4(2.0f * f2VisibleAreaUV.x - 1.0f, 1.0f - 2.0f * f2VisibleAreaUV.y, 0.0f, 1.0f);
 }

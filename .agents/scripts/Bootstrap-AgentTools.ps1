@@ -84,11 +84,11 @@ try {
 	$dataPackerExe = Join-Path $dataPackerOutput 'DataPacker.exe'
 	$dataPackerStampPath = Join-Path $dataPackerOutput 'DataPackerPrebuildStamp.txt'
 	$dataPackerTrees = @('DataPacker', 'Common', 'ThirdParty')
-	$modelViewerSolution = Join-Path $root 'Tools\ModelViewer\Platforms\VisualStudio2026\ModelViewer.sln'
-	$modelViewerOutput = Join-Path $root 'Tools\ModelViewer\Platforms\VisualStudio2026\Output'
+	$modelViewerSolution = Join-Path $root 'Projects\ModelViewer\Platforms\VisualStudio2026\ModelViewer.sln'
+	$modelViewerOutput = Join-Path $root 'Projects\ModelViewer\Platforms\VisualStudio2026\Output'
 	$modelViewerExe = Join-Path $modelViewerOutput 'ModelViewer.exe'
 	$modelViewerStampPath = Join-Path $modelViewerOutput 'ModelViewerPrebuildStamp.txt'
-	$modelViewerTrees = @('Tools/ModelViewer', 'Common', 'Engine', 'ThirdParty', 'DataPacker', 'Projects/BrokenEngineSandbox/Data')
+	$modelViewerTrees = @('Projects/ModelViewer', 'Common', 'Engine', 'ThirdParty', 'DataPacker', 'Projects/BrokenEngineSandbox/Data')
 
 	$commonBuildArguments = @('/p:Platform=x64', '/p:EnableClangTidyCodeAnalysis=false', '/p:RunCodeAnalysis=false', '/verbosity:minimal')
 	function Invoke-BootstrapBuild([string] $Solution, [string] $Configuration, [string] $Executable, [string[]] $ExtraArguments = @()) {
@@ -234,6 +234,7 @@ try {
 			$gameProjects = @($discoveredProjects | Where-Object { "Projects/$_/Platforms/VisualStudio2026/$_.vcxproj" -cin $committedProjectFiles })
 		}
 		foreach ($gameProject in $gameProjects) {
+			if (-not (Test-Path -LiteralPath (Join-Path $root "Projects\$gameProject\Data") -PathType Container)) { continue }
 			$gameDataDirectory = Join-Path $root "Projects\$gameProject\Platforms\VisualStudio2026\Output\Data"
 			# The data stamp holds the primary commit this export ran from; a worktree game build uses this
 			# Shared data only when its data inputs equal that commit's. The old stamp goes before the export,
