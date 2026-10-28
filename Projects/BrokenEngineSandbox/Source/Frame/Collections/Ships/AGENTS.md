@@ -54,6 +54,14 @@ What the three ship collections — Fighters, Omnis, Battleships — share: the 
 
 ## Fleet Navigation Invariants
 
+- After arrival grace expires, a living fleet Fighter or Battleship accelerates
+  only when its horizontal AI bearing is within the inclusive +/-45-degree
+  forward cone; a zero AI bearing is outside. Outside the cone it retains drag
+  and uses its type's signed maximum turn rate, preserving that
+  navigation turn through terrain bounce and skipping terrain avoidance.
+  Terrain contact and pusher response still apply. Inside the cone it uses
+  ordinary steering smoothing. This rule does not apply to Omnis or random-spawn
+  ships.
 - Navigation covers roaming, cross-cell movement, island destinations, and flagship following. Mode transitions depend only on shared state.
 - Flagship following has no frame-local exit when the flagship row is not in
   the follower's cell, and the server never reassigns the flagship: a fleet's

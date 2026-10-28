@@ -594,6 +594,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 
 		CountdownPendingOrders(iPendingFleetWantedCoordinateTicks);
 		float fPositionCorrectionX = 0.0f;
+		bool bAligning = false;
 
 		if (!(lifecycleFlags & engine::LifecycleFlags::kDying)) [[likely]]
 		{
@@ -604,8 +605,17 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 			else if (rPrevious.pController[i] == ShipController::kFleet)
 			{
 				ComputeNavigation(rFrame, rPreviousFrame, rStaticData, {.eType = ShipType::kBattleship, .iRow = i}, vecPosition, vecCellCenter, fleetWantedCoordinate, iPendingFleetWantedCoordinateTicks, rPrevious.pOrders[i], rPrevious.pFlagshipGlobalIds[i], deltaTime, iNavigationDirection, iNavigationWaypointIndex, vecAiDirection, vecIslandDestination, cellChangeTimer);
-				SteerHeadingTowards(vecPosition, vecDirection, XMVectorAdd(vecPosition, vecAiDirection), true, kfBattleshipChaseTurnRate, kfBattleshipSteeringSmoothing, kfBattleshipSteeringDecay, deltaTime, fDeltaRotation);
-				ApplyHeadingMovement(vecDirection, flags, deltaTime, kBattleshipMovement, vecVelocity);
+				bAligning = !IsWithinHeadingCone(vecDirection, vecAiDirection);
+				if (bAligning)
+				{
+					float fDirectionAiCrossZ = XMVectorGetZ(XMVector3Cross(vecDirection, vecAiDirection));
+					fDeltaRotation = fDirectionAiCrossZ > 0.0f ? kfBattleshipMaxTurnRate : -kfBattleshipMaxTurnRate;
+				}
+				else
+				{
+					SteerHeadingTowards(vecPosition, vecDirection, XMVectorAdd(vecPosition, vecAiDirection), true, kfBattleshipChaseTurnRate, kfBattleshipSteeringSmoothing, kfBattleshipSteeringDecay, deltaTime, fDeltaRotation);
+				}
+				ApplyHeadingMovement(vecDirection, flags, !bAligning, deltaTime, kBattleshipMovement, vecVelocity);
 				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfBattleshipMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 			}
 			else
@@ -618,7 +628,7 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 				XMVECTOR vecDestination = ComputeFleeOrReturnDestination(islandCandidates, vecPosition, bEnemyFound, vecNearestEnemy, flags, bHasDestination);
 				float fTurnRate = ((flags & ShipFlags::kFlee) && !(flags & ShipFlags::kReturnToIslandCenter)) ? -kfBattleshipFleeTurnRate : kfBattleshipChaseTurnRate;
 				SteerHeadingTowards(vecPosition, vecDirection, vecDestination, bHasDestination, fTurnRate, kfBattleshipSteeringSmoothing, kfBattleshipSteeringDecay, deltaTime, fDeltaRotation);
-				ApplyHeadingMovement(vecDirection, flags, deltaTime, kBattleshipMovement, vecVelocity);
+				ApplyHeadingMovement(vecDirection, flags, true, deltaTime, kBattleshipMovement, vecVelocity);
 				ApplyPusherPush(rFrame, rCurrentInterpolate.pPushers[i], kfBattleshipMaxPusherPushVelocity, vecVelocity, fPositionCorrectionX);
 			}
 		}
@@ -627,9 +637,14 @@ void BattleshipsPostRender::Update([[maybe_unused]] Frame& __restrict rFrame, [[
 			vecVelocity = XMVectorScale(XMVectorNegate(rPrevious.pVecDamageDirections[i]), kfDeathKnockbackSpeed);
 		}
 
+		float fNavigationDeltaRotation = fDeltaRotation;
 		if (!SkipsTerrainContact(XMVectorGetZ(rCurrentInterpolate.pVecPositions[i])))
 		{
 			ApplyTerrainBounce(rStaticData, {.eType = ShipType::kBattleship, .iRow = i}, rPreviousInterpolate.pVecPositions[i], rCurrentInterpolate.pVecPositions[i], vecDirection, kfBattleshipRadius, deltaTime, fDeltaRotation, vecVelocity, GetTargetFlightPlane(rPrevious.pOrders[i]));
+		}
+		if (bAligning)
+		{
+			fDeltaRotation = fNavigationDeltaRotation;
 		}
 		rCurrentInterpolate.pVecPositions[i] = XMVectorSetX(rCurrentInterpolate.pVecPositions[i], XMVectorGetX(rCurrentInterpolate.pVecPositions[i]) + fPositionCorrectionX);
 		// Last velocity write, after pusher response, knockback, and bounce: a stored Z speed would reach the next

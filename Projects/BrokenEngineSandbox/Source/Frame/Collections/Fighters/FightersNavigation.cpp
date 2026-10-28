@@ -30,6 +30,11 @@ void FightersPostRender::AvoidTerrain([[maybe_unused]] Frame& __restrict rFrame,
 			continue;
 		}
 
+		if (rCurrentPostRender.pController[i] == ShipController::kFleet && !IsWithinHeadingCone(rCurrentInterpolate.pVecDirections[i], rCurrentPostRender.pVecAiDirections[i]))
+		{
+			continue;
+		}
+
 		XMVECTOR vecNearestEnemy = XMVectorZero();
 		if (FindNearestEnemyShip(rPreviousFrame, rCurrentInterpolate.pVecPositions[i], rCurrentPostRender.pAlignments[i], std::nullopt, vecNearestEnemy))
 		{
