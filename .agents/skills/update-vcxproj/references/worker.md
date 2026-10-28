@@ -17,7 +17,7 @@ unique lowercase-hex `{8-4-4-4-12}` GUID.
    | `Tools/AgentHarness/**` | AgentHarness | source item; `AgentHarness[...]` |
    | `Tools/WorktreeCli/**` | WorktreeCli | source item; `WorktreeCli[...]` |
    | `DataPacker/Source/**` | DataPacker | source item; `DataPacker[...]` |
-   | `Tools/ModelViewer/Source/**` | ModelViewer | source item; `Viewer` |
+   | `Projects/ModelViewer/Source/**` | ModelViewer | source item; `Viewer` |
    | `Tools/ServerMonitor/**` | ServerMonitor | source item; `ServerMonitor[...]` |
    | `Engine/Source/**` | client/server/both by structural affinity | source item; `Engine[...]` |
    | game `Source/**` | client/server/both by structural affinity | source item; `Game[...]` |

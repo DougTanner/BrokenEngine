@@ -8,8 +8,8 @@ Wrapper gPhysicallyBasedRenderingDayBrightness(3.0f, 1.0f, 4.0f);
 Wrapper gPhysicallyBasedRenderingModelDataMipmapLevelOfDetailBias(-0.17f, -2.0f, 2.0f);
 Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffuse(8.566f, 0.0f, 20.0f);
 Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionDiffusePower(0.8f, 0.5f, 2.0f);
-Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular(16.113f, 0.0f, 30.0f);
-Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower(1.5f, 0.1f, 2.0f);
+Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecular(5.964f, 0.0f, 30.0f);
+Wrapper gPhysicallyBasedRenderingBidirectionalReflectanceDistributionFunctionSpecularPower(0.559f, 0.1f, 2.0f);
 Wrapper gPhysicallyBasedRenderingExposure(0.924f, 0.0f, 2.0f);
 Wrapper gPhysicallyBasedRenderingGamma(0.558f, shaders::kfEpsilon, 2.0f); // Nonzero min load-bearing: LightingUniforms.cpp uploads 1.0f / gPhysicallyBasedRenderingGamma.mfCurrent as the HdrResolve.frag pow exponent.
 Wrapper gColorGradingSaturation(1.207f, 0.0f, 2.0f);

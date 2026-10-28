@@ -84,11 +84,11 @@ try {
 	$dataPackerExe = Join-Path $dataPackerOutput 'DataPacker.exe'
 	$dataPackerStampPath = Join-Path $dataPackerOutput 'DataPackerPrebuildStamp.txt'
 	$dataPackerTrees = @('DataPacker', 'Common', 'ThirdParty')
-	$modelViewerSolution = Join-Path $root 'Tools\ModelViewer\Platforms\VisualStudio2026\ModelViewer.sln'
-	$modelViewerOutput = Join-Path $root 'Tools\ModelViewer\Platforms\VisualStudio2026\Output'
+	$modelViewerSolution = Join-Path $root 'Projects\ModelViewer\Platforms\VisualStudio2026\ModelViewer.sln'
+	$modelViewerOutput = Join-Path $root 'Projects\ModelViewer\Platforms\VisualStudio2026\Output'
 	$modelViewerExe = Join-Path $modelViewerOutput 'ModelViewer.exe'
 	$modelViewerStampPath = Join-Path $modelViewerOutput 'ModelViewerPrebuildStamp.txt'
-	$modelViewerTrees = @('Tools/ModelViewer', 'Common', 'Engine', 'ThirdParty', 'DataPacker', 'Projects/BrokenEngineSandbox/Data')
+	$modelViewerTrees = @('Projects/ModelViewer', 'Common', 'Engine', 'ThirdParty', 'DataPacker', 'Projects/BrokenEngineSandbox/Data')
 
 	$commonBuildArguments = @('/p:Platform=x64', '/p:EnableClangTidyCodeAnalysis=false', '/p:RunCodeAnalysis=false', '/verbosity:minimal')
 	function Invoke-BootstrapBuild([string] $Solution, [string] $Configuration, [string] $Executable, [string[]] $ExtraArguments = @()) {

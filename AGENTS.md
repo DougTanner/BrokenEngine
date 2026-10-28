@@ -79,7 +79,7 @@ are not, and stay out of the CRC.
 - `/Common/` — shared utilities (`common::`); `Common.h` is the single aggregation header (included by `Pch.h`)
 - `/DataPacker/` — asset preprocessor producing `.pack`/`.manifest` files
 - `/Engine/` — runtime: graphics, audio, input, frame state (`engine::`); `Engine.h` is the single aggregation header (included by `Pch.h`) with `#ifdef BT_CLIENT`/`BT_SERVER` guards, except for the few deliberate exceptions noted at the subsystem hubs
-- `/Projects/` — game implementations (`game::`)
+- `/Projects/` — engine applications, including game implementations (`game::`) and the standalone ModelViewer (`Projects/ModelViewer/`)
 - `/Tools/ServerMonitor/` — Server Monitor: Windows program showing a local or remote server's statistics over the monitor channel
 - `/Tools/AgentHarness/` — loopback client/server command transport
 - `/Tools/ToolCommon/` — shared Windows and coordination support compiled into both tools

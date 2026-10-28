@@ -158,7 +158,7 @@ try {
 	}
 	Import-Module (Join-Path $sharedScripts 'AgentScriptCommon.psm1') -Force
 	$root = Get-AgentCanonicalPath $RepositoryRoot
-	$executable = Join-Path $root 'Tools\ModelViewer\Platforms\VisualStudio2026\Output\ModelViewer.Debug.exe'
+	$executable = Join-Path $root 'Projects\ModelViewer\Platforms\VisualStudio2026\Output\ModelViewer.Debug.exe'
 	if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
 		Complete-ModelViewerCapture 'capture.executable-missing' "The ModelViewer Debug executable is missing: '$executable'."
 	}
